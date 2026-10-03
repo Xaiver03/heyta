@@ -136,12 +136,34 @@
      并行批次加 `byCreatedAtOrder / isArchived / isLive / trashedIn`）—— 取并集解决，其余八个落点
      （含 `ListsSection`、web `store.ts`、两份词条表、`packages/ui/src/index.ts`、web 那份 spec）
      **逐个 auto-merge 干净**；合并态读数见 §0 表第三行。顺带把层级里两份手写抄件交给新权威（见分支上那笔 refactor）。
-     **还剩的阻塞**：主检出此刻仍有 **3 个**本条线落点是未提交状态（`packages/i18n/src/locales/en.ts`、
-     `.../zh-CN.ts`、`packages/ui/src/index.ts`；全仓未提交 64 条）。它们一旦提交，
-     `git merge feat/list-parent` 应当**零冲突**（因为 main 已经是本分支的祖先：
-     `git merge-base --is-ancestor d27bccde feat/list-parent`）。
-     复跑现量：`git status --porcelain -- packages/i18n/src/locales/en.ts packages/i18n/src/locales/zh-CN.ts packages/ui/src/index.ts`。
-     🔴 在那之前往主检出合 = 把别人正在改的三个文件按进合并 ⇒ 造一次没人能干净解的三方冲突，**所以不合**。
+     **还剩的阻塞**：主检出此刻有 **5 个**本条线落点是未提交状态（`packages/i18n/src/locales/en.ts`、
+     `.../zh-CN.ts`、`packages/ui/src/index.ts`，**外加本轮新量出来的两个 web 落点**：
+     `apps/web/src/features/projects/ProjectsPanel.tsx`、`apps/web/tests/projects-panel.spec.tsx`；
+     全仓未提交 74 条）。复跑现量（一条命令出交集，别数文件名片段）：
+
+     ```bash
+     comm -12 \
+       <(git diff --name-only $(git merge-base HEAD feat/list-parent) feat/list-parent | sort) \
+       <(git status --porcelain | awk '$1=="M"{print $2}' | sort)
+     ```
+
+     🔴 上一版本这里写的是"3 个"，那是**我自己一小时前**的量，期间归档线开始改 web 那两个文件。
+     **撞车面是活树瞬时读数、不是提交属性**（同下面死胡同那节里"脏清单每次都要重新现量"那条，本轮又应验一次）。
+     它们一旦提交，`git merge feat/list-parent` 应当**零冲突** —— 本轮把这句从"推断"换成了实测：
+     把我分支那份 5 文件补丁在三个版本上各跑一次 `git apply --check`（拷到 `/tmp` 的一次性 `git init`
+     仓库里跑，**没有碰主检出的索引/工作树**）。5 个落点里 2 个在活树上也落得动，另 3 个的结果是：
+
+     | 落点版本 | `git apply --check` | 含义 |
+     |---|---|---|
+     | 合并基点 `d27bccde` | 3 个全部 **0** | 阳性对照：补丁本身是好的 |
+     | 当前 main HEAD `f6478fad` | 3 个全部 **0** | **已提交的 main 与我的改动零重叠** |
+     | 别人的未提交工作树 | 3 个全部 **1** | 重叠**只**来自未提交那部分 |
+
+     ⇒ 所以等的是**他们提交**，不是"重新设计落点"。他们提交后重跑这三条腿，就能判定要不要人工协调。
+     🔴 在那之前往主检出合 = 把别人正在改的五个文件按进合并 ⇒ 造一次没人能干净解的三方冲突，**所以不合**。
+     ⚠️ 同时更正上一版另一句过期断言："main 已经是本分支的祖先"现在**在 HEAD 上不成立**了
+     （`git merge-base --is-ancestor HEAD feat/list-parent` → 1），差的那一笔就是我刚提的这份文档；
+     代码级仍是零落后：`git rev-list --count feat/list-parent..HEAD` = 1，且它只碰本文件。
    - 成长统计行：热力图无障碍名被 `apps/mobile/tests/growth-display.spec.ts:365` 钉成空串；
      补打卡被 `HabitStreakList.tsx:269` 的 `||` 渲染条件挡住（**接了也不出现、不报错**）。→ B41 / B42。
    - 权益行：`entitlement.ts` 那次 GET **一个响应字段都不消费**，web 侧到期条同样只有两个布尔
@@ -180,7 +202,9 @@
    **回退不写 SHA**（写了就会漂，我自己刚漂过一次）：这条线**没合进 main**，所以"回退"就是不合流；
    真要逐层退，在分支上现量 `git log --oneline 0a61c0a6..feat/list-parent`（写侧 / 界面 / 行为判据 / 注释各一笔），
    从尾往头 `git revert`。
-   🔴 唯一没做的是**合流**：主检出七个落点正被归档线改着（见 §3.3 的合流义务），现在合 = 三方冲突。
+   🔴 唯一没做的是**合流**：主检出**五个**落点正被归档线改着（现量与三条腿对照见 §3.3 的合流义务那条；
+   这一版原先写的是"七个"，那是把**落点清单**当成了**脏清单** —— 交集要现量，别拿清单当读数），现在合 = 三方冲突。
+
 5. 若要做热力图/补打卡：那是**翻冻结判据**的权限问题，不是接线问题 —— 需要判卷文件的属主批准改 `growth-display.spec.ts:365`/`:302`。
 
 > 🔴 1/2/3 全都卡在同一个"窗口"上，而窗口由**别人**的负载决定；4 是唯一一件本条线能自己推到底的事，

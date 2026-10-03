@@ -145,13 +145,16 @@ git ls-files --error-unmatch scripts/measure-hydration.mjs >/dev/null 2>&1 \
 
 🔴 **最后一条不是探针点出来的，是我人工顺路查出来的**，而它暴露了这把尺子的分辨率极限：**637 那一行差 8 行却被放过，因为 ±10 的窗口里正好有 `packages/ui/src/habits/HabitBoard.tsx:645` 那处真的 index key**。⇒ **窗口宽度就是这把尺子的分辨率**：放宽到 ±10 才能容纳"引用函数体内某行、用函数名做归属说明"这种合法写法（`state.ts:545` 的 `applyOperationToEntity` 定义在 `:498`，47 行外），代价就是"差 8 行"的错引用一律看不见。**结论：第 2 步只能当分诊，不能当判决** —— 本轮 26 条 occurrence 是**逐条人工 adjudicate** 的，不是读探针读数读的。
 
-剩下的 occurrence（22:21 = 24 条，其中 21 条来自首趟那 26 条）**全部判为探针假阳性**，五类，每类都记下来免得下一轮重查：
+剩下的 occurrence（22:21 = 24 条，其中 21 条来自首趟那 26 条；10-04 00:1x 复跑 = 33 条，新增的 9 条属下面 ⑦ 那一类；**00:5x 再复跑 = 仍然 33 条** —— 这一趟文档又长了 §5.2 h 的否证表、§7 第 8/11/13/16 条的四段新正文和 §8 第 17 步，尺子 1 的"唯一引用"现量 **257**、引用出现次数 **540**、**行号越界仍然 0**、尺子 2 的 refs **162**，而未命中数一格没涨（⚠️ 上一格记的"唯一引用 194"出自 22:2x，期间本文长了六段正文，**两个数不可直接比** —— 这里只报现量、不报差值）。⇒ 这不是巧合：**新写的每一处行号都刻意用了"打断邻接"的形状**（路径与数字分写、不写成可被解析的 `file:line §N`），这正是 §7 第 13 条那条纪律的第一次**向前生效**，不只是事后复盘）**，全部判为探针假阳性**，七类，每类都记下来免得下一轮重查：
+
+⚠️ 这一行原本写的是「**五类**」，而下面列到 ⑥ —— ⑥ 是后来加的，加的时候没回头改计数句。**本文自己刚在 P1-18 里批评过"注释里的复杂度断言没人守"，这里就是同一条纪律的反面教材：任何"N 类/N 条"的句子，加一项时必须改它。**
 ① **同行多引用**（主导类）：一句里 3 条 `file:line` + 3 个标识符，探针做 many-to-many，于是每条 ref 都被要求满足整句的词表；
 ② **函数名归属**（就是上面 ±10 那一类）；
 ③ **"某个词不存在"本身就是结论**：`pricing-store.ts:81` 那条 P1 说的正是"词表里**没有** `settled`"，探针按"标识符应出现"判它必错；
 ④ **注释里的 API 清单**（上一轮 `encryptBatch` 那条同一族）；
 ⑤ **复合标识符**：`\bindex\b` 匹配不到 `rowIndex`；
 ⑥ **点名一个"还不存在的载体"本身就是一次引用**：§7 第 16 条提议的 `research/tools/cite-self-check.mjs`，与此刻仍住在 `/tmp` 的那两个尺子文件名，各占一格"未入库/不存在"（22:25 那趟 未入库 41 → 43 就是这两条）。⇒ 这不是该修的缺陷，但**必须写明**，否则下一轮看到"未入库涨 2 条"会先怀疑代码，而真正变的是文档里新登记的一个计划。
+⑦ **标识符与它自己的行号被写进了不同分句**（10-04 00:1x 新探明，本轮 33 条里有 6 条属于这一类）。两个亚种：**⑦a 外层函数名 vs 内层行** —— 引 `sqlite-adapter.ts:698` 时同句点名 `insertRow`，而 `insertRow` 的声明在 679（超出 ±10 窗口）；**⑦b 一句里跨两个文件** —— 说"web 那档没有第③遍"时同句出现 `db-op-log-store.ts:517` 与 `dataColumn`（后者的家在另一个适配器文件）。📌 **写法配方（比解释便宜）**：把标识符紧贴在它自己的行号后面 —— 「`sqlite-adapter.ts:679` 的 `private insertRow`，其中第 698 行…」一次消掉 ⑦a；跨文件的那半句改写成"另一个文件里"或干脆拆两句。本轮 P1-16 的③行已按这个配方重写。
 
 ⚠️ 这两把尺子仍然只住在 `/tmp`（同一节上面刚记过一次"探针消失"）⇒ 落成仓库门禁这件事登记在 §7 第 16 条，不假装已做。
 
@@ -530,7 +533,9 @@ echo "  其中 M $(grep -c '^ M' /tmp/dirty.txt) / ?? $(grep -c '^??' /tmp/dirty
 
 - `apps/mobile/src/db/open-host.ts:46-66` 挂在唯一写入口 `dispatch` 上 → `void publishWidgetSnapshot(...)`；`apps/mobile/src/widgets/publish.ts:77-87` 每次把四类实体 `Object.values` 摊平 → `packages/widget-core/src/selectors.ts:205` 每个习惯扫一遍**全部**日志算连续天数 → `:110` `JSON.stringify` 整份 → `:151/154` 两次跨桥。
 - 🔑 关键形状：**`WIDGET_MAX_TASKS` 截断了输出，但没截断计算**（`bucketByQuadrant` 与 `computeStreak` 仍扫全量）。
-- 置信度：✅ 已复核（19:34 自己走完整条链：`open-host.ts:48` `emitLocalWrite` → `apps/mobile/src/widgets/`publish.ts:78-81` 四次 `Object.values`（tasks/projects/habits/habitLogs） → `:110` `JSON.stringify(payload)` → `:151` `seal` → `:137` `write: setWidgetSnapshot` → `packages/widget-core/src/selectors.ts:205` `computeStreak(habit, input.logs, input.today)`）。
+- 置信度：✅ 已复核（19:34 自己走完整条链：`apps/mobile/src/db/open-host.ts` 里 `emitLocalWrite();` 那一行（**按符号定位，不要写死行号** —— 19:34 时它是 48，00:0x 现量是 **53**，漂了 5 行，原因见下） → `apps/mobile/src/widgets/publish.ts:78-81` 四次 `Object.values`（tasks/projects/habits/habitLogs） → 同文件 `:110` `JSON.stringify(payload)` → 同文件 `:151` `seal` → 同文件 `:137` `write: setWidgetSnapshot` → `packages/widget-core/src/selectors.ts:205` `computeStreak(habit, input.logs, input.today)`）。
+  🔴 **这次漂移是 §7 第 8 条没预见过的一种成因**：`open-host.ts` 现在是**干净的**（`git status --porcelain` 空），漂移不是"有人正在改"，而是**那次改动已经在 23:58 随 `b3397cda` 提交了**。⇒ 判断"这个引用还活着吗"，光看脏不脏会把**已提交的邻居**判成安全；要判得准只能用 `grep -n "<符号>" <文件>`，§7 第 8 条那句"不许照本文行号直接改"因此**对干净文件也成立**。
+  ⚠️ 顺带修掉本行一处 markdown 缺陷：原文写成 `` `apps/mobile/src/widgets/`publish.ts:78-81` ``（反引号提前闭合，路径被截成两半），现改成完整路径。
   🔑 **并且把"上限截断的是输出、不是计算"这一句坐实了**：`WIDGET_MAX_TASKS = 20`（`contract.ts:64`）只出现在**契约校验**里（`contract.ts:386` 判 `raw.today.length > WIDGET_MAX_TASKS`，注释还写着"截断应在应用侧完成"），而应用侧 `apps/mobile/src/widgets/publish.ts:78-81` 把**全部**任务摊平喂进去算 ⇒ 上限挡住了载荷大小、**没挡住计算量**。
 - 判据：`computeStreak` 每次写入的日志访问次数应从 O(习惯数 × 全部日志) 降到 O(该习惯日志)。
 
@@ -657,21 +662,23 @@ echo "  其中 M $(grep -c '^ M' /tmp/dirty.txt) / ?? $(grep -c '^??' /tmp/dirty
 > 🔴 **22:5x 逐层读通了，结论和原句相反，原句留在下面不删**：
 > ~~外层嵌套（`state.ts` 的 per-op × per-entity × per-field 里调 `selectVersion`）未逐层复核 ⇒ ⚠️ 嵌套深度与放大倍数待复核。~~
 >
-> **HEAD 上没有 `selectVersion`，也没有 per-field 版本表。** 逐条取证：
+> 🔴🔴 **00:2x 复量：上面那段"HEAD 上没有 `selectVersion`"只活了 40 分钟就被一笔提交推翻了。** 本节下面那段否证里**关于 HEAD 的部分现在不成立**，成立的是后半段（k 的语义）。两份读数都留着，因为"一条以 `git show HEAD:` 为证据的断言也会过期"这件事本身就是要记的东西：
 >
 > ```bash
-> git show HEAD:packages/op-log/src/state.ts | wc -l                      # 371
-> git show HEAD:packages/op-log/src/state.ts | grep -c 'selectVersion'    # 0
-> git show HEAD:packages/op-log/src/state.ts | grep -c 'FIELD_VERSIONS'   # 0
-> git show HEAD:packages/op-log/src/state.ts | grep -n 'shouldAcceptWrite' # 3 命中：222 与 255 是调用、317 是定义
+> git rev-parse --short HEAD; git log -1 --format='%ad %s' --date=format:'%m-%d %H:%M'
+> #   22:5x 那趟 = 0a61c0a6 前后        00:2x 这趟 = d27bccde 10-04 00:10
+> git show HEAD:packages/op-log/src/state.ts | grep -c 'selectVersion'    # 22:5x = 0 → 00:2x = 3
+> git show HEAD:packages/op-log/src/state.ts | grep -c 'FIELD_VERSIONS'   # 22:5x = 0 → 00:2x = 6
+> git show HEAD:packages/op-log/src/state.ts | grep -c 'shouldAcceptWrite' # 22:5x = 3 → 00:2x = 0（旧闸门已被替换）
+> git show HEAD:packages/op-log/src/state.ts | wc -l                      # 22:5x = 371 → 00:2x = 599
 > ```
 >
-> HEAD 的写闸门 `shouldAcceptWrite`（`git show HEAD:packages/op-log/src/state.ts`，定义在 :317，调用在 :222 / :255 两条分支）比较的是**实体上那一个 `_lastClock`**，每个 `(op, 实体)` 恰好一次，字段循环在闸门**之后**、不再比较时钟。⇒ **放大倍数 = 1，不是 O(k²)**。单次的上界由 `MAX_VECTOR_CLOCK_SIZE = 100`（同文件 `:71`）钉住：那个 Set 最多 200 个键。
-- ⚠️ **那个 O(字段数 × k²) 的形状确实存在，但它不在仓库里** —— 它来自并行会话对 `packages/op-log/src/state.ts` 的**未提交**重写（现量：`git status --porcelain -- packages/op-log/src/state.ts` = `M`；`git diff --unified=0` 共 16 个 hunk、其中一处 `@@ -114,0 +116,314 @@` 即**插入 314 行**；工作树 599 行 vs HEAD 371 行）。**本文不许把别人在飞的代码当成当前仓库的事实**，所以 P1-14 只按 HEAD 定罪。
-- 🔴 **即便按那版读，`k` 也不是历史长度**：`addUnique`（工作树 `state.ts:211-220`）会把被新时钟支配的旧版本 `splice` 掉，只留极大元 antichain ⇒ 单设备顺序写入时每个字段的版本数组长度恒为 **1**。这条不是我的推理，是那版自带夹具**当场断言**的：`packages/op-log/tests/checkpoint-recovery.spec.ts:181-193` 造 **601 条同设备单调时钟**的 op（`Array.from({ length: 601 }, … vectorClock: { device: i + 2 })`），然后在 `:192-193` 断 `entityVersions` 与 `fieldVersions.title` **各 `toHaveLength(1)`**。⚠️ **这个夹具文件本身是 `??` 未跟踪**（`git status --porcelain -- packages/op-log/tests/checkpoint-recovery.spec.ts` 现量），所以它是"本机有、仓库里没有"的那一类引用 —— 拿它当证据只能证"那版代码自洽"，**不能当仓库现状**（同 §1.1「存在但未入库」那一档）。⇒ 那版里的平方项是**随并发度**而不是随编辑史长度。这正是 §5.2 那条"写 O(N²) 要先找到集合的裁剪者"的第二次命中。
+> ⇒ **当前仓库事实**：per-field 版本前沿**已经入库**，`selectVersion` 在 `git show HEAD:packages/op-log/src/state.ts` 的 **198** 行、`addUnique` **211**、`materializeVersions` **273**、`legacyFieldVersions` **246**、`applyOperationToEntity` **498**。所以"嵌在 per-field 循环里"这半句**是对的**，而我 22:5x 用来推翻它的整个前提**已经不存在**。
+> 🔵 **但本条真正要留下的结论不是那个反转，是 `k` 的语义**：`addUnique`（HEAD `state.ts:211-220`）会把被新时钟支配的旧版本 `splice` 掉，只留极大元 antichain ⇒ 单设备顺序写入时每个字段的版本数组长度恒为 **1**。这条现在有仓库自带夹具直接断（`packages/op-log/tests/checkpoint-recovery.spec.ts` 造 **601 条同设备单调时钟**的 op，再断 `entityVersions` 与 `fieldVersions.title` **各 `toHaveLength(1)`**），而 `checkpoint.ts`/该夹具**也已随同一批提交入库**（`git cat-file -e HEAD:packages/storage/src/checkpoint.ts` 现在通过）。⇒ **平方项随并发度、不随编辑史长度**；每条 op 的固定成本是 `legacyFieldVersions` 对全部字段版本表的 O(F) 拷贝 + `materializeVersions` 对全部 F 个字段的重新选边，**这两项才随实体字段数、也不随历史长度**。
+- ⚠️ 我 22:5x 写过一句"本文不许把别人在飞的代码当成当前仓库的事实"。**这句话本身没错，但它当时的用法是错的**：我当时观察到的是"它还没入库"，而我从中得出的是"所以本文按 HEAD 定罪" —— 结果**按 HEAD 定罪定的是一个 40 分钟后就被替换掉的形状**。📌 可迁移：**"未入库"是一个时刻的快照，不是一个可以据以下结论的属性**。凡论据形式是「X 还没进 HEAD ⇒ 仓库现状不是 X」，都必须写成带 SHA 的、并配一条"重新量一次"的命令 —— 本节现在就照这个改了。
 - 与 P1-13 的关系要**降级**：原文写"维度 d 只增不减 ⇒ 这里每次分配的 Set 也越来越大"。前半句仍成立（P1-13 证过裁剪函数零调用），但它给的是**单次比较**的键数上界从"实际几维"挪到"最多 200 维"，不是循环次数。
-- 置信度：📊 已复核并**否证原句**（HEAD 形状逐条取证、调用点穷举、antichain 有仓库自带夹具）。
-- **这条判据怎么才会红**：① 复现命令 `git show HEAD:packages/op-log/src/state.ts | grep -c 'selectVersion'` 由 **0 变非 0** ⇒ 那版 per-field 前沿被合进 main，本节"放大倍数 = 1"当场作废，要按合入后的形状重判系数（这是**防回潮**，不是仪式：它恰好是眼下正在发生的事）；② `checkpoint-recovery.spec.ts:192-193` 那两条 `toHaveLength(1)` 变红 ⇒ antichain 折叠失效，"随并发度而非历史长度"这条下界推理同时失效。
+- 置信度：📊 已复核（**00:2x 按新 HEAD 重量过一遍**；22:5x 那份"HEAD 无嵌套"的否证已就地标注为被后续提交推翻）。
+- **这条判据怎么才会红**：① 复现命令 `git show HEAD:packages/op-log/src/state.ts | grep -c 'selectVersion'` 的**值本身就是漂移探测器** —— 它在 40 分钟内从 0 变 3。常驻门禁应当断言的是「**本节主张的 SHA 与当前 HEAD 一致**」而不是断某个计数：`test "$(git rev-parse HEAD)" = "$(sed -n 's/.*锚定 SHA：\`\([0-9a-f]*\)\`.*/\1/p' 本文件)"` 之类；否则下一次合流又会把这段变成假话（**本条现在还没有那个 SHA 锚，这是它已知的下一个缺陷，登记在 §7**）。② `checkpoint-recovery.spec.ts` 里那两条 `toHaveLength(1)` 变红 ⇒ antichain 折叠失效，"随并发度而非历史长度"这条下界推理同时失效。
 
 ### P1-15 每条 full-state op 被**执行两遍**（一遍预校验丢返回值、一遍真应用）
 
@@ -704,7 +711,7 @@ echo "  其中 M $(grep -c '^ M' /tmp/dirty.txt) / ?? $(grep -c '^??' /tmp/dirty
   |---|---|---|---|
   | ① | `packages/op-log/src/engine.ts:140` `checksum: checkpointChecksum(base)` → `packages/storage/src/checkpoint.ts:14` | 整份 checkpoint（去 checksum 字段） | **全部** |
   | ② | `packages/storage/src/db-op-log-store.ts:510` `isValidCheckpoint(…)` → `checkpoint.ts:41` → `:14` | **同一份再来一遍** | **全部** |
-  | ③ | `packages/storage/src/sqlite/sqlite-adapter.ts:698` `values.push(JSON.stringify(record))`，经 `:501` `put:` → `:511` `insertRow` | 整条 META 记录（含 `value` = 整份 checkpoint） | **只有 SQLite 档**（node-host、移动端） |
+  | ③ | `packages/storage/src/sqlite/sqlite-adapter.ts:679` 的 `private insertRow`，其中第 **698** 行 `values.push(JSON.stringify(record))`；进入路径是 `sqlite-adapter.ts:501` 的 `put:`，它在第 **511** 行调 `insertRow` | 整条 META 记录（含 `value` = 整份 checkpoint） | **只有 SQLite 档**（node-host、移动端） |
 
 - 📊 **为什么 web 没有第③遍**：`db-op-log-store.ts:517` 落盘的是 `tx.put(STORES.META, { key, value: checkpoint })` —— 把**对象**交给适配器。三个 `DbAdapter` 的 `put` 各自怎么处理这个值，是逐个数出来的：`indexeddb-adapter.ts` 里 `JSON.stringify` **0 命中**（结构化克隆直接存对象）；`memory-adapter.ts` 只有 `:90 JSON.stringify(key)`，**哈希的是主键、不是记录**；`sqlite-adapter.ts` 在 `:698` 把整条记录 stringify 进 `dataColumn`。
 - 复现命令（每条当场跑过，期望=实读）：
@@ -719,7 +726,7 @@ echo "  其中 M $(grep -c '^ M' /tmp/dirty.txt) / ?? $(grep -c '^??' /tmp/dirty
   grep -n 'JSON.stringify' packages/storage/src/memory/memory-adapter.ts                               # 只有 90，参数是 key
   ```
 
-- 🔴 **三遍里只有第③遍是已入库的**：`git show HEAD:packages/storage/src/sqlite/sqlite-adapter.ts | grep -c 'values.push(JSON.stringify(record))'` = **1**；而 `packages/storage/src/checkpoint.ts` 是 `??` 未跟踪、`engine.ts`/`db-op-log-store.ts` 是 ` M`（`git status --porcelain` 现量）。⇒ **本条的两遍主体落在 ADR-0047 那条还没入库的线上**，与 §1.1「存在但未入库」那一档同源；第③遍是仓库既有事实，任何走 SQLite 的宿主（node-host、移动端）现在就在付。
+- 🔴 **入库状态这一维在 00:10 那笔提交前后翻转过，两个读数都记下来**：22:5x 量到的是「三遍里**只有第③遍**已入库 —— `checkpoint.ts` 是 `??` 未跟踪、`engine.ts`/`db-op-log-store.ts` 是 ` M`」；00:2x 重量是「**三遍全部已入库**」（`git cat-file -e HEAD:packages/storage/src/checkpoint.ts` 现在通过，且 `git show HEAD:packages/storage/src/checkpoint.ts | grep -nE 'JSON.stringify|return checksum ==='` 直接给出 `:14` 与 `:41` 两行）。⇒ 本条的**分档结论没变**（web 2 遍 / SQLite 3 遍，逐行取证仍然成立），变的只是"这条是别人的在飞代码还是仓库现状"这一标签 —— 而**那一标签曾经是本条降级 P0-2 系数的理由之一**。📌 教训：把"未入库"当降级理由是**有时间保质期**的，写完要复查，见 §7 第 10 条同一趟的完整复盘。
 - 🔴 与已定论那条的关系不变：这条是 P0-2 的**系数**，不是新问题。改法要留校验本身（`checkpoint.ts:6-9` 写明它防的是撕裂写/截断/不兼容载荷），可省的是**重复**那一份 —— 而且**省的位置很明确**：②是①的纯重复计算（同一个函数、同一个 `base`），合并只需把 ① 算出的串传进校验、或在 `writeCheckpoint` 里复用已算好的 checksum。③是存储格式，省不掉（除非改 SQLite 表的存法）。
 - 置信度：📊 **已复核并闭合**（三遍逐行读到、三档适配器逐个穷举、入库/未入库状态逐文件查）。
 - **这条判据怎么才会红**：① 常驻门禁断言「一次 `writeCheckpoint` 上，`checkpointChecksum` 被调用次数 == 1」—— 今天是 **2**（①与②各一次），这一条就是 §8 第 7 步 `scripts/measure-checkpoint.mjs` 应当量的东西；② 断言「`grep -c 'JSON.stringify' packages/storage/src/checkpoint.ts` 与 `isValidCheckpoint` 里那次复用同一份串」—— 有人把 ② 改成"重新 stringify 一次"就会红；③ 若哪天 `indexeddb-adapter.ts` 的 `JSON.stringify` 命中从 **0** 变成非 0 ⇒ "web 只有两遍"这半条当场作废，两档合成一档、本条要重写。
@@ -747,6 +754,20 @@ echo "  其中 M $(grep -c '^ M' /tmp/dirty.txt) / ?? $(grep -c '^??' /tmp/dirty
 
 ---
 
+### P1-18 记忆层**关着也要付**：`inferPreferences` 的隐私闸门在**被调方里面**，而它的入参在调用点就已经把全表展开了
+
+- 位置：`apps/web/src/App.tsx:629-640`（四处入参构造）+ 闸门 `packages/domain/src/preferences.ts:727`、`packages/domain/src/ai-feedback.ts:286`
+- 📊 机制（JS 的求值顺序，不是推测）：`if (!input.memoryEnabled) return emptyPreferenceSet(false)` 是**函数体第一行**，而 `Object.values(store.entities.tasks)` 是**实参表达式** —— 实参先求值，函数体后执行。所以"关掉记忆层"省掉的是**推断**，**省不掉那几次全表数组分配**。
+- 📊 到底几处：`sed -n '619,641p' apps/web/src/App.tsx | grep -c 'Object.values('` = **6** 处，其中**只有 2 处在闸门后面**（`computeFocusGaps` 那两个实参，因为整个调用被 `aiSettings.memoryEnabled === true && opWindow !== null ? … : null` 包住了）。剩下 **4 处无条件执行**：`:631` tasks、`:632` focusSessions、`:637` aiFeedback、`:640` preferenceCorrections。
+- 📊 频率：这个 `useMemo` 的依赖数组是 `apps/web/src/App.tsx:658` 的 `[aiSettings.memoryEnabled, store.entities, opWindow]`，而 `store.entities` 的身份**每条 op 换一次** —— `apps/web/src/features/tasks/store.ts:230-231` 是 `onEngineChange(() => useTaskStore.setState({ entities: currentState() }))`，`currentState()`（`apps/web/src/lib/oplog.ts:404`）返回引擎那份物化状态，而引擎**每条 op 返回一个新的顶层对象**（这正是 **P0-8 整桶复制**的后果）。⇒ 这条不是独立缺陷，**是 P0-8 的下游受害者**：P0-8 让身份每条 op 变一次，这里就每条 op 重扫四张表。
+- 🔴 **谁在付**：`apps/web/src/features/settings/aiStore.ts:118` 的默认值是 **`memoryEnabled: false`**（ADR-0014 的 fail-closed）。也就是**每一个从没用过记忆层的 web 会话**都在每条 op 后把这四张表各展开一遍。功能越没人用，这笔钱越白花 —— 这是它比"开了功能慢"更值得修的原因。
+- ⚠️ 原注释是一句**没人守的性能断言**：`App.tsx:602` 写着「`inferPreferences` 是纯函数，重算的代价是 O(任务数) —— 可以忽略」。两处偏差：① 实际是 `O(任务数 + 专注会话数 + aiFeedback 数 + 纠正数)`（四张表），② "可以忽略"判的是**推断**那一段，而闸门之前那四次分配被这句话一起盖过去了。**注释里的复杂度断言既不进类型也不进门禁，它只会跟着代码漂。**
+- ✅ **修法不需要新抽象，同一段 9 行之上就有正确形状**：把 `:629-640` 也写成 `aiSettings.memoryEnabled === true ? (…) : { preferenceSet: emptyPreferenceSet(false), feedbackSet: emptyFeedbackPreferenceSet(false), … }`，与 `computeFocusGaps` 那条三元一致。零新增概念、零行为变化（关闭时 `inferPreferences` 本来就返回空集 —— 这是它自己的契约，见 `preferences.ts:722` 那句"立即返回空集"）。
+- 置信度：📊 已复核（四处实参、闸门位置、依赖数组、默认值、`entities` 身份来源五处原文逐行读到；未实测的是**毫秒**）。
+- **这条判据怎么才会红**：① 断言「`memoryEnabled === false` 时，一条无关 op 之后 `Object.values(store.entities.tasks)` 被调用 **0** 次」—— 今天是 ≥1，且这一条**不需要真机 profiler**，jsdom 里挂个 getter 计数就能断（`Object.defineProperty(store.entities, 'tasks', {get: spy})`）；② 反向防回潮：断言「`aiStore.ts` 里 `memoryEnabled` 的默认值仍是 `false`」—— 若哪天有人把默认改成 true，本条"每个人都在付"升级为"付费的人更多"，判据要跟着改级别。变异对照：把那四处实参改成 `memoryEnabled ? Object.values(...) : []` ⇒ ① 转绿；把 `App.tsx:658` 依赖里的 `store.entities` 换成 `store.entities.tasks` ⇒ ① 仍红（因为 tasks 身份也每条 op 变），**这恰好证明这条的根在 P0-8，不在这里**。
+
+---
+
 ## 4. P2（只列 📊 实测过的计数，其余进 §7）
 
 | 形状 | 位置 | 计数/事实 |
@@ -761,7 +782,8 @@ echo "  其中 M $(grep -c '^ M' /tmp/dirty.txt) / ?? $(grep -c '^??' /tmp/dirty
 ```bash
 D=docs/research/performance-hotpaths-audit.md
 echo "P0=$(grep -cE '^### P0-' $D) P1=$(grep -cE '^### P1-' $D) P2=$(grep -cE '^\| \*\*P2-' $D)"
-# 期望：P0=11 P1=17 P2=4  —— 与 docs/README.md 索引里那句逐字相等，改任何一条都要同时改那一句
+# 期望：P0=11 P1=18 P2=4  —— 与 docs/README.md 索引里那句逐字相等，改任何一条都要同时改那一句
+# （18 是 10-04 00:08 由 17 变来的：闭合 §7 第 5 条时落出一条真的新 P1-18，不是重新编号）
 
 # 表格列数一致性（22:40 新增；它抓到过一处真缺陷：§5.1 的 B 行里 `.every(… || …)` 那个裸 `||`
 # 把单元格劈成了两列 —— 代码段里的竖线在 markdown 表格里**不豁免**，必须写成 `\|\|`）
@@ -773,7 +795,7 @@ while(i<d.length){if(d[i].trim().startsWith("|")&&d[i+1]&&/^\|[\s:|-]+\|$/.test(
 console.log("列数不一致的表:",bad.length?bad.join("  "):"0 张 ✅");' $D
 # 期望：0 张 ✅（22:40 实测修完 B 行后为 0）
 
-# §7 台账自检（23:0x 新增）。为什么现算而不是手抄：手抄那句「§7 共 16 条未闭合」在我
+# §7 台账自检（10-03 22:54 新增）。为什么现算而不是手抄：手抄那句「§7 共 16 条未闭合」在我
 # 闭合掉两条之后**当场就过期了** —— 台账类数字只有从文件本身推导才不会漂。
 awk '
 /^## 7\./{f=1; next}
@@ -787,11 +809,16 @@ END{
   if (k==0) { print "§7 自检失效：一条编号项都没抓到 —— 标题锚点 `## 7.` 改名了，或整节被挪走"; exit 1 }
   max=0; for(i=1;i<=k;i++) if(items[i]>max) max=items[i];
   miss=""; for(x=1;x<=max;x++){h=0; for(i=1;i<=k;i++) if(items[i]==x) h=1; if(!h) miss=miss x " ";}
+  if (miss!="") miss=substr(miss,1,length(miss)-1);   # 同上：不摘就是"缺号 [13 ]"这种带尾空格的读数
   s=""; c2=0; for(x=1;x<=max;x++) if(cl[x]){s=s x " "; c2++;}
   if (c2>0) s=substr(s,1,length(s)-1);      # 末项后的那个空格要摘掉，否则单条闭合时输出成"第 10 "
   printf "§7 登记 %d 条 / 最大号 %d / 缺号 [%s] / 已闭合 %d 条(第 %s 条) / 未闭合 %d\n", k, max, (miss==""?"无":miss), c2, s, k-c2;
 }' $D
-# 期望：§7 登记 16 条 / 最大号 16 / 缺号 [无] / 已闭合 3 条(第 10 11 12 条) / 未闭合 13
+# 期望（10-04 00:3x 现量）：§7 登记 16 条 / 最大号 16 / 缺号 [无] / 已闭合 2 条(第 11 12 条) / 未闭合 14
+# 🔴 这一行期望**会随台账闭合进度漂**，它自己就是上一轮的受害者：曾写"3 条(第 10 11 12)"，
+#    第 10 条在 00:2x 被现量否证、降级成 🟡 之后当场过期。所以别抄这一行 —— 跑一次，
+#    只断言那条自洽式：**登记数 == 已闭合数 + 未闭合数，且 最大号 == 登记数、缺号为空**。
+#    四臂变异的期望已经改成**从基线推导**、不再写死数字（见 §5.2 的 h 那件）。
 # ⚠️ 阈值不是拍的：实测「已闭合」三个真命中的字节位置是 17/17/71，而两个**假候选**
 #    （"闭合判据""闭合代价"那两处）在 85 和 88 —— 所以窗口取 80 且匹配的是**"已闭合"整词**。
 #    "1..N 无缺号"这一维也必须留：N 从文件里现取，不写死上界（写死就会漏掉号段外整段）。
@@ -926,7 +953,7 @@ grep -c 'map:' server/prisma/schema.prisma
 | §1 ① `React.memo` 命中文件数 | 0 | 0 | ✅ |
 | §1 ② 移动端虚拟化原语命中 | 0 | 0 | ✅ |
 | §1 ③ 共享层 `FlatList` 所在文件 | 只有 TaskList.tsx | `packages/ui/src/task-list/TaskList.tsx` | ✅ |
-| §4 计数自检 | P0=11 P1=17 P2=4 | 20:14 那趟是 11 / **16** / 4；20:42 折入 P1-17 后重跑得 11 / **17** / 4，并已同步 `docs/README.md` 那句 | ✅（期望值曾落后一条，见 d） |
+| §4 计数自检 | P0=11 P1=17 P2=4 | 20:14 那趟是 11 / **16** / 4；20:42 折入 P1-17 后重跑得 11 / **17** / 4，并已同步 `docs/README.md` 那句。🔴 **10-04 00:08 再到 18**：闭合 §7 第 5 条（那批"子 Agent 报过、我没复核"）时落出一条真的新 **P1-18**，两处副本同批改掉 ⇒ 本行左列是**当时**的读数，不是当前值 | ✅（期望值曾落后一条，见 d） |
 | P0-8 `state[bucket]` 展开点 | 3 处 | 3 | ✅ |
 | P0-9 主入口字节 | 1,936,369 | 1936369 | ✅ |
 | P0-9 gzip | 573,480 | 573480 | ✅ |
@@ -978,7 +1005,7 @@ grep -c 'map:' server/prisma/schema.prisma
 | L93 §1.1 未入库现量 | `??` 三个日历 + `checkpoint.ts` + `UNTRACKED（磁盘上：有）` | 全中（另多出 `?? CalendarViewTabs.tsx` —— 别人在飞的第 4 个文件，非缺陷） | ✅ |
 | L143 整店订阅 | 18 | 18 | ✅（⚠️ 22:31 = 19：见 §1.1「第三把尺子」，同一趟还有两处行号漂） |
 | L553 P1-13 两条 | src 侧 5 命中；调用形状 **0**（rc=1） | 5 条逐字对上；第二条 **0 命中 ⇒ rc=1** | ✅（rc 语义已写进 §7 第 13 条那块） |
-| L637 §4 计数 | P0=11 P1=17 P2=4 | `P0=11 P1=17 P2=4` | ✅ Goal ③ 第三次复现 |
+| 「§4 计数自检」块（原文这里写的是 `L637` —— 本文自己的行号，已经漂了，改按标题定位） | P0=11 P1=17 P2=4 | `P0=11 P1=17 P2=4` | ✅ Goal ③ 第三次复现。⚠️ **该行是 22:4x 那趟的读数；10-04 00:08 起当前值是 18**（见上一行） |
 | L716 §5.1 取号三条 | 块内**不写期望值**（它就是"现取"命令） | 最大号 **188** · `git diff --numstat` = **173 行未提交** · `stat` = **21:21:16** | ✅ 三行都可跑。🔴 反倒是**我这一行原先写了"期望 184"** —— 那是我把 §5.1 正文里 20:16 那次的历史读数错当成这块的期望值。已改成本句 |
 | L736 §5.1 三条索引现量 | 4 / 4 行 / 1 | `4`、四行原文、`1` | ✅ |
 | L873 §7 第 13 条 | 目标清单 + `0008` 是 ` M` + HEAD 命中 0 | 15 个目标；` M`；`0`（rc=1） | ✅，但**该块原来带一个 `<link-check 输出>` 占位符，粘上去跑不了** ⇒ 已改成自包含三行 |
@@ -1011,7 +1038,53 @@ grep -c 'map:' server/prisma/schema.prisma
 
 ⚠️ **同一种装置缺陷这轮又出现第三次，记下来是因为它和前两次不同：它失败得很干净。** 我在 heredoc 里写 `node -e '…'` / `.cjs`，替换文本是**双引号 JS 字符串**，而中文句子用了 ASCII `"…"` ⇒ JS 在 `SyntaxError: Unexpected identifier '讲这件事怎么做'` 处停住，**一个字都没写进文件**。同一形状连撞三次（第二次连"该不该收进 scripts"那句也被截断）。✅ 正确的修法不是转义，是**改通道**：中文正文里的引一律用全角「」，或干脆走 Edit 工具而不是脚本。📌 可迁移：**"替换脚本没运行"和"替换没写盘"在这条通道上是同一件安全的事**（`writeFileSync` 在末尾），而它只在"所有断言都通过"时才发生 —— 这就是把写盘放到最后一步的全部价值。
 
-⚠️ **本节自身也会漂**：它记的是 20:14–20:22、20:47、21:53 与 22:13 五趟的读数。要当前值请重跑命令，不要引用本表。
+**h. 10-03 23:54 → 10-04 00:00 新加的那条常驻自检，是踩着自己两个新缺陷才学会不撒谎的。**
+
+给 §4 加"§7 台账自检"这一条时（就是本节上面那块 awk），先后撞出两件性质不同的事：
+
+| # | 发生了什么 | 症状 | 为什么严重 |
+|---|---|---|---|
+| 1 | 变异臂用 `sed -E '…{s/✅//; s/…/…/ }'`（BSD sed 不吃这种分组写法）**报错**，而 `> /tmp/mut10.md` 这个重定向**在 sed 跑之前就把文件截断了** | awk 读到空文件 ⇒ 打印 `已闭合 0 条 / 未闭合 0` | 这是 §5.2 整节反复讲的那个形状：**空测量看着最干净**。四臂里三臂 rc=2、一臂报"0 条"，如果我当时只看"有没有红"，那臂"0 条"会被读成"台账空了"而不是"输入空了" |
+| 2 | 我用 Edit 给 awk 加非空守卫时，`old_string` 覆盖了三行、`new_string` 只带回两行 ⇒ **把 `miss=…` 那行计算吃掉了**，而 `printf` 里仍然引用 `miss` | 输出**照旧**是 `缺号 [无]` —— 一模一样 | 🔴 比第 1 件严重得多：这不是"探针没测到"，是**门禁当场掉牙而且不掉色**。`miss` 变成未初始化 ⇒ 恒为 `""` ⇒ "1..N 无缺号"这一维从此**永远报无缺号**。没有报错、没有红、没有形状变化 |
+
+两处都是**先红一次再改对**：第 1 件把变异装置换成 node（`replace` 命中数不达标就拒绝继续、并且打印 awk 的 **stderr**，rc=2 不再伪装成读数）；第 2 件是把丢的那行补回去之后重跑，才拿到下面那份四臂读数。守卫本身也留了下来（`if (k==0) { print "…自检失效…"; exit 1 }`）—— 它是第 1 件教的，但**它挡不住第 2 件**：第 2 件里 k 是 16、一切正常。⇒ 可迁移的那条不是"再加一个守卫"，而是：**改门禁的代码时，改完必须让门禁在一个"本该命中"的样本上跑一次**（这里就是臂 2：造一个缺号，看它点不点名）。
+
+四臂读数（第一趟的装置是 `/tmp/heyta-perf-scan/mutate-s7-check.cjs`，**已换成仓库里的 `research/tools/audit-self-check-mutation.mjs`** —— 理由就是紧跟在这张表后面的那次否证）。装置从文档里**现抽** awk 程序而不是抄第二份 —— 抄一份就是 §5.2 老话题里的"同一个判断写两遍"：
+
+| 臂 | 变异 | 期望 | 实读（10-03 23:5x） |
+|---|---|---|---|
+| 0 | 无（对照） | 已闭合 3 条(第 10 11 12 条) / 未闭合 13 | ✅ 同 |
+| 1 | 抹掉第 10 条的 `✅` 与"已闭合" | 已闭合 **2** 条(第 11 12 条) / 未闭合 14 | ✅ 同 |
+| 2 | 把第 13 项编号改成 `13x` | 登记 15 条 / 最大号 16 / **缺号 [13]** | ✅ 同 |
+| 3 | 把 `## 7.` 标题改名为 `## 七、` | **rc=1** 且打印"§7 自检失效…" | ✅ 同 |
+
+🔴 **上面这张表在两趟之间被现量否证了一半，而否证它的正是它自己**（10-04 00:3x 重跑旧装置）：
+
+| 臂 | 00:3x 重跑 | 原因 |
+|---|---|---|
+| 0 | **FAIL** | 期望写成字面量"已闭合 3 条(第 10 11 12 条)"，而第 10 条在 00:2x 降级成 🟡 ⇒ 基线实读 `已闭合 2 条(第 11 12 条) / 未闭合 14`。**门禁没错，是装置过期** |
+| 1 | **FAIL（响亮）** | 变异正则 `^10\. ✅ \*\*P1-14 已闭合` 命中 0 次 ⇒ 走到 `if (a1 === orig)` 那个守卫并报"装置失效"。**那条守卫是承重的**：它让"靶子没了"以 FAIL 收场，而不是以"四臂全对"收场 |
+| 2 | PASS | 但**原设计是运气**：它删的是第 13 项（非最大号），所以缺号维度留得下洞 |
+| 3 | PASS | 锚点与措辞都没变 |
+
+⇒ 新装置改了三个地方，每处都是被上面某一臂教出来的：① **期望从基线推导**，臂 0 断言的是自洽式（登记 == 闭合 + 未闭合、最大号 == 登记、缺号为空、闭合号不越界不重复）而不是具体数字；② **臂 1 的靶子从基线闭合列表里取**（当前取到第 12 条），不再写死编号；③ **臂 2 改删"最大号减 1"那一项** —— 这不是随手挑的：**删最大号自己造不出缺号**，awk 的 `max` 是从现存编号现取的，把最大项摘掉 `max` 会跟着降、缺号反而报"无"（这一条是我先按"删最大号"写、跑出来 `最大号 15 / 缺号 [无]` 才看到的，属于**装置自己的期望错**，第 5 个真凶）。
+
+00:3x 新装置实读（`node research/tools/audit-self-check-mutation.mjs` ⇒ `4 臂：4 对 / 0 不对 ✅`，RC=0）：
+
+| 臂 | 变异 | 期望（推导） | 实读 |
+|---|---|---|---|
+| 0 | 无（对照） | 登记 16 = 闭合 2 + 未闭合 14，最大号 16，缺号空 | `§7 登记 16 条 / 最大号 16 / 缺号 [无] / 已闭合 2 条(第 11 12 条) / 未闭合 14` ✅ |
+| 1 | 抹掉**闭合列表里最后一条**（现取到 12）的 `✅` 与"已闭合" | 闭合少 1 ⇒ `第 11 条`、未闭合 +1 | `已闭合 1 条(第 11 条) / 未闭合 15` ✅ |
+| 2 | 把第 15 项编号改成 `15x` | 登记 15 / 最大号仍 16 / 缺号点名 `[15]` | `§7 登记 15 条 / 最大号 16 / 缺号 [15]` ✅ |
+| 3 | `## 7.` → `## 七、` | **rc=1** 且打印"§7 自检失效…" | `rc=1 出=[§7 自检失效：一条编号项都没抓到…]` ✅ |
+
+⚠️ **新装置仍然不是门禁**：它没挂进 `pnpm check`，而且它**自己没带阳性对照**（臂 0 的自洽式在"台账 0 条闭合"时会退化成"臂 1 无靶子 ⇒ FAIL"，这是设计如此、不是漏）。这两点和 §7 第 16 条讲的是同一件事。
+
+⚠️ 阈值 `80` / `8` 不是拍的：实测三处真命中的字节位置是 17 / 17 / **71**，而两个假候选（正文里的"闭合判据""闭合代价"）在 **85 / 88** —— 窗口取 80 恰好把假候选挡在外面，同时匹配的是**"已闭合"整词**而不是"闭合"。⚠️ 这类"从相邻文本里划窗口"的阈值**只在当前文档长度与措辞下成立**，谁把第 12 条那行改长，它就可能掉出窗口 —— 所以臂 1 那种"抹标记"的变异要跟着常驻，不能只跑一次。
+
+📌 与本节 a–g 的关系：a–g 全是**尺子误读**（假阳性/假阴性），h 是**第一例"门禁静默失去牙齿"**，而且它不是被任何检查抓到的，是我把 `old_string` 与 `new_string` 逐行对了一遍才看到的。⇒ 这一条应该进环境陷阱（见 §5.1 追加的 E）。
+
+⚠️ **本节自身也会漂**：它记的是 10-03 的 20:14–20:22、20:47、21:53、22:13、22:47–22:56（P1-14/P1-16 两条否证）与 23:54–00:00（h）六趟的读数。要当前值请重跑命令，不要引用本表。
 
 ---
 
@@ -1044,21 +1117,58 @@ grep -c 'map:' server/prisma/schema.prisma
 2. **P0-4 的每批耗时** —— 需要真 PostgreSQL 上的 EXPLAIN 与计时（`server/tests/integration/` 有真库设施可借）。
 3. **P0-5 的产物侧模块计数** —— 需要一份 `--dev false --minify false` 的可读 bundle。
 4. **P1-4 与 §4 的计数** —— ⚠️ 待复核，本文标了。
-5. **子 Agent 报过、我没复核的一批**：`i18n` 的 `t()` 实现、`domain/preference-resolver` 是否每次从 op-log 全量重算（注意 [ADR-0014](../adr/0014-memory-switch-and-corrections.md) **有意**规定"推断结果不持久化、每次重算"，所以频率才是问题、不是形状）、`ai-tool-selection` 每输入是否全工具遍历、`export-dump` 的内存峰值。
+5. 🔴 **本条五个子项：四个已复核完（5-a/5-b/5-c/5-d），一个需要新载体（5-e）**。本条**不算闭合** —— §7 台账自检把它记在未闭合里是对的，因为 5-e 还差夹具。原句是：「**子 Agent 报过、我没复核的一批**：`i18n` 的 `t()` 实现、`domain/preference-resolver` 是否每次从 op-log 全量重算（注意 [ADR-0014](../adr/0014-memory-switch-and-corrections.md) **有意**规定"推断结果不持久化、每次重算"，所以频率才是问题、不是形状）、`ai-tool-selection` 每输入是否全工具遍历、`export-dump` 的内存峰值。」逐子项处置：
+
+   - **5-a `i18n` 的 `t()` —— ✅ 已复核，子 Agent 的怀疑不成立。** 本体是 `packages/i18n/src/catalog.ts:44` `translateIn()`（入口 `translate()` 在 `packages/i18n/src/translate.ts:26`，只做一次 `CATALOGS[locale]` 查表再转调）：**O(1) 字典取串**，只有传了 `vars` 才多一次 `template.replace(PLACEHOLDER, …)`。**没有**每次重建表、**没有**扫描。🔵 顺带排掉一个经典坑：`PLACEHOLDER` 是模块级 `/g` 正则，但走的是 `String.replace` —— `replace` 会把 `lastIndex` 归零，所以不存在 `.test()` + `/g` 那种跨调用状态泄漏（这条**不是**问题）。⇒ i18n 真正的代价从来不在 `t()`，在**两份表都进 bundle**（那是 P0-9 的 781,062 B）。
+   - **5-b `domain/preference-resolver` —— 🔴 这个名字是我写错的：全仓没有这个文件。** 现量：`find packages apps server -name '*preference-resolver*' -not -path '*/node_modules/*'` 输出 **0 行**；`packages/domain/src/` 下真实存在的前缀同族文件是 `preferences.ts`、`preference-evidence.ts`、`preference-hints.ts`、`preference-corrections.ts` —— **里面没有 `preference-resolver.ts`**。真符号是 **`inferPreferences`**（`packages/domain/src/preferences.ts:726`）。⚠️ **这正是本文 §1.1 第三把尺子点名的那类错 —— 我自己在本文里犯了一次**：点名一个不存在的载体，和点名一个不存在的函数是同一件事。之所以没被尺子 1 抓到：**"文件不存在"这一维它只检查带行号的 `file:line` 引用，而这里写的是包名+驼峰词（`domain/preference-resolver`），不成形状。** ⇒ 尺子 1 应当加一维"把正文里的 `xxx/yyy-zzz` 式路径词也拿去 `test -e`"，这条登记在 §8 **第 17 步**。
+   - **5-c 频率问题（原句里"所以频率才是问题"那句）—— ✅ 复核完，而且比"频率"更糟：它关着也在付。** ⇒ 已单独成条 **P1-18**（`apps/web/src/App.tsx:629-640` 的四处 `Object.values` 实参在隐私闸门**之前**求值，而 `store.entities` 每条 op 换身份 ⇒ 依赖数组 `:658` 每条 op 失效一次；默认 `memoryEnabled: false` 在 `aiStore.ts:118`）。**本条是本批唯一从"待复核"里长出来的新 P1**，P1 计数因此 17 → 18。
+   - **5-d `ai-tool-selection` 每输入全工具遍历 —— ✅ 形状属实，等级判掉：不是热路径。** `resolveToolSelection`（`packages/app-host/src/ai-tool-selection.ts:167`）确实 `for (const rule of rules)` × `findCatalogTool()`，而后者是 `LOCAL_API_TOOLS.find(...)` 的线性扫（`:220-221`）⇒ **O(R×K)**。现量：**R=4 条规则**、**K=6 个工具**（`packages/local-api/src/tools.ts:94-145`，逐个点名 `list_tasks/get_task/list_projects/create_task/update_task/complete_task`；计数带两条阳性对照，第一版正则不认这个元素的缩进形状、报出过 K=0，所以这个 6 是重数过的）。⇒ 最坏 **24 次字符串比较 + 4 个正则**，**每次 AI 输入一次**（两个生产调用点：`packages/app-host/src/ai-tool-call.ts:209`、`apps/web/src/features/ai/AiToolRun.tsx:168`）。同一次请求紧接着要么走一次模型往返、要么被规则直接本机跑完 —— **24 次比较在这个分母上是噪声**。⚠️ 注意 K 是**分分支**的：倒数纪念日那条线给目录加了 4 条 `EVENT` 工具，但**这条工作树的 `tools.ts` 是干净的、K=6**；不要把 22 之类的数搬进来当系数。
+   - **5-e `export-dump` 的内存峰值 —— ⚠️ 未闭合，需要新载体（本文造不出来）。** 要量的是"一次导出的峰值堆内存"，载体必须是**一份有真实 op 数的库 + 一次真导出**：node-host（真 SQLite 文件）跑 `export-dump` 并用 `--max-old-space-size` 逼出峰值 + `process.memoryUsage().heapUsed` 采样点。这件事和 P0-8 的微基准同批做最省（同一个夹具）。**没做，所以这里不写任何数字** —— 只登记"它和 P0-8 共用一次夹具"这个降成本的事实。
 6. **一条要产品侧知道的顺序约束**：P1-9 ⇒ 给 web 接自动同步之前，必须先有在途保护与 memo/selector，否则会把一次写入放大成 3 次全列表重建 × 无互斥重入。
 7. **两个应当变成常驻门禁、但目前只活在 `/tmp` 的探针**（本轮没把它们收进 `scripts/`，因为那属于源码改动、超出"只读审计 + 落文档"的边界）：
    - **引用完整性自检 = 尺子 1**（`/tmp/heyta-perf-scan/cite-audit5r.cjs`。⚠️ 这里原来写的是 `cite-audit4.mjs`，而那份与 v5 都已随 `/tmp` 消失 —— **点名一个已不存在的载体，和点名一个不存在的函数是同一件事**）—— 任何带 `file:line` 的调研文档都能扫；它抓到 4 处歧义引用与 3 组落在未入库文件上的引用，但 **22:03 之后它不再是收益最高的一把**，见 §1.1「第二把尺子」与本节第 16 条。
    - **checkpoint 写成本基线**（§8 第 4 步的 `measure-checkpoint.mjs`）。
    要闭合：把它们写进 `scripts/` 并挂进 `pnpm check`，每条都要按 AGENTS.md §8 第 3 条做一次"注入违规会红"的反证。
 8. 🔴 **本文的行号有近半落在"活文件"上，开工前必须按符号重新定位 —— 这一条已从"风险"变成"实测发生过"。** 22:32 普查（命令见 §1.1「第三把尺子」）：**被引 62 个文件形状里 29 个正在被动**（` M` 26 + `??` 3）。其中 §1.1 那 3 条未入库引用所在的日历文件（W6 的落点 `packages/ui/src/calendar/*`）是风险最高的一类 —— **在干净检出上它们不存在**；而 `apps/mobile/src/App.tsx`、`server/src/sync/sync.routes.ts` 两处**在本文写作的一小时内就各漂了 3 行**（118→121、163→166），是同一天内两把尺子都报绿的引用。⇒ §8 任何一步开工前**不许照本文行号直接改**，要用 §1.1 抽查块那种 `grep -n "<符号>" <文件>` 的形状重定位；要判断"这个引用还活着吗"，跑 §1.1 那块普查命令，不要跑尺子 1/2（它们的盲区正是这件事）。
+   🔴 **00:2x 复量：这个比例本身在 60 分钟内从 47% 掉到 4%。** 同一条普查命令现在给出：**被引 72 个（我新增了 10 个）· 正在被动 3 个（`M ` 1 + ` M` 2）· `??` 0**（三个是 `packages/app-host/src/host.ts`、`server/src/sync/services/operation-upload.service.ts`、`server/src/sync/sync.service.ts`）。⇒ 两件事同时成立，别读成一件好事：**①** "近半在动"是**那一刻的状态**，不是本文的永久属性 —— 拿它当"本文件特别危险"的证据是错的；**② 危险度一点没降**：那些文件变成"干净"的原因不是"没人改了"，而是**改动进了 HEAD**，而 HEAD 一变，本文所有以工作树为准的行号就同时集体过期（P1-14 就是当场例子：`state.ts` 现在干净，但它的内容与我 22:5x 读的那份已经不是同一份）。📌 所以这条纪律的正确形式是**"每次开工前按符号重量一遍"，而不是"脏的时候才重量"** —— 干净不等于没变。
 9. **新折入的四条 P0 只有形状与阶是实测的，毫秒全未实测。** 要闭合各自的载体不同，不能笼统说"等 profiler"：
    - **P0-8（整桶复制）** —— 一次 Node 微基准就能定级（不需要真机）：固定 op 数只变桶内实体数，看 `dispatch` 中位耗时。子 Agent 报的读数是「200 实体 0.043 ms → 4000 实体 0.992 ms；固定 N 只变 T 时重放 6.9 → 217 ms」，**我没有复现它**，所以本文只写阶、不写这些数。它的基准脚本在 `/tmp/heyta-perf-scan/`。
    - **P0-9（首屏 1.94 MB）** —— 一次构建 + 一份可读的 chunk 归因（`rollup-plugin-visualizer` 或 `--minify false`）就能把"哪个包占多少"钉死。字节数已实测，缺的是**归因**。
    - **P0-10（O(N³)）** 与 **P0-11（Argon2id 首批）** —— 需要真机：前者要列表渲染的 profile，后者要**首次同步**那一刻的峰值内存与耗时。⚠️ P0-11 的取证还有个特殊点：**它只在会话首批付**，所以要冷启动测，不能拿"第二次同步很快"当反证。
-10. ✅ **P1-14 已闭合，而且闭合的方式是"原句被否证"**（22:5x 逐层读通，不需要任何新载体）：原句是「`vector-clock.ts:95` 确实每次比较 `new Set`，但"它嵌在 per-field × O(k²) 的版本选择循环里"这层嵌套我**没有逐层读通** ⇒ 放大倍数未知」。现量结论：**HEAD 里没有那层嵌套** —— `git show HEAD:packages/op-log/src/state.ts | grep -c 'selectVersion'` = **0**、`grep -c 'FIELD_VERSIONS'` = **0**，写闸门 `shouldAcceptWrite` 只在 `:222`/`:255` 两处、每 `(op, 实体)` **一次**比较，字段循环在闸门之后 ⇒ **放大倍数 = 1**。那个 O(字段数 × k²) 的形状在**并行会话未提交的 `state.ts` 重写**里（工作树 599 行 vs HEAD 371 行，16 个 hunk），而即便按那版读，`addUnique` 只留极大元 ⇒ `k` 随**并发度**不随历史长度（那版自带夹具直接断了 601 条单调 op 后 `toHaveLength(1)`）。逐条取证、复现命令、以及"这条判据怎么才会红"都在 **P1-14 节正文**里。🔴 教训与 §5.2 同族：**"嵌套未读通"的正确出路是去读，而不是先把 O(k²) 写进标题** —— 标题里的复杂度断言一旦写错，它会比正文活得更久。
-11. ✅ **P1-16 已闭合，第三遍找到了，但它不是"第三遍"而是"某一档宿主的第三遍"**（同样不需要新载体）：原句是「≥2 遍 stringify+hash 是读到的，第三遍（落盘那次序列化）未逐行确认，所以本文不写"3 次写 + 2 次读"」。现量结论：**web（IndexedDB）2 遍、SQLite 档（node-host / 移动端）3 遍**，第③遍是 `packages/storage/src/sqlite/sqlite-adapter.ts:698`（`put:` `:501` → `insertRow` `:511`），且**这一遍是三条证据里唯一已入库的**。三个适配器逐个穷举：`indexeddb-adapter.ts` 里 `JSON.stringify` 命中 **0**（结构化克隆），`memory-adapter.ts` 只有 `:90 JSON.stringify(key)` —— 哈希的是主键不是记录。⇒ 顺带**部分推翻 §7 开头那句"没有采纳子 Agent 的『3 次 stringify』"**：那个数在它自己的宿主上是对的，错的是把它写成一个不分档的标量。表格与 7 条复现命令见 **P1-16 节正文**（本趟逐条跑过，期望=实读）。
+10. 🟡 **P1-14 这条"闭合"只维持了 40 分钟 —— 记成"半闭合"，别当已结。** 22:5x 我按当时的 HEAD 逐条取证，得到「HEAD 里没有 per-field 版本前沿 ⇒ 放大倍数 = 1」，并据此把标题里那句"嵌在 O(k²) 循环里"判成不成立。**00:2x 重量：那条依据的载体本身换了**（`git rev-parse --short HEAD` 现为 `d27bccde`，00:10 一笔提交）：同一组命令现在给出 `selectVersion` **3**、`FIELD_VERSIONS` **6**、`shouldAcceptWrite` **0**、文件 **599** 行。⇒ **原句那半句"确实嵌在 per-field 循环里"现在是对的，我用来推翻它的整个前提没了。** 真正站得住的是另一半、也是更有用的那一半：`addUnique` 只留极大元 ⇒ **平方项随并发度不随编辑史长度**（`checkpoint-recovery.spec.ts` 用 601 条单调 op 直接断了 `toHaveLength(1)`，该夹具现也已入库）。逐条读数、两个 SHA 与"为什么会误判"都在 **P1-14 节正文**。🔴 **这条留下的缺口**：一个以 `git show HEAD:` 为证据的断言**必须写锚定的 SHA 并配一条"当前 HEAD 是否等于锚"的复现命令**，否则它会在下一次合流时静默变成假话 —— 本条自己就缺这个锚，登记在 §8 **第 17 步**。教训与 §5.2 同族：**"嵌套未读通"的正确出路是去读，而不是先把 O(k²) 写进标题；而读通之后的结论如果锚在一次 `git show` 上，它和标题一样会过期。**
+11. ✅ **P1-16 已闭合，第三遍找到了，但它不是"第三遍"而是"某一档宿主的第三遍"**（同样不需要新载体）：原句是「≥2 遍 stringify+hash 是读到的，第三遍（落盘那次序列化）未逐行确认，所以本文不写"3 次写 + 2 次读"」。现量结论：**web（IndexedDB）2 遍、SQLite 档（node-host / 移动端）3 遍**，第③遍是 `packages/storage/src/sqlite/sqlite-adapter.ts:698`（`put:` `:501` → `insertRow` `:511`），且**这一遍是三条证据里唯一已入库的**。⚠️ 这半句在 10-04 00:5x 过期：HEAD 走到 `f6478fad` 之后三遍**全部**已入库（现量：`git cat-file -e HEAD:packages/storage/src/checkpoint.ts` 通过、`git show HEAD:packages/storage/src/sqlite/sqlite-adapter.ts | grep -n 'JSON.stringify(record)'` → **698**、`git show HEAD:packages/op-log/src/engine.ts | grep -c checkpointChecksum` → **2**）。📌 原文留着是因为它记的是 23:5x 那一刻的状态 —— 那一时刻它是真的；**"已入库"和 §7 第 10 条讲的"未入库"一样，是一个时刻的快照而不是属性**，所以这类句子必须带 SHA 或时间，否则下一次合流就变成假话（这条缺口登记在 §8 **第 17 步**）。三个适配器逐个穷举：`indexeddb-adapter.ts` 里 `JSON.stringify` 命中 **0**（结构化克隆），`memory-adapter.ts` 只有 `:90 JSON.stringify(key)` —— 哈希的是主键不是记录。⇒ 顺带**部分推翻 §7 开头那句"没有采纳子 Agent 的『3 次 stringify』"**：那个数在它自己的宿主上是对的，错的是把它写成一个不分档的标量。表格与 7 条复现命令见 **P1-16 节正文**（本趟逐条跑过，期望=实读）。
 12. 🔴 **P1-13 查清了它为什么不算"ADR 没写完"**（本条已闭合，结论不是缺口）：[ADR-0047](../adr/0047-checkpointed-incremental-hydration.md) §4 写了 `archiveUpTo()` 的**语义与守卫**（"没有覆盖 cutoff 的有效 checkpoint 时拒绝归档"），§6 把"归档后的完整回退"列进了契约测试 —— 也就是说这份 ADR **假设有东西会调它**，但**没有登记触发者**。⇒ 这不是取证缺口，**是一条需要产品侧拍板的触发条件**（低频后台？启动时？仅在 checkpoint 落后 N 条时？），本文 §8 把它排在需要决策的那一步。
-13. 🔴 **`docs-link-check` 本文**没有**跑到 exit 0，而且这一步不该由本文凑绿 —— 必须写清，否则下一轮会误以为门禁绿。** 20:18 实测 `LINK_CHECK_EXIT=1`，31 处红项**全部形如"本机存在，但 git 没有跟踪它"**，涉及的 9 个目标文件如下，**没有一个属于本次改动的三个文件**（本文、`environment-traps.md`、`docs/README.md`）：
+13. 🟡 **`docs-link-check`：本文这一格 10-04 00:4x 起**字面**达成 exit 0，但记成 🟡 不记成 ✅ —— durable 的那一半还不归本文。** 原始状态是 🔴「本文**没有**跑到 exit 0，而且这一步不该由本文凑绿 —— 必须写清，否则下一轮会误以为门禁绿」；下面整条按时间顺序保留了它曾经不绿的全部读数，**别只读第一句就当它一直绿**。🔴 **10-04 00:19 现量已把下面这整段变成历史**：现在跑是 **`EXIT=1`、只剩 2 处红，且都不在本文**（`grep -c performance-hotpaths-audit` 在这份输出上 = **0**）。那 31/45 处"本机存在但 git 未跟踪"的红项**已经自己消失了** —— 原因是并行会话在 23:58 前后把 `docs/adr/0046-0048`、`docs/plans/trash-and-archive*` 等目标**提交了**（`git log -1 -- apps/mobile/src/db/open-host.ts` 现量给出 `b3397cda 10-03 23:58`）。⇒ **本条原来那句"这一步不该由本文凑绿"以另一种方式兑现了：把它凑绿的人不是我，是把它写进库的人。** 现在这 2 处红的逐条归属：
+
+    | 红项 | 位置 | 事实 | 为什么不代改 |
+    |---|---|---|---|
+    | 指向 `countdown-w7-device-export.md`（目录 `docs/plans/`）的第 2 节 | `docs/plans/countdown-anniversary.md:1091` | 该文件**本检出没有**（`ls docs/plans/ \| grep countdown` 只有 `countdown-anniversary.md` 与 `countdown-batch2-handoff.md`），而 AGENTS.md 明写 W7 跑在**独立 worktree `feat/countdown-w7`** 里 | 🔴 这**极可能是前向引用**（那份产物在另一个 worktree，合流时就到）。从本检出"修"它 —— 要么删掉一条正当的引用，要么改成一条此刻不存在的路径的另一种写法 —— 两种都是替别人决定意图 |
+    | `docs/adr/README.md` 里的第 1 节章节号不存在 | `docs/plans/countdown-anniversary.md:1295` | 目标文件**在**（`ls` 有），缺的是里面没有那个节号 | 那是别人已提交的台账；正确修法取决于那份 README 该有第 1 节、还是那条引用该指别的节 —— 一次跨两个所有者的判断，不归本批 |
+
+    两条都在**倒数纪念日那条线**的文件里（该文件本趟 `git status` 干净 ⇒ 已提交）。⇒ 本条对 ⑥ 的诚实结论从"结构不可达，因为 45 处未跟踪"**改写成**"结构不可达，因为 2 处**跨条目的意图判断**"；本文自己是 **0 红**。要闭合 ⑥ 只需要：那条线自己修掉两处（或 `docs/adr/README.md` 补出 §1）。**没有一条出路需要本文改自己的链接。**
+
+🔴 **10-04 00:5x 复量：那 2 处原封不动，但门禁又多了 4 处新的 —— 而且新的这 4 处来自第三条线。** 现量（`node research/tools/docs-link-check.mjs` ⇒ `EXIT=1`）：**失效的章节引用 2 处**（还是 `countdown-anniversary.md` 的 1091 与 1295 两行，逐行对得上 00:19 那份归属表 —— 第 1091 行指的那个文件在本检出依然不存在，第 1295 行指的那节依然没有）+ **本机有、仓库里没有 4 处**（新增，全在 `docs/adr/0050-e2ee-key-lifecycle-and-recovery.md` 的 94/95/96/99 行，指向 `apps/web/evidence/vault-panel/` 里四张 `pg-*.png`）。那 4 张的归属现量：`git ls-files apps/web/evidence/vault-panel | wc -l` = **7**（已跟踪）而 `git ls-files -o --exclude-standard` 同目录 = **14**（未跟踪）⇒ 那条线的产物目录**一半在库外**，而且 ADR 本体自己是**已跟踪**的（`git ls-files docs/adr/0050-….md` = 1），所以这不是"整条线还没入库"，是"文件写进去了、图没写进去"。
+⇒ **本文贡献仍然是 0**（`grep -c performance-hotpaths` 在这份输出上 = **0**），但**⑥ 的闭合条件从"一处跨条目判断"变成"两处、分属两条线"**：倒数纪念日那 2 处 + 密钥迁移那条线的 4 张图。本文一条都不代改的理由和上面那张表一样，而且对那 4 张图多一条：**截图可能带用户数据，"该不该入库"必须由那条线判断**（AGENTS.md 只说 evidence 目录要入库，没替任何人决定哪张图能进）。📌 这一格又一次证明本条开头那句话：**红项集合是活树瞬时读数，不是提交的属性** —— 它在 00:19 与 00:5x 之间换了来源，而没有任何人动过门禁。
+
+✅ **10-04 00:4x 复跑：门禁绿了 —— `EXIT=0`，连跑三次都是 0，而本文一行链接都没改。** 这正是本条最后那句预测在两小时内兑现：那 6 处红被**各自的所有者**关掉了，归属逐条现量（**别把这条读成"本批做完了 ⑥"，它读出来的是"⑥ 由别人在飞的工作满足的"**）：
+
+| 谁关的 | 怎么关的 | 现量取证 |
+|---|---|---|
+| 密钥迁移那条线 | 把 `apps/web/evidence/vault-panel/` 里被引用的 PNG **`git add` 进了索引**（5 个暂存路径，含被点名的 4 张） | `git diff --cached --name-only \| grep vault-panel \| wc -l` = **5**，同目录 `git ls-files -o` 从 14 降到 **9** |
+| 倒数纪念日那条线 | 把那两行**改写成不可被解析的形状**：1091 行从"`file.md` + 节号"改成"…`file.md` 第二节"；1295 行从指一个不存在的节号改成指 `../adr/README.md` 的一个真锚点 | `git status --porcelain -- docs/plans/countdown-anniversary.md` = **` M`（未暂存）**；那两行在工作树里已改写、在 HEAD 里还是旧形状 |
+
+🔴 **但这枚绿是"只在混合工作树成立的绿"** —— 与本条前面讲的第三种红灯正好是一枚硬币的两面，而且可以不打 worktree 就证伪：
+```bash
+git ls-tree HEAD apps/web/evidence/vault-panel/ --name-only | wc -l                          # 7 ⇒ 那 4 张不在 HEAD 里，只是被暂存了
+git cat-file -e HEAD:apps/web/evidence/vault-panel/pg-legacy-new-device.png 2>&1 | head -1   # "exists on disk, but not in 'HEAD'"
+git show HEAD:docs/plans/countdown-anniversary.md | sed -n '1091p'                           # 旧的"路径紧跟节号"形状还在
+```
+⇒ **在 `f6478fad` 的干净检出上这道门禁仍然是 6 处红**；它只有在①那 5 个暂存路径被真的 commit、②倒计时那两行的改写被 commit 之后才 durable。⚠️ 所以本条对 ⑥ 的结论要分两格写，不许合并：**"收尾命令现量 exit 0"= 达成**；**"仓库在 CI 形态下绿"= 未达成，且不归本批改**（本批不 commit、不 push，也绝不替别人把那 5 个暂存路径一起提交 —— 那 5 张图里可能带界面截图，"能不能进库"是那条线的判断）。
+
+    ⚠️ **本表第一版自己造了 2 处新红（00:2x 实测：门禁从 2 处变 4 处，其中两处来源就是这张表）。** 机制：门禁把**行内代码**里的"路径 + 节号"也当一次真引用解析，所以"如实转述一条死链"= 新增一条死链。✅ 修法不是少写，是**打断邻接**：把节号写成"第 2 节"而不是紧跟在路径后面的 `§2`；改完重跑 = 2 处红、本文贡献 **0** 处（现量命令：`node research/tools/docs-link-check.mjs | grep -c performance-hotpaths` ⇒ 0）。📌 与 §5.1 那条"抄门禁原文进被扫描的台账=造新违规"同族 —— 这条是它的**转述版**：**任何会被机器解析的形状（路径、节号、前缀），在描述它的时候都必须先破坏自己的可解析性。**
+
+    ⚠️ 下面 20:18–22:2x 的四趟读数与那份 9 文件清单**原样保留**，因为它们记录的是"红项曾长什么样"这个事实，而且它现在是**否证性证据**：同一道门禁在四小时内从 31 处红变成 2 处，中间没有任何人动过门禁 —— 这一句本身就是"门禁红不等于你的代码红"这条纪律的最好例证。
+
 
     ```
     docs/adr/0046-lossless-vector-clock-frontiers.md          docs/plans/trash-and-archive.md
@@ -1071,7 +1181,7 @@ grep -c 'map:' server/prisma/schema.prisma
     现量命令（两条就够，别只看红项数）：
 
     ```bash
-    node research/tools/docs-link-check.mjs > /tmp/lc.txt 2>&1; echo "EXIT=$?"     # 当前 EXIT=1（本条就是不绿，别改成 || true）
+    node research/tools/docs-link-check.mjs > /tmp/lc.txt 2>&1; echo "EXIT=$?"     # 10-03 写这句时 EXIT=1；10-04 00:4x 起现量 0（见上面那格）。⚠️ 别把它改成 `|| true` —— 那会把一条会红的命令变成不会红的
     grep -oE '解析到 [^，]+' /tmp/lc.txt | sed 's/解析到 //' | sort -u              # 红项涉及的目标
     git status --porcelain docs/adr/0008-vector-clock-limit.md                       # 报"引用了 0046"的那个文件正被人 M 着改
     git show HEAD:docs/adr/0008-vector-clock-limit.md | grep -c '0046'; echo "rc=$?" # 0 ⇒ HEAD 态根本没有这条引用
@@ -1102,6 +1212,8 @@ grep -c 'map:' server/prisma/schema.prisma
      📌 这一格的可迁移结论比它本身值得记：**一份"记录别人的红"的文档，自己就成了红的来源** —— 凡是把判据的输出形状抄进正文，都要假设它会被同一把尺子再量一遍。
    - 本文自身：链接目标 **6 个、真死链 0**；`link-check` 输出里本文出现 8 行（21:47 趟），**逐行读过，8 行全是"本机存在但 git 未跟踪"这一类，且目标只有两个**（`adr/0047` ×6、`research/trash-and-archive-best-practice.md` ×2），**没有一行是本文的链接坏了**。
    📌 这条更新的价值在于形状：**门禁红的项数是一条活读数，它随别人的提交进度单调变动**，所以任何"红 N 项"写进文档都必须带时间戳与归属，否则下一轮会把它当成"这批遗留下来的"。⇒ `LINK_CHECK_EXIT` 仍为 **1**，本文第 ⑥ 项仍未达成，闭合判据不变（`git ls-files 'docs/adr/004[6-8]*.md' | wc -l` 应为 3，外加那 6 个新目标各自入库）。
+
+✅ **10-04 00:4x：这一格给出的两条闭合判据都已满足，而且门禁当场变绿。** 现量（就是上面那两条命令，原样复跑）：`git ls-files 'docs/adr/004[6-8]*.md' | wc -l` = **3**（22:23 那趟是 0）、`git ls-files -o --exclude-standard docs/adr | wc -l` = **0**（当时是 6）⇒ **回收站/归档那条线把它的 6 份 ADR 全部入库了**；同一趟 `node research/tools/docs-link-check.mjs` 的 `EXIT` = **0**（连跑三次都是 0）。⇒ 这一格从 20:18 起挂着的那条"⑥ 未达成"**字面闭合**，而闭合方式正是本条从第一天就写下的那一种：**不是本文改自己的链接，是目标被各自所有者入库**。⚠️ 但 durable 的那一半换了新判据、还没满足 —— 见上一格那张表（那 5 个 `vault-panel` PNG 只在**索引**里、倒计时那两行的改写只在**工作树**里，`f6478fad` 的干净检出上这 6 处红会原样复现）。所以本条记 🟡 不记 ✅。
 
 14. 🔴 **三条扫描线共 46 项的逐条处置账**（不写这条，下一轮就会把这 46 项读成"本批漏做"）。
     现量（20:47 重取，不凭记忆）：`1-sync-kernel.md` 53,095 B / **19 项**（P0 2 · P1 7 · P2 10）；`2-storage.md` 56,415 B / **14 项**（P0 2 · P1 6 · P2 6）；`4-web-render.md` 32,286 B / **13 项**（P0 3 · P1 6 · P2 4）。合计 **46**。
@@ -1190,6 +1302,7 @@ grep -c 'map:' server/prisma/schema.prisma
       a) **必须带阳性对照** —— 先注入一条已知错的引用（随便把一个行号 +1），确认尺子 2 报红，再改回来；
       b) **默认窗口 = ±0**（标识符必须在被引那一行），把 ±10 降级成可选宽松档。理由就是本节刚付过的学费：**±10 放过了"差 8 行"的 `HabitBoard.tsx` 637 行**，而"引用函数体内某行、用函数名做归属"这种合法写法应该由文档改写成函数定义行（`state.ts:498` 而不是 `:545`），不靠尺子放宽。
     - 在落成之前，本文 Goal ② 那条"每个 `file:line` 都能用一条命令证实符号存在"**目前的真实达成方式是"人工 adjudicate + 一次性脚本"** —— 别把它读成"仓库里有条自动检查在守这件事"。
+    - ✅ **10-04 00:4x 本条部分转正，但转正的不是尺子**：四臂变异装置已经从 `/tmp` 落进仓库（`research/tools/audit-self-check-mutation.mjs`，未跟踪、未提交、未挂 `pnpm check`）。它落进来的直接收益是**下一轮不必重造装置**，而它落进来时当场付的学费写进 §5.2 h：**旧装置的期望是写死数字的，台账一变它就两臂 FAIL**（一臂响亮、一臂靠 `a1 === orig` 那个守卫才没装成"四臂全对"）。⚠️ 尺子 1 与尺子 2 **仍然只住在 `/tmp`**，本条的主张没有变。
 
 
 ---
@@ -1216,6 +1329,7 @@ grep -c 'map:' server/prisma/schema.prisma
 | 14 | **P0-6** 的算法侧：`habit-streak` 改成按记录数走 | 放在门禁之后 —— 它改的是**用户能看到的连续天数**，需要一条"改前改后连续天数逐习惯相等"的等价判据垫底 |
 | 15 | 🔴 **P0-8**：物化层换数据结构（持久化字典树 / 浅结构共享），别再整桶展开 | 全表**最后**做，不是因为不重要，而是它**威胁两条既有不变量**：reducer 的纯性是 checkpoint 确定性 checksum 的前提（P0-2 那套），而就地 mutate 会让 ADR-0047 的回退判定失效。必须先有第 7 步的基线与"state 序列化字节序列改前改后相等"的等价判据 |
 | 16 | 上传批次按形状上界数发数 | P0-4，服务端属不可逆层，必须先有观测再动 |
+| 17 | 🔴 **本条线自己掉出的两条门禁缺口**（不是代码改动，是"下一轮别再付同样的学费"）：**a)** 凡以 `git show HEAD:` 为证据的断言，必须**同时写出锚定的那个 SHA**，并配一条比对当前 HEAD 与锚的复现命令；**b)** 尺子 1 要加"路径词存在性"一维 —— 把句中出现的路径 token 逐个 `test -e` | **a)** 是 P1-14 / P1-16 与 §7 第 10、11 条这一轮**当场过期两次**的形状：`git show HEAD:` 的读数在下一次合流之后就变成假话，而它打印出来的样子和真话完全一样（本文 23:5x 与 00:2x 两趟读数的差异就是它）。**b)** 来自 §7 第 5-b 条 —— 我点名过一个全仓根本不存在的 `domain/preference-resolver`：尺子 1 只把"路径 + 行号"这种形状当引用解析，**纯路径词根本不进检查**，所以那是一条盲区而不是漏检。⚠️ 两条都要授权才能落成自动检查（新增 `research/tools/` 或 `scripts/` 里的检查并挂进 `pnpm check`），本次 Goal 的边界只允许改文档 —— 所以本文只做**登记**，不声称有东西在守 |
 
 📌 **第 3、4、6 三步是收齐三条扫描线之后才排进来的**，它们的共同点是"改动面小 + 零产品决策 + 有现成参照"。原来那张表里没有它们，是因为当时只复核到渲染侧与取数侧。
 
