@@ -1,4 +1,10 @@
 import Foundation
+// 🔴 `RCTPromiseResolveBlock` / `RCTPromiseRejectBlock` 是 React 那两个 ObjC typedef，
+//    少了这一行 import 就"找不到类型"——而它**只在 xcodebuild 里现形**：TS 侧单测、
+//    `check:card-export`（它数的是 pbxproj 有没有这两个文件）全都挡不住。
+//    04 07:33 第一次真跑 `reinstall-all --only ios` 才照出来（22 条 error 全在这一处）。
+//    同仓兄弟模块 `HeytaReminderModule.swift:3` / `HeytaVaultSecureStorage.swift:3` 都是这么写的。
+import React
 
 /**
  * 把一段 base64 PNG 写进沙盒的临时目录，回一个 `file://` URI（W7 成品图落盘）。
