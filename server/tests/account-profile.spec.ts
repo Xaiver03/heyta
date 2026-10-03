@@ -11,11 +11,12 @@
  * ⚠️ 全程 mock `prisma`，不碰数据库。迁移本身（可空列、级联、默认值）的证据在
  * `account-profile-schema.pglite.spec.ts`，两件事别互相冒充。
  */
-// 🔴 显式 `import 'dotenv/config'`：别的用例是靠 `src/api` 的导入链**顺带**加载 .env，
-// 而本文件把 `../src/db` mock 掉了 ⇒ 那条链断了，`process.env.JWT_SECRET` 会是
-// undefined，症状是"整个文件一条用例都没跑就报 setup 错"。
-// 依赖偶然的导入顺序去拿环境变量，就是这种查不出方向的红灯。
-import 'dotenv/config';
+// 本文件把 `../src/db` mock 掉了 ⇒ 靠 `src/api` 的导入链**顺带**加载 .env 那条路断了，
+// 所以原来这里显式写了 `import 'dotenv/config'`。开发机上能过，而**干净检出（CI 的唯一形态）
+// 没有 `server/.env`**（`server/.gitignore:5` 忽略它）⇒ 整个文件在加载期就红。
+// §7 第 157 条点名的正是这个形状：那次清扫补了 4 个文件，这里是漏掉的第 5 个。
+// 改回仓库自己的约定（同 `account-locale` / `password-recovery` / `legal-recheck.routes`）：
+// 用 `vi.hoisted` 在所有 import 之前把测试密钥放好，`??=` 让显式设过值的文件不被覆盖。
 import Fastify, { FastifyInstance } from 'fastify';
 import * as jwt from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
@@ -35,8 +36,14 @@ vi.mock('../src/db', () => ({ prisma: mocks }));
 import { accountProfileRoutes } from '../src/account/account-profile.routes';
 import { withAccountProfile } from '../src/account/account-profile.store';
 
+vi.hoisted(() => {
+  process.env.JWT_SECRET ??= 'test-jwt-secret-that-is-long-enough-for-validation';
+});
+
+// 🔴 这条 `throw` 留着不是为了防御（上面已经保证有值），是**前提断言**：约定块被挪走或删掉时
+// 症状必须是一句响的，而不是 27 条用例各自报一个看不懂的签名错误。
 const SECRET = process.env.JWT_SECRET;
-if (SECRET === undefined) throw new Error('测试进程里没有 JWT_SECRET —— 看 server/.env / setup 链');
+if (SECRET === undefined) throw new Error('测试进程里没有 JWT_SECRET —— 看上面的 vi.hoisted 约定块');
 
 /** 令牌主人是 1 号。请求体里再写别的 userId 都不该生效。 */
 const token = (userId: number): string =>
