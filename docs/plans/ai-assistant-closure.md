@@ -46,7 +46,7 @@
 | **D-1** | 是否用 `feature-matrix.md` §11 那条反需求的"**除非明确有差异化价值**"豁免，取代 ADR-0005 的"不做聊天助手"禁令 | 无论做不做，都缺一份建立取代关系的 ADR（ADR 不可改，只能新增取代）。**没有它，W12 无法开工，W8 的形态也无从定** | W8、W12 |
 | **D-1a** | 「多步」是否从 ADR-0035 定义的"只读循环"扩成"**读循环 + 末尾一次写提案**" | 这是 D-1 的实质前置。**不拍它，滴答截图 A 那条链（3 读 + 1 写）永远复现不了**，且 W8 无法定义完成判据 | W8 |
 | **D-2** | 工具目录扩到几十个后，授权粒度按**工具** / 按**读-写两档** / 按**实体分组** / 按**会话临时授权** | 目录是内置助手与入站 MCP **共用一份**（ADR-0035 明令不许另建）。为助手扩目录 = 同时把外部 AI 攻击面同比扩大。**不先定粒度，扩目录就是拿隐私换功能** | W10 |
-| **D-3** | 倒数日 `EVENT` 实体是否与它的 AI 工具**同批**设计 | `docs/plans/countdown-anniversary.md`（⚠️ 该文**尚未提交**，故此处用 code span 而非链接，以免在干净检出上成死链；它入库后改回链接）162 行里**零 AI 工作项**。不同批就会在第 11 个实体上重演"功能做完再回头补 AI"；而滴答恰好在这里说了句产品谎言，这是唯一一处能比它先做对的机会 | W14'（见 §4） |
+| **D-3** | 倒数日 `EVENT` 实体是否与它的 AI 工具**同批**设计 | ✅ **已拍：同批**（2026-10-03 产品负责人）。落点与字段边界见 [`ai-event-tool-contract.md`](ai-event-tool-contract.md) | `AI-COV`（原 W14'） |
 
 ⚠️ **D-1 与 D-1a 要分开拍**。产品负责人问的是"用户能不能使唤 AI 干活"，那是 **D-1a**；
 "要不要一个聊天界面"是 **D-1**，是外壳。**把两件事混成一个"要不要做助手"的问题，
@@ -336,9 +336,12 @@
 | **W13** 移动端入口 | — | 目前 `apps/mobile/src` 零 `@heyta/ai` 导入，Electron 壳零 AI | 至少一条真模拟器 E2E，零 mock，照 `verify:mobile-*` 那批的形状 |
 | **W14** 语音线 AI | — | 滴答有 AI 语音添加（一段话拆多条、不确定给两版左右滑）与录音转写总结（30+ 语言、失败回退普通模式）；heyta **整条线为零**，且**不在任何现有 AI 计划里** | 🔴 **先过 AGENTS §3.1 可维护性 + §3.2 许可证两道门并完成登记**，再谈立项。语音模型接入不走现有 `packages/ai` 那条文本路径 |
 
-**W14'**（挂在 D-3，不占主序号）：若倒数日 `EVENT` 与 AI 工具同批，则 `EVENT` 的工具与能力清单项
-必须出现在 `countdown-anniversary.md` 的工单里；若不同批，则**在该计划里显式登记"AI 覆盖延后"并给编号**，
-不许静默消失。
+**W14'（已消化进 `AI-COV`，编号不再复用 W 号）**：D-3 拍成"同批"之后，这条不再是"要么登记延后、
+要么静默消失"的二选一，而是**已经有一份契约等实体落地**：
+[`ai-event-tool-contract.md`](ai-event-tool-contract.md) 定死了 `EVENT` 的读 2 / 写 4、
+逐工具 `egressFields`、三项刻意不进 AI 的字段（`pin` / 样式 / 图片）与农历的分工。
+🔴 **编号消歧**：闭环计划（本文）与倒数日计划**各有一个 W10 且指的是同一件事** ——
+覆盖面门禁从 2026-10-03 起统一称 `AI-COV`，两边都不要再复用 W 号。
 
 ---
 
@@ -402,11 +405,11 @@ W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的�
 | W7（结构债） | ✅ | 见本文 W7 的"✅ 2026-10-03 做完了"那节 | 冗余前门删除 + 请求组装收成一个 + `describeRoutedFailure()` 定义点恰好一处，全部由 `check-ai-tools.mjs` 规则 6 钉住（**已注入验证会红**） |
 | W8（多步循环 + 一次性并集披露 + 硬上界） | ✅ | `ai-assistant.ts`（循环 / 档位 / 并集 / 计划）+ `packages/ai/src/assistant-limits.ts`（三个上界住在这里，不在 app-host） | `packages/app-host/tests/ai-assistant.spec.ts` 20 条：第二次请求带 `role:'tool'` 的观察、失败也回送且**仍计入步数**、写只出提案（`host.submits === 0`）、提案后**没有第二次调用**、越界字段 ⇒ 停而不是放行。`assistant-limits.spec.ts` 13 条：单位是**字节**、边界取 `>` 不取 `>=`、标签由常量推导 |
 | W9（能力清单生成器） | ✅ | `scripts/gen-ai-capability-manifest.mjs` → `packages/ai/src/capability-manifest.generated.ts`（424 行，生成物） | 手写**不可能**：清单是产物。`--check` 已作为**规则 7 接进 `check:ai-tools`**（不一致 exit 1），`capability-manifest.spec.ts` 29 条钉形状 |
-| W10（扩工具目录 + "覆盖面"门禁） | ⛔ 未做 | — | 目录仍是 6 个工具（读 3 / 写 3），覆盖面 **2/8** 实体；`EntityModelMap` 每个实体必须有工具的那道门禁**还没写** —— 见 §7.2 第 3 条 |
+| W10（扩工具目录 + "覆盖面"门禁） | 🔄 **开工**（2026-10-03，改称 `AI-COV`） | [`ai-event-tool-contract.md`](ai-event-tool-contract.md) §2 | 目录仍是 6 个工具（读 3 / 写 3）。🔴 **此前对外说的 `2/8` 两个数都是错的**：`covered` 判的是"有任一工具"，于是只读一个 `list_projects` 的 `PROJECT` 被算成已覆盖；按"读+写都有"改口径、并把 `FOCUS_SESSION`（无用户填写面）移出分母之后，现状是 **1/7**。缺的六项：`PROJECT` 写、`TAG`、`NOTE`、`HABIT`、`HABIT_LOG`、`REMINDER` |
 | W11（批量写入） | ⛔ 未做 | — | 按本文要求：**先论证**与 AGENTS §3.4 的关系，论证不成立就不做 |
 | W12（chat 外壳） | ✅ | `apps/web/src/features/ai/AssistantPanel.tsx` + `App.tsx`（任务视图内）+ i18n 37 键 ×2 语言 | 单测 19 条（`ai-assistant-panel.spec.tsx`，含"第一次点发送 ⇒ 一个请求都没发"）；**真浏览器** `e2e/tests/ai-assistant.spec.ts` 一条旅程 + **四张**截图（含暗色那张）。⚠️ **看图的是本会话的 agent，不是产品负责人** —— 两张有问题的图确实是被"看"出来的（动画中途按快门、两种角色分不出来），但 §6.2 要求的那一眼**还没发生**，四张图在 `apps/web/evidence/assistant/` 等人看。档位选择器在设置里（`ai-assistant-tier.spec.tsx` 14 条） |
 | D-2（授权粒度） | ✅ **已拍并落地**（助手侧） | `apps/web/src/features/settings/{aiStore,AiSettings}.tsx` 的 `assistantTier` | 拍的是**助手这一侧**：读 / 读+提议两档，与入站 MCP 的**逐工具默认关**解耦但共用 `isToolGranted()`。双向不越界已在真浏览器里验（`ai-assistant.spec.ts` 第 7 步）。⚠️ 目录扩到几十个之后仍需重拍（见 §7.2 第 3 条） |
-| D-3（`EVENT` 与 AI 工具同批） | ⛔ 仍未拍 | — | 倒数日尚未立项到可开工的程度（`docs/plans/countdown-anniversary.md` 的 D1/D2/D3 也未拍） |
+| D-3（`EVENT` 与 AI 工具同批） | ✅ **已拍（2026-10-03 产品负责人）并落成契约** | [`ai-event-tool-contract.md`](ai-event-tool-contract.md) | 拍的是"**同批**"：契约（读 2 / 写 4、逐工具 `egressFields`、三项刻意不进 AI 的字段、农历只许本地换算）已定死，实现等倒数日那条线把 `EVENT` 进 `EntityModelMap`。🔴 该计划自己的 `:175`「不在本批立这条门禁，后面再说」已被这次拍板推翻，**那句要就地更正**（此刻那份文件正被一次 merge 占用，改不了就先留着这条指针） |
 
 ### 7.1 🔴 本轮抓到的一个真缺陷（不是重构的副产品）
 
