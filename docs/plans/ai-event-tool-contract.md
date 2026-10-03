@@ -3064,3 +3064,41 @@ for b in feat/countdown-batch2 feat/countdown-w9 feat/countdown-w4b feat/countdo
 `heyta.ai.assistant.history` 命中 **1** 个；而已装的 `/Applications/Heyta.app/.../web-dist` 只有 26 个文件、
 `assistant.history` 命中 1 个（`assets/index-Da9aaZLq.js`）而 `list_events` 命中 **0** 个
 ⇒ 同一对 needle 一边中一边不中，"装的是合并下载体"这句才不是猜的。
+
+### 15.43e `environment-traps` 的编号在两个文件之间**已经串号**了 —— 这是 ④"按工作树现量复核"照出来的，本批只登记不动它
+
+现量（10-04 02:4x，main `74cbe812` 之后）：
+
+```bash
+grep -nE '^[0-9]{2}\. ' AGENTS.md                       # AGENTS.md 自己带着 6 枚 traps 形状的条目
+grep -nE '^8[0-3]\. ' docs/reference/environment-traps.md
+grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md | tr -d '. ' | sort -n | tail -1
+grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md | tr -d '. ' | sort | uniq -d   # 重复号
+seq 1 202 | comm -23 - <(…sorted…)                        # 缺号
+```
+
+| 读数 | 值 |
+|---|---|
+| AGENTS.md 里的 traps 条目 | 第 **975 / 1000 / 1022 / 1039 / 1062 / 1088** 行，行首号依次是 **82, 80, 83, 81, 82, 83** ⇒ **82 与 83 各有两枚，内容互不相同** |
+| traps 文件里的 80 / 81 / 82 | `am start -n $PKG/.MainActivity…` / `RNW 的 CLI 命令"不存在"…` / `aka.ms/<短链> 回退到 Bing 搜索页…` —— **与 AGENTS.md 那六枚没有一枚对得上** |
+| traps 文件的缺号 | **83、84、85、120**（1..最大号之间） |
+| traps 文件的重复号 | **38、93、94、95**（各两枚；这条 §15.42 已经登记过，此处只是复核仍存在） |
+| traps 文件最大号 | **202**，而 AGENTS.md §7 那张号段索引表最后一行只写到 **165–176** |
+
+⇒ 后果要说得具体：**任何"`§7` 第 82 条"的引用现在是不可判定的** —— 它可能指"非空白挡不住错误屏"（AGENTS 第一枚 82）、
+"重装≠装上当前源码"（AGENTS 第二枚 82），也可能指 traps 文件里的 `aka.ms` 短链那枚。
+而 §7 的索引表停在 176，会让读者以为文件到 176 就结束了。
+
+**为什么本批不动它**（三条都是现量，不是"代价大"的印象）：
+① 引用 `8[0-3]` 号的行 **65 处**、分布在 ≥10 个文件（`docs/plans/*`、`scripts/*`、`research/tools/*`、`PROGRESS.md`…）
+   ⇒ 任何整体重编号 = 一次跨 10+ 文件的引用改写，逐条核对不是全局 `sed` 能做的事；
+② `AGENTS.md` 此刻是 `M`（另一条会话正在写它）⇒ 我改它就是把别人没跑完判据的行带走；
+③ 本批 Goal 的 ④ 写的是"**复核**"，不是"迁移"。
+
+**登记给下一批的修法**（按这个顺序做才不会二次串号）：
+1. 把 AGENTS.md 那 6 枚**按内容**追加到 traps 文件末尾，号按当时工作树现取（别在这里写死"应为 #203"）；
+2. 原引用处**逐条**改指新号，每条改完用 `git show HEAD:<file>` 复算一次；
+3. 同时补两条门禁（都能失败才算存在）：traps 文件"行首编号唯一且在 1..最大号内连续"；
+   AGENTS.md "不允许出现 `^[0-9]{2}\. ` 形状的行"（注入一枚就该红）。
+4. 元规则一句：**"`§7` 编号只增不改"这句话本身需要一条门禁**，否则它就是一张会漂的抄件 ——
+   而它漂的方式是**两个文件同号不同事**，读的人不会察觉，只会引用错。
