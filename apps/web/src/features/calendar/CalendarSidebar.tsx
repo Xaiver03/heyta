@@ -168,21 +168,25 @@ function MiniDay({
              而按 class 数会连容器一起数（`-dots` 那一层每天都画）。 */
           <i data-testid={`calendar-mini-dot-${date}`} style={{ background: cssVar(dotToken) }} />
         )}
+        {/*
+          「休 / 班」（W6 补齐的那半：原先只有主区月历画，侧栏说"这天有没有事"，
+          却不说"这天是不是班"）。词与颜色都来自共享层同一个
+          `calendarDayMarkerView` —— 这里只搬它给的 token 名，不再判一次。
+
+          🔴 它和那颗点**共用这一行**，不是下面另起一行：另起一行会把格子撑高，
+          而这一列宽只有 ~27px（`--ht-layout-sidebar-min-width` 192px / 7），
+          2026-10-04 实测那样会把七列撑歪、整张月历溢出侧栏
+          （取证见 `sidebar.css` 里 `.ht-sidebar__day` 那条记录）。
+        */}
+        {marker === undefined ? null : (
+          <span
+            className={`ht-sidebar__day-marker ${MARKER_CLASS[marker.colorToken]}`}
+            data-testid={`calendar-mini-marker-${date}`}
+          >
+            {marker.text}
+          </span>
+        )}
       </span>
-      {/*
-        「休 / 班」（W6 补齐的那半：原先只有主区月历画，侧栏说"这天有没有事"，
-        却不说"这天是不是班"）。词与颜色都来自共享层同一个
-        `calendarDayMarkerView` —— 这里只搬它给的 token 名，不再判一次。
-      */}
-      {marker === undefined ? null : (
-        <span
-          className={`ht-sidebar__day-marker ${MARKER_CLASS[marker.colorToken]}`}
-          data-testid={`calendar-mini-marker-${date}`}
-          aria-hidden="true"
-        >
-          {marker.text}
-        </span>
-      )}
     </button>
   );
 }
