@@ -60,11 +60,20 @@ cd server
 # 2. Copy environment example
 cp env.example .env
 
-# 3. Configure .env (Set JWT_SECRET, DOMAIN, POSTGRES_PASSWORD)
+# 3. Configure .env
+#    Refuses to start without these three: JWT_SECRET (>= 32 chars),
+#    PASSWORD_PEPPER, POSTGRES_PASSWORD.
+#    🔴 Two more have defaults that are WRONG for you and fail silently:
+#    DOMAIN and PUBLIC_URL (default http://localhost:1900) — leave them at the
+#    default and every verification / password-reset email points at localhost.
 nano .env
 
 # 4. Deploy the stack and run database migrations
-./scripts/deploy.sh
+#    🔴 `--build` is not optional today: heyta publishes no image, and the default
+#    image name is `supersync:local`. Without `--build`, deploy.sh tries to PULL it
+#    and you get `pull access denied for supersync … may require 'docker login'`
+#    (there is no registry to log in to).
+./scripts/deploy.sh --build
 ```
 
 **`./scripts/deploy.sh` is the supported entry point, and the reason is the migrations.**
@@ -120,8 +129,11 @@ the API by construction. That variable is for clients served from *another* orig
 That compiles the whole monorepo **on the deploy host**, beside the running
 stack: expect several minutes and a peak above 1.5 GB of RAM on top of the
 ~2.5 GB the containers already reserve, plus a BuildKit cache that grows by
-~1.4 GB per build and is never pruned for you. On a small VPS, prefer the pull,
-or build elsewhere and set `SUPERSYNC_IMAGE` (passing the same `VCS_REF`, see
+~1.4 GB per build and is never pruned for you. 🔴 **`--build` is the only path that
+works today** — heyta publishes no image, so "prefer the pull" is not available here
+(the pull now fails loudly with a message naming `--build`, rather than Docker's
+misleading "may require 'docker login'"). On a small VPS, build elsewhere and set
+`SUPERSYNC_IMAGE` to a tag in **your own** registry (passing the same `VCS_REF`, see
 below). `--build` also refuses to run if the image inputs have uncommitted or
 untracked changes; the error names the offending files.
 
@@ -324,15 +336,15 @@ All configuration is done via environment variables.
 | `HOST`                                  | `0.0.0.0`                            | Server bind address. Use `::` for IPv6-only deployments.                                                                                       |
 | `DATABASE_URL`                          | -                                    | PostgreSQL connection string (e.g. `postgresql://user:pass@localhost:5432/db`)                                                                 |
 | `JWT_SECRET`                            | -                                    | **Required.** Secret for signing JWTs (min 32 chars)                                                                                           |
-| `PUBLIC_URL`                            | -                                    | **Required.** Public URL used for email links (e.g. `https://sync.example.com`)                                                                |
+| `PUBLIC_URL`                            | `http://localhost:1900`              | 🔴 **Has a default, and that default is wrong for any real deployment.** It is the base for every email link (verify / reset). Leave it and the server starts fine while the emails point at localhost — the failure is silent, not a crash. Under `NODE_ENV=production` a *public* host must be https (that one does throw); loopback / private IPs over http are deliberately allowed. |                                                                |
 | `CORS_ORIGINS`                          | `https://app.super-productivity.com` | Allowed CORS origins. `*` allows any origin — never do this in production, CORS runs with `credentials: true`.                                 |
 | `SMTP_HOST`                             | -                                    | SMTP Server for emails                                                                                                                         |
 | `WEBAUTHN_RP_ID`                        | `localhost`                          | **Required for passkeys.** Your domain, without protocol or port. Passkeys bind to this — changing it invalidates every registered credential. |
 | `WEBAUTHN_ORIGIN`                       | `http://localhost:1900`              | **Required for passkeys.** Where users reach the auth UI, with protocol.                                                                       |
 | `WEBAUTHN_RP_NAME`                      | value of `WEBAUTHN_RP_ID`            | Name shown in your users' OS passkey prompt.                                                                                                   |
 | `ALLOWED_EMAILS`                        | - (anyone may register)              | Comma-separated exact addresses and/or `*@domain` rules.                                                                                       |
-| `WEB_APP_DIR`                           | `/app/web-dist` (in the image)       | Where the built web client lives on disk. The switch is "does this directory exist", not a boolean: empty value = serve no UI, a non-empty path without `index.html` is a startup error, and a path starting with a reserved segment (`/api`, `/health`, `/live`, `/ws`) is refused rather than silently relocated. |
-| `WEB_APP_PATH`                          | `/app/`                              | URL prefix the client is served under. It must match how the UI was **built** (`HEYTA_WEB_BASE` at build time) — mismatched pairs load HTML where CSS is expected. |
+| `WEB_APP_DIR`                           | `/app/web-dist` (in the image)       | Where the built web client lives on disk. The switch is "does this directory exist", not a boolean: empty value = serve no UI, a non-empty path **without `index.html` is not an error** — it logs one line and serves API only (that is a legitimate deployment, e.g. someone hosting the UI elsewhere), and a path starting with a reserved segment (`/api`, `/health`, `/live`, `/ws`) **is** refused at startup rather than silently relocated. |
+| `WEB_APP_PATH`                          | `/app/`                              | URL prefix the client is served under. It must match how the UI was **built** (`HEYTA_WEB_BASE` at build time) — mismatched pairs load HTML where CSS is expected. ⚠️ Nothing checks this pair **at runtime**: the build-time gate (`check:web-artifact`) only runs in our pipeline, so setting `WEB_APP_PATH=/ui/` against an image baked for `/app/` starts cleanly and serves a blank page. Change both or neither. |
 | `SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES` | `104857600` (100 MB)                 | Quota for accounts created from now on. Existing accounts keep the value stored on their row.                                                  |
 
 ### Legal pages

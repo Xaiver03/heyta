@@ -226,6 +226,25 @@ if [ "$BUILD_LOCAL" = true ]; then
     docker compose $COMPOSE_FILES build
 else
     # Pull from registry (default)
+    #
+    # 🔴 heyta publishes NO image, so this default path points at nothing: the
+    # resolved tag is `supersync:local`, which only ever exists if somebody built
+    # it on this machine. Asking Docker for it does not fail cleanly -- Docker
+    # answers `pull access denied for supersync, repository does not exist or may
+    # require 'docker login'`, which sends the operator hunting for credentials to
+    # a registry that does not exist. Fail here instead, naming the real fix.
+    # The image is read back from compose itself (not from a copy of its default)
+    # so this check cannot drift away from docker-compose.yml.
+    RESOLVED_IMAGE="$(docker compose $COMPOSE_FILES config --format json 2>/dev/null \
+        | jq -r '.services.supersync.image // empty' || true)"
+    if [ -n "$RESOLVED_IMAGE" ] \
+        && [ "${RESOLVED_IMAGE##*:}" = "local" ] \
+        && ! docker image inspect "$RESOLVED_IMAGE" >/dev/null 2>&1; then
+        echo "ERROR: '$RESOLVED_IMAGE' is not present locally, and heyta publishes no image to pull."
+        echo "       First deploy on this machine: ./scripts/deploy.sh --build"
+        echo "       Or build elsewhere, push to YOUR OWN registry, and set SUPERSYNC_IMAGE to that tag."
+        exit 1
+    fi
     echo "==> Pulling latest image..."
     docker compose $COMPOSE_FILES pull supersync
 fi

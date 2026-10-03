@@ -232,6 +232,11 @@
   **不匹配** `/app`，而落地页给出的地址去掉尾斜杠是**故意的**（`apps/landing/src/lib/app-url.ts`）。
   少了它，`/app` 会掉进 `location /` 拿回**落地页 HTML**（HTTP 200、看着正常，点进去却是别的页面）。
   带 `$is_args$args` 是为了**保留查询串** —— `?lang=en` 必须跟着走，否则英文用户又回到中文应用。
+  🟢 **2026-10-03 起这条从"必须"降成"留着无害"**：服务端自己注册了
+  `GET /app → 307 /app/`（`server/src/web-app.ts`，判据 `server/tests/web-app-slash-redirect.spec.ts`），
+  所以**跑当前镜像**的自建者不写这条 nginx 规则也不会踩到。上面那句"少了它拿回落地页 HTML"
+  现在只对**旧镜像**成立 —— 上面这套 nginx 配置里这条规则仍然保留（nginx 的精确匹配先命中，
+  于是仍然是 301 在前、服务端的 307 在后者不会被用到），删它没有收益。
 - ✅ `location /api/` → `proxy_pass http://127.0.0.1:1900;`，带 `Upgrade` / `Connection: upgrade`
   （WebSocket，真实路径 `/api/sync/ws`）、`Host` / `X-Real-IP` / `X-Forwarded-For` /
   `X-Forwarded-Proto`，`proxy_read_timeout 90s` / `proxy_send_timeout 90s`。
@@ -852,6 +857,9 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
 ⚠️ 正是这一步抓到了一个 `curl` 抓不到的 bug：`appUrl()` 会去掉末尾斜杠，
 而 nginx 的 `location /app/` **不匹配** `/app` —— 点链接（而不是手输 `/app/`）
 的用户拿到的是 JSON 404。修法即 `location = /app { return 301 /app/; }`。
+🟢 **2026-10-03 补**：这条修法后来**下沉到服务端自己**了（`GET /app → 307 /app/`，
+`server/src/web-app.ts`），因为自建的人不会记得加这条 nginx 规则，而少它的表现和
+"应用坏了"长得一样。上面这段历史记录本身不改 —— 它记的是**当时**靠 nginx 补的那一刀。
 
 #### 还没做的
 

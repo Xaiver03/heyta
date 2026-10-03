@@ -132,6 +132,38 @@ export const registerWebApp = async (
 ): Promise<void> => {
   if (mount === null) return;
 
+  /**
+   * `/app`（**无尾斜杠**）→ 307 `/app/`，查询串原样带过去。
+   *
+   * 为什么必须由服务端自己做：`@fastify/static` 的 `prefix: '/'` 注册出来的是
+   * `/app/*` 通配，而 find-my-way 的 `/*` **不匹配没有尾斜杠的父路径** ⇒
+   * `/app` 与 `/app?lang=zh` 根本不进这个封装作用域，落到默认 404（JSON）。
+   * 落地页给出的入口地址去掉尾斜杠是**故意的**（`apps/landing/src/lib/app-url.ts`），
+   * 所以用户点的正是这条路径：症状是"页面打不开"，而 `/app/` 一切正常。
+   *
+   * 线上此前靠宿主 nginx 的 `location = /app { return 301 /app/$is_args$args; }`
+   * （`docs/runbooks/deployment.md` §3.3.1）。界面改由服务端自己挂之后，那一条
+   * **不再是可选项** —— 自托管的人不会记得补它，而少它的表现和服务坏了长得一样。
+   *
+   * 三条刻意的取值：
+   * - 挂在**外层 `server`** 上，不在封装作用域里：作用域的 `prefix` 会把路径钉在
+   *   `/app/` 之下，`/app` 在那里面根本注册不出来。
+   * - **静态精确路径**，不是 `startsWith` 判断：这样 `/api`、`/health`、`/live`、`/ws`
+   *   结构上不可能被它吞掉（尤其不会出现把 `/api/x` 重定向成 `/api/x/` 那种把宽写窄收的
+   *   事故）—— 判据在 `web-app-slash-redirect.spec.ts` 的反向对照那条。
+   * - **307 而不是 301/308**：308/301 会被浏览器**长期缓存**，而挂载前缀
+   *   `WEB_APP_PATH` 是每台实例自己配的，改了前缀就把用户锁死在旧重定向上；
+   *   307 同时保留方法与查询串，不缓存，可撤销。
+   */
+  const barePrefix = mount.prefix.replace(/\/+$/, '');
+  if (barePrefix !== '') {
+    server.get(barePrefix, async (request, reply) => {
+      const queryStart = request.url.indexOf('?');
+      const search = queryStart === -1 ? '' : request.url.slice(queryStart);
+      return reply.redirect(`${mount.prefix}${search}`, 307);
+    });
+  }
+
   await server.register(
     async (scope) => {
       scope.addHook('onSend', async (_request, reply, payload) => {
