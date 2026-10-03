@@ -161,6 +161,24 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 
 ### W10 · EVENT 必须同时进 AI 工具目录（否则内置 AI 与 MCP 都够不着它）
 
+> ✅ **2026-10-03 同日、AI 那条线合流时的更正**（下面两处说法已过期；原文留着是为了让下一个人看清当时为什么这么判）：
+>
+> 1. 「🔴 这条没有门禁兜底……加一个 `EVENT` 实体不会让任何一处变红」**不再成立**。
+>    `scripts/check-ai-coverage.mjs` 现在除了 `AiFeature` 那一节，还多了一节由
+>    `EntityModelMap` / `ENTITY_TYPES` 驱动的**实体覆盖面**（口径：读和写都要有工具）。
+>    ⇒ **W2 把 `EVENT` 落进 `EntityModelMap` 而不配 AI 工具，门禁会当场红**；
+>    现量红文字见 [`ai-event-tool-contract.md`](ai-event-tool-contract.md) §5.3 的注入 D 与 §11.3 的臂 1。
+>    本节末尾那句「根治做法：把工具目录改成由 `ENTITY_TYPES` 驱动……这条要单独确认」——
+>    **该做法已经落地，不必再确认**。
+> 2. 「⏸ 排期决定：不在本批立这条门禁，后面再说」被产品负责人同日改判：
+>    **`EVENT` 与它的 AI 工具同批设计**（D-3）。当时那条理由（"一上就会让没接 AI 的实体当场全红"）
+>    由唯一豁免通道 `ENTITY_COVERAGE_DEBT` 化解 —— 已知未覆盖可以带 `AI-COV-<n>` 工单号
+>    **留在分母里而不炸红**，只有"既没工具又没登记"才响。
+>    ⇒ 本节最后那句"AI 侧不会有任何东西提醒我们、必须靠人工核对"不再成立，
+>    W2 判据里那项人工核对可以撤。AI 侧的字段边界（读 2 / 写 4、逐工具 `egressFields`、
+>    三项刻意不进 AI、农历只许本地换算）在
+>    [`ai-event-tool-contract.md`](ai-event-tool-contract.md)。
+
 新实体如果只进 UI，**AI 侧就是瞎的**：工具目录、授权判定、执行器在 `packages/app-host`（`ai-tool-selection.ts` 自然语言→工具、`ai-tool-run.ts` 读即执行/写只产出提案）与 `packages/local-api` 之间**共用一份**（ADR-0035，AGENTS §3.5 明写"不要另建一份"）。
 
 - 做：读工具（列倒数日 / 取某条的下一次发生日）+ 写工具（产出**提案**）。
