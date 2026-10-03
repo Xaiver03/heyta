@@ -1,0 +1,380 @@
+#!/usr/bin/env node
+/**
+ * `research/tools/selfhost-merge-carrier.mjs` —— 把 `feat/self-host-distribution`
+ * 合进 main 的那次合并**重算成一条命令**。
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ * 为什么是脚本，不是"文档里写清步骤"
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ * 落地那一刻要的是"main 前进到一个跑过完整链的载体"。而 main 在这台机器上**每两三分钟**
+ * 前进一笔（2026-10-04 01:50→01:53→01:57 实测三笔），所以任何手算出来的载体在写完
+ * 那一秒就过期。§8.29 记的第一次手算撞上的就是这个；本轮第二次手算（main=5d0b27b9，
+ * 七条冲突逐个解完、五道纯 fs 门禁全绿）在**即将落笔的前一回合**又被
+ * "main 已到 6afca90f" 顶回来 —— 那一回合什么都没做错，只是慢了一分钟。
+ *
+ * 更糟的是手算的**产出**也会漂：上一版提交说明里写 `.gitignore 213 行 = base 193 +
+ * main 8 + 本批 13`，那个等式左右根本不相加（214≠213）。真相是 193+8+13=214 个
+ * `split('\n')` 段 = `wc -l` 的 213 行（文件以换行结尾）。**手抄的数字连单位都会错**，
+ * 所以这里的读数全部由脚本自己拼进提交说明，不由人复述。
+ *
+ * ## 四条冲突族与它们的解法（§8.22 预置，本文件是唯一执行者）
+ *
+ *  1. `package.json`：scripts 键并集 + `check` 链并集，带四条断言
+ *     （两侧键不缺 / 两侧链段不缺 / 两侧各自相对顺序不颠倒 / 两侧相对 base 都不得摘段）。
+ *     🔴 断言④是前提断言：并集脚本默认"只增不减"，谁摘了 base 的一段就必须停下来人判，
+ *     否则摘掉的那段会被当成"另一边没有"而**静默消失**。
+ *     第一版（手改）把冲突块按 main 侧收掉，症状是"合上了"而实际摘掉本批五道门禁。
+ *  2. `.gitignore`：交给 `git merge-file --diff3`，只对**纯追加**的冲突块（base 段为空）
+ *     做"两块都留"；base 段非空 ⇒ 那不是双方各自追加，退 2 交人判。
+ *     ⚠️ 不要用"公共前缀 + 两条尾巴"：其前提是两侧都只在 EOF 追加，而本批在第 89 行
+ *     中间插了 3 行 ⇒ 公共前缀只到第 88 行，两条尾巴各带后半份，拼出 318 段 = 后半份抄两遍。
+ *  3. `apps/web/evidence/**.png`（binary）：取 **main** 侧。它们是产物不是源码，
+ *     留 main 的不丢任何判据，留本批的会把 main 上另一批的现场覆盖掉。
+ *  4. `docs/research/self-host-distribution-audit.md`（add/add）：取**本分支**侧，
+ *     但不靠印象 —— 断言是**结构粒度**的：main 那份的每一个小节标题（`^#{2,6} `）和每一个
+ *     `§8.NN` 编号都必须能在本分支那份里找到；缺任何一个 ⇒ 那是别人写的"一节"，退 2 交人判。
+ *     🔴 为什么不是行粒度（本轮实测出来的）：第一版要求"main 那份的每一行都在本分支该文件的
+ *     历史 blob 里出现过"，它在 main=59f0ab45 上**判红了两行**，而那两行确实是本批自己的话
+ *     （一条讲 `apps/web/dist` 无人引用，一条是"缺的成本"表格行）。原因是并行会话
+ *     （GDPR 那笔 `6e447033`）把**当时工作树里未提交的中间态**整文件带进了 main，
+ *     而我随后又把那两句改写了一版 ⇒ 旧措辞在 git 历史里**从来没有过 blob**。
+ *     行粒度挡不住这种漂，只会把"我自己改过措辞"误报成"别人有内容"；
+ *     而"别人的内容"在这个文件里的真实形状是**一整节**（标题 + §编号），那一层挡得住。
+ *     行级孤儿数量仍然打印并进提交说明，只是不作门禁。
+ *
+ * 任何不属于这四族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
+ *
+ * ## 落笔前的门禁（只跑纯文件系统的那五道）
+ *
+ * `check:gate-wiring`（并集有没有静默摘掉谁的门禁，这一族的裁判）、
+ * `check:selfhost-entry-command`（入口命令抄件对账；顺带证明合并没把站内两份词条抄件并掉）、
+ * `check:script-snapshot`、`check:docs`、`check:md-tables`。
+ * 完整 `pnpm check`（要 node_modules、要起栈、`check:ai-e2e` 会 SIGKILL 别人的 dev server，
+ * §7 #87）**不在这里跑** —— 它是落地那一刻的判据，载体绿不绿不由本脚本主张。
+ *
+ * ## 落笔前的新鲜度守卫
+ *
+ * `git commit` 之前再取一次 `main`：与本次检出用的 SHA 不同 ⇒ 退 4 且不提交。
+ * 没有这条守卫时会产出一笔"第一父已经不在 main 上"的载体，而它看起来和合法载体一模一样。
+ * 重跑本脚本就是全部恢复动作。
+ */
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
+const MAIN = process.env.HEYTA_MAIN_REF || 'main';
+const BRANCH = process.env.HEYTA_CARRIER_BRANCH || 'feat/self-host-merge-main';
+const SOURCE = process.env.HEYTA_SOURCE_REF || 'feat/self-host-distribution';
+// 载体工作树是**一次性的**：每次跑都硬重置到 main tip，不复用旧索引。
+const WT = process.env.HEYTA_CARRIER_WT || '/tmp/heyta-merge-carrier';
+
+const git = (args, opts = {}) =>
+  execFileSync('git', ['-C', REPO, ...args], { encoding: 'utf8', maxBuffer: 1 << 26, ...opts });
+
+const failures = [];
+const notes = [];
+const die = (code, msg) => {
+  // 🔴 失败必须把**已经量到的读数**一起打出来。本轮就吃过这个亏：门禁红只打了门禁输出，
+  //    而真正的问题是"合并根本没起来"——那个读数（冲突 0 条）当时只进了 notes。
+  if (notes.length) console.error(`   已量到的读数：\n${notes.map((n) => `     · ${n}`).join('\n')}`);
+  console.error(`❌ ${msg}`);
+  process.exit(code);
+};
+
+// ── 0. 起点 ──────────────────────────────────────────────────────────
+const mainSha = git(['rev-parse', MAIN]).trim();
+const srcSha = git(['rev-parse', SOURCE]).trim();
+const baseSha = git(['merge-base', mainSha, srcSha]).trim();
+try {
+  // rc 0 ⇒ 本批已全部在 main 上，没有合并要做。非 0 会 throw，正是我们要的"继续"。
+  git(['merge-base', '--is-ancestor', srcSha, mainSha]);
+  console.log(`载体：${SOURCE} 已是 ${MAIN} 的祖先（${mainSha.slice(0, 8)}），无需重算`);
+  process.exit(0);
+} catch { /* 不是祖先 ⇒ 要做合并，继续 */ }
+notes.push(`main=${mainSha.slice(0, 8)} · ${SOURCE}=${srcSha.slice(0, 8)} · merge-base=${baseSha.slice(0, 8)}`);
+
+if (!existsSync(WT)) {
+  git(['worktree', 'add', '--detach', WT, mainSha]);
+} else {
+  try { git(['-C', WT, 'merge', '--abort']); } catch { /* 没有进行中的合并 */ }
+  git(['-C', WT, 'checkout', '--force', '--detach', mainSha]);
+  git(['-C', WT, 'reset', '--hard', mainSha]);
+}
+notes.push(`载体检出 ${WT} @ ${mainSha.slice(0, 8)}`);
+
+// ── 1. 合并 ──────────────────────────────────────────────────────────
+let mergeOut = '';
+try {
+  mergeOut = git(['-C', WT, 'merge', '--no-commit', '--no-ff', SOURCE], { stdio: ['ignore', 'pipe', 'pipe'] });
+} catch (err) {
+  mergeOut = `${err.stdout ?? ''}${err.stderr ?? ''}`;
+}
+// 🔴 合并**必须真的在进行中**（MERGE_HEAD 就是那一笔的来源 SHA）。
+// 少了这道守卫时踩过一次：合并没起来（工作树里还有上一趟的残留），脚本却继续往下走，
+// 分族读到"冲突 0 条"⇒ 四族一条都没解 ⇒ 门禁是拿**基本等于 main** 的树在跑，
+// 症状是 check:gate-wiring 报"本批五道门禁不在链里" —— 那不是合并把门禁摘了，
+// 是**根本没有合并**。这种红比不红好（它响了），但归因会指错地方。
+let mergeHead = '';
+try { mergeHead = git(['-C', WT, 'rev-parse', 'MERGE_HEAD']).trim(); } catch { /* 空 ⇒ 下面判红 */ }
+if (mergeHead !== srcSha) {
+  die(2, `合并没有真正开始：MERGE_HEAD=${mergeHead || '(不存在)'}，应当是 ${SOURCE}=${srcSha}。\n` +
+    `   git merge 的输出：\n${mergeOut.split('\n').slice(0, 12).map((l) => `     ${l}`).join('\n')}`);
+}
+const conflicts = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
+notes.push(`MERGE_HEAD=${mergeHead.slice(0, 8)} 已确认 · 冲突 ${conflicts.length} 条：${conflicts.join(', ') || '（无）'}`);
+
+// ── 2. 分族并逐个解 ─────────────────────────────────────────────────
+const stage = (path, n) => git(['-C', WT, 'show', `:${n}:${path}`]);
+const PNG = (p) => p.startsWith('apps/web/evidence/') && p.endsWith('.png');
+const AUDIT = 'docs/research/self-host-distribution-audit.md';
+
+const fam = { pkg: [], gi: [], png: [], audit: [], other: [] };
+for (const p of conflicts) {
+  if (p === 'package.json') fam.pkg.push(p);
+  else if (p === '.gitignore') fam.gi.push(p);
+  else if (PNG(p)) fam.png.push(p);
+  else if (p === AUDIT) fam.audit.push(p);
+  else fam.other.push(p);
+}
+if (fam.other.length) {
+  die(2, `出现**预置四族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
+    `   先把它加进本文件的分族与解法，再重跑。`);
+}
+notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} other=${fam.other.length}`);
+if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1) {
+  die(2, '同一族出现多于一份文件 —— 分族前提（各一处）不成立，交人判');
+}
+
+/* ── package.json ─────────────────────────────────────────────────── */
+let pkgReading = '';
+if (fam.pkg.length) {
+  const base = JSON.parse(stage('package.json', 1));
+  const ours = JSON.parse(stage('package.json', 2)); // main = 第一父
+  const theirs = JSON.parse(stage('package.json', 3));
+  const outPkg = JSON.parse(JSON.stringify(ours));
+  for (const [k, v] of Object.entries(theirs.scripts)) {
+    if (!(k in ours.scripts)) {
+      outPkg.scripts = { ...outPkg.scripts, [k]: v };
+      continue;
+    }
+    if (ours.scripts[k] === theirs.scripts[k] || k === 'check') continue;
+    const oursIsBase = (base.scripts[k] ?? null) === ours.scripts[k];
+    const theirsIsBase = (base.scripts[k] ?? null) === theirs.scripts[k];
+    if (!oursIsBase && !theirsIsBase) {
+      die(2, `package.json 的 scripts.${k} 两边都改且互不相同 —— 这条不许自动决定`);
+    }
+    outPkg.scripts[k] = oursIsBase ? theirs.scripts[k] : ours.scripts[k];
+  }
+  const seg = (s) => s.split(' && ').map((x) => x.replace(/^pnpm /, '').trim());
+  const bChain = seg(base.scripts.check);
+  const oChain = seg(ours.scripts.check);
+  const tChain = seg(theirs.scripts.check);
+  const result = [...oChain];
+  for (let i = 0; i < tChain.length; i += 1) {
+    const s = tChain[i];
+    if (oChain.includes(s)) continue;
+    let anchor = null;
+    for (let j = i - 1; j >= 0; j -= 1) {
+      if (oChain.includes(tChain[j])) { anchor = tChain[j]; break; }
+    }
+    result.splice(anchor === null ? 0 : result.indexOf(anchor) + 1, 0, s);
+  }
+  const missingKeys = [...new Set([...Object.keys(ours.scripts), ...Object.keys(theirs.scripts)])]
+    .filter((k) => !(k in outPkg.scripts));
+  const missingSegs = [...new Set([...oChain, ...tChain])].filter((s) => !result.includes(s));
+  const keepOrder = (want) => result.filter((x) => want.includes(x)).join('|') === want.join('|');
+  const dropped = { main: bChain.filter((s) => !oChain.includes(s)), src: bChain.filter((s) => !tChain.includes(s)) };
+  const bad = [];
+  if (missingKeys.length) bad.push(`缺 scripts 键 ${missingKeys.join(', ')}`);
+  if (missingSegs.length) bad.push(`缺链段 ${missingSegs.join(', ')}`);
+  if (!keepOrder(oChain)) bad.push('颠倒了 main 侧的相对顺序');
+  if (!keepOrder(tChain)) bad.push('颠倒了本批侧的相对顺序');
+  if (dropped.main.length) bad.push(`main 相对 base 摘掉 ${dropped.main.length} 段：${dropped.main.join(', ')}`);
+  if (dropped.src.length) bad.push(`本批相对 base 摘掉 ${dropped.src.length} 段：${dropped.src.join(', ')}`);
+  if (bad.length) die(2, `package.json 并集判定失败：${bad.join(' · ')}`);
+  writeFileSync(join(WT, 'package.json'), `${JSON.stringify(outPkg, null, 2)}\n`);
+  git(['-C', WT, 'add', '--', 'package.json']);
+  pkgReading = `并集 scripts 键 ${Object.keys(outPkg.scripts).length} 个 · check 链段 main=${oChain.length} 本批=${tChain.length} base=${bChain.length} 并集=${result.length}（摘段 0/0）`;
+  notes.push(`package.json ${pkgReading}`);
+  // 🔴 写完**回读磁盘**再验一次并集。少这一步时踩过一次：脚本报告四族都解完了、门禁却红在
+  //    "本批五道门禁不在链里" —— 磁盘上的 package.json 当时是 main 那份（63 段），
+  //    而"我算出的并集"只在内存里被断言过。断言要落在**要提交的那个对象**上。
+  const back = JSON.parse(readFileSync(join(WT, 'package.json'), 'utf8')).scripts;
+  const backSegs = seg(back.check);
+  const lostSegs = [...new Set([...oChain, ...tChain])].filter((s) => !backSegs.includes(s));
+  const lostKeys = [...new Set([...Object.keys(ours.scripts), ...Object.keys(theirs.scripts)])]
+    .filter((k) => !(k in back));
+  if (lostSegs.length || lostKeys.length) {
+    die(5, `package.json 并集写回后回读**不含**完整并集：缺链段 ${lostSegs.length}（${lostSegs.slice(0, 6).join(', ')}）· 缺键 ${lostKeys.length}（${lostKeys.slice(0, 6).join(', ')}）` +
+      ` —— 磁盘 segs=${backSegs.length}，应当=${result.length}`);
+  }
+}
+
+/* ── .gitignore ───────────────────────────────────────────────────── */
+let giReading = '';
+if (fam.gi.length) {
+  const baseTxt = stage('.gitignore', 1);
+  const oursTxt = stage('.gitignore', 2);
+  const theirsTxt = stage('.gitignore', 3);
+  const tmp = (name, text) => { writeFileSync(`/tmp/ht-${name}`, text); return `/tmp/ht-${name}`; };
+  const [fO, fB, fT] = [tmp('gi-o', oursTxt), tmp('gi-b', baseTxt), tmp('gi-t', theirsTxt)];
+  let raw = '';
+  let gitBlocks = 0;
+  try {
+    raw = execFileSync('git', ['merge-file', '-p', '--diff3', fO, fB, fT], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  } catch (err) {
+    raw = String(err.stdout ?? '');
+    gitBlocks = (String(err.stdout ?? '').match(/^<{7}/gm) || []).length;
+  }
+  const lines = raw.split('\n');
+  const out = [];
+  let parsed = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const l = lines[i];
+    if (!l.startsWith('<<<<<<<')) { out.push(l); continue; }
+    parsed += 1;
+    const o = [];
+    const b = [];
+    const t = [];
+    let mode = 'o';
+    i += 1;
+    for (; i < lines.length; i += 1) {
+      const x = lines[i];
+      if (x.startsWith('|||||||')) { mode = 'b'; continue; }
+      if (x.startsWith('=======')) { mode = 't'; continue; }
+      if (x.startsWith('>>>>>>>')) break;
+      (mode === 'o' ? o : mode === 'b' ? b : t).push(x);
+    }
+    if (b.length !== 0) {
+      die(2, `.gitignore 第 ${parsed} 个冲突块的 base 段非空（${b.length} 行）⇒ 同一处被两边改过，不自动决定：${b.slice(0, 3).join(' / ')}`);
+    }
+    out.push(...o, ...t);
+  }
+  if (parsed !== gitBlocks) die(2, `.gitignore 解析到 ${parsed} 个冲突块，git 报 ${gitBlocks} 个 —— 解析器与 git 不一致，产出不可信`);
+  const miss = (want) => want.filter((x) => !out.includes(x));
+  const oL = oursTxt.split('\n');
+  const tL = theirsTxt.split('\n');
+  const bL = baseTxt.split('\n');
+  const bad = [];
+  if (miss(oL).length) bad.push(`缺 main 的 ${miss(oL).length} 行`);
+  if (miss(tL).length) bad.push(`缺本批的 ${miss(tL).length} 行`);
+  const expect = bL.length + (oL.length - bL.length) + (tL.length - bL.length);
+  if (out.length !== expect) bad.push(`产出 ${out.length} 段 ≠ base ${bL.length} + main ${oL.length - bL.length} + 本批 ${tL.length - bL.length} = ${expect} 段`);
+  if (out.some((x) => /^(<{7}|>{7}|\|{7})/.test(x))) bad.push('残留冲突标记');
+  if (bad.length) die(2, `.gitignore 合并判定失败：${bad.join(' · ')}`);
+  writeFileSync(join(WT, '.gitignore'), out.join('\n'));
+  git(['-C', WT, 'add', '--', '.gitignore']);
+  const backGi = readFileSync(join(WT, '.gitignore'), 'utf8').split('\n');
+  if (backGi.length !== out.length || tL.some((x) => !backGi.includes(x))) {
+    die(5, `.gitignore 写回后回读与产出不可达一致（磁盘 ${backGi.length} 段 vs 产出 ${out.length} 段）`);
+  }
+  giReading = `产出 ${out.length} 个 split('\\n') 段（= wc -l ${out.length - 1} 行，文件以换行结尾）= base ${bL.length} + main ${oL.length - bL.length} + 本批 ${tL.length - bL.length}，纯追加块 ${parsed} 个两块都留`;
+  notes.push(`.gitignore ${giReading}`);
+}
+
+/* ── evidence PNG：取 main 侧 ─────────────────────────────────────── */
+if (fam.png.length) {
+  git(['-C', WT, 'checkout', '--ours', '--', ...fam.png]);
+  git(['-C', WT, 'add', '--', ...fam.png]);
+  notes.push(`evidence PNG ${fam.png.length} 枚取 main 侧（产物，谁主张谁出图）：${fam.png.map((p) => p.split('/').pop()).join(', ')}`);
+}
+
+/* ── 审计文档：取本分支侧，但先证明"main 那份没有别人写的**节**" ───── */
+let auditReading = '';
+if (fam.audit.length) {
+  const mainTxt = stage(AUDIT, 2);
+  const srcTxt = stage(AUDIT, 3);
+  const headings = (t) => t.split('\n').filter((l) => /^#{2,6} /.test(l)).map((l) => l.trim());
+  const secRefs = (t) => [...new Set((t.match(/8\.\d+/g) || []))];
+  const hMiss = headings(mainTxt).filter((h) => !headings(srcTxt).includes(h));
+  const rMiss = secRefs(mainTxt).filter((r) => !secRefs(srcTxt).includes(r));
+  const orphan = mainTxt.split('\n').filter((l) => l.trim() !== '' && !new Set(srcTxt.split('\n')).has(l));
+  if (hMiss.length || rMiss.length) {
+    die(2, `审计文档取本分支侧会**丢掉别人的节**：main 那份有 ${hMiss.length} 个标题、` +
+      `${rMiss.length} 个 §8.NN 编号不在本分支那份里（这是结构性粒度，不是措辞差异）\n` +
+      [...hMiss, ...rMiss].slice(0, 6).map((l) => `      · ${l}`).join('\n'));
+  }
+  auditReading = `取本分支侧：main 那份的**每一个小节标题**（${headings(mainTxt).length} 个）与**每一个 §8.NN 编号**（${secRefs(mainTxt).length} 个）都在本分支那份里 ⇒ 取本分支侧不会丢掉任何人的"节"；行级孤儿 ${orphan.length} 行只是本批自己更早的措辞（见下）`;
+  notes.push(`审计文档：标题 ${headings(mainTxt).length}/${headings(srcTxt).length}、§编号 ${secRefs(mainTxt).length}/${secRefs(srcTxt).length} 覆盖完整；行级孤儿 ${orphan.length} 行`);
+  if (orphan.length) {
+    notes.push(`  孤儿行前 2 条：${orphan.slice(0, 2).map((l) => l.slice(0, 60)).join(' ／ ')}`);
+  }
+  git(['-C', WT, 'checkout', '--theirs', '--', AUDIT]);
+  git(['-C', WT, 'add', '--', AUDIT]);
+}
+
+const still = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
+if (still.length) die(2, `解完之后仍有未解决冲突：${still.join(', ')}`);
+for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'), 'utf8')], ['.gitignore', readFileSync(join(WT, '.gitignore'), 'utf8')]]) {
+  if (/^<{7}/m.test(txt)) die(2, `${path} 仍含冲突标记`);
+}
+
+// ── 3. 纯 fs 门禁 ────────────────────────────────────────────────────
+const GATES = [
+  ['check:gate-wiring', 'scripts/check-gate-wiring.mjs'],
+  ['check:selfhost-entry-command', 'scripts/check-selfhost-entry-command.mjs'],
+  ['check:script-snapshot', 'scripts/check-script-snapshot.mjs'],
+  ['check:docs', 'research/tools/docs-link-check.mjs'],
+  ['check:md-tables', 'scripts/check-md-table-rows.mjs'],
+];
+const gateReadings = [];
+for (const [label, file] of GATES) {
+  let out = '';
+  let rc = 0;
+  try {
+    out = execFileSync('node', [file], { cwd: WT, encoding: 'utf8', maxBuffer: 1 << 26 });
+  } catch (err) {
+    rc = err.status ?? 1;
+    out = `${err.stdout ?? ''}${err.stderr ?? ''}`;
+  }
+  const summary = out.trim().split('\n').filter((l) => l.trim() !== '')
+    .slice(rc === 0 ? -2 : -8).join(' / ').replace(/\s+/g, ' ');
+  if (rc !== 0) {
+    failures.push(`${label} 在载体上退 ${rc}：${summary}`);
+  } else {
+    gateReadings.push(`${label} exit 0 —— ${summary}`);
+  }
+}
+if (failures.length) die(3, `载体的纯 fs 门禁没全绿（不提交，先修解法）：\n  - ${failures.join('\n  - ')}`);
+
+// ── 4. 新鲜度守卫 + 提交 + 移动分支 ──────────────────────────────────
+const mainNow = git(['rev-parse', MAIN]).trim();
+if (mainNow !== mainSha) {
+  die(4, `main 在本次重算期间又前进了：${mainSha.slice(0, 8)} → ${mainNow.slice(0, 8)}。` +
+    ` 载体不落笔（落了一笔"第一父不在 main 上"的对象比不落更坏）。重跑本脚本即可。`);
+}
+const msg = `merge(selfhost): 把 ${SOURCE} 合进 ${MAIN}（载体，第一父 = ${mainSha.slice(0, 8)}）
+
+由 research/tools/selfhost-merge-carrier.mjs 产出，逐路径解法与断言记在该文件头部。
+${notes.map((n) => `· ${n}`).join('\n')}
+
+解法：${[pkgReading, giReading, auditReading].filter(Boolean).join('；')}
+${fam.png.length ? `· evidence PNG ${fam.png.length} 枚取 main 侧` : ''}
+
+载体的纯 fs 门禁读数（全部现量）
+${gateReadings.map((r) => `· ${r}`).join('\n')}
+
+🔴 完整 pnpm check（要 node_modules、要起栈、check:ai-e2e 会 SIGKILL 别人的 dev server）**不在这一笔的主张里**，
+它是落地那一刻的判据；本笔只把"四条冲突族的解法"固化成一个可复核对象。
+这一笔**不是** ${MAIN} 的推进。main 每前进一步或本批每多一笔，都要重跑本脚本（只认 ${BRANCH}，不认 SHA）。
+`;
+writeFileSync('/tmp/ht-carrier-msg.txt', msg);
+git(['-C', WT, 'commit', '-q', '-F', '/tmp/ht-carrier-msg.txt']);
+const carrierSha = git(['-C', WT, 'rev-parse', 'HEAD']).trim();
+// 🔴 双亲要逐条取**完整 SHA**再比。`log --format=%p` 这一仓会打**缩写**（实测 `parents=ce6c1c98 b850b1c6`），
+//    拿 40 位的 mainSha 去比必然不等 —— 那道断言就会把**合法**的载体判死，
+//    而它已经在落笔之后了（本轮就是这么留下了一笔没被分支指向的载体对象）。
+const p1 = git(['-C', WT, 'rev-parse', 'HEAD^1']).trim();
+const p2 = git(['-C', WT, 'rev-parse', 'HEAD^2']).trim();
+if (p1 !== mainSha || p2 !== srcSha) {
+  die(5, `载体的双亲不对：p1=${p1} p2=${p2}，应当是 (${mainSha} ${srcSha})。载体 ${carrierSha} 已落笔但未指向分支`);
+}
+git(['branch', '-f', BRANCH, carrierSha]);
+console.log(`✅ 载体 ${carrierSha.slice(0, 8)} = ${MAIN}(${mainSha.slice(0, 8)}) × ${SOURCE}(${srcSha.slice(0, 8)})，分支 ${BRANCH} 已指过去`);
+console.log(`   ${pkgReading}`);
+console.log(`   ${giReading}`);
+console.log(`   门禁 ${GATES.length} 道全 exit 0；完整 pnpm check 留给落地那一刻`);
+console.log(`   main 若再前进 ⇒ 重跑：node research/tools/selfhost-merge-carrier.mjs`);
