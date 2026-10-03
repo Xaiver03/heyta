@@ -19,8 +19,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * 所以这一组判据钉的不是"有没有 code"，而是**那条销毁动作的唯一安全触发条件**：
  * 每个可能让令牌失效的原因各自有码，且**除 ACCOUNT_CLOSED 外没有一个能长得像它**。
  *
- * ⚠️ 本轮只落服务端那一半（`packages/storage` 与 `packages/sync-client` 正被并行会话改着）。
- * 状态码维持 401 不变，见 §"状态码留给 E2 同批"。
+ * ✅ 状态码那一半已随 E1b 落地（2026-10-04）：注销走 **410**，其余仍 401。
+ * 留这条注释是为了让后来者看清曾经的取舍 —— 以及为什么 410 只对外说"别再重试"，
+ * **客户端要不要销毁本机数据仍然只认稳定码**（见 sync-client 的 `isAccountClosedFailure`）。
  */
 
 const mocks = vi.hoisted(() => ({
@@ -150,16 +151,19 @@ describe('失效原因的可辨识码（真 verifyToken）', () => {
 });
 
 describe('稳定码要出到线上（真路由 + 真 authenticate）', () => {
-  it('🔴 账号已注销：401 响应体带 code=ACCOUNT_CLOSED', async () => {
+  it('🔴 账号已注销：**410** 响应体带 code=ACCOUNT_CLOSED（E1b）', async () => {
     mocks.findUnique.mockResolvedValue(null);
 
     const res = await callProtectedRoute(tokenFor());
 
-    expect(res.statusCode).toBe(401);
+    expect(res.statusCode).toBe(410);
     expect(res.json()).toMatchObject({ code: 'ACCOUNT_CLOSED' });
   });
 
-  it('撤销 / 未验证 / 过期同样是 401，但码各不相同 ⇒ "看到 401 就删库"这句话不成立', async () => {
+  it('🔴 410 是**注销独占**的：其余三种失效各自仍是 401，且码各不相同', async () => {
+    // 这一条钉的是"状态码这一维也携带了信息"：410 只说"这个账号永远不会再有效"。
+    // 把 TOKEN_REVOKED（改口令 / 被踢下线）也推到 410，就等于对外宣称
+    // "重新登录也没用" —— 而那种情况下用户重新登录是**能**继续用的。
     const cases: Array<[string, () => void, string]> = [
       ['TOKEN_REVOKED', () => mocks.findUnique.mockResolvedValue({ ...VERIFIED, tokenVersion: 3 }), tokenFor(1, 0)],
       ['ACCOUNT_UNVERIFIED', () => mocks.findUnique.mockResolvedValue(UNVERIFIED), tokenFor()],
@@ -185,7 +189,7 @@ describe('稳定码要出到线上（真路由 + 真 authenticate）', () => {
     expect(res.json()).not.toHaveProperty('code');
   });
 
-  it('🔴 注销那一次必须打掉鉴权缓存里的 ghost：预热后注销，旧令牌再请求要 401 ACCOUNT_CLOSED', async () => {
+  it('🔴 注销那一次必须打掉鉴权缓存里的 ghost：预热后注销，旧令牌再请求要 410 ACCOUNT_CLOSED', async () => {
     // `api.ts` 在 delete 前后各 invalidate 一次。这条腿钉的就是那两行：
     // 缓存里如果留着"这个 userId 有效"，注销后的设备会**继续成功**，
     // 于是既拿不到销毁信号、也说明"删了"这件事在响应面上根本不可见。
@@ -202,7 +206,7 @@ describe('稳定码要出到线上（真路由 + 真 authenticate）', () => {
     expect(deleted.statusCode).toBe(200);
 
     const after = await callProtectedRoute(token);
-    expect(after.statusCode).toBe(401);
+    expect(after.statusCode).toBe(410);
     expect(after.json()).toMatchObject({ code: 'ACCOUNT_CLOSED' });
   });
 });

@@ -187,7 +187,10 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
         }),
         prisma.coupon.count(),
         prisma.coupon.count({ where: { enabled: true } }),
-        prisma.couponRedemption.count({ where: { state: 'settled' } }),
+        // 🔴 「已结算」是 `settledAt` 这一列，不是 `state` 的一个取值 ——
+        //   `REDEMPTION_STATES` 只有 reserved/applied/expired/reversed，写 `state: 'settled'`
+        //   会命中一个**存在的索引**从而又快又错地恒返回 0。
+        prisma.couponRedemption.count({ where: { settledAt: { not: null } } }),
         prisma.inviteCode.count(),
         prisma.inviteCode.count({ where: { disabled: true } }),
         prisma.referral.count(),

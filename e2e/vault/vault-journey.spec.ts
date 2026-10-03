@@ -14,7 +14,10 @@ const renewedPassphrase = 'vault test recovered passphrase';
 const rotatedPassphrase = 'vault test rotated passphrase';
 
 async function device(browser: Browser, credentials: { baseUrl: string; token: string; accountId: string; email: string }) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 1100 } });
+  // These tests place barriers on real HTTP requests. A service worker can
+  // forward them outside Playwright's routing, making fault injection vacuous.
+  // PWA behavior has its own gate; this suite exercises the production UI/API.
+  const context = await browser.newContext({ viewport: { width: 1280, height: 1100 }, serviceWorkers: 'block' });
   const page = await context.newPage();
   const errors: string[] = [];
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
@@ -229,6 +232,133 @@ test('migration resumes after a browser restart and cancellation releases real s
     console.error('Resume browser errors', a.errors);
     throw error;
   } finally {
+    await a.context.close();
+  }
+});
+
+test('a task added during root migration syncs with the new generation after publication', async ({ browser, request }) => {
+  if (!api) throw new Error('Run scripts/verify-vault-web-journey.mjs');
+  const email = `vault-concurrent-${Date.now()}@test.local`;
+  const created = await request.post(`${api}/api/test/create-user`, { data: { email, password: 'Auth-test-only-928!' } });
+  expect(created.status()).toBe(201);
+  const account = await created.json() as { token: string; userId: number };
+  const headers = { authorization: `Bearer ${account.token}` };
+  const credentials = { baseUrl: api, token: account.token, accountId: String(account.userId), email };
+  const a = await device(browser, credentials);
+  const devices = [a];
+  let releaseInventory = () => {};
+  try {
+    await settings(a.page);
+    await a.page.getByTestId('vault-create-passphrase').fill(passphrase);
+    await a.page.getByTestId('vault-create').click();
+    await confirmCode(a.page);
+    await expect(a.page.getByTestId('vault-ready')).toBeVisible();
+    let inventorySeen = false;
+    const inventoryRelease = new Promise<void>((resolve) => { releaseInventory = resolve; });
+    const inventoryRoute = `${api}/api/sync/key-migration/inventory**`;
+    await a.page.route(inventoryRoute, async (route) => {
+      const actual = await route.fetch();
+      expect(actual.status()).toBe(200);
+      inventorySeen = true;
+      await inventoryRelease;
+      await route.fulfill({ response: actual });
+    });
+    await a.page.getByTestId('vault-new-passphrase').fill(rotatedPassphrase);
+    await a.page.getByTestId('vault-rotate-root').click();
+    await confirmCode(a.page);
+    await expect.poll(() => inventorySeen, { message: 'production migration reached the inventory barrier' }).toBe(true);
+    await a.page.getByRole('button', { name: 'Close sync settings' }).click();
+    const title = `task created during migration ${Date.now()}`;
+    await a.page.locator('input[placeholder^="Add a task"]').fill(title);
+    await a.page.locator('input[placeholder^="Add a task"]').press('Enter');
+    await expect(a.page.getByText(title, { exact: true }).first()).toBeVisible();
+    await a.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await shot(a.page, 'pg-concurrent-local-task');
+    // The local edit must remain responsive while its network upload waits.
+    const during = await request.get(`${api}/api/sync/key-migration/inventory`, { headers });
+    expect(during.status()).toBe(200);
+    expect((await during.json()).operations).toHaveLength(0);
+    releaseInventory();
+    await expect.poll(async () => (await (await request.get(`${api}/api/sync/key-package`, { headers })).json()).payloadKeyVersion).toBe(2);
+    await expect.poll(async () => (await (await request.get(`${api}/api/sync/key-migration/inventory`, { headers })).json()).operations.length).toBe(1);
+    const b = await device(browser, credentials); devices.push(b);
+    await settings(b.page);
+    await b.page.getByTestId('vault-passphrase').fill(rotatedPassphrase);
+    await b.page.getByTestId('vault-unlock').click();
+    await expect(b.page.getByTestId('vault-ready')).toBeVisible();
+    await b.page.getByRole('button', { name: 'Close sync settings' }).click();
+    await b.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await shot(b.page, 'pg-concurrent-new-device');
+    await expect(b.page.getByText(title, { exact: true }).first()).toBeVisible();
+    await shot(b.page, 'pg-concurrent-new-device');
+  } catch (error) {
+    await shot(a.page, 'pg-concurrent-failure').catch(() => undefined);
+    console.error('Concurrent browser errors', a.errors);
+    throw error;
+  } finally {
+    releaseInventory();
+    for (const d of devices) await d.context.close().catch(() => undefined);
+  }
+});
+
+test('a reload after server commit restores the unpublished local root and clears its journal', async ({ browser, request }) => {
+  if (!api) throw new Error('Run scripts/verify-vault-web-journey.mjs');
+  const email = `vault-commit-crash-${Date.now()}@test.local`;
+  const created = await request.post(`${api}/api/test/create-user`, { data: { email, password: 'Auth-test-only-928!' } });
+  expect(created.status()).toBe(201);
+  const account = await created.json() as { token: string; userId: number };
+  const headers = { authorization: `Bearer ${account.token}` };
+  const a = await device(browser, { baseUrl: api, token: account.token, accountId: String(account.userId), email });
+  let releaseCommit = () => {};
+  try {
+    await settings(a.page);
+    await a.page.getByTestId('vault-create-passphrase').fill(passphrase);
+    await a.page.getByTestId('vault-create').click();
+    await confirmCode(a.page);
+    await expect(a.page.getByTestId('vault-ready')).toBeVisible();
+    const holdCommit = new Promise<void>((resolve) => { releaseCommit = resolve; });
+    let committedRequest = '';
+    const commitRoute = `${api}/api/sync/key-migration/*/commit`;
+    await a.page.route(commitRoute, async (route) => {
+      const actual = await route.fetch();
+      expect(actual.status()).toBe(200);
+      committedRequest = new URL(route.request().url()).pathname.split('/').at(-2)!;
+      await holdCommit;
+      await route.abort('connectionreset').catch(() => undefined);
+    });
+    await a.page.getByTestId('vault-new-passphrase').fill(rotatedPassphrase);
+    await a.page.getByTestId('vault-rotate-root').click();
+    const recovery = await confirmCode(a.page);
+    await expect.poll(() => committedRequest, { message: 'PostgreSQL committed before browser restart' }).not.toBe('');
+    const state = await request.get(`${api}/api/sync/key-migration/${committedRequest}`, { headers });
+    expect((await state.json()).state).toBe('PUBLISHED');
+    await shot(a.page, 'pg-commit-before-restart');
+    await a.page.reload();
+    releaseCommit();
+    await a.page.unroute(commitRoute);
+    await settings(a.page);
+    await a.page.getByTestId('vault-passphrase').fill(passphrase);
+    await a.page.getByTestId('vault-unlock').click();
+    await shot(a.page, 'pg-commit-restart-recovery');
+    await expect(a.page.getByTestId('vault-recovery-resume')).toBeVisible();
+    await a.page.getByTestId('vault-recovery-confirm').fill(recovery);
+    await a.page.getByTestId('vault-publish').click();
+    await expect(a.page.getByTestId('vault-ready')).toBeVisible();
+    // A second migration proves that the first journal was acknowledged after
+    // local installation, rather than silently left to block future rotations.
+    await a.page.getByTestId('vault-new-passphrase').fill(renewedPassphrase);
+    await a.page.getByTestId('vault-rotate-root').click();
+    await confirmCode(a.page);
+    await shot(a.page, 'pg-commit-restart-next-rotation');
+    await expect(a.page.getByTestId('vault-ready')).toBeVisible();
+    const current = await request.get(`${api}/api/sync/key-package`, { headers });
+    expect((await current.json()).payloadKeyVersion).toBe(3);
+  } catch (error) {
+    await shot(a.page, 'pg-commit-restart-failure').catch(() => undefined);
+    console.error('Commit restart browser errors', a.errors);
+    throw error;
+  } finally {
+    releaseCommit();
     await a.context.close();
   }
 });

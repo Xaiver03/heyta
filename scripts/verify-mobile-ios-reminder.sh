@@ -180,6 +180,32 @@ clear_task_search() {
   done
   return 1
 }
+dismiss_privacy_gate() {
+  local _i
+  # The first-run privacy sheet leaves the underlying task tree in AX, so
+  # seeing 「新建任务」 does not prove the sheet is gone. Gate handling must
+  # precede every task-page assertion and must re-check that its button is no
+  # longer present after the tap.
+  for _i in 1 2 3 4 5 6 7 8; do
+    if has "只用本机"; then
+      press "只用本机" >/dev/null 2>&1 || true
+      sleep 2
+      continue
+    fi
+    if has "同意并联网"; then
+      press "只用本机" >/dev/null 2>&1 || true
+      sleep 2
+      continue
+    fi
+    if has "以后再说"; then
+      press "以后再说" >/dev/null 2>&1 || true
+      sleep 2
+      continue
+    fi
+    return 0
+  done
+  return 1
+}
 dismiss_keyboard_checked() {
   local _i out kpresent
   # idb may report a successful dismiss before UIKit has removed the keyboard
@@ -376,13 +402,8 @@ step "1. 冷启动、离线入口与任务创建（真实 RN UI）"
 xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
 sleep 6
 # 新安装的当前包先经过隐私/联网选择页；它不是欢迎页，不能只等「先离线使用」。
-# 逐个按真实标签收掉首启闸门，再判断是否需要离线入口。
-for _gate in "以后再说" "只用本机"; do
-  if wait_has "$_gate" 3; then
-    press "$_gate" >/dev/null 2>&1 || true
-    sleep 2
-  fi
-done
+# 先确认覆盖层确实收掉，再判断是否需要离线入口。
+if dismiss_privacy_gate; then ok "已收起首启隐私/联网选择层"; else bad "首启隐私/联网选择层未收起"; fi
 if wait_has "先离线使用" 12; then
   press "先离线使用" >/dev/null 2>&1 || true
   wait_has "新建任务" 20 && ok "冷启动进入任务页" || bad "离线入口后没有任务页"
@@ -490,6 +511,7 @@ ok "已在投递断言前保存截图：$SCREENSHOT"
 # 重新启动触发 startup reconcile；不要把进程终止本身当 fired 证据。
 xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
 sleep 8
+dismiss_privacy_gate || true
 PHONE_DB="$(phone_db)"
 FIRED="$(sqlite3 "$PHONE_DB" "SELECT COUNT(*) FROM ops WHERE json_extract(data,'\$.op.entityType')='REMINDER' AND json_extract(data,'\$.op.payload.firedAt') IS NOT NULL AND json_extract(data,'\$.op.payload.firedForTriggerAt') IS NOT NULL;" 2>/dev/null | tr -d ' ')"
 if [ "${FIRED:-0}" -ge 1 ]; then

@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises';
 import Fastify, { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { REDEMPTION_STATES, type RedemptionState } from '../src/billing/pricing-store';
 
 /**
  * `/api/admin/*` 的**安全边界**与契约。
@@ -167,6 +169,35 @@ describe('GET /overview', () => {
     // `DEFAULT_ENTITLEMENT_POLICY` 只有 active 算有效 ⇒ past_due 不计入。
     expect(body.subscriptions.active).toBe(3);
     expect(body.subscriptions.entitledStatuses).toContain('active');
+  });
+
+  it('🔴 「已结算的核销」数的是 `settledAt` 那一列，不是 `state` 的一个取值', async () => {
+    setAdmin(true);
+    mocks.couponRedemption.count.mockResolvedValue(7);
+
+    const res = await app.inject({ method: 'GET', url: '/api/admin/overview', headers: AUTH });
+
+    // 词表（`REDEMPTION_STATES`）里没有 `settled` 这个取值：写 `state: 'settled'`
+    // 会命中一个**存在的索引**，于是又快又错地恒返回 0 —— 界面上就是一个"没人用券"。
+    expect(mocks.couponRedemption.count).toHaveBeenCalledWith({ where: { settledAt: { not: null } } });
+    expect(res.json().coupons.settledRedemptions).toBe(7);
+  });
+
+  it('🔴 管理路由里出现的核销状态字面量必须全部来自词表（真源只有一处）', async () => {
+    const src = await readFile(new URL('../src/admin/admin.routes.ts', import.meta.url), 'utf8');
+    // ⚠️ 必须先剥注释再匹配：本文件上面那段解释"以前写成 `state: 'settled'`"的注释
+    //   本身就是**对这个形状的转述**，不剥的话分类器会把说明当成违规。
+    const code = src
+      .split('\n')
+      .map((line) => line.replace(/\/\/.*$/, '').replace(/^\s*\*.*$/, ''))
+      .join('\n');
+    const literals = [...code.matchAll(/state:\s*'([a-z_]+)'/g)].map((m) => m[1]);
+    const outside = literals.filter((s) => !REDEMPTION_STATES.includes(s as RedemptionState));
+    expect(outside, `词表外的核销状态：${outside.join(', ')}`).toEqual([]);
+
+    // 阳性对照：这条分类器自己必须能红 —— 拿一个已知违规的写法喂它。
+    const probe = [...`count({ where: { state: 'settled' } })`.matchAll(/state:\s*'([a-z_]+)'/g)].map((m) => m[1]);
+    expect(probe.filter((s) => !REDEMPTION_STATES.includes(s as RedemptionState))).toEqual(['settled']);
   });
 });
 

@@ -28,7 +28,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { DbAdapter } from '../../src/db.types.js';
-import { OP_FIELDS, OP_INDEXES, STORES } from '../../src/stores.js';
+import { ALL_STORES, OP_FIELDS, OP_INDEXES, STORES } from '../../src/stores.js';
 
 export interface AdapterContractOptions {
   name: string;
@@ -398,6 +398,60 @@ export function runDbAdapterContract({ name, create }: AdapterContractOptions): 
         });
         expect(seq).toBe(1);
       });
+    });
+
+    // ── 销毁（批次 E2）───────────────────────────────────────
+    /**
+     * 🔴 这四条钉的是「注销账号 = 这台设备上的我没了」这句话里**存储层能负责的那一段**。
+     *
+     * 之所以放在共享契约里而不是各实现自己测：这一条的失败方式是
+     * **"某个宿主/某个实现忘了"**，而忘了不会报错 —— 只会继续留着明文。
+     * 只有一份跑遍所有实现的判据才能让"漏了一个实现"这件事变红。
+     */
+    it('destroy 要么删掉持久容器，要么**说清为什么没删**（不许静默）', async () => {
+      const db = await create();
+      await db.add(STORES.META, { key: 'k', value: 1 });
+      const report = await db.destroy();
+      db.close();
+
+      expect(report.target, '报告必须说清销毁的是哪一个库').not.toBe('');
+      // 这条析取式就是 `DbDestroyReport` 存在的全部理由：
+      // "没删容器"必须**带原因**，否则它与"删了"在下游长得一模一样。
+      if (!report.containerRemoved) {
+        expect(typeof report.reason, `容器没删掉却没给原因：${JSON.stringify(report)}`).toBe(
+          'string',
+        );
+        expect(report.reason, '原因不能是空串').not.toBe('');
+      }
+    });
+
+    it('destroy 之后每个 store 都是空的', async () => {
+      const db = await create();
+      await db.add(STORES.OPS, opRecord());
+      await db.add(STORES.META, { key: 'k', value: 1 });
+      await db.destroy();
+
+      for (const store of ALL_STORES) {
+        expect(await db.count(store), `销毁后「${store}」仍有记录`).toBe(0);
+      }
+      db.close();
+    });
+
+    it('destroy 的 storesCleared 不少于 schema 里的 store 数（漏表会被数出来）', async () => {
+      const db = await create();
+      const report = await db.destroy();
+      expect(
+        report.storesCleared,
+        `只清了 ${String(report.storesCleared)} 个，schema 里有 ${String(ALL_STORES.length)} 个`,
+      ).toBeGreaterThanOrEqual(ALL_STORES.length);
+      db.close();
+    });
+
+    it('destroy 幂等：销毁一份已经没了的库不是错误', async () => {
+      const db = await create();
+      await db.destroy();
+      await expect(db.destroy()).resolves.toMatchObject({ storesCleared: expect.any(Number) });
+      db.close();
     });
   });
 }

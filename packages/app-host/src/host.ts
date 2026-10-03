@@ -50,11 +50,13 @@ import { decodeBase64 } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 import type { VaultKeyMigrationResponse } from '@heyta/shared-schema';
 import { randomId } from './ids.js';
+import { hasLocalEraser, registerLocalEraser } from './local-erasure.js';
 import { createSyncClient } from './sync-wiring.js';
 import {
   createVaultKeyMigrationRemote,
   createVaultMigrationInventorySource,
   createVaultMigrationJournal,
+  acknowledgeVaultPayloadMigration,
   cancelVaultPayloadMigrationForScope,
   migrateVaultPayloads,
   type VaultMigrationProgress,
@@ -312,6 +314,22 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     driverFactory: options.driverFactory,
     ...(options.clientId !== undefined ? { clientId: options.clientId } : {}),
   });
+
+  /**
+   * 本机数据销毁器的**兜底注册**（E2）。
+   *
+   * 🔴 为什么在宿主内部注册，而不是要求每个壳自己传一个回调：
+   * `createSyncClient()` 的构造点有四个宿主（node-host、移动端、两个桌面壳），
+   * 而它们都经这一个函数拿到 adapter。写在这里，"这个宿主忘了接"就**不是**
+   * 一个可能的状态 —— 那正是 §10.2 那条取证量的东西（信号收到了、没人清）。
+   *
+   * ⚠️ **只在没人注册时注册**：Web 有自己的销毁器（要清 OPFS/`localStorage`/
+   * SW 那四类，adapter 一份清不完），它先注册 ⇒ 这里就不许把它盖掉。
+   * 反过来如果这里无条件注册，症状是"Web 注销后 OPFS 里那份库还在"。
+   */
+  if (!hasLocalEraser()) {
+    registerLocalEraser(async () => [await adapter.destroy()]);
+  }
 
   const engine = new OpLogEngine({
     store,
@@ -577,12 +595,16 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
               : {}),
             journal: vaultMigrationJournal,
             journalScope,
+            clearJournalOnPublished: false,
             onProgress,
           });
           return published;
         });
         if (migrationEpoch !== vaultEpoch) throw new Error('Vault migration was invalidated by credential changes');
         if (published === undefined) throw new Error('Vault migration did not publish a result');
+        // The migration journal is acknowledged only after confirmAndMigrate...
+        // has atomically installed the package, payload generation, and root.
+        await acknowledgeVaultPayloadMigration(vaultMigrationJournal, journalScope, published.requestId);
         return published;
       });
     },

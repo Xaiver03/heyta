@@ -52,7 +52,7 @@ beforeEach(async () => {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     if (init?.method === 'PUT') {
       published = JSON.parse(String(init.body)).package as Record<string, unknown>;
-      return response(200, { package: published });
+      return response(200, { package: published, payloadKeyVersion: null });
     }
     if (published === undefined) return response(404, { error: 'key_package_not_found' });
     return response(200, { package: published, payloadKeyVersion: null });
