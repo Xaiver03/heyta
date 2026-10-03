@@ -1182,6 +1182,32 @@ W0b ─> 随时可做（台账那半要等文件干净）
   `apps/mobile/tests/projects-sections.spec.ts:81`、同步清单 `e2e/tests/helpers.ts:353-368`。
 - **判据**：倒数日入口进 `SHELL_MODULES`（🔴 **默认值是产品判断**，§3 W8 的倾向是"默认关"⇒ 关掉的模块**不进 DOM**，
   既有 tab 计数断言不受影响）；移动端那一处重复按本文 §7 第 5 条给出裁决并登记；钉 tab 顺序的 e2e 同步更新且**仍能红**。
+- 🟡 **04 03:1x 现量（载体 `feat/countdown-batch2`）**：上面三条"事实"里只有**桌面壳不含业务 UI**那条还成立，
+  另两条已被本单自己改掉，逐条给读数：
+  - `apps/web/src/features/shell/modules.ts:119-128` 现在**有** `key: 'countdown'` 且 `defaultOn: false`，
+    注释里写明"默认关是产品负责人拍的"与"关掉的模块不进 DOM（不是 `display:none`）"
+    ⇒ 判据第一条的"默认值"这一档**按预期落了**，既有的 tab 计数断言因此不需要动。
+  - 🔴 **§7 第 5 条那个"要不要重复一个 tab"的问题被消解，不是被回答**：移动端**没有加第 6 个 tab**
+    （`apps/mobile/src/nav/TabBar.tsx:51` 的 `TABS` 里 `grep -c countdown` = **0**），
+    入口改挂在"我的"页的一条共享清单 `apps/mobile/src/nav/feature-entries.ts:93-96`
+    （`key: 'countdown'` / `testID: 'profile-entry-countdown'`）。
+    所以当初担心的"两端各一份 tab 表会漂"没有发生 —— 两端各有一份**入口表**，
+    而它们的一致性由 `check:shell-surfaces` 钉，不是由"只有一张表"钉。
+  - 🔴 **04 03:2x 现量：这条门禁现在 rc=1，5 格里 4 绿 / 1 红**（`node scripts/check-shell-surfaces.mjs > /tmp/x.txt 2>&1; echo $?`）。
+    红的那格是 `[web] W5`，而它报的是**产物过期不是代码缺失**：
+    `dist 2026-10-03T18:53:06Z < src 2026-10-03T19:40:25Z` —— 差的正是我方 `e2def90f`（W6）与后台面板那两笔改动之后
+    **没有重打 `apps/web/dist`**。它前面一次全绿（03:0x，见 §8.4 那行）也是真的 ⇒
+    **同一行命令二十分钟内两种答案**，差别在**我这边的提交**，不在判据。修法是它点名那句
+    `pnpm --filter @heyta/web build`（🔴 不是手改 dist —— 门禁的"不要用下列手法修绿"清单里就有这条）。
+  - ⚠️ 另两栏**未取证**（`desktop-macos / countdown · 产物`、`desktop-windows / countdown · 产物`），
+    macOS 那栏现在连"包在"都还不上：包里 `index.html` sha256 `5ab36a445c57` ≠ 本地 `18865497ee11`（同一原因 —— 本地 dist 落后于源码，而包里那份又落后于本地）。
+    门禁文件头那句话是判据本体："这份绿说的是**通道在**，**不是**装出来的包里有这一屏"。
+  - 📌 **我自己在这条读数上刚踩了 §7 第 45 条**：第一次跑写的是 `... | tail -22; echo "RC=$?"`，
+    拿到 **RC=0** 并差点照抄成"rc=0，5 格全绿"。管道后的 `$?` 是 `tail` 的，
+    而这份输出的**最后几行**恰好是"不要用下列手法修绿"的科普文字（不带退出码信息）——
+    两个假绿凑在一起了。上面那条带重定向的命令才是取 RC 的写法。
+  - ⚠️ **因此这张表不能打勾**：红的要靠重打产物消，未取证的两栏**只由 §5 第 4 条 `pnpm reinstall:all` 关闭**
+    （四端装上当前产物），代码与静态门禁再绿都不算。补齐后在这里改 ✅ 并写装出来的包里"这一屏真在"的取证方式。
 - [ ] W8 完成
 
 #### ⏹ W9 · 提醒：本批做"能响的那半截"，原生投递另立一单
@@ -1435,8 +1461,39 @@ W0b ─> 随时可做（台账那半要等文件干净）
       （与既有 `stubLegalRecheck` 同形同因，应答体按服务端 `holidayVersionToken()` 算出来是 `0.0.0`）。
       🔴 **同一条理由预测会打红 `inbox.spec.ts`**（它既塞凭据又有同一句守卫，且没有 `**` 兜底路由）——
       这条**尚未实测**，量法：`cd e2e && pnpm exec playwright test tests/inbox.spec.ts`。
+      - 📌 **04 03:5x 先把"还有谁会被打红"穷举掉，别等收尾时打地鼠**。敞口不是"所有 e2e 用例"，
+        而是三个条件的**交集**，逐条现量：
+        ① 会发这条请求 ⇒ 必须**开机前**就有 `baseUrl`（`startPublicFacts()` 只在
+        `apps/web/src/main.tsx:152` 调一次，运行中配好的端点不会补发；且它 G-12 闸门未同意时零请求）
+        ⇒ `grep -rln "heyta.sync.credentials" e2e/tests/*.ts` = **8 个文件命中，但真写凭据的只有 7 个**
+        —— 多出来那个是 `helpers.ts`，命中在**它自己的注释里**（第 239 行那句"凡是往…塞了 baseUrl+token 的用例"）。
+        7 个真写点：`public-facts`(本单主题) / `admin-console`(已修) / `account-menu` / `vault-settings` /
+        `legal-reconfirm-gate` / `inbox` / `profile-avatar-e2ee`；
+        ② 会把 404 变成红的断言 ⇒ `grep -rln "assertNoProblems\|status() >= 400" e2e/tests/*.ts` = **3 个文件**
+        （`admin-console` / `inbox` / `motivation`）；
+        ③ 数请求条数的断言（`stubLog` / `expectNoStubCall` / `expectStubCount` / `waitForStubCalls`）= **6 个 `ai-*.spec.ts`**
+        （另有 `ai-row-layout` 不用它们），而这六个 `grep -c heyta.sync.credentials` **逐个 = 0**
+        （`openApp()` 不写凭据，只 `enableAllModules` + 同意面板）⇒ **不在交集里**。
+        `motivation` 同样落在 ② 却不在 ①（它没有开机凭据）⇒ 也不进交集。
+        交集 ⇒ **只剩 `inbox.spec.ts` 一个文件、三处 `assertNoProblems`**（`:304 :361 :392`，
+        凭据点在 `:103` 与 `:311`）—— 上面那条预测的**范围**已由静态穷举钉住，
+        但**它到底红不红仍待那一趟实跑**（穷举证明的是"没有第四个文件要修"，不是"inbox 已修"）。
     - ⚠️ **待补才打勾**：判据②的三臂变异（B1 出处不再是链接 / B2 不带 `rel` / B3 把 CSS 修复整个拿掉），
       装置 `/tmp/w4b-mutate.mjs`。
+    - 🔴 **第一版修复是无效的，而照出它的正是那条正向对照**（04 03:38 现量）。
+      第一版给共用的 `.ht-settings__admin-badges` 加了 `min-inline-size: 0` + `flex-wrap: wrap`，
+      理由写的是"徽标不可收缩"。带正向对照重跑 ⇒ `GEOM_OK_RC=1`，报错原文
+      **「这一格根本没参与布局（clientWidth=48）」** —— 元素被排版了（不是 0），但只有 48px，
+      也就是**裁切依旧**，第一版什么都没改。
+      真正的机制是 **flex-basis**：徽标容器的 basis 默认是它的 `max-content`（两条 URL 排一行 ≈ 1140px），
+      而 `rowMain` 是 `flex: 1`（= `1 1 0%`，只长不占）⇒ 整行没有多余空间时**先占得多的一方赢**。
+      `min-inline-size: 0` 改变的是"肯不肯收缩"，不是"先占多少"。
+      正解：`flex: 1 1 0` 给出处那一格一个 0 basis 并让它参与生长，URL 在徽标内部折行
+      （`overflow-wrap: anywhere` 是它 min-content 能小于一整条 URL 的前提）。
+      🔴 **且刻意只挂在 `--papers` 修饰符上**：用户列表那排徽标共用 `.ht-settings__admin-badges`，
+      那里 `rowMain` 装的是邮箱 —— 分一半宽度给徽标是回归不是修复。
+      📌 一般形状：**"允许收缩"与"先占多少"是两个旋钮**，只拧第一个的修复会在自己的判据下原地失败；
+      而没有正向对照时，那条判据会把"完全没修"读成"修好了"。
 
 #### 🟡 L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）—— 判定表已出、命中已修；剩下的那条闸门已于 20:1x **立成常驻门禁 `check:legal-permissions`**，而踩响它的是 W9 不是 W7
 
@@ -1513,6 +1570,28 @@ W0b ─> 随时可做（台账那半要等文件干净）
      ⇒ **这就是那条闸门该做的事**：条款的翻转必须由 W9 那条会话（或合流的人）在**同一批**里做完 +
      重跑 `pnpm check:legal-copy` 重生成落地页文案；不在我这批改，因为 `permissions.ts` / `third-parties.ts`
      / 两个 plist 此刻**都在主检出里脏着**（撞车判据 = 同一文件的未提交 diff），我不代改别人的在飞文件。
+  1b. 🔴 **04 03:5x 把这条红的"载体"钉死：它是 main 已提交状态的属性，不是谁的工作树造成的**。
+     上面 20:1x 那条读数是喂**主检出的未提交工作树**量出来的，所以它有一个没被排除的解释：
+     "红只在混合工作树成立"。这次用门禁自己那条旋钮 `HEYTA_CHECK_ROOT` 换一个**只放已提交内容**的根：
+
+     ```bash
+     R=/tmp/legal-root-main; rm -rf $R; mkdir -p $R/scripts
+     cp scripts/check-legal-permissions.mjs $R/scripts/
+     grep -oE "'[A-Za-z0-9_./-]+\.[a-zA-Z]+'" scripts/check-legal-permissions.mjs \
+       | tr -d "'" | sort -u > /tmp/lr.txt            # 7 个输入（含两个 .entitlements，第一次漏了它）
+     while read -r p; do mkdir -p "$R/$(dirname "$p")"; git show origin/main:"$p" > "$R/$p"; done < /tmp/lr.txt
+     HEYTA_CHECK_ROOT=$R node $R/scripts/check-legal-permissions.mjs > /tmp/out.txt 2>&1; echo rc=$?
+     grep -c '^❌' /tmp/out.txt
+     ```
+
+     读数：**`origin/main` 的输入 ⇒ rc=1 / 7 条红**；**同一探针喂 `HEAD` 的输入 ⇒ rc=1 / 7 条红**，
+     两侧末行"读数：…"逐字相同。⇒ 归属结论从"别人的在飞工作树"升级为
+     **"W9 那笔 `b0ba4a35` 已提交在 main 上的矛盾"**（六句没翻 + `SCHEDULE_EXACT_ALARM` 没登记），
+     合流前不修就一直红，与谁的未提交改动无关。**不由本批代改**（判据同上：那是 W9 的产品/法务判断，
+     而且 A13 那条臂本来就是**故意**要它响亮失败）。
+     📌 顺手记一条探针纪律：第一版探针只按 `.ts/.xml/.plist/.json` 收集输入，**漏了 `.entitlements`**，
+     于是两边都短路在第 1 条"读不到 ⇒ 必须响亮失败"上、报出"1 条红"——**一个坏探针差点把"7 条红"读成"1 条"**，
+     而它看起来完全像在工作（脚本确实读了东西）。缺一个输入时它不静默、而是响亮失败，这条设计救了我一次。
   2. ~~**`third-parties.ts:230-241` 否表里那一行的"依据"是条件真的**…⇒ 这条应当挂成 **W9 移动半的前置闸门**，与 L1 同形。~~
      ✅ **这条闸门已于 2026-10-03 19:3x 当场结掉，且结论是"不改现文、只换依据的措辞来源"**：
      W9 移动半经复量确认是**停批**（不是"还没开工"）—— 移动端 `new Notification(` **0 命中**、
@@ -1562,9 +1641,9 @@ W0b ─> 随时可做（台账那半要等文件干净）
 | W6 日历第二源 | ✅ **已闭合**（`e2def90f`，04 02:5x） | W2 | 2 | 判据本体（"没有截止日的倒数日能上日历"）+ 四个档位 + 侧栏那颗点各有真 DOM 判据；三层 14/8/13 passed + e2e 3 passed 五张图人看过；变异 5 臂逐臂只红自己那条。**原判"排后：落点被整片重写"这句由 `608fa5b1` 合流关闭**（详见 §8.2 那条 W6 节）。剩 **W6-G1**：接进「今天」/收集箱要先给 `TaskList` 一条"不可交互行"的契约变更，不属于这一批 |
 | W5 卡片网格 | ✅ | W2、W0 | 5 | 12 passed + 12 例变异 0 未证 + 9 道门禁 rc=0；e2e **6 passed**（整族 15 passed）、三张图已看、看图照出"逾期卡没有日期行"并修成 `94760c82`，两腿变异各红一次 |
 | W7 成品图导出 | 🟡 **三端出图已落地并取证**，待两臂变异才打勾 | W5 | 2（含 RN 出图取证） | 载体已从 `heyta-wt-w7` 换到 `feat/countdown-batch2`（合入 `43e94b32`，**现在已是 main 的祖先**）。**04 03:1x 现量**：mobile `card-export.spec.ts` **21 passed / `MOBILE_RC=0`**、真浏览器 `countdown-export.spec.ts` **5 passed / `EXPORT_E2E_RC=0`**、门禁 `check:card-export` rc=0、成品图实测 **1080×1440 逐字等于契约**（契约从 `shared-schema/dist` 读回来，不在测试里重推公式）、六张图**人已看**且已进版本库（`apps/web/evidence/countdown-export/` + README）。"零法务变更"改成可复跑：W7 往 manifest 加的只有 `<provider>`，`git diff 43e94b32^1 43e94b32` 里**零个 `<uses-permission>`** |
-| W8 三端接线 | 🟡 **三端代码 + 壳级门禁已在 batch2**，剩两栏产物未取证 | W5/W6 | 3 | 🔴 原先这行写"排后：同 W6，日历线未落地前不动 `CalendarScreen`"—— **那是按整条线推断出来的，现量否证过**：W8 的落点在 main 里逐个文件都干净，且 web 半已随 W5 落地。载体已从 `heyta-wt-w8` 换到 `feat/countdown-batch2`（合入 `f2d09974`）。**04 03:0x 现量**：`node scripts/check-shell-surfaces.mjs` ⇒ **rc=0，判定 5 格 = 5 绿 / 0 红，未取证 2 栏**（`desktop-macos / countdown · 产物`、`desktop-windows / countdown · 产物`），门禁自己那句话是承重判据："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" ⇒ 那两栏只由 §5 第 4 条 `pnpm reinstall:all` 关闭，本表在此之前不打勾 |
+| W8 三端接线 | 🟡 **三端代码 + 壳级门禁已在 batch2**，那格门禁 04 03:2x **自己变红了（红在产物落后）** | W5/W6 | 3 | 🔴 原先这行写"排后：同 W6，日历线未落地前不动 `CalendarScreen`"—— **那是按整条线推断出来的，现量否证过**：W8 的落点在 main 里逐个文件都干净，且 web 半已随 W5 落地。载体已从 `heyta-wt-w8` 换到 `feat/countdown-batch2`（合入 `f2d09974`）。**读数取两次，因为答案在二十分钟内变了**：04 03:0x ⇒ rc=0，5 格 = 5 绿 / 0 红；**04 03:2x ⇒ rc=1，4 绿 / 1 红**，红的格是 `[web] W5 产物比源码旧`（`dist 18:53 < src 19:40`）—— 差的正是我方 `e2def90f`（W6）+ 后台面板那两笔之后没重打 `apps/web/dist`，**不是新缺陷，是自家提交把这条判据甩下了**，修法是它点名的 `pnpm --filter @heyta/web build`（门禁的"不要用它修绿"清单里明确排除了手改 dist）。未取证仍是 2 栏（`desktop-macos / countdown · 产物`、`desktop-windows / countdown · 产物`，macOS 那栏现在连 sha256 都对不上：包里 `5ab36a445c57` vs 本地 `18865497ee11`），门禁自己那句话是承重判据："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" ⇒ 两栏只由 §5 第 4 条 `pnpm reinstall:all` 关闭；🔴 **而它同时给这条线加了一条新前置：收尾那趟 `pnpm check` 之前必须先重打 web 产物，否则这一格必红**（本批自己造的红，不登记给别人） |
 | W9 提醒（web 半 + DST） | ✅ web 半 | 可与 W2 并行 | 3 | 42/28/40 passed；变异 9 臂 9/9 红、0 未证；移动端那半**没动** |
 | W10 AI 工具目录 | ✅ | **W2 之后** | 3 + 差集归零 | 130/223/1019 passed；变异**第一趟 3 臂无牙**→补判据→第二趟 6/6 红 |
 | W4b 调休通道 + ADR | 🟡 **判据①②都有真界面读数**，待三臂变异才打勾 | 独立（1 条迁移） | 4 | 全链已进 main（`6735cc39`/`b05fbc50`/`67fef701` + 服务端那 4 笔 + `check:public-facts` 八臂 8 红）。**04 03:2x**：判据②的后台面板落了（`AdminPanel.tsx` 的 `HolidayPanel`），`e2e/tests/admin-console.spec.ts` 整套 **6 passed / `ADMIN_RERUN_RC=0`**，图在 `apps/web/evidence/admin-holiday/`。🔴 这一趟最值钱的是**看图照出年份被挤成「2026…」**（长 URL 徽标不可收缩，全套文本断言当时全绿）⇒ 修 CSS + 判据改几何（`scrollWidth-clientWidth<=1`）**并自带正向对照**（先断 `clientWidth>100`，否则"没参与布局"的 `0-0=0` 让判据永远通过——这个坑由它自己的第一趟假绿照出来：Playwright 03:21:33 就加载了 spec，判据 03:22:11 才写进去，那趟"6 passed"里根本没有它）。另补 `e2e/tests/helpers.ts:stubPublicFacts`：本批的开机拉取会把任何带"不该有非 2xx"守卫的套件无关地拖红（实测一次红五条） |
-| L' 法务联动 | 🟡 判定表已出、命中已修；**它立的门禁现在响在 main 上** | 随最后一个改承诺的工单 | 4 | 普查 82 行 → 唯一真命中已修（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`，13 臂变异全红）。🔴 **04 03:0x 现量**：`node scripts/check-legal-permissions.mjs` ⇒ **rc=1**，两条红都在 `third-parties.ts` 的推送 SDK 否表行（zh+en）——`b0ba4a35`（W9 原生投递，**已在 origin/main**）加了 `POST_NOTIFICATIONS` 而那六句没翻。**不是批次二造成的、也不由本批代改**（六句必须一起翻 + 重跑 `check:legal-copy`，且主检出 `packages/legal` 5 个 `M` 里那六句已经不见了 ⇒ 并行会话正在翻）。关闭判据：该命令 rc=0 |
+| L' 法务联动 | 🟡 判定表已出、命中已修；**它立的门禁现在响在 main 的已提交状态上** | 随最后一个改承诺的工单 | 4 | 普查 82 行 → 唯一真命中已修（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`，13 臂变异全红）。🔴 **读数取三次，每次载体不同**：04 03:0x 在**主检出** ⇒ rc=1 / **2 条红**（那四句 `permissions.ts` 已被并行会话在未提交的工作树里翻掉）；04 03:5x 在**本批工作树** ⇒ rc=1 / **7 条红**；把**只含 `origin/main` 已提交内容**的七份输入喂给同一份脚本（`HEYTA_CHECK_ROOT` 探针，命令在 §8.2 L' 第 1b 条）⇒ **rc=1 / 7 条红，与喂 `HEAD` 那份逐字相同**。⇒ 归属从"别人的在飞工作树"升级为**"`b0ba4a35`（W9 原生投递）已提交在 main 上的矛盾"**：六句对外承诺没翻 + `SCHEDULE_EXACT_ALARM` 未登记（那条臂 A13 是**故意**要它响）。**不由本批代改**（是 W9 的产品/法务判断，且合流的人必须把六句 + `check:legal-copy` 同批做完）。关闭判据：`node scripts/check-legal-permissions.mjs` rc=0（每次引用本条重跑，并写明在哪个载体跑的） |
 | 收尾四项（§5） | 🟡 **两条已量，两条待安静窗口** | 全部 | 4 | ✅ 第 2 条：`node research/tools/docs-link-check.mjs` 在本检出 ⇒ **rc=0 / 死链 0 处**（⚠️ 那句"33 处"是**主检出**的读数，死链数是"仓库+本机未跟踪文件"的属性，引用必须带在哪跑的）。✅ 第 3 条：W6 五张、W7 六张、W4b 一张**都打开看过**，各自 README 写了"看见了什么"，并且**看图一共照出三处断言抓不到的东西**（W5 少一行日期 / W7 竖条不是主蓝 / W4b 年份被挤没）。⏹ 第 1 条完整 `pnpm check`（68 段，含 `check:ai-e2e` 与 `check:legal-permissions` ⇒ 后者会在 main 自带的那条红上响，读数要分段写明在谁手里）。⏹ 第 4 条 `pnpm reinstall:all` 四端 + 私有现场设备验收（排在最后；⚠️ 现场核对：Android 模拟器 `emulator-5554` 在线、iOS 起了 **两台**（`heyta-iphone-17pro` + 别人的 `heyta-ios-isolated`）、`windows-pc` SSH 可达 ⇒ 这一段是**共享资源**，动设备前要先看谁在用） |
