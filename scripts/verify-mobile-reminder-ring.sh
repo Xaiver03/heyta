@@ -43,20 +43,16 @@ echo "=== 移动端提醒投递验收（真实模拟器，零 mock）==="
 echo "  设备: $E2E_SERIAL   任务: $TITLE"
 
 dismiss_consent_if_present() {
-  local waited=0 xy label
-  while [ "$waited" -lt 10 ]; do
-    dump
-    [ "$(has_text "在使用联网功能之前")" = "1" ] && break
-    sleep 1
-    waited=$((waited + 1))
-  done
-  [ "$(has_text "在使用联网功能之前")" = "1" ] || return 0
-  xy=$(xy_desc "只用本机"); label="只用本机"
-  if [ -z "$xy" ]; then xy=$(xy_text "只用本机"); fi
-  if [ -n "$xy" ]; then
-    $ADB shell input tap $xy; sleep 2
-    echo "     已处理隐私同意面板（${label}）—— 提醒是本地 op，本验收不需要联网"
+  # 处理本身在 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`（五个安卓脚本各抄一份
+  # 的时代结束了 —— 抄漏那份的症状是整轮"找不到按钮"的假红）。
+  # 🔴 本验收选**「只用本机」**：提醒是本地 op，不需要联网许可；替用户点「同意并联网」
+  #    等于让一段本地判据的验收顺手做了一个隐私决定。
+  handle_privacy_consent "只用本机" "以后再说"
+  local rc=$?
+  if [ "$CONSENT_GATE_SEEN" = "1" ]; then
+    echo "     （提醒是本地 op，本验收不需要联网）"
   fi
+  return $rc
 }
 
 # 通知栏里有没有含 $1 的通知。标题带时间戳（ring-e2e-<HHMMSS>），不会撞别的应用。

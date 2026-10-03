@@ -638,7 +638,28 @@ ensure_app_foreground() {
 #    所以这一步不是绕过被测功能，而是把设备恢复成"用户已经做过首次选择"的初态。
 #
 # 幂等：不在欢迎页时什么都不做（主界面里根本没有这两个按钮）。
+#
+# 🔴 它现在**先把首启的隐私同意面板收掉**，再处理欢迎页 —— 顺序就是屏幕上的顺序
+#    （隐私面板是一块盖住整屏的 RN Modal，它立着的时候欢迎页的节点根本不在
+#    无障碍树里，"点先离线使用"会点进遮罩）。
+#
+# ⚠️ 默认走**「同意并联网」**，这条决定是有代价的，写清楚：
+#   · 本 lib 的调用方（`verify-mobile-*`）**绝大多数**后面就要配同步凭据、看另一台
+#     设备读不读得到 —— 选「只用本机」或「以后再说」会让出口闸把每一个请求拦在
+#     本地（`consent-gate.ts` 的职责），后面所有网络判据红。那**不是产品坏了**，
+#     但会把一轮验收变成十几次"找不到按钮"的假红（2026-10-03 实测：`verify-mobile-auth.sh`
+#     整轮 17 条红，全是这一块面板）。
+#   · 真用户要走通那条旅程**也必须**点这一边，所以这不是"绕过被测行为"，
+#     是替被测行为做一次它自己要求的前置选择。
+#   · 被测的是**本地**行为的脚本，在调用本函数之前先 `export CONSENT_GATE_PREFERRED=只用本机`
+#     （或「以后再说」），本函数就按那个走 —— 已经有三个这么做了
+#     （`reminder-ring` / `schedule` / `timeline`，它们各在自己的处理里点名了按钮）。
+#   · ⚠️ 选「以后再说」**不等于处理完了**：决定仍是"没问过"，面板会在下一次冷启动
+#     或下一次撞上门闸时再弹（`startup.ts` 判的是 `undecided()`）。`schedule` 与
+#     `timeline` 外面那圈 `settle_*` 循环就是在处理这个后果，不是界面"随机换序"。
 dismiss_welcome_if_present() {
+  # 首启隐私同意面板（先它，因为它在最上面）。
+  handle_privacy_consent "${CONSENT_GATE_PREFERRED:-同意并联网}" "只用本机"
   dump
   if [ "$(has_desc "先离线使用")" != "1" ] && [ "$(has_text "先离线使用")" != "1" ]; then
     return 0
@@ -654,6 +675,90 @@ dismiss_welcome_if_present() {
   sleep 3
   echo "     已离开欢迎页（点「先离线使用」@ ${xy}）"
   return 0
+}
+
+# 首启的**隐私同意面板**（`common.privacy.consent.title` =「在使用联网功能之前」）。
+#
+# 🔴 它是一块**盖住整屏的 RN Modal**（`accessibilityViewIsModal`），所以它立着的
+#    时候，欢迎页 / 主界面的节点**根本不在无障碍树里**。不处理它，后面每一条基于
+#    界面的断言得到的都是"找不到按钮""冷启动第一屏没有注册/登录"——
+#    看起来像产品坏了，其实只是验收载体没处理一次法定前置询问。
+#    （实测：`verify-mobile-auth.sh` 就是这么整轮全红的，2026-10-03。）
+#
+# 为什么放在共享库里而不是各脚本各写一份
+# ------------------------------------------------
+# 这条要求落地后，五个安卓脚本**各自**抄了一份 `dismiss_consent_*`，
+# 各自处理的按钮不一样、等待时长不一样、有的还**没有**复验面板真的走了。
+# 第六个要用的脚本（本文件头列的那批之外新加的）没有抄到 ⇒ 整轮假红。
+# **抄件一定会漂，漂的症状就是这种"什么都没坏但全屏找不到按钮"。**
+#
+# 用法：
+#   handle_privacy_consent <优先按钮> [备选按钮…]
+#     · 要验联网/注册/同步的脚本传「同意并联网」在前（选「只用本机」会让出口闸
+#       拦掉每一个请求，后面所有网络判据红 —— 那是闸门在正确地工作，不是产品坏了）；
+#     · 只验本地行为的传「只用本机」或「以后再说」在前。
+#
+# 置三个变量给调用方**断言用**（本函数自己不改 PASS/FAIL —— 判据归调用方，
+# 否则"要不要把这次豁免算成一条检查"就由库代码替脚本决定了）：
+#   CONSENT_GATE_SEEN   1 = 面板确实出现过（没出现 ⇒ 调用方那条"首启必须问"会红）
+#   CONSENT_GATE_CHOSEN 实际点掉的按钮标签
+#   返回码 0 = 面板不在，或已被点掉；1 = 面板在却点不掉
+#
+# ⚠️ 三条实测形状，都写进来了，别再让下一个脚本重新踩：
+#   · 面板有**入场动画延迟**，启动后立刻 dump 常常还没有它 ⇒ 轮询等（≤10s），
+#     不是"看一眼没有就当没弹"。
+#   · RN 的 `Button` 可辨识名在 **content-desc**，不在 text ⇒ 先 `xy_desc`；
+#     「只用本机」这类标签**正文 bullet 里也出现一次**，所以 `xy_text` 兜底
+#     取的是**第 2 个**匹配（第 1 个是那句说明文字，点它什么都不会发生）。
+#   · 点一次**未必收下**（动画/焦点），所以复验还在就再点一次；仍在才算失败。
+CONSENT_GATE_SEEN=0
+CONSENT_GATE_CHOSEN=""
+
+privacy_gate_present() {
+  [ "$(has_text "在使用联网功能之前")" = "1" ]
+}
+
+handle_privacy_consent() {
+  local waited=0 xy label attempt
+  CONSENT_GATE_SEEN=0
+  CONSENT_GATE_CHOSEN=""
+
+  while [ "$waited" -lt 10 ]; do
+    dump
+    privacy_gate_present && break
+    sleep 1
+    waited=$((waited + 1))
+  done
+  privacy_gate_present || return 0
+  CONSENT_GATE_SEEN=1
+
+  attempt=0
+  while [ "$attempt" -lt 2 ]; do
+    attempt=$((attempt + 1))
+    label=""
+    xy=""
+    local want
+    for want in "$@"; do
+      xy=$(xy_desc "$want")
+      [ -z "$xy" ] && xy=$(xy_text "$want" 1)
+      if [ -n "$xy" ]; then label="$want"; break; fi
+    done
+    if [ -z "$label" ]; then
+      echo "     隐私同意面板在，但取不到候选按钮的坐标（文案改了？候选：$*）"
+      return 1
+    fi
+    $ADB shell input tap $xy
+    sleep 2
+    dump
+    if ! privacy_gate_present; then
+      CONSENT_GATE_CHOSEN="$label"
+      echo "     已处理隐私同意面板（点「${label}」@ ${xy}）"
+      return 0
+    fi
+    echo "     点了「${label}」但面板还在，再点一次"
+  done
+  echo "     ❌ 隐私同意面板点不掉"
+  return 1
 }
 
 screen_txt(){
