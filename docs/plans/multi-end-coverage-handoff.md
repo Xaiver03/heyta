@@ -292,6 +292,19 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    所以缺口落在我自己的启动器里，**登记**给它属主：B 段目前只在 `>1 台 booted` 时打一句 ⚠️，
    没有"目标那台里 App 正在跑"这一条 FAIL。复跑现量：
    `for u in $(xcrun simctl list devices booted | grep -oE '[0-9A-F-]{36}'); do echo "$u $(xcrun simctl spawn $u launchctl list 2>/dev/null | grep -c UIKitApplication:com.heyta)"; done`。
+   🔴 **android 那一侧同一个洞，而且当场就有**：01:4x 现量 `emulator-5554` 上
+   `pidof com.heyta` = **13309**、`mCurrentFocus` = `com.heyta/com.heytamobile.MainActivity` —— App 正在前台跑。
+   ① 的 android 段会 `adb uninstall` 它、③ 的第 0 步会 `pm clear` 它的库。两条启动器现在都在闸门之后
+   **再读一次设备自己**（`/tmp/heyta-device-occupancy.sh`，只读查询，不 tap 不 dump）。
+   这条探针自己按 §7 元规则第二条验过**三条臂**（用假 `adb` 做夹具，不碰真设备）：
+   可读且没跑 ⇒ **0（空闲）**；可读且在跑 ⇒ **1**；**`get-state` 失败 ⇒ 1 并打印"不能当成空闲"**。
+   第三臂是这里唯一有牙的地方 —— `pidof` 返回空串有两种成因（"没跑"与"adb 连不上"），
+   把它们合成同一个读数就等于"探针坏了看起来像空闲"。**"空闲"那一臂不能靠真设备验**
+   （要它空就得停掉别人的 App），所以用夹具；夹具用完即删。
+   🔴 **取证图的"存在"不是取证**：`/tmp/heyta-reinstall-*` 那四张（mac 是**两张**：窗口 + `.webview`）
+   与 `apps/mobile/evidence/android-notes-*.png` 三张，上一轮就在（01:4x 现量：mac 23:05:50、android 23:34:50），
+   ⇒ 两条启动器现在都在起跑前记 `RUN_START`，并按 mtime 打 `[本轮新生] / [陈旧-早于本轮起跑]`。旧的那条写法还带一个 glob
+   `apps/mobile/ios/build/**/*.png` —— bash 默认没开 globstar，它**不递归**，缺图时表现成"这一端没打印"。
    ⚠️ 隔离检出里 `pnpm -r typecheck` 会因 `packages/legal/dist`、`apps/node-host/dist` 缺而报一串
    `TS2307`（那是载体不全不是源码错，见 §6）。
 2. 同一窗口内补跑那 3 段 Playwright，然后跑满 `pnpm check`，把**可过段数 + 载体 sha** 一起记账。
