@@ -58,6 +58,15 @@ interface CalendarViewState {
    *   只服务一个视图的状态（本文件文件头记过这个理由）。
    */
   captureOpen: boolean;
+  /**
+   * 公共事实（调休 / 补班）覆盖表的**变更计数**（W4b）。
+   *
+   * 🔴 为什么是计数而不是布尔：覆盖表住在 `@heyta/domain` 的模块级状态里，React 看不见它。
+   * 每装一次 / 每拉到新版都要让那 42 个格子重算，而 `CalendarView` 把 `dayMarker`
+   * 的**函数身份**挂在这个数上 —— 于是无论格子有没有被 memo 包住都会重读 `adjustmentOn()`。
+   * 布尔的坏法是"第二次装成同样的值 ⇒ 不触发"，而"部署方改了公告又改回来"正是这种第二次。
+   */
+  publicFactsEpoch: number;
 }
 
 interface CalendarViewActions {
@@ -97,6 +106,8 @@ interface CalendarViewActions {
   setScopeGroup: (kind: ScopeKind, ids: readonly string[]) => void;
   /** 「所有」那一行：清掉全部勾选 = 显示全部。 */
   resetScope: () => void;
+  /** 公共事实覆盖表变了 —— 让日历重算（见 `publicFactsEpoch`）。 */
+  bumpPublicFactsEpoch: () => void;
 }
 
 function idsOf(scope: TaskScope, kind: ScopeKind): readonly string[] {
@@ -127,6 +138,7 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   scope: FULL_SCOPE,
   view: 'month',
   captureOpen: false,
+  publicFactsEpoch: 0,
 
   setCursor: (date) => {
     set({ cursor: date });
@@ -168,5 +180,9 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
 
   resetScope: () => {
     set({ scope: FULL_SCOPE });
+  },
+
+  bumpPublicFactsEpoch: () => {
+    set((state) => ({ publicFactsEpoch: state.publicFactsEpoch + 1 }));
   },
 }));
