@@ -313,6 +313,25 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    ② 设备侧 adb 可见的只有 `emulator-5554`（`com.heyta` versionName=1.0）；`:3100` 空着 ⇒ ③ 那条"必须自己起服务端"仍然成立。
    ③ 现场有一条**别人正在跑的 `react-native bundle --platform android`**（pid 90249）—— 这正是窗口判据里
    "别人的打包进程"那一档，所以此刻**不启动**我这边的重打 APK（它同时是 ③ 的硬前置与最重的一步）。
+   🔴 **01:3x 一个决定：③ 的载体换成隔离检出**，依据是同一脚本在同一对端口上的 A/B 现量
+   （`HEYTA_LOAD_GATE_WAIT=0 PORT=3100 bash scripts/verify-mobile-window-gate.sh --target c`）：
+   | 同一道 C 闸门 | 主检出 | 载体 `../heyta-wt-reinstall` |
+   |---|---|---|
+   | 未提交源码 | ❌ **67 枚**（00:5x 那次是 49 枚 —— 这本身就是会漂的数） | ✅ `packages/ apps/ server/` 里没有未提交的修改 |
+   | APK | ❌ 比源码旧（APK 00:55:22 / 源码 01:26:50） | ❌ **不存在**（那条产物路径在载体里从来没打过） |
+   | 其余各条 | 两边一致：❌ 负载 48>12、❌ 有移动端验收在跑、✅ `emulator-5554` 在线、✅ 凭据三件套齐、❌ 服务端没在 `:3100` | 同 |
+   ⇒ 主检出那 67 枚会被打进产物而判据看不出来（闸门自己的话），而便签链全在 HEAD ⇒ **在载体里跑才是"验当前提交"**；
+   代价写清楚：**开窗后 ③ 的第一件事是重打 APK**（`pnpm -r build` → `pnpm build:android` → `adb install -r`），
+   且三张取证图会落在**载体**的 `apps/mobile/evidence/` 下，收尾要点名提交它们（§7 里那条"验收会重写检出里的 evidence png"）。
+   🟢 **一条省事的顺序依赖**：① 的 android 段本来就是"清旧包 → 从当前源码重打 → 卸旧装新"，
+   而它也在**同一个载体**里跑 ⇒ **按 §5 的顺序 ①→②→③ 走，③ 的 APK 前置由 ① 顺带做完**；
+   只有 ① 的 android 段红了或想跳过 ① 先做 ③ 时，才需要上面那三条命令自己来一遍。
+   ✅ **两条启动器的"会拒跑"这道门本轮已被现量验证有牙**（不是装饰）：
+   `bash /tmp/heyta-run-checks.sh`（不带 `--go`）退 **3**，打印 `:4318 = busy / :4319 = busy`；
+   `bash /tmp/heyta-run-notes.sh`（已改指向载体，不带 `--go`）退 **3**，打印 `GATE_EXIT=3 / VERDICT=NOT-RUNNING`。
+   两者都是**闸门判"现场不成立"**那一支（`verify-mobile-window-gate.sh` 自己的退出码约定是
+   0=窗口开 / 3=现场不成立 / 1=用法错，见该文件 `:17-20`），而启动器退 3 之前都先打印了具体哪几条 ❌
+   （`/tmp/heyta-notes-preflight.log` 现量 **4 条 ❌**）—— 不是脚本静默失败被当成环境红。
 4. ✅ **父子层级选择器：做完（2026-10-03 深夜），在未合并分支 `feat/list-parent`** ——
    细节与判据在 §3.3 第一条。**跨端形态是代拍**（原话把这条列为"要产品负责人拍"）：
    现量依据 = `OrganizerList` 早就渲染一层嵌套、两端同一棵骨架，所以入口挂到它**已有**的插槽上
