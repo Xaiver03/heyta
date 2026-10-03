@@ -182,7 +182,8 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 
 | 文档 | 内容 |
 |---|---|
-| [local-server-verification.md](runbooks/local-server-verification.md) | ⭐ 不依赖 Docker 跑通服务端 + Docker 部署 + 实测发现 |
+| [self-host.md](runbooks/self-host.md) | ⭐ **自建一套 heyta 服务端**（面向陌生人：落地页那个按钮指向的就是这份）——必填的三项凭据、一条受支持的部署入口、界面挂在 `/app/`、第一次开机的一次性迁移、大陆可达性怎么自己配、以及 §8 那张"还没做到的"表 |
+| [local-server-verification.md](runbooks/local-server-verification.md) | ⭐ 不依赖 Docker 跑通服务端 + Docker 部署 + 实测发现。🔴 **写给的是我们自己的 P0 验收**：开头是一张内部机器表（SSH 别名 / 公网 IP），所以它**不是**对外自建指南，也别从公页直链过去（判据见 `apps/landing/tests/public-copy-register.spec.tsx` 的「公页指向的仓库文档」） |
 | [deployment.md](runbooks/deployment.md) | ⭐ **运维与部署现状**：哪台服务器跑什么、heyta 公网部署拓扑、反向代理与证书、代理链路、DNS、本机开发环境、🔴 待清理风险（含"实测 / 引用 / 未核实"标记） |
 | [multi-platform-build.md](runbooks/multi-platform-build.md) | ⭐ **多端构建操作手册**：Android / iOS / Windows / 鸿蒙怎么打包、怎么验产物、高频坑；**§6 是桌面原生壳安装包**（macOS `.dmg` / Linux `.deb` / Windows MSIX） |
 | [desktop.md](runbooks/desktop.md) | ⭐ **桌面端（Electron）操作手册**：骨架由什么组成、Spike S1 结论（主进程持库）、库文件在哪、**Electron 二进制为何没被下载**（要跑 GUI 需放行 `allowBuilds`）、**不装 Electron 也能验证的 11 个用例**、以及"复用而非复制"的机器判据 |
