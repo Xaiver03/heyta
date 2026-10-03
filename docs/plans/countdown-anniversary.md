@@ -418,6 +418,54 @@ grep 命令**数成第二处定义（判据必须锚"行首的定义形状"，�
    op 数**恰好 +1**、界面出现「当前：每年」、笔记本读到同一条规则。
    ⚠️ 期望值取自**手机此刻的 dueDate**（`repeatAnchor = dueLocal ?? todayLocal`），
    不是脚本开头写死的那个日期 —— 这一点本身是第 15 步存在的理由。
+
+   **12:04–12:27 这一趟的实测（每一条都是磁盘上的读数，不是计划）**：
+
+   1. ✅ **当前产物的 APK 里 yearly 真的在**：`app-release.apk` 67,140,908 字节（12:04 打），
+      解开 `assets/index.android.bundle` 按字节数 needle ⇒ `每年`(UTF-16LE)=**1**、
+      `FREQ=YEARLY`(ascii)=**1**、阳性对照 `收集箱`=**10**、阴性对照 `年同比不存在串`=**0**。
+      有对照是因为 #171 那个坑：**中文在 Hermes 字节码里是 UTF-16LE，`grep` 恒 0** ——
+      没有那 10 次 `收集箱`，这个 0 和"没做"长得一模一样。
+   2. 🔴 **12:09 那一趟 exit 1 是我的探针坏了，不是产品也不是环境**：编排脚本用
+      `adb -s <d> emu avd name` 的第一行去**逐字相等**比 AVD 名，而 `adb emu` 的应答是 **CRLF** ——
+      `od -c` 实测 `h e y t a - w 3 - y e a r l y \r \n` ⇒ `[ "$nm" = "$AVD" ]` **恒假**，
+      60 轮全空转。设备其实 12:05 就 `Boot completed in 25012 ms`。
+      同一个脚本里 `getprop sys.boot_completed` 那行做了 `tr -d '\r'`，**这行漏了** ——
+      典型的"同一份输出格式在一条链上被两种方式对待"。补上 `tr -d '\r'` 后第一次轮询就命中。
+      📌 待入台账（取号以当时现量为准，别照抄本行）：**`adb emu` 系（console）应答带 `\r`，
+      `getprop`/`shell` 系也带 —— 任何"逐字相等"的 adb 读数判据必须先 `tr -d '\r'`，
+      而它坏掉的形状是"永远等不到"，不是"报错"**。
+   3. 🔴 **12:16 那一趟 exit 1 是隔离检出的固有代价，不是配置错**：`git worktree add` **不带
+      `server/.env`**（它被 gitignore），而服务端有两把必填钥匙：`JWT_SECRET`
+      （`server/src/auth.ts:34` 直接抛）与 `PASSWORD_PEPPER`
+      （`server/src/index.ts:59` 的 `assertPasswordBackend` 在**绑端口之前**自检，缺了就拒绝启动）——
+      症状是"服务端 60 秒内没有就绪"，真因在 `/tmp/heyta-e2e-server.log` 的第一行。
+      我这趟的做法：给自己的栈**新生成一把**（不复用主检出那把）写进 `w3-stack.env`（权限 600、
+      值不打印、复跑复用同一把 —— 中途换值会让已注册账号的口令散列永远验不过）。
+      📌 待入台账：**"隔离检出"不等于"能跑的检出"** —— 凡是 gitignore 的配置（`server/.env`）
+      都要在隔离现场显式补，且它的失败形状是**下游超时**（栈没起来）而不是"缺文件"。
+   4. ✅ **私有库这条路线本来就有配方**：`docs/runbooks/local-server-verification.md` §步骤 1-2
+      （`createdb` + `sh scripts/migrate-deploy.sh`，macOS 要 `research/tools/macos-sed-shim` 在 PATH 上）。
+      现量：`heyta_w3_yearly_20261003` 已应用迁移 **42** 条，与共享库 `heyta_mobile_smoke` 的 **42** 条
+      **逐条等量**（这就是"我的库不是半成品"的证据；直接 `prisma migrate deploy` 会在 9 个
+      CONCURRENTLY 迁移上 P3018）。
+   5. ✅ **归属四条都成立**：`:3200` 监听者 pid = **33262**，而共享 pidfile
+      `/tmp/heyta-e2e-server.pid` 里的数**就是 33262**（跑前那个 pidfile 是**死人**：42398 已不存在）；
+      账号是 `mobile-e2e-1791001057@example.com`（本轮新建，client 数 0 < 20）。
+      ⚠️ **顺带照出的一条敞口（归他们那条线，不是本批能改的）**：`PIDFILE`/`LOGFILE`/账号凭据
+      都是**固定 `/tmp` 路径**（`mobile-e2e-up.sh:46-47`、`mobile-e2e-down.sh:16`、
+      `down` 里 purge 掉的三个 `heyta_mobile_*.txt`），而"幂等复用"的判据是**端口**
+      （`mobile-e2e-up.sh:82` 只要求 `/health` 有**任意非空**响应）⇒ 两个会话用不同 `PORT`
+      时**共用同一份 pidfile 与同一份凭据**：后写的覆盖前写的，而 `mobile-e2e-down.sh` 会杀掉
+      "最后那个写 pidfile 的人"的服务端。所以**我这趟收尾不跑 `mobile-e2e-down.sh`**，
+      改用 `../heyta-wt-logs/w3-teardown.sh`：只杀"命令行里带 3200 的占有者"、
+      只 `adb emu kill` 名为 `heyta-w3-yearly` 的设备（先读 `emu avd name` 再动手）。
+   6. 🔄 **负载门第一次在真实场景下工作**（不是变异夹具）：12:17:37 开始读数
+      **469 / 495 / 509 / 486 / 459 / 431 / 444 / 411 / 396 / 296 / 196 / 136 / 115 / 90 / 66 / 51 / 35 / 28 / 20 / 13**
+      —— 全部 `> 12` 就一律不放行，每 30s 一次、上限 900s，等满就 `exit 3`。
+      📌 这里把上一轮那条一般规律**量成了现场**：那 469 不是别人在跑设备（`pgrep -f 'verify-mobile-'`=0、
+      `xcodebuild`=0），是**同机多个 agent 会话的构建/测试并发** —— 所以"负载高"在这台机器上
+      **不构成"有人在抢设备"的证据**，两件事要各自量。
 4. 📌 **本会话留下的隔离检出**：`../heyta-wt-closeout`（detached，`43a6cf60`）。
    它的**两个脚本**（`scripts/reinstall-all.sh`、`apps/desktop-macos/scripts/package-app.sh`）
    与 main 逐字节相同（`cmp` 过）；**文档以 main 为准** —— 检出里那份落后于把台账条目
