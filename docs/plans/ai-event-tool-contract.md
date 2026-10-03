@@ -1567,3 +1567,18 @@ MTIME=2026-10-03T19:04:30
 本轮不改：`scripts/reinstall-all.sh` 正是 §15.10 那 13 条重叠路径之一。
 登记为 **`B49`**，关闭路径 = 落地之后由本线实现第 2 条 + 用"同步后手动改远端 `index.html` 一个字节"
 做一次变异验证（必须判红）。
+
+### 15.17 ③ 的四端环境预检（只读，19:2x 现量）：环境全绿，唯一卡点是"链 rc=0"那道门
+
+| 端 | 前置 | 读数 |
+|---|---|---|
+| mac | `/Applications` 可写 + 打包脚本在位 | `APPS_WRITABLE=yes`、`apps/desktop-macos/scripts/package-app.sh` 存在 |
+| android | 模拟器在线（**序列号每次现取**） | `emulator-5554 device`（`adb devices -l`） |
+| ios | 有 booted 模拟器 | `heyta-iphone-17pro (FE195661-…-1F2F7AE3A102) Booted` |
+| windows | 主机可达 + `apps/web/dist` 在包里 | 可达；`WEBDIST=True`；但远端哈希是**别的会话**的（见 §15.16） |
+| 全部 | 有没有别人的设备验收在跑 | `ps` 扫 `verify-mobile\|adb .*shell\|uiautomator\|simctl` ⇒ **空** |
+
+**结论写死，免得下一趟会话再怀疑环境**：③ 现在**不缺设备、不缺主机、不缺权限**，
+只缺 `pnpm check` 的 rc=0（挂在 `B47` 那条上游红上）。
+这五个读数都是**会过期的**（设备会被占、远端会被别人同步）—— 真要跑 ③ 之前必须重取，
+尤其 `adb devices` 与 `simctl list devices booted` 这两条。
