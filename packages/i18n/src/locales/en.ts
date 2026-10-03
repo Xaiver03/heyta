@@ -232,7 +232,7 @@ export const en = {
   'landing.selfhost.step2.body': 'On first launch, pick one: your own server address or the hosted option. You can switch whenever you want.',
   'landing.selfhost.step3.title': 'You set the secrets',
   'landing.selfhost.step3.body': 'There are no default credentials — it is not a zero-thought installer, but every step is documented.',
-  'landing.selfhost.guide.title': 'The full walk-through lives in the repo',
+  'landing.selfhost.guide.title': 'The full walk-through is in the self-hosting guide',
   'landing.selfhost.guide.body': 'Every command, requirement and config file is in the self-hosting guide; follow it once and it comes up.',
   'landing.selfhost.guide.link': 'Open the self-host guide',
 

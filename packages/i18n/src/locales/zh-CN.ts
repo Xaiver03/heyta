@@ -267,7 +267,7 @@ export const zhCN = {
   'landing.selfhost.step2.body': '首次启动时二选一：填自己的服务器地址，或者用托管。选了随时能换。',
   'landing.selfhost.step3.title': '密钥与口令自己配',
   'landing.selfhost.step3.body': '没有默认值，要自己设 —— 不是零思考的一键安装，但每一步都有指南。',
-  'landing.selfhost.guide.title': '完整步骤在仓库里',
+  'landing.selfhost.guide.title': '完整步骤在自建指南里',
   'landing.selfhost.guide.body': '要逐条执行的命令、依赖与配置文件都写在自建指南里，跟着跑一遍就能起来。',
   'landing.selfhost.guide.link': '打开自建指南',
 
