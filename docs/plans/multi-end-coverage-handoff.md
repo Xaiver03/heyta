@@ -276,6 +276,22 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    `/usr/bin/xcrun simctl list devices booted | grep '(Booted)'`。
    启动器：`/tmp/heyta-run-reinstall.sh`（体检模式）→ 加 `--go` 真跑；它会把载体对齐到**当时**的 main HEAD，
    且只在 `pnpm-lock.yaml`/`package.json` 变化时重装。
+   🔴 **但"取 booted 列表第一台"这一条是错的，01:4x 现场把它照出来了**：三台 booted 里
+   `heyta-ios-isolated` 的 `launchctl list` 有 `UIKitApplication:com.heyta`（**App 正在跑**），
+   而那台里装的那枚 mtime = **01:38**（两分钟前）—— 那是别人这一轮的 iOS 现场，
+   而 ios 段拿到名字之后第一件事是 `simctl uninstall`。选择规则（已写进启动器）：
+   **逐台读设备自己的 launchctl，只挑没跑着 com.heyta 的那台；每台都读空则不跑并退出 3**（外部显式传的
+   `IOS_DEVICE_NAME` 优先，但占用表照打）。为什么不用 `ps`：人肉点的、别的工具的会话都不在进程表里留名字
+   （§7 那条"读 0 不等于没人用"的第 N 次应验），而设备侧读数不会说谎。
+   ⚠️ **这条判据本身差点是坏的**：第一版名字切片写成 `sed 's/ \((.*)\) \(Booted\).*/\1/'`，
+   贪心匹配把 UDID 一起粘进名字（打印成 `heyta-iphone-17proFE195661-…`）⇒ 传出去**永远匹配不上**，
+   症状看起来像"这台机器没有可用模拟器"。现量两条对照才修对：名字保留空格（`iPhone Duo heyta`）、
+   `running_heyta` 三台里恰好 `1 / 0 / 0`。
+   🔴 **闸门文件本身没动**：`scripts/verify-mobile-window-gate.sh` 此刻是 `M`（+23/-2，别人正在往里加
+   "iOS 目标取不到就停"那一段 —— 与我这条**同一个不变量的另一侧**）。撞车判据是"该文件有别人的未提交 diff"，
+   所以缺口落在我自己的启动器里，**登记**给它属主：B 段目前只在 `>1 台 booted` 时打一句 ⚠️，
+   没有"目标那台里 App 正在跑"这一条 FAIL。复跑现量：
+   `for u in $(xcrun simctl list devices booted | grep -oE '[0-9A-F-]{36}'); do echo "$u $(xcrun simctl spawn $u launchctl list 2>/dev/null | grep -c UIKitApplication:com.heyta)"; done`。
    ⚠️ 隔离检出里 `pnpm -r typecheck` 会因 `packages/legal/dist`、`apps/node-host/dist` 缺而报一串
    `TS2307`（那是载体不全不是源码错，见 §6）。
 2. 同一窗口内补跑那 3 段 Playwright，然后跑满 `pnpm check`，把**可过段数 + 载体 sha** 一起记账。
