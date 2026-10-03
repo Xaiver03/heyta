@@ -146,6 +146,22 @@ describe('新建提醒', () => {
     await expect(actions.createReminder(taskId, clock + 99 * MINUTE)).rejects.toThrow(/上限/);
   });
 
+  it('🔴 并发连点 8 次也不能突破上限（上限检查的 TOCTOU 回归）', async () => {
+    // 上一条是"逐条 await"的形状，它挡不住真正的失效模式：
+    // `dispatch` 落到物化状态是异步的，所以 N 个并发调用会在**同一个旧快照**上
+    // 同时通过 `aliveOfTask(...) < 上限` 的检查。加写链之前实测 8 条全落库。
+    const taskId = await makeTask();
+    const results = await Promise.allSettled(
+      Array.from({ length: 8 }, (_, i) => actions.createReminder(taskId, clock + (i + 1) * MINUTE)),
+    );
+    const alive = Object.values(state().reminders).filter(
+      (r) => r.taskId === taskId && r.deletedAt === undefined,
+    ).length;
+    expect(alive, '存活数超过上限 ⇒ 检查跑在旧快照上，上限等于没有').toBe(MAX_REMINDERS_PER_TASK);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(MAX_REMINDERS_PER_TASK);
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(3);
+  });
+
   it('墓碑不占上限名额（删一条还能再建一条）', async () => {
     const taskId = await makeTask();
     const ids: string[] = [];
