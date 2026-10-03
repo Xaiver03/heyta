@@ -2818,3 +2818,25 @@ for(const m of fs.readFileSync(d+"/"+f,"utf8").matchAll(/name:\s*['"]([a-z0-9_.]
 const t=fs.readFileSync("packages/legal/src/documents/ai-and-transfer.ts","utf8");
 console.log("dir="+n.size+" missing="+[...n].filter(x=>!t.includes(x)).length)'
 ```
+
+## B49. 🔴 Windows 打包机的对账只做了前半程：远端是**共享目的目录**，而构建要跑几分钟（2026-10-03 19:2x 只读预检照出）
+
+预检读数（`ssh windows-pc 'powershell -NoProfile -Command …'`，只读）：
+`WEBDIST=True`、远端 `apps/web/dist/index.html` 的 sha256 = `0191588D…`、`MTIME=2026-10-03T19:04:30`，
+而本载体同一文件 = `0B00C587…` ⇒ **远端那份是另一个会话刚同步的**，`C:\src\heyta` 是共用目的目录。
+
+**缺口形状**：`scripts/reinstall-all.sh` 的 windows 段是
+`sync_windows_sources`（`:241`，三条对账：`index.html` 哈希 / `native-bridge.js` 哈希 / 远端 chunk 数，
+不符即 `return 1` 拒绝打包）→ `package-msix.sh`（`:243`，远端就地构建 + 安装，**几分钟**）→
+`msix_check_facts`（`:249`，五条判据）。**对账在前、构建在后**，构建区间内被别的会话同步了也不会被发现 ——
+装上的不是本线的源码，而五条判据全绿。`grep -rn 'flock|HEYTA_WIN_LOCK' scripts/*.sh scripts/lib/*.sh` ⇒ **无跨会话锁**。
+
+与 §7 第 82 条的区别写清楚：82 条治的是"**没有**对账"，这一条是"**对账只做了前半程**"。
+
+**修法（第 2 条更硬，它不依赖"没人插队"）**：
+1. 远端写 `.heyta-sync-id`（本次运行 id），打包完成后读回来比对；
+2. `msix_check_facts` 之前**重跑一次哈希对账**（只比哈希、不重新同步），把"远端 == 本地"从一次断言变成**区间的两端**。
+
+**本轮不改**：`scripts/reinstall-all.sh` 是 §15.10 那 13 条重叠路径之一。
+**关闭判据**：落地后由本线实现第 2 条，并做一次变异验证 —— 同步完成后手动把远端 `index.html` 改一个字节，
+那一趟**必须判红**（现在不会）。

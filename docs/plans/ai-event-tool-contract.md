@@ -1534,3 +1534,36 @@ update_note
 **最终正确的那趟是 node**（`matchAll(/name:\s*['\"]([a-z0-9_.]+)['\"]/g)` + `Set` + `includes`）。
 一般规律：**名单类判据优先用宿主语言写**；shell 里三趟给出 16 / 0 / 24 三个数，
 而"对不上"本身就是探针坏的证据 —— 报数之前先要两个独立实现同意。
+
+### 15.16 Windows 打包机预检（只读）照出：远端是**共享目的目录**，而对账只发生在打包**之前**
+
+为了不让 ③ 到时候卡在环境上，先做了一次**只读**预检（照仓内现成调用式，不自己发明）：
+
+```bash
+ssh windows-pc 'powershell -NoProfile -Command "… Test-Path / Get-FileHash …"'
+MACHINE=<windows-pc>   NOW=2026-10-03T19:23:22
+WEBDIST=True  SHA=0191588D96407D488B9B2902F1A5208E629C34B141CC78CF63D97CD639CC2C8A
+MTIME=2026-10-03T19:04:30
+# 本载体 apps/web/dist/index.html = 0B00C5879AF7B7FBF40C25AF24FF0A6F7BA206FC3AF3E6E8B7E0C543555AD2BD
+```
+
+三条读数各自有用：主机可达、`apps/web/dist` **在**（不是 §7 第 82 条当年"包里根本没有 web-dist"那个形态）、
+**但远端那份不是我这条线的**（哈希不同，且 mtime 是 19:04 —— 另一个会话刚同步过）。
+⇒ **`C:\src\heyta` 是一条被多个会话共用的目的目录。**
+
+🔴 **于是暴露出一个 §7 第 82 条没覆盖的形状**：`scripts/reinstall-all.sh` 的 windows 段是
+`sync_windows_sources`（`:241`，内含三条对账：`index.html` 哈希 / `native-bridge.js` 哈希 / 远端 chunk 数，
+任一不符 `return 1` 拒绝打包）→ `package-msix.sh`（`:243`，**远端就地构建 + 安装**）→ `msix_check_facts`（`:249`）。
+**对账发生在远端构建之前**，而远端构建要跑几分钟 —— 这个区间里另一个会话同步它自己的树，
+我这趟装上的产物就不是我的源码，而**五条判据一条都不会红**（它们量的都是"远端曾经等于本地"那一刻之后
+由我的构建产出的东西）。仓内 `grep -rn 'flock\|HEYTA_WIN_LOCK' scripts/*.sh scripts/lib/*.sh` ⇒ **无跨会话锁**。
+
+这不是"把 82 条再说一遍"：82 条治的是**没有对账**，这一条是**对账只做了前半程**。
+修法很便宜，两条任选其一（第二条更硬，因为它不依赖"没人插队"这个假设）：
+1. 远端 `C:\src\heyta\.heyta-sync-id` 写入本次运行 id，**打包完成后**再读回来比对；
+2. `msix_check_facts` 之前**重跑一次 `sync_windows_sources` 的哈希对账**（不重新同步，只比哈希），
+   不符就判红 —— 把"等于本地"从一次断言变成区间的两端。
+
+本轮不改：`scripts/reinstall-all.sh` 正是 §15.10 那 13 条重叠路径之一。
+登记为 **`B49`**，关闭路径 = 落地之后由本线实现第 2 条 + 用"同步后手动改远端 `index.html` 一个字节"
+做一次变异验证（必须判红）。
