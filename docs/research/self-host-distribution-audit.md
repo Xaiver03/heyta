@@ -3779,19 +3779,50 @@ image-license, crosslang-contract, journey-coverage, ai-tools, ai-coverage, web-
 | **G-54** | 🔴 **修法已提交在本分支，判据已落，真构建那一层证据未取** | `server/package.json` 的 devDependencies 里有 registry 上取不到的本地包 ⇒ `npm install --omit=dev` **在 `--omit=dev` 下仍解析 dev spec** ⇒ 镜像生产阶段第一条 install 就 E404。归属：main `b3397cda`（不是本批引入），但**它同样挡在本批的落地件上**，因为载体取的是 main 那一版 `server/package.json`。修法 `server/Dockerfile` 装之前 `npm pkg delete devDependencies` + 第 5 步两腿判据 + 新鲜度哈希按字段分区。⚠️ **本批那句"外人一条 compose 起全套"在 main 当下的树上是假的** —— 而它不在任何一道 `pnpm check` 的可见范围里（链从不构建镜像），这正是 §8.11 那条"验收脚本把自己要验的默认值换掉"的又一种面目 |
 | **G-54b** | 登记，不动 | "往 `dependencies` 里加一枚 `@heyta/*` 却没给 tgz" 这一类由第 5b 腿挡住了；**往 devDependencies 加**这一类只被 prune 挡住。两种形状不同源，注释里各写了一句，别合并成一句 |
 
-#### 还欠的（别当已完成）
+#### 同一轮补的两条现量（不是欠项，是为了下一轮别把预期读成回归）
 
-⑧ **按命题扫过"还有没有第二处会踩同一个 E404 的构建面"**（不是只扫我改的那一处）：
+⑧ **prune 会带来一个副作用，我先用夹具把它量出来了**（免得下一轮把它读成"锁漏了东西"）：
+`package.json` 里没有 `devDependencies` 而**提交物锁里还有**时，`npm install --omit=dev` 不只是不装它们，
+它会**把锁里的 dev 条目整段删掉**。实测夹具（npm 10.9.4；`ms` 生产 + `is-odd` 开发）：
+
+| 量 | 装之前 | 装之后 |
+|---|---|---|
+| 锁根条目 `devDependencies` | `{"is-odd":"3.0.1"}` | **`null`** |
+| 锁的 `packages` 键 | `""`,`node_modules/is-number`,`node_modules/is-odd`,`node_modules/ms` | `""`,`node_modules/ms` |
+| rc / 实际装上的 | — | rc=0 / 只有 `ms` |
+
+⇒ 对本批三条锁侧判据的影响逐条判过：**都不需要改**。
+`check:image-install-contract` 第 4 步与 `image-lock-platform.mjs`（G-53 那 14 枚平台条目）读的是**提交物锁**，
+它不在镜像里被改写；`--installed-tree` 那条对账比的是"磁盘枚举 ⊆ 锁的**非 dev** 集"，
+dev 条目本来就被排除在等式之外，删掉它们不改变非 dev 那 158 条。
+🔴 **要紧的是那一手"重生成锁只能靠一次真构建"**：从 `/app/package-lock.json` 取回来落成提交物时，
+新锁**天生不再含 dev 条目**（旧的那把含，因为它取自在没有 prune 的那一趟构建）。
+所以条目总数会掉一截 —— 那是 prune 的**预期结果**，不是"锁漏了"，也不是回归。
+看到数字变小就重新做差集的人，会顺手往 `IMAGE_ONLY_PACKAGES` 里加错东西，所以这句要写在这里。
+⚠️ 边界：夹具是 npm 10.9.4、两个真包，等式的**形状**成立；镜像里那一趟（npm 11.19.0 + 三枚 tgz + `prisma` 点名）
+的确切键数留给真构建那趟读数，不许由这一行外推。
+⑨ **按命题扫过"还有没有第二处会踩同一个 E404 的构建面"**（不是只扫我改的那一处）：
 `git ls-files | grep -i dockerfile` 全仓只有两枚 —— `server/Dockerfile` 与 `server/Dockerfile.test`。
 后者确实跑 `npm install`（还不带 `--omit=dev`），但它 `COPY` 的是
 `packages/super-sync-server/package.json` 与 `packages/sync-core/…` 这套**上游目录布局**，
 在本仓库里那些路径根本不存在（我们的服务端在 `server/`），所以它在第一步就死，
 且本仓 §8.54 早就量过"**没有任何构建路径用它**"（`.github/workflows/heyta-server-image.yml:182`
 指向的是 `file: server/Dockerfile`，同一条 `docker build-push-action` ⇒ 修法自动被发布路径继承）。
-⇒ 这条不是"又一个 G-54"，是一枚上游遗留的死件；留在这里是因为**"只修我看见的那一处"就是漂移的起点**。
+⇒ 这条不是"又一个 G-54"，是一枚上游遗留的死件；留在这里是因为**"只修我看见的那一处"就是漂移的起点*
+
+
+#### 还欠的（别当已完成）
+
+*。
 
 1. **真构建**：载体重算（带上本节这几笔）之后跑一次 `verify:selfhost-stack`，看生产阶段那层建成、
    并且 `check:image-license` 在载体上从 🔴 变 ✅。这一步同时是 #2 的第 N 趟现量。
+   🔴 **这一趟还要专门看一件事，别把它的红读成"G-54 没修好"**：上面 ⑧ 已经量出 prune 会让镜像内那把
+   `/app/package-lock.json` **只剩非 dev 条目**（根条目的 devDependencies 变 `null`）。装出来的生产树不变
+   （`--omit=dev` 本来就不装），但锁的字节会变 —— 而 `dump-installed-tree` / 双载体对账 / `deriveFromLock` 读的都是锁。
+   所以要看的是"**非 dev 那 158 条与模式 A 的 146 条是否仍逐字对得上**"，不是"锁的条目总数有没有变"。
+   若差集里冒出新的 `IMAGE_ONLY` 条目，那是**登记没跟上**（不是回归），照 §8.45 那套逐项补登记并核 `carrier` 字段。
+
 2. ~~**main 侧同段复跑**：拿一个 main 的 detached 检出跑**同一条**纯 fs 段，把上面那 13 条红逐条归属
    （"main 也红" = 非本批；"只有载体红" = 接缝）。这是 #1 关闭判据要求的那一句，不是可选项。~~
    🔴 **07:3x 已做掉，读数在 §8.60**：两棵树同段各跑一遍，**"只在载体红"= 空集**，而"只在 main 红"恰好是本节这一条。
