@@ -2535,6 +2535,69 @@ comm -12 <(git -C <载体> diff --name-only main..HEAD | sort) \
          <(git -C <主检出> diff --name-only HEAD | sort)
 ```
 
+## 15.37 00:0x：载体被并行会话当成**合流点**用了两次，而我在 merge 中途提交不出去（载体 `3a4d9175`→`305212ad`，00:0x）
+
+这一节是**现场记录**，不是计划。全部读数按时间顺序，每条带命令。
+
+### 1. 现场：三件事在 7 分钟内接连发生
+
+| 时刻 | 发生了什么 | 取证 |
+|---|---|---|
+| ~00:00 | `main` 从 `0a61c0a6` 前进到 **`55bc9c05`**，中间是 `2f735392 chore(wiring): 并行批次的总接线`（14 个逻辑提交的那一批：vault / 向量时钟 / W9 / 回收站 / 日历视图 / 头像 / 法务） | `git -C <主检出> log --format='%h %ct %s' -3` |
+| 00:02:20 | **有人在我的载体 worktree 里起了一次 `git merge main`**，3 个文件冲突：`packages/app-host/src/local-api-host.ts`、`packages/app-host/src/reminder-actions.ts`、`packages/app-host/tests/reminder-actions.spec.ts` | `git status` 报 `You have unmerged paths`；`$(git rev-parse --git-dir)/MERGE_HEAD` = `55bc9c05`，`MERGE_MSG` 首行写「吸收 main（2f735392）」 |
+| 00:03:42 | 那一次**由他们解完并提交了** `305212ad`（我线的三个提交仍是祖先：`git merge-base --is-ancestor 3a4d9175 HEAD` = YES；`main ⊂ HEAD` = YES） | `git log --format='%h %ct %s' -4` |
+| 00:04–00:10 | 同一棵载体里**又起第二次 merge**：`MERGE_MSG` 首行「merge: countdown 批次二主线（W0/W0b/W2/W5/W10 + W4b 的 web 半与后台录入）」，`MERGE_HEAD` = `c36b1d89`（= `feat/countdown-batch2`），00:10 现量 **25 个 `UU`**、工作树脏项 **123**（39 `A` / 56 `M` / 25 `UU`） | 同 `git status` + `git diff --name-only --diff-filter=U` |
+
+🔴 也就是说：**① 的"把几条线并成一条集成线"这件事，正在被别人在我这棵 worktree 里做**，
+而且这一次合的是 `countdown 批次二`——`git merge-base --is-ancestor c36b1d89 main` = **NO**，
+所以这条合并是批次二**第一次**与我的 AI 线并处，合并态此前从未被任何门禁量过。
+
+### 2. 我在 merge 中途提交不出去（一条 git 的硬规则，不是我的操作失误）
+
+`git commit --only -- <三个台账文件>` 直接 **fatal**：
+
+```
+fatal: cannot do a partial commit during a merge.
+```
+
+这是设计如此：合并提交的是**整个索引**，`--only`（部分提交）与之冲突。
+⇒ 我这轮的三处文档编辑只能留在**工作树**里（`索引命中 0 / 工作树命中 2` 是我逐文件量过的），
+并先 `cp` 了一份到 `~/scratch-heyta/carrier-snapshot-0004/`（300148 / 128098 / 214865 字节）。
+⚠️ 这里有一条**反向事故的形状**（我自己踩过并记过）：他们下一次 `git commit` 合并时提交的是整个索引，
+所以只要我的编辑**没进索引**就不会被带走 —— 但工作树里的这份仍然可能被后续 checkout/merge 覆盖。
+快照是为了那一刻准备的，不是为了抢提交。
+
+### 3. 五条红线在合并**之前**就逐条对账过（读的是 `c36b1d89` 那棵树，零写盘）
+
+| 红线 | 对 `c36b1d89` 的现量 | 判定 |
+|---|---|---|
+| AI 类型上产不出 op | `git show c36b1d89:packages/ai/package.json` 里 `dependencies` / `peerDependencies` **一段都没有** ⇒ 仍是零依赖，`@heyta/op-log` 在这个包里解析不到 | 不变 |
+| `host.submit` 全仓恰好一处（可穷举） | `git grep -n 'host\.submit(' c36b1d89 -- '*.ts' '*.tsx'` 命中 11 行；**src 里的非注释**只有 `ai-tool-run.ts:195` 与 `server.ts:587`，其余是注释表（`AssistantPanel.tsx:24`、`server.ts:458`）与 `packages/app-host/tests/event-tool-host.spec.ts` 的 7 处夹具。而 `check:ai-tools` 规则 9 的扫描集是 `listPackageSrcs()`（`scripts/check-ai-tools.mjs:478-485`：只遍历 package 的 `src`），**tests 不在扫描面里** | 合并后这条**不会**因批次二而红；但合并态仍要由门禁自己说话（下一节跑） |
+| 逐工具默认关 | `git show c36b1d89:packages/local-api/src/tools.ts` 里 `return grants?.[toolName] === true;` 原样在，只是行号从 **337-339 漂到 897**（他们那批把目录按实体拆开后文件变长了） | 语义不变、**行号抄件会漂** ⇒ 台账里这条以后引**代码形状**而不是引行号 |
+| 不开托管 AI / 不 bump schema | `CURRENT_SCHEMA_VERSION = 1` 在 `HEAD` / `c36b1d89` / `main` 三方**取值相同** | 不变 |
+| 我线的东西有没有被吞 | `git show HEAD:packages/app-host/src/local-api-host.ts` 里 `submit:`(477) → `submitIntent(`(478/509) 这条接线**仍在**（这是第一次合并 `305212ad` 后的读数；第二次合并完成后要再量一次） | 待复查 |
+
+### 4. ② 的读数**不能在这棵树上拿**，所以我另起一条干净通道
+
+123 项未提交改动、其中 25 项还是未解冲突 —— 在这种混合态里跑出来的红/绿**只在混合态成立**
+（这条我以前写过一次，这次是它第二次把我挡住）。新脚本
+`~/scratch-heyta/heyta-integration-verify.sh`：先断言 `未解冲突=0`（否则 exit 3，不硬量），
+再 `git worktree add --detach` 到载体分支的当前提交、软链 `node_modules`，
+然后 `pnpm -r build` → `-r typecheck` → `-r test` → `pnpm check`，逐段记 rc、日志落 `~/scratch-heyta/verify-<时分>/`。
+00:10 的 dry-run 现场：`载体 HEAD=305212ad 未解冲突=25 脏项=123`，`负载 12.73 / 阈值 12`。
+
+### 5. 这一节欠的三条（写给下一个读它的人，不是给自己的安慰）
+
+1. `305212ad` 那次合并**是他们解的冲突**，我没读过解法 ⇒ 合并态里 `local-api-host.ts` 的
+   **逐工具授权**与 **W11 批量提案**两处是否都在，必须用 `check:ai-tools` + `packages/app-host` 的测试来判，不能靠"看着没少"。
+2. 我这轮的三处文档编辑**还没有提交**（受第 2 小节那条 git 硬规则挡着）。
+   合流一结束就 `git commit --only` 那三个路径，并**按内存里那条反查**：
+   提交后量三处命中数（HEAD / 他们暂存 / 工作树），确认我的段落不是被 `git add -A` 顺手带走的。
+3. `docs/plans/ai-event-tool-contract.md` 里凡是引**行号**的地方都是一份会漂的抄件 ——
+   本节已经抓到一处（`tools.ts:337-339` → `:897`）。剩下已知的一处是 §15.29 那条
+   `host.ts:331-332`（它在合流后是否还指对东西，等 ② 一起量）。
+
+
 
 
 
