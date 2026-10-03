@@ -799,6 +799,54 @@ ssh ubuntu-jcli 'ls /var/www/heyta-app/assets/'
 `apps/web` 一有提交就要重建。这跟落地页那条（`VITE_APP_URL`）是两件事：
 落地页管"入口在不在、指向哪"，应用管"点进去之后是什么"。
 
+#### 🔴 2026-10-03：线上那份应用**三列塌成三段全宽**，而门禁全绿 —— 根因还是"产物比源码旧"
+
+现象是产品负责人**肉眼**看出来的，没有任何一条判据报过：`/app/` 在 2560 宽下
+rail、sidebar、main 各占满一整行竖着堆，图标旁边没有名字。
+
+实测根因（三层，缺一层就会归错因）：
+
+| 量什么 | 读数 |
+|---|---|
+| `.ht-app` 的 computed `grid-template-columns` | `2560px` —— **一列**，不是三列 |
+| 线上 CSS 里 `.ht-app--with-sidebar` 那条声明 | 引用 `--ht-layout-sidebar-min-width` 与 `-max-width` |
+| 同一份 CSS 的 `:root` | **没有这两条定义** |
+
+⇒ 引用落空让**整条声明**在 computed-value 阶段失效，网格退化成单列。
+控制台 0 条错误、CSS 200、资源零缺失、`pnpm check` 全绿 —— 也就是说这一族坏法
+在 CSS 层的表现是"**布局塌了，但所有读数都正常**"。
+
+**修法与验证顺序**（每一步都有读数，别跳）：
+
+```bash
+# 1) 从当前源码重打，带挂载参数
+cd apps/web && pnpm exec vite build --base=/app/
+# 2) 本地量几何要用**与生产同形状**的静态服务：
+#    ⚠️ `vite preview` 在 --base=/app/ 下会把 /app/assets/*.js 回成 index.html（text/html），
+#    拿它验产物会得到"整页空白"的**假结论** —— 本次实测踩到，别再用 preview 验 /app/ 产物。
+# 3) 备份 → 发布 → 线上复量同一组几何 + 截图给人看
+ssh ubuntu-jcli 'tar czf /tmp/heyta-app-backup-pre-a6e1a017.tgz -C /var/www heyta-app'
+rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
+```
+
+本地与线上读数一致：`64px 240px 2256px`（rail / sidebar / main），`errs 0 条`。
+备份：`/tmp/heyta-app-backup-pre-a6e1a017.tgz`。
+
+**判据（这次不再靠人眼）**：`check:web-artifact` 加了第 5 条 —— 产物里每个**无兜底值**的
+`var(--ht-*)` 必须在该 CSS 里定义过。只判 `--ht-` 命名空间（实测第三方 react-native-web
+自己用 `var(--placeholderTextColor)`，算进来就是天天加豁免）；带兜底值的不判（规范上优雅降级）。
+注入验证：把当前 CSS 里那两条定义摘掉 ⇒ **精确复刻线上那一版** ⇒ 报出两个名字、`rc=1`；真产物 `rc=0`。
+
+🔴 **线上现在跑的是哪个 commit 要写明白**：本次产物
+（`index-CBdUhwXG.css` / `index-8ESfmTgh.js`）来自分支 `feat/self-host-distribution` 的 `a6e1a017`，
+**它还没合进 `main`**（被并行会话在飞的 6 个重叠文件挡着，见 `docs/research/self-host-distribution-audit.md` §8.13）。
+也就是说这一刻 **生产 ≠ main** —— 下次重建前必须先确认那批改动已经进 main，否则会把修复覆盖回去。
+
+📌 **待入 `environment-traps`**（该文件此刻正被并行会话改着，不往里挤）：
+"产物比源码旧"在 CSS 层的**第三种面目** —— 前两种是 APK 里打旧 JS bundle（§7 第 27 条）
+与安装包没打 `web-dist`（第 82 条）；这一种是旧产物的 CSS 引用了当时还不存在的 token，
+症状既不是白屏也不是缺样式，而是**布局塌了但每个读数都正常**。
+
 #### 变更前备份（回滚用）
 
 - `/etc/nginx/sites-available/heyta.finlaw.cloud.bak-20260927T145658Z`（**迁移前**：只有落地页、没有 `/app/` 与 `/api/`）

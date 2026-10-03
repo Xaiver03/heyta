@@ -40,8 +40,8 @@
  * 一条永远绿的空判据比没有判据更糟。
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -216,8 +216,77 @@ if (outOfScope.length > 0) {
   );
 }
 
+// ── 5. 产物里每个**无兜底值**的 `var(--ht-*)` 必须真的被定义过 ──────────
+/**
+ * 2026-10-03 线上实测到的形状（产品负责人肉眼看出来的，不是门禁）：
+ * `.ht-app--with-sidebar` 的 `grid-template-columns` 引用了
+ * `--ht-layout-sidebar-min-width` / `--ht-layout-sidebar-max-width`，
+ * 而**那一版构建的 `:root` 还没有这两条** ⇒ 整条声明在 computed-value 阶段失效，
+ * 三列网格退化成"每块都占满 2560 宽、竖着堆三段"。
+ *
+ * 🔴 它不报错：控制台 0 条、CSS 200、资源一个都不缺、哈希对账照样通过 ——
+ * 而 `pnpm check` 全绿。这是 §7 第 82 条那一族（"非空白"回答不了"是不是这个界面"）
+ * 在 CSS 层的同一件事：**没有任何一层知道"这条引用有没有落空"**。
+ *
+ * ⚠️ 只判 `--ht-` 前缀：那是设计系统唯一的命名空间（`check:tokens` 守它的产物同步）。
+ *    产物里另有第三方自己用的名字（实测 `var(--placeholderTextColor)` 来自 react-native-web），
+ *    算进来只会让这条判据天天有人来加豁免。
+ * ⚠️ 带兜底值的 `var(--x, y)` **不判**：按 CSS 规范它会优雅降级，不是坏声明。
+ */
+const listFiles = (dir, re, out = []) => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const child = join(dir, entry.name);
+    if (entry.isDirectory()) listFiles(child, re, out);
+    else if (re.test(entry.name)) out.push(child);
+  }
+  return out;
+};
+
+const cssFiles = listFiles(DIST, /\.css$/);
+const definedTokens = new Set();
+for (const file of cssFiles) {
+  for (const m of readFileSync(file, 'utf8').matchAll(/(--ht-[A-Za-z0-9-]+)\s*:/g)) {
+    if (m[1] !== undefined) definedTokens.add(m[1]);
+  }
+}
+if (definedTokens.size === 0) {
+  fail(
+    '产物里一个 `--ht-*` 定义都没有',
+    `  扫了 ${String(cssFiles.length)} 份 CSS。这不是"没有未定义引用"，是**扫描本身空转** ——\n` +
+      '  没有定义的样式表不可能自洽，先把 token 产物打回来。',
+  );
+}
+
+const undefinedUses = new Map();
+for (const file of [...cssFiles, ...listFiles(DIST, /\.js$/)]) {
+  for (const m of readFileSync(file, 'utf8').matchAll(/var\(\s*(--ht-[A-Za-z0-9-]+)\s*([,)])/g)) {
+    const name = m[1];
+    const followedByComma = m[2] === ',';
+    if (name === undefined || followedByComma || definedTokens.has(name)) continue;
+    if (!undefinedUses.has(name)) undefinedUses.set(name, new Set());
+    undefinedUses.get(name).add(relative(DIST, file));
+  }
+}
+if (undefinedUses.size > 0) {
+  fail(
+    `产物里有 ${String(undefinedUses.size)} 个无兜底值的 var(--ht-*) 引用落空`,
+    [
+      ...[...undefinedUses].map(([name, where]) => `    ${name}  ←  ${[...where].join(', ')}`),
+      '',
+      '  后果不是"少一点样式"：引用落空会让**整条声明**在 computed-value 阶段失效。',
+      '  实测那一发是网格容器丢掉 `grid-template-columns` ⇒ 三列塌成三段全宽，',
+      '  而控制台 0 条错误、CSS 200、资源零缺失。',
+      '',
+      `  定义侧现量：${String(cssFiles.length)} 份 CSS 里共 ${String(definedTokens.size)} 个 --ht-* 定义。`,
+      '  修法：确认 `packages/design-system/src/tokens.css` 与它的生成物一致（`pnpm check:tokens`），',
+      '  然后**从当前源码重打**这份产物 —— 这种坏法只出现在"产物比源码旧"的时候。',
+    ].join('\n'),
+  );
+}
+
 console.log(
   `✅ 产物自洽：挂载 ${MOUNT} 与产物声明一致；` +
     `index.html 的 ${String(allRefs.length)} 个本地引用、manifest 的 ${String(manifestFiles.length)} 个文件全部存在；` +
-    `${String(widgetData.length)} 个组件数据 URL 都落在 SW 前缀 ${widgetDir} 内`,
+    `${String(widgetData.length)} 个组件数据 URL 都落在 SW 前缀 ${widgetDir} 内；` +
+    `${String(definedTokens.size)} 个 --ht-* 定义对得上产物里全部无兜底引用`,
 );
