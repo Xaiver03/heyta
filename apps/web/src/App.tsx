@@ -370,9 +370,28 @@ export function App(): React.JSX.Element {
    * 只在挂载时看一次：用户手动关掉面板之后地址还在，但"每次重渲染都抢回来"不是
    * 我们要的行为（刷新才重新打开，是可预期的）。消化点为什么在壳而不在 `AuthPanel`，
    * 理由写在 `lib/auth-deep-link.ts` 文件头。
+   *
+   * 🔴 但**不在首启隐私浮层还等着回答的时候叠上去**。两个模态同屏的样子是
+   * "登录表单被一张卡片盖住一半"，读起来就是界面坏了（2026-10-03 线上截图实测到的
+   * 正是这个，而它是我这次改动**新引入**的：以前那一层上面只有隐私面板）。
+   * 判据用 `shouldAskOnFirstLaunch()` 而不是 store 里的 `open` —— 那一层是**上面那个
+   * effect 在同一次提交的 effect 阶段**打开的，读状态的 hook 拿到的是渲染期的 `false`，
+   * 于是"看着没开"而实际会开。深链的意图记住一次，等那一层落下再兑现。
    */
   useEffect(() => {
-    if (wantsSignInOnLoad()) useSyncStore.getState().openSignIn();
+    if (!wantsSignInOnLoad()) return;
+    if (!shouldAskOnFirstLaunch()) {
+      useSyncStore.getState().openSignIn();
+      return;
+    }
+    const unsubscribe = usePrivacyStore.subscribe((state) => {
+      if (state.open) return;
+      unsubscribe();
+      useSyncStore.getState().openSignIn();
+    });
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   /**
