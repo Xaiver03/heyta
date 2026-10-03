@@ -405,6 +405,15 @@ grep 命令**数成第二处定义（判据必须锚"行首的定义形状"，�
    ```bash
    HEYTA_E2E_SERIAL=<自己的模拟器> PORT=<空端口> bash scripts/verify-mobile-repeat.sh
    ```
+   🔴 **12:01 起这一趟真的在跑了**，形状是"三层都不共享"（这条写在这里是为了：**会话死了不会留下没人知道的现场**）：
+   检出 = `../heyta-wt-closeout`（`git checkout --detach 592ea170`，跑前 `git status --porcelain` 为 0 行）；
+   设备 = **新建的私有 AVD `heyta-w3-yearly`**（`system-images;android-36;google_apis;arm64-v8a`，
+   headless `-no-window -no-snapshot-save`，不碰 `SSOS-Parity-A36`）；
+   服务端 = `PORT=3200` + `HEYTA_E2E_DB=heyta_w3_yearly_20261003`（不复用 `heyta_mobile_smoke` 那个默认库名）。
+   跑之前主检出的状态是：`adb` 无设备、`pgrep -f qemu-system`=0、:3000/:3100 全空、
+   `pgrep -f 'verify-mobile-'`=0、`gradle|xcodebuild`=0（11:58 复量），只有 3 台 iOS 模拟器起着且负载 40 在落。
+   编排脚本与各步退出码：`../heyta-wt-logs/w3-run.sh` / `w3-run.log`（每步 `STEPn_RC=`；
+   `STEP3_RC` = 当前产物 APK，`STEP7_RC` = 第 15 步那一趟，**3 = 负载等满 = 环境无效不是产品失败**）。
    判据在第 15 步：点「每年」⇒ 规则 = `FREQ=YEARLY;BYMONTH=<当前截止月>;BYMONTHDAY=<日>`、
    op 数**恰好 +1**、界面出现「当前：每年」、笔记本读到同一条规则。
    ⚠️ 期望值取自**手机此刻的 dueDate**（`repeatAnchor = dueLocal ?? todayLocal`），
