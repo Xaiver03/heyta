@@ -404,6 +404,9 @@ export const en = {
   'web.shell.modules.title': 'Feature modules',
   'web.shell.account.aria': 'Account',
   'web.shell.account.ariaAs': 'Account: {email}',
+  // R10: after the identity block, before Settings. The same shape all six
+  // competitors use — avatar → menu → second-level surface, never a resident tab.
+  'web.shell.account.profile': 'Edit profile',
   'web.shell.account.settings': 'Settings',
   'web.shell.account.signOut': 'Sign out',
   'web.shell.nav.help': 'Help',
@@ -469,6 +472,33 @@ export const en = {
   'web.shell.settings.close': 'Close settings',
   'web.shell.dueMode.aria': 'Due date display',
   'web.shell.dueMode.date': 'Date',
+
+  // ── Profile (R10, 2026-10-03) ──────────────────────────────────────────
+  // Nickname and avatar. This page is for you alone: heyta has no sharing and
+  // no collaboration, and the server exposes no endpoint that looks another
+  // user's profile up — so never phrase these as "others will see".
+  'web.settings.profile.title': 'Profile',
+  'web.settings.profile.nickname.label': 'Nickname',
+  'web.settings.profile.nickname.placeholder': 'Leave empty to show your email',
+  'web.settings.profile.nickname.hint': 'Up to {max} characters. A nickname is a display name, not your legal name; your sign-in identifier stays the email address.',
+  'web.settings.profile.nickname.toolong': 'The nickname allows at most {max} characters, this has {count}.',
+  'web.settings.profile.nickname.save': 'Save nickname',
+  'web.settings.profile.nickname.saved': 'Nickname saved',
+  'web.settings.profile.nickname.cleared': 'Nickname cleared',
+  'web.settings.profile.avatar.label': 'Avatar',
+  'web.settings.profile.avatar.change': 'Choose a new image',
+  'web.settings.profile.avatar.remove': 'Remove avatar',
+  'web.settings.profile.avatar.removed': 'Avatar removed',
+  'web.settings.profile.avatar.uploading': 'Uploading…',
+  // 🔴 Not an error message but a product fact: the passphrase is never written
+  // to disk, so after a refresh the device cannot open the avatar — neither can we.
+  'web.settings.profile.avatar.needPassword': 'Your avatar is protected by your end-to-end encryption passphrase, which this device does not keep. Enter it once under Sync settings to change or preview your avatar.',
+  'web.settings.profile.avatar.badType': 'Only these image formats are supported: {types}.',
+  'web.settings.profile.avatar.tooBig': 'Even after compression the image exceeds {max}. Please pick a smaller one.',
+  'web.settings.profile.avatar.failed': 'The avatar could not be uploaded. Please try again.',
+  'web.settings.profile.email.label': 'Email',
+  // A read-only field needs a reason, or it reads as a broken input.
+  'web.settings.profile.email.hint': 'Your email address is your sign-in identifier and the only way to recover the account. It cannot be changed here.',
 
   'web.settings.display.title': 'Display',
   'web.settings.display.dueNote': 'Show due dates on task rows as a date, or as a countdown to the deadline.',
@@ -633,6 +663,10 @@ export const en = {
   // (the server answers neutrally to prevent email enumeration).
   'web.auth.sent.login': 'If an account with that email exists, a login link is on its way. Open it and you land back here signed in; no email at hand? Paste the link under “Advanced”.',
   'web.auth.sent.register': 'Registration submitted. Open the verification link in your email - when it lands back here, you will already be signed in.',
+  // 🔴 Only shown when the server itself says the mail was NOT delivered
+  // (`emailDelivered: false`). It must name a next step: retrying against a
+  // server with no SMTP never produces that email. Both exits are real.
+  'web.auth.sent.mailNotSent': 'This server could not send the verification email - most likely no mail service is configured. The account exists but is not active: ask the server operator to set up SMTP and submit the registration again, or set REQUIRE_EMAIL_VERIFICATION=false on a server you run only for yourself.',
   'web.auth.sent.recovery': 'If an account with that email exists, a recovery link has been sent. Open it to register a new passkey for this account (this replaces the old one).',
   'web.auth.signedIn.title': 'Signed in',
   'web.auth.signedIn.body': 'The token has been written into the sync settings ({email}). Set the end-to-end encryption passphrase and syncing can start.',
@@ -1783,6 +1817,9 @@ export const en = {
   // The destination belongs in the placeholder: with a list open, "Add a task"
   // only says half of it — the task lands in Inbox and vanishes from the list.
   'web.capture.placeholderTo': 'Add a task to "{list}", press Enter to confirm (you can write "tomorrow", "next Wednesday", "!1")',
+  'web.capture.placeholderToDay': 'Add to {day}, press Enter to confirm (a written "tomorrow" wins)',
+  'web.calendar.capture.add': 'Add to the selected day',
+  'web.calendar.capture.close': 'Dismiss the input',
   'web.capture.addLabel': 'New task title',
   'web.capture.add': 'Add',
   'web.capture.matches.aria': 'Recognized fields',
@@ -1954,6 +1991,7 @@ export const en = {
   'common.weekday.sun': 'Sun',
   'common.date.monthTitle': '{month}/{year}',
   'common.date.dayTitle': '{weekday}, {month}/{day}',
+  'common.date.weekRangeTitle': '{startMonth}/{startDay} – {endMonth}/{endDay}, {year}',
   // Global search (tasks + notes + quick jumps). Since 2026-10-01 this is the
   // ONLY search entry - the header's in-list filter box was removed.
   // Shape and boundaries: packages/ui/src/search/SearchPanel.tsx.
@@ -1982,6 +2020,11 @@ export const en = {
   'web.calendar.title': 'Calendar',
   'web.calendar.prevMonth': 'Previous month',
   'web.calendar.nextMonth': 'Next month',
+  'web.calendar.prevWeek': 'Previous week',
+  'web.calendar.nextWeek': 'Next week',
+  'web.calendar.view.aria': 'View',
+  'web.calendar.view.month': 'Month',
+  'web.calendar.view.week': 'Week',
   'web.calendar.weekShort': 'W{n}',
   'web.calendar.backToToday': 'Back to today',
   'web.calendar.monthTitle': '{month}/{year}',
@@ -1991,6 +2034,7 @@ export const en = {
   'web.calendar.a11y.dayWithTasks': '{date}, {count} tasks',
   'web.calendar.a11y.dayWithTasksOne': '{date}, {count} task',
   'web.calendar.a11y.dayNoTasks': '{date}, no tasks',
+  'web.calendar.a11y.moreTasks': '{count} more',
   'web.calendar.side.aria': 'Calendar sidebar',
   'web.calendar.mini.aria': 'Mini month grid',
   'web.calendar.scope.all': 'All',
@@ -2208,6 +2252,7 @@ export const en = {
   // Singular sibling; a day with exactly one due task is common.
   'mobile.calendar.a11y.dayWithTasksOne': '{date}, {count} task',
   'mobile.calendar.a11y.dayNoTasks': '{date}, no tasks',
+  'mobile.calendar.a11y.moreTasks': '{count} more',
   'mobile.calendar.a11y.markDone': 'Mark done: {title}',
   'mobile.calendar.a11y.unmarkDone': 'Mark as not done: {title}',
 
@@ -2352,6 +2397,11 @@ export const en = {
   // anything, so these must never assert that an account was created.
   'mobile.auth.sent.login': 'If an account exists for this email, a login link has been sent. Open the link in your email, or paste it into the field above.',
   'mobile.auth.sent.register': 'If this email is available, we will send a verification email. Open the verification link, then come back here to sign in.',
+  // Same fact and same trigger as `web.auth.sent.mailNotSent` (the server says
+  // the mail was not delivered). Kept as its own key because the mobile line
+  // above carries the neutral "if this email is available" prefix, while this
+  // one is not about the email at all - it is about the server.
+  'mobile.auth.sent.mailNotSent': 'This server could not send the verification email - most likely no mail service is configured. The account exists but is not active: ask the server operator to set up SMTP and submit the registration again, or set REQUIRE_EMAIL_VERIFICATION=false on a server you run only for yourself.',
   'mobile.auth.emailVerified': 'Your email is verified, but this step does not issue a token. Tap "Sign in with an email link" again and paste the new link into the field above.',
   'mobile.auth.signedIn.title': 'Signed in',
   'mobile.auth.signedIn.body': 'Current account: {email}',
