@@ -353,6 +353,10 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 
 ## 7. `pnpm check` 链的逐段读数（2026-10-03，本批收尾）
 
+> 📌 **本节是"本批分支"那一棵树的读数，不是现状**。同一条链在**合并态**（`main` + 本批）上重跑过，
+> 那里下面 5 条红有 3 条已经不在（逐条对照在 §11.1）。两节不等价、也都不该被读成对方的更新：
+> §7 回答"这个分支单独存在时链是什么状态"，§11 回答"合流时会发生什么"。
+
 链共 **57 段**（`node -e` 把 `scripts.check` 按 `&&` 切开数出来的）。
 `check:ai-coverage` 在第 **48** 段 —— 即"新门禁接进 `pnpm check`"这件事**不需要改 `package.json`**，
 它是既有段（第 34/35 段是 `check:ai-quota` / `check:ai-tools`），本批往里加了一节。
@@ -483,3 +487,116 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 另外两条边界条件也未被跨越：`CURRENT_SCHEMA_VERSION` 仍是 **1**
 （`packages/shared-schema/src/schema-version.ts:36`），本批**没有**给任何持久化模型加必填字段
 （新增的六个 pack 全部只读既有实体 + 写既有 payload 形状）。
+
+## 11. 合流态实测（2026-10-03，把 `main` 合进本批分支后逐段跑）
+
+登记"合流后自然消失"是一句**断言**；这一节是它的**读数**。载体是一条**临时**分支，
+本批那条分支（`1b7fdb5e`）与 `main` 都没被改动，**未 push**。
+
+| 项 | 现量 |
+|---|---|
+| 合并载体 | 临时分支 `tmp/ai-cov-on-main` = 合并提交 `3ad21570`（父：本批 `1b7fdb5e` + `main` `a04753b6`） |
+| 落后量 | 合并前 `HEAD..main` = **76 笔** |
+| 文件交集 | 本批改动 57 枚 / `main` 改动 127 枚 / 交集 **5 枚** |
+| 真冲突 | **1 个文件 2 处**（`docs/plans/ai-assistant-closure.md` 的 D-3 两行）；其余 4 枚（ADR-0045、`docs/plans/README.md`、两份词条表）自动合并 |
+| 词条表合并后 | `en.ts` / `zh-CN.ts` 各 **2847 键**、重复 **0**、两边键集差 **0 / 0** —— 这是"合并会不会把双语词条并坏"的判据，不是"看起来没红" |
+| 链的段数 | 本批 **57 段** → 合并态 **61 段**（`main` 新增 `check:licenses:stamp` / `check:calendar` / `check:holiday` / `check:mobile-first-run-gate`）；本批的 `check:ai-coverage` 在第 **51** 段，**一段都没丢** |
+
+### 11.1 逐段读数：61 段里实跑 55 段全绿，6 段是**按规则不跑**
+
+`pnpm build` 先跑（rc=0，且 `packages/local-api/dist/index.js` 比 `src/tools/tag.ts` 新 158 秒
+⇒ 后面读 dist 的那几道门禁证的是当前源码）。其余逐段 `NO_COLOR=1 pnpm <段>`，每段单独退出码
+落 `/tmp/merge-gates.log`，末行自带分母对账：
+
+- **54 段实跑，全部 rc=0**（第一轮 `SEGMENTS_RUN=30 GREEN=30 RED=0` +
+  第二轮 `SEGMENTS_RUN=24 GREEN=24 RED=0`）—— 含 `check:ai-tools`（那五条隐私不变量）
+  **盖着 `main` 的倒数日实现**跑绿，也含 `check:macos-window` / `check:arkts` /
+  `check:mobile-bundle` / `screenshot:verify`。
+- **未跑的 6 段与原因（不是遗漏）**：`check:ai-e2e`（它的 preflight 会 SIGKILL 别人的
+  dev server ⇒ 本仓硬禁止）、`check:privacy-consent-e2e` / `check:landing-e2e` /
+  `check:web-storage` / `check:web-migration`（都要起 dev server 抢端口）、`-r test`。
+  现量现场：并行会话 `heyta-wt-closeout` 正在跑 `verify-mobile-repeat` + 一枚
+  Playwright Chromium，`uptime` = `load averages: 18.11 / 16 核`。
+  在这种负载下跑全量单测只会得到**无法归因的红**，所以留到窗口空闲再补，
+  并把它算作"未测"而不是"通过"。
+
+三条"本批红过、合并态绿了"的对照，正是那句"分支落后所致"从推断升成实测：
+
+| 段 | 本批分支上 | 合并态 | 合并态打印的分母 |
+|---|---|---|---|
+| `check:docs` | 🔴 4 条死链（全指向倒数日那三个文件） | ✅ **0 条** | 245 个 Markdown / 1590 个相对链接 / 429 处跨文档章节引用 / 54 处页内锚点 |
+| `typecheck` | 🔴 2 条（`hosted-account-profile.spec.ts:138/156`） | ✅ 全包 `Done` | `main` 上那两条已由该文件的所有者自己修掉，不是本批改的 |
+| `check:l4` | 🔴 内联样式 98 > 基线 90 | ✅ **恰在基线 90** | `apps/mobile/src/screens（L4 视图）：内联样式 90 处，恰在基线 90（未新增）` |
+
+覆盖面门禁在合并态的读数与本批分支**逐字相同**：`实体覆盖面 8/8` /
+`目录 22 个工具 ≤ 每实体 5 × 分母 8 = 40 席（已用 22，剩 18）`
+⇒ "合流不会引爆任何一条 AI 门禁"这句现在是量出来的。
+
+**对照基线（不是本批量的，但合并态要跟它比）**：并行会话在 `main` tip `a04753b6` 的干净检出上
+把**整条 61 段链一次跑完**并记了逐包读数（2026-10-03 14:23–14:32，见
+[`goal-multi-end-coverage.md`](goal-multi-end-coverage.md) §7.23）：
+`FULL_CHECK_INNER_EXIT=0`，逐包 `web 1500 passed / 12 skipped` · `app-host 1303` ·
+`mobile 538` · `node-host 165` · `desktop 12` · `server 2095 / 1 skipped`，零 failed。
+⇒ 上面那 6 段未跑的红/绿在这个基线之下**没有未知风险**（它们在 `a04753b6` 上是绿的），
+本批欠的只是"合并态复跑一遍"这条腿 —— 记成**未测**，不记成"继承基线所以通过"。
+比较判据也随之下好：合并态的 `-r test` 应当 `web ≥ 1500`、`app-host ≥ 1303` 且零 failed；
+低于这两个数就说明合并把某条线的用例弄丢了，而不是"少跑了几条"。
+
+> ⚠️ 同一条 §7.23 里还有一条**别误接**的读数：同一时刻在**主检出**跑 `check:docs` 是 exit 1，
+> 7 处死链全指向并行会话**未跟踪**的新文档（`adr/0046-*`、`plans/trash-and-archive.md` 等），
+> 而引用它们的三份文档自己也还没提交 ⇒ `HEAD` 不红、干净检出 exit 0。
+> 结论：**`check:docs` 只能在干净检出或隔离 worktree 里量**，在主检出量到的是别人在飞的状态。
+
+### 11.2 🔴 合流时要改的是**两处**，不是一处
+
+本批原先只登记了 `countdown-anniversary.md:175`（「不在本批立这条门禁，后面再说」）
+要在合流时就地更正。合并态读到 :168–:171 还有第二句，而且它比 :175 更误导：
+
+> 「🔴 **这条没有门禁兜底，所以最容易整块漏掉。**…… `scripts/check-ai-coverage.mjs`
+> **由 `AiFeature` 联合类型驱动**……加一个 `EVENT` 实体不会让任何一处变红。」
+
+**这句在本批之后不再成立**：覆盖面那一节（`check-ai-coverage.mjs` §9）已由
+`EntityModelMap` / `ENTITY_TYPES` 驱动，注入 D 的现量红是「实体 `EVENT` 在分母里，
+AI 却**没有能读又能写**的工具（读 0 / 写 0）…」。它该改成"当时为什么这么判"保留原句、
+结论指向 `AI-COV` 已接管（W2 落 `EVENT` 而不配工具 ⇒ 当场红）。
+同一段里的"根治做法……这条要单独确认"也一并被否证 —— 根治做法已经存在。
+
+⇒ 合流检查项从"改一行"改成"**按关键字全篇 grep 那个文件的旧说法**"，现量命令：
+
+```bash
+git show main:docs/plans/countdown-anniversary.md \
+  | grep -n "没有门禁兜底\|后面再说\|要单独确认"
+```
+
+这是"同一个结论落在两份文档 ⇒ 改一处必漏另一处"的又一实例：`:175` 是登记到的，
+`:168`–`:171` 是靠**把合并态整篇读一遍**才发现的，不是靠推理。
+
+✅ **这条债已经在同日还掉（载体是合流那条临时分支，不是 `main`）**：更正块以
+**纯插入**方式落在 `tmp/ai-cov-on-main` 的 `b2f2bbcc`（`git diff --numstat` 删除 **0**、
+插入 18 行 —— 原文一字未删，过期说法留着并标"已过期"），合流态 `check:docs` **rc=0**
+（1592 个相对链接 / 429 处章节引用 / 54 处页内锚点，新增那两个指向本文的链接都解析得到）。
+⇒ 谁合流都不必再补这一笔；如果只 cherry-pick 本批那 14 笔而不用这个合并态，
+`b2f2bbcc` 单独摘过去也行（它只动 `docs/plans/countdown-anniversary.md` 一枚文件）。
+
+### 11.3 覆盖面门禁在合并态**仍有牙**（两条臂 + 基线 + 还原取证）
+
+"合流没把门禁合坏"不能靠 `check:ai-coverage` 绿来证明 —— 一条恒绿的判据照样"绿"。
+在合并态的 `3ad21570` 上重跑一次正向对照 + 两条注入（载体是临时分支，两份脚本事后逐字节还原）：
+
+| 臂 | 注入 | 读数 |
+|---|---|---|
+| 基线 | 不动任何源码 | `对照（未变异）rc=0` —— 没有这一行，"两条臂都响"和"门根本没法跑"同形（见 §6.4） |
+| 1 | 从剔除表删掉一枚"落库载体"，让 `AI_FEEDBACK` **进分母而它没有任何工具**（= `EVENT| W2 那一刻的形状） | rc=1，逐字：`1. 实体 `AI_FEEDBACK` 在分母里，AI 却**没有能读又能写**的工具（读 0 / 写 0），而 `ENTITY_COVERAGE_DEBT` 里也没有它。` |
+| 2 | 往唯一豁免通道塞一个不在分母里的名字 | rc=1，逐字：`1. `ENTITY_COVERAGE_DEBT` 里有 `MEETING`，但它**已经不在分母里**了。` |
+| 还原 | 两份脚本 `git checkout` 后复跑 | rc=0，且 `git status --porcelain` 对这两份**输出为空** |
+
+⚠️ **臂 2 的夹具形状要记下来，否则下一个人会把它当成门禁的缺陷**：
+台账条目的形状是 `{ gap: 'AI-COV-<n>', reason: '…（≥20 字）' }`，
+我第一次写成了 `{ ticket, reason }` ⇒ 门禁那行 ℹ️ 打印出 `已登记缺口 1 项：MEETING=undefined`。
+这不是判据坏了：**工单号形状那条检查只遍历"在分母里且未被覆盖"的实体**，
+而 `MEETING` 不在分母 ⇒ 走的是 9c 那条，照样 rc=1。**没有一条畸形登记能悄悄过去** ——
+这句已升级成读数（臂 3：往**已被覆盖**的 `HABIT` 上挂一条 `{ticket}` 形状的登记）：
+rc=1，逐字 \`1. \`HABIT\` 现在**读和写都有工具**了，但 \`ENTITY_COVERAGE_DEBT\` 里还挂着它（工单 undefined）。\`
+三条通道（不在分母 / 在分母且已覆盖 / 在分母未覆盖）各红一次，还原后 rc=0、`git status` 为空。
+看到报错信息里出现 `undefined` 时，先查自己塞的形状，别去改判据。
+现量脚本在 `/tmp/merged-teeth.mjs` 与 `/tmp/merged-teeth3.mjs`（一次性，不在仓库里）。
