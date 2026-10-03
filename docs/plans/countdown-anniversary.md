@@ -276,6 +276,11 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    op 数**恰好 +1**、界面出现「当前：每年」、笔记本读到同一条规则。
    ⚠️ 期望值取自**手机此刻的 dueDate**（`repeatAnchor = dueLocal ?? todayLocal`），
    不是脚本开头写死的那个日期 —— 这一点本身是第 15 步存在的理由。
+4. 📌 **本会话留下的隔离检出**：`../heyta-wt-closeout`（detached，`11cdba9b`）。
+   它的三个改动文件与 main 的 `90140793` + `cc35f21b` **逐字节相同**（`cmp` 过），
+   所以结构上没有非留不可的理由；留着的唯一用途是它已经 `pnpm install` + `pnpm -r build`
+   完，等负载 ≤12 且设备归自己时可以直接在那儿跑第 15 步。
+   不需要了就 `git worktree remove --force ../heyta-wt-closeout && git worktree prune`。
 
 ### 待入 §7 的台账（编号取合入时现量的 `max(现有编号)+1`）
 
