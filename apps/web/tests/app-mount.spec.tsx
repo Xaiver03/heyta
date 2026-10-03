@@ -282,6 +282,62 @@ describe('侧栏导航', () => {
   });
 
   /**
+   * 🔴 R9（2026-10-02 产品负责人实测）：页头标题跟着**视图**走，
+   * 不许停在上一个视图留下的筛选上。
+   *
+   * 她报的路径是：在收集箱点「重要不紧急」→ 再去点侧栏别的入口 →
+   * 日历已经画出来了，页头却**永远**写着「重要不紧急」。
+   *
+   * 根因不是"忘了清 filter"，而是标题的默认方向反了：当时有一张
+   * `VIEW_TITLED_BY_TAB` 白名单列出"标题跟视图走"的视图，**不在表上的**
+   * 回落到读 `store.filter`。日历是后来才加进 `MODULE_VIEW_TABS` 的模块视图，
+   * 没人登记它 —— 于是它走了回落那条路。
+   *
+   * ⚠️ 第 ④ 步和前三步一样重要：**不许用"切视图时清空 filter"来修标题**。
+   * 用户回到任务视图应当看到他离开时停着的那一格，那是他的位置，不是垃圾。
+   */
+  it('🔴 点过象限再切日历/搜索，标题跟着视图换，而筛选留在原处', async () => {
+    await freshDb();
+    await mount();
+
+    const titleEl = (): string =>
+      container!.querySelector('.ht-header__title')?.textContent?.trim() ?? '';
+    const railTab = (name: string): HTMLButtonElement | undefined =>
+      [...container!.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(
+        (b) => b.textContent?.trim() === name,
+      );
+
+    // ① 先钉住**该保留**的那一半：任务视图里点象限，标题就该是象限名。
+    const q2 = navEntry(container!, '重要不紧急');
+    expect(q2, '侧栏缺少「重要不紧急」入口').toBeDefined();
+    await act(async () => {
+      q2!.click();
+    });
+    expect(titleEl()).toBe('重要不紧急');
+
+    // ② 切日历：内容换成日历，标题必须跟着换。
+    await act(async () => {
+      railTab('日历')!.click();
+    });
+    expect(titleEl(), '日历页挂着上一个视图残留的象限名').toBe('日历');
+
+    // ③ 搜索同理 —— 它同样不在那张白名单上。
+    await act(async () => {
+      railTab('搜索')!.click();
+    });
+    expect(titleEl(), '搜索页挂着上一个视图残留的象限名').toBe('搜索');
+
+    // ④ 回任务视图：筛选还在象限上，标题也就还是象限名。
+    await act(async () => {
+      railTab('任务')!.click();
+    });
+    expect(
+      titleEl(),
+      '回到任务视图后筛选应当还在原处 —— 标题的修法不是把 filter 清掉',
+    ).toBe('重要不紧急');
+  });
+
+  /**
    * 🔴 「组件是对的」不等于「用户碰得到它」。
    *
    * `NoteEditor` 有自己的测试，但那些测试是**直接挂组件**的 —— 把
