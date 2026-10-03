@@ -2004,6 +2004,18 @@ export const en = {
   'web.reminder.notify.denied': 'Notifications are blocked by the browser. To re-enable, change it in the site settings.',
   'web.reminder.notify.limit': 'Notifications only fire while heyta is open. They do not fire when the app is closed - background wake-up needs a separate protocol we do not have yet.',
   'web.reminder.notify.body': 'Due: {title}',
+  // ── Long reminder leads (W9 ①, 2026-10-03) ──
+  // 🔴 These four must stay 1:1 with `REMINDER_LONG_OFFSET_PRESETS_MS`; the mapping
+  //    lives in apps/web/src/features/reminders/reminder-tiers.ts
+  //    (its `default` branch throws on purpose).
+  // The 2d / 3d / 1w / 30d in the key names are part of the contract: the label says
+  // "3 days before", so the host must schedule 3 *calendar* days before the due time
+  // (not 72 hours - that drifts an hour across DST, see W9 ③).
+  'web.reminder.offset.groupLabel': 'Earlier (by day)',
+  'web.reminder.offset.2d': '2 days before',
+  'web.reminder.offset.3d': '3 days before',
+  'web.reminder.offset.1w': '1 week before',
+  'web.reminder.offset.30d': '30 days before',
   'web.search.title': 'Search',
   'web.search.placeholder': 'Search task titles, notes and note bodies',
   'web.search.tasksSection': 'Tasks',

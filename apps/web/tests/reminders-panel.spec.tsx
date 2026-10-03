@@ -49,6 +49,7 @@ const { ReminderPanel } = await import('../src/features/reminders/ReminderPanel.
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
 /** 复刻 i18n 的 `t`：用真词条表，不自己编文案。 */
 const t = ((key: string) => zhCN[key as keyof typeof zhCN]) as I18nValue['t'];
@@ -188,6 +189,21 @@ describe('A. 提前量预设与文案的下标对齐', () => {
   });
 
   it('🔴 第 i 档按钮建出的提醒 = dueDate − `REMINDER_OFFSET_PRESETS_MS[i]`', async () => {
+    /**
+     * 期望值按**档位的语义**算，而不是无脑 `dueDate - offset`（W9 ③）。
+     *
+     * 不足一天的档位说的就是"那 N 毫秒"；整天以上的说的是"前 N 个**日历日**的
+     * 同一套钟表时间" —— 在有夏令时的时区里两者相差一小时，而这条判据若继续
+     * 写 `dueDate - DAY`，它会在每年那两天把正确的产品行为报成红。
+     * 这里用测试自己写的 `setDate` 当独立 oracle（不 import 领域层的实现）。
+     */
+    const expectedTriggerAt = (dueDate: number, offsetMs: number): number => {
+      if (offsetMs < DAY || offsetMs % DAY !== 0) return dueDate - offsetMs;
+      const d = new Date(dueDate);
+      d.setDate(d.getDate() - offsetMs / DAY);
+      return d.getTime();
+    };
+
     for (let index = 0; index < REMINDER_OFFSET_PRESETS_MS.length; index += 1) {
       const dueDate = Date.now() + 30 * 24 * HOUR;
       // 每档用一条新任务：每任务存活提醒有上限，全建在同一条上会撞上限。
@@ -198,7 +214,7 @@ describe('A. 提前量预设与文案的下标对齐', () => {
       await waitFor(`第 ${String(index)} 档建出提醒`, () => remindersOf(taskId).length === 1);
 
       const created = remindersOf(taskId);
-      const expected = dueDate - REMINDER_OFFSET_PRESETS_MS[index]!;
+      const expected = expectedTriggerAt(dueDate, REMINDER_OFFSET_PRESETS_MS[index]!);
       expect(
         created[0]?.triggerAt,
         `第 ${String(index)} 档的提前量错位了`,

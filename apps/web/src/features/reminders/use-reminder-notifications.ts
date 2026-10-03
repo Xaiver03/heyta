@@ -16,9 +16,16 @@
  * "什么时候算到点"的判据，而它与 store 那份必然漂移 ——
  * 症状是"面板里显示已到点、通知却不响"。
  *
- * ⚠️ 这带来一个真实的局限：**应用没开、或者没有发生任何 op 时，不会到点自动响。**
- * 见 `notify.ts` 文件头那段"如实写出的局限"。这是刻意接受的：
- * 后台唤醒需要一套不泄露内容的协议，不是这里顺手能补的。
+ * ## W9 ②：那不等于"不需要定时器"，只是定时器**不许带判据**
+ *
+ * 上面那条推理曾推出一句过强的结论："没有 op 就不会响" —— 而那正是缺陷本身：
+ * 用户 09:00 建一条"09:30 提醒我"，之后不再产生任何 op，09:30 那一刻
+ * **没人去问一次**。现在由 `use-reminder-wake.ts` 补上那一次问：它只算
+ * "下一个该看的时刻"，到点调 `store.recheck()`，而 `recheck()` 里只有
+ * 动作层那**同一个** `due()`。⇒ 判据仍只有一份，多出来的只是一个钟。
+ *
+ * ⚠️ 补完之后仍然有一个真实局限：**应用进程不在（关掉）不会响**。
+ * 那需要 Service Worker + 一个不泄露内容的唤醒协议，见 `notify.ts` 文件头。
  */
 
 import { useEffect, useRef } from 'react';
@@ -27,15 +34,21 @@ import { useI18n } from '@heyta/i18n';
 
 import { useReminderStore } from './store.js';
 import { deliverDueReminders, type DeliveryOutcome } from './notify.js';
+import { useReminderWakeTimer } from './use-reminder-wake.js';
 import { useTaskStore } from '../tasks/store.js';
 
 /**
- * 监听"已到点、还没投递"的提醒并投出去。
+ * 监听"已到点、还没投递"的提醒并投出去，**同时挂上到点自醒的钟**。
  *
  * 返回值只为测试/诊断用（真实调用点忽略它）。
+ *
+ * 🔴 定时器为什么挂在**这里**而不是 `App.tsx`：这个 hook 已经挂在根组件上了
+ *（`App.tsx` 里那一行 `useReminderNotifications()`）。于是"什么时候醒"与
+ * "醒了投给谁"在同一个子树里 —— 拆成两处挂，就会有一处哪天被忘掉。
  */
 export function useReminderNotifications(): { last: DeliveryOutcome | undefined } {
   const { t } = useI18n();
+  useReminderWakeTimer();
   const due = useReminderStore((s) => s.due);
   const tasks = useTaskStore((s) => s.entities.tasks);
 
