@@ -208,6 +208,16 @@
 .ht-settings__admin-badges {
   display: inline-flex;
   gap: var(--ht-space-1);
+  /**
+   * 🔴 这两条是看图看出来的，不是预先想到的。
+   * 调休面板把"公告原文出处"渲染成徽标，而一条 gov.cn 的 URL 有 60 多个字符：
+   * 徽标原本 `nowrap` 且**不可收缩** ⇒ 它把整行的内在宽度占满，
+   * 同行的 `.ht-settings__admin-rowMain`（`flex: 1` + 省略号）被压成「2026…」——
+   * **年份本身被藏掉了**，而所有文本断言都还是绿的（DOM 里文字是全的，裁切只发生在渲染上）。
+   * `min-inline-size: 0` 让这一格肯让位，`flex-wrap` 让第二条出处可以换行。
+   */
+  min-inline-size: 0;
+  flex-wrap: wrap;
 }
 
 .ht-settings__admin-badge {
@@ -216,7 +226,9 @@
   color: var(--ht-color-foreground-muted);
   font-size: var(--ht-font-size-2xs);
   padding: 0 var(--ht-space-2);
-  white-space: nowrap;
+  /** 出处 URL 不许截断显示：运营要核对的就是那串地址本身。 */
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
 }
 
 .ht-settings__admin-badge--admin {
