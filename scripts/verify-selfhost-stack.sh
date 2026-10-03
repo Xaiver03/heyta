@@ -388,6 +388,9 @@ esac
 log "    界面挂载确认：$(printf '%s\n' "$SERVER_LOGS" | grep '\[web-app\]' | tail -1)"
 
 log "==> 真浏览器三条判据（${BASE}）"
+# 🔴 起跑时刻要先落到变量里，**再**跑用例 —— 后面那条新鲜度判据要比的就是这个数。
+# （顺序反了就是"拿同一棵树量两次"：判据永远绿。）
+BROWSER_T0=$(date +%s)
 cd e2e
 [ -d node_modules/@playwright/test ] || die "e2e 的依赖没装：先 cd e2e && pnpm install（它自己一份 lockfile）"
 set +e
@@ -398,7 +401,39 @@ cd "$REPO_ROOT"
 
 log ""
 log "截图落在 e2e/selfhost-stack-results/ —— 按 §6.2 规定一，**人必须打开看**："
-ls -1 e2e/selfhost-stack-results/*.png 2>/dev/null | sed 's/^/  /' || log "  （没有截图 = 有用例在截图前就失败了）"
+# 🔴 「文件存在」不是证据。内存闸门拒绝启动时，Playwright 一条用例都没跑，
+#    而这个目录里还躺着**上一批**那四张同名同尺寸的图（2026-10-04 实测：
+#    这一趟 03:41 起跑，四张图全是 Oct 3 14:32 的）—— 任何人 `ls` 一次就会把它们
+#    当成这次的界面证据。所以判据是「mtime 晚于本次起跑」，不是「有这四张」。
+SHOTS=$(node --input-type=commonjs -e '
+const fs = require("fs"), path = require("path");
+const t0 = Number(process.argv[1]), dir = process.argv[2];
+const want = ["s1-app-loaded.png", "s2-signed-in.png", "s3-device-a-synced.png", "s3-device-b-recovered.png"];
+let fresh = 0;
+for (const n of want) {
+  let st = null;
+  try { st = fs.statSync(path.join(dir, n)); } catch (e) { /* 文件不存在 */ }
+  const m = st ? Math.floor(st.mtimeMs / 1000) : null;
+  const ok = st !== null && m >= t0;
+  if (ok) fresh += 1;
+  console.log("  " + n + "  mtime=" + (m === null ? "不存在" : new Date(m * 1000).toISOString()) +
+    "  bytes=" + (st ? st.size : "-") + "  " + (ok ? "本次的" : "不是本次的"));
+}
+console.log("FRESH=" + fresh + "/" + String(want.length));
+if (fresh !== want.length) process.exit(1);
+' "$BROWSER_T0" "e2e/selfhost-stack-results")
+SHOT_RC=$?
+printf '%s\n' "$SHOTS"
+# 🔴 先算进变量再插值：bash 3.2 解析不了 `"… $(date -r "$X" '…') …"` 这种**双引号里套
+#    双引号**的写法（`syntax error near unexpected token ')'`，2026-10-04 实测）。
+BROWSER_T0_HUMAN=$(date -r "$BROWSER_T0" '+%Y-%m-%dT%H:%M:%S')
+log "   （起跑时刻 ${BROWSER_T0_HUMAN} —— 只有标「本次的」那几张才算这一趟的证据）"
+
+if [ "$RC" = "0" ] && [ "$SHOT_RC" != "0" ]; then
+  die "Playwright 退出码 0，但四张截图里**没有一张是本次的**（见上面那张 mtime 表）。
+   「退出码 0」+「截图是旧的」这个组合只有一种解释：用例没走到截图那一步就返回了 0 ——
+   也就是**没有证据**。这一趟不算闭合。"
+fi
 
 if [ "$KEEP" = "1" ]; then
   log ""
