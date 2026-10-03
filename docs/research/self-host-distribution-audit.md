@@ -2410,6 +2410,27 @@ G-53 的关闭动作（不做半截）：① 先拍"我们承诺发哪几个架�
 这一单本批**没动代码**：它需要一次真构建 + 一个架构承诺的决定，而架构承诺属于 D-1/D-2 那一档
 要人拍板的事，不替他拍。
 
+🔴 **顺着这条又量出一句没被验证过的断言，并已就地改掉**（同轮）：
+`.github/workflows/heyta-server-image.yml` 里 `platforms:` 上面那段注释原本写着"平台：与
+`server/Dockerfile` 现有实测范围一致（**本机 amd64/arm64 单架构**）"。三个现量把它否证了：
+
+| 量的是什么 | 读数 |
+|---|---|
+| 发布 workflow 钉的平台 | `platforms: linux/amd64` |
+| 被 `verify:selfhost-stack` 验过的那枚 | `docker image inspect` ⇒ **`arch=arm64 os=linux`**（`docker build` 不带 `--platform` ⇒ 跟随构建机） |
+| 那两枚平台二进制包的许可 | `npm view @node-rs/argon2-{linux-arm64-musl,linux-x64-musl}@2.2.1 license` ⇒ 都是 **MIT** |
+
+所以那句话的错处不是"amd64 不能发"，是**"两个架构都实测过"没有依据**：这台机器只有一个架构，
+而 amd64 那枚发布物到今天**没有任何一次运行证据**（`platforms` 那行是发布配置，不是验证记录）。
+内容层面今天没有真违规（两枚都是 MIT），但"今天没事"由**运气**保证 —— 没有任何一层会知道下一枚
+按平台切的包是什么许可，这正是 G-53 要的那条判据。
+⇒ 已改：workflow 那段注释改成"只发 amd64 / amd64 无运行证据 / 两枚的平台包不是同一批"；
+`verify-selfhost-stack.sh` 现在**每次跑都把被验镜像的 `os/arch` 打进日志**，
+非 amd64 时明写"这趟证明的是外人在自己机器上 build 的那一枚，不构成对发布物的运行证据"。
+🔴 一般规律：**"发布配置"与"验证载体"是两个对象**，把它们写成一句话（"实测范围一致"）
+就是拿前者的存在去冒充后者的证据 —— 与本文件 §8.11 / §8.13 那两次同族。
+
+
 **③ 顺带把"钉住"的成本量出来了**（这是 G-47 一直缺的那个数）。镜像那棵树的形状是
 `server/package.json`（21 条 prod deps）＋ 三枚本地包带出的 **5** 条 registry deps
 （`@noble/ciphers`、`@noble/hashes`、`hash-wasm`、`zod`、`ical.js`；只有 `zod` 与 server 那份重叠）
