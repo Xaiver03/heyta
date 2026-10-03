@@ -22,7 +22,9 @@ import {
   FAILURE_REASON_BY_SERVER_CODE,
   HOSTED_AUTH_PATHS,
   changePassword,
+  completePasskeyRegistration,
   loginWithEmailPassword,
+  registerWithMagicLink,
   registerWithEmailPassword,
   requestPasswordReset,
   resetPasswordWithToken,
@@ -651,6 +653,64 @@ describe('setInitialPassword：加认证器，不是换钥匙', () => {
         newPassword: 'b'.repeat(9),
       });
       expect(outcome).toMatchObject({ ok: true, message: '' });
+    }
+  });
+});
+
+/**
+ * `emailDelivered` —— 服务端**亲口否认**"信已发出"时，这一层必须把它带上来。
+ *
+ * 为什么值得单独一组：这个字段的语义全在"缺省"上。三种情况都没有它
+ * （发信成功、连的是没有这个字段的老服务端、`REQUIRE_EMAIL_VERIFICATION=false`
+ * 的自托管服务器压根不需要信），而界面在那三种下该说的还是原来那句
+ * "去查收邮件"。所以判据必须同时钉住"有 false 要带上来"和"其它一律不出现"——
+ * 只钉前一半的话，`emailDelivered: body.emailDelivered !== true` 那种写法
+ * 也能过，而它会让**每一次**成功注册都凭空多出一句"邮件没发出去"。
+ */
+describe('emailDelivered：只有字面 false 会被说出来', () => {
+  const NEUTRAL_MSG = 'Registration successful. Please check your email to verify your account.';
+  const registerPaths = [
+    ['邮箱+口令', (fetchImpl: typeof fetch) =>
+      registerWithEmailPassword({ baseUrl: 'https://sync.example.com', fetchImpl }, {
+        email: 'a@b.c',
+        password: 'p'.repeat(9),
+      })],
+    ['魔法链接', (fetchImpl: typeof fetch) =>
+      registerWithMagicLink({ baseUrl: 'https://sync.example.com', fetchImpl }, {
+        email: 'a@b.c',
+      })],
+    ['通行密钥', (fetchImpl: typeof fetch) =>
+      completePasskeyRegistration({ baseUrl: 'https://sync.example.com', fetchImpl }, {
+        email: 'a@b.c',
+        credential: { id: 'cred-1', rawCredential: {} },
+      })],
+  ] as const;
+
+  it('三条路都把 false 带上来，而 message 照旧是中性的', async () => {
+    for (const [name, run] of registerPaths) {
+      const stub = stubFetch(() => ({
+        status: 201,
+        body: { message: NEUTRAL_MSG, emailDelivered: false },
+      }));
+      const outcome = await run(stub.impl as unknown as typeof fetch);
+      expect(outcome, name).toMatchObject({ ok: true, emailDelivered: false });
+    }
+  });
+
+  it('缺省 / true / 字符串 "false" 都算"没说" ⇒ 这个键**不出现**', async () => {
+    for (const body of [
+      { message: NEUTRAL_MSG },
+      { message: NEUTRAL_MSG, emailDelivered: true },
+      { message: NEUTRAL_MSG, emailDelivered: 'false' },
+      { message: NEUTRAL_MSG, emailDelivered: 0 },
+    ]) {
+      const outcome = await registerWithEmailPassword(
+        opts({ fetchImpl: stubFetch(() => ({ status: 201, body })).impl }),
+        { email: 'a@b.c', password: 'p'.repeat(9) },
+      );
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) continue;
+      expect('emailDelivered' in outcome, JSON.stringify(body)).toBe(false);
     }
   });
 });
