@@ -36,7 +36,7 @@
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { openApp, switchView } from './helpers';
+import { openApp, parkCursor, switchView } from './helpers';
 
 /**
  * 🔴 证据路径**按本文件的位置**解析，不用相对路径。
@@ -83,11 +83,32 @@ async function taskIdByTitle(page: Page, title: string): Promise<string> {
   return String(attr).replace('task-title-', '');
 }
 
-/** 读某一个锚点的解析后底色（要求它**唯一**，否则读到的可能是别人）。 */
+/**
+ * 读某一个锚点的解析后底色（要求它**唯一**，否则读到的可能是别人）。
+ *
+ * 🔴 必须等到**算得出来**为止。Chromium 对**已从文档分离**的节点，
+ * `getComputedStyle` 返回空串 —— 而四象限的板子在 dnd-kit 初始化时会把行节点换掉，
+ * 实测两次连跑全绿、第三趟就撞上过一次（读数 `""`，症状是"基线不一致"这种**假红**）。
+ * 更该防的是反方向：`settledSelectionBg` 的判据是"选中那条 ≠ 基线"，
+ * 空串永远 ≠ 任何真实底色 ⇒ **"根本没读到值"会被判成"画上选中色了"**（假绿）。
+ *
+ * ⚠️ 这条 `not.toBe('')` 与文件头那句"不比是不是透明"**不矛盾**：
+ * `''` 是"探针没读到"，`rgba(0, 0, 0, 0)` 是"读到了，值是透明"。
+ * 拿**透明**当产品判据是恒真（被否决的那种写法）；拿**空串**当探针故障是前提自检。
+ */
 async function bgOfTestId(page: Page, testId: string): Promise<string> {
   const el = page.locator(`[data-testid="${testId}"]`);
   await expect(el, `${testId} 在界面上不止一个，读出来的底色分不出是哪一条`).toHaveCount(1);
-  return el.first().evaluate((node) => getComputedStyle(node).backgroundColor);
+  const read = () =>
+    el
+      .first()
+      .evaluate((node) => (node.isConnected ? getComputedStyle(node).backgroundColor : ''));
+  await expect
+    .poll(read, {
+      message: `${testId} 的底色一直算不出来 —— 读到的是分离节点，不能拿空串去比`,
+    })
+    .not.toBe('');
+  return read();
 }
 
 /**
@@ -109,18 +130,6 @@ async function createTask(page: Page, title: string): Promise<void> {
   const input = page.locator('input[placeholder^="添加任务"]');
   await input.fill(title);
   await input.press('Enter');
-}
-
-/**
- * 截图前把鼠标挪开。
- *
- * 🔴 这条不是美化：`switchView` 用鼠标点 rail，rail 的 tooltip 会**留在下一张图上**，
- * 实测 `03-timeline.png` 里那句"四象限"正好压在选中那条任务的标题上 ——
- * 断言全绿，而证据图看不清被高亮的是哪一行（§6.2 规定一要的是"人能看懂的那张图"）。
- */
-async function parkCursor(page: Page): Promise<void> {
-  await page.mouse.move(640, 40);
-  await page.waitForTimeout(120);
 }
 
 test.describe('选中：一条任务在三种投影里都是同一条被高亮', () => {
