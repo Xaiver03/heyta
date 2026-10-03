@@ -1960,3 +1960,35 @@ grep -oE '^#{2,4} ?B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | uniq -d  
 - **② 仍未取全链读数**：合并后 `node scripts/check-ai-coverage.mjs` 因新载体没有构建产物而 rc=1
   （它报的是"上游读不出/建不出 ⇒ 无法判定"，与规则 7 同一族），跑全段要先 `pnpm -r build`，
   而 `vm.loadavg` 在 21:5x 是 `74 → 115`（重启后全体进程复活的风暴），闸门阈值 12 ⇒ 不起跑。
+
+## 15.27 合并态逐段读数（载体 `heyta-wt-ai-closeout` @ `43ef4a22`，2026-10-03 22:0x）
+
+第一次在**重启后的新载体**上取到全链逐段读数。工具：`~/scratch-heyta/heyta-chain.sh`
+（负载门用单一所有者 `scripts/lib/wait-for-quiet-host.sh`，阈值不动；段名与顺序**现取** `package.json`）。
+`pnpm -r build` rc=**0**。链 61 段：**56 绿 / 4 红 / 1 段按规则不跑**。四条红逐条归属，没有一条是本线的：
+
+| 段 | 判据 | 性质 | 归属证据（都可复跑） |
+|---|---|---|---|
+| 33 | `check:docs` rc=1 | **继承自 main** | 4 条死链的引用行在 `git show main:` 里就有、目标文件在 main 树上就不存在（§15.26） |
+| 53 | `check:privacy-consent-e2e` rc=1（5s） | **环境无效** | 失败原文是 `error: unknown command 'test'` + `Local package.json exists, but node_modules missing` ⇒ 新载体的 `e2e/node_modules` 没装。用时 5 秒也证明它没跑到浏览器 |
+| 54 | `check:landing-e2e` rc=1（1s） | **环境无效** | 同上，1 秒 |
+| 61 | `pnpm -r test` rc=1 | **不在本线的产品红** | `packages/ui` 的 `tests/projects-model.spec.ts:96` 失败（`toOrganizerTree` 节点多出 `archived` 键）。本线在 `packages/ui/` 下改动 **0 文件**；`src/projects/model.ts` 与该 spec 两侧**逐字节相同** ⇒ main 单跑同样红。最后一动是 `192a516d`（17:53） |
+
+- 🔴 **第 61 段这条不是"一条用例红了"那么轻**：那句断言写的是"每一层都只有 `id / name / children`
+  —— **不把整个实体漏出去**"。现在节点里多了 `archived`，也就是**界面层的投影承诺已经和代码不一致**。
+  它和 `B56`（侧栏清单名被挤成零宽）出自**同一笔** `192a516d`，是同一次改动留下的第二个形状。
+  ⚠️ 两种可能都成立：要么投影该剥 `archived`（代码错），要么 `archived` 是新加的必要字段（测试该更新）——
+  **判这个要改的人拍，本线不代改、不为绿而改别人的测试**。待 `BLOCKED.md` 空闲时立 `B59`；
+  现在先记在本节，因为共享台账正被并行会话写着（上一次往里追加的代价见 `B56` 的归属段）。
+- **覆盖面门禁在合并 + 构建态 rc=0**。它现在的读数形状是 main 侧那笔带进来的**按端枚举**：
+  `界面端覆盖：mobile 0/5（显式登记的缺口：产品负责人 2026-10-03 拍板"AI 上移动端这轮不做"…见 BLOCKED B34）`
+  ⇒ 本线原先"覆盖面 8/8"那句仍然成立（实体维度），但**它不再是全部门禁读数**，别拿它代替端维度。
+- **`check:ai-e2e` 按规则不跑**（它的前置会 SIGKILL 4318/4319 上的 vite，traps #87），
+  记 `rc=SKIPPED_BY_RULE`，**不算通过**。合并态这一段的真实状态**仍未判定** —— 补跑脚本
+  `~/scratch-heyta/heyta-e2e-rerun.sh` 已经写好（那一腿**去掉前置**直跑 `pnpm --dir e2e run test`），
+  但 22:0x 起跑前实测 `vm.loadavg = { 270 105 62 }`（16 核），占 CPU 的是**另一个项目**
+  （`…/ssos/.worktrees/inv-ship-rec/services/api` 的 vitest + postgres INSERT）加重启后的
+  `mds_stores` 索引 ⇒ **环境无效**，不起跑、不降级判据。
+- **落地仍未做**：`heyta-land.sh` 的前置 1 在 22:0x 正确拒绝过一次 —— main 在合并完成后
+  又前进了（`96f3293d → 3a3071e1`），"可直落"是时刻性读数。现量：
+  `git -C <主检出> merge-base --is-ancestor main integrate/2026-10-03-closeout`。
