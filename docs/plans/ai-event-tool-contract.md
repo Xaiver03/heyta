@@ -1328,3 +1328,36 @@ cd /private/tmp/heyta-final && git merge --no-edit main && pnpm build && pnpm ch
 `uiautomator dump` 在 load 62 时抓不到界面）。剩下六段里 52/53/55/56 走真浏览器、58 走设备、60 是全量测试，
 **全部留在闸门后面**，一条都不提前跑。此刻 `vm.loadavg` 1 分钟 = **200.62**（并行会话多趟整链同跑），
 等窗口是正常状态，不是卡住。
+
+### 15.10 ④ 已落进载体（`a90b7627`），而 ① 的障碍量成了 13 条**逐 blob 不同**的路径
+
+**④ 台账**：`PROGRESS.md` 新增「AI 覆盖面收口」一节（四项各带载体的读数），`BLOCKED.md` 里
+`B36` 第 2 条挂了闭合指针（`1a6640f2`，带一对现量命令：修复前形态 = 3 / 载体 = 0），
+并新立 **`B47`** 记那条挂上游的 organizer 零宽红。两道 markdown 门禁 `check:docs` / `check:docs-voice`
+各 **rc=0**；`check:ui-language` 不管根目录台账，所以没跑它算数。
+
+**① 落地的真实障碍，量法要改。** 先前只报"主检出 220 个脏文件、13 个与本线重叠"——那还是**间接**证据。
+逐条比 blob 之后：13 条重叠路径里 **13 条**的内容是**三方互不相同**
+（`git rev-parse HEAD:<f>` ≠ `git rev-parse main:<f>`，而工作树又脏）⇒ `merge --ff-only` 一定会被
+"local changes would be overwritten" 拒掉，而且**即使他们提交，落地大概率也不是一次快进，
+而是一次要逐段归属的真合并**（重叠面正好在本线的核心上：`packages/local-api/src/{tools,mcp}.ts`、
+`packages/app-host/src/local-api-host.ts`、`packages/domain/src/capture.ts`、i18n 两份词条表、
+`scripts/{mutate-closeout-gates,reinstall-all}.sh`）。现量命令（可重跑，别只报数）：
+
+```bash
+git diff --name-only main...HEAD | sort > /tmp/mine.txt
+git -C <主检出> status --porcelain=v1 | sed 's/^...//;s/.* -> //' | sort > /tmp/theirs.txt
+comm -12 /tmp/mine.txt /tmp/theirs.txt | while read f; do
+  [ "$(git rev-parse HEAD:$f)" = "$(git rev-parse main:$f)" ] || echo "DIFF $f"; done
+```
+
+**一次探针自伤，形状和我这一批反复记的那类一模一样**：数 `BLOCKED.md` 的 B 号时用了 `^### B[0-9]+`，
+它只覆盖 **4 个 `###` 子条目**（`B30.1/2/3`、`### B31 关闭`），漏掉 **40 个 `## B<NN>.` 主条目**
+⇒ 得到"最大 B = 31"，并据此把 closure 指针从**正确的 B36 改成了 B31**（改反了方向）。
+形状无关的口径：`grep -oE '^#{2,4} ?B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | tail -1`
+⇒ 载体 **40**、main **46** ⇒ 新条目取 **B47**（自造短编号前先查命名空间归属，这条纪律救了一次撞号）。
+一般规律：**"这个字段有几种写法"要先数，一种正则只覆盖一种写法时它给出的最大值只是那一种写法的最大值。**
+
+**两个解锁条件挂在只读轮询上**（`/tmp/heyta-unblock/poll.log`，60 分钟封顶，不并发跑重活）：
+① organizer 修复进 `main`（判据 = `main:packages/ui/src/projects/OrganizerList.tsx` 里 `minWidth` 命中 > 0）；
+② 上面那 13 条重叠路径清空。两个都满足才做**最后一次**合并 + 全链复跑，避免"每合并一次就把读数作废一次"。
