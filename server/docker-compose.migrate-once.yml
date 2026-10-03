@@ -1,0 +1,93 @@
+# D-3：一次性迁移服务（**显式 opt-in 的 override，不是默认服务图的一部分**）
+#
+#     docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml up -d
+#
+# ## 为什么它不进 docker-compose.yml
+#
+# `RUN_MIGRATIONS_ON_STARTUP` 默认 `false`（`docker-compose.yml:50`）保护的是两件真事：
+# 多副本启动时互相抢 Prisma 的迁移 advisory 锁（P1002），以及 `scripts/deploy.sh`
+# 自己的 migrator —— 它在**旧应用还在服务**的时候把迁移跑完，跑不完就**不换容器**。
+# 把一次性服务直接加进默认图 = 让这两个入口在同一次 `up` 里都试图迁移动作，
+# 而那正是这行默认值当初写下来防的东西。所以它做成 override：**要用就点名带上**。
+#
+# ## 它和 helm 那张图的关系
+#
+# `server/helm/supersync/templates/deployment.yaml:42-49` 的 initContainer `migrate-db`
+# 跑的就是同一条 `sh scripts/migrate-deploy.sh`、同样带
+# `REQUIRE_DATABASE_POOL_LIMITS=true`、同样用**应用那一枚镜像**。
+# 之前 compose 这条路"起来却跑在未迁移的表结构上"，两套部署方式口径不一致；
+# 这个文件把 compose 侧补齐成同一个形状，`service_completed_successfully`
+# 等价于 initContainer 的"退出码 0 才放行"。
+#
+# ## ⚠️ 升级时它不会自己再跑一遍
+#
+# 一次性服务退出 0 之后，容器以 `exited (0)` 留着；下一次 `up -d` 只要该服务的
+# **配置哈希没变，compose 不会重建它** ⇒ 新镜像里的新迁移不会被应用。
+# 升级请走 `./scripts/deploy.sh`（它是受支持入口，见 `server/README.md` 第一屏），
+# 或者显式强制重建：
+#
+#     docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml \
+#       up -d --force-recreate supersync-migrate
+#
+# 这条不是边角注意事项：一个"只在第一次开机管用"的迁移入口，如果文档把它写成
+# "以后每次都不用管"，那它比没有更糟 —— 它会让运维**相信自己已经迁过了**。
+
+x-one-shot: &one-shot
+  restart: 'no'
+  # 一次性容器不需要 restart 循环，但**需要** init：和主容器同一个理由
+  # （见 docker-compose.yml 里那段关于僵尸进程的记录），迁移脚本会 fork 子进程。
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  networks:
+    - internal
+
+services:
+  supersync-migrate:
+    <<: *one-shot
+    # 与主容器**同一枚镜像**，这是刻意的：迁移文件在镜像里（`prisma/migrations`），
+    # 跑迁移的脚本也在镜像里（`scripts/migrate-deploy.sh`）。用另一枚镜像 =
+    # 用一份可能比数据库更旧的迁移清单，而那正是 deploy.sh 的注释里点名要避免的
+    # "a stale host deploy.sh can no longer skip a new CONCURRENTLY migration's recovery"。
+    image: ${SUPERSYNC_IMAGE:-supersync:local}
+    entrypoint: ['sh', '-ec', 'sh scripts/migrate-deploy.sh']
+    environment:
+      # 🔴 必须是**带 connection_limit / pool_timeout 的那一条 URL**，逐字抄主容器：
+      # `scripts/migrate-deploy.sh` 会校验"恰好一个正的 connection_limit 与
+      # pool_timeout"，不满足就**拒绝开始**（它宁可不动数据库，也不要在一个没边界的
+      # 池子上跑 CONCURRENTLY）。少抄这两个参数，症状是迁移一步都没跑。
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-supersync}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-supersync}?connection_limit=60&pool_timeout=10}
+      # 🔴 上面那条校验**只有在这个开关为 true 时才发生**（`migrate-deploy.sh:136`
+      #  是 `if [ "${REQUIRE_DATABASE_POOL_LIMITS:-false}" = "true" ]`）。
+      # 所以只抄 URL 不抄这一行 = 校验层整个绕过 = 一条没边界的 URL 也能迁。
+      # helm 的 `migrate-db` initContainer 就是两样一起给的
+      # （`helm/supersync/templates/deployment.yaml:48`），这里跟着做，
+      # 而不是自己发明第三个口径。
+      - REQUIRE_DATABASE_POOL_LIMITS=true
+      # 让失败时打印的恢复命令是 compose 形态而不是 k8s/helm 形态。
+      - MIGRATE_RECOVERY_RUNTIME=compose
+      # 逐步上限。默认与镜像内一致（1800s）；`up` 这条路径没有 deploy.sh 那个
+      # 外层 host timeout 兜底，所以这里让它**可拧**而不是硬编码。
+      - MIGRATE_STEP_TIMEOUT=${MIGRATE_STEP_TIMEOUT:-1800}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 384m
+    cpus: '0.5'
+
+  supersync:
+    # compose 对 map 是**按键合并**：这里只加一个新键，postgres 那条从基础文件继承。
+    # 仍然把 postgres 重写一遍 —— 因为这条判据要看得到"两个条件都在"，
+    # 而"继承来的依赖"在不同 compose 版本上的行为不值得赌一次。
+    depends_on:
+      postgres:
+        condition: service_healthy
+      supersync-migrate:
+        condition: service_completed_successfully
+    environment:
+      # 显式钉住：走了这条路就**更不该**让应用自己启动时再迁一遍。
+      # 值本来就是 false（`docker-compose.yml:50`），写在这里是把它变成**声明**，
+      # 这样 override 文件本身就能被读成"迁移只由那个一次性服务负责"。
+      - RUN_MIGRATIONS_ON_STARTUP=false
