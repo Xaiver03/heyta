@@ -49,6 +49,7 @@ const PRESET_LABEL_KEYS: Record<RepeatPresetId, MessageKey> = {
   weekly: 'web.repeat.weekly',
   weekdays: 'web.repeat.weekdays',
   monthly: 'web.repeat.monthly',
+  yearly: 'web.repeat.yearly',
 };
 
 /** 自定义输入的两种失败。用**结构化枚举**而不是文案，文案由词条表给。 */
