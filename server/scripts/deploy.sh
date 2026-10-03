@@ -105,19 +105,51 @@ if [ "${SUPERSYNC_SKIP_IMAGE_REVISION_CHECK:-}" != "true" ] && ! command -v jq >
     exit 1
 fi
 
+# 🔧 heyta 改动：镜像输入清单**只有这一份**。
+#
+# 原来这四个判断（算 revision / `git diff` / `git diff --cached` / `git ls-files --others`）
+# 各自抄了一遍路径列表，而"哪几个路径算镜像输入"是一个判断被写了四遍 ——
+# 这正是本仓库 §3.2 那条教训的形状（"失败判据被抄了三遍，三遍都漏了同一项"）。
+# 现在只有一份，四段都吃它。
+#
+# ⚠️ 这里的每一项都必须和 `Dockerfile` 真正 COPY 的东西对齐。**漏一项的后果不是报错，
+# 是"跑旧镜像配新迁移"那类事故换个入口重来**：revision 标签会算出一个"看起来最新"的
+# commit，而镜像里其实是旧的前端。所以 web 阶段一旦把 `apps/web` 变成镜像输入，
+# 下面必须一起加上 —— 两边都在同一个提交里改。
+SUPER_SYNC_IMAGE_INPUTS=(
+    ../.dockerignore
+    # ⚠️ 这一条**目前指向一个不存在的文件**（`.github/workflows/` 里只有 `ci.yml`，
+    # 本仓库从来没有镜像发布流水线 —— 实测 `[ -e ]` 就它一个 MISSING）。
+    # 它是上游留下的名字。等发布流水线落地时要把它换成真实文件名，并确认那份
+    # workflow 真的传 `VCS_REF=`（否则 revision 核对形同虚设）。
+    ../.github/workflows/supersync-docker.yml
+    ../package.json
+    ../pnpm-lock.yaml
+    ../pnpm-workspace.yaml
+    ../tsconfig.base.json
+    ../scripts/check-web-artifact.mjs
+    ../apps/web
+    ../packages/ai
+    ../packages/app-host
+    ../packages/design-system
+    ../packages/domain
+    ../packages/i18n
+    ../packages/local-api
+    ../packages/op-log
+    ../packages/shared-schema
+    ../packages/storage
+    ../packages/sync-client
+    ../packages/sync-core
+    ../packages/ui
+    ../packages/widget-core
+    .
+)
+
 supersync_image_source_revision() {
     local revision
 
     revision="$(git log -1 --format=%H -- \
-        ../.dockerignore \
-        ../.github/workflows/supersync-docker.yml \
-        ../package.json \
-        ../pnpm-lock.yaml \
-        ../tsconfig.base.json \
-        ../packages/shared-schema \
-        ../packages/sync-core \
-        ../packages/domain \
-        . 2>/dev/null || true)"
+        "${SUPER_SYNC_IMAGE_INPUTS[@]}" 2>/dev/null || true)"
     if [ -n "$revision" ]; then
         printf '%s\n' "$revision"
         return
@@ -150,43 +182,19 @@ assert_clean_supersync_image_inputs() {
     fi
 
     if ! git diff --quiet -- \
-        ../.dockerignore \
-        ../.github/workflows/supersync-docker.yml \
-        ../package.json \
-        ../pnpm-lock.yaml \
-        ../tsconfig.base.json \
-        ../packages/shared-schema \
-        ../packages/sync-core \
-        ../packages/domain \
-        . ||
+        "${SUPER_SYNC_IMAGE_INPUTS[@]}" ||
         ! git diff --cached --quiet -- \
-            ../.dockerignore \
-            ../.github/workflows/supersync-docker.yml \
-            ../package.json \
-            ../pnpm-lock.yaml \
-            ../tsconfig.base.json \
-            ../packages/shared-schema \
-            ../packages/sync-core \
-            ../packages/domain \
-            .; then
+            "${SUPER_SYNC_IMAGE_INPUTS[@]}"; then
         echo ""
         echo "ERROR: Refusing to build a labeled supersync image from dirty tracked input files."
-        echo "       Commit or stash changes under packages/sync-core, packages/shared-schema,"
-        echo "       packages/domain, tsconfig.base.json, package*.json, or"
-        echo "       .dockerignore/.github/workflows/supersync-docker.yml before running --build."
+        echo "       Commit or stash changes in the image inputs before running --build."
+        echo "       Inputs (one list, at the top of this script):"
+        printf '%s\n' "${SUPER_SYNC_IMAGE_INPUTS[@]}" | sed 's/^/       - /'
         exit 1
     fi
 
     untracked_files="$(git ls-files --others --exclude-standard -- \
-        ../.dockerignore \
-        ../.github/workflows/supersync-docker.yml \
-        ../package.json \
-        ../pnpm-lock.yaml \
-        ../tsconfig.base.json \
-        ../packages/shared-schema \
-        ../packages/sync-core \
-        ../packages/domain \
-        . 2>/dev/null || true)"
+        "${SUPER_SYNC_IMAGE_INPUTS[@]}" 2>/dev/null || true)"
     if [ -n "$untracked_files" ]; then
         echo ""
         echo "ERROR: Refusing to build a labeled supersync image with untracked input files."

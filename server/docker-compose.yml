@@ -58,12 +58,34 @@ services:
       - PASSWORD_PEPPER=${PASSWORD_PEPPER}
       - PUBLIC_URL=${PUBLIC_URL:-http://localhost:1900}
       - CORS_ORIGINS=${CORS_ORIGINS:-https://app.super-productivity.com}
+      # 🔧 heyta 改动：共享 UI 的两个旋钮**必须**在这里出现。
+      #
+      # `environment:` 是一份**白名单**：写在 `.env` 里的变量不会自动进容器。
+      # `env.example` 里每一个文档化的键，如果这条列表没有它，那么"照着文档填了值"
+      # 与"什么都没填"在容器里**逐字相同** —— 而这正是本文件上面 PASSWORD_PEPPER
+      # 那条注释亲口警告过的形状（"Without this line the container never sees it"）。
+      # 现在由 `pnpm check:server-env` 把这条规则钉住（它扫 env.example ∩ compose ∪ scripts）。
+      #
+      # ⚠️ 用 `${VAR-default}`（**没有**冒号），不是 `${VAR:-default}`：
+      # 带冒号的那种在值为空串时也会回落到默认值，而"空串"在这里是有语义的
+      # —— `WEB_APP_DIR=`（空）= 显式只跑 API。用带冒号的写法就把这条逃生门焊死了。
+      - WEB_APP_DIR=${WEB_APP_DIR-/app/web-dist}
+      - WEB_APP_PATH=${WEB_APP_PATH-/app/}
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_SECURE=${SMTP_SECURE:-false}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
+      # 邮箱验证是**所有**登录路径的硬前置，所以"没配 SMTP"在这台实例上不是
+      # "少一个功能"，而是"注册说成功了、口令永远登录不进"（每一句"请查收邮件"
+      # 都指向一封从来没存在过的信）。关掉它的旋钮必须真的能传到容器里 ——
+      # 上面那五行 SMTP_* 通了而这一行没通的话，文档里那条逃生门是画上去的。
+      #
+      # ⚠️ 这一条用带冒号的 `:-true`（与 WEB_APP_* 相反）：服务端**只接受 true/false**，
+      # 空串会在启动时直接报错，所以不能把"未设置"传成空串。
+      # `true` 与 `server/src/config.ts` 的默认值一致 ⇒ 不填时行为逐字不变。
+      - REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION:-true}
       - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID:-localhost}
       # Shown in your users' OS passkey prompt. Defaults to WEBAUTHN_RP_ID when unset.
       - WEBAUTHN_RP_NAME=${WEBAUTHN_RP_NAME:-}

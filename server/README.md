@@ -39,10 +39,14 @@ Deploy hosts need Docker with the Compose plugin, `curl`, `git`, and `jq`.
 The image revision check requires Docker Compose support for
 `docker compose config --format json`.
 
-> **There are no release tags.** `ghcr.io/super-productivity/supersync` publishes
-> only `latest` and `master-<sha>`, both built from `master`, so a default deploy
-> tracks upstream `master` rather than a released version. Pin `SUPERSYNC_IMAGE`
-> to a `master-<sha>` tag if you need a fixed one.
+> **🔴 No images are published for heyta, and the upstream ones are not substitutes.**
+> `ghcr.io/super-productivity/supersync` ships only `latest` and `master-<sha>`, both built
+> from Super Productivity's own server — whose entity list, migrations and encryption
+> enforcement have diverged from this repository. Pointing `SUPERSYNC_IMAGE` at it starts
+> fine, passes `/health`, and runs **someone else's schema**. The compose default is
+> therefore the locally built `supersync:local` (see `docker-compose.yml`); build it with
+> `./scripts/deploy.sh --build`, or push your own build to a registry you control and set
+> `SUPERSYNC_IMAGE` to it (passing the same `VCS_REF` — see the revision check below).
 
 ```bash
 # 1. Enter the server directory **of this repository**.
@@ -62,6 +66,20 @@ nano .env
 # 4. Deploy the stack and run database migrations
 ./scripts/deploy.sh
 ```
+
+**That is the whole setup — there is no separate frontend to build or host.** The image
+contains the web client, built from the same commit as the server it ships with, and the
+server serves it at `/app/` (default; `WEB_APP_PATH` moves it, `WEB_APP_DIR=` turns it
+off). The app container publishes `127.0.0.1:1900` only, so on the deploy host it is
+`http://127.0.0.1:1900/app/`, and for other people it is `https://<your-domain>/app/`
+through the bundled Caddy service — which reverse-proxies everything to 1900, so it needs
+no per-path configuration for the UI. The startup log line
+`[web-app] 共享 UI 挂在 /app/（来自 ...）` is what "this container really has a UI"
+looks like; no such line means the directory was absent, which is a legitimate API-only
+deployment rather than an error.
+
+`CORS_ORIGINS` does **not** need an entry for the bundled client: it is same-origin with
+the API by construction. That variable is for clients served from *another* origin.
 
 `./scripts/deploy.sh --build` builds the image locally instead of pulling it.
 That compiles the whole monorepo **on the deploy host**, beside the running
@@ -278,6 +296,8 @@ All configuration is done via environment variables.
 | `WEBAUTHN_ORIGIN`                       | `http://localhost:1900`              | **Required for passkeys.** Where users reach the auth UI, with protocol.                                                                       |
 | `WEBAUTHN_RP_NAME`                      | value of `WEBAUTHN_RP_ID`            | Name shown in your users' OS passkey prompt.                                                                                                   |
 | `ALLOWED_EMAILS`                        | - (anyone may register)              | Comma-separated exact addresses and/or `*@domain` rules.                                                                                       |
+| `WEB_APP_DIR`                           | `/app/web-dist` (in the image)       | Where the built web client lives on disk. The switch is "does this directory exist", not a boolean: empty value = serve no UI, a non-empty path without `index.html` is a startup error, and a path starting with a reserved segment (`/api`, `/health`, `/live`, `/ws`) is refused rather than silently relocated. |
+| `WEB_APP_PATH`                          | `/app/`                              | URL prefix the client is served under. It must match how the UI was **built** (`HEYTA_WEB_BASE` at build time) — mismatched pairs load HTML where CSS is expected. |
 | `SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES` | `104857600` (100 MB)                 | Quota for accounts created from now on. Existing accounts keep the value stored on their row.                                                  |
 
 ### Legal pages
@@ -371,12 +391,38 @@ Check sync status and storage info. Not used by the production client — intend
 GET /api/sync/status
 ```
 
-## Client Configuration
+## Clients and version coupling
 
-In Super Productivity, configure the Custom Sync provider with:
+heyta is local-first with end-to-end encryption: the server stores ciphertext and op-logs,
+so what a client must agree on with a server is the **wire contract**
+(`packages/shared-schema`) and the entity list, not a REST surface.
 
-- **Base URL**: `https://sync.your-domain.com` (or your deployed URL)
-- **Auth Token**: JWT token from login
+There are two cases, and they are deliberately different:
+
+- **The web client shipped in this image.** It is built from the same commit as the server
+  and served at `/app/`, so there is no matrix to consult — the coupling is resolved by
+  construction. `deploy.sh`'s `org.opencontainers.image.revision` check is what keeps a
+  "same tag, different content" image from sneaking past it.
+- **Any other client** (the mobile shells, the desktop shells, `apps/node-host`, or a UI
+  you host separately): the only supported combination is **a client built from the same
+  source revision as the server image it talks to**. Point a separately-hosted UI at your
+  API and you own keeping the two in step, including `CORS_ORIGINS`.
+
+Why there is no "N-1 works" or "same major only" promise yet — stated plainly because a
+policy that cannot be enforced is decoration:
+
+- Nothing has been released, so there is no older version to be compatible with.
+- The server can already see a client's version (`appVersion` on the download request is
+  parsed and recorded per device in `server/src/sync/checkpoint-gate.ts` /
+  `sync.routes.ts`), but **no heyta client sends it today**: the one place that builds the
+  download query (`packages/sync-client/src/client.ts`) sets `sinceSeq` and `excludeClient`
+  only, and every host goes through it. A version gate would therefore match nothing, and a
+  "supported versions" table would be unreadable by the software it describes.
+
+The trigger to revisit this: the first time images are published (see
+`docs/research/self-host-distribution-audit.md` §7 G-40⑤/⑥), a compatibility matrix has to
+be written *and* clients have to start reporting `appVersion` — those two land together or
+neither is a policy.
 
 ## Maintenance
 

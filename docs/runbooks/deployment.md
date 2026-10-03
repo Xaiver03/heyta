@@ -422,8 +422,14 @@ location ~ ^/(health|live)$ {
 }
 ```
 
-⚠️ 这条**不在仓库里** —— 和 `/app/` 那段一样，nginx 站点文件只是主机上的文件（见 §7）。
-改完记得回来更新本节。
+⚠️ 这句**已过期**（2026-10-03 逐字核过）：原文写"这条不在仓库里 —— nginx 站点文件只是主机上的文件"。
+现在它在：`server/deploy/nginx/` 是线上站点文件的**版本化镜像**
+（`heyta.finlaw.cloud.conf`、`heyta.waytofuture.cn.conf` 两份都在 `git ls-files` 里），
+`server/scripts/nginx-sync.sh --apply` 才是把改动推上服务器的那一步。
+
+真正的告诫是**反过来**的方向，而且现在更要紧：**改仓库里那一份不会改变线上行为**。
+所以改站点配置要动两处（服务器上的文件 + 仓库里的镜像），只动一处就出现
+"仓库说的和线上跑的不是同一份"——那正是这个目录被建出来的原因（见其 README）。
 
 **旧域名 `heyta-tmp.litopia.space`（已弃用，只留端点与入口 301）：**
 
@@ -886,8 +892,10 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
      本机 `mime.types` 里没有 `.webmanifest`。不影响解析（浏览器按 `link` 的 `rel` 认），
      但值得补一条 `application/manifest+json webmanifest;`。
 
-- 应用产物没走 CDN、没有 SRI、没有构建版本号注入；`/app/` 那段 nginx **不在仓库里**
-  （仓库只跟踪 `server/Caddyfile`），只能上机改 —— 改完记得回来更新本节。
+- 应用产物没走 CDN、没有 SRI、没有构建版本号注入。`/app/` 那段 nginx **在仓库里有镜像**
+  （`server/deploy/nginx/*.conf`，那个目录自 2026-09-28 起被跟踪 —— 本条原先写"仓库只跟踪
+  `server/Caddyfile`"，是过期话），但**那份镜像不是部署源** —— 改它不会改变线上，要
+  `server/scripts/nginx-sync.sh --apply`。
 - `heyta-tmp.litopia.space` 那份 nginx 站点仍在（`location /` → 1900 的 Connect 页与 `/api/`、
   `/health`；`/app*` 与 `/landing*` 已改成 **301**），留作回滚路径。它**已经不是入口**了：
   落地页的「立即使用」自 2026-09-27 起指向 `heyta.finlaw.cloud`，而且那里 passkey 不可用（§3.7.1）。
