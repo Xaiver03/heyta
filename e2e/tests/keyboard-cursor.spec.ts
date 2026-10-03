@@ -17,7 +17,7 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
-import { addTask, openApp, openSettingsView, parkCursor, switchView } from './helpers';
+import { addHabit, addNote, addTask, openApp, openSettingsView, parkCursor, switchView } from './helpers';
 
 const SHOT = (name: string) =>
   fileURLToPath(new URL(`../../apps/web/evidence/keyboard-cursor/${name}.png`, import.meta.url));
@@ -39,10 +39,19 @@ function readRows(page: Page) {
       const cs = getComputedStyle(el);
       const transparent =
         cs.backgroundColor === 'rgba(0, 0, 0, 0)' || cs.backgroundColor === 'transparent';
+      /**
+       * `near` = 往上最近的带 `data-testid` 的祖先（四象限是 `quadrant-board`）。
+       * 它不是断言，是**失败读数的一部分**：并行跑的时候这一条红过一次"高亮行数 = 2"，
+       * 而单独跑三次都绿 —— 那种"只有并发时才红"的现场，错误消息里不带容器就永远查不下去
+       * （`test-results` 每次重跑会被清掉，快照不是可留存的证据）。
+       */
+      const host = el.closest('[data-testid]') === el ? el.parentElement?.closest('[data-testid]') : el.closest('[data-testid]');
       return {
         id: (el.getAttribute('data-testid') ?? '').replace(/^task-item-/, ''),
         title: (el.textContent ?? '').trim().slice(0, 12),
         highlighted: !transparent,
+        bg: cs.backgroundColor,
+        near: host?.getAttribute('data-testid') ?? '(none)',
       };
     }),
   );
@@ -247,7 +256,7 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
     const rows = await readRows(page);
     expect(rows.length, '四象限里没有任务行（投影没接上）').toBeGreaterThan(0);
     const on = rows.map((r, i) => (r.highlighted ? i : -1)).filter((i) => i >= 0);
-    expect(on.length, '切到四象限后高亮行数不是 1（选中没跟着过来）').toBe(1);
+    expect(on.length, `切到四象限后高亮行数不是 1（选中没跟着过来）；全部行读数 ${JSON.stringify(rows)}`).toBe(1);
     const got = rows[on[0] as number] as { id: string; title: string };
     expect(
       got.id,
@@ -257,5 +266,164 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
 
     await parkCursor(page);
     await page.screenshot({ path: SHOT('k4-quadrant-same-selection') });
+  });
+
+  /**
+   * K6 习惯面（工单 W1「跨视图通用」的第二条腿，真界面载体）
+   * -----------------------------------------------------
+   *
+   * 这一条存在理由：`CURSOR_VIEWS` 里 `habits` 那一行在 jsdom 里只对着**插出来的**
+   * DOM 跑过，在真浏览器里一直没走过真数据。
+   *
+   * 🔴 读数与任务面**不同形**，这点必须写清楚而不是含糊过去：习惯行的选中态由
+   * `HabitsView.tsx:217` 的派生回落 `?? rows[0]` 决定 —— **没选中时右窗格也永远有内容**，
+   * 而 `aria-current` 挂的是那个回落行（`HabitsList.tsx:106`）。
+   * 于是"第一次 ↓"在界面上是**不可见的**（回落行 = 光标进入的第一行，同一个下标）。
+   * 这条判据因此不假装能证第一次按键，它证的是**之后每一步都跟着光标**，
+   * 并且把"两种线索说同一件事"钉住：`aria-current` 那一行必等于带底色那一行。
+   */
+  test('K6 🔴 习惯面走同一套光标：aria-current 与浅底始终同一行，↑↓ 逐格跟', async ({ page }) => {
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '习惯');
+    await addHabit(page, '光标甲');
+    await addHabit(page, '光标乙');
+    await addHabit(page, '光标丙');
+
+    /**
+     * 每行读 `{id, aria-current, 底色}`。
+     *
+     * 🔴 为什么不是"底色非透明就算选中"（第一版就是这么写的，红在这里）：
+     * `.ht-habit__row` 自己是 `<button>`，**未选中也有底色**（现量三行全是非透明），
+     * 选中态只是**换成另一层浅底**（`habits.css:100` 的 `[aria-current='true']`）。
+     * 所以"哪一行被选中"在 DOM 上不是"有没有颜色"，而是"**哪一行的颜色和别的行不一样**"。
+     * 这里刻意**不硬编码那个颜色值** —— 它由设计 token 决定，抄进测试就是一份会漂的副本；
+     * 判据问的是"少数派那一行 = `aria-current` 那一行"。
+     */
+    const read = async () => {
+      const rows = await page.locator('[data-testid^="habit-row-"]').evaluateAll((els) =>
+        els.map((el) => ({
+          id: (el.getAttribute('data-testid') ?? '').replace(/^habit-row-/, ''),
+          current: el.getAttribute('aria-current') === 'true',
+          bg: getComputedStyle(el).backgroundColor,
+        })),
+      );
+      const others = new Set(rows.filter((r) => !r.current).map((r) => r.bg));
+      expect(others.size, `未选中的行自己有 ${others.size} 种底色，无法定义"少数派"：${JSON.stringify(rows)}`).toBe(1);
+      const base = [...others][0] as string;
+      return {
+        ids: rows.map((r) => r.id),
+        current: rows.map((r, i) => (r.current ? i : -1)).filter((i) => i >= 0),
+        painted: rows.map((r, i) => (r.bg !== base ? i : -1)).filter((i) => i >= 0),
+      };
+    };
+
+    const rows0 = await read();
+    expect(rows0.ids.length, '习惯列表里没有行（数据没灌进去，这条判据量不到东西）').toBe(3);
+    // 回落读数：界面必须自己说清"窗格开的是哪一行"，且只有一行。
+    expect(
+      rows0.current,
+      `没按键时 aria-current 的下标应恰好一个（派生回落），实际 ${JSON.stringify(rows0)}`,
+    ).toHaveLength(1);
+    expect(
+      rows0.painted,
+      `底色线索与 aria-current 线索不一致（选中态有两种说法）：${JSON.stringify(rows0)}`,
+    ).toEqual(rows0.current);
+
+    // 焦点交回页面：`addHabit` 之后光标还留在**新建输入框**里，那时第①道闸门
+    // （正在打字）本来就该吃掉方向键 —— 不复位焦点的话这条判据量的是闸门，不是光标。
+    await releaseFocus(page);
+    await press(page, 'ArrowDown');
+    await press(page, 'ArrowDown');
+    const step = await read();
+    expect(
+      step.painted,
+      `连按两次 ↓ 之后浅底没跟着走：${JSON.stringify(rows0)} → ${JSON.stringify(step)}`,
+    ).toEqual(step.current);
+    expect(
+      step.current.length === 1 && (step.current[0] as number) > (rows0.current[0] as number),
+      `连按两次 ↓ 之后 aria-current 没往前走（${JSON.stringify(rows0.current)} → ${JSON.stringify(step.current)}）`,
+    ).toBe(true);
+
+    await press(page, 'ArrowUp');
+    const back = await read();
+    expect(
+      back.painted,
+      `↑ 之后两种线索又分叉了：${JSON.stringify(back)}`,
+    ).toEqual(back.current);
+    expect(
+      back.current.length === 1 && (back.current[0] as number) < (step.current[0] as number),
+      '↑ 没往回走',
+    ).toBe(true);
+
+    await press(page, 'ArrowUp');
+    await press(page, 'ArrowUp');
+    const top = await read();
+    expect(
+      top.current.length === 1 && (top.current[0] as number) === 0,
+      `到顶端 ↑ 应当**夹住**不环绕，实际 ${JSON.stringify(top)}`,
+    ).toBe(true);
+    expect(top.painted, `夹住之后浅底和 aria-current 不在同一行：${JSON.stringify(top)}`).toEqual(
+      top.current,
+    );
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('k6-habits-cursor-aria-current') });
+  });
+
+  /**
+   * K7 便签面（第三条腿，也是这一轮**照出行为差别**的一条）
+   * -----------------------------------------------------
+   *
+   * 便签的选中不是"高亮一行"，而是**打开编辑器面板**：`NotesView.tsx:99` 用
+   * `useSelected('note')` 决定编辑器开不开、开哪条。于是这里要问的是：
+   * 光标每按一次，界面跟着换的是**内容**而不是底色。
+   *
+   * 🔴 关键前提（现量，不是假设）：编辑器 `NoteEditor` 是**普通 View**
+   * —— 既没有 `role="dialog"`，也没有裸 `.ht-sheet` 类（`packages/ui/src/notes/NoteEditor.tsx:162`）。
+   * 所以第②道"浮层开着就不响应"的闸门**不拦它**，连按 ↓ 会继续换编辑器内容。
+   * 这条判据钉的就是这件事真的成立（第一版我猜的是"打开编辑器后光标会被浮层闸门挡住" ——
+   * 现量否证，正是 §8.9 那条"先怀疑自己的假设"的又一次应用）。
+   */
+  test('K7 🔴 便签面：↓ 换的是编辑器内容，且编辑器不算浮层（闸门不挡它）', async ({ page }) => {
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '便签');
+    await addNote(page, '便签光标甲');
+    await addNote(page, '便签光标乙');
+
+    const editor = page.getByTestId('notes-editor-input');
+    await expect(
+      page.getByTestId('notes-editor'),
+      '刚进便签视图编辑器就开着：选中还没发生',
+    ).toHaveCount(0);
+
+    // 同 K6：`addNote` 之后焦点在便签输入框里，先交回页面再按。
+    await releaseFocus(page);
+    await press(page, 'ArrowDown');
+    await expect(editor, '第一次 ↓ 没把选中落到某一条便签（编辑器没开）').toBeVisible();
+    const first = await editor.inputValue();
+
+    // 前提：这上面确实**没有**浮层闸门要的两种形状，否则下面那句连按会被闸门吃掉。
+    expect(
+      await page.evaluate(
+        () => document.querySelectorAll('[role="dialog"], .ht-sheet').length,
+      ),
+      '便签编辑器带了浮层形状 ⇒ 这条判据的前提变了',
+    ).toBe(0);
+
+    await press(page, 'ArrowDown');
+    const second = await editor.inputValue();
+    expect(
+      second !== first && second.length > 0,
+      `第二次 ↓ 之后编辑器内容没换（${JSON.stringify(first)} → ${JSON.stringify(second)}）`,
+    ).toBe(true);
+
+    await press(page, 'ArrowUp');
+    expect(
+      await editor.inputValue(),
+      '↑ 之后编辑器没回到上一条',
+    ).toBe(first);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('k7-notes-editor-follows-cursor') });
   });
 });
