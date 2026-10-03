@@ -31,17 +31,14 @@
  */
 
 import {
-  LOCAL_API_TOOLS,
   authorizeToolCall,
   findTool,
-  projectListForTool,
-  readItemForTool,
-  readListTasksDueArgs,
   type LocalApiConfig,
   type LocalApiItem,
   type LocalApiWriteIntent,
   type LocalApiWriteResult,
 } from './tools.js';
+import { LOCAL_API_TOOLS, packForTool } from './tools/registry.js';
 import {
   JSON_RPC_ERRORS,
   MCP_PROTOCOL_VERSION,
@@ -296,73 +293,58 @@ function asRecord(args: unknown): Record<string, unknown> {
  */
 export type ToolReadOutcome =
   | { ok: true; payload: unknown }
-  | { ok: false; kind: 'invalid-args' | 'not-readable' | 'not-a-read-tool'; message: string };
+  | {
+      ok: false;
+      kind: 'invalid-args' | 'not-readable' | 'not-a-read-tool' | 'tool-not-implemented';
+      message: string;
+    };
 
 /**
- * 执行一个**只读**工具。
+ * 执行一个**只读**工具：查目录 → 找到认领它的 pack → 委托。
  *
- * 🔴 三条不容商量的规则在这里落地：
+ * 三条不容商量的规则（列表逐条投影 / 单条明确拒绝 / 参数不成立就报错）**住在 pack 里**
+ * （`tools/task.ts`、`tools/project.ts`），本函数只负责三种"没进 pack"的返回：
  *
- * 1. **读列表时逐条投影** —— 受保护的条目只出元数据，且**列表里正文一律不出**（`projectListForTool`）
- * 2. **读单条时明确拒绝** —— 不是返回空（`readItemForTool`）
- * 3. **`list_tasks` 的参数不成立就报错** —— 不降级成"当这个参数没传"。
- *    日期形状与 14 天跨度上限由 `readListTasksDueArgs` 判（契约见 `tools.ts`）。
+ * | 情况 | 返回 |
+ * |---|---|
+ * | 目录里没有这个名字（含未知工具名） | `not-a-read-tool` —— 与"它存在但是写工具"给出**同一种**错误，否则能枚举目录 |
+ * | 目录里有它，但它是写工具 | 同上 |
+ * | 目录里有它、是读工具，可 pack 却没写这个分支 | 🔴 `tool-not-implemented` —— **注册不齐**，不是用户参数错 |
  *
  * ⚠️ `get_task` 找不到时**不是错误**，而是一个带 `error` 字段的正常结果 ——
- * 这是既有行为，测试钉着它。别顺手改成 `ok: false`。
+ * 这是既有行为，测试钉着它（在 pack 里）。别顺手改成 `ok: false`。
  */
 export async function runReadTool(
   host: LocalApiHost,
   name: string,
   args: unknown,
 ): Promise<ToolReadOutcome> {
-  const a = asRecord(args);
-
-  switch (name) {
-    case 'list_tasks': {
-      // 🔴 日期参数**先校验再传给宿主**。校验不成立时报 `invalid-args`，
-      // 而不是"忽略这个参数照样列" —— 后者会把拼错的日期伪装成
-      // "今天什么都没有了"，与本文件要修的那条缺陷同源。
-      const due = readListTasksDueArgs(a);
-      if (!due.ok) {
-        return { ok: false, kind: 'invalid-args', message: due.message };
-      }
-      const items = await host.listTasks({
-        ...(typeof a['projectId'] === 'string' ? { projectId: a['projectId'] } : {}),
-        ...(typeof a['completed'] === 'boolean' ? { completed: a['completed'] } : {}),
-        // ⚠️ `limit` 只是**递过去**，截断发生在宿主里，且在过滤**之后**。
-        // 不要把任何过滤挪到这里来配合它（见 `LocalApiHost.listTasks` 的注释）。
-        ...(typeof a['limit'] === 'number' ? { limit: a['limit'] } : {}),
-        ...due.args,
-      });
-      // 🔴 投影：受保护条目只留元数据，而且**列表里正文一律不出**
-      // （`projectListForTool` —— 目录描述与 `egressFields` 都这么承诺）。
-      return { ok: true, payload: projectListForTool(items) };
-    }
-
-    case 'get_task': {
-      if (typeof a['taskId'] !== 'string') {
-        return { ok: false, kind: 'invalid-args', message: 'get_task 需要 taskId。' };
-      }
-      const item = await host.getTask(a['taskId']);
-      if (item === undefined) {
-        return { ok: true, payload: { error: '没有找到这个任务。' } };
-      }
-      const read = readItemForTool(item);
-      // 🔴 受保护 → **错误**，不是空结果。调用方必须知道"读失败"而不是"没内容"。
-      if (!read.ok) {
-        return { ok: false, kind: 'not-readable', message: read.message };
-      }
-      return { ok: true, payload: read.item };
-    }
-
-    case 'list_projects': {
-      return { ok: true, payload: await host.listProjects() };
-    }
-
-    default:
-      return { ok: false, kind: 'not-a-read-tool', message: `「${name}」不是只读工具。` };
+  const tool = findTool(name);
+  if (tool === undefined || tool.kind !== 'read') {
+    return { ok: false, kind: 'not-a-read-tool', message: `「${name}」不是只读工具。` };
   }
+
+  const pack = packForTool(name);
+  if (pack === undefined) return toolNotImplemented(name);
+
+  const outcome = await pack.runRead(host, name, asRecord(args));
+  return outcome ?? toolNotImplemented(name);
+}
+
+/**
+ * 🔴 目录里有这个工具、按 `kind` 该由 pack 处理，但没有任何 pack 交出结果。
+ *
+ * 为什么必须有这一条而不是让它落到 `not-a-read-tool`：目录**就是从 pack 生成的**，
+ * 所以走到这里意味着"条目登记了、分支没写"（或者聚合的形状变了）。
+ * 把它报成"不是只读工具"是在**撒谎** —— 用户与模型都会去查一个根本没问题的地方，
+ * 而这正是本仓库反复付学费的那类失效（界面在说谎）。
+ */
+function toolNotImplemented(name: string): ToolReadOutcome {
+  return {
+    ok: false,
+    kind: 'tool-not-implemented',
+    message: `工具「${name}」在目录里，但没有任何实体工具包处理它 —— 注册不齐，是 heyta 的缺陷，不是你的参数错。`,
+  };
 }
 
 /**
@@ -383,50 +365,24 @@ export type ToolWriteIntentOutcome =
   | { ok: true; intent: LocalApiWriteIntent }
   | { ok: false; message: string };
 
+/** 见 {@link runReadTool} —— 同一张目录、同一个 pack，只是走写的那一侧。 */
 export function toWriteIntent(name: string, args: unknown): ToolWriteIntentOutcome {
-  const a = asRecord(args);
-
-  switch (name) {
-    case 'create_task': {
-      if (typeof a['title'] !== 'string' || a['title'].trim() === '') {
-        return { ok: false, message: 'create_task 需要 title。' };
-      }
-      return {
-        ok: true,
-        intent: {
-          action: 'create-task',
-          title: a['title'],
-          ...(typeof a['dueDate'] === 'string' ? { dueDate: a['dueDate'] } : {}),
-          ...(typeof a['priority'] === 'string' ? { priority: a['priority'] } : {}),
-          ...(typeof a['projectId'] === 'string' ? { projectId: a['projectId'] } : {}),
-        },
-      };
-    }
-
-    case 'update_task': {
-      if (typeof a['taskId'] !== 'string' || typeof a['fields'] !== 'object' || a['fields'] === null) {
-        return { ok: false, message: 'update_task 需要 taskId 与 fields。' };
-      }
-      return {
-        ok: true,
-        intent: {
-          action: 'update-task',
-          taskId: a['taskId'],
-          fields: a['fields'] as Record<string, unknown>,
-        },
-      };
-    }
-
-    case 'complete_task': {
-      if (typeof a['taskId'] !== 'string') {
-        return { ok: false, message: 'complete_task 需要 taskId。' };
-      }
-      return { ok: true, intent: { action: 'complete-task', taskId: a['taskId'] } };
-    }
-
-    default:
-      return { ok: false, message: `「${name}」不是会改数据的工具。` };
+  const tool = findTool(name);
+  if (tool === undefined || tool.kind !== 'write') {
+    return { ok: false, message: `「${name}」不是会改数据的工具。` };
   }
+
+  const pack = packForTool(name);
+  const outcome = pack?.toIntent(name, asRecord(args));
+  if (outcome !== undefined) return outcome;
+
+  // 与 `toolNotImplemented()` 同一件事，但 `ToolWriteIntentOutcome` 没有 `kind`
+  // （它的形状是既有的，两个调用方都只读 `ok` / `message` / `intent`）——
+  // 所以"注册不齐"这条信息只能进消息文本。
+  return {
+    ok: false,
+    message: `工具「${name}」在目录里，但没有任何实体工具包处理它的写入 —— 注册不齐，是 heyta 的缺陷，不是你的参数错。`,
+  };
 }
 
 /**
