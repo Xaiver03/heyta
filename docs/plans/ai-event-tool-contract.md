@@ -1453,6 +1453,25 @@ checked=19 missing=0 zh无中文=0 en含中文=0 逐字相同=0 占位符不一�
 本线两件事都做了一件 —— 门禁写死了，进度表一行都没有。
 一个只在计划文档里、不在入口表里的能力，下一个会话读 `AGENTS §9` 时会认为它不存在。
 
+**⚠️ 上面那句"`roadmap.md` 本轮不动"已在 19:3x 作废，就地更正（载体 `aa1163fd` 之后）**：
+`roadmap.md §1.1` 的 AI-6 行**已落地**，因为复核脏区时发现**它是干净的**（`git diff --numstat` 零行），
+而 `AGENTS.md` 正被并行会话改（同一条命令读到 **15 增 / 8 删**）——
+所以"不动"这条纪律**只落在真正脏的那份上**，不是两份一起搁着。
+顺带在这次编辑里修掉了 `roadmap.md` AI-5 行的一处**抄件漂移**：它抄着"6 个工具：`list_tasks` / …"，
+实测已是 22 个（读 10 / 写 12），而**没有任何一层会报错** —— 三处独立取数一致：
+`node scripts/check-ai-coverage.mjs` 打印 22、`require('…/dist').LOCAL_API_TOOLS.length` = 22、
+`grep -c "^  name: '" packages/local-api/src/tools/*.ts` = 22。
+现在那一栏改成**指针 + 现量命令**，不再抄数（AI-6 行同理：容量 5 从 `MAX_TOOLS_PER_ENTITY` 产物读，不在门禁里抄）。
+三处取数里**只有两处能长期复现**，这个区别值得写下来：
+`node scripts/check-ai-coverage.mjs`（打印"目录 22 个工具"）与
+`node -e 'console.log(require("./packages/local-api/dist/index.js").LOCAL_API_TOOLS.length)'`（22）都读的是**同一份真源**；
+我原本还想第三条腿用 `grep -c "^  name: '" …/tools/*.ts`，**实测它返回 0** ——
+缩进是 4 空格不是 2，而多文件的 `grep -c` 打的是**逐文件计数**不是总和。
+🔴 一条"现量命令"如果复现出 0，读它的人会得出"文档在说谎"，而说谎的是命令本身 ——
+所以上面两处只保留**跑过并核对过输出**的命令（缩进那条改成 `grep -h "^    name: '" … | wc -l` = 22，已实测）。
+`AGENTS §9` 那行**仍未动**，候选文本留在上面；现量命令：
+`cd <主检出> && git diff --numstat -- AGENTS.md`（非空就别碰，落地后重取）。
+
 ### 15.14 编号复核的结论 + 一个比 §15.11 更大的同类缺口：**四个变异台，零个自动消费者**
 
 **`environment-traps` 编号按工作树现量复核（19:1x）**：载体 **186** 条顶格编号 / 最大号 **177**；
