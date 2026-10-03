@@ -690,15 +690,18 @@ git merge-tree --write-tree --name-only main feat/detail-pane   # rc=1 = 有冲�
 |---|---|---|---|
 | `check:empty-state` | `node scripts/check-empty-state.mjs` | `🔴 有 1 处**新的**手写空态：apps/web/src/features/focus/FocusDetailPane.tsx 形态：空态 testid` | 🔴 **本分支**：站点是 `9bdab17e`（W7 番茄右栏）新写的 `<p className="ht-app__detail-empty" data-testid="focus-records-empty">`。已修 `edd9971b` |
 | `check:docs` | `node research/tools/docs-link-check.mjs` | ① `docs/plans/countdown-anniversary.md:1280` → `docs/adr/README.md` 的 §1（该章节号不存在）；② `PROGRESS.md:1362` → `docs/research/aed-implementation-evidence.md` 死链 | 别的线（倒数纪念日 + AED）。现量：`git log main..HEAD -- docs/plans/countdown-anniversary.md PROGRESS.md` **为空**（本分支没动过这两个宿主文件），且死链目标在 merge-base 的 `docs/research` 里 **0 命中**。登记不代改 |
-| `check:journey-coverage` | `node scripts/check-journey-coverage.mjs` | `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY` → `[ERROR] Command failed with exit code 1: pnpm install` | 载体：它内部经 `pnpm` 跑那条 spec，而 **pnpm 的 deps-status 预检自己会去调 `pnpm install`**（真身栈：`runDepsStatusCheck` → `runPnpmCli` → `sync`），在 linked worktree 里无 TTY 必拒 ⇒ **不是这道门禁要去装依赖**，机制与绕法见 §8.15；判据本身没跑到（它前面那几行旅程对账是 ✅） |
-| `check:widgets` | `node scripts/check-widgets.mjs` | 报的是 `packages/widget-core/tests/fixtures.spec.ts:1 夹具与重建结果不一致`，而"代码"栏里装的就是上面那条 pnpm 无 TTY 报错 | 载体（同上）：它比的是**重建命令的输出**，输出是 pnpm 的报错 ⇒ 判成"不一致"。这是"载体不可用被读成产品违规"的形状，不是夹具真漂了 |
-| `check:mobile-bundle` | `node scripts/check-mobile-bundle.mjs` | Metro `Unable to resolve module react-native-get-random-values`，脚本自己收尾写明「⛔ 打包失败（android）—— 门禁**没能运行**，这不是通过」 | 载体：本检出没有自己装过的 `apps/mobile/node_modules`。脚本这句"这不是通过"是**对的**判据措辞，别把它读成红在产品 |
+| `check:journey-coverage` ⚠️**07:00 已闭合为绿**（见 §8.19） | `node scripts/check-journey-coverage.mjs` | `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY` → `[ERROR] Command failed with exit code 1: pnpm install` | 载体：它内部经 `pnpm` 跑那条 spec，而 **pnpm 的 deps-status 预检自己会去调 `pnpm install`**（真身栈：`runDepsStatusCheck` → `runPnpmCli` → `sync`），在 linked worktree 里无 TTY 必拒 ⇒ **不是这道门禁要去装依赖**，机制与绕法见 §8.15；判据本身没跑到（它前面那几行旅程对账是 ✅） |
+| `check:widgets` ⚠️**07:00 已闭合为绿**（见 §8.19） | `node scripts/check-widgets.mjs` | 报的是 `packages/widget-core/tests/fixtures.spec.ts:1 夹具与重建结果不一致`，而"代码"栏里装的就是上面那条 pnpm 无 TTY 报错 | 载体（同上）：它比的是**重建命令的输出**，输出是 pnpm 的报错 ⇒ 判成"不一致"。这是"载体不可用被读成产品违规"的形状，不是夹具真漂了 |
+| `check:mobile-bundle` | `node scripts/check-mobile-bundle.mjs` | Metro `Unable to resolve module react-native-get-random-values`，脚本自己收尾写明「⛔ 打包失败（android）—— 门禁**没能运行**，这不是通过」 | 载体：脚本这句"这不是通过"是**对的**判据措辞，别把它读成红在产品。🔴 但**这一格原来写的原因（"本检出没有自己装过的 `apps/mobile/node_modules`"）07:00 现量被否证** —— 那个目录在，17 个条目，且 `react-native-get-random-values` 的两跳软链 `os.path.realpath` 解析到底**存在 package.json** ⇒ 真因是 Metro 不跟随 linked worktree 的软链节点（解析器策略），不是没装。见 §8.19 |
 | `check:web-storage` | `node scripts/verify-web-storage-backend.mjs` | vite `server-fs-allow` 拒 `/@fs` 下主检出的 `@sqlite.org/sqlite-wasm@3.53.4-build1` → `page.waitForFunction: Timeout 60000ms exceeded` | 载体：§8 W1 行记着同一形状（linked worktree 的软链 node_modules 不在 vite 的 fs.allow 里） |
 | `check:web-migration` | `node scripts/verify-web-migration.mjs` | 同上（同一台 vite dev 的同一个 `/@fs` 拒绝） | 载体（同上） |
 
 ⇒ **本单在别的门禁上没弄坏任何东西**：七条里一条是本分支的（已修），两条是别的线的文档引用，
 四条是载体不可用。那四条在**本检出内无法判定红绿**，合流后要在主检出复跑；本单不为它们做任何
 降级或跳过（那是替别人改判据）。
+⚠️ **07:00 更正（见 §8.19）**：这四条里 **两条已经在本检出判出来了**（都是绿）—— 加一个
+`--config.verify-deps-before-run=false` 就绕过了那条 pnpm 预检，判据本体照样跑。
+所以本节的原判读**没算错当时的现场**，但把"绕法尚未试过"写成了"无法判定"。
 
 ### 修 `check:empty-state` 这一条时用到的三臂（`/tmp/dp_es_mutate.py`，一次性）
 
@@ -1080,3 +1083,27 @@ W1 判据的一条修订（要拍板），而不是顺手重构。
 两份都报 **0**，而门禁本体在 HEAD 上报出 3 行 —— 这就是 §7 第 77 条那一族（**中文/全角在 C locale 下的计数不可信**）。
 **判"某个形状在不在"要跑被审的那条门禁自己，别自己另写一个计数正则** —— 上面那张五行读数表里的每一行
 都是门禁本体的退出码，不是我的计数。
+
+## 8.19 §8.13 那"四条无法判定"里有两条其实判得出来 —— 绕法早就实测过，只是没套上来（2026-10-04 06:59–07:00 现量）
+
+§8.15 为了跑全量构建，已经把 `--config.verify-deps-before-run=false` 这条绕法**在同一棵树上证过一次**
+（绕开 pnpm 的 deps-status 预检，而不是用 `CI=true` 那种会 purge 共享 modules 的写法）。
+06:59 把它套到 §8.13 表里"载体不可用"那四条上，两条**当场出判定、且都是绿**：
+
+| 门禁 | 命令（原样，只多一个 flag） | 读数 | 判据本体跑到没有 |
+|---|---|---|---|
+| `check:widgets` | `pnpm --config.verify-deps-before-run=false run check:widgets` | **RC=0** ✅「小组件边界完好（扫描 12 个文件 + 4 份黄金夹具，5 条规则）」 | 跑到了 —— 上一轮它红的是**重建命令的输出被 pnpm 报错替换**，所以"夹具不一致"是载体噪声，不是产品 |
+| `check:journey-coverage` | `pnpm --config.verify-deps-before-run=false run check:journey-coverage` | **RC=0** ✅ vitest `Test Files 3 passed / Tests 36 passed` +「每一端要么有旅程验收、要么有显式登记的缺口」 | 跑到了 —— 上一轮"判据本身没跑到"这句现在可以划掉 |
+| `check:mobile-bundle` | `node scripts/check-mobile-bundle.mjs`（不加 pnpm 也一样） | **RC=1** ⛔ 仍判"门禁没能运行" | **没跑到**，但**原因被现量否证**：`apps/mobile/node_modules` 在（17 个条目），`react-native-get-random-values` 两跳软链 `realpath` 解析到底**目录存在且有 package.json** ⇒ 卡点是 **Metro 不跟随 linked worktree 的软链节点**，不是"没装依赖" |
+| `check:web-storage` / `check:web-migration` | —— | **本轮没重跑**，原判读（vite `server-fs-allow` 拒 `/@fs` 下主检出的 sqlite-wasm）照旧保留 | 与 mobile-bundle 同族：**载体的解析器策略**，不是产品 |
+
+⇒ 三条结论：
+
+1. §8.13 那句"四条在本检出内无法判定红绿"**多写了两条**。正确的说法是：**两条已判定为绿，两条卡在解析器策略**。
+   原判读没有算错当时的现场（那一趟确实拿不到判定），错在**把"这一种跑法不行"写成了"这道门禁判不了"**。
+2. 🔴 **可迁移的那条**：**同一种绕法在同一棵树上被证过一次之后，所有以它为失败点的判定都必须先套一遍再下结论。**
+   绕法是 06:2x 为全量构建实测的，四条门禁是 06:0x 量的 —— 中间隔了一次实测却没回灌，于是"无法判定"多活了四十分钟。
+3. **合流那一趟仍然只剩两件**：`check:mobile-bundle` 与 `check:web-storage` / `check:web-migration`
+   —— 且现在的预期写得更准了：**在主检出（node_modules 是真目录）里跑**，而不是"换个时间再试"。
+   ⚠️ 本单**没有**为这两条重做变异验证：那两条门禁的判据不属于本单，给别人的门禁补"能不能失败"是替别人做事，
+   本单只主张"判据本体这次真的跑到了、跑出来是绿"。
