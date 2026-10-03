@@ -964,3 +964,81 @@ model AccountNotification {
   @@index([userId, createdAt])
   @@map("account_notifications")
 }
+
+/// 调休/补班公告的**年度录入**（一行 = 一个年度 = 一次运营录入）。W4b。
+///
+/// ## 这是 heyta 第一条服务端→客户端的**内容**通道的数据源
+///
+/// 定性见 [ADR-0050](../../docs/adr/0050-public-facts-are-deployer-supplied.md)：
+/// 它装的是**公共事实**（国务院哪天让上班、哪天让放假 + 公告原文出处），
+/// 不是用户数据 ⇒ 不进 op-log、不加密、不参与向量时钟与 LWW。
+/// AGENTS §1 那句「云端不是事实源」约束的是用户数据，不约束这一张表。
+///
+/// ## 为什么是两张表而不是一张表 + 一个 `Json` 的 `days`
+///
+/// 判据③要求"日期非法 / `isOffDay` 不是布尔"**在库层就拦得住**，而
+/// `Json` 列对这两件事一个都不拦：`{"day":"2026-02-30","isOffDay":1}`
+/// 是一段完全合法的 JSON，Postgres 存得下去、服务端读得出来，
+/// 于是症状推迟到客户端 —— 那一天永远不上界面（`2 月 30 日` 谁都查不到），
+/// 而 `isOffDay: 1` 会被当成"休"，把一个补班日标成放假日。
+/// **界面在说谎，而两层都没报错**，这就是把校验下沉到列类型的那个数钱的理由。
+///
+/// 于是：`holiday_adjustment_days` 用 `DATE` 主键 + `BOOLEAN NOT NULL`；
+/// 这张表只存**元信息与出处**（`papers` 是数组，逐日表里没必要重复 40 遍）。
+///
+/// ## 为什么"全有或全无"必须在写入层而不是读取层
+///
+/// 一年一次录入。允许"2027 年有 3 天，其中 1 天校验失败但另 2 天先存进去"，
+/// 客户端就会拿到一个**半套**的 2027 年：那半天在界面上显示"休"，
+/// 另外半天什么都不显示，而这两者都是"部署方下发的权威数据"的表现形式。
+/// 判据④因此要求"非法 ⇒ 整年拒绝"，实现见 `packages/domain` 的
+/// `installHolidayAdjustmentOverrides()`（先在校验副本上跑完，再一次性提交）。
+model HolidayAdjustmentYear {
+  /// 年份本身是主键：一年一条，`2027.5` 与重复年份在库里装不下。
+  year Int @id
+
+  /// 🔴 公告原文出处（gov.cn 的链接）。**不许为空** —— 没有出处的节假日数据
+  /// 不能进库，这条纪律随包那份 `scripts/vendor/holiday-cn/load.mjs:52` 先立过，
+  /// 运营录入没有理由比自动抓取更宽松。判据②"链接随数据入库且能回显"要看的就是它。
+  papers String[] @default([])
+
+  /// 运营备注（例如「据 2026-11 调整公告，原定 10-11 上班改为不上班」）。
+  /// 可选：它只是给人看的线索，不参与任何裁决。
+  note String?
+
+  /// 写入时间与操作者（追责与回滚都要它；`updatedBy` 是邮箱字符串而不是外键 ——
+  /// 与 `PriceVersion.createdBy` 同一决定：录入可能来自 CLI/运维，强绑 `users`
+  /// 会让"脚本代录"无法表达）。
+  updatedAt BigInt  @default(0) @map("updated_at")
+  updatedBy String? @map("updated_by")
+
+  days HolidayAdjustmentDay[]
+
+  @@map("holiday_adjustment_years")
+}
+
+/// 逐日表：某一天是**放假**（`true`）还是**补班**（`false`）。W4b。
+///
+/// 🔴 一张**没有这列就拦不住判据③**的表 —— 见 `HolidayAdjustmentYear` 那段。
+/// `day` 用 `DATE`（不是 `String`）正是为了让 `2026-02-30` 在库里就不是一个值。
+model HolidayAdjustmentDay {
+  /// 主键 = 那一天：同一天既休又补班、或同一天录两条，物理上装不下。
+  ///
+  /// ⚠️ Prisma 把 `DATE` 列读成 **UTC 零点的 `Date`**。回成字符串只能用
+  /// `toISOString().slice(0, 10)`，**不许**用本地 getter（`packages/domain` 的
+  /// `toLocalDate()`）—— 那会让 UTC-5 的部署把 `2027-01-01` 读成 `2026-12-31`。
+  /// 这条是 `dayColumnToIso()` 存在的全部理由，钉在
+  /// `server/tests/holiday-adjustment-migration.pglite.spec.ts`。
+  day      DateTime @id @map("day") @db.Date
+  isOffDay Boolean  @map("is_off_day")
+
+  /// 冗余一份年份：取某一年的全部安排是热路径（后台回显、公开 GET 都按年取），
+  /// 而 `day::date` 上的主键范围扫描要走索引边界。也是 CHECK「年份与日期必须一致」
+  /// 的左操作数 —— 没有这一列，那条约束就得每次逐行 cast。
+  year     Int
+
+  yearRef HolidayAdjustmentYear @relation(fields: [year], references: [year], onDelete: Cascade)
+
+  @@index([year])
+  @@map("holiday_adjustment_days")
+}
