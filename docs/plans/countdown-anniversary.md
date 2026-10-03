@@ -466,6 +466,34 @@ grep 命令**数成第二处定义（判据必须锚"行首的定义形状"，�
       📌 这里把上一轮那条一般规律**量成了现场**：那 469 不是别人在跑设备（`pgrep -f 'verify-mobile-'`=0、
       `xcodebuild`=0），是**同机多个 agent 会话的构建/测试并发** —— 所以"负载高"在这台机器上
       **不构成"有人在抢设备"的证据**，两件事要各自量。
+   7. 🔴 **这一趟照出三条真 bug，各自当场修完**（都是"多个会话共用一套验收台架"这一类的，
+      每条默认值与被替换的字面量**逐字相同** ⇒ 单会话行为一字不变，每条都有改前/改后 A/B）：
+
+      | 提交 | 缺陷 | A/B 读数 |
+      |---|---|---|
+      | `87ba108f` | `lib/mobile-e2e-fresh-account.sh` 的默认地址**不跟 `PORT`**。六个设备脚本（auth / autosync / calendar / conflict / focus / repeat）都在 `lib/mobile-e2e.sh` **之前** source 它 ⇒ 那一刻 `SERVER` 必为空、写死的 `:3000` 赢。换端口的效果是"设备侧连 3200、**建号打在 3000**" | 改前 `PORT=3200` 仍得 `http://127.0.0.1:3000`；改后得 `:3200`；显式给 `SERVER` 时行为不变（`verify-mobile-ios.sh` 在 `mobile-e2e.sh` **之后**才 source，它拿到的仍是推导过的 `SERVER`） |
+      | `5ca275e1` | 凭据三个路径**写者参数化了、读者写死**：`mobile-e2e-fresh-account.sh:49-51` 收 `HEYTA_E2E_*_FILE`，而 `mobile-e2e.sh:80-82` 硬 `cat /tmp/heyta_mobile_*.txt` ⇒ 设了变量只是把号建到私有文件、验收**继续读别人那一轮的令牌**。症状不是报错，是"用错了身份"：`pm clear`、op 数、跨设备断言全落在别人的账号上 | 旧件 + 私有路径 ⇒ 读到 `/tmp` 那份；新件 + 私有路径 ⇒ 读到私有的；不给变量 ⇒ 与原字面量相同 |
+      | `3603db71` | `verify-mobile-repeat.sh` 开局 `rm -f` 两个**写死路径**的本地 sqlite ⇒ 第二个会话起这一轮，会把**第一个会话正在用的那轮**的笔记本库删掉；之后那批断言全在读一台空笔记本，看着像"手机写了、笔记本收不到"（与 traps #169 同形状，对象从设备换成文件） | 旧件设变量仍指 `/tmp/heyta-repeat-laptop.sqlite`；新件设了才换、不设相同 |
+
+   8. 🔴 **第四条不是脚本 bug，是我这次隔离设计漏的一层**：`emulator-5554` 是**全仓所有设备脚本的
+      默认串口**（`HEYTA_E2E_SERIAL` 缺省值），所以"私有 AVD"起在 5554 等于**把别人的默认设备
+      换成了我的**。实测撞上来的形状：12:33 另一个会话建号写了共享凭据（`/tmp/heyta_mobile_email.txt`
+      的 mtime），12:35 我的模拟器收到一句"等 20 秒优雅退出"就没了（`w3-emu.log:100`），
+      而我的下一趟 20 轮×3s 全报"没有名为 `heyta-w3-yearly` 的设备"。
+      ⇒ 现在这趟改成 **`-port 5556`**（串口 = `emulator-5556`），私有凭据目录 `/tmp/heyta-w3-yearly`，
+      私有 sqlite 两份。📌 一般规律：**"名字私有"不等于"命名空间私有"** —— AVD 名是我的，
+      串口号却是公共的。
+   9. ⚠️ **登记为缺口、本批不修的那一条**：`/tmp/ui.xml`（`uiautomator dump` 的宿主落点）仍是固定名，
+      并行两轮会互相覆盖 —— 闭合代价是**现量**的而不是估的：
+      `grep -rc '/tmp/ui.xml' scripts/lib/mobile-e2e.sh scripts/verify-mobile-*.sh | awk -F: '{s+=$2} END{print s}'` ⇒ **36 处**，
+      分布在 1 个 lib + 12 个验收脚本（`grep -rl 'ui\.xml' scripts/verify-mobile-*.sh | wc -l` ⇒ 12）。
+      这不是"顺手加个默认值"的量级，所以留在这里而不是塞进本批。
+   10. 📌 **我自己这一趟犯的两次探针读法错误，记下来给后来者**：
+       ① `cmp -s A B && echo "✅ 同步"` 那行**没打印**，我把紧随其后的**门禁自己的** ✅ 行（"自快照 bootstrap 全部在位"）
+          当成了它的输出，差点把"检出已同步"写进文档 —— 判据行必须与它所属的命令**在同一行可核对**，
+          或用 md5 这种带值的读数（最后就是 `md5 -q` 两边相等才认）。
+       ② 一条 A/B 探针把 `/tmp/heyta_mobile_token.txt` **原文打印了出来**（一枚本地 TEST_MODE 账号的 JWT，
+          未进任何文件/提交）。以后比较凭据只比**长度或哈希前缀**，不 `cat`。
 4. 📌 **本会话留下的隔离检出**：`../heyta-wt-closeout`（detached，`43a6cf60`）。
    它的**两个脚本**（`scripts/reinstall-all.sh`、`apps/desktop-macos/scripts/package-app.sh`）
    与 main 逐字节相同（`cmp` 过）；**文档以 main 为准** —— 检出里那份落后于把台账条目
