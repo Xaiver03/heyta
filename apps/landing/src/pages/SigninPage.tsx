@@ -69,46 +69,47 @@ export function SigninPage({ page }: { page: SitePage }): React.JSX.Element {
       */}
       <PageHead page={page} cta={false} />
 
-      <div className="lp-section">
-        {/*
-          🔴 `.lp-wrap` 不是可选的：`.lp-section` 只给**纵向**留白，横向容器是
-          `.lp-wrap`（`max-inline-size` + `margin-inline:auto`）。少这一层，
-          出口按钮会贴到视口左边缘，而它上面的标题与引言在内容列里 ——
-          2026-10-03 线上截图实测到的就是这个（同一屏两套左边距，读起来像页面坏了）。
-        */}
-        <div className="lp-wrap">
+      {/*
+        🔴 两个容器的取舍都是实测出来的，别照"别的页怎么写"改回去：
+
+        · **必须有 `.lp-wrap`**（横向内容列）。少这一层，出口按钮甩到视口左边缘，
+          而它上面的标题与引言在内容列里 —— 同一屏两套左边距，读起来像页面坏了
+          （2026-10-03 第一版线上截图就是这个形状，`live-signin-entry.spec.ts`
+          拿"与页脚那条链接同一列"当判据钉住它）。
+
+        · **不套 `.lp-section`**。那一层给的是"一整节内容"的纵向留白
+          （`padding-block: space-16 × 1.75`），而这一页整页只有三行出口 ——
+          套上它会在引言与主行动之间留出一段约 150px 的空洞，
+          读起来仍然像页面缺了一块。
+      */}
+      <div className="lp-wrap">
+        <p className="lp-page__cta">
+          <a
+            className="lp-btn lp-btn--primary"
+            href={cta.href}
+            {...(cta.external ? { rel: 'noopener noreferrer' } : {})}
+          >
+            {t(cta.labelKey)}
+          </a>
+        </p>
+
+        {recoverHref === null ? null : (
           <p className="lp-page__cta">
-            <a
-              className="lp-btn lp-btn--primary"
-              href={cta.href}
-              {...(cta.external ? { rel: 'noopener noreferrer' } : {})}
-            >
-              {t(cta.labelKey)}
+            <a className="lp-btn lp-btn--secondary" href={recoverHref} rel="noopener noreferrer">
+              {t('site.signin.recover.link')}
             </a>
           </p>
+        )}
 
-          {recoverHref === null ? null : (
-            <p className="lp-page__cta">
-              <a
-                className="lp-btn lp-btn--secondary"
-                href={recoverHref}
-                rel="noopener noreferrer"
-              >
-                {t('site.signin.recover.link')}
-              </a>
-            </p>
-          )}
-
-          {/*
-            用 `.lp-prose` 而不是 `.lp-note`：后者是一枚**带边框的卡片**，
-            这一页只有它一个卡片时，读起来像"这里有个提示"，而不是一句去处。
-          */}
-          <p className="lp-prose">
-            <a className="lp-link" href={siteHref(pageById('account'), locale)}>
-              {t('site.signin.helpLink')}
-            </a>
-          </p>
-        </div>
+        {/*
+          用 `.lp-prose` 而不是 `.lp-note`：后者是一枚**带边框的卡片**，
+          这一页只有它一个卡片时，读起来像"这里有个提示"，而不是一句去处。
+        */}
+        <p className="lp-prose">
+          <a className="lp-link" href={siteHref(pageById('account'), locale)}>
+            {t('site.signin.helpLink')}
+          </a>
+        </p>
       </div>
     </>
   );
