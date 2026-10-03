@@ -2143,6 +2143,16 @@ W0b ─> 随时可做（台账那半要等文件干净）
   `scripts/verify-mobile-window-gate.sh` 已经是唯一所有者，落库的正确动作是**给它加一个 `--target b --confirm`
   的执行分支**（它文件头本来就写了"加 `--confirm` 才真的执行"）—— 那是那条线（性能热路径/日历线共用它）的活，
   本批只把"这一趟要执行什么"逐行写在这里，等窗口一开由我按这份清单跑。
+  ✅ **开工前的三处预检已经量掉**（04 06:5x，都是只读）：
+  ①`emulator` 那条起设备的命令行**四个旋钮都存在**（`emulator --help` 的 `-no-audio` / `-no-boot-anim`
+  / `-no-window`，`-no-snapshot-save` 在 `-help` 第 30 行；版本 37.1.11.0）—— 选 `-no-snapshot-save`
+  是为了**退出时不覆盖别人那台 AVD 的快照**；
+  ②`verify:mobile-card-export` 那条新鲜度门的 `HEYTA_REPO_ROOT` 解析自 `scripts/lib/mobile-e2e.sh:87`
+  那个 `BASH_SOURCE` 的 `../..` ⇒ **在这条链的工作树里跑就是本批这棵树**，不会漂到主检出
+  （漂了的话它比的是别人未提交的源码 mtime，那是一条会假绿的判据）；
+  ③那条门的输入现量：`apps/mobile/src` + `packages/ui/src/countdown` 里最新一枚 `.ts(x)` 的 mtime =
+  **10-04 04:30（epoch 1791059422）** ⇒ 窗口一开装出来的 APK（`lastUpdateTime` 必然晚于此刻）过得了这道门，
+  **不需要**那个 `HEYTA_CARD_EXPORT_ALLOW_STALE=1` 旋钮（用了本轮读数就不代表当前源码）。
 
 🔴 **待入 traps 三条（04 06:0x 现量取号：主检出工作树 `docs/reference/environment-traps.md` 最大号 = **215**、行首编号命中 224 行，而该文件此刻正被另一条会话脏着 ⇒ 按纪律不往共享台账插行，先记在本单，搬运那一刻再现量重取号）**：
 
