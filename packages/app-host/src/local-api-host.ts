@@ -35,18 +35,52 @@
  */
 
 import type {
+  LocalApiFocusSession,
   LocalApiHabit,
+  LocalApiHabitLog,
   LocalApiHost,
   LocalApiItem,
+  LocalApiNote,
+  LocalApiNoteRow,
   LocalApiProject,
+  LocalApiReminder,
+  LocalApiTag,
   LocalApiWriteIntent,
   LocalApiWriteResult,
 } from '@heyta/local-api';
-import { Priority, type Habit, type HabitGoalType, type Task } from '@heyta/domain';
+import {
+  DAY_MS,
+  MAX_REMINDER_LEAD_MS,
+  MAX_REMINDERS_PER_TASK,
+  NOTE_MAX_CONTENT_LENGTH,
+  Priority,
+  aliveReminders,
+  localDateTimeToEpoch,
+  noteProjectId,
+  noteRejection,
+  reminderPhase,
+  reminderRejection,
+  today,
+  type FocusSession,
+  type Habit,
+  type HabitGoalType,
+  type HabitLog,
+  type Note,
+  type Reminder,
+  type Task,
+} from '@heyta/domain';
 
 import type { ActionContext, TaskActions } from './actions.js';
-import { createHabitActions, type HabitActions, type NewHabitFields } from './habit-actions.js';
+import { createFocusActions, focusLogFailureCode, type FocusActions } from './focus-actions.js';
+import {
+  createHabitActions,
+  habitLogId,
+  type HabitActions,
+  type NewHabitFields,
+} from './habit-actions.js';
+import { createNoteActions, type NoteActions } from './note-actions.js';
 import { createProjectActions, type ProjectActions } from './project-actions.js';
+import { createReminderActions, type ReminderActions } from './reminder-actions.js';
 
 export interface LocalApiHostOptions {
   /**
@@ -67,6 +101,16 @@ export interface LocalApiHostOptions {
    * 而它恰恰是 ADR-0011 最重要的一条。
    */
   isReadable: (task: Task) => boolean;
+
+  /**
+   * 现在几点。**只在两处用**：给新落的专注记录填 `createdAt`，以及算提醒的
+   * `phase`（还没到 / 该响了 / 已响过 —— 那个判定本身在领域层，这里只是把"现在"递给它）。
+   *
+   * ⚠️ 缺省 `Date.now()` 是有意的：宿主端口是给三个宿主共用的，而"现在"在生产里
+   * 就是墙上时钟。测试要确定性就注入一个固定时钟 —— 不注入也不会漏接，
+   * 因为这条**不是**隐私开关（上一条 `isReadable` 必须是必填的理由只适用于它）。
+   */
+  now?: () => number;
 }
 
 /** `Priority` 枚举 ↔ MCP 字符串。 */
@@ -155,6 +199,93 @@ export function habitToItem(habit: Habit): LocalApiHabit {
   return item;
 }
 
+/**
+ * `Tag` → `LocalApiTag`。白名单重建，只有两个字段。
+ *
+ * ⚠️ `color` 不搬：不是"暂时没接"，而是**全仓库没有任何一条路径往 `Tag.color` 写值**
+ * （落在 `TAG` 上的 op 只有 Create 与 Delete）。搬一个永远为空的字段进出境清单，
+ * 等于给"将来顺手填上"留一条已经声明过的通道。
+ */
+export function tagToRow(tag: { id: string; name: string }): LocalApiTag {
+  return { id: tag.id, name: tag.name };
+}
+
+/**
+ * `Note` → 列表行。**正文在这里被剥掉** —— 这一行是 `list_notes`
+ * "不返回正文"那句承诺的唯一执行点（同 `projectListForTool` 的位置）。
+ *
+ * `projectId` 用领域层的 `noteProjectId` 归一成 `null`：实体里"未归属"是**缺字段**，
+ * 而界面上它是一个真的分组。原样搬 `undefined` 会让 `JSON.stringify` 把这个键整个吞掉，
+ * 于是"未归属"和"这次没算出来"在出境的数据里长得一样。
+ */
+export function noteToRow(note: Note): LocalApiNoteRow {
+  return {
+    id: note.id,
+    projectId: noteProjectId(note),
+    isPinnedToToday: note.isPinnedToToday,
+    updatedAt: note.updatedAt,
+  };
+}
+
+/** `Note` → 单条（列表行的全部字段 + 正文）。 */
+export function noteToItem(note: Note): LocalApiNote {
+  return { ...noteToRow(note), content: note.content };
+}
+
+/**
+ * `HabitLog` → `LocalApiHabitLog`。
+ *
+ * ⚠️ `note` 不搬：`checkIn` 从来不写它，而自由文本一旦进白名单就是一条出境通道。
+ */
+export function habitLogToItem(log: HabitLog): LocalApiHabitLog {
+  const item: LocalApiHabitLog = { habitId: log.habitId, date: log.date };
+  if (log.value !== undefined) item.value = log.value;
+  return item;
+}
+
+/**
+ * `FocusSession` → `LocalApiFocusSession`。字段名与实体逐字一致（毫秒）。
+ *
+ * 可选字段**缺席时连键都不写**：出境的 JSON 里不该出现 `"taskId": null` ——
+ * 那会被模型读成"有一个任务，但没说清是哪个"，而它本来的意思是"没挂任务"。
+ * （物化状态里也不会有 `null`：reducer 把 payload 的 `null` 翻译成**删除键**，
+ * 见 `packages/op-log/src/state.ts:279-285`。所以这里的判据只看 `undefined`；
+ * 那个"不出现 null"由下面的用例钉住，不靠这里的第二道过滤。）
+ *
+ * ⚠️ `createdAt` / `updatedAt` / `endedAt` 不搬：`endedAt` 与 `startedAt + actualMs`
+ * 是同一件事的两份抄件，多给一份就是让模型自己挑一个来算时长。
+ */
+export function focusToItem(session: FocusSession): LocalApiFocusSession {
+  const item: LocalApiFocusSession = {
+    kind: session.kind,
+    plannedMs: session.plannedMs,
+  };
+  if (session.taskId !== undefined) item.taskId = session.taskId;
+  if (session.actualMs !== undefined) item.actualMs = session.actualMs;
+  if (session.completed !== undefined) item.completed = session.completed;
+  if (session.startedAt !== undefined) item.startedAt = session.startedAt;
+  return item;
+}
+
+/**
+ * `Reminder` → `LocalApiReminder`。
+ *
+ * 🔴 `phase` 是**领域层算的**（`reminderPhase`），不是这里拼的：三个原始时间戳
+ * （`firedAt` / `snoozedUntil` / `dismissedAt`）合成一个封闭词表这件事只有一个所有者。
+ * 把三个时间戳原样搬出去，等于让每个调用方各自重算一遍这个判定 —— 那正是漂移的形状。
+ */
+export function reminderToItem(reminder: Reminder, at: number): LocalApiReminder {
+  return {
+    id: reminder.id,
+    taskId: reminder.taskId,
+    triggerAt: reminder.triggerAt,
+    phase: reminderPhase(reminder, at),
+  };
+}
+
+/** 分钟 → 毫秒。单位换算，不是产品规则，所以只需要一份。 */
+const MINUTE_MS = 60_000;
+
 export function createLocalApiHost(
   ctx: ActionContext,
   actions: TaskActions,
@@ -173,15 +304,19 @@ export function createLocalApiHost(
   options: LocalApiHostOptions,
 ): LocalApiHost {
   const isReadable = options.isReadable;
+  const now = options.now ?? ((): number => Date.now());
 
-  // 🔴 清单与习惯的动作**在这里内部构造**，不从壳注入 —— 这两个动作集只需要
+  // 🔴 各实体的动作**在这里内部构造**，不从壳注入 —— 这些动作集只需要
   // `ActionContext`（`dispatch` + `getState`），而 `ctx` 已经在参数里。
-  // 为什么不做成 `options.projectActions`：那样每个宿主都要多接一根线，
+  // 为什么不做成 `options.noteActions`：那样每个宿主都要多接一根线，
   // 而**漏接的那一个只会让 `submit` 少一条分支**（AGENTS §3.5 的"每端一份、
   // 各自漂移"就是这么长出来的）。内部构造 ⇒ 三个宿主（Web / node-host CLI / MCP stdio）
-  // 接到的行为逐字相同，且 op 的构造仍然只在 `project-actions.ts` / `habit-actions.ts` 里有一份。
+  // 接到的行为逐字相同，且 op 的构造仍然只在各 `*-actions.ts` 里有一份。
   const projectActions = createProjectActions(ctx);
   const habitActions = createHabitActions(ctx);
+  const noteActions = createNoteActions(ctx);
+  const focusActions = createFocusActions(ctx);
+  const reminderActions = createReminderActions(ctx, { now });
 
   return {
     listTasks: (args) => {
@@ -248,7 +383,55 @@ export function createLocalApiHost(
     // 是跨端一致的那条（见 `actions.ts` 的 `byCanonicalOrder`）。
     listHabits: () => Promise.resolve(habitActions.listHabits().map(habitToItem)),
 
-    submit: (intent) => submitIntent(ctx, actions, projectActions, habitActions, intent),
+    // 下面六条同一条纪律：**排序所有者在动作层，这里一律不重排**
+    // （`listTags` / `listNotes` / `listLogs` / `listSessions` 各自已经有确定性顺序，
+    // 再排一遍就是第二个所有者，而两端顺序会漂 —— 那类 bug 没有报错，只有"第 3 条不一样"）。
+    // 唯一的例外是 `listReminders`：它的顺序所有者**没有**承诺过"按时刻"，
+    // 而工具描述对用户承诺了，所以这里按 `triggerAt` 重排（理由写在那条里）。
+    listTags: () => Promise.resolve(projectActions.listTags().map(tagToRow)),
+
+    listNotes: (limit) => Promise.resolve(noteActions.listNotes().slice(0, Math.max(0, limit)).map(noteToRow)),
+
+    getNote: (noteId) => {
+      // `aliveNotes` 的语义在这里是"删掉的便签读不到正文"，与 `getTask` 同一条：
+      // 取不到就是 `undefined`（不是抛错，也不是返回一个空的便签）。
+      const note = noteActions.listNotes().find((x) => x.id === noteId);
+      return Promise.resolve(note === undefined ? undefined : noteToItem(note));
+    },
+
+    listHabitLogs: (habitId, limit) => {
+      const logs = habitActions.listLogs();
+      const filtered = habitId === undefined ? logs : logs.filter((l) => l.habitId === habitId);
+      return Promise.resolve(filtered.slice(0, Math.max(0, limit)).map(habitLogToItem));
+    },
+
+    listFocusSessions: (limit) =>
+      Promise.resolve(focusActions.listSessions().slice(0, Math.max(0, limit)).map(focusToItem)),
+
+    listReminders: (taskId) => {
+      const all = aliveReminders(Object.values(ctx.getState().reminders));
+      const filtered = taskId === undefined ? all : all.filter((r) => r.taskId === taskId);
+      // `aliveReminders` 的顺序是 id 字典序，而提醒的 id 是 `任务:时刻` 拼出来的 ——
+      // 那读起来像时间序、实际按任务分组。这里按 `triggerAt` 从早到晚重排，
+      // 因为工具描述对用户承诺的是"按提醒时刻从早到晚"。
+      const ordered = [...filtered].sort(
+        (a, b) => a.triggerAt - b.triggerAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      );
+      return Promise.resolve(ordered.map((r) => reminderToItem(r, now())));
+    },
+
+    submit: (intent) =>
+      submitIntent(
+        ctx,
+        actions,
+        projectActions,
+        habitActions,
+        noteActions,
+        focusActions,
+        reminderActions,
+        now,
+        intent,
+      ),
   };
 }
 
@@ -260,12 +443,24 @@ export function createLocalApiHost(
  *
  * ⚠️ 联合类型**没有 `default` 分支**是刻意的：加一个写入动作而不在这里表态，
  * 编译就过不去（那正是"每个宿主都被逼着表态"的落点，而三个宿主共用这一个实现）。
+ *
+ * 🔴 **领域规则一律不在这里重写第二遍**：正文合法性问 `noteRejection`，
+ * 时刻合不合法问 `reminderRejection`，上限问 `MAX_REMINDERS_PER_TASK`（导入的那个常量），
+ * 专注类型与时长问 `focusActions.log()` 自己抛的那三种码。
+ * 这里只做两件事：**把不存在的东西挡在门口**（任务/习惯/清单/标签的存在性 ——
+ * 那是读物化状态，领域层没有这个函数），以及**把抛出来的错翻成一句用户看得懂的话**。
+ * 把规则抄一份进来的代价不是"重复"，是两条路对同一句输入给两种答案 ——
+ * 本仓库已经为这一条付过三次学费（AGENTS §3.5）。
  */
 async function submitIntent(
   ctx: ActionContext,
   actions: TaskActions,
   projectActions: ProjectActions,
   habitActions: HabitActions,
+  noteActions: NoteActions,
+  focusActions: FocusActions,
+  reminderActions: ReminderActions,
+  now: () => number,
   intent: LocalApiWriteIntent,
 ): Promise<LocalApiWriteResult> {
   switch (intent.action) {
@@ -431,6 +626,228 @@ async function submitIntent(
 
       const id = await habitActions.createHabit(name, over);
       return { ok: true, taskId: id, entityId: id, entityType: 'HABIT' };
+    }
+
+    case 'create-tag': {
+      const name = intent.name.trim();
+      if (name === '') {
+        return { ok: false, reason: 'invalid', message: '标签名称不能为空。' };
+      }
+      const id = await projectActions.createTag(name);
+      return { ok: true, taskId: id, entityId: id, entityType: 'TAG' };
+    }
+
+    case 'set-task-tags': {
+      const task = actions.findTask(intent.taskId);
+      if (task === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      // 🔴 逐个标签验存在且活着，并把**第一个**不成立的报出来。
+      // `setTags` 自己也会 throw，但它 throw 的是整句"找不到标签「id」"——
+      // 而这里的读者是用户，他要的是"哪一个"。存在性不是领域规则，是读物化状态，
+      // 所以这一条不算抄第二遍。
+      const state = ctx.getState();
+      for (const tagId of intent.tagIds) {
+        const tag = state.tags[tagId];
+        if (tag === undefined || tag.deletedAt !== undefined) {
+          return {
+            ok: false,
+            reason: 'not-found',
+            message: `找不到标签「${tagId}」——先列一下现有标签，再把你确实想挂的那几个一起交过来。`,
+          };
+        }
+      }
+      await actions.setTags(intent.taskId, [...intent.tagIds]);
+      return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'create-note': {
+      // 正文的规则问领域层（`noteRejection`）：空 / 超长两码，**数字不住在这里**。
+      const rejection = noteRejection(intent.content);
+      if (rejection === 'empty') {
+        return { ok: false, reason: 'invalid', message: '便签正文不能为空（只有空格也算空）。' };
+      }
+      if (rejection === 'too-long') {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `便签正文最长 ${String(NOTE_MAX_CONTENT_LENGTH)} 个字符。`,
+        };
+      }
+      if (intent.projectId !== undefined) {
+        const parent = ctx.getState().projects[intent.projectId];
+        if (parent === undefined || parent.deletedAt !== undefined) {
+          return {
+            ok: false,
+            reason: 'not-found',
+            message: `找不到要放进去的那个清单（「${intent.projectId}」）。`,
+          };
+        }
+      }
+      const id = await noteActions.createNote(intent.content, {
+        ...(intent.projectId === undefined ? {} : { projectId: intent.projectId }),
+        ...(intent.isPinnedToToday === undefined
+          ? {}
+          : { isPinnedToToday: intent.isPinnedToToday }),
+      });
+      return { ok: true, taskId: id, entityId: id, entityType: 'NOTE' };
+    }
+
+    case 'update-note': {
+      const note = noteActions.listNotes().find((x) => x.id === intent.noteId);
+      if (note === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这条便签。' };
+      }
+      const rejection = noteRejection(intent.content);
+      if (rejection === 'empty') {
+        return { ok: false, reason: 'invalid', message: '便签正文不能为空（只有空格也算空）。' };
+      }
+      if (rejection === 'too-long') {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `便签正文最长 ${String(NOTE_MAX_CONTENT_LENGTH)} 个字符。`,
+        };
+      }
+      await noteActions.updateNoteContent(intent.noteId, intent.content);
+      return { ok: true, taskId: intent.noteId, entityId: intent.noteId, entityType: 'NOTE' };
+    }
+
+    case 'record-checkin': {
+      const habit = ctx.getState().habits[intent.habitId];
+      if (habit === undefined || habit.deletedAt !== undefined) {
+        return { ok: false, reason: 'not-found', message: `找不到习惯「${intent.habitId}」。` };
+      }
+      const day = intent.date ?? today(now());
+      if (intent.value !== undefined && (!Number.isFinite(intent.value) || intent.value < 0)) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `打卡数值必须是不小于 0 的有限数，收到「${String(intent.value)}」。`,
+        };
+      }
+      // 🔴 那一天已经打过卡时，`checkIn` 回 `false` 并且**不落第二条 op** ——
+      // 那是幂等成功（同 ADR-0009 对精确重复的 op 的裁决），不是失败：
+      // 打卡记录的标识是 `习惯:日期` 组合，重复调用不会多出第二条。
+      // 报 `ok: false` 会让用户以为没打上，而再点一次也不会变成"打上"。
+      await habitActions.checkIn(intent.habitId, day, intent.value);
+      const logId = habitLogId(intent.habitId, day);
+      return { ok: true, taskId: logId, entityId: logId, entityType: 'HABIT_LOG' };
+    }
+
+    case 'log-focus': {
+      const at = now();
+      try {
+        const id = await focusActions.log({
+          // 标识由 `log()` 自己生成，它**从不读**传进来的这个字段。留空串是刻意的：
+          // 填一个看起来像真的假标识，将来谁误用它就是一条落在别人身上的记录。
+          id: '',
+          createdAt: at,
+          updatedAt: at,
+          kind: intent.kind as FocusSession['kind'],
+          plannedMs: Math.round(intent.plannedMinutes * MINUTE_MS),
+          ...(intent.actualMinutes === undefined
+            ? {}
+            : { actualMs: Math.round(intent.actualMinutes * MINUTE_MS) }),
+          ...(intent.taskId === undefined ? {} : { taskId: intent.taskId }),
+          ...(intent.completed === undefined ? {} : { completed: intent.completed }),
+        });
+        return { ok: true, taskId: id, entityId: id, entityType: 'FOCUS_SESSION' };
+      } catch (error) {
+        // 那三种失败各有码（`focusLogFailureCode` 是它为此导出的），所以这里不猜、
+        // 也不把词表抄一遍："这种类型不认识"就够了，三种取值已经写在工具描述里。
+        const code = focusLogFailureCode(error);
+        if (code === 'unknown-kind') {
+          return { ok: false, reason: 'invalid', message: '专注类型不认识（只有工作 / 短休息 / 长休息）。' };
+        }
+        if (code === 'non-positive-planned-ms') {
+          return { ok: false, reason: 'invalid', message: '计划时长必须大于 0 分钟。' };
+        }
+        if (code === 'missing-created-at') {
+          // 落不到这条：`createdAt` 由这里填 `now()`。留着是因为**宿主换了一个不动的时钟**
+          // （测试里传 `() => 0`）就会走到这里 —— 那是一条该响亮报出来的接线错，
+          // 不能让它变成"写成功了但记录是坏的"。
+          return { ok: false, reason: 'invalid', message: '宿主时钟给不出有效的记录时刻。' };
+        }
+        throw error;
+      }
+    }
+
+    case 'create-reminder': {
+      const task = actions.findTask(intent.taskId);
+      if (task === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个任务。' };
+      }
+      // 上限问领域层导入的那个常量，**数字不住在这里**（同 `GOAL_TYPES` 那条先例的理由：
+      // 抄一个数字，漂的时候没有任何一层会报错）。
+      const alive = aliveReminders(Object.values(ctx.getState().reminders)).filter(
+        (r) => r.taskId === intent.taskId,
+      );
+      if (alive.length >= MAX_REMINDERS_PER_TASK) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `这条任务的提醒已经有 ${String(alive.length)} 条，到上限了（写入层按同一个数拦，` +
+            '界面没有另设一套）。',
+        };
+      }
+
+      if (intent.minutesBeforeDue !== undefined) {
+        if (task.dueDate === undefined) {
+          return {
+            ok: false,
+            reason: 'invalid',
+            message: '这条任务没有截止时间，"提前多少分钟提醒"没有依据 —— 要提醒就给它一个截止日。',
+          };
+        }
+        const offsetMs = intent.minutesBeforeDue * MINUTE_MS;
+        // 走 `createReminderBeforeDue` 而不是自己算 `dueDate - offsetMs`：
+        // 它会把 `offsetMs` 一起落进 payload，重复任务每次顺延都还能按"提前 30 分"重排。
+        // 自己算那个减法，落出来的记录就没有 offset，下一次顺延会留在旧时刻上。
+        try {
+          const id = await reminderActions.createReminderBeforeDue(intent.taskId, offsetMs);
+          return { ok: true, taskId: id, entityId: id, entityType: 'REMINDER' };
+        } catch (error) {
+          return {
+            ok: false,
+            reason: 'invalid',
+            message: error instanceof Error && error.message !== '' ? error.message : '这条提醒落不下来。',
+          };
+        }
+      }
+
+      if (intent.date === undefined || intent.time === undefined) {
+        // pack 已经挡过一次；这里是**第二条腿**（MCP 侧的调用方不经过助手的形状检查）。
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: '要提醒就得说清时刻：给 date + time，或者给 minutesBeforeDue。',
+        };
+      }
+      const triggerAt = localDateTimeToEpoch(`${intent.date}T${intent.time}`);
+      if (triggerAt === undefined) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `无法理解这个时刻「${intent.date} ${intent.time}」。日期应为 YYYY-MM-DD，时间应为 HH:MM。`,
+        };
+      }
+      const rejection = reminderRejection(triggerAt, now());
+      if (rejection === 'not-a-time') {
+        return { ok: false, reason: 'invalid', message: '这个提醒时刻不是一个可用的时间。' };
+      }
+      if (rejection === 'in-the-past') {
+        return { ok: false, reason: 'invalid', message: '提醒时刻已经过了 —— 要么往前调，要么这条就不必了。' };
+      }
+      if (rejection === 'too-far') {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `这个提醒太远（超过最长提前量 ${String(Math.round(MAX_REMINDER_LEAD_MS / DAY_MS))} 天）。`,
+        };
+      }
+      const id = await reminderActions.createReminder(intent.taskId, triggerAt);
+      return { ok: true, taskId: id, entityId: id, entityType: 'REMINDER' };
     }
   }
 }

@@ -23,9 +23,14 @@ import {
   runReadTool,
   toWriteIntent,
   type JsonRpcRequest,
+  type LocalApiFocusSession,
   type LocalApiHabit,
+  type LocalApiHabitLog,
   type LocalApiHost,
   type LocalApiItem,
+  type LocalApiNoteRow,
+  type LocalApiReminder,
+  type LocalApiTag,
   type LocalApiWriteIntent,
   type LocalApiWriteResult,
 } from '../src/index.js';
@@ -53,6 +58,12 @@ function recordingHost() {
       calls.push('listHabits');
       return Promise.resolve(HABITS);
     },
+    listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+    listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+    listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
     submit: (intent) => {
       calls.push('submit');
       submitted.push(intent);
@@ -159,6 +170,12 @@ describe('list_habits：真的从宿主读到东西', () => {
       getTask: () => Promise.resolve(undefined),
       listProjects: () => Promise.resolve([]),
       listHabits: () => Promise.resolve([]),
+      listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+      listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+      getNote: () => Promise.resolve(undefined),
+      listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+      listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+      listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
       submit: () => Promise.resolve({ ok: true, taskId: 'x' }),
     };
     const outcome = await runReadTool(empty, 'list_habits', {});

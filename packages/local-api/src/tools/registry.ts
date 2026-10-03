@@ -15,19 +15,33 @@
 import type { McpToolDefinition } from '../mcp.js';
 import type { EntityToolPack } from './pack.js';
 import type { LocalApiTool } from './shared.js';
+import { focusToolPack } from './focus.js';
 import { habitToolPack } from './habit.js';
+import { habitLogToolPack } from './habit-log.js';
+import { noteToolPack } from './note.js';
 import { projectToolPack } from './project.js';
+import { reminderToolPack } from './reminder.js';
+import { tagToolPack } from './tag.js';
 import { taskToolPack } from './task.js';
 
 /**
  * 已注册的实体工具包。**数组顺序就是目录顺序的一部分，改动要按下面这条规则验。**
  *
  * ⚠️ 顺序**只许追加到末尾**（新实体排在最后），不要在中间插入。
+ * 理由不是"某个界面就是这个顺序"（不是），而是这条顺序会原样进
+ * `tools/list` 与模型看到的 `tools` 数组，两处判据把它钉成**有序子序列**；
+ * 中间插一段 = 那些判据红，而红的原因只有"顺序变了"。
+ * 判据在 `tests/tool-pack-coverage.spec.ts`。
  */
 export const LOCAL_API_TOOL_PACKS: readonly EntityToolPack[] = [
   taskToolPack,
   projectToolPack,
   habitToolPack,
+  tagToolPack,
+  noteToolPack,
+  habitLogToolPack,
+  focusToolPack,
+  reminderToolPack,
 ];
 
 export interface ToolPackRegistry {
@@ -103,12 +117,13 @@ const registry = buildToolPackRegistry(LOCAL_API_TOOL_PACKS);
 /**
  * 工具目录。
  *
- * ⚠️ 刻意**保持很小**。Joplin 有 11 个工具，但那是一个笔记应用。
- * 这里是任务管理，够用就停 —— **工具每多一个，"默认关"的清单就长一条，
- * 而用户不可能逐个理解它们的风险**。
+ * ⚠️ 每一个工具都会让"逐工具默认关"那张清单长一条，而用户要逐个理解它的风险 ——
+ * 所以容量是**按实体**判的，不是按总数：见 `shared.ts` 的 `MAX_TOOLS_PER_ENTITY`
+ * 与 `tests/local-api.spec.ts` 那条按实体分组的断言。
+ * 总数上限由覆盖面门禁从"分母里有几个实体"推出来（`scripts/check-ai-coverage.mjs` §10）。
  *
  * 导出名 / 类型 / 成员集合 / 成员顺序都是既有的（`tests/local-api.spec.ts` 钉着
- * "不超过 10 个"和"名字唯一"，`tests/server.spec.ts` 与 node-host 的 stdio 用例钉着顺序）。
+ * "名字唯一"与"每实体不超额"，`tests/server.spec.ts` 与 node-host 的 stdio 用例钉着顺序）。
  */
 export const LOCAL_API_TOOLS: readonly LocalApiTool[] = registry.tools;
 

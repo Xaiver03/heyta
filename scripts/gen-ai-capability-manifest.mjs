@@ -952,6 +952,14 @@ export async function readUpstream() {
     // MCP 的 `tools/list` 同一次调用（ADR-0035：一份目录 + 一份投影）。
     // 目录里有、投影里没有 ⇒ 模型根本看不见它，界面却会照样宣称支持。
     modelVisibleToolNames: definitions.map((d) => d.name),
+    /**
+     * 每实体工具数上限，**从同一份产物里取**（`packages/local-api/src/tools/shared.ts` 是它的所有者）。
+     *
+     * 🔴 为什么跟着 `readUpstream()` 走而不是让门禁自己 import：`check:ai-coverage` 第 10 段
+     * 要把"目录规模"与"覆盖面分母"放在同一趟读取里比 —— 自己再读一次上游就多一条读取路径，
+     * 而两条路径对同一个常量各拿一份值时，其中一份是旧的这件事没有任何信号。
+     */
+    maxToolsPerEntity: localApi.MAX_TOOLS_PER_ENTITY,
   };
 }
 

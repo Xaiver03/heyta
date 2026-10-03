@@ -38,7 +38,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { I18nProvider } from '@heyta/i18n';
 import type { AiRoutingConfig, EgressConsent, SecretStore } from '@heyta/ai';
 import type { Task } from '@heyta/domain';
-import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
+import type {
+  LocalApiFocusSession,
+  LocalApiHabitLog,
+  LocalApiHost,
+  LocalApiItem,
+  LocalApiNoteRow,
+  LocalApiReminder,
+  LocalApiTag,
+} from '@heyta/local-api';
 
 import { AiBreakdown } from '../src/features/ai/AiBreakdown.js';
 import { AiPrioritize } from '../src/features/ai/AiPrioritize.js';
@@ -115,6 +123,12 @@ function fakeHost(): LocalApiHost {
     getTask: () => Promise.resolve(items[0]),
     listProjects: () => Promise.resolve([]),
     listHabits: () => Promise.resolve([]),
+    listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+    listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+    listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
     submit: () => Promise.resolve({ ok: true as const, taskId: 'created-1' }),
   };
 }

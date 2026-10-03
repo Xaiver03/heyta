@@ -140,10 +140,15 @@ export function listAuthorizedTools(
  * 写清楚能减少"请求没授权的能力"这类无用往返。
  */
 function describeForMcp(tool: LocalApiTool): string {
+  // 🔴 这句提醒里不许出现内部架构词（`op-log` / `dispatch` / ADR 编号…）：
+  // 它是**出境数据**，模型读不懂的行话只会变成错调用 —— 而它原来写的正是
+  // 「必须经 heyta 的正常写入路径（op-log）」，被 `tests/mcp.spec.ts` 那条
+  // "整份目录无黑话"的判据扫出来（那条判据原来只看 `list_tasks`，所以这句话活了很久）。
+  // 对 MCP 的调用方，真正相关的事实是**这条调用会不会改数据、什么时候生效**：
+  // 外部工具调用是直接落库的（`executeTool` 的写分支 `host.submit`），
+  // 而"要用户在界面上确认"是 heyta **内置助手**那条路，不是这条。
   const kindNote =
-    tool.kind === 'write'
-      ? '（会修改数据：必须经 heyta 的正常写入路径）'
-      : '（只读，不会修改任何数据）';
+    tool.kind === 'write' ? '（会修改数据：调用即生效）' : '（只读，不会修改任何数据）';
   return `${tool.description} ${kindNote}`;
 }
 

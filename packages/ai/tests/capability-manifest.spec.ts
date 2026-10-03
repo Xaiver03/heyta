@@ -349,16 +349,33 @@ describe('分母恰好 8，且逐条列出是哪 8 个', () => {
     }
   });
 
-  it('现状基线 3/8：TASK / PROJECT / HABIT 读写都有（W10 扩目录时这条会红，那是要的）', () => {
-    // 2026-10-03 按本文件头那条纪律**重新判断过一次**并把基线搬到这里：
-    // PROJECT 补了 `create_project`、HABIT 补了 `list_habits` + `create_habit`。
+  it('现状基线 8/8：分母里每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
+    // 2026-10-03 两次搬这条基线，都在这里重新判断过：
+    // ① PROJECT 补 `create_project`、HABIT 补 `list_habits` + `create_habit`（3/8）；
+    // ② 补齐 TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER 的读写工具（8/8）。
     // 下一个动目录的人同样必须在这里重新判断一次 —— 改成从上游推导就是永真判据。
+    //
+    // ⚠️ 现在这个数已经顶到分母，**它不再能靠"加实体"变红**：往后新实体进了分母却没工具时，
+    // 报的是 `check-ai-coverage` 那条门禁，不是这个常数。
     const withTools = manifest.entities
       .filter((e) => e.countsTowardCoverage && e.coverage !== 'none')
       .map((e) => e.entityType);
-    expect(withTools.sort()).toEqual(['HABIT', 'PROJECT', 'TASK']);
-    expect(manifest.coverage.covered).toBe(3);
-    expect(manifest.coverage.ratio).toBe('3/8');
+    expect(withTools.sort()).toEqual([
+      'FOCUS_SESSION',
+      'HABIT',
+      'HABIT_LOG',
+      'NOTE',
+      'PROJECT',
+      'REMINDER',
+      'TAG',
+      'TASK',
+    ]);
+    expect(manifest.coverage.covered).toBe(8);
+    expect(manifest.coverage.ratio).toBe('8/8');
+    // `covered` 是分母名单的**统计结果**，`userOperableEntityTypes.length` 是名单本身：
+    // 两个数取自生成器里两条不同的路径，这里要求它们当下确实相等 ——
+    // 不等就是那两条口径漂了（比如覆盖率把某个已剔除的视图又算了进去）。
+    expect(manifest.coverage.covered).toBe(manifest.userOperableEntityTypes.length);
   });
 });
 

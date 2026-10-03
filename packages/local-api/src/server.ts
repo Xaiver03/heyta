@@ -82,6 +82,81 @@ export interface LocalApiHabit {
 }
 
 /**
+ * 标签。只有 `id` 与 `name`：`Tag.color` **在界面上没有任何写入路径**
+ * （全仓落在 `TAG` 上的 op 只有 Create 与 Delete），所以它也不该出现在读出来的一行里 ——
+ * 暴露一个永远为空的字段，等于给将来的"顺手填上"留门。
+ */
+export interface LocalApiTag {
+  id: string;
+  name: string;
+}
+
+/**
+ * 便签的**列表行**：刻意**没有正文**。
+ *
+ * 🔴 这不是"忘了给"，是 `list_tasks` / `get_task` 那条已经立好的分工：
+ * 列表给目录信息，正文逐条取。便签的正文是它**唯一**的自由文本，
+ * 一次列几十张等于把几十条正文一起送出去，而用户按"我同意"时看到的
+ * 只是"会送出便签正文"这一句 —— 逐条取让每一次正文出境都对应一次明确的请求。
+ * 正文在 {@link LocalApiNote} 那一档。
+ */
+export interface LocalApiNoteRow {
+  id: string;
+  /** 归属清单；`null` = 未归属（与实体一致：界面上"未归属"是一个真的分组，不是缺省值）。 */
+  projectId: string | null;
+  isPinnedToToday: boolean;
+  updatedAt: number;
+}
+
+/** 单条便签 = 列表行的全部字段 **加** 正文。 */
+export interface LocalApiNote extends LocalApiNoteRow {
+  content: string;
+}
+
+/**
+ * 一次打卡（HABIT_LOG）。`note` 那个字段**不出**：`checkIn` 从来不写它，
+ * 而把一条永远为空的自由文本放进白名单，等于放一条将来的出境通道。
+ */
+export interface LocalApiHabitLog {
+  habitId: string;
+  /** 本地日历日 `YYYY-MM-DD`（与实体里存的那个串逐字相同）。 */
+  date: string;
+  /** 这一次打卡的数值。界面上按"目标 vs 实际"判达成，所以它不是可有可无的。 */
+  value?: number;
+}
+
+/**
+ * 一段专注记录。字段名与 `FocusSession` **逐字一致**（`plannedMs` / `actualMs` 是毫秒）：
+ * 读出来的是已经落盘的记录，改名就是造第二个词表。
+ *
+ * ⚠️ 写的那一侧用的是**分钟**（`log_focus` 的 `plannedMinutes`）—— 那不是不一致，
+ * 是两件事：读要忠实于实体，写要能让模型算对。换算只发生在
+ * `packages/app-host/src/local-api-host.ts` 的一处。
+ */
+export interface LocalApiFocusSession {
+  kind: string;
+  taskId?: string;
+  plannedMs: number;
+  actualMs?: number;
+  completed?: boolean;
+  startedAt?: number;
+}
+
+/**
+ * 一条提醒。四个时间戳只出 `triggerAt` 与一个**派生的** `phase`：
+ * `firedAt` / `snoozedUntil` / `dismissedAt` 是"这条提醒走到哪一步"的三个原始证据，
+ * 而领域层已经把三者合成了一个封闭词表（`ReminderPhase`）。
+ * 让工具自己拼那三个字段 = 在出境面上重做一遍领域判定（两份口径早晚漂）。
+ */
+export interface LocalApiReminder {
+  id: string;
+  taskId: string;
+  triggerAt: number;
+  /** `scheduled` / `snoozed` / `due` / `fired` / `dismissed`（由宿主用领域层函数算）。 */
+  phase: string;
+}
+
+/**
  * `list_tasks` 的查询条件（日期已经过 `readListTasksDueArgs` 校验）。
  *
  * ⚠️ 三个日期参数是 `YYYY-MM-DD` 的**日历日字符串**，不是时刻 —— 本包刻意不产生时刻：
@@ -137,6 +212,23 @@ export interface LocalApiHost {
    * 那正是能力清单这一整套生成物要消灭的那类谎话。
    */
   listHabits(): Promise<readonly LocalApiHabit[]>;
+  /**
+   * 列标签（TAG）。
+   *
+   * 🔴 与 `listHabits` 同样的立场：**必填成员**。可选成员会让"这个宿主忘了接"
+   * 落到运行时，而症状是"AI 说它没有这个能力" —— 正是能力清单要消灭的那类谎话。
+   */
+  listTags(): Promise<readonly LocalApiTag[]>;
+  /** 列便签的**列表行**（不含正文，理由见 {@link LocalApiNoteRow}）。 */
+  listNotes(limit: number): Promise<readonly LocalApiNoteRow[]>;
+  /** 取单条便签（含正文）。取不到返回 `undefined`（不是抛错，同 `getTask`）。 */
+  getNote(noteId: string): Promise<LocalApiNote | undefined>;
+  /** 列打卡记录（HABIT_LOG），按时间从早到晚；`habitId` 省略 = 全部习惯。 */
+  listHabitLogs(habitId: string | undefined, limit: number): Promise<readonly LocalApiHabitLog[]>;
+  /** 列专注记录（FOCUS_SESSION），按开始时间从早到晚。 */
+  listFocusSessions(limit: number): Promise<readonly LocalApiFocusSession[]>;
+  /** 列提醒（REMINDER）；`taskId` 省略 = 全部任务的提醒。 */
+  listReminders(taskId: string | undefined): Promise<readonly LocalApiReminder[]>;
   /**
    * 🔴 **必须是 `dispatch()`。**
    *
