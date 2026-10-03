@@ -35,8 +35,8 @@
 |---|---|---|
 | 任务 0：`check` 段数 = 62 | ⚠️ **已漂到 63**（10-04 00:5x 现量） | `node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'` → **63**。多出来的两段是 `check:md-tables` 与 `check:op-log-semantics`（定源：`git diff e5f91c3f..HEAD -- package.json` 的新增段名；各提交时的段数曲线 60→61→61→61→62→**63**）。⇒ **报"可过 N 段"必须带总数与载体**，别沿用 62 |
 | 任务 0：l4 baseline 104 / 90 | ✅ 对上 | `scripts/check-l4-no-style.mjs` `:155 baseline: 104`、`:162 baseline: 90`（现量读数 98/90，**未动阈值**） |
-| 任务 0：`apps/mobile/tests/*.spec.ts` = 35 | ⚠️ **已漂到 44** | `ls apps/mobile/tests/*.spec.ts \\| wc -l` → 44。本条线新增 3 份，其余是并行条线加的 ⇒ **接手别拿 35 当基线** |
-| 任务 0：中英词条各 2881 | ⚠️ 口径不同 | 我的解析形状量到 **zh 2911 / en 2911**（单引号键 2875 + 双引号/反引号键 36）。任务书那个数是写书人的另一套数法 ⇒ **稳的判据是"两侧键数相等"**，不是绝对值 |
+| 任务 0：`apps/mobile/tests/*.spec.ts` = 35 | ⚠️ **已漂到 44**（01:4x 复量：工作树 **44** / HEAD **44**，这一格暂时稳） | `ls apps/mobile/tests/*.spec.ts \| wc -l`。本条线新增 3 份，其余是并行条线加的 ⇒ **接手别拿 35 当基线** |
+| 任务 0：中英词条各 2881 | ⚠️ 口径不同，而且**我这条判据比仓里已有的弱** | 01:4x 现量（同一形状重数）：**HEAD 两侧各 2981**（单引号 2945 + 双引号/反引号 36）/ **工作树两侧各 2983**（别人正在这两张表里加 2 个键，两侧同步加所以仍相等）。🔴 我原先写的"稳的判据 = 两侧键数相等"是个**数数**判据，而仓里早就有一条**集合**判据：`packages/i18n/tests/catalog.spec.ts:18`「中英两表的 key 集合完全一致（双向）」—— 它同时挡漏翻译与键名错位，键数相等挡不住后者。**以后这类"两份抄件"的对账先找仓内现成装置再接**（`:24` 与 `:67` 那两条还各自挡"中文里塞英文占位"与"英文复制中文交差"） |
 | 任务 0：开工回执 ≤10 行写进 PROGRESS | ✅ | `PROGRESS.md` 首节 |
 | 任务 1：6 个脚本补 `verify:` 别名 | ✅ | 现量 `verify-*.sh` 共 **31** 个、**无别名 = 0** |
 | 任务 1：account 与 reminder-ring 进 MANIFEST + 改掉过期注释 | ✅ | `scripts/check-script-snapshot.mjs` 含 `verify-mobile-account` / `-reminder-ring` / `-notes` / `-restore` 均 true |
