@@ -24,10 +24,10 @@ import {
   TOOL_ENVELOPE_EGRESS_FIELDS,
   findTool,
   runReadTool,
+  type LocalApiEventItem,
   type LocalApiFocusSession,
   type LocalApiHabit,
   type LocalApiHabitLog,
-  type LocalApiEventItem,
   type LocalApiHost,
   type LocalApiItem,
   type LocalApiNote,
@@ -100,6 +100,8 @@ function host(
     listHabitLogs: async () => [CHECKIN],
     listFocusSessions: async () => [FOCUS],
     listReminders: async () => [REMINDER],
+    listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+    getEvent: () => Promise.resolve(undefined),
     submit: async () => ({ ok: true, taskId: 'created-1' }),
   };
 }
@@ -235,12 +237,6 @@ describe('egressFields 声明 == 真实投影', () => {
     const writes = LOCAL_API_TOOLS.filter((t) => t.kind === 'write');
     expect(writes.length).toBeGreaterThanOrEqual(5);
     for (const tool of writes) {
-  it('写工具不出境任何数据字段：`egressFields` 必须是空表', () => {
-    // 目录驱动：**每一个** `kind === 'write'` 的工具都要过这条，
-    // 手抄三条名字的版本会在加第四条写工具时静默漏掉它。
-    for (const name of [...LOCAL_API_TOOLS.filter((t) => t.kind === 'write').map((t) => t.name)]) {
-      const tool = findTool(name);
-      expect(tool, `目录里没有工具「${name}」`).toBeDefined();
       // 写工具只产出提案、结果不回送模型 ⇒ 它不贡献出境字段。
       // 这里刻意**不点名工具**：点名就是那份会漏抄的清单（本文件开头那条理由）。
       expect(tool.egressFields, `${tool.name} 的出境字段必须是空表`).toEqual([]);
@@ -321,10 +317,19 @@ const PROTECTED_EVENT: LocalApiEventItem = {
 };
 
 function eventHost(events: readonly LocalApiEventItem[]): LocalApiHost {
+  // 🔴 其余成员给最小实现：本 describe 只驱动 EVENT 工具，但 `LocalApiHost`
+  // 的成员是必填的 —— 假宿主少一个成员，"这个宿主没接"就退回编译期可见。
   return {
     listTasks: async () => [],
     getTask: async () => undefined,
     listProjects: async () => [],
+    listHabits: async () => [],
+    listTags: async () => [],
+    listNotes: async () => [],
+    getNote: async () => undefined,
+    listHabitLogs: async () => [],
+    listFocusSessions: async () => [],
+    listReminders: async () => [],
     listEvents: async () => events,
     getEvent: async (eventId: string) => events.find((e) => e.id === eventId),
     submit: async () => ({ ok: true, taskId: 'created-1' }),

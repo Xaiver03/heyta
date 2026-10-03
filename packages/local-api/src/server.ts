@@ -244,6 +244,18 @@ export interface LocalApiHost {
   /** 列提醒（REMINDER）；`taskId` 省略 = 全部任务的提醒。 */
   listReminders(taskId: string | undefined): Promise<readonly LocalApiReminder[]>;
   /**
+   * 列倒数日 / 纪念日（EVENT，W10）。**同样由壳逐条标注 `readable`。**
+   *
+   * 🔴 与 `listHabits` / `listTags` 同一立场：**必填成员**（2026-10-03 合流时把
+   * 批次二的“可选 + hostDoesNotSupport”改成必填，与 W11“每个宿主必须表态”对齐；
+   * 可选成员会让“这个宿主忘了接”落到运行时，症状是“AI 说它没有这个能力”）。
+   * 顺序、集合成员、正文判定全部由宿主问领域层；`limit` 与 `listTasks`
+   * 同一条纪律：**先筛后截**。
+   */
+  listEvents(args: { limit?: number }): Promise<readonly LocalApiEventItem[]>;
+  /** 取单个倒数日。取不到返回 `undefined`（不是抛错，同 `getTask`）。 */
+  getEvent(eventId: string): Promise<LocalApiEventItem | undefined>;
+  /**
    * 🔴 **必须是 `dispatch()`。**
    *
    * 壳在这一层把 `LocalApiWriteIntent` 翻译成真正的 op 并交给 op-log。

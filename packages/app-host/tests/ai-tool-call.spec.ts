@@ -63,6 +63,8 @@ function fakeHost(): LocalApiHost & { submits: number } {
     listHabitLogs: () => Promise.resolve([]),
     listFocusSessions: () => Promise.resolve([]),
     listReminders: () => Promise.resolve([]),
+    listEvents: () => Promise.resolve([]),
+    getEvent: () => Promise.resolve(undefined),
     submit: (): Promise<{ ok: true; taskId: string }> => {
       host.submits += 1;
       return Promise.resolve({ ok: true, taskId: 'created-1' });

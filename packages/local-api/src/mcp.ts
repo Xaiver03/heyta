@@ -91,12 +91,14 @@ export type McpToolDefinition = AuthorizedToolDefinition;
  * 新增工具时不登记就红（见 `tests/mcp.spec.ts`），而不是逐工具抄名字。
  */
 export function hasInputSchemaFor(toolName: string): boolean {
-  return Object.prototype.hasOwnProperty.call(INPUT_SCHEMAS, toolName);
+  // pack 结构下 schema 只能经 registry 登记（认领不齐在模块求值期就抛），
+  // 所以"有没有登记"直接问 registry —— 不存在第二份 INPUT_SCHEMAS 抄件。
+  return inputSchemaForTool(toolName) !== undefined;
 }
 
 /** `INPUT_SCHEMAS` 里登记过的工具名（用于查"孤儿抄件"：有 schema、目录里却没这个工具）。 */
 export function recordedInputSchemaNames(): readonly string[] {
-  return Object.keys(INPUT_SCHEMAS);
+  return LOCAL_API_TOOLS.filter((t) => inputSchemaForTool(t.name) !== undefined).map((t) => t.name);
 }
 
 /**

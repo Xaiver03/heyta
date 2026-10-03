@@ -37,6 +37,7 @@ const WRITABLE: Record<LocalApiWrittenEntityType, true> = {
   HABIT_LOG: true,
   FOCUS_SESSION: true,
   REMINDER: true,
+  EVENT: true,
 };
 
 type KnownEntity = (typeof ENTITY_TYPES)[number];

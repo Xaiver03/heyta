@@ -3870,7 +3870,6 @@ export const en = {
   "site.legal.data-rights.seo.title": "Exercising Your Rights: Requests and Responses — heyta",
   "site.legal.data-rights.seo.description": "Access, copy, correction, deletion, account closure and withdrawal of consent — what is self-service in heyta, what is email-only, the 15-working-day response window, and what \"deletion\" actually means in this architecture.",
   // <<<end:generated:packages/legal/scripts/gen-site-copy.mjs>>>
-} satisfies Record<MessageKey, string>;
   // ── Countdowns & anniversaries (batch two, W5) ──
   'web.countdown.title': 'Countdowns',
   'web.countdown.empty': 'No countdowns yet',

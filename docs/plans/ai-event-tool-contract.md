@@ -2597,6 +2597,69 @@ fatal: cannot do a partial commit during a merge.
    本节已经抓到一处（`tools.ts:337-339` → `:897`）。剩下已知的一处是 §15.29 那条
    `host.ts:331-332`（它在合流后是否还指对东西，等 ② 一起量）。
 
+## 15.38 ① 的第四次吸收 main，与"合并态的五条红线在两棵树之间各量了一遍"（载体 `e54b899b`，00:1x）
+
+### 1. ①：线已经并到 128 笔待落，而落地仍被 9 个共享文件挡着
+
+`git merge --no-edit main`（第四次吸收）只带进一笔 docs 提交（`d27bccde docs(handoff)`，
+`+9/-7`，`merge-tree --write-tree` 预演 rc=0 零冲突），落地后：
+
+```
+main ⊂ 载体 = YES   待落 = 128 笔   载体 HEAD = e54b899b
+```
+
+`bash ~/scratch-heyta/heyta-land.sh --dry-run` 的现量（**这条判据上一轮刚被改准成"按路径的交集"，
+这一轮第一次给出可用的数**）：
+
+```
+001736 main = d27bccde → 目标 = e54b899b
+001736 ✓ 快进成立：128 笔待落
+001736 ❌ 我的合并要更新 185 个文件，其中 9 个正被别人未提交地改着
+       （主检出共 60 项未提交，其余与本次更新不重叠 ⇒ 不在挡路的范围里）
+     PROGRESS.md 17+/0- · docs/plans/README.md 4+/0- · docs/reference/environment-traps.md 231+/16-
+     package.json 2+/1- · packages/app-host/src/index.ts 1+/0- · packages/ui/src/index.ts 12+/0-
+     packages/i18n/src/locales/en.ts 10+/0- · …/zh-CN.ts 11+/0- · packages/storage/src/stores.ts 4+/0-
+```
+
+⚠️ 这 9 项和 23:5x 那 15 项**不是同一批**：那 15 项里挡路的代码文件（`tools.ts`、`mcp.ts`、
+`local-api-host.ts`…）在 00:0x 由它们的所有者提交了（`2f735392` 那一批），
+现在剩下的是**三本共享台账 + 三个 barrel/词条文件** ⇒ 落地这件事的最后一段
+只能等这 9 个文件被各自所有者提交，脚本不改判据、不 `stash` 别人的东西。
+
+### 2. 五条红线：合并**之前**对着 `c36b1d89` 那棵树量过（§15.37 第 3 小节），合并**之后**对着 `e54b899b` 再量一遍
+
+| 红线 | 合并态现量（`git grep` 打在树 `e54b899b` 上，零写盘） | 判定 |
+|---|---|---|
+| AI 类型上产不出 op | `packages/ai/package.json` 的 `dependencies` / `peerDependencies` 段命中 **0**；`packages/ai/src` 里对 `createOp\|OpLogRecord\|@heyta/op-log\|@heyta/sync-core\|dispatch(` 只命中 `provider.ts` 的 **2 行，且都是注释**（`:14`「**AI 是输入法，不是业务逻辑。** 它坐在 `dispatch()` **之上**」、`:16`「走 `packages/app-host` 的动作层、经 `dispatch()` 完成」= ADR-0005 §3.1 的说明原文） | 未放宽 |
+| `host.submit` 全仓恰好一处（入口可穷举） | `ai-tool-run.ts` 命中 **1**；`server.ts` 命中 **2** = 注释表 `:514`「\| MCP / 本机 API \| 立刻 `host.submit(intent)` \|」+ 代码 `:578` `return writeResult(await host.submit(write.intent));` ⇒ **代码入口仍是那两个** | 未放宽 |
+| 逐工具默认关 | `tools.ts:450` `return grants?.[toolName] === true;` 原样在 | 未放宽 |
+| 出境逐字段披露 | 目录 `name: '` 合计 **26**（我这轮 22 → 并进批次二的 4 条 EVENT 工具）、`egressFields` 声明合计 **31**、`TOOL_ENVELOPE_EGRESS_FIELDS` **3**。🔴 这三个数是 `git grep -c` 的**行数合计**，不是工具条数的逐项对账 ⇒ 只当"披露层还在"的弱读数，**权威读数交给 ② 的 `check:ai-coverage` / `check:ai-tools` / 那 9 条出境用例** | 待门禁确认 |
+| 回退不跨越隐私边界 | `fallback-needs-consent` 命中 **10**（`provider.ts` 1 / `routing.ts` 5 / `supply.ts` 4）；`retention-undecided` 在 `supply.ts` **4** 处，`assertEnableable()` 仍抛 ⇒ 托管 AI 仍未开 | 未放宽 |
+| 不 bump schema | `CURRENT_SCHEMA_VERSION = 1`：`HEAD` / `c36b1d89` / `main` **三方相同**（§15.37 已量，合并后 `HEAD` 仍是 1） | 未放宽 |
+
+🔴 **一次行号漂移的现场样本**（把 §15.37 第 5 小节第 3 条那句话坐实）：同一条
+`return grants?.[toolName] === true;` 在一个小时里的三棵树上是三个行号 ——
+`337-339`（我的线）→ `897`（`c36b1d89`）→ `450`（合并态 `e54b899b`）。
+⇒ 台账里这条以后**只引代码形状**，行号当"当时的位置"而不是"位置的答案"。
+
+### 3. ② 的通道：干净检出 + 逐段链，不在混合态上量
+
+`~/scratch-heyta/heyta-integration-verify.sh`（00:17 起，pid 94084）：
+
+- 前置断言 `未解冲突=0`（否则 exit 3，"量了也不能当集成态读数"）；
+- `git worktree add --detach` 到 `e54b899b`，**镜像 node_modules**（`find -maxdepth 4 -name node_modules`
+  逐个软链，不是只链 root —— 每个包自己的 `node_modules` 才是它的依赖解引用）；
+- 然后 `HEYTA_CARRIER=<干净检出> bash heyta-chain.sh`：单一所有者负载门 →
+  `pnpm -r build` → 逐段链（段名从 `package.json` 现取、存**原始命令**不存段名）→
+  逐段 rc 落 `chain-verify-integration-<时分>/segments-rc.txt`；
+- `check:ai-e2e` 那一段按规则**不跑**（它的 preflight 会对 4318/4319 上 LISTEN 的进程直接 SIGKILL，
+  而那台 vite 可能是并行会话的，traps #87）⇒ 记 `SKIPPED_BY_RULE`，**不算通过**。
+  这一段单独走 `heyta-e2e-when-quiet.sh`，且要求 4318/4319 现量空闲。
+
+⚠️ 这一轮的载体读数是 **128 笔待落 / 9 个共享文件挡住落地 / 一次都没在这棵混合树上量** ——
+下一节要把 ② 的逐段读数原样接上，别用"上一轮 56 绿"顶替：载体换了，段数与红集都可能不一样。
+
+
 
 
 

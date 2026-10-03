@@ -25,6 +25,7 @@ import {
   buildToolPackRegistry,
   runReadTool,
   toWriteIntent,
+  type LocalApiEventItem,
   type LocalApiHost,
   type LocalApiFocusSession,
   type LocalApiHabit,
@@ -92,6 +93,9 @@ function host(): LocalApiHost {
     listHabitLogs: () => Promise.resolve([CHECKIN]),
     listFocusSessions: () => Promise.resolve([FOCUS]),
     listReminders: () => Promise.resolve([REMINDER]),
+    listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+    getEvent: () => Promise.resolve(undefined),
+
     submit: (): Promise<LocalApiWriteResult> => Promise.resolve({ ok: true, taskId: 'created-1' }),
   };
 }

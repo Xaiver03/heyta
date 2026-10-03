@@ -25,9 +25,7 @@ import {
   type AiRoutingConfig,
   type EgressConsent,
 } from '@heyta/ai';
-import type { LocalApiHabit, LocalApiHost, LocalApiItem, LocalApiProject } from '@heyta/local-api';
-import { LOCAL_API_TOOLS } from '@heyta/local-api';
-import type { LocalApiHost, LocalApiItem, LocalApiProject } from '@heyta/local-api';
+import { LOCAL_API_TOOLS, type LocalApiHabit, type LocalApiHost, type LocalApiItem, type LocalApiProject } from '@heyta/local-api';
 
 import {
   assistantEgressFields,
@@ -58,6 +56,8 @@ function fakeHost(items: readonly LocalApiItem[] = [], projects: readonly LocalA
     listHabitLogs: () => Promise.resolve([]),
     listFocusSessions: () => Promise.resolve([]),
     listReminders: () => Promise.resolve([]),
+    listEvents: () => Promise.resolve([]),
+    getEvent: () => Promise.resolve(undefined),
     submit: (): Promise<{ ok: true; taskId: string }> => {
       host.submits += 1;
       return Promise.resolve({ ok: true, taskId: 'created-1' });
