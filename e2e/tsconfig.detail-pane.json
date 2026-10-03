@@ -1,0 +1,41 @@
+// e2e 详情面这一族的**类型检查载体**（工单 W1b 的边界③ 由此闭合）
+//
+// 为什么需要它：Playwright 走 esbuild，**只转译不类型检查**，所以 `e2e/tests/**`
+// 里的类型错误以前没有任何东西会看见。实测不是假想病 —— 加上这个配置的第一趟
+// 就抓到 `keyboard-cursor.spec.ts` 里 `onlyHighlighted` 的返回类型**少写了一个 `id`**，
+// 而调用方靠 `as` 硬掰（那条跨投影判据比的就是 `id`）。
+//
+// 🔴 编译器从 `../apps/web/node_modules/.bin/tsc` 取，不在这里装 typescript：
+// `e2e/` 刻意住在 pnpm 工作区之外（理由见 `e2e/pnpm-workspace.yaml`），而它的
+// `node_modules` 只有 `@playwright` 一棵；新增依赖要过 AGENTS §3.1（维护性）与
+// §3.2（许可证）两道门，还会写进**主检出那份共享的** `e2e/node_modules`。
+// 用现成的编译器跑同一批源码，成本是零，收益是同一条判据。
+//
+// 完整命令（在 `e2e/` 里跑）：
+//   ../apps/web/node_modules/.bin/tsc --noEmit -p tsconfig.detail-pane.json
+//
+// 🔴 `include` 只列本单那一族六个文件，不是偷懒：同一趟对 `tests/*.ts` 全量跑，
+// 现量 **13 条错误，分布在另外 6 个文件**（`calendar-cells` 5 / `calendar-week` 3 /
+// `quadrant-fill` 2 / `task-row-touch-target` 1 / `search-overlay` 1 / `due-date-edit` 1），
+// 那些是别的线在飞的活。把整目录收进来只会得到"这道检查天生是红的"，
+// 而一道不能失败的检查没有价值（AGENTS §8 第 3 条）。
+// 复现那 13 条：把 `include` 临时换成 `["tests/*.spec.ts", "tests/helpers.ts"]` 再跑上面那条命令。
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true
+  },
+  "include": [
+    "tests/helpers.ts",
+    "tests/detail-column-slot.spec.ts",
+    "tests/detail-pane-overlay.spec.ts",
+    "tests/detail-pane-collapse.spec.ts",
+    "tests/focus-detail-pane.spec.ts",
+    "tests/keyboard-cursor.spec.ts"
+  ]
+}
