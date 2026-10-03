@@ -42,12 +42,20 @@
  *    **替这个脚本做了一个它明说不做的决定**。
  *    （这条是判据 1–2 加完**当场照出来的**：把处置收进 lib 的同一轮，
  *    我自己就漏了 `verify-mobile-task-row.sh` 一处。）
+ * 4. 🔴 **点名本地按钮的脚本不许同时有用得着出门的动作**：`CONSENT_GATE_PREFERRED=`
+ *    选了「只用本机」或「以后再说」，脚本里却出现 `configure_sync_credentials` /
+ *    `wait_laptop_has` / `heyta_e2e_ensure_account` / `$CLI sync` / `laptop()` 之一
+ *    ⇒ 那句"本验收不需要联网"是假的：出口闸（`apps/mobile/src/privacy/consent-gate.ts`）
+ *    会拦掉每一个请求，后面所有网络判据红在**闸门在正确地工作**上，读起来像产品坏了。
+ *    六个点名本地按钮的脚本实测网络侧调用行数都是 0，所以这条零误报 ——
+ *    它是白送的一条红线，用来拦住"以后往本地类脚本里加一条同步判据"那一刻。
  *
- * 变异验证（四条各自实测会红，还原后复跑 RC=0）：
+ * 变异验证（五条各自实测会红，还原后复跑 RC=0）：
  * - A 从 `verify-mobile-auth.sh` 删掉 `handle_privacy_consent` 那一行 ⇒ 判据 1 报缺处置；
  * - B 往任意脚本里塞一份带 `input tap` 的 `dismiss_consent_xxx()` ⇒ 判据 2 报重复实现；
  * - C 把共享调用从 `dismiss_welcome_if_present()` 里摘出去 ⇒ 判据 0 红；
- * - D 删掉某个本地类脚本的 `CONSENT_GATE_PREFERRED=` ⇒ 判据 3 红（指名那个脚本）。
+ * - D 删掉某个本地类脚本的 `CONSENT_GATE_PREFERRED=` ⇒ 判据 3 红（指名那个脚本）；
+ * - F 给某个本地类脚本加一行用不着的 `wait_laptop_has` ⇒ 判据 4 红（指名同一个脚本）。
  *
  * ⚠️ **本门禁自己前两跑是恒过的**，两次都是"判在不在"用了名字而不是形状：
  * 一次要 `(xy_desc|xy_text|…)\s*\(`，而 shell 里的调用是 `$(xy_desc "邮箱")`
