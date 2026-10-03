@@ -1309,3 +1309,53 @@ landing `typecheck` 0；真浏览器 `docs-centre.spec.ts` **18 passed**，
 
 ⚠️ **仍然没做**：词条改了 ≠ 页面改了。这 4 份入口 HTML 与两份词条要**重新发布落地页**才对外生效，
 而发布是共享状态动作 —— 等这批对外文案定稿（D-2 一锤）之后一次发，不逐条改一次发一次。
+
+---
+
+### 8.22 🔴 §8.16 那句"零冲突"几小时后就过期了：现在 `merge-tree` rc=1，六条路径冲突
+
+现量（2026-10-04 00:1x，`main` = `d27bccde`，`feat/self-host-distribution` = `faa5e730`，
+merge-base = `437e7c1a`）：
+
+```
+git merge-tree --write-tree main feat/self-host-distribution   →  rc=1
+```
+
+| 冲突路径 | 类型 | 两侧各是什么 |
+|---|---|---|
+| `.gitignore` | content（**两侧都在文件末尾追加**） | main：`/tmp/`、`e2e/_probe/`、`e2e/playwright.probe.config.ts`、`e2e/vault-results/`、`.vitest/`、`tmp-commit-plan.sh`；本批：`e2e/selfhost-stack-results/.last-run.json`（带"只忽略这一枚，s1–s3 截图仍可提交"的理由块） |
+| `apps/web/evidence/assistant/1-disclosure.png`<br>`assistant/2b-chat-dark.png`<br>`task-row-touch-target/timeline-light.png` | **binary**（git 明说 `Cannot merge binary files`） | 两侧都刷新过同一族取证图：main 有 `0c8a0ad4 test(evidence): 刷新助手/象限/触达目标的取证图（并行批次现量）`，本分支上另有一笔 `f304e713` 做了同一件事 |
+| `docs/research/self-host-distribution-audit.md` | **add/add**（merge-base 里没有这个文件） | main 有一份 **176 行**的版本；本分支这份 1100+ 行 |
+| `package.json` | content | 两侧都往 `check` 链里加门禁（§8.12 记过的同一形状） |
+
+#### 这条读数的价值不在"有冲突"，在"它把 §8.16 变成了一条会过期的引用"
+
+§8.16 落笔时 `merge-tree` 两个方向都 rc=0，那是**当天那趟**的事实。几小时后 `main` 前进了
+**16 笔**（`0a61c0a6`→`d27bccde`，含 ADR-0046/0047/0050/0051 那一批），冲突就从 0 变成 6。
+⇒ **#7 的关闭判据不能引用本文档任何一次合并读数**，只能在落地那一刻重跑那三行。
+这与"红段集合是活树瞬时读数、不是提交属性"是同一件事，只是这次过期的是"绿"的那一侧 ——
+**过期的绿比过期的红更危险**，因为它读起来像"合并已经铺好了"。
+
+#### 逐路径的预置解法（机械的，不等现场再想）
+
+1. `.gitignore`：**两块都留**，顺序是先 main 的探针残留块、后本批那枚 `.last-run.json`。
+   两侧都是纯追加，没有一行语义重叠 —— 这条不需要判断。
+2. 三枚 evidence PNG：**取 main 侧**，然后由主张那张图的那一侧重新生成。
+   理由：它们是**产物不是源码**，而 §6.2 规定一要的是"谁主张谁出图、人看过" ——
+   保留 main 的那份不会丢任何判据，保留本分支的这份则会把 main 上另一批的现场覆盖掉。
+3. 本审计文档：**取本分支侧**。这句是需要证据的，所以量过：main 那份 122 个非空行里
+   只有 **9 行**不在本分支当前版本中；其中 **7 行**能在本文件的历史 blob 里逐字找到；
+   剩下 **2 行**（`apps/web/dist` 那条 bullet、"缺的成本"那一行的 ⑤）是本人在**未提交态**
+   写过、后来又被我自己加注的版本（现版本里同一行后面跟着"⚠️ 同样过期…"与实测结果）。
+   ⇒ **122 行里没找到任何别人写的东西**，main 那份是我自己这份在中间时刻的一份快照。
+   取本分支侧不丢任何人的内容 —— 但这条结论的保质期同样只到下一次 `merge-tree`。
+4. `package.json`：链取**并集**，然后让 `check:gate-wiring` 当裁判（它现在除了"定义必须在链里"，
+   还要求链外那道有可验的消费方）—— §8.12 那次靠人肉 grep 核对六枚名字，正是它被写出来的原因。
+
+#### 归属登记（不改写别人的历史）
+
+`f304e713 test(evidence): 刷新助手/象限/触达取证图（自托管批次现量）` 落在本分支上，
+**不是这一批的动作**：本批从没提交过 `apps/web/evidence/`。它带来的直接后果是上面那三条 binary 冲突。
+我不 rebase 掉它、不改写它（那是别人的动作），只把它的存在与解法写在这里。
+🔴 顺带一条给后来者的形状：**同一族取证图被两个会话各自刷新并各自提交**，binary 就不可合并 ——
+取证图应当由**跑那套界面的一侧**提交，或者干脆不入库（改由 `landing-results/` 那类被忽略的目录出证）。
