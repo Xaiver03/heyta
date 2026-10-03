@@ -60,10 +60,17 @@ sync_windows_sources() {
     echo "  🔴 源码包送不过去（$host 不可达？）"
     return 1
   fi
-  # ⚠️ **覆盖式解包，不删远端目录** —— 那棵树里有 node_modules 与 dotnet 依赖，
+  # ⚠️ **覆盖式解包，不删远端整棵树** —— 那棵树里有 node_modules 与 dotnet 依赖，
   #    整棵删掉重建会把"打包"变成"重装工具链"。
-  if ! ssh -o ConnectTimeout=10 "$host" 'tar -xzf C:\src\heyta-src.tar.gz -C C:\src\heyta'; then
-    echo "  🔴 远端解包失败"
+  # 🔴 但 `apps/web/dist` 是**构建产物目录**，必须**先清再解**：vite 的 chunk 名带内容哈希，
+  #    覆盖式解包对它等于**只增不减** —— 2026-10-03 实测远端 `assets/` 里躺着 26 个
+  #    `index-*.js`（本地 7 个，跨 9/27→10/3 六次构建），而 `package-msix.ps1` 把整份
+  #    `web-dist` 搬进包 ⇒ 装出来的包带着 ~19 枚没人引用的旧 chunk。今天行为没坏
+  #    （index.html 按哈希引用），坏的是"清旧包"这一环在 Windows 段只到 .appx 层、
+  #    没到同步源层：**一旦有什么按旧哈希去取，包里就真躺着那份旧代码。**
+  if ! ssh -o ConnectTimeout=10 "$host" \
+    'powershell -NoProfile -Command "Remove-Item -Recurse -Force C:\src\heyta\apps\web\dist -ErrorAction SilentlyContinue"; tar -xzf C:\src\heyta-src.tar.gz -C C:\src\heyta'; then
+    echo "  🔴 远端解包失败（清旧 apps/web/dist + tar）"
     return 1
   fi
   # 新鲜度判据：拿**两个构建输入**的哈希对账
@@ -93,6 +100,22 @@ sync_windows_sources() {
     echo "     —— 拒绝打包：那样壳里跑的是**旧的 TS 逻辑**（改了桥却像没改）"
     return 1
   fi
-  echo "  ✅ 远端新鲜度对账通过（web-dist/index.html=${local_hash:0:16}… bridge=${local_bridge:0:16}…）"
+  # 🔴 哈希对账只锚 `index.html`，它证明不了"目录里没留旧构建的 chunk"—— 而"只增不减"
+  #    正是上面那次实测的形状。所以再要一条**按数量**的对账：本地与远端 `assets/*.js`
+  #    的枚数必须相等，数不到也算红（数不到 = 对账不成立，不是"没问题"）。
+  local local_chunks remote_chunks
+  local_chunks="$(ls apps/web/dist/assets/*.js 2>/dev/null | wc -l | tr -d ' ')"
+  remote_chunks="$(ssh -o ConnectTimeout=10 "$host" \
+    'powershell -NoProfile -Command "(Get-ChildItem C:\src\heyta\apps\web\dist\assets -Filter *.js -ErrorAction SilentlyContinue | Measure-Object).Count"' 2>/dev/null |
+    tr -d '\r' | grep -E '^[0-9]+$' | tail -1)"
+  if [ -z "$remote_chunks" ]; then
+    echo "  🔴 数不到远端 apps/web/dist/assets 的 chunk 数 —— 对账不成立，拒绝打包"
+    return 1
+  fi
+  if [ "$local_chunks" != "$remote_chunks" ]; then
+    echo "  🔴 远端 chunk 数 $remote_chunks ≠ 本地 $local_chunks ⇒ 远端目录里留着旧构建的产物"
+    return 1
+  fi
+  echo "  ✅ 远端新鲜度对账通过（web-dist/index.html=${local_hash:0:16}… bridge=${local_bridge:0:16}… assets/*.js=${local_chunks} 枚一致）"
   return 0
 }

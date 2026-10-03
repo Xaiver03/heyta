@@ -25,7 +25,7 @@ import { Recurrence, isoWeekday, parseLocalDate, type LocalDate } from '@heyta/d
  * 🔴 **不要用界面上的文字当标识** —— 换一个说法（「每周」→「每周一次」）
  * 就会让所有存过状态的路径失效。id 是数据，文字是展示。
  */
-export type RepeatPresetId = 'daily' | 'weekly' | 'weekdays' | 'monthly';
+export type RepeatPresetId = 'daily' | 'weekly' | 'weekdays' | 'monthly' | 'yearly';
 
 /** 预设的顺序（界面按这个顺序排）。`none`（不重复）由界面自己加，不是规则。 */
 export const REPEAT_PRESET_IDS: readonly RepeatPresetId[] = [
@@ -33,6 +33,7 @@ export const REPEAT_PRESET_IDS: readonly RepeatPresetId[] = [
   'weekly',
   'weekdays',
   'monthly',
+  'yearly',
 ];
 
 /** ISO 星期（1=周一 … 7=周日）→ RRULE 的 BYDAY 取值。 */
@@ -83,6 +84,38 @@ export function repeatPresetRule(id: RepeatPresetId, anchor: LocalDate): string 
       }
       if (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) return undefined;
       return Recurrence.monthlyOnDay(dayOfMonth);
+    }
+
+    /**
+     * 「每年」= 锚点所在的那月那日，逐年推进。
+     *
+     * 🔴 **2 月 29 日的锚点会退化成"只在闰年重复"** —— 这不是这里的疏漏，
+     * 而是 RFC 5545 的 `BYMONTH=2;BYMONTHDAY=29` 的字面语义，且 Google / Apple
+     * 日历的"每年重复"对 2/29 事件做的就是这件事。实测（ical.js）：
+     * `2024-02-29 → 2028-02-29 → 2032-02-29`，中间三年**不产出日期**。
+     *
+     * 另一种口径（平年过 2 月最后一天）用 `BYMONTHDAY=-1` 表达，ical.js 实测
+     * 能正确展开成 `2/28, 2/28, 2/28, 2/29…`，但**两条界面措辞路径都会把它渲染成
+     * 「每年 2 月 -1 日」**（`describeRecurrence` 与移动端 `recurrence-display` 都把
+     * 数字直接拼进句子），要改就得同时改域层措辞 + 壳层措辞 + 两套中英词条。
+     * 所以：**本单不引入 `-1`**，把它留到有真实消费者时（倒数纪念日要显示
+     * 「在一起多少天」，那一天是不是 2/29 才是产品问题；任务重复不是），
+     * 并把这条边界钉在测试里，而不是留成没人知道的暗坑。
+     */
+    case 'yearly': {
+      // 不做额外的月/日范围检查：`parseLocalDate` 会**回读校验**（`2026-13-40` 直接抛错），
+      // 成功返回的 `Date` 必然给出 `month ∈ 1..12`、`day ∈ 1..31`。
+      // 再判一次就是给一条永远不会为假的分支写测试。
+      let month: number;
+      let day: number;
+      try {
+        const d = parseLocalDate(anchor);
+        month = d.getMonth() + 1;
+        day = d.getDate();
+      } catch {
+        return undefined;
+      }
+      return Recurrence.yearly(month, day);
     }
 
     default: {

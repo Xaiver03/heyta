@@ -44,3 +44,5 @@ export * from './activity.js';
 export * from './ticktick-format.js';
 export * from './ticktick-import.js';
 export * from './quick-due-picks.js';
+export * from './lunar.js';
+export * from './holidays.js';

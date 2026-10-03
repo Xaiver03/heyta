@@ -8,7 +8,8 @@
  *
  * ## 🔴 三条硬要求（都是产品要求，不是风格偏好）
  *
- * 1. **默认中文。** 语言优先级：显式传入（邮件链接里的 `?lang=`）> `Accept-Language` > `zh-CN`。
+ * 1. **默认中文。** 语言只由**显式选择**决定（邮件链接里的 `?lang=`），没有就中文。
+ *    `Accept-Language` **不参与** —— 理由见 `resolveLocale`。
  * 2. **用设计系统。** 颜色/间距/字体一律从 token 取 —— 这里**一个裸 hex 都没有**。
  * 3. **严禁任何渐变。** 本文件（以及它引用的生成物）里不允许出现 `gradient(`。
  *    生成脚本还会在设计系统那一侧断言一次（见 `gen-server-design.mjs`）。
@@ -67,33 +68,28 @@ export const asServerLocale = (value: string | null | undefined): ServerLocale |
 /**
  * 解析语言。
  *
- * 优先级：**显式参数**（`?lang=`，发信时就写进链接里）> `Accept-Language` > 默认 `zh-CN`。
+ * 优先级：**显式参数**（`?lang=`，发信时就写进链接里）> 默认 `zh-CN`。
  *
  * 显式参数排第一是刻意的：邮件是**为收件人**渲染的，而收件人点开链接时
  * 用的浏览器语言未必等于他注册时用的语言（比如在英文系统里注册的中文用户）。
  * 把语言写进链接，收件人看到的就是**发信那一刻**他该看到的语言。
+ *
+ * 🔴 **`Accept-Language` 从 2026-10-03 起不再参与**（产品负责人拍板）：
+ * 「默认应该是中文，除非用户登录之后改成了英文、或者一开始就选了英文」。
+ * 浏览器语言不是**选择** —— 它是环境噪声。原来那条 `> Accept-Language` 让
+ * 一台英文系统上的用户，哪怕应用界面是中文、账号语言从没设过，点开的凭据页
+ * 也是英文；实测就是 Playwright 的 chromium（`Accept-Language: en-US`）
+ * 打开中文注册流程发出的确认页渲染成了整页英文。
+ *
+ * 摘掉它之后，英文只有三条来路，全都是**用户自己选的**：
+ *   ① 客户端界面语言（注册/发信请求里的 `body.locale`）；
+ *   ② 账号语言（`users.locale`，设置里改过）；
+ *   ③ 邮件链接里的 `?lang=`（它本身就是 ①/② 在发信那一刻的快照）。
+ * 三条都没有 ⇒ 中文。
  */
-export function resolveLocale(
-  explicit?: string | null,
-  acceptLanguage?: string | null,
-): ServerLocale {
+export function resolveLocale(explicit?: string | null): ServerLocale {
   if (explicit !== undefined && explicit !== null && isServerLocale(explicit)) {
     return explicit;
-  }
-
-  // `Accept-Language: zh-CN,zh;q=0.9,en;q=0.8` —— 只做一次朴素但正确的匹配：
-  // 按顺序取第一个我们支持的语言。不做 q 值排序（那需要完整实现 RFC 9110 的权重比较，
-  // 而这里的收益只是极少数多语言用户的首选差异）。
-  if (acceptLanguage !== undefined && acceptLanguage !== null) {
-    for (const part of acceptLanguage.split(',')) {
-      const tag = part.split(';')[0]?.trim();
-      if (tag === undefined || tag === '') continue;
-      if (isServerLocale(tag)) return tag;
-      // `zh` / `en-US` 这类前缀匹配。
-      const lower = tag.toLowerCase();
-      if (lower.startsWith('zh')) return 'zh-CN';
-      if (lower.startsWith('en')) return 'en';
-    }
   }
 
   return DEFAULT_SERVER_LOCALE;
