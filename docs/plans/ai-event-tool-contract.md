@@ -495,8 +495,8 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 
 | 项 | 现量 |
 |---|---|
-| 合并载体 | 临时分支 `tmp/ai-cov-on-main` = 合并提交 `3ad21570`（父：本批 `1b7fdb5e` + `main` `a04753b6`） |
-| 落后量 | 合并前 `HEAD..main` = **76 笔** |
+| 合并载体 | 临时分支 `tmp/ai-cov-on-main` = 合并提交 `3ad21570`（父：本批 `1b7fdb5e` + `main` `a04753b6`）。🔴 **这不是载体现状**：同日又推进到 `9a0b368a`（修 §12 那条缺陷）→ `d910cf64` → `aed16522`（再合 `main` 6 笔，见 §12.2）；载体尖端要现量：`git -C /tmp/heyta-merge-check rev-parse --short tmp/ai-cov-on-main` |
+| 落后量 | 合并前 `HEAD..main` = **76 笔**（同一句在 15:2x 再量已是 **82 笔** ⇒ 这个数只在这张表那一趟里有意义，往后一律用 `git rev-list --count feat/ai-entity-coverage..main` 现量） |
 | 文件交集 | 本批改动 57 枚 / `main` 改动 127 枚 / 交集 **5 枚** |
 | 真冲突 | **1 个文件 2 处**（`docs/plans/ai-assistant-closure.md` 的 D-3 两行）；其余 4 枚（ADR-0045、`docs/plans/README.md`、两份词条表）自动合并 |
 | 词条表合并后 | `en.ts` / `zh-CN.ts` 各 **2847 键**、重复 **0**、两边键集差 **0 / 0** —— 这是"合并会不会把双语词条并坏"的判据，不是"看起来没红" |
@@ -750,3 +750,35 @@ rc=1，逐字 \`1. \`HABIT\` 现在**读和写都有工具**了，但 \`ENTITY_C
 让人停下来的是 `apps/landing` 那一行**正好 1303**。
 ⇒ 从现在起本批写基线一律带 `(ref, 包名, 哪一趟, 退出码来源)` 四元组，
 少一项就当"没有基线"，另配一条**静态可复算**的量（上面那段 `git ls-tree` + `git show | grep -c` 的脚本）。
+
+### 12.2 `main` 在同一天又前进了 6 笔 ⇒ 重复合流一次，并把"跑到哪一层"如实分开
+
+15:2x 现量：`git rev-list --count feat/ai-entity-coverage..main` = **82**（写这一句时是 82，
+**这个数每天都在变，别把它当现状引用**；要现量就跑上面那条命令）。
+新增的 6 笔里 4 笔是文档、2 笔动 `scripts/`（`verify-mobile-repeat.sh` + 新的 `mutate-closeout-gates.sh`），
+其中 4 笔文档**动了 `docs/plans/countdown-anniversary.md`** —— 那正是 §11.2 那处更正落地的文件，
+所以必须重复合流一次来确认更正没被顶掉。
+
+载体 `tmp/ai-cov-on-main` 再合 `main` ⇒ **无冲突**（`Auto-merging docs/plans/countdown-anniversary.md`），
+新 tip `aed16522`，链仍是 **61 段、`check:ai-coverage` 在第 51 段**。
+就地核到的两件事：
+
+| 判据 | 读数 |
+|---|---|
+| §11.2 那处更正还在不在 | ✅ 还在，`:163` 那行逐字为 `> ✅ **2026-10-03 同日、AI 那条线合流时的更正**（下面两处说法已过期；原文留着是为了让下一个人看清当时为什么这么判）：` —— 3 行新增的倒数日文档没有覆盖它 |
+| 三条静态门禁在新 tip | `check:docs rc=0`（245 md / 1593 链接）· `check:ai-coverage rc=0`（覆盖面 8/8、22 工具 ≤ 40 席）· `check:ai-tools rc=0`（那五条隐私不变量 + 清单 `--check`） |
+
+🔴 **这一趟刻意没跑的两条，写清楚而不是含混过去**：`pnpm -r test` 与 `pnpm -r typecheck`
+**没有在 `aed16522` 上重跑**。原因是现场 `loadavg 15.27 / 16 核`，
+而 `heyta-wt-closeout` 那条会话**正在跑 `verify-mobile-repeat`**（`pgrep` 现量到它的快照脚本 + 一枚 Gradle daemon），
+另一个项目同时有 Chromium e2e 在跑 —— 按本文件 §11.1 与 §12 同一条纪律，
+**在别人跑设备验收时加 CPU 负载，最坏的后果不是我这趟红，是他们那趟出现无法归因的红**（tap 超时那一类）。
+⇒ 合并态 `-r test` 的绿是 **`9a0b368a`** 那一趟的读数（§12.1），
+`aed16522` 只证到"静态三条 + 更正还在 + 链形状没变"。
+窗口空闲时要补的那条命令：
+
+```bash
+cd /tmp/heyta-merge-check && NO_COLOR=1 pnpm -r build && NO_COLOR=1 pnpm -r test; echo "rc=$?"
+# 判据（角色对得上的一组，见 §11.1）：web ≥ 1500、app-host ≥ 1072、server ≥ 2095、
+# mobile ≥ 538、node-host ≥ 165、desktop ≥ 12，逐包汇总里 failed 出现 0 次
+```
