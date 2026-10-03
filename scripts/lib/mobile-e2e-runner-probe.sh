@@ -3,18 +3,15 @@
 # "这台设备上还有别的移动端验收在跑吗" 的**唯一实现**
 # ================================================================
 #
-# 消费者：
+# 消费者（它们要的排除规则是同一条，所以不该各写一份）：
 #   - `lib/mobile-e2e.sh` 的 `another_mobile_e2e_running`：各验收脚本在任何
-#     破坏性动作（`pm clear` / `install -r` / 按坐标点击）**之前**的门。
+#     破坏性动作（`pm clear` / `install -r` / 按坐标点击）**之前**的门；
+#   - `verify-mobile-window-gate.sh` 的设备独占粗筛：只体检窗口开没开的 dry-run，
+#     它**不能** source `mobile-e2e.sh`（那个文件尾有会真动设备的 EXIT trap），
+#     所以它直接 source 本文件。
 #
-# ⚠️ 同一形状的正则**还有第二份抄件**在 `scripts/verify-mobile-window-gate.sh`
-#    里（`pgrep -f 'bash [^ ]*verify-mobile-…'`），它**同样瞎**。那个文件此刻是
-#    **未跟踪**的（并行会话刚写的新工具，HEAD 里没有它）⇒ 不归本条线改。
-#    它落地后把它那一行换成两行即可去重：
-#      . "$(dirname "$0")/lib/mobile-e2e-runner-probe.sh"
-#      OTHERS=$(mobile_e2e_runner_lines | awk '{print $1}')
-#    （它能直接 source 本文件 —— 本文件没有 trap，而它偏偏**不能** source
-#     `mobile-e2e.sh`，因为那个文件尾的 EXIT trap 会真动设备。）
+# 🔴 本文件只许**定义函数**：不许 trap、不许碰设备、不许有副作用。
+#    加了副作用，dry-run 那条消费者就会开始改机器状态。
 #
 # 🔴 本文件只许**定义函数**：不许 trap、不许碰设备、不许有副作用。
 #    加了副作用，dry-run 那条消费者就会开始改机器状态。
