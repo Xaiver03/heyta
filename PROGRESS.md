@@ -1417,3 +1417,5 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 - 01:00 Web 并发迁移真链路已先证红：inventory 屏障后在界面新建任务并同步，commit 返回 409、generation 没有推进。前两次探针被 Service Worker 绕过，修正为独立 context 禁 SW 并断言屏障确实命中后才得到产品缺陷证据；过程并入环境陷阱 #191 和 AGENTS §8.9，互斥修复进行中。
 
 - 2026-10-04 续验：迁移服务端已 PUBLISHED 但浏览器未收到响应的真实 reload 用例补到 5/5 全绿。生产入口现在保留 ciphertext-only journal，只有新 package/root 与 payload generation 在本地同一事务 `saveBound` 成功后才 ack 清理；随后再次 root rotation 通过，证明 journal 不会阻塞后续迁移。证据见 ADR-0050 与 `apps/web/evidence/vault-panel/pg-commit-restart-*`。Web build 另修正 ServiceWorkerRegistration 的异步注销调用。Goal 仍 active：Android Vault 真实 UI、iOS OS 投递/Keychain、最终全仓门禁与四端当前源码重装未完成。
+
+- 2026-10-04 iOS 提醒续验：修复 `HeytaReminderModuleBridge.m` 的导出名错配（`RCT_EXTERN_MODULE` 实际导出 `HeytaReminderModule`，JS 读取 `HeytaReminder`），改为 `RCT_EXTERN_REMAP_MODULE` 后，Release 模拟器真实日志出现授权 `granted=true`、排程 `error=none`；`heyta-reminder-receipts.json` 有 `posted/receipts`，启动 reconcile 后 SQLite 出现同时含 `firedAt` 与 `firedForTriggerAt` 的 REMINDER op。隐私覆盖层先由 AX 真实关闭并复核消失。证据与限制已写入 ADR-0051：这证明 iOS 模拟器 OS 投递闭环，不替代实体设备通知权限或 iOS Keychain 验收；本轮未取得新的 Keychain 实机证据。

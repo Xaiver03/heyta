@@ -161,6 +161,12 @@ export {
 } from './local-erasure.js';
 
 /**
+ * 注销账号那条**主动**路径（批次 E3）：服务端级联硬删 + 本机销毁，
+ * 以及"服务端没删成就不许清本机"这条顺序。见 `account-closure.ts` 文件头。
+ */
+export { closeAccountAndEraseLocal, type ClosureDisposition, type ClosureResult } from './account-closure.js';
+
+/**
  * 权益探测。**所有宿主共用这一份** —— 见 `entitlement.ts` 文件头：
  * 它是一次**不携带任何任务内容**的 GET（E2EE 硬约束：计费只碰账户与权益状态）。
  * 判定本身是 `@heyta/domain` 的纯函数，这里只负责发请求。
@@ -288,6 +294,7 @@ export {
   uploadAccountAvatar,
   verifyEmailAddress,
   verifyMagicLink,
+  closeAccount,
   type AccountAvatarImage,
   type AvatarDecodeResult,
   type DisplayNameWritePlan,

@@ -141,7 +141,7 @@ describe('E2 —— 清单与真源逐字对账（抄件一定会漂）', () => 
     // 所以这里必须按同一条规则派生，不能只比一个字符串常量。
     const worker = readFileSync(join(WEB_SRC, 'worker/storage.worker.ts'), 'utf8');
     const driver = readFileSync(
-      join(process.cwd(), '../packages/storage/src/sqlite/sqlite-wasm-driver.ts'),
+      join(REPO_ROOT, 'packages/storage/src/sqlite/sqlite-wasm-driver.ts'),
       'utf8',
     );
     const vfs = literal(worker, /const DB_VFS_NAME = '([^']+)'/);
@@ -276,11 +276,7 @@ describe('E2 —— 逐类真的清掉', () => {
   });
 
   it('OPFS 不可用（没有 getDirectory）⇒ 如实报 false，不抛、不假装删了', async () => {
-    Object.defineProperty(globalThis.navigator, 'storage', {
-      value: {},
-      configurable: true,
-      writable: true,
-    });
+    override(globalThis.navigator, 'storage', {});
     installServiceWorkerLayer();
 
     const reports = await eraseWebLocalData();
@@ -308,11 +304,7 @@ describe('E2 —— 逐类真的清掉', () => {
         throw new Error('SecurityError');
       },
     } as unknown as Storage;
-    Object.defineProperty(globalThis, 'sessionStorage', {
-      value: throwing,
-      configurable: true,
-      writable: true,
-    });
+    override(globalThis, 'sessionStorage', throwing);
     installOpfs();
     installServiceWorkerLayer();
 

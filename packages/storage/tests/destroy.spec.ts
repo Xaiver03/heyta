@@ -70,16 +70,34 @@ function freshIdb(): IDBFactory {
   return factory;
 }
 
-/** 只用来给"仍在 pending"这条判据收尾；不 resolve 就永远拿回 `'pending'`。 */
-async function settle<T>(promise: Promise<T>, ms = 60): Promise<'pending' | T> {
-  const PENDING = 'pending' as const;
-  return Promise.race([
-    // A rejection is intentionally left pending: this helper only answers
-    // whether the operation is still in flight, and must not widen the value
-    // type with a diagnostic object that callers could mistake for success.
-    promise.catch(() => new Promise<never>(() => {})),
-    new Promise<typeof PENDING>((resolve) => setTimeout(() => resolve(PENDING), ms)),
-  ]);
+/**
+ * 判"有没有还在飞"不许用墙上时钟。
+ *
+ * ⚠️ 这台机器常年并行跑着设备验收与别人的套件，负载能在 100 以上。
+ * 用 `setTimeout(ms)` 去判 pending 会两头出错：机器慢时**正向对照**被判成红
+ * （它在窗口内还没跑完），机器快时**变异体**（在第一个宏任务里就 resolve）被漏掉。
+ * 改成排空固定轮数的微/宏任务队列 —— 它与机器快慢无关，
+ * 而 `deleteDatabase` 的 success/error/blocked 派发最多经过一个任务队列。
+ */
+function track<T>(promise: Promise<T>): { done: boolean; value?: T } {
+  const box: { done: boolean; value?: T } = { done: false };
+  promise.then(
+    (value) => {
+      box.done = true;
+      box.value = value;
+    },
+    () => {
+      box.done = true;
+    },
+  );
+  return box;
+}
+
+async function drainTaskQueues(rounds = 40): Promise<void> {
+  for (let i = 0; i < rounds; i++) {
+    await Promise.resolve();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
 }
 
 describe('destroy —— 磁盘上的字节', () => {
@@ -174,8 +192,18 @@ describe('destroy —— 磁盘上的字节', () => {
     expect(report.containerRemoved, '桥没实现删除容器，报告却声称容器没了').toBe(false);
     expect(report.reason, '没有容器可删却不给原因').toBeTruthy();
     expect(report.storesCleared).toBeGreaterThanOrEqual(ALL_STORES.length);
-    // 内容确实被 DROP 了 —— 这是"没有全没"和"一点没做"的区别，报告必须能区分这两者。
+    // 文件**确实还在** —— 报告说"没删容器"必须与磁盘一致，两个方向都不能说谎。
     expect(readdirSync(dir)).toEqual(['heyta.sqlite']);
+
+    // 🔴 文件还在，所以**内容**必须真的被清掉了 —— 这一句是 `DROP TABLE` 那个循环
+    // 唯一的牙：其余每条 destroy 判据都跑在"文件被删掉"的驱动上，
+    // 而那些判据在漏删 DROP 的情况下**全绿**（重开一个新连接本来就什么都没有）。
+    const survivor = new SqliteAdapter({ schema: INDEXEDDB_SCHEMA, driverFactory: () => new NodeSqliteDriver(path) });
+    await survivor.init();
+    for (const store of ALL_STORES) {
+      expect(await survivor.count(store), `文件留着但「${store}」没清空`).toBe(0);
+    }
+    survivor.close();
   });
 });
 
@@ -224,12 +252,13 @@ describe('destroy —— IndexedDB 不许伪造成功', () => {
     // 真实浏览器里这就是同源的另一个上下文；它一占着，deleteDatabase 只会 blocked。
     const holder = await openSecondConnection('heyta-e2-blocked');
 
-    const destroy = db.destroy();
-    const outcome = await settle(destroy);
+    const promise = db.destroy();
+    const destroy = track(promise);
+    await drainTaskQueues();
 
-    // 判据本体：拿回 'pending'。曾经这里是 onblocked 里 resolve()，
+    // 判据本体：还在飞。曾经这里是 onblocked 里 resolve()，
     // 于是这句会变成"销毁成功"，而库里那条明文一个字都没少。
-    expect(outcome, `被堵住却返回了结果：${JSON.stringify(outcome)}`).toBe('pending');
+    expect(destroy.done, `被堵住却返回了结果：${JSON.stringify(destroy.value)}`).toBe(false);
 
     // 反向确认"没删"是真没删，而不是探针看不见的假红/假绿。
     const stillThere = await new Promise<number>((resolve, reject) => {
@@ -241,7 +270,7 @@ describe('destroy —— IndexedDB 不许伪造成功', () => {
     expect(stillThere, '探针说没删，但库里其实空了 ⇒ 这条判据在测探针').toBe(1);
 
     holder.close();
-    await expect(destroy).resolves.toMatchObject({ containerRemoved: true });
+    await expect(promise).resolves.toMatchObject({ containerRemoved: true });
   });
 
   it('正向对照：占着的连接**让位**后 destroy 真的完成（证明上一条不是永远 pending）', async () => {
@@ -255,8 +284,9 @@ describe('destroy —— IndexedDB 不许伪造成功', () => {
     // 与上一条唯一的区别就是这一行：网页正常关掉旧标签页时会走到这里。
     holder.onversionchange = () => holder.close();
 
-    const outcome = await settle(db.destroy(), 200);
-    expect(outcome, '让位了却仍然 pending ⇒ destroy 在等一个不会来的信号').not.toBe('pending');
+    // 直接 await：它若永远不 resolve，vitest 自己的超时会把这条判据说清楚。
+    // （这里不套计时器 —— 计时器在负载高时会把正向对照判成红，那正是上一条要避免的错。）
+    await expect(db.destroy()).resolves.toMatchObject({ containerRemoved: true });
   });
 });
 

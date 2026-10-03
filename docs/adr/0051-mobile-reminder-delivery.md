@@ -152,7 +152,7 @@ HOME 后用 SIGKILL 终止普通进程，系统 alarm 保留，22:55 仍交付�
 [`ios-ax-shim.py`](../../scripts/tools/ios-ax-shim.py) 和验收脚本，并由 `check-script-snapshot` 登记
 [`verify-mobile-ios-reminder.sh`](../../scripts/verify-mobile-ios-reminder.sh)。
 
-2026-10-04 的 iOS 真实续验仍**失败，不能宣称 OS 级投递已通过**。当前 Release
+2026-10-04 早先的 iOS 真实续验仍**失败，不能宣称 OS 级投递已通过**。当前 Release
 `/tmp/heyta-ios-reminder-release/Build/Products/Release-iphonesimulator/Heyta.app` 已卸载旧包后重装，
 真实 RN Composer 创建 `ios-reminder-delivery-004726`，详情页通过「今天」和截止时刻输入框写入
 `00:50`，再通过「截止时」写入 REMINDER CREATE；SQLite 只读回读到
@@ -171,3 +171,16 @@ HOME 后用 SIGKILL 终止普通进程，系统 alarm 保留，22:55 仍交付�
 设置。Xcode 27.1 / iOS 27 下 Unix companion 可能创建 socket 后返回 `GRPCCore.RuntimeError`，
 默认改用同一 `idb_companion` 的 TCP `127.0.0.1:10982`，脚本必须确认键盘确实收起、Composer
 字段的占位值确实出现、以及目标按钮 press 后状态真的改变，不能只看 idb 命令退出码。
+
+同日修复并验证了一个真正阻断投递的桥接错误：`HeytaReminderModuleBridge.m` 原先用
+`RCT_EXTERN_MODULE(HeytaReminderModule, NSObject)`，实际向 JS 导出的是
+`NativeModules.HeytaReminderModule`，而移动端唯一调用方读取 `NativeModules.HeytaReminder`；
+因此原生授权与排程方法根本没有被调用。桥接现改为
+`RCT_EXTERN_REMAP_MODULE(HeytaReminder, HeytaReminderModule, NSObject)`，并保留原生状态日志
+作为排障证据。修复后的 Release 构建 `/tmp/heyta-ios-reminder-release/Build/Products/Release-iphonesimulator/Heyta.app`
+在模拟器 `1EDCFA59-6A9C-428D-8FE2-160B11318648` 上真实复验：日志记录
+`requestAuthorization completion granted=true`、`authorizationStatus=2` 和
+`schedule completion ... error=none`；`Application Support/heyta-reminder-receipts.json`
+出现对应 `posted`/`receipts`，启动 reconcile 后真 SQLite 中出现 1 条同时含
+`firedAt` 与 `firedForTriggerAt` 的 REMINDER op。隐私覆盖层也先由真实 AX 点击关闭并复核消失。
+这轮证明的是模拟器 OS 投递与回收闭环；实体设备通知权限仍需独立验收，Keychain 也不由这条证据代替。
