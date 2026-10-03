@@ -249,7 +249,7 @@
 | G-44 | `appVersion` 在服务端**有消费者、没有生产者**：`server/src/sync/checkpoint-gate.ts` 拿它判 `MIN_CHECKPOINT_SAFE_APP_VERSION`，`sync.service.ts:676 touchDevice` 把它记进 `sync_devices`，而它是**下载请求上的一个可选查询参数**（`packages/shared-schema/src/supersync-http-contract.ts:191` 是 `z.string().optional()`）—— `packages/sync-client/src/client.ts:1324-1327` 只往查询串里写 `sinceSeq` 与 `excludeClient`，**没有任何 heyta 客户端发过它** | 🔴 **本批重新归类，不按原登记实现**（证据链见 §8.17）。原句"补一个生产者"是错的：三条事实连起来说明**光上报版本会把那条日志变成假信号**，而阈值 `18.21.2` 住在**上游 Super Productivity 的版本空间**里。它不是自托管分发的缺口，是"客户端检查点/全量边界"这条**未实现的功能**的一部分 ⇒ 对外说法已在 `server/README.md`「Clients and version coupling」就地改成三个前置条件（原句只列了两个，且把"只差上报"写成了事实） |
 | G-45 | 台阶 3（镜像 npm 依赖树 vs 许可证门禁扫的 pnpm store）曾是**未证实** | **本批量完并关成"有对账"**（§8.8）：`check:image-license` 逐条对账 + 四条会红的登记自检，7 发变异各自精确报红、阳性对照绿。残余风险（纯传递依赖上游发新版）已改挂 G-47 |
 | G-46 | `server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 的唯一实体）原来是**上游形状**：它自己抄了一份 7 条的镜像输入清单，其中 3 条在本仓库不存在（实测 `[ -e ]` 全不成立），而 `apps/web` / 11 个 `packages/*` / `pnpm-lock.yaml` / `server/` 自己**一条都不在里面**；`GHCR_NAMESPACE` 默认成 `super-productivity`（**别人的组织**）；并且无论给不给版本号都**顺带覆盖 `:latest`** | **本批关闭**（§8.7 第 4 条）。三条各自都会出事，都已改：清单改成 source 同一个读者、namespace 无默认值（不给就在任何 docker 之前 exit 1）、只推点名的那一个 tag。⚠️ 消费者集合是量过的：除 `server/package.json:14` 外只有 `server/tests/migration-sql.spec.ts:345` 读它，而那一发在 `it.skip` 里 ⇒ **不报错也不守** |
-| G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | 🔄 **对账已做、登记那句被量得更准、闭合形状要换**（读数见 §8.20）。现量：镜像树与 pnpm 生产树**同名同版本 125 个、镜像独有 0 个、版本不一致 14 个** —— 14 个全是镜像比 lockfile **新**，其中 12 个是传递依赖（`pino` + `@simplewebauthn/server` 底下 11 个 `@peculiar/asn1-*`，那是 **passkey 验证路径**），2 个是直接依赖（`@fastify/static ^10.1.2` 解到 10.1.5 而 pnpm 是 10.1.4、`ws ^8.18.0` 解到 8.22.0 而 pnpm 是 8.21.3）。⇒ 登记那句"改直接依赖才会漂"其实**说轻了**：没人改任何依赖，只因为版本落在 `^` 范围内，发出去的镜像就跑着一套本仓库任何测试都没跑过的版本。`--check` 新鲜度绿、覆盖率对账绿，两条都管不到这件事。🔴 **原闭合形状实测不成立**：`pnpm deploy --prod` 在 pnpm v10+ 要求 `inject-workspace-packages=true`（全仓依赖解析方式的改动），而 `--legacy` 会去 registry 取 `@heyta/i18n` 直接失败；另外 filter 打错时 `pnpm deploy` **什么都没做还 exit 0**。⇒ 换成：把已提交的那份快照从"记录 npm 这次解出什么"改成**镜像要装的版本就是它**（装配时按快照逐条钉版本），等式判据与钉版本**同一批**落地（不能先加判据把链钉红），复验仍要一轮真构建 |
+| G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | 🔄 **对账已做、登记那句被量得更准、闭合形状要换**（读数见 §8.20）。现量：镜像树与 pnpm 生产树**同名同版本 125 个、镜像独有 0 个、版本不一致 14 个** —— 14 个全是镜像比 lockfile **新**，其中 12 个是传递依赖（`pino` + `@simplewebauthn/server` 底下 11 个 `@peculiar/asn1-*`，那是 **passkey 验证路径**），2 个是直接依赖（`@fastify/static ^10.1.2` 解到 10.1.5 而 pnpm 是 10.1.4、`ws ^8.18.0` 解到 8.22.0 而 pnpm 是 8.21.3）。⇒ 登记那句"改直接依赖才会漂"其实**说轻了**：没人改任何依赖，只因为版本落在 `^` 范围内，发出去的镜像就跑着一套本仓库任何测试都没跑过的版本。`--check` 新鲜度绿、覆盖率对账绿，两条都管不到这件事。🔴 **原闭合形状实测不成立**：`pnpm deploy --prod` 在 pnpm v10+ 要求 `inject-workspace-packages=true`（全仓依赖解析方式的改动），而 `--legacy` 会去 registry 取 `@heyta/i18n` 直接失败；另外 filter 打错时 `pnpm deploy` **什么都没做还 exit 0**。⇒ 换成：把已提交的那份快照从"记录 npm 这次解出什么"改成**镜像要装的版本就是它**（装配时按快照逐条钉版本），等式判据与钉版本**同一批**落地（不能先加判据把链钉红），复验仍要一轮真构建。🟡 **2026-10-04 00:4x 部分推进**（现量与判据见 §8.26）：那 143 条**仍未钉**（要 docker + 低负载窗口，与 #12 同一个），但镜像里**唯一那一枚手写版本字面量** `prisma@5.22.0` 现在有了等式判据 —— 它是第三份抄件，此前没有任何一层在守；新判据挂成 `check:image-license` 的第三条腿，5 臂注入各自精确报红、未变异对照绿。同时 §8.20 步骤 1 的**形状被改掉**（快照不能既是 install 实参的来源、又是 install 形状的哈希输入，否则等式两边都是它自己）|
 | G-48 | `check:web-artifact:app`（核对 `--base=/app/` 那份产物的那一道）**零自动消费者** —— 2026-10-03 由新门禁 `check:gate-wiring` 量出：它是 63 道 `check:*` 里唯一合法落在链外的一道，而全仓 `grep` 只有 `package.json` 自己那一行，没有任何 workflow / 验收脚本 / `deploy.sh` 调用它 ⇒「上线前跑一次」目前只写在脚本头部注释里 | ✅ **已关（2026-10-03，判据与登记见 §8.19）**。登记那半句被否证：`server/Dockerfile:191` 一直在跑同一条判据的**脚本本体**，`grep` 漏它是因为搜的是别名。决定：链**不放**这道判据（`apps/web/dist` 是一个目录、两种载体，链里 `pnpm build` 打的必然是根载体，把 `/app/` 载体放链里就是拿错的字节验对的东西 —— 现量：同一份 dist 上一条 rc=0 一条 rc=1）；改为**每个发布载体各自带对账**：runbook §3.7 的 rsync 之前插入 `pnpm check:web-artifact:app`（两处），`check:gate-wiring` 新增"链外门禁必须点名消费方文件 + 该文件里有一行**以这条命令开头**"，把"没人跑它"从一句注释变成会红的判据。6 臂注入 5 红 1 绿（绿那臂是刻意留的越界对照） |
 | G-48b | G-48 关的是"这一步在不在发布序列里"，**没有**关"这一趟有没有人真的跑过它"：`consumers` 判的是 runbook 里那行命令还在，人工 rsync 前跳不跳过去仍然只取决于人。另外 `apps/web/dist` 一目录两载体没变（§8.19 读数 B），按载体分目录要同时动 `package-app.sh` / `package-msix.ps1` / `reinstall-all.sh` 的同步对账 / `Dockerfile` —— 四端打包输入的变更 | **未关**（本批只登记，理由如上：会新增一个"能碰生产"的对外动作面，或要改四端打包输入）。挂在这里是为了让下一轮别把 G-48 的绿读成"发布已经有守卫" |
 | G-49 | 站内那篇自建指南（`packages/i18n` 的 `site.docs.selfhost.*`）是入口命令的**第 4 份抄件**，而 `check:selfhost-entry-command` 的扫描集里没有它（现有扫描集：`docs/runbooks/self-host.md`、`server/README.md`、`server/env.example`、`docker-compose.migrate-once.yml`、`local-server-verification.md`）| ✅ **本批关闭**，但**登记的前提一半是错的**（读数在 §8.18）：58 条词条里当时**没有一条**是完整入口命令，s7p2 只有 `-f` 那三个 flag 的**碎片**（没前缀、没 `up -d`、**没 `--build`**）。碎片比没抄件更坏 —— 拼起来敲就是 §8.11 那次 `pull access denied`。所以做的是两件事：文章改成给**完整一条**（中英各一份，与 runbook 逐字相同），再把这两份词条文件纳入扫描集（`source: 'copy'`） |
@@ -1496,3 +1496,82 @@ OrbStack 的 `~/.orbstack/run/docker.sock` 不存在 ❌。
 两枚 `/tmp` trial 检出在载体提交并移动分支指针**之后**已 `git worktree remove` ——
 `git worktree list` 是 §8.23 用来数"几个会话在跑"的现量命令，我留着它就是在给别人的计数加两个假检出。
 载体本体是**分支** `feat/self-host-merge-main`（不是 /tmp、不是 SHA），SHA 只作为这一趟的读数存在。
+
+---
+
+### 8.26 G-47 的第三条腿：镜像里唯一那枚**手写版本字面量**是三份抄件，而它没有判据
+
+主体（把 143 条钉住）仍卡在 docker + 低负载窗口，和 #12 同一个窗口。
+但读 `server/Dockerfile` 生产阶段时照出来一件**今天就能闭合**的事，所以把它做掉了。
+
+#### 现量
+
+```
+server/Dockerfile:252   npm install prisma@5.22.0 --registry=… --ignore-scripts --omit=dev
+server/package.json     dependencies["@prisma/client"] = 5.22.0
+server/package.json     devDependencies["prisma"]      = 5.22.0
+server/image-npm-tree.json  packages: prisma@5.22.0、@prisma/client@5.22.0
+```
+
+⇒ 同一个版本号在**四个地方**，其中 `5.22.0` 那个字面量是**整个仓库里唯一手写的包版本**，
+而它不在任何 lockfile 里。今天四处一致 —— **一致不是判据，是运气**（AGENTS §8.3：不能失败的检查没有价值）。
+
+#### 为什么这条值得单独有一条判据（机制，不是"顺手对账"）
+
+`prisma` 住在 **devDependencies**，而生产阶段那条常规 `npm install` 带 `--omit=dev`
+⇒ 常规那一发**永远装不到 CLI**，镜像里 `npx prisma generate` 用的那个 CLI 版本
+**只由 Dockerfile 那枚字面量决定**。于是漂移的形状很具体：
+
+有人 bump `@prisma/client`（或 devDeps 的 `prisma`）而忘了那一行 ⇒
+镜像里用 5.22 的引擎生成 client、运行时 import 的是 5.23 的 client，
+报错点在**容器里、而且是在生产库上迁移跑过之后**；`pnpm check` 全绿，因为
+**链从来不构建镜像**（§8.7 记的就是这条盲区）。Dockerfile 自己那句
+`IMPORTANT: prisma version must match @prisma/client in package.json` 说的正是这件事 ——
+🔴 **它是一句提醒，不是一条判据**，而提醒挡不住"改了声明没改提醒"。
+
+#### 落地的判据
+
+`research/tools/check-image-install-contract.mjs`（挂成 `check:image-license` 的第三条腿，
+**不新增 `check:*` 键** ⇒ `check:gate-wiring` 的读数仍是 63 道 / 66 段，没有制造新的"链外门禁"）：
+
+| 腿 | 比的是 | 红的时候说什么 |
+|---|---|---|
+| ①↔③ | Dockerfile 字面量 ↔ `dependencies["@prisma/client"]` | 镜像里的 CLI 与运行时 client 不同版本，并给出**该改成哪一枚** |
+| ②↔③ | Dockerfile 字面量 ↔ `prisma`（devDeps 或 deps） | 本机会与镜像**各自生成一次** client，"我本地跑过迁移没问题"对容器不成立 |
+| 快照↔声明 | `image-npm-tree.json` 里 `prisma` / `@prisma/client` ↔ 上面两处 | 对账脚本此刻正在给**一个没人装过的树**打分 |
+| 没有对象 | 生产阶段读不到 `prisma@X` 点名 | 响亮失败（`prisma` 在 devDeps ⇒ 没这行镜像里就没有 CLI）——**不许退化成"没扫到也算过"** |
+
+install 形状仍然**只有一个所有者**：那条腿通过 `image-install-shape.mjs` 从 Dockerfile 读，
+不抄第二份清单（§8.8 立下的规矩）。
+
+#### 注入验证（5 臂 + 未变异对照，逐臂读数）
+
+| 臂 | 变异 | rc | 命中的判据消息 |
+|---|---|---|---|
+| A | Dockerfile `prisma@5.22.0` → `5.23.0` | 1 | 「镜像里的 prisma CLI 与运行时 @prisma/client 不是同一个版本」 |
+| B | package.json `@prisma/client` → `5.23.0` | 1 | 同 A（反方向） |
+| C | devDeps `prisma` → `5.23.0` | 1 | 「与开发者本机的 prisma CLI 不是同一个版本」 |
+| D | 快照里 `prisma` → `5.20.0` | 1 | 「快照里的 prisma=5.20.0 ≠ Dockerfile 钉的 prisma@5.22.0」 |
+| E | 那一整条点名换成 `npm install lodash` | 1 | 「生产阶段没有 `npm install prisma@<version>` 这一条了」 |
+| 对照 | 三份文件原样拷进临时目录 | **0** | 「三处同源 … 快照 5.22.0 / 5.22.0」 |
+
+夹具带**命中数断言**（`npm install prisma@5.22.0` 必须恰好命中 1 次、快照里 `prisma` 必须恰好 1 条），
+改 package.json/快照走解析器而不是猜缩进 —— 抄件会漂的第一现场就是这种"文本形状写死在夹具里"。
+
+#### 🔴 同时改掉 §8.20 步骤 1 的形状（这一条比判据本身更值钱）
+
+步骤 1 原写"装配阶段按快照里的 `name@version` 逐条钉版本"。把今天这条腿读完之后发现它有**自锚**问题：
+
+- 快照的 `inputs` 里有一枚是 **Dockerfile 的 install 形状哈希**；
+- 一旦把 143 条 `name@version` 写进那条 `npm install`，**形状哈希就是在哈希快照的内容**；
+- 于是 `--check` 从"快照 ↔ 当前声明"退化成"快照 ↔ 快照自己" ⇒ **永远绿**。
+
+⇒ 合同的**来源**必须是那个独立的东西（pnpm 的 lockfile 生产树），快照只是它的投影、
+Dockerfile 的实参来自快照。步骤 2 的等式才有两个不同的边可比的；否则新增的那条判据
+就是 §8.19 那种"一条永远绿的空判据"。
+
+🟡 顺带一条实测到的**既有守卫**（不是我要加的）：`gen-image-npm-tree.mjs` 读到生产阶段用
+`pnpm` 装会**直接 fail** 并写明"那时这条快照与对账应当**撤掉**，不是改成读别的文件"。
+也就是说如果最终走"镜像里用 pnpm 按 lockfile 装"，被撤下的是整套快照+覆盖率对账，
+而许可证门禁与镜像从此扫**同一棵树** —— 那才是 G-47 真正的终点。
+这条守卫把"半吊子迁移"（留着快照又换成 pnpm）当场拦住，值得记下来。
