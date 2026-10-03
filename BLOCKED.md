@@ -2616,3 +2616,16 @@ B30 写这两段"不是再跑一遍就好的东西"，并各自给了闭合代�
 🔴 **#154 原句的更正没有写进 `environment-traps.md`** —— 那个文件此刻正被并行会话写着
 （工作树 +48 行未提交，#178–#180 是他们的），按同一份台账的规矩不整文件 `git add`、不往脏文件追加。
 现量什么时候可以写：`git diff --numstat docs/reference/environment-traps.md` 为空。
+
+### B31 关闭（2026-10-03 14:1x）：不是修好的，是**它自己不复现了**
+
+上面那条"四臂排除、根因未定位"之后接着查，`pod install` 在**同一棵树**（`/tmp/heyta-ri-ios` @ `1ac5913a`）
+`rm -rf Pods` 之后 exit 0，`LANG`-only 与 `LANG`+`LC_ALL` 两臂都过；`/tmp/heyta-g5` 那一趟真走了
+当年崩的那一行（`Generating Pods project`）也过。⇒ **变量仍未定位**，但"这台机器跑不出 iOS 产物"
+不成立了，ios 段端到端已跑绿（读数、六臂表、两条 Ruby 侧一般事实、两条边界都在
+[`goal-multi-end-coverage.md`](docs/plans/goal-multi-end-coverage.md) §7.21）。
+
+🔴 **本条上面那句"traps #154 的 remedy 已被否证"要一起收回**：#154 说"新克隆能过"、
+本轮说"新克隆也崩"——**两句现在都不是当前事实**。留 #154 的更正动作照旧挂在
+`environment-traps.md` 干净的时候做，但**更正的内容变了**：不是"remedy 错了"，而是
+"这条崩溃不可复现、且两侧各测到一次相反结果 ⇒ 在能稳定复现之前，任何一句关于它的解法都不该写成解法"。

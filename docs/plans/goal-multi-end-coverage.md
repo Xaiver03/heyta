@@ -93,7 +93,8 @@
 
 > ⚠️ **读这张表之前先看文末**：下面"收尾"那一行写的是 **10:0x 的状态**（当时 `check` 还有两段红、
 > 缺口按"两段"登记）。12:0x 之后那两段红已当场解除、链本身也从 59 段长到 61 段，
-> **现状以 §7.17（61 段逐段读数）与 §7.19（本轮终局审计）为准** —— 表内那行不是最新答案。
+> **现状以 §7.17（61 段逐段读数）、§7.20（终局审计）与 §7.21–§7.22（ios 段解禁 + 四端同载体跑绿）为准**
+> —— 表内那行不是最新答案。
 > 留原文不改是为了让人看清"缺口当时是怎么被描述的"，不是让人照它行动。
 
 | 批 | 状态 | 判据 | 证据 |
@@ -928,17 +929,112 @@ Chrome 图标、信息气泡、Google 搜索栏本来就是蓝的。也就是说
 | ① 批五③ 移动端还原卡 JSX + i18n 中英复验 | ✅ | `git show HEAD:apps/mobile/src/screens/ExportScreen.tsx` 里 `restoreFromBackup`/`parseExportDocument`/`restoreIntoEmptyTarget` 三个符号**共 5 处命中**；`check:ui-language` exit 0；中英词条对等由 `@heyta/i18n` 的用例钉着（本轮 `pnpm -r test` 全过） |
 | ② 批五④ 设备判据转绿 + 变异 + 截图人看 + 审计回填 | ✅ | §7.6（26 项 / 0 失败）、§7.9（两条变异臂在当前产物上重证）、§7.12–§7.13（链逐段读数） |
 | ③ `pnpm check` 全量绿 | ✅ **达成** | §7.17：干净检出 @ `1ac5913a`，61 段一次跑完，`FULL_CHECK_INNER_EXIT=0`。**没有放宽任何基线、没有改别人的判据**；三段红（l4 / landing-e2e / shell-unicode）各自当场修 |
-| ③ `pnpm reinstall:all` 四端重装绿 | ⚠️ **差一段** | android ✅（`57e0e1fc`，含新加的前台窗口判据）；mac / windows ✅ 但**是 09:5x 那一趟的读数**，本批按包输入证明它们不受影响（`package-app.sh` 只吃 `apps/web`+`packages/app-host`）；**ios 🔴 被 `pod install` 挡住**（§7.19 那张表） |
+| ③ `pnpm reinstall:all` 四端重装绿 | ⚠️ **差一段** | android ✅（`57e0e1fc`，含新加的前台窗口判据）；mac / windows ✅ 但**是 09:5x 那一趟的读数**，本批按包输入证明它们不受影响（`package-app.sh` 只吃 `apps/web`+`packages/app-host`）；**ios 🔴 被 `pod install` 挡住**（§7.19 那张表）<br>✅ **14:2x 已关闭**：四端在**同一载体 `940af1c0`** 上逐段跑绿，见 §7.21 + §7.22（本行原句留着，因为它记录的"当时差 ios 一段"确实成立过） |
 | ③ 按归属纪律提交 | ✅ | 本条线这一轮 7 笔：`e446e54e` `f79d3733` `1ac5913a` `661cff78` `860fe82a` `57e0e1fc` + 本笔。全部 `git commit --only <点名路径>`，每笔之后 `git show --name-status` 只含自己点名的路径（`e446e54e` 13 条、`f79d3733` 2 条、`1ac5913a` 1 条、`661cff78` 2 条、`860fe82a` 1 条）。暂存区在提交前实测 `git diff --cached --name-only \| wc -l` = **10**，全是我自己那 10 条 rename，**没有别人的暂存条目被带走** |
 
 **没做的，逐条列名 + 现量命令**（不写成"以后再说"）：
 
-1. **ios 段重装** —— 阻塞在 `pod install`（§7.19）。要跑：换一台 `pod install` 能过的机器后
+1. ~~**ios 段重装** —— 阻塞在 `pod install`（§7.19）。要跑：换一台 `pod install` 能过的机器后
    `IOS_DEVICE_NAME="heyta-iphone-17pro" bash scripts/reinstall-all.sh --only ios`。
-   在此之前，"iOS 装的是当前源码"这句**不成立**，别引用 09:5x 那趟的 iOS 读数代替它。
+   在此之前，"iOS 装的是当前源码"这句**不成立**，别引用 09:5x 那趟的 iOS 读数代替它。~~
+   ✅ **14:1x 已做掉**（同一条命令，载体 `940af1c0`，`INNER_EXIT=0`）—— 见 §7.21 / §7.22。
+   划线留着是因为它当时是对的，而且它下面那句"别引用旧读数"现在仍然适用于**任何**没重跑的端。
 2. **落地页重新部署** —— `e446e54e` 改了用户可见 URL 前缀，线上现量 `assets/help` 200 / `assets/docs` 404
    （§7.16）。发布要产品负责人点头。
-3. **traps #154 的 remedy 更正** —— 本轮否证（新克隆同样崩）。写回原句的动作留给
-   `environment-traps.md` 没有未提交改动的时候做（现量：`git diff --numstat docs/reference/environment-traps.md`）。
+3. ~~**traps #154 的 remedy 更正** —— 本轮否证（新克隆同样崩）。~~
+   ⚠️ **更正的内容变了**（§7.21）：不是"remedy 错了"，而是"这条崩溃是间歇的，
+   #154 的解法与本轮对它的否证各是一个时间窗的读数，两句都不该往下传"。
+   写回原文件的动作照旧挂在 `environment-traps.md` 干净的时候做
+   （现量：`git diff --numstat docs/reference/environment-traps.md`；14:2x 实测仍是 `48 0`）。
 4. **`check:macos-window` 四条跳过分支仍返回 exit 0** —— 登记在案、**尚未拍**的老缺口，本轮没动它。
 5. **M3 的 41 处内联样式** —— 现在住在基线 90 里，B18 **没有解除**，只是不再表现为红。
+
+### 7.21 🔴 B31 当场解除：`pod install` 在**同一棵树、同一 commit** 上现在 exit 0 —— 于是 #154 的 remedy 与本轮对它的否证**都不成立**（14:0x–14:1x，载体 `940af1c0`）
+
+§7.19 那张表把 ios 段判成"四臂排除、根因未定位"。这一轮接着查，**它自己好了**：
+
+| 时刻 | 臂 | 结果 |
+|---|---|---|
+| 06:45 | `/tmp/heyta-g5` @ `840effb1`（**就是 traps #154 本体**），含 `rm -rf Pods` 后重装 | 🔴 同一处栈 ⇒ #154 当场排除过"沙盒残留" |
+| 12:5x | `/tmp/heyta-ri-ios` @ `1ac5913a`，`LANG=en_US.UTF-8`（脚本原样） | 🔴 `ArgumentError - path name contains null byte` @ `project.rb:452` |
+| 13:5x | 同 commit 现开新克隆（否证 #154 的 remedy） | 🔴 同一处栈 |
+| 14:0x | **同一棵 ri-ios** `rm -rf Pods` + `LANG=en_US.UTF-8`（不带 `LC_ALL`） | ✅ **exit 0**，`Pod installation complete! 84 dependencies / 83 pods` |
+| 14:0x | 同一棵树 + `LANG` 与 `LC_ALL` 都设 | ✅ exit 0 |
+| 14:0x | **`/tmp/heyta-g5`（#154 当年那棵长活的树）** @ `57e0e1fc`，沙盒与 lock 不一致 ⇒ 真走 `Generating Pods project` | ✅ exit 0，日志第 167 行就是当年崩的那一行 |
+
+⇒ **变量没有被定位，但"这台机器跑不出 iOS"这句被推翻了。** 三条当时能想到的解释各自有反证：
+不是 locale（两臂都过）、不是树龄（**同一棵树先崩后过**：g5 06:45 崩 / 14:0x 过，
+ri-ios 12:5x 崩 / 14:0x 过）、**不是 CocoaPods 缓存被修好**
+（`~/Library/Caches/CocoaPods` 顶层 mtime = **10-02 00:43**，崩溃趟与成功趟之间**零修改**）。
+我这一轮为定位它加的探针臂（`prepend` 一个 `Pathname#realdirpath` 包装、把 receiver 的字节打出来）
+**没有抓到 NUL —— 因为跑不到崩了**，它只留下两条一般事实（见下）。
+
+🔴 **所以这条的形状是"间歇"，不是"还有臂没试对"**：同一条件先红后绿，那么 #154 的 remedy
+（"换棵新树，5 秒，没理由在旧树上重试"）和本轮对它的那条否证（"新克隆也崩"）**只是两个时间窗里
+各采到一次的相反读数**，两句都不该再被当成解法往下传；也别给它建失败率模型 ——
+没有一段稳定复现的样本，`p` 无从谈起。（这正是"间歇性缺陷的 p 只属于采样那段窗口"那个老坑的第三次命中。）
+可用的只有一件事：**跑不通就重跑一次再判**，而判据本身一条没动。
+
+**顺带量到的两条，值得单独入 traps**：
+
+1. 🔴 **`LANG` 与 `LC_ALL` 都为空时，`pod install` 一步都走不出去**，死在
+   `Pod::Config#installation_root` 的 `String#unicode_normalize`
+   （`Unicode Normalization not appropriate for ASCII-8BIT`），而外层栈顶是
+   `verify_podfile_exists!` —— **读起来像"找不到 Podfile"**。本机 agent 的 shell 里
+   `LANG`/`LC_ALL` 实测**都是空的**，所以 `reinstall-all.sh` pod 步骤那句
+   `env ... LANG=en_US.UTF-8` 是**承重的**，不是装饰，别删。
+2. **Ruby 4.0 的 `Pathname.new` 自己就拦 NUL 与非 ASCII-compatible 编码**
+   （`Pathname.new("/tmp\0x")` ⇒ `ArgumentError: path name contains null byte`；
+   UTF-16/UTF-32 ⇒ `Encoding::CompatibilityError: path name must be ASCII-compatible`）。
+   ⇒ 所以"`path name contains null byte`"**不是**"仓库里有个带 NUL 的文件名"——
+   那种路径根本构造不出来。#154 与本轮都往"扫 1.9 GB 文件名"那个方向走过，**方向是错的**。
+
+**iOS 段这一趟的读数**（`IOS_DEVICE_NAME="heyta-iphone-17pro" bash scripts/reinstall-all.sh --only ios`，
+在隔离检出 `/tmp/heyta-g5` @ `940af1c0` 跑；`940af1c0` 与上一趟载体 `1ac5913a` 之间
+`packages/`、`apps/mobile/src` **零源码改动**，实测 `git log --name-only` 只列出文档与两张 png）：
+
+```
+模拟器 FE195661-B021-4A71-AAD1-1F2F7AE3A102 · 沙盒已同步（Manifest.lock == Podfile.lock）
+** BUILD SUCCEEDED ** · ✅ 已安装进模拟器（全新安装）
+✅ 已装的包比源码新 —— 这一轮装的是当前产物
+窗口 1206x2622 · 内容占比 61.5% · 主蓝命中 4136   INNER_EXIT=0
+进程佐证：simctl spawn … launchctl list → `UIKitApplication:com.heyta[fb92]` pid 22330
+```
+
+证据 `apps/mobile/evidence/ios-reinstall-940af1c0.png` —— **人已看**：iOS 上的是**联网同意弹窗**
+（标题"在使用联网功能之前"、主蓝按钮"同意并联网"、`服务条款`/`隐私政策` 两个蓝链接），
+与 android 那张同一状态，正是全新安装应有的第一屏。
+
+⚠️ **两条边界，不要读多**：
+
+1. **ios 段没有 android 那条前台窗口判据**（`57e0e1fc` 只加在 android 段）。这一趟的
+   `launchctl list` 是我**事后**补的独立佐证，不在流程里。缺口登记，不冒充已做。
+2. **`pod install` 会改三个已跟踪文件**：两个 `Info.plist` 被重写（**吃掉了里面的 XML 注释**，
+   含"只使用标准加密算法…出口合规"那条，并加进 `RCTNewArchEnabled`）、
+   `Podfile.lock` 的 `hermes-engine` 哈希差 1 行。在共享工作树里**别顺手提交它们**；
+   脚本对 lock 只打 ⚠️ 不判红（提交态可复现性由 `check:native-deps` 管）。
+
+### 7.22 ✅ §6.1.1 固定收尾：四端在**同一个载体 `940af1c0`** 上全部重装跑绿（14:1x–14:2x）
+
+上面 §7.20 那行"差一段"到此关闭。四段分别用 `--only <端>` 在隔离检出 `/tmp/heyta-g5`
+（`git checkout 940af1c0`，`git status --porcelain` 实测**空**）跑，每段 `INNER_EXIT=0`：
+
+| 端 | 判据读数 | 证据 |
+|---|---|---|
+| mac | 窗口 1092x723 · webview 内容占比 **73.0%** · 主蓝命中 **1269** · `HEYTA_NO_FOCUS=1` 后台起 | `apps/desktop-macos/evidence/mac-reinstall-webview-940af1c0.png` |
+| windows | 远端新鲜度对账（`web-dist/index.html=ca473eb5…` + bridge + **7 枚 assets 一致**）· `ADD_APPX=OK` `RESULT=OK` `PAYLOAD_WEBDIST=T` `M2D=OK` | `apps/desktop-windows/evidence/windows-reinstall-first-run-940af1c0.png` |
+| android | release APK 64M 重打 · 全新安装 · ⚠️ monkey 后前台不是 `com.heyta` → `am start -W` 拉起 → **前台窗口确认** `mCurrentFocus=…com.heyta/com.heytamobile.MainActivity` · 1080x2400 · 内容 58.5% · 主蓝 **4001** | `apps/mobile/evidence/android-reinstall-940af1c0.png` |
+| ios | 沙盒同步 → `** BUILD SUCCEEDED **` → 全新安装 → **新鲜度**（已装包比源码新）· 1206x2622 · 内容 61.5% · 主蓝 **4136** · 事后独立佐证 `launchctl list` 里 `UIKitApplication:com.heyta[fb92]` pid 22330 | `apps/mobile/evidence/ios-reinstall-940af1c0.png` |
+
+**四张图都人眼看过**（§6.2 规定一）：三端是**联网同意弹窗**（mac 那张还能看到 rail 的
+收集箱/今天/最近 7 天/已完成/四象限/清单/标签 + 铃铛 + 帮助、`AI 工具调用` 行、中/EN 切换），
+windows 那张还额外开着**头像菜单**（`登录 / 注册` 在第一项 + `设置`）—— 正是 `M2D` 那条判据要看的东西。
+
+ **android 那一行的 ⚠️ 是 `57e0e1fc` 那条新判据第一次在真事件上生效**：上一轮它把一张
+桌面启动器判成绿（§7.19），这一轮它先报"monkey 之后前台不是 com.heyta"、显式拉起、确认前台，
+**才**打分。判据没动过一条，跑法也没变 —— 这是它该有的样子。
+
+⚠️ **载体与主分支的关系**（别读成"装的是 `940af1c0` 之后的东西"）：跑完之后 main 又走了两笔
+（`a371a658` `9f1cc9c3`），`git diff --name-only 940af1c0..HEAD` 实测只有
+`scripts/lib/mobile-e2e.sh`、`scripts/mutate-closeout-gates.sh`、`scripts/verify-mobile-repeat.sh`
+三行，`apps/` 与 `packages/` 命中 **0** ⇒ 四端产物输入未变。
