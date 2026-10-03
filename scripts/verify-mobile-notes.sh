@@ -93,6 +93,10 @@ PHONE_DB=/tmp/heyta-notes-phone.sqlite
 TAB_Y=2253
 EVIDENCE="$HEYTA_REPO_ROOT/apps/mobile/evidence"
 mkdir -p "$EVIDENCE"
+# 🔴 起跑时间戳取在任何破坏性动作之前（第 0 步的 pm clear / install -r 都算）：
+#    第 12 步原来只判 `-s`（非空），而**上一趟留下的旧图同样非空** ——
+#    产物在、结论也对，只是它不属于这一趟（§7 第 27 条那一族的第三种面目）。
+RUN_STARTED=$(date +%s)
 
 # 🔴 **故意用 ASCII 正文**：`adb shell input text` 发不了非 ASCII（实测抛
 #    NullPointerException，而它退出码仍可能是 0）。中文便签走 iOS 侧
@@ -512,9 +516,22 @@ else
   fi
 fi
 
-step "12. 截图证据落库"
+step "12. 截图证据落库（非空**且本轮新生**）"
+# 🔴 这里判两件事，缺一不可：
+#    · `-s`（非空）—— 挡"adb 没写出来"；
+#    · mtime ≥ 起跑 —— 挡"那是上一趟留下的"。第 8 步那张在很深的成功分支里，
+#      那一支没走到时旧图**照样非空**，只判前一条就会把"这一趟没拍到"印成"证据在库"。
 for f in android-notes-1-editor-open.png android-notes-2-list-after-edit.png android-notes-3-from-search.png; do
-  if [ -s "$EVIDENCE/$f" ]; then ok "证据在库：apps/mobile/evidence/$f"; else bad "证据缺失：apps/mobile/evidence/$f"; fi
+  p="$EVIDENCE/$f"
+  if [ ! -s "$p" ]; then
+    bad "证据缺失或为空：apps/mobile/evidence/$f"; continue
+  fi
+  M=$(stat -f %m "$p")
+  if [ "$M" -lt "$RUN_STARTED" ]; then
+    bad "证据是旧的：apps/mobile/evidence/$f —— mtime $(stat -f '%Sm' -t '%m-%d %H:%M:%S' "$p") 早于本轮起跑 $(date -r "$RUN_STARTED" '+%m-%d %H:%M:%S')（非空不等于本轮拍的）"
+  else
+    ok "证据在库且本轮新生：apps/mobile/evidence/$f（$(stat -f %z "$p") bytes）"
+  fi
 done
 echo "   📷 三张截图（**人必须打开看**）：编辑屏初值 / 列表摘要已变 / 从搜索结果进来的编辑屏"
 
