@@ -205,6 +205,16 @@ export const META_KEYS = {
   ENCRYPTION_ENABLED: 'encryptionEnabled',
   /** 最后成功同步的时间。 */
   LAST_SYNCED_AT: 'lastSyncedAt',
+<<<<<<< HEAD
+=======
+  /** 上一次成功拉到的公共事实响应体（`HolidayAdjustmentsResponse` 的 JSON）。 */
+  PUBLIC_FACTS_JSON: 'publicFactsJson',
+  /** 它对应的版本令牌（服务端 ETag 的候选值），条件请求时原样回传。 */
+  PUBLIC_FACTS_ETAG: 'publicFactsEtag',
+  /** 那次拉取的本地毫秒时间戳（只用于"缓存多旧"，不参与任何裁决）。 */
+  PUBLIC_FACTS_FETCHED_AT: 'publicFactsFetchedAt',
+
+>>>>>>> feat/countdown-batch2
   /**
    * 服务端已确认的因果前沿。
    *

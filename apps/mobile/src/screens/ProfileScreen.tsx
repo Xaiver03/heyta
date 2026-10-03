@@ -76,10 +76,12 @@ import {
 } from '@heyta/ui';
 
 import { Button, Card, Divider, HStack, Screen, SectionHeader, Text, TextField } from '../ui/kit';
+import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
 import { AvatarBadge } from '../ui/avatar';
 import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
+import { CountdownScreen } from './CountdownScreen';
 import { EntitlementSection } from './EntitlementSection';
 import {
   MOBILE_FEATURE_ENTRIES,

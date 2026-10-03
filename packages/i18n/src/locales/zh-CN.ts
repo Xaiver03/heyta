@@ -3857,6 +3857,11 @@ export const zhCN = {
   'common.conflict.reason.localArchive': '本机把它归档了',
   // 认不出来时的兜底：不能回落成服务端那句英文诊断，也不能什么都不说。
   'common.conflict.reason.fallback': '两边对同一处做了不同的改动',
+  // 日历格子里的「休 / 班」（W4b 公共事实）。同一份词表既当可见字符也当读屏名 ——
+  // `calendarDayMarkerView` 里 `spoken` 直接取它，所以英文侧必须是能念出来的词，不能是符号。
+  'common.calendar.dayMarker.off': '休',
+  'common.calendar.dayMarker.work': '班',
+
   // 🔴 这一组住在 `common.*` 而不是 `web.*`：**两端都要用**（档位每批会加一档，
   //    所以这里刻意**不写条数** —— 写过数字的注释一定会漂）。
   //    原来它们是 `web.calendar.view.*`，而移动端补上档位入口时要读同一组词 ——

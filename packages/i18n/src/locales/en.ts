@@ -3615,6 +3615,9 @@ export const en = {
   'common.conflict.reason.remoteArchive': 'The other device archived it',
   'common.conflict.reason.localArchive': 'This device archived it',
   'common.conflict.reason.fallback': 'Both sides made different changes to the same thing',
+  'common.calendar.dayMarker.off': 'Off',
+  'common.calendar.dayMarker.work': 'Work',
+
   // 🔴 This group lives under `common.*`, not `web.*`: **both shells read it**
   //    (a view tier is added per batch, so the count is deliberately not written
   //    here — comments that carry a number always drift).
