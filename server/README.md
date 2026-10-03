@@ -67,6 +67,32 @@ nano .env
 ./scripts/deploy.sh
 ```
 
+**`./scripts/deploy.sh` is the supported entry point, and the reason is the migrations.**
+It applies them **while the previous app container is still serving**, and only swaps the
+container if that succeeded — so a bad migration leaves you running the old build instead of
+leaving you with a new build against a schema it does not know.
+
+Plain `docker compose up -d` does **not** do that, on purpose: `RUN_MIGRATIONS_ON_STARTUP`
+defaults to `false` here (see the Configuration table below) because startup migrations make
+replicas fight over Prisma's migration lock, and because adding a migrate step to the default
+service graph would collide with the migrator `deploy.sh` already owns. The honest consequence
+is that bare `up -d` on a fresh volume **starts an app against an unmigrated schema**.
+
+If you want compose alone to be enough — first boot, no `deploy.sh` — opt into the one-shot
+migrator, which is the same shape as the Helm chart's `migrate-db` init container:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml up -d
+```
+
+The override adds exactly one service and does not touch the default graph. It waits for
+Postgres to be healthy, runs `scripts/migrate-deploy.sh` from the image, and only then lets the
+app start (`service_completed_successfully`). ⚠️ It migrates on **first** boot: a one-shot
+container whose config hash did not change is not re-run by a later `up -d`, so upgrades still
+need `deploy.sh` (or `--force-recreate supersync-migrate`). A migration entry that quietly only
+works once, documented as if it worked always, would be worse than none — it would make the
+operator believe the schema is current.
+
 **That is the whole setup — there is no separate frontend to build or host.** The image
 contains the web client, built from the same commit as the server it ships with, and the
 server serves it at `/app/` (default; `WEB_APP_PATH` moves it, `WEB_APP_DIR=` turns it

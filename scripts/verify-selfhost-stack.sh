@@ -31,6 +31,26 @@
 # 拿它起一套会验收到"生产库的 schema 状态"上去，而这条命令要判的是
 # "从空库起一条 compose 能不能用" —— 那必须是**新库**。
 # 同理这里的凭据是随机值且**不进任何仓库**：它们只活在这条命令的临时文件里。
+#
+# ## 🔴 迁移这一环判的是 D-3，而且是**两条腿**
+#
+# 本脚本**始终带上** `docker-compose.migrate-once.yml`（对外文档第一屏写的那条
+# "compose 自己就够"的入口），并且夹具里**不设** `RUN_MIGRATIONS_ON_STARTUP`
+# —— 于是容器里读到的是 `docker-compose.yml:50` 那个默认 `false`。
+# 两条合起来才证明"空库起来的那套能用的界面，迁移是被**那个一次性服务**做掉的"：
+#
+#   · 腿一：一次性容器**退出码 0**，且库里「已成功应用」的**不同迁移名数**等于磁盘上的
+#     迁移目录数（阈值从被约束的常量推导，不是"大于 0"—— 后者在只建了基线表时也能绿）；
+#   · 腿二：应用容器自己的 `RUN_MIGRATIONS_ON_STARTUP` 当场读出来是 `false`；
+#   · 腿三：没有一条迁移处在「既没 finished_at 也没 rolled_back_at」的悬挂态。
+#     ⚠️ 刻意**不**断言"`finished_at IS NULL` 的行数为 0"：`migrate-deploy.sh` 对
+#     CONCURRENTLY 走"回滚标记 + 带外恢复"，恢复成功后同一个名字**留两行**（一条痕迹、
+#     一条结果）。本机现量：42 个目录 / 42 个已应用名 / 5 条回滚痕迹 / 悬挂 0 / 重复完成 0。
+#     按行数判会把一次**正确**的部署判成失败。
+#
+# 只留腿一就是假绿：那种写法下迁移可能来自应用自己启动那一段（旧脚本正是这样，
+# 它偷偷设 `RUN_MIGRATIONS_ON_STARTUP=true`），于是这条命令验的**从来不是** D-3，
+# 而是"启动即迁移能不能用"—— 而那是默认档刻意不承诺的语义。
 
 set -euo pipefail
 
@@ -47,6 +67,14 @@ PORT="${HEYTA_SELFHOST_PORT:-1900}"
 BASE="http://127.0.0.1:${PORT}/app/"
 BUILD=1
 KEEP=0
+
+# 🔴 两份 compose 文件写成**一个数组**，因为"带不带 override"就是这条验收的判据本体。
+# 各段自己拼 `-f a -f b` 的写法，漂起来的方向是某个调用忘了带 override ——
+# 那次跑的就不是对外文档里那条入口，而输出照样全绿。
+COMPOSE_FILES=(-f "$REPO_ROOT/server/docker-compose.yml" -f "$REPO_ROOT/server/docker-compose.migrate-once.yml")
+compose() {
+  docker compose -p "$PROJECT" --env-file "$ENV_FILE" "${COMPOSE_FILES[@]}" "$@"
+}
 
 for arg in "$@"; do
   case "$arg" in
@@ -98,6 +126,12 @@ fi
 
 # ── 一次性凭据：够长、只在这条命令的进程里存在 ─────────────────────
 rand() { head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c "$1"; }
+# 🔴 heredoc 用的是**不带引号的 EOF**（要靠 $IMAGE 和 $(rand) 展开），所以正文里
+# **一个反引号都不能有**：那会被当命令替换执行。实测形态 ——
+# 上一版在正文注释里写了 `server/docker-compose.yml` 和 `docker-compose.yml:50`，
+# 于是每次跑都印出 `Permission denied` 与 `command not found` 两行假错误，
+# 而**写入是成功的** ⇒ 我当天把第一行误判成"沙箱夹层的产物"，还把它写进了下面的注释。
+# 那条误判已就地撤回。判据只看文件内容（真的那两条在下面）。
 write_env_file() {
   cat >"$ENV_FILE" <<EOF
 SUPERSYNC_IMAGE=$IMAGE
@@ -107,9 +141,10 @@ PASSWORD_PEPPER=$(rand 40)
 PUBLIC_URL=https://selfhost.verify.invalid
 NODE_ENV=production
 DOMAIN=selfhost.verify.invalid
-# 这条验收判的就是"没配 SMTP 的那台实例"，所以显式关掉邮箱验证 ——
-# 同时它也是 `server/docker-compose.yml` 里那条转发行**有没有生效**的载体。
-RUN_MIGRATIONS_ON_STARTUP=true
+# REQUIRE_EMAIL_VERIFICATION=false：这条验收判的就是"没配 SMTP 的那台实例"，
+# 所以显式关掉邮箱验证；它同时也是 compose 里那条 SMTP 转发行有没有生效的载体。
+# 这里刻意**不设** RUN_MIGRATIONS_ON_STARTUP，让它落回默认 false —— 于是"界面可用"
+# 只可能由一次性迁移服务造成（两条腿见文件头）。
 REQUIRE_EMAIL_VERIFICATION=false
 EOF
 }
@@ -129,25 +164,45 @@ grep -q '^POSTGRES_PASSWORD=.\+' "$ENV_FILE" || die "凭据文件里没有非空
 grep -q '^JWT_SECRET=.\+' "$ENV_FILE" || die "凭据文件里没有非空的 JWT_SECRET（$ENV_FILE）。"
 
 log "==> 起栈（project=$PROJECT，端口 127.0.0.1:$PORT）"
+
+# ── 服务图对账：override 加了一个服务，默认那张图**一个都没多** ──────────
+# 这两条是本步骤的红线（"不得改默认服务图"）。放在 `up` **之前**：
+# 图要是已经被改坏，栈照样起得来、界面照样能用 —— 那时候所有行为判据都会绿，
+# 而"默认档不许有迁移服务"这句话已经没人守了。
+services_of() {
+  # `config --services` 走的是 compose 自己的解析器（不是正则猜），
+  # 排序后逐字比对 ⇒ 少一个、多一个、名字漂了都能抓到。
+  docker compose -p "$PROJECT" --env-file "$ENV_FILE" "$@" config --services 2>/dev/null | LC_ALL=C sort | tr '\n' ' '
+}
+DEFAULT_SERVICES="$(services_of -f "$REPO_ROOT/server/docker-compose.yml")"
+[ "$DEFAULT_SERVICES" = "caddy postgres supersync " ] || {
+  printf '默认服务图实测：%s\n' "$DEFAULT_SERVICES" >&2
+  die "默认服务图应当**恰好**是 caddy / postgres / supersync 三个。多出来的那一个就是「启动时谁迁移」的第二个所有者 —— 它会和 deploy.sh 的 migrator 互踩（RUN_MIGRATIONS_ON_STARTUP=false 防的正是这件事）。"
+}
+OVERRIDE_SERVICES="$(services_of "${COMPOSE_FILES[@]}")"
+[ "$OVERRIDE_SERVICES" = "caddy postgres supersync supersync-migrate " ] || {
+  printf '带 override 的服务图实测：%s\n' "$OVERRIDE_SERVICES" >&2
+  die "override 应当只加 supersync-migrate 这一个服务。"
+}
+log "    服务图对账：默认 3 个（未动） · 带 override 4 个（+supersync-migrate）"
+
 cd server
 # 🔴 先把这一套的**卷**清掉。实测形态：上一轮的 postgres 数据卷还在，
 # 而 `POSTGRES_PASSWORD` 是每次随机生成的 —— 官方镜像看到非空数据目录就**跳过初始化**，
 # 于是库里的口令是上一轮那个，新口令永远对不上，容器 P1000 之后无限重启。
 # 这条命令判的是"从空库起一条 compose 能不能用"，复用别人的旧库连题都不是。
-docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f docker-compose.yml \
-  down -v --remove-orphans >/dev/null 2>&1 || true
-docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f docker-compose.yml \
-  up -d postgres supersync >/tmp/heyta-selfhost-up.log 2>&1 || {
-    tail -20 /tmp/heyta-selfhost-up.log
-    [ "$KEEP" = "1" ] || docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f docker-compose.yml down -v >/dev/null 2>&1
-    die "compose 起栈失败（/tmp/heyta-selfhost-up.log）"
-  }
+compose down -v --remove-orphans >/dev/null 2>&1 || true
+compose up -d postgres supersync >/tmp/heyta-selfhost-up.log 2>&1 || {
+  tail -20 /tmp/heyta-selfhost-up.log
+  [ "$KEEP" = "1" ] || compose down -v >/dev/null 2>&1
+  die "compose 起栈失败（/tmp/heyta-selfhost-up.log）"
+}
 cd "$REPO_ROOT"
 
 down_stack() {
   [ "$KEEP" = "1" ] && return 0
   log "==> 拆栈"
-  docker compose -p "$PROJECT" --env-file "$ENV_FILE" -f docker-compose.yml down -v --remove-orphans >/dev/null 2>&1 || true
+  compose down -v --remove-orphans >/dev/null 2>&1 || true
 }
 
 # ── 等健康：迁移要跑完（含 CONCURRENTLY 的带外恢复），最长 240s ────
@@ -165,6 +220,57 @@ if [ "$healthy" != "1" ]; then
   down_stack
   die "服务端在 240s 内没有起来（上面是它的日志）"
 fi
+
+# ── D-3：迁移是**那个一次性服务**做的，不是应用自己启动时做的 ────────────
+# 三条各管一段，缺任何一条这个结论都不成立：
+#   1 一次性容器退出码 0（它真跑完了，不是还在跑、也不是失败后被 restart 策略留着）；
+#   2 应用容器自己读到的 RUN_MIGRATIONS_ON_STARTUP 当场是 false（排除"迁移来自应用"）；
+#   3 库里已 applied 的迁移数 **等于** 磁盘上的迁移目录数（阈值从被约束的常量推导，
+#     不是"大于 0" —— 后者在只建了基线表、一条迁移都没跑的时候也能绿）。
+# ⚠️ 这里用 `supersync`/`supersync` 是因为**上面那份夹具没设** POSTGRES_USER/POSTGRES_DB，
+# 于是走 `docker-compose.yml` 的默认值；换夹具要同步换这里的两个名字。
+MIG_PS="$(compose ps -a --format '{{.Service}}|{{.State}}|{{.ExitCode}}' supersync-migrate 2>/dev/null | head -1)"
+case "$MIG_PS" in
+  'supersync-migrate|exited|0') ;;
+  *) die "一次性迁移容器不是「exited 且退出码 0」，实测读到的是「${MIG_PS:-查不到这个服务}」。
+     没跑完 ⇒ 这台实例跑在未迁移的表结构上；还在跑 ⇒ 顺序没被 service_completed_successfully 挡住。" ;;
+esac
+APP_STARTUP_MIGRATE="$(docker exec supersync-server printenv RUN_MIGRATIONS_ON_STARTUP 2>/dev/null || echo '<读不到>')"
+if [ "$APP_STARTUP_MIGRATE" != "false" ]; then
+  printf '   应用容器里的 RUN_MIGRATIONS_ON_STARTUP 实测 = %s\n' "$APP_STARTUP_MIGRATE" >&2
+  die "这条验收只在「迁移由一次性服务完成」时才有意义。应用自己启动即迁移 ⇒ 判到的是另一条语义（那正是默认档刻意不承诺的），而界面照样能用、上面两条照样全绿。"
+fi
+MIGRATION_DIRS=$(find server/prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+psql_t() { compose exec -T postgres psql -U supersync -d supersync -tA -c "$1" 2>/dev/null | tr -d '[:space:]'; }
+APPLIED="$(psql_t 'SELECT count(DISTINCT migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL')"
+INFLIGHT="$(psql_t 'SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NULL AND rolled_back_at IS NULL')"
+DUPDONE="$(psql_t 'SELECT count(*) FROM (SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL GROUP BY migration_name HAVING count(*) > 1) t')"
+TRACE="$(psql_t 'SELECT count(*) FROM _prisma_migrations WHERE rolled_back_at IS NOT NULL')"
+# 🔴 四个读数都必须是数字。`2>/dev/null` 会把"连不上库/表不存在"变成空串，
+# 而空串走 `${X:-1}` 会被读成「有 1 条悬挂」—— 那是把**探针坏了**报成**产品缺陷**。
+for pair in "已应用名数=$APPLIED" "悬挂数=$INFLIGHT" "重复完成数=$DUPDONE" "回滚痕迹数=$TRACE"; do
+  case "${pair#*=}" in
+    ''|*[!0-9]*)
+      printf '   读数：%s\n' "$pair" >&2
+      die "迁移台账读不出数字（上面那对键值就是原样读数）。探针够不着的时候报「有 N 条悬挂」是假红 —— 先修读法。"
+      ;;
+  esac
+done
+[ "${APPLIED}" = "${MIGRATION_DIRS}" ] || {
+  printf '   迁移目录 %s 个 · 库里"已成功应用"的不同迁移名 %s 个\n' "$MIGRATION_DIRS" "${APPLIED:-读不到}" >&2
+  die "已成功应用的迁移**名字数**必须等于磁盘上的迁移目录数。少了就是「起来却跑在未迁移表结构上」这个缺陷本身 —— 那条缺陷以前只能靠 README 里一句话，现在有数了。"
+}
+# ⚠️ 这里**不**断言 `finished_at IS NULL` 的行数为 0 —— 实测那种写法会把一次**正确**的
+# 部署判成失败。`scripts/migrate-deploy.sh` 对 CONCURRENTLY 迁移走"先原生试、失败就回滚
+# 标记再带外恢复"，恢复成功后同一个迁移名留下**两行**：一行 rolled_back_at 有值（痕迹）、
+# 一行 finished_at 有值（结果）。本机现量：42 个目录 / 42 个已应用名字 / 5 条回滚痕迹
+# （20260512、20260514、20260514000002、20260828000001、20260829000000 —— 全是 CONCURRENTLY 那几条）。
+# 真正"没跑完"的形状是 **既没有 finished_at 也没有 rolled_back_at**（PENDING / IN_PROGRESS），
+# 那才是要拦的一条，而且它有牙：漏跑一条迁移 ⇒ 下面 INFLIGHT 或 APPLIED 必然不匹配。
+[ "${INFLIGHT:-1}" = "0" ] || die "有 ${INFLIGHT} 条迁移处在「既没完成也没回滚」的状态（PENDING/IN_PROGRESS）= 迁移被打断在中间，这台实例的 schema 不是干净状态。"
+[ "${DUPDONE:-1}" = "0" ] || die "有 ${DUPDONE} 个迁移名出现了**两条**已完成的行 —— 台账写脏了，APPLIED 那个数就不再是证据（两条同一名字 + 一条漏跑，计数照样相等）。"
+log "    D-3 对账：一次性容器 exited(0) · 应用侧 RUN_MIGRATIONS_ON_STARTUP=false · 已应用 ${APPLIED}/${MIGRATION_DIRS} · 悬挂 0 · 重复完成 0 · 带外恢复痕迹 ${TRACE} 条（设计内）"
+
 
 # 🔴 前置判据：**这台实例真的有界面**。
 # 少了这一条，"打开 /app/ 是 404" 会被算成"界面用例失败"，
@@ -200,7 +306,7 @@ ls -1 e2e/selfhost-stack-results/*.png 2>/dev/null | sed 's/^/  /' || log "  （
 if [ "$KEEP" = "1" ]; then
   log ""
   log "⚠️ 栈留着没拆（--keep）：$BASE 现在可以直接用浏览器打开。"
-  log "   拆掉：cd server && docker compose -p $PROJECT --env-file $ENV_FILE -f docker-compose.yml down -v"
+  log "   拆掉：docker compose -p $PROJECT --env-file $ENV_FILE ${COMPOSE_FILES[*]} down -v"
 else
   down_stack
 fi
