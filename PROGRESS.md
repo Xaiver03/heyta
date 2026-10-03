@@ -1392,3 +1392,24 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   ⇒ `check:docs` 在 HEAD 上报 1 处死链、出处 `PROGRESS.md:1362`，committer 是我、句子不是我写的。
   目标文件在本机存在（3907 B / 20:46），是 owner 还没 `git add`；我不代 add、也不代改别人的句子。
 - 已登记 **B53**（含可复跑的 blame 取证与五条新配方）。历史不重写 —— 倒回去会删掉别人那节。
+
+### 2026-10-03 · B/C 续验：授权竞态与通知证据
+
+- C 首次系统授权完成后显式再次调度，保留本地意图独立落库；三种授权时序测试通过。
+- iOS 本机不确定投递证据已接到共享提醒列表的说明，不改同步 phase；旧 occurrence 在 snooze 后不再提示。共享行模型 11 项、提醒动作/投递/重复 56 项通过，UI/mobile 类型检查通过。
+- 原则回写 AGENTS §8、ADR-0051 与环境陷阱 #189；真实通知脚本修正为“取消前仍有通知”的正向对照，避免先点击 autoCancel 后假绿。
+- 当前工作区 build、Android Release 构建通过；真实 Android/iOS 投递与恢复 UI 仍在执行，不能用构建结果替代 B/C 的完成证据。
+- 22:55 续验：当前 Android Release 的提醒主链 11 项全部通过，包含取消前通知存在的正向对照、真实十分钟贪睡、SIGKILL 后系统投递与点击返回；两张系统通知截图已人工查看，证据回写 ADR-0051 和多端覆盖计划 §4。B 原子迁移配额竞态正在修复，iOS、跨端恢复、最终全仓门禁与四端重装未完成，Goal 保持 active。
+- Android 安全存储在当前 Debug 安装产物上完成五阶段真实 instrumentation：账号 scope 隔离、跨四个独立进程读写/删除、整机重启后读回均通过。APK 哈希与阶段结果位于 `apps/mobile/evidence/android-vault-storage.txt`；脚本入口 `pnpm verify:android-vault-storage` 已接入自快照门禁，并由 ADR-0050 链接。此结果不冒充锁屏禁读、iOS Keychain 或生产恢复 UI 验收。
+- 23:39 Android C 补验完成：权限恢复、force-stop + 整机重启后再次启动补发、未到期 pending alarm 删除各 5/5；系统与 SQLite 双判据验证没有伪造 fired。前后截图已核看并由 ADR-0051 链接，原计划批三状态同步更正；调度器空实现的 Release 变异被 OS 通知断言抓到。过程约束继续融入 AGENTS §8 与现有 ADR，不建孤立记忆文件。iOS、生产密钥迁移 UI、全量门禁与四端重装仍未完成。
+
+### 2026-10-04 · B 端到端反证补强
+
+- 按用户要求继续把经验融入原入口：AGENTS §8 补入密文 journal、AAD 下载规范表示，以及在预检后建立预留的事务屏障判据。ADR-0050 保留真实失败边界。
+- 更强的真实 PostgreSQL/HTTP 用例抓到两条未闭合缺口：迁移 inventory 的 `entityIds: []` 与普通下载省略字段产生不同 AAD，新设备 full-state 解密失败；预检后建立 reservation 时普通 upload 仍可越过配额。正在修复，不能用此前 3/3、5/5 的较窄测试宣布完成。
+- 新增既有 ADR 链接的 `pnpm verify:vault-web`：三个独立 Chromium context，经真实生产 HTTP 路径创建、恢复、轮换和下载；00:20 三台新设备真实旅程已全绿（创建 → 恢复后强制 wrapper 轮换 → root 迁移 → 新设备下载重建），尚不覆盖 legacy 历史。恢复码截图遮挡、trace/video 关闭，避免测试证据保存秘密。Goal 保持 active。
+- 00:06 补上移动端原生安全存储的保存/登出串行化与在途读取失效：12/12 行为测试通过；隔离副本取消串行化后，登出仍残留原生 root 的判据转红。该约束已并入 AGENTS §8.10 与 ADR-0050，原生设备仍须在最终当前安装产物上续验。
+
+- 00:28 独立复核发现首次建包误判 legacy 历史世代，以及 wrapper 更新与迁移并发覆盖；服务端正补事务判据。另将 payload cipher 的空 `entityIds` 规范为下载时的省略形状：新回归先在 AES 认证处失败，再修复后 14/14 通过；非空列表篡改仍必须拒绝。
+
+- 00:39 Web 真 PostgreSQL 旅程扩至 3/3：旧密文首次建包与迁移、新设备恢复，以及 chunk 网络中断重启续传、commit 响应丢失查询同 requestId、取消后刷新无 pending 全部通过；DEV StrictMode 并发 session 已合并，fixture 1/1。全仓 typecheck 通过；全量测试抓到新增三类密钥表未同步隐私文档，已补中英用途/留存/注销类别及草案版本 1.2，legal 66/66。后续继续全量测试与原生验收。

@@ -20,6 +20,10 @@
 		BCEFFD3F2AF9BA4D4D74A03C /* HeytaWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 043B3AB8A7839FD9E717C737 /* HeytaWidgetBundle.swift */; };
 		C7BF8A4B8258E1E0A2713805 /* HeytaWidgetKit in Frameworks */ = {isa = PBXBuildFile; productRef = BAF2BC86C34AAABEFEAD0650 /* HeytaWidgetKit */; };
 		E10761744B4ACA38F1304981 /* HeytaWidgetModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB312F0DA2AD3E458F74337 /* HeytaWidgetModule.swift */; };
+		E10761754B4ACA38F1304981 /* HeytaReminderModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10761764B4ACA38F1304981 /* HeytaReminderModule.swift */; };
+		E10761774B4ACA38F1304981 /* HeytaReminderModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = E10761784B4ACA38F1304981 /* HeytaReminderModuleBridge.m */; };
+		E10761794B4ACA38F1304981 /* HeytaVaultSecureStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E107617A4B4ACA38F1304981 /* HeytaVaultSecureStorage.swift */; };
+		E107617B4B4ACA38F1304981 /* HeytaVaultSecureStorageBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = E107617C4B4ACA38F1304981 /* HeytaVaultSecureStorageBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,6 +69,10 @@
 		8D22EB6C565E4257AB4A6650 /* HeytaWidgetExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = HeytaWidgetExtension.entitlements; path = HeytaWidgetExtension.entitlements; sourceTree = "<group>"; };
 		9FDD8A63A9057319E7AF1AC4 /* HeytaWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HeytaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		E10761764B4ACA38F1304981 /* HeytaReminderModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HeytaReminderModule.swift; path = Heyta/HeytaReminderModule.swift; sourceTree = "<group>"; };
+		E10761784B4ACA38F1304981 /* HeytaReminderModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = HeytaReminderModuleBridge.m; path = Heyta/HeytaReminderModuleBridge.m; sourceTree = "<group>"; };
+		E107617A4B4ACA38F1304981 /* HeytaVaultSecureStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HeytaVaultSecureStorage.swift; path = Heyta/HeytaVaultSecureStorage.swift; sourceTree = "<group>"; };
+		E107617C4B4ACA38F1304981 /* HeytaVaultSecureStorageBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = HeytaVaultSecureStorageBridge.m; path = Heyta/HeytaVaultSecureStorageBridge.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -100,6 +108,10 @@
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				7BB312F0DA2AD3E458F74337 /* HeytaWidgetModule.swift */,
 				7CAF7A9B123DBD3433233462 /* HeytaWidgetModuleBridge.m */,
+				E10761764B4ACA38F1304981 /* HeytaReminderModule.swift */,
+				E10761784B4ACA38F1304981 /* HeytaReminderModuleBridge.m */,
+				E107617A4B4ACA38F1304981 /* HeytaVaultSecureStorage.swift */,
+				E107617C4B4ACA38F1304981 /* HeytaVaultSecureStorageBridge.m */,
 			);
 			name = Heyta;
 			sourceTree = "<group>";
@@ -361,6 +373,10 @@
 				7A10000E2C0A00010066001A /* SceneDelegate.swift in Sources */,
 				E10761744B4ACA38F1304981 /* HeytaWidgetModule.swift in Sources */,
 				008BCDCCEA59400F058F1BF0 /* HeytaWidgetModuleBridge.m in Sources */,
+				E10761754B4ACA38F1304981 /* HeytaReminderModule.swift in Sources */,
+				E10761774B4ACA38F1304981 /* HeytaReminderModuleBridge.m in Sources */,
+				E10761794B4ACA38F1304981 /* HeytaVaultSecureStorage.swift in Sources */,
+				E107617B4B4ACA38F1304981 /* HeytaVaultSecureStorageBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

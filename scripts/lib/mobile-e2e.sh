@@ -21,6 +21,10 @@
 set -u
 export PATH="/opt/homebrew/bin:$PATH"
 
+# 「别的验收在跑吗」的探针。用 BASH_SOURCE 而不是 `$0` 的 dirname：本文件是被
+# source 的，`$0` 是**调用方脚本**的路径（可能是绝对路径、也可能从 scripts/ 下起）。
+. "$(dirname "${BASH_SOURCE[0]:-$0}")/mobile-e2e-runner-probe.sh"
+
 # 🔴 设备号**只有一个住处**：`$E2E_SERIAL`。打印它的脚本一律引用这个变量，
 #    不要再抄一遍字面量 —— 实测 9 个 `verify-mobile-*.sh` 的横幅硬编码
 #    `emulator-5554`，而设备换到 5556 时它们照打 5554：跑的是对的机器，
@@ -111,24 +115,19 @@ step() { echo ""; echo "════ $1 ════"; }
 #    满屏"找不到按钮""应用没起来" —— 看起来像产品坏了，其实只是撞车。
 #    这种"环境造成的假红"必须能被**说出来**，而不是让人去猜。
 #
+# 🔴 匹配规则**不在这里**：唯一实现在 `lib/mobile-e2e-runner-probe.sh`。
+#    那个文件没有 trap，所以 dry-run 类的消费者（`verify-mobile-window-gate.sh`）
+#    可以 source 它 —— 而它们**不能** source 本文件（本文件尾的 EXIT trap 会真动设备）。
+#    旧写法用 `bash [^ ]*…`，跨不过本仓路径里的空格，对被快照成 `.snap.<pid>` 的
+#    运行者**永久隐形**；原因、夹具与自检写在那个文件头。
+#
 # ⚠️ `$$` 在命令替换的子 shell 里仍是**父 shell 的 pid**（bash 的规定），
 #    但那个子 shell **自己的 pid 却不是** `$$` —— 而它的 argv 与本脚本逐字相同
 #    （`ps` 里就是一行 `bash scripts/verify-mobile-auth.sh`）。所以只排除 `$$`
 #    会把**自己**当成"别人"（实测踩过：脚本刚启动就报"还有别的验收在跑"）。
-#    因此这里同时排除 `$$` 的**直接子进程**（`ppid == me`），并且只认
-#    "直接跑脚本"那一行（`bash -c …` 的包装进程不算：它的 argv 里出现脚本名，
-#    但它并没有驱动设备）。
+#    因此探针同时排除 `$$` 的**直接子进程**（`ppid == me`）。
 another_mobile_e2e_running() {
-  ps -Ao pid=,ppid=,command= > /tmp/_heyta_mobile_e2e_ps.txt 2>/dev/null
-  awk -v me="$$" '
-    $1 == me { next }
-    $2 == me { next }
-    # `zsh -c` / `bash -c` 的包装进程 argv 里可能内嵌脚本名文本（上游用 printf
-    # 写启动器再执行、或工具链把整条命令记进 argv），它们不是真正的运行者 ——
-    # 真正的运行者永远是直接 `bash scripts/verify-….sh` 的那个进程，会被单独匹配到。
-    $0 ~ /(zsh|bash) -c/ { next }
-    $0 ~ /bash [^ ]*verify-mobile-[a-z-]+\.sh/ && $0 !~ /bash -n/ { print; exit }
-  ' /tmp/_heyta_mobile_e2e_ps.txt
+  mobile_e2e_runner_lines
 }
 
 # ── UI 辅助 ────────────────────────────────────────────────

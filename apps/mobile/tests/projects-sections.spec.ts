@@ -163,3 +163,66 @@ describe('空态词条是 `common.organizer.*`，两个宿主都接了线', () =
     }
   });
 });
+
+/**
+ * W4b · 标签删除确认的**接线与形状**（源码级）
+ * ---------------------------------------------
+ *
+ * 渲染结果由 `apps/web/tests/projects-panel.spec.tsx` 的 `W4b` 那一块钉（node 里
+ * 加载不了 `react-native`，移动端只能读源码）。这里防的是那两种"不报错的形状坏法"：
+ *
+ *   1. **只有一半宿主接了** —— 于是"删标签要不要确认"在两个端是两个答案；
+ *   2. **确认框画了，按下还是直接删** —— 组件里 `onRemove` 多了一个没被文案挡住的调用点。
+ *
+ * 🔴 第 3 条是**刻意的不对称**（清单不确认、标签确认），必须留在这儿：
+ * 没有这条注释，下一个看到"两边不一致"的人会把它"顺手统一"掉。
+ */
+describe('W4b 标签删除确认：两端都接、且默认形态没被改动', () => {
+  const REPO = resolve(HERE, '../../..');
+  const read = (rel: string): string => readFileSync(resolve(REPO, rel), 'utf8');
+  const component = read('packages/ui/src/projects/OrganizerList.tsx');
+
+  it('两端宿主都传 `confirmRemove` 与 `removeImpact`（缺一个就是"零件都在、没人接线"）', () => {
+    for (const [file, source] of [
+      ['apps/mobile/src/screens/TagsSection.tsx', readScreen('TagsSection.tsx')],
+      ['apps/web/src/features/projects/ProjectsPanel.tsx', read('apps/web/src/features/projects/ProjectsPanel.tsx')],
+    ] as const) {
+      expect(source, `${file} 没打开删除确认`).toContain('confirmRemove:');
+      expect(source, `${file} 没传影响面`).toContain('removeImpact={');
+    }
+  });
+
+  it('影响面取数走共享的 `liveTaskCountsByTag`，**不是**行上那个 `openTagCounts`', () => {
+    const tags = readScreen('TagsSection.tsx');
+    expect(tags).toContain('liveTaskCountsByTag(');
+    // 口径顶替的症状是确认框说"没有任务受影响"（已完成的任务被滤掉了）。
+    expect(tags, '拿常驻计数当影响面 = 一句假承诺').not.toContain('openTagCounts(');
+    expect(read('apps/web/src/features/projects/ProjectsPanel.tsx')).toContain('liveTaskCountsByTag(');
+  });
+
+  it('清单那一列**不传** confirmRemove（删了能捞，标签不能 —— 这是拍板的不对称）', () => {
+    expect(readScreen('ListsSection.tsx')).not.toContain('confirmRemove');
+  });
+
+  it('🔴 组件里 `onRemove(item)` 只有两个调用点：没确认文案时的直删、以及「确认删除」', () => {
+    const calls = component.match(/onRemove\(item\)/g) ?? [];
+    expect(calls, `onRemove 有 ${calls.length} 个调用点，多出来的那一个不受确认挡`).toHaveLength(2);
+    // 直删那一条必须**被文案挡住**（不是"看起来在同一行"）。
+    expect(component).toContain('if (confirmLabels === undefined) {');
+    expect(component).toContain('setPendingRemove(item.id)');
+  });
+
+  it('四个词条中英各就位（宿主传了不存在的键不会报错，只会把键名渲染到界面上）', () => {
+    for (const locale of ['zh-CN', 'en']) {
+      const table = read(`packages/i18n/src/locales/${locale}.ts`);
+      for (const key of [
+        "'common.organizer.confirm.ask'",
+        "'common.organizer.confirm.impactTags'",
+        "'common.organizer.confirm.delete'",
+        "'common.organizer.confirm.cancel'",
+      ]) {
+        expect(table, `${locale}.ts 缺词条 ${key}`).toContain(key);
+      }
+    }
+  });
+});

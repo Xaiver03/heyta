@@ -430,6 +430,9 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
    */
   const CATEGORY_NAMES: Array<{ table: string; zh: string; en: string }> = [
     { table: 'operations', zh: '同步事件', en: 'sync event' },
+    { table: 'vault_key_packages', zh: '加密密钥包', en: 'wrapped key package' },
+    { table: 'vault_key_migrations', zh: '密钥迁移记录', en: 'key migration record' },
+    { table: 'revoked_sync_devices', zh: '撤销设备记录', en: 'revoked device record' },
     { table: 'user_sync_state', zh: '同步状态', en: 'sync state' },
     { table: 'sync_devices', zh: '设备记录', en: 'device record' },
     { table: 'passkeys', zh: '通行密钥', en: 'passkey' },

@@ -15,7 +15,8 @@
 | `main` HEAD | `0a61c0a6`（21:1x 那版写的 `96f3293d` 已被并行条线的 5 笔 `docs(countdown)` 顶掉） | `git rev-parse --short HEAD` |
 | 本条线的父子层级分支 | `feat/list-parent`（工作树 `../heyta-wt-hierarchy`），基线 `0a61c0a6`，**未 push、未合** | 别数提交笔数（会漂）：`git log --oneline 0a61c0a6..feat/list-parent` 现量 |
 | 本条线层级判据（本轮现量） | 领域 **15** / 动作层 **10** / 共享层形状 **8** / web DOM **30（含新 6）**，全部 0 skipped | `pnpm --filter @heyta/domain exec vitest run tests/project-hierarchy.spec.ts` 等 |
-| 已知 **HEAD 级**红（不是本条线的，别代改） | `@heyta/ui` `tests/projects-model.spec.ts:96`：`toOrganizerTree` 现在多一个 `archived` 键，而那条判据钉的是 `['children','id','name']` ⇒ 全量 `pnpm -r test` 在 HEAD 上就红 1 条。引入者是 `192a516d`（归档那批），这两个文件在主检出此刻仍逐个是 `M` | `pnpm --filter @heyta/ui test 2>&1 \| grep "Tests "` |
+| 已知 **HEAD 级**红（不是本条线的，别代改） | ~~`@heyta/ui` `projects-model.spec.ts:96`：`toOrganizerTree` 多一个 `archived` 键~~ ⇒ ✅ **已被并行批次关掉**（把 `d27bccde` 合进本条线分支后 `@heyta/ui` **488 passed / 0 failed**）。登记留着是为了让下一个人在自己又看到它时知道这是同一件事的第几趟 | `pnpm --filter @heyta/ui test` |
+| 🔴 **HEAD 级门禁红（本条线不吸收）** | `check:l4`：`apps/web/src/features` 内联样式 **112 > 基线 104（+8）**，由并行批次那笔「总接线」`d27bccde` 带进来；红名单 19 个文件逐个不是本条线碰过的（本条线在 web 的落点 `ProjectsPanel.tsx` 内联样式 **0 处**） | `node scripts/check-l4-no-style.mjs` |
 | l4 棘轮 | 见 §0.5（阈值 ≤104/90，别名是 `check:l4` 不是 `check:l4-no-style`，见 §6） | `node scripts/check-l4-no-style.mjs` |
 
 ⚠️ **接手第一件事**：`git status --porcelain` 现在约 **270 条**未提交，其中绝大多数不属于本条线。
@@ -95,12 +96,25 @@
 
 ## 3. 当前状态：还差的（逐项带现量）
 
-1. **条件 2 的第 1 条：`pnpm check` 62 段 exit 0** —— 现量 **57/62**。5 段红各自的位置：
+1. **条件 2 的第 1 条：`pnpm check` 62 段 exit 0** —— 上一轮现量 **57/62**；⚠️ 本轮**没有**重跑全量（窗口不在），
+   但已确证**至少多出一段红**，所以下一次现量的起点应当是 **≤56/62**：
+   - 🔴 **新增的一段（2026-10-03 23:5x 现量）：`check:l4`** —— `apps/web/src/features` 内联样式 **112 > 基线 104**。
+     成因是并行批次那笔已提交的「总接线」（`d27bccde`）：红名单 19 个文件逐个不是本条线碰过的，
+     而本条线在 web 的落点 `ProjectsPanel.tsx` 内联样式 **0 处**。⇒ **不吸收凑绿、不调基线**（脚本自己写着"不要为了变绿把 baseline 调高"）。
+     现量命令：`node scripts/check-l4-no-style.mjs`（pnpm 别名是 `check:l4`，见 §6）。
    - 3 段 Playwright（`check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e`）：
      需要 `:3000` 空闲且没有别人的 vite；`check:ai-e2e` 会 **SIGKILL 别人的 dev server**（traps #87）。
    - `check:shell-unicode`：**HEAD 上就红**，在别人提交的 `scripts/mutate-closeout-gates.sh`（B36.2，地界外不代改）。
    - `check:docs`（第 34 段）：**HEAD 上就红 3 处**（别人引用进了提交、目标文件漏 `git add`，B51），
-     其余 24–30 处只在混合工作树成立，**本条线 0 处**。
+     其余 24–30 处只在混合工作树成立，**本条线 0 处**。本轮再量一次是 **2 处失效章节引用**，
+     两条都在倒数纪念日那份主计划里（一处指向一张 W7 设备导出工单的第二节，那张文档不存在；
+     另一处引用 ADR 索引的第一节，而那个索引里没有编号 1 的小节）⇒ 那条线自己的，**不动**。
+     ⚠️ 我为了"说清是哪两处"把它们转述进本文件时，**反而让本文件多出两条同样失效的引用**（现量：
+     报错行的文件名从倒数纪念日那份变成了本文件），因为"`<文件名>` §`<节号>`"这个形状
+     **即使包在反引号里也会被解析成章节引用** —— 本节最后一条原先写的是"行内代码里的路径不是链接"，
+     那句对**纯路径**成立、对**带 § 的章节引用**不成立。已就地改成不含该形状的写法，并把这条记到 §6。
+   - ⚠️ 上一轮登记的 **`@heyta/ui projects-model.spec.ts:96`（HEAD 级红）已经不红**（合并 `d27bccde` 后 ui 488 passed / 0 failed），
+     所以 `pnpm -r test` 那一段的读数也要重取，别沿用旧的"1 failed"。
 2. **条件 2 的第 2 条：四端重装 `INNER_EXIT=0`** —— 🔴 **本轮没跑**。上一次四端跑绿的载体不是本轮交付，不能顶替。
 3. **条件 1 的三行 🟡**（不是漏做，是拦路的在本批权限之外）：
    - 清单/标签行的「父子层级选择器」：✅ **本条线做完了，在未合并分支 `feat/list-parent`**（笔数现量：`git log --oneline 0a61c0a6..feat/list-parent | wc -l`）：
@@ -116,13 +130,40 @@
      写判据时现量出**两条真缺陷**并当场修掉：① "当前位置"那一项原来照点照写 = 一条内容不变的 UPD（违 §3.4）；
      ② 候选含已归档清单，而 `toOrganizerTree` 默认不画归档父 ⇒ 移进去的那条**从侧栏消失**（`model.ts` 自己写成"宁可当孤儿"）。
      → B52 结构上关闭，**只剩合流**（下一条）。
-   - 🔴 **合流义务（本条线唯一没法自己收的一步）**：主检出里
-     `packages/app-host/src/project-actions.ts`、`packages/i18n/src/locales/{zh-CN,en}.ts`、
-     `packages/ui/src/index.ts`、`packages/ui/src/projects/{OrganizerList,model}.ts`、
-     `apps/web/src/features/projects/store.ts`、`apps/mobile/src/screens/ListsSection.tsx`
-     **逐个是 `M`**（归档线正在飞）。合流只能等他们提交后把 `feat/list-parent` rebase 上去，
-     冲突面预计三处：`ProjectActions` 接口块、词条表尾部、`ListsSection` 的 `renderItemExtra`。
-     现在往主检出合 = 造一次没人能干净解的三方冲突，所以**不合**。
+   - 🔴 **合流义务：本轮推进了一大步，但仍差最后一步**（2026-10-03 23:5x 现量）。
+     **已经在分支里做的**：把 `d27bccde` 合进 `feat/list-parent`，唯一冲突是
+     `packages/app-host/src/project-actions.ts` 的 **domain 导入表**（我加 `validateProjectParentChange`、
+     并行批次加 `byCreatedAtOrder / isArchived / isLive / trashedIn`）—— 取并集解决，其余八个落点
+     （含 `ListsSection`、web `store.ts`、两份词条表、`packages/ui/src/index.ts`、web 那份 spec）
+     **逐个 auto-merge 干净**；合并态读数见 §0 表第三行。顺带把层级里两份手写抄件交给新权威（见分支上那笔 refactor）。
+     **还剩的阻塞**：主检出此刻有 **5 个**本条线落点是未提交状态（`packages/i18n/src/locales/en.ts`、
+     `.../zh-CN.ts`、`packages/ui/src/index.ts`，**外加本轮新量出来的两个 web 落点**：
+     `apps/web/src/features/projects/ProjectsPanel.tsx`、`apps/web/tests/projects-panel.spec.tsx`；
+     全仓未提交 74 条）。复跑现量（一条命令出交集，别数文件名片段）：
+
+     ```bash
+     comm -12 \
+       <(git diff --name-only $(git merge-base HEAD feat/list-parent) feat/list-parent | sort) \
+       <(git status --porcelain | awk '$1=="M"{print $2}' | sort)
+     ```
+
+     🔴 上一版本这里写的是"3 个"，那是**我自己一小时前**的量，期间归档线开始改 web 那两个文件。
+     **撞车面是活树瞬时读数、不是提交属性**（同下面死胡同那节里"脏清单每次都要重新现量"那条，本轮又应验一次）。
+     它们一旦提交，`git merge feat/list-parent` 应当**零冲突** —— 本轮把这句从"推断"换成了实测：
+     把我分支那份 5 文件补丁在三个版本上各跑一次 `git apply --check`（拷到 `/tmp` 的一次性 `git init`
+     仓库里跑，**没有碰主检出的索引/工作树**）。5 个落点里 2 个在活树上也落得动，另 3 个的结果是：
+
+     | 落点版本 | `git apply --check` | 含义 |
+     |---|---|---|
+     | 合并基点 `d27bccde` | 3 个全部 **0** | 阳性对照：补丁本身是好的 |
+     | 当前 main HEAD `f6478fad` | 3 个全部 **0** | **已提交的 main 与我的改动零重叠** |
+     | 别人的未提交工作树 | 3 个全部 **1** | 重叠**只**来自未提交那部分 |
+
+     ⇒ 所以等的是**他们提交**，不是"重新设计落点"。他们提交后重跑这三条腿，就能判定要不要人工协调。
+     🔴 在那之前往主检出合 = 把别人正在改的五个文件按进合并 ⇒ 造一次没人能干净解的三方冲突，**所以不合**。
+     ⚠️ 同时更正上一版另一句过期断言："main 已经是本分支的祖先"现在**在 HEAD 上不成立**了
+     （`git merge-base --is-ancestor HEAD feat/list-parent` → 1），差的那一笔就是我刚提的这份文档；
+     代码级仍是零落后：`git rev-list --count feat/list-parent..HEAD` = 1，且它只碰本文件。
    - 成长统计行：热力图无障碍名被 `apps/mobile/tests/growth-display.spec.ts:365` 钉成空串；
      补打卡被 `HabitStreakList.tsx:269` 的 `||` 渲染条件挡住（**接了也不出现、不报错**）。→ B41 / B42。
    - 权益行：`entitlement.ts` 那次 GET **一个响应字段都不消费**，web 侧到期条同样只有两个布尔
@@ -161,7 +202,9 @@
    **回退不写 SHA**（写了就会漂，我自己刚漂过一次）：这条线**没合进 main**，所以"回退"就是不合流；
    真要逐层退，在分支上现量 `git log --oneline 0a61c0a6..feat/list-parent`（写侧 / 界面 / 行为判据 / 注释各一笔），
    从尾往头 `git revert`。
-   🔴 唯一没做的是**合流**：主检出七个落点正被归档线改着（见 §3.3 的合流义务），现在合 = 三方冲突。
+   🔴 唯一没做的是**合流**：主检出**五个**落点正被归档线改着（现量与三条腿对照见 §3.3 的合流义务那条；
+   这一版原先写的是"七个"，那是把**落点清单**当成了**脏清单** —— 交集要现量，别拿清单当读数），现在合 = 三方冲突。
+
 5. 若要做热力图/补打卡：那是**翻冻结判据**的权限问题，不是接线问题 —— 需要判卷文件的属主批准改 `growth-display.spec.ts:365`/`:302`。
 
 > 🔴 1/2/3 全都卡在同一个"窗口"上，而窗口由**别人**的负载决定；4 是唯一一件本条线能自己推到底的事，
@@ -192,7 +235,10 @@
   否则别人一次裸 `git commit` 会把我这几百行倒回去。
 - `check:docs` 的**总数是活的**（一小时内 27→32→33→34），别把它当提交属性引用；判归属要用**链接整串**，
   不能用文件名 basename（`README.md` 会假命中），也不能用解析后的绝对路径（文档里写的是相对串）。
-- 行内代码（反引号）里的路径**不是链接**，`check:docs` 看不见它 —— 别把"没被报"读成"是好的"。
+- 行内代码（反引号）里的**纯路径**不是链接，`check:docs` 看不见它 —— 别把"没被报"读成"是好的"。
+  🔴 但**"文件名 § 节号"这个形状即使在反引号里也会被当章节引用解析**（2026-10-03 实测：我为了转述别人那两处
+  失效引用，把 `` `<文件>` §2 `` 写进本文件，`check:docs` 立刻把报错行的文件名换成了本文件 ——
+  等于我自己新造了两条死链）。**转述死链时不要带 § 与文件名相邻的写法**，用中文说清是哪一张哪一节。
 - 门禁名的唯一权威来源是 `package.json` 的 `scripts` 键（`check:docs` = `node research/tools/docs-link-check.mjs`，
   没有 `scripts/check-docs-link.mjs` 这个文件）。
 - 🔴 **提交共享台账（`BLOCKED.md` / `PROGRESS.md`）时，提交内容 = `git show HEAD:<文件>` + 你自己那段文本**，不要拿工作树文件当提交源：追加区是所有会话共用的尾部，"单 hunk + 删除 0 行"只证明形状是追加，**不证明作者是你**（`96f3293d` 就把并行会话的整节替他们提交了，详见 B53）。

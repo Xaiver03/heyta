@@ -963,28 +963,25 @@ grep -oE "✓[^│|]*[0-9]{3,}ms" /tmp/alltests.log | grep -v "tests)" | \
     → 与本条同族的还有第 40 条：**平台工具的输入能力是有边界的，
     而"能输入中文"这件事必须在**具体那条路径上**验过，不能从别处推断。
 
-44. 🔴 **iOS 模拟器上目前没有可用的滚动办法 —— 于是 iOS 验收只能覆盖首屏。**
+44. 🔴 **iOS 模拟器的滚动能力取决于手势参数和起点；“滚不动”不能直接归因于产品。**
 
-    三条路都实测过，全部不可用：
+    当前 Xcode 27.1 / iOS 27 runtime 的实测矩阵：
 
     | 调用 | 结果 |
     |---|---|
-    | `idb ui swipe X1 Y1 X2 Y2 --duration 800` | **会滚，但 60 秒不返回（rc=124），内容只挪 30px**（行程 600px）。不传 `--duration` 能返回，但一点都不滚。 |
-    | `idb ui scroll down`（不带目标） | 先做坐标探针，报 `the point is empty` / `found no element`，然后**什么都不做**；退出码还可能是 1。 |
-    | `idb ui scroll down <坐标\|标记>` | 落在空白 View 上报 `the point is empty`；落在 `TextInput` 上报 `element had moved by the time the write reached it`。都不滚。 |
+    | `idb ui swipe X1 Y1 X2 Y2`（不带 `--duration`） | 命令可返回，但页面通常不移动。 |
+    | `idb ui swipe X1 Y1 X2 Y2 --duration 1.0` | **可滚动**；`duration` 单位是秒，1.0 是直接操纵，约等于拖拽距离。 |
+    | `idb ui swipe ... --duration 800` | 把 800 当作 800 秒，命令看似挂死；不要使用。 |
+    | `idb ui scroll down` | 不提供可靠的目标滚动，可能报 `the point is empty` / `found no element`。 |
 
-    另外 **`idb ui set-value` 对滚出屏幕的元素不生效，而且不报错**：
-    元素在 y=1357（屏高 874）时 `--set` 返回 `{"detail":"<placeholder>"}` ——
-    回读是占位符，即写入没发生。**回读是唯一能发现这件事的判据。**
+    验收脚本通过 AX 树选择死区起点，再用 `--duration 1.0` 分段拖拽并每步复测；起点不能落在
+    TextField、按钮或底部 Tab 上。详情页日期网格最后一行的 44px 按钮曾被误识别为 Tab，导致
+    后续“截止时刻”字段永远滚不进来；Tab 结构判据现在要求约 64px 的触控行，并保留边缘死区。
 
-    需要滚动才能到达的元素，去 Android 侧验，或者把它挪进首屏。
-
-    ⚠️ 我**一度"测出" `idb ui scroll` 有效**（「清单名称」的 y 862 → 542），
-    并据此写了一段"它是走 AXScrollAction、方向与手势相反"的解释。
-    后来复测发现：**不带目标时它纹丝不动**，那次位移的真正来源是
-    之前被 `timeout` 杀掉的 `ui swipe` 在 companion 侧继续跑完了。
-    → 先有机制猜想、再去找证据，就会把巧合读成因果（第 38 条同族）。
-    **怀疑和解释都要能重复：换个初态再测一次，它就不成立了。**
+    另外 **`idb ui set-value` 对滚出屏幕的元素不生效，而且不报错**：必须先
+    `--scroll-into-view`，再 set，并以同一字段的 AX 回读作为唯一写入判据。
+    对普通 TextInput，回读必须在键盘仍显示时完成；点击键盘“完成”可能触发
+    `onSubmitEditing`，把收键盘误当成任务提交。只有 secure 输入框因聚焦从 AX 树消失时，才收键盘后重读。
 
 45. 🔴 **`cmd | tail -n; echo $?` 里 `$?` 是 `tail` 的 —— 我因此把
     "退出码是 1" 读成了 "退出码是 0"。**
@@ -4506,3 +4503,221 @@ ArgumentError - path name contains null byte
     📌 一般规律：**动作的"成功"文案不能由"进了这个分支"来打印** ——
     它要么由动作自己的退出码打印，要么由事后核对打印；两者都没有时，
     输出里那句 ✅ 就是这条脚本最贵的一处假绿。
+
+178. 🔴 **四端重装的判据回答"装上了、起得来、画的是我们的界面"，不回答"装的是不是含这一批的产物"。**
+    （2026-10-03 实测，日历日档 §6.1.1 收尾）
+    上一趟 `reinstall:all` 的 mac 段全绿（.app 10:30 装好、截图非空白、主蓝命中），
+    而现量它里面的 `Contents/Resources/web-dist/assets`：
+    `calendar-day-board` = **0**、`dayNoTimed` = **0**，同批阳性对照 `收集箱` = **1**。
+    也就是说**装的是 09:49 那次构建的共享 UI，里面压根没有这一批的功能**。
+    根因不是脚本坏了（它第 0 步确实跑 `pnpm -r build`），是**收尾跑在这批代码定稿之前** ——
+    而四条判据没有一条问"这一批的东西在不在包里"。
+    ✅ 补一条**产物字面量对账**（十行、零依赖）：从这一批新增的源码里取
+    **一到两个 ASCII 字面量**（testID 前缀 / i18n key / 具名常量），
+    到"装好的那个包"的产物字节里数命中，同时数一枚**一定在**的旧串当阳性对照。
+    📌 三个会让这条判据自己骗人的地方：
+    ① **CJK 串在产物里可能是转义形态**（§7 #171：Hermes 是 UTF-16LE；web bundle 会写 `\uXXXX`）
+      ⇒ 要证中文界面就挑 **ASCII 字面量**（key / testID），别挑文案；
+    ② **被 minify 掉的标识符命中 0 不算缺口** —— 同一次测量里 `readDragSegments` = 0
+      只是因为函数名被压掉了，`calendar-day-board`（字符串常量）= 1 才是证据；
+      ⇒ 选 needle 时先问"它是**值**还是**名字**"，只有值会活到产物里；
+    ③ 阳性对照必须**同一趟**跑（`收集箱` 在缺日档的那份包里仍然 = 1），
+      否则"0 命中"到底是"没这个功能"还是"我读错了文件"分不开。
+
+179. 🔴 **`cmd > log 2>&1; echo EXIT=$? | tee -a log` 里的退出码是 `tee` 的。**
+    （2026-10-03 实测，四端重装收尾）
+    后台任务的完成通知报 **exit code 0**，而日志第 2 行写着
+    "🔴 全仓构建失败 —— 打包必然打进旧产物，停下" —— 四端**一段都没跑**。
+    形状：真实命令的 `$?` 被管道末端吃掉了（§7 #45 同一族的第五种面目），
+    而 `| tee` 让"看起来记录了退出码"这件事**必然成功**。
+    ✅ 收尾要记**真退出码**：`cmd > log 2>&1; code=$?; printf 'EXIT=%s\n' "$code" >> log; exit "$code"`
+    —— 最后一行是关键：**不 `exit` 就还是包装脚本自己的 0**。
+    📌 一般规律：**任何"包装 + 记录退出码"的脚本，都要问一句"我打印的那个数字是谁的退出码"**；
+    完成通知里的 exit code 属于最外层，不属于被包装的那条命令。
+
+180. 🔴 **共享组件在一个 tick 里连调宿主两个 setter 时，宿主读闭包状态必错 —— 第一个宿主看不出，第二个宿主才现形。**
+    （2026-10-03 实测，日历档位入口接进 `apps/mobile`）
+    共享板 `CalendarBoard.pickDay` 的实现是 `onSelect(date)` 紧跟 `onCursorChange(date)`。
+    Web 那边写的是 zustand 的 `set((state) => ...)` —— **天然读到新鲜状态**，所以这个形状
+    在第一个宿主上跑了三批都没事。移动端换成两个 `useState` setter：
+    React 批处理这两个更新，而 `calendarSelectedForCursor(view, date, selected)` 里那个
+    `selected` 是**上一次渲染**的闭包值 ⇒ 刚点的那一天被写回成旧的。
+    症状：**"月档点格子没选中 / 日档点了没反应"** —— 不崩、不报错、控制台干净。
+    ✅ 修法：宿主侧凡是"读另一个状态再决定"的 setter 一律走**函数式更新**
+    （`setSelected((prev) => rule(view, date, prev))`）。
+    📌 一般规律：**共享组件调宿主几个回调、按什么顺序调，是宿主的契约**，
+    不是实现细节。第一个宿主（尤其自带"读最新状态"的 store）会把这条契约**掩护成不存在**；
+    接第二个宿主时先问一句"这两个回调在同一 tick 里，我这边读到的是谁的值"。
+    ⚠️ 本仓移动端测试通道**没有** React 渲染器（加它要过 §3.1/§3.2 两道门），
+    所以这条目前只有一条**源码形状**判据钉着（`apps/mobile/tests/calendar-view-entry.spec.ts` 第 5 条，
+    变异臂 AJ 会红）。那是缺口的**替代品**，不是解 —— 有渲染器之后应换成行为判据。
+
+181. 🔴 **并行 Agent 回报的"已落盘 N 字节"是它的**意图**，不是磁盘事实 —— 本次实测：一份连路径带符号带毫秒全编的报告，同时声称写成了 32,391 B。**
+    （2026-10-03 实测，性能热路径审计，全文见 [性能审计](../research/performance-hotpaths-audit.md) §5）
+    一个负责"编排层与支撑包"的子 Agent 交回一条 P0：`packages/shared-schema/src/line.ts:101` 的
+    `tryParseOpEnvelope` 每条 op 跑一次 zod 校验，"单条约 180ms、100k op ≈ 5 小时"，
+    并明确回报"报告已落盘 32,391 字节"。
+    现量：**`line.ts` 不存在**（那个目录是 `supersync-http-contract.ts` / `entity-types.ts` / `schema-version.ts` / …）、
+    **`tryParseOpEnvelope` 全仓 0 命中**、**`strictObject` 0 命中**、
+    **`packages/sync-client/src/` 里 `.parse`/`safeParse` 0 命中**（客户端根本不逐条校验，
+    zod 只在服务端边界每**请求**一发：`sync.routes.ops-handler.ts:96`、`sync.routes.ts:149`）。
+    而那份"32,391 B"的文件在 `/tmp` 里**从来没有出现过**。
+    代价不是学术性的：**那句话已经被转述进汇报里**，要撤回。
+    ✅ 三条判别动作，每条一条命令：
+    ① 判"没做完"先 `ls -la` 产物目录，**不要只看回报**（同一天另一条 Agent 反过来 —— 报告落盘了 33.5 KB 但完成通知没送达，也被误判成"还在跑"）；
+    ② 采纳任何 `file:line` 前先 `grep -n` 那个符号，命中 0 直接删条目；
+    ③ 重派时在任务书里写死"每条引用先自检存在性 + 先落盘再 Read 回读报字节数 + 必须存在'我怀疑过但不成立'那一节"。
+    📌 一般规律：**汇报里的数字有三种来源 —— 量出来的、读码推出来的、按常识生成的**，
+    而它们在文本上**长得一模一样**（都有冒号都有单位）。只有"能不能一条命令复现"能区分。
+    ⚠️ 这条只针对**并行 Agent 的回报**，不改变 §6.2 规定一"人必须真的打开那张图"—— 那是同一族里"声称看过 ≠ 看过"的另一面。
+
+    **B/C 续验补充（2026-10-03）**：分包编译与库函数通过的回报，只能证明对应层级。
+    原生提醒尚未完成 OS 投递验收时，计划表曾提前写“已实现”；已改回实施中。
+    E2EE 批量加密函数返回成功也不能证明服务端原子发布、旧日志迁移与新设备恢复成立。
+    采纳完成回报时，必须沿原计划逐条检查生产调用点、失败恢复、平台实测与产物身份。
+
+182. 🔴 **形状像 O(N²) 的循环查找，可能被同一个表达式里的短路条件整体废掉 —— 于是"读代码判性能"会自己造出假 P0。**
+    （2026-10-03 实测，性能审计：`packages/op-log/src/engine.ts:635`）
+    ```ts
+    pendingAtStart.every((row) => row.seq > checkpoint.coveredSeq || checkpoint.appliedOpIds.includes(row.op.id));
+    ```
+    `appliedOpIds` 从 checkpoint 读出来是 **plain array**，`includes` 是线性扫 —— 看着就是 O(pending × N)，
+    100k 历史 × 1000 pending 像是几秒钟。我把它写成了 P0 候选。
+    实测**不成立**：`coveredSeq` 在正常情况下接近日志末尾，`row.seq > coveredSeq` **短路为真**，
+    `includes` 基本不执行；它只在真的出现覆盖空洞时才跑，而那正是这个检查要防的稀有情况。
+    （复现只需 5 行微基准，跑完 `array.includes` = 0.0–0.1ms；见审计文档 §5 第 2 条）
+    ✅ 判嵌套成本之前先读**求值顺序**：`a || b` 里的 `b`、`a && b` 里的 `b`、
+    以及 `if (x) return` 提前走掉的那一支，都可能让下面那行**永不执行**。
+    📌 一般规律：这是 §7 #46（"没复现 ≠ 路径没执行"）与 #50（"状态对'在'没生效'时也绿"）的**第三种面目**：
+    **静态形状不等于运行时次数**。而它比那两条更危险，因为它产出的是一条**看起来完全合理的 P0**。
+
+183. 🔴 **`grep schema.prisma` 按索引名找，会恒判"缺失" —— Prisma 的 `@@index` 不写名字。**
+    （2026-10-03 实测，性能审计服务端那条线；同一条坏探针当场输出 47 条假阳性）
+    我为了回答"哪些索引只活在迁移裸 SQL 里"写了这条看起来无害的命令：
+    从 `server/prisma/migrations/**/*.sql` 抓 `CREATE INDEX "<name>"` 的名字，逐个去 `schema.prisma` 里数命中。
+    **期望 4 条，实际 47 条** —— 因为 `@@unique([email])` 在数据库里叫 `users_email_key`，
+    `@@index([userId, receivedAt, serverSeq])` 叫 `operations_user_id_received_at_server_seq_idx`，
+    **名字是 Prisma 按约定生成的，schema 文本里根本没有**。
+    现量：全 `schema.prisma` 里 `map:` 只出现 **1** 次（就是那个 GIN），
+    所以"按名字对账"在这个仓库**结构上不可用**。
+    ✅ 正确的对账维度是**列集 + 谓词**，不是名字：
+    ```bash
+    # 迁移里带 WHERE 谓词的索引（Prisma 表达不了 ⇒ 必然在 schema 之外）→ 实测 4 条
+    find server/prisma/migrations -name 'migration.sql' -exec \
+      awk 'BEGIN{RS=";"} /CREATE[ \t]+INDEX/ && /WHERE/ {n=$0; gsub(/[ \t\n]+/," ",n); print n}' {} \; \
+      | grep -c 'CREATE INDEX'
+    awk '/^model Operation /,/^}/' server/prisma/schema.prisma | grep -E '@@index|@@unique'   # 实测 4 行
+    grep -c 'map:' server/prisma/schema.prisma                                                # 实测 1
+    ```
+    📌 顺带一条**项目事实**（不是探针问题）：`operations` 上有 **4 个 partial 索引**只存在于迁移 ——
+    `(user_id, server_seq) WHERE is_payload_encrypted = true`、两个同列集但谓词不同的
+    `op_type IN (...)` / `... OR (op_type='REPAIR' AND repair_base_server_seq IS NOT NULL)`、
+    以及 `(user_id, id) WHERE payload_bytes = 0`。其中三个**列集完全相同、只靠谓词区分**，
+    所以连"按列集去重"也会把它们并成一个 —— 判索引覆盖只能读 DDL 原文或问数据库。
+    ⚠️ 未闭合：真正的对账是 **`pg_indexes`（生产实况）↔ 仓内声明**，需要一个能连库的门禁，本轮没做。
+
+184. 🔴 **zsh 里 `${PIPESTATUS[0]}` 是空值（不是 bash 的数组下标）—— 于是"退出码"读成一个空串，比读错更危险。**
+    （2026-10-03 实测，性能审计收尾跑 `docs-link-check`）
+    `cmd 2>&1 | tail -4; echo "EXIT=${PIPESTATUS[0]}"` 打出 **`EXIT=`（空）**，
+    而门禁当时其实是**通过**的 —— 空串既不是 0 也不是非 0，任何"`[ -z ... ]` 就重试"的下游逻辑都会误判。
+    同一族已经有 #45（管道后 `$?` 是 `tail` 的）和 #179（`echo EXIT=$? | tee` 记的是 `tee` 的）。
+    ✅ 要真退出码就别用管道：`cmd > /tmp/x.log 2>&1; echo "EXIT=$?"; tail -4 /tmp/x.log`
+    —— **先落盘、再取 `$?`、最后才 tail**。
+    📌 一般规律：`$?` 只有一个槽位，**任何"顺手记一下退出码"的写法都要先问"这一刻 `$?` 属于谁"**；
+    而在 zsh 下连 `${PIPESTATUS[0]}` 这个写法本身都不存在。
+
+185. 🔴 **歧义引用会让一次复核得出「错误的确证」—— 不是让人开错文件，是让"我已经核过了"这句话本身失效。**
+
+    性能审计里三条重派产物都用裸文件名写 `file:line`（`host.ts:358`、`client.ts:906`、`sqlite-adapter.ts:561`）。我照它们去复核，实际发生三次错：
+
+    | 报的引用 | 真身 | 错在哪 |
+    |---|---|---|
+    | `host.ts:358` | 命中 `apps/desktop/src` / `apps/node-host/src` / `packages/app-host/src` 三份 | 我读了 **app-host** 那份，看到 `getAllOps()` 就以为确认了那条 P0；真落点在 `apps/web/src/lib/oplog.ts`（两边都不对） |
+    | `client.ts:906` | 被归到 `packages/sync-core/`，真身 `packages/sync-client/src/client.ts` | **包名错、行号完全对得上** ⇒ 最坏的一种：错的东西里有一个对的数字 |
+    | `sqlite-adapter.ts:561` | 真身 `packages/storage/src/sqlite/sqlite-adapter.ts` | 少一层子目录，按字面路径 `sed` 直接 "No such file"，容易误判成"文件不存在 = 引用是编的" |
+
+    前一轮已经写过 #181（"已落盘 N 字节"是意图不是事实），那条管的是**编造**；这条管的是**真内容配了不可唯一定位的坐标** —— 后者更危险，因为它能通过复核。
+
+    ✅ 判别与修法：复核别人的裸名引用时，先 `git ls-files | grep -E "/?<name>$"` **展开全部候选并逐个看完**，只看第一个等于没核。写的时候一律全路径。
+    📌 一般规律：**"我核过了"必须能回答"核的是哪一棵树上的哪个文件"**；定位不唯一的引用把复核变成了掷骰子，而掷骰子多半会命中一个"看起来对"的行。
+
+186. 🔴 **两个"取证装置自己造红/造空"的形态：逐行执行 markdown 代码块的 runner，和 awk 的 `END{print s}`。**
+
+    复跑文档里的每条命令时抓到两处，两处都不是文档的错：
+
+    1. **一个 `D=…` + `echo "P0=$(… $D)"` 的两行块，逐行 `execSync` 会报 `P0=0 P1=0 P2=0`。**
+       第二行在**新进程**里，`D` 不存在 ⇒ grep 对空文件名报错、三个计数全 0。我差一点据此宣布"文档的自检判据坏了"。
+       ✅ **一个代码块 = 一次执行**（`bash -c '<整块>'`），改完立刻得到 11/16/4。
+    2. **`ls -la | awk '$1>300000 {s+=$1} END {print s}'` 恒假，而且失败方式是"印一个空行"。**
+       `ls -la` 的 `$1` 是权限串（`-rw-r--r--@`），字节数在 `$5` ⇒ 条件从不成立 ⇒ `s` 从未累加 ⇒ 打印空。
+       空值在终端上和"命令跑通了、数据就是这样"**无法区分**。
+       ✅ 汇总打印一律写 **`print s+0`**：无命中时给 **0**，那是一个能判断的读数。
+    📌 一般规律：**探针报告"没有"之前，要先证明探针在能命中的样本上会报"有"**（对照 #46/#50/#174）；
+    而"字段号取错"这类缺陷的产物往往是**空**而不是错 —— 所以宁可我自己的汇总在空集上也要输出一个显式的 0。
+
+187. 🔴 **提醒验收安装失败后仍继续操作，得到的是旧包行为；force-stop 也不是普通进程死亡。**
+    （2026-10-03，B/C 续验；入口：[多端覆盖计划](../plans/goal-multi-end-coverage.md) §4）
+    `verify-mobile-reminder-ring.sh` 曾卸载 `com.heytamobile`，但 helper 的真实包名为
+    `com.heyta`。随后 release 安装报 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，输出经过
+    `tail` 吞掉状态后继续跑 UI，产生一串无法归因的失败。该轮截图与日志不能作为投递成功证据。
+    规则：包身份从构建/共享 helper 对账；安装退出非零立即终止；当前 APK 的安装身份与构建时间
+    对上后才验业务。同一模拟器只能由一个执行者安装与操作。源码变异与构建也须独占，避免把
+    变异产物装进正常验收。通知判据应检查 active notification，不能 grep 通知历史当成当前弹出。
+    Android force-stop 会阻止后台投递，须验证“再次启动后补算”；普通 kill 后的系统排程另测。
+    **当前状态**：已定位上述脚本错误，修复及真机复验仍在进行；本条不是验收通过记录。
+
+
+188. 🔴 **用“当前状态是否匹配”在 reducer 中丢弃提醒回执，会破坏乱序收敛。**
+    （2026-10-03，原生提醒 C 续验；契约：[ADR-0051](../adr/0051-mobile-reminder-delivery.md)）
+    为阻止旧通知回执把新 snooze 标成 fired，初稿在 reducer 比较当前 effectiveTrigger，
+    不相等就 return state。单机队列用例通过，但 fired 先于 CREATE 到达时会永久丢回执，
+    同一 op 集合按不同顺序回放得到不同事实。修法是把回执所属的 trigger 作为可选数据字段
+    `firedForTriggerAt` 保存，领域读取时与当前 occurrence 比较，不能按当下物化状态丢 op。
+    判据是 CREATE/fired/snooze 的全部六种顺序收敛，以及排队 snooze 后旧回执不使新 occurrence fired。
+    规则：本地竞态的修法也必须经过 [E 的语义规格](../research/op-log-e1-semantic-spec.md)，
+    不能用“本机串行”替代“跨设备乱序”。
+
+189. 🔴 **取消通知的负向断言需要仍然活动的正向对照，启动命令也需要读回。**
+    （2026-10-03，C 提醒验收；契约：[ADR-0051](../adr/0051-mobile-reminder-delivery.md)）
+
+    原脚本先点击带 `autoCancel` 的通知，再删除提醒、断言通知不存在；即便取消接线失效，
+    系统也早在点击时清掉通知，因此这条判据会假绿。修成先从启动器回应用，断言通知仍活动，
+    再删除提醒；通知点击另用下一条真实通知验证。截图先展开通知栏、再落盘、最后断言，
+    不能拿桌面截图证明通知展示。另一次实测中 `monkey` 输出物理按键检查后退出，应用
+    `stopped=true/notLaunched=true`；显式 `am start -W` 才拿到真实 Activity 启动结果。
+    规则：操作成功退出不能代替目标状态读回，负向判据必须证明此前对象确实存在。
+    同轮截图还确认 Android edge-to-edge Modal 的新建面板被 IME 覆盖：树中的“添加”坐标仍在，
+    点击却落在键盘上。Activity 的 `adjustResize` 没有保护这个 Modal；为 Android 的
+    `KeyboardAvoidingView` 显式设置 `height` 后，当前 Release 截图显示输入框与添加按钮在键盘上方。
+    不能盲发 BACK 收键盘，它可能直接关闭 Modal。夹具日期改用宿主独立计算的 ISO 日期，
+    不再假设中文 capture 解析器支持英文 `yesterday`；输入后读回完整值，再点击可见按钮。
+    连续跑下一轮时还要先 `cmd statusbar collapse`：截图留下的通知栏不会因 `am start -W`
+    自动收起。Activity 已在前台、AX 却只有系统开关时，先排除这个探针留下的覆盖层，
+    不要反复重装或把“看不到应用按钮”归为产品未启动。
+    续验还发现仅加 `height` 不足以覆盖首次显示的竞态：自动聚焦可能早于原生 Modal
+    显示与父级键盘监听就绪。改为在 `Modal.onShow` 后才挂载自动聚焦的输入组件；
+    23:26 的当前 Release 截图确认面板、日期/时间预览与添加按钮都在键盘上方，
+    实际点击成功创建任务。没有用隐藏键盘的测试开关绕过这个用户可见的问题。
+    23:39 续验再把“已展示通知撤回”和“未到期 alarm 取消”拆成独立判据：后者必须先在
+    `dumpsys alarm` 中数到该应用的 active alarm，再删除并确认归零；不能匹配 dump 的历史统计项。
+    force-stop/整机重启后的补发同样先证明自然跨过 due 且 SQLite 没有 fired，再显式启动；
+    “启动后补发”不等于“强停期间仍投递”，不许把这两条产品承诺混写。
+
+190. 🔴 **Xcode 27.1 / iOS 27 上 idb companion 的 Unix socket 失败，不等于 AX 或产品失败；
+     但 TCP fallback 也不能掩盖脚本自己的错误判据。**
+
+     本轮真实验收中，`idb_companion --grpc-domain-sock` 报
+     `GRPCCore.RuntimeError error 1`；同一二进制用 `--grpc-port 10982` 可连接并返回真实 RN AX 树。
+     `scripts/tools/ios-ax-shim.py` 因此接受 `/tmp/...sock` 与 `host:port` 两种传输，验收脚本在 Unix
+     socket 失败时切 TCP，并把两种日志留在 `/tmp/heyta-idb-reminder-companion*.log`。
+
+     同时踩到的三个脚本级陷阱也固定为规则：
+
+     - `--scroll-into-view` 只返回 `found/visible`，不会替调用方执行 `--press`；必须滚入后再精确点击。
+     - `set-value` 后普通 TextInput 要在键盘仍显示时回读；点击“完成”可能触发
+       `onSubmitEditing`，把任务 Composer 误提交并关闭。
+     - 详情页日期网格的 44px 按钮不能当作底部 Tab；否则滚动起点被禁在网格上方，后续时间字段永远不可达。
+
+     这些规则已落在 `ios-ax-shim.py`、`verify-mobile-ios-reminder.sh` 和 ADR-0051；新脚本也必须登记
+     `check-script-snapshot` 的显式清单。验收截图必须先保存、再人工查看；旧的全黑截图只能作失败证据，
+     不能被引用为通知投递成功。

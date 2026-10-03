@@ -58,7 +58,8 @@ export interface VaultMigrationJournalRecord {
 }
 
 export interface VaultMigrationJournal {
-  load(scope: string, requestId: string): Promise<VaultMigrationJournalRecord | undefined>;
+  /** With no request id, return the sole unfinished migration for this scope. */
+  load(scope: string, requestId?: string): Promise<VaultMigrationJournalRecord | undefined>;
   save(record: VaultMigrationJournalRecord): Promise<void>;
   clear(scope: string, requestId: string): Promise<void>;
 }
@@ -69,15 +70,16 @@ export const createVaultMigrationJournal = (adapter: DbAdapter): VaultMigrationJ
     const record = await adapter.get<{ key: string; value: unknown }>(STORES.META, META_KEYS.VAULT_MIGRATION_JOURNAL);
     if (!record || typeof record.value !== 'object' || record.value === null || Array.isArray(record.value)) return undefined;
     const value = record.value as Record<string, unknown>;
-    if (value.scope !== scope || value.requestId !== requestId ||
-        typeof value.scope !== 'string' || typeof value.requestId !== 'string') return undefined;
+    if (typeof value.scope !== 'string' || typeof value.requestId !== 'string' ||
+        value.scope !== scope || (requestId !== undefined && value.requestId !== requestId)) return undefined;
+    const storedRequestId = value.requestId;
     const manifest = vaultKeyMigrationManifestSchema.safeParse(value.manifest);
     if (!manifest.success || !Array.isArray(value.chunks)) throw new Error('Invalid persisted vault migration journal');
     const chunks = value.chunks.map((chunk) => vaultKeyMigrationChunkSchema.safeParse(chunk));
     if (chunks.some((chunk) => !chunk.success)) throw new Error('Invalid persisted vault migration journal');
     return {
       scope,
-      requestId,
+      requestId: storedRequestId,
       manifest: manifest.data,
       chunks: chunks.filter((chunk): chunk is { success: true; data: VaultKeyMigrationChunk } => chunk.success).map((chunk) => chunk.data),
     };
@@ -316,8 +318,11 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
   if (!options.journalScope || options.journalScope.length > 512) {
     throw new VaultMigrationError('Invalid migration journal scope', 'invalid_inventory');
   }
-  const requestId = options.requestId ?? randomId();
-  const prior = await options.journal.load(options.journalScope, requestId);
+  const priorByScope = options.requestId === undefined
+    ? await options.journal.load(options.journalScope)
+    : undefined;
+  const requestId = options.requestId ?? priorByScope?.requestId ?? randomId();
+  const prior = priorByScope ?? await options.journal.load(options.journalScope, requestId);
   if (prior !== undefined) {
     if (prior.scope !== options.journalScope || prior.requestId !== requestId) {
       throw new VaultMigrationError('Migration journal scope mismatch', 'invalid_inventory');
@@ -479,6 +484,19 @@ export const cancelVaultPayloadMigration = async (
   remote: VaultKeyMigrationRemote,
   requestId: string,
 ): Promise<VaultKeyMigrationStageResponse> => validateStage(await remote.cancel(requestId));
+
+/** Cancel the unfinished server reservation identified by the local journal. */
+export const cancelVaultPayloadMigrationForScope = async (
+  remote: VaultKeyMigrationRemote,
+  journal: VaultMigrationJournal,
+  journalScope: string,
+): Promise<VaultKeyMigrationStageResponse | undefined> => {
+  const pending = await journal.load(journalScope);
+  if (pending === undefined) return undefined;
+  const stage = await cancelVaultPayloadMigration(remote, pending.requestId);
+  await journal.clear(journalScope, pending.requestId);
+  return stage;
+};
 
 export const VAULT_KEY_MIGRATION_INVENTORY_PATH = '/api/sync/key-migration/inventory';
 export const VAULT_KEY_MIGRATION_PATH = '/api/sync/key-migration';
