@@ -285,6 +285,20 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
      换个 `PORT` 也还是会撞同一个 project
    - `uptime` ⇒ 1 分钟负载 38.86，而本仓自己的等待阈值 = 核数 × 3/4 = **12**
 
+   ⚠️ **11:16–11:24 复量：窗口没有开，反而更堵** —— `sysctl -n vm.loadavg` ⇒ **50.64 / 31.44 / 27.96**；
+   `adb devices` ⇒ 仍只有 `emulator-5556`，而 `ls ~/.android/avd` ⇒ 这台机器上**只有 `SSOS-Parity-A36` 一个 AVD**
+   （`pgrep -f qemu-system` 那台就是它）⇒ "另起一台自己的模拟器"不是"再起一台"，要先 `avdmanager create avd`
+   （系统镜像只有 `android-36`，在 `/opt/homebrew/share/android-commandlinetools`）；
+   `lsof` ⇒ :3000 仍 pid 87593、:3100 仍 pid 58679；`pgrep -f 'verify-mobile-'` ⇒ **0**
+   （这条今天刚从一条**盲探针**换成能匹配的，见上面第 1 条的 🔴 —— 换之前它两个方向都不可信）。
+   负载 50 上再起一台模拟器会把别人**有时限**的设备判据压成超时假红，所以**没跑**。
+   📌 **谁手里**：设备与 compose 栈在并行会话手里；两条收尾等窗口：① 本节第 15 步那一趟；
+   ② 台账 #180 从我这里搬进 `docs/reference/environment-traps.md`（台账此刻 `M`，见下面一节）。
+   📌 **另一条不属于本批、但同一把尺子量出来的缺口**：`AGENTS.md` §7 索引行现在覆盖到 **176**，
+   而工作树台账末号是 **179** —— #177–#179 是并行会话那三笔，索引行归他们补。现量：
+   `awk -F. '/^[0-9]+\. /{if($1>m)m=$1} END{print m}' docs/reference/environment-traps.md` 与
+   `grep -oE '^\| *[0-9]+–[0-9]+' AGENTS.md | grep -oE '[0-9]+$' | sort -n | tail -1`。
+
    设备与服务端都归自己时的复跑命令：
    ```bash
    HEYTA_E2E_SERIAL=<自己的模拟器> PORT=<空端口> bash scripts/verify-mobile-repeat.sh
