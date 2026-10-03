@@ -120,6 +120,20 @@ NODE_IMAGE=你自己的源/library/node:24-alpine
 这三处必须同源，否则 `web` 阶段与 `production` 阶段会各自拉不同的 base，
 "我的镜像里到底装了什么"就再也对不上了。
 
+🔴 **上面这三个旋钮只管"构建"，管不到"起栈"**。`docker compose up` 还要在**运行期**再拉两枚镜像，
+它们同样出自 Docker Hub，而构建期的任何旋钮对它们无能为力：
+
+```bash
+POSTGRES_IMAGE=你自己的源/library/postgres:16-alpine
+CADDY_IMAGE=你自己的源/library/caddy:2.11-alpine
+```
+
+它们住在 `docker-compose.yml`（不是 `docker-compose.build.yml`），变量没设时渲染出来逐字节等于
+`postgres:16-alpine` / `caddy:2.11-alpine`（判据 `docker compose config` 现量，见
+`docs/research/self-host-distribution-audit.md` §8.36）。
+`check:image-build-args` 的 **R6** 现在会走一遍 `server/docker-compose*.yml`，
+任何一枚 `image:` 不是 `${名字:-默认}` 形状就报红 —— 这一条存在的理由就是本节曾经只说了三个旋钮。
+
 镜像仓库同理：**我们不提供任何第三方公共镜像**，需要就近拉取就把它推到
 **你自己的** registry，`SUPERSYNC_IMAGE` 指向那里。
 
@@ -142,7 +156,8 @@ or may require 'docker login'
 那句 `may require 'docker login'` 是这条路上最容易误导人的一步 —— 它会让人去找
 "该登录哪个仓库"，而真相是**根本没有仓库**。带上 build override 之后，同一条命令
 自己把镜像打出来（`APK_MIRROR` / `NPM_REGISTRY` / `NODE_IMAGE` 三个旋钮在这条路上也生效，
-它们就住在这份 override 的 `args` 里）。
+它们就住在这份 override 的 `args` 里 —— ⚠️ 那三个只覆盖**构建**；`up` 在运行期还要拉的
+`postgres` / `caddy` 两枚由 §3 末尾那两个旋钮管，它们住在**默认**那份文件里）。
 
 `docker-compose.migrate-once.yml` 是一个**一次性迁移服务**的 override：默认服务图里
 没有它（那里恰好是 `caddy / postgres / supersync` 三个），加进来之后迁移跑完就退出，

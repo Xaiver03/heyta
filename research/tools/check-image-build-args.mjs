@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * `server/Dockerfile` 的构建参数（ARG）与 `server/docker-compose.build.yml` 的 `build.args`
- * 之间的**四条等式**。
+ * 之间的**四条等式**，外加两条"旋钮本身还在不在 / 全不全"的**形状判据**（R5、R6）。
  * ==============================================================================
  *
  * ## 为什么会有这个文件（触发它的是 `NODE_IMAGE`，但它不止管 `NODE_IMAGE`）
@@ -30,7 +30,7 @@
  *
  * 这四条里，①②③④ 都是**只有把判据写成跨文件等式才挡得住**的：单看一个文件永远自洽。
  *
- * ## 四条判据
+ * ## 判据清单
  *
  * | 号 | 判据 | 红的时候是什么形状 |
  * |---|---|---|
@@ -38,6 +38,15 @@
  * | R2 | 每个 `FROM ${NAME}` 之前，**同一个 stage 内**必须有 `ARG NAME=…` | 漏声明 ⇒ 那一段退回 Docker Hub |
  * | R3 | compose `args:` 里每一项 Dockerfile 都必须声明过 | 死旋钮（compose 传了没人收） |
  * | R4 | Dockerfile 里每一个 ARG compose 都必须传；两处的**默认值必须相同**，除非在 `DEFAULT_MAY_DIFFER` 里逐条写明为什么 | ① 文档承诺的 `.env` 旋钮没接线；② 两处默认值不同而没人拍过板 |
+ * | R5 | 每个 `FROM` 都得是 `FROM ${NODE_IMAGE} AS <别名>` | **整族撤掉**旋钮时 R1/R3/R4 一条都不响，只有这条数得出来 |
+ * | R6 | `server/docker-compose*.yml` 里每一枚 `image:` 都必须是 `${VAR:-默认}` 形状，或在 `IMAGE_HARDCODED` 里逐条写明为什么 | 对外承诺"连不上 Docker Hub 也能走通"，而运行期 pull 的那几枚**根本没接线** |
+ *
+ * 🔴 **R6 的触发原因不是洁癖，是本仓库自己对外说过的一句超出的话**（§8.36）：
+ * `server/README.md` 写过"这份 override 让这条路在连不上 Alpine CDN、npm registry **或
+ * Docker Hub** 的机器上也能走通"。那句话里 `NODE_IMAGE` 只管**构建期**那一次 pull，而
+ * `docker compose up` 还要**运行期**再 pull 两枚（`postgres:16-alpine`、`caddy:2.11-alpine`）——
+ * R1–R5 全在看 Dockerfile 与 `build.args`，**运行期的 `image:` 不在任何一条判据的视野里**。
+ * 这是 §8.21 那条"按命题取，不能按字面串取"的同一个形状：按"镜像源"扫的时候只扫了构建期那一段。
  *
  * ⚠️ `DEFAULT_MAY_DIFFER` 现在只有一条：`VCS_REF`（compose 侧默认 `local`、Dockerfile 侧
  * 默认 `unknown`）。这不是疏漏，是**刻意的不同** —— compose 那条要的是"这台机器上打的本地
@@ -53,7 +62,7 @@
  * ```
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -144,6 +153,20 @@ for (const f of froms) {
 }
 
 // ── 读 compose 的 build.args（只取 supersync 那一个服务的 args 映射）───────
+// 🔴 先做存在性检查再读：少了这三行时，一棵缺文件的树得到的是 `node:fs` 的 ENOENT **栈**
+//    （也是 rc=1，所以不会放行），但那个人看到的是一行堆栈而不是"哪个文件不在了"。
+//    判据的失败要能点名 —— 这一条是 2026-10-04 拿"空树"做变异对照时撞出来的（§8.36 同轮）。
+if (!existsSync(DOCKERFILE)) {
+  fail('R0', DOCKERFILE, '文件不在 —— 这一侧的等式没有对象，不是"通过"');
+}
+if (!existsSync(COMPOSE)) {
+  fail('R0', COMPOSE, '文件不在 —— `build.args` 读不到，R3/R4 就没有对象，不是"通过"');
+}
+if (reds.length > 0) {
+  console.error(`\n${reds.join('\n')}\n\n共 ${String(reds.length)} 条红（探针的对象不见了，见文件头对 R0 的说明）。`);
+  process.exit(1);
+}
+
 const composeLines = readFileSync(COMPOSE, 'utf8').split('\n');
 /** @type {{name:string, envName:string, def:string|null, line:number}[]} */
 const composeArgs = [];
@@ -250,6 +273,65 @@ for (const f of froms) {
 const summary = [...byName].map(
   ([name, list]) => `${name}×${String(list.length)}（默认 ${list[0].def}）`,
 );
+
+// ── R6：compose 里每一枚 `image:` 都必须是旋钮驱动的 ────────────────────────
+/**
+ * 刻意不接旋钮的 `image:`（键 = `<文件名>::<镜像引用>`，值 = **理由**）。
+ * 加一条要先回答"为什么它在连不上 Docker Hub 的机器上不挡路" —— 和
+ * `DEFAULT_MAY_DIFFER` 同一个成本设计：判据一旦能靠白名单放行，白名单就是要逐条读的。
+ */
+const IMAGE_HARDCODED = {};
+
+const COMPOSE_DIR = join(root, 'server');
+const composeFiles = readdirSync(COMPOSE_DIR)
+  .filter((f) => /^docker-compose.*\.ya?ml$/.test(f))
+  .sort();
+if (composeFiles.length === 0) {
+  fail('R0', COMPOSE_DIR, '一枚 `docker-compose*.yml` 都没读到 —— 探针瞎了，这不算通过');
+}
+
+const imageRefs = [];
+for (const file of composeFiles) {
+  const lines = readFileSync(join(COMPOSE_DIR, file), 'utf8').split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = /^\s+image:\s*(.+?)\s*$/.exec(lines[i]);
+    if (!m) continue;
+    // 🔴 必须是 `${NAME:-默认}` 整串，**不接受**只写 `${NAME}` 的"半旋钮"：
+    //    那种形状在变量没设时把 image 解析成空串，compose 报的是
+    //    `invalid reference format` —— 症状从"没接旋钮"变成"这条命令根本跑不起来"，
+    //    比硬编码更糟，因为它看起来像已经接好了。
+    const knob = /^\$\{([A-Za-z_][A-Za-z0-9_]*):-([^}]*)\}$/.exec(m[1]);
+    imageRefs.push({
+      file,
+      line: i + 1,
+      value: m[1],
+      knobbled: knob !== null,
+      envName: knob ? knob[1] : null,
+      def: knob ? knob[2] : null,
+    });
+  }
+}
+// 阳性对照：这棵树里**必然**有若干枚 `image:`。数为 0 说明正则或目录错了，而不是"全都接了旋钮"。
+if (imageRefs.length === 0) {
+  fail('R0', COMPOSE_DIR, `${String(composeFiles.length)} 份 compose 里一个 image: 都没读到 —— 探针瞎了`);
+}
+for (const ref of imageRefs) {
+  if (ref.knobbled) continue;
+  const key = `${ref.file}::${ref.value}`;
+  if (IMAGE_HARDCODED[key]) {
+    notes.push(`${ref.file}:${String(ref.line)} 的 \`${ref.value}\` **刻意不接旋钮** —— ${IMAGE_HARDCODED[key]}`);
+    continue;
+  }
+  fail(
+    'R6',
+    `${COMPOSE_DIR}/${ref.file}:${String(ref.line)} · image: ${ref.value}`,
+    '这枚镜像是**运行期**由 `docker compose up` 去 Docker Hub 拉的，而它不是 `${名字:-默认}` 形状 ⇒ ' +
+      '在连不上 `docker.io` 的主机上，构建阶段无论配了什么源都会死在这里' +
+      '（只写 `${名字}` 也不算接好：变量没设时 image 会解析成空串，compose 报 `invalid reference format`）。' +
+      '写成 `${你的名字:-' + ref.value + '}`（不带那一行时逐字节等于今天的行为），' +
+      '或者在 `IMAGE_HARDCODED` 里写明它为什么不挡路。',
+  );
+}
 if (reds.length > 0) {
   console.error(
     `\n读到的形状：Dockerfile ${String(froms.length)} 段 / ${String(dockerArgs.length)} 条 ARG` +
@@ -268,5 +350,9 @@ console.log(
   `✅ 镜像构建参数：${String(froms.length)} 段全部 \`FROM \${NODE_IMAGE} AS …\`（R5）｜` +
     `同名 ARG 默认值逐字一致（R1，${summary.join('、')}）｜` +
     `每段 FROM 之前同段内有 ARG（R2）｜compose 传的 ${String(composeArgs.length)} 项 Dockerfile 全认（R3）｜` +
-    `Dockerfile 的 ${String(byName.size)} 个 ARG compose 全传且默认值相同（R4，例外 ${String(notes.length)} 条已写明理由）`,
+    `Dockerfile 的 ${String(byName.size)} 个 ARG compose 全传且默认值相同（R4，例外 ${String(notes.length)} 条已写明理由）｜` +
+    `${composeFiles.length} 份 compose 的 ${String(imageRefs.length)} 枚 image: 全部旋钮驱动（R6，` +
+    `接了旋钮 ${String(imageRefs.filter((r) => r.knobbled).length)} / 刻意硬编码 ${String(
+      Object.keys(IMAGE_HARDCODED).length,
+    )}）`,
 );

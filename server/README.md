@@ -101,7 +101,21 @@ the build override compose has neither a build definition nor a local tag, so it
 **pull** and you get `pull access denied for supersync, repository does not exist or may require
 'docker login'`. That hint is the misleading part: there is no registry to log in to. The build
 override is also where `APK_MIRROR`, `NPM_REGISTRY` and `NODE_IMAGE` live, so it is the file that
-makes this path work on a machine that cannot reach Alpine's CDN, npm's registry, or Docker Hub.
+makes the **build** work on a machine that cannot reach Alpine's CDN, npm's registry, or Docker Hub.
+
+That was not the whole story, and the paragraph above used to claim it was (audit §8.36): `up -d`
+pulls two more images at **run** time, and a build-time knob cannot reach them. They are knobbed
+too, but they live in `docker-compose.yml`, not in this override:
+
+```bash
+POSTGRES_IMAGE=your-mirror/library/postgres:16-alpine
+CADDY_IMAGE=your-mirror/library/caddy:2.11-alpine
+```
+
+Unset, each renders byte-identical to the tag it replaced (verified with
+`docker compose config`, not by eyeballing the YAML). `check:image-build-args` rule **R6** now walks
+every `server/docker-compose*.yml` and fails on any `image:` that is not `${NAME:-default}`, because
+"the build was covered" is exactly the claim that was sitting here un-checked.
 
 `NODE_IMAGE` fails differently from the other two, which is why it is called out: the Alpine and npm
 knobs affect layers that only run **after** the build has started, while the base image is pulled
