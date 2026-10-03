@@ -89,10 +89,10 @@ export function VaultSettingsSection(): React.JSX.Element {
   const serverUrl = readSyncConfig()?.serverUrl;
   const scope = useMemo(currentScope, [accountId, serverUrl]);
 
-  const rememberCurrentRoot = useCallback(async (nextSession: VaultKeySession): Promise<void> => {
+  const rememberCurrentRoot = useCallback(async (nextSession: VaultKeySession, enabled = rememberUnlock): Promise<void> => {
     // A recovery unlock is deliberately a bridge to rotation. Never persist
     // the old root before the user publishes a new passphrase/recovery code.
-    if (!rememberUnlock || scope === undefined || nextSession.requiresRecoveryRotation) return;
+    if (!enabled || scope === undefined || nextSession.requiresRecoveryRotation) return;
     const root = nextSession.copyUnlockedRootKey();
     try {
       await saveVaultRootKey(scope, encodeBase64(root));
@@ -134,10 +134,16 @@ export function VaultSettingsSection(): React.JSX.Element {
         }
         if (cancelled || remembered === undefined) return;
         const root = decodeRootKey(remembered);
-        try {
-          next.unlockWithRootKey(root);
-          setRememberUnlock(true);
-          setRevision((value) => value + 1);
+          try {
+            next.unlockWithRootKey(root);
+            await next.restorePendingRootRotation();
+            setRememberUnlock(true);
+            const restored = next.getPendingRootRotation();
+            if (restored !== undefined) {
+              setPending(restored);
+              setPendingAction('rotate');
+            }
+            setRevision((value) => value + 1);
         } finally {
           root.fill(0);
         }
@@ -169,14 +175,22 @@ export function VaultSettingsSection(): React.JSX.Element {
   const toggleRemember = (): void => {
     if (busy || scope === undefined) return;
     if (rememberUnlock) {
-      setBusy(true);
-      void removeVaultRootKey(scope)
-        .then(() => setRememberUnlock(false))
-        .catch((caught: unknown) => setError(errorKey(caught)))
-        .finally(() => setBusy(false));
+      void run(async () => {
+        await removeVaultRootKey(scope);
+        setRememberUnlock(false);
+      });
       return;
     }
-    setRememberUnlock(true);
+    if (session?.state !== 'unlocked') {
+      // The choice is remembered in this screen and is applied immediately
+      // after the next successful unlock/creation confirmation.
+      setRememberUnlock(true);
+      return;
+    }
+    void run(async () => {
+      await rememberCurrentRoot(session, true);
+      setRememberUnlock(true);
+    });
   };
 
   const unlock = (action: () => Promise<void>): void => {
@@ -282,7 +296,7 @@ export function VaultSettingsSection(): React.JSX.Element {
         <Card>
           <Stack>
             <Text variant="row-title">{t('mobile.vault.recoveryLabel')}</Text>
-            <Text selectable>{pending.recoveryCode}</Text>
+            {pending.recoveryCode !== '' ? <Text selectable>{pending.recoveryCode}</Text> : <Text variant="caption" tone="subtle">{t('mobile.vault.recoveryResume')}</Text>}
             <Text variant="caption" tone="subtle">{t('mobile.vault.recoveryHint')}</Text>
             <TextField
               label={t('mobile.vault.recoveryConfirm')}
@@ -313,11 +327,15 @@ export function VaultSettingsSection(): React.JSX.Element {
             />
             <Button
               label={t('mobile.vault.cancel')}
-              onPress={() => {
+              onPress={() => void run(async () => {
+                if (pendingAction === 'rotate') {
+                  const activeHost = host ?? await openTaskHost();
+                  await activeHost.cancelVaultRootRotation();
+                }
                 setPending(undefined);
                 setPendingAction(undefined);
                 setMigrationProgress(undefined);
-              }}
+              })}
               disabled={busy}
             />
             {pendingAction === 'change' ? <Text variant="caption">{t('mobile.vault.changeTitle')}</Text> : null}
@@ -339,6 +357,11 @@ export function VaultSettingsSection(): React.JSX.Element {
                 session.lock();
                 setRevision((value) => value + 1);
               }}
+            />
+            <Checkbox
+              checked={rememberUnlock}
+              onToggle={toggleRemember}
+              label={t('mobile.vault.remember')}
             />
             <TextField
               label={t('mobile.vault.newPassphrase')}
