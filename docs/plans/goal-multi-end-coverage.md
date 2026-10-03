@@ -1214,7 +1214,7 @@ $ cd apps/mobile && NO_COLOR=1 npx vitest run tests/growth-share-summary.spec.ts
 | 习惯 改名与删除 | ✅ | `npx vitest run tests/organizer-rename.spec.ts` → 26 passed | — |
 | 便签 编辑 | ✅ | `npx vitest run tests/note-edit.spec.ts` → 15 passed | 接线已完；真机只走到第 5 步（§3.2） |
 | 搜索 | ✅ | `npx vitest run tests/reminders-notes-display.spec.ts` → 17 passed | — |
-| 清单/标签 改名、归档 | 🟡 | 同上 `organizer-rename` | 本批两项都 ✅；留 🟡 的是**父子层级选择器**，任务书四项里没有它 |
+| 清单/标签 改名、归档 | 🟡 | 同上 `organizer-rename` | 本批两项都 ✅；留 🟡 的是**父子层级选择器**。🔴 22:0x 查到底：`ProjectActions` 接口面上没有改父方法，**但 `project-actions.ts:165` 那个私有的 `updateProject(entityId, payload)` 是开放 payload 的现成派发器**（rename/setColor/archive 全是它的一行包装）⇒ **写侧只差一个同形状的接口包装 + 守卫**（任务侧 `actions.ts:613-625` 的 `setParent` 守卫可对照），真缺的是**两端的选择器界面 + 词条**，且 web 同样没有 ⇒ 跨端形态是产品裁决，不在本 goal 的四项里。取证与那条 `moveProject` 撞 `removeProject` 子串的假命中记在 **B52** |
 | 成长统计 | 🟡 | `npx vitest run tests/growth-share-summary.spec.ts` → 13 passed | 分享块 ✅；**热力图 / 补打卡 被冻结判据钉住**（B41/B42，机制见下） |
 | 订阅/权益可见 | 🟡 | `node scripts/check-pricing-consistency.mjs` → exit 0 | 权益卡 ✅；**"到 X 日到期"拿不到**（B45，实测见下） |
 

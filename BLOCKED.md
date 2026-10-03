@@ -3002,3 +3002,69 @@ N 是活的：同一小时三趟 **27 / 32 / 33**。
 ② 反向的坑：按**解析后的绝对路径**去 grep，而文档里写的是相对串 `](../../apps/web/…)`，
 0 命中会被误读成"HEAD 没引用"。**零命中要先确认 needle 的形状和被扫文本的形状一致。**
 
+
+## B52. 「清单父子层级选择器」：~~改父的写动作在 app-host 里根本不存在~~ ⇒ 更正为**接口面上没有，但通用的 payload 派发是现成的**；真缺的是两端界面 + 跨端形态裁决（2026-10-03 21:5x 实测，22:0x 自我更正）
+
+**为什么它挡着审计矩阵那一行翻 ✅**：那一行写的是「清单/标签 **改名**、**父子**、**归档**」，
+本批把改名与归档两端都接了（判据 `apps/mobile/tests/organizer-rename.spec.ts` 26 passed），
+**留 🟡 的就是"父子"这一项**。我这一轮把它查到底，结论是它**不属于本 goal 的前提**
+（本 goal 的前提是"零件都在、没人接线"）。
+
+**三条现量**（都在仓库根跑，第二条带阳性对照）：
+
+```bash
+# ① ProjectActions 到底有几个动作
+awk '/^export interface ProjectActions/,/^}/' packages/app-host/src/project-actions.ts \
+  | grep -oE '^  [a-zA-Z]+\(' | tr -d ' ('
+#   → createProject / renameProject / setProjectColor / archiveProject / removeProject
+#     ~~🔴 没有任何一个能改已存在清单的父~~
+#     🔴 **接口面（ProjectActions）上确实没有改父的方法**，但我上面那句"没有任何一个能改父"**说满了**，
+#        被自己下一趟探针否证：同文件 `:165` 有一个**模块内私有**的
+#        `const updateProject = async (entityId, payload: Record<string, unknown>)`
+#        —— 它校验实体存在、直接 `dispatch({entityType:'PROJECT', opType:Update, payload})`，
+#        **payload 是开放的**。rename / setColor / archive 三个动作都是它的一行包装
+#        （`:209` `{name}`、`:225` `{color}`、`:230` `{archived}`）。
+#        ⇒ 缺的是**接口上一个同样形状的包装**，不是"一条新的写路径"。成本比我下面写的低。
+
+# ② 精确名找"改父"的动作（阳性对照：任务侧同一条命令查 setParent，命中 3）
+grep -rnw -e setProjectParent -e moveProjectToFolder -e reparentProject -e setParentProject \
+  packages apps --include='*.ts' --include='*.tsx' | grep -v '/dist/' | wc -l   # → 0
+grep -rnw setParent packages/app-host/src --include='*.ts' | wc -l               # → 3（对照有效）
+
+# ③ createProject(name, parentId?) 那个第二参，有没有界面路径把它喂进来
+grep -rn 'createProject(' apps/web/src apps/mobile/src | grep -v '/dist/'
+#   → web: store.ts:69  createProject(name, parentId)   ← store **转发了自己的形参**，不是它决定父
+#     mobile: TaskDetailSheet.tsx:608 / ListsSection.tsx:167   ← 两处都只传 name
+grep -rn 'addProject(' apps/web/src --include='*.tsx'
+#   → 唯一调用点 ProjectsPanel.tsx:200  void projects.addProject(draft);   ← **一个参数**
+#   ⇒ 全仓没有任何一条**界面路径**能给出父清单（store 那层是管道，不是决策者）
+
+# ④ 清单侧有没有现成的嵌套守卫（任务侧有，清单侧没有）
+grep -rnw -e isFolder -e projectDepth packages/domain/src packages/app-host/src --include='*.ts' | wc -l
+#   → 0（两个名字都 0 命中）；`cycle` 6 命中**全在任务侧** subtasks/actions，与 PROJECT 无关
+#   ⇒ 新的 `setParent` 包装**必须自带守卫**（一层文件夹、不许指向自己/自己的子、不许形成环）
+```
+
+⚠️ **第②条差点把我骗过去**：我第一趟用 `grep -rn 'moveProject'` 找"移动清单"，命中 **13 行**，
+看起来像"动作存在、只是没人接"。而那 13 行全是 **`removeProject`** —— `moveProject` 是它的子串。
+**needle 要用词边界（`-w`）或带前导点，零命中还要挂一条同形阳性对照**，否则"不存在"会被误报成"存在"，
+反过来"存在"也会从"不存在"里误报出来。
+
+**所以"父子"缺的不是新写路径，是两样**：① `ProjectActions` 上一个 `setParent(entityId, parentId?)`
+包装（照 `archiveProject` 的形状写，三行，走同一个 `updateProject`，一个意图 = 一个 op）
+**+ 环/深度守卫**（任务侧 `setParent` 已经有现成的守卫可以对照：`actions.ts:613-625` 先判 `verdict` 再写）；
+② **两端的选择器界面 + 词条**（这一层才是真工作量，而且 web 同样没有）。
+**跨端形态是产品裁决**：移动端单方做出嵌套、桌面端仍是平铺，我不能替领导拍这个板。
+
+🔴 **这一条把我自己上一版的结论改小了，也把"下一批的成本"改小了**：我原先写的是
+"要新增共享写动作 = 一条新的写路径"，读起来像要动领域层与线协议；实测是
+**payload 通道本来就是开放的，只差接口上一个包装**。
+**教训一句**：判"某个写动作不存在"时，光列接口方法名不够 —— 还要看接口后面那个通用派发器
+有没有被别的动作共用（共用了就说明通道是现成的，缺的只是门面）。
+
+**领域层已经把设计钉死了**（`packages/domain/src/entities.ts:270-277`）：
+`parentId` 可选、**只允许一层文件夹 + 其下清单，不支持任意深度嵌套**（避免循环引用与深度查询）。
+⇒ 下一批真要做，守卫的形状是现成的，不必重新设计。
+
+**本批不做**：地界内能做的（改名/归档两端）已全部做完并带判据；这一项要新增共享写动作 + 双端界面，
+且跨端形态待裁决。**那一行因此留 🟡，不是"本批漏做"**。
