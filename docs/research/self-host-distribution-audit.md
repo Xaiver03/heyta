@@ -242,7 +242,9 @@
 | G-43 | `checking` 期间宿主把拦截叙述成裁决（界面对用户说谎） | **本批关闭**（§8.3 第 1 条） |
 | G-44 | `appVersion` 在服务端**有消费者、没有生产者**：`server/src/sync/checkpoint-gate.ts` 拿它判 `MIN_CHECKPOINT_SAFE_APP_VERSION`，`sync.service.ts:676 touchDevice` 把它记进 `sync_devices`，而它是**下载请求上的一个可选查询参数**（`packages/shared-schema/src/supersync-http-contract.ts:191` 是 `z.string().optional()`）—— `packages/sync-client/src/client.ts:1324-1327` 只往查询串里写 `sinceSeq` 与 `excludeClient`，**没有任何 heyta 客户端发过它** | **未关**（本批只把它写成事实）。后果是那条闸门对自家客户端恒等于"未知版本"，所以 §8.5 的版本政策**不能**写成 N-1/major 矩阵，只能写成触发条件 |
 | G-45 | 台阶 3（镜像 npm 依赖树 vs 许可证门禁扫的 pnpm store）仍是**未证实** | **未关**：G-40⑦ 原样保留，量完再改这一行 |
-| G-46 | `server/scripts/build-and-push.sh` 是**上游形状**的脚本：它的输入清单里写着 `packages/super-sync-server`、`package-lock.json`、`.github/workflows/supersync-docker.yml` —— 三个在本仓库都不存在（实测 `[ -e ]` 全不成立）。它和 `deploy.sh` 里那份已收口的 `SUPER_SYNC_IMAGE_INPUTS` 是**同一件事的第二份抄件**，而抄件的那一份从没跟着改 | **未关**：本批只把 `deploy.sh` 那份换成真实文件名并写明"不存在的 pathspec 是被静默忽略的"（`git log -- <不存在>` 与不给它回的是同一个提交，`git diff --quiet -- <不存在>` 恒真 ⇒ 两个方向都不报）。这个脚本要么并到那一份上、要么删，**不该留着让人以为有第二条发布路** |
+| G-46 | `server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 的唯一实体）原来是**上游形状**：它自己抄了一份 7 条的镜像输入清单，其中 3 条在本仓库不存在（实测 `[ -e ]` 全不成立），而 `apps/web` / 11 个 `packages/*` / `pnpm-lock.yaml` / `server/` 自己**一条都不在里面**；`GHCR_NAMESPACE` 默认成 `super-productivity`（**别人的组织**）；并且无论给不给版本号都**顺带覆盖 `:latest`** | **本批关闭**（§8.7 第 4 条）。三条各自都会出事，都已改：清单改成 source 同一个读者、namespace 无默认值（不给就在任何 docker 之前 exit 1）、只推点名的那一个 tag。⚠️ 消费者集合是量过的：除 `server/package.json:14` 外只有 `server/tests/migration-sql.spec.ts:345` 读它，而那一发在 `it.skip` 里 ⇒ **不报错也不守** |
+
+
 
 ### 8.5 版本耦合写成政策（台阶 1 本体的最后一项）
 
@@ -285,4 +287,69 @@
    改成锚定 `- KEY=value` 的行形状。与 §8.3 第 5 条（compose 的注释喂饱了键名扫描）同一个形状，
    而同一天我在两个不同的脚本里各修了一次 —— 说明它不是手误，是"用 `includes` 判配置"这个习惯的必然产物。
 
+### 8.7 台阶 2：发布流水线**文件落地但这条路当下走不通**，并且我先前给它写的"三重保险"里有一重是假的
 
+新文件 `.github/workflows/heyta-server-image.yml`。它今天发不出任何东西，拦着的是
+**四个当场量过的事实**（2026-10-03，全部只读命令，未推送、未发布）：
+
+| 事实 | 现量命令 | 读数 |
+|---|---|---|
+| 仓库没有 `vX.Y.Z` tag | `git tag -l 'v*.*.*' \| wc -l` | `0` |
+| 远端也没有（不是本地没同步） | `git ls-remote --tags origin` | 空输出 |
+| `GHCR_NAMESPACE` 这个仓库变量不存在 | `gh api repos/Xaiver03/heyta/actions/variables` | `(空)` |
+| `image-publish` 环境不存在 | `gh api repos/Xaiver03/heyta/environments` | `(空)` |
+
+再加上"唯一触发方式是 `push: tags`"这一条形状 ⇒ **打 tag 这个动作本身就是拍板**，
+不需要再造一个"禁止运行"的开关。
+
+🔴 **一条我写错了、当天就撤掉的断言**：第一版把这个环境写成"三重保险"里的第二重，
+理由是"GitHub 对引用不存在的环境的处理是**作业不执行**"。**这句是错的** ——
+官方文档（Actions → 管理部署环境）原文是
+"**运行引用不存在环境的工作流程时，将会创建一个使用该引用名称的环境**"。
+也就是说那一行既不会拦、也不会报，它只会**凭空长出一个环境**。
+已就地改成 ⚠️ 注释并写明它的真实作用 = **留痕**（发布过就删不掉痕迹），
+而它**不是闸门**；真正的闸门只有 `guard` 那一步的 `exit 1`。
+这条值得留下的原因不是"我错了"，而是：**一份"为什么安全"的清单里，
+每一条都必须是被量过的，不然它会把唯一真的那条淹掉。**
+
+顺手同批修掉的另外三个形状问题：
+
+1. 🔴 **`workflow_dispatch` 删掉了**。它绕过"没有 tag"那一重，而它的 `version` 输入
+   在这个文件里**没有任何步骤消费**（一个没人用的手动输入 = 一个会失败、
+   但失败点不在你按下去那一下的按钮）。将来发版要做的动作就是打 tag 本身。
+2. 🔴 **`guard` 里那条判据原本是恒假的**：写的是 `[ -z "${IMAGE_NAME##*/}" ]`，
+   取的是**最后一段**，它永远等于 `heyta-server` ⇒ 条件永不成立，整个 `if` 只是装饰。
+   改成取第一个 `/` 之前的 `${IMAGE_NAME%%/*}` —— 变量未设时 `IMAGE_NAME="/heyta-server"`，
+   它才是**空串**。A/B 实测：未设的形状 rc=1 并打印出该补哪两样，设成 `acme` 时 rc=0。
+3. **`VCS_REF` 不再"假设等于 release 提交号"，而是当场证。** `deploy.sh` 的期望值是
+   `git log -1 --format=%H -- <镜像输入清单>`（cwd=server/），而**不等就是 `exit 1`**
+   （读的是 `verify_supersync_image_revision` 本体，不是注释）。所以一笔什么都没改、
+   只加了 tag 的 release 提交会打出一个"**每次部署都被拒**"的镜像，而 CI 全绿。
+   现在构建前比一次，不等就拒绝发布并说清修法。
+   变异实测：把 HEAD 换成 `HEAD~1/2/3/5` ⇒ **4 发全 rc=1** 并打印两个 SHA；
+   不变异时 rc=0 且 `GITHUB_OUTPUT` 里确实落到了 `revision=470dda0c…`。
+
+**镜像输入清单收成一份文件**（这一步是 3. 的前提，否则清单就有第五份抄件）：
+`server/image-inputs.txt`（数据 + 为什么）+ `server/scripts/image-inputs.sh`（唯一读者，
+**被 source 不执行**）。`deploy.sh` 与这份 workflow 现在吃同一个读者。
+
+- **零行为变化**是量过的，不是声称的：用改造前那份数组的字面值与读者读出的 22 项分别跑
+  `git log -1 --format=%H`、`git diff --name-only`、`git ls-files --others --exclude-standard`，
+  外加清单本身 ⇒ **四发 `cmp` 全部相同**（rev 都是 `470dda0c…`）。
+- 读者的三条失败分支各自做过变异，并带阳性对照（只给 `.` 一项 ⇒ 绿）：
+  清单只有注释 ⇒ 红（"读空"不许变成"什么都不检查"）；某项不存在 ⇒ 红；
+  清单文件不存在 ⇒ 红。`deploy.sh` 那段 `if ! . …; then exit 1` 的接线也用同一个读者
+  在坏输入下复跑过，走到的是 exit 1 而不是静默继续。
+  ⚠️ 最后这一发是**接线复刻**（在 `/tmp` 的副本目录里跑那四行），不是 `deploy.sh` 整机 ——
+  跑整机会真去部署，本批不许碰。
+- `../.github/workflows/supersync-docker.yml`（上游留的名字，本仓库从来不存在）从清单里去掉，
+  换成这份真实文件；"不存在的 pathspec 会被 git 静默忽略"那整段推理搬进了
+  `image-inputs.txt` 的头注释，因为它现在是**读者要拦的事**而不是注释里的事。
+- 大陆可达性的口径写在文件头：**官方分发点只有 GHCR 一个**，第三方公共 mirror
+  一律不写成官方；可达性由部署者自己配 mirror/反代，教程在 `docs/runbooks/deployment.md`。
+
+- 4. 🔴 **"第二条发布路"不是错觉，它一条命令就能跑 —— 所以在拍板之前先把它修到不害人**：`server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 就是它）原本自带一份 7 条的镜像输入清单，其中 3 条在本仓库**不存在**（`.github/workflows/supersync-docker.yml`、`package-lock.json`、`packages/super-sync-server`），而 `apps/web` 与 11 个 `packages/*` **一条都不在里面** —— 它算出的 revision 因此**恒落后于真实输入**，正是"新前端配旧标签"那类事故的形状。现在它 source 同一个读者（第三个消费者）。另两条同批改：`GHCR_NAMESPACE` **去掉默认值 `super-productivity`**（那是上游的组织，配了 token 的人一跑就把镜像推进别人命名空间），不给就在任何 docker 之前 exit 1；不再"顺带覆盖 `:latest`"（只推点名的那一个 tag，`latest` 归发布流水线的 `latest=auto` 判）。三发实测：不给 namespace ⇒ rc=1 且没碰 docker；给了 namespace ⇒ 走到脏输入检查并打印出**同一份 22 项清单**（仍然没碰 docker）；三处 `VCS_REF` 算法（本脚本 / `deploy.sh` / workflow 里那条断言）在 `HEAD=470dda0c` 上给出**同一个值**。
+  ⚠️ 记一条探针教训：上面第三发我第一次是在 **zsh** 里跑的，`BASH_SOURCE` 为空 ⇒ `dirname ""` = `.` ⇒ 清单被解析到仓库根，报"读不到"后 zsh（没有 `set -e`）继续跑，于是得到一句 `fatal: empty string is not a valid pathspec`。**那是探针坏，不是读者坏** —— 换 `bash -c` 后同一发出的是 `n=22 / revision=470dda0c…`。
+
+G-40⑤（版本来源约定）与 G-40⑥（兼容矩阵）**仍未关** —— 它们要的是"第一枚镜像发出去"
+这个动作之后的事，本批不许碰（见 §8.5 那条触发条件）。

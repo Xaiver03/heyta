@@ -105,45 +105,29 @@ if [ "${SUPERSYNC_SKIP_IMAGE_REVISION_CHECK:-}" != "true" ] && ! command -v jq >
     exit 1
 fi
 
-# 🔧 heyta 改动：镜像输入清单**只有这一份**。
+# 🔧 heyta 改动：镜像输入清单**只有这一份**，而且它是一个**文件**（`../image-inputs.txt`），
+# 由 `scripts/image-inputs.sh` 读进来。
 #
 # 原来这四个判断（算 revision / `git diff` / `git diff --cached` / `git ls-files --others`）
 # 各自抄了一遍路径列表，而"哪几个路径算镜像输入"是一个判断被写了四遍 ——
 # 这正是本仓库 §3.2 那条教训的形状（"失败判据被抄了三遍，三遍都漏了同一项"）。
 # 现在只有一份，四段都吃它。
 #
-# ⚠️ 这里的每一项都必须和 `Dockerfile` 真正 COPY 的东西对齐。**漏一项的后果不是报错，
-# 是"跑旧镜像配新迁移"那类事故换个入口重来**：revision 标签会算出一个"看起来最新"的
-# commit，而镜像里其实是旧的前端。所以 web 阶段一旦把 `apps/web` 变成镜像输入，
-# 下面必须一起加上 —— 两边都在同一个提交里改。
-SUPER_SYNC_IMAGE_INPUTS=(
-    ../.dockerignore
-    # ⚠️ 这一条**目前指向一个不存在的文件**（`.github/workflows/` 里只有 `ci.yml`，
-    # 本仓库从来没有镜像发布流水线 —— 实测 `[ -e ]` 就它一个 MISSING）。
-    # 它是上游留下的名字。等发布流水线落地时要把它换成真实文件名，并确认那份
-    # workflow 真的传 `VCS_REF=`（否则 revision 核对形同虚设）。
-    ../.github/workflows/supersync-docker.yml
-    ../package.json
-    ../pnpm-lock.yaml
-    ../pnpm-workspace.yaml
-    ../tsconfig.base.json
-    ../scripts/check-web-artifact.mjs
-    ../apps/web
-    ../packages/ai
-    ../packages/app-host
-    ../packages/design-system
-    ../packages/domain
-    ../packages/i18n
-    ../packages/local-api
-    ../packages/op-log
-    ../packages/shared-schema
-    ../packages/storage
-    ../packages/sync-client
-    ../packages/sync-core
-    ../packages/ui
-    ../packages/widget-core
-    .
-)
+# 为什么搬到文件而不是留在脚本里：发布流水线（`.github/workflows/heyta-server-image.yml`）
+# 要往镜像里写 `org.opencontainers.image.revision`，而 `deploy.sh` 每次部署都拿
+# **同一个式子**算期望值。两边差一个提交，自托管用户每次部署都被
+# `verify_supersync_image_revision` 硬拒（实测那条是 `exit 1`，不是警告）。
+# 抄一份列表过去就是第五份抄件 —— 所以它改成 source 同一个读者。
+#
+# ⚠️ 要加/减输入，改 `../image-inputs.txt`（那里写着"必须和 Dockerfile 真正 COPY 的
+# 东西对齐"的理由，以及"不许出现不存在的文件"为什么必须响亮失败）。
+# 读者会校验每一项真实存在，清单读空或不存在的项都会**直接退出**。
+# shellcheck disable=SC1091
+if ! . "$SCRIPT_DIR/image-inputs.sh"; then
+    echo "ERROR: 读镜像输入清单失败，拒绝继续（没有这份清单，revision 核对与脏树检查都是空的）。" >&2
+    exit 1
+fi
+echo "==> 镜像输入清单：$SUPER_SYNC_IMAGE_INPUTS_LIST（$(printf '%s\n' "${SUPER_SYNC_IMAGE_INPUTS[@]}" | wc -l | tr -d ' ') 项）"
 
 supersync_image_source_revision() {
     local revision
@@ -188,7 +172,7 @@ assert_clean_supersync_image_inputs() {
         echo ""
         echo "ERROR: Refusing to build a labeled supersync image from dirty tracked input files."
         echo "       Commit or stash changes in the image inputs before running --build."
-        echo "       Inputs (one list, at the top of this script):"
+        echo "       Inputs (one list, read by scripts/image-inputs.sh):"
         printf '%s\n' "${SUPER_SYNC_IMAGE_INPUTS[@]}" | sed 's/^/       - /'
         exit 1
     fi
