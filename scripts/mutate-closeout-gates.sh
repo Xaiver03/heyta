@@ -153,5 +153,34 @@ else
   no "定义 $defs 处 / source 语句 $srcs 处 —— 期望 1 与 2"
 fi
 
+say "U) settle_for 的三种时刻：见到才算、见不到必须红、隔几轮才出现也要等到"
+# 🔴 这一组**不碰真的 /tmp/ui.xml**（那台机器上可能正有别人的设备验收在读它），
+#    所以把函数体里的路径整段换到临时夹具上 —— 换的是被测对象读的文件，不是判据本身。
+UFD=$(mktemp -d); UXML="$UFD/ui.xml"
+UFN="$(sed -n '/^settle_for() {/,/^}/p' "$REPO/scripts/lib/mobile-e2e.sh" | sed "s#/tmp/ui.xml#$UXML#g")"
+[ -n "$UFN" ] || { no "U0 没从 lib 里取出 settle_for 函数体（形状变了？）"; }
+dump_stub='dump(){ :; }; '
+printf '<hierarchy><node text="立即同步"/></hierarchy>' > "$UXML"
+if bash -c "${dump_stub}${UFN}; settle_for '立即同步' 3 0"; then
+  ok "U1 界面上就有 → 返回 0"
+else
+  no "U1 有却说没有（正向对照失败）"
+fi
+printf '<hierarchy><node text="别的界面"/></hierarchy>' > "$UXML"
+if bash -c "${dump_stub}${UFN}; settle_for '立即同步' 3 0"; then
+  no "U2 🔴 界面上一路都没有却返回 0 —— 这条判据没牙"
+else
+  ok "U2 一路都没有 → 返回 1（调用方那句 bad 照样会红）"
+fi
+printf '<hierarchy><node text="别的界面"/></hierarchy>' > "$UXML"
+( sleep 0.5; printf '<hierarchy><node text="立即同步"/></hierarchy>' > "$UXML" ) &
+if bash -c "${dump_stub}${UFN}; settle_for '立即同步' 8 1"; then
+  ok "U3 第 1 秒才出现也等到（不是一次性读数）"
+else
+  no "U3 中途出现的没等到 —— 还是在猜固定 sleep"
+fi
+wait 2>/dev/null || true
+rm -rf "$UFD"
+
 printf '\n=== 合计 %d 绿 / %d 红 ===\n' "$PASS" "$FAIL"
 [ "$FAIL" = "0" ] || exit 1
