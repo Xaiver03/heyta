@@ -2380,6 +2380,24 @@ export function App(): React.JSX.Element {
           )}
         </div>
       </main>
+      {/*
+       * 🔴 详情列（工单 W2）：`.ht-app` 的**直接子项**，与 `<main>` 平级。
+       *
+       * 为什么必须是兄弟而不是 `.ht-content` 的后代：那一层带
+       * `max-inline-size: var(--ht-layout-content-max)` + `margin-inline: auto`，
+       * 挂在里面的列**永远贴不到窗口右边缘**，读起来就不是"三栏 + 右详情"而是
+       * "中间一坨里再分两栏"。这条是 W2 的承重判据（`boundingBox` 右边缘相等），
+       * 变异臂就是把这一列搬回 `.ht-content` 里面 —— 搬回去它必须转红。
+       *
+       * ⚠️ 今天它是**空的**，这是设计不是半成品：产品负责人对这一栏的原话是
+       * "即使没东西也空在那里，一旦选中任何东西右边就出详细的面单"。
+       * 被主计划 §5.4 否决的是"没有选中态时往槽里塞装饰"，而 W1 的选中态已经就绪。
+       * 往里放什么属于"详情面本体"那一单（阻塞在拍板 #1/#8），
+       * 所以这里也**不给它起无障碍名** —— 一个还没有内容的区域，名字会比内容更响。
+       *
+       * ⚠️ 窄屏（≤1023px）这一列不出现，规则与算过的账在 `styles/app/narrow.css`。
+       */}
+      <aside className="ht-app__detail" data-testid="detail-column" />
       </div>
       </AiSettingsNavigationContext.Provider>
     </HeytaUiProvider>
