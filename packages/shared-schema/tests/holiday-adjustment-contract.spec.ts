@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   HOLIDAY_ADJUSTMENT_MAX_DAYS_PER_YEAR,
+  HOLIDAY_ADJUSTMENT_NOTE_MAX_CHARS,
   HOLIDAY_ADJUSTMENT_PATHS,
   HOLIDAY_ADJUSTMENT_YEAR_MAX,
   HOLIDAY_ADJUSTMENT_YEAR_MIN,
   PUBLIC_FACT_SHAPES,
+  holidayAdjustmentAdminDeleteQuerySchema,
   holidayAdjustmentDaySchema,
   holidayAdjustmentYearSchema,
   holidayAdjustmentsResponseSchema,
+  holidayYearPutSchema,
   isRealCalendarDay,
 } from '../src/holiday-adjustment-contract';
 
@@ -275,5 +278,122 @@ describe('PUBLIC_FACT_SHAPES 与契约必须逐字相等', () => {
   it('公开路径与后台路径是**两条不同**的路径（公共事实那条不带身份维度）', () => {
     expect(HOLIDAY_ADJUSTMENT_PATHS.public).toBe('holiday-adjustments');
     expect(HOLIDAY_ADJUSTMENT_PATHS.adminPut).not.toBe(HOLIDAY_ADJUSTMENT_PATHS.public);
+  });
+
+  it('🔴 PUT 与 DELETE 都不许出现 `:id` / `:year` 这类**路径参数**形态', () => {
+    // 理由在 `HOLIDAY_ADJUSTMENT_PATHS.adminDelete` 那段注释里：年份一旦同时住在
+    // 路径与载荷两处，就得再写一条"两边必须一致"的守卫，而漏写那条守卫是**静默**的。
+    // 这一条把"只有一个来源"钉成形状事实 —— 有人改成 `/years/:year` 时这里先红。
+    for (const value of Object.values(HOLIDAY_ADJUSTMENT_PATHS)) {
+      expect(value, `路径 ${value} 不该带路径参数`).not.toMatch(/:[A-Za-z]/);
+    }
+  });
+});
+
+/**
+ * `holidayYearPutSchema`（后台写的那一份）。
+ *
+ * 🔴 这一组保护的是**"两份 schema 共用一套规则"这个决定本身**。
+ * 它之所以被拆成两份（而不是 `.extend()`），是因为 `.refine()` 之后拿不到 `.shape`
+ * 那种可组合的对象（实测 zod 4），于是两条年度级规则要靠具名谓词各调一次。
+ * "各调一次"的正确性不是自明的：漏掉第二处调用，症状是
+ * **PUT 能收下一份公开面形状不认的数据** —— 写进去了、GET 时 `safeParse` 拒掉、
+ * 于是那条通道整个坏掉，而坏的位置离错的位置隔了两个包。
+ * 所以下面那两条"PUT 也拦"的用例是这一拆分的**承重判据**。
+ */
+describe('holidayYearPutSchema：后台写入的那一份', () => {
+  it('合法录入过（note 可给可不给 —— §3.3：新字段一律可选）', () => {
+    expect(holidayYearPutSchema.safeParse(YEAR_2027).success).toBe(true);
+    expect(holidayYearPutSchema.safeParse({ ...YEAR_2027, note: '据 11 月调整公告' }).success).toBe(
+      true,
+    );
+    expect(holidayYearPutSchema.safeParse({ ...YEAR_2027, note: null }).success).toBe(true);
+  });
+
+  it('🔴 与公开那份的差别**只有** `note`（多一项就有人在往匿名面下发运营内部措辞）', () => {
+    const putKeys = Object.keys(holidayYearPutSchema.shape).sort();
+    const publicKeys = Object.keys(holidayAdjustmentYearSchema.shape).sort();
+    expect(putKeys).toEqual([...publicKeys, 'note'].sort());
+    expect(publicKeys).not.toContain('note');
+  });
+
+  it('🔴 年度级规则在 PUT 这一份里**同样**生效：同一天两条 ⇒ 拒', () => {
+    expect(
+      holidayYearPutSchema.safeParse({
+        ...YEAR_2027,
+        days: [
+          { day: '2027-01-01', isOffDay: true },
+          { day: '2027-01-01', isOffDay: false },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('🔴 年度级规则在 PUT 这一份里**同样**生效：跨年 ⇒ 拒', () => {
+    expect(
+      holidayYearPutSchema.safeParse({
+        ...YEAR_2027,
+        days: [{ day: '2026-12-31', isOffDay: true }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('`note` 有上界（列类型是无长度 TEXT，而它会被后台渲染成文本）', () => {
+    expect(
+      holidayYearPutSchema.safeParse({ ...YEAR_2027, note: 'x'.repeat(HOLIDAY_ADJUSTMENT_NOTE_MAX_CHARS) })
+        .success,
+    ).toBe(true);
+    expect(
+      holidayYearPutSchema.safeParse({
+        ...YEAR_2027,
+        note: 'x'.repeat(HOLIDAY_ADJUSTMENT_NOTE_MAX_CHARS + 1),
+      }).success,
+    ).toBe(false);
+  });
+
+  it('`note` 不许是对象/数组（`nullish` 不等于"什么都能收"）', () => {
+    expect(holidayYearPutSchema.safeParse({ ...YEAR_2027, note: { a: 1 } }).success).toBe(false);
+    expect(holidayYearPutSchema.safeParse({ ...YEAR_2027, note: ['a'] }).success).toBe(false);
+    expect(holidayYearPutSchema.safeParse({ ...YEAR_2027, note: 42 }).success).toBe(false);
+  });
+
+  it('判据③那两条在 PUT 这一份里也拦得住（录入面才是它们真正的入口）', () => {
+    expect(holidayYearPutSchema.safeParse({ ...YEAR_2027, days: [{ day: '2027-02-30', isOffDay: true }] }).success).toBe(false);
+    expect(holidayYearPutSchema.safeParse({ ...YEAR_2027, days: [{ day: '2027-01-01', isOffDay: 1 }] }).success).toBe(false);
+    expect(holidayYearPutSchema.safeParse({ ...YEAR_2027, papers: [] }).success).toBe(false);
+    // `javascript:` 那条是后台 XSS 的入口：`papers` 唯一的用途就是被渲染成 `<a href>`。
+    expect(
+      holidayYearPutSchema.safeParse({ ...YEAR_2027, papers: ['javascript:alert(1)'] }).success,
+    ).toBe(false);
+  });
+});
+
+/**
+ * `DELETE` 的查询串。
+ *
+ * 它只有 `year` 一项，所以这组断言看着像摆设 —— 它守的是**"不接受别的东西"**：
+ * 有人后来给它加一个 `force: true` 或 `userId=` 时，这里会红，
+ * 而那条通道今天全部的正当性就在于它不带身份维度（ADR-0050 §3）。
+ */
+describe('holidayAdjustmentAdminDeleteQuerySchema', () => {
+  it('合法的年份过', () => {
+    expect(holidayAdjustmentAdminDeleteQuerySchema.safeParse({ year: '2027' }).success).toBe(true);
+    expect(holidayAdjustmentAdminDeleteQuerySchema.safeParse({ year: 2027 }).success).toBe(true);
+  });
+
+  it('缺 year / 非数字 ⇒ 拒', () => {
+    expect(holidayAdjustmentAdminDeleteQuerySchema.safeParse({}).success).toBe(false);
+    expect(holidayAdjustmentAdminDeleteQuerySchema.safeParse({ year: 'abc' }).success).toBe(false);
+  });
+
+  it('🔴 除 `year` 外**不接受任何键**（写操作里多一个可选键 = 多一个会被绕开的分支）', () => {
+    // 这一条要求 schema 是 `z.strictObject`（默认 `z.object` 会**静默剥掉**未知键，
+    // 于是"不接受"变成"收了但当作没看见" —— 后者在写路径上尤其糟：
+    // 运营传了 `force: true` 收到 200，会以为真的强制了）。
+    expect(
+      holidayAdjustmentAdminDeleteQuerySchema.safeParse({ year: 2027, force: true }).success,
+    ).toBe(false);
+    const keys = Object.keys(holidayAdjustmentAdminDeleteQuerySchema.shape);
+    expect(keys, '这一项是封闭清单：加键要先想清楚它是不是身份维度').toEqual(['year']);
   });
 });

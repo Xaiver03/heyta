@@ -18,6 +18,9 @@
  * | GET  | `/orders`                | 订单列表 |
  * | GET  | `/coupons`               | 优惠码 + 核销数 |
  * | GET  | `/invites`               | 邀请码 + 推荐关系 |
+ * | GET  | `/holiday-adjustments`   | 调休/补班已录入的年度（含 `papers` 出处回显） |
+ * | PUT  | `/holiday-adjustments/years` | **整年替换**某一年（公共事实的唯一写入口，判据③的载体） |
+ * | DELETE | `/holiday-adjustments/years?year=` | 撤销某一年（退回随包表，不是"下发空的一年"） |
  *
  * **不做**：改订阅、退款、发券、群发通知。理由见 ADR-0038 §2 三 / §3.4 ——
  * 前三个动到钱与权益，各自需要幂等键、审计与回滚；群发自由文本会破坏
@@ -40,8 +43,20 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import {
+  HOLIDAY_ADJUSTMENT_PATHS,
+  holidayAdjustmentAdminDeleteQuerySchema,
+} from '@heyta/shared-schema';
+
 import { DEFAULT_ENTITLEMENT_POLICY } from '../entitlement';
+import { getAuthUser } from '../middleware';
 import { Logger } from '../logger';
+import {
+  deleteHolidayAdjustmentYear,
+  listHolidayAdjustmentYearsForAdmin,
+  parseHolidayYearPut,
+  replaceHolidayAdjustmentYear,
+} from '../holidays/holiday-adjustment-store';
 import { requireAdmin } from './admin.middleware';
 import { prisma } from '../db';
 
@@ -741,5 +756,98 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
       Logger.error(`Admin invites error: ${message}`);
       return reply.status(500).send({ error: 'Failed to load invites.' });
     }
+  });
+
+  // ── 调休/补班（公共事实的唯一写入口）。W4b，定性见 ADR-0050 ─────────
+  //
+  // 🔴 这三条路由是这个服务端上**唯一**能写"会下发给所有人的内容"的地方，
+  //    所以它们继承上面那个插件级闸门（`addHook('preHandler', requireAdmin)`）。
+  //    闸门挂在这个文件里而不是 `admin.middleware.ts` —— 那个文件只有 `requireAdmin`
+  //    的**定义**；把注册当挂载等于没挂（工单原句就是这么写的，实测纠正过）。
+  //
+  //    为什么这件事值得单独一句：公共事实的**读**面是匿名的
+  //   （`GET /api/holiday-adjustments`），而**写**面是全后台权限最高的一组。
+  //    两者路径只差一个前缀（`/api/` vs `/api/admin/`），一个漏掉鉴权的复制粘贴
+  //    就会把"任何人可改国务院公告"变成一个 200。
+  fastify.get('/holiday-adjustments', async (_req, reply) => {
+    try {
+      // 🔴 与公开那条读**同一次换算**（`fetchYearRows`），只是出参多了元信息。
+      return reply.send(await listHolidayAdjustmentYearsForAdmin());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin holiday adjustments error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load holiday adjustments.' });
+    }
+  });
+
+  fastify.put('/holiday-adjustments/years', async (req, reply) => {
+    // 判据③的**实际载体**：非法日期 / `isOffDay` 不是布尔 ⇒ 400 + 逐字段原因。
+    // ⚠️ 校验入口只有 `parseHolidayYearPut` 这一个（它包着契约里那份
+    //    `holidayYearPutSchema`）。在 handler 里另写一份 zod 就是 §3.5 那条
+    //    "同一个判断抄两遍"，而两遍的区别会表现为"HTTP 收了、CLI 拒了"。
+    const parsed = parseHolidayYearPut(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'Invalid holiday adjustment year.',
+        // 逐字段回给运营看。**不含**任何用户数据 —— 这里根本没有用户数据可泄，
+        // 而把 `issues` 原样返回是 zod 的默认形状，改写成"人类可读"要一套映射、
+        // 一套映射就会漂。
+        issues: parsed.error.issues.map((i) => ({
+          path: i.path.join('.'),
+          message: i.message,
+        })),
+      });
+    }
+
+    // 操作者邮箱：`updatedBy` 是审计事实。`requireAdmin` 只查了 `isAdmin`
+    //（它不必读 email），所以这里补一次按主键的 `findUnique` ——
+    // 写一年一次，这次查询不是热路径。
+    const actor = await prisma.user.findUnique({
+      where: { id: getAuthUser(req).userId },
+      select: { email: true },
+    });
+
+    try {
+      await replaceHolidayAdjustmentYear({
+        year: parsed.data.year,
+        papers: parsed.data.papers,
+        note: parsed.data.note ?? null,
+        days: parsed.data.days,
+        updatedAt: Date.now(),
+        updatedBy: actor?.email ?? null,
+      });
+    } catch (err) {
+      // 🔴 走到了这里说明**契约层放过、库层拒了** —— 两层校验的并集漏了一格。
+      // 不能报 500 就当没事：500 会让运营以为"服务坏了，等等再试"，
+      // 而那一条数据永远进不去。报 400 + 把原始信息记进日志（日志是唯一能
+      // 指出"哪一层该补一条 CHECK"的地方）。
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(
+        `Admin holiday adjustment PUT rejected by the database (zod accepted it): ${message}`,
+      );
+      return reply.status(400).send({ error: 'Rejected by database constraints.', rejectedBy: 'database' });
+    }
+
+    // 🔴 判据②：`papers` 随数据入库且**能回显**。回显在 PUT 的响应里也给一份，
+    //    是为了让"提交了 3 条出处、界面只显示 2 条"这种丢法当场可见 ——
+    //    只让运营去刷列表的话，丢一行与列表坏了分不开。
+    return reply.send({
+      ok: true,
+      year: parsed.data.year,
+      papers: parsed.data.papers,
+      dayCount: parsed.data.days.length,
+    });
+  });
+
+  fastify.delete('/holiday-adjustments/years', async (req, reply) => {
+    // 年份走查询串而不是 `/years/:year` —— 与 PUT 同一口径，理由见契约里
+    // `HOLIDAY_ADJUSTMENT_PATHS.adminDelete` 那段（两个来源 = 一条必须额外写的守卫）。
+    const parsed = holidayAdjustmentAdminDeleteQuerySchema.safeParse(req.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+
+    const deleted = await deleteHolidayAdjustmentYear(parsed.data.year);
+    // 0 = 那一年本来就没录过。**这是幂等成功**，不是 404：
+    // "撤销一次录入"重复执行一次没有副作用，而把它报成错误会让运营以为没撤销掉。
+    return reply.send({ ok: true, year: parsed.data.year, deleted });
   });
 };
