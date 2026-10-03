@@ -835,3 +835,32 @@ cd /tmp/heyta-merge-check && NO_COLOR=1 pnpm -r build && NO_COLOR=1 pnpm -r test
 **一般形式**：验证跑完，归因写的是"哪一棵树"，那棵树**必须有一个名字**（分支 / tag / 远端）。
 "我当时 checkout 到 X 跑绿了"不是证据，因为下一句"`git log X` 看它"可能已经无处可看。
 探测器一行：`git worktree list | grep detached`。
+
+---
+
+## 14. W11 进了合并态，但那一趟的读数**没有落盘**（如实分开写）
+
+W11（`complete_task` 的批量参数）落在本批分支 `a0df705e` + 文档 `74194e56`，
+随后合进载体：
+
+| 项 | 现量 |
+|---|---|
+| 载体尖端 | `deccbb35`（合并提交，父：`74194e56` + `main` 当时尖端） |
+| 分支可寻址 | `git -C /tmp/heyta-merge-check rev-parse --short tmp/ai-cov-on-main` ⇒ `deccbb35`，与 `HEAD` **同尖** |
+| 载体形态 | `git worktree list` 打 `detached HEAD` —— 但这次分支 ref 一起动了，所以 §13.2 那个坑没有复发（探测器仍要跑，不是"上次对了就不跑"） |
+
+🔴 **当时那趟 `pnpm -r build && pnpm -r test` 的读数（build 零 `error TS`、
+`local-api 146` / `app-host 1078` / `apps/web 1504 | 12` / 逐包 `failed` 0 处）
+只存在于那次运行的输出里，日志文件已不在盘上**，而我另外更正一笔：
+我在会话里报过载体 SHA 为 `deccbb34`，那是**手打的错值**，现量是 `deccbb35`。
+所以这一节的口径是：**W11 在合并态"跑过一次并绿"，但那一趟现在不可复核。**
+
+要把它变成可复核的读数，复现命令是（载体是临时分支，不改任何长期线）：
+
+```bash
+cd /tmp/heyta-merge-check && pnpm -r build && pnpm -r --filter '!@heyta/sync-server' test
+```
+
+**为什么当时没有复跑**：现场 `loadavg 23.27 / 16 核`、`free 11.9 GB / 64 GB`，
+而并行会话正在用同一批设备与 e2e 载体 —— 按 §7 的负载门与
+"等窗口期间连允许全量跑的重活都别起"，这一笔留成**待复跑**而不是绿。
