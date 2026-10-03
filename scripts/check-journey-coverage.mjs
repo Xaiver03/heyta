@@ -85,9 +85,55 @@ const ENDPOINTS = [
   },
   {
     end: 'mobile',
-    journeySpecs: ['apps/mobile/tests/auth-flow.spec.ts', 'scripts/verify-mobile-auth.sh'],
+    /**
+     * 🔴 **2026-10-03 补齐登记**：这一条原先只有 2 个入口（`auth-flow.spec.ts` +
+     * `verify-mobile-auth.sh`），而仓库里已经有 20 多个**真机零 mock 验收脚本**跑过
+     * 了完整的用户旅程（清单/标签跨设备、冲突解决、自动同步、备份还原、提醒投递…）。
+     *
+     * 入口没登记 ≠ 验收不存在 —— 但**门禁看不见它就是没有**：这正是本文件开头那条
+     * 失效形状（"手写清单漏掉的不是细节，是整个条目"）在移动端的第二次现形。
+     *
+     * 收录判据（三条同时成立才登记，避免把这里变成脚本目录的复制品）：
+     *   ① 有 `pnpm verify:*` 别名（否则不是可复跑的入口）；
+     *   ② 真模拟器/真机 + 真服务端，**零 mock**；
+     *   ③ 验的是一段**用户旅程**（能从界面点进去走完），不是单个组件的渲染。
+     * 每条后面的注释是它验的那一段，`covers` 只用于报告。
+     */
+    journeySpecs: [
+      'apps/mobile/tests/auth-flow.spec.ts',
+      // J1–J7 身份与凭据
+      'scripts/verify-mobile-auth.sh',
+      'scripts/verify-mobile-account.sh', // 改密码 / 通行密钥管理（凭据页）
+      // 写入 → 跨设备读到同一条
+      'scripts/verify-mobile-task-edit.sh', // 任务可编辑（截止/优先级/重命名/删除）
+      'scripts/verify-mobile-task-row.sh', // 任务行的一次点击
+      'scripts/verify-mobile-lists.sh', // 清单：手机建 → 归入 → 笔记本读到同一 projectId
+      'scripts/verify-mobile-tags.sh', // 标签：实体 + 任务引用，两端四层判据
+      'scripts/verify-mobile-conflict.sh', // 并发冲突在界面上解决
+      'scripts/verify-mobile-autosync.sh', // 全程不点同步按钮，写入也必须自己出去
+      'scripts/verify-mobile-restore.sh', // 备份还原（只还原到空库）
+      'scripts/verify-multi-end-sync.sh', // Web ↔ 服务端 ↔ 笔记本三相（移动数据的对端）
+      // 视图与交互
+      'scripts/verify-mobile-calendar.sh',
+      'scripts/verify-mobile-timeline.sh',
+      'scripts/verify-mobile-inbox.sh',
+      'scripts/verify-mobile-schedule.sh',
+      'scripts/verify-mobile-sort-sheet.sh', // 排序面板
+      'scripts/verify-mobile-quadrant-fill.sh', // 四象限铺满（Yoga 盒模型那一侧）
+      'scripts/verify-universal-slice.sh', // 共享 UI 切片在移动壳里成立
+      // 平台特性
+      'scripts/verify-mobile-focus.sh', // 专注（番茄钟）闭环
+      'scripts/verify-mobile-repeat.sh', // 重复规则 + 勾选顺延
+      'scripts/verify-mobile-repeat-custom.sh', // 自定义重复（含跨年）
+      'scripts/verify-mobile-capture.sh', // 快速捕捉 → 收集箱
+      'scripts/verify-mobile-ticktick-import.sh', // 外部导入
+      'scripts/verify-mobile-reminder-ring.sh', // 提醒到点：OS 通知栏真出现
+      'scripts/verify-mobile-ios.sh', // iOS 输入侧全链路 + 零点击自动同步
+    ],
     shellSpecs: [],
-    covers: '欢迎页 → 注册/登录 → 令牌 → 同步（真机脚本待独占模拟器）',
+    covers:
+      'J1–J7 全覆盖（真模拟器 + 真服务端，零 mock）：身份注册/登录 → 凭据管理 → 写入并跨设备读回同一条 → ' +
+      '冲突解决 → 零点击自动同步 → 备份还原 → 六个视图 → 专注/重复/提醒投递，Android 与 iOS 两端',
   },
   {
     end: 'macos',
