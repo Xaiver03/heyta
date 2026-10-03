@@ -3810,6 +3810,35 @@ dev 条目本来就被排除在等式之外，删掉它们不改变非 dev 那 1
 指向的是 `file: server/Dockerfile`，同一条 `docker build-push-action` ⇒ 修法自动被发布路径继承）。
 ⇒ 这条不是"又一个 G-54"，是一枚上游遗留的死件；留在这里是因为**"只修我看见的那一处"就是漂移的起点**。
 
+⑩ **那两枚"别人正在改我的文件"的落地解法，现在有门禁当仲裁了，不再是我说了算。**
+07:5x 逐行比过主检出里那两枚的未提交版本与本分支 HEAD：
+`check-image-license-coverage.mjs` 他们那版是 **210 行**，我这版 **554 行** —— 也就是说
+**他们改的是形状 C 之前的那份文件**（main 里躺着的就是那版老代码），而不是"在我这版上又加了东西"。
+他们独有 30 个非空行里，唯一一条**语义**上是新东西的就是
+`'@fastify/websocket@11.3.3'` 那枚登记（单行写法），而它在本分支里以多行写法**已经在**。
+`server/image-npm-tree.json` 更直接：他们那枚钉的是
+`serverPackageJsonSha256 = 272b16d2…`（正好是 main 那版 `server/package.json` 的**整文件**哈希，
+见上面第 ③ 点那张四棵树表）且**没有** `packageLockSha256` 这一档 ——
+那是"跑一遍旧生成器、联网重解一次"的产物（`generatedAt 2026-10-03T18:35:38Z`）。
+🔴 于是落地时"取本分支"不是一条偏好，而是**门禁会判他们那枚红** —— 这一句现在是**现量**而不是我的推测：
+把主检出那枚未提交的 `server/image-npm-tree.json`，连同我这版的生成器与它要读的输入
+（`server/{Dockerfile,package.json,package-lock.json}` + 三枚 `packages/*/package.json`）摆进一份临时树，
+跑 `node research/tools/gen-image-npm-tree.mjs --check` ⇒ **rc=1，"5 处失真"**，逐字是那五条：
+① `serverInstallInputSha256` 与当下不一致；② `packageLockSha256` 与当下不一致；
+③ `packages/shared-schema/package.json` 快照哈希 `a363b0c66f50…` ≠ 当下 `3f21a18ae57c…`；
+④ `packages/sync-core/package.json` `260741f66829…` ≠ `657cd7991fb4…`；
+⑤ "这份快照钉的还是**整个 `server/package.json` 的字节哈希**（旧键 `serverPackageJsonSha256`）"。
+（复现：`/tmp/their-snap`，`cd /tmp/their-snap && node research/tools/gen-image-npm-tree.mjs --check`；
+2026-10-04 08:0x 重跑与当时留档 `cmp -s` **逐字节相同**。）
+
+⚠️ 我上一版在这里写的是"`gen-image-npm-tree --check` 直接说'快照里**没有** packageLockJsonSha256…（原文是
+`packedPackageJsonSha256` 与 `packageLockSha256` 两条）'"—— ~~那个措辞是我照着记忆猜的，实测不是这个形状~~。
+猜错的地方有两处，都值得留着：**它把"旧键还在"猜成了"新键缺失"**（真实输出两条都说了，但主语是"钉的还是整文件哈希"），
+而且**漏了 ③④**。③④ 是这趟我才没预料到的：那枚快照连**本地包清单的哈希**都对不上当下源码，
+说明它不是"形状 C 之前"那么中性，而是**对着另一份源码状态**生成的。
+这条腿（本地包清单进新鲜度对账）本来就在，这一趟是它**第一次真的抓到人** —— 不是我为落地新加的。
+这就是 §8.19 那句"让门禁当裁判"第一次真的替我把一条冲突解掉了，而不是我替它选边。
+
 
 #### 还欠的（别当已完成）
 
