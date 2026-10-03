@@ -389,6 +389,18 @@ grep 命令**数成第二处定义（判据必须锚"行首的定义形状"，�
    `avdmanager` 与 `emulator` 可执行、系统镜像 `android-36/google_apis` 在位 ⇒ **技术上今天就能建**；
    拦着的不是工具链，是"再来一台模拟器的负载"和"这台机器上有人在跑设备判据"这两件事。
 
+   ⚠️ **11:56 复量，上面那条"在落"当场被否证**：`sysctl -n vm.loadavg` ⇒ **128.28 / 218.09 / 137.06**
+   （11:49 是 22.50 / 31.28 / 44.51 ⇒ 7 分钟内 1 分钟负载从 22 涨回 128）。
+   📌 一般规律：**1 分钟负载是一次瞬时读数，不构成趋势** —— 判"窗口开了没"要连读两次且看间隔；
+   单次读数写成"在落"就已经是过度解读（这次它错了）。
+   设备侧四条读数仍然全部指向"不是我的"：`adb devices` 无设备 / `pgrep -f qemu-system` = 0 /
+   :3000 与 :3100 都空 / `xcrun simctl list devices booted` = **3 台起着** / `gradle|xcodebuild` = **2 个在跑**。
+   📌 **push 这件事的现量（我没有推任何东西，也没有 merge）**：
+   `git rev-list --count origin/main..main` ⇒ **37 笔未推**（其中含本批收口那 16 笔），
+   `git merge-base --is-ancestor a29881e9 origin/main` ⇒ **真**（批次一的合入本身已在远端，
+   是 09:56 那一笔 `d0aa20ff` 带上去的），`git ls-remote --heads origin feat/countdown-anniversary` ⇒ **0**
+   （分支从没推过，也已被合入，留着还是删由产品负责人定：`git branch -d feat/countdown-anniversary` 我没有执行）。
+
    设备与服务端都归自己时的复跑命令：
    ```bash
    HEYTA_E2E_SERIAL=<自己的模拟器> PORT=<空端口> bash scripts/verify-mobile-repeat.sh
