@@ -260,15 +260,21 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    ⚠️ **还欠一行接线，且欠的原因不是贵，是别人正占着那个文件**：把
    `"check:license-stamp": "node research/tools/render-license-inventory.mjs --check-stamp"`
    加进 `package.json` 的 `check` 链（放在 `pnpm check:licenses` 后面）。
-   `package.json` 现在是**并行会话的在途改动**：工作树里正在加 `check:mobile-first-run-gate`，
-   而它指向的 `scripts/check-mobile-first-run-gate.mjs` 还是**未跟踪**状态
-   （现量：`git show HEAD:package.json | grep -c mobile-first-run` ⇒ 0、
-   `git ls-tree -r --name-only HEAD | grep -c check-mobile-first-run-gate.mjs` ⇒ 0、
-   `ls scripts/check-mobile-first-run-gate.mjs` ⇒ 存在）。
-   这时我用 `commit --only package.json` 会把他们那两样**一起卷进我的提交**
-   （`--only` 提交的是该路径的工作树内容），而那样落进 HEAD 的是一条指向不存在文件的门禁。
-   🔴 **顺带把这条风险交回他们**：等 `package.json` 干净时（`git status --porcelain -- package.json` 为空）
-   一起补，且必须先确认那笔提交里**同时**含 `scripts/check-mobile-first-run-gate.mjs`。
+   ✅ **这一行已于同日 11:46 落地** —— 等的就是 `package.json` 变干净，且落地前先确认了
+   他们那笔是**脚本与接线同一笔提交**（不是把一条指向不存在文件的门禁推进 HEAD）：
+   `git status --porcelain -- package.json` ⇒ 空、
+   `git ls-tree -r --name-only HEAD | grep -c scripts/check-mobile-first-run-gate.mjs` ⇒ **1**、
+   `git show HEAD:package.json | grep -c 'check:mobile-first-run-gate'` ⇒ **2**（定义 + 链上引用）。
+   实际取的名字是 **`check:licenses:stamp`**（跟 `check:licenses` / `check:licenses:nuget` 同族，
+   而不是我草稿里那个孤立的名字），插在 `check:licenses` 之后。
+   现量：`pnpm -s check:licenses:stamp; echo RC=$?` ⇒ ✅ 对得上当前 lockfile，**RC 0**。
+   📌 它能进 `pnpm check` 而内容级的 `--check` 不能，全部差别在一件事上：**它不需要装任何东西**。
+   ⚠️ 等的时候照出来一条**归他们**的风险 —— "`package.json` 里已经引了
+   `check:mobile-first-run-gate`，而它指向的脚本还是未跟踪状态" ⇒ 那时任何一笔从 HEAD
+   起的干净检出跑 `pnpm check` 都会红在 `MODULE_NOT_FOUND` 上。**这条现在自己关掉了**：
+   他们那一笔把脚本与接线放进了同一笔提交（上面那三条读数是它现在的状态），
+   所以我没有代改，也没动他们的行。留这段是为了记一条形状：
+   **门禁的"引用"与"被引用的那个文件"必须在同一笔提交里落地**，否则 HEAD 是不可跑的状态。
 2. ✅ **撞号已按原指示处理，而且比预告的严重**：预告只说"主检出工作树里已有一条写到 136"，实测合并时 main 的台账已经编到 **160**，本批四条占的 137–140 是**真撞号**（`sed -n '/^137\./,/^137\./p'` 取到的是别人的条目）。合并方把它们重编为 **161–164**，内容一字未改。收口复核：台账 1–164 无重号（`grep -oE '^[0-9]+\. ' | sort -n | uniq -d` 只剩 `1,2,3,4,38,93,94,95` —— 全是条目正文里的有序列表，不是条目号）。
 3. ✅ **AGENTS.md §7 索引表**补了 161–164 那一行（用户 2026-10-03 指示"把落下的东西全部收口"就是 §8 要求的那次明确授权）。同批把 §7 开头写死的"83 条实测踩过"换成现量命令 —— 它本身就是本条要说的那种抄件，已经漂了。
 4. ✅ **lockfile 复解析过了：零 churn**。在合并态的隔离检出（`a29881e9` + 一次全新 `pnpm install`）跑完 `git status --porcelain` 输出 **0 行** ⇒ 合并后的 lockfile 与全部 manifest 自洽。
