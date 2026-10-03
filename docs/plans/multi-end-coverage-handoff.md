@@ -283,6 +283,9 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    🔴 **起跑前必须 `4318/4319/4320` 三个端口空闲**，因为 `check:ai-e2e` 的前置会对它们发 SIGKILL（traps #87）
    —— 启动器把这一步做成硬门：只要有一个是 busy 就 **exit 3 不跑**，绝不为凑自己的读数杀掉别人的 dev server。
    00:5x 现量：三个端口 + `:3000` **全部空闲**（`:3000` 上那台旧构建已经退场）。
+   ⚠️ **同一条读数在 01:3x 已翻面**（现量 `lsof -ti tcp:<p> -sTCP:LISTEN`）：`4318`=pid 92385、`4319`=pid 92369、
+   `3000`=pid 70256 都**被占**，`3100/4320/4322` 仍空 ⇒ ② 此刻起跑会按设计 exit 3。**端口空闲是趟间瞬时读数，
+   不许把上一趟的"全空闲"带到下一趟**（这正是启动器每次都重量的原因）。
 3. **把 `verify:mobile-notes` 整段跑完**（🔴 判据**不需要写** —— 第 6/7 步的 op 判据、第 8 步第三张截图、
    第 9–11 步跨设备三条腿**已经在脚本里**，带行号的现量见 §3 第 4 条）。
    🔴 **两个前置在本轮被现量改了**：① 凭据三件套**已经在**（`--target c` 报 ✅），不需要再建号；
@@ -296,6 +299,14 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    必须先 `pnpm --filter @heyta/ui build && pnpm build:android` 再装，否则验的是旧 bundle（§7 第 27 条）。
    📌 本轮顺带踩到一条探针教训：我用 `lsof -nP -iTCP:3000 -sTCP:LISTEN` 得到"没有监听"，而 `curl` 拿到 200 ——
    **那是探针够不着**（监听进程不在我这个用户可见范围），不是"服务不存在"。§7 元规则第一条又应验一次。
+   ✅ **01:3x 补三条只读前置（开窗即执行，不用现场再判断）**：
+   ① **便签整条链已在 HEAD 里，不依赖任何未提交改动** —— `git cat-file -e HEAD:<f>` 对
+   `apps/mobile/src/screens/NoteEditScreen.tsx` / `packages/ui/src/notes/NoteEditor.tsx` /
+   `packages/app-host/src/note-actions.ts` 三处全 yes，且 `git status --porcelain | grep -i note` **0 条**
+   ⇒ ③ 可以**完全在 HEAD 载体里跑**，不必回主检出（此前没验过这一点）。
+   ② 设备侧 adb 可见的只有 `emulator-5554`（`com.heyta` versionName=1.0）；`:3100` 空着 ⇒ ③ 那条"必须自己起服务端"仍然成立。
+   ③ 现场有一条**别人正在跑的 `react-native bundle --platform android`**（pid 90249）—— 这正是窗口判据里
+   "别人的打包进程"那一档，所以此刻**不启动**我这边的重打 APK（它同时是 ③ 的硬前置与最重的一步）。
 4. ✅ **父子层级选择器：做完（2026-10-03 深夜），在未合并分支 `feat/list-parent`** ——
    细节与判据在 §3.3 第一条。**跨端形态是代拍**（原话把这条列为"要产品负责人拍"）：
    现量依据 = `OrganizerList` 早就渲染一层嵌套、两端同一棵骨架，所以入口挂到它**已有**的插槽上
