@@ -34,13 +34,19 @@ import {
   EventBoard,
   HeytaUiProvider,
   WEEKDAY_MESSAGE_KEYS,
+  categorySlotToken,
   formatDayTitleText,
   formatMonthTitleText,
+  useHeytaUiTheme,
   type CountdownFilter,
   type CountdownView as CountdownBoardView,
   type EventBoardLabels,
+  type EventCard,
+  type EventCardTexts,
+  type DatePickerLabels,
 } from '@heyta/ui';
 
+import { exportEventCard } from './card-export.js';
 import { useCountdownStore } from './store.js';
 
 type Translate = I18nValue['t'];
@@ -87,6 +93,8 @@ export function eventBoardLabels(t: Translate): EventBoardLabels {
     fieldTemplate: t('web.countdown.field.template'),
     templateDefault: t('web.countdown.template.none'),
     templateName: (slot) => t('web.countdown.template.slot', { slot }),
+    // W7：给了这一格才会渲染（`onExportCard` 与它**成对**，见共享层注释）。
+    exportCard: t('web.countdown.export'),
     a11yMenu: (title) => t('web.countdown.a11y.menu', { title }),
     a11yCloseMenu: (title) => t('web.countdown.a11y.menuClose', { title }),
     errorPrefix: t('web.countdown.error'),
@@ -141,19 +149,119 @@ function datePickerLabels(t: Translate) {
   };
 }
 
-export function CountdownView({ today }: { today: LocalDate }): React.JSX.Element {
-  const { t } = useI18n();
+/**
+ * 板子本体：**必须活在 `<HeytaUiProvider>` 里面**。
+ *
+ * 成品图要读当前主题的 `tokens` 与 `text`（唯一事实源），而 `useHeytaUiTheme()`
+ * 在 Provider 外面是**运行时抛错**、类型与单测都不红（文件头那条 M3 教训）。
+ * 所以主题读取只能开在这一层 —— 这也是为什么 `exportEventCard` 的入参
+ * 是"整套主题表"而不是几个颜色：颜色一旦被宿主挑着传，就会有人图省事写 `#fff`。/**
+ * 板子本体：**必须活在 `<HeytaUiProvider>` 里面**。
+ *
+ * 成品图要读当前主题的 `tokens` 与 `text`（设计系统唯一事实源），而
+ * `useHeytaUiTheme()` 在 Provider 外面是**运行时抛错**、类型与单测都不红
+ * （文件头那条 M3 教训）。所以主题读取只能开在这一层。
+ *
+ * 🔴 `exportEventCard` 的入参是**整套主题表**而不是挑出来的几个颜色：
+ * 颜色一旦被宿主挑着传，下一句就是"这里先写个白的"，而 `check:design`
+ * 只拦字面量、拦不住挑错 token。
+ */
+function CountdownBoard({
+  today,
+  view,
+  filter,
+  columns,
+  labels,
+  pickerLabels,
+  exportFailed,
+  onViewChange,
+  onFilterChange,
+}: {
+  today: LocalDate;
+  view: CountdownBoardView;
+  filter: CountdownFilter;
+  columns: number;
+  labels: EventBoardLabels;
+  pickerLabels: DatePickerLabels;
+  /** 「导不出来」那一句（**宿主词条**，不进共享的 `EventBoardLabels`：共享层只需要知道有没有这一格）。 */
+  exportFailed: string;
+  onViewChange: (view: CountdownBoardView) => void;
+  onFilterChange: (filter: CountdownFilter) => void;
+}): React.JSX.Element {
+  const theme = useHeytaUiTheme();
   const events = useCountdownStore((s) => s.events);
   const archivedEvents = useCountdownStore((s) => s.archivedEvents);
-  const error = useCountdownStore((s) => s.error);
-  const syncToday = useCountdownStore((s) => s.syncToday);
+  const storeError = useCountdownStore((s) => s.error);
   const addEvent = useCountdownStore((s) => s.addEvent);
   const patchEvent = useCountdownStore((s) => s.patchEvent);
   const togglePinned = useCountdownStore((s) => s.togglePinned);
   const archive = useCountdownStore((s) => s.archive);
   const unarchive = useCountdownStore((s) => s.unarchive);
   const remove = useCountdownStore((s) => s.remove);
+  /**
+   * 导出失败那一句。**成功不需要说话**（浏览器自己把文件放下了），
+   * 失败必须上屏 —— 便签登记的那条"失败静默吞掉还清空草稿"的高危不复制到这儿。
+   */
+  const [exportError, setExportError] = useState<string | undefined>(undefined);
 
+  const handleExport = (card: EventCard, texts: EventCardTexts): void => {
+    void exportEventCard({
+      texts,
+      theme: { tokens: theme.tokens, text: theme.text },
+      // 与卡片上**同一个表达式**：模板 = 分类色板的一格，没选过就是沉底底色。
+      accentColor:
+        card.template === undefined
+          ? theme.tokens['color.surface-sunken']
+          : theme.tokens[categorySlotToken(card.template)],
+      // 文件名里的日期段用的就是屏上那一行（同一次 `cardTextsFor` 的产物），
+      // 所以"图上写的日子"与"文件名字里的日子"不可能不一致。
+      dateStem: texts.date,
+    }).then((result) => {
+      setExportError(result.ok ? undefined : exportFailed);
+    });
+  };
+
+  return (
+    <EventBoard
+      events={view === 'archived' ? archivedEvents : events}
+      today={today}
+      view={view}
+      filter={filter}
+      columns={columns}
+      onAdd={addEvent}
+      onPatch={(entityId, patch) => {
+        void patchEvent(entityId, patch);
+      }}
+      onTogglePinned={(entityId, pinned) => {
+        void togglePinned(entityId, pinned);
+      }}
+      onArchive={(entityId) => {
+        void archive(entityId);
+      }}
+      onUnarchive={(entityId) => {
+        void unarchive(entityId);
+      }}
+      onRemove={(entityId) => {
+        void remove(entityId);
+      }}
+      onViewChange={onViewChange}
+      onFilterChange={onFilterChange}
+      error={storeError}
+      exportError={exportError}
+      onExportCard={(_entityId, card, texts) => {
+        handleExport(card, texts);
+      }}
+      datePickerLabels={pickerLabels}
+      labels={labels}
+      testID="countdown-view"
+    />
+  );
+}
+
+export function CountdownView({ today }: { today: LocalDate }): React.JSX.Element {
+  const { t } = useI18n();
+  const syncToday = useCountdownStore((s) => s.syncToday);
+  // 视图与筛选是**这一屏的局部态**（不进 store：它不是事实，刷新回到默认是预期行为）。
   const [view, setView] = useState<CountdownBoardView>('active');
   const [filter, setFilter] = useState<CountdownFilter>('all');
 
@@ -180,38 +288,20 @@ export function CountdownView({ today }: { today: LocalDate }): React.JSX.Elemen
   }, []);
 
   const labels = useMemo(() => eventBoardLabels(t), [t]);
-    const pickerLabels = useMemo(() => datePickerLabels(t), [t]);
+  const pickerLabels = useMemo(() => datePickerLabels(t), [t]);
 
   return (
     <HeytaUiProvider>
-      <EventBoard
-        events={view === 'archived' ? archivedEvents : events}
+      <CountdownBoard
         today={today}
         view={view}
         filter={filter}
         columns={columns}
-        onAdd={addEvent}
-        onPatch={(entityId, patch) => {
-          void patchEvent(entityId, patch);
-        }}
-        onTogglePinned={(entityId, pinned) => {
-          void togglePinned(entityId, pinned);
-        }}
-        onArchive={(entityId) => {
-          void archive(entityId);
-        }}
-        onUnarchive={(entityId) => {
-          void unarchive(entityId);
-        }}
-        onRemove={(entityId) => {
-          void remove(entityId);
-        }}
+        labels={labels}
+        pickerLabels={pickerLabels}
+        exportFailed={t('web.countdown.export.failed')}
         onViewChange={setView}
         onFilterChange={setFilter}
-        error={error}
-        datePickerLabels={pickerLabels}
-        labels={labels}
-        testID="countdown-view"
       />
     </HeytaUiProvider>
   );

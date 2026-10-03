@@ -964,6 +964,7 @@ export {
 } from './countdown/EventBoard.js';
 export {
   COUNTDOWN_FILTERS,
+  cardTextsFor,
   countdownFace,
   filterEventCards,
   toEventCards,
@@ -972,4 +973,6 @@ export {
   type CountdownFilter,
   type CountdownView,
   type EventCard,
+  type EventCardTextLabels,
+  type EventCardTexts,
 } from './countdown/model.js';
