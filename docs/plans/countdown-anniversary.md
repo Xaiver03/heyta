@@ -1237,6 +1237,19 @@ W0b ─> 随时可做（台账那半要等文件干净）
     ⇒ `packages/legal/src/documents/permissions.ts` 那句"heyta 不申请 … **照片** … 权限"**逐字仍为真**。
     ⚠️ 同一条门禁**整体是 rc=1**，但红的是 W9 那半的**通知**那六句，与照片无关、与本单无关
     （逐条取证与归属见上面 W9 节那条 04 03:0x 的更正）。
+  - ✅ **"零法务变更"重取现量（04 06:3x @ 载体 `895ad07c`，Goal 范畴②点名要的这一条）**——这次不走门禁的
+    读数行单独证一遍，因为那条门禁整体 `rc=1`，"它没报照片"容易被读成"它没看"：
+    ①`AndroidManifest.xml` 全文 `<uses-permission>` 现量 **3 条**
+    （`INTERNET` / `POST_NOTIFICATIONS` / `SCHEDULE_EXACT_ALARM`），`grep -icE "READ_MEDIA|WRITE_EXTERNAL|READ_EXTERNAL"` = **0**；
+    ②W7 那一笔对 manifest 的 `+` 行里**只有 `<provider>` 与 `<meta-data>`，零个 `<uses-permission>`**
+    （`git diff 43e94b32^1 43e94b32 -- …/AndroidManifest.xml`）；
+    ③iOS `Info.plist` 的 `NSPhotoLibrary*` 命中 **0**，出图写 `FileManager.default.temporaryDirectory`
+    （`HeytaCardExportModule.swift:67`），全仓 iOS 侧对 `PHPhotoLibrary` 的引用只出现在**注释里那句"刻意不走"**；
+    ④同一条门禁自己的读数行此刻打印 `Android 声明 3 条 [INTERNET, POST_NOTIFICATIONS, SCHEDULE_EXACT_ALARM]、
+    NS…UsageDescription 1 条` ⇒ **①②③④ 四路同向**。
+    ⇒ `permissions.ts:37` 那句"heyta 不申请位置、通讯录、通话记录、短信、**照片**、麦克风、相机、健康、
+    日历读写权限"**逐字仍为真**；那 7 条红逐条读过来，**没有一条提到照片**（全是通知那六句 + 一条
+    `SCHEDULE_EXACT_ALARM` 未进登记表，都属 W9 那半）。**本批不改 `packages/legal`**（§8.2 L' 第 1 条的归属裁决不变）。
   - 📌 顺带修掉一条**证据存放**的缺陷：这条 e2e 原来把成品图写进 `/tmp/heyta-card-export-results/`，
     而 Goal 要求"界面结论截图且人真的看过"——落在 `/tmp` 的图下一趟就没人能复查了。
     现在写进版本库 `apps/web/evidence/countdown-export/`（含 `README.md` 逐张写"看见了什么"）。
@@ -1982,8 +1995,57 @@ W0b ─> 随时可做（台账那半要等文件干净）
   `node research/tools/docs-link-check.mjs` ⇒ **`rc=0`，✅ 无死链、无"本机有仓库里没有"的链接、无失效章节引用、无失效锚点**（输出 19 行）。
   ⚠️ 取码方式记一下，因为它差点报错读数：第一次是 `… | tail -8; echo $?`，那个 `$?` 是 **`tail` 的**（§7 第 45 条同族），
   第二次改成先重定向再取码才拿到真正的 `RC=0`。✅ 那句"33 处死链"仍然只是**主检出**的属性，留在第 1 条原句旁不动。
+  ⚠️ **同一条复核顺手量出 `check:md-tables` 的一个覆盖缺口**（不是本批造成的，但只有现量能说明）：
+  它报"列数、断行与是不是表都一致"（`rc=0`），而**同一趟**我用 `re.findall(r'(?<!\\)\|')` 逐行数未转义竖线，
+  发现那张交接表的"收尾"行有 **6 条未转义 `|`**（分隔行是 5）—— 其中多出来的那条是**代码段里的 `| tail`**，
+  把这一行在渲染时切成五格。⇒ **这道门禁不看代码段里的竖线**，所以"md-tables 绿"**不能**被读成
+  "表格列数对"。我自己那一处已改成 `` `\| tail` `` 转义；核对命令（谁都要能重跑）：
+  `python3 -c "import re,io;[print(i+1,len(re.findall(r'(?<!\\\\)\\|',l))) for i,l in enumerate(io.open('docs/plans/countdown-batch2-handoff.md',encoding='utf-8').read().split('\n')) if l.startswith('| 收尾')]"`
+  —— 判据是**行首那格的竖线数与分隔行逐字相等**。这条属于别人那条线（门禁本身）的账，本批只登记不代改。
 
-🔴 **待入 traps 两条（04 06:0x 现量取号：主检出工作树 `docs/reference/environment-traps.md` 最大号 = **215**、行首编号命中 224 行，而该文件此刻正被另一条会话脏着 ⇒ 按纪律不往共享台账插行，先记在本单，搬运那一刻再现量重取号）**：
+- ⑬ **收尾第 4 条（四端重装）此刻没开窗，开没开用仓里现成的闸门量**（04 06:3x 现量，载体 `895ad07c`）：
+  `bash scripts/verify-mobile-window-gate.sh --target b` ⇒ **`RC_WINGATE_B=3`**，四条前置 **3 ✅ / 1 ❌**：
+  ✅ `packages/ apps/ server/` 无未提交修改 · ✅ `scripts/reinstall-all.sh` 干净 ·
+  ✅ iOS 有已启动模拟器（**三台**：`heyta-iphone-17pro` / `heyta-ios-isolated` / `iPhone Duo heyta`）·
+  ❌ **1 分钟负载 18 > 阈值 12（16 核，阈值 = `hw.ncpu × 3/4`）**。
+  ⚠️ 同趟 `adb devices` 在线设备 = **0 台**（本机 AVD 两个：`SSOS-Parity-A36` / `heyta-w3-yearly`，都没起）
+  ⇒ Android 那一端此刻连"可达"都不成立（`scripts/reinstall-all.sh:299` 会打印
+  "🔴 模拟器 emulator-5554 不可达——先起模拟器"并以该段的红收尾）。
+  🔴 **另一件事不是"在跑"，是"挂死"**：别人那条装包链的 `.reinstall-all.sh.snap.93817` 从 03:1x 起跑，
+  它的子进程 `notarytool submit … --wait`（pid 98934）**06:3x 现量已 3 小时 21 分**，
+  `/tmp/heyta-reinstall-mac.log` 自 **03:13** 起**零字节增量**、末行停在 `=== ⑥ 公证 ===`。
+  它与本批的不变量**不相容**：`/Applications/Heyta.app`、`/tmp/heyta-macos-dist`、`windows-pc` 的
+  `C:\src\heyta` 与随后的模拟器都是**同一批共享目标**（AGENTS §8.9）⇒ 不并发挤进去，
+  等满按任务书第 8 条记 **exit 3 = 环境无效，不是产品失败**。
+  ⚠️ 它的载体 `d0a81927` **不含**本批 HEAD（`git merge-base --is-ancestor 895ad07c d0a81927` ⇒ rc=1），
+  所以"它已经装过一遍了"**不能**被读成"四端已经是当前产物"——那一趟装的是别人的源码。
+  🔴 顺带查出打包脚本**两条属于别人面上的形状**（现量自 `apps/desktop-macos/scripts/package-app.sh:278-284`，
+  **本批没改它** —— 它在主检出是 `MM`，正被另一条会话改着）：
+  ① 那次公证提交**没有任何超时** ⇒ 一次挂死的 Apple 提交会把整条固定收尾无限期挂住，
+  而 mac 段排在第一段 ⇒ 后面 windows / android / ios 三段**一条都不会跑**；
+  ② `if xcrun notarytool submit … 2>&1 | tail -8 | awk '{print …}'; then` 判的是**管道最后一个命令**（`awk`）
+  的退出码，而 `awk` 恒 0 ⇒ 那个 `🔴 公证失败` 分支**结构上不可达**，失败也会先打印"✅ 公证通过"，
+  随后 `stapler staple` / `validate` 的失败同样只打印不判红。这是 §7 元规则二（一条永远通过的判据比没有更糟）
+  在安装包这条线上的实例，与 §7 第 82 条**同族但不是同一件事**（82 讲"非空白挡不住错误屏"，这里讲**管道吃掉退出码**，
+  即 §7 第 45 条那一族的又一面目）。
+  📌 本机 Gatekeeper 现量（04 06:3x 重取）：`spctl --status` ⇒ **`assessments disabled`**（rc=1）
+  ⇒ "这台机器上装出来的包打不打得开"**不能用本机 `spctl` 回答**，它的 `accepted` 只反映总开关被关。
+  这条直接影响 Goal ⑤ 的读法：`reinstall:all` 的 mac 判据是"安装副本启动自截屏非空白 + **主蓝命中**"，
+  **不是**"公证通过"，所以公证挂死卡住的是**打包链**，不是那条判据的含义。
+- ⑭ **我自己犯的一条探针形状，记下来是因为它差点让本批白等 180 分钟**：
+  上一版等待链（`/tmp/device-closeout-D.sh` 第 2 步）用
+  `pgrep -f "queue-reinstall-all.sh|heyta-reinstall|notarytool submit"` 判"别人正在装包"，
+  而**创建这份脚本的后台包装 shell（pid 78920）的 argv 里带着整份 heredoc 正文**，正文里就有这些字符串
+  ⇒ 探针**永远命中自己**，窗口永远"没空"。同形状在 main 上 06:21 刚被记过一次
+  （`dc63cbff`："③ 连退 23 轮的『别的移动端验收在跑』是闸门自拒绝——每次点名不同 pid 就是它的形状"）。
+  ✅ 两条动作：**① 占用类探针必须豁免自己这一棵**（`grep -vE 'window-wait|device-closeout'`，
+  并把"同一个 needle 在自己那棵上跑应为空"当自检），**② 别手搓负载/现场探针，用仓里现成的闸门**
+  `scripts/verify-mobile-window-gate.sh --target <b|c>` —— 负载阈值、工作树未提交源码、iOS 设备名现取
+  都在它里面，重写一遍就是再造一份会漂的抄件。新的等待链 `/tmp/window-wait-E.sh` 按这两条改过，
+  起跑前把它自己的探针空跑了一遍：输出的 6 行**全是别人那条链**（81007 / 93771 / 93772 / 93817 / 95477 / 98934），
+  没有一行是我自己的 —— 这就是"豁免成立"的现量证据。
+
+🔴 **待入 traps 三条（04 06:0x 现量取号：主检出工作树 `docs/reference/environment-traps.md` 最大号 = **215**、行首编号命中 224 行，而该文件此刻正被另一条会话脏着 ⇒ 按纪律不往共享台账插行，先记在本单，搬运那一刻再现量重取号）**：
 
 - **待入 #216 —— 组件注释里那句"测试环境不会触发 X"是一条会被上游推翻的断言，而它会诱导下一个人再写一次错的定位。**
   `DueEditor.tsx` 写着"jsdom 不触发 `toggle` ⇒ 面板回落在水流布局"，据此用例从 `container` 里找格子里的东西；
@@ -2003,3 +2065,12 @@ W0b ─> 随时可做（台账那半要等文件干净）
   **② 反证一条几何猜测时先确认你算的那一维就是缺陷所在的那一维** ——
   我那条"11px 的字撑不开 26px 的轨道"算术全程正确，但它算的是**宽度**，
   而缺陷从**高度**绕道进来，于是它把真缺陷判成了"不可能"。
+- **待入 #218 —— "查别人在不在跑"的探针必须豁免自己这一棵，否则它永远命中、窗口永远"没空"。**
+  症状不是报错，是**安静地一直等待**：用 `pgrep -f "<某个别的链的脚本名>"` 判占用，而**创建这份探针的
+  后台包装 shell 的 argv 里带着整份 heredoc 正文**，正文里就有那个字符串 ⇒ 自匹配。
+  main 上另一条会话同日撞的是同一形状的另一种面目（"连退 23 轮的『别的移动端验收在跑』是闸门自拒绝，
+  **每次点名不同 pid 就是它的形状**"—— pid 一直在变正是"命中自己"的指纹，不是"对方在换进程"）。
+  三条动作：**① 探针排除自己**（按自己脚本名的字面量 `grep -v`，并把"同一 needle 在自己那棵上跑应为空"
+  写成自检项）；**② 现场判据优先用仓里现成的闸门**，负载阈值 / 工作树未提交源码 / 设备名现取这些
+  一旦被手搓第二遍就是第二份会漂的抄件；**③ 长等待要带终局**（有界轮数 + 到点 `exit 3` = 环境无效，
+  绝不无限等 —— 无限等的链条在输出上与"正在正常推进"完全一样）。
