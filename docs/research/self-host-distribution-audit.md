@@ -870,3 +870,83 @@ i18n `22 passed`；`check:entries` 75 份一致、`check:ui-language`（zh/en �
 📌 顺带一条**门禁卫生**：新取证目录 `e2e/live-signin-results/` 当时没进 `.gitignore`，
 `git status` 里就是一坨未跟踪 PNG —— 而那正是本仓 `.gitignore` 第 84 行注释里写的
 "曾经差点被当成源码提交"的同一族。已补登记。
+
+### 8.16 #7 那笔合并：零冲突**只**证明文本，剩下的要用接缝去量
+
+先记一条**过期**：本节原计划"等并行会话提交后 `git merge --ff-only` 即可"。现量否证了它 ——
+`git merge-base --is-ancestor main feat/self-host-distribution` 为**假**：main 自 merge-base
+起前进了 28 笔、本批 25 笔。所以 #7 从现在起是一次**真合并**，不再是 FF。
+
+合并面实测（全部不带管道取码，`| head` 之后的 `$?` 是 `head` 的）：
+
+| 量 | 读数 |
+|---|---|
+| `git merge-tree --write-tree` 双向 | `REAL_RC` 均为 0，输出恰好 1 行 tree OID ⇒ 零冲突 |
+| `pnpm-lock.yaml` | main / 分支 / 合并树三边**同一个 blob** `674079fe` ⇒ 合并树不需要重装依赖（这是"软链 node_modules 可用"的前提，不是假设） |
+| `package.json` | 合并后是第三个 blob `82ec7dcc`（main 加 `verify:mobile-notes`，本批加那批 `check:*`）|
+| 源码级文件交集 | **只有** `packages/i18n/src/locales/{zh-CN,en}.ts` 两个数据文件 |
+
+词条表是唯一两边都改的源码，所以逐条量它：2826 → **2841** 键（main 加了 15），
+两侧键数对等，**零重复键**（对象字面量里文本合并造出的重复键 TS 不报错、后者静默覆盖，
+而 parity 类门禁挡不住它 —— 这条探针喂过合成样本做阳性对照：`dupKeys=1 [["a.key",2]]`）。
+`check:ui-language` rc=0。
+四把生成物门禁（`server-copy` / `server-design` / `legal-copy` / `docs-voice`）
+加 `selfhost-entry-command` 全 rc=0 —— **且是重建 `packages/i18n` 的 dist 之后跑的**：
+不重建就是量我 2826 键那一批的旧 dist，属于 §7 里"测试绿 ≠ 当前产物"那一族。
+
+编译面不看文件名相同与否，看**接缝**：本批有 3 个文件（`apps/web/src/App.tsx`、
+`apps/web/src/features/sync/store.ts`、`apps/mobile/tests/legal-recheck-mobile.spec.ts`）
+import 了 main 也改过的两个 barrel（`@heyta/app-host`、`@heyta/ui`）。逐个符号查实：
+这 3 个文件跨过接缝用到的 **17 个符号**在合并树里**声明与 barrel 重导出都在**
+（负向对照 `NoSuchSymbol_zzz_control` 如期 MISS）。main 侧那 4 行 `-export`
+（`aliveProjects` / `topLevelProjects` / `childProjects` / `toOrganizerTree`）
+是在 `packages/ui/src/projects/model.ts` **原位重写**、不是移除，且本批一个都没引用。
+main 两侧都没有新增 workspace 包（`packages` 14、`apps` 8 合并前后不变）⇒ 不会有
+"缺软链让 typecheck 报出一个像产品坏的数"那种形状。
+
+🔴 **`check:docs` 在合并树上红 5 处，而这 5 处一条都不是合并造成的 —— 是 main 自己现在就不绿**：
+
+- `docs/plans/detail-pane-alignment.md` 与 `docs/research/detail-pane-alignment-and-spaced-review.md`
+  只存在于 main（本批没有这两个文件）；
+- `PROGRESS.md:1362` 与 `docs/plans/countdown-anniversary.md:1280` 那两行**只在 main 的版本里**
+  （本批版本的同一行是空的）；
+- 四个死链目标（`aed-implementation-evidence.md` / `trash-and-archive.md` /
+  `calendar-year-time-and-mobile-profile.md` / `trash-and-archive-best-practice.md`）
+  在主检出里**全是 `??` 未跟踪** —— 引用方已提交、被引文件还没提交，所以他们的链接
+  在**他们的工作树里是活的、在提交里是死的**；
+- 本批那 76 个文件里**一个都没碰**这四个引用方。
+
+⇒ **#7 的关闭判据不能写成"`pnpm check` 全量绿"**（会被别人已提交的技术债挡住，
+而那条债不该由本批吸收）。改成：上面这 8 把门禁绿 + `check:docs` 的 5 处红**逐条仍能
+归属到非本批文件**。
+
+一条不计入的：`check:web-artifact --mount /` rc=1。它读的是磁盘上的 `apps/web/dist`，
+而我最后一次构建是为了发布应用带的 `--base=/app/`；`pnpm check` 链的第一步就是
+`pnpm build`，所以链内自洽。但它把 **G-48 的真实形状**照出来了：链里挂的是 `--mount /`，
+而生产实际发出去的那份是 `--mount /app/`，**同一个 `dist` 目录不可能两条同时绿**。
+所以 G-48 不是"顺手把它挂进链"就能闭合的 —— 要的是决定（产物分目录，还是挂载路径变成构建参数后
+由链按当前载体选）。这条**本轮没动**，仍是开口。
+
+载体：预置合并 `50b02558`（父 = `e3312dba` main + `56e6506c` 本批；**第一父是 main**，
+这样落地后 `git log --first-parent main` 不会跳进本批历史）已挂在
+**`feat/self-host-merge-main`**，不落 /tmp。main 一旦前进它就过期，重算是这几行：
+
+```bash
+mb=$(git merge-base main feat/self-host-distribution)
+tree=$(git merge-tree --write-tree main feat/self-host-distribution) || exit 1
+git commit-tree "$tree" -p "$(git rev-parse main)" -p "$(git rev-parse feat/self-host-distribution)" -F <msg-file>
+```
+
+🔴 **尚未实测的边界（写明，不主张）**：`pnpm -r typecheck` 与 `pnpm -r test` **没跑**。
+本轮现场是负载 81.90 / 16 核、OrbStack 的 docker daemon 未运行；且此时 dist 半新半旧
+（只重建了 i18n），typecheck 量不到东西。所以"合并树编译绿 / 测试绿"目前是**主张，
+不是读数**，落地那一趟必须在合并载体上跑完整链才算。
+
+⚠️ **待入 traps**（编号按收口当时的**工作树**取，不写死 —— 该台账此刻正被并行会话脏着，
+HEAD 到 177 而工作树已到 189，190+ 属于他们）：
+
+1. `git grep -E` 里 `\b` **不是词边界** ⇒ 一次 18 符号的存在性检查全报 0，症状与
+   "符号真的不存在"逐字相同。识别形状：连 AGENTS.md 明文写着的 `createSyncClient`
+   都在 0 里 —— 全集为 0 时先怀疑探针，别先怀疑结论。
+2. zsh 里 `$ref:apps` 被 **`:a` 修饰符**吃掉，展开成"绝对路径 + `pps`"，
+   于是打出 `main apps:0` 这种看着像读数的假值（真实是 8）。跨 ref 取属性一律写 `"${ref}:path"`。
