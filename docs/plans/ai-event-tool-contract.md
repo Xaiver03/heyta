@@ -502,7 +502,7 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 | 词条表合并后 | `en.ts` / `zh-CN.ts` 各 **2847 键**、重复 **0**、两边键集差 **0 / 0** —— 这是"合并会不会把双语词条并坏"的判据，不是"看起来没红" |
 | 链的段数 | 本批 **57 段** → 合并态 **61 段**（`main` 新增 `check:licenses:stamp` / `check:calendar` / `check:holiday` / `check:mobile-first-run-gate`）；本批的 `check:ai-coverage` 在第 **51** 段，**一段都没丢** |
 
-### 11.1 逐段读数：61 段里实跑 55 段全绿，6 段是**按规则不跑**
+### 11.1 逐段读数：61 段第一轮实跑 54 段全绿，余下 6 段后来补齐（见 §12 / §12.1）
 
 `pnpm build` 先跑（rc=0，且 `packages/local-api/dist/index.js` 比 `src/tools/tag.ts` 新 158 秒
 ⇒ 后面读 dist 的那几道门禁证的是当前源码）。其余逐段 `NO_COLOR=1 pnpm <段>`，每段单独退出码
@@ -519,6 +519,8 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
   Playwright Chromium，`uptime` = `load averages: 18.11 / 16 核`。
   在这种负载下跑全量单测只会得到**无法归因的红**，所以留到窗口空闲再补，
   并把它算作"未测"而不是"通过"。
+  → **这 6 段后来的读数在 §12（发现真缺陷）与 §12.1（修后全绿）**；本节以下凡写"未测"都只到
+  2026-10-03 15:1x 之前为止。
 
 三条"本批红过、合并态绿了"的对照，正是那句"分支落后所致"从推断升成实测：
 
@@ -537,10 +539,47 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 [`goal-multi-end-coverage.md`](goal-multi-end-coverage.md) §7.23）：
 `FULL_CHECK_INNER_EXIT=0`，逐包 `web 1500 passed / 12 skipped` · `app-host 1303` ·
 `mobile 538` · `node-host 165` · `desktop 12` · `server 2095 / 1 skipped`，零 failed。
+
+🔴 **那个 `app-host 1303` 是一个角色错位的抄件，本批的量把它否证了（2026-10-03 收尾时实测）**：
+合并态实测 `packages/app-host test: Tests 1072 passed (1072)` / `51 files`，
+而 **`apps/landing test: Tests 1303 passed (1303)`** —— 1303 是 landing 的数，
+`§7.23` 那一行根本没有列 landing。独立佐证（不需要跑测试的静态量，对三个 ref 各数一遍）：
+
+```bash
+for ref in main HEAD tmp/ai-cov-on-main; do
+  git ls-tree -r --name-only $ref -- packages/app-host/tests | grep -E 'spec\.tsx?$' |
+    while read f; do git show "$ref:$f" | grep -cE '^[[:space:]]*(it|test)(\.each|\.skip|\.only)?\('; done |
+    awk -v r=$ref '{s+=$1} END {print r, "decls=" s+0}'
+done
+```
+
+读数：`main 47 文件 / 928 条声明`、本批分支 `51 / 988`、合并态 `51 / 992`。
+928 条声明在运行时因为 `it.each` 展开只会涨几十条（本分支 988 → 1067），**不可能涨到 1303**
+⇒ 1303 从来不是 `app-host` 的数。**这条基线我当时是直接抄进本节的、没有换算来源，
+所以它作为判据是不可用的**（值对得上不等于它就是那个角色；抄件要带它是哪一趟、哪个包的读数）。
+
+比较判据随之改写（用本批自己量到的、角色对得上的两个数）：
+**合并态 `app-host` 应 `≥` 本批分支的 `1067`（51 文件）且 `≥` `main` 的用例声明数 `928`**，
+`web ≥ 1500`、`server ≥ 2095`、`mobile ≥ 538`、`node-host ≥ 165`、`desktop ≥ 12`，零 failed；
+低于就是合并把某条线的用例弄丢了。**实测（修完 §12 那条缺陷之后，`tmp/ai-cov-on-main` @ `9a0b368a`）：
+`app-host 1072 (51 files)` / `web 1500 | 12 skipped` / `server 2095 | 1 skipped` /
+`mobile 538` / `node-host 165` / `desktop 12` / `landing 1303` / `ui 442` / `domain 821`，
+21 个包全部 `Done`，`TEST_RC=0`，逐包汇总里 `failed` 出现 **0** 次** ——
+文件数与声明数两边都 `≥`（`51 ≥ 47`、`992 ≥ 928`）⇒ **合流没有丢 `main` 侧的 app-host 用例**，
+这条现在是量出来的，不是推的。
+⚠️ **`§7.23` 那一行的更正要留给它的所有者做**（那是并行会话的单写者文档，我不代改他们的正文），
+本批只在自己这份文档里把继承来的错误基线标死。
+
 ⇒ 上面那 6 段未跑的红/绿在这个基线之下**没有未知风险**（它们在 `a04753b6` 上是绿的），
-本批欠的只是"合并态复跑一遍"这条腿 —— 记成**未测**，不记成"继承基线所以通过"。
-比较判据也随之下好：合并态的 `-r test` 应当 `web ≥ 1500`、`app-host ≥ 1303` 且零 failed；
-低于这两个数就说明合并把某条线的用例弄丢了，而不是"少跑了几条"。
+本批欠的只是"合并态复跑一遍"这条腿。
+✅ **这条腿已经补上了（同日 §12 / §12.1）**：6 段里 5 段实跑绿（`check:privacy-consent-e2e`
+`7 passed` / `check:web-storage` / `check:web-migration` / `check:landing-e2e` `17 passed` /
+`-r test` 见下），`-r test` **第一次跑红**、根因是真缺陷、修后**全绿**；
+`check:ai-e2e` 这一段**仍然没跑，这是规则不是遗漏**（它的 preflight 会 SIGKILL 别人的 dev server），
+它的用例是用直跑方式覆盖的（`3 passed`）。
+⇒ 61 段的最终口径是 **60 段实测绿 + 1 段（`check:ai-e2e`）按硬规则不跑**，
+不再写"55 段实跑、6 段未测"。
+记成**未跑**而不是"通过"的那条只有 `check:ai-e2e` 本身。
 
 > ⚠️ 同一条 §7.23 里还有一条**别误接**的读数：同一时刻在**主检出**跑 `check:docs` 是 exit 1，
 > 7 处死链全指向并行会话**未跟踪**的新文档（`adr/0046-*`、`plans/trash-and-archive.md` 等），
@@ -575,7 +614,8 @@ git show main:docs/plans/countdown-anniversary.md \
 **纯插入**方式落在 `tmp/ai-cov-on-main` 的 `b2f2bbcc`（`git diff --numstat` 删除 **0**、
 插入 18 行 —— 原文一字未删，过期说法留着并标"已过期"），合流态 `check:docs` **rc=0**
 （1592 个相对链接 / 429 处章节引用 / 54 处页内锚点，新增那两个指向本文的链接都解析得到）。
-⇒ 谁合流都不必再补这一笔；如果只 cherry-pick 本批那 14 笔而不用这个合并态，
+⇒ 谁合流都不必再补这一笔；如果只 cherry-pick 本批分支的提交而不用这个合并态
+（笔数现量：`git rev-list --count main..feat/ai-entity-coverage`，不写死），
 `b2f2bbcc` 单独摘过去也行（它只动 `docs/plans/countdown-anniversary.md` 一枚文件）。
 
 ### 11.3 覆盖面门禁在合并态**仍有牙**（两条臂 + 基线 + 还原取证）
@@ -600,3 +640,113 @@ rc=1，逐字 \`1. \`HABIT\` 现在**读和写都有工具**了，但 \`ENTITY_C
 三条通道（不在分母 / 在分母且已覆盖 / 在分母未覆盖）各红一次，还原后 rc=0、`git status` 为空。
 看到报错信息里出现 `undefined` 时，先查自己塞的形状，别去改判据。
 现量脚本在 `/tmp/merged-teeth.mjs` 与 `/tmp/merged-teeth3.mjs`（一次性，不在仓库里）。
+
+## 12. 🔴 合并态那唯一一条红**不是 flake** —— 每任务提醒上限可被并发写入整条突破
+
+§11.1 欠的那条腿（"未跑的 6 段留到窗口空闲再补"）在窗口里跑完了一趟：
+`/tmp/merge-final.log`，`STEPS_RUN=6 GREEN=5 RED=1 FINAL_EXIT=1`（现场 `loadavg1=9.04 / 16 核`，
+阻塞 0 条）：
+
+| # | 段 | rc | 打印 |
+|---|---|---|---|
+| 1 | `pnpm -r test` | 🔴 1 | `apps/web: tests/reminders-panel.spec.tsx (6 tests \| 1 failed) 2576ms` ⇒ `Test Files 1 failed \| 109 passed \| 2 skipped (112)` / `Tests 1 failed \| 1499 passed \| 12 skipped (1512)` |
+| 2 | `check:privacy-consent-e2e` | ✅ 0 | `7 passed (7.9s)` |
+| 3 | `check:web-storage` | ✅ 0 | —— |
+| 4 | `check:web-migration` | ✅ 0 | —— |
+| 5 | `check:landing-e2e` | ✅ 0 | `17 passed (1.0m)` |
+| 6 | AI 的 e2e 用例（直跑，**不经** `check:ai-e2e`，那条会 SIGKILL 别人的 dev server） | ✅ 0 | `3 passed (14.3s)` |
+
+第 1 段那条红的真身是一个**产品缺陷**，和 AI 这条线没有因果关系，只是在合并态那次跑里第一次被踩到。
+修复落在本批分支的 `f2886e72`。
+
+**取证序列（三段，顺序不能反）**
+
+1. 合并态全量 `-r test`：`apps/web/tests/reminders-panel.spec.tsx` 一条红 ——
+   `Error: 等待「超上限的错误被记下」超时`，附带 DOM 里 `6提醒10/3 15:58 待触发…`，
+   读数 `Tests 1 failed | 1499 passed | 12 skipped (1512)`。
+2. **单文件复跑 8 次：0 次复现**（其中一次 `loadavg` 现量 14.8，比案发时更高）。
+   ⚠️ 到这一步极易写成"偶发/flake"——**"不复现"只是证据不足，不是排除**；
+   要下环境归因就得把环境拿掉再跑一次，跑掉了才算，跑不掉就说明归因作废。
+3. 摘掉 UI 层，直接对 `createReminder` 打探针（真 `SqliteAdapter` + 真 `NodeSqliteDriver(':memory:')`
+   + 真 `OpLogEngine`，零 mock）：
+   `PROBE 并发 8 次：成功 8 / 拒 0 / 物化存活 8 / 上限 5`，
+   串行对照 `PROBE 串行 8 次：物化存活 5 / 拒 3`。
+   ⇒ 上限在并发写入下**整条失效**，且不是竞态窗口小、是没有锁。
+
+**根因**：`reminder-actions.ts` 里 `aliveOfTask(taskId).length >= MAX_REMINDERS_PER_TASK`
+读的是**当前物化快照**，而 `ctx.dispatch` 把 op 落到物化状态是**异步**的 ⇒ 同一任务的并发调用
+全部在旧快照上通过检查。界面表现为"渲染出 6 条而 `error` 是空的"，
+所以那条用例只能等到自己的超时 —— 它断言的是"错误被记下"，而错误**永远不会**被记下。
+
+**修法**（一层就够，且不碰任何不可逆层）：在 **`packages/app-host` 的动作层**加一条
+**按任务分键**的写链，把「读存活数 → dispatch → 状态可见」排进同一次串行化里；
+链跑完即摘，不留跨任务的常驻内存。`writeNew` 是唯一的上限检查点，
+两个写入口 `createReminder`（`:238`）/ `createReminderBeforeDue`（`:250`）都经它 ⇒
+一处覆盖全部写者（三条调用链：`apps/web/src/features/reminders/store.ts:90`、
+`apps/mobile/src/lib/reminders.ts:152`、`packages/app-host/src/local-api-host.ts:849`，
+后者同时是内置 AI 与入站 MCP 的路径）。
+不 bump `CURRENT_SCHEMA_VERSION`、不加持久化字段、不动线协议，§10 那五条隐私不变量零变化。
+
+**判据与变异**（新用例：`并发连点 8 次也不能突破上限`）
+
+| 臂 | 动作 | 读数 |
+|---|---|---|
+| 基线 | 修复后跑 `tests/reminder-actions.spec.ts` | `24 passed (24)` |
+| 变异 | `prev.then(fn, fn)` → `fn()`（排队摘掉，别的都不动） | **恰好 1 条红**，且就是那条：`expected 8 to be 5`；其余 23 条不受影响 |
+| 还原 | `cp` 回原文件 | 与被改前 `cmp -s` **逐字节相同**，复跑 `24 passed`，`VITEST_RC=0` |
+| 构建 | `pnpm --filter @heyta/app-host build`（含 DTS 阶段） | rc=0 —— 同一文件多处改动后必须跑构建，vitest 绿不算（§7 #162 那族） |
+| 全包 | `packages/app-host` 整包 | `51 files / 1067 passed` |
+| 用例方 | `apps/web` 那条原本红的面板用例 | `6 passed (6)` |
+
+**三条可以迁移的结论**
+
+1. **串行用例对上限类判据是全盲的**。一条"连点 8 次撞上限"的用例在串行下永远绿，
+   它测的是"检查存在"，不是"上限成立"。判上限要判**并发下的上限**——
+   这条和 AGENTS §7 #165 那一族（变异要配对的断言）是同一件事的另一面。
+2. **"等某个错误被记下"这种断言，在竞态下会退化成一个纯超时**：界面渲染出的东西是对的
+   （只是多了 1 条），`error` 却永远是 `undefined`，于是失败信息里一个字节都不提"超限"。
+   写这类判据时把**数值判据**（存活数 ≤ 上限）放在前面，错误文案放在后面。
+3. **先怀疑探针**在这条上反过来用了一次：探针自己没错，但它证明了"负载归因"是假的 ——
+   `loadavg` 更高时**更不复现**，说明触发条件是 `Promise.allSettled` 式的并发提交，与环境无关。
+
+⚠️ **待入 `docs/reference/environment-traps.md` 的登记**（不直接追加进那份文件：
+它此刻正被并行会话改着，编号按工作树取而不是按 HEAD，往几百行的脏文件里插一段会被别人整文件
+`git add` 抹回去）。建议条目：
+**"上限/配额类判据必须并发提交才测得到 —— 串行连点 8 次撞上限的用例对 TOCTOU 全盲，
+而它的失败形态是一个只等错误文案的超时"**，取证行 = 上面那三行 `PROBE` 读数 +
+`expected 8 to be 5`。
+
+⚠️ **合流后还有一件小账**：在合并载体重跑那 8 张 `apps/web/evidence/{assistant,tool-run}/*.png`
+时它们与提交物**字节不同**（`1-disclosure.png` 工作树 199275 B vs 提交物 170217 B），
+原因是合进来的 `main` 改了共享 UI。载体里已 `git checkout` 还原（证据不该被载体污染），
+但**合流之后那 8 张需要重新生成并提交** —— 提交物现在是"本批分支状态"的截图，不是合并状态。
+
+### 12.1 修后在合并态重跑 `-r test`：21 个包全绿、零 failed ⇒ 61 段的最终口径
+
+载体 `tmp/ai-cov-on-main` @ `9a0b368a`（= `b2f2bbcc` + 本批分支 `f2886e72`），
+`pnpm -r build` 后 `NO_COLOR=1 pnpm -r test`，退出码由脚本自己写进哨兵文件
+（`BUILD_RC=0` / `TEST_RC=0` / `DONE`，不是包装命令的码）：
+
+| 包 | 合并态读数 | 与 §11.1 那条基线的关系 |
+|---|---|---|
+| `apps/web` | `1500 passed \| 12 skipped (1512)` | **逐字等于**基线（那 1 条红没了，`failed` 计数 0） |
+| `packages/app-host` | `1072 passed (1072)`，`51 files` | 基线那句 `1303` 已被 §11.1 否证（是 landing 的数）；本批分支自己是 `1067 / 51 files` ⇒ 合并态 `≥` 分支 |
+| `apps/landing` | `1303 passed (1303)` | 1303 的真实归属就在这行 |
+| `server` | `2095 passed \| 1 skipped (2096)`，`111 files` | 逐字等于基线 |
+| `apps/mobile` / `node-host` / `desktop` | `538` / `165` / `12` | 逐字等于基线 |
+| 其余 `packages/*` | `ui 442` · `domain 821` · `storage 314` · `design-system 489` · `sync-core 282` · `widget-core 193` · `ai 223` · `local-api 133` · `legal 59` · `shared-schema 80` · `sync-client 84` · `op-log 51` · `i18n 22` | 全 `Done`，零 failed |
+| 汇总 | 21 个包 `test: Done`；逐包汇总行里 `failed` 出现 **0** 次 | —— |
+
+⇒ **61 段链的最终口径（合并态）**：第一轮实跑 54 段绿（§11.1）+ `pnpm build` 绿 +
+补跑 5 段绿（§12 那张表，其中 `-r test` 先红后绿）= **60 段实测绿**，
+唯一没跑的 1 段是 `check:ai-e2e` —— **那是本仓硬规则（它的 preflight 会 SIGKILL 别人的 dev server），
+不是遗漏**，它的用例以直跑方式覆盖了（`3 passed`）。
+这一句现在对应 Goal ⑤ 的"逐段跑绿"，并且**每条读数都有载体的 SHA 与日志可复跑**。
+
+**这一轮真正的教训（写在这里而不是只写在 commit message 里）**：
+一条从别人文档抄来的"基线"如果没带它是**哪个包、哪一趟**的读数，它就不是判据，
+而是一个会反过来指控你的数字 —— 我按 `app-host ≥ 1303` 去核对合并态，量到 1072，
+第一反应是"合并丢了 231 条用例"（那会是一次很贵的误判：要去查三次合并冲突的解法）。
+让人停下来的是 `apps/landing` 那一行**正好 1303**。
+⇒ 从现在起本批写基线一律带 `(ref, 包名, 哪一趟, 退出码来源)` 四元组，
+少一项就当"没有基线"，另配一条**静态可复算**的量（上面那段 `git ls-tree` + `git show | grep -c` 的脚本）。
