@@ -287,9 +287,14 @@ export async function stubLegalRecheck(page: Page, origin: string = STUB_ORIGIN)
  *
  * ⚠️ 它**只答读侧、且刻意答"没有数据"**。要验"下发了数据日历会变"的是
  * `public-facts.spec.ts`，它自己装了带具体数据与 404 的路由（后注册的会遮蔽这里）。
+ *
+ * 🔴 "只答读侧"是**代码层的**，不是注释里的：非 GET 一律 `fallback()` 交回夹具的
+ * catch-all，让"某个套件不该发的写请求"仍然按未登记计入红集 —— 把写侧也一并 fulfill
+ * 掉，就等于用一条中性夹具替产品开了后门。
  */
 export async function stubPublicFacts(page: Page, origin: string = STUB_ORIGIN): Promise<void> {
   await page.route(`${origin}/api/holiday-adjustments**`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
