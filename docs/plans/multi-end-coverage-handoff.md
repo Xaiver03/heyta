@@ -624,6 +624,26 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
      两腿夹具验过（`/tmp/notes-needle-fixture.sh`）：新 needle 段1=3/段2=2/汇总=2，旧 needle=0 ⇒ 这条修正是承重的。
      ⚠️ 夹具**自己也错了两回**（多打了一个 `/` 让 BSD sed 报 `invalid command code`；把"两行判决"写成"≥3 行"），
      两次都是夹具错而不是 needle 错 —— **夹具 FAIL 时先读夹具**，不然会去改一条本来对的判据。
+- 🔴 **把一份未跟踪的草稿提交进 HEAD 的那一刻，所有还持有同名未跟踪副本的检出，下一次对齐 HEAD 都会 `checkout` 失败**
+  （04:16:56 现量，① 自己撞的）：`80af76f0` 提了 `e2e/tests/list-folder.spec.ts`，而载体里那份还是未跟踪的草稿
+  ⇒ `git checkout --detach <新 HEAD>` 报 `The following untracked working tree files would be overwritten`
+  并整段红，**设备一个都没碰**。这不是别人的债：**是我提交草稿那一笔制造的**，而我在写那笔的时候没有想到载体。
+  ✅ 修法（已进启动器）：对齐之前把 `git ls-files --others --exclude-standard` 与新 HEAD 求交，
+  逐枚 `cmp` —— 相同就直接让位（checkout 会写回同样的字节），**不同就先 `cp -p` 搬到
+  `/tmp/heyta-carrier-untracked-<时间>/` 再让位**（绝不静默删）。
+  📌 一般规律：**"提交未跟踪件"是一个跨检出的动作**，它的落点不止 `git add` 那一枚文件，
+  还包括所有持有该路径副本的工作树。
+- 🔴 **我那道"别人的重装在跑"的互斥门，pattern 漏掉了真正的运行形态**（同一轮现量）：
+  写的是 `scripts/reinstall-all\.sh`，而现场那一跑是 `bash /tmp/heyta-reinstall/scripts/**.reinstall-all.sh.snap.93817**`
+  —— 快照脚本带前导点与 `.snap.<pid>` 后缀 ⇒ 旧 pattern 只抓到排队的那两枚（81007/93771），**抓不到正在跑的 93817**。
+  两腿对照现量：旧 `81007 93771` / 新 `81007 93771 93817`。这次没造成事故纯属侥幸 ——
+  ① 在**对齐 HEAD 那一步**就红了，根本没走到装机。
+  📌 **互斥类 pattern 必须拿现场真实命令行做"必须命中"那一腿**，不能只验"pattern 不为空"。
+- ⚠️ **链 v5：把已成交的段摘出轮转，不是清理，是让窗**（04:20）。② 的逐段表一段要 35 分钟，
+  而 ①/③ 缺的正是这 35 分钟的 CPU —— 拿**已落账的读数**去抢**未成交**的窗，是 §8.9 那条"共享资源独占"的反面。
+  🔴 顺带一条形状教训：**"红了就摘出轮转"这条规则本身没错，但红的原因如果是启动器自己的缺陷，
+  修完必须手动重新入轮** —— v4 把 ① 记成 `DONE-RED` 之后就不会再碰它，而那一红是上面这两枚缺陷造成的，
+  不是产品红。链 v5 因此只轮转 ①/③，且头部注释写明了为什么不带 ②/④（读数的 sha 都在 goal §7.30）。
 
 - 🔴 **别用 `git commit --only <文件>` 提本条线的两份台账** —— 里面此刻混着并行会话的 hunk
   （`goal-multi-end-coverage.md:104` 是他们改的 W9 状态句）。正确做法见 `96f3293d` 的提交信息：
