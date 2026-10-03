@@ -1506,3 +1506,27 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 `IMPORT_CHECK_RC=`）。02:2x 逐条 `grep -l` 对过：`INNER_EXIT`、`CHECK_EXIT`、`NOTES_EXIT`、`CARRIER_SHA`
 四个串都在对应脚本里，**只有那一个是我编的** ⇒ 已改成真实串。"照自己写的字段名去等一个不存在的打印"
 是 §7 元规则第一条（先怀疑探针）在文档侧的版本，而它只有在**填槽那一刻**才会现形 —— 建槽时看起来完全正常。
+
+- ✅ **05:3x 对 HEAD 复核 ④（这是"核验"，不是重做）**，四件都在：
+    ① **领域层守卫是七条封闭原因**（`packages/domain/src/project-hierarchy.ts`）：
+    `project_not_found / parent_not_found / self / cycle / parent_not_top_level / has_children`，
+    其中**环检测沿父链上走且带访问集** —— 理由是磁盘上可能已经躺着一条别的宿主写进去的环，
+    没有访问集这里会**死循环**；`parent_not_top_level` 与 `has_children` **刻意不合成**一个
+    `depth_exceeded`，因为界面要能说出"为什么不能移"，而那是两句不同的话。
+    ② **动作层不吞**（`packages/app-host/src/project-actions.ts:280` 起）：`!verdict.ok` 直接 `throw`，
+    注释写明"静默的后果是用户以为移好了、层级没变"；`undefined → null` 才穿得过 JSON 表达"清除"。
+    ③ **两端共用同一个拒绝映射** `folderRejectionMessageKey`（`packages/ui/src/projects/FolderPicker.tsx:43` 起），
+    且明确**不许**用 `error.message.includes('cycle')`（错误串里带原始 id 与标题，包含关系会把"原因"
+    和"任何提到这个词的文案"混在一起）；认不出来落 `unknown`、**不编一句**。
+    ④ **词条中英对等**：`common.organizer.folder.*` 共 **11 枚**（4 枚界面 + 7 枚拒绝句含 `unknown`），
+    zh-CN 与 en 两侧键集 `diff` 为**空**。
+  - ⚠️ 这一趟顺手抓到**我自己的探针错了两回**，都值得留给下一位：
+    第一趟 `grep -c "'folder.button'"` 量出中英**都 0**，差点报成"词条缺失"—— 那张表的键是**扁平全路径**
+    （`'common.organizer.folder.button'`），拿尾段当 needle 恒不命中；第二趟字符类写成 `[A-Za-z]+`，
+    又把 `folder.reject.*` 这 7 枚整段滤掉（少算 7 枚，且两侧都少 ⇒ 差集"看起来为空"是**假对等**）。
+    ⇒ **0 命中先查 needle 的格式与字符类，再谈结论；对账类判据要带"总数"这一列**，
+    只报差集为空挡不住"两边同时漏掉同一批"。
+- ✅ **05:3x ⑤ 复核**：`B41/B42/B45` 三行仍在 §7.28 那张「完成条件逐条的现量与差什么」表里（`:1220`/`:1221`，状态 🟡，
+    各带自己的现量命令），本夜落笔的六笔只改了 `scripts/verify-mobile-notes.sh` 的第 12 步与
+    `apps/desktop-macos/scripts/package-app.sh` 的公证段，加上四份文档，
+    **没有翻任何冻结判据、没有动服务端面** —— 这三项按边界继续保持登记。
