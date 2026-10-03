@@ -34,6 +34,55 @@
   flex: 0 0 auto;
 }
 
+/*
+ * 日历的**视图档位**（R11 批三：月 / 周）。
+ *
+ * 为什么是类而不是内联样式：页头那个任务排序下拉（`App.tsx`）用的是内联，
+ * 而 `check:l4` 的内联棘轮只许降不许升 —— 新控件再抄一份内联就是**往回涨**。
+ * 挂在已有的 `.ht-header__*` 前缀族下（不新开一族），
+ * `check:row-single-source` 的族计数基线才不会因为这一条而动。
+ *
+ * 🔴 可见的文字标签不是装饰：页头裸 chip 的教训还记在 `App.tsx` 那段
+ *   （产品负责人 2026-09-30："用户根本不知道它们是什么"）。
+ */
+.ht-header__view {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  flex: 0 0 auto;
+}
+
+.ht-header__capture {
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-background);
+  color: var(--ht-color-primary);
+  font-size: var(--ht-font-size-lg);
+  line-height: var(--ht-line-height-tight);
+  cursor: pointer;
+}
+
+/* hover 用**边框**表达层次，不用 translateY（AGENTS §5 那条容易犯的错） */
+.ht-header__capture:hover {
+  border-color: var(--ht-color-primary);
+}
+
+.ht-header__view select {
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-md);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+}
+
 .ht-content {
   flex: 1;
   /* 🔴 **必须是 flex 列，不能是块容器** —— 这是 R2（"组件没铺满高"）的宿主那一刀。
@@ -63,4 +112,24 @@
      2026-09-29 产品负责人实测指出进度卡与采集条近到像连成一张，根因就是"两头都没声明
      外间距"（共享组件是 RN 的 `View`，外间距归宿主）。当时把它挂在进度卡上 ——
      那张卡 2026-10-01 已删（R6），但这条**机制**留着：下一个贴死的面，同样是谁在上面谁声明。 */
+}
+
+/*
+ * 日历那一屏的宿主层（`CalendarView.tsx` 里挂滚轮翻月监听的那个 div）。
+ *
+ * 🔴 它必须把 `.ht-content` 的**确定高度**传下去。`.ht-content` 是 flex 列且有确定高度，
+ * 但中间这一层原来是**裸块容器**：块容器只把自己 Stretch 到内容宽度，
+ * 不会把母高变成弹性基准 ⇒ 共享板根节点那句 `flexGrow: 1` 空转，整月只画在半屏里
+ *（R11 批一"日历只占一半"的宿主那一刀；与上面 `.ht-content` 那段注释记的是同一个机制）。
+ *
+ * ⚠️ 挂在 `.ht-content__calendar-host` 而不是新造 `.ht-calendar` 族：
+ * `check:row-single-source` 的 `ht-*` 前缀族基线**只许下降**，新视图不许长出新族。
+ * ⚠️ 不用内联 `style`：`check:l4` 的内联样式棘轮只许降不许升。
+ */
+.ht-content__calendar-host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* 允许在内容超高时收缩（否则 min-height 会停在内容高度，把整页顶出滚动区）。 */
+  min-height: 0;
 }

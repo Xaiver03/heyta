@@ -34,17 +34,16 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
-import { isoWeek, scopeTasks, toLocalDate, addMonths, type LocalDate } from '@heyta/domain';
-import { useI18n } from '@heyta/i18n';
+import { scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
 import {
   CalendarBoard as SharedCalendarBoard,
-  formatDayTitleText,
-  formatMonthTitleText,
   HeytaUiProvider,
-  WEEKDAY_MESSAGE_KEYS,
+  stepCalendarCursor,
 } from '@heyta/ui';
 
+import { CaptureComposer } from '../capture/CaptureComposer.js';
 import { useTaskStore } from '../tasks/store.js';
+import { useCalendarLabels } from './useCalendarLabels.js';
 import { useWheelMonthNav } from './useWheelMonthNav.js';
 import { useCalendarViewStore } from './store.js';
 
@@ -56,7 +55,6 @@ import { useCalendarViewStore } from './store.js';
 const BOARD_TEST_ID = 'calendar-board';
 
 export function CalendarView(): React.JSX.Element {
-  const { t } = useI18n();
   const store = useTaskStore();
   /**
    * 🔴 月/日与侧栏**共用这一份**，不是本地 `useState`。
@@ -82,57 +80,24 @@ export function CalendarView(): React.JSX.Element {
     [store.entities.tasks, view.scope],
   );
 
-  const labels = useMemo(
-    () => ({
-      // 🔴 日期措辞来自**共享**的 `date-text.ts`（与 mobile 同一份实现）。
-      //     web 与 mobile 各写一份的必然结果是同一个日子显示成
-      //    「9月26日 星期五」和「9月26日 周五」—— 而没人会为此报 bug。
-      monthTitle: (d: LocalDate) => formatMonthTitleText(d, t),
-      dayTitle: (d: LocalDate) => formatDayTitleText(d, t),
-      weekdays: WEEKDAY_MESSAGE_KEYS.map((k) => t(k)) as unknown as readonly [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ],
-      // ⚠️ 单复数分两条词条：词条表**刻意没有 ICU**（见 `packages/i18n/src/types.ts`），
-      //    所以英文的 "1 tasks" 只能靠调用方分支。
-      dayWithTasks: ({ date, count }: { date: string; count: number }) =>
-        count === 1
-          ? t('web.calendar.a11y.dayWithTasksOne', { date, count })
-          : t('web.calendar.a11y.dayWithTasks', { date, count }),
-      dayNoTasks: ({ date }: { date: string }) => t('web.calendar.a11y.dayNoTasks', { date }),
-      prevMonth: t('web.calendar.prevMonth'),
-      nextMonth: t('web.calendar.nextMonth'),
-      backToToday: t('web.calendar.backToToday'),
-      // 🔴 周次列（滴答式"31周"）：ISO 周数由领域 `isoWeek` 算，这里只措辞。
-      weekNumber: (d: LocalDate) => t('web.calendar.weekShort', { n: isoWeek(d) }),
-      dayEmpty: t('web.calendar.dayEmpty'),
-      footnote: t('web.calendar.footnote'),
-      taskRow: {
-        toggleOn: (row: { title: string }) => t('web.shell.tasks.complete', { title: row.title }),
-        toggleOff: (row: { title: string }) =>
-          t('web.shell.tasks.uncomplete', { title: row.title }),
-      },
-    }),
-    [t],
-  );
+  /** 🔴 文案抽进 `useCalendarLabels()`：页头那个工具栏（批二）要的是**同一份**，
+   *  两处各构造一遍就是"同一句文案的两份事实源"（AGENTS §3.5）。 */
+  const labels = useCalendarLabels();
 
   /**
-   * 滚轮翻月（产品负责人 2026-10-01：「上下滑动自由无限切换日历」）。
+   * 滚轮翻月 / 翻周（产品负责人 2026-10-01：「上下滑动自由无限切换日历」）。
    *
-   * 🔴 走的是**和侧栏迷你月历同一个** `setCursor` —— 只翻月、不动选中的那天。
-   * 另写一份"翻月"逻辑的结局是滚轮翻完，侧栏还圈着上个月的格子。
+   * 🔴 走的是**和页头那两个箭头同一个** `stepCalendarCursor` ——
+   *   两边各算一遍"下一段"的结局是"点箭头翻一周、滚轮翻一月"。
+   *   落到 store 上也只有 `setCursor` 这一个口子：只翻段、不动选中的那天，
+   *   所以滚完之后侧栏与主区仍指着同一段（另写一份的结局见 `store.ts` 文件头）。
    *
    * `within` 只圈月历卡片：卡片下面那份当天清单需要正常滚页，
    * 把它一起吃掉的话指针停在那儿就再也滚不动了。
    */
   const wheelHost = useWheelMonthNav(
     (step) => {
-      view.setCursor(addMonths(view.cursor, step));
+      view.setCursor(stepCalendarCursor(view.view, view.cursor, step));
     },
     { within: `[data-testid="${BOARD_TEST_ID}-month-card"]` },
   );
@@ -158,7 +123,27 @@ export function CalendarView(): React.JSX.Element {
 
   return (
     <HeytaUiProvider>
-      <div ref={wheelHost}>
+      {/*
+        🔴 这一层**必须把 `.ht-content` 的确定高度传下去**（R11 批一"日历只占一半"的宿主那一刀）。
+        共享板的根有 `flexGrow: 1`，但 `flexGrow` 只在**弹性容器**里生效 ——
+        这一层原来是裸 `<div>`（块容器），于是板子只按内容长高，整月画在半屏里。
+        样式挂在 `.ht-content__calendar-host`（见 `styles/app/main-area.css`），
+        **不写内联 style**（`check:l4` 的内联样式棘轮只许降不许升）。
+      */}
+      <div ref={wheelHost} className="ht-content__calendar-host">
+        {/*
+          「说一句话落进选中那一格」（R11 批五，§9.3 差异化第 2 条）。
+          滴答的 `+` 只能新建、落不进你正指着的那一格 —— 这里能，
+          因为**本地优先**：选中哪天是这一屏的状态，捕获框就在同一屏拿得到它。
+
+          🔴 落点由 `anchorDate` 交给共享层，**不在这里换算日期**
+             （`toCaptureSubmitPlan` 那条优先级：输入里写了「明天」以输入为准）。
+             也不叫 AI：这条是纯规则解析，零模型、不出境（ADR-0013 的
+             `retention-undecided` 仍然挡着 `managed`，而这条根本不需要它）。
+        */}
+        {view.captureOpen ? (
+          <CaptureComposer anchorDate={view.selected} />
+        ) : null}
         <SharedCalendarBoard
           tasks={tasks}
           today={today}
@@ -166,6 +151,12 @@ export function CalendarView(): React.JSX.Element {
           selected={view.selected}
           onCursorChange={view.setCursor}
           onSelect={view.selectDay}
+          /* 🔴 批二：工具栏搬到**页头**（`CalendarHeaderToolbar`），板子里那份撤掉。
+             与下面的 `onToday` 是**一对**：宿主接了跳回，工具栏才有那颗「今天」；
+             两处不同时改，结局是"整屏没有回到今天的入口"或"同一屏两个入口"。 */
+          toolbar="external"
+          /* 档位由页头那个下拉决定（store 里唯一一份），板子只照它画。 */
+          view={view.view}
           onToday={() => {
             // 「今天」跳回：选中今天 + 月份跟过去（与迷你月历的 ○ 同一条路径）。
             view.goToToday(today);

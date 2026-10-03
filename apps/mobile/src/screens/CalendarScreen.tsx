@@ -166,6 +166,8 @@ export function CalendarScreen(): React.JSX.Element {
           ? t('mobile.calendar.a11y.dayWithTasksOne', { date, count })
           : t('mobile.calendar.a11y.dayWithTasks', { date, count }),
       dayNoTasks: ({ date }: { date: string }) => t('mobile.calendar.a11y.dayNoTasks', { date }),
+      // `+3` 读屏会念成"加三"，给它一句人话（视觉不变，两端同一份词条）。
+      moreTasks: (count: number) => t('mobile.calendar.a11y.moreTasks', { count }),
       prevMonth: t('mobile.common.prevMonth'),
       nextMonth: t('mobile.common.nextMonth'),
       backToToday: t('mobile.calendar.backToToday'),

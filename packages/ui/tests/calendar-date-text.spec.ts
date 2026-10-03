@@ -28,6 +28,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatDayTitleText,
   formatMonthTitleText,
+  formatWeekRangeText,
   WEEKDAY_MESSAGE_KEYS,
   type CalendarDateKey,
 } from '../src/calendar/date-text.js';
@@ -115,5 +116,45 @@ describe('WEEKDAY_MESSAGE_KEYS', () => {
     expect(WEEKDAY_LABELS[6]).toBe('日');
     expect(t(WEEKDAY_MESSAGE_KEYS[0]!)).toBe('[common.weekday.mon]');
     expect(t(WEEKDAY_MESSAGE_KEYS[6]!)).toBe('[common.weekday.sun]');
+  });
+});
+
+describe('formatWeekRangeText（R11 批三：周视图的标题）', () => {
+  it('🔴 区间是**周一到周日**，不是"传入的那天"两侧', () => {
+    // 传进来之所以可以是周里的**任意一天**，是因为游标的约定就是
+    // "这一段里的任意一天"。如果这里直接用 `date` 当区间一端，
+    // 那么"周三切到周视图"会把标题写成「…周三 – …周三」，
+    // 而界面画的是整周 —— 两边都"合法"，没人会报 bug。
+    const { t, calls } = recorder();
+    formatWeekRangeText('2026-10-03', t); // 10-03 是周六
+    expect(calls[0]?.key).toBe('common.date.weekRangeTitle');
+    expect(calls[0]?.vars).toEqual({
+      year: 2026,
+      startMonth: 9,
+      startDay: 28,
+      endMonth: 10,
+      endDay: 4,
+    });
+  });
+
+  it('同一周里传哪一天都给出**同一个标题**（周一起算，与 `weekGrid` 同一套）', () => {
+    const one = recorder();
+    formatWeekRangeText('2026-09-28', one.t);
+    for (const d of ['2026-09-30', '2026-10-02', '2026-10-04']) {
+      const other = recorder();
+      formatWeekRangeText(d, other.t);
+      expect(other.calls[0]?.vars).toEqual(one.calls[0]?.vars);
+    }
+  });
+
+  it('🔴 年份来自**周一那一年** —— 跨年那一周（12-29 – 1-4）不许读成下一年', () => {
+    const { t, calls } = recorder();
+    formatWeekRangeText('2027-01-01', t); // 周五
+    const v = calls[0]?.vars as Record<string, number>;
+    expect(v.year).toBe(2026);
+    expect(v.startMonth).toBe(12);
+    expect(v.startDay).toBe(28);
+    expect(v.endMonth).toBe(1);
+    expect(v.endDay).toBe(3);
   });
 });

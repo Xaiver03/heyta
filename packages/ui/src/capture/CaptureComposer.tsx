@@ -79,7 +79,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
-import type { CaptureExclusion } from '@heyta/domain';
+import type { CaptureExclusion, LocalDate } from '@heyta/domain';
 import { Plus, RotateCcw, X } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
@@ -149,6 +149,15 @@ export interface CaptureComposerProps {
   readonly labels: CaptureComposerLabels;
   /** 提交。字段已换算成 `Task` 约定（`dueDate` = epoch ms）。 */
   readonly onSubmit: (plan: CaptureSubmitPlan) => void | Promise<void>;
+  /**
+   * **锚点日**（R11 批五：日历里"说一句话落进选中那一格"）。
+   *
+   * 🔴 语义是**兜底**，不是覆盖：输入里解析出的日期赢，其次才是锚点，
+   *   都没有才不带 `dueDate`（优先级与理由在 `toCaptureSubmitPlan`）。
+   *   ⚠️ 给了锚点就**必须在界面上说出来**（宿主负责，见它的 placeholder）——
+   *   悄悄改变一条任务的落点，是"界面没说谎但用户以为没说"那一类缺陷。
+   */
+  readonly anchorDate?: LocalDate | undefined;
   /**
    * 宿主内容（web 是 AI 一句话捕获）。不传就不渲染。
    *
@@ -289,6 +298,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
 export function CaptureComposer({
   labels,
   onSubmit,
+  anchorDate,
   renderAssistant,
   now,
   autoFocus,
@@ -314,7 +324,7 @@ export function CaptureComposer({
   const canSubmit = captureCanSubmit(parsed);
 
   function submit(): void {
-    const plan = toCaptureSubmitPlan(parsed);
+    const plan = toCaptureSubmitPlan(parsed, anchorDate);
     if (plan === undefined) return;
     void onSubmit(plan);
     setDraft('');

@@ -17,9 +17,12 @@ test('日历：周次列 + 今天跳回 + 今天列头高亮', async ({ page }) 
   await openApp(page);
   await page.getByRole('tab', { name: '日历' }).click();
 
-  // ① 「今天」跳回按钮在头部（⚠️ 页脚本来就有一个回今天 —— 用 -header 这个 ID）
-  const today = page.getByTestId('calendar-board-today-header');
-  await expect(today, '头部必须有「回到今天」').toBeVisible();
+  // ① 「今天」跳回。🔴 它现在住在**页头**的工具栏里（批二），不在月历卡片内 ——
+  //    旧的 `calendar-board-today-header` 这个 ID 随那次搬家没了。
+  //    页脚那颗只在宿主**没接** `onToday` 时才画（移动端就是那种情况），
+  //    Web 接了 ⇒ 这一屏只有一个「回到今天」。
+  const today = page.getByTestId('calendar-toolbar-today');
+  await expect(today, '页头工具栏必须有「回到今天」').toBeVisible();
 
   // ② 周次列：至少一行出现"数字+周"的灰字
   const weekCell = page.locator('[data-testid="calendar-board"]').getByText(/\d+周/, { exact: false });

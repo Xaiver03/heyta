@@ -39,7 +39,7 @@ const OUT_LIST = `侧栏在外-${STAMP}`;
 
 const SIDEBAR = '.ht-sidebar--calendar';
 const MINI_TITLE = '[data-testid="calendar-mini-title"]';
-const BOARD_MONTH = '[data-testid="calendar-board-month"]';
+const BOARD_MONTH = '[data-testid="calendar-toolbar-month"]';
 const BOARD_DAY = '[data-testid="calendar-board-day-title"]';
 const DAY_LIST = '[data-testid="calendar-board-day-list"]';
 

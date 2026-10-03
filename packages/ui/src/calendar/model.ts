@@ -27,18 +27,86 @@
  * 用自己的 i18n 说出来。这与 `timeline/model.ts` 的 `TimelineViewLabels` 同一形状。
  */
 
-import { toLocalDate, type LocalDate, type Task } from '@heyta/domain';
+import {
+  addDays,
+  addMonths,
+  DAYS_PER_WEEK,
+  toLocalDate,
+  type LocalDate,
+  type Task,
+} from '@heyta/domain';
 
 import type { TaskListLabels } from '../task-list/TaskList.js';
 
 /**
- * 一个格子里最多画几个点。
+ * 一个格子里最多画几条任务条。
  *
- * 多于此只会糊成一片色块 —— 那时"这天有 14 件事"和"有 3 件事"看起来一样，
- * 用户得到的信息反而更少。点只回答"这天有没有事、大致什么状态"，
- * 具体有哪几件事由下面的当日列表回答。
+ * 原来是 `MAX_CALENDAR_DOTS = 3` 个**圆点**，而圆点不回答"这天有什么事" ——
+ * 产品负责人 2026-10-02 对标滴答的那五张图里，格子里写的是任务标题。
+ * 她说"内容永远不会被截断"在 heyta **不是一个已存在的缺陷**（格子里本来没有一个字），
+ * 真缺陷是**格子里没有东西可读**。所以这一档从"点数"改成"可见条数"，
+ * 而"不截断"变成**验收条件**：超出的一律折成 `+N`，绝不出现半条。
+ *
+ * 为什么还是 3：月格一行的高度 = 日期 + 3 条 + 可能的 `+N`，再高就会把
+ * 6 行月历顶出视口 —— 那等于用"看得见标题"换掉"看得见整月"，不划算。
  */
-export const MAX_CALENDAR_DOTS = 3;
+export const MAX_CALENDAR_BARS = 3;
+
+/**
+ * 周视图一格里的条数上限（批三）。
+ *
+ * 🔴 它**不是**"月档那个数乘个倍数"那种看着推导、实际是拍的数 ——
+ *   真正的约束是**这一格画得下几行**，而那由视口高度决定，不由档位数决定。
+ *   取值过程（实测 1280×720 / 1280×1200 两张图，见
+ *   `docs/plans/ui-review-fill-zh-timeline.md` §9.9）：
+ *   周档那一格在 720 上约 `H` px 高、一条 ≈ 22px ⇒ 能完整画出 ⌊H/22⌋ 条。
+ *   取 **6**：再多就已经超出"当天清单"自己那一屏的容量 ——
+ *   周视图的作用是"一眼看完这一周"，不是"把清单搬进格子"。
+ *   ⚠️ 判据一律**从这个常量推导**（`apps/web/tests/calendar-week-view.spec.tsx`
+ *      与 `e2e/tests/calendar-week.spec.ts`），不许在测试里再抄一个 6。
+ */
+export const MAX_WEEK_CALENDAR_BARS = 6;
+
+/** 格子里一条任务条需要的最小事实。🔴 不是 `Task`：格子只画标题与两个状态。 */
+export type CalendarCellBar = {
+  readonly id: string;
+  readonly title: string;
+  readonly done: boolean;
+  readonly overdue: boolean;
+};
+
+/**
+ * 把当天的任务折成"可见条 + 被折叠数"。
+ *
+ * 排序是**有内容的**：逾期 → 未做 → 已做。
+ * 理由是格子只有 3 个位置，把已完成的排进来等于用掉一个"这天还有什么要做"的信号，
+ * 而那个信号才是她翻日历时想要的东西。
+ *
+ * ⚠️ `hidden` 是**从数据算出来的**（`tasks.length - visible.length`），
+ * 不是界面数 DOM 数出来的 —— 后者会让"3 条 + +0"这种废话出现在界面上。
+ */
+export function calendarCellBars(
+  tasks: readonly Task[],
+  today: LocalDate,
+  date: LocalDate,
+  max: number = MAX_CALENDAR_BARS,
+): { readonly bars: readonly CalendarCellBar[]; readonly hidden: number } {
+  const decorated = tasks.map((task) => {
+    const done = task.completedAt !== undefined;
+    // 逾期 = 截止时间在今天之前**且还没做完**。已完成的不再算逾期 ——
+    // 给一件做完的事标红是噪音，而红色在这个应用里只表示"要注意"（见 `calendarDayTone`）。
+    return {
+      id: task.id,
+      title: task.title,
+      done,
+      overdue: !done && date < today,
+    } satisfies CalendarCellBar;
+  });
+  const rank = (bar: CalendarCellBar): number => (bar.overdue ? 0 : bar.done ? 2 : 1);
+  decorated.sort((a, b) => rank(a) - rank(b));
+  const bars = decorated.slice(0, Math.max(0, max));
+  return { bars, hidden: decorated.length - bars.length };
+}
 
 /**
  * 一天的状态色。**三档而不是五种**：格子里只有 4px 的点，再细分就分不出来了。
@@ -69,6 +137,33 @@ export function calendarDayTone(
  * ⚠️ 动态的那几条是函数，不是带占位符的字符串：本层不知道宿主的插值语法
  *（词条表刻意没有 ICU），而且日期本身也要按语言格式化。
  */
+/**
+ * 日历档位。**只列真的实现出来的**（§9.3 那条明确不做的事：
+ * 一排点了没反应的菜单项就是"零件在、最后一米没接"）。
+ *
+ * 🔴 类型定义在共享层：板子、工具栏、两个宿主的 store 都要用它，
+ *   而"这一档到底存不存在"是**产品语义**，不是某个壳的偏好（AGENTS §3.5）。
+ */
+export type CalendarViewKind = 'month' | 'week';
+
+/**
+ * 游标走 **N 段**：月档一段 = 一个月，周档一段 = 一整周（7 天）。
+ *
+ * 🔴 为什么单独成一个函数，而不是"工具栏里写一遍、滚轮里再写一遍"：
+ *   这两处都在回答同一个问题 ——「`>` 或滚一格之后，我在看哪一段」。
+ *   两份实现的漂移形状是"点箭头翻一周、滚轮翻一月"，而两边各自都"看着对"。
+ *   （`addMonths` / `addDays` 本身仍在 `@heyta/domain` —— 这里只决定"一段多长"。）
+ */
+export function stepCalendarCursor(
+  view: CalendarViewKind,
+  cursor: LocalDate,
+  segments: number,
+): LocalDate {
+  return view === 'week'
+    ? addDays(cursor, segments * DAYS_PER_WEEK)
+    : addMonths(cursor, segments);
+}
+
 export interface CalendarBoardLabels {
   /** 月份标题，如「2026 年 9 月」。 */
   readonly monthTitle: (date: LocalDate) => string;
@@ -86,8 +181,30 @@ export interface CalendarBoardLabels {
   readonly dayWithTasks: (args: { readonly date: string; readonly count: number }) => string;
   /** 格子读屏名：这天没有事。 */
   readonly dayNoTasks: (args: { readonly date: string }) => string;
+  /**
+   * 格子里被折叠掉的那几条的读屏名（视觉上是 `+3`，但 `+3` 不该被念成"加三"）。
+   *
+   * ⚠️ 刻意**可选**：`+N` 这个符号本身不需要翻译，所以没有它界面也完整 ——
+   * 缺的只是读屏用户的一句解释。做成必填会让两端同时红
+   * （AGENTS §3.3 那条"新增必填字段会在 hydration 炸"的 UI 版：新 props 一律可选）。
+   * 两个宿主目前都传了，但**类型上仍然不许 required**：第三方宿主拆掉它不该编译不过。
+   */
+  readonly moreTasks?: (count: number) => string;
   readonly prevMonth: string;
   readonly nextMonth: string;
+  /**
+   * 周视图的标题与两个箭头的读屏名（批三）。
+   *
+   * ⚠️ 三条都**可选**，理由与 `moreTasks` 一样：新 props 一律可选，否则
+   *   只实现月视图的宿主会当场编译不过（AGENTS §3.3 的 UI 版）。
+   *   🔴 代价是"切到周视图却没给 `weekTitle`"在类型上合法 —— 那种状态下
+   *   标题会退回月份（`2026年10月` 配一行 7 天，看着像坏了）。
+   *   所以这条**由判据兜**：`e2e/tests/calendar-week.spec.ts` 断言周视图的
+   *   标题里出现的是**周区间**，不是月份。
+   */
+  readonly weekTitle?: (date: LocalDate) => string;
+  readonly prevWeek?: string;
+  readonly nextWeek?: string;
   readonly backToToday: string;
   /**
    * 周次列的文案（滴答式："31周" / "W31"）。**可选** ——
@@ -107,6 +224,18 @@ export interface CalendarBoardLabels {
   /** 当日列表里那些行自己的文案（勾选框读屏名等）—— 原样转交给共享 `TaskList`。 */
   readonly taskRow: TaskListLabels;
 }
+
+/**
+ * 顶部工具栏只要这四条文案（`CalendarToolbar.tsx`）。
+ *
+ * 🔴 用 `Pick` 从 `CalendarBoardLabels` 上**取**，不是另写一份同形状的接口 ——
+ * 后者会变成"同一句文案的两份契约"：板子改了名字，工具栏还按旧的要，
+ * 编译期不报错，直到某个宿主发现自己少传了一条。
+ */
+export type CalendarToolbarLabels = Pick<
+  CalendarBoardLabels,
+  'monthTitle' | 'prevMonth' | 'nextMonth' | 'backToToday' | 'weekTitle' | 'prevWeek' | 'nextWeek'
+>;
 
 /**
  * 按**本地日期**把任务分到各天。

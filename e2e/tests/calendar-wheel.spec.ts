@@ -39,7 +39,7 @@ test.use({ viewport: { width: 1280, height: 600 } });
 const STAMP = Date.now().toString().slice(-6);
 const MONTH_CARD = '[data-testid="calendar-board-month-card"]';
 const DAY_LIST = '[data-testid="calendar-board-day-list"]';
-const BOARD_MONTH = '[data-testid="calendar-board-month"]';
+const BOARD_MONTH = '[data-testid="calendar-toolbar-month"]';
 const MINI_TITLE = '[data-testid="calendar-mini-title"]';
 
 /**
@@ -62,6 +62,48 @@ async function seed(page: Page): Promise<void> {
   await page.getByRole('tab', { name: '日历' }).click();
   await expect(page.locator(MONTH_CARD)).toBeVisible();
   await expect(page.locator(DAY_LIST)).toBeVisible();
+}
+
+/**
+ * 把指针放到某个元素**内部**，并返回那个点。
+ *
+ * 🔴 原来这里直接拿 `boundingBox()` 的坐标去 `mouse.move`，而这一屏在 600px 高的
+ *    视口下**是超出一屏的** —— 清单的顶边可以在视口外。Chromium 对落在视口外的
+ *    滚轮事件**走合成线程直接滚文档，根本不派发到主线程**，于是探针里
+ *    `__wheel` 是空的、`lastPrevented` 回 `null`，报出来的红是
+ *    "清单上的滚轮不许被吃掉"—— 一个探针的红，不是产品的红（§7 元规则 1）。
+ *
+ * 所以这里做三件事：① 先把靶子滚进视口；② 取一个**保证在视口内**的点；
+ * ③ 用 `elementFromPoint` 反查那个点**真的命中靶子**，不命中就直接判红 ——
+ *    否则"滚了"可能是滚在别的元素上，A/B 的前提就没了。
+ */
+async function pointInside(page: Page, sel: string): Promise<{ x: number; y: number }> {
+  const target = page.locator(sel);
+  await target.scrollIntoViewIfNeeded();
+  const box = await target.boundingBox();
+  expect(box, `靶子不存在：${sel}`).not.toBeNull();
+  const viewport = page.viewportSize();
+  const maxY = (viewport?.height ?? 720) - 8;
+  const minY = 8;
+  const y = Math.min(Math.max(box!.y + Math.min(40, box!.height / 2), minY), maxY);
+  const x = box!.x + box!.width / 2;
+  const hit = await page.evaluate(
+    ([px, py, selector]) => {
+      const at = document.elementFromPoint(px, py);
+      const want = document.querySelector(selector);
+      return {
+        hit: at !== null,
+        inside: at !== null && want !== null && (want === at || want.contains(at) || at.contains(want)),
+      };
+    },
+    [x, y, sel] as [number, number, string],
+  );
+  expect(hit.hit, `(${String(x)}, ${String(y)}) 上没有任何元素（点跑到视口外了？）`).toBe(true);
+  expect(
+    hit.inside,
+    `(${String(x)}, ${String(y)}) 命中的不是 ${sel} 的子树 —— 滚轮会落在别人身上，A/B 的前提不成立`,
+  ).toBe(true);
+  return { x, y };
 }
 
 /**
@@ -141,29 +183,46 @@ test('滚轮归月历：指针在格子上滚翻月而页面不滚，指针在�
     host0.scrollable,
     `当天清单必须落在一个**真的能滚**的宿主里，否则"没滚"什么都不证明：${host0.id}`,
   ).toBe(true);
-  const listBox = await page.locator(DAY_LIST).boundingBox();
-  expect(listBox).not.toBeNull();
-  await page.mouse.move(listBox!.x + listBox!.width / 2, listBox!.y + Math.min(40, listBox!.height / 2));
+  const listPoint = await pointInside(page, DAY_LIST);
+  await page.mouse.move(listPoint.x, listPoint.y);
   await page.mouse.wheel(0, 240);
   await expect
     .poll(async () => (await probe(page)).top, '指针在当天清单上 ⇒ 滚轮该滚页')
     .toBeGreaterThan(host0.top);
   expect(await lastPrevented(page), '清单上的滚轮不许被吃掉').toBe(false);
   const afterListScroll = (await probe(page)).top;
+  void afterListScroll; // 只用于"清单那一下真的滚了"这一条，不作下面翻月的基线。
 
   // ── ② 同一个宿主、同一份滚动位置，指针移到月历格子：翻月而**不滚** ──
-  const cardBox = await page.locator(MONTH_CARD).boundingBox();
-  expect(cardBox).not.toBeNull();
-  await page.mouse.move(cardBox!.x + cardBox!.width / 2, cardBox!.y + cardBox!.height / 2);
+  const cardPoint = await pointInside(page, MONTH_CARD);
+  // 🔴 基线**必须在把指针放到卡片上之后**重新取：上面那一步可能自己滚过
+  //    （`pointInside` 会把跑到视口外的靶子先滚进来）。拿放指针**之前**的读数当基线，
+  //    量到的就是探针自己的动作，不是"翻月把页面滚走了"。
+  const beforeCardWheel = (await probe(page)).top;
+  await page.mouse.move(cardPoint.x, cardPoint.y);
   await page.mouse.wheel(0, 240);
 
   const after = await monthText(page);
   expect(after, `下滚一格必须翻到**下一个**月（起点 ${before}）`).not.toBe(before);
   expect(await lastPrevented(page), '月历上的滚轮必须被吃掉，否则页面会同时滚走').toBe(true);
+  /*
+   * 🔴 "翻月不滚页"不能比"滚前 == 滚后"。翻月是**换数据**：翻到下个月，今天那一格
+   *    的 6 条任务条就没了 ⇒ 卡片矮了 ⇒ 浏览器把 scrollY 夹到新内容高度、
+   *    再加 scroll anchoring，读数会漂十几 px（实测 80 → 91）。
+   *    产品要说的那件事是**"这一下滚轮没有把页面推走"**，所以判据是
+   *    "漂移量远小于滚轮量 240"，而不是"一个像素都不许动"。
+   *    ⚠️ 容差不是放宽到"随便漂"：变异（把 `preventDefault()` 拿掉）会漂满 240，
+   *       这条照样红 —— 容差 20 与 240 之间差一个数量级。
+   */
+  const WHEEL_DELTA = 240;
+  const SCROLL_ANCHOR_TOLERANCE = 20;
+  const afterCardWheel = (await probe(page)).top;
   expect(
-    (await probe(page)).top,
-    `翻月的同时页面不能滚（滚前 ${afterListScroll}）`,
-  ).toBe(afterListScroll);
+    Math.abs(afterCardWheel - beforeCardWheel),
+    `指针在月历上滚了一格（${String(WHEEL_DELTA)}px），页面却从 ${String(
+      beforeCardWheel,
+    )} 滚到了 ${String(afterCardWheel)}`,
+  ).toBeLessThan(SCROLL_ANCHOR_TOLERANCE);
   expect(
     await page.locator(MINI_TITLE).textContent(),
     '侧栏迷你月历必须跟着走同一个 cursor',
@@ -178,7 +237,7 @@ test('滚轮归月历：指针在格子上滚翻月而页面不滚，指针在�
   expect(await monthText(page), '惯性尾巴必须被锁定期吃掉，不能攒成连翻').toBe(oneMonth);
 
   // ── ④ 横向手势（触控板两指横滑）让出去：不翻月、也不吃 ──
-  await page.mouse.move(cardBox!.x + cardBox!.width / 2, cardBox!.y + cardBox!.height / 2);
+  await page.mouse.move(cardPoint.x, cardPoint.y);
   await page.mouse.wheel(400, 40);
   expect(await monthText(page), '横向手势不是"上下滑动切月"').toBe(oneMonth);
   expect(await lastPrevented(page), '横向手势不属于月历').toBe(false);

@@ -282,6 +282,34 @@ export function monthGrid(date: LocalDate): MonthGridCell[][] {
   return weeks;
 }
 
+/** 所在周的**周一**（与 `monthGrid` 同一开头规则：`isoWeekday` 1 = 周一）。 */
+export function startOfWeek(date: LocalDate): LocalDate {
+  return addDays(date, -(isoWeekday(date) - 1));
+}
+
+/**
+ * 周视图的一行：**周一起 7 格**，每格都带真实日期。
+ *
+ * 🔴 `inMonth` 在这里的含义与 `monthGrid` **不同**，而且是刻意的：
+ *   · 月视图：这一格属于"正在显示的那个月"吗；
+ *   · 周视图：这一格属于**传进来的那个锚点日**所在的月吗。
+ * 周视图里没有"这个月"这个东西 —— 一周本来就常跨月（10-26 到 11-01）。
+ * 拿锚点月判，界面上"月末那几天"会淡一档，读起来是"这周有三天已经到下个月了"，
+ * 那是真的信息；全部不淡则跨周看不出来，全部淡则一半的格子看着不能点。
+ */
+export function weekGrid(date: LocalDate): MonthGridCell[] {
+  const first = startOfWeek(date);
+  const anchorPrefix = date.slice(0, 7);
+  const cells: MonthGridCell[] = [];
+  for (let i = 0; i < DAYS_PER_WEEK; i += 1) {
+    const cellDate = addDays(first, i);
+    // 🔴 参照是**锚点日**那个月，不是周一那个月 —— 否则"10-30 那一周"里
+    //    10-30 自己会被标成补白格。
+    cells.push({ date: cellDate, inMonth: anchorPrefix === cellDate.slice(0, 7) });
+  }
+  return cells;
+}
+
 /**
  * 紧凑日期：`09-26`。**跨年时带上年份**（`2027-01-05`）——
  * 否则"1 月 5 日"在一年的头几天里看不出是哪一年。

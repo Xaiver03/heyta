@@ -42,6 +42,8 @@ const { __resetOpLogForTests, initOpLog } = await import('../src/lib/oplog.js');
 const { useTaskStore } = await import('../src/features/tasks/store.js');
 const { useCalendarViewStore } = await import('../src/features/calendar/store.js');
 const { addDays, startOfMonth, FULL_SCOPE, toLocalDate } = await import('@heyta/domain');
+/** 🔴 上限**从共享层取**，不在测试里抄一个 3 —— 抄件一定会漂。 */
+const { MAX_CALENDAR_BARS } = await import('@heyta/ui');
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -111,6 +113,10 @@ beforeEach(async () => {
     cursor: startOfMonth(today),
     selected: today,
     scope: FULL_SCOPE,
+    // 🔴 `view` 也必须重置：它是同一个模块级单例的一部分。漏掉它的症状是
+    //    "上一个用例切到了周视图，这一用例数出 7 个格子"，
+    //    而失败信息看起来像月历坏了。
+    view: 'month',
   });
   void today;
 });
@@ -144,7 +150,7 @@ describe('日历视图（Web）', () => {
     await mount();
     await openCalendar();
 
-    const month = container!.querySelector('[data-testid="calendar-board-month"]')?.textContent ?? '';
+    const month = container!.querySelector('[data-testid="calendar-toolbar-month"]')?.textContent ?? '';
     // 「2026年9月」——这条形状由共享的 `formatMonthTitleText` 决定。
     expect(month, `月份标题不像共享实现给的形状：「${month}」`).toMatch(/^\d{4}年\d{1,2}月$/);
 
@@ -187,10 +193,95 @@ describe('日历视图（Web）', () => {
     ).toBe(true);
   });
 
+  /**
+   * R11 批一：月格从"最多 3 个圆点"改成"任务条 + `+N`"。
+   *
+   * 🔴 这一组判据钉的是**界面上真的读得到字**这件事 —— 圆点时代 `role=button`
+   * 的格子数量照样是 42，一条都不会红。
+   * 折叠的数量**不在这层重算**（那是 `calendarCellBars` 的事，已在
+   * `packages/ui/tests/calendar-cell-bars.spec.ts` 钉住），这里只验它传到了 DOM。
+   * "没有一条被裁一半"也**不在这层**：jsdom 的 rect 全是 0，
+   * 那条只能在真浏览器里量（`e2e/tests/calendar-cells.spec.ts`）。
+   */
+  async function seedDueToday(titles: readonly string[]): Promise<void> {
+    for (const title of titles) {
+      await useTaskStore.getState().addTask(title);
+      const created = useTaskStore.getState().entities.tasks;
+      const id = Object.keys(created).find(
+        (key) => created[key]?.title === title && created[key]?.dueDate === undefined,
+      );
+      expect(id, `没找到刚建的「${title}」`).toBeDefined();
+      await useTaskStore.getState().setDueDate(id!, Date.now());
+    }
+  }
+
+  it('🔴 格子里画的是**任务标题**（不是一个点）—— 这条是整个改造的立论', async () => {
+    await seedDueToday(['评审登录页', '补备案材料']);
+    await mount();
+    await openCalendar();
+
+    const today = toLocalDate(Date.now());
+    const cell = container!.querySelector<HTMLElement>(`[data-testid="calendar-cell-${today}"]`);
+    expect(cell, `今天的格子 (calendar-cell-${today}) 没渲染`).not.toBeNull();
+
+    const bars = [...cell!.querySelectorAll(`[data-testid="calendar-cell-${today}-bar"]`)];
+    expect(bars, '格子里一条任务条都没有').toHaveLength(2);
+    // 🔴 每条都必须**有字**：空文本的"条"就退化回圆点了。
+    for (const bar of bars) {
+      expect((bar.textContent ?? '').trim(), '任务条是空的（等于没画标题）').not.toBe('');
+    }
+    const drawn = bars.map((bar) => bar.textContent?.trim());
+    expect(drawn).toEqual(expect.arrayContaining(['评审登录页', '补备案材料']));
+  });
+
+  it('🔴 超过上限的折成「+N」，N = 这一天真正的条数 − 可见条数', async () => {
+    await seedDueToday(['甲', '乙', '丙', '丁', '戊']);
+    await mount();
+    await openCalendar();
+
+    const today = toLocalDate(Date.now());
+    const cell = container!.querySelector<HTMLElement>(`[data-testid="calendar-cell-${today}"]`);
+    expect(cell).not.toBeNull();
+    const bars = cell!.querySelectorAll(`[data-testid="calendar-cell-${today}-bar"]`);
+    expect(bars.length, `可见条数应当封顶在 ${String(MAX_CALENDAR_BARS)}`).toBe(MAX_CALENDAR_BARS);
+
+    const more = cell!.querySelector(`[data-testid="calendar-cell-${today}-more"]`);
+    expect(more, `5 条任务却没有折叠标记（应当出现 +${String(5 - MAX_CALENDAR_BARS)}）`).not.toBeNull();
+    expect(more!.textContent).toBe(`+${String(5 - MAX_CALENDAR_BARS)}`);
+  });
+
+  it('🔴 恰好等于上限时**不出现「+0」**（那句废话在数据上就该是 0）', async () => {
+    await seedDueToday(['甲', '乙', '丙'].slice(0, MAX_CALENDAR_BARS));
+    await mount();
+    await openCalendar();
+
+    const today = toLocalDate(Date.now());
+    const cell = container!.querySelector<HTMLElement>(`[data-testid="calendar-cell-${today}"]`);
+    expect(cell).not.toBeNull();
+    expect(cell!.querySelectorAll(`[data-testid="calendar-cell-${today}-bar"]`)).toHaveLength(
+      MAX_CALENDAR_BARS,
+    );
+    expect(
+      cell!.querySelector(`[data-testid="calendar-cell-${today}-more"]`),
+      '格子装得下全部任务时不该出现折叠标记',
+    ).toBeNull();
+  });
+
+  it('读屏念的是**这一天的总条数**，不是画出来的那几条（折叠不能把数字说小）', async () => {
+    await seedDueToday(['甲', '乙', '丙', '丁', '戊']);
+    await mount();
+    await openCalendar();
+
+    const today = toLocalDate(Date.now());
+    const cell = container!.querySelector<HTMLElement>(`[data-testid="calendar-cell-${today}"]`);
+    expect(cell).not.toBeNull();
+    expect(cell!.getAttribute('aria-label'), '格子没有读屏名').toContain('5 个任务');
+  });
+
   it('🔴 「回到今天」把选中框带回今天（跨月之后仍然有效）', async () => {
     const today = toLocalDate(Date.now());
     const monthOf = (): string =>
-      container!.querySelector('[data-testid="calendar-board-month"]')?.textContent ?? '';
+      container!.querySelector('[data-testid="calendar-toolbar-month"]')?.textContent ?? '';
     await mount();
     await openCalendar();
     const before = monthOf();
@@ -210,7 +301,7 @@ describe('日历视图（Web）', () => {
     expect(monthOf(), '翻「下个月」之后月份没变，下面就没东西可"回"').not.toBe(before);
 
     // 回到今天。
-    const back = container!.querySelector<HTMLElement>('[data-testid="calendar-board-today"]');
+    const back = container!.querySelector<HTMLElement>('[data-testid="calendar-toolbar-today"]');
     expect(back, '找不到「回到今天」').not.toBeNull();
     await act(async () => {
       back!.click();
@@ -223,6 +314,107 @@ describe('日历视图（Web）', () => {
     const d = new Date();
     expect(day).toContain(`${String(d.getMonth() + 1)}月${String(d.getDate())}日`);
     expect(today).toBeTruthy();
+  });
+
+  /** 数出网格里**日期格**的个数（按 `calendar-cell-<日期>` 这个稳定锚点，
+   *  不是按 `role=button` —— 后者会把工具栏与页脚的按钮一起数进来）。 */
+  function dayCells(): string[] {
+    return [
+      ...(container?.querySelectorAll<HTMLElement>('[data-testid^="calendar-cell-"]') ?? []),
+    ].map((el) => el.getAttribute('data-testid')!.replace('calendar-cell-', ''));
+  }
+
+  async function setView(kind: 'month' | 'week'): Promise<void> {
+    const select = container!.querySelector<HTMLSelectElement>('[data-testid="calendar-view-select"]');
+    expect(select, '页头找不到视图档位下拉').not.toBeNull();
+    // React 的受控 `<select>` 只认原生 setter（与 `setInput` 同一条理由）。
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLSelectElement.prototype,
+      'value',
+    )?.set;
+    await act(async () => {
+      setter?.call(select, kind);
+      select!.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await flush();
+  }
+
+  it('🔴 切到「周」之后：网格里**恰好 7 格**，而且是选中那天所在的整周', async () => {
+    await mount();
+    await openCalendar();
+    expect(dayCells()).toHaveLength(42); // 先确认月档画的是 6×7
+
+    await setView('week');
+    const cells = dayCells();
+    expect(cells).toHaveLength(7);
+    const today = toLocalDate(Date.now());
+    // 🔴 断的是**这一周包含今天**，不是"今天在第一格"：周视图从周一起，
+    //    今天可以是这周的任何一天。写死"第一格是今天"的用例会在周四跑红、
+    //    周五跑绿 —— 那是把日历的数学绑到了"今天星期几"上。
+    expect(cells, '周视图里没有今天那一格').toContain(today);
+    // 连续七天：后一格 = 前一格 +1 天。
+    for (let i = 1; i < cells.length; i += 1) {
+      expect(cells[i]).toBe(addDays(cells[i - 1]!, 1));
+    }
+  });
+
+  it('🔴 周档的标题是**周区间**，不是月份（漏接 `weekTitle` 会静默退回月份）', async () => {
+    await mount();
+    await openCalendar();
+    const title = (): string =>
+      container!.querySelector('[data-testid="calendar-toolbar-month"]')?.textContent ?? '';
+    const monthShape = title();
+    expect(monthShape, '月档标题应当是「xxxx年x月」').toMatch(/^\d{4}年\d{1,2}月$/);
+
+    await setView('week');
+    const weekShape = title();
+    expect(weekShape, '切到周档后标题没换 —— `weekTitle` 没接上，界面退回成月份').not.toBe(monthShape);
+    expect(weekShape).toMatch(/^\d{4}年\d{1,2}月\d{1,2}日 – \d{1,2}月\d{1,2}日$/);
+  });
+
+  it('🔴 周档里点箭头走的是**一整周**（7 天），不是一个月', async () => {
+    await mount();
+    await openCalendar();
+    await setView('week');
+    const before = dayCells();
+
+    const next = container!.querySelector<HTMLElement>('[data-testid="calendar-toolbar-next"]');
+    await act(async () => {
+      next!.click();
+    });
+    await flush();
+    const after = dayCells();
+    expect(after).toHaveLength(7);
+    expect(after[0]).toBe(addDays(before[0]!, 7));
+    // 标题跟着走，而且**还是**周区间（不是翻回月档）。
+    expect(
+      container!.querySelector('[data-testid="calendar-toolbar-month"]')?.textContent,
+    ).not.toBe('');
+  });
+
+  it('切回「月」之后又是 42 格，且游标回到选中那天所在的月', async () => {
+    await mount();
+    await openCalendar();
+    await setView('week');
+    await setView('month');
+    expect(dayCells()).toHaveLength(42);
+    expect(useCalendarViewStore.getState().cursor).toBe(
+      startOfMonth(useCalendarViewStore.getState().selected),
+    );
+  });
+
+  it('🔴 下拉里**只有真的能用的档位**（不许出现点了没反应的第三档）', async () => {
+    await mount();
+    await openCalendar();
+    const select = container!.querySelector<HTMLSelectElement>('[data-testid="calendar-view-select"]');
+    const options = [...(select?.options ?? [])].map((o) => o.value);
+    // 🔴 这条钉的是"**日历档位**这一半"：`CalendarViewKind` 的全部取值就是
+    //    month / week，日/年**还不存在**，所以不许出现第三种日历档位。
+    expect(options.filter((v) => v === 'month' || v === 'week')).toEqual(['month', 'week']);
+    // ⚠️ 2026-10-03 批五下半起，这一栏还多一项 `'timeline'` —— 它**不是**日历档位，
+    //    而是外壳视图的跳转（点了真能走，且不会写进日历 store）。
+    //    那一条的形状由 `calendar-view-family.spec.tsx` 钉，这里只登记"没有第四种东西"。
+    expect(options).toEqual(['month', 'week', 'timeline']);
   });
 
   it('功能模块里能关掉日历 —— 关掉之后 rail 上就没有它了', async () => {
