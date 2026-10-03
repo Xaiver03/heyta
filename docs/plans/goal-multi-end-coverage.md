@@ -1309,3 +1309,21 @@ grep -c 'multi-end-entry-coverage-audit\|goal-multi-end-coverage\|0051-mobile-re
 `docs/adr/0051-…` 从行内代码改成了真链接 `../adr/0051-mobile-reminder-delivery.md`（目标仍未被 git 跟踪）。
 **同一份文件、同一个目标、形状一变就从"看不见"变成"报出来"** ⇒ 上面那个 A/B 由双向证据闭合了。
 那一行不进本条线的提交（提交方式见交接文档"死胡同警告"第一条）。
+
+### 7.30 §5 四段的记账槽（2026-10-04 02:1x 建槽，读数待填）
+
+Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —— 建槽这一刻（02:1x 现量）§5 那四段
+**一条都没有起跑**：窗口闸门在载体里连退 `3`（02:14:01 读数：1 分钟负载 32，阈值 12 = 16 核 × 3/4），
+两台 booted 模拟器里 `com.heyta` 都在跑 ⇒ 这里**没有读数可记**，也不写"预计能过"。
+每个槽位写死"待填 + 现量命令"，填的时候只替换那一条。
+
+- ① 四端重装：`INNER_EXIT=` **待填** —— 现量命令 `bash /tmp/heyta-run-reinstall.sh --go`（载体 `heyta-wt-reinstall`）；截图逐张写明钉到哪一步、人看到什么，跟在这条后面。
+- ② Playwright 三段 + 全量 `pnpm check`：`CHECK_EXIT=` 与逐段表 `PASS/FAIL/SKIP` **待填** —— 现量命令 `bash /tmp/heyta-run-checks.sh --go`；**段数现取 = 63**（不是 62），载体 sha 与读数同批记（脚本首尾各打一次 `CARRIER_SHA`）。
+- ③ 便签移动端验收：`NOTES_EXIT=` **待填**（第 6/7 步的 op 判据、第 8 步第三张截图、第 9–11 步跨设备三条腿各写一条读数）—— 现量命令 `bash /tmp/heyta-run-notes.sh`。
+- ④ 父子层级合流：`MERGED_REF=` **待填** —— 现量命令 `bash /tmp/heyta-land-parent-merge.sh --apply`；02:0x 的 dry-run 三条门全过（`merge-tree rc=0` / 被碰 14 枚 ∩ 主检出未提交 = 0 / `STAGED_ENTRIES=0`），但**那是趟间读数，`--apply` 那一刻会重过**。
+
+🔴 **建槽而不是"等有读数再写整节"的理由**：一段文档在这本台账上的存活期取决于**还有谁持有它的旧副本**，
+不取决于它是否进了 HEAD —— 上一轮我 plumbing 进台账的段落，被并行会话的下一次整文件 `git add` 抹回去过一次。
+槽位先落地 ⇒ 后续更新是在**我自己的那一节**里替换行，不再和别人抢文件末尾的追加区，也不再新增编号。
+建槽时的守卫（全为现量）：本文件 `git status --porcelain` 为空、`git diff --cached` 为空，
+提交只点这一个路径，且 `git show --stat` 的删除数必须为 **0**。
