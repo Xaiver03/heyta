@@ -498,20 +498,6 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
     });
   }
 
-<<<<<<< HEAD
-=======
-  async getMetaValue(key: string): Promise<string | number | undefined> {
-    const rec = await this.db.get<{ key: string; value: string | number }>(STORES.META, key);
-    return rec?.value;
-  }
-
-  async setMetaValue(key: string, value: string | number): Promise<void> {
-    await this.db.transaction([STORES.META], 'readwrite', async (tx) => {
-      await writeMeta(tx, key, value);
-    });
-  }
-
->>>>>>> feat/countdown-batch2
   async readCheckpoint(): Promise<MaterializedCheckpoint | undefined> {
     const record = await this.db.get<{ key: string; value: MaterializedCheckpoint }>(
       STORES.META,
@@ -594,7 +580,6 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
         [META_FIELDS.KEY]: META_KEYS.HISTORY_INCOMPLETE,
         [META_FIELDS.VALUE]: true,
       });
-<<<<<<< HEAD
     });
   }
 
@@ -606,8 +591,6 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
   async setMetaValue(key: string, value: string | number): Promise<void> {
     await this.db.transaction([STORES.META], 'readwrite', async (tx) => {
       await writeMeta(tx, key, value);
-=======
->>>>>>> feat/countdown-batch2
     });
   }
 }

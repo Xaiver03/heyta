@@ -3647,8 +3647,6 @@ export const en = {
   //   当天完全可以在 16:00 挂一条（R14 之后这是常态），那句话就成了谎话，
   //   而它下面 20 行就是那条任务。两条句子各说各的范围。
   'common.calendar.dayAllDayEmpty': 'Nothing in "All day" — tasks set to a time sit on the hour axis below.',
-  'common.calendar.dayMarker.off': 'Off',
-  'common.calendar.dayMarker.work': 'Work',
 
   // Reminders (B1-1 UI layer; shared by web and mobile).
   // 🔴 `reminder.offset.*` must stay 1:1 and in order with
