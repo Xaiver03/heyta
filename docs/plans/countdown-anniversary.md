@@ -1412,6 +1412,32 @@ W0b ─> 随时可做（台账那半要等文件干净）
     （`apps/web/src/features/admin/` 里没有调休面板、`admin-client.ts` 里也没有对应方法）
     ⇒ 运营者现在只能靠 curl 录入，这条通道对她还没真正可用。补齐并跑过判据之后这张表才打勾。
 
+    - ✅ **04 03:2x 现量：那句"后台界面没有"过期了** —— `HolidayPanel` 在
+      `apps/web/src/features/admin/AdminPanel.tsx:640+`（Tab `调休/补班` 按需拉取，
+      `papers` 渲染成 `<a href>` + `rel="noreferrer noopener"`，并把服务端算的 `dayCount`
+      回显成"存进去的 == 显示出来的"核对）。真浏览器那条腿在
+      `e2e/tests/admin-console.spec.ts`「调休/补班那一页把出处回显成可点链接」，
+      整套 `ADMIN_RERUN_RC=0`（**6 passed**），图在 `apps/web/evidence/admin-holiday/`。
+    - 🔴 **这一趟最值钱的产出不是"跑绿了"，是看图看出一条断言抓不到的缺陷**：
+      第一趟截图里那一行的**年份显示成「2026…」** —— 两条 60+ 字符的 gov.cn 出处徽标不可收缩，
+      把同一行 `flex: 1` 的主体挤到被省略号裁切。**全套文本断言当时是绿的**，
+      因为 DOM 里文字是完整的，裁切只发生在渲染上（与 §8.4 里 W5 那条"断言只验写了什么、
+      不验少了什么"同族，这次少的是**看得见的部分**）。
+      修法两层：CSS 让徽标可收缩可换行（`admin.css`），判据改成**几何的**
+      （`scrollWidth - clientWidth <= 1`）并且**自带正向对照**
+      （先断 `clientWidth > 100` —— 一条"元素没参与布局"的 `0 - 0 = 0` 读数会让判据永远通过，
+      这个坑是它自己的第一趟假绿照出来的：那一趟 Playwright 在 03:21:33 就加载了 spec，
+      而判据是 03:22:11 才写进去的，所以"6 passed"里**根本没有这条判据**）。
+    - ⚠️ **本批欠 e2e 载体一笔，是这一趟撞出来的**：W4b 的 `startPublicFacts()` 挂在
+      `apps/web/src/main.tsx:152` ⇒ **每个** e2e 套件一开机都发 `GET /api/holiday-adjustments`，
+      而假端点只实现 `/v1/chat/completions` ⇒ `admin-console.spec.ts` 一次红五条、
+      报错逐字相同、其中四条与后台无关。补了 `e2e/tests/helpers.ts:stubPublicFacts`
+      （与既有 `stubLegalRecheck` 同形同因，应答体按服务端 `holidayVersionToken()` 算出来是 `0.0.0`）。
+      🔴 **同一条理由预测会打红 `inbox.spec.ts`**（它既塞凭据又有同一句守卫，且没有 `**` 兜底路由）——
+      这条**尚未实测**，量法：`cd e2e && pnpm exec playwright test tests/inbox.spec.ts`。
+    - ⚠️ **待补才打勾**：判据②的三臂变异（B1 出处不再是链接 / B2 不带 `rel` / B3 把 CSS 修复整个拿掉），
+      装置 `/tmp/w4b-mutate.mjs`。
+
 #### 🟡 L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）—— 判定表已出、命中已修；剩下的那条闸门已于 20:1x **立成常驻门禁 `check:legal-permissions`**，而踩响它的是 W9 不是 W7
 
 - 🔴 §4 自己的话：「倒数日**纯文字版（第一版）不触发 L1/L2/L4/L5**：它不申请任何权限、不上传任何内容」。
@@ -1535,10 +1561,10 @@ W0b ─> 随时可做（台账那半要等文件干净）
 | W2 `EVENT` 实体 | ✅ | D1/D2 ✅ | 4 + 静默门禁人工勾 | 20/7/17/41/30 passed；`listEvents` 已进 READ_PATTERNS 且三腿验过能红 |
 | W6 日历第二源 | ✅ **已闭合**（`e2def90f`，04 02:5x） | W2 | 2 | 判据本体（"没有截止日的倒数日能上日历"）+ 四个档位 + 侧栏那颗点各有真 DOM 判据；三层 14/8/13 passed + e2e 3 passed 五张图人看过；变异 5 臂逐臂只红自己那条。**原判"排后：落点被整片重写"这句由 `608fa5b1` 合流关闭**（详见 §8.2 那条 W6 节）。剩 **W6-G1**：接进「今天」/收集箱要先给 `TaskList` 一条"不可交互行"的契约变更，不属于这一批 |
 | W5 卡片网格 | ✅ | W2、W0 | 5 | 12 passed + 12 例变异 0 未证 + 9 道门禁 rc=0；e2e **6 passed**（整族 15 passed）、三张图已看、看图照出"逾期卡没有日期行"并修成 `94760c82`，两腿变异各红一次 |
-| W7 成品图导出 | 🔄 并行 | W5 | 2（含 RN 出图取证） | `heyta-wt-w7` 进行中，本表不代它主张读数 |
+| W7 成品图导出 | 🟡 **三端出图已落地并取证**，待两臂变异才打勾 | W5 | 2（含 RN 出图取证） | 载体已从 `heyta-wt-w7` 换到 `feat/countdown-batch2`（合入 `43e94b32`，**现在已是 main 的祖先**）。**04 03:1x 现量**：mobile `card-export.spec.ts` **21 passed / `MOBILE_RC=0`**、真浏览器 `countdown-export.spec.ts` **5 passed / `EXPORT_E2E_RC=0`**、门禁 `check:card-export` rc=0、成品图实测 **1080×1440 逐字等于契约**（契约从 `shared-schema/dist` 读回来，不在测试里重推公式）、六张图**人已看**且已进版本库（`apps/web/evidence/countdown-export/` + README）。"零法务变更"改成可复跑：W7 往 manifest 加的只有 `<provider>`，`git diff 43e94b32^1 43e94b32` 里**零个 `<uses-permission>`** |
 | W8 三端接线 | 🟡 **三端代码 + 壳级门禁已在 batch2**，剩两栏产物未取证 | W5/W6 | 3 | 🔴 原先这行写"排后：同 W6，日历线未落地前不动 `CalendarScreen`"—— **那是按整条线推断出来的，现量否证过**：W8 的落点在 main 里逐个文件都干净，且 web 半已随 W5 落地。载体已从 `heyta-wt-w8` 换到 `feat/countdown-batch2`（合入 `f2d09974`）。**04 03:0x 现量**：`node scripts/check-shell-surfaces.mjs` ⇒ **rc=0，判定 5 格 = 5 绿 / 0 红，未取证 2 栏**（`desktop-macos / countdown · 产物`、`desktop-windows / countdown · 产物`），门禁自己那句话是承重判据："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" ⇒ 那两栏只由 §5 第 4 条 `pnpm reinstall:all` 关闭，本表在此之前不打勾 |
 | W9 提醒（web 半 + DST） | ✅ web 半 | 可与 W2 并行 | 3 | 42/28/40 passed；变异 9 臂 9/9 红、0 未证；移动端那半**没动** |
 | W10 AI 工具目录 | ✅ | **W2 之后** | 3 + 差集归零 | 130/223/1019 passed；变异**第一趟 3 臂无牙**→补判据→第二趟 6/6 红 |
-| W4b 调休通道 + ADR | 🟡 **代码链闭合，剩后台面板** | 独立（1 条迁移） | 4 | ⚠️ 这行 20:4x 写的是"`heyta-wt-w4b` 已落 3 笔、迁移在写"，**23:0x 起过期**：迁移与两张表已提交（`3708d08c`）、服务端三条端点已并入 batch2（`2877dd37`）、**客户端拉取 + META 缓存 + web 日历「休/班」+ i18n 中英已落地**（`6735cc39`/`b05fbc50`/`67fef701`），判据①有真界面三档截图。剩：判据②的**后台界面**回显（API 层已有）。载体已从 `heyta-wt-w4b` 换到 `feat/countdown-batch2` |
-| L' 法务联动 | 🟡 判定表已出 | 随最后一个改承诺的工单 | 4 | 普查 82 行 → **唯一真命中已修**（`2d53ea94` 条款补 4 行 + 版本 bump；`8996de9d` 新门禁四臂全红）。原写"3 文件正脏 ⇒ 现在改会盖掉别人"**被现量改写了**：脏的 6 个文件里恰好不含命中的那一份 |
-| 收尾四项（§5） | ⏹ | 全部 | 4 | |
+| W4b 调休通道 + ADR | 🟡 **判据①②都有真界面读数**，待三臂变异才打勾 | 独立（1 条迁移） | 4 | 全链已进 main（`6735cc39`/`b05fbc50`/`67fef701` + 服务端那 4 笔 + `check:public-facts` 八臂 8 红）。**04 03:2x**：判据②的后台面板落了（`AdminPanel.tsx` 的 `HolidayPanel`），`e2e/tests/admin-console.spec.ts` 整套 **6 passed / `ADMIN_RERUN_RC=0`**，图在 `apps/web/evidence/admin-holiday/`。🔴 这一趟最值钱的是**看图照出年份被挤成「2026…」**（长 URL 徽标不可收缩，全套文本断言当时全绿）⇒ 修 CSS + 判据改几何（`scrollWidth-clientWidth<=1`）**并自带正向对照**（先断 `clientWidth>100`，否则"没参与布局"的 `0-0=0` 让判据永远通过——这个坑由它自己的第一趟假绿照出来：Playwright 03:21:33 就加载了 spec，判据 03:22:11 才写进去，那趟"6 passed"里根本没有它）。另补 `e2e/tests/helpers.ts:stubPublicFacts`：本批的开机拉取会把任何带"不该有非 2xx"守卫的套件无关地拖红（实测一次红五条） |
+| L' 法务联动 | 🟡 判定表已出、命中已修；**它立的门禁现在响在 main 上** | 随最后一个改承诺的工单 | 4 | 普查 82 行 → 唯一真命中已修（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`，13 臂变异全红）。🔴 **04 03:0x 现量**：`node scripts/check-legal-permissions.mjs` ⇒ **rc=1**，两条红都在 `third-parties.ts` 的推送 SDK 否表行（zh+en）——`b0ba4a35`（W9 原生投递，**已在 origin/main**）加了 `POST_NOTIFICATIONS` 而那六句没翻。**不是批次二造成的、也不由本批代改**（六句必须一起翻 + 重跑 `check:legal-copy`，且主检出 `packages/legal` 5 个 `M` 里那六句已经不见了 ⇒ 并行会话正在翻）。关闭判据：该命令 rc=0 |
+| 收尾四项（§5） | 🟡 **两条已量，两条待安静窗口** | 全部 | 4 | ✅ 第 2 条：`node research/tools/docs-link-check.mjs` 在本检出 ⇒ **rc=0 / 死链 0 处**（⚠️ 那句"33 处"是**主检出**的读数，死链数是"仓库+本机未跟踪文件"的属性，引用必须带在哪跑的）。✅ 第 3 条：W6 五张、W7 六张、W4b 一张**都打开看过**，各自 README 写了"看见了什么"，并且**看图一共照出三处断言抓不到的东西**（W5 少一行日期 / W7 竖条不是主蓝 / W4b 年份被挤没）。⏹ 第 1 条完整 `pnpm check`（68 段，含 `check:ai-e2e` 与 `check:legal-permissions` ⇒ 后者会在 main 自带的那条红上响，读数要分段写明在谁手里）。⏹ 第 4 条 `pnpm reinstall:all` 四端 + 私有现场设备验收（排在最后；⚠️ 现场核对：Android 模拟器 `emulator-5554` 在线、iOS 起了 **两台**（`heyta-iphone-17pro` + 别人的 `heyta-ios-isolated`）、`windows-pc` SSH 可达 ⇒ 这一段是**共享资源**，动设备前要先看谁在用） |
