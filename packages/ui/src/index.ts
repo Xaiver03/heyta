@@ -1036,6 +1036,7 @@ export {
 } from './countdown/EventBoard.js';
 export {
   COUNTDOWN_FILTERS,
+  cardTextsFor,
   countdownFace,
   filterEventCards,
   toEventCards,
@@ -1044,6 +1045,8 @@ export {
   type CountdownFilter,
   type CountdownView,
   type EventCard,
+  type EventCardTextLabels,
+  type EventCardTexts,
 } from './countdown/model.js';
 
 /**
@@ -1057,3 +1060,21 @@ export {
  * "删标签到底会不会动到已完成的任务"这个问题就会出现两个答案。
  */
 export { liveTaskCountsByTag } from './projects/model.js';
+/**
+ * 成品图（W7）的**版面**。各端只许 import 这一份再画一遍 ——
+ * 在 `apps/web` 与 `apps/mobile` 各写一套版面 = 两张会漂移的图，
+ * 而漂移的表现（"屏幕上一行、导出少一行 / 字号不同"）只有人眼看得出。
+ * 倍率是**必填参数**：见 `countdown/card-export-layout.ts` 文件头那张表。
+ */
+export {
+  buildCardExportLayout,
+  cardExportFileName,
+  cardExportFileStem,
+  estimateAdvance,
+  wrapCardText,
+  type CardExportDrawOp,
+  type CardExportLayout,
+  type CardExportRequest,
+  type CardExportTheme,
+  type TextMeasurer,
+} from './countdown/card-export-layout.js';

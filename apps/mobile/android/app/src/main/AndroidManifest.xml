@@ -127,5 +127,33 @@
             android:name="android.appwidget.provider"
             android:resource="@xml/widget_focus_info" />
       </receiver>
+
+      <!--
+        成品图落盘（W7）：把 `cacheDir/card-export/` 里那张 PNG 换成能被分享面板
+        接受的 `content://` URI。
+
+        🔴 **零新增权限** —— 这是这一格全部的意义。
+        `Share` 要的"真实文件 URI"如果走"写进系统相册"那条路，就要么申请照片权限、
+        要么引第三方库，而 `packages/legal/src/documents/permissions.ts` 里写着
+        "heyta 不申请 … 照片 … 权限"。走自己的缓存目录 + FileProvider 一个权限都不必加，
+        那句对外承诺继续逐字为真。这条路上出现的 `<uses-permission>` 只有 INTERNET
+        （同步用的，本单没有动它）。
+
+        ⚠️ `android:exported="false"` + `grantUriPermissions="true"` 是配套的：
+        provider 本身不对外开，权限**随这一次 URI 临时授予**给接住它的那个 App。
+        authority 用 `${applicationId}` 而不是写死 `com.heyta` —— 它必须与
+        Kotlin 侧运行时拼出的 `${packageName}.fileprovider` 相等，而两边的定义源
+        分别是 `build.gradle` 的 applicationId 与 `Context.getPackageName()`，
+        写死就是把这两个数抄成第三份。
+      -->
+      <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.fileprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+          android:name="android.support.FILE_PROVIDER_PATHS"
+          android:resource="@xml/card_export_paths" />
+      </provider>
     </application>
 </manifest>

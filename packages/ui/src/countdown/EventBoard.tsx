@@ -64,6 +64,7 @@ import {
   Archive,
   CalendarDays,
   Check,
+  Download,
   Ellipsis,
   Hourglass,
   Pin,
@@ -81,6 +82,7 @@ import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import {
   COUNTDOWN_FILTERS,
+  cardTextsFor,
   filterEventCards,
   toEventCards,
   toEventRows,
@@ -88,6 +90,7 @@ import {
   type CountdownFilter,
   type CountdownView,
   type EventCard,
+  type EventCardTexts,
 } from './model.js';
 
 /** 面板全部文案，**每一项都由宿主注入**（`@heyta/ui` 不 import `@heyta/i18n`）。 */
@@ -133,6 +136,12 @@ export interface EventBoardLabels {
   readonly a11yMenu: (title: string) => string;
   readonly a11yCloseMenu: (title: string) => string;
   readonly errorPrefix: string;
+  /**
+   * 「导出成品图」那一格的文字。**与 `onExportCard` 成对**：
+   * 只给回调不给文字时这一格**不渲染**（而不是画一个没有名字的按钮 ——
+   * 无障碍名缺失比少一个动作更糟）。
+   */
+  readonly exportCard?: string;
 }
 
 /** 编辑器一次提交能带的字段（`undefined` = 不改，`null` = 明确清除）。 */
@@ -171,6 +180,23 @@ export interface EventBoardProps {
   readonly onFilterChange: (filter: CountdownFilter) => void;
   /** 上一次写入失败的原因（校验的权威在动作层；这一层只把它画出来）。 */
   readonly error?: string;
+  /**
+   * 「导出成品图」（W7）。**省略 = 这一格根本不渲染**，与 `CalendarBoard` 的
+   * `dayMarker?` 是同一条做法（默认值等于原值的可选 prop ⇒ 既有端与既有断言不受影响）。
+   *
+   * 🔴 为什么这个开关**必须由宿主给**而不是共享层自己判断：成品图是**设备能力**
+   * （浏览器有 `<canvas>`；RN 侧见 `docs/plans/countdown-w7-device-export.md` §2 的取证
+   * —— 可栅格化但落不了盘）。共享层写一个 `Platform.OS === 'web'` 就是替宿主做平台判断，
+   * 而 AGENTS §3.5 的分界线正是"业务/平台语义不许出现在这一层"。
+   * 宿主不给 ⇒ 界面上就没有这个动作，而不是"给了但点了没反应"。
+   */
+  /** 「导出成品图」失败的那一句（整句，宿主给）。与 `error` 分开，理由见渲染处。 */
+  readonly exportError?: string;
+  readonly onExportCard?: (
+    entityId: string,
+    card: EventCard,
+    texts: EventCardTexts,
+  ) => void;
   readonly datePickerLabels: DatePickerLabels;
   readonly labels: EventBoardLabels;
   readonly testID?: string;
@@ -313,6 +339,8 @@ export function EventBoard({
   onViewChange,
   onFilterChange,
   error,
+  exportError,
+  onExportCard,
   datePickerLabels,
   labels,
   testID,
@@ -465,6 +493,17 @@ export function EventBoard({
         </View>
       ) : null}
 
+      {exportError !== undefined && exportError !== '' ? (
+        // 🔴 与上面那条**分开**：「没能保存」与「导不出来」是两件事，合成一条
+        // 就等于告诉用户"你的数据可能没存上"，而那恰恰没发生。
+        // 整句由宿主给（导出失败的措辞自带"数据未改动"，不需要前缀）。
+        <View style={styles.error} testID="event-export-error">
+          <Text style={[text['row-meta'], { color: tokens['color.foreground'] }]}>
+            {exportError}
+          </Text>
+        </View>
+      ) : null}
+
       {cards.length === 0 ? (
         // 🔴 空态**不在这里手写**：形状、居中、图标边长、排版整条，全部由共享
         //    `EmptyState` 决定（`packages/ui/src/empty-state/EmptyState.tsx`）。
@@ -527,6 +566,15 @@ export function EventBoard({
                         onRemove(card.id);
                         setMenuFor(undefined);
                       }}
+                      onExportCard={
+                        onExportCard === undefined
+                          ? undefined
+                          : (texts) => {
+                              // 🔴 **不收菜单**：导出是异步的（画布 → blob → 下载），
+                              // 收起菜单会让用户以为没点到。失败那一句还在板子上方。
+                              onExportCard(card.id, card, texts);
+                            }
+                      }
                     />
                   </View>
                 ),
@@ -557,6 +605,7 @@ function EventCardView({
   onArchive,
   onUnarchive,
   onRemove,
+  onExportCard,
 }: {
   card: EventCard;
   view: CountdownView;
@@ -572,9 +621,15 @@ function EventCardView({
   onArchive: () => void;
   onUnarchive: () => void;
   onRemove: () => void;
+  /** 见 `EventBoardProps.onExportCard`：`undefined` = 这一格不渲染。 */
+  onExportCard?: ((texts: EventCardTexts) => void) | undefined;
 }): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
+  // 🔴 屏幕上这张卡的措辞与**导出的成品图**用的是同一次 `cardTextsFor` 调用
+  // （理由见 `./model.ts` 那个函数的注释：抄第二遍就会改一处漏一处，
+  // 症状是"图上是错的、屏幕上是对的"，而没有任何一层会报）。
+  const texts = cardTextsFor(card, labels);
 
   return (
     <View style={styles.card} testID={`event-card-${card.id}`}>
@@ -597,31 +652,33 @@ function EventCardView({
           numberOfLines={2}
           testID={`event-title-${card.id}`}
         >
-          {card.title}
+          {texts.title}
         </Text>
         {/* 🔴 这行**只有措辞会变**：`face === 'since'` 不换颜色（§2.7）。 */}
         <Text
           style={[text['numeric-display'], styles.days, { color: tokens['color.foreground'] }]}
           testID={`event-days-${card.id}`}
         >
-          {labels.faceText(card.face, card.days)}
+          {texts.face}
         </Text>
         <View style={styles.row}>
           {/* 🔴 一次性且已过去的倒数日**没有"下一次"**（`nextDate` 是 undefined），
               但那一天是这张卡唯一的事实 —— 只留"已经 31 天"而不说是哪一天，
-              用户就没法核对它到底记的是哪天。落回锚点日期，不是"没日期就不画"。 */}
+              用户就没法核对它到底记的是哪天。落回锚点日期，不是"没日期就不画"。
+              这条判断**住在 `cardTextsFor` 里**（W5 在真浏览器里红过一次的那条），
+              所以导出的成品图与屏幕上的卡现在**同一次调用**，不可能一边修了一边没修。 */}
           <Text
             style={[text['row-meta'], styles.meta]}
             testID={`event-date-${card.id}`}
           >
-            {labels.formatDate(card.nextDate ?? card.anchorDate)}
+            {texts.date}
           </Text>
-          {card.ageDays !== undefined ? (
+          {texts.age !== undefined ? (
             <Text
               style={[text['row-meta'], styles.meta]}
               testID={`event-age-${card.id}`}
             >
-              {labels.ageText(card.ageDays)}
+              {texts.age}
             </Text>
           ) : null}
           {card.isPinned ? (
@@ -697,6 +754,18 @@ function EventCardView({
                   onPress={onUnarchive}
                 />
               )}
+              {onExportCard !== undefined && labels.exportCard !== undefined ? (
+                <BoardAction
+                  styles={styles}
+                  text={text}
+                  label={labels.exportCard}
+                  icon={Download}
+                  testID={`event-export-${card.id}`}
+                  onPress={() => {
+                    onExportCard(texts);
+                  }}
+                />
+              ) : null}
               <BoardAction
                 styles={styles}
                 text={text}

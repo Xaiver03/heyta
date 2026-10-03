@@ -6,6 +6,7 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
+import com.heytamobile.fs.CardExportPackage
 import com.heytamobile.fs.LocalFsPackage
 import com.heytamobile.widget.WidgetPackage
 import com.heytamobile.reminder.ReminderPackage
@@ -35,6 +36,11 @@ class MainApplication : Application(), ReactApplication {
           // Vault root keys are opt-in persisted only through OS secure storage.
           // This module is separate from the widget's device-key alias/cache.
           add(VaultSecureStoragePackage())
+          // 成品图落盘（W7 设备出图）。栅格化由 react-native-svg 的原生模块做，
+          // 这里补的是"base64 → 能被分享的文件"那一环。
+          // ⚠️ 忘了这一行时 `NativeModules.HeytaCardExport` 是 undefined，
+          //    JS 侧必须把它当成**会显示的失败**（"这台设备导不出图"），不许静默。
+          add(CardExportPackage())
         },
     )
   }

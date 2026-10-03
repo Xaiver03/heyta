@@ -3953,6 +3953,8 @@ export const en = {
   'web.countdown.template.slot': 'Template {slot}',
   'web.countdown.a11y.menu': 'Actions for “{title}”',
   'web.countdown.a11y.menuClose': 'Close actions for “{title}”',
+  'web.countdown.export': 'Export card image',
+  'web.countdown.export.failed': 'Export failed: this device gave us no canvas. Nothing was changed and nothing was sent.',
   'web.countdown.error': 'Not saved: ',
   'web.shell.modules.countdown.label': 'Countdowns',
   'web.shell.modules.countdown.note': 'Keep the dates you watch at the top. A date that has passed is not a failure.',
@@ -3983,4 +3985,9 @@ export const en = {
   'web.admin.holiday.notice.saved': 'Saved {year}: {count} scheduled days.',
   'web.admin.holiday.notice.deleted': 'The {year} entry has been revoked; that year falls back to the bundled gazette data.',
   'web.admin.holiday.notice.failed': 'Not saved: the server rejected this submission, see the message above for why.',
+} satisfies Record<MessageKey, string>;
+  'mobile.countdown.export.noModule': 'This build of heyta ships without the export component — it is not a data problem; reinstalling this version fixes it.',
+  'mobile.countdown.export.rasterize': 'The system could not draw the card into an image. Nothing was lost and nothing left this device.',
+  'mobile.countdown.export.write': 'The image was rendered, but it could not be written to storage on this device.',
+  'mobile.countdown.export.share': 'The share sheet rejected this image.',
 } satisfies Record<MessageKey, string>;
