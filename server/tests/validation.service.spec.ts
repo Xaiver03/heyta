@@ -622,6 +622,10 @@ describe('ValidationService', () => {
       'MIGRATION',
       'RECOVERY',
       'ALL',
+      // 倒数纪念日 W2 的 `EVENT`。它是**有意识的新增实体**（ADR-0044 那批），
+      // 而这条"精确数量"断言存在的意义就是让每一次新增都必须在这里认领一次 ——
+      // W2 落地时只跑了 packages/* 的套件，服务端这一侧没人跑过，所以欠到今天。
+      'EVENT',
     ];
 
     it('should include all heyta entity types', () => {
