@@ -2634,7 +2634,8 @@ main ⊂ 载体 = YES   待落 = 128 笔   载体 HEAD = e54b899b
 | `host.submit` 全仓恰好一处（入口可穷举） | `ai-tool-run.ts` 命中 **1**；`server.ts` 命中 **2** = 注释表 `:514`「\| MCP / 本机 API \| 立刻 `host.submit(intent)` \|」+ 代码 `:578` `return writeResult(await host.submit(write.intent));` ⇒ **代码入口仍是那两个** | 未放宽 |
 | 逐工具默认关 | `tools.ts:450` `return grants?.[toolName] === true;` 原样在 | 未放宽 |
 | 出境逐字段披露 | 目录 `name: '` 合计 **26**（我这轮 22 → 并进批次二的 4 条 EVENT 工具）、`egressFields` 声明合计 **31**、`TOOL_ENVELOPE_EGRESS_FIELDS` **3**。🔴 这三个数是 `git grep -c` 的**行数合计**，不是工具条数的逐项对账 ⇒ 只当"披露层还在"的弱读数，**权威读数交给 ② 的 `check:ai-coverage` / `check:ai-tools` / 那 9 条出境用例** | 待门禁确认 |
-| 回退不跨越隐私边界 | `fallback-needs-consent` 命中 **10**（`provider.ts` 1 / `routing.ts` 5 / `supply.ts` 4）；`retention-undecided` 在 `supply.ts` **4** 处，`assertEnableable()` 仍抛 ⇒ 托管 AI 仍未开 | 未放宽 |
+| 回退不跨越隐私边界 | ~~`fallback-needs-consent` 命中 **10**（`provider.ts` 1 / `routing.ts` 5 / `supply.ts` 4）~~ 🔴 **这句是我把两条 grep 的输出拼成了一条**：`supply.ts` 那 4 处属于 `retention-undecided`，`fallback-needs-consent` 的逐文件明细只有 `provider.ts` 1 + `routing.ts` 5 = **6**（00:2x 逐行复核：`git grep -n` 在三棵树 `main` / `e54b899b` / `926398d2` 上打出**完全相同的 6 行**，`diff` 为空）。`retention-undecided` 在 `supply.ts` **4** 处，`assertEnableable()` 仍抛 ⇒ 托管 AI 仍未开。**判据本身没变**（`:812` 那条 `reason: 'fallback-needs-consent'` 仍在候选循环体内、发请求之前） | 未放宽 |
+| 同一个 needle 的**作用域**才是数值的单位 | 🔴 顺带把这条量出来，免得下一个人再猜：**同一个 needle、同一棵树，换作用域就是三个数**（`main` 上的 `fallback-needs-consent`：`packages/ai/src` = **6** / `packages/ai` = **13**（多出来的是 `tests/routing.spec.ts` 6 + `tests/diagnose.spec.ts` 1）/ 全仓 = **45**）。所以 §15.x 里那种"6 → 8 处"的历史读数**没有一句写明作用域，就无法复现** —— 我不据此判它是错的，但它在今天这三棵树上都取不回来。⇒ 台账写法：**计数必须带作用域 + 带命令**，"更严/更松"的方向只有在同一作用域下才成立。 | 记录 |
 | 不 bump schema | `CURRENT_SCHEMA_VERSION = 1`：`HEAD` / `c36b1d89` / `main` **三方相同**（§15.37 已量，合并后 `HEAD` 仍是 1） | 未放宽 |
 
 🔴 **一次行号漂移的现场样本**（把 §15.37 第 5 小节第 3 条那句话坐实）：同一条
