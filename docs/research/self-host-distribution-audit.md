@@ -250,7 +250,8 @@
 | G-45 | 台阶 3（镜像 npm 依赖树 vs 许可证门禁扫的 pnpm store）曾是**未证实** | **本批量完并关成"有对账"**（§8.8）：`check:image-license` 逐条对账 + 四条会红的登记自检，7 发变异各自精确报红、阳性对照绿。残余风险（纯传递依赖上游发新版）已改挂 G-47 |
 | G-46 | `server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 的唯一实体）原来是**上游形状**：它自己抄了一份 7 条的镜像输入清单，其中 3 条在本仓库不存在（实测 `[ -e ]` 全不成立），而 `apps/web` / 11 个 `packages/*` / `pnpm-lock.yaml` / `server/` 自己**一条都不在里面**；`GHCR_NAMESPACE` 默认成 `super-productivity`（**别人的组织**）；并且无论给不给版本号都**顺带覆盖 `:latest`** | **本批关闭**（§8.7 第 4 条）。三条各自都会出事，都已改：清单改成 source 同一个读者、namespace 无默认值（不给就在任何 docker 之前 exit 1）、只推点名的那一个 tag。⚠️ 消费者集合是量过的：除 `server/package.json:14` 外只有 `server/tests/migration-sql.spec.ts:345` 读它，而那一发在 `it.skip` 里 ⇒ **不报错也不守** |
 | G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | **未关**（本批只登记）。闭合形状是现成的：生产阶段换成 `pnpm deploy --prod` ⇒ 三个 `workspace:*` 由 pnpm 内联、三枚 tgz 的 dance 一起消失、镜像的树**就是** `pnpm-lock.yaml` 的树 ⇒ 门禁与产物同源，`check:image-license` 与快照应当**撤掉**（不是改成读另一个文件）。代价：动生产镜像的装配路径，要单独一轮真构建复验（`pnpm verify:selfhost-stack` 全跑） |
-| G-48 | `check:web-artifact:app`（核对 `--base=/app/` 那份产物的那一道）**零自动消费者** —— 2026-10-03 由新门禁 `check:gate-wiring` 量出：它是 63 道 `check:*` 里唯一合法落在链外的一道，而全仓 `grep` 只有 `package.json` 自己那一行，没有任何 workflow / 验收脚本 / `deploy.sh` 调用它 ⇒「上线前跑一次」目前只写在脚本头部注释里 | **未关**（本批只登记）。它进不了 `pnpm check`（链里那份产物是默认根路径打的，拿错的产物验对的东西），要闭合得挂到**镜像构建与 rsync 那条路径**上（与 G-47 那轮一起做最省） |
+| G-48 | `check:web-artifact:app`（核对 `--base=/app/` 那份产物的那一道）**零自动消费者** —— 2026-10-03 由新门禁 `check:gate-wiring` 量出：它是 63 道 `check:*` 里唯一合法落在链外的一道，而全仓 `grep` 只有 `package.json` 自己那一行，没有任何 workflow / 验收脚本 / `deploy.sh` 调用它 ⇒「上线前跑一次」目前只写在脚本头部注释里 | ✅ **已关（2026-10-03，判据与登记见 §8.19）**。登记那半句被否证：`server/Dockerfile:191` 一直在跑同一条判据的**脚本本体**，`grep` 漏它是因为搜的是别名。决定：链**不放**这道判据（`apps/web/dist` 是一个目录、两种载体，链里 `pnpm build` 打的必然是根载体，把 `/app/` 载体放链里就是拿错的字节验对的东西 —— 现量：同一份 dist 上一条 rc=0 一条 rc=1）；改为**每个发布载体各自带对账**：runbook §3.7 的 rsync 之前插入 `pnpm check:web-artifact:app`（两处），`check:gate-wiring` 新增"链外门禁必须点名消费方文件 + 该文件里有一行**以这条命令开头**"，把"没人跑它"从一句注释变成会红的判据。6 臂注入 5 红 1 绿（绿那臂是刻意留的越界对照） |
+| G-48b | G-48 关的是"这一步在不在发布序列里"，**没有**关"这一趟有没有人真的跑过它"：`consumers` 判的是 runbook 里那行命令还在，人工 rsync 前跳不跳过去仍然只取决于人。另外 `apps/web/dist` 一目录两载体没变（§8.19 读数 B），按载体分目录要同时动 `package-app.sh` / `package-msix.ps1` / `reinstall-all.sh` 的同步对账 / `Dockerfile` —— 四端打包输入的变更 | **未关**（本批只登记，理由如上：会新增一个"能碰生产"的对外动作面，或要改四端打包输入）。挂在这里是为了让下一轮别把 G-48 的绿读成"发布已经有守卫" |
 | G-49 | 站内那篇自建指南（`packages/i18n` 的 `site.docs.selfhost.*`）是入口命令的**第 4 份抄件**，而 `check:selfhost-entry-command` 的扫描集里没有它（现有扫描集：`docs/runbooks/self-host.md`、`server/README.md`、`server/env.example`、`docker-compose.migrate-once.yml`、`local-server-verification.md`）| ✅ **本批关闭**，但**登记的前提一半是错的**（读数在 §8.18）：58 条词条里当时**没有一条**是完整入口命令，s7p2 只有 `-f` 那三个 flag 的**碎片**（没前缀、没 `up -d`、**没 `--build`**）。碎片比没抄件更坏 —— 拼起来敲就是 §8.11 那次 `pull access denied`。所以做的是两件事：文章改成给**完整一条**（中英各一份，与 runbook 逐字相同），再把这两份词条文件纳入扫描集（`source: 'copy'`） |
 
 
@@ -668,6 +669,13 @@ successfully applied`，`caddy` / `supersync` / `postgres` 三个都 `healthy`�
 也就是说"打进服务端镜像 / rsync 上线前跑一次"目前只写在脚本头部注释里。
 **登记为缺口，不伪装成"有守卫"**：已编号 **G-48**（见 §7 那张表）。
 
+> ⚠️ **上面那段"零自动消费者"只有一半是对的，2026-10-03 收盘点时否证了后半**（读数见 §8.19）：
+> `grep` 扫的是**别名** `check:web-artifact:app`，而 `server/Dockerfile:191` 跑的是**同一条判据的脚本本体**
+> （`node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/`）⇒ 镜像路径一直有自动载体。
+> 真的没人守的是**人工 rsync 那一趟**（生产 `/app/` 到今天走的正是它）。
+> 原句留着是因为它记的是"那天那次扫描读到了什么"，改成后来修好的样子就抹掉了
+> **"用别名当搜索词会漏掉脚本本体"** 这个可迁移的形状。
+
 **自动合并的五个文件里，两个 i18n 词条表必须单独核，因为"合上了"不等于"合对了"**：
 
 | 核的东西 | 读数 |
@@ -1042,3 +1050,85 @@ G-40⑤（版本来源）因此多了一条硬约束：**它必须和闸门共�
 ⚠️ **一条已知没做的**：命令在文章里是**散文中的内联代码**（软换行），不是围栏代码块。
 复制不受影响（浏览器软换行不插入换行符），但要给它一个真正的代码块需要文档渲染器加一种
 新的分区形状 —— 那是界面结构改动，不在这一批里顺手做。
+
+---
+
+### 8.19 G-48：登记写"零自动消费者"，实测是"别名没人跑、脚本本体一直有人在跑，而真正没人守的是 rsync 那一趟"
+
+这一条从登记到关闭只隔了 15 分钟，而**翻转的不是判据，是主语**。写下来是因为它的形状很容易再犯：
+判据的名字和判据本身不是同一个东西，`grep` 到 0 次的那个是名字。
+
+#### 现量（三条，全部是这一趟跑出来的，不是从表里抄的）
+
+| # | 量什么 | 读数 |
+|---|---|---|
+| A | 收盘点前磁盘上那份产物（今天 17:06 留下的，按 `/app/` 打的）分别按两种载体验 | `--mount /` → **rc=1**，报「产物声明它挂在 `"/app/"`（从 index.html 的 2 条 assets 引用反推）」；`--mount /app/` → **rc=0**，`246` 个 `--ht-*` 定义、`5` 个 index.html 本地引用、`15` 个 manifest 文件、`4` 个组件数据 URL 落在 `/app/widgets/` |
+| B | 新记录的那条构建命令照抄一遍，再拿同一份字节验两条 | `HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build` rc=0 → `src="/app/assets/index-Cg9joIvN.js"`；`pnpm check:web-artifact:app` **rc=0**，同字节上 `pnpm check:web-artifact` **rc=1** ⇒ 登记里那句"同一个 `apps/web/dist` 不可能两条同时绿"**第一次被量出来**，此前它只是写在表里的一句话 |
+| C | `pnpm check` 里这两段的位置 | 链共 `66` 段：`pnpm build` 在第 **2** 段，`check:web-artifact` 在第 **62** 段 ⇒ 链自己先把 `apps/web/dist` 重打成**根载体**，然后验那份刚被打出来的根载体 |
+
+读数 C 才是这道门禁最不舒服的地方，也是"顺手把它挂进链"这个建议的真正问题：
+**链永远看不见生产那份字节。** 它不是"漏了一个消费者"，它是结构上不可能有 ——
+链里那份产物的挂载路径由链自己第 2 段决定。把它挂进链只会多一个**必然绿**的读数，
+然后把"有人守"这句话变成假的（AGENTS §7 元规则 2 的第三种面目）。
+
+#### 决定（以及被否证的那半句登记）
+
+- `server/Dockerfile:191` 早就在跑这条判据：`RUN node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/`
+  ⇒ 镜像构建那一趟**一直有自动载体**。原登记"零自动消费者"搜的是 npm 别名 `check:web-artifact:app`，
+  别名与脚本本体是两种字面形状，只搜一种就会把另一种判成"没人跑"。
+- **链里不放这道判据**（读数 B/C 就是理由）。改成**每个载体各自带对账**：
+  镜像路径已有（Dockerfile），人工发布路径本轮补上。
+- `docs/runbooks/deployment.md` §3.7「重新发布的两条命令」→「**三条**」：
+  `构建 → pnpm check:web-artifact:app → rsync`。同一形状补进"干净 HEAD 上构建"那一组。
+  第三组（2026-10-03 那次三列塌成三段全宽的修法）**不改写命令本身**，只在其后加一句
+  "这是事故现场记录、不要照抄，要重发请照 §3.7 那三条" —— 把事故当时的命令改成后来修好的样子，
+  下一轮就没人能从这段读出当时到底跑了什么（同 §7 那张表里排除审计报告的理由）。
+- 🔴 顺带修掉这一族的第二种坏法：那三组命令**都在 `cd apps/web` 之后紧跟
+  `rsync -az --delete apps/web/dist/ …`** —— 源路径在 `cd` 之后不存在，照抄的人得到一条
+  rsync 报错，而它看起来像"服务器连不上"。这与 §8.18 修掉的落地页那一发是同一个形状，
+  而它在这个文件里存在**三处**。现在三组都不再 `cd`，构建改用 `vite.config.ts` 里那个会校验取值的
+  `HEYTA_WEB_BASE`（命令行 `--base=` 绕过校验，参数比默认值多的那一档就是白给）。
+- 把"有没有人跑它"从注释变成判据：`check:gate-wiring` 的链外允许表原本只要一句理由 ——
+  而那句理由自己写着「⚠️ 已知缺口：目前**没有任何自动载体**跑它」，门禁照样绿。
+  现在每条链外门禁必须有 `consumers[]`：文件存在、且文件里**有一行以这条命令开头**。
+
+#### 变异验证：6 臂，5 臂按预期红、1 臂按预期绿
+
+载体：`node scripts/check-gate-wiring.mjs --pkg <真 package.json> --root <临时树>`
+（`--root` 是本轮新加的旋钮，只为注入验证存在 —— 主检出有别的会话在飞，不许为验证去改工作树）。
+
+| 臂 | 做法 | 期望 | 读数 |
+|---|---|---|---|
+| E | 未变异（阳性对照，防"整片红其实是探针坏"） | rc=0 且两条消费方各打印一次 | ✅ rc=0，`deployment.md（2 处）` / `Dockerfile（1 处）` |
+| A | 删掉两处 rsync 前的对账命令，**散文里仍提到它** | rc=1 报 runbook | ✅ rc=1「里没有任何一行**以这条命令开头**」 |
+| B | 把 Dockerfile 那行 `RUN …` 注释掉（字符串还在文件里） | rc=1 报 Dockerfile | ✅ rc=1，同一句话 |
+| C | 消费方文件整个不见 | rc=1 报"不存在" | ✅ rc=1「载体被改名/删掉/挪走了，而这里还登记着它」 |
+| D | `consumers:` 键名打错（等价于没登记） | rc=1 报"没有 consumers" | ✅ rc=1「它不是"手动跑的那一条"，它是"没有人跑的那一条"」 |
+| F | 删掉**构建**那一行 | **rc=0** | ✅ rc=0 —— 本门禁只管"这条判据有没有人跑"，红在这里就是判据越界 |
+
+🔴 A 与 B 这两臂是**改出来的**，不是设计出来的：needle 一开始写的是 `includes`，
+而我给第三组（事故记录那段）加了一句"它少了 `pnpm check:web-artifact:app`"，
+门禁当场把那句**散文提及**数成一次命中（读数从 2 处变 3 处）。
+也就是说两条真命令块全删掉、只留一句"这里本该有它"，门禁仍然绿 —— 与它要防的那一发一模一样。
+⇒ 匹配改成 `line.trimStart().startsWith(needle)`，needle 连指令前缀一起写
+（Dockerfile 那条必须写成 `RUN node …`）。B 臂测的就是这一层。
+
+#### 已回归的门禁与产物
+
+`check:gate-wiring` rc=0（63 道定义 / 66 段链 / 链外 1 道，消费方读数逐条打印）、
+`check:web-artifact` 恢复根载体后 rc=0、`--check` 语法 `node --check` 两份脚本均 OK。
+本轮**没有**改 `apps/web` 源码，只重打并最终恢复成默认载体（`/`），
+`check:design` / `check:ui-language` / `check:docs` 不受影响（改动落在 runbook 与 `scripts/`）。
+
+#### 残留（登记，不沉默）
+
+1. 🔴 **rsync 那一趟仍然是人工的**。本轮让它"少一步就会被门禁红抓住"的前提是
+   人照着 runbook 走；`consumers` 判的是"runbook 里那行命令还在"，不是"有人执行过它"。
+   要把后者变成判据就得把发布收成一个脚本（`scripts/publish-web-app.mjs`），
+   而那是**新的对外动作面**（它会 rsync 到生产），不在本批授权内 → 记为 **G-48b**。
+2. `apps/web/dist` **一个目录、两种载体**没有变（读数 B 就是它的直接后果）。
+   真正的结构解法是按载体分目录（`dist` / `dist-app`），但 `apps/web/dist` 同时是
+   macOS 与 Windows 安装包的 `web-dist` 输入（AGENTS §6.1.1 那张表），
+   改名要把 `package-app.sh` / `package-msix.ps1` / `reinstall-all.sh` 的同步对账 / Dockerfile
+   一起改，属于四端打包输入的变更 ⇒ 不在"关一条门禁"这一批里顺手做，
+   本轮的缓解是对账必须紧跟构建（同一条命令链里），错了会响亮报两侧取值。

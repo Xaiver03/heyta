@@ -469,15 +469,28 @@ location ~ ^/(health|live)$ {
 | nginx 片段 | `/etc/nginx/sites-available/heyta.waytofuture.cn` —— 应用（`/app/`）、同步 API（`/api/`）与三张凭据页都在这里；`heyta.finlaw.cloud` 那份保留但**不是入口** |
 | 旧地址 | `https://heyta-tmp.litopia.space/app/` 与 `https://heyta.finlaw.cloud/app/` 都**不再提供服务**（两者都留作回滚路径，passkey 均不可用：RP ID 只能有一个，见 §3.7.1） |
 
-#### 重新发布的两条命令
+#### 重新发布的三条命令
+
+🔴 **三条都在仓库根跑，不要 `cd apps/web`。** 原来这一段是 `cd apps/web && …` 后面紧跟
+`rsync -az --delete apps/web/dist/ …` —— 那条 rsync 的源路径在 `cd` 之后**不存在**，
+照抄的人得到一条 rsync 报错，而它看起来像"服务器连不上"。
+下面这一段与落地页那组（「站点与应用要**一起**发布」）现在同一个形状：**同一条命令链只有一份写法**。
 
 ```bash
-# 1) 构建：🔴 --base=/app/ 不能省
-cd apps/web && pnpm exec tsc -b && pnpm exec vite build --base=/app/
+# 1) 构建：🔴 挂载路径必须显式给（参数在 apps/web/vite.config.ts 的 webBase()，取值不合理会当场报错）
+HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build
 
-# 2) 上传
+# 2) 🔴 发布前对账：产物自己声明的挂载路径，必须等于我们真要放在的位置
+pnpm check:web-artifact:app
+
+# 3) 上传
 rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 ```
+
+🔴 **第 2 条不是仪式，它挡的是这一族里最难归因的那一发**：`apps/web/dist` 是**一个目录、两种载体**
+（`/` 给 dev/preview/`pnpm check`，`/app/` 给生产），谁最后构建谁覆盖谁。
+在 build 与 rsync 之间跑一次对账，就把"发出去的字节是不是这个载体"变成了判据 ——
+而只比"本地 vs 远端哈希"是挡不住的（两边可以是同一份错的产物，§7 第 82 条）。
 
 🔴 **`--base=/app/` 必须显式给。** Vite 默认 `base` 是 `/`，产物的资源引用是
 **根绝对路径**（`/assets/…`）。挂在 `/app/` 下时浏览器会去请求
@@ -571,8 +584,10 @@ cd apps/web && VITE_SITE_URL=https://site.example.com pnpm exec tsc -b && \
 | `/app/` 白屏、`#root` 空的、`/assets/index-*.js` **404** | 工作区的 `build` 脚本**不带 `--base=/app/`**，产物引用 `/assets/…`，而那个前缀属于落地页 |
 | 落地页的「立即使用」**消失** | 那个 `build` 脚本**不带 `VITE_APP_URL`**，入口按设计不渲染 |
 
-⚠️ 所以：**要发布就用本节这两条命令，不要用 `pnpm --filter … build`。**
+⚠️ 所以：**要发布就用本节列出的那组命令，不要用裸的 `pnpm --filter … build`。**
 两者名字一样、行为不同 —— 这正是"命令看起来对、结果错得没有报错"的那一类。
+（🔴 这里原先写的是"这两条命令"，而应用那组已经含一条发布前对账 —— 把**条数**写进结论句，
+它就是下一个会漂的东西。发布序列的唯一清单在 §3.7「重新发布的三条命令」。）
 
 #### 🔴 2026-09-27 又两个坑（本次一并修掉，都在站点文件里）
 
@@ -761,7 +776,7 @@ L5 当次两侧逐字相同（九份里 `terms@1.1`、其余 `1.0`），但脚�
 ssh ubuntu-jcli 'grep -o "\"lang\"" /var/www/heyta-app/assets/index-*.js | wc -l'
 ```
 
-修法是**重建应用本体**（§3.7 那两条命令），不是重发落地页。实测结果：
+修法是**重建应用本体**（§3.7「重新发布的三条命令」），不是重发落地页。实测结果：
 中文页 → `/app/` → `#root` 141 字符；英文页 → `/app/?lang=en` → `html lang="en"`、
 `#root` 335 字符；旧域名 `/app/` → 301 → 同样可用；`/health` 仍 200 JSON 未被重定向。
 （共 23 项断言，见 `verify-domain` 脚本；它住在 `/tmp`，不属于仓库。）
@@ -777,7 +792,9 @@ git worktree remove --force /tmp/heyta-head 2>/dev/null || true
 rm -rf /tmp/heyta-head
 git worktree add --detach /tmp/heyta-head HEAD
 cd /tmp/heyta-head && pnpm install && pnpm build
-cd apps/web && pnpm exec tsc -b && pnpm exec vite build --base=/app/
+# ↓ 下面三条都在这个干净检出**的根**跑（原写法 `cd apps/web` 之后那条 rsync 的源路径不存在）
+HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build
+pnpm check:web-artifact:app
 rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 ```
 
@@ -835,6 +852,11 @@ cd apps/web && pnpm exec vite build --base=/app/
 ssh ubuntu-jcli 'tar czf /tmp/heyta-app-backup-pre-a6e1a017.tgz -C /var/www heyta-app'
 rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 ```
+
+🔴 **上面这段是 2026-10-03 那一趟实际跑的顺序，留作事故记录，不要照抄**：它少了 rsync 之前的
+产物对账（`pnpm check:web-artifact:app`），而且 `cd apps/web` 之后那条 rsync 的源路径并不存在。
+要重发请照 §3.7「重新发布的三条命令」。**不改写这一段本身** —— 把事故现场的命令改成"后来修好的样子"，
+下一轮就没人能从这段读出当时到底跑了什么。
 
 本地与线上读数一致：`64px 240px 2256px`（rail / sidebar / main），`errs 0 条`。
 备份：`/tmp/heyta-app-backup-pre-a6e1a017.tgz`。
