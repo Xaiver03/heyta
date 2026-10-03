@@ -1,7 +1,7 @@
 # 倒数纪念日（含农历、节日、纪念卡片）实施计划
 
 > 状态：🔄 **批次一已落地**（2026-10-03，`a29881e9` 已合进 main）：W1 历法层 / W3「每年」预设 / W4 节假日随包数据 + bundle 体积闸门，落地记录与本批欠账见 **§3.5**。
-> 🔴 **批次二进行中**（全部在本地分支，未 push 未 merge）：W0 / W2 / W5 / W10 已闭合，W9 落了 web 半、**原生投递那一半于 19:3x 复量后确认停批**（有依赖裁决，不是没做 —— 见 W9 节末那条打勾的读数），**L' 的判定表已出、命中那条已修**（见 §8.2），W4b / W7 / W8 在并行工区里跑，**唯一一条完全没开工的是 W6**（撞车面的实测读数见 §8.2 开头；它的载体已确认与 W4b 的 `dayMarker` 是同一条缝）。逐项读数在 **§8.2 / §8.4**，本节这行原先写"⏸ 批次二未开工"，那是一句比正文更早写下、落地后没 sweep 的话 —— 同一份文档里这种"状态行跑在正文后面"的漂移已经出现过一次（见下面第 4 行那条 ADR 的教训）。
+> 🔴 **批次二进行中**（全部在本地分支，未 push 未 merge）：W0 / W2 / W5 / W10 已闭合，W9 落了 web 半，**原生投递那一半 20:1x 现量确认由另一条会话在主检出实现中（未提交，见 W9 节末）** —— 我 19:3x 那条"确认停批"只有四十分钟寿命；**L' 的判定表已出、命中那条已修，剩下的前置闸门已立成常驻门禁 `check:legal-permissions`（13 臂变异 13/13，见 §8.2 L' 第 1 条）**，W4b / W7 / W8 在并行工区里跑，**唯一一条完全没开工的是 W6**（撞车面的实测读数见 §8.2 开头；它的载体已确认与 W4b 的 `dayMarker` 是同一条缝）。逐项读数在 **§8.2 / §8.4**，本节这行原先写"⏸ 批次二未开工"，那是一句比正文更早写下、落地后没 sweep 的话 —— 同一份文档里这种"状态行跑在正文后面"的漂移已经出现过一次（见下面第 4 行那条 ADR 的教训）。⚠️ **这行本身现在又多了一条同族样本，而且形状不同**：19:3x 那次的状态行**不是**写早了，是**写对了再过期** —— 并行会话在半小时内把"停批"变成了"在实现"。⇒ 只要一条读数描述的是别人的在飞状态，它就必须在被引用时**重取**，不能被引用为"已确认"。
 > 决策：[ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（实体 / 农历依赖 / 数据分发 / 图片双档四则）
 > 证据基础：[`countdown-anniversary-data-and-images.md`](../research/countdown-anniversary-data-and-images.md)（2026-10-02 调研，本文只引用它的结论，不重复取证）
 > 决策：✅ 已立 = [ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（2026-10-03 接受；本行原先写"🔴 待立 ADR"，那是同一份文档里比正文更早写下的一句，落地后忘了 sweep —— 按 `docs/README.md` §一，调研给证据、ADR 下结论、计划管落地）。本文不代替 ADR。
@@ -1121,7 +1121,16 @@ W0b ─> 随时可做（台账那半要等文件干净）
   🔴 合流冲突预告：主检出此刻有另一会话未提交的提醒改动（D1 墓碑任务过滤 + D14 `markDelivered` 写 `firedAt`），
   与本批在 `store.ts` / `use-reminder-notifications.ts` / `reminder-actions.spec.ts` 三个文件**同函数不同行**，
   语义互补 ⇒ 必须真三方合并、禁止整文件覆盖；他们的 `due()` 加了"任务还活着"那道门，合进来正好让 `recheck()` 一并受益。
-- [x] 原生投递：**确认停批**（2026-10-03 19:3x 复量，四条现状全部与 10-02 那次裁决时一致 ⇒ 裁决**没有被推翻**，也不是"还没做"）
+- [x] 🔴 **原生投递：19:3x 那条"确认停批"已于 20:1x 被现量作废 —— 另一条会话正在实现它**
+  20:1x 现量（主检出，**未提交**）：`AndroidManifest.xml:4-5` 声明 `POST_NOTIFICATIONS` + `SCHEDULE_EXACT_ALARM`；
+  `apps/mobile/ios/Heyta/Info.plist:37` 新增 `NSUserNotificationsUsageDescription`；新增未跟踪
+  `HeytaReminderModule.swift` + `HeytaReminderModuleBridge.m`；`Heyta.xcodeproj/project.pbxproj` 脏；
+  决策文档落在 `docs/adr/0051-mobile-reminder-delivery.md`（**未跟踪**，尚未进 git ⇒ 本表不代它主张已落地）。
+  ⚠️ 那条会话写进 AGENTS §9 的行引用的是 `docs/adr/0050-mobile-reminder-delivery.md`，而盘上的文件是
+  **0051**（`0050` 是 `e2ee-key-lifecycle-and-recovery.md`）—— 编号撞了一次，`docs-link-check` 覆盖不到 AGENTS.md。
+  ⇒ 这条线留下的可迁移教训不是"我量错了"，而是**"某句对外条款的依据"这类记录本身有保质期**：
+  它必须由门禁守着，而不是由文档守着 —— 那正是本轮把 L1 那条闸门立成 `check:legal-permissions` 的理由（见下面 §8.2 L'）。
+  **下面那四条 19:3x 读数留作 provenance**（它们在当时是真的，四十分钟后全变了）：
   `grep -rn "new Notification(" apps/mobile/src packages/ui/src packages/app-host/src` = **0 命中**（同一条在 `apps/web/src` = **4 命中**）；
   `apps/mobile/android/app/src/main/AndroidManifest.xml` 里 `POST_NOTIFICATIONS` **0 处**；
   `apps/mobile/ios/Heyta/Info.plist` 与 `HeytaWidgetExtension/Info.plist` 的 `UsageDescription` 各 **0 处**；
@@ -1227,7 +1236,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   并**回写 `docs/adr/0038-admin-console-scope.md` 范围表 `:75-79`**。
 - [ ] W4b 完成
 
-#### 🟡 L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）—— 判定表已出、命中已修，只剩一条前置闸门（L1↔W7 的 manifest 对账）
+#### 🟡 L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）—— 判定表已出、命中已修；剩下的那条闸门已于 20:1x **立成常驻门禁 `check:legal-permissions`**，而踩响它的是 W9 不是 W7
 
 - 🔴 §4 自己的话：「倒数日**纯文字版（第一版）不触发 L1/L2/L4/L5**：它不申请任何权限、不上传任何内容」。
   批次二交付的正是纯文字版（素材图片背景归 P2-9，见 §0 与 §6）⇒ **照"六处全改"施工就是按过期假设做工**。
@@ -1274,13 +1283,34 @@ W0b ─> 随时可做（台账那半要等文件干净）
   改成 1.1 等于假装用户同意过新版本）。落地页生成物**零字节变化**：生成器只搬标题与摘要，这次没动那两格。
 
   🔴 **仍开着的两条（不是这次漏做，是它们的前提还没到）**：
-  1. **L1 对 W7 是前置闸门**：`permissions.ts` 那句"不申请照片/相机"与 `Info.plist` / Android manifest
-     的**实际权限项**对账 —— 计划 §4 判据③ 当时写的就是「⚠️ **未证实是否已有这样的门禁**」。
-     现量：**没有**（读了 `scripts/check-legal-host.mjs` 全文 —— 它做的是 `OPERATOR.hostedDomain` ↔
-     `OFFICIAL_SITE_ORIGIN` ↔ `legal.generated.ts` 的**域名三方对账**，
-     `Info.plist|AndroidManifest|Permission` 在其中命中 0）。
-     W7 若引入任何新的 usage description，这行必须**先于发布**改；对账门禁应当在 W7 的 manifest
-     真出现新项之后再立，现在立等于猜它的形状。
+  1. ✅ **L1 那条前置闸门已经立成常驻门禁**（2026-10-03 20:1x，`1d71e75f` + `017adc3e` @ `feat/countdown-batch2`，
+     脚本 `scripts/check-legal-permissions.mjs`，已挂进 `pnpm check` 的 `check:legal-tools` 与 `check:legal-host` 之间）。
+     它做的是**三方**对账：真实申请面（`AndroidManifest.xml` 的 `uses-permission` + 两个 `Info.plist` 的
+     `NS*UsageDescription` + `.entitlements`）⇄ `permissions.ts` 那句九项"不申请" ⇄ `third-parties.ts` 的通知否表行。
+     **判据方向**（第一版写反了，文件头留着这段记录）：不是"声明了 ⇒ 句子必须提到"，而是
+     **"声明了 ⇒ 句子不许再声称不申请"** —— 第一版在 `CAMERA` 进 manifest 时反而退出 0，变异臂 A1 当场照出来。
+     `REVIEWED_REQUESTED` 今天必须是空表，加一条的成本是刻意的（同 §3.2 许可证白名单）；
+     它不是"永远不许申请隐私权限"的墙 —— 臂 A9 证明"登记 + 中英两句同时改掉"会**复绿**。
+     **变异 13 臂 13/13**（0 臂未证伪、0 臂夹具失效、被改文件逐字节还原=是）：
+     A1 CAMERA 未登记 / A2 中文漏一项 / A3 句子冒出没登记的"运动" / A4 plist 冒 `NSPhotoLibraryUsageDescription` /
+     A5 manifest 声明 `POST_NOTIFICATIONS` / A6 那两句措辞改掉 ⇒ **解析前提响亮失败**（`exit 1`，不把"读不到"当"没申请"）/
+     A7 通知那句被删而申请面没声明（悄悄删承诺）/ A8 登记了但句子仍说不申请（说谎臂）/ A9 合法翻面复绿 /
+     A10 plist 冒通知键 ⇒ **走通知族那一臂**而不是"未登记的键"（带反向判据）/
+     A11 **只翻 `third-parties.ts`、漏了 `permissions.ts`** ⇒ 逐位置判必须还红（这条是"翻面翻一半"的形状）/
+     A12 申请面声明 + 六个位置**一起**翻 ⇒ 复绿 / A13 `SCHEDULE_EXACT_ALARM` ⇒ 红，**故意的**：
+     它不属于那九项，合流的人必须显式判它是不是隐私权限并写理由，不能让它顺手通过。
+     通知族那六个字面位置（= 合流时必须一起翻的清单，中英各三处）：
+     `permissions.ts` Android 行依据 zh「移动端代码目前不产生任何系统通知」/ en
+     "the mobile code currently raises no system notification at all"、`permissions.ts` iOS 行依据 zh
+     「也不申请通知授权」/ en "notification authorisation is not requested either"、`third-parties.ts`
+     推送否表行 zh「移动端不申请通知权限」/ en "The mobile app requests no notification permission"。
+     另外 `permissions.ts` 文件头 ①② 两行注释是同一件事的依据，也要一起 sweep（它不对外，门禁不判）。
+     **现量读数（主检出 20:1x，只读取别人的未提交状态）：rc=1，7 条红** ——
+     `HEYTA_CHECK_ROOT="/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta" node <batch2>/scripts/check-legal-permissions.mjs`
+     ⇒ 6 条是上面那六个位置各自"仍写着不申请，而申请面已声明通知授权"，第 7 条是 `SCHEDULE_EXACT_ALARM` 未登记。
+     ⇒ **这就是那条闸门该做的事**：条款的翻转必须由 W9 那条会话（或合流的人）在**同一批**里做完 +
+     重跑 `pnpm check:legal-copy` 重生成落地页文案；不在我这批改，因为 `permissions.ts` / `third-parties.ts`
+     / 两个 plist 此刻**都在主检出里脏着**（撞车判据 = 同一文件的未提交 diff），我不代改别人的在飞文件。
   2. ~~**`third-parties.ts:230-241` 否表里那一行的"依据"是条件真的**…⇒ 这条应当挂成 **W9 移动半的前置闸门**，与 L1 同形。~~
      ✅ **这条闸门已于 2026-10-03 19:3x 当场结掉，且结论是"不改现文、只换依据的措辞来源"**：
      W9 移动半经复量确认是**停批**（不是"还没开工"）—— 移动端 `new Notification(` **0 命中**、
@@ -1290,6 +1320,10 @@ W0b ─> 随时可做（台账那半要等文件干净）
      `goal-multi-end-coverage.md` 批三那行）。⇒ 「移动端不申请通知权限，提醒只在应用内」**是当前产品事实**，
      那句话不必动；要记的是它的依据从"还没做"换成了"**有依赖裁决**"——
      一句真话的依据换了，比那句话本身更容易在半年后失守，所以 AGENTS §9 的 W9 那行现在直接把四条读数印在旁边。
+     🔴 **20:1x 更正（同一批现量，见上面 W9 那一节）**：上面这段"不必动现文"的结论**当场过期**了 ——
+     那条会话把那半实现了，`POST_NOTIFICATIONS` 与 `NSUserNotificationsUsageDescription` 进了申请面，
+     于是「移动端不申请通知权限」这句**从真话变成假话**。⇒ 结掉的不是这句话的真假，而是它的**判法**：
+     现在由 `check:legal-permissions` 的通知臂逐位置守着（六个位置、两侧对称），文档不再负责记住它。
   3. 同一种"封闭句式没有对账门禁"的形状**还有一处没被处理**：`third-parties.ts:103`
      「下表是**全部**…第 2–5 行是对服务端代码做全量出网穷举后得到的**四类**对外请求」。
      这次判定它**不必改**（W4b 不出网），但那个"全部"以后任何一次新增出网调用都会让它变假，
