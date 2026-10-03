@@ -4363,8 +4363,14 @@ ArgumentError - path name contains null byte
     阈值 = **核数 × 3/4**（本机 16 核 ⇒ 12），每 30s 重试，等满 900s 就
     "❌ 本轮不跑（**环境无效，不是产品失败**）" 并 `exit 3`。
     手写等待循环 = 把别人已经踩平的坑重新踩三遍。
-    **待办：把它抽进 `scripts/lib/`**（现在是某一个脚本的私有函数，第二个想用的时候就又是一份抄件
-    —— 同族教训见 `mobile-e2e.sh` 文件头）。
+    ~~**待办：把它抽进 `scripts/lib/`**（现在是某一个脚本的私有函数，第二个想用的时候就又是一份抄件
+    —— 同族教训见 `mobile-e2e.sh` 文件头）。~~
+    ✅ **这条待办已过期（2026-10-04 00:5x 现量撤回）**：单一所有者已经存在 ——
+    `scripts/lib/wait-for-quiet-host.sh` 提供 `wait_for_quiet_host()`，`grep -rl` 现量有
+    **7 个**验收脚本 source 它（`verify-mobile-{notes,repeat,window-gate,trash,restore,due-time}` 与
+    `mutate-closeout-gates.sh`）。**待办不撤回 = 下一个人还会去做一遍**；
+    台账里的**状态句**也是断言，保质期取决于别人什么时候补上它（同 `BLOCKED.md` 的 B63 同族）。
+    顺手扫法：`grep -n '待办' docs/reference/environment-traps.md` 逐条问"现在做了没"。
 
 169. 🔴 **"下一步就是卸载/删除"的脚本，选目标不许靠默认值或 `head -1`。**（2026-10-03 实测）
     `scripts/reinstall-all.sh` 的 ios 段原来这样选设备：先按 `IOS_DEVICE_NAME`（默认
@@ -4379,6 +4385,26 @@ ArgumentError - path name contains null byte
     把 "iPhone Duo heyta" 打成三个"候选"，照它填 `IOS_DEVICE_NAME` 永远匹配不上。
     判据：从脚本里**原样抽出**选设备逻辑 + 桩 `xcrun` 跑四种现场 = 7/7
     （含"名字匹配时选中正确那台"的阳性对照，证明不是把判据改成恒不匹配）。
+
+    同一件事在 **android 端**还有第二种面目，而且比 ios 那种更阴 —— 它**不靠默认值也不靠 `head -1`，
+    靠一个"看起来是我的"串口**（2026-10-04 00:0x 实测，取证在 `BLOCKED.md` B62 第三份）：
+    `scripts/reinstall-all.sh:270` 的 `SERIAL=${HEYTA_E2E_SERIAL:-emulator-5554}` 后面接的是
+    `adb uninstall` + `pm clear`，串口对上了就动手。而**串口相同不等于设备相同**：
+    `emulator-5554` 是"第一个起来的模拟器"占的号，本机它当时挂的是并行会话的私有 AVD
+    `heyta-w3-yearly`。于是四条产物判据**全绿**、负载闸门**全绿**，读数是拿别人的设备量出来的，
+    动作也打在别人的设备上（把对方正在跑的验收现场清了）。
+    ⇒ 选目标这一步必须**把串口解析到 AVD 名再断言所有权**，三条现量命令：
+    `adb devices -l`、`ps -eo pid=,command= | grep -o '\-avd [^ ]*'`、
+    `stat -f '%SB' ~/.android/avd/<name>.avd`（创建时刻能区分"我这轮建的"与"别人两小时前建的"）。
+
+    🔴 还有**反向**的那一面，也是本节原来没写的：**这台机器上的设备指针是共享的，
+    我"新启一台"就是在改写别人脚本的读数**。对端的 ios 段是
+    `grep Booted | head -1` 的盲选回退（`verify-mobile-ios-reminder.sh:74-79`，
+    它的默认设备名在本机不存在 ⇒ 每次都会走盲选）。我只要多 boot 一台，Booted 清单的排序就变，
+    **他们的验收会静默换一台设备继续跑，并且一句报错都不打**。
+    这比"我这边没装上"贵得多 —— 我的失败是显性的，他们被换掉的读数是隐性的。
+    ⇒ 所以"起个模拟器来绕过占用"不是逃生门，而是一种共享资源写入；
+    要么先拿到那台设备的所有者同意，要么这一端按**环境无效 exit 3** 如实收工。
 
 170. 🔴 **窗口截图当"界面画没画"的载体，会同时产出假红和假绿 —— 该换的是载体，不是阈值。**
     （2026-10-03 实测，macOS 安装包 §6.1.1 判据）
@@ -4830,3 +4856,44 @@ ArgumentError - path name contains null byte
      这些规则已落在 `ios-ax-shim.py`、`verify-mobile-ios-reminder.sh` 和 ADR-0051；新脚本也必须登记
      `check-script-snapshot` 的显式清单。验收截图必须先保存、再人工查看；旧的全黑截图只能作失败证据，
      不能被引用为通知投递成功。
+
+196. 🔴 **`.gitignore` 里带尾斜杠的 `node_modules/` 只匹配目录，挡不住软链** ——
+     凡是拿 `git ls-files -co --exclude-standard` 当"打包输入集合"的流程，
+     在**软链 node_modules 的检出**里会把软链当"未跟踪且未忽略"整片送出去。（2026-10-04 00:2x 两腿实测）
+
+     触发场景是我为了量"集成态"而建的干净检出：`git worktree add --detach` 出来一棵**只有源码**的树，
+     为了复用 pnpm 的 store，把 `node_modules` **软链**回载体。
+     随后 `git status --porcelain` 报 **21 项未跟踪**，看着像"这棵检出脏了 / 我污染了现场"，
+     实际那 21 枚全是我自己建的软链。
+
+     两腿对照（**同一条规则** `.gitignore:1` 的 `node_modules/`，只换对象类型）：
+
+     | 对象 | `git check-ignore -q node_modules` | `git ls-files -co --exclude-standard` 里的条目数 |
+     |---|---|---|
+     | 真目录（载体） | rc=**0**（被忽略） | **0** |
+     | 软链（干净检出） | rc=**1**（未忽略） | **21** |
+
+     ⇒ gitignore 的尾斜杠语义是"**只匹配目录**"，软链在索引眼里是一个普通文件，
+     于是一行规则在同一棵树上给出两种答案。**"忽略规则写了 = 这类路径永远不进集合"是假的**，
+     它成立与否取决于那一个路径的**对象类型**。
+
+     🔴 真正贵的是第二跳：Windows 段的源码同步 `sync_windows_sources()` 正是
+     `git ls-files -co --exclude-standard` + `tar -T -` 的形状（AGENTS 6.1.1 那条新鲜度对账的实现）。
+     在软链检出里跑它，21 枚软链会进 tar；远端解包时它们指向远端不存在的路径，
+     **症状会伪装成"远端构建坏了"**，而本地一切都是绿的。
+     本轮没让它发生是因为我在**载体**（真目录）里跑打包、只在干净检出里跑门禁 ——
+     这是运气不是设计。
+
+     两条落地判据：
+     ① **测量装置自己造的未跟踪条目，要在打脏项数时显式排除** ——
+        `heyta-integration-verify.sh` 原来那句 `脏项=$(git status --porcelain | wc -l)（应为 0）`
+        现在改成"其中**非软链**项必须为 0，否则 exit 4 并列出来的是哪些"，
+        下一轮不会再把这 21 读成"检出脏了"；
+        🔴 但这条分类判据自己也要用 `-uall`：`git status --porcelain` 默认把
+        "目录里只剩未跟踪项"**折叠**成 `?? apps/`，而**目录不是软链** ⇒ 折叠行会被算成非软链脏项
+        （独立对照仓库实测：不带 `-uall` 得 `2/2`，带上得期望的 `2/1`；
+        真实现场 `heyta-wt-verify-integration` 两腿都是 `21/0`，因为那里的父目录还有已跟踪文件，不折叠）。
+        **"按对象类型分类"的判据，必须先确认集合是逐项的还是折叠的**；
+     ② 任何"把 `ls-files -co` 的集合送去另一台机器"的流程，起跑前先断言
+        `find . -type l -name node_modules | wc -l` **等于 0**（不为 0 就响亮失败，
+        别指望解包端报错 —— 它报的将是另一件事）。
