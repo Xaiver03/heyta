@@ -1476,7 +1476,12 @@ W0b ─> 随时可做（台账那半要等文件干净）
       报错逐字相同、其中四条与后台无关。补了 `e2e/tests/helpers.ts:stubPublicFacts`
       （与既有 `stubLegalRecheck` 同形同因，应答体按服务端 `holidayVersionToken()` 算出来是 `0.0.0`）。
       🔴 **同一条理由预测会打红 `inbox.spec.ts`**（它既塞凭据又有同一句守卫，且没有 `**` 兜底路由）——
-      这条**尚未实测**，量法：`cd e2e && pnpm exec playwright test tests/inbox.spec.ts`。
+      ✅ **04 04:3x 量到了，预测成立**：`cd e2e && pnpm exec playwright test tests/inbox.spec.ts`
+      ⇒ `RC_INBOX_PRE=1` / **2 failed, 1 passed**，报错逐字
+      `除已登记缺失外不该有非 2xx：["/api/holiday-adjustments"]`（`helpers.ts:200` 的 `assertNoProblems`）。
+      🔴 **红的是两条塞了凭据的用例，第三条不红** —— 与上面穷举的两个凭据点（`:103` / `:311`）**逐一对上**，
+      这就是那套静态交集算式的现量校验：它多算一个文件就会在这里露出来。
+      补 `stubPublicFacts(page, SERVER)` 两处之后的复测读数见下一条。
       - 📌 **04 03:5x 先把"还有谁会被打红"穷举掉，别等收尾时打地鼠**。敞口不是"所有 e2e 用例"，
         而是三个条件的**交集**，逐条现量：
         ① 会发这条请求 ⇒ 必须**开机前**就有 `baseUrl`（`startPublicFacts()` 只在
