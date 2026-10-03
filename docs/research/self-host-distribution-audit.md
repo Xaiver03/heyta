@@ -3179,6 +3179,53 @@ en 'site.platforms.web.body':
 它要一次真浏览器跑，等窗口；在拿到之前，上面那句措辞是**保守**的
 （"点一次就能装成应用"仍然预设了能装 —— 如果那一发测出来是不发，这句还得再退一步）。
 
+### 8.51 把 §8.49 那次全跑的读数**钉在"当前产物"上**，并排掉两处"看着像缺口"的（06:0x）
+
+Goal 的第 2 项要的是"现量"，而 §8.49 那次全跑打的 `VCS_REF=a70b0ef8`，分支之后又走了两笔
+（`5a369e0b`、`95ca337c`）。"那两笔只是文档"是我的印象，不是证据 —— 这一轮把它量成证据，
+并且**用清单自己的读者去量**（不是我自己 eyeball 文件名）：
+
+```sh
+cd server && . scripts/image-inputs.sh
+git diff --name-only a70b0ef8 HEAD -- "${SUPER_SYNC_IMAGE_INPUTS[@]}" | grep -c .   # → 0
+```
+
+| 读数 | 值 | 它挡的是什么 |
+|---|---|---|
+| 清单条目数 | **22** | 空数组时 `git diff --quiet --` 会退化成"整个仓库脏才报错"，所以分母必须打出来 |
+| `a70b0ef8..HEAD` 改动文件 | 4（1 份审计文档 + 3 张证据 PNG） | 阳性对照：同一命令去掉 pathspec 限制回 4 ⇒ 那条 pathspec 确实有东西可筛 |
+| **交集** | **0** | 没有任何一条镜像内容输入变过 |
+| 两棵树按同一读者算出的"最后碰过输入的提交" | 都是 **`1b7d0921`** | 这是最强的那条：deploy.sh 与发布 workflow 算 OCI revision 标签用的就是这个式子，两边同值 ⇒ **从 HEAD 重新 build 出来的那枚镜像，内容输入与 §8.49 验过的那枚同一棵树** |
+
+⚠️ 诚实的边界：唯一会随 HEAD 变的是**打进镜像的 `VCS_REF` 字符串本身**（`scripts/verify-selfhost-stack.sh:168`
+传的是 `git rev-parse HEAD`）。它是 `org.opencontainers.image.revision` 这个 LABEL（`server/Dockerfile:217/221`），
+**不是内容输入** —— 所以"内容相同、标签字符串不同"。写清这个差别，免得下一轮有人把两枚镜像的标签不一致读成"产物不一致"。
+
+**两处这次查了、确认不是缺口的（登记下来是为了别再重新推导）**：
+
+1. **同一个 OCI 字段有五个生产者**：Dockerfile 默认 `unknown` / compose `${SUPERSYNC_BUILD_SHA:-local}` /
+   deploy.sh 与 workflow 都按输入清单算 sha（两边注释里写明"必须逐字同式"）/ `verify-selfhost-stack.sh` 传全量 HEAD。
+   这**不是漂移**：`check-image-build-args.mjs:51-55` 把 `VCS_REF` 作为 `DEFAULT_MAY_DIFFER` 里唯一一条登记了理由
+   （compose 侧要"人能读懂的 local"，Dockerfile 侧要"没人给值就别装作有版本"），R4 因此对它放行。
+2. **外人把两条路径混着跑会不会撞死**：compose 直接 build 出来的那枚标签是 `local`，
+   随后 `./scripts/deploy.sh`（不带 `--build`）会不会像 §8.11 那样"照抄必失败"？现量：不会——
+   `server/scripts/deploy.sh:238-246` 在 pull 之前就把这种情况做成**响亮失败并点名真修法**
+   （`ERROR: 'supersync:local' is not present locally, and heyta publishes no image to pull.`
+   → 下一行就是 `First deploy on this machine: ./scripts/deploy.sh --build`）。
+   runbook:167 那句行内的 `./scripts/deploy.sh`（不带 `--build`，因而 `check:selfhost-entry-command` 的行首锚定看不见它）
+   是一个**片段**而不是断点：它指向 §3 那条带 `--build` 的命令，而即使有人照抄，接到的是上面那条会指路的报错。
+   ⇒ 登记这条差别：**"片段没被门禁看见"只有在脚本自己接不住时才是对外错话**；这里接得住。
+
+**我这轮又踩了那条已入档的路径错**（同族第二次，05:4x→06:0x）：判"两份 i18n 表提交了没有"时先用了
+`packages/i18n/src/zh-CN.ts` —— 真路径是 `packages/i18n/src/locales/{zh-CN,en}.ts`，错的 pathspec 静默回空，
+看起来像"这两枚干净了"。改成先 `git ls-files -- packages/i18n` 拿真名字再判。
+
+**#7 的 06:0x 现量**：那 5 枚重叠文件（`docs/README.md`、`package.json`、
+`packages/i18n/src/locales/{zh-CN,en}.ts`、`scripts/check-script-snapshot.mjs`）**全部仍是 `M`**；
+main 已走到 `030f0969` ⇒ 载体又过一期（只认分支名不认 SHA 这条纪律不变）。
+本轮**没有**重算载体：main 两三分钟前进一笔，而现在重算出来的 SHA 在我写下它的同一轮就会过期，
+且真正的阻塞不在 SHA 在那 5 枚文件上 —— 重算留到它们变干净那一刻做。
+
 
 
 
