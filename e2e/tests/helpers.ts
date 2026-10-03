@@ -270,6 +270,35 @@ export async function stubLegalRecheck(page: Page, origin: string = STUB_ORIGIN)
 }
 
 /**
+ * 给"公共事实"那条通道一个**中性**的应答（`GET /api/holiday-adjustments`）。
+ *
+ * 🔴 与 {@link stubLegalRecheck} 完全同形，且是**同一个成因**：应用一启动就会拉一次
+ * 公共事实（`apps/web/src/main.tsx:152 startPublicFacts()`，W4b 客户端那半），
+ * 而假服务端只实现 `/v1/chat/completions`，其余一律 404 ⇒ 那声 404 落进每条用例都挂的
+ * 「除已登记缺失外不该有非 2xx」，把真正的失败淹掉。
+ * 2026-10-04 03:0x 实测：`admin-console.spec.ts` **一次红五条**，五条的报错原文
+ * 逐字相同（`["/api/holiday-adjustments"]`），而其中四条与该套件的主题毫无关系。
+ *
+ * ⚠️ "中性"是有定义的：`years: []` 表示**部署方没下发任何一年**，
+ * 按 `holidayAdjustmentYearSchema` 的粒度（一整年逐日表**整体替换**，见契约 `:266` 那张表），
+ * 空数组 = 一年都不替换 ⇒ 随包节假日表照旧，日历上不该有任何肉眼可见的变化。
+ * `version` 那个串不是随手编的：`server/src/holidays/holiday-adjustment-store.ts:113`
+ * `holidayVersionToken()` 对空数据算出来就是 `0.0.0`（`maxUpdatedAt.yearCount.dayCount`）。
+ *
+ * ⚠️ 它**只答读侧、且刻意答"没有数据"**。要验"下发了数据日历会变"的是
+ * `public-facts.spec.ts`，它自己装了带具体数据与 404 的路由（后注册的会遮蔽这里）。
+ */
+export async function stubPublicFacts(page: Page, origin: string = STUB_ORIGIN): Promise<void> {
+  await page.route(`${origin}/api/holiday-adjustments**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ version: '0.0.0', years: [] }),
+    });
+  });
+}
+
+/**
  * 打开应用。
  *
  * @param path 打开哪个路径 —— 默认 `/`（应用根）。
