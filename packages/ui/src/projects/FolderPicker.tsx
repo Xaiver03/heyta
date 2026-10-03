@@ -191,12 +191,23 @@ export function FolderPicker({
         <View style={styles.menu} testID={testID ? `${testID}-menu` : undefined}>
           <Text style={[text['group-label'], styles.menuTitle]}>{labels.title}</Text>
 
+          {/*
+            🔴 「不放进文件夹」在**已经是顶级**时不许点，当前所在文件夹那一行同理。
+            候选集来自 `folderTargetsFor`，它按领域规则会把"当前父"也算成一个合法目标
+            （重挂到同一个父不产生任何层级风险）。所以如果这里照点不误，用户点一下
+            "看起来没变化"的项，op-log 里就**多一条内容不变的 UPD** —— 而 §3.4 的口径是
+            "一个用户意图 = 一个 op"。这一条不是防御性代码：它就是那次"点了没反应但
+            数据多了一条"的形态，只是发生在写入侧、界面上看不见。
+          */}
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={labels.none}
+            aria-disabled={currentParentId === undefined}
+            disabled={currentParentId === undefined}
             onPress={() => {
               pick(undefined);
             }}
-            style={styles.option}
+            style={[styles.option, currentParentId === undefined ? styles.disabled : null]}
             testID={testID ? `${testID}-none` : undefined}
           >
             <View style={styles.marker}>
@@ -204,35 +215,43 @@ export function FolderPicker({
                 <HeytaIcon data={Check} size={tokens['icon.xs']} color={tokens['color.primary']} />
               ) : null}
             </View>
-            <Text style={[text['row-meta'], styles.optionName]}>{labels.none}</Text>
+            <Text style={[text['row-meta'], styles.optionName]}>
+              {labels.none}
+              {currentParentId === undefined ? ` ${labels.current}` : ''}
+            </Text>
           </Pressable>
 
-          {candidates.map((candidate) => (
-            <Pressable
-              key={candidate.id}
-              accessibilityRole="button"
-              accessibilityLabel={labels.button(candidate.name)}
-              onPress={() => {
-                pick(candidate.id);
-              }}
-              style={styles.option}
-              testID={testID ? `${testID}-to-${candidate.id}` : undefined}
-            >
-              <View style={styles.marker}>
-                {candidate.id === currentParentId ? (
-                  <HeytaIcon
-                    data={Check}
-                    size={tokens['icon.xs']}
-                    color={tokens['color.primary']}
-                  />
-                ) : null}
-              </View>
-              <Text style={[text['row-meta'], styles.optionName]}>
-                {candidate.name}
-                {candidate.id === currentParentId ? ` ${labels.current}` : ''}
-              </Text>
-            </Pressable>
-          ))}
+          {candidates.map((candidate) => {
+            const isCurrent = candidate.id === currentParentId;
+            return (
+              <Pressable
+                key={candidate.id}
+                accessibilityRole="button"
+                accessibilityLabel={labels.button(candidate.name)}
+                aria-disabled={isCurrent}
+                disabled={isCurrent}
+                onPress={() => {
+                  pick(candidate.id);
+                }}
+                style={[styles.option, isCurrent ? styles.disabled : null]}
+                testID={testID ? `${testID}-to-${candidate.id}` : undefined}
+              >
+                <View style={styles.marker}>
+                  {isCurrent ? (
+                    <HeytaIcon
+                      data={Check}
+                      size={tokens['icon.xs']}
+                      color={tokens['color.primary']}
+                    />
+                  ) : null}
+                </View>
+                <Text style={[text['row-meta'], styles.optionName]}>
+                  {candidate.name}
+                  {isCurrent ? ` ${labels.current}` : ''}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       )}
     </View>

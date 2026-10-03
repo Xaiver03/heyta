@@ -111,6 +111,21 @@ export function validateProjectParentChange(
  *   动作层 `setParent` 仍然会再判一次（写侧才是唯一能拦住坏数据的地方）。
  *
  * 直接复用 `validateProjectParentChange`，不重述规则 —— 两条路径因此不可能漂移。
+ *
+ * ⚠️ 已归档的清单**不进候选**，理由与墓碑那条同源但**不是同一条**：
+ * `toOrganizerTree` 在没开 `includeArchived` 时（= 侧栏默认），父 id 指向一条已归档
+ * 清单的子级**整条从界面上消失**（那个文件把它写成"已知取舍：宁可当孤儿，不冒充顶层"）。
+ * 所以"移进一条归档清单"在默认视图里表现为：这条清单点了一下就没了 —— 用户既看不见它，
+ * 也点不回它。要移进去只有一条路：先取消归档，让它重新出现在候选里。
+ *
+ * ⚠️ 写侧（`validateProjectParentChange`）**不拦**归档父 —— 因为"归档一条有子的文件夹"
+ * 本身是合法操作，拦了会让已有的 子→归档父 结构变成没法解释的数据。
+ * 这里的差别是刻意的：**界面不给入口，不代表这个状态非法**。
+ *
+ * 🔴 归档只从**候选**里排除，不从**被移动的那条**里排除：侧栏开着「显示已归档」时，
+ * 归档那一行照样画出来、照样带这个入口，此时它必须还能移出去（移到一条没归档的文件夹里）。
+ * 若把它一起排除，`folderTargetsFor(归档行)` 会因"被改的清单不存在"返回空候选，
+ * 那一行的菜单就只剩一个点不动的「不放进文件夹」—— 一个看着能点、点了没反应的入口。
  */
 export function folderTargetsFor(
   projects: readonly Project[],
@@ -120,6 +135,7 @@ export function folderTargetsFor(
   return alive
     .filter(
       (candidate) =>
+        candidate.archived !== true &&
         candidate.id !== projectId &&
         validateProjectParentChange(alive, projectId, candidate.id).ok,
     )
