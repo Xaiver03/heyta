@@ -62,6 +62,13 @@ trap 'rm -f -- "$0"' EXIT
 #
 set -u
 
+# 🔴 负载门放在**建号之前**：这一轮后面要 `install -r` + `pm clear`（本文件里第 241 行），
+#    而宿主机过载时 `uiautomator dump` 抓不到界面 —— 那种红是**环境失效**不是产品缺陷，
+#    可它已经先把别人的设备现场清掉了。所以先问"现在能不能跑"，再动任何东西。
+#    （判据与阈值的单一所有者在 `scripts/lib/wait-for-quiet-host.sh`，traps #168。）
+. "$(dirname "$0")/lib/wait-for-quiet-host.sh"
+wait_for_quiet_host || exit 3
+
 . "$(dirname "$0")/lib/mobile-e2e-fresh-account.sh"
 heyta_e2e_ensure_account || exit 1
 
