@@ -927,9 +927,12 @@ main 两侧都没有新增 workspace 包（`packages` 14、`apps` 8 合并前后
 所以 G-48 不是"顺手把它挂进链"就能闭合的 —— 要的是决定（产物分目录，还是挂载路径变成构建参数后
 由链按当前载体选）。这条**本轮没动**，仍是开口。
 
-载体：预置合并 `50b02558`（父 = `e3312dba` main + `56e6506c` 本批；**第一父是 main**，
-这样落地后 `git log --first-parent main` 不会跳进本批历史）已挂在
-**`feat/self-host-merge-main`**，不落 /tmp。main 一旦前进它就过期，重算是这几行：
+载体：**`feat/self-host-merge-main`**（不落 /tmp）。**只认这个分支名，不认 SHA** ——
+本批每多一笔提交、或 main 每前进一步，它都要用下面几行重算一次，SHA 一定变。
+（我自己刚犯过一次：这一节写下 `50b02558` 之后本批又多了一笔文档提交，
+指针当场变陈旧，重算得到 `834f9613`。这正是 traps 里"抄件一定会漂"的形状，
+所以正确写法是把**重算命令**当载体，而不是把某一枚 SHA 当载体。）
+第一父是 main，这样落地后 `git log --first-parent main` 不会跳进本批历史。重算：
 
 ```bash
 mb=$(git merge-base main feat/self-host-distribution)
