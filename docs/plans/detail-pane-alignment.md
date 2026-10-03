@@ -676,6 +676,10 @@ git merge-tree --write-tree --name-only main feat/detail-pane   # rc=1 = 有冲�
 
 ### 这一节真正要留下的三条探针错（都是我自己犯的）
 
+📌 这三条 + §8.14 第 1 条都够格进 `docs/reference/environment-traps.md`。
+**本单不往那本账插行** —— 它是多会话共写的活台账，取号必须按**工作树**现量而不是按 HEAD
+（§8.10 记过这条纪律）。登记在此即视为"待入 traps"，由收口那一轮统一取号。
+
 1. **按命名规律猜门禁的脚本路径**。复跑时我写的是 `node scripts/check-design.mjs` /
    `node scripts/check-l4-no-style…`，其中 `check:design` 的真身在
    `design-system/heyta/check-hardcoded.mjs` ⇒ 得到 `MODULE_NOT_FOUND` + 退出码 1，
