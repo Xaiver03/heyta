@@ -3855,6 +3855,9 @@ HEAD 没这行引用，那一趟这段应当是绿的；如果它红了，说明
 4. `PAX_WIN=PROVEN` —— 判据是 `scripts/lib/msix-install-facts.sh` 的 **`MSIX_REQUIRED_FACTS` 五条全在位**（含用户点名的 `SHORTCUT_OK=True`），**这条链不自己抄清单**；取证文件 mtime 要晚于本轮起跑，否则读 `STALE`
    **且** 收尾那行 `装完之后 main→重装载体的打包输入差集 = 0`（§7 #206）。
 
+🟡 **04:59 一条现场事实，不属于本线但影响这一条的判读**：另一条线的四端重装此刻真在跑，而它的检出是 `d0a81927` —— `git rev-list --count d0a81927..main` = **19**，`merge-base --is-ancestor integrate/2026-10-03-closeout d0a81927` 退 **1**（不含本线）。也就是说它装完之后四端仍是那 19 笔之前的样子，而 `install rc=0` / 取证图 / 五条 Windows 判据都会绿。已入 `docs/reference/environment-traps.md` #208（**顺序门只量了一个方向**）。
+⇒ 本线这一趟**不能**被它那趟代替：②③ 的读数必须写着自己的载体；也**不**去动它的脚本或进程（不是我的现场）。
+
 **不许的关闭方式**（都出现过 tempting 的形态）：拿"链 64 绿"当交付证据（链答的是源码，不是安装包，§7 #82）；
 拿"`simctl install` / `adb install` 退 0"当"装的是当前产物"；把 windows 的 `NOT-PROVEN` 读成"远端跑过了应该没问题"。
 

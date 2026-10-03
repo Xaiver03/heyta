@@ -4711,6 +4711,15 @@ ArgumentError - path name contains null byte
     E2EE 批量加密函数返回成功也不能证明服务端原子发布、旧日志迁移与新设备恢复成立。
     采纳完成回报时，必须沿原计划逐条检查生产调用点、失败恢复、平台实测与产物身份。
 
+    **2026-10-04 隔离收口补充**：共享检出在 build/test 期间被其他会话更新，曾造成产物过期、
+    声明文件消失与测试行号对不上。改用固定基线加明确文件哈希的隔离副本；不得把这份读数
+    写成主检出后续所有修改也通过。浏览器复验还发现第四列出现后，手势探针的固定起点
+    `x=1000` 已落入详情列，根本没在目标任务上按下。修探针时从目标行几何推导起点，
+    并用 `elementFromPoint` 正控确认确实命中任务；保留拖出内容区、翻日与不误勾选的原断言。
+    同轮 `countdown-export` 在 Node 24.2.0 + Playwright 动态导入真实 CJS 构建时报
+    `ERR_INTERNAL_ASSERTION: Unexpected module status 3`，普通 Node 直接导入同一文件正常。
+    改读同次构建生成的 ESM `index.mjs` 后加载器正控通过；不是“缺产物”，不能重抄契约常量兜底。
+
 182. 🔴 **形状像 O(N²) 的循环查找，可能被同一个表达式里的短路条件整体废掉 —— 于是"读代码判性能"会自己造出假 P0。**
     （2026-10-03 实测，性能审计：`packages/op-log/src/engine.ts:635`）
     ```ts
@@ -5062,3 +5071,72 @@ ArgumentError - path name contains null byte
     ② 抄件漂移最早出现在**新写的那一侧**（旧的一侧有门禁、新的那一侧没人比），
     所以新探针要**同时**跑一次"应当判 `STALE`/`LIB-MISSING`"的反向腿（02:59 用两个 `INST_START`
     各跑一次，一腿 `PROVEN` 一腿 `STALE`，才算这条判据有牙）。
+
+208. 🔴 **iOS 模拟器的 `simctl io screenshot` 默认屏幕可能是黑的副显示器，PNG 有效不等于取到了设备画面。**
+
+     2026-10-04 在 iOS 27.1 的 `heyta-ios-isolated`（UDID
+     `1EDCFA59-6A9C-428D-8FE2-160B11318648`）上，直接执行
+     `xcrun simctl io <udid> screenshot out.png` 成功写出 2007×2853 的合法 PNG，但 `png-stats`
+     读到 `contentRatio=1`、`colorSpan=0`，实际是全黑的 `LCD-1`（screen 3）。同一设备先用
+     `xcrun simctl io <udid> enumerate` 找到 `Device Name: primary`，再执行
+     `screenshot --display=primary` 得到 1398×2034、`colorSpan=255` 的真实主屏。
+
+     因此截图脚本必须显式选择 `--display=primary`（允许环境变量覆盖），并在保存后用仓库的
+     `scripts/screenshots/png-stats.mjs` 拒绝 `looksBlank` 的文件；截图存在、PNG 可解析和命令退出 0
+     都不能单独作为画面证据。最后仍须人工查看，尤其是通知中心这类系统 UI，不能把锁屏壁纸或应用详情页当通知可见。
+
+209. 🔴 **AX 按钮返回 success 不等于 React 异步写入已经发生。**
+
+     2026-10-04 iOS `pending-cancel` 续验中，AX 点击真实的“删除提醒”按钮返回成功，等待 4 秒并
+     重启 reconcile 后，真 SQLite 仍只有 REMINDER `CRT`，没有 `DEL`；原生 scheduled ledger 也仍保留
+     future occurrence。之前把 AX success 当成“删除完成”会产生假绿。涉及异步业务动作时，必须在
+     点击后读实际状态：对应 op 落库、行从 AX 消失、或原生 pending/ledger 确实清空；否则只能报告
+     “点击已发送”，不能报告“功能完成”。
+210. 🔴 **`pnpm --filter <名字>` 报 `No projects matched the filters` 不等于"这个包不在工作区"** —— 先核名字，再下结论。
+
+    我把 `server/` 写成 `pnpm --filter @heyta/server typecheck`，得到那句"没匹配上"，
+    读起来就像"服务端不在 `pnpm -r test` 的范围内、它的 spec 要手工接线"。
+    现量两处把它否证了：`pnpm-workspace.yaml:3` 就列着 `server`，而
+    `node -e "console.log(require('./server/package.json').name)"` 打出来是 **`@heyta/sync-server`**。
+    ⇒ 名字错一个词，边界事实整个读反。
+
+    同族的第二种误读，一起记：`server/tsconfig.json` 的 `include` 只有 `src/**/*` 与 `scripts/**/*`，
+    **不含 `tests`** ⇒ 在 `server/` 里跑 `tsc --noEmit` 拿到 exit 0，**不能当成"测试文件也没类型问题"**。
+    判据：写 spec 之前先看它落不落在 tsconfig 的 `include` 里，不在就单独说明。
+
+211. 🔴 **一个文件如果 `import` 就等于"跑一遍"，它就永远测不到** —— 而"某条路径零测试"的表面理由，往往不是没人想写。
+
+    `server/scripts/recover-user.ts` 头上挂着 `Status: UNVERIFIED against real encrypted data`，
+    解密 + 重放那一段确实一条测试都没有。两个形状是原因：
+    ① `main()` 挂在模块顶层且没有门 —— `import` 它就等于读 argv、连库、`disconnect()`；
+    ② 解密函数用 `require('../../sync-core/src/encryption')` 拿（摸的是**隔壁包的源码路径**，不是包名），
+      只有 `ts-node --transpile-only` 解析得动，签名靠一行 `as` 手写，vitest 里根本进不来。
+
+    把这两处修掉（`if (require.main === module)` + `import { decryptBatch } from '@heyta/sync-core'`）之后，
+    那条路第一次被**真密码学**跑通，而且当场照出两个静默缺陷：
+    脚本自己抄的那份 prisma `select` 少两列 ⇒ 少 `entityIds` 让**批量删除在还原文件里复活**（#8340 的第二份抄件），
+    少 `repairBaseServerSeq` 让**用过 REPAIR 的账号根本恢复不了**（报的还是"legacy"）。
+
+    📌 三条一般规律：
+    1. 脚本类产物要可测，就先给它**入口门**与**走包名的 import**，这不是"顺手重构"，是让别人能验它。
+    2. 缺陷会**互相遮蔽**：同一份日志里先抛错的那条挡住了后面"数据复活"那条 —— 把 REPAIR 摘出去单独跑才量到第二档。
+    3. 抄一份列集合 = 埋一份会漂的抄件。修法不是"补两列"，是**取消第二份**（用快照路径导出的那一份）。
+
+208. 🔴 **"落地之后才装"这道顺序门，如果只判"main 有没有前进到载体"，就会放过反方向 ——
+    从**落后 main 若干笔的载体**装一遍，而输出一眼看上去就是"四端已交付"。**
+
+    04:59 现量（另一条线的重装队列真的开跑了）：
+
+    ```bash
+    git -C <主检出> merge-base --is-ancestor integrate/2026-10-03-closeout d0a81927   # 退 1 ⇒ 不含本线
+    git rev-list --count d0a81927..main                                              # 19
+    ```
+
+    它的脚本自己印了 `检出 HEAD=d0a81927`，也印了 `install rc=0`，注释里还**专门**处理了
+    "main 还没前进到载体"那一支 —— 也就是说这一族缺陷不是"没人想过顺序"，而是
+    **只检查了一个方向**。落后 19 笔里含另一条线已经落的整批改动，装完之后四端就是那 19 笔之前的样子，
+    而取证图、`ADD_APPX=OK`、`M2D=OK` 全部会绿（第 82 条的老形状，换了个成因）。
+
+    📌 可迁移的一句：**凡"从某个检出打包装到别的机器/另一个目录"的流程，
+    要同时量两个方向** —— `载体 ⊆ main`？以及 `main \ 载体 = ?`（后者按**打包输入集**数，
+    见第 206 条）。只量一个方向的门，会把它没看的那一侧当成"另一侧已经安全"。
