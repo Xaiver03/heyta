@@ -579,6 +579,10 @@ G-01 回答"这么做**合法吗**"。送审前先把能拍的拍完，否则律
      这套是并行会话在飞的 **help → docs 迁移**：工作树里 65 处 landing 变更，其中
      `apps/landing/help/*` 与 `apps/landing/en/help/*` 共 40+ 个 `index.html` **已 staged 删除**，
      新增未跟踪 `apps/landing/docs/` 与 `apps/landing/en/docs/`。**没有一条失败与 `/legal/*` 有关。**
+     ⚠️ **这条已闭合（2026-10-03，提交 `e446e54e`）**：那笔 help → docs 迁移缺的**产物目录那一半**
+     补完了（`public/assets/help/` → `assets/docs/`，实际只动了 `helpFigures.ts` 的 `URL_PREFIX` 一行 + 一次 `git mv`），
+     `check:landing-e2e` 现量 **17 passed / 0 failed**。上面那段归因**当时是对的**，
+     但别拿它当"这条门禁至今有 2 处红"的依据。取证见 `BLOCKED.md` 的 B24 关闭段。
   2. `check:web-storage` —— **一条断言都没跑到**。`scripts/verify-web-storage-backend.mjs:50-54`
      自己 spawn `vite --port 4321 --strictPort`，而 :4321 被另一条会话的 vite 占了约 10 小时
      （PID 25572，`--strictPort`）。本机只读探一次 bind 即 `EADDRINUSE`。
