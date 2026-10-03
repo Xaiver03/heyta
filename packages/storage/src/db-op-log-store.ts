@@ -42,10 +42,12 @@ import {
   OpLogStoreError,
   OpLogStoreErrorCode,
   type ImportedAppendResult,
+  type MaterializedCheckpoint,
   type OpLogStore,
   type OperationSource,
   type StoredOperation,
 } from './op-log-store.js';
+import { isValidCheckpoint } from './checkpoint.js';
 import {
   META_FIELDS,
   META_KEYS,
@@ -53,6 +55,8 @@ import {
   OP_INDEXES,
   STORES,
 } from './stores.js';
+
+const MATERIALIZED_CHECKPOINT_KEY = 'materializedCheckpoint';
 
 /**
  * `appendBatchSkipDuplicates` 的结果类型。
@@ -136,7 +140,7 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
     if (ops.length === 0) return { appended: [], skipped: [], seqs: [] };
 
     return this.db.transaction(
-      [STORES.OPS, STORES.META],
+      [STORES.OPS, STORES.ARCHIVE, STORES.META],
       'readwrite',
       async (tx) => {
         const appended: TOperation[] = [];
@@ -151,6 +155,12 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
             continue;
           }
           seenInBatch.add(op.id);
+          // Both stores share one logical opId namespace. Locking them in the
+          // same transaction makes this check atomic with concurrent archiving.
+          if (await tx.getKeyFromIndex(STORES.ARCHIVE, OP_INDEXES.OP_ID, op.id) !== undefined) {
+            skipped.push(op);
+            continue;
+          }
 
           const record: Omit<StoredOperation<TOperation>, 'seq'> = {
             op,
@@ -256,18 +266,18 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
     const exclude = new Set(excludeIds);
     let cleared = 0;
 
-    await this.db.transaction([STORES.OPS], 'readwrite', async (tx) => {
-      const all = await tx.getAllFromIndex<StoredOperation<TOperation>>(
-        STORES.OPS,
-        OP_INDEXES.ENTITY_IDS,
-        undefined,
-      );
-      for (const rec of all) {
-        if (isFullStateOp(rec.op) && !exclude.has(rec.op.id)) {
-          await tx.delete(STORES.OPS, rec.seq);
-          cleared += 1;
+    await this.db.transaction([STORES.OPS, STORES.ARCHIVE, STORES.META], 'readwrite', async (tx) => {
+      for (const store of [STORES.OPS, STORES.ARCHIVE]) {
+        const all = await tx.getAll<StoredOperation<TOperation>>(store);
+        for (const rec of all) {
+          if (isFullStateOp(rec.op) && !exclude.has(rec.op.id)) {
+            await tx.delete(store, rec.seq);
+            cleared += 1;
+          }
         }
       }
+      // A cached materialization may refer to one of the removed records.
+      if (cleared > 0) await tx.delete(STORES.META, MATERIALIZED_CHECKPOINT_KEY);
     });
 
     return cleared;
@@ -280,14 +290,8 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
     limit?: number,
     excludeClient?: string,
   ): Promise<StoredOperation<TOperation>[]> {
-    const all = await this.db.getAll<StoredOperation<TOperation>>(STORES.OPS, {
-      lower: sinceSeq,
-      lowerOpen: true,
-    });
-    const filtered =
-      excludeClient === undefined
-        ? all
-        : all.filter((r) => r.op.clientId !== excludeClient);
+    const all = await this.getAllOps({ lower: sinceSeq, lowerOpen: true }, excludeClient === undefined ? limit : undefined);
+    const filtered = excludeClient === undefined ? all : all.filter((r) => r.op.clientId !== excludeClient);
     return limit === undefined ? filtered : filtered.slice(0, limit);
   }
 
@@ -295,12 +299,21 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
     entityType: EntityType,
     entityId: string,
   ): Promise<StoredOperation<TOperation>[]> {
-    const rows = await this.db.getAllFromIndex<StoredOperation<TOperation>>(
-      STORES.OPS,
-      OP_INDEXES.ENTITY,
-      [entityType, entityId],
-    );
-    return rows.sort((a, b) => a.seq - b.seq);
+    return this.db.transaction([STORES.OPS, STORES.ARCHIVE], 'readonly', async (tx) => {
+      const scalar = await tx.getAllFromIndex<StoredOperation<TOperation>>(
+        STORES.OPS, OP_INDEXES.ENTITY, [entityType, entityId],
+      );
+      const batch = await tx.getAllFromIndex<StoredOperation<TOperation>>(
+        STORES.OPS, OP_INDEXES.ENTITY_IDS, entityId,
+      );
+      // The existing archive schema has only an opId index. Cold-history
+      // queries deliberately scan it instead of requiring a schema migration.
+      const archived = await tx.getAll<StoredOperation<TOperation>>(STORES.ARCHIVE);
+      return [...new Map([...scalar, ...batch, ...archived]
+        .filter((r) => r.op.entityType === entityType &&
+          (r.op.entityId === entityId || r.op.entityIds?.includes(entityId)))
+        .map((r) => [r.seq, r])).values()].sort((a, b) => a.seq - b.seq);
+    });
   }
 
   async getLastLocalSeq(): Promise<number> {
@@ -312,9 +325,14 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
   }
 
   async getAllOps(range?: DbKeyRange, limit?: number): Promise<StoredOperation<TOperation>[]> {
-    const all = await this.db.getAll<StoredOperation<TOperation>>(STORES.OPS, range);
-    const sorted = all.sort((a, b) => a.seq - b.seq);
-    return limit === undefined ? sorted : sorted.slice(0, limit);
+    // A shared read transaction cannot observe an op both before and after
+    // an archive move, or miss it between separate hot/cold reads.
+    return this.db.transaction([STORES.OPS, STORES.ARCHIVE], 'readonly', async (tx) => {
+      const hot = await tx.getAll<StoredOperation<TOperation>>(STORES.OPS, range, limit);
+      const archived = await tx.getAll<StoredOperation<TOperation>>(STORES.ARCHIVE, range, limit);
+      const sorted = [...hot, ...archived].sort((a, b) => a.seq - b.seq);
+      return limit === undefined ? sorted : sorted.slice(0, limit);
+    });
   }
 
   // ── 崩溃恢复 ────────────────────────────────────────────
@@ -341,27 +359,41 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
   /**
    * 把 `upToSeq` 之前的 op 移入归档。
    *
-   * ⚠️ 调用方必须先确认这些 op 的效果已被快照完整捕获。
-   * 这里的实现**不校验**这件事 —— 它无法知道快照是否完整。
+   * 检查 checkpoint 校验和与实际归档上界（exclusive cutoff - 1）。
+   * 未上传/未应用/被拒绝的记录仍留在热区；归档历史仍属于日志。
    */
   async archiveUpTo(upToSeq: number): Promise<number> {
     const cutoff = upToSeq - this.archiveKeepRecent;
     if (cutoff <= 0) return 0;
 
     return this.db.transaction(
-      [STORES.OPS, STORES.ARCHIVE],
+      [STORES.OPS, STORES.ARCHIVE, STORES.META],
       'readwrite',
       async (tx) => {
+        const checkpointRecord = await tx.get<{
+          key: string;
+          value: MaterializedCheckpoint;
+        }>(STORES.META, MATERIALIZED_CHECKPOINT_KEY);
+        const lastLocalSeq = await readMetaNumber(tx, META_KEYS.LAST_LOCAL_SEQ);
+        if (!isValidCheckpoint(checkpointRecord?.value, lastLocalSeq) || checkpointRecord!.value.coveredSeq < cutoff - 1) {
+          throw new OpLogStoreError(
+            OpLogStoreErrorCode.ARCHIVE_REQUIRES_CHECKPOINT,
+            `归档 seq < ${cutoff} 需要一个覆盖至少 ${cutoff - 1} 的有效 checkpoint`,
+          );
+        }
         const rows = await tx.getAll<StoredOperation<TOperation>>(STORES.OPS, {
           upper: cutoff,
           upperOpen: true,
         });
-        for (const rec of rows) {
+        const eligible = rows.filter((rec) => rec.applyStatus === 'applied' && rec.uploadStatus === 'uploaded');
+        for (const rec of eligible) {
+          // Pending uploads, unapplied remote operations and rejected writes
+          // remain in the hot store where queues and diagnostics can see them.
           // ARCHIVE 也用 keyPath 'seq'，同样不能传显式 key
           await tx.put(STORES.ARCHIVE, rec);
           await tx.delete(STORES.OPS, rec.seq);
         }
-        return rows.length;
+        return eligible.length;
       },
     );
   }
@@ -465,6 +497,91 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
       await writeMeta(tx, META_KEYS.LAST_SERVER_SEQ, seq);
     });
   }
+
+  async readCheckpoint(): Promise<MaterializedCheckpoint | undefined> {
+    const record = await this.db.get<{ key: string; value: MaterializedCheckpoint }>(
+      STORES.META,
+      MATERIALIZED_CHECKPOINT_KEY,
+    );
+    return record?.value;
+  }
+
+  async writeCheckpoint(checkpoint: MaterializedCheckpoint): Promise<void> {
+    if (!isValidCheckpoint(checkpoint, await this.getLastLocalSeq())) {
+      throw new OpLogStoreError(
+        OpLogStoreErrorCode.STORAGE_UNAVAILABLE,
+        '拒绝写入无效 materialized checkpoint',
+      );
+    }
+    await this.db.transaction([STORES.META], 'readwrite', async (tx) => {
+      await tx.put(STORES.META, { key: MATERIALIZED_CHECKPOINT_KEY, value: checkpoint });
+    });
+  }
+
+  /** Read the durable server-observed causal frontier, independent of checkpoints. */
+  async readObservedClock(): Promise<Record<string, number>> {
+    return this.db.transaction([STORES.META], 'readonly', async (tx) => {
+      const record = await tx.get<{ key: string; value: unknown }>(
+        STORES.META,
+        META_KEYS.OBSERVED_CLOCK,
+      );
+      if (record === undefined) return {};
+      return validateObservedClock(record.value);
+    });
+  }
+
+  /**
+   * Persist a component-wise max merge in one META transaction.
+   *
+   * The read and write intentionally share the same transaction: concurrent
+   * callers must never lose a dimension because both read the same old value.
+   */
+  async mergeObservedClock(clock: Record<string, number>): Promise<void> {
+    const incoming = validateObservedClock(clock);
+    await this.db.transaction([STORES.META], 'readwrite', async (tx) => {
+      const record = await tx.get<{ key: string; value: unknown }>(
+        STORES.META,
+        META_KEYS.OBSERVED_CLOCK,
+      );
+      const current = record === undefined ? {} : validateObservedClock(record.value);
+      const merged: Record<string, number> = { ...current };
+      for (const [clientId, counter] of Object.entries(incoming)) {
+        if ((merged[clientId] ?? 0) < counter) {
+          Object.defineProperty(merged, clientId, {
+            value: counter,
+            enumerable: true,
+            configurable: true,
+            writable: true,
+          });
+        }
+      }
+      await tx.put(STORES.META, {
+        [META_FIELDS.KEY]: META_KEYS.OBSERVED_CLOCK,
+        [META_FIELDS.VALUE]: merged,
+      });
+    });
+  }
+
+  /** Read the one-way history-integrity marker; absent means complete. */
+  async hasIncompleteHistory(): Promise<boolean> {
+    return this.db.transaction([STORES.META], 'readonly', async (tx) => {
+      const record = await tx.get<{ key: string; value: unknown }>(
+        STORES.META,
+        META_KEYS.HISTORY_INCOMPLETE,
+      );
+      return record?.value === true;
+    });
+  }
+
+  /** Set the history-integrity marker. Deliberately no clearing operation exists. */
+  async markHistoryIncomplete(): Promise<void> {
+    await this.db.transaction([STORES.META], 'readwrite', async (tx) => {
+      await tx.put(STORES.META, {
+        [META_FIELDS.KEY]: META_KEYS.HISTORY_INCOMPLETE,
+        [META_FIELDS.VALUE]: true,
+      });
+    });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -499,6 +616,35 @@ async function readMetaNumber(
 
 async function writeMeta(tx: DbTx, key: string, value: unknown): Promise<void> {
   await tx.put(STORES.META, { [META_FIELDS.KEY]: key, [META_FIELDS.VALUE]: value });
+}
+
+/** Validate a persisted or incoming causal frontier before it can affect state. */
+function validateObservedClock(value: unknown): Record<string, number> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('observed clock 必须是对象');
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError('observed clock 必须是普通对象');
+  }
+  if (Reflect.ownKeys(value).some((key) => typeof key !== 'string')) {
+    throw new TypeError('observed clock 的键必须是字符串');
+  }
+  const clock: Record<string, number> = {};
+  for (const [clientId, counter] of Object.entries(value)) {
+    if (!Number.isSafeInteger(counter) || counter < 0) {
+      throw new RangeError(
+        `observed clock「${clientId}」必须是非负安全整数，收到：${String(counter)}`,
+      );
+    }
+    Object.defineProperty(clock, clientId, {
+      value: counter,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+  return clock;
 }
 
 export { OpLogStoreError, OpLogStoreErrorCode };

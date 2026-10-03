@@ -15,6 +15,7 @@ import { OpType, decrypt, encrypt } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 
 import { SyncClient, createRetryScheduler, isNetworkError, type SyncStatus } from '../src/client.js';
+import { createVaultPayloadCipher, type SyncPayloadCipher } from '../src/payload-cipher.js';
 
 const PASSWORD = 'correct horse battery staple';
 const BASE = 'http://127.0.0.1:3000';
@@ -40,21 +41,39 @@ interface Harness {
   uploads: Array<{ url: string; body: Record<string, unknown> }>;
   downloads: string[];
   marked: Array<ReadonlyMap<string, number>>;
+  historyIncomplete: { value: number };
+  events: string[];
   /** `markRejected` 的调用记录（按批）。用于断言"永久拒绝被移出队列"。 */
   rejected: string[][];
   applied: Operation<string>[][];
+  mergedClocks: Array<Record<string, number>>;
   cursor: { value: number };
+}
+
+interface HarnessOptions {
+  getPayloadCipher?: () => Promise<SyncPayloadCipher | undefined>;
+  password?: string | undefined;
+  ops?: Operation<string>[];
+  /** Omit the durable incomplete-history hook to exercise fail-closed behavior. */
+  withoutHistoryMarker?: boolean;
+  /** Make the durable incomplete-history hook fail after recording the attempt. */
+  failHistoryMarker?: boolean;
+  /** Omit the durable snapshot frontier hook to exercise fail-closed behavior. */
+  withoutMergeRemoteClock?: boolean;
 }
 
 function makeHarness(
   handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
-  opts: { password?: string | undefined; ops?: Operation<string>[] } = {},
+  opts: HarnessOptions = {},
 ): Harness {
   const uploads: Harness['uploads'] = [];
   const downloads: string[] = [];
   const marked: Harness['marked'] = [];
+  const historyIncomplete = { value: 0 };
+  const events: string[] = [];
   const rejected: Harness['rejected'] = [];
   const applied: Harness['applied'] = [];
+  const mergedClocks: Harness['mergedClocks'] = [];
   const cursor = { value: 0 };
 
   const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -72,8 +91,10 @@ function makeHarness(
     clientId: 'device-a',
     getToken: async () => 'test-token',
     getPassword: async () => ('password' in opts ? opts.password : PASSWORD),
+    ...(opts.getPayloadCipher ? { encryptionMode: 'vault' as const, getPayloadCipher: opts.getPayloadCipher } : { encryptionMode: 'password' as const }),
     getLastServerSeq: async () => cursor.value,
     setLastServerSeq: async (s) => {
+      events.push(`cursor:${String(s)}`);
       cursor.value = s;
     },
     getLocalOps: async () => opts.ops ?? [],
@@ -81,8 +102,22 @@ function makeHarness(
       marked.push(m);
     },
     applyRemote: async (ops) => {
+      events.push('apply-remote');
       applied.push(ops);
     },
+    ...(opts.withoutMergeRemoteClock ? {} : {
+      mergeRemoteClock: async (clock: Record<string, number>) => {
+        events.push('merge-remote-clock');
+        mergedClocks.push(clock);
+      },
+    }),
+    ...(opts.withoutHistoryMarker ? {} : {
+      markHistoryIncomplete: async () => {
+        events.push('mark-history-incomplete');
+        historyIncomplete.value += 1;
+        if (opts.failHistoryMarker) throw new Error('incomplete-history persistence failed');
+      },
+    }),
     redispatch: async () => undefined,
     discardLocal: async () => undefined,
     markRejected: async (ids) => {
@@ -94,7 +129,18 @@ function makeHarness(
     fetchImpl,
   });
 
-  return { client, uploads, downloads, marked, rejected, applied, cursor };
+  return {
+    client,
+    uploads,
+    downloads,
+    marked,
+    historyIncomplete,
+    events,
+    rejected,
+    applied,
+    mergedClocks,
+    cursor,
+  };
 }
 
 function okJson(body: unknown): Response {
@@ -158,7 +204,157 @@ describe('同步客户端 — E2EE 强制', () => {
   });
 });
 
+describe('同步客户端 — 因果前沿协议', () => {
+  it('compacts only operations that already dominate a negotiated frontier', async () => {
+    const pending: Operation<string>[] = [];
+    const h = makeHarness((_url, init) => init?.method === 'POST'
+      ? okJson({ results: [], latestSeq: 12 })
+      : okJson({ ops: [], hasMore: false, latestSeq: 12,
+          capabilities: { causalFrontierDelta: true },
+          causalFrontier: { token: 'cf1.test', vectorClock: { remote: 4, old: 2 } } }),
+      { ops: pending });
+    await h.client.sync();
+    pending.push(makeOp({ id: 'dominates', vectorClock: { 'device-a': 3, remote: 4, old: 2, newDevice: 1 } }),
+      makeOp({ id: 'offline', vectorClock: { 'device-a': 2, remote: 3 } }));
+    await h.client.sync();
+    const request = h.uploads[0]!.body;
+    const sent = request['ops'] as Array<Record<string, unknown>>;
+    expect(request['causalFrontierToken']).toBe('cf1.test');
+    expect(sent[0]!['vectorClockEncoding']).toBe('frontier-delta');
+    expect(sent[0]!['vectorClock']).toEqual({ 'device-a': 3, newDevice: 1 });
+    expect(sent[1]!['vectorClockEncoding']).toBeUndefined();
+    expect(sent[1]!['vectorClock']).toEqual(pending[1]!.vectorClock);
+  });
+});
+
+describe('frontier compatibility failures', () => {
+  it('does not skip an unreadable full-state prefix even when a later delta decrypts', async () => {
+    const cipher = await encrypt('{}', PASSWORD);
+    const h = makeHarness(() => okJson({
+      ops: [
+        { serverSeq: 1, op: { ...makeOp({ id: 'snapshot', opType: 'REPAIR', entityType: 'ALL' }), payload: 'bad-cipher', isPayloadEncrypted: true } },
+        { serverSeq: 2, op: { ...makeOp({ id: 'tail' }), payload: cipher, isPayloadEncrypted: true } },
+      ], latestSeq: 2, hasMore: false, snapshotVectorClock: { lost: 10 },
+    }));
+    expect((await h.client.sync()).kind).toBe('error');
+    expect(h.cursor.value).toBe(0);
+    expect(h.applied).toEqual([]);
+    expect(h.mergedClocks).toEqual([]);
+  });
+
+  for (const failureStatus of [400, 404]) {
+    it(`retries full immutable operations after compact endpoint returns ${failureStatus}`, async () => {
+      const pending: Operation<string>[] = [];
+      const h = makeHarness((url, init) => {
+        if (init?.method !== 'POST') return okJson({ ops: [], latestSeq: 4,
+          capabilities: { causalFrontierDelta: true },
+          causalFrontier: { token: 'cf1.test', vectorClock: { remote: 4 } } });
+        if (url.endsWith('/causal')) return new Response('{}', { status: failureStatus });
+        return okJson({ results: [{ opId: 'op-1', accepted: true, serverSeq: 5 }], latestSeq: 5 });
+      }, { ops: pending });
+      await h.client.sync();
+      pending.push(makeOp({ vectorClock: { remote: 4, 'device-a': 1 } }));
+      expect((await h.client.sync()).kind).toBe('synced');
+      expect(h.uploads).toHaveLength(2);
+      expect(h.uploads[0]!.url).toContain('/ops/causal');
+      expect(h.uploads[1]!.url.endsWith('/ops')).toBe(true);
+      const compact = (h.uploads[0]!.body['ops'] as Array<Record<string, unknown>>)[0]!;
+      const full = (h.uploads[1]!.body['ops'] as Array<Record<string, unknown>>)[0]!;
+      expect(full['vectorClock']).toEqual(pending[0]!.vectorClock);
+      expect(full['vectorClockEncoding']).toBeUndefined();
+      expect(full['payload']).toBe(compact['payload']);
+      expect(full['id']).toBe(compact['id']);
+    });
+  }
+
+  it('does not enable compaction without explicit server capability', async () => {
+    const pending: Operation<string>[] = [];
+    const h = makeHarness(() => okJson({ ops: [], latestSeq: 1,
+      causalFrontier: { token: 'cf1.test', vectorClock: { remote: 4 } } }), { ops: pending });
+    await h.client.sync();
+    pending.push(makeOp({ vectorClock: { remote: 4, 'device-a': 1 } }));
+    await h.client.sync();
+    const sent = (h.uploads[0]!.body['ops'] as Array<Record<string, unknown>>)[0]!;
+    expect(sent['vectorClockEncoding']).toBeUndefined();
+    expect(sent['vectorClock']).toEqual(pending[0]!.vectorClock);
+  });
+});
+
+describe('同步客户端 — 压实因果前沿', () => {
+  it('消费 snapshotVectorClock，即使本页没有对应的 op', async () => {
+    const h = makeHarness(() =>
+      okJson({
+        ops: [],
+        hasMore: false,
+        latestSeq: 42,
+        snapshotVectorClock: { 'archived-device': 9 },
+      }),
+    );
+
+    const status = await h.client.sync();
+
+    expect(status.kind).toBe('synced');
+    expect(h.mergedClocks).toEqual([{ 'archived-device': 9 }]);
+  });
+
+  it('🔴 snapshotVectorClock 没有 durable merge hook 时失败且不推进游标', async () => {
+    const h = makeHarness(() => okJson({
+      ops: [],
+      hasMore: false,
+      latestSeq: 42,
+      snapshotVectorClock: { 'archived-device': 9 },
+    }), { withoutMergeRemoteClock: true });
+
+    const status = await h.client.sync();
+
+    expect(status).toMatchObject({ kind: 'error', reason: 'unexpected' });
+    expect(h.cursor.value).toBe(0);
+    expect(h.mergedClocks).toEqual([]);
+  });
+});
+
 describe('同步客户端 — 上传与游标', () => {
+  it('🔴 上传响应 gapDetected 时先持久化 incomplete-history，再提交游标', async () => {
+    const h = makeHarness(
+      (url, init) => init?.method === 'POST'
+        ? okJson({
+            results: [{ opId: 'op-1', accepted: true, serverSeq: 3 }],
+            latestSeq: 3,
+            gapDetected: true,
+          })
+        : okJson({ ops: [], hasMore: false, latestSeq: 3 }),
+      { ops: [makeOp()] },
+    );
+
+    const status = await h.client.sync();
+
+    expect(status.kind).toBe('synced');
+    expect(h.historyIncomplete.value).toBe(1);
+    expect(h.cursor.value).toBe(3);
+    expect(h.events.indexOf('mark-history-incomplete')).toBeLessThan(
+      h.events.findIndex((event) => event.startsWith('cursor:')),
+    );
+  });
+
+  it('🔴 上传响应 gapDetected 时 durable marker 失败就不推进游标', async () => {
+    const h = makeHarness(
+      (_url, init) => init?.method === 'POST'
+        ? okJson({
+            results: [{ opId: 'op-1', accepted: true, serverSeq: 3 }],
+            latestSeq: 3,
+            gapDetected: true,
+          })
+        : okJson({ ops: [], hasMore: false, latestSeq: 3 }),
+      { ops: [makeOp()], failHistoryMarker: true },
+    );
+
+    const status = await h.client.sync();
+
+    expect(status).toMatchObject({ kind: 'error', reason: 'unexpected' });
+    expect(h.historyIncomplete.value).toBe(1);
+    expect(h.cursor.value).toBe(0);
+  });
+
   it('上传成功后标记 op 已同步（否则下次会重传）', async () => {
     const h = makeHarness(
       () =>
@@ -372,6 +568,14 @@ describe('同步客户端 — 上传与游标', () => {
 
     // 4. 有的解开、有的解不开 → 游标推进（否则永久卡在同一批上）
     expect(h.cursor.value).toBe(50);
+    // The durable marker must be committed before the transport cursor crosses
+    // the unreadable history. Otherwise a crash after this sync would make the
+    // server-side repair path believe the prefix was complete.
+    expect(h.historyIncomplete.value).toBe(1);
+    expect(h.events.indexOf('mark-history-incomplete')).toBeGreaterThanOrEqual(0);
+    expect(h.events.indexOf('mark-history-incomplete')).toBeLessThan(
+      h.events.findIndex((event) => event.startsWith('cursor:')),
+    );
 
     // 5. 状态结构化地点名读不了的那条，而不是报 synced / 报"未知错误"
     expect(status).toMatchObject({
@@ -437,6 +641,62 @@ describe('同步客户端 — 上传与游标', () => {
       expect(status.message).toContain('poison-45');
       expect(status.message ?? '').not.toMatch(/[\u4e00-\u9fff]/);
     }
+  });
+
+  it('🔴 搭车部分解密失败时没有 durable marker 就 fail-closed，不能跳过历史', async () => {
+    const good = await encrypt(JSON.stringify({ title: '搭车能读的' }), PASSWORD);
+    const bad = await encrypt('{}', 'an-old-password');
+    const h = makeHarness(
+      (_url, init) => init?.method === 'POST'
+        ? okJson({
+            results: [{ opId: 'op-1', accepted: true, serverSeq: 40 }],
+            latestSeq: 50,
+            newOps: [
+              {
+                serverSeq: 45,
+                receivedAt: 45,
+                op: {
+                  id: 'good-piggy-without-marker',
+                  clientId: 'other',
+                  actionType: 'CREATE_TASK',
+                  opType: 'CRT',
+                  entityType: 'TASK',
+                  entityId: 'e-good',
+                  payload: good,
+                  vectorClock: { other: 1 },
+                  timestamp: 100,
+                  schemaVersion: 1,
+                  isPayloadEncrypted: true,
+                },
+              },
+              {
+                serverSeq: 46,
+                receivedAt: 46,
+                op: {
+                  id: 'bad-piggy-without-marker',
+                  clientId: 'other',
+                  actionType: 'CREATE_TASK',
+                  opType: 'CRT',
+                  entityType: 'TASK',
+                  entityId: 'e-bad',
+                  payload: bad,
+                  vectorClock: { other: 2 },
+                  timestamp: 200,
+                  schemaVersion: 1,
+                  isPayloadEncrypted: true,
+                },
+              },
+            ],
+          })
+        : okJson({ ops: [], hasMore: false, latestSeq: 50 }),
+      { ops: [makeOp()], withoutHistoryMarker: true },
+    );
+
+    const status = await h.client.sync();
+
+    expect(status).toMatchObject({ kind: 'error', reason: 'unexpected' });
+    expect(h.applied.flat().map((op) => op.id)).toEqual(['good-piggy-without-marker']);
+    expect(h.cursor.value).toBe(0);
   });
 
   it('🔴 游标用 latestSeq 推进，而不是最后一条 op 的 serverSeq', async () => {
@@ -542,6 +802,39 @@ describe('同步客户端 — 上传与游标', () => {
 });
 
 describe('同步客户端 — 下载与解密', () => {
+  it('🔴 下载 gapDetected 时先持久化 incomplete-history，再提交游标', async () => {
+    const h = makeHarness(() => okJson({
+      ops: [],
+      hasMore: false,
+      latestSeq: 9,
+      gapDetected: true,
+    }));
+
+    const status = await h.client.sync();
+
+    expect(status.kind).toBe('synced');
+    expect(h.historyIncomplete.value).toBe(1);
+    expect(h.cursor.value).toBe(9);
+    expect(h.events.indexOf('mark-history-incomplete')).toBeLessThan(
+      h.events.findIndex((event) => event.startsWith('cursor:')),
+    );
+  });
+
+  it('🔴 下载 gapDetected 时 durable marker 失败就不推进游标', async () => {
+    const h = makeHarness(() => okJson({
+      ops: [],
+      hasMore: false,
+      latestSeq: 9,
+      gapDetected: true,
+    }), { failHistoryMarker: true });
+
+    const status = await h.client.sync();
+
+    expect(status).toMatchObject({ kind: 'error', reason: 'unexpected' });
+    expect(h.historyIncomplete.value).toBe(1);
+    expect(h.cursor.value).toBe(0);
+  });
+
   it('下载的加密 op 被解密后交给 op-log', async () => {
     const cipher = await encrypt(JSON.stringify({ title: '远端任务' }), PASSWORD);
     const h = makeHarness(() =>
@@ -709,6 +1002,10 @@ describe('同步客户端 — 下载与解密', () => {
 
     // 2. 游标推进 —— 否则下次同步再撞同一条，永久卡死
     expect(h.cursor.value).toBe(2);
+    expect(h.historyIncomplete.value).toBe(1);
+    expect(h.events.indexOf('mark-history-incomplete')).toBeLessThan(
+      h.events.findIndex((event) => event.startsWith('cursor:')),
+    );
 
     // 3. 状态结构化地说明"有东西没读进来"，而不是报 synced
     expect(status).toMatchObject({
@@ -718,6 +1015,116 @@ describe('同步客户端 — 下载与解密', () => {
     });
     // 诊断信息要**可定位**到具体是哪条 op
     expect(status.kind === 'error' ? status.message : '').toContain('poison');
+  });
+
+  it('🔴 下载部分解密失败时，持久化 incomplete-history 失败就不推进游标', async () => {
+    const good = await encrypt(JSON.stringify({ title: '能读的' }), PASSWORD);
+    const bad = await encrypt('{}', 'an-old-password');
+    const h = makeHarness(
+      () => okJson({
+        ops: [
+          {
+            serverSeq: 1,
+            receivedAt: 1,
+            op: {
+              id: 'good-before-marker-failure',
+              clientId: 'other',
+              actionType: 'CREATE_TASK',
+              opType: 'CRT',
+              entityType: 'TASK',
+              entityId: 'e-good',
+              payload: good,
+              vectorClock: { other: 1 },
+              timestamp: 100,
+              schemaVersion: 1,
+              isPayloadEncrypted: true,
+            },
+          },
+          {
+            serverSeq: 2,
+            receivedAt: 2,
+            op: {
+              id: 'bad-before-marker-failure',
+              clientId: 'other',
+              actionType: 'CREATE_TASK',
+              opType: 'CRT',
+              entityType: 'TASK',
+              entityId: 'e-bad',
+              payload: bad,
+              vectorClock: { other: 2 },
+              timestamp: 200,
+              schemaVersion: 1,
+              isPayloadEncrypted: true,
+            },
+          },
+        ],
+        hasMore: false,
+        latestSeq: 2,
+      }),
+      { failHistoryMarker: true },
+    );
+
+    const status = await h.client.sync();
+
+    expect(status).toMatchObject({ kind: 'error', reason: 'unexpected' });
+    expect(h.historyIncomplete.value).toBe(1);
+    expect(h.applied.flat().map((op) => op.id)).toEqual(['good-before-marker-failure']);
+    expect(h.cursor.value).toBe(0);
+    expect(h.events).not.toContain('cursor:2');
+  });
+
+  it('🔴 下载部分解密失败时没有 durable marker 就 fail-closed，不能跳过历史', async () => {
+    const good = await encrypt(JSON.stringify({ title: '能读的' }), PASSWORD);
+    const bad = await encrypt('{}', 'an-old-password');
+    const h = makeHarness(
+      () => okJson({
+        ops: [
+          {
+            serverSeq: 1,
+            receivedAt: 1,
+            op: {
+              id: 'good-without-marker',
+              clientId: 'other',
+              actionType: 'CREATE_TASK',
+              opType: 'CRT',
+              entityType: 'TASK',
+              entityId: 'e-good',
+              payload: good,
+              vectorClock: { other: 1 },
+              timestamp: 100,
+              schemaVersion: 1,
+              isPayloadEncrypted: true,
+            },
+          },
+          {
+            serverSeq: 2,
+            receivedAt: 2,
+            op: {
+              id: 'bad-without-marker',
+              clientId: 'other',
+              actionType: 'CREATE_TASK',
+              opType: 'CRT',
+              entityType: 'TASK',
+              entityId: 'e-bad',
+              payload: bad,
+              vectorClock: { other: 2 },
+              timestamp: 200,
+              schemaVersion: 1,
+              isPayloadEncrypted: true,
+            },
+          },
+        ],
+        hasMore: false,
+        latestSeq: 2,
+      }),
+      { withoutHistoryMarker: true },
+    );
+
+    const status = await h.client.sync();
+
+    expect(status).toMatchObject({ kind: 'error', reason: 'unexpected' });
+    expect(h.applied.flat().map((op) => op.id)).toEqual(['good-without-marker']);
+    expect(h.cursor.value).toBe(0);
   });
 
   it('解不开的计数是每次同步现算的，不会跨次累积', async () => {
@@ -1097,5 +1504,42 @@ describe('离线重试调度', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+
+describe('vault production sync wiring', () => {
+  it('reports key-provider failures as locked without a rejected promise or network write', async () => {
+    const h = makeHarness(() => okJson({}), { ops: [makeOp()], getPayloadCipher: async () => { throw new Error('secure-store unavailable'); } });
+    expect(await h.client.sync()).toMatchObject({ kind: 'error', reason: 'no-encryption-password' });
+    expect(h.uploads).toHaveLength(0);
+    expect(h.downloads).toHaveLength(0);
+  });
+
+  it('refuses a configured but locked vault even with a legacy password present', async () => {
+    const h = makeHarness(() => okJson({}), {
+      ops: [makeOp()], getPayloadCipher: async () => undefined,
+    });
+    expect(await h.client.sync()).toMatchObject({ kind: 'error', reason: 'no-encryption-password' });
+    expect(h.uploads).toHaveLength(0);
+    expect(h.downloads).toHaveLength(0);
+  });
+
+  it('uploads and downloads through the captured vault session with no password', async () => {
+    const codec = createVaultPayloadCipher({ current: { keyVersion: 1, rootKey: new Uint8Array(32).fill(13) } });
+    const local = makeOp();
+    const remote = makeOp({ id: 'remote-op', clientId: 'device-b', entityId: 'remote-task', vectorClock: { 'device-b': 1 } });
+    const remoteCipher = await codec.encrypt(JSON.stringify(remote.payload), remote);
+    const getCipher = vi.fn(async () => codec);
+    const h = makeHarness((_url, init) => init?.method === 'POST'
+      ? okJson({ results: [{ opId: local.id, accepted: true, serverSeq: 1 }], latestSeq: 1 })
+      : okJson({ ops: [{ serverSeq: 2, receivedAt: 1000, op: { ...remote, payload: remoteCipher, isPayloadEncrypted: true } }], latestSeq: 2, hasMore: false }),
+      { password: undefined, ops: [local], getPayloadCipher: getCipher });
+    expect(await h.client.sync()).toMatchObject({ kind: 'synced' });
+    expect(getCipher).toHaveBeenCalledTimes(1);
+    const sent = (h.uploads[0]!.body['ops'] as Array<Record<string, unknown>>)[0]!;
+    expect(await codec.decrypt(sent['payload'] as string, local)).toBe(JSON.stringify(local.payload));
+    expect(h.applied.flat().map((op) => op.payload)).toContainEqual(remote.payload);
+    expect(h.cursor.value).toBe(2);
   });
 });
