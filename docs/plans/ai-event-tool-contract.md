@@ -3058,3 +3058,9 @@ for b in feat/countdown-batch2 feat/countdown-w9 feat/countdown-w4b feat/countdo
 
 🟡 所以 **③ 现在没有闭合**，也不是"再等等就好"的模糊状态：它闭合的形态是
 队列里那段 `reinstall-all.sh` 在**落地载体**上跑完、四端各自那条"装上的是当前产物且能起来"的判据打出来。
+
+🔴 上面那行"mac 里 `list_events` 命中 0"**配了同刻的阳性对照**才敢这么写（否则 0 命中可能只是"这个 needle 本来就不进 web-dist"）：
+同一时刻从**落地载体**新打的 `apps/web/dist/assets` 是 7 个 js，其中 `list_events` 命中 **2** 个文件、
+`heyta.ai.assistant.history` 命中 **1** 个；而已装的 `/Applications/Heyta.app/.../web-dist` 只有 26 个文件、
+`assistant.history` 命中 1 个（`assets/index-Da9aaZLq.js`）而 `list_events` 命中 **0** 个
+⇒ 同一对 needle 一边中一边不中，"装的是合并下载体"这句才不是猜的。
