@@ -3832,7 +3832,7 @@ HEAD 没这行引用，那一趟这段应当是绿的；如果它红了，说明
 | mac | `.app` 里 `index.html` 引用 `index-Da9aaZLq.js`（sha `dd7f8156…`，23:05 构建），载体当前构建是 `index-BGKxdnVs.js`；标记 `list_events` 已装 **0** / 载体 **2** | **MISMATCH** |
 | android | 已装 APK `66,953,324 B`，载体构建产物 `67,183,868 B`；`lastUpdateTime=2026-10-04 02:46:47`（有人刚重装过，**不是本线载体**） | **SIZE-DIFF** |
 | ios | 已装 `main.jsbundle` sha `e713c7bf…`；构建侧 `/tmp/heyta-ios-release/…/main.jsbundle` 此刻不存在（那一端本轮没跑过） | **无对照** |
-| windows | 本机日志里 `ADD_APPX=` / `PAYLOAD_WEBDIST=` / `M2D=` **一条都没取到** | **NOT-PROVEN** |
+| windows | 02:59 更正（原地）：第一版这里写的是"本机日志一条都没取到"—— 那是因为**这一趟还没跑到阶段 5**，日志不存在。权威载体不是日志而是取证文件 `dist/windows/install-capture.txt`，**现量它在 10-03 23:12 五条判据全在位**（`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` / `M2D=OK` / `SHORTCUT_OK=True`）⇒ 对本轮而言的读数是 `PAX_WIN=STALE`（旧一趟的），不是"没证据" | **STALE**（不是 NOT-PROVEN） |
 
 **为什么没做完**：② 与 ③ 的前置是同一条窗口（负载 ≤12 + 无人在跑设备/e2e + 无另一趟链）。
 01:00–03:00 现量负载在 **50–86** 之间起伏，`qemu-system-aarch64-headless` 单进程 651% CPU，
@@ -3845,7 +3845,7 @@ HEAD 没这行引用，那一趟这段应当是绿的；如果它红了，说明
 1. `REINSTALL rc=0` **且** 它的载体与 `CHAIN rc=0` 那条是同一枚 SHA；
 2. `PAX_MAC=MATCH` 且 `PAX_IOS=MATCH`（逐字节同，不是"mtime 新"）；
 3. `PAX_AND=MATCH` 或写明"装了别人那一份、尺寸差多少"（不许读成通过）；
-4. `PAX_WIN=PROVEN`（`ADD_APPX=OK` + `PAYLOAD_WEBDIST=True` + `M2D=OK` 三条同时取到）
+4. `PAX_WIN=PROVEN` —— 判据是 `scripts/lib/msix-install-facts.sh` 的 **`MSIX_REQUIRED_FACTS` 五条全在位**（含用户点名的 `SHORTCUT_OK=True`），**这条链不自己抄清单**；取证文件 mtime 要晚于本轮起跑，否则读 `STALE`
    **且** 收尾那行 `装完之后 main→重装载体的打包输入差集 = 0`（§7 #206）。
 
 **不许的关闭方式**（都出现过 tempting 的形态）：拿"链 64 绿"当交付证据（链答的是源码，不是安装包，§7 #82）；

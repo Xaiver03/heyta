@@ -5042,3 +5042,23 @@ ArgumentError - path name contains null byte
 
     配套（三条都是同一条不变量的不同时刻）：**起跑前重量一次**（窗口是瞬时读数）、
     **装完再量一次**（重装那 40 分钟里并进一笔代码完全正常，差集≠0 就得说明这一装在落地那一刻已过期）。
+
+207. 🔴 **判据清单已经有单一所有者 lib 了，链里再 `grep` 一遍字面量 = 当场抄出第二份定义** ——
+    我在这次会话里抄错了，而且抄少两条。
+
+    `scripts/lib/msix-install-facts.sh` 的文件头**逐字**写着"清单从两处开始就一定会漂"，
+    它列的是 `MSIX_REQUIRED_FACTS` **五条**（`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` /
+    `M2D=OK` / `SHORTCUT_OK=True`）。02:51 我写交付链的 payload 探针时，为了"不再依赖那个 lib 在不在"，
+    在链里直接 `grep -aoE 'ADD_APPX=…|PAYLOAD_WEBDIST=…|M2D=…'` ⇒ **只剩三条**，
+    用户点名的那条 `SHORTCUT_OK` 在我这条链上永远不会被读到，而 `PAX_WIN=PROVEN` 照样能报出来。
+    02:59 才发现（是我自己拿 `grep -n shortcut` 去找"这活儿到底做没做"时撞上那个 lib 的）。
+
+    修：`. "$CARRIER/scripts/lib/msix-install-facts.sh"` 后用 `msix_check_facts <取证文件>`，
+    并把清单条数打进日志（`判据清单=5 条（取自单一所有者）`）—— **数量也是判据**，
+    读成 0 就说明 lib 不在，那要 `PAX_WIN=LIB-MISSING` 而不是退回我抄的那份。
+
+    📌 两条一般规律：① **仓库里已经有单一所有者的清单时，"我自己 grep 一遍字面量"不是保守做法，
+    而是复制做法** —— 保守做法是 source 它，并断言"清单确实从它拿到了 N 条"；
+    ② 抄件漂移最早出现在**新写的那一侧**（旧的一侧有门禁、新的那一侧没人比），
+    所以新探针要**同时**跑一次"应当判 `STALE`/`LIB-MISSING`"的反向腿（02:59 用两个 `INST_START`
+    各跑一次，一腿 `PROVEN` 一腿 `STALE`，才算这条判据有牙）。

@@ -3147,7 +3147,7 @@ grep -a SUMMARY ~/scratch-heyta/chain-ai-closeout-0134/segments-rc.txt
 | mac | `PAX_MAC=MISMATCH`：`/Applications/Heyta.app/…/web-dist/index.html` 引用 `index-Da9aaZLq.js`（sha `dd7f8156…`），而载体 `apps/web/dist` 里那枚文件名**根本不存在**（载体当前是 `index-BGKxdnVs.js`）；标记 `list_events` 在已装包里 **0** 处、载体包里 **2** 处 | 装的是 10-03 23:05 的构建，**早于落地** |
 | android | `PAX_AND=SIZE-DIFF`：已装 `66,953,324 B` vs 载体构建产物 `67,183,868 B`，`dumpsys` 的 `lastUpdateTime=2026-10-04 02:46:47` | 02:46 有人重装过，**装的不是本线载体**（另一条线的产物） |
 | ios | `PAX_IOS=MISMATCH`：已装 `main.jsbundle` sha `e713c7bf…`，构建侧路径 `/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle` 此刻**不存在** | 探针对还没跑过 ⇒ 记 `NOT-READABLE` 才对（这条已经改：判据从 `-n` 换成 `-f`） |
-| windows | `PAX_WIN=NOT-PROVEN`：本机日志里 `ADD_APPX=` / `PAYLOAD_WEBDIST=` / `M2D=` **一条都没取到** | 没证据就是没证据，**不**读成"装上了" |
+| windows | `PAX_WIN=NOT-PROVEN`：本机日志里 `ADD_APPX=` / `PAYLOAD_WEBDIST=` / `M2D=` **一条都没取到** | 没证据就是没证据，**不**读成"装上了"。**⚠️ 02:59 原地更正**：这一格取错了载体 —— 判 Windows 的权威文件是 `dist/windows/install-capture.txt`，现量它 23:12 起**五条判据全在位**（含 `SHORTCUT_OK=True`）。所以真实读数是 `STALE`（旧一趟的齐码），而"一条都没取到"这句只描述了一个还不存在的日志 |
 
 🔴 **所以 ③ 的当前状态是"未完成"，且这不是坏消息而是这一节的全部内容**：四端里三端装着过期或别人的构建、
 一端连读数都没有。任何"本轮交付完成"的说法都必须先让阶段 5 真跑一遍并由这五个读数背书。
