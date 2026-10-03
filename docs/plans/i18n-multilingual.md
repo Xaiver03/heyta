@@ -775,6 +775,11 @@ node scripts/check-pricing-consistency.mjs
    `e2e/playwright.lang-shots.config.ts`（私有端口 4327：`check:ai-e2e` 的预检
    会对 4318/4319 下 SIGKILL，不能共用），它含"顶栏只有一个入口且入口自己说明自己"
    与中/英 × 浅/暗 × 1280/660 共 16 张图。
+   ⚠️ **一处日期更正**：这一批改动的注释与文档最初把形态变更写成"2026-10-04"，
+   实际提交时间戳是 **2026-10-03**（`git log` 可查），已由 `fb0d7b0a` 改回。
+   🔴 那条提交信息里"当时已经过了午夜"这句归因是**错的** —— 时间戳是 17:55，
+   没有任何午夜可言，写错就是写错。留在这里是因为提交信息改不掉：
+   **写进历史里的因果句也是断言**，被否证就要在能改的地方撤回。
 9. **`packages/sync-client` 的 `describeConflictPayload` 仍是中文，且会吐出内部标识符。**
    它返回一句中文（空载荷 `（空）`），其中一支还会把载荷的**字段名**拼进去（`completedAt: 123`）。
    现在加了一个结构化兄弟函数 `summarizeConflictPayload(payload)` →
