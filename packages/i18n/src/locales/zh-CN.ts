@@ -2250,6 +2250,20 @@ export const zhCN = {
   'web.reminder.notify.denied': '通知已被浏览器拒绝。要重新开启，请在浏览器的站点设置里改。',
   'web.reminder.notify.limit': '⚠️ 通知只在 heyta 开着的时候发得出来。应用关掉后不会响 —— 后台唤醒需要另一套协议，目前还没有。',
   'web.reminder.notify.body': '该做「{title}」了',
+  // ── 提醒的**长提前量档位**（W9 ①，2026-10-03）──
+  // 🔴 这四条**必须与 `REMINDER_LONG_OFFSET_PRESETS_MS` 一一对应**，映射写在
+  //    `apps/web/src/features/reminders/reminder-tiers.ts` 的 `longOffsetMessageKey`
+  //    （`default` 分支直接抛，就是防"领域层加了一档、这里忘了补 key"）。
+  // ⚠️ 键名里的 `2d/3d/1w/30d` 是契约的一部分：文案说"提前 3 天"，宿主就必须建
+  //    "截止前 3 个**日历日**"（不是 72 小时 —— 跨夏令时会漂一小时，见 W9 ③）。
+  // 为什么单独一组、不并进上面的 `reminder.offset.*`：那一组是共享组件
+  // `ReminderList` 的下标契约（web 与 mobile 各有一份 key 数组），移动端还没有
+  // 这几档的词条，硬并进去会让移动端一打开提醒面板就抛。
+  'web.reminder.offset.groupLabel': '更早（按天）',
+  'web.reminder.offset.2d': '提前 2 天',
+  'web.reminder.offset.3d': '提前 3 天',
+  'web.reminder.offset.1w': '提前 1 周',
+  'web.reminder.offset.30d': '提前 30 天',
   'web.search.title': '搜索',
   'web.search.placeholder': '搜任务标题、备注、便签正文',
   'web.search.tasksSection': '任务',
