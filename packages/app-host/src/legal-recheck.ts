@@ -46,6 +46,11 @@
  *
  * 🔴 由此得出一条宿主必须守住的顺序：**先 `refresh()`，再放行任何数据出站**。
  * 这条顺序不是可选的优化，判据（`tests/legal-recheck.spec.ts`）里有对应的一条。
+ *
+ * 🔴 但"拦着"不等于"可以说"。`checking` 期间宿主**不许**把拦截写成一句裁决
+ * （"你要重新确认"），因为那时我们还没问过 —— 要等就说要等，能等就 `await settled()`
+ * 再判。这一条是实测补上的：自建栈真浏览器里，新设备登录后第一次点同步拿到的是
+ * "条款文本已经更新…"，而服务端对同一账号已答 `needsReconfirm:false`。
  */
 
 import {
@@ -126,6 +131,11 @@ export function createLegalRecheckGate(ports: LegalRecheckPorts) {
    * 与 `apps/mobile/src/sync/auto-sync.ts` 的"代际计数防丢写"是同一条纪律。
    */
   let generation = 0;
+  /**
+   * 最近一轮 `ask()` 的在途 Promise。初值是"没有任何东西在途"，
+   * 于是 `settled()` 在没问过的状态下就是一个已完成的等待。
+   */
+  let pending: Promise<void> = Promise.resolve();
   const listeners = new Set<() => void>();
 
   const set = (next: LegalRecheckView): void => {
@@ -177,7 +187,8 @@ export function createLegalRecheckGate(ports: LegalRecheckPorts) {
     // `checking` 期间界面不许继续显示旧版本，也不许弹面板
     // （`shouldShowSheet()` 为假），所以清空是安全的。
     set(view('checking'));
-    return ask(gen);
+    pending = ask(gen);
+    return pending;
   };
 
   return {
@@ -194,6 +205,32 @@ export function createLegalRecheckGate(ports: LegalRecheckPorts) {
      */
     dataEgressAllowed(): boolean {
       return state.phase !== 'checking' && state.phase !== 'needs-reconfirm';
+    },
+
+    /**
+     * 等这一问**落定**（闸门不再处于 `checking`）。没在途询问时立刻完成。
+     *
+     * 🔴 存在理由：`checking` 不是一个可以对外宣布的裁决，而宿主原来就是在当场读它的 ——
+     * 于是"还在问"被写成了 `legal-reconfirm-required`，界面那句话的内容是
+     * "条款文本已经更新，而这个账号还没有重新确认"。实测形态（自建栈真浏览器）：
+     * 新设备登录后**第一次**点同步得到那句话，而同一次登录里服务端对
+     * `/api/account/legal-consent` 已答 `needsReconfirm:false`；**一个下载请求都没发**，
+     * 再点一次才同步成功。既谎了，又拦住了一件本来该成的事。
+     *
+     * 与"拦不拦"的分工要说清：`dataEgressAllowed()` 在 `checking` 时**照旧返回 `false`**，
+     * 那条不变量一个字都没松（自动同步与实时通道仍然不等答案，它们靠订阅者在落定后重建）。
+     * 这里改的是宿主**什么时候有资格把话说出口**。
+     *
+     * ⚠️ 循环而不是 `await` 一次：等待期间可能有更晚的一轮询问接上（换令牌、
+     * 确认后的重问 —— 文件头"代际计数"那一节列的就是这两种），那一轮的 `checking`
+     * 同样不是答案。终止性由 `ask()` 的结构保证：每一轮都会 `set()` 一个非 `checking`
+     * 的状态（四种问不到的形态各自归成 `unavailable` / `anonymous`），
+     * 而 `pending` 永远指向**当前这一代**那一轮。
+     */
+    async settled(): Promise<void> {
+      while (state.phase === 'checking') {
+        await pending;
+      }
     },
 
     /** 界面要不要弹。与"拦不拦"刻意分开：`checking` 时不许弹一个可能永远不消失的面板。 */
