@@ -31,6 +31,8 @@ const src = (rel: string): string => readFileSync(resolve(here, '..', 'src', rel
 
 const TASKS = src('screens/TasksScreen.tsx');
 const HABITS = src('screens/HabitsScreen.tsx');
+const NOTES = src('screens/NotesSection.tsx');
+const SEARCH = src('screens/SearchScreen.tsx');
 const LIB = src('lib/selection.ts');
 
 describe('1. 回落喂的是活跃全集，不是筛后的那一截', () => {
@@ -47,16 +49,43 @@ describe('1. 回落喂的是活跃全集，不是筛后的那一截', () => {
     expect(HABITS).toMatch(/const aliveHabits = actions\.listHabits\(\);/);
     expect(HABITS).toMatch(/pruneSelectionAgainst\(\{\s*habit:\s*aliveHabits\.map\(/);
   });
+
+  /**
+   * 🔴 便签这一类有**两个**持有实体全集的屏（「我的 → 便签」那一段、搜索浮层），
+   * 少接一个的症状是具体的：从搜索点开一条便签后它在另一台设备上被删了，
+   * 编辑屏不会自己关 —— 因为那一刻只有没挂载的那个屏在跑回落。
+   */
+  it('便签：两个持有全集的屏都跑了回落，且喂的是 `listNotes()` 的结果', () => {
+    for (const [name, text] of [['NotesSection', NOTES], ['SearchScreen', SEARCH]] as const) {
+      expect(text, `${name} 没接便签回落`).toMatch(/pruneSelectionAgainst\(\{\s*note:/);
+      // 反向：不许拿筛完的 `results.notes` / 排过序的那一截当谓词来源。
+      expect(text, `${name} 的回落谓词来自筛后的一截`).not.toMatch(
+        /pruneSelectionAgainst\(\{\s*note:\s*(?:results|filtered|visible)/,
+      );
+    }
+    expect(NOTES).toMatch(/const listed = actions\.listNotes\(\);/);
+    expect(SEARCH).toMatch(/const listed = noteActions\.listNotes\(\);/);
+  });
 });
 
 describe('2. 旧的本地选中态确实删掉了（不是"又加了一份新的"）', () => {
-  it('两屏都不再 `useState` 一个选中 id', () => {
-    for (const [name, text] of [['TasksScreen', TASKS], ['HabitsScreen', HABITS]] as const) {
+  it('四屏都不再 `useState` 一个选中 id', () => {
+    for (const [name, text] of [
+      ['TasksScreen', TASKS],
+      ['HabitsScreen', HABITS],
+      ['NotesSection', NOTES],
+      ['SearchScreen', SEARCH],
+    ] as const) {
       expect(text, `${name} 又长回本地选中态`).not.toMatch(
-        /const\s*\[\s*(?:detail|selected|open|active)(?:Task|Habit|Note|Project|Tag|Event)Id\s*(?:,\s*set[A-Za-z0-9_$]+\s*)?\]\s*=\s*useState/,
+        // 🔴 `edit(ing)` 分支是 2026-10-03 补的：`editingNoteId`（TasksScreen）与
+        // `editingId`（NotesSection）就是同一个问题被答了两遍，而旧的正则一个都不认。
+        /const\s*\[\s*(?:detail|selected|open|active|edit(?:ing)?)(?:Task|Habit|Note|Project|Tag|Event)Id\s*(?:,\s*set[A-Za-z0-9_$]+\s*)?\]\s*=\s*useState/,
       );
-      expect(text).toContain("from '../lib/selection'");
     }
+    // 任务屏与便签那一段都必须从共享那份读，而不是从 react 自己造。
+    expect(TASKS).toContain("from '../lib/selection'");
+    expect(HABITS).toContain("from '../lib/selection'");
+    expect(NOTES).toContain("from '../lib/selection'");
   });
 
   it('选中态只在 `lib/selection.ts` 里实例化一次', () => {
@@ -71,6 +100,19 @@ describe('3. 离开这一屏时收起详情层', () => {
     expect(TASKS).toMatch(/useEffect\(\s*\(\) => \(\) => \{\s*selection\.select\('task', null\);/);
     expect(HABITS).toMatch(/useEffect\(\s*\(\) => \(\) => \{\s*selection\.select\('habit', null\);/);
   });
+
+  /**
+   * 便签的编辑屏有**两个宿主**（任务屏的搜索入口、「我的 → 便签」那一段），
+   * 所以清理也必须两处都有。只在一处清的后果是"从另一条路进来时，
+   * 切个标签回来编辑屏还站在屏幕上"—— 与上面两条同一个坏行为。
+   */
+  it('便签：两个宿主都在卸载时清了自己那一类', () => {
+    for (const [name, text] of [['TasksScreen', TASKS], ['NotesSection', NOTES]] as const) {
+      expect(text, `${name} 的卸载清理没收便签编辑屏`).toMatch(
+        /useEffect\(\s*\(\) => \(\) => \{[\s\S]{0,160}?selection\.select\('note', null\);/,
+      );
+    }
+  });
 });
 
 describe('4. 回落循环只有一份实现（宿主不各写一遍）', () => {
@@ -82,7 +124,25 @@ describe('4. 回落循环只有一份实现（宿主不各写一遍）', () => {
   });
 });
 
-describe('5. 接线本身的行为（在真 store 上走一遍）', () => {
+/**
+ * 🔴 这一组是 Goal 那条"选中不能只应用到一个地方"在本壳的落点。
+ * 数的是**接线点**，不是印象：三种投影（列表 / 四象限 / 时间线）加搜索浮层
+ * 一共四个写入口，三种投影各一个高亮出口。少接一处的症状是"在列表里选中一条、
+ * 切到四象限就不认识它了" —— 那正是三份本地选中态的老形状。
+ */
+describe('5. 同一批任务的几种投影接的是同一个选中（W1 跨视图）', () => {
+  it('四个入口都写 `select(\'task\', id)`', () => {
+    expect(TASKS.split("selection.select('task', id);").length - 1).toBe(4);
+  });
+
+  it('三种投影都把选中递回去当高亮光标', () => {
+    expect(TASKS.split('activeTaskId={detailTaskId}').length - 1).toBe(3);
+    // 阳性对照：这个值就是本屏读的共享选中，不是又造了一个本地状态。
+    expect(TASKS).toContain("const detailTaskId = useSelected('task');");
+  });
+});
+
+describe('6. 接线本身的行为（在真 store 上走一遍）', () => {
   it('选中的实体不在了 ⇒ 清空；还在（哪怕不在筛选里）⇒ 保持', () => {
     selection.clear();
     selection.select('task', 't2');

@@ -425,13 +425,15 @@ export function TasksScreen({
    */
   const [searchOpen, setSearchOpen] = useState(false);
   /**
-   * 从**搜索结果**里点开的那条便签（多端第二批）。
+   * 从**搜索结果**里点开的那条便签 = **选中的那一条**（W1）。
    *
-   * 与 `NotesSection` 里那个同名状态是分开的两份：两个宿主、两个入口，
-   * 各自管自己那一段的"打开了什么"。合成一份要跨屏传回调，
-   * 而 `NoteEditScreen` 自己是全屏 `Modal`，谁挂着它都一样。
+   * ~~与 `NotesSection` 里那个同名状态是分开的两份……合成一份要跨屏传回调~~
+   * **（2026-10-03 已推翻，留原文是为了让后来者认出这个形状）**：选中态是
+   * `lib/selection` 的模块级单例，两个入口各写一次 `select('note', id)`，**没有回调要传**。
+   * 而分开两份的代价当场现形：web 那条搜索路径没有共同的地方可写，于是 id 被丢掉。
+   * `NoteEditScreen` 是全屏 `Modal`，一次只有一个 tab 挂在树上 ⇒ 不会叠两层。
    */
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const editingNoteId = useSelected('note');
   /** 截止时间的呈现方式。与 Web 端 `DueBadge` 的开关一致，默认 `date`。 */
   const [dueMode, setDueMode] = useState<DueDisplayMode>('date');
   /**
@@ -573,6 +575,8 @@ export function TasksScreen({
   useEffect(
     () => () => {
       selection.select('task', null);
+      // 本屏还挂着搜索那条入口的便签编辑屏（`NoteEditScreen`），同一条理由一起收。
+      selection.select('note', null);
     },
     [],
   );
@@ -1041,6 +1045,7 @@ export function TasksScreen({
             tasks={tasks}
             now={now}
             busyTaskId={busyId}
+            activeTaskId={detailTaskId}
             labels={taskRowLabels}
             renderMeta={renderTaskMeta}
             renderTrailing={renderTaskTrailing}
@@ -1063,6 +1068,7 @@ export function TasksScreen({
             tasks={tasks}
             today={today}
             now={now}
+            activeTaskId={detailTaskId}
             // 触屏端的排期入口：点行 → 详情表单（横向拖拽与滚动冲突，不搬鼠标手势）。
             onOpenTask={(id) => {
               selection.select('task', id);
@@ -1089,6 +1095,7 @@ export function TasksScreen({
               onOpenTask={(id) => {
                 selection.select('task', id);
               }}
+              activeTaskId={detailTaskId}
               busyTaskId={busyId}
               labels={taskRowLabels}
               renderMeta={renderTaskMeta}
@@ -1148,7 +1155,7 @@ export function TasksScreen({
           // 🔴 先关浮层再开编辑屏：两个 `Modal` 同时在场在 Android 上没实测过，
           //    而"关掉搜索再看这条便签"本来就是用户想要的次序。
           setSearchOpen(false);
-          setEditingNoteId(id);
+          selection.select('note', id);
         }}
       />
 
@@ -1156,7 +1163,7 @@ export function TasksScreen({
         <NoteEditScreen
           noteId={editingNoteId}
           onBack={() => {
-            setEditingNoteId(null);
+            selection.select('note', null);
           }}
         />
       )}

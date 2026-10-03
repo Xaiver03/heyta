@@ -57,7 +57,7 @@ describe('选中态：每类至多一个选中项', () => {
   });
 
   it('clear() 不带参数 = 全清（退出登录 / 切账号用）', () => {
-    const store = createSelectionStore({ task: 't', note: 'n', tag: 'g' });
+    const store = createSelectionStore({ task: 't', note: 'n', habit: 'h' });
     expect(Object.keys(store.snapshot()).length).toBe(3);
     store.clear();
     expect(store.snapshot()).toEqual({});
@@ -66,9 +66,10 @@ describe('选中态：每类至多一个选中项', () => {
   });
 
   it('词表是封闭的：新增一类必须显式改这里', () => {
-    expect([...SELECTABLE_KINDS].sort()).toEqual(
-      ['event', 'habit', 'note', 'project', 'tag', 'task'].sort(),
-    );
+    // 🔴 这一份是**类型层**的封闭；运行时还有第二道 ——
+    // `scripts/check-selection-single-source.mjs` 的断言 D 会查新加的那一类
+    // 在宿主里到底有没有人选中它。只改这里就能通过的"支持六类"是假完成。
+    expect([...SELECTABLE_KINDS].sort()).toEqual(['habit', 'note', 'task'].sort());
   });
 });
 

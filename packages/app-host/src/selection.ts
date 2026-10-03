@@ -8,7 +8,7 @@
  *    web 习惯侧是 `HabitsView` 的一个 `useState`、移动端任务侧是
  *    `TasksScreen` 的 `detailTaskId: useState`。三份 = 三套回落规则，
  *    而"选中对象消失时怎么办"这种边界条件恰恰是最容易各写各的。
- * 2. 详情面（第四栏）要能在任务/习惯/便签/清单/标签/纪念日之间统一渲染，
+ * 2. 详情面（第四栏）要能在任务/习惯/便签之间统一渲染，
  *    前提是"当前选中了什么"有一个共同的答案。
  *
  * 🔴 **它不是数据。** 不进 op-log、不参与向量时钟、不同步 ——
@@ -20,23 +20,20 @@
  * （web 的 store 是 zustand，移动端是 `useSyncExternalStore`）。
  */
 
-/** 可以被选中的实体类别。新增一类要同时改这里 —— 它是封闭词表。 */
-export type SelectableKind =
-  | 'task'
-  | 'habit'
-  | 'note'
-  | 'project'
-  | 'tag'
-  | 'event';
+/**
+ * 可以被选中的实体类别。新增一类要同时改这里 —— 它是封闭词表。
+ *
+ * 🔴 **只有"界面会指出现在看的是哪一条"的那些类别才许进来。**
+ * `pnpm check:selection-single-source` 的断言 D 会逐类查宿主有没有消费者，
+ * 加一个没有消费者的 kind 直接红。这条纪律拦的是本仓库记过的那个形状：
+ * 词表里先写好「清单 / 标签 / 纪念日」，槽位建了、`pruneSelection` 的谓词也写了，
+ * 但界面上没有任何一处会选中它们 —— 于是"有这个功能"变成一个自欺的读数。
+ * 清单与标签今天在两侧都是**筛选/导航**（点它换中间那一栏的内容），不是"看哪一条"；
+ * `EVENT` 还不在物化状态里。它们各自等到真有详情面时再加。
+ */
+export type SelectableKind = 'task' | 'habit' | 'note';
 
-export const SELECTABLE_KINDS: readonly SelectableKind[] = [
-  'task',
-  'habit',
-  'note',
-  'project',
-  'tag',
-  'event',
-];
+export const SELECTABLE_KINDS: readonly SelectableKind[] = ['task', 'habit', 'note'];
 
 export type SelectionSnapshot = Readonly<Partial<Record<SelectableKind, string>>>;
 

@@ -50,11 +50,9 @@ export function pruneSelectionFromEntities(entities: MaterializedState): void {
     task: existsIn(aliveIds(entities.tasks)),
     habit: existsIn(aliveIds(entities.habits)),
     note: existsIn(aliveIds(entities.notes)),
-    project: existsIn(aliveIds(entities.projects)),
-    tag: existsIn(aliveIds(entities.tags)),
-    // 🔴 没有 `event` 这一档：`EVENT` 实体还不在物化状态里（批次二未合）。
-    // 有槽位没数据源时**宁可不回落**，也不许拿一个恒真的谓词顶上 ——
-    // 恒真谓词会让"纪念日被删了右边还在显示它"变成一条永远不会红的判据。
+    // 🔴 词表只有这三类，而这不是省事：清单/标签在两侧都是**筛选**（点它换中间那一栏），
+    // 纪念日还没进物化状态。给一个没有消费者的类别写谓词，得到的是一条
+    // 永远绿、永远不成立的判据 —— 断言 D（`check:selection-single-source`）就是拦这个的。
   });
 }
 
