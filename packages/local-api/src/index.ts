@@ -82,6 +82,22 @@ export {
   type ToolCallOutcome,
 } from './mcp.js';
 
+/**
+ * 实体工具包的接缝与聚合结果。
+ *
+ * 🔴 `LOCAL_API_TOOL_PACKS` 是**导出件**，不只是内部实现：
+ * `scripts/gen-ai-capability-manifest.mjs` 从构建产物里读它的 `schemas` 键集，
+ * 用来回答"这个工具的参数 schema 有没有被登记过"（`schemaRecorded`）——
+ * 那是 dist 层面唯一问得到、而 `listAuthorizedTools()` 的空 `properties` 回退
+ * 会把两种情况长得一模一样的问题。
+ */
+export {
+  LOCAL_API_TOOL_PACKS,
+  buildToolPackRegistry,
+  type ToolPackRegistry,
+} from './tools/registry.js';
+export type { EntityToolPack } from './tools/pack.js';
+
 export {
   LOCAL_API_METHODS,
   createLocalApiHandler,
