@@ -1311,3 +1311,20 @@ cd /private/tmp/heyta-final && git merge --no-edit main && pnpm build && pnpm ch
   是**每一次 `pnpm check` 都会跑**的那一段 ⇒ 落地本线会让 main 的第 54 段从红变绿。
 - 实测对照就在眼前：主检出 18:4x 那一趟整链 **e2e 段 `124 passed / 0 failed` 过了、死在第 54 段**
   （`/tmp/heyta-aed-check-final6.log` 末尾 `Command failed with exit code 1`）。
+
+**段 52–60 的读数进度（载体 `861f4f3a`，代码树与 `10dc0bd4` 逐目录同一：`packages` `475e69b7` /
+`apps` `459ac9db` / `scripts` `405152ca` / `server` `68843bda` / `e2e` `b10a7c01`，差集只有一行 docs）**
+
+| 段 | 读数 | 跑法 |
+|---|---|---|
+| 54 `check:shell-unicode` | **rc=0**（扫 68 个 `.sh`） | 单跑 |
+| 57 `check:script-snapshot` | **rc=0**（自快照 bootstrap 30 个脚本 + `.gitignore` 全在位） | 单跑 |
+| 59 `screenshot:verify` | **rc=0**（注册表 23 个目标，已生成的尺寸正确、无 alpha、非空白） | 单跑 |
+| 52 / 53 / 55 / 56 / 58 / 60 | 待补 | `/tmp/heyta-tail-segs-185511`（对端清空 + 负载门各段各过一道） |
+
+ **为什么这三段允许在负载门外单跑**（写清楚，免得被读成放宽闸门）：它们的判据是**静态文本 / 文件属性**
+（`node scripts/check-shell-unicode-vars.mjs`、`check-script-snapshot.mjs`、`screenshots/verify-artifacts.mjs`），
+结论不随宿主机时序变化；而负载门的适用对象是**设备与截图时序**那一类（traps #168 的起因就是
+`uiautomator dump` 在 load 62 时抓不到界面）。剩下六段里 52/53/55/56 走真浏览器、58 走设备、60 是全量测试，
+**全部留在闸门后面**，一条都不提前跑。此刻 `vm.loadavg` 1 分钟 = **200.62**（并行会话多趟整链同跑），
+等窗口是正常状态，不是卡住。
