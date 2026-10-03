@@ -1,9 +1,9 @@
 # 倒数纪念日（含农历、节日、纪念卡片）实施计划
 
-> 状态：**规划中**（🔴 决策已定：[ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md) 已接受 ⇒ **可开工**。两道前置闸门：W1 的 bundle 体积实测、W2 的服务端先行部署顺序）
+> 状态：🔄 **批次一已落地**（2026-10-03，`a29881e9` 已合进 main）：W1 历法层 / W3「每年」预设 / W4 节假日随包数据 + bundle 体积闸门，落地记录与本批欠账见 **§3.5**。⏸ 批次二未开工：W0 界面、W2 `EVENT` 实体（🔴 有"服务端先于客户端"的部署顺序硬约束，见 §3 W2）、W5–W9、W4b、L 系列。
 > 决策：[ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（实体 / 农历依赖 / 数据分发 / 图片双档四则）
 > 证据基础：[`countdown-anniversary-data-and-images.md`](../research/countdown-anniversary-data-and-images.md)（2026-10-02 调研，本文只引用它的结论，不重复取证）
-> 决策：🔴 **待立 ADR**（§1 拍完再写，编号顺延）。本文不代替 ADR —— 按 `docs/README.md` §一，调研给证据、ADR 下结论、计划管落地。
+> 决策：✅ 已立 = [ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（2026-10-03 接受；本行原先写"🔴 待立 ADR"，那是同一份文档里比正文更早写下的一句，落地后忘了 sweep —— 按 `docs/README.md` §一，调研给证据、ADR 下结论、计划管落地）。本文不代替 ADR。
 
 ---
 
@@ -195,6 +195,8 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 
 🔴 **表里不写分母数字**（公告条数、扫描文件数、入口字节数）—— 那些由 `pnpm check:calendar` 每次现场打印；写进文档就是抄件，抄件一定会漂。变异例数是本次交付的稳定事实，所以只有它进表。
 
+⚠️ **但"变异例数"也不许再加总**。收口时实测到两处自造的合计：`docs/README.md` 与 `docs/plans/README.md` 各写过"26 例"（那是 W1+W4 的中间数，写完 W3 与 bundle 闸门后就没更新），本会话对用户的口头汇报又说过"31 例"（把表里第三列误当两个数相加）。表里四行的 **19 / 5 / 7 / 7 是唯一一份账**，谁要合计自己加 —— 已从两处索引里撤掉总数，改为指针。
+
 ### 明确没做（逐条给理由，不是漏掉）
 
 1. **W3 的"真机/真服务端 yearly 断言"**（本工单原本要求补的那条）。2026-10-03 02:02（本地）实测：`emulator-5556` 正被并行会话的 `scripts/verify-mobile-restore.sh`（pid 86145 / 86147，当时已跑 11 分 46 秒）占用，且主检出有一批未提交的 `apps/mobile/**` 源码改动 —— 此时抢设备既打断对方，装出来的 APK 也不是本分支的代码。**顺延到设备空闲时**，且必须在 `pnpm reinstall:mobile` 之后跑，否则验的是旧二进制（AGENTS §6.1.1）。
@@ -203,37 +205,26 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 4. **W4 判据②的界面半段**（"数据只到 2026 时 2027 显示节、不显示休/班"）：本批不做 UI，所以落的是**数据层**那半 —— 2027 有节无休、不抛错、非法日期响亮失败，都有单测与变异。界面上那条随 W5。
 5. **W0 / W2 / W5 / W6 / W7 / W8 / W9 / W10、W4b、L 系列**：按排期未开工。W2 未动 = `shared-schema`、服务端、迁移一个字节都没改（批次二的部署顺序风险留在那里处理）。
 
-### 合入时必须做的事（现在做不了，每件都有硬理由）
+### 合入时必须做的事 —— 2026-10-03 上午收口结果（逐条带读数）
 
-0. 🔴 **主检出里还留着本批文档的"上一版"**，直接 `git merge` 会被它自己拦下：
-   - 未跟踪的 `docs/adr/0044-…md`、`docs/plans/countdown-anniversary.md`、
-     `docs/research/countdown-anniversary-data-and-images.md` —— 分支里带的是**更新过的版本**
-     （§5b / §3.5 / §6），git 遇到"未跟踪文件会被覆盖"是**整个合并中止**，而且报错里不会
-     说明这三份的内容其实已经有人接手了。
-   - 未提交的一行 `docs/plans/README.md` 与 11 行 `docs/plans/goal-layout-audit.md`（都是
-     本会话写的，现已随分支落地）—— 对**已跟踪**文件的本地改动，merge 同样会拒绝。
-   ✅ 正确动作（一次做完，先验证再动）：
-   ```bash
-   cd heyta
-   git diff --stat docs/plans/README.md docs/plans/goal-layout-audit.md   # 应当只有本批那几行
-   mkdir -p /tmp/heyta-pre-merge && git ls-files -co --exclude-standard -- docs \
-     | grep -E "countdown|0044" | tar czf /tmp/heyta-pre-merge/docs.tgz -T -
-   mv docs/adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md \
-      docs/plans/countdown-anniversary.md \
-      docs/research/countdown-anniversary-data-and-images.md /tmp/heyta-pre-merge/
-   git checkout -- docs/plans/README.md docs/plans/goal-layout-audit.md
-   ```
-   ⚠️ 这一步**故意不在本批执行**：主检出是并行会话正在用的工作树
-   （2026-10-03 02:02 它的 `verify-mobile-restore.sh` 正在跑，`docs/` 下还有别人
-   未提交的改动，包括一个已经 staged 的文件）。改它的跟踪文件 = 动别人的现场。
+原条目**保留原文**，一是让后来者看清"合入前必须先做什么"这件事的形状，二是其中两条的**理由被实测否证了**，更正必须写在原句旁边。
 
-1. **`research/licenses-inventory.generated.md` 要全量重渲染**：渲染器扫的是**当前检装的依赖树**，在隔离 worktree 里跑会把并行会话工作树才装着的包判成不存在并写掉。实测本 worktree 跑一次是 **962 → 957**：掉 10 条（`@floating-ui/*` 五条、Playwright 三条、`react-activity-calendar`、`tabbable`），多 5 条（argon2 两条、`@zxcvbn-ts/*` 两条，以及本批真正的 `lunar-typescript`）——**只有最后那条是应该进登记的，前 14 条是工作树差异造成的假象**。⇒ 已逐字节还原，并把要求登记在 `THIRD_PARTY_LICENSES.md` §2 那条 ⚠️ 里。**在主检出合入本批 lockfile 之后跑。**
-2. **traps 编号可能撞号**：本批新增的 §7 条目从 **137** 起编，而主检出工作树里已有一条正在写到的 **136**（并行会话未提交）。合入时若 137–140 已被占用，**顺延编号、内容不改**。
-3. **AGENTS.md §7 索引表**要为本批的号段补一行（规则文件不由本批改，见 §8「不要擅自做的事」）。
-4. **`pnpm install` 要在主检出重跑一次再核对 lockfile**：本批只在根加了 `lunar-typescript`，
-   但 pnpm 会因此给 React Native CLI 子树补 peer 后缀 —— 实测本 worktree
-   `(supports-color@5.5.0)` 从 60 处涨到 76 处（同种写法，HEAD 已有 60 处，不是新形状）。
-   这笔账写在提交信息里，合入的人要**看着它重新解析一次**，而不是直接信 worktree 里这份。
+0. ✅ **已由并行会话执行**：主检出 09:39:20 起在跑 `git merge feat/countdown-anniversary`，MERGE_MSG 里写明"合并前按该分支 §3.5 的指示移除了主检出的三份旧版文档"，合并提交 = `a29881e9`，冲突四处（`docs/README.md`、`docs/plans/goal-layout-audit.md`、`docs/reference/environment-traps.md`、`package.json`）全部由对方解决。本会话在 `.git/MERGE_HEAD` 存在期间**没有碰**主检出的 index 与工作树（当时 `.git/index` 每几十秒被写一次、load 76）。
+1. ✅ **许可证清单已全量重渲染**（`135beb2c`，在主检出跑的；本会话用 `node research/tools/render-license-inventory.mjs --check` 独立复核 = ✅ 一致）。
+   ⚠️ **本条原来给的机制不准确**。原文说"在隔离 worktree 里跑会把**并行会话工作树才装着的包**判成不存在"——实测那 14 条差异分属两个原因：
+   - `@floating-ui/*` 五条 + `react-activity-calendar` + `tabbable`：**真被删掉的依赖**。合并后的 `pnpm-lock.yaml` 里 grep 计数 0，`packages/*`、`apps/*` 里也没有任何 package.json 声明它们；清单记着它们只是因为那份产物的生成日期（2026-09-27）早于移除。
+   - `playwright` 三条：**工作树差异**。`e2e/` 刻意不在根 pnpm 工作区内（它自带一份 lockfile，AGENTS §6），所以只有跑过 `cd e2e && pnpm install` 的那棵树才看得见它。实测同一份渲染器在隔离 worktree 出 **958** 条、在主检出出 **1093** 条。
+   ⇒ 结论不变、理由换掉：**这份产物只能在装了全部 workspace 的主检出渲染**，在隔离检出渲染会**静默少一整条 workspace 的依赖**。
+   🔴 顺带照出一个真缺口：`check:licenses` 判的是**准入**（有没有不合格许可），**没有任何门禁判这份产物新不新鲜**，所以它能在依赖树变化后安静过期六天。**不能**直接把 `render-license-inventory.mjs --check` 挂进 `pnpm check`：它读磁盘上的 node_modules，在没装 e2e 那份 workspace 的干净检出 / CI 上**必然假红**。要挂，得先让渲染器改从 lockfile + workspace 配置推导（不在本批，登记为 **G-1**）。
+2. ✅ **撞号已按原指示处理，而且比预告的严重**：预告只说"主检出工作树里已有一条写到 136"，实测合并时 main 的台账已经编到 **160**，本批四条占的 137–140 是**真撞号**（`sed -n '/^137\./,/^137\./p'` 取到的是别人的条目）。合并方把它们重编为 **161–164**，内容一字未改。收口复核：台账 1–164 无重号（`grep -oE '^[0-9]+\. ' | sort -n | uniq -d` 只剩 `1,2,3,4,38,93,94,95` —— 全是条目正文里的有序列表，不是条目号）。
+3. ✅ **AGENTS.md §7 索引表**补了 161–164 那一行（用户 2026-10-03 指示"把落下的东西全部收口"就是 §8 要求的那次明确授权）。同批把 §7 开头写死的"83 条实测踩过"换成现量命令 —— 它本身就是本条要说的那种抄件，已经漂了。
+4. ✅ **lockfile 复解析过了：零 churn**。在合并态的隔离检出（`a29881e9` + 一次全新 `pnpm install`）跑完 `git status --porcelain` 输出 **0 行** ⇒ 合并后的 lockfile 与全部 manifest 自洽。
+   ⚠️ 本条原文那句"`(supports-color@5.5.0)` 从 **60** 处涨到 **76** 处"是**我抄错的数**，实测是 base **58** → 分支 **74**（+16），并且**只改 key 的 peer 后缀拼写、零个版本变化**。数字不再抄进文档，只留现量命令：
+   `git diff <base>..<tip> -- pnpm-lock.yaml | grep -cE '^[+-] +version:'`。
+
+**收口时新照出来的一条（不属于本批，已归还原主线）**：合并态 `pnpm -r typecheck` 红在两处 —— `packages/app-host/tests/hosted-account-profile.spec.ts:138,156`（`null` 与 `string | undefined` 的覆写类型），来自 `7e299118`「feat(account): 账号资料三端贯通」（09:38 提交）。归属证据：`git diff --name-only 2ed84122..57078ddb` 里 `hosted|account` 命中 **0 处** ⇒ 本批不可能造成它。对方已在 `8fdcab6a` 修掉，本会话在 `8fdcab6a` 上独立复跑 `pnpm --filter @heyta/app-host typecheck` = **RC 0**。
+
+**合并态实测**（在 `a29881e9` 的隔离检出里，一条命令一段日志、每段自己那次的真实退出码）：`pnpm -r build` **0**、`pnpm check:calendar` **0**、`pnpm check:holiday` **0**、`pnpm check:licenses` **0**、`pnpm -r --filter '!@heyta/sync-server' test` **0**；`pnpm -r typecheck` 在 `a29881e9` 上 **2**（就是上面那条别人的债），在 `8fdcab6a` 上 **0**。
 
 ---
 
