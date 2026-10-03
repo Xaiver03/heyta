@@ -231,6 +231,31 @@ describe('E. 提交计划：本地日期 → Task 约定（epoch ms，本地零�
     expect(toCaptureSubmitPlan(parsed('明天'))).toBeUndefined();
   });
 
+  // ── R11 批五：锚点日（"说一句话落进选中那一格"）───────────────────
+  it('🔴 有锚点、输入里没写日期 ⇒ 落在**锚点那一天**', () => {
+    const plan = toCaptureSubmitPlan(parsed('交周报'), '2026-10-08');
+    const due = new Date(plan!.dueDate!);
+    expect([due.getFullYear(), due.getMonth() + 1, due.getDate()]).toEqual([2026, 10, 8]);
+    expect(due.getHours()).toBe(0);
+  });
+
+  it('🔴 输入里写了日期 ⇒ **输入的赢**，锚点只是兜底', () => {
+    // 反过来（锚点赢）会得到"在日历上选了 8 号，于是'明天'永远说不进去"——
+    // 那一格就变成了一个吞掉日期语义的开关。
+    const plan = toCaptureSubmitPlan(parsed('明天交周报'), '2026-10-08');
+    const due = new Date(plan!.dueDate!);
+    expect([due.getFullYear(), due.getMonth() + 1, due.getDate()]).toEqual([2026, 9, 29]);
+  });
+
+  it('没给锚点时行为与批五之前**逐字相同**（不带 `dueDate` 这个键）', () => {
+    const plan = toCaptureSubmitPlan(parsed('交周报'), undefined);
+    expect(Object.prototype.hasOwnProperty.call(plan, 'dueDate')).toBe(false);
+  });
+
+  it('🔴 锚点不许把**空标题**救成可提交（"选了格子输入一个明天"仍然不该建任务）', () => {
+    expect(toCaptureSubmitPlan(parsed('明天'), '2026-10-08')).toBeUndefined();
+  });
+
   it('AI 字段走**同一张计划**：合法本地日期时间串换算成 epoch', () => {
     const plan = toAiCaptureSubmitPlan({
       title: '交周报',

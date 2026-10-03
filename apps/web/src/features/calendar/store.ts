@@ -31,6 +31,7 @@ import {
   type LocalDate,
   type TaskScope,
 } from '@heyta/domain';
+import type { CalendarViewKind } from '@heyta/ui';
 
 type ScopeKind = 'project' | 'tag';
 
@@ -40,6 +41,23 @@ interface CalendarViewState {
   /** 选中的那一天。 */
   selected: LocalDate;
   scope: TaskScope;
+  /**
+   * 主区看的是**一个月**还是**一周**。
+   *
+   * 🔴 它住在界面状态里而不是共享板里，是因为**这一屏有三个消费者**：
+   *   主区的板、页头那个档位下拉、以及滚轮翻月那条手势（`useWheelMonthNav`）。
+   *   留在板内部 `useState` 的话，后两个看不见它 —— 那正是 R11 批二
+   *   把工具栏搬进页头时踩过的形状（"两份状态"的症状是滚轮翻月而标题不动）。
+   */
+  view: CalendarViewKind;
+  /**
+   * 「往选中那天加一条」那行输入框开着没有（R11 批五）。
+   *
+   * ⚠️ 它和 `view` 一样住在 store 里，因为**开关在页头、输入框在主区** ——
+   *   用 `useState` 就得把它提到 `App.tsx`，那等于让外壳长出一份
+   *   只服务一个视图的状态（本文件文件头记过这个理由）。
+   */
+  captureOpen: boolean;
 }
 
 interface CalendarViewActions {
@@ -61,6 +79,15 @@ interface CalendarViewActions {
   selectDay: (date: LocalDate) => void;
   /** 「回到今天」：迷你月历的 ○ 与主区的按钮走同一条路径。 */
   goToToday: (today: LocalDate) => void;
+  /**
+   * 换档位。**换的那一瞬间要把游标搬到"新档位看得见 selected 的地方"**：
+   * 月档游标是"那个月的 1 号"，周档游标是"那一周里的任意一天"。
+   * 不搬的症状：选了 10-25 再切到周视图，画面停在月初那一周，
+   * 而下面的清单列着 10-25 —— 共享板 `pickDay` 那条纪律的反面。
+   */
+  setView: (view: CalendarViewKind) => void;
+  /** 开/关那一行输入。开着再点 `+` 就是收起 —— 一屏只有一行输入框。 */
+  toggleCapture: () => void;
   /** 勾/去掉一条清单或一个标签。 */
   toggleScopeItem: (kind: ScopeKind, id: string) => void;
   /**
@@ -76,6 +103,18 @@ function idsOf(scope: TaskScope, kind: ScopeKind): readonly string[] {
   return kind === 'project' ? scope.projectIds : scope.tagIds;
 }
 
+/**
+ * 「要让 `date` 这一天天可见，游标该放哪」—— **只此一处**。
+ *
+ * 🔴 这条规则被 `selectDay` / `goToToday` / `setView` 三个动作共用。写成三份的
+ *   下场本文件已经记过一次（"两处各写一遍迟早有一边忘"），而这次是三份。
+ *   周档返回 `date` 本身：游标的约定是"这一段里的任意一天"，
+ *   而 `weekGrid` 会自己回到周一 —— 不需要在这里算周首。
+ */
+function cursorFor(view: CalendarViewKind, date: LocalDate): LocalDate {
+  return view === 'week' ? date : startOfMonth(date);
+}
+
 function withIds(scope: TaskScope, kind: ScopeKind, ids: readonly string[]): TaskScope {
   return kind === 'project' ? { ...scope, projectIds: ids } : { ...scope, tagIds: ids };
 }
@@ -86,17 +125,27 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   cursor: startOfMonth(toLocalDate(Date.now())),
   selected: toLocalDate(Date.now()),
   scope: FULL_SCOPE,
+  view: 'month',
+  captureOpen: false,
 
   setCursor: (date) => {
     set({ cursor: date });
   },
 
   selectDay: (date) => {
-    set({ selected: date, cursor: startOfMonth(date) });
+    set((state) => ({ selected: date, cursor: cursorFor(state.view, date) }));
   },
 
   goToToday: (today) => {
-    set({ selected: today, cursor: startOfMonth(today) });
+    set((state) => ({ selected: today, cursor: cursorFor(state.view, today) }));
+  },
+
+  setView: (view) => {
+    set((state) => ({ view, cursor: cursorFor(view, state.selected) }));
+  },
+
+  toggleCapture: () => {
+    set((state) => ({ captureOpen: !state.captureOpen }));
   },
 
   toggleScopeItem: (kind, id) => {

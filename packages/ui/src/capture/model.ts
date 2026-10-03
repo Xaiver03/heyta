@@ -213,12 +213,22 @@ export interface CaptureSubmitPlan {
  *
  * `dueDate` 走 `@heyta/domain#dueDateToEpoch`（本地日历日 → 本地零点）；
  * 没解析出截止时间就**不带这个字段**，而不是带一个 `undefined`。
+ *
+ * 🔴 `anchor`（R11 批五："在选中的那一格上直接说一句话"）的优先级是刻意的：
+ *   **输入里写出来的日期赢，锚点只是兜底**。反过来（锚点赢）会得到
+ *   "在日历上选了 8 号，于是'明天'永远说不进去" —— 那等于把这一格
+ *   变成了一个吞掉日期语义的开关。所以顺序是
+ *   `解析出的 → 锚点 → 不带这个字段`。
  */
-export function toCaptureSubmitPlan(parsed: CaptureParse): CaptureSubmitPlan | undefined {
+export function toCaptureSubmitPlan(
+  parsed: CaptureParse,
+  anchor?: LocalDate,
+): CaptureSubmitPlan | undefined {
   if (!captureCanSubmit(parsed)) return undefined;
+  const dueDate = parsed.dueDate ?? anchor;
   return {
     title: parsed.title,
-    ...(parsed.dueDate !== undefined ? { dueDate: dueDateToEpoch(parsed.dueDate) } : {}),
+    ...(dueDate !== undefined ? { dueDate: dueDateToEpoch(dueDate) } : {}),
     ...(parsed.priority !== undefined ? { priority: parsed.priority } : {}),
   };
 }

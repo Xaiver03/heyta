@@ -35,7 +35,9 @@ import {
   monthGrid,
   parseLocalDate,
   startOfMonth,
+  startOfWeek,
   toLocalDate,
+  weekGrid,
 } from '../src/date.js';
 
 describe('parseLocalDate（格式**和**范围都要校验）', () => {
@@ -230,6 +232,79 @@ describe('monthGrid', () => {
 
   it('传哪一天都行，不只接受 1 号', () => {
     expect(monthGrid('2026-09-26').flat()[1]!.date).toBe('2026-09-01');
+  });
+});
+
+describe('startOfWeek / weekGrid（R11 批三：周视图的那一行）', () => {
+  it('🔴 与 monthGrid **同一套**周一计算 —— 两套实现迟早漂一天', () => {
+    // 周视图那一行必须**逐格等于**月视图里包含这一天的那一行。
+    // 各自实现一遍"周一起"的话，偏移一天不会让任何一端报错，
+    // 只会让同一个日子在两个视图里落到不同的列。
+    for (const d of ['2026-09-01', '2026-09-26', '2026-10-03', '2026-11-01', '2026-02-01']) {
+      const row = monthGrid(d).find((w) => w.some((c) => c.date === d))!;
+      expect(weekGrid(d).map((c) => c.date)).toEqual(row.map((c) => c.date));
+    }
+  });
+
+  it('恰好 7 格、周一起周日止、日子连续', () => {
+    const cells = weekGrid('2026-10-03');
+    expect(cells).toHaveLength(DAYS_PER_WEEK);
+    expect(isoWeekday(cells[0]!.date)).toBe(1);
+    expect(isoWeekday(cells[6]!.date)).toBe(7);
+    for (let i = 1; i < cells.length; i += 1) {
+      expect(cells[i]!.date).toBe(addDaysViaGrid(cells[i - 1]!.date));
+    }
+  });
+
+  it('锚点：2026-09-26（周六）那一周是 09-21 到 09-27', () => {
+    expect(startOfWeek('2026-09-26')).toBe('2026-09-21');
+    expect(weekGrid('2026-09-26').map((c) => c.date)).toEqual([
+      '2026-09-21',
+      '2026-09-22',
+      '2026-09-23',
+      '2026-09-24',
+      '2026-09-25',
+      '2026-09-26',
+      '2026-09-27',
+    ]);
+  });
+
+  it('同一周里传哪一天都给出**同一行**', () => {
+    const first = weekGrid('2026-09-21');
+    for (const d of ['2026-09-22', '2026-09-24', '2026-09-27']) {
+      expect(weekGrid(d).map((c) => c.date)).toEqual(first.map((c) => c.date));
+    }
+  });
+
+  it('🔴 跨月周：inMonth 的参照是**锚点那个月**，不是周一那个月', () => {
+    // 2026-10-26 周一 … 2026-11-01 周日 是同一周。
+    // 锚点 10-30（在 10 月里）⇒ 前十月的六天 inMonth，11-01 不是。
+    expect(weekGrid('2026-10-30').map((c) => `${c.date}:${String(c.inMonth)}`)).toEqual([
+      '2026-10-26:true',
+      '2026-10-27:true',
+      '2026-10-28:true',
+      '2026-10-29:true',
+      '2026-10-30:true',
+      '2026-10-31:true',
+      '2026-11-01:false',
+    ]);
+    // 反过来锚点 11-01（周日，同一周）⇒ 只有它自己算"本月"。
+    // 这两半合起来才钉住"参照跟着锚点走"：只钉上面那半，
+    // 写成"永远跟着周一那个月"也会通过。
+    expect(weekGrid('2026-11-01').map((c) => `${c.date}:${String(c.inMonth)}`)).toEqual([
+      '2026-10-26:false',
+      '2026-10-27:false',
+      '2026-10-28:false',
+      '2026-10-29:false',
+      '2026-10-30:false',
+      '2026-10-31:false',
+      '2026-11-01:true',
+    ]);
+  });
+
+  it('startOfWeek 幂等（对已经是周一的那天不动）', () => {
+    expect(startOfWeek('2026-09-21')).toBe('2026-09-21');
+    expect(startOfWeek(startOfWeek('2026-10-03'))).toBe(startOfWeek('2026-10-03'));
   });
 });
 

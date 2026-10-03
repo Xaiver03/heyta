@@ -244,7 +244,7 @@ async function wheelOn(
 
 function monthTitles(): { main: string; mini: string } {
   return {
-    main: need('calendar-board-month').textContent?.trim() ?? '',
+    main: need('calendar-toolbar-month').textContent?.trim() ?? '',
     mini: need('calendar-mini-title').textContent?.trim() ?? '',
   };
 }

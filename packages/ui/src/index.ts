@@ -84,15 +84,22 @@ export {
   type SearchGroups,
 } from './search/model.js';
 export { CalendarBoard, type CalendarBoardProps } from './calendar/CalendarBoard.js';
+export { CalendarToolbar, type CalendarToolbarProps } from './calendar/CalendarToolbar.js';
 export {
   calendarDayTone,
+  calendarCellBars,
+  stepCalendarCursor,
   groupTasksByDueDate,
-  MAX_CALENDAR_DOTS,
+  MAX_CALENDAR_BARS,
   type CalendarBoardLabels,
+  type CalendarCellBar,
+  type CalendarViewKind,
   type CalendarDayTone,
+  type CalendarToolbarLabels,
 } from './calendar/model.js';
 export {
   formatDayTitleText,
+  formatWeekRangeText,
   weekdayMessageKey,
   formatMonthTitleText,
   WEEKDAY_MESSAGE_KEYS,

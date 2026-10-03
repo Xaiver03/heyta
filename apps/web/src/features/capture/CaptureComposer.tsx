@@ -65,7 +65,7 @@ import { useCallback, useMemo } from 'react';
 
 import { useI18n } from '@heyta/i18n';
 
-import type { AiFeedbackOutcome, PreferenceSet } from '@heyta/domain';
+import type { AiFeedbackOutcome, LocalDate, PreferenceSet } from '@heyta/domain';
 import type {
   AiHealthSnapshot,
   AiRoutingConfig,
@@ -83,6 +83,8 @@ import {
   type CaptureComposerLabels,
   type CaptureSubmitPlan,
 } from '@heyta/ui';
+
+import { formatDayTitleText } from '@heyta/ui';
 
 import { dateWithRemaining } from '../ai/locale-punctuation.js';
 import { AiCapture } from '../ai/AiCapture.js';
@@ -116,6 +118,14 @@ export interface CaptureComposerProps {
    * 「写进了清单、占位符却说不写」—— 界面说谎，而且没有任何类型会拦。
    */
   destination?: CaptureDestination | undefined;
+  /**
+   * **锚点日**（R11 批五）。给了它，输入里没写日期的任务就落在这一天；
+   * 输入里写了「明天」仍然以输入为准（优先级在共享层 `toCaptureSubmitPlan`）。
+   *
+   * 🔴 传了这个就必须让 placeholder **说出落点** —— 本文件下面那条分支
+   *   就是在做这件事，别把它改成通用 placeholder。
+   */
+  anchorDate?: LocalDate | undefined;
 }
 
 /** 落点：清单 id + 它在界面上的名字（用户自己的字，不翻译）。 */
@@ -128,6 +138,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
   const addTask = useTaskStore((s) => s.addTask);
   const { t, locale } = useI18n();
   const destination = props.destination;
+  const anchorDate = props.anchorDate;
 
   /**
    * 文案全部由宿主注入（共享层不 import `@heyta/i18n`）。
@@ -139,9 +150,14 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
   const labels = useMemo<CaptureComposerLabels>(
     () => ({
       placeholder:
-        destination === undefined
-          ? t('web.capture.placeholder')
-          : t('web.capture.placeholderTo', { list: destination.name }),
+        anchorDate === undefined
+          ? destination === undefined
+            ? t('web.capture.placeholder')
+            : t('web.capture.placeholderTo', { list: destination.name })
+          // 锚点那一档必须**自己说一句**，不能复用清单那句：
+          // "添加到 10月8日"与"添加到「工作」"是两件不同的事，
+          // 合成一句就会有一边说不清。
+          : t('web.capture.placeholderToDay', { day: formatDayTitleText(anchorDate, t) }),
       addLabel: t('web.capture.addLabel'),
       add: t('web.capture.add'),
       matchesAria: t('web.capture.matches.aria'),
@@ -159,7 +175,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         return t(capturePriorityLabelKey(chip.priority));
       },
     }),
-    [t, locale, destination],
+    [t, locale, destination, props.anchorDate],
   );
 
   /**
@@ -219,6 +235,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
       <SharedCaptureComposer
         labels={labels}
         onSubmit={onSubmit}
+        anchorDate={anchorDate}
         renderAssistant={renderAssistant}
       />
     </HeytaUiProvider>

@@ -31,7 +31,14 @@
  * 这里用 `Date` 的基础 getter 手写，行为完全确定、无环境依赖。
  */
 
-import { isoWeekday, parseLocalDate, type LocalDate } from '@heyta/domain';
+import {
+  addDays,
+  DAYS_PER_WEEK,
+  isoWeekday,
+  parseLocalDate,
+  startOfWeek,
+  type LocalDate,
+} from '@heyta/domain';
 
 /** 本模块用到的词条 key（`MessageKey` 的子集，见文件头）。 */
 export type CalendarDateKey =
@@ -43,7 +50,8 @@ export type CalendarDateKey =
   | 'common.weekday.sat'
   | 'common.weekday.sun'
   | 'common.date.monthTitle'
-  | 'common.date.dayTitle';
+  | 'common.date.dayTitle'
+  | 'common.date.weekRangeTitle';
 
 /**
  * 宿主注入的翻译函数。
@@ -110,5 +118,27 @@ export function formatDayTitleText(date: LocalDate, t: CalendarTranslate): strin
     month: d.getMonth() + 1,
     day: d.getDate(),
     weekday: t(weekdayMessageKey(isoWeekday(date))),
+  });
+}
+
+/**
+ * 周视图的标题：「2026年10月26日 – 11月1日」。
+ *
+ * 🔴 入参是**这一周里的任意一天**（与 `weekGrid` / 游标的约定一致），
+ *   周一与周日由 `startOfWeek` + 6 天现算 —— 不在这里再定一次"周从哪天开始"。
+ *   年份只出现一次（在开头），因为跨年那一周（12/29 – 1/4）里
+ *   "12月29日"和"1月4日"属于两个年份，写两遍反而读不出哪个是"这一周的年"。
+ */
+export function formatWeekRangeText(date: LocalDate, t: CalendarTranslate): string {
+  const start = startOfWeek(date);
+  const end = addDays(start, DAYS_PER_WEEK - 1);
+  const sd = parseLocalDate(start);
+  const ed = parseLocalDate(end);
+  return t('common.date.weekRangeTitle', {
+    year: sd.getFullYear(),
+    startMonth: sd.getMonth() + 1,
+    startDay: sd.getDate(),
+    endMonth: ed.getMonth() + 1,
+    endDay: ed.getDate(),
   });
 }

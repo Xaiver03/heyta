@@ -287,21 +287,21 @@ describe('日历侧栏（Web）', () => {
     // 侧栏翻月 → 两列的月份标题**同时**变（各存一份的话这里必红）。
     await click('calendar-mini-prev');
     expect(need('calendar-mini-title').textContent).toBe('2026年8月');
-    expect(need('calendar-board-month').textContent).toBe('2026年8月');
+    expect(need('calendar-toolbar-month').textContent).toBe('2026年8月');
 
     // 点补白格（8月31日，出现在 9 月的网格里）：选中跟过去，**月份也必须跟过去**。
     await click('calendar-mini-next');
     await click(`calendar-mini-day-${OUTSIDE_PREV}`);
     expect(need('calendar-board-day-title').textContent).toContain('8月31日');
     expect(
-      need('calendar-board-month').textContent,
+      need('calendar-toolbar-month').textContent,
       '点了补白格只改选中日、没改月份 —— 主区列着 9 月、侧栏圈着 8 月',
     ).toBe('2026年8月');
 
     // ○ 回到今天：两列一起回。
     await click('calendar-mini-today');
     expect(need('calendar-mini-title').textContent).toBe('2026年9月');
-    expect(need('calendar-board-month').textContent).toBe('2026年9月');
+    expect(need('calendar-toolbar-month').textContent).toBe('2026年9月');
     expect(need('calendar-board-day-title').textContent).toContain('9月28日');
     expect(miniCell(TODAY).getAttribute('aria-current')).toBe('date');
   });
