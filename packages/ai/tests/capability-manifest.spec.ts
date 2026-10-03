@@ -303,8 +303,19 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     expect([...manifest.userOperableEntityTypes]).toEqual(expected);
     expect(manifest.userOperableEntityTypes.length).toBe(9);
     expect(manifest.coverage.denominator).toBe(9);
-    // 🔴 EVENT 进了分母**却没有工具** —— 这正是清单要暴露的那件事（W10 的靶子）
-    expect(manifest.entityTypesWithoutTools).toContain('EVENT');
+    // 🔴 W10 **之前**这里是 `toContain('EVENT')` —— 清单的职责就是把"实体有了、
+    // 工具还没接"这件事显形。W10 做完之后它必须**不再**出现（这条改向就是那件事
+    // 做完了的机器化证据；反向漏做 ⇒ 这条与上面 3/9 那条一起红）。
+    expect(manifest.entityTypesWithoutTools).not.toContain('EVENT');
+    // 顺序由实体清单决定，所以断言**排序后**的集合（口径是"还剩谁"，不是"谁先谁后"）
+    expect([...manifest.entityTypesWithoutTools].sort()).toEqual([
+      'FOCUS_SESSION',
+      'HABIT',
+      'HABIT_LOG',
+      'NOTE',
+      'REMINDER',
+      'TAG',
+    ]);
   });
 
   it('分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体', async () => {
@@ -346,13 +357,36 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     }
   });
 
-  it('现状基线 2/9：只有 TASK 与 PROJECT 有工具（W10 扩目录时这条会红，那是要的）', () => {
+  it('现状基线 3/9：TASK / PROJECT / **EVENT** 有工具（再扩目录时这条会红，那是要的）', () => {
     const withTools = manifest.entities
       .filter((e) => e.countsTowardCoverage && e.coverage !== 'none')
       .map((e) => e.entityType);
-    expect(withTools.sort()).toEqual(['PROJECT', 'TASK']);
-    expect(manifest.coverage.covered).toBe(2);
-    expect(manifest.coverage.ratio).toBe('2/9');
+    // W10 把 EVENT 接上了四个工具（读 2 / 写 2），覆盖面从 2/9 进到 3/9。
+    // 这条点名是**判据**不是内容：目录再扩一个实体而这里没跟上，说明那批没做完。
+    expect(withTools.sort()).toEqual(['EVENT', 'PROJECT', 'TASK']);
+    expect(manifest.coverage.covered).toBe(3);
+    expect(manifest.coverage.ratio).toBe('3/9');
+  });
+
+  it('🔴 EVENT 的四个工具**读写都有**，且归因走的是名字（不是 override 名单）', async () => {
+    const event = manifest.entities.find((e) => e.entityType === 'EVENT');
+    expect(event).toBeDefined();
+    expect([...event!.readToolNames].sort()).toEqual(['get_event', 'list_events']);
+    expect([...event!.writeToolNames].sort()).toEqual(['create_event', 'update_event']);
+    // coverage 必须是 read-write —— 竞品那句"我们只能查看、不能新建"的产品谎言，
+    // 在 heyta 的**这一格**上被否证（gap-analysis §2.1 的靶子）
+    expect(event!.coverage).toBe('read-write');
+    // 四条都登记了参数 schema（`schemaRecorded:false` 会静默出现在给模型的投影里）
+    for (const name of ['list_events', 'get_event', 'create_event', 'update_event']) {
+      const tool = manifest.tools.find((t) => t.name === name);
+      expect(tool, `${name} 不在清单里`).toBeDefined();
+      expect(tool!.schemaRecorded, `${name} 没有登记 INPUT_SCHEMAS`).toBe(true);
+      expect(tool!.entityType).toBe('EVENT');
+    }
+    // 逃生门没有被用掉：EVENT 是靠**名字**归因的，不是靠 override 名单
+    // （`TOOL_ENTITY_OVERRIDES` 一旦开始被逐个点名，清单就开始变成第二份手写名单）
+    const gen = await loadGenerator();
+    expect(Object.keys(gen.TOOL_ENTITY_OVERRIDES)).toEqual([]);
   });
 });
 

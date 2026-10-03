@@ -1453,6 +1453,14 @@ export const en = {
   'web.ai.tools.intentCreate': 'Create task "{title}"',
   'web.ai.tools.intentUpdate': 'Update task {id}',
   'web.ai.tools.intentComplete': 'Mark task {id} as done',
+  // 🔴 W10: every new closed variant of `LocalApiWriteIntent` must grow a sentence here
+  // in the same commit - a proposal card must never render "unknown operation",
+  // that is asking the user to confirm something they were never shown.
+  // What enforces it: two compile-time gates, both harder than a test —
+  // the exhaustive switch in `AiToolRun.tsx:intentText()` (TS2366 when a variant
+  // is missing) and `en: Record<MessageKey, string>` (missing translation = build error).
+  'web.ai.tools.intentCreateEvent': 'Create countdown/anniversary "{title}" ({date})',
+  'web.ai.tools.intentUpdateEvent': 'Update countdown/anniversary {id}',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',
