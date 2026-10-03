@@ -13,7 +13,7 @@
 | 项 | 值（2026-10-03 23:5x 现量） | 复跑核对 |
 |---|---|---|
 | `main` HEAD | `0a61c0a6`（21:1x 那版写的 `96f3293d` 已被并行条线的 5 笔 `docs(countdown)` 顶掉） | `git rev-parse --short HEAD` |
-| 本条线的父子层级分支 | `feat/list-parent` = `06c0bfd9`，基线 `0a61c0a6`（**未 push、未合**）；工作树 `../heyta-wt-hierarchy` | `git log --oneline 0a61c0a6..feat/list-parent` → 3 笔 |
+| 本条线的父子层级分支 | `feat/list-parent`（工作树 `../heyta-wt-hierarchy`），基线 `0a61c0a6`，**未 push、未合** | 别数提交笔数（会漂）：`git log --oneline 0a61c0a6..feat/list-parent` 现量 |
 | 本条线层级判据（本轮现量） | 领域 **15** / 动作层 **10** / 共享层形状 **8** / web DOM **30（含新 6）**，全部 0 skipped | `pnpm --filter @heyta/domain exec vitest run tests/project-hierarchy.spec.ts` 等 |
 | 已知 **HEAD 级**红（不是本条线的，别代改） | `@heyta/ui` `tests/projects-model.spec.ts:96`：`toOrganizerTree` 现在多一个 `archived` 键，而那条判据钉的是 `['children','id','name']` ⇒ 全量 `pnpm -r test` 在 HEAD 上就红 1 条。引入者是 `192a516d`（归档那批），这两个文件在主检出此刻仍逐个是 `M` | `pnpm --filter @heyta/ui test 2>&1 \| grep "Tests "` |
 | l4 棘轮 | 见 §0.5（阈值 ≤104/90，别名是 `check:l4` 不是 `check:l4-no-style`，见 §6） | `node scripts/check-l4-no-style.mjs` |
@@ -47,7 +47,7 @@
 | 任务 2：反向验证"拿掉 onEdit ⇒ 用例必红" | ✅ | 红→绿两段输出记在 goal §7 任务 2 那节 |
 | 任务 3：清单/标签改名、归档入口、习惯改名与删除 | ✅ | `organizer-rename.spec.ts` **26 passed**；`renameTag` 与习惯改名是本轮新建的 action（一个意图一个 op，未 fan-out） |
 | 任务 3 验收：两端各一组用例 + `check:reachability` 绿 | ✅ | reachability 现量 exit 0 |
-| **Goal 第④步：父子层级选择器**（`setParent` + 一层/环/自指守卫 + 两端界面与词条） | ✅ **做完，在未合并分支** | `feat/list-parent` = `06c0bfd9`（基线 `0a61c0a6`）。读数见 §0 表第三行；**跨端形态是代拍**（依据 + 一条 `git revert` 回退写在 §5 第 4 步）；合流被并行线的七个 `M` 挡住（§3.3） |
+| **Goal 第④步：父子层级选择器**（`setParent` + 一层/环/自指守卫 + 两端界面与词条） | ✅ **做完，在未合并分支** | `feat/list-parent`（基线 `0a61c0a6`，**未合**）。读数见 §0 表第三行；**跨端形态是代拍**（依据 + 一条 `git revert` 回退写在 §5 第 4 步）；合流被并行线的七个 `M` 挡住（§3.3） |
 | Goal 第④步的"守卫不许漂移" | ✅ 有常驻判据 | 领域那条"候选集 = `validateProjectParentChange` 的展开（唯一差别 = 归档不进候选）"逐对断言，两端都走同一个 `folderTargetsFor`；web 6 条 DOM 级判据 + 8 臂变异（`aria-disabled` 那种"说了但没禁用"的漂法也被"点它什么都不该发生"那条抓住） |
 | 任务 4：移动端传 `share`（周小结） | ✅ | `growth-share-summary.spec.ts` **13 passed** + 变异两臂 |
 | 任务 4：词条 `{{count}}` 与 `{count}` 字形统一 | ✅ | **定论是"本来就只有一种"**：`{{`/`}}` 各 2 行且**全是注释**，真值 `web.growth.year.heatmap` 两端都是单层 `{count}`；交付物 = 三条测量 + 一条常驻判据 + 一次变异（goal §7.27） |
@@ -103,7 +103,7 @@
      其余 24–30 处只在混合工作树成立，**本条线 0 处**。
 2. **条件 2 的第 2 条：四端重装 `INNER_EXIT=0`** —— 🔴 **本轮没跑**。上一次四端跑绿的载体不是本轮交付，不能顶替。
 3. **条件 1 的三行 🟡**（不是漏做，是拦路的在本批权限之外）：
-   - 清单/标签行的「父子层级选择器」：✅ **本条线做完了，在未合并分支 `feat/list-parent`（三个提交，载体 `06c0bfd9`）**：
+   - 清单/标签行的「父子层级选择器」：✅ **本条线做完了，在未合并分支 `feat/list-parent`**（笔数现量：`git log --oneline 0a61c0a6..feat/list-parent | wc -l`）：
      写侧 `ProjectActions.setParent(entityId, parentId?)` + 领域守卫
      `packages/domain/src/project-hierarchy.ts`（自指 / 悬空父 / 环 / 文件夹不进文件夹 / 一级深度，
      判序逐条带变异）；界面是共享 `FolderPicker`，经 `OrganizerList` **已有**的 `renderItemExtra`
@@ -112,7 +112,7 @@
      界面 6 条 **DOM 级** + 8 条源码级形状；变异 **8 臂全红**、每臂复原后复绿并断言逐字复原。
      🔴 跨端形态是**代拍**（原话要求"两端同时做嵌套"而非"移动端先做"），理由与回退：
      现量依据 = `OrganizerList` 早就渲染一层嵌套（两端同一棵骨架），代拍只是把入口挂到已有插槽上；
-     回退 = `git revert 06c0bfd9 f9032878 776fc23c`（三个提交各管一层，逐层可退）。
+     回退**不写 SHA**（写了就漂，本轮已漂过一次）：分支没合进 main ⇒ 回退就是不合流；要逐层退就从尾往头 `git revert` 那几笔（写侧 / 界面 / 行为判据各一笔）。
      写判据时现量出**两条真缺陷**并当场修掉：① "当前位置"那一项原来照点照写 = 一条内容不变的 UPD（违 §3.4）；
      ② 候选含已归档清单，而 `toOrganizerTree` 默认不画归档父 ⇒ 移进去的那条**从侧栏消失**（`model.ts` 自己写成"宁可当孤儿"）。
      → B52 结构上关闭，**只剩合流**（下一条）。
@@ -154,11 +154,13 @@
    （`packages/legal/dist`、`apps/node-host/dist` 缺 ⇒ `pnpm -r typecheck` 会报一串 `TS2307`，见 §6 新增那条）。
 2. 同一窗口内补跑那 3 段 Playwright，然后跑满 `pnpm check` 并把**可过段数与载体 sha** 一起写进 goal §7.30。
 3. `verify:mobile-notes` 从第 6 步接着做（第 6/7 步的 op 判据 → 第 8 步第三张截图 → 第 9–11 步跨设备）。⚠️ 它要 `PORT=3100`（`:3000` 是别人的旧进程）。
-4. ✅ **父子层级选择器：做完（2026-10-03 深夜），在未合并分支 `feat/list-parent`（载体 `06c0bfd9`）** ——
+4. ✅ **父子层级选择器：做完（2026-10-03 深夜），在未合并分支 `feat/list-parent`** ——
    细节与判据在 §3.3 第一条。**跨端形态是代拍**（原话把这条列为"要产品负责人拍"）：
    现量依据 = `OrganizerList` 早就渲染一层嵌套、两端同一棵骨架，所以入口挂到它**已有**的插槽上
-   就能两端同批，而不是"移动端先做"；**回退一条命令**：`git revert 06c0bfd9 f9032878 776fc23c`
-   （三个提交各管一层：写侧 / 界面 / 行为判据，逐层可退）。
+   就能两端同批，而不是"移动端先做"。
+   **回退不写 SHA**（写了就会漂，我自己刚漂过一次）：这条线**没合进 main**，所以"回退"就是不合流；
+   真要逐层退，在分支上现量 `git log --oneline 0a61c0a6..feat/list-parent`（写侧 / 界面 / 行为判据 / 注释各一笔），
+   从尾往头 `git revert`。
    🔴 唯一没做的是**合流**：主检出七个落点正被归档线改着（见 §3.3 的合流义务），现在合 = 三方冲突。
 5. 若要做热力图/补打卡：那是**翻冻结判据**的权限问题，不是接线问题 —— 需要判卷文件的属主批准改 `growth-display.spec.ts:365`/`:302`。
 
