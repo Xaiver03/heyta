@@ -472,9 +472,13 @@ W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的�
      ② `newSession()` 里我多写了一次 `clearAssistantHistory` —— 变异摘掉它 **0 红**，
      因为落盘 effect 的 `items.length === 0` 分支已经删了；多余的那次已删，
      变异锚点也搬到了真正承重的 effect 那一支。
-     ⚠️ **仍然没做**：D-4 的 (ii)（跨设备会话实体）与**移动端接线**
-     （同一判据要接 `apps/mobile/src/prefs/device-prefs.ts` 那条本机通道；
-     本轮不动 `apps/mobile/**`，它有并行会话的未提交改动）。
+     ⚠️ **仍然没做**：D-4 的 (ii)（跨设备会话实体，产品未拍）。
+     🔴 **并且更正我上面写过的一句**：这里原本记成"移动端接线漏了，
+     同一判据要接 `apps/mobile/src/prefs/device-prefs.ts`"—— 那个框架是错的。
+     实测 `apps/mobile/src` 里 `requestAssistantTurn` / `AssistantPanel` / `assistantTier`
+     **零命中**：移动端按 ADR-0045 §5.5 **根本没有助手入口**，
+     所以这一层不是"漏接一条本机通道"，是"还没有那个界面"。
+     等移动端真有助手时，落盘那条要按 §3.5 抽到宿主无关层，而不是再抄一份。
 
      📌 **两条待入 `environment-traps.md` 的读数**（本轮不直接追加：那份台账此刻
      正被并行会话改着 —— 现量工作树 189 行 / `git show HEAD:` 186 行，
