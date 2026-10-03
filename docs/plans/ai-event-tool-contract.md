@@ -3579,3 +3579,34 @@ bash 脚本"（bash 按偏移边读边执行，长度一变会从错位处继续
 `ps -p 10581 -o pid,ppid,lstart,command` 确认那一枚是我 06:31 自己起的、且它还停在阶段 1 的等待循环
 （`grep -c '阶段 2/5'` = 0，没开始干活）⇒ `kill 10581`（只这一枚，不按名字广播杀）⇒ 改 ⇒
 `bash -n` + 上表三条对照 ⇒ 重起（pid 35045，读数目录 `~/scratch-heyta/deliver-0641/`）。
+
+#### §15.43v（10-04 06:48）③ 的现场普查用的是仓里那道现成体检装置，结论把"闭合条件"从两条改成四条
+
+06:45 跑 `research/tools/b-reinstall-readiness.sh`（**别的线**为 B 落的装置，默认 dry-run、
+只量不动设备；我先读它的文件头与 `rm` 面确认它只删自己的临时文件才跑）——
+`READY_RC=3`，"窗口没开，4 项前置不成立"：
+
+| 前置 | 现量 | 我这一侧的处理 |
+|---|---|---|
+| 有另一趟 reinstall 在跑 | pid 93817（3h32m，子 `package-app.sh` 95477 挂在公证 `--wait`，累计 CPU 0.04s） | 阶段 5 的有界等（120s/轮、上限 21600s）；处置权在人（B67 有 `ps`+`kill` 两条） |
+| 目标树有别人未提交的打包输入 | 主检出 76 枚（我的队列另判 `--target b` + 载体自己的差集） | 队列按规范闸门挡，不在混合态上装 |
+| iOS 设备名歧义 | 三台 Booted：`heyta-iphone-17pro` / `heyta-ios-isolated` / `iPhone Duo heyta` | **早就显式传**（`IOS_DEVICE_NAME=${IOS_DEVICE_NAME:-heyta-iphone-17pro}`，traps #169 那条我先前一轮就做了）；约定不是我自己发明的：`b-reinstall-readiness.sh:28` 与另一条线的台账 00:49:10 都是这个名 |
+| android 段无可达设备 | `adb devices` 里**一台都没有**；本仓 AVD = `heyta-w3-yearly` | 🔴 本轮补：见下 |
+
+**补的那一条**：`reinstall-all.sh:297` 会自己把 android 段如实判红（§6.1.1"不硬装"），
+但那时 mac / windows / ios 三端**已经被这一轮重装过** ⇒ 现场变成"三端新、一端旧"，
+下一轮读任何一端的判据都要先问代次。半轮不如不起，于是阶段 5 在 `INST_START` **之前**加两条：
+`adb` 不在 PATH ⇒ 退 3（"读不到设备"≠"没有设备"，探针坏不许伪装成现场空）；
+`adb devices` 无 `device` 状态条目 ⇒ 退 3 并把准备动作交回人。
+**我不代起 qemu**：那道体检装置自己写明"环境准备不在本脚本里代跑：起 qemu 会把负载顶上去，
+别人的 adb 因此超时"——我照它的判断，而不是自己另发明一条（06:44 我凭记忆写的
+`~/Library/Android/sdk/emulator/emulator` 在本机**根本不存在**，真路径是它现探测后打印的）。
+
+新探针的六种形状各跑一次（`awk 'NR>1 && $2=="device"'`）：
+真空→空；`emulator-5554 device`→命中；`offline`→不计；`unauthorized`→不计；
+两台混合（一在线一离线）→只报在线那台；真实现场→空（与 06:45 那道体检的读数一致，两条独立通道对上）。
+
+其余 ③ 前置里唯一**没有**卡住的一项是打包机：`ssh -o BatchMode=yes windows-pc 'echo WIN_HOST_OK'` ⇒ 通
+（附带一条 openssh 关于 `pq.html` 的升级提示，不影响这次连接；没据此推任何结论）。
+队列重起为 pid 51640 / `~/scratch-heyta/deliver-0648/`（改的是正在跑的脚本 ⇒ 先 `ps` 认 pid、
+确认它还停在阶段 1 没开工，才 kill 单枚、改、`bash -n` + 六形状对照、再起）。

@@ -3944,6 +3944,17 @@ NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target b; echo "rc=$?"   
 pgrep -f 'scripts/[.]?reinstall-all[.]sh'                                               # 06:32 = 93817
 ```
 
+**06:48 再收一次口径：闭合条件不是两条，是四条**（拿仓里那道现成体检装置量的：
+`bash research/tools/b-reinstall-readiness.sh` ⇒ `READY_RC=3`，逐项见 §15.43v 那张表）。
+上面那两条之外还差：**(3) android 段一台可达设备都没有**（`adb devices` 空；本仓 AVD = `heyta-w3-yearly`，
+起它这件事本线**刻意不代跑** —— 那道装置自己写明起 qemu 会把负载顶上去、别人的 adb 因此超时）；
+**(4) iOS 三台同时 Booted 时设备名必须显式**（本线队列已传 `heyta-iphone-17pro`，此项已闭合，
+列在这里是为了让"哪几台在 booted"这件事可复核）。
+唯一不卡的是打包机：`ssh -o BatchMode=yes windows-pc 'echo WIN_HOST_OK'` ⇒ 通。
+⇒ 人要往下推 ③，动作顺序是：处置那五枚（上面 `kill` 那两条）→ 起 `heyta-w3-yearly` →
+其余等并行会话自己落定；队列 `deliver-0648`（pid 51640）会自己在窗口开的那一刻接手，
+**且不会在 android 没设备时先装另外三端**（那会留下"三端新、一端旧"的代次现场）。
+
 ## B68. 🔴 05:32 本线自报：我把 `environment-traps.md` 提成了 **18 字节**，而它被 `ee71c6e1` 从索引里带走了（已恢复；那笔提交的本意需要它的所有者复核）
 
 **发生了什么**（写在这里的第一目的是**让 `ee71c6e1` 的所有者能复查**，不是甩锅）：
