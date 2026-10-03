@@ -49,7 +49,7 @@ export function useReminderNotifications(): { last: DeliveryOutcome | undefined 
   const last = useRef<DeliveryOutcome | undefined>(undefined);
 
   useEffect(() => {
-    last.current = deliverDueReminders(due, tasks, shown.current, {
+    const outcome = deliverDueReminders(due, tasks, shown.current, {
       // 通知的标题就是产品名 —— 它出现在系统通知里，所以必须走词条
       //（硬编码会被 `check:ui-language` 拦，而它正是为这一类存在的）。
       title: t('common.brand'),
@@ -57,6 +57,22 @@ export function useReminderNotifications(): { last: DeliveryOutcome | undefined 
       // 泛泛的"你有新提醒"等于没有告诉用户任何事。
       body: (taskTitle: string) => t('web.reminder.notify.body', { title: taskTitle }),
     });
+    last.current = outcome;
+
+    /**
+     * 🔴 投出去就要**落库**（写 `firedAt` op），否则"投过"只活在这一次页面加载里。
+     *
+     * `shown.current` 是 `useRef(new Set())`：刷新即忘、另一台设备完全不知道。
+     * 领域层判 `fired` **优先于** `due`，所以把 `firedAt` 写成 op 之后，
+     * 这条提醒在任何一端重放同一份状态时都不会再进 `due()`。
+     * （此前 `markReminderFired` 全仓库只有它自己的单测在调 —— 见计划 D14。）
+     *
+     * ⚠️ 不 `await`：effect 里等一条写 op 会把"弹通知"变成"等同步"，
+     * 而失败已经由 store 落进 `error` 并在面板上渲染（`attempt` 的既有纪律）。
+     */
+    if (outcome.deliveredIds.length > 0) {
+      void useReminderStore.getState().markDelivered(outcome.deliveredIds);
+    }
   }, [due, tasks, t]);
 
   return { last: last.current };

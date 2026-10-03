@@ -1345,3 +1345,102 @@ summary() {  # <验收名> [结尾语] [退出码]
   esac
   exit "$code"
 }
+
+# ── 移动端「界面状态」类 helper（单点所有者）──────────────────────────────
+#
+# 原先只住在 verify-mobile-notes.sh 里。现在有两个消费者（notes / trash），
+# 再复制一份就是 AGENTS §3.5 点名的那个反面教材：抽出了共享实现，
+# 旧的那份却没删。四条都只碰**探针**（系统弹窗 / 前台归属 / 换页 /
+# 崩溃归因），不碰任何产品语义。
+# 走底部标签页：**坐标现取** + **点完必须验界面真的换了**。
+#
+# 🔴 这条 helper 是本脚本自己那次假红逼出来的，不是讲究：
+# 原先第 8 步写的是 `input tap 135 2253` 然后 `require_screen`，而
+# `require_screen` **只检查 /tmp/ui.xml 里有没有 `<hierarchy`，不重新抓界面**
+# —— 于是它读的是上一步（「我的」页）遗留的快照，报出
+# 「任务页没有「打开搜索」入口」。事后手动 dump 证明：**界面早就切过去了、
+# 入口也在**（content-desc="打开搜索" 就在任务页顶栏）。
+# 「没观测到 X」被当成了「X 没发生」（§7 元规则一）。
+#
+# 坐标现取的另一半理由：这台模拟器 1080×2400，标签文字下沿实测
+# `bounds=[78,2271][137,2308]`，写死的 2253 落在文字**上方**的图标区。
+tap_tab() {  # <标签无障碍名> <切过去之后应当出现的无障碍名>
+  local name=$1 marker=$2 i xy
+  for i in 1 2 3; do
+    dump || true
+    xy=$(xy_desc "$name")
+    if [ -n "$xy" ]; then
+      $ADB shell input tap $xy; sleep 3
+      dump || true
+      if [ -n "$(xy_desc "$marker")" ]; then return 0; fi
+    fi
+    echo "   ↻ 没切到「${name}」（第 ${i} 次，标记「${marker}」没出现）" >&2
+  done
+  return 1
+}
+
+# 🔴 **冷启动不保证一次落进前台**，而判据不能读界面文字。
+#
+# 实测（2026-10-03，本脚本首跑）：`pm clear` 之后 `monkey` 拉一次，6 秒后前台
+# 仍然是启动器（`mCurrentFocus` = nexuslauncher），于是第 2 步之后每一次点击都
+# 打在桌面图标上，报出来的是「找不到便签输入框」—— 听着像产品缺陷，其实是
+# 根本没进应用（§7 元规则一：先怀疑探针）。
+#
+# 原来那句 `has_text "任务"` 判「应用已启动」同时是**假绿**：欢迎页的说明文字里
+# 也有「任务」二字。窗口归属只能读 `mCurrentFocus`（§7 那条「截图判 UI 先读
+# mCurrentFocus」是同一件事）。
+# 系统的**权限弹窗**会盖在应用上面，而 `uiautomator dump` 导出的是**当前活动窗口**
+# 的树 —— 弹窗在时读到的是弹窗的节点，应用的一个都不在。
+#
+# 🔴 实测（2026-10-03，本脚本第二跑）：填完凭据、第一次唤起中文输入法时，
+# Google 输入法弹了「Allow Google to take pictures and record video?」。
+# 于是第 2 步报「找不到便签输入框（滚动到「便签」段也没找到）」—— 听着像产品缺陷，
+# 其实应用根本没被读到（§7 元规则一：先怀疑探针）。
+#
+# 只认那对**拒绝**按钮，而且**先证明弹窗在**才点：无条件按坐标点下去，
+# 点的会是应用自己的按钮（那才是真事故）。选「不允许」而不是"允许"：
+# 本验收不需要相机，而权限一旦授了就在这台镜像上留着。
+dismiss_permission_dialog() {
+  local xy
+  dump || true
+  xy=$(xy_text "Don’t allow")
+  if [ -z "$xy" ]; then xy=$(xy_text "不允许"); fi
+  if [ -z "$xy" ]; then return 0; fi
+  echo "   ⤷ 收掉系统权限弹窗（点「不允许」@ ${xy}）—— 那不是本应用的界面"
+  $ADB shell input tap $xy; sleep 2
+  dump || true
+  if [ -n "$(xy_text "Don’t allow")" ] || [ -n "$(xy_text "不允许")" ]; then
+    echo "   ⚠️ 点了「不允许」弹窗还在（可能连着两问）" >&2
+    return 1
+  fi
+  return 0
+}
+
+# 🔴 **崩了要当场说清是崩了。**
+#
+# 实测（2026-10-03）：便签 composer 提交时**整个应用进程没了**（两份 react-native
+# 进同一个 bundle ⇒ `Unsupported top level event type "topSelectionChange"`），
+# 而当时的脚本报的是「建完之后列表里没有这条便签」—— 那句会把排查带去
+# "产品没写入本地库"，而真相是**根本没有产品在跑**。
+# 判据不仅要会红，还要红在对的位置上。
+blame_crash() {  # <在哪一步之后>；返回 0 = 本趟确实有崩溃
+  local fatal
+  fatal=$($ADB logcat -d -b crash 2>/dev/null | grep -m2 -A1 'FATAL EXCEPTION' | tr '\n' ' ')
+  if [ -n "$fatal" ]; then
+    bad "「${1}」之后应用进程崩了（本趟 crash 缓冲区有内容）：${fatal}"
+    return 0
+  fi
+  return 1
+}
+
+settle_foreground() {
+  local i cur
+  for i in 1 2 3 4 5 6; do
+    cur=$($ADB shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r' | sed 's/.*u0 //;s/\/.*//')
+    [ "$cur" = "$PKG" ] && return 0
+    echo "   ↻ 前台是「${cur:-空}」，重新拉起 ${PKG}（第 ${i} 次）"
+    launch_app
+    sleep 3
+  done
+  return 1
+}

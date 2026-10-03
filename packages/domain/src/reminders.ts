@@ -26,8 +26,9 @@
  *    看的是 `snoozedUntil ?? triggerAt`，不是 `triggerAt` 一个字段；
  *    而且 `dismissed` / `fired` 都**优先于**"到点了"。顺序写反的后果是
  *    "用户关掉的提醒到点又弹一次"，而且只在跨端时出现。
- * 2. **状态机是单调的**：`firedAt` 一旦写上，稍后再 snooze 不会让它复活
- *    （见 {@link reminderPhase} 的判定顺序）。复活只能靠显式清字段。
+ * 2. **投递属于一个 occurrence**：新数据用 `firedForTriggerAt` 与有效触发时刻
+ *    配对；snooze/改期后旧 marker 自动失效。没有 marker 的旧数据仍保留
+ *    `firedAt` 的历史语义。
  * 3. **重复任务怎么顺延**（{@link nextTriggerAfterRepeat}）：
  *    带 `offsetMs` 的提醒跟着 `dueDate` 走，不带的是**绝对时刻**、不移动。
  *    两句话分开说，是因为"每天 9 点提醒我"里的 9 点是绝对时间，
@@ -90,7 +91,7 @@ export const MAX_SNOOZE_MS = 7 * DAY_MS;
  * - `scheduled` —— 排着，还没到
  * - `snoozed`   —— 被推迟到未来某刻（`snoozedUntil`）
  * - `due`       —— 到点了且还没投递 → **调度器该发通知的就是它**
- * - `fired`     —— 已经投递过（`firedAt`）
+ * - `fired`     —— 当前有效触发时刻已经投递过
  * - `dismissed` —— 用户主动关闭（`dismissedAt`）
  */
 export type ReminderPhase = 'scheduled' | 'snoozed' | 'due' | 'fired' | 'dismissed';
@@ -109,6 +110,13 @@ export function reminderEffectiveAt(reminder: Reminder): number {
   return reminder.snoozedUntil ?? reminder.triggerAt;
 }
 
+/** Whether the recorded delivery belongs to this reminder's current occurrence. */
+export function reminderIsFired(reminder: Reminder): boolean {
+  return reminder.firedAt !== undefined &&
+    (reminder.firedForTriggerAt === undefined ||
+      reminder.firedForTriggerAt === reminderEffectiveAt(reminder));
+}
+
 /**
  * 判定状态。**判定顺序就是语义**，不要重排：
  *
@@ -120,7 +128,7 @@ export function reminderEffectiveAt(reminder: Reminder): number {
  */
 export function reminderPhase(reminder: Reminder, at: number): ReminderPhase {
   if (reminder.dismissedAt !== undefined) return 'dismissed';
-  if (reminder.firedAt !== undefined) return 'fired';
+  if (reminderIsFired(reminder)) return 'fired';
   if (at >= reminderEffectiveAt(reminder)) return 'due';
   if (reminder.snoozedUntil !== undefined) return 'snoozed';
   return 'scheduled';
