@@ -1099,6 +1099,12 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
   sudo -E ./scripts/deploy.sh --build'
 ```
 
+⚠️ **这两个旋钮不是"构建镜像需要的全部旋钮"**，只是**这台生产机**当时需要的那两个：
+它拉 `docker.io` 是通的，所以 base 镜像从来没成为问题。有一台**连不上 docker.io** 的机器要照这一段
+重打镜像时，还要第三个 `NODE_IMAGE` —— 它坏得更早在**第一条 Dockerfile 指令之前**，
+所以得到的是一条响亮但没有层线索的 `load metadata … failed to fetch anonymous token`。
+见 [`self-host.md`](self-host.md) §3（含实测错误原文）与 `check:image-build-args` 那条门禁。
+
 > 第 3 步要**带上和第 2 步一样的两个变量**：`deploy.sh --build` 会再跑一次
 > `docker compose build`，变量不一致就是不同的 ARG ⇒ **缓存全废、重头再建一遍**。
 
