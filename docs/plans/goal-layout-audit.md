@@ -72,6 +72,17 @@
 | 页6 搜索浮层 | 搜索是纯本地领域搜索（`domain/search.ts`），无后端依赖 | ✅ 可做（已做；滴答搜"过滤器"，heyta 无此实体 —— IA 差异如实登记） |
 | 页7 范围列计数 | `selectQuadrantCounts` 已有；per-filter 计数选择器前端可推导 | ✅ 可做（已做） |
 
+> 🔴 **勘误（2026-10-02）——上表"页5 日历节日标注"那行的理由已被推翻，原文保留不删**：
+> 它写的「**无任何节假日数据源**」不成立。实测有两个过得了 AGENTS §3.1 维护门 + §3.2 许可门的
+> 现成来源（`6tail/lunar-typescript` MIT / 2026-08 仍在提交；`NateScarlet/holiday-cn` MIT / 2026-09 仍在提交），
+> 且农历与传统节日是**纯算法、零数据文件**，"离线优先"与它不冲突。
+> 该行当时自留的出口「如要做需先立数据源 ADR」正是它该走的路 —— 证据基础见
+> [`countdown-anniversary-data-and-images.md`](../research/countdown-anniversary-data-and-images.md)，
+> 落地见 [`countdown-anniversary.md`](countdown-anniversary.md)（状态：规划中，ADR 待立）。
+> ⚠️ **但有一处它没说错、勘误也不推翻**：**调休/补班**（哪天上班）是国务院每年 11–12 月发布的
+> 行政决定，**不可预测**、必须逐年取数。"节日都可预测"只对农历与公历节日成立。
+> 所以本行的"数据维护负担"对**放假安排**仍然成立，对**节日标注**不成立 —— 两者在调研 §1 被拆成 A/B/C 三件事。
+
 ### 4.1 页9「任务描述」立项登记（独立阻塞，不在排版轮实现）
 
 - **字段**：`Task.description?: string` —— **可选**、运行时默认 `undefined`，

@@ -107,6 +107,7 @@
 | 文件 | 状态 |
 |---|---|
 | [`i18n-multilingual.md`](i18n-multilingual.md) | 进行中 |
+| [`countdown-anniversary.md`](countdown-anniversary.md) | **规划中 → 可开工**（2026-10-03）：倒数纪念日（农历生日 / 传统节日 / 卡片式倒计时 / 钉住与归档 / 纪念卡片导出）。决策已定 = [ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（`EVENT` 实体 / 农历走 `lunar-typescript` / 节假日三档分发 / 图片双档）。🔴 两道前置闸门：bundle 体积实测、服务端先于客户端的部署顺序。它同时**推翻**了 [`goal-layout-audit.md`](goal-layout-audit.md) §4 里"节日标注无数据源 ⇒ 不做"那条判断的理由（勘误已追加在原处） |
 
 ---
 

@@ -493,3 +493,104 @@ Node 实测 `'café'.normalize('NFC') === 'café'.normalize('NFD')` 为 **`false
 
 按 W0 → W9 顺序推进。W0 是探针，半天内能出结论，且**它的四条否定结果都可能改写上面的表**
 （尤其是 1、2、4）。W0 之后任何一步想偏离本篇，先改 `user-journey-and-auth.md` 并写明理由。
+
+---
+
+## 12. 自托管也必须走这条路（2026-10-03 追加，产品负责人裁决）
+
+**原话**：「抽象的账号密码登录层是一定要有的，一定是主流的。即使用户自托管了，给了那种
+各种的回调域名之类的，给了同步域名之类的，他应该是给一个服务器的同步域名嘛。即使有了这个
+东西，他也是账号密码登录的，都一样应该是。」
+
+这句话拆成两条判据：**① 判定与表单只有一份，在抽象层**；**② 换任何一台服务器，这条路都走得完**。
+第①条落地时就是成立的（下表）。第②条**不成立**，而且坏的地方没人会当 bug 看 —— 这就是本轮修的。
+
+### 12.1 第①条的现状（读被调方本体核过，不是 grep 符号）
+
+| 层 | 位置 | 是否随服务器地址漂移 |
+|---|---|---|
+| 判定（长度/泄露/锁定/同码同句） | `server/src/password/` | 否 —— 谁运营谁裁决 |
+| 协议（路径、请求体、失败归类） | `packages/app-host/src/hosted-auth.ts`：`registerWithEmailPassword:1547` / `loginWithEmailPassword:~1580` / `resetPasswordWithToken` / `changePassword` / `setInitialPassword` | 否 —— 每个函数第一个参数就是 `options.baseUrl` |
+| 表单（两步、显隐、`autocomplete`、错误落点） | `packages/ui/src/auth/AuthForm.tsx` 一份 | 否 —— web/移动共用 |
+| 界面可达性 | 头像菜单第一项「登录 / 注册」→ 面板第一屏是邮箱+口令，通行密钥降到「或者用别的方式」文字链（§W6e 两张图） | 否 |
+| 自托管入口 | `AuthPanel` 的 `selfHostToggle` + 地址框，`effectiveBaseUrl` 决定打到哪台服务器；移动壳 `AuthScreen` 有同一个地址栏 | 否 |
+
+### 12.2 第②条当时是**断的**，断点有两处，都是"界面在说谎"那一类
+
+1. `isVerified` 是**所有**登录路的硬前置：`verifyToken` 拒未验证账号，
+   `loginWithEmailPassword` 更是在**口令校验通过之后**才抛 `email_not_verified`
+   （那条顺序是为了不泄露邮箱是否存在，见 `server/src/passkey.ts:1030` 的注释）。
+   而开这道闸的唯一动作是点那封验证邮件里的链接。
+2. `server/src/auth.ts` 的两处发信分支（新建 + 重发）在 `sendVerificationEmail` 返回
+   `false` 时，**回的是同一句**"Registration successful. Please check your email…"。
+   一台没配 SMTP 的服务器上：信从来没发出去 → 界面说"去查收" → 用户能做的只有
+   再点一次注册 → 再拿到同一句谎话。`server/src/passkey.ts` 的注册路同形。
+
+> 顺带记一条**没动**的：非生产模式下没配 SMTP 会退回 Ethereal（第三方测试收件箱），
+> 而 `scripts/verify-password-web-journey.mjs:49` **正是靠抓那行 `Preview URL:`**
+> 来证明"那封信真的存在"。所以这条兜底是承重的，不能顺手删；本轮只把它的
+> 隐私代价写进那行 `Logger.warn`（`server/src/email.ts`），并把"生产要么配 SMTP、
+> 要么显式关验证"写进 `server/env.example`。
+
+### 12.3 修法（三层，每层各一条判据）
+
+| 层 | 改动 | 判据 |
+|---|---|---|
+| 裁决 | 新 env `REQUIRE_EMAIL_VERIFICATION`（默认 `true`，取值严格、写错启动即报错，与 `ENTITLEMENT_GATE_ENABLED` 同纪律）。判点抽成 `emailVerificationRequired(config)`，**三条注册路共用同一个函数** | `server/tests/self-host-email-verification.spec.ts` 第 3 组 |
+| 服务端诚实 | 发信失败 ⇒ 响应多一个 `emailDelivered: false`，而**中性文案与状态码一字不变**（变了就成邮箱存在性预言机）；"不需要信"与"信没发出去"是两件事，前者**不带**这个字段 | 同文件第 1、2 组（9 条） |
+| 客户端 | `app-host` 严格读（只认字面 `false`）→ web store `registeredFrom` → `AuthPanel` 换那句；移动壳 `registerNoticeKey` 同理。词条 `web/mobile.auth.sent.mailNotSent` 中英各一条 | `packages/app-host/tests/hosted-password-auth.spec.ts` 第 6 组、`apps/web/tests/auth-store-password.spec.ts` 第 6 组、`apps/web/tests/auth-panel.spec.tsx` 新增那条 |
+
+### 12.4 变异数字（含一条反直觉的，值得所有写判据的人看）
+
+`emailVerificationRequired` 往**两个方向**各改一次，红字名单**不重合**：
+
+| 变异 | 结果 |
+|---|---|
+| 换成 `config.testMode?.autoVerifyUsers === true`（忽略开关、**永远不**验证） | 3 红 = 第 2 组两条 + 判点那条。🔴 **第 1 组两条照样绿** —— 一台什么都不验证的机器恰好满足"当场激活、一封都不发" |
+| 换成 `config.testMode?.autoVerifyUsers !== true`（忽略开关、**永远要**验证） | 3 红 = 第 1 组两条 + 判点那条 |
+| `auth.ts` 两处 `emailDelivered: false` 改回只回中性句 | **恰好** 2 红（第 2 组），其余 7 条不动 |
+
+📌 教训：**"这条判据测得出这个缺陷"取决于缺陷往哪边坏。** 只做一次单向变异就宣布有牙齿，
+测到的可能是"实现和缺陷恰好同向"。开关类判据必须两个方向各变异一次。
+（本条目第一版写的是"改回 `testMode?.autoVerifyUsers` ⇒ 第 1 组红"，实测**不成立**，
+已按实测改在这里。）
+
+### 12.5 ⚠️ 这批改动**还没提交**，而且不能整文件提交（2026-10-03 01:00 现场）
+
+代码与判据都已实测（见下表），但共享工作树里此刻同时躺着**另外三条线的未提交源码**
+（AI 收尾、账号资料 `withAccountProfile`、移动端导出/还原）。逐文件按 hunk 量过：
+
+| 文件 | 我的 hunk | 别人的 hunk | 能不能整文件提交 |
+|---|---|---|---|
+| `server/src/config.ts`、`email.ts`、`passkey.ts`、`password/service.ts`、`env.example`、`server/tests/magic-link-registration.spec.ts`、`server/tests/passkey.spec.ts`、`apps/web/src/features/auth/store.ts`、`apps/web/src/features/auth/AuthPanel.tsx`、`apps/web/tests/auth-panel.spec.tsx`、`apps/web/tests/auth-store-password.spec.ts`、`apps/mobile/src/screens/AuthScreen.tsx`、`apps/mobile/tests/auth-screen-password.spec.ts`、`docs/plans/email-password-auth.md`、`docs/reference/environment-traps.md` | 全部 | 0 | ✅ 能 |
+| `server/src/auth.ts` | 7 | 7（`withAccountProfile` 那半） | ❌ 混 |
+| `packages/app-host/src/hosted-auth.ts` | 5 | 6 | ❌ 混 |
+| `packages/i18n/src/locales/{zh-CN,en}.ts` | 各 2 | 各 3（`web.ai.failure.cause.networkOriginRejected` 那半） | ❌ 混 |
+| `packages/app-host/tests/hosted-password-auth.spec.ts` | 1 | 1 | ❌ 混 |
+
+🔴 **不许"顺手整文件提交"的三个理由**：① 会把别人正在写的东西以我的名义钉进历史；
+② `server/src/auth.ts` 那半此刻**自己是红的**（`magic-link-registration.spec.ts` 的
+"consume a login token" 一条因 session `user` 多了 `avatarHash`/`displayName`/`locale`
+而失败 —— HEAD 里 `withAccountProfile` 命中 0 次、工作树 4 次），跟着提交就是把一笔
+红账算到我头上（§7 第 123 条那个"check 链把账算到下一笔"的形状）；
+③ 本仓今天已经有一次 plumbing 提交脚本伤到另一条会话的自报（`BLOCKED.md` 22:06 那条）。
+
+**正确的提交窗口**是"树上没有别人的未提交源码"那一刻（与 §6.1.1 四端重装同一个前提）。
+到时候：`git commit --only -- <上面那串路径>`，提交后 `git show --stat` 复核
+**删除数为 0**，再跑第二轮 `reinstall:all`（本轮那套装的是 00:23 的 HEAD，
+不含 §12.3 的客户端那半）。
+
+### 12.6 本轮实测数字（新鲜，不是复述）
+
+| 判据 | 结果 |
+|---|---|
+| `cd server && npx tsc --noEmit` | exit 0 |
+| `cd server && npx vitest run` | 2052 passed / 5 failed → 修完我那 4 条后 **1 failed**，而那 1 条是上表的 `withAccountProfile`（不是本条线） |
+| `packages/app-host` | 911 passed |
+| `packages/i18n` | 22 passed（中英键集一致） |
+| `apps/web` | 1431 passed / 12 skipped，exit 0 |
+| `apps/mobile` | 538 passed，`tsc --noEmit` exit 0 |
+| 门禁 | `check:ui-language` / `check:layering` / `check:server-copy` / `check:server-design` / `check:design` / `check:crosslang-contract` / `check:journey-coverage` 全 OK；`check:docs` 红在 ADR-0044/0045 那两条线的未跟踪文档上，与本条线无关 |
+| 四端重装（隔离检出 @ HEAD，00:23–00:44） | `CHAIN_EXIT=0`：mac ✅ / windows ✅ / android ✅（1080x2400、内容 55.3%、主蓝 4036）/ ios ✅（1206x2622、内容 61.5%、主蓝 4136，且"已装的包比源码新"） |
+| `verify:password-web`（改完客户端之后**又跑了一遍**） | 2 passed / exit 0（真服务端 `TEST_MODE` 关 + 同源反代 + 从工作树重打的 `apps/web/dist`） |
+| 全量离线 e2e（同一批改动之后） | 96 passed / 2 skipped / **4 failed**。🔴 那 4 条**不是**本条线的：`admin-console.spec.ts` 抓的是别人在途的账号资料端点 `GET /api/account/profile` 没进假端点 —— 取证与闭口清单在 `BLOCKED.md` B14。（20:5x 那一跑同一条判据是 100 passed，差的就是那半件在途事。） |
