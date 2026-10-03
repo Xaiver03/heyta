@@ -1333,6 +1333,11 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     我的启动器那道 `pgrep -f 'queue-reinstall-all\.sh|scripts/reinstall-all\.sh'` 门因此退 3 —— **对称的互斥由我这一侧守**。
     ② **android 设备在用**：`emulator-5554` 上 `com.heyta` pid 20246、`mCurrentFocus` 指向它（① 要 `adb uninstall`、③ 要 `pm clear`）。
     ③ **负载 13.20 > 阈值 12**（`ncpu×3/4`）。
+    ✅ **05:4x 审过 `scripts/reinstall-all.sh` 的失败汇总，`INNER_EXIT=0` 是硬门不是软门**
+    （免得下一位重审）：`:486-504` 那个 `case "$r"` 有第三支 `*)` —— 某端**没走到判据**（既不是 OK
+    也不是 FAIL）时打「🔴 没有结论（段内未走到判据）—— 按失败处理」并 `FAIL=1`；
+    截图读不出来在 `:130` 直接 `exit 1`（不是"跳过这条判据"）；
+    `--skip` / 不在 `--only` 范围的端各占一条**大字**分支，明写"这端**没有**验证当前产物"。
     ⚠️ 顺带一条**对 ① 有用的反向现量**：iOS 那三台 booted 里 **`heyta-iphone-17pro` 与 `iPhone Duo heyta` 的
     `launchctl` 读空**（没跑 com.heyta），只有 `heyta-ios-isolated` 在跑 ⇒ **ios 段有可用的空闲目标**，
     窗口开时不必把 ① 整体判死在 iOS 上。设备占用表每次现取，别抄这一行。
