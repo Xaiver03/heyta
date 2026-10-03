@@ -620,10 +620,10 @@ git merge-tree --write-tree --name-only main feat/detail-pane   # rc=1 = 有冲�
 复现读数：`cd apps/web && NO_COLOR=1 ./node_modules/.bin/vitest run tests/reminders-panel.spec.tsx`（单独跑必绿）。
 
 
-## 8.13 全量门禁扫描：这一族此前只验过 9/56 道门禁，扫出来那条红是本单的（2026-10-04 06:0x 现量）
+## 8.13 全量门禁扫描：这一族此前只验过 9/58 道门禁，扫出来那条红是本单的（2026-10-04 06:0x 现量；58 是 §8.14 第 1 条修正后的数，本节第一版写的 56 是探针截断的读数）
 
 电池那 25 步覆盖的是 **9 道门禁** + 6 条 typecheck + 6 个包单测 + 2 步构建 + e2e 那一族，
-而根 `check` 的组合里有 **56 道**门禁。也就是说「这一族有没有把**别的**门禁弄坏」此前
+而根 `check` 的组合里有 **58 道**门禁（🔴 本节第一版在这里写的是 56 —— 那个数是**我的枚举正则截断**出来的，不是仓库给的，全过程见 §8.14 第 1 条）。也就是说「这一族有没有把**别的**门禁弄坏」此前
 **从没量过**。本轮量了：一次性脚本 `/tmp/dp_gates_sweep.py`（不提交）从 `package.json` 的
 `check` 组合取清单、跳过要浏览器/真机的、把 `pnpm --filter` 类展开成各包自己的 node 命令、
 逐条报 rc。
@@ -633,6 +633,8 @@ git merge-tree --write-tree --name-only main feat/detail-pane   # rc=1 = 有冲�
 | 修前 | `total=56 ok=44 red=7 skip=5 missing_env=0`<br>红 7 道：`check:docs,check:empty-state,check:journey-coverage,check:mobile-bundle,check:web-migration,check:web-storage,check:widgets` |
 | 修后 | `total=56 ok=45 red=6 skip=5 missing_env=0`<br>红 6 道：`check:docs,check:journey-coverage,check:mobile-bundle,check:web-migration,check:web-storage,check:widgets` |
 
+
+⚠️ 上面两行的 `total=56` 是**探针给的数**，不是仓库给的数：枚举用的 `check:[a-z0-9-]+` 不吃第二个冒号，把 `check:licenses:nuget` 与 `check:licenses:stamp` 折进了 `check:licenses`。按正确正则重扫的第三趟：`total=58 ok=47 red=6 skip=5 missing_env=0`，**红集与第二趟逐字相同** ⇒ 本节的归属结论不受影响，但总数是 58。全过程在 §8.14 第 1 条。
 消失的那一条就是本单自己的：`check:empty-state`。新增的红：`无（红集只减不增）`。
 
 ### 七条红的逐项归属
@@ -699,4 +701,75 @@ git merge-tree --write-tree --name-only main feat/detail-pane   # rc=1 = 有冲�
 
 ⚠️ 一条证据寿命的账：扫描的**逐条日志**落在 `/tmp/dp_gates_check_<门禁>.log`，
 第二趟同名覆盖。本节里那些错误串是在被覆盖**之前**抄进来的；下一轮要重取就得重跑那一趟。
+
+
+## 8.14 一个我自己造出来的假发现、重装窗口的第三个读数、两条被否证的怀疑（2026-10-04 06:1x–06:2x 现量）
+
+### 1. 🔴 我差点把"58 道里有 2 道没人跑"写成一桩许可证敞口 —— 那是我的探针形状
+
+事情的过程（按发生顺序，不美化）：
+
+1. 我想给 §8.13 补一条"怎么复现这个总数"的一行式，跑出来是
+   `defined=58 named_unique=56` ⇒ 看起来像**有两道 `check:*` 不在 `pnpm check` 组合里**。
+2. 我去查那两道（`check:licenses:nuget` / `check:licenses:stamp`）有没有别的自动消费者：
+   `grep -rln "licenses:nuget\|licenses:stamp" --exclude-dir=node_modules --exclude-dir=.git .`
+   命中 7 个文件，**全部是文档 + `package.json` 自己**，没有 workflow、没有 hook。
+   这一步的读数是**真的** —— 但它论证的是我下一步就要写的那个**不存在的东西**。
+3. 单跑那两道：都 **RC=0**（nuget「8 个包全部宽松许可」；stamp「清单对得上当前 lockfile
+   `111cc2d1d04d3763`」）。所以我正准备写的句子是"两条此刻是绿的敞口"。
+4. 写文档时我顺手加了一句解释"为什么点名 58 次而唯一只有 56"，并说那是**重复点名**。
+   那句话逼我去核它 —— 一核就穿了：`uniq -d` 意义上重复的是 `check:licenses`，**出现了 3 次**，
+   因为我的正则 `check:[a-z0-9-]+` **不包含冒号**，遇到 `check:licenses:nuget` 就停在
+   `check:licenses`。也就是说"58 次点名"里那 3 次是 `licenses` 本体 + 两个**被截断的子门禁**。
+
+现量对照（同一份 `package.json`，两把正则）：
+
+| 枚举正则 | 组合里点名的唯一门禁 | 与"仓库定义的 58 道 `check:*`"的差集 |
+|---|---|---|
+| `check:[a-z0-9-]+`（§8.13 那趟用的） | 56 | `check:licenses:nuget, check:licenses:stamp` ← **假的** |
+| `check:[a-z0-9:-]+`（修正后） | 58 | `（空）` ← 空 |
+
+⇒ **没有任何门禁是"没人跑"的**：58 道定义全在 `pnpm check` 的组合里。
+⇒ 但扫描**确实漏跑了那两道**（枚举就是从这把截断的正则来的），所以 §8.13 的
+`total=56` 要读成"探针看到的 56"。修正枚举后重扫第三趟：**`total=58 ok=47 red=6 skip=5 missing_env=0`**，
+红集与第二趟**逐字相同**（`check:docs,check:journey-coverage,check:mobile-bundle,check:web-migration,check:web-storage,check:widgets`）⇒ §8.13 的逐项归属不受影响，只是分母从 56 改成 58。
+
+📌 **可迁移的那一条**：差集类结论出来之前，先问一句
+**"两边是用同一个词法解析的吗"** —— 我这次左边是 `Object.keys(scripts)`（完整名），
+右边是正则片段（截断名），两个集合根本不在同一套 token 上，差集必然非空。
+一个少算两项的枚举不会报错，它只会让差集**长得像发现**。
+（同族：§7 元规则第 1 条；新的面目是"探针不仅会漏读，还会**凭空造出**一条待办"。）
+
+### 2. 四端重装的第三个占用读数（同一条队列，已经 3 小时）
+
+| 时刻 | 读数 |
+|---|---|
+| 04:58（§8.10） | 负载 `71.93 / 45.50 / 28.54`，四个 PID `81007` `93771` `93817` `95477` |
+| 05:37（§8.10） | 那四个 PID **一个没变** |
+| **06:10（本轮）** | 同四个 PID 仍在，`etime` 最长 **03:01:31**（`sh /tmp/queue-reinstall-all.sh` → `bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817` → `bash apps/desktop-macos/scripts/package-app.sh /tmp/heyta-macos-dist`）；负载已落到 **8.62 / 11.01 / 14.73**；`adb devices` 只有 `emulator-5554` |
+
+复量命令（每次现取，别照本节念）：
+`ps -Ao pid,etime,command | grep -Ei 'reinstall-all|package-app.sh|package-msix|verify-mobile' | grep -v grep`
+
+⚠️ 三个时刻同一批 PID + 负载从 71.9 掉到 8.6，这两个事实放一起**指向前不是中性的**：
+既可能在跑后面的段，也可能卡在某一端。**本单不判断，更不去动它**（那是别人起的队列）。
+但如果下一轮还是这四个 PID，结论就该从"窗口没空"改写成**"这一步需要持有者介入"** ——
+一直等一个可能已经停住的队列，等于把七行工单挂在无人认领的进程上。
+
+### 3. 本轮被现量**否证**的另外两条怀疑（记下来让下一轮不必重查）
+
+1. **"选中态门禁的断言 B 大概漏 `useState<T>()`（不带实参）这个形状"** —— 否证。
+   `LOCAL_STATE_DECL` 要的是 `useState` 后面那个 `(`，**不要求里面有实参**
+   （`scripts/check-selection-single-source.mjs:185-186`），所以 `useState<string | undefined>()` 会命中。
+2. **"`QuadrantBoard.tsx:158` 那个本地 `activeId` 是第二个选中态所有者"** —— 否证，而且它自己就写着：
+   `:148` 的注释点名"与 `activeId`（dnd-kit 的**正在拖**那条）无关，两个名字像但不是一件事"，
+   读写点全在拖放回调里（`:250` `setActiveId(String(e.active.id))`、`:306` 拖拽提示）。
+   门禁不报它也是**判决不是遗漏**：文件头负向对照 **N2** 就是拿它和 `editingRowId` 跑的（绿）。
+
+### 4. 修后收尾读数
+
+`/tmp/dp_w1b_battery.py` 第 6 趟：**25 步全 RC=0、`BATTERY_RESULT=ALL_GREEN`**，含 `test web`
+（**1585 passed / 12 skipped**）、`build web tsc -b` + `vite`、`typecheck e2e family`、
+`e2e detail-pane family` **25 passed**。`docs-link-check` 对本文件 **0 命中**。
+门禁第三趟 `total=58 ok=47 red=6 skip=5 missing_env=0`。载体：`edd9971b`（代码）+ 本笔（文档）。
 
