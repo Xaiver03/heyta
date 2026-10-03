@@ -179,3 +179,45 @@ export function toEventRows(
   }
   return rows;
 }
+
+/**
+ * 一张卡片**说的那几句话**（`EventBoardLabels` 里卡片正文用到的那一子集）。
+ *
+ * 刻意写成"结构子集"而不是 `EventBoardLabels`：这样导出海报那条路只需要
+ * 三个函数，而编译器仍然会替宿主检查全部字段。
+ */
+export interface EventCardTextLabels {
+  readonly faceText: (face: CountdownFace, days: number) => string;
+  readonly formatDate: (date: LocalDate) => string;
+  readonly ageText: (days: number) => string;
+}
+
+/** 卡片正文的四段话。**`age` 只可能是 `undefined` 或有值，没有空字符串** ——
+ *  "有没有这一行"是判断，画不画才是展示；把空串带到渲染层就会长出
+ * `text !== '' ? … : null` 这类第二次判断。 */
+export interface EventCardTexts {
+  readonly title: string;
+  readonly face: string;
+  readonly date: string;
+  readonly age: string | undefined;
+}
+
+/**
+ * 🔴 **卡片与导出成品图共用这一份措辞映射**（W7）。
+ *
+ * 为什么它必须存在而不是各自写一遍：`EventCardView` 里那句
+ * `labels.formatDate(card.nextDate ?? card.anchorDate)` 带着一条**判断**
+ * （一次性且已过去的倒数日没有"下一次"，落回锚点，而不是整行不画 ——
+ * 这条在真浏览器里红过一次，见 `countdown.spec.ts` 的"两张卡都要有日期行"）。
+ * 海报如果再抄一遍，下一次修那条判断的人**只会改一处**，
+ * 症状是"屏幕上是对的、导出的图是错的"，而那种错误**没有任何一层会报**。
+ * 同一个理由见本文件头的"顺序只有一份"。
+ */
+export function cardTextsFor(card: EventCard, labels: EventCardTextLabels): EventCardTexts {
+  return {
+    title: card.title,
+    face: labels.faceText(card.face, card.days),
+    date: labels.formatDate(card.nextDate ?? card.anchorDate),
+    age: card.ageDays === undefined ? undefined : labels.ageText(card.ageDays),
+  };
+}

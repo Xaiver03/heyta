@@ -128,3 +128,20 @@ export type {
   AccountAvatarUpdate,
   AvatarPayload,
 } from './account-profile-contract';
+
+// 纪念卡片成品图的导出契约（批次二 W7）。
+// ⚠️ 与头像那一组同一档：**边长 / 比例 / 格式是产品规格**，所以住在契约层；
+// "怎么把卡片栅格化成那张图"是平台调用，住各自的壳（`avatar-encode.ts` 的同一条分界）。
+// 这一批**没有**动线协议、没有动 schema 版本 —— 它导出的是设备本地产物。
+export {
+  EXPORT_CARD_EDGE_PX,
+  EXPORT_CARD_ASPECT_W,
+  EXPORT_CARD_ASPECT_H,
+  EXPORT_CARD_HEIGHT_PX,
+  EXPORT_CARD_REF_WIDTH_DP,
+  EXPORT_CARD_SCALE,
+  EXPORT_CARD_CONTENT_TYPE,
+  EXPORT_CARD_FILE_STEM_MAX_CODE_POINTS,
+  EXPORT_CARD_SIZE,
+} from './card-export-contract';
+export type { ExportCardSize } from './card-export-contract';
