@@ -204,7 +204,9 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    - 🔴 期望值**从手机当前 `dueDate` 现场推**，不抄脚本开头的 `DUE_DATE`：`TaskDetailSheet` 的锚点是 `repeatAnchor = dueLocal ?? todayLocal`，而第 11/14 步已经把截止日顺延过两次 —— 拿旧日期算期望会把这条正确的实现判成红。"锚点跟着当前截止日走"本身也一起被钉住了。
    - 离线做到哪一步：`bash -n` 0；把 `dueDate` 的 ms 喂进脚本里那段 python，拼出的规则串与 `packages/domain/dist` 的 `Recurrence.yearly(10,17)` **逐字相同**。⚠️ 这只算半个验证 —— 它证明不了第六枚 chip 在真机上点得到（chips 是一行横排的）。
    - 为什么没跑：2026-10-03 02:05（本地）实测 **1 分钟负载 328–353**、107 个 node/java 级进程、并行会话正在连续提交；02:09 复量还是 **48–55**（5 分钟均值 117–125），九分钟内四次读数没有一次落到 18 以下。脚本默认的 `emulator-5554` 没起，唯一在线的 `emulator-5556` 与 :3000 / :3100 两个服务端都捏在别人手里。这一刻起四端重装会把别人**有时限**的设备判据压成超时假红（同一台机器上曾实测把 load 顶到 250–537）。
+     ⚠️ **10:37–10:38 复量**：负载已降到 13–38，但**设备、两个端口、compose 栈三条仍在这个会话之外**（`verify-mobile-repeat.sh:241` 是 `pm clear`，跑它 = 清掉别人在那台共用 AVD 上的登录态）。四条最新读数与复跑命令写在下面「固定收尾」一节第 3 条，**以那一节为准**。
    - 下次跑之前必须按顺序做完（缺一条就是在验旧二进制）：`pnpm -r build` → `pnpm reinstall:mobile` → `HEYTA_E2E_SERIAL=<现取的在线机> PORT=<自己的端口> pnpm verify:mobile-repeat`；跑前重新现量四条现场判据：`ps Axo command | grep -F 'verify-mobil[e]'`、`sysctl -n vm.loadavg`、`xcrun simctl list devices booted`、`adb devices -l`。
+     ⚠️ **这条的前半截已满足**（2026-10-03 10:02 / 10:05）：android 与 ios 由并行会话在隔离检出 `267ac912` 重装过，本会话又**按内容**复核过设备上那份包里确有本批的 `每年` / `FREQ=YEARLY`（读数见下面第 2 条）⇒ 下次跑第 15 步**不必先重装**，但"现取在线机 + 自己的端口"那两条照旧。
 2. **`'yearly'` 加了 id 但没人能测到"忘了加进 `REPEAT_PRESET_IDS`"** —— 这一档的表现是"界面上没有每年"，属于**按定义不可观测**，不为此扭曲设计；类型系统已能抓到"switch 少一档"与"标签少一档"（`Record<RepeatPresetId, MessageKey>` 是穷举的）。
 3. **2/29 的"平年过 2 月最后一天"口径**：需要 `BYMONTHDAY=-1`，而域层 `describeRecurrence` 与移动端 `recurrence-display` 都会把它渲染成「每年 2 月 -1 日」。现状按 RFC + 主流日历实现（只在闰年重复），并**把这条边界钉在测试里**而不是留成暗坑。真正的产品问题在倒数日（"在一起多少天"那天算不算 2/29），随 W5 一起定。
 4. **W4 判据②的界面半段**（"数据只到 2026 时 2027 显示节、不显示休/班"）：本批不做 UI，所以落的是**数据层**那半 —— 2027 有节无休、不抛错、非法日期响亮失败，都有单测与变异。界面上那条随 W5。
@@ -231,34 +233,84 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 
 **合并态实测**（在 `a29881e9` 的隔离检出里，一条命令一段日志、每段自己那次的真实退出码）：`pnpm -r build` **0**、`pnpm check:calendar` **0**、`pnpm check:holiday` **0**、`pnpm check:licenses` **0**、`pnpm -r --filter '!@heyta/sync-server' test` **0**；`pnpm -r typecheck` 在 `a29881e9` 上 **2**（就是上面那条别人的债），在 `8fdcab6a` 上 **0**。
 
-### 收口之后仍欠的两件事（一条是环境，一条是排期 —— 都不是"忘了"）
+### 固定收尾（AGENTS §6.1.1）：mac 段我自己跑绿了，另外三端按内容独立复核
 
-1. 🔴 **AGENTS §6.1.1 的固定收尾 `pnpm reinstall:all` 本批一次都没跑过**，所以"四个端都装上了当前源码的产物"这件事**尚未成立**，本批的交付状态只能写到"门禁绿 + 产物打得出"。不跑的理由与读数写在上面「明确没做」第 1 条（1 分钟负载 328–353）。跑的时候按实测过的做法在**隔离检出**里跑，别等主检出干净（主检出长期有别人的未提交源码，Windows 段送的是 `git ls-files -co`，那等于把半成品装上四端）：
+1. ✅ **mac 段 = 本会话自己跑的**（隔离检出，10:29–10:33）。读数：
+   `窗口 1092x723、heyta-reinstall-mac-installed.png.webview.png 内容占比 73.0%、主蓝命中 1269 —— 是共享 UI`。
+   第一趟（10:19）**判红过**，而红的是判据不是产品：窗口截图 13 KB / 内容 0.0% ⇒ 🔴 疑似空白，
+   同一秒的 WebView 快照是完整真界面（人已看过）。修法与变异读数写在提交 `90140793`，
+   以及下面「待入 §7」第 3 条。
+2. ✅ **android / ios / windows 三段没有重复跑** —— 并行会话 09:51 起在隔离检出 `267ac912`
+   跑过一趟完整的，`/tmp/heyta-g7-reinstall.log` 汇总三行 ✅（10:05）。
+   我占设备重装的代价是清掉别人的现场，所以改成**按内容**证明"装的就是当前产物"，四条现量：
+   - `git merge-base --is-ancestor a29881e9 267ac912` ⇒ 真（本批合入是那趟的祖先）
+   - `git diff --name-only 267ac912..HEAD -- apps packages | wc -l` ⇒ **8**，且 8 个全在
+     `apps/web/evidence/**`（png + 一个 txt）—— 那 14 笔里**没有一行会进包的源码**
+   - 已装的 APK 从设备拉回来再探：`adb -s emulator-5556 pull "$(adb -s emulator-5556 shell pm path com.heyta | sed 's/^package://')" …`
+     → `unzip -p … assets/index.android.bundle` → `每年`=1（UTF-16LE）/ `yearly`=5 / `FREQ=YEARLY`=1，
+     同趟阳性对照 `收集箱`=10
+   - iOS 已装容器的 `main.jsbundle`（mtime 10:05）同一趟同读数；mac 的
+     `/Applications/Heyta.app/Contents/Resources/web-dist/assets/*.js`：`FREQ=YEARLY`=1 / `yearly`=22 / `收集箱`=16
+   🔴 **这条结论差点被一个坏探针推翻**：Hermes 字节码里中文是 **UTF-16LE**，
+   所以 `grep 每年` 和"按 utf8 文本读整份文件"都**恒 0**。我第一趟据此写下"装的包里没有本批代码" ——
+   那是探针坏，不是产品坏，而且**同趟的 `收集箱`=0 就是它自己的反证**，只是我没先看对照。
+   正文进下面「待入 §7」第 4 条。
+3. 🔴 **仍欠的一件：W3「每年」的真机那一趟**（脚本第 15 步已落地并离线验过：`bash -n` 0、
+   期望规则串与 `Recurrence.yearly(10,17)` 逐字节相同、`check:script-snapshot` 仍 ✅ 28 个脚本）。
+   2026-10-03 10:37–10:38 现量的现场 —— 四条都说明**现在跑它就是在动别人的现场**：
+   - `adb devices` ⇒ 只有 `emulator-5556`；`adb -s emulator-5556 emu avd name` ⇒ **SSOS-Parity-A36**
+     （与另一个项目共用的 AVD），`dumpsys window` 前台 = `com.heyta/com.heytamobile.MainActivity`
+   - `scripts/verify-mobile-repeat.sh:241` ⇒ `adb shell pm clear $PKG` —— 跑它会把别人在那台设备上的
+     登录态和数据**清掉**（这条在脚本里是第 241 行，不是可选项）
+   - `lsof -nP -iTCP:3000 -sTCP:LISTEN` / `:3100` ⇒ 各有一个 `node dist/src/index.js` 在听
+     （pid 87593 已 15h41m、58679 已 9h02m）
+   - `docker ps` ⇒ `supersync-server` / `supersync-postgres` **Up About a minute**：并行会话正在起**同一套 compose**，
+     换个 `PORT` 也还是会撞同一个 project
+   - `uptime` ⇒ 1 分钟负载 38.86，而本仓自己的等待阈值 = 核数 × 3/4 = **12**
+
+   设备与服务端都归自己时的复跑命令：
    ```bash
-   git worktree add --detach ../heyta-wt-reinstall <当前 main HEAD>
-   cd ../heyta-wt-reinstall && pnpm install && pnpm -r build
-   (cd apps/mobile/ios && pod install)          # 🔴 隔离检出必须先补这步，否则 ios 段必红
-   bash scripts/reinstall-all.sh                # 或 --only mac,android,ios（汇总会大字列出没装的端）
+   HEYTA_E2E_SERIAL=<自己的模拟器> PORT=<空端口> bash scripts/verify-mobile-repeat.sh
    ```
-   ⚠️ Windows 段之前先确认那台打包机与隧道没被别人占着（它 `Remove-AppxPackage` + `Add-AppxPackage` 是**真卸真装**，会打断对方的壳级取证）。
-   📌 这一次重装同时能清掉 [`ai-assistant-closure.md`](ai-assistant-closure.md) 记着的那笔同种欠账 —— 那条线也还没装过当前产物。
-2. **待入 §7 台账的一条**（2026-10-03 收口实测）。**现在故意不追加进 `docs/reference/environment-traps.md`**：那条台账今天已经被两条会话撞过一次号（本批的 137–140 撞上 main 的 124–160，合并时才重编成 161–164），在它还脏着、别人随时会 `git add` 整份文件的时候往里追加就是再撞一次。落地时**编号取现量的 `max(现有编号)+1` 起**，正文照抄：
+   判据在第 15 步：点「每年」⇒ 规则 = `FREQ=YEARLY;BYMONTH=<当前截止月>;BYMONTHDAY=<日>`、
+   op 数**恰好 +1**、界面出现「当前：每年」、笔记本读到同一条规则。
+   ⚠️ 期望值取自**手机此刻的 dueDate**（`repeatAnchor = dueLocal ?? todayLocal`），
+   不是脚本开头写死的那个日期 —— 这一点本身是第 15 步存在的理由。
 
-   > 🔴 **等负载的循环里，解析 `vm.loadavg` 的那一步自己坏了，而且坏了 15 轮没人发现。**
-   > `sysctl -n vm.loadavg | tr -d '{} ' | cut -d' ' -f1` 看着只是"剥花括号取第一个数"，
-   > 但 **`tr -d ' '` 把分隔符连同三个值一起粘成一个非法整数**（`65.9440.2735`），
-   > 于是 `[ "${L%.*}" -lt 14 ]` **每轮都报 `integer expression expected`、条件恒假、循环恒睡**。
-   > 症状是"窗口永远不清"，真相是**判据从来没比较成功过** —— 恒假的等待条件比没有条件更糟，
-   > 因为它看起来还在等。
-   > ⚠️ **同一条里我连错两次解析**：先以为 `awk '{print $1}'` 是对的（`vm.loadavg` 的输出带花括号，
-   > `$1` 就是那个 `{`），后又在 zsh 下用 `case "$L" in *[!0-9.]*)` 做"值可不可信"的守卫，
-   > 结果它把合法的 `48.05` 判成坏值、闸门第一轮就自己关掉。**守卫本身也是探针，也要先喂阳性对照。**
-   > 🔴 更根本的一条：**这仓库早就有现成的等法** —— `scripts/verify-mobile-restore.sh` 里的
-   > `wait_for_quiet_host`：`uptime | sed 's/.*load averages: //' | awk '{print int($1)}'`，
-   > 阈值 = **核数 × 3/4**，每 30s 重试，等满 900s 就
-   > "❌ 本轮不跑（**环境无效，不是产品失败**）" 并 `exit 3`。
-   > 手写等待循环 = 把别人已经踩平的坑重新踩三遍。**待办：把它抽进 `scripts/lib/`**
-   > （现在是某一个脚本的私有函数，第二个想用的时候就又是一份抄件 —— 同族教训见 `mobile-e2e.sh` 文件头）。
+### 待入 §7 的台账（编号取合入时现量的 `max(现有编号)+1`）
+
+```bash
+grep -E '^[0-9]+\. ' docs/reference/environment-traps.md | tail -1 | cut -d. -f1   # 现量最大号
+```
+
+1. 🔴 **等负载的循环里，解析 `vm.loadavg` 的那一步自己坏了，而且坏了 15 轮没人发现。**
+   `sysctl -n vm.loadavg | tr -d '{} ' | cut -d' ' -f1` 看着只是"剥花括号取第一个数"，
+   但 **`tr -d ' '` 把分隔符连同三个值一起粘成一个非法整数**（`65.9440.2735`），
+   于是 `[ "${L%.*}" -lt 14 ]` **每轮都报 `integer expression expected`、条件恒假、循环恒睡**。
+   症状是"窗口永远不清"，真相是**判据从来没比较成功过** —— 恒假的等待条件比没有条件更糟，
+   因为它看起来还在等。
+   ⚠️ **同一条里我连错两次解析**：先以为 `awk '{print $1}'` 是对的（`vm.loadavg` 的输出带花括号，
+   `$1` 就是那个 `{`），后又在 zsh 下用 `case "$L" in *[!0-9.]*)` 做"值可不可信"的守卫，
+   结果它把合法的 `48.05` 判成坏值、闸门第一轮就自己关掉。**守卫本身也是探针，也要先喂阳性对照。**
+   🔴 更根本的一条：**这仓库早就有现成的等法** —— `scripts/verify-mobile-restore.sh` 里的
+   `wait_for_quiet_host`：`uptime | sed 's/.*load averages: //' | awk '{print int($1)}'`，
+   阈值 = **核数 × 3/4**，每 30s 重试，等满 900s 就
+   "❌ 本轮不跑（**环境无效，不是产品失败**）" 并 `exit 3`。
+   手写等待循环 = 把别人已经踩平的坑重新踩三遍。**待办：把它抽进 `scripts/lib/`**
+   （现在是某一个脚本的私有函数，第二个想用的时候就又是一份抄件 —— 同族教训见 `mobile-e2e.sh` 文件头）。
+2. （`reinstall-all.sh` 的 ios 段盲选模拟器）—— 已修在 `90140793`，登记时把"名字不匹配 ⇒ `head -1`"
+   与"`simctl uninstall` 是它的下一句"放在一起说：**破坏性动作的载体不能靠猜**。
+3. 🔴 **窗口截图当"画没画"的载体，会同时产出假红和假绿。** 同一台机器两种面目都实测到：
+   13 KB / 内容 0.0% 的窗口图把**真界面**判成红的（同一秒 WebView 快照主蓝 1269）；
+   205/206/272 KB、内容 ~100% 的窗口图把**没画出来**放行了三趟（那三张主蓝 4/17/0，
+   拍到的是壳自己的暗底 + 一行诊断字）。⇒ 判据的**载体**和阈值同等重要；
+   一个既能假红又能假绿的载体，改阈值永远修不好它 —— 要换的是它回答哪个问题。
+4. 🔴 **构建产物里的中文有"第二种字形"，而 0 命中长得和"没做"一模一样。**
+   Hermes 字节码（`main.jsbundle` / `index.android.bundle`，头 8 字节 `c61fbc03…`）
+   把字符串存成 **UTF-16LE**：`grep 每年`、按 utf8 读整份文件、`\uXXXX` 两种大小写**全都是 0**。
+   ⇒ 探产物前先跑同趟阳性对照（`收集箱` 这类"一定在里面"的串）；对照也是 0 就说明
+   **探针读不懂这个格式**，而不是产品里没有。ASCII 串不受影响，所以
+   `FREQ=YEARLY` / `yearly` 这类标识是更稳的第一选择。
 
 ---
 
