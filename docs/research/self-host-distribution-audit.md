@@ -3190,9 +3190,21 @@ Goal 的第 2 项要的是"现量"，而 §8.49 那次全跑打的 `VCS_REF=a70b
 并且**用清单自己的读者去量**（不是我自己 eyeball 文件名）：
 
 ```sh
-cd server && . scripts/image-inputs.sh
-git diff --name-only a70b0ef8 HEAD -- "${SUPER_SYNC_IMAGE_INPUTS[@]}" | grep -c .   # → 0
+cd server                       # 🔴 必须在这个目录 source，见下面那条
+. scripts/image-inputs.sh
+out=$(git diff --name-only a70b0ef8 HEAD -- "${SUPER_SYNC_IMAGE_INPUTS[@]}") || exit 1
+echo "交集 = $(printf '%s' "$out" | grep -c .)"     # → 0
 ```
+
+🔴 **这段差点读成一个假的 0**：复跑时我给 reader 加了 `git -C ..`，而清单第一项是 `../.dockerignore`
+—— 从仓库根看它就在**仓库外**，git 直接 `fatal: '../.dockerignore' is outside repository`，
+而 `| grep -c .` 把"命令死了"读成"交集为 0"，看起来比真值还干净。两条 fatal 就印在我那一行读数的上下。
+⇒ **计数之前先断言退出码**（`|| exit 1`），并且这个 reader 的 cwd 是它契约的一部分：
+清单里的路径是**相对 `server/`** 的，换目录 source 就等于换语义（脚本头部本来就写了这句）。
+🟡 这条一般规律（**测量被管道喂给计数器时，"命令死了"和"结果是 0"长得一模一样**）**待入环境陷阱**——
+`docs/reference/environment-traps.md` 在主检出正脏着（在 06:1x 那批重叠文件里），按纪律不往多人台账插行，先登记在这里。
+06:20 在分支 tip `d4c30912` 上按正确形态复量：**交集 0 / 阳性对照 5 / `diff rc=0` / `log rc=0`，
+"最后碰过输入的提交"仍是 `1b7d0921`** ⇒ §8.51 那条"读数钉在当前产物上"到本轮全部提交之后仍然成立。
 
 | 读数 | 值 | 它挡的是什么 |
 |---|---|---|
