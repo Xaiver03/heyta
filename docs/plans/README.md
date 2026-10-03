@@ -69,7 +69,8 @@
 | 文件 | 说明 |
 |---|---|
 | [`ai-strategy.md`](ai-strategy.md) | 策略入口（被引用最多的一份，13 处）。🔴 **§8 那张"下一步"表已过期**：第 3、4 行（捕获解析、拆解）在 §7.1 里自己标了已完成，只有第 5 行"agent 多步自主 / Pi / 仅桌面"仍有效 |
-| [`ai-assistant-closure.md`](ai-assistant-closure.md) | **规划中**（2026-10-02）：AI 能力面补齐的**执行工单**（W1–W14，缺口编号 `AI-G*`）。🔴 它是 `ai-strategy.md` §8 信任阶梯的拆解，**不是第二份策略** —— 冲突时以 `ai-strategy.md` 为准。分两段：W1–W7 不依赖拍板可直开；W8+ 挂在三处待决（D-1 是否取代 ADR-0005 的"不做聊天助手"禁令、D-1a 多步是否含"末尾一次写提案"、D-2 工具目录共用后的授权粒度）。证据在 [`dida-ai-assistant-gap-analysis.md`](../research/dida-ai-assistant-gap-analysis.md) |
+| [`ai-assistant-closure.md`](ai-assistant-closure.md) | **W1–W4、W7–W9、W12 已落地**（2026-10-03）：AI 能力面补齐的**执行工单**（W1–W14，缺口编号 `AI-G*`）。🔴 它是 `ai-strategy.md` §8 信任阶梯的拆解，**不是第二份策略** —— 冲突时以 `ai-strategy.md` 为准。⚠️ 原文那句"W8+ 挂在三处待决（D-1 / D-1a / D-2）"**已过期**：三处都由产品负责人 2026-10-02–03 拍板（聊天外壳与"末尾一次写提案"放行、授权粒度改成助手侧独立档位、`EVENT` 与 AI 工具同批），逐条状态与**还剩什么**（W5 / W10 / W11 + 四条登记缺口）在它的 §7 与 §7.2。证据在 [`dida-ai-assistant-gap-analysis.md`](../research/dida-ai-assistant-gap-analysis.md) |
+| [`ai-event-tool-contract.md`](ai-event-tool-contract.md) | **设计已定，实现待两头合流**（2026-10-03）：倒数日 `EVENT` 的 **AI 工具契约**（D-3 拍板"实体与工具同批"的落点）。定死读 2 / 写 4 个工具、每工具的 `egressFields`、三项刻意不进 AI 的字段及理由、农历的分工（模型不许换算），以及**覆盖面分母的准入判据**（"有用户能填或能按的编辑面"）—— 顺带纠正两处口径：`covered` 从"有任一工具"改成"读写都有"、`FOCUS_SESSION` 移出分母 ⇒ 对外说过的 `2/8` 两个数都是错的，现状是 **1/7**。🔴 编号消歧：本文称覆盖面门禁为 `AI-COV`，因为闭环计划与倒数日计划**各有一个 W10 且是同一件事** |
 | [`ai-capability-branches.md`](ai-capability-branches.md) | 能力分支与开发分支策略 |
 | [`ai-memory-system.md`](ai-memory-system.md) | 记忆系统 |
 | [`ai-tier-pricing-rollout.md`](ai-tier-pricing-rollout.md) | 分档与定价 |
