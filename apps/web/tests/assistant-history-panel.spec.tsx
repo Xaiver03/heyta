@@ -52,11 +52,21 @@ const secrets = { get: () => Promise.resolve(undefined) };
 const ITEMS: readonly LocalApiItem[] = [{ id: 't1', title: '买牛奶', body: '两盒', readable: true }];
 
 function fakeHost(): LocalApiHost & { submits: number } {
+  // ⚠️ 成员清单以 `ai-assistant-panel.spec.tsx` 的 `fakeHost` 为准。
+  // 这里少一个就会在**合并态**才炸：`LocalApiHost` 从 3 个读方法扩到 9 个之后，
+  // 单跑本文件照样绿（运行时没人调那些方法），`tsc` 才判得出类型不完整。
   const host = {
     submits: 0,
     listTasks: () => Promise.resolve(ITEMS),
     getTask: (taskId: string) => Promise.resolve(ITEMS.find((x) => x.id === taskId)),
     listProjects: () => Promise.resolve([{ id: 'p1', name: '工作', taskCount: 1 }]),
+    listHabits: () => Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
+    listTags: () => Promise.resolve([]),
+    listNotes: () => Promise.resolve([]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([]),
+    listFocusSessions: () => Promise.resolve([]),
+    listReminders: () => Promise.resolve([]),
     submit: () => {
       host.submits += 1;
       return Promise.resolve({ ok: true as const, taskId: 'created-1' });
