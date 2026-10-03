@@ -12,16 +12,36 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { validateProjectParentChange, type ProjectParentRejection } from '../src/index.js';
+import {
+  folderTargetsFor,
+  validateProjectParentChange,
+  type ProjectParentRejection,
+} from '../src/index.js';
 import type { Project } from '../src/entities.js';
 
 function mkProject(id: string, overrides: Partial<Project> = {}): Project {
-  return { id, name: id, createdAt: 1_700_000_000_000, updatedAt: 1_700_000_000_000, ...overrides };
+  return {
+    id,
+    name: id,
+    createdAt: 1_700_000_000_000 + Number(idSeqForCreatedAt(id)),
+    updatedAt: 1_700_000_000_000,
+    ...overrides,
+  };
+}
+
+/**
+ * 让 TREE 里四条的 `createdAt` **互不相同** —— 顺序判据才有意义：
+ * 全部同刻的话排序只比 id，"按创建时间升序"那一半永远测不到。
+ */
+function idSeqForCreatedAt(id: string): number {
+  const order = ['folder', 'in-folder', 'loose-a', 'loose-b'];
+  const index = order.indexOf(id);
+  return index === -1 ? 90 : index;
 }
 
 /**
  * 一棵合法的一层树：
- * `folder`（顶级）→ `in-folder`；另有两条顶级清单 `loose-a` / `loose-b`。
+ * `folder`（顶级，有子）→ `in-folder`；另有两条顶级清单 `loose-a` / `loose-b`。
  */
 const TREE: Project[] = [
   mkProject('folder'),
@@ -96,6 +116,54 @@ describe('validateProjectParentChange：六种拒绝各一条，逐条点名 rea
     expect(reject(TREE, 'folder', 'loose-b')).toBe('has_children');
     // 阳性对照：同一个目标 `loose-b`，挂一条**没有子**的清单合法。
     expect(validateProjectParentChange(TREE, 'loose-a', 'loose-b').ok).toBe(true);
+  });
+});
+
+describe('folderTargetsFor：两端共用的候选集', () => {
+  it('候选里只有**合法**的目标：不含自己、不含别人文件夹里的清单、不含自己（文件夹不能进文件夹）', () => {
+    // 🔴 `folder` **在**候选里：它虽然已经有子（它是文件夹），但"把一条普通清单
+    //    移进文件夹"正是这个功能的目的 —— 被限制的是**文件夹自己**不能被别人当子。
+    expect(folderTargetsFor(TREE, 'loose-a').map((p) => p.id)).toEqual(['folder', 'loose-b']);
+    // 反过来：`folder` 自己有子 ⇒ 它不能挂进任何东西，候选是空集。
+    expect(folderTargetsFor(TREE, 'folder').map((p) => p.id)).toEqual([]);
+    // 已经在 folder 里的清单：同为顶级的 folder / loose-a / loose-b 都可以当它的父
+    // （folder 那一项就是"原地不动"，界面用「（当前位置）」标出来 —— 它必须**可见**，
+    //   否则用户看不出自己在哪一层）。
+    expect(folderTargetsFor(TREE, 'in-folder').map((p) => p.id)).toEqual([
+      'folder',
+      'loose-a',
+      'loose-b',
+    ]);
+    // 不含自己：任何一条的候选里都不该出现它自己的 id。
+    for (const project of TREE) {
+      expect(folderTargetsFor(TREE, project.id).map((p) => p.id)).not.toContain(project.id);
+    }
+  });
+
+  it('已删除的清单不进候选（选了就是写一个任何视图都查不到的父）', () => {
+    const withTomb: Project[] = [
+      ...TREE,
+      mkProject('已删', { deletedAt: 1 }),
+      mkProject('刚删的父', { deletedAt: 2 }),
+    ];
+    expect(folderTargetsFor(withTomb, 'loose-a').map((p) => p.id)).not.toContain('已删');
+  });
+
+  it('顺序是**创建时间升序**（TREE 四条的 createdAt 互不相同，所以这一半测得到），且不靠输入顺序', () => {
+    expect(folderTargetsFor(TREE, 'loose-a').map((p) => p.id)).toEqual(['folder', 'loose-b']);
+    const shuffled = [TREE[3]!, TREE[1]!, TREE[2]!, TREE[0]!];
+    expect(folderTargetsFor(shuffled, 'loose-a').map((p) => p.id)).toEqual(['folder', 'loose-b']);
+  });
+
+  it('🔴 它就是 `validateProjectParentChange` 的展开，两者不许给出不同答案', () => {
+    for (const moved of TREE) {
+      const allowed = new Set(folderTargetsFor(TREE, moved.id).map((p) => p.id));
+      for (const candidate of TREE) {
+        if (candidate.id === moved.id) continue;
+        const verdict = validateProjectParentChange(TREE, moved.id, candidate.id).ok;
+        expect(verdict).toBe(allowed.has(candidate.id));
+      }
+    }
   });
 });
 

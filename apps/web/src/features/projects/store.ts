@@ -44,6 +44,14 @@ interface ProjectState {
   deleteProject: (id: string) => Promise<void>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setProjectColor: (id: string, slot?: CategorySlot) => Promise<void>;
+  /**
+   * 移入某个文件夹（省略 = 提为顶级）。
+   *
+   * 🔴 **薄转发，不在这里判断能不能移** —— 一层/环/自指/文件夹不进文件夹
+   *    全在领域层 `validateProjectParentChange`（`app-host` 的 `setParent` 会调它）。
+   *    界面自己筛一遍 = 第二套裁决标准，而两端各筛一次就是两套。
+   */
+  setProjectParent: (id: string, parentId?: string) => Promise<void>;
 
   addTag: (name: string) => Promise<void>;
   renameTag: (id: string, name: string) => Promise<void>;
@@ -88,6 +96,13 @@ export const useProjectStore = create<ProjectState>(() => ({
     // 界面这一侧不做第二份判断，两份判断迟早不一致。
     await projectActions.setProjectColor(id, slot);
     syncProjects();
+  },
+
+  setProjectParent: async (id, parentId) => {
+    // 与 setProjectColor 同一个理由：被领域层拒绝时**让它抛**，
+    // 界面负责把错误显示出来（`ProjectsPanel` 里那条候选集本来就是按同一条规则筛的，
+    // 所以正常操作走不到拒绝分支；走到了就是真有第二套标准，不许在这里吞掉）。
+    await projectActions.setParent(id, parentId);
   },
 
   addTag: async (name) => {

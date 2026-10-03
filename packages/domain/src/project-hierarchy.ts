@@ -100,3 +100,38 @@ export function validateProjectParentChange(
 
   return { ok: true, parentId: newParentId };
 }
+
+/**
+ * 某条清单**现在能移进哪些清单**（= 领域层允许的合法目标，按输入顺序返回）。
+ *
+ * 🔴 它存在的唯一理由是：**两端的选择器必须用同一份候选集**。界面如果自己筛一遍
+ * （"看起来是顶级的就能选"），那第二份标准迟早和守卫不一致 —— 本仓为"同一条规则
+ * 两处实现"付过三次学费（AGENTS.md §3.5）。所以：
+ *   界面 **只画** 这个函数给的东西，**不自己判断能不能移**；
+ *   动作层 `setParent` 仍然会再判一次（写侧才是唯一能拦住坏数据的地方）。
+ *
+ * 直接复用 `validateProjectParentChange`，不重述规则 —— 两条路径因此不可能漂移。
+ */
+export function folderTargetsFor(
+  projects: readonly Project[],
+  projectId: string,
+): Project[] {
+  const alive = projects.filter((project) => project.deletedAt === undefined);
+  return alive
+    .filter(
+      (candidate) =>
+        candidate.id !== projectId &&
+        validateProjectParentChange(alive, projectId, candidate.id).ok,
+    )
+    // 同一条规则里 `parentId` 可能是"没这个键"（reducer 把 null 翻成删除），
+    // 而排序要确定性 —— 按创建时间、同刻按 id，与 `listProjects()` 同一条规范顺序。
+    .sort((a, b) =>
+      a.createdAt !== b.createdAt
+        ? a.createdAt - b.createdAt
+        : a.id < b.id
+          ? -1
+          : a.id > b.id
+            ? 1
+            : 0,
+    );
+}
