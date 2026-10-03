@@ -515,3 +515,47 @@ merge 时会在他们改过的那 3 行上冲突，而**一次草率的解冲突
 
 **台阶 0 没做完的那一件**：线上落地页仍是旧文案，词条改动不会自己上线；重新发布站点是共享状态动作，**留给产品负责人拍板**。
 
+### 8.10 合入前做了一次**只读**干跑：冲突只有一个文件，而它的危险不在冲突本身
+
+本批收尾时并行会话又往前走了（落后多少笔**不写死**，会漂；现量：
+`git rev-list --left-right --count main...HEAD`）。"这个分支现在合得进去吗"以前是靠感觉回答的，
+这次用 `git merge-tree --write-tree --name-only main HEAD` 干跑了一遍 ——
+**它只写对象库，不动工作树、不动索引、不改 HEAD**，所以在共享检出里跑是安全的。
+
+重叠文件现量法（🔴 不能用两参 `git diff A..B`，理由见 §8.9 第三条待入项）：
+
+```bash
+MB=$(git merge-base main HEAD)
+comm -12 <(git diff --name-only $MB..main | sort) <(git diff --name-only $MB..HEAD | sort)
+```
+
+结果：**6 个重叠文件，5 个自动合并，只有 `package.json` 内容冲突**。那 5 个是
+`docs/runbooks/deployment.md`、`packages/i18n/src/locales/{zh-CN,en}.ts`、
+`apps/landing/{,en/}docs/index.html`（两份入口 HTML 是生成物，合入后仍要重跑 `gen:entries` 再验
+`check:entries`，不能因为"自动合上了"就当它是最终字节）。
+
+冲突两侧的差异**全部是"各自往 `check` 链里加门禁"**，逐名归属现量（`git show <ref>:package.json | grep -c '"<gate>"'`）：
+
+| 门禁名 | base | main | 本分支 |
+|---|---|---|---|
+| `check:licenses:stamp` | 0 | 1 | 0 |
+| `check:mobile-first-run-gate` | 0 | 1 | 0 |
+| `check:image-license` | 0 | 0 | 1 |
+| `check:server-env` | 0 | 0 | 1 |
+| `check:web-artifact` | 0 | 0 | 1 |
+
+base 一个都没有 ⇒ 这不是"两边改了同一行"的语义分歧，解法只有**并集**，没有取舍。
+
+🔴 **真正的风险是解完之后少一个名字**。`check` 是一串 `&&`，把某个门禁掉出去**不会让任何东西失败** ——
+它只是不再被跑，而链子照样 exit 0。这正是"一条永远通过的判据比没有判据更糟"的形状，
+只不过这里坏的方式是**它整条都不在了**。所以合入后必须立刻跑：
+
+```bash
+for g in check:licenses:stamp check:mobile-first-run-gate check:image-license check:server-env check:web-artifact; do
+  printf '%-30s %s\n' "$g" "$(grep -c -- "\"$g\"" package.json)"
+done   # 五行都必须 ≥1，出现 0 就是这次合并把某个人的门禁弄丢了
+```
+
+（同族先例：§7 第 88 条"plumbing 半个文件的索引尾巴"—— 都是**合并/暂存动作会静默丢内容**，
+而丢后的输出与"一切正常"完全一样。）
+
