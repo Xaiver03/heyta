@@ -19,7 +19,7 @@
  *   3. **fixture**：往输入里注入一个新工具，产物里必须出现它；判不出实体的工具、
  *      归到没模型实体的工具、进了分母的视图名 —— 三种都必须让生成**当场失败**。
  *
- * 只有"现状基线 2/8"那一条是**故意钉住今天的事实**：W10 扩目录时它会红，
+ * 只有"现状基线 N/8"那一条是**故意钉住今天的事实**：W10 扩目录时它会红，
  * 而那正是要求的动作 —— 重新判断一次，而不是让它悄悄跟着变。
  *
  * ## 关于"从测试里 import 一个 Node 脚本"
@@ -78,6 +78,14 @@ interface FixtureManifest {
   coverage: { covered: number; denominator: number; ratio: string };
   userOperableEntityTypes: readonly string[];
   entityTypesWithoutTools: readonly string[];
+  entities: readonly {
+    entityType: string;
+    materialized: boolean;
+    countsTowardCoverage: boolean;
+    coverage: 'read-write' | 'read-only' | 'write-only' | 'none';
+    readToolNames: readonly string[];
+    writeToolNames: readonly string[];
+  }[];
   tools: readonly {
     name: string;
     kind: string;
@@ -341,13 +349,33 @@ describe('分母恰好 8，且逐条列出是哪 8 个', () => {
     }
   });
 
-  it('现状基线 2/8：只有 TASK 与 PROJECT 有工具（W10 扩目录时这条会红，那是要的）', () => {
+  it('现状基线 8/8：分母里每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
+    // 2026-10-03 两次搬这条基线，都在这里重新判断过：
+    // ① PROJECT 补 `create_project`、HABIT 补 `list_habits` + `create_habit`（3/8）；
+    // ② 补齐 TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER 的读写工具（8/8）。
+    // 下一个动目录的人同样必须在这里重新判断一次 —— 改成从上游推导就是永真判据。
+    //
+    // ⚠️ 现在这个数已经顶到分母，**它不再能靠"加实体"变红**：往后新实体进了分母却没工具时，
+    // 报的是 `check-ai-coverage` 那条门禁，不是这个常数。
     const withTools = manifest.entities
       .filter((e) => e.countsTowardCoverage && e.coverage !== 'none')
       .map((e) => e.entityType);
-    expect(withTools.sort()).toEqual(['PROJECT', 'TASK']);
-    expect(manifest.coverage.covered).toBe(2);
-    expect(manifest.coverage.ratio).toBe('2/8');
+    expect(withTools.sort()).toEqual([
+      'FOCUS_SESSION',
+      'HABIT',
+      'HABIT_LOG',
+      'NOTE',
+      'PROJECT',
+      'REMINDER',
+      'TAG',
+      'TASK',
+    ]);
+    expect(manifest.coverage.covered).toBe(8);
+    expect(manifest.coverage.ratio).toBe('8/8');
+    // `covered` 是分母名单的**统计结果**，`userOperableEntityTypes.length` 是名单本身：
+    // 两个数取自生成器里两条不同的路径，这里要求它们当下确实相等 ——
+    // 不等就是那两条口径漂了（比如覆盖率把某个已剔除的视图又算了进去）。
+    expect(manifest.coverage.covered).toBe(manifest.userOperableEntityTypes.length);
   });
 });
 
@@ -375,12 +403,38 @@ describe('注入一个工具，清单里必须出现它（证明"生成"而不�
     expect(injected, '新加的工具没进清单 —— 生成器在抄旧清单').toBeTruthy();
     expect(injected!.entityType).toBe('REMINDER');
     expect(injected!.kind).toBe('write');
-    // 🔴 注入**改变了结论**：REMINDER 不再是"没有工具的实体"，覆盖面 +1。
+    // 🔴 注入**改变了结论**：REMINDER 不再是"没有工具的实体"。
     //    这一条才是"生成在跟随上游"的正面证据 —— 抄件做不到这件事。
     expect(built.entityTypesWithoutTools).toEqual(['PROJECT']);
     expect(built.coverage.denominator).toBe(3);
     expect(before.coverage.covered).toBe(1);
-    expect(built.coverage.covered).toBe(before.coverage.covered + 1);
+    // ⚠️ 但覆盖面**一格都没动**：只加了一个写工具，REMINDER 现在是 `write-only`。
+    //    口径见 `countsAsCovered` —— "读得到也改得动"才算覆盖，
+    //    所以这里必须钉住 `1/3` 而不是旧的那句 `2/3`（旧口径把只读/只写都算成已覆盖，
+    //    那正是 `2/8` 那句虚报的来源）。
+    expect(
+      built.entities.find((e) => e.entityType === 'REMINDER')!.coverage,
+    ).toBe('write-only');
+    expect(built.coverage.covered).toBe(before.coverage.covered);
+    expect(built.coverage.ratio).toBe('1/3');
+  });
+
+  it('🔴 补齐读 + 写两个工具，覆盖面才 +1 —— 「读得到也改得动」这条口径有牙齿', async () => {
+    const gen = await loadGenerator();
+    const built = gen.buildCapabilityManifest(
+      fixtureInput({
+        tools: [
+          { name: 'list_tasks', kind: 'read', description: '列出任务。', schemaRecorded: true, args: [] },
+          { name: 'create_task', kind: 'write', description: '新建任务。', schemaRecorded: true, args: [] },
+          { name: 'list_reminders', kind: 'read', description: '列提醒。', schemaRecorded: true, args: [] },
+          { name: 'create_reminder', kind: 'write', description: '给任务建一条提醒。', schemaRecorded: true, args: [] },
+        ],
+      }),
+    );
+    expect(
+      built.entities.find((e) => e.entityType === 'REMINDER')!.coverage,
+    ).toBe('read-write');
+    expect(built.coverage.covered).toBe(2);
     expect(built.coverage.ratio).toBe('2/3');
   });
 

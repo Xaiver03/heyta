@@ -25,7 +25,7 @@ import {
   type AiRoutingConfig,
   type EgressConsent,
 } from '@heyta/ai';
-import type { LocalApiHost, LocalApiItem, LocalApiProject } from '@heyta/local-api';
+import type { LocalApiHabit, LocalApiHost, LocalApiItem, LocalApiProject } from '@heyta/local-api';
 
 import {
   assistantEgressFields,
@@ -48,6 +48,14 @@ function fakeHost(items: readonly LocalApiItem[] = [], projects: readonly LocalA
     getTask: (taskId: string): Promise<LocalApiItem | undefined> =>
       Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: (): Promise<readonly LocalApiProject[]> => Promise.resolve(projects),
+    listHabits: (): Promise<readonly LocalApiHabit[]> =>
+      Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
+    listTags: () => Promise.resolve([]),
+    listNotes: () => Promise.resolve([]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([]),
+    listFocusSessions: () => Promise.resolve([]),
+    listReminders: () => Promise.resolve([]),
     submit: (): Promise<{ ok: true; taskId: string }> => {
       host.submits += 1;
       return Promise.resolve({ ok: true, taskId: 'created-1' });
@@ -380,7 +388,11 @@ describe('🔴 出境披露：循环前一次算完，越界就停', () => {
   it('计划里的上界就是从常量推导的（不是另写一个数）', () => {
     const plan = planAssistantEgress('read-only');
     expect(plan.maxRequests).toBe(MAX_ASSISTANT_TOOL_STEPS + 1);
-    expect(plan.tools.length).toBe(3);
+    // ⚠️ 10 = 目录**当前**的读工具条数（`list_tasks` / `get_task` / `list_projects` /
+    // `list_habits` / `list_tags` / `list_notes` / `get_note` / `list_checkins` /
+    // `list_focuses` / `list_reminders`，2026-10-03 补齐六个实体工具之后）。
+    // 写成 `LOCAL_API_TOOLS.filter(…)` 的长度就是拿被验的那份推导去当期望值 —— 一条永真判据。
+    expect(plan.tools.length).toBe(10);
     expect(plan.fields).toEqual(assistantEgressFields('read-only'));
   });
 
@@ -480,8 +492,35 @@ describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
 describe('授权前端有两个，判断只有一个', () => {
   it('`assistantGrants` 由**目录**推导，不是一份手写的名单', () => {
     const grants = assistantGrants('read-only');
+    // ⚠️ 下面这 22 个名字是**目录当前的内容**（2026-10-03 补齐 TAG / NOTE / HABIT_LOG /
+    // FOCUS_SESSION / REMINDER 之后；此前是 9 个），不是一份"允许清单"：
+    // 判据是"键集合 == 目录"，所以目录扩了就必须跟着列全 ——
+    // 把它换成 `LOCAL_API_TOOLS.map(...)` 会让这条断言变成自己比自己的**永真判据**。
     expect(Object.keys(grants).sort()).toEqual(
-      ['complete_task', 'create_task', 'get_task', 'list_projects', 'list_tasks', 'update_task'].sort(),
+      [
+        'complete_task',
+        'create_habit',
+        'create_note',
+        'create_project',
+        'create_reminder',
+        'create_tag',
+        'create_task',
+        'get_note',
+        'get_task',
+        'list_checkins',
+        'list_focuses',
+        'list_habits',
+        'list_notes',
+        'list_projects',
+        'list_reminders',
+        'list_tags',
+        'list_tasks',
+        'log_focus',
+        'record_checkin',
+        'set_task_tags',
+        'update_note',
+        'update_task',
+      ].sort(),
     );
     expect(grants['list_tasks']).toBe(true);
     expect(grants['create_task']).toBe(false);

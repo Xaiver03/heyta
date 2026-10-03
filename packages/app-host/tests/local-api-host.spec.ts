@@ -361,3 +361,99 @@ describe('🔴🔴 写操作真的经 dispatch 产出 op', () => {
     });
   });
 });
+
+/**
+ * W11 批量完成的落库侧。参数层的判据在
+ * `packages/local-api/tests/tool-batch-complete.spec.ts`，这里只测**只有真引擎能回答**的事：
+ * 一次批量到底写了几条 op、失败时是不是真的一条都没写。
+ */
+describe('complete-tasks（批量完成）', () => {
+  async function createTasks(titles: readonly string[]): Promise<string[]> {
+    const host = makeHost();
+    const out: string[] = [];
+    for (const title of titles) {
+      const created = await host.submit({ action: 'create-task', title });
+      if (!created.ok) throw new Error(`夹具建任务失败：${created.message}`);
+      out.push(created.taskId);
+    }
+    return out;
+  }
+
+  async function opCount(): Promise<number> {
+    return (await engine.getAllOps()).length;
+  }
+
+  it('🔴 建 5 条再批量完成：op 增量**恰好 5**（不是"至少 1"）', async () => {
+    const created = await createTasks(['a', 'b', 'c', 'd', 'e']);
+    const before = await opCount();
+    const result = await makeHost().submit({ action: 'complete-tasks', taskIds: created });
+
+    expect(result.ok).toBe(true);
+    expect(await opCount() - before, '一条批量写了不止 5 条 ⇒ 有一步偷偷多发了 op').toBe(5);
+    const host = makeHost();
+    for (const id of created) {
+      expect((await host.getTask(id))?.completed, `${id} 没被真的完成`).toBe(true);
+    }
+  });
+
+  it('🔴 结果里的 taskIds 逐字等于被改的那几条（外部程序据此算范围）', async () => {
+    const created = await createTasks(['a', 'b', 'c']);
+    const result = await makeHost().submit({ action: 'complete-tasks', taskIds: created });
+    if (!result.ok) throw new Error(`批量失败：${result.message}`);
+    expect(result.taskIds).toEqual(created);
+    expect(result.taskId, 'taskId 必须是第一条 —— 既有消费者都按它读').toBe(created[0]);
+  });
+
+  it('🔴 其中一条不存在 ⇒ 整批拒绝，且**一条都没改**（全批预检的那一半判据）', async () => {
+    const created = await createTasks(['a', 'b', 'c']);
+    const before = await opCount();
+    const result = await makeHost().submit({
+      action: 'complete-tasks',
+      taskIds: [created[0] ?? 'x', '不存在的', created[1] ?? 'y'],
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('期望被拒');
+    expect(result.reason).toBe('not-found');
+    expect(result.message).toContain('一条都没有改');
+    expect(await opCount(), '拒绝的一批里还写了 op ⇒ 预检没放在写之前').toBe(before);
+    const host = makeHost();
+    expect((await host.getTask(created[0] ?? ''))?.completed).toBe(false);
+    expect((await host.getTask(created[1] ?? ''))?.completed).toBe(false);
+  });
+
+  it('🔴 已经是完成态的不重复写：增量 = 未完成的条数，taskIds 只含真改了的', async () => {
+    const created = await createTasks(['a', 'b', 'c', 'd']);
+    const first = await makeHost().submit({ action: 'complete-task', taskId: created[0] ?? '' });
+    if (!first.ok) throw new Error('夹具失败');
+    const before = await opCount();
+
+    const result = await makeHost().submit({ action: 'complete-tasks', taskIds: created });
+    if (!result.ok) throw new Error(`批量失败：${result.message}`);
+
+    expect(await opCount() - before, '给已完成的任务又写了一条 op').toBe(3);
+    expect(result.taskIds).toEqual(created.slice(1));
+  });
+
+  it('全部本来就是完成的 ⇒ ok，但一条 op 都不写、taskIds 是空数组', async () => {
+    const created = await createTasks(['a', 'b']);
+    const host = makeHost();
+    for (const id of created) {
+      const one = await host.submit({ action: 'complete-task', taskId: id });
+      if (!one.ok) throw new Error('夹具失败');
+    }
+    const before = await opCount();
+    const result = await makeHost().submit({ action: 'complete-tasks', taskIds: created });
+
+    if (!result.ok) throw new Error(`期望 ok：${result.message}`);
+    expect(result.taskIds).toEqual([]);
+    expect(await opCount()).toBe(before);
+  });
+
+  it('🔴 空数组不许回 ok + 空 id（那会把"什么都没做"报成"做完了"）', async () => {
+    const result = await makeHost().submit({ action: 'complete-tasks', taskIds: [] });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('期望被拒');
+    expect(result.reason).toBe('invalid');
+  });
+});
