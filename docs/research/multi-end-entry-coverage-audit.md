@@ -40,7 +40,7 @@
 | 习惯 建/打卡/目标/颜色 | ✅ | ✅ |
 | 习惯 **改名与删除** | ✅ 详情窗格头部：内联改名框 + 删除（**墓碑** —— `listHabits` 滤掉、库里仍在，打卡历史一条都不动） | ✅ 详情层两个图标 + 内联改名框（判据 `apps/mobile/tests/organizer-rename.spec.ts` 里那条习惯 describe 4 条，见 §4 P2-3） |
 | 便签 建/钉/删 | ✅ | ✅ |
-| 便签 **编辑** | ✅ 便签视图里的编辑面板（共享 `NoteEditor`） | ✅ 二级全屏编辑屏（2026-10-03 第四批；判据 `apps/mobile/tests/note-edit.spec.ts` + `reminders-notes-display.spec.ts` 那条翻向断言；🟡 真机截图未取证，见 §4 P2-1） |
+| 便签 **编辑** | ✅ 便签视图里的编辑面板（共享 `NoteEditor`） | ✅ 二级全屏编辑屏（2026-10-03 第四批；判据 `apps/mobile/tests/note-edit.spec.ts` + `reminders-notes-display.spec.ts` 那条翻向断言；真机两张截图已入库并逐张写明各自钉到脚本第几步，**第 8 步之后三腿仍缺** —— §3.2） |
 | 专注 / 分类报告 / 冲突解决 / 实时同步 | ✅ | ✅ |
 | 搜索 | ✅ 可打开便签 | ✅ 可打开便签（2026-10-03 第四批：`SearchScreen` 传 `onOpenNote` → 同一个 `NoteEditScreen`。原文写的是「不可打开便签（刻意）」） |
 | 回收站 | ✅ 仅任务 | ✅ 仅任务 |
@@ -55,6 +55,60 @@
 | 模块开关 | ✅ 7 模块 | ❌ 固定 5 tab（立场差异） |
 | 订阅/权益可见 | ✅ 到期条 | 🟡 **「我的」页有一条权益卡**（2026-10-03，任务 4：`EntitlementSection` 消费 `app-host#fetchHostedEntitlementReading`，四态只渲两态）；**拿不到"到 X 日到期"**，因为 `entitled` 分支没有日期字段 ⇒ 要改服务端面，本批不许碰（BLOCKED **B45**）。设备级截图未取证 |
 | 同步设置 / 隐私同意 / 小组件 / 语言 | ✅ | ✅ |
+
+### 3.1 上面这几行的复跑命令与现量读数（2026-10-03 19:1x，载体 = `main` 上的本条线提交）
+
+四条命令、四个退出码，每条对应矩阵里的一行或几行：
+
+```bash
+cd apps/mobile
+npx vitest run tests/organizer-rename.spec.ts        # → exit=0  Tests 26 passed (26)
+npx vitest run tests/note-edit.spec.ts               # → exit=0  Tests 15 passed (15)
+npx vitest run tests/growth-share-summary.spec.ts    # → exit=0  Tests 13 passed (13)
+npx vitest run tests/reminders-notes-display.spec.ts # → exit=0  Tests 17 passed (17)
+```
+
+| 矩阵行 | 命令 | 读数 |
+|---|---|---|
+| 清单/标签 **改名**、归档 | `organizer-rename.spec.ts` | 26 passed；`check:reachability` exit=0（PROJECT/TAG 各有 6 处宿主调用点） |
+| 习惯 **改名与删除** | 同上文件的习惯 describe | 含在那 26 条里；钉的是"删除是墓碑、打卡历史一条不动、撤销后连续天数还在" |
+| 便签 **编辑** | `note-edit.spec.ts` | 15 passed（含"改标题 ⇒ 恰好一条 UPD、载荷只有 content"） |
+| 搜索 **可打开便签** | `reminders-notes-display.spec.ts` | 17 passed（含那条由 not.toContain 翻向 toContain 的 `onEdit=`，同时钉真 op 落点） |
+| 成长统计 · **周小结带走** | `growth-share-summary.spec.ts` | 13 passed + 两次变异各自转红（摘掉 `share={share}` ⇒ 1 红；把共享层第二行改硬编码 ⇒ 3 红） |
+| 订阅/权益可见 | 同上文件的权益段 | 含在 13 条里；`check:payment-entry` / `check:pricing` 各 exit=0 |
+
+**没被这四条命令覆盖的两件事，别读成"已做完"**：年度热力图与补打卡仍被冻结判据
+`growth-display.spec.ts:365`/`:302` 钉着（**B41 / B42**），真机设备级截图只跑到第 5 步（见 §3.2），
+第 8 步之后的三腿仍缺（**B48 / B49**）。
+
+### 3.2 便签编辑链的真机截图（2026-10-03 17:20，`apps/mobile/evidence/`）
+
+两张图，**人都打开看过**（AGENTS §6.2 规定一），逐张写清看到什么：
+
+| 文件 | 看到什么 | 证明到哪一步 |
+|---|---|---|
+| `android-notes-1-editor-open.png` | 顶部标题「编辑便签」+ 返回箭头，中间一个多行输入框，初值就是这条便签的当前正文 `note-e2e-171747-read-once`，底部「× 取消」与主蓝「✓ 保存」 | 脚本第 4 步：列表里那段摘要**点得开**，且打开的是共享 `NoteEditor` 那屏、**输入框初值 = 当前正文** |
+| `android-notes-2-list-after-edit.png` | 「我的」页的便签卡片，正文已是**改过之后**的 `note-e2e-171747-edited`，卡尾带着「钉到今天 / 删除便签」，底部仍是 5 个标签（没多出第 6 个） | 脚本第 5 步：保存之后回到列表，**摘要真的变了** —— 不是只有输入框里变 |
+
+**这两张凭什么算"当前产物"（traps #27 要求回答的就是这个）**：便签链上六个文件最后一笔写入都在
+16:20–16:31（`notes/model.ts` 16:20:39、`NoteEditor.tsx` 16:21:28、`NotesBoard.tsx` 16:21:44、
+`SearchScreen.tsx` 16:26:55、`NoteEditScreen.tsx` 16:30:50、`NotesSection.tsx` 16:31:23），
+此后到现在 `git diff HEAD -- <六个>` 逐字为空；而这一趟的 needle 是 `note-e2e-171747`
+（17:17:47 起跑），截图 17:20:20 / 17:20:36 —— **比源文件最后一次改动晚 46 分钟以上**。
+另一条独立的时序证据：「编辑便签」这一屏由 `NoteEditScreen` + `NoteEditor` 渲染，
+**这两个文件 16:21 之前不存在**，所以任何早于它们的构建根本画不出图 1 的样子 —— 旧产物这条假设在图面前不成立。
+⚠️ 但**做不到逐字节复现**：磁盘上那枚 `app-release.apk` 已被 19:07 并行会话的另一次构建覆盖，
+能对账的只有"文件字节没变 + 时序"这两条，这一条要写清而不是含糊过去。
+
+**这两张没证明的（别读成"整条脚本过了"）**：
+① `android-notes-3-from-search.png`（第 8 步：任务页搜索里点开便签）**不存在** —— 两张已有图的落点
+分别在 `verify-mobile-notes.sh:394`（第 4 步）与 `:418`（第 5 步），第三张在 `:515`（第 8 步），
+所以这一趟**至少走到第 5 步、确定没走到第 8 步**（中间第 6/7 步有没有过，日志没留、不猜），
+"搜索 → 编辑屏"这条腿因此**只有单元测试证据**（`reminders-notes-display.spec.ts` 17 条），没有真机证据；
+② 第 6 步「恰好一条 `UPD`、载荷只有 `content`」、第 7 步「没改动就一条都不写」、第 9–11 步
+「服务端数得到 + 笔记本解密读到同一份新正文」三腿同样未取证。
+整条脚本至今**没有一次跑通** —— 三次被环境挡的现量读数在 `BLOCKED.md` **B48 / B49**，
+`verify-mobile-notes.sh:604` 那一步（截图落库对账）本身就是会因第三张缺失而转红的判据。
 
 ## 4. 真缺口清单
 
@@ -90,7 +144,7 @@
 
 | # | 缺口 | 证据 |
 |---|---|---|
-| P2-1 | ✅ **已修（2026-10-03，多端第四批）**：便签**两端都能改正文**了。编辑器抽进共享层 `packages/ui/src/notes/NoteEditor.tsx` —— 两端各写一份「多行输入 + 保存 + 取消」最容易漂出来的差异是**一端点保存会落一条什么都没改的 `UPD`**：它推进 `updatedAt`，而列表按它排第二段，用户读到的是「我只是点开看了一眼，这条便签跳到最前了」。那条闸门本身在 `@heyta/app-host#updateNoteContent`（写不写 op 是产品语义，AGENTS §3.5），这一层保证的是**两端用的是同一个入口**，所以闸门只有一处、也只会被踩到一处。移动端是「我的 → 便签」的二级全屏 Modal，搜索结果里点便签进的是同一屏（`onOpenNote`）。判据 = `apps/mobile/tests/note-edit.spec.ts`（含「改标题 ⇒ 恰好一条 UPD、载荷只有 content」）+ `reminders-notes-display.spec.ts` 那条由 not.toContain(「onEdit=」) **翻向** toContain 的断言（同时钉住真 op 的落点）+ 摘掉 `onEdit` 的变异臂转红；`check:ui-language` / `check:reachability` 各 exit 0。**仍未闭合**：真机截图 —— `scripts/verify-mobile-notes.sh` 三次被环境挡（现量负载 23.5、`:3100` 无服务、`:3000` 是并行会话的 e2e 栈），按「环境无效 ≠ 产品失败」登记，不硬挤、不起第二个 postgres。**另有两条债本轮暴露并已补**：`NoteEditor.tsx` 与它的三处配套（`notes/model.ts` 的 `isNoteDraftBlank`、`NotesBoard.tsx` 改用同一条判据、`index.ts` 导出块）在第一笔提交里**漏了**（未跟踪的新文件不在按路径过滤的提交范围内），HEAD 单独检出编译不过；成因与反向查法记在 `PROGRESS.md`。原文：~~能建能删不能改，任何一端都改不了~~ | `NoteEditor.tsx`、`NoteEditScreen.tsx`、`NotesView.tsx`、`SearchScreen.tsx` |
+| P2-1 | ✅ **已修（2026-10-03，多端第四批）**：便签**两端都能改正文**了。编辑器抽进共享层 `packages/ui/src/notes/NoteEditor.tsx` —— 两端各写一份「多行输入 + 保存 + 取消」最容易漂出来的差异是**一端点保存会落一条什么都没改的 `UPD`**：它推进 `updatedAt`，而列表按它排第二段，用户读到的是「我只是点开看了一眼，这条便签跳到最前了」。那条闸门本身在 `@heyta/app-host#updateNoteContent`（写不写 op 是产品语义，AGENTS §3.5），这一层保证的是**两端用的是同一个入口**，所以闸门只有一处、也只会被踩到一处。移动端是「我的 → 便签」的二级全屏 Modal，搜索结果里点便签进的是同一屏（`onOpenNote`）。判据 = `apps/mobile/tests/note-edit.spec.ts`（含「改标题 ⇒ 恰好一条 UPD、载荷只有 content」）+ `reminders-notes-display.spec.ts` 那条由 not.toContain(「onEdit=」) **翻向** toContain 的断言（同时钉住真 op 的落点）+ 摘掉 `onEdit` 的变异臂转红；`check:ui-language` / `check:reachability` 各 exit 0。**仍未闭合的是真机那半条**：17:17 那一趟**至少走到第 5 步、确定没走到第 8 步**就被环境挤掉了 ——第 4/5 步的两张截图已入库并逐张写明各自钉到哪一步（§3.2），但第 8 步「搜索里点开便签」的第三张、第 6/7 步的 op 判据、第 9–11 步的跨设备三腿**都还没有真机证据**。三次尝试的现量读数（负载 23.5 → 236、`:3100` 无服务、`:3000` 是并行会话的 e2e 栈）登记在 **B48 / B49**，按「环境无效 ≠ 产品失败」处理，不硬挤、不起第二个 postgres。**另有两条债本轮暴露并已补**：`NoteEditor.tsx` 与它的三处配套（`notes/model.ts` 的 `isNoteDraftBlank`、`NotesBoard.tsx` 改用同一条判据、`index.ts` 导出块）在第一笔提交里**漏了**（未跟踪的新文件不在按路径过滤的提交范围内），HEAD 单独检出编译不过；成因与反向查法记在 `PROGRESS.md`。原文：~~能建能删不能改，任何一端都改不了~~ | `NoteEditor.tsx`、`NoteEditScreen.tsx`、`NotesView.tsx`、`SearchScreen.tsx` |
 | P2-2 | ✅ **已修（2026-10-03，多端第三批）**：清单/标签**两端都能改名**，标签补上原本根本不存在的动作 `renameTag`（一条 UPD、载荷只有 `name`，引用它的任务一个都不碰）。行内编辑器在共享 `OrganizerList` 里，两端各只多传 `onRename` + 两句无障碍名。判据 = `apps/mobile/tests/organizer-rename.spec.ts` 26 条（含"全局 op 数恰好 +1"这条防 fan-out、"重放后名字仍在"= 刷新还在）+ 变异两臂各自转红（摘掉移动端 `onRename` ⇒ 接线那条红；给 `renameTag` 载荷多塞一个 `color` ⇒ `expected ['name','color'] to equal ['name']`）；`check:reachability` exit 0。原文：~~web store 有 `renameProject` 零调用；移动端明示不做；标签连动作都没有~~ | `ListsSection.tsx`、`TagsSection.tsx`、`features/projects/{store,ProjectsPanel}`、`features/habits/{store,HabitsView}` |
 | P2-3 | ✅ **已修（2026-10-03，多端第三批）**：习惯**改名 + 删除**两端都有入口（移动端详情层两个图标 + 内联改名框，web 窗格头部同款）。删除是**墓碑**（`DEL` + `deletedAt`，`listHabits` 滤掉、库里仍在），且**打卡历史一条都不动** —— 撤销后连续天数还在。习惯改名刻意**不许"删了重建"**：`HABIT_LOG` 按 (habitId, date) 寻址，换 id 会让历史静默失联（用例钉住 `Object.keys(fresh.habits)` 仍是同一条）。判据 = 同上文件那条 describe 的 4 条 + `check:reachability` 0。原文：~~建了删不掉，`HabitBoard.tsx:64` 明示未接~~ | `HabitsScreen.tsx`、`features/habits/HabitsView.tsx` |
 | P2-4 | **回收站只覆盖任务**：清单/标签/习惯/便签软删后任何端都看不见、还原不了 | `tasks/store.ts:387` |
