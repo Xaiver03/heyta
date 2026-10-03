@@ -20,11 +20,28 @@
  *
  * ```sh
  * pnpm check:gate-wiring              # 正常跑
- * node scripts/check-gate-wiring.mjs --pkg <path>   # 拿一份候选 package.json 试（注入验证用，不动工作树）
+ * node scripts/check-gate-wiring.mjs --pkg <path>              # 拿一份候选 package.json 试（注入验证用，不动工作树）
+ * node scripts/check-gate-wiring.mjs --root <dir>              # 把"链外门禁的消费方"指到临时树（同上，只用于注入验证）
  * ```
+ *
+ * ## 2026-10-03 加的那一条：允许表**原本是装饰**
+ *
+ * `check:web-artifact:app` 在允许表里登记的是一条自我承认的缺口 ——
+ * 「⚠️ 已知缺口：目前**没有任何自动载体**跑它」。而这条门禁绿。
+ * 也就是说：一道链外门禁可以既不进链、也没人跑、还把"没人跑"写在理由里长期存在，
+ * 三道判据一条都不会红。**不能失败的判据没有价值**（AGENTS §7 元规则 2），
+ * 而这一条尤其坏：那句"已知缺口"读起来像是在管理风险，实际是在**给漏洞上户口**。
+ *
+ * 现实同时有一半是**否证的**：`server/Dockerfile` 的 web 构建阶段就在跑
+ * `node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/`（`:191`），
+ * 所以"零自动消费者"讲的是那个 npm 别名，不是这条判据本身。
+ * 真正没人守的是**人工 rsync 那一趟** —— 生产 `/app/` 到今天为止走的正是那条路
+ * （§3.7 的发布命令），而它的三条抄件里 build 与 rsync 之间什么都没有。
+ * ⇒ 这次两头都收了：runbook 的发布序列里插入对账（并修掉那三条里 `cd apps/web` 之后
+ * rsync 源路径根本不存在那个断点），以及本文件把"链外必须有可验消费方"变成判据。
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,9 +50,20 @@ const ROOT = resolve(HERE, '..');
 
 const argv = process.argv.slice(2);
 let pkgPath = join(ROOT, 'package.json');
+/**
+ * 消费方文件的解析根。默认就是仓库根；`--root` 只为**注入验证**存在 ——
+ * 把一份改坏的 `docs/runbooks/deployment.md` 放进临时目录指过来，就能证明这条判据会红，
+ * 而不用去动工作树（工作树里有别的会话在飞）。
+ */
+let consumersRoot = ROOT;
 for (let i = 0; i < argv.length; i += 1) {
   if (argv[i] === '--pkg') {
     pkgPath = resolve(argv[i + 1] ?? '');
+    i += 1;
+    continue;
+  }
+  if (argv[i] === '--root') {
+    consumersRoot = resolve(argv[i + 1] ?? '');
     i += 1;
   }
 }
@@ -43,12 +71,44 @@ for (let i = 0; i < argv.length; i += 1) {
 /**
  * 链里**允许**不出现的 `check:*` 定义。每条都要写清"为什么不进链"，
  * 而且它必须仍然是一个真实存在的定义 —— 门禁拿掉了但这里还留着，同样判红。
+ *
+ * ## 🔴 而且必须**点名消费方**，并且那个消费方真的在跑它
+ *
+ * 原先进允许表只需要一句理由。理由不是判据 —— 2026-10-03 实测：`check:web-artifact:app`
+ * 的条目里自己就写着「⚠️ 已知缺口：目前**没有任何自动载体**跑它」，而这条门禁照样绿。
+ * 也就是说这道表当时的作用是**掩护**，不是**记账**：一道谁都不跑的门禁被写成"有意放在链外"，
+ * 与"忘了加进链"在输出上长得一模一样，而前者还会挡住后来人去查。
+ *
+ * 现在的形状：每条 = 不进链的理由 + `consumers[]`，每个 consumer = 一个**会跑这条判据的载体文件**
+ * 加一段它在该文件里必须逐字出现的 `needle`。
+ *
+ * ⚠️ **needle 是手写的字面量，并且按行首匹配**：派生匹配（"看文件名里有没有这个 gate 名"）会命中
+ * 注释、命中别的门禁、命中"提到但没跑"的那一行；连 `includes` 都不够 —— 见下面判据 `2b` 的注释。
+ * 这里要的判据是**这一行会执行它**，所以 needle 取真实命令形状，且指令前缀要一起写进去
+ * （Dockerfile 写成 `RUN node scripts/… --mount /app/`，markdown 代码块里就写 `pnpm check:…`）。
+ * 判"有没有人跑它"一旦靠模糊匹配，就又是一条永远绿的空判据（AGENTS §7 元规则 2）。
  */
 const ALLOWED_OUTSIDE_CHAIN = new Map([
   [
     'check:web-artifact:app',
-    '它读的是 `--base=/app/` 那份产物，而 `pnpm build` 打的是默认根路径那份 —— 进链就是拿错的产物去验对的东西。' +
-      '⚠️ 已知缺口：目前**没有任何自动载体**跑它（脚本头部写的用法是"打进服务端镜像 / rsync 上线前"手动跑）。',
+    {
+      reason:
+        '它读的是 `HEYTA_WEB_BASE=/app/` 那份产物，而 `pnpm build` 打的是默认根路径那份 —— ' +
+        '进链就是拿错的产物去验对的东西（`apps/web/dist` 是**一个目录、两种载体**，谁最后构建谁覆盖谁）。' +
+        '⇒ 判它的载体是"发布那一趟"和"建镜像那一趟"，不是"每次提交那一趟"。',
+      consumers: [
+        {
+          file: 'docs/runbooks/deployment.md',
+          needle: 'pnpm check:web-artifact:app',
+          role: '人工发布 rsync **之前**那一步（§3.7「重新发布的三条命令」；干净 HEAD 那一组同样带着它）',
+        },
+        {
+          file: 'server/Dockerfile',
+          needle: 'RUN node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/',
+          role: '镜像构建阶段自动跑 —— 这是**同一条判据**的自动载体（跑的是脚本本身，不是 npm 别名）',
+        },
+      ],
+    },
   ],
 ]);
 
@@ -108,13 +168,61 @@ for (const name of defs) {
   }
 }
 
-// 2) 允许表不能比现实宽
-for (const name of ALLOWED_OUTSIDE_CHAIN.keys()) {
+// 2) 允许表不能比现实宽，也不许**空着**（每条链外门禁都要有可验的消费方）
+const consumerReadings = [];
+for (const [name, entry] of ALLOWED_OUTSIDE_CHAIN) {
   if (!(name in (pkg.scripts ?? {}))) {
     failures.push(`${name}: 允许表说它是一道"链外门禁"，但 package.json 里已经没有这个定义了。`);
   }
   if (inChain.has(name)) {
     failures.push(`${name}: 它已经回到链里了，允许表里那条理由该删 —— 留着就是在掩护下一道。`);
+  }
+  if (typeof entry?.reason !== 'string' || entry.reason.trim().length === 0) {
+    failures.push(`${name}: 允许表条目没有"为什么不进链"的理由。没理由的豁免与没有豁免是同一种东西。`);
+  }
+
+  // 2a) 非空哨兵：`consumers` 为空 ⇒ 这道门禁**没有任何载体在跑**。
+  //     这不允许写成一条注释。原先那条评论就写着"没有任何自动载体跑它"，而门禁绿。
+  const consumers = Array.isArray(entry?.consumers) ? entry.consumers : [];
+  if (consumers.length === 0) {
+    failures.push(
+      `${name}: 在允许表里但**没有 consumers** ⇒ 没人跑它。` +
+        '它不是"手动跑的那一条"，它是"没有人跑的那一条" —— 链外门禁必须有名字可点的载体，' +
+        '否则"有意放在链外"就成了"忘了加进链"的掩护。',
+    );
+    continue;
+  }
+
+  // 2b) 逐个消费方：文件要在，needle 要逐字出现。
+  for (const consumer of consumers) {
+    const abs = join(consumersRoot, consumer.file);
+    if (!existsSync(abs)) {
+      failures.push(
+        `${name} 的消费方 \`${consumer.file}\` 不存在 —— 载体被改名/删掉/挪走了，` +
+          '而这里还登记着它。链外门禁的载体一旦消失，这道门禁就静默变成 0 次执行。',
+      );
+      continue;
+    }
+    if (typeof consumer.needle !== 'string' || consumer.needle.length === 0) {
+      failures.push(`${name} 的消费方 \`${consumer.file}\` 没有 needle —— "它在那里被提到了"不算消费。`);
+      continue;
+    }
+    const lines = readFileSync(abs, 'utf8').split('\n');
+    // 🔴 **行首锚定**，不是 `includes`：写这条判据的当天，runbook 里就多了一句散文式的"这里少了
+    // `pnpm check:web-artifact:app`"—— 它不是消费方，但它会让 includes 数到一次命中，
+    // 于是两条真正的命令块都被删掉时门禁仍然绿。模糊匹配把"提到"当成"跑过"，
+    // 正是这条门禁要防的形状（AGENTS §7 元规则 2）。
+    // ⇒ needle 要连指令前缀一起写（Dockerfile 是 `RUN …`、markdown 代码块里就是命令本身）。
+    const hits = lines.reduce((n, l) => (l.trimStart().startsWith(consumer.needle) ? n + 1 : n), 0);
+    if (hits === 0) {
+      failures.push(
+        `${name} 的消费方 \`${consumer.file}\` 里没有任何一行**以这条命令开头**：\n      ${consumer.needle}\n` +
+          `      （\`${consumer.role}\`）—— 那一趟不再跑这条判据了，而链外门禁**只有**那一趟会跑它。\n` +
+          '      ⚠️ 行首锚定：散文里"提到"它不算消费（needle 要包含 `RUN ` 这类指令前缀）。',
+      );
+      continue;
+    }
+    consumerReadings.push(`${name} ← ${consumer.file}（${String(hits)} 处）`);
   }
 }
 
@@ -141,6 +249,7 @@ const outside = defs.filter((n) => !inChain.has(n));
 console.log(
   `门禁定义 ${defs.length} 道 ｜ 链里被引用 ${chainTokens.length} 段 ｜ 链外 ${outside.length} 道（允许表 ${ALLOWED_OUTSIDE_CHAIN.size} 道）`,
 );
+for (const r of consumerReadings) console.log(`   · 链外门禁的消费方：${r}`);
 
 if (failures.length > 0) {
   for (const f of failures) console.error('🔴 ' + f);
@@ -148,4 +257,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('✅ check 链与门禁定义对上了（含"链外门禁"逐条有理由、锚点在场）');
+console.log('✅ check 链与门禁定义对上了（含"链外门禁"逐条有理由、有可验的消费方、锚点在场）');
