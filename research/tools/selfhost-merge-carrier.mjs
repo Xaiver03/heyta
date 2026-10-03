@@ -102,7 +102,13 @@ notes.push(`main=${mainSha.slice(0, 8)} · ${SOURCE}=${srcSha.slice(0, 8)} · me
 if (!existsSync(WT)) {
   git(['worktree', 'add', '--detach', WT, mainSha]);
 } else {
-  try { git(['-C', WT, 'merge', '--abort']); } catch { /* 没有进行中的合并 */ }
+  // 🔴 先问"真的有一场合并在进行吗"，再 abort。无条件跑 `merge --abort` 会把
+  //    `fatal: There is no merge to abort` 漏到 stderr —— **成功的那趟里印着一行 fatal**，
+  //    而下一个人会先怀疑合并坏了（判"某个动作失败了"只能看退出码，不能看有没有红字）。
+  try {
+    git(['-C', WT, 'rev-parse', '--verify', 'MERGE_HEAD'], { stdio: 'ignore' });
+    git(['-C', WT, 'merge', '--abort']);
+  } catch { /* 没有进行中的合并：本来就不必 abort */ }
   git(['-C', WT, 'checkout', '--force', '--detach', mainSha]);
   git(['-C', WT, 'reset', '--hard', mainSha]);
 }
