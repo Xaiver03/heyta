@@ -14,6 +14,8 @@ import { useShallow } from 'zustand/react/shallow';
 import {
   CircleHelp,
   Moon,
+  PanelRightClose,
+  PanelRightOpen,
   Sun,
   Trash2,
   X,
@@ -79,6 +81,11 @@ import { type DueDisplayMode } from './lib/due-display.js';
 import { TaskRowMeta } from './features/tasks/row-meta.js';
 import { loadDueDisplay, saveDueDisplay } from './features/tasks/due-display-pref.js';
 import { loadTaskSort, saveTaskSort } from './features/tasks/sort-pref.js';
+import {
+  loadDetailPane,
+  saveDetailPane,
+  type DetailPanePref,
+} from './features/shell/detail-pane-pref.js';
 import { TaskOrganizer } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
 import { TaskRepeat } from './features/tasks/TaskRepeat.js';
@@ -610,6 +617,49 @@ export function App(): React.JSX.Element {
     setDueDisplayState(mode);
     saveDueDisplay(mode);
   }, []);
+
+  /**
+   * 详情列（右侧那一栏）的收起状态（工单 W4 ②③）。
+   *
+   * 🔴 它是**用户的选择**，与"这一栏今天画不画得出来"是两件事：后者由视口几何决定，
+   * 断点在 `styles/app/narrow.css`（≤768 / 769–1023 / ≥1024 但高 < 480 三种都不出现）。
+   * 两处不许合成一个布尔 —— 合成就等于把"这台屏幕放不下"说成"用户关掉了它"，
+   * 于是窗口拉宽之后界面自己改了主意，而设置里那一项显示的是"收起"。
+   *
+   * 三条恢复路径各自独立成立：页头的开关、设置里这一项、⌘/Ctrl + Shift + \\。
+   * 判据逐条各走一次（`e2e/tests/detail-pane-collapse.spec.ts`），
+   * 因为"三条路径"最容易写成"其实只有同一个 onClick 调了三遍"。
+   */
+  const [detailPane, setDetailPaneState] = useState<DetailPanePref>(loadDetailPane);
+  const setDetailPane = useCallback((value: DetailPanePref) => {
+    setDetailPaneState(value);
+    saveDetailPane(value);
+  }, []);
+  const toggleDetailPane = useCallback(() => {
+    setDetailPane(detailPane === 'collapsed' ? 'open' : 'collapsed');
+  }, [detailPane, setDetailPane]);
+
+  /**
+   * ⌘/Ctrl + Shift + \\ 开合详情列 —— 三条恢复路径里的"快捷键"那一条。
+   *
+   * 值得为它加一个界面上没画出来的入口：键盘用户收起它的那一下就是想要"临时让列表变宽"，
+   * 而把它叫回来要跑三次鼠标（页头 → 按钮 → 点）比收起它还麻烦 —— 那条不对称会让人
+   * 干脆不去收。开关本身在页头与设置里都有名字，所以这不是"藏一个入口"。
+   * ⚠️ 选 \\ 而不是字母：`Ctrl+Shift+D`（Chrome 书签管理器）、`Ctrl+Shift+K`
+   * （Firefox 控制台）都被浏览器占着，字母组合在这两个浏览器里**根本到不了页面**。
+   * 🔴 监听挂**捕获阶段**，理由与搜索浮层那条同（§7 #80：RNW 的输入框在 keydown 里
+   *    无条件 `stopPropagation()`，焦点在输入框时冒泡阶段的监听永远收不到）。
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.altKey || !(event.metaKey || event.ctrlKey) || !event.shiftKey) return;
+      if (event.key !== '\\') return;
+      event.preventDefault();
+      toggleDetailPane();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [toggleDetailPane]);
 
   /**
    * 记忆落差的 op 窗口（最近 `MEMORY_OP_WINDOW` 条 op）。
@@ -1422,7 +1472,12 @@ export function App(): React.JSX.Element {
     */
     <HeytaUiProvider value={uiTheme}>
       <AiSettingsNavigationContext.Provider value={openAiSettings}>
-      <div className={`ht-app${withSidebar ? ' ht-app--with-sidebar' : ''}`}>
+      <div
+        className={`ht-app${withSidebar ? ' ht-app--with-sidebar' : ''}`}
+        // 🔴 详情列的**用户选择**（不是几何判断）落在这里，CSS 按它把轨道归零 +
+        // 不渲染那一列（`styles/app/base.css`）。两条各管一件事，见上面那段注释。
+        data-detail={detailPane}
+      >
       {/*
         ═══════════════════════════════════════════════════════════════════════
         🔴 外壳分三层（2026-09-29，落实 `dida-view-unification.md` §1.3 / §4.1 / §4.4）
@@ -1789,6 +1844,33 @@ export function App(): React.JSX.Element {
             {/* 语言切换。外壳顶栏的全局控件区，与主题切换并列 ——
                 这是**真实用户唯一能把界面切到英文的入口**（见该文件的注释）。 */}
             <LanguageSwitcher />
+            {/*
+              详情列的开关（工单 W4 ②的第一条路径）。
+              与主题按钮同一档位：**纯图标 + 自带可访问名**，名字说的是"点下去会怎样"
+              （`web.shell.detailPane.{collapse,expand}`），所以文案随状态翻转而不是恒一个"详情"。
+              🔴 它在几何不可行的三档视口里由 CSS 一起藏掉（`narrow.css`）：
+              那一栏没地方画，还留一个按钮就是界面在说谎。
+              `aria-pressed` 报的是"这一栏现在在不在"，与名字互为对照 ——
+              读屏用户不需要看见图标就能知道自己刚按下会收还是会展。
+            */}
+            <button
+              type="button"
+              className="ht-btn ht-btn--ghost ht-app__detail-toggle"
+              data-testid="detail-pane-toggle"
+              aria-label={
+                detailPane === 'collapsed'
+                  ? t('web.shell.detailPane.expand')
+                  : t('web.shell.detailPane.collapse')
+              }
+              aria-pressed={detailPane === 'open'}
+              onClick={toggleDetailPane}
+            >
+              {detailPane === 'collapsed' ? (
+                <PanelRightOpen size={ICON_SIZE.md} aria-hidden="true" />
+              ) : (
+                <PanelRightClose size={ICON_SIZE.md} aria-hidden="true" />
+              )}
+            </button>
             <button
               type="button"
               className="ht-btn ht-btn--ghost"
@@ -2263,6 +2345,43 @@ export function App(): React.JSX.Element {
                       name="due-display"
                       checked={dueDisplay === d.key}
                       onChange={() => setDueDisplay(d.key)}
+                    />
+                    <span>{t(d.labelKey)}</span>
+                  </label>
+                ))}
+              </div>
+              {/*
+                详情列的常驻/收起（工单 W4 ②的第二条路径）。
+                🔴 与上面那组**同一个 section、同一条说明纪律**（2026-09-30 那条教训：
+                页头上光秃秃的「日期 | 倒计时」没人知道是什么）。这里必须带一句
+                说明，而且那句话要把"**什么时候这一项不起作用**"写进去 ——
+                窗口太窄或太矮时这一栏由几何直接不出现，此时选"常驻"也画不出来；
+                不写清这句，用户会把它当成一个坏掉的开关。
+                ⚠️ 用 `radio` 而不是 `checkbox`：两个档是**互斥的词表**（`open`/`collapsed`），
+                与设备本地存储里那两个值一一对应，不是一个布尔的两面。
+              */}
+              <p className="ht-settings__hint">{t('web.settings.display.detailNote')}</p>
+              <div
+                role="radiogroup"
+                aria-label={t('web.settings.display.detail.title')}
+                className="ht-settings__options"
+                data-testid="detail-pane-pref"
+              >
+                {(
+                  [
+                    { key: 'open' as DetailPanePref, labelKey: 'web.settings.display.detail.modeOpen' },
+                    {
+                      key: 'collapsed' as DetailPanePref,
+                      labelKey: 'web.settings.display.detail.modeCollapsed',
+                    },
+                  ] as const
+                ).map((d) => (
+                  <label key={d.key} className="ht-settings__option">
+                    <input
+                      type="radio"
+                      name="detail-pane-pref"
+                      checked={detailPane === d.key}
+                      onChange={() => setDetailPane(d.key)}
                     />
                     <span>{t(d.labelKey)}</span>
                   </label>
