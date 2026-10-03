@@ -2585,3 +2585,34 @@ B30 写这两段"不是再跑一遍就好的东西"，并各自给了闭合代�
 **恰好 1 处超线（91 > 90）、exit 1**，随后 `git checkout --` 还原并与 `HEAD` 那个 blob `cmp` 判等；
 后者把前缀改成坏的 `/assets/doc` ⇒ **恰好 2 红**（`docs-centre.spec.ts:959` 与 `:1013`）。
 详细读数见 goal §7.15。
+
+## B31. 🔴 iOS 端重装跑不起来：`pod install` 崩在 CocoaPods 的 NUL 路径上，而 **traps #154 给的解法本轮实测不复现**（2026-10-03 13:5x 取证，载体 `1ac5913a`）
+
+§6.1.1 的固定收尾这一轮被 `f79d3733`（碰了 `apps/mobile`）触发。android 段跑绿（还顺带照出一处假绿，
+修法见 `57e0e1fc` 与 goal §7.19），**ios 段一步都没走出去**：`pod install` 在 `Generating Pods project`
+崩 `ArgumentError - path name contains null byte`（`cocoapods-1.17.0/lib/cocoapods/project.rb:452`
+`Pathname#realdirpath`，`add_file_accessors_paths_to_pods_group`），于是脚本按设计响亮地不跑 xcodebuild。
+
+🔴 **这条要登记的的不是这个崩溃本身（#154 早就记过），是"它当时那条被写成解法的臂"现在不成立了**：
+#154 的结论是"变量是**这棵长活的树**，现开新克隆两次都 exit 0 ⇒ 没有理由在旧树上重试"。
+本轮照它做：`git clone --no-hardlinks` + `pnpm install` @ **同一个 commit** ⇒ **同一处栈照崩**。
+另外三条臂也当场排除：`LANG/LC_ALL=en_US.UTF-8` 不是变量（仍 exit 1）、
+工具链没漂移（`/opt/homebrew/Cellar/cocoapods/1.17.0` 目录 mtime = **9 月 25 日**，ruby 4.0.7）、
+`Podfile.lock` 自上一趟绿（`840effb1`）以来只差**一行 `ReactCodegen` 哈希**，
+且 `git diff --name-only 840effb1..1ac5913a` 的 250 个路径里**非 ASCII 文件名 0 命中**。
+
+⇒ 所以"换一棵新树就能跑"这句**是错的或者至少是有条件的**。四臂排除之后，剩下的唯一没查的仍是
+#154 当年说的那件："哪个路径让 Ruby 拿到 NUL"（要扫 `node_modules` 里 1.9 GB 的文件名）。
+**这不是本条线能当场修的**，也不是产品缺陷（App 在 android 上跑得好、iOS 侧一行代码都没动）。
+
+要推动它，二选一：
+1. 换一台 `pod install` 能过的机器（或换 ruby 3.x 下的 cocoapods）后跑
+   `IOS_DEVICE_NAME="heyta-iphone-17pro" bash scripts/reinstall-all.sh --only ios`；
+2. 定位那个路径：`pod install --verbose` 的日志里，崩溃前最后一段文件枚举就是嫌疑人
+   （本轮的 `--verbose` 日志末尾只有栈，没有点名 —— 下一步该按 pod 分组切，
+   比如临时把 `Pods/` 里某个 pod 的 `vendored_frameworks`/`source_files` 逐块注释掉做二分）。
+
+⚠️ 在 ios 段跑绿之前，**"iOS 装的是当前源码"这句不成立**，不要引用 09:5x 那趟的 iOS 读数代替它。
+🔴 **#154 原句的更正没有写进 `environment-traps.md`** —— 那个文件此刻正被并行会话写着
+（工作树 +48 行未提交，#178–#180 是他们的），按同一份台账的规矩不整文件 `git add`、不往脏文件追加。
+现量什么时候可以写：`git diff --numstat docs/reference/environment-traps.md` 为空。
