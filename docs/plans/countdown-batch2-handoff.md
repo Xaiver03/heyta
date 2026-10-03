@@ -291,6 +291,14 @@ cd "…/heyta" && git merge-tree --write-tree --name-only feat/countdown-batch2 
 > ② 判据②"papers 在**后台界面**回显"只做到 API 层 —— 后台没有调休面板，`admin-client.ts` 也没有
 >    对应方法 ⇒ 已开工补面板（`apps/web/src/features/admin/` + `admin-client` + i18n + 判据），
 >    **面板落地并跑过判据之前 W4b 不打勾**。
+> 🔴 ③ **一条边界，免得下一个人以为"三端都接了"**：第 2 件的"宿主接线"这轮落的是 **web 那一个宿主**
+>    （工单原文点名的接点就是 `apps/web/src/features/calendar/CalendarView.tsx`）。**移动端没接**：
+>    `apps/mobile/src/screens/CalendarScreen.tsx:193` 用的是同一块共享板，加那两个可选 prop 就亮，
+>    但它缺的是**另一件东西** —— 一次宿主级启动接线（`readSyncConfig()` 的地址 + `openTaskHost()` 的
+>    store + `AppState` 回前台），而那个文件正被日历线整片重写（§5 那 14 个里就有它）。
+>    ⇒ 与迷你月历**同一笔账、同一个 owner（W6/W8）**。
+>    📌 `createPublicFactsWiring` 这个工厂**形状上已经宿主无关**（端口全注入、零 DOM），
+>    移动端接时**直接复用，不要复制一份** —— 复制的那一半就是 AGENTS §3.5 记过两次的事故形状。
 
 已落（服务端半，未提交）：两张表 + 1 条迁移（年度录入存 `papers` / 逐日 `day DATE + isOffDay BOOLEAN`）、
 线协议契约在 `shared-schema`（**唯一一份**）、`holidays.ts:108 adjustmentOn()` 接上"部署方下发的覆盖表"入口、
