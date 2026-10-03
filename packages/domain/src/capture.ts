@@ -39,12 +39,12 @@
  * ═════════════════════════════════════════════════════════════════════════
  */
 
-import type { LocalDate } from './date.js';
-import { addDays, isoWeekday, parseLocalDate, today } from './date.js';
+import type { LocalDate, LocalTime } from './date.js';
+import { addDays, isoWeekday, parseLocalDate, parseLocalTime, timeOfDayMs, today } from './date.js';
 import { Priority } from './entities.js';
 
 /** 本解析器能识别的字段。刻意很小 —— 见文件头"LLM 做得最少"。 */
-export type CaptureField = 'dueDate' | 'priority';
+export type CaptureField = 'dueDate' | 'dueTime' | 'priority';
 
 /** 一条识别结果。UI 用它渲染"我读懂了什么"，并允许用户逐条取消。 */
 export interface CaptureMatch {
@@ -73,6 +73,15 @@ export interface CaptureMatch {
   rejected: boolean;
   /** `field === 'dueDate'` 且被采纳时存在。 */
   dueDate?: LocalDate;
+  /**
+   * `field === 'dueTime'` 且被采纳时存在（`HH:MM`）。
+   *
+   * 🔴 它**从不单独成立**：没有采纳到日期的时刻一律 `applied: false`
+   * （见 `parseCapture` 里那条 `dueTimeNeedsDate` 判定）。理由是"16:00"
+   * 既可能是"今天 16:00"，也可能是"明天 16:00"，还可能是"9:16 比例"——
+   * 猜一个日子比留着不动更糟。
+   */
+  dueTime?: LocalTime;
   /** `field === 'priority'` 且被采纳时存在。 */
   priority?: Priority;
 }
@@ -97,6 +106,12 @@ export interface CaptureParse {
   title: string;
   /** 采纳的截止日期（本地日历日）。 */
   dueDate?: LocalDate;
+  /**
+   * 采纳的时刻（`HH:MM`）。🔴 **只在 `dueDate` 也被采纳时才可能出现。**
+   * 调用方要拿它算 epoch，用 `dueDateToEpoch(dueDate, dueTime)` ——
+   * 不要自己拼，时区那一刀只允许有一处（见该函数）。
+   */
+  dueTime?: LocalTime;
   /** 采纳的优先级。 */
   priority?: Priority;
   /** 全部识别结果（含 `applied: false` 的），按 `start` 升序。 */
@@ -253,6 +268,7 @@ const DAY_NUMBER_LABEL_BEFORE = new Set([
 interface Resolved {
   display: string;
   dueDate?: LocalDate;
+  dueTime?: LocalTime;
   priority?: Priority;
 }
 
@@ -522,6 +538,31 @@ const RULES: Rule[] = [
     },
   },
 
+  // ── 时刻（`HH:MM`）──────────────────────────────────────
+  //
+  // 🔴 这一条**只在认领到日期之后才成立**（判定在 `parseCapture` 末尾，
+  //   名字就叫 `dueTimeNeedsDate`）。理由不是实现方便：`16:00` 单独出现时，
+  //   "今天 16:00""明天 16:00""视频比例 9:16"三种意思都合法，
+  //   而猜一个日子会把用户的文字**悄悄**变成一条别的数据 —— 那是本文件
+  //   开头那条不变量禁止的事。所以没有日期时这条匹配 `applied: false`，
+  //   文字原样留在标题里。
+  {
+    field: 'dueTime',
+    re: /(?:[01]?\d|2[0-3]):[0-5]\d/g,
+    resolve: (m, ctx) => {
+      // 手写边界（不用 lookbehind，理由见 `isDigit` 那里的 Hermes 说明）。
+      // 拦掉的典型误报：`12:30:45`（带秒的时刻，两侧都挨着数字/冒号 → 整条不认）、
+      // `2026:09`（年:月）、版本号 `v1:20`。
+      const before = m.index > 0 ? ctx.input.charAt(m.index - 1) : '';
+      const afterIdx = m.index + m[0].length;
+      const after = afterIdx < ctx.input.length ? ctx.input.charAt(afterIdx) : '';
+      if (isDigit(before) || before === ':') return undefined;
+      if (isDigit(after) || after === ':') return undefined;
+      const time = parseLocalTime(m[0]);
+      return time === undefined ? undefined : { display: time, dueTime: time };
+    },
+  },
+
   // ── 优先级 ────────────────────────────────────────────
   {
     field: 'priority',
@@ -621,6 +662,17 @@ export function parseCapture(input: string, options: CaptureOptions = {}): Captu
     if (!firstOfField.has(c.field)) firstOfField.set(c.field, c);
   }
 
+  /*
+   * 🔴 `dueTimeNeedsDate`：时刻**不单独成立**。
+   *
+   * 把 `firstOfField` 里那条删掉，而不是在规则表里判断 —— 因为规则表看不到
+   * 别的规则认了什么（它是逐条扫全文的），而"有没有日期"是**整次解析**的事实。
+   * 删掉之后 `applied` 自然是 `false`，于是那条不变量自动成立：
+   * **没被采纳的片段一定留在标题里**（"剪 9:16 的视频"不会被吃掉 9:16）。
+   */
+  const dueTimeNeedsDate = !firstOfField.has('dueDate');
+  if (dueTimeNeedsDate) firstOfField.delete('dueTime');
+
   const matches: CaptureMatch[] = nonOverlapping.map((c) => {
     const isRejected = excluded.has(`${c.field}\u0000${c.raw}`);
     return {
@@ -632,6 +684,7 @@ export function parseCapture(input: string, options: CaptureOptions = {}): Captu
       applied: !isRejected && firstOfField.get(c.field) === c,
       rejected: isRejected,
       ...(c.dueDate !== undefined ? { dueDate: c.dueDate } : {}),
+      ...(c.dueTime !== undefined ? { dueTime: c.dueTime } : {}),
       ...(c.priority !== undefined ? { priority: c.priority } : {}),
     };
   });
@@ -653,12 +706,14 @@ export function parseCapture(input: string, options: CaptureOptions = {}): Captu
   title = title.replace(/\s+/g, ' ').trim();
 
   const dueDate = firstOfField.get('dueDate')?.dueDate;
+  const dueTime = firstOfField.get('dueTime')?.dueTime;
   const priority = firstOfField.get('priority')?.priority;
 
   return {
     input,
     title,
     ...(dueDate !== undefined ? { dueDate } : {}),
+    ...(dueTime !== undefined ? { dueTime } : {}),
     ...(priority !== undefined ? { priority } : {}),
     matches,
   };
@@ -671,7 +726,12 @@ export function parseCapture(input: string, options: CaptureOptions = {}): Captu
  * 而本文件一律用本地日历日。约定是**本地零点** ——
  * 因为"今天"视图是按 `new Date(dueDate).toDateString()` 比对日历日的，
  * 用本地零点才能让"今天到期"在本地时间的任何时刻都属于今天。
+ *
+ * 🔴 第二个参数是**可选的时刻**：传了就落在本地那一天几点几分，
+ * 不传（或传 `undefined`）就是原来的本地零点，也就是"只到日"。
+ * 这两者共用同一个字段、同一个函数 —— 加时刻**没有**新增持久化字段，
+ * 也没有改"日期那一刀"的语义（`toLocalDate(ms)` 对两者给出同一个日子）。
  */
-export function dueDateToEpoch(date: LocalDate): number {
-  return parseLocalDate(date).getTime();
+export function dueDateToEpoch(date: LocalDate, time?: LocalTime): number {
+  return parseLocalDate(date).getTime() + (time === undefined ? 0 : timeOfDayMs(time));
 }

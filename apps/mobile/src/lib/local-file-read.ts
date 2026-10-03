@@ -31,13 +31,27 @@ interface CoreFileReader {
 
 interface LocalFsNative {
   readTextUri(uri: string): Promise<string>;
+  /**
+   * 把一张本机图压成头像契约要的那张方形图，回 base64。
+   * 为什么它挂在**同一个模块**上而不是再建一个：读 URI 的字节是同一个平台能力，
+   * 两个 `NativeModules` 入口 = 两处各自处理"这台设备上有没有这个模块"。
+   * ⚠️ 可选的：iOS 侧目前没有这个原生模块，调用方必须自己判缺。
+   */
+  prepareAvatarBase64?(uri: string, edgePx: number, format: string): Promise<string>;
 }
 
 function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-function nativeModule(): LocalFsNative | undefined {
+/**
+ * 取那个原生模块（没有就回 `undefined`）。
+ *
+ * 🔴 **导出是为了只有一个入口**：头像那条路（`lib/avatar-prepare.ts`）问的是
+ * 同一个"这台设备上有没有 `HeytaLocalFs`"。两处各写一遍 `require('react-native')`
+ * 的话，"缺模块"这件事在两条路上可以有两种表现 —— 而它应当只有一种。
+ */
+export function nativeModule(): LocalFsNative | undefined {
   try {
     const rn = require('react-native') as {
       NativeModules?: Record<string, unknown>;

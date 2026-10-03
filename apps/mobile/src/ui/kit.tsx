@@ -868,6 +868,15 @@ export interface TextFieldProps {
   hint?: string;
   hintTone?: 'subtle' | 'danger';
   /**
+   * 单行字段的**提交**通道：给了就在键盘上出现「完成」并回调一次。
+   *
+   * ⚠️ 不传时 `returnKeyType` 保持 RN 默认 —— 现有调用点（登录、凭据表单）
+   * 一个都不许因为这次加参数而改变键盘形状。
+   */
+  onSubmitEditing?: () => void;
+  /** 这一格的可发现性标识（自动化取证用）。默认不出现。 */
+  testID?: string;
+  /**
    * 多行输入（粘贴 CSV、写长备注）。
    *
    * ⚠️ 单行输入框贴一大段多行文本时，**看得见的只有最后一行**，
@@ -901,6 +910,8 @@ export function TextField({
   editable = true,
   hint,
   hintTone = 'subtle',
+  onSubmitEditing,
+  testID,
   multiline = false,
   lines = 6,
 }: TextFieldProps): React.JSX.Element {
@@ -927,6 +938,10 @@ export function TextField({
         // 只给多行时传：给单行传 numberOfLines 在 Android 上会把它变成多行。
         numberOfLines={multiline ? lines : undefined}
         accessibilityLabel={label}
+        testID={testID}
+        onSubmitEditing={onSubmitEditing}
+        // 只有声明了提交通道才改键盘形状（现有调用点保持 RN 默认）。
+        returnKeyType={onSubmitEditing === undefined ? undefined : 'done'}
         // cursorColor 是 TextInput 的 **prop**，不是 style —— 放进 style 会被静默忽略。
         cursorColor={t['color.primary']}
         onFocus={() => {

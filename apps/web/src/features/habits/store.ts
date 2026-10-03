@@ -52,6 +52,8 @@ import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js
 interface HabitState {
   habits: Habit[];
   logs: HabitLog[];
+  /** 🔴 回收站那一路（有墓碑且未彻底删除）。判据与顺序在领域层，这里不写。 */
+  trashed: Habit[];
   error?: string;
 
   addHabit: (name: string, over?: NewHabitFields) => Promise<void>;
@@ -60,6 +62,13 @@ interface HabitState {
   /** 撤销打卡。 */
   undoCheckIn: (habitId: string, date?: LocalDate) => Promise<void>;
   deleteHabit: (habitId: string) => Promise<void>;
+  /**
+   * 从回收站还原习惯。返回 `false` = 它本来不在回收站里（没有写 op）；
+   * 已被彻底删除的那条由动作层**抛错**，界面必须接住并说出来（不许 `void` 掉）。
+   */
+  restoreHabit: (habitId: string) => Promise<boolean>;
+  /** 彻底删除一条习惯：只追加 `purgedAt` 标记，打卡记录一条都不动。 */
+  purgeHabit: (habitId: string) => Promise<void>;
   /**
    * 改名。**不许**用"删了重建"代替它 —— 打卡记录按 `(习惯 id, 日期)` 寻址，
    * 重建会换 id，于是那条习惯的历史整个清零（`app-host` 侧同一条理由）。
@@ -95,6 +104,7 @@ const habitActions = createHabitActions(actionContext);
 export const useHabitStore = create<HabitState>(() => ({
   habits: [],
   logs: [],
+  trashed: [],
 
   addHabit: async (name, over) => {
     // 交互决策：空名字什么都不做（动作层对空名字抛错）。
@@ -129,6 +139,18 @@ export const useHabitStore = create<HabitState>(() => ({
     refresh();
   },
 
+  restoreHabit: async (habitId) => {
+    const changed = await habitActions.restoreHabit(habitId);
+    refresh();
+    return changed;
+  },
+
+  purgeHabit: async (habitId) => {
+    // 不 catch：不可逆动作被拒绝（例如它已被别处恢复）必须让界面说给用户。
+    await habitActions.purgeHabit(habitId);
+    refresh();
+  },
+
   setHabitGoal: async (habitId, goal) => {
     // 不 catch：拒绝原因要一路冒到界面去说清楚（见接口注释）。
     await habitActions.setHabitGoal(habitId, goal);
@@ -152,6 +174,7 @@ function refresh(): void {
   useHabitStore.setState({
     habits: habitActions.listHabits(),
     logs: habitActions.listLogs(),
+    trashed: habitActions.listTrashedHabits(),
   });
 }
 

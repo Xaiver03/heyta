@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { classifyOperationRelation } from '@heyta/sync-core';
 import {
   CONFLICT_DETECTION_ENTITY_BATCH_SIZE,
   ConflictResult,
@@ -6,8 +7,6 @@ import {
   LatestEntityOperationRow,
   Operation,
   VectorClock,
-  compareVectorClocks,
-  limitVectorClockSize,
 } from './sync.types';
 
 const TASK_TIME_DELTA_ACTION_TYPE = '[TimeTracking] Sync time spent';
@@ -223,8 +222,12 @@ export const resolveConflictForExistingOp = (
   // reads and raw SQL rows; cast only at the vector-clock comparison boundary.
   const existingClock = existingOp.vectorClock as unknown as VectorClock;
 
-  // Compare vector clocks
-  const comparison = compareVectorClocks(op.vectorClock, existingClock);
+  const classification = classifyOperationRelation(
+    op.vectorClock,
+    existingClock,
+    op.clientId,
+    existingOp.clientId,
+  );
 
   // Timer batches are additive and uniquely identified operations. Concurrent
   // deltas commute, so entity-level LWW must not discard either contribution.
@@ -232,7 +235,7 @@ export const resolveConflictForExistingOp = (
   // may already be represented by the stored state and replaying them could
   // double-count time.
   if (
-    comparison === 'CONCURRENT' &&
+    classification === 'concurrent' &&
     op.actionType === TASK_TIME_DELTA_ACTION_TYPE &&
     existingOp.actionType === TASK_TIME_DELTA_ACTION_TYPE
   ) {
@@ -240,18 +243,18 @@ export const resolveConflictForExistingOp = (
   }
 
   // If the incoming op's clock is GREATER_THAN existing, it's a valid successor
-  if (comparison === 'GREATER_THAN') {
+  if (classification === 'causal-successor') {
     return { hasConflict: false };
   }
 
   // If clocks are EQUAL, this might be a retry of the same operation - check if from same client
-  if (comparison === 'EQUAL' && op.clientId === existingOp.clientId) {
+  if (classification === 'retry') {
     return { hasConflict: false };
   }
 
   // EQUAL clocks from different clients is suspicious - treat as conflict
   // This could happen if client IDs rotate or clocks are somehow reused
-  if (comparison === 'EQUAL') {
+  if (classification === 'equal-different-client') {
     return {
       hasConflict: true,
       conflictType: 'equal_different_client',
@@ -261,7 +264,7 @@ export const resolveConflictForExistingOp = (
   }
 
   // CONCURRENT means both clocks have entries the other doesn't
-  if (comparison === 'CONCURRENT') {
+  if (classification === 'concurrent') {
     return {
       hasConflict: true,
       conflictType: 'concurrent',
@@ -271,7 +274,7 @@ export const resolveConflictForExistingOp = (
   }
 
   // LESS_THAN means the incoming op is older than what we have
-  if (comparison === 'LESS_THAN') {
+  if (classification === 'superseded') {
     return {
       hasConflict: true,
       conflictType: 'superseded',
@@ -507,27 +510,14 @@ export const isSameDuplicateOperation = (
   maxClockDriftMs: number,
   originalTimestamp: number = op.timestamp,
 ): boolean => {
-  // Reproduce the normalization of the already-stored row. Storage may protect
-  // a low-counter causal full-state author in addition to the uploader, so use
-  // the stored clock's IDs as the authoritative protected set. Otherwise a
-  // genuine retry of an oversized post-import op compares as an ID collision.
-  //
-  // Tradeoff, deliberate: for an oversized incoming clock this projects onto the
-  // stored key set, so an id collision that ALSO differs only by an extra clock
-  // entry now reads as a duplicate instead of being caught. Accepted because
-  // every other structural field below (clientId, payload, entity, timestamp)
-  // must still match — and when they all do, acking beats rejecting a retry
-  // whose only sin is having learned about one more client.
-  const storedClockClientIds =
-    existingOp.vectorClock !== null &&
-    typeof existingOp.vectorClock === 'object' &&
-    !Array.isArray(existingOp.vectorClock)
-      ? Object.keys(existingOp.vectorClock)
-      : [];
-  const storedVectorClock = limitVectorClockSize(op.vectorClock, [
-    op.clientId,
-    ...storedClockClientIds,
-  ]);
+  // Preserve exact clocks for new rows. A legacy row may contain a clipped
+  // subset from the pre-A loss window; accepting a retry is still safe when
+  // every stored dimension matches and the operation id/other identity fields
+  // match, while a changed stored dimension remains a hard collision.
+  // Compare against the complete incoming clock. Legacy rows may have been
+  // written before lossless storage; in that case the stored dimensions must
+  // still match exactly, while newly observed dimensions are allowed.
+  const storedVectorClock = op.vectorClock;
   const incomingEncrypted = op.isPayloadEncrypted ?? false;
 
   // encrypt() uses a fresh random IV per call, so retried ciphertext differs
@@ -549,7 +539,13 @@ export const isSameDuplicateOperation = (
     // retry matches while a batch op differing only in entityIds does not.
     areJsonValuesEqual(existingOp.entityIds, getStoredEntityIds(op)) &&
     payloadsMatch &&
-    areJsonValuesEqual(existingOp.vectorClock, storedVectorClock) &&
+    (areJsonValuesEqual(existingOp.vectorClock, storedVectorClock) ||
+      (existingOp.vectorClock !== null &&
+        typeof existingOp.vectorClock === 'object' &&
+        !Array.isArray(existingOp.vectorClock) &&
+        Object.entries(existingOp.vectorClock as Record<string, unknown>).every(
+          ([clientId, counter]) => storedVectorClock[clientId] === counter,
+        ))) &&
     existingOp.schemaVersion === op.schemaVersion &&
     isSameDuplicateTimestamp(
       existingOp.clientTimestamp,
@@ -581,10 +577,7 @@ export const isSameIncomingOperation = (
     first.entityId === second.entityId &&
     areJsonValuesEqual(getStoredEntityIds(first), getStoredEntityIds(second)) &&
     (bothEncrypted || areJsonValuesEqual(first.payload, second.payload)) &&
-    areJsonValuesEqual(
-      limitVectorClockSize(first.vectorClock, [first.clientId]),
-      limitVectorClockSize(second.vectorClock, [second.clientId]),
-    ) &&
+    areJsonValuesEqual(first.vectorClock, second.vectorClock) &&
     first.schemaVersion === second.schemaVersion &&
     firstOriginalTimestamp === secondOriginalTimestamp &&
     (first.isPayloadEncrypted ?? false) === (second.isPayloadEncrypted ?? false) &&

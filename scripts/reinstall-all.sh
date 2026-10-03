@@ -202,6 +202,29 @@ if printf '%s' "$WANT" | grep -q "mac"; then
     rm -rf "$INSTALLED_APP"                           # 卸旧：不留"上一次的包"
     if cp -R "$MAC_OUT/Heyta.app" "$INSTALLED_APP"; then
       echo "  ✅ 已安装到 $INSTALLED_APP"
+      # 🔴 **装上的必须就是刚打的那份，而那份必须是当前 dist**（2026-10-03 实测）。
+      #    产品负责人在装好的 .app 里看到日历"内容超出容器范围"，当前源码同一尺寸
+      #    同一状态量出来是能放下的 —— 差的就是包里那份 web-dist 是**早于 R13/R14 的
+      #    另一次构建**（`now-line`/`clock-` 两个标记在包内 JS 里 0 命中，本机产物各 1 命中）。
+      #    而 mac 段原有的两条判据（截图非空白 + 主蓝命中）**全绿** —— 它们量的是
+      #    "有没有界面"，回答不了"是不是这份源码的界面"（AGENTS §7 第 82 条第四次露面）。
+      #    比的是 `assets/` 的**文件名集合**：Vite 的文件名是内容寻址的哈希，
+      #    集合相等就等于两次构建相等，不用逐字节比（也比不动 —— 包内是签名后的副本）。
+      assets_of() { ls "$1" 2>/dev/null | sort; }
+      DIST_ASSETS="$ROOT/apps/web/dist/assets"
+      APP_ASSETS="$INSTALLED_APP/Contents/Resources/web-dist/assets"
+      MAC_DIST_OK=0
+      if [ ! -d "$DIST_ASSETS" ]; then
+        echo "  🔴 对账没有分母：本机没有 ${DIST_ASSETS}（先 pnpm --filter @heyta/web build）"
+      elif [ ! -d "$APP_ASSETS" ]; then
+        echo "  🔴 对账没有分母：装出来的 .app 里没有 web-dist/assets（打包环节没进包）"
+      elif diff <(assets_of "$APP_ASSETS") <(assets_of "$DIST_ASSETS") > /dev/null; then
+        echo "  ✅ 安装对账：.app 里的 web-dist 与本机 apps/web/dist 是**同一次构建**（$(assets_of "$APP_ASSETS" | wc -l | tr -d ' ') 个 chunk）"
+        MAC_DIST_OK=1
+      else
+        echo "  🔴 安装对账失败：.app 里的 web-dist 与本机 apps/web/dist **不是同一次构建**"
+        diff <(assets_of "$APP_ASSETS") <(assets_of "$DIST_ASSETS") | head -8 | sed 's/^/     /'
+      fi
       # 🔴 清壳的 WKWebView 存储（重装 = 首次运行态）。不清的话上一轮的
       #    localStorage（比如“最后停留在设置页”）会把应用带进别的视图，
       #    判据截图就不是冷启动第一屏（实测：曾因此对着设置 sheet 打分）。
@@ -215,11 +238,11 @@ if printf '%s' "$WANT" | grep -q "mac"; then
       rm -f "$MAC_SELFIE" "$MAC_SELFIE_WV"
       HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$MAC_SELFIE" \
         "$INSTALLED_APP/Contents/MacOS/HeytaMac" >/dev/null 2>&1 || true
-      if [ -f "$MAC_SELFIE" ] && shot_ok_logged "$MAC_SELFIE" "$MAC_SELFIE_WV"; then
+      if [ "$MAC_DIST_OK" = 1 ] && [ -f "$MAC_SELFIE" ] && shot_ok_logged "$MAC_SELFIE" "$MAC_SELFIE_WV"; then
         echo "  截图证据：${MAC_SELFIE}（窗口）+ ${MAC_SELFIE_WV}（共享 UI）"
         RESULT_mac=OK
       else
-        echo "  🔴 安装副本不可信 —— 窗口没起来，或共享 UI 没渲染"
+        echo "  🔴 安装副本不可信 —— 产物对账没过，或窗口没起来，或共享 UI 没渲染"
         echo "     证据：${MAC_SELFIE}:$([ -f "$MAC_SELFIE" ] && stat -f%z "$MAC_SELFIE" || echo 缺)" \
              "${MAC_SELFIE_WV}:$([ -f "$MAC_SELFIE_WV" ] && stat -f%z "$MAC_SELFIE_WV" || echo 缺)"
       fi

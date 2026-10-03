@@ -53,6 +53,7 @@ import { RefreshCw, Settings, X } from 'lucide-react';
 
 import { AuthPanel } from '../auth/AuthPanel.js';
 import { HELP_SYNC_ANCHOR, siteLink } from '../../lib/site-url.js';
+import { VaultSettingsPanel } from './VaultSettingsPanel.js';
 
 /**
  * 服务端地址的示例。**不是文案，是 URL 字面量。**
@@ -123,6 +124,7 @@ export function SyncBar() {
   const [baseUrl, setBaseUrl] = useState(sync.baseUrl ?? '');
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
+  const vaultMode = sync.accountId !== undefined && sync.accountId.trim() !== '';
 
   /**
    * 🔴 对话框**打开时**把三个输入框对齐到已保存的配置。
@@ -268,6 +270,9 @@ export function SyncBar() {
               padding: cssVar('space.6'),
               minWidth: cssVar('layout.content-max'),
               maxWidth: '90vw',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxSizing: 'border-box',
               display: 'flex',
               flexDirection: 'column',
               gap: cssVar('space.3'),
@@ -322,29 +327,35 @@ export function SyncBar() {
               {t('web.auth.open')}
             </button>
 
-            <label style={labelStyle}>
-              {t('web.sync.password.label')}
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                style={fieldStyle}
-              />
-            </label>
+            {!vaultMode ? (
+              <>
+                <label style={labelStyle}>
+                  {t('web.sync.password.label')}
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="new-password"
+                    style={fieldStyle}
+                  />
+                </label>
 
-            <p
-              style={{
-                margin: 0,
-                fontSize: cssVar('font-size.2xs'),
-                color: cssVar('color.foreground-muted'),
-                lineHeight: cssVar('line-height.normal'),
-              }}
-            >
-              {t('web.sync.password.lead')}
-              <strong>{t('web.sync.password.strong')}</strong>
-              {t('web.sync.password.tail')}
-            </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: cssVar('font-size.2xs'),
+                    color: cssVar('color.foreground-muted'),
+                    lineHeight: cssVar('line-height.normal'),
+                  }}
+                >
+                  {t('web.sync.password.lead')}
+                  <strong>{t('web.sync.password.strong')}</strong>
+                  {t('web.sync.password.tail')}
+                </p>
+              </>
+            ) : null}
+
+            <VaultSettingsPanel />
 
             <div style={{ display: 'flex', gap: cssVar('space.2'), justifyContent: 'flex-end' }}>
               {/*

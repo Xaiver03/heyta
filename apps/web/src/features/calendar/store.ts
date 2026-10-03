@@ -31,7 +31,12 @@ import {
   type LocalDate,
   type TaskScope,
 } from '@heyta/domain';
-import type { CalendarViewKind } from '@heyta/ui';
+import {
+  calendarCursorFor,
+  calendarMonthDrill,
+  calendarSelectedForCursor,
+  type CalendarViewKind,
+} from '@heyta/ui';
 
 type ScopeKind = 'project' | 'tag';
 
@@ -64,9 +69,10 @@ interface CalendarViewActions {
   /**
    * 换月。参数是**该月里的任意一天**，与共享板 `onCursorChange` 给的东西一致。
    *
-   * ⚠️ 只动 `cursor`，**不动 `selected`** —— 翻去看别的月，不等于改选中的那天。
+   * ⚠️ 月/周档**只动 `cursor`，不动 `selected`** —— 翻去看别的月，不等于改选中的那天。
    * 侧栏的两个箭头自己调 `addMonths(cursor, ±1)` 再把结果交进来：
    * 月份算术是领域层的，这里不替它算第二遍。
+   * 🔴 **日档是例外**（游标即那一天，两个名字必须同一天），实现里写了原因。
    */
   setCursor: (date: LocalDate) => void;
   /**
@@ -86,6 +92,12 @@ interface CalendarViewActions {
    * 而下面的清单列着 10-25 —— 共享板 `pickDay` 那条纪律的反面。
    */
   setView: (view: CalendarViewKind) => void;
+  /**
+   * 从年档点进某一个月（R13）。**要改什么由共享层决定**（`calendarMonthDrill`），
+   * 这里只负责把它写进状态 —— 包括"选中那天不动"那一条：那个函数返回的对象里
+   * 根本没有 `selected`，所以不是"我记得别改"。
+   */
+  drillIntoMonth: (monthFirstDay: LocalDate) => void;
   /** 开/关那一行输入。开着再点 `+` 就是收起 —— 一屏只有一行输入框。 */
   toggleCapture: () => void;
   /** 勾/去掉一条清单或一个标签。 */
@@ -104,17 +116,11 @@ function idsOf(scope: TaskScope, kind: ScopeKind): readonly string[] {
 }
 
 /**
- * 「要让 `date` 这一天天可见，游标该放哪」—— **只此一处**。
- *
- * 🔴 这条规则被 `selectDay` / `goToToday` / `setView` 三个动作共用。写成三份的
- *   下场本文件已经记过一次（"两处各写一遍迟早有一边忘"），而这次是三份。
- *   周档返回 `date` 本身：游标的约定是"这一段里的任意一天"，
- *   而 `weekGrid` 会自己回到周一 —— 不需要在这里算周首。
+ * 🔴 游标规则（"要让某天可见，游标放哪"）与日档那条"游标带走选中"**不在本文件**：
+ *   它们在 `@heyta/ui` 的 `calendar/model.ts`（`calendarCursorFor` /
+ *   `calendarSelectedForCursor`）。这里原来有一份本地 `cursorFor`，
+ *   移动端补上档位入口时就要抄第二份 —— 已删，两端共用那一份（AGENTS §3.5）。
  */
-function cursorFor(view: CalendarViewKind, date: LocalDate): LocalDate {
-  return view === 'week' ? date : startOfMonth(date);
-}
-
 function withIds(scope: TaskScope, kind: ScopeKind, ids: readonly string[]): TaskScope {
   return kind === 'project' ? { ...scope, projectIds: ids } : { ...scope, tagIds: ids };
 }
@@ -129,19 +135,30 @@ export const useCalendarViewStore = create<CalendarViewState & CalendarViewActio
   captureOpen: false,
 
   setCursor: (date) => {
-    set({ cursor: date });
+    // 🔴 游标怎么归一、选中跟不跟着走，两条规则都在 `@heyta/ui`（本文件不再抄一份）。
+    //   日档里"游标必须带走选中"的理由与它的判据写在那里（`calendarSelectedForCursor`），
+    //   症状是**安静地各指一天**：轴翻到 10-05、侧栏还圈着 10-03、新任务写进了 10-03。
+    //   判据：`apps/web/tests/calendar-day-view.spec.tsx`（含变异臂 Z）。
+    set((state) => ({
+      cursor: calendarCursorFor(state.view, date),
+      selected: calendarSelectedForCursor(state.view, date, state.selected),
+    }));
   },
 
   selectDay: (date) => {
-    set((state) => ({ selected: date, cursor: cursorFor(state.view, date) }));
+    set((state) => ({ selected: date, cursor: calendarCursorFor(state.view, date) }));
   },
 
   goToToday: (today) => {
-    set((state) => ({ selected: today, cursor: cursorFor(state.view, today) }));
+    set((state) => ({ selected: today, cursor: calendarCursorFor(state.view, today) }));
   },
 
   setView: (view) => {
-    set((state) => ({ view, cursor: cursorFor(view, state.selected) }));
+    set((state) => ({ view, cursor: calendarCursorFor(view, state.selected) }));
+  },
+
+  drillIntoMonth: (monthFirstDay) => {
+    set(() => ({ ...calendarMonthDrill(monthFirstDay) }));
   },
 
   toggleCapture: () => {

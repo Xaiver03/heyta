@@ -8,7 +8,7 @@
  * 必然变成第二份 —— 而"第二份"在本仓库已经漂移过三次（见 AGENTS.md §3.5）。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 三个由这里**独占**的语义决定：
+ * 四个由这里**独占**的语义决定：
  *
  * 1. **无父清单写 `parentId: null`，不写"不放这个键"。**
  *    旧实现写成"`parentId` 为 undefined 时不要放进 payload"，注释里还专门
@@ -24,13 +24,28 @@
  * 3. **删除发 `DEL` op，不是改标志位。** 与任务一致：物理删除会让同步端
  *    永远看不到这次删除。
  *
+ * 4. **"归档的清单不进任何出口"由这里的 list 分裂负责。**（W9 / P-9 / I5）
+ *    `listProjects()` 只给可见的，`listArchivedProjects()` 只给归档的。
+ *    以前这条规则**只存在于 UI 层**，四个出口各拿一次原始表 —— 于是
+ *    "界面上收起来了、助手嘴里它还在"。隐藏由**层**负责才不会被漏，
+ *    由调用点负责一定会漏（同一个形状的问题 W8 在墓碑上已经出过一次）。
+ *
  * ⚠️ 标签（TAG）与清单（PROJECT）放在同一个动作集里，是因为在**数据模型**上
  * 它们是两个独立实体，但在**产品**上是同一件事的两个面（组织任务）。
  * 分成两个文件会让人以为它们的语义可以各自演化。
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { parseCategorySlot, type CategorySlot, type Project, type Tag } from '@heyta/domain';
+import {
+  byCreatedAtOrder,
+  isArchived,
+  isLive,
+  trashedIn,
+  parseCategorySlot,
+  type CategorySlot,
+  type Project,
+  type Tag,
+} from '@heyta/domain';
 import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
 
@@ -38,6 +53,12 @@ import type { ActionContext } from './actions.js';
 import { randomId } from './ids.js';
 
 export interface ProjectActionsOptions {
+  /**
+   * 时间源。`purgeProject` 要把"彻底删除发生在什么时候"写进载荷，
+   * 因此与 `TaskActionsOptions.now` / `NoteActionsOptions.now` 同一个理由：
+   * 不可逆动作的时刻必须可注入，否则判据只能靠真实时钟（会飘）。
+   */
+  now?: () => number;
   /** 清单 id 生成器。可注入，理由见 `TaskActionsOptions.newTaskId`。 */
   newProjectId?: () => string;
   /** 标签 id 生成器。 */
@@ -86,32 +107,78 @@ export interface ProjectActions {
   renameTag(entityId: string, name: string): Promise<void>;
   removeTag(entityId: string): Promise<void>;
 
-  /** 未删除的清单，按 (createdAt, id) 升序 —— 与 `listTasks()` 同一条规则。 */
+  /**
+   * **可见**的清单：未删除**且未归档**，按 (createdAt, id) 升序。
+   *
+   * 🔴 归档在这里就被滤掉，不是"由调用点记得滤"（I5 / P-9 / W9）。
+   * 之前的形状是这里只滤 `deletedAt`、归档**只有 UI 层滤**
+   *（`packages/ui/src/projects/model.ts`），于是 local-api / MCP / AI 助手 /
+   * node-host CLI 四个出口都**看得见归档清单**：用户在界面上把它"收起来了"，
+   * 助手嘴里它还在，而且会被当成活的推荐目标。
+   *
+   * ⇒ 界面上那个「显示已归档」开关的数据源是**下面那条** `listArchivedProjects()`，
+   *   宿主必须**两路并起来**再喂给共享层。只接一路的后果不是报错，是
+   *   "开关按了什么都没出现" —— 归档从此变成**单向门**（`archiveProject`
+   *   那条注释说的正是这件事）。
+   */
   listProjects(): Project[];
-  /** 未删除的标签，顺序同上。 */
+  /**
+   * **只含已归档**且未删除的清单，顺序同 `listProjects()`。
+   *
+   * 与 `listTasks()` / `listTrashed()` 同一个形状：另一种可见性 = 另一个 list 方法，
+   * 而不是"把原始表递出去让调用方自己滤"。
+   */
+  listArchivedProjects(): Project[];
+  /**
+   * 界面侧栏的数据源 = 上面两路**按规范顺序合并**。
+   *
+   * 🔴 它存在的唯一理由是：宿主如果只接其中一路，症状**不是报错**，而是
+   *   "「显示已归档」开关按了什么都没出现" —— 归档从此变成单向门。
+   *   两路各宿主自己拼一遍，就是给这个坑留了两次机会；这里由
+   *   `listProjects()` + `listArchivedProjects()` **派生**，所以拼不出第二种口径。
+   *
+   * ⚠️ 出口（local-api / MCP / AI / CLI）**不许**用它，用 `listProjects()` ——
+   *   这条线的存在意义就是归档不进出口（P-9）。
+   */
+  listAllProjects(): Project[];
+  /**
+   * 回收站里的清单：**有墓碑、且没有被彻底删除**，最近删除的在前（`trashedIn`）。
+   *
+   * ⚠️ 归档态与删除态是**正交**的：一条"归档后被删掉"的清单还原之后仍然归档，
+   * 因此它会回到 `listArchivedProjects()` 而不是 `listProjects()`。这不是 bug ——
+   * 用户删掉它没有顺带改变"它被收起来了"这个事实。
+   */
+  listTrashedProjects(): Project[];
+  /**
+   * 从回收站还原清单。**幂等**：不在回收站里时返回 `false` 且不写 op。
+   *
+   * 🔴 已被彻底删除（`purgedAt`）的那条会**抛错**，不是返回 `false` —— 与
+   *   `TaskActions.restore` / `restoreNote` 同一条契约。
+   */
+  restoreProject(entityId: string): Promise<boolean>;
+  /**
+   * 彻底删除一条清单：只追加 `purgedAt` **标记**，墓碑与 op 载荷都留着。
+   *
+   * 🔴 不清 `deletedAt` —— 清了以后离线对端回放会把这条**复活**（ADR-0048）。
+   *    也不物理删 op：那会改写同步历史。
+   * @throws 找不到 / 不在回收站里
+   */
+  purgeProject(entityId: string): Promise<void>;
+
+  /** 未删除的标签，顺序同 `listProjects()`。⚠️ 标签**没有** `archived` 这一态。 */
   listTags(): Tag[];
 }
 
 /** 未软删除的记录（顺序未定义，调用方自己 sort）。 */
 function aliveOf<T extends { deletedAt?: number }>(record: Record<string, T>): T[] {
-  return Object.values(record).filter((item) => item.deletedAt === undefined);
-}
-
-/**
- * 跨端一致的规范顺序：创建时间升序，同刻按 id 字典序。
- *
- * 与 `actions.ts` 的 `byCanonicalOrder` 是**同一条规则**，这里重写一遍是因为
- * 泛型不同（那边是 `Task`）。规则本身只有一条，别在这里改。
- */
-function byCanonicalOrder<T extends { createdAt: number; id: string }>(a: T, b: T): number {
-  if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  return Object.values(record).filter(isLive);
 }
 
 export function createProjectActions(
   ctx: ActionContext,
   options: ProjectActionsOptions = {},
 ): ProjectActions {
+  const now = options.now ?? Date.now;
   const makeProjectId = options.newProjectId ?? ((): string => `project-${randomId()}`);
   const makeTagId = options.newTagId ?? ((): string => `tag-${randomId()}`);
 
@@ -140,6 +207,14 @@ export function createProjectActions(
       payload,
     });
   };
+
+  const visibleProjects = (): Project[] =>
+    aliveOf(ctx.getState().projects)
+      .filter((project) => !isArchived(project))
+      .sort(byCreatedAtOrder);
+
+  const archivedOnly = (): Project[] =>
+    aliveOf(ctx.getState().projects).filter(isArchived).sort(byCreatedAtOrder);
 
   return {
     async createProject(name, parentId) {
@@ -238,12 +313,58 @@ export function createProjectActions(
       });
     },
 
-    listProjects() {
-      return aliveOf(ctx.getState().projects).sort(byCanonicalOrder);
+    listProjects: visibleProjects,
+
+    listArchivedProjects: archivedOnly,
+
+    // 由上面两路**派生**（不在这里再判一次 `archived` / `deletedAt`），
+    // 所以"侧栏看到的"与"出口看到的 + 归档那一档"不可能各说一套。
+    listAllProjects: () => [...visibleProjects(), ...archivedOnly()].sort(byCreatedAtOrder),
+
+
+    async restoreProject(entityId) {
+      // 读**原始表**而不是 `projectOf()`：那个辅助函数把墓碑当成"不存在"，
+      // 而回收站里的一条既存在、又正需要被恢复。
+      const raw = ctx.getState().projects[entityId];
+      if (raw === undefined) throw new Error(`找不到清单「${entityId}」`);
+      // 🔴 已被彻底删除 → 抛错，不返回 false。与 `restoreNote` 同一条契约（P-5）：
+      //   "没有变化"与"永远做不成"是两句话，合成一句界面就只能咽掉后者。
+      if (raw.purgedAt !== undefined) {
+        throw new Error(`清单「${entityId}」已被彻底删除，无法恢复`);
+      }
+      if (raw.deletedAt === undefined) return false;
+      // 恢复 = 写一条新的 UPD 清掉墓碑（不"物理撤掉"那条 DEL —— 那会让同步端
+      // 再也看不到这次删除，见文件头第 3 条）。
+      await ctx.dispatch({
+        entityType: 'PROJECT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        payload: { deletedAt: null },
+      });
+      return true;
+    },
+
+    async purgeProject(entityId) {
+      const raw = ctx.getState().projects[entityId];
+      if (raw === undefined) throw new Error(`找不到清单「${entityId}」`);
+      if (raw.deletedAt === undefined) throw new Error(`清单「${entityId}」不在回收站里`);
+      // 幂等：已经打过标记就什么都不做（不可逆动作被点两次不该产出两条 op）。
+      if (raw.purgedAt !== undefined) return;
+      await ctx.dispatch({
+        entityType: 'PROJECT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        payload: { purgedAt: now() },
+      });
+    },
+
+    listTrashedProjects() {
+      // 判据、顺序、"挑 + 排"这一遍都在领域层（`trashedIn`），这里不重写。
+      return trashedIn(Object.values(ctx.getState().projects));
     },
 
     listTags() {
-      return aliveOf(ctx.getState().tags).sort(byCanonicalOrder);
+      return aliveOf(ctx.getState().tags).sort(byCreatedAtOrder);
     },
   };
 }

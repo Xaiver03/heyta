@@ -34,6 +34,7 @@ import {
   Priority,
   Quadrant,
   bucketByQuadrant,
+  trashedIn,
   filterTasks,
   type QuadrantDropPlan,
   type Task,
@@ -379,18 +380,14 @@ export function selectQuadrantCounts(state: TaskState): Record<Quadrant, number>
 /**
  * 回收站列表：**已软删除且未彻底删除**的任务，最近删除的在前（同刻按 id）。
  *
- * ⚠️ 判据与顺序必须与 `@heyta/app-host` 的 `TaskActions.listTrashed()` 一致 ——
- * 那是同一份产品语义的规范定义。selector 在这里重写一遍，是因为它只能读
- * **传入的 state**：去读引擎单例会破坏 zustand 的引用稳定性约定
- * （见 `App.tsx` 里 `useShallow` 那段记录的真实崩溃）。
+ * 🔴 判据、顺序、"挑 + 排"这一遍**不在这里写**：权威是 `@heyta/domain` 的 `trashedIn`（
+ *   里面是 `inTrash` / `byDeletedOrder`），与 `@heyta/app-host` 的
+ *   `TaskActions.listTrashed()` 同一个答案。
+ * 这里原来抄了一遍两段的实现（谓词 + 比较器），那正是本文件 `:349` 那段
+ * "判据只有一份"要防的形状：**同一个决定落在两处，漂移只是时间问题**。
+ * selector 保留是因为它只能读**传入的 state**：去读引擎单例会破坏 zustand 的
+ * 引用稳定性约定（见 `App.tsx` 里 `useShallow` 那段记录的真实崩溃）。
  */
 export function selectTrashedTasks(state: TaskState): Task[] {
-  return Object.values(state.entities.tasks)
-    .filter((t) => t.deletedAt !== undefined && t.purgedAt === undefined)
-    .sort((a, b) => {
-      const ad = a.deletedAt ?? 0;
-      const bd = b.deletedAt ?? 0;
-      if (ad !== bd) return bd - ad;
-      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-    });
+  return trashedIn(Object.values(state.entities.tasks));
 }

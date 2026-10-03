@@ -291,9 +291,20 @@ export class StorageQuotaService {
 
     const quota = Number(user?.storageQuotaBytes ?? getDefaultStorageQuotaBytes());
     const currentUsage = Number(user?.storageUsedBytes ?? 0);
+    // Staged vault rotations reserve their replacement payload bytes without
+    // inflating the durable operation counter. Include live reservations in
+    // the admission calculation so ordinary uploads cannot consume space
+    // promised to an in-flight rotation. This query is part of the production
+    // quota contract; a database failure must reject the check rather than
+    // silently allowing an upload to spend reserved bytes.
+    const reservations = await prisma.vaultKeyMigration.aggregate({
+      _sum: { reservedStorageBytes: true },
+      where: { userId, state: 'STAGING', expiresAt: { gt: BigInt(Date.now()) } },
+    });
+    const reservedBytes = Number(reservations._sum?.reservedStorageBytes ?? 0n);
 
     return {
-      allowed: currentUsage + additionalBytes <= quota,
+      allowed: currentUsage + reservedBytes + additionalBytes <= quota,
       currentUsage,
       quota,
     };

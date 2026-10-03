@@ -195,6 +195,21 @@ export const META_KEYS = {
   ENCRYPTION_ENABLED: 'encryptionEnabled',
   /** 最后成功同步的时间。 */
   LAST_SYNCED_AT: 'lastSyncedAt',
+  /**
+   * 服务端已确认的因果前沿。
+   *
+   * 这是同步恢复所需的独立簿记，不能复用 materialized checkpoint：
+   * checkpoint 是可删除的本地加速缓存，而这个前沿是服务端确认过的事实。
+   */
+  OBSERVED_CLOCK: 'observedClock',
+  /** 历史曾经不完整（例如存在无法解密的远程 op），只能置 true。 */
+  HISTORY_INCOMPLETE: 'historyIncomplete',
+  /** Opaque wrapped vault key package; never contains a plaintext root key. */
+  VAULT_KEY_PACKAGE: 'vaultKeyPackageV1',
+  /** Account/server scope paired atomically with the opaque vault package. */
+  VAULT_KEY_SCOPE: 'vaultKeyScopeV1',
+  /** Ciphertext-only durable key-migration journal; no root/plaintext/password. */
+  VAULT_MIGRATION_JOURNAL: 'vaultMigrationJournalV1',
 } as const;
 
 export type MetaKey = (typeof META_KEYS)[keyof typeof META_KEYS];

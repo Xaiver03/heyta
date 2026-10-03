@@ -65,7 +65,7 @@ import type { Note } from '@heyta/domain';
 import { Pin, PinOff, Plus, Trash2 } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { NOTE_EXCERPT_LENGTH, isNoteDraftBlank, toNoteRows } from './model.js';
+import { isNoteDraftBlank, toNoteRows } from './model.js';
 
 /** 面板全部文案，**每一项都由宿主注入**（见文件头）。 */
 export interface NotesBoardLabels {
@@ -92,7 +92,7 @@ export interface NotesBoardLabels {
 export interface NotesBoardProps {
   /** 未删除的便签（由宿主从 action 层取，`listNotes()` 已经是）。 */
   readonly notes: readonly Note[];
-  /** 摘要长度。省略 = {@link NOTE_EXCERPT_LENGTH}（窄屏可收短）。 */
+  /** 摘要长度。省略 = 领域层的 `NOTE_EXCERPT_LENGTH`（窄屏可收短）。 */
   readonly excerptLength?: number;
   /**
    * 新建。**内容校验的权威是宿主的 `createNoteActions`**（见文件头）——
@@ -211,7 +211,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
 
 export function NotesBoard({
   notes,
-  excerptLength = NOTE_EXCERPT_LENGTH,
+  excerptLength,
   onAdd,
   onRemove,
   onTogglePinned,

@@ -27,6 +27,12 @@ export {
   MAX_VECTOR_CLOCK_SIZE,
 } from './vector-clock';
 export { VectorClockComparison } from './vector-clock';
+export { classifyOperationRelation } from './conflict-classification';
+export type { OperationConflictClassification } from './conflict-classification';
+export {
+  compactVectorClockAgainstFrontier,
+  expandVectorClockFromFrontier,
+} from './causal-clock';
 
 // Full-state import clean-slate vector-clock decisions.
 export { classifyOpAgainstSyncImport } from './sync-import-filter';
@@ -211,3 +217,33 @@ export type { SyncLogError, SyncLogMeta, SyncLogger } from './sync-logger';
 
 // Entity key encoding helpers.
 export { toEntityKey, parseEntityKey } from './entity-key.util';
+
+// Versioned vault key lifecycle: recovery package, feature keys and rotation.
+export {
+  VAULT_KEY_PACKAGE_VERSION,
+  VAULT_KEY_VERSION,
+  VAULT_KEY_PURPOSES,
+  isVaultKeyPurpose,
+  assertWrappedVaultKey,
+  assertVaultKeyPackage,
+  assertEncryptedVaultRecord,
+  generateRecoveryCode,
+  normalizeRecoveryCode,
+  createVaultKeyPackage,
+  unlockVaultWithPassphrase,
+  unlockVaultWithRecoveryCode,
+  deriveVaultFeatureKey,
+  encryptVaultRecord,
+  decryptVaultRecord,
+  reencryptVaultRecords,
+  rotateVaultKey,
+  rewrapVaultKeyPackage,
+  vaultRootKeyFingerprint,
+} from './key-lifecycle';
+export type {
+  VaultKeyPurpose,
+  WrappedVaultKey,
+  VaultKeyPackage,
+  CreatedVaultKeyPackage,
+  EncryptedVaultRecord,
+} from './key-lifecycle';

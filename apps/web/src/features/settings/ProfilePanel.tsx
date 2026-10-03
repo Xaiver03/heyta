@@ -50,16 +50,20 @@ import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
 import {
   deleteAccountAvatar,
-  fetchAccountAvatar,
   getAccountProfile,
+  planDisplayNameWrite,
+  resolveAccountAvatarImage,
   updateAccountDisplayName,
   uploadAccountAvatar,
+  type AccountAvatarImage,
 } from '@heyta/app-host';
 import {
   ACCOUNT_AVATAR_CONTENT_TYPES,
   ACCOUNT_AVATAR_EDGE_PX,
   ACCOUNT_AVATAR_MAX_SOURCE_BYTES,
   ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS,
+  avatarDataUri,
+  avatarInitialFromEmail,
   displayNameCodePoints,
 } from '@heyta/shared-schema';
 
@@ -90,17 +94,30 @@ export function ProfilePanel(): React.JSX.Element {
   /** 服务端当前那个昵称。用来区分"没改过"与"改回原值"，也用来出占位符。 */
   const [savedName, setSavedName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  /** 读侧的结论由共享裁决给出（`absent` / `needs-password` / `undecryptable` / `unreadable`）。 */
+  const [avatarState, setAvatarState] = useState<AccountAvatarImage['state'] | undefined>(
+    undefined,
+  );
   const [nameNotice, setNameNotice] = useState<Notice>({ kind: 'idle' });
   const [avatarNotice, setAvatarNotice] = useState<Notice>({ kind: 'idle' });
+  /**
+   * 🔴 资料**读取**失败单独一行，不借用昵称或头像那两句。
+   * 以前这里写的是 `nameNotice = t('common.profile.avatar.failed')` ——
+   * 一次 GET 失败，界面却在昵称下面说"头像没有传上去"：一件从没发生过的事。
+   */
+  const [loadNotice, setLoadNotice] = useState<Notice>({ kind: 'idle' });
   const fileRef = useRef<HTMLInputElement | null>(null);
   /** 卸载后**不许**再 setState：这两条路都是 await 回来的。 */
   const aliveRef = useRef(true);
-  useEffect(
-    () => () => {
+  /** 账号/口令切换后，前一个会话的响应即使晚到也不能写回当前面板。 */
+  const sessionGenerationRef = useRef(0);
+  useEffect(() => {
+    // StrictMode 会执行 setup → cleanup → setup；每次 setup 都恢复存活状态。
+    aliveRef.current = true;
+    return () => {
       aliveRef.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   /**
    * 读取当前资料。
@@ -111,51 +128,62 @@ export function ProfilePanel(): React.JSX.Element {
    * 被告知"你还没有头像"，然后他传一张上去，把**自己原来那张**覆盖掉。
    */
   useEffect(() => {
+    const generation = ++sessionGenerationRef.current;
+    let cancelled = false;
+    const isCurrent = (): boolean =>
+      aliveRef.current && !cancelled && sessionGenerationRef.current === generation;
+
     if (!signedIn || token === undefined) {
       setSavedName(null);
       setDraft('');
       setAvatarUrl(undefined);
-      return;
+      setAvatarState(undefined);
+      return () => {
+        cancelled = true;
+      };
     }
     const options = { baseUrl };
     void (async () => {
       const profile = await getAccountProfile(options, token);
-      if (!aliveRef.current) return;
+      if (!isCurrent()) return;
       if (!profile.ok) {
-        setNameNotice({ kind: 'error', text: t('web.settings.profile.avatar.failed') });
+        setLoadNotice({ kind: 'error', text: t('common.profile.loadFailed') });
         return;
       }
+      setLoadNotice({ kind: 'idle' });
       setSavedName(profile.displayName);
       setDraft(profile.displayName ?? '');
-      if (profile.avatarHash === null) {
-        setAvatarUrl(undefined);
-        return;
-      }
-      if (password === undefined || password === '') return;
-      const decoded = await fetchAccountAvatar(options, token, password);
-      if (!aliveRef.current) return;
-      // `AvatarDecodeResult` 的成功支是 `{ ok: true, image }` —— 多一层，
-      // 因为"解出来的东西"和"解码这件事的结果"不是一回事（失败支只有 reason）。
-      setAvatarUrl(
-        decoded.ok
-          ? `data:${decoded.image.contentType};base64,${decoded.image.dataBase64}`
-          : undefined,
-      );
+      // 🔴 "要不要取图 / 有没有口令 / 解不解得开"不在这里判 —— 见
+      //   `resolveAccountAvatarImage`。移动端接的是同一个函数（AGENTS §3.5）。
+      //   原来这里是三段 `if (avatarHash === null) … / if (password === '') return;`，
+      //   把解码失败的四种原因压成了同一个 `undefined`：口令不对的人因此被界面
+      //   告知"你还没有头像"，他接着点「换一张」，把自己原来那张覆盖掉。
+      const reading = await resolveAccountAvatarImage(options, token, password, profile.avatarHash);
+      if (!isCurrent()) return;
+      setAvatarState(reading.state);
+      if (reading.state === 'ready') setAvatarUrl(reading.dataUri);
+      else if (reading.state === 'absent') setAvatarUrl(undefined);
+      // 其余三种**不动**已显示的图：一次取不到不该让已经看到的头像凭空消失，
+      // 而 `avatarState` 那句话会说明它可能不是最新的。
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [baseUrl, password, signedIn, t, token]);
 
   /** 换一张：编码在前、上限判断在后，任何一步不对都**不发请求**。 */
   const onPickFile = async (file: File): Promise<void> => {
+    const generation = sessionGenerationRef.current;
     if (!signedIn || token === undefined || password === undefined) {
       setAvatarNotice({
         kind: 'error',
-        text: t('web.settings.profile.avatar.needPassword'),
+        text: t('common.profile.avatar.needPassword'),
       });
       return;
     }
     setAvatarNotice({ kind: 'busy' });
     const encoded = await loadAvatarImage(file);
-    if (!aliveRef.current) return;
+    if (!aliveRef.current || sessionGenerationRef.current !== generation) return;
     if (!encoded.ok) {
       setAvatarNotice({ kind: 'error', text: fileErrorText(encoded.error) });
       return;
@@ -166,46 +194,45 @@ export function ProfilePanel(): React.JSX.Element {
       password,
       encoded.image,
     );
-    if (!aliveRef.current) return;
+    if (!aliveRef.current || sessionGenerationRef.current !== generation) return;
     if (!outcome.ok) {
-      setAvatarNotice({ kind: 'error', text: t('web.settings.profile.avatar.failed') });
+      setAvatarNotice({ kind: 'error', text: t('common.profile.avatar.failed') });
       return;
     }
-    setAvatarUrl(`data:${encoded.image.contentType};base64,${encoded.image.dataBase64}`);
-    setAvatarNotice({ kind: 'done', text: t('web.settings.profile.nickname.saved') });
+    setAvatarUrl(avatarDataUri(encoded.image));
+    // 🔴 说的是**头像**那句。这里曾经复用 `nickname.saved`（"昵称已保存"），
+    //    于是用户换完照片看到的是一句关于别的东西的话。
+    setAvatarNotice({ kind: 'done', text: t('common.profile.avatar.uploaded') });
+    setAvatarState('ready');
   };
 
   const fileErrorText = (error: AvatarFileError): string =>
     error === 'bad-type'
-      ? t('web.settings.profile.avatar.badType', {
+      ? t('common.profile.avatar.badType', {
           types: ACCOUNT_AVATAR_CONTENT_TYPES.map((c) => c.replace('image/', '')).join(' / '),
         })
       : error === 'too-big'
-        ? t('web.settings.profile.avatar.tooBig', {
+        ? t('common.profile.avatar.tooBig', {
             max: `${Math.floor(ACCOUNT_AVATAR_MAX_SOURCE_BYTES / 1024)} KB`,
           })
-        : t('web.settings.profile.avatar.failed');
+        : t('common.profile.avatar.failed');
 
   const saveNickname = async (): Promise<void> => {
-    if (!signedIn || token === undefined) return;
-    // 🔴 超长**不发请求**。服务端也会拒（同一枚常量），但那是第二次机会而不是理由：
-    // 发出去只会让红字晚一个来回出现，而这一段网络往返本身就是用户不需要的代价。
-    // 与"未登录不发请求"同一条纪律 —— 区别只在于这条规则**住在这里**，
-    // 因为"超没超长"是输入框的状态，app-host 看不到。
-    if (displayNameCodePoints(draft) > ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS) return;
-    if (draft.trim() === (savedName ?? '').trim()) return;
+    const generation = sessionGenerationRef.current;
+    // 🔴 「这一发到底发不发、发什么」不在这里判 —— 见 `planDisplayNameWrite`。
+    //    移动端做的是同一件事，两边各写一遍就是从两个地方各判一遍（AGENTS §3.5）。
+    //    `baseUrl === ''` 折算成"没有可用凭据"：本机的 `signedIn` 就是这么定义的。
+    const plan = planDisplayNameWrite({
+      token: baseUrl === '' ? undefined : token,
+      draft,
+      saved: savedName,
+    });
+    if (plan.action === 'skip') return;
     setNameNotice({ kind: 'busy' });
-    // 🔴 空框发的是 `null`（清除），**不是**空串。这两件事在服务端是两个不同的结果：
-    // `null` 写进列、界面回落到邮箱派生名；空串被契约拒成 400。
-    // 把它们混成一个，"清除昵称"这个动作就永远做不到（见契约里那段）。
-    const outcome = await updateAccountDisplayName(
-      { baseUrl },
-      token,
-      draft.trim() === '' ? null : draft,
-    );
-    if (!aliveRef.current) return;
+    const outcome = await updateAccountDisplayName({ baseUrl }, plan.token, plan.value);
+    if (!aliveRef.current || sessionGenerationRef.current !== generation) return;
     if (!outcome.ok) {
-      setNameNotice({ kind: 'error', text: t('web.settings.profile.avatar.failed') });
+      setNameNotice({ kind: 'error', text: t('common.profile.nickname.failed') });
       return;
     }
     setSavedName(outcome.displayName);
@@ -213,25 +240,36 @@ export function ProfilePanel(): React.JSX.Element {
       kind: 'done',
       text:
         outcome.displayName === null
-          ? t('web.settings.profile.nickname.cleared')
-          : t('web.settings.profile.nickname.saved'),
+          ? t('common.profile.nickname.cleared')
+          : t('common.profile.nickname.saved'),
     });
   };
 
   const removeAvatar = async (): Promise<void> => {
+    const generation = sessionGenerationRef.current;
     if (!signedIn || token === undefined) return;
     setAvatarNotice({ kind: 'busy' });
     const outcome = await deleteAccountAvatar({ baseUrl }, token);
-    if (!aliveRef.current) return;
+    if (!aliveRef.current || sessionGenerationRef.current !== generation) return;
     if (!outcome.ok) {
-      setAvatarNotice({ kind: 'error', text: t('web.settings.profile.avatar.failed') });
+      setAvatarNotice({ kind: 'error', text: t('common.profile.avatar.failed') });
       return;
     }
     setAvatarUrl(undefined);
-    setAvatarNotice({ kind: 'done', text: t('web.settings.profile.avatar.removed') });
+    setAvatarState('absent');
+    setAvatarNotice({ kind: 'done', text: t('common.profile.avatar.removed') });
   };
 
   const codePoints = displayNameCodePoints(draft);
+  /** 没有头像时圈里的字母 —— 判定在共享层，与移动端同一份（这里只是渲染它）。 */
+  const avatarInitial = avatarInitialFromEmail(email);
+  /** 读侧那三种"有头像但这台设备显示不出来"的状态才需要说一句话。 */
+  const avatarReadMessage =
+    avatarState === 'undecryptable'
+      ? t('common.profile.avatar.undecryptable')
+      : avatarState === 'unreadable'
+        ? t('common.profile.avatar.unreadable')
+        : null;
   const tooLong = codePoints > ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS;
   /** 与当前值相同 ⇒ 这一次点击不产生写（空转的请求也算副作用）。 */
   const unchanged = draft.trim() === (savedName ?? '').trim();
@@ -239,15 +277,17 @@ export function ProfilePanel(): React.JSX.Element {
   return (
     <section className="ht-settings" data-testid="profile-panel">
       <h2 className="ht-settings__title ht-type-section-title">
-        {t('web.settings.profile.title')}
+        {t('common.profile.title')}
       </h2>
+      <NoticeLine notice={loadNotice} testId="profile-load-notice" />
 
       <div className="ht-settings__section" data-testid="profile-avatar-row">
-        <div className="ht-settings__item-label">{t('web.settings.profile.avatar.label')}</div>
+        <div className="ht-settings__item-label">{t('common.profile.avatar.label')}</div>
         <div className="ht-settings__avatar" data-testid="profile-avatar">
           {avatarUrl === undefined ? (
-            // 没有图就用邮箱首字母。⚠️ 拿不到邮箱时**不编一个字母**（与头像菜单同一条纪律）。
-            <span aria-hidden="true">{(email?.split('@')[0] ?? '').trim().charAt(0).toUpperCase()}</span>
+            // 没有图就用邮箱首字母。⚠️ 拿不到邮箱时**不编一个字母**（与头像菜单同一条纪律，
+            // 两处现在都读 `avatarInitialFromEmail`）。
+            avatarInitial === undefined ? null : <span aria-hidden="true">{avatarInitial}</span>
           ) : (
             <img src={avatarUrl} alt="" data-testid="profile-avatar-img" />
           )}
@@ -276,7 +316,7 @@ export function ProfilePanel(): React.JSX.Element {
             data-testid="profile-avatar-change"
             onClick={() => fileRef.current?.click()}
           >
-            {t('web.settings.profile.avatar.change')}
+            {t('common.profile.avatar.change')}
           </button>
           {avatarUrl === undefined ? null : (
             <button
@@ -285,21 +325,31 @@ export function ProfilePanel(): React.JSX.Element {
               data-testid="profile-avatar-remove"
               onClick={() => void removeAvatar()}
             >
-              {t('web.settings.profile.avatar.remove')}
+              {t('common.profile.avatar.remove')}
             </button>
           )}
         </div>
         {canTouchAvatar ? null : (
           <p className="ht-settings__hint" data-testid="profile-avatar-need-password">
-            {t('web.settings.profile.avatar.needPassword')}
+            {t('common.profile.avatar.needPassword')}
           </p>
         )}
         <NoticeLine notice={avatarNotice} testId="profile-avatar-notice" />
+        {/*
+          读侧那句与写侧那句**分开渲染**：`avatarNotice` 记的是"用户刚做的那件事的结果"，
+          这一行记的是"这台设备现在能不能看到头像"。合成一行的后果是
+          上传成功后紧跟着一次读取失败，界面就把两件不同的事说成同一句。
+        */}
+        {avatarReadMessage === null ? null : (
+          <p className="ht-settings__hint" data-testid="profile-avatar-read-notice">
+            {avatarReadMessage}
+          </p>
+        )}
       </div>
 
       <div className="ht-settings__section" data-testid="profile-nickname-row">
         <label className="ht-settings__item-label" htmlFor="profile-nickname">
-          {t('web.settings.profile.nickname.label')}
+          {t('common.profile.nickname.label')}
         </label>
         <input
           id="profile-nickname"
@@ -308,20 +358,20 @@ export function ProfilePanel(): React.JSX.Element {
           data-testid="profile-nickname-input"
           value={draft}
           maxLength={ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS * 2}
-          placeholder={t('web.settings.profile.nickname.placeholder')}
+          placeholder={t('common.profile.nickname.placeholder')}
           onChange={(event) => {
             setDraft(event.target.value);
             setNameNotice({ kind: 'idle' });
           }}
         />
         <p className="ht-settings__hint">
-          {t('web.settings.profile.nickname.hint', {
+          {t('common.profile.nickname.hint', {
             max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
           })}
         </p>
         {tooLong ? (
           <p className="ht-settings__danger" data-testid="profile-nickname-toolong">
-            {t('web.settings.profile.nickname.toolong', {
+            {t('common.profile.nickname.toolong', {
               max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
               count: String(codePoints),
             })}
@@ -334,7 +384,7 @@ export function ProfilePanel(): React.JSX.Element {
             data-testid="profile-nickname-save"
             onClick={() => void saveNickname()}
           >
-            {t('web.settings.profile.nickname.save')}
+            {t('common.profile.nickname.save')}
           </button>
         </div>
         <NoticeLine notice={nameNotice} testId="profile-nickname-notice" />
@@ -342,11 +392,11 @@ export function ProfilePanel(): React.JSX.Element {
 
       {email === undefined ? null : (
         <div className="ht-settings__section" data-testid="profile-email-row">
-          <div className="ht-settings__item-label">{t('web.settings.profile.email.label')}</div>
+          <div className="ht-settings__item-label">{t('common.profile.email.label')}</div>
           <p className="ht-settings__hint" data-testid="profile-email">
             {email}
           </p>
-          <p className="ht-settings__hint">{t('web.settings.profile.email.hint')}</p>
+          <p className="ht-settings__hint">{t('common.profile.email.hint')}</p>
         </div>
       )}
     </section>

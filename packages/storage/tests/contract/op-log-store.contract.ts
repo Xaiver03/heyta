@@ -22,7 +22,8 @@ import type { Operation } from '@heyta/sync-core';
 
 import type { DbAdapter } from '../../src/db.types.js';
 import type { OpLogStore, StoredOperation } from '../../src/op-log-store.js';
-import { OP_FIELDS } from '../../src/stores.js';
+import { checkpointChecksum } from '../../src/checkpoint.js';
+import { META_KEYS, OP_FIELDS, STORES } from '../../src/stores.js';
 
 export interface OpLogStoreContractOptions {
   name: string;
@@ -56,12 +57,12 @@ const ids = (rows: StoredOperation<Operation<string>>[]): string[] =>
 export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreContractOptions): void {
   describe(`OpLogStore 契约 —— ${name}`, () => {
     const withStore = async (
-      fn: (store: OpLogStore<Operation<string>>) => Promise<void>,
+      fn: (store: OpLogStore<Operation<string>>, db: DbAdapter) => Promise<void>,
     ): Promise<void> => {
       const db = await createDb();
       const store = create(db);
       try {
-        await fn(store);
+        await fn(store, db);
       } finally {
         db.close();
       }
@@ -172,6 +173,132 @@ export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreCont
         const ops = [makeOp(), makeOp(), makeOp()];
         await store.appendLocal(ops);
         expect(ids(await store.getAllOps())).toEqual(ops.map((o) => o.id));
+      });
+    });
+
+    it('D1 checkpoint hooks are durable and optional at transport boundaries', async () => {
+      await withStore(async (store) => {
+        if (store.readCheckpoint === undefined || store.writeCheckpoint === undefined) return;
+        await store.appendLocal([makeOp()]);
+        const checkpointBase = {
+          formatVersion: 1 as const,
+          coveredSeq: 1,
+          state: { formatVersion: 1, buckets: { tasks: { t1: { data: { id: 't1' }, entityVersions: [], fieldVersions: {} } } } },
+          clock: { device: 7 },
+          appliedOpIds: ['op-7'],
+        };
+        const checkpoint = {
+          ...checkpointBase,
+          checksum: checkpointChecksum(checkpointBase),
+        };
+        await store.writeCheckpoint(checkpoint);
+        expect(await store.readCheckpoint()).toEqual(checkpoint);
+      });
+    });
+
+    it('observed clock 默认为空，并按组件取 max 合并', async () => {
+      await withStore(async (store) => {
+        if (store.readObservedClock === undefined || store.mergeObservedClock === undefined) return;
+
+        expect(await store.readObservedClock()).toEqual({});
+        await store.mergeObservedClock({ alpha: 4, beta: 2 });
+        await store.mergeObservedClock({ alpha: 3, gamma: 9 });
+        expect(await store.readObservedClock()).toEqual({ alpha: 4, beta: 2, gamma: 9 });
+      });
+    });
+
+    it('observed clock 合并是事务化并发安全的，不丢不同维度或更大的计数', async () => {
+      await withStore(async (store) => {
+        if (store.readObservedClock === undefined || store.mergeObservedClock === undefined) return;
+
+        await Promise.all([
+          store.mergeObservedClock({ alpha: 3 }),
+          store.mergeObservedClock({ beta: 7 }),
+          store.mergeObservedClock({ alpha: 11 }),
+          store.mergeObservedClock({ gamma: 5 }),
+          store.mergeObservedClock({ beta: 2 }),
+        ]);
+        expect(await store.readObservedClock()).toEqual({ alpha: 11, beta: 7, gamma: 5 });
+      });
+    });
+
+    it('observed clock 跨 store reopen 保留，且与损坏 checkpoint 独立', async () => {
+      await withStore(async (store, db) => {
+        if (store.readObservedClock === undefined || store.mergeObservedClock === undefined) return;
+
+        await store.mergeObservedClock({ device: 42 });
+        // 模拟一个损坏的、可删除的 materialized checkpoint；它不应遮蔽前沿。
+        await db.put(STORES.META, {
+          key: 'materializedCheckpoint',
+          value: { formatVersion: 1, coveredSeq: 999, checksum: 'broken' },
+        });
+        // 重新实例化 store，模拟恢复阶段重新取得存储句柄。各 DbAdapter
+        // 的真实 close/reopen 磁盘覆盖由 sqlite 独有持久化测试负责；这里
+        // 让同一套契约也覆盖 Worker 代理与内存实现。
+        const reopened = create(db);
+        expect(await reopened.readObservedClock?.()).toEqual({ device: 42 });
+        expect(await reopened.readCheckpoint?.()).toEqual({
+          formatVersion: 1,
+          coveredSeq: 999,
+          checksum: 'broken',
+        });
+      });
+    });
+
+    it('observed clock 拒绝非法、负数、非安全整数且不污染已有值', async () => {
+      await withStore(async (store) => {
+        if (store.readObservedClock === undefined || store.mergeObservedClock === undefined) return;
+
+        await store.mergeObservedClock({ stable: 8 });
+        const invalid = [
+          null,
+          [],
+          'clock',
+          { negative: -1 },
+          { fraction: 1.5 },
+          { nan: Number.NaN },
+          { infinity: Number.POSITIVE_INFINITY },
+          { tooLarge: Number.MAX_SAFE_INTEGER + 1 },
+        ] as unknown[];
+        for (const clock of invalid) {
+          await expect(
+            store.mergeObservedClock(clock as Record<string, number>),
+          ).rejects.toThrow();
+        }
+        expect(await store.readObservedClock()).toEqual({ stable: 8 });
+      });
+    });
+
+    it('历史不完整标记默认 false、只能置 true，且不受 checkpoint 损坏或删除影响', async () => {
+      await withStore(async (store, db) => {
+        if (store.hasIncompleteHistory === undefined || store.markHistoryIncomplete === undefined) return;
+
+        expect(await store.hasIncompleteHistory()).toBe(false);
+        await store.markHistoryIncomplete();
+        expect(await store.hasIncompleteHistory()).toBe(true);
+
+        // checkpoint 损坏时仍必须保留“历史不完整”事实。
+        await db.put(STORES.META, {
+          key: 'materializedCheckpoint',
+          value: { formatVersion: 1, coveredSeq: 999, checksum: 'broken' },
+        });
+        const afterCorruption = create(db);
+        expect(await afterCorruption.hasIncompleteHistory?.()).toBe(true);
+
+        // checkpoint 被删除也不能提供清除标记的旁路。
+        await db.delete(STORES.META, 'materializedCheckpoint');
+        const afterDeletion = create(db);
+        expect(await afterDeletion.hasIncompleteHistory?.()).toBe(true);
+      });
+    });
+
+    it('历史不完整标记跨 store 重实例化保留', async () => {
+      await withStore(async (store, db) => {
+        if (store.hasIncompleteHistory === undefined || store.markHistoryIncomplete === undefined) return;
+
+        await store.markHistoryIncomplete();
+        const reopened = create(db);
+        expect(await reopened.hasIncompleteHistory?.()).toBe(true);
       });
     });
 
@@ -357,12 +484,70 @@ export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreCont
 
     it('archiveUpTo 把老 op 移入归档，但日志仍可读', async () => {
       await withStore(async (store) => {
-        for (let i = 0; i < 5; i++) await store.appendLocal([makeOp()]);
+        await store.appendImported(Array.from({ length: 505 }, () => makeOp()));
 
-        const archived = await store.archiveUpTo(3);
-        expect(archived).toBeGreaterThanOrEqual(0);
+        const checkpoint = {
+          formatVersion: 1 as const,
+          coveredSeq: 5,
+          state: { formatVersion: 1, buckets: {} },
+          clock: { 'client-a': 505 },
+          appliedOpIds: [],
+        };
+        if (store.writeCheckpoint !== undefined) {
+          await store.writeCheckpoint({ ...checkpoint, checksum: checkpointChecksum(checkpoint) });
+        }
+
+        const archived = await store.archiveUpTo(505);
+        expect(archived).toBeGreaterThanOrEqual(1);
         // 无论归档策略如何，**不能丢数据**
-        expect(await store.getAllOps()).toHaveLength(5);
+        expect(await store.getAllOps()).toHaveLength(505);
+      });
+    });
+
+    it('没有覆盖归档边界的 checkpoint 时拒绝归档', async () => {
+      await withStore(async (store) => {
+        await store.appendImported(Array.from({ length: 505 }, () => makeOp()));
+        if (store.writeCheckpoint === undefined) return;
+        await expect(store.archiveUpTo(505)).rejects.toThrow('需要一个覆盖至少');
+      });
+    });
+
+    it('archival preserves pending queues and global opId uniqueness', async () => {
+      await withStore(async (store) => {
+        const ops = Array.from({ length: 505 }, () => makeOp());
+        await store.appendLocal(ops);
+        await store.markUploaded(new Map(ops.slice(2).map((op, i) => [op.id, i + 3])));
+        await store.markRejected([ops[1]!.id]);
+        const base = { formatVersion: 1 as const, coveredSeq: 505,
+          state: { formatVersion: 1, buckets: {} }, clock: {}, appliedOpIds: [] };
+        await store.writeCheckpoint!({ ...base, checksum: checkpointChecksum(base) });
+        expect(await store.archiveUpTo(505)).toBe(2);
+        expect(ids(await store.findPendingUpload())).toEqual([ops[0]!.id]);
+        const result = await store.appendBatchSkipDuplicates([ops[2]!], 'remote', { pendingApply: true });
+        expect(result.skippedCount).toBe(1);
+        expect(await store.getAllOps()).toHaveLength(505);
+        expect((await store.getAllOps())[1]!.uploadStatus).toBe('rejected');
+        expect(await store.findPendingApply()).toHaveLength(0);
+        expect(ids(await store.getOpsForEntity('TASK', 'task-1'))).toEqual(ops.map((op) => op.id));
+        const baseInvalid = { ...base, coveredSeq: 1 };
+        await store.writeCheckpoint!({ ...baseInvalid, checksum: checkpointChecksum(baseInvalid) });
+        await expect(store.archiveUpTo(505)).rejects.toThrow('需要一个覆盖至少');
+      });
+    });
+
+    it('clears obsolete full-state rows in both stores and invalidates their checkpoint', async () => {
+      await withStore(async (store) => {
+        const old = makeOp({ payload: { isFullState: true } });
+        const latest = makeOp({ payload: { isFullState: true } });
+        await store.appendImported([old, ...Array.from({ length: 503 }, () => makeOp()), latest]);
+        const base = { formatVersion: 1 as const, coveredSeq: 4,
+          state: { formatVersion: 1, buckets: {} }, clock: {}, appliedOpIds: [] };
+        await store.writeCheckpoint!({ ...base, checksum: checkpointChecksum(base) });
+        expect(await store.archiveUpTo(505)).toBe(4);
+        expect(await store.clearFullStateOpsExcept([latest.id])).toBe(1);
+        expect(await store.readCheckpoint!()).toBeUndefined();
+        expect(ids(await store.getAllOps()).includes(old.id)).toBe(false);
+        expect(ids(await store.getAllOps()).includes(latest.id)).toBe(true);
       });
     });
 

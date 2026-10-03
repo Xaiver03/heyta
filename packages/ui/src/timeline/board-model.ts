@@ -28,6 +28,7 @@ import {
   addMonths,
   diffDays,
   formatCompactDate,
+  isAllDayDueMs,
   isoWeekday,
   parseLocalDate,
   startOfDay,
@@ -83,11 +84,15 @@ export interface TimelineBoardLabels {
 // 位置 → 几何
 // ─────────────────────────────────────────────────────────────────────────
 
-/** 时刻是不是本地自然日的 0 点整（"全天"截止）。 */
-export function isAllDayMs(ms: number): boolean {
-  const d = new Date(ms);
-  return d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0;
-}
+/**
+ * 时刻是不是本地自然日的 0 点整（"全天"截止）。
+ *
+ * 🔴 判定本身住在 `@heyta/domain` 的 `isAllDayDueMs`：输入侧（`DueEditor` 要回答
+ *   "这条截止有没有时刻"）与这里问的是**同一个问题**，抄第二份就是漂移的开始
+ *   —— 两份对"0 点整"的口径一旦分叉，界面上会出现"时间线画在轴上、
+ *   而编辑器说它是全天"。这个名字留着是因为它已经是本模块的导出口。
+ */
+export const isAllDayMs = isAllDayDueMs;
 
 /**
  * 一个位置在轴上的**落笔时刻**。
