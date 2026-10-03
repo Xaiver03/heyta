@@ -316,7 +316,7 @@ pnpm verify:mobile-autosync     # 🔴 自动同步：**全程不点任何同步
                                 #   判据 b：另一台设备读到那条任务）。见 §7 第 66 条
 pnpm verify:mobile-focus        # 专注（番茄钟）闭环
 pnpm verify:mobile-calendar     # 日历（判断的期望值来自宿主机的 Python，不是本仓库的日历代码）
-pnpm verify:mobile-repeat       # 重复任务（设规则 → 同步 → 勾选顺延 → 反向再从笔记本完成）
+pnpm verify:mobile-repeat       # 重复任务（设规则 → 同步 → 勾选顺延 → 反向再从笔记本完成；六个预设含「每年」，第 15 步专测跨年那一档）
 
 # iOS 验收：真 iPhone 17 Pro 模拟器 + 真服务端 + 真笔记本设备。
 # 走 AX 树点击（不依赖窗口 z-order / 焦点，见 §7 第 34 条）
