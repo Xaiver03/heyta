@@ -157,10 +157,11 @@ step() { echo ""; echo "════ $1 ════"; }
 #    满屏"找不到按钮""应用没起来" —— 看起来像产品坏了，其实只是撞车。
 #    这种"环境造成的假红"必须能被**说出来**，而不是让人去猜。
 #
-# 🔴 匹配规则**不在这里**：唯一实现在 `lib/mobile-e2e-runner-probe.sh`，
-#    因为 `verify-mobile-window-gate.sh` 要同一条规则却不能 source 本文件
-#    （文件尾的 EXIT trap 会真动设备）。以前它抄了一份 `pgrep` 版，两份都瞎 ——
-#    瞎的原因与夹具自检都写在那个文件里。
+# 🔴 匹配规则**不在这里**：唯一实现在 `lib/mobile-e2e-runner-probe.sh`。
+#    那个文件没有 trap，所以 dry-run 类的消费者（`verify-mobile-window-gate.sh`）
+#    可以 source 它 —— 而它们**不能** source 本文件（本文件尾的 EXIT trap 会真动设备）。
+#    旧写法用 `bash [^ ]*…`，跨不过本仓路径里的空格，对被快照成 `.snap.<pid>` 的
+#    运行者**永久隐形**；原因、夹具与自检写在那个文件头。
 #
 # ⚠️ `$$` 在命令替换的子 shell 里仍是**父 shell 的 pid**（bash 的规定），
 #    但那个子 shell **自己的 pid 却不是** `$$` —— 而它的 argv 与本脚本逐字相同

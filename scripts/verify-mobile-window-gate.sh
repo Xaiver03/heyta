@@ -123,9 +123,11 @@ case "$TARGET" in
     # 🔴 **不 source `lib/mobile-e2e.sh`**：它在文件尾 `trap restore_ime EXIT`，
     #    而 `restore_ime` 是真的会动设备的（`ime enable` + `show_ime_with_hard_keyboard 1`）。
     #    一个"只是看看窗口开没开"的 dry-run 不该改设备状态。
-    #    权威判据在 `verify-mobile-due-time.sh` 第 0 步的 `another_mobile_e2e_running` 里，
-    #    这里只做同一条排除规则的粗筛：只认"直接 bash 那个脚本"的行，`bash -n` 是预检不算运行者。
-    OTHERS=$(pgrep -f 'bash [^ ]*verify-mobile-[a-z-]+\.sh' 2>/dev/null | grep -v "^$$\$" | head -3)
+    #    但它要的排除规则与验收脚本第 0 步那道门**是同一条** ⇒ source 两者共用的那个
+    #    无 trap 探针文件。旧写法是在这里抄一份 `pgrep` 正则，而那份抄件**跨不过仓库
+    #    路径里的空格**，对被快照成 `.snap.<pid>` 的运行者永久隐形（细则见该文件头）。
+    . "$(dirname "$0")/lib/mobile-e2e-runner-probe.sh"
+    OTHERS=$(mobile_e2e_runner_lines | awk '{print $1}')
     if [ -n "$OTHERS" ]; then
       echo "   ❌ 有移动端验收在跑（pid：$(printf '%s ' $OTHERS)）"
       FAIL=$((FAIL + 1))
