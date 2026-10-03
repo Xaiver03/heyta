@@ -2929,3 +2929,10 @@ pnpm    run check:pricing-consistency   → exit=1  bytes=162    ← [ERR_PNPM_N
 `package.json`，不存在就**响亮退出**；循环里不要用 `-s`，或在非零时**把 stdout+stderr 全文贴出来**。
 建议入 `docs/reference/environment-traps.md`（与 #164「后台通知的 exit code 是包装命令的」同族：
 **退出码不属于你以为的那个东西**）—— 该文件不在本批地界内，**不代改**，留给它的 owner。
+
+⚠️ **一小时内我自己又犯了一次同一个错**（19:4x）：`node scripts/check-docs-link.mjs` → `exit=1`，
+而真实文件是 `research/tools/docs-link-check.mjs`（pnpm 名 `check:docs`）。这次运气好 —— 直接调 `node`
+所以 `MODULE_NOT_FOUND` 被原样打出来了，当场看穿，没有误判成"HEAD 又被人弄红"。**防法升级一句**：
+门禁的权威名只有一个来源 = `package.json` 的 `scripts` 键；跑之前用
+`node -e "console.log(require('./package.json').scripts['check:docs'])"` 取一次，**不要从记忆里拼名字或路径**。
+复跑读数：`check:docs exit=0`（✅ 无死链）、`check:docs-voice exit=0`（禁词表 30 项零命中）。
