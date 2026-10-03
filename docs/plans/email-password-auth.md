@@ -713,8 +713,38 @@ AGENTS §3.5 早就给过这条的形状（`ids.ts` / `createSyncClient` 那两�
   ⚠️ 起它的时候**没有把 `server/.env` 拷进 `/tmp`**：dotenv 读 `process.cwd()/.env`，
   所以 cwd 用主检出的 `server/`、跑的产物用隔离检出那枚 dist —— 配置原位读，代码是 HEAD 的。
 
+### 13.6.1 顺带量出来的两条"要不要重装"的判据（省掉一轮无谓的四端重装）
+
+- **四端装的产物到今天为止还有效吗**：`69f64ae4..HEAD`（mac 那次）与 `267ac912..HEAD`
+  （另三端那次）之间的**打包输入**一共动了 11 个文件，逐个分过后只有三类：
+  ① `apps/web/evidence/*`（9 枚，证据图与日志，不进包）；
+  ② `apps/landing/docs/index.html` + `en/`（落地页产物，随那 11 条词条重生成过，`check:entries` 现量 RC=0）；
+  ③ `packages/i18n/src/locales/{zh-CN,en}.ts`（今天那 11 条公开词条）。
+- 🔴 而那 11 条**没有一条进应用壳**：逐个键去 `apps/web/src`、`apps/mobile/src`、
+  `packages/ui/src`、`packages/app-host/src` 里搜（**不限扩展名**，界面常是 `.js`），
+  四个集合命中 **0** —— 它们全是 `site.docs.*` / `site.help.*`，消费者只有
+  `apps/landing` 的文档中心（构建期烘焙进 HTML）与 `packages/legal`。
+  ⇒ 装着的那四个端**不需要为这批词条重装**；要让线上文档中心也显示新文案，缺的只是
+  落地页的重建与部署（属于"部署那条线"，本批没动）。
+- ⚠️ 反向留一行给下一个人：安装副本的 bundle 里**确实还能搜到旧串**
+  「没有邮箱+密码这条路」（`index-CObYzQxm.js` 命中 2，两种字形各扫过）。
+  那不是"界面在说旧话"，是**整张词条表被原样打进包**而没人读它 ——
+  命中旧串只证明"表在里面"，不证明"界面渲染它"；要判后者得去数消费者。
+
 ### 13.7 这一轮的状态（写在这里，不靠记忆）
 
 设备那一跑**截至本节写作时还没跑成**：宿主机负载被另一个项目（litopia 的 gradle/OrbStack）
-顶到 17.9–180，验收链按 `≤12` 的窗口在等（等满即以"环境不成立"结束，不是产品失败）。
-**在它拿到真实读数之前，本节不写任何"移动端全绿"的结论。** |
+顶到 17.9–**664**（12:04 现量 164），验收链按 `≤12` 的窗口在等（120 轮 × 30s = 60 分钟上限；
+等满即以 `RUN_EXIT=3` 结束 —— **环境不成立，不是产品失败**，不为挤进窗口把阈值调低）。
+**在它拿到真实读数之前，本节不写任何"移动端全绿"的结论。**
+
+跑的是这条链，读数都落在 `/tmp/heyta-mobile-auth-head.log`：
+`A 产物来源核对（隔离检出 HEAD=f4fe87d2 且脏 0；APK md5 8a1d9654…；server/dist 不比 src 旧）
+→ B 起一台 :3101 的 HEAD 服务端（legal-consent=401，路由在）→ C 等负载窗口
+→ D HEYTA_APK=<HEAD 那枚> bash scripts/verify-mobile-auth.sh`。
+
+🔴 本节的另一条教训（写下来是因为我自己又踩了一次）：**运行中的 bash 脚本不许编辑**。
+第一条链在等窗口时我改了 `/tmp/run-mobile-auth-head.sh`，bash 按字节偏移续读 ⇒
+日志里冒出 `line 77: /legal-consent)（401… : No such file or directory`，
+那条链之后的行为不可信，只能整条杀掉重来（仓里 `verify-mobile-*.sh` 的
+`HEYTA-SNAPSHOT-BOOTSTRAP` 就是为了这件事，而 `/tmp` 的手写链没有它）。 |
