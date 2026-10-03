@@ -1186,3 +1186,28 @@ mobile screens **恰在 90**）/ `:payment-entry` / `:pricing`。
 任务 2 的真机判据 `verify-mobile-notes.sh` 本轮第三次尝试仍被环境挡：现量 **负载 23.5**、
 `:3100` 无服务、`:3000` 是别人的 e2e 栈（pidfile 对得上 PID 80257）——
 按纪律"环境无效 ≠ 产品失败"，不硬挤、不去起第二个 postgres。
+
+### 提交后的自洽复查：上一笔漏了 4 个文件（已补）
+
+复跑「HEAD 单独检出能不能编译」时发现 `120c8153` **不自洽**：它里面的
+`apps/mobile/src/screens/NoteEditScreen.tsx:41` 与 `apps/web/src/features/notes/NotesView.tsx`
+都 `import { NoteEditor } from '@heyta/ui'`，而 HEAD 的 `packages/ui` 里**没有这个组件**。
+干净检出会编译不过 —— 混工作树里跑绿，是因为漏下的文件还在工作树上。
+
+漏的 4 个路径（全部属任务 2，也全部在我的地界内）：
+
+| 路径 | 漏了什么 |
+|---|---|
+| `packages/ui/src/notes/NoteEditor.tsx` | 整个文件未跟踪（共享编辑器本体，215 行） |
+| `packages/ui/src/notes/model.ts` | `isNoteDraftBlank`（+14 行纯追加；HEAD 计数 0） |
+| `packages/ui/src/notes/NotesBoard.tsx` | 5 处 `draft.trim()===''` 换成同一条判据（5/5，无行为变化） |
+| `packages/ui/src/index.ts` | 我的导出块（15 行，本来就设计成末尾追加） |
+
+**为什么会漏**：上一笔的归属过滤是「从 28 个已跟踪路径里挑我的 hunk」，
+而未跟踪的新文件**不在这 28 个里**，所以过滤器从源头上看不见它们；
+`git diff-tree --diff-filter=A` 只列"这笔新增了什么"，不列"本该新增却缺席什么"。
+**补法**：反向查 —— 拿 HEAD 的 import 图去问"每个具名导入在 HEAD 的导出面里有没有"，
+缺席的就是漏网的。探针做过阳性对照（往 `share-summary.ts` 塞一根
+`from './definitely-missing-file'` ⇒ 16 条含它，撤掉 ⇒ 15 条），
+残留 3 条假阳性分别是 `export type {` 形状（`TaskSection`）与断言字符串里的
+import 语句原文（`./NoteEditScreen`、`./NotesSection`），已逐条读到字面行确认。
