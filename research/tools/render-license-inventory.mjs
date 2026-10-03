@@ -32,6 +32,7 @@
  * 而不是让它去卡 CI。
  */
 
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -57,6 +58,60 @@ function localDate() {
 const dateArg = process.argv.find((a) => a.startsWith('--date='));
 const DATE = dateArg ? dateArg.slice('--date='.length) : localDate();
 const checkOnly = process.argv.includes('--check');
+
+// ── lockfile 指纹：这条产物"新不新鲜"的唯一自动判据 ───────────────
+//
+// 🔴 为什么判的是**指纹**而不是**内容**（G-1 的落点）：许可证字符串只存在于每个已安装包的
+//    `package.json` 里（实测 `grep -c license pnpm-lock.yaml` = **0**），所以"从 lockfile 推导
+//    整份清单"这条路**在数据模型上不成立** —— lockfile 里没有那个字段，要拿它只能装或联网。
+//    而内容级的 `--check` 也**不能**挂进 `pnpm check`：依赖树天生平台相关（本文件头 §为什么不挂），
+//    且 `e2e/` 是**独立工作区**、干净检出里没装它 —— 那会造成必然的跨平台/跨检出假红。
+//    能挂门禁的前提是它**不需要装任何东西**：只有"这份产物的生成日期晚于 lockfile 最后一次变化"
+//    这一件事是纯文件的。所以这里记一把锁的指纹，`--check-stamp` 只比它。
+//    它拦的是本仓库真发生过的那次事故：依赖树变了，清单安静地过期六天，而 `check:licenses`
+//    照绿（它判的是准入，不是新鲜度）。
+const LOCKFILE = join(ROOT, 'pnpm-lock.yaml');
+const LOCK_STAMP = createHash('sha256')
+  .update(readFileSync(LOCKFILE))
+  .digest('hex')
+  .slice(0, 16);
+const stampLine = () =>
+  `lockfile 指纹：\`${LOCK_STAMP}\`（清单在这把指纹下渲染；` +
+  `对账：\`node research/tools/render-license-inventory.mjs --check-stamp\`）`;
+
+// ── --check-stamp：只比指纹，**不碰 node_modules**，因此可以在 CI/干净检出上跑 ──
+//
+// 必须放在取数据**之前**：取数据要扫虚拟 store（那是 `--check` 的输入），
+// 而这个判据的全部前提就是"没有装任何东西也能判"。
+if (process.argv.includes('--check-stamp')) {
+  let artifact = '';
+  try {
+    artifact = readFileSync(OUT, 'utf8');
+  } catch {
+    console.error('🔴 research/licenses-inventory.generated.md 不存在 —— 无从判断新鲜度。');
+    process.exit(1);
+  }
+  const recorded = artifact.match(/lockfile 指纹：`([0-9a-f]{16})`/);
+  if (!recorded) {
+    console.error(
+      '🔴 清单里没有 lockfile 指纹行 —— 它是加这条判据之前渲染的。\n' +
+        '   重新生成：node research/tools/render-license-inventory.mjs',
+    );
+    process.exit(1);
+  }
+  if (recorded[1] === LOCK_STAMP) {
+    console.log(`✅ 许可证清单对得上当前 lockfile（${LOCK_STAMP}）。`);
+    process.exit(0);
+  }
+  console.error(
+    `🔴 许可证清单**已过期**：它是在 lockfile \`${recorded[1]}\` 下渲染的，` +
+      `而当前是 \`${LOCK_STAMP}\`。\n` +
+      '   在**装了全部 workspace** 的检出里重渲染（在缺 `e2e/` 的树上渲染会静默少一整条 workspace 的依赖）：\n' +
+      '     cd e2e && pnpm install && cd .. && node research/tools/render-license-inventory.mjs',
+  );
+  process.exit(1);
+}
+
 
 // ── 取数据 ──────────────────────────────────────────────────────
 //
@@ -97,6 +152,7 @@ lines.push('> ⚠️ **本文件由工具生成，请勿手工编辑。**');
 lines.push('> 重新生成：`node research/tools/render-license-inventory.mjs`');
 lines.push('> 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。');
 lines.push('> 去重口径：`包名@版本`（同名多版本分别登记）。');
+lines.push(`> ${stampLine()}`);
 lines.push('');
 lines.push(`生成时间：${DATE}`);
 lines.push('');
