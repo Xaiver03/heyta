@@ -2,7 +2,7 @@
  * 调休/补班（公共事实）的**匿名只读**下行：`GET /api/holiday-adjustments`。
  * ============================================================================
  *
- * W4b。定性见 [`docs/adr/0050-public-facts-are-deployer-supplied.md`](../../../docs/adr/0050-public-facts-are-deployer-supplied.md)。
+ * W4b。定性见 [`docs/adr/0052-public-facts-are-deployer-supplied.md`](../../../docs/adr/0052-public-facts-are-deployer-supplied.md)。
  *
  * ## 🔴 这是这个服务端上**第一条**匿名只读的非密文 JSON 下行
  *

@@ -2,7 +2,7 @@
 --
 -- 依据：docs/plans/countdown-anniversary.md §3 W4b 与 §8 的那张落地任务卡；
 -- 定性（为什么服务端可以下发它、而 AGENTS §1 那句"云端不是事实源"仍然成立）在
---   docs/adr/0050-public-facts-are-deployer-supplied.md。
+--   docs/adr/0052-public-facts-are-deployer-supplied.md。
 --
 -- ## 🔴 为什么必须有一张**逐日表**，而不是一张表 + 一个 `Json` 的 `days`
 --

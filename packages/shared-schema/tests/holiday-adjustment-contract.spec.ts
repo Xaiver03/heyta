@@ -373,7 +373,7 @@ describe('holidayYearPutSchema：后台写入的那一份', () => {
  *
  * 它只有 `year` 一项，所以这组断言看着像摆设 —— 它守的是**"不接受别的东西"**：
  * 有人后来给它加一个 `force: true` 或 `userId=` 时，这里会红，
- * 而那条通道今天全部的正当性就在于它不带身份维度（ADR-0050 §3）。
+ * 而那条通道今天全部的正当性就在于它不带身份维度（ADR-0052 §2.1）。
  */
 describe('holidayAdjustmentAdminDeleteQuerySchema', () => {
   it('合法的年份过', () => {

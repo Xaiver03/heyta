@@ -148,7 +148,7 @@ export type { ExportCardSize } from './card-export-contract';
 
 // 调休/补班（公共事实，W4b）：路径 / 年份区间 / 逐日形状 / 两个响应体 / 门禁的形状登记表。
 // 🔴 这一份是 heyta **第一条匿名只读的服务端→客户端内容通道**的契约。
-// 定性与"为什么它不违反 AGENTS §1 那句云端不是事实源"见 docs/adr/0050；
+// 定性与"为什么它不违反 AGENTS §1 那句云端不是事实源"见 docs/adr/0052；
 // `PUBLIC_FACT_SHAPES` 是 `pnpm check:public-facts` 的被检查对象 ——
 // 往公共事实里加第二种形状，那条门禁必须红。
 export {

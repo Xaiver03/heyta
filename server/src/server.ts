@@ -569,7 +569,7 @@ export const createServer = (
       // ⚠️ 它同样不受计费闸门影响 —— 改自己的昵称不是付费能力。
       await fastifyServer.register(accountProfileRoutes, { prefix: '/api' });
 
-      // 调休/补班（公共事实）的**匿名只读**下行。W4b，定性见 ADR-0050。
+      // 调休/补班（公共事实）的**匿名只读**下行。W4b，定性见 ADR-0052。
       //
       // 🔴 这是这个服务端上**第一条**不需要凭据就能读的 JSON 下行
       //（`push.routes.ts:127` 那条 vapid 是认证**后**只读，未登录 401）。
