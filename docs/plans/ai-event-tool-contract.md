@@ -1288,6 +1288,8 @@ git diff --name-only a1ef4d9a b6294ef0 | grep -E "packages/(ai|local-api|app-hos
 
 **人眼看图**（§6.2 规定一第 4 条，真的打开了 `e2e/test-results/calendar-sidebar-迷你月历…-chromium/test-failed-1.png`）：侧栏「清单」区那一行显示的是 placeholder **「新清单」+ ✓**，刚创建的清单名**读不出来**，它下面一行是四个动作图标。所以这不是"用例太严"，是**界面上真的看不见那行名字** —— 一条真产品缺陷，只是它不归这条线修。
 
+**证据 c 后来升级成了实测**（同一台机器上顺手的免费对照）：主检出带着那笔**未提交**的修复（`OrganizerList.tsx` 里 `minWidth` 命中 2 处、"zero-width" 注释 1 处）跑整链时，这两条用例是 **✓ 35 / ✓ 36 全过**，其 e2e 段汇总 `124 passed / 2 skipped / 0 failed`（日志 `/tmp/heyta-aed-check-final6.log:1243-1244`，载体 = 主检出工作树 18:5x，非干净检出）。所以关闭判据不是"等一个可能管用的改法"，而是**那条改法已经被这两条用例自己验过一遍**。
+
 **不代改的理由 + 关闭判据**：`git status --porcelain -- packages/ui` 此刻 10 个 `M`，`OrganizerList.tsx` 正脏着，而 `packages/ui` 是并行会话 W5/W6/W8 的落点。等他们提交后由我复跑：
 
 ```bash
