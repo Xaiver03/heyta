@@ -155,13 +155,40 @@ describe('folderTargetsFor：两端共用的候选集', () => {
     expect(folderTargetsFor(shuffled, 'loose-a').map((p) => p.id)).toEqual(['folder', 'loose-b']);
   });
 
-  it('🔴 它就是 `validateProjectParentChange` 的展开，两者不许给出不同答案', () => {
-    for (const moved of TREE) {
-      const allowed = new Set(folderTargetsFor(TREE, moved.id).map((p) => p.id));
-      for (const candidate of TREE) {
+  it('🔴 已归档的清单不进候选 —— 但写侧照旧放行，这个不对称是刻意的', () => {
+    const withArchived: Project[] = [...TREE, mkProject('归档的文件夹', { archived: true })];
+    // 界面不给入口：默认视图里 `toOrganizerTree` 不画归档父，挂进去的子**整条消失**，
+    // 用户看到的是"点了一下这条清单就没了"。
+    expect(folderTargetsFor(withArchived, 'loose-a').map((p) => p.id)).not.toContain(
+      '归档的文件夹',
+    );
+    // 但这条规则**不许**搬到写侧：归档一条有子的文件夹本身是合法操作，
+    // 拦了会让那种已有结构变成没法解释的数据。两边都断言之，
+    // 否则下一个人只会看到"候选里没有归档"，然后把它顺手加进守卫。
+    expect(validateProjectParentChange(withArchived, 'loose-a', '归档的文件夹')).toEqual({
+      ok: true,
+      parentId: '归档的文件夹',
+    });
+    // 🔴 另一半：归档那一行**自己**照样能移出去（开着「显示已归档」时它就是一行可点的行）。
+    // 只断言"归档不进候选"的话，把归档一起从 `alive` 里滤掉也能过 ——
+    // 而那样一来这一行的候选是空的，菜单只剩一个点不动的「不放进文件夹」。
+    expect(folderTargetsFor(withArchived, '归档的文件夹').map((p) => p.id)).toEqual([
+      'folder',
+      'loose-a',
+      'loose-b',
+    ]);
+  });
+
+  it('🔴 它就是 `validateProjectParentChange` 的展开（唯一差别 = 归档不进候选），两者不许各自演化', () => {
+    const withArchived: Project[] = [...TREE, mkProject('归档的文件夹', { archived: true })];
+    for (const moved of withArchived) {
+      const allowed = new Set(folderTargetsFor(withArchived, moved.id).map((p) => p.id));
+      for (const candidate of withArchived) {
         if (candidate.id === moved.id) continue;
-        const verdict = validateProjectParentChange(TREE, moved.id, candidate.id).ok;
-        expect(verdict).toBe(allowed.has(candidate.id));
+        const expected =
+          validateProjectParentChange(withArchived, moved.id, candidate.id).ok &&
+          candidate.archived !== true;
+        expect(allowed.has(candidate.id)).toBe(expected);
       }
     }
   });
