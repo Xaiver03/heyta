@@ -467,6 +467,17 @@ export {
 } from './motivation.js';
 
 /**
+ * 本周小结的纯文本。两端共用一份（原来只有 web 一份，移动端接分享块时会逼出第二份
+ * —— 理由见 `share-summary.ts` 文件头与 AGENTS §3.5）。
+ */
+export {
+  SHARE_SUMMARY_KEYS,
+  buildShareSummary,
+  type ShareSummaryKey,
+  type ShareSummaryTranslate,
+} from './share-summary.js';
+
+/**
  * 导出（**导出自由**，README 设计原则第 5 条）。
  *
  * 🔴 导出的**内容形状**是产品语义，所以它在这里而不在 `apps/*` ——

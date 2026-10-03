@@ -16,10 +16,12 @@
  *    而手机上的清单与标签在「我的」页的两段里，不是一个可以从搜索结果
  *    一步到达的目的地。给不出目的地就不给这一组 ——
  *    文案那边同步换掉（见 `lib/search-display.ts`）。
- * 2. **不给 `onOpenNote`。** 移动端**没有便签详情屏**（`NotesSection`
- *    文件头那条"不传 onEdit"的理由在这里同样成立）。便签行仍然显示
- *    正文摘要与日期，也就是这个问题要的答案本身；点它去做一件不存在的事
- *    比点不动更糟。
+ * 2. ~~**不给 `onOpenNote`。**~~ **（2026-10-03 多端第二批已补上，留原文是为了
+ *    让后来者认出这个形状）** 编辑屏 {@link NoteEditScreen} 已经存在，本屏现在
+ *    传它：点搜索结果里的便签 = 关掉浮层 + 打开那条便签的编辑屏。
+ *    当时那句理由（"点它去做一件不存在的事比点不动更糟"）仍然成立，变的是屏有了。
+ *    ⚠️ 顺序是**先关浮层再开编辑屏** —— 两个 `Modal` 同时在场在 Android 上
+ *    没有实测过，而"关掉搜索再看便签"本来就是用户想要的次序。
  * 3. **不给 `activeEntry` / `keyHints`。** 触屏没有键盘光标，也没有
  *    ↑↓ / ↵ / esc。共享面板对没传的形态**不渲染**那排芯片。
  *
@@ -66,6 +68,8 @@ export interface SearchScreenProps {
   busyTaskId?: string | null;
   onToggleTask: (taskId: string) => void;
   onOpenTask: (taskId: string) => void;
+  /** 点搜索结果里的便签。宿主用来打开编辑屏（见文件头决定 2）。 */
+  onOpenNote: (noteId: string) => void;
 }
 
 export function SearchScreen({
@@ -76,6 +80,7 @@ export function SearchScreen({
   busyTaskId = null,
   onToggleTask,
   onOpenTask,
+  onOpenNote,
 }: SearchScreenProps): React.JSX.Element {
   const t = useI18n().t;
   const tokens = useTokens();
@@ -181,6 +186,7 @@ export function SearchScreen({
           busyTaskId={busyTaskId}
           onToggleTask={onToggleTask}
           onOpenTask={onOpenTask}
+          onOpenNote={onOpenNote}
           labels={labels}
           testID="mobile-search-panel"
         />

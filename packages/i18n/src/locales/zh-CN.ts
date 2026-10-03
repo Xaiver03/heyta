@@ -1200,7 +1200,7 @@ export const zhCN = {
   'web.growth.stat.focus.unit': '分钟',
   'web.growth.year.title': '这一年',
   'web.growth.year.note': '一格是一天。有记录的日子才会亮起来 —— 打卡、完成任务、跑完一轮专注都算。',
-  'web.growth.year.heatmap': '最近一年共 {{count}} 次记录',
+  'web.growth.year.heatmap': '最近一年共 {count} 次记录',
   'web.growth.milestones.title': '里程碑',
   'web.growth.milestones.note': '只增不减。中断不会让这些数字变小。',
   'web.growth.milestone.allReached': '{name}的里程碑已全部达成',
@@ -2632,6 +2632,9 @@ export const zhCN = {
   'mobile.profile.entry.settings.hint': '同步凭据、桌面小组件与语言',
   'mobile.profile.section.sync': '同步',
   'mobile.profile.section.status': '状态',
+  // 「我的」里那条托管同步权益。只有服务端**明确说**有才显示这一行
+  // （`entitled` / `denied`），未配置与探测失败一律不显示 —— 见 `EntitlementSection.tsx`。
+  'mobile.profile.entitlement.entitled': '官方托管同步已开启',
   'mobile.profile.section.language': '语言',
   'mobile.profile.section.lists': '清单',
   // 🔴 认证入口在这一屏的**顶部卡片**（一级可见）—— 规范 §3.1 的「前置」落点。
@@ -3751,6 +3754,11 @@ export const zhCN = {
   'notes.a11y.pin': '把便签「{excerpt}」钉到今天',
   'notes.a11y.unpin': '取消便签「{excerpt}」的钉选',
   'notes.error.empty': '便签不能是空的',
+  // 便签编辑屏（多端第二批）。正文没改动时不写 op，那条闸门在 app-host 的 updateNoteContent。
+  'notes.edit.title': '编辑便签',
+  'notes.save': '保存',
+  'notes.cancel': '取消',
+  'notes.edit.notFound': '这条便签已经不在了（可能是在另一台设备上删除的）',
 
   // ── 运营管理后台（ADR-0038）──────────────────────────────────────────
   // ⚠️ 这一层**只给运营者看**，但仍然走词条表：`apps/web/src` 已在

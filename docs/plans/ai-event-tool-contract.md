@@ -1336,7 +1336,7 @@ cd /private/tmp/heyta-final && git merge --no-edit main && pnpm build && pnpm ch
 
 **④ 台账**：`PROGRESS.md` 新增「AI 覆盖面收口」一节（四项各带载体的读数），`BLOCKED.md` 里
 `B36` 第 2 条挂了闭合指针（`1a6640f2`，带一对现量命令：修复前形态 = 3 / 载体 = 0），
-并新立 **`B53`** 记那条挂上游的 organizer 零宽红。两道 markdown 门禁 `check:docs` / `check:docs-voice`
+并新立 **`B56`** 记那条挂上游的 organizer 零宽红。两道 markdown 门禁 `check:docs` / `check:docs-voice`
 各 **rc=0**；`check:ui-language` 不管根目录台账，所以没跑它算数。
 
 **① 落地的真实障碍，量法要改。** 先前只报"主检出 220 个脏文件、13 个与本线重叠"——那还是**间接**证据。
@@ -1540,7 +1540,7 @@ update_note
    （`git show main:package.json | grep -c check:legal-tools` = 0）⇒ 现在补，改的是**没有门禁的那份真源**，
    门禁一落地还要按它的形状重写一遍。
 
-**登记**：`BLOCKED.md` 新立 **`B54`**，写清缺哪 16 条、三个版本读数、以及"等 `check:legal-tools`
+**登记**：`BLOCKED.md` 新立 **`B57`**，写清缺哪 16 条、三个版本读数、以及"等 `check:legal-tools`
 提交后由本线按它的形状补齐 + 与那条线对齐版本号"这条关闭路径。
 
 📌 **顺带记一次差点签出去的假清白**（zsh 词分割的第三种面目）：
@@ -1584,7 +1584,7 @@ MTIME=2026-10-03T19:04:30
    不符就判红 —— 把"等于本地"从一次断言变成区间的两端。
 
 本轮不改：`scripts/reinstall-all.sh` 正是 §15.10 那 13 条重叠路径之一。
-登记为 **`B55`**，关闭路径 = 落地之后由本线实现第 2 条 + 用"同步后手动改远端 `index.html` 一个字节"
+登记为 **`B58`**，关闭路径 = 落地之后由本线实现第 2 条 + 用"同步后手动改远端 `index.html` 一个字节"
 做一次变异验证（必须判红）。
 
 ### 15.17 ③ 的四端环境预检（只读，19:2x 现量）：环境全绿，唯一卡点是"链 rc=0"那道门
@@ -1598,7 +1598,7 @@ MTIME=2026-10-03T19:04:30
 | 全部 | 有没有别人的设备验收在跑 | `ps` 扫 `verify-mobile\|adb .*shell\|uiautomator\|simctl` ⇒ **空** |
 
 **结论写死，免得下一趟会话再怀疑环境**：③ 现在**不缺设备、不缺主机、不缺权限**，
-只缺 `pnpm check` 的 rc=0（挂在 `B53` 那条上游红上）。
+只缺 `pnpm check` 的 rc=0（挂在 `B56` 那条上游红上）。
 这五个读数都是**会过期的**（设备会被占、远端会被别人同步）—— 真要跑 ③ 之前必须重取，
 尤其 `adb devices` 与 `simctl list devices booted` 这两条。
 
@@ -1725,7 +1725,7 @@ grep -oE '^[0-9]\. ' docs/reference/environment-traps.md | wc -l         # 18（
 读他们的 diff 确认了两件我本来会写错的事，所以两条都不用撤回：
 
 1. 那条 mobile 0/5 **不影响退出码**（登记项只打印）⇒ §15.17 的
-   "③ 只缺链 rc=0，卡在 B53 那条上游红"**没有被这条改动否证**。
+   "③ 只缺链 rc=0，卡在 B56 那条上游红"**没有被这条改动否证**。
 2. 咬人的那条是**半接即红**（某端 import 了任何一条 AI 入口而其余没接完），
    且"全接完也红，直到把登记删掉" —— 所以它不是 `check:l4` 那种永久豁免。
 
@@ -1771,7 +1771,7 @@ roadmap 那一行已改成**两条维度各带自己的读数 + 出处（B34 / `
 
 ⇒ **没有第二个卡点**：唯一那枚 🔴 是"新检出没 build"（`pnpm check` 第一段就是 build，
 正常路径碰不到），mobile 0/5 那条登记**只打印不影响退出码**。
-所以 §15.17 那句"只缺 `pnpm check` 的 rc=0，挂在 B53 那条上游红上"**仍然成立**，不撤回。
+所以 §15.17 那句"只缺 `pnpm check` 的 rc=0，挂在 B56 那条上游红上"**仍然成立**，不撤回。
 
 🟡 **但那行 ℹ️ 里有一条与本线直接相关的盲区，登记在此**：新维度判"这端接没接"是
 **只认每个功能的第一个 `request*` 入口名**，而 `tool-calling` 的第二个入口
@@ -1786,9 +1786,9 @@ roadmap 那一行已改成**两条维度各带自己的读数 + 出处（B34 / `
 
 | 条 | 关闭判据（本台账里写死的那条） | 现量 | 结论 |
 |---|---|---|---|
-| **B53** 侧栏清单名被四个动作按钮挤成零宽（不在本线的产品缺陷，挡住本线交付） | `git show main:packages/ui/src/projects/OrganizerList.tsx \| grep -c minWidth` > 0 | **0**（该文件最后一次进 main 是引入那四个按钮的 `192a516d`；修复仍在主检出未提交） | 未闭合，且**只有作者能闭** |
-| **B54** 法务工具表少列本线加的 16 条（那张表是授权面） | `check:legal-tools` 进了 main 的链 | `git show main:package.json \| grep -c check:legal-tools` = **0**；`scripts/check-legal-tools.mjs` 在 main 上不存在 | 未闭合 —— 那条门禁还不在别人手里落地，补表要连着"条款版本号进同意指纹"一起拍（§15.15） |
-| **B55** Windows 对账只做了前半程 | 在 `msix_check_facts` 之前重跑一次哈希对账 + 一次"远端改一个字节"变异必须判红 | `scripts/reinstall-all.sh` 在主检出 **25+/2− 未提交**（正是 §15.10 那 13 条重叠路径之一） | 未闭合，落点被占 |
+| **B56** 侧栏清单名被四个动作按钮挤成零宽（不在本线的产品缺陷，挡住本线交付） | `git show main:packages/ui/src/projects/OrganizerList.tsx \| grep -c minWidth` > 0 | **0**（该文件最后一次进 main 是引入那四个按钮的 `192a516d`；修复仍在主检出未提交） | 未闭合，且**只有作者能闭** |
+| **B57** 法务工具表少列本线加的 16 条（那张表是授权面） | `check:legal-tools` 进了 main 的链 | `git show main:package.json \| grep -c check:legal-tools` = **0**；`scripts/check-legal-tools.mjs` 在 main 上不存在 | 未闭合 —— 那条门禁还不在别人手里落地，补表要连着"条款版本号进同意指纹"一起拍（§15.15） |
+| **B58** Windows 对账只做了前半程 | 在 `msix_check_facts` 之前重跑一次哈希对账 + 一次"远端改一个字节"变异必须判红 | `scripts/reinstall-all.sh` 在主检出 **25+/2− 未提交**（正是 §15.10 那 13 条重叠路径之一） | 未闭合，落点被占 |
 
 AGENTS §9 的候选行同样**不能落**：`AGENTS.md` 主检出 `1+/1−` 未提交（现量见上表同一时刻）。
 

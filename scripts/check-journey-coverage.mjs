@@ -109,6 +109,7 @@ const ENDPOINTS = [
       'scripts/verify-mobile-task-row.sh', // 任务行的一次点击
       'scripts/verify-mobile-lists.sh', // 清单：手机建 → 归入 → 笔记本读到同一 projectId
       'scripts/verify-mobile-tags.sh', // 标签：实体 + 任务引用，两端四层判据
+      'scripts/verify-mobile-notes.sh', // 便签改正文：恰好一条 UPD + 没改动不写 + 笔记本读到新正文
       'scripts/verify-mobile-conflict.sh', // 并发冲突在界面上解决
       'scripts/verify-mobile-autosync.sh', // 全程不点同步按钮，写入也必须自己出去
       'scripts/verify-mobile-restore.sh', // 备份还原（只还原到空库）

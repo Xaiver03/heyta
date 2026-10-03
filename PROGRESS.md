@@ -1157,7 +1157,7 @@ mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计�
 "打印过的 SHA"不等于"运行时的 SHA"）。`pnpm build` rc=**0**；`pnpm check`（61 段）rc=**1**，
 断在第 51 段 `check:ai-e2e`：`3 failed / 2 skipped / 112 passed`。三条红两种性质：一条是 4318
 载体被对端 preflight 按端口 SIGKILL（环境无效），两条是 `calendar-sidebar.spec.ts:111/:226` 的
-**确定性**红 —— 归属 `main` 侧 `192a516d`（三条独立证据 + 人眼看图，见 §15.9 与 `B53`）。
+**确定性**红 —— 归属 `main` 侧 `192a516d`（三条独立证据 + 人眼看图，见 §15.9 与 `B56`）。
 反方向一条：第 54 段 `check:shell-unicode` 在 `main` 上是红的（`scripts/mutate-closeout-gates.sh:223/232/242`
 三处 `「$V1」`），本线 `1a6640f2` 已修 —— **落地会让 main 这一段从红变绿**。
 段 52–60 里 54 / 57 / 59 已单跑 **rc=0**（静态判据，理由写在 §15.9 的读数表），真浏览器与设备那六段
@@ -1170,7 +1170,258 @@ mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计�
 `install-and-capture.ps1:110-133` 真建 `<Desktop>\heyta.lnk`（MSIX 走 `shell:AppsFolder` AUMID）
 并**读回来验**，判据即 `SHORTCUT_OK` —— 实现与判据齐，**未跑**（跑在 ③ 后面）。
 
-**④ 台账 ✅** —— 本节 + `B36` 第 2 条的 closure 指针 + 新登记 `B53`（那条挂上游的红）+
+**④ 台账 ✅** —— 本节 + `B36` 第 2 条的 closure 指针 + 新登记 `B56`（那条挂上游的红）+
 `AGENTS.md` 三处漂移登记（`:35` 漏列 `ai-tool-call.ts`、`:37` 未提工具目录已按实体拆包、
 `:295` 写"2592 通过"实际 **7839**）+ `AGENTS §7` 索引 vs `environment-traps.md` 的缺号审计。
 `pnpm check:docs` rc=0。
+---
+
+## 任务 4（成长三件 + 权益可见）—— 2026-10-03 18:2x–18:4x
+
+**做的顺序**：先把词条字形统一（一个 5 分钟的改动，但它决定 `t()` 能不能直接喂变量）→
+把 `buildShareSummary` 从 web 抽进 `app-host`（不抽就必然长出第二份）→ 移动端接 `share` →
+接权益块 → 最后才写判据文件。**为什么只做了三件中的两件**：`activityDays` 与 `onRepair`
+被**冻结判卷**钉着（`growth-display.spec.ts:365` / `:302` 断言的正是"本端还没接"这个状态），
+绕过去会得到一块没有无障碍名的热力图和一个不出现的按钮 —— 那恰好是判据要拦的假绿。
+不绕、不改判卷，写成 B41/B42/B43 并各带"最小一步"。
+
+**落地**：
+- `web.growth.year.heatmap` 的 `{{count}}` → `{count}`（中英两侧本来就有 4 处 `{{` 全在注释里，
+  判据"去注释后计数 = 0"带了一条"原文件确实含 `{{`"的阳性对照，防的是判据自己坏掉）；
+  `GrowthView.tsx:237` 从 `.replace('{{count}}', …)` 改成 `t(key, { count })`。
+- 新建 `packages/app-host/src/share-summary.ts`：`buildShareSummary` + `SHARE_SUMMARY_KEYS`。
+  🔴 `t` 的类型用**本地字面量联合**而不是 `@heyta/i18n` 的 `MessageKey` —— app-host 不新增对 i18n
+  的依赖边，而"词条改名/漏译"仍然在宿主调用点变成编译错误（靠 `strictFunctionTypes`）。
+  web 侧 `copy.ts` 留一层**转发门面**（`apps/web/tests/motivation.spec.ts` 从那个路径 import，
+  而那文件不可改），输出逐字节不变。
+- 移动端 `GrowthScreen` 传 `share`：复制走 **RN 核心 `Clipboard.setString`**（实测 0.84.1 两端
+  仍注册），零新依赖、零手搓原生模块；`icons.tsx` 加 `'growth.share': Copy`（与 `growth.week` 不同字形）。
+- 新建 `EntitlementSection.tsx` 挂在「我的」页：四态只渲两态（`unconfigured`/`unavailable`
+  整块不渲染 —— 探测失败不等于没权益）。新增 `mobile.profile.entitlement.entitled` 中英各一条。
+
+**判据**：`apps/mobile/tests/growth-share-summary.spec.ts` 13 条。mobile 全量
+**40 files / 625 passed / 0 skipped**（基线 39/612，+1 文件 +13 条）；web 全量
+**1564 passed / 13 skipped**（基线 1562/13，跳过数没动）。五个工程 typecheck exit 0
+（`pnpm -r typecheck` 现在会红在 `packages/legal`，那是别人在飞的 +117 行，见 B46）。
+六道门禁各 exit 0：`check:reachability` / `:ui-language` / `:design` / `:l4`（web 98≤104、
+mobile screens **恰在 90**）/ `:payment-entry` / `:pricing`。
+
+**两条变异（红→绿，原话级读数）**：
+1. 摘掉 `share={share}` ⇒ `AssertionError: expected '/**\n * 「我的成长」…' to contain 'share={share}'`
+   （**1 failed | 12 passed**），还原后 `2 passed / 45 passed`。
+2. 把共享层的小结第二行换成硬编码 `'打卡 ' + checkIns + ' 次'`（改 `src` 后**重建 dist** 才跑，
+   判据读的是 dist）⇒ **三条同时红**：keyOnly 注入那条（行的**顺序/数量**变了）、
+   zh 精确串（`to contain '打卡 5 次 · 完成 2 件 · 专注 30 分钟'`）、
+   en 零 CJK（`expected '打卡 5 次' not to match /[一-龥]/u`）。还原源码 + 重建 ⇒ 45/45。
+
+**未闭合（都登记了编号，不当已做）**：热力图 B41 / 补打卡 B42 / `onFreshStart` 无动作 B43 /
+剪贴板设备级读回 B44 / 权益拿不到到期日 B45 / `packages/legal` 的 typecheck 红归属 B46。
+任务 2 的真机判据 `verify-mobile-notes.sh` 本轮第三次尝试仍被环境挡：现量 **负载 23.5**、
+`:3100` 无服务、`:3000` 是别人的 e2e 栈（pidfile 对得上 PID 80257）——
+按纪律"环境无效 ≠ 产品失败"，不硬挤、不去起第二个 postgres。
+
+### 提交后的自洽复查：上一笔漏了 4 个文件（已补）
+
+复跑「HEAD 单独检出能不能编译」时发现 `120c8153` **不自洽**：它里面的
+`apps/mobile/src/screens/NoteEditScreen.tsx:41` 与 `apps/web/src/features/notes/NotesView.tsx`
+都 `import { NoteEditor } from '@heyta/ui'`，而 HEAD 的 `packages/ui` 里**没有这个组件**。
+干净检出会编译不过 —— 混工作树里跑绿，是因为漏下的文件还在工作树上。
+
+漏的 4 个路径（全部属任务 2，也全部在我的地界内）：
+
+| 路径 | 漏了什么 |
+|---|---|
+| `packages/ui/src/notes/NoteEditor.tsx` | 整个文件未跟踪（共享编辑器本体，215 行） |
+| `packages/ui/src/notes/model.ts` | `isNoteDraftBlank`（+14 行纯追加；HEAD 计数 0） |
+| `packages/ui/src/notes/NotesBoard.tsx` | 5 处 `draft.trim()===''` 换成同一条判据（5/5，无行为变化） |
+| `packages/ui/src/index.ts` | 我的导出块（15 行，本来就设计成末尾追加） |
+
+**为什么会漏**：上一笔的归属过滤是「从 28 个已跟踪路径里挑我的 hunk」，
+而未跟踪的新文件**不在这 28 个里**，所以过滤器从源头上看不见它们；
+`git diff-tree --diff-filter=A` 只列"这笔新增了什么"，不列"本该新增却缺席什么"。
+**补法**：反向查 —— 拿 HEAD 的 import 图去问"每个具名导入在 HEAD 的导出面里有没有"，
+缺席的就是漏网的。探针做过阳性对照（往 `share-summary.ts` 塞一根
+`from './definitely-missing-file'` ⇒ 16 条含它，撤掉 ⇒ 15 条），
+残留 3 条假阳性分别是 `export type {` 形状（`TaskSection`）与断言字符串里的
+import 语句原文（`./NoteEditScreen`、`./NotesSection`），已逐条读到字面行确认。
+
+### 收尾复跑：HEAD 自洽、链 58/62 绿、四条 skip 归属
+
+**1. 干净检出自洽（补交之后）** —— 拿纯 HEAD 的树（`git archive` 抽出 960 个 ts/tsx）做两件事：
+
+| 探针 | 阳性对照 | 真残留 |
+|---|---|---|
+| 每条相对 import 能否在 HEAD 树里解析到文件 | 往 `share-summary.ts` 塞一根 `from './definitely-missing-file'` ⇒ 16 条含它，撤掉 ⇒ 15 条 | 0（15 条假阳性逐条读到字面行：断言字符串里的 import 原文、文档注释里的路径、探针不认 `.mjs`/`export type`） |
+| 每条跨包具名导入能否在 HEAD 的导出面里找到 | 同一个收集器先漏 `export type {` ⇒ 补上后 i18n 那 4 个类型名不再报 | 0（`NoteEditor`/`NoteEditorLabels` 那 4 条已随补交消失；`domain` 的 5 个类型名逐条读到 `export interface`/`export type` 声明行 —— 之前那轮 0 命中是 `\b` 在 POSIX ERE 里不认，探针坏不是仓库坏） |
+
+**2. `pnpm check` 逐段（段数硬门 = 62，实落 62 行）**：静态 50 段全 `exit=0`；补跑 8 段
+（`typecheck` / `macos-shell` / `macos-window` / `windows-shell` / `linux-shell` / `arkts` /
+`screenshot:verify` / `-r test`）全 `exit=0`。**合 58 段绿、0 段红**；没跑的 4 段与原因在 **B48**
+（`build` 与三段 e2e 会在别人跑到一半时重写 dist / SIGKILL 他们的 vite）。
+**B46 就此解除**：`pnpm -r typecheck` 整链绿。
+
+**3. skip 账（"skipped 必须 0"这条的逐包读数）**：`mobile 40 files/625 passed`、`ui 26/473`、
+`app-host 48/1002`、`widget-core 6/193`、`landing 22/1303`、`sync-client 6/98`、`op-log 7/99`、
+`node-host 9/165`、`desktop 2/12` —— **这些包 skipped 全为 0**。有跳过的是两处既有机制，
+不是我引入的：`apps/web` 13 条（`e2e-sync.integration.spec.ts` 里
+`describe.skipIf(URL_BASE === undefined)`，就是文档说的"真实服务端类默认跳过"）与 `server` 1 条。
+HEAD 的 `apps/web`+`apps/mobile` 里 `.skip(` 标记数 = **0**；我那两笔提交新增的 3 处"skip 字样"
+命中全是 `raise SystemExit(...)`（被 `xit\(` 这条宽松分支抓到，逐行看过真值形态）。
+
+**4. 又被我这批否证的注释**：`packages/ui/src/habits/HabitBoard.tsx` 第 3 条"删除习惯没有进这一刀 /
+习惯建出来就删不掉"已改成"曾未接、现已接（走的正是它自己提的『并入详情层』那条）"并挂上判据。
+同一次全仓扫还扫到地界外的一条（`docs/research/trash-and-archive-best-practice.md:179`）⇒ **不代改**，
+登记 **B47** 并把一行改法留给它的 owner。
+
+---
+
+## 19:2x：那两张"我以为没取证"的真机截图 —— 归位 + 一种新的产物对账法
+
+**事实更正**：我在 B49 里写过"§3 那两行设备级截图未取证"。`ls apps/mobile/evidence/` 实测
+`android-notes-1-editor-open.png` / `android-notes-2-list-after-edit.png` **存在且非空**（17:20:20 / 17:20:36）。
+两张都打开看过：图 1 是「编辑便签」那屏（标题 + 返回箭头 + 多行框里 `note-e2e-171747-read-once` +
+「× 取消」/主蓝「✓ 保存」），图 2 是「我的」→便签卡上**改过之后**的 `note-e2e-171747-edited`。
+**错在哪**：我按脚本第 12 步那条**整体判据**（三张齐才算过）倒推出"一张都没有" —— 整体没过
+推不出局部不存在。**登记"未取证"之前先 `ls` 目标目录。**
+
+**产物新鲜度怎么证（这轮的真正产出）**：逐字节复现做不到 —— 那枚 `app-release.apk` 已被并行会话
+19:07 的构建覆盖（`stat` 现量 19:07:35，晚于截图 2 小时）。能立住的是三条合起来：
+① 便签链六个源文件最后写入 16:20:39–16:31:23，此后 `git diff HEAD` 逐字为空；
+② 这一趟 needle 自带时间戳 `note-e2e-171747` = 17:17:47，**晚于最后一次源码改动 46 分钟以上**；
+③ 图 1 那一屏由 `NoteEditScreen` + `NoteEditor` 渲染，两文件 16:21 前不存在 ⇒
+**早于它们的构建画不出这张图**。③ 是"旧产物"假设的否证，也是我先前那个假设该死的理由。
+把这三条写进审计 §3.2，同时把矩阵那行的措辞从"未取证"改成"两张已入库 + 第 8 步之后三腿仍缺"，
+边界写清不躺赢：**没有**第三张（第 8 步 搜索点开便签），第 6/7 步的 op 判据与第 9–11 步的跨设备三腿
+也**没有**真机证据 ⇒ 矩阵行保持 ✅（那是"接线完成"的判据，单测 + 变异已钉），但缺口逐条挂在 §3.2 与 B48/B49。
+
+**本轮门禁读数**（新加的 §3.2 不引死链、不动口径）：`docs-link-check exit=0`、`check-docs-voice exit=0`。
+
+---
+
+## 19:3x：任务书拍板那半件（`check:ai-coverage` 按端枚举）—— 变异第一次存活，修的是门禁
+
+读数、三处改动、以及"为什么不能用子串判"都在 goal §7.26。这里只留两条对我下次有用的：
+
+- **变异臂第一次是存活的**，而且存活原因是我的正则只认单引号 `from '…'`，探针写的是双引号。
+  我差点把这读成"这条规则没牙"就过去 —— 判据存活先问"探针真打到它了吗"，再问"它是不是没牙"。
+  修完两条臂（双引号 / 多行 + `as` 别名）都精确点名缺的 3 条并 `exit=1`，还原 `exit=0`、探针残留 0 文件。
+- **子串判在这个仓库会自己造红**：`tool-calling` 的入口名就叫 `request`，移动端 3 个文件本来在写
+  `requestPasswordReset`。新加一条"按名字找调用点"的判据之前，先 `Grep` 那个名字在本仓有多少**无关**命中。
+
+---
+
+## 19:4x：任务 4 最后一条子项（词条字形）定论 —— 结论是"本来就只有一种"，交付物是测量不是改动
+
+全部读数与复跑载体在 goal §7.27。这里留三条对我下次有用的：
+
+- **任务书那句"两种字形统一"预设了一个不存在的事实**：`{{count}}` 只活在 4 行注释里（讲
+  react-activity-calendar 那个库形状的来历），真值 100% 是单层 `{count}`。遇到"要我修 X"先量 X
+  还在不在 —— 已经在的修复不需要一次提交，但**需要一条会红的常驻判据 + 一次实测的变异**，
+  否则我和"以为修了"的人区别不大。
+- **一次变异只红了一条臂，另一条臂存活的原因查实了**：`translate()` 走的是
+  `require.resolve('@heyta/i18n')` → **`packages/i18n/dist/index.js`**（19:29 构建），改 src 不重 build
+  打不到它。我**没有**为它去重建 `dist` —— 那是共享产物，别的会话正在跑打包与设备验收。
+  写明"哪条臂守哪一层载体"比"跑了两条臂"有用。
+- **第一次量是假空**：`grep -c "{{count}}" packages/i18n/src/*.ts` → 0/0，因为 glob 没进 `src/locales/`。
+  零命中要么配注入对照（这次两条都配了），要么先验 glob 能不能命中它自己的目录。
+
+---
+
+## 20:1x：完成条件逐条现量（§7.28）+ 两条原话被实测否证 + 一处死链当场改对
+
+写台账前把每条约束都重新量了一遍，结论与读数在 **goal §7.28**（条件 1 逐行、条件 2 逐条，各带复跑命令）。
+三条对以后有用的：
+
+- **两条"被冻结判据钉住"里，一条的因果是假的、另一条的机制我说浅了。**
+  `growth-display.spec.ts:364` 那句"传了 activityDays 这条会先红"否证 —— `:365` 只读适配层；
+  B42 的真实机制是 `HabitStreakList.tsx:269` 的 **或**条件（`onRepair` 有值但标签是 `undefined`
+  ⇒ 按钮根本不渲染、不报错）。**登记"拦不住"之前要读被拦那行的渲染条件**，
+  否则下一批会照着"改判据就行"去排活，而真拦路的是共享组件里那个 `||`。
+- **权益那条"要改服务端"我这次读到底才敢写**：`entitlement.ts` 那次 GET 一个响应字段都不消费，
+  而 web 侧"到期条"同样只有 `expired`/`refused` 两个布尔（`SubscriptionNotice.tsx:78`）
+  ⇒ 两端都拿不到日期，不是我移动端漏接。
+- **抄来的编号必须在落盘前 `ls` 一次。** 我把新契约写成 `docs/adr/0050-…`（读的是并行会话刚改的
+  AGENTS.md），几分钟内它把号让给 **0051**（0050 现在是 E2EE 密钥生命周期）。两处已就地改对。
+  ⚠️ 顺手量到的两件都写进 §7.28 而不是藏起来：
+  ① `docs/adr/0051-mobile-reminder-delivery.md` **此刻还没被 git 跟踪**（`ls-files` 报 "Did you forget to
+  'git add'?"）⇒ 我这两处引用在干净检出上暂时指不到东西 —— 那是他们的文件，不代 add；
+  ② ~~**`pnpm check:docs` 现在 exit=1（27 处死链），而且一条都不是我的**~~ ⇒ **21:3x 复跑三趟后加严并更正**：
+  `check:docs` 是 `pnpm check` 的**第 34 段**，所以可过段数从"58/62"降到 **57/62**（我上一版那句 58 是错的）；
+  总数**是活的**（同一小时 27 → 32 → 33，分布每趟都变）；**"一条都不是我的"这句仍然成立**（三趟都 0 命中）。
+  但**"全部只在混合工作树成立"是我这次量出来的错话**：逐条问 `git show HEAD:<源>` 里还写没写这个引用之后，
+  **有 3 条 HEAD 上就红**（`detail-pane-alignment.md:4` 与 `detail-pane-alignment-and-spaced-review.md:101` 的两条，
+  两份源文件工作树**干净**、HEAD 已跟踪 ⇒ 是"引用提交了、目标没 `git add`"，CI 一样红）；
+  其余 **24 / 29 / 30** 条才是别人的未提交引用指向未 add 的文件。
+  取证命令与完整归属表在 goal 文档 **§7.28 末尾**。
+  🔴 **归属探针自己差点给出第 4 条假红**：目标名是通用的 `README.md` 时，按 basename 去 HEAD grep 命中 6 行，
+  探针判它"HEAD 上就红"，而 HEAD 版那份文件只有 2709 行、引用在未提交的第 2737 行 ⇒ **判死链归属要用链接整串，
+  不能用 basename**；反向也一样，头一趟我按解析后的**绝对路径**去 grep，文档里写的是相对串，0 命中差点被我
+  当成"HEAD 没引用"。两条都写进 §7.28。
+  ✅ 顺带做出一个**行内代码 vs 链接形状**的 A/B：我为了写这条，在正文里用反引号抄了一个指向未跟踪文件的
+  `[.](…)` 形状，改完复跑 `check:docs` —— **我的文件 0 命中**，而同一个目标在别人的 `[]( )` 形态里被报了出来
+  ⇒ 证实"我引的 0051 没进死链账是因为形状不是链接，不是因为它是好的"。
+  `check:docs-voice` 与 `check:row-single-source` 同刻 **exit=0**（我这轮纯文档改动没撞它们）。
+
+## 21:3x–22:0x（载体 8519de39 之后）：check:docs 的归属量到底 + 把"父子"这一项查穿并自我更正
+
+- **环境不在窗口，没挤**：`vm.loadavg` 1min=**91**（16 核）、`:3000` 仍被 PID 80257 占、
+  有人在 `/tmp/heyta-reminder-ios4` 编 iOS（`clang … iphonesimulator27` 在跑）。
+  ⇒ 四端重装与三条 Playwright 段这轮**没跑**，不拿旧载体读数顶替。
+- **`check:docs` 三趟 27→32→33，我把它逐条拆到 HEAD**：24/29/30 条只在混合工作树成立，
+  **3 条 HEAD 上就红**（别人的引用进了提交、目标文件漏 `git add`），**本条线 0 条**。
+  于是 `pnpm check` 的可过段数从"58/62"**降到 57/62**（`check:docs` 是第 34 段，我先前把它漏在 4 段之外）。
+  立 **B51**，并把 B50 里我自己那句 `check:docs exit=0` 划线更正。
+- 🔴 **自己的探针差点造出一条假红**：按 **basename** 去 HEAD grep 判归属，目标叫 `README.md` 的那条命中 6 行
+  ⇒ 被判"HEAD 上就红"，实际 HEAD 版那份文件只有 2709 行、引用在未提交的 2737 行。
+  反向也错一趟：按**解析后的绝对路径** grep，文档里写的是相对串 ⇒ 0 命中差点被我当成"HEAD 没引用"。
+  **判引用存在与否要用链接整串 + 词边界。**
+- ✅ **顺手撞出一个 A/B**：我为写这条教训，在正文里用反引号抄了个指向未跟踪文件的 `[.](…)` 形状，
+  复跑 `check:docs` 我的文件 **0 命中**、同一目标在别人的 `[]( )` 形态里被报出来
+  ⇒ 证实"我引的 0051 没进死链账是形状问题，不是它是好的"。
+- **把 🟡 那行的"父子"查穿，并且把自己写满的结论改小**（立 **B52**）：
+  `ProjectActions` 接口面上确实没有改父的方法，**但我第一版那句"没有任何一个能改父"说满了**——
+  下一趟探针（查有没有通用 `updateProject`）把它否证了：`project-actions.ts:165` 那个私有派发器
+  **payload 是开放的**，rename/setColor/archive 都是它的一行包装 ⇒ 写侧只差一个同形状包装 + 守卫，
+  真缺的是**两端界面**（web 也没有嵌套）与跨端形态裁决。
+  🔴 一般规律：**判"某写动作不存在"，光列接口方法名不够，还得看接口背后那个通用派发器有没有被别的动作共用。**
+  ⚠️ 同一趟 `grep 'moveProject'` 命中 13 行，全是 **`removeProject`** 的子串 ⇒ 又是一条 needle 形状错，改 `-w` 后重测。
+- **未闭合**（原样继承，不粉饰）：条件 2 的 5 段红 + 四端重装 + `verify:mobile-notes` 剩余腿。
+
+
+### 2026-10-03 · 架构 B/C 续验与规则落地
+
+B/C 尚未完成：B 的密钥包/服务端基础不等于生产日志迁移和恢复闭环；C 的编译通过不等于
+OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md) 批三和 AGENTS W9
+已纠正为实施中；[A/E/D 证据](docs/research/aed-implementation-evidence.md) 明确旧范围边界。
+依据用户要求，把完成范围对账、经验回写、安全测试不得放宽生产鉴权、模拟器/变异独占、
+通知回执事实分层写入 AGENTS §8；具体事故扩充环境陷阱 #181 并追加提醒验收条目。
+[文档中心](docs/README.md) 已链接 B/C ADR 与既有证据，避免成为孤立记忆。
+这些新增流程约束目前是人工执行规则，不宣称已全部由自动门禁覆盖。
+
+## 21:2x（载体 96f3293d 之后）：交接落盘 + 提交纪律里又踩到两条
+
+- 新建 `docs/plans/multi-end-coverage-handoff.md`（同目录已有 10 份 `*-handoff.md`，形态一致），
+  并从 goal §7.29 与 `docs/README.md` 的 plans 索引各挂一处（AGENTS §8「新文档必须由原计划或文档中心链接」）。
+- **Goal 状态没有变**：条件 1 = 3 ✅ / 3 🟡（🟡 的三条拦路全在本批权限外：B41/B42 要翻冻结判据、B45 要动服务端、
+  B52 要跨端形态裁决）；条件 2 未达成（`pnpm check` **57/62**、四端重装**本轮没跑**）。
+  ⇒ **不标 complete**，交接给下一个会话按 §5 的顺序接着跑。
+- 🔴 **本轮两条新踩的坑**（都记进了交接文档的"死胡同警告"）：
+  ① 脚本开了 `set -o pipefail` 之后，`if ! diff -u A B | grep -q …` **永远走 else 分支** ——
+  `diff` 在有差异时退 1，管道整体状态被 pipefail 变成 1，匹配成功也被读成失败。
+  我在这条上**空转了四趟**，中途还把它误判成"脚本里写中文 needle 不匹配"（改成直接 `grep 文件` 立刻通）。
+  ② `git commit --only` 之后共享索引仍停在**上一笔 HEAD** ⇒ `git status` 报 `MM`，
+  而别人一次**裸** `git commit` 就会把我这几百行倒回去。收尾必须按**路径**把索引刷到新内容
+  （`git update-index --cacheinfo 100644,<HEAD blob>,<path>`，路径清单里**不能混目录**）。
+- ⚠️ 我又犯了一次记忆里那条"Edit 别吃掉相邻块的边界行"：给 `docs/README.md` 插索引行时
+  把 `old_string` 写成"那一行 + 换行"，结果两行被粘成一行（`… 不重复决策 || [subscription-wechat…`）。
+  当场用 python 精确修回（needle 命中数断言 = 1），净效果校验为 **+1 行 / 0 删**
+  （那 1 条删除是并行会话自己对 ADR-0043 表格行的改写，不是我造成的）。
+
+## 21:4x 自查：`96f3293d` 替并行会话提交了整节 ⇒ 提交共享台账的配方改成"blob = HEAD + 我的文本"
+
+- 现象：`PROGRESS.md` 1358–1366 行（`### 2026-10-03 · 架构 B/C 续验与规则落地`）不是我写的，
+  被我这笔提交带走了。守卫只验了"单 hunk + 删除 0 行"—— **追加的形状不等于作者的归属**。
+- 后果：那句里的 `[A/E/D 证据](docs/research/aed-implementation-evidence.md)` 指向**未跟踪**文件
+  ⇒ `check:docs` 在 HEAD 上报 1 处死链、出处 `PROGRESS.md:1362`，committer 是我、句子不是我写的。
+  目标文件在本机存在（3907 B / 20:46），是 owner 还没 `git add`；我不代 add、也不代改别人的句子。
+- 已登记 **B53**（含可复跑的 blame 取证与五条新配方）。历史不重写 —— 倒回去会删掉别人那节。
