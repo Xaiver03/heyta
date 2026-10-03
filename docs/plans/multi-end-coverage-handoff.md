@@ -644,6 +644,25 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   🔴 顺带一条形状教训：**"红了就摘出轮转"这条规则本身没错，但红的原因如果是启动器自己的缺陷，
   修完必须手动重新入轮** —— v4 把 ① 记成 `DONE-RED` 之后就不会再碰它，而那一红是上面这两枚缺陷造成的，
   不是产品红。链 v5 因此只轮转 ①/③，且头部注释写明了为什么不带 ②/④（读数的 sha 都在 goal §7.30）。
+- 🔴 **`reinstall:all` 的 mac 段可以在一个外部调用上永久挂住，而挂住的那一方同时钉死了所有并行会话**
+  （05:04 现量）：`apps/desktop-macos/scripts/package-app.sh:278` 的
+  `xcrun notarytool submit … --wait` **没有任何上限**。现场那一跑已经卡在这一行 **1h52m**、CPU 时间 0:00.04：
+  ```
+  95477 bash apps/desktop-macos/scripts/package-app.sh /tmp/heyta-macos-dist
+  98934   /Applications/Xcode-27.1.0-Beta.app/…/notarytool submit /tmp/hey…   ← 0.0% CPU，1h51m
+  ```
+  后果不止它自己：它同时是"有别人在重装"那道互斥门的持有者 ⇒ **我的 ① 与所有并行会话的固定收尾一起被钉住**。
+  ✅ 该加的修法（**已写好但刻意还没有落到文件上**，原因见下一条）：给这一段加显式上限
+  `HEYTA_NOTARY_TIMEOUT`（默认 900s，`0` = 保留旧的"不设限"），输出先落临时文件再打印以便区分
+  `rc=124`（Apple 没回话）与真实拒绝；两种都不许走"✅ 公证通过"、都不装订票据。
+  ⚠️ 顺带**否证我自己的一条假设**：我一度以为同一行的 `notarytool … | tail -8 | awk` 是 traps #45
+  那一族（管道后 `$?` 是 `tail` 的），读了脚本第 23 行才看到 **`set -euo pipefail` 是开着的** ——
+  有 `pipefail` 时这条管道的退出码确实是 `notarytool` 的。**"看着像同一个已知缺陷"不构成证据，要先读被调方的头部。**
+- 🔴 **不能在 `bash` 正在执行一个脚本时改那个脚本**（这条决定了上面那笔修法什么时候落）：
+  bash 是**按字节偏移增量读脚本文件**的，运行中的那份会从我改后的文件中间继续读 ⇒ 轻则报语法错、
+  重则把后半段解释成别的命令。现场 `pid 95477` 正是 `bash …/package-app.sh`，
+  所以修法必须等它退出之后再落盘。**落盘前的现量判据**：`pgrep -f 'package-app\.sh'` 为空。
+  📌 一般规律：**"这个文件现在干不干净"不只看 `git status`，还要看有没有进程正踩着它执行。**
 
 - 🔴 **别用 `git commit --only <文件>` 提本条线的两份台账** —— 里面此刻混着并行会话的 hunk
   （`goal-multi-end-coverage.md:104` 是他们改的 W9 状态句）。正确做法见 `96f3293d` 的提交信息：
