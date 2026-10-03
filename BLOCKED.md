@@ -2629,3 +2629,63 @@ B30 写这两段"不是再跑一遍就好的东西"，并各自给了闭合代�
 本轮说"新克隆也崩"——**两句现在都不是当前事实**。留 #154 的更正动作照旧挂在
 `environment-traps.md` 干净的时候做，但**更正的内容变了**：不是"remedy 错了"，而是
 "这条崩溃不可复现、且两侧各测到一次相反结果 ⇒ 在能稳定复现之前，任何一句关于它的解法都不该写成解法"。
+
+## B32. 任务书「只允许改」清单漏列根 `package.json`，而任务 1/2 在定义上必须改它（2026-10-03 15:4x）
+
+任务 1 要求"6 个脚本补 `verify:` 别名"、任务 2 要求新脚本"同时补别名"——别名只住在
+`package.json` 的 `scripts` 里，白名单没列它。这是**写书人的疏漏**，不是执行者越权的许可。
+处置：按最小必要改，**只加/改 `scripts` 里的条目**，其余字段一个字不动；
+且该文件此刻是 ` M`（并行会话有未提交改动）⇒ 提交走「HEAD + 只我的 hunk 重建暂存」，
+不整文件 `git add`。留痕在本节而不是偷偷改完不提。
+
+## B33. 移动端提醒投递：要人拍的那一句（本 Goal 按"不做"走）
+
+批三停批的禁令是「禁止手搓原生模块」，但仓库此刻**已有两个自研 RN 原生模块**
+（`apps/mobile/android/app/src/main/java/com/heytamobile/widget/WidgetModule.kt`、
+`fs/LocalFsModule.kt`，iOS 侧 `HeytaWidgetCore`）。禁令的前提（"只有三方库这条路"）已经不成立。
+自研薄通知模块（Android `AlarmManager` + iOS `UNUserNotificationCenter`）是唯一同时满足
+判据 ①（后台/锁屏仍投递）与 ③（force-stop 后仍投递）的路，代价是 `AndroidManifest.xml`
+要加 `POST_NOTIFICATIONS` 与精确闹钟权限。**这一句要产品负责人拍**，本 Goal 不动。
+
+## B34. AI 上移动端要拍的语义，与鸿蒙更硬的那条阻塞
+
+- AI：`classifyDestination` 只看端点 URL（`packages/ai/src/supply.ts:91-101`），
+  **网络接口不在模型里** ⇒ "蜂窝算不算远程"在类型上目前无法表达。要拍的是
+  "要不要为移动新增第四道按网络类型收紧的闸"。本 Goal 只做不依赖裁决的那半件
+  （把 `check-ai-coverage.mjs` 改成按端枚举）。
+- 鸿蒙：外部条件（模拟器镜像 + 签名）之外还有一条更硬的：**`@op-engineering/op-sqlite`
+  官方不支持鸿蒙**（`docs/plans/multi-end-unified-strategy.md:1527`「鸿蒙壳最大风险点，仍未验」）
+  ⇒ 买齐镜像与签名仍然造不出能用的壳。要人拍"选库还是自写存储驱动"。
+
+## B35. `GrowthBoard.onFreshStart` 没有对应动作（本 Goal 不顺手加）
+
+补打卡 `onRepair` 可直接接现成的 `checkIn(habitId, date)`（`packages/app-host/src/habit-actions.ts:129`）；
+"重新开始" 在动作层**没有对应函数**，加它等于在本批里顺手扩 op 语义。按规矩登记，不做。
+
+## B36. 任务 1 实测下来与任务书不符的两条（2026-10-03 16:0x，HEAD `6570e52d`）
+
+1. 🔴 **任务书那条反向验证不成立，我做了能成立的那一条，并把原命题变成登记项。**
+   任务书写「临时删掉 MANIFEST 一条 ⇒ 门禁必须红」。两次变异都跑了：
+   - 把 `verify-mobile-account.sh` 的 bootstrap 块删掉 ⇒ `❌ … 缺自快照 bootstrap（HEYTA-SNAPSHOT-BOOTSTRAP）`，
+     exit **1**；还原（`cmp` 逐字节相同）后 exit **0**。
+   - 把 `scripts/verify-mobile-account.sh` 这一条从 MANIFEST 里删掉 ⇒ `✅ 自快照 bootstrap 全部在位（29 个脚本 + .gitignore）`，
+     exit **0**（**不红**）。
+   原因在门禁本体：`check-script-snapshot.mjs` 只遍历「清单里的文件」查标记与三处结构（`:73-99`），
+   **从不扫磁盘** ⇒ "磁盘上有、清单里漏了一条"这一档结构上抓不到 —— 而 `account` 与 `reminder-ring`
+   恰恰就是这么漏了好几天，还配了一条过期理由。**要把 `no_manifest=0` 变成常驻判据得改这个文件的判据部分，
+   而任务书给我的授权只有「MANIFEST 列表」这一小节** ⇒ 登记待拍，不自作主张扩权。
+   本轮每条验收都跑了这条现量命令（过渡期的对账口，`$` 在文档里不展开）：
+   ```bash
+   node -e 'const fs=require("fs");const s=fs.readFileSync("scripts/check-script-snapshot.mjs","utf8");const man=[...s.matchAll(/^  .(scripts\/[^"\x27]+).,$/gm)].map(m=>m[1]);const disk=fs.readdirSync("scripts").filter(f=>/^verify-.*\.sh$/.test(f)).map(f=>"scripts/"+f);console.log("no_manifest="+disk.filter(n=>!man.includes(n)).length)'
+   # 别名那一档同理由：把 disk 换成与 package.json 里 verify:* 的脚本名集合做差，输出 no_alias
+   ```
+
+2. 🔴 **`check:shell-unicode` 在当前 HEAD 上是红的，三处落在我地界外。**
+   `scripts/mutate-closeout-gates.sh:223/232/242` 的 `「$V1」` 被全角引号吞掉变量名，
+   由 `cc974fbd`「fix(scripts): 第 7 步的"没渲染"其实是"没滚到"」提交，工作树对该文件干净
+   ⇒ **已提交的技术债**，不是谁在飞的改动。这一档挡住的是完成条件 2 的「`pnpm check` 62 段 exit 0」，
+   与本条线做的功能无关。我不代改别人的变异脚本，登记给那条线，一条命令就能修平：
+   `python3 research/tools/fix-shell-unicode-vars.py --write`。
+   同批被扫出的另一处 `scripts/verify-mobile-repeat.sh:675`（`$XY15C）`）**在我地界内**
+   （`scripts/verify-mobile-*.sh`），已就地改成 `${XY15C}` 并复验门禁只报地界外那三处 ——
+   那是 `3fe7f590` 提交的真缺陷（验收日志里那个坐标读数会整个丢掉），不是顺手重构。
