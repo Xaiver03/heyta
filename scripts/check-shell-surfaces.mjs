@@ -124,6 +124,13 @@
  *   G11 台账：Linux 保持 gap，但在 `apps/desktop-linux/` 里加一处
  *       `web-dist` 引用（假装有了）                                    → L2 红（声明过期）
  *   G12 台账：把 Linux 那行改成 `reachable` 而通道并没补               → L1/D1 红
+ *   G13 严格模式：`HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 且本机没有
+ *       "确实是本轮打的"那份包                                        → 产物那两栏红
+ *       🔴 这一臂是**补出来的**：第一版这个开关只写在"包不存在"那一个分支里，
+ *          于是本机存在**别人的**包时严格模式照样 rc=0（实测 rc=0，期望 1）。
+ *
+ *   （以上 13 臂的**实测读数**逐条记在
+ *    `docs/plans/countdown-w8-shell-gate.md` §5 —— 那里是过去式 + 数字，本列表是配方。）
  *
  * 用法：
  *   node scripts/check-shell-surfaces.mjs              # 全部门禁
@@ -397,8 +404,22 @@ function fail(end, face, lines) {
   record(end, face, false, lines);
 }
 
-/** 响亮跳过：印出来、算进"未取证"，**不计为通过也不计为红**。 */
+/**
+ * 响亮跳过：印出来、算进"未取证"，**不计为通过也不计为红**。
+ *
+ * 🔴 但 `HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 时**必须**折成红 —— 而且这一条要覆盖
+ * **所有**未取证的路径（没这个包 / 有包但不是本轮的 / 这台机器上根本没有这一端）。
+ * 实测踩过：这个开关第一版只写在"包不存在"那一个分支里，于是本机存在
+ * **别人的**包时严格模式照样 rc=0 —— 一句写在文档里的假逃生门比没有逃生门更糟。
+ */
 function skipped(end, face, lines) {
+  if (REQUIRE_ARTIFACT) {
+    record(end, face, false, [
+      '🔴 HEYTA_REQUIRE_PACKAGED_ARTIFACT=1 ⇒ "未取证"按红处理',
+      ...lines,
+    ]);
+    return;
+  }
   record(end, face, true, lines, 'skip');
   unverified.push(`${end} / ${face}`);
 }
@@ -814,16 +835,10 @@ for (const end of ['desktop-macos', 'desktop-windows']) {
           ? channel.artifactWebDist
           : join(ROOT, channel.artifactWebDist));
       if (!existsSync(abs)) {
-        const line = [
+        skipped(end, `${face.key} · 产物`, [
           `⚠️ 产物判据未跑：${abs} 不存在（这台机器上没打过 ${channel.hostLabel} 包），`,
           `      要取证：${channel.produceCmd}`,
-        ];
-        if (REQUIRE_ARTIFACT) {
-          line.unshift('🔴 HEYTA_REQUIRE_PACKAGED_ARTIFACT=1 ⇒ 未取证按红处理');
-          record(end, `${face.key} · 产物`, false, line);
-        } else {
-          skipped(end, `${face.key} · 产物`, line);
-        }
+        ]);
       } else {
         // 🔴 **先对账"这份包是不是我这棵树打的"，再谈里面有没有这一面。**
         //    `package-app.sh` 的默认 OUT_DIR 是 `/tmp/heyta-macos-dist` —— 那是
