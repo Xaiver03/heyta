@@ -174,10 +174,27 @@
      （`web-list-folder` 18、两份词条表各 11、`setParent` 6、`FolderPicker` 5/3/2/2、
      `validateProjectParentChange` 5）⇒ 那 38 条里确实包含我这 6 条 DOM 用例。
      复跑：`git show f41221a8:<文件> | grep -c <标记>` 对 `grep -c <标记> <文件>`。
-   - 成长统计行：热力图无障碍名被 `apps/mobile/tests/growth-display.spec.ts:365` 钉成空串；
-     补打卡被 `HabitStreakList.tsx:269` 的 `||` 渲染条件挡住（**接了也不出现、不报错**）。→ B41 / B42。
-   - 权益行：`entitlement.ts` 那次 GET **一个响应字段都不消费**，web 侧到期条同样只有两个布尔
-     ⇒「到 X 日到期」要动服务端面。→ B45。
+   - 成长统计行：热力图无障碍名被 `apps/mobile/tests/growth-display.spec.ts:365` 钉成空串
+     （现量该行仍是 `expect(labels.heatmap.grid({ total: 42, days: 365 })).toBe('')`）；
+     补打卡被 `packages/ui/src/motivation/HabitStreakList.tsx:269` 的
+     `onRepair === undefined || labels.repairAction === undefined ? null :` 挡住（**接了也不出现、不报错**）。
+     ⚠️ 这一句旧账只写了 basename 没写目录 —— 那个文件在**共享层** `packages/ui`，不在 `apps/mobile`。→ B41 / B42。
+   - 权益行：🔴 **本轮把这条登记的"理由"纠正了，结论不变**（00:5x 现量）。
+     旧账写"`entitlement.ts` 那次 GET **一个响应字段都不消费**"—— **错的**：
+     `packages/domain/src/subscription.ts:189-230` 消费 `status` + `body.errorCode` + `body.reason` +
+     `body.currentPeriodEnd`，并在 `toHostedSyncAccess`（`:246-252`）里从它派生 `expired`。
+     真正缺的是**服务端不给那个字段**：`server/src/entitlement.ts:376-380` 的 402 响应体逐字是
+     `{error, errorCode, reason}` ⇒ 客户端解析器那个 `currentPeriodEnd?` 槽位**永远是 undefined**；
+     而 2xx 分支只回 `{kind:'entitled'}`，也**不读**任何到期信息。
+     ⇒ 结论仍归 B45（要动服务端面，本批不越权），但**闭环形状现在清楚了**：服务端在两处之一给出
+     `currentPeriodEnd`（402 body，或 `/api/sync/status` 的 200 payload），
+     客户端**已经能接**（解析器有那个可选槽位、`expired` 也由它派生），剩下只有界面那一行"到 X 日到期"。
+     ⚠️ **我在这条上 30 秒内自我否证了一次**：先写下"移动端一个权益消费者都没有"，
+     再跑 `grep -rn "toHostedSyncAccess\|SubscriptionNotice\|fetchHostedEntitlementReading" apps/mobile/src`
+     → **4 处命中**：`apps/mobile/src/screens/EntitlementSection.tsx` 是有的（它 fetch reading，
+     按 `reading.reason === 'PERIOD_ENDED'` 选变体）。**真实缺口不是"移动端没这块"，而是两端都只渲染状态、
+     没有任何到期日**（`:89-108` 三个 `Text` 全是标题/正文/本地数据说明）。
+     ⇒ 教训同 §6 那条"断言没有 X 要读被断言对象的本体"：**我这条没跑就写进文档了，被自己的下一条命令推翻。**
 4. **`verify:mobile-notes` 的剩余腿**：🔴 **本轮现量否证了"判据还没写"这个前提** ——
    真机只走到第 5 步是**执行**状态，不是**编写**状态：脚本里 13 步（0–12）、**55 条 ok/bad 断言**，
    目标原话点名的三条腿**逐条都在文件里**（带行号）：
