@@ -393,12 +393,36 @@ describe('ValidationService', () => {
       expect(result.errorCode).toBe(SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK);
     });
 
-    it('should strip invalid vector clock entries (non-numeric values)', () => {
+    it('should reject invalid vector clock entries (non-numeric values)', () => {
       const op = createValidOp({ vectorClock: { client1: '5', client2: 10 } });
       const result = validationService.validateOp(op, clientId);
-      expect(result.valid).toBe(true);
-      // String values are stripped, only valid numeric entries remain
-      expect(op.vectorClock).toEqual({ client2: 10 });
+      expect(result.valid).toBe(false);
+      expect(result.errorCode).toBe(SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK);
+      expect(op.vectorClock).toEqual({ client1: '5', client2: 10 });
+    });
+
+    it('preserves the 4096-entry resource boundary and rejects 4097', () => {
+      const acceptedClock = Object.fromEntries(
+        Array.from({ length: 4096 }, (_, index) => [`device-${index}`, index + 1]),
+      );
+      const accepted = validationService.validateOp(
+        createValidOp({ vectorClock: acceptedClock }),
+        clientId,
+      );
+      expect(accepted.valid).toBe(true);
+      expect(Object.keys(acceptedClock)).toHaveLength(4096);
+
+      const rejectedClock = {
+        ...acceptedClock,
+        'device-4096': 4097,
+      };
+      const rejected = validationService.validateOp(
+        createValidOp({ vectorClock: rejectedClock }),
+        clientId,
+      );
+      expect(rejected.valid).toBe(false);
+      expect(rejected.errorCode).toBe(SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK);
+      expect(rejected.error).toContain('max 4096');
     });
 
     it('should reject deeply nested payloads', () => {

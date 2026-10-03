@@ -13,6 +13,9 @@ vi.mock('../src/db', () => ({
     userSyncState: {
       findUnique: vi.fn(),
     },
+    vaultKeyMigration: {
+      aggregate: vi.fn().mockResolvedValue({ _sum: { reservedStorageBytes: 0n } }),
+    },
   },
 }));
 
@@ -28,6 +31,9 @@ describe('StorageQuotaService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.vaultKeyMigration.aggregate).mockResolvedValue({
+      _sum: { reservedStorageBytes: 0n },
+    });
     service = new StorageQuotaService();
   });
 
@@ -184,6 +190,16 @@ describe('StorageQuotaService', () => {
         currentUsage: 0,
         quota: 100 * 1024 * 1024,
       });
+    });
+
+    it('should fail closed when the reservation query fails', async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        storageQuotaBytes: BigInt(100000),
+        storageUsedBytes: BigInt(0),
+      } as any);
+      vi.mocked(prisma.vaultKeyMigration.aggregate).mockRejectedValue(new Error('db down'));
+
+      await expect(service.checkStorageQuota(1, 1000)).rejects.toThrow('db down');
     });
   });
 

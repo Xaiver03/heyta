@@ -61,6 +61,19 @@ interface ReminderState {
   snooze: (entityId: string) => Promise<void>;
   dismiss: (entityId: string) => Promise<void>;
   remove: (entityId: string) => Promise<void>;
+  /**
+   * 把**已经真的弹出过通知**的提醒写成 `firedAt`。
+   *
+   * 🔴 这是"投过就没有"在**磁盘上**的那一半。投递处的 `shown` 集合只在一次页面
+   * 加载内有效，而提醒的 `firedAt` 走 op —— 没有这一步，刷新一次或另一台设备
+   * 上线都会把同一条到点提醒**再弹一遍**（缺陷 D14：动作层的 `markReminderFired`
+   * 写好了、测好了，生产零调用点）。
+   *
+   * 逐条串行而不是 `Promise.all`：它们各自是一条 `UPD` op，并发写会让队列里
+   * 出现同一批的交错；`markReminderFired` 自己是幂等的（已投过返回 `false`、
+   * 不写 op），所以重复调用不会堆出第二条 `UPD`。
+   */
+  markDelivered: (entityIds: readonly string[]) => Promise<void>;
 }
 
 /** 与任务 / 习惯 / 专注 store 同一个形状。只含两个函数引用，不含任何判断。 */
@@ -107,6 +120,12 @@ export const useReminderStore = create<ReminderState>((set) => ({
 
   remove: async (entityId) => {
     await attempt(set, taskIdOf(entityId), () => reminderActions.removeReminder(entityId));
+  },
+
+  markDelivered: async (entityIds) => {
+    for (const entityId of entityIds) {
+      await attempt(set, taskIdOf(entityId), () => reminderActions.markReminderFired(entityId));
+    }
   },
 }));
 

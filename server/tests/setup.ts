@@ -202,6 +202,7 @@ vi.mock('../src/db', () => {
     $transaction: vi.fn().mockImplementation(async (callback: any) => {
       // Create a transaction context
       const tx = {
+        vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
         operation: {
           create: vi.fn().mockImplementation(async (args: any) => {
             serverSeqCounter++;
@@ -324,6 +325,9 @@ vi.mock('../src/db', () => {
           }),
           update: vi.fn().mockResolvedValue({}),
         },
+        vaultKeyMigration: {
+          aggregate: vi.fn().mockResolvedValue({ _sum: { reservedStorageBytes: 0n } }),
+        },
         // Every raw query issued inside the transaction must be recognised here and
         // anything unknown must THROW. A tolerant default is how the array branch
         // stayed silently stubbed out: conflict.ts reads an unrecognised row via
@@ -338,6 +342,17 @@ vi.mock('../src/db', () => {
               return entityArrayBranchRows(testData.operations, params);
             }
             const sql = Array.isArray(strings) ? strings.join('') : String(strings);
+            if (sql.includes('FROM user_sync_state') && sql.includes('FOR UPDATE')) {
+              const [txUserId] = params as [number];
+              const syncState = testData.userSyncStates.get(txUserId);
+              return [{
+                lastSeq: syncState?.lastSeq ?? 0,
+                latestStateReplacementSeq: syncState?.latestStateReplacementSeq ?? null,
+              }];
+            }
+            if (sql.includes('SELECT id FROM users WHERE id') && sql.includes('FOR UPDATE')) {
+              return [];
+            }
             throw new Error(`Unmocked raw query in tx: ${sql}`);
           }),
         // The upload transaction writes the storage counter atomically via
@@ -375,6 +390,9 @@ vi.mock('../src/db', () => {
     user: {
       findUnique: vi.fn(),
       update: vi.fn(),
+    },
+    vaultKeyMigration: {
+      aggregate: vi.fn().mockResolvedValue({ _sum: { reservedStorageBytes: 0n } }),
     },
     $queryRaw: vi.fn().mockResolvedValue([{ total: BigInt(0) }]),
     $executeRaw: vi.fn().mockResolvedValue(0),

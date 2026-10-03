@@ -47,10 +47,27 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { pick } from '@react-native-documents/picker';
 import type { SyncStatus } from '@heyta/sync-client';
 import { useI18n } from '@heyta/i18n';
 import { isArgon2SlowBackend } from '@heyta/sync-core';
-import { fetchAccountNotifications } from '@heyta/app-host';
+import {
+  deleteAccountAvatar,
+  fetchAccountNotifications,
+  getAccountProfile,
+  planDisplayNameWrite,
+  resolveAccountAvatarImage,
+  updateAccountDisplayName,
+  uploadAccountAvatar,
+  type AccountAvatarImage,
+} from '@heyta/app-host';
+import {
+  ACCOUNT_AVATAR_CONTENT_TYPES,
+  ACCOUNT_AVATAR_MAX_SOURCE_BYTES,
+  ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS,
+  avatarDataUri,
+  displayNameCodePoints,
+} from '@heyta/shared-schema';
 import {
   SettingsRow,
   resolvePendingUploadPresentation,
@@ -58,14 +75,14 @@ import {
   type SettingsRowModel,
 } from '@heyta/ui';
 
-import { Button, Card, Divider, Screen, SectionHeader, Text } from '../ui/kit';
-import {
-  MOBILE_FEATURE_ENTRIES,
-  type MobileFeatureEntryKey,
-} from '../nav/feature-entries';
+import { Button, Card, Divider, HStack, Screen, SectionHeader, Text, TextField } from '../ui/kit';
+import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
+import { AvatarBadge } from '../ui/avatar';
+import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
+import { EntitlementSection } from './EntitlementSection';
 import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';
 import { HabitsScreen } from './HabitsScreen';
@@ -86,6 +103,12 @@ import { currentSignedInEmail, forgetSignedInUser } from '../auth/session';
 import { privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate';
 import { wipeCredentialsAndWidgets } from '../widgets/credential-wipe';
 import { clearWidgetState } from '../widgets/widget-bridge';
+import {
+  disableVaultRootAutoUnlock,
+  removeVaultRootKey,
+  type VaultSecureStorageScope,
+} from '../lib/vault-secure-storage';
+import { invalidateTaskHostVaultSession } from '../db/open-host';
 
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
@@ -97,6 +120,7 @@ export function ProfileScreen(): React.JSX.Element {
    * `credential-form.ts` 文件头）。设置面拿的是值与回调。
    */
   const form = useSyncCredentialForm();
+  const [vaultCleanupPending, setVaultCleanupPending] = useState<VaultSecureStorageScope>();
 
   // 🔴 冲突界面的可见性只是**界面状态**，不进 store。
   const [conflictsOpen, setConflictsOpen] = useState(false);
@@ -148,18 +172,70 @@ export function ProfileScreen(): React.JSX.Element {
    *    "当前账号：x@y" —— 一句与实际同步状态矛盾的话。
    */
   const onClearCredentials = (): void => {
-    void wipeCredentialsAndWidgets({
-      clearCredentials: clearSyncConfig,
-      clearWidgets: clearWidgetState,
-      onWidgetError: (error) => {
-        // ⚠️ 组件没清干净是这里**唯一真正危险**的失败，
-        //    所以必须留下痕迹，而不是退化成没人知道的 false。
-        console.warn('[widgets] 清除凭据时没能清掉小组件状态', error);
-      },
-    });
-    form.clear();
-    forgetSignedInUser();
+    const config = readSyncConfig();
+    const accountId = config?.accountId?.trim();
+    let scope: VaultSecureStorageScope | undefined;
+    if (config !== undefined && accountId !== undefined && accountId !== '') {
+      try {
+        scope = { serverOrigin: new URL(config.serverUrl).origin, accountId };
+      } catch (error: unknown) {
+        console.warn('[vault] logout secure root cleanup skipped for invalid server URL', error);
+      }
+    }
+
+    // Fence remembered unlock before touching the live credentials. This is a
+    // synchronous device-local write, so a failed native delete cannot make a
+    // stale root usable during the next cold start.
+    if (scope !== undefined) {
+      try {
+        disableVaultRootAutoUnlock(scope);
+      } catch (error: unknown) {
+        setVaultCleanupPending(scope);
+        console.warn('[vault] logout remembered-unlock fence failed', error);
+      }
+    }
+    // Only an already-open host may be invalidated. Logout must never await
+    // opening it or perform a remote GET before clearing the token.
+    invalidateTaskHostVaultSession();
+
+    void (async () => {
+
+      // `wipeCredentialsAndWidgets` clears sync config synchronously before
+      // its first await, so no token remains usable while native cleanup runs.
+      const wipePromise = wipeCredentialsAndWidgets({
+        clearCredentials: clearSyncConfig,
+        clearWidgets: clearWidgetState,
+        onWidgetError: (error) => {
+          console.warn('[widgets] 清除凭据时没能清掉小组件状态', error);
+        },
+      });
+      form.clear();
+      forgetSignedInUser();
+      await wipePromise;
+
+      if (scope !== undefined) {
+        try {
+          await removeVaultRootKey(scope);
+          setVaultCleanupPending(undefined);
+        } catch (error: unknown) {
+          // Keep the scope in memory for an explicit retry. The auth material
+          // is already gone, so a failed native delete cannot re-enable sync.
+          setVaultCleanupPending(scope);
+          console.warn('[vault] logout secure root cleanup failed', error);
+        }
+      }
+    })();
   };
+
+  const retryVaultCleanup = useCallback((): void => {
+    const scope = vaultCleanupPending;
+    if (scope === undefined) return;
+    void removeVaultRootKey(scope)
+      .then(() => setVaultCleanupPending(undefined))
+      .catch((error: unknown) => {
+        console.warn('[vault] retry secure root cleanup failed', error);
+      });
+  }, [vaultCleanupPending]);
 
   /**
    * 「我的成长」是**第二层**页面，不是第 6 个底部标签。
@@ -208,6 +284,241 @@ export function ProfileScreen(): React.JSX.Element {
       void fetchInboxUnread();
     });
   }, [fetchInboxUnread]);
+
+  /**
+   * 昵称：服务端 `User` 上的**一列明文**，不是 op、不进 op-log。
+   *
+   * 🔴 读用 `getAccountProfile`、判用 `planDisplayNameWrite`、写用
+   *   `updateAccountDisplayName` —— 三个函数与 web **同一份**（AGENTS §3.5）。
+   *   "空框=清除不是空串""超长不发""没凭据不发""没改不发"这四条各写一遍
+   *   就是四套裁决，而它们决定的正是"用户按下去到底发生了什么"。
+   *
+   * ⚠️ 出境同意闸门与徽标同一条：`networkAllowed()` 为假时**一个请求都不发**
+   *   （不是"发出去再失败"）。所以这里没凭据/没同意 ⇒ 那一行不出现，
+   *   而不是出现一个空的、点不动的昵称行。
+   *
+   * `savedName` 的三态是**有意的**：`undefined` = 还没读到（不渲染），
+   * `null` = 读到了、用户确实没设（渲染那句「留空则显示邮箱」）。
+   */
+  const [savedName, setSavedName] = useState<string | null | undefined>(undefined);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameEditing, setNameEditing] = useState(false);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameNotice, setNameNotice] = useState<{ text: string; danger: boolean } | null>(null);
+
+  const fetchDisplayName = useCallback((): Promise<void> => {
+    if (!privacyConsent.networkAllowed()) return Promise.resolve();
+    const config = readSyncConfig();
+    const token = config?.token ?? '';
+    if (config === undefined || config.serverUrl === '' || token === '') return Promise.resolve();
+    return getAccountProfile({ baseUrl: config.serverUrl }, token).then((outcome) => {
+      // 🔴 失败**不清空**已有读数：一次网络抖动不该让"你的昵称"在界面上凭空消失。
+      if (!outcome.ok) return;
+      setSavedName(outcome.displayName);
+      // 同一次读取顺手带回 `avatarHash` —— 头像"有没有"的事实源就是这一行，
+      // 不给它单开一次请求（多一次往返、还多一个可能不一致的读数）。
+      setAvatarHash(outcome.avatarHash);
+    });
+  }, []);
+  useEffect(() => {
+    void fetchDisplayName();
+  }, [fetchDisplayName]);
+
+  const saveDisplayName = useCallback(async (): Promise<void> => {
+    if (nameSaving) return;
+    const config = readSyncConfig();
+    const plan = planDisplayNameWrite({
+      token: config === undefined || config.serverUrl === '' ? undefined : (config.token ?? ''),
+      draft: nameDraft,
+      saved: savedName,
+    });
+    if (plan.action === 'skip') {
+      // 三种"不发"里只有超长需要说给用户：另外两种他看不出差别，说一句"没保存"
+      // 反而是在暗示出过事。
+      if (plan.reason === 'too-long') {
+        setNameNotice({
+          text: t('common.profile.nickname.toolong', {
+            max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
+            count: String(displayNameCodePoints(nameDraft)),
+          }),
+          danger: true,
+        });
+      }
+      return;
+    }
+    setNameSaving(true);
+    setNameNotice(null);
+    const outcome = await updateAccountDisplayName(
+      { baseUrl: config?.serverUrl ?? '' },
+      plan.token,
+      plan.value,
+    );
+    setNameSaving(false);
+    if (!outcome.ok) {
+      // 🔴 说的是**昵称**那句。web 这里曾经复用头像的失败文案（"头像没有传上去"），
+      //    于是昵称没存上时界面在讲另一件事 —— 判据钉在 profile-panel 那一侧。
+      setNameNotice({ text: t('common.profile.nickname.failed'), danger: true });
+      return;
+    }
+    setSavedName(outcome.displayName);
+    setNameEditing(false);
+    setNameNotice({
+      text:
+        outcome.displayName === null
+          ? t('common.profile.nickname.cleared')
+          : t('common.profile.nickname.saved'),
+      danger: false,
+    });
+    void fetchDisplayName();
+  }, [fetchDisplayName, nameDraft, nameSaving, savedName, t]);
+
+  /**
+   * 头像：一张**端到端加密的图片**，读写都要那把同步口令。
+   *
+   * 🔴 读它分两步，而且这两步答的是**两个不同的问题**：
+   * `getAccountProfile` 给的是 `avatarHash`（服务端只知道这个，它看不到内容），
+   * 有了 hash 才去 `GET account/avatar` 取密文并用口令解开。
+   * 所以"这台设备现在显示不出头像"有五种原因，而它们对应的**用户动作不同**：
+   * 没有头像（想设就设）/ 本机没填口令（去填）/ 口令不对（去核对）/
+   * 暂时取不到（稍后重试）/ 这台设备没有读图通道（先用网页版）。
+   * 把这五种并成一句"头像没有传上去"，症状是界面在对着一件没发生过的事说话 ——
+   * 这正是 web 那边已经钉过一次的那一族，所以这里从一开始就分开。
+   * 判定住在 `resolveAccountAvatarImage`（app-host），界面只按状态出句子。
+   *
+   * ⚠️ `avatarHash` 的三态与 `savedName` 同一条理由：`undefined` = 还没读到
+   * （那一整块不渲染），`null` = 读到了、确实没有头像。
+   */
+  const [avatarHash, setAvatarHash] = useState<string | null | undefined>(undefined);
+  const [avatarImage, setAvatarImage] = useState<string | undefined>(undefined);
+  const [avatarState, setAvatarState] = useState<AccountAvatarImage['state'] | undefined>(
+    undefined,
+  );
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarNotice, setAvatarNotice] = useState<{ text: string; danger: boolean } | null>(null);
+
+  /** 读侧的那句话：只有"有头像却显示不出来"才需要说，`absent` 不是一件事。 */
+  const avatarReadMessage =
+    avatarState === 'undecryptable'
+      ? t('common.profile.avatar.undecryptable')
+      : avatarState === 'unreadable'
+        ? t('common.profile.avatar.unreadable')
+        : null;
+
+  const fetchAvatarImage = useCallback((): Promise<void> => {
+    // `null` = 服务端说没有 ⇒ **一个请求都不发**（这是契约前提，不是优化）。
+    if (avatarHash === undefined || avatarHash === null) return Promise.resolve();
+    if (!privacyConsent.networkAllowed()) return Promise.resolve();
+    const config = readSyncConfig();
+    const token = config?.token ?? '';
+    if (config === undefined || config.serverUrl === '' || token === '') return Promise.resolve();
+    return resolveAccountAvatarImage(
+      { baseUrl: config.serverUrl },
+      token,
+      config.password,
+      avatarHash,
+    ).then((reading) => {
+      setAvatarState(reading.state);
+      // 🔴 失败**不清掉**上一次显示的那张图：一次取不到不该让已经看到的头像凭空消失，
+      //    但它也不会被当成"最新的"——下一句 `avatarReadMessage` 会说明它可能不是最新。
+      if (reading.state === 'ready') setAvatarImage(reading.dataUri);
+      else if (reading.state === 'absent') setAvatarImage(undefined);
+    });
+  }, [avatarHash]);
+  useEffect(() => {
+    void fetchAvatarImage();
+  }, [fetchAvatarImage]);
+
+  /**
+   * 需要口令的那句话只在**共享裁决**说"缺口令"时出现。
+   *
+   * ⚠️ 这里刻意不在渲染期读 `readSyncConfig()`：凭据是模块级可变状态，
+   * 渲染期读它会在"用户刚在设置面填了口令"那一刻保持旧值，
+   * 于是界面继续说"本机没有口令"。`avatarState` 是上一次真实读到的结论，
+   * 而"去设置里填一次"这个动作完成后会重读资料 —— 它跟着事实走，不跟着猜测走。
+   */
+  const needsPassword = avatarState === 'needs-password';
+
+  const prepareMessage = useCallback(
+    (error: AvatarPrepareError): string =>
+      error === 'bad-type'
+        ? t('common.profile.avatar.badType', {
+            types: ACCOUNT_AVATAR_CONTENT_TYPES.map((c) => c.replace('image/', '')).join(' / '),
+          })
+        : error === 'too-big'
+          ? t('common.profile.avatar.tooBig', {
+              max: `${Math.floor(ACCOUNT_AVATAR_MAX_SOURCE_BYTES / 1024)} KB`,
+            })
+          : error === 'no-channel'
+            ? t('mobile.profile.avatar.noChannel')
+            : t('common.profile.avatar.failed'),
+    [t],
+  );
+
+  const changeAvatar = useCallback(async (): Promise<void> => {
+    if (avatarBusy) return;
+    const config = readSyncConfig();
+    const token = config?.token ?? '';
+    const password = config?.password ?? '';
+    if (config === undefined || config.serverUrl === '' || token === '' || password === '') {
+      // 说的是"为什么现在不能换"，不是"换失败了"——一次请求都没发出去。
+      setAvatarNotice({ text: t('common.profile.avatar.needPassword'), danger: true });
+      return;
+    }
+    setAvatarNotice(null);
+    const picked = await pick({ allowMultiSelection: false }).catch((e: unknown) => {
+      // 取消是正常路径（静默）；其他码不能说谎。
+      if ((e as { code?: string }).code === 'OPERATION_CANCELED') return undefined;
+      setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
+      return undefined;
+    });
+    if (picked === undefined) return;
+    const doc = picked[0];
+    if (doc === undefined) {
+      setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
+      return;
+    }
+    setAvatarBusy(true);
+    const prepared = await prepareAvatarFromUri(doc.uri, doc.type ?? doc.nativeType ?? '');
+    if (!prepared.ok) {
+      setAvatarBusy(false);
+      setAvatarNotice({ text: prepareMessage(prepared.error), danger: true });
+      return;
+    }
+    const outcome = await uploadAccountAvatar(
+      { baseUrl: config.serverUrl },
+      token,
+      password,
+      prepared.image,
+    );
+    setAvatarBusy(false);
+    if (!outcome.ok) {
+      setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
+      return;
+    }
+    // 本地图立刻显示（不等下一次读），hash 换成服务端给的那一枚。
+    setAvatarImage(avatarDataUri(prepared.image));
+    setAvatarState('ready');
+    setAvatarHash(outcome.avatarHash);
+    setAvatarNotice({ text: t('common.profile.avatar.uploaded'), danger: false });
+  }, [avatarBusy, prepareMessage, t]);
+
+  const removeAvatar = useCallback(async (): Promise<void> => {
+    if (avatarBusy) return;
+    const config = readSyncConfig();
+    const token = config?.token ?? '';
+    if (config === undefined || config.serverUrl === '' || token === '') return;
+    setAvatarBusy(true);
+    const outcome = await deleteAccountAvatar({ baseUrl: config.serverUrl }, token);
+    setAvatarBusy(false);
+    if (!outcome.ok) {
+      setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
+      return;
+    }
+    setAvatarImage(undefined);
+    setAvatarState('absent');
+    setAvatarHash(null);
+    setAvatarNotice({ text: t('common.profile.avatar.removed'), danger: false });
+  }, [avatarBusy, t]);
 
   /**
    * 本会话内登录过的账号邮箱（**只放内存**，见 `auth/session.ts`）。
@@ -439,6 +750,20 @@ export function ProfileScreen(): React.JSX.Element {
     });
   }
 
+  /**
+   * 头像那一行**一次只说一句**，优先级从"用户刚做的事"往"环境缺什么"排：
+   * 刚上传/刚移除的结果 > 这台设备读不到头像 > 本机没有口令。
+   *
+   * 🔴 叠三句会被读成"出过三件事"，而这里三句互相排斥：
+   * 上传成功后再说一句"缺口令"就是自相矛盾（他刚用完口令）。
+   */
+  const avatarLine =
+    avatarNotice?.text ??
+    avatarReadMessage ??
+    (needsPassword ? t('common.profile.avatar.needPassword') : null);
+  const avatarLineDanger =
+    avatarNotice !== null ? avatarNotice.danger : avatarReadMessage !== null;
+
   return (
     <Screen title={t('mobile.profile.title')}>
       {/*
@@ -460,6 +785,123 @@ export function ProfileScreen(): React.JSX.Element {
               valueTestID: 'profile-account-value',
             }}
           />
+          {/*
+            🔴 昵称行**只在真的读到之后**出现。没凭据 / 没同意出境 ⇒ 一个请求都不发，
+            于是这里连行都不画 —— 画一行"昵称：（空）"会被读成"设置坏了"，
+            而它其实是"你还没登录"。这两件事在界面上必须长得不一样。
+
+            ⚠️ 这一段**一个 `style={{ }}` 都不许出现**：`check:l4` 的 mobile 段
+            现量恰在基线 90、零余量（只减不增的棘轮）。行、输入框、按钮的样式
+            全在 `SettingsRow` 与 `ui/kit` 里，这里只给模型与文案。
+          */}
+          {/*
+            🔴 头像行与昵称行**同一次读取**才出现（`savedName === undefined` 就是不出现）。
+            理由与昵称那条一样：没登录时画一个空的、点不动的头像圈，
+            会被读成"设置坏了"，而它其实是"你还没登录"。
+
+            ⚠️ 这一段同样**一个 `style={{ }}` 都不许有**：圈和图的样式在 `ui/avatar.tsx`
+            （那是 `check:l4` mobile 段豁免的目录），这里只给数据与文案。
+          */}
+          {savedName === undefined ? null : (
+            <>
+              <HStack gap="default" align="center">
+                <AvatarBadge dataUri={avatarImage} email={signedInEmail} />
+                <Text variant="row-title" grow>
+                  {t('common.profile.avatar.label')}
+                </Text>
+              </HStack>
+              <HStack gap="tight">
+                <Button
+                  label={t('common.profile.avatar.change')}
+                  onPress={() => {
+                    void changeAvatar();
+                  }}
+                  tone="secondary"
+                  loading={avatarBusy}
+                />
+                {avatarImage === undefined ? null : (
+                  <Button
+                    label={t('common.profile.avatar.remove')}
+                    onPress={() => {
+                      void removeAvatar();
+                    }}
+                    tone="ghost"
+                    loading={avatarBusy}
+                  />
+                )}
+              </HStack>
+              {avatarLine === null ? null : (
+                <Text variant="caption" tone={avatarLineDanger ? 'danger' : 'subtle'}>
+                  {avatarLine}
+                </Text>
+              )}
+            </>
+          )}
+          {savedName === undefined ? null : nameEditing ? (
+            <>
+              <TextField
+                label={t('common.profile.nickname.label')}
+                value={nameDraft}
+                onChangeText={(next) => {
+                  setNameDraft(next);
+                  setNameNotice(null);
+                }}
+                placeholder={t('common.profile.nickname.placeholder')}
+                hint={
+                  nameNotice?.text ??
+                  t('common.profile.nickname.hint', {
+                    max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
+                  })
+                }
+                hintTone={nameNotice?.danger === true ? 'danger' : 'subtle'}
+                onSubmitEditing={() => {
+                  void saveDisplayName();
+                }}
+                testID="profile-nickname-input"
+              />
+              <Button
+                label={t('common.profile.nickname.save')}
+                onPress={() => {
+                  void saveDisplayName();
+                }}
+                tone="primary"
+                loading={nameSaving}
+              />
+              <Button
+                label={t('mobile.common.cancel')}
+                onPress={() => {
+                  setNameEditing(false);
+                  setNameNotice(null);
+                }}
+                tone="ghost"
+              />
+            </>
+          ) : (
+            <>
+              <SettingsRow
+                row={{
+                  kind: 'value',
+                  label: t('common.profile.nickname.label'),
+                  // 🔴 `null` 显示的是那句「留空则显示邮箱」，**不是空字符串**：
+                  //    空值会被读成"没读到"，而那与"读到了、用户确实没设"是两件事。
+                  value: savedName ?? t('common.profile.nickname.placeholder'),
+                  tone: savedName === null ? 'subtle' : 'default',
+                  onPress: () => {
+                    setNameDraft(savedName ?? '');
+                    setNameNotice(null);
+                    setNameEditing(true);
+                  },
+                  valueTestID: 'profile-nickname-value',
+                }}
+              />
+              <Text
+                variant="caption"
+                tone={nameNotice?.danger === true ? 'danger' : 'subtle'}
+              >
+                {nameNotice?.text ?? t('mobile.profile.nickname.hint')}
+              </Text>
+            </>
+          )}
           <Text variant="caption" tone="subtle">
             {signedInEmail === undefined
               ? t('mobile.profile.account.offlineHint')
@@ -527,6 +969,16 @@ export function ProfileScreen(): React.JSX.Element {
         ))}
       </View>
 
+      {/*
+        托管同步权益（「已开启」/「已到期」/「暂不可用」）。独立成组件有两个理由：
+        ① 它要发一次出境探测，得跟着 `privacyConsent` 闸门走，不该混进这屏的
+        凭据/头像状态机；② 本文件的冻结判据（`profile-nickname-entry.spec.ts:144`）
+        要求这里**一个 web 前缀的词条调用都没有**，而那三条说明是 web 已有的真词条
+        —— 复用它们、不复制第二份，所以引用只能落在这个独立文件里。
+        没有权益可说时它自己返回 null（不占位）。
+      */}
+      <EntitlementSection />
+
       {/* 清单 / 标签 / 便签管理。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
       <ListsSection />
@@ -551,6 +1003,8 @@ export function ProfileScreen(): React.JSX.Element {
         }}
         form={form}
         onClearCredentials={onClearCredentials}
+        vaultCleanupPending={vaultCleanupPending !== undefined}
+        onRetryVaultCleanup={retryVaultCleanup}
       />
     </Screen>
   );

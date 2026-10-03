@@ -16,6 +16,7 @@ import type { Operation } from '@heyta/sync-core';
 
 import { IndexedDbAdapter } from '../src/indexeddb/indexeddb-adapter.js';
 import { DbOpLogStore } from '../src/db-op-log-store.js';
+import { checkpointChecksum } from '../src/checkpoint.js';
 import { META_KEYS, OP_FIELDS, OP_INDEXES, STORES } from '../src/stores.js';
 
 // 每个测试用全新的 IndexedDB 全局，避免互相污染
@@ -309,7 +310,17 @@ describe('DbOpLogStore', () => {
     const seqs = await store.appendLocal(Array.from({ length: 20 }, () => makeOp()));
     const lastSeq = seqs[seqs.length - 1]!;
 
+    const rows = await store.getAllOps();
+    await store.markUploaded(new Map(rows.map((r) => [r.op.id, r.seq])));
     const store5 = new DbOpLogStore<Operation<string>>(db, 5);
+    const checkpoint = {
+      formatVersion: 1 as const,
+      coveredSeq: lastSeq - 5,
+      state: { formatVersion: 1, buckets: {} },
+      clock: { 'client-a': 20 },
+      appliedOpIds: [],
+    };
+    await store5.writeCheckpoint({ ...checkpoint, checksum: checkpointChecksum(checkpoint) });
     const archived = await store5.archiveUpTo(lastSeq);
 
     // cutoff = lastSeq - 5，所以归档的是 seq <= cutoff 的那批

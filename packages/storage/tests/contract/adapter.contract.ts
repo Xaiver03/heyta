@@ -122,6 +122,18 @@ export function runDbAdapterContract({ name, create }: AdapterContractOptions): 
 
     // ── 区间语义 ────────────────────────────────────────────
 
+    it('getAll limit applies after the key range and is preserved inside transactions', async () => {
+      await withDb(async (db) => {
+        for (let i = 0; i < 8; i++) await db.add(STORES.OPS, opRecord());
+        const range = { lower: 3, lowerOpen: true, upper: 8, upperOpen: true };
+        expect((await db.getAll<Record<string, unknown>>(STORES.OPS, range, 2)).map((r) => r[OP_FIELDS.SEQ])).toEqual([4, 5]);
+        await db.transaction([STORES.OPS], 'readonly', async (tx) => {
+          expect((await tx.getAll<Record<string, unknown>>(STORES.OPS, range, 2)).map((r) => r[OP_FIELDS.SEQ])).toEqual([4, 5]);
+        });
+        await expect(db.getAll(STORES.OPS, undefined, 0)).rejects.toThrow();
+      });
+    });
+
     it('区间是**闭开**语义：lower 含、upperOpen 不含', async () => {
       await withDb(async (db) => {
         for (let i = 0; i < 5; i++) await db.add(STORES.OPS, opRecord());

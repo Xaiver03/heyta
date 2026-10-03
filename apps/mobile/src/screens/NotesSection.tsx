@@ -26,9 +26,11 @@
  * ─────────────────────────────────────────────────────────────────────────
  * 三个刻意的决定
  *
- * 1. **不传 `onEdit`。** 移动端**没有便签编辑屏** —— 共享组件据此不渲染
- *    摘要上的编辑入口（`a11yEdit` 因此不会出现）。传一个"打开一个还不存在的屏"
- *    的回调，比没有这个入口更坏。
+ * 1. ~~**不传 `onEdit`。**~~ **（2026-10-03 多端第二批已推翻这句，留原文是为了让
+ *    后来者认出"零件都在、没人接线"这个形状）** 编辑屏已存在
+ *    （{@link NoteEditScreen}），本文件现在传 `onEdit`，摘要那段因此变成可点的入口。
+ *    当时那句理由本身仍然成立 —— 传一个通往不存在的屏的回调比没有入口更坏；
+ *    变的是屏有了。
  * 2. **不传 `excerptLength`。** 走共享默认（`NOTE_EXCERPT_LENGTH = 60`），
  *    与 web 同一行宽；移动端窄屏真放不下时再调，而不是现在先猜一个数字。
  * 3. **错误显示原始文本、不翻译。** 便签超长时 `createNote` 会抛错
@@ -45,6 +47,7 @@ import { NotesBoard } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { notesBoardLabels } from '../lib/notes-display';
+import { NoteEditScreen } from './NoteEditScreen';
 import { useMobileSync } from '../sync/store';
 import { Card, SectionHeader, Text } from '../ui/kit';
 
@@ -62,6 +65,14 @@ export function NotesSection(): React.JSX.Element {
   const [notes, setNotes] = useState<Note[]>([]);
   /** 见文件头决定 3：失败原因原样显示，不静默吞。 */
   const [error, setError] = useState<string | null>(null);
+  /**
+   * 正在编辑的那条便签 id，`null` = 编辑屏没开。
+   *
+   * 🔴 刻意**不放**在 `ProfileScreen` 的那一族 `useState` 里：编辑屏是全屏
+   * `Modal`（见 `NoteEditScreen` 文件头那条理由），挂在拥有这段数据的本文件里，
+   * 「我的」页就不用为一个它不关心的状态多一层回调；而搜索那条入口另有一个宿主。
+   */
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -130,9 +141,22 @@ export function NotesSection(): React.JSX.Element {
             // 算好传进来，本文件不再取反（取反两次就永远不会变）。
             run(actions.setNotePinnedToToday(entityId, pinned));
           }}
+          // 摘要那段因此从纯文本变成可点的编辑入口（共享组件按传没传决定）。
+          // ⚠️ `NotesBoard` 交出的是**行 id**，与 `onRemove` / `onTogglePinned` 同一个键。
+          onEdit={(entityId) => {
+            setEditingId(entityId);
+          }}
           testID="mobile-notes-board"
         />
       </Card>
+      {editingId === null ? null : (
+        <NoteEditScreen
+          noteId={editingId}
+          onBack={() => {
+            setEditingId(null);
+          }}
+        />
+      )}
       {error !== null ? (
         <Text variant="caption" tone="danger" selectable>
           {error}

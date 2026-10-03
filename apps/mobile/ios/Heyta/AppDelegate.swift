@@ -2,9 +2,10 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import UserNotifications
 
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
 
@@ -12,6 +13,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    UNUserNotificationCenter.current().delegate = self
+    UNUserNotificationCenter.current().setNotificationCategories([
+      UNNotificationCategory(identifier: HeytaReminderReceipts.category, actions: [],
+        intentIdentifiers: [], options: [.customDismissAction])
+    ])
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -20,6 +26,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     reactNativeFactory = factory
 
     return true
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    if notification.request.content.categoryIdentifier == HeytaReminderReceipts.category {
+      do { try HeytaReminderReceipts.observe([notification.request.identifier]) }
+      catch { NSLog("[reminder] Failed to persist foreground receipt") }
+    }
+    completionHandler([.banner, .sound, .badge])
+  }
+
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    if response.notification.request.content.categoryIdentifier == HeytaReminderReceipts.category {
+      do { try HeytaReminderReceipts.observe([response.notification.request.identifier]) }
+      catch { NSLog("[reminder] Failed to persist interaction receipt") }
+    }
+    completionHandler()
   }
 
   /// 🔴 iOS 26+ SDK 构建强制 UIScene 生命周期（见 SceneDelegate.swift 文件头）。

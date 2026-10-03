@@ -44,6 +44,8 @@ import {
   dueReminders as dueOf,
   nextTriggerAfterRepeat,
   reminderPhase,
+  reminderEffectiveAt,
+  reminderIsFired,
   reminderRejection,
   reminderTriggerFromOffset,
   type Reminder,
@@ -95,7 +97,12 @@ export interface ReminderActions {
    * 标记已投递。**幂等**：已投递返回 `false` 且不写 op
    * （否则每次进前台都会推高 `updatedAt`，在两端制造假冲突）。
    */
-  markReminderFired(entityId: string): Promise<boolean>;
+  /**
+   * Mark a delivery as fired. When an occurrence time is supplied, the check is
+   * repeated inside the op reducer so a queued snooze/reschedule cannot be
+   * incorrectly marked fired after this method first observes the old value.
+   */
+  markReminderFired(entityId: string, expectedTriggerAt?: number): Promise<boolean>;
   /** 用户主动关闭。已关闭返回 `false`。 */
   dismissReminder(entityId: string): Promise<boolean>;
   /** 撤销关闭（清 `dismissedAt`）。未关闭返回 `false`。 */
@@ -104,13 +111,19 @@ export interface ReminderActions {
   removeReminder(entityId: string): Promise<void>;
   /** 某任务的未删除提醒，按 id 字典序（两端顺序一致）。 */
   listForTask(taskId: string): Reminder[];
-  /** **已到点、还没投递**的提醒，顺序确定（领域层 `dueReminders`）。 */
+  /**
+   * **已到点、还没投递、且所属任务还活着**的提醒，顺序确定（领域层 `dueReminders`）。
+   *
+   * 🔴 "任务活着"这一道在本方法里，**不在调用方**：墓碑任务与它的提醒是两条独立
+   * 记录，只滤提醒自己会让已删除任务到点照样弹（缺陷 D1）。宿主只管订阅结果。
+   */
   due(): Reminder[];
   /**
    * 重复任务顺延：把该任务每条带 `offsetMs` 的提醒重置到**下一个周期**。
    *
-   * 一条 `UPD` 同时写 `triggerAt` + 清 `firedAt` / `dismissedAt` / `snoozedUntil`
-   * —— 上一个周期的投递/关闭/推迟状态对新周期没有意义（见文件头第 5 条）。
+   * 一条 `UPD` 同时写 `triggerAt` + 清 `dismissedAt` / `snoozedUntil`；旧的
+   * `firedAt` 与 `firedForTriggerAt` 保留为历史事实，由 marker 与新 trigger
+   * 的不匹配使旧 occurrence 失效。
    * 不需要顺延的（无 `offsetMs`、无新截止、时刻没变）**不写 op**。
    *
    * 返回真正被顺延的提醒数。
@@ -134,6 +147,29 @@ export function createReminderActions(
   options: ReminderActionsOptions = {},
 ): ReminderActions {
   const now = options.now ?? Date.now;
+  /**
+   * 建提醒的上限检查与 Create op 必须按任务串行。
+   *
+   * `writeNew` 先数存活提醒再 dispatch；若同一任务的快速点击并发进入，
+   * 每个调用都可能在前一个 op 落库前看到同一个旧计数，短时间内就能越过
+   * `MAX_REMINDERS_PER_TASK`。这不是 UI 去重能修的竞态：动作层的上限契约
+   * 必须在所有宿主、导入和程序化调用下都成立。
+   */
+  const createQueues = new Map<string, Promise<void>>();
+
+  function enqueueCreate<T>(taskId: string, run: () => Promise<T>): Promise<T> {
+    const previous = createQueues.get(taskId) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(run);
+    const tail = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    createQueues.set(taskId, tail);
+    void tail.then(() => {
+      if (createQueues.get(taskId) === tail) createQueues.delete(taskId);
+    });
+    return next;
+  }
 
   const taskOf = (taskId: string): { id: string; dueDate?: number } | undefined => {
     const task = ctx.getState().tasks[taskId];
@@ -176,6 +212,10 @@ export function createReminderActions(
     triggerAt: number,
     over: NewReminderFields,
   ): Promise<string> {
+    // The caller checks before enqueueing, but another queued create may have
+    // waited while the task was deleted. Re-check at the actual write point so
+    // a delayed request cannot create a reminder for a tombstoned task.
+    if (taskOf(taskId) === undefined) throw new Error(`找不到任务「${taskId}」`);
     const entityId = reminderId(taskId, triggerAt);
     // 幂等：同任务同刻已经有一条存活提醒 → 直接返回它（见文件头第 1 条）。
     if (reminderOf(entityId) !== undefined) return entityId;
@@ -207,7 +247,7 @@ export function createReminderActions(
       if (taskOf(taskId) === undefined) throw new Error(`找不到任务「${taskId}」`);
       assertTrigger(triggerAt);
       if (over.offsetMs !== undefined) assertOffset(over.offsetMs);
-      return writeNew(taskId, triggerAt, over);
+      return enqueueCreate(taskId, () => writeNew(taskId, triggerAt, over));
     },
 
     async createReminderBeforeDue(taskId, offsetMs) {
@@ -219,12 +259,16 @@ export function createReminderActions(
       assertOffset(offsetMs);
       const triggerAt = reminderTriggerFromOffset(task.dueDate, offsetMs);
       assertTrigger(triggerAt);
-      return writeNew(taskId, triggerAt, { offsetMs });
+      return enqueueCreate(taskId, () => writeNew(taskId, triggerAt, { offsetMs }));
     },
 
     async rescheduleReminder(entityId, triggerAt) {
-      if (reminderOf(entityId) === undefined) throw new Error(`找不到提醒「${entityId}」`);
+      const reminder = reminderOf(entityId);
+      if (reminder === undefined) throw new Error(`找不到提醒「${entityId}」`);
       assertTrigger(triggerAt);
+      const legacyFiredForTriggerAt = reminder.firedAt !== undefined && reminder.firedForTriggerAt === undefined
+        ? reminderEffectiveAt(reminder)
+        : undefined;
       await ctx.dispatch({
         entityType: 'REMINDER' as EntityType,
         entityId,
@@ -232,7 +276,11 @@ export function createReminderActions(
         // 改期会**清掉 snooze**：用户重新挑了个时间，上一次的"稍后"已经没有意义，
         // 留着它会让 `reminderEffectiveAt` 继续返回旧的 snooze 时刻
         // （症状：改完时间却没生效）。
-        payload: { triggerAt, snoozedUntil: null },
+        payload: {
+          triggerAt,
+          snoozedUntil: null,
+          ...(legacyFiredForTriggerAt === undefined ? {} : { firedForTriggerAt: legacyFiredForTriggerAt }),
+        },
       });
     },
 
@@ -256,10 +304,14 @@ export function createReminderActions(
       return true;
     },
 
-    async markReminderFired(entityId) {
+    async markReminderFired(entityId, expectedTriggerAt) {
       const reminder = reminderOf(entityId);
       if (reminder === undefined) throw new Error(`找不到提醒「${entityId}」`);
-      if (reminder.firedAt !== undefined) return false;
+      if (reminderIsFired(reminder)) return false;
+
+      if (expectedTriggerAt !== undefined && reminderEffectiveAt(reminder) !== expectedTriggerAt) {
+        return false;
+      }
 
       await ctx.dispatch({
         entityType: 'REMINDER' as EntityType,
@@ -267,9 +319,17 @@ export function createReminderActions(
         opType: OpType.Update,
         // 时刻写进**载荷**（数据）而不是只依赖 op 的 timestamp（日志元数据）：
         // 两端重放同一条 op 必须得到同一个 `firedAt`（reducer 是纯函数的纪律）。
-        payload: { firedAt: now() },
+        payload: {
+          firedAt: now(),
+          firedForTriggerAt: expectedTriggerAt ?? reminderEffectiveAt(reminder),
+        },
       });
-      return true;
+      // The reducer re-checks the marker while the op is actually applied. A
+      // snooze/reschedule already queued ahead of this op therefore wins and
+      // this receipt is treated as stale by the delivery reconciler.
+      if (expectedTriggerAt === undefined) return true;
+      const after = reminderOf(entityId);
+      return after !== undefined && reminderIsFired(after);
     },
 
     async dismissReminder(entityId) {
@@ -316,8 +376,27 @@ export function createReminderActions(
       return aliveOfTask(taskId);
     },
 
+    /**
+     * 🔴 **所属任务已进墓碑（或根本不在）的提醒不算到点。**
+     *
+     * `dueReminders` 只看提醒**自己**的 `deletedAt`，而任务和提醒是两条记录：
+     * 把任务丢进回收站只给任务打了 `deletedAt`，那条挂着的提醒仍然是"存活、到点、
+     * 没投递过"。症状（缺陷 D1）：删掉任务之后到点照样弹一条，点进去什么都没有。
+     *
+     * 判"任务在不在"复用同一个 `taskOf`（它对 `deletedAt !== undefined` 返回
+     * `undefined`，因此已彻底删除的那条一并被挡住）—— **不在这里另写一遍过滤**，
+     * 也不挪到某个投递点去补：`due()` 是这一层唯一交出去"该弹哪些"的地方，
+     * 隐藏由层负责，不由调用点各自记得。
+     *
+     * ⚠️ `taskOf` 顺带挡住了"任务不存在"的那种提醒：通知正文要用任务标题，
+     * 任务不在时它说不出任何有用的东西，而界面层原本是靠
+     * `task === undefined` 才跳过的 —— 两道门现在口径一致。
+     */
     due() {
-      return dueOf(Object.values(ctx.getState().reminders), now());
+      const reminders = Object.values(ctx.getState().reminders).filter(
+        (reminder) => taskOf(reminder.taskId) !== undefined,
+      );
+      return dueOf(reminders, now());
     },
 
     async rescheduleForRepeat(taskId, nextDueDate) {
@@ -372,9 +451,11 @@ export async function rescheduleRemindersForRepeat(
       payload: {
         triggerAt: next,
         // 新周期重置：上一个周期的投递/关闭/推迟对新周期没有意义（文件头第 5 条）。
-        firedAt: null,
         dismissedAt: null,
         snoozedUntil: null,
+        ...(reminder.firedAt !== undefined && reminder.firedForTriggerAt === undefined
+          ? { firedForTriggerAt: reminderEffectiveAt(reminder) }
+          : {}),
       },
     });
     moved += 1;

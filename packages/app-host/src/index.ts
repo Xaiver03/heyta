@@ -83,6 +83,35 @@ export {
   type ReminderActions,
   type ReminderActionsOptions,
 } from './reminder-actions.js';
+export { planNativeReminders, type NativeReminderPlan } from './reminder-scheduler.js';
+export {
+  createVaultKeyMigrationRemote,
+  createVaultMigrationInventorySource,
+  cancelVaultPayloadMigration,
+  cancelVaultPayloadMigrationForScope,
+  createVaultMigrationJournal,
+  migrateVaultPayloads,
+  VAULT_KEY_MIGRATION_INVENTORY_PATH,
+  VAULT_KEY_MIGRATION_PATH,
+  VaultMigrationError,
+  type VaultKeyMigrationRemote,
+  type VaultKeyMigrationRemoteOptions,
+  type VaultMigrationInventoryOperation,
+  type VaultMigrationInventoryPage,
+  type VaultMigrationInventorySnapshot,
+  type VaultMigrationInventorySource,
+  type VaultMigrationJournal,
+  type VaultMigrationJournalRecord,
+  type VaultMigrationOptions,
+  type VaultMigrationProgress,
+} from './vault-migration.js';
+export {
+  createReminderReconciler,
+  reconcileReminderDelivery,
+  type ReminderAuthorization,
+  type ReminderDeliveryOptions,
+  type ReminderDeliveryPort,
+} from './reminder-delivery.js';
 
 /**
  * 便签动作（幻觉 #12「笔记模块」的写路径）。
@@ -244,6 +273,7 @@ export {
   parseLegalConsentStatus,
   passkeyDeletePath,
   passkeyPath,
+  planDisplayNameWrite,
   registerWithEmailPassword,
   registerWithMagicLink,
   renamePasskey,
@@ -251,13 +281,16 @@ export {
   requestPasskeyRecovery,
   requestPasswordReset,
   resetPasswordWithToken,
+  resolveAccountAvatarImage,
   setInitialPassword,
   updateAccountDisplayName,
   updateAccountLocale,
   uploadAccountAvatar,
   verifyEmailAddress,
   verifyMagicLink,
+  type AccountAvatarImage,
   type AvatarDecodeResult,
+  type DisplayNameWritePlan,
   type HostedAuthFailure,
   type HostedAuthFailureReason,
   type HostedAuthLocale,
@@ -302,7 +335,9 @@ export {
 export {
   createLocalApiHost,
   fromLocalDateString,
+  LOCAL_API_DUE_FORMAT_HINT,
   taskToItem,
+  toLocalApiDueString,
   toLocalDateString,
   type LocalApiHostOptions,
 } from './local-api-host.js';
@@ -480,6 +515,17 @@ export {
 } from './motivation.js';
 
 /**
+ * 本周小结的纯文本。两端共用一份（原来只有 web 一份，移动端接分享块时会逼出第二份
+ * —— 理由见 `share-summary.ts` 文件头与 AGENTS §3.5）。
+ */
+export {
+  SHARE_SUMMARY_KEYS,
+  buildShareSummary,
+  type ShareSummaryKey,
+  type ShareSummaryTranslate,
+} from './share-summary.js';
+
+/**
  * 导出（**导出自由**，README 设计原则第 5 条）。
  *
  * 🔴 导出的**内容形状**是产品语义，所以它在这里而不在 `apps/*` ——
@@ -619,3 +665,26 @@ export {
   type PublicFactsSnapshot,
   type PublicFactsUnavailableCause,
 } from './public-facts.js';
+
+export {
+  createVaultKeyPackageStore,
+  type VaultKeyPackageStore,
+  type VaultKeyPackageScope,
+} from './vault-key-package-store.js';
+
+export {
+  VAULT_KEY_PACKAGE_PATH,
+  VaultSessionError,
+  createVaultKeyPackageRemote,
+  createVaultKeySession,
+  type PendingVaultCreation,
+  type VaultKeyPackageRemote,
+  type VaultKeyPackageRemoteOptions,
+  type VaultKeyPackageRemoteState,
+  type VaultRootRotationMigration,
+  type VaultRootRotationMigrationInput,
+  type VaultRootRotationMigrationResult,
+  type VaultRootRotationPort,
+  type VaultKeySession,
+  type VaultSessionState,
+} from './vault-session.js';

@@ -45,6 +45,7 @@ import {
 import { CaptureComposer } from '../capture/CaptureComposer.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
+import { useDragDayNav } from './useDragDayNav.js';
 import { useWheelMonthNav } from './useWheelMonthNav.js';
 import { useCalendarViewStore } from './store.js';
 
@@ -130,6 +131,22 @@ export function CalendarView(): React.JSX.Element {
     { within: `[data-testid="${BOARD_TEST_ID}-month-card"]` },
   );
 
+  /**
+   * 横向拖拽换天（R11 批四，产品负责人："鼠标在这里左右滑动…就是上一天和下一天的切换"）。
+   *
+   * 🔴 走多远仍然只有 `stepCalendarCursor` 一个来源 —— 与页头那两个箭头、
+   *   与滚轮**同一个函数**，只是 `segments` 来自横向位移。
+   *   只在日档挂这个监听（`enabled`）：在月档里"横拖一下"不是任何人的意图，
+   *   而它会和"点某一格"抢同一次按下。
+   */
+  useDragDayNav(
+    wheelHost,
+    (step) => {
+      view.setCursor(stepCalendarCursor('day', view.cursor, step));
+    },
+    { within: `[data-testid="${BOARD_TEST_ID}-day"]`, enabled: view.view === 'day' },
+  );
+
   const onToggleTask = useCallback(
     (taskId: string) => {
       // 与象限板同一条规矩：忙碌时**直接丢掉**这一次点击，而不是排队 ——
@@ -179,12 +196,21 @@ export function CalendarView(): React.JSX.Element {
           selected={view.selected}
           onCursorChange={view.setCursor}
           onSelect={view.selectDay}
+          /*
+            年档里点一张月卡（R13）。🔴 宿主**只做接线**，"去哪"由共享层决定
+            （`calendarMonthDrill`）—— 移动端接同一档时抄的是同一个函数，
+            而不是"两边都试过、看着都对"的两套状态迁移。
+          */
+          onPickMonth={view.drillIntoMonth}
           /* 🔴 批二：工具栏搬到**页头**（`CalendarHeaderToolbar`），板子里那份撤掉。
              与下面的 `onToday` 是**一对**：宿主接了跳回，工具栏才有那颗「今天」；
              两处不同时改，结局是"整屏没有回到今天的入口"或"同一屏两个入口"。 */
           toolbar="external"
           /* 档位由页头那个下拉决定（store 里唯一一份），板子只照它画。 */
           view={view.view}
+          /* 🔴 日档那条"现在"线的时钟**只有一个来源**：任务 store 的 `now`。
+             界面 store 刻意不存时钟（存了就会漂 —— 放着不动的一屏，线还在走才算"现在"）。 */
+          now={store.now}
           onToday={() => {
             // 「今天」跳回：选中今天 + 月份跟过去（与迷你月历的 ○ 同一条路径）。
             view.goToToday(today);

@@ -30,6 +30,7 @@ import { useMemo } from 'react';
 import { useI18n } from '@heyta/i18n';
 import {
   captureChipRemainingDays,
+  captureChipTimeLabel,
   capturePriorityLabelKey,
   type CaptureComposerLabels,
 } from '@heyta/ui';
@@ -56,6 +57,10 @@ export function captureLabels(t: Translate): CaptureComposerLabels {
     restoreAria: (raw) => t('mobile.capture.restoreAria', { raw }),
     ignoreAria: (raw) => t('mobile.capture.ignoreAria', { raw }),
     valueLabel: (chip, now) => {
+      // 🔴 与 web 同一处判定：时刻芯片念归一化后的 `HH:MM`（共享层给串），
+      //   掉进下面的优先级兜底会念成「不设置」。
+      const timeLabel = captureChipTimeLabel(chip);
+      if (timeLabel !== undefined) return timeLabel;
       const days = captureChipRemainingDays(chip, now);
       if (chip.dueDate !== undefined && days !== undefined) {
         return t('mobile.capture.valueWithRemaining', {

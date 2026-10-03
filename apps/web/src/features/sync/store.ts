@@ -35,6 +35,7 @@ import { createHostRealtimeClient, createSyncClient } from '@heyta/app-host';
 
 // W4：凭据持久化。**只存 baseUrl 与 token，绝不存口令** —— 见该文件头。
 import { clearStoredCredentials, loadCredentials, saveCredentials } from './credential-storage.js';
+import { getWebVaultSession, invalidateWebVaultSession } from '../../lib/vault-session.js';
 
 // 🔴 同意闸门（G-12）。这个文件**只**用它做两件事：给客户端注入带闸的 `fetch`，
 // 以及在闸门关闭时不建实时通道。判定逻辑全在 `@heyta/app-host`。
@@ -63,6 +64,8 @@ interface SyncStoreState {
    * 未登录 / 老版本凭据里没有它时是 `undefined` —— 头像退回通用图标。
    */
   email?: string;
+  /** Stable authenticated account id; presence selects vault encryption mode. */
+  accountId?: string;
   /** E2EE 口令。**只在内存**。 */
   password?: string;
   /** 上次同步时间。 */
@@ -108,7 +111,7 @@ interface SyncStoreState {
    * 而用户刚在上一屏把口令输进去过。所以它是一条**专门的、窄的**动作，
    * 而不是复用 `configure(baseUrl, token, '')`。
    */
-  applyAuthToken: (baseUrl: string, token: string, email?: string) => void;
+  applyAuthToken: (baseUrl: string, token: string, email?: string, accountId?: string) => void;
   clearCredentials: () => void;
   syncNow: () => Promise<SyncStatus>;
   /**
@@ -177,6 +180,30 @@ function buildClient(
 ): SyncClient | undefined {
   const { baseUrl, token } = get();
   if (baseUrl === '' || token === undefined) return undefined;
+
+  const accountId = get().accountId;
+  if (accountId !== undefined && accountId !== '') {
+    return createSyncClient({
+      engine: requireEngine(),
+      store: requireStore(),
+      baseUrl,
+      getToken: async () => get().token,
+      getPassword: async () => undefined,
+      encryptionMode: 'vault',
+      getPayloadCipher: async () => {
+        const current = get();
+        if (current.accountId === undefined || current.accountId === '') return undefined;
+        const session = await getWebVaultSession(
+          current.accountId,
+          current.baseUrl,
+          async () => get().token,
+        );
+        return session.getPayloadCipher();
+      },
+      applyRemote: applyRemoteOps,
+      fetchImpl: consentFetch,
+    });
+  }
 
   return createSyncClient({
     engine: requireEngine(),
@@ -405,6 +432,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   baseUrl: persisted?.baseUrl ?? '',
   token: persisted?.token,
   email: persisted?.email,
+  accountId: persisted?.accountId,
   conflictDialogOpen: false,
   settingsOpen: false,
   signInOpen: false,
@@ -435,12 +463,16 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   configure: (baseUrl, token, password) => {
+    // A server/token edit changes the authentication binding. Fence any
+    // in-flight vault load before the new credentials can be used.
+    const previous = get();
+    if (previous.baseUrl !== baseUrl || previous.token !== token) invalidateWebVaultSession();
     set({ baseUrl, token, password, status: { kind: 'idle' } });
     // 🔴 W4：口令**不进** saveCredentials 的参数 —— 它只在内存。
     // ⚠️ 邮箱**保留已有的那个**：手填凭据这条路径不知道账号是谁，
     //    而它不该把上一次登录留下的标签抹掉。
     if (baseUrl !== '' && token !== '') {
-      saveCredentials({ baseUrl, token, email: get().email });
+      saveCredentials({ baseUrl, token, email: get().email, accountId: get().accountId });
     }
     // 🔴 凭据变了 ⇒ 补签状态必须**重问**（上一个账号的答案不属于这个账号）。
     syncLegalRecheckCredentials({ token, baseUrl });
@@ -448,14 +480,26 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     restartRealtime(get);
   },
 
-  applyAuthToken: (baseUrl, token, email) => {
+  applyAuthToken: (baseUrl, token, email, accountId) => {
+    invalidateWebVaultSession();
     // 口令与上次同步时间原样保留 —— 见接口上的说明。
     //
     // ⚠️ `email` 是**可选**的：手填凭据那条路径没有邮箱，此时**保留已有的那个**
     //（`email ?? get().email`）—— 否则重新登录一次会把头像的标签抹掉。
-    set({ baseUrl, token, email: email ?? get().email, status: { kind: 'idle' } });
+    set({
+      baseUrl,
+      token,
+      email: email ?? get().email,
+      accountId: accountId ?? get().accountId,
+      status: { kind: 'idle' },
+    });
     // 🔴 W4：登录成功即落盘 ⇒ "登录后重开还在"。
-    saveCredentials({ baseUrl, token, email: email ?? get().email });
+    saveCredentials({
+      baseUrl,
+      token,
+      email: email ?? get().email,
+      accountId: accountId ?? get().accountId,
+    });
     // 🔴 登录后**先问补签状态，再**建实时连接（顺序有意义：`refresh()` 同步把闸门
     // 置成 `checking`，于是新连接不会在"还没问到答案"的窗口里建立起来）。
     // 答案回来后由 `legalRecheck.subscribe()` 重建，不需要这里等它。
@@ -469,6 +513,9 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   clearCredentials: () => {
+    // Logout must not await/open the host or let a pending GET/loader install
+    // a session after the token has been cleared.
+    invalidateWebVaultSession();
     retry?.stop();
     retry = undefined;
     // 🔴 登出必须断开实时通道 —— 否则那个连接会**带着已失效的令牌**继续重连，
@@ -478,7 +525,13 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // 🔴 G-27：登出要把补签状态一起清掉 —— 不许留着**上一个人**的版本与答案，
     // 否则下一个人（可能是另一次登录的另一个账号）会看到不相干的面板。
     clearLegalRecheckCredentials();
-    set({ token: undefined, email: undefined, password: undefined, status: { kind: 'idle' } });
+    set({
+      token: undefined,
+      email: undefined,
+      accountId: undefined,
+      password: undefined,
+      status: { kind: 'idle' },
+    });
     // 🔴 W4：登出必须把**落盘的那份**也清掉。
     // 只清内存的话，刷新一次令牌就"活"回来了 —— 用户以为登出了，其实没有。
     clearStoredCredentials();

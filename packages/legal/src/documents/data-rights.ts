@@ -16,11 +16,20 @@
  * 三条绝对不能写（写了就是虚假陈述，而且一查就穿）：
  * 1. **"立即从服务器彻底销毁"** —— 界面上的"彻底删除"只是打一个加性标记，
  *    服务端承载它的加密历史要等保留期届满或账号注销才消失（D24.3、D25.2）。
- * 2. **"你可以在设置里注销账号"** —— 服务端确实有一条真·硬删的路由（级联 18 处、
+ * 2. **"你可以在设置里注销账号"** —— 服务端确实有一条真·硬删的路由（引用 `users` 且
+ *    CASCADE 的外键 16 条、覆盖 15 张表；2026-10-03 更正：此前这里写的"级联 18 处"与
+ *    隐私政策的"19 处"是两个错误口径的抄件 —— 它们数的是全部迁移里 `ON DELETE CASCADE`
+ *    的出现次数，既含与账号无关的级联又把历史重建重复计入。真值由
+ *    `packages/legal/tests/structure.spec.ts` 从 `server/prisma/migrations` 现量对账）、
  *    带审计与限流），但应用内**零入口**（D24.4）。所以本文件写"通过邮件申请"。
  * 3. **"删除后 30 日内于备份中完成"** —— 备份是整库快照，代码里**不存在**
  *    "从既有备份中单独删掉某一条/某一个人"的能力（D25.4）。不写天数、不写穿透，
  *    只写"随备份自身保留期结束而消失"。
+ * 4. 🔴 **"注销会删除你在所有设备上的数据"**（2026-10-03 加，产品负责人要求 GDPR 口径后的新雷区）
+ *    —— 注销删的是服务端。本地优先意味着每台设备自己有一份**明文**库，而当前代码里
+ *    没有任何"账号已注销 ⇒ 清除本机数据"的路径（`DbAdapter` 连 `destroy` 都没有声明，
+ *    IndexedDB 那份 `destroy()` 零调用方，同步客户端遇到鉴权失败的既有立场是"绝不清本地数据"）。
+ *    写这句话就是虚假陈述；写"不会"才是可核验的。
  *
  * 另外两处必须如实写的限制：邮箱**不可更换**（服务端根本没有改邮箱的路由），
  * 以及导出文件本身**不受加密保护**（它是客户端解开之后的明文副本）。
@@ -163,12 +172,12 @@ const zh = [
         rows: [
           ['删除', '从列表消失，回收站可见', '记录仍在，带"已删除"标记', '对应的加密历史仍在'],
           ['恢复', '回到原列表', '标记被清除，这也是一条新记录', '同上，新增一条加密记录'],
-          ['彻底删除', '回收站也不再显示', '记录仍在，带"已彻底删除"标记', '对应的加密历史仍在，直到保留期届满或账号注销'],
+          ['彻底删除', '回收站也不再显示', '记录仍在，带"已彻底删除"标记', '对应的加密历史仍在。⚠️ 按当前版本，那条每日清扫对我们的数据**一条都不命中**（它的生效条件见第四节），所以现在真的会让它消失的只有注销账号'],
         ],
       },
       {
         kind: 'p',
-        text: '所以要如实说清：**"彻底删除"不是一条抹除指令，而是一个标记。** 服务器承载那条数据的加密历史记录，只有两条路会真的让它消失 —— 一是保留期（当前为 **45 天**，写死在产品里、每日执行一次清理）届满，二是账号注销。我们不写"立即从服务器销毁"，因为那不成立；照实写反而把端到端加密与保留期这两件事交代清楚了。',
+        text: '所以要如实说清：**"彻底删除"不是一条抹除指令，而是一个标记。** 服务器承载那条数据的加密历史记录，理论上只有两条路会真的让它消失 —— 保留期届满，或账号注销。🔴 但按当前版本必须再补一句：**保留期这条路现在走不通** —— 每日清扫只处理已经存在「完整状态边界」的账号，而本产品当前的客户端不会产生那种边界，实测每天清掉的条数是 0。所以目前唯一真的会让它消失的是**注销账号**。我们不写"立即从服务器销毁"，因为那不成立；把清理条件写清楚，反而把端到端加密与保留期这两件事交代明白了。',
       },
       {
         kind: 'callout',
@@ -182,7 +191,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '服务端侧的注销是**真删除**，不是打标记：账号行连同它名下的同步数据、设备记录、通行密钥、订阅与订单、邀请关系与通知一并级联清除，口令与令牌随之失效，活动连接被踢下线。这一步没有冷静期、没有回收站，做完不可恢复。',
+        text: '服务端侧的注销是**真删除**，不是打标记：账号行连同它名下的同步数据、设备记录、通行密钥、订阅与订单、邀请关系与通知一并级联清除，口令与令牌随之失效，活动连接被踢下线。这一步没有冷静期、没有回收站，做完不可恢复。🔴 但它删的是**服务端那一份**：你其它设备上的本地数据不会因为注销而消失 —— 本地优先意味着每台设备自己存着一份可读的库，而"账号已注销就清除本机数据"这个动作**今天在产品里还不存在**（既没有自助注销的入口，也没有随注销信号清库的实现）。所以我们不承诺它；把设备交还干净状态目前只能靠系统层面的卸载并清除应用数据。',
       },
       {
         kind: 'p',
@@ -286,7 +295,7 @@ const zh = [
         items: [
           '**注销账号做出界面入口之后**：第五节会从"通过邮件申请"改写为自助表述。补入口时必须同时带上二次确认与"先导出"提示 —— 那是一条没有冷静期的硬删除，一键即删比没有入口更危险。',
           '**邮箱换绑实现之后**：第三节那条"邮箱不可更换"会被删除，并换成换绑流程。',
-          '**保留期调整之后**：第四节的 45 天要跟着改。它是产品设定、不是你可以自选的选项，改它需要发版。',
+          '**保留期调整之后**：第四节的 45 天要跟着改。它是产品设定、不是你可以自选的选项，改它需要发版。还有第二件事也要让文案跟着改：**清理真正开始对我们的数据生效**的那一天（见第四节如实补出的那条边界）。',
         ],
       },
       {
@@ -443,12 +452,12 @@ const en = [
         rows: [
           ['Delete', 'Gone from lists, visible in Trash', 'Record still present, marked as deleted', 'The corresponding encrypted history is still there'],
           ['Restore', 'Back in its list', 'Marker cleared, which is itself a new record', 'As above, plus one more encrypted record'],
-          ['Purge', 'No longer shown in Trash either', 'Record still present, marked as purged', 'The encrypted history remains until retention expires or the account is closed'],
+          ['Purge', 'No longer shown in Trash either', 'Record still present, marked as purged', 'The encrypted history remains. ⚠️ Under the current version the daily sweep **matches no data of ours** (its precondition is spelled out in section four), so right now the only route that really removes it is closing the account'],
         ],
       },
       {
         kind: 'p',
-        text: 'So it has to be said plainly: **"purge" is not an erasure command, it is a marker.** The encrypted history that carries that data leaves our server by exactly two routes — the retention period (currently **45 days**, fixed in the product, swept by a job that runs daily) expiring, or your account being closed. We do not write "destroyed on the server immediately", because that is not true; writing it as it is also explains end-to-end encryption and retention properly.',
+        text: 'So it has to be said plainly: **"purge" is not an erasure command, it is a marker.** In theory the encrypted history that carries that data leaves our server by exactly two routes — the retention period expiring, or your account being closed. 🔴 A third sentence has to be added for the current version: **the retention route does not work today** — the daily sweep only processes accounts whose stream already contains a "full-state boundary", which the clients this product ships never produce, and the measured number of rows removed per day is 0. So the only route that really removes it right now is **closing your account**. We do not write "destroyed on the server immediately", because that is not true; spelling out the pruning condition also explains end-to-end encryption and retention properly.',
       },
       {
         kind: 'callout',
@@ -462,7 +471,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'On the server side, account closure is a **real delete**, not a marker: the account row and everything under it — synced data, device records, passkeys, subscriptions and orders, referral relationships and notifications — are removed by cascade. Passwords and tokens die with it, and live connections are dropped. There is no cooling-off period and no Trash: once done, it cannot be undone.',
+        text: 'On the server side, account closure is a **real delete**, not a marker: the account row and everything under it — synced data, device records, passkeys, subscriptions and orders, referral relationships and notifications — are removed by cascade. Passwords and tokens die with it, and live connections are dropped. There is no cooling-off period and no Trash: once done, it cannot be undone. 🔴 What it deletes is **the server copy**. Data that already sits in a device’s own local store is not removed by closing the account: local-first means each device keeps a readable database, and the action "account closed, so wipe this device" **does not exist in the product today** — neither a self-service closure entry point nor an implementation that wipes local storage on the closure signal. We therefore do not promise it; returning a device to a clean state currently means uninstalling it and clearing the app’s data at the operating-system level.',
       },
       {
         kind: 'p',
@@ -566,7 +575,7 @@ const en = [
         items: [
           '**Once account closure has an interface entry**: section five moves from "request it by email" to a self-service statement. The entry must ship together with a second confirmation and a "export first" prompt — this is a hard delete with no cooling-off period, and a one-click version would be worse than no entry at all.',
           '**Once email rebinding is implemented**: "the email address cannot be changed" in section three is deleted and replaced by the rebinding procedure.',
-          '**Once the retention period changes**: the 45 days in section four changes with it. It is a product setting, not an option you can pick, and changing it requires a release.',
+          '**Once the retention period changes**: the 45 days in section four changes with it. It is a product setting, not an option you can pick, and changing it requires a release. A second event also requires this text to change: **the day the sweep really starts applying to our data** (see the boundary spelled out in section four).',
         ],
       },
       {

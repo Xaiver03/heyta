@@ -358,62 +358,233 @@ describe('对外承诺里的主体不许错', () => {
 /**
  * 对外承诺里**可复算的数字**必须与它的数据源对账。
  *
- * 🔴 为什么单独立一条，而不是"改的时候记得一起改"：隐私政策里那句「共 19 处级联」是对
- * `DELETE /api/account` 行为的**事实性承诺**（PIPL 第四十七条"删除"到底删了多少东西）。
- * 它由一份 research 文档抄进 `privacy.ts` 的中英两栏 —— 而**抄件一定会漂**。
- * 2026-10-03 实测就漂了一次：R10 加 `user_avatars` 那条级联关系后，真实数是 19，
- * 文本还写着 18，而**没有任何一层会报错**（中英镜像判据只看形状，形状没变）。
+ * 🔴 为什么单独立一条，而不是"改的时候记得一起改"：隐私政策里那句「注销是真删除」是对
+ * `DELETE /api/account` 行为的**事实性承诺**（PIPL 第四十七条 / GDPR 第十七条"删除权"
+ * 到底删了多少东西）。它由一份 research 文档抄进文案 —— 而**抄件一定会漂**。
+ * 2026-10-03 实测漂过两次：R10 加 `user_avatars` 后真值变了而文本没跟；
+ * 而 `data-rights.ts` 与三份 research 文档抄走的是**另一个数**（18），无人值守。
  *
- * 所以这里不比"两个文档一不一致"（那只是把漂移换个地方存），而是**回到唯一的真源**：
- * 迁移 SQL 里 `ON DELETE CASCADE` 的实际出现次数。加一条级联关系 ⇒ 这条自动红。
+ * ⚠️ **本条的口径在 2026-10-03 被更正过一次，原口径是错的**：
+ * 原来数的是"全部迁移里 `ON DELETE CASCADE` 的出现次数"（当时 = **19**），
+ * 而那句话承诺的是"**我名下的数据**随注销消失"。两个口径不是一回事：
+ * 前者把与被删账号无关的级联（例如 `coupon_redemptions → checkout_orders`）算进来，
+ * 还把同一条约束在后续迁移里被重建的那几次**重复计数**（42 个迁移文件是累加的历史，不是当前状态）。
+ * 现量三种口径：出现次数 19、`schema.prisma` 声明的 Cascade 代码行 16、
+ * **引用 `users` 且 CASCADE 的外键 16 条 / 覆盖 15 张表**（`referrals` 有邀请人、被邀请人两条）。
+ * ⇒ 这里改成从迁移里推导"**引用 users 且 CASCADE**"的约束**集合**，
+ *   并且除了比数字，还要求文案**逐类点名**每一张表（少一类就红 —— 那才是用户读得到的东西）。
  */
 describe('对外文本里可复算的数字，回到真源对账', () => {
   /** 迁移目录相对本包：`packages/legal/tests` → 仓库根的 `server/prisma/migrations`（上三级）。 */
   const MIGRATIONS = fileURLToPath(new URL('../../../server/prisma/migrations', import.meta.url));
 
-  const cascadeCount = readdirSync(MIGRATIONS, { recursive: true })
-    .filter((p): p is string => typeof p === 'string' && p.endsWith('migration.sql'))
-    .reduce((total, rel) => {
+  /**
+   * 从迁移历史推导"注销一个账号时真的会随 `users` 行消失的外键约束"。
+   * 按**约束名**建账：后面某条迁移把它改成非 CASCADE（或重建）就撤账，
+   * 所以 42 个文件的累加历史不会变成重复计数。
+   */
+  const userCascades = (() => {
+    const live = new Map<string, string>();
+    for (const rel of readdirSync(MIGRATIONS, { recursive: true })
+      .filter((p): p is string => typeof p === 'string' && p.endsWith('migration.sql'))
+      .sort()) {
       const sql = readFileSync(join(MIGRATIONS, rel), 'utf8');
-      return total + (sql.match(/ON DELETE CASCADE/gi)?.length ?? 0);
-    }, 0);
-
-  it('迁移里确实数得出级联关系（数不出 = 路径坏了，不是"没有级联"）', () => {
-    // 🔴 这条是上面那个 reduce 的**前提断言**：目录名写错时 cascadeCount 会是 0，
-    // 而"文本也写 0"永远不会发生，于是下面那条对账会红在错误的原因上。
-    expect(cascadeCount, `在 ${MIGRATIONS} 下数到 0 条 ON DELETE CASCADE —— 先怀疑这个探针`).toBeGreaterThan(
-      0,
-    );
-  });
-
-  it('隐私政策中英两栏的「共 N 处级联 / N cascades in total」都等于迁移里的真实级联数', () => {
-    const privacy = LEGAL_DOCUMENTS.find((d) => d.id === 'privacy');
-    expect(privacy, '注册表里没有 privacy 这份文件').toBeTruthy();
-
-    const patterns = [
-      // 中文栏：「（共 19 处级联）」
-      /共\s*(\d+)\s*处级联/g,
-      // 英文栏：「(19 cascades in total)」
-      /(\d+)\s+cascades in total/g,
-    ];
-
-    let checked = 0;
-    for (const locale of LEGAL_LOCALES) {
-      const text = columnTexts(privacy!, locale).join('\n');
-      for (const pattern of patterns) {
-        for (const match of text.matchAll(pattern)) {
-          checked += 1;
-          expect(
-            Number(match[1]),
-            `${privacy!.id} 的 ${locale} 栏承诺了 ${match[1]} 处级联，而迁移里实际是 ${cascadeCount} 条 —— ` +
-              '加/删级联关系时必须同时改这里（真源：server/prisma/migrations）',
-          ).toBe(cascadeCount);
+      for (const raw of sql.split(';')) {
+        const s = raw.replace(/\s+/g, ' ');
+        for (const m of s.matchAll(
+          /CONSTRAINT\s+"([^"]+)"\s+FOREIGN KEY\s*\("([^"]+)"\)\s+REFERENCES\s+"([^"]+)"/gi,
+        )) {
+          if (m[3] !== 'users') continue;
+          const [, name, column] = m;
+          if (name === undefined || column === undefined) {
+            throw new Error('Foreign-key constraint match is missing its name or column');
+          }
+          const tail = s.slice(m.index);
+          const od = tail.match(/ON DELETE (CASCADE|RESTRICT|SET NULL|SET DEFAULT)/i);
+          // 表名 = 约束名去掉 `_<列名>_fkey`（Postgres 默认命名 `<表>_<列>_fkey`）。
+          // 🔴 以前这里是 `name.split('_')[0]`，于是 `account_notifications_user_id_fkey`
+          //    被切成 `account`、`checkout_orders_user_id_fkey` 被切成 `checkout` ——
+          //    整个类别覆盖判据会拿着七个假表名去要求文案点名，红的原因和真的缺陷无关。
+          //    对不上这个形状就**响亮地失败**，不静默猜表名。
+          const suffix = `_${column}_fkey`;
+          if (!name.toLowerCase().endsWith(suffix)) {
+            throw new Error(
+              `约束名 "${name}" 不是 Postgres 默认的 "<表>_<列>_fkey" 形状，` +
+                '推不出表名 —— 这里被手工命名过，判据要先跟着改（不许退回按第一个下划线切）',
+            );
+          }
+          const table = name.slice(0, name.length - suffix.length);
+          if (od?.[1]?.toUpperCase() === 'CASCADE') live.set(name, table);
+          else live.delete(name);
         }
       }
     }
-    // 反向防悬空：两栏各至少命中一次。命中 0 次说明措辞被改写，这条判据已经抓不到东西。
-    expect(checked, '一处"N 处级联/N cascades in total"都没命中 —— 这句话被改写了，判据已悬空').toBeGreaterThanOrEqual(
-      2,
+    return live;
+  })();
+
+  const cascadeTables = [...new Set(userCascades.values())].sort();
+
+  /**
+   * 每张表**必须**在文案里有一个用户读得到的类别名。这里是判据的期望值（不是第二份真源）：
+   * 表名来自上面的推导，而"这一类在中文里叫什么"是人话，只用来检查文案有没有漏掉一类。
+   */
+  const CATEGORY_NAMES: Array<{ table: string; zh: string; en: string }> = [
+    { table: 'operations', zh: '同步事件', en: 'sync event' },
+    { table: 'vault_key_packages', zh: '加密密钥包', en: 'wrapped key package' },
+    { table: 'vault_key_migrations', zh: '密钥迁移记录', en: 'key migration record' },
+    { table: 'revoked_sync_devices', zh: '撤销设备记录', en: 'revoked device record' },
+    { table: 'user_sync_state', zh: '同步状态', en: 'sync state' },
+    { table: 'sync_devices', zh: '设备记录', en: 'device record' },
+    { table: 'passkeys', zh: '通行密钥', en: 'passkey' },
+    { table: 'pending_passkey_registrations', zh: '未完成的通行密钥注册', en: 'pending passkey registration' },
+    { table: 'subscriptions', zh: '订阅', en: 'subscription' },
+    { table: 'checkout_orders', zh: '订单', en: 'checkout order' },
+    { table: 'coupon_redemptions', zh: '优惠码核销', en: 'coupon redemption' },
+    { table: 'invite_codes', zh: '邀请码', en: 'invite code' },
+    { table: 'referrals', zh: '邀请关系', en: 'referral' },
+    { table: 'account_notifications', zh: '通知', en: 'notification' },
+    { table: 'user_avatars', zh: '头像', en: 'avatar' },
+    { table: 'user_consents', zh: '条款接受记录', en: 'consent' },
+    { table: 'tombstones', zh: '墓碑', en: 'tombstone' },
+    { table: 'widget_push_subscriptions', zh: '推送订阅', en: 'push subscription' },
+  ];
+
+  it('🔴 推导本身有产出（数不出约束 = 探针坏了，不是"没有级联"）', () => {
+    // 前提断言：目录/正则/约束名形状任一失效都会得到空集合，而空集合能让下面每一条"对账"
+    // 都变成恒真 —— 所以先证明探针能数到东西，再谈数字对不对。
+    expect(userCascades.size, `在 ${MIGRATIONS} 下推导到 0 条「引用 users 且 CASCADE」的约束 —— 先怀疑这个探针`).toBeGreaterThan(0);
+    // 正向对照：这两张表是"我的任务数据"的载体，它们必须在集合里；
+    // 不在就说明推导口径被改坏了（改名、改约束名形状、或级联被摘掉）。
+    expect(cascadeTables).toEqual(expect.arrayContaining(['operations', 'user_sync_state']));
+  });
+
+  it('🔴 每张随注销消失的表都在文案里有一个用户读得到的类别名', () => {
+    // 判据的"牙齿"在这条：数字对得上但漏列一类（原句就漏了 5 类）同样是对外少承诺了范围。
+    const missing = cascadeTables.filter(
+      (t) => !CATEGORY_NAMES.some((c) => c.table === t),
     );
+    expect(
+      missing,
+      `这些表会随注销被级联删除，但文案里没有任何一处点到它们这一类：${missing.join(', ')}`,
+    ).toEqual([]);
+    // 反向防悬空：登记的类别不许比真源多（多出来的那类要么已被取消级联、要么表名写错了）。
+    const extra = CATEGORY_NAMES.filter((c) => !cascadeTables.includes(c.table)).map((c) => c.table);
+    expect(extra, `登记了这些类别，但真源里没有对应的 users 级联约束：${extra.join(', ')}`).toEqual([]);
+  });
+
+  it('🔴 所有抄了「N 处级联 / N cascades」的文档、中英两栏，都等于真源条数', () => {
+    // 三个可复算的量各自有形状：级联**条数**、覆盖的**表数**（`referrals` 有两条外键，
+    // 所以条数 ≠ 表数），以及下面那条"逐类点名"的判据。只钉第一个的话，
+    // "16 条级联、12 张表"这种半对的写法会溜过去。
+    const checks: Array<{ pattern: RegExp; truth: number; label: string }> = [
+      { pattern: /共\s*(\d+)\s*处级联/g, truth: userCascades.size, label: '处级联' },
+      { pattern: /覆盖\s*(\d+)\s*张表/g, truth: cascadeTables.length, label: '张表' },
+      { pattern: /(\d+)\s+cascades?\b[^)）]{0,24}total/gi, truth: userCascades.size, label: 'cascades in total' },
+      { pattern: /across\s+(\d+)\s+tables/gi, truth: cascadeTables.length, label: 'tables' },
+    ];
+
+    let checked = 0;
+    const offenders: string[] = [];
+    for (const document of LEGAL_DOCUMENTS) {
+      for (const locale of LEGAL_LOCALES) {
+        const text = columnTexts(document, locale).join('\n');
+        for (const { pattern, truth, label } of checks) {
+          for (const match of text.matchAll(pattern)) {
+            checked += 1;
+            if (Number(match[1]) !== truth) {
+              offenders.push(
+                `${document.id}/${locale} 的「${label}」写的是 ${match[1]}，而真源是 ${truth}（引用 users 且 CASCADE 的外键 ${userCascades.size} 条 / ${cascadeTables.length} 张表）`,
+              );
+            }
+          }
+        }
+      }
+    }
+    expect(offenders, '\n' + offenders.join('\n')).toEqual([]);
+    // 悬空守卫：一处都没命中 = 这句话被改写掉了，本条判据已经抓不到任何东西。
+    expect(checked, '一处"N 处级联/N cascades in total"都没命中 —— 判据已悬空，要么改措辞要么改判据，不能都留着').toBeGreaterThanOrEqual(
+      4,
+    );
+  });
+
+  it('🔴 逐类点名的那句文案，中英两栏都要在（不许只在中文栏列全）', () => {
+    const privacy = LEGAL_DOCUMENTS.find((d) => d.id === 'privacy');
+    expect(privacy, '注册表里没有 privacy 这份文件').toBeTruthy();
+    for (const locale of LEGAL_LOCALES) {
+      // 🔴 取样范围必须等于这句话的语义范围。第一版把整份文档拼起来判"有没有点名这一类"，
+      // 于是变异"从注销那句里删掉墓碑"**一个都不红** —— 因为「墓碑」在政策别处（四态那节）也有。
+      // 判据的作用域比承诺宽，它就只是在打印自己。
+      // ⇒ 只在**承载注销承诺的那一格**里查覆盖：它靠"处级联 / cascades in total"定位，
+      //   而那正是上面数字判据认的同一形状，两者不会各看一份文本。
+      const marker = locale === 'zh-CN' ? '处级联' : 'cascades in total';
+      const closureCells = columnTexts(privacy!, locale).filter((t) => t.includes(marker));
+      expect(
+        closureCells.length,
+        `${locale} 栏找不到承载注销承诺的那一格（定位形状漂了）—— 判据已悬空`,
+      ).toBeGreaterThan(0);
+
+      // 🔴 本包的 locale 字面量是 `'zh-CN' | 'en'`，而类别表按 `'zh' | 'en'` 登记；
+      // 直接 `c[locale]` 会拿到 undefined（第一版就在这里炸了）。映射要显式写出来。
+      const lang = locale === 'zh-CN' ? 'zh' : 'en';
+      for (const cell of closureCells) {
+        const lower = cell.toLowerCase();
+        const absent = CATEGORY_NAMES.filter((c) => !lower.includes(c[lang].toLowerCase())).map(
+          (c) => `${c.table}（这一类要出现「${c[lang]}」）`,
+        );
+        expect(
+          absent,
+          `${locale} 栏的注销承诺里少列了这些类别：${absent.join('、')}`,
+        ).toEqual([]);
+      }
+    }
+  });
+
+  it('🔴 每一格"注销是级联硬删"的承诺，中英两栏都自带"其它设备本地数据"这条边界', () => {
+    // 来历：本轮（批次 E）把"注销 = 彻底销毁"落成实话时发现，注销承诺散在四份文档里，
+    // 而它们**只说服务端删了什么**，没有一处说"你其它设备上的本地明文库不会因此消失"。
+    // 中英镜像判据挡不住这种漂移 —— 它只比形状（单元格数、块序），两栏可以一起夸大。
+    // 所以这条按**语义**判：凡是做了级联硬删承诺的那一格，就必须同时带着那条边界。
+    // 定位的是**那条注销承诺本身**，不是"任何同时提到注销和级联的格子" ——
+    // 「订阅、订单」那行也说"注销时随账号一起级联删除"，但它是分类表里的一行，
+    // 要求它也去复述设备边界只会把文案写成复读机。判据的范围要等于承诺的范围。
+    const CLAIM_ZH = /注销[\s\S]{0,40}(硬删除|硬删|没有冷静期|不可恢复)/;
+    const CLAIM_EN =
+      /((closure|account deletion|close your account)[\s\S]{0,90}(hard delete|no cooling-off|cannot be undone))|((hard delete|no cooling-off)[\s\S]{0,90}(closure|account deletion))/i;
+    const BOUNDARY_ZH = /本地.{0,16}(库|数据)/;
+    // 🔴 「local data」两词相邻的写法会漏掉 "Local plaintext data"（本轮真实文案就是这样写的），
+    // 所以允许中间夹最多三个修饰词。放宽的是**形状**，不是语义：仍然要求"本地"紧挨着
+    // "data/database/store"，把边界删掉照样红（变异 M7 验过）。
+    const BOUNDARY_EN = /local(?:\s+\w+){0,3}\s+(data|databases?|store)/i;
+    const DEVICE_ZH = /(其它|其他)设备/;
+    const DEVICE_EN = /other device/i;
+
+    const offenders: string[] = [];
+    let claims = 0;
+    for (const document of LEGAL_DOCUMENTS) {
+      for (const locale of LEGAL_LOCALES) {
+        const zh = locale === 'zh-CN';
+        for (const cell of columnTexts(document, locale)) {
+          if (!(zh ? CLAIM_ZH : CLAIM_EN).test(cell)) continue;
+          claims += 1;
+          // 🔴 逐项 push，不要写成 `[[a],[b]].filter(Boolean)` —— 那两个内层数组恒真，
+          // 于是每一条承诺都会被判红，这条判据从"找缺边界"退化成"见谁都红"。
+          const miss: string[] = [];
+          if (!(zh ? BOUNDARY_ZH : BOUNDARY_EN).test(cell)) {
+            miss.push(zh ? '「本地库/本地数据」这条边界' : 'the "local data" boundary');
+          }
+          if (!(zh ? DEVICE_ZH : DEVICE_EN).test(cell)) {
+            miss.push(zh ? '「其它设备」这个限定' : 'the "other devices" qualifier');
+          }
+          if (miss.length) {
+            offenders.push(
+              `${document.id}/${locale}：「${cell.slice(0, 42)}…」承诺了级联硬删，却没写 ${miss.join('、')}`,
+            );
+          }
+        }
+      }
+    }
+    expect(offenders, '\n' + offenders.join('\n')).toEqual([]);
+    // 前提：一条承诺都没匹配到 = 我的定位形状漂了，这条会退化成恒绿。
+    expect(claims, '没有任何一格被认成"注销级联硬删"的承诺 —— 定位形状漂了，这条判据已经悬空').toBeGreaterThan(0);
   });
 });

@@ -25,6 +25,7 @@ import {
   aliveProjects,
   childProjects,
   listNameFor,
+  liveTaskCountsByTag,
   openTagCounts,
   openTaskCount,
   openTaskCounts,
@@ -91,10 +92,21 @@ describe('清单层级：顶层 / 一层子级 / 归档隐藏', () => {
     ]);
   });
 
-  it('toOrganizerTree 的每一层都只有 id / name / children —— 不把整个实体漏出去', () => {
+  it('toOrganizerTree 的每一层只带行模型字段 —— 含 archived 以支持取消归档', () => {
     const first = toOrganizerTree(projects)[0]!;
-    expect(Object.keys(first).sort()).toEqual(['children', 'id', 'name']);
-    expect(Object.keys(first.children[0]!).sort()).toEqual(['id', 'name']);
+    expect(Object.keys(first).sort()).toEqual(['archived', 'children', 'id', 'name']);
+    expect(first.archived).toBe(false);
+    expect(Object.keys(first.children[0]!).sort()).toEqual(['archived', 'id', 'name']);
+    expect(first.children[0]!.archived).toBe(false);
+  });
+
+  it('includeArchived 会保留行的 archived 状态，而不是把实体原样漏出', () => {
+    const tree = toOrganizerTree(projects, { includeArchived: true });
+    const archived = tree.find((node) => node.id === 'p9');
+    expect(archived).toMatchObject({ id: 'p9', name: '旧项目', archived: true });
+    expect(archived?.children).toEqual([
+      { id: 'p9a', name: '旧项目子', archived: false },
+    ]);
   });
 });
 
@@ -251,5 +263,47 @@ describe('listNameFor：什么才算"这条任务的归属"', () => {
    */
   it('收集箱那个词是传进来的，不是共享层里写死的', () => {
     expect(listNameFor(projects, undefined, 'Inbox')).toBe('Inbox');
+  });
+});
+
+/**
+ * 删除确认里那句影响面（回收站与归档 W4b）。
+ *
+ * 🔴 本块存在的唯一理由是：**它与 `openTagCounts` 差一条滤**。
+ * 那条差值是界面上看得见的 —— 一条挂着 2 条已完成任务的标签，
+ * `openTagCounts` 说 0（行上没有数字，对），而确认框必须说 2
+ * （"这些任务不会被删除，只是不再带这个标签"）。
+ * 有人"顺手统一成一个函数"的话，症状是确认框说**没有任务受影响** ——
+ * 一句假承诺，而不是一个报错。所以这里把两个数字**在同一份夹具上**各钉一次。
+ */
+describe('liveTaskCountsByTag：影响面含已完成，`openTagCounts` 不含', () => {
+  const tasks: Task[] = [
+    task({ id: 't1', tagIds: ['g1'] }),
+    task({ id: 't2', tagIds: ['g1'], completedAt: NOW }),
+    task({ id: 't3', tagIds: ['g1'], deletedAt: NOW }),
+    task({ id: 't4', tagIds: ['g1', 'g2'], completedAt: NOW }),
+    task({ id: 't5' }),
+  ];
+
+  it('g1 = 3（未完成 1 + 已完成 2，墓碑那条不算）', () => {
+    expect(liveTaskCountsByTag(tasks).g1).toBe(3);
+  });
+
+  it('同一份夹具上 g1 的常驻计数是 1 —— 两个数字**不许**相等', () => {
+    expect(openTagCounts(tasks).g1).toBe(1);
+  });
+
+  it('一条任务挂两个标签时两边各 +1（不是加总数）', () => {
+    const impact = liveTaskCountsByTag(tasks);
+    expect(impact.g2).toBe(1);
+  });
+
+  it('没有任何存活任务引用的标签**没有键**（`undefined`，不是 0）', () => {
+    expect(liveTaskCountsByTag([task({ id: 't9' })]).g1).toBeUndefined();
+  });
+
+  it('墓碑任务单独存在时不给 0（否则确认框会说"它挂在 0 条任务上"）', () => {
+    const onlyTombstone = [task({ id: 't3', tagIds: ['g1'], deletedAt: NOW })];
+    expect(liveTaskCountsByTag(onlyTombstone).g1).toBeUndefined();
   });
 });

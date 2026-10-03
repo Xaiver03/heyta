@@ -36,15 +36,29 @@ import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js
 interface ProjectState {
   projects: Project[];
   tags: Tag[];
+  /** 🔴 回收站那一路（有墓碑且未彻底删除）；判据与顺序在领域层。 */
+  trashed: Project[];
 
   addProject: (name: string, parentId?: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
-  archiveProject: (id: string) => Promise<void>;
+  /** 归档/取消归档。**目标状态**省略时 = 归档（`app-host` 那边的默认值）。 */
+  archiveProject: (id: string, archived?: boolean) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
+  /**
+   * 从回收站还原清单。返回 `false` = 它不在回收站里（不写 op）。
+   *
+   * ⚠️ "归档过"与"删过"是两件事：一条**归档后被删**的清单还原之后仍然归档，
+   *   所以它会回到 `listArchivedProjects()` 而不是侧栏默认可见的那一路。
+   *   这不是 bug —— 删它没有顺带改变"它被收起来了"这个事实。
+   */
+  restoreProject: (id: string) => Promise<boolean>;
+  /** 彻底删除一条清单：追加 `purgedAt` 标记；**里面的任务一条都不动**。 */
+  purgeProject: (id: string) => Promise<void>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setProjectColor: (id: string, slot?: CategorySlot) => Promise<void>;
 
   addTag: (name: string) => Promise<void>;
+  renameTag: (id: string, name: string) => Promise<void>;
   deleteTag: (id: string) => Promise<void>;
 }
 
@@ -59,6 +73,7 @@ const projectActions = createProjectActions(actionContext);
 export const useProjectStore = create<ProjectState>(() => ({
   projects: [],
   tags: [],
+  trashed: [],
 
   addProject: async (name, parentId) => {
     // ⚠️ 交互决策，不是数据决策：用户按了空回车就该什么都不发生。
@@ -72,13 +87,25 @@ export const useProjectStore = create<ProjectState>(() => ({
     await projectActions.renameProject(id, name);
   },
 
-  archiveProject: async (id) => {
-    await projectActions.archiveProject(id);
+  archiveProject: async (id, archived) => {
+    await projectActions.archiveProject(id, archived);
   },
 
   deleteProject: async (id) => {
     // 软删除（墓碑）。⚠️ 不级联删任务，见文件头。
     await projectActions.removeProject(id);
+  },
+
+  restoreProject: async (id) => {
+    const changed = await projectActions.restoreProject(id);
+    syncProjects();
+    return changed;
+  },
+
+  purgeProject: async (id) => {
+    // 不 catch：不可逆动作被拒绝必须让界面说给用户。
+    await projectActions.purgeProject(id);
+    syncProjects();
   },
 
   setProjectColor: async (id, slot) => {
@@ -93,16 +120,28 @@ export const useProjectStore = create<ProjectState>(() => ({
     await projectActions.createTag(name);
   },
 
+  renameTag: async (id, name) => {
+    // 与 renameProject 同一条交互决策：空回车什么都不发生，动作层负责抛错。
+    if (name.trim() === '') return;
+    await projectActions.renameTag(id, name);
+  },
+
   deleteTag: async (id) => {
     await projectActions.removeTag(id);
   },
 }));
 
 function syncProjects(): void {
-  // 列表来自动作层 —— "哪些算未删除""按什么顺序"都是产品语义，不在这里决定。
+  // 列表来自动作层 —— "哪些算未删除""哪条算已归档""按什么顺序"都是产品语义，不在这里决定。
+  //
+  // 🔴 用 `listAllProjects()`（可见 + 已归档合并）而不是 `listProjects()`：
+  //   后者从 W9 起**不含归档**，而本面板的「显示已归档」开关与 `archivedCount`
+  //   都要求归档那一路**在数据里**（开关只是决定画不画出来）。
+  //   只接一路的症状不是报错，是"开关按了什么都没出现"—— 归档变成单向门。
   useProjectStore.setState({
-    projects: projectActions.listProjects(),
+    projects: projectActions.listAllProjects(),
     tags: projectActions.listTags(),
+    trashed: projectActions.listTrashedProjects(),
   });
 }
 

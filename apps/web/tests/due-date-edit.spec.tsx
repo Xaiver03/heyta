@@ -24,7 +24,7 @@
  *     同一形状），日子格直接 `el.click()`。
  */
 
-import { dueDateToEpoch, parseLocalDate, type LocalDate, type Task } from '@heyta/domain';
+import { dueDateToEpoch, localTimeOf, parseLocalDate, type LocalDate, type Task } from '@heyta/domain';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'react';
@@ -36,7 +36,7 @@ import { HeytaUiProvider } from '@heyta/ui';
 
 import { __resetOpLogForTests, initOpLog, requireEngine } from '../src/lib/oplog.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
-import { DueEditor, panelTopFor } from '../src/features/tasks/DueEditor.js';
+import { DueEditor, DUE_PANEL_HEIGHT_ESTIMATE, panelTopFor } from '../src/features/tasks/DueEditor.js';
 
 /** 冻结的"现在"：2026-10-02（周五）10:00 本地时。今天/日子格的期望值都从它推。 */
 const NOW = parseLocalDate('2026-10-02').getTime() + 10 * 3_600_000;
@@ -64,13 +64,69 @@ function renderEditor(task: Task): void {
             task={task}
             now={NOW}
             onSetDueDate={(due) => {
-              void useTaskStore.getState().setDueDate(task.id, due);
+              // 🔴 **记下这张凭据**，不要 `void` 掉。见下面 `drainWrites`。
+              writes.push(useTaskStore.getState().setDueDate(task.id, due));
             }}
           />
         </HeytaUiProvider>
       </I18nProvider>,
     );
   });
+}
+
+/*
+ * 🔴 **写入的凭据表**：读 op 之前必须等它落干。
+ *
+ * 这条判据的证据是 op 本身，而组件的 `onSetDueDate` 是**异步**的。以前这里写的是
+ * `void setDueDate(...)`，然后靠"await 一次 engine 查询"把写入链冲完 ——
+ * 那是**赌引擎在一个微任务里把 op 落盘**。2026-10-03 实测赌输了：op-log 那边
+ * 给 `dispatch` 加了一条串行队列（`serialize()`，在飞的那条线，不是本批的改动），
+ * 落盘多排了一个 tick，于是同一份代码**当场 6 红**（`Expected 2, Received 1`）。
+ *
+ * ⚠️ 症状是"写入没发生"，真原因是"读取没等写入" —— 这两件事在界面上长得一样，
+ *   而只有后者是这份判据能修的。修法不是加 `setTimeout`（那是换个赌法），
+ *   是**拿着 store 返回的凭据 await 它**：写入完成这件事由被调方宣告，不由我数微任务。
+ *
+ * 反向的用处更大：「敲进去也不产生 op」「非法形状 0 条」这两条判的是 **0**，
+ * 没有 drain 时"0"完全可能只是"还没写完" ⇒ **假绿**。drain 之后 0 才是 0。
+ */
+const writes: Promise<unknown>[] = [];
+
+async function drainWrites(): Promise<void> {
+  const pending = writes.splice(0, writes.length);
+  await Promise.all(pending);
+}
+
+/**
+ * 等到**条件**成立（最多 ~200 个宏任务），等不到就带着"它在等什么"失败。
+ *
+ * 🔴 为什么不是再多 `await` 两次：本仓的 `reminders-panel.spec.tsx` /
+ *   `notes-view.spec.tsx` 文件头都记着同一件事 —— "固定刷 N 个宏任务"
+ *   只在机器空的时候刚好够，全量并行时不够，而红的文件每次还可能不是同一个。
+ *   那是**探针在猜时长**，不是产品行为漂了。
+ */
+async function waitUntil(label: string, done: () => boolean, limit = 200): Promise<void> {
+  for (let i = 0; i < limit; i += 1) {
+    if (done()) return;
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+  throw new Error(`等待「${label}」超时（${limit} 个宏任务）`);
+}
+
+/**
+ * 播种"已有截止"的状态，并等到它**真的物化**。
+ *
+ * 🔴 只 await 写入的 promise 不够：`setDueDate` 入队之后就返回，而组件拿的是
+ *   物化后的快照。实测（2026-10-03 16:33）本文件单跑 15/15、`pnpm --filter web test`
+ *   全量 1 红，红的正是「有 due 时才出现『清除』」那条 —— 快照还没有 due，
+ *   于是面板按"没有截止"画，按钮当然不在。
+ */
+async function seedDue(due: number): Promise<void> {
+  const before = await useTaskStore.getState().setDueDate(taskId, due);
+  await before;
+  await waitUntil(`dueDate 物化成 ${due}`, () => taskOf(taskId).dueDate === due);
 }
 
 /** 拿**当前**实体（store 是可变引用，每次都重新读）。 */
@@ -101,6 +157,7 @@ beforeEach(async () => {
   (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
   localStorage.clear();
   __resetOpLogForTests();
+  writes.length = 0;
   await initOpLog();
 
   container = document.createElement('div');
@@ -136,6 +193,7 @@ describe('🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate �
       cell!.click();
     });
 
+await drainWrites();
     const ops = await engine.getOpsForEntity('TASK', taskId);
     expect(ops).toHaveLength(before.length + 1);
     const last = ops[ops.length - 1]!;
@@ -149,7 +207,7 @@ describe('🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate �
   });
 
   it('清除 ⇒ +1 条 UPD、payload 是 { dueDate: null }（清除要能穿过 JSON）', async () => {
-    await useTaskStore.getState().setDueDate(taskId, dueDateToEpoch('2026-10-18'));
+    await seedDue(dueDateToEpoch('2026-10-18'));
     renderEditor(taskOf(taskId));
     openPanel();
 
@@ -162,6 +220,7 @@ describe('🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate �
       clear!.click();
     });
 
+await drainWrites();
     const ops = await engine.getOpsForEntity('TASK', taskId);
     expect(ops).toHaveLength(before.length + 1);
     expect(ops[ops.length - 1]!.opType).toBe(OpType.Update);
@@ -181,7 +240,7 @@ describe('🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate �
     act(() => {
       today!.click();
     });
-    // setDueDate 是 async：await 一次 engine 查询把写入链冲完（同上两个用例）。
+await drainWrites();
     const ops = await engine.getOpsForEntity('TASK', taskId);
 
     expect(ops).toHaveLength(before.length + 1);
@@ -190,7 +249,7 @@ describe('🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate �
   });
 
   it('已有 due 时触发器反映当前值（扫一眼列表就知道这条定在哪天）', async () => {
-    await useTaskStore.getState().setDueDate(taskId, dueDateToEpoch('2026-10-18'));
+    await seedDue(dueDateToEpoch('2026-10-18'));
     renderEditor(taskOf(taskId));
     const summary = container.querySelector('[data-testid="due-editor-summary"]');
     expect(summary!.textContent).toContain('10月18日');
@@ -207,9 +266,13 @@ describe('🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate �
  * 纯函数抽出来是为了把三个分支各自钉住（e2e 只能钉到"这一格点得到"那一个形状）。
  */
 describe('弹层放置：三种情形都必须把面板留在视口内', () => {
-  // 估高与边距来自实现；这里**不抄常数**，只按"面板高 500 / 边距 8"的形状给坐标，
-  // 真正的兜底判据是下面每一条都断的 `top + 500 <= 视口高`。
-  const PANEL = 500;
+  /*
+   * ⚠️ 2026-10-03 更正：这里原来是**手抄一个 500**（注释写着"不抄常数"），
+   * 而实现里的估高随 R14 加了时刻那一行改成 540 —— 四条**照样全绿**。
+   * 那就是"测试对着自己抄的旧值打分"：面板变高这件事完全没被量到。
+   * 现在从实现导出的常数推，估高一旦再变这四条会立刻跟着变判。
+   */
+  const PANEL = DUE_PANEL_HEIGHT_ESTIMATE;
 
   it('下面放得下 ⇒ 贴着锚点下沿开', () => {
     const top = panelTopFor({ top: 100, bottom: 120 }, 1200);
@@ -225,7 +288,8 @@ describe('弹层放置：三种情形都必须把面板留在视口内', () => {
   });
 
   it('🔴 两头都放不下（实测那个形状）⇒ **夹进视口**，不许裁掉面板', () => {
-    // 行在 y≈500、视口 720：下面要 1004、上面要 -4，两边都放不下。
+    // 行在 y≈500、视口 720：朝下要 518+8+估高（540）+边距 = 1074、
+    // 朝上要 500-8-540 = -48，两边都放不下（数字按 `PANEL` 推，不写死）。
     const top = panelTopFor({ top: 500, bottom: 518 }, 720);
     expect(top).toBeGreaterThanOrEqual(8);
     // 这条就是"18 号点得到"的算术形式：面板整块在视口里。
@@ -235,6 +299,153 @@ describe('弹层放置：三种情形都必须把面板留在视口内', () => {
   it('视口比面板还矮 ⇒ 至少贴顶，不产生负顶边（也不产生 NaN）', () => {
     const top = panelTopFor({ top: 100, bottom: 118 }, 400);
     expect(top).toBe(8);
+  });
+});
+
+/*
+ * ── R14：时刻那一栏（判据与上面同一套：证据是 **op 本身**，不是"状态变了"）──
+ */
+describe('🔴 R14 时刻：输入、搬运、全天、无日期四档', () => {
+  /** 往 RNW 的 TextInput 里"打字"。React 的 onChange 走原生 `input` 事件，
+   *  而直接改 `.value` 会被 React 自己的 value tracker 当成"没有变化"吞掉 ——
+   *  必须用原型上的 setter 走一次，事件才带得上正确的新旧值。 */
+  function typeTime(text: string): void {
+    // 从 `document` 找：面板有**两副身体**（details 内的在流卡 / Portal 的 fixed 卡），
+    // 写入之后切到 Portal 那副就不在 `container` 里了 —— 在 container 里找会得到
+    // `null`，看起来像"那一栏消失了"。
+    const input = document.querySelector<HTMLInputElement>('[data-testid="date-picker-time-input"]');
+    expect(input, '面板里应有时刻输入框').not.toBeNull();
+    if (input === null) throw new Error('面板里应有时刻输入框');
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value',
+    )!.set!;
+    act(() => {
+      setter.call(input, text);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  function clickByTestId(testID: string): void {
+    const node = document.querySelector<HTMLElement>(`[data-testid="${testID}"]`);
+    expect(node, `界面上应有 ${testID}`).not.toBeNull();
+    act(() => {
+      node!.click();
+    });
+  }
+
+  /** 播种一条"10月18日 16:00"的任务，并把写完后的 op 数拿回来。 */
+  async function seedTimedTask(): Promise<number> {
+    await seedDue(dueDateToEpoch('2026-10-18', '16:00'));
+    renderEditor(taskOf(taskId));
+    openPanel();
+    return (await requireEngine().getOpsForEntity('TASK', taskId)).length;
+  }
+
+  it('触发器上写着**这条截止的精度**（10月18日 16:00，不是只剩日子）', async () => {
+    await seedDue(dueDateToEpoch('2026-10-18', '16:00'));
+    renderEditor(taskOf(taskId));
+    const summary = container.querySelector('[data-testid="due-editor-summary"]');
+    expect(summary!.textContent).toContain('10月18日');
+    expect(
+      summary!.textContent,
+      '触发器要写出精度 —— 否则"这条定在 16:00"只有点开面板才知道',
+    ).toContain('16:00');
+  });
+
+  it('🔴 在输入框敲 16:00 ⇒ 恰好一条 UPD，payload 落在**本地 16:00**', async () => {
+    await seedTimedTask();
+    // 先改回全天（否则"敲进去 16:00"可能与播种值巧合相同，那条断言就没牙了）。
+    clickByTestId('date-picker-time-all-day');
+await drainWrites();
+    const cleared = await requireEngine().getOpsForEntity('TASK', taskId);
+    expect(cleared[cleared.length - 1]!.payload).toEqual({ dueDate: dueDateToEpoch('2026-10-18') });
+    /*
+     * 重新渲染。`task` 是**快照 prop**（宿主在任务行上传的是当前实体），
+     * 不重 render 组件就还以为时刻是 16:00 —— 于是"敲进 16:00"变成写同一个值，
+     * op 层判重 ⇒ 没有新 op ⇒ 这条会假红（2026-10-03 实测就是这个形状）。
+     */
+    renderEditor(taskOf(taskId));
+    openPanel();
+
+    typeTime('16:00');
+await drainWrites();
+    const ops = await requireEngine().getOpsForEntity('TASK', taskId);
+    expect(ops).toHaveLength(cleared.length + 1);
+    expect(ops[ops.length - 1]!.opType).toBe(OpType.Update);
+    expect(ops[ops.length - 1]!.payload).toEqual({
+      dueDate: dueDateToEpoch('2026-10-18', '16:00'),
+    });
+    expect(new Date(taskOf(taskId).dueDate!).getHours()).toBe(16);
+  });
+
+  it('🔴 换日子**搬运时刻**：18日16:00 → 点 25 号 ⇒ 25日16:00，不是 25日零点', async () => {
+    const before = await seedTimedTask();
+    const cell = container.querySelector<HTMLDivElement>(
+      '[role="button"][aria-label="10月25日"]',
+    );
+    expect(cell, '月历里应有 10月25日 这格').not.toBeNull();
+    act(() => {
+      cell!.click();
+    });
+await drainWrites();
+    const ops = await requireEngine().getOpsForEntity('TASK', taskId);
+    expect(ops).toHaveLength(before + 1);
+    expect(ops[ops.length - 1]!.payload).toEqual({
+      dueDate: dueDateToEpoch('2026-10-25', '16:00'),
+    });
+  });
+
+  it('点「全天」⇒ payload 回到那一天的**本地零点**（清除时刻是写出来的，不是留空）', async () => {
+    const before = await seedTimedTask();
+    clickByTestId('date-picker-time-all-day');
+await drainWrites();
+    const ops = await requireEngine().getOpsForEntity('TASK', taskId);
+    expect(ops).toHaveLength(before + 1);
+    expect(ops[ops.length - 1]!.payload).toEqual({ dueDate: dueDateToEpoch('2026-10-18') });
+    expect(taskOf(taskId).dueDate).toBe(dueDateToEpoch('2026-10-18'));
+    // 读回来必须是"全天"（与时间线那侧同一个判定，不是这里自己再算一遍时分）。
+    expect(localTimeOf(taskOf(taskId).dueDate!)).toBeUndefined();
+  });
+
+  it('🔴 没有日子就没有"几点"：时刻输入框不可编辑，敲进去也不产生 op', async () => {
+    renderEditor(taskOf(taskId));
+    openPanel();
+await drainWrites();
+    const before = await requireEngine().getOpsForEntity('TASK', taskId);
+    const input = document.querySelector<HTMLInputElement>(
+      '[data-testid="date-picker-time-input"]',
+    );
+    expect(input, '没有 due 时那一行照样画出来（让用户看得见这一栏）').not.toBeNull();
+    expect(input!.disabled, '没有 due 时必须是不可编辑的').toBe(true);
+    typeTime('16:00');
+await drainWrites();
+    const after = await requireEngine().getOpsForEntity('TASK', taskId);
+    expect(after).toHaveLength(before.length);
+  });
+
+  it('🔴 非法形状不写库：敲 25:00 ⇒ 一条新 op 都不产生', async () => {
+    /*
+     * 判的是产品结论（**没写进库**），不是框里显示什么 —— 草稿的回显形状
+     * 属于显示形态（"断言产品结论不断言显示形态"），而且实测它会被
+     * 面板换身体（details 卡 ↔ Portal 卡）时的重挂载牵动，拿它当判据会测到脚手架。
+     *
+     * "打字确实送到了组件"这件事由同一个 describe 里
+     * 「敲 16:00 ⇒ 恰好一条 UPD」那条正着钉住（同一条通道、同一个寻址方式），
+     * 所以这里的 0 不是"通道根本没通"的 0。
+     */
+    const before = await seedTimedTask();
+    const input = document.querySelector<HTMLInputElement>('[data-testid="date-picker-time-input"]');
+    expect(input, '面板里应有时刻输入框').not.toBeNull();
+    expect(input!.disabled, '已有日子时必须可编辑（否则"0 条"可能只是没送到）').toBe(false);
+
+    typeTime('25:00');
+await drainWrites();
+    const after = await requireEngine().getOpsForEntity('TASK', taskId);
+    expect(after).toHaveLength(before);
+    expect(taskOf(taskId).dueDate, '库里还是播种那一条 09:30 之前的值').toBe(
+      dueDateToEpoch('2026-10-18', '16:00'),
+    );
   });
 });
 

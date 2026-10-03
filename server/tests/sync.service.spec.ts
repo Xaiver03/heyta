@@ -37,6 +37,12 @@ vi.mock('../src/db', async () => {
   const { Prisma: PrismaModule } = await import('@prisma/client');
 
   const createTxMock = () => ({
+    // No active payload generation in the legacy upload fixtures. Production
+    // uses the real Prisma model; keeping this explicit prevents the test
+    // double from accidentally becoming a fail-open production branch.
+    vaultKeyPackage: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     operation: {
       create: vi.fn().mockImplementation(async (args: any) => {
         // Check for duplicate ID (unique constraint)
@@ -405,7 +411,7 @@ vi.mock('../src/db', async () => {
     // $executeRaw to keep the data write and the counter delta in a single
     // commit. Mock is a no-op here — the existing spec asserts behaviour at
     // the op level and does not inspect storage_used_bytes inside this file.
-    $executeRaw: vi.fn().mockResolvedValue(0),
+    $executeRaw: vi.fn().mockResolvedValue(1),
     // Full-state op uploads aggregate prior vector clocks inside the same
     // transaction. Dispatch on SQL text so unrelated $queryRaw callers keep
     // returning their existing default shape.
@@ -441,6 +447,9 @@ vi.mock('../src/db', async () => {
             latestStateReplacementSeq: syncState?.latestStateReplacementSeq ?? null,
           },
         ];
+      }
+      if (sql.includes('SELECT id FROM users WHERE id') && sql.includes('FOR UPDATE')) {
+        return [];
       }
       if (sql.includes('jsonb_each_text(vector_clock)')) {
         const [txUserId, beforeServerSeq] = params;
@@ -1272,12 +1281,11 @@ describe('SyncService', () => {
         | Record<string, number>
         | undefined;
       expect(storedClock).toBeDefined();
-      expect(Object.keys(storedClock ?? {})).toHaveLength(MAX_VECTOR_CLOCK_SIZE);
+      expect(Object.keys(storedClock ?? {})).toHaveLength(Object.keys(oversizedDelta.vectorClock).length);
       expect(storedClock?.[fullStateAuthor]).toBe(1);
       expect(storedClock?.[uploadClient]).toBe(2);
 
-      // 重传（内容逐字段相同）按幂等成功处理；上面那三条"裁剪保留了
-      // fullStateAuthor"的断言才是这个用例的重点，它们不受这次语义变更影响。
+      // 重传（内容逐字段相同）按幂等成功处理；完整时钟也必须保持不变。
       const retryResult = (await service.uploadOps(userId, uploadClient, [retryDelta]))[0];
       expect(retryResult.accepted).toBe(true);
       // 真的比较：回的必须是**首次上传那条**的序号（不是新分配的，也不是 undefined）
@@ -1343,9 +1351,7 @@ describe('SyncService', () => {
       );
     });
 
-    it('looks the full-state author up at most once per upload', async () => {
-      // The answer cannot change mid-transaction unless this upload itself
-      // accepts a full-state op, so one oversized op must not become one query.
+    it('does not look up a full-state author when clocks are retained losslessly', async () => {
       const service = new SyncService();
       const fullStateAuthor = 'import-author';
       const uploadClient = 'post-import-client';
@@ -1383,13 +1389,12 @@ describe('SyncService', () => {
       const results = await service.uploadOps(userId, uploadClient, oversizedDeltas);
       expect(results.every(({ accepted }) => accepted)).toBe(true);
 
-      expect(testState.fullStateAuthorLookupCount).toBe(1);
-      // The saved query must not cost the protection it exists for.
+      expect(testState.fullStateAuthorLookupCount).toBe(0);
       for (const delta of oversizedDeltas) {
         const storedClock = testState.operations.get(delta.id)?.vectorClock as
           | Record<string, number>
           | undefined;
-        expect(Object.keys(storedClock ?? {})).toHaveLength(MAX_VECTOR_CLOCK_SIZE);
+        expect(Object.keys(storedClock ?? {})).toHaveLength(Object.keys(delta.vectorClock).length);
         expect(storedClock?.[fullStateAuthor]).toBe(1);
       }
     });
@@ -1790,20 +1795,14 @@ describe('SyncService', () => {
       expect(testState.operations.size).toBe(2);
     });
 
-    it('runs the upload transaction at REPEATABLE READ isolation', async () => {
-      // Tripwire for the FIX 1.5 removal (ARCHITECTURE-DECISIONS.md #4): the
-      // post-allocation conflict re-check was deleted because RepeatableRead
-      // pins every statement to one snapshot and the lastSeq increment raises
-      // 40001 against concurrent writers. Lowering the isolation level makes
-      // that deletion unsound — this must fail loudly, not silently re-arm a
-      // missed-conflict race.
+    it('runs the upload transaction at READ COMMITTED with an explicit user lock', async () => {
       const service = new SyncService();
       await service.uploadOps(userId, clientId, [makeOp({ entityId: 'iso-task' })]);
 
       expect(prisma.$transaction).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
-          isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
         }),
       );
     });
@@ -2422,7 +2421,7 @@ describe('SyncService', () => {
       expect(results[0].accepted).toBe(true);
     });
 
-    it('should sanitize vector clock with string values (strip invalid entries)', async () => {
+    it('should reject vector clock with string values', async () => {
       const service = getSyncService();
       const op = {
         id: uuidv7(),
@@ -2437,12 +2436,12 @@ describe('SyncService', () => {
         schemaVersion: 1,
       } as Operation;
 
-      // Service sanitizes by stripping invalid entries, not rejecting
       const results = await service.uploadOps(userId, clientId, [op]);
-      expect(results[0].accepted).toBe(true);
+      expect(results[0]).toMatchObject({ accepted: false, errorCode: SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK });
+      expect(testState.operations.has(op.id)).toBe(false);
     });
 
-    it('should sanitize vector clock with negative values (strip invalid entries)', async () => {
+    it('should reject vector clock with negative values', async () => {
       const service = getSyncService();
       const op: Operation = {
         id: uuidv7(),
@@ -2457,12 +2456,12 @@ describe('SyncService', () => {
         schemaVersion: 1,
       };
 
-      // Service sanitizes by stripping invalid entries, not rejecting
       const results = await service.uploadOps(userId, clientId, [op]);
-      expect(results[0].accepted).toBe(true);
+      expect(results[0]).toMatchObject({ accepted: false, errorCode: SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK });
+      expect(testState.operations.has(op.id)).toBe(false);
     });
 
-    it('should sanitize vector clock with null entries (strip invalid entries)', async () => {
+    it('should reject vector clock with null entries', async () => {
       const service = getSyncService();
       const op = {
         id: uuidv7(),
@@ -2477,9 +2476,9 @@ describe('SyncService', () => {
         schemaVersion: 1,
       } as Operation;
 
-      // Service sanitizes by stripping invalid entries, not rejecting
       const results = await service.uploadOps(userId, clientId, [op]);
-      expect(results[0].accepted).toBe(true);
+      expect(results[0]).toMatchObject({ accepted: false, errorCode: SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK });
+      expect(testState.operations.has(op.id)).toBe(false);
     });
 
     it('should reject payload that is null', async () => {

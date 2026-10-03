@@ -570,13 +570,37 @@ const ENTRY_LIKE = /^\s*'[^']+':/;
 function parseCatalog(file) {
   const src = readFileSync(file, 'utf8');
   const entries = new Map();
+  /** 🔴 同一个键写两次 = 后一条静默赢。这与"解析漏行"是两种病，必须分开报。 */
+  const firstLine = new Map();
+  const duplicates = new Map();
   let entryLikeLines = 0;
+  let lineNumber = 0;
   for (const line of src.split('\n')) {
-    if (ENTRY_LIKE.test(line)) {
-      entryLikeLines += 1;
-      const m = ENTRY.exec(line);
-      if (m !== null) entries.set(m[1], m[2]);
+    lineNumber += 1;
+    if (!ENTRY_LIKE.test(line)) continue;
+    entryLikeLines += 1;
+    const m = ENTRY.exec(line);
+    if (m === null) continue;
+    if (firstLine.has(m[1])) {
+      const lines = duplicates.get(m[1]) ?? [firstLine.get(m[1])];
+      duplicates.set(m[1], [...lines, lineNumber]);
+    } else {
+      firstLine.set(m[1], lineNumber);
     }
+    // 🔴 返回值保持"键 → 句子"的原契约：后面的规则 2/3/4 直接比 value，
+    //    把它换成对象会让别的规则比对不上 —— 那是另一种假绿。
+    entries.set(m[1], m[2]);
+  }
+  if (duplicates.size > 0) {
+    const detail = [...duplicates.entries()]
+      .map(([key, lines]) => `   · '${key}' 第 ${lines.join(' 行、第 ')} 行（后一条覆盖前一条）`)
+      .join('\n');
+    console.error(
+      `🔴 词条表里有重复键：${relative(ROOT, file)}\n${detail}\n` +
+        `   两条都在表里、TS 不报错、构建不报错 —— 只有运行时知道用了哪一句，` +
+        `而那是"最后写进去的那个人"的决定，不是产品决定。`,
+    );
+    process.exit(1);
   }
   if (entries.size !== entryLikeLines) {
     console.error(

@@ -74,6 +74,8 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
 import { placeAnchoredPanel } from '@heyta/ui';
+
+import { avatarInitialFromEmail } from '@heyta/shared-schema';
 import { CircleUser, LogIn, LogOut, Settings, TrendingUp, UserRoundPen } from 'lucide-react';
 
 /**
@@ -141,13 +143,12 @@ export function AccountMenu({
   /** 面板的 fixed 坐标。`undefined` = 还没量（只在挂载那一帧，人看不到）。 */
   const [pos, setPos] = useState<{ top: number; left: number } | undefined>(undefined);
 
-  /** 首字母：取邮箱 @ 之前那一段的第一个字符。 */
-  const initial = ((): string | undefined => {
-    if (email === undefined) return undefined;
-    const local = email.split('@')[0] ?? '';
-    const first = local.trim().charAt(0);
-    return first === '' ? undefined : first.toUpperCase();
-  })();
+  /**
+   * 首字母：取邮箱 `@` 之前第一段的第一个**码点**。
+   * 🔴 判定住在 `@heyta/shared-schema` —— 设置页那个圈以前自己算了一遍
+   * （用 `.charAt(0)`，遇到 emoji 会取出半个代理对），于是同一条规则有两套裁决。
+   */
+  const initial = avatarInitialFromEmail(email);
 
   // 点外部关闭。`mousedown` 而不是 `click`：在拖动选择文本时 `click` 不触发，
   // 于是"点空白处关不掉"会变成偶发现象。

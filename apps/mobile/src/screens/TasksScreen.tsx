@@ -124,6 +124,7 @@ import {
 import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
 import { TaskDetailSheet } from './TaskDetailSheet';
 import { SearchScreen } from './SearchScreen';
+import { NoteEditScreen } from './NoteEditScreen';
 // 🔴 「四象限」那一档的实现（P10 收敛后**唯一**的实现）——
 // 它是共享 `QuadrantBoard` 的移动宿主，不再是第 6 个 tab 的整屏。
 import { QuadrantScreen } from './QuadrantScreen';
@@ -151,6 +152,10 @@ function Composer({
   const labels = useCaptureLabels();
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
+  const [presented, setPresented] = useState(false);
+  useEffect(() => {
+    if (!visible) setPresented(false);
+  }, [visible]);
 
   const submit = useCallback(
     async (plan: CaptureSubmitPlan) => {
@@ -172,6 +177,7 @@ function Composer({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      onShow={() => setPresented(true)}
       // 说明：遮罩用 material.scrim。它是**纯色半透明**，不需要模糊 ——
       // 这正是它能用在 RN 上、而 chrome-tint 不能的原因。
       statusBarTranslucent
@@ -204,7 +210,10 @@ function Composer({
       />
       <KeyboardAvoidingView
         style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Android edge-to-edge Modal can retain full window bounds despite
+        // adjustResize, leaving the composer underneath the IME. Explicitly
+        // resize its content so accessibility coordinates remain tappable.
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View
           style={{
@@ -244,12 +253,15 @@ function Composer({
                 自动抢焦点，所以那是宿主的参数而不是共享层的默认值）；
               · 提交后的清空由共享组件自己做（`apply` / `submit` 里都清了草稿）。
             */}
-            <CaptureComposer
+            {/* Mount the auto-focused input only after the native dialog is
+                shown. Otherwise its keyboard can appear before the parent
+                KeyboardAvoidingView has subscribed or measured its frame. */}
+            {presented ? <CaptureComposer
               labels={labels}
               onSubmit={submit}
               autoFocus
               testID="mobile-capture"
-            />
+            /> : null}
             {/* 取消留在这里：共享组件只管"添加"，关闭面板是 modal 的事。
 
                 ⚠️ 这里原来写着 `style={{ flex: 1 }}`，我一度以为它就是「取消」被压到
@@ -413,6 +425,14 @@ export function TasksScreen({
    * 两个入口各管一件事，所以两个状态也各留一份。
    */
   const [searchOpen, setSearchOpen] = useState(false);
+  /**
+   * 从**搜索结果**里点开的那条便签（多端第二批）。
+   *
+   * 与 `NotesSection` 里那个同名状态是分开的两份：两个宿主、两个入口，
+   * 各自管自己那一段的"打开了什么"。合成一份要跨屏传回调，
+   * 而 `NoteEditScreen` 自己是全屏 `Modal`，谁挂着它都一样。
+   */
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   /** 截止时间的呈现方式。与 Web 端 `DueBadge` 的开关一致，默认 `date`。 */
   const [dueMode, setDueMode] = useState<DueDisplayMode>('date');
   /**
@@ -1095,7 +1115,22 @@ export function TasksScreen({
           setSearchOpen(false);
           setDetailTaskId(id);
         }}
+        onOpenNote={(id) => {
+          // 🔴 先关浮层再开编辑屏：两个 `Modal` 同时在场在 Android 上没实测过，
+          //    而"关掉搜索再看这条便签"本来就是用户想要的次序。
+          setSearchOpen(false);
+          setEditingNoteId(id);
+        }}
       />
+
+      {editingNoteId === null ? null : (
+        <NoteEditScreen
+          noteId={editingNoteId}
+          onBack={() => {
+            setEditingNoteId(null);
+          }}
+        />
+      )}
 
       <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
       <SortPicker

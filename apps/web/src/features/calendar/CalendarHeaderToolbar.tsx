@@ -40,18 +40,23 @@
 
 import { toLocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { CalendarToolbar, type CalendarViewKind } from '@heyta/ui';
+import {
+  CALENDAR_VIEW_LABEL_KEYS,
+  CALENDAR_VIEW_ORDER,
+  CalendarToolbar,
+  type CalendarViewKind,
+} from '@heyta/ui';
 
 import { useTaskStore } from '../tasks/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
 import { useCalendarViewStore } from './store.js';
 
-/** 档位 → 自称。顺序就是下拉里的顺序，**月在前**（默认档）。 */
-const VIEW_OPTIONS: readonly { readonly kind: CalendarViewKind; readonly key: 'web.calendar.view.month' | 'web.calendar.view.week' }[] =
-  [
-    { kind: 'month', key: 'web.calendar.view.month' },
-    { kind: 'week', key: 'web.calendar.view.week' },
-  ];
+/*
+ * 档位与它们的键名**不在这里**（R17）：这里曾经写着一张 `{kind, key}[]`，
+ * 而移动端写着同一件事的另外两份 —— 加一档要人记着改三处。
+ * 唯一事实源在 `@heyta/ui` 的 `CALENDAR_VIEW_ORDER` / `CALENDAR_VIEW_LABEL_KEYS`，
+ * 反抄件判据在 `apps/web/tests/calendar-view-tabs.spec.tsx`（本文件里出现档位键字面量就红）。
+ */
 
 /**
  * 「时间线」那个 `<option value>`。
@@ -112,9 +117,9 @@ export function CalendarHeaderToolbar({
             +
           </button>
           <label className="ht-header__view" data-testid="calendar-view-switch">
-            {t('web.calendar.view.aria')}
+            {t('common.calendar.view.aria')}
             <select
-              aria-label={t('web.calendar.view.aria')}
+              aria-label={t('common.calendar.view.aria')}
               data-testid="calendar-view-select"
               value={view.view}
               onChange={(e) => {
@@ -129,9 +134,9 @@ export function CalendarHeaderToolbar({
                 view.setView(next as CalendarViewKind);
               }}
             >
-              {VIEW_OPTIONS.map((o) => (
-                <option key={o.kind} value={o.kind}>
-                  {t(o.key)}
+              {CALENDAR_VIEW_ORDER.map((kind) => (
+                <option key={kind} value={kind}>
+                  {t(CALENDAR_VIEW_LABEL_KEYS[kind])}
                 </option>
               ))}
               {timelineEnabled ? (

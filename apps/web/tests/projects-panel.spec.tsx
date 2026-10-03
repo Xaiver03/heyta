@@ -235,7 +235,7 @@ describe('C/D 清单：点一行报给宿主，删除走 action', () => {
 });
 
 describe('E 标签：与清单同一棵骨架，计数口径也是同一套', () => {
-  it('标签行渲染、可点、可删', () => {
+  it('标签行渲染、可点；删除要**两步**（W4b 之后）', () => {
     seed();
     const view = render();
     expect(byTestId(view, 'tag-g1-row')).not.toBeNull();
@@ -243,8 +243,14 @@ describe('E 标签：与清单同一棵骨架，计数口径也是同一套', ()
     click(byTestId(view, 'tag-g2-select'));
     expect(selected).toEqual([{ kind: 'tag', tagId: 'g2' }]);
 
+    // 🔴 这一条**改过**（原话是"点 `tag-g1-remove` → `deleteTag('g1')`"）。
+    // 改它不是因为测试坏了，是因为**产品语义变了**：§7.1 P-1 拍板标签不进回收站
+    // （重建成本≈0），于是删之前告知影响面是唯一的防护 —— 而按下即写 op 时，
+    // 那句告知没有任何一处能出现。判据跟着改成"点删除只出确认行"，
+    // 完整的两步在下面的 `W4b` 那一块逐条钉。
     click(byTestId(view, 'tag-g1-remove'));
-    expect(actions.deleteTag).toHaveBeenCalledWith('g1');
+    expect(actions.deleteTag).not.toHaveBeenCalled();
+    expect(byTestId(view, 'tag-g1-confirm')).not.toBeNull();
   });
 
   it('计数 = 挂着这个标签的未完成任务；一条任务挂两个标签则**两边各 +1**', () => {
@@ -616,5 +622,113 @@ describe('F 一份实现：web 侧只剩接线', () => {
     expect(source).toContain("t('web.projects.newPlaceholder')");
     expect(source).toContain("t('web.tags.heading')");
     expect(source).toContain("t('web.tags.newPlaceholder')");
+  });
+
+  it('🔴 侧栏的数据源必须是两路合并（W9 之后开关才有数据可放出来）', () => {
+    // `listProjects()` 从 W9 起**不含归档**（归档不进任何出口，P-9），
+    // 而本面板的「显示已归档」开关与 `archivedCount` 都要求归档那一路在数据里。
+    // 读错那一路的症状不是报错 —— 是"开关按了什么都没出现"。
+    const store = readFileSync(resolve(WEB_SRC, 'features/projects/store.ts'), 'utf8');
+    expect(store).toContain('projectActions.listAllProjects()');
+    expect(store).not.toContain('projectActions.listProjects()');
+
+    const panel = readFileSync(resolve(WEB_SRC, 'features/projects/ProjectsPanel.tsx'), 'utf8');
+    expect(panel).toContain('archivedProjects(projects.projects)');
+    expect(panel).toContain('includeArchived: showArchived');
+  });
+});
+
+/**
+ * W4b · 标签删除确认（回收站与归档批次 B）
+ * ------------------------------------------
+ *
+ * 产品裁决（§7.1 P-1）：标签**不进回收站**，重建成本≈0，所以唯一的防护是
+ * "删之前告诉你影响几条任务"。这一步住在共享 `OrganizerList`（`labels.confirmRemove`），
+ * 两端同一份 —— 这里钉的是**渲染结果**，因为坏法恰恰是"确认框画了，按下还是直接删"
+ * 和"数字用了行上那个常驻计数"，两者都不报错、都不空白，只有点下去才看得出来。
+ *
+ * 🔴 变异对照（本轮实测，读数写在计划 §11.12）：
+ *   · 把 `onPress` 里的 `setPendingRemove` 换成 `onRemove` ⇒ 前两条红；
+ *   · 把宿主传的 `removeImpact` 换成 `tagCounts` ⇒ 只有「两个数字同时在场」那条红
+ *     —— 也就是说**这一条是唯一能抓住"口径用错"的**，别把它当冗余删掉。
+ */
+describe('W4b 标签删除确认：一次点击不许写 op', () => {
+  /** g1 上挂：1 条未完成 + 2 条已完成 + 1 条墓碑 ⇒ 影响面 3，常驻计数 1。 */
+  function seedImpact(): void {
+    seed([
+      task({ id: 't1', tagIds: ['g1'] }),
+      task({ id: 't2', tagIds: ['g1'], completedAt: NOW }),
+      task({ id: 't3', tagIds: ['g1'], deletedAt: NOW }),
+      task({ id: 't4', tagIds: ['g1'], completedAt: NOW }),
+    ]);
+  }
+
+  it('点删除 → 确认行出现，`deleteTag` **一次都没调**', () => {
+    seedImpact();
+    const view = render();
+    click(byTestId(view, 'tag-g1-remove'));
+    expect(actions.deleteTag).not.toHaveBeenCalled();
+    const confirm = byTestId(view, 'tag-g1-confirm');
+    expect(confirm, '确认行没出现').not.toBeNull();
+    expect(confirm!.textContent).toContain('确定要删除「紧急」吗？');
+    // 原来那个删除按钮**收起来**了：armed 态下再点它不该有第二种含义。
+    expect(byTestId(view, 'tag-g1-remove')).toBeNull();
+  });
+
+  it('点「确认删除」→ `deleteTag` 恰好一次，确认行随之消失', () => {
+    seedImpact();
+    const view = render();
+    click(byTestId(view, 'tag-g1-remove'));
+    click(byTestId(view, 'tag-g1-confirm-yes'));
+    expect(actions.deleteTag).toHaveBeenCalledTimes(1);
+    expect(actions.deleteTag).toHaveBeenCalledWith('g1');
+    expect(byTestId(view, 'tag-g1-confirm')).toBeNull();
+  });
+
+  it('点「取消删除」→ 一条 op 都不写，行回到常态', () => {
+    seedImpact();
+    const view = render();
+    click(byTestId(view, 'tag-g1-remove'));
+    click(byTestId(view, 'tag-g1-confirm-no'));
+    expect(actions.deleteTag).not.toHaveBeenCalled();
+    expect(byTestId(view, 'tag-g1-confirm')).toBeNull();
+    expect(byTestId(view, 'tag-g1-remove'), '取消后必须还能再删').not.toBeNull();
+  });
+
+  it('🔴 那句影响面 = 3（含已完成），同一趟里行上的常驻计数 = 1', () => {
+    seedImpact();
+    const view = render();
+    expect(byTestId(view, 'tag-g1-count')?.textContent).toBe('1');
+    click(byTestId(view, 'tag-g1-remove'));
+    expect(byTestId(view, 'tag-g1-confirm')?.textContent).toContain('它挂在 3 条任务上');
+    // 措辞必须把"任务不会被删除"说出来 —— 只有数字的话读起来仍像"会动那 3 条"。
+    expect(byTestId(view, 'tag-g1-confirm')?.textContent).toContain('这些任务不会被删除');
+  });
+
+  it('没有存活任务时**不画**那句影响面（宁可少说一句，不编"挂在 0 条上"）', () => {
+    seed();
+    const view = render();
+    click(byTestId(view, 'tag-g2-remove'));
+    expect(byTestId(view, 'tag-g2-confirm')?.textContent).toContain('确定要删除「等回复」吗？');
+    expect(byTestId(view, 'tag-g2-confirm')?.textContent).not.toContain('它挂在');
+  });
+
+  it('一次只 armed 一行（两条同时 armed 时"确认删除"落在哪条只能靠猜）', () => {
+    seed();
+    const view = render();
+    click(byTestId(view, 'tag-g1-remove'));
+    expect(byTestId(view, 'tag-g1-confirm')).not.toBeNull();
+    click(byTestId(view, 'tag-g2-remove'));
+    expect(byTestId(view, 'tag-g1-confirm'), '第一条的确认行没收回').toBeNull();
+    expect(byTestId(view, 'tag-g2-confirm')).not.toBeNull();
+    expect(actions.deleteTag).not.toHaveBeenCalled();
+  });
+
+  it('清单行**不受影响**：仍然一次点击直接删，且没有确认行（默认形态逐字相同）', () => {
+    seed();
+    const view = render();
+    expect(byTestId(view, 'project-p1-confirm')).toBeNull();
+    click(byTestId(view, 'project-p1-remove'));
+    expect(actions.deleteProject).toHaveBeenCalledWith('p1');
   });
 });

@@ -31,7 +31,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { StatusBar, View } from 'react-native';
+import { AppState, StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { I18nProvider, type Locale } from '@heyta/i18n';
 import { ThemeProvider, useTheme, useTokens } from './theme';
@@ -55,9 +55,11 @@ import { PrivacyConsentSheet } from './screens/PrivacyConsentSheet';
 import { LegalReconfirmSheet } from './screens/LegalReconfirmSheet';
 import { startPrivacyGate } from './privacy/startup';
 import { startAutoSync } from './sync/auto-sync';
+import { useMobileSync } from './sync/store';
 import { startWidgetLifecycle } from './widgets/lifecycle';
 import { DEFAULT_SERVER_URL, readSyncConfig } from './sync/config';
 import { hasSeenWelcome, markWelcomeSeen } from './prefs/device-prefs';
+import { reconcileNativeReminders, subscribeNativeReminderWrites } from './lib/native-reminder-scheduler';
 
 /**
  * 🔴 **隐私闸门必须在任何一次渲染之前装好**（G-12）。
@@ -87,6 +89,22 @@ function Shell(): React.JSX.Element {
    * 要么逼 `TabBar` 内部去特判。让"没有"就用"没有"表达。
    */
   const [pendingCount, setPendingCount] = useState<number | undefined>(undefined);
+  const { dataRevision } = useMobileSync();
+
+  // 原生通知不是 React 状态；数据变化、冷启动和回前台都走同一条回收/排程路径。
+  useEffect(() => {
+    const reconcile = (): void => { void reconcileNativeReminders().catch((error: unknown) => {
+      console.warn('[reminder] 原生提醒同步失败：', error);
+    }); };
+    reconcile();
+    const unsubscribeWrites = subscribeNativeReminderWrites((error: unknown) => {
+      console.warn('[reminder] 本地写入后排程失败：', error);
+    });
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') reconcile();
+    });
+    return () => { subscription.remove(); unsubscribeWrites(); };
+  }, [dataRevision]);
 
   /**
    * 🔴 **自动同步**：回到前台时拉一次，本地写入之后（防抖）推一次。
