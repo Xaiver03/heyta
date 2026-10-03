@@ -1235,6 +1235,10 @@ W0b ─> 随时可做（台账那半要等文件干净）
 - **服务端现状**：路由注册表 `server/src/server.ts:494-586`；今天**唯一一条公开只读、非密文**下行是
   `GET /api/push/vapid-public-key`（`push.routes.ts:152`）⇒ "公共事实"挂这一类。
   全 `server/src` **零** `ETag`/`Cache-Control`/`Last-Modified`；可借的版本号形状只有 `PriceVersion`（`schema.prisma:388`）。
+  ⚠️ 这句是 **HEAD 读数**（20:4x 复跑：`git grep -icE 'etag|cache-control|last-modified' HEAD -- server/src` 合计 **1**，
+  而那 1 处是 `sync/conflict.ts:381` 注释里的 `updateTag`，不是响应头）。
+  **W4b 那条分支已经给公共事实这一条加上了 ETag / `cache-control` / 304**（`holiday-adjustment.routes.ts:111-123`，
+  见 ADR-0052 §7）⇒ 别把上面这句读成"仓库里今天还没有条件请求"。
 - **要迁移吗**：**要，2 张表 1 条迁移**。理由不是"想要范式干净"：判据③（非法日期 / `isOffDay` 不是布尔）在 `Json` 列上
   **库层拦不住** ⇒ 除"年度录入"表（存 `papers`）外要一张逐日表 `day DATE + isOffDay BOOLEAN`。
   🔴 遵守 §4 迁移纪律：一个文件一条语句、`CONCURRENTLY` 走可恢复形状、需要 `ACCESS EXCLUSIVE` 的 DDL 自带
@@ -1246,13 +1250,45 @@ W0b ─> 随时可做（台账那半要等文件干净）
   测试 `server/tests/admin-routes.spec.ts`（**遍历全部路由的 401/403** + 白名单投影两型）、`admin-migration.pglite.spec.ts`、
   `apps/web/tests/admin-panel.spec.tsx`。`check:journey-coverage` 不会因新资源红（`:50/245` 按端登记）⇒ 人工登记。
 - **客户端拉取 + 缓存**：**从零**（最接近的先例只有 `apps/web/src/pwa/push-subscribe.ts:202,367` 现拉不缓存；
-  `packages/app-host` 今天**没有任何 `fetch(`** —— 公共事实要不要破这条边界，必须写进新 ADR）。
+  ~~`packages/app-host` 今天**没有任何 `fetch(`** —— 公共事实要不要破这条边界，必须写进新 ADR~~
+  🔴 **2026-10-03 20:4x 本条被现量否证，而且否证的方式本身就值得记**：那句是拿 `git grep -c 'fetch('` 量的，
+  在 HEAD 上确实恒 0 —— 而 app-host 的出站调用**从来就不长那个形状**：
+  `const fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis)` 然后 `await fetchImpl(url, …)`
+  （`admin-client.ts:254,260`、`entitlement.ts:84`、`inbox.ts:161`、`privacy-consent.ts`；
+  另有 `host.ts:110`、`hosted-auth.ts:630` 直接绑 `globalThis.fetch`）。
+  现量命令与读数：`git grep -c "fetchImpl(" HEAD -- packages/app-host/src` ⇒ **4 个模块 / 5 个调用点**；
+  含 `globalThis.fetch` 的文件另有 2 个。⇒ **边界早就过了**，"要不要破 AGENTS §3.5"这个问句本身是错的，
+  真问题被 W4b 的实测改成了「**照抄哪一份现成形状**（`baseUrl` + `getToken` + `fetchImpl` + `joinEndpointUrl` +
+  失败落成 reason 词表）+ 公共事实这一条**不要 token**」。
+  ⚠️ 可迁移的规律：**断言"没有 X"时，先读被调方本体再定 needle** —— 按字面 token 量的"零命中"，
+  和"这件事没有先例"之间隔着一层调用形状。原文留着划线，是因为它当时就是这样把一个人带偏的）。
 - **判据**：①自托管拿不到数据时**不报错、不留空块**，且要在**真界面**跑一次（截图 + 人看）；②`papers` 链接随数据入库并在后台回显；
   ③校验层能因"日期非法 / `isOffDay` 不是布尔"拒绝录入（变异验证）；④🔴 **注入接缝本身要有判据**：`adjustmentOn` 加了
   "部署方下发的覆盖表"入口后，必须能分别测出"有覆盖用覆盖 / 无覆盖退回随包 / 覆盖里日期非法就整年拒绝"三条分支。
 - **文档**：新写一份 ADR 给这条通道定性（§8 工作流：不改已接受 ADR 的结论，要变更另写一份）；
   并**回写 `docs/adr/0038-admin-console-scope.md` 范围表 `:75-79`**。
-- [ ] W4b 完成
+- [x] 文档这两条已做完（2026-10-03 20:4x，`c28e5f1a` @ main 本地提交）
+  - ✅ 新 ADR = **`docs/adr/0052-public-facts-are-deployer-supplied.md`**。定性的那句话：
+    **对公共事实而言部署方是事实源，对用户数据而言设备才是** —— AGENTS §1 那句"云端不是事实源"成立的原因是
+    服务端读不到也无法裁决用户明文，而"2026-10-10 上班"既不是任何人的数据、服务端也完全读得写得出。
+    🔴 因此本文唯一可判的边界写在 §2.1：**公开读面不许出现身份维度**（`:id` / `?userId=` / 按人分流）——
+    一旦"按用户下发不同的公共事实"成为可能，定性当场作废。被否决的选项（每年发版随包 / 客户端自己抓 gov.cn）按 README 要求列全。
+  - ✅ ADR-0038 的回写**没有动它正文一个字**（`docs/adr/README.md` §1a 第 1 条），而是在文末追加
+    `## 5. 勘误（2026-10-03）`：① §2 第三条那个"三"是**当时的决定、不是当前清单**；
+    ② 第四个写动作与前三个差在**作用域**（单账号 vs 该部署方全体用户 ⇒ 录错一年所有人跟着错），
+    这正是 ADR-0052 给写面钉"权限最高 + 只能整年替换 + 出处必填"三道的理由；
+    ③ §4.2 第 4 条"三个写动作没有审计表"的覆盖对象同步过时；
+    ④ §4.3 三条不变量**逐条核过没破**（不返回密钥类字段 / 不走 `account_notifications` ⇒ 没有新 kind / 不碰计费），
+    §2 第二条单级 `isAdmin` 未变（新三端点共用同一个 `addHook('preHandler', requireAdmin)`）。
+  - ⚠️ **ADR 编号撞车已登记在 ADR-0052 §7**：并行工区的契约文件头写着「定性见 ADR-0050
+    `0050-public-facts-are-deployer-supplied.md`」，而 `0050` 已被 E2EE 密钥生命周期占用、`0051` 被移动端提醒占用
+    ⇒ 合流时**那个指针必须改指 0052**；如果并行那条线自己也写了同号文件，保留一份、把增量并进 §2/§4 后删重复件。
+    复跑：`ls docs/adr | grep -oE '^0[0-9]{3}' | sort -n | tail -3`（20:4x 读数 = 0050 / 0051 / 0052）。
+  - 🔴 **这不等于 W4b 完成**。判据①②③④ 里 ①（拿不到数据 ⇒ 不报错、不留空块，还要真界面截图 + 人看）
+    与 ④（注入接缝的三条分支）目前**没有载体**：客户端拉取那半 + 共享 `CalendarBoard` 的 `dayMarker?` 那个可选 prop
+    都还没落点（20:4x 现量：`grep -rln "holidayAdjustment\|dayMarker" packages/app-host/src packages/ui/src apps/web/src packages/storage/src`
+    ⇒ 命中集合里没有这四条路径下的文件）。`scripts/check-public-facts.mjs` 在 main 与 w4b 工区都**不存在**。
+- [ ] W4b 完成 —— 代码那半（客户端拉取 + `dayMarker` + `check:public-facts` + 判据①-④）在 `heyta-wt-w4b` 工区进行中，本表不代它主张读数
 
 #### 🟡 L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）—— 判定表已出、命中已修；剩下的那条闸门已于 20:1x **立成常驻门禁 `check:legal-permissions`**，而踩响它的是 W9 不是 W7
 
@@ -1351,8 +1387,14 @@ W0b ─> 随时可做（台账那半要等文件干净）
 ### 8.3 收尾（§5 的四条，一项都不能省）
 
 1. `pnpm -r typecheck && pnpm -r test`，然后**完整 `pnpm check`**（动过 `packages/legal` 必含 `check:legal-copy`）。
-   ⚠️ 当前 HEAD 上 `check:docs` 已红（8 处"本机有、仓库没跟踪"的死链，全在并行会话的文档里）——
-   收尾时这条红**不吸收、不代改**，写成"缺口在哪一段、在谁手里"的现量。
+   ⚠️ 当前 HEAD 上 `check:docs` 已红，而且**数量在长**：20:4x 现量
+   `node research/tools/docs-link-check.mjs` ⇒ **33 处**"本机有、仓库没跟踪"的死链
+   （这一行原先写"8 处"，那是更早一趟的读数 —— 死链数是别人未跟踪文档的函数，不是常量，引用它必须带日期）。
+   全部落在并行会话的未跟踪文档上（`docs/README.md` → `adr/0046`/`0047`/`0048`、`plans/trash-and-archive*`、
+   `research/aed-implementation-evidence.md`、`docs/plans/README.md` → `calendar-year-time-and-mobile-profile.md` 等）。
+   ⇒ 收尾时这条红**不吸收、不代改**（别人未跟踪的文件不该由我 `git add`），写成"缺口在哪一段、在谁手里"的现量。
+   ✅ 本批自己引入的死链：**0** —— 复核命令 `node research/tools/docs-link-check.mjs | grep -E 'adr/0038|adr/0052|countdown'`，
+   20:4x 读数无命中（`0038 → 0052` 那条曾在清单里，是因为 0052 当时未跟踪；`c28e5f1a` 提交后消失）。
 2. `node research/tools/docs-link-check.mjs` 带读数复核。
 3. 界面结论必须有截图且人真的看过；验收不抢前台。
 4. `pnpm reinstall:all` 四端装上当前产物（AGENTS §6.1.1）；真机验收排在最后，用私有现场。
@@ -1364,7 +1406,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
 | W0 弹层上提 | ✅ | — | 3 | ui 448 passed + 变异 1 红 + e2e 注入红在"面板应在头像上方" + 3 张图已看 |
 | W0b 遗留缺口 | 🟡 ①② | 台账需干净 | 3 | 16 文件路径/库名旋钮；harness 22 绿 0 红；③ 转投单写者文档待入 traps |
 | W2 `EVENT` 实体 | ✅ | D1/D2 ✅ | 4 + 静默门禁人工勾 | 20/7/17/41/30 passed；`listEvents` 已进 READ_PATTERNS 且三腿验过能红 |
-| W6 日历第二源 | ⏹ 排后 | W2 | 2 | 落点四文件正被并行会话整片重写（撞车面见 §8.2 开头） |
+| W6 日历第二源 | ⏹ 排后 | W2 | 2 | 落点正被并行会话整片重写，**代价已量出来**（20:2x）：`calendar/model.ts` **+264/−7**（261→518 行，含一处 166 行整块插入）、`CalendarBoard.tsx` +107、`CalendarScreen.tsx` +153；关闭判据 = 那六个路径的 `git status --porcelain` 为空。HEAD 与他们的版本里 `grep -c 'EVENT'` **都是 0** ⇒ 没被别人做掉 |
 | W5 卡片网格 | ✅ | W2、W0 | 5 | 12 passed + 12 例变异 0 未证 + 9 道门禁 rc=0；e2e **6 passed**（整族 15 passed）、三张图已看、看图照出"逾期卡没有日期行"并修成 `94760c82`，两腿变异各红一次 |
 | W7 成品图导出 | 🔄 并行 | W5 | 2（含 RN 出图取证） | `heyta-wt-w7` 进行中，本表不代它主张读数 |
 | W8 三端接线 | 🔄 并行 | W5/W6 | 3 | 🔴 原先这行写"排后：同 W6，日历线未落地前不动 `CalendarScreen`"—— **那是按整条线推断出来的，现量否证过**：W8 的落点在 main 里逐个文件都干净，且 web 半已随 W5 落地。现由 `heyta-wt-w8` 在跑（移动半 + 壳级门禁），读数它自己填，本表不代它主张 |
