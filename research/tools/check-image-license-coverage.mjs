@@ -117,12 +117,14 @@ const IMAGE_ONLY_PACKAGES = {
   // 🔴 2026-10-04 由 `--installed-tree`（真树载体）第一次照出来：预测快照钉在 11.3.1，
   // 而**两趟独立构建的镜像里都是 11.3.3**。这条就是"快照在漂"的那一条本身 ——
   // 它以前只能靠人肉比对（审计 §8.38），现在这条门禁会自己说。
+  // ⚠️ 它**不写 `carrier`**（= 两种载体下都必须在）：20:47 重生成快照之后，快照自己也
+  // 解析到了 11.3.3，于是这条在两种载体上都出现 —— 省略字段是**更强**的规则，
+  // 哪天 npm 取到 11.3.4，这一条会在两种载体下同时被判过期，逼人来重判。
   '@fastify/websocket@11.3.3': {
     license: 'MIT',
     source: 'https://registry.npmjs.org/@fastify/websocket/11.3.3',
     checkedAt: '2026-10-04',
     why: 'pnpm-lock 锁在 11.3.1，而 npm 每次构建取 ^11.3.0 范围内最新 ⇒ 两条解析路必然漂',
-    carrier: 'installed-tree',
   },
 };
 
@@ -159,6 +161,8 @@ if (INSTALLED_TREE) {
     packages: dump.packages.map((p) => ({ name: p.name, version: p.version, license: p.license ?? null })),
     generatedAt: `镜像内 ${dump.root}（扫到 ${dump.scannedEntries} 个目录项）`,
     installedTree: true,
+    lockEntries: Array.isArray(dump.lockEntries) ? dump.lockEntries : null,
+    lockfile: dump.lockfile || null,
   };
   carrier = '真镜像里装上的那棵树';
 } else {
@@ -195,6 +199,47 @@ if (snapshot.installedTree && snapshot.packages.filter((p) => typeof p.license =
     )} 条（<100）⇒ dump 脚本没把包自己的 license 字段读出来，"登记=声明"那条判定会假绿。`,
   );
   process.exit(1);
+}
+
+// ── 载体互相对账：我数出来的磁盘树 vs npm 自己写下的 lock ────────────
+// 为什么要有这一条：`dump-installed-tree.js` 是**我手写的一次遍历**，它坏起来的形态是
+// "少几条"，而少几条时剩下的那些照样全绿 —— 这正是 §8.44 之前它漏掉 4 条嵌套副本的形态
+// （那 4 条版本与顶层不同，只数顶层看不见）。镜像里恰好有第二个独立载体：
+// 构建期 npm 自己写的 `/app/package-lock.json`。两个载体互相印证，任何一方的漏数都会现形。
+// 规则从数据推导，不写死包名：lock 的**非 dev** 条目 = npm 认为该装的；磁盘上多的必须被 lock 记着，
+// 磁盘上少的必须**全是 optional**（本平台不装的平台变体）。
+let treeAgreement = null;
+if (snapshot.installedTree) {
+  const lockEntries = snapshot.lockEntries;
+  if (!Array.isArray(lockEntries) || lockEntries.length === 0) {
+    console.error(
+      '❌ 现量树里没有 lockEntries —— 磁盘树没有第二个载体可对，' +
+        '"我数出来的树"就只是我数出来的。dump 脚本要连 /app/package-lock.json 的非 dev 条目一起吐出来。',
+    );
+    process.exit(1);
+  }
+  const lockById = new Map(lockEntries.map((e) => [e.id, e]));
+  const diskIds = new Set(snapshot.packages.map((p) => `${p.name}@${p.version}`));
+  const diskNotInLock = [...diskIds].filter((id) => !lockById.has(id));
+  const lockNotOnDisk = [...lockById.keys()].filter((id) => !diskIds.has(id));
+  const notOptional = lockNotOnDisk.filter((id) => lockById.get(id).optional !== true);
+  if (diskNotInLock.length > 0) {
+    console.error(
+      `❌ 磁盘上有 ${diskNotInLock.length} 条 lock 没记的包：${diskNotInLock.slice(0, 12).join(', ')}` +
+        (diskNotInLock.length > 12 ? ' …' : '') +
+        '\n   两个独立载体对不上 ⇒ 要么 dump 读错了目录，要么镜像里有 lock 之外的东西被装进来了。',
+    );
+    process.exit(1);
+  }
+  if (notOptional.length > 0) {
+    console.error(
+      `❌ npm 的 lock 认为该装、磁盘上却没有的非 optional 包 ${notOptional.length} 条：${notOptional.slice(0, 12).join(', ')}` +
+        (notOptional.length > 12 ? ' …' : '') +
+        '\n   要么 dump 漏了（它历史上漏过嵌套副本一次），要么生产装依赖少装了东西。',
+    );
+    process.exit(1);
+  }
+  treeAgreement = { disk: diskIds.size, lock: lockById.size, platformOnly: lockNotOnDisk.length };
 }
 
 // ── 新鲜度：快照描述的必须是**当下**这套声明（只对预测快照成立）──────
@@ -400,9 +445,15 @@ if (!quiet) {
   );
   console.log(
     INSTALLED_TREE
-      ? '   载体是**跑起来的镜像里那棵树**，所以这句是对着发出去的字节说的。'
+      ? '   载体是**跑起来的镜像里那棵树**，所以这句是对着发出去的字节说的。' +
+          (treeAgreement
+            ? `\n   两个独立载体对上了：磁盘枚举 ${treeAgreement.disk} 条 ⊆ npm 自己写的 lock 非 dev ` +
+              `${treeAgreement.lock} 条，差集 ${treeAgreement.platformOnly} 条且全是 optional（本平台不装的平台变体）。`
+            : '')
       : `   ⚠️ 这**不是**"镜像的树被钉住了"：快照描述 ${snapshot.generatedAt} 那一次 npm 解析的结果，` +
-        '而每次构建 npm 都会重解（没有 lockfile）。把树钉住才是闭合，已登记 G-47；' +
+        '而每次构建 npm 都会重解 —— 仓库里没有**作为输入的** lockfile' +
+        '（镜像里那把 `/app/package-lock.json` 是构建期 npm 写出来的**产物**，钉不住下一次构建）。' +
+        '把树钉住才是闭合，已登记 G-47；' +
         '`scripts/verify-selfhost-stack.sh` 会用 --installed-tree 对真树再跑一遍。',
   );
 }
