@@ -1024,6 +1024,47 @@ W0b ─> 随时可做（台账那半要等文件干净）
   "部署方下发的覆盖表"入口后，必须能分别测出"有覆盖用覆盖 / 无覆盖退回随包 / 覆盖里日期非法就整年拒绝"三条分支。
 - **文档**：新写一份 ADR 给这条通道定性（§8 工作流：不改已接受 ADR 的结论，要变更另写一份）；
   并**回写 `docs/adr/0038-admin-console-scope.md` 范围表 `:75-79`**。
+
+##### 实测于 2026-10-03（W4b 开工前的 file:line 逐条复核）
+
+命令都是在本工单的隔离 worktree 上跑的（分支 `feat/countdown-w4b`，基线 `192a516d`）。
+**四条断言被现实否证**，按它们施工会做错事，逐条改正如下。
+
+| 工单原句 | 实测 | 结论 |
+|---|---|---|
+| 「`packages/app-host` 今天**没有任何 `fetch(`** —— 公共事实要不要破这条边界」 | `grep -rln "globalThis.fetch\|await fetch" packages/app-host/src/` ⇒ **5 个文件**：`admin-client.ts:254`、`inbox.ts:161`、`host.ts:111`、`entitlement.ts:84`、`hosted-auth.ts:629` | 🔴 **否证**。边界早就破了，而且已经有一套成型形状：`{ baseUrl, getToken, fetchImpl? }` + `joinEndpointUrl` + **不抛、把失败落成 reason 词表**（`inbox.ts:140` 的文件头明写"只有一处网络与错误处理"）。本工单不再讨论"要不要破"，改为**照抄既有形状**并在 ADR 里把"公共事实通道不许要 token"这条与它们区分开 |
+| 「今天唯一一条**公开只读**、非密文下行是 `GET /api/push/vapid-public-key`」 | `server/src/push/push.routes.ts:127` 有 `fastify.addHook('preHandler', authenticate)`；`:156` 再取一次 `getAuthUser` | 🔴 **否证**（措辞）。vapid 那条是**认证后**只读，未登录直接 401（客户端 `push-subscribe.ts:207` 就是按 401 判"还没到能订阅的时候"）。所以今天**零条**匿名只读的非密文 JSON 下行 —— 本工单要建的是第一条，风险面比工单假设的大，ADR 与门禁必须按"第一条匿名面"写 |
+| 「`adjustmentOn` 加了覆盖表入口之后，判据①才有载体」 | `adjustmentOn` / `festivalsOn` 的**全部**读取方 = `packages/domain/tests/holidays.spec.ts`（grep 全仓 24 处命中，非测试文件 **0**）；i18n 里 `holiday\|festival\|调休\|补班` **零词条** | 🔴 **比工单说的更糟**：不是"覆盖表没载体"，是**节假日这件事在界面上根本不存在**（批次一 §3.5 明确"本批不做 UI，界面上那条随 W5"）。⇒ 判据①"真界面跑一次"必须先建一个 UI 载体，否则那条判据无法执行 —— 落点见下面「UI 载体」 |
+| 「路径 `push.routes.ts:152`」 | 实际是 `server/src/push/push.routes.ts:152` | 行号对，目录漏了一层（`server/src/push/`） |
+
+其余逐条复核 = **准确**（不重述理由，只登记读数）：`holidays.ts` 的 `:75/:108/:121/:161` 四个锚点、
+`server/src/server.ts` 路由注册块 `:494-586`、`schema.prisma:388` 的 `PriceVersion`、
+`admin.routes.ts` 的 `/overview:152` `/coupons:614` `/invites:670` 与端点表（**漂 2 行**：表体现在 `:11-20`）、
+白名单投影段 `:98-102`（实测在 `:98` 起的注释 + `:103` 的 `USER_LIST_SELECT`）、
+插件级闸门 `addHook('preHandler', requireAdmin)` 在 **`admin.routes.ts:149`**（工单写的 `admin.middleware.ts:34` 是 `requireAdmin` 的定义处 `:33`，不是挂载处 —— 两个都要知道，挂错文件就等于没挂）、
+`admin-client.ts:190/205/359/368`（`:244` 是 `adminRequest` 传输层，不是行号漂移）、
+`AdminPanel.tsx:36 TABS`、`store.ts:60 AdminTab`、i18n `web.admin.*` 中英各 **74** 条成对、
+`load.mjs` 的四道校验（`DATE_RE :29`、`days[]` 非空 `:49`、`papers` 非空 `:52`、`isOffDay` 布尔 `:62-63`）、
+`server/src` 全量 `grep -i "etag|cache-control|last-modified"` = **0 命中**（唯一一条是 `sync/conflict.ts:381` 注释里的 `updateTag`，不是响应头）。
+
+两条**新增的现场事实**（工单没写，但决定形状）：
+
+- 本地缓存有现成的家：`packages/storage/src/stores.ts` 的 `STORES.META` + `META_KEYS`
+  （`{key, value}` 键值簿记，`clientId` / `lastServerSeq` 就住这儿，**不进 op-log、不跨设备**）。
+  加一个 `META_KEYS` 项是纯可加 ⇒ **不动 `CURRENT_SCHEMA_VERSION`**（§3.3）。
+- 契约的唯一住处也有现成的先例：`packages/shared-schema/src/account-profile-contract.ts`
+  文件头把"为什么常量住在这里"讲透了（server 只依赖 domain / shared-schema / sync-core，
+  而 app-host 没有 zod ⇒ 校验函数从本包导出）。公共事实的 zod 形状**照这一份**放，
+  不要在 server 与 app-host 各写一遍 —— 那是 §3.5 那条"同一个判断写三次"的原样复发。
+
+**UI 载体（判据①的前置，工单没给落点，这里补上）**：`packages/ui` 的共享 `CalendarBoard`
+的 `DayCell`（`:127`）是"休/班"唯一的自然位置（滴答/飞书都在这里）。做法必须遵守
+仓库已经吃过的那条教训：**给共享组件加"默认值等于原值"的可选 prop**
+（`dayMarker?: (date) => 'off' | 'work' | undefined`，默认 `undefined` ⇒ 不渲染任何东西 ⇒
+移动端 `CalendarScreen.tsx:193` 零改动、零视觉变化），由 web 宿主把 `adjustmentOn` 接进去。
+这样判据①（拿不到数据 ⇒ 不报错、不留空块）与批次一欠的那半条 W4 判据②
+（"2027 有节无休、不空白"）用的是**同一个载体**，一次做掉两条。
+
 - [ ] W4b 完成
 
 #### ⏹ L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）
