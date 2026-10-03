@@ -3293,3 +3293,72 @@ emulator pid=36840 → 忙叶子=[36856 ]（期望非空） ✅ 正向腿成立
 
 📌 一般规律一句：**多人同写一个台账时，"提交前先 `git diff --numstat` 看行数对不对"是必需动作，
 不是可选检查** —— 我这次连 numstat 都没看就提了，78 行 vs 20 行的差本来一眼就能看出来。
+
+#### 15.43n 🔴 自报第二起事故：我把 383 KB 的台账提成了 18 字节（`execSync` 的 `input` 是数据，不是路径）
+
+05:32 我按 §15.43m 说的"等 #212 落定后再提 #213/#214"去做，用的是同一套 plumbing 配方，
+但建 blob 那一步写成了：
+
+```js
+execSync('git hash-object -w --stdin', { input: '/tmp/traps-blob.md' })   // ❌
+```
+
+`execSync` 的 `input` 选项是**喂给 stdin 的数据**。于是 git 收到并存储了字符串
+`/tmp/traps-blob.md` 本身 —— 18 字节、1 行。`hash-object` 照样打印一枚**合法**的 sha（`19faadf3…`），
+脚本照样"全闸通过"，`update-ref` 的 CAS 照样成功。提交 `bfdeea31` 把
+`docs/reference/environment-traps.md` 在 HEAD 里从 383353 B 变成 **18 B**。
+
+- **传播**：收尾那步"把真实索引刷成 HEAD"（§15.43m 记的配方）此刻刷的正是那枚坏 blob ——
+  它在共享索引里停留了 33 秒，另一条会话的一笔**无 pathspec** 提交 `ee71c6e1` 从索引把它带走了
+  ⇒ 坏内容在历史里有**两笔**在场。
+- **唯一在提交那一刻就现形的信号**是我自己写的复核，不是 numstat：复核里那两条
+  **不期望为 0** 的计数（`git show HEAD:<f> | grep -cE '^213\. '`、`… '^214\. '`）**同时返回 0**
+  加上一条 `^208. ` 返回 **0** 而不是 1。⇒ 判据要写成"**期望值**"而不是"打印出来看看"，
+  否则 18 字节的文件也能"看起来跑完了复核"。
+- **处置（工作树一个字节没动，不改历史）**：立刻 `git update-index --cacheinfo` 把索引刷回
+  `eae1ef61` 那份完整文本；想 CAS 摘掉 `bfdeea31` 时 HEAD 已被 `ee71c6e1` 推进 ⇒ CAS 前提不成立，
+  **不 revert、不 rewrite**，改成在其上提一笔 `87f62b39`：内容 = 完整文本 + 我自己的两处
+  （改号 208→213、追加 #214），他们的 #212 一行都没进（`git show HEAD:<f> | grep -cE '^212\. '` = 0，
+  `git diff | grep -cE '^\+212\. '` = 1）。
+- **新增那道闸（G5）就是把"落盘的对象 == 这份文本"钉住**：
+  `git cat-file -s <blob>` 必须逐字等于文本字节数、blob 里必须读得到两条标题、
+  且尺寸 > 300 KB。上一轮缺的正是这一道 —— 有了它，"18 字节的台账"根本提不出去。
+- **现量复核（`87f62b39` 之后）**：HEAD 里该文件 385139 B / 5165 行；`^208. `=1、`^213. `=1、
+  `^214. `=1、`^212. `=0；工作树 md5 前后 SAME；别人已暂存 8 条目一条没动
+  （中间那次 9→8 是我自己那条"恢复条目"进了索引又与 HEAD 重合，不是他们的）。
+
+📌 一般规律：**sha 对任何字节串都算得出来，所以"blob 建成功了"完全不构成"blob 是对的"**。
+任何"从文本建 blob 再提进历史"的路子，收尾必须做一次**读回比对**（`cat-file -p` 的尺寸 + needle），
+而不是只看 `hash-object` 的退出码和那 40 个十六进制字符。
+
+#### 15.43o ② 的集成态全链读数（载体 `1ebcf136`，2026-10-04 05:25–05:28，74 段）
+
+`pnpm -r build` rc=0；起跑前负载 `{ 11.39 19.71 20.83 }`（阈值 12 = 16 核 × 3/4）、对端相关进程 11。
+**链 74 段 = 59 绿 / 14 红 / 1 段按规则不跑**（63 `check:ai-e2e`，理由见 §7 #87；这轮的替代读数在阶段 4 单跑）。
+
+**本线 12 道门禁全部 rc=0**（逐段现取自 `chain-ai-closeout-0525/segments-rc.txt`）：
+`01 check:gate-wiring`、`03 check:entries`、`09 check:migrations`、`11 check:layering`、
+`23 check:docs-voice`、`25 check:legal-tools`、`40 check:docs`、`43 check:ai-quota`、
+`44 check:ai-tools`、`46 check:design`、`48 check:server-design`、`62 check:ai-coverage`。
+
+14 条红**逐段归属**（每条都用它自己报出的文件判，不看"某条线在忙"的印象）：
+
+| 段 | 门禁 | 报出来的东西 | 归因 |
+|---|---|---|---|
+| 35 / 64 / 65 | journey-coverage / privacy-consent-e2e / landing-e2e | `内存闸门拒绝启动：已有测试在跑（pid=3248，锁 /tmp/tfa-test.lock）` | **环境无效**（外部 tfa-shield 拒并发），不是产品 |
+| 08 | check:op-log-semantics | `mutate-op-log-semantics.mjs: missing assertion report` | 别人那条线的变异夹具 |
+| 12 | check:ui-provider | `GrowthScreen` 里 `<GrowthBoard>` 不在 Provider 子树 | 界面线 |
+| 13 | check:theme | `apps/web/tests/countdown-card-export.spec.ts:192` 直取 L0 原始表 | 倒数日线（W7 的测试） |
+| 15 | check:selection-single-source | `packages/ui/src/calendar/CalendarDayBoard.tsx` 声明 `onOpenTask` 没用起来 | 日历线 |
+| 18 | check:widgets | 四端解析器夹具与真源不一致 | 小部件线 |
+| 22 | check:ui-language | `apps/web/src/lib/local-data-destruction.ts:264` 诊断字段里整句中文 | 法务/存储线 |
+| 26 | check:legal-permissions | `packages/legal/src/documents/third-parties.ts` 中英两行仍写"移动端不申请通知权限" | W9 提醒投递线 |
+| 31 | check:image-license | `server/package.json` 与镜像依赖快照差一枚 sha256 | 服务端线 |
+| 32 | check:crosslang-contract | C# 驱动契约重放 2 条失败（`destroy 幂等`）+ rc=134 | Windows/mac 壳线 |
+| 66 | check:shell-unicode | `research/tools/r14c-window-retry.sh:85/88` `$?（` 全角括号 | 窗口重试点（不是我这轮写的脚本） |
+| 74 | `pnpm -r test` | **21 个包/应用全 passed**（`packages/local-api` 8 files、`app-host` 64、`ui` 30、`apps/mobile` 47、`packages/domain` 36），只有 `server` 1 个文件失败：`tests/holiday-adjustment-migration.pglite.spec.ts` | W4b 调休线的迁移测试 |
+
+两处**相对上一轮（载体 `187057bb`，73 段 64 绿 / 8 红）的变化**要写清：
+① `check:licenses:stamp` 这轮**转绿**（段 29 rc=0）—— 那枚 lockfile sha 由它的所有者补齐了；
+② `packages/domain` 那条翻译断言这轮**转绿**（段 74 里 36 passed）。
+⇒ "红变绿"在这条链上多数是**别人落地了**，不是我这轮做的事；记下来是为了不让下一个人把它当成本线的成果。
