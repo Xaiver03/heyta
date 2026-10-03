@@ -21,6 +21,7 @@ import { habitLogToolPack } from './habit-log.js';
 import { noteToolPack } from './note.js';
 import { projectToolPack } from './project.js';
 import { reminderToolPack } from './reminder.js';
+import { eventToolPack } from './event.js';
 import { tagToolPack } from './tag.js';
 import { taskToolPack } from './task.js';
 
@@ -42,6 +43,7 @@ export const LOCAL_API_TOOL_PACKS: readonly EntityToolPack[] = [
   habitLogToolPack,
   focusToolPack,
   reminderToolPack,
+  eventToolPack,
 ];
 
 export interface ToolPackRegistry {

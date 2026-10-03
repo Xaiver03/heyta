@@ -101,6 +101,7 @@ export {
 } from './calendar/CalendarViewTabs.js';
 export {
   calendarDayTone,
+  calendarDayMarkerView,
   calendarCellBars,
   calendarDayBuckets,
   calendarHourMark,
@@ -121,6 +122,7 @@ export {
   type CalendarViewLabelKey,
   type CalendarDayBuckets,
   type CalendarDayTone,
+  type CalendarDayMarker,
   type CalendarToolbarLabels,
 } from './calendar/model.js';
 export {
@@ -984,3 +986,47 @@ export {
   type NoteEditorProps,
 } from './notes/NoteEditor.js';
 export { isNoteDraftBlank } from './notes/model.js';
+
+ * ── 批次二 W0：锚点弹层的定位算术 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 只转出算术，不转出测量：`packages/ui` 进不来 DOM，而"量触发器与面板的 rect"
+ * 与"捕获阶段的 scroll 重算"本来就必须住在每个宿主里（见 `overlay/model.ts` 文件头）。
+ */
+export {
+  placeAnchoredPanel,
+  type AnchoredPanelOptions,
+  type AnchoredPanelPosition,
+  type AnchoredPanelViewport,
+  type PanelPlacement,
+  type PanelSize,
+  type TriggerRect,
+} from './overlay/model.js';
+
+/**
+ * ── 批次二 W5：倒数日/纪念日板 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 转出的是**卡片怎么画、怎么筛、怎么分行**（`countdown/model.ts`）与那张板子本身；
+ * 天数、闰月、顺序、归档判定一律留在 `@heyta/domain`，op 的构造留在
+ * `@heyta/app-host` —— 这一层转出的是展示，不是判断。
+ */
+export {
+  EventBoard,
+  type EventBoardLabels,
+  type EventBoardProps,
+  type EventEditPatch,
+} from './countdown/EventBoard.js';
+export {
+  COUNTDOWN_FILTERS,
+  countdownFace,
+  filterEventCards,
+  toEventCards,
+  toEventRows,
+  type CountdownFace,
+  type CountdownFilter,
+  type CountdownView,
+  type EventCard,
+} from './countdown/model.js';

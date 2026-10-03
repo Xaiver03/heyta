@@ -57,6 +57,7 @@ interface GeneratorModule {
   DENOMINATOR_EXCLUSIONS: readonly { entityType: string; reason: string }[];
   NON_ENTITY_VIEWS: readonly string[];
   SYSTEM_ENTITY_TYPES: readonly string[];
+  TOOL_ENTITY_OVERRIDES: Readonly<Record<string, string>>;
   attributeToolByName: (name: string) => { entityType: string | null; how: string | null };
   buildCapabilityManifest: (input: unknown) => FixtureManifest;
   renderModelText: (manifest: unknown) => string;
@@ -295,10 +296,13 @@ describe('每一个工具都在清单里，且 kind 与目录一致', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// 3. 分母口径（ADR-0045 §2.7 钉死：8，且视图不进分母）
+// 3. 分母口径（ADR-0045 §2.7 钉的是**规则**：视图与两个落库载体不进分母。
+//    具体数字随实体清单走：批次二 W2 物化 `EVENT` 之后分母从 8 变 9。
+//    ⚠️ ADR-0045 正文里那句"分母是 8 / 现状基线 2/8"是**当时**的读数，
+//    它不是结论（结论是那条规则），所以不去改已接受的 ADR，只在这里写明口径。）
 // ─────────────────────────────────────────────────────────────────────────
 
-describe('分母恰好 8，且逐条列出是哪 8 个', () => {
+describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
   it('分母成员逐条点名（多一个少一个都红 —— 这条挡住"顺手把视图加进分母"）', async () => {
     const [gen, upstream] = [await loadGenerator(), await upstreamDirectory()];
     const excludedNames = gen.DENOMINATOR_EXCLUSIONS.map((e) => e.entityType);
@@ -306,8 +310,21 @@ describe('分母恰好 8，且逐条列出是哪 8 个', () => {
       (t) => !excludedNames.includes(t) && !gen.NON_ENTITY_VIEWS.includes(t),
     );
     expect([...manifest.userOperableEntityTypes]).toEqual(expected);
-    expect(manifest.userOperableEntityTypes.length).toBe(8);
-    expect(manifest.coverage.denominator).toBe(8);
+    expect(manifest.userOperableEntityTypes.length).toBe(9);
+    expect(manifest.coverage.denominator).toBe(9);
+    // 🔴 W10 **之前**这里是 `toContain('EVENT')` —— 清单的职责就是把"实体有了、
+    // 工具还没接"这件事显形。W10 做完之后它必须**不再**出现（这条改向就是那件事
+    // 做完了的机器化证据；反向漏做 ⇒ 这条与上面 3/9 那条一起红）。
+    expect(manifest.entityTypesWithoutTools).not.toContain('EVENT');
+    // 顺序由实体清单决定，所以断言**排序后**的集合（口径是"还剩谁"，不是"谁先谁后"）
+    expect([...manifest.entityTypesWithoutTools].sort()).toEqual([
+      'FOCUS_SESSION',
+      'HABIT',
+      'HABIT_LOG',
+      'NOTE',
+      'REMINDER',
+      'TAG',
+    ]);
   });
 
   it('分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体', async () => {
@@ -376,6 +393,36 @@ describe('分母恰好 8，且逐条列出是哪 8 个', () => {
     // 两个数取自生成器里两条不同的路径，这里要求它们当下确实相等 ——
     // 不等就是那两条口径漂了（比如覆盖率把某个已剔除的视图又算了进去）。
     expect(manifest.coverage.covered).toBe(manifest.userOperableEntityTypes.length);
+  it('现状基线 3/9：TASK / PROJECT / **EVENT** 有工具（再扩目录时这条会红，那是要的）', () => {
+    const withTools = manifest.entities
+      .filter((e) => e.countsTowardCoverage && e.coverage !== 'none')
+      .map((e) => e.entityType);
+    // W10 把 EVENT 接上了四个工具（读 2 / 写 2），覆盖面从 2/9 进到 3/9。
+    // 这条点名是**判据**不是内容：目录再扩一个实体而这里没跟上，说明那批没做完。
+    expect(withTools.sort()).toEqual(['EVENT', 'PROJECT', 'TASK']);
+    expect(manifest.coverage.covered).toBe(3);
+    expect(manifest.coverage.ratio).toBe('3/9');
+  });
+
+  it('🔴 EVENT 的四个工具**读写都有**，且归因走的是名字（不是 override 名单）', async () => {
+    const event = manifest.entities.find((e) => e.entityType === 'EVENT');
+    expect(event).toBeDefined();
+    expect([...event!.readToolNames].sort()).toEqual(['get_event', 'list_events']);
+    expect([...event!.writeToolNames].sort()).toEqual(['create_event', 'update_event']);
+    // coverage 必须是 read-write —— 竞品那句"我们只能查看、不能新建"的产品谎言，
+    // 在 heyta 的**这一格**上被否证（gap-analysis §2.1 的靶子）
+    expect(event!.coverage).toBe('read-write');
+    // 四条都登记了参数 schema（`schemaRecorded:false` 会静默出现在给模型的投影里）
+    for (const name of ['list_events', 'get_event', 'create_event', 'update_event']) {
+      const tool = manifest.tools.find((t) => t.name === name);
+      expect(tool, `${name} 不在清单里`).toBeDefined();
+      expect(tool!.schemaRecorded, `${name} 没有登记 INPUT_SCHEMAS`).toBe(true);
+      expect(tool!.entityType).toBe('EVENT');
+    }
+    // 逃生门没有被用掉：EVENT 是靠**名字**归因的，不是靠 override 名单
+    // （`TOOL_ENTITY_OVERRIDES` 一旦开始被逐个点名，清单就开始变成第二份手写名单）
+    const gen = await loadGenerator();
+    expect(Object.keys(gen.TOOL_ENTITY_OVERRIDES)).toEqual([]);
   });
 });
 

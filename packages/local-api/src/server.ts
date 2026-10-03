@@ -34,6 +34,7 @@ import {
   authorizeToolCall,
   findTool,
   type LocalApiConfig,
+  type LocalApiEventItem,
   type LocalApiItem,
   type LocalApiWriteIntent,
   type LocalApiWriteResult,
@@ -173,6 +174,19 @@ export interface ListTasksQuery {
   dueFrom?: string;
   /** 范围终点（**含**这一天），与 `dueFrom` **成对**出现。 */
   dueTo?: string;
+}
+
+/**
+ * `list_events` 的查询条件（W10）。
+ *
+ * ⚠️ 刻意**只有** `limit`，没有日期筛选：倒数日的"哪一天"有三种口径
+ * （锚点日 / 下一次发生日 / 农历换算后的公历日），而这三段的判断
+ * 全在 `packages/domain/src/events.ts` 一处。协议层要是接受 `dueOn` 之类的参数，
+ * 就等于在这里长出**第二套**"下一次是哪天" —— 那正是 AGENTS §3.5 记着两次学费的形状。
+ * 要按日期筛，现在的做法是列出来让调用方读 `nextOccurrence` 字段。
+ */
+export interface ListEventsQuery {
+  limit?: number;
 }
 
 /**
@@ -467,6 +481,25 @@ function toolNotImplemented(name: string): ToolReadOutcome {
     ok: false,
     kind: 'tool-not-implemented',
     message: `工具「${name}」在目录里，但没有任何实体工具包处理它 —— 注册不齐，是 heyta 的缺陷，不是你的参数错。`,
+  };
+}
+
+/**
+ * 宿主没有实现这一段能力时的回答。
+ *
+ * 🔴 单独成一个函数，是为了让**两个**入口（内置 AI 与 MCP）说的是同一句话 ——
+ * 两个前端一份判断（不变量 19）。
+ * ⚠️ `kind` 取 `invalid-args` 而不是新造一档：新增一档会牵动
+ * `ai-tool-run.ts` 的失败映射与 `apps/web` 的失败文案表，而那两处不在本工单范围内
+ * （W10 的验收明确要求 `ai-tool-run.ts` 零改动）。真正的信息在 `message` 里。
+ */
+function hostDoesNotSupport(name: string): ToolReadOutcome {
+  return {
+    ok: false,
+    kind: 'invalid-args',
+    message:
+      `这个宿主没有接倒数日（${name} 需要宿主实现对应的读方法），` +
+      '所以一个字节都没有读到 —— 不是"你没有倒数日"。',
   };
 }
 

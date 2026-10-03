@@ -129,6 +129,12 @@ export {
   type NoteActions,
   type NoteActionsOptions,
 } from './note-actions.js';
+export {
+  createEventActions,
+  type EventActions,
+  type EventActionsOptions,
+  type NewEventFields,
+} from './event-actions.js';
 
 /**
  * 同步接线。**所有宿主共用这一份** —— 见 `sync-wiring.ts` 文件头：
@@ -169,7 +175,10 @@ export {
   adminForceUserLogout,
   adminSetUserQuota,
   adminUnlockUser,
+  adminDeleteHolidayYear,
+  adminPutHolidayYear,
   fetchAdminCoupons,
+  fetchAdminHolidayYears,
   fetchAdminInvites,
   fetchAdminOrders,
   fetchAdminOverview,
@@ -179,6 +188,10 @@ export {
   type AdminClientOptions,
   type AdminCouponRow,
   type AdminFailureReason,
+  type AdminHolidayYear,
+  type AdminHolidayYearPut,
+  type AdminHolidayYearPutResult,
+  type AdminHolidayYears,
   type AdminInvites,
   type AdminOrderRow,
   type AdminOverview,
@@ -655,3 +668,22 @@ export {
   type VaultKeySession,
   type VaultSessionState,
 } from './vault-session.js';
+
+/**
+ * 公共事实（调休 / 补班）的下行（W4b，ADR-0052）。
+ *
+ * 🔴 这是 heyta 第一条服务端→客户端的**内容**通道，宿主必须只从 `app-host` 拿它：
+ * 判断（匿名、失败不动缓存、坏形状不覆盖好数据、装进 domain 的覆盖表）出现在
+ * `apps/*` 里就是 AGENTS.md §3.5 那个分界线上的一次后退 —— 四个壳会各抄一份，
+ * 而"抄了没抄"在界面上完全看不出来（它的失败态就是"日历少一块"，判据①禁的正是这个）。
+ */
+export {
+  installPublicFactsFromCache,
+  readPublicFactsCache,
+  refreshPublicFacts,
+  type PublicFactsCachePort,
+  type PublicFactsRefreshOptions,
+  type PublicFactsRefreshResult,
+  type PublicFactsSnapshot,
+  type PublicFactsUnavailableCause,
+} from './public-facts.js';

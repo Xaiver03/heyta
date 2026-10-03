@@ -34,7 +34,8 @@
 
 import { useCallback, useMemo, useState } from 'react';
 
-import { scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
+import { adjustmentOn, scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
 import {
   CalendarBoard as SharedCalendarBoard,
   HeytaUiProvider,
@@ -84,6 +85,33 @@ export function CalendarView(): React.JSX.Element {
   /** 🔴 文案抽进 `useCalendarLabels()`：页头那个工具栏（批二）要的是**同一份**，
    *  两处各构造一遍就是"同一句文案的两份事实源"（AGENTS §3.5）。 */
   const labels = useCalendarLabels();
+
+  /**
+   * 「休 / 班」标记（W4b 公共事实，ADR-0052 §2.6）。
+   *
+   * 🔴 这里**只有一条读**：`adjustmentOn(date)` —— 判断（有覆盖用覆盖、没覆盖退回随包表、
+   * 覆盖里日期非法整年拒绝）全在 `@heyta/domain`，而"什么时候去拉、拉回来存哪"
+   * 全在 `@heyta/app-host`。宿主这一层要是能自己决定"这天算不算休"，
+   * 那就是 AGENTS §3.5 那条分界线上的一次后退。
+   *
+   * ⚠️ 函数身份挂在 `publicFactsEpoch` 上：覆盖表是领域层的模块级状态，React 看不见它，
+   * 换一次函数身份才保证那 42 个格子**无论有没有被 memo 包住**都会重读。
+   */
+  const markerEpoch = view.publicFactsEpoch;
+  const dayMarker = useCallback(
+    (date: LocalDate): 'off' | 'work' | undefined => adjustmentOn(date),
+    [markerEpoch],
+  );
+
+  const { t } = useI18n();
+  /** 词表没给时共享层会退化成一颗点 —— 而"用颜色说话"违反 AGENTS §5，所以必须给。 */
+  const dayMarkerLabels = useMemo(
+    () => ({
+      off: t('common.calendar.dayMarker.off'),
+      work: t('common.calendar.dayMarker.work'),
+    }),
+    [t],
+  );
 
   /**
    * 滚轮翻月 / 翻周（产品负责人 2026-10-01：「上下滑动自由无限切换日历」）。
@@ -190,6 +218,8 @@ export function CalendarView(): React.JSX.Element {
           onToggleTask={onToggleTask}
           busyTaskId={busyId}
           labels={labels}
+          dayMarker={dayMarker}
+          dayMarkerLabels={dayMarkerLabels}
           testID={BOARD_TEST_ID}
         />
       </div>

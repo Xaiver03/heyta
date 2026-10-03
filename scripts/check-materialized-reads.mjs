@@ -46,6 +46,9 @@ const READ_PATTERNS = [
   /\.listSessions\s*\(/,
   /\.listPendingTasks\s*\(/,
   /\.listProjects\s*\(/,
+  // W2：倒数日/纪念日是第二个事件源。漏这一行的后果是移动端倒计时屏
+  // 不订阅 dataRevision 也**永远不红** —— 这条模式必须在屏建出来之前就位。
+  /\.listEvents\s*\(/,
   /engine\.getState\s*\(/,
   /materializedState\s*\(/,
 ];

@@ -301,6 +301,7 @@ const ACTION_FAMILIES = [
    * 文末列出的禁止修法之一。
    */
   { entity: 'NOTE', family: 'createNoteActions' },
+  { entity: 'EVENT', family: 'createEventActions' },
 ];
 
 /** 写 op 的锚点：`entityType: 'X'` 后允许 `as EntityType` 之类的类型断言。 */

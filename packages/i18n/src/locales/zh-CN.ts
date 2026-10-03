@@ -1626,6 +1626,16 @@ export const zhCN = {
   'web.ai.tools.intentCreateReminderAt': '给任务 {id} 加一条提醒：{when}',
   'web.ai.tools.intentCreateReminderBeforeDue': '给任务 {id} 加一条提醒：比截止早 {minutes} 分钟',
   'web.ai.tools.intentCreateReminderIncomplete': '给任务 {id} 加提醒，但没说清时刻 —— 要选一个时间或填"提前几分钟"',
+  // 🔴 W10：`LocalApiWriteIntent` 每加一个封闭变体，这里就**必须**同时长出一句 ——
+  // 提案卡不许出现"未知操作"，那是让用户对着没读过的东西点确认。
+  // 谁来拦：两道**编译期**的闸，都比测试硬 ——
+  //   ① `apps/web/src/features/ai/AiToolRun.tsx` 的 `intentText()` 是对
+  //      `intent.action` 的**穷尽 switch**，漏一个变体 `tsc` 报 TS2366（缺返回值）；
+  //   ② key 拼错 / 只加中文不加英文 ⇒ `MessageKey` 与 `en: Record<MessageKey, string>`
+  //      当场报错（见本文件头"漏翻译是编译失败"那条）。
+  // 实测：本轮先加 case 不加词条，`pnpm --filter @heyta/web typecheck` 立刻两条 TS2345。
+  'web.ai.tools.intentCreateEvent': '新建倒数纪念日「{title}」（{date}）',
+  'web.ai.tools.intentUpdateEvent': '修改倒数纪念日 {id}',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',
@@ -3781,6 +3791,7 @@ export const zhCN = {
   'common.entity.NOTE': '便签',
   'common.entity.TASK_REPEAT_CFG': '重复规则',
   'common.entity.REMINDER': '提醒',
+  'common.entity.EVENT': '倒数纪念日',
   'common.entity.HABIT': '习惯',
   'common.entity.HABIT_LOG': '打卡记录',
   'common.entity.FOCUS_SESSION': '专注记录',
@@ -3832,6 +3843,10 @@ export const zhCN = {
   //   当天完全可以在 16:00 挂一条（R14 之后这是常态），那句话就成了谎话，
   //   而它下面 20 行就是那条任务。两条句子各说各的范围。
   'common.calendar.dayAllDayEmpty': '「全天」里还没有任务；定到具体时刻的在下面那条轴上。',
+  // 日历格子里的「休 / 班」（W4b 公共事实）。同一份词表既当可见字符也当读屏名 ——
+  // `calendarDayMarkerView` 里 `spoken` 直接取它，所以英文侧必须是能念出来的词，不能是符号。
+  'common.calendar.dayMarker.off': '休',
+  'common.calendar.dayMarker.work': '班',
 
   // ─────────────────────────────────────────────────────────────
   // 提醒（B1-1 的界面层；web 与 mobile 共用同一批词条）
@@ -4108,6 +4123,80 @@ export const zhCN = {
   "site.legal.data-rights.seo.title": "个人权利行使与请求响应 —— heyta",
   "site.legal.data-rights.seo.description": "查阅、复制、更正、删除、注销、撤回同意逐项在 heyta 里怎么做；哪些能自助、哪些只能走邮件、答复时限 15 个工作日，以及\"删除\"在这个架构里到底意味着什么。",
   // <<<end:generated:packages/legal/scripts/gen-site-copy.mjs>>>
+  // ── 倒数日/纪念日（批次二 W5；文案唯一事实源在这里，界面里不许出现硬编码串）──
+  'web.countdown.title': '倒数纪念日',
+  'web.countdown.empty': '还没有倒数日',
+  'web.countdown.empty.hint': '记下一个日子，它会留在你的所有设备上 —— 服务器不需要知道它是什么。',
+  'web.countdown.archived.empty': '没有已归档的倒数日',
+  'web.countdown.archived.empty.hint': '归档是把不再盯的日子收起来，不是删除，随时能还原。',
+  'web.countdown.composer.placeholder': '给这一天起个名字',
+  'web.countdown.add': '添加',
+  'web.countdown.pickDate': '选日期',
+  'web.countdown.filter.all': '全部',
+  'web.countdown.kind.countdown': '倒数日',
+  'web.countdown.kind.anniversary': '纪念日',
+  'web.countdown.kind.birthday': '生日',
+  'web.countdown.kind.festival': '节日',
+  'web.countdown.kind.unset': '不选',
+  'web.countdown.view.active': '在用',
+  'web.countdown.view.archived': '已归档',
+  'web.countdown.face.until': '还有 {days} 天',
+  'web.countdown.face.today': '就是今天',
+  'web.countdown.since': '已经 {days} 天',
+  'web.countdown.badge.pinned': '置顶',
+  'web.countdown.pin': '置顶',
+  'web.countdown.unpin': '取消置顶',
+  'web.countdown.edit': '编辑',
+  'web.countdown.save': '保存',
+  'web.countdown.cancel': '取消',
+  'web.countdown.archive': '归档',
+  'web.countdown.unarchive': '还原',
+  'web.countdown.remove': '删除',
+  'web.countdown.field.title': '名称',
+  'web.countdown.field.date': '日期',
+  'web.countdown.field.kind': '类型',
+  'web.countdown.field.template': '样式',
+  'web.countdown.yearly': '每年',
+  'web.countdown.lunar': '农历',
+  'web.countdown.template.none': '默认',
+  'web.countdown.template.slot': '模板 {slot}',
+  'web.countdown.a11y.menu': '「{title}」的操作',
+  'web.countdown.a11y.menuClose': '收起「{title}」的操作',
+  'web.countdown.error': '没能保存：',
+  'web.shell.modules.countdown.label': '倒数纪念日',
+  'web.shell.modules.countdown.note': '把要盯的日子排在最前面；过去的那天不算失败。',
+  'web.shell.views.countdown': '倒数纪念日',
+  // W8（三端接线）：移动端「我的」页的功能域入口行。**只追加在表尾** ——
+  // 这两个文件此刻在别的会话里也是脏的，重排/格式化会造出一场没人能解的三方冲突。
+  'mobile.countdown.entry': '倒数纪念日',
+  'mobile.countdown.entry.hint': '记下要盯的日子，看它还有几天',
+  // ── W4b：后台「调休 / 补班」录入面板（公共事实的唯一写入口）─────────
+  // ⚠️ 两条措辞约束，都是产品语义不是修辞：
+  //   1. 撤销那一年**不等于**"那一年没有任何安排" —— 未覆盖的年份各端读的是
+  //      App 随包的国务院公告数据（`packages/domain` 的 holiday-cn 生成物），
+  //      所以界面必须说"退回随包数据"，说成"清空"会让运营以为撤销完日历上什么都不标。
+  //   2. 这一层**不判日期合法性**（判据在 `holidayYearPutSchema`），
+  //      所以文案不许出现"格式正确才能保存"这类承诺 —— 失败了界面只会转述服务端的拒绝。
+  'web.admin.tab.holidays': '调休/补班',
+  'web.admin.holiday.lead': '这里录入的是覆盖表：某一年一旦被整年替换，各端就用它，不再用随包的公告数据。',
+  'web.admin.holiday.list': '已录入的年度',
+  'web.admin.holiday.version': '内容版本：{version}',
+  'web.admin.holiday.dayCount': '{count} 天安排',
+  'web.admin.holiday.list.none': '还没有录入过任何一年，各端读的都是随包数据。',
+  'web.admin.holiday.revoke': '撤销这一年',
+  'web.admin.holiday.revoke.confirm': '撤销之后，那一年退回随包的公告数据，日历仍按那份数据标注休与班。',
+  'web.admin.holiday.revoke.yes': '确认撤销',
+  'web.admin.holiday.form.title': '录入一整年',
+  'web.admin.holiday.form.lead': '一次提交替换整年：这里写的就是那一年的全部安排，没有列到的日期一律按"正常上班"处理。',
+  'web.admin.holiday.form.year': '年份',
+  'web.admin.holiday.form.papers': '公告原文链接（一行一条，必须至少一条）',
+  'web.admin.holiday.form.offDays': '放假日期（一行一个 YYYY-MM-DD）',
+  'web.admin.holiday.form.workDays': '补班日期（一行一个 YYYY-MM-DD）',
+  'web.admin.holiday.form.note': '运营备注（只给后台看，不下发给客户端）',
+  'web.admin.holiday.save': '保存这一年',
+  'web.admin.holiday.notice.saved': '{year} 年已保存，共 {count} 天安排。',
+  'web.admin.holiday.notice.deleted': '{year} 年的录入已撤销，那一年退回随包的公告数据。',
+  'web.admin.holiday.notice.failed': '没有保存：服务端拒绝了这次录入，原因见上面的提示。',
 } as const;
 
 /**

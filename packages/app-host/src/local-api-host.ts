@@ -35,6 +35,7 @@
  */
 
 import type {
+  LocalApiEventItem,
   LocalApiFocusSession,
   LocalApiHabit,
   LocalApiHabitLog,
@@ -55,6 +56,13 @@ import {
   NOTE_MAX_CONTENT_LENGTH,
   Priority,
   aliveReminders,
+  eventDaysFromToday,
+  eventKindOf,
+  eventRejection,
+  isEventPinned,
+  isEventRepeating,
+  isValidRecurrenceRule,
+  nextEventOccurrence,
   localDateTimeToEpoch,
   localTimeOf,
   noteProjectId,
@@ -62,7 +70,11 @@ import {
   reminderPhase,
   reminderRejection,
   today,
+  type CountdownEvent,
+  type CountdownEventKind,
   type FocusSession,
+  type LocalDate,
+
   type Habit,
   type HabitGoalType,
   type HabitLog,
@@ -82,10 +94,11 @@ import {
 import { createNoteActions, type NoteActions } from './note-actions.js';
 import { createProjectActions, type ProjectActions } from './project-actions.js';
 import { createReminderActions, type ReminderActions } from './reminder-actions.js';
+import { createEventActions, type EventActions } from './event-actions.js';
 
 export interface LocalApiHostOptions {
   /**
-   * 这条任务的内容能不能被本机工具读。
+   * 这条条目的正文能不能被本机工具读。
    *
    * 🔴 **必填，没有默认值。**
    *
@@ -100,8 +113,15 @@ export interface LocalApiHostOptions {
    * ⚠️ 不要因为"现在恒为 true"就删掉它 —— 删掉之后那段契约
    * （`projectForTool` / `readItemForTool`）就完全没有生产调用点，
    * 而它恰恰是 ADR-0011 最重要的一条。
+   *
+   * 🔴 **W10 把参数放宽成 `Task | CountdownEvent`**：倒数日的备注与任务的备注
+   * 是**同一件事**（正文类内容），所以"能不能读正文"必须问**同一个**钩子。
+   * 另加一个 `isEventReadable` 会造出第二个隐私开关 ——
+   * 而两个开关的默认值方向可以不一致，那正是这里已经踩过一次的坑。
+   * 两个实体都有 `id` 与 `title`，够钩子做判断了；要按实体区分，
+   * 在钩子里判 `'date' in item` 即可（倒数日有 `date`，任务没有）。
    */
-  isReadable: (task: Task) => boolean;
+  isReadable: (item: Task | CountdownEvent) => boolean;
 
   /**
    * 现在几点。**只在两处用**：给新落的专注记录填 `createdAt`，以及算提醒的
@@ -112,6 +132,84 @@ export interface LocalApiHostOptions {
    * 因为这条**不是**隐私开关（上一条 `isReadable` 必须是必填的理由只适用于它）。
    */
   now?: () => number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 倒数日 / 纪念日（`EVENT`）→ `LocalApiEventItem`（W10，合流时随 pack 结构迁移）
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * `CountdownEvent` → `LocalApiEventItem`。**备注只在 `readable` 时带。**
+ *
+ * 🔴 全部日历判断都**问领域层**，本函数一个都不自己算 ——
+ * "下一次是哪天"如果在协议层再算一遍，就会出现"卡片说还有 3 天、AI 说还有 4 天"。
+ */
+export function eventToItem(
+  event: CountdownEvent,
+  readable: boolean,
+  today: LocalDate,
+): LocalApiEventItem {
+  const item: LocalApiEventItem = {
+    id: event.id,
+    title: event.title,
+    date: event.date,
+    kind: eventKindOf(event, today),
+    daysFromToday: eventDaysFromToday(event, today),
+    repeating: isEventRepeating(event),
+    isLunar: event.isLunar === true,
+    pinned: isEventPinned(event),
+    readable,
+  };
+  // 一次性且已过 ⇒ **缺席**（不是 `null`、不是"今天"）。界面与工具读同一个 undefined。
+  const next = nextEventOccurrence(event, today);
+  if (next !== undefined) item.nextOccurrence = next;
+  // 🔴 正文只在可读时挂上（与 `taskToItem` 逐字同一条纪律）。
+  if (readable && event.notes !== undefined) item.notes = event.notes;
+  return item;
+}
+
+/**
+ * 倒数日 `kind` 的**校验点**。形状是 `Record<CountdownEventKind, true>`：
+ * 领域层加一档而这里没补，`tsc` 当场报"缺属性"—— 一份数组抄件则是永远静默少一档。
+ */
+const EVENT_KIND_BY_NAME: Readonly<Record<CountdownEventKind, true>> = {
+  countdown: true,
+  anniversary: true,
+  birthday: true,
+  festival: true,
+};
+
+/** 词表的**派生**清单（给测试与描述对账用，不是第二份定义）。 */
+export const EVENT_KIND_NAMES = Object.keys(EVENT_KIND_BY_NAME) as readonly CountdownEventKind[];
+
+/** 这个字符串是不是一个合法档位。**唯一的判定入口。** */
+export function isEventKindName(value: unknown): value is CountdownEventKind {
+  return (
+    typeof value === 'string' &&
+    Object.prototype.hasOwnProperty.call(EVENT_KIND_BY_NAME, value)
+  );
+}
+
+/** `update_event.fields` 认识的键。不认识的**一律拒绝**，不静默忽略。 */
+const EVENT_UPDATABLE_FIELDS = [
+  'title',
+  'date',
+  'kind',
+  'isLunar',
+  'recurrence',
+  'pinned',
+  'notes',
+] as const;
+
+/** 把领域层的拒绝翻成一句给调用方看的话。**措辞在这里，判定不在这里。** */
+function eventRejectionMessage(
+  rejection: 'empty-title' | 'too-long-title' | 'invalid-date',
+  title: string,
+  date: string,
+): string {
+  if (rejection === 'empty-title') return '标题不能为空（空白也算空）。';
+  if (rejection === 'too-long-title') return `标题 ${String(title.length)} 字，超过上限。`;
+  return `日期「${date}」不是有效的 YYYY-MM-DD（且必须是真实存在的一天）。`;
 }
 
 /** `Priority` 枚举 ↔ MCP 字符串。 */
@@ -359,6 +457,7 @@ export function createLocalApiHost(
   const noteActions = createNoteActions(ctx);
   const focusActions = createFocusActions(ctx);
   const reminderActions = createReminderActions(ctx, { now });
+  const eventActions = createEventActions(ctx);
 
   return {
     listTasks: (args) => {
@@ -474,6 +573,30 @@ export function createLocalApiHost(
       return Promise.resolve(ordered.map((r) => reminderToItem(r, now())));
     },
 
+    /**
+     * 列倒数日。**顺序、集合成员、正文判定全部问领域层。**
+     *
+     * 🔴 `limit` 与 `listTasks` 同一条纪律：**先筛后截**。
+     * 这里"筛"就是 `listEvents(today)` 已经做完的那一层（未删除 + 未归档 + 规范顺序），
+     * 所以截断只能发生在它**之后** —— 反过来会变成"倒数日排在第 50 条之后就查不到"。
+     */
+    listEvents: (args) => {
+      const day = today(now());
+      const events = eventActions.listEvents(day);
+      const limit = args.limit ?? 50;
+      return Promise.resolve(
+        events
+          .slice(0, Math.max(0, limit))
+          .map((event) => eventToItem(event, isReadable(event), day)),
+      );
+    },
+
+    getEvent: (eventId) => {
+      const event = eventActions.eventOf(eventId);
+      if (event === undefined) return Promise.resolve(undefined);
+      return Promise.resolve(eventToItem(event, isReadable(event), today(now())));
+    },
+
     submit: (intent) =>
       submitIntent(
         ctx,
@@ -483,6 +606,7 @@ export function createLocalApiHost(
         noteActions,
         focusActions,
         reminderActions,
+        eventActions,
         now,
         intent,
       ),
@@ -514,6 +638,7 @@ async function submitIntent(
   noteActions: NoteActions,
   focusActions: FocusActions,
   reminderActions: ReminderActions,
+  eventActions: EventActions,
   now: () => number,
   intent: LocalApiWriteIntent,
 ): Promise<LocalApiWriteResult> {
@@ -939,5 +1064,133 @@ async function submitIntent(
       const id = await reminderActions.createReminder(intent.taskId, triggerAt);
       return { ok: true, taskId: id, entityId: id, entityType: 'REMINDER' };
     }
+
+    case 'create-event': {
+      const rejection = eventRejection(intent.title, intent.date as LocalDate);
+      if (rejection !== undefined) {
+        return { ok: false, reason: 'invalid', message: eventRejectionMessage(rejection, intent.title, intent.date) };
+      }
+      if (intent.kind !== undefined && !isEventKindName(intent.kind)) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message:
+            `类型档位应为 ${EVENT_KIND_NAMES.join(' / ')} 之一，收到「${intent.kind}」。` +
+            '（词表归 `packages/domain` 的 `CountdownEventKind` 所有，这里只是拒绝未知值。）',
+        };
+      }
+      if (intent.recurrence !== undefined && !isValidRecurrenceRule(intent.recurrence)) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `重复规则「${intent.recurrence}」不是合法 RRULE。`,
+        };
+      }
+      const id = await eventActions.createEvent(
+        intent.title,
+        intent.date as LocalDate,
+        {
+          ...(intent.kind === undefined || !isEventKindName(intent.kind)
+            ? {}
+            : { kind: intent.kind }),
+          ...(intent.isLunar === undefined ? {} : { isLunar: intent.isLunar }),
+          ...(intent.recurrence === undefined ? {} : { recurrence: intent.recurrence }),
+          ...(intent.notes === undefined ? {} : { notes: intent.notes }),
+        },
+      );
+      // ⚠️ 返回值的字段名是 `taskId`，但它承载的是"这次写入的实体 id"（既有形状，见
+      // `LocalApiWriteResult` 的注释）。另给 `entityType: 'EVENT'` 让外部程序知道落的是什么。
+      return { ok: true, taskId: id, entityId: id, entityType: 'EVENT' };
+    }
+
+    case 'update-event': {
+      const event = eventActions.eventOf(intent.eventId);
+      if (event === undefined) {
+        return { ok: false, reason: 'not-found', message: '没有找到这个倒数日。' };
+      }
+      // 与 `update-task` 同一条纪律：不认识就**拒绝**，静默忽略会让调用方以为改成功了。
+      const unknown = Object.keys(intent.fields).filter(
+        (k) => !(EVENT_UPDATABLE_FIELDS as readonly string[]).includes(k),
+      );
+      if (unknown.length > 0) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `不支持修改这些字段：${unknown.join('、')}。`,
+        };
+      }
+
+      const f = intent.fields;
+      const nextTitle = typeof f['title'] === 'string' ? f['title'] : event.title;
+      const nextDate = typeof f['date'] === 'string' ? f['date'] : event.date;
+      // 🔴 校验的是**改完之后**的那一条（标题 + 日期），不是逐字段各判各的：
+      // `event-actions.ts` 的文件头第 1 条就是"日期与历法同一条 op"，
+      // 而 `setEventDate` 内部会拿**当前标题**再判一次 —— 先在这里判掉，
+      // 才不会把一个 `throw` 漏到协议层。
+      const rejection = eventRejection(nextTitle, nextDate as LocalDate);
+      if (rejection !== undefined) {
+        return { ok: false, reason: 'invalid', message: eventRejectionMessage(rejection, nextTitle, nextDate) };
+      }
+      if (f['kind'] !== undefined && f['kind'] !== null && !isEventKindName(f['kind'])) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message:
+            `类型档位应为 ${EVENT_KIND_NAMES.join(' / ')} 之一（或 null 表示"不选，回到按日期方向"），` +
+            `收到「${String(f['kind'])}」。`,
+        };
+      }
+      const recurrence = f['recurrence'];
+      if (typeof recurrence === 'string' && !isValidRecurrenceRule(recurrence)) {
+        return {
+          ok: false,
+          reason: 'invalid',
+          message: `重复规则「${recurrence}」不是合法 RRULE。`,
+        };
+      }
+
+      if (typeof f['title'] === 'string') await eventActions.renameEvent(intent.eventId, f['title']);
+      // 🔴 日期与 `isLunar` **合起来一条 op**（领域层的裁决）。
+      // 只改农历不改日期时，锚点仍写回**它自己** —— 那不是"顺手多写一个字段"，
+      // 是因为 `setEventDate` 是这条 op 的唯一构造点，绕开它就得在这里自己拼 payload。
+      if (typeof f['date'] === 'string' || typeof f['isLunar'] === 'boolean') {
+        await eventActions.setEventDate(
+          intent.eventId,
+          (typeof f['date'] === 'string' ? f['date'] : event.date) as LocalDate,
+          typeof f['isLunar'] === 'boolean' ? f['isLunar'] : undefined,
+        );
+      }
+      if (f['kind'] === null) await eventActions.setEventKind(intent.eventId, null);
+      else if (isEventKindName(f['kind'])) {
+        await eventActions.setEventKind(intent.eventId, f['kind']);
+      }
+      if (typeof recurrence === 'string' || recurrence === null) {
+        await eventActions.setEventRecurrence(
+          intent.eventId,
+          recurrence === null ? null : (recurrence as string),
+        );
+      }
+      if (typeof f['pinned'] === 'boolean') {
+        await eventActions.setEventPinned(intent.eventId, f['pinned']);
+      }
+      if (typeof f['notes'] === 'string' || f['notes'] === null) {
+        await eventActions.setEventNotes(
+          intent.eventId,
+          f['notes'] === null ? null : (f['notes'] as string),
+        );
+      }
+      return { ok: true, taskId: intent.eventId, entityId: intent.eventId, entityType: 'EVENT' };
+    }
   }
+}
+
+/** 把领域层的拒绝翻成一句给调用方看的话。**措辞在这里，判定不在这里。** */
+function eventRejectionMessage(
+  rejection: 'empty-title' | 'too-long-title' | 'invalid-date',
+  title: string,
+  date: string,
+): string {
+  if (rejection === 'empty-title') return '标题不能为空（空白也算空）。';
+  if (rejection === 'too-long-title') return `标题 ${String(title.length)} 字，超过上限。`;
+  return `日期「${date}」不是有效的 YYYY-MM-DD（且必须是真实存在的一天）。`;
 }

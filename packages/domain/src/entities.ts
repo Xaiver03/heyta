@@ -15,6 +15,9 @@
 
 import type { EntityType } from '@heyta/shared-schema';
 
+import type { CategorySlot } from './activity-categories.js';
+import type { LocalDate } from './date.js';
+
 /** 所有实体共有的元数据。 */
 export interface EntityBase {
   /** 全局唯一 ID（客户端生成，离线可用）。 */
@@ -565,6 +568,88 @@ export interface Reminder extends EntityBase {
   dismissedAt?: number;
 }
 
+// ─────────────────────────────────────────────────────────────
+// 倒数日 / 纪念日
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 倒数日的**类型档位**。
+ *
+ * 🔴 这四档是**用户选的**，不是从日期推出来的（§2.6「App 不替用户决定含义」）：
+ * 哪天出生、哪天是节日，只有用户知道。唯一能从日期说的是
+ * "还没到 / 已过"这副面孔，所以它是 `kind` 缺席时的兜底，而不是反过来。
+ */
+export type CountdownEventKind = 'countdown' | 'anniversary' | 'birthday' | 'festival';
+
+/**
+ * 农历闰月那年怎么过（ADR-0044 D2 的产品决定）。
+ *
+ * · `first`（默认）= 逢闰过正：闰月那年过**非闰**的那个同名月
+ * · `last` = 逢闰过闰
+ * · `both` = 两个月各过一次（下一次发生日取两者中较早的那个）
+ */
+export type LunarLeapMonthPolicy = 'first' | 'last' | 'both';
+
+/**
+ * 倒数日 / 纪念日（**倒数纪念日**功能的载体，ADR-0044 D1 拍定新建实体）。
+ *
+ * 🔴 **为什么是独立实体而不是"没有截止日的 Task"**（依据逐条）：
+ *
+ * 1. **视图不建实体，但倒数日不是视图。** `docs/plans/countdown-anniversary.md` §0
+ *    的立项理由就是它有自己的字段（历法、闰月口径、归档、置顶、样式），
+ *    这些塞进 Task 会让"改标题"与"改历法"在同一实体上 LWW 互斥 ——
+ *    与 `Reminder` 不用 `Task.dueDate` 承载是同一条推理。
+ * 2. **它没有"完成"这个状态。** Task 的 reducer 语义（完成 → 顺延时 `completedAt`）
+ *    套在一个"每年都要来一次"的东西上是错的。
+ * 3. **日历需要第二个源**（W6）：一条没有截止日的倒数日能上日历，
+ *    这正是它区别于 TASK 的可观测判据。
+ *
+ * ⚠️ 持久化字段的可选性（AGENTS §3.3）：`title` / `date` 是**实体身份的一部分**
+ * （没有它们这张卡片什么都没有），与 `Note.content`、`HabitLog.habitId`、
+ * `Reminder.taskId` 同一条先例，是必填；**其余一律可选 + 运行时默认值**。
+ *
+ * ⚠️ `date` 存的一律是**公历 LocalDate**（`YYYY-MM-DD`）。农历不是第二个字段：
+ * `isLunar` 说的是"每年重复时按农历那一天推"，锚点本身仍用公历写，
+ * 读的时候经 `solarToLunar` 换算。这样排序、日历、回收站都不必认识两套日期。
+ */
+export interface CountdownEvent extends EntityBase {
+  /** 标题。空白标题在写入侧拒绝（见 `domain/src/events.ts` 的 `eventRejection`）。 */
+  title: string;
+  /** 锚点日期（公历 `YYYY-MM-DD`，**不是时间戳** —— 倒数日没有"几点"）。 */
+  date: LocalDate;
+  /** 类型档位；**缺席 = 用户没选过**，由日期方向兜底（见 `eventKindOf`）。 */
+  kind?: CountdownEventKind;
+  /** 每年重复时按农历锚点推（`true`）。默认 `false` = 公历。 */
+  isLunar?: boolean;
+  /** 闰月口径；默认 `'first'`（ADR-0044 D2）。只在 `isLunar` 为真时有意义。 */
+  leapMonthPolicy?: LunarLeapMonthPolicy;
+  /**
+   * RRULE 字符串（与 `Task.repeatRule` 同一套词表，由 `Recurrence` 构造，
+   * **不许界面手拼**）。缺席 = 不重复（一次性倒数日）。
+   */
+  recurrence?: string;
+  /**
+   * 置顶时刻。🔴 **它同时就是"排在最前"**，不再另设 `sortOrder`／`isPinned`
+   * 第二个字段（§2.4：两个字段必然在一次编辑里漂移；先例是 `Note.isPinnedToToday`）。
+   */
+  pinnedAt?: number;
+  /**
+   * 归档时刻。**归档 ≠ 删除**（§2.5）：它不进回收站、不可被"还原"，
+   * 只在归档视图里出现。🔴 实现成"打 `deletedAt` 再打回来"是错的 ——
+   * 那会让归档项出现在回收站，且离线端会把它当"从未删除"同步回来。
+   */
+  archivedAt?: number;
+  /** 图标名（Lucide）。🔴 只给图标不给含义（§2.6）。 */
+  icon?: string;
+  /**
+   * 色槽**编号**（1–8），不是颜色值。与活动分类同一条纪律：
+   * 存不变量而不是"长什么样"，调色板改版不该动磁盘上的旧数据。
+   */
+  color?: CategorySlot;
+  /** 备注（卡片上的那行小字）。 */
+  notes?: string;
+}
+
 /**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
@@ -580,6 +665,7 @@ export interface EntityModelMap {
   AI_FEEDBACK: AiFeedback;
   PREFERENCE_CORRECTION: PreferenceCorrection;
   REMINDER: Reminder;
+  EVENT: CountdownEvent;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -607,6 +693,7 @@ export const MODELED_ENTITY_TYPES = [
   'AI_FEEDBACK',
   'PREFERENCE_CORRECTION',
   'REMINDER',
+  'EVENT',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */

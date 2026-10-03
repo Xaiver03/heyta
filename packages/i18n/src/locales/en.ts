@@ -1524,6 +1524,14 @@ export const en = {
   'web.ai.tools.intentCreateReminderAt': 'Add a reminder for task {id}: {when}',
   'web.ai.tools.intentCreateReminderBeforeDue': 'Add a reminder for task {id}: {minutes} min before due',
   'web.ai.tools.intentCreateReminderIncomplete': 'Add a reminder for task {id}, but no time was given — pick a time or a "minutes before due"',
+  // 🔴 W10: every new closed variant of `LocalApiWriteIntent` must grow a sentence here
+  // in the same commit - a proposal card must never render "unknown operation",
+  // that is asking the user to confirm something they were never shown.
+  // What enforces it: two compile-time gates, both harder than a test —
+  // the exhaustive switch in `AiToolRun.tsx:intentText()` (TS2366 when a variant
+  // is missing) and `en: Record<MessageKey, string>` (missing translation = build error).
+  'web.ai.tools.intentCreateEvent': 'Create countdown/anniversary "{title}" ({date})',
+  'web.ai.tools.intentUpdateEvent': 'Update countdown/anniversary {id}',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',
@@ -3543,6 +3551,7 @@ export const en = {
   'common.entity.NOTE': 'Note',
   'common.entity.TASK_REPEAT_CFG': 'Repeat rule',
   'common.entity.REMINDER': 'Reminder',
+  'common.entity.EVENT': 'Countdown',
   'common.entity.HABIT': 'Habit',
   'common.entity.HABIT_LOG': 'Check-in record',
   'common.entity.FOCUS_SESSION': 'Focus session',
@@ -3591,6 +3600,8 @@ export const en = {
   //   当天完全可以在 16:00 挂一条（R14 之后这是常态），那句话就成了谎话，
   //   而它下面 20 行就是那条任务。两条句子各说各的范围。
   'common.calendar.dayAllDayEmpty': 'Nothing in "All day" — tasks set to a time sit on the hour axis below.',
+  'common.calendar.dayMarker.off': 'Off',
+  'common.calendar.dayMarker.work': 'Work',
 
   // Reminders (B1-1 UI layer; shared by web and mobile).
   // 🔴 `reminder.offset.*` must stay 1:1 and in order with
@@ -3859,4 +3870,74 @@ export const en = {
   "site.legal.data-rights.seo.title": "Exercising Your Rights: Requests and Responses — heyta",
   "site.legal.data-rights.seo.description": "Access, copy, correction, deletion, account closure and withdrawal of consent — what is self-service in heyta, what is email-only, the 15-working-day response window, and what \"deletion\" actually means in this architecture.",
   // <<<end:generated:packages/legal/scripts/gen-site-copy.mjs>>>
+} satisfies Record<MessageKey, string>;
+  // ── Countdowns & anniversaries (batch two, W5) ──
+  'web.countdown.title': 'Countdowns',
+  'web.countdown.empty': 'No countdowns yet',
+  'web.countdown.empty.hint': 'Name a date and it stays on every one of your devices — the server never needs to know what it is.',
+  'web.countdown.archived.empty': 'No archived countdowns',
+  'web.countdown.archived.empty.hint': 'Archiving tucks away a date you no longer watch. It is not deletion — you can bring it back.',
+  'web.countdown.composer.placeholder': 'Name this date',
+  'web.countdown.add': 'Add',
+  'web.countdown.pickDate': 'Pick a date',
+  'web.countdown.filter.all': 'All',
+  'web.countdown.kind.countdown': 'Countdown',
+  'web.countdown.kind.anniversary': 'Anniversary',
+  'web.countdown.kind.birthday': 'Birthday',
+  'web.countdown.kind.festival': 'Festival',
+  'web.countdown.kind.unset': 'Unset',
+  'web.countdown.view.active': 'Active',
+  'web.countdown.view.archived': 'Archived',
+  'web.countdown.face.until': '{days} days to go',
+  'web.countdown.face.today': 'Today',
+  'web.countdown.since': '{days} days so far',
+  'web.countdown.badge.pinned': 'Pinned',
+  'web.countdown.pin': 'Pin',
+  'web.countdown.unpin': 'Unpin',
+  'web.countdown.edit': 'Edit',
+  'web.countdown.save': 'Save',
+  'web.countdown.cancel': 'Cancel',
+  'web.countdown.archive': 'Archive',
+  'web.countdown.unarchive': 'Restore',
+  'web.countdown.remove': 'Delete',
+  'web.countdown.field.title': 'Name',
+  'web.countdown.field.date': 'Date',
+  'web.countdown.field.kind': 'Type',
+  'web.countdown.field.template': 'Style',
+  'web.countdown.yearly': 'Yearly',
+  'web.countdown.lunar': 'Lunar',
+  'web.countdown.template.none': 'Default',
+  'web.countdown.template.slot': 'Template {slot}',
+  'web.countdown.a11y.menu': 'Actions for “{title}”',
+  'web.countdown.a11y.menuClose': 'Close actions for “{title}”',
+  'web.countdown.error': 'Not saved: ',
+  'web.shell.modules.countdown.label': 'Countdowns',
+  'web.shell.modules.countdown.note': 'Keep the dates you watch at the top. A date that has passed is not a failure.',
+  'web.shell.views.countdown': 'Countdowns',
+  // W8（三端接线）：与 zh-CN.ts 同批追加的两条，**中英成对**（`check:ui-language` 拦）。
+  'mobile.countdown.entry': 'Countdowns',
+  'mobile.countdown.entry.hint': 'Keep the dates you watch, and see how far off they are',
+  // W4b: the admin "work-day changes" panel. Same two wording constraints as zh-CN:
+  // revoking a year falls back to the bundled gazette data (it is NOT "empty that year"),
+  // and the UI never claims to validate dates - the server contract is the only judge.
+  'web.admin.tab.holidays': 'Work-day changes',
+  'web.admin.holiday.lead': 'What you enter here is an override: once a year is replaced, every client reads it instead of the bundled gazette data.',
+  'web.admin.holiday.list': 'Recorded years',
+  'web.admin.holiday.version': 'Content version: {version}',
+  'web.admin.holiday.dayCount': '{count} scheduled days',
+  'web.admin.holiday.list.none': 'No year recorded yet, so every client is reading the bundled data.',
+  'web.admin.holiday.revoke': 'Revoke this year',
+  'web.admin.holiday.revoke.confirm': 'After revoking, that year falls back to the bundled gazette data and the calendar still marks rest and work days from it.',
+  'web.admin.holiday.revoke.yes': 'Confirm revoke',
+  'web.admin.holiday.form.title': 'Record a whole year',
+  'web.admin.holiday.form.lead': 'One submission replaces the entire year: what is written here is all of that year, and any date not listed stays a normal working day.',
+  'web.admin.holiday.form.year': 'Year',
+  'web.admin.holiday.form.papers': 'Gazette source links (one per line, at least one)',
+  'web.admin.holiday.form.offDays': 'Days off (one YYYY-MM-DD per line)',
+  'web.admin.holiday.form.workDays': 'Make-up working days (one YYYY-MM-DD per line)',
+  'web.admin.holiday.form.note': 'Operator note (admin only, never delivered to clients)',
+  'web.admin.holiday.save': 'Save this year',
+  'web.admin.holiday.notice.saved': 'Saved {year}: {count} scheduled days.',
+  'web.admin.holiday.notice.deleted': 'The {year} entry has been revoked; that year falls back to the bundled gazette data.',
+  'web.admin.holiday.notice.failed': 'Not saved: the server rejected this submission, see the message above for why.',
 } satisfies Record<MessageKey, string>;

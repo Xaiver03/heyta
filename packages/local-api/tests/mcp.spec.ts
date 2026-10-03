@@ -18,7 +18,9 @@ import {
   MCP_SERVER_NAME,
   errorCodeForDenial,
   handleToolsCall,
+  hasInputSchemaFor,
   listMcpTools,
+  recordedInputSchemaNames,
   type LocalApiConfig,
 } from '../src/index.js';
 
@@ -68,21 +70,33 @@ describe('listMcpTools —— 只暴露已授权的工具', () => {
   });
 
   it('additionalProperties 一律 false（不接受不认识的字段）', () => {
+    // 🔴 授权集合从**目录**派生：手抄 6 个名字的版本在目录扩到 10 条之后，
+    // 这条"全部工具"的检查其实只覆盖了旧的 6 条 —— 新加工具**不会**让它红，
+    // 于是"每个工具都守 additionalProperties:false"这句话开始说谎。
     const all = listMcpTools({
       ...CONFIG,
-      grants: {
-        list_tasks: true,
-        get_task: true,
-        list_projects: true,
-        create_task: true,
-        update_task: true,
-        complete_task: true,
-      },
+      grants: Object.fromEntries(LOCAL_API_TOOLS.map((t) => [t.name, true])),
     });
-    expect(all).toHaveLength(6);
+    expect(all.length).toBeGreaterThanOrEqual(10);
+    expect(all).toHaveLength(LOCAL_API_TOOLS.length);
     for (const tool of all) {
       expect(tool.inputSchema.additionalProperties, tool.name).toBe(false);
     }
+  });
+
+  it('🔴 目录里每一条工具都**登记过**参数 schema（`INPUT_SCHEMAS` 不许有静默回退）', () => {
+    // `listAuthorizedTools()` 对没登记的工具回退成空 `properties` ——
+    // 那与"这个工具真的不接参数"在 MCP 客户端与内置 AI 上**长得一模一样**，
+    // 而能力清单只会标 `schemaRecorded:false`、**不会红**（生成器文件头明写了这个取舍）。
+    // 所以"忘登记 schema"这件事只有这一条判据会响。目录驱动，不逐工具抄名字。
+    const unrecorded = LOCAL_API_TOOLS.filter((t) => !hasInputSchemaFor(t.name)).map((t) => t.name);
+    expect(unrecorded, `这些工具没有登记 INPUT_SCHEMAS：${unrecorded.join('、')}`).toEqual([]);
+  });
+
+  it('🔴 反向也对：schema 里不许留**孤儿抄件**（目录已删而 schema 还留着）', () => {
+    const names = new Set(LOCAL_API_TOOLS.map((t) => t.name));
+    const orphans = recordedInputSchemaNames().filter((n) => !names.has(n));
+    expect(orphans, `这些 schema 在目录里已经没有对应工具了：${orphans.join('、')}`).toEqual([]);
   });
 
   it('必填参数被如实标注', () => {

@@ -598,7 +598,23 @@ export type LocalApiWriteIntent =
       date?: string;
       time?: string;
       minutesBeforeDue?: number;
-    };
+    }
+  /**
+   * 新建倒数日/纪念日（EVENT，W10）。`date` 是锚点日 `YYYY-MM-DD`（没有"几点"）；
+   * `kind` 的封闭词表归 `packages/domain` 的 `CountdownEventKind` 所有，
+   * 宿主侧 `isEventKindName` 是唯一判定入口。
+   */
+  | {
+      action: 'create-event';
+      title: string;
+      date: string;
+      kind?: string;
+      isLunar?: boolean;
+      recurrence?: string;
+      notes?: string;
+    }
+  /** 修改倒数日字段（W10）。只改显式给定的字段；要把某项清空请显式传 `null`。 */
+  | { action: 'update-event'; eventId: string; fields: Readonly<Record<string, unknown>> };
 
 /**
  * 一条写入落地的实体类型。
@@ -630,7 +646,8 @@ export type LocalApiWrittenEntityType =
   | 'NOTE'
   | 'HABIT_LOG'
   | 'FOCUS_SESSION'
-  | 'REMINDER';
+  | 'REMINDER'
+  | 'EVENT';
 
 export type LocalApiWriteResult =
   | {

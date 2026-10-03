@@ -2433,5 +2433,108 @@ pnpm build:android                       # :10 ⇒ 里面是 gradle
 载体只合过 `main` + 上面那三个分支，而 `main..HEAD` 按定义不含 main 的东西。
 （`88` 而不是 87：这一节自己的提交也算进去了。）
 
+## 15.36 ③ 的最后一端：android 那枚绿是**踩在对端设备上**拿到的，而 ios 这枚我在起跑前查出了同一件事（载体 `3a4d9175`，23:5x）
+
+这一节全部是**现量**，每一条都带可复跑的命令。两件事合起来是同一个缺口的两面：
+**这些脚本按"串口/名字"选设备，而设备的所有权既不住在串口里、也不住在那个默认名字里。**
+
+### 1. android 的绿读数成立，但它的代价要先写清（不是环境问题，是我这一侧的动作）
+
+读数逐字取自 `~/scratch-heyta/reinstall-gated-2327/stage2-android-ios.log`（23:35 那趟）：
+
+```
+✅ release APK 已重打（ 64M；日志 /tmp/heyta-reinstall-apk.log）
+✅ 模拟器 emulator-5554 全新安装成功
+✅ 前台窗口确认：  mCurrentFocus=Window{98b625 u0 com.heyta/com.heytamobile.MainActivity}
+主蓝采样命中 4001（数的是 heyta-reinstall-android.png）
+✅ 窗口 1080x2400、heyta-reinstall-android.png 内容占比 58.3%、主蓝命中 4001 —— 是共享 UI
+```
+
+按 §6.1.1 那张表，这一端的四条判据（清旧包 → 重打 → 卸旧装新 → "装上的是当前产物"）**都在位**。
+但 23:5x 现量把它的**所有权**查出来了：
+
+| 事实 | 取证 |
+|---|---|
+| `adb devices -l` 只有 `emulator-5554 device` | 现量 23:51 |
+| 它的 qemu 是 pid **36840**，命令行 `-avd heyta-w3-yearly`，21:55:09 起跑（到 23:51 已 1h57m） | `ps -eo pid,command \| grep 'qemu.*-avd'` + `ps -p 36840 -o lstart=` |
+| 这台 AVD 的建号时间是 **10-03 12:04**，早于我这一轮任何动作 | `stat -f '%SB' ~/.android/avd/heyta-w3-yearly.avd` |
+| 它在仓内的身份是**别人新建的私有设备** | `docs/plans/countdown-anniversary.md:436`「设备 = **新建的私有 AVD `heyta-w3-yearly`**」、`:488`「只 `adb emu kill` 名为 `heyta-w3-yearly` 的设备」 |
+| 另一条线**已经点名过这个风险** | `docs/plans/goal-multi-end-coverage.md:771`：`emulator-5554` 的 qemu（那时 pid 25285）= `-avd heyta-w3-yearly`，结论原文「这台 AVD 是**并行会话在用的设备**，`reinstall` 会 `pm clear`/卸装它」 |
+
+⇒ 我那一段执行过 `adb -s emulator-5554 uninstall com.heyta`，也就是**清掉了对方设备上正在被验收的 App 与数据**。
+这件事不可恢复，所以不写成"环境复杂"：是我的动作，登记在这里和 `B62`。
+
+**病根一句话：串口相同不等于设备相同。** `scripts/reinstall-all.sh:270`
+`SERIAL="${HEYTA_E2E_SERIAL:-emulator-5554}"` 用**串口**选设备，而所有权单位是 **AVD 名**；
+我那把 device_gate 扫的是"有没有对端验收**进程**"，它天然看不见"这台 emulator 挂的是谁的 AVD"
+（对端的验收脚本可以停在两次进程之间，设备却一直是他们的）。
+这正是 traps **#169**（ios 段 `head -1` 盲选）在 android 侧的对应缺口，只是没人写过那条。
+
+**修法本轮不能落进产品脚本**：`scripts/reinstall-all.sh` 此刻在 ① 的那 15 项对端脏清单里
+= 别人正在改它。所以本轮只做我这侧的：把"跑 android 段前先把串口解析到 AVD 名、再确认是自己的"
+写成前置留在 `B62`，产品脚本里那条断言等它空闲时补。现量三行就够：
+
+```bash
+adb devices -l                                        # 串口
+ps -eo pid=,command= | grep -o '\-avd [^ ]*'          # 串口 → AVD 名（经 qemu 命令行）
+stat -f '%SB' ~/.android/avd/<name>.avd               # 这台 AVD 是谁什么时候建的
+```
+
+### 2. iOS 端本轮**不跑**：三台 Booted 全都有主，而这次是查完归属才停的
+
+新写的 `run_ios()`（`--confirm-ios`，理由与代码在 `~/scratch-heyta/heyta-reinstall-gated.sh`）
+会把 `IOS_DEVICE_NAME` 与它解析出的 UDID **打进日志**——这条设计是这一节能成立的前提：
+没有那行读数，我就只会知道"我选了项目设备"，不会知道它和对端是同一台。
+
+| 设备 | UDID | `com.heyta` 数据最后写入 | 归属证据 | 判定 |
+|---|---|---|---|---|
+| `heyta-iphone-17pro` | `FE195661-B021-…A102` | 10-03 **19:32** | 对端 `verify-mobile-ios-reminder.sh` 的**盲选回退**恰好落在它（下面那段） | 不能用 |
+| `heyta-ios-isolated` | `1EDCFA59-6A9C-…8648` | 10-03 **23:53**（现量前 5 分钟，活现场） | 有人正在用它验；全仓 0 引用 | 不能用 |
+| `iPhone Duo heyta` | `742A8651-1A31-…153F` | 10-02 19:35（闲置 28h） | `docs/plans/ui-review-fill-zh-timeline.md:1542` 把它当**别人取证链的证据载体**登记：「iPhone 模拟器 `iPhone Duo heyta` 处于 `Booted`，ios 段要 `simctl uninstall` + 删 Derive…」 | 不动别人的证据 |
+
+🔴 最要紧的一行是**对端脚本的选设备形状**（`scripts/verify-mobile-ios-reminder.sh:74-79`）：
+先按 `IOS_DEVICE_NAME`（默认 `iPhone 17 Pro`）匹配，**匹配不到就 `grep Booted | head -1`**。
+按他们自己的写法在本机复现：
+
+```
+名字匹配结果=[]                     # "iPhone 17 Pro" 在本机不存在
+盲选回退结果=FE195661-B021-4A71-AAD1-1F2F7AE3A102
+```
+
+`simctl list devices | grep -E '691C20D9|iPhone 17 Pro'` 输出 **0 行** —— 连
+`scripts/verify-mobile-ios.sh:82` 写死的默认 UDID `691C20D9-…` 都不在清单里。
+⇒ **"我选的项目设备"和"对端的盲选目标"是同一台**不是巧合，是同一个缺口的两面：
+脚本用名字选设备，名字在本机不存在，于是所有人最终都落在 `head -1`。
+
+由此得一条 `B62` 该收的**新否证理由**（原来只按负载否证过"另起一台"）：
+**给这台机器新启任何一台模拟器都可能悄悄改写别人的设备选择** —— 对端用 `head -1`，
+Booted 清单的排序一变，他们的验收就换了一台设备，**而他们不会知道**。
+"我这边没装上"可恢复，"别人的验收悄悄换到另一台设备上"不可恢复。
+
+本轮实际动作：`--confirm-ios` 于 23:54:35 起跑，23:55:56 过了设备闸门
+（对端 pid 93192 = 主检出里的 `.verify-mobile-ios-reminder.sh.snap.93192` 在 23:54:35/23:54:55
+两次命中，23:55:15 起三次干净采样），进入负载闸门（`load 32.56` / 阈值 `12`）。
+我在**负载闸门等待期间**把它停了（pid 99764，残留进程现量 0）——
+继续等的结果是"负载一落就 `simctl uninstall` 对端正在用的那台"，这正是本轮不该做的事。
+
+⇒ **③ 的现量读数**：mac ✅ · windows ✅ · android ✅（代价见第 1 条）· **ios ⏹ 环境无效（按 exit 3 记）**。
+iOS 这端的关闭条件写两条，任一即可：(a) `B62` 那把带 ttl 的认领锁落地；
+(b) 一个明确窗口 —— 对端 `verify-mobile-*` 全部结束，**且他们的 `head -1` 指针不落在我要用的那台上**。
+
+### 3. ① 的同一趟现量（没变，所以要把"没变"写成读数）
+
+`main` 仍是 `0a61c0a6`（未前进），主检出脏项 **385**，与载体线 `main..HEAD` 的**重叠文件仍 15 项**，
+清单逐字未变（`PROGRESS.md`、`docs/plans/README.md`、`docs/reference/environment-traps.md`、
+`packages/app-host/src/{local-api-host,reminder-actions}.ts` 及其两个 spec、
+`packages/domain/{src/capture.ts,tests/capture.spec.ts}`、`packages/i18n/src/locales/{en,zh-CN}.ts`、
+`packages/local-api/src/{mcp,tools}.ts`、`scripts/{mutate-closeout-gates,reinstall-all}.sh`）
+⇒ 落地仍**不可执行**，`heyta-land.sh` 的前置 2 会照样挡下。命令：
+
+```bash
+comm -12 <(git -C <载体> diff --name-only main..HEAD | sort) \
+         <(git -C <主检出> diff --name-only HEAD | sort)
+```
+
+
 
 

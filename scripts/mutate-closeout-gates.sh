@@ -154,27 +154,30 @@ else
 fi
 
 say "U) settle_for 的三种时刻：见到才算、见不到必须红、隔几轮才出现也要等到"
-# 🔴 这一组**不碰真的 /tmp/ui.xml**（那台机器上可能正有别人的设备验收在读它），
-#    所以把函数体里的路径整段换到临时夹具上 —— 换的是被测对象读的文件，不是判据本身。
+# 🔴 这一组**不碰真的 /tmp/ui.xml**（那台机器上可能正有别人的设备验收在读它）。
+#    W0b ① 之后改的是**注入环境变量**而不是改写函数体：lib 里的 `settle_for`
+#    读的就是 `"$UI_XML"`，把夹具路径从外面喂进去，测到的就是脚本本体。
+#    （原来这里是把函数体里的路径 `sed` 成临时路径 —— 那等于**测的是一份副本**：
+#    副本绿不说明本体绿，而本体改成别的变量名时副本照样是绿的。）
 UFD=$(mktemp -d); UXML="$UFD/ui.xml"
-UFN="$(sed -n '/^settle_for() {/,/^}/p' "$REPO/scripts/lib/mobile-e2e.sh" | sed "s#/tmp/ui.xml#$UXML#g")"
+UFN="$(sed -n '/^settle_for() {/,/^}/p' "$REPO/scripts/lib/mobile-e2e.sh")"
 [ -n "$UFN" ] || { no "U0 没从 lib 里取出 settle_for 函数体（形状变了？）"; }
 dump_stub='dump(){ :; }; '
 printf '<hierarchy><node text="立即同步"/></hierarchy>' > "$UXML"
-if bash -c "${dump_stub}${UFN}; settle_for '立即同步' 3 0"; then
+if UI_XML="$UXML" bash -c "${dump_stub}${UFN}; settle_for '立即同步' 3 0"; then
   ok "U1 界面上就有 → 返回 0"
 else
   no "U1 有却说没有（正向对照失败）"
 fi
 printf '<hierarchy><node text="别的界面"/></hierarchy>' > "$UXML"
-if bash -c "${dump_stub}${UFN}; settle_for '立即同步' 3 0"; then
+if UI_XML="$UXML" bash -c "${dump_stub}${UFN}; settle_for '立即同步' 3 0"; then
   no "U2 🔴 界面上一路都没有却返回 0 —— 这条判据没牙"
 else
   ok "U2 一路都没有 → 返回 1（调用方那句 bad 照样会红）"
 fi
 printf '<hierarchy><node text="别的界面"/></hierarchy>' > "$UXML"
 ( sleep 0.5; printf '<hierarchy><node text="立即同步"/></hierarchy>' > "$UXML" ) &
-if bash -c "${dump_stub}${UFN}; settle_for '立即同步' 8 1"; then
+if UI_XML="$UXML" bash -c "${dump_stub}${UFN}; settle_for '立即同步' 8 1"; then
   ok "U3 第 1 秒才出现也等到（不是一次性读数）"
 else
   no "U3 中途出现的没等到 —— 还是在猜固定 sleep"
@@ -185,10 +188,11 @@ rm -rf "$UFD"
 say "V) 第 7 步的逐屏收集：区块在首屏之外必须算数，真缺一个必须报红"
 # 🔴 载体：**从脚本里原样抽出收集块**（不另抄一份逻辑 —— 抄的那份迟早和脚本漂移），
 #    把它的三个观测函数与 dump 接到"虚拟滚动"夹具上：一屏一个 XML，往下滚=下一屏，
-#    往上滚=上一屏。这样测的是脚本本体，而 /tmp/ui.xml 一个字都不碰
+#    往上滚=上一屏。这样测的是脚本本体，而真 `/tmp/ui.xml` 一个字都不碰
 #    （那台机器上随时可能正有别人的设备验收在读它）。
+#    W0b ① 之后夹具路径经 `UI_XML` 注入，不再改写抽出来的函数体。
 VFD=$(mktemp -d); VXML="$VFD/ui.xml"; VSCR="$VFD/screens"; mkdir -p "$VSCR"
-HFN="$(grep -E '^has_(text|desc|desc_sub)\(\)' "$REPO/scripts/lib/mobile-e2e.sh" | sed "s#/tmp/ui.xml#$VXML#g")"
+HFN="$(grep -E '^has_(text|desc|desc_sub)\(\)' "$REPO/scripts/lib/mobile-e2e.sh")"
 [ -n "$HFN" ] || no "V0 没从 lib 里取出那三个观测函数（形状变了？）"
 VBLK="$(awk 'f && /^  if \[/{exit} f{print} /^  DOWN=0$/{f=1}' "$REPO/scripts/verify-mobile-repeat.sh")"
 [ -n "$VBLK" ] || no "V0 没从第 7 步抽出收集块（形状变了？）"
@@ -209,7 +213,7 @@ run_vcase() {
   cat >> "$VFD/prog.sh" <<'VTAIL'
 echo "HAS=$HAS_HEADING MIS=$MISSING DOWN=$DOWN DN=$VDN UP=$VUP POS=$VPOS"
 VTAIL
-  VDIR="$VSCR" VXML="$VXML" bash "$VFD/prog.sh"
+  VDIR="$VSCR" VXML="$VXML" UI_XML="$VXML" bash "$VFD/prog.sh"
 }
 
 # —— V1：真实形状（整块在首屏之外，滚两屏收齐）——
@@ -242,6 +246,60 @@ else
   no "V3 🔴 整块没有却读出「${V3}」—— 这条判据没牙"
 fi
 rm -rf "$VFD"
+
+say "W) W0b ①②：现场路径的旋钮与库名默认值漂移守卫"
+# 这四条各挡一种真实坏法：
+#   W1 默认值被改 → 单轮运行行为变了（本批的立场是"默认值逐字不变"）
+#   W2 旋钮没接上 → 环境变量设了个寂寞，并行两轮还在共用同一个现场
+#   W3 **半套现场** → grep 类断言切到变量了、python 那几处还读字面量。
+#      这一种最阴：设了变量之后看起来隔离了，实际上一半读新的、一半读旧的。
+#   W4 漂移守卫自己坏了 → lib 与建库脚本各说一个库名，而横幅只印一个
+LIB="$REPO/scripts/lib/mobile-e2e.sh"
+UP="$REPO/scripts/mobile-e2e-up.sh"
+
+W1=$(env -u HEYTA_E2E_UI_XML -u HEYTA_E2E_XY_PY bash -c "set -u; . '$LIB'; printf '%s|%s' \"\$UI_XML\" \"\$XY_PY\"" 2>/dev/null || true)
+if [ "$W1" = "/tmp/ui.xml|/tmp/_xy.py" ]; then
+  ok "W1 不给变量时两个路径**逐字等于原来的字面量**（$W1）"
+else
+  no "W1 🔴 默认值变了或读不到，实测「$W1」—— 单轮运行的行为就不再是不变的"
+fi
+
+W2=$(HEYTA_E2E_UI_XML=/tmp/private-run.xml HEYTA_E2E_XY_PY=/tmp/private-run.py bash -c "set -u; . '$LIB'; printf '%s|%s' \"\$UI_XML\" \"\$XY_PY\"" 2>/dev/null || true)
+if [ "$W2" = "/tmp/private-run.xml|/tmp/private-run.py" ]; then
+  ok "W2 给变量时两个路径跟着走（$W2）"
+else
+  no "W2 🔴 旋钮没接上，实测「$W2」—— 并行两轮仍会共用同一个快照文件"
+fi
+
+# 🔴 计数前先确认这把尺子有刻度：同一套过滤喂给一个**必然命中**的样本，必须数出 1。
+#    （没有这条正向对照时，"计数为 0"可能只是过滤写坏了 —— 台账里那族空测量。）
+W3_PROBE=$(printf '  grep -q foo /tmp/ui.xml\n' | grep -vE '^[[:space:]]*#' | grep -c '/tmp/ui\.xml' || true)
+[ "$W3_PROBE" = "1" ] || no "W3a 🔴 过滤器自己坏了（阳性对照应为 1，实测 $W3_PROBE）—— 下面那条 0 不作数"
+W3=$(grep -vE '^[[:space:]]*#' "$LIB" | grep -v '^UI_XML=' | grep -c '/tmp/ui\.xml' || true)
+if [ "$W3_PROBE" = "1" ] && [ "$W3" = "0" ]; then
+  ok "W3 lib 里除定义那一行外**没有第三处** /tmp/ui.xml 字面量（不是半套现场）"
+else
+  no "W3 🔴 lib 的非注释行里还剩 $W3 处 /tmp/ui.xml 字面量 —— 那些位点不认旋钮"
+fi
+
+W4FD=$(mktemp -d)
+cp "$LIB" "$W4FD/mobile-e2e.sh"
+# ① 逐字相同 ⇒ source 成功（正向对照：守卫不许误伤）
+cp "$UP" "$W4FD/mobile-e2e-up.sh"
+if bash -c "set -u; . '$W4FD/mobile-e2e.sh'" >/dev/null 2>&1; then
+  ok "W4a 两处默认值一致时守卫放行"
+else
+  no "W4a 🔴 一致却报警 —— 守卫会误伤，下一轮就没人信它了"
+fi
+# ② 改一位 ⇒ 必须响亮失败，且把**两个值**都打出来（只说"不一致"不够定位）
+sed 's/heyta_mobile_smoke/heyta_mobile_smokf/' "$UP" > "$W4FD/mobile-e2e-up.sh"
+W4ERR=$(bash -c "set -u; . '$W4FD/mobile-e2e.sh'" 2>&1 >/dev/null; printf 'RC=%s' "$?")
+case "$W4ERR" in
+  *RC=0*) no "W4b 🔴 默认值漂移却放行（$W4ERR）—— 守卫没有牙" ;;
+  *heyta_mobile_smokf*) ok "W4b 漂移被拦下，且把两边的值都打了出来" ;;
+  *) no "W4b 拦下了但没指名道姓：$W4ERR" ;;
+esac
+rm -rf "$W4FD"
 
 printf '\n=== 合计 %d 绿 / %d 红 ===\n' "$PASS" "$FAIL"
 [ "$FAIL" = "0" ] || exit 1

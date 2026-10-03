@@ -20,6 +20,10 @@ export * from './timeline.js';
 export * from './timeline-position.js';
 export * from './notes.js';
 export * from './trash-rows.js';
+
+export * from './events.js';
+// W8：跨端唯一一份的**功能域词表**（为什么在这里而不是 app-host，见那个文件头）。
+export * from './feature-modules.js';
 export * from './search.js';
 export * from './habit-streak.js';
 export * from './habit-resilience.js';

@@ -89,7 +89,7 @@ LAPTOP_TITLE="laptop-edited-$TITLE"
 # ── 开始 ──────────────────────────────────────────────────
 echo ""
 echo "=== 移动端冲突解决闭环验收（真实模拟器 + 真服务端，零 mock）==="
-echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: heyta_mobile_smoke"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: $E2E_DB"
 echo "  账号: $EMAIL"
 echo "  任务: $TITLE"
 
@@ -186,7 +186,7 @@ if [ -n "$LAPTOP_ID" ]; then
   # 后果不只是这个脚本变红：**冲突根本没被造出来**，第 5 步会以
   # "手机没有报冲突"这种极具误导性的说法失败（看起来像手机的锅）。
   # 所以这里直接问服务端：那条改名 op 到底落库没有。
-  SRV_UPD=$(psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+  SRV_UPD=$(psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
     "SELECT count(*) FROM operations WHERE entity_id='$LAPTOP_ID' AND op_type='UPD';" 2>/dev/null | tr -d ' ')
   if [ "${SRV_UPD:-0}" -ge 1 ]; then
     ok "笔记本的改动确实落到了服务端（该实体有 $SRV_UPD 条 UPD）"
@@ -244,7 +244,7 @@ if [ -z "$XY" ]; then bad "点不到「逐条处理」（滚动后仍不可点�
   dump
   L=$(has_text "本机"); R=$(has_text "其他设备")
   [ "$L" = "1" ] && [ "$R" = "1" ] && ok "并排显示了两侧（本机 / 其他设备）" || bad "两侧没同时出现（本机=$L 其他设备=${R}）"
-  N=$(grep -o 'text="保留这一版"' /tmp/ui.xml | wc -l | tr -d ' ')
+  N=$(grep -o 'text="保留这一版"' "$UI_XML" | wc -l | tr -d ' ')
   [ "$N" -ge 2 ] && ok "两个「保留这一版」按钮都在（$N 个）" || bad "保留按钮数量不对（${N}）"
   [ "$(has_text "取不到这一侧的版本")" = "1" ] && bad "不该出现「取不到」——两端都应取得到" || ok "两侧都取到了版本"
   [ "$(has_text "$LAPTOP_TITLE")" = "1" ] && ok "界面上能看到对端那一版的内容" || bad "看不到对端内容"
@@ -540,7 +540,7 @@ fi
 fi  # ← 对应 7b 开头的「保留远端前置未成立则跳过」闸门
 
 step "10. 直接查 Postgres"
-psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
   "SELECT (SELECT count(*) FROM operations) AS ops, (SELECT count(*) FROM sync_devices) AS devices" 2>/dev/null \
   | sed 's/^/      ops|devices = /'
 

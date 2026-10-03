@@ -3521,6 +3521,36 @@ mac+windows 先跑，它不碰共享设备；android+ios 后跑，带跑动中�
 **这就是本节开头那个形状的实锤**：起跑前的探测挡不住跑动中的撞车，因为 uninstall 在构建之后。
 ⇒ `B62` 现在有两份独立取证，那把带 ttl 的认领锁该不该做，证据已经够了。
 
+### 23:5x 更新：第三份取证换了维度 —— 这把闸门**看不见"设备是谁的"**，而 android 那端已经付出代价
+
+两份旧取证都是"起跑后撞见对端进程"。23:5x 这一份不是撞车，是**我把别人的设备卸了而闸门全程绿灯**：
+
+- `reinstall-gated-2327`（23:35 那趟）的 android 段判据四条全在位，但它动的是 `emulator-5554`；
+  现量该串口挂的是 qemu pid 36840 = **`-avd heyta-w3-yearly`**（AVD 建号 10-03 12:04、起跑 21:55），
+  而 `docs/plans/goal-multi-end-coverage.md:771` 早已写明「这台 AVD 是**并行会话在用的设备**，
+  `reinstall` 会 `pm clear`/卸装它」。⇒ 那一段的 `adb uninstall com.heyta` 清掉了对方正在验收的设备。
+- 我的 device_gate 没报错、也不该报错：它扫的是**对端验收进程**，而设备所有权不住在进程里。
+  **`reinstall-all.sh:270` 用串口选设备（`SERIAL=${HEYTA_E2E_SERIAL:-emulator-5554}`），
+  但设备的所有权单位是 AVD 名** ⇒ 这是 traps #169（ios 段 `head -1` 盲选）在 android 侧的对应缺口。
+
+同一趟在 ios 侧查出的第二件事（这次停在了起跑前）：三条 `Booted` 全有主 ——
+`heyta-iphone-17pro` 恰好是**对端脚本的盲选回退目标**（`verify-mobile-ios-reminder.sh:74-79`
+默认名 `iPhone 17 Pro` 在本机不存在 ⇒ 落回 `grep Booted | head -1` = `FE195661`）、
+`heyta-ios-isolated` 的 `com.heyta` 数据 **23:53** 刚被写过（活现场）、
+`iPhone Duo heyta` 被 `ui-review-fill-zh-timeline.md:1542` 当别人的证据载体登记着。
+⇒ **③ 的 ios 端本轮按环境无效记（不降级判据）**，读数与逐台取证在
+`docs/plans/ai-event-tool-contract.md` §15.36。
+
+🔴 由此补一条**新的否证理由**（本节原来只按负载否证过"另起一台设备"）：
+给这台机器**新启**任何一台模拟器都可能**悄悄改写别人的设备指针** —— 对端用 `head -1`，
+Booted 清单排序一变他们的验收就换了一台设备，而且不会有任何报错。
+"我这边没装上"可恢复，"别人的验收静默换设备"不可恢复。
+
+**关闭判据补一条**（除了原来那条 `heyta-device-owner` 认领锁的双向对照）：
+`scripts/reinstall-all.sh` 的 android 段在 `uninstall` 之前必须先把串口解析到 AVD 名并断言它属于本轮
+（取证三行：`adb devices -l` / `ps -eo pid=,command= | grep -o '\-avd [^ ]*'` / `stat -f '%SB' ~/.android/avd/<name>.avd`），
+解析不到或不是自己的 ⇒ 响亮 exit 3。⚠️ 本轮**不能改这个文件**：它在 ① 的 15 项对端脏清单里。
+
 ## B63. 🔴 `environment-traps.md` 有 **4 个号各住着两条不同条目**，而 AGENTS.md 自己就有两个重号（2026-10-03 23:0x 现量）
 
 **这是 ④ 那条"编号按工作树现量复核"查出来的，不是假设**：

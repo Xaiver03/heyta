@@ -53,6 +53,8 @@ import {
   MAX_CALENDAR_BARS,
   MAX_WEEK_CALENDAR_BARS,
   groupTasksByDueDate,
+  calendarDayMarkerView,
+  type CalendarDayMarker,
   type CalendarBoardLabels,
   type CalendarCellBar,
   type CalendarViewKind,
@@ -133,6 +135,24 @@ export interface CalendarBoardProps {
    *    这里不预先替宿主决定"那一格放什么"，共享层不认识同步、也不认识宿主的面包屑。
    */
   readonly toolbarTrailing?: React.ReactNode;
+  /**
+   * 公共事实的"休 / 班"标记（W4b，ADR-0052 §2.6 点名的那条缝）。
+   *
+   * 🔴 **默认 `undefined` ⇒ 一个节点都不画**，不是"画成看不见的"。这条通道的内容由
+   * 部署方录入，自托管实例很可能什么都没有；宿主不接它的时候日历必须与今天逐字一样
+   * （这也是 ADR 选"给共享组件加默认值等于原值的可选 prop"而不是新开注入点的理由）。
+   *
+   * 返回 `'off'`（这一天休息）/ `'work'`（这一天补班）/ `undefined`（这天没有说法）。
+   */
+  readonly dayMarker?: ((date: LocalDate) => CalendarDayMarker | undefined) | undefined;
+  /**
+   * 上面那个标记**怎么写**（`休` / `班` 那一档字，由宿主的词条表给）。
+   *
+   * ⚠️ 只给 `dayMarker` 而不给词表时标记退化成一颗色点，而"用颜色说话"违反 AGENTS §5
+   *    那条不许只靠颜色表达状态的立场。宿主两个都要给；这条写在判据里（见
+   *    `apps/web/tests/calendar-view.spec.tsx` 同族的 ui 侧判据）。
+   */
+  readonly dayMarkerLabels?: Readonly<{ off: string; work: string }> | undefined;
 }
 
 /**
@@ -152,6 +172,8 @@ function DayCell({
   bars,
   hidden,
   labels,
+  dayMarker,
+  dayMarkerLabels,
   onPress,
 }: {
   date: LocalDate;
@@ -163,6 +185,8 @@ function DayCell({
   bars: readonly CalendarCellBar[];
   hidden: number;
   labels: CalendarBoardLabels;
+  dayMarker: CalendarBoardProps['dayMarker'];
+  dayMarkerLabels: CalendarBoardProps['dayMarkerLabels'];
   onPress: (date: LocalDate) => void;
 }): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -192,6 +216,11 @@ function DayCell({
   const dayTitle = labels.dayTitle(date);
   const barCount = bars.length + hidden;
 
+  // 公共事实的「休 / 班」（W4b）。判断全在 `calendarDayMarkerView` 里（本包边界：
+  // 有分支的逻辑不进组件）。宿主没接 `dayMarker` 时这里恒为 `undefined`
+  // ⇒ 下面一个节点都不画，格子与改动前逐字一样。
+  const markerView = calendarDayMarkerView(dayMarker?.(date), dayMarkerLabels);
+
   return (
     <Pressable
       onPress={() => onPress(date)}
@@ -202,9 +231,12 @@ function DayCell({
          会被**整个丢掉**（`check:rn-aria` 断言 B 拦下的就是这一处）。 */
       aria-selected={isSelected}
       accessibilityLabel={
-        barCount > 0
+        (barCount > 0
           ? labels.dayWithTasks({ date: dayTitle, count: barCount })
-          : labels.dayNoTasks({ date: dayTitle })
+          : labels.dayNoTasks({ date: dayTitle })) +
+        // 标记不进这句就只剩看得见的人知道 —— 没接 dayMarker 时这里拼的是空串。
+        // 而词表没给时**不拼**：那颗点不该被念成"圆点"。
+        (markerView?.spoken === undefined ? '' : ` ${markerView.spoken}`)
       }
       style={[
         styles.cell,
@@ -224,6 +256,14 @@ function DayCell({
       ]}
     >
       <Text style={[text['numeric-body'], { color: numberColor }]}>{day}</Text>
+      {markerView === undefined ? null : (
+        <Text
+          testID={`calendar-day-marker-${date}`}
+          style={[text['row-meta'], { color: tokens[markerView.colorToken] }]}
+        >
+          {markerView.text}
+        </Text>
+      )}
       {/*
         任务条（R11 批一）。原来是 4px 圆点，**格子里没有一个字可读**。
         每条 = 一根 3px 的状态色条 + 标题一行。三处刻意的选择：
@@ -318,6 +358,8 @@ export function CalendarBoard({
   view = 'month',
   now,
   toolbarTrailing,
+  dayMarker,
+  dayMarkerLabels,
 }: CalendarBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -491,6 +533,8 @@ export function CalendarBoard({
                   bars={bars}
                   hidden={hidden}
                   labels={labels}
+                  dayMarker={dayMarker}
+                  dayMarkerLabels={dayMarkerLabels}
                   onPress={pickDay}
                 />
               );

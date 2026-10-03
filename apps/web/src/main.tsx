@@ -29,6 +29,7 @@ import { useSyncStore } from './features/sync/store.js';
 import { askLegalRecheck } from './features/legal-recheck/gate.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
 import { storageHintKey } from './features/shell/error-hint.js';
+import { startPublicFacts } from './features/calendar/public-facts.js';
 import { initOpLog } from './features/tasks/store.js';
 import { LocaleHost } from './lib/locale-host.js';
 import { startWidgetLifecycle } from './pwa/lifecycle.js';
@@ -135,6 +136,20 @@ if (new URLSearchParams(window.location.search).has('shell')) {
        * 它自己吞掉所有失败（见 `pwa/lifecycle.ts`）：组件是增强，不是功能前提。
        */
       startWidgetLifecycle();
+
+      /**
+       * 公共事实（调休 / 补班）的下行（W4b，ADR-0052）。
+       *
+       * 🔴 排在这里的两个理由缺一不可：
+       *  · 它要 `requireStore()` —— 引擎没就绪时那是**一条会抛的读**，而它没有重试；
+       *  · 装缓存是**异步**的，所以首屏很可能先没有标记、装完再补上 —— 这不是缺陷，
+       *    但补上那一步必须有人敲（`publicFactsEpoch`），否则界面会一直停在首屏那张图。
+       *
+       * ⚠️ 它自己判闸门（G-12）：没同意时一个请求都不发，缓存照装。
+       *    所以这里无条件调，而不是把它挂到"已登录"那条分支上 ——
+       *    这条通道是匿名的，未登录的用户同样该看到部署方录的调休。
+       */
+      startPublicFacts();
 
       /**
        * W1：消费**邮件登录链接**带回来的令牌。
