@@ -37,9 +37,33 @@
 
 ## 0. 一句话现状
 
-批次二的**代码半基本落地**，卡点不在代码而在**合流**：三条并行线（W7/W8/W4b）的成果还躺在各自
-worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 笔**（`main` 是多人协作的活树，
-不是我的基线）。**下一段最贵的工作是把三条线收进 batch2 并兑现 §3 那两条义务，不是再写新功能。**
+> 🔴 **本节 2026-10-04 03:1x 重写。下面那段"卡点在合流"已经被现量否证，原句留在引用块里划掉，
+> 因为它记录的是一种会复现的形状：**"别人什么时候把它合掉的"不在我的读数里，所以"还没合流"这句话的保质期不由我决定。**
+
+> ~~批次二的**代码半基本落地**，卡点不在代码而在**合流**：三条并行线（W7/W8/W4b）的成果还躺在各自
+> worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 笔**。~~
+
+**现在的状态**：合流**已经发生**，而且不是我做的。现量（每次引用本条都要重跑，别信这段文字）：
+
+```bash
+git log --oneline origin/main..HEAD          # 2026-10-04 03:1x 读数：只剩 e2def90f（W6 那一笔）
+git rev-list --count HEAD..origin/main       # 同刻读数：228 —— main 在吸收批次二之后又前进了 228 笔
+```
+
+⇒ 三条线（W7 `43e94b32`、W8 `f2d09974`、W4b 那六笔）**都已经是 `origin/main` 的祖先**，
+`heyta-wt-w7` / `heyta-wt-w8` 那些 worktree 里的"未提交成果"这个描述整体过期了。
+本批剩下的不是"合流"，而是**把 W6 那一笔之外的收尾做完**：判据②的真浏览器读数、W7 的变异臂、
+完整 `pnpm check`、四端重装。
+
+🔴 **这条变化改变一件事的判断口径**：凡"本批带来的后果"现在**同时是 main 的后果**，
+所以"等合流之后再管"这个念头不再成立。两个当场撞见的例子，**归属不一样**（第二个不是我们的债）：
+① `apps/web/src/main.tsx:152 startPublicFacts()` 让**每个** e2e 套件一开机都发一次
+  `GET /api/holiday-adjustments`，而假服务端只实现 `/v1/chat/completions` ⇒ 带
+  「除已登记缺失外不该有非 2xx」守卫的套件被无关地拖红（`admin-console.spec.ts` 实测一次红五条，
+  修法见 `e2e/tests/helpers.ts` 新增的 `stubPublicFacts`，与 `stubLegalRecheck` 同形同因）；
+② W9 那半在 main 上声明了 `POST_NOTIFICATIONS`，而 `third-parties.ts` 那六句"移动端不申请通知权限"
+  没跟着翻 ⇒ **`node scripts/check-legal-permissions.mjs` 在干净 main 上就 rc=1**
+  （取证与归属写在 `countdown-anniversary.md` §8.2 的 W9 节，本批不代它翻那六句）。
 
 本轮新增了一条**常驻门禁**：`pnpm check:legal-permissions`（`1d71e75f` + 加固 `017adc3e`，在 batch2 分支），
 它把"移动端不申请任何权限"这类**对外承诺**与 manifest / Info.plist / entitlements 的**真实声明面**对账。
@@ -66,14 +90,14 @@ worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 
 | W0 | 批次一遗留的登记缺口收掉（`/tmp/ui.xml` 固定名 36 处、`verify-mobile-repeat.sh:243` 硬印库名、**待入台账的两条正文搬运**） | 🟡 **①② done**（`6598703b`，harness 22 绿 0 红） | ③ **台账搬运没做**：`environment-traps.md` 正脏 ⇒ 正文停在计划 §3.5（`:675` 起），任务 #14 |
 | W2 | 新实体 `EVENT` 落 `shared-schema` + `domain` + `op-log` reducer + 存储三套适配 + 线协议契约；🔴 部署顺序硬约束"服务端先于客户端"；ADR-0044 已定"闰月生日逢闰过正" | ✅ 已闭合（`bb6c1203` + `05794dc5`），**且服务端那一腿本轮补上了**（`30340fa2`：`EVENT` 认领进 `validation.service.spec.ts` 的手写实体清单） | 无。**但"服务端先于客户端"是部署期义务，`reinstall:all` 那一步要按它排序** |
 | W5 | 倒数日卡片网格 + 二级操作（界面） | ✅ 已闭合（`a9529a59` + `94760c82` + `c07df677`），e2e 6 passed、三张图人已看 | 无 |
-| W6 | 第二个日期数据源 | ⏹ **停放**（撞车面非空，关闭判据见 §5） | 等六个日历路径 `git status --porcelain` 归零后落地，复用 §4 第 3 条的 `dayMarker` 缝 |
-| W7 | 纪念卡片导出为**成品图**（设备渲染导出，**零通道、零法务变更**；区别于素材图） | 🟡 **已提交 `581bdb99` 并合进 batch2 `caf9a48c`**：只有线协议契约（99 行）+ ui 侧字段（+42）。🔴 合进来的东西**本轮第一次跑过**：`shared-schema` 117 passed、`pnpm -r build` rc=0（⚠️ 但它是靠 build 才第一次进 dist —— 起手 `grep -c EXPORT_CARD_EDGE_PX dist/index.js` = **0**） | 🔴 **设备出图那半没有**：RN/原生渲染导出、`check:*` 门禁、判据（含"零法务变更"的现量复核）全未做 |
-| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | 🟡 **已提交 `b8f39cae` 并合进 batch2 `db430cc9`**：移动半（`CountdownScreen` 267 行 + `feature-entries` 109 + `countdown-display` 133）+ 领域层 `feature-modules.ts` 77 + 测试 244 行；web 半已随 W5 落地。✅ **那 244 行本轮真跑了**：`@heyta/mobile` 547 passed、`@heyta/domain` 859 passed（起手 4+15 枚红全部是读旧 dist，见 §2.2 第 1 条） | 🔴 "三端"里**原生壳那半 + 壳级门禁**没有产物 |
+| W6 | 第二个日期数据源 | ✅ **已闭合**（`e2def90f` @ `feat/countdown-batch2`，2026-10-04 02:5x） | 无。⚠️ 原句"等六个日历路径归零后落地"的载体已经不存在了 —— 那六个路径的未提交 diff 随 main 的推进被各自所有者提交掉，`608fa5b1` 把合并基搬到 batch2 上，落地前重跑了一次关闭判据（`git status --porcelain -- packages/ui/src/calendar apps/web/src/features/calendar apps/mobile/src/screens/CalendarScreen.tsx` 输出为空）。**留了一条编号缺口 W6-G1**：接进「今天」/收集箱要先给共享 `TaskList` 一条"不可交互行"的契约变更（把 EVENT 塞进任务行要么伪造 `completedAt`、违反 §3.4 一个意图一个 op，要么凭空造第三种行形），不属于这一批 |
+| W7 | 纪念卡片导出为**成品图**（设备渲染导出，**零通道、零法务变更**；区别于素材图） | ✅ **三端都到最终态**（`43e94b32`，**现在已是 `origin/main` 的祖先**）：共享版面 `packages/ui/src/countdown/card-export-layout.ts` + web `<canvas>` 出图 + 移动原生落盘（Android `cacheDir` + `FileProvider`、iOS 写沙盒，两端**都不走相册**）+ 门禁 `check:card-export`。**04 03:1x 现量**：`apps/mobile/tests/card-export.spec.ts` **21 passed**（`MOBILE_RC=0`）、`e2e/tests/countdown-export.spec.ts` **5 passed**（`EXPORT_E2E_RC=0`）、成品图与四张界面图**人已看**且**已进版本库**（`apps/web/evidence/countdown-export/`，含每张"看见了什么"+ 两件事：竖条是 `surface-sunken` 不是主蓝＝夹具没选模板，这是设计；「还有 28 天」与「11月1日」互相自洽＝只有看图才会做的交叉验证） | 只剩**两臂变异**（A1 画布宽不再等于契约 / A3 宿主不传失败文案），装置在 `/tmp/w7-mutate.mjs`，跑完把读数写进 `countdown-anniversary.md` 的 W7 节才打勾 |
+| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | ✅ **三端代码 + 壳级门禁都在 main 上了**（`f2d09974`）。**04 03:0x 现量**：`node scripts/check-shell-surfaces.mjs` ⇒ **rc=0，判定 5 格 = 5 绿 / 0 红，未取证 2 栏**（`desktop-macos / countdown · 产物`、`desktop-windows / countdown · 产物`）。🔴 门禁自己那句话是判据本体："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" | 那两栏**只由** Goal 第 ⑤ 条的 `pnpm reinstall:all` 关闭（它顺带把 `apps/web/dist` 打进两端安装包）。在此之前本行不打勾 —— 这正是 AGENTS §6.1.1 与 §7 第 27/82 条要防的那种"绿了但装的是旧产物" |
 | W9 | 提醒（含投递路径 —— 现状是全仓零 `new Notification(`） | 🟡 **web 半 + DST ✅**（`a8f5a9a6`，变异 9/9 红）；**原生投递那半没动** | 投递路径 = Goal 明文要求的**没做完**那半（ADR-0051 另立一单）；合流时连带兑现 §3.1 |
 | W10 | `EVENT` 必须**同时**进 AI 工具目录与 local-api 工具契约（实体与 AI 工具一起做；不改 `ENTITY_TYPES` 驱动的排期决定） | ✅ 已闭合（`8a595493` + `e2aeedc4`），目录 4 条 EVENT 工具，MCP 与内置 AI 共用同一份 | 无。⚠️ 副作用已被 L' 抓住并修（`ai-and-transfer.ts` 那张表 = 授权面） |
-| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | ✅ **代码链已闭合**（23:0x）：服务端半那 4 笔（`a39f7fa6`/`a2259e5d`/`3708d08c`/`2877dd37`）+ ADR 定性与 0038 回写（`c28e5f1a` @ `main`）+ §3.2 ADR 指针（`1dbe6df6`）+ 门禁 `check:public-facts`（`3f327dc2`，八臂 8 红 0 存活）+ `dayMarker` 缝（`509a06cd`）+ **客户端拉取三笔**（`6735cc39` storage META 通用读写 / `b05fbc50` app-host 模块 / `67fef701` web 接线 + i18n + 真界面判据）。判据①**已在真界面跑过**（三档截图人已看，读数见 §4） | 🔴 **只剩一条**：判据②"papers 在**后台界面**回显"目前只到 API 层（`admin.routes.ts` 的 GET 带 papers，但 `apps/web/src/features/admin/` 没有调休面板、`admin-client.ts` 也没有对应方法）⇒ 面板正在补（见 §4 末），补完并跑过判据才打勾 |
-| L 系列 | 法务联动 —— 改 `packages/legal` 那六处现成位置、每处中英双份、落地页文案走生成物不许手改（`check:legal-copy` 已在 `pnpm check`） | 🟡 **判定表已出、唯一真命中已修**（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`） | 🔴 六处**没有被"全改一遍"是判定结果**（§4 时序条款：纯文字版不触发 L1/L2/L4/L5），但 **§3.1 那六个字面位置随 W9 那半必须翻转** |
-| 收尾 | Goal 第 7 条 + 计划 §5/§8.3 | 🟡 **§6 第 1 条的两半已做**（`pnpm -r build` rc=0、`pnpm -r typecheck` rc=0、八个包 + 服务端全套的读数见 §2.2） | `check:docs`（33 处是别人未跟踪文档的函数）、界面截图人看、`pnpm reinstall:all` 四端 —— 全未做 |
+| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | ✅ **代码链闭合，判据②的面板也落了**：服务端半 4 笔 + ADR 定性与 0038 回写（`c28e5f1a`）+ 门禁 `check:public-facts`（八臂 8 红 0 存活）+ `dayMarker` 缝 + 客户端拉取三笔（`6735cc39`/`b05fbc50`/`67fef701`）。**判据①**真界面三档截图已看；**判据②**的后台面板在 `apps/web/src/features/admin/AdminPanel.tsx`（`HolidayPanel`，把 `papers` 渲染成 `<a href>` + `rel="noreferrer noopener"`），e2e 那条用例（`admin-console.spec.ts`「调休/补班那一页把出处回显成可点链接」）**04 03:0x 第一趟跑出来是红的**：五条同因红，报错逐字相同 `除已登记缺失外不该有非 2xx：["/api/holiday-adjustments"]` —— 根因不是面板，是**本批自己的**开机拉取没人登记（见 §0 第 ① 条例外），补了 `e2e/tests/helpers.ts:stubPublicFacts` 之后重跑 | 待这一趟的 `ADMIN_RERUN_RC=0` + 截图人看 + 一臂变异（把 `papers` 从 `<a>` 降级成纯文本 ⇒ 必须红）。三条齐了才打勾 |
+| L 系列 | 法务联动 —— 改 `packages/legal` 那六处现成位置、每处中英双份、落地页文案走生成物不许手改（`check:legal-copy` 已在 `pnpm check`） | 🟡 **判定表已出、唯一真命中已修**（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`）。🔴 **04 03:0x 现量：§3.1 那六个字面位置现在真的红了，而且红在 main 上** —— `node scripts/check-legal-permissions.mjs` ⇒ **rc=1**，两条落在 `third-parties.ts` 的推送 SDK 否表行（zh + en），因为 `b0ba4a35`（W9 原生投递，**已在 `origin/main`**）往 manifest 加了 `POST_NOTIFICATIONS` 而句子没翻。取证：门禁脚本与它在 `check` 里的挂钩**都在 main 上**、矛盾两端**都已提交在 main**、主检出 `packages/legal` 5 个 `M` 里那六句**已经不见了**（正在被并行会话翻） | ⇒ **归属不在本批**：六句必须一起翻并重跑 `check:legal-copy`，本批代改会造出三方冲突。**关闭判据**：`node scripts/check-legal-permissions.mjs` rc=0（每次引用本条重跑） |
+| 收尾 | Goal 第 7 条 + 计划 §5/§8.3 | 🟡 §8.3 第 1 条的两半已做（`pnpm -r build` / `pnpm -r typecheck` rc=0）。**04 02:5x 现量更正**：`node research/tools/docs-link-check.mjs` 在 `heyta-wt-batch2` 隔离检出 ⇒ **rc=0，死链 0 处** —— 上面那句"33 处"是**主检出**（有别人未跟踪文档）的读数，死链数是"仓库 + 本机未跟踪文件"的属性，不是仓库属性 | 完整 `pnpm check`（要安静窗口）、界面截图人看（W6/W7 已看，W4b 判据②待看）、`pnpm reinstall:all` 四端 —— 未做 |
 | 同步 | 每完成一项 → 计划文档打勾 + **同步 AGENTS §9** | 🟡 计划文档已同步（`cd839ec5`）；**AGENTS §9 欠着** | `AGENTS.md` 脏 ⇒ 不能 `--only` 提交（§7 第二条），等干净后补 |
 
 **硬边界与纪律（任务书原文 7 条，逐条仍在生效）**：
