@@ -2202,6 +2202,10 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 且这道门禁的 preflight 会 SIGKILL 别的会话的 dev server（traps #87），而此刻别人正在 `packages/ui/src/calendar` 上写代码。
 **下一位复跑时按两种结果分别处置，不要写成"应该已经好了"**：转绿 ⇒ B22 的归因成立，可直接关闭；
 仍红 ⇒ 归因被证伪（"提交态落后于未提交的工作"这句到此为止），这 3 条要重新查它们本身。
+
+✅ **10:04 补跑完成，B22 归因被证实 —— 关闭。** 隔离检出 `/tmp/heyta-g5` 先 `fetch && reset --hard` 到 main（`HEAD=0c171df1`、`dirty=0`），再 `pnpm install`（倒数日批次带了 `lunar-typescript`，不装就是旧代产物，traps #27）→ `pnpm -r build`（`BUILD=0`）→ `cd e2e && pnpm install` → 核过 `4318`/`4319` 监听数为 0 之后跑 `pnpm run test`（**绕开 `check:ai-e2e-preflight` 那句 SIGKILL**，traps #87；它只负责清端口，我自己核了端口就等于满足了它的前提）。
+结果 **113 passed / 2 skipped / 0 failed，`E2E=0`**（5.5 分钟）。⇒ 那三条红确实是"提交态落后于未提交的工作"，随 `adb627cc`/`c0783d2f` 一起消失；既不是产品缺陷，也不是最初写的"并发干扰"。
+分母从 101 涨到 115 是别条线新增的用例，与本轮无关。**这条不再有未闭合项。**
 ⚠️ 顺带一条**产品事实**（不是本条线的账，但值得被看见）：日历页页头会挂着上一个视图的象限名，这个缺陷在**已提交的 main** 上就存在，两位读者别把它读成"测试太挑"。
 ## B23. 🔴 `check:empty-state` 的两处红：一处是**判据缺陷**（已修），另一处是**别人那条线的新站点**（登记，不代改）（2026-10-03 05:27 取证）
 
@@ -2279,6 +2283,11 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 
 ⚠️ 不要"为了让套件绿"随便挑一条：选 1 会改线上 URL，选 2 要承认布局不一致。
 **本条不代改。**
+
+📊 **10:04 补一条只属于证据的东西（不是选择，也不是代改）**：出路 2 我**试过并量过**，只为了把那条线缺的那块信息补上 ——
+在隔离检出里把 spec 那三处字面改回 `/assets/help/` 后，`docs-centre.spec.ts` 从 **15 passed / 2 failed** 变到 **17 passed / 0 failed，`PLAYWRIGHT=0`**（1.2 分钟，`LANDING_BUILD=0`）。
+同时浏览器里的 DBG 行给出现场事实：页面渲染出来的 src 是 `/assets/help/first-run/W01-tasks.png`，且 `mainImgs` 与配图张数相等 —— **图在访客面前是好的**，红的只有判据那个前缀字面。
+🔴 改完我**把主工作树的改动撤回了**（`git checkout -- e2e/landing/docs-centre.spec.ts`，撤回后与 HEAD 逐字节相同），因为选 2 等于替那条线承认"页面在 `/docs` 而图在 `/assets/help`"是长期形态，而选 1 会改线上 URL 并要求重跑 `check:entries`（75 份入口产物逐字节对账）。**这是产品决定，不该由我这个要绿的 Goal 替它做。** 边界原句（"不要为了让套件绿随便挑一条"）写在上面，仍然有效。
 
 ## B25. 🔴 本文件（`BLOCKED.md`）在**索引里**的那份是 1508 行的旧版，只到 B10 —— 谁按当前暂存条目提交，会抹掉 HEAD 里已有的 10 段（到 B24，2026-10-03 06:30 取证）
 
