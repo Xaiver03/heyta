@@ -145,6 +145,7 @@ function callsFunction(text, name) {
 const missing = [];
 const duplicated = [];
 const contradicted = [];
+const mismatched = [];
 const ok = [];
 let cleared = 0;
 
@@ -170,6 +171,18 @@ for (const file of files) {
   // 2026-10-03 实测：把处置收进 lib 的同一轮就是这样差点改掉三条本地类验收的语义。
   const namesLocalButton = new RegExp(`^\\s*${SHARED}\\s+"(只用本机|以后再说)"`, 'm').test(code);
   const pinsItsOwnChoice = /^\s*CONSENT_GATE_PREFERRED=/m.test(code);
+  // 🔴 判据 4：点名了本地按钮（不授予联网）**却**在本脚本里用到了要出门的动作 ——
+  // 那句"本验收不需要联网"就是假的，而它会连带把后面所有网络判据变成
+  // "闸门在正确地拦"那种红（看着像产品坏了）。六个点名本地按钮的脚本实测
+  // 网络侧调用行数都是 0（判据 4 因此零误报），所以这条红线是白送的。
+  const pinsLocal = /^\s*CONSENT_GATE_PREFERRED=(?:"?(只用本机|以后再说)"?)/m.test(code);
+  const needsNetwork = /\b(configure_sync_credentials|wait_laptop_has|heyta_e2e_ensure_account)\b|\$CLI sync|laptop\(\)/.test(code);
+  if (pinsLocal && needsNetwork) {
+    mismatched.push(
+      `${file}  点名了本地按钮（不授予联网），但脚本里有用得着出门的动作 ⇒ 那句"不需要联网"是假的`,
+    );
+  }
+
   if (namesLocalButton && viaWelcome && !pinsItsOwnChoice) {
     contradicted.push(
       `${file}  自己点名了「只用本机/以后再说」，却没设 CONSENT_GATE_PREFERRED ⇒ 欢迎页 helper 会改点「同意并联网」`,
@@ -188,6 +201,10 @@ if (duplicated.length) {
   console.log(`\n❌ 判据 2 —— 出现了第二份实现（${duplicated.length} 处）：`);
   for (const line of duplicated) console.log(`  ${line}`);
 }
+if (mismatched.length) {
+  console.log(`\n❌ 判据 4 —— 点名的按钮与脚本自己的动作矛盾（${mismatched.length} 个）：`);
+  for (const line of mismatched) console.log(`  ${line}`);
+}
 if (contradicted.length) {
   console.log(`\n❌ 判据 3 —— 本地类验收没把自己的按钮点名（${contradicted.length} 个）：`);
   for (const line of contradicted) console.log(`  ${line}`);
@@ -196,7 +213,7 @@ if (missing.length) {
   console.log(`\n❌ 判据 1 —— 没走到共享处置（${missing.length} 个）：`);
   for (const line of missing) console.log(`  ${line}`);
 }
-if (duplicated.length || missing.length || contradicted.length) {
+if (duplicated.length || missing.length || contradicted.length || mismatched.length) {
   console.log('\n处置：调用 scripts/lib/mobile-e2e.sh 的 handle_privacy_consent <按钮优先级…>，');
   console.log('      或在冷启动后调 dismiss_welcome_if_present（它会先收这块面板）。');
   console.log('      不要在这里再抄一份 —— 抄漏一个脚本的代价是那一轮整片假红。');
