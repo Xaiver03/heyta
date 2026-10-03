@@ -127,7 +127,7 @@ if ! . "$SCRIPT_DIR/image-inputs.sh"; then
     echo "ERROR: 读镜像输入清单失败，拒绝继续（没有这份清单，revision 核对与脏树检查都是空的）。" >&2
     exit 1
 fi
-echo "==> 镜像输入清单：$SUPER_SYNC_IMAGE_INPUTS_LIST（$(printf '%s\n' "${SUPER_SYNC_IMAGE_INPUTS[@]}" | wc -l | tr -d ' ') 项）"
+echo "==> 镜像输入清单：${SUPER_SYNC_IMAGE_INPUTS_LIST}（$(printf '%s\n' "${SUPER_SYNC_IMAGE_INPUTS[@]}" | wc -l | tr -d ' ') 项）"
 
 supersync_image_source_revision() {
     local revision

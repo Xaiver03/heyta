@@ -80,7 +80,7 @@ for arg in "$@"; do
   case "$arg" in
     --no-build) BUILD=0 ;;
     --keep) KEEP=1 ;;
-    *) echo "未知参数：$arg（支持 --no-build / --keep）" >&2; exit 2 ;;
+    *) echo "未知参数：${arg}（支持 --no-build / --keep）" >&2; exit 2 ;;
   esac
 done
 
@@ -102,14 +102,14 @@ for name in supersync-server supersync-postgres; do
   if [ -n "$(docker ps -q --filter "name=^${name}$" 2>/dev/null)" ]; then
     owner="$(docker inspect "$name" --format '{{ index .Config.Labels "com.docker.compose.project" }}' 2>/dev/null || true)"
     [ "$owner" = "$PROJECT" ] && continue
-    die "容器 $name 正在被另一个 compose 项目用着（project=$owner）。
+    die "容器 $name 正在被另一个 compose 项目用着（project=${owner}）。
    这条验收不能共用别人的实例（判据会量到别人的库）。
    要么先停掉那一套，要么换 HEYTA_SELFHOST_PORT 并改掉 server/docker-compose.yml 里的 container_name。"
   fi
 done
 
 if [ "$BUILD" = "1" ]; then
-  log "==> 打镜像（$IMAGE，VCS_REF=$(git rev-parse --short HEAD)）"
+  log "==> 打镜像（${IMAGE}，VCS_REF=$(git rev-parse --short HEAD)）"
   # 构建上下文 = 仓库根（与 docker-compose.build.yml 的 context: .. 一致）。
   DOCKER_BUILDKIT=1 docker build -f server/Dockerfile \
     --build-arg VCS_REF="$(git rev-parse HEAD)" \
@@ -158,12 +158,12 @@ write_env_file
 # 而写入其实成功了 —— 别被那行带走，判据只看文件内容。
 [ -s "$ENV_FILE" ] || die "一次性凭据文件没写出来（$ENV_FILE 为空或不存在）—— 后面的栈一定起不来。"
 case "$ENV_FILE" in
-  "$REPO_ROOT"/*) die "凭据文件的目标路径在仓库里（$ENV_FILE）—— 拒绝写入工作树。" ;;
+  "$REPO_ROOT"/*) die "凭据文件的目标路径在仓库里（${ENV_FILE}）—— 拒绝写入工作树。" ;;
 esac
-grep -q '^POSTGRES_PASSWORD=.\+' "$ENV_FILE" || die "凭据文件里没有非空的 POSTGRES_PASSWORD（$ENV_FILE）。"
-grep -q '^JWT_SECRET=.\+' "$ENV_FILE" || die "凭据文件里没有非空的 JWT_SECRET（$ENV_FILE）。"
+grep -q '^POSTGRES_PASSWORD=.\+' "$ENV_FILE" || die "凭据文件里没有非空的 POSTGRES_PASSWORD（${ENV_FILE}）。"
+grep -q '^JWT_SECRET=.\+' "$ENV_FILE" || die "凭据文件里没有非空的 JWT_SECRET（${ENV_FILE}）。"
 
-log "==> 起栈（project=$PROJECT，端口 127.0.0.1:$PORT）"
+log "==> 起栈（project=${PROJECT}，端口 127.0.0.1:${PORT}）"
 
 # ── 服务图对账：override 加了一个服务，默认那张图**一个都没多** ──────────
 # 这两条是本步骤的红线（"不得改默认服务图"）。放在 `up` **之前**：
@@ -290,7 +290,7 @@ case "$SERVER_LOGS" in
 esac
 log "    界面挂载确认：$(printf '%s\n' "$SERVER_LOGS" | grep '\[web-app\]' | tail -1)"
 
-log "==> 真浏览器三条判据（$BASE）"
+log "==> 真浏览器三条判据（${BASE}）"
 cd e2e
 [ -d node_modules/@playwright/test ] || die "e2e 的依赖没装：先 cd e2e && pnpm install（它自己一份 lockfile）"
 set +e
