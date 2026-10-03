@@ -14,8 +14,8 @@
  * 也不会把"数据没灌进去"误读成"光标坏了"。
  */
 
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 
 import { selection } from '../src/lib/selection.js';
 import { useSelectionKeyboardCursor } from '../src/lib/keyboard-cursor.js';
@@ -136,6 +136,23 @@ describe('键盘光标按渲染顺序走', () => {
   });
 });
 
+/**
+ * 递归列出 `root` 下的 `.ts` / `.tsx`（跳过 `node_modules`、点开头目录、软链）。
+ * ⚠️ 用 `withFileTypes` 而不是 `statSync`：linked worktree 里到处是软链，
+ * `statSync` 对软链给的是链本身而不是目标（同一族坑记在环境陷阱里）。
+ */
+function walkSource(root: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    if (entry.isSymbolicLink()) continue;
+    const full = join(root, entry.name);
+    if (entry.isDirectory()) out.push(...walkSource(full));
+    else if (/\.(tsx|ts)$/.test(entry.name)) out.push(full);
+  }
+  return out;
+}
+
 describe('跨视图通用（工单 W1 的那条硬要求）', () => {
   /**
    * 五个入口用**同一个 hook、同一套规则**，只是行的前缀不同。
@@ -162,6 +179,49 @@ describe('跨视图通用（工单 W1 的那条硬要求）', () => {
       expect(selection.get(c.kind)).toBe('r1');
     });
   }
+
+  /**
+   * 🔴 上面那圈循环**插的是自己造的 DOM**，所以它证的是"给定这些行，光标走对"，
+   * 证不了"真实界面里那些行的 testid 前缀就是表里写的那一个"。
+   * 前缀写错（或共享组件哪天改了 `testID`）的症状是**那条腿静默变成死线**：
+   * `renderedIds()` 返回空数组 ⇒ 处理器直接 return ⇒ 界面上按 ↓ 什么都不发生，
+   * 而上面那圈循环**一条都不会红**。这正是 §7 第 179 条那一族
+   * （"有那个功能"和"界面真的接上了"是两件事）。
+   *
+   * 所以这一条**从表本身读前缀**（不在测试里再抄一份清单 —— 抄件会漂），
+   * 并要求每个前缀在真实渲染代码里有一个 testid 生产者。
+   * ⚠️ 它证到"生产者存在且形状对"，**不证**"那个生产者就挂在 `c.view` 那一面上"
+   * —— 后者需要真浏览器 + 真数据（习惯/便签在 web 上没有创建入口，本轮做不到，
+   * 这条边界写进工单 §8 的 W1b 行，不当已证）。
+   */
+  it('🔴 表里每个前缀在真实渲染代码里有 testid 生产者（不是只在插出来的 DOM 里存在）', () => {
+    const tableSrc = readFileSync(resolve(__dirname, '../src/lib/keyboard-cursor.ts'), 'utf8');
+    const prefixes = [...tableSrc.matchAll(/prefix:\s*'([^']+)'/g)].map((m) => m[1] as string);
+    // 解析出 0 项也算红（先例：`check:selection-single-source` 的词表读法）。
+    expect(prefixes.length, '没从 CURSOR_VIEWS 里解析出任何前缀 ⇒ 这条判据在空转').toBeGreaterThan(0);
+    expect(new Set(prefixes).size, `前缀集合异常：${JSON.stringify(prefixes)}`).toBeGreaterThanOrEqual(3);
+
+    const producers = new Map<string, string[]>();
+    for (const root of [resolve(__dirname, '../src'), resolve(__dirname, '../../../packages/ui/src')]) {
+      for (const file of walkSource(root)) {
+        if (file.endsWith('lib/keyboard-cursor.ts')) continue; // 表自己不算生产者
+        const text = readFileSync(file, 'utf8');
+        for (const prefix of new Set(prefixes)) {
+          // 只认"模板串形状"的 testid 生产者：`data-testid={`prefix-${...}`}` 或 RN 的 `testID={`prefix-${...}`}`
+          const shape = new RegExp(`(?:data-testid|testID)=\\{\\\`${prefix}-\\$\\{`);
+          if (shape.test(text)) {
+            producers.set(prefix, [...(producers.get(prefix) ?? []), relative(root, file)]);
+          }
+        }
+      }
+    }
+    for (const prefix of new Set(prefixes)) {
+      expect(
+        producers.get(prefix) ?? [],
+        `前缀 "${prefix}" 在 apps/web/src 与 packages/ui/src 里找不到 testid 生产者 ⇒ 那个面上的光标是死线`,
+      ).not.toHaveLength(0);
+    }
+  });
 
   it('🔴 表里没有的视图（日历 / 回收站 / 搜索）不绑光标', async () => {
     // 回收站的 ↑↓ 是"恢复还是删除"（`TrashView`），搜索面板有它自己那条
