@@ -2259,3 +2259,32 @@ W0b ─> 随时可做（台账那半要等文件干净）
   编号自锚检查必须**排除自己**。排除后的真读数：本仓 `grep -rn "DOCS-GATE" docs scripts \| grep -vc countdown` = **0**，
   主检出同一把尺 = **0** ⇒ 命名空间确实是空的），
   实施要动 `scripts/`，排在设备窗口之后。
+
+- ㉒ **链 H 的三格读数 + 新鲜度门在真设备上第一次执行就照出探针自己的形状错**（04 07:11:09–07:15:34，载体 `93a5ea61`→`fb3fddfb`，日志 `/tmp/device-closeout-H.log`）：
+
+  ① **`RC_WINDOWS=0`：windows 端装上当前产物了**，而且它带回来一条比门禁更硬的读数 ——
+  `远端新鲜度对账通过（web-dist/index.html=517c6ba76d00fb25… bridge=2623f10eb2e1e12e… assets/*.js=7 枚一致）`，
+  而 `517c6ba76d00fb25` 与本链起点行独立打印的**本工作树 `apps/web/dist/index.html` 的 sha 前缀逐字相同**
+  （起点：`装前基线：… 本批 dist sha=517c6ba76d00fb25`）⇒ "远端字节 == 本地当前工作树"这条 §7 第 82 条的判据成立。
+  🔴 **但门禁那一栏仍然报"未取证"**，而这**不是取证不存在**：`check-shell-surfaces.mjs:778` 给 desktop-windows 通道写死
+  `artifactWebDist: null`，而 `:821` 那个分支在 `:831` 读 `HEYTA_WINDOWS_WEB_DIST` **之前就短路** ——
+  也就是说本台账那句"那两栏只由 `pnpm reinstall:all` 关闭"对 **windows 这一栏结构上不成立**。
+  已登记 **W8-GAP-W1**（任务 #20：把远端已经算出的那几个值 + 装好的包里 `countdown-view` 的命中数落成机器可读取证文件，
+  门禁 D4 对 `null` 通道改成读它，配对判据原样保留；三臂变异）。原句不删，就地标注它被哪条现量否证。
+  ② **`RC_IOS=1`：两个缺陷叠在一起，而只有一个是我的。** 我的：`MYSIM_UDID=$(xcrun simctl create …)` 把
+  **错误文本当成了 UDID**（`simctl create` 失败时把话写到 stdout），于是链里出现"我自己造的模拟器 Unable to create a device…"
+  这种读起来像成功的行。不是我的：`reinstall-all` 的 ios 段**行为正确** —— 它看到"有 3 台已启动模拟器且没有一台叫
+  `heyta-batch2-closeout`"就拒跑并打印"不猜（这一段会 `simctl uninstall`）"，正是 §8.9 要的（那三台是别人的）。
+  根因是 `iPhone-17-Pro @ iOS-27-1` 这一对不被接受（runtime 与机型都在列表里，但组合不行）。链 I 改成
+  **只认 36 位 UDID 形状 + 单独收 stderr + 按候选对逐个试**。
+  ③ **`RC_CARDEXPORT_DEV=3` 连着两次，两次的原因不同**：第一次（07:11:10）报"读不到 `com.heyta` 的安装时间（应用没装？）"
+  —— 现量 `dumpsys package com.heyta` 里明明白白有 `lastUpdateTime=2026-10-04 07:05:07`，**是探针读不出格式**：
+  那句 `sed 's/.*=//;s/ .*//'` 对格式化日期剥出 `2026-10-04`，过不了整数判定。这条判据从没在真设备上执行过
+  （前几趟都停在第 0 步的现场门），所以它一执行就红在**探针**身上。已修 `644130c7`（两种形状都吃 +
+  "epoch 不早于 2020-01-01"的前提断言），并且**负向臂量过**：把 `apps/mobile/src/screens/CalendarScreen.tsx`
+  的 mtime 推到此刻 ⇒ `RC=3`、打印 `装的是旧产物：移动端源码最新 1791069554 > 包 1791068707`，随后按原值
+  `202610040206.47` 还原。第二次（07:19:xx）报的**就是这条负向读数本身**——因为 `git checkout --` 还原探针文件时
+  把 `card-export-layout.ts` 的 mtime 推到了 07:11:05，比 07:05:07 装的那个包新 358 秒。
+  ✅ 处置是**重装**（门要的就是这个），不是把 mtime 抹回去骗过它 —— 后者正是 §7 元规则二禁的那种"让判据闭嘴"。
+  ④ `RC_MAC` 仍未跑：`package-app.sh` + `notarytool submit` 此刻 **4 小时 03 分**（07:15:33 现量），
+  且 07:0x 起还多出两枚 `queue-reinstall-all.sh`。链 I 每次开工前重查这一档。
