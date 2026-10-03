@@ -494,6 +494,34 @@ grep 命令**数成第二处定义（判据必须锚"行首的定义形状"，�
           或用 md5 这种带值的读数（最后就是 `md5 -q` 两边相等才认）。
        ② 一条 A/B 探针把 `/tmp/heyta_mobile_token.txt` **原文打印了出来**（一枚本地 TEST_MODE 账号的 JWT，
           未进任何文件/提交）。以后比较凭据只比**长度或哈希前缀**，不 `cat`。
+   11. 🔴 **12:45–12:51 那一趟整片"找不到 X"不是产品缺陷，是一台几何不对的设备**（已提交判据 `1ebbf800`）：
+       `verify-mobile-repeat.sh:101-103` 的标签栏坐标是**写死像素**
+       （`TAB_TASKS=108`、`TAB_PROFILE=972`、`TAB_Y=2253`），只在 **1080x2400@420** 这一档成立，
+       而**没有任何一条判据核对过这个前提**。我这台是 `avdmanager create avd` 不带 `--device` 时
+       默认给的 **320x640@160**（对照：那台共用的 `SSOS-Parity-A36` 是 1080x2400@420 ——
+       `grep hw.lcd. ~/.android/avd/<avd>/config.ini` 现量），于是 `input tap 972 2253`
+       **落在屏幕之外：不报错、也不生效**。表现正是"从第 2 步起每条断言都『找不到 X』"。
+       否证过程留三条读数是重点：
+       ① 我先假设"**灭屏/锁屏**"——`dumpsys power` ⇒ `mWakefulness=Awake`、
+          `settings get system screen_off_timeout` ⇒ **2147483647**、无 keyguard ⇒ **假设被否证**，
+          没有把它写进任何结论；
+       ② 再假设"**应用崩了**"——`dumpsys dropbox` ⇒ `data_app_crash`/`data_app_anr` **0 条** ⇒ 否证；
+       ③ 决定性的是**当时那份 dump 的内容**：6 个 text 节点、20 个 id 全是
+          `com.google.android.apps.nexuslauncher`（`Sat, Oct 3` / `Phone` / `heyta` / `Chrome`）——
+          **前台是桌面**，而我手动 `am start` 之后同一台设备 dump 出 **34,579 字节、包名全是
+          `com.heyta`、17 个中文 text**（任务/日历/专注/分类/我的 + 列表/四象限/时间线/日期/**倒计时**）
+          ⇒ 应用一直活着，坏的是"我点在屏幕外"。
+       📌 一般规律：**"每条断言都找不到 X"这个形状，先问"屏幕上是谁"，再问"X 做没做"** ——
+       一叠缺失断言在输出上和"应用在前台但功能坏了"长得一模一样（§7 元规则 1 的第五次现身）。
+       修法分两层，都要：①我这台改成 1080x2400@420（`config.ini` 改前三处数值、备份
+       `config.ini.bak-320x640`），编排脚本里加一条开局 `wm size`/`wm density` 对账；
+       ②脚本本体加**前提判据**（不符 ⇒ `exit 3` = 环境无效，与负载门同一约定），
+       而不是留一屏假红等人来猜。
+   12. 📌 顺带一条**没修、登记**的小口子：`verify-mobile-repeat.sh:243` 那行抬头把库名**写死印成
+       `heyta_mobile_smoke`，而真正用的库由 `HEYTA_E2E_DB` 决定 —— 我这趟是
+       `heyta_w3_yearly_20261003`，日志里那行是错的。现量：
+       `grep -n '库: heyta_mobile_smoke' scripts/verify-mobile-repeat.sh` ⇒ 1 行。
+       它不改行为，但它把"这一轮跑在哪个库上"这条取证信息印错了，属于本仓库最不该有的那类抄件。
 4. 📌 **本会话留下的隔离检出**：`../heyta-wt-closeout`（detached，`43a6cf60`）。
    它的**两个脚本**（`scripts/reinstall-all.sh`、`apps/desktop-macos/scripts/package-app.sh`）
    与 main 逐字节相同（`cmp` 过）；**文档以 main 为准** —— 检出里那份落后于把台账条目
