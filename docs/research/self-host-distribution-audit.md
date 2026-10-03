@@ -1899,6 +1899,109 @@ BFS 停在 18 个直接依赖上，输出"两边差 127 条"。第二版读了 s
   **引用不等于转述免责**：门禁按"引用方"计数，把不存在的章节号写进抄件，抄件自己就成了引用方。
   改写办法是把号与文件名分开写（`…里一个还不存在的章节号 7.30`），本文现在 exit 0。
 
+### 8.32 冲突族今天**不构成冲突**了（因为 main 已把整批吸进去），而"停掉对外错话"这轮量到的一条在**产物字节**里
+
+02:4x–03:00 这一轮。三件事，都有现量命令。
+
+#### ① 载体重算：四条冲突族退化成零冲突，脚本的守卫一条没摘
+
+```bash
+git merge-base main feat/self-host-distribution          # b850b1c6 = 本批 01:45 那笔
+git diff --name-only b850b1c6 feat/self-host-distribution | wc -l   # 3
+git merge-tree --write-tree --name-only main feat/self-host-distribution   # 只有一行 tree OID
+```
+
+`merge-tree` 那一趟**没有冲突段** ⇒ 上一条记的四族（`package.json` 并集、`.gitignore` 三方、
+evidence png 取 main、本文取本分支）今天全部不触发。原因不是"解法变好了"，是
+**main 已经把整批合进去了**（并行会话那笔），所以两侧现在只在"我比 merge-base 多的那 3 个文件"
+上 differ。🔴 这不等于守卫可以删：main 每两三分钟前进一笔，任何一笔都可能重新撞上那四族里的某一族
+（尤其 `package.json` 的 `check` 链），守卫留着是廉价的，摘掉是拿下一轮去赌。
+
+载体读数（`node research/tools/selfhost-merge-carrier.mjs`，本轮跑了两趟）：
+
+| 趟 | 载体 | 第一父（main 当时） | 第二父（分支当时） | 五道纯 fs 门禁 |
+|---|---|---|---|---|
+| 01:5x | `b1839411` | `67149961` | `8fd34087` | 全 exit 0 |
+| 02:5x | `5399ceef` | `248a663a` | `f56a2a9a` | 全 exit 0 |
+
+链段数在载体上是 **74**，本批那 7 道（`check:gate-wiring` / `check:selfhost-entry-command` /
+`check:script-snapshot` / `check:web-artifact` / `check:server-copy` / `check:server-design` /
+`check:md-tables`）逐条在链里 —— 判据是"链里含这道"，由 `node -e` 现拆现数，不抄上文的数字。
+
+⚠️ **我又踩了一遍猜路径**，而且这次是两处：判"main 里缺 `docker-compose.build.yml`"、
+"缺 `apps/web/src/lib/mount-path.ts`"。`git ls-tree -r --name-only main` 的现量是
+`server/docker-compose.build.yml`（在），而挂载路径那件事在 main 侧的判据文件是
+`apps/web/tests/app-mount.spec.tsx`（我记的那个源码文件名根本不是一个文件）。
+上一条已经为同一件事写过一次（探针脚本的真实路径在 `research/tools/` 下）。
+规则再落一遍，因为它两次都值：**判"文件在不在"只认 `ls-tree`，不认我脑子里的路径形状**。
+
+#### ② 这轮真正的对外错话在**产物字节**里，不在文档里
+
+线上 `live-site` 两条红的根因不是判据坏。抓线上产物看（不是看源码）：
+
+```bash
+curl -s --noproxy '*' --resolve heyta.waytofuture.cn:443:124.223.13.226 \
+  https://heyta.waytofuture.cn/assets/main-D9TgKitZ.js | grep -o 'if(i===Il)return n'
+```
+
+命中的是 `function ch(n,i){if(i===Il)return n; …}` —— 也就是 `withLocale` 里
+"默认语言直接返回原地址"那一支**还在生产里**。它的后果是用户侧的一句话：
+英文浏览器（`devices['Desktop Chrome']` 的 `en-US` 就是这种情况）读**中文**落地页、
+点「立即使用」，落到的应用是**英文界面**。前提被 `0aa6cb0e` 撤掉了：应用的解析链多了
+系统语言那一层（显式存储 > `?lang=` > 系统语言），"没有偏好"不再等于"默认语言"。
+
+修法与判据各一笔：
+
+- `8fd34087`：两种语言都带 `?lang=`；`DEFAULT_LOCALE` 在该文件里没有消费者了，import 一并摘掉。
+  带参数不覆盖用户已选语言（解析链里显式存储排在前面，推断值不算显式存储 —— 读过
+  `apps/web/src/lib/locale.ts` 那三条注释才敢这么写）。`pnpm --filter @heyta/landing test`
+  现量 **22 files / 1312 passed**（第一次被宿主内存闸门挡了 5 轮，排队第 6 轮放行）。
+- `f56a2a9a`：线上用例跟上设计，**没有放松**（中文那条从断"`/app`"改成断"`/app?lang=zh-CN`"，
+  且**故意不改浏览器语言**，所以它现在量的是"`?lang=` 压过系统语言"这件事本身；
+  PWA 那条自己开 `locale: 'zh-CN'` 的上下文，因为它走的是"直接打开 `/app/`"，那里没有落地页可继承）。
+- 变异两臂（`withLocale` 直通 / 摘掉 `?signin`）+ 未变异复绿对照：**没跑成**。臂 A 排队 23 轮
+  （约 12 分钟）宿主内存闸门一直被别人的 vitest 分片占着，02:5x 主动终止（我没有用
+  `TFA_ALLOW_CONCURRENT_TEST` 绕，也没有直接调 `node_modules/.bin/vitest` 绕过劫持），
+  终止后脚本自己打了两条 `RESTORE_VERIFIED=ok`，`git status --porcelain` 该文件为空 ——
+  🔴 **这条不是"验过"**：`?lang=` 这件事目前只有 `8fd34087` 那笔里改过的 1312 条断言在守，
+  以及线上产物字节 + `live-site` 那条 href 断言（红→绿要等重发之后复跑）。
+  两臂留到窗口开的时候补，读数进 §8.33。
+
+数数为什么要分意图（这条是判据设计上的，不是文案上的）：改成"按 pathname 认"之后
+`render.spec` 那条从 2 变成 **4** —— 同一个 pathname 上住着两个意图
+（「立即使用」2 条 + 「登录」宽屏操作位与窄屏菜单各 1 条）。按整串相等数会把
+"真的多出了入口"读成"一条都没有"，按 pathname 数会把"两个意图"读成"入口翻倍"。
+分开数（各自 =2）才是这件事的形状。
+
+#### ③ 新的一条：发布**必须**从载体，不能从分支
+
+`git diff --name-only b850b1c6 main -- apps/landing packages/i18n packages/design-system` 现量 **13 个文件**
+（`docs.ts`、`helpFigures.ts`、`trash-coverage-copy.spec.ts`、两语词条表、6 份 token 产物）。
+也就是说：**用分支的工作树重打落地页并把 rsync 上去，会把这 13 个文件在主线上的改动盖掉**
+—— 而线上表现是"文案/配色悄悄回到旧版，命令退出码 0"。所以这一轮发布走
+`/tmp/heyta-land-publish` 检出载体 `5399ceef` 那条路，且发布前必过产物判据。
+
+#### ④ `research/tools/verify-landing-dist.mjs`（新）：产物自洽判据，六臂读数
+
+四条判据：四张必需入口页都在 / `index.html` 引用的每个本地资源都在磁盘上（且该集合**非空**才算走到判据）/
+预期域名全树 ≥1 且旧域名 =0 / **现行那句钉在 `docs/selfhost/index.html` 这一页上**，作废句全树与该页都 =0。
+
+| 臂 | 动作 | 结果 |
+|---|---|---|
+| 干净 | 拿现有真实产物跑 | **exit 0**：95 个文件、79 个 .html/.js、预期域名 577 处、旧域名 0、作废句 0、该页现行句 4 |
+| 1 | 摘掉 `index.html` 引用的 `/assets/main-D9TgKitZ.js` | 红：引用了 1 个不存在的本地资源 |
+| 2 | 抹掉**那一页**里的现行句（4 处） | 🔴 **第一版活了**（见下），改成文件级后红 |
+| 3 | 往英文页塞旧域名 | 红：残留旧域名 1 处 |
+| 4 | 缺 `en/index.html` | 红：缺入口页 1 张 |
+| 5 | 往中文页塞作废句 | 红 2 条（全树 + 该页同时报） |
+| 6 | 把预期域名换成不存在的 | 红：正向对照该红 |
+| 还原 | 四臂复原后再跑 | exit 0 |
+
+臂 2 是第一版**没有牙**的证据：那版把"现行句"做成**全树计数 ≥1**，抹掉那一页的 4 处之后
+同一句话在别处还剩 3 处 ⇒ 照绿。全树计数挡得住"整篇没了"，挡不住"这一篇被换回旧文案"；
+只有把判据钉在**它所属的那个文件**上才有牙。这是 §7 那条"断言只会验界面写了什么、不会验少了什么"
+在文案层第二次现量，只不过这次是**我自己写的判据**，而且是靠先做一次变异才发现的。
+
 
 
 
