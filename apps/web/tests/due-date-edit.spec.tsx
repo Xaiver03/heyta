@@ -36,7 +36,7 @@ import { HeytaUiProvider } from '@heyta/ui';
 
 import { __resetOpLogForTests, initOpLog, requireEngine } from '../src/lib/oplog.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
-import { DueEditor } from '../src/features/tasks/DueEditor.js';
+import { DueEditor, panelTopFor } from '../src/features/tasks/DueEditor.js';
 
 /** 冻结的"现在"：2026-10-02（周五）10:00 本地时。今天/日子格的期望值都从它推。 */
 const NOW = parseLocalDate('2026-10-02').getTime() + 10 * 3_600_000;
@@ -194,6 +194,47 @@ describe('🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate �
     renderEditor(taskOf(taskId));
     const summary = container.querySelector('[data-testid="due-editor-summary"]');
     expect(summary!.textContent).toContain('10月18日');
+  });
+});
+
+/*
+ * ── 弹层**放置**（2026-10-03 补）─────────────────────────────────
+ * 起因是全量 e2e 里 `e2e/tests/due-date-edit.spec.ts` **确定性地**红在
+ * `element is outside of the viewport`（单跑也红，不是负载 flake）。
+ * 截图量的到的形状：行在 y≈500、视口 720、面板估高 500 ⇒
+ * **下面放不下、上面也放不下**，而旧逻辑在这种情况下写的是"宁低不遮列表头"
+ * ⇒ 面板朝下开、最后两周被视口底裁掉 ⇒ **那个日期在界面上根本选不到**。
+ * 纯函数抽出来是为了把三个分支各自钉住（e2e 只能钉到"这一格点得到"那一个形状）。
+ */
+describe('弹层放置：三种情形都必须把面板留在视口内', () => {
+  // 估高与边距来自实现；这里**不抄常数**，只按"面板高 500 / 边距 8"的形状给坐标，
+  // 真正的兜底判据是下面每一条都断的 `top + 500 <= 视口高`。
+  const PANEL = 500;
+
+  it('下面放得下 ⇒ 贴着锚点下沿开', () => {
+    const top = panelTopFor({ top: 100, bottom: 120 }, 1200);
+    expect(top).toBeGreaterThan(120);
+    expect(top).toBeLessThan(140);
+    expect(top + PANEL).toBeLessThanOrEqual(1200);
+  });
+
+  it('下面放不下、上面放得下 ⇒ 翻到锚点上方', () => {
+    const top = panelTopFor({ top: 600, bottom: 620 }, 900);
+    expect(top + PANEL).toBeLessThanOrEqual(600 - 8);
+    expect(top).toBeGreaterThanOrEqual(8);
+  });
+
+  it('🔴 两头都放不下（实测那个形状）⇒ **夹进视口**，不许裁掉面板', () => {
+    // 行在 y≈500、视口 720：下面要 1004、上面要 -4，两边都放不下。
+    const top = panelTopFor({ top: 500, bottom: 518 }, 720);
+    expect(top).toBeGreaterThanOrEqual(8);
+    // 这条就是"18 号点得到"的算术形式：面板整块在视口里。
+    expect(top + PANEL).toBeLessThanOrEqual(720);
+  });
+
+  it('视口比面板还矮 ⇒ 至少贴顶，不产生负顶边（也不产生 NaN）', () => {
+    const top = panelTopFor({ top: 100, bottom: 118 }, 400);
+    expect(top).toBe(8);
   });
 });
 

@@ -34,6 +34,43 @@ import type { MessageKey } from '@heyta/i18n';
 
 const TRIGGER_ICON_SIZE = 14;
 
+/**
+ * 弹层面板的**放置几何**（视口坐标）。三个数都是刻意分开的，各自有名字，
+ * 因为"放哪"这件事以前是一个表达式：`rect.bottom + 500 < innerHeight`，
+ * 于是"下面放不下就朝上"与"两头都放不下时怎么办"被写进了同一个常数里。
+ */
+const PANEL_EDGE = 8;
+/** 面板与锚点之间的缝。 */
+const PANEL_GAP = 8;
+/**
+ * 面板**估计高**（实测约 474：4 个快捷项 + 月标题 + 星期行 + 6 周）。
+ *
+ * 🔴 它是估计，不是事实 —— 事实由 `e2e/tests/due-date-edit.spec.ts` 那条
+ *   "每一格都在视口内"的量兜住：**估计一旦漂小，那条判据立刻红**，
+ *   而不是让用户选不到日期。
+ */
+const PANEL_HEIGHT_ESTIMATE = 500;
+
+/**
+ * 面板顶边落在视口的哪个 y。
+ *
+ * 三种情形，**第三种以前是"宁低不遮列表头"**（`DueEditor` 文件头那条注释），
+ * 也就是"两头都放不下 ⇒ 仍然朝下开"。实测它的后果是**面板被视口底裁掉**：
+ * 行落在 y≈500、视口 720 时，最后两周（含 18 号）根本不在屏幕上，
+ * 而面板又是 fixed（滚动即关）⇒ **那个日期在界面上选不到**。
+ * 遮一下列表头 与 选不到日期 不是同一档代价，所以第三种情形改成**夹进视口**。
+ */
+export function panelTopFor(
+  anchorRect: { top: number; bottom: number },
+  viewportHeight: number,
+): number {
+  const down = anchorRect.bottom + PANEL_GAP + PANEL_HEIGHT_ESTIMATE;
+  const up = anchorRect.top - PANEL_GAP - PANEL_HEIGHT_ESTIMATE;
+  if (down + PANEL_EDGE <= viewportHeight) return anchorRect.bottom + PANEL_GAP;
+  if (up >= PANEL_EDGE) return up;
+  return Math.max(PANEL_EDGE, viewportHeight - PANEL_HEIGHT_ESTIMATE - PANEL_EDGE);
+}
+
 /** 快捷项 key → 本端措辞。日期数学在 domain，这里只管说话。 */
 const QUICK_PICK_LABEL_KEYS: Record<string, MessageKey> = {
   today: 'web.due.today',
@@ -71,9 +108,7 @@ export function DueEditor({
    */
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
-  const [anchor, setAnchor] = useState<{ top?: number; bottom?: number; right: number } | null>(
-    null,
-  );
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     const details = detailsRef.current;
@@ -88,13 +123,8 @@ export function DueEditor({
           return;
         }
         const rect = summary.getBoundingClientRect();
-        // 面板实测高 ~474。放下面放不下、上面也放不下时，宁低不遮列表头。
-        const panelHeightEstimate = 500;
-        const openDown =
-          rect.bottom + panelHeightEstimate < window.innerHeight || rect.top < panelHeightEstimate;
         setAnchor({
-          top: openDown ? rect.bottom + 8 : undefined,
-          bottom: openDown ? undefined : window.innerHeight - rect.top + 8,
+          top: panelTopFor(rect, window.innerHeight),
           right: window.innerWidth - rect.right,
         });
       });
@@ -196,7 +226,6 @@ export function DueEditor({
             style={{
               position: 'fixed',
               top: anchor.top,
-              bottom: anchor.bottom,
               right: anchor.right,
               zIndex: cssVar('z.popover'),
               padding: cssVar('space.3'),
