@@ -180,6 +180,13 @@ const zh = [
           ['`create_task`', '新建任务', '不读数据；写入必须经操作日志'],
           ['`update_task`', '修改任务', '只改你显式给出的字段'],
           ['`complete_task`', '完成任务', '不读数据'],
+          // 🔴 W10 给目录加了四条 EVENT 工具 ⇒ 这张表**必须同时**加行：条款里那句
+          // "未列出的工具视为未授权"把这行当成了授权面，少一行就是对着用户少说一项能读到什么。
+          // 对账由 `pnpm check:legal-tools` 钉住（工具目录 ↔ 中英两张表三方集合相等）。
+          ['`list_events`', '列出倒数日与纪念日', '标识、标题、锚点日期、下一次发生日、距今几天、种类、是否重复/农历/置顶，一次最多 50 条 —— **不含正文**（列表连可读条目的正文也不给）'],
+          ['`get_event`', '读取单条倒数日详情', '上面全部，**再加这条倒数日的正文全文**（写了正文才有这一格）'],
+          ['`create_event`', '新建倒数日', '不读数据；写入必须经操作日志'],
+          ['`update_event`', '修改倒数日', '只改你显式给出的字段'],
         ],
       },
       {
@@ -194,7 +201,7 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '**不要以为"加密条目"在本机接口前是读不出来的。** 协议层确实做了字段白名单投影，但这款产品目前还没有"受保护条目"这个概念，两个真实宿主都把"可读"判为真。结论很简单：你一旦打开 `get_task`，那台机器上的那个程序就能读到你的任务备注正文全文。只开 `list_tasks` 也不算安全 —— 标题加截止时间足以拼出一个人的日程。',
+        text: '**不要以为"加密条目"在本机接口前是读不出来的。** 协议层确实做了字段白名单投影，但这款产品目前还没有"受保护条目"这个概念，两个真实宿主都把"可读"判为真。结论很简单：你一旦打开 `get_task`，那台机器上的那个程序就能读到你的任务备注正文全文。只开 `list_tasks` 也不算安全 —— 标题加截止时间足以拼出一个人的日程。🔴 倒数日那两条同理，而且**更窄不了**：`get_event` 给正文全文，而倒数日的标题往往本身就是内容（「妈妈的生日」加上那一天，不读正文也已经说出一件事）。',
       },
       {
         kind: 'p',
@@ -429,6 +436,12 @@ const en = [
           ['`create_task`', 'Create a task', 'Reads nothing; writes go through the operation log'],
           ['`update_task`', 'Update a task', 'Only the fields explicitly supplied'],
           ['`complete_task`', 'Complete a task', 'Reads nothing'],
+          // The same four EVENT tools, in the same order as the Chinese table —
+          // `pnpm check:legal-tools` asserts the two language tables carry identical name sets.
+          ['`list_events`', 'List countdowns and anniversaries', 'Id, title, anchor date, next occurrence, days from today, kind, whether it repeats/is lunar/is pinned — 50 at a time, **without note bodies** (the list projection strips them even for readable entries)'],
+          ['`get_event`', 'Read one countdown in full', 'Everything above, **plus the complete note body of that entry** (only when one was written)'],
+          ['`create_event`', 'Create a countdown', 'Reads nothing; writes go through the operation log'],
+          ['`update_event`', 'Update a countdown', 'Only the fields explicitly supplied'],
         ],
       },
       {
@@ -443,7 +456,7 @@ const en = [
       },
       {
         kind: 'callout',
-        text: '**Do not assume that "encrypted entries" are unreadable through the local interface.** The protocol layer really does project fields through a whitelist, but this product has no concept of a "protected entry" yet, and both real hosts currently evaluate readability as true. The consequence is simple: once you enable `get_task`, that program on that machine can read your task note bodies in full. Enabling only `list_tasks` is not the safe option either — titles plus due dates are enough to reconstruct somebody\'s schedule.',
+        text: '**Do not assume that "encrypted entries" are unreadable through the local interface.** The protocol layer really does project fields through a whitelist, but this product has no concept of a "protected entry" yet, and both real hosts currently evaluate readability as true. The consequence is simple: once you enable `get_task`, that program on that machine can read your task note bodies in full. Enabling only `list_tasks` is not the safe option either — titles plus due dates are enough to reconstruct somebody\'s schedule. 🔴 The two countdown tools are the same, and there is no narrower option to fall back on: `get_event` returns the full note body, and a countdown title is often itself the content — a title naming a person plus that date already discloses something even when no note exists.',
       },
       {
         kind: 'p',
@@ -529,9 +542,13 @@ const en = [
 
 export const aiAndTransfer: LegalDocument = {
   id: 'ai-and-transfer',
-  version: '1.0',
+  // 🔴 1.0 → 1.1：这次改的是**披露本身**（本机接口工具表 + 那句"打开之后能读到什么"）。
+  // 版本号进同意指纹（`packages/legal/src/index.ts:125` 把每张文档拼成 `id@version`），
+  // 改了文字而不 bump，等于让 1.0 那枚已存的同意去覆盖一段它没见过的话 ——
+  // 这正是条款 s12 那条纪律禁止的事（"否则等于偷偷改"）。
+  version: '1.1',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-03',
   title: {
     'zh-CN': 'AI 功能与数据流向',
     en: 'AI Features and Where Your Data Goes',
