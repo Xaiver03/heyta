@@ -116,9 +116,11 @@ step() { echo ""; echo "════ $1 ════"; }
 #    这种"环境造成的假红"必须能被**说出来**，而不是让人去猜。
 #
 # 🔴 匹配规则**不在这里**：唯一实现在 `lib/mobile-e2e-runner-probe.sh`，
-#    因为 `verify-mobile-window-gate.sh` 要同一条规则却不能 source 本文件
-#    （文件尾的 EXIT trap 会真动设备）。以前它抄了一份 `pgrep` 版，两份都瞎 ——
-#    瞎的原因与夹具自检都写在那个文件里。
+#    那个文件没有 trap（dry-run 类的消费者不能因为共用规则去 source 本文件 ——
+#    本文件尾的 EXIT trap 会真动设备）。旧写法用 `bash [^ ]*…`，跨不过本仓路径里的
+#    空格，对被快照成 `.snap.<pid>` 的运行者**永久隐形**；原因与夹具自检写在那个
+#    文件头。**同一形状的第二份抄件还在** `verify-mobile-window-gate.sh` 的 pgrep 里
+#    （那个文件此刻未跟踪、归并行会话），去重方式登记在该文件头。
 #
 # ⚠️ `$$` 在命令替换的子 shell 里仍是**父 shell 的 pid**（bash 的规定），
 #    但那个子 shell **自己的 pid 却不是** `$$` —— 而它的 argv 与本脚本逐字相同
