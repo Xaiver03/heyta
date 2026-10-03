@@ -74,6 +74,7 @@ interface ReminderState {
    * 不写 op），所以重复调用不会堆出第二条 `UPD`。
    */
   markDelivered: (entityIds: readonly string[]) => Promise<void>;
+  /**
    * **只看钟、重算一次"到点了没"**（W9 ②）。不产生 op、不改任何数据。
    *
    * 🔴 它存在的唯一理由：`refresh()` 由**引擎变化**驱动，所以"用户没操作、
@@ -146,6 +147,8 @@ export const useReminderStore = create<ReminderState>((set) => ({
     for (const entityId of entityIds) {
       await attempt(set, taskIdOf(entityId), () => reminderActions.markReminderFired(entityId));
     }
+  },
+
   recheck: () => {
     // 🔴 一次调用、零判断：`due()` 里就是领域层那份 `dueReminders()`。
     set({ due: reminderActions.due() });

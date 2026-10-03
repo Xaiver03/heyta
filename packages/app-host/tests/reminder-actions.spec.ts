@@ -509,6 +509,8 @@ describe('🔴 firedAt 落库后，另一台设备不再重弹（D14）', () => 
     }
   });
 });
+
+/**
  * W9 ① + ③ 在**真实写路径**上的判据。
  *
  * 领域层那边（`packages/domain/tests/reminders-*.spec.ts`）证的是算术；

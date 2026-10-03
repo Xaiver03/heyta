@@ -81,13 +81,10 @@ import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-pre
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { EntitlementSection } from './EntitlementSection';
-import { Button, Card, Divider, Screen, SectionHeader, Text } from '../ui/kit';
 import {
   MOBILE_FEATURE_ENTRIES,
   type MobileFeatureEntryKey,
 } from '../nav/feature-entries';
-import { AuthScreen, type SavedAuthSession } from './AuthScreen';
-import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
 import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';

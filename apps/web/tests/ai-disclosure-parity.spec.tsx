@@ -128,6 +128,8 @@ function fakeHost(): LocalApiHost {
     getNote: () => Promise.resolve(undefined),
     listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
     listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listEvents: () => Promise.resolve([]),
+    getEvent: () => Promise.resolve(undefined),
     listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
     submit: () => Promise.resolve({ ok: true as const, taskId: 'created-1' }),
   };

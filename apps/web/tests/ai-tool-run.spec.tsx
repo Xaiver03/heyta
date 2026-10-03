@@ -64,6 +64,8 @@ function fakeHost(): LocalApiHost & { submits: number } {
     getNote: () => Promise.resolve(undefined),
     listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
     listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listEvents: () => Promise.resolve([]),
+    getEvent: () => Promise.resolve(undefined),
     listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
     submit: () => {
       host.submits += 1;

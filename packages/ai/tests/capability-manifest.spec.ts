@@ -366,7 +366,7 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     }
   });
 
-  it('现状基线 8/8：分母里每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
+  it('现状基线 9/9：分母里每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
     // 2026-10-03 两次搬这条基线，都在这里重新判断过：
     // ① PROJECT 补 `create_project`、HABIT 补 `list_habits` + `create_habit`（3/8）；
     // ② 补齐 TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER 的读写工具（8/8）。
@@ -378,6 +378,7 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
       .filter((e) => e.countsTowardCoverage && e.coverage !== 'none')
       .map((e) => e.entityType);
     expect(withTools.sort()).toEqual([
+      'EVENT',
       'FOCUS_SESSION',
       'HABIT',
       'HABIT_LOG',
@@ -387,21 +388,14 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
       'TAG',
       'TASK',
     ]);
-    expect(manifest.coverage.covered).toBe(8);
-    expect(manifest.coverage.ratio).toBe('8/8');
+    // 2026-10-03 合流：EVENT 的四条工具随 W10 移植进 pack 目录（读 2 / 写 2），
+    // 基线从 8/8（W11 批次）与 3/9（批次二当时的中间态）收拢为 9/9。
+    expect(manifest.coverage.covered).toBe(9);
+    expect(manifest.coverage.ratio).toBe('9/9');
     // `covered` 是分母名单的**统计结果**，`userOperableEntityTypes.length` 是名单本身：
     // 两个数取自生成器里两条不同的路径，这里要求它们当下确实相等 ——
     // 不等就是那两条口径漂了（比如覆盖率把某个已剔除的视图又算了进去）。
     expect(manifest.coverage.covered).toBe(manifest.userOperableEntityTypes.length);
-  it('现状基线 3/9：TASK / PROJECT / **EVENT** 有工具（再扩目录时这条会红，那是要的）', () => {
-    const withTools = manifest.entities
-      .filter((e) => e.countsTowardCoverage && e.coverage !== 'none')
-      .map((e) => e.entityType);
-    // W10 把 EVENT 接上了四个工具（读 2 / 写 2），覆盖面从 2/9 进到 3/9。
-    // 这条点名是**判据**不是内容：目录再扩一个实体而这里没跟上，说明那批没做完。
-    expect(withTools.sort()).toEqual(['EVENT', 'PROJECT', 'TASK']);
-    expect(manifest.coverage.covered).toBe(3);
-    expect(manifest.coverage.ratio).toBe('3/9');
   });
 
   it('🔴 EVENT 的四个工具**读写都有**，且归因走的是名字（不是 override 名单）', async () => {
