@@ -4506,3 +4506,31 @@ ArgumentError - path name contains null byte
     📌 一般规律：**动作的"成功"文案不能由"进了这个分支"来打印** ——
     它要么由动作自己的退出码打印，要么由事后核对打印；两者都没有时，
     输出里那句 ✅ 就是这条脚本最贵的一处假绿。
+178. 🔴 **RNW 把样式对象编译成 class，不写内联 `style` —— jsdom 里 `el.style.backgroundColor` 恒为 `''`。**
+    用它当"有没有画出来"的判据，会得到一次**看起来像四个真缺陷**的空读数。（2026-10-03 实测，W1 选中高亮）
+    形状：`TaskRow` 的 `rowActive`（`backgroundColor: tokens['color.primary-subtle']`）落到 DOM 是
+    `class="css-view-… r-backgroundColor-o5e8d5 r-borderRadius-1xfd6ze"`，`getAttribute('style')` 是 `null`。
+    四条"选中那条应该有底色"的用例（列表 / 四象限 / 时间线 / 泳道）同时报"expected '' not to be ''"，
+    而接线**完全正确** —— 差的是载体，不是产品（§7 元规则 1：探针够不着与没发生长得一样）。
+    实测对照：一次性探针里 `cssText` 为空、`getComputedStyle(el).backgroundColor` 回 `rgb(239, 246, 255)`，
+    未选中的行回 `rgba(0, 0, 0, 0)`（**不是空串** —— 拿 `''` 当"没底色"的期望值会两头错）。
+    ⚠️ 别把它推广成"jsdom 里读不到内联样式"：**运行时算出来的**内联值照样能读，
+    本文件的日历/时间线几何判据用的就是 `style.left`（`"23.4%"`）。分界线是
+    **`StyleSheet.create` 那批静态样式 → class；渲染期算出来的 style 对象 → 内联**。
+    📌 一般规律：**视觉属性判据在 jsdom 里走 `getComputedStyle`**；写这类判据前先用一次性探针
+    打印一次 DOM，别把"载体不认"实现成"产品坏了"。
+
+179. 🔴 **共享层的"默认值等于原值的可选 prop"会把"宿主没接"伪装成"做完了"—— typecheck 与既有门禁全绿。**
+    （2026-10-03 实测，`apps/web/src/features/quadrant/QuadrantBoard.tsx`）
+    形状：包装层声明了 `readonly activeTaskId?: string | null` 与 `readonly onOpenTask?`，
+    也在解构里取了这两个值，**唯独没往 `<SharedQuadrantBoard>` 传**。
+    于是"任务的三种投影接同一个选中"实际只有两种接上，而：
+    ① prop 是可选的 ⇒ 编译期没有任何东西会失败；
+    ② 静态判据读的是**调用点**（`App.tsx` 里确实递了 `activeTaskId={selectedTaskId}`）⇒ 绿；
+    ③ 共享层自己的用例挂的是共享组件 ⇒ 绿。症状只有一句"四象限不跟随选中"。
+    ✅ 修法两层，缺一不可：**行为判据必须从宿主挂下去**（挂 `WebQuadrantBoard` 而不是挂板子，
+    那层转发才量得到），并加一条**同文件内比"声明"与"使用"**的静态判据
+    （`check:selection-single-source` 断言 E：声明了 `readonly NAME?:` 就必须出现
+    `NAME={` / `NAME(` / `NAME ===`；解构那一行不算使用）。
+    📌 一般规律：**凡是"可选 + 有默认值"的注入点，都要问一次"有没有人真的在传它"**；
+    判据挂在链条的哪一节，就只能证明那一节之后是通的。

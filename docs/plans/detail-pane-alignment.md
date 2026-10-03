@@ -1,7 +1,7 @@
 # 详情面对齐与复习面：工单分解
 
 > 状态：**规划中**（2026-10-03 立）
-> 🔴 **它是 [`ui-review-fill-zh-timeline.md`](ui-review-fill-zh-timeline.md) 的下游工单，不取代它** —— 那张表里 R1–R16 的历史裁决仍以那份为准；本篇只新增"详情面 / 常驻右栏 / 复习面"这一段。同理**不取代** [`goal-layout-audit.md`](goal-layout-audit.md)（逐页排版判据）、[`calendar-year-time-and-mobile-profile.md`](calendar-year-time-and-mobile-profile.md)（日历与移动端）、[`multi-end-unified-strategy.md`](multi-end-unified-strategy.md)（**唯一权威主计划**，其 §5.2 / §5.3 / §5.4 / §7.1e 是本篇的对账基准）。
+> 🔴 **它是 [`ui-review-fill-zh-timeline.md`](ui-review-fill-zh-timeline.md) 的下游工单，不取代它** —— 那张表里 R1–R16 的历史裁决仍以那份为准；本篇只新增"详情面 / 常驻右栏 / 复习面"这一段。同理**不取代** [`goal-layout-audit.md`](goal-layout-audit.md)（逐页排版判据）、`docs/research/calendar-year-time-and-mobile-profile.md`（日历与移动端；⚠️ **2026-10-03 现量：该文档只活在主检出的未提交改动里，`git log --all` 里没有它** —— 所以这里写成路径而不是链接，干净检出上链接会是死链）、[`multi-end-unified-strategy.md`](multi-end-unified-strategy.md)（**唯一权威主计划**，其 §5.2 / §5.3 / §5.4 / §7.1e 是本篇的对账基准）。
 > 证据全部在 [`../research/detail-pane-alignment-and-spaced-review.md`](../research/detail-pane-alignment-and-spaced-review.md)（下称**调研**）。本篇只写"按什么顺序做、每单怎么算做完"，**不重复证据**。
 > 按 [`README.md`](README.md) §七.4：**计划层不引用行号**，一律引小节标题与符号名。
 
@@ -134,7 +134,7 @@ W0 文档纠正、W6 value 那一米：与上面全部正交，随时可插队
 | 单 | 状态 | 读数（判据条数 / 变异臂红集 / 截图路径 / 四端是否重装） |
 |---|---|---|
 | W0 | ✅ 已完成（2026-10-03） | 两处过期都改在**文档本体**：① `docs/reference/architecture.md` 的实体清单里 `FocusSession` 原写 `mode(pomo/stopwatch), duration` —— 三个字段**都不存在**，真实形状是 `kind(work/shortBreak/longBreak) + plannedMs + actualMs? + completed? + startedAt? + endedAt?`（逐字段核对 `packages/domain/src/entities.ts` 的 `FocusSessionKind` 与 `interface FocusSession`）；② `docs/README.md` 对 ADR-0043 那句「⚠️ 代码未开工」改成已落地并留了更正痕迹（指向调研 A0.8 的取证）。**判据**：`docs-link-check` 无死链 + 两份文档不再与代码冲突（人工核对，无自动判据 —— 按 §2 那一行写明的"允许只做人工核对并在此登记"，这条**没有**变异臂，别把它当成有牙的）。⚠️ 归属：`docs/README.md` 同一文件里另有别人 7 行未提交的改动，所以我**没有**单独提交那一行，改动作废在工作树里，由下一次整文件提交带进去 |
-| W1 | 🔄 进行中 | **已落地**：单一所有者收拢完成 —— 新增 `packages/app-host/src/selection.ts`（封闭词表 6 类 + `createSelectionStore` + 纯函数 `pruneMissingSelection` / `pruneSelection`），四份本地 `useState` **全删**（web 任务侧原本没有、web `HabitsView`、mobile `TasksScreen` 的 `detailTaskId`、mobile `HabitsScreen` 的 `selectedId`），两端各只留一份宿主胶水 `apps/{web,mobile}/src/lib/selection.ts`。**判据**：共享层 **16 条**（`packages/app-host/tests/selection.spec.ts`）+ web **12 条**（`apps/web/tests/task-selection.spec.tsx`）+ mobile **9 条**（`apps/mobile/tests/selection-single-owner.spec.ts`）+ 新门禁 `check:selection-single-source`（三条断言，已挂进 `pnpm check` 链）。**变异臂红集**：共享层 7 臂 **7/7 转红**（摘掉"重复选不通知" / 快照不缓存 / 直接迭代 live listener 集合 / 回落判据摘掉 / 无差别清空 / `clear(kind)` 变空操作 / 没变化也通知）；web 4 臂 **4/4 转红**（只接一条渲染路径 / 回落改喂筛后集合 / 点行不写选中 / 光标改第二个来源）；mobile 4 臂 **4/4 转红**；门禁 A/B/B2/C/D 注入各红 + "字样只写进注释"的负向对照绿。🔴 **两条真实读数**：① 第一版 `snapshot()` 每次新建对象，会让宿主的 `useSyncExternalStore` 进死循环 —— 是接线前自查出来的，已改成缓存并钉成判据；② 门禁第一版把 setter 写成必需，注入"只读不写"的选中态时**存活**，补了 B2 臂才有牙。**全量套件**（隔离工作树，载体 `feat/detail-pane` = `9a9920d7`）：app-host 990 passed、mobile 601 passed、web 1512 passed \| 12 skipped，零失败。**未闭合的两件**：ⓐ 截图 + 人看图（行体从"不可点"变"可点"是视觉/交互变化，§4 要求真浏览器取证 —— 本机负载与他人 e2e 占用，未跑；跑法是 `PORT=3100` + 自己的 preview 端口，不用 :3000/:4318）；ⓑ 四端重装（AGENTS §6.1.1 的固定收尾，本轮只在隔离检出里做了 build+typecheck+单测，**没装**） |
+| W1 | 🔄 **进行中**（接线与判据已闭合；§4 要求的**截图 + 人看图**与 AGENTS §6.1.1 的**四端重装**未做，所以不算已完成） | **已落地**：单一所有者收拢 —— `packages/app-host/src/selection.ts`（封闭词表 + `createSelectionStore` + 纯函数 `pruneMissingSelection`/`pruneSelection`），四份本地 `useState` 全删，两端各只留一份宿主胶水 `apps/{web,mobile}/src/lib/selection.ts`。🔴 **词表从 6 类改成 3 类**（`task|habit|note`）：`project`/`tag`/`event` 是**投机项** —— 两侧的 prune 谓词照着写了 project/tag，而**没有任何一处界面会选中一条清单或标签**（它们在两端都是筛选/导航），"支持六类"读起来像已完成、实际只有三类活着。这条被升级成常驻门禁的**断言 D**（逐类扫宿主有没有 `select/useSelected`，零消费者即红；词表从数组字面量现读，解析出 0 项也算红）。💥 **本轮现场抓出的两个真缺陷**：① `apps/web/src/features/quadrant/QuadrantBoard.tsx` 把 `onOpenTask`/`activeTaskId` **声明了、解构了、没往共享板子传** ⇒ "三种投影接同一个选中"实际只有两种接上，而两个 prop 都是可选的 ⇒ **typecheck 全绿、当时四条门禁全绿**，症状只是"四象限不跟随选中"（→ §7 #179）；② `openNoteFromSearch` **签名里不收 id** ⇒ 搜索结果点便签只换视图、什么都不打开。③ 顺手补掉一条既有的端间不一致：web 时间线的行体此前**根本不可点**，而触屏端早能。**判据**：共享层 16 条（`packages/app-host/tests/selection.spec.ts`）+ web 选中 16 条（`task-selection.spec.tsx`）+ mobile 13 条（`selection-single-owner.spec.ts`）+ 三种投影各自的行为判据（`quadrant-row-parity.spec.tsx` 新增 2 条、`timeline-board.spec.tsx` 新增 3 条、`notes-view.spec.tsx` 新增 3 条）+ 门禁 `check:selection-single-source` **五条断言 A–E**（E 是本轮新增：同文件内比"声明"与"使用"）。🔴 **载体发现（写进 §7 #178）**：RNW 在 jsdom 里把样式编译成 class（`r-backgroundColor-*`），`el.style.backgroundColor` **恒为 `''`** —— 用它当判据第一次就得到"三种投影全都没底色"这种**看起来像三个真缺陷**的空读数；底色一律走 `getComputedStyle`（未选中是 `rgba(0, 0, 0, 0)`，不是空串）。**变异臂（两趟 rig 共 18 臂，每臂跑完复原并复跑回到绿；终态 Z2 = web/mobile/门禁三处 RC=0）**：14 条正臂按设计转红（门禁 A/B/B2/B3/C/A2/D/E/E2/E3-分母自检 + TaskList 底色 + TimelineBoard 两处底色 + 两处 `onPress` + NotesView 退回本地态 + 搜索丢 id + web 四处投影断一处 + mobile 回落摘一处 + mobile 三处投影全摘）；🔴 **一条第一次跑活了**：把 web 便签换回**裸名** `const [editingId] = useState(null)` 时门禁**全绿** —— 而文档块里当时写着"仍未覆盖：不带实体名的 editingId"，即这条缺口我**登记过但没验证**。补上裸名分支（`detailId|selectedId|editingId`，刻意不含 `active`/`open`：四象限的 `activeId` 是 dnd-kit 正在拖哪一颗）后重跑**转红**；为此把 `PasskeyPanel` 那份行内改名编辑器的状态改名 `editingRowId`（第一次我改成 `renamingId`，撞上 store 里已有的"请求在途那条"——两个概念不能并成一个名字，断言把它挡在写盘前）。两条负向对照绿：字样只写进注释、以及树上活着的 `activeId`/`editingRowId` 不被误伤。**读数**：门禁绿（`词表 3 类全有消费者（task 10 / habit 7 / note 13）、接线声明 17 处全部用起来`）；本轮直接跑的 `task-selection + timeline-board + quadrant-row-parity + notes-view` = **55 passed / 0 failed**；web/mobile/app-host/ui 四包 typecheck RC=0；`check:docs` 归因见 §8.1（三处死链指向**别人未提交**的在途文档，已把链接改成带状态的指针）。**未闭合的两件**：ⓐ 真浏览器截图 + 人看图（行体从"不可点"变"可点"、四格与时间线多了底色是视觉/交互变化，§6.2 规定一）；ⓑ 四端重装 `pnpm reinstall:all` |
 | W1b 键盘光标 | ⏸ 未开工 | 原 W1 判据 ③「↑↓ 移动选中」**拆到这一行**，理由不是省事：`TaskList` 的 `activeTaskId` 是**展示槽**，而"往哪走"要有目的地才有意义 —— 详情列（W2）没开之前，回车没有可去的地方。解锁条件：W2 落地后一起做，判据是"↑↓ 改选中 + 详情面跟着换 + Enter 打开焦点" |
 | W2 | ⏸ 未开工 | |
 | W3 | ⏸ 未开工 | |
@@ -148,3 +148,46 @@ W0 文档纠正、W6 value 那一米：与上面全部正交，随时可插队
 | W10 | ⏸ 不在本篇开工（阻塞于 C1#9–12） | |
 | W11 | ⏸ 未开工（阻塞于是否重开"不做删除"） | |
 | W12 | ⏸ 未开工（阻塞于是否要做正计时） | |
+
+---
+
+## 8.1 W1 收口时的归因与登记（2026-10-03 现量）
+
+**`pnpm check:docs` 报的四处死链，逐条问过"文件在谁手里"**（判据是同一文件的未提交 diff，
+不是"某条线在忙"的印象）：
+
+| 出处 | 指向 | 现量 | 处置 |
+|---|---|---|---|
+| 本篇第 4 行 | `calendar-year-time-and-mobile-profile.md` | 主检出里 `??`（**未跟踪**），`git log --all --diff-filter=A` 查不到 | 已改：链接 → 带状态的路径指针 |
+| 调研第 101 行 ×2 | `trash-and-archive-best-practice.md`、`../plans/trash-and-archive.md` | 同上，`??` | 已改：链接 → 路径 + "那条决定归回收站线自己提交" |
+| `PROGRESS.md:1362`（**已提交**的那一行） | `docs/research/aed-implementation-evidence.md` | 该文件在主检出里**存在但是未跟踪**（`??`，`git log --all --diff-filter=A` 查不到）⇒ 干净检出上是死链 | **只登记不代改**：那行属于回收站/A-E-D 那条线，由他们提交目标文档来关 |
+| `docs/plans/countdown-anniversary.md:1280` | ADR 索引的**第 1 节**（那个章节号不存在） | 倒数纪念日那条线的文档 | **只登记不代改** |
+
+改成"路径而不是链接"而不是删掉引用：那两份文档里的裁决是**真前提**（`FOCUS_SESSION` 不做删除），
+删掉引用会让那句结论没有出处；但**干净检出不该有死链**，所以指针要带上"它现在活在哪"。
+
+**登记的缺口（编号只增；每条写清该谁做、为什么不在本篇做）**：
+
+- **G-1 时间线行的无障碍表面**：`TimelineBoard` 在同一颗 `Pressable` 上同时给了硬写的
+  `role="listitem"` 与条件 `accessibilityRole="button"`，RNW 让前者胜出（实测：接了宿主与
+  没接宿主两种状态下 `role` / `tabindex="0"` / `cursor:pointer` **三者完全相同**）。
+  后果：读屏用户听到"列表项"而不是"按钮"，键盘与鼠标能用。修法要动结构（外层 `listitem` +
+  内层 `button`），会牵动几何判据与 `check:rn-aria`，**不在本篇做**。现状已被
+  `timeline-board.spec.tsx` 那条"无障碍表面现状"钉住 —— 谁改它谁红一次、顺手把这条划掉。
+- **G-2 没接出口的行仍被画成可点**（同一条实测读数的另一面）：这与 `TaskList` 的既有立场
+  （"刻意不把没给 `onOpenTask` 降级成点行=切换完成"）不一致。用 `disabled` 修**不行** ——
+  它会把 `pointer-events: none` 传染给子元素，而 `timeline-resize-*`（拖拽握把）正是行体
+  **的孩子**，用例里就有"宿主没接 `onOpenTask` 只握把可用"的走法。同属结构级修法。
+- **G-3 门禁 B 仍不认的两种形状**：模块级 `let editingId: string | null = null`、
+  `useReducer` 里的选中。词表里它是合法的（今天没有这两种写法），如实登记而不是当成已覆盖。
+- **G-4 断言 E 的已知边界**：它比的是"同一个文件里声明了有没有用"，所以将来用
+  `{...props}` 整体转发的写法会被判红（现在没有）。修法要显式改这条并说明理由，
+  **不要靠注释绕过**。
+
+现量命令（这三条读数每次都要重取，别照本表念）：
+
+```bash
+NO_COLOR=1 node research/tools/docs-link-check.mjs; echo RC=$?
+git log --all --diff-filter=A -- docs/research/aed-implementation-evidence.md | head -1   # 空 = 从未被提交
+cd "$(git rev-parse --show-toplevel)/.." && git status --porcelain docs/research | head  # ?? = 未跟踪
+```
