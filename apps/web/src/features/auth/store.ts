@@ -98,8 +98,17 @@ export type AuthStatus =
   | { kind: 'busy'; action: AuthBusyAction }
   /** 登录链接已发出（服务端用中性文案防邮箱枚举，所以这里也不许断言"邮箱存在"）。 */
   | { kind: 'link-sent' }
-  /** 注册申请已提交，还需要去邮箱点验证链接。**这不是"已登录"。** */
-  | { kind: 'registered' }
+  /**
+   * 注册申请已提交，还需要去邮箱点验证链接。**这不是"已登录"。**
+   *
+   * `mailDelivered: false` 只在服务端**亲口说**那封信没发出去时出现
+   * （没配 SMTP / 服务商拒了）。那一刻界面不许再说"去查收邮件" ——
+   * 对着一个永远收不到的邮箱说"请查收"，就是把人永久关在门外还说一切正常。
+   * ⚠️ 缺省**不等于** false：发信成功、连的是没有这个字段的老服务端、
+   * 以及这台服务器 `REQUIRE_EMAIL_VERIFICATION=false`（当场激活、不需要信）
+   * 三种情况都是"没说"，那三种下该说的还是原来那句。
+   */
+  | { kind: 'registered'; mailDelivered?: false }
   /** 找回通行密钥的邮件已发出（入口见 `requestRecovery`）。同样不断言邮箱存在。 */
   | { kind: 'recovery-sent' }
   /**
@@ -378,6 +387,18 @@ function failedFrom(outcome: HostedAuthFailure): AuthStatus {
   return failed(outcome.reason, outcome);
 }
 
+/**
+ * 从一次**成功注册**的 outcome 里搬出"那封信到底发出去了没有"。
+ *
+ * 三条注册路（邮箱+口令 / 魔法链接 / 通行密钥）都过这里 —— 与 `failedFrom`
+ * 同一个理由：谎话修在两处、漏在一处，就是下一次漂移的开始。
+ */
+function registeredFrom(outcome: { emailDelivered?: false }): AuthStatus {
+  return outcome.emailDelivered === undefined
+    ? { kind: 'registered' }
+    : { kind: 'registered', mailDelivered: false };
+}
+
 export const useAuthStore = create<AuthStoreState>((set) => ({
   status: { kind: 'signed-out' },
 
@@ -404,7 +425,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       },
     );
     set({
-      status: outcome.ok ? { kind: 'registered' } : failedFrom(outcome),
+      status: outcome.ok ? registeredFrom(outcome) : failedFrom(outcome),
     });
   },
 
@@ -476,7 +497,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     );
     set({
       status: completed.ok
-        ? { kind: 'registered' }
+        ? registeredFrom(completed)
         : failedFrom(completed),
     });
   },
@@ -557,8 +578,9 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     );
     // ⚠️ 成功 → `registered`（还要去邮箱点验证链接），**不是** `signed-in`。
     // 把"号建了"渲染成"登录好了"是本仓库记过的那类"状态对、界面在说谎"。
+    // 同一条纪律的反面：服务端说信没发出去时，也不许再说"去查收邮件"。
     set({
-      status: outcome.ok ? { kind: 'registered' } : failedFrom(outcome),
+      status: outcome.ok ? registeredFrom(outcome) : failedFrom(outcome),
     });
   },
 

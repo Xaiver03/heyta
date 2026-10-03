@@ -215,6 +215,22 @@ export interface ServerConfig {
   /** Web Push（Windows PWA 小组件的刷新机制）。**默认不存在**，见下面接口的说明。 */
   webPush?: WebPushConfig;
   /**
+   * 注册是否必须以"点过验证邮件里的链接"为前提。**默认 true**。
+   *
+   * 🔴 为什么自托管要能关：`isVerified` 是**所有**登录路的硬门 —— `verifyToken`
+   * 拒绝未验证账号（`auth.ts` 里那句 "a JWT ... represents a verified session"），
+   * `loginWithEmailPassword` 更是在**口令校验通过之后**才抛 `email_not_verified`。
+   * 而开这道闸的唯一动作是点邮件里的链接。一台没配 SMTP 的服务器于是得到：
+   * 注册"成功" → 那封信从来没存在过 → 口令永远登录不进 —— 而"邮箱 + 口令"
+   * 是本产品**主流**的登录方式（产品负责人 2026-10-02：即使用户自托管、
+   * 给了自己的同步域名，也照样该是账号密码登录）。
+   *
+   * 与 `ENTITLEMENT_GATE_ENABLED` 同一条纪律：只有运营者**显式**写 env 才改变行为，
+   * 代码不猜"这是自托管实例"（没有任何程序化标志），且取值严格 —— 写错在启动时
+   * **报错**，不静默落到任何一边。
+   */
+  requireEmailVerification: boolean;
+  /**
    * Test mode configuration. When enabled, provides endpoints for E2E testing.
    * NEVER enable in production!
    */
@@ -224,6 +240,22 @@ export interface ServerConfig {
     autoVerifyUsers: boolean;
   };
 }
+
+/**
+ * "这个实例是否**靠那封验证邮件**来激活账号" —— 三条注册路共用的**唯一**判点。
+ *
+ * 🔴 为什么要有这个函数而不是各处写条件：`registerWithMagicLink`（邮箱+口令与
+ * 魔法链接共用）、`registerPasskey` 两条路各自都要回答这一个问题，而答案必须
+ * 一样 —— 一台没配 SMTP 的自托管服务器上，"只关掉一半"的后果是用户换一条注册路
+ * 就又撞回同一堵墙。两条路各抄一遍 `config.testMode?.autoVerifyUsers` 正是
+ * 这种漂移的起点（AGENTS §3.5）。
+ *
+ * 两个让它为 false 的理由刻意不同：`TEST_MODE.autoVerifyUsers` 是 E2E 夹具，
+ * `REQUIRE_EMAIL_VERIFICATION=false` 是运营者的显式选择。判点相同、日志不同
+ * （调用方各自打），因为"[TEST_MODE] 出现在一台生产服务器上"是要能一眼看出来的。
+ */
+export const emailVerificationRequired = (config: ServerConfig): boolean =>
+  config.requireEmailVerification && config.testMode?.autoVerifyUsers !== true;
 
 /**
  * Default CORS origins — the stable production app, and nothing else.
@@ -251,6 +283,8 @@ const DEFAULT_CONFIG: ServerConfig = {
   entitlements: {
     enabled: false,
   },
+  // 🔴 默认**要**验证邮箱：官方托管实例的行为不变，关掉它是自托管的显式选择。
+  requireEmailVerification: true,
 };
 
 /**
@@ -494,6 +528,33 @@ export const loadConfigFromEnv = (
       );
     }
     config.entitlements = { enabled: rawEntitlementGate === 'true' };
+  }
+
+  // 注册是否必须验证邮箱（默认 true = 与官方托管实例一致）。
+  //
+  // 关掉它 = "邮箱 + 口令"注册**当场可用**，不等那封信。这是给自托管的一等公民
+  // 开关，不是测试开关（`TEST_MODE` 的 `autoVerifyUsers` 那条留给 E2E）：
+  // 一台没配 SMTP 的服务器若保持 true，注册接口会返回成功话而信从来没发出去，
+  // 用户被永久挡在门外 —— 见 `ServerConfig['requireEmailVerification']` 上那段。
+  //
+  // 🔴 代价必须写清楚：关掉以后"证明你收得到这个邮箱"这一环**没有了**，
+  // 任何人都能用任意邮箱建号（找回密码也就找不到真人）。所以它只该出现在
+  // "这台服务器只给自己/自己人用"的部署里。
+  //
+  // 取值与上面那道闸门同样严格：只接受 'true' / 'false'，写错**报错**。
+  if (process.env.REQUIRE_EMAIL_VERIFICATION !== undefined) {
+    const rawRequireEmailVerification =
+      process.env.REQUIRE_EMAIL_VERIFICATION.trim().toLowerCase();
+    if (
+      rawRequireEmailVerification !== 'true' &&
+      rawRequireEmailVerification !== 'false'
+    ) {
+      throw new Error(
+        `Invalid REQUIRE_EMAIL_VERIFICATION: ${process.env.REQUIRE_EMAIL_VERIFICATION}. ` +
+          `Use 'true' or 'false'.`,
+      );
+    }
+    config.requireEmailVerification = rawRequireEmailVerification === 'true';
   }
 
   // 微信支付（Native 扫码）—— **运营者显式开关 + 六个凭证全齐**才注册。
