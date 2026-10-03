@@ -574,6 +574,20 @@ export {
   type OrganizerListProps,
   type OrganizerRowContext,
 } from './projects/OrganizerList.js';
+/**
+ * 清单「移入文件夹」的行内选择器（经 `OrganizerList` 已有的 `renderItemExtra`
+ * 插槽接入 ⇒ 共享行骨架一行没改）。
+ *
+ * 🔴 候选集**由宿主按领域层 `validateProjectParentChange` 筛过再传进来** ——
+ * 组件自己不算"能不能移"，否则两端各有一套裁决标准（AGENTS §3.5）。
+ */
+export {
+  FolderPicker,
+  folderRejectionMessageKey,
+  type FolderPickerLabels,
+  type FolderPickerProps,
+  type FolderRejectionMessageKey,
+} from './projects/FolderPicker.js';
 export {
   aliveProjects,
   archivedProjects,

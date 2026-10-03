@@ -49,11 +49,13 @@ import { ICON_SIZE } from '@heyta/design-system';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
-import { useI18n } from '@heyta/i18n';
-import { parseCategorySlot } from '@heyta/domain';
+import { useI18n, type MessageKey } from '@heyta/i18n';
+import { folderTargetsFor, parseCategorySlot } from '@heyta/domain';
 import { Archive, Check, Folder, Plus, Tag as TagIcon } from 'lucide-react';
 import {
   archivedProjects,
+  FolderPicker,
+  folderRejectionMessageKey,
   HeytaUiProvider,
   OrganizerList,
   openTagCounts,
@@ -77,6 +79,12 @@ export function ProjectsPanel({
   const projects = useProjectStore();
   const tasks = useTaskStore();
   const [draft, setDraft] = useState('');
+  /**
+   * 「移入文件夹」被领域层拒绝时那一句人话（候选集本来就按同一条规则筛过，
+   * 走到这里通常是**另一端刚改了这棵树**）。
+   * 🔴 不许吞：吞掉的后果是"点了没反应"，而数据什么都没变。
+   */
+  const [folderError, setFolderError] = useState('');
   const [tagDraft, setTagDraft] = useState('');
   // 输入框**默认不出现**（点标题右侧的 + 才展开）。与草稿分开存：
   // 收起不清草稿，重新点开还能接着打 —— 只有 Esc 才明确丢弃。
@@ -129,6 +137,23 @@ export function ProjectsPanel({
     () => toOrganizerTree(projects.projects, { includeArchived: showArchived }),
     [projects.projects, showArchived],
   );
+  /**
+   * 「移入文件夹」的候选集 —— 与移动端调的是**同一个领域函数**
+   * （`folderTargetsFor` = `validateProjectParentChange` 的逐目标展开）。
+   * 两端各筛一遍迟早漂成两套标准，而漂移的症状是"手机上能选、电脑上不能选"。
+   */
+  const folderTargets = useMemo(
+    () =>
+      new Map(
+        projects.projects.map((project) => [
+          project.id,
+          folderTargetsFor(projects.projects, project.id),
+        ]),
+      ),
+    [projects.projects],
+  );
+  const parentOf = (id: string): string | undefined =>
+    projects.projects.find((project) => project.id === id)?.parentId ?? undefined;
   const tagNodes = useMemo(
     () => toOrganizerNodes(toTagItems(projects.tags)),
     [projects.tags],
@@ -264,16 +289,55 @@ export function ProjectsPanel({
               context.isChild ? null : <Folder size={ICON_SIZE.xs} aria-hidden="true" />
             }
             renderItemExtra={(item) => (
-              <ColorSlotPicker
-                value={slotOf(item.id)}
-                onChange={(slot) => {
-                  void projects.setProjectColor(item.id, slot);
-                }}
-                targetName={item.name}
-              />
+              <>
+                <ColorSlotPicker
+                  value={slotOf(item.id)}
+                  onChange={(slot) => {
+                    void projects.setProjectColor(item.id, slot);
+                  }}
+                  targetName={item.name}
+                />
+                {/*
+                  ✅ 「移入文件夹」用的是共享层**已有**的 `renderItemExtra` 插槽
+                  （取色入口本来就走这条）⇒ `OrganizerList` 的行骨架一行没改。
+                  候选集来自领域层，与移动端同一个函数，所以两端不会出现
+                  "这边能选那边不能选"。
+                */}
+                <FolderPicker
+                  item={item}
+                  candidates={(folderTargets.get(item.id) ?? []).map((target) => ({
+                    id: target.id,
+                    name: target.name,
+                  }))}
+                  currentParentId={parentOf(item.id)}
+                  labels={{
+                    button: (name) => t('common.organizer.folder.button', { name }),
+                    title: t('common.organizer.folder.title'),
+                    none: t('common.organizer.folder.none'),
+                    current: t('common.organizer.folder.current'),
+                  }}
+                  onSelect={(targetId) => {
+                    setFolderError('');
+                    void projects
+                      .setProjectParent(item.id, targetId)
+                      .catch((cause: unknown) => {
+                        setFolderError(t(folderRejectionMessageKey(cause) as MessageKey));
+                      });
+                  }}
+                  testID={`web-list-folder-${item.id}`}
+                />
+              </>
             )}
             testID="projects-list"
           />
+          {folderError === '' ? null : (
+            // 复用 `.ht-settings__danger`（定义在 `ai-panels.css` 那组共享选择器里）
+            // 而不是新造一个类 —— 新增 CSS 类会去动 `check:design` / 行样式单一来源那几道
+            // 棘轮，而这里需要的只是"一句红字"，不是新的视觉语汇。
+            <p className="ht-settings__danger" role="alert" data-testid="list-folder-failed">
+              {folderError}
+            </p>
+          )}
         </section>
 
         <section>

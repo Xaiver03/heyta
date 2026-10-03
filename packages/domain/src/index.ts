@@ -15,6 +15,7 @@ export * from './task-order.js';
 export * from './quadrant.js';
 export * from './task-filter.js';
 export * from './subtasks.js';
+export * from './project-hierarchy.js';
 export * from './reminders.js';
 export * from './timeline.js';
 export * from './timeline-position.js';
