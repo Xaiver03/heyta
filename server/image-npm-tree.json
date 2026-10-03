@@ -1,0 +1,744 @@
+{
+  "_what": "镜像生产阶段（`server/Dockerfile` 的 FROM … AS production）经 npm 解析出来的依赖树快照。不是清单、不是许可判定 —— 判定在 research/tools/check-image-license-coverage.mjs。",
+  "generatedAt": "2026-10-03T04:38:05Z",
+  "generator": "research/tools/gen-image-npm-tree.mjs",
+  "inputs": {
+    "targetPlatform": {
+      "os": "linux",
+      "cpu": "x64",
+      "libc": "musl"
+    },
+    "registry": "https://registry.npmjs.org/",
+    "serverPackageJsonSha256": "b152bf0433395e3f42470baa04d9d6f0b7ae26b58a84c940de679858b72a8c74",
+    "installShapeSha256": "4b555c29f4aab19827e73338bb4ef15b24ce5fb33443799d7c76504424b89f12",
+    "packedWorkspaceDeps": [
+      "@heyta/domain",
+      "@heyta/shared-schema",
+      "@heyta/sync-core"
+    ],
+    "localTarballs": [
+      "./sync-core.tgz",
+      "./shared-schema.tgz",
+      "./domain.tgz"
+    ],
+    "registryResolvedDeps": 23,
+    "skippedForOtherPlatform": 12
+  },
+  "packages": [
+    {
+      "name": "@fastify/accept-negotiator",
+      "version": "2.1.0",
+      "optional": false
+    },
+    {
+      "name": "@fastify/ajv-compiler",
+      "version": "4.0.6",
+      "optional": false
+    },
+    {
+      "name": "@fastify/cors",
+      "version": "11.3.0",
+      "optional": false
+    },
+    {
+      "name": "@fastify/error",
+      "version": "4.2.0",
+      "optional": false
+    },
+    {
+      "name": "@fastify/fast-json-stringify-compiler",
+      "version": "5.1.0",
+      "optional": false
+    },
+    {
+      "name": "@fastify/forwarded",
+      "version": "3.0.2",
+      "optional": false
+    },
+    {
+      "name": "@fastify/helmet",
+      "version": "13.1.1",
+      "optional": false
+    },
+    {
+      "name": "@fastify/merge-json-schemas",
+      "version": "0.2.1",
+      "optional": false
+    },
+    {
+      "name": "@fastify/proxy-addr",
+      "version": "5.1.1",
+      "optional": false
+    },
+    {
+      "name": "@fastify/rate-limit",
+      "version": "10.3.0",
+      "optional": false
+    },
+    {
+      "name": "@fastify/send",
+      "version": "4.1.1",
+      "optional": false
+    },
+    {
+      "name": "@fastify/static",
+      "version": "10.1.5",
+      "optional": false
+    },
+    {
+      "name": "@fastify/websocket",
+      "version": "11.3.1",
+      "optional": false
+    },
+    {
+      "name": "@hexagon/base64",
+      "version": "1.1.28",
+      "optional": false
+    },
+    {
+      "name": "@levischuck/tiny-cbor",
+      "version": "0.2.11",
+      "optional": false
+    },
+    {
+      "name": "@lukeed/ms",
+      "version": "2.0.2",
+      "optional": false
+    },
+    {
+      "name": "@noble/ciphers",
+      "version": "2.4.0",
+      "optional": false
+    },
+    {
+      "name": "@noble/hashes",
+      "version": "2.4.0",
+      "optional": false
+    },
+    {
+      "name": "@node-rs/argon2-linux-x64-gnu",
+      "version": "2.2.1",
+      "optional": true
+    },
+    {
+      "name": "@node-rs/argon2-linux-x64-musl",
+      "version": "2.2.1",
+      "optional": true
+    },
+    {
+      "name": "@node-rs/argon2",
+      "version": "2.2.1",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-android",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-cms",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-csr",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-ecc",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-pfx",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-pkcs8",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-pkcs9",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-rsa",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-schema",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-x509-attr",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/asn1-x509",
+      "version": "2.10.0",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/utils",
+      "version": "2.0.3",
+      "optional": false
+    },
+    {
+      "name": "@peculiar/x509",
+      "version": "1.14.3",
+      "optional": false
+    },
+    {
+      "name": "@pinojs/redact",
+      "version": "0.4.0",
+      "optional": false
+    },
+    {
+      "name": "@prisma/client",
+      "version": "5.22.0",
+      "optional": false
+    },
+    {
+      "name": "@prisma/debug",
+      "version": "5.22.0",
+      "optional": false
+    },
+    {
+      "name": "@prisma/engines-version",
+      "version": "5.22.0-44.605197351a3c8bdd595af2d2a9bc3025bca48ea2",
+      "optional": false
+    },
+    {
+      "name": "@prisma/engines",
+      "version": "5.22.0",
+      "optional": false
+    },
+    {
+      "name": "@prisma/fetch-engine",
+      "version": "5.22.0",
+      "optional": false
+    },
+    {
+      "name": "@prisma/get-platform",
+      "version": "5.22.0",
+      "optional": false
+    },
+    {
+      "name": "@simplewebauthn/server",
+      "version": "13.3.3",
+      "optional": false
+    },
+    {
+      "name": "@simplewebauthn/types",
+      "version": "12.0.0",
+      "optional": false
+    },
+    {
+      "name": "@zxcvbn-ts/dictionary-compression",
+      "version": "3.0.1",
+      "optional": false
+    },
+    {
+      "name": "@zxcvbn-ts/language-common",
+      "version": "4.1.3",
+      "optional": false
+    },
+    {
+      "name": "abstract-logging",
+      "version": "2.0.1",
+      "optional": false
+    },
+    {
+      "name": "ajv-formats",
+      "version": "3.0.1",
+      "optional": false
+    },
+    {
+      "name": "ajv",
+      "version": "8.20.0",
+      "optional": false
+    },
+    {
+      "name": "asn1js",
+      "version": "3.0.10",
+      "optional": false
+    },
+    {
+      "name": "atomic-sleep",
+      "version": "1.0.0",
+      "optional": false
+    },
+    {
+      "name": "avvio",
+      "version": "9.3.0",
+      "optional": false
+    },
+    {
+      "name": "balanced-match",
+      "version": "4.0.4",
+      "optional": false
+    },
+    {
+      "name": "bcryptjs",
+      "version": "3.0.3",
+      "optional": false
+    },
+    {
+      "name": "brace-expansion",
+      "version": "5.0.12",
+      "optional": false
+    },
+    {
+      "name": "buffer-equal-constant-time",
+      "version": "1.0.1",
+      "optional": false
+    },
+    {
+      "name": "content-disposition",
+      "version": "3.0.0",
+      "optional": false
+    },
+    {
+      "name": "cookie",
+      "version": "1.1.1",
+      "optional": false
+    },
+    {
+      "name": "depd",
+      "version": "2.0.0",
+      "optional": false
+    },
+    {
+      "name": "dequal",
+      "version": "2.0.3",
+      "optional": false
+    },
+    {
+      "name": "dotenv",
+      "version": "17.4.2",
+      "optional": false
+    },
+    {
+      "name": "duplexify",
+      "version": "4.1.3",
+      "optional": false
+    },
+    {
+      "name": "ecdsa-sig-formatter",
+      "version": "1.0.11",
+      "optional": false
+    },
+    {
+      "name": "end-of-stream",
+      "version": "1.4.5",
+      "optional": false
+    },
+    {
+      "name": "escape-html",
+      "version": "1.0.3",
+      "optional": false
+    },
+    {
+      "name": "fast-decode-uri-component",
+      "version": "1.0.1",
+      "optional": false
+    },
+    {
+      "name": "fast-deep-equal",
+      "version": "3.1.3",
+      "optional": false
+    },
+    {
+      "name": "fast-json-stringify",
+      "version": "7.0.1",
+      "optional": false
+    },
+    {
+      "name": "fast-querystring",
+      "version": "1.1.2",
+      "optional": false
+    },
+    {
+      "name": "fast-uri",
+      "version": "3.1.8",
+      "optional": false
+    },
+    {
+      "name": "fast-uri",
+      "version": "4.2.1",
+      "optional": false
+    },
+    {
+      "name": "fastify-plugin",
+      "version": "5.1.0",
+      "optional": false
+    },
+    {
+      "name": "fastify-plugin",
+      "version": "6.0.0",
+      "optional": false
+    },
+    {
+      "name": "fastify",
+      "version": "5.12.5",
+      "optional": false
+    },
+    {
+      "name": "fastq",
+      "version": "1.20.3",
+      "optional": false
+    },
+    {
+      "name": "find-my-way",
+      "version": "9.9.0",
+      "optional": false
+    },
+    {
+      "name": "glob",
+      "version": "13.0.6",
+      "optional": false
+    },
+    {
+      "name": "hash-wasm",
+      "version": "4.12.0",
+      "optional": false
+    },
+    {
+      "name": "helmet",
+      "version": "8.3.0",
+      "optional": false
+    },
+    {
+      "name": "http-errors",
+      "version": "2.0.1",
+      "optional": false
+    },
+    {
+      "name": "ical.js",
+      "version": "2.2.1",
+      "optional": false
+    },
+    {
+      "name": "inherits",
+      "version": "2.0.4",
+      "optional": false
+    },
+    {
+      "name": "ipaddr.js",
+      "version": "2.5.0",
+      "optional": false
+    },
+    {
+      "name": "json-schema-ref-resolver",
+      "version": "3.0.0",
+      "optional": false
+    },
+    {
+      "name": "json-schema-traverse",
+      "version": "1.0.0",
+      "optional": false
+    },
+    {
+      "name": "jsonwebtoken",
+      "version": "9.0.3",
+      "optional": false
+    },
+    {
+      "name": "jwa",
+      "version": "2.0.1",
+      "optional": false
+    },
+    {
+      "name": "jws",
+      "version": "4.0.1",
+      "optional": false
+    },
+    {
+      "name": "light-my-request",
+      "version": "6.6.0",
+      "optional": false
+    },
+    {
+      "name": "lodash.includes",
+      "version": "4.3.0",
+      "optional": false
+    },
+    {
+      "name": "lodash.isboolean",
+      "version": "3.0.3",
+      "optional": false
+    },
+    {
+      "name": "lodash.isinteger",
+      "version": "4.0.4",
+      "optional": false
+    },
+    {
+      "name": "lodash.isnumber",
+      "version": "3.0.3",
+      "optional": false
+    },
+    {
+      "name": "lodash.isplainobject",
+      "version": "4.0.6",
+      "optional": false
+    },
+    {
+      "name": "lodash.isstring",
+      "version": "4.0.1",
+      "optional": false
+    },
+    {
+      "name": "lodash.once",
+      "version": "4.1.1",
+      "optional": false
+    },
+    {
+      "name": "lru-cache",
+      "version": "11.5.3",
+      "optional": false
+    },
+    {
+      "name": "mime",
+      "version": "3.0.0",
+      "optional": false
+    },
+    {
+      "name": "minimatch",
+      "version": "10.2.6",
+      "optional": false
+    },
+    {
+      "name": "minipass",
+      "version": "7.1.3",
+      "optional": false
+    },
+    {
+      "name": "ms",
+      "version": "2.1.3",
+      "optional": false
+    },
+    {
+      "name": "nodemailer",
+      "version": "9.1.1",
+      "optional": false
+    },
+    {
+      "name": "on-exit-leak-free",
+      "version": "2.1.2",
+      "optional": false
+    },
+    {
+      "name": "once",
+      "version": "1.4.0",
+      "optional": false
+    },
+    {
+      "name": "path-scurry",
+      "version": "2.0.2",
+      "optional": false
+    },
+    {
+      "name": "pino-abstract-transport",
+      "version": "3.0.0",
+      "optional": false
+    },
+    {
+      "name": "pino-std-serializers",
+      "version": "7.1.0",
+      "optional": false
+    },
+    {
+      "name": "pino",
+      "version": "10.4.0",
+      "optional": false
+    },
+    {
+      "name": "prisma",
+      "version": "5.22.0",
+      "optional": false
+    },
+    {
+      "name": "process-warning",
+      "version": "4.0.1",
+      "optional": false
+    },
+    {
+      "name": "process-warning",
+      "version": "5.1.0",
+      "optional": false
+    },
+    {
+      "name": "pvtsutils",
+      "version": "1.3.6",
+      "optional": false
+    },
+    {
+      "name": "pvutils",
+      "version": "1.2.0",
+      "optional": false
+    },
+    {
+      "name": "quick-format-unescaped",
+      "version": "4.0.4",
+      "optional": false
+    },
+    {
+      "name": "readable-stream",
+      "version": "3.6.2",
+      "optional": false
+    },
+    {
+      "name": "real-require",
+      "version": "1.0.0",
+      "optional": false
+    },
+    {
+      "name": "reflect-metadata",
+      "version": "0.2.2",
+      "optional": false
+    },
+    {
+      "name": "require-from-string",
+      "version": "2.0.2",
+      "optional": false
+    },
+    {
+      "name": "ret",
+      "version": "0.5.0",
+      "optional": false
+    },
+    {
+      "name": "reusify",
+      "version": "1.1.0",
+      "optional": false
+    },
+    {
+      "name": "rfdc",
+      "version": "1.4.1",
+      "optional": false
+    },
+    {
+      "name": "safe-buffer",
+      "version": "5.2.1",
+      "optional": false
+    },
+    {
+      "name": "safe-regex2",
+      "version": "5.1.1",
+      "optional": false
+    },
+    {
+      "name": "safe-stable-stringify",
+      "version": "2.5.0",
+      "optional": false
+    },
+    {
+      "name": "secure-json-parse",
+      "version": "4.1.0",
+      "optional": false
+    },
+    {
+      "name": "semver",
+      "version": "7.8.5",
+      "optional": false
+    },
+    {
+      "name": "set-cookie-parser",
+      "version": "2.7.2",
+      "optional": false
+    },
+    {
+      "name": "setprototypeof",
+      "version": "1.2.0",
+      "optional": false
+    },
+    {
+      "name": "sonic-boom",
+      "version": "4.2.1",
+      "optional": false
+    },
+    {
+      "name": "split2",
+      "version": "4.2.0",
+      "optional": false
+    },
+    {
+      "name": "statuses",
+      "version": "2.0.2",
+      "optional": false
+    },
+    {
+      "name": "stream-shift",
+      "version": "1.0.3",
+      "optional": false
+    },
+    {
+      "name": "string_decoder",
+      "version": "1.3.0",
+      "optional": false
+    },
+    {
+      "name": "thread-stream",
+      "version": "4.2.0",
+      "optional": false
+    },
+    {
+      "name": "toad-cache",
+      "version": "3.7.4",
+      "optional": false
+    },
+    {
+      "name": "toidentifier",
+      "version": "1.0.1",
+      "optional": false
+    },
+    {
+      "name": "tslib",
+      "version": "1.14.1",
+      "optional": false
+    },
+    {
+      "name": "tslib",
+      "version": "2.8.1",
+      "optional": false
+    },
+    {
+      "name": "tsyringe",
+      "version": "4.10.0",
+      "optional": false
+    },
+    {
+      "name": "util-deprecate",
+      "version": "1.0.2",
+      "optional": false
+    },
+    {
+      "name": "uuidv7",
+      "version": "1.2.1",
+      "optional": false
+    },
+    {
+      "name": "wrappy",
+      "version": "1.0.2",
+      "optional": false
+    },
+    {
+      "name": "ws",
+      "version": "8.22.0",
+      "optional": false
+    },
+    {
+      "name": "zod",
+      "version": "4.6.5",
+      "optional": false
+    }
+  ]
+}
