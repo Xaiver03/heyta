@@ -1992,3 +1992,23 @@ grep -oE '^#{2,4} ?B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | uniq -d  
 - **落地仍未做**：`heyta-land.sh` 的前置 1 在 22:0x 正确拒绝过一次 —— main 在合并完成后
   又前进了（`96f3293d → 3a3071e1`），"可直落"是时刻性读数。现量：
   `git -C <主检出> merge-base --is-ancestor main integrate/2026-10-03-closeout`。
+
+## 15.28 Goal 四件事逐项对账（22:1x；**未闭合项写明卡在谁手里**，不给"差不多齐了"）
+
+本轮（重启之后）新增的六笔：`50ddb3ce`（规则 7 修复 + §15.25）/ `75acfe3f`（并 main）/
+`43ef4a22`（§15.26）/ `eec1ab3b`（§15.27 逐段读数）/ `57e5380f`（`B59` 立账 + PROGRESS 续段）/
+`9dbe1e44`（更正我自己写的"四个读取点"与缺目录的文件名）。
+
+| 项 | 状态 | 证据 / 卡点（都可复跑） |
+|---|---|---|
+| ① 合并成一条集成线 | ✅ 做完 | 三分支 tip 都在载体里（`git merge-base --is-ancestor` 逐枚真）；`main → 集成线`已并（`75acfe3f`，2 处冲突按并集无损） |
+| ① 落到本地 main | ⏸ **卡在并行会话，不绕** | 22:1x 现量：主检出 `git status --porcelain \| wc -l` = **331 项未提交**（含 `AGENTS.md`、`PROGRESS.md`、`package.json`），且 main 在 6 分钟内又前进 3 笔（`e3312dba`）。不 stash 别人的东西、不 `branch -f` 换掉他们脚下的 HEAD。入口：`~/scratch-heyta/heyta-land.sh`（三条前置任一不成立 exit 1，`--confirm` 才 `merge --ff-only`，不 force、不 push） |
+| ② 干净检出 build + 全链逐段 | ✅ 取到 | 载体 `heyta-wt-ai-closeout` @ `43ef4a22`：`pnpm -r build` rc=0；61 段 = **56 绿 / 4 红 / 1 段按规则不跑**；四条红逐条归属见 §15.27（1 条继承 docs、2 条环境未装依赖、1 条 `B59` 产品红）|
+| ② 三段 e2e 的真实读数 | 🔄 **等安静窗口** | 依赖已补齐（`e2e/node_modules` 装好，playwright 1.63.0）；跑批器 `~/scratch-heyta/heyta-e2e-when-quiet.sh` 挂在单一所有者负载门后（阈值 12 不动，耐心 3600s）。22:1x 负载 `12.25 / 75 / 76`，占用者是**另一个项目**（ssos 的 vitest + postgres）加重启后的 `mds_stores` |
+| ③ 四端重装 | ⏸ **未跑** | 前置逐端现量：mac 签名身份 4 枚可用 ✓；android `emulator-5554 device` ✓；**ios 无 Booted 模拟器**（脚本 `:362` 会响亮报"先 boot"，且它自己会把 Pods 与 `Podfile.lock` 对账）；windows-pc `ssh` 可达 ✓。快捷方式的实现与判据在合并态核过（`apps/desktop-windows/scripts/install-and-capture.ps1:82/110/236` 产出 `SHORTCUT_OK=`，`scripts/lib/msix-install-facts.sh` 五项清单由 `reinstall-all.sh:249` **一处**读）。**不提前宣称任何一端装上** |
+| ④ 台账逐条收口 | 🔄 进行中 | `PROGRESS.md` AI 节加了 22:0x 续段（载体易址、① 的"零冲突"预演不等价于 main 那次、② 读数被新的 56/4/1 取代、③ 两处我自己写错的句子就地更正）；`BLOCKED.md` 立 `B59`；`environment-traps` 现量 **189 条 / max 180 / 真实重号 38·93·94·95**（`grep -oE '^[0-9]+\. ' … \| uniq -d`，`1 2 3 4` 是内部有序列表被行首模式误抓，属计数噪声）；死链：合并态 4 条**全部继承自 main**，本轮追加文本自身新增 **0** 条 |
+| ④ AGENTS §9 候选行 | ⏸ 排在落地之后 | 载体里 `AGENTS.md` 干净可改，但 §9 那句要写的是"已落到 main"这个状态 —— **落地没发生就不能先写**。登记在 `B56/B57/B58` 的关闭判据里 |
+
+🔴 一条元结论（今天第二次撞上）：**"预演过零冲突"不等于"合并没有冲突"**。
+14:4x 那次 `merge-tree` 预演对的是"三个分支之间"，22:0x 真合并对的是"main 与集成线"，
+输入变了结论就作废 —— 凡是把预演结果写成"已验证"的地方，都要带上它验的是哪一次。
