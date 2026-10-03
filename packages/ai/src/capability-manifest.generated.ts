@@ -737,7 +737,7 @@ export const AI_CAPABILITY_MANIFEST =
       'name': 'create_event',
       'kind': 'write',
       'entityType': 'EVENT',
-      'description': '新建一个倒数日/纪念日。日期是 `YYYY-MM-DD` 的**锚点日期**（倒数日没有“几点”）。可给类型档位（countdown / anniversary / birthday / festival 四档之一）、是否按农历每年重复、RRULE 重复规则、备注。必须走 heyta 的正常写入路径（op-log）。',
+      'description': '新建一个倒数日/纪念日。日期是 `YYYY-MM-DD` 的**锚点日期**（倒数日没有“几点”）。可给类型档位（countdown / anniversary / birthday / festival 四档之一）、是否按农历每年重复、RRULE 重复规则、备注。写入只是提案：你在界面上确认之后才会真正保存。',
       'schemaRecorded': true,
       'args': [
         {
