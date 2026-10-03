@@ -2466,3 +2466,36 @@ HEAD 里我的 B25–B27 与 goal §7.1 就**从历史上消失**（他们的提
 
 取证（下面这几个日志在 /tmp，会被同机会话扫走 —— 表内的读数本身就是副本，traps #159）：`/tmp/g5-l4-now.log`（l4 两段现量）、`/tmp/g5-ai-e2e/chain.log` + `S6-e2e.log`（ai-e2e 113/2/0 全绿，`E2E=0`）、
 `/tmp/g5-ai-e2e/landing-e2e-{pre,post}.log`（改前 15/2、把字面对齐真源后 17/0）。
+
+### B30.1 补充：把那 8 处的归属**逐文件 blame 量了一遍**（2026-10-03 10:1x）——B27 那句"本条线不再欠账"成立，所以这笔账不该由本条线付
+
+我一度怀疑 B27 犯了"整块 blame 把自家债记给别人"的老错（记忆里就记着这条），所以逐文件取了每一处 `style={{` 所在行的**作者笔**，不是取文件级 blame：
+
+| 文件 | 处数 | 归属笔（日期） |
+|---|---|---|
+| `TaskDetailSheet.tsx` | 26 | `27764c93`(09-27) · `aff9ad1f`(09-26) · `b2b5455a`(09-28) · `d51181d6`(09-27) · `9ed11d74`(09-30) · `896d6c74`(10-02) |
+| `TasksScreen.tsx` | 15 | `e9daa4b8`(09-25) · `27764c93`(09-27) · `9d5050d5`(09-27) · `b2b5455a`(09-28) · `697fba42`/`b1c40f5a`(10-01) |
+| `NotificationsScreen.tsx` | 11 | 全部 `896d6c74`(10-02，`test(mobile-ios)` 那笔夹具修复) |
+| `SettingsScreen.tsx` | 9 | `72dd32fc`(09-30，「补上认证与设置两面」) ×7 + `881aa92a`(10-02 隐私同意) ×2 |
+| `ProfileScreen.tsx` | 9 | `8a703ef3`(09-27) ×3 · `72dd32fc`(09-30) ×3 · `b2b5455a`(09-28) · `896d6c74`(10-02) ×2 |
+| `AuthScreen.tsx` | 8 | `72dd32fc`(09-30) ×4 · `881aa92a`(10-02) ×3 · `77f11d17`(10-02) ×1 |
+| `TrashScreen.tsx` | 6 | 全部 `42541e70`(09-27) |
+| `FocusScreen.tsx` | 5 | `aff9ad1f`(09-26) ×2 · `27764c93`(09-27) ×3 |
+| `SearchScreen.tsx` | 4 | `e8d430e9`/`078971c5`(10-01) 各 2 |
+| `ConflictSheet.tsx` | 3 | `aff9ad1f`(09-26) · `27764c93`(09-27) ×2 |
+| `WelcomeScreen.tsx` | 3 | 全部 `72dd32fc`(09-30) |
+| `SecurityScreen.tsx` | 1 | `804842be`(10-02) —— **本条线刻意留下的那一处**（passkeys 子卡表面：`gap`+`surface-sunken`+`radius.md`+`padding` 四件事一起，不是布局意图；`bb41e9fe` 文件头写明"为消一处而给共享层发明没人第二处要用的 API"是要避免的事） |
+| `ExportScreen.tsx` | **0** | 本条线批五的 6 处在 `057ec9b7`/`7420d8d7`/`bb41e9fe` 里全部清零 |
+
+⚠️ 口径：上表的处数是**纯 `grep style={{`**（合计 101，含 `PrivacyConsentSheet` 1 处），门禁 `check:l4` 的读数先 `stripComments` 再数，实测 **98**（基线 90）。两者差 3 处是注释里的示例代码。这张表给的是"每处是谁写的"，不是"门禁数到几"。
+
+⇒ **结论**：本 Goal 自己的两个屏（`ExportScreen` 0 处、`SecurityScreen` 仅剩那 1 处且有理由）已经付清，
+缺的 8 处**只能从别的条线写下的文件里取**（09-25~10-01 的 P2/布局批次、10-02 的隐私同意与 iOS 验收笔）。
+所以"这 8 处属 M3/别的条线"不是挡箭牌，是 blame 的读数 —— B27 的判定成立，我在上面那个怀疑是错的，
+按记忆的规矩把撤回写回原处：**没有犯"把自家债记给别人"，但差点犯了反向的错（为了凑绿去替别人重构他的屏）**。
+
+📌 顺带给真正要付这笔账的人一条省事的地图：`NotificationsScreen` 的 11 处**同一笔**写下、
+且其中 6 处是 `gap: tokens['space.2']` 与 `flexDirection:'row'+gap+alignItems:'center'` ——
+正好是 kit 里 `Stack`（`gap` 缺省档）与 `HStack gap align="center"` 的**逐字节等价出口**，
+一处都不用给共享层加新 API；`SettingsScreen` 另有 2 处同类（303/306）。
+其余的（`TaskDetailSheet` 26 处、`TasksScreen` 15 处）才是真需要 `ListSurface`/`TaskRow` 那档设计口径的部分。
