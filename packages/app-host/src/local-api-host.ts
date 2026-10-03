@@ -548,6 +548,42 @@ async function submitIntent(
       return { ok: true, taskId: intent.taskId };
     }
 
+    case 'complete-tasks': {
+      // 🔴 **先全部预检，再一条都不写**：op-log 里没有跨 op 事务（一批就是 N 条 op），
+      // 所以"要么全改、要么全不改"唯一的实现方式是把校验整个放在写之前。
+      // 中途才失败（例如第 7 条不存在）会留下"改了 6 条"的状态，而用户看到的是一句报错 ——
+      // 那是这套确认机制最坏的失效形状。
+      const missing = intent.taskIds.filter((id) => actions.findTask(id) === undefined);
+      if (missing.length > 0) {
+        const shown = missing.slice(0, 3).join('、');
+        return {
+          ok: false,
+          reason: 'not-found',
+          message: `这批里有 ${String(missing.length)} 条任务已经不在了（${shown}${missing.length > 3 ? ' 等' : ''}），一条都没有改。`,
+        };
+      }
+      // 已经是完成态的**不重复写**（照 `createReminder` 那条幂等口径：已在该状态就不再发一条 op）。
+      // ⚠️ 于是"确认卡上的条数"（用户要提交的范围）与"实际写了几条"可以不相等；
+      // 差值只在结果里可见 —— 它不是用户要看的那件事，但 MCP 那侧的外部程序要能算出来。
+      const changed: string[] = [];
+      for (const id of intent.taskIds) {
+        const task = actions.findTask(id);
+        if (task === undefined || task.completedAt !== undefined) continue;
+        await actions.setCompleted(id, true);
+        changed.push(id);
+      }
+      const [first] = changed;
+      if (first === undefined) {
+        // 只有"绕过了 `toWriteIntent` 直接构造意图"才可能走到这里（空数组在参数层就被拒）。
+        // 不许回一句 `ok` 加一个空 id —— 那是把"什么都没做"报成"做完了"。
+        if (intent.taskIds.length === 0) {
+          return { ok: false, reason: 'invalid', message: 'taskIds 是空的：没有要完成的任务。' };
+        }
+        return { ok: true, taskId: intent.taskIds[0] ?? '', taskIds: [] };
+      }
+      return { ok: true, taskId: first, taskIds: changed };
+    }
+
     case 'create-project': {
       const name = intent.name.trim();
       // 空名**不落到 `projectActions.createProject`** —— 它会 throw，而 throw 会顺着
