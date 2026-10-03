@@ -15,6 +15,7 @@
 import type { McpToolDefinition } from '../mcp.js';
 import type { EntityToolPack } from './pack.js';
 import type { LocalApiTool } from './shared.js';
+import { habitToolPack } from './habit.js';
 import { projectToolPack } from './project.js';
 import { taskToolPack } from './task.js';
 
@@ -23,7 +24,11 @@ import { taskToolPack } from './task.js';
  *
  * ⚠️ 顺序**只许追加到末尾**（新实体排在最后），不要在中间插入。
  */
-export const LOCAL_API_TOOL_PACKS: readonly EntityToolPack[] = [taskToolPack, projectToolPack];
+export const LOCAL_API_TOOL_PACKS: readonly EntityToolPack[] = [
+  taskToolPack,
+  projectToolPack,
+  habitToolPack,
+];
 
 export interface ToolPackRegistry {
   /** 目录（按下面的"读在前写在后"规则生成）。 */

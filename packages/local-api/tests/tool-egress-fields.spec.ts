@@ -24,6 +24,7 @@ import {
   findTool,
   runReadTool,
   type LocalApiHost,
+  type LocalApiHabit,
   type LocalApiItem,
   type LocalApiProject,
 } from '../src/index.js';
@@ -40,15 +41,19 @@ const ITEM: LocalApiItem = {
 };
 const PROTECTED_ITEM: LocalApiItem = { ...ITEM, id: 't2', title: '受保护的', body: '机密', readable: false };
 const PROJECT: LocalApiProject = { id: 'p1', name: '工作', taskCount: 2 };
+/** 每个字段都填满的习惯样本 —— 漏声明最容易发生在"平时是 undefined"的字段上。 */
+const HABIT: LocalApiHabit = { id: 'h1', name: '喝水', target: 8, unit: '杯', goalType: 'atLeast' };
 
 function host(
   items: readonly LocalApiItem[] = [ITEM, PROTECTED_ITEM],
   projects: readonly LocalApiProject[] = [PROJECT],
+  habits: readonly LocalApiHabit[] = [HABIT],
 ): LocalApiHost {
   return {
     listTasks: async () => items,
     getTask: async (taskId: string) => items.find((x) => x.id === taskId),
     listProjects: async () => projects,
+    listHabits: async () => habits,
     submit: async () => ({ ok: true, taskId: 'created-1' }),
   };
 }
@@ -142,6 +147,23 @@ describe('egressFields 声明 == 真实投影', () => {
     const declared = declaredKeys('list_projects');
     const outside = [...keysIn(run.payload)].filter((k) => !declared.has(k));
     expect(outside, `实际送出但没声明：${outside.join('、')}`).toEqual([]);
+  });
+
+  it('list_habits：`LocalApiHabit` 的每个键都被声明（新增实体的读同样过这道闸）', async () => {
+    // 字段填满的那条样本是关键：`target` / `unit` / `goalType` 平时可能是 undefined，
+    // 而"平时不出现"正是漏声明最容易溜过去的时刻（本文件开头那条理由）。
+    const run = await runReadTool(host(), 'list_habits', {});
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    const declared = declaredKeys('list_habits');
+    const outside = [...keysIn(run.payload)].filter((k) => !declared.has(k));
+    expect(outside, `实际送出但没声明：${outside.join('、')}`).toEqual([]);
+    // 反过来说：宿主多给一个没声明的键，这条判据真的会点出来（同一个探针，另一条腿）。
+    const leaky: LocalApiHabit = { ...HABIT, streakDays: 12 } as unknown as LocalApiHabit;
+    const leakyRun = await runReadTool(host([ITEM], [PROJECT], [leaky]), 'list_habits', {});
+    expect(leakyRun.ok).toBe(true);
+    if (!leakyRun.ok) return;
+    expect([...keysIn(leakyRun.payload)].filter((k) => !declared.has(k))).toEqual(['streakDays']);
   });
 
   it('🔴 判据有牙齿：多一个没声明的键就会被点出来', async () => {

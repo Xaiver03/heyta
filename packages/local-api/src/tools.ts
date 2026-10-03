@@ -83,6 +83,7 @@ export type {
   LocalApiWriteIntent,
   LocalApiWritePort,
   LocalApiWriteResult,
+  LocalApiWrittenEntityType,
   ReadVerdict,
   ToolKind,
 } from './tools/shared.js';

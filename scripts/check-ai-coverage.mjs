@@ -529,22 +529,27 @@ if (!exists(AI_DIST)) {
  * 于是它不是一份"待办清单的抄件"，而是一份**必须与上游逐字对账**的声明。
  */
 const ENTITY_COVERAGE_DEBT = new Map([
-  [
-    'PROJECT',
-    {
-      gap: 'AI-COV-1',
-      reason:
-        '只有 `list_projects`，没有任何写工具 —— 界面上能建清单、改名、删除（`ProjectsPanel`），' +
-        'AI 却提不出"把这条放进「工作」"。',
-    },
-  ],
+  // 🔴🔴 **下面四条的理由，第一版全是错的** —— 它们抄自一次"读完代码之后的汇报"，
+  // 那份汇报说 TAG / NOTE / HABIT_LOG / REMINDER **在产品侧根本没有写动作本体**，
+  // 所以"AI 连提案都产不出"。这次逐行打开了被调函数本体（2026-10-03）：
+  //   · project-actions.ts:178  createTag   → :183 dispatch，entityType TAG，opType Create
+  //   · note-actions.ts:133     createNote  → :140 dispatch，entityType NOTE
+  //   · habit-actions.ts:275    checkIn     → :283 dispatch，entityType HABIT_LOG
+  //   · reminder-actions.ts:174 writeNew    → :190 dispatch，entityType REMINDER
+  // 四条**全都有写路径**。错在哪一层：那份汇报按"函数名去搜实现"，没打开被调函数本体，
+  // 而我把它的结论直接抄进了一道门禁的理由串里 —— 于是**一句没取证的谎拿到了门禁的权威**，
+  // 下一轮读到它的人只会照着"产品没写路径"去排期。这正是本仓库反复付学费的形状
+  // （抄件一定会漂 + 断言"没有 X"必须读被调方本体）。原句留在下面不是为了引用，是为了认错。
+  //
+  // ⇒ 真正的卡点只有一个，而且是量出来的：目录容量，见每条末尾那句。
   [
     'TAG',
     {
       gap: 'AI-COV-2',
       reason:
-        '产品侧**没有标签的写动作本体**（`setTags` 在 app-host 里有形状，标签实体的创建/改名/删除没有实现）' +
-        '⇒ AI 连提案都产不出。要 AI 能改标签，先要有"改标签"这件事。',
+        '产品侧**有**写路径（project-actions.ts:178 的 createTag 真的 dispatch TAG 的 CRT）。' +
+        '卡点是目录容量：覆盖它要一读一写两个条目，而 local-api.spec.ts:87 判 ' +
+        'LOCAL_API_TOOLS.length <= 10、现 9 个 ⇒ 只剩 1 席。',
     },
   ],
   [
@@ -552,15 +557,8 @@ const ENTITY_COVERAGE_DEBT = new Map([
     {
       gap: 'AI-COV-3',
       reason:
-        '同 TAG：`note-actions.ts` 的创建/编辑路径没有真的写 op 的实现体' +
-        '⇒ 只读工具可以加，写提案加不了。',
-    },
-  ],
-  [
-    'HABIT',
-    {
-      gap: 'AI-COV-4',
-      reason: '界面上能新建/编辑习惯（`HabitsView`），目录里一个 HABIT 工具都没有。',
+        '同 TAG：note-actions.ts:133 的 createNote 真的 dispatch NOTE 的 CRT（该文件 6 处 dispatch）。' +
+        '卡点是同一个容量判据。',
     },
   ],
   [
@@ -568,8 +566,8 @@ const ENTITY_COVERAGE_DEBT = new Map([
     {
       gap: 'AI-COV-5',
       reason:
-        '「打卡」是用户真的能按的（`HabitsView` 的勾选），但 `logHabit` 没有写动作本体' +
-        '⇒ 与 AI-COV-2/3 同一类：先补产品的写路径，再补 AI 工具。',
+        'habit-actions.ts:275 的 checkIn 真的 dispatch HABIT_LOG 的 CRT，HabitsScreen 与 web 的勾选都在调它' +
+        '—— 第一版那句"logHabit 没有写动作本体"是错的。卡点是同一个容量判据。',
     },
   ],
   [
@@ -577,8 +575,10 @@ const ENTITY_COVERAGE_DEBT = new Map([
     {
       gap: 'AI-COV-6',
       reason:
-        '番茄钟能开始/结束（`focus-timer.ts`），AI 侧零工具。' +
-        '⚠️ 这条**刻意不放进"剔除项"**：它有用户能按的编辑面，按准入判据就该进分母。',
+        '番茄钟能开始/结束（focus-timer.ts），AI 侧零工具。' +
+        '⚠️ 这条**刻意不放进"剔除项"**：它有用户能按的编辑面，按准入判据就该进分母。' +
+        '🔴 卡点是容量：一读一写两个条目，而 local-api.spec.ts:87 判 <= 10、现 9 个 ⇒ 只剩 1 席。' +
+        '要么重新拍那条上限，要么先腾出一个既有工具 —— **不要为了塞进去而删工具**。',
     },
   ],
   [
@@ -586,8 +586,8 @@ const ENTITY_COVERAGE_DEBT = new Map([
     {
       gap: 'AI-COV-7',
       reason:
-        '提醒在任务行上就能设（`ReminderPanel` + 行内「提醒」），`reminder-actions.ts` 有写路径，' +
-        '但 AI 目录里一个 REMINDER 工具都没有。',
+        '提醒在任务行上就能设，reminder-actions.ts:174 的 writeNew 真的 dispatch REMINDER 的 CRT' +
+        '（该文件 6 处 dispatch）。卡点是同一个容量判据。',
     },
   ],
 ]);

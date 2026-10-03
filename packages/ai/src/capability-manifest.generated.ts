@@ -101,9 +101,9 @@ export const AI_CAPABILITY_MANIFEST =
     'source': 'ADR-0045 §2.6 纪律二',
   },
   'coverage': {
-    'covered': 1,
+    'covered': 3,
     'denominator': 8,
-    'ratio': '1/8',
+    'ratio': '3/8',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -140,7 +140,6 @@ export const AI_CAPABILITY_MANIFEST =
   'entityTypesWithoutTools': [
     'TAG',
     'NOTE',
-    'HABIT',
     'HABIT_LOG',
     'FOCUS_SESSION',
     'REMINDER',
@@ -165,11 +164,13 @@ export const AI_CAPABILITY_MANIFEST =
       'entityType': 'PROJECT',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'read-only',
+      'coverage': 'read-write',
       'readToolNames': [
         'list_projects',
       ],
-      'writeToolNames': [] as const,
+      'writeToolNames': [
+        'create_project',
+      ],
     },
     {
       'entityType': 'TAG',
@@ -191,9 +192,13 @@ export const AI_CAPABILITY_MANIFEST =
       'entityType': 'HABIT',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'none',
-      'readToolNames': [] as const,
-      'writeToolNames': [] as const,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_habits',
+      ],
+      'writeToolNames': [
+        'create_habit',
+      ],
     },
     {
       'entityType': 'HABIT_LOG',
@@ -299,6 +304,14 @@ export const AI_CAPABILITY_MANIFEST =
       'args': [] as const,
     },
     {
+      'name': 'list_habits',
+      'kind': 'read',
+      'entityType': 'HABIT',
+      'description': '列出习惯及其打卡目标（目标数值、单位、达成口径）。只列习惯的定义，不列每天的打卡记录。',
+      'schemaRecorded': true,
+      'args': [] as const,
+    },
+    {
       'name': 'create_task',
       'kind': 'write',
       'entityType': 'TASK',
@@ -360,6 +373,54 @@ export const AI_CAPABILITY_MANIFEST =
         },
       ],
     },
+    {
+      'name': 'create_project',
+      'kind': 'write',
+      'entityType': 'PROJECT',
+      'description': '新建一个清单（项目）。可选放进某个已有清单的下层，最多一层。名称不能为空；放在哪个清单下面由宿主核对，认不出就整条拒绝而不是建到看不见的地方。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'parentId',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'create_habit',
+      'kind': 'write',
+      'entityType': 'HABIT',
+      'description': '新建一个习惯。可指定每天的目标数值、单位与达成口径（至少 / 至多 / 恰好）。不传目标就是"每天做过一次"。名称不能为空。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'target',
+          'type': 'number',
+          'required': false,
+        },
+        {
+          'name': 'unit',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'goalType',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
   ],
   'protocolTypesWithoutModel': [
     'TASK_REPEAT_CFG',
@@ -384,26 +445,29 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 8 个，其中 1 个**读和写都有**工具（1/8）。',
+  '覆盖口径：用户可操作的已物化实体 8 个，其中 3 个**读和写都有**工具（3/8）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
-  '一、有 AI 工具的实体（1 个）',
+  '一、有 AI 工具的实体（3 个）',
   '- TASK —— 读和写都有（读 2 / 写 3）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
   '  · [写] create_task（title*:string, dueDate:string, priority:string, projectId:string）',
   '  · [写] update_task（taskId*:string, fields*:object）',
   '  · [写] complete_task（taskId*:string）',
-  '- PROJECT —— 只有读（读 1 / 写 0）',
+  '- PROJECT —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_projects（无参数）',
+  '  · [写] create_project（name*:string, parentId:string）',
+  '- HABIT —— 读和写都有（读 1 / 写 1）',
+  '  · [读] list_habits（无参数）',
+  '  · [写] create_habit（name*:string, target:number, unit:string, goalType:string）',
   '',
-  '二、产品里有、但我没有任何工具的实体（6 个）—— 实体存在，只是我没配工具',
+  '二、产品里有、但我没有任何工具的实体（5 个）—— 实体存在，只是我没配工具',
   '- TAG：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '- NOTE：产品支持它，但我没有任何工具 —— 别说产品做不到。',
-  '- HABIT：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '- HABIT_LOG：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '- FOCUS_SESSION：产品支持它，但我没有任何工具 —— 别说产品做不到。',
   '- REMINDER：产品支持它，但我没有任何工具 —— 别说产品做不到。',

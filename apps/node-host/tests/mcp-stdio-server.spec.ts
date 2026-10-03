@@ -49,6 +49,7 @@ function fakeHost() {
     listTasks: () => Promise.resolve(TASKS),
     getTask: (id) => Promise.resolve(TASKS.find((t) => t.id === id)),
     listProjects: () => Promise.resolve([]),
+    listHabits: () => Promise.resolve([]),
     submit: (intent) => {
       submitted.push(intent);
       return Promise.resolve({ ok: true, taskId: 'new-1' });

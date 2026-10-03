@@ -47,6 +47,7 @@ function fakeHost() {
     listTasks: () => Promise.resolve([TASK]),
     getTask: () => Promise.resolve(TASK),
     listProjects: () => Promise.resolve([]),
+    listHabits: () => Promise.resolve([]),
     submit: (intent) => {
       submitted.push(intent);
       return Promise.resolve({ ok: true, taskId: 't-new' });
@@ -194,6 +195,7 @@ describe('🔴 真实 HTTP 往返', () => {
       listTasks: () => Promise.resolve([secret]),
       getTask: () => Promise.resolve(secret),
       listProjects: () => Promise.resolve([]),
+      listHabits: () => Promise.resolve([]),
       submit: () => Promise.resolve({ ok: true, taskId: 'x' }),
     };
     server = await startOnFreePort(host);

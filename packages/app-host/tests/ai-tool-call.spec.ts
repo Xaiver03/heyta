@@ -56,6 +56,7 @@ function fakeHost(): LocalApiHost & { submits: number } {
     listTasks: (): Promise<readonly LocalApiItem[]> => Promise.resolve(items),
     getTask: (): Promise<LocalApiItem | undefined> => Promise.resolve(items[0]),
     listProjects: () => Promise.resolve([{ id: 'p1', name: '工作', taskCount: 1 }]),
+    listHabits: () => Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
     submit: (): Promise<{ ok: true; taskId: string }> => {
       host.submits += 1;
       return Promise.resolve({ ok: true, taskId: 'created-1' });

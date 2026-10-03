@@ -35,15 +35,18 @@
  */
 
 import type {
+  LocalApiHabit,
   LocalApiHost,
   LocalApiItem,
   LocalApiProject,
   LocalApiWriteIntent,
   LocalApiWriteResult,
 } from '@heyta/local-api';
-import { Priority, type Task } from '@heyta/domain';
+import { Priority, type Habit, type HabitGoalType, type Task } from '@heyta/domain';
 
 import type { ActionContext, TaskActions } from './actions.js';
+import { createHabitActions, type HabitActions, type NewHabitFields } from './habit-actions.js';
+import { createProjectActions, type ProjectActions } from './project-actions.js';
 
 export interface LocalApiHostOptions {
   /**
@@ -129,6 +132,29 @@ export function taskToItem(task: Task, readable: boolean): LocalApiItem {
   return item;
 }
 
+/**
+ * 达成口径的闭集。与 `@heyta/domain` 的 `HabitGoalType` **同集合 —— 两边一起改**
+ * （同 `focus-actions.ts` 的 `KINDS` 那条先例）。
+ *
+ * 🔴 为什么在**这里**验而不是在协议层：本包零依赖，写不出这个类型；而"不认识的
+ * 值"如果原样进 `createHabit` 的载荷，会被 `isAchieved` 当成**默认口径**处理 ——
+ * 症状是"我要的是今天一次都不碰，结果它按至少一次算"，而任何一层都不报错。
+ */
+const GOAL_TYPES: ReadonlySet<string> = new Set<string>(['atLeast', 'atMost', 'exactly']);
+
+/**
+ * `Habit` → `LocalApiHabit`。**白名单重建**（同 `taskToItem` / `projectForTool`）：
+ * `color` / `icon` / `frequency` / `backfillDays` 一律不出 ——
+ * 它们不在 `list_habits` 的 `egressFields` 里，多搬一个字段就是让出境声明说谎。
+ */
+export function habitToItem(habit: Habit): LocalApiHabit {
+  const item: LocalApiHabit = { id: habit.id, name: habit.name };
+  if (habit.target !== undefined) item.target = habit.target;
+  if (habit.unit !== undefined) item.unit = habit.unit;
+  if (habit.goalType !== undefined) item.goalType = habit.goalType;
+  return item;
+}
+
 export function createLocalApiHost(
   ctx: ActionContext,
   actions: TaskActions,
@@ -147,6 +173,15 @@ export function createLocalApiHost(
   options: LocalApiHostOptions,
 ): LocalApiHost {
   const isReadable = options.isReadable;
+
+  // 🔴 清单与习惯的动作**在这里内部构造**，不从壳注入 —— 这两个动作集只需要
+  // `ActionContext`（`dispatch` + `getState`），而 `ctx` 已经在参数里。
+  // 为什么不做成 `options.projectActions`：那样每个宿主都要多接一根线，
+  // 而**漏接的那一个只会让 `submit` 少一条分支**（AGENTS §3.5 的"每端一份、
+  // 各自漂移"就是这么长出来的）。内部构造 ⇒ 三个宿主（Web / node-host CLI / MCP stdio）
+  // 接到的行为逐字相同，且 op 的构造仍然只在 `project-actions.ts` / `habit-actions.ts` 里有一份。
+  const projectActions = createProjectActions(ctx);
+  const habitActions = createHabitActions(ctx);
 
   return {
     listTasks: (args) => {
@@ -208,7 +243,12 @@ export function createLocalApiHost(
       return Promise.resolve(projects);
     },
 
-    submit: (intent) => submitIntent(actions, intent),
+    // 顺序与 `listTasks()` 同一条规则（`habit-actions.ts` 的 `listHabits` 已经排过），
+    // 所以"AI 看到的第 N 个习惯"与界面上的第 N 个是同一个 —— 不是实现细节，
+    // 是跨端一致的那条（见 `actions.ts` 的 `byCanonicalOrder`）。
+    listHabits: () => Promise.resolve(habitActions.listHabits().map(habitToItem)),
+
+    submit: (intent) => submitIntent(ctx, actions, projectActions, habitActions, intent),
   };
 }
 
@@ -217,9 +257,15 @@ export function createLocalApiHost(
  *
  * 🔴 **这是 `LocalApiWriteIntent` 唯一被解释的地方。**
  * 译不出来（或参数不合法）就返回 `invalid`，**绝不"尽力而为"地猜**。
+ *
+ * ⚠️ 联合类型**没有 `default` 分支**是刻意的：加一个写入动作而不在这里表态，
+ * 编译就过不去（那正是"每个宿主都被逼着表态"的落点，而三个宿主共用这一个实现）。
  */
 async function submitIntent(
+  ctx: ActionContext,
   actions: TaskActions,
+  projectActions: ProjectActions,
+  habitActions: HabitActions,
   intent: LocalApiWriteIntent,
 ): Promise<LocalApiWriteResult> {
   switch (intent.action) {
@@ -305,6 +351,86 @@ async function submitIntent(
       }
       await actions.setCompleted(intent.taskId, true);
       return { ok: true, taskId: intent.taskId };
+    }
+
+    case 'create-project': {
+      const name = intent.name.trim();
+      // 空名**不落到 `projectActions.createProject`** —— 它会 throw，而 throw 会顺着
+      // 两个壳的 catch 变成一句"工具执行失败"。这里返回 `invalid`，用户看到的是原因。
+      // （同 `create-task` 那条"标题不能为空"。）
+      if (name === '') {
+        return { ok: false, reason: 'invalid', message: '清单名称不能为空。' };
+      }
+      if (intent.parentId !== undefined) {
+        const parent = ctx.getState().projects[intent.parentId];
+        if (parent === undefined || parent.deletedAt !== undefined) {
+          return {
+            ok: false,
+            reason: 'not-found',
+            message: `找不到要放进的那个清单（parentId「${intent.parentId}」）。`,
+          };
+        }
+        // 🔴 领域层明确**只支持一层**（`Project.parentId` 的注释 + `packages/ui/src/projects/model.ts:72`），
+        // 而界面只渲染"顶层 + 其下一级"。挂到一个本身已是子级的清单下面，
+        // 建出来的清单在四个端上**都看不见** —— 写成功、读不出、不报错。
+        if (parent.parentId !== undefined) {
+          return {
+            ok: false,
+            reason: 'invalid',
+            message: `「${parent.name}」已经在一个清单下面了，清单只支持一层。`,
+          };
+        }
+      }
+      const id = await projectActions.createProject(name, intent.parentId);
+      return { ok: true, taskId: id, entityId: id, entityType: 'PROJECT' };
+    }
+
+    case 'create-habit': {
+      const name = intent.name.trim();
+      if (name === '') {
+        return { ok: false, reason: 'invalid', message: '习惯名称不能为空。' };
+      }
+
+      const over: NewHabitFields = {};
+
+      if (intent.target !== undefined) {
+        // 下界是 **0 而不是 1**：`goalType: 'atMost'` 时"目标 0 次"是合法习惯
+        // （"今天一次都不碰"）。同 `setHabitGoal` 那条判定 —— 两边必须同口径，
+        // 否则"AI 能建、界面不能改"这种分裂就会出现。
+        if (!Number.isFinite(intent.target) || intent.target < 0) {
+          return {
+            ok: false,
+            reason: 'invalid',
+            message: `目标数值必须是不小于 0 的有限数，收到「${String(intent.target)}」。`,
+          };
+        }
+        over.target = intent.target;
+      }
+
+      if (intent.unit !== undefined) {
+        const unit = intent.unit.trim();
+        if (unit === '') {
+          // 空单位**拒绝**而不是落成空串：界面上会渲染成「8 」（少一个字的观感），
+          // 而 `setHabitGoal` 对同一个输入的处理是"清除单位"—— 两条路对同一句话
+          // 给两种结果就是漂移。要单位就别给空的。
+          return { ok: false, reason: 'invalid', message: '单位不能是空白；要没有单位就别传这个字段。' };
+        }
+        over.unit = unit;
+      }
+
+      if (intent.goalType !== undefined) {
+        if (!GOAL_TYPES.has(intent.goalType)) {
+          return {
+            ok: false,
+            reason: 'invalid',
+            message: `达成口径应为 atLeast / atMost / exactly，收到「${intent.goalType}」。`,
+          };
+        }
+        over.goalType = intent.goalType as HabitGoalType;
+      }
+
+      const id = await habitActions.createHabit(name, over);
+      return { ok: true, taskId: id, entityId: id, entityType: 'HABIT' };
     }
   }
 }

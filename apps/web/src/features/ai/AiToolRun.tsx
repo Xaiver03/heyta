@@ -104,6 +104,13 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t']): stri
       return t('web.ai.tools.intentUpdate', { id: intent.taskId });
     case 'complete-task':
       return t('web.ai.tools.intentComplete', { id: intent.taskId });
+    // 🔴 每条**新写的**意图都要在这里有一句人话。这里没有 `default`：
+    // 加了写入动作而不改这里就编译不过 —— 而漏改的症状是"提案卡上一片空白"，
+    // 用户点确认时看不见将要发生什么（那才是这套确认机制唯一起作用的地方）。
+    case 'create-project':
+      return t('web.ai.tools.intentCreateProject', { name: intent.name });
+    case 'create-habit':
+      return t('web.ai.tools.intentCreateHabit', { name: intent.name });
   }
 }
 
