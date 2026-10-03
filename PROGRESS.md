@@ -1145,31 +1145,40 @@ mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计�
 
 细节全在 `docs/plans/ai-event-tool-contract.md` §15.5–§15.9，本节只放**带载体的读数**（抄件必漂）。
 
-**① 合并 ✅** —— `feat/ai-entity-coverage` + `feat/assistant-history-local-persistence` +
+**① 合并 🟡 —— "并成一条集成线" ✅，"落到本地 main" 🟡 未做（01:3x 现量：11 个别人未提交的文件挡路，
+`git merge-tree` 反而 rc=0 零冲突；落地代价与逐条归属在 `BLOCKED.md` B65）** ——
+`feat/ai-entity-coverage` + `feat/assistant-history-local-persistence` +
 `integrate/2026-10-03-closeout` 并成一条集成线。落地形状**从快进改成带对账的合并**，因为 `main`
 在这批工作期间前进了三次（`792f9b2d` → `192a516d` → `1694b7d0` → `120c8153`）。
 预演 `git merge-tree --write-tree` 零冲突；两侧文件交集**只有 i18n 两份词条表**，逐条量过：
 三处参照键数 2850 / 2841 / 2860、重复键 0、单边键 0、算术闭合；合并结果 tree 与预演预测
 `b08b020c` 逐字节相同。
 
-**② 集成态验证 🟡（段 0–50 绿 / 段 51 挂上游 / 段 52–60 逐段补）** —— 载体 `10dc0bd4`
-（🔴 更正：runner 打印的是合并那一刻的 `b6294ef0`，而链起跑时 HEAD 已前进两笔 docs ——
-"打印过的 SHA"不等于"运行时的 SHA"）。`pnpm build` rc=**0**；`pnpm check`（61 段）rc=**1**，
-断在第 51 段 `check:ai-e2e`：`3 failed / 2 skipped / 112 passed`。三条红两种性质：一条是 4318
-载体被对端 preflight 按端口 SIGKILL（环境无效），两条是 `calendar-sidebar.spec.ts:111/:226` 的
-**确定性**红 —— 归属 `main` 侧 `192a516d`（三条独立证据 + 人眼看图，见 §15.9 与 `B56`）。
-反方向一条：第 54 段 `check:shell-unicode` 在 `main` 上是红的（`scripts/mutate-closeout-gates.sh:223/232/242`
-三处 `「$V1」`），本线 `1a6640f2` 已修 —— **落地会让 main 这一段从红变绿**。
-段 52–60 里 54 / 57 / 59 已单跑 **rc=0**（静态判据，理由写在 §15.9 的读数表），真浏览器与设备那六段
-全部留在"对端清空 + 负载门"后面，一条都不提前跑。
+**② 集成态验证 ✅ 有一趟有效读数，🟡 合并后的复核被环境挡在门外** —— 最新一趟：载体
+`heyta-wt-ai-closeout @ 187057bb`（01:34 起跑，负载门 load≈12 放行），`pnpm -r build` **rc=0**，
+逐段链 **73 段 = 64 绿 / 8 红 / 1 按规则不跑**（`check:ai-e2e` 会 SIGKILL 别人在 4318/4319 的 vite，
+traps #87 ⇒ 记"未跑"不记"通过"）。8 条红逐条带归属在 `BLOCKED.md` **B65**，一句话版本：
+65 `check:shell-unicode` 是**本批自己的**（6 处 `$VAR` 紧跟中文 ⇒ 值被吞），已当场修完并复跑该段 rc=0；
+其余 7 条属成长/详情/日历/总接线/W9/自托管×vault 六条线，其中 26 与 31 两条门禁**根本不在 main**，
+落地当天才显形。五条隐私不变量在这一趟里全部有 rc=0 的段号（43/44/61/63 + 24/25/27/50）。
+🔴 顺带量到"落地会把 main 从 **63 段** 带到 **73 段**"，新增的 10 段是别人的门禁 —— 见 B65。
+01:4x 在并行会话两次 merge 之后的 `2e50ee97` 上复核：四条**源码级** gate 仍 rc=0，
+而 `check:privacy-consent-e2e` 翻红 —— **现量否证成"不是产品"**：`priorityColorToken` 在
+`packages/ui/src/index.ts:1097` 有、`packages/ui/dist` 里 0 命中（dist 落后于合并后的源码，
+traps #27/#79 那一族），我补跑的 `pnpm -r build` 又撞到 `apps/node-host` DTS 阶段 `TS7006`，
+而单跑那个包**是过的**、端口两版逐字相同 ⇒ 多 tsup 抢同一棵 dist 的竞态。现量 `load 515` +
+对端 7 个构建进程 ⇒ **按环境无效记录，不降级判据**，重开条件写在 B65。
+（前一趟读数：载体 `10dc0bd4` 的"61 段 / 断在第 51 段 `check:ai-e2e`"已过期 —— 段数与红集都换了，
+🔴 但那句"第 54 段 `check:shell-unicode` 在 main 上是红的、本线 `1a6640f2` 已修，落地会让它从红变绿"
+**只对了半天**：后来那批 W1–W4 旋钮把同一写法长回来了 6 处，本轮再修一次 ——
+"修过"从来不等于"不会再漂"，能等于的只有常驻门禁。）
 
-**③ 交付 ⏸（前置不成立，不放宽闸门）** —— `pnpm reinstall:all` 的闸门是"链 rc=0"，而只要 `main`
-带着 organizer 那条红它就结构上不可达。本轮把 Windows 段的判据从两条补成**五条且住进单一所有者**
-（`scripts/lib/msix-install-facts.sh`：`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` /
-`M2D=OK` / `SHORTCUT_OK=True`）；用户点名的「自动创建快捷方式」真身在
-**`apps/desktop-windows/scripts/install-and-capture.ps1`**（段落从 `:82` 起，`:110` 建
-`<Desktop>\heyta.lnk`，MSIX 走 `explorer.exe shell:AppsFolder\<PFN>!App` 与脚本自己的启动路径**同一条**，
-`:236` 把 `SHORTCUT_OK=` 写进取证文件），实现与判据齐，**未跑**（跑在 ③ 后面）。
+**③ 交付 ⏸（不是判据不够，是载体刚被改过 + 环境无效）** —— 四段现状：mac ✅（B61 已闭合，
+安装副本自截屏非空白且主蓝命中）、Windows ✅（任务 #29，判据五条住进 `scripts/lib/msix-install-facts.sh`，
+用户点名的「自动创建快捷方式」实现与判据齐）、Android ✅（23:35 拿到绿读数）、iOS 🟡 未闭合（B62，
+三台 `Booted` 全有主）。🔴 新情况：01:4x 之后载体的源码被并行会话两次 merge 改过，
+而 §6.1.1 这条固定收尾装的是**当前产物** ⇒ `pnpm reinstall:all` 必须在**新尖端**重跑才有效，
+此刻 `load 515` + 对端 7 个构建进程 + 设备被占 ⇒ **环境无效，未跑**（不降级判据、不拿旧读数顶）。
 
 > 🔴 22:0x 现量把上面这段里**我自己写错的两处**改掉，原文形状留在下面，因为它们是同一种错的两个实例：
 > ① 原句写"四个读取点已接上" —— 实际是**一个**调用点（`reinstall-all.sh:249 msix_check_facts`）
