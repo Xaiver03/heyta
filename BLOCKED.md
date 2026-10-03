@@ -2499,3 +2499,24 @@ HEAD 里我的 B25–B27 与 goal §7.1 就**从历史上消失**（他们的提
 正好是 kit 里 `Stack`（`gap` 缺省档）与 `HStack gap align="center"` 的**逐字节等价出口**，
 一处都不用给共享层加新 API；`SettingsScreen` 另有 2 处同类（303/306）。
 其余的（`TaskDetailSheet` 26 处、`TasksScreen` 15 处）才是真需要 `ListSurface`/`TaskRow` 那档设计口径的部分。
+
+### B30.2 补充：B30 那句"只剩 check 链的这两段"当时**少算了一段**（2026-10-03 10:3x 逐段实测，HEAD `a2d0d634`）
+
+B30 写在 10:0x，依据是"`&&` 链断在第一红之后，后面的段没执行"这一**推断**。随后把链逐段单独跑
+（跳过需要设备/GUI/重负载的 12 段；`check:ai-e2e`、`check:landing-e2e` 已按 B22/B24 单独实测）
+才发现最后一段 `pnpm -r test` 也是红的。✅ 两条都在本条线当场修完（都是**撞见**的仓库级红，
+不是本条线欠的账，也不是为了让套件绿而改判据）：
+
+| 那段里的失败 | 修复前现量 | 归属 | 修复笔 |
+|---|---|---|---|
+| `password-reset-page.spec.ts:74` | **1 failed / 22 passed**，对所有机器形态都红 | `ce23d3ab` 语言改判**漏掉的第四份判据**（文件 10-01 就在） | `c1395bf8`：反向断言 + 同页阳性对照，两次相反方向的变异各只打红一条（§7 第 167 条） |
+| `account-profile.spec.ts` | 干净检出 `Test Files 1 failed` + `Tests no tests`（27 条没跑）；主检出全绿 | `7e299118`（09:38）带进来的第 5 个 `dotenv` 依赖，属 §7 第 157 条那一类 | `a2d0d634`：改回 `vi.hoisted` + `??=`，并补 `test-env-contract.spec.ts` 让这条约定第一次会失败 |
+
+修复后的现量：主检出与干净检出的 server 整片都是 **111 files / 2095 passed / 1 skipped**；
+`pnpm -r test` 在**干净检出**（`/tmp/heyta-g5` detached @ `a2d0d634`，无 `server/.env`）
+**20 个 test 任务全过、`INNER_EXIT=0`**（traps #164：后台通知的退出码是包装命令的，所以这里写的是日志里的 `INNER_EXIT`）。
+
+🔴 顺带记一次自己的错判：这一条**先被判成"隔离检出缺 `.env` 的探针缺件"**。按第 157 条的标准那句不成立
+—— 干净检出是 CI 的唯一形态，"我这台机器绿"不是排除证据；两种树形各量一次才分得开谁在说谎。
+
+⇒ B30 表格的"两段"现在是**实测**的（`check:l4` 与 `check:landing-e2e`），处置与代价未变，仍按 B30 正文。
