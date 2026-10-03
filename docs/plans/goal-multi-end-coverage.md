@@ -175,7 +175,7 @@ B27 那笔还账（`bb41e9fe`：`Stack` 补 `gap="tight"`、新增 `HStack`、`T
 | 12 | `check:l4` | screens 内联样式 98 > 基线 90（多 8） | 本条线欠的 10 处已清 9 处（`bb41e9fe`），剩 8 处按 B27 的 blame 属 M3 那条线。**门禁绿在本条线不可达** |
 | 49 | `check:ai-e2e` | **3 failed / 98 passed**（`8b41648a` 干净检出 07:5x 复跑，与逐段循环同数） | B22 已把归因点到**三枚未提交文件**：`DueEditor.tsx`（弹层永不 stable）、`App.tsx` + `view-tabs.ts`（日历没登记进标题回落表 ⇒ 页头挂着「收集箱」）。**不是本条线欠的，也不是用例坏了** |
 | 51 | `check:landing-e2e` | **2 failed / 15 passed**（同一轮复跑，未变） | B24 已取证：**判据断在一个没人实现过的目录名上**；未提交侧没有对应修复文件，归因不变 |
-| 57 | `pnpm -r test` | server 4 个文件加载失败：`JWT_SECRET environment variable is required`（其余 103 文件 / 2005 条全过） | 🔴 **环境红，不是产品红**，而且反证做了两半：机制上 `server/.env` 被 `server/.gitignore:5` 忽略 ⇒ 任何干净克隆都没有它；行为上补一个随机 `JWT_SECRET` 后那 4 个文件 **4 passed / 43 tests passed**（`/tmp/g5-jwt-proof.log`，`rc=0`）。主工作树有 `server/.env`，所以这一条在主线上是绿的 |
+| 57 | `pnpm -r test` | server 4 个文件加载失败：`JWT_SECRET environment variable is required`（其余 103 文件 / 2005 条全过） | 🔴 **环境红，不是产品红**，而且反证做了两半：机制上 `server/.env` 被 `server/.gitignore:5` 忽略 ⇒ 任何干净克隆都没有它；行为上补一个随机 `JWT_SECRET` 后那 4 个文件 **4 passed / 43 tests passed**（`/tmp/g5-jwt-proof.log`，`rc=0`）。🔴 **但这条定性后来被推翻了一半**：CI 的唯一形态就是干净检出，所以这是链的缺陷 —— 已按仓库既有约定修掉，见 §7.5 |
 
 **补一条主线直测（2026-10-03 08:00）**：上面那句"主线是绿的"当时只有机制推论，现在量过了 ——
 `pnpm --filter @heyta/sync-server test` 在**主工作树**上 **exit 0**，**110 个文件全过（共 110）**、**2091 passed / 1 skipped**（总 2092），
@@ -209,7 +209,7 @@ i18n 中英复验过（`check:ui-language` 绿）。落点见 §5 与上面各�
 | 收尾项 | 结论 | 证据 |
 |---|---|---|
 | `pnpm reinstall:all` 四端装当前产物 | ✅ 成立，但**取证分两批** | android / ios 在 `6834b4ae` 重跑（§7.2）；mac / windows 的判据在 `d25161ce` 上取，**继承的合法性来自对账**：`d25161ce..HEAD` 里 `apps/web` / `apps/desktop*` / `packages/` 命中 0 |
-| `pnpm check` 全量绿 | 🔴 **不可达** | 57 段逐段循环：4 段红（§7.2 表；§7.4 另证这 8 笔没引入新红）。**没有一条是本条线欠的账** —— l4 剩 8 处属 M3（B27）、ai-e2e 3 条属"提交态落后于别人未提交的工作"（B22）、landing-e2e 2 条属判据断在没人实现的目录名（B24）、`-r test` 4 文件是干净克隆缺 gitignored 的 `server/.env`（两半反证都在 §7.2） |
+| `pnpm check` 全量绿 | 🔴 **不可达（缺口已从 4 缩到 3）** | 57 段逐段循环：4 段红（§7.2 表；§7.4 另证这 8 笔没引入新红；**§7.5 把其中 `-r test` 那道修掉了**）。**没有一条是本条线欠的账** —— l4 剩 8 处属 M3（B27）、ai-e2e 3 条属"提交态落后于别人未提交的工作"（B22）、landing-e2e 2 条属判据断在没人实现的目录名（B24）、`-r test` 4 文件是干净克隆缺 gitignored 的 `server/.env`（两半反证都在 §7.2） |
 | 按归属纪律提交 | ✅ 达成 | 收尾这一轮 4 笔（`bb41e9fe` / `6997592c` / `6834b4ae` / `ef67b0d4`），每笔都点名路径 + plumbing，判据行统一打印 `别人暂存条目: 提交前=9 提交后=9 丢失=0`；`0/0` 的 filemode 变化（`verify-mobile-quadrant-fill.sh` / `-sort-sheet.sh`，别人的）被排除在清单外 |
 | Goal 完成审计 | ✅ 就是本节 | —— |
 
@@ -254,3 +254,24 @@ detached 到 `2831111d`）上又逐段跑了一遍：
 
 📌 这条的价值不在"绿了多少段"，而在**把"我只改了文档"这句自我陈述换成一次可比对的实测**：
 同一套 57 段、同一台机器、两枚 commit，红段集合的差集为空 —— 这才是"没引入新红"的可复核形态。
+
+### 7.5 ✅ 第 4 道红（`pnpm -r test`）**修掉了**，不是登记掉的（2026-10-03 08:2x）
+
+§7.2 把它定性成"取证环境缺 gitignored 的 `server/.env`"——那句是对的，但**结论下早了**：
+CI 的唯一形态就是干净检出，所以"干净检出上必红"本身就是这条链的缺陷，不是环境的错。
+仓库里早就有解决它的约定：需要令牌的 spec 自己用 `vi.hoisted` 把 `JWT_SECRET` 放好
+（`password-recovery.spec.ts`、`magic-link-registration.spec.ts`、`replace-token-expiry.spec.ts` 都是这么写的），
+因为 `getJwtSecret()` 跑在 `src/auth.ts:48` 的**模块顶层**。这 4 个文件没跟上约定，
+只是被开发机上的 `.env` 长期遮住了 —— 其中 `email-locale-wire.spec.ts` 连 `JWT_SECRET` 都没提，
+是**经 import 链**（`../src/api` → `src/auth`）加载到那行的，所以"它到底会不会读环境变量"是查出来的，不是假设的。
+
+| 步 | 结果 |
+|---|---|
+| 4 个文件各插一个 `vi.hoisted` 块（`??=`，不覆盖自己设过值的文件） | 命中数逐文件断言 =1 |
+| 干净检出（`/tmp/heyta-ios-ab`，**没有** `server/.env`、`src/auth.ts` 是提交态）跑那 4 个文件 | **4 passed (4) / 43 tests passed**，`rc=0` |
+| 🔴 变异：把其中一个文件退回提交态（没有那个块）再跑 | **`Test Files 1 failed`**、报回原错 `JWT_SECRET environment variable is required`，`rc=1` ⇒ 这块是**承重的**，不是装饰 |
+| 同一棵干净检出跑整段 `pnpm -r test` | **`RTEST_EXIT=0`**；server **107 文件全过**、**2048 passed / 1 skipped**（总 2049） |
+
+⇒ 57 段链在干净检出上的红段从 **4 段变成 3 段**（`check:l4` / `check:ai-e2e` / `check:landing-e2e`），
+剩下这 3 段逐条属别人那条线（§7.2 表 + B22/B24/B27）。**"全量绿"仍然没达成，但缺口从 4 缩到 3，
+而且这 3 段没有一个是可以靠"给测试补配置"糊过去的**。
