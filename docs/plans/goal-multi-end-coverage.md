@@ -177,6 +177,12 @@ B27 那笔还账（`bb41e9fe`：`Stack` 补 `gap="tight"`、新增 `HStack`、`T
 | 51 | `check:landing-e2e` | **2 failed / 15 passed**（同一轮复跑，未变） | B24 已取证：**判据断在一个没人实现过的目录名上**；未提交侧没有对应修复文件，归因不变 |
 | 57 | `pnpm -r test` | server 4 个文件加载失败：`JWT_SECRET environment variable is required`（其余 103 文件 / 2005 条全过） | 🔴 **环境红，不是产品红**，而且反证做了两半：机制上 `server/.env` 被 `server/.gitignore:5` 忽略 ⇒ 任何干净克隆都没有它；行为上补一个随机 `JWT_SECRET` 后那 4 个文件 **4 passed / 43 tests passed**（`/tmp/g5-jwt-proof.log`，`rc=0`）。主工作树有 `server/.env`，所以这一条在主线上是绿的 |
 
+**补一条主线直测（2026-10-03 08:00）**：上面那句"主线是绿的"当时只有机制推论，现在量过了 ——
+`pnpm --filter @heyta/sync-server test` 在**主工作树**上 **exit 0**，**110 个文件全过（共 110）**、**2091 passed / 1 skipped**（总 2092），
+而且这一跑是踩在别人**未提交**的 `server/src/auth.ts` 等改动上做的，仍然全绿。
+⇒ 第 4 道红的定性从"干净克隆缺 gitignored 配置"升级为"同一套用例在有配置的树上实测通过"，
+   不留"把推论当证据"的尾巴。
+
 ⇒ **"pnpm check 全量绿"在本轮不可达**，而且不可达的原因一条都不是"本条线留了坏东西"：
 1 条是别人的棘轮账（本条线的账已清）、2 条已由 B22/B24 归因、1 条是取证环境的 gitignored 配置。
 把这条写在这里而不是删掉那 4 行，是因为"我全量绿了"如果被读成一句假话，下一位会照着它建判据。
