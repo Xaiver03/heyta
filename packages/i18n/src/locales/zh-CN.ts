@@ -1549,6 +1549,7 @@ export const zhCN = {
   'web.ai.tools.intentCreate': '新建任务「{title}」',
   'web.ai.tools.intentUpdate': '修改任务 {id}',
   'web.ai.tools.intentComplete': '把任务 {id} 标记完成',
+  'web.ai.tools.intentCompleteBatch': '把这 {count} 个任务标记完成',
   'web.ai.tools.intentCreateProject': '新建清单「{name}」',
   'web.ai.tools.intentCreateHabit': '新建习惯「{name}」',
   'web.ai.tools.intentCreateTag': '新建标签「{name}」',

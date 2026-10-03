@@ -15,6 +15,7 @@
 import type { McpToolDefinition } from '../mcp.js';
 import type { LocalApiHost, ToolReadOutcome, ToolWriteIntentOutcome } from '../server.js';
 import {
+  MAX_TASKS_PER_BATCH_COMPLETE,
   projectListForTool,
   readItemForTool,
   readListTasksDueArgs,
@@ -65,7 +66,11 @@ const TOOLS: readonly LocalApiTool[] = [
   {
     name: 'complete_task',
     egressFields: [],
-    description: '把任务标记为完成。',
+    // ⚠️ 这个数字来自 `MAX_TASKS_PER_BATCH_COMPLETE`，不是抄的：描述会出境给模型，
+    // 一个和实际拒判不一致的上限，症状是"模型以为能给 30 条、每次都被告知太多"。
+    description:
+      '把任务标记为完成。单条给 taskId；要一次完成多条给 taskIds' +
+      `（一次最多 ${String(MAX_TASKS_PER_BATCH_COMPLETE)} 条，按去重后的条数算）。`,
     kind: 'write',
     defaultEnabled: false,
   },
@@ -140,9 +145,18 @@ const SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
   complete_task: {
     type: 'object',
     properties: {
-      taskId: { type: 'string', description: '要标记完成的任务 id。' },
+      taskId: { type: 'string', description: '要标记完成的那一条任务 id。' },
+      taskIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          `要一次标记完成的多条任务 id（最多 ${String(MAX_TASKS_PER_BATCH_COMPLETE)} 条）。` +
+          '与 taskId 二选一，都给会被拒绝而不是挑一个用 —— 一次意图只能有一个范围。',
+      },
     },
-    required: ['taskId'],
+    // ⚠️ 这里刻意**没有** `required`：单条与批量是同一件事的两种范围，
+    // "两个都没给"由 `toWriteIntent` 判（判据在那里，症状是一条说得出原因的报错，
+    // 不是模型收到一个协议层的 schema 拒绝）。
     additionalProperties: false,
   },
 };
@@ -249,10 +263,49 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
     }
 
     case 'complete_task': {
-      if (typeof a['taskId'] !== 'string') {
-        return { ok: false, message: 'complete_task 需要 taskId。' };
+      const single = a['taskId'];
+      const batch = a['taskIds'];
+      if (single !== undefined && batch !== undefined) {
+        return {
+          ok: false,
+          message: 'complete_task 的 taskId 与 taskIds 只能给一个：一次意图的范围要么是一条，要么是多条。',
+        };
       }
-      return { ok: true, intent: { action: 'complete-task', taskId: a['taskId'] } };
+      if (single !== undefined) {
+        if (typeof single !== 'string' || single === '') {
+          return { ok: false, message: 'complete_task 的 taskId 应是非空字符串。' };
+        }
+        return { ok: true, intent: { action: 'complete-task', taskId: single } };
+      }
+      if (batch === undefined) {
+        return { ok: false, message: 'complete_task 需要 taskId（单条）或 taskIds（批量）。' };
+      }
+      if (
+        !Array.isArray(batch) ||
+        batch.some((id) => typeof id !== 'string' || (id as string) === '')
+      ) {
+        return { ok: false, message: 'taskIds 必须是由非空 id 字符串组成的数组。' };
+      }
+      // 先去重再判上限：否则"同一份清单点了 25 次"会因为重复被拒，而它实际只有几条。
+      const ids = [...new Set(batch as readonly string[])];
+      if (ids.length === 0) {
+        return { ok: false, message: 'taskIds 是空的：没有要完成的任务。' };
+      }
+      if (ids.length > MAX_TASKS_PER_BATCH_COMPLETE) {
+        return {
+          ok: false,
+          message:
+            `一次最多完成 ${String(MAX_TASKS_PER_BATCH_COMPLETE)} 条，去重后收到 ${String(ids.length)} 条。` +
+            '要再多就得分成几次，每次都要单独确认 —— 这个上限守的是"那一次确认"本身。',
+        };
+      }
+      const [only] = ids;
+      if (ids.length === 1 && only !== undefined) {
+        // 去重后只剩一条就走单条形状：确认卡上"这条"和"这 1 条"是两句话，
+        // 而批量形状会让用户以为还有一件别的事发生。
+        return { ok: true, intent: { action: 'complete-task', taskId: only } };
+      }
+      return { ok: true, intent: { action: 'complete-tasks', taskIds: ids } };
     }
 
     default:

@@ -1452,6 +1452,7 @@ export const en = {
   'web.ai.tools.intentCreate': 'Create task "{title}"',
   'web.ai.tools.intentUpdate': 'Update task {id}',
   'web.ai.tools.intentComplete': 'Mark task {id} as done',
+  'web.ai.tools.intentCompleteBatch': 'Mark {count} tasks as done',
   'web.ai.tools.intentCreateProject': 'Create list "{name}"',
   'web.ai.tools.intentCreateHabit': 'Create habit "{name}"',
   'web.ai.tools.intentCreateTag': 'Create tag "{name}"',
