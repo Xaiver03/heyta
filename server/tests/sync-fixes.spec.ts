@@ -162,7 +162,7 @@ vi.mock('../src/db', async () => {
           // findFirst above, which finds no prior op for an entity either.
           $queryRaw: vi.fn().mockResolvedValue([{ maxSeq: null }]),
           // Upload transaction writes the storage counter atomically via $executeRaw.
-          $executeRaw: vi.fn().mockResolvedValue(0),
+          $executeRaw: vi.fn().mockResolvedValue(1),
         };
         return callback(tx);
       }),
@@ -232,6 +232,9 @@ vi.mock('../src/db', async () => {
           storageUsedBytes: BigInt(0),
         }),
         update: vi.fn().mockResolvedValue({}),
+      },
+      vaultKeyMigration: {
+        aggregate: vi.fn().mockResolvedValue({ _sum: { reservedStorageBytes: 0n } }),
       },
       $queryRaw: vi.fn().mockResolvedValue([{ total: BigInt(0) }]),
     },

@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -56,12 +56,35 @@ function walk(dir: string): string[] {
 function showAtHead(relPath: string): string {
   for (const cwd of [process.cwd(), resolve(process.cwd(), '..')]) {
     try {
-      return execSync(`git show HEAD:${relPath}`, { cwd, encoding: 'utf8' });
+      return execFileSync('git', ['show', `HEAD:${relPath}`], { cwd, encoding: 'utf8' });
     } catch {
       // 换下一个 cwd
     }
   }
   throw new Error(`拿不到 HEAD:${relPath} —— 这条判据的前提是它在 HEAD 里`);
+}
+
+/** Find the last real pre-fix source in history so this regression probe keeps
+ * its teeth after the fix itself is committed. */
+function showHistoricalVersion(relPath: string): string {
+  for (const cwd of [process.cwd(), resolve(process.cwd(), '..')]) {
+    try {
+      const commits = execFileSync('git', ['log', '--format=%H', '--all', '--', relPath], {
+        cwd,
+        encoding: 'utf8',
+      }).trim().split(/\s+/).filter(Boolean);
+      for (const commit of commits) {
+        const source = execFileSync('git', ['show', `${commit}:${relPath}`], {
+          cwd,
+          encoding: 'utf8',
+        });
+        if (piiInLogLines(source).length >= 2) return source;
+      }
+    } catch {
+      // Try the repository root if Vitest was started from server/.
+    }
+  }
+  throw new Error(`找不到 ${relPath} 的历史违规版本`);
 }
 
 describe('日志里不许出现可识别个人信息（E7）', () => {
@@ -90,7 +113,7 @@ describe('日志里不许出现可识别个人信息（E7）', () => {
   it('🔴 判据自己有牙齿：把本轮改掉的那两行原文喂回去，必须逐行判红', () => {
     // 真源用 HEAD 的那份管理端路由 —— 这就是"这次改动是承重的"的唯一证明方式，
     // 而不是我自己编一个假想违规。
-    const historical = showAtHead('server/src/admin/admin.routes.ts');
+    const historical = showHistoricalVersion('server/src/admin/admin.routes.ts');
     expect(historical.length).toBeGreaterThan(1000);
     const hits = piiInLogLines(historical);
     expect(

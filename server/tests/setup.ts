@@ -359,7 +359,7 @@ vi.mock('../src/db', () => {
         // $executeRaw to keep the data write and the counter delta in a single
         // commit. Default mock is a no-op; specs that care about counter
         // behaviour mock it explicitly.
-        $executeRaw: vi.fn().mockResolvedValue(0),
+        $executeRaw: vi.fn().mockResolvedValue(1),
       };
       if (typeof callback === 'function') {
         return callback(tx);
