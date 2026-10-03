@@ -22,26 +22,46 @@
  * 要不要复验面板真的走了，三份各不相同）。两种失效都不会自己说话，
  * 所以只能由门禁说话。
  *
- * ## 判据（任一不成立即红）
+ * ## 判据（任一不成立即红；编号与输出里的"判据 N"一一对应）
  *
+ * 0. 🔴 **推定本身必须成立**：共享实现在 lib 里**在**，而且
+ *    `dismiss_welcome_if_present()` 里**真的还调着**它 —— 判据 1 有 15 个脚本是靠
+ *    "它调了欢迎页 helper"通过的，哪天那一次调用被从 helper 里摘出去，
+ *    这 15 条"已处置"会全部变成假绿，而门禁自己不会有任何反应。
  * 1. **处置在位**：凡 `pm clear` 之后还要靠无障碍树驱动界面的脚本，必须能
  *    走到共享实现 —— 自己调 `handle_privacy_consent`，或调
  *    `dismiss_welcome_if_present`（它第一件事就是收这块面板）。
+ *    而且每条**必须打印它是怎么成立的**（直接调 / 经欢迎页 helper）——
+ *    否则"它满足了判据"和"它其实什么都没做"在输出上长得一样。
  * 2. **只能有一份实现**：任何脚本里名字含 `consent` 的函数**不得**自己
  *    `$ADB shell input tap` —— 那是第二份实现，正是漂移的起点。
  *    唯一允许带点击动作的地方是 `scripts/lib/mobile-e2e.sh`。
- * 3. 🔴 判据 1 的成立方式必须**打印出来**（直接调 / 经欢迎页 helper），
- *    否则"它满足了判据"和"它其实什么都没做"在输出上长得一样。
+ * 3. 🔴 **本地类验收不许被库的默认值改口**：脚本自己点名了「只用本机」或「以后再说」
+ *    （= 明说不授予联网），却又调 `dismiss_welcome_if_present`，而没设
+ *    `CONSENT_GATE_PREFERRED` ⇒ 欢迎页 helper 内部那一次会按库的默认值点「同意并联网」，
+ *    **替这个脚本做了一个它明说不做的决定**。
+ *    （这条是判据 1–2 加完**当场照出来的**：把处置收进 lib 的同一轮，
+ *    我自己就漏了 `verify-mobile-task-row.sh` 一处。）
  *
- * 变异验证（两条都会红，实测过）：
- * - 从 `verify-mobile-auth.sh` 删掉 `handle_privacy_consent` 那一行 ⇒ 判据 1 报缺处置；
- * - 往任意脚本里塞一份带 `input tap` 的 `dismiss_consent_xxx()` ⇒ 判据 2 报重复实现。
+ * 变异验证（四条各自实测会红，还原后复跑 RC=0）：
+ * - A 从 `verify-mobile-auth.sh` 删掉 `handle_privacy_consent` 那一行 ⇒ 判据 1 报缺处置；
+ * - B 往任意脚本里塞一份带 `input tap` 的 `dismiss_consent_xxx()` ⇒ 判据 2 报重复实现；
+ * - C 把共享调用从 `dismiss_welcome_if_present()` 里摘出去 ⇒ 判据 0 红；
+ * - D 删掉某个本地类脚本的 `CONSENT_GATE_PREFERRED=` ⇒ 判据 3 红（指名那个脚本）。
+ *
+ * ⚠️ **本门禁自己前两跑是恒过的**，两次都是"判在不在"用了名字而不是形状：
+ * 一次要 `(xy_desc|xy_text|…)\s*\(`，而 shell 里的调用是 `$(xy_desc "邮箱")`
+ * （名字后面跟的是空格和引号）⇒ 一个脚本都没被认出来，它打印"冷启动驱动界面 0 个"
+ * 然后 ✅；一次用 `src.includes('handle_privacy_consent')` 判处置在位，
+ * 命中的是脚本**文件头那句注释**（正是为了让下一个人看懂为什么必须有它而写的）
+ * ⇒ 把调用整行删掉仍然 RC=0。两处都改成"剥掉注释行 + 按行首调用形状匹配"。
+ * 详见 `docs/plans/email-password-auth.md` §13.4 —— 恒过的判据比没有判据更糟（§7 元规则二）。
  *
  * ## 范围为什么排除 `-ios.sh`
  *
  * iOS 那条走无障碍 API（`ax --pressable --press`），不是 `uiautomator` dump +
- * 坐标点击，它的 `grant_network_consent_if_asked()` 是**另一套技术**下的同级实现，
- * 不能共用这个探针。它自己的判据在 `verify-mobile-ios.sh` 里。
+ * 坐标点击；它的 `grant_network_consent_if_asked()` 是**另一套技术**下的同级实现，
+ * 共用这个探针只会造出一条打不着的判据。它自己的处置与判据在 `verify-mobile-ios.sh` 里。
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -124,6 +144,7 @@ function callsFunction(text, name) {
 
 const missing = [];
 const duplicated = [];
+const contradicted = [];
 const ok = [];
 let cleared = 0;
 
@@ -141,6 +162,20 @@ for (const file of files) {
   const code = codeOnly(src);
   const direct = callsFunction(code, SHARED);
   const viaWelcome = callsFunction(code, WELCOME_HELPER);
+
+  // 🔴 判据 3：脚本自己点名了一颗**本地**按钮（「只用本机」/「以后再说」= 不授予联网），
+  // 却又调 `dismiss_welcome_if_present`，而没设 `CONSENT_GATE_PREFERRED` ——
+  // 那么欢迎页 helper 内部那一次会按库的默认值点「同意并联网」，
+  // **替这个脚本做了一个它明说不做的那个决定**。
+  // 2026-10-03 实测：把处置收进 lib 的同一轮就是这样差点改掉三条本地类验收的语义。
+  const namesLocalButton = new RegExp(`^\\s*${SHARED}\\s+"(只用本机|以后再说)"`, 'm').test(code);
+  const pinsItsOwnChoice = /^\s*CONSENT_GATE_PREFERRED=/m.test(code);
+  if (namesLocalButton && viaWelcome && !pinsItsOwnChoice) {
+    contradicted.push(
+      `${file}  自己点名了「只用本机/以后再说」，却没设 CONSENT_GATE_PREFERRED ⇒ 欢迎页 helper 会改点「同意并联网」`,
+    );
+  }
+
   if (direct && viaWelcome) ok.push(`${file}  直接调 ${SHARED} + 经 ${WELCOME_HELPER}`);
   else if (direct) ok.push(`${file}  直接调 ${SHARED}`);
   else if (viaWelcome) ok.push(`${file}  经 ${WELCOME_HELPER}（它第一件事就是收面板）`);
@@ -153,11 +188,15 @@ if (duplicated.length) {
   console.log(`\n❌ 判据 2 —— 出现了第二份实现（${duplicated.length} 处）：`);
   for (const line of duplicated) console.log(`  ${line}`);
 }
+if (contradicted.length) {
+  console.log(`\n❌ 判据 3 —— 本地类验收没把自己的按钮点名（${contradicted.length} 个）：`);
+  for (const line of contradicted) console.log(`  ${line}`);
+}
 if (missing.length) {
   console.log(`\n❌ 判据 1 —— 没走到共享处置（${missing.length} 个）：`);
   for (const line of missing) console.log(`  ${line}`);
 }
-if (duplicated.length || missing.length) {
+if (duplicated.length || missing.length || contradicted.length) {
   console.log('\n处置：调用 scripts/lib/mobile-e2e.sh 的 handle_privacy_consent <按钮优先级…>，');
   console.log('      或在冷启动后调 dismiss_welcome_if_present（它会先收这块面板）。');
   console.log('      不要在这里再抄一份 —— 抄漏一个脚本的代价是那一轮整片假红。');

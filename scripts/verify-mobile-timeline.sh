@@ -60,6 +60,8 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 TITLE="tl-e2e-$(date +%H%M%S)"
 
+CONSENT_GATE_PREFERRED=以后再说
+
 # 隐私同意面板（2026-10-01 并行刀新增的首启面板）：不点掉它，后面每一步
 # （建任务 / 切 chip）都被面板挡住，症状是"找不到控件"而不是"被面板挡了"。
 # 处理本身已收进 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`（那三条实测形状
