@@ -330,6 +330,16 @@ test('①–⑥ 注册 → 那一封信 → 确认页 → 落到 /app/ → 退�
   // 而那条 404 会被读成"确认页坏了"）。
   expect(verifyLink.startsWith(SERVER), `③ 信里的链接：${verifyLink.slice(0, 80)}`).toBe(true);
 
+  // 🔴 structure：**界面语言必须一路传到信和页**。产品负责人 2026-10-03 的口径是
+  //   「默认中文，英文只能是用户自己选的」，而这里能证到的最强形式是"跟着界面走"：
+  //   客户端把当前界面语言作为 `body.locale` 发出去，服务端把它写进链接的 `lang=`。
+  //   这条同时钉住两件事：① 参数没在链路上丢；② 页不再由 `Accept-Language` 决定
+  //   （本套件的 chromium 是 `Desktop Chrome` ⇒ `en-US`，界面是中文时只要链路上
+  //   任何一环还读浏览器头，这里就会拿到 `en` 而红）。
+  const uiLang = await page.evaluate(() => document.documentElement.lang);
+  expect(uiLang, '③ 先证明界面语言本身可读（读不到就是判据空转）').toBe('zh-CN');
+  expect(verifyLink.includes(`lang=${uiLang}`), `③ 链接里的语言：${verifyLink}`).toBe(true);
+
   // ── ④ 在浏览器里点开它：确认页 → 点确认 → 跳 /app/ → 真的登录了 ────────
   /**
    * 🔴 **同一个标签页**，不是 `context.newPage()`。
@@ -351,6 +361,12 @@ test('①–⑥ 注册 → 那一封信 → 确认页 → 落到 /app/ → 退�
   const confirmButton = page.locator('#login-btn');
   // outcome：打开的是**确认页**（有那个确认按钮），不是"链接已失效"。
   await expect(confirmButton, '④ 服务端渲染的确认页必须有确认按钮').toBeVisible();
+  // 🔴 outcome：确认页**说界面那种语言**。这张图就是 2026-10-03 那次翻车的位置 ——
+  //   它渲染成了整页英文，而收件人真正点开的链接是带 `lang=zh-CN` 的（探针截了参数）。
+  expect(
+    await page.evaluate(() => document.documentElement.lang),
+    '④ 确认页的 <html lang> 必须等于界面语言',
+  ).toBe(uiLang);
   await page.screenshot({ path: SHOT('5-confirm-page') });
 
   await confirmButton.click();
@@ -515,6 +531,10 @@ async function verifyLinkFromLog(): Promise<string> {
   const raw = (await res?.text()) ?? '';
   // 🔴 预览页把正文内嵌时做了两层转义（`\u002f` 与 `&amp;`），不归一化就取不出链接。
   const html = raw.replace(/\\u002f/gi, '/').replace(/\\\//g, '/').replace(/&amp;/g, '&');
-  const all = html.match(/https?:\/\/[^"'\s]*\/verify-email\?token=[0-9a-f]+/g) ?? [];
+  // 🔴 取**整条**链接，含 `&lang=`。原来这里写到 `token=[0-9a-f]+` 就停，
+  //    于是导航的是一个**没有任何用户会打开的 URL**（少了发信时写进去的语言），
+  //    确认页因此按浏览器语言渲染 —— 英文 chromium 上得到一整页英文，
+  //    而真实收件人点开的从来都是带 `lang=zh-CN` 的那条。截参数 = 换被测对象。
+  const all = html.match(/https?:\/\/[^"'\s\\]*\/verify-email\?token=[0-9a-f]+(?:&[^\s"'\\]*)?/g) ?? [];
   return all.at(-1) ?? '';
 }

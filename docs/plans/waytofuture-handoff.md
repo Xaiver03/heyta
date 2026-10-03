@@ -140,7 +140,9 @@ ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js gr
 | `server/src/design.generated.ts` | 设计系统的 `generated/tokens.json` | `pnpm gen:server-design` | `pnpm check:server-design` |
 | `server/src/copy.generated.ts` | `packages/i18n` 词条表（**只有 `server.` 前缀**） | `pnpm --filter @heyta/sync-server gen:server-copy` | `pnpm check:server-copy` |
 
-**语言优先级**：`?lang=`（发信时写进链接）> `Accept-Language` > **默认 `zh-CN`**。
+**语言优先级**：`?lang=`（发信时写进链接）> **默认 `zh-CN`**。
+（2026-10-03 起 `Accept-Language` 不参与 —— 浏览器语言不是用户的选择。见
+[`deployment.md`](../runbooks/deployment.md) §3.9.2「语言怎么定」。）
 
 ### 4.5 修掉的 4 个真缺陷
 

@@ -370,7 +370,7 @@ export const requestLoginMagicLink = async (
   email: string,
   /**
    * 收件人的语言（**可选**，缺省时邮件按默认语言 zh-CN 渲染）。
-   * 由路由层从请求里取（`?lang=` / `Accept-Language`），见 `design-html.ts` 的 `resolveLocale`。
+   * 由路由层从请求里取（`body.locale` > 账号语言 > 中文），见 `api.ts` 的 `localeForEmail`。
    */
   locale?: ServerLocale,
 ): Promise<{ message: string }> => {
