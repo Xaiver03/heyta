@@ -274,16 +274,16 @@
 | 12 | 界面上允许出现哪些科学宣称 | B | **对外话术的合规边界**，不是工程问题（B2 的收窄 + B6 第 1 条未补一手） |
 
 > 🔴 这 12 项里**卡住工单**的那几条（#1 / #2 / #8 / #9–12），业界实际怎么答、推荐与代价已落在 **C1b**
-> （2026-10-03 第二批一手调研）。本节仍是"要拍"的清单 —— C1b 只把选择题变成**有出处的**选择题，不替谁拍。
-> ⚠️ 其中 **#2（习惯统计口径）本轮没取到一手对照**，C1b-Q2 写的是解锁条件而不是结论。
+> （2026-10-03 第二批一手调研，#2 的对照在 19:27 到齐）。本节仍是"要拍"的清单 —— C1b 只把选择题变成**有出处的**选择题，不替谁拍。
 
 ## C1b. 别人怎么做的 × 推荐（2026-10-03 第二批一手调研）
 
 > 🔴 **本节不替产品负责人拍**，它只做一件事：把"这 5 项要拍的值，业界实际怎么答"摆出来，
 > 每条带**出处 + 访问日期 + 一手/二手**，并给一个带代价的推荐。
-> 完整表在 `/tmp/heyta-research/q1-q2-detail-pane-content-and-disclosure.md`（18 条来源）与
-> `/tmp/heyta-research/q4-srs-in-task-managers-and-claims.md`（24 条 URL）——
-> ⚠️ **那两份是临时载体，会随机器没掉**；本节是它们进仓库的唯一落点，只搬结论与承重出处。
+> 完整表在 `/tmp/heyta-research/q1-q2-detail-pane-content-and-disclosure.md`（18 条来源）、
+> `/tmp/heyta-research/q4-srs-in-task-managers-and-claims.md`（24 条 URL）与
+> `/tmp/heyta-research/q3-habit-statistics-conventions.md`（Loop/Habitica 逐行 file:line + Streaks/滴答/Apple/Google 一手文档）——
+> ⚠️ **那三份是临时载体，会随机器没掉**；本节是它们进仓库的唯一落点，只搬结论与承重出处。
 
 ### C1b-Q1（= C1 #1：右栏放"仅选中项"还是"永远放概览 + 记录 + 选中项"）
 
@@ -326,11 +326,82 @@
 - 🔴 为什么不选"全部空即隐藏"：本仓库已经吃过这个形状的反果 —— `tagIds` 全仓零读写那段记的是"零件都在、产品里没有这个功能"。**界面上隐藏空区块是最容易悄悄把一个功能变成"没有功能"的地方**，而这类失败从来不会报错。
 - Carbon 那句 "use just text" 与本仓库已拍的「不抄空态插画」同向，可直接引用为一致依据。
 
-### C1b-Q2（= C1 #2：习惯统计三处口径）
+### C1b-Q2（= C1 #2：习惯统计三处口径 A 日历月 vs 韧性 / B 自然月 vs 滚动 / C 天 vs 次）
 
-⚠️ **本轮未取到一手对照**（负责这一项的子 Agent 到写这一节时仍未交付）。**不许**在本节写"别人怎么做"的猜测。
-解锁条件：那份报告落到 `/tmp/heyta-research/q3-habit-statistics-conventions.md` 后，把 Loop（开源 ⇒ 公式可直接读源码）、Habitica、Streaks、滴答帮助中心四家的口径逐条搬进上表格式，并更新本节日期。
-**W8 在此之前不开工**（工单 §5 的阻塞映射不变）。
+> 取证日期 **2026-10-03**（本节 19:27 到齐后填入，替换此前"未取到一手对照"那一段）。
+> **Loop（uhabits）与 Habitica 的结论来自读源码**，下面每一行给 `file:line`；
+> 这四条承重断言我在写入前**逐行回读过原始文件**（不是采信子 Agent 的转述）：
+> `FrequencyPickerDialog.kt:174-177`、`StreakList.kt:48-58`、`cards/OverviewCard.kt:47-50`、`cards/TargetCard.kt:153-158`。
+
+**一手分布**：
+
+| 口径 | 谁怎么做 | 精确判据 / 公式 | 出处 | 一手性 |
+|---|---|---|---|---|
+| **一天算完成** | Loop 布尔 | `value > 0` ⇒ YES_MANUAL(2) / YES_AUTO(1) / **SKIP(3) 都算** | `models/StreakList.kt:48-58`、`models/Entry.kt:40-62` | **一手代码** |
+| | Loop 数值 | `value/1000 >= targetValue`（AT_LEAST）；`entered && <= targetValue`（AT_MOST） | `StreakList.kt:50-54`（**逐行回读确认**）、`Habit.kt:58-69` | **一手代码** |
+| | Habitica Daily | `task.completed = true ⇒ task.streak += 1`；取消 `-= 1`；漏 ⇒ cron 置 0 | `website/common/script/ops/scoreTask.js:326,333,338,374,388`；`:310` | **一手代码** |
+| | Streaks | "Every day you complete a task, your streak is extended."，一天一次、上限 **24 个任务**（不是 24 次） | https://streaks.app/ ；App Store 开发者描述（iTunes lookup `id=963034692`, v11.4.2, 2026-09-27） | **一手文档** |
+| | 滴答 | 三档打卡：**自动记录**（"每滑动一次就自动记录完成了一杯"）/ **手动记录**（"一次背了3页，晚上有点累背了1…"）/ **完成全部**（"当天完成了就直接完成全部，没有完成量的记录"） | `help.dida365.com`《更好地完成习惯》正文 | **一手文档** |
+| **次住在哪一轴** | Loop | 频率轴**表达不了**"一天 N 次"：取数器收尾 `if (numerator >= denominator  numerator < 1) { numerator = 1; denominator = 1 }` ⇒ `3次/1天` 被**折叠成"每天一次"**。要表达只能建成**数值习惯**（`targetValue=3`、`unit="次"`） | `FrequencyPickerDialog.kt:174-177`（**逐行回读确认**）、`Frequency.kt:22-47` | **一手代码** |
+| | 滴答 | 同上：`频率` 那一轴只写"一周完成3次"这类**周期内次数**；"一天几次"放**目标**轴（"当天完成一定量"） | 《开始坚持一个习惯》 | **一手文档** |
+| | Habitica | "次"下放给另一条实体（Habit `counterUp += times`），而 **Habit 不计连续**（`scoreTask.js:204-210`） | 同左 | **一手代码** |
+| ⇒ | **竞品共识：`一天 N 次` 属于"目标/数量"轴，不属于"频率/排期"轴。** heyta 现状已在正确的一侧（`HabitFrequency` 只有 `daily / weekly{daysOfWeek} / interval{everyNDays}`，**无** per-period 配额，次数在 `Habit.target/unit` + `HabitLog.value`）⇒ **不用改模型** | `packages/domain/src/entities.ts:302-305`（行号 2026-10-03 自核） | 仓库现状 |
+| **"5 次一周"有两副面孔** | 排期日模型 | Streaks（"Set the days … Go to the gym **(3 days per week)**"）、Habitica（`frequency:'weekly'` + `daysOfTheWeek` + `everyX`，`cron.js:154-178`）、**heyta 现状** ⇒ 分母是**计划日**，非计划日既不算漏也不断链 | 同左 | 一手 |
+| | 窗口配额模型 | Loop `Frequency(5,7)`：配额**不产生"未达标"判定**，而是把散落的 YES_MANUAL 折算成区间并**自动补 YES_AUTO 天**，再按**自然日相邻**数连续；自己注释写着 "gaps are eliminated and **streaks are maximized**" | `EntryList.kt:100-103,222-245,247-273` | **一手代码** |
+| 🔴 | **同一个使用序列（周三/五/日各一次 ×4 周）两种口径给的不是同一个数**：排期日 = **12**，配额（被自动补格连成一片）可达 **28** ⇒ **判据必须先声明用哪一种，否则"期望值"没有意义** | — | 推论 |
+| **部分完成的那天**（目标 5、实际 3） | 四家 + 两个平台**一致**：数量照记、**天数不记** | Loop 未达标格子画 **GREY**（达标 ON / 未达标 GREY，`HistoryCard.kt:165-184`）但 `groupedSum` 把 3 计入月总量；Habitica 的 checklist 比例**只减轻扣分**、不给那天 streak（`scoreTask.js:39-47`）；滴答原话 **"即使哪一天没有背够5页的单词，也能记录自己完成3页的付出和努力"**；Apple `HKActivitySummary` = "data for a given day" + 成对 `…/…Goal` 字段，Google Fit 日桶边界 = "midnight of the current day" | 同左 | **一手** |
+| **自然月 vs 滚动 30** | 滴答**同时用两者并分别精确标注**：习惯热力图 = "追踪**本月**中每一天"，任务完成统计小组件 = "**近30天内**每天完成的任务数量" ⇒ **没有一家把滚动 30 天叫"本月"** | 《🌮 小组件》正文 | **一手文档** |
+| | Loop 也两者混用，且留下一处**名与算式不同源**的反面样本：Target 卡按 `TruncateField.MONTH` 日历截断（`TargetCard.kt:71-74`），区间标签却写死 `intervals.add(30/91/365)`（`:153-158`，**逐行回读确认**）；Overview 卡的分数差值用 `today.minus(30)`（滚动，`OverviewCard.kt:41-42`） | 同左 | **一手代码** |
+| **"累计"那一格数的是什么** | Loop 的 `totalCount` = `originalEntries.filter { value == YES_MANUAL }.count()` ⇒ **手动打卡的天数，不是次数**（`OverviewCard.kt:47-50`，**逐行回读确认**） | 同左 | **一手代码** |
+
+🔴 **heyta 现状的三处说谎点**（这才是 W8 必须先拍口径的原因，逐条带 file:line）：
+
+1. `computeHabitResilience().total = achieved.size`（`packages/domain/src/habit-resilience.ts:197`）= **达成天数**，
+   而渲染链把它一路当"次"印出去：`packages/ui/src/habits/HabitBoard.tsx:484` `labels.streakTotal(r.total)`
+   → `apps/web/src/features/habits/copy.ts:35-38` → 词条 **"累计 {count} 次"**。
+   🔴 **同一句话落在三个键上**（2026-10-03 现量，路径含 `locales/`，行号自核）：
+   `packages/i18n/src/locales/zh-CN.ts:1120` 与 `:1121`（`web.habits.streak.total` / `.totalOne`）、`:2816`（`mobile.growth.streak.total`）；
+   英文侧 `locales/en.ts:1035-1036` 写的是 **"{count} check-ins"** —— 同样是"次" flavored。
+   ⇒ 值与词不同源，**二选一改掉**（改句子或改值），且**三处必须一起改**（同一对抄件，改一处必 sweep 全仓）。
+   Loop 那一行恰好给了这一格的**一手口径背书**：它的 `totalCount` 数的是**天**。
+2. `habitHeatLevel(count) = count === 0 ? 0 : 4`（`packages/ui/src/habits/model.ts:187`）是**二值**的，
+   而 `completionRatio()`（`packages/domain/src/habit-streak.ts:215-220`）算好的当日比例 `todayRatio` **零渲染消费者**
+   ⇒ "每天完成 3/5 页"今天在界面上**不可见**（Loop 用 GREY 格子留痕，正是这一块的位置）。
+3. `onCheckIn(habitId, date?)` **不带 value**（`packages/ui/src/habits/HabitBoard.tsx:188`），缺省 `value = habit.target ?? 1`
+   （`packages/app-host/src/habit-actions.ts:311`，`value ?? habit.target ?? 1`）⇒ 一滑记满 = **只有滴答"完成全部"那一档**；"自动记录（+1）"要等 **W6**。
+   结构性约束：`HabitLog` 的 id 是 `habitId:date`（`habit-actions.ts:155-157`）且当天已有 log 时 `checkIn` **直接 `return false`**（`:295-301`）
+   ⇒ **一天只可能有一条 log**，所以"次"**只能**住在 `value` 里；把"次"实现成 **log 条数**会恒等于天数 —— 那是假判据。
+
+**推荐（供 W8 写判据；A/B/C 三条互相依赖，先拍 C）**：
+
+- **C：天 = 唯一的连续性单位；次 = `Σ value`。** 沿用 `isAchieved`（`value >= target`）：达到当天目标才算完成；
+  未达标的天**不记分数天、不进连续**（Loop / Habitica / Streaks / 滴答 / Apple / Google **六方一致**）。
+  判据写法：**"一天打 3 次"落库 = 一条 log `value=3`，`完成次数 +3`、`完成天数 +1`**。
+  "5 次一周"走**排期日**（`weekly{daysOfWeek}`），不走 Loop 的窗口配额 —— 理由：① heyta 的冻结与 `isStillAlive` 全按**计划日**计数，
+  配额模型会让"连续"变成一个**无法向用户解释**的数（Loop 的自动补格本质是在 *maximize streak*），
+  而 ADR-0022 要求"只增不减"是**规则**而不是算法副作用；② 配额模型下"连续 28 天"与"一周 3 次"互相矛盾；③ Streaks / Habitica 也用排期日。
+  ⚠️ **代价必须写进判据**：非排期日不进分母也不断链 ⇒ 周 3 次习惯的"月完成率 100%"意味着 **9/9 个计划日**，不是 9/30。
+  "一天 N 次"只动**目标轴**（`target=N`、`unit="次"`），**不许**给 `HabitFrequency` 加配额字段（会同时撞 §3.3 与上面的竞品共识）。
+- **A：主卡 = 日历月完成天数；第二级 = 当前连续（含冻结）；第三级 = 最长/累计。**
+  完成率 = `该月达成天数 / 该月计划日数`（借滴答《成就值》的定义："实际完成的任务，和你**原本安排在对应时间**的任务的比值"，
+  分母是**安排在该时段的量**，不是自然日数）。理由：日历月是**外部时钟**，界面上不需要解释冻结就能读懂；
+  🔴 反过来若把月指标改成"韧性口径"，就等于让月度数字**依赖冻结参数** ⇒ 重新引入 ADR-0022 已经消解掉的那条风险
+  （参数放宽会让历史月份数字变化）。**没有任何一家把冻结做成卡片口径** —— Loop 的 skip 只出现在格子纹理（`HistoryCard.kt:169,179`）
+  和一句 FAQ（"Skips keep your score unchanged and don't break your streak"，`res/values/strings.xml` `pref_skip_description`），
+  这正是 ADR-0022 要的形态：**机制在数据里、解释在事件里、不在余额里。**
+- **B：全部用自然月，卡片词固定为"本月/当月"；`近 N 天` 只允许出现在真正滚动的地方**
+  （heyta 目前只有 `HABIT_HEATMAP_DAYS = 90` 的热力图，它的词就该是"最近 90 天"，现状已如此）。
+  分母用**该年该月的实际计划日数**（2 月/闰年/跨月），**不许出现"名写月、算用 30"的 Loop 式错位**。
+  E2EE + 本地计算 ⇒ 这些数全在客户端算，没有任何服务端聚合成本要求滚动窗口；选自然月只多一个 `monthLength`，而 heyta 已经有它。
+- **D（= C1 #4 非时间单位）：图 = 每日完成量柱 + 目标线（target-ratio 形状），不做 cumulative 曲线**；
+  卡片 = "本月完成量 N 页 / 总完成量 N 页"（`Σ value` 带 `unit`）。竞品形状是"target ratio + 每日量柱状"并存，**没有一家做累计曲线**。
+  🔴 前置（= C1 #3）：`HabitLog.value` 全仓**只有一处求和且只认"分钟"类单位**（`packages/domain/src/activity-categories.ts:100-113`）
+  ⇒ "65 页"这类量今天**没有读侧**；且 `unit` 是自由字符串（`entities.ts:320`，`unit?: string`），不是封闭词表。
+  推荐 **`unit` 只做显示、求和按纯数**（改动最小），而不是新加一个量纲封闭词表。
+
+⚠️ **一条依赖关系**：上面凡涉及"多次"的期望值，**在 W6 落地前不可达**（`onCheckIn` 不带 `value`）⇒ W8 要么等 W6，
+要么把判据明确限定为"一次记满"，**不许为它编一个可达的期望值**。
+
 
 ### C1b-Q9~Q12（= C1 #9 做不做 / #10 挂谁身上 / #11 免费付费 / #12 允许哪些科学宣称）
 
@@ -365,7 +436,13 @@ OmniFocus 的 Review 是**项目级元审查**（"Each project has a Next review
 1. ~~滴答右栏在无选中时放什么~~ ✅ **已结案**：任务视图 = 纯装饰插画；番茄专注视图 = 概览 + 记录 + 补录入口。⇒ 滴答自己**逐页不一致**，说明"放什么"是产品决定而非框架约束。其余 6 个视图（日历/四象限/时间线/便签/成长/回收站）的无选中态**仍未穷举**。
 2. ~~滴答详情面板的完整字段~~ ✅ **已取证**（A3）。🔴 但 [multi-end-unified-strategy.md §9 第 13 条:1524](../plans/multi-end-unified-strategy.md) 那句"取证未覆盖"**仍成立** —— 取到的是**字段清单**，不是**全部区块**：中间那片空白在"有子任务/有提醒/有附件"时长什么样、右下三个图标的语义，**未取证**。补法：在同一条带子任务与提醒的任务上看一次。
 3. **⚡/ 的官方含义**：A6 的对应关系靠**同一屏两组数值**推出，滴答界面上始终没有文字标签 ⇒ 仍属推断，只是这次**可复核**。
-4. **官方帮助中心细节**：`help.dida365.com` 是 SPA，`WebFetch` 只拿到片段（《专注数据统计》《习惯数据统计》《更好地完成习惯》三篇**未取到正文**）。取到的一手只有《常用专注》：番茄/正计时两模式、默认 25 分钟可自定义、铃声/白噪音/屏幕常亮、记录含时长与任务、**移动端可补记、桌面端仅补记不可删**、支持预计番茄数或预计时长。⚠️ 该页是移动端帮助镜像，桌面端行为以截图为准。
+4. ~~**官方帮助中心细节**：`help.dida365.com` 是 SPA，`WebFetch` 只拿到片段（《专注数据统计》《习惯数据统计》《更好地完成习惯》三篇**未取到正文**）~~
+   🔴 **本条在 2026-10-03 被推翻**（C1b-Q2 那一轮）：这三篇的**全文都取到了**。方法记下来复用 ——
+   该站是 Next.js SPA，但**全部 97 篇文章的 markdown 正文内嵌在页面 `__NEXT_DATA__` 的 `props.pageProps.articles` 里**：
+   `curl https://help.dida365.com/articles/<任一 id>` → 解 `<script id="__NEXT_DATA__">` → 读 `articles`。
+   ⚠️ 也就是说，先前那句"SPA 取不到正文"是**只用了 WebFetch、没看页面自带的数据载荷**造成的假缺席（原文留档是为了让后来者认出这个形状）。
+   取到的一手仍然包含：番茄/正计时两模式、默认 25 分钟可自定义、铃声/白噪音/屏幕常亮、记录含时长与任务、
+   **移动端可补记、桌面端仅补记不可删**、支持预计番茄数或预计时长。⚠️ 该页是移动端帮助镜像，桌面端行为以截图为准。
 5. **`monthGrid` 能否直接长成"可点的月历打卡格"**：数学现成但今天只服务 `DatePicker`，"格子带打卡状态 + 可点 + 跨月灰显"三件事**无实现证据**。
 6. **移动端要不要同样三栏**：主战场是移动端 + macOS + Windows（[ADR-0036](../adr/0036-main-battlefield-and-rn-single-source-ui.md)），A7.3 只回答了"怎么回收"，没回答"移动端的概览放哪"。
 
@@ -385,6 +462,26 @@ OmniFocus 的 Review 是**项目级元审查**（"Each project has a Next review
 18. 🔴 **艾宾浩斯的全部具体数字**（"20 分钟遗忘 42%""1 天后 66%"，以及中文圈通行的"5 分钟/30 分钟/12 小时/1 天/2 天/6 天/15 天/31 天"复习表）：**均未追溯到一手**（未取到 1885《Über das Gedächtnis》或 1913 英译全文，Gutenberg 探测取到的是另一本书）。⇒ 这些数字一旦进对外文案，撞的就是上面第 16 条引的那份指南**第七条**（"广告主无法证明其真实性的，依照《广告法》有关规定予以查处"）；同时 B2 小节那条"Murre & Dros 2015 复现了曲线、但 24h 处有上跳"的表述**仍然只能当内部依据**，不是可以印在商店页上的承诺。
 19. **fsrs.js 仓库描述那句"overtakes Anki and catches up with SuperMemo"**：跑分出处未追（SuperMemo 方基准）⇒ **不得**作为 heyta 的文案依据。
 20. **Obsidian 官方同步定价 / AnkiMobile 具体售价 / OmniFocus 价格与 Pro 边界**：均未核（`apps.ankiweb.net` 不印价格）。⇒ C1b-Q11 的结论只到"没人把算法放进付费墙"，不到"他们各自卖多少钱"。
+
+第三批（2026-10-03 19:27，C1b-Q2 那批习惯口径结论里**不能当依据**的部分）：
+
+21. 🔴 **滴答"月完成率"的分子/分母、以及"完成天数 vs 完成次数"的官方定义**：帮助中心**没有任何一篇给公式**
+    （《习惯数据统计》只给「月度打卡表 / 打卡概览 / 年度热力图」这三个**名字**）。六卡读数仍来自**截图**。
+    ⇒ C1b-Q2 里那条"完成率 = 达成天数 / 计划日数"是从**任务侧《成就值》的定义借推**到习惯侧的，**不是滴答习惯页的原文**。
+    补法：在同一习惯上制造"一周 3 次、某日只完成 2/5"的输入，逐卡读数。
+22. **滴答"一周完成 N 次"到底怎么换算成"打卡天数"**（排期日模型还是配额模型）—— 文档没写，C1b-Q2 的两种口径都吻合现有文字。
+    ⇒ 推荐里"走排期日"这一条**没有被竞品直接证实**，它的依据是 heyta 自己的冻结/`isStillAlive` 按**计划日**计数这一内部事实。
+23. **Streaks 的日界线 / 部分完成 / 一天能否多次完成**：`crunchdevelopment.com` 全线 404，`streaks.app` 的 FAQ/help/features
+    **全部返回同一页**，官方说帮助**只在 App 内**（"Streaks contains an in-app help system"）⇒ 只能证到
+    "一天一次、上限 24 个任务、按日加连续"这一层。
+24. **Loop 的"完美日 / +2"那一档**：FAQ 出现 "If you perform a daily habit perfectly"，但 `StreakList` / `ScoreList` / `Entry` 里
+    **没有找到 2.0 阈值的代码**，只核到 `percentageCompleted = min(1.0, rollingSum/numerator)`（`ScoreList.kt:133`）。
+    ⇒ 旧文档里"完美日 = 2 倍"的说法**本轮未证实，不要写进判据**。
+25. **Time4Play / Habitify / Fabulous / Notion 类追踪器**：本轮**一家都没拿到一手来源**（Time4Play 是 Loop 的 fork，口径应同 Loop，但未逐一核）。
+26. **Google Fit 的日目标字段**（`dailyStepGoalTotal` 等）：相关页面 404；本轮只核到**日桶边界**（"midnight of the current day"）
+    与 Apple `HKActivitySummary` 的成对日级目标字段。
+27. **滴答的会员闸门**（习惯统计的历史长度、周/月视图是否付费）：《习惯数据统计》里只写"高级会员还能够直接查看你这一整个月的习惯打卡进度"，
+    其余面未核 ⇒ 与 C1b-Q11"没人把算法放进付费墙"不冲突，但**滴答确实把一部分统计放进了会员**。
 
 
 ## C3. 与既有冻结调研的分工（唯一事实源规则）
