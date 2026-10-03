@@ -1310,7 +1310,7 @@ grep -c 'multi-end-entry-coverage-audit\|goal-multi-end-coverage\|0051-mobile-re
 **同一份文件、同一个目标、形状一变就从"看不见"变成"报出来"** ⇒ 上面那个 A/B 由双向证据闭合了。
 那一行不进本条线的提交（提交方式见交接文档"死胡同警告"第一条）。
 
-### 7.30 §5 四段的记账槽（02:1x 建槽；04:1x 现量：**② 与 ④ 已闭合**（② 三段 + 74 段逐段总账、④ 五张图逐张看过且 spec 已提交）；①③ 仍是槽，卡在另一条会话正在跑的 `reinstall:all` 与它占着的 android 设备）
+### 7.30 §5 四段的记账槽（02:1x 建槽；04:1x 现量：**② 与 ④ 已闭合**（② 三段 + 74 段逐段总账、④ 五张图逐张看过且 spec 已提交）；①③ 仍是槽；05:1x 复量把"卡在正在跑的那条"改成了 **"卡在那条已经永久挂住"**，见 ① 的第三小条）
 
 ⚠️ 下面那句"一条都没有起跑"**只对建槽那一刻成立**：02:35:26 窗口开过一次（闸门 `--target b` 退 0、
 负载现量 12 = 阈值 12），② 因此有了真读数（已填进那一条），而 ① 与 ③ 在同一次窗口里被
@@ -1328,13 +1328,27 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     实际那一跑是 `pid 93817 bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817`
     （**它用的是自己那枚载体 `/tmp/heyta-reinstall`，与我的 `heyta-wt-reinstall` 不是同一棵** ⇒ 不互踩工作树，
     但**照样互踩设备与安装包**，所以那道门该有）
-    （就是 §6 里"它的前置不查有没有别人在重装"的那条队列，03:09 起排、04:02 开跑）。
+    （就是 §6 里"它的前置不查有没有别人在重装"的那条队列，03:09 起排、04:02 开跑，
+    **05:1x 现量它已经不会再自己结束** —— 见下面第三小条）。
     我的启动器那道 `pgrep -f 'queue-reinstall-all\.sh|scripts/reinstall-all\.sh'` 门因此退 3 —— **对称的互斥由我这一侧守**。
     ② **android 设备在用**：`emulator-5554` 上 `com.heyta` pid 20246、`mCurrentFocus` 指向它（① 要 `adb uninstall`、③ 要 `pm clear`）。
     ③ **负载 13.20 > 阈值 12**（`ncpu×3/4`）。
     ⚠️ 顺带一条**对 ① 有用的反向现量**：iOS 那三台 booted 里 **`heyta-iphone-17pro` 与 `iPhone Duo heyta` 的
     `launchctl` 读空**（没跑 com.heyta），只有 `heyta-ios-isolated` 在跑 ⇒ **ios 段有可用的空闲目标**，
     窗口开时不必把 ① 整体判死在 iOS 上。设备占用表每次现取，别抄这一行。
+  - 🔴 **05:1x 现量：那条 `reinstall:all` 不是"慢"，是死等** ——
+    `pid 95477 bash apps/desktop-macos/scripts/package-app.sh` 已 **1h57m**，累计 CPU **0:00.03**，
+    `lsof -nP -p 95477 -i` **零条 TCP 连接**；它自己的日志停在 `═══ 1. macOS ═══`，
+    后面 windows/android/ios 三段永远不会开始。根因是 `notarytool submit --wait` **没有上限**。
+    ⇒ 这一条把 ① 与 ③ 一起钉死（互斥门要求"没有别人在重装"），而**它不会自己让开**：
+    要么它的所有者杀掉，要么等到有别的窗口。我没有代它杀 —— 那是别人的一条验收，
+    杀掉会让它的日志与载体停在半路（AGENTS §8.9 的共享资源独占）。
+    ✅ 修法**已落 `694c05e3`**（`HEYTA_NOTARY_TIMEOUT` 默认 900s + 无 coreutils 时的纯 bash 看门狗，
+    五臂夹具逐臂量过：`hang`→"N s 内没有返回"且 staple 0 次、`reject`→rc=1 分支、
+    无 `timeout` 二进制的 `hang`→看门狗仍返回 124）。**但它救不了已经挂住的这一跑** ——
+    上限只对下一趟生效；这一趟的 mac 段读的是它自己载体 `/tmp/heyta-reinstall/…` 那份旧代码。
+    📌 所以 ① 的解除条件不是"负载降下来"，而是**那条 pid 95477 消失**（现量命令
+    `lsof -nP -t -- apps/desktop-macos/scripts/package-app.sh` 为空 **且** `pgrep -f 'reinstall-all\.sh'` 为空）。
 - ② Playwright 三段 + 全量 `pnpm check`：**02:35–02:41 已在载体 `f08b26e7` 上跑过一趟**（窗口 02:35:26 开：
   闸门 `--target b` 退 0，负载现量 12 = 阈值 12）。两个读数**分开报**（这是 §5-2 定的取法）：
   - **整条 `pnpm check`：`CHECK_EXIT=1`**，断在第 8 段 `check:op-log-semantics`，而拒绝它的是**本机内存闸门**
