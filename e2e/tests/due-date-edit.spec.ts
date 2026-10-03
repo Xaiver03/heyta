@@ -77,6 +77,26 @@ test('行尾「截止」：点开 → 选日 → DueBadge 变化 → 刷新后�
   await page.waitForTimeout(300); // RNW 的 Yoga 布局落地后再拍，证据图里要有真日历
   await page.screenshot({ path: SHOT('2-open'), fullPage: false });
 
+  // ②.5 🔴 **面板整块必须在视口里**（2026-10-03 加）。
+  //   加它的理由不是"自动化不方便"：面板是 `position: fixed` 且**滚动即关**，
+  //   所以视口外那些格子**用户同样点不到** —— 他得先滚列表（一滚面板就关），
+  //   再指望它开在别的位置。当时的实测形状：行在 y≈500、视口 720、面板估高 500
+  //   ⇒ 最后两周（含 18 号）在屏幕外，Playwright 重试 113 次"scroll into view"
+  //   全部失败（fixed 元素不跟页面滚）。
+  const offscreen = await picker.evaluate((el) => {
+    const h = window.innerHeight;
+    return [...el.querySelectorAll<HTMLElement>('[role="button"]')]
+      .filter((b) => {
+        const r = b.getBoundingClientRect();
+        return r.top < 0 || r.bottom > h + 1;
+      })
+      .map((b) => `${b.getAttribute('aria-label') ?? '?'}@y=${String(Math.round(b.getBoundingClientRect().top))}`);
+  });
+  expect(
+    offscreen,
+    `这些日子格落在视口外 ⇒ 面板被裁，用户在界面上选不到：${offscreen.join(' , ')}`,
+  ).toEqual([]);
+
   // ③ 选一个日子（无障碍名 = 完整日期）。取当月 18 日；不在当月就翻下月。
   let cell = picker.locator('[role="button"][aria-label$="18日"]');
   if ((await cell.count()) === 0) {
