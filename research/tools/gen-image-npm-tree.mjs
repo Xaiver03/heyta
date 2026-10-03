@@ -1,5 +1,15 @@
 // 生成 `server/image-npm-tree.json` —— **镜像里实际装了什么**的一份快照。
 //
+// 🔴 但"实际"两个字要说清边界（2026-10-04 第一次拿真镜像对账量出来的，见审计文档 §8.38）：
+// 这份快照是 **registry 对 `{os:linux, cpu:x64, libc:musl}` 这一个平台的解析结果**，
+// 不是任何一趟真构建的字节。两处实测之差：
+//   ① 按平台切分的二进制包：真镜像（本机 arm64，构建不带 `--platform`）里是
+//      `@node-rs/argon2-linux-arm64-musl`，而快照列的是 `-linux-x64-musl` **和** `-linux-x64-gnu`
+//      —— 后者那一枚永远不会进 Alpine 镜像。⇒ "镜像里有而门禁没扫过"这一整类见 G-53。
+//   ② `^` 范围在两次解析之间会走：`@fastify/websocket` 快照 `11.3.1` / 真镜像 `11.3.3`。
+// 所以它管的是"**装法的形状**有没有漂"，不能当"这棵树就是发布物"用 —— 要那个读数只能钉 lockfile
+// （G-47，本文件末尾那段 `fail` 说的就是这件事的正确出口）。
+//
 // 为什么需要它（现量结论写在 docs/research/self-host-distribution-audit.md §8.8）：
 // `server/Dockerfile` 的**生产阶段**用 `npm install`（不是 pnpm），而仓库里**没有任何
 // npm lockfile** —— 所以那棵树每次构建都从 registry 重解一遍。许可证门禁
