@@ -3394,6 +3394,86 @@ grep -rl -E 'ubuntu-jcli|windows-pc|124\.223\.13\.226' apps/landing/dist | wc -l
 容器列表为空（05:50 那趟已收），`:3000` 与 `:3100` 各有别人的 node 在听 —— 按目标那句
 "负载 >12 属环境无效，等窗口而不是调低阈值"，这一测属于**该等**的那一档，不是能做的那一档。
 
+## §8.55 · 06:3x 「别人在改我批的文件」读到底：同一条漂移的第二份独立取证，但它跑在旧载体上
+
+先给现量：本轮复量里 `main` 换了两次手（`dc63cbff` → `f9d150e5`，间隔不到两分钟），
+写集仍是 33 枚、阻塞仍是 3 枚 —— 与 §8.52 那张表同一批名字：
+`package.json`、`research/tools/check-image-license-coverage.mjs`、`server/image-npm-tree.json`。
+
+### 🔴 先记一条我自己刚犯的探针错（它把 3 量成了 27）
+
+我手敲的未跟踪桶用了 `git ls-files -co --exclude-standard`，量出 `脏=3226 / 阻塞=27`。
+**`-c` 在 `ls-files` 里是 cached（已跟踪），不是"未跟踪"** ⇒ 那一列其实是"全仓文件"。
+可疑点当场就该抓到：那 27 枚里躺着 `server/Dockerfile` 和本审计文档自己。
+改成 `--others` 之后是 `未跟踪=40 / 脏合算=164 / 阻塞=3`，与等待器的读数逐字一致
+（它写的本来就是 `ls-files --others --exclude-standard`）。
+
+⚠️ **这不是说 [`AGENTS.md`](../../AGENTS.md) §7 第 82 条里那条 `git ls-files -co --exclude-standard` 打 tar 的配方坏了** ——
+那个用途要的正是"已跟踪 + 未跟踪非忽略"＝整棵源码树，`-c` 在那里是对的。
+错的是我把一条命令从它的原问题里摘出来复用到另一个问题上。
+**可迁移的形状：复用别人（或自己）写过的命令行时，先回去看它当初在回答哪个问题**；
+而"阻塞数从 3 跳到 27"这种量级跳变，第一反应应该是查探针，不是查现场。
+（待入 `docs/reference/environment-traps.md` —— 那枚文件在主检出是 `M`，按 §8.51 的做法先登记在这里。）
+
+### 两枚阻塞的真相：不是撞车，是第二条取证路
+
+| 文件 | 他人工作树里的差量（现量） | 与我分支的关系 |
+|---|---|---|
+| `check-image-license-coverage.mjs` | **+1 行**：`'@fastify/websocket@11.3.3': MIT`，`why` 写"已核对发布 tarball 的 package/LICENSE 为 MIT" | 同一枚条目、同一个 MIT 判定**已提交**在我分支；我的取证取自**镜像产物里随包发布的 LICENSE** |
+| `server/image-npm-tree.json` | 重生成 `generatedAt=2026-10-03T18:35:38Z`，3/3 行 | 我那枚是 `21:19:36Z`，且 inputs 里带 `packageLockSha256` |
+
+差别不在内容，在**载体**。他那份是 main 上**旧生成器（联网版）**的产物：
+`git show HEAD:research/tools/gen-image-npm-tree.mjs | grep -c packageLockSha256` = **0**（我分支 = **3**），
+他快照的 `_what` 仍是"经 npm 解析出来的依赖树快照"，我的已是"由提交物锁推导"。
+去时间戳后两份快照有 5 处不同，其中 3 处正是这个形状差（`packageLockSha256` 一行、`_what` 一行），
+2 处是输入哈希差（`server/package.json` 与两枚本地包 —— 因为我的分支里那两枚各自 +1 行 `"license": "MIT"`，
+见 §8.52 的自我审计）。**所以这不是两条线各做一个更好的版本，而是一条线在把 G-47 之前的形状重新生产一遍。**
+
+### 谁该赢不由我说：注入验证过了
+
+把他那份快照灌进我的树跑 `pnpm check:image-license` ⇒ **RC=1，4 处失真**：
+
+```
+- server/package.json 变了（快照里的 serverPackageJsonSha256 与当下不一致）
+- server/package-lock.json（镜像那棵树的钉子） 变了（快照里的 packageLockSha256 与当下不一致）
+- packages/shared-schema/package.json 变了 —— 快照哈希 a363b0c66f50… ≠ 当下 3f21a18ae57c…
+- packages/sync-core/package.json 变了 —— 快照哈希 260741f66829… ≠ 当下 657cd7991fb4…
+```
+
+还原后 `git status --porcelain` 对该文件 **0 行**；本轮我那份快照 `check:image-license` **rc=0**。
+**⇒ 合并若取他那份，载体上的门禁立刻红；取我这这份绿。** 这就是 §8.52 那张逐文件解法表里
+两枚 `取分支` 行的机制依据 —— 不是偏好，是**旧载体的产物在新判据下自证失真**，
+而那条判据（`gen --check` 比对输入哈希）本来就是为了这件事才加的。
+
+**信息损失已清零**：他 `why` 里那条**第二取证路（发布 tarball 的 `package/LICENSE`）**是我原先没有的证据
+（我只手边那一路：构建好的镜像里的 LICENSE 文件），已并进我分支该条目下面的注释块
+（`research/tools/check-image-license-coverage.mjs`，"署名 `Copyright (c) 2017-present The Fastify team`"
+之后那 4 行，写明另一条会话线独立核过并点明"该登记在人家工作树里尚未提交"）。
+落地取我这一份时，他这次的**发现**继续活着，被取代的只有时间戳和旧 `_what` 措辞。
+
+### main 此刻对这条 npm 漂移没有防御 —— 但我不把它写成"必红"
+
+`git show HEAD:research/tools/check-image-license-coverage.mjs | grep -n websocket` = **0 行**
+（连注释都没有），同趟阳性对照列出该文件在 main 上真有 14 条 `IMAGE_ONLY` 登记
+（`@fastify/static@10.1.5`、`ws@8.22.0`、12 条 `@peculiar/*`）。
+含义写准：**`@fastify/websocket` 的防御只活在我分支和另一条会话的未提交改动里。**
+⚠️ 但"main 现在红不红"不是这一段能主张的 —— 它取决于 `gen --check` 在干净树上重解析到 `^11.3.0`
+里的哪一枚，那是**下一条要量的事**（要跑就得在 main 的干净 linked worktree 里跑，不在混合树上读）。
+
+### 落地解法表（06:3x 现量：`main=f9d150e5`、写=33、阻塞=3）
+
+| 阻塞文件 | 谁的手 | 落地时的解 | 机制依据 |
+|---|---|---|---|
+| `package.json` | 他人（4/2 行未提交） | 单行 `check` 链**联合** | 合并脚本 pkg 族 + §8.16 |
+| `research/tools/check-image-license-coverage.mjs` | 他人未提交 = 我分支同判定的第二取证路 | **取分支**（且他的发现已并进来） | 本节的注入 RC=1 那一组 |
+| `server/image-npm-tree.json` | 他人重生成于旧载体 | **取分支** | 同上 |
+
+### 环境读数（06:30 前后）：`vm.loadavg` 1 分钟位 **11.54**（<12），`docker info` OK
+
+窗口确实开过，而**没有**用它起 `verify:selfhost-stack` —— 该项已在 §8.49 拿到 `VERIFY_EXIT=0`
+并在 §8.51 钉在当前产物上（#12 已闭合）。此刻重跑只会拿到一个"main 又前进 20+ 枚之后"的新读数，
+而它属于落地**之后**与 #8 `reinstall:all` 同一时机该做的事，不是现在该烧的窗口。
+
 
 
 
