@@ -286,6 +286,12 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    实际取的名字是 **`check:licenses:stamp`**（跟 `check:licenses` / `check:licenses:nuget` 同族，
    而不是我草稿里那个孤立的名字），插在 `check:licenses` 之后。
    现量：`pnpm -s check:licenses:stamp; echo RC=$?` ⇒ ✅ 对得上当前 lockfile，**RC 0**。
+   ✅ **而且真的在干净检出上验过一遍**（不是只验"我这台装了东西的树"）：
+   `git worktree add --detach /tmp/heyta-wt-cleanstamp HEAD` 之后那棵树里 `node_modules` **不存在**，
+   在它里面跑 `node research/tools/render-license-inventory.mjs --check-stamp` ⇒
+   ✅ `对得上当前 lockfile（111cc2d1d04d3763）`，**RC=0**；跑完 `git worktree remove --force` + `prune` 收掉。
+   这才是"能进 `pnpm check`"这句话的证据 —— temp 目录里手搓的那一份只能证明文件比较逻辑，
+   证明不了 HEAD 这棵树的产物与 lockfile 是对得上的。
    📌 它能进 `pnpm check` 而内容级的 `--check` 不能，全部差别在一件事上：**它不需要装任何东西**。
    ⚠️ 等的时候照出来一条**归他们**的风险 —— "`package.json` 里已经引了
    `check:mobile-first-run-gate`，而它指向的脚本还是未跟踪状态" ⇒ 那时任何一笔从 HEAD
