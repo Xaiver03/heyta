@@ -864,3 +864,49 @@ cd /tmp/heyta-merge-check && pnpm -r build && pnpm -r --filter '!@heyta/sync-ser
 **为什么当时没有复跑**：现场 `loadavg 23.27 / 16 核`、`free 11.9 GB / 64 GB`，
 而并行会话正在用同一批设备与 e2e 载体 —— 按 §7 的负载门与
 "等窗口期间连允许全量跑的重活都别起"，这一笔留成**待复跑**而不是绿。
+
+## 15. 合并落定在长期线上，复跑的载体因此换了一个（2026-10-03 17:3x 现量）
+
+§14 那趟的载体是临时分支 `deccbb35`（`/tmp/heyta-merge-check`，detached）。
+现在三条分支已经合进**长期分支**，所以复跑不必再借临时检出：
+
+| 项 | 现量（命令自证） |
+|---|---|
+| 载体 | `integrate/2026-10-03-closeout`，检出在 `/private/tmp/heyta-final` |
+| 合并提交 | `3d357132`（并 `feat/ai-entity-coverage`）、`3d6aadd2`（并 `feat/assistant-history-local-persistence`） |
+| 与 main 的关系 | `git rev-list --left-right --count main...fd34c42a` ⇒ **`0 31`**，即 main 是祖先、可直接落地、无冲突面 |
+| 内容差集 | `main...dd8f2210` 的 62 个文件、`main...f2d7ed40` 的 14 个文件，对 `main...fd34c42a`（73 个）的差集都是 **0 条** ⇒ 两条分支的东西一个都没落在外面 |
+| 链段数 | `fd34c42a` 的 `package.json` ⇒ **61** 段（主检出工作树是 62，多出的那段 `check:op-log-semantics` 是并行会话**未提交**的改动 —— 读数必须写明载体，同 §14 那个坑） |
+
+🔴 **B36.2 由本条线收掉了**（`1a6640f2`），但收它之前先量清了归属：
+`scripts/mutate-closeout-gates.sh` 的这 3 处**是同一缺陷的第二次** ——
+`1ac5913a` 已经为这个文件把 4 处 `$var` 紧跟全角括号改成 `${var}`，
+而 `cc974fbd`（10-03 14:40）新增的 V1/V2/V3 三条**失败证据行**又写回裸形式。
+后果不是"门禁红"这么轻：那三行是**变异验证失败时打印读数的地方**，
+变量名被非 ASCII 吞掉 ⇒ 判据说"没牙"的同时把牙印也抹掉了（对照组实测：
+`V=abc; echo "「$V」"` 打成 `「`，`${V}` 打成 `「abc」`）。
+改动只有 3 行、期望值字符串逐字未动、`bash -n` 过、门禁复跑扫 67 个 `.sh` 全绿。
+
+**复跑命令（换成长期载体，日志必须落盘 —— §14 的教训是"跑过"和"可复核"是两件事）**：
+
+```bash
+cd /private/tmp/heyta-final && pnpm -r build 2>&1 | tee /tmp/intg-build.log
+cd /private/tmp/heyta-final && pnpm -r typecheck 2>&1 | tee /tmp/intg-typecheck.log
+cd /private/tmp/heyta-final && pnpm -r --filter '!@heyta/sync-server' test 2>&1 | tee /tmp/intg-test.log
+# 61 段全链要单独等窗口：见下面那条端口纪律
+cd /private/tmp/heyta-final/e2e && pnpm install   # 该检出没有 e2e/node_modules（实测），全链前要先装
+```
+
+🔴 **为什么"全链"和"build+test"要分两趟而不是并成一条**：
+`check:ai-e2e` 的前置 `scripts/check-ai-e2e-preflight.mjs` 会对 **4318 / 4319**
+（另两档传参 4320 / 4322）上**正在 LISTEN 的进程直接 SIGKILL**，
+判据是 `lsof -ti tcp:<port> -sTCP:LISTEN` —— 它不区分那个 vite 是谁起的。
+并行会话的界面验收正挂在同批端口与同批设备上时，跑全链**会把别人的那一趟打断**，
+而那在他们那边长得像"界面自己坏了"。所以顺序固定：
+① 负载门（单一所有者 `scripts/lib/wait-for-quiet-host.sh`，阈值 = 核数 × 3/4 = **12**，
+等满 `HEYTA_LOAD_GATE_WAIT`（默认 900s）仍超 ⇒ `exit 3` 记成"环境无效"而不是产品失败）；
+② `ps` 里**没有** `verify-mobile*` / `.snap.` / playwright 残留；
+③ 才允许起 build+test，最后才起全链。
+
+本节写下这些的时候现场是 `load 22`、`verify-mobile-notes.sh`（pid 75769）在跑、
+`free 69%` ⇒ **② 尚未复跑**，这一笔仍是待复跑，不是绿。
