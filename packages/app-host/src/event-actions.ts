@@ -49,6 +49,7 @@ import { OpType } from '@heyta/sync-core';
 
 import type { ActionContext } from './actions.js';
 import { randomId } from './ids.js';
+import { repeatPresetRule } from './repeat-presets.js';
 
 /** 新建时可一并写入的字段。省略 = 用领域层的运行时默认值。 */
 export interface NewEventFields {
@@ -67,6 +68,29 @@ export interface NewEventFields {
   notes?: string | null;
 }
 
+/**
+ * {@link EventActions.patchEvent} 的载荷：**出现的键才改**，`null` = 用户明确清除。
+ *
+ * ⚠️ 刻意只有编辑器真的会一起改的那几项（标题 / 日期+历法 / 类型 / 重复 / 模板色）。
+ * `pinnedAt`、`archivedAt`、`notes` 不在这里 —— 它们是**各自的独立意图**
+ * （菜单上一次点一下），做成可选项就等于给"随手带上别的字段"开了口子。
+ */
+export interface EventPatch {
+  title?: string;
+  date?: LocalDate;
+  isLunar?: boolean;
+  kind?: CountdownEventKind | null;
+  /**
+   * 「每年」这一档的**勾选**（不是规则串）。
+   *
+   * 🔴 为什么在动作层翻译：RRULE 的构造是业务语义，而它**依赖锚点日期** ——
+   * 让每个界面自己拼一条规则串，结局是 web 与手机各拼一种、各自都能过自己的测试。
+   * `false` = 改成一次性（写 `null`，不是省略键）。
+   */
+  yearly?: boolean;
+  color?: CategorySlot | null;
+}
+
 export interface EventActionsOptions {
   /** 倒数日 id 生成器。可注入，理由见 `NoteActionsOptions.newNoteId`。 */
   newEventId?: () => string;
@@ -78,6 +102,15 @@ export interface EventActionsOptions {
 export interface EventActions {
   createEvent(title: string, date: LocalDate, over?: NewEventFields): Promise<string>;
   renameEvent(entityId: string, title: string): Promise<void>;
+  /**
+   * 一次保存 = **一个 op**（AGENTS §3.4）。卡片的编辑器改了几个字段就带几个字段，
+   * 没出现的键一律不动。
+   *
+   * 🔴 为什么需要它：如果"保存"变成 5 次 setter，一次点击就是 5 条 op ——
+   * 它们的向量时钟互相无关，另一台设备并发编辑同一条时会**逐字段**分裂
+   * （标题来自第 2 条、日期来自第 4 条），而 LWW 只能在单条 op 上裁决。
+   */
+  patchEvent(entityId: string, patch: EventPatch): Promise<void>;
   /** 🔴 日期与历法**同一条 op**（见文件头第 1 条）。`isLunar` 省略 = 不改历法。 */
   setEventDate(entityId: string, date: LocalDate, isLunar?: boolean): Promise<void>;
   /** `null` = 用户明确"不选类型"（回到按日期方向兜底），不是"不改"。 */
@@ -189,6 +222,59 @@ export function createEventActions(
         payload: { title: title.trim() },
       });
     },
+
+    async patchEvent(entityId, patch) {
+      const current = eventOf(entityId);
+      if (current === undefined) throw new Error(`找不到倒数日「${entityId}」`);
+
+      const payload: Record<string, unknown> = {};
+
+      if (patch.title !== undefined) {
+        const rejection = eventTitleRejection(patch.title);
+        if (rejection !== undefined) {
+          throw new Error(
+            rejection === 'empty-title'
+              ? '倒数日标题不能为空（空白也算空）'
+              : `倒数日标题 ${String(patch.title.length)} 字，超过上限`,
+          );
+        }
+        payload.title = patch.title.trim();
+      }
+
+      // 日期与农历是**同一次改动**：只改其中一个时，另一个用当前值一起过一遍校验，
+      // 否则"把 2 月 30 日改对、农历标记还留着"这类组合能在一次保存里溜进去。
+      if (patch.date !== undefined || patch.isLunar !== undefined) {
+        const date = patch.date ?? current.date;
+        assertTitleAndDate(patch.title?.trim() ?? current.title, date);
+        if (patch.date !== undefined) payload.date = patch.date;
+        if (patch.isLunar !== undefined) payload.isLunar = patch.isLunar;
+      }
+
+      if (patch.kind !== undefined) payload.kind = patch.kind;
+
+      // 「每年」在**日期校验之后**才构造规则：锚点非法时用户该看到"日期不合法"，
+      // 而不是撞上第二序的"规则构造不出来"。
+      if (patch.yearly !== undefined) {
+        if (!patch.yearly) {
+          payload.recurrence = null;
+        } else {
+          const rule = repeatPresetRule('yearly', patch.date ?? current.date);
+          if (rule === undefined) {
+            throw new Error(`「每年」的规则没能从日期「${patch.date ?? current.date}」构造出来`);
+          }
+          payload.recurrence = rule;
+        }
+      }
+
+      if (patch.color !== undefined) payload.color = patch.color;
+
+      await ctx.dispatch({
+        entityType: 'EVENT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        payload,
+      });
+      },
 
     async setEventDate(entityId, date, isLunar) {
       const current = eventOf(entityId);

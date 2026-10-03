@@ -55,7 +55,8 @@ export type ShellModuleKey =
   | 'timeline'
   | 'focus'
   | 'growth'
-  | 'notes';
+  | 'notes'
+  | 'countdown';
 
 export interface ShellModule {
   readonly key: ShellModuleKey;
@@ -115,6 +116,16 @@ export const SHELL_MODULES: readonly ShellModule[] = [
     key: 'notes',
     labelKey: 'web.shell.modules.notes.label',
     noteKey: 'web.shell.modules.notes.note',
+    defaultOn: false,
+  },
+  {
+    // 🔴 默认关是产品负责人拍的（`docs/plans/countdown-anniversary.md` §3 W8）。
+    //    它和「日历」的区别不是重不重要，而是**用的频率**：倒数日一周点几次，
+    //    而 rail 是每天点几十次的地方。关掉的模块**不进 DOM**（不是 `display:none`），
+    //    所以这条默认值不会动到任何既有的 tab 计数断言。
+    key: 'countdown',
+    labelKey: 'web.shell.modules.countdown.label',
+    noteKey: 'web.shell.modules.countdown.note',
     defaultOn: false,
   },
 ];
