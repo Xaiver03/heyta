@@ -45,6 +45,16 @@ export const HOLIDAY_ADJUSTMENT_PATHS = {
   adminList: 'holiday-adjustments',
   /** 后台整年写入（PUT 一个年 = 该年逐日表被**整体替换**，见 `holidayYearPutSchema`）。 */
   adminPut: 'holiday-adjustments/years',
+  /**
+   * 后台撤销某一年（DELETE，年份走**查询串**而不是路径参数）。
+   *
+   * 🔴 为什么不用 `/years/:year`：PUT 的年份住在 **body** 里（`holidayYearPutSchema.year`），
+   * 如果 DELETE 的年份住在**路径**里，同一个数字就有了两个来源，
+   * 而"路径说 2027、body 说 2026"这种请求必须再写一条守卫才不会被接受 ——
+   * 那条守卫的缺失是**静默**的（它拦的是一个只有手工构造请求才能出现的分歧）。
+   * 两个动词都用"集合路径 + 载荷里的年份"，分歧在形状上就写不出来。
+   */
+  adminDelete: 'holiday-adjustments/years',
 } as const;
 
 /**
@@ -143,56 +153,128 @@ export const holidayAdjustmentDaySchema = z.object({
   isOffDay: z.boolean(),
 });
 
-/** 一个年度的录入：出处 + 逐日表。 */
-export const holidayAdjustmentYearSchema = z
-  .object({
-    year: z
-      .number()
-      .int('year 必须是整数')
-      .min(HOLIDAY_ADJUSTMENT_YEAR_MIN, `year 不得早于 ${HOLIDAY_ADJUSTMENT_YEAR_MIN}`)
-      .max(HOLIDAY_ADJUSTMENT_YEAR_MAX, `year 不得晚于 ${HOLIDAY_ADJUSTMENT_YEAR_MAX}`),
-    papers: z
-      .array(
-        z
-          .string()
-          .min(1)
-          .refine(isHttpPaperUrl, 'papers 必须是 http/https 的完整 URL（后台会把它们渲染成链接）'),
-      )
-      .min(HOLIDAY_ADJUSTMENT_MIN_PAPERS, 'papers 不能为空：没有出处的节假日数据不能进库')
-      .max(HOLIDAY_ADJUSTMENT_MAX_PAPERS, `papers 最多 ${HOLIDAY_ADJUSTMENT_MAX_PAPERS} 条`),
-    days: z
-      .array(holidayAdjustmentDaySchema)
-      .min(1, 'days 不能为空数组：一年都没有安排就不要录这一年')
-      .max(HOLIDAY_ADJUSTMENT_MAX_DAYS_PER_YEAR, `days 最多 ${HOLIDAY_ADJUSTMENT_MAX_DAYS_PER_YEAR} 条`),
-  })
-  /**
-   * 🔴 **同一天不许出现两次**。
-   *
-   * 逐日表的主键是 `day`，所以库里物理上装不下两条 —— 但**校验必须发生在写库之前**，
-   * 否则症状是整年录入失败（或更糟：后一条覆盖前一条，运营看到的是"存成功了"，
-   * 而客户端拿到的是被悄悄改掉的那一半）。
-   * 判据④「覆盖里日期非法就**整年拒绝**、不接受半套数据」要求的正是这种
-   * "要么全收、要么全不收"，它在契约层就得成立。
-   */
-  .refine(
-    (value) => new Set(value.days.map((d) => d.day)).size === value.days.length,
-    '同一天不许出现两次（既休又补班没有意义，而"两次里取哪一次"没有任何一层能替你决定）',
-  )
-  /** `year` 与 `days[]` 里的年份不许对不上（录入时把 2026 的行放进 2027 年那一条）。 */
-  .refine(
-    (value) => value.days.every((d) => Number(d.day.slice(0, 4)) === value.year),
-    'days[] 里的日期必须都属于 year 那一年（跨年会同时进两张年，谁覆盖谁说不清）',
-  );
+/**
+ * 一个年度载荷的**共享件**。
+ *
+ * 🔴 为什么拆成 `shape` + 两条具名谓词，而不是 `holidayYearPutSchema = holidayAdjustmentYearSchema.extend({note})`：
+ * 后者依赖 `.refine()` 的返回值还是 `ZodObject`（实测 zod 4 里 `.refine()` 返回的
+ * 是**效果包装后的类型**，`.extend` 在上面不存在 —— 编译期就炸）。
+ * 绕开它有三条路：把 `note` 塞进公开那份（会让运营内部措辞跟着匿名下发，
+ * `PUBLIC_FACT_SHAPES` 当场变红，而那**不是**门禁坏了）；或者抄一份带 `note` 的对象
+ * （两条年度级规则就变成四份，漂移只是时间问题）。
+ * 所以走第四条：**规则各只有一份**（`yearShape` / `papersShape` / `daysShape` +
+ * 两个谓词函数），只有"字段集合"这一层是两个 schema。
+ * 加一条新规则时必须同时传进两次 `superRefine` —— 漏一处的表现是
+ * "PUT 收了、匿名 GET 那份的形状又不同意"，而这两处谁会先报错没有保证。
+ */
+const yearFields = {
+  year: z
+    .number()
+    .int('year 必须是整数')
+    .min(HOLIDAY_ADJUSTMENT_YEAR_MIN, `year 不得早于 ${String(HOLIDAY_ADJUSTMENT_YEAR_MIN)}`)
+    .max(HOLIDAY_ADJUSTMENT_YEAR_MAX, `year 不得晚于 ${String(HOLIDAY_ADJUSTMENT_YEAR_MAX)}`),
+  papers: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .refine(isHttpPaperUrl, 'papers 必须是 http/https 的完整 URL（后台会把它们渲染成链接）'),
+    )
+    .min(HOLIDAY_ADJUSTMENT_MIN_PAPERS, 'papers 不能为空：没有出处的节假日数据不能进库')
+    .max(HOLIDAY_ADJUSTMENT_MAX_PAPERS, `papers 最多 ${String(HOLIDAY_ADJUSTMENT_MAX_PAPERS)} 条`),
+  days: z
+    .array(holidayAdjustmentDaySchema)
+    .min(1, 'days 不能为空数组：一年都没有安排就不要录这一年')
+    .max(
+      HOLIDAY_ADJUSTMENT_MAX_DAYS_PER_YEAR,
+      `days 最多 ${String(HOLIDAY_ADJUSTMENT_MAX_DAYS_PER_YEAR)} 条`,
+    ),
+};
 
-/** `PUT /api/admin/holiday-adjustments/years` 的请求体：**一次一个年度，整年替换**。 */
-export const holidayYearPutSchema = holidayAdjustmentYearSchema;
+/**
+ * 🔴 **同一天不许出现两次**。
+ *
+ * 逐日表的主键是 `day`，所以库里物理上装不下两条 —— 但**校验必须发生在写库之前**，
+ * 否则症状是整年录入失败（或更糟：后一条覆盖前一条，运营看到的是"存成功了"，
+ * 而客户端拿到的是被悄悄改掉的那一半）。
+ * 判据④「覆盖里日期非法就**整年拒绝**、不接受半套数据」要求的正是这种
+ * "要么全收、要么全不收"，它在契约层就得成立。
+ */
+const noSameDayTwice = (value: { days: { day: string }[] }): boolean =>
+  new Set(value.days.map((d) => d.day)).size === value.days.length;
+const NO_SAME_DAY_TWICE =
+  '同一天不许出现两次（既休又补班没有意义，而"两次里取哪一次"没有任何一层能替你决定）';
+
+/** `year` 与 `days[]` 里的年份不许对不上（录入时把 2026 的行放进 2027 年那一条）。 */
+const daysBelongToYear = (value: { year: number; days: { day: string }[] }): boolean =>
+  value.days.every((d) => Number(d.day.slice(0, 4)) === value.year);
+const DAYS_BELONG_TO_YEAR =
+  'days[] 里的日期必须都属于 year 那一年（跨年会同时进两张年，谁覆盖谁说不清）';
+
+/**
+ * 一个年度的**公开**载荷：出处 + 逐日表。**三项，没有别的**。
+ *
+ * ⚠️ 这个字段集合就是 `PUBLIC_FACT_SHAPES.keys.year` 那三项。多一项（哪怕可选）
+ * 都会让匿名 GET 多下发一个键，而 `check:public-facts` 会红。
+ */
+export const holidayAdjustmentYearSchema = z
+  .object(yearFields)
+  .superRefine((value, ctx) => {
+    if (!noSameDayTwice(value)) ctx.addIssue({ code: 'custom', message: NO_SAME_DAY_TWICE });
+    if (!daysBelongToYear(value)) ctx.addIssue({ code: 'custom', message: DAYS_BELONG_TO_YEAR });
+  });
+
+/**
+ * 运营备注的长度上限。
+ *
+ * 🔴 有上界**不是**防"输入太长"这种洁癖：列类型是 `TEXT`（无长度），而这一项会在
+ * 后台被渲染成文本。没有上界 = 一个后台账号能让后台渲染任意长的字符串。
+ * 500 是"一句中文备注"的量级；要写长的应该去 issue 里写，不是进这一列。
+ */
+export const HOLIDAY_ADJUSTMENT_NOTE_MAX_CHARS = 500;
+
+/**
+ * `PUT /api/admin/holiday-adjustments/years` 的请求体：**一次一个年度，整年替换**。
+ *
+ * ⚠️ 它与 {@link holidayAdjustmentYearSchema} 的差别**只有** `note`
+ *（为什么不是 `.extend()` 过去，见上面"共享件"那段）。这一格必须写清楚，
+ * 否则下一个人会以为两边可以互换：
+ *
+ * - `note` 是**只写、不进公开面**的运营备注（"据 2026-11 调整公告，原定 10-11 不上班"）。
+ *   它**不在** `holidayAdjustmentsResponseSchema` 里，因此也不在
+ *   `PUBLIC_FACT_SHAPES.keys.year` 那三项里 —— 匿名 GET 拿不到它。
+ *   把 `note` 放进 `holidayAdjustmentYearSchema` 会让它跟着下发，
+ *   而 `check:public-facts` 会因此变红：**那是它有意的行为**，不是门禁坏了。
+ *   运营的内部措辞不是公共事实。判据钉在
+ *   `server/tests/holiday-public-route.spec.ts` 的「公开面不许出现 note」。
+ */
+export const holidayYearPutSchema = z
+  .object({
+    ...yearFields,
+    /** 可选（§3.3：不给就不写，别让"备注"变成录入的必填负担）。`null` 与不传同样表示"没有"。 */
+    note: z
+      .string()
+      .max(HOLIDAY_ADJUSTMENT_NOTE_MAX_CHARS, `note 最多 ${String(HOLIDAY_ADJUSTMENT_NOTE_MAX_CHARS)} 字`)
+      .nullish(),
+  })
+  .superRefine((value, ctx) => {
+    if (!noSameDayTwice(value)) ctx.addIssue({ code: 'custom', message: NO_SAME_DAY_TWICE });
+    if (!daysBelongToYear(value)) ctx.addIssue({ code: 'custom', message: DAYS_BELONG_TO_YEAR });
+  });
 
 /** 公开 GET 的响应体，也是本地缓存落盘的形状。 */
 export const holidayAdjustmentsResponseSchema = z.object({
   /**
-   * 这份数据的版本令牌（`W/<max(updated_at)>-<年份数>`，服务端算）。
-   * 客户端把它当 `If-None-Match` 回传，命中就 304、连 body 都不发。
-   * 形状自己定的理由在 ADR-0050 §4（照 `PriceVersion` 那种"版本号是数据的一部分"的做法）。
+   * 内容版本令牌：`<max(updated_at)>.<年度数>.<逐日行数>`（服务端从数据算出来）。
+   *
+   * 客户端把它当 `If-None-Match` 的候选回传，命中就 304、连 body 都不发。
+   * 三个量为什么要凑齐（少一个就有"改了数据但令牌没变"的窗口）与
+   * "它**不是**内容哈希、别当校验和用"那半句，写在
+   * [ADR-0050](../../docs/adr/0050-public-facts-are-deployer-supplied.md) §4；
+   * 实现是 `server/src/holidays/holiday-adjustment-store.ts` 的 `holidayVersionToken()`。
+   *
+   * 形状照 `PriceVersion`（`server/prisma/schema.prisma:388`）那条既有立场：
+   * **版本号是数据的一部分**，不是响应头里现造的一个数。
    */
   version: z.string().min(1),
   /** 升序、无重复年份。服务端排好序 —— 两端各排一次就会有两种顺序。 */
@@ -207,10 +289,18 @@ export const holidayAdjustmentsAdminListSchema = z.object({
       /** 这一版是谁、什么时候写的（回显到后台表格里，追责与回滚都要它）。 */
       updatedAt: z.number(),
       updatedBy: z.string().nullable(),
+      /** 运营备注。可空 —— 它只是给人看的线索，不参与任何裁决。 */
+      note: z.string().nullable(),
       /** 库里实际行数，用来核对"界面显示的条数 == 存进去的条数"。 */
       dayCount: z.number().int(),
     }),
   ),
+});
+
+/** 后台 DELETE 的查询串：**只有** `year`，多一个键都不收。 */
+export const holidayAdjustmentAdminDeleteQuerySchema = z.strictObject({
+  /** 与 PUT 一样走查询串/载荷，不走路径参数（理由见 `HOLIDAY_ADJUSTMENT_PATHS.adminDelete`）。 */
+  year: z.coerce.number().int(),
 });
 
 /**
@@ -239,3 +329,4 @@ export const PUBLIC_FACT_SHAPES = [
 export type HolidayAdjustmentDay = z.infer<typeof holidayAdjustmentDaySchema>;
 export type HolidayAdjustmentYear = z.infer<typeof holidayAdjustmentYearSchema>;
 export type HolidayAdjustmentsResponse = z.infer<typeof holidayAdjustmentsResponseSchema>;
+export type HolidayAdjustmentsAdminList = z.infer<typeof holidayAdjustmentsAdminListSchema>;
