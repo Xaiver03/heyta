@@ -1750,7 +1750,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
 改前/改后两张图 md5 **不同**（`8970c732…` / `f14afbc0…`，早先它们逐字节相同过，那等于什么都没证），
 看图后的两条例外都写进 [`../apps/web/evidence/admin-holiday/README.md`](../../apps/web/evidence/admin-holiday/README.md) |
 | L' 法务联动 | 🟡 判定表已出、命中已修；**它立的门禁现在响在 main 的已提交状态上** | 随最后一个改承诺的工单 | 4 | 普查 82 行 → 唯一真命中已修（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`，13 臂变异全红）。🔴 **读数取三次，每次载体不同**：04 03:0x 在**主检出** ⇒ rc=1 / **2 条红**（那四句 `permissions.ts` 已被并行会话在未提交的工作树里翻掉）；04 03:5x 在**本批工作树** ⇒ rc=1 / **7 条红**；把**只含 `origin/main` 已提交内容**的七份输入喂给同一份脚本（`HEYTA_CHECK_ROOT` 探针，命令在 §8.2 L' 第 1b 条）⇒ **rc=1 / 7 条红，与喂 `HEAD` 那份逐字相同**。⇒ 归属从"别人的在飞工作树"升级为**"`b0ba4a35`（W9 原生投递）已提交在 main 上的矛盾"**：六句对外承诺没翻 + `SCHEDULE_EXACT_ALARM` 未登记（那条臂 A13 是**故意**要它响）。**不由本批代改**（是 W9 的产品/法务判断，且合流的人必须把六句 + `check:legal-copy` 同批做完）。关闭判据：`node scripts/check-legal-permissions.mjs` rc=0（每次引用本条重跑，并写明在哪个载体跑的） |
-| 收尾四项（§5） | 🟡 **三条已量（第 1 条分两趟），第 4 条待跑** | 全部 | 4 | ✅ 第 2 条：`node research/tools/docs-link-check.mjs` 在本检出 ⇒ **rc=0 / 死链 0 处**（⚠️ 那句"33 处"是**主检出**的读数，死链数是"仓库+本机未跟踪文件"的属性，引用必须带在哪跑的）。✅ 第 3 条：W6 五张、W7 六张、W4b 一张**都打开看过**，各自 README 写了"看见了什么"，并且**看图一共照出三处断言抓不到的东西**（W5 少一行日期 / W7 竖条不是主蓝 / W4b 年份被挤没）。⏳ 第 1 条完整 `pnpm check`：**分两趟逐段量完了 66/68 段**（装置 `research/tools/check-segments.mjs`，段的来源是 `package.json:58` 那条真串而不是抄的名单，`--skip` 的选择器会报分母）。第一趟 04:45–04:49 @ `7d1b85b3`：**67 段 / 60 绿 / 7 红**；四笔提交把其中 4 条按各自真因修掉（`816dea4c` theme / server-legal / shell-unicode，`2924b15d` 取回 main 已落的 6 份测试修复）；第二趟 05:0x–05:12 @ `e25377f7`：**66 段 / 63 绿 / 3 红**；那三条红随后逐条对账，**其中一条当场被现量否证并修掉**（`check:licenses:stamp` —— main 早就重渲染过那份清单，取回即可，见下面第 ⑦ 条），剩下 **2 条是本批之外的已提交状态** —— `check:ui-provider`（探针穿不过 `return featureScreen(...)` 那层，四条点名文件在 `origin/main` 与 HEAD **逐字节相同**）、`check:legal-permissions`（红在 `third-parties.ts` 推送 SDK 的英文否表行 vs `POST_NOTIFICATIONS`/`NSUserNotificationsUsageDescription`，属 **W9 原生投递那条线**，不是 L'）。`pnpm -r test` **全量已在 04 05:2x 量到**（19/19 个有 `test` 脚本的包，**10760 passed / 1 failed / 14 skipped**，逐条见下面第 ⑧ 条）；第 1 条只剩 `check:ai-e2e` 一段，排在 `/tmp/batch2-closeout2.sh` 的 [A2] 步。⚠️ 这里换了编排，也换了一个**当天现量出来的理由**：另一条会话的 `reinstall:all`（载体 `d0a81927`，不是本批）此刻卡在 macOS 公证的 `notarytool submit … --wait` 上**已经两个多小时**（`/tmp/heyta-reinstall-mac.log` 自 03:13 起没再写），而 `pnpm -r test` 与 `check:ai-e2e` **一台设备都不碰** —— 把它们押在"等对方整串跑完"上是白等，所以链条改成"先量不碰设备的两段，再排设备窗口"；等对方链退出这件事只对**设备那几段**保留（§8.9）。⏹ 第 4 条 `pnpm reinstall:all` 四端 + 私有现场设备验收（排在最后；⚠️ 现场核对 **05:0x 现量**：Android 模拟器 `emulator-5554` 在线、iOS 起了 **两台**（`heyta-iphone-17pro` + 别人的 `heyta-ios-isolated`）、`windows-pc` SSH 可达，而**这三样此刻全在另一条会话的重装链手里** ⇒ 本批这一趟已改成**串行排队**（等对方链退出 + 负载门 ncpu*3/4 + 工作树必须干净 + 4318/4319 与测试锁空才跑 `check:ai-e2e`，等满记 exit 3 = 环境无效而非产品失败） |
+| 收尾四项（§5） | 🟡 **三条已量（第 1 条分两趟），第 4 条待跑** | 全部 | 4 | ✅ 第 2 条：`node research/tools/docs-link-check.mjs` 在本检出 ⇒ **rc=0 / 死链 0 处**（⚠️ 那句"33 处"是**主检出**的读数，死链数是"仓库+本机未跟踪文件"的属性，引用必须带在哪跑的）。✅ 第 3 条：W6 五张、W7 六张、W4b 一张**都打开看过**，各自 README 写了"看见了什么"，并且**看图一共照出三处断言抓不到的东西**（W5 少一行日期 / W7 竖条不是主蓝 / W4b 年份被挤没）。⏳ 第 1 条完整 `pnpm check`：**分两趟逐段量完了 66/68 段**（装置 `research/tools/check-segments.mjs`，段的来源是 `package.json:58` 那条真串而不是抄的名单，`--skip` 的选择器会报分母）。第一趟 04:45–04:49 @ `7d1b85b3`：**67 段 / 60 绿 / 7 红**；四笔提交把其中 4 条按各自真因修掉（`816dea4c` theme / server-legal / shell-unicode，`2924b15d` 取回 main 已落的 6 份测试修复）；第二趟 05:0x–05:12 @ `e25377f7`：**66 段 / 63 绿 / 3 红**；那三条红随后逐条对账，**其中一条当场被现量否证并修掉**（`check:licenses:stamp` —— main 早就重渲染过那份清单，取回即可，见下面第 ⑦ 条），剩下 **2 条是本批之外的已提交状态** —— `check:ui-provider`（探针穿不过 `return featureScreen(...)` 那层，四条点名文件在 `origin/main` 与 HEAD **逐字节相同**）、`check:legal-permissions`（红在 `third-parties.ts` 推送 SDK 的英文否表行 vs `POST_NOTIFICATIONS`/`NSUserNotificationsUsageDescription`，属 **W9 原生投递那条线**，不是 L'）。`pnpm -r test` **全量已在 04 05:2x 量到**（19/19 个有 `test` 脚本的包，**10760 passed / 1 failed / 14 skipped**，逐条见下面第 ⑧ 条）；第 1 条只剩 `check:ai-e2e` 的**一趟安静复跑**（04 05:24 那趟已经跑过：**142 passed / 3 failed / 2 skipped**，但它与另一条会话的 e2e 并发 ⇒ 那三条红还不能当判据读数，逐条见下面第 ⑨ 条），排在 `/tmp/batch2-closeout2.sh` 的 [A2] 步。⚠️ 这里换了编排，也换了一个**当天现量出来的理由**：另一条会话的 `reinstall:all`（载体 `d0a81927`，不是本批）此刻卡在 macOS 公证的 `notarytool submit … --wait` 上**已经两个多小时**（`/tmp/heyta-reinstall-mac.log` 自 03:13 起没再写），而 `pnpm -r test` 与 `check:ai-e2e` **一台设备都不碰** —— 把它们押在"等对方整串跑完"上是白等，所以链条改成"先量不碰设备的两段，再排设备窗口"；等对方链退出这件事只对**设备那几段**保留（§8.9）。⏹ 第 4 条 `pnpm reinstall:all` 四端 + 私有现场设备验收（排在最后；⚠️ 现场核对 **05:0x 现量**：Android 模拟器 `emulator-5554` 在线、iOS 起了 **两台**（`heyta-iphone-17pro` + 别人的 `heyta-ios-isolated`）、`windows-pc` SSH 可达，而**这三样此刻全在另一条会话的重装链手里** ⇒ 本批这一趟已改成**串行排队**（等对方链退出 + 负载门 ncpu*3/4 + 工作树必须干净 + 4318/4319 与测试锁空才跑 `check:ai-e2e`，等满记 exit 3 = 环境无效而非产品失败） |
 
 🔴 **04 04:45–04:49 收尾第 1 条的第一趟已量**（载体 `7d1b85b3`，命令 `HEYTA_REPO_ROOT=$PWD node research/tools/check-segments.mjs --skip check:ai-e2e`，起点 load 11.97）：**67 段 = 60 绿 / 7 红**，前面还先跑了 `RC_WEB_BUILD=0`（那条红的 W5 产物格因此转绿）。七条红逐条给归属，不打包成"仓库还红着"：
 
@@ -1806,4 +1806,27 @@ W0b ─> 随时可做（台账那半要等文件干净）
   ⇒ **不猜**：已排一条单独复跑探针（`/tmp/rerun-due-date.sh`：等测试锁空 → 同一条用例连跑两趟），
   两趟同红 = 确定性红（那就要按 main 的账登记），一趟红一趟绿 = 并发单发不稳。
   ⚠️ 登记这条时不写"这是别人弄坏的"，只写**现量到的边界**：它不在本批的改动面上，而它是不是恒红还没量过。
+- ⑨ `check:ai-e2e`（04 05:24–05:28，载体 `af6fb28e`→`d4255e10` 这段只有文档提交）：
+  **142 passed / 3 failed / 2 skipped（6.0m）**。三条红逐条写清"是什么形状 + 归谁 + 还差什么"：
+  · `tests/calendar-sidebar.spec.ts:111`「迷你月历：七列真的对齐…」—— 几何判据量出
+  **第 1 列的列头与格子中心差 5.3px**，`retry #1` **同一个数**（所以不是抖动）。
+  本批的嫌疑面：`e2def90f`（W6）给侧栏格子加了「休 / 班」那颗点（`CalendarSidebar.tsx:177`），
+  而列头与格子是**两副各自分配列宽的 grid**（`sidebar.css:308` 两处共用 `repeat(7, 1fr)`）——
+  两副 grid 只在"没有任何一列被内容撑开"时才会对齐。
+  🔴 **但这句话到机制为止，不能当结论**：那颗点只有一个 2xs 的字，按宽度算撑不开 1/7 那一格，
+  而 5.25px 的位移要成立需要某几列各被撑开 ~1px。我照这个猜测改了一版 `minmax(0, 1fr)`，
+  **在没有浏览器可量的时候又把它撤了**（`git checkout -- apps/web/src/styles/app/sidebar.css`）——
+  交付一个"看起来像修好了"的改动，比留一条没定的红更贵。要定它只需一次带测量的跑：
+  打印那 7 个 track 的实际宽度，看被撑开的是哪几列、撑开多少。
+  · `tests/profile-avatar-e2ee.spec.ts:213`（头像 + 口令那条线）与 `tests/vault-settings.spec.ts:138`（vault 那条线）
+  —— 两条都不在本批的改动面上（本批没碰头像/vault 的任何文件）。
+  ⚠️ **这一趟不能算"判据读数"**：它与另一条会话的 e2e **并发**（实测我自己的 vitest 随后被本仓的内存闸门挡下，
+  挡我的那把锁 `/tmp/tfa-test.lock` 就是那条 `pnpm --dir e2e run test` 占的）⇒
+  三条红都要等一趟**安静**的复跑才算数，已排探针。
+  🔴 顺一条对**流程**有影响的现量：`check:ai-e2e` 跑完会**重写 41 个已跟踪的 evidence png**
+  （`apps/web/evidence/**`，里面大部分是别的条线的：`assistant/`、`vault-panel/`、`calendar-year/`、
+  `profile-panel/r15b-*`、`quadrant-fill/`…），而 `pnpm reinstall:all` 的不变量正是"工作树没有未提交的已跟踪改动"
+  （它要把整棵树同步到远端打包机）⇒ 任何"先跑 e2e 再装包"的链条都会在中间被这 41 个文件挡下。
+  本批的处置是 `git checkout -- apps/web/evidence`（**41 → 0**），理由写清楚：
+  那些图的"人已看"结论在各目录 README 里，而 README 钉的是**版本库那一份**的 md5 —— 留着新字节反而让那条 md5 判据失效。
 📌 三条一般形状：① ~~**"清单已过期"的修法不是"重渲染"，是"在装齐的树上重渲染"**~~ —— 这句被 ⑦ 自己否证了，正确顺序是**先问"main 有没有已经渲染好的那份"**，再用 `diff` 证明它对本分支同样成立（lockfile 逐字节相同 ⇒ 清单正文相同 ⇒ 只差戳与日期 = 免费的正确性证明）；"在装齐的树上重渲染"是**没有那份可取时**的次选，而不是第一选择。② **linked worktree 的 `pnpm install` 会少一整片 workspace**（这里 961 vs 1093），症状与"清单过期"长得一样（数字变小）、方向相反（越修越瞎）—— 所以"在这棵树上跑生成器"之前要先跑 `diff`。③ **`pnpm -r test` 在第一个失败包就停**，所以"某段 rc=1"完全可能只量到了 21 个包里的第 14 个 —— 报"全量绿"之前要数**跑到了第几个包**，不是数红了几条。
