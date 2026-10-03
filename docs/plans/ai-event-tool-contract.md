@@ -2731,6 +2731,154 @@ AGENTS §8 第 7 条那句"范围扩大后，旧范围的完成证据不能覆�
 所以 §15.39 那一节的落盘位置现在是：工作树 + `~/scratch-heyta/carrier-snapshot-0004/`
 （229730 字节，00:21 重新快照）。这节写完一并等合流活动停了再按路径提交。
 
+## 15.41 红线 4「出境逐字段披露」的实质缺口补上了（条款那张表 10 条 → 26 条），外加两件**只有合并态才照得出来**的事（载体 `d718f248`，00:5x）
+
+先结案：上面那句"等合流活动停了再按路径提交"过期了。**§15.39 与 §15.40 已经进了 HEAD**，
+但不是从我的提交进去的 —— 是并行会话的整索引提交把它们带上去的
+（`cdf421b3` / `4fad02b0` / `d718f248` 三笔，00:47–00:50）。现量核验：
+`git show HEAD:docs/plans/ai-event-tool-contract.md` 里 `## 15.39` 与 `## 15.40` 两个标题都在，
+字节数 233176 与工作树相同。所以任务 #36（"合流停止后按路径提交这两节"）**没有产物了，只剩这段记录**。
+这就是这台机器上"提交"的真实形状：载体同时是别人的合流点时，**我的未提交段落会被别人的提交吸收**，
+归属只能靠台账文字自己声明。
+
+### 一、门禁的取数前提先被合并态打断，然后才轮到条款
+
+`check:legal-tools`（`scripts/check-legal-tool-catalog.mjs`）原来从 `packages/local-api/src/tools.ts`
+里扫 `export const LOCAL_API_TOOLS` 那一段的 `name:`。目录按实体拆包之后那一行只剩
+`export { LOCAL_API_TOOLS } from './tools/registry.js'` ⇒ **门禁对着合并态直接抛异常**，
+而它要拦的那件事（加了工具没写进条款）反而没人说了。改法是**照装配表取数**：
+从 `tools/registry.ts` 的 `LOCAL_API_TOOL_PACKS` 读出被并进来的符号 → 按结构导入映射到实体文件 →
+逐文件扫 `name:` 且要求同一对象字面量里有 `kind: 'read'|'write'` → 排序返回。
+三条前提破了都**响亮失败**（装配表解析不到 / 某 pack 一个 `name:` 都没有 / 同名工具落在两个文件里），
+不是返回空集合。刻意**没有**复刻 registry 的"读前写后"顺序规则 —— 那是 `buildToolPackRegistry` 的不变量，
+已由 `packages/local-api/tests/server.spec.ts:189` 与 `apps/node-host/tests/mcp-stdio-server.spec.ts:188` 逐字钉着。
+
+**取数口径改对了的证据**（这一步不能省，否则只是"换个姿势扫源码"）：
+门禁的 26 个名字集合，与运行时目录 `packages/local-api/dist/index.js` 里 `LOCAL_API_TOOLS`
+的 26 个 `name` 做 `diff` ⇒ **空**。也就是"两侧逐字相同（门禁的源码扫描 == 运行时目录）"。
+
+改完门禁，它立刻报出**实质缺口**（原话）：
+`❌ … 中文表（第 175 行）缺 16 个工具：create_habit, create_note, create_project, create_reminder,
+create_tag, get_note, list_checkins, list_focuses, list_habits, list_notes, list_reminders, list_tags,
+log_focus, record_checkin, set_task_tags, update_note —— 目录里有、条款里没说，而条款把这张表当成了授权面`
+（英文表同一条，第 431 行）。
+
+**这 16 条全是本线（覆盖面批次二）产出的工具**，所以这个缺口是我这条线欠的，不是继承来的。
+
+### 二、写进去的 16 行，逐格取值来自产物而不是记忆
+
+用 `~/scratch-heyta/probe-catalog-dist.mjs`（把 `name / kind / egressFields` 从**构建产物**里打出来 ——
+产物会把 `ROW_FIELDS` 这类常量展开成真实字段名，源码正则做不到）现量取每格的字段，再照表内既有措辞写：
+读格列字段并显式写"不含什么"（`list_notes` 特别写明**便签没有标题**，所以列表出境的只有"什么时候动过"；
+`list_checkins` / `list_focuses` / `list_reminders` 各写明"不含习惯名 / 不含任务标题"，
+并把"加上时间戳就已经是一份行为记录"这件事说出来而不是藏起来）；
+写格一律"不读数据；写入必须经操作日志"，`set_task_tags` 写明**整组覆盖**、`update_note` 写明**整段替换**。
+中英两张表**逐行同序**（门禁第 3 条判据，抓的是"行贴错对象"）。
+
+配套：`version: '1.1' → '1.2'`（版本号进同意指纹 `packages/legal/src/index.ts:125`，
+条款 s12 自己列的三条触发条件里第一条就是"新增出境字段"），
+并把 s12 那张**修订历史表补齐** —— 现量发现它只有 `1.0` 一行，而 `version` 已经是 `1.1`：
+上一次 bump（W10 那四条 EVENT 行）只改了 `version` 没加历史行。兄弟文件（`data-rights.ts` /
+`privacy.ts` / `minors.ts`）都是 `version` 与历史行同时翻的，所以这里按同一口径补 `1.1` + `1.2` 两行，
+并把 `updatedDate` 改成 `2026-10-04`。
+顺手摘掉一处会漂的常量：`packages/local-api/src/mcp.ts:13` 那句注释里的"全部 10 个工具"
+（目录早就不是 10 条了）改成"目录里的全部工具" —— 注释里写死上游当前状态，就是 §"判据别把上游当前状态写死"
+那一类，只不过这次写死它的是注释而不是断言。
+
+跑通的读数（载体 `d718f248`，工作树当时干净）：
+`check:legal-tools rc=0`（`✅ … 目录 26 条 == 中文表 == 英文表，且中英逐行同序`）、
+`check:legal-copy --check rc=0`、`gen-server-legal --check rc=0`（指纹里 `ai-and-transfer@1.2`）、
+`check:legal-host rc=0`、`@heyta/legal typecheck rc=0`、`check:docs rc=0`。
+
+### 三、🔴 我给一份 `.ts` 法务文档写出了**语法错误**，而我这套验证本来看不见它
+
+英文行里我写 `'… show a person's daily rhythm'` —— 单引号字符串里一个裸撇号 ⇒ 这个文件当时**不可解析**。
+它没被我发现的原因很具体，值得记下来：
+**这张表的对账方全是"文本读者"** —— `check:legal-tools` 用正则扫 `rows`、`gen-site-copy --check`
+比对生成物字符串、`check:legal-copy` 同理，**没有一层解析 TS**。真正能拦住它的是 `pnpm typecheck`，
+而我这一轮先跑的是上面那三个文本门禁。
+更不舒服的一点：我随后跑了 `pnpm --filter @heyta/legal build`，它回 **rc=0**，
+但那条 rc 是在 `4fad02b0 00:48:48` 把撇号修好**落到工作树之后**才量到的
+（那笔提交的标题就是"英文工具表的撇号转义"，改的正是我这一行）。
+⇒ 在"载体每 20–30 秒被并行会话提交一次"的机器上，**"我跑出来 rc=0" 可能是别人修完之后的读数**，
+它不构成"我的验证有牙"的证据。这条和 §15.40 的"混合工作树里跑出来的红/绿只在混合态成立"是同一族，
+只是这次是**反向**的：混合态会把别人的修复算成我的通过。
+
+落地成两条动作：① 改 `.ts` 里的**文档内容**之后，除了文本门禁必须跑该包的 `typecheck`
+（`pnpm --filter @heyta/legal typecheck`，现在这条已经在我这轮的读数里）；
+② 在这台机器上主张"我验过了"，得带上**载体 SHA + 那一刻工作树脏项数**，否则那句话没有主语。
+
+### 四、合并态照出两条**不归本批**的红
+
+1. 🔴 **`check:legal-permissions` rc=1，7 条 ❌，且是已提交态的红**（四个相关文件现量都干净）。
+   根因是 W9 把**申请面**改了没翻**条款**：`b0ba4a35 23:58 feat(app-host,mobile,web): W9 提醒的原生投递（ADR-0051）`
+   往 `AndroidManifest.xml` 加了 `POST_NOTIFICATIONS` + `SCHEDULE_EXACT_ALARM`、往 iOS `Info.plist` 加了
+   `NSUserNotificationsUsageDescription`，而 `permissions.ts` / `third-parties.ts` 里六个位置（中英各三）
+   还写着"移动端不申请通知授权" ⇒ 那句对外条款当场是假话。
+   **这条门禁按设计工作了**：`017adc3e 20:16 feat(gates): 权限对账的通知臂改成六个字面位置、两侧对称 ——
+   W9 原生半落地时它会精准指到该翻的那句`，提交信息里就把用途写明了。
+   第 7 条是 `SCHEDULE_EXACT_ALARM` 既不在 `PRIVACY_ITEMS` 也不在 `NON_PRIVACY_ANDROID_PERMISSIONS`
+   ⇒ 门禁拒绝给"通过"（这是它的设计：不认识的声明必须人来归类）。
+   **我不代翻这六句**：它们要说的是"什么时候申请、申请来做什么、被拒之后怎么降级"，
+   这些事实只有 W9 的所有者有；我照门禁的提示语编一段对外法务条款，比留着这条红更贵
+   （AGENTS §8 第 10 条"安全判据不得为测试桩降级"是同一条纪律的另一面）。
+   🔴 结构性后果写进 ②：**`pnpm check` 在它翻之前不可能全绿**，而 `e54b899b`（② 那趟干净检出的载体）
+   同样以 `b0ba4a35` 为祖先（`git merge-base --is-ancestor` 现量 YES），所以那一趟的逐段读数里
+   这一段**必红** —— 报"61 段绿"的时候要按这个改口，不是"链坏了"。
+   现量命令：`NO_COLOR=1 node scripts/check-legal-permissions.mjs`。
+   这也是 AGENTS §9 那条 L' 前置闸门（"`permissions.ts` 那句'不申请照片'要等 W7 的 manifest 才知会不会变假"）
+   的**兑现**：它变假了，而且变假的是通知那一组，范围比当初登记的更大。
+2. ✅ **`check:docs` 转绿，但过程里那条红是自己造的**：`docs-link-check` 的
+   `SECTION_REF_RE`（`research/tools/docs-link-check.mjs:305`）按「路径 `.md` + 空格 + `§数字`」的字面形状扫，
+   不看它是不是正被引用 ⇒ 我 23:23 为了记录"某处引用了不存在的章节号"而**原样抄了一遍那个引用**，
+   于是记账文本自己成为全仓唯一命中，**记录那条红的句子自己就是那条红**。
+   改写成不落在那个形状里的说法后 rc=0，且没有藏红：原始那条出自 `cd839ec5` 的引用已由它的所有者改对
+   （改前全仓 `grep` 只剩本行自己）。可迁移的一句：**门禁扫的是文本形状，那么"引用一个坏形状"就必须避开那个形状**
+   —— 与 §7 #171（Hermes 字节码里的中文是 UTF-16LE，`grep` 恒 0）是同一族的两面：
+   一面是"扫不到不等于没有"，另一面是"扫到了不等于真有其事"。
+
+### 五、改造后的门禁有没有牙：四臂变异（00:57，全在树外副本里打）
+
+副本树 `~/scratch-heyta/mut-0049`（`scripts/` 拷脚本、`packages/legal/…` 拷文档、
+`packages/local-api/src` **实拷**而不是软链 —— 软链会把变异打进真仓库）。
+未变异对照 **rc=0**，四臂 **全部 rc=1**，跑完载体两个文件 `git status` 干净：
+
+| 臂 | 打在哪 | 门禁说的话 |
+|---|---|---|
+| A | 表侧：删中文表 `list_habits` 一行 | `中文表（第 175 行）缺 1 个工具：list_habits` |
+| B | 表侧：中文表相邻两行**只换序**（集合仍相等） | `中英两表的工具顺序不一致（集合相等也可能行贴错对象）` |
+| C | 表侧：删英文表 `get_note` 一行 | `English表（第 461 行）缺 1 个工具：get_note` |
+| **D** | **目录侧**：往 `tools/tag.ts` 塞一条 `kind: 'read'` 的 `zzz_probe` | 中英两表各报 `缺 1 个工具：zzz_probe` |
+
+D 是这组里唯一有意义的一臂 —— A/B/C 只证明"表侧有牙"，而这条门禁存在的理由是
+**"往目录加一项而条款没写"**，那一侧的输入是源码，必须真加一条工具才能验。
+装置落在 `~/scratch-heyta/mut-legal-row.mjs`（A/B/C）与 `mut-legal-catalog.mjs`（D），可重跑。
+
+⚠️ 这一趟我自己踩了两个探针坑，都记下来（它们各自差点产出一条假读数）：
+1. 第一版三臂**全部 rc=0**，看着像"门禁没牙"，实际是**变异一行都没打进去** ——
+   我把路径塞进 `process.env.MT`，而 Bash 工具没有"环境变量"这个入参，`MT` 是 `undefined`，
+   于是 `node -e` 里的 `readFileSync` 抛 ENOENT，变异失败被 `||` 吞在半路，
+   而门禁照原样跑、照原样绿 ⇒ **三个假绿**。改成"变异装置写成文件、路径走 argv"后才拿到真红。
+   （同 §7 #176 那一族：桩/装置没走到被测判据，PASS 是假的。）
+2. 我按 `check:md-tables` 这个名字去跑 `scripts/check-md-tables.mjs` ⇒ **MODULE_NOT_FOUND、rc=1**，
+   看着像"表格门禁红了"，实际真名是 `scripts/check-md-table-rows.mjs`（跑它 rc=0）。
+   ⇒ 报任何一段红之前，先确认那条命令**存在且是链里那一条**（`node -e` 读 `package.json` 的 `scripts` 现取）。
+
+### 六、这节结束时还站着的四条
+
+
+- ② 那趟干净检出的链（pid 94084，载体 `heyta-wt-verify-integration` @ `e54b899b`）00:52 仍在**负载门里等**
+  （起跑前负载 `{38.05 26.71 29.56}`，阈值 12；00:48 现量 1 分钟 26.06）⇒ 读数还没出来，
+  出来时**`check:legal-permissions` 那一段按上面第四条记为必红**。
+- ③ iOS 那一端仍未闭合（B62 第三份取证 + 三台 `Booted` 全有主），重开条件写在 `BLOCKED.md` B62。
+- ① 落地：`d718f248` 比 `e54b899b` 又多吸收了两轮 main 增量与 W9/W4b 的收尾，
+  §15.40 那条"不落半成品"的裁决**没变**，但"挡路的是哪几个文件"这件事每次都要重量 ——
+  现量命令在 `~/scratch-heyta/heyta-land.sh`（默认 dry-run）。
+- 本节的**归属**：`ai-and-transfer.ts` 的两张表 + `version`、`scripts/check-legal-tool-catalog.mjs` 的取数改造、
+  `mcp.ts` 的注释、`server/src/legal.generated.ts` 再生成，全部落在别人的 `cdf421b3`/`4fad02b0`/`d718f248` 里。
+  下一位读 HEAD 的人只会看到"fix(legal,ai): 终态合流收口"，看不到那 16 行是谁欠的 —— 所以这段是必要记录，不是仪式。
+
+
 
 
 
