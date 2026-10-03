@@ -863,6 +863,13 @@ bash apps/desktop-windows/scripts/package-msix.sh
 前置：macOS 需要 `swift`；Linux 走 SSH 到 `sanjiaozhou`（Ubuntu 24.04，有 gtk4/jsc/dpkg-deb）；
 Windows 走 SSH 到 `windows-pc`（Win11，Windows SDK x64 + dotnet 10 + 管理员）。
 
+🔴 **macOS 那条的公证一步有上限**：`HEYTA_NOTARY_TIMEOUT`（默认 900 秒，`0` = 显式要旧行为"不设限"）。
+`notarytool submit --wait` 在 Apple 侧不回话时会**永久挂住** —— 2026-10-04 实测一条 `reinstall:all`
+卡在那一行 1h57m，累计 CPU 0:00.03 且**零条 TCP 连接**（连重试都没在重试）。**超时不判通过**：
+它走"没通过公证"那一支，不装订票据，并把 rc=124 与 Apple 真实拒绝（rc≠0）分开报。
+裸 macOS 不带 `timeout`（那是 GNU coreutils），所以还有一条纯 bash 看门狗兜底 —— 否则"没装 homebrew
+的打包机"这个默认情况会退化成没有上限。
+
 ### 6.1 🔴 Windows：`Add-AppxPackage` 必须在**非提权**的交互式会话里跑
 
 AppX 部署是**按用户**的。SSHD 给的是**提权**会话，在那里跑就会得到：
