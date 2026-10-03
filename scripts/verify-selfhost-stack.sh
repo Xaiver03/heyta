@@ -178,6 +178,25 @@ else
   docker image inspect "$IMAGE" >/dev/null 2>&1 || die "--no-build 但本地没有 $IMAGE"
 fi
 
+# 🔴 **这一趟验的是哪个架构的产物**必须落在日志里，否则"整套验收过了"会被读成
+#    "要发布的那枚过了"。`docker build` 不带 `--platform` ⇒ 镜像架构 = 构建机架构；
+#    而发布 workflow 钉的是 `linux/amd64`
+#    （`.github/workflows/heyta-server-image.yml` 的 `platforms`）。
+#    2026-10-04 现量：本机这枚是 `linux/arm64`，它里面的平台二进制包与快照/许可证门禁
+#    按 `linux/x64/musl` 预测的那批**不是同一批**（`@node-rs/argon2-linux-arm64-musl`
+#    谁都没扫过 —— 审计文档 §8.38 / G-53）。
+IMAGE_ARCH=$(docker image inspect "$IMAGE" --format '{{.Os}}/{{.Architecture}}' 2>/dev/null || echo '读不到')
+case "$IMAGE_ARCH" in
+  linux/amd64)
+    log "    被验的镜像：${IMAGE_ARCH}（与发布 workflow 钉的那枚同架构）"
+    ;;
+  *)
+    log "    被验的镜像：${IMAGE_ARCH} —— 🔴 不等于发布 workflow 钉的 linux/amd64。"
+    log "      这趟证明的是「外人在自己机器上 build 出来的那一枚能跑」（M 系列自建者正是这种），"
+    log "      它**不构成**对 amd64 发布物的运行证据；两者的平台二进制包不是同一批。"
+    ;;
+esac
+
 # ── 一次性凭据：够长、只在这条命令的进程里存在 ─────────────────────
 rand() { head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c "$1"; }
 # 🔴 heredoc 用的是**不带引号的 EOF**（要靠 $IMAGE 和 $(rand) 展开），所以正文里
