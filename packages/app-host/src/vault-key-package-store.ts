@@ -66,6 +66,10 @@ export interface VaultKeyPackageStore {
     currentRootKey: Uint8Array,
     targetRootKey: Uint8Array,
   ): Promise<void>;
+  /** Read the staged package without decrypting its root, while locked. */
+  peekPendingRootRotationPackage(
+    scope: VaultKeyPackageScope,
+  ): Promise<VaultKeyPackage | undefined>;
   loadPendingRootRotation(
     scope: VaultKeyPackageScope,
     currentRootKey: Uint8Array,
@@ -170,6 +174,20 @@ export const createVaultKeyPackageStore = (adapter: DbAdapter): VaultKeyPackageS
         } satisfies PersistedPendingRootRotation,
       });
     });
+  },
+  async peekPendingRootRotationPackage(scope): Promise<VaultKeyPackage | undefined> {
+    const record = await adapter.get<{ key: string; value: unknown }>(STORES.META, META_KEYS.VAULT_PENDING_ROOT_ROTATION);
+    if (!record || typeof record.value !== 'object' || record.value === null || Array.isArray(record.value)) {
+      return undefined;
+    }
+    const value = record.value as Partial<PersistedPendingRootRotation>;
+    if (value.version !== 1 || value.accountId !== scope.accountId || value.serverOrigin !== scope.serverOrigin ||
+        value.package === undefined) {
+      return undefined;
+    }
+    const parsed = vaultKeyPackageSchema.safeParse(value.package);
+    if (!parsed.success) throw new Error('Invalid persisted pending vault rotation package');
+    return parsed.data;
   },
   async loadPendingRootRotation(scope, currentRootKey): Promise<{ package: VaultKeyPackage; rootKey: Uint8Array } | undefined> {
     if (currentRootKey.length !== 32) throw new Error('Invalid vault root key');

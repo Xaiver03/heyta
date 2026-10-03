@@ -4,9 +4,9 @@
 > 重新生成：`node research/tools/render-license-inventory.mjs`
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
-> lockfile 指纹：`111cc2d1d04d3763`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
+> lockfile 指纹：`0f3c1bf6d9e21526`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
 
-生成时间：2026-10-03
+生成时间：2026-10-04
 
 **总计 1093 个包** —— 宽松许可 1092，受限 0，无许可证 0，白名单外已登记 1。
 

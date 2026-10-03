@@ -4933,3 +4933,17 @@ ArgumentError - path name contains null byte
      "日志没长"不构成任何状态，既不证明在跑、也不证明在等。
      与 #164（后台通知里的 `exit code 0` 是包装命令的）、#46（"没观测到"≠"没发生"）同族 ——
      **观测通道本身的存在性也要有一条判据**。
+
+199. **真实浏览器的网络故障注入必须先证明拦截发生；Service Worker 能绕过 page.route。**
+
+     2026-10-04 Vault 并发迁移验收在静态生产构建上暂停 inventory 响应，准备在暂停期间
+     新建任务。前两轮一直等不到屏障，但截图已显示迁移完成：应用的 Service Worker
+     转发了请求，Playwright 的 `page.route` 没有介入。这不是“迁移没有发请求”。
+     同一份产物在独立 context 明确 `serviceWorkers: 'block'` 后，屏障实际命中，
+     随后的真实并发上传让 commit 返回 409、payload generation 保持 1，判据才抓到
+     缺少 Web 同步/迁移互斥的缺陷。PWA 自身仍由独立门禁验收，这个控制条件只用于
+     Vault 的 HTTP 故障注入。
+
+     `e2e/vault/vault-journey.spec.ts` 每个屏障都须有正向前提（实际到达该请求），
+     等待用有限时的 poll，而不是无期限 Promise；失败前截图，恢复码遮挡，关闭 trace/video。
+     “没有请求”必须区分排队、错误、Service Worker 代发和探针没有命中。

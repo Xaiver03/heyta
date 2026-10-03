@@ -152,7 +152,22 @@ HOME 后用 SIGKILL 终止普通进程，系统 alarm 保留，22:55 仍交付�
 [`ios-ax-shim.py`](../../scripts/tools/ios-ax-shim.py) 和验收脚本，并由 `check-script-snapshot` 登记
 [`verify-mobile-ios-reminder.sh`](../../scripts/verify-mobile-ios-reminder.sh)。
 
-目前仍没有把 iOS OS 级投递宣称为已验证：验收包已完成 Release 安装、RN 创建和选日，但时间字段的
-AX 长表单滚动在 companion 长连接下仍有超时，尚未取得“截止时刻写入 → 进程终止 → 通知中心投递 →
-启动 reconcile 写入 firedAt”的完整成功链路。之前的全黑截图保留作失败夹具证据，不能作为成功证据；
-新的完整链路必须重新截图并人工查看。Android 的真实投递结果不替代 iOS 的权限、重启和不确定回执验收。
+2026-10-04 的 iOS 真实续验仍**失败，不能宣称 OS 级投递已通过**。当前 Release
+`/tmp/heyta-ios-reminder-release/Build/Products/Release-iphonesimulator/Heyta.app` 已卸载旧包后重装，
+真实 RN Composer 创建 `ios-reminder-delivery-004726`，详情页通过「今天」和截止时刻输入框写入
+`00:50`，再通过「截止时」写入 REMINDER CREATE；SQLite 只读回读到
+`triggerAt=1791046200000`，重启 reconcile 后没有 `firedAt`/`firedForTriggerAt`，原生
+`Application Support/heyta-reminder-receipts.json` 也没有生成。因此这轮的 17 项前置/边界判据
+不能替代缺失的 OS 投递判据。
+
+投递断言前保存的 `apps/mobile/evidence/ios-reminder-delivery.png` 已人工打开；画面是应用自己的
+「在使用联网功能之前」隐私选择覆盖层，不是通知中心，也看不到 heyta 通知，故该截图明确记为失败
+证据，不能挂成成功截图。下一轮必须先取得真实 `UNUserNotificationCenter` 授权状态/系统权限交互
+证据，再重复“到期 → 普通进程终止 → 通知中心 → 启动 reconcile → SQLite receipt”；不能把
+`schedule()` 返回值、任务 CREATE 或脚本截图存在当作投递成功。
+
+本轮还固化了两条验收规则：iOS HID `idb ui text` 不能稳定注入中文连接词或带斜杠的整段捕获文本，
+会让 Composer 关闭或把文字落进搜索框；日期和时刻验收必须通过真实详情页 DatePicker/截止时刻输入框
+设置。Xcode 27.1 / iOS 27 下 Unix companion 可能创建 socket 后返回 `GRPCCore.RuntimeError`，
+默认改用同一 `idb_companion` 的 TCP `127.0.0.1:10982`，脚本必须确认键盘确实收起、Composer
+字段的占位值确实出现、以及目标按钮 press 后状态真的改变，不能只看 idb 命令退出码。

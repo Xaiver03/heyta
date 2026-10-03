@@ -10,3 +10,6 @@
 # 设备：emulator-5554
 
 CAPTURE_METHOD=adb-screencap
+INITIAL_CONSENT=handled-before-capture
+CAPTURE_STATE=task-home-after-local-only-choice
+SECRETS_IN_CAPTURE=none

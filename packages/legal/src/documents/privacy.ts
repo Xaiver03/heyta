@@ -127,7 +127,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '加密密钥与恢复：服务器保存加密密钥包及其版本、密钥指纹，以及撤销设备记录，用于跨设备解锁、迁移和阻止已撤销会话继续访问；这些记录保留至账号注销。服务器不接收加密口令、恢复码或未包裹的数据密钥。迁移期间暂存替换密文，发布或取消时释放；未完成的暂存 24 小时后过期，由清理任务释放，迁移状态回执保留至注销。浏览器只持久化加密包、加密迁移草稿与密文续传记录；移动端仅在你明确选择记住解锁后，将数据密钥交给系统安全存储。加密口令与恢复码都丢失时，服务端无法恢复你的内容；撤销设备无法抹除该设备已经取得的本地内容或密钥。',
+        text: '加密密钥与恢复：服务器保存加密密钥包及其版本、密钥指纹，以及撤销设备记录，用于跨设备解锁、迁移和阻止已撤销会话继续访问；这些记录保留至账号注销。服务器不接收加密口令、恢复码或未包裹的数据密钥。迁移期间暂存替换密文，发布或取消时释放；未完成的暂存 24 小时后过期，由清理任务释放，迁移状态回执保留至注销。密钥管理在浏览器中只持久化加密包、加密迁移草稿与密文续传记录；移动端仅在你明确选择记住解锁后，将数据密钥交给系统安全存储。加密口令与恢复码都丢失时，服务端无法恢复你的内容；撤销设备无法抹除该设备已经取得的本地内容或密钥。',
       },
       {
         kind: 'table',
@@ -653,7 +653,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'Encryption keys and recovery: the server retains wrapped key packages, their versions and key fingerprints, and revoked device records until account closure to support unlocking across devices, migration and rejection of revoked sessions. It never receives your encryption passphrase, recovery code or unwrapped data key. Replacement ciphertext is staged during migration and released on publication or cancellation; unfinished staging expires after 24 hours and is released by cleanup, while migration status receipts remain until account closure. Browsers persist only wrapped packages, encrypted migration drafts and ciphertext resume records. Mobile devices place a data key in OS secure storage only when you explicitly choose to remember unlocking. If both the encryption passphrase and recovery code are lost, the server cannot recover your content. Revocation cannot erase content or keys a device already obtained.',
+        text: 'Encryption keys and recovery: the server retains wrapped key packages, their versions and key fingerprints, and revoked device records until account closure to support unlocking across devices, migration and rejection of revoked sessions. It never receives your encryption passphrase, recovery code or unwrapped data key. Replacement ciphertext is staged during migration and released on publication or cancellation; unfinished staging expires after 24 hours and is released by cleanup, while migration status receipts remain until account closure. For key management, browsers persist only wrapped packages, encrypted migration drafts and ciphertext resume records. Mobile devices place a data key in OS secure storage only when you explicitly choose to remember unlocking. If both the encryption passphrase and recovery code are lost, the server cannot recover your content. Revocation cannot erase content or keys a device already obtained.',
       },
       {
         kind: 'table',

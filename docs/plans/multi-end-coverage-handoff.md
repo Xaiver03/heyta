@@ -276,6 +276,35 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    `/usr/bin/xcrun simctl list devices booted | grep '(Booted)'`。
    启动器：`/tmp/heyta-run-reinstall.sh`（体检模式）→ 加 `--go` 真跑；它会把载体对齐到**当时**的 main HEAD，
    且只在 `pnpm-lock.yaml`/`package.json` 变化时重装。
+   🔴 **但"取 booted 列表第一台"这一条是错的，01:4x 现场把它照出来了**：三台 booted 里
+   `heyta-ios-isolated` 的 `launchctl list` 有 `UIKitApplication:com.heyta`（**App 正在跑**），
+   而那台里装的那枚 mtime = **01:38**（两分钟前）—— 那是别人这一轮的 iOS 现场，
+   而 ios 段拿到名字之后第一件事是 `simctl uninstall`。选择规则（已写进启动器）：
+   **逐台读设备自己的 launchctl，只挑没跑着 com.heyta 的那台；每台都读空则不跑并退出 3**（外部显式传的
+   `IOS_DEVICE_NAME` 优先，但占用表照打）。为什么不用 `ps`：人肉点的、别的工具的会话都不在进程表里留名字
+   （§7 那条"读 0 不等于没人用"的第 N 次应验），而设备侧读数不会说谎。
+   ⚠️ **这条判据本身差点是坏的**：第一版名字切片写成 `sed 's/ \((.*)\) \(Booted\).*/\1/'`，
+   贪心匹配把 UDID 一起粘进名字（打印成 `heyta-iphone-17proFE195661-…`）⇒ 传出去**永远匹配不上**，
+   症状看起来像"这台机器没有可用模拟器"。现量两条对照才修对：名字保留空格（`iPhone Duo heyta`）、
+   `running_heyta` 三台里恰好 `1 / 0 / 0`。
+   🔴 **闸门文件本身没动**：`scripts/verify-mobile-window-gate.sh` 此刻是 `M`（+23/-2，别人正在往里加
+   "iOS 目标取不到就停"那一段 —— 与我这条**同一个不变量的另一侧**）。撞车判据是"该文件有别人的未提交 diff"，
+   所以缺口落在我自己的启动器里，**登记**给它属主：B 段目前只在 `>1 台 booted` 时打一句 ⚠️，
+   没有"目标那台里 App 正在跑"这一条 FAIL。复跑现量：
+   `for u in $(xcrun simctl list devices booted | grep -oE '[0-9A-F-]{36}'); do echo "$u $(xcrun simctl spawn $u launchctl list 2>/dev/null | grep -c UIKitApplication:com.heyta)"; done`。
+   🔴 **android 那一侧同一个洞，而且当场就有**：01:4x 现量 `emulator-5554` 上
+   `pidof com.heyta` = **13309**、`mCurrentFocus` = `com.heyta/com.heytamobile.MainActivity` —— App 正在前台跑。
+   ① 的 android 段会 `adb uninstall` 它、③ 的第 0 步会 `pm clear` 它的库。两条启动器现在都在闸门之后
+   **再读一次设备自己**（`/tmp/heyta-device-occupancy.sh`，只读查询，不 tap 不 dump）。
+   这条探针自己按 §7 元规则第二条验过**三条臂**（用假 `adb` 做夹具，不碰真设备）：
+   可读且没跑 ⇒ **0（空闲）**；可读且在跑 ⇒ **1**；**`get-state` 失败 ⇒ 1 并打印"不能当成空闲"**。
+   第三臂是这里唯一有牙的地方 —— `pidof` 返回空串有两种成因（"没跑"与"adb 连不上"），
+   把它们合成同一个读数就等于"探针坏了看起来像空闲"。**"空闲"那一臂不能靠真设备验**
+   （要它空就得停掉别人的 App），所以用夹具；夹具用完即删。
+   🔴 **取证图的"存在"不是取证**：`/tmp/heyta-reinstall-*` 那四张（mac 是**两张**：窗口 + `.webview`）
+   与 `apps/mobile/evidence/android-notes-*.png` 三张，上一轮就在（01:4x 现量：mac 23:05:50、android 23:34:50），
+   ⇒ 两条启动器现在都在起跑前记 `RUN_START`，并按 mtime 打 `[本轮新生] / [陈旧-早于本轮起跑]`。旧的那条写法还带一个 glob
+   `apps/mobile/ios/build/**/*.png` —— bash 默认没开 globstar，它**不递归**，缺图时表现成"这一端没打印"。
    ⚠️ 隔离检出里 `pnpm -r typecheck` 会因 `packages/legal/dist`、`apps/node-host/dist` 缺而报一串
    `TS2307`（那是载体不全不是源码错，见 §6）。
 2. 同一窗口内补跑那 3 段 Playwright，然后跑满 `pnpm check`，把**可过段数 + 载体 sha** 一起记账。
@@ -292,6 +321,8 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    ⚠️ **同一条读数在 01:3x 已翻面**（现量 `lsof -ti tcp:<p> -sTCP:LISTEN`）：`4318`=pid 92385、`4319`=pid 92369、
    `3000`=pid 70256 都**被占**，`3100/4320/4322` 仍空 ⇒ ② 此刻起跑会按设计 exit 3。**端口空闲是趟间瞬时读数，
    不许把上一趟的"全空闲"带到下一趟**（这正是启动器每次都重量的原因）。
+   ⚠️ **十分钟内它又翻回来自**（01:5x `curl` 法现量：4318/4319/4320 + 3100 全 free，而同一刻负载 185）
+   ⇒ 端口与负载是**两条独立的门**：端口空了不等于窗口开了，取的是全部成立的那个交集。
 3. **把 `verify:mobile-notes` 整段跑完**（🔴 判据**不需要写** —— 第 6/7 步的 op 判据、第 8 步第三张截图、
    第 9–11 步跨设备三条腿**已经在脚本里**，带行号的现量见 §3 第 4 条）。
    🔴 **两个前置在本轮被现量改了**：① 凭据三件套**已经在**（`--target c` 报 ✅），不需要再建号；
@@ -326,6 +357,12 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    🟢 **一条省事的顺序依赖**：① 的 android 段本来就是"清旧包 → 从当前源码重打 → 卸旧装新"，
    而它也在**同一个载体**里跑 ⇒ **按 §5 的顺序 ①→②→③ 走，③ 的 APK 前置由 ① 顺带做完**；
    只有 ① 的 android 段红了或想跳过 ① 先做 ③ 时，才需要上面那三条命令自己来一遍。
+   🔴 **01:5x 现量把这条从"省事"升级成"硬前置"**：载体里 `apps/node-host/dist`、`packages/app-host/dist`、
+   `packages/ui/dist`、`packages/sync-core/dist` **四个全缺**（主检出四个全在 —— 同一支脚本两棵树各跑一次，
+   载体 rc=3 / 主检出 rc=0，所以这不是探针坏）。③ 的第 11 步要 `apps/node-host/dist/cli.js` 起笔记本那台设备，
+   而本验收第 0 步就会 `pm clear` 手机库 —— 探测必须排在破坏性步骤**之前**，否则代价是"设备已清空、跨设备那条腿没做成"。
+   启动器已加这道门（缺就打印该按的顺序并退 3）。⇒ **③ 之前必须有 `pnpm -r build`**，
+   而 ① 的第 0 段正是它 —— 顺序 ①→②→③ 不是偏好，是被这两个缺件逼出来的。
    ✅ **两条启动器的"会拒跑"这道门本轮已被现量验证有牙**（不是装饰）：
    `bash /tmp/heyta-run-checks.sh`（不带 `--go`）退 **3**，打印 `:4318 = busy / :4319 = busy`；
    `bash /tmp/heyta-run-notes.sh`（已改指向载体，不带 `--go`）退 **3**，打印 `GATE_EXIT=3 / VERDICT=NOT-RUNNING`。

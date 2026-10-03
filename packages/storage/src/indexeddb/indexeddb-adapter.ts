@@ -27,6 +27,7 @@ import type {
   DbAdapter,
   DbCursorAction,
   DbCursorVisitor,
+  DbDestroyReport,
   DbIndexQuery,
   DbIterateOptions,
   DbKey,
@@ -552,16 +553,32 @@ export class IndexedDbAdapter implements DbAdapter {
     });
   }
 
-  /** 删除整个数据库。测试与"清除所有数据"用。 */
-  async destroy(): Promise<void> {
+  /**
+   * 删除整个数据库（`indexedDB.deleteDatabase`）。
+   *
+   * 🔴 `onblocked` **以前是 `resolve()` 的，那是假凭据**：blocked 的含义是
+   * "还有别的标签页/窗口持有连接，删除请求排在它后面"，此刻数据库**还在**。
+   * 当场 resolve 会让销毁报告在"什么都没删掉"的情况下说"删了"，
+   * 而调用方拿到的正是那句用来对用户承诺的话。
+   * 现在 blocked 只是**等待**：决议只来自 onsuccess / onerror。
+   *
+   * ⚠️ 代价要想清楚：另一个标签页永不关闭时，这个 Promise 会一直挂着。
+   * 这是**诚实的**挂起（"我还没做到"），而不是虚假的完成（"我做到了"）。
+   * 宿主如果要给用户一个期限，应该在**调用这一层的界面**上做超时并说
+   * "另有一个窗口开着，关掉它才能清干净" —— 那不是这一层能替用户决定的事。
+   */
+  async destroy(): Promise<DbDestroyReport> {
     this.close();
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.deleteDatabase(this.dbName);
       request.onsuccess = () => resolve();
       request.onerror = () =>
         reject(storageError(request.error, '删除数据库失败', { kind: 'request-failed' }));
-      request.onblocked = () => resolve(); // 有其它连接时也可能成功
+      request.onblocked = () => {
+        // 什么都不做：等 onsuccess。见上面那段。
+      };
     });
+    return { target: this.dbName, containerRemoved: true, storesCleared: ALL_STORES.length };
   }
 }
 

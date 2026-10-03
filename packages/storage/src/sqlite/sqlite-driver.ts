@@ -23,6 +23,18 @@
 export type SqlValue = string | number | null | Uint8Array;
 
 /**
+ * {@link SqliteDriver.removeDatabase} 的返回值：持久容器的处置结果。
+ *
+ * 它**必须带上"没删掉的原因"**。理由与 `DbAdapter.destroy` 同一条：
+ * 这一层是"文件到底还在不在"的唯一知情人，而注销承诺的实话就靠它。
+ */
+export interface SqliteContainerRemoval {
+  readonly target: string;
+  readonly containerRemoved: boolean;
+  readonly reason?: string;
+}
+
+/**
  * 一条 SQL 的最小驱动。
  *
  * 实现方只需保证：
@@ -42,6 +54,34 @@ export interface SqliteDriver {
 
   /** 关闭连接。必须幂等。 */
   close(): void;
+
+  /**
+   * 可选：**移除数据库文件本身**（不是清空表）。
+   *
+   * 🔴 与 `DbAdapter.destroy` 为什么一个必填、一个可选 —— 这个不对称是**有意的**，
+   * 别把它当成疏漏：
+   *
+   * · `destroy` 必填，因为它的缺失会**静默留下明文**（漏了不会报错），
+   *   而适配器层是 TypeScript 的，编译器能一次查全。
+   * · 这一层可选，因为驱动的**实现方跨出 TypeScript**：Swift / C# / ArkTS
+   *   的原生桥（`apps/desktop-macos`、`apps/desktop-windows`、`apps/node-host`
+   *   之外还有 `app-host` 的 `native-bridge.ts`）不在同一个编译单元里，
+   *   把必填加在它们身上只会得到"改不动 → 整条契约被绕过"。
+   *
+   * ⚠️ 代价说清楚：**驱动没有这个方法时，销毁只做到"清空内容"，文件还在**。
+   * 适配器不会把它藏起来 —— 它会在 {@link DbDestroyReport} 里给出
+   * `containerRemoved: false` 与原因，而调用方**必须**把这一句说出去。
+   * 已验证的三个 TypeScript 驱动（node / sqlite-wasm OPFS / op-sqlite）**都有**，
+   * 缺的那一方是原生桥，登记在 `docs/plans/trash-and-archive.md` 批次 E。
+   *
+   * 实现要点：
+   *  - 必须在 `close()` **之后**调用（适配器负责这个顺序），否则删的是还被
+   *    句柄占着的文件 —— 在 POSIX 上那等于"文件消失了但数据还活着"。
+   *  - 顺手带走 SQLite 的旁挂文件（`-wal` / `-shm`），只删主文件会留下
+   *    一份能重放回明文的日志。
+   *  - 文件本来就不存在 = **成功**（幂等），不是错误。
+   */
+  removeDatabase?(): SqliteContainerRemoval | Promise<SqliteContainerRemoval>;
 
   /**
    * 可选：判定一个异常是否属于"唯一约束冲突"。
