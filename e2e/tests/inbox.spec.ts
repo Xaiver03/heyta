@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp, stubLegalRecheck } from './helpers';
+import { openApp, stubLegalRecheck, stubPublicFacts } from './helpers';
 
 /**
  * 通知中心 + 活动（福利中心）：真浏览器契约。
@@ -107,6 +107,10 @@ async function seedServerAndStubRoutes(page: import('@playwright/test').Page): P
 
   // 🔴 补签那道读侧闸：塞了凭据应用一启动就会问一次，与通知这个主题无关。
   await stubLegalRecheck(page, SERVER);
+  // 🔴 同一形状的**第二道**闸，来自 W4b：应用一开机就问 `/api/holiday-adjustments`
+  //（`apps/web/src/main.tsx` 里那一次 `startPublicFacts()`），而假端点只实现
+  // `/v1/chat/completions` ⇒ 不登记它，`assertNoProblems` 会把这条 404 算成通知面的缺陷。
+  await stubPublicFacts(page, SERVER);
 
   await page.route(`${SERVER}/api/notifications**`, async (route) => {
     if (route.request().method() === 'POST') {
@@ -315,6 +319,8 @@ test.describe('通知中心 + 活动', () => {
 
     // 🔴 同上：这一条也塞了凭据，启动时必然问一次补签状态。
     await stubLegalRecheck(page, SERVER);
+    // 🔴 同上：W4b 的开机拉取不在这条用例的主题里，但它确实会发。
+    await stubPublicFacts(page, SERVER);
 
     // 通知与活动都空。
     await page.route(`${SERVER}/api/notifications**`, async (route) => {
