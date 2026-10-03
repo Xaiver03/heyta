@@ -1582,3 +1582,44 @@ MTIME=2026-10-03T19:04:30
 只缺 `pnpm check` 的 rc=0（挂在 `B47` 那条上游红上）。
 这五个读数都是**会过期的**（设备会被占、远端会被别人同步）—— 真要跑 ③ 之前必须重取，
 尤其 `adb devices` 与 `simctl list devices booted` 这两条。
+
+### 15.18 五条隐私红线**逐条读到判定机制**（载体 `fe2fd2de`，19:3x 现量）
+
+红线写的是"不放宽"，而"没放宽"要能回答**它靠什么不放宽**。计数不算回答 ——
+所以这一节每条给的是**判定发生在哪一行、以什么形状判定**，另给两栏：
+**有牙**（能不能失败）与**有人跑**（谁自动跑它）。这两栏是分开的两件事，
+§15.11 / §15.14 已经量过"有牙但没人跑"的整批，所以这里不能只报前者。
+
+| # | 红线原文 | 判定机制（不是计数） | 有牙 | 有人跑 |
+|---|---|---|---|---|
+| 1 | AI 类型上产不出 op | `LocalApiWriteIntent` 是**封闭联合**（`packages/local-api/src/tools/shared.ts:517-601`，13 个成员、全部 `action:` 判别、**没有 op 字段也没有 op 构造函数**）；`LocalApiWritePort.submit(intent)` 把 intent 当**不透明值**传递（`:493-494` "本包不解释它，只传递。这保证了解释 op 的地方只有一处"），于是能把它变成 op 的只剩宿主与 `packages/op-log` | 宿主侧 `packages/app-host/src/local-api-host.ts:466` 的 `switch` 实测 **13 个 case 且无 `default`** ⇒ 加了联合成员而不在宿主翻译 = **编译不过**（不是运行时才发现）；`entity-type-parity.spec.ts` 把 `LocalApiWrittenEntityType` 在编译期钉成 `ENTITY_TYPES` 的子集 | `pnpm -r typecheck` —— 类型层判据的执行者就是它，所以这条不需要额外门禁 |
+| 2 | `host.submit` 恰好一处 | **见下面的更正**：非测试代码实测**两个入口各一处**，"全仓一处"是措辞错 | 助手入口：`scripts/check-ai-tools.mjs:131-150` 规则 2 —— 剥注释后 `.submit(` 在 `RUN_FILE` 里**恰好 1 次**，且必须位于 `confirmAiToolProposal` 声明之后（次数**与位置**都判；`:64-67` 说明为什么必须剥注释：不剥就会对正确代码报红） | 该门禁**在链里**：本载体 `package.json` 的 `check` 现量 **61 段**，`check:ai-tools` = **第 36 段**、`check:ai-coverage` = 第 51 段。🔴 但它 `WATCH_DIR` 只有 `packages/app-host/src` + 前缀 `ai-tool-`（`:53-56`，注释 `:52` 明写"只扫这几个文件，不搞全仓 grep"）⇒ **MCP 那处不在扫描范围** |
+| 3 | 逐工具默认关 | `isToolGranted(grants, name)` = `grants?.[toolName] === true`（`packages/local-api/src/tools.ts:337-339`）—— **只有显式 `true` 算授权**，`undefined` / 缺字段 / 不存在的工具名一律 `false`；`:333-335` 明写这是有意的 fail-closed，且它**不检查工具是否存在**（MCP 侧要区分"不存在"与"未授权"得自己先 `findTool()`，为的是不泄露目录） | `mcp.spec.ts` / `local-api.spec.ts` 各有 `tool-not-granted` 断言 | `pnpm -r test`（已挂进 `pnpm check` 末尾） |
+| 4 | 出境逐字段披露 | `buildDisclosure(request)`（`packages/ai/src/egress.ts:126-138`）：**结构化结论是唯一判断来源**，两句兼容文本（`destinationText` / `retentionText`）由它**投影**出来 ⇒ 两条路径对同一次出境不可能给出不同结论；`fields` 直接取 `request.fields`，而它是从目录的 `egressFields` 现算的并集（`packages/app-host/src/ai-assistant.ts:123-125`："不在这里列字段名单 —— 列了就是一份抄件"）；🔴 **拒绝分支必须带 `disclosure`**（`egress.ts:151-153`：只说"未授权"而不说"授权后会发生什么"= 逼用户盲签） | `egress.spec.ts`（含 `consent-missing`）、`routing.spec.ts`、`diagnose.spec.ts` | `pnpm -r test` |
+| 5 | 回退不跨越隐私边界 | 第 3 道闸**在候选循环体内、发请求之前**（`packages/ai/src/routing.ts:714-722`，注释 `:718` "**必须在网络之前**"）：`authorizeEgress` 不放行时首选 ⇒ `return egress-not-authorized`（`:725-741`）；回退 ⇒ 记 `blockedByConsent` 后 **`break`**（`:746-750`）。`attempts` 只在真实 invoke 之后累加，所以这条腿的形状是**一次请求都不发**；收尾把"被隐私拦住"排在普通失败**之前**报（`:806-822`，理由写在 `:806`：它需要用户做一个决定） | `routing.spec.ts` / `diagnose.spec.ts` / `app-host/tests/ai-cause.spec.ts` 三处都有 `fallback-needs-consent`；用户侧话术 `packages/app-host/src/ai-failure-fallback.ts:37` | `pnpm -r test` |
+
+**🔴 一条更正（红线原文与实测不符，且错在"措辞"而不是"边界"）**：
+红线是「host.submit **全仓**恰好一处」。非测试代码实测 **2 处**：
+
+| 入口 | 调用点 | 该文件自己的措辞 |
+|---|---|---|
+| 内置助手 | `packages/app-host/src/ai-tool-run.ts:195`（`confirmAiToolProposal()` 内） | `:188` "`check:ai-tools` 静态钉住 `RUN_FILE` 里 `.submit(` 恰好 1 次且在本函数内" |
+| 本机 API / MCP | `packages/local-api/src/server.ts:545`（`executeTool()` 内） | `:518` "写只走 `host.submit` —— 本函数是**唯一**调 `submit` 的地方" |
+
+两处各自**文件内**都成立；"全仓一处"是把文件级措辞读成了仓库级。🔴 **这不是放宽边界**：
+MCP 那条"立刻 submit"是 ADR-0011 的设计（外部程序显式调用 + 逐工具默认关 + 只监听回环 + 显式 token），
+助手那条"确认后才 submit"是 ADR-0005 §3.1 要防的那件事 —— 两个入口守的不是同一件事。
+两个入口的授权也**确实是同一份判定**（`assistantGrants()` 与 MCP 的 `config.grants`
+最后都汇到 `isToolGranted()`，`apps/web/src/features/settings/aiStore.ts:83-89` 把这张两入口对照表写在代码里），
+且助手的档位默认 `read-only`（`aiStore.ts:120`，缺字段/旧值一律落回 `read-only` `:152`）——
+所以"内置助手是档位级、不是逐工具级"这个差异**是被显式记账过的设计**，不是漏。
+
+**真正的缺口在"有人跑"那一栏**：`check:ai-tools` 的范围不含 `packages/local-api/src/server.ts`
+⇒ 今天可以在 MCP 的 `executeTool` 旁边再加第二个写点，门禁不一定红。
+登记为下一批的一条（**不并进 ③**，因为它改的是门禁的**范围**，而 `scripts/` 在 §15.10 那批重叠路径里；动手前先现量）：
+判据形状 = 剥注释后**按入口分别**计数（助手 1 / MCP 1）并把 `WATCH_DIR` 扩到两个入口目录；
+变异验证 = 在 MCP 入口加第二个 `.submit(` ⇒ 必须红，且**只在助手入口加**也要红。
+
+⚠️ 这一节**不下"五条都成立"的总结论**：1 / 3 / 4 / 5 读到了判定机制且自动跑；
+第 2 条在助手入口成立且有门禁，在 **MCP 入口只有约定和注释在守，没有计数门禁** ——
+把它写成"五条都成立"就是又一次把主张当门禁。
