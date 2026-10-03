@@ -8,9 +8,28 @@
 
 .ht-header {
   display: flex;
+  /*
+   * 🔴 挤不下就**折行**，不压窄、不裁掉（2026-10-04 现量照出来的缺陷）。
+   *
+   * 症状：详情列（W2）加上侧栏之后，1280 宽时中间那一列只剩 624px，
+   * 而日历那一面的页头内容需要 ~918px。`flex: 0 0 auto`（不许压窄）是对的，
+   * 但配上原来的 `block-size`（固定高度、不许长高）就变成"**溢出且点不到**"：
+   * `e2e/tests/calendar-cells.spec.ts` 那条页头不溢出的判据当场红，
+   * 而同文件另一条 `locator.click` 直接超时 90s —— 那不是一个测试问题，
+   * 那是"控件在 DOM 里、在视口外"的真实形态。
+   *
+   * 为什么不用"提高详情列的出现阈值"来躲：算一下就知道挡不住 ——
+   * 要让日历那一面的页头在带侧栏 + 详情列时放得下，视口得 ~1580px 宽。
+   * 把一条布局规则变成"屏幕小于 1580 就别用这功能"不是响应式，是把问题藏起来。
+   *
+   * 配套的两条都是承重改动，别改回去：
+   *   · `block-size` → `min-block-size`：原来那一档是**下限**，不是不许长高；
+   *   · `row-gap` 给折行后的两行留间距（与原来的 `gap` 分工，纵向单独给）。
+   */
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--ht-space-3);
-  block-size: var(--ht-layout-header-height);
+  gap: var(--ht-space-2) var(--ht-space-3);
+  min-block-size: var(--ht-layout-header-height);
   padding: 0 var(--ht-space-6);
   border-bottom: 1px solid var(--ht-color-border);
   background: var(--ht-color-surface);
@@ -29,9 +48,20 @@
 .ht-header__actions {
   margin-inline-start: auto;
   display: flex;
+  justify-content: flex-end;
+  /* 🔴 折行必须发生在**装得下最小单位的那一层**，而且光加 `flex-wrap` 不够。
+     第一版只在 `.ht-header` 上加了 wrap ⇒ 溢出从 922 降到 870 但**仍然溢出**；
+     第二版在这里也加了 wrap ⇒ 读数**一字没变**（还是 870）。两次都卡在同一个机制上：
+     这一整排在父层眼里是一个 `flex: 0 0 auto` 的子项，它的宽度等于**内容最大宽度**，
+     永远不会被约束 ⇒ 它自己那一层的 `flex-wrap` 根本不会触发。
+     所以三件要一起改：允许收缩（`0 1 auto`）、把收缩下限打开（`min-inline-size: 0`）、
+     收缩到装不下时在**这一层内部**折行（`flex-wrap`）。
+     原来的不变量"动作不许被压窄"没有被放弃：`min-inline-size: 0` 让的是**这一整块**可收缩，
+     块里的每一只控件仍然按自己的内容宽度排版，文字不会被压成竖排（那正是原来要防的）。 */
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  flex-wrap: wrap;
   gap: var(--ht-space-2);
-  /* 同上：右侧动作（日期/倒计时/同步状态/主题）不被压窄 */
-  flex: 0 0 auto;
 }
 
 /*

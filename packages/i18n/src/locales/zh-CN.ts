@@ -561,6 +561,16 @@ export const zhCN = {
 
   'web.settings.display.title': '显示',
   'web.settings.display.dueNote': '任务行上的截止时间显示为日期，还是距离截止时间的倒计时。',
+  // 工单 W4：详情列（右侧那一栏）的出现与收起。
+  // 🔴 说明句里必须把"它自己不出来的两种情况"和"收起来之后怎么叫回来"都说完 ——
+  // 一个只写「常驻 / 收起」的开关，用户收起后在窗口变窄时看到它没了，
+  // 会以为自己按坏了。
+  'web.shell.detailPane.collapse': '收起详情面',
+  'web.shell.detailPane.expand': '展开详情面',
+  'web.settings.display.detail.title': '详情面',
+  'web.settings.display.detail.modeOpen': '常驻',
+  'web.settings.display.detail.modeCollapsed': '收起',
+  'web.settings.display.detailNote': '右侧那一栏显示当前选中项的面单。窗口太窄或太矮时它自己不出现，这时这一项设置不起作用。在这一台设备上收起之后，页头的按钮、这里的开关，或快捷键 ⌘/Ctrl + Shift + \\ 都能把它叫回来。',
   'web.shell.dueMode.countdown': '倒计时',
   // 任务行上那几个**纯图标**按钮：名字里必须带上任务标题，
   // 否则屏幕阅读器听到的是一串没有区别的"按钮"。

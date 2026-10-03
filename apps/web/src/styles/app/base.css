@@ -81,3 +81,24 @@
   border-left: var(--ht-border-width-thin) solid var(--ht-color-border);
   background: var(--ht-color-surface);
 }
+
+/*
+ * 用户**主动收起**（工单 W4）。状态由 `App.tsx` 写在 `.ht-app` 的 `data-detail` 上，
+ * 设备本地持久化（`features/shell/detail-pane-pref.ts`）。
+ *
+ * 🔴 收起必须**同时**做两件事：轨道归零 + 这一列不渲染。只做后者会让 grid 里
+ * 留着一条 `clamp()` 算出来的空轨道 —— 症状是"右边凭空多出一道空白、中间那一列被挤窄"，
+ * 而 `display: none` 的那个子项本身已经看不见了，所以**截图和断言都容易读成"收好了"**。
+ * 承重判据因此不是"这一列不见了"，而是"`.ht-main` 的右边缘 == 视口右边缘"（没有死轨道）。
+ * 走 `--ht-detail-track` 而不是重抄两条 `grid-template-columns`，与 W2 同一条理由。
+ *
+ * ⚠️ 这一条只管"用户收没收"。视口够不够是另一件事，断点在 `narrow.css`
+ * —— 两处的理由不同（一个是选择、一个是几何可行性），不许合成一个布尔。
+ */
+.ht-app[data-detail='collapsed'] {
+  --ht-detail-track: 0;
+}
+
+.ht-app[data-detail='collapsed'] .ht-app__detail {
+  display: none;
+}

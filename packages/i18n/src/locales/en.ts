@@ -502,6 +502,13 @@ export const en = {
 
   'web.settings.display.title': 'Display',
   'web.settings.display.dueNote': 'Show due dates on task rows as a date, or as a countdown to the deadline.',
+  // Ticket W4: the details pane (right column) — when it shows up and how to get it back.
+  'web.shell.detailPane.collapse': 'Hide details pane',
+  'web.shell.detailPane.expand': 'Show details pane',
+  'web.settings.display.detail.title': 'Details pane',
+  'web.settings.display.detail.modeOpen': 'Always shown',
+  'web.settings.display.detail.modeCollapsed': 'Hidden',
+  'web.settings.display.detailNote': 'The right column shows the details pane for the current selection. When the window is too narrow or too short it hides itself and this setting does nothing. Once you hide it on this device, the header button, this setting, or ⌘/Ctrl + Shift + \\ brings it back.',
   'web.shell.dueMode.countdown': 'Countdown',
   // Icon-only buttons on a task row: the name must carry the task title, or a
   // screen reader reads out a run of indistinguishable "button"s.
