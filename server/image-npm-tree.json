@@ -1,6 +1,6 @@
 {
   "_what": "镜像生产阶段（`server/Dockerfile` 的 FROM … AS production）经 npm 解析出来的依赖树快照。不是清单、不是许可判定 —— 判定在 research/tools/check-image-license-coverage.mjs。",
-  "generatedAt": "2026-10-03T07:58:46Z",
+  "generatedAt": "2026-10-03T20:47:38Z",
   "generator": "research/tools/gen-image-npm-tree.mjs",
   "inputs": {
     "targetPlatform": {
@@ -18,8 +18,8 @@
     ],
     "packedPackageJsonSha256": {
       "packages/domain/package.json": "4850bf55b5c40bb37f183f238fdfbf7cddad19b802fd41c9c211b8b1ac7809e7",
-      "packages/shared-schema/package.json": "a363b0c66f50cb4f5adec37a64797fef4bf76839b7eb152c4ed2401c312c74a6",
-      "packages/sync-core/package.json": "260741f66829865b1517b739682d8df9cea84f535d9c2700586982cfd31ed50c"
+      "packages/shared-schema/package.json": "3f21a18ae57c4ba63d7db591af29d7fb99a3a8784cfddb049661cf37f7821e69",
+      "packages/sync-core/package.json": "657cd7991fb4bef709c4bdf5e11e275abc9b6ee99c6b987e6fcecca4b7a6face"
     },
     "localTarballs": [
       "./sync-core.tgz",
@@ -92,7 +92,7 @@
     },
     {
       "name": "@fastify/websocket",
-      "version": "11.3.1",
+      "version": "11.3.3",
       "optional": false
     },
     {

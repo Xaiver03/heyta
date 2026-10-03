@@ -197,6 +197,32 @@ case "$IMAGE_ARCH" in
     ;;
 esac
 
+# ── 镜像内那棵依赖树：对到许可证门禁的扫描集上 ─────────────────────
+# 为什么放在这里而不是 pnpm check 里：这条判据的输入**必须是刚构建出来的那枚镜像**。
+# check:image-license 那条链上跑的读的是预测快照（不联网、不 docker 也能跑），
+# 而审计 §8.38/§8.43 量到预测与真树之间确实有差 —— 差的那一截只有构建之后才看得见。
+# 🔴 不许用 npm ci --dry-run 代替它：那条命令对 file: 依赖一个字节都不碰（§8.43）。
+log "==> 镜像内依赖树 × 许可证门禁扫描集（真产物载体）"
+IMAGE_TREE_JSON="$(mktemp -t heyta-image-tree.XXXXXX.json)"
+set +e
+docker run --rm -i --entrypoint node "$IMAGE" --input-type=commonjs - \
+  < "$REPO_ROOT/research/tools/dump-installed-tree.js" > "$IMAGE_TREE_JSON"
+TREE_RC=$?
+set -e
+if [ "$TREE_RC" != "0" ] || [ ! -s "$IMAGE_TREE_JSON" ]; then
+  rm -f "$IMAGE_TREE_JSON"
+  die "在镜像里枚举已装依赖树失败（rc=${TREE_RC}）—— 没有输入，这条对账不能算过"
+fi
+set +e
+node "$REPO_ROOT/research/tools/check-image-license-coverage.mjs" \
+  --installed-tree "$IMAGE_TREE_JSON"
+COVER_RC=$?
+set -e
+rm -f "$IMAGE_TREE_JSON"
+if [ "$COVER_RC" != "0" ]; then
+  die "镜像里装的树对不上许可证门禁 —— 上面逐条点名了是哪几条、为什么"
+fi
+
 # ── 一次性凭据：够长、只在这条命令的进程里存在 ─────────────────────
 rand() { head -c 32 /dev/urandom | base64 | tr -d '/+=' | head -c "$1"; }
 # 🔴 heredoc 用的是**不带引号的 EOF**（要靠 $IMAGE 和 $(rand) 展开），所以正文里
