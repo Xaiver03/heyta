@@ -2033,6 +2033,136 @@ curl -s --noproxy '*' --resolve heyta.waytofuture.cn:443:124.223.13.226 \
    动主检出都被明令禁止，而 main 已被主检出占用、第二个 worktree 签不出同一分支）。
    ⇒ 记成**待窗口 + 待所有者**，两条各有一条可复核的现量命令。
 
+### 8.33 目标口径"外人一条 compose 起全套"的第一道关，实测**根本进不去第二条**：镜像死在 `load metadata`
+
+这一节记的不是"本机网络差"，是**产品侧缺一个旋钮**。判据是 §1 的那句话：
+外人要能一条命令起全套、打开浏览器就能用。
+
+#### ① 事故与现量（`verify:selfhost-stack` 第一趟 rc=1）
+
+链日志 `/tmp/selfhost-stack.log` 的末尾三条是**可复核的**：
+
+```
+docker=29.4.0 / OrbStack
+⚠️ 测试锁仍被占（89173）；verify:selfhost-stack 自带负载门，让它自己判
+verify:selfhost-stack rc=1
+❌ 镜像构建失败（完整日志 /tmp/heyta-selfhost-image.log）
+```
+
+`/tmp/heyta-selfhost-image.log:8` 的原文（逐字抄，不要手改）：
+
+```
+#2 ERROR: failed to authorize: DeadlineExceeded: failed to fetch anonymous token:
+Get "https://auth.docker.io/token?scope=repository%3Alibrary%2Fnode%3Apull&service=registry.docker.io":
+dial tcp [2a03:2880:f126:83:face:b00c:0:25de]:443: i/o timeout
+```
+
+🔴 这条错误**没有"哪一层错了"的线索**：buildkit 是在执行第一条 Dockerfile 指令**之前**
+去要匿名 token 的，所以任何写进 Dockerfile 的诊断、任何 `RUN` 层的失败点都还没轮到出现。
+"界面在说谎"那一类在构建层的对应物是：**错误在说谎它属于哪一步**。
+
+2026-10-04 现量（`docker images` + `curl -m 8 -o /dev/null -w '%{http_code}' https://<host>/`）：
+
+| 事实 | 读数 |
+|---|---|
+| 本地 `node:*` 镜像 | **0 枚**（所以没有"缓存兜住"这回事） |
+| `registry-1.docker.io` / `auth.docker.io` | `000`（连不上，不是慢） |
+| `docker.m.daocloud.io` / `docker.1ms.run` | `302`（根路径的重定向，说明**可达**） |
+| 那个 IP | `2a03:2880:f126:83:face:b00c:0:25de` —— fake-ip 池的指纹（本机 DNS 走代理） |
+
+⚠️ 归因纪律（§7 第 84 条那条元规则的又一次现量）：**本机 fake-ip 是环境，旋钮缺失是产品**。
+区分它们的是这一句 —— 大陆上一台**正常**的机器同样拉不动 `auth.docker.io`，
+而它没有任何 fake-ip。所以这条不能记成"我这台机器的网络问题"。
+仓库此刻的立场是"**不发布任何镜像**"（§8.30），那么"自己构建"就是**唯一**对外承诺的路径，
+它在第一步就断，等于对外那句"一条 compose 起全套"是错话。
+
+#### ② 修法：`NODE_IMAGE`（与 `APK_MIRROR` / `NPM_REGISTRY` 同族，第三个旋钮）
+
+| 落点 | 内容 |
+|---|---|
+| `server/Dockerfile` | **三个 stage 各声明一次** `ARG NODE_IMAGE=node:24-alpine`（`ARG` 不跨 `FROM` 继承）；文件头有上面那段错误原文 |
+| `server/docker-compose.build.yml` | `args:` 加 `NODE_IMAGE: ${NODE_IMAGE:-node:24-alpine}` ⇒ `.env` 里那一行真的会变成 `--build-arg` |
+| `scripts/verify-selfhost-stack.sh` | 构建那条命令加 `${NODE_IMAGE:+--build-arg NODE_IMAGE=$NODE_IMAGE}` —— **不加这一行，验收脚本自己就用不了这个旋钮**（先漏了它，是这一节里我自己那处"改了配置没反应"的现量） |
+| `docs/runbooks/self-host.md` | §3 补第三行旋钮 + 三种失败形态的区别（`apk add`/`pnpm install` 是**无声挂住**，base 是**响亮但无线索**）；§4 那句"`APK_MIRROR` / `NPM_REGISTRY` 两个旋钮"→ 三个（同一句结论落在两份文档里，改一处必 sweep，见 [[feedback-duplicate-facts-drift]]） |
+| `server/README.md`（英文那份） | 同一段的英文版，含"compose 那份 args **总是**把值传下去，所以生效的是 compose 的默认值" |
+
+默认值逐字等于 `node:24-alpine` ⇒ 能直连 Docker Hub 的机器**一点行为都没变**。
+仓库里不写死任何地域性源，理由与 `APK_MIRROR` 同一条。
+
+#### ③ 新门禁 `check:image-build-args`（五条判据，七臂变异全对）
+
+这个旋钮的形状是**"必须声明三次 + 第四份抄件在另一个文件"**，
+而跨文件等式是**唯一能看见它的地方** —— 单看任何一个文件都永远自洽。
+`research/tools/check-image-build-args.mjs`：
+
+| 号 | 钉住什么 | 漏了会怎样 |
+|---|---|---|
+| R1 | 同名 ARG 的每份声明默认值逐字相同 | 三个 stage 用三个源 |
+| R2 | 每个 `FROM ${NAME}` 之前**同一段内**有 `ARG NAME=` | 那一段退回 Docker Hub，最后一层才死 |
+| R3 | compose `args:` 每一项 Dockerfile 都声明过 | 死旋钮（传了没人收，build 不报错） |
+| R4 | Dockerfile 每个 ARG compose 都传**且默认值相同**（例外要写理由） | 文档承诺的 `.env` 行根本没接线 / compose 静默覆盖 Dockerfile 的默认值 |
+| R5 | 每段 `FROM` 都必须是 `FROM ${NODE_IMAGE} AS <别名>` | 整族旋钮被撤掉时 R1–R4 **一条都不响**（跨文件等式的共同盲区） |
+
+`DEFAULT_MAY_DIFFER` 只有一条 `VCS_REF`（compose `local` vs Dockerfile `unknown`），
+并写明**为什么这不是漂移** —— 加一条的成本是刻意的，否则 R4 就不是判据。
+
+七臂变异读数（一次性副本，`--root` 注入，不动工作树；`node /tmp/ciba-arms.cjs`）：
+
+| 臂 | rc | 命中的规则 |
+|---|---|---|
+| control（未变异） | **0** | （不红） |
+| 第三处默认值漂成 `node:22-alpine` | 1 | R1 |
+| 删掉 production 段的 `ARG NODE_IMAGE` | 1 | R2 |
+| compose 里加一个 Dockerfile 没声明的 `BOGUS_KNOB` | 1 | R3 |
+| compose 的默认值改成 `node:20-alpine` | 1 | R4 |
+| 一段 `FROM` 改回字面量 | 1 | R5 |
+| **整族撤掉**（三处全回字面量 + compose 条目删掉） | 1 | R5 |
+
+最后一臂是这一节真正的产出：它证明前五臂之外的那条"两边一起改回原样"被 R5 挡住了。
+干净树读数（`node research/tools/check-image-build-args.mjs`）：
+
+```
+✅ 镜像构建参数：3 段全部 `FROM ${NODE_IMAGE} AS …`（R5）｜同名 ARG 默认值逐字一致
+（R1，NODE_IMAGE×3、APK_MIRROR×2、NPM_REGISTRY×3、VCS_REF×1）｜…compose 传的 4 项 Dockerfile 全认（R3）
+｜Dockerfile 的 4 个 ARG compose 全传且默认值相同（R4，例外 1 条已写明理由）
+```
+
+它挂在 `check:image-license` 之后（`pnpm check` 链多一段）；
+`check:gate-wiring` / `check:docs` / `check:script-snapshot` / `check:selfhost-entry-command`
+四条在这批改动后**仍 exit 0**（现量命令就是这四条）。
+
+#### ④ 顺带被现量照出来的一条：live-site 的 PWA 用例撞上了隐私同意闸门
+
+`verify:selfhost-stack` 那趟失败之后接着跑的线上验收（`/tmp/live-rerun.log`）里，
+7 条 `live-domain` 用例 6 绿 1 红，红的是 PWA 那条，抛的是：
+
+```
+PrivacyConsentBlockedError: privacy-consent-not-granted: 用户尚未同意隐私规则，
+拒绝发起任何请求（https://heyta.waytofuture.cn/app/manifest.webmanifest）
+```
+
+**这不是站点坏了，也不是用例写错了地址**：隐私那条线（G-12 / G-27）把
+`window.fetch`、实时通道、以及 **`serviceWorker.register()` 本身**三件事一起搬到了
+"同意之后"（`apps/web/src/features/privacy/startup-network.ts` 那张表的最后一行）。
+所以在一个全新的浏览器上下文里，未同意时 `navigator.serviceWorker.ready`
+**永远不 resolve** —— 没人注册过它。这条比"抛错"更坏，因为它会被读成"SW 坏了"。
+
+用例现在先点真界面上的「同意」（与 `live-signin-entry.spec.ts:106` 同一个动作），
+再跑那段探测。**判据一条没减**，只是把它原本没走到的用户动作补上了。
+⚠️ 复跑读数**还没取**（负载 13.5 > 12 的测量闸门 + 测试锁被占），所以这一条现在
+只是"已按产品行为改法，待现量"，不是"已验过"。
+🔴 顺带一条要交给那条线的事：这条用例在 2026-09-30 是**没有这一步也能绿**的，
+同意闸门落进来时**没有任何一层通知它** —— 线上验收与产品新语义之间缺一条对账
+（与 §7 里"改不变量要按谁引用了输入来枚举"同族）。
+
+#### ⑤ 没闭合的，编号登记
+
+| 号 | 事项 | 前置 |
+|---|---|---|
+| **#2（本目标第 2 项）** | `pnpm verify:selfhost-stack` 全跑现量仍缺。旋钮已接进脚本，下一趟要带 `NODE_IMAGE=<自己拉得到的源>/library/node:24-alpine` | 无测试锁 + load ≤12 的窗口；等满以 rc=3 记"环境无效≠产品失败" |
+| **G-50** | 站内「自建一套同步服务器」那篇文章（外人从落地页点进来的**那一份**）里，`镜像/国内/拉取/registry` **一个词都没有**（`grep` 现量 0 命中）—— 也就是它把上面这个第一关**完全没提**。要补需要动 `packages/i18n` 中英两份 + `apps/landing/src/site/docs.ts` 的 key 清单 + 重跑 `gen:entries` 与 `check:entries` | 那两份词条表**此刻仍在主检出未提交**（就是 #7 那 5 个重叠文件之二）⇒ 现在动它等于给落地加冲突面。登记，不沉默 |
+
+
 
 
 
