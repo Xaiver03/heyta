@@ -235,10 +235,13 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
 
 1. 等窗口（**判据 = §4 那道闸门 `--target b` 在隔离载体里退 0**，别再自己数负载）
    → 跑 `pnpm reinstall:all`，要 `INNER_EXIT=0` 与四张**逐张写明各自钉到哪一步**的截图（AGENTS §6.2 规定一：人必须打开看图）。
-   ⚠️ 载体的建法（本轮已想清楚，别再试错）：`git worktree add --detach <新路径> main` → 把主检出的
-   `node_modules` **软链**过去（本仓实测可用）→ `pnpm reinstall:all` 第 0 段自己会 `pnpm -r build`，
-   iOS 段会自愈 `pod install`。**先建载体再等窗口**是错的（build 会把负载顶上去，反而把窗口关掉），
-   顺序应是：闸门报绿 → 建载体 → 一条后台链跑完四段 → 逐段取证。
+   ⚠️ 载体的建法（本轮踩过一条**危险**的弯路，别再走）：`git worktree add --detach <新路径> main` →
+   在**那个载体里** `pnpm install --prefer-offline`（本仓既有形态是每个 worktree 各有一份真 `node_modules`）。
+   🔴 **不要软链主检出的 `node_modules` 过去** —— pnpm 会判定它是"外来的 modules 目录"并试图 purge，
+   只因没有 TTY 才中止；加了 `CI=true` 就会顺着链接删掉**全部并行会话共用的那棵 4.5 GB 树**（见 §6 第一条）。
+   之后：`pnpm reinstall:all` 第 0 段自己会 `pnpm -r build`，iOS 段会自愈 `pod install`。
+   **先建载体再做重活**是错的（install/build 会把负载顶上去，反而把窗口关掉），
+   顺序应是：闸门报绿 → 装载体 → 一条后台链跑完四段 → 逐段取证。
    ⚠️ 隔离检出里 `pnpm -r typecheck` 会因 `packages/legal/dist`、`apps/node-host/dist` 缺而报一串
    `TS2307`（那是载体不全不是源码错，见 §6）。
 2. 同一窗口内补跑那 3 段 Playwright，然后跑满 `pnpm check`，把**可过段数 + 载体 sha** 一起记账。
@@ -309,6 +312,17 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
 - 🔴 **提交共享台账（`BLOCKED.md` / `PROGRESS.md`）时，提交内容 = `git show HEAD:<文件>` + 你自己那段文本**，不要拿工作树文件当提交源：追加区是所有会话共用的尾部，"单 hunk + 删除 0 行"只证明形状是追加，**不证明作者是你**（`96f3293d` 就把并行会话的整节替他们提交了，详见 B53）。
 - 脚本里开了 `set -o pipefail` 时，**别写 `if ! diff -u A B | grep -q …`**：`diff` 在有差异时退 1，
   整条管道状态就是 1，匹配成功也会被读成失败（本轮在此空转四趟）。改成直接 `grep 文件`。
+- 🔴 **别给 linked worktree 软链 `node_modules`（我第一次这么干就差点删掉共享依赖树）**：pnpm 11 在
+  `pnpm --filter … exec …` 之前会做 deps 状态校验，发现 `node_modules` 是"外来的"就**试图 purge 整个目录**，
+  报 `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY / Aborted removal of modules directory due to no TTY` ——
+  它只因**没有 TTY** 才停手。我的软链指向主检出那棵 4.5 GB / 1185 包的树，加一个 `CI=true` 或
+  `confirmModulesPurge=false` 就会顺着链接把它删掉（那是**全部并行会话共用**的）。
+  ✅ 本仓既有形态是**每个 worktree 各有一份真 node_modules**（现量：`heyta` 1185 / `-hierarchy` 977 /
+  `-batch2` `-w9` `-closeout` 各 974 包），载体准备动作就是在载体里 `pnpm install --prefer-offline`。
+  复跑现量：`for d in …; do ls -d "$d/node_modules/.pnpm" | wc -l; done`。
+  📌 同轮另一次「先怀疑探针」：我在 `…/All in one Data` 下用相对路径 `heyta/node_modules` 量六个载体，
+  得到六个"❌ 无 node_modules"，差点当成自己闯的祸写进文档 —— 真仓库在 `…/All in one Data/01_PROJECTS/heyta`。
+  **跨目录量东西一律用绝对路径**，且"全部一样地坏"优先怀疑测量本身（§7 元规则 1）。
 - 🔴 **凡是"从 `ps` 的 argv 里正则匹配一个路径"的探针，先问"这个路径里有空格吗"**（00:4x 实测，就是本轮那个
   设备占用门）：本仓路径含空格（`All in one Data`），而 `[^ ]*` 停在第一个空格 ⇒ 整条判据**恒不命中**，
   输出永远"干净"。这类假读数比空值危险：它长得像"没人占着"。写这类探针要么按 argv **字段**判
