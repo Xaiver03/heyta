@@ -2957,7 +2957,7 @@ export const en = {
   'site.help.q.export': 'How do I take my data with me?',
   'site.help.a.export': 'All three ends can **export**: on the web under Settings, on mobile under "Mine" via the system share sheet, and `export` on the command line. But **only the web and the CLI can import it back**, and only into an empty library — mobile has no import entry point. See "Taking your data with you".',
   'site.help.q.selfhost': 'How do I run my own server?',
-  'site.help.a.selfhost': 'You can, but this is "operate a service yourself", not one command and you are done: **no prebuilt image is published** (you build it), **bringing the service up is not a deployment** (the table-structure changes have to be applied explicitly, once). Registration and sign-in run on **email + password**; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with `REQUIRE_EMAIL_VERIFICATION=false`. See "Running your own sync server".',
+  'site.help.a.selfhost': 'You can, but this is "operate a service yourself": **no prebuilt image is published** (you build it), and **upgrading is not one command** — the one-shot migration service exits after it runs and compose does not restart an exited service, so after a table-structure change you re-run the command that names `supersync-migrate`. Registration and sign-in run on **email + password**; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with `REQUIRE_EMAIL_VERIFICATION=false`. See "Running your own sync server".',
   'site.help.q.privacy': 'Where does my data actually live?',
   'site.help.a.privacy': 'On your own device first; once sync is on, the cloud holds ciphertext only — the server rejects plaintext outright. **Metadata is not encrypted**, though — sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise "we can see nothing".',
 
@@ -3072,7 +3072,7 @@ export const en = {
   // Self-hosting
   'site.docs.selfhost.title': 'Running your own sync server',
   'site.docs.selfhost.seo.title': 'Running your own sync server — heyta',
-  'site.docs.selfhost.sum': 'You can, and it is one of the reasons heyta exists — but it means operating a service yourself, not one command and you are done.',
+  'site.docs.selfhost.sum': 'You can, and it is one of the reasons heyta exists — but it means operating a service yourself: bringing it up is the easy part; everything after that is your operations (backup and restore, upgrades, TLS, and nobody reading your logs when it breaks).',
   'site.docs.selfhost.s1': 'The difficulty, up front',
   'site.docs.selfhost.s1p1': 'These four are what make people quit halfway, so they go first:',
   'site.docs.selfhost.s1i1': '**No prebuilt image is published** — you build it on your own machine.',
