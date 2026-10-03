@@ -124,13 +124,13 @@ for path in apps/mobile/src packages/ui/src/countdown; do
   [ -n "$m" ] && [ "$m" -gt "$NEWEST_SRC" ] && NEWEST_SRC=$m
 done
 if [ "$NEWEST_SRC" -gt "$APK_EPOCH" ]; then
-  echo "   ❌ 装的是旧产物：移动端源码最新 $NEWEST_SRC > 包 $APK_EPOCH（$APK_LINE）"
+  echo "   ❌ 装的是旧产物：移动端源码最新 $NEWEST_SRC > 包 ${APK_EPOCH}（${APK_LINE}）"
   echo "      先 pnpm reinstall:mobile（或 build:android + install）。"
   echo "      显式跨过：HEYTA_CARD_EXPORT_ALLOW_STALE=1 —— 但那样本轮读数**不代表当前源码**。"
   [ "${HEYTA_CARD_EXPORT_ALLOW_STALE:-0}" = 1 ] || exit 3
   echo "   ⚠️ 已按显式旋钮跨过新鲜度门"
 else
-  ok "装的包不比源码旧（$APK_LINE）"
+  ok "装的包不比源码旧（${APK_LINE}）"
 fi
 
 step "1. 判据①：PNG 读数器读得对，而且**会区分**"
@@ -140,7 +140,7 @@ EXP_H=$(contract EXPORT_CARD_HEIGHT_PX)
 POS="$HEYTA_REPO_ROOT/apps/web/evidence/countdown-export/card-light.png"
 NEG="$HEYTA_REPO_ROOT/apps/web/evidence/countdown-export/probe-3x2.png"
 for f in "$POS" "$NEG"; do
-  [ -f "$f" ] || { echo "   ❌ 自检缺图：$f（对照不存在 ⇒ 判据①无效，本轮不成立）"; exit 3; }
+  [ -f "$f" ] || { echo "   ❌ 自检缺图：${f}（对照不存在 ⇒ 判据①无效，本轮不成立）"; exit 3; }
 done
 POS_R=$(read_png "$POS"); NEG_R=$(read_png "$NEG")
 echo "   正向 $POS_R"
@@ -166,18 +166,18 @@ dump; require_screen
 TAB_LABEL=$(zh mobile.tab.profile)
 TAB_XY=$(scroll_to_text "$TAB_LABEL")
 if [ -z "$TAB_XY" ]; then
-  echo "   ❌ 底部找不到「$TAB_LABEL」这一格 —— 先排除探针（词条来自真源）"; screen_txt; exit 3
+  echo "   ❌ 底部找不到「${TAB_LABEL}」这一格 —— 先排除探针（词条来自真源）"; screen_txt; exit 3
 fi
 $ADB shell input tap $TAB_XY; sleep 3
 ENTRY_LABEL=$(zh mobile.countdown.entry)
 ENTRY_XY=$(scroll_to_text "$ENTRY_LABEL")
 if [ -z "$ENTRY_XY" ]; then
-  bad "「我的」页里没有倒数日入口「$ENTRY_LABEL」（`feature-entries.ts` 那一行没渲染？）"; screen_txt
+  bad "「我的」页里没有倒数日入口「${ENTRY_LABEL}」（`feature-entries.ts` 那一行没渲染？）"; screen_txt
   summary "纪念卡片设备出图（Android）" "入口没开到，判据②③未跑" 1
 fi
 $ADB shell input tap $ENTRY_XY; sleep 3
 VIEW_TITLE=$(zh web.shell.views.countdown)
-if settle_for "$VIEW_TITLE" 8 2; then ok "倒数日屏开到前台（标题「$VIEW_TITLE」）"
+if settle_for "$VIEW_TITLE" 8 2; then ok "倒数日屏开到前台（标题「${VIEW_TITLE}」）"
 else bad "点了入口却没开到倒数日屏"; screen_txt; fi
 
 step "3. 保证屏上有一张卡（空态就现场建一条带 ASCII 戳的）"
@@ -202,14 +202,14 @@ if grep -qF -- "$(zh web.countdown.empty)" "$UI_XML"; then
   DAY_DESC=$(printf '%s' "$DAY_TPL" | sed "s/{title}//g; s/{month}/$MON_NUM/g; s/{day}/$DAY_NUM/g")
   DAY_XY=$(scroll_to_desc "$DAY_DESC")
   if [ -z "$DAY_XY" ]; then
-    echo "   ❌ 日期格里找不到「$DAY_DESC」—— 模板或默认月份视图与预期不符（本轮无效）"; screen_txt; exit 3
+    echo "   ❌ 日期格里找不到「${DAY_DESC}」—— 模板或默认月份视图与预期不符（本轮无效）"; screen_txt; exit 3
   fi
   $ADB shell input tap $DAY_XY; sleep 1
   ADD_XY=$(scroll_to_text "$(zh web.countdown.add)")
   [ -z "$ADD_XY" ] && { echo "   ❌ 找不到「$(zh web.countdown.add)」"; screen_txt; exit 3; }
   $ADB shell input tap $ADD_XY; sleep 3
   if settle_for "$CARD_TITLE" 8 2; then ok "新卡片上了屏（「点了」之后「看得见」）"
-  else bad "建卡之后屏上找不到标题「$CARD_TITLE」"; screen_txt; fi
+  else bad "建卡之后屏上找不到标题「${CARD_TITLE}」"; screen_txt; fi
 else
   echo "   屏上已有卡片，本轮不新增"
   CARD_TITLE=""
@@ -241,13 +241,13 @@ MENU_DESC=$(printf '%s' "$MENU_TPL" | sed "s/{title}/$CARD_TITLE/g")
 MENU_XY=$(xy_desc "$MENU_DESC")
 [ -z "$MENU_XY" ] && MENU_XY=$(scroll_to_desc "$MENU_DESC")
 if [ -z "$MENU_XY" ]; then
-  bad "卡片上没有「$MENU_DESC」这颗菜单钮"; screen_txt
+  bad "卡片上没有「${MENU_DESC}」这颗菜单钮"; screen_txt
 else
   $ADB shell input tap $MENU_XY; sleep 2
   EXPORT_LABEL=$(zh web.countdown.export)
   EXP_XY=$(scroll_to_text "$EXPORT_LABEL")
   if [ -z "$EXP_XY" ]; then
-    bad "菜单里没有「$EXPORT_LABEL」那一格（宿主没接 onExportCard，或 labels.exportCard 没给）"; screen_txt
+    bad "菜单里没有「${EXPORT_LABEL}」那一格（宿主没接 onExportCard，或 labels.exportCard 没给）"; screen_txt
   else
     $ADB shell input tap $EXP_XY
     FOUND=""
@@ -288,7 +288,7 @@ else
       fi
       [ "$(field "$IMG_R" BLANK)" = "false" ] && ok "不是空白图" || bad "数出来是空白 —— 栅格化画了个寂寞"
       [ "$(field "$IMG_R" TRANSPARENT)" = "false" ] && ok "没有透明像素（与 web 那张同口径）" || bad "图里有透明像素"
-      echo "   证据留在 $IMG（设备侧原名 $FOUND）—— 🔴 人要打开看一眼"
+      echo "   证据留在 ${IMG}（设备侧原名 ${FOUND}）—— 🔴 人要打开看一眼"
     fi
   fi
 fi
@@ -298,7 +298,7 @@ FOCUS=$($ADB shell dumpsys window 2>/dev/null | grep -m1 'mCurrentFocus' | tr -d
 echo "   此刻前台：$FOCUS"
 case "$FOCUS" in
   *"$PKG"*) ok "前台仍是 $PKG —— 这条路没有触发任何权限页（与「不申请照片」那句条款同向）" ;;
-  *) bad "前台不是 $PKG（$FOCUS）—— 要么弹了授权页/系统页，要么应用掉了；本条通道按设计不该有这些" ;;
+  *) bad "前台不是 ${PKG}（${FOCUS}）—— 要么弹了授权页/系统页，要么应用掉了；本条通道按设计不该有这些" ;;
 esac
 
 $ADB unroot >/dev/null 2>&1

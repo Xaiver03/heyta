@@ -35,7 +35,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { darkTokens, lightTokens, resolveTextStyle } from '@heyta/design-system';
+import { resolveTextStyle, tokensForTheme } from '@heyta/design-system';
 import { EXPORT_CARD_EDGE_PX, EXPORT_CARD_HEIGHT_PX, EXPORT_CARD_SCALE, EXPORT_CARD_SIZE } from '@heyta/shared-schema';
 import { buildCardExportLayout, type CardExportDrawOp, type CardExportRequest } from '@heyta/ui/node';
 import { describe, expect, it } from 'vitest';
@@ -62,7 +62,9 @@ function codeOf(file: string): string {
 }
 
 function requestOf(dark = false): CardExportRequest {
-  const tokens = dark ? darkTokens : lightTokens;
+  // 走 `tokensForTheme()` 而不是直接拿 `lightTokens`/`darkTokens`：L0 原始表只允许
+  // design-system 内部与 `packages/ui` 的建表点引用（`check:theme` 的 R3）。
+  const tokens = tokensForTheme(dark ? 'dark' : 'light');
   return {
     texts: {
       title: '上线那天',
