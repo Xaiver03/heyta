@@ -101,7 +101,7 @@ if printf '%s' "$out" | grep -q 'RC=0'; then ok "L2 低负载放行（阳性对�
 
 LIMIT=$(( $(sysctl -n hw.ncpu) * 3 / 4 ))
 out="$(gate "uptime(){ echo \" 03:30:00 up 1, load averages: ${LIMIT}.00 3 2\"; }" '')"
-if printf '%s' "$out" | grep -q 'RC=0'; then ok "L3 负载 == 阈值（$LIMIT）放行"; else no "L3 边界误挡：$out"; fi
+if printf '%s' "$out" | grep -q 'RC=0'; then ok "L3 负载 == 阈值（${LIMIT}）放行"; else no "L3 边界误挡：$out"; fi
 
 CNT="$(mktemp)"
 out="$(/bin/bash -c "set -u
@@ -137,7 +137,7 @@ else
   no "P1 预期盲探针报 0，实际 $blind —— 对照组可能没起来，这一组读数不作数"
 fi
 if [ "$seen" -ge 1 ] && [ "$after" = "$base" ]; then
-  ok "P2 pgrep -f 'verify-mobile-' 命中活对照组（$seen），清理后回到基线（$base→$after）⇒ 既不盲也不数观察者"
+  ok "P2 pgrep -f 'verify-mobile-' 命中活对照组（${seen}），清理后回到基线（${base}→${after}）⇒ 既不盲也不数观察者"
 else
   no "P2 pgrep 不成立：命中 $seen / 基线 $base → 清理后 $after"
 fi
