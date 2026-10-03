@@ -133,6 +133,7 @@ import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
 import { GrowthView } from './features/motivation/GrowthView.js';
+import { CountdownView } from './features/countdown/CountdownView.js';
 import { NotesView } from './features/notes/NotesView.js';
 import { ReminderPanel } from './features/reminders/ReminderPanel.js';
 import { TimelinePanel } from './features/timeline/TimelinePanel.js';
@@ -2141,6 +2142,8 @@ export function App(): React.JSX.Element {
           {/* 便签。🔴 `NotesView` 里自带一层 `HeytaUiProvider` ——
               上面 tasks 那棵树的 Provider 不覆盖兄弟节点（见该文件头）。 */}
           {contentView === 'notes' && <NotesView />}
+          {/* 倒数纪念日（W5）。与便签同一类：`CountdownView` 自带 `HeytaUiProvider`。 */}
+          {contentView === 'countdown' && <CountdownView today={toLocalDate(store.now)} />}
           {contentView === 'trash' && <TrashView />}
           {/*
             🔴 **设置是浮层（sheet），不是一路由** —— 见 `settingsBaseView` 的说明与

@@ -944,3 +944,30 @@ export {
   type PanelSize,
   type TriggerRect,
 } from './overlay/model.js';
+
+/**
+ * ── 批次二 W5：倒数日/纪念日板 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 转出的是**卡片怎么画、怎么筛、怎么分行**（`countdown/model.ts`）与那张板子本身；
+ * 天数、闰月、顺序、归档判定一律留在 `@heyta/domain`，op 的构造留在
+ * `@heyta/app-host` —— 这一层转出的是展示，不是判断。
+ */
+export {
+  EventBoard,
+  type EventBoardLabels,
+  type EventBoardProps,
+  type EventEditPatch,
+} from './countdown/EventBoard.js';
+export {
+  COUNTDOWN_FILTERS,
+  countdownFace,
+  filterEventCards,
+  toEventCards,
+  toEventRows,
+  type CountdownFace,
+  type CountdownFilter,
+  type CountdownView,
+  type EventCard,
+} from './countdown/model.js';

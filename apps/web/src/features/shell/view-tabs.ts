@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   CircleDot,
   Inbox,
+  Hourglass,
   Move,
   Search,
   Settings,
@@ -120,6 +121,7 @@ export type ViewKey =
   | 'timeline'
   | 'growth'
   | 'notes'
+  | 'countdown'
   | 'trash'
   | 'settings';
 
@@ -195,6 +197,10 @@ export const ALWAYS_ON_VIEW_TABS: readonly ViewTab[] = [
  * 设置属于工具 —— 顺带把它从"每天要看的视图"里摘出来。
  *
  * ⚠️ 时间线留在上段：它占的是滴答 rail 里**「日历」**那一格（heyta 没有日历视图）。
+ *
+ * 🔴 `countdown` 的图标取 `Hourglass`（沙漏），判据是**16px 下读得出形状** ——
+ * 与上面「四象限为什么是 `Move` 不是 `ChartScatter`」同一条 R12 纪律，
+ * 不是"语义最准"。候选 `CalendarHeart` 在 16px 下是日历里一团点，读不出心形。
  */
 export const MODULE_VIEW_TABS: readonly ViewTab[] = [
   // 日历：滴答 rail 的 5 个主菜单之一（任务 / 日历 / 四象限 / 习惯 / 搜索），
@@ -221,6 +227,7 @@ export const MODULE_VIEW_TABS: readonly ViewTab[] = [
   { key: 'focus', labelKey: 'web.shell.views.focus', Icon: Sun },
   { key: 'growth', labelKey: 'web.shell.views.growth', Icon: TrendingUp },
   { key: 'notes', labelKey: 'web.shell.views.notes', Icon: StickyNote },
+  { key: 'countdown', labelKey: 'web.shell.views.countdown', Icon: Hourglass },
 ];
 
 /**
