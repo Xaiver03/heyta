@@ -575,6 +575,9 @@ git show main:docs/plans/countdown-anniversary.md \
 台账条目的形状是 `{ gap: 'AI-COV-<n>', reason: '…（≥20 字）' }`，
 我第一次写成了 `{ ticket, reason }` ⇒ 门禁那行 ℹ️ 打印出 `已登记缺口 1 项：MEETING=undefined`。
 这不是判据坏了：**工单号形状那条检查只遍历"在分母里且未被覆盖"的实体**，
-而 `MEETING` 不在分母 ⇒ 走的是 9c 那条，照样 rc=1。**没有一条畸形登记能悄悄过去**，
-但报错信息里出现 `undefined` 时，先查自己塞的形状，别去改判据。
-现量脚本在 `/tmp/merged-teeth.mjs`（一次性，不在仓库里）。
+而 `MEETING` 不在分母 ⇒ 走的是 9c 那条，照样 rc=1。**没有一条畸形登记能悄悄过去** ——
+这句已升级成读数（臂 3：往**已被覆盖**的 `HABIT` 上挂一条 `{ticket}` 形状的登记）：
+rc=1，逐字 \`1. \`HABIT\` 现在**读和写都有工具**了，但 \`ENTITY_COVERAGE_DEBT\` 里还挂着它（工单 undefined）。\`
+三条通道（不在分母 / 在分母且已覆盖 / 在分母未覆盖）各红一次，还原后 rc=0、`git status` 为空。
+看到报错信息里出现 `undefined` 时，先查自己塞的形状，别去改判据。
+现量脚本在 `/tmp/merged-teeth.mjs` 与 `/tmp/merged-teeth3.mjs`（一次性，不在仓库里）。
