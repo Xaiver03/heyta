@@ -1076,9 +1076,20 @@ W0b ─> 随时可做（台账那半要等文件干净）
 
 - **事实**：`react-native-svg@15.15.5` **已在依赖树**（`apps/mobile/package.json:38`、`packages/ui/package.json:28,37`、
   `apps/mobile/ios/Podfile.lock:2628,3026` 已 pod 已链接、`packages/ui/src/icon/Icon.tsx:47,85` 真在用）
-  ⇒ **不需要新过 §3.1/§3.2 两道门**。缺的是**栅格化**（全仓无 `toDataURL`/`toBlob`/`react-native-view-shot`/Skia）。
+  ⇒ **不需要新过 §3.1/§3.2 两道门**。~~缺的是**栅格化**（全仓无 `toDataURL`/`toBlob`/`react-native-view-shot`/Skia）~~
   现成"渲染成图"的产品通道只有 `apps/web/src/features/settings/avatar-encode.ts`（canvas→data URL，
   文件头明写"画布属平台能力、三端各不同"）与 macOS `WKWebView.takeSnapshot`（`HeytaMacApp.swift:181,210`，目前只在验收里用）。
+  > ⚠️ **上面划掉那半句在 2026-10-03 23:1x 被现量否证，留着是为了让人看清错在哪。**
+  > "全仓没有一处 `toDataURL` 调用"是真的，从它推不出"缺栅格化"：
+  > **已装的 `react-native-svg@15.15.5` 自带三端栅格化出口**，我自己复核过原生那份（不是只对着 `elements.web.js` 下的结论）——
+  > `node_modules/.pnpm/react-native-svg@15.15.5_*/node_modules/react-native-svg/lib/commonjs/elements/Svg.js` 里 `toDataURL` 在。
+  > **真正缺的是"把字节交出去"那一环**：移动端全部原生方法只有 6 条，其中唯一的文件操作是
+  > `LocalFsModule.kt:40 readTextUri` —— **只有一个"读"，没有任何"写"**；RN 核心 0.84 也没有 `FileSystem`/`CameraRoll`；
+  > `Share` 的 `url` 分支要**真实文件 URI**，`message` 分支只能传文本 ⇒ base64 无路可去。
+  > 两端还有一个**尺寸口径不一致**的真坑：Android `SvgView.java:365` 用**像素**建 bitmap（⇒ 逐字等于契约），
+  > iOS `UIGraphicsImageRenderer -initWithSize:` 的默认 scale **是屏幕 scale**、`bounds.size` 是 **point**（⇒ 3× 真机导出 3240×4320）。
+  > 完整取证（含可复跑命令 [F6]/[F5]/[C]）在 `docs/plans/countdown-w7-device-export.md` §2 ——
+  > 那份**住在 `feat/countdown-w7` 上、尚未进 main**，所以这里只点名不给链接（给了就是死链）。
 - **判据**：导出全程**零网络请求** —— 复用 `e2e/tests/privacy-consent-zero-egress.spec.ts:79-95`
   （`page.on('request')` 分类器 + `page.on('websocket')`；`:16-30` 那条"零必须有非零正向对照"是承重的）
   与 `e2e/tests/inbox.spec.ts:231-234`（按 method+url 数）。
