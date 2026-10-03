@@ -32,7 +32,7 @@
 
 | Goal 里那条要求 | 现在 | 复跑与读数 |
 |---|---|---|
-| 任务 0：`check` 段数 = 62 | ✅ 对上 | `node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'` → **62** |
+| 任务 0：`check` 段数 = 62 | ⚠️ **已漂到 63**（10-04 00:5x 现量） | `node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'` → **63**。多出来的两段是 `check:md-tables` 与 `check:op-log-semantics`（定源：`git diff e5f91c3f..HEAD -- package.json` 的新增段名；各提交时的段数曲线 60→61→61→61→62→**63**）。⇒ **报"可过 N 段"必须带总数与载体**，别沿用 62 |
 | 任务 0：l4 baseline 104 / 90 | ✅ 对上 | `scripts/check-l4-no-style.mjs` `:155 baseline: 104`、`:162 baseline: 90`（现量读数 98/90，**未动阈值**） |
 | 任务 0：`apps/mobile/tests/*.spec.ts` = 35 | ⚠️ **已漂到 44** | `ls apps/mobile/tests/*.spec.ts \\| wc -l` → 44。本条线新增 3 份，其余是并行条线加的 ⇒ **接手别拿 35 当基线** |
 | 任务 0：中英词条各 2881 | ⚠️ 口径不同 | 我的解析形状量到 **zh 2911 / en 2911**（单引号键 2875 + 双引号/反引号键 36）。任务书那个数是写书人的另一套数法 ⇒ **稳的判据是"两侧键数相等"**，不是绝对值 |
@@ -99,7 +99,7 @@
 ## 3. 当前状态：还差的（逐项带现量）
 
 1. **条件 2 的第 1 条：`pnpm check` 62 段 exit 0** —— 上一轮现量 **57/62**；⚠️ 本轮**没有**重跑全量（窗口不在），
-   但已确证**至少多出一段红**，所以下一次现量的起点应当是 **≤56/62**：
+   但已确证**至少多出一段红**，所以下一次现量的起点应当是 **≤56/63**（总数已从 62 漂到 63，见 §0.5 那条）：
    - 🔴 **新增的一段（2026-10-03 23:5x 现量）：`check:l4`** —— `apps/web/src/features` 内联样式 **112 > 基线 104**。
      成因是并行批次那笔已提交的「总接线」（`d27bccde`）：红名单 19 个文件逐个不是本条线碰过的，
      而本条线在 web 的落点 `ProjectsPanel.tsx` 内联样式 **0 处**。⇒ **不吸收凑绿、不调基线**（脚本自己写着"不要为了变绿把 baseline 调高"）。
@@ -242,12 +242,29 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    之后：`pnpm reinstall:all` 第 0 段自己会 `pnpm -r build`，iOS 段会自愈 `pod install`。
    **先建载体再做重活**是错的（install/build 会把负载顶上去，反而把窗口关掉），
    顺序应是：闸门报绿 → 装载体 → 一条后台链跑完四段 → 逐段取证。
+   ✅ **载体本轮已建好并验可用**（00:5x）：`../heyta-wt-reinstall`，`pnpm install --prefer-offline` 8.6 秒，
+   跑 main 里已有的 `packages/domain/tests/activity-categories.spec.ts` → 30 passed；`e2e/` 那份独立依赖也已装。
+   🔴 **一条现量收益**：闸门在载体里跑，"**别人未提交的源码**"那 49 枚阻塞**整条消失**，
+   只剩负载一条（00:5x 现量 17→14，阈值 12）⇒ 这正是"必须在隔离载体里跑"的量化理由，不是仪式。
+   🔴 **必须显式传 `IOS_DEVICE_NAME`**：脚本默认值是 `iPhone 17 Pro`，而这台机器 booted 的是
+   `heyta-iphone-17pro` / `heyta-ios-isolated` / `iPhone Duo heyta`（名字带空格的也算），
+   照默认值走会匹配不上（脚本自己会打印候选并提示加 `--only ios`）。设备名每次现取：
+   `/usr/bin/xcrun simctl list devices booted | grep '(Booted)'`。
+   启动器：`/tmp/heyta-run-reinstall.sh`（体检模式）→ 加 `--go` 真跑；它会把载体对齐到**当时**的 main HEAD，
+   且只在 `pnpm-lock.yaml`/`package.json` 变化时重装。
    ⚠️ 隔离检出里 `pnpm -r typecheck` 会因 `packages/legal/dist`、`apps/node-host/dist` 缺而报一串
    `TS2307`（那是载体不全不是源码错，见 §6）。
 2. 同一窗口内补跑那 3 段 Playwright，然后跑满 `pnpm check`，把**可过段数 + 载体 sha** 一起记账。
    🔴 **记账落在本文件，不落在 Goal 台账**（00:5x 决定）：`docs/plans/goal-multi-end-coverage.md`
    此刻正被别人挂着未提交改动，而本仓实测过反向事故 —— 往正脏着的共享台账 plumbing 追加，
    别人一次整文件 `git add` 就把我那段抹回去。**读数以本节末尾这条为准，Goal 台账那份"待入"由合流时统一搬。**
+   ⚠️ **本轮把这条的前置全部做实了**（开窗即执行，启动器 `/tmp/heyta-run-checks.sh`，体检模式已过）：
+   三段名经 `package.json` 的 `scripts` 键核过（`check:ai-e2e` / `check:privacy-consent-e2e` /
+   `check:landing-e2e` 都在），段数**在脚本里现取**（当前 **63**，不是 62，见 §0.5）；
+   载体里 `e2e/` 那份独立依赖已 `pnpm install`（269 ms，Playwright 1.63 → `chromium-1243` 缓存已在）；
+   🔴 **起跑前必须 `4318/4319/4320` 三个端口空闲**，因为 `check:ai-e2e` 的前置会对它们发 SIGKILL（traps #87）
+   —— 启动器把这一步做成硬门：只要有一个是 busy 就 **exit 3 不跑**，绝不为凑自己的读数杀掉别人的 dev server。
+   00:5x 现量：三个端口 + `:3000` **全部空闲**（`:3000` 上那台旧构建已经退场）。
 3. **把 `verify:mobile-notes` 整段跑完**（🔴 判据**不需要写** —— 第 6/7 步的 op 判据、第 8 步第三张截图、
    第 9–11 步跨设备三条腿**已经在脚本里**，带行号的现量见 §3 第 4 条）。
    🔴 **两个前置在本轮被现量改了**：① 凭据三件套**已经在**（`--target c` 报 ✅），不需要再建号；
