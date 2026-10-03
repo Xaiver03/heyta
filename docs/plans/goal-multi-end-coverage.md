@@ -340,3 +340,21 @@ CI 的唯一形态就是干净检出，所以"干净检出上必红"本身就是
 （判据 `SECTION_REF_RE` 只允许 `.md` 与 `§N` 之间夹可选反引号 + 空白）。
 ⇒ 这条把 §7.7 原本的教训补全了：**归因跑完不等于归因结束，写完要立刻在干净检出上复跑同一条命令** ——
 上一秒的 exit 0 不担保下一句写完还是 0。
+
+### 7.8 收尾复核（2026-10-03 08:5x，HEAD `e56f0e22`）
+
+| 项 | 现量 |
+|---|---|
+| 本波 `6834b4ae..HEAD` 改了哪些路径 | 10 枚：`BLOCKED.md`、2 枚 `apps/mobile/evidence/android-restore-*.png`、4 枚文档（goal / traps / 审计 / 本文件）、4 枚 `server/tests/*.spec.ts` |
+| 其中命中**打包输入**的吗 | `git diff --name-only 6834b4ae..HEAD -- apps/mobile/src apps/web packages/ apps/desktop*` ⇒ **0** ⇒ §7.2 那两轮四端重装判据（android 4036 / ios 4136 / mac 1137 / windows 四条 + sha 对账）**没有失效**，不需要重跑 |
+| 本波自造的那处红 | 干净检出复跑 `docs-link-check`：`d86f0439` 1 处红 → `81054ba1` **3 处红**（我把门禁原文抄进台账，那一行自带 `.md` 与 `§N` 的邻接）→ `e56f0e22` **`POST_EXIT=0`** |
+| 提交前预验（换了顺序的那一步） | 把三枚候选 blob 拷进干净检出复跑 ⇒ `PRE_EXIT=0`；量完 `git checkout --` 还原，克隆脏行数回到 0 |
+| 现场 | 我起的 `vite preview :4322`（PID 48539，cwd `/private/tmp/heyta-ios-ab/apps/web`）已终止，端口监听数回到 0。**:3100 上那枚 `node dist/src/index.js` 的 cwd 是主工作树的 `server/`，不是本会话起的 ⇒ 不动**（归属判定逐枚 `ps -o command=` + `lsof -d cwd`） |
+| 克隆的取舍 | `/tmp/heyta-ios-ab` 留着（还原屏 26/0 那轮的证据载体，删了这条腿要按配方重建）；`/Users/rocalight/heyta-ios-ri` 留着，理由见 traps #154 |
+
+**Goal 四条收尾判据的当前状态**：① `pnpm check` 全量绿 **未达成且不可达**（干净检出剩 3 段外部红：
+`check:l4` 剩 8 处属 M3 / `check:ai-e2e` 对应别人未提交的 `DueEditor.tsx`+`App.tsx`+`view-tabs.ts` /
+`check:landing-e2e` 是 B24 的判据缺陷）；② `pnpm reinstall:all` 四端重装 **已达成**（§7.2 + 本表第一行）；
+③ 归属纪律 **已达成**（本波 16 笔，每笔打印「别人暂存条目 提交前=9 提交后=9 丢失=0」）；
+④ Goal 完成审计 **本节即是**。⇒ 因此 **不**把 Goal 标成 complete：第 ① 条要求的是全量绿，
+而它现在剩下的每一段都不在本条线手里。
