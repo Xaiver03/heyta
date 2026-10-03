@@ -373,21 +373,42 @@ describe('🔴 完成重复任务时，它的提醒跟着新的截止走', () =>
     expect(remindersOf(taskId)[0]?.triggerAt).toBe(absolute);
   });
 
-  it('顺带清掉上一个周期的投递/关闭/推迟状态（新周期它们没有意义）', async () => {
+  it('新周期不继承旧 occurrence 的 fired 语义，保留 marker 供领域层判定', async () => {
     const reminders = createReminderActions(engine, { now });
     const taskId = await actions.create('每周一的会', { dueDate: noonOf(MONDAY) });
     await actions.setRepeat(taskId, EVERY_MONDAY);
     const THIRTY_MIN = 30 * 60 * 1000;
     const id = await reminders.createReminderBeforeDue(taskId, THIRTY_MIN);
 
-    // 先让它"已投递"，再顺延 —— 不清的话下个周期到点不会弹（fired 优先于到点）。
+    // 先让它"已投递"，再顺延 —— trigger 改变后旧 marker 自动失效。
     expect(await reminders.markReminderFired(id)).toBe(true);
     expect(engine.getState().reminders[id]?.firedAt).toBeDefined();
 
     await actions.setCompleted(taskId, true);
 
-    expect(engine.getState().reminders[id]?.firedAt).toBeUndefined();
+    expect(engine.getState().reminders[id]?.firedAt).toBeDefined();
+    expect(engine.getState().reminders[id]?.firedForTriggerAt).toBe(noonOf(MONDAY) - THIRTY_MIN);
     expect(engine.getState().reminders[id]?.triggerAt).toBe(advancedDueMs - THIRTY_MIN);
+  });
+
+  it('legacy firedAt 在重复顺延时惰性绑定旧 trigger', async () => {
+    const reminders = createReminderActions(engine, { now });
+    const taskId = await actions.create('旧提醒', { dueDate: noonOf(MONDAY) });
+    await actions.setRepeat(taskId, EVERY_MONDAY);
+    const THIRTY_MIN = 30 * 60 * 1000;
+    const id = await reminders.createReminderBeforeDue(taskId, THIRTY_MIN);
+    const oldTrigger = noonOf(MONDAY) - THIRTY_MIN;
+
+    await engine.dispatch({
+      entityType: 'REMINDER', entityId: id, opType: OpType.Update,
+      payload: { firedAt: now() },
+    });
+    await actions.setCompleted(taskId, true);
+
+    const moved = engine.getState().reminders[id]!;
+    expect(moved.firedAt).toBeDefined();
+    expect(moved.firedForTriggerAt).toBe(oldTrigger);
+    expect(moved.triggerAt).toBe(advancedDueMs - THIRTY_MIN);
   });
 
   it('**没有规则的普通任务**完成时不会碰提醒（回归保护）', async () => {

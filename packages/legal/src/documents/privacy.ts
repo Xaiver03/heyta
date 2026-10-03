@@ -52,11 +52,10 @@
  *   pepper、HIBP 前缀 / A4 passkey 字段与 challenge 不落库 / A5 五封邮件与 SMTP /
  *   A6 邀请关系里的第三人邮箱 / A7 微信支付 `attach` 逐字段 / A8 后台白名单投影 /
  *   A9 `logger: false`、IP 不落库 / A10 埋点与崩溃上报 14 个关键词零命中 + 出网四类目的地 /
- *   附：45 天保留期与每日清理、`DELETE /api/account` 的 19 处级联硬删）。
- *   🔴 **19 这个数是可复算的**：对 `server/prisma/migrations` 下的迁移 SQL 数 `ON DELETE CASCADE`
- *   的出现次数（`grep -rho "ON DELETE CASCADE" server/prisma/migrations | wc -l`）。
- *   它由 `structure.spec.ts` 里那条判据钉住（数字与迁移不一致即红），所以**加一条级联关系时必须同时改这里**。
- *   （2026-10-03 从 18 变 19：`user_avatars.user_id → users.id` 那条级联，见 R10 §8.7。）
+ *   附：45 天保留期与每日清理、`DELETE /api/account` 的级联硬删（引用 `users` 且 CASCADE 的
+ *   外键 19 条、覆盖 18 张表；新增密钥包、迁移记录与撤销设备记录）。
+ *   数字由 `packages/legal/tests/structure.spec.ts` 顺序回放迁移中的外键增删后计算，
+ *   不能用全部 SQL 中 CASCADE 的出现次数替代；新增关系须同步更新类别说明与中英数字。
  * - 各端本地存了什么、明文还是密文、权限清单实际内容：`docs/research/legal-dataflow-client.md`
  *   （B11 clientId 是随机假名 / **B12 本地存储是明文、E2EE 只覆盖传输** / B13 凭据落盘面 /
  *   B14 三条通知通路 / B15 小组件加密快照 / B16 导出是明文且三端通道不同 /
@@ -124,7 +123,11 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '这一节放在第二条，因为它是整份政策里最容易被写成假话的地方。heyta 的加密**只覆盖同步通道**：一条改动在离开你的设备之前就被加密，服务器收到的是密文，而它不持有解密所需的密钥（密钥由你的口令在你的设备上派生）。但这**不等于"你的数据全是加密的"** —— 下面三种位置必须分开说。',
+        text: '这一节放在第二条，因为它是整份政策里最容易被写成假话的地方。heyta 的加密**只覆盖同步通道**：一条改动在离开你的设备之前就被加密，服务器收到的是密文，而它不持有解密所需的密钥（新格式使用设备生成的随机数据密钥，由加密口令和恢复码分别加密保护；旧格式仍由加密口令派生密钥）。但这**不等于"你的数据全是加密的"** —— 下面三种位置必须分开说。',
+      },
+      {
+        kind: 'p',
+        text: '加密密钥与恢复：服务器保存加密密钥包及其版本、密钥指纹，以及撤销设备记录，用于跨设备解锁、迁移和阻止已撤销会话继续访问；这些记录保留至账号注销。服务器不接收加密口令、恢复码或未包裹的数据密钥。迁移期间暂存替换密文，发布或取消时释放；未完成的暂存 24 小时后过期，由清理任务释放，迁移状态回执保留至注销。浏览器只持久化加密包、加密迁移草稿与密文续传记录；移动端仅在你明确选择记住解锁后，将数据密钥交给系统安全存储。加密口令与恢复码都丢失时，服务端无法恢复你的内容；撤销设备无法抹除该设备已经取得的本地内容或密钥。',
       },
       {
         kind: 'table',
@@ -132,7 +135,7 @@ const zh = [
         rows: [
           [
             '**你自己的设备**（Web 用浏览器自带的本地存储，移动端与桌面端用本机的数据库文件）',
-            '🔴 **明文**。heyta 不加密磁盘上的数据，一个字节都不加。',
+            '🔴 任务等业务数据是**明文**。这不包括下述加密密钥包和系统安全存储。',
             '拿到这台设备、解开这个账户的人，就能读到你的全部任务、清单、便签、习惯与专注记录。防线是设备自身的锁屏、系统账户与文件权限 —— FileVault、APFS、Android FBE 这些是**操作系统**的能力，不是本应用提供的。',
           ],
           [
@@ -378,8 +381,8 @@ const zh = [
         rows: [
           [
             '同步事件（密文内容 + 那 11 项明文形状）',
-            '🔴 **45 天**。这是代码里的固定常量，当前**不可由配置改**，配合**每日一次**的自动清理任务。清理任务即使删除条数为 0 也会打一条日志，为的是"保留期真的执行过"这件事可以被证明，而不是只能靠缺失来诊断。',
-            '从数据库删除；已被快照覆盖的旧事件同样在清理范围内。',
+            '🔴 **窗口写的是 45 天，但当前实际不会清理**。45 天是代码里的固定常量、清理任务也确实每日执行一次；那条任务**只在一个账号的同步流水里已经存在"完整状态边界"时才动手**，而本产品当前的客户端不会产生这种边界。所以对我们现在的账号，它一条也清不掉 —— 每日任务日志里的删除条数恒为 0。我们照实写这一条，而不是把它写成承诺。',
+            '在清理条件具备之前：**不删除**，保留到你注销账号（注销那一行是真的删）。清理生效之后：按 45 天窗口删除，含已被完整状态边界覆盖的旧事件。',
           ],
           [
             '设备记录',
@@ -394,11 +397,11 @@ const zh = [
           [
             '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像密文、条款接受时刻）',
             '到你注销账号为止。',
-            '🔴 注销是**真删除**：账号行连同名下的事件、同步状态、设备、通行密钥、订阅、订单、邀请、通知、昵称与头像按数据库级联删除（共 19 处级联），**没有冷静期，也没有回收站**。',
+            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录，按数据库外键级联删除（共 19 处级联，覆盖 18 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据不会因注销而消失。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库；当前代码里没有任何"账号已注销 ⇒ 清除本机数据"的路径，界面上也还没有注销入口（注销靠邮件申请）。把这一条写成"你的所有数据立即彻底销毁"就是假话。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
           ],
           [
             '订阅、订单与优惠码核销记录',
-            '账号存续期间；注销时随账号一起级联删除。法律与税务要求保留的凭证，在其法定期限内仅用于履行该义务。',
+            '账号存续期间；注销时随账号一起级联删除。🔴 一处要分清：**支付事件**（第三方通道的回调与对账流水）没有账号外键，注销后那一行仍在，但指向订阅的指针会被置空 —— 它与你不再有任何关联，只剩金额与时间，仅用于履行法律与税务要求保留凭证的义务，在其法定期限内保存。',
             '到期删除。',
           ],
           [
@@ -419,7 +422,7 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '⚠️ 「45 天」的诚实边界：每日清扫有一条运维侧的删除预算开关，把它设成 0 会让清扫停摆。我们**按"45 天、每日执行"来设计并监控它**，而不是把它写成一条自然规律 —— 一项可被验证的运维承诺，比一个绝对化的保证更靠得住。',
+        text: '⚠️ 「45 天」的诚实边界，有两条，我们两条都写出来。**第一条**：每日清扫有一条运维侧的删除预算开关，把它设成 0 会让清扫停摆。**第二条**（比第一条更关键）：对同步事件而言，这条清扫当前**根本不会命中任何数据** —— 它只处理已经存在"完整状态边界"的账号，而本产品当前的客户端不产生那种边界，实测每日任务的删除条数恒为 0。我们按"代码里写了什么、跑起来发生什么"来写这一节，而不是按设计意图 —— 一项可被核验的陈述，比一个绝对化的保证更靠得住。等清理真的对我们的数据生效，这一节会改写并重新发布。',
       },
     ],
   },
@@ -482,8 +485,8 @@ const zh = [
         items: [
           '**查阅与复制**：✅ 三个端（Web、命令行、移动端）都能导出**全量**数据 —— 你看得见的全部内容、完整的事件日志、已删除记录（墓碑），外加可核对的计数。**导出文件本身是明文 JSON、不加任何保护**，它落在哪里、要不要转给别人，由你负责。',
           '**更正与补充**：✅ 任务、清单、标签、习惯等业务字段你在任一端改一次，就会同步到其他所有端。⚠️ 服务器上那些事件是密文，我们**无法读取、也无法替你改写**其中某一条 —— 只能由你登录后自行修改。❌ **邮箱不可更换**：产品目前没有换绑邮箱的能力，我们如实写这条限制，而不是摆一个点了没反应的入口。',
-          '**删除**：✅ 应用内的删除在事件模型里是**追加一条删除事件**，不是抹掉记录。它从你的所有设备与界面上消失，但服务器上承载它的加密历史记录会在**保留期（当前 45 天）届满后**被清理掉。🔴 界面里的"彻底删除"**只是一个标记**，它不缩短这个期限，也不等于"已从服务器销毁"。',
-          '**注销账号**：⚠️ 服务端有真正的硬删除能力，但**应用界面里目前没有这个入口**。所以现在的路径是**写信给我们**（`heyta@waytofuture.cn`，从你注册时用的那个邮箱发出，以便我们核验归属），我们在 15 个工作日内完成核查与删除。注销之后仍然存在的副本只有一处：上条那个 14 天的备份窗口。',
+          '**删除**：✅ 应用内的删除在事件模型里是**追加一条删除事件**，不是抹掉记录。它从你的所有设备与界面上消失。🔴 至于服务器上承载它的那段加密历史：**当前不会定期清理**。我们部署了每日运行的保留期清扫（窗口 45 天），但它只对已经存在"完整状态边界"的账号动手，而本产品当前的客户端不会产生那种边界 —— 实测每天清掉的条数是 0。所以在那之前，这段加密历史实际只有一条路真的消失：**注销账号**。界面里的"彻底删除"**只是一个标记**，它不缩短任何期限，也不等于"已从服务器销毁"。我们不会把"会到期清理"写成承诺，除非它真的对我们的数据成立。',
+          '**注销账号**：⚠️ 服务端有真正的硬删除能力，但**应用界面里目前没有这个入口**。所以现在的路径是**写信给我们**（`heyta@waytofuture.cn`，从你注册时用的那个邮箱发出，以便我们核验归属），我们在 15 个工作日内完成核查与删除。注销之后仍可能存在的副本有**三处**，我们逐处写明：① 上条那个 14 天的整库备份窗口；② 🔴 **你其它设备上的本地数据** —— 本地优先意味着每台设备自己存着一份可读的库，而"账号已注销就清除本机数据"这个动作今天还不存在（所以我们不写"你在所有设备上的数据都会被删除"）；③ 支付事件的审计行，它没有账号外键，注销后指向订阅的指针被置空、只剩金额与时间，仅用于履行法定留存义务。',
           '**撤回同意**：✅ **联网这件事有它自己的撤回入口** —— 设置页里那一项叫「隐私同意」，点「撤回同意」之后这台设备**立刻**停止对外发出任何请求，**已经建立的实时连接当场关掉**，而且状态清回"没问过"：界面会重新问你一次，不是默默换成"你已经拒绝了"。本地数据一条都不动。此外 AI 出境授权、记忆偏好层、推送订阅三处也各自能撤回，关掉之后**下一次调用连输入都不再被读取**（不是只在数据库里标成"已关闭"）。限制：撤回不溯及已经发出的请求。',
           '**要求解释说明**：✅ 你有权要求我们对这份处理规则作出解释，同样走上面的邮箱。',
         ],
@@ -585,6 +588,7 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
         rows: [
+          ['1.2', '`2026-10-04` 补充密钥包、恢复码、系统安全存储与密文迁移记录的用途和留存边界；注销范围增加三类记录，按迁移真源更新级联数量。业务本地库仍为明文。**状态：草案，尚未经法务复核、尚未生效。**'],
           [
             '1.0',
             '`2026-10-01` 首次起草。全文依据三份代码考古（服务端数据流 / 客户端与权限 / AI 出境与权利实现）写成，逐条对照《认定方法》六大类与第十七条的四项必备内容。**状态：草案，尚未经法务复核、尚未生效** —— 页面顶部会显示"尚未生效"横幅，本文中的时限（15 个工作日）、保留期（45 天 / 14 天）与各项承诺在产品负责人核定、法务复核之前仍可能改写。',
@@ -645,7 +649,11 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'This section comes second because it is where this policy would most easily turn into a false statement. heyta’s encryption **covers the sync channel only**: a change is encrypted before it leaves your device, the server receives ciphertext, and the server does not hold what would be needed to decrypt it (the key is derived from your password, on your device). That is **not** the same as “all of your data is encrypted”, and the three locations below must be kept apart.',
+        text: 'This section comes second because it is where this policy would most easily turn into a false statement. heyta’s encryption **covers the sync channel only**: a change is encrypted before it leaves your device, the server receives ciphertext, and the server does not hold what would be needed to decrypt it (new-format data uses a random key generated on your device and separately wrapped with your encryption passphrase and recovery code; legacy data still uses a passphrase-derived key). That is **not** the same as “all of your data is encrypted”, and the three locations below must be kept apart.',
+      },
+      {
+        kind: 'p',
+        text: 'Encryption keys and recovery: the server retains wrapped key packages, their versions and key fingerprints, and revoked device records until account closure to support unlocking across devices, migration and rejection of revoked sessions. It never receives your encryption passphrase, recovery code or unwrapped data key. Replacement ciphertext is staged during migration and released on publication or cancellation; unfinished staging expires after 24 hours and is released by cleanup, while migration status receipts remain until account closure. Browsers persist only wrapped packages, encrypted migration drafts and ciphertext resume records. Mobile devices place a data key in OS secure storage only when you explicitly choose to remember unlocking. If both the encryption passphrase and recovery code are lost, the server cannot recover your content. Revocation cannot erase content or keys a device already obtained.',
       },
       {
         kind: 'table',
@@ -653,7 +661,7 @@ const en = [
         rows: [
           [
             '**Your own device** (your browser\'s built-in local storage on the web; a database file on the device for mobile and desktop)',
-            '🔴 **Plaintext**. heyta does not encrypt anything on disk, not a single byte.',
+            '🔴 Task and other application data is **plaintext**. Wrapped key packages and OS secure storage described below are separate.',
             'Anyone holding this device who unlocks this account can read every task, list, note, habit and focus record you have. The line of defence is the device’s own lock screen, OS account and file permissions — FileVault, APFS and Android FBE are **operating system** capabilities, not features of this app.',
           ],
           [
@@ -899,8 +907,8 @@ const en = [
         rows: [
           [
             'Sync events (ciphertext content plus those 11 plaintext shape fields)',
-            '🔴 **45 days**. This is a fixed constant in the code, currently **not configurable**, paired with an automatic cleanup job that runs **once a day**. The job writes a log line even when it deletes zero records, so that “the retention period really was enforced” is provable rather than something you can only diagnose from an absence.',
-            'Deleted from the database; superseded older events already covered by a snapshot fall within the same cleanup scope.',
+            '🔴 **The window says 45 days, but nothing is actually pruned today.** The 45-day constant is in the code and the cleanup job does run once a day; that job, however, **only acts on accounts whose sync stream already contains a “full-state boundary”**, and the clients this product ships never produce one. So for the accounts we have today it deletes nothing — the daily job logs a deletion count of 0. We write this as it is rather than as a promise.',
+            'Until the pruning condition is actually reachable: **not deleted**; kept until your account is closed (that row really is deleted). Once the cleanup does apply: deleted on the 45-day window, including older events already covered by a full-state boundary.',
           ],
           [
             'Device records',
@@ -915,11 +923,11 @@ const en = [
           [
             'The account itself (email address, password hash, passkeys, language, nickname, avatar ciphertext, moment of accepting the terms)',
             'Until you close the account.',
-            '🔴 Closure is a **genuine hard delete**: the account row and, by database cascade, its events, sync state, devices, passkeys, subscriptions, orders, referrals, notifications, nickname and avatar are deleted (19 cascades in total). **There is no cooling-off period and no trash bin.**',
+            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones, push subscriptions, wrapped key packages, key migration records and revoked device records — are deleted (19 cascades in total, across 18 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices is not removed by closure.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database; there is currently no code path that wipes a device when its account is closed, and no closure button in the interface (closure is by email request). Writing this as "all your data is destroyed immediately" would be false. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
           ],
           [
             'Subscriptions, orders and coupon redemptions',
-            'For as long as the account exists; deleted by cascade together with the account. Vouchers that law or tax rules require us to retain are kept for their statutory period and used only to discharge that obligation.',
+            'For as long as the account exists; deleted by cascade together with the account. 🔴 One distinction: **payment events** (provider callbacks and reconciliation rows) carry no account foreign key, so the row itself survives closure — but its pointer to the subscription is nulled. It is no longer linked to you and retains only an amount and a timestamp, kept for the statutory period solely to discharge our legal and tax record-keeping duty.',
             'Deleted at expiry.',
           ],
           [
@@ -940,7 +948,7 @@ const en = [
       },
       {
         kind: 'callout',
-        text: '⚠️ The honest boundary around “45 days”: the daily sweep has an operator-side deletion-budget switch, and setting it to 0 stops the sweep. We **design for and monitor “45 days, executed daily”** rather than writing it as a law of nature — an operational commitment you can verify is worth more than an absolute assurance.',
+        text: '⚠️ There are two honest boundaries around “45 days”, and we write out both. **First**: the daily sweep has an operator-side deletion-budget switch, and setting it to 0 stops the sweep. **Second** (the more important one): for sync events the sweep currently **matches no data at all** — it only processes accounts that already have a “full-state boundary” in their stream, and the clients this product ships never create one, so the measured daily deletion count is 0. We write this section from what the code does and what the job actually removes, not from design intent — a statement you can check is worth more than an absolute assurance. When the cleanup really does apply to our data, this section will be rewritten and republished.',
       },
     ],
   },
@@ -1003,8 +1011,8 @@ const en = [
         items: [
           '**Access and copy**: ✅ all three ends (web, command line, mobile) can export **everything** — the materialised entities, the complete event log and the deleted records (tombstones) — with counts you can check against. **The export file is itself unguarded plaintext JSON**: where it lands, and whether you pass it on, is your responsibility.',
           '**Correction and completion**: ✅ business fields — tasks, lists, labels, habits — are changed once on any end and propagate to every other end. ⚠️ The events on our server are ciphertext: we **cannot read them and cannot rewrite one of them for you**; only you, once signed in, can. ❌ **The email address cannot be changed**: the product has no re-binding capability today, and we state the limitation plainly rather than mounting a control that does nothing when pressed.',
-          '**Deletion**: ✅ deleting inside the app is, in the event model, **appending a delete event**, not erasing a record. The item disappears from all your devices and from every interface, while the encrypted history carrying it on our server is cleared **once the retention period (currently 45 days) has run out**. 🔴 The “delete permanently” affordance in the interface **is only a marker**: it neither shortens that period nor means “destroyed on the server”.',
-          '**Account closure**: ⚠️ the server does have a genuine hard-delete capability, but **there is currently no entry point for it in the app interface**. The path today is therefore **to write to us** (`heyta@waytofuture.cn`, sent from the address you registered with, so that we can verify ownership), and we complete verification, deletion and our reply within 15 working days. Exactly one copy can still exist afterwards: the 14-day backup window described in section 7.',
+          '**Deletion**: ✅ deleting inside the app is, in the event model, **appending a delete event**, not erasing a record. The item disappears from all your devices and from every interface. 🔴 As for the encrypted history carrying it on our server: **it is not periodically pruned today**. We do run a daily retention sweep (45-day window), but it only acts on accounts that already contain a “full-state boundary”, which the clients this product ships never produce — the measured number of records removed per day is 0. So until that changes, there is exactly one route by which that history really disappears: **closing your account**. The “delete permanently” affordance in the interface **is only a marker** — it shortens no period and does not mean “destroyed on the server”. We will not phrase “it gets cleaned up after the retention period” as a promise while it is not true of your data.',
+          '**Account closure**: ⚠️ the server does have a genuine hard-delete capability, but **there is currently no entry point for it in the app interface**. The path today is therefore **to write to us** (`heyta@waytofuture.cn`, sent from the address you registered with, so that we can verify ownership), and we complete verification, deletion and our reply within 15 working days. 🔴 Three copies may still exist afterwards, and we name each one: (1) the 14-day whole-database backup window described in section 7; (2) **local data on your other devices** — local-first means every device keeps its own readable database, and the action "the account was closed, so wipe this device" does not exist in the product today, which is why we never write "your data is deleted on all your devices"; (3) payment-event audit rows, which carry no account foreign key — closure nulls their subscription pointer, leaving only an amount and a timestamp kept solely to discharge our statutory record-keeping duty.',
           '**Withdrawal of consent**: ✅ **going online has its own entry point** — the item in Settings is named “Privacy consent”, and pressing “Withdraw consent” makes this device stop sending any outbound request **immediately**, **closes the live sync connection on the spot**, and resets the state to “never asked”: the app asks you again rather than quietly filing your choice as “you declined”. Not one byte of local data moves. Beyond that, the AI egress consent, the memory preference layer and push subscriptions can each be withdrawn as well, and after you turn one off **the next call does not even read the input** (this is not a row quietly flagged as “off” while the behaviour continues). Limitation: withdrawal is not retroactive to requests already sent.',
           '**Requesting an explanation**: ✅ you may ask us to explain these rules of processing, through the same email address.',
         ],
@@ -1106,6 +1114,7 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date and summary of changes'],
         rows: [
+          ['1.2', '`2026-10-04` Adds purposes and retention boundaries for wrapped keys, recovery codes, OS secure storage and ciphertext migration records. Adds three categories to account deletion and updates cascade counts from migrations. Local application data remains plaintext. **Status: draft, not yet reviewed by counsel or in effect.**'],
           [
             '1.0',
             '`2026-10-01` First draft. Written clause by clause from three code archaeology reports (server data flow / clients and permissions / AI egress and rights as implemented), checked against all six categories of the Method and against the four mandatory elements of Article 17. **Status: draft — not yet reviewed by counsel, not yet in effect**; the page shows a “not yet in effect” banner, and the time limits (15 working days), retention periods (45 days / 14 days) and every other undertaking in this text may still be rewritten before sign-off by the product owner and legal review.',
@@ -1122,9 +1131,9 @@ const en = [
 
 export const privacy: LegalDocument = {
   id: 'privacy',
-  version: '1.1',
+  version: '1.2',
   status: 'draft',
-  updatedDate: '2026-10-02',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': '隐私政策',
     en: 'Privacy Policy',

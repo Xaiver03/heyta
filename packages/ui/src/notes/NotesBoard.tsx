@@ -65,7 +65,7 @@ import type { Note } from '@heyta/domain';
 import { Pin, PinOff, Plus, Trash2 } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { NOTE_EXCERPT_LENGTH, toNoteRows } from './model.js';
+import { isNoteDraftBlank, toNoteRows } from './model.js';
 
 /** 面板全部文案，**每一项都由宿主注入**（见文件头）。 */
 export interface NotesBoardLabels {
@@ -92,7 +92,7 @@ export interface NotesBoardLabels {
 export interface NotesBoardProps {
   /** 未删除的便签（由宿主从 action 层取，`listNotes()` 已经是）。 */
   readonly notes: readonly Note[];
-  /** 摘要长度。省略 = {@link NOTE_EXCERPT_LENGTH}（窄屏可收短）。 */
+  /** 摘要长度。省略 = 领域层的 `NOTE_EXCERPT_LENGTH`（窄屏可收短）。 */
   readonly excerptLength?: number;
   /**
    * 新建。**内容校验的权威是宿主的 `createNoteActions`**（见文件头）——
@@ -211,7 +211,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
 
 export function NotesBoard({
   notes,
-  excerptLength = NOTE_EXCERPT_LENGTH,
+  excerptLength,
   onAdd,
   onRemove,
   onTogglePinned,
@@ -231,7 +231,7 @@ export function NotesBoard({
    * 清空会让用户以为自己写的空格被当成了一张便签。
    */
   function submit(): void {
-    if (draft.trim() === '') return;
+    if (isNoteDraftBlank(draft)) return;
     onAdd(draft);
     setDraft('');
   }
@@ -257,10 +257,10 @@ export function NotesBoard({
         // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
         // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
         // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-          aria-disabled={draft.trim() === ''}
-          disabled={draft.trim() === ''}
+          aria-disabled={isNoteDraftBlank(draft)}
+          disabled={isNoteDraftBlank(draft)}
           onPress={submit}
-          style={[styles.addButton, draft.trim() === '' ? styles.addDisabled : null]}
+          style={[styles.addButton, isNoteDraftBlank(draft) ? styles.addDisabled : null]}
           testID="notes-submit"
         >
           <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.on-primary']} />

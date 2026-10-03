@@ -56,30 +56,54 @@
  * `ProfileScreen` 的 `profile-entry-growth`（`growthOpen` → 本屏）。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴 本端**刻意没做**的三件事（逐条记账，附影响 + 最小一步）
+ * 🔴 本端**没做**的三件事（逐条记账，附影响 + 卡在哪 + 最小一步）
  *
  *   1. **没传 `activityDays`** ⇒ 没有年度活动热力图。
- *      两条独立的理由：① 缺一条可用词条 —— 唯一候选
- *      `web.growth.year.heatmap` 用的是库自己的 `{{count}}` 占位符，`t()`
- *      会渲染出字面的 `{5}`；② 把 web 的年度视图带进小屏需要一次真机验收，
- *      本轮拿不到真机。**影响**：移动端看不到"这一年"，其余三层都在。
- *      **最小一步**：补 `mobile.growth.year.heatmap`（含 `{total}`/`{days}`），
- *      再把 `dailyActivityCountsFromState(tables, now)` 传进去。
- *   2. **没传 `share` / `onCopySummary` 对应物（`share`）** ⇒ 没有分享块。
- *      移动端没有剪贴板接线，传了会得到一个点不动的按钮。
- *      **影响**：无法把周小结复制成纯文本。
- *      **最小一步**：接一个 RN 剪贴板实现 + `buildShareSummary` 等价物。
+ *      ~~理由 ①：缺一条可用词条。~~ ✅ **那条已清**：`web.growth.year.heatmap`
+ *      的 `{{count}}` 双花括号（react-activity-calendar 的语法）已在 2026-10-03
+ *      统一成 i18n 的单层 `{count}`，中英两侧同形，`t(key, { count })` 直接可用。
+ *      🔴 现在**只剩一条**，而且不是我能动的那类：判卷文件
+ *      `apps/mobile/tests/growth-display.spec.ts:365` 断言
+ *      `labels.heatmap.grid({ total: 42, days: 365 })` 必须**等于空串**，而它自己
+ *      第 364 行写着「一旦有人传了 activityDays，这条会先红」。本轮判卷冻结
+ *      （唯一豁免是 `reminders-notes-display.spec.ts:261`）。
+ *      ⚠️ **不能绕**：传了 `activityDays` 而让 `grid` 继续回空串，等于渲染一块
+ *      **没有无障碍名**的热力图 —— 屏幕阅读器念不出"这一年共多少次"，而没有任何
+ *      一层会报错。那正是那条判据要拦的事，不是它拦我要做的事。→ BLOCKED.md
+ *      **影响**：移动端看不到"这一年"，其余三层都在。
+ *      **最小一步**：把 `:365` 的极性翻成"必须是非空、含数字"，同时本屏
+ *      `activityDays={dailyActivityCountsFromState(tables, now, 365)}` +
+ *      `grid: ({ total }) => t('web.growth.year.heatmap', { count: total })`，
+ *      再补一次真机验收（横向滚动/尺寸）。
+ *   2. ~~**没传 `share`** ⇒ 没有分享块。~~
+ *      ✅ **已做完（2026-10-03，任务 4）**：复制走 **RN 核心的 `Clipboard.setString`**
+ *      （实测 0.84.1 两端都还注册着 —— Android `MainReactPackage.kt` 四处、
+ *      iOS `React/CoreModules/RCTClipboard.mm` 带 `RCT_EXPORT_MODULE`），
+ *      零新依赖、零手搓原生模块；小结文本来自 `@heyta/app-host#buildShareSummary`
+ *      （原来只有 web 一份实现，搬进共享层是为了不逼出第二份 —— AGENTS §3.5）。
+ *      ⚠️ **一条诚实边界**：RN 的 `setString` 是 fire-and-forget（返回 `void`，
+ *      读不回），所以移动端的"已复制"说的是"已经交给系统剪贴板"，**不是**
+ *      "验证过里面就是这段"。设备级读回判据（点完去粘贴框贴一次）本轮没做 → BLOCKED.md
  *   3. **没传 `onRepair` / `onFreshStart`** ⇒ 补打卡 / 重新开始**只有文字**。
- *      这两个动作要走 action 层写 op，而本刀白名单不含习惯 action 接线。
- *      **影响**：与迁移前完全一致（迁移前也只有文字）。
- *      **最小一步**：把 `HabitsScreen` 里已有的 `createHabitActions(...)`
- *      补打卡/重新开始调法搬到本屏传进来。
+ *      `onRepair` 的接法本来就现成（`createHabitActions(host).checkIn(habitId, date)`，
+ *      `HabitsScreen.tsx:372` 已在用），但共享层的按钮渲染条件是
+ *      `onRepair !== undefined && labels.repairAction !== undefined`
+ *      （`HabitStreakList.tsx:269`），而判卷文件
+ *      `apps/mobile/tests/growth-display.spec.ts:302` 断言
+ *      `labels.streaks.repairAction` 必须**是 undefined**（同一批"刻意没做"的 tripwire，
+ *      本轮判卷冻结）⇒ 与第 1 条同一个阻塞，见 BLOCKED.md。
+ *      🔴 `onFreshStart` **不只是没接**：action 层**没有"重新开始"这个动作**
+ *      （它语义上是"把这条连续的锚点挪到今天"，要么建新习惯、要么改历史，
+ *      两者都不是一个 op 能表达的事）⇒ 不许顺手编一个，缺口登记在 BLOCKED.md。
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Clipboard } from 'react-native';
 import type { AppHost, MotivationTables } from '@heyta/app-host';
 import {
+  activityTotalsFromState,
   aliveRecords,
+  buildShareSummary,
   habitGrowth,
   identityTagsFromState,
   milestonesFromState,
@@ -151,6 +175,7 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     return {
       today: todayProgressFromState(tables, now),
       week: weeklyReviewFromState(tables, now),
+      totals: activityTotalsFromState(tables),
       milestones: milestonesFromState(tables),
       tags: identityTagsFromState(tables, now),
       habits: aliveRecords(tables.habits),
@@ -158,14 +183,44 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     };
   }, [tables, now]);
 
+  /**
+   * 分享块（L3 出口）。文本来自 `@heyta/app-host`（与 web 同一份实现，理由见
+   * 那边的文件头），复制走 **RN 核心的 `Clipboard`**。
+   *
+   * 🔴 契约是"**成功 = resolve，失败 = reject**"（`ShareSummarySection` 靠它区分
+   * `copied` / `failed`）。RN 的 `setString` 返回 `void`、读不回，所以这里不吞异常：
+   * 原生模块缺失或写入抛错就让它 reject，界面显示"当前环境不允许复制"。
+   */
+  const summary = useMemo(
+    () => (data === null ? '' : buildShareSummary(data.week, data.totals, t)),
+    [data, t],
+  );
+  const share = useMemo(
+    () =>
+      data === null
+        ? undefined
+        : {
+            summary,
+            onCopy: async (): Promise<void> => {
+              Clipboard.setString(summary);
+            },
+          },
+    [data, summary],
+  );
+
   const labels = useMemo(() => growthBoardLabels(t), [t]);
 
   /**
    * 区块标题插槽。
    *
    * 标题是**宿主的外观**（移动端用 kit 的 `SectionHeader`），共享层只给区块 id。
-   * `compareNote` 自带那句文案、不要标题；`heatmap` / `category` / `share`
-   * 本端不渲染（见文件头"刻意没做"），返回 null 而不是编个标题。
+   * `compareNote` 自带那句文案、不要标题；`heatmap` / `category` 本端不渲染
+   * （理由见文件头"没做的三件事"），返回 null 而不是编个标题。
+   * `share` **现在渲染**：分享块没有标题会读成"一个孤零零的按钮"，而那两句
+   * （"带走这一周" / "复制成一段纯文字，粘到哪都行。它不含你的账号、设备或任何
+   * 标识。"）是这套设计的立场声明 —— 尤其"E2EE 下分享出去的文本不带标识"这条，
+   * 不写出来用户不会知道。词条复用 web 那两条（本端 `growth-display.ts` 已经在
+   * 借 `web.growth.*` 的既有词条，不复制第三份句子）。
    *
    * ⚠️ 三个"说明句"（连续 / 里程碑 / 身份）跟着标题一起给 ——
    * 共享层没有"区块副标题"这个概念，而这三句是迁移前移动端已有的文案。
@@ -176,8 +231,16 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         case 'compareNote':
         case 'heatmap':
         case 'category':
-        case 'share':
           return null;
+        case 'share':
+          return (
+            <>
+              <SectionHeader icon="growth.share" title={t('web.growth.share.title')} />
+              <Text variant="row-meta" tone="subtle">
+                {t('web.growth.share.note')}
+              </Text>
+            </>
+          );
         case 'today':
           return <SectionHeader icon="group.today" title={t('mobile.growth.today.title')} />;
         case 'week':
@@ -243,6 +306,14 @@ export function GrowthScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           // 🔴 连续 + 韧性必须用同一份日志、同一个 `today` 配对 ——
           // 实现只有 `@heyta/app-host#habitGrowth` 这一处，两端都注入它。
           growth={habitGrowth}
+          /*
+            🔴 这一份文本 + 这条复制路径就是本端"周小结"的出口。
+            `activityDays`（年度热力图）与 `onRepair`（补打卡按钮）**仍然没传** ——
+            不是忘了，是被两条冻结判据钉在"刻意没做"上，接线会让那块变成
+            没有无障碍名的热力图 / 让那条"按钮必须不出现"的断言红。
+            逐条取证与最小一步见本文件头"没做的三件事"第 1、3 条与 BLOCKED.md。
+          */
+          share={share}
           labels={labels}
           renderSectionHeader={renderSectionHeader}
           testID="growth-board"

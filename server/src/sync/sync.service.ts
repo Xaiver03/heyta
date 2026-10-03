@@ -10,7 +10,9 @@ import {
   SYNC_ERROR_CODES,
   createStateReplacementRequiredResults,
   SyncDeviceInfo,
+  DUPLICATE_OP_SELECT,
 } from './sync.types';
+import { isSameDuplicateOperation } from './conflict';
 import { CheckpointGateFleetSummary } from './checkpoint-gate';
 import { Logger } from '../logger';
 import { loadConfigFromEnv } from '../config';
@@ -85,6 +87,13 @@ const resolveRetainedReplacementSeq = async (
 class CleanSlateUploadRejectedError extends Error {
   constructor(readonly results: UploadResult[]) {
     super('Clean-slate replacement was rejected');
+  }
+}
+
+class StorageQuotaReservationRaceError extends Error {
+  constructor() {
+    super('Storage quota changed while upload was committing');
+    this.name = 'StorageQuotaReservationRaceError';
   }
 }
 
@@ -238,29 +247,32 @@ export class SyncService {
             lastKnownServerSeq !== undefined ||
             (containsRepair && !isLegacyRepairUpload);
           let currentServerSeq = 0;
+          // Every accepted upload participates in the same lock order as a
+          // vault reservation: user_sync_state first, then users. The route's
+          // quota preflight runs outside this transaction, so this lock is the
+          // commit-time serialization point for reservation mutations.
+          await tx.userSyncState.upsert({
+            where: { userId },
+            create: { userId, lastSeq: 0 },
+            update: {},
+          });
+          const rows = await tx.$queryRaw<
+            Array<{
+              lastSeq: number;
+              latestStateReplacementSeq: number | null;
+            }>
+          >`
+            SELECT
+              last_seq AS "lastSeq",
+              latest_state_replacement_seq AS "latestStateReplacementSeq"
+            FROM user_sync_state
+            WHERE user_id = ${userId}
+            FOR UPDATE
+          `;
+          currentServerSeq = rows[0]?.lastSeq ?? 0;
+          await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+
           if (needsSyncStateLock) {
-            // Serialize state replacements, cursor checks, and later inserts on
-            // the same per-user row. Whichever request acquires this lock first
-            // defines the safe order seen by every other server instance.
-            await tx.userSyncState.upsert({
-              where: { userId },
-              create: { userId, lastSeq: 0 },
-              update: {},
-            });
-            const rows = await tx.$queryRaw<
-              Array<{
-                lastSeq: number;
-                latestStateReplacementSeq: number | null;
-              }>
-            >`
-              SELECT
-                last_seq AS "lastSeq",
-                latest_state_replacement_seq AS "latestStateReplacementSeq"
-              FROM user_sync_state
-              WHERE user_id = ${userId}
-              FOR UPDATE
-            `;
-            currentServerSeq = rows[0]?.lastSeq ?? 0;
             let latestStateReplacementSeq = rows[0]?.latestStateReplacementSeq ?? null;
             if (latestStateReplacementSeq === null) {
               // The column is intentionally not backfilled during migration:
@@ -297,6 +309,24 @@ export class SyncService {
           }
 
           if (containsRepair && !isLegacyRepairUpload) {
+            // The response may have been lost after a singleton maintenance
+            // snapshot committed. Confirm its identity before rejecting the
+            // now-old base; never create a second snapshot on a retry.
+            if (ops.length === 1 && repairBaseServerSeq !== undefined) {
+              const op = ops[0];
+              const stored = await tx.operation.findUnique({
+                where: { id: op.id }, select: { ...DUPLICATE_OP_SELECT, serverSeq: true },
+              });
+              if (stored) {
+                const exact = this.validationService.validateOp(op, clientId).valid &&
+                  isSameDuplicateOperation(stored, userId, op, this.config.maxClockDriftMs, op.timestamp);
+                results.push(exact
+                  ? { opId: op.id, accepted: true, serverSeq: stored.serverSeq }
+                  : { opId: op.id, accepted: false, errorCode: SYNC_ERROR_CODES.INVALID_OP_ID,
+                    error: 'Operation ID already belongs to a different operation' });
+                return;
+              }
+            }
             if (
               repairBaseServerSeq === undefined ||
               repairBaseServerSeq !== currentServerSeq
@@ -371,19 +401,6 @@ export class SyncService {
           // `markStorageNeedsReconcile` marker is lost too.
           let acceptedDeltaBytes = 0;
           let unserializableAccepted = 0;
-
-          // Ensure user has sync state row (init if needed)
-          // We assume user exists in `users` table because of foreign key,
-          // but if `uploadOps` is called, authentication should have verified user existence.
-          // However, `user_sync_state` might not exist yet.
-          if (!needsSyncStateLock) {
-            await tx.userSyncState.upsert({
-              where: { userId },
-              create: { userId, lastSeq: 0 },
-              update: {}, // No-op update to ensure it exists
-            });
-            uploadDbRoundtrips++;
-          }
 
           const firstOperationById = new Map<
             string,
@@ -493,19 +510,35 @@ export class SyncService {
           // increment) avoids double-counting anything left in the row.
           if (acceptedDeltaBytes > 0 && !shouldCleanSlate) {
             const delta = BigInt(Math.floor(acceptedDeltaBytes));
-            await tx.$executeRaw`
+            const updated = await tx.$executeRaw`
               UPDATE users
               SET storage_used_bytes = GREATEST(storage_used_bytes + ${delta}::bigint, 0::bigint)
               WHERE id = ${userId}
+                AND storage_used_bytes + COALESCE((
+                  SELECT SUM(reserved_storage_bytes)
+                  FROM vault_key_migrations
+                  WHERE user_id = ${userId}
+                    AND state = 'STAGING'
+                    AND expires_at > (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
+                ), 0::bigint) + ${delta}::bigint <= storage_quota_bytes
             `;
+            if (updated !== 1) throw new StorageQuotaReservationRaceError();
             uploadDbRoundtrips++;
           } else if (acceptedDeltaBytes > 0 && shouldCleanSlate) {
             const delta = BigInt(Math.floor(acceptedDeltaBytes));
-            await tx.$executeRaw`
+            const updated = await tx.$executeRaw`
               UPDATE users
               SET storage_used_bytes = ${delta}::bigint
               WHERE id = ${userId}
+                AND COALESCE((
+                  SELECT SUM(reserved_storage_bytes)
+                  FROM vault_key_migrations
+                  WHERE user_id = ${userId}
+                    AND state = 'STAGING'
+                    AND expires_at > (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
+                ), 0::bigint) + ${delta}::bigint <= storage_quota_bytes
             `;
+            if (updated !== 1) throw new StorageQuotaReservationRaceError();
             uploadDbRoundtrips++;
           }
         },
@@ -513,10 +546,11 @@ export class SyncService {
           // Large operations like SYNC_IMPORT/BACKUP_IMPORT can have payloads up to 20MB.
           // Default Prisma timeout (5s) is too short for these. Use 60s to match generateSnapshot.
           timeout: 60000,
-          // FIX 1.6: Set explicit isolation level for strict consistency.
-          // Accepted writers serialize through the shared
-          // user_sync_state.last_seq row update; see ARCHITECTURE-DECISIONS.md #4.
-          isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+          // READ COMMITTED is required here: a reservation may commit after
+          // this transaction begins but before its final quota UPDATE. Each
+          // statement must observe that latest committed reservation; the
+          // user-row lock above supplies the ordering contract.
+          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
         },
       );
 
@@ -530,7 +564,7 @@ export class SyncService {
         this.requestDeduplicationService.clearForUser(userId);
       }
 
-      // Outside the RepeatableRead transaction on purpose: the download route
+      // Outside the upload transaction on purpose: the download route
       // touches the same (user_id, client_id) row fire-and-forget, and a touch
       // committing between this transaction's snapshot and its own upsert
       // aborted the WHOLE upload with a serialization failure (40001). Seen
@@ -557,6 +591,18 @@ export class SyncService {
           `[user:${userId}] Clean-slate replacement rejected; existing data preserved`,
         );
         return err.results;
+      }
+
+      if (err instanceof StorageQuotaReservationRaceError) {
+        Logger.warn(
+          `[user:${userId}] Upload rolled back: active vault migration reservation consumed the remaining quota`,
+        );
+        return ops.map((op) => ({
+          opId: op.id,
+          accepted: false,
+          error: 'Storage quota exceeded by an active key migration',
+          errorCode: SYNC_ERROR_CODES.STORAGE_QUOTA_EXCEEDED,
+        }));
       }
 
       // Transaction failed - all operations were rolled back
@@ -621,6 +667,7 @@ export class SyncService {
     gapDetected: boolean;
     latestSnapshotSeq?: number;
     snapshotVectorClock?: VectorClock;
+    causalFrontier?: { token: string; vectorClock: VectorClock };
   }> {
     return this.operationDownloadService.getOpsSinceWithSeq(
       userId,
@@ -1000,6 +1047,10 @@ export class SyncService {
 
   async listDevices(userId: number): Promise<SyncDeviceInfo[]> {
     return this.deviceService.listDevices(userId);
+  }
+
+  async revokeDevice(userId: number, clientId: string): Promise<void> {
+    await this.deviceService.revokeDevice(userId, clientId);
   }
 }
 

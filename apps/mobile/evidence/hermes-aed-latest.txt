@@ -1,0 +1,16 @@
+heyta Android Hermes A/D probe
+date=20261003-175033
+serial=emulator-5554
+apk=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+artifact=TEMPORARY_PROBE_APK
+restore=pnpm reinstall:all
+abi=arm64-v8a
+status=PROBE_PASS
+10-03 17:50:56.285 10281 10336 I ReactNativeJS: PROBE_START db=heyta-hermes-aed-1791021056285 hermes=true
+10-03 17:50:56.720 10281 10336 I ReactNativeJS: PROBE_CLOCK_BEFORE_RESTART dimensions=101
+10-03 17:50:56.765 10281 10336 I ReactNativeJS: PROBE_CHECKPOINT coveredSeq=101
+10-03 17:50:56.779 10281 10336 I ReactNativeJS: PROBE_DB_CLOSED
+10-03 17:50:56.785 10281 10336 I ReactNativeJS: PROBE_RESTART_OK preservedDimensions=101 dimensions=102 replayed=1
+10-03 17:50:56.785 10281 10336 W ReactNativeJS: [heyta] 向量时钟有 102 条，超过上限 100，正在裁剪 —— 这会丢失因果信息，可能导致该设备写入被服务端永久拒绝。见 ADR-0008。
+10-03 17:50:56.785 10281 10336 W ReactNativeJS: PROBE_LEGACY_LIMIT_WARNING_OBSERVED input=102 output=100
+10-03 17:50:56.785 10281 10336 I ReactNativeJS: PROBE_PASS

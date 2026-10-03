@@ -30,7 +30,8 @@ vi.mock('../src/db', async () => {
   return {
     prisma: {
       $transaction: vi.fn().mockImplementation(async (callback: any) => {
-        const tx = {
+      const tx = {
+        vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
           operation: {
             create: vi.fn().mockImplementation(async (args: any) => {
               serverSeqCounter++;
@@ -219,6 +220,10 @@ vi.mock('../src/db', async () => {
         upsert: vi.fn().mockResolvedValue({}),
         count: vi.fn().mockResolvedValue(1),
         deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      revokedSyncDevice: {
+        findUnique: vi.fn().mockResolvedValue(null),
+        upsert: vi.fn().mockResolvedValue({}),
       },
       user: {
         findUnique: vi.fn().mockResolvedValue({

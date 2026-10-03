@@ -21,6 +21,7 @@ vi.mock('../src/db', async () => {
   const { Prisma: PrismaModule } = await import('@prisma/client');
 
   const createTxMock = () => ({
+    vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
     operation: {
       create: vi.fn().mockImplementation(async (args: any) => {
         if (state.operations.has(args.data.id)) {
@@ -893,7 +894,7 @@ describe('Conflict Detection', () => {
       expect(result2[0].error).toContain('Equal vector clocks from different clients');
     });
 
-    it('should handle oversized vector clocks by pruning to MAX_VECTOR_CLOCK_SIZE before storage', async () => {
+    it('should retain oversized vector clocks losslessly before storage', async () => {
       const service = getSyncService();
       const entityId = 'task-1';
 
@@ -915,19 +916,17 @@ describe('Conflict Detection', () => {
       const result = await service.uploadOps(userId, clientA, [op1]);
       expect(result[0].accepted).toBe(true);
 
-      // Verify the clock was pruned to MAX_VECTOR_CLOCK_SIZE (20) before storage.
-      // clientA ('client-a') is not in the clock, so only the MAX most active
-      // clients are kept (the ones with highest counters).
+      // The accepted clock is retained exactly; resource limits reject only
+      // clocks above MAX_ACCEPTED_VECTOR_CLOCK_ENTRIES at validation time.
       const ops = (await operationDownloadService.getOpsSinceWithSeq(userId, 0)).ops;
       const storedClock = ops[0].op.vectorClock;
-      expect(Object.keys(storedClock).length).toBe(MAX_VECTOR_CLOCK_SIZE);
-      // The most active clients should be preserved (top MAX entries by counter)
-      for (let i = entryCount - MAX_VECTOR_CLOCK_SIZE; i < entryCount; i++) {
+      expect(Object.keys(storedClock).length).toBe(entryCount);
+      for (let i = 0; i < entryCount; i++) {
         expect(storedClock[`client-${i}`]).toBe(i + 1);
       }
     });
 
-    it('should preserve uploading client ID during server-side clock pruning', async () => {
+    it('should preserve every client ID during server-side storage', async () => {
       const service = getSyncService();
       const entityId = 'task-1';
 
@@ -947,11 +946,10 @@ describe('Conflict Detection', () => {
       const result = await service.uploadOps(userId, clientA, [op]);
       expect(result[0].accepted).toBe(true);
 
-      // Verify the clock was pruned to MAX_VECTOR_CLOCK_SIZE
+      // No causal dimension is silently discarded.
       const ops = (await operationDownloadService.getOpsSinceWithSeq(userId, 0)).ops;
       const storedClock = ops[0].op.vectorClock;
-      expect(Object.keys(storedClock).length).toBe(MAX_VECTOR_CLOCK_SIZE);
-      // clientA should be preserved despite having the lowest counter
+      expect(Object.keys(storedClock).length).toBe(MAX_VECTOR_CLOCK_SIZE + 11);
       expect(storedClock[clientA]).toBe(2);
     });
 
@@ -1001,13 +999,12 @@ describe('Conflict Detection', () => {
       // The server must accept this as GREATER_THAN (not reject as CONCURRENT)
       expect(resolvedResult[0].accepted).toBe(true);
 
-      // Verify the stored clock was pruned to MAX after acceptance
+      // Verify the complete clock survived acceptance
       const ops = (await operationDownloadService.getOpsSinceWithSeq(userId, 0)).ops;
       const latestOp = ops.find((o: any) => o.op.id === resolvedOp.id);
       expect(latestOp).toBeDefined();
       const storedClock = latestOp!.op.vectorClock;
-      expect(Object.keys(storedClock).length).toBe(MAX_VECTOR_CLOCK_SIZE);
-      // clientA should be preserved (it's the uploading client)
+      expect(Object.keys(storedClock).length).toBe(MAX_VECTOR_CLOCK_SIZE + 1);
       expect(storedClock[clientA]).toBe(1);
     });
 

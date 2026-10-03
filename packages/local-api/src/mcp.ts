@@ -86,7 +86,8 @@ const INPUT_SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> 
       dueOn: {
         type: 'string',
         description:
-          '只要截止日正好是这一天的任务，格式 YYYY-MM-DD，与返回里的 dueDate 同一口径。' +
+          '只要截止日正好是这一天的任务，格式 YYYY-MM-DD（**按日**比：带时刻的任务属于它那一天）。' +
+          '返回里的 dueDate 可能是 `2026-03-15` 或 `2026-03-15T16:00`，前 10 位就是这一天。' +
           '与 dueFrom / dueTo 互斥。没有截止日的任务不属于任何一天，不会出现在结果里。',
       },
       dueFrom: {
@@ -125,7 +126,10 @@ const INPUT_SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> 
     type: 'object',
     properties: {
       title: { type: 'string', description: '任务标题。' },
-      dueDate: { type: 'string', description: '截止日期，`YYYY-MM-DD`。' },
+      dueDate: {
+        type: 'string',
+        description: '截止日期：`YYYY-MM-DD`（只到日），或 `YYYY-MM-DDTHH:MM`（本地时区的某一分钟）。',
+      },
       priority: { type: 'string', description: '优先级：high / medium / low。' },
       projectId: { type: 'string', description: '放进哪个清单。' },
     },

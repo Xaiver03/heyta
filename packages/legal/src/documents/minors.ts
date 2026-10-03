@@ -219,7 +219,7 @@ const zh = [
         rows: [
           ['查阅、复制其数据', '与孩子一起在设备上使用导出功能（明文只有使用者一侧能解开，我们读不到内容，因此无法代为导出）', '即时，自助完成'],
           ['更正、补充其数据', '在设备上直接修改；改完经同步到达其他设备', '即时，自助完成'],
-          ['删除某条数据或注销整个账号', '邮箱申请；注销是服务端级联硬删除，做完不可恢复，所以请先导出', '收到请求后 15 个工作日内'],
+          ['删除某条数据或注销整个账号', '邮箱申请；注销是服务端级联硬删除，做完不可恢复，所以请先导出。🔴 它删的是服务端那一份：你其它设备上的本地数据不会因为注销而消失（今天还没有随注销清除本机数据的动作）', '收到请求后 15 个工作日内'],
           ['撤回同意、停止某项处理', '在设置的对应开关上关闭（AI 出境、记忆与偏好、推送、本机接口）', '即时'],
           ['退订与退款、投诉与举报、要求解释说明', '邮箱申请', '收到请求后 15 个工作日内'],
         ],
@@ -453,7 +453,7 @@ const en = [
         rows: [
           ['Access and copy their data', 'Use the export function on the device, together with the child (only the user side can turn ciphertext back into plaintext, so we cannot export it for you)', 'Immediate, self-service'],
           ['Correct or supplement their data', 'Edit it on the device; the change reaches your other devices through sync', 'Immediate, self-service'],
-          ['Delete particular records, or close the whole account', 'By email; closure is a cascading hard delete on the server and cannot be undone, so export first', 'Within 15 working days of receipt'],
+          ['Delete particular records, or close the whole account', 'By email; closure is a cascading hard delete on the server and cannot be undone, so export first. 🔴 It removes the server copy: local data on your other devices is not deleted by closure (no such per-device wipe exists today)', 'Within 15 working days of receipt'],
           ['Withdraw consent, stop a processing activity', 'Switch it off in settings (AI egress, memory and preferences, push, the local interface)', 'Immediate'],
           ['Cancellation and refund, complaints and reports, a request to explain our rules', 'By email', 'Within 15 working days of receipt'],
         ],

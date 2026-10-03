@@ -27,6 +27,11 @@
  *
  * 🔴 写入只有一处：勾选完成，走 `createTaskActions`。
  * 这一层**不做**任何自己的 op 构造（AGENTS.md §3.5）。
+ *
+ * 🔴 **档位入口（月 / 周 / 日）在 2026-10-03 才补上**（§9.4「批三·补」）。
+ * 在此之前这一屏永远只有月档 —— 共享板两端同一份，可入口只有一端有，
+ * 于是"周视图/日视图已交付"在手机上其实只兑现了一半。
+ * 形态为什么是一排按钮而不是下拉：见 `CalendarViewTabs` 文件头。
  * ─────────────────────────────────────────────────────────────────────────
  */
 
@@ -37,15 +42,37 @@ import { useI18n } from '@heyta/i18n';
 import { createTaskActions, type AppHost, type TaskActions } from '@heyta/app-host';
 import {
   CalendarBoard,
+  CalendarViewTabs,
+  CALENDAR_VIEW_LABEL_KEYS,
+  CALENDAR_VIEW_ORDER,
+  calendarCursorFor,
+  calendarHourMark,
+  calendarMonthDrill,
+  calendarSelectedForCursor,
   formatDayTitleText,
+  formatMonthShortText,
   formatMonthTitleText,
+  formatYearTitleText,
   WEEKDAY_MESSAGE_KEYS,
+  type CalendarViewKind,
 } from '@heyta/ui';
 import { useToday } from '../lib/use-today';
 
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
 import { Screen, Text } from '../ui/kit';
+
+/**
+ * 这一屏**真的能切过去**的档位 = 共享层那份 `CALENDAR_VIEW_ORDER`（R17 起这里不再写一份）。
+ *
+ * 🔴 刻意不含「时间线」：时间线在移动端是另一张屏（`TimelineScreen`），
+ *   把它塞进这一屏的切换器就等于"同一个视图两个入口、两份当前态"——
+ *   Web 那边为同一件事写成分叉（选它就 `goToView`，不写进日历 store），
+ *   而移动端连那个分叉都没有，硬加只会多出一个"看着像档位其实是另一张屏"的东西。
+ * ✅ 含「年」是因为 R13 把它真的做出来了（`CalendarYearBoard`）——
+ *   那条"不许提前画一个点了没反应的选项"的立场由共享那份表统一守：
+ *   **表里没有的档位，两端都画不出来**，而加一档不给键名会编译不过。
+ */
 
 export function CalendarScreen(): React.JSX.Element {
   const { t } = useI18n();
@@ -57,7 +84,9 @@ export function CalendarScreen(): React.JSX.Element {
 
   // 🔴 "现在"由 `useToday` 提供：回到前台与跨过本地零点时会刷新。
   // 原来的 `useMemo(() => Date.now(), [])` 会让"今天"永远停在打开应用的那一天。
-  const { today } = useToday();
+  // ⚠️ `now` 同一个来源：日档那根现在线读的也是它 —— 在这里另写一次 `Date.now()`
+  //    就是"两个时钟"，症状是轴上那根线停在打开应用的那一刻。
+  const { now, today } = useToday();
   // 同步完成 → `dataRevision` 变 → 上面的 effect 重读物化状态。
   const { dataRevision } = useMobileSync();
 
@@ -65,6 +94,8 @@ export function CalendarScreen(): React.JSX.Element {
   const [cursor, setCursor] = useState<LocalDate>(() => startOfMonth(toLocalDate(Date.now())));
   /** 选中的那一天。 */
   const [selected, setSelected] = useState<LocalDate>(() => toLocalDate(Date.now()));
+  /** 这一屏看的是哪一档（月 / 周 / 日 / 年）。 */
+  const [view, setView] = useState<CalendarViewKind>('month');
 
   /** 上一次的"今天"，用来判断跨零点时选中框要不要跟着走。 */
   const prevToday = useRef(today);
@@ -139,6 +170,57 @@ export function CalendarScreen(): React.JSX.Element {
   );
 
   /**
+   * 游标动了（`‹ ›`、滚轮、以及日档的横向拖拽都走这里）。
+   *
+   * 🔴 两条规则**不在本文件**：归一化在 `calendarCursorFor`、
+   *   "日档里游标带走选中"在 `calendarSelectedForCursor`（都在 `@heyta/ui`）——
+   *   Web 那份 store 用的是同一对。写成两份的下场是两端各指一天。
+   *
+   * ⚠️ `setSelected` 走**函数式更新**：共享板的 `pickDay` 是连着调
+   *   `onSelect(date)` + `onCursorChange(date)` 两个 setter，React 会批处理它们，
+   *   而闭包里的 `selected` 还是**上一次渲染**的那个 —— 直接读它就会把刚点的那一天
+   *   写回成旧的（症状：月档点格子没选中、日档点了没反应）。
+   */
+  const stepCursor = useCallback(
+    (date: LocalDate) => {
+      setCursor(calendarCursorFor(view, date));
+      setSelected((prev) => calendarSelectedForCursor(view, date, prev));
+    },
+    [view],
+  );
+
+  const pickDay = useCallback(
+    (date: LocalDate) => {
+      setSelected(date);
+      setCursor(calendarCursorFor(view, date));
+    },
+    [view],
+  );
+
+  /**
+   * 年档里点了一张月卡。
+   *
+   * 🔴 "去哪"不在这里判：`calendarMonthDrill`（`@heyta/ui`）给的就是"要改哪几项"，
+   *   而它的返回值里**没有 `selected`** —— 所以"点月卡不换选中那天"这条
+   *   在类型上成立，不靠我记得别写它。Web 那边接的是同一个函数
+   *   （`store.drillIntoMonth`），两端各写一套状态迁移就是 AGENTS §3.5 那一刀。
+   */
+  const pickMonth = useCallback((monthFirstDay: LocalDate) => {
+    const drill = calendarMonthDrill(monthFirstDay);
+    setView(drill.view);
+    setCursor(drill.cursor);
+  }, []);
+
+  const changeView = useCallback(
+    (next: CalendarViewKind) => {
+      setView(next);
+      // 换档不换"选中哪天"，只把游标挪到那一天所在的那一段（与 Web 的 `setView` 同一条）。
+      setCursor(calendarCursorFor(next, selected));
+    },
+    [selected],
+  );
+
+  /**
    * 共享板要的全部文案。
    *
    * 🔴 共享层**不许 `import '@heyta/i18n'`**（会拖进第二份 React），
@@ -170,6 +252,25 @@ export function CalendarScreen(): React.JSX.Element {
       moreTasks: (count: number) => t('mobile.calendar.a11y.moreTasks', { count }),
       prevMonth: t('mobile.common.prevMonth'),
       nextMonth: t('mobile.common.nextMonth'),
+      // 🔴 周/日两档的词与 Web **同一份**（`common.calendar.*`）。留在 `web.*` 里
+      //    就是逼移动端另抄一套 —— 而两套的必然下场是同一个按钮在两端说法不同，
+      //    且没有任何一层会报错（词条对账只比中英，不比 web 与 mobile）。
+      prevWeek: t('common.calendar.prevWeek'),
+      nextWeek: t('common.calendar.nextWeek'),
+      prevDay: t('common.calendar.prevDay'),
+      nextDay: t('common.calendar.nextDay'),
+      // 年档（R13）：标题、两个箭头、月卡顶上的短月份名 —— 三条都走共享的
+      // `date-text.ts` / 同一批词条，移动端一份都不新写。
+      yearTitle: (d: LocalDate) => formatYearTitleText(d, t),
+      yearMonthTitle: (d: LocalDate) => formatMonthShortText(d, t),
+      prevYear: t('common.calendar.prevYear'),
+      nextYear: t('common.calendar.nextYear'),
+      dayAllDay: t('common.calendar.dayAllDay'),
+      dayNoTimed: t('common.calendar.dayNoTimed'),
+      // 🔴 与 web 同一句：「全天」带的空态只管这条带，不管"这一天有没有到期的任务"。
+      dayAllDayEmpty: t('common.calendar.dayAllDayEmpty'),
+      // 时刻刻度也只有一份：`calendarHourMark`（与时间线同源），这里不另写格式。
+      hourLabel: (hour: number) => calendarHourMark(hour),
       backToToday: t('mobile.calendar.backToToday'),
       dayEmpty: t('mobile.calendar.dayEmpty'),
       footnote: t('mobile.calendar.footnote'),
@@ -182,6 +283,28 @@ export function CalendarScreen(): React.JSX.Element {
     [t],
   );
 
+  /**
+   * 档位切换器要的词。
+   *
+   * ⚠️ 共享层不许 `import '@heyta/i18n'`（会拖进第二份 React），所以**翻译动作**仍然在这里；
+   *   但"哪一档叫什么名字"这张表 R17 起也**不在这里**了 —— 它和 web 的下拉是同一件事，
+   *   原先两边各写一份，加一档要人记着改两处。唯一事实源：
+   *   `@heyta/ui` 的 `CALENDAR_VIEW_LABEL_KEYS` / `CALENDAR_VIEW_ORDER`。
+   */
+  const viewLabels = useMemo(
+    () => ({
+      group: t('common.calendar.view.aria'),
+      /*
+        🔴 原来是三层嵌套三元，而它的**兜底那一支是「日」** —— 加一档时不改这里，
+        年那一格就会念成「日」（类型上完全合法、词条也都在、界面上看着是个正常的
+        切换器）。守卫现在搬到共享层那份 `Record<CalendarViewKind, …>` 上：
+        少一条就**编译不过**，而且 web 那边同时拿到这颗牙。
+      */
+      name: (kind: CalendarViewKind) => t(CALENDAR_VIEW_LABEL_KEYS[kind]),
+    }),
+    [t],
+  );
+
   return (
     <Screen title={t('mobile.calendar.title')}>
       {error !== null ? (
@@ -190,16 +313,36 @@ export function CalendarScreen(): React.JSX.Element {
         </Text>
       ) : null}
 
+      {/*
+        🔴 档位入口挂在**板子外面**（不是 `toolbarTrailing`）：共享板内部每加一个
+        `role=button`/`role=tab`，Web 那两条"按 role 数格子"的判据就会打爆
+        （§9.5 第一条点名的就是这件事）。挂在外面还有一层好处：
+        这一组控件在月/周/日三档里长得一模一样，不随档位换布局。
+      */}
+      <CalendarViewTabs
+        view={view}
+        options={CALENDAR_VIEW_ORDER}
+        onViewChange={changeView}
+        labels={viewLabels}
+        testID="calendar-view-tabs"
+      />
+
       <CalendarBoard
         tasks={tasks}
         today={today}
         cursor={cursor}
         selected={selected}
-        onCursorChange={setCursor}
-        onSelect={setSelected}
+        // 🔴 不直接给 `setCursor` / `setSelected`：游标的归一化、日档里"选中跟着游标走"、
+        //   以及"换档不换选中"三条判断都在上面的 handler 里（规则本体在 `@heyta/ui`）。
+        onCursorChange={stepCursor}
+        onSelect={pickDay}
+        /* 年档点月卡。不给的话共享板会把月卡画成**不可点** —— 那条立场写在板子里。 */
+        onPickMonth={pickMonth}
         onToggleTask={onToggleTask}
         busyTaskId={busyId}
         labels={labels}
+        view={view}
+        now={now}
         testID="calendar-board"
       />
     </Screen>

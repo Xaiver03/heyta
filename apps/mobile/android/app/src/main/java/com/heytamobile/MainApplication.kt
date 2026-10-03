@@ -9,6 +9,8 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.heytamobile.fs.CardExportPackage
 import com.heytamobile.fs.LocalFsPackage
 import com.heytamobile.widget.WidgetPackage
+import com.heytamobile.reminder.ReminderPackage
+import com.heytamobile.vault.VaultSecureStoragePackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -35,6 +37,10 @@ class MainApplication : Application(), ReactApplication {
           // ⚠️ 忘了这一行时 `NativeModules.HeytaCardExport` 是 undefined，
           //    JS 侧必须把它当成**会显示的失败**（"这台设备导不出图"），不许静默。
           add(CardExportPackage())
+          add(ReminderPackage())
+          // Vault root keys are opt-in persisted only through OS secure storage.
+          // This module is separate from the widget's device-key alias/cache.
+          add(VaultSecureStoragePackage())
         },
     )
   }

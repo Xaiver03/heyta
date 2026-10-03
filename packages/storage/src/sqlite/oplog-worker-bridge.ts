@@ -333,6 +333,24 @@ export function createWorkerOpLogSession<TOperation extends Operation<string> = 
     discardPendingUpload: (opIds) => call('discardPendingUpload', [opIds]) as Promise<number>,
     markRejected: (opIds) => call('markRejected', [opIds]) as Promise<number>,
     archiveUpTo: (upToSeq) => call('archiveUpTo', [upToSeq]) as Promise<number>,
+    readCheckpoint: () => call('readCheckpoint', []) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['readCheckpoint']>
+    >,
+    writeCheckpoint: (checkpoint) => call('writeCheckpoint', [checkpoint]) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['writeCheckpoint']>
+    >,
+    readObservedClock: () => call('readObservedClock', []) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['readObservedClock']>
+    >,
+    mergeObservedClock: (clock) => call('mergeObservedClock', [clock]) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['mergeObservedClock']>
+    >,
+    hasIncompleteHistory: () => call('hasIncompleteHistory', []) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['hasIncompleteHistory']>
+    >,
+    markHistoryIncomplete: () => call('markHistoryIncomplete', []) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['markHistoryIncomplete']>
+    >,
 
     // ── 簿记（同步游标）──
     getLastServerSeq: () => call('getLastServerSeq', []) as Promise<number>,

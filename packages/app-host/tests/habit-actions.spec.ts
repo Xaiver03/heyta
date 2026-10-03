@@ -418,3 +418,106 @@ describe('习惯目标（setHabitGoal）', () => {
     expect(isAchieved(habitAfter, logAfter), '改成 atMost/0 之后 1 次就不该算达成').toBe(false);
   });
 });
+
+// ── 追加到 packages/app-host/tests/habit-actions.spec.ts ───────────────
+describe('习惯进回收站（W4 / P-1）', () => {
+  const trashedIds = (): string[] => actions.listTrashedHabits().map((h) => h.id);
+
+  it('🔴 删除 → 回收站列出它；还原 → 回到 listHabits（正向对照各一条）', async () => {
+    const doomed = await actions.createHabit('要删的习惯');
+    clock += 1000;
+    const alive = await actions.createHabit('活着的习惯');
+
+    clock += 1000;
+    await actions.removeHabit(doomed);
+
+    expect(trashedIds()).toEqual([doomed]);
+    expect(actions.listHabits().map((h) => h.id)).toEqual([alive]);
+
+    expect(await actions.restoreHabit(doomed)).toBe(true);
+    expect(trashedIds()).toEqual([]);
+    expect(actions.listHabits().map((h) => h.id)).toEqual([doomed, alive]);
+  });
+
+  it('🔴 还原写一条新的 UPD { deletedAt: null }；不在回收站时返回 false 且不写 op', async () => {
+    const id = await actions.createHabit('删了又还原');
+    await actions.removeHabit(id);
+    const before = (await engine.getOpsForEntity('HABIT', id)).length;
+
+    await actions.restoreHabit(id);
+    const ops = await engine.getOpsForEntity('HABIT', id);
+    expect(ops).toHaveLength(before + 1);
+    expect(ops.at(-1)?.opType).toBe(OpType.Update);
+    expect(payloadOf(ops.at(-1)!).deletedAt).toBeNull();
+
+    // 再还原一次：已经没有墓碑了 ⇒ 空操作（不该产出第二条噪音 op）。
+    expect(await actions.restoreHabit(id)).toBe(false);
+    expect(await engine.getOpsForEntity('HABIT', id)).toHaveLength(before + 1);
+  });
+
+  it('🔴 彻底删除：从回收站消失、墓碑仍在，而打卡记录一条都不少', async () => {
+    const id = await actions.createHabit('喝水');
+    await actions.checkIn(id, DAY1);
+    await actions.checkIn(id, DAY2);
+
+    await actions.removeHabit(id);
+    clock += 1000;
+    await actions.purgeHabit(id);
+
+    expect(trashedIds()).toEqual([]);
+    const raw = engine.getState().habits[id];
+    expect(typeof raw?.deletedAt).toBe('number'); // 清墓碑 = 离线对端会把它复活
+    expect(raw?.purgedAt).toBe(clock);
+    // 打卡记录是"这条习惯发生过什么"的事实源：连彻底删除都不许顺手清掉它。
+    expect(actions.listLogs()).toHaveLength(2);
+  });
+
+  it('彻底删除的三条拒绝：不存在 / 没删过 / 已彻底删除（幂等）', async () => {
+    await expect(actions.purgeHabit('habit-不存在')).rejects.toThrow(/找不到/);
+
+    const live = await actions.createHabit('还活着');
+    await expect(actions.purgeHabit(live)).rejects.toThrow(/不在回收站里/);
+
+    await actions.removeHabit(live);
+    await actions.purgeHabit(live);
+    const ops = (await engine.getOpsForEntity('HABIT', live)).length;
+    await actions.purgeHabit(live);
+    expect(await engine.getOpsForEntity('HABIT', live)).toHaveLength(ops);
+  });
+
+  it('🔴 已彻底删除的习惯不许被还原（抛错 ≠ 返回 false）', async () => {
+    const id = await actions.createHabit('删了、又彻底删除');
+    await actions.removeHabit(id);
+    await actions.purgeHabit(id);
+
+    await expect(actions.restoreHabit(id)).rejects.toThrow(/已被彻底删除/);
+  });
+
+  it('🔴 另一端回放后也不在回收站里（"在回收站"这件事本身跨设备）', async () => {
+    const adapterB = new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: () => new NodeSqliteDriver(':memory:'),
+    });
+    await adapterB.init();
+    const engineB = new OpLogEngine({
+      store: new DbOpLogStore<Operation<string>>(adapterB),
+      clientId: 'client-habit-trash-other',
+      now,
+    });
+
+    const trashed = await actions.createHabit('只是删掉');
+    clock += 1000;
+    const purged = await actions.createHabit('彻底删除');
+    await actions.removeHabit(trashed);
+    await actions.removeHabit(purged);
+    await actions.purgeHabit(purged);
+
+    await engineB.applyRemote(await engine.getPendingUpload());
+    const onB = createHabitActions(engineB, { now });
+
+    expect(onB.listTrashedHabits().map((h) => h.id)).toEqual([trashed]);
+    expect(onB.listHabits()).toEqual([]);
+
+    adapterB.close();
+  });
+});

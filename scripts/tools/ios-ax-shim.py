@@ -87,6 +87,19 @@ import sys
 import time
 
 
+def companion_args(companion):
+    """Use TCP for a host:port companion, otherwise use a binary path.
+
+    The bundled idb companion currently fails while creating Unix sockets on
+    Xcode 27's iOS 27 runtimes, but the same companion serves the gRPC API over
+    TCP. Keep the old path contract for existing scripts and make the transport
+    choice explicit from the caller.
+    """
+    if ':' in companion and not companion.startswith('/'):
+        return ["--companion", companion]
+    return ["--companion-path", companion]
+
+
 def dump_nodes(idb, companion, udid, attempts=3):
     """拉一次无障碍树，拍平成节点列表。失败返回空列表（调用方据此判 found=False）。
 
@@ -108,7 +121,7 @@ def dump_nodes(idb, companion, udid, attempts=3):
 def _dump_nodes_once(idb, companion, udid):
     try:
         r = subprocess.run(
-            [idb, "--companion-path", companion, "ui", "describe-all", "--udid", udid],
+            [idb, *companion_args(companion), "ui", "describe-all", "--udid", udid],
             capture_output=True, text=True, timeout=45,
         )
     except (subprocess.TimeoutExpired, OSError):
@@ -397,6 +410,11 @@ def tab_bar_top(nodes):
         x, y, w, hh = frame_of(n)
         if hh <= 0 or w <= 0:
             continue
+        # 日期网格最后一行也可能贴近屏幕底缘，但它的按钮高 44；真实底部
+        # Tab 的触控行约 64 高。没有这个结构条件时，滚动起点会被错误地
+        # 限制在日期网格上方，导致详情页后续字段永远滚不进来。
+        if hh < 50:
+            continue
         if w_screen and w > w_screen / 3:
             continue
         if not (bottom_band_top <= y and y + hh <= h + 2):
@@ -440,7 +458,9 @@ def find_dead_zone(nodes, width, no_go_y, y_from=None, y_to=None):
     lo = 170 if y_to is None else y_to
     if width is not None:
         cx = width // 2
-        xs = [cx, 10, (width - 10) if width > 20 else cx]
+        # 边缘 10px 可能仍落入 RN 控件的碰撞保护边界（例如日期网格
+        # x=16..78 会把 x=10 也视为占用）；用 2px 留给真正的空白区。
+        xs = [cx, 2, (width - 2) if width > 4 else cx]
     else:
         xs = [200]
     for x in xs:
@@ -456,7 +476,7 @@ def idb_swipe(idb, companion, udid, x0, y0, x1, y1, duration):
     """发一条带 --duration（**秒**）的 swipe。返回 (rc, err)。"""
     try:
         r = subprocess.run(
-            [idb, "--companion-path", companion, "ui", "swipe",
+            [idb, *companion_args(companion), "ui", "swipe",
              str(x0), str(y0), str(x1), str(y1),
              "--duration", str(duration), "--udid", udid],
             capture_output=True, text=True, timeout=30,
@@ -485,7 +505,9 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
     w, h = screen_size(nodes)
     vis_limit = (h - 120) if h else 700
     if h:
-        no_go = tab_bar_top(nodes) or (h - 100)
+        # 无底部 Tab 的详情页仍需从屏底空白区起手；h-100 会把起点放在
+        # 日期网格最后一行之上，手势落不到 ScrollView 的可拖拽区域。
+        no_go = tab_bar_top(nodes) or (h - 80)
     else:
         no_go = 700
 
@@ -592,7 +614,8 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
 
 
 RETURN_KEY_LABELS = ("换行", "return", "Return", "done", "Done", "go", "Go",
-                     "next", "Next", "search", "Search", "send", "Send", "完成")
+                     "next", "Next", "search", "Search", "搜索", "send", "Send",
+                     "发送", "下一步", "完成")
 
 
 def type_text(idb, companion, udid, label, want_pressable, want_field, role, value):
@@ -620,7 +643,7 @@ def type_text(idb, companion, udid, label, want_pressable, want_field, role, val
     cx, cy = center(node)
     try:
         subprocess.run(
-            [idb, "--companion-path", companion, "ui", "tap",
+            [idb, *companion_args(companion), "ui", "tap",
              str(cx), str(cy), "--udid", udid],
             capture_output=True, text=True, timeout=30)
     except (subprocess.TimeoutExpired, OSError) as e:
@@ -638,7 +661,7 @@ def type_text(idb, companion, udid, label, want_pressable, want_field, role, val
         return out
     try:
         r = subprocess.run(
-            [idb, "--companion-path", companion, "ui", "text", value, "--udid", udid],
+            [idb, *companion_args(companion), "ui", "text", value, "--udid", udid],
             capture_output=True, text=True, timeout=60)
         out["typedRc"] = str(r.returncode)
         if r.returncode != 0:
@@ -647,9 +670,9 @@ def type_text(idb, companion, udid, label, want_pressable, want_field, role, val
         out["typedRc"] = f"text-failed {str(e)[:80]}"
         return out
     time.sleep(0.8)
-    # 🔴 **回读前必须先收键盘** —— 理由同 `--set`：聚焦中的 secure 框在键盘
-    #    弹着时会从 AX 树上消失，回读永远拿不到掩码（第 6 轮实测）。
-    dismiss_keyboard(idb, companion, udid)
+    # 普通 TextInput 先在键盘仍显示时回读；点击 return/完成可能触发
+    # onSubmitEditing（任务 Composer 会因此被提交并关闭）。只有字段因 secure
+    # 聚焦从 AX 树隐藏时，才收键盘后重读。
     fresh = dump_nodes(idb, companion, udid)
     tx, ty, tw, th = frame_of(node)
     back = None
@@ -657,6 +680,13 @@ def type_text(idb, companion, udid, label, want_pressable, want_field, role, val
         if is_field(n) and frame_of(n) == (tx, ty, tw, th):
             back = n.get("AXValue")
             break
+    if back is None:
+        dismiss_keyboard(idb, companion, udid)
+        fresh = dump_nodes(idb, companion, udid)
+        for n in fresh:
+            if is_field(n) and frame_of(n) == (tx, ty, tw, th):
+                back = n.get("AXValue")
+                break
     if back is None:
         for n in fresh:
             if is_field(n) and label_of(n) == label_of(node):
@@ -701,7 +731,7 @@ def dismiss_keyboard(idb, companion, udid):
         kx, ky = center(key)
         try:
             subprocess.run(
-                [idb, "--companion-path", companion, "ui", "tap",
+                [idb, *companion_args(companion), "ui", "tap",
                  str(kx), str(ky), "--udid", udid],
                 capture_output=True, text=True, timeout=30,
             )
@@ -792,7 +822,7 @@ def main():
             return 0
         try:
             r = subprocess.run(
-                [args.idb, "--companion-path", args.companion, "ui", "tap",
+                [args.idb, *companion_args(args.companion), "ui", "tap",
                  str(tx), str(ty), "--udid", args.udid],
                 capture_output=True, text=True, timeout=60,
             )
@@ -826,7 +856,7 @@ def main():
             return 0
         try:
             r = subprocess.run(
-                [args.idb, "--companion-path", args.companion, "ui", "tap",
+                [args.idb, *companion_args(args.companion), "ui", "tap",
                  str(cx), str(cy), "--udid", args.udid],
                 capture_output=True, text=True, timeout=60,
             )
@@ -862,7 +892,7 @@ def main():
         set_err = ""
         try:
             r = subprocess.run(
-                [args.idb, "--companion-path", args.companion, "ui", "set-value",
+                [args.idb, *companion_args(args.companion), "ui", "set-value",
                  str(cx), str(cy), "--value", args.set_value, "--udid", args.udid],
                 capture_output=True, text=True, timeout=60,
             )
@@ -876,16 +906,10 @@ def main():
             set_err = str(e)[:200]
         # 回读必须**重新拉树**，否则读到的是设值前的旧值。
         time.sleep(0.6)
-        # 🔴 **回读前必须先收键盘**（2026-10-02 第 6 轮实测）：`set-value` 会聚焦
-        #    目标框并弹出软键盘，而**聚焦中的 secure 框会连同键盘一起从 AX 树上
-        #    消失**（它的 StaticText 标签还在、TextField 没了）—— 按帧找、按标签
-        #    找都找不到，回读永远是空串。调用方会把它判成"写失败"然后无限重试，
-        #    而其实每一次都写成功了。收掉键盘，框就带着值回到树上了。
-        kb = dismiss_keyboard(args.idb, args.companion, args.udid)
-        if kb.get("present") == "True":
-            # 收了两次还在：不再纠缠，按现状回读（调用方的重试会兜住）。
-            time.sleep(0.5)
-        # 🔴 回读必须锚定**同一个字段**（比 frame），不能取"第一个非空的字段"。
+        # 🔴 先在键盘仍显示时按原坐标回读。普通 TextInput 可以直接读到值；
+        #    这条路径不能先点击键盘的 return/完成，因为任务 Composer 的
+        #    onSubmitEditing 会把收键盘误当成提交并关闭面板。只有 secure 框因聚焦
+        #    从 AX 树隐藏时，才退回到收键盘后重读。
         #    实测踩到：「我的」页上「服务器地址」本来就有内容，于是填空「访问令牌」之后
         #    回读拿到的是**服务器地址的值**（http://127.0.0.1:3000）——
         #    脚本于是报"填写访问令牌失败"，而真因是**我读错了框**。
@@ -898,6 +922,15 @@ def main():
             if frame_of(n) == (tx, ty, tw, th):
                 back = n.get("AXValue")
                 break
+        if back is None:
+            kb = dismiss_keyboard(args.idb, args.companion, args.udid)
+            if kb.get("present") == "True":
+                time.sleep(0.5)
+            fresh = dump_nodes(args.idb, args.companion, args.udid)
+            for n in fresh:
+                if is_field(n) and frame_of(n) == (tx, ty, tw, th):
+                    back = n.get("AXValue")
+                    break
         if back is None:  # 兜底：frame 变了（布局移动）时退回按标签找
             for n in fresh:
                 if is_field(n) and label_of(n) == label_of(node):

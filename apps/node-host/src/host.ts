@@ -39,6 +39,8 @@
  */
 
 import {
+  createHabitActions,
+  createNoteActions,
   createProjectActions,
   createTaskActions,
   exportDocumentFromHost,
@@ -50,7 +52,8 @@ import {
   type NewTaskFields,
   type RestoreExportResult,
 } from '@heyta/app-host';
-import type { Project, Tag, Task } from '@heyta/domain';
+import type { Note, Project, Tag, Task, TrashItem } from '@heyta/domain';
+import { toTrashItems } from '@heyta/domain';
 import type { OpIntent } from '@heyta/op-log';
 import type { EntityType } from '@heyta/shared-schema';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -116,6 +119,24 @@ export interface NodeHost {
    */
   listTrashed(): Task[];
   /**
+   * 回收站里的**全部四路**（任务 / 便签 / 清单 / 习惯），顺序与两端界面同源。
+   *
+   * 🔴 这一条是 W6 的落点。原来本壳只有 `listTrashed()`（任务那一路），
+   * 于是"手机删了一条清单，另一台设备的回收站里有没有它"这句话**在这个宿主上
+   * 无法断言** —— 而界面两端都画得出它。合并、取标题、判序全在
+   * `@heyta/domain#toTrashItems`，这里只把四路递进去（AGENTS §3.5）。
+   */
+  trashRows(): TrashItem[];
+  /**
+   * 未删除的便签。
+   *
+   * 🔴 存在理由与 `listProjects()` 同一条：W6 的判据要读"手机上删掉的那条便签，
+   * 在笔记本上还原之后是不是真的活着"，而这个壳此前**一个便签命令都没有** ——
+   * 没有读通道，那条判据就只能落在"手机上看得到"这一侧，
+   * 而那一侧证不了跨设备（§7 那一族"只证了半程"的假绿）。
+   */
+  listNotes(): Note[];
+  /**
    * 未删除的清单，按 (createdAt, id) 升序。
    *
    * 🔴 这是**验收探针能不能看见新数据**的问题，不是功能问题：
@@ -177,6 +198,8 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
 
   const actions = createTaskActions(app);
   const projectActions = createProjectActions(app);
+  const noteActions = createNoteActions(app);
+  const habitActions = createHabitActions(app);
 
   return {
     dbPath: app.dbPath,
@@ -190,6 +213,14 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     purgeTask: (entityId) => actions.purge(entityId),
     listTasks: () => actions.listTasks(),
     listTrashed: () => actions.listTrashed(),
+    trashRows: () =>
+      toTrashItems({
+        tasks: actions.listTrashed(),
+        notes: noteActions.listTrashed(),
+        projects: projectActions.listTrashedProjects(),
+        habits: habitActions.listTrashedHabits(),
+      }),
+    listNotes: () => noteActions.listNotes(),
     listProjects: () => projectActions.listProjects(),
     listTags: () => projectActions.listTags(),
 

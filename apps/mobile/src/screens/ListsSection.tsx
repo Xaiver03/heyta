@@ -46,8 +46,14 @@
  *    把它混进这个列表会让人以为它可删可改名，而删掉它没有任何东西可删。
  * 2. **删除按钮旁边必须说明"任务不会一起删"。**
  *    `ProjectActions.removeProject()` 刻意不级联，但用户不知道时会**不敢删**。
- * 3. **不改名、不归档。** 改名要内联编辑态、归档要"显示已归档"开关，
- *    两者都会把交互重量翻倍。没做的不假装做了。
+ * 3. **改名与归档（2026-10-03 第二批接上）。** 这里原先写的是"不改名、不归档"，
+ *    理由是"内联编辑态与'显示已归档'开关会把交互重量翻倍"。那句话现在只描述了
+ *    **没做的那一半**：行内编辑器已经沉进共享组件 `OrganizerList`，移动端因此
+ *    只是**多传两个 prop**（`onRename` / `onArchive`），没有第二份行骨架 ——
+ *    翻倍的重量被共享层吸收了一次，两端共用。
+ *    ⚠️ 归档必须**成对**：给了归档按钮就要给"取消归档"的通路，所以这里同时接了
+ *    `includeArchived` 与「显示已归档」开关。只给一半会把归档变成**单向门**
+ *    （点得进去、出不来）—— 而那正是共享层注释点名的那个坑。
  *
  * 🔴 本文件里**没有一行业务逻辑**：能不能建（空名字由 app-host 抛错）、
  * 删了任务去哪、无父清单写 `parentId: null` 还是省略 —— 全部由
@@ -60,7 +66,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Project } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { createProjectActions, type AppHost, type ProjectActions } from '@heyta/app-host';
-import { OrganizerList, toOrganizerTree } from '@heyta/ui';
+import { archivedProjects, OrganizerList, toOrganizerTree } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
@@ -73,7 +79,7 @@ export function ListsSection(): React.JSX.Element {
    *
    *   1. 门禁会拦（`scripts/check-materialized-reads.mjs`：任何屏只要调用了
    *      读物化状态的 API，就必须在同一个文件里引用 `dataRevision`）。
-   *   2. **它才是真正让这段界面正确的那个东西。** `listProjects()` 读的是
+   *   2. **它才是真正让这段界面正确的那个东西。** `listAllProjects()` 读的是
    *      **已物化的内存状态**，同步在后台改了状态**不会**触发 React 重渲染。
    *      不订阅的话：在另一台设备上建的清单，这台设备**同步完了也看不见**，
    *      而且没有任何报错 —— 界面只是"看起来没这个清单"。
@@ -84,6 +90,12 @@ export function ListsSection(): React.JSX.Element {
   const [projects, setProjects] = useState<Project[]>([]);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  /**
+   * 「显示已归档」这个开关**不是装饰**：归档按钮一旦画出来，就必须有一条
+   * 把它收回来的路 —— 否则清单归档后永远消失，等于删除。
+   * 默认关闭（与迁移前 web 的选择器逐字一致：`archived !== true` 全隐藏）。
+   */
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -105,8 +117,13 @@ export function ListsSection(): React.JSX.Element {
 
   const read = useCallback((): void => {
     if (actions === null) return;
-    // ⚠️ `listProjects()` 是**同步**的（读已物化状态），不是 Promise。
-    setProjects(actions.listProjects());
+    // ⚠️ `listAllProjects()` 是**同步**的（读已物化状态），不是 Promise。
+    //
+    // 🔴 这里**不能**换成 `listProjects()`。W9 之后那条只给可见的（归档被动作层滤掉，
+    //   这样出口就不会再露出归档清单），而本屏的「显示已归档」开关与 `archivedCount`
+    //   都要靠归档那一路的数据。只接一路不会报错 —— 它会表现成
+    //   "开关按了什么都没出现"，也就是共享层注释点名的那个**单向门**。
+    setProjects(actions.listAllProjects());
   }, [actions]);
 
   useEffect(read, [read, dataRevision]);
@@ -126,8 +143,20 @@ export function ListsSection(): React.JSX.Element {
   /**
    * 层级由共享层决定（`toOrganizerTree`）—— 本文件**不再自己拼平表**。
    * 那正是迁移前两端界面不同的来源。
+   *
+   * `includeArchived` 跟着那个开关走：关了就是共享层的默认口径（归档全隐藏）。
    */
-  const tree = useMemo(() => toOrganizerTree(projects), [projects]);
+  const tree = useMemo(
+    () => toOrganizerTree(projects, { includeArchived: showArchived }),
+    [projects, showArchived],
+  );
+
+  /**
+   * 已归档条数决定**开关画不画**（没有已归档清单时画一个永远点不出东西的按钮，
+   * 是噪音）。"哪几条算已归档"不在这里判 —— 走共享的 `archivedProjects`，
+   * 与 web 侧栏同一个口径，两端不会漂。
+   */
+  const archivedCount = useMemo(() => archivedProjects(projects).length, [projects]);
 
   const add = useCallback((): void => {
     const trimmed = name.trim();
@@ -150,15 +179,38 @@ export function ListsSection(): React.JSX.Element {
           ⚠️ 不传 `onSelect`：移动端没有"侧栏筛选"这个概念（筛的是
           `TasksScreen` 自己的分节），点一行没有去处就不做成可点 ——
           一个点了没反应的按钮比不可点更坏。也不传 `counts`：
-          移动端此前不显示未完成任务数，本刀不顺手加。
+          移动端此前不显示未完成任务数，本批不顺手加。
+
+          ✅ 传 `onRename` / `onArchive`（连同 `labels` 里那两句无障碍名）：
+          行内编辑器住在共享组件里，所以这里**没有新增任何界面重量**，
+          而移动端第一次和 web 一样能把建错的清单改名。
         */}
         <OrganizerList
           kind="project"
           items={tree}
           labels={{
             removeLabel: (label) => t('mobile.lists.remove', { name: label }),
+            rename: {
+              button: (label) => t('common.organizer.rename.button', { name: label }),
+              save: t('common.organizer.rename.save'),
+              cancel: t('common.organizer.rename.cancel'),
+            },
+            archive: {
+              button: (label) => t('common.organizer.archive.button', { name: label }),
+              unarchive: (label) => t('common.organizer.archive.unarchive', { name: label }),
+            },
             empty: t('common.organizer.lists.empty'),
             emptyHint: t('common.organizer.lists.empty.hint'),
+          }}
+          onRename={(item, next) => {
+            if (actions === null) return;
+            run(actions.renameProject(item.id, next));
+          }}
+          onArchive={(item, archived) => {
+            // 传的是**目标状态**（共享层按这一行的 `archived` 推出来的），
+            // 不是"切换一下" —— 两个写"归档"的按钮里有一个其实在取消归档。
+            if (actions === null) return;
+            run(actions.archiveProject(item.id, archived));
           }}
           onRemove={(item) => {
             if (actions === null) return;
@@ -167,6 +219,20 @@ export function ListsSection(): React.JSX.Element {
           busy={busy}
           testID="mobile-projects-list"
         />
+        {archivedCount === 0 ? null : (
+          <Button
+            label={
+              showArchived
+                ? t('common.organizer.hideArchived')
+                : t('common.organizer.showArchived')
+            }
+            tone="secondary"
+            icon="task.project"
+            onPress={() => {
+              setShowArchived((prev) => !prev);
+            }}
+          />
+        )}
       </Card>
       <Text variant="caption" tone="subtle">
         {t('mobile.lists.removeHint')}

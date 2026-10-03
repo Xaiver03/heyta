@@ -211,6 +211,26 @@ export const META_KEYS = {
   PUBLIC_FACTS_ETAG: 'publicFactsEtag',
   /** 那次拉取的本地毫秒时间戳（只用于"缓存多旧"，不参与任何裁决）。 */
   PUBLIC_FACTS_FETCHED_AT: 'publicFactsFetchedAt',
+
+  /**
+   * 服务端已确认的因果前沿。
+   *
+   * 这是同步恢复所需的独立簿记，不能复用 materialized checkpoint：
+   * checkpoint 是可删除的本地加速缓存，而这个前沿是服务端确认过的事实。
+   */
+  OBSERVED_CLOCK: 'observedClock',
+  /** 历史曾经不完整（例如存在无法解密的远程 op），只能置 true。 */
+  HISTORY_INCOMPLETE: 'historyIncomplete',
+  /** Opaque wrapped vault key package; never contains a plaintext root key. */
+  VAULT_KEY_PACKAGE: 'vaultKeyPackageV1',
+  /** Account/server scope paired atomically with the opaque vault package. */
+  VAULT_KEY_SCOPE: 'vaultKeyScopeV1',
+  /** Ciphertext-only durable key-migration journal; no root/plaintext/password. */
+  VAULT_MIGRATION_JOURNAL: 'vaultMigrationJournalV1',
+  /** Active encrypted-payload generation paired with the local key package. */
+  VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
+  /** Encrypted pending root-rotation target; never stores a plaintext root. */
+  VAULT_PENDING_ROOT_ROTATION: 'vaultPendingRootRotationV1',
 } as const;
 
 export type MetaKey = (typeof META_KEYS)[keyof typeof META_KEYS];

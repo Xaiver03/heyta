@@ -477,28 +477,33 @@ export const en = {
   // Nickname and avatar. This page is for you alone: heyta has no sharing and
   // no collaboration, and the server exposes no endpoint that looks another
   // user's profile up — so never phrase these as "others will see".
-  'web.settings.profile.title': 'Profile',
-  'web.settings.profile.nickname.label': 'Nickname',
-  'web.settings.profile.nickname.placeholder': 'Leave empty to show your email',
-  'web.settings.profile.nickname.hint': 'Up to {max} characters. A nickname is a display name, not your legal name; your sign-in identifier stays the email address.',
-  'web.settings.profile.nickname.toolong': 'The nickname allows at most {max} characters, this has {count}.',
-  'web.settings.profile.nickname.save': 'Save nickname',
-  'web.settings.profile.nickname.saved': 'Nickname saved',
-  'web.settings.profile.nickname.cleared': 'Nickname cleared',
-  'web.settings.profile.avatar.label': 'Avatar',
-  'web.settings.profile.avatar.change': 'Choose a new image',
-  'web.settings.profile.avatar.remove': 'Remove avatar',
-  'web.settings.profile.avatar.removed': 'Avatar removed',
-  'web.settings.profile.avatar.uploading': 'Uploading…',
+  'common.profile.title': 'Profile',
+  'common.profile.nickname.label': 'Nickname',
+  'common.profile.nickname.placeholder': 'Leave empty to show your email',
+  'common.profile.nickname.hint': 'Up to {max} characters. A nickname is a display name, not your legal name; your sign-in identifier stays the email address.',
+  'common.profile.nickname.toolong': 'The nickname allows at most {max} characters, this has {count}.',
+  'common.profile.nickname.save': 'Save nickname',
+  'common.profile.nickname.saved': 'Nickname saved',
+  'common.profile.nickname.cleared': 'Nickname cleared',
+  'common.profile.nickname.failed': 'Couldn\'t save the nickname. Please try again.',
+  'common.profile.avatar.label': 'Avatar',
+  'common.profile.avatar.change': 'Choose a new image',
+  'common.profile.avatar.remove': 'Remove avatar',
+  'common.profile.avatar.removed': 'Avatar removed',
+  'common.profile.avatar.uploading': 'Uploading…',
   // 🔴 Not an error message but a product fact: the passphrase is never written
   // to disk, so after a refresh the device cannot open the avatar — neither can we.
-  'web.settings.profile.avatar.needPassword': 'Your avatar is protected by your end-to-end encryption passphrase, which this device does not keep. Enter it once under Sync settings to change or preview your avatar.',
-  'web.settings.profile.avatar.badType': 'Only these image formats are supported: {types}.',
-  'web.settings.profile.avatar.tooBig': 'Even after compression the image exceeds {max}. Please pick a smaller one.',
-  'web.settings.profile.avatar.failed': 'The avatar could not be uploaded. Please try again.',
-  'web.settings.profile.email.label': 'Email',
+  'common.profile.avatar.needPassword': 'Your avatar is protected by your end-to-end encryption passphrase, which this device does not keep. Enter it once under Sync settings to change or preview your avatar.',
+  'common.profile.avatar.badType': 'Only these image formats are supported: {types}.',
+  'common.profile.avatar.tooBig': 'Even after compression the image exceeds {max}. Please pick a smaller one.',
+  'common.profile.avatar.failed': 'The avatar could not be uploaded. Please try again.',
+  'common.profile.avatar.uploaded': 'Avatar updated',
+  'common.profile.avatar.undecryptable': 'This device cannot decrypt your avatar — the end-to-end encryption passphrase does not match. Enter it once under Sync settings.',
+  'common.profile.avatar.unreadable': 'The avatar could not be read right now. Please try again later.',
+  'common.profile.loadFailed': 'Your profile could not be loaded. Please try again later.',
+  'common.profile.email.label': 'Email',
   // A read-only field needs a reason, or it reads as a broken input.
-  'web.settings.profile.email.hint': 'Your email address is your sign-in identifier and the only way to recover the account. It cannot be changed here.',
+  'common.profile.email.hint': 'Your email address is your sign-in identifier and the only way to recover the account. It cannot be changed here.',
 
   'web.settings.display.title': 'Display',
   'web.settings.display.dueNote': 'Show due dates on task rows as a date, or as a countdown to the deadline.',
@@ -534,16 +539,23 @@ export const en = {
   // a soft delete — this is where a user can see it and restore it. Permanent
   // deletion is a separate, confirmed, irreversible action.
   'web.trash.nav': 'Trash',
-  'web.trash.intro': 'Deleted tasks land here. Restore one and it goes back where it was.',
+  'web.trash.intro': 'Deleted tasks, notes, lists and habits land here. Restore one and it goes back where it was.',
   'web.trash.empty.title': 'Trash is empty',
-  'web.trash.empty.hint': 'Tasks you delete show up here first',
+  'web.trash.empty.hint': 'Tasks, notes, lists and habits you delete show up here first',
   'web.trash.deletedAt': 'Deleted {date}',
   'web.trash.restore': 'Restore: {title}',
   'web.trash.purge': 'Delete permanently: {title}',
   'web.trash.confirm.title': 'Delete “{title}” permanently?',
   'web.trash.confirm.body': 'Once deleted permanently it leaves the trash and cannot be restored.',
+  // Same sentence as mobile.trash.confirm.notErasure: purging stops offering a restore, it does not erase history.
+  'web.trash.confirm.notErasure': 'This is not a physical erase: the operation log still holds this record — the app simply stops offering a restore.',
+  // Same sentence as mobile.trash.confirm.projectTasks: deleting a list never cascades into its tasks.
+  'web.trash.confirm.projectTasks': 'It still holds {count} task(s) — those will not be deleted.',
+  'web.trash.confirm.habitLogs': 'Its check-in records are kept — restore the habit and the streak continues.',
   'web.trash.confirm.submit': 'Delete permanently',
   'web.trash.confirm.cancel': 'Cancel',
+  // The action layer refuses some operations (e.g. restoring a purged item). Saying nothing is the "button does nothing" bug.
+  'web.trash.error': 'That did not work: {reason}',
   // Empty states: every list needs one, and it must say what to do next -
   // a blank screen makes users think the app is broken.
   'web.shell.empty.all.title': 'Your inbox is empty',
@@ -580,6 +592,38 @@ export const en = {
   'web.sync.password.lead': 'The passphrase is ',
   'web.sync.password.strong': 'never',
   'web.sync.password.tail': ' saved to disk - it lives only in this session. If it is lost, already-synced data can no longer be decrypted, so keep it safe. Sync is refused without it; the server only accepts end-to-end encrypted payloads.',
+  'web.sync.vault.title': 'Encrypted data key',
+  'web.sync.vault.description': 'This key unlocks your synced data. It is separate from your sign-in password and is never stored in the browser.',
+  'web.sync.vault.accountRequired': 'Sign in first to manage this account’s encrypted data key.',
+  'web.sync.vault.createTitle': 'Create the encrypted data key',
+  'web.sync.vault.passphrase': 'Encryption passphrase',
+  'web.sync.vault.create': 'Create key',
+  'web.sync.vault.recoveryLabel': 'Recovery code',
+  'web.sync.vault.recoveryHint': 'Save this code in a password manager or offline record. It is shown once and cannot be recovered from the server.',
+  'web.sync.vault.recoveryResume': 'This rotation was prepared earlier. Enter the recovery code you saved to resume it.',
+  'web.sync.vault.recoveryConfirm': 'Enter the recovery code to confirm',
+  'web.sync.vault.confirm': 'Confirm and publish',
+  'web.sync.vault.cancel': 'Cancel',
+  'web.sync.vault.unlockTitle': 'Unlock encrypted data',
+  'web.sync.vault.unlock': 'Unlock with passphrase',
+  'web.sync.vault.recoveryCode': 'Recovery code',
+  'web.sync.vault.unlockRecovery': 'Unlock with recovery code',
+  'web.sync.vault.ready': 'Encrypted data is unlocked on this device.',
+  'web.sync.vault.recoveryRotationRequired': 'Recovery unlock succeeded. Set a new passphrase and save the new recovery code before encrypted data can be used.',
+  'web.sync.vault.lock': 'Lock data key',
+  'web.sync.vault.changeTitle': 'New passphrase and recovery code',
+  'web.sync.vault.newPassphrase': 'New encryption passphrase',
+  'web.sync.vault.change': 'Change passphrase',
+  'web.sync.vault.rotateRoot': 'Rotate data key and migrate data',
+  'web.sync.vault.rootRotationHint': 'This creates a new data key and migrates all retained encrypted records before publishing it.',
+  'web.sync.vault.rootRotationProgress': 'Migrating encrypted data: {completed}/{total}',
+  'web.sync.vault.legacyPassphrase': 'Previous encryption passphrase (migration only)',
+  'web.sync.vault.legacyPassphraseHint': 'Leave this empty when all retained records already use a vault key. Enter the old passphrase only if this account still has legacy password-encrypted records.',
+  'web.sync.vault.busy': 'Loading encrypted data key…',
+  'web.sync.vault.error': 'The encrypted data key could not be loaded or used. Your local data is unchanged; check the server and try again.',
+  'web.sync.vault.errorMismatch': 'The recovery code does not match. Enter the displayed code exactly.',
+  'web.sync.vault.errorConflict': 'The key changed on another device. Reload the key and try again.',
+  'web.sync.vault.errorRotation': 'The server requires the full encrypted data migration before this key can be changed.',
   'web.sync.saveAndSync': 'Save and sync',
   // Status wording. It used to come back as Chinese from
   // `features/sync/store.ts`'s `describeStatus`; the sentence now lives in the
@@ -1213,6 +1257,17 @@ export const en = {
   'web.due.prevMonth': 'Previous month',
   'web.due.nextMonth': 'Next month',
   'web.due.dayLabel': '{month}/{day}',
+  // 🔴 Time and date are two precisions of the **same `dueDate` number**, not a
+  //    second field: empty = local midnight = "day only"; set = that minute.
+  //    "All day" is the same word the timeline band uses — two names for one
+  //    state would read as two different things.
+  // 🔴 The namespace is `common.`, not `web.`: these four say **whether this due
+  //    date carries a time**, one product fact both ends read. A key named after
+  //    "which shell drew it" forces the next shell to copy the value instead.
+  'common.due.timeLabel': 'Time',
+  'common.due.allDay': 'All day',
+  'common.due.timePlaceholder': 'HH:MM',
+  'common.due.timeAria': 'Due time for task "{title}" (empty means all day)',
 
   // ── Web · repeat (B2-3) ───────────────────────────────────
   //    🔴 This family fixes an **inconsistency between the two ends**: mobile has
@@ -1998,6 +2053,9 @@ export const en = {
   'common.weekday.fri': 'Fri',
   'common.weekday.sat': 'Sat',
   'common.weekday.sun': 'Sun',
+  // R13: the year-view heading. English reads a bare number as a year,
+  // so this is just the placeholder — Chinese needs the 「年」 character.
+  'common.date.yearTitle': '{year}',
   'common.date.monthTitle': '{month}/{year}',
   'common.date.dayTitle': '{weekday}, {month}/{day}',
   'common.date.weekRangeTitle': '{startMonth}/{startDay} – {endMonth}/{endDay}, {year}',
@@ -2029,11 +2087,6 @@ export const en = {
   'web.calendar.title': 'Calendar',
   'web.calendar.prevMonth': 'Previous month',
   'web.calendar.nextMonth': 'Next month',
-  'web.calendar.prevWeek': 'Previous week',
-  'web.calendar.nextWeek': 'Next week',
-  'web.calendar.view.aria': 'View',
-  'web.calendar.view.month': 'Month',
-  'web.calendar.view.week': 'Week',
   'web.calendar.weekShort': 'W{n}',
   'web.calendar.backToToday': 'Back to today',
   'web.calendar.monthTitle': '{month}/{year}',
@@ -2353,6 +2406,30 @@ export const en = {
   'mobile.lists.add': 'New list',
   'mobile.lists.removeHint': 'Deleting a list does not delete its tasks — they go back to the Inbox.',
   'mobile.lists.remove': 'Delete list "{name}"',
+  // Inline rename / archive (multi-end batch 2, 2026-10-03).
+  // Consumed by the shared `OrganizerList` via `labels.rename` / `labels.archive`;
+  // one sentence, one entry — no per-端 copies.
+  'common.organizer.rename.button': 'Rename "{name}"',
+  'common.organizer.rename.save': 'Save name',
+  'common.organizer.rename.cancel': 'Cancel renaming',
+  // "Archive" and "Unarchive" must be two different strings: one label covering
+  // both states leaves the user guessing what the second press does.
+  'common.organizer.archive.button': 'Archive "{name}"',
+  'common.organizer.archive.unarchive': 'Unarchive "{name}"',
+  'common.organizer.showArchived': 'Show archived',
+  'common.organizer.hideArchived': 'Hide archived',
+  // Delete confirmation (trash & archive W4b, 2026-10-03) — consumed by the
+  // shared `OrganizerList` via `labels.confirmRemove`; one sentence, one entry.
+  // impactTags is the whole reason this step exists: "on 8 tasks" reads as
+  // "deleting it touches those 8" (so people never delete), while "you can always
+  // recreate it" is also false — a new tag has a NEW id, those tasks do not re-attach.
+  'common.organizer.confirm.ask': 'Delete "{name}"?',
+  'common.organizer.confirm.impactTags': 'It is on {count} task(s). Those tasks will not be deleted — they just lose this tag.',
+  'common.organizer.confirm.delete': 'Confirm deletion',
+  'common.organizer.confirm.cancel': 'Cancel deletion',
+  'common.habits.rename.button': 'Rename habit "{name}"',
+  'common.habits.rename.label': 'Habit name',
+  'common.habits.delete.button': 'Delete habit "{name}"',
   'mobile.profile.section.tags': 'Tags',
   'common.organizer.tags.empty': 'No tags yet',
   'common.organizer.tags.empty.hint': 'Tags group tasks across lists — for example "Urgent" or "Waiting".',
@@ -2432,6 +2509,8 @@ export const en = {
   'mobile.profile.entry.settings.hint': 'Sync credentials, widgets and language',
   'mobile.profile.section.sync': 'Sync',
   'mobile.profile.section.status': 'Status',
+  // Mirrors the zh side: shown only when the server **explicitly** says entitled / denied.
+  'mobile.profile.entitlement.entitled': 'Hosted sync is on',
   'mobile.profile.section.language': 'Language',
   'mobile.profile.section.lists': 'Lists',
   // The auth entry sits in the top card of this screen so it is one tap away;
@@ -2441,6 +2520,8 @@ export const en = {
   'mobile.profile.account.signInHint': 'Sign in with an email link or a passkey; sync is wired up for you so you never copy a token by hand.',
   'mobile.profile.account.signedInLabel': 'Current account',
   'mobile.profile.account.signedInHint': 'An access token is already in place. Sign in again to switch accounts or add another credential.',
+  'mobile.profile.nickname.hint': 'Tap this row to change your nickname.',
+  'mobile.profile.avatar.noChannel': 'This device cannot read images from local storage yet. Change your avatar on the web app for now; the same image will show up here.',
   'mobile.profile.account.offline': 'Not signed in',
   // The form moved into the Settings sheet: pointing "below" would send the user
   // hunting through Profile for something that is no longer there.
@@ -2469,6 +2550,40 @@ export const en = {
   'mobile.profile.lastSync.label': 'Last successful sync',
   'mobile.profile.lastSync.never': 'Never',
   'mobile.profile.clearCredentials': 'Clear credentials saved on this device',
+  'mobile.vault.title': 'Encrypted data key',
+  'mobile.vault.description': 'This key unlocks synced data. It is separate from your sign-in password. The passphrase and recovery code stay on this device.',
+  'mobile.vault.accountRequired': 'Sign in first to manage this account’s encrypted data key.',
+  'mobile.vault.createTitle': 'Create the encrypted data key',
+  'mobile.vault.passphrase': 'Encryption passphrase',
+  'mobile.vault.create': 'Create key',
+  'mobile.vault.recoveryLabel': 'Recovery code',
+  'mobile.vault.recoveryHint': 'Save this code in a password manager or offline record. It is shown once and cannot be recovered from the server.',
+  'mobile.vault.recoveryResume': 'This rotation was prepared earlier. Enter the recovery code you saved to resume it.',
+  'mobile.vault.recoveryConfirm': 'Enter the recovery code to confirm',
+  'mobile.vault.confirm': 'Confirm and publish',
+  'mobile.vault.cancel': 'Cancel',
+  'mobile.vault.unlockTitle': 'Unlock encrypted data',
+  'mobile.vault.unlock': 'Unlock with passphrase',
+  'mobile.vault.recoveryCode': 'Recovery code',
+  'mobile.vault.unlockRecovery': 'Unlock with recovery code',
+  'mobile.vault.ready': 'Encrypted data is unlocked on this device.',
+  'mobile.vault.recoveryRotationRequired': 'Recovery unlock succeeded. Set a new passphrase and save the new recovery code before encrypted data can be used.',
+  'mobile.vault.lock': 'Lock data key',
+  'mobile.vault.remember': 'Remember unlock on this device',
+  'mobile.vault.changeTitle': 'New passphrase and recovery code',
+  'mobile.vault.newPassphrase': 'New encryption passphrase',
+  'mobile.vault.change': 'Change passphrase',
+  'mobile.vault.rotateRoot': 'Rotate data key and migrate data',
+  'mobile.vault.rootRotationHint': 'A new data key will be published only after every retained encrypted record has been migrated.',
+  'mobile.vault.rootRotationProgress': 'Migrating encrypted data: {completed}/{total}',
+  'mobile.vault.busy': 'Loading encrypted data key…',
+  'mobile.vault.error': 'The encrypted data key could not be loaded or used. Your local data is unchanged; check the server and try again.',
+  'mobile.vault.errorMismatch': 'The recovery code does not match. Enter it exactly.',
+  'mobile.vault.errorRememberedKey': 'The remembered key does not match this account. Unlock with your passphrase or recovery code.',
+  'mobile.vault.errorConflict': 'The key changed on another device. Reload the key and try again.',
+  'mobile.vault.errorRotation': 'The server requires the full encrypted data migration before this key can be changed.',
+  'mobile.vault.logoutCleanupFailed': 'The encrypted key could not be removed from this device. Credentials are cleared; retry removal before using this account again.',
+  'mobile.vault.retryCleanup': 'Retry encrypted key cleanup',
   'mobile.profile.footnote': 'Credentials are kept in memory only and must be re-entered after the app fully exits.',
   'mobile.profile.conflict.body': 'Both sides changed these places, and heyta will not choose for you - picking one automatically would silently drop the other side. Nothing is lost, but nothing uploads until you choose.',
   'mobile.profile.conflict.open': 'Review one by one',
@@ -2620,7 +2735,7 @@ export const en = {
   // `purgedAt` marker — the op-log payload survives locally and on the server.
   'mobile.trash.title': 'Trash',
   'mobile.trash.entry': 'Trash',
-  'mobile.trash.entry.hint': 'Restore tasks you deleted',
+  'mobile.trash.entry.hint': 'Restore the tasks, notes, lists and habits you deleted',
   // ── Notification center / activity (batch 2, multi-end coverage audit P0-2) ──
   'mobile.inbox.title': 'Notifications',
   'mobile.inbox.back': 'Back',
@@ -2697,9 +2812,9 @@ export const en = {
   'mobile.security.passkeys.delete': 'Delete',
   'mobile.security.passkeys.deleteConfirm': 'Tap again to confirm',
   'mobile.security.passkeys.deleteTitle': 'Delete this passkey?',
-  'mobile.trash.intro': 'Deleted tasks land here. Restore one and it goes back where it was.',
+  'mobile.trash.intro': 'Deleted tasks, notes, lists and habits land here. Restore one and it goes back where it was.',
   'mobile.trash.empty.title': 'Trash is empty',
-  'mobile.trash.empty.hint': 'Tasks you delete show up here first',
+  'mobile.trash.empty.hint': 'Tasks, notes, lists and habits you delete show up here first',
   'mobile.trash.deletedAt': 'Deleted {date}',
   'mobile.trash.restore': 'Restore',
   'mobile.trash.restoreA11y': 'Restore: {title}',
@@ -2708,6 +2823,8 @@ export const en = {
   'mobile.trash.confirm.title': 'Delete “{title}” permanently?',
   'mobile.trash.confirm.body': 'It leaves the trash and cannot be restored.',
   'mobile.trash.confirm.notErasure': 'This is not a physical erase: the operation log still holds this record — the app simply stops offering a restore.',
+  'mobile.trash.confirm.projectTasks': 'It still holds {count} task(s) — those will not be deleted.',
+  'mobile.trash.confirm.habitLogs': 'Its check-in records are kept — restore the habit and the streak continues.',
   'mobile.trash.confirm.submit': 'Delete permanently',
   'mobile.trash.confirm.cancel': 'Cancel',
 
@@ -3271,7 +3388,7 @@ export const en = {
   'site.docs.reminders.s2': 'When it fires — and why sometimes it will not',
   'site.docs.reminders.s2p1': 'Web: **only while the app is open**. The browser raises the notification when the time arrives, provided you granted the permission in the interface first — that grant has to come from a click of yours, which is the browser\'s rule, not ours.',
   'site.docs.reminders.s2p2': '⚠️ Close the page and nothing fires: the trigger times were computed locally in advance, but **nobody is reading them**. That limit is written into the code comments as a known boundary, not a temporary state.',
-  'site.docs.reminders.s2p3': 'Mobile: there is **no system local notification wired up**, so nothing pops outside the app. On a phone, due times and reminders are currently "visible in the interface", not "will sound".',
+  'site.docs.reminders.s2p3': 'Mobile: Android and iOS use their system local notification centers. Delivery still depends on platform permission and OS scheduling; a missing permission or uncertain receipt keeps the reminder due instead of inventing a sent fact.',
   'site.docs.reminders.s2p4': 'Time has bounds: a trigger may sit at most **one year** out; snoozing defaults to **10 minutes** and caps at **7 days**, and past the cap it is **clamped to the cap with the real value shown** instead of letting your click fail. Landing slightly before now is allowed — a one-minute window, because milliseconds pass between computing the moment and writing it down.',
   'site.docs.reminders.s2i1': 'Three conditions to hear anything: the time arrived, the app is open, you already granted permission — miss one and it stays quiet.',
   'site.docs.reminders.s2i2': 'Muting and snoozing are different roads: the first stops that one reminder from popping, the second moves its trigger time wholesale.',
@@ -3288,16 +3405,17 @@ export const en = {
   'site.docs.trash.title': 'Trash, and why "permanent delete" deletes nothing',
   'site.docs.trash.seo.title': 'Trash and permanent delete — why history survives — heyta',
   'site.docs.trash.sum': 'Both actions are in the interface, but the second one removes visibility, not the record — and that is a deliberate sync-protocol decision.',
-  'site.docs.trash.s1': 'The trash holds tasks only',
-  'site.docs.trash.s1p1': 'Lists, tags and notes do not go to the trash today — once deleted they have no restore entry. That is not an oversight: their delete semantics differ from a task\'s.',
-  'site.docs.trash.s1p2': 'The trash is not a separate bin and there is no second table: it is exactly the tasks that are "deleted and not yet permanently deleted", **most recently deleted first**.',
+  'site.docs.trash.s1': 'What the trash holds',
+  'site.docs.trash.s1p1': 'Tasks, notes, lists and habits all land in the trash once deleted — restore and delete-forever both live on that one panel. Tags, reminders and focus sessions deliberately do **not**: a tag is trivial to recreate, deleting a reminder means \'cancel it\', which is not the same decision as \'I don\'t want this thing anymore\', and a focus session is the source of truth for your statistics — letting it be deleted would mean letting your history be rewritten.',
+  'site.docs.trash.s1p3': 'Deleting a list never takes its tasks with it — they simply become \'no list\', and restoring the list brings the assignment back. Deleting a habit never erases its check-ins: restore it and the streak is still there.',
+  'site.docs.trash.s1p2': 'The trash is not a separate bin and there is no second table: it is exactly the records that are "deleted and not yet permanently deleted", **most recently deleted first**.',
   'site.docs.trash.s1i1': 'Web: "Trash" in the left sidebar, always visible.',
   'site.docs.trash.s1i2': 'Mobile: a trash entry inside the Mine screen.',
   'site.docs.trash.s1i3': 'Both actions are on the same board: restore, and delete permanently — the latter asks you to confirm twice.',
-  'site.docs.trash.fig.trash': 'The trash states plainly that it holds tasks only — and, when empty, where the entries will come from',
+  'site.docs.trash.fig.trash': 'The trash names which kinds it holds — and, when empty, where the entries will come from',
   'site.docs.trash.fig.trash.alt': 'Web trash panel with its explanatory line and empty state',
   'site.docs.trash.s2': 'What restore changes',
-  'site.docs.trash.s2p1': 'Restore = clearing the task\'s deletion flag back to empty, written as an ordinary update. It is not "copying something back from a backup": the same task with the same history keeps growing.',
+  'site.docs.trash.s2p1': 'Restore = clearing the deletion flag back to empty, written as an ordinary update. It is not "copying something back from a backup": the same record with the same history keeps growing.',
   'site.docs.trash.s2p2': 'An entry you have already permanently deleted stops appearing in the trash and so cannot be restored — the interface treats the two separately, by design rather than as a missing step.',
   'site.docs.trash.s2p3': 'Even if you bypass the interface and call it directly, restoring a permanently deleted task is **rejected on the spot**. That is a deliberate point of no return, not a step that has not been built yet.',
   'site.docs.trash.s3': 'Why "permanent delete" does not really delete',
@@ -3448,6 +3566,36 @@ export const en = {
   'common.calendar.dayMarker.off': 'Off',
   'common.calendar.dayMarker.work': 'Work',
 
+  // 🔴 This group lives under `common.*`, not `web.*`: **both shells read it**
+  //    (a view tier is added per batch, so the count is deliberately not written
+  //    here — comments that carry a number always drift).
+  //    They used to be `web.calendar.view.*`, and the mobile shell had to read
+  //    the same words once it got the view switcher — a second copy is where
+  //    "one word, two spellings" starts (AGENTS §3.5).
+  'common.calendar.view.aria': 'View',
+  'common.calendar.view.month': 'Month',
+  'common.calendar.view.week': 'Week',
+  'common.calendar.view.day': 'Day',
+  // R13: the year tier. 🔴 It is a calendar tier, unlike "Timeline", which is a
+  //   shell-view jump and never enters `CalendarViewKind`.
+  'common.calendar.view.year': 'Year',
+  // 🔴 这六条也在 `common.*`：它们是**共享板**在周/日两档要的词，
+  //    而共享板两端同一份 ⇒ 移动端补上档位入口后必须给得出同样的词。
+  //    留在 `web.*` 里的下场就是移动端再抄一份（AGENTS §3.5 同形状的第二次）。
+  'common.calendar.prevWeek': 'Previous week',
+  'common.calendar.nextWeek': 'Next week',
+  'common.calendar.prevDay': 'Previous day',
+  'common.calendar.nextDay': 'Next day',
+  // R13: the two year arrows (screen-reader names), same `common.*` reason as above.
+  'common.calendar.prevYear': 'Previous year',
+  'common.calendar.nextYear': 'Next year',
+  'common.calendar.dayAllDay': 'All day',
+  'common.calendar.dayNoTimed': 'Nothing on this day has a specific time — they are all in the "All day" band above.',
+  // 🔴 「全天」那条带**自己**的空态，不能说"这一天没有到期的任务" ——
+  //   当天完全可以在 16:00 挂一条（R14 之后这是常态），那句话就成了谎话，
+  //   而它下面 20 行就是那条任务。两条句子各说各的范围。
+  'common.calendar.dayAllDayEmpty': 'Nothing in "All day" — tasks set to a time sit on the hour axis below.',
+
   // Reminders (B1-1 UI layer; shared by web and mobile).
   // 🔴 `reminder.offset.*` must stay 1:1 and in order with
   //    `REMINDER_OFFSET_PRESETS_MS` — the shared component reads
@@ -3470,6 +3618,7 @@ export const en = {
   'reminder.phase.scheduled': 'Scheduled',
   'reminder.phase.snoozed': 'Snoozed',
   'reminder.phase.due': 'Due now',
+  'reminder.delivery.uncertain': 'Delivery on this device is unconfirmed. Choose Snooze to schedule again.',
   'reminder.phase.fired': 'Sent',
   'reminder.phase.dismissed': 'Dismissed',
   'reminder.hint.noDueDate': 'This task has no due date, so only an absolute time can be set',
@@ -3494,6 +3643,11 @@ export const en = {
   'notes.a11y.pin': 'Pin the note "{excerpt}" to today',
   'notes.a11y.unpin': 'Unpin the note "{excerpt}"',
   'notes.error.empty': 'A note cannot be empty',
+  // Note editor screen (multi-end batch two). The no-change gate lives in app-host updateNoteContent.
+  'notes.edit.title': 'Edit note',
+  'notes.save': 'Save',
+  'notes.cancel': 'Cancel',
+  'notes.edit.notFound': 'This note is gone (it may have been deleted on another device)',
 
   // ── Admin console (ADR-0038) ─────────────────────────────────────────
   'web.admin.title': 'Admin',

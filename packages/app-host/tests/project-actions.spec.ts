@@ -86,7 +86,11 @@ beforeEach(async () => {
   });
   clock = 1_700_000_000_000;
   idSeq = 0;
-  actions = createProjectActions(engine, { newProjectId: makeProjectId, newTagId: makeTagId });
+  // ⚠️ `now` 必须注入：`purgeProject` 写进载荷的 `purgedAt` 取的就是它。
+  // 第一次写 W4 那组判据时这里没传，于是断言"purgedAt === clock"量到的是真实
+  // 墙上时钟（1.79e12 vs 1.70e12）—— 看着像实现错了，其实是夹具没给时钟。
+  // 生产侧不传是对的（默认 `Date.now`），只有判据需要可控时间。
+  actions = createProjectActions(engine, { now, newProjectId: makeProjectId, newTagId: makeTagId });
 });
 
 afterEach(() => {
@@ -310,7 +314,111 @@ describe('🔴 把标签打到任务上（setTags）', () => {
   });
 });
 
+describe('归档的 list 分裂（W9 / P-9 / I5）', () => {
+  /**
+   * 三条清单：A、B、C 的 `createdAt` 依次递增，归档中间那条 B。
+   *
+   * ⚠️ 刻意把归档的那条放在**中间**：'可见的全在前'与'按创建时间排'这两种
+   * 合并写法，只有归档项不在两端时才会露出来。
+   */
+  async function seed(): Promise<{ a: string; b: string; c: string }> {
+    const a = await actions.createProject('A 可见');
+    clock += 1000;
+    const b = await actions.createProject('B 要归档');
+    clock += 1000;
+    const c = await actions.createProject('C 可见');
+    clock += 1000;
+    await actions.archiveProject(b);
+    return { a, b, c };
+  }
+
+  const ids = (list: readonly { id: string }[]): string[] => list.map((x) => x.id);
+
+  it('🔴 归档后：可见那路不含它、归档那路**只**含它（两路都带正向对照）', async () => {
+    const { a, b, c } = await seed();
+
+    expect(ids(actions.listProjects())).toEqual([a, c]);
+    expect(ids(actions.listArchivedProjects())).toEqual([b]);
+
+    // 正向对照：归档那路**只有**这一条、可见那路确实有两条。
+    // 少了这两句，"两个方法都返回空数组"的实现也能让上面两条一起通过。
+    expect(actions.listProjects()).toHaveLength(2);
+    expect(actions.listArchivedProjects()).toHaveLength(1);
+  });
+
+  it('取消归档 = 回到可见那一路，归档那一路不再有它', async () => {
+    const { a, b, c } = await seed();
+    await actions.archiveProject(b, false);
+
+    expect(ids(actions.listProjects())).toEqual([a, b, c]);
+    expect(ids(actions.listArchivedProjects())).toEqual([]);
+    // 正向对照：三条都还在可见那路里（不是列表整个空了）。
+    expect(actions.listProjects()).toHaveLength(3);
+  });
+
+  it('🔴 归档 + 删除：两路**都**不含（墓碑优先，归档不许把已删除的捞回来）', async () => {
+    const { a, b, c } = await seed();
+    await actions.removeProject(b);
+
+    expect(ids(actions.listProjects())).toEqual([a, c]);
+    // 这一条挡的是一种具体的坏法：`listArchivedProjects()` 直接读原始表、
+    // 只判 archived，于是删掉的归档清单会一直挂在"已归档"那一档里 ——
+    // 用户在回收站之外永远碰不到它，而它显示自己还活着。
+    expect(ids(actions.listArchivedProjects())).toEqual([]);
+    expect(ids(actions.listAllProjects())).toEqual([a, c]);
+  });
+
+  it('listAllProjects() = 两路合并、顺序仍是规范序', async () => {
+    const { a, b, c } = await seed();
+
+    // 宿主喂给「显示已归档」开关的就是这一路：只接 `listProjects()` 的话
+    // 归档那条根本没有数据可放出来（单向门），而**症状不是报错**。
+    expect(ids(actions.listAllProjects())).toEqual([a, b, c]);
+    expect(actions.listAllProjects()).toHaveLength(
+      actions.listProjects().length + actions.listArchivedProjects().length,
+    );
+  });
+});
+
+describe('🔴 归档只藏**容器**，不藏里面的任务（W3 / P-9 的边界）', () => {
+  // 这条判据挡的是一种很自然的过度实现：既然"归档 = 收起来"，那不如把它下面的
+  // 任务也一起收起来。那会让归档从**整理**变成**另一种删除** ——
+  // 用户在收集箱/日历/四象限/搜索结果里会突然少掉几条任务，
+  // 而回收站里也没有它们（`deletedAt` 根本没写过），于是没有任何一处能把它们找回来。
+  //
+  // ⚠️ 另一端同样不许"顺手"改数据：归档一条清单不许把任务的 `projectId` 清掉
+  //   （那等于把"它属于哪个清单"这条用户输入擦掉了，取消归档也补不回来）。
+  it('归档后：任务仍在 `listTasks()` 里，且仍指向那条清单', async () => {
+    const projectId = await actions.createProject('收起来的清单');
+    const tasks = createTaskActions(engine, { now });
+    const taskId = await tasks.create('仍然要看得见', { projectId });
+
+    await actions.archiveProject(projectId);
+
+    expect(tasks.listTasks().map((t) => t.id)).toContain(taskId);
+    expect(tasks.findTask(taskId)?.projectId).toBe(projectId);
+    // 正向对照：清单确实被收起来了（不然这条只是在验"什么都没发生"）。
+    expect(actions.listProjects().map((p) => p.id)).not.toContain(projectId);
+    expect(actions.listArchivedProjects().map((p) => p.id)).toEqual([projectId]);
+  });
+
+  it('归档后：完成态/回收站那几路也不受影响（归档与那两态是正交的）', async () => {
+    const projectId = await actions.createProject('收起来的清单');
+    const tasks = createTaskActions(engine, { now });
+    const done = await tasks.create('已完成', { projectId });
+    await tasks.setCompleted(done, true);
+
+    await actions.archiveProject(projectId);
+
+    expect(tasks.listPendingTasks().map((t) => t.id)).not.toContain(done);
+    expect(tasks.listTasks().map((t) => t.id)).toContain(done);
+    // 归档不是删除：回收站里必须没有它，也没有那条清单。
+    expect(tasks.listTrashed()).toEqual([]);
+  });
+});
+
 describe('列表顺序', () => {
+
   it('按 createdAt 升序（而不是存储返回顺序）', async () => {
     const a = await actions.createProject('A');
     clock += 1000;
@@ -435,6 +543,136 @@ describe('🔴 反静默丢弃：另一台设备真的能物化它', () => {
     const onB = createProjectActions(engineB);
     expect(onB.listProjects().map((p) => p.id)).toEqual([projectId]);
     expect(onB.listTags().map((t) => t.id)).toEqual([tagId]);
+
+    adapterB.close();
+  });
+});
+
+// ── 追加到 packages/app-host/tests/project-actions.spec.ts ─────────────
+describe('清单进回收站（W4 / P-1）', () => {
+  const trashedIds = (): string[] => actions.listTrashedProjects().map((p) => p.id);
+
+  it('🔴 删除 → 回收站列出它；还原 → 回到可见那一路（正向对照各一条）', async () => {
+    const doomed = await actions.createProject('要删的');
+    clock += 1000;
+    const alive = await actions.createProject('活着的');
+
+    clock += 1000;
+    await actions.removeProject(doomed);
+
+    expect(trashedIds()).toEqual([doomed]);
+    expect(actions.listProjects().map((p) => p.id)).toEqual([alive]);
+
+    const changed = await actions.restoreProject(doomed);
+    expect(changed).toBe(true);
+    expect(trashedIds()).toEqual([]);
+    expect(actions.listProjects().map((p) => p.id)).toEqual([doomed, alive]);
+  });
+
+  it('🔴 还原写的是一条新的 UPD { deletedAt: null }，不是"把那条 DEL 撤掉"', async () => {
+    // 撤 op 在事件溯源里等于改写历史：另一端已经收到过那条 DEL，
+    // 你撤掉它，它就永远不知道曾经删过 —— 而回放顺序也回不去了。
+    const id = await actions.createProject('删了又还原');
+    await actions.removeProject(id);
+    const before = (await engine.getOpsForEntity('PROJECT', id)).length;
+
+    await actions.restoreProject(id);
+
+    const ops = await engine.getOpsForEntity('PROJECT', id);
+    expect(ops).toHaveLength(before + 1);
+    expect(ops.at(-1)?.opType).toBe(OpType.Update);
+    expect(payloadOf(ops.at(-1)!).deletedAt).toBeNull();
+  });
+
+  it('还原是幂等的：不在回收站里返回 false 且**不写 op**', async () => {
+    const id = await actions.createProject('没删过');
+    const before = await engine.getOpsForEntity('PROJECT', id);
+
+    expect(await actions.restoreProject(id)).toBe(false);
+    expect(await engine.getOpsForEntity('PROJECT', id)).toHaveLength(before.length);
+  });
+
+  it('🔴 归档后被删的清单，还原之后仍然归档（两态正交，不互相覆盖）', async () => {
+    const id = await actions.createProject('收起来又删掉');
+    await actions.archiveProject(id);
+    clock += 1000;
+    await actions.removeProject(id);
+
+    expect(trashedIds()).toEqual([id]);
+    await actions.restoreProject(id);
+
+    // 删它没有顺带改变"它被收起来了"这个事实 —— 于是它回归档那一路，
+    // 而不是侧栏默认可见的那一路。
+    expect(actions.listProjects().map((p) => p.id)).toEqual([]);
+    expect(actions.listArchivedProjects().map((p) => p.id)).toEqual([id]);
+  });
+
+  it('🔴 彻底删除：从回收站消失，但墓碑仍在、里面的任务一条不少', async () => {
+    const projectId = await actions.createProject('要被彻底删除');
+    const tasks = createTaskActions(engine, { now });
+    const taskId = await tasks.create('里面的任务', { projectId });
+
+    await actions.removeProject(projectId);
+    clock += 1000;
+    await actions.purgeProject(projectId);
+
+    expect(trashedIds()).toEqual([]);
+    // ADR-0048 的承重那条：清墓碑会让离线对端把这条**复活**。
+    const raw = engine.getState().projects[projectId];
+    expect(typeof raw?.deletedAt).toBe('number');
+    expect(raw?.purgedAt).toBe(clock);
+    // 删容器不删内容 —— 彻底删除也不许破这条。
+    expect(tasks.findTask(taskId)).toBeDefined();
+    expect(tasks.listTasks().map((t) => t.id)).toEqual([taskId]);
+  });
+
+  it('彻底删除的三条拒绝：不存在的抛错、没删的抛错、已彻底删除的幂等', async () => {
+    await expect(actions.purgeProject('project-不存在')).rejects.toThrow(/找不到/);
+
+    const live = await actions.createProject('还活着');
+    await expect(actions.purgeProject(live)).rejects.toThrow(/不在回收站里/);
+
+    await actions.removeProject(live);
+    await actions.purgeProject(live);
+    const opsAfterFirstPurge = (await engine.getOpsForEntity('PROJECT', live)).length;
+    // 幂等：不可逆动作被点两次不该再多产一条 op。
+    await actions.purgeProject(live);
+    expect(await engine.getOpsForEntity('PROJECT', live)).toHaveLength(opsAfterFirstPurge);
+  });
+
+  it('🔴 已彻底删除的清单不许被还原（抛错，不是返回 false）', async () => {
+    const id = await actions.createProject('删了、又彻底删除');
+    await actions.removeProject(id);
+    await actions.purgeProject(id);
+
+    // 返回 false 的那一句是"没变化"；抛错的那一句是"永远做不成"。
+    // 合成一句，界面就只能把后者咽掉（症状是"点还原没反应"）。
+    await expect(actions.restoreProject(id)).rejects.toThrow(/已被彻底删除/);
+  });
+
+  it('🔴 彻底删除要同步得出去：另一端回放后也不在回收站里', async () => {
+    const adapterB = new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: () => new NodeSqliteDriver(':memory:'),
+    });
+    await adapterB.init();
+    const engineB = new OpLogEngine({
+      store: new DbOpLogStore<Operation<string>>(adapterB),
+      clientId: 'client-trash-other',
+      now,
+    });
+
+    const id = await actions.createProject('两端都要看不见它');
+    await actions.removeProject(id);
+    await actions.purgeProject(id);
+
+    await engineB.applyRemote(await engine.getPendingUpload());
+    const onB = createProjectActions(engineB);
+
+    expect(onB.listTrashedProjects().map((p) => p.id)).toEqual([]);
+    expect(onB.listProjects().map((p) => p.id)).toEqual([]);
+    // 而 B 端也不是"什么都没收到"：墓碑与 purgedAt 都在它的物化状态里。
+    expect(typeof engineB.getState().projects[id]?.purgedAt).toBe('number');
 
     adapterB.close();
   });

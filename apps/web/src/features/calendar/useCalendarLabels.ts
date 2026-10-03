@@ -15,9 +15,12 @@
 import { isoWeek, type LocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
+  calendarHourMark,
   formatDayTitleText,
+  formatMonthShortText,
   formatMonthTitleText,
   formatWeekRangeText,
+  formatYearTitleText,
   WEEKDAY_MESSAGE_KEYS,
   type CalendarBoardLabels,
 } from '@heyta/ui';
@@ -52,8 +55,27 @@ export function useCalendarLabels(): CalendarBoardLabels {
       // 周视图（批三）：标题与两个箭头的读屏名。措辞在共享的 `formatWeekRangeText`
       // 里，移动端以后接同一档时不必再写一份"周一到周日怎么念"。
       weekTitle: (d: LocalDate) => formatWeekRangeText(d, t),
-      prevWeek: t('web.calendar.prevWeek'),
-      nextWeek: t('web.calendar.nextWeek'),
+      prevWeek: t('common.calendar.prevWeek'),
+      nextWeek: t('common.calendar.nextWeek'),
+      // 日档（批四）：箭头读屏名 + 顶部那条带的名字。
+      prevDay: t('common.calendar.prevDay'),
+      nextDay: t('common.calendar.nextDay'),
+      // 年档（R13）：标题、两个箭头、月卡顶上的短月份名。
+      // 🔴 `yearMonthTitle` 复用仓里**唯一一份**月份名（`web.board.month.*`，
+      //    时间线两端都读它），不给它开第三套抄件（AGENTS §3.5）。
+      yearTitle: (d: LocalDate) => formatYearTitleText(d, t),
+      yearMonthTitle: (d: LocalDate) => formatMonthShortText(d, t),
+      prevYear: t('common.calendar.prevYear'),
+      nextYear: t('common.calendar.nextYear'),
+      dayAllDay: t('common.calendar.dayAllDay'),
+      // 🔴 轴整列空着时必须说一句 —— 否则"这天没定到时刻"与"这档没接上数据"同形。
+      dayNoTimed: t('common.calendar.dayNoTimed'),
+      // 🔴 「全天」带自己的空态不能说"这一天没有到期的任务"：定在 16:00 的任务
+      //    就在下面那条轴上，同屏两句互相打脸（R14 之后这是常态）。
+      dayAllDayEmpty: t('common.calendar.dayAllDayEmpty'),
+      // ⚠️ 时刻刻度**不新写一份 `HH:mm`**：走共享的 `calendarHourMark`（它复用时间线
+      //    那一份 `formatClock`）。两根轴各拼一次的漂移形状是同一屏两种时刻写法。
+      hourLabel: (hour: number) => calendarHourMark(hour),
       backToToday: t('web.calendar.backToToday'),
       // 🔴 周次列（滴答式"31周"）：ISO 周数由领域 `isoWeek` 算，这里只措辞。
       weekNumber: (d: LocalDate) => t('web.calendar.weekShort', { n: isoWeek(d) }),

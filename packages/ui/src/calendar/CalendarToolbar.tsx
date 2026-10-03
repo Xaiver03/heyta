@@ -13,7 +13,7 @@
  *   两端 testID 因此**完全一致**（`calendar-toolbar-*`）——
  *   如果摆位一变就换一套 ID，判据就得跟着摆位分叉，那是漂移的开始。
  *
- * ⚠️ 视图档位（月 / 周）走 `trailing` 插槽，**不在共享层里画**：
+ * ⚠️ 视图档位（月 / 周 / 日）走 `trailing` 插槽，**不在共享层里画**：
  *   Web 用原生 `<select>`（与页头那个任务排序下拉同一模式，理由抄在那儿 ——
  *   暗色下不必自绘弹层），而 RN 侧没有 `<select>`。
  *   把控件本体放进共享层就等于替两端决定"这一格长什么样"，
@@ -73,19 +73,66 @@ export function CalendarToolbar({
   /**
    * 走一步。
    *
-   * 🔴 周视图用 `addDays(±7)` 而不是 `addWeeks`：**同一个游标语义**要求它落在
-   *   与当前游标同星期几的那一天上，而 `startOfWeek` 那一套已经在 `weekGrid` 里了。
-   *   游标始终是"正在显示的这一周（这个月）里的任意一天"，两端一致。
+   * 🔴 走多远**不在这里判**（`stepCalendarCursor` 是唯一一份）：工具栏、Web 的滚轮、
+   *   日档的横向拖拽三个入口各算一遍"下一段"，结局就是"点箭头翻一周、滚轮翻一月"。
+   *   游标的约定始终是"正在显示的这一段里的任意一天"，三端一致。
    */
   const step = (dir: number): void => {
     onCursorChange(stepCalendarCursor(view, cursor, dir));
   };
 
-  // 周视图没给 `weekTitle` 时**退回月份**，而不是渲染 `undefined`（那会画出一个空标题）。
-  // 这条退回是"看着像坏了"，所以由判据兜住 —— 见 `model.ts` 里那段。
-  const title = view === 'week' ? (labels.weekTitle?.(cursor) ?? labels.monthTitle(cursor)) : labels.monthTitle(cursor);
-  const prevLabel = view === 'week' ? (labels.prevWeek ?? labels.prevMonth) : labels.prevMonth;
-  const nextLabel = view === 'week' ? (labels.nextWeek ?? labels.nextMonth) : labels.nextMonth;
+  /**
+   * 这一档**说什么**：月档说月份、周档说周区间、日档说那一天。
+   *
+   * 🔴 一处 `switch` 而不是三行嵌套三元：加一档时这里必须多一个 `case`，
+   *   而"切过去了但标题没换"是本仓登记过的形状（周档第一版漏接 `weekTitle`
+   *   会静默退回月份，类型上完全合法 —— 见 §9.9 那条判据）。
+   * ⚠️ 周档没给 `weekTitle` 时**退回月份**，而不是渲染 `undefined`（那会画出空标题）。
+   */
+  const copyFor = (kind: CalendarViewKind): {
+    title: string;
+    prev: string;
+    next: string;
+  } => {
+    switch (kind) {
+      case 'week':
+        return {
+          title: labels.weekTitle?.(cursor) ?? labels.monthTitle(cursor),
+          prev: labels.prevWeek ?? labels.prevMonth,
+          next: labels.nextWeek ?? labels.nextMonth,
+        };
+      case 'day':
+        // 日档的游标**就是**那一天（宿主的 `cursorFor` 负责保证这点），
+        // 所以标题直接复用已有的 `dayTitle`，不需要新的措辞。
+        return {
+          title: labels.dayTitle(cursor),
+          prev: labels.prevDay ?? labels.prevMonth,
+          next: labels.nextDay ?? labels.nextMonth,
+        };
+      case 'year':
+        /*
+         * 年档说的是**一年**，不是这一年里的某一个月。
+         *
+         * 🔴 缺 `yearTitle` 时退回 `monthTitle` 是**故意难看**的：这一档摊开 12 张月卡，
+         *   标题却指着一个月，用户会去找"那一月在哪儿"。类型上这条是合法的
+         *   （新标签一律可选，§9.1），所以它由判据兜 —— `e2e/tests/calendar-year.spec.ts`
+         *   断言年档标题里出现的是年份、不是月份名，漏传会响亮地红。
+         *   与周档那条 `weekTitle` 判据同一档位。
+         */
+        return {
+          title: labels.yearTitle?.(cursor) ?? labels.monthTitle(cursor),
+          prev: labels.prevYear ?? labels.prevMonth,
+          next: labels.nextYear ?? labels.nextMonth,
+        };
+      default:
+        return {
+          title: labels.monthTitle(cursor),
+          prev: labels.prevMonth,
+          next: labels.nextMonth,
+        };
+    }
+  };
+  const { title, prev: prevLabel, next: nextLabel } = copyFor(view);
 
   return (
     <View style={styles.root}>

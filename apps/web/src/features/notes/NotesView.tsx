@@ -26,13 +26,23 @@
  * 在这里再写一句"还没有便签"会让同一个空态长出第二份实现
  * （`check:empty-state` 的断言抓的就是视图里手写的空态标记）。
  *
- * ⚠️ **刻意不传 `onEdit`**：web 目前没有便签编辑入口（那需要另一个界面）。
- * 不传的语义是"不渲染编辑入口"，而不是"渲染一个按下去没反应的按钮"。
+ * ⚠️ ~~**刻意不传 `onEdit`**~~ **（2026-10-03 多端第二批已补上，留原文是为了让
+ * 后来者认出这个形状）**：共享编辑器 {@link NoteEditor} 已经在
+ * `@heyta/ui`（与移动端**同一份实现**），本视图现在传 `onEdit`，
+ * 摘要那段因此变成可点的入口，点它在列表上方展开编辑面板。
+ * 当年那句"不传的语义是不渲染编辑入口，而不是渲染一个按下去没反应的按钮"
+ * 仍然是这里的判据 —— 面板与入口要么一起有，要么一个都不留。
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useI18n, type I18nValue } from '@heyta/i18n';
-import { HeytaUiProvider, NotesBoard, type NotesBoardLabels } from '@heyta/ui';
+import {
+  HeytaUiProvider,
+  NoteEditor,
+  NotesBoard,
+  type NoteEditorLabels,
+  type NotesBoardLabels,
+} from '@heyta/ui';
 
 import { useNoteStore } from './store.js';
 
@@ -55,17 +65,62 @@ export function notesBoardLabels(t: I18nValue['t']): NotesBoardLabels {
   };
 }
 
+/** 构造共享 `NoteEditor` 的全部文案。与上面同一纪律：字段对不上编译不过。 */
+export function noteEditorLabels(t: I18nValue['t']): NoteEditorLabels {
+  return {
+    // 占位符**复用 composer 那一句**：两处问的是同一件事（"写点什么"），
+    // 各起一条词条迟早会漂成两种说法。
+    placeholder: t('notes.composer.placeholder'),
+    save: t('notes.save'),
+    cancel: t('notes.cancel'),
+  };
+}
+
 export function NotesView(): React.JSX.Element {
   const { t } = useI18n();
   const notes = useNoteStore((s) => s.notes);
   const addNote = useNoteStore((s) => s.addNote);
+  const updateNote = useNoteStore((s) => s.updateNote);
   const removeNote = useNoteStore((s) => s.removeNote);
   const togglePinned = useNoteStore((s) => s.togglePinned);
+  const editError = useNoteStore((s) => s.editError);
+
+  /**
+   * 正在编辑的那条便签 id，`null` = 面板没开。
+   *
+   * 🔴 用 **id** 而不是 `Note` 对象：`refresh()` 之后对象会换新引用，
+   * 存对象会让面板在每次同步后拿到一份过期快照（与移动端同一个取舍）。
+   */
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const labels = useMemo(() => notesBoardLabels(t), [t]);
+  const editorLabels = useMemo(() => noteEditorLabels(t), [t]);
+  const editing = editingId === null ? undefined : notes.find((note) => note.id === editingId);
+  // 便签在别处被删掉了（另一台设备同步过来的墓碑）→ 面板自然消失，
+  // 而不是留着一个指向不存在的 id 的输入框。
+  const activeEditing = editing !== undefined ? editing : null;
 
   return (
     <HeytaUiProvider>
+      {activeEditing === null ? null : (
+        <NoteEditor
+          key={activeEditing.id}
+          initialContent={activeEditing.content}
+          labels={editorLabels}
+          error={editError ?? null}
+          onSave={(content) => {
+            void updateNote(activeEditing.id, content).then((ok) => {
+              // 只有真落成了才收面板：失败时错误要留在屏幕上，
+              // 否则用户看到的是"点了保存，面板自己关了，什么也没改"。
+              if (ok) setEditingId(null);
+            });
+          }}
+          onCancel={() => {
+            setEditingId(null);
+          }}
+          testID="notes-editor"
+        />
+      )}
       <NotesBoard
         notes={notes}
         onAdd={(content) => {
@@ -76,6 +131,9 @@ export function NotesView(): React.JSX.Element {
         }}
         onTogglePinned={(entityId, pinned) => {
           void togglePinned(entityId, pinned);
+        }}
+        onEdit={(entityId) => {
+          setEditingId(entityId);
         }}
         labels={labels}
         testID="notes-board"

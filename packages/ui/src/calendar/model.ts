@@ -31,11 +31,15 @@ import {
   addDays,
   addMonths,
   DAYS_PER_WEEK,
+  MONTHS_PER_YEAR,
+  startOfMonth,
   toLocalDate,
   type LocalDate,
   type Task,
 } from '@heyta/domain';
 
+import { isAllDayMs } from '../timeline/board-model.js';
+import { formatClock, MINUTES_PER_HOUR } from '../timeline/model.js';
 import type { TaskListLabels } from '../task-list/TaskList.js';
 
 /**
@@ -62,7 +66,7 @@ export const MAX_CALENDAR_BARS = 3;
  *   周档那一格在 720 上约 `H` px 高、一条 ≈ 22px ⇒ 能完整画出 ⌊H/22⌋ 条。
  *   取 **6**：再多就已经超出"当天清单"自己那一屏的容量 ——
  *   周视图的作用是"一眼看完这一周"，不是"把清单搬进格子"。
- *   ⚠️ 判据一律**从这个常量推导**（`apps/web/tests/calendar-week-view.spec.tsx`
+ *   ⚠️ 判据一律**从这个常量推导**（`apps/web/tests/calendar-view.spec.tsx`
  *      与 `e2e/tests/calendar-week.spec.ts`），不许在测试里再抄一个 6。
  */
 export const MAX_WEEK_CALENDAR_BARS = 6;
@@ -143,25 +147,244 @@ export function calendarDayTone(
  *
  * 🔴 类型定义在共享层：板子、工具栏、两个宿主的 store 都要用它，
  *   而"这一档到底存不存在"是**产品语义**，不是某个壳的偏好（AGENTS §3.5）。
+ *
+ * ⚠️ 「时间线」**不在这里**，而且永远不会：它不是日历的一档，是外壳的另一个视图，
+ *   下拉里那一项点了是**跳转**（不写日历 store）。把它混进这个联合类型，
+ *   就等于宣布"切到时间线也算一次档位切换"，而游标、选中、`stepCalendarCursor`
+ *   全都要跟着替一个不存在的时间线编一套语义。判据在
+ *   `apps/web/tests/calendar-view-family.spec.tsx`。
  */
-export type CalendarViewKind = 'month' | 'week';
+export type CalendarViewKind = 'month' | 'week' | 'day' | 'year';
 
 /**
- * 游标走 **N 段**：月档一段 = 一个月，周档一段 = 一整周（7 天）。
+ * 每一档**叫什么**（i18n 键名）。R17 收成这一份。
+ *
+ * 🔴 为什么原来要两份：web 的下拉写了一张 `{kind, key}[]`，移动端的切换器写了
+ * 一张 `CalendarViewKind[]` 加一张「档位 → 键」的表 —— 三处共同回答同一个问题，
+ * 而 R13 加年档时**三处都靠人记着改**。同形状的第三次就是 AGENTS §3.5 说的
+ * "抽取的收尾动作是删掉旧的那份并加门禁"，这里补上那一步。
+ *
+ * 🔴 `Record<CalendarViewKind, …>` 不是随手选的类型，它就是守卫本身：
+ * 往上面那个联合类型添一档而这里少一条 ⇒ **编译不过**（原先那条"兜底念成「日」"
+ * 的三层三元表达式，移动端作者换成按键取值就是为了拿到这颗牙 —— 现在两端都拿到）。
+ *
+ * ⚠️ 这里存的是**关名，不是文案值**：共享层不许 `import '@heyta/i18n'`
+ *   （会把第二份 React 拖进来），所以两个宿主仍然各自 `t()`，值只有一本表。
+ */
+export type CalendarViewLabelKey =
+  | 'common.calendar.view.month'
+  | 'common.calendar.view.week'
+  | 'common.calendar.view.day'
+  | 'common.calendar.view.year';
+
+export const CALENDAR_VIEW_LABEL_KEYS: Record<CalendarViewKind, CalendarViewLabelKey> = {
+  month: 'common.calendar.view.month',
+  week: 'common.calendar.view.week',
+  day: 'common.calendar.view.day',
+  year: 'common.calendar.view.year',
+};
+
+/**
+ * 下拉与切换器里的**顺序**：`month → week → day → year`，**年排在最后**。
+ * 插在中间会读成"半年"（两端在 R13 之前各自表述过这条，理由只有一个）。
+ *
+ * 顺序与"有哪些档"是两件事，所以分成两个常量，但它们的**集合必须相同** ——
+ * 那条一致判据在 `packages/ui/tests/calendar-view-step.spec.ts`，它从这两份共享事实
+ * 自己推导，不在测试里再抄一份四档字面量（那会是第四份抄件）。
+ */
+export const CALENDAR_VIEW_ORDER: readonly CalendarViewKind[] = ['month', 'week', 'day', 'year'];
+
+/**
+ * 游标走 **N 段**：月档一段 = 一个月，周档一段 = 一整周（7 天），
+ * 日档一段 = 一天，年档一段 = **一整年（12 个月）**。
  *
  * 🔴 为什么单独成一个函数，而不是"工具栏里写一遍、滚轮里再写一遍"：
  *   这两处都在回答同一个问题 ——「`>` 或滚一格之后，我在看哪一段」。
  *   两份实现的漂移形状是"点箭头翻一周、滚轮翻一月"，而两边各自都"看着对"。
  *   （`addMonths` / `addDays` 本身仍在 `@heyta/domain` —— 这里只决定"一段多长"。）
+ *
+ * ⚠️ 日档那一支同时是**横向拖拽**的落点：手势只算"往哪边、几格"，
+ *   走多远仍然由这里决定（见 §9.12 —— 拖拽与滚轮/箭头必须共用这一份）。
+ *
+ * 🔴 年档那一支**必须是显式 `case`**。这里的 `default` 是"月"，所以漏写年档不会报错、
+ *   不会编译不过，只会**安静地按月走**：用户在年视图里点 `›`，画面上的 12 个月
+ *   一张都没换（因为它们还是同一年），而标题也没变 —— 症状是"这一档坏了、点了没反应"。
+ *   这正是 `CalendarToolbar.tsx` 那段注释警告的形状，也是本批变异臂要抓的那一支。
  */
 export function stepCalendarCursor(
   view: CalendarViewKind,
   cursor: LocalDate,
   segments: number,
 ): LocalDate {
-  return view === 'week'
-    ? addDays(cursor, segments * DAYS_PER_WEEK)
-    : addMonths(cursor, segments);
+  switch (view) {
+    case 'week':
+      return addDays(cursor, segments * DAYS_PER_WEEK);
+    case 'day':
+      return addDays(cursor, segments);
+    case 'year':
+      return addMonths(cursor, segments * MONTHS_PER_YEAR);
+    default:
+      return addMonths(cursor, segments);
+  }
+}
+
+/**
+ * 「要让 `date` 这一天天可见，游标该放哪」—— **两端只此一份**。
+ *
+ * 🔴 它原来住在 `apps/web` 的日历 store 里（那里的注释写着"只此一处"，
+ *   意思是"web 的三个动作共用一处"）。移动端补上档位入口之后，它变成了
+ *   **两个宿主都要做的同一件事** —— 那就是 AGENTS §3.5 说的"同形状的第二次"，
+ *   而它的必然下场是：一边把游标归到月首、另一边不归，
+ *   于是同一个日子在两端显示成不同的月份/不同的选中框。
+ *
+ * 周档、日档与**年档**返回 `date` 本身：游标的约定是"这一段里的任意一天"，
+ * `weekGrid` 会自己回到周一、`yearGrid`（即 `monthsOfYear`）会自己回到 1 月，
+ * 而日档那一段只有一天。
+ * ⚠️ 月档是这一规则的**唯一例外**（归到月首），因为它的游标在界面上被读成"哪个月"，
+ *   不归一的话"选了 10 月 30 日"会让月份翻到 11 月（月格里 30 日是补白格，
+ *   属于下个月的视线范围）。
+ */
+export function calendarCursorFor(view: CalendarViewKind, date: LocalDate): LocalDate {
+  return view === 'month' ? startOfMonth(date) : date;
+}
+
+/**
+ * 游标走到 `cursorDate` 之后，**选中的那天**该是什么。
+ *
+ * 🔴 日档里两者必须一起走。这一档界面上有**三个**消费者：小时轴读游标，
+ *   侧栏迷你月历的高亮与「说一句话落进选中那格」的 `anchorDate` 读选中。
+ *   只动游标的症状不是崩溃，是**安静地各指一天**（轴翻到 10-05、侧栏还圈着 10-03），
+ *   而没有任何一层会报错 —— 判据见 §9.12 与变异臂 Z。
+ *   月/周/年档没有这个问题：那里"显示的段"和"选中的一天"本来就是两件事，
+ *   所以**不许**跟着动（跟着动会让用户点一次箭头就换掉他要写任务的那一天）。
+ */
+export function calendarSelectedForCursor(
+  view: CalendarViewKind,
+  cursorDate: LocalDate,
+  selected: LocalDate,
+): LocalDate {
+  return view === 'day' ? cursorDate : selected;
+}
+
+/**
+ * 年视图一行摆几张月卡 —— **只取能整除 12 的那些**。
+ *
+ * 🔴 为什么"整除"是硬规矩而不是好看：12 张卡摆 5 列会剩两张孤零零挂在最后一行，
+ *   而那块空白在界面上读起来像"这一年只有 12 个月里的 10 个月有东西、剩下两格坏了"。
+ *   这不是审美：日历上任何一处"看着像缺了什么"都会被当成数据没了 ——
+ *   本仓为这一类症状记过一整页（`labels.footnote` 存在的理由就是它）。
+ *   所以候选只有 1 / 2 / 3 / 4 / 6 / 12（12 的约数），取**装得下的那个里最大的**。
+ *
+ * ⚠️ 入参 `fits` 是宿主量出来的"这一宽能塞几张"（见 `CalendarYearBoard` 文件头：
+ *   视口是壳才有的概念，共享层不猜，与 `QuadrantBoard` 的 `twoColumns` 同一条纪律）。
+ *   给它 `0` 或负数会得到 1 —— 那对应"窄到一张都放不下"，此时也要有一张能看，
+ *   而不能渲染出一个空的年（空的年视图与"这一档没接上"在界面上又是同一副长相）。
+ */
+export function calendarYearColumns(fits: number): number {
+  let columns = Math.floor(fits);
+  if (!Number.isFinite(columns) || columns < 1) return 1;
+  if (columns > MONTHS_PER_YEAR) columns = MONTHS_PER_YEAR;
+  while (columns > 1 && MONTHS_PER_YEAR % columns !== 0) columns -= 1;
+  return columns;
+}
+
+/**
+ * 点年档里的一张月卡之后，界面状态该长成什么样。
+ *
+ * 🔴 它是**产品语义**，所以在这里，不在某个壳的 store 里（AGENTS §3.5）：
+ *   两个宿主都要回答"点月卡去哪"，各写一遍的下场是一边切到月档、另一边只挪游标，
+ *   而两边看着都像是"年档的钻取"。这里给的形状是**只返回要改的那几项** ——
+ *   `selected` 刻意不在返回值里，所以"选中那天不动"这条在**类型上**成立，
+ *   不靠调用方记得别写它。
+ *
+ * ⚠️ 游标走 `calendarCursorFor('month', ...)`（同一条归一化规则），不在这里
+ *   `startOfMonth` 一遍：两条规则各指一次月首，将来一边改成"周首"就是漂移。
+ */
+export function calendarMonthDrill(monthFirstDay: LocalDate): {
+  readonly view: 'month';
+  readonly cursor: LocalDate;
+} {
+  return { view: 'month', cursor: calendarCursorFor('month', monthFirstDay) };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 日视图（R11 批四）：一天怎么摊开
+// ─────────────────────────────────────────────────────────────────────────
+
+/** 小时轴的行数。**24 是"一天"的定义**，不是可调的显示参数。 */
+export const HOURS_IN_DAY = 24;
+
+/**
+ * 日视图的分桶结果：**顶部那条"全天" + 24 个小时格**。
+ *
+ * 🔴 这个形状是产品负责人 2026-10-03 用一张滴答日视图截图拍的板，
+ *   它同时回答了我先前登记的那个二选一（"小时网格在当前模型下是空的"
+ *   vs "把当天清单放大"）：**两样都要** —— 没有时刻的落在顶部那条带里，
+ *   有时刻的才挂到小时格上。所以"轴上大多是空的"**不是缺陷**，
+ *   是这一档与竞品共同的形状（那张参考图里也是五条全在顶部带、轴上只有今天线）。
+ */
+export interface CalendarDayBuckets {
+  /** 当天**没有时刻**（本地 0 点整）或没有截止但属于这一天的任务，按原顺序。 */
+  readonly allDay: readonly Task[];
+  /** 长度恒为 `HOURS_IN_DAY`；第 h 项 = 落在 h 点的那些任务（可能为空数组）。 */
+  readonly hours: readonly (readonly Task[])[];
+  /**
+   * 轴上挂到了东西的小时数。
+   *
+   * 🔴 它存在的原因是**界面上要说这句话**：整轴空白时，用户需要知道
+   *   "这一天没有定时任务"与"这一档没接上"是两件事（后者本仓登记过一整页）。
+   */
+  readonly timedCount: number;
+}
+
+/**
+ * 把一组任务分到"全天带 / 某个小时格"。
+ *
+ * 🔴 **"有没有时刻"复用时间线那一份判定 `isAllDayMs`，不在这里另写一遍**
+ *   （`packages/ui/src/timeline/board-model.ts`）—— 两个 seam 各自判"0 点整"
+ *   的漂移形状是"时间线画在正午、日视图画在 00:00 那一行"，
+ *   而两边看起来都"合理"。
+ *
+ * ⚠️ 只取 `dueDate`：`startDate` 是**时间线排期**的语义（ADR-0043），
+ *   与"什么时候到期"互不推导，塞进同一根轴等于替用户发明关系。
+ */
+export function calendarDayBuckets(
+  tasks: readonly Task[],
+  day: LocalDate,
+): CalendarDayBuckets {
+  const allDay: Task[] = [];
+  const hours: Task[][] = Array.from({ length: HOURS_IN_DAY }, () => []);
+  let timedCount = 0;
+  for (const task of tasks) {
+    if (task.dueDate === undefined || toLocalDate(task.dueDate) !== day) continue;
+    if (isAllDayMs(task.dueDate)) {
+      allDay.push(task);
+      continue;
+    }
+    const hour = new Date(task.dueDate).getHours();
+    const bucket = hours[hour];
+    if (bucket === undefined) continue; // `noUncheckedIndexedAccess`：越界即跳过
+    if (bucket.length === 0) timedCount += 1;
+    bucket.push(task);
+  }
+  return { allDay, hours, timedCount };
+}
+
+/**
+ * 日档小时轴那一行的刻度（`9:00`）。
+ *
+ * 🔴 **复用时间线那一份 `formatClock`**，不在日历里再拼一次 `HH:mm`：
+ *   两根轴在同一个产品里说的是同一件事（几点），各拼一遍的漂移形状是
+ *   "日视图写 `09:00`、甘特那条写 `9:00`" —— 同一屏两种时刻写法，而两边都不报错。
+ *   ⚠️ 于是小时**不补零** —— 这是**跟着已有那根轴**的代价，不是这里的选择；
+ *      "0 点那一行的字比 23 点短"由**列宽**吸收（见 `CalendarDayBoard` 的 `hourLabel`），
+ *      而不是在这里给数字补一个 0。
+ *
+ * ⚠️ 宿主想要 12 小时制（`9 AM`）就在自己的 `labels.hourLabel` 里给一条别的 ——
+ *   那条留在契约里就是为了这个，本层不替英文/中文拍"该用几小时制"。
+ */
+export function calendarHourMark(hour: number): string {
+  return formatClock(hour * MINUTES_PER_HOUR);
 }
 
 export interface CalendarBoardLabels {
@@ -205,6 +428,66 @@ export interface CalendarBoardLabels {
   readonly weekTitle?: (date: LocalDate) => string;
   readonly prevWeek?: string;
   readonly nextWeek?: string;
+  /**
+   * 日档的读屏箭头名（**标题不需要新的** —— 复用已有的 `dayTitle`，
+   * 它就是「10月3日 星期六」这一句，而日档说的正是这一天）。
+   *
+   * ⚠️ 可选的理由与 `prevWeek` 同一条：新标签一律可选，否则两端同时红（§9.1）。
+   */
+  readonly prevDay?: string;
+  readonly nextDay?: string;
+  /**
+   * 年档的标题（「2026年」）。**可选**，理由与 `weekTitle` 同一条（新标签一律可选，§9.1）。
+   *
+   * 🔴 但它**不能被 `monthTitle` 顶掉** —— 年档摊开的是整年 12 个月，标题却写
+   *   「2026年10月」会把人指回某一个格子，而那一格子在 12 张卡里并不更显眼。
+   *   所以缺省时的降级是**故意难看**的（月份照旧），配合判据"年档标题里出现的是年、
+   *   不是某一个月"，让漏传在测试里响亮地红，而不是在界面上安静地误导。
+   */
+  readonly yearTitle?: (date: LocalDate) => string;
+  readonly prevYear?: string;
+  readonly nextYear?: string;
+  /**
+   * 年档里那张月卡顶上的**短月份名**（「10月」/ `Oct`）。
+   *
+   * 🔴 刻意是**函数**而不是 12 个字符串的数组：数组会变成"词条表的一份抄件"，
+   *   而月份名这个数据在仓里**已经有一份**（时间线那套 `labels.monthNames`，
+   *   两个宿主都从同一批词条 key 建）。宿主把它按 `LocalDate` 现取现说，
+   *   这一层就只多了一个"怎么问"的形状，没有多第二份"是什么"。
+   *
+   * ⚠️ 不给时降级成 `monthTitle`（「2026年10月」）—— 长，但读得出，且不编造。
+   */
+  readonly yearMonthTitle?: (date: LocalDate) => string;
+  /**
+   * 日档顶部那条带的名字（「全天」）。**可选**：不给就不画那一句标签，
+   * 带本身照旧 —— 与 `weekNumber` 同一纪律（新标签一律可选，§9.1）。
+   */
+  readonly dayAllDay?: string;
+  /**
+   * 「全天」那条带**自己**的空态。
+   *
+   * 🔴 不能复用 `dayEmpty`（"这一天没有到期的任务"）：R14 之后一条任务可以
+   *   定在 16:00 —— 那时带是空的而**这一天不空**，同屏就会出现
+   *   "上面说没有到期的任务、下面 20 行挂着一条到期的任务"。
+   *   与 `dayNoTimed` 是同一条立场的两半：每块区域只说自己那一份。
+   * 可选（§9.1：新标签一律可选，带本身照旧），不给时退回 `dayEmpty`。
+   */
+  readonly dayAllDayEmpty?: string;
+  /**
+   * 小时轴整列空白时界面上要说的那一句。
+   *
+   * 🔴 这条不是装饰：**"这一天没定到具体时刻"与"这一档没接上数据"在界面上长得一样**，
+   *   而后者本仓为它记过一整页账。见 `CalendarDayBoard` 文件头。
+   */
+  readonly dayNoTimed?: string;
+  /**
+   * 小时轴那一行的时刻名（「09:00」）。
+   *
+   * ⚠️ 刻意是**函数**而不是 `HH:mm` 的字面量拼接：阿拉伯数字与冒号在所有语言里
+   *   同形，但**前导零与上下午**不是（`9 AM` / `09:00`），而这里恰好是个语言问题。
+   *   不给时那一格留空 —— 轴仍然可读，因为任务条自带时刻文案。
+   */
+  readonly hourLabel?: (hour: number) => string;
   readonly backToToday: string;
   /**
    * 周次列的文案（滴答式："31周" / "W31"）。**可选** ——
@@ -234,7 +517,19 @@ export interface CalendarBoardLabels {
  */
 export type CalendarToolbarLabels = Pick<
   CalendarBoardLabels,
-  'monthTitle' | 'prevMonth' | 'nextMonth' | 'backToToday' | 'weekTitle' | 'prevWeek' | 'nextWeek'
+  | 'monthTitle'
+  | 'prevMonth'
+  | 'nextMonth'
+  | 'backToToday'
+  | 'weekTitle'
+  | 'prevWeek'
+  | 'nextWeek'
+  | 'dayTitle'
+  | 'prevDay'
+  | 'nextDay'
+  | 'yearTitle'
+  | 'prevYear'
+  | 'nextYear'
 >;
 
 /**
