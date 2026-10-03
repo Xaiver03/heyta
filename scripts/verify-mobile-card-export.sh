@@ -180,7 +180,14 @@ handle_privacy_consent
 dismiss_welcome_if_present
 dump; require_screen
 TAB_LABEL=$(zh mobile.tab.profile)
-TAB_XY=$(scroll_to_text "$TAB_LABEL")
+TAB_XY=$(xy_desc "$TAB_LABEL")
+# 🔴 底栏目标**只能走 `xy_desc`，不能走 `scroll_to_text` / `scroll_to_desc`** ——
+#    那两个的 `*-sane` 模式带一条 `cy < 2100` 守卫（防"ScrollView 折叠线以下的节点照样在树里、
+#    按它的'中心点'下去会跳到别的标签页"，理由写在 lib :1259 那段）。而**底栏自己的中心就在 2100 以下**：
+#    「我的」那颗可点的 View 是 `bounds=[864,2169][1080,2337]` ⇒ 中心 2253 ⇒ 被守卫滤掉 ⇒ 恒空。
+#    04 07:3x 在同一台设备上量过三种取法：`xy_desc` = **972 2253**、`scroll_to_desc` = **空**、
+#    `scroll_to_text` = **空**（屏上明明有「我的」—— 于是"找不到"是探针，不是产品）。
+#    这里不写死 `945 2253` 那种字面坐标（§7：坐标每次现取，兄弟脚本里那种硬码是旧账）。
 if [ -z "$TAB_XY" ]; then
   echo "   ❌ 底部找不到「${TAB_LABEL}」这一格 —— 先排除探针（词条来自真源）"; screen_txt; exit 3
 fi
