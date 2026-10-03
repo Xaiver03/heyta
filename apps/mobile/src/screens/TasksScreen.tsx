@@ -49,6 +49,7 @@ import { useI18n } from '@heyta/i18n';
 // 在这一刀之前移动端只有一个纯标题输入框 —— 同一句话在两端建出不同的任务。
 import { CaptureComposer, type CaptureSubmitPlan } from '@heyta/ui';
 import { useCaptureLabels } from '../lib/capture-labels';
+import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import {
   createProjectActions,
   createTaskActions,
@@ -403,9 +404,18 @@ export function TasksScreen({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
-  /** 打开详情的任务 id。用 id 而不是 Task 对象：列表刷新后对象会换新引用，
-      存对象会让面板在每次同步后拿到过期快照。 */
-  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  /**
+   * 打开详情的任务 id —— 读**全壳那一份**选中态（`lib/selection.ts` →
+   * `@heyta/app-host` 的 `selection.ts`），不再是本屏的 `useState`。
+   *
+   * 用 id 而不是 Task 对象：列表刷新后对象会换新引用，
+   * 存对象会让面板在每次同步后拿到过期快照。
+   *
+   * 🔴 收成一份之后才成立的行为：**选中跨视图保持**（列表 / 搜索 / 日历 /
+   * 四象限 / 时间线 / 回收站是同一批任务，"当前选中哪一条"不该各屏各记一遍）。
+   * 而实体被删时选中会**自己回落**（回落规则在共享层，见 `pruneSelectionAgainst`）。
+   */
+  const detailTaskId = useSelected('task');
   /**
    * 全局搜索浮层。
    *
@@ -530,12 +540,42 @@ export function TasksScreen({
     // ⚠️ `listTasks()` 是**同步**的（读的是已物化的内存状态），不是 Promise。
     // 我一度写成 `.then(...)` —— 运行时那里直接抛 "then is not a function"，
     // 而界面只是停在"正在打开本地数据"，看起来像数据库慢。
-    setTasks(actions.listTasks());
+    const aliveTasks = actions.listTasks();
+    setTasks(aliveTasks);
+    /**
+     * 选中态的**回落**：详情面正开着的那条任务如果被删掉（本机删、或另一台
+     * 设备删了同步过来），选中就没了 ⇒ 浮层自己关上。
+     *
+     * 🔴 传的是 `listTasks()` 的**全集**（未删除的所有任务），不是筛完/分组后的
+     * 那一截。写成后者的话，用户切一下视图，正在详情面里看的那条就被判成
+     * "不存在"、面板凭空关掉 —— 而这条规则本身在共享层（`app-host/selection.ts`），
+     * 这里只负责把事实源递进去。
+     */
+    pruneSelectionAgainst({ task: aliveTasks.map((task) => task.id) });
     if (projectActions) {
       setProjects(projectActions.listProjects());
       setTags(projectActions.listTags());
     }
   }, [actions, projectActions]);
+
+  /**
+   * 离开这一屏时收起"详情"这一层。
+   *
+   * 🔴 这一条**不是**共享层的规则，是移动端的形态决定的：这里的详情是一个
+   * `Modal` 浮层（外壳按标签切屏时会把本屏**卸载**），选中态若留着，
+   * 用户切回「任务」标签就会**凭空弹出一个面板**。
+   * web 恰好相反 —— 详情是常驻列，跨视图保持选中就是它要的东西。
+   *
+   * ⚠️ 所以"移动端要不要也做成常驻栏"仍然是一条待拍的产品决定
+   * （调研 `detail-pane-alignment-and-spaced-review.md` C2 第 6 条），
+   * 本行只是**保持现状**，不是替它做决定。
+   */
+  useEffect(
+    () => () => {
+      selection.select('task', null);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!host) return;
@@ -1008,7 +1048,7 @@ export function TasksScreen({
               runFor(id, actions.toggleCompleted(id));
             }}
             onOpenTask={(id) => {
-              setDetailTaskId(id);
+              selection.select('task', id);
             }}
           />
         ) : view === 'timeline' ? (
@@ -1025,7 +1065,7 @@ export function TasksScreen({
             now={now}
             // 触屏端的排期入口：点行 → 详情表单（横向拖拽与滚动冲突，不搬鼠标手势）。
             onOpenTask={(id) => {
-              setDetailTaskId(id);
+              selection.select('task', id);
             }}
           />
         ) : nothing ? (
@@ -1047,7 +1087,7 @@ export function TasksScreen({
                 runFor(id, actions.toggleCompleted(id));
               }}
               onOpenTask={(id) => {
-                setDetailTaskId(id);
+                selection.select('task', id);
               }}
               busyTaskId={busyId}
               labels={taskRowLabels}
@@ -1073,7 +1113,7 @@ export function TasksScreen({
           task={detailTask}
           visible={detailTaskId !== null}
           onClose={() => {
-            setDetailTaskId(null);
+            selection.select('task', null);
           }}
           actions={actions}
           projects={projects}
@@ -1102,7 +1142,7 @@ export function TasksScreen({
         }}
         onOpenTask={(id) => {
           setSearchOpen(false);
-          setDetailTaskId(id);
+          selection.select('task', id);
         }}
         onOpenNote={(id) => {
           // 🔴 先关浮层再开编辑屏：两个 `Modal` 同时在场在 Android 上没实测过，
