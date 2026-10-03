@@ -1211,3 +1211,31 @@ mobile screens **恰在 90**）/ `:payment-entry` / `:pricing`。
 `from './definitely-missing-file'` ⇒ 16 条含它，撤掉 ⇒ 15 条），
 残留 3 条假阳性分别是 `export type {` 形状（`TaskSection`）与断言字符串里的
 import 语句原文（`./NoteEditScreen`、`./NotesSection`），已逐条读到字面行确认。
+
+### 收尾复跑：HEAD 自洽、链 58/62 绿、四条 skip 归属
+
+**1. 干净检出自洽（补交之后）** —— 拿纯 HEAD 的树（`git archive` 抽出 960 个 ts/tsx）做两件事：
+
+| 探针 | 阳性对照 | 真残留 |
+|---|---|---|
+| 每条相对 import 能否在 HEAD 树里解析到文件 | 往 `share-summary.ts` 塞一根 `from './definitely-missing-file'` ⇒ 16 条含它，撤掉 ⇒ 15 条 | 0（15 条假阳性逐条读到字面行：断言字符串里的 import 原文、文档注释里的路径、探针不认 `.mjs`/`export type`） |
+| 每条跨包具名导入能否在 HEAD 的导出面里找到 | 同一个收集器先漏 `export type {` ⇒ 补上后 i18n 那 4 个类型名不再报 | 0（`NoteEditor`/`NoteEditorLabels` 那 4 条已随补交消失；`domain` 的 5 个类型名逐条读到 `export interface`/`export type` 声明行 —— 之前那轮 0 命中是 `\b` 在 POSIX ERE 里不认，探针坏不是仓库坏） |
+
+**2. `pnpm check` 逐段（段数硬门 = 62，实落 62 行）**：静态 50 段全 `exit=0`；补跑 8 段
+（`typecheck` / `macos-shell` / `macos-window` / `windows-shell` / `linux-shell` / `arkts` /
+`screenshot:verify` / `-r test`）全 `exit=0`。**合 58 段绿、0 段红**；没跑的 4 段与原因在 **B48**
+（`build` 与三段 e2e 会在别人跑到一半时重写 dist / SIGKILL 他们的 vite）。
+**B46 就此解除**：`pnpm -r typecheck` 整链绿。
+
+**3. skip 账（"skipped 必须 0"这条的逐包读数）**：`mobile 40 files/625 passed`、`ui 26/473`、
+`app-host 48/1002`、`widget-core 6/193`、`landing 22/1303`、`sync-client 6/98`、`op-log 7/99`、
+`node-host 9/165`、`desktop 2/12` —— **这些包 skipped 全为 0**。有跳过的是两处既有机制，
+不是我引入的：`apps/web` 13 条（`e2e-sync.integration.spec.ts` 里
+`describe.skipIf(URL_BASE === undefined)`，就是文档说的"真实服务端类默认跳过"）与 `server` 1 条。
+HEAD 的 `apps/web`+`apps/mobile` 里 `.skip(` 标记数 = **0**；我那两笔提交新增的 3 处"skip 字样"
+命中全是 `raise SystemExit(...)`（被 `xit\(` 这条宽松分支抓到，逐行看过真值形态）。
+
+**4. 又被我这批否证的注释**：`packages/ui/src/habits/HabitBoard.tsx` 第 3 条"删除习惯没有进这一刀 /
+习惯建出来就删不掉"已改成"曾未接、现已接（走的正是它自己提的『并入详情层』那条）"并挂上判据。
+同一次全仓扫还扫到地界外的一条（`docs/research/trash-and-archive-best-practice.md:179`）⇒ **不代改**，
+登记 **B47** 并把一行改法留给它的 owner。

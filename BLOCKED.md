@@ -2836,3 +2836,50 @@ grep -c "推不出表名" packages/legal/tests/structure.spec.ts                
 ```bash
 pnpm --filter @heyta/app-host --filter @heyta/i18n --filter @heyta/ui --filter @heyta/mobile --filter @heyta/web typecheck   # EXIT=0
 ```
+
+## B47. `docs/research/trash-and-archive-best-practice.md:179` 那句「删习惯的入口本身未接」已被第三批否证 —— 但那份文件不在本条线地界内（2026-10-03）
+
+全仓扫 `HabitBoard.tsx:64` 这个引用时抓到的。那一行的现值：
+
+```
+| `HABIT` | ✅ | ❌ | ❌ | ❌ | ❌ | **删习惯的入口本身未接**（`HabitBoard.tsx:64`） |
+```
+
+**它现在是错的**：第三批（`192a516d`）之后两端都有删除入口，`HabitBoard.tsx` 里那句自述也已经
+在本轮连同这条一起改成"曾未接、现已接"。该文件属另一条线（回收站/归档）的调研台账，
+白名单没写它 ⇒ **不代改**，把一行改法留在这里给它的owner：
+
+- 最后一列改成：`**删习惯的入口已在两端接上**（2026-10-03 第三批；判据 apps/mobile/tests/organizer-rename.spec.ts 的习惯 describe）—— 但 HABIT 仍不进回收站面（本表前三列不变）`
+
+同一次扫描还看到 `.worktrees/detail-pane/…` 里有一份同名审计文档的旧副本 —— 那是别的检出，不动。
+
+## B48. 全量 `pnpm check` 本轮跑了 58 段全绿，**4 段主动不跑**：段1 build、段53/54/55 e2e（2026-10-03 19:0x）
+
+不是跑不动，是**跑下去会打断别人**：`check:ai-e2e` 的前置会 SIGKILL 占用 vite 端口的进程
+（traps #87），而此刻 `:3000` 上是并行会话的 e2e 栈（PID 80257，pidfile 对得上），
+Android 模拟器 `heyta-w3-yearly` 已经跑了 2h10m。段1 `pnpm build` 会重写 `packages/*/dist`，
+而判据读 dist（traps 里那条"变异共享包要 build 后再跑"是同一枚硬币）—— 在别人跑到一半时重写
+就是给对方造一个假红。
+
+**已跑到的读数**（逐段取真实退出码，段数硬门 = 62）：
+
+```
+SEG 2…26 全部 exit=0（静态段 50 条）        →  SUMMARY green=50 red=0 deferred=12 total=62
+SEG 3  exit=0 pnpm typecheck               →
+SEG 27 exit=0 check:macos-shell             SEG 28 exit=0 check:macos-window
+SEG 31 exit=0 check:windows-shell           SEG 32 exit=0 check:linux-shell
+SEG 47 exit=0 check:arkts                   SEG 61 exit=0 screenshot:verify
+SEG 62 exit=0 pnpm -r test
+（合计 58 段 exit=0，0 段红）
+```
+
+顺带 **B46 已解除**：`pnpm -r typecheck` 现在整链 exit=0（`packages/legal` 那 +117 行由它自己
+的 owner 补完了）。所以"全量 check 只剩 4 段没跑"这件事，卡的是**设备与端口窗口**，不是代码。
+
+## B49. `pnpm reinstall:all` 四端重装：本轮同样被设备占用挡住，且它比验收更具破坏性（2026-10-03）
+
+`reinstall:all` 的 android 段会 `adb uninstall` + 全新安装、ios 段会 `simctl uninstall`
+（traps #169 已因此加过"不许盲选目标"的约束）。**现在这台模拟器正被另一个会话用于它自己的
+验收** —— 我这边装下去，对方那一轮读到的就是被我换掉的产物。这属于"影响到别人"的动作，
+不是"我这边慢一点"的问题，所以**不硬跑**，等窗口或产品负责人指定顺序。
+`docs/research/multi-end-entry-coverage-audit.md` §3 里那两行"设备级截图未取证"因此还是 🟡。
