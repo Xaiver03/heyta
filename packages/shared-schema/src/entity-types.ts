@@ -29,6 +29,15 @@ export const ENTITY_TYPES = [
   /** 重复任务的 RRULE 配置（与 TASK 分开，便于独立同步与复用） */
   'TASK_REPEAT_CFG',
   'REMINDER',
+  /**
+   * 倒数日 / 纪念日（一个实体装两副面孔，见 `docs/plans/countdown-anniversary.md` §0）。
+   *
+   * ⚠️ **可加性变更，不 bump `CURRENT_SCHEMA_VERSION`**（ADR-0014 §3.2 同一条）：
+   * 老客户端读到 `EVENT` 的 op 会当未知实体优雅跳过，不会卡住同步。
+   * 🔴 但**服务端必须先于客户端上线** —— 老服务端的白名单里没有它，
+   * 会把该 op 判成 `INVALID_ENTITY_TYPE` 永久拒绝（§2.1 的硬顺序）。
+   */
+  'EVENT',
 
   // ── 习惯打卡 ──────────────────────────────────────────────
   /**

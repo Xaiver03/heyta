@@ -287,10 +287,13 @@ describe('每一个工具都在清单里，且 kind 与目录一致', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// 3. 分母口径（ADR-0045 §2.7 钉死：8，且视图不进分母）
+// 3. 分母口径（ADR-0045 §2.7 钉的是**规则**：视图与两个落库载体不进分母。
+//    具体数字随实体清单走：批次二 W2 物化 `EVENT` 之后分母从 8 变 9。
+//    ⚠️ ADR-0045 正文里那句"分母是 8 / 现状基线 2/8"是**当时**的读数，
+//    它不是结论（结论是那条规则），所以不去改已接受的 ADR，只在这里写明口径。）
 // ─────────────────────────────────────────────────────────────────────────
 
-describe('分母恰好 8，且逐条列出是哪 8 个', () => {
+describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
   it('分母成员逐条点名（多一个少一个都红 —— 这条挡住"顺手把视图加进分母"）', async () => {
     const [gen, upstream] = [await loadGenerator(), await upstreamDirectory()];
     const excludedNames = gen.DENOMINATOR_EXCLUSIONS.map((e) => e.entityType);
@@ -298,8 +301,10 @@ describe('分母恰好 8，且逐条列出是哪 8 个', () => {
       (t) => !excludedNames.includes(t) && !gen.NON_ENTITY_VIEWS.includes(t),
     );
     expect([...manifest.userOperableEntityTypes]).toEqual(expected);
-    expect(manifest.userOperableEntityTypes.length).toBe(8);
-    expect(manifest.coverage.denominator).toBe(8);
+    expect(manifest.userOperableEntityTypes.length).toBe(9);
+    expect(manifest.coverage.denominator).toBe(9);
+    // 🔴 EVENT 进了分母**却没有工具** —— 这正是清单要暴露的那件事（W10 的靶子）
+    expect(manifest.entityTypesWithoutTools).toContain('EVENT');
   });
 
   it('分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体', async () => {
@@ -341,13 +346,13 @@ describe('分母恰好 8，且逐条列出是哪 8 个', () => {
     }
   });
 
-  it('现状基线 2/8：只有 TASK 与 PROJECT 有工具（W10 扩目录时这条会红，那是要的）', () => {
+  it('现状基线 2/9：只有 TASK 与 PROJECT 有工具（W10 扩目录时这条会红，那是要的）', () => {
     const withTools = manifest.entities
       .filter((e) => e.countsTowardCoverage && e.coverage !== 'none')
       .map((e) => e.entityType);
     expect(withTools.sort()).toEqual(['PROJECT', 'TASK']);
     expect(manifest.coverage.covered).toBe(2);
-    expect(manifest.coverage.ratio).toBe('2/8');
+    expect(manifest.coverage.ratio).toBe('2/9');
   });
 });
 

@@ -480,6 +480,7 @@ export type EntityLabelKey =
   | 'common.entity.NOTE'
   | 'common.entity.TASK_REPEAT_CFG'
   | 'common.entity.REMINDER'
+  | 'common.entity.EVENT'
   | 'common.entity.HABIT'
   | 'common.entity.HABIT_LOG'
   | 'common.entity.FOCUS_SESSION'
@@ -498,6 +499,7 @@ export const ENTITY_LABEL_KEYS: Record<string, EntityLabelKey> = {
   NOTE: 'common.entity.NOTE',
   TASK_REPEAT_CFG: 'common.entity.TASK_REPEAT_CFG',
   REMINDER: 'common.entity.REMINDER',
+  EVENT: 'common.entity.EVENT',
   HABIT: 'common.entity.HABIT',
   HABIT_LOG: 'common.entity.HABIT_LOG',
   FOCUS_SESSION: 'common.entity.FOCUS_SESSION',

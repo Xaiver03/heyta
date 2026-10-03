@@ -3417,6 +3417,7 @@ export const en = {
   'common.entity.NOTE': 'Note',
   'common.entity.TASK_REPEAT_CFG': 'Repeat rule',
   'common.entity.REMINDER': 'Reminder',
+  'common.entity.EVENT': 'Countdown',
   'common.entity.HABIT': 'Habit',
   'common.entity.HABIT_LOG': 'Check-in record',
   'common.entity.FOCUS_SESSION': 'Focus session',
