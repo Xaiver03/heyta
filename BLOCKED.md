@@ -3650,4 +3650,85 @@ Booted 清单排序一变他们的验收就换了一台设备，而且不会有�
 **闭合判据**（谁做谁打勾）：六个位置中英同步翻掉 → `pnpm check:legal-copy` 重生成落地页文案 →
 `SCHEDULE_EXACT_ALARM` 进两张表之一并写理由 → `NO_COLOR=1 node scripts/check-legal-permissions.mjs` rc=0。
 
+## B65. 🔴 落地（① 的最后一步）卡在 **11 个别人未提交的文件**上，而它会把 main 从"63 段"带到"**73 段含 8 红**"（10-04 01:3x 载体 `187057bb` 现量）
+
+**合并本身从来不是障碍**：`git merge-tree --write-tree main 15862311` ⇒ **rc=0、零冲突**。
+挡路的是主检出那 11 个"既在合并更新集里、又正被别人写着"的文件（B60 记的是 9 个，**数字每次都要重量**）：
+
+| 文件 | 谁在写（读 diff 得出的依据，不是猜） |
+|---|---|
+| `AGENTS.md` | 别人：§8 第 9 行新加"网络故障注入也须证明目标请求实际命中屏障…（环境陷阱 #191）" |
+| `PROGRESS.md` | 别人：新增两行"01:00 Web 并发迁移真链路已先证红…过程并入环境陷阱 #191 和 AGENTS §8.9" |
+| `docs/README.md` | 别人：`performance-hotpaths-audit` 那行的台账读数从"2/14"翻成"3/13" |
+| `docs/reference/environment-traps.md` | 别人：+#191 一整段（15 行） |
+| `apps/web/src/features/sync/store.ts`、`apps/web/src/main.tsx`、`packages/app-host/src/{index,sync-wiring}.ts`、`packages/sync-client/src/client.ts`、`packages/ui/src/sync/model.ts`、`packages/i18n/src/locales/{zh-CN,en}.ts` | 别人：vault/E2EE 并发迁移那一族的接线与词条 |
+
+⇒ 这三条"绕过去"的办法一条都没用：① **不代他们提交**（他们的判据还没跑完，#191 原话就是"已先证红"）；
+② **不 rebase/checkout**（那会重写别人正在跑验收的工作树）；
+③ **不用 plumbing 把 `refs/heads/main` 指到合并树而不动工作树** —— 那样更新集 382 个文件里
+那 382−11=**371** 个"没脏但内容变了"的文件会全部显示成相对新 HEAD 的改动
+（按 git 的 status 定义它们落在"Changes to be committed"位，index 与工作树都还是旧 main 的内容 ——
+🟡 **这一句是按规则推的，没实测**），等于摆出一块"任何人一次整文件 `git add` 就能把合并撤掉"的现场。
+
+🔴 **落地不是"免费的字节搬运"，它会把别人那条线的红一起带进 main**（这是 ① 第一次被量出来）：
+
+| 现量 | 读数 |
+|---|---|
+| 段数 | 载体 **73** / main 活树 **63** ⇒ 落地给 main **新增 10 段**：`check:gate-wiring`、`check:shell-surfaces`、`check:selection-single-source`、`check:legal-tools`、`check:legal-permissions`、`check:image-license`、`check:server-env`、`check:public-facts`、`check:selfhost-entry-command`、`check:web-artifact`（现量命令：把两边 `package.json` 的 `scripts.check` 按 `&&` 切开做差集） |
+| 合并态的红 | **8 段**（链汇总原话：`64 绿 / 8 红 / 1 按规则不跑 / 共 73 段`，载体 `187057bb`）：`12 check:ui-provider`、`15 check:selection-single-source`、`26 check:legal-permissions`、`29 check:licenses:stamp`、`31 check:image-license`、`64 check:landing-e2e`、`65 check:shell-unicode`、`73 pnpm -r test` |
+
+逐条归属（每条都查了"肇事提交在不在 main"）：
+
+| 段 | 根因（门禁原话） | 在不在 main | 是不是本批 |
+|---|---|---|---|
+| 12 | `apps/mobile/src` 有 3 处共享 UI 消费者在 `HeytaUiProvider` 子树**外**（`GrowthScreen.tsx:298` / `HabitsScreen.tsx:394` / `ui/habit-goal-slot.tsx:37`） | 门禁**在** main；3 条里 2 条的提交（`120c8153`、`9ed11d74`）**已在** main，第 3 条 `9a9920d7`（详情面 W1）**不在** ⇒ 推断 main 今天也红、🟡 **未实测**（main 检出跑不了） | ❌ 成长/详情两条线 |
+| 15 | `packages/ui/src/calendar/CalendarDayBoard.tsx` 声明了 `onOpenTask` 却既不传也不读（两个 prop 都可选 ⇒ typecheck 不红） | 门禁**不在** main，肇事提交 `5e23b7bf`（日历日/年视图，23:58）**已在** main ⇒ **main 里已存在、只是没人测** | ❌ 日历线 |
+| 26 | 六个位置的对外条款还写着"移动端不申请通知授权"，而申请面已有 `POST_NOTIFICATIONS` | 门禁**不在** main，`1d71e75f`（门禁自己）**不在** main ⇒ 落地当天才会显形 | ❌ W9（见 `B64`） |
+| 29 | 许可证清单是在 lockfile `111cc2d1d04d3763` 下渲染的，当前是 `0f3c1bf6d9e21526` | 门禁**在** main；lockfile 最后由 `2f735392`（23:58 并行批次总接线）改，**已在** main ⇒ 推断 main 也红、🟡 **未实测** | ❌ 总接线那笔 |
+| 31 | `server/image-npm-tree.json` 里的 `serverPackageJsonSha256`=`b152bf04…`，当下 `server/package.json` 是 `272b16d2…` | 门禁与快照都**不在** main（来自 `0be10361` 自托管批次，经 `94b4dea2` 那次 merge 进本线）；把 sha 改动的是 `b3397cda`（vault/E2EE，23:58，**已在** main）⇒ **两条线各自都对、并到一起才红** | ❌ 自托管 × vault |
+| 64 | vite preview **已经打印过** `➜ Local: http://127.0.0.1:4320/`，随后 `Command was killed with SIGKILL (Forced termination): vite preview --host 127.0.0.1 --port 4320 --strictPort` ⇒ 5 条用例各吃到 `net::ERR_CONNECTION_REFUSED` | 不是产品红也不是判据红，是**跑动中现场被人清了**（对端进程数 8→12）。🟡 凶手未定：已知规律"check:ai-e2e 的 preflight 会 SIGKILL 别人的 vite"（traps #87）**只认 4318/4319，端口对不上** | ❌ 载体被杀 ⇒ 待对端清空后单跑 |
+| 65 | `scripts/mutate-closeout-gates.sh` 有 6 处 `$VAR` 紧跟中文（`:262 :264 :269 :271 :277` 加 `W4ERR` 一处）⇒ 值被吞 | 文件 `b1fcc686` 与门禁**都在 main** ⇒ main 今天也红在这里 | ✅ **本批自己的，已当场修完**：`fix-shell-unicode-vars.py --write`（预演报"1 个文件 6 处"正是我这个文件），改后该段 rc=0（扫 78 个 .sh）、`bash -n` 过 |
+| 73 | `server test: Test Files 7 failed / 114 passed (121)`、`Failed Tests 61`：`storage-quota-cleanup`(10/23)、`conflict-detection`(**25/25 整文件**)、`duplicate-operation-precheck`(7/17)、`gap-detection`(13/15)、`sync-fixes`(5/10)、`holiday-adjustment-migration.pglite`(**0 test = 收集期就炸**)、`admin-log-pii`(1/4)。原话形状 `Unmocked raw query in tx: SELECT id FROM users WHERE id =  FOR UPDATE`（🔴 **值位是空的**）+ `bad sig` + `expected 500 to be 200`。其余包全绿：`app-host 1277 · mobile 689(46 files) · node-host 173` | 候选根因：**新增的 `FOR UPDATE` 原子读没进 prisma mock**（AGENTS §8 第 14 条"共享预算必须与占用变更原子裁决"那一族）。🟡 **未实测 main 是否同样红**（main 检出被 77 项未提交占着，不能在上面量） | ❌ vault/配额那条线（待实测） |
+
+**为什么这 8 条里除 65 之外都不由本批修**：与 `B64` 同一条纪律 —— 它们要的是**别人手里的产物再生成**
+（29 要"在装了全部 workspace 的检出里"重渲染、31 要联网跑 `gen-image-npm-tree.mjs` 并**重新判一次
+哪些包是 image-only**）、**别人手里的产品接线**（12/15 是 Provider 挂载点与选中态透传，动的是日历/详情两条线的文件）、
+**别人手里的对外承诺**（26）。我从门禁提示语反推一遍，产出的是一条"看起来绿了的假话"，
+比留着这条红贵得多。
+
+🟡 **另一个不落地也没躲开的事实**：本线早已不只是 Goal ① 点名的那三条 AI 分支 ——
+`main..HEAD` 里按前缀分组是 `docs(ai-contract) 18 · docs(ai-coverage) 13 · docs(countdown) 10 ·
+docs(blocked) 7 · feat(selfhost) 6 · docs(selfhost) 6 · fix(scripts) 5 · feat(countdown) 5 · docs(ai) 5 …`，
+自托管那批是经 `94b4dea2`（00:23"merge: 自托管分发批次"）进来的。
+⇒ 按 AGENTS §8 第 7 条，**旧范围的完成证据不覆盖新增项**："落地 = 把 AI 三条线并到 main"
+这句已经不成立，落地实际是把 **AI + 自托管 + countdown + 总接线** 一起带进 main。
+**要人拍的是这个范围，不是"要不要落地"**。
+
+### 01:4x 复核：并行会话那两次 merge 之后，五条不变量的 gate 有一个翻了 —— 而病根是**并发构建抢同一棵 dist**
+
+上面那条链（`64 绿 / 8 红`）跑在 `187057bb` 上、负载门放行时 load≈12 —— **那次读数有效**。
+之后并行会话在同一载体里连做两次 merge（`d3b7eafd` 解 16 个 UU、`2e50ee97` 吸收 main 的 handoff 批次），
+我在 `2e50ee97` 上复跑五条不变量的 gate：
+
+| gate | rc | 说明 |
+|---|---|---|
+| `check:ai-tools` · `check:ai-coverage` · `check:legal-tools` · `check:shell-unicode` | **0** | 这四条是**源码级扫描**、不读 dist ⇒ 合并没动摇它们 |
+| `check:privacy-consent-e2e` | **1** | 🔴 但它红的不是产品：它内部跑 `@heyta/web` 的 `tsc -b && vite build` ⇒ 先吃到一整片 `TS7016: Could not find a declaration file for module '@heyta/i18n'`，加 `TS2305: '@heyta/ui' has no exported member 'priorityColorToken'`。**现量否证了"源码坏了"这个读法**：`priorityColorToken` 在 `packages/ui/src/index.ts:1097` **有**，而 `packages/ui/dist` 里 0 命中 ⇒ dist 落后于合并后的源码（traps #27/#79 那一族）。我补跑 `pnpm -r build` 又撞到 `apps/node-host` 在 DTS 阶段报 `TS7006: Parameter 'keyRef' implicitly has an 'any' type`，而**单跑 `pnpm --filter @heyta/node-host build` 是过的**，且 `SecretStore` 端口在 `187057bb` 与 `HEAD` **逐字相同**、`packages/ai/dist/index.d.ts:1002` 也在 ⇒ 那条 TS7006 是**多个 tsup 抢同一棵 dist 的竞态**，不是缺陷 |
+
+⇒ **这一段的结论是"环境无效"，不是"不变量被放宽"**：复跑时现量 `load averages 515.78 319.43 195.31`、
+`ps` 里 7 个对端 `pnpm/tsup` 在跑。按红线"负载高按环境无效如实记录、不降级判据"处理。
+**重开条件**：对端构建清空 + 负载回到阈值内，再单跑 `pnpm -r build && pnpm check:privacy-consent-e2e`，
+两条都 rc=0 才算这一条闭合。
+
+**最小一步**（不需要任何人拍板就能做的那半）：把 8 条红里除 65（本批自己的，已当场修完）之外那 **7 条**
+的**归属**逐条送到所有者手里（`B64` 已把 26 交给 W9；本表把 12/15/29/31 交到成长/详情/总接线/自托管四条线，
+64 交给"谁清了 4320"、73 交给 vault/配额那条线并附**未实测 main** 这一句），
+本批只保证自己那条接缝：**落地后的 `check:ai-*` / `check:legal-copy` / `check:legal-tools` /
+`check:privacy-consent-e2e` 四段必须仍然 rc=0**（01:3x 在载体 `187057bb` 上现量：
+`43 ai-quota=0 · 44 ai-tools=0 · 61 ai-coverage=0 · 63 privacy-consent-e2e=0 · 24 legal-copy=0 · 25 legal-tools=0 · 27 legal-host=0 · 50 server-legal=0`）。
+
+**关闭判据**：`bash ~/scratch-heyta/heyta-land.sh --confirm`（默认 dry-run；它现取"更新集 ∩ 主检出脏项"，
+非空就拒绝并列出）在 rc=0 落地后，`pnpm check` 在 main 上的红集 = 上表那 5 条**减去已被各所有者闭合的**，
+且上表"是不是本批"那一列的 ❌ 一条都没变成 ✅ —— 也就是**我没有为了让 main 绿而动别人的债**。
+
 
