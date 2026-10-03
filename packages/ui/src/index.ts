@@ -926,3 +926,21 @@ export {
   type DatePickerLabels,
   type DatePickerQuickPick,
 } from './date-picker/DatePicker.js';
+
+/**
+ * ── 批次二 W0：锚点弹层的定位算术 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 只转出算术，不转出测量：`packages/ui` 进不来 DOM，而"量触发器与面板的 rect"
+ * 与"捕获阶段的 scroll 重算"本来就必须住在每个宿主里（见 `overlay/model.ts` 文件头）。
+ */
+export {
+  placeAnchoredPanel,
+  type AnchoredPanelOptions,
+  type AnchoredPanelPosition,
+  type AnchoredPanelViewport,
+  type PanelPlacement,
+  type PanelSize,
+  type TriggerRect,
+} from './overlay/model.js';
