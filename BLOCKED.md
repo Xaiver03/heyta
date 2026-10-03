@@ -3896,3 +3896,39 @@ kill 98934 95477                          # 只停这一棵，不广播按名字
 ```
 
 停掉之后本线这一趟会自己走进阶段 5（队列 pid 与读数目录见 §15.43g 的 `~/scratch-heyta/deliver-*`）。
+
+## B68. 🔴 05:32 本线自报：我把 `environment-traps.md` 提成了 **18 字节**，而它被 `ee71c6e1` 从索引里带走了（已恢复；那笔提交的本意需要它的所有者复核）
+
+**发生了什么**（写在这里的第一目的是**让 `ee71c6e1` 的所有者能复查**，不是甩锅）：
+
+1. AI 线（本会话）用 plumbing 追加 traps 条目时，建 blob 那一步写成
+   `execSync('git hash-object -w --stdin', { input: '/tmp/traps-blob.md' })`。
+   `input` 是**喂给 stdin 的数据**而不是文件路径 ⇒ git 存进去的是那串路径字符本身：
+   **18 字节 / 1 行**，替代了 383353 B 的台账（提交 `bfdeea31`，05:32）。
+2. 收尾那步"把真实索引刷成 HEAD"于是刷的是坏 blob。它在共享索引里停留约 **33 秒**，
+   这中间 `ee71c6e1`（`docs(goal): §7.30 补 ④ 的 HEAD 核验读数…`）**不带 pathspec** 提交，
+   把索引里那条坏内容一起带走了 ⇒ 坏内容在历史里有**两笔**。
+3. ✅ 已恢复：`87f62b39`（05:34）把该文件写回完整文本 + 只做 AI 线自己的两处（改号 208→213、追加 #214）。
+   现量：HEAD 里该文件 **385139 B / 5165 行**，`^208. `=1、`^213. `=1、`^214. `=1、`^212. `=0
+   （#212 是另一条线的未提交条目，一行都没进这两笔）。工作树全程 md5 未变。
+
+**要 `ee71c6e1` 的所有者做的一件事**：如果你那笔的本意**包含** `environment-traps.md` 的任何改动
+（比如你自己那条未提交条目），它并没有落到你那笔里 —— 你那笔里该文件是 18 字节的垃圾。
+拿 `git show 87f62b39:docs/reference/environment-traps.md` 与你的工作树对一眼即可。
+若那笔只是文档且不含 traps 改动，则无需动作。
+
+**机制修法（不是"下次注意"）**：任何"从文本建 blob 再提进历史"的路子，收尾必须做一次
+**读回比对**：`git cat-file -s <blob>` 逐字等于文本字节数 + blob 里读得到本次标题 + 尺寸下限。
+sha 对任何字节串都算得出来，所以"`hash-object` 成功打印了一枚 sha"**不构成**"blob 是对的"。
+这次抓住它的也不是 numstat，而是我自己那三条**带期望值**的复核计数（`^213. ` 与 `^214. ` 期望 1、
+`^208. ` 期望 1，三条同时读到 0）——⇒ 复核要写成期望值比较，不能只"打印出来看看"。
+细节与五道闸的完整读数：`docs/plans/ai-event-tool-contract.md` §15.43n。
+
+**顺带把 ② 的新鲜读数记在这里**（细节在 §15.43o）：载体 `1ebcf136`、`pnpm -r build` rc=0、
+链 **74 段 = 59 绿 / 14 红 / 1 按规则不跑**；本线 12 道门禁**全部 rc=0**（含 `check:ai-coverage`、
+`check:legal-tools`、`check:ai-tools`、`check:ai-quota`、`check:layering`）。
+14 条红里 **3 条是外部内存闸门 `tfa-shield` 拒并发**（`/tmp/tfa-test.lock`，pid 3248 在跑
+`pnpm --dir e2e run test`）⇒ 按 Goal 红线记为**环境无效**，不降级、不放宽；其余 11 条
+逐段报出的文件**都在别人的面上**（CalendarDayBoard / countdown-card-export.spec / third-parties.ts /
+镜像依赖快照 / C# 契约重放 / r14c-window-retry.sh / server 的 holiday-adjustment pglite 等）。
+**B66 的 ③ 仍然开着**：阶段 5 被那棵挂在 notarization 上的对端进程按着（见 B67）。
