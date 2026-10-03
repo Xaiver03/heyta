@@ -311,9 +311,14 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    ⚠️ 隔离检出里 `pnpm -r typecheck` 会因 `packages/legal/dist`、`apps/node-host/dist` 缺而报一串
    `TS2307`（那是载体不全不是源码错，见 §6）。
 2. 同一窗口内补跑那 3 段 Playwright，然后跑满 `pnpm check`，把**可过段数 + 载体 sha** 一起记账。
-   🔴 **记账落在本文件，不落在 Goal 台账**（00:5x 决定）：`docs/plans/goal-multi-end-coverage.md`
-   此刻正被别人挂着未提交改动，而本仓实测过反向事故 —— 往正脏着的共享台账 plumbing 追加，
-   别人一次整文件 `git add` 就把我那段抹回去。**读数以本节末尾这条为准，Goal 台账那份"待入"由合流时统一搬。**
+   🔴 **记账落点这条 02:1x 改了**：旧决定是"落本文件、不落 Goal 台账"，理由是那本台账正挂着别人未提交改动
+   （往脏着的共享台账追加，别人一次整文件 `git add` 就把我那段抹回去）。
+   **02:1x 现量四本共享台账的未提交行数全是 0**（`goal-multi-end-coverage.md` / `environment-traps.md` /
+   `PROGRESS.md` / `BLOCKED.md`）⇒ 原由不成立，读数以**目标原话点名的 `goal-multi-end-coverage.md` §7.30** 为准。
+   ⚠️ 但这条决定本身也是瞬时读数：**动笔那一刻先重量一次**
+   `git status --porcelain -- docs/plans/goal-multi-end-coverage.md`，非空就退回本文件并标"待入 §7.30"。
+   （上一段那句"不 plumbing 进 Goal 台账"的完整理由与反向事故见 §6；本文件同时保留**同一份读数的第二住处**，
+   因为"一段文档的存活期取决于还有谁持有它的旧副本"。）
    ⚠️ **本轮把这条的前置全部做实了**（开窗即执行，启动器 `/tmp/heyta-run-checks.sh`，体检模式已过）：
    三段名经 `package.json` 的 `scripts` 键核过（`check:ai-e2e` / `check:privacy-consent-e2e` /
    `check:landing-e2e` 都在），段数**在脚本里现取**（当前 **63**，不是 62，见 §0.5）；
@@ -526,3 +531,8 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   ② 只 `kill <我自己那个 pid>`（我这条哨兵是 `nohup bash -c '…'`，pid 在启动时就打印过，本来就该直接用它）；
   ③ 只有确认某条模式只属于我这一棵树时才允许按模式杀，且要在命令里带上 `-u $UID` 与逐项排除。
   ⚠️ 这次**无法回滚**（别人那一轮预检的读数已经没了），所以按仓库惯例如实登记，不写成"应该没影响到别人"。
+
+> ✅ **本节那几条"待入 traps"已落权威位置**（02:1x 现量 `environment-traps.md` 未提交行数 = 0 之后才动的笔）：
+> **#200** 合流判据不许写"能快进"、**#201** `ps` 的 argv 数不出"谁在跑套件"、**#202** 按名广播 `pkill` 的自报。
+> 这三条在本节里**继续留着**（本节是这条线的一手过程账，权威文件是通用规则），不是重复登记而是两个层次；
+> 下一次接手要引通用编号时引 #200–#202，要复原"当时怎么踩到的"再回来看这里。
