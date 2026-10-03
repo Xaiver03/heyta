@@ -4037,3 +4037,35 @@ sha 对任何字节串都算得出来，所以"`hash-object` 成功打印了一�
 **复查命令**（谁落这一行谁跑）：
 `cd e2e && npx playwright test tests/ai-assistant.spec.ts`，判据是那条用例转绿
 **且** `apps/web/evidence/assistant/2b-chat-dark.png` 落盘（暗色那张）。
+
+## B70. 🔴 06:59 现量：另一棵工作树里有一枚 **vitest worker 忙等 8 小时 10 分、累计 CPU 486 分钟**，它同时是本机负载与 B 线窗口的常驻成因
+
+**读数**（两条独立通道，都可复跑）：
+
+```bash
+ps -o pid,ppid,etime,time,%cpu,stat -p 29644
+#   29644 29434 08:10:48 486:04.01 100.0 R     ← 状态 R、单核钉满
+lsof -a -d cwd -p 29644 -Fn | awk '/^n/{print substr($0,2); exit}'
+#   …/01_PROJECTS/heyta-wt-hierarchy          ← 归属按 cwd，不按我起的文件名
+ps -o command= -p 29093 | tr ' ' '\n' | grep spec
+#   tests/project-hierarchy.spec.ts           ← 它正在跑的那一条用例
+```
+
+祖先链（`ps -o ppid=` 逐层回溯）：`29093 pnpm --filter @heyta/domain exec vitest run tests/project-hierarchy.spec.ts`
+→ `29434 vitest.mjs run …` → `29644 vitest/dist/workers/forks.js`。
+也就是**父进程都在睡（0.33s / 0.51s 累计 CPU），热的是那枚 fork worker**。
+
+**为什么要登在这里（两条都是本线的直接后果）**：
+
+1. **我 06:52 的一次判断被这条否证了**：我当时量 `ps -o time= -p 29093,29434` 得 8 秒零增量，
+   就下结论"对端两枚是僵尸，我的测试通道门在僵尸上死等"。**错在只加了两个父进程的量**——
+   真正在烧的是它们的子进程。交付队列那道门按**整棵进程树**求和，判它"在算"是**正确**的。
+   更正留在这里（原句在上面的段落里，不悄悄删）：这条门不是死等，对端确实有一核在被永久占用。
+2. **③ 的窗口因此不会自己开**：本线的阶段 1 要等"别人**在算**的 test runner 归零"，而这枚不会归零，
+   它会等到 `HEYTA_TEST_CHANNEL_WAIT`（默认 7200s）上限然后按**环境无效 exit 3** 收尾。
+   这不是判据太严——与一枚 100% 占核的进程同跑全链，双方读数都不能归因。
+
+**处置权在它的所有者**（本线不 kill 别人的进程，红线；也不改它树的代码）：
+要往下走得由 hierarchy 那条线自己收掉这枚 worker（它的用例形状像"没有 sleep 的忙等自旋"——
+本仓 10-03 已为同款形状入过一次档：判 5 秒超时的断言写在循环外，循环体每轮只做一次 `readFile`）。
+它停下来之后，本线队列（`~/scratch-heyta/deliver-*` 里活着的那一枚）会自己走进阶段 1 的下一道门。
