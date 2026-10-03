@@ -1,6 +1,7 @@
 # 倒数纪念日（含农历、节日、纪念卡片）实施计划
 
-> 状态：🔄 **批次一已落地**（2026-10-03，`a29881e9` 已合进 main）：W1 历法层 / W3「每年」预设 / W4 节假日随包数据 + bundle 体积闸门，落地记录与本批欠账见 **§3.5**。⏸ 批次二未开工：W0 界面、W2 `EVENT` 实体（🔴 有"服务端先于客户端"的部署顺序硬约束，见 §3 W2）、W5–W9、W4b、L 系列。
+> 状态：🔄 **批次一已落地**（2026-10-03，`a29881e9` 已合进 main）：W1 历法层 / W3「每年」预设 / W4 节假日随包数据 + bundle 体积闸门，落地记录与本批欠账见 **§3.5**。
+> 🔴 **批次二进行中**（全部在本地分支，未 push 未 merge）：W0 / W2 / W5 / W10 已闭合，W9 落了 web 半，W4b / W7 / W8 在并行工区里跑，**W6 与 L 系列仍未开工**（各自撞车面的实测读数见 §8.2 开头）。逐项读数在 **§8.2 / §8.4**，本节这行原先写"⏸ 批次二未开工"，那是一句比正文更早写下、落地后没 sweep 的话 —— 同一份文档里这种"状态行跑在正文后面"的漂移已经出现过一次（见下面第 4 行那条 ADR 的教训）。
 > 决策：[ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（实体 / 农历依赖 / 数据分发 / 图片双档四则）
 > 证据基础：[`countdown-anniversary-data-and-images.md`](../research/countdown-anniversary-data-and-images.md)（2026-10-02 调研，本文只引用它的结论，不重复取证）
 > 决策：✅ 已立 = [ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（2026-10-03 接受；本行原先写"🔴 待立 ADR"，那是同一份文档里比正文更早写下的一句，落地后忘了 sweep —— 按 `docs/README.md` §一，调研给证据、ADR 下结论、计划管落地）。本文不代替 ADR。
@@ -249,7 +250,13 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 2. **`'yearly'` 加了 id 但没人能测到"忘了加进 `REPEAT_PRESET_IDS`"** —— 这一档的表现是"界面上没有每年"，属于**按定义不可观测**，不为此扭曲设计；类型系统已能抓到"switch 少一档"与"标签少一档"（`Record<RepeatPresetId, MessageKey>` 是穷举的）。
 3. **2/29 的"平年过 2 月最后一天"口径**：需要 `BYMONTHDAY=-1`，而域层 `describeRecurrence` 与移动端 `recurrence-display` 都会把它渲染成「每年 2 月 -1 日」。现状按 RFC + 主流日历实现（只在闰年重复），并**把这条边界钉在测试里**而不是留成暗坑。真正的产品问题在倒数日（"在一起多少天"那天算不算 2/29），随 W5 一起定。
 4. **W4 判据②的界面半段**（"数据只到 2026 时 2027 显示节、不显示休/班"）：本批不做 UI，所以落的是**数据层**那半 —— 2027 有节无休、不抛错、非法日期响亮失败，都有单测与变异。界面上那条随 W5。
+   🔴 **"随 W5"这句挂错了**（W5 收尾时现量否证，见 §8.2 W5 勾里那条 **W4-UI**）：倒数日卡片面不画休/班，
+   而 `adjustmentOn` / `festivalsOn` 当时在全仓**零界面消费者** —— 改挂 W6 / W8。
 5. **W0 / W2 / W5 / W6 / W7 / W8 / W9 / W10、W4b、L 系列**：按排期未开工。W2 未动 = `shared-schema`、服务端、迁移一个字节都没改（批次二的部署顺序风险留在那里处理）。
+
+   ⚠️ **这句到 2026-10-03 晚已经过期**（留原文是为了看清它是"批次一收口时写的欠账清单"，不是现状）：
+   W0 / W2 / W5 / W10 已闭合、W9 落了 web 半、W4b / W7 / W8 在并行工区里跑，
+   **只有 W6 与 L 系列仍未开工**。现量读数一律看 §8.4 那张表，不要看这一条。
 
 ### 合入时必须做的事 —— 2026-10-03 上午收口结果（逐条带读数）
 
@@ -830,7 +837,9 @@ W0b ─> 随时可做（台账那半要等文件干净）
 ### 8.2 逐项：范围 / 落点 / 判据 / 变异 / 勾
 
 > 🔴 **执行顺序与工单编号不一致，这是决定的，不是漂移**（2026-10-03 18:2x 记）：
-> 实际走的顺序是 W0 → W0b → W2 → W5(代码半) → W10 → W9(web 半) → ‖W4b ‖W7 → **W6 / W8 / L 排最后**。
+> 实际走的顺序是 W0 → W0b → W2 → W5（代码半 17:0x，e2e 半 18:5x）→ W10 → W9(web 半) → ‖W4b ‖W7 ‖W8 → **W6 / L 排最后**。
+> ⚠️ 这一行 18:2x 初版写的是"W5(代码半)…→ **W6 / W8 / L 排最后**"，把 W8 一起排后了 —— **那条推断当场被否证**
+> （详见 §8.4 的 W8 行）：撞车的判据是**同一文件的未提交 diff**，不是"某条线在忙"的印象。
 > 理由是一条实测的**撞车面**，不是难度排序：开工前 `git status` 现量到主检出里
 > ① 日历线正在整片重写（`packages/ui/src/calendar/model.ts`、`CalendarBoard.tsx`、新的 Day/Year 板、
 > `apps/mobile/src/screens/CalendarScreen.tsx`），而 **W6 的落点就是这四件**；
@@ -959,7 +968,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   变异 = 把 EVENT 源接成"必须有 dueDate" ⇒ 红。另接进"今天"与收集箱（`App.tsx:723` 的 `refreshNow()` 是现成的"今天"重估点）。
 - [ ] W6 完成
 
-#### ⏹ W5 · 卡片网格 + 类型筛选 + pin + `⋯` 二级操作 + 归档视图
+#### ✅ W5 · 卡片网格 + 类型筛选 + pin + `⋯` 二级操作 + 归档视图
 
 - **事实**：最接近的现成品 `packages/ui/src/notes/NotesBoard.tsx:71-110`（pin/unpin）、
   `packages/ui/src/trash/TrashBoard.tsx:48,63`（归档视图）、`packages/ui/src/material/material-surface.ts:38 materialTier`；
@@ -971,7 +980,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   ④门禁：`check:design`、`check:l4`（内联只减不增）、`check:row-single-source`（🔴 `HT_FAMILY_BASELINE = 28`，
   新增 `ht-countdown__*` 一族必须同时消掉一族才能净增为零）、`check:text-color`、`check:ui-language`；
   ⑤界面结论有截图且人真的看过，主蓝数得出（§7 #82/#83）。
-- [x] W5 代码半完成（2026-10-03 17:0x，`a9529a59` @ 分支 `feat/countdown-batch2`）／🔴 **e2e 那半未跑，判据⑤未闭合**
+- [x] W5 完成（2026-10-03 17:0x 代码半 `a9529a59` → 18:5x e2e 半 `94760c82` + `c07df677` @ 分支 `feat/countdown-batch2`）
 
   **做了什么**：`packages/ui/src/countdown/{model.ts,EventBoard.tsx}`（卡片形状、两副面孔的措辞档位、
   筛选档位、**按行切**的网格 `toEventRows`、`⋯` 卡内展开式二级操作）+ `packages/app-host` 的 `patchEvent`
@@ -987,18 +996,51 @@ W0b ─> 随时可做（台账那半要等文件干净）
   3. 空态走共享 `EmptyState`，宿主侧构造文案落进 `check:empty-state` 登记表并写明来历（真 +1，不是搬家）。
   4. 模块 `defaultOn: false` —— "关掉的模块不进 DOM" ⇒ 现有 tab 计数判据不受影响。
 
-  **判据读数**：`apps/web/tests/countdown-board.spec.tsx` **11 passed / 0 failed**；
+  **判据读数**：`apps/web/tests/countdown-board.spec.tsx` **12 passed / 0 failed**（e2e 那半照出缺陷后
+  新增 ②b，从 11 条变 12 条）；
   12 例变异复现 **0 条未证伪**；`check:design` / `l4` / `layering` / `ui-language` / `reachability` /
   `row-single-source` / `text-color` / `empty-state` / `ui-provider` 全部 rc=0；
   摘掉 `check:empty-state` 那行登记 → rc=1 并点名本文件（**这条登记是承重的**）。
   判据①②③（pin 单一字段 / 归档不碰 `deletedAt` / 排序三段带 id 兜底）都在那 12 例变异里。
 
-  🔴 **未闭合的那一半，写清楚是什么**：判据⑤（真浏览器 + 截图 + 人真的看 + 主蓝数得出）**没有做**。
-  `e2e/tests/countdown.spec.ts` 与三处 tab 计数配套改动（`helpers.ts` / `smoke.spec.ts` / `motivation.spec.ts`）
-  留在 `heyta-wt-batch2` 工作树里**未提交** —— 起 suite 时这台机器负载 64（并行会话在跑重活），
-  高负载下红了分不清是产品还是环境。编号 **W5-e2e**，收尾窗口跑。
-  ⚠️ 那四个文件还改动了**共享的** tab 计数断言（smoke 10→11 等），所以它们**必须**与被测 spec 同一笔提交，
-  不能只提 spec 不提断言 —— 否则下一次别人跑 `check:ai-e2e` 会红在计数上。
+- [x] W5 判据⑤（真浏览器 + 截图 + 人真的看）闭合（2026-10-03 18:5x，`c07df677`）
+
+  **读数**：`cd e2e && npx playwright test tests/countdown.spec.ts` → **6 passed / 0 failed**；
+  与被它改动的共享断言一起跑 `countdown + motivation + smoke` → **15 passed / 0 failed**（rc=0）。
+  三张图**都打开看了**（§6.2 规定一第 4 条）：`test-results/countdown-empty.png`（空态两块文案）、
+  `countdown-board.png`（1280px 两列 + 一张未来一张逾期）、`countdown-archived.png`（归档视图没有输入行、
+  二级操作里确实没有"编辑/归档"）。
+
+  🔴 **看图照出一个真缺陷，而 15 条断言全绿**：逾期那张卡**整行日期没画**。根因在共享层 ——
+  一次性且已过去的倒数日没有"下一次"（`EventCard.nextDate` 是 `undefined`），卡片原来写的是
+  `nextDate !== undefined ? <Text>…</Text> : null`，于是界面上只剩「已经 31 天」，
+  用户**没法核对这张卡记的到底是哪天** —— 而那一天是它唯一的事实。修成落回锚点
+  （`card.nextDate ?? card.anchorDate`），钉在 `94760c82`。
+  ⚠️ 这条与 §7 第 82 条是**同族但不是同一件事**：82 是"非空白挡不住错误屏"，这里是
+  **"断言只验界面写了什么，不验界面少了什么"** —— 12 条 jsdom 断言 + 6 条 e2e 断言里没有一条
+  想到要问"逾期那张的日期行呢"，所以它只能被**看图**照出来。可迁移的做法：给"每一张卡都有的那一行"
+  写一条**存在性**判据，而不是只给"我以为会有的那几行"写内容判据。
+
+  **新判据能不能失败（变异复现，两腿各一次）**：把 `EventBoard.tsx` 的渲染退回修复前那个三元形状 ⇒
+  ① jsdom `1 failed | 11 passed`，红的正是 `②b 🔴 过期那张仍然说得出"是哪一天"`；
+  ② e2e `rc=1`，红在 `countdown.spec.ts:170 › 1280px 下两列` —— 形态是
+  `waiting for locator('[data-testid^="event-card-"]').nth(1).locator('[data-testid^="event-date-"]')`
+  等满 60s 超时，**retry #1 同样红**（不是负载型 flake）。还原后源文件**字节相同**、复绿 12 passed。
+  ⚠️ e2e 那条红的形态是超时而不是我写的那句中文消息（`locator.textContent()` 会自己等元素），
+  读数能用、定位够用，但下次要更响的话先 `toHaveCount(1)` 再读文本。
+
+  **现场隔离（这是本轮唯一一次撞到别人的进程）**：4318/4319 当时被另一个会话的 `check:ai-e2e`
+  占着，`reuseExistingServer: false` 撞上就是 `already used`。没有杀别人的进程，而是临时复制一份
+  配置把端口换成 4418/4419（假端点还要额外传 `env: { STUB_PORT: '4419' }`，否则它自己 EADDRINUSE），
+  跑完删掉。**不留这个副本**：整份配置抄第二份必漂。复跑配方就那两行差异，需要时现搭。
+
+  🔴 **有一条"挂到 W5"的账没在这里平掉，登记成 W4-UI**：§3.5 第 4 条把 W4 判据② 的界面半段
+  （"数据只到 2026 时，2027 显示节、不显示休/班"）写成"随 W5"。这句在 W5 收尾时**现量否证过一次**：
+  `packages/domain/src/holidays.ts:108 adjustmentOn` 与 `festivalsOn` 在**任何界面里都没有消费者**
+  （全仓 grep 只命中 `domain` 自己 + 它的测试 ⇒ 日历面根本没读这两个函数）。
+  倒数日卡片面本来就不画休/班（那是日历那一屏的事），所以这条**不是 W5 漏做，是当初挂错了工单**，
+  改挂 **W6 / W8**（日历第二源 + 三端接线）—— 而那两个落点正是并行会话在整片重写的
+  `packages/ui/src/calendar/*`，所以它现在**做不了**，不是不想做。
 
 #### ⏹ W7 · 纪念卡片导出为成品图
 
@@ -1210,9 +1252,9 @@ W0b ─> 随时可做（台账那半要等文件干净）
 | W0b 遗留缺口 | 🟡 ①② | 台账需干净 | 3 | 16 文件路径/库名旋钮；harness 22 绿 0 红；③ 转投单写者文档待入 traps |
 | W2 `EVENT` 实体 | ✅ | D1/D2 ✅ | 4 + 静默门禁人工勾 | 20/7/17/41/30 passed；`listEvents` 已进 READ_PATTERNS 且三腿验过能红 |
 | W6 日历第二源 | ⏹ 排后 | W2 | 2 | 落点四文件正被并行会话整片重写（撞车面见 §8.2 开头） |
-| W5 卡片网格 | 🟡 代码半 | W2、W0 | 5 | 11 passed + 12 例变异 0 未证 + 9 道门禁 rc=0；🔴 判据⑤ e2e 未跑（W5-e2e） |
+| W5 卡片网格 | ✅ | W2、W0 | 5 | 12 passed + 12 例变异 0 未证 + 9 道门禁 rc=0；e2e **6 passed**（整族 15 passed）、三张图已看、看图照出"逾期卡没有日期行"并修成 `94760c82`，两腿变异各红一次 |
 | W7 成品图导出 | 🔄 并行 | W5 | 2（含 RN 出图取证） | `heyta-wt-w7` 进行中，本表不代它主张读数 |
-| W8 三端接线 | ⏹ 排后 | W5/W6 | 3 | 同 W6：日历线未落地前不动 `CalendarScreen` |
+| W8 三端接线 | 🔄 并行 | W5/W6 | 3 | 🔴 原先这行写"排后：同 W6，日历线未落地前不动 `CalendarScreen`"—— **那是按整条线推断出来的，现量否证过**：W8 的落点在 main 里逐个文件都干净，且 web 半已随 W5 落地。现由 `heyta-wt-w8` 在跑（移动半 + 壳级门禁），读数它自己填，本表不代它主张 |
 | W9 提醒（web 半 + DST） | ✅ web 半 | 可与 W2 并行 | 3 | 42/28/40 passed；变异 9 臂 9/9 红、0 未证；移动端那半**没动** |
 | W10 AI 工具目录 | ✅ | **W2 之后** | 3 + 差集归零 | 130/223/1019 passed；变异**第一趟 3 臂无牙**→补判据→第二趟 6/6 红 |
 | W4b 调休通道 + ADR | 🔄 并行 | 独立（1 条迁移） | 4 | `heyta-wt-w4b` 已落 3 笔（schema/线协议/`adjustmentOn` 接缝），迁移在写 |
