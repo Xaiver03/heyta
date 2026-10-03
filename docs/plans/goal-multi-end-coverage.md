@@ -928,7 +928,7 @@ Chrome 图标、信息气泡、Google 搜索栏本来就是蓝的。也就是说
 |---|---|---|
 | ① 批五③ 移动端还原卡 JSX + i18n 中英复验 | ✅ | `git show HEAD:apps/mobile/src/screens/ExportScreen.tsx` 里 `restoreFromBackup`/`parseExportDocument`/`restoreIntoEmptyTarget` 三个符号**共 5 处命中**；`check:ui-language` exit 0；中英词条对等由 `@heyta/i18n` 的用例钉着（本轮 `pnpm -r test` 全过） |
 | ② 批五④ 设备判据转绿 + 变异 + 截图人看 + 审计回填 | ✅ | §7.6（26 项 / 0 失败）、§7.9（两条变异臂在当前产物上重证）、§7.12–§7.13（链逐段读数） |
-| ③ `pnpm check` 全量绿 | ✅ **达成** | §7.17：干净检出 @ `1ac5913a`，61 段一次跑完，`FULL_CHECK_INNER_EXIT=0`。**没有放宽任何基线、没有改别人的判据**；三段红（l4 / landing-e2e / shell-unicode）各自当场修 |
+| ③ `pnpm check` 全量绿 | ✅ **达成** | §7.17：干净检出 @ `1ac5913a`，61 段一次跑完，`FULL_CHECK_INNER_EXIT=0`。**没有放宽任何基线、没有改别人的判据**；三段红（l4 / landing-e2e / shell-unicode）各自当场修<br>✅ **14:32 在收尾后的 HEAD 上重证**：同一把尺子 @ `a04753b6` 仍 `FULL_CHECK_INNER_EXIT=0`，见 §7.23 |
 | ③ `pnpm reinstall:all` 四端重装绿 | ⚠️ **差一段** | android ✅（`57e0e1fc`，含新加的前台窗口判据）；mac / windows ✅ 但**是 09:5x 那一趟的读数**，本批按包输入证明它们不受影响（`package-app.sh` 只吃 `apps/web`+`packages/app-host`）；**ios 🔴 被 `pod install` 挡住**（§7.19 那张表）<br>✅ **14:2x 已关闭**：四端在**同一载体 `940af1c0`** 上逐段跑绿，见 §7.21 + §7.22（本行原句留着，因为它记录的"当时差 ios 一段"确实成立过） |
 | ③ 按归属纪律提交 | ✅ | 本条线这一轮 7 笔：`e446e54e` `f79d3733` `1ac5913a` `661cff78` `860fe82a` `57e0e1fc` + 本笔。全部 `git commit --only <点名路径>`，每笔之后 `git show --name-status` 只含自己点名的路径（`e446e54e` 13 条、`f79d3733` 2 条、`1ac5913a` 1 条、`661cff78` 2 条、`860fe82a` 1 条）。暂存区在提交前实测 `git diff --cached --name-only \| wc -l` = **10**，全是我自己那 10 条 rename，**没有别人的暂存条目被带走** |
 
@@ -1038,3 +1038,23 @@ windows 那张还额外开着**头像菜单**（`登录 / 注册` 在第一项 +
 （`a371a658` `9f1cc9c3`），`git diff --name-only 940af1c0..HEAD` 实测只有
 `scripts/lib/mobile-e2e.sh`、`scripts/mutate-closeout-gates.sh`、`scripts/verify-mobile-repeat.sh`
 三行，`apps/` 与 `packages/` 命中 **0** ⇒ 四端产物输入未变。
+
+### 7.23 ✅ `pnpm check` 全量绿**在收尾之后的 HEAD 上重证了一次**（14:23–14:32，`a04753b6`）
+
+§7.17 那条绿是 `1ac5913a` 的读数，而它之后 main 又走了 6 笔（本条线 3 笔 + 并行 3 笔）。
+把整条链在**干净检出** `/tmp/heyta-g5` @ `a04753b6` 上重跑一遍：
+
+```
+命令：pnpm check（14:23:5x 起 → 14:32:0x 止）
+结果：FULL_CHECK_INNER_EXIT=0        ← 写在日志里的真退出码，不是包装命令的
+逐包：server 2095 passed | 1 skipped · web 1500 | 12 skipped · app-host 1303 ·
+      mobile 538 · node-host 165 · desktop 12 · 其余 packages 全 passed，零 failed
+```
+
+🔴 **顺带量到一条"只在混合工作树成立"的红，别误接**：同一时刻在主检出跑 `pnpm check:docs` 是 **exit 1**，
+7 处"本机有、仓库里没有"的死链全部指向并行会话**未跟踪**的文档
+（`adr/0046-*`、`plans/trash-and-archive.md`、`research/trash-and-archive-*`、
+`plans/calendar-year-time-*`、`apps/web/evidence/calendar-day/`）。
+逐条核过归属：引用它们的 `docs/README.md` 等三份**自己就还是 `M`（未提交）**，
+而 `git show HEAD:docs/README.md | grep -c "0046-lossless"` = **0** ⇒ **HEAD 不红**，
+干净检出同一把尺子 `exit 0`（上面那条链里就含这一道）。**不代改、不 `git add` 别人的文档。**
