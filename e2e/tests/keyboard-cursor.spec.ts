@@ -57,8 +57,19 @@ function readRows(page: Page) {
   );
 }
 
-/** 断言"有且只有一行高亮"，返回它的下标与标题。 */
-async function onlyHighlighted(page: Page, label: string): Promise<{ at: number; title: string }> {
+/**
+ * 断言"有且只有一行高亮"，返回它的下标、`id` 与标题。
+ *
+ * 🔴 返回类型里**必须带 `id`**：跨投影那条判据（K4）比的就是两行 `task-item-<id>`
+ * 里的 `<id>`（用标题比会被行尾插槽骗到，见上面 `readRows` 的注释）。
+ * 之前这里声明的是 `{at, title}` 而 `return` 里塞着 `id` —— **类型在说谎**，
+ * 调用方只能靠 `as` 硬掰。e2e 以前没有类型检查载体，所以没人看见；
+ * 现在有了（`e2e/tsconfig.detail-pane.json`），第一趟就把它报出来了。
+ */
+async function onlyHighlighted(
+  page: Page,
+  label: string,
+): Promise<{ at: number; id: string; title: string }> {
   const rows = await readRows(page);
   expect(rows.length, `${label}：列表里没有行（数据没灌进去，这条判据量不到东西）`).toBeGreaterThan(0);
   const on = rows.map((r, i) => (r.highlighted ? i : -1)).filter((i) => i >= 0);
