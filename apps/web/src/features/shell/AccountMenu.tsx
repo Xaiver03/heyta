@@ -73,6 +73,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
+import { placeAnchoredPanel } from '@heyta/ui';
 import { CircleUser, LogIn, LogOut, Settings, TrendingUp, UserRoundPen } from 'lucide-react';
 
 /**
@@ -162,7 +163,11 @@ export function AccountMenu({
   }, [open]);
 
   /**
-   * 锚点：面板 fixed 到触发器下方（放不下就上方），并夹在视口内。
+   * 锚点：面板 fixed 到触发器那侧空间大的一边，并夹在视口内。
+   *
+   * 算术在 `@heyta/ui` 的 `placeAnchoredPanel`（四端共用，单测钉住翻转与夹取）；
+   * 这个 effect 只干两件属于宿主的事：**量**（DOM rect + 设计 token 换算的像素值）
+   * 与**重算时机**。
    *
    * 在 layout effect 里量（不是 effect）：面板与坐标同一次提交里就位，
    * 人看不到"先在左上角闪一下再跳过去"。
@@ -176,22 +181,12 @@ export function AccountMenu({
       const trigger = wrapRef.current?.getBoundingClientRect();
       const panel = panelRef.current;
       if (trigger === undefined || panel === null) return;
-      const gap = tokenPx('--ht-space-1');
-      const edge = tokenPx('--ht-space-2');
       const size = panel.getBoundingClientRect();
-      // 🔴 **哪边空间大就往哪边弹**，不是"下面装不下才翻上去"。
-      //    塌缩态（≤768px）的头像在**底部导航**里：下方虽然还塞得下（面板矮），
-      //    但那样面板会盖住底部导航自己 —— 而"菜单盖住触发它的那条栏"
-      //    是实测被判错的那种形态（e2e `account-menu.spec.ts` 的塌缩态用例）。
-      const roomAbove = trigger.top - gap - edge;
-      const roomBelow = window.innerHeight - trigger.bottom - gap - edge;
-      const flipUp = roomAbove > roomBelow;
-      const top = flipUp
-        ? Math.max(edge, trigger.top - gap - size.height)
-        : trigger.bottom + gap;
-      const left = Math.min(
-        Math.max(edge, trigger.left),
-        Math.max(edge, window.innerWidth - size.width - edge),
+      const { top, left } = placeAnchoredPanel(
+        { top: trigger.top, left: trigger.left, bottom: trigger.bottom },
+        { width: size.width, height: size.height },
+        { width: window.innerWidth, height: window.innerHeight },
+        { gap: tokenPx('--ht-space-1'), edge: tokenPx('--ht-space-2') },
       );
       setPos({ top, left });
     };
