@@ -1,7 +1,8 @@
 # 交接：多端补齐（重点移动端）Goal —— 当前停在哪
 
-> 状态行：**🔄 未完成**。条件 1 的 6 行里 **3 行 ✅ / 3 行 🟡**；条件 2 **未达成**（`pnpm check` 57/62 段可过、
-> 四端重装本轮没跑）。**这条 Goal 没有被标记完成，也不要照本文件当成已完成接手。**
+> 状态行：**🔄 未完成**。条件 1 的 6 行里 **3 行 ✅ / 3 行 🟡**；条件 2 **未达成**（`pnpm check` 上一次现量是
+> **57/62 段可过** —— ⚠️ 那是旧载体上的读数，段数总数此后已漂到 **63**（现量 `node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'`），
+> 所以"57"描述的是**那一趟**，不是当前仓库；四端重装本轮没跑）。**这条 Goal 没有被标记完成，也不要照本文件当成已完成接手。**
 > 唯一权威过程账在 [`goal-multi-end-coverage.md`](goal-multi-end-coverage.md) §7（§7.27 字形定论、§7.28 完成条件逐条现量），
 > 阻塞与归属账在仓库根 [`../../BLOCKED.md`](../../BLOCKED.md)（B33/B41/B42/B43/B45/B47/B50/B51/B52），
 > 逐程流水在 [`../../PROGRESS.md`](../../PROGRESS.md)。本文件**不重复决策与归因**，只写"现在在哪、下一步按什么顺序做"。
@@ -49,14 +50,14 @@
 | 任务 2：反向验证"拿掉 onEdit ⇒ 用例必红" | ✅ | 红→绿两段输出记在 goal §7 任务 2 那节 |
 | 任务 3：清单/标签改名、归档入口、习惯改名与删除 | ✅ | `organizer-rename.spec.ts` **26 passed**；`renameTag` 与习惯改名是本轮新建的 action（一个意图一个 op，未 fan-out） |
 | 任务 3 验收：两端各一组用例 + `check:reachability` 绿 | ✅ | reachability 现量 exit 0 |
-| **Goal 第④步：父子层级选择器**（`setParent` + 一层/环/自指守卫 + 两端界面与词条） | ✅ **做完，在未合并分支** | `feat/list-parent`（基线 `0a61c0a6`，**未合**）。读数见 §0 表第三行；**跨端形态是代拍**（依据 + 一条 `git revert` 回退写在 §5 第 4 步）；合流被并行线的七个 `M` 挡住（§3.3） |
+| **Goal 第④步：父子层级选择器**（`setParent` + 一层/环/自指守卫 + 两端界面与词条） | ✅ **做完，且分支侧已把 main 合进来** | `feat/list-parent` @ `c983a7cf`（零冲突、并集与归属核对齐，见 §3.3）。**跨端形态是代拍**（依据 + 回退写在 §5 第 4 步）。⚠️ 这一行旧账写"合流被七个 `M` 挡住"—— 现在只剩**两张词条表**，且挡的是"在 main 上落那一笔 `--ff-only`"（检出层），不再是三方冲突风险 |
 | Goal 第④步的"守卫不许漂移" | ✅ 有常驻判据 | 领域那条"候选集 = `validateProjectParentChange` 的展开（唯一差别 = 归档不进候选）"逐对断言，两端都走同一个 `folderTargetsFor`；web 6 条 DOM 级判据 + 8 臂变异（`aria-disabled` 那种"说了但没禁用"的漂法也被"点它什么都不该发生"那条抓住） |
 | 任务 4：移动端传 `share`（周小结） | ✅ | `growth-share-summary.spec.ts` **13 passed** + 变异两臂 |
 | 任务 4：词条 `{{count}}` 与 `{count}` 字形统一 | ✅ | **定论是"本来就只有一种"**：`{{`/`}}` 各 2 行且**全是注释**，真值 `web.growth.year.heatmap` 两端都是单层 `{count}`；交付物 = 三条测量 + 一条常驻判据 + 一次变异（goal §7.27） |
 | 任务 4：移动端传 `activityDays`（年度热力图） | 🟡 **不归本批** | 被冻结判据 `apps/mobile/tests/growth-display.spec.ts:365` 钉成空串 ⇒ **B41** |
 | 任务 4：移动端传 `onRepair`（补打卡） | 🟡 **不归本批** | `HabitStreakList.tsx:269` 是 **或**条件 + `:302` 钉 `repairAction` 必须 `undefined` ⇒ **接了也不渲染、不报错** ⇒ **B42** |
 | 任务 4：`onFreshStart` 不许顺手加 | ✅ 按书执行 | 无对应动作 ⇒ 写进 **B43**，一行代码都没加 |
-| 任务 4：「我的」加权益/到期可见 | 🟡 **半** | 权益卡已挂（消费 `app-host#fetchHostedEntitlementReading`）；**"到 X 日到期"拿不到** —— 那次 GET 一个响应字段都不消费、web 侧同样只有两个布尔 ⇒ 要动服务端面 ⇒ **B45** |
+| 任务 4：「我的」加权益/到期可见 | 🟡 **半** | 权益卡已挂（消费 `app-host#fetchHostedEntitlementReading`）；**"到 X 日到期"拿不到** —— ⚠️ 旧账写"那次 GET 一个响应字段都不消费"，**这句是错的**（`packages/domain/src/subscription.ts:189-230` 确实消费 `status`/`errorCode`/`reason`/`currentPeriodEnd`）；真缺口是**服务端 402 body 只有 `{error, errorCode, reason}`**（`server/src/entitlement.ts:376-380`），那个可选槽位永远 undefined ⇒ 要动服务端面 ⇒ **B45**（详见 §5 第 3 步那条纠正记录） |
 | 任务 4 验收：`check:payment-entry`、pricing 一致 | ✅ | `check:payment-entry` exit 0；**权威名是 `check:pricing`**（任务书里写的 `check:pricing-consistency` 是**文件名**不是 pnpm 别名，我照名字跑得到 "command not found" 的假红 —— 第三次踩 B50，已在 B50 追加）|
 | 拍板 1：移动端提醒不做，禁令前提要拍 | ✅ 已拍并回写 | 前提被**第三个自研原生模块**否证（B33）；并行条线已实施原生投递，本行**不代其主张验收读数** |
 | 拍板 2：AI 功能不做，但 `check:ai-coverage` 改成按端枚举 | ✅ | 提交 `05293b7d`；门禁现在逐端打印 `mobile 0/5`，接一半会红（变异：塞两条探针 ⇒ 精确点名缺的 3 条）|
@@ -66,7 +67,7 @@
 | 界限：白名单外只读 | 🟡 两处越界候选，如实记 | ① 根 `package.json` 被改 —— **任务 1 要求"补 verify: 别名"必然要动它**，属隐含授权；② `BLOCKED.md` / `PROGRESS.md` 是任务书自己指定的记录文件。其余零越界 |
 | 规矩：不新增依赖 | ✅ | 51 个文件里无 lockfile、无 `package.json` 依赖段变更 |
 | 规矩：skipped 必须 0 | ✅ | 本批四份判据文件现量 **71 passed / 0 skipped** |
-| 收尾：`pnpm check` 全量 exit 0 | 🔴 **未达成 57/62** | 5 段红的逐条归属在 goal §7.28 与 **B51** |
+| 收尾：`pnpm check` 全量 exit 0 | 🔴 **未达成**（上一趟 **57/62**；⚠️ 该读数属于**那一趟的载体**，段数总数现已量 **63**） | 5 段红的逐条归属在 goal §7.28 与 **B51**；下一次现量起点应写 **≤56/63**（§3.1） |
 | 收尾：四端重装 `INNER_EXIT=0` + 四张截图 | 🔴 **本轮没跑** | 环境不在窗口（§4）；**别拿上次跑绿的载体顶替** |
 | 规矩：提交用点名路径、不 push | ✅ 且已升级 | 本轮起改用 plumbing + "blob = HEAD + 我的文本"（**B53**），并补了一步：`96f3293d` 曾把并行会话的整节替他们提交 |
 
