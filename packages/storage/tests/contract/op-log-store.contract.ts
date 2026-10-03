@@ -377,5 +377,36 @@ export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreCont
         expect(await store.getLastServerSeq()).toBe(7);
       });
     });
+
+    /**
+     * META 的通用读写（公共事实缓存的落点，ADR-0052 §2.5）。
+     *
+     * 🔴 这四条各自挡一种"看起来没事"的坏法：
+     *  · 查不存在的键回 `0` / `''` 而不是 `undefined` ⇒ 上层会把"从没缓存过"
+     *    读成"缓存了一条空值"，判据①那条"没有覆盖也是正常状态"就没了载体；
+     *  · 数字被存成字符串（SQLite 那套最容易）⇒ 上层 `typeof === 'number'` 恒假，
+     *    表现为"拉取时间永远是 0"，而界面一个错都不报；
+     *  · 实现直接把值写到 OPS / 别的 store ⇒ 会污染 op-log 的账；
+     *  · 覆盖写没生效 ⇒ 条件请求拿着旧 ETag 一直 304，部署方改了公告也读不到。
+     */
+    it('META 通用读写：缺键给 undefined、值型不变、覆盖生效、不碰游标', async () => {
+      await withStore(async (store) => {
+        expect(await store.getMetaValue('publicFactsEtag')).toBeUndefined();
+
+        await store.setMetaValue('publicFactsEtag', '1730000000000.1.2');
+        expect(await store.getMetaValue('publicFactsEtag')).toBe('1730000000000.1.2');
+
+        await store.setMetaValue('publicFactsFetchedAt', 1234);
+        const fetchedAt = await store.getMetaValue('publicFactsFetchedAt');
+        expect(typeof fetchedAt, `数字存成了 ${typeof fetchedAt} —— 上层的数字判定会恒假`).toBe('number');
+        expect(fetchedAt).toBe(1234);
+
+        await store.setMetaValue('publicFactsEtag', '1730000000000.9.9');
+        expect(await store.getMetaValue('publicFactsEtag')).toBe('1730000000000.9.9');
+
+        // 游标与公共事实同住 META，但互不打扰。
+        expect(await store.getLastServerSeq()).toBe(0);
+      });
+    });
   });
 }
