@@ -17,10 +17,13 @@
  *
  *   1. 导航那个「登录」的 href 必须**就是**应用地址且带那个参数 —— 参数名不是抄的，
  *      是从**同一页上另一条同源链接**（页头那颗）与 URL 本身推出来的；
- *   2. 点下去之后**认证表单真的可见**（`auth-form-email` 是四端共用的字段契约，
- *      不是 web 恰好这么写的 DOM）—— 这一条才是用户那句"直接进入到登录界面"；
+ *   2. 点下去之后**先只看到一张浮层**（首启隐私那一层），答完决定之后
+ *      **认证表单真的可见**（`auth-form-email` 是四端共用的字段契约，
+ *      不是 web 恰好这么写的 DOM）—— 这两步合起来才是用户那句"直接进入到登录界面"，
+ *      而第一步单独成判据是因为**叠两层模态**是这次改动自己引入的形状（见下面 ②）；
  *   3. `/signin/` 那一页**没有说明性小节**，但主行动仍然在（防止"删过头"变成空页）；
- *   4. 那段说明在 `/docs/account/` 上**读得到**（needle 来自被搬走的那句话本身）。
+ *   4. 那段说明在 `/docs/account/` 上**读得到**（needle 来自被搬走的那句话本身）；
+ *   5. 出口按钮与页脚那条链接在**同一列**（参照物取自同一页，不引入像素阈值）。
  *
  * ⚠️ 与 `apps/landing/tests/` 的分工：那边钉"代码会渲染出什么"，
  * 这里钉"线上那份产物渲染出了什么"。两边都要 —— 只有前者会漏"没发布"，
@@ -85,14 +88,27 @@ test('线上「登录」：点一次就到登录界面，中途不落在那段�
 
   await page.screenshot({ path: `${SHOT_DIR}/live-1-landing-zh.png` });
 
-  // ② 点它 —— 认证表单必须真的出现在屏幕上。
+  // ② 点它 —— 到的是应用，而且**先只看到隐私那一层**。
+  //
+  // 🔴 这一条不是妥协，是判据：全新访客（干净上下文 = 没做过隐私决定）点「登录」
+  // 落到应用时，第一屏必须是**一张**浮层，不是"登录表单被卡片盖住一半"。
+  // 那个叠层形状是这次深链改动自己引入的，2026-10-03 由线上截图看到（第一版这条
+  // 用例直接断"表单可见"，结果它红 —— 红得对：表单当时确实不在，因为隐私那一层
+  // 还没答，而深链的意图被记到那之后才兑现）。
   await signin.click();
   await page.waitForLoadState('domcontentloaded');
+  const consent = page.locator('[data-testid="privacy-consent-dialog"]').first();
+  await expect(consent).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('[data-testid="auth-form-email"]')).toHaveCount(0);
+  await page.screenshot({ path: `${SHOT_DIR}/live-2a-first-visit-consent.png` });
+
+  // 答完之后，登录表单真的出现 —— 而不是永远不兑现。
+  await page.locator('[data-testid="privacy-consent-accept"]').first().click();
   await expect(page.locator('[data-testid="auth-form-email"]').first()).toBeVisible({
-    timeout: 60_000,
+    timeout: 30_000,
   });
   await page.waitForTimeout(600);
-  await page.screenshot({ path: `${SHOT_DIR}/live-2-signin-panel.png` });
+  await page.screenshot({ path: `${SHOT_DIR}/live-2b-signin-panel.png` });
 
   // 面板不是空壳：第二步要能真的往下走 —— 「继续」这颗在，表单才是活的。
   await expect(page.locator('[data-testid="auth-form-continue"]').first()).toBeVisible();
@@ -120,8 +136,12 @@ test('线上英文页同一条路（语言参数不能把 signin 挤掉）', asy
 
   await signin.click();
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('[data-testid="auth-form-email"]').first()).toBeVisible({
+  await expect(page.locator('[data-testid="privacy-consent-dialog"]').first()).toBeVisible({
     timeout: 60_000,
+  });
+  await page.locator('[data-testid="privacy-consent-accept"]').first().click();
+  await expect(page.locator('[data-testid="auth-form-email"]').first()).toBeVisible({
+    timeout: 30_000,
   });
   // 界面确实跟着切到英文 —— 否则"参数带上了但语言丢了"这条判据就没牙。
   await expect(page.locator('html')).toHaveAttribute('lang', /^en/);
@@ -143,6 +163,26 @@ test('线上 /signin/ 只剩出口，那段说明在文档中心读得到', asyn
   await expect(body.locator('h1')).not.toHaveText('');
   // 出口至少一条（没配应用时是站内锚点，配了是外链 —— 两种都算"有出口"）。
   expect(await body.locator('a[href]').count()).toBeGreaterThan(0);
+
+  /**
+   * 🔴 出口必须落在**内容列**里，而不是贴视口左边缘。
+   *
+   * 这条是"人看图"看出来的：`.lp-section` 只管纵向留白，横向容器是它里面的
+   * `.lp-wrap`，少写一层时按钮跑到 x≈10 而引言在 x=88 —— 同一屏两套左边距，
+   * 读起来就是"页面坏了"（2026-10-03 第一版线上截图实测到的形状）。
+   *
+   * 参照物取**同一页页脚**里的那条链接：两者都是 `.lp-wrap` 的直接子元素，
+   * 所以这条比的是"同一列"，不引入任何编出来的像素数。
+   */
+  const ctaBox = await body.locator('.lp-page__cta a').first().boundingBox();
+  const footerBox = await page.locator('footer .lp-wrap a').first().boundingBox();
+  expect(ctaBox, '正文里没有主行动按钮 —— 上面那条 a[href] 判据的前提变了').not.toBeNull();
+  expect(footerBox, '页脚里没有可比的参照链接：这条判据的参照物没了，要改就一起改').not.toBeNull();
+  expect(
+    Math.round(ctaBox!.x),
+    `出口按钮在 x=${String(Math.round(ctaBox!.x))} 而内容列在 x=${String(Math.round(footerBox!.x))} —— 少了一层 .lp-wrap`,
+  ).toBe(Math.round(footerBox!.x));
+
   await page.screenshot({ path: `${SHOT_DIR}/live-4-signin-page.png` });
 
   // ④ 说明的归处：文档中心那篇文章里，**线上那份**真的读得到。
