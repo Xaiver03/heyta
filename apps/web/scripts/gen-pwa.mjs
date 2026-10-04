@@ -31,7 +31,14 @@ import { fileURLToPath } from 'node:url';
 
 import { ADAPTIVE_CARD_KINDS, buildAdaptiveCardPlaceholder } from '@heyta/widget-core';
 import { DEFAULT_LOCALE, translate } from '@heyta/i18n';
-import { tokensForTheme } from '@heyta/design-system';
+import {
+  BRAND_MARK_CANVAS,
+  BRAND_MARK_PWA_SAFE,
+  BRAND_MARK_RADIUS,
+  BRAND_MARK_SAFE,
+  brandMarkSvg,
+  tokensForTheme,
+} from '@heyta/design-system';
 import { build as esbuild } from 'esbuild';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -97,31 +104,35 @@ const t = (key, vars) => translate(DEFAULT_LOCALE, key, vars);
 //    **静默丢掉**（产出没有字形的图，而不是报错）。所以字形是 path。
 // ─────────────────────────────────────────────────────────────────────
 
-/** 「h」—— 两条竖 + 一横。坐标基于 512×512 画布。 */
-function hGlyph(scale, offset) {
-  const rect = (x, y, w, h) =>
-    `<rect x="${offset + x * scale}" y="${offset + y * scale}" width="${w * scale}" height="${h * scale}" rx="${22 * scale}" fill="${ON_PRIMARY}"/>`;
-  return [
-    rect(140, 120, 52, 272), // 左竖（带升部）
-    rect(320, 228, 52, 164), // 右竖
-    rect(140, 228, 232, 48), // 横
-  ].join('\n    ');
-}
-
-function iconSvg({ size, radius, scale, offset }) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <rect width="${size}" height="${size}" rx="${radius}" fill="${PRIMARY}"/>
-  <g>
-    ${hGlyph(scale, offset)}
-  </g>
-</svg>
-`;
-}
+/**
+ * 「h」的几何**不在这里** —— 它在 `@heyta/design-system` 的 `brand-mark.ts`。
+ *
+ * 原来这两条竖和一横只写在本文件里，于是其他端要图标只有两条路：手抄一份路径
+ * 数据（落地页的 favicon 就是这么长出第二枚 mark 的），或者干脆用脚手架默认图
+ * （Android 的 launcher 图标至今是 React Native 模板那张）。抽成一份之后，
+ * `scripts/gen-app-icons.mjs` 与各端清单从同一个函数栅格化。
+ *
+ * 🔴 抽取这一步**不改变任何产物字节**（这是结构重构，不是行为变更）：
+ * `node apps/web/scripts/gen-pwa.mjs --check` 仍然逐字节对得上，
+ * 而 `packages/design-system/tests/brand-mark.spec.ts` 把"这份 SVG 等于提交物"钉成判据。
+ */
 
 // 普通图标：圆角方块铺满
-const plain = iconSvg({ size: 512, radius: 112, scale: 1, offset: 0 });
+const plain = brandMarkSvg({
+  size: BRAND_MARK_CANVAS,
+  radius: BRAND_MARK_RADIUS,
+  ...BRAND_MARK_SAFE,
+  background: PRIMARY,
+  glyph: ON_PRIMARY,
+});
 // maskable：**内容必须落在中心 80% 的安全区**，否则被圆形/方形遮罩切掉字形
-const maskable = iconSvg({ size: 512, radius: 0, scale: 0.72, offset: 72 });
+const maskable = brandMarkSvg({
+  size: BRAND_MARK_CANVAS,
+  radius: 0,
+  ...BRAND_MARK_PWA_SAFE,
+  background: PRIMARY,
+  glyph: ON_PRIMARY,
+});
 
 emit(join(ICONS, 'icon.svg'), plain, 'icons/icon.svg');
 emit(join(ICONS, 'icon-maskable.svg'), maskable, 'icons/icon-maskable.svg');
