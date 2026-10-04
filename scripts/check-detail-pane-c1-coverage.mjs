@@ -147,6 +147,57 @@ const hasExternal = (s) => URLRE.test(s.body) || extFlOf(s.body).length > 0;
 const noExt = sections.filter((s) => !hasExternal(s) && !SECTION_EXC.test(s.title));
 const excusedExt = sections.filter((s) => !hasExternal(s) && SECTION_EXC.test(s.title));
 
+// 腿 6：**未核实台账**（`## B6.` / `## C2.`）的每一条必须写明怎么关掉它。
+// 为什么落在台账而不是落在 C1b 各节：目标第 1 条那句"带日期+出处+**未核实标记**"，
+// 本文档的实现方式是把未核实项**集中登记**到 B6/C2（各节里只留指针），所以"每节 ≥1 枚
+// 未核实字样"那种形状与文档自己的组织约定冲突 —— 会逼着已经核完的节去伪造一枚标记。
+// 于是这一档问的是台账本身的老问题：2026-10-04 21:3x 现量 34 条未核实项里只有 3 条写了
+// 「补法」⇒ 31 条只说明"这条不算依据"，不说明"下一轮靠什么把它算依据"，也没有一条写明
+// 拿不到。那种台账会在每一轮被重读一遍、每一轮都原地重新推断一次成本。
+// 🔴 三档词表是封闭的，且**划线不算结案**：`~~…~~` 只表示"原句被推翻"，被推翻的条目里
+//   仍然常带一条活的尾巴（现量：C2 #1 划掉的是"右栏放什么"，尾巴是"其余 6 个视图仍未穷举"）。
+//   真要结案就写 `结案取证：` —— 让结案这个动作留下证据，而不是留下删除线。
+// 🔴 标签位置：B6 #1/#2 是**行内**写法（"…只证到 PMID。补法：取 SAGE DOI 原文 PDF"），
+//   C2 #21 是**独立续行**写法 —— 只认行首会把已有补法的两条读成缺，那是探针形状错不是内容缺。
+//   所以取"标签前是行首/空白/句读"这一档，且仍要求紧跟冒号（"这条的补法以后再想"不算有补法）。
+const CLOSER_LABEL = /(?:^|[\s。；，])\*{0,2}(?:补法|不可补|结案取证)\*{0,2}\s*[：:]/;
+const ledgerItems = [];
+for (const headRe of [/^## B6[.．]/, /^## C2[.．]/]) {
+  const s = lines.findIndex((l) => headRe.test(l.trim()));
+  if (s === -1) {
+    console.log('🔴 未核实台账小节整段找不到（B6 或 C2 被改名/挪走）—— 分母为空，本判据拒绝报绿。');
+    process.exit(1);
+  }
+  let e = s + 1;
+  while (e < lines.length && !/^## /.test(lines[e])) e += 1;
+  let cur = null;
+  for (let i = s + 1; i < e; i += 1) {
+    const m = lines[i].match(/^(\d+)\.\s/);
+    if (m) {
+      // 批次说明行（"第二批（…）："）不带编号，天然进不到这里；`---` 分隔线也不算条目的一部分
+      if (cur) ledgerItems.push(cur);
+      cur = { head: headRe.source, n: Number(m[1]), line: i + 1, body: [lines[i]] };
+      continue;
+    }
+    if (!cur) continue;
+    if (/^---\s*$/.test(lines[i])) {
+      ledgerItems.push(cur);
+      cur = null;
+      continue;
+    }
+    cur.body.push(lines[i]);
+  }
+  if (cur) ledgerItems.push(cur);
+}
+const openLedger = ledgerItems.filter((it) => !it.body.some((l) => CLOSER_LABEL.test(l)));
+const closedLedger = ledgerItems.filter((it) => it.body.some((l) => CLOSER_LABEL.test(l)));
+const perLedger = Object.entries(
+  ledgerItems.reduce((acc, it) => {
+    acc[it.head] = (acc[it.head] || 0) + 1;
+    return acc;
+  }, {}),
+);
+
 console.log(`取样：${doc.startsWith(root + '/') ? doc.slice(root.length + 1) : doc}（C1 表 ${lines.slice(start, end).length} 行区间）`);
 console.log(
   `C1 行 ${rows.length} 行 ⇒ 有对照节 ${rows.length - uncov.length} / 例外 ${excused.length} / 未覆盖 ${unexcused.length}；C1b 节 ${sections.length} 个（有推荐 ${sections.filter(hasRec).length} / 标题写明不需要拍 ${excusedSections.length} / 缺推荐 ${noRec.length}）（有外部锚 ${sections.filter(hasExternal).length} / 缺外部锚 ${noExt.length} / 标题豁免 ${excusedExt.length}）`,
@@ -182,8 +233,14 @@ dump('🔴 C1b 节只有自家路径的 file:line 而没有 URL，也没有第�
   return `  :${s.line} ${s.title.split('（')[0]} —— 自家路径引用=[${shown}]`;
 });
 dump('· 例外（只从节标题里认）', excusedSections, (s) => `  :${s.line} ${s.title.slice(0, 46)}`);
+dump(
+  '🔴 未核实台账里这条没写「补法 / 不可补 / 结案取证」中的任何一档（只说明"不算依据"，不说明"下一轮怎么关掉它"）',
+  openLedger,
+  (it) => `  :${it.line} ${it.head === '^## B6[.．]' ? 'B6' : 'C2'} #${it.n} ${it.body[0].replace(/^\d+\.\s*/, '').slice(0, 58)}…`,
+);
 
 // 逐节读数（含覆盖到的行号），让覆盖面可数而不是一个总数
+console.log(`\n承重(腿6)：${perLedger.map(([h, n]) => `${h === '^## B6[.．]' ? 'B6' : 'C2'} ${n} 条`).join('｜')}｜已结案档 ${closedLedger.length}｜缺 ${openLedger.length}（三档词表：补法/不可补/结案取证；划线不结案）`);
 console.log('\n逐节读数：');
 for (const s of sections) {
   const urls = (s.body.match(/https?:\/\/\S+/g) || []).length;
@@ -197,11 +254,11 @@ for (const s of sections) {
   );
 }
 
-const bad = unexcused.length + orphanSections.length + weak.length + noRec.length + noExt.length;
+const bad = unexcused.length + orphanSections.length + weak.length + noRec.length + noExt.length + openLedger.length;
 console.log(
   `\n结论：${
     bad === 0
-      ? 'C1 每一行要么有对照节、要么写明例外类别；每个对照节都有日期、出处、**外部锚**（URL 或第三方源码行号）与推荐那一档（或标题写明不需要拍）✅'
+      ? 'C1 每一行要么有对照节、要么写明例外类别；每个对照节都有日期、出处、**外部锚**（URL 或第三方源码行号）与推荐那一档（或标题写明不需要拍）；未核实台账逐条带「补法 / 不可补 / 结案取证」✅'
       : `🔴 ${bad} 处不成立`
   }`,
 );
