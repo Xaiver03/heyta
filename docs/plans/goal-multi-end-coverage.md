@@ -3072,3 +3072,31 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   它不参与判据（① 早就不挂 ③ 的退出码了）。所以更正落在本台账，不改活体脚本；下次换新链版本时带上。
 - ⇒ 对 ③ 那趟的读法因此改变：**第 8 步那张图若红，按真缺陷处理**（不再当作"已知会红"跳过），
   而 `xy_desc` 找不到行时先查 NOTE_B 是否还落在首行（第 4 臂那条边界），再查产品。
+#### 7.31.10 ③ 的第 11 条腿（node-host）四项前置离线核完；链的构建门是**按提交内容**比的，我按 mtime 数出来的那个数不算数（14:12–14:13 现量）
+
+- 为什么要单独核：③ 的三条跨设备腿里，第 9/10 条早就有读数（手机库远端 op、PG `operations=90/pg_tables=93`），
+  而第 11 条要**在载体里跑 node-host 的真 CLI**。设备窗口只有一次，腿断在"CLI 跑不起来"上等于白烧一个窗口。
+- 四项前置现量（全部零设备、零写库）：
+  1. 载体 `apps/node-host/dist/cli.js` **存在且真跑得起来**：用仓内 helper 同一条 node 解析顺序取到的
+     `~/.nvm/versions/node/v22.22.0/bin/node` 执行 `--help` ⇒ 打出「heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同步）」，`rc=0`。
+  2. `@heyta/node-host` 的 `package.json:17` 有 `"build": "tsup"` ⇒ 链里那句 `pnpm -r build` **覆盖得到它**
+     （这条如果不成立，第 11 条腿会拿旧 CLI 验新代码，正是 §7 第 27 条那一族在另一端的翻版）。
+  3. `sqlite3` 在 PATH（本机解析到 `/Users/rocalight/miniconda3/bin/sqlite3`）—— 脚本第 11 步直接用它数 `ops` 表。
+  4. helper 的形状对得上：`scripts/lib/mobile-e2e.sh:89` `CLI=<repo>/apps/node-host/dist/cli.js`、`:979 laptop()` 用
+     `$NODE "$CLI" … --json 2>/dev/null | tail -1`，而 `:983` 另有一条**不吞 stderr** 的 `laptop_ok` 变体 ——
+     那条才是"探针有没有跑起来"的判据来源（文件头 `:101-107` 写的就是"跑不起来"和"对端没收到"长得一模一样这件事）。
+- 🔴 **我按 mtime 数出来的"45 个 .ts 比 dist 新"不构成判据**：链的构建门比的是**提交内容**
+  （链 v20 `:163` = `git diff --quiet "$BUILT" "$CARRIER_HEAD" -- packages apps shared pnpm-lock.yaml package.json`；
+  时刻戳文件本身在 `:28 STAMP=/tmp/heyta-chain8.built`），
+  而 `checkout` 会给恢复出来的文件盖新 mtime —— 用 mtime 判新鲜度会把"内容没变"读成"dist 落后"。
+  那 45 个里面还包括 `packages/ui/dist/*.d.ts`（**产物**，不是源码），我当时没滤 `-path '*/dist/*'`。
+  ⇒ 结论：**③ 的 CLI 会不会重建由链那道提交级门决定，不由我数的 mtime 决定**；这一条我原本打算写成"载体 dist 落后 ⇒ 第 11 步验的是旧 CLI"，
+  那是**错的**，写在这儿是为了让下一位不重复我这个推法。
+- ⚠️ 一条对窗口读数的预期管理（不是优化，是别误判）：`/tmp/heyta-chain8.built` 现在**不存在** ⇒
+  下一次窗口成立时，链会**先跑一整趟 `pnpm -r build` 再起跑 ③**。那几分钟里日志不会有设备动作，
+  **不要读成卡死**，也不要为了省这几分钟去预置那枚 stamp —— 预置成别的提交就是让构建门闭着眼睛放行，
+  而它挡的正是"拿旧产物验新代码"。stamp 住 `/tmp` 这件事本身是同一条 `/tmp` 毛病（和 §7.31.8 那个 `EVID` 同族），
+  留到下一版链再做（**不改正在运行的链文件**：bash 边读边执行，`sed` 改长度会让它读到错偏移）。
+- 🔴 顺带记一次自己的命令形状错：我为了预测重建与否写了 `git diff --name-only "$S" …`，而 `$S` 当时是中文占位串「（无）」
+  ⇒ stderr 出 `fatal: bad revision`，可我的 `wc -l` 仍然打出 **`diff 数=0`** —— 一个空测量长得像"零差异、不用重建"的干净结论。
+  这是记忆里"空测量看着最干净"的又一次命中：**负向分支的读数必须先看 stderr，或者先断言输入是合法 rev**。
