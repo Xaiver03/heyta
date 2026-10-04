@@ -3773,6 +3773,31 @@ W0b ─> 随时可做（台账那半要等文件干净）
     （`LOG` 路径、等的哨兵清单、那句标签），`diff /tmp/chain-T2.sh /tmp/chain-T2b.sh` 只有 4 处（多一行理由注释、`LOG`、
     哨兵清单、`RC_T2` 改名 `RC_T2b`）；**68 段自校验、`timeout 1500`、负载门档、`HEYTA_LOAD_GATE_WAIT=3600` 一行都没动**。
 
+- ㊦ **mac 那一腿绿了（18:45:48 `RC_MAC=0`），而且它顺手把 ③ 那格的读数升级成了"裸路径可复现"**（04 18:4x–18:5x）
+  - 装包读数（`/tmp/chain-MAC-run.txt`，起跑 18:44:44 负载 `10.60`）：
+    `pnpm -r build` 先过 → 打包（.app + .dmg，`.dmg 也已签名`）→ `rm -rf /Applications/Heyta.app` → 拷进去 →
+    **安装对账：`.app` 里的 `web-dist` 与本机 `apps/web/dist` 是同一次构建（9 个 chunk）** →
+    安装副本自截屏：**窗口 1092×723、`…installed.png.webview.png` 内容占比 100.0%、主蓝采样命中 1266 ⇒ 判据"是共享 UI"成立**。
+    汇总大字照实列出没装的三端（`windows / android / ios 不在 --only 范围`）。
+    ⚠️ 边界：带的是 `HEYTA_SKIP_NOTARIZE=1`（去掉的是**没有上界的等待**，不是判据 —— 同一档实测 11h25m 不返回，见 ㉗/㊒ 那两条三臂实测）。
+  - ✅ **③ 那格的读数从此不需要 env 覆盖**：18:48 裸跑 `node scripts/check-shell-surfaces.mjs` ⇒
+    **`rc=0` / 判定 5 格 **5 绿 0 红；未取证 **0 栏****。原因是它默认读的那条路径
+    `/tmp/heyta-macos-dist/Heyta.app/Contents/Resources/web-dist` 被这一腿重新打上了当前产物 ——
+    18:48 现量三处 sha256 前缀**逐字相同**：`/tmp/heyta-macos-dist/…index.html` = `/Applications/Heyta.app/…index.html`
+    = 本机 `apps/web/dist/index.html` = `517c6ba76d00fb25`。
+    ⇒ ㊣ 那条"引用 0 栏必须带用了哪个覆盖"的告诫现在可以降级成：**裸路径成立，但覆盖仍然有效**（`HEYTA_MACOS_WEB_DIST`）。
+  - 👁 **⑤-3 的"人看过"这一格补上了 mac 那张**（我打开的是 `/tmp/heyta-reinstall-mac-installed.png.webview.png`）：
+    看到的是**暗色外观下的共享 UI**（这台机器的系统外观是暗色 —— §5 那条"暗色不是亮色的反相，必须实际切换查看"在这里是被动满足的，
+    不是我们主动切的，写清楚以免被读成"暗色已验收"）：左侧 rail 收集箱/今天/最近 7 天/已完成 + 四象限四条 + 清单/标签，
+    主区页标题「收集箱」+「未同步」chip +「AI 工具调用」一节，中央浮层是首启那张
+    「在使用联网功能之前」（中英双份、`服务条款`/`隐私政策` 两个链接、`同意并联网` 是主蓝实心钮、`只用本机` 是次级钮），
+    中文零豆腐块。**没有**看到倒数日那一屏 —— 这张图证的是"装进 /Applications 的是当前源码的界面"，
+    倒数日那一屏在包里由上面那条 sha 逐字相同 + 9 chunk 集合对账来证（与 Android/windows 那两格同一条边界，不混着说）。
+  - 📌 一条与 ㊣ 同一族的现场更新：**pid 772 还在跑**（18:49 现量 `etime 21:16:21 / %cpu 0.0 / state S`），
+    而它的 bundle 已经在 18:44 被 `rm -rf` + 覆盖 ⇒ 它现在执行的是**已从盘上摘掉的那份二进制**。
+    按 ㊣ 那条撤回报案处理：**不动它**（并行台账 `BLOCKED.md:3419` 早把"旧实例挡路"判过否证，本批的判据也不按窗口名选目标），
+    但**后来的窗口类门禁要先 `ps` 排僵尸**（§7 第 81 条第三种面目，这条不因为本批没杀它就失效）。
+
 
   - 🔴 **改名这一刀有代价，而且代价量出来了**：`check-shell-surfaces.mjs` 的 macOS "产物"栏默认读的就是
     **同一个路径** `/tmp/heyta-macos-dist/Heyta.app/Contents/Resources/web-dist`。18:22 裸跑现量
