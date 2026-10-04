@@ -1149,6 +1149,30 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   → `pnpm --filter @heyta/op-log build` exit 0 → 在**载体里**跑
   `IOS_DEVICE_NAME="heyta-iphone-17pro" bash scripts/reinstall-all.sh`（不在共享树上跑，理由见 §4.05 (10)）。
 
+- (24) **22:1x：第 11 号那 14 枚"逐枚量过"之后，结论是它们**不可能靠重钉闭合**——而且 B 与它被同一个上游事件挡着。**
+  🔴 **先量"图字节晚不晚于那次真改动"**（这一步决定动作是"重钉"还是"重拍"，跳过去就会写出假主张）：
+  逐枚 `git log -1 --format='%h %ad' -- <目录>/<png>` 现量 ⇒
+  **9 枚落在 `ab13c22e`（10-03 09:38）**（`calendar-capture.png`、`calendar-cells{,-dark,-empty}.png`、
+  `calendar-tall-viewport.png`、`calendar-toolbar.png`、`calendar-week-{bars,nav,tall}.png`），
+  **5 枚落在 `5e23b7bf`（10-03 23:58）**（`calendar-day-{full,drag-next,drag-prev,away,back-today}.png`）。
+  而把它们判红的那笔是 **`39032107`（10-04 10:11，主区页头改成"动作整体可换行"）**——
+  **14 枚的字节全部早于它** ⇒ 这些图**物理上画不出**当前页头形状。
+  ⇒ 所以"重钉 UIPIN 让它们归绿"这一手**不是捷径，是造假**：钉上去就是在主张"这张图画的是当前交付形状"，
+  而字节比那次改动早六个小时以上。唯一闭合动作是**重拍**（`§5 第 11 号`那句"重拍 + 人看 + 重钉"里的第一步）。
+  🟢 **装置早就有**（14:2x 那批建的，本轮没重造）：`research/tools/r17-reshoot-stale.sh` ——
+  默认 dry-run、`--confirm` 才动、前置不达标 **exit 3**、**刻意不自动重钉**（"钉"的前提是人打开看过）、
+  **不猜目录→spec 映射**（映射表里没有的目录点名报错，因为挑错 spec 会拿别的界面的图覆盖取证目录，
+  而那种破坏在输出上长得和"重拍成功"一模一样）。
+  22:1x 复跑五格读数：`✅ 4318/4319 空闲` · `❌ load1=25 > 12` · `❌ dist 落后源码 1 个（--strict）` ·
+  `✅ e2e/node_modules 在` · `❌ 载体不干净：packages/design-system/src/tokens.css 未提交，命中 4 个待拍目录`
+  ⇒ **`GATES=load,dist,src`**（这是环境无效，不是产品失败）。
+  🔴 **这一格真正值钱的地方**：那三格红的**同一个所有者**，与 (23) 里 B 的 `src` 那格**同源**——
+  都是**正在改 `packages/design-system/src/tokens.css`（连带 6 枚生成物）的那条线**：
+  它没提交 ⇒ B 的 `src` 红、重拍的"载体"红、`@heyta/design-system` 的 dist 落后、负载也被它的构建抬着。
+  ⇒ **一次等待同时覆盖 B 与第 11 号**，本线不代改、不代提交（那是别人的活文件）。
+  可复跑：`NO_COLOR=1 bash research/tools/r17-reshoot-stale.sh`（dry-run，看 `GATES=` 那行）·
+  `bash scripts/verify-mobile-window-gate.sh --target b`。
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）**G0. 调休标记（休/班）只画在月档，年档那 12 张月格里一颗都没有，而文档里没有"刻意不做"的登记。**
 看图看出来的（22:0x，`calendar-view-options/view-select-closed.png` 月档里 10-01…10-07 与 10-09 带绿色「休」、
 10-10 带橙色「班」；同目录 `view-tabs-year.png` 的年档 12 张月格**零枚**标记）。
