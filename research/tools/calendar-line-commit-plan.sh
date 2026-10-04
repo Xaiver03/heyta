@@ -27,6 +27,7 @@ PATHS=(
   # 🔴 10:1x 由新的 OUTSIDE_NS 读数格**当场照出来的漏件**：本线 09:0x 新建的楔住检测 lib，
   #    C 链的覆盖判据与窗口闸门都 source 它，它不在清单里 = A 提交出去的 HEAD 少一枚承重文件。
   scripts/lib/wedged-runner.sh
+  scripts/lib/ps-scan.sh
   scripts/verify-mobile-window-gate.sh
   scripts/verify-mobile-due-time.sh
   research/tools/r14c-carrier-chain.sh
@@ -276,7 +277,7 @@ echo "== 1b. 防「漏登记」：本线命名空间里改了却没点名的文�
 # ⚠️ `docs/reference/environment-traps.md` **刻意不在这里、也不在 PATHS**：那是并行会话共用的台账
 #    （14:1x 现量 ` M`、+318/-7；**本线占哪几条不抄在这里** —— 号段会漂而且不连续，唯一现量口径在交接 §4.05 那条 `for n in …grep -cE` 命令），点名它 = 把别人几百行未提交内容
 #    一起提交进去。本线条目的可复跑归属口径写在交接 §4.05。
-NS_RE='^research/tools/(r14c-|r17-|h-flaky-|calendar-line-|b-|f-boundary-)|^docs/plans/(calendar-year-time-and-mobile-profile|calendar-profile-handoff)\.md$|^scripts/(verify-mobile-window-gate|verify-mobile-due-time)\.sh$|^scripts/lib/(mobile-e2e-runner-probe|wedged-runner)\.sh$|^apps/web/evidence/(calendar-day|calendar-view-options|profile-panel)/[^/]+\.(md|png)$|^apps/web/evidence/(calendar-year|calendar-day-time|calendar-cells|calendar-week|calendar-capture)/README\.md$'
+NS_RE='^research/tools/(r14c-|r17-|h-flaky-|calendar-line-|b-|f-boundary-)|^docs/plans/(calendar-year-time-and-mobile-profile|calendar-profile-handoff)\.md$|^scripts/(verify-mobile-window-gate|verify-mobile-due-time)\.sh$|^scripts/lib/(mobile-e2e-runner-probe|wedged-runner|ps-scan)\.sh$|^apps/web/evidence/(calendar-day|calendar-view-options|profile-panel)/[^/]+\.(md|png)$|^apps/web/evidence/(calendar-year|calendar-day-time|calendar-cells|calendar-week|calendar-capture)/README\.md$'
 # 🔴 11:0x 加 `f-boundary-`（不写裸 `f-`：那个前缀太短，别的线随时会撞上，撞上了就把别人的文件
 #    划进本线的归属）。同一时刻把它加进上面的 PATHS —— **两处一起改**才有效：
 #    只改正则 = 它在 1b 里"可见但不被点名"；只改 PATHS = 下次再写一枚新装置照样会被漏（今天已经第三次）。
