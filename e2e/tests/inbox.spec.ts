@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp, stubLegalRecheck } from './helpers';
+import { openApp, stubEmptyHolidayAdjustments, stubLegalRecheck } from './helpers';
 
 /**
  * 通知中心 + 活动（福利中心）：真浏览器契约。
@@ -107,6 +107,7 @@ async function seedServerAndStubRoutes(page: import('@playwright/test').Page): P
 
   // 🔴 补签那道读侧闸：塞了凭据应用一启动就会问一次，与通知这个主题无关。
   await stubLegalRecheck(page, SERVER);
+  await stubEmptyHolidayAdjustments(page, SERVER);
 
   await page.route(`${SERVER}/api/notifications**`, async (route) => {
     if (route.request().method() === 'POST') {
@@ -315,6 +316,7 @@ test.describe('通知中心 + 活动', () => {
 
     // 🔴 同上：这一条也塞了凭据，启动时必然问一次补签状态。
     await stubLegalRecheck(page, SERVER);
+    await stubEmptyHolidayAdjustments(page, SERVER);
 
     // 通知与活动都空。
     await page.route(`${SERVER}/api/notifications**`, async (route) => {

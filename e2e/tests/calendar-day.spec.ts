@@ -213,7 +213,13 @@ test('🔴 真鼠标左右拖 = 下一天 / 上一天，而且**不会顺手勾�
    *   那些事件落在侧栏子树里冒不上来，症状是"轻轻拖有用、大幅度拖没反应"。
    *   那是**产品的缺陷**，不是判据写坏了（修法见 `useDragDayNav.ts` 文件头）。
    */
-  await dragHorizontally(page, 1000, 200, y);
+  // 详情列出现后 x=1000 已落在详情列，不能把“没在任务上按下”当成手势失败。
+  // 起点由目标行实测，另用命中测试证明指针确实从这条任务开始。
+  const startX = box!.x + box!.width * 0.75;
+  const startsOnRow = await row.evaluate((element, point) =>
+    element.contains(document.elementFromPoint(point.x, point.y)), { x: startX, y });
+  expect(startsOnRow, '拖拽起点没有命中目标任务行，不能验证手势').toBe(true);
+  await dragHorizontally(page, startX, 200, y);
   await page.screenshot({ path: 'test-results/calendar-day-drag-next.png', fullPage: false });
   const afterNext = await titleText(page);
   expect(afterNext, `往左拖之后标题不是下一天（实测「${afterNext}」）`).toContain(dayPhrase(tomorrow));

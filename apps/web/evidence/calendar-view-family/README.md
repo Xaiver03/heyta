@@ -41,3 +41,18 @@
    （`pointer-events: none`，挡不住点击），**不是产品缺陷** —— 但它会盖住证据图里
    第一行的日期，本目录这张的**第一版**就被压着（`timeline-rework-light.png` 同一处）。
    ⇒ 现在截图前挪开指针并等淡出走完。**证据图要能读，这件事是判据的一部分。**
+
+## md5 钉（2026-10-04 00:2x 现取）
+
+`md5 -r apps/web/evidence/calendar-view-family/*.png`：
+
+```
+279a857e81bb7d0c0467e26e6f0c13eb  calendar-family-timeline.png
+```
+
+这几枚与 `git show HEAD:…` **逐字节相同**（00:2x 实测），所以钉的是**已入库的那一趟**。
+⚠️ md5 不是恒定属性，它是"哪一趟运行"的身份：谁重跑那条 e2e 覆盖了同名文件，
+`bash research/tools/r17-evidence-md5-check.sh --all` 就会报 MISMATCH，届时"人看过的那张图"要重看。
+这一段只给已有的看图记录补上**字节级对账**，不新增任何"看过"的主张。
+
+📌 这一枚是「日历家族 = 月/周/日 + 时间线」那一档的界面证据（批五）。

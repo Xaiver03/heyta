@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,8 +32,26 @@ import { beforeAll, afterAll, describe, expect, it } from 'vitest';
  * 下面那条断言钉的就是这件事（`server/src/holidays/day-column.ts` 是唯一实现处）。
  */
 
-const MIGRATION_DIR = '20261009000000_add_holiday_adjustments';
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), '../prisma/migrations');
+
+// 🔴 目录名**从盘上推导，不写死**。本文件原先钉的是 `20261009000000_add_holiday_adjustments`，
+// 而盘上那笔（以及 HEAD 里那笔）叫 `20261013000000_add_holiday_adjustments` —— 合流时迁移重新编了号，
+// 于是 `readFileSync` ENOENT：判据③在库层的全部牙齿**一条都没跑过**，红的是探针自己而不是迁移。
+// 认的目标改成"唯一那笔 `*_add_holiday_adjustments`"，0 笔或多笔都响亮失败（把"没对象"和"通过"分开）。
+const MIGRATION_SUFFIX = '_add_holiday_adjustments';
+const migrationDirs = readdirSync(migrationsDir, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && entry.name.endsWith(MIGRATION_SUFFIX))
+  .map((entry) => entry.name)
+  .sort();
+if (migrationDirs.length !== 1) {
+  throw new Error(
+    `期望恰好一笔 *${MIGRATION_SUFFIX} 迁移，实际 ${String(migrationDirs.length)} 笔：` +
+      `${migrationDirs.join(', ') || '（一笔都没有）'}\n` +
+      '   🔴 0 笔 = 那笔迁移不在了，本文件的断言全部失去对象；多笔 = 出现了第二份同名结构。\n' +
+      '      两种都请更新这里的锚点，而不是删断言 —— `DATE` + `BOOLEAN` 就是判据③的牙齿。',
+  );
+}
+const MIGRATION_DIR = String(migrationDirs[0]);
 
 const migrationSqlFromFile = (): string => {
   const sql = readFileSync(join(migrationsDir, MIGRATION_DIR, 'migration.sql'), 'utf8');

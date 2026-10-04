@@ -39,6 +39,7 @@ import {
   enableAllModules,
   openSettingsView,
   stubLegalRecheck,
+  stubEmptyHolidayAdjustments,
 } from './helpers';
 import { installMissingProducerShims } from './shims';
 
@@ -158,6 +159,7 @@ async function fakeServer(
   // 塞了凭据之后这几条也会真发出去；给空但合法的响应，免得无关的 404 淹掉真正的失败
   // （与 `admin-console.spec.ts` / `inbox.spec.ts` 同一条补位纪律）。
   await stubLegalRecheck(page, SERVER);
+  await stubEmptyHolidayAdjustments(page, SERVER);
   // 设置页会探测管理员权限；此夹具是普通账号，真实接口应返回 403。
   await page.route(`${SERVER}/api/admin/overview`, (route) =>
     route.fulfill({

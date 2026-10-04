@@ -47,3 +47,25 @@ cd e2e && npx playwright test tests/calendar-day.spec.ts
 - **不证明现在线画得准**。它按 `小时 × size.row-min-height` 推导，
   位置由 `apps/web/tests/calendar-day-view.spec.tsx` 那两条钉；
   图里只能看到"有这根线"。
+
+## 为什么这一目录**故意没有**常驻 md5（00:2x 现量核过）
+
+`bash research/tools/r17-evidence-md5-check.sh --all` 对本目录打印 `EMPTY`，那是**预期**，不是漏登记。
+两条按构造成立的原因：
+
+1. 图里有**随机任务名**：`e2e/tests/calendar-day.spec.ts:49` 是
+   `const STAMP = Date.now().toString().slice(-6);`，第 306 行把它拼成 `挂在十六点-${STAMP}`
+   并直接渲染进 16:00 那一格 ⇒ 每跑一趟像素就不同。
+2. 图里有**"今天"的日期**：页头「10月4日 星期日」与侧栏迷你月历跟着系统日期走 ⇒ 隔天必变。
+
+任何一条都让"钉住的 md5"变成**下一趟必然 MISMATCH** 的判据 —— 那比没有判据更糟（AGENTS §8.3 的对偶：
+一条永远红的常驻判据会把人训练成忽略它）。所以这里不钉 md5，改用可复跑的两条：
+
+- 重新拍：`cd e2e && npx playwright test tests/calendar-day.spec.ts`，产物在 `e2e/test-results/` 后复制到本目录。
+- 看图（00:2x 这一趟我打开三张看过，与上面那张表逐条对得上）：
+  `day-timed-hour16.png` = 16:00 那一格里有那条任务、"全天"块是空态文案；
+  `day-timed.png` = 未定时刻的那条**不在**轴上（轴从 0:00 起、全天块给的是同一句空态）；
+  `day-hour-labels.png` = 小时标签逐档 0:00/1:00/2:00/3:00/4:00，"这一天没有到期的任务。"
+
+🟢 要让它**可以**常驻对账，前置是把上面两条随机源消掉（`STAMP` 改成可注入定值 + 把"今天"冻进夹具），
+这属于 e2e 夹具改造、且 `e2e/` 正被并行会话使用 ⇒ 登记不代做。

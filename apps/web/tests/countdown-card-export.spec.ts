@@ -29,7 +29,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { darkTokens, lightTokens, resolveTextStyle } from '@heyta/design-system';
+import { tokensForTheme, resolveTextStyle } from '@heyta/design-system';
 import {
   EXPORT_CARD_FILE_STEM_MAX_CODE_POINTS,
   EXPORT_CARD_SCALE,
@@ -87,7 +87,7 @@ function wordsOf(card: EventCard): EventCardTexts {
 }
 
 function layoutOf(card: EventCard, words: EventCardTexts, dark = false, rasterScale = EXPORT_CARD_SCALE) {
-  const tokens = dark ? darkTokens : lightTokens;
+  const tokens = tokensForTheme(dark ? 'dark' : 'light');
   return buildCardExportLayout({
     texts: words,
     theme: {
@@ -128,7 +128,7 @@ describe('W7 成品图版面：尺寸与排版都来自唯一事实源', () => {
   });
 
   it('每条文字指令的 (字号|行高) 都是某个语义角色 × EXPORT_CARD_SCALE 的结果', () => {
-    const tokens = lightTokens;
+    const tokens = tokensForTheme('light');
     const allowed = new Set(
       (
         [
@@ -164,7 +164,7 @@ describe('W7 成品图版面：尺寸与排版都来自唯一事实源', () => {
   });
 
   it('大数字用 numeric-display、标题用 row-title（不是"挑一个大的"）', () => {
-    const tokens = lightTokens;
+    const tokens = tokensForTheme('light');
     const ops = layoutOf(CARD, wordsOf(CARD)).ops;
     const byText = new Map(ops.filter(isText).map((op) => [op.text ?? '', op]));
     expect(byText.get(TEXT_LABELS.faceText(CARD.face, CARD.days))?.fontSize).toBe(
@@ -178,7 +178,7 @@ describe('W7 成品图版面：尺寸与排版都来自唯一事实源', () => {
 
 describe('W7 成品图版面：颜色只有 token，模板色不当文字色', () => {
   it('文字指令的颜色只许是 foreground / foreground-muted', () => {
-    const tokens = lightTokens;
+    const tokens = tokensForTheme('light');
     const allowed = new Set([tokens['color.foreground'], tokens['color.foreground-muted']]);
     for (const op of textOps(layoutOf(CARD, wordsOf(CARD)).ops)) {
       expect(
@@ -189,7 +189,7 @@ describe('W7 成品图版面：颜色只有 token，模板色不当文字色', (
   });
 
   it('accentColor 只出现在矩形上，而且**一定**出现在某一条上（强调条不许整条消失）', () => {
-    const accent = lightTokens['color.primary'];
+    const accent = tokensForTheme('light')['color.primary'];
     const ops = layoutOf(CARD, wordsOf(CARD)).ops;
     const withAccent = ops.filter((op) => op.color === accent);
     expect(withAccent.length, '强调条没画出来 ⇒ 图与卡就不是同一张东西').toBeGreaterThanOrEqual(1);

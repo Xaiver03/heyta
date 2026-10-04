@@ -82,7 +82,7 @@ X/Y/AB/AC 要重写 `packages/ui/dist`，而另一条会话正在读它打移动
 
 跑的是 `e2e/tests/calendar-day-en.spec.ts`（2 条），视口 1280×720。**拍过两趟**（18:24 与 18:53），
 下面表里的 md5 是**后一趟**（mtime 18:53:16–17）。这三张**跨趟必然不同**，因为种子标题里带
-`STAMP`（这一趟 `en-day-793948`，上一趟 `en-day-054555`）。🔴 而 `full` 与 `no-timed`
+`STAMP`（写这句时是 `en-day-793948`，06:46 那趟是 `en-day-589776` —— **值每趟都换，所以它不能当指纹用**，能当判据的只有"这句话整行读得出"）。🔴 而 `full` 与 `no-timed`
 「是同一屏」这件事**在两趟里都成立**（两张并排看：同一标题、说明都在视口内）⇒ 那条降级不是偶然读数。
 语言由 URL 上的 `?lang=en` 决定（解析链第 2 层；第 1 层 `heyta.locale` 这里**故意不写**，
 写了就把英文压回去 —— 理由见 `docs/plans/calendar-year-time-and-mobile-profile.md` §2 R16 那格的更正）。
@@ -90,9 +90,20 @@ X/Y/AB/AC 要重写 `packages/ui/dist`，而另一条会话正在读它打移动
 
 | 文件 | md5 | 人看到的 |
 |---|---|---|
-| `day-en-full.png` | `46d2e2fb21cc4ee15223349c7b9715d3` | 整屏英文：页头 `Calendar` / `Sat, 10/3` / `Back to today` / `View Day` / `Not synced yet`；「All day」带里一条 `en-day-054555`；轴从 `0:00` 起；**最长那句说明在轴卡下面整行读得出**：`Nothing on this day has a specific time — they are all in the "All day" band above.`（单行、没换行、没省略号、没出容器） |
-| `day-en-no-timed.png` | `519263223d2106f4640319bc5d448f9f` | ⚠️ **与上一张是同一屏**（人眼看内容相同，md5 不同 ⇒ 差异不在说明的可读性上）。这张的存在理由是 spec 里那句注释"`day-en-full` 可能已经把说明滚出视口"—— **1280×720 下没发生**，所以它在这个视口下**不构成独立证据**，只是"视口更矮时"的保险。要它成为证据得先有一个把说明挤出视口的窄视口 |
-| `day-en-empty.png` | `eb50b404f48f3ebdc034b36086903513` | 空的那天的英文态：「All day」卡里居中 `Nothing is due on this day.`，**没有**上面那句"都在全天里"（那天两条带都空，说了就是谎），底部仍有一句 `Tasks without a due date are not on the calendar; they live in the Inbox on the Tasks tab.` |
+| `day-en-full.png` | `d9916538a42055e92d034ac7913b37b3` | 整屏英文：页头 `Calendar` / `Sun, 10/4` / `Back to today` / `View Day` / `Not synced yet`；「All day」带里一条 `en-day-589776`（随机后缀每次现造 ⇒ 这三张的 md5 **跨趟必不同是设计**）；轴从 `0:00` 起；⚠️ 06:46 那趟重渲染后**这张里没有红色 now 线**（拍于 06:46，线落在 `6:00` 之下、不在取景内。旧文案那句"`1:00` 与 `2:00` 之间有一条红色 now 线"是 01:34 那一趟的事实，**对这张不成立**）；**最长那句说明在轴卡下面整行读得出**：`Nothing on this day has a specific time — they are all in the "All day" band above.`（单行、没换行、没省略号、没出容器） |
+| `day-en-no-timed.png` | `40e71764e83853ba81fad6b50cdb2a4e` | ⚠️ **与上一张是同一屏**（人眼看内容相同，md5 不同 ⇒ 差异不在说明的可读性上）。这张的存在理由是 spec 里那句注释"`day-en-full` 可能已经把说明滚出视口"—— **1280×720 下没发生**，所以它在这个视口下**不构成独立证据**，只是"视口更矮时"的保险。要它成为证据得先有一个把说明挤出视口的窄视口 |
+| `day-en-empty.png` | `57d2d0085e46dcd469aa00d2a19aa28b` | 空的那天的英文态：「All day」卡里居中 `Nothing is due on this day.`，**没有**上面那句"都在全天里"（那天两条带都空，说了就是谎），底部仍有一句 `Tasks without a due date are not on the calendar; they live in the Inbox on the Tasks tab.`；轴只到 `4:00` 那一档；⚠️ 旧文案的"同样带红色 now 线"对这张同样不成立（now 线在取景外） |
+
+🔴 **05:4x 更正：上面这三枚 md5 是重取的，原来那三枚（`46d2e2fb…` / `51926322…` / `eb50b404…`）已经对不上盘上字节**。
+成因与 `calendar-view-options/README.md` 那一条**是同一件事**：2026-10-04 01:34 另一条会话跑 e2e 时把同名 png 覆盖，
+而覆盖之后**连图带这份 README 一起被提交** ⇒ 坏指纹此刻**就在 HEAD 上**（`git status` 对本目录为空、
+`git show HEAD:day-en-full.png | md5 -q` == 新值）。上面那句"同一检出里别人也在跑 e2e，文件会被覆盖"
+是当初就写下的预警 —— **它预言对了，但没有配套任何一条会红的对账**，所以它只是把风险写进了文档，没有拦住它。
+05:4x 三张图**人都重新打开看过**，本表按新字节改写（旧写法里的 `Sat, 10/3` 与 `en-day-054555` 已经不成立：
+日期过午夜、任务名那条是每次运行现造的随机后缀）。
+🟢 常驻对账：`bash research/tools/r17-evidence-md5-check.sh --all`（认两种形状：`md5 -r` 的裸行与本表这种
+`| 文件 | md5 | 说明 |`；现量 `dirs_scanned=12 entries_parsed=9 dirs_with_mismatch=0`，rc=**0**）。
+它的牙由 `--selftest` 四臂钉住（未变异 0 枚 / 裸形状注入恰好 1 枚 / 表格形状解析到 1 条 / 表格形状注入恰好 1 枚）。
 
 顺带量到、**判成不是缺陷**的一条：英文那张空态卡里 `Nothing is due on this day.`
 上下留白很大（卡片按"能装下带任务的行"的高度撑开）。这是共享 `EmptyState` 在

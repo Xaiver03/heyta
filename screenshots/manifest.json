@@ -1,14 +1,14 @@
 {
-  "capturedAt": "2026-10-01T03:11:54.071Z",
+  "capturedAt": "2026-10-04T00:16:53.368Z",
   "targets": 1,
   "artifacts": [
     {
       "path": "screenshots/web-desktop/W07-en-Trash.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.0495,
+      "contentRatio": 0.0766,
       "colorSpan": 228,
-      "sha256": "4e22c5041eb94dc87e4649a05e84cbbd06a382ba84ac92be23950380e6e8f870"
+      "sha256": "136d26af4bfddfef8fa7ea44680d8c1ed1d66d1c05598dbdd4ecb9ed9d9fc4f5"
     }
   ]
 }
