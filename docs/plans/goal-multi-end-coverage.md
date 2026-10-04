@@ -1355,7 +1355,7 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   - ✅ **05:4x ① 的"起跑前就绪表"**（每条都是只读探，为的是窗口一开就没有**可预备的**失败原因）：
     | 端 | 前置现量 |
     |---|---|
-    | mac | 公证 key 在 `~/Library/Private/AppStoreConnect/AuthKey_P68MYZ66HR.p8`；`/Applications/Heyta.app` 已装（段里会先卸） |
+    | mac | 🔴 **本格 05:4x 记错了对象，18:35 现量更正**：① 真正用的公证凭据是 `AuthKey_T2H876K8MJ.p8`（`package-app.sh:263-269` 的候选清单与 `KEY_ID` 都只有这一枚）。原先写的 `AuthKey_P68MYZ66HR.p8` **文件在盘上确实存在**（同目录两枚都在）⇒ 缺陷不是"路径撞空"而是**指错了 key**：照旧那行去核对或轮换凭据，会核对到 ① 不用的一把。判"公证用哪把"要按代码的候选清单，不按"盘上有几把"；`/Applications/Heyta.app` 已装（18:35 复量仍在，段里会先卸） |
     | windows | `ssh windows-pc` 可达；远端默认 shell 是 **cmd 不是 PowerShell**（我第一发 `if (Test-Path …)` 被原样 echo、`whoami` 没执行）；`C:\src\heyta` = YES、`apps\web\dist\index.html` = YES、**没有 dotnet 在跑**（不抢 `C:\src\heyta`） |
     | android | `emulator-5554` 在线；此刻 `com.heyta` pid 20246 **在跑** ⇒ 这一条是唯一还没空的设备门 |
     | ios | 三台 booted 的 `launchctl` 全读空（05:3x 现量 0/0/0），启动器那条"逐台挑没跑着 com.heyta 的那台"三台都合格 |
