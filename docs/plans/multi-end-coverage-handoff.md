@@ -2029,7 +2029,7 @@ package.json 2/1 两次都是空交集）：
 |---|---|
 | `scripts/run-gradle.mjs` | 唯一收口点按平台分流：Windows 逐字不变，macOS/Linux ssh `windows-pc` → 远端 `gradlew` → 产物回传到**消费者原本期望的路径** + 本地 mtime 回写成远端构建完成时刻（让 §7 第 27 条在换宿主后仍然有效）。远端不可达直接红，`HEYTA_ANDROID_LOCAL_GRADLE=1` 是显式例外开关 |
 | `scripts/lib/sync-windows-sources.sh` | 源码同步 + sha256 对账抽成单一实现（`_heyta_windows_sync_push`），新增 `sync_windows_sources_for_android`；MSIX 那条腿（`scripts/reinstall-all.sh`，**没动过**）默认参数逐字等于历史上硬编码的那两个值 |
-| `scripts/check-android-gradle-remote.mjs` | 新门禁 G1–G6，钉的是**形状**（新开 `./gradlew` 入口 / 白名单比现实宽 / 回传路径与 `$APK` 对不上 / 绕开收口点 / 远程支里出现 `runLocal(` / 第二份同步实现）。`--self-test` 七臂，实测 7/7 按预期转红转绿（臂 0 = 阳性对照） |
+| `scripts/check-android-gradle-remote.mjs` | 新门禁 G1–G7，钉的是**形状**（新开 `./gradlew` 入口 / 白名单比现实宽 / 回传路径与 `$APK` 对不上 / 绕开收口点 / 远程支里出现 `runLocal(` / 第二份同步实现 / **远程前置是一条永不开的门**）。`--self-test` 逐臂证明，00:4x 现量 **臂 0–9 全按预期**（臂 0 = 阳性对照，臂 7/8 = 豁免正反两腿，臂 9 = G7）；臂数不许抄，现取它自己打印的末行 |
 | `docs/runbooks/android-build-on-windows.md` | 手册。🔴 判据表里**只有第 1 条（门禁自检）是实测的**，"远程真打出 APK / 装机截图主蓝 / 连续两轮防旧 bundle"三条明确写"未实测"；Mac 释放清单一条都没执行 |
 | `AGENTS.md` §6.1 + `package.json` | 规则本体 + **接线**：`check:android-gradle-remote` 已进 `pnpm check`。`check:gate-wiring` 现量：`门禁定义 80 道 ｜ 链里被引用 83 段 ｜ 链外 1 道（允许表 1 道）` rc 0 |
 
@@ -2122,3 +2122,53 @@ git -C …/heyta-wt-batch2 show HEAD:AGENTS.md | grep -c 'windows-pc' → 2     
 信息量比那份手写注记大），把分支那份重复注记删掉 —— 这是"同一结论句落在两份文档 ⇒
 改一处必 sweep 全仓"的第三次出现。我不去动 `heyta-wt-batch2/AGENTS.md`：
 它是**用户自己手写的未提交改动**，不是本线的落点，改它 = 替别人（这次是本人）处置在途工作。
+
+## 00:4x 并行 Agent 撞到轮次上限退出，但它留在盘上的东西是成套可用的 —— 我接手补了一条 G7
+
+**Agent 的收口状态**（它最后一条消息是"这条门禁被并行会话新增的门禁文件触红了，我把豁免改成有牙的
+分类判据"，然后被 150 轮上限截断）：
+
+- 新门禁 `scripts/check-android-build-host.mjs`（规则**对侧那半边**：模拟器侧 / 文档侧 / runbook 死链 /
+  载体对账）。现量：真树 `rc=0`、`--self-test` 六臂全对（臂 0 阳性对照、臂 4 是"手册被删 ⇒ 3 条死链"、
+  臂 5 是"允许表条目被摘 ⇒ H4 抓到本门禁没有载体"）。
+- 🔴 它**刻意不进 `pnpm check`**，而是登记进 `check:gate-wiring` 的允许表（链外 2 道，各自点名消费方），
+  理由是分母正被并行会话计数，此时并进去会让所有人都对不上；并把**摘除条件**写进登记
+  （"并行那批不再引用链段数之后并进链，同时删掉本条登记 —— 留着而它已进链，gate-wiring 会红"）。
+  这与我 23:3x 给 `check:android-gradle-remote` 的处置相反（那枚直接进链），两条并存时读数得**分别**取。
+- 它把 runbook 的判据 1 更新成 00:1x 现量，并新增 §八"第一次真远程构建之前要跑的那条"。
+
+**我接手的这条不是补风格，是真缺陷**：远程构建的**步骤 1 是一条永不开的门**。
+
+| 现量 | 值 |
+|---|---|
+| 第一版前置探的路径 | `C:\src\heyta\apps\mobile\android\node_modules` |
+| `pnpm-workspace.yaml` 的 packages | `packages/*` / `apps/*` / `server` ⇒ `apps/mobile/android` **不是工作区包** |
+| 本机 | `apps/mobile/node_modules` 在、`apps/mobile/android/node_modules` **不在**，而 Mac 的 APK 打得出来 |
+| 远端 | `apps/mobile/node_modules=True`、`node_modules/.pnpm=True`、`gradlew.bat=True`、`ANDROID_HOME` 存在 |
+
+⇒ 远程构建会**恒定**红在步骤 1，而它打印的修法（去远端 `pnpm install`）执行完**照样红** ——
+这正是 §7 元规则 2 说的"一条永不开的门比没有判据更糟"。改成 `${REMOTE_ROOT}\apps\mobile\node_modules`，
+并给门禁加 **G7**：前置路径去掉 `node_modules` 后必须匹配工作区某条 glob ——
+**期望值靠推导工作区清单，不靠"这路径在不在"**（后者在干净检出上必假红）。`--self-test` 加臂 9
+把事故形状钉住：现量 `✅ 臂 9 转红：非工作区包的 node_modules 前置被 G7 抓到（恰好 1 条）`，
+臂 0 阳性对照仍 0 红。
+
+**同一轮我自己踩的探针坑（比缺陷本身更该记）**：第一版只读探针走
+`ssh host "powershell -Command \"…\""`。这台远端默认 shell 是 **cmd.exe**，它会把内层转义引号拆坏，
+后果是 **stdout 全空而 rc=0**（只有客户端那三行 post-quantum 警告回来）。于是每条 `Test-Path`
+都读成"不是 True"，我**编造出四条根本不存在的缺口**（gradlew 没装 / 依赖没装 / SDK 不存在 / 没有 android-36）。
+两条修法：① 整段 PS 走 `-EncodedCommand`（UTF-16LE→base64，单 token 无引号可破坏）；
+② **先断言读到了读数，再判缺口** —— 缺任何一步，一次通道失效就会被读成"远端什么都没有"。
+仓里那枚 `run-gradle.mjs` 反倒没这个问题：它探测前先判 `status !== 0 || stdout === ''` 就 die，
+这条形状我第一版没有。探针已固化在 `~/.heyta-window-rigs/heyta-android-host-probe.sh`（非 /tmp，可复现）。
+
+**臂数从此不写进文档**：AGENTS §6.1 与 runbook 里"七臂/九臂"那几处已 sweep 成
+"逐臂，臂数以 `--self-test` 自己打印的末行为准"。理由就是这一轮 —— 加一条臂，
+三份抄件同时过期（同一对抄件历史上漂过两次，这次是第三次）。
+
+**静态门禁现量**（00:4x，改完这批准提交时）：`check:android-gradle-remote` rc=0 /
+`--self-test` 臂 0–9 rc=0 / `check:android-build-host` 与其六臂 rc=0 /
+`check:gate-wiring` `定义 82 ｜ 链引 84 ｜ 链外 2（允许表 2）` rc=0 /
+`check:docs` rc=0 / `check:doc-citations`、`check:md-tables`、`check:docs-voice`、`check:claims`、
+`check:script-snapshot`、`check:verify-script-copy` 全 rc=0。
+窗口仍未开（00:1x 现量负载 77.14，阈值 12；`:4318/4319/4322` 空、`:3000/:3100` 忙）。

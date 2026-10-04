@@ -110,6 +110,26 @@ const ALLOWED_OUTSIDE_CHAIN = new Map([
       ],
     },
   ],
+  [
+    'check:android-build-host',
+    {
+      reason:
+        'Android 构建主机规则的**第二枚**门禁（模拟器侧 / 文档侧 / runbook 死链 / 载体对账）。' +
+        '同批的另一枚 `check:android-gradle-remote` 已经在链里，这一枚**本批刻意不进链**：' +
+        '`check` 那条 `&&` 串的分母正被并行会话计数（现量方式写在手册 §七 那条里），' +
+        '此时并进去会把别人的读数改成谁都对不上。⇒ 判它的载体现在是"照着手册跑远程构建那一趟"，' +
+        '不是"每次提交那一趟"。' +
+        '🔴 摘除条件：并行那批不再引用链段数之后把它并进链，并**同时删掉本条登记** ——' +
+        '登记留着而它已进链，本文件第 2 条判据会红（"留着就是在掩护下一道"）。',
+      consumers: [
+        {
+          file: 'docs/runbooks/android-build-on-windows.md',
+          needle: 'pnpm check:android-build-host',
+          role: '手册 §八 的代码块 —— 第一次真远程构建之前要跑的那条（也是本批唯一的载体）',
+        },
+      ],
+    },
+  ],
 ]);
 
 /** 链必须包含的锚点：掉哪一个都是"整条链不再检查一件事"级别的事故。 */

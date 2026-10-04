@@ -373,7 +373,7 @@ pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
 > - 门禁：`pnpm check:android-gradle-remote`（已进 `pnpm check`）。它钉的是**形状**——
 >   新开一条 `./gradlew` 入口、白名单比现实宽、回传路径与 `reinstall-all.sh` 的 `$APK`
 >   对不上、绕开收口点、远程支里出现 `runLocal(`、第二份源码同步实现 —— 各自都会红
->   （`--self-test` 七臂，臂 0 是阳性对照）。
+>   （`--self-test` 逐臂证明，臂 0 是阳性对照 —— **臂数由它自己打印，文档里不许抄**）。
 > - 操作步骤 / 验收判据 / Mac 释放清单 / 边界（**Windows 侧没有 Android 模拟器**，
 >   所以设备侧验收目前仍在 Mac）见
 >   [`docs/runbooks/android-build-on-windows.md`](docs/runbooks/android-build-on-windows.md)。

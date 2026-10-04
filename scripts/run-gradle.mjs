@@ -251,8 +251,15 @@ function runRemote() {
   // 🔴 整条 PowerShell 命令**只用一对**外层双引号、里面全是单引号：cmd 会把内层的
   //    `"; "` 形状当成参数边界，实测会把命令拆坏。
   const localProps = `${REMOTE_ANDROID_WIN}\\local.properties`;
+  // 🔴 RNDEPS 量的是 `apps/mobile/node_modules`，**不是** `apps/mobile/android/node_modules`。
+  //    这不是笔误修正，是一条"永不开的门"：pnpm-workspace.yaml 的 packages 是
+  //    `packages/*` / `apps/*` / `server` ⇒ `apps/mobile/android` 不是工作区包，
+  //    `pnpm install` **永远不会**在那儿建 node_modules。实测本机：
+  //    `apps/mobile/node_modules` 存在、`apps/mobile/android/node_modules` 不存在，
+  //    而 Mac 上 APK 打得出来 —— 说明这条路径从来就不是构建输入。
+  //    原来按它判 ⇒ 远程构建会**恒定**红在步骤 1，而给出的修法（远端 pnpm install）做完也还是红。
   const preCmd =
-    `powershell -NoProfile -Command "Write-Output ('RNDEPS=' + (Test-Path '${REMOTE_ANDROID_WIN}\\node_modules')); ` +
+    `powershell -NoProfile -Command "Write-Output ('RNDEPS=' + (Test-Path '${REMOTE_ROOT}\\apps\\mobile\\node_modules')); ` +
     `Write-Output ('ROOTDEPS=' + (Test-Path '${REMOTE_ROOT}\\node_modules\\.pnpm')); ` +
     `if (Test-Path '${localProps}') { if ((Get-Content -Raw '${localProps}') -match '/Users/|/opt/homebrew') ` +
     `{ Write-Output 'LOCALPROPS=MAC-PATH' } else { Write-Output 'LOCALPROPS=ok' } } ` +

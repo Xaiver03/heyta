@@ -146,6 +146,7 @@
     "check:entries": "pnpm --filter @heyta/landing check:entries",
     "check:gate-wiring": "node scripts/check-gate-wiring.mjs",
     "check:android-gradle-remote": "node scripts/check-android-gradle-remote.mjs",
+    "check:android-build-host": "node scripts/check-android-build-host.mjs",
     "check:claims": "node scripts/check-claims.mjs",
     "screenshot:list": "node scripts/screenshots/capture.mjs --list",
     "screenshot:capture": "node scripts/screenshots/capture.mjs",
