@@ -1829,3 +1829,33 @@ cwd 在别条线 `heyta-wt-ai-closeout/apps/mobile/ios/Pods`）。
   先给那两枚路径加上 `$$`。
 - **全仓装置普查复跑**：`heyta-rig-sweep.sh` 现量 `SWEEPED=26 / SWEEP=GREEN / 不合要求 0`，新夹具已进台账
   （`grep -c notes-teeth` = 1），且它没调用任何被 VETO 的产品命令。
+
+## 23:03 `find /tmp …` 在这台机上**恒 0**：起点就是那个符号链接时 BSD find 不进去（定点实验钉准射程）
+
+起因是我自己那句"近 30 分钟没有重装日志"——同一趟 `ls` 明明看到 `/tmp/heyta-reinstall-ios.png` 是 22:54 写的。
+**空读数 + 已知在场 = 探针坏**（§7 元规则一），所以先量探针再下结论。定点实验（临时目录
+`/private/tmp/heyta-findprobe-$$`，两枚文件，用完删）：
+
+| 形状 | 读数 | 结论 |
+|---|---|---|
+| `find /tmp -maxdepth 1 -name 'heyta-findprobe-*'` | **0** | 起点就是 `/tmp` 这枚符号链接 ⇒ BSD find 默认 `-P` 不跟随 ⇒ 只报告链接自己 |
+| `find -H /tmp …` / `find -L /tmp …` / `find /private/tmp …` | 1 / 1 / 1 | 三种写法都对；**`/private/tmp` 是最省事的正解** |
+| `find /tmp/heyta-findprobe-$$ -type f` | **2**（负向对照 `-name zzz` = 0） | 起点是链接**下面的真目录**时一切正常：中间路径组件由内核解析，一定会跟随 |
+| `ls /tmp/…/*.txt`、`stat /tmp/…/a.txt` | 2、1 | glob 与 stat 走路径解析 ⇒ 不受影响 |
+
+🔴 **射程必须写窄，不许写成"这台机器的 `find /tmp/…` 都不可信"**：把规则说宽会误伤台账里已有的合法证据 ——
+`BLOCKED.md:4824` 与 `docs/plans/ai-assistant-closure.md:633` 用的是 `find /tmp/heyta-reinstall …`（起点是子目录），
+按上表第三行**它们是有效的**；本仓真正受影响的形状只有一种：**拿 `/tmp` 本身当起点做枚举**
+（`find /tmp -maxdepth 1 …`、`find /tmp -newermt …`）。全仓扫过一次，命中这种形状的只有我自己刚才那条一次性命令，
+`scripts/` 与 `research/tools/` 里没有常驻判据这么写。
+⇒ 规则落成一条动作：**枚举 `/tmp` 顶层一律写 `find /private/tmp …` 或加 `-H`**；
+一次性测量优先用 `ls -lT /private/tmp/xxx*`（经路径解析，不受影响）。
+⚠️ 待入 `docs/reference/environment-traps.md #271`（现取最大号 270；那份台账此刻是 ` M`、
+正被别的会话追加 ⇒ 按本线纪律不往脏台账里插行，先记在这里，收口时由单写者并进）。
+
+同一趟的顺带现量（都不必动作，只是把 ① 的前途写清楚）：
+- 那四张 `/tmp` 图是**别人那趟重装**写的（mac 22:20 → win 22:23 → pod 22:49 → ios-build 22:53，
+  `heyta-reinstall-ios-build.log` 16 MB），gradle 的三条 java（18969/19881/80650）仍活着 ⇒ 那趟还在跑，
+  我的 ① 会被启动器自己的 RIVAL 门挡下（这是对的，不抢别人的四端重装）。
+- ① 的第五条腿有路：`ssh -o BatchMode=yes windows-pc 'echo SSHECHO=OK'` 回 **OK**（打包机可达）；
+  载体里 `dist/windows/packaged-first-run.png` 现在**不存在**是正常的 —— 它由 windows 段现场产出。
