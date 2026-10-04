@@ -4047,3 +4047,41 @@ say "逐段非绿共 ${NG_N} 条（含 rc=SKIPPED_BY_RULE=按规则不跑，不�
 `57ff8c55 merge: W4b 服务端半`），HEAD 里还有 3 处指着 09 号（那份 spec + `docs/adr/0052` + `docs/plans/countdown-batch2-handoff`）。
 ⇒ **② 的读数里那条 `pnpm -r test` 红属 W4b 线，不属本线**；本线不代拍改哪个号、也不吸收别人的债凑绿，
 只把归属与可复跑命令交出去（细节只在 B71 一处，这里不留副本，免得又长出第二套号）。
+
+#### §15.43ak（10-04 08:3x）`DONE` 以前只问"装的是不是当前源码"，不问"本线的门绿不绿" —— 而链的 rc **不编码段的红**
+
+现量的原因不是猜的：05:25 那趟 `链 rc=0` 与 `SUMMARY pass=59 fail=14` **同在一趟里并存**
+（`heyta-chain.sh` 只在 build/前置失败时非 0，段红只进 `segments-rc.txt`）。
+⇒ 队列原来的收尾 `LANDING-CURRENT ⇒ echo DONE` 在本线的门全红的情况下也会照样写 DONE，
+而 rc.txt 里没有任何一行能把这件事区分出来。
+
+补上的判定（`decide_final`，与 `decide_landing`/`decide_win_facts` 同一套做法：纯函数 + 离线喂腿）：
+
+```
+DONE 需要两件事同时成立：装的是当前源码（LANDING-CURRENT） + Goal 点名的两条门（check:ai-coverage / check:ai-tools）没有红
+"本线有哪些门"从载体现推：git ls-files scripts/check-(ai|legal|journey)*.mjs ∩ package.json 里引用它的脚本名
+量不到就判 UNKNOWN（FINAL-OWNRED-UNKNOWN ⇒ exit 7，绝不写 DONE）
+```
+
+| 腿 | 输入 | 现量 |
+|---|---|---|
+| 真产物 0525 的 15 条非绿 × 载体现推的门 | own_gates=10 | **own_red=5**：`check:legal-permissions check:journey-coverage check:ai-e2e check:privacy-consent-e2e check:landing-e2e`；strict=0 ⇒ `DONE-CURRENT-AND-OWN-GREEN` |
+| 只把 `check:ai-coverage` 造红 | 同上 | own_red=1 / strict=1 ⇒ `DONE-BUT-OWN-RED`（rc.txt 写 `NOT-DONE …` + `exit 7`） |
+| `check:ai-tools` 红 + 一条别人的门红 | 同上 | own_red=2 / strict=1 ⇒ `DONE-BUT-OWN-RED`（拦的是自己那条，别人的只记录） |
+| 全绿 | 同上 | own_red=0 / strict=0 ⇒ `DONE-CURRENT-AND-OWN-GREEN` |
+| 边界 | `(CURRENT,'',10)` `(CURRENT,0,'')` `(CURRENT,0,0)` `(CURRENT,x,10)` | 全部 `FINAL-OWNRED-UNKNOWN` |
+| 落地本身过期 | `(LANDING-STALE,1,10)` | 原样透传 `LANDING-STALE`（有界重起那台机器不受影响） |
+
+🔴 **为什么只拦 Goal 点名的两条而不是全部 own_gates**：第一版我写成"本线的门有红就 exit 7"，
+拿真产物一量立刻发现那是 §15.43ab/af 同一个错的**反向版本** —— 05:25 那趟 own_gates 里有 5 条红，
+全部红因是别人的源码与环境，照它拦就等于把别人的债变成一道**永不放行**的门。
+红线那句"不吸收别人的债凑绿"的另一半在这里同样成立：**不许拿别人的债当永不放行**。
+⇒ 口径改成：`own_red` 全量记进 rc.txt（DONE 行也带条数，谁都不会把 DONE 读成"own 全绿"），
+只有"覆盖面到底有没有成为门禁"这一件本 Goal 自己的交付物（coverage / tools 两条门）红时才 exit 7。
+
+两处顺带的账：
+- 现推依赖 `~/scratch-heyta/heyta-own-gates.mjs`（放家目录持久 scratch，不放 `/tmp` —— 那条规则已入档）。
+  它丢了会怎样也测了：`node` 失败 ⇒ `OG_N=0` ⇒ `FINAL-OWNRED-UNKNOWN` ⇒ 不写 DONE（缺依赖只会变严，不会变松）。
+- 差点误登记一条：`scripts/check-legal-{closure-truth,gdpr}.mjs` 在推导里显示成"没有 pnpm 脚本消费者的门"，
+  看着像孤儿门禁。现量是 **`??` 未跟踪**（`git ls-files --error-unmatch` 报 did not match、`git cat-file -e HEAD:` 说不存在），
+  属回收站那条线在飞的东西 ⇒ 不是 main 的缺陷。也正因此，推导只认 `git ls-files`（干净检出里跑的载体自然没有它们）。
