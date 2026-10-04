@@ -4315,5 +4315,58 @@ git status --porcelain --untracked-files=all | awk '{print substr($0,3)}'
 🔴 g57 存在的原因写在这：**`pnpm check` 是一整行 `&&` 链，第一红就停** ⇒ 整链跑一次只拿到**一条**红，
 逐条归属必须逐段跑。§8.60 那句"两棵树各跑一遍完整 check"按字面做是拿不到归属的。
 
+### 8.67 🔵 Goal 第 2 项现在**五层齐了**（真镜像 + 真服务端 + 真浏览器 + 四张图人看过），顺带 live-site 23/23 转绿（09:3x）
+
+#### ① `verify:selfhost-stack` 全跑 `VERIFY_EXIT=0`，载体是分支 `959fd1e6`
+
+09:30:17 起跑（等窗口 6 分钟，09:19:14 现量 `tfa=yes listeners=3`），09:32:54 收工。逐项：
+
+| 层 | 读数 |
+|---|---|
+| 真镜像 | 建成，`VCS_REF=959fd1e6`；`check:image-license` 那条腿在**真镜像树**上对账 `145 = 126 + 16 + 3`（无解释 0 / 非宽松 0 / **声明对不上 0** / 失效登记 0） |
+| 默认服务图 | 3 个未动 · 带 override 4 个（+`supersync-migrate`） |
+| 一次性迁移 | `exited(0)` · 应用侧 `RUN_MIGRATIONS_ON_STARTUP=false` · 带外恢复 flag=true · **已应用 42/42** · 悬挂 0 · 重复完成 0 |
+| 界面挂载 | 服务端日志真印「共享 UI 挂在 /app/（来自 /app/web-dist）」 |
+| 真浏览器 | 三条判据全过（`http://127.0.0.1:1900/app/`，零 mock） |
+| **四张截图** | `FRESH=4/4`（mtime 09:32:45 / :49 / :52 / :53，全部晚于起跑）且**我逐张打开看过** |
+| 失败与恢复 | `LEFTOVER_CONTAINERS=0` —— 这一趟是 rc=0 的正常收尾，而 09:0x 那趟**中途 die** 也是 0（§8.65 ①） |
+
+四张图各自看到的东西（不是"非空白"，是内容）：S1 应用起在 `/app/`、中文、侧栏完整、顶栏「未同步」、收集箱空态；
+S2 已登录（`selfhost-7565269-1@example.test`）+ 顶栏「已同步」+ 头像菜单三项（编辑个人信息 / 设置 / 退出登录在最底、危险色）；
+S3-a 设备 A 建出 `selfhost-task-7565269-2`，收集箱计数 1；
+S3-b **全新设备**（空 IndexedDB 的新 context）登录后从服务端**读回同一条任务**、顶栏「已同步」。
+⚠️ 与 05:50 那四张的差别只在多了一行「排序方式 / AI 排优先级」（别人的功能落进共享界面了），
+挂载/同步/身份三条判据的形状没变。
+
+#### ② live-site 那 23 条今天**全绿**，包括 §8.27 停在第 ③ 条的那一句
+
+`/tmp/g58-live-site.sh` 09:31:44 收工：`LIVE_SITE_RC=0`，`Running 23 tests using 1 worker` → **23 passed (1.4m)**。
+其中三条正是这笔债的判据：
+
+- `live-domain.spec.ts:157` 「英文落地页的入口带 `?lang=en`（否则英文访客进应用看到中文）」 ✅
+  ⇒ §8.27 那句"今天它停在第 ③ 条，报的是 `/docs/selfhost/ 仍在线上印「不是一个命令就完事」4 处`"
+  **已被现量否证**（09:2x 的产物层读数见 §8.66：旧句 0 / 新句 4）。
+- `live-domain.spec.ts:256` 「PWA 资产在 `/app/` 子路径下拿到真身，且 SW 真的注册成功」 ✅
+- `live-signin-entry.spec.ts` 三条（含"语言参数不能把 signin 挤掉"）✅
+
+🔴 **两件不许顺势读成已做完**：
+1. 这条判据的**牙**没在可控载体上证过 —— 它打的是线上，我不能为了变异去改生产。
+   合法做法是把 `HEYTA_LIVE_ORIGIN` 指到一份**故意打回旧形状**的本地产物上跑同一用例，
+   那一趟没跑 ⇒ #20 的"补变异读数"这一格**仍欠**，本批不宣布关闭。
+2. 线上这份 build 的**来源树仍然无法归属**（§8.27 原话）。今天能说的是"它带着 `6e307b22` 的文案
+   与 `?lang=en` 那条行为"，不能说是"从 main 的某一枚 SHA 发的"。
+
+#### ③ 队列状态（09:3x 现量，引用前重取）
+
+| 脚本 | 状态 |
+|---|---|
+| `/tmp/g56-browser-retry-then-check.sh` | 阶段 1 `S1_OK attempt=1`；阶段 2 在等 4318/4319/3000 空闲（09:33 现量 `listeners=1`、load 29） |
+| `/tmp/g57-attribution.sh` | 在等 g56 的 `CHECK_RC`/`S_ALL_DONE` |
+| `/tmp/g58-live-site.sh` | 已完成（`LIVE_SITE_RC=0`） |
+
+分支侧纯 fs 门禁在 `959fd1e6` 上逐条现量：`check:selfhost-entry-command` / `check:image-build-args` /
+`check:gate-wiring` / `check:script-snapshot` / `check:docs` / `check:image-license` **全部 rc=0**。
+
+
 
 
