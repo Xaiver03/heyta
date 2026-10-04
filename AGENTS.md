@@ -567,7 +567,7 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
 **从不制造愧疚**。关键裁决见下面 ADR-0022 与
 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
 
-### 2026-10-03：倒数纪念日 批次二（✅ **已完成质量审计、合并，并已进 `main`**：`origin/main` = `91a672f6`）
+### 2026-10-03：倒数纪念日 批次二（✅ **已完成质量审计、合并，并已进 `main`**：`origin/main` = `a5891fde`）
 
 > 逐项状态与全部读数：[`docs/plans/countdown-anniversary.md`](docs/plans/countdown-anniversary.md) §8.2 / §8.4。
 > **本轮质量审计 + 分组提交 + 合并的逐条裁决与合并态读数：同文 §8.5**（2026-10-04）。

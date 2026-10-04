@@ -183,7 +183,8 @@ ADR-0038 §2 第三条把首版写面钉成"仅三个、都不涉及钱"。W4b �
   ⇒ 三端都接上了，不是"共享层做了、宿主没接"那一档。
   📌 **这条的价值在于它证明了本文的日期标注是承重的**：一句带时间戳的"还没做"会在 **96 分钟**后变成假的，
   而它不会自己通知你。所以 §7 每一格的读数都必须写载体，引用本文状态前先现量。
-- 🟢 **合并态读数（04 22:2x）**：`origin/main` = `91a672f6`（第六次并入）之后的本批收口笔已推上去，
+- 🟢 **合并态读数（04 22:3x）**：`origin/main` = `origin/feat/countdown-batch2` = `a5891fde`（现量命令
+  `git -c credential.helper='!gh auth git-credential' ls-remote https://github.com/Xaiver03/heyta.git refs/heads/main`），
   §2.1/§2.2 从"已决定 + 已在写"升级为**已上线**；W4b 的判据①自此有载体。
 - ⚠️ **编号撞车登记**：该分支的契约文件头写的是「定性见 [ADR-0050] `docs/adr/0050-public-facts-are-deployer-supplied.md`」——
   那个号已被另一条会话占用（`0050-e2ee-key-lifecycle-and-recovery.md`，未跟踪），
