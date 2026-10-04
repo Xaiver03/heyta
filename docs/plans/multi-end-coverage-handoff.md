@@ -2295,3 +2295,13 @@ md5 `8596440d…` / `8679ade2…`，与入库那两枚 `fa8180d2…` / `f6718cb1
 ⇒ 一般规律：**验收产物落在受跟踪目录里，会被自己的"工作树干净度"闸门判成别人在飞** —— 要么落仓外，要么闸门必须认它。
 
 ③ 还欠的（都在窗口内那一趟）：第 8 步之后的**第三张截图**（从搜索结果点开这条便签）+ 第 9–11 步跨设备三条腿。
+
+### 清道夫是有寿命的（窗口若在 04:26 之后才开，必须先看这一行）
+
+`heyta-carrier-panitor` 实身 `~/.heyta-window-rigs/heyta-carrier-png-janitor.sh`，
+现量 `pid=34578`、`etime 02:13`（22:26:17 起），`CAP=360 轮 × 60s` ⇒ **约 04:26 自行退出**。
+它退出之后 ③ 再跑一趟，第 12 步又会把 2–3 枚脏图留在受跟踪路径里 ⇒ 规范闸门 `--target c`
+从此每轮 `REDS=…,src` 恒红（形状与"别人在飞"逐字相同）。
+要么在窗口前重起它：`nohup bash ~/.heyta-window-rigs/heyta-carrier-png-janitor.sh >/dev/null 2>&1 & disown`，
+要么在 ③ 跑完立刻手工做同一件事（先 `cp -p` 归档到 `~/.heyta-evidence/`、`cmp -s` 校验、再
+`git -C <载体> checkout -- apps/mobile/evidence/`）。⚠️ 顺序不能反：没校验就还原 = 把本趟证据丢了。
