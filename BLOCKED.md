@@ -4258,3 +4258,14 @@ git grep -n '20261009000000_add_holiday_adjustments' HEAD
 >   测试用的夹具目录 `deliver-CCCtest-1111` 已删除并验证不存在（残留会让下一趟误判"已产出 DONE"）。
 > - 按 AGENTS §8 第 8 条（同日刚被并行线加强："只在文末追加成功记录、却保留正文旧断言 ⇒ 两套状态"）复扫正文，
 >   第二批 sweep 抓到的 4 处正是这个形状（不带日期的"现量"、裸交付清单、无趟标签的门禁输出转录）。
+
+## B75. 🟠 `check:docs` 现在红，但红点不在本线：`docs/adr/0051-mobile-reminder-delivery.md:203/205` 指向 `apps/mobile/evidence/` 里三张**本机存在、git 未跟踪**的截图（归属 iOS 提醒那条线，本线不代改）
+
+- 现量：`git status --porcelain -- docs/adr/0051… apps/mobile/evidence` = ` M` 那份 ADR + 三枚 `??` PNG；
+  `git ls-files apps/mobile/evidence/ios-reminder-pending*.png` = **0**，而 `ls` = 3 枚。
+  `git show HEAD:docs/adr/0051…` 的 200–206 行是别的内容 ⇒ 那些链接只存在于别人未提交的编辑里。
+- 结论：这条红**只在混合工作树成立**（§"门禁红的第三种形态"），干净检出里既没有那几行也没有那几个链接。
+  关闭判据在它的主人手里：要么 `git add` 那三张（截图属产品证据、该入库），要么按门禁给的三条出路里
+  的 ②/③ 处理。**本线不代改、不放宽 `docs-link-check`，也不为了整片绿去吸收别人的债。**
+- 本线因此改用什么当"文档改动没引入死链"的读数：`check:md-tables` / `claims` / `doc-citations` 三道 rc=0，
+  加上 `check:docs` 的输出里**本线文件命中 0 条**（现量：报出的三处全在 `docs/adr/0051…`）。
