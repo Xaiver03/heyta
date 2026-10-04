@@ -2510,3 +2510,28 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     ⇒ 收读数前先 `tail` 一眼产物；needle 要抄被打印那一句的字面形状（§7 那条"0 命中先怀疑探针"的又一次现形）。
   - ⇒ ③ 的缺口现在**只剩"窗口内那一趟完整读数"**（第 6/7 步 op、第 8 步第三张图、第 9–11 步三条腿），
     "判据本身有没有牙齿"已经不由那一趟来回答了。
+- 🔴 **11:2x 查出一条"没人认领的缺口"，写好判据却因主机的内存闸门没能落**（这条是给 Goal ① 的四张截图兜底的那半）：
+    · 现量：`grep -cE 'countColor|countBrandBlue|HEYTA_BLUE' scripts/screenshots/png-stats.test.mjs` = **0**，
+      而 `grep -rln 'countBrandBlue|countColor' scripts apps/*/scripts` 显示它的消费者正是
+      **`scripts/reinstall-all.sh`（① 那四端的判据本体）** 与 `apps/desktop-macos/scripts/package-app.sh`。
+      也就是说：**"装上来的是不是 heyta 的界面"这条判据（§7 第 82 条换来的那半）自己没有任何常驻用例** ——
+      采样密度退回去（20 万点 → 2 万点）、容差被改、暗色那一支被摘掉，产出的都是一个像样的小整数，
+      没有任何一层会失败。元规则 2 的形状。
+    · 我按现有文件的两层结构补了 **4 条判别对**（候选件：`~/.heyta-pending/notes-e2e-20261004/png-stats.test.with-brandblue-cases.mjs`，
+      sha8 **`4030f106`**，相对 HEAD 是 `66/1`，那 1 删就是被我替换的 import 行）：
+      ① 1200x800 白底上放一块 **24x24** 主蓝 ⇒ 命中数不只 `>0`，还要 **≥20**（判据真实用的阈值，从被约束常量推，不写死"看起来像"）；
+      ② 暗色那张：浅色支必须 **0**、暗色支必须 **>0**（证明两支不互相顶替，"只验一套主题"是 §7 第 83 条那种错）；
+      ③ 🔴 **错误屏判别对**：复刻"找不到共享 UI 产物"那张（浅底 + 深灰标题/正文块），
+        断言 `looksBlank === false` **且** `contentRatio > 0.01`（前提："非空白"这条确实放过它）
+        而 `countBrandBlue === 0`（结论：拦住它的只能是品牌蓝）；
+      ④ 容差边界：`r0 + HEYTA_BLUE_TOLERANCE` 算命中、`+TOLERANCE+1` 必须不算（阈值要有边，且从常量推）。
+    · **为什么没落**：`node --test` 被本机 `~/.tfa-shield` 的**内存闸门**挡回 —— 锁 `/tmp/tfa-test.lock`
+      的持有者是 `pid 72717`（`/bin/sh ~/.tfa-shield/bin/node --test /Users/rocalight/scratch-owner-transfer/rbac-…`，
+      11:19 起，不是我这条线）。它给的 `TFA_ALLOW_CONCURRENT_TEST=1` 我**不用**：那道门是防整机 OOM 的
+      （并发 `node --test` 能把单进程推到 1.8–26GB），为了一趟离线复跑去摘机器级保护，代价不落在我身上、落在别人的现场上。
+      ⇒ 未验证的判据不进仓库（AGENTS §8.3「不能失败的检查没有价值」的反面是"没验过会不会失败的检查也没价值"），
+      所以我把工作树那枚文件**还原到 HEAD**（`cmp` 证工作树==HEAD、脏计数 0），候选件留在归档，
+      等测试通道空了就落 + 跑两枚变异（把 `sampleStep` 改粗、把容差改成精确相等）证它有牙。
+    · ⚠️ 顺手又踩一次自己记过的坑：第一趟我用 `grep -E '^# (tests|pass|fail)'` 收判决拿到**空输出**，
+      差点读成"套件没跑"——实际是主机闸门在**跑之前**就退了 1，真消息在 stderr 里。
+      ⇒ `> log 2>&1; echo EXIT=$?; tail` 这一套要无条件走，不能只在"看起来该有输出"时才走。
