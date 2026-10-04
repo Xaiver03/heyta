@@ -46,6 +46,14 @@ PATHS=(
   # 🔴 与链的 `ask_gate()` + `verify rc=3 有界重跑`**同批落地**：那 22 行窗口判据现在有两个消费者
   #    （开窗前与重跑前），而"rc=3 才重跑、rc=1 绝不重跑、闸门关着就一个字不跑"只能由这把六臂 rig 答。
   research/tools/r14c-verify-retry-arms.sh
+  # 🔴 **与 `r14c-carrier-chain.sh` 这一批同列**（链依赖的 rig 要与 dependent 同列，否则
+  #    `--only` 会提一个"改了判据但牙没入库"的 HEAD —— 17:46 那次 `stack_up` 事故的同一条规矩）：
+  #    ① `stack_down` 的四臂 + 两条静态不变量 + 变异；
+  #    ② `ask_gate` 的负载落位从"次数"改"时间预算"后的九臂（含 F1 正对照 / F2 变异）；
+  #    ③ UIPIN 路径清单的常驻护栏（它拦的是 27 枚钉行的触发源，改的是 8 枚 README）。
+  research/tools/r14c-stack-down-arms.sh
+  research/tools/r14c-regate-load-arms.sh
+  research/tools/r17-pin-path-hygiene.sh
   # 🔴 这一批**成对落地的三枚**（链 + 它依赖的两枚共享起栈脚本）：
   #    `r14c-carrier-chain.sh` 新加的 `stack_isolation` 后置断言依赖 `scripts/mobile-e2e-up.sh`
   #    那两枚新旋钮（`HEYTA_E2E_PIDFILE` / `HEYTA_E2E_LOGFILE`），而载体那份取的是**已提交副本**
@@ -135,11 +143,22 @@ PATHS=(
 #    并对"已经不脏的在册条目"打「待摘」—— 所以这里不许写"永远不归本线"那种话，
 #    条目只能跟着现量走（它什么时候被别人提交了 / 被重拍覆盖了，就该从这本册子里划掉）。
 # 格式：`<路径>|<为什么不带走 + 处置路>`
+# 🔴 **2026-10-04 21:3x 摘空**：原来那 4 枚（`view-select-closed.png` + `calendar-day/day-en-{empty,full,no-timed}.png`）
+#    的**字节已被各自持有者在 `68fadb10`（"一批 web 界面证据图重写（同屏重采集，非新增判据）"）提交掉**，
+#    现量 `git status --porcelain` 对这 4 枚回 **0 行** ⇒ 按上面那句"条目只能跟着现量走"划掉。
+#    ⚠️ **摘掉那 4 枚 ≠ 那单做完了**：交接 §5 第 11 号（重拍 + 人看 + 重钉）**仍然未闭合**，
+#    而且它现在是**另一格红** —— `r17-evidence-md5-check.sh --dir apps/web/evidence/calendar-day`
+#    现量 `entries=1 mismatch=9 md5bad=1 pinbad=8`（README 记的指纹落后于刚提交进去的新字节：
+#    `day-en-empty.png` README=`57d2d0085e…` 而盘上/HEAD=`d64c499450…`）。
+#    登记这件事留在交接 §4.05 (19) 末，不放这里 —— 这里只放"这一笔不带"的册子。
+#    ⚠️ **册子空着≠以后没有条目**：21:3x 就往回补了一枚（docs/plans/README.md，同一枚文件换了脏的人），
+#    所以下面那行空册子的形状只保留为"这次恰好清零"的读数，不是一个长期状态。
+#    🔴 **条目正文里一律不写反引号**：这些行是**双引号字符串**，反引号在双引号内照样触发命令替换 ——
+#    21:3x 第一版就写着「现量 `git diff --stat`」，于是那枚反引号被 bash 执行了，
+#    在册理由变成了**当场 git diff 的整段输出**（打印出来才现形：一行"理由"糊了 15 个文件名的表）。
+#    要引用命令就写全角括号或裸文本；这条也解释了为什么上面那段注释里的反引号是安全的（注释不展开）。
 UNCARRIED=(
-  "apps/web/evidence/calendar-view-options/view-select-closed.png|17:25 别人那趟 e2e 重写的字节，本线没看过它（README 第 11 行那句「盘上此刻」随之过期）⇒ 处置＝交接 §5 的第 11 号那一单（重拍 + 人看 + 重钉）"
-  "apps/web/evidence/calendar-day/day-en-empty.png|同一趟 17:25 重写的字节，而 README 把它钉成**常驻 md5**（README=57d2d008… 等于 HEAD，盘上=d64c4994…）⇒ 带走就是提交一个判据自己就会红的 HEAD；处置＝同上那一单"
-  "apps/web/evidence/calendar-day/day-en-full.png|同一趟 17:25 重写；该目录 README 第 146–147 行写着它与 day-en-no-timed **是同一屏**（现在连字节都相同：两枚都是 bac2e331…）⇒ 这张在本视口下不构成独立证据，等重拍时一并定"
-  "apps/web/evidence/calendar-day/day-en-no-timed.png|同上（与 day-en-full 逐字节相同）；处置＝重拍时决定要不要把这张降级成『窄视口才有意义』的那一张"
+  "docs/plans/README.md|21:3x 现量「git diff --stat」= +2 −0，那两行是**回收站／归档那条线**的索引（trash-and-archive.md 与它的任务书），本线在这一枚里没有待落字节 ⇒ 不带走；处置＝那条线自己提交它自己的两行"
 )
 
 CONFIRM=0
