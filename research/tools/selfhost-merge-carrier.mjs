@@ -861,9 +861,15 @@ const GATES = [
   ['链里每条脚本目标都在树里', ['research/tools/selfhost-chain-targets.mjs'], /^悬空\/判不了\s/],
   // 第五族的裁判：`check:image-license` 的**三条腿原样**挂进来（不是只挂第 1 腿）。
   // 🔴 排除的只有 `--installed-tree` 那一**模式**（它要真镜像里 dump 出来的树，消费者是
-  //    `verify:selfhost-stack`），不是第 2/3 腿本身。10-04 13:5x 在载体上实测过：
-  //    `--quiet` 的 coverage 与 install-contract 只读「提交物锁 / Dockerfile / 快照 / server/package.json」，
-  //    里面的 `node_modules/<name>` 是**锁里的键形状**、不是磁盘路径 ⇒ 两条都 exit 0、不联网、不要 node_modules。
+  //    `verify:selfhost-stack`），不是第 2/3 腿本身。
+  // ⚠️ **这句先前是错的，抄在这里是为了别再照它行动**：旧注释写"10-04 13:5x 在载体上实测过 ⇒
+  //    两条都 exit 0、不联网、不要 node_modules"。那次量的确实 exit 0，但那棵树**恰好有
+  //    `node_modules/.pnpm`**（10-04 07:03 由人装进去的，脚本既不检查也不记录）。10-05 03:0x
+  //    把同一份脚本搬到一棵没有 store 的一次性载体上：第 2 腿立刻非零 —— 它调
+  //    `license-inventory.mjs --json`，那把尺读的是**已安装的** pnpm 树；`node_modules/<name>`
+  //    确实是锁里的键形状（那句没错），但取键的路径要先有 store 才走得通。⇒ "在这棵树上绿过"
+  //    不等于"不依赖这棵树的环境"。现在这一条由下面 `PAIR_WT` 那层的 store 在场检查兜住：
+  //    缺 store 时不再冒充"归属不成立"，而是按"配不了"响亮拒绝并打出恢复命令。台账 §8.161。
   //    这条为什么值得挂进落笔前：main 正在动 `server/`（一次重算就见到它往 devDependencies 里加了
   //    `@heyta/app-host` / `@heyta/storage` / `@heyta/sync-client`），而第 3 腿正是
   //    "prune 必须在第一条 install 之前 + prisma 三处同源"那一族的守门人。
@@ -881,6 +887,18 @@ const runGate = (argv, cwd) => {
 const brief = (out, rc) => out.trim().split('\n').filter((l) => l.trim() !== '')
   .slice(rc === 0 ? -2 : -8).join(' / ').replace(/\s+/g, ' ');
 
+/* 🔴 配对有一个先前没写下来的**前提**：那道门在两棵树上都能跑出读数。`check:image-license`
+ *    第 2 腿不是纯 fs —— 它调 `license-inventory.mjs --json`，那把尺读的是**已安装的** pnpm 树，
+ *    没有 `node_modules/.pnpm` 时它既不是"通过"也不是"红"，是**什么都答不了**。
+ *    10-05 03:0x 现量（一次性载体，两侧都没有 store）：归属层收到的是"这道门没有缺陷行提取式
+ *    ⇒ 判不了"，紧跟的建议是"先在解法侧修掉"—— 在那个现场这句把人往错的方向推（要修的是
+ *    树，不是判据）。更坏的一条路是**假归属**：载体侧点名了缺陷、配对侧读不到 store ⇒
+ *    `attributeRed` 会算成"缺陷只在载体 ⇒ 本批带进去的"，而真相是那一侧没被问成功。
+ *    所以这里在任何归属判定**之前**先把"配不了"这种情形单独摘出来响亮拒绝。
+ *    结论方向一条没动（仍然不放行），改的是它说的那句话真不真。台账 §8.161。 */
+const hasStore = (dir) => existsSync(join(dir, 'node_modules', '.pnpm'));
+const STORE_BLIND_RE = /找不到任何 pnpm store|请先运行 pnpm install/;
+
 const gateReadings = [];
 const reds = []; // {label, argv, re, rc, out}
 for (const [label, argv, re] of GATES) {
@@ -891,6 +909,11 @@ for (const [label, argv, re] of GATES) {
   }
   reds.push({ label, argv, re, rc: g.rc, out: g.out });
 }
+// 🔴 把"这一趟是在什么环境下判的"打进读数，而不是只打结论：第 2 腿要已安装的树，
+//    而载体那侧的 store 由**人**装（10-04 07:03 那次），脚本既不装也不检查 ⇒ 一趟"全绿"
+//    可能只证明了两棵都能跑的树恰好存在。现在每次重算都留一行它到底存不存在。
+notes.push(`落笔前门禁的运行前提：载体 store 在场=${hasStore(WT)}（${WT}）· 门禁 ${GATES.length} 道 ` +
+  `（其中第 2 腿读的是已安装的 pnpm 树，不在场时它既不是通过也不是红，是答不了）`);
 
 /* ── 红集配对：拿干净 main 的那棵树，逐条判"这条红 main 上有没有" ─────────
  * 判定本体在 `selfhost-red-attribution.mjs`（单一所有者，`--selftest` 12 条、
@@ -940,16 +963,40 @@ const ensurePairTree = () => {
 };
 if (reds.length) {
   ensurePairTree();
-  const results = reds.map((g) => {
-    const m2 = runGate(g.argv, PAIR_WT);
-    return attributeRed({
-      gate: g.label, carrierRc: g.rc, carrierOut: g.out,
-      mainSha, mainRc: m2.rc, mainOut: m2.out, defectRe: g.re,
-    });
-  });
+  const paired = reds.map((g) => ({ g, m2: runGate(g.argv, PAIR_WT) }));
+  const blind = paired.filter(({ g, m2 }) => STORE_BLIND_RE.test(g.out) || STORE_BLIND_RE.test(m2.out));
+  if (blind.length) {
+    const blindLabels = new Set(blind.map(({ g }) => g.label));
+    const rest = reds.filter((g) => !blindLabels.has(g.label));
+    die(3, `载体红 ${reds.length} 道，其中 ${blind.length} 道**配不了**（不是"main 上也红"，也不是"本批带进来的"）：\n` +
+      blind.map(({ g, m2 }) => `  · ${g.label}：载体侧读不到已安装的树=${STORE_BLIND_RE.test(g.out)} · 配对侧=${STORE_BLIND_RE.test(m2.out)}`).join('\n') +
+      // 🔴 其余那几道也要**点名**：只数不点名，读的人就得为了知道是哪道门再跑一趟（10-05 03:1x
+      //    现量：这里报"红 2 道"而只印了 1 道，第二道是谁只能靠再跑一次去猜）。
+      (rest.length
+        ? `\n   另外 ${rest.length} 道红（这次没走到归属，因为上面那一道已经判不了）：${rest.map((g) => g.label).join(' / ')}\n`
+        : '') +
+      `\n   store 在场：载体=${hasStore(WT)}（${WT}）· 配对树=${hasStore(PAIR_WT)}（${PAIR_WT}）\n` +
+      `   ⇒ 这两棵树里至少一侧没有 node_modules/.pnpm 那层已安装的树，那道门在这侧什么都答不了；` +
+      '把它读成"归属不成立"会让人去改判据，而缺的是一棵能跑的树。\n' +
+      `   恢复（本工具**不代跑** install：载体目录与并行那条线的打包共用）：\n` +
+      `     cd ${hasStore(WT) ? PAIR_WT : WT} && pnpm install --frozen-lockfile && cd e2e && pnpm install --frozen-lockfile\n` +
+      `     然后重跑本脚本（第 1 族只做 reset --hard、不重装依赖，所以载体侧的 store 必须与它当前这把锁同源 —— ` +
+      `land-main 第 3 道 gate 那把尺判的就是这件事）。`);
+  }
+  const results = paired.map(({ g, m2 }) => attributeRed({
+    gate: g.label, carrierRc: g.rc, carrierOut: g.out,
+    mainSha, mainRc: m2.rc, mainOut: m2.out, defectRe: g.re,
+  }));
   const badVerdict = attributionVerdict(results);
   if (badVerdict) {
+    // 🔴 两种"没有全部通过"要分开说：一条是"这条红是本批的"（要修），一条是"这条红我判不了"
+    //    （要先让判据能被逐条点名）。把后者也念成前者，就是让人去修一条并不存在的缺陷。
+    const cannotTell = /判不了/.test(badVerdict);
     die(3, `载体的纯 fs 门禁红了，而**逐条归属没有全部通过**（不提交）：\n  - ${badVerdict}\n` +
+      (cannotTell
+        ? '   ⇒ 上面带"判不了"的那些**不是**本批的缺陷判定，是这道门没能把缺陷逐条点名（提取式没接上或两侧输出对不上）。' +
+          '先把那道门的点名形状补上（并注入验证它能抓到），再谈这条红归谁。\n'
+        : '') +
       `   ⇒ 归属不成立的那些必须先在解法侧修掉；本工具不拿"看起来差不多"当放行。`);
   }
   for (const r of results) {
