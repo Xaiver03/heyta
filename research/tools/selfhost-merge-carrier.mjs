@@ -18,7 +18,7 @@
  * `split('\n')` 段 = `wc -l` 的 213 行（文件以换行结尾）。**手抄的数字连单位都会错**，
  * 所以这里的读数全部由脚本自己拼进提交说明，不由人复述。
  *
- * ## 九条冲突族与它们的解法（§8.22 预置 + 后续每次新增一族都写在这里，本文件是唯一执行者）
+ * ## 十一条冲突族路径与它们的解法（§8.22 预置 + 后续每次新增一族都写在这里，本文件是唯一执行者）
  *
  *  1. `package.json`：scripts 键并集 + `check` 链并集，带四条断言
  *     （两侧键不缺 / 两侧链段不缺 / 两侧各自相对顺序不颠倒 / 两侧相对 base 都不得摘段）。
@@ -71,8 +71,18 @@
  *     所以解法只**改写冲突块本身**，块外一个字节不动。判据与守卫在
  *     `research/tools/selfhost-dockerfile-merge.mjs`（`--selftest` 十七条：control 十条 + 七条拒绝臂，
  *     每条**按拒绝理由认领**；四道守卫各做过摘除变异，各自把自己的那条臂打红）。
+ *  10. `docs/runbooks/deployment.md`（**第十族**，10-05 01:1x 出现 —— main 一夜走 30+ 笔后新增的冲突面）：
+ *     两侧都在**同一处纯追加**（各自写了一段"为什么这一步在这里"），base 段为空 ⇒ 解法是并集，
+ *     无损性**按块**证明（块内两侧的行都必须留在产出里 + 无标记残留）。判据在
+ *     `research/tools/selfhost-text-merge.mjs`（`--selftest` 九臂）。
+ *  11. `e2e/live-site/live-domain.spec.ts`（**第十一族**，同一趟出现）：这一枚**不能并集** ——
+ *     base 段非空，两侧各写了"先在界面上点同意、再探测"这同一件事的两种实现，并集会把
+ *     `const probe` 复制成两枚（语法就不过）。解法取 **main 侧**（那一侧带 2026-10-05 的线上实测：
+ *     `waitFor` + 断言消息 + 超时），并把**本批侧被丢的独有行打进读数**，不静默。
+ *     🔴 不在这两侧之外发明第三种写法：载体里现写未跑过的代码，等于把"落地"变成"未经检验的修改"。
+ *     本批那版多的一处 `.first()` 严格模式护栏已记进台账，由这条线在落地后回补到 main 那版上。
  *
- * 任何不属于这九族的冲突路径 ⇒ 退 2 并点名，**不自动决定**；退 2 之前必须把进行中的合并**中止干净**
+ * 任何不属于这十一族的冲突路径 ⇒ 退 2 并点名，**不自动决定**；退 2 之前必须把进行中的合并**中止干净**
  * （`MERGE_HEAD=无` + 工作树 0 条脏），否则下一次重算会被第 0a 步那道闸门挡在门外。
  *
  * ## 落笔前的门禁（只跑纯文件系统的那几道，条数由 `GATES.length` 现量并打进读数）
@@ -113,6 +123,7 @@ import { resolveDockerfileConflict, dockerfileReading, selftestArms as dockSelft
 import { attributeRed, attributionVerdict, attributionArms } from './selfhost-red-attribution.mjs';
 import { readImageInstallShape, readImageInstallShapeFromText } from './image-install-shape.mjs';
 import { liveCarrierUsers } from './selfhost-carrier-busy.mjs';
+import { unionMerge, oursMerge, sameCountAs } from './selfhost-text-merge.mjs';
 
 const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
 const MAIN = process.env.HEYTA_MAIN_REF || 'main';
@@ -304,8 +315,18 @@ const ORPHAN = 'research/tools/image-deps-fingerprint.mjs';
 // 镜像构建的剪枝那一步（**第九族**，10-04 23:0x 出现）。理由与判据见文件头第 9 族那一段，
 // 本体在 `selfhost-dockerfile-merge.mjs`（这一族特别不能"整文件取一侧"，所以解法在那里）。
 const DOCK = DOCKERFILE_PATH;
+// 部署手册（**第十族**，10-05 01:1x 出现：main 一夜走了 30+ 笔之后新增的冲突面）。
+// 两侧都在同一处**纯追加**（各自写了一段发布说明）⇒ 并集是无损的，且"无损"可以逐块证明。
+const DEPLOY = 'docs/runbooks/deployment.md';
+// 线上域名用例（**第十一族**，同一趟出现）。这一枚**不是**纯追加：两侧各写了
+// "先在界面上点同意、再探测" 的同一件事的两种实现，base 段非空 ⇒ 并集会造出两枚
+// `const probe` 声明（语法就不过）。所以取 main 侧，并把本批侧被丢的独有行打进读数。
+// 取 main 侧的理由是**读数新**：那一侧带 2026-10-05 线上实测（含 waitFor + 断言消息），
+// 本批那版是 10-04 写的同一修法，只多一处 `.first()` 严格模式护栏 —— 它记进台账，
+// 由这条线在落地后自己回补到 main 那版上，不在载体里发明第三种写法。
+const LSPEC = 'e2e/live-site/live-domain.spec.ts';
 
-const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], gen: [], cov: [], cap: [], dock: [], other: [] };
+const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], gen: [], cov: [], cap: [], dock: [], deploy: [], lspec: [], other: [] };
 for (const p of conflicts) {
   if (p === 'package.json') fam.pkg.push(p);
   else if (p === '.gitignore') fam.gi.push(p);
@@ -316,14 +337,16 @@ for (const p of conflicts) {
   else if (p === COV) fam.cov.push(p);
   else if (p === CAPTURE_PATH) fam.cap.push(p);
   else if (p === DOCK) fam.dock.push(p);
+  else if (p === DEPLOY) fam.deploy.push(p);
+  else if (p === LSPEC) fam.lspec.push(p);
   else fam.other.push(p);
 }
 if (fam.other.length) {
-  die(2, `出现**预置九族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
+  die(2, `出现**预置十一族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
     `   先把它加进本文件的分族与解法，再重跑。`);
 }
-notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} cov=${fam.cov.length} cap=${fam.cap.length} dock=${fam.dock.length} other=${fam.other.length}`);
-if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1 || fam.gen.length > 1 || fam.cov.length > 1 || fam.cap.length > 1 || fam.dock.length > 1) {
+notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} cov=${fam.cov.length} cap=${fam.cap.length} dock=${fam.dock.length} deploy=${fam.deploy.length} lspec=${fam.lspec.length} other=${fam.other.length}`);
+if ([fam.pkg, fam.gi, fam.audit, fam.snap, fam.gen, fam.cov, fam.cap, fam.dock, fam.deploy, fam.lspec].some((a) => a.length > 1)) {
   die(2, '同一族出现多于一份文件 —— 分族前提（各一处）不成立，交人判');
 }
 
@@ -619,6 +642,69 @@ if (fam.audit.length) {
     ` + 本分支独有 ${r.stats.srcOnly} 行；断言 main 零丢行 / 本分支零丢行 / 无两侧之外的新行 / 无冲突标记 全过`;
   notes.push(`审计文档并集：main 节 ${r.stats.mainHeadings}、本分支节 ${r.stats.srcHeadings}、` +
     `main 独有行 ${r.stats.mainOnly}、本分支独有行 ${r.stats.srcOnly}、产出非空行 ${r.text.split('\n').filter((l) => l.trim() !== '').length}`);
+}
+
+/* ── 第十族 / 第十一族（10-05 01:1x 出现的两枚文本冲突路径）───────────────
+ * 判据本体在 `research/tools/selfhost-text-merge.mjs`（离线九臂自检，闸门在下面）。
+ * 🔴 两枚用**两种**解法，由形状决定而不是由偏好决定：base 段为空 ⇒ 并集是无损的；
+ *    base 段非空 ⇒ 只能取一侧，因为并集会把 `const probe` 这类声明复制成两枚 ——
+ *    那不是"两边都保留"，那是把语法改坏。union 在这种形状上自己会拒绝，不许降级。 */
+const TMERGE = 'research/tools/selfhost-text-merge.mjs';
+if (!existsSync(join(WT, TMERGE))) {
+  die(2, `第十/十一族的判据文件不在载体树上（${TMERGE}）⇒ 没有它就不许解这两族，也不许当"没有这两族"混过去`);
+}
+{
+  let out = '';
+  let rc = 0;
+  try {
+    out = execFileSync('node', [join(WT, TMERGE)], { encoding: 'utf8', maxBuffer: 8 << 20 });
+  } catch (e) {
+    rc = e.status ?? 1;
+    out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+  }
+  const badArms = out.split('\n').filter((l) => /^BAD\s/.test(l));
+  const armLine = (out.split('\n').find((l) => /臂数\s\d+/.test(l)) ?? '').trim();
+  const claimed = armLine.match(/臂数\s(\d+) · 不符\s(\d+)/);
+  // 合成臂不需要这两枚真的在冲突里 ⇒ 每次重算都跑（它验的是判据有没有牙，与第八/九族同一口径：
+  // 只看退出码不够 —— "一条臂都没跑"的输出长得和通过一模一样）。
+  if (rc !== 0) die(2, `第十/十一族的自检退 ${rc}（有臂不符或被改坏了）⇒ 不用它解这两族：\n${badArms.slice(0, 6).join('\n')}`);
+  if (badArms.length) die(2, `第十/十一族的自检**退出码 0 却带着不符臂**（判据坏了）：${badArms[0]}`);
+  if (!claimed || Number(claimed[1]) < 9 || Number(claimed[2]) !== 0) {
+    die(2, `第十/十一族的自检读数对不上（臂数行：“${armLine || '（没有这一行）'}”，要求 臂数 ≥9 且 不符 = 0）` +
+      ` ⇒ 要么臂被删了，要么输出形状变了而这里没跟上。`);
+  }
+  notes.push(`第十/十一族判据自检：${armLine}`);
+}
+if (fam.deploy.length) {
+  const r = unionMerge(stage(DEPLOY, 2), stage(DEPLOY, 1), stage(DEPLOY, 3));
+  if (!r.ok) die(2, `${DEPLOY} 并集：${r.refuse} ⇒ 绝不提交，交人判`);
+  writeFileSync(join(WT, DEPLOY), r.text);
+  git(['-C', WT, 'add', '--', DEPLOY]);
+  const onDisk = readFileSync(join(WT, DEPLOY), 'utf8');
+  if (onDisk !== r.text) {
+    die(5, `${DEPLOY} 写回后回读与产出逐字节不同（磁盘 ${onDisk.length}B vs 产出 ${r.text.length}B）`);
+  }
+  notes.push(`${DEPLOY} 并集：纯追加块 ${r.parsed} 个、两侧块内行全部留在产出里（块级无损检查过），` +
+    `产出 ${onDisk.split('\n').length} 段`);
+}
+if (fam.lspec.length) {
+  const mainTxt = stage(LSPEC, 2);
+  const shape = (merged) => [
+    sameCountAs('const probe = await page.evaluate', mainTxt)(merged),
+    sameCountAs('privacy-consent-accept', mainTxt)(merged),
+  ].filter(Boolean);
+  const r = oursMerge(mainTxt, stage(LSPEC, 1), stage(LSPEC, 3), shape);
+  if (!r.ok) die(2, `${LSPEC} 取 main 侧：${r.refuse} ⇒ 绝不提交，交人判`);
+  writeFileSync(join(WT, LSPEC), r.text);
+  git(['-C', WT, 'add', '--', LSPEC]);
+  const onDisk = readFileSync(join(WT, LSPEC), 'utf8');
+  if (onDisk !== r.text) {
+    die(5, `${LSPEC} 写回后回读与产出逐字节不同（磁盘 ${onDisk.length}B vs 产出 ${r.text.length}B）`);
+  }
+  // 🔴 丢掉的东西必须**有名字**：一句"取了 main 侧"挡不住"其实少了一段注释"。
+  const sample = r.dropped.slice(0, 3).map((l) => l.trim().slice(0, 70)).join(' / ');
+  notes.push(`${LSPEC} 取 main 侧（带 2026-10-05 线上实测那一版）；本批侧被丢的独有行 ${r.dropped.length} 条` +
+    `（前三条：${sample || '（无）'}）—— 已记进台账，由这条线落地后回补，不在载体里发明第三种写法`);
 }
 
 /* ── 镜像 npm 树快照：取本分支侧，但由**生产门禁**来判对错 ────────────────
