@@ -11,30 +11,86 @@
 // 会得到 9 条，而真实展开后是几十条 —— 那种探针的"没报缺失"证明不了任何事，
 // 因为分组成员根本没进过集合。所以本脚本对**含图片后缀却没有 `{}` 配对形状**的
 // token 也照样入账，并把解析不到的显式列成红。
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
-const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+// `--root DIR`：把"仓库"换成一棵**物化出来的树**（合流预检用 `git archive` 把候选树/基线树解到 /tmp，
+// 那种目录没有索引，`git ls-files` 在那里读出来的是空集 ⇒ 会被当成"所有引用都没入库"整片假红）。
+// 产物树里"存在"就等于"在那棵树里被跟踪"（archive 只放树内文件），所以集合改成目录遍历，
+// 并把档位**打在输出里**，不假装还在 git 模式。
+const rootArgIdx = process.argv.indexOf('--root');
+const rootArg = rootArgIdx === -1 ? undefined : process.argv[rootArgIdx + 1];
+const TREE_MODE = rootArg !== undefined;
+const root = TREE_MODE ? rootArg : execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+const IMG_EXT = /\.(?:png|jpg|jpeg|webp)$/;
+const PRUNE = new Set(['node_modules', '.git', 'dist', 'test-results']);
+const walk = (dir, acc) => {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.name.startsWith('.') || PRUNE.has(e.name)) continue;
+    const abs = join(dir, e.name);
+    if (e.isDirectory()) walk(abs, acc);
+    else if (IMG_EXT.test(e.name)) acc.push(relative(root, abs));
+  }
+  return acc;
+};
+
 const DEFAULT_DOCS = [
   'docs/plans/detail-pane-alignment.md',
   'docs/research/detail-pane-alignment-and-spaced-review.md',
 ];
-const docs = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-const targets = (docs.length ? docs : DEFAULT_DOCS).map((d) => (d.startsWith('/') ? d : join(root, d)));
-
-const git = (args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' });
-let trackedRaw;
-try {
-  trackedRaw = git(['ls-files']);
-} catch (error) {
-  console.log(
-    '🔴 拿不到 `git ls-files` —— 「本机有、仓库里没有」这一半判据无法执行，拒绝给出"通过"的结论。\n' +
-      `   git 报的是：${error instanceof Error ? error.message : String(error)}`,
-  );
-  process.exit(1);
+const positional = [];
+for (let i = 2; i < process.argv.length; i += 1) {
+  const a = process.argv[i];
+  if (a === '--root') {
+    i += 1; // 它的实参不是文档
+    continue;
+  }
+  if (!a.startsWith('--')) positional.push(a);
 }
-const tracked = trackedRaw.split('\n').filter(Boolean);
+const targets = (positional.length ? positional : DEFAULT_DOCS).map((d) => (d.startsWith('/') ? d : join(root, d)));
+
+let tracked;
+if (TREE_MODE) {
+  tracked = walk(root, []);
+} else {
+  const git = (args) =>
+    // 🔴 `execFileSync` 的默认 `maxBuffer` 是 1MB（本仓全量输出超它，会被**静默截断**）；
+    // 🔴 更要命的是 git 默认 `core.quotePath=true`：含非 ASCII 的路径被输出成 `"apps/web/evidence/中文.png"`
+    // 这种带引号的转义形状 ⇒ 既不匹配 `.png$`，也永远匹配不上文档里的引用。
+    // 16:2x 实测：同一棵树，全量解析只拿到 222 枚图片，而目录遍历/`git archive` 里是 **250** 枚 ——
+    // 少的正是那 28 枚非 ASCII 名字的证据文件。集合漏收不会报错，它只会让"歧义判定"和"没入库判定"双双失灵。
+    // ⇒ 一律用 `-z`（NUL 分隔、原始字节、不转义），并显式抬高 maxBuffer。
+    execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: 1 << 28 });
+  let trackedRaw;
+  try {
+    trackedRaw = git(['ls-files', '-z']).replace(/\0$/, '');
+  } catch (error) {
+    console.log(
+      '🔴 拿不到 `git ls-files` —— 「本机有、仓库里没有」这一半判据无法执行，拒绝给出"通过"的结论。\n' +
+        `   git 报的是：${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(1);
+  }
+  const listed = trackedRaw.split('\0').filter(Boolean);
+  // 两种模式的集合都必须是**同一个宇宙**（只有图片），否则简写的歧义判定会随模式漂移。
+  tracked = listed.filter((p) => IMG_EXT.test(p));
+  // 完整性守卫（16:2x 那两个假读数——2827 条"图片"、222 枚集合——都是没有这道守卫时才活得下去的）：
+  // ⚠️ 第一版这里写的是 `git ls-files --count`，**本机 git 没有这个选项**（直接 unknown option 退 129），
+  // 症状是判据崩在守卫上而不是查到红。工具能力要实测，别按别的 CLI 的习惯猜。
+  // 改成对本判据真正依赖的那一片做独立计数：证据族目录。
+  const scoped = git(['ls-files', '-z', '--', 'apps/web/evidence']).replace(/\0$/, '');
+  const scopedCount = scoped.split('\0').filter(Boolean).length;
+  const parsedScoped = listed.filter((p) => p.startsWith('apps/web/evidence/')).length;
+  if (scopedCount !== parsedScoped) {
+    console.log(
+      `🔴 集合不完整：单独问 apps/web/evidence/ 得到 ${scopedCount} 条，全量解析后只剩 ${parsedScoped} 条` +
+        ` ⇒ 全量那份集合漏收（历史上两种成因都出现过：maxBuffer 截断、非 ASCII 路径被引号转义）。` +
+        '本次读数无效（拒绝报绿）。',
+    );
+    process.exit(1);
+  }
+}
 const trackedSet = new Set(tracked);
 
 // 一个 token = 任意层目录前缀 + 可选 `{a,b}` 分组 + 图片扩展名。
@@ -46,11 +102,10 @@ const trackedSet = new Set(tracked);
 // 那一档 —— 第一趟就是这么得到 7 条假红的。认成完整 token 之后再按"含星号"分到模式档，
 // 既不判它落位、也不静默跳过。
 // ⚠️ 逗号**只在花括号内**允许：放进前缀字符类会让 `a.png,b.png` 被贪心吃成一个 token。
-// ⚠️ 省略号也要进字符类：人写缩略引用（`{k1-…,k7-…}.png`）时，若正则吃不到 `…`，
-// token 会在省略号处断掉、只剩 `}.png` —— 那会被当成"形状解析不了"报红，
-// 而它其实是腿 5 那一档（缩略提及）。让它完整进 token，分类才有得可分。
-const TOKEN =
-  /[A-Za-z0-9_.\-*?[\]/…]*\{?[A-Za-z0-9_.\-,…]*\}?\.(?:png|jpg|jpeg|webp)/g;
+// 🔴 字符类不能列 ASCII 白名单：本仓有 **28 枚**证据文件名带中文（`apps/web/evidence/row-tail-fold/01-通道-hover-展开态.png` 那一族），
+// 早先那版 `[A-Za-z0-9_.…/-]` 把它们整条看不见 ⇒ 引用它们时判据读成"引用 0 条"（A7 臂就是为这个而留的）。
+// 改成"排除空白 / 反引号 / 竖线 / 花括号 / 逗号"的反向字符类：非 ASCII 自动进集合，逗号仍只在组内允许。
+const TOKEN = /[^\s`|{},]*\{?[^\s`|{}]*\}?[^\s`|{},]*\.(?:png|jpg|jpeg|webp)/g;
 const GLOBY = /[*?[\]]/;
 
 function expand(token) {
@@ -168,6 +223,12 @@ const untracked = rows.filter((r) => r.kind === 'full' && r.onDisk && !r.isTrack
 const unresolved = rows.filter((r) => r.kind === 'short' && r.bad);
 
 const rel = (f) => (f.startsWith(root + '/') ? f.slice(root.length + 1) : f);
+console.log(
+  `集合来源：${TREE_MODE ? '目录遍历（`--root` 产物树模式：树里没有 git 索引，"在这棵树里存在"即等价于被跟踪 —— 产物由 git archive 解出，只放树内文件）' : 'git 索引（`ls-files`：能抓住"本机有、库里没"那一半）'}，图片文件 ${tracked.length} 枚`,
+);
+if (tracked.length === 0) {
+  console.log('🔴 图片文件集合为 0 —— 遍历/索引其中一边坏了，"全部落位"在这种集合上是**永真**的，拒绝报绿。');
+}
 console.log(`取样文档：${targets.length} 份（${targets.map(rel).join(', ')}）`);
 console.log(
   `图片 token ${tokens} 个（其中 ${patterns.length} 个是通配模式，见下）⇒ 花括号展开后引用 ${expanded} 条（全路径 ${rows.filter((r) => r.kind === 'full').length} / 简写 ${rows.filter((r) => r.kind === 'short').length}）`,
@@ -215,6 +276,16 @@ if (shortAmbiguous.length) {
   for (const r of shortAmbiguous.slice(0, 12)) console.log(`  ${r.doc}:${r.line}  ${r.ref} → ${r.resolved}`);
 }
 
-const bad = missing.length + untracked.length + unresolved.length + malformed.length + (expanded === 0 ? 1 : 0);
-console.log(`\n结论：${bad === 0 ? '本线文档每条截图引用都落在一枚被仓库跟踪的文件上 ✅' : `🔴 ${bad} 处不成立`}`);
+// 🔴 空集合必须**计进红**：只在输出里印一句"集合为 0"而不改变退出码，等于又造一条永远通过的判据
+// （元规则二那种病——本仓为同样的事修过一轮）。
+const bad =
+  missing.length +
+  untracked.length +
+  unresolved.length +
+  malformed.length +
+  (expanded === 0 ? 1 : 0) +
+  (tracked.length === 0 ? 1 : 0);
+console.log(
+  `\n结论：${bad === 0 ? `本线文档每条截图引用都落在一枚${TREE_MODE ? '合并产物树里的' : '被仓库跟踪的'}文件上 ✅` : `🔴 ${bad} 处不成立`}`,
+);
 process.exit(bad === 0 ? 0 : 1);

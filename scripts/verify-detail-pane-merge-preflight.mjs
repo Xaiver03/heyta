@@ -48,6 +48,14 @@ const ROOT = process.cwd();
 const git = (args, opts = {}) =>
   execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28, ...opts });
 
+// 这两道看的是**文档**（截图引用能不能落位 / C1 与 C1b 对不对账），合流当场就是它们最该说话的时刻：
+// 合并会把两边各自新写的引用拼进同一篇文档，而"引用一枚只有对面那棵树里才有的截图"这种红
+// 在各自的检出里都看不见。它们进 GATES 的代价是要用 `--root`（见下面 runOne 那条注释）。
+const TREE_ROOT_GATES = [
+  'scripts/check-detail-pane-evidence-refs.mjs',
+  'scripts/check-detail-pane-c1-coverage.mjs',
+];
+
 // 纯 fs 门禁：全部是 `pnpm check` 已经消费的同一批脚本，一个都不新造判据。
 const GATES = [
   'scripts/check-selection-single-source.mjs',
@@ -67,7 +75,9 @@ const GATES = [
   'scripts/check-theme-single-source.mjs',
   'design-system/heyta/check-hardcoded.mjs',
   'scripts/check-docs-voice.mjs',
+  ...TREE_ROOT_GATES,
 ];
+
 
 const refA = process.argv.includes('--a') ? process.argv[process.argv.indexOf('--a') + 1] : 'main';
 const refB = process.argv.includes('--b') ? process.argv[process.argv.indexOf('--b') + 1] : 'HEAD';
@@ -223,8 +233,12 @@ for (const rel of silent) {
 
 const runOne = (dir, gate) => {
   if (!existsSync(join(dir, gate))) return { rc: 'MISS', line: '临时载体里没有这个脚本' };
+  // 🔴 这两道本线判据默认从 **git 索引**取集合，而这里的载体是 `git archive` 解出来的裸树（没有索引）：
+  // 不传 `--root` 的话，`check-detail-pane-evidence-refs` 会直接崩（拿不到 toplevel），
+  // 症状是"合流把门禁搞红了"，其实是探针够不着载体。两者都改成产物树模式，档位由脚本自己打在输出第一行。
+  const args = TREE_ROOT_GATES.includes(gate) ? [gate, '--root', dir] : [gate];
   try {
-    const out = execFileSync('node', [gate], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    const out = execFileSync('node', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     return { rc: 0, line: out.trim().split('\n').pop().slice(0, 58) };
   } catch (e) {
     const out = `${e.stdout || ''}${e.stderr || ''}`.trim().split('\n');
