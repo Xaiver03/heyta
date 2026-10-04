@@ -285,18 +285,35 @@ export function GrowthView() {
 
   const labels = useMemo(() => growthBoardLabels(t), [t]);
 
-  // 投影**只取一次**，四块共用同一个 `now` —— 分两次取就可能落在不同日期上。
-  const todayProgress = selectTodayProgress(entities, now);
-  const review = selectWeeklyReview(entities, now);
-  const totals = selectTotals(entities);
-  const milestones = selectMilestones(entities);
-  const tags = selectIdentityTags(entities, now);
+  /**
+   * 🔴 六次投影全部**记忆化**（P0-6 的 web 半）。
+   *
+   * 投影**只取一次**，四块共用同一个 `now` —— 分两次取就可能落在不同日期上。
+   *
+   * 为什么要收进 `useMemo`：这个视图挂在整个 App 树上，而 App 的重渲染源很多
+   * （同步状态、语言、`store` 的任意字段）。不记忆化时**每一轮重渲染**都要把
+   * 五张表重摊一遍 —— 移动端 `GrowthScreen.tsx:173/194/198/211` 早就是这个写法。
+   *
+   * ⚠️ 这一刀**不**解决"每 60 秒那一轮"：那个 60 秒是 `now` 这个**输入**在变，
+   *   记忆化按定义就该重算。要止住它得先把"这些投影到底吃不吃一天以内的精度"
+   *   审清楚（或按 `§8` 第 14 步把 `habit-streak` 改成按记录数走），
+   *   那是行为变更、不是缓存。这一句写在这里是为了不让下一个读代码的人
+   *   把"加了 useMemo"当成"每分钟那一轮已经没了"。
+   */
+  const todayProgress = useMemo(() => selectTodayProgress(entities, now), [entities, now]);
+  const review = useMemo(() => selectWeeklyReview(entities, now), [entities, now]);
+  const totals = useMemo(() => selectTotals(entities), [entities]);
+  const milestones = useMemo(() => selectMilestones(entities), [entities]);
+  const tags = useMemo(() => selectIdentityTags(entities, now), [entities, now]);
 
   /**
    * 年视图的**事实**序列（旧 → 新、窗口内每天补齐）。
    * ⚠️ 只传事实，分档由 `ActivityHeatmap` 内部做（见文件头）。
    */
-  const activityDays = dailyActivityCountsFromState(entities, now, 365);
+  const activityDays = useMemo(
+    () => dailyActivityCountsFromState(entities, now, 365),
+    [entities, now],
+  );
 
   const summary = buildShareSummary(review, totals, t);
 
