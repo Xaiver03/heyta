@@ -1846,6 +1846,26 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   - ⚠️ **本条只有夹具读数，没有真机读数**：此刻（07:5x）设备仍被别人的 `com.heyta`（pid 5928）占着、
     负载 36.55，而 `uiautomator dump` 会往 `/sdcard/ui.xml` 写 ⇒ 那是对共享设备的写操作，**不在窗口里就不做**。
     下一趟 ③（链 v9）的失败分支日志会直接带上设备原话，那才是这条的真机读数。
+  - ✅ **08:0x ③ 的第 9 步 setup 从"形状说明"升级成可应用的 diff**（`/tmp/heyta-step9-setup.patch`，
+    43 行、`step "` 计数 14 → 15；说明书 `/tmp/heyta-notes-step9-setup.patch.txt` 同步重写）：
+    `bash -n` 过、新增行里 `$var` 紧跟全角 **0 命中**（同一条尺子喂已知该红的写法命中 1，阳性对照）、
+    `git apply --check` **对着当前这个脏工作树**通过（落点在第 8/9 步，与别人那行第 12 步上下文不相交）。
+    🔴 **仍然不应用**：等的不是技术，是别把一个文件变成"我的 + 他的"混合态。
+  - 🔴 **这次升级把我自己写在说明里的两处未取证断言撤掉了**（原文 06:31 版，划线留在 `/tmp` 那两份里）：
+    ① 写过法时称"把**第 11 步那套 `node-host` 写入**挪到前面当 setup" —— 现量 HEAD `:493` 起的第 11 步
+    **根本没有写入**，只有一次 `laptop sync` 加两条 `sqlite3` 读，笔记本在这条脚本里从头到尾没写过东西；
+    ② 那里还手搓了 `node apps/node-host/dist/cli.js task add … --sync`，那个**动词与旗标都没取证过**。
+    ⇒ 真实形状改成从两处真源取：`apps/node-host/src/cli.ts` 的 `case 'add'`（HEAD `:292`，
+    `--json` 返回 `{ok,command,id,due}` ⇒ id 直接可得，不必像 `verify-mobile-conflict.sh:163` 那样
+    再 `laptop list` 反查）与 `scripts/lib/mobile-e2e.sh` 的 `laptop()` / `laptop_ok()`（`:969` / `:979`）。
+    业务语义仍全在 `packages/app-host`（`host.addTask`），脚本只按下这个动词（AGENTS §3.5）。
+  - 🔴 **08:0x 现量：`pnpm check:shell-unicode` 在**当前混合工作树**里 exit 1，但提交态是绿的** ——
+    红的三枚逐枚量过：`research/tools/b-reinstall-readiness.sh`、`tmp/w07-probe-run.sh`（mtime 都 08:00，
+    即**正在被别的会话写**）、`tmp/w07-recapture.sh`（06:32），三枚 `git ls-files` 全是 **N**、
+    `HEAD:` 里**都不存在**。在 HEAD 的临时 detached worktree 里跑同一个门禁 **exit 0**，
+    而那三枚文件在那份检出里根本不存在。
+    ⇒ ② 那条"75 段可过"的读数不用改；但**任何"`pnpm check` 全绿"的说法必须带上工作树状态**，
+    而未跟踪的并行产物会让它红 —— 这不是产品红，也不由本线代改（AGENTS §8.9）。
 - ✅ **05:3x ⑤ 复核**：`B41/B42/B45` 三行仍在 §7.28 那张「完成条件逐条的现量与差什么」表里（`:1220`/`:1221`，状态 🟡，
     各带自己的现量命令），本夜落笔的六笔只改了 `scripts/verify-mobile-notes.sh` 的第 12 步与
     `apps/desktop-macos/scripts/package-app.sh` 的公证段，加上四份文档，
