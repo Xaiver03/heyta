@@ -863,6 +863,14 @@ bash apps/desktop-windows/scripts/package-msix.sh
 前置：macOS 需要 `swift`；Linux 走 SSH 到 `sanjiaozhou`（Ubuntu 24.04，有 gtk4/jsc/dpkg-deb）；
 Windows 走 SSH 到 `windows-pc`（Win11，Windows SDK x64 + dotnet 10 + 管理员）。
 
+🔴 **mac 第 ⑥ 步（公证）是唯一没有上界的一步，`HEYTA_SKIP_NOTARIZE=1` 只跳过它。**
+`notarytool submit --wait` 不带超时，2026-10-04 实测同一档卡住 **11h25m**（pid 98934，父链是另一条会话的
+`reinstall-all`），而 `.app` 与 `.dmg` 在第 ④、⑤ 步就已产完 —— 也就是说**被判据需要的那些字节早就齐了**，
+被卡住的只是"Apple 又扫了一遍"这一张票据。用它之前先认清它**不**改变任何判据：第 ⑥ 步从不在退出码里
+（`if xcrun notarytool … | tail -8 | awk` 判的是 `awk` 的码，公证失败分支只打印一句红就继续走完 —— §7 第 179 条那个形状），
+所以它**不可能**把红跳成绿。反过来，跳过之后那一趟**不许**主张"包已通过公证"；那句只有不带这个变量的一趟能说。
+分支三臂实测：不设 ⇒ 走提交、`=0` ⇒ 走提交、`=1` ⇒ 跳过（默认行为逐字不变）。
+
 ### 6.1 🔴 Windows：`Add-AppxPackage` 必须在**非提权**的交互式会话里跑
 
 AppX 部署是**按用户**的。SSHD 给的是**提权**会话，在那里跑就会得到：
