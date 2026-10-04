@@ -3686,3 +3686,50 @@ v24 由解析器认出（`32924 /tmp/heyta-window-chain24.sh`）、确认没有 
 **窗口现量（17:47:46）**：负载 98（阈值 12）、设备仍不空闲（`com.heyta` pid 6296 在前台，
 另有别人主检出里的 iOS-reminder 走查在跑）、`:3000` 被 node/70256 占 ⇒ ② 的条件也不成立。
 ⇒ **①②③ 仍未起**；③ 的读数现在多了一条"账号是谁、什么时候钉的"的自证。
+
+#### 7.31.25 ① 今天被一枚 **14 小时 39 分的孤儿句柄**钉着；我评估过"把产物目录搬私有"这条路，**否掉了**，理由是它会反过来骗门禁（17:51–17:53 现量）
+
+**先记一条我自己差点造出来的事故**（没有造成任何改动，但它值一条编号）：
+我用 `grep -n 'notary_rc' … | cut -c1-135` 读 `apps/desktop-macos/scripts/package-app.sh:311`，
+截断后那一行**看起来**是 `… || notary_rc`（右值是个裸变量名 ⇒ `set -euo pipefail` 下 command-not-found、
+整段 127 崩掉、"超时不判通过"那一支永不可达）。我还跑了一次最小复现确认 127 —— 复现没错，
+**错在复现的输入是我自己截出来的假象**。用 `awk 'NR>=308 && NR<=318 {printf "%d|%s|\n"}'` 不截断重读 ⇒
+两个分支都写着 `|| notary_rc=$?`，代码是对的。**我差点"当场修"掉一段正确的共享代码。**
+⇒ 规则：**凡要凭一行文本下"这里有缺陷/改这行"的判断，先把整行带首尾锚点打出来**；
+`cut -c1-N` 只配读长注释，不配当证据。（顺带：BSD 没有 `cat -A`，看不可见字符用 `cat -v`/`od -c`。）
+
+**① 的真实阻塞（现量 17:52）**：mac 段起跑第一步就是 `rm -rf /tmp/heyta-macos-dist`
+（`scripts/reinstall-all.sh:196,199` 逐字读过），而那枚目录里的 `Heyta-1.0.0.dmg` 正被
+```
+pid 98171  comm /System/…/DiskImages.framework/Resources/diskimages-helper
+ppid 1(launchd)  状态 SNs  累计 CPU 0:00.14  已存在 14:39:13  FD 5u → /private/tmp/heyta-macos-dist/Heyta-1.0.0.dmg
+```
+持着，而它的名义主人（11:44:49 起的那趟 `notarytool submit --wait`，pid 98934）**早已退出**
+（17:51 现量 `pgrep -x notarytool` 为空）。⇒ 这就是 §7.31.21 那条"公证可能比父进程活得久"的
+**第三个实例，也是第一个会永久钉死固定收尾的**：句柄不释放，① 一步都走不了。
+按 §8.9（只对自己创建的对象动手）**不去动它** —— 它可能是别人挂载中的磁盘映像。
+
+**评估后否掉的那条路**：把 mac 产物目录做成旋钮、我这一趟用私有目录，这样既删不到别人的 dmg、
+也不被那枚句柄挡。**否掉的理由**（现量）：`scripts/check-shell-surfaces.mjs:263` 把
+`macAppDist: '/tmp/heyta-macos-dist/Heyta.app/Contents/Resources/web-dist'` **当成本轮产物证据路径写死了**，
+目录一搬，那道门禁就会把**别人 11:44 打的那枚包**读成"我这轮的产物"—— 正是它自己注释（844-848 行）
+今天刚记过的坑。而那处的既有缓解是**对账 `index.html` 的 sha256**（"共享位置"是被承认、被核对的，
+不是被搬走的）。所以这事要做得连门禁一起改（三枚文件、跨到别人今天还在动的区域），
+**不是一行 knob**；在没有所有者点头之前不动它。
+
+**顺带把 ① 其余两条腿的前瞻读数量掉**（免得真开窗时才发现）：
+- Windows 打包机可达：`ssh -o ConnectTimeout=8 -o BatchMode=yes windows-pc "echo OK-PING"` ⇒
+  `OK-PING`、`ssh_rc=0`。（第一次探用的是 `hostname`，远端回的是 GBK 中文参数错误、`ssh_rc=1` ——
+  那是**命令不被 Windows 那侧接受**，不是连不上；连接层由这条 `echo` 证的。）
+- mac 段公证**已有上限**：`HEYTA_NOTARY_TIMEOUT` 默认 900s（`package-app.sh:283`，别人 05:15 那笔
+  `694c05e3` 加的；超时走 🔴 那一支、不装订票据、不判通过）⇒ ① 不会因 Apple 不回话而无限挂着。
+
+**① 的关闭判据（谁都能复跑，不依赖我的叙述）**：
+```bash
+pgrep -x notarytool | tr '\n' ' '; echo                       # 期望：空（已空）
+lsof +D /tmp/heyta-macos-dist 2>/dev/null | awk 'NR>1{print $1"/"$2}' | sort -u   # 期望：空 ← 现在非空（98171）
+bash ~/.heyta-window-rigs/heyta-real-runner-pids.sh 'reinstall-all\.sh'            # 期望：空（已空）
+```
+三条同时为空才谈 ①；第二条不是我的对象，我不去清。**要人拍板的只有一件事**：
+那枚 14 小时 39 分前的挂载句柄由谁回收（它的会话已经不在了）。
+在那之前 ① 的状态是**外部阻塞**，不是"窗口没开"—— 这点和 §7.31.21/22 的读数要分开记。
