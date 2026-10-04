@@ -81,8 +81,11 @@ const blockers = writeSet.filter((p) => dirty.has(p));
 
 const RESOLVE = {
   'package.json': '取并集（载体脚本已实现：写回 + 两侧原文建映射 + round-trip 断言）',
-  'research/tools/check-image-license-coverage.mjs': '取本分支（我们的登记是他们那条的超集）',
-  'server/image-npm-tree.json': '取本分支（旧载体的产物在新判据下自证失真）',
+  // 🔴 这两枚的脏行是**同一个动作的两半**（10-03 傍晚重生成快照 ⇒ 版本变 11.3.3 ⇒ 只能手加一条许可登记），
+  //    所以收口有两条，终点相同（main 带我们这份由提交物锁派生的快照）：他们提交 ⇒ 合并取本分支；
+  //    他们丢弃这两枚 ⇒ 合并根本没东西要撞。选哪条是他们的事，见 §8.70。
+  'research/tools/check-image-license-coverage.mjs': '取本分支（我们的登记是他们那条的超集），或他们直接丢弃这两枚',
+  'server/image-npm-tree.json': '同上 —— 与那枚 +1 行的许可登记是同一个动作',
 };
 
 console.log(`主检出（脏集合来源）：${mainWt.path}`);
