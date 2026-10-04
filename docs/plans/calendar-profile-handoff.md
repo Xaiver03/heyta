@@ -963,8 +963,138 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   ⏭️ 这一格之后 C 的两件欠账在**一次开窗内**可同时闭合：判据集第一次真跑 + ⑧ 若红自带判决读数；
   而万一又撞上一次无效窗口，链会重问闸门再给一次机会，而不是把整发窗口作废。看守仍 pid 74502（21:0x 现量 ATTEMPT rc=3，负载仍高于阈值）。
 
+- (19) **21:13 那一发：修正后的判据集第一次在真设备上跑完 —— 通过 32 / 失败 5，五条红逐条归因完，没有一条是产品缺陷；⑧⑨a⑩ 三条第一次绿。**
+  链日志 `/tmp/ht-r14c-chain.74502.log`（`chain end 21:20:03 verify_rc=1`）。
+  🔴 **新形态第一次在野外出现**（不是我自己构造的读数）：`REGATE who=pre try=1 rc=3 REDS=load` ⇒ 等 60s ⇒ `try=2 rc=0` 才动设备
+  —— (13) 那条"build 刚跑完，1 分钟负载还没落"的落位重试真的按设计走了一次，而它挡住的是**我自己刚打的那发 build**。
+  verify 第 0 步的六条前置全绿，含新加的 `界面 dump 每跑私有：UI_XML=/tmp/heyta-duetime-ui.24391.xml`（(17) 那格的私有路径）。
+
+  **产品主张这一格可以合上了**：⑧（重开面板时刻仍在）✅、⑨a（换日子后时刻不丢）✅、⑩（笔记本侧 `dueDate` 与设备时区**逐毫秒**相同）✅
+  —— 19:1x 那趟这三条**全是红**，而这批红的根因全在探针侧（见下面第 1、2 条）。R14c 那句「`time` 进共享层并真的落到 `dueDate`」
+  现在在真设备上有下游三条判据齐着的读数，不再只有笔记本侧。
+
+  **五条红的归因（每条都指到日志行）**：
+  1. **② 与 ④b —— 同一条根因：锚点排在了"节点进入这份 dump"之前。** ① 那次改动把它和 ②④ 拉到同一条腿是对的，
+     但 `calibrate_time_empty` 本身仍排在 `scroll_to_rid` 前面 ⇒ 那一刻节点**不在这份 dump 里**，`rid_attr` 查不到就回**空串**，
+     于是 `TIME_EMPTY=''`、归一化成**无操作**，后面 ②/④b 读到的是占位符 `'时:分'`。日志自己把这条摊开了：
+     同一趟先打 `空框锚点 TIME_EMPTY=''（长度 0）`，紧接着 ② 打"归一后读到 '时:分'"。
+     🔴 **这是"探针取空"被当成"设备答空"** —— 两种空在输出上逐字相同，而**枚数是唯一的分辨器**。
+     修两处：锚点移到滚动之后（仍在任何敲字之前）；并把两种空**并排判** —— `TIME_EMPTY` 为空**且**此刻树里 0 枚 ⇒
+     `bad` + `who_else` + `screen_txt` + `exit 3`，绝不让它继续当"无操作"往下跑。
+     （同族：`feedback-absence-claims-need-callee-body` —— 空串有两个生产者，读被调方本体才知道是哪个。）
+  2. **⑪（第 12 步"详情面板没重开"）—— 我们自己的导航走掉了、没走回来。** 第 11 步为了同步**自己点了「我的」**
+     （`ensure_phone_sync` 那颗按钮只在「我的」页上），第 12 步直接从那一屏去找任务行 ⇒ 那份 dump 是**我们自己的「我的」页**，
+     不是抢占。修：第 12 步开头 `$ADB shell input tap 135 "$TAB_Y"`（与第 3 步那枚坐标逐字相同）。
+  3. **「同步按钮既不空闲也不在忙」×1 与 ⑪c** —— 都是第 2 条的**下游**，不是新缺陷：⑪a/⑪b 没跑到 ⇒「全天」一次都没点过 ⇒
+     笔记本侧当然还是 16:00。⚠️ ⑪c 那句"期望 `2026-10-05 00:00`，实测 `1791187200000` = `2026-10-05 16:00:00`"里
+     **日子是对的、错的只有时刻** ⇒ 它与同趟 ⑩ 那条"跨设备时刻逐毫秒相同"**不冲突**，别把它读成"跨设备对不上"。
+
+  ⏭️ **欠账 ②（(14) 登记的"19:1x ⑧ 之后界面漂到「我的」页"）现在的准确状态**：修正探针 + 私有 dump 路径之后**没有重现**。
+  三条候选里有两条已经处理掉：① 共享 `/tmp/ui.xml` 被别的消费者覆写 ⇒ **结构上不可能了**（每跑私有路径，那行读数就在日志第 0 步）；
+  ② "我们自己的导航把界面带走了" ⇒ 21:1x **证明了这条机制真实存在**（同一症状在第 11→12 步复现过一次），
+  所以不 invoke 外部抢占也能解释 19:1x 的形状。⚠️ **但这不构成对 19:1x 那一趟的归因** —— 那一趟没有 `who_else` 读数，
+  所以账保留"未定性"；判据已就位：下一次再出现时红的当场会打**窗口级 `mCurrentFocus` + 进程级粗筛**两枚读数，两条解释就分得开。
+  ✅ 牙（复跑读数）：`r14c-time-empty-arms.sh` `pass=7 fail=0` · `r14c-channel-arms.sh` `pass=9 fail=0` ·
+  `r14c-verify-retry-arms.sh` `pass=6 fail=0` · `bash -n` OK。
+  ⚠️ `check:shell-unicode` 此刻红在**别人的** `scripts/verify-macos-account-erasure.sh`（不在本笔点名路径里），
+  本笔走 `git commit --only` 点名路径，`calendar-line-commit-plan.sh` 报 PLAN=0。
+  ⏭️ 看守 pid 74502 已随那一发结束退出 ⇒ 本笔提交后需重挂（下一发要验的就是这三处修完后的 ②/④b/⑪）。
+  ✅ **21:36:10 已重挂**：本笔入库为 `83359555`（3 枚点名路径 / +106 −25，别人的暂存 0 枚、
+  提交后这些路径剩余状态行 **0**，**没有 push**），看守 = **pid 18211**、`BUDGET=7200`、
+  日志 `/tmp/ht-r14c-window.20261004-213609.18211.log`（稳定名 `/tmp/ht-r14c-window.log` 已指过来），
+  `selftest=positive_ok`，开窗后先把载体 checkout 到**当时的主检出当前提交**再打产物 ⇒ 这一发装上去的 APK 含本笔两处修
+  （⚠️ 写这行时主检出 = `83359555`，但看守每次第 1 步现量重取，开火那一刻以它打印的 `主检出 sha=` 为准，别把这里当承诺）。
+
+  **顺手把 §1c 那本「刻意不带」册子跟着现量走了一遍**（它自己的注释就写着"条目只能跟着现量走"）：
+  原来那 4 枚取证图的字节已被并行会话在 `68fadb10`（"一批 web 界面证据图重写（同屏重采集，非新增判据）"）提交掉，
+  现量 `git status --porcelain` 对这 4 枚回 **0 行** ⇒ 从册子里划掉。
+  ⚠️ **这不等于 §5 第 11 号那单做完了** —— 它现在换成另一格红：
+  `r17-evidence-md5-check.sh --dir apps/web/evidence/calendar-day` ⇒ `entries=1 mismatch=9 md5bad=1 pinbad=8`
+  （`day-en-empty.png` README=`57d2d0085e…` 而盘上/HEAD=`d64c499450…`，即刚提交进去的新字节还没重钉指纹）。
+  同日补进**新的一枚**在册：`docs/plans/README.md` —— 它脏的 **+2 −0** 两行是**回收站／归档那条线**的索引，
+  本线在这一枚里没有待落字节 ⇒ 挂着、不带走（这条正是 17:5x 造这本册子要拦的那个读法：
+  把"别人的脏字节"读成"本线入库被挡住了"）。改完的读数：`在册 1 枚；断言不过 0 枚；待摘 0 枚`、
+  `待入库 3 枚`、`calendar-line-commit-only-arms.sh` `pass=8 fail=0`。
+  🔴 **写这条在册时踩到一枚自己的装置 bug，值得留形**：在册条目是**双引号字符串**，而我在理由里写了
+  「现量 `git diff --stat`」—— **反引号在双引号内照样触发命令替换** ⇒ 那条理由变成当场 `git diff` 的整段输出
+  （打印出来才现形：一行"理由"糊了 15 个文件名的表）。`bash -n` 完全看不出（语法没错），
+  只有**把理由打印出来读**才看得见 ⇒ 已在 `calendar-line-commit-plan.sh` 里把"条目正文一律不写反引号"写成注释。
+
+- (20) **21:44–22:0x：一发窗口被链自己漏下的三枚服务端烧掉 —— 根因是"链只有 stack_up、从来没有 stack_down"；顺手把 UIPIN 形状锚点的触发源收窄。**
+  🔴 **形状是"装置写了一句承诺、从没执行它"**：链在 `E2E_PIDFILE=` 那行的注释里写着
+  "留下'这棵起过栈、怎么停'的口径，**别留一枚没人知道的活进程**"，而**停它的那条命令一次都没被执行过** ——
+  链的步骤表里只有 `stack_up`。三发窗口各留一枚活服务端：现量 pid **75311 / 77431 / 18909**
+  与 `/tmp/heyta-e2e-server.carrier.{73068,75095,17219}.pid` **一一对得上号**（`cat` 出来逐个 `kill -0` 全 alive），
+  于是 21:44 那一发在 `CHAIN_STOPPED_AT=port（候选 3100 3120 3140 3160 全被占）` 上烧掉，**没动设备**。
+  ⚠️ 归因注意：`26407`（:3100，etime **15:42:04**）**不是**本线漏的 —— 没有任何一枚 carrier pidfile 指向它，
+  所以四个候选里只有三个是本线的账，清理只清这三个
+  （`HEYTA_E2E_PIDFILE=<该文件> bash scripts/mobile-e2e-down.sh` 逐枚停，三行都打 `✅ 服务端已停止`，
+  之后 `3120/3140/3160` 现量空闲、`:3100` 仍归 26407）。
+  **修的四层**（都在 `research/tools/r14c-carrier-chain.sh`）：
+  ① `stack_down()`：走**仓内那把按 pidfile 认人**的 `mobile-e2e-down.sh`（不按端口/进程名乱杀，理由写在它文件头）；
+  ② 挂在 **EXIT 与 TERM/INT 两道 trap 上且排在 `restore_carrier` 之前**（down 脚本自己在覆盖清单里，
+     先还原就会拿"载体那份"去停）；`STACK_UP=1` **排在 `run stack_up` 之前** —— 排晚了的话，
+     17:46 那种停在 `stack_up` 半途的路上就没有收尾；
+  ③ **后置断言**：down 退 0 **不算**（它没有 pidfile 时也退 0），端口必须真的空出来，
+     否则打 `STACK_DOWN=still-listening` 并点名残留 pid 与命令；
+  ④ 端口全占时把每枚占有者的 `etime` 与命令一起打出来，并列出本线自己的 pidfile ——
+     21:44 那次我跑了三条 `ps` 才分清"是不是自己漏的"，这一格本来就该在日志里。
+  ✅ 牙：新 rig `research/tools/r14c-stack-down-arms.sh` ⇒ `pass=7 fail=0`
+  （A 正常收尾真杀进程 / B `STACK_UP=0` 一道都不许动 / **C 桩假绿（rc=0 什么都没停）而 :8641 仍有人听 ⇒ 必须点名 still-listening** /
+  D·E 两道 trap 与 `STACK_UP=1` 的**顺序**静态不变量 / F 变异：摘掉 EXIT 里的 `stack_down` ⇒ D 的正读数从 1 变 0）。
+  ⚠️ 写这把 rig 时又造了一次自己的坏读数并留在文件注释里：`grep -c . f || echo 0` 对**空文件**
+  会既打印 0 又退出 1，于是 `||` 那一支再补一个 0，臂 B 的计数读成 `"0\n0"` —— 计数一律改 `wc -l`。
+  🔴 **野外第一次读数（修完立刻撞上一发真窗口）**：21:49:47 开窗、链跑到 `preflight_after_build rc=0`，
+  然后 `REGATE who=pre try=1/2/3 rc=3 REDS=load` 三次用尽 ⇒ 停在 regate、**没动设备**，
+  而日志末尾出现 `STEP stack_down rc=0` + `STACK_DOWN=port-free（PORT=3120）` —— 泄漏在这一形上不再发生。
+  **但这一发又白跑了**，而且原因不是"3 次太少"这么简单：当时同分钟现量 `loadavg 16.7 20.8 33.4 / 16 核`
+  （15 分钟均值 33 ⇒ 这台机被打了很久，不是"我刚打完 build"那一下）。⇒ 把"等多久"从**次数**改成**时间预算**
+  （`REGATE_LOAD_DEADLINE=420s`，`REGATE_TRIES` 降级为防死循环的绝对上限）：旧值 3 是我随手写的数，
+  **不是从被约束的量推出来的**（§8.3 元规则），而"秒"这个单位与"负载落位"这个对象对得上。
+  ⚠️ 这**不改变**"没动设备"的结论，也不保证下一发能挤进去 —— 它只是让"等位"这件事说得出界。
+  ✅ 牙：新 rig `research/tools/r14c-regate-load-arms.sh` ⇒ `pass=9 fail=0`
+  （A 开着一次即止 / B load,load,open 等到开 / C 恒 load 用尽预算返回 3 且日志带"已等 Ns / 预算 M" /
+  **D `REDS=dev` 一次都不许多问**（这条腿只给 load 开）/ E `REDS` 行缺失 = 装置坏，当场停 /
+  F1 `D=0` 的正对照 / **F2 变异：删掉时间预算那一枚条件 ⇒ 同一串输入从 RET=3 翻成 RET=0** / G 默认值排在 `ask_gate` 之前）。
+  ⚠️ 这把 rig 自己先错了两处，都留在注释里：① 桩的序列用完后 `exit ""` 以 **255** 收场，被臂 C 读成"闸门回了个怪码"
+  （**夹具坏 ≠ 判据坏**，先分这一层）；② `ask_gate` 的判决写在 `$LOG` 而不是 stdout，
+  所以臂 D/E 那两条**负向**断言原本**无条件成立** —— 负向断言测错载体 = 自证，改成把日志一起回显并每臂先清空。
+  ⏭️ **C 的欠账不变**：②/④b/⑪ 三处修完后的"转绿读数"仍然没拿到（两发窗口一发烧在 port、一发烧在 load）。
+  看守已重挂（本笔提交后），下一发判据同 (19) 末。
+
+  **另一件顺手做的事（§5 第 11 号的一半，零负载）**：把 `UIPIN` 形状锚点的**触发源**收窄。
+  现量 `r17 --all` ⇒ `14 目录 / 8 有红 / 27 枚 UISTALE`，而 **27 枚点名的全是同一笔** `baf125e5`
+  （20:45「法务条款六份 + 中英词条」）：它在 `packages/i18n` 里动的是 `common.privacy.consent.*`
+  与 `site./web./mobile.` 的措辞，全仓只有一行提到 calendar，还是隐私文案里列举功能名的一个词
+  ⇒ **对这些图零像素影响**。触发率现量：近 3 天 `packages/i18n` **78 笔** vs 同期 `packages/ui/src/calendar` **4 笔**。
+  ⇒ 27 枚钉行的路径清单里都写着 `packages/i18n`，这就是"每二十笔提交必红一次、且红得与图无关"的构造式，
+  也正是 `r17` 文件头当年为 COMMITPIN 写过的那种坑**换了触发源**（`calendar-view-options/README.md` 第 42–44 行
+  甚至已经为 `App.tsx` 写过同一条"不收进来是因为它一天动好几笔"的理由 —— 却没人为 `packages/i18n` 写）。
+  动作：① 从 27 枚钉行里摘掉 `packages/i18n`（一次 node 批写、**命中数等于 27 才落盘**，否则一个字节都不写）；
+  ② 复测 `r17 --all` ⇒ `有红目录 8 → 5`、`UISTALE 27 → 14`，**剩下的 14 枚全部点名 `39032107`**
+  （那笔真的改了主区页头的换行行为）= 摘掉噪声之后剩下的都是真信号；
+  ③ 常驻护栏 `research/tools/r17-pin-path-hygiene.sh`（deny 表逐条带理由；**不测提交频率**，
+  那是上游状态，写进判据就变成"今天恰好如此"）。它的牙现量三条：干净时 `rc=0` 且报分母 `27 枚`；
+  第一版探针因 `grep -rn` 的 `路径:行号:` 前缀读空 ⇒ **`rc=4`「探针坏」当场响**（这条自检不是装饰）；
+  阳性对照 = 往 `calendar-year` 的一枚钉行塞回 `packages/i18n` ⇒ `rc=1` 且点到那一枚，之后 `cmp` 逐字节复原。
+  ⚠️ **第 11 号没做完的部分写清楚**：`calendar-view-options/` 那两枚我**打开看过**（页头折成两行、
+  月档格子里有「休/班」、年档 12 张月格里**一个都没有** —— 见 §4.1 的 G0），
+  其余 **5 个有红目录 / 14 枚** 要"人看图 + 重钉"或重拍，而**重拍要负载落回个位且 4318/4319 空闲**，
+  本批刻意不在等设备窗口的同时再压负载 ⇒ 仍挂 §5 第 11 号，分母换成现量 `5 目录 / 14 枚 / md5bad 4`。
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
 
+**G0. 调休标记（休/班）只画在月档，年档那 12 张月格里一颗都没有，而文档里没有"刻意不做"的登记。**
+看图看出来的（22:0x，`calendar-view-options/view-select-closed.png` 月档里 10-01…10-07 与 10-09 带绿色「休」、
+10-10 带橙色「班」；同目录 `view-tabs-year.png` 的年档 12 张月格**零枚**标记）。
+🔴 **判"年档没画"读了被调方本体**，不是看图猜：`packages/ui/src/calendar/CalendarBoard.tsx:425-434` 的
+`view === 'year'` 分支只把 `tasks/today/year/onPickMonth/labels/testID` 传给 `CalendarYearBoard`，
+**`dayMarker` 与 `dayMarkerLabels` 两个都没传**，而 `CalendarYearBoard.tsx` 全文 `dayMarker` **0 处引用** ⇒
+年档**结构上画不出**这个标记（宿主那份 `dayMarker` 在 `apps/web/src/features/calendar/CalendarView.tsx:221` 确实给了）。
+现量命令：`grep -n 'dayMarker' packages/ui/src/calendar/CalendarYearBoard.tsx`（空）·
+`sed -n '425,434p' packages/ui/src/calendar/CalendarBoard.tsx`。
+⚠️ **本条不判它是缺陷还是刻意**：`docs/plans/countdown-anniversary.md` 里 `grep -n '年档\|年视图' | grep -E '休|班|dayMarker'`
+现量 **0 命中** ⇒ 既没登记"不做"，也就不能主张"故意留白"。归属＝倒数纪念日那条线（W4b 的落点），本线只登记。
 
 **G. `docs/plans/README.md` 第 17 行是一张错位行。** 「一、权威入口」那张表表头是 3 列
 （我想知道 / 看这一份 / 说明），而 `| [countdown-anniversary.md](countdown-anniversary.md) | …`
@@ -1121,7 +1251,7 @@ done
 |---|---|---|---|
 | H | 交付物在 HEAD 且字节可复验（10:4x rc=0/12 条）；🔴 但**主张只到 `39032107`**（见 n 格）—— 12:1x 起这句话**有一条会自己响的判据**了：`UIPIN` 代码锚点，现量 `--dir apps/web/evidence/calendar-view-options` ⇒ `entries=1 mismatch=0 pins=2` rc=**0**（两枚 UIOC）。🔴 同刻 `view-select-closed.png` 的常驻 md5 **降级为记录值**：11:55 别人那趟在**同一笔代码**下把它改了 4982 枚像素（全在左侧 rail，肉眼并排无差、原因未定性）⇒ 见 bb) 格与 §6 第 34 条；flaky **未定性**——(a) 仍没喂到，且 10:5x 借来的那趟红**里没有洪泛**（见 q 格）；看守已装自快照 bootstrap（11:1x，见 x 格），11:2x 起**每趟自动打一行 `RUN_<i>_DISTFRESH`**（§5 第 1 条搬进装置，见 y 格） | 整机负载 + 往树里写的并行会话（11:2x 现量负载 69，看守 pid 38951 在等） | ~~`tail -3 /tmp/ht-h-flaky.*.log`（稳定名软链已没，用每趟唯一那份）~~ 🔴 11:1x 起**稳定名软链又在了**（允许名单只有 `run` 会挂，现量 `lrwxr-xr-x /tmp/ht-h-flaky.log -> …112757.38951.log`）⇒ 读 `tail -3 /tmp/ht-h-flaky.log`；`bash research/tools/r17-evidence-md5-check.sh --all`；`git log -1 --format='%h %ad' --date=format:'%H:%M' -- apps/web/evidence/calendar-view-options/view-tabs-year.png` |
 | B | 未闭合；🔴 **12:2x 复跑 `bash scripts/verify-mobile-window-gate.sh --target b` ⇒ rc=3、`REDS=load,src,dev`**（负载 66、66 枚未提交源码、pid 9178 在跑移动端验收、pid 93817 那趟 reinstall 还楔着 —— `notarytool submit --wait` 此刻 etime **09:10:36 / CPU 0:00.03**）。与 11:2x 那格相比 `apk` 那一档**已经不红了** ⇒ 阻塞集从四减到三，但三条里两条是别人的动作，不是等待可解。**第二条路已有装置**（四段身份对账，10:4x 复跑三段仍 `DIFFER`）⇒ 🔴 对账只有在**自己刚 build 完的那一刻**之后跑才算数（本机 `apps/web/dist` 是并行共写件，见 p 格）；闭合序列已钉成①build→②reinstall→③reconcile。🔴 **14:2x 复跑：rc=3、`REDS=load,src,dev,apk`** —— `apk` 那一格**又红了**（12:2x 那次它是唯一不红的），负载现量 **27.55**，93817 那趟 etime **11:10:39 / CPU 0:00.01**、叶子 98934 **11:09:42 / CPU 0:00.03** ⇒ 楔住更深，结论不变：这条**不是等待可解** | 🔴 **16:0x 复跑：rc=3、`REDS=src,dev`**（`load` 与 `apk` 两格转绿：负载现量在阈值 12 上下抖、`APK 不比源码旧`）。剩下两格的**性质都查清了**：`dev`＝93817 那趟整链是**孤儿** —— `/tmp/queue-reinstall-all.sh`（pid 81007）的 **PPID=1**，启动它的会话早就不在了；叶子 98934 `notarytool submit --wait` etime **12:20:27 / CPU 0:00.03**，而 `lsof -nP -p 98934 -a -i` **一条 socket 都没有** ⇒ 不是「正在轮询的等待」：0.03s CPU 撑不起 12 小时的轮询握手（⚠️ 从前那句「非等待可解」是拿 CPU 推的，这次补上了直接证据）。`src`＝**100 枚**别人未提交源码（现量含 `apps/mobile/ios/Heyta/*.swift`、`apps/mobile/src/screens/*.tsx`、`packages/i18n`、`apps/landing/docs/*.html`）。🔴 **不动那枚孤儿**，三条理由，而且第①条**只对一半**：① 对**共享树**这一路，`src` 那格独立就把 B 和 C 都挡住了，砍一棵不解决任何一条 —— ⚠️ 但这句对「在 HEAD 的隔离 worktree 里跑重装」那一路**不成立**（那条载体天生干净、`src` 根本不适用于它），所以杀链确实能开那扇门；不走它的原因是 ②③，不是 ①。（我 16:0x 第一版把 ① 写成了通用结论，被本文件 §4.05(9) 自己那条「隔离载体」出路否证 ⇒ 就地改成限定式，留这句自我更正的理由是让后来者认出「归因写成断言、范围却比证据宽」这个形状。）② 杀掉链会让那趟从 mac 段继续往 windows / android 走，`adb uninstall` 落在共享模拟器上（§7 第 244 条预告的形状），而四端重装本身就包含「卸掉别人刚装上去的那一份」这种动作；③ 它已被另一条会话登记在案（B76 补记 #11/#12）⇒ 拍板权在那条线，本线不代拍。复跑：`ps -o pid,ppid,etime,command -p 81007`（PPID=1 即孤儿）· `lsof -nP -p 98934 -a -i` · `bash scripts/verify-mobile-window-gate.sh --target b`。🟢 **17:3x 更正上面这一格的两处**：① 那两枚无主占用（81007 整链、29644 那枚 18h 满转的 vitest worker）**在我动手前已被各自持有者收掉**，本会话没有 kill 任何进程；② 我当时说"公证通道解析不到是对 B 更硬的外因"，**那句被自己否证**（`notarytool history` rc=0、`appstoreconnect.apple.com` 302，notarytool 不用 `notary.apple.com`），撤回并记在 §4.05 (10)。另外 `package-app.sh` 自 `694c05e3` 起有 900s 公证上界 ⇒ 楔 12h 这一形不会重现。旧账：楔住的重装叶子 `notarytool submit`（pid 98934，CPU 0s）要**持有者拍板**；设备面被别人占（10:4x 现量还有 `verify-mobile-ios-reminder` pid 79158 在跑 —— 11:1x 复跑它已退出，11:2x 现量占面的是 pid 41138，11:4x 复跑是 **56364** —— **连续换班，没有"等这一个"的终点**） | `IOS_DEVICE_NAME="heyta-iphone-17pro" bash research/tools/b-batch-reconcile.sh`；`bash scripts/verify-mobile-window-gate.sh --target b`（取 rc 用 `OUT=$(…); rc=$?`，别接管道） |
-| C | 未闭合；10:4x 复跑 ⇒ **rc=3、`REDS=load,src,dev,apk`**（5 条 ❌，两条共用 `WHY_DEV`，这是第 307 行注释预告过的形状、不是新缺陷）；载体链与四层判据都在，等同一张设备面。🔴 **11:2x 复跑同一条命令：rc=3、`REDS` 逐字相同，但三格内容变了** —— 凭据三件套现量**都在**、模拟器**在线**（旧账那两行"全无/要起栈"过期），设备面运行者**连续换班**（10:4x 79158 → 11:2x 41138 → 11:4x **56364**，前两个都已退出 ⇒ 没有"等这一个就好"的终点）；`src` 那格量化过，**且量的是会翻的比例**（逐树 M 行 ≠ 逐消费者源码：11:2x 是 21 枚里 evidence 2 枚，11:3x 复算成 38 枚里 evidence **21** 枚 ⇒ 那格的红有多少"只是别人的取证图"取决于谁刚跑了一趟 e2e，别抄本表）；不改判据的两条理由与"按 target 分范围"这条下一批边界在第 4 条末。🔴 **14:2x 复跑：rc=3、`REDS=load,src,dev,apk`**（与 10:4x 逐字相同），`src` 那格现量含 `packages/i18n`、`packages/legal`、`packages/shared-schema`、`server/src/legal.generated.ts` 等**多条并行线正在写**；同一分钟 `lsof` 现量 4318/4319 由 node **93264 / 93252** 占着 ⇒ H 与 C 共用的是**同一张窗口**，不是两张。🔴 **17:3x 再复跑：rc=3、`REDS=load,src,dev,apk`**（四格全红回去：负载 15–19、`src` 101 枚、dev=pid 49211 正在跑 `verify-mobile-card-export-ios.sh`、APK 15:02 比源码 15:36 旧）。🔴 **17:46:22 那个看守真的开火了一次**（`FIRE=apk-deferred`），链跑到 `stack_up rc=1` 停住 —— 根因与修法、四臂牙、变异读数全在 §4.05 (13)：**载体没有未跟踪的 `server/.env`，而 `mobile-e2e-up.sh` 的启动 env 块里没有 `JWT_SECRET`**（主检出靠 dotenv 读那个文件，链依赖的东西必须与 dependent 同列）。现量 18:2x：`REDS=load,src,apk`（`dev` 又绿，17:4x 报的 pid 90200 已退）⇒ **C 离闭合只差一次重挂看守 + 负载落位**。**上一把看守**：pid 84884、`CARRIER=…heyta-wt-r14c BUDGET=7200`、日志 `/tmp/ht-r14c-window.20261004-171301.84884.log`；而同一趟 `--repo 载体` 那一路现量 `REDS=load,dev,apk` —— **`src` 在隔离载体里是绿的**（见 §4.05 (10) 最后一条）。上一次 16:0x 的读数：rc=3、`REDS=src,dev`，设备面前置**四条同时绿**（本线第一次见到这个组合）：粗筛没有别的移动端验收在抢 emulator-5554、emulator-5554 在线、凭据三件套都在、APK 不比源码旧，负载与 apk 两格都不再红。挡住它的还是那两格，且都不归本线：`src`＝100 枚别人未提交源码（含 `packages/i18n`、`apps/mobile/src/screens/ProfileScreen.tsx`），`dev`＝上面那趟孤儿重装（性质与「不动它」的两条理由见 B 格）。⚠️ **本批刻意不给 C 挂 `r14c-window-retry.sh`**（开窗即打 APK 会把 H 的负载门顶回去，而 C 的 blocker 是"要人拍板"不是"没排队"） | 18:0x 现量：楔住那趟重装（`reinstall-all` / `notarytool` / `queue-reinstall`）**整条已消失** ⇒ `dev` 那格自解，本线没有要等的外部拍板了；剩下的是负载 + 别人未提交源码（`src`）+ apk 那格由链自己补 | `bash scripts/verify-mobile-window-gate.sh --target c`；`bash research/tools/r14c-bundle-testid-preflight.sh`；`src` 差集（表格里不放管道符，那要转义且复制下来不能跑）：`git status --porcelain -- packages apps server >/tmp/ht-dirty.txt; grep -cE '^ ?M' /tmp/ht-dirty.txt; grep -c '/evidence/' /tmp/ht-dirty.txt` |
+| C | 未闭合；10:4x 复跑 ⇒ **rc=3、`REDS=load,src,dev,apk`**（5 条 ❌，两条共用 `WHY_DEV`，这是第 307 行注释预告过的形状、不是新缺陷）；载体链与四层判据都在，等同一张设备面。🔴 **11:2x 复跑同一条命令：rc=3、`REDS` 逐字相同，但三格内容变了** —— 凭据三件套现量**都在**、模拟器**在线**（旧账那两行"全无/要起栈"过期），设备面运行者**连续换班**（10:4x 79158 → 11:2x 41138 → 11:4x **56364**，前两个都已退出 ⇒ 没有"等这一个就好"的终点）；`src` 那格量化过，**且量的是会翻的比例**（逐树 M 行 ≠ 逐消费者源码：11:2x 是 21 枚里 evidence 2 枚，11:3x 复算成 38 枚里 evidence **21** 枚 ⇒ 那格的红有多少"只是别人的取证图"取决于谁刚跑了一趟 e2e，别抄本表）；不改判据的两条理由与"按 target 分范围"这条下一批边界在第 4 条末。🔴 **14:2x 复跑：rc=3、`REDS=load,src,dev,apk`**（与 10:4x 逐字相同），`src` 那格现量含 `packages/i18n`、`packages/legal`、`packages/shared-schema`、`server/src/legal.generated.ts` 等**多条并行线正在写**；同一分钟 `lsof` 现量 4318/4319 由 node **93264 / 93252** 占着 ⇒ H 与 C 共用的是**同一张窗口**，不是两张。🔴 **17:3x 再复跑：rc=3、`REDS=load,src,dev,apk`**（四格全红回去：负载 15–19、`src` 101 枚、dev=pid 49211 正在跑 `verify-mobile-card-export-ios.sh`、APK 15:02 比源码 15:36 旧）。🔴 **17:46:22 那个看守真的开火了一次**（`FIRE=apk-deferred`），链跑到 `stack_up rc=1` 停住 —— 根因与修法、四臂牙、变异读数全在 §4.05 (13)：**载体没有未跟踪的 `server/.env`，而 `mobile-e2e-up.sh` 的启动 env 块里没有 `JWT_SECRET`**（主检出靠 dotenv 读那个文件，链依赖的东西必须与 dependent 同列）。现量 18:2x：`REDS=load,src,apk`（`dev` 又绿，17:4x 报的 pid 90200 已退）⇒ **C 离闭合只差一次重挂看守 + 负载落位**。**上一把看守**：pid 84884、`CARRIER=…heyta-wt-r14c BUDGET=7200`、日志 `/tmp/ht-r14c-window.20261004-171301.84884.log`；而同一趟 `--repo 载体` 那一路现量 `REDS=load,dev,apk` —— **`src` 在隔离载体里是绿的**（见 §4.05 (10) 最后一条）。上一次 16:0x 的读数：rc=3、`REDS=src,dev`，设备面前置**四条同时绿**（本线第一次见到这个组合）：粗筛没有别的移动端验收在抢 emulator-5554、emulator-5554 在线、凭据三件套都在、APK 不比源码旧，负载与 apk 两格都不再红。挡住它的还是那两格，且都不归本线：`src`＝100 枚别人未提交源码（含 `packages/i18n`、`apps/mobile/src/screens/ProfileScreen.tsx`），`dev`＝上面那趟孤儿重装（性质与「不动它」的两条理由见 B 格）。⚠️ **本批刻意不给 C 挂 `r14c-window-retry.sh`**（开窗即打 APK 会把 H 的负载门顶回去，而 C 的 blocker 是"要人拍板"不是"没排队"） | 18:0x 现量：楔住那趟重装（`reinstall-all` / `notarytool` / `queue-reinstall`）**整条已消失** ⇒ `dev` 那格自解，本线没有要等的外部拍板了；剩下的是负载 + 别人未提交源码（`src`）+ apk 那格由链自己补。🟢 **21:13 那一发把"判据集第一次在真设备上跑完"这件账合上了**：`通过 32 / 失败 5`，五条红**逐条归因完、没有一条是产品缺陷**（②④b＝锚点排在节点进 dump 之前 ⇒"探针取空"被当"设备答空"；⑪＝第 11 步自己点了「我的」而第 12 步没走回来；后两条是⑪的下游），而 **⑧⑨a⑩ 三条第一次绿** ⇒ R14c 的产品主张在真设备上有下游读数了。两处修完 + 三套夹具 `7/9/6 fail=0` ⇒ 明细 §4.05 (19)；看守 74502 随那一发退出，**下一发的判据就是这三处修完后 ②/④b/⑪ 是否一起转绿** | `bash scripts/verify-mobile-window-gate.sh --target c`；`bash research/tools/r14c-bundle-testid-preflight.sh`；`src` 差集（表格里不放管道符，那要转义且复制下来不能跑）：`git status --porcelain -- packages apps server >/tmp/ht-dirty.txt; grep -cE '^ ?M' /tmp/ht-dirty.txt; grep -c '/evidence/' /tmp/ht-dirty.txt` |
 | A | ✅ **10-04 16:0x 闭合**（用户当场授予提交权 —— 这同时是本线**第一次真跑** `--confirm` 那一腿）：`b4033742`，32 枚点名路径 / +2706 −88，`git show --name-only` 逐条都在本线 PATHS 里、别人的路径 0 枚被带走，**没有 push**；复跑 `bash research/tools/calendar-line-commit-plan.sh` ⇒ 「A 此刻**无待办**」、命名空间 0 枚未点名、md-tables / shell-unicode / docs-link 三声 rc=0。🔴 入库当场把那条**自锁的前置**换掉了：旧 §2「索引必须是空的」来自一次**裸 `git commit`** 的事故（实测吞掉别人 109 枚暂存），而本工具走 `git commit --only -- <点名路径>` —— 15:0x 手工一趟 + 15:4x rig 臂 1 一趟（两次外来暂存枚数都是 1）实测：别人那枚的索引 blob 提交前后**逐字相同**、且不在本笔的树里 ⇒ 前置换成**提交后逐字节对账**（§5b），牙落在新 rig `research/tools/calendar-line-commit-only-arms.sh`（当时三臂，**现五臂** —— 新增那一对量 §3 收窄的两个方向，见 §4.05 (12)：正向 / 把 `--only` 摘成裸 commit ⇒ §5b 点名 foreign.txt 且 rc=1 / 把**我方点名路径**暂存成别的内容 ⇒ §2 拒绝、零提交、那份暂存原样留着）。已入 §7 第 **247** 条。⚠️ 本线那枚 `r17-evidence-md5-check.sh` 的十臂版**没等到自己那笔**：15:2x 被并行会话的 `8590ae02`（「r17 证据校验脚本的 $var+中文 写法收敛」）连工作树整文件提交掉 ⇒ 内容在 HEAD、署名在别处（同族事故已在项目 memory 里）。下面那句是当时的账，留着是因为它记的是一条**性质**（这条闸门的颜色与别人的动作同源，不是本线的属性），不是当前读数：🔴 **此刻没有提交权**；11:0x 复跑 ⇒ **rc=1**：别人的三枚 `apps/landing/evidence/*.png` 进了索引，闸门拒绝在它上面动刀（v 格）。本线待入库 **8 枚**（改动 7 + 新增 1 枚 `f-boundary-scope-count.sh`，先 add 才进得了 `--only`）。🟢 **11:39 复跑 ⇒ rc=0、`✅ 索引为空（0 枚）`、三门禁 rc=0、待入库点名 8 枚、工作树脏行分母 78** —— ⚠️ 这格的红是**别人把自己那三枚提交掉**才消的，与 o 格那句"绿此刻挂在别人的暂存区上"是同一件事的两个方向：**这条闸门的颜色与别人的动作同源，不是本线的属性**；🟢 **17:4x 复跑：A 仍然闭合，但"闭合"的含义要说清** —— 待入库 **4 枚**且**全是图**（`view-select-closed.png` + `calendar-day/day-en-{empty,full,no-timed}.png`，mtime 17:25 = 别人那一趟 e2e 的产物），本线这一笔只带 3 枚文档/装置（账在 §4.05 (12)），**这四枚刻意不带走**：盘上字节与其 README 记的不是同一份（`r17 --dir …calendar-day` ⇒ `md5bad=1`）。带走 = 造出一个自相矛盾的 HEAD，也正是 (11) 那句警告点名的形状。同刻 `shell-unicode` 由 rc=1 翻成 **rc=0**（持有者修掉了自己那枚），所以 17:5x 之后任何"这道门禁红"的引用都要重跑才算 | 索引那三枚＝落地页/凭据线的会话（**已提交，本格关闭**）；🔴 11:4x 起**全局 `check:docs` 又红**（3 处指向一枚未跟踪的 vault 取证件，来源 `PROGRESS.md` ×1 + `ADR-0050` ×2）＝端到端加密密钥生命周期那条线，本线不代改（z 格）；本线＝若有授权的一轮 | `bash research/tools/calendar-line-commit-plan.sh`（默认 dry-run，`MSG=… --confirm` 才动）；~~关到关的判据是回到 `✅ 索引为空`~~ 🔴 **那句随 §2 前置一起作废**（它量的是本工具不走的那条路）：现在的关闭判据 = 「待入库 0 枚」+ §5b 那句「别人的暂存一条不少、索引 blob 逐字不变」，见 §4.05 (12) 与 §7 第 247 条 |
 | E | ✅ 闭合，且闭合形状是**属性**不是段数 | — | `git show HEAD:package.json` 解析链里 `check:md-tables` 恰 1 段；`node scripts/check-md-table-rows.mjs` rc=0 |
 | F | ✅ 只登记两条下一批边界，本轮不做；🔴 但第二条现在有**自己的现量脚本**了（11:0x：`处=235 行=234 文件=16 去重键=222`，与 03:0x 逐字相同 ⇒ 8 小时没动；仍**不是**常驻门禁，见 u 格） | — | 英文规则表那条见本节第 6 条与过程账 §3·补 ⑧；改名这条跑 `bash research/tools/f-boundary-scope-count.sh`（三臂 `--selftest` rc=0） |

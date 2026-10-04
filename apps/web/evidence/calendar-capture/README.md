@@ -29,7 +29,7 @@
 （图里的 `捕获-153908` 每趟随机）⇒ 钉 md5 会变成每跑必红。
 pin 取拍图（mtime 10-03 03:59）之前最后一次动过那组路径的提交 `51d828c5`（10-03 03:49）。
 
-UIPIN calendar-capture.png 51d828c5 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+UIPIN calendar-capture.png 51d828c5 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
 
 🔴 补完锚点后 `r17-evidence-md5-check.sh --all` 报这一枚 UISTALE，且报得对：
 `39032107`（10-04 10:11「主区头部可换行」）动了 `apps/web/src/styles/app/main-area.css`，

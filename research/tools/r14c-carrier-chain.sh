@@ -98,8 +98,30 @@ restore_carrier() {
   done < "$OVERLAY_LIST"
   echo "RESTORE_DONE $(grep -c . "$OVERLAY_LIST") 枚 备份留在 $BAK" >> "$LOG"
 }
-trap 'restore_carrier' EXIT   # 🔴 在动第一枚文件**之前**挂上：中途 exit 5 也要还原已覆盖的那几枚
-# 🔴 06:5x 现场事故：本会话把正在跑的链 kill 掉，载体留下一枚
+# 🔴 **栈的收尾必须排在还原覆盖件之前，而且必须挂在所有退出路径上**（21:44 现量的事故就是这么来的：
+#    下面 `E2E_PIDFILE=` 那行注释写着"别留一枚没人知道的活进程"，**但这句话从来没被执行过** ——
+#    链只有 `stack_up`，没有 `stack_down`。三发窗口各留一枚活服务端在候选端口上，
+#    第四发在 `CHAIN_STOPPED_AT=port` 上烧掉（现量 3100/3120/3140/3160 全被占，
+#    其中 75311/77431/18909 与 `/tmp/heyta-e2e-server.carrier.{73068,75095,17219}.pid` 一一对得上）。
+#    顺序理由：`scripts/mobile-e2e-down.sh` 自己在覆盖清单里 —— 先 restore 就会拿"载体那份"去停，
+#    而那份可能根本没有本线那条 pidfile 旋钮。
+#    `STACK_UP` 是幂等闸门：没起过栈的退出路径（overlay 判红、port 判红、build 失败）一律不动。
+STACK_UP=0
+stack_down() {
+  [ "$STACK_UP" = 1 ] || return 0
+  STACK_UP=0
+  HEYTA_E2E_PIDFILE="$E2E_PIDFILE" bash scripts/mobile-e2e-down.sh >> "$LOG" 2>&1
+  echo "STEP stack_down rc=$? pidfile=${E2E_PIDFILE}" >> "$LOG"
+  # 🔴 后置断言：端口必须真的空出来。"down 脚本退 0"不算 —— 它没有 pidfile 时也退 0
+  #    （`⏭ 没有 pidfile` 那一支），那正是 traps #191 一族：报绿的动作没碰到被测对象。
+  LEFT=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)
+  if [ -n "$LEFT" ]; then
+    echo "STACK_DOWN=still-listening（PORT=${PORT} 上还剩 pid=${LEFT}：$(ps -o command= -p "$LEFT" 2>/dev/null | cut -c1-70)）" >> "$LOG"
+  else
+    echo "STACK_DOWN=port-free（PORT=${PORT}）" >> "$LOG"
+  fi
+}
+trap 'stack_down; restore_carrier' EXIT   # 🔴 在动第一枚文件**之前**挂上：中途 exit 5 也要还原已覆盖的那几枚# 🔴 06:5x 现场事故：本会话把正在跑的链 kill 掉，载体留下一枚
 #    ` M scripts/verify-mobile-due-time.sh`。代价不是"脏一个文件"，是**下一次开窗时
 #    `git checkout --detach` 被拒**（06:53 实跑现量 rc=1；而那枚未提交内容与目标提交逐字节相同
 #    也一样拒 —— 我第一版以为"内容相同能干净过去"，被这次实际运行否证）。
@@ -111,7 +133,7 @@ trap 'restore_carrier' EXIT   # 🔴 在动第一枚文件**之前**挂上：中
 # ⇒ 这条 TERM trap 的真实增量只有两点：日志里那一行 signal 哨兵（下一个人知道链为什么
 #    停在中途）+ 确定的 143 退出码。它**不是**防残留的手段 —— 防 -9 残留靠
 #    `research/tools/r14c-carrier-heal.sh`（开窗前的有界自愈）。
-trap 'restore_carrier; echo "CHAIN_STOPPED_AT=signal（收到 TERM/INT，已还原覆盖件后以 143 退出）" >> "$LOG"; exit 143' TERM INT
+trap 'stack_down; restore_carrier; echo "CHAIN_STOPPED_AT=signal（收到 TERM/INT，已还原覆盖件后以 143 退出）" >> "$LOG"; exit 143' TERM INT
 
 for p in "${JUDG_PATHS[@]}"; do
   case "$p" in
@@ -158,9 +180,16 @@ else
   PORT=""
   for cand in $PORT_CANDIDATES; do
     if port_free "$cand"; then PORT="$cand"; break; fi
-    echo "   候选 ${cand} 已被占（pid=$(lsof -nP -iTCP:"$cand" -sTCP:LISTEN -t 2>/dev/null | head -1)），跳过" >> "$LOG"
+    HP=$(lsof -nP -iTCP:"$cand" -sTCP:LISTEN -t 2>/dev/null | head -1)
+    # 🔴 光打 pid 不够：21:44 那一发停在"全被占"之后，要再跑三条 `ps` 才知道**是不是本线自己漏的**
+    #    （答案正是"是"——三枚都是本线的 pidfile 对得上号的活服务端）。
+    #    把 etime 与命令一起打出来，"上一发漏了"与"别人在跑"这一趟就能分开。
+    echo "   候选 ${cand} 已被占（pid=${HP:-?} etime=$(ps -o etime= -p "${HP:-0}" 2>/dev/null | tr -d ' ') cmd=$(ps -o command= -p "${HP:-0}" 2>/dev/null | cut -c1-60)），跳过" >> "$LOG"
   done
-  [ -n "$PORT" ] || { echo "CHAIN_STOPPED_AT=port（候选 ${PORT_CANDIDATES} 全被占）" >> "$LOG"; exit 4; }
+  [ -n "$PORT" ] || { echo "CHAIN_STOPPED_AT=port（候选 ${PORT_CANDIDATES} 全被占）" >> "$LOG"
+    echo "   本线自己的 pidfile 现量（对得上号的就是上一发漏的收尾，停法：HEYTA_E2E_PIDFILE=<该文件> bash scripts/mobile-e2e-down.sh）：" >> "$LOG"
+    ls -1 /tmp/heyta-e2e-server.carrier.*.pid 2>/dev/null | sed 's/^/     /' >> "$LOG"
+    exit 4; }
 fi
 export PORT
 echo "PORT=${PORT}（候选=${PORT_CANDIDATES}）" >> "$LOG"
@@ -230,6 +259,9 @@ run build_all pnpm -r build || { echo "CHAIN_STOPPED_AT=build_all" >> "$LOG"; ex
 E2E_PIDFILE="${E2E_PIDFILE:-/tmp/heyta-e2e-server.carrier.$$.pid}"
 E2E_LOGFILE="${E2E_LOGFILE:-/tmp/heyta-e2e-server.carrier.$$.log}"
 echo "E2E_PIDFILE=${E2E_PIDFILE} E2E_LOGFILE=${E2E_LOGFILE}（停它：HEYTA_E2E_PIDFILE=${E2E_PIDFILE} bash scripts/mobile-e2e-down.sh）" >> "$LOG"
+STACK_UP=1   # 🔴 **起栈之前就置 1**，不是起成功之后：`stack_up` 半途失败也可能留下一枚已bind的服务端
+             #    （17:46 那趟就停在 `CHAIN_STOPPED_AT=stack_up`）。置晚了 = 那条路上没有收尾。
+             #    没起过时 `mobile-e2e-down.sh` 走"没有 pidfile"那一支，无害。
 run stack_up env PORT="$PORT" HEYTA_E2E_PIDFILE="$E2E_PIDFILE" HEYTA_E2E_LOGFILE="$E2E_LOGFILE" \
   bash scripts/mobile-e2e-up.sh || { echo "CHAIN_STOPPED_AT=stack_up" >> "$LOG"; exit 1; }
 # 🔴 起栈失败**不再往下走**（原来这里只 `echo NOTE` 然后继续，等于把"没服务端"留给验收脚本来个 exit 3 ——
@@ -238,6 +270,7 @@ run stack_up env PORT="$PORT" HEYTA_E2E_PIDFILE="$E2E_PIDFILE" HEYTA_E2E_LOGFILE
 if [ -z "$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)" ]; then
   echo "CHAIN_STOPPED_AT=stack_listen（PORT=${PORT} 起栈后没在听）" >> "$LOG"; exit 1
 fi
+STACK_UP=1   # 🔴 从这一行起 EXIT/TERM 两道 trap 里的 `stack_down` 才有活可干（见上面 stack_down 那段）
 echo "STACK_UP_OK port=${PORT} listener=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)" >> "$LOG"
 # 🔴 后置断言：**"传了旋钮"不等于"接住旋钮的那份代码被跑了"**。载体那份 up 若是旧的已提交副本，
 #    它照旧写那两枚跨树共享名，而副作用落在**别的树的读数**上、本线任何门禁都不会红
@@ -271,7 +304,14 @@ run preflight_after_build bash research/tools/r14c-bundle-testid-preflight.sh \
 # 🔴 负载红可以给一次落位的机会：那一分钟负载里有**我自己刚打的 build** 一份。
 #    这不是放松阈值（阈值仍是闸门算的那个数），是"把 caused-by-me 的读数等成不是自己造成的"。
 #    除 load 以外的任何红（含 REDS 行缺失 = 闸门版本不对/装置坏）当场停。
-REGATE_TRIES="${REGATE_TRIES:-3}"
+# 🔴 **这一等是按"时间预算"界的，不是按次数**（21:49 现量改的：那一发 `try=1/2/3` 三次都 `REDS=load`
+#    而停在 regate，**没动设备**（判据行为是对的），但整发窗口作废；当时同分钟现量
+#    `loadavg 16.7 20.8 33.4 / 16 核` —— 15 分钟均值 33 说明这台机被打了很久，不是"我刚打完"那一下）。
+#    旧值 `REGATE_TRIES=3` 是我随手写的数，**不是从被约束的量推出来的**（§8.3 元规则）；
+#    换成 420s 预算同样是判断，区别是它说的单位（秒）与量的对象（负载落位）对得上，
+#    而"3 次"说的单位（次数）对不上任何东西。`REGATE_TRIES` 降级成**防死循环的绝对上限**。
+REGATE_LOAD_DEADLINE="${REGATE_LOAD_DEADLINE:-420}"
+REGATE_TRIES="${REGATE_TRIES:-12}"
 REGATE_SETTLE="${REGATE_SETTLE:-60}"
 # 🔴 收成**一个函数**而不是两段抄件：下面 verify 的"无效重跑"那条路要问的是**同一条**窗口判据，
 #    复制第二段就是本仓那条老规矩的反面（抄件一定会漂，而且漂的那一段没人看）。
@@ -279,6 +319,7 @@ REGATE_SETTLE="${REGATE_SETTLE:-60}"
 ask_gate() {  # <这一段是谁在问：pre|retry>
   REGATE_RG=0; REGATE_RC=1; REGATE_REDS=''
   local who="${1:-pre}"
+  local gstart; gstart=$(date +%s)
   while :; do
     REGATE_RG=$((REGATE_RG + 1))
     RT="/tmp/ht-r14c-regate.$$.${who}.try${REGATE_RG}.txt"
@@ -289,8 +330,9 @@ ask_gate() {  # <这一段是谁在问：pre|retry>
     rm -f "$RT"
     echo "REGATE who=${who} try=${REGATE_RG} rc=${REGATE_RC} REDS=${REGATE_REDS:-〈该行不存在〉}" >> "$LOG"
     [ "$REGATE_RC" = 0 ] && return 0
-    if [ "$REGATE_RC" = 3 ] && [ "$REGATE_REDS" = load ] && [ "$REGATE_RG" -lt "$REGATE_TRIES" ]; then
-      echo "REGATE=load-only（${who} 第 ${REGATE_RG} 次，${REGATE_SETTLE}s 后重问；build 刚跑完，1 分钟负载还没落）" >> "$LOG"
+    if [ "$REGATE_RC" = 3 ] && [ "$REGATE_REDS" = load ] \
+       && [ $(( $(date +%s) - gstart )) -lt "$REGATE_LOAD_DEADLINE" ] && [ "$REGATE_RG" -lt "$REGATE_TRIES" ]; then
+      echo "REGATE=load-only（${who} 第 ${REGATE_RG} 次，已等 $(( $(date +%s) - gstart ))s / 预算 ${REGATE_LOAD_DEADLINE}s，${REGATE_SETTLE}s 后重问；build 刚跑完，1 分钟负载还没落）" >> "$LOG"
       sleep "$REGATE_SETTLE"
       continue
     fi
@@ -329,6 +371,9 @@ done
 # 03:5x 现量主检出 `verify-mobile-due-time.sh:626-629` 就是这四个默认值）。
 # 用途是分辨"op 没到服务端"和"读不到服务端"—— 前者是产品红，后者是环境红。
 run readability bash research/tools/r14c-server-readability-judgment.sh
+# 🔴 收尾**显式**停栈（不指望 EXIT trap：那样日志里 `stack_down` 会排在 `chain end` 之后，
+#    读日志的人会先看到"结束"再看到一条来历不明的 STEP）。trap 那道是兜底，`STACK_UP` 已归 0 ⇒ 不重复。
+stack_down
 echo "=== chain end $(date '+%F %T') verify_rc=${rc} readability_rc=$? ===" >> "$LOG"
 echo "[chain] verify rc=${rc}"
 exit $rc

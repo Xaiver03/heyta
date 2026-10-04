@@ -126,14 +126,14 @@ X/Y/AB/AC 要重写 `packages/ui/dist`，而另一条会话正在读它打移动
    图字节一个字没变、源码动了 ⇒ 仍然红），所以它回答的是 md5 回答不了的那半边 —— **主张过期**。
 
 ```text
-UIPIN day-en-full.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN day-en-no-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN day-en-empty.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN calendar-day-full.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN calendar-day-drag-next.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN calendar-day-drag-prev.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN calendar-day-away.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN calendar-day-back-today.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN day-en-full.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN day-en-no-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN day-en-empty.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-full.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-drag-next.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-drag-prev.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-away.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-back-today.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
 ```
 
 ⚠️ **后五枚此刻是红的（UISTALE），这是要的结果不是事故**：钉 `5e23b7bf`（10-03 23:58）之后

@@ -58,9 +58,9 @@
   但**看图才会注意到**，而它正是上面"侧栏迷你月历与它同源"那条主张的边界：
   迷你月历跟 cursor 走，选中日不跟。别把这张图当成"整屏同步移动"的证据。
 
-UIPIN calendar-week-bars.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
-UIPIN calendar-week-nav.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
-UIPIN calendar-week-tall.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+UIPIN calendar-week-bars.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-week-nav.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-week-tall.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
 
 pin 取拍图（mtime 03:47）之前最后一次动过那组路径的提交 `401bbcd6`（10-03 03:13）。
 🔴 补完锚点后 `--all` 报这三枚 UISTALE —— 与 `../calendar-cells/` 同一个原因
