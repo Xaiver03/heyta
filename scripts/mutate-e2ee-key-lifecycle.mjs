@@ -10,6 +10,60 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
+if (process.argv[2] === '--egress') {
+  // Real Web/vault/HTTP/PG boundary. Run only in an isolated checkout: the
+  // runner rebuilds app-host/web, and no platform build may consume the mutant.
+  const source = new URL('../packages/app-host/src/ai-breakdown.ts', import.meta.url);
+  const originalSource = await readFile(source, 'utf8');
+  const anchor = "user: lines.join('\\n')";
+  if (originalSource.split(anchor).length !== 2) throw new Error('Egress mutation anchor is not unique');
+  const mutant = originalSource.replace(anchor, 'user: JSON.stringify(source)');
+  const output = await mkdtemp(join(tmpdir(), 'heyta-egress-mutation-'));
+  const execute = (name) => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['scripts/verify-vault-web-journey.mjs', 'ai-egress.spec.ts', '--reporter=json'], {
+      cwd: new URL('..', import.meta.url), stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: join(output, `${name}.json`) },
+    });
+    let log = '';
+    child.stdout.on('data', chunk => { log += chunk; });
+    child.stderr.on('data', chunk => { log += chunk; });
+    child.on('error', reject);
+    child.on('close', code => {
+      writeFile(join(output, `${name}.log`), log).then(() => resolve(code), reject);
+    });
+  });
+  if (await execute('baseline') !== 0) throw new Error(`Egress baseline failed; see ${output}`);
+  if (await readFile(source, 'utf8') !== originalSource) {
+    throw new Error('Egress source changed during baseline; no mutation was written');
+  }
+  try {
+    await writeFile(source, mutant);
+    const code = await execute('whole-task-projection');
+    const report = JSON.parse(await readFile(join(output, 'whole-task-projection.json'), 'utf8'));
+    const errors = [];
+    const collect = (suites) => { for (const suite of suites ?? []) {
+      for (const spec of suite.specs ?? []) for (const test of spec.tests ?? [])
+        for (const result of test.results ?? []) if (result.status === 'failed') errors.push(...(result.errors ?? []));
+      collect(suite.suites);
+    } };
+    collect(report.suites);
+    if (code === 0 || !errors.some(error => error.message?.includes('the user message must contain exactly the disclosed title'))) {
+      throw new Error(`Egress mutant did not hit the field-boundary assertion; see ${output}`);
+    }
+    console.log('mutation caught: whole-task-projection');
+  } finally {
+    if (await readFile(source, 'utf8') !== mutant) {
+      await writeFile(join(output, 'original.ts'), originalSource);
+      throw new Error(`Concurrent edit preserved; original saved in ${output}`);
+    }
+    await writeFile(source, originalSource);
+    // Rebuild and rerun after restoration: do not leave a mutant dist behind.
+    if (await execute('restored') !== 0) throw new Error(`Restored egress validation failed; see ${output}`);
+  }
+  console.log(`Evidence: ${output}`);
+  process.exit(0);
+}
+
 const root = new URL('../packages/sync-core/src/key-lifecycle.ts', import.meta.url);
 const original = await readFile(root, 'utf8');
 const evidence = await mkdtemp(join(tmpdir(), 'heyta-key-mutation-'));

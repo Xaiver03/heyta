@@ -1,3 +1,4 @@
+import { fillVaultSecret } from '../vault/privacy';
 /**
  * B · Web vault settings (real Chromium, real Vite app, HTTP fixture).
  *
@@ -21,7 +22,9 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const EVIDENCE = `${ROOT}apps/web/evidence/vault-panel`;
 
 // Even synthetic recovery codes should not be retained in traces or videos.
-test.use({ trace: 'off', video: 'off', screenshot: 'off' });
+// This test replaces HTTP with page.route; a production Service Worker would
+// own those fetches instead. PWA worker behavior has its own dedicated suite.
+test.use({ trace: 'off', video: 'off', screenshot: 'off', serviceWorkers: 'block' });
 async function screenshot(page: Page, filename: string): Promise<void> {
   await page.screenshot({ path: `${EVIDENCE}/${filename}`, fullPage: false, mask: [
     page.getByTestId('vault-recovery-display'), page.getByTestId('vault-recovery-code'),
@@ -85,6 +88,8 @@ async function installHttpFixture(page: Page): Promise<{
 
   await page.route(`${SERVER}/api/account/profile**`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ displayName: null, avatarHash: null }) }));
+  await page.route(`${SERVER}/api/sync/devices`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ devices: [] }) }));
   await page.route(`${SERVER}/api/sync/status**`, (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ latestSeq: 0 }) }));
   await page.route(`${SERVER}/api/sync/ops**`, (route) =>
@@ -161,15 +166,15 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   await expect(dialog).toBeVisible();
   await screenshot(page, '00-loaded-light.png');
   await expect(dialog.getByTestId('vault-create-form')).toBeVisible();
-  await dialog.getByTestId('vault-create-passphrase').fill('correct horse battery staple');
+  await fillVaultSecret(dialog.getByTestId('vault-create-passphrase'), 'correct horse battery staple');
   await dialog.getByTestId('vault-create').click();
   await expect(dialog.getByTestId('vault-recovery-display')).toBeVisible();
   await screenshot(page, '01-created-light.png');
   expect(fixture.putCount(), 'unconfirmed recovery code must not publish a package').toBe(0);
 
   const recoveryCode = await dialog.getByTestId('vault-recovery-display').textContent();
-  expect(recoveryCode).toMatch(/^[0-9A-Z-]{40,}$/u);
-  await dialog.getByTestId('vault-recovery-confirm').fill(recoveryCode ?? '');
+  expect(/^[0-9A-Z-]{40,}$/u.test(recoveryCode ?? ''), 'recovery code format is valid').toBe(true);
+  await fillVaultSecret(dialog.getByTestId('vault-recovery-confirm'), recoveryCode ?? '');
   await dialog.getByTestId('vault-publish').click();
   await expect(dialog.getByTestId('vault-ready')).toBeVisible();
   await screenshot(page, '02-ready-light.png');
@@ -177,9 +182,9 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   expect(fixture.published()).toBeDefined();
 
   const afterCreateStorage = await storageDump(page);
-  expect(afterCreateStorage).not.toContain(recoveryCode!.replaceAll('-', ''));
-  expect(afterCreateStorage).not.toContain('recoveryCode');
-  expect(afterCreateStorage).not.toContain('"rootKey":');
+  expect(afterCreateStorage.includes(recoveryCode!.replaceAll('-', '')), 'recovery code is absent from storage').toBe(false);
+  expect(afterCreateStorage.includes('recoveryCode'), 'recovery-code field is absent from storage').toBe(false);
+  expect(afterCreateStorage.includes('"rootKey":'), 'root-key field is absent from storage').toBe(false);
 
   await page.reload();
   await expect(page.locator('input[placeholder^="Add a task"]')).toBeVisible();
@@ -191,31 +196,32 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   await page.getByRole('button', { name: 'Close sync settings' }).click();
   await page.getByRole('button', { name: 'Switch to dark theme', exact: true }).click();
   await page.getByRole('button', { name: 'Sync settings', exact: true }).click();
-  await reloadedDialog.getByTestId('vault-recovery-code').fill('0000-0000-0000-0000-0000-0000-0000-0000-0000');
+  await fillVaultSecret(reloadedDialog.getByTestId('vault-recovery-code'), '0000-0000-0000-0000-0000-0000-0000-0000-0000');
   await reloadedDialog.getByTestId('vault-unlock-recovery').click();
   await screenshot(page, '04-wrong-recovery-dark.png');
   await expect(reloadedDialog.getByTestId('vault-error')).toBeVisible();
   await expect(reloadedDialog.getByTestId('vault-unlocked')).toHaveCount(0);
 
-  await reloadedDialog.getByTestId('vault-recovery-code').fill(recoveryCode ?? '');
+  await fillVaultSecret(reloadedDialog.getByTestId('vault-recovery-code'), recoveryCode ?? '');
   await reloadedDialog.getByTestId('vault-unlock-recovery').click();
   await expect(reloadedDialog.getByTestId('vault-recovery-rotation')).toBeVisible();
   await reloadedDialog.getByTestId('vault-lock').click();
   await expect(reloadedDialog.getByTestId('vault-unlock-form')).toBeVisible();
 
-  await reloadedDialog.getByTestId('vault-recovery-code').fill(recoveryCode ?? '');
+  await fillVaultSecret(reloadedDialog.getByTestId('vault-recovery-code'), recoveryCode ?? '');
   await reloadedDialog.getByTestId('vault-unlock-recovery').click();
   await expect(reloadedDialog.getByTestId('vault-recovery-rotation')).toBeVisible();
-  await reloadedDialog.getByTestId('vault-new-passphrase').fill('a different passphrase');
+  await fillVaultSecret(reloadedDialog.getByTestId('vault-new-passphrase'), 'a different passphrase');
   await reloadedDialog.getByTestId('vault-change-passphrase').click();
   await expect(reloadedDialog.getByTestId('vault-recovery-display')).toBeVisible();
   const nextRecoveryCode = await reloadedDialog.getByTestId('vault-recovery-display').textContent();
-  await reloadedDialog.getByTestId('vault-recovery-confirm').fill(nextRecoveryCode ?? '');
+  await fillVaultSecret(reloadedDialog.getByTestId('vault-recovery-confirm'), nextRecoveryCode ?? '');
   await reloadedDialog.getByTestId('vault-publish').click();
   await expect(reloadedDialog.getByTestId('vault-ready')).toBeVisible();
   await screenshot(page, '05-ready-dark.png');
   expect(fixture.putCount()).toBe(2);
-  expect(await storageDump(page)).not.toContain(nextRecoveryCode!.replaceAll('-', ''));
+  expect((await storageDump(page)).includes(nextRecoveryCode!.replaceAll('-', '')),
+    'rotated recovery code is absent from storage').toBe(false);
   expect(fixture.unexpected(), `unexpected fixture requests: ${fixture.unexpected().join(' | ')}`).toEqual([]);
   // A missing package is the expected pre-creation response. Chromium logs
   // that intentional 404 as a resource error, so keep it explicitly bounded
