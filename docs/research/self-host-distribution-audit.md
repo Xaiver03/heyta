@@ -4952,3 +4952,46 @@ prune 修法 `89cda0df` **是** `959fd1e6` 的祖先 ⇒ 那趟构建**带着**�
 
 ⚠️ 这一节**没有**宣布"77 段里有多少段带执行读数"—— 那个总数要在五段读数齐了之后按日志逐段点，
 留给 §8.82。
+
+### 8.82 `check:ai-e2e` 的那一枚红用**结构层**结案（不靠窗口），外加第 8 项的前置现量（2026-10-04 14:2x）
+
+**载体上的执行读数**（`/tmp/g66-c1-check:ai-e2e.log`，14:15:14–14:21:24）：
+`Running 157 tests using 1 worker` → **154 passed / 2 skipped / 1 failed**，rc=1。
+唯一红的那条是 `tests/list-folder.spec.ts:72`「清单移入文件夹：入口常驻、跨刷新还在、非法目标不给点」，
+**首次与 retry #1 都红**（同一签名，不是抖动）。
+
+**这一条不需要等窗口就能结案**，靠的是两条现量而不是印象：
+
+1. **交集 0**：本批写集 37 枚 ∩ { `apps/web/`、`e2e/tests/`、`e2e/playwright*.config.ts`、`packages/*/src/` } = **0 条**。
+   `packages/` 下只有两枚 `package.json`（`shared-schema` / `sync-core`），逐条 `--numstat` = **+1 −0**，
+   改的就是那行 `"license": "MIT"` 声明；`pnpm-lock.yaml` 与 `e2e/pnpm-lock.yaml` **都不在写集**
+   ⇒ 那条 spec 的被测应用与依赖解析在 main 和载体上**逐字节相同**。
+2. **归属通式「集外 0」**（载体脚本每次重算都跑的那条）：合并只写了本批自己写过的路径 ⇒
+   载体树上凡是本批没写过的字节都等于 main ⇒ **这条红不可能由合并引入**。
+
+🔴 **阳性对照（这条方法有牙）**：同一条交集法对 `check:landing-e2e` 报的是 **5**
+（本批改了 `apps/landing/**`，而 `e2e/playwright.landing.config.ts:30` 的 `testDir: './landing'`
+跑的正是这个 app）⇒ 上面那个 0 **不是**"探针扫不到"。
+🔴 **边界（两条都不许越）**：结构论证证明的是"**不是本批造成的**"，**不证明**它在 main 上此刻红着
+（那需要一发 main 树上的执行读数 —— 与正在跑的 `check:ai-e2e` 抢同一对 4318/4319 端口，
+所以现在跑只会造自己的假红，**排在 g66 之后单跑那一条 spec、两次同签名即结案**）；
+更**不**等于本批去修它 —— `list-folder` 是别人那条线的界面用例，AGENTS「绝不代改他们的」那一档。
+
+**第 8 项（落地后的 `reinstall:all`）的前置现量**（14:21 只读取证，没动任何别人的现场）：
+
+| 端 | 前置 | 读数 |
+|---|---|---|
+| android | 设备在 | `emulator-5554 device` |
+| windows | 打包机可达 | `ssh windows-pc` → `SSH_OK`（附 openssh pq.html 提示） |
+| mac | 现装产物在 | `/Applications/Heyta.app` 在 |
+| ios | 🔴 **六枚模拟器正被 Booted** | `heyta-batch2-closeout` / `heyta-bc-reminders` / `heyta-iphone-17pro` / `heyta-ios-isolated` / `iPhone Duo heyta` … |
+
+⇒ ios 那一段的动作里有 `simctl uninstall` —— 落在别人正在取证的设备上会**毁掉他们的证据**，
+所以这一格要的是**所有者让位**，不是"负载降到 12 以下"。（它本来就排在落地之后，不构成现在的阻塞。）
+
+**顺手补上的一条覆盖缺口登记**：今天的并集是 **77** 段，而 `check:entries` 这一段在载体上
+**从没执行过**（把并集段名与 g60 那趟 75 行 `SEG_CARRIER` 逐名对账，只有它多出来；
+另一个"多出来"的 `-r` 是我自己解析 `pnpm -r test` 取的**假名**，不是缺口）。
+它本身是 fs 类、可以当场补，但它会**重新生成入口页并与提交物逐字节比** ⇒
+与正在跑的 `check:ai-e2e` 同时动 4318/4319 会互相造红 ⇒ 命令记在这里，排在 g66 之后跑：
+`pnpm --filter @heyta/landing check:entries`（在载体树上）。
