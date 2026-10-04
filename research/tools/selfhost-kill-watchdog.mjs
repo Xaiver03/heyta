@@ -17,7 +17,7 @@
  *    等于把整条链的守护换成 §8.122 那一族"stdout 空 = 没人用"的假 0。
  *    代价说清楚：会有一次几十分钟的链被白中止（记 exit 3 = 环境无效，不是产品红）。
  */
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { listenersOn } from './selfhost-kill-ports.mjs';
 
 /** 某个 pid 的工作目录（macOS 的 lsof 会解 `/tmp` ⇒ `/private/tmp`，交调用方比之前先归一）。
@@ -47,7 +47,7 @@ export function cwdOf(pid) {
 /**
  * 归属探针的**阳性对照**：问自己这个 pid 的 cwd，必须读回 `process.cwd()`。
  * 上面那条 `-a` 就是被它抓住的 —— 任何"归属"类探针都要配一条问已知答案的腿，
- * 否则它坏了的时候读起来 Still 像"没人监听"。
+ * 否则它坏了的时候读起来照样像"没人监听"。
  */
 export function cwdSelfcheck(pid = process.pid) {
   const got = cwdOf(pid);
@@ -144,6 +144,58 @@ export function startWatch({ ports, carrierDir, intervalMs = 5000, onTrip, probe
   // 立刻先判一次：起跑前那一眼之后到第一次定时之间也有窗口。
   tick();
   return handle;
+}
+
+/**
+ * 🔴 **这就是 `selfhost-land-main.mjs` 第 4 道跑链的那段代码本体**（spawn 子进程 + 边跑边守 +
+ *    中止时 SIGTERM→5s 后 SIGKILL + 退出码归一 + 回"判了几轮/用了多久/子进程输出"）。
+ *    抽到这里来的唯一理由是：那段逻辑留在调用方手里时，**只有真窗口能取到它的读数**
+ *    （§8.127 末段那条"写成待取"就是这么来的），而一次中止读数本来不需要几十分钟的链。
+ *    调用方（真链与 `--watch-leg` 合成腿）共用这一个函数 ⇒ 合成腿取到的就是生产路径的读数，
+ *    不是"另写了一份像它的代码"。
+ * @returns {Promise<{code:number, sig:string|null, trip:string|null, reads:number, probeReading:string|undefined, elapsedMs:number, output:string}>}
+ */
+export async function runChildUnderWatch({
+  command,
+  args = [],
+  cwd,
+  env = process.env,
+  ports,
+  carrierDir,
+  intervalMs = 5000,
+  hardKillMs = 5000,
+}) {
+  const t0 = Date.now();
+  const chunks = [];
+  const child = spawn(command, args, { cwd, env });
+  child.stdout.on('data', (c) => chunks.push(c));
+  child.stderr.on('data', (c) => chunks.push(c));
+  let trip = null;
+  const watch = startWatch({
+    ports,
+    carrierDir,
+    intervalMs,
+    onTrip: (why) => {
+      trip = why;
+      child.kill('SIGTERM');
+      const hard = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* 已退 */ } }, hardKillMs);
+      hard.unref();
+    },
+  });
+  const code = await new Promise((res) => {
+    child.on('exit', (c, sig) => res(typeof c === 'number' ? c : (sig ? 143 : 1)));
+    child.on('error', (e) => { chunks.push(Buffer.from(`\nspawn 失败：${e.message}`)); res(127); });
+  });
+  watch.stop();
+  return {
+    code,
+    sig: child.signalCode ?? null,
+    trip,
+    reads: watch.reads,
+    probeReading: watch.probeReading,
+    elapsedMs: Date.now() - t0,
+    output: Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8'),
+  };
 }
 
 /* ── 自检（夹具驱动，不碰真端口；`--selftest` 退出码非 0 就是装置坏了）── */
