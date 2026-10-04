@@ -4944,3 +4944,85 @@ for c in dd8f2210 f2d7ed40 fd34c42a de296b9d; do git merge-base --is-ancestor $c
 >
 > **② 仍欠的那一格**：链尾 `pnpm -r test` 在本尖端还没有一次完整读数
 > （`-r build` 与 `-r typecheck` 已在同一窗口量过）。不拿"build 绿"冒充"test 绿"。
+
+---
+
+## B79. 🟠 品牌批落地后的第一条完整链：84 段 3 条红，其中一条是「DOM 就绪锚点不知道有品牌帧」——三端同形，本线不代拍（10-05 00:5x）
+
+**载体**：隔离检出 `heyta-wt-ai-closeout`，detached 到 `4a7eafac`；`pnpm-lock.yaml` 的 sha256 前 12 位
+与主检出逐字相同（`0f3c1bf6d9e2`）⇒ 没有重装依赖。整机负载 60–147（别的会话在跑 pytest 与模拟器）。
+
+**四段读数**（每条都是被测命令自己的退出码，不是包装命令的）：
+
+| 段 | 读数 |
+|---|---|
+| `pnpm -r build` | **RC=0** |
+| `pnpm -r typecheck` | **RC=0**（在 `c97d3f1d` 上是 **RC=2**，红点 `packages/design-system` —— 见下面第 ① 条） |
+| `pnpm -r test` | **11,344 passed / 14 skipped / 0 failed**（20 个包，量于 `1869de2b`）；`4a7eafac` 上 `@heyta/web` 复跑 **1,759 passed / 13 skipped / 0 failed** |
+| 链 84 段（分四批） | **81 绿 / 3 红**：36 `check:macos-window`、42 `check:docs`、69 `check:ai-e2e` |
+
+**本窗口落的六笔**：`2b116072`（把 `check:brand-assets` 接进链）· `c97d3f1d`（计划文档挂进文档中心）·
+`1869de2b`（品牌批带进 main 的两条门禁级红）· `5b67c944`（那条"在树上"改成真的判 HEAD）·
+`f7da0b9a`（§6 判据表跟着改）· `4a7eafac`（36 那条红的成因写进判据文案）。
+
+### 三条红的逐条归因
+
+**① 第 36 段 `check:macos-window`：红得对，但根因不是"壳里没画应用"。**
+现量：`contentOnModalRatio 0.011 < 0.02`，而**同一趟** M2 探针是 ✅（头像 1 个、采集框 1 个、
+设置里的滴答导入面板可达）。快照打开看了 —— 那是**首屏品牌帧**（近白底 + 居中 mark）。
+
+机制：壳的自截图是**事件触发**的（`HeytaMacApp.swift` 的 `triggerIfRequested()`：首屏探针一过就截），
+而那条探针判的是 **DOM**；品牌帧的退场是挂载之后一次 260ms 淡出。⇒ "DOM 里挂上了"与
+"像素上遮罩没了"之间天然差着一整条动画 —— **首屏动画落地之后每次都差**。
+
+⚠️ 先试过的修法被实测否证，留形免得有人重走：给门禁加"最多 3 趟重取"。三趟
+`WEBVIEW_SNAPSHOT_BYTES` 逐字节相同（60672）—— 事件触发的截图不会因为重试而变晚，
+重试只把 22s 变成 66s。已摘掉，只留下这条读数与一句分诊（`4a7eafac`）。
+
+🔴 **正解要拍板，而且它不止 mac 一端**：`grep heyta-boot` 在 `apps/desktop-macos` /
+`apps/desktop-windows` / `apps/desktop-linux` 的原生侧**零命中** —— 三端的就绪锚点
+（mac 的 `firstScreenProbe`、Windows 的 `MainWindow.xaml.cs:297` 同样数 `account-menu-avatar`）
+都不知道品牌帧的存在。改法是给锚点加一条"且 `#heyta-boot` 已摘除"，**不是**调低阈值
+（调低等于把"错误屏 0.004 / WebView 没合成 0.006"那两档重新放回来）。
+没做的理由：`HeytaMacApp.swift` 正被别的会话写着（未提交 +175/−10，账号注销旅程），
+按共享工作树纪律不抢改。
+
+📌 **同一条还捎带照出装机判据的一个洞**（给 ③ 的那条线，不在本线代改）：
+`scripts/reinstall-all.sh` 的 mac 段判据是"非空白 + 主蓝命中 ≥ 20"，而品牌帧的 mark
+本身就是一大块 `#2563EB` —— 卡住的启动帧会**满分通过**这条。这是 §7 第 82 条的第五种面目。
+
+**② 第 42 段 `check:docs`：不在本线。**
+`docs/plans/calendar-profile-handoff.md:1187` 与 `docs/plans/multi-end-coverage-handoff.md:2068`
+都引用 `trash-and-archive.md §10.87`，而 §10.87 **只存在于别人未提交的工作树版本**
+（`git show HEAD:… | grep -c 10\.87` = 0，工作树 = 1），那两份引用文件本身与 HEAD 一致。
+⇒ **已提交的文档引用了未提交的章节** —— 和刚修的「XML 引用未提交 PNG」（`5b67c944`）同族，
+只是发生在文档侧。归属：回收站/归档那条线（B75 是同一族的旧形状）。本线不代改章节号。
+
+**③ 第 69 段 `check:ai-e2e`：1 硬失败 + 2 flaky，三条同一个成因 —— 把 B76 那条待拍板项升级。**
+- `ai-assistant.spec.ts:65` 两趟都红：`toHaveCount(0)` 期望披露块消失，实得 1；
+- `ai-tool-run.spec.ts:103`、`:155` flaky（首趟 60s 卡在
+  `disclosure.getByTestId('ai-tool-send').click()`，retry 3.1s 过）。
+
+三条的触发点都是**同一行**：用例里那张 `fullPage: true` 截图会改视口高度 ⇒ 右栏那一列量到 0
+⇒ AI 面换挂载点 = 换子树 ⇒ 未决的披露状态/待发的那一句被悄悄取消。这是 `78cdff67`（把 AI 面
+搬进右栏）带出来的。**新证据在于症状数**：原来记的是"约一半运行红在等 send 超时"，
+现在实测是**一条硬失败 + 两条 flaky**，而且 flaky 的那两条靠 retry 掩盖掉了。
+A/B 两臂的取舍与已否证的两条修法（portal、模块级 ephemeral）原文在 B76 补记 #17，不重抄。
+
+### 第 84 段那次红不是代码
+
+`pnpm -r test` 在链尾红了一次，两条原因都是载体自脏：
+1. `check:ai-e2e` 在同一次运行里重写了 `apps/web/evidence/**`（12+ 张），字节比对类用例
+   于是对着一张被 e2e 改过的图打分 —— `git restore -- apps/web/evidence` 之后整包复跑 **0 失败**。
+   （项目记忆里"e2e 一跑重写截图 ⇒ 复跑必 restore"这条在**新载体**上再次成立。）
+2. `due-date-edit.spec.tsx:239`「快捷项应有『今天』」在整趟里失败，单独跑（15/15）与整包复跑
+   （1,759/0）**都过**。n=1 不复现，**没有归因到任何一笔改动**，登记成待观察而不是"已修"。
+
+### 一条失误（留形）
+
+第一次提交 `package.json` 时漏了"先把只含本行改动的那份写回工作树"，`git commit --only`
+于是把别人未提交的一行（`verify:macos-account-erasure`）一起带走了。撤回条件逐条核过才动手：
+那笔未推（`git branch -r --contains` 空）、索引零暂存（`git diff --cached --name-only` 空）、
+tip 是自己 10 秒前造的那笔 —— `git reset --soft HEAD~1` + `git restore --staged package.json`，
+撤回前后 `git status --porcelain` 快照逐行对比，唯一差的就是 `package.json` 回到 ` M`。
+重做后的 numstat 是 2/1（只含本行改动）。
