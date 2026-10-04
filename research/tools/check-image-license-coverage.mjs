@@ -58,6 +58,7 @@ const IMAGE_ONLY_PACKAGES = {
   // 同名不同版本：pnpm-lock.yaml 只在人手动 `pnpm update` 时才前进，
   // 而 npm 每次构建都取 `^` 范围内最新 ⇒ 两条解析路必然漂。
   '@fastify/static@10.1.5': { license: 'MIT', source: 'https://registry.npmjs.org/@fastify/static/10.1.5', checkedAt: '2026-10-03', why: 'pnpm 锁在 10.1.4' },
+  '@fastify/websocket@11.3.3': { license: 'MIT', source: 'https://registry.npmjs.org/@fastify/websocket/11.3.3', checkedAt: '2026-10-04', why: 'npm 镜像解析到 2026-10-03 新发布的 11.3.3，pnpm store 未含此版本；已核对发布 tarball 的 package/LICENSE 为 MIT' },
   '@peculiar/asn1-android@2.10.0': { license: 'MIT', source: 'https://registry.npmjs.org/@peculiar/asn1-android/2.10.0', checkedAt: '2026-10-03', why: 'pnpm 锁在 2.9.5' },
   '@peculiar/asn1-cms@2.10.0': { license: 'MIT', source: 'https://registry.npmjs.org/@peculiar/asn1-cms/2.10.0', checkedAt: '2026-10-03', why: 'pnpm 锁在 2.9.5' },
   '@peculiar/asn1-csr@2.10.0': { license: 'MIT', source: 'https://registry.npmjs.org/@peculiar/asn1-csr/2.10.0', checkedAt: '2026-10-03', why: 'pnpm 锁在 2.9.5' },

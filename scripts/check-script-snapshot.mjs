@@ -46,6 +46,7 @@ import { readFileSync, existsSync } from 'node:fs';
 
 const MANIFEST = [
   'scripts/verify-android-vault-storage.sh',
+  'scripts/verify-ios-vault-keychain.sh',
   'scripts/reinstall-all.sh',
   'scripts/verify-harmony-rnoh-js.sh',
   'scripts/verify-harmony-rnoh.sh',

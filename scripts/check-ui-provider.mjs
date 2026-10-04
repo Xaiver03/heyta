@@ -640,7 +640,8 @@ function providerNodesOf(file) {
  * 只看 `file.nodes` 会把它算成"在 Provider 之外"，误报。
  *
  * 判据与 `isTagOpen` 一致：`<` 前一个非空字符不能是标识符字符（排除 TS 泛型
- * `useState<Foo>`），`</` 闭合标签不匹配。
+ * `useState<Foo>`）；这里另外接受 `return <Foo>` / `yield <Foo>`，因为这是合法
+ * 的 JSX 返回形状，不能把 `return` 的末尾字母误当成泛型边界。
  */
 function renderedTags(file, from, to) {
   const out = [];
@@ -650,7 +651,13 @@ function renderedTags(file, from, to) {
     if (m.index < from || m.index >= to) continue;
     let p = m.index - 1;
     while (p >= 0 && (file.structural[p] === ' ' || file.structural[p] === '\t')) p--;
-    if (p >= 0 && /[A-Za-z0-9_$)\]]/.test(file.structural[p])) continue;
+    // `return <Screen />` is JSX even though the previous non-space character
+    // is the final `n` of the JavaScript keyword. Keep the generic-expression
+    // guard for `value<Foo>`, while accepting JSX returned directly from a
+    // function (the mobile feature-screen registry uses this shape).
+    const before = file.structural.slice(Math.max(0, m.index - 32), m.index);
+    const followsReturn = /\b(?:return|yield)\s*$/.test(before);
+    if (p >= 0 && /[A-Za-z0-9_$)\]]/.test(file.structural[p]) && !followsReturn) continue;
     out.push({ name: m[1], offset: m.index });
   }
   return out;
