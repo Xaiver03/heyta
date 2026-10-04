@@ -61,6 +61,32 @@ const scratch = mkdtempSync(join(tmpdir(), 'dp-carrier-'));
 const raw = layDown(tree, join(scratch, 'raw'));
 const resolved = layDown(tree, join(scratch, 'resolved'));
 
+// 🔴 P2 的那半句断言（"剩下的那一枚写着'仍带冲突标记'"）**读的是候选树里那道槽位判据的行为**，
+// 而候选树来自 `merge-tree main HEAD` —— 工作树里尚未提交的改动不会进树。
+// 第一版就是这么错的：判据的 marker 分支只在工作树，装置却断产物里有那句，于是红的是装置的前提，
+// 不是被测判据（症状和"合并造成的红"长得一样）。所以先把前提判成前提：拿不到就**拒绝跑**，不猜。
+const SLOT_GATE_IN_TREE = join(raw, 'scripts', 'check-detail-pane-slot.mjs');
+if (!existsSync(SLOT_GATE_IN_TREE)) {
+  console.error('🔴 候选树里没有 scripts/check-detail-pane-slot.mjs —— P2 没有靶，拒绝跑。');
+  rmSync(scratch, { recursive: true, force: true });
+  process.exit(2);
+}
+if (!readFileSync(SLOT_GATE_IN_TREE, 'utf8').includes('仍带冲突标记')) {
+  console.error(
+    '🔴 候选树里那道槽位判据**还没有** marker 分流分支（它只在工作树里没提交）——\n' +
+      '      P2 断的是它的读数，这一趟的红会落在装置前提上而不是判据上。先把那道判据提交，再跑本装置。',
+  );
+  rmSync(scratch, { recursive: true, force: true });
+  process.exit(2);
+}
+// 剩下那枚红的**名字**要现量打印，不许写死成"槽位判据"：写死的披露行在名字变化后仍会照原样印，
+// 那是"自我削弱式错话"的形状。
+const redGateNames = (out) =>
+  out
+    .split('\n')
+    .filter((l) => /^🔴 check-detail-pane/.test(l))
+    .map((l) => l.replace(/^🔴\s*/, '').trim().split(/\s+/)[0]);
+
 // —— P2 的处置：把表外那段旧抄件整段丢掉（形状与 §8.16 §4 ⑦ 一致）
 // 🔴 段的定位**从判据的读数来**，不自己猜形状：第一版写成"找第一段连续三行 `| W…`"，
 // 命中的却是修好的那张表自己（表体本来就是连续 16 行）—— 于是删掉 16 行**合法**行，
@@ -139,10 +165,19 @@ check(
 
 const p2 = runCarrier(resolved);
 const t2 = tally(p2.out);
+// 🔴 P2 原来断的是"处置后聚合数 = 0"。18:2x 之后这一句必须拆开：产物里除了那 13 行旧抄件，
+// 还留着一枚 **App.tsx 的冲突 marker**（详情列那一格两侧各写了一份内容，见工单 §8.75），
+// 于是 `check-detail-pane-slot` 也落进"候选红而 main 没有这道脚本"那一档 —— 那是**预期**读数，
+// 归零条件在它自己身上（marker 清完），不在本臂的文档处置上。所以这一臂改成断两件事：
+//   ① 文档那一枚红确实消失了（这才是在证明"它会归零"，不是恒红装饰）；
+//   ② 剩下的那一枚**必须**是槽位判据，且全文写着"仍带冲突标记"，而不是任何一条产品判据。
 check(
-  'P2 丢掉对面那批旧抄件 → 那一档归零（证明它会归零，不是恒红装饰）',
-  t2.noControl === 0 && t2.missing === 0 && t1.noControl >= 1,
-  `处置前 ${t1.noControl} → 处置后 ${t2.noControl}（丢掉 ${dropped} 行，从第 ${staleStart + 1} 行起）`,
+  'P2 丢掉对面那批旧抄件 → 文档那一枚红消失；聚合数还剩 1，且那一枚点名的是 marker 未清的槽位判据',
+  t2.noControl === t1.noControl - 1 &&
+    redGateNames(p2.out).join(',') === 'check-detail-pane-slot.mjs' &&
+    /仍带冲突标记/.test(p2.out),
+  `处置前 ${t1.noControl} → 处置后 ${t2.noControl}（丢掉 ${dropped} 行，从第 ${staleStart + 1} 行起）；` +
+    `处置后红的门禁=${redGateNames(p2.out).join(',') || '（无）'}；全文含"仍带冲突标记"=${/仍带冲突标记/.test(p2.out)}`,
 );
 
 let p3;
