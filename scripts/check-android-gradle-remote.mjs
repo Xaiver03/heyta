@@ -36,13 +36,19 @@
  *      而自己**不实现**第二份源码打包（不许出现 `tar -czf`）；同一文件里
  *      `sync_windows_sources`（MSIX 那一腿的入口）与它的两个消费方必须都还在。
  *      —— 这是 AGENTS §3.5「抽出来的收尾动作是删掉旧的那份并加门禁」那一课的直接应用。
+ *   G7 **远程前置不许是一条永不开的门**：步骤 1 探的那些 `<远端根>\…\node_modules`，
+ *      去掉 `node_modules` 之后必须匹配 `pnpm-workspace.yaml` 的某一条 packages glob。
+ *      理由是真事故：第一版探 `apps\mobile\android\node_modules`，而 `apps/mobile/android`
+ *      不是工作区包 ⇒ `pnpm install` 永远不会在那儿建目录，远程构建**恒定**红在步骤 1，
+ *      而它给出的修法执行完照样红（§7 元规则 2）。期望值靠**推导**工作区清单，
+ *      不靠"这路径在不在" —— 后者在干净检出上必假红。
  *
  * ## 怎么跑
  *
  * ```sh
  * node scripts/check-android-gradle-remote.mjs              # 真树
  * node scripts/check-android-gradle-remote.mjs --root <dir> # 临时夹具（注入验证用，不动工作树）
- * node scripts/check-android-gradle-remote.mjs --self-test  # 五臂：证明上面每条都会红
+ * node scripts/check-android-gradle-remote.mjs --self-test  # 逐臂证明每条判据都会红（臂数现量：看它自己打印的那行）
  * ```
  *
  * ## 这条判据**没有**覆盖什么（别读多）
@@ -118,9 +124,26 @@ const ALLOWED_FILE = 'scripts/run-gradle.mjs';
  * 承认它是夹具，然后按夹具处理）。
  *
  * 代价说清楚：本文件里可以出现 gradlew 这个字面量而不被判红。所以本文件的形状由
- * `--self-test` 的七臂守着，而不是由扫描面守着。
+ * `--self-test` 的豁免两腿（臂 7 正向 / 臂 8 反向）守着，而不是由扫描面守着。
  */
 const SELF_FILE = 'scripts/check-android-gradle-remote.mjs';
+
+/**
+ * 门禁同类文件（`scripts/check-*.mjs`）的**形状豁免**，2026-10-05 加，而且是**实测逼出来的**：
+ * 并行会话新增的 `scripts/check-android-build-host.mjs`（钉"不许在 Mac 起模拟器"那半边）
+ * 里登记着自己的 needle 与匹配模式（`/\bgradlew\b/`、`cd android && ./gradlew assembleDebug`），
+ * 本门禁当场报 4 条红 —— 而那四行**一行都不会执行构建**，它们是扫描器的描述文本。
+ *
+ * 🔴 但"看起来是扫描器"不等于豁免。所以这一档不是按文件名放行，而是**带一条反向判据**：
+ * 同一行里出现**真的把进程交出去的形状**（`spawnSync(` / `execSync(` / `execFile(` /
+ * `fork(` / `child_process`）就**照红**，豁免立刻失效。也就是说：
+ *   · 描述一条命令 ⇒ 豁免；
+ *   · 在门禁文件里**执行**一条 gradlew ⇒ 仍然被 G1 抓住。
+ * 这条反向判据由 `--self-test` 的臂 7（正照：needle 不红）与臂 8（变异：门禁里真 spawn ⇒ 红）
+ * 各自钉住 —— 不是写在注释里的承诺。
+ */
+const CHECKER_FILE = /^scripts\/check-[^/]+\.mjs$/;
+const EXECUTION_SHAPE = /spawnSync\(|execSync\(|execFile\(|fork\(|child_process/;
 
 /**
  * G2 的基线：**规则生效之前**就存在的直接 gradlew 入口。每条都要写清"为什么还留着"，
@@ -156,9 +179,10 @@ function isCommentLine(line) {
   return false;
 }
 
-/** G1：列出 `root` 下所有"非注释行提到 gradlew"的可执行文件落点。 */
+/** G1：列出 `root` 下所有"非注释行提到 gradlew"的可执行文件落点（+ 被形状豁免的那些）。 */
 export function findGradlewSites(baseRoot) {
   const sites = [];
+  const exempted = [];
   const walk = (dir) => {
     let entries;
     try {
@@ -183,6 +207,20 @@ export function findGradlewSites(baseRoot) {
       if (!text.includes('gradlew')) continue;
       const relFile = relative(baseRoot, abs).split(/[\\/]/).join('/');
       if (relFile === SELF_FILE) continue; // 扫描器自己的 needle 与输出文本，理由见 SELF_FILE
+      // 门禁同类文件：只**描述**命令的行豁免；同一行有执行形状则**不豁免**（反向判据）。
+      if (CHECKER_FILE.test(relFile)) {
+        const linesPre = text.split('\n');
+        for (let i = 0; i < linesPre.length; i += 1) {
+          if (!linesPre[i].includes('gradlew')) continue;
+          if (isCommentLine(linesPre[i])) continue;
+          if (!EXECUTION_SHAPE.test(linesPre[i])) {
+            exempted.push(`${relFile}:${i + 1}`);
+            continue;
+          }
+          sites.push({ file: relFile, line: i + 1, text: linesPre[i].trim() });
+        }
+        continue;
+      }
       const lines = text.split('\n');
       for (let i = 0; i < lines.length; i += 1) {
         if (!lines[i].includes('gradlew')) continue;
@@ -192,7 +230,7 @@ export function findGradlewSites(baseRoot) {
     }
   };
   walk(baseRoot);
-  return sites;
+  return { sites, exempted };
 }
 
 /* ── 判据 ─────────────────────────────────────────────────────────────── */
@@ -202,7 +240,7 @@ const readings = [];
 
 /** G1 + G2：现量扫描 vs 白名单 + 基线。 */
 function checkGradlewSites(baseRoot) {
-  const sites = findGradlewSites(baseRoot);
+  const { sites, exempted } = findGradlewSites(baseRoot);
   const allowed = sites.filter((s) => s.file === ALLOWED_FILE);
   const baselineHits = new Map();
   const offenders = [];
@@ -239,7 +277,14 @@ function checkGradlewSites(baseRoot) {
     }
   }
   readings.push(`G1/G2 扫描到 gradlew 落点 ${sites.length} 处（白名单 ${allowed.length} ／ 基线命中 ${baselineHits.size} ／ 违规 ${offenders.length}）`);
-  readings.push(`G1 扫描器自身（${SELF_FILE}）按夹具豁免 —— 它的形状由 --self-test 的七臂守，不在扫描面里`);
+  // ⚠️ 豁免不是"数一下就放过"：每一处都点名到 file:line，读数里看得见。
+  if (exempted.length > 0) {
+    readings.push(
+      `G1 形状豁免 ${exempted.length} 处（都是 scripts/check-*.mjs 里**只描述不执行**的 needle 行；` +
+        `同一行出现 spawnSync/execSync/execFile/fork/child_process 就照红）：${exempted.join(', ')}`,
+    );
+  }
+  readings.push(`G1 扫描器自身（${SELF_FILE}）按夹具豁免 —— 它的形状由 --self-test 的豁免两腿守，不在扫描面里`);
   return out;
 }
 
@@ -352,7 +397,77 @@ function checkRouterInvariants(baseRoot) {
   return out;
 }
 
-/* ── 自检：七臂（含一条阳性对照），证明每条判据都会红 ─────────────────── */
+/**
+ * G7：远程前置探测里那条 `node_modules` 路径，必须是 **pnpm 真会创建的目录**。
+ *
+ * 这条判据是被一次真跑出来的：第一版步骤 1 探的是 `apps\mobile\android\node_modules`，
+ * 而 `pnpm-workspace.yaml` 的 packages 是 `packages/*` / `apps/*` / `server` ⇒
+ * `apps/mobile/android` 不是工作区包，`pnpm install` 永远不会在那儿建目录。
+ * 后果不是"多一条红"，是**一条永不开的门**：远程构建恒定红在步骤 1，
+ * 而它给出的修法（去远端跑 pnpm install）做完了照样红 —— 这类判据比没有判据更糟
+ * （AGENTS §7 元规则 2）。本机反证：`apps/mobile/node_modules` 在、
+ * `apps/mobile/android/node_modules` 不在，而 Mac 的 APK 打得出来。
+ *
+ * 判法不靠"这路径存不存在"（CI 上是干净检出，没有 node_modules ⇒ 会假红），
+ * 靠**推导**：路径去掉 `node_modules` 之后的那一截，必须匹配工作区 packages 的某条 glob。
+ */
+function checkRemotePreflightPaths(baseRoot) {
+  const out = [];
+  let router = '';
+  try {
+    router = readFileSync(join(baseRoot, 'scripts/run-gradle.mjs'), 'utf8');
+  } catch {
+    return ['G7 读不到 scripts/run-gradle.mjs —— 远程前置路径这条判据无法求值。'];
+  }
+  let patterns = [];
+  try {
+    const ws = readFileSync(join(baseRoot, 'pnpm-workspace.yaml'), 'utf8');
+    const block = /packages:\n([\s\S]*?)(\n\S|\n*$)/.exec(ws);
+    if (block) {
+      patterns = [...block[1].matchAll(/^\s*-\s*["']?([^"'\n]+)["']?\s*$/gm)].map((m) => m[1].trim());
+    }
+  } catch {
+    /* 下面按"读不到"处理 */
+  }
+  if (patterns.length === 0) {
+    return ['G7 读不到 pnpm-workspace.yaml 的 packages 清单 —— 这条判据无法求值，不要当它成立。'];
+  }
+  const toRe = (glob) => new RegExp(`^${glob.split('/').map((seg) => (seg === '*' ? '[^/]+' : seg.replace(/[.+^${}()|[\]\\]/g, '\\$&'))).join('/')}$`);
+  const matchers = patterns.map(toRe);
+
+  // 解析远端常量：`const REMOTE_ANDROID_WIN = `${REMOTE_ROOT}\\apps\\mobile\\android`;`
+  const consts = { REMOTE_ROOT: '' };
+  for (const m of router.matchAll(/const\s+([A-Z][A-Z0-9_]*)\s*=\s*`\$\{REMOTE_ROOT\}([^`]*)`/g)) {
+    consts[m[1]] = m[2].replace(/\\\\/g, '/').replace(/\\/g, '/').replace(/^\/+/, '');
+  }
+
+  // 扫 preCmd 里的 Test-Path 实参：只挑以 node_modules 结尾的那几条（其它探测项不归这条判）
+  const found = [...router.matchAll(/Test-Path\s+'\$\{([A-Z][A-Z0-9_]*)\}([^']*?)node_modules'/g)];
+  if (found.length === 0) {
+    out.push('G7 远程前置探测里读不到任何 `${REMOTE_*}\\…\\node_modules` 形状 —— 依赖前置那一档可能被整段摘掉了。');
+    return out;
+  }
+  for (const f of found) {
+    const base = consts[f[1]];
+    if (base === undefined) {
+      out.push(`G7 探测路径用了没解析出来的远端常量 \${${f[1]}} —— 这条判据无法判断它指向哪，不算成立。`);
+      continue;
+    }
+    const rel = `${base}/${f[2].replace(/\\\\/g, '/').replace(/\\/g, '/').replace(/\/+$/, '')}`.replace(/^\/+/, '');
+    if (!matchers.some((re) => re.test(rel))) {
+      out.push(
+        `G7 远程前置探的 ${rel}/node_modules **不是工作区包目录**（pnpm-workspace 的 packages = ${patterns.join(', ')}）—— ` +
+          `pnpm install 永远不会在那儿建 node_modules ⇒ 这是一条永不开的门：远程构建会恒定红在步骤 1，` +
+          `而它给的修法执行完也还是红。本机反证：Mac 上没有该目录而 APK 打得出来。`,
+      );
+    } else {
+      readings.push(`G7 远程前置路径 ${rel}/node_modules 由工作区包 ${rel} 推导成立`);
+    }
+  }
+  return out;
+}
+
+/* ── 自检：逐臂证明每条判据都会红（臂 0 是阳性对照，臂 7/8 是豁免的正反两腿）── */
 
 /**
  * 臂的设计原则（AGENTS §7 元规则 2：不能失败的判据没有价值）：
@@ -379,6 +494,7 @@ function selfTest() {
     const rootPkg = readFileSync(join(DEFAULT_ROOT, 'package.json'), 'utf8');
     const baselineA = readFileSync(join(DEFAULT_ROOT, 'scripts/verify-mobile-aed.sh'), 'utf8');
     const baselineB = readFileSync(join(DEFAULT_ROOT, 'scripts/verify-android-vault-storage.sh'), 'utf8');
+    const wsYaml = readFileSync(join(DEFAULT_ROOT, 'pnpm-workspace.yaml'), 'utf8');
 
     const seed = (tweaks = {}) => {
       rmSync(dir, { recursive: true, force: true });
@@ -390,11 +506,12 @@ function selfTest() {
       write('scripts/verify-android-vault-storage.sh', tweaks.baselineB ?? baselineB);
       write('apps/mobile/package.json', tweaks.mobilePkg ?? mobilePkg);
       write('package.json', tweaks.rootPkg ?? rootPkg);
+      write('pnpm-workspace.yaml', tweaks.wsYaml ?? wsYaml);
     };
 
     /* 臂 0：阳性对照 —— 干净夹具必须 0 红（否则整套判据是恒红装饰） */
     seed();
-    let msgs = [...checkGradlewSites(dir), ...checkArtifactPathReconcile(dir), ...checkFunnel(dir), ...checkRouterInvariants(dir)];
+    let msgs = [...checkGradlewSites(dir), ...checkArtifactPathReconcile(dir), ...checkFunnel(dir), ...checkRouterInvariants(dir), ...checkRemotePreflightPaths(dir)];
     if (msgs.length === 0) console.log('   ✅ 臂 0 阳性对照：干净夹具 0 红');
     else {
       console.log(`   🔴 臂 0 坏了：干净夹具报了 ${msgs.length} 条\n      ${msgs.join('\n      ').slice(0, 600)}`);
@@ -468,11 +585,58 @@ function selfTest() {
       console.log(`   🔴 臂 6 存活：复制实现只报了 ${countRed(msgs, 'G6 ')} 条 G6`);
       fail = 1;
     }
+    /* 臂 7：门禁同类文件里**只描述**命令 ⇒ 必须不红（正向：豁免不是靠猜，是被量出来的）
+     *  这一臂的存在理由：并行会话新增的 scripts/check-android-build-host.mjs 真的
+     *  因为自己的 needle 被本门禁报了 4 条红 —— 那是**扫描器的描述文本**，不是构建入口。*/
+    seed();
+    write('scripts/check-some-other-gate.mjs', "const BASELINE = [{ needle: 'cd android && ./gradlew assembleDebug' }];\n");
+    msgs = checkGradlewSites(dir);
+    if (countRed(msgs, 'G1 ') === 0) console.log('   ✅ 臂 7 正照：门禁文件里"只描述"的 needle 不判红（豁免生效）');
+    else {
+      console.log(`   🔴 臂 7 坏了：描述性的 needle 被判成红（${countRed(msgs, 'G1 ')} 条）—— 豁免没生效`);
+      fail = 1;
+    }
+
+    /* 臂 8：同一类文件里**真的把 gradlew 交给自己 spawn** ⇒ 必须红（豁免不能变成通行证） */
+    write('scripts/check-some-other-gate.mjs', "import { spawnSync } from 'node:child_process';\nspawnSync('gradlew.bat', ['assembleRelease']);\n");
+    msgs = checkGradlewSites(dir);
+    if (countRed(msgs, 'G1 ') === 1) console.log('   ✅ 臂 8 转红：门禁文件里真执行 gradlew 的那一行照红（豁免带反向判据）');
+    else {
+      console.log(`   🔴 臂 8 存活：门禁文件里的真实 spawn 只报了 ${countRed(msgs, 'G1 ')} 条（应当恰好 1）`);
+      fail = 1;
+    }
+
+    /* 臂 9：把远程前置路径改回"非工作区包目录"那一枚 ⇒ G7 恰好 1 条。
+     * 这一臂就是**真事故的形状**：第一版步骤 1 探的正是 `apps\mobile\android\node_modules`，
+     * 而 pnpm-workspace 的 packages 是 packages/* + apps/* + server，里面**没有**它 ⇒
+     * `pnpm install` 永远不会在那儿建目录，远程构建会**恒定**红在步骤 1，而它给出的修法
+     * 执行完仍然红。这是 AGENTS §7 元规则 2 说的"一条永不开的门比没有判据更糟"。 */
+    seed();
+    const badRouter = router.replace(
+      '${REMOTE_ROOT}\\\\apps\\\\mobile\\\\node_modules',
+      '${REMOTE_ROOT}\\\\apps\\\\mobile\\\\android\\\\node_modules',
+    );
+    if (badRouter === router) {
+      console.log('   🔴 臂 9 没施上：run-gradle.mjs 里读不到 `${REMOTE_ROOT}\apps\mobile\node_modules` 那一串 —— 前置形状变了，G7 无从求值');
+      fail = 1;
+    } else {
+      write('scripts/run-gradle.mjs', badRouter);
+      msgs = checkRemotePreflightPaths(dir);
+      if (countRed(msgs, 'G7 ') === 1) console.log('   ✅ 臂 9 转红：非工作区包的 node_modules 前置被 G7 抓到（恰好 1 条，永不开的门）');
+      else {
+        console.log(`   🔴 臂 9 存活：前置换成非工作区包目录后 G7 报了 ${countRed(msgs, 'G7 ')} 条（应当恰好 1）`);
+        fail = 1;
+      }
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  console.log(fail === 0 ? '自检：七臂（臂 0 = 阳性对照）全部按预期转红/转绿' : '自检有臂存活 —— 那条判据等于没有');
+  console.log(
+    fail === 0
+      ? '自检：逐臂（臂 0 = 阳性对照）全部按预期转红/转绿 —— 臂数见上面逐条打印，别抄进文档'
+      : '自检有臂存活 —— 那条判据等于没有',
+  );
   return fail;
 }
 
@@ -490,6 +654,7 @@ for (const f of [
   ...checkArtifactPathReconcile(root),
   ...checkFunnel(root),
   ...checkRouterInvariants(root),
+  ...checkRemotePreflightPaths(root),
 ]) {
   failures.push(f);
 }
