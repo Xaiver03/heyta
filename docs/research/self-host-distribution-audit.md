@@ -6312,3 +6312,51 @@ main 树：输入脚本=46 needle=238 缺失=0 插值needle=22 词条中文值�
 它**不挂 scripts 键、不进链** —— 它吃的是"另一棵工作树的磁盘状态"，挂进链就等于让 `pnpm check`
 依赖别人工作树的未提交内容（那不再是可重跑的判据，而是当前状态的照片）。
 今天跑出来的就是上面那三行：摘段四个方向全 0、新增 6 段里 4 段实现未跟踪。
+
+### 8.106 G-51 的五步里前三步落地：阻塞集降到 2 枚之后，词条表第一次是干净的（2026-10-04 17:1x）
+
+§8.57 的 v2 补丁（把整条安装承诺从 `site.platforms.web.body` 摘掉）备好文句之后一直压着，
+原因是"两份 i18n 词条表在主检出脏着"。这一节先记一件事：**那个前提今天变了**——
+现量主检出 `packages/i18n/src/locales/zh-CN.ts` 与 `en.ts` 都是干净的（`git status --porcelain -- …` 空），
+阻塞集只剩 `.gitignore` 与 `package.json` 两枚。⇒ 五步里的 ①②③ 第一次可做。
+
+动手前先量两件"删一条会被吞掉吗"与"别人正改这一行吗"：
+
+- **删一条会不会被并集复活**：`grep -n "i18n|词条|zh-CN|en-US" research/tools/selfhost-merge-carrier.mjs`
+  只回一条注释（`check:selfhost-entry-command` 顺带证明"没把两份词条抄件并掉"），
+  **没有** i18n 那族的自动解法实现 ⇒ 这两个文件走普通 git merge，而 main 没有碰这一行 ⇒ 删除干净生效。
+  （这句是查"载体对该文件做了什么"得到的，不是从"并集一般怎样"推的。）
+- **是不是别人正在改**：逐字取回四行 —— main HEAD 的 `zh:3282 / en:3053` 与主检出工作树的 `zh:3310 / en:3081`
+  **全是旧句**（`可安装、可离线用…` / `Installable, works offline…`）⇒ 不是撞车面，只是我这条分支落后。
+
+落的字面 = §8.57 里那份 v2（**照抄定稿，不另写措辞**）：
+
+```
+zh  'site.platforms.web.body': 完整产品，不是演示。断网也能照常记，恢复后自动补传；数据就存在你自己的浏览器里。
+en  'site.platforms.web.body': The full product, not a demo. It keeps working when you are offline and
+                               syncs when the connection returns — your data lives in your own browser.
+```
+
+#### 跑到的门禁（当天）
+
+`@heyta/i18n build` rc=0 ｜ `check:entries` rc=0（入口文件与注册表一致 75 份 ⇒ **这句不在提交物入口页里**，
+`grep -rln 可安装、可离线用` 只回 `apps/landing/dist`、`apps/web/dist` 两枚**被忽略的构建产物**）｜
+`check:docs-voice` rc=0（site.* 1018 条、禁词表零命中）｜ `check:ui-language` rc=0（zh-CN 2826 / en 2826，中英同步）｜
+`check:claims` / `check:legal-copy` / `check:reachability` 各 rc=0。
+
+#### 🔴 两件没做的事，以及为什么没做
+
+1. **两条包测试没跑**：`pnpm --filter @heyta/i18n test` 与 `--filter @heyta/landing test` 都被
+   全局内存闸门拒了 —— `已有测试在跑（pid=74180，锁 /tmp/tfa-test.lock；它是 scratch-owner-transfer/
+   rbac-local-admission 那趟 node --test）`。**没有**用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕别人的护栏
+   （拒绝是环境读数，不是产品结论）。
+   替代取证（能免费拿的那一半）：不限扩展名 grep 全部测试目录（`apps/landing/tests`、`apps/web/tests`、
+   `packages/i18n/tests`、`e2e/tests`、`e2e/live-site`）⇒ **没有任何用例钉着这句**；
+   该键唯一消费者是 `apps/landing/src/site/content.ts:131` 的 `bodyKeys` ⇒ 改值的爆炸半径就是那一张卡。
+2. **界面级证据没做，也就不声称**：§6.2 规定一要有真浏览器截图且人看过才算，
+   而落地页要 build + preview 起服务，本机负载 19.6、闸门在别人手里。
+   ⇒ 这一档与 live-site 判据（步骤④）和落地页重发（步骤⑤）排在同一趟，
+   今天这句只到"源码与词条表已改成不承诺安装"，**不到**"用户看到的页面已经不含那句话"。
+
+按 §8.20 的纪律，那条"`site.platforms.web.body` 不含「可安装 / Installable」"的 live-site 判据
+**现在不落**：线上站点仍是旧句，提前挂上去只会红在"还没发布"这件事上，而不是红在代码上。

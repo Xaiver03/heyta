@@ -3044,7 +3044,7 @@ export const zhCN = {
   'site.platforms.legend.partial': '能跑起来，但还缺发布所必需的东西',
   'site.platforms.legend.blocked': '有明确的外部依赖没解决',
   'site.platforms.web.name': 'Web',
-  'site.platforms.web.body': '完整产品，不是演示。可安装、可离线用，数据就存在你的浏览器里。',
+  'site.platforms.web.body': '完整产品，不是演示。断网也能照常记，恢复后自动补传；数据就存在你自己的浏览器里。',
   'site.platforms.android.name': 'Android',
   'site.platforms.android.body': '真机可用：建任务、改期、优先级、清单、标签、重复、专注、冲突解决、回收站都能用。桌面小组件与发布签名还在路上。',
   'site.platforms.ios.name': 'iOS',
