@@ -2319,6 +2319,24 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     两边都是 1 分钟值且都 >12，所以不构成"哪个探针坏了"，但**别把两个时刻的数当同刻比**。
     🔴 这条闸门对我那枚未提交的 `scripts/verify-mobile-notes.sh` **不算阻塞**（它只扫 `packages/ apps/ server/`），
     所以五枚补丁住在载体里不影响窗口判定。
+  - 🔴 **10:39 ③ 服务端那一侧的归属要写成"进程"而不是"文件"，这条已经现量完并把结论落到 ③ 的读法上**：
+    `:3100` 的监听者是 **pid `26407`**（`node dist/src/index.js`，cwd = 主检出的 `server/`，父进程 `launchd`），
+    起跑时刻 **06:02:44**；而 `server/src` 在那之后有两笔提交（`31031b23`、`fcff5bbb`），
+    `server/dist/src/index.js` 的 mtime 是 **10:34:49**。⇒ **文件是新的，进程不是**：
+    我链上那条"比自身源码旧的 .ts = 0"量的是**磁盘新鲜度**，它看不见"重建过但没重启"，
+    于是会把"跑着旧代码的进程"印成"当前构建"（与 §7 第 164 那族同形：读数与结论隔了一层）。
+    复核办法（下次直接跑，别抄我这句）：
+    `lsof -nP -ti tcp:3100 -sTCP:LISTEN` 取 pid → `ps -o lstart= -p <pid>` 与 `stat -f %Sm server/dist/src/index.js` 比先后。
+    ✅ **这两笔对 ③ 是否构成失效：逐笔 diff 量过，不构成**——
+    `31031b23` 在 `snapshot-generation.service.ts` 上只把 `REPLAY_OPERATION_SELECT` 从 `const` 改成
+    `export const` 并加注释（该文件 +12/-1，运行期形状未变），改的是 `server/scripts/recover-user.ts` 那条运维路径；
+    `fcff5bbb` 在 `server/` 下只动了 `src/legal.generated.ts`（生成物，法务文案），也不在 sync 路上。
+    所以 ③ 用到的那三段（上传响应搭车、下载 delta、operations 落库）由这个进程做的仍然成立，
+    但**台账里要按"服务端进程=06:02 那份构建"来写**，不写"服务端=main 当前构建"。
+    ⚠️ 顺带一条否证：我原想"让 ③ 打到自己那棵载体的服务端上"以躲开这个归属问题 ——
+    现量 `heyta-wt-reinstall/server/.env` **不存在**（主检出那份有 15 个键），载体起不来自己的服务端；
+    而把 `:3100` 那个进程重启掉会打断此刻正在跑的并行走查（设备 `com.heyta` pid 刚 12027→14944），
+    按 §8.9 与"只对自己创建的对象动手"，两者都不做，改为把归属写准。
 - ✅ **05:3x ⑤ 复核**：`B41/B42/B45` 三行仍在 §7.28 那张「完成条件逐条的现量与差什么」表里（`:1220`/`:1221`，状态 🟡，
     各带自己的现量命令），本夜落笔的六笔只改了 `scripts/verify-mobile-notes.sh` 的第 12 步与
     `apps/desktop-macos/scripts/package-app.sh` 的公证段，加上四份文档，
