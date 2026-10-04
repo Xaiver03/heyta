@@ -3765,6 +3765,13 @@ W0b ─> 随时可做（台账那半要等文件干净）
     并让同一趟里有一个必然非 0 的对照**（这次是门禁自己的读数行）。修法就一个字符集：`"${r}:${P}"` 加花括号。
   - ✅ 顺带把两条负载无关的读数垫上（18:37 @ `de93cd2a`）：`pnpm --filter @heyta/mobile typecheck` **rc=0**（`tsc --noEmit` 全过，含 `afterNextFrame` 那条注入调度器的签名），
     `pnpm run check:legal-permissions` 的这条 rc=1/7 红也一并 dated。
+  - 🔧 **18:41 又把队列重排了一次，方向和 ㊢ 那次相反**：原队列是 `MAC → FULL（68 段）→ T2（Android 出图补跑）`，
+    等于**把 Goal ② 那一格排在一个要占整段长窗口的活后面**。现在是 `MAC → T2b（Android 补跑）→ FULL2（68 段）`。
+    动手现场记下来，因为"改跑着的队列"必须是纯等待状态：旧 `chain-FULL.sh`（pid 79857）与旧 `chain-T2.sh`（pid 453）
+    都停在"等 MAC 哨兵"的 `sleep 30` 循环里，`pgrep -fl 'reinstall-all|verify-mobile'` 零命中、工作树 `git status` 为空 ⇒ 才动的手。
+    ⚠️ 重排**没有**改任何判据或阈值：新脚本是从原脚本改出来的，`diff /tmp/chain-FULL.sh /tmp/chain-FULL2.sh` 现量只有 3 处
+    （`LOG` 路径、等的哨兵清单、那句标签），`diff /tmp/chain-T2.sh /tmp/chain-T2b.sh` 只有 4 处（多一行理由注释、`LOG`、
+    哨兵清单、`RC_T2` 改名 `RC_T2b`）；**68 段自校验、`timeout 1500`、负载门档、`HEYTA_LOAD_GATE_WAIT=3600` 一行都没动**。
 
 
   - 🔴 **改名这一刀有代价，而且代价量出来了**：`check-shell-surfaces.mjs` 的 macOS "产物"栏默认读的就是
