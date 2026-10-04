@@ -6983,3 +6983,69 @@ pnpm --config.verify-deps-before-run=false --filter @heyta/widget-core exec vite
 📌 这一节值得留在这儿的原因不是"数字从 1 变成 0"，而是：**一处只影响"输出多少行"的缺陷，
 把合流的一整步挂成了"交给人"**。判据少打一行红，下游装置就把"读不到"翻译成"前提不成立"——
 链条上每一环都诚实，合起来仍然会让人多等一个批次。
+
+## 8.106 §C1b-Q8 那三行"未核实 · 未附来源"全部核回厂商页面 —— 顺带照出**我自己的探针错了一次**（2026-10-04 23:2x 现量，载体续 `dce3bc70`）
+
+这是目标第①条（"带日期+出处+未核实标记"）里**最后一处挂着的外部证据缺口**（§8.100 之前逐条数过）。
+三行不是靠"再找一遍"关掉的，是靠**换取法**关掉的。
+
+| 行 | 改前 | 改后（一手） | 逐字命中 |
+|---|---|---|---|
+| Things | 「未核实 · 未附来源」，且**产品名写错**（记作 Things 4） | [`culturedcode.com/things/features`](https://culturedcode.com/things/features/) 整句 "…but those fields are neatly tucked away in the corner until you need them." | 剥标签文本 **1** |
+| Todoist | 「未核实 · 未附来源」：原记"同一 help 页"却没落 URL | [`…use-the-task-view-to-manage-tasks-in-todoist-eDeRDO0C`](https://www.todoist.com/help/todoist/features/use-the-task-view-to-manage-tasks-in-todoist-eDeRDO0C)（页面自标更新于 2026-08-28）"On the right-hand sidebar, you can:" 组下三条 `Click …` 各 **1**；另加同立场第二枚 [`inspiration/todoist-new-task-view`](https://www.todoist.com/inspiration/todoist-new-task-view) 的 "attributes are compact but visible" | 各 **1** |
+| Outlook | 「未核实 · 未附来源」：断言"那是客户端界面串，不是文档句子" | [`support.microsoft.com …reading-pane-to-preview-messages-in-outlook`](https://support.microsoft.com/en-us/outlook/use-and-configure-the-reading-pane-to-preview-messages-in-outlook) 整句含 "you will see 'Select an item to Read'" | 原始字节 **1** |
+
+🔴 **两处错误，都留在文档本体而不是悄悄改掉**：
+
+1. **版本号**：`culturedcode.com/things/` 与 `/things/features/` 同一趟 `curl` 里 `Things 4` 命中 **0 / 0**、`Things 3` 命中 **6 / 7**。
+   那句话是真的，但它说的是 Things 3。活主张两处已改名（§C1b-Q8 那一行 + §C1b-Q1 表第 4 行）；
+   历史记述（本节、§8.100 那格、上面第 1841 行那句当时的诊断）保留原字样，回潮检查写成**语义判据**、不落命中数（见 §C2 第 30 条）。
+2. **我的探针先错过一次**：`grep -F "Click Date"` 打在**原始 HTML 字节**上得 **0**，于是差点把"这句话不在页面上"当成结论；
+   实际页面写的是 `Click <b>Date</b> to add…`（行内标记把词切开），**剥掉标签再打命中 1**。
+   ⇒ 可迁移：**对网页判"这句不存在"之前，必须在去标签文本上打过一次**；原始字节 0 命中不构成缺席证据。
+   同一趟还有一次反例支撑：那句 "For example, in case you don't need a reminder or label, attributes are compact but visible."
+   **原始字节 0 / 剥标签 1**，而短句 `compact but visible` 原始字节 1 —— 一个句子两种字形，坑就在"整句 vs 片段"的边界上。
+   这与 §7 第 171 条（Hermes 字节码里的中文是 UTF-16LE，`grep` 恒 0）同族。
+
+**承重的变化（不是"补了三个链接"这么简单）**：`affordance 常驻` 由单点依据变成两枚一手（Apple + Todoist 那句同立场先例）；
+`空态只给一行文案` 里 Outlook 那枚**射程收窄** —— 厂商原文只覆盖"关掉 always preview + 启动后首次进文件夹"那一格，
+且原文把位置写作 **navigation pane**（不是 reading pane），所以"那是界面串不是文档句子"这句旧断言被否证，
+而该档的主要依据回到 Carbon。⇒ 推荐本身不动，但**"即使被推翻也不动"那句自保措辞被换成按实际读数的承重表**，
+这一换本身值得留档：它当时挡住的是不确定性，没有消掉它。
+
+**门禁读数（改前 = HEAD 干净检出 `dce3bc70`，改后 = 本批）**：
+
+| 门禁 | 改前 | 改后 |
+|---|---|---|
+| `check-detail-pane-c1-coverage` | RC=0，Q8 行 `日期=2 URL=4 未核实=5` | RC=0，**同一行 `日期=3 URL=10 未核实=3`**（残留那 3 处是本节引述旧标记的历史句） |
+| `check-detail-pane-status-table` | RC=0（十项） | RC=0（十项）。腿10 计数**改前 41 块／149 条目（本档）+ 8 块／55 条目（调研档）→ 改后 42／151 + 8／56**，增量逐条对得上：本档 +1 块 +2 条目 = 上面那个"两处错误"的有序列表，调研档 +1 条目 = §C2 第 30 条 |
+| `check-docs-voice` / `check-detail-pane-evidence-refs` | RC=0 / RC=0 | RC=0 / RC=0 |
+| `research/tools/docs-link-check.mjs` | 🔴 **RC=1，死链 1 枚** | 🔴 **RC=1，同一枚，零新增** |
+| 两道余量为 0 的棘轮（§1 第②道） | — | `check:l4` RC=0（mobile **90 处恰在基线 90**、web 98 ≤ 104）｜`check:row-single-source` RC=0（`ht-*` 族 **28 个恰在基线 28**）⇒ 本批纯文档，基线一字未动，也没有借机调高 |
+
+⚠️ **这一趟我自己两次把"探针错"当成"门禁红"**：`node scripts/docs-link-check.mjs` 与 `node scripts/check-l4.mjs` 都是**路径写错**（真名分别是
+`research/tools/docs-link-check.mjs`、`scripts/check-l4-no-style.mjs`），`MODULE_NOT_FOUND` 的退出码同样是 **1**，
+和一道真红在退出码上**完全不可区分**。两次都是靠**读日志头 12 行**才认出那不是产品读数。
+⇒ 可迁移：批量跑门禁时，`RC=1` 之后**先分辨它是不是"没跑成"**（§8.100/§8.102 立的三档制正是为这个），
+别把探针的失败记进被测对象的账上 —— 今天若照退出码记账，§8.106 就会多写两枚假红。
+
+⚠️ 那枚死链**不是本批引入的，也不归本批修**：`PROGRESS.md:1362 → docs/research/aed-implementation-evidence.md`，
+被引文件**只在 `main` 存在**（`git cat-file -e main:…` = YES，`HEAD:` = NO），它由 `c25960cb`（10-03 23:58，另一条线的 AED 取证链）带进 main，
+而 `git merge-base --is-ancestor c25960cb HEAD` = **NO**；引用它的那一行由 `96f3293d`（10-03 21:13）带进本分支的 PROGRESS.md。
+⇒ 这是**分支与 main 的不对称**，合流落地后自动消失。**不代改**（改法只有两种：删别人那一行，或把别人那条线的产物文件抄进本分支，都不该由本批做）。
+这也说明：**`check:docs` 在本分支当前不是绿的**，引用"全量门禁绿"时必须带载体。
+
+**现量命令**（关掉这一节用的就是这条；HTML 落在临时目录，不进仓库）：
+
+```bash
+curl -sL -o /tmp/t.html https://culturedcode.com/things/features/
+python3 -c 'import re,html,sys
+t=open(sys.argv[1],encoding="utf-8",errors="replace").read()
+t=re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>","",t)
+t=re.sub(r"<[^>]+>"," ",t); t=html.unescape(t); t=re.sub(r"\s+"," ",t)
+print(t.count("Things 4"), t.count("Things 3"), t.count("until you need"))' /tmp/t.html
+```
+
+🔴 **仍未闭合的两格**（不是本节做完了的意思）：Things 那句是**营销级**、Todoist 那两句是**自述级**，
+两边都**零界面图证** —— "空字段在渲染树里到底在不在"这个问题厂商没答。已登记为 §C2 第 30 条，
+补法与第 13、28 条是同一次实测（各家一个登录态 + 一张空任务截图），⇒ **要人**。
