@@ -165,8 +165,14 @@ export class OpLogEngine {
           await this.options.store.hasIncompleteHistory()) {
         throw new Error('Sync checkpoint requires completely materialized history');
       }
-      if ((await this.options.store.findPendingUpload()).length > 0 ||
-          (await this.options.store.findPendingApply()).length > 0) {
+      // 🔴 队列判定只需要"空不空"，所以走索引计数。
+      // 之前这里是 `findPendingUpload().length > 0` —— 把整条待上传队列
+      // （含密文正文）物化进内存，只为了回答一个 `> 0`。
+      // 检查点会在每次同步后尝试，于是这个成本是**周期性**的。
+      // ⚠️ 下面那处 `getAllOps()` **不是**同一件事：那是维护扫描，
+      // 它真的要逐条看 `source` / `uploadStatus`，不能换成计数。
+      if ((await this.options.store.countPendingUpload()) > 0 ||
+          (await this.options.store.countPendingApply()) > 0) {
         throw new Error('Sync checkpoint requires drained upload and apply queues');
       }
       // An older reducer may retain future entities in the log without knowing
@@ -223,6 +229,19 @@ export class OpLogEngine {
   async getPendingUpload(): Promise<Operation<string>[]> {
     const rows = await this.options.store.findPendingUpload();
     return rows.filter((r) => r.source === 'local').map((r) => r.op);
+  }
+
+  /**
+   * 待上传队列的**条数**，不物化任何 op。
+   *
+   * 🔴 界面上那个「待上传 N 项」徽标以前调的是 `getPendingUpload().length` ——
+   * 每次刷新都把整条队列（含密文正文）读进内存，只为了显示一个数字。
+   * 计数与上面那个列表的等价性前提是「`uploadStatus==='pending'` 只可能出现在
+   * `source==='local'` 的行上」，它由 `@heyta/storage` 的契约测试钉住，
+   * 不是靠这句注释自称成立。
+   */
+  async countPendingUpload(): Promise<number> {
+    return this.options.store.countPendingUpload();
   }
 
   /**
@@ -288,13 +307,25 @@ export class OpLogEngine {
   /**
    * 读**完整**本地 op-log（只读，不改任何状态）。
    *
-   * 备份还原的「目标必须真的是空库」判定要用它
-   * （`app-host` 的 `restoreIntoEmptyTarget` 经宿主的 `ImportTarget.readOpLog`
-   * 到这里）—— 写之前必须知道目标里已有什么，而 pending 只是它的一个子集。
+   * 备份**导出**要用它（`app-host` 的 `export-dump`）。
+   * ⚠️ 还原的「目标必须真的是空库」判定**不再**用它 —— 那个只需要一个数，
+   * 见 {@link countStoredOps}。留在这里是因为导出真的要把每一条都带走。
    */
   async getAllOps(): Promise<Operation<string>[]> {
     const all = await this.options.store.getAllOps();
     return all.map((r) => r.op);
+  }
+
+  /**
+   * 本地日志的**条数**（热区 + 归档），不物化任何一行。
+   *
+   * 🔴 存在的理由：空库守卫以前是 `getAllOps().length > 0` —— 为了回答
+   * "这台设备有没有数据"，把整库含密文正文读进内存。在备份还原那个场景里，
+   * 用户点下"还原"的那一次会把**他正要保护的那份数据**整个搬一遍。
+   * 计数必须**含归档**，否则有归档历史的设备会被判成空库（见接口上的注释）。
+   */
+  async countStoredOps(): Promise<number> {
+    return this.options.store.countAllOps();
   }
 
   /** 取某实体的全部本地 op（冲突解决要用它比对时间戳）。 */

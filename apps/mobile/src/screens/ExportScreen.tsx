@@ -268,10 +268,9 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     setRestoreBusy(true);
     setRestoreError(undefined);
     void restoreIntoEmptyTarget(
-      {
-        engine: host.engine,
-        readOpLog: async () => host.engine.getAllOps(),
-      },
+      // 🔴 只交引擎：空库守卫走 `engine.countStoredOps()`（索引计数），
+      // 不再为了数一下就把整库连密文正文搬进内存。
+      { engine: host.engine },
       restorePreview,
     )
       .then((result) => {

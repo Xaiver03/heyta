@@ -593,5 +593,114 @@ export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreCont
         expect(await store.getLastServerSeq()).toBe(0);
       });
     });
+
+    /**
+     * 计数 / 存在性方法（P1-10）
+     * ==========================
+     *
+     * 这三条各挡一种坏法，缺一条就会有一种"看起来做完了"的假实现过关：
+     *
+     * ① **数得对不对。** 徽标上那个数字是这条路径的全部产出，数错了界面就开始
+     *    说谎，而没有任何一层会报错。同时它证明计数与物化方法**逐字同数** ——
+     *    等价性前提（`uploadStatus==='pending'` 只可能是本地写入）也在这里量出来：
+     *    谁哪天让远端 op 也进 pending，`countPendingUpload()` 就会开始多报，
+     *    而引擎侧那个 `filter(source === 'local')` 会把它遮住。
+     * ② **归档必须算进总数。** 只数热区的计数会让「还原只允许空库」那条守卫
+     *    在一台**有归档历史**的设备上放行 —— 于是还原把数据写进一个其实不空的库。
+     * ③ **不许把行读回来。** 没有这一条，"加一个 count 方法、实现成
+     *    `getAllFromIndex(...).length`" 也算"接口上有计数"，而那**正是** P1-10
+     *    要修的东西。⚠️ 这一腿量的是**适配器层的物化读**（`getAll` /
+     *    `getAllFromIndex` 被调了几次、返回几行）；SQLite 的 `countFromIndex`
+     *    内部仍然取回命中行，那是另一条独立的债（审计文档 P1-11），不在这里遮。
+     */
+    it('🔴 计数与物化同数、含归档、且计数不读回行（P1-10）', async () => {
+      await withStore(async (store, db) => {
+        let materializedRows = 0;
+        const originalGetAll = db.getAll.bind(db);
+        const originalGetAllFromIndex = db.getAllFromIndex.bind(db);
+        db.getAll = (async (...args: Parameters<DbAdapter['getAll']>) => {
+          const rows = await originalGetAll(...args);
+          materializedRows += rows.length;
+          return rows;
+        }) as DbAdapter['getAll'];
+        db.getAllFromIndex = (async (...args: Parameters<DbAdapter['getAllFromIndex']>) => {
+          const rows = await originalGetAllFromIndex(...args);
+          materializedRows += rows.length;
+          return rows;
+        }) as DbAdapter['getAllFromIndex'];
+
+        // 空库：三个计数都必须是 0（守卫的默认分支就靠这个）。
+        expect(await store.countAllOps()).toBe(0);
+        expect(await store.countPendingUpload()).toBe(0);
+        expect(await store.countPendingApply()).toBe(0);
+
+        const local = [makeOp(), makeOp(), makeOp()];
+        await store.appendLocal(local);
+        await store.appendBatchSkipDuplicates([makeOp({ entityId: 'task-remote' })], 'remote', {
+          pendingApply: true,
+        });
+
+        // ① 计数 == 物化方法同数，而且是设计中的那个数
+        expect(await store.countPendingUpload()).toBe((await store.findPendingUpload()).length);
+        expect(await store.countPendingUpload()).toBe(3);
+        expect(await store.countPendingApply()).toBe((await store.findPendingApply()).length);
+        expect(await store.countPendingApply()).toBe(1);
+        expect(await store.countAllOps()).toBe((await store.getAllOps()).length);
+        expect(await store.countAllOps()).toBe(4);
+
+        // ①' 等价性前提现量：pending 队列里不许出现非本地写入的行
+        for (const row of await store.findPendingUpload()) {
+          expect(row.source, 'pending 里出现了非 local 行 ⇒ countPendingUpload 会开始多报').toBe(
+            'local',
+          );
+        }
+
+        // ③ 计数期间一次物化读都不许发生（前面那些物化调用先把计数清零）
+        materializedRows = 0;
+        expect(await store.countPendingUpload()).toBe(3);
+        expect(await store.countPendingApply()).toBe(1);
+        expect(await store.countAllOps()).toBe(4);
+        expect(
+          materializedRows,
+          '计数被实现成"取回全部命中行再数"就还是 P1-10 的病灶',
+        ).toBe(0);
+        // 阳性对照：同一台探针下，物化方法必须**真的**被数到 ——
+        // 否则上面那条 0 是探针坏了，不是实现便宜。
+        materializedRows = 0;
+        await store.findPendingUpload();
+        expect(materializedRows, '探针读不到物化读 ⇒ 上面那条 0 不算证据').toBeGreaterThan(0);
+
+        // ② 归档之后：总数必须仍等于 getAllOps 的长度（含 ARCHIVE 里的行）。
+        // 夹具形状照本文件那条归档用例：`archiveKeepRecent` 默认 500，
+        // 所以 `archiveUpTo(509)` 的 cutoff 是 9 ⇒ seq 5..8 那四条"已上传且已应用"的
+        // 本地行会被移进归档，而前面 3 条待上传与 1 条待应用的留在热区。
+        const ops = Array.from({ length: 505 }, () => makeOp());
+        await store.appendLocal(ops);
+        await store.markUploaded(new Map(ops.map((op, i) => [op.id, i + 5])));
+        const base = {
+          formatVersion: 1 as const,
+          coveredSeq: 509,
+          state: { formatVersion: 1, buckets: {} },
+          clock: {},
+          appliedOpIds: [],
+        };
+        await store.writeCheckpoint!({ ...base, checksum: checkpointChecksum(base) });
+        const archived = await store.archiveUpTo(509);
+        expect(archived, '夹具没归档出任何东西 ⇒ 这一腿会空跑').toBeGreaterThan(0);
+
+        materializedRows = 0;
+        const counted = await store.countAllOps();
+        expect(materializedRows, '归档后的总数也不许靠读回行来数').toBe(0);
+        expect(counted).toBe((await store.getAllOps()).length);
+        // 🔴 这一条才是"归档必须算进总数"的牙：热区单独计数**必然**小于总数。
+        // 把 `countAllOps` 实现成只数 OPS，它当场转红。
+        const hotOnly = await db.count(STORES.OPS);
+        expect(
+          hotOnly,
+          `归档了 ${String(archived)} 条却数不出差额 ⇒ 总数没算 ARCHIVE`,
+        ).toBeLessThan(counted);
+        expect(counted - hotOnly).toBe(archived);
+      });
+    });
   });
 }

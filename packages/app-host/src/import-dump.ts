@@ -42,7 +42,7 @@
  *
  * ## 🔴 导入**绝不**清空或覆盖现有数据
  *
- * `restoreIntoEmptyTarget()` 在写任何东西**之前**先读目标 op-log：
+ * `restoreIntoEmptyTarget()` 在写任何东西**之前**先数目标 op-log（含归档）：
  * 只要里面**有任何一条 op**，就返回 `target-not-empty` 并**什么都不写**。
  * 所以"导入把用户数据清了"这条路径在代码里根本不存在 —— 不是靠界面拦，
  * 而是靠这里拦。界面还会再确认一次（见 `ImportPanel`），那是第二道。
@@ -116,17 +116,21 @@ export type RestoreExportResult =
 /**
  * 还原要落到的目标。
  *
- * `AppHost` **结构上**满足它（`engine` + `readOpLog`），所以宿主直接把 host 传进来；
- * `apps/web` 没有 AppHost 对象，就传一个 `{ engine, readOpLog }` 的薄适配。
- * 刻意收窄而不是要求完整 `AppHost`：还原只该看到"日志里有什么""写进去""状态是什么"。
+ * `AppHost` **结构上**满足它（`engine.countStoredOps`），所以宿主直接把 host 传进来；
+ * `apps/web` 没有 AppHost 对象，就传一个 `{ engine }` 的薄适配 —— 引擎自己就能数。
+ * 刻意收窄而不是要求完整 `AppHost`：还原只该看到"库里有多少条""写进去""状态是什么"。
+ *
+ * 🔴 以前这里要的是 `readOpLog()`（读**全库**）。空库守卫只需要一个 `> 0`，
+ * 却把用户正要保护的那份数据连密文正文一起搬进内存数一遍 —— 每次点"还原"付一次。
+ * 换成计数之后，接口上**没有**能把全库读回来的口子了，这条成本就不可能再被引进来。
  */
 export interface ImportTarget {
   engine: {
     importOperations(ops: readonly Operation<string>[]): Promise<{ imported: number; skipped: number }>;
     getState(): MaterializedState;
+    /** 全库条数（热区 + 归档），不物化任何一行。 */
+    countStoredOps(): Promise<number>;
   };
-  /** 读**完整**本地 op-log（判断目标是否为空，以及拒绝后回报条数）。 */
-  readOpLog(): Promise<Operation<string>[]>;
 }
 
 // ── 解析 ────────────────────────────────────────────────────
@@ -263,12 +267,12 @@ export async function restoreIntoEmptyTarget(
   document: ExportDocument,
 ): Promise<RestoreExportResult> {
   // 1. 目标必须真的是空库。**这一步在写任何东西之前。**
-  const existing = await target.readOpLog();
-  if (existing.length > 0) {
+  const existing = await target.engine.countStoredOps();
+  if (existing > 0) {
     return {
       ok: false,
       reason: 'target-not-empty',
-      detail: `本机已有 ${String(existing.length)} 条操作日志`,
+      detail: `本机已有 ${String(existing)} 条操作日志`,
     };
   }
 

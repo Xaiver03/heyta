@@ -137,6 +137,22 @@ export interface OpLogStore<
   /** 全量操作（用于导出、快照）。**必须分页**，不要一次拉全库。 */
   getAllOps(range?: DbKeyRange, limit?: number): Promise<StoredOperation<TOperation>[]>;
 
+  /**
+   * 全库条数（**热区 + 归档**），不物化任何一行。
+   *
+   * 🔴 为什么接口上必须有它：在此之前，"库里有多少条 / 库里有没有东西"
+   * 只能 `getAllOps().length` —— 把**含密文正文的全表**读进内存再数一下。
+   * 三个真实消费者都付这份钱：备份还原的空库守卫、同步检查点的前置判定、
+   * 以及界面上的待上传数。
+   *
+   * ⚠️ 必须**含归档**：归档的那些 op 仍然是这台设备的历史。只数热区会让
+   * 「还原只允许空库」这条守卫在一台有归档历史的设备上放行，
+   * 于是还原把数据写进一个**其实不空**的库。
+   *
+   * 与 {@link getAllOps} 的语义等价性由契约测试钉住（同一份夹具两条路必须同数）。
+   */
+  countAllOps(): Promise<number>;
+
   // ── 崩溃恢复 ─────────────────────────────────────────────
 
   /**
@@ -148,6 +164,14 @@ export interface OpLogStore<
   findPendingApply(): Promise<StoredOperation<TOperation>[]>;
 
   /**
+   * 「有没有已落盘未应用的 op」的**便宜版本**（条数，不物化行）。
+   *
+   * 检查点前置判定只需要一个 `> 0`，而它以前把整条队列（含密文正文）读进内存
+   * 再数。语义等价性由契约测试与 {@link findPendingApply} 对账。
+   */
+  countPendingApply(): Promise<number>;
+
+  /**
    * 待上传的本地 op（离线队列），按本地 seq 升序。
    *
    * ⚠️ 与 {@link findPendingApply} 是**两个不同的队列**，不要混用：
@@ -157,6 +181,18 @@ export interface OpLogStore<
    * 也可能是"已应用"但"待上传"（本地 op）。这就是为什么它们是两个字段。
    */
   findPendingUpload(): Promise<StoredOperation<TOperation>[]>;
+
+  /**
+   * 待上传队列的条数（不物化行）—— 界面上那个「待上传 N 项」徽标要用它。
+   *
+   * 🔴 它与 `engine.getPendingUpload().length` 的**等价性不是免费的**：
+   * 引擎那边会再 `filter(r => r.source === 'local')`。之所以可以直接数索引，
+   * 是因为 `uploadStatus === 'pending'` 只在**本地写入**那一处被赋值
+   * （`db-op-log-store.ts` 里 `source === 'local' ? 'pending' : 'uploaded'`）。
+   * 那条不变量由本包的契约测试钉住 —— 谁哪天让远端 op 也进 pending，
+   * 这个计数就会开始多报，而那正是"徽标说谎"的形状。
+   */
+  countPendingUpload(): Promise<number>;
 
   /** 标记 op 已上传，并回写服务端分配的 seq。返回更新条数。 */
   markUploaded(serverSeqsByOpId: ReadonlyMap<string, number>): Promise<number>;
