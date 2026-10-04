@@ -52,6 +52,10 @@ function pkgScript(pkg, key) {
 // 这一族不碰它们；哪天碰了，这里要一起加，否则第 27 条那个形状会原地复发。
 const BUILD_PKGS = ['packages/domain', 'packages/i18n', 'packages/ui', 'packages/app-host'];
 
+// 证据图守卫的快照落在带 pid 的一次性路径上：两个并行电池不会互相覆盖，
+// 而"读不到快照"必须是 exit 2（PROBE_BROKEN），不能读成"这趟没改写任何图"。
+const EVG = path.join(os.tmpdir(), `dp-evidence-${process.pid}.json`);
+
 const STEPS = [
   // 门禁：本单直接相关的两条在前（分层 + 选中态单一来源），再带上会串行触发的三道样式门。
   ['gate layering', '.', 'node scripts/check-layering.mjs'],  ['gate selection-single-source', '.', 'node scripts/check-selection-single-source.mjs'],
@@ -77,7 +81,12 @@ const STEPS = [
   ['build web vite', 'apps/web', './node_modules/.bin/vite build'],
   // e2e 这一族的类型检查：Playwright 走 esbuild 只转译不查类型，以前这一族没有类型载体。
   ['typecheck e2e family', 'e2e', '../apps/web/node_modules/.bin/tsc --noEmit -p tsconfig.detail-pane.json'],
+  // 证据图守卫包在 e2e 那一族**两侧**：跑之前记下每一枚的字节与"当时是不是已经脏着"，
+  // 跑之后只还原"这一趟改写的"那几枚（跑前就脏的一格不动）。工单 #40，判据臂台
+  // `research/tools/mutation-rigs/mutate-evidence-guard.mjs` 四臂 + 收尾零残留。
+  ['evidence snapshot', '.', `node scripts/verify-detail-pane-evidence-guard.mjs --snapshot ${EVG}`],
   ['e2e detail-pane family', 'e2e', './node_modules/.bin/playwright test --config playwright.detail-pane.config.ts'],
+  ['evidence reconcile', '.', `node scripts/verify-detail-pane-evidence-guard.mjs --reconcile ${EVG}`],
 ];
 
 const bad = [];
@@ -111,6 +120,20 @@ if (missingTest.length) {
   bad.push('self-check:missing-test');
 } else {
   console.log(`SELF_CHECK test_steps=${PACKAGES.length} 包全覆盖`);
+}
+
+// 预检一之三：证据图守卫必须**包在** e2e 那一族两侧。顺序错了不会报错，只会静默失效 ——
+// 快照在 e2e 之后取 ⇒ 每一枚都"跑前就干净、之后没变"，还原集合恒空，那这条守卫就只是装饰。
+{
+  const idx = (n) => STEPS.findIndex((s) => s[0] === n);
+  const [iSnap, iE2e, iRec] = [idx('evidence snapshot'), idx('e2e detail-pane family'), idx('evidence reconcile')];
+  const ordered = iSnap >= 0 && iRec >= 0 && iE2e >= 0 && iSnap < iE2e && iE2e < iRec;
+  if (!ordered) {
+    console.log(`SELF_CHECK 证据守卫顺序不成立 snapshot=${iSnap} e2e=${iE2e} reconcile=${iRec}`);
+    bad.push('self-check:evidence-guard-order');
+  } else {
+    console.log(`SELF_CHECK 证据守卫包在 e2e 两侧（${iSnap} < ${iE2e} < ${iRec}）`);
+  }
 }
 
 // 预检一之二：那四条 build 步骤假设各库包的 `build` 脚本就是 `tsup`（纪律 3：命令从真源读回来对账）。
@@ -199,7 +222,9 @@ const dirtyEvidence = spawnSync('git', ['status', '--porcelain', '--', 'apps/web
   cwd: ROOT,
   encoding: 'utf8',
 }).stdout.trim().split('\n').filter(Boolean).length;
-console.log(`EVIDENCE_DIRTY=${dirtyEvidence}（>0 就是这一趟重写了提交态截图，不是别人弄脏的）`);
+console.log(
+  `EVIDENCE_DIRTY=${dirtyEvidence}（守卫已把这一趟改写的还原回提交态；这里还剩 N>0 枚说明它们**不是**这一趟写的 —— 是别人的在途证据，不许顺手还原）`,
+);
 
 console.log('BATTERY_RESULT=' + (bad.length ? `RED:${bad.join(',')}` : 'ALL_GREEN'));
 process.exit(bad.length ? 1 : 0);
