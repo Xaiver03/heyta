@@ -110,6 +110,7 @@ import { fileURLToPath } from 'node:url';
 import { unionAudit, unionAuditVerdict, ownershipVerdict, pkgFieldVerdict } from './selfhost-audit-union.mjs';
 import { replayCapture, replayVerdict, replayReading, selftestOutputVerdict, CAPTURE_PATH } from './selfhost-capture-replay.mjs';
 import { resolveDockerfileConflict, dockerfileReading, selftestArms as dockSelftestArms, DOCKERFILE_PATH } from './selfhost-dockerfile-merge.mjs';
+import { attributeRed, attributionVerdict, attributionArms } from './selfhost-red-attribution.mjs';
 import { readImageInstallShape, readImageInstallShapeFromText } from './image-install-shape.mjs';
 import { liveCarrierUsers } from './selfhost-carrier-busy.mjs';
 
@@ -119,12 +120,15 @@ const BRANCH = process.env.HEYTA_CARRIER_BRANCH || 'feat/self-host-merge-main';
 const SOURCE = process.env.HEYTA_SOURCE_REF || 'feat/self-host-distribution';
 // 载体工作树是**一次性的**：每次跑都硬重置到 main tip，不复用旧索引。
 const WT = process.env.HEYTA_CARRIER_WT || '/tmp/heyta-merge-carrier';
+// 红集配对用的**干净 main** 检出（声明在这里而不是配对那一层：teardown 在文件头就要引用它，
+// 而后置的 `const` 会被 die() 走早于声明的那条路读成 TDZ 崩）。
+const PAIR_WT = process.env.HEYTA_CARRIER_PAIR_WT || '/tmp/heyta-merge-carrier-mainpair';
 
 const git = (args, opts = {}) =>
   execFileSync('git', ['-C', REPO, ...args], { encoding: 'utf8', maxBuffer: 1 << 26, ...opts });
 
-const failures = [];
 const notes = [];
+const attribution = []; // 载体红逐条归属到非本批的读数（进提交说明，不只在终端闪过）
 
 /* 🔴 退路必须擦现场（2026-10-04 23:1x 现量踩过）：第九族刚出现时那一趟**拒绝**了，
  *    但拒绝只做了"打印 + 退出"，把 `/tmp/heyta-merge-carrier` **留在半合状态**
@@ -135,20 +139,31 @@ const notes = [];
  *    没擦干净时不改退出码（原始失败才是归因对象），但把恢复命令印成一行可直接执行的话。 */
 let mergeStarted = false;
 const teardown = () => {
-  if (!mergeStarted) return { ok: true, line: '合并未开始 ⇒ 没有现场要擦' };
-  try {
-    git(['-C', WT, 'merge', '--abort'], { stdio: 'ignore' });
-  } catch (e) {
-    return { ok: false, line: `merge --abort 本身失败：${String(e.stderr || e.message).split('\n')[0]}` };
+  const parts = [];
+  if (!mergeStarted) parts.push('合并未开始 ⇒ 没有现场要擦');
+  else {
+    try {
+      git(['-C', WT, 'merge', '--abort'], { stdio: 'ignore' });
+    } catch (e) {
+      parts.push(`merge --abort 本身失败：${String(e.stderr || e.message).split('\n')[0]}`);
+    }
+    let mh = '';
+    // stdio ignore：这一条**期望失败**（干净树上没有 MERGE_HEAD），不压住就会在成功退出的那趟里
+    // 留下一行 `fatal: Needed a single revision`（本文件第 0 步就为同一件事写过一条注释）。
+    try { mh = git(['-C', WT, 'rev-parse', '--verify', 'MERGE_HEAD'], { stdio: 'ignore' }).trim(); } catch { /* 期望的就是这里抛 */ }
+    const dirty = git(['-C', WT, 'status', '--porcelain']).split('\n').filter(Boolean).length;
+    parts.push(`已 merge --abort ⇒ MERGE_HEAD=${mh || '无'} · 工作树脏 ${dirty} 条`);
+    if (mh || dirty) parts.push(`未擦净`);
   }
-  let mh = '';
-  try { mh = git(['-C', WT, 'rev-parse', '--verify', 'MERGE_HEAD']).trim(); } catch { /* 期望的就是这里抛 */ }
-  const dirty = git(['-C', WT, 'status', '--porcelain']).split('\n').filter(Boolean).length;
-  return {
-    ok: !mh && dirty === 0,
-    line: `已 merge --abort ⇒ MERGE_HEAD=${mh || '无'} · 工作树脏 ${dirty} 条`,
-  };
+  // 配对树也是现场：留着 = 下一读的人在 `git worktree list` 里看见一枚没人认领的 detached 检出。
+  if (pairTreeCleanable()) {
+    try { git(['worktree', 'remove', '--force', PAIR_WT], { stdio: 'ignore' }); parts.push('配对树已移除'); }
+    catch { parts.push('配对树移除失败（留在 ' + PAIR_WT + '，可由 `git worktree remove --force` 收尾）'); }
+  }
+  return { ok: !parts.includes('未擦净'), line: parts.join(' · ') };
 };
+// `pairTree` 声明在文件后面的配对层，而 die() 在那之前就可能被调用 ⇒ 用 existsSync 判，不读未初始化的变量。
+const pairTreeCleanable = () => existsSync(PAIR_WT);
 
 const die = (code, msg) => {
   // 🔴 失败必须把**已经量到的读数**一起打出来。本轮就吃过这个亏：门禁红只打了门禁输出，
@@ -732,12 +747,24 @@ for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'
   notes.push(`合并归属：写 ${own.counts.write} 枚 / 合并相对 ${MAIN} 改 ${own.counts.merged} 枚 / 集外 0 / 写集里未被改到 ${own.unfused.length} 枚`);
 }
 
-// ── 3. 纯 fs 门禁 ────────────────────────────────────────────────────
+// ── 3. 纯 fs 门禁 + "红要逐条归属"的配对层 ────────────────────────────
+/* 每条门禁可带第三个元素 = **缺陷行提取式**（那道门禁自己点名缺陷的输出形状）。
+ * 载体红时，同一道门在**干净 main 检出**上再跑一次，逐条比"载体点名的缺陷 ⊆ main 点名的缺陷"：
+ *   ·  ⊆ 成立 ⇒ 那条红**不是本批造成的**，放行落笔，并把配对读数打进提交说明（别人的债不由本批吸收，
+ *     也不许由本批的"绿"掩埋 —— 它是 main 上仍然存在的真红，归属写清楚才有主）；
+ *   · 多出来的那一条 ⇒ 本批带进去的 ⇒ 照旧 die(3)；
+ *   · 这道门没有提取式 ⇒ **判不了** ⇒ die(3)。🔴 "没法归属"永远不许被读成"归属过了"——
+ *     这一条就是 §8.122 那族假 0 的第四个面目（读不出 ⇒ 放行）。
+ * 为什么必须做这一层：main 现在**自己就红**（2c69c57d 现量：`check:docs` 1 处，
+ * `calendar-profile-handoff.md:1187` 指向 `trash-and-archive.md §10.87`，而 main 那份只到 §10.17），
+ * 那两枚文件都不在本批写集里。少了配对层，载体脚本会把**别人的红**当成"解法没修好"而永远拒绝落笔 ——
+ * 症状是"每次都退 3、每次都说要修解法"，而实际没有解法可修。 */
+const DOC_DEFECT = /^   [^\s]+:\d+/; // docs-link-check 四类缺陷都以三空格 + `路径:行号` 开头
 const GATES = [
   ['check:gate-wiring', ['scripts/check-gate-wiring.mjs']],
   ['check:selfhost-entry-command', ['scripts/check-selfhost-entry-command.mjs']],
   ['check:script-snapshot', ['scripts/check-script-snapshot.mjs']],
-  ['check:docs', ['research/tools/docs-link-check.mjs']],
+  ['check:docs', ['research/tools/docs-link-check.mjs'], DOC_DEFECT],
   ['check:md-tables', ['scripts/check-md-table-rows.mjs']],
   // 第五族的裁判：`check:image-license` 的**三条腿原样**挂进来（不是只挂第 1 腿）。
   // 🔴 排除的只有 `--installed-tree` 那一**模式**（它要真镜像里 dump 出来的树，消费者是
@@ -751,25 +778,93 @@ const GATES = [
   ['镜像许可证覆盖（check:image-license 第 2 腿）', ['research/tools/check-image-license-coverage.mjs', '--quiet']],
   ['镜像安装合同（check:image-license 第 3 腿）', ['research/tools/check-image-install-contract.mjs']],
 ];
+const runGate = (argv, cwd) => {
+  try {
+    return { rc: 0, out: execFileSync('node', argv, { cwd, encoding: 'utf8', maxBuffer: 1 << 26 }) };
+  } catch (err) {
+    return { rc: err.status ?? 1, out: `${err.stdout ?? ''}${err.stderr ?? ''}` };
+  }
+};
+const brief = (out, rc) => out.trim().split('\n').filter((l) => l.trim() !== '')
+  .slice(rc === 0 ? -2 : -8).join(' / ').replace(/\s+/g, ' ');
+
 const gateReadings = [];
-for (const [label, argv] of GATES) {
+const reds = []; // {label, argv, re, rc, out}
+for (const [label, argv, re] of GATES) {
+  const g = runGate(argv, WT);
+  if (g.rc === 0) {
+    gateReadings.push(`${label} exit 0 —— ${brief(g.out, g.rc)}`);
+    continue;
+  }
+  reds.push({ label, argv, re, rc: g.rc, out: g.out });
+}
+
+/* ── 红集配对：拿干净 main 的那棵树，逐条判"这条红 main 上有没有" ─────────
+ * 判定本体在 `selfhost-red-attribution.mjs`（单一所有者，`--selftest` 12 条、
+ * 五道守卫各做过摘除变异并各打红自己那条臂）。这里只做"取数 + 落笔前的接线"。 */
+const ATTR = 'research/tools/selfhost-red-attribution.mjs';
+let attrSelftestReading = '';
+if (!existsSync(join(WT, ATTR))) {
+  die(2, `红集归属的判据文件不在载体树上（${ATTR}）⇒ 载体红时没有任何东西能判"这条红是不是本批的"`);
+}
+{
   let out = '';
   let rc = 0;
   try {
-    out = execFileSync('node', argv, { cwd: WT, encoding: 'utf8', maxBuffer: 1 << 26 });
-  } catch (err) {
-    rc = err.status ?? 1;
-    out = `${err.stdout ?? ''}${err.stderr ?? ''}`;
+    out = execFileSync('node', [join(WT, ATTR), '--selftest'], { encoding: 'utf8', maxBuffer: 8 << 20 });
+  } catch (e) {
+    rc = e.status ?? 1;
+    out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
   }
-  const summary = out.trim().split('\n').filter((l) => l.trim() !== '')
-    .slice(rc === 0 ? -2 : -8).join(' / ').replace(/\s+/g, ' ');
-  if (rc !== 0) {
-    failures.push(`${label} 在载体上退 ${rc}：${summary}`);
-  } else {
-    gateReadings.push(`${label} exit 0 —— ${summary}`);
+  const redArms = out.split('\n').filter((l) => /^RED\s/.test(l));
+  const armLine = out.split('\n').find((l) => /臂数\s\d+/.test(l)) ?? '';
+  const m = armLine.match(/臂数\s(\d+) · 红\s(\d+)/);
+  if (rc !== 0) die(2, `红集归属判据的自检退 ${rc} ⇒ 不用它放行：\n${redArms.slice(0, 6).join('\n')}`);
+  if (redArms.length) die(2, `红集归属判据自检**退出码 0 却带红臂**：${redArms[0]}`);
+  if (!m || Number(m[1]) < 12 || Number(m[2]) !== 0) {
+    die(2, `红集归属判据的自检读数对不上（臂数行："${armLine || '（没有这一行）'}"，要求 臂数 ≥12 且 红 = 0）`);
   }
+  const a = attributionArms();
+  if (a.length < 12 || a.some((x) => x.got !== x.expect)) {
+    die(2, `红集归属判据从**函数**这一侧数出来对不上：${a.length} 条、不符 ${a.filter((x) => x.got !== x.expect).length} 条`);
+  }
+  attrSelftestReading = `红集归属判据自检：${m[1]} 条臂（含五条按理由认领的拒绝臂）红 0 · 五道守卫各做过摘除变异`;
+  notes.push(attrSelftestReading);
 }
-if (failures.length) die(3, `载体的纯 fs 门禁没全绿（不提交，先修解法）：\n  - ${failures.join('\n  - ')}`);
+let pairTree = false; // 供 teardown 收尾（这一层自己也是"现场"，拒了不留干净就等于给别人埋雷）
+const ensurePairTree = () => {
+  if (pairTree) return;
+  if (existsSync(PAIR_WT)) git(['worktree', 'remove', '--force', PAIR_WT], { stdio: 'ignore' });
+  git(['worktree', 'add', '--detach', PAIR_WT, mainSha]);
+  // 🔴 配对树必须是**干净的 main**：脏了就说明它不是 main，那条"main 上也红"的读数便什么都不是。
+  const dirty = git(['-C', PAIR_WT, 'status', '--porcelain']).split('\n').filter(Boolean).length;
+  const at = git(['-C', PAIR_WT, 'rev-parse', 'HEAD']).trim();
+  if (at !== mainSha || dirty > 0) {
+    die(3, `配对树不是干净的 ${MAIN}（HEAD=${at} 应为 ${mainSha}，脏 ${dirty} 条）⇒ 没有可比的那一侧`);
+  }
+  pairTree = true;
+  notes.push(`配对树就绪 ${PAIR_WT} @ ${mainSha.slice(0, 8)}（工作树脏 0 条）`);
+};
+if (reds.length) {
+  ensurePairTree();
+  const results = reds.map((g) => {
+    const m2 = runGate(g.argv, PAIR_WT);
+    return attributeRed({
+      gate: g.label, carrierRc: g.rc, carrierOut: g.out,
+      mainSha, mainRc: m2.rc, mainOut: m2.out, defectRe: g.re,
+    });
+  });
+  const badVerdict = attributionVerdict(results);
+  if (badVerdict) {
+    die(3, `载体的纯 fs 门禁红了，而**逐条归属没有全部通过**（不提交）：\n  - ${badVerdict}\n` +
+      `   ⇒ 归属不成立的那些必须先在解法侧修掉；本工具不拿"看起来差不多"当放行。`);
+  }
+  for (const r of results) {
+    attribution.push(r.why);
+    gateReadings.push(r.why);
+  }
+  notes.push(`红集归属：载体红 ${reds.length} 道，全部逐条归属到非本批（配对树 = 干净 main ${mainSha.slice(0, 8)}）`);
+}
 
 // ── 4. 新鲜度守卫 + 提交 + 移动分支 ──────────────────────────────────
 const mainNow = git(['rev-parse', MAIN]).trim();
@@ -777,6 +872,7 @@ if (mainNow !== mainSha) {
   die(4, `main 在本次重算期间又前进了：${mainSha.slice(0, 8)} → ${mainNow.slice(0, 8)}。` +
     ` 载体不落笔（落了一笔"第一父不在 main 上"的对象比不落更坏）。重跑本脚本即可。`);
 }
+if (pairTree) { git(['worktree', 'remove', '--force', PAIR_WT], { stdio: 'ignore' }); pairTree = false; }
 const msg = `merge(selfhost): 把 ${SOURCE} 合进 ${MAIN}（载体，第一父 = ${mainSha.slice(0, 8)}）
 
 由 research/tools/selfhost-merge-carrier.mjs 产出，逐路径解法与断言记在该文件头部。
@@ -812,5 +908,6 @@ console.log(`   ${giReading}`);
 //    在成功时是静默的，而"静默的通过"会被下一轮读成"没跑"或"跑了但没人看"。
 console.log(`   ${capSelftestReading}`);
 console.log(`   ${dockSelftestReading}`);
+if (attribution.length) console.log(`   🔴 载体红 ${attribution.length} 道，已逐条归属到非本批（那条红仍在 main 上，不由本批修）：\n     ${attribution.join('\n     ')}`);
 console.log(`   门禁 ${GATES.length} 道全 exit 0；完整 pnpm check 留给落地那一刻`);
 console.log(`   main 若再前进 ⇒ 重跑：node research/tools/selfhost-merge-carrier.mjs`);
