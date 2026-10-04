@@ -2292,6 +2292,33 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     重装启动器 `42f0c64c`、真运行者解析器 `46967a01`、新提交器 `cd5af719`、APK 预备 `f04fcad7`）。
     理由不是整洁：**这些定义只住在 `/tmp` 的话，一次重启就把"这条读数是怎么量出来的"整条抹掉**，
     下一个人只能从我写的读数倒推装置（那就是主张而不是证据）。运行中的链仍在 `/tmp`（重启即停是预期行为）。
+  - 🔴 **10:33 ③ 的输入基线自己动了 —— 那条"合流之后要验的三条读数"在 40 分钟内就被用上并量到了**：
+    别人那一行 `${f}` 的改动随 `35dbffe9` 落进 main，`scripts/verify-mobile-notes.sh` 的 blob 从
+    `3a9f6890` 变成 **`a7f6579b`**（仍是 550 行，HEAD 里 `step10-scoped` 命中 0 处 —— 那五枚是我的，不是他们的）。
+    于是"当前 main + 我那五枚"的合并态**不再是载体那份 `fbe0ee72`，而是 09:53 合流实验早就算出来的
+    `df46f473`**（673 行）。三条读数逐条复量：行数 673 ✅、`grep -c 'evidence/${f}'` = 1 ✅、
+    `git hash-object` = `df46f473fae55b7763c3f26165d2e9b181e703a8` ✅（正是那句"合流之后要验的三条"预测的那枚 sha）。
+    载体已按这条路重对齐：`git checkout -- scripts/verify-mobile-notes.sh`（备份 `/tmp/backup-notes-fbe0ee72.sh`）
+    → `git checkout fc324e12`（此时工作树干净，切换成功、基线回到 `a7f6579b`）→ 从持久合并态覆盖回来
+    → `bash -n` OK、收范围腿 `step10-scoped begin` 命中 1 处 → **`heyta-step10-fixture.sh` 对着这份活载体文件复跑：
+    `FIXTURE=GREEN`，变异存活 0 / 无效 0**。第 10 步那条判据不随基线漂移。
+  - ✅ **10:35 链升到 v16，两处改动**：
+    ① 核身门的"目标身份"换成 `df46f473` + 持久件 `merged-with-others-f5line.sh`（不换就会在每一轮
+    拿旧身份 `fbe0ee72` 去比新基线而**永久拒绝起跑 ③** —— 拒绝是安全的，但读不出来就等于白等）；
+    ② ① 起跑前**现取并显式指定 iOS 模拟器**（`heyta-iphone-17pro`）。这一条是代拍，理由写进链里：
+    启动器自己挑的是"占用表里第一台空闲的"，10:33 现量四台 booted **全部** `running_heyta=0`，
+    列表第一台是 `heyta-batch2-closeout` —— 倒数纪念日那条线的现场，而重装 ios 段会 `uninstall` 目标。
+    依据＝本条线历史上 ① 用的就是 `heyta-iphone-17pro`（台账两处 `IOS_DEVICE_NAME` 读数）；
+    回退＝去掉那一个环境变量即可回到启动器默认行为。占用判据复用仓内那把 `ios_occupancy_table`
+    （`/tmp/heyta-device-occupancy.sh`，与启动器同一份实现，不另写第二把）。
+  - ⚠️ **10:31 按 §5 的指示改用仓内闸门判窗口**（"判据 = `verify-mobile-window-gate.sh --target b` 退 0，别再自己数负载"）：
+    载体里两把都跑了，`--target b` 与 `--target c` 各 **rc=3**，唯一不成立的那条是负载
+    （现量 1 分钟 22–26 / 阈值 12）；`packages/ apps/ server/ 无未提交修改` ✅、`reinstall-all.sh 干净` ✅、
+    设备名现取 ✅。⚠️ 一处探针教训：闸门报"负载 26"而我 `uptime` 读到 17–20，同刻并读
+    `sysctl vm.loadavg` 与 `uptime` 得到 **22.79 / 26.26 / 40.52** —— 差在采样时刻而不是读法，
+    两边都是 1 分钟值且都 >12，所以不构成"哪个探针坏了"，但**别把两个时刻的数当同刻比**。
+    🔴 这条闸门对我那枚未提交的 `scripts/verify-mobile-notes.sh` **不算阻塞**（它只扫 `packages/ apps/ server/`），
+    所以五枚补丁住在载体里不影响窗口判定。
 - ✅ **05:3x ⑤ 复核**：`B41/B42/B45` 三行仍在 §7.28 那张「完成条件逐条的现量与差什么」表里（`:1220`/`:1221`，状态 🟡，
     各带自己的现量命令），本夜落笔的六笔只改了 `scripts/verify-mobile-notes.sh` 的第 12 步与
     `apps/desktop-macos/scripts/package-app.sh` 的公证段，加上四份文档，
