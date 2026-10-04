@@ -1387,6 +1387,16 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     ⇒ **① 的解除条件仍未满足**，且这一趟不会自己结束：看门狗 `HEYTA_NOTARY_TIMEOUT` 在 main 的
     `package-app.sh:283`，而那枚载体的同名文件里 grep 这个变量 **0 处**（它早于修复）——
     上限只对下一趟生效这件事，04:02 就写过，这次是拿到"它连自己的载体都没带上修复"的字节级对照。
+    ✅ **08:2x 第三次复量：形状仍未变，且把"看门狗杀不到孙进程"这条怀疑否证掉** ——
+    `93817`→`95477`→`98934` 三代都在，`notarytool submit` 已 **5h09m**，
+    `93817` 的累计 CPU 在 20 秒内 **0:00.01 → 0:00.01**（零推进），`lsof -a -p 93817 -i -sTCP:ESTABLISHED` **0 条**。
+    两处字节级对照：正在执行的快照 `/tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817` 里
+    `run_bounded` **0 处**，载体的 `apps/desktop-macos/scripts/package-app.sh` 里也 **0 处**（而 main 那份 `:291` 有定义）。
+    ⚠️ 我一度怀疑 main 那把看门狗是**装饰**（"只杀 `xcrun` 那一层，`notarytool` 孙进程会成孤儿"），
+    现量否证：`ps -o ppid -p 98934` = **95477**，即 `notarytool` 是脚本的**直接子进程**（`xcrun` 是 exec 不是 fork），
+    所以 `kill -TERM/-KILL` 那个 pid 就够 —— 这条怀疑不成立，别照它去"修"看门狗。
+    ⇒ **① 的处置不变**：由那一趟的持有者重启即可（重启后的那趟带看门狗，默认 900s 上限、到点 return 124 并往下走），
+    本线**不代杀** `93817/95477/98934`（AGENTS §8.9：那是别人起的、且它占着 mac 段的产物目录）。
   - ⚠️ **05:3x 两条与 ① 直接相关的现场**（都要带时刻读，它们会反过来）：
     ① **iOS 侧此刻是空的**：三台 booted 逐台 `simctl spawn <udid> launchctl list` 读
     `UIKitApplication:com.heyta`，命中数 **0 / 0 / 0**（01:4x 那次 `heyta-ios-isolated` 还在跑）
