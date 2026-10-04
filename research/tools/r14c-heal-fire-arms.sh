@@ -152,10 +152,18 @@ git worktree prune 2>/dev/null
 rm -f "$G" "$C" "$MARKER" "$L5" "$L6"
 WT_AFTER=$(git worktree list | wc -l | tr -d ' ')
 LEAK=$(git worktree list | grep -c "$(basename "$WT")" || true); LEAK=${LEAK:-0}
-if [ "$WT_AFTER" = "$WT_BEFORE" ] && [ "$LEAK" = "0" ]; then
-  say "  ✅ 收尾：worktree 数回到基线 ${WT_BEFORE}，临时那枚已摘（全仓现量 ${WT_AFTER}）"
+# 🔴 判据**改过一次**，改的原因是它自己会假红：原来写的是「计数相等 且 临时那枚不在清单里」，
+#    而 worktree 计数是**全仓共享量** —— 10-04 17:2x 现量 `基线 16 → 现在 15`，
+#    差的那一枚不是我建的（我建的那枚已经从清单里、从盘上都消失了），
+#    是另一条会话在同一次运行中间摘掉了它自己的 worktree。
+#    上面第 70 行的注释其实已经写了"13 这种全仓数字本身没有判据力"，而断言却仍在比计数。
+#    现在比的是**我自己那件产物**的两个直接读数：清单里没有它 + 盘上没有那个目录。
+#    计数只作为**打印的读数**保留（掉/涨都可能，归别人），不进门。
+DIR_LEAK=0; [ -e "$WT" ] && DIR_LEAK=1
+if [ "$LEAK" = "0" ] && [ "$DIR_LEAK" = "0" ]; then
+  say "  ✅ 收尾：临时那枚已摘干净（清单 0 命中 + 盘上目录不存在）；worktree 计数 ${WT_BEFORE} → ${WT_AFTER}（差 $((WT_AFTER - WT_BEFORE))，全仓共享量，只打印不判定）"
 else
-  say "  ❌ 收尾：基线 ${WT_BEFORE} → 现在 ${WT_AFTER}，清单里还找得到临时枚 ${LEAK} 次"; FAIL=1
+  say "  ❌ 收尾：本装置自己漏了 —— 清单命中 ${LEAK} 次，目录存在=${DIR_LEAK}（这才是这一格判的东西）"; FAIL=1
 fi
 [ "$FAIL" = "0" ] || exit 4
 say "臂 5–9 逐条读数见上面那五行（每行自己写明了期望值）；FAIL=${FAIL}"

@@ -48,6 +48,16 @@ esac
 if [ -z "$REPO" ]; then
   REPO="$(cd "$(dirname "$0")/.." && pwd)"
 fi
+# 🔴 在 `cd "$REPO"` **之前**记下闸门自己住在哪棵树。
+#   17:1x 实测到的混树：`r14c-window-retry.sh` 用 `--repo <载体>` 调本脚本（测量确实该读载体），
+#   而下面三行 lib 的 source 用的是**相对路径** ⇒ cwd 已经换成载体，于是
+#   `scripts/lib/wedged-runner.sh` 与 `scripts/lib/apk-freshness.sh` 报 `No such file or directory`
+#   （前者载体那个提交里还没有，后者根本未跟踪、任何提交里都没有），
+#   再往下 `heyta_apk_pair` 就成了 `command not found`，`APK_MT/NEWEST` 取空 ⇒
+#   打印出 `APK 1970-01-01 08:00:00 / 最新源码 1970-01-01 08:00:00` 并判 **"APK 比源码旧"**。
+#   也就是说：**探针缺席被报成了一条真实的产品读数**，而那条红会让人去重打一个根本不必重打的 APK。
+#   分工钉死：**闸门自己的代码从自己那棵树取，被测量的东西从 `$REPO` 取**。
+GATE_SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$REPO" || { echo "❌ 进不去仓库根：$REPO" >&2; exit 1; }
 # 🔴 cd 成功后立刻把 REPO 换成绝对路径：调用方给的是相对路径时（`--repo ../heyta-wt-r14c`，
 #    实测 07:0x 真撞上过），`cd` 明明成功了，而下面那句比对里 GIT_TOP 永远是 git 给的绝对路径 ⇒
@@ -100,13 +110,25 @@ reinstall_other_pids() {
 #     分隔符连同三个值粘成一个非法整数 ⇒ 比较恒假、循环恒睡，坏了 15 轮没人发现）。
 echo ""
 echo "════ 1. 负载门（规范实现，阈值 = hw.ncpu × 3/4）════"
-. scripts/lib/wait-for-quiet-host.sh
+# 🔴 三枚 lib 一律按**闸门自己那棵树**取（`$GATE_SELF_DIR`），不写相对路径 ——
+#    相对路径会跟着 `--repo` 跑到载体里去解析，而那是"测量"的位置，不是"我的代码"的位置。
+#    缺席要响亮：一条判据在自己辅助函数缺失时给出的空读数，与真读数长得一模一样（见上面 17:1x 那段）。
+. "$GATE_SELF_DIR/lib/wait-for-quiet-host.sh" || exit 1
 # 「那一趟是在推进还是已经楔住」的**纯读数**（不参与下面的红/绿与 REDS= 机器通道）。
 # 抽成 lib 是因为两道门都要它：抄一份到第二道门就是等它漂（AGENTS §7 那一族）。
-. scripts/lib/wedged-runner.sh
+if [ -f "$GATE_SELF_DIR/lib/wedged-runner.sh" ]; then
+  . "$GATE_SELF_DIR/lib/wedged-runner.sh"
+  WEDGE_LIB=ok
+else
+  WEDGE_LIB=missing
+fi
 # APK 新鲜度的算法（下面第 4 步与 `verify-mobile-trash.sh` 装包前共用同一份；
 # 那份脚本以前没有这道门，所以"忘了跑闸门"的人会拿旧 bundle 报全绿 —— §7 第 27 条）。
-. scripts/lib/apk-freshness.sh
+if [ -f "$GATE_SELF_DIR/lib/apk-freshness.sh" ]; then
+  . "$GATE_SELF_DIR/lib/apk-freshness.sh"
+else
+  echo "   ⚠️ 缺 $GATE_SELF_DIR/lib/apk-freshness.sh ⇒ APK 新鲜度**测不了**（下面按不放行处理，不冒充读数）"
+fi
 # 这里**只读一次现量**，不阻塞等人：窗口的判断是给调用者的，不是替调用者睡觉。
 CORES=$(sysctl -n hw.ncpu)
 LIMIT=$((CORES * 3 / 4))
@@ -270,7 +292,13 @@ case "$TARGET" in
       echo "      现量 :3000 监听者 pid=${SVC3000:-（空）} —— 非空就说明那**不是**本线起的服务端"
     fi
     APK="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
-    if [ -f "$APK" ]; then
+    if ! declare -F heyta_apk_pair >/dev/null 2>&1; then
+      # 🔴 这一条存在的理由：**缺席不是"旧"**。17:1x 现场就是没有这个函数，
+      #    而旧写法照样打印一对 `1970-01-01` 并判"APK 比源码旧" —— 一条测不出来的读数被写成了一条产品缺陷。
+      #    仍然按不放行处理（fail-closed），但话说清楚是探针没了，不是 APK 旧。
+      warn "APK 新鲜度**测不了**：heyta_apk_pair 未定义（lib 不在闸门自己那棵树 $GATE_SELF_DIR 里）⇒ 按不放行处理，这不是一句产品读数"
+      WHY_APK=1
+    elif [ -f "$APK" ]; then
       # 算法住在 `scripts/lib/apk-freshness.sh`（真机验收脚本装包前那一发用的是同一份）。
       # 这里只保留**呈现**，两行输出的字面形状与抽出去之前逐字相同。
       read -r APK_MT NEWEST < <(heyta_apk_pair "$APK" "$PWD")
