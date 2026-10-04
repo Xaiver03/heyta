@@ -416,9 +416,9 @@ builder / web 两个阶段用 pnpm + `--frozen-lockfile`。
 |---|---|
 | `research/tools/image-install-shape.mjs` | 从 `Dockerfile` 的 `AS production` 阶段读那几条 `npm install`（生成器与对账共用；抄两份正则就是第五份抄件） |
 | `research/tools/gen-image-npm-tree.mjs` | 让 npm 自己解一遍，落成 `server/image-npm-tree.json`（带 `inputs` 哈希：`server/package.json` 的 sha256 + 那几条 install 命令的 sha256） |
-| `research/tools/check-image-license-coverage.mjs` | 快照逐条对扫描集；没见过的必须在 `IMAGE_ONLY_PACKAGES` 里**带 license/URL/日期/为什么**登记过；登记还要**仍然成立**；计数恒等式必须闭合 |
+| `research/tools/check-image-license-coverage.mjs` | 两种载体的树逐条对扫描集；没见过的必须在 `IMAGE_ONLY_PACKAGES` 里**带 license/URL/日期/为什么**登记过；登记还要**仍然成立**；计数恒等式必须闭合；**两种载体各有一条与该树之输入/来源锁的双向差集**（真树=磁盘↔`/app/package-lock.json` 两个独立观测；快照=与它的**输入**锁，只拦生成器漏数与手改提交物，2026-10-04 §8.103 补） |
 
-它同时拦四种"看起来没事"：
+它同时拦五种"看起来没事"（第 5 种是 2026-10-04 §8.103 加的；前四种每条都注过射）：
 
 - 快照里冒出一条没登记的新依赖 ⇒ 红（**注入 `evil-injected-pkg@9.9.9` 实测红**，
   并连带报"计数不闭合"）；
@@ -428,6 +428,11 @@ builder / web 两个阶段用 pnpm + `--frozen-lockfile`。
   报"豁免不再成立"**）—— 这张表因此只能跟着现实变小；
 - 改了声明却没重新生成快照 ⇒ 红（**注入错的 `serverPackageJsonSha256` 实测红**，
   并打印重跑命令）；
+- 树与该树的**来源锁**双向差集（§8.103）⇒ 红。快照侧：摘掉一条锁里非 optional 的包
+  （**注入 `@fastify/accept-negotiator@2.1.0` 实测红，报"快照里却没有的非 optional 条目 1 条"**）、
+  塞一条锁没记的包（**注入 MIT 假包实测红**）；而差集里那 12 条全 optional ⇒ 绿（容差的正面读数）；
+  真树侧：登记项逐条摘满 16 条，**15 条由 lock↔磁盘层抓、1 条 optional 由 rot 层抓，0 条摘了没人守**
+  （表在 §8.103，每臂的层级都单独取过原文）。
 - 外加两发解析层哨兵（快照 <100 条 ⇒ 红：**注入"只留 5 条"实测红**；
   `fastify`/`@prisma/client`/`zod` 三个 needle 缺任一 ⇒ 红），
   防止"解析悄悄退化成空集然后一路绿"。
@@ -6200,3 +6205,44 @@ objective 那句"**同一个 `apps/web/dist` 不可能两条同时绿**"本轮�
 写集代价：本批多一枚 `research/tools/check-image-license-coverage.mjs`，它在主检出里**现量干净**
 （`git status --porcelain -- …` 只回 `.gitignore` 与 `package.json` 两枚）⇒ **落地阻塞集没有因此变大，仍是 2 枚**。
 它是载体预置冲突族第七族的成员，取本分支侧这条决定不变。⇒ 任务 #29 关闭。
+
+### 8.104 #28 落地：构建层那条判据不止是"看不见"，它判的还是**拷贝前**那份产物（2026-10-04 16:5x–17:0x）
+
+#28 登记的是"verify 把 `docker build` 的输出吞了 ⇒ 镜像层判据不可观测"。实现时先撞到一件更大的事：
+`server/Dockerfile` 里那条 `check-web-artifact --mount /app/`（第 211 行）判的是 **web 阶段的
+`/repo/apps/web/dist`**，而外人拿到的是它之后 `COPY --from=web … ./web-dist`（第 268 行，WORKDIR=/app）
+⇒ **`/app/web-dist`**。挂载前缀与产物落点一旦说不上（G-48 当初就是这个形状），构建阶段那条照样绿。
+所以这次不是"把日志留档"这么简单，补的是三样：
+
+1. `--progress=plain`（那条 RUN 的 stdout 进留档；不加就只能看到 step 名）；
+2. 构建层读数写成**三种合法形状**并把命中哪一种打进日志：`ran` / `cached-or-silent` / 两者都没有 ⇒ die。
+   不写死"必须执行过"：BuildKit 命中缓存时那一层只打 `CACHED`、不出声，硬判红会把"缓存"与
+   "判据没了"混成同一个读数（§8.100 那条"载体存在≠这趟真跑"的另一种面目）；
+3. 🔴 **在镜像里**跑同一条 checker：`docker run --rm --entrypoint node -v $REPO_ROOT/scripts:/heyta-chk:ro $IMAGE
+   /heyta-chk/check-web-artifact.mjs --dist /app/web-dist --mount $EXPECT_MOUNT`。
+   它读的是发出去的那份字节，与缓存无关、与 `--no-build` 无关；checker 本体从宿主只读挂进去，
+   不在镜像里再抄一份判定。挂载值 `EXPECT_MOUNT` **从 Dockerfile 现取**（不写死 `/app/`，
+   抄进脚本就又造一份抄件），取到 0 行或**多于 1 行**都 die —— "该对哪个挂载"没有唯一答案时不许按首值通过。
+
+#### 五条读数
+
+| 腿 | 期望 | 实际 |
+|---|---|---|
+| `--no-build` 走一遍真实代码路径 | 提取不 die（现量唯一 1 行=`/app/`）、新的那句复用日志印出来 | ✅✅，随后被 §8.92 那条 revision 闸挡住：`镜像 label=feed25c9… / git HEAD=f00db9cd…` ⇒ `rc=1` |
+| 镜像内 checker 正向 | rc=0 | ✅ `产物自洽：挂载 /app/ 与产物声明一致；index.html 的 5 个本地引用、manifest 的 15 个文件全部存在；4 个组件数据 URL 都落在 SW 前缀 /app/widgets/ 内；246 个 --ht-* 定义对得上产物里全部无兜底引用` |
+| 镜像内 checker 失败腿（同一条命令只把挂载改成 `/nope/`） | rc≠0 | ✅ `rc=1` + 「产物声明它挂在 "/app/"（从 index.html 的 2 条 assets 引用反推）/ 而你要把它放在 "/nope/"」 |
+| 构建层三形状打在真数据上 | 真 plain 日志(g88)⇒`ran`；空日志⇒`die`；合成 `CACHED`⇒`cached-or-silent` | ✅ 三个各命中一次 |
+| 唯一性守卫注入（往 Dockerfile 第 211 行后**复制一条**匹配的 RUN） | rc=1 且报错印出条数 | ✅ `现量取到 2 行`；复原后 `md5 54584b49…` 与备份逐字节相同 |
+
+🔴 **这一笔提交自己把本地镜像作废了**（HEAD 前进 ⇒ revision 闸红）。这不是事故，是那条闸在做事：
+它挡的正是"给旧二进制打新分数"。`ran/cached` 那个形状读数因此**还没在真实构建上取过**，
+留给下一次全跑（本轮负载 19.6，为一行打印去抢一次完整构建不是窗口该花的钱）。
+
+#### 两条实施期踩到的（都值得入档，属"探针自己坏"那一族）
+
+- 本脚本第 86 行就开着 `set -euo pipefail`。我先写的是 `OUT=$(docker run …)` 换行 `RC=$?` ——
+  **失败时 shell 在赋值那一行就退出了，`RC=` 那行永远执行不到**，红色路径只会得到一个没有诊断的退出。
+  改成 `OUT=$(…) || RC=$?` 才是这条判据自己的取码形状。
+- 施臂命令写成 `awk … > server/Dockerfile`，而 awk 有语法错：**重定向在 awk 开始工作之前就把文件截成 0 字节**，
+  而 `&&` 链里的失败让后续步骤不执行 —— 这次没留下坏文件只是因为复原那条写在了链外（无条件）。
+  一般规律：**施臂的复原动作不能排在 `&&` 链里**；改用 node 写文件后同一臂正常施成并复原。
