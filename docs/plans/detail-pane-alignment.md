@@ -6571,7 +6571,7 @@ M1 的职责是"往 C1 表加一行既无对照节也不写例外 ⇒ 红且点�
 |---|---|
 | ① 归属门 | `node scripts/verify-detail-pane-ownership.mjs scripts/check-selection-single-source.mjs` ⇒ **VERDICT=CLEAN**（点名 1 条｜本地不在场 0｜被占 0）。本批只碰 `scripts/` 一份门禁 + `research/tools/` 一份新装置 + 本工单文档，**产品源码零改动** |
 | ② 两道余量为 0 的棘轮 | **不适用**：没有界面/样式改动，`check:l4`（mobile 90）与 `check:row-single-source`（28）的输入都没变，基线未动 |
-| ③ 干净检出复跑 | 提交后跑（纯 fs 判据，无构建依赖） |
+| ③ 干净检出复跑 | 🔴 **已跑**（载体 `606efa37`，`git worktree add --detach` 到 /tmp）：五道纯 fs 判据各 **RC=0** —— `check-selection-single-source`／`check-detail-pane-c1-coverage`／`check-detail-pane-status-table`／`check-docs-voice`／`check-script-snapshot`，而且 `✅ I` 那一行在干净检出里打的是同一串读数（11 / 6 / 7 / 13）—— 名册不是只在我的工作树里成立 |
 | ④ packages 改完先 build | **不适用**（未碰 `packages/`） |
 
 同趟其余读数：选中门禁 RC=0（A–I 九组齐全）；`check-detail-pane-status-table` RC=0（十项；承重(腿9) 表格行 995 枚／含 code span 591 枚／不成对而跳过 0）；
