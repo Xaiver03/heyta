@@ -28,6 +28,7 @@ import { planAssistantEgress, type AssistantTier } from '@heyta/app-host';
 import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
+import { AssistantEphemeralProvider } from '../src/features/ai/assistant-ephemeral.js';
 import { AssistantPanel } from '../src/features/ai/AssistantPanel.js';
 
 const ROUTING: AiRoutingConfig = {
@@ -131,6 +132,7 @@ async function render(props: {
   await act(async () => {
     root!.render(
       <I18nProvider locale={props.locale ?? 'zh-CN'}>
+      <AssistantEphemeralProvider>
         <AssistantPanel
           routing={props.routing ?? ROUTING}
           consents={props.consents ?? CONSENTS}
@@ -139,6 +141,7 @@ async function render(props: {
           host={props.host}
           {...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl })}
         />
+      </AssistantEphemeralProvider>
       </I18nProvider>,
     );
   });

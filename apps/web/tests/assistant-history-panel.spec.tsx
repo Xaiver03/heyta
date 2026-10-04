@@ -23,6 +23,7 @@ import { I18nProvider } from '@heyta/i18n';
 import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
+import { AssistantEphemeralProvider } from '../src/features/ai/assistant-ephemeral.js';
 import { AssistantPanel } from '../src/features/ai/AssistantPanel.js';
 import {
   ASSISTANT_HISTORY_STORAGE_KEY,
@@ -128,6 +129,7 @@ async function render(storage: HistoryStorage, fetchImpl?: typeof fetch): Promis
   await act(async () => {
     root!.render(
       <I18nProvider locale="zh-CN">
+      <AssistantEphemeralProvider>
         <AssistantPanel
           routing={ROUTING}
           consents={CONSENTS}
@@ -137,6 +139,7 @@ async function render(storage: HistoryStorage, fetchImpl?: typeof fetch): Promis
           historyStorage={storage}
           {...(fetchImpl === undefined ? {} : { fetchImpl })}
         />
+      </AssistantEphemeralProvider>
       </I18nProvider>,
     );
   });
