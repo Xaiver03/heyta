@@ -8957,6 +8957,29 @@ node research/tools/selfhost-land-main.mjs        # 不带 --confirm：只读数
 装置自己踩到的一次：`ROOT` 少剥一层（`research/tools` → 仓库根需要 `'..','..'`），
 `readFileSync` ENOENT 当场炸 —— 报错比"静默空臂"好。
 
-🔴 **仍没测的那一半**：同样的三条臂在 **`--installed-tree`（真树）载体**上还没施过 ——
-那一趟要跑起来的镜像，排在落地后的低负载窗口，与 #28（`docker build` 输出可观测）同一趟。
-所以这一节的主张只到"snapshot 载体这张表有牙"，不到"镜像里实际那棵树有人守"。
+~~🔴 **仍没测的那一半**：同样的三条臂在 `--installed-tree`（真树）载体上还没施过 ——
+那一趟要跑起来的镜像，排在落地后的低负载窗口，与 #28 同一趟。~~
+🔴 **这句当场被自己否证，划线留在这里**：真树 dump **不是构建窗口级的贵事**。本机就有那枚镜像
+（`supersync:selfhost-verify`，`074da09c8436`，6 小时前 §8.118 那次 verify 留的），
+一条秒级的一次性容器就导得出来（命令形状从 `scripts/verify-selfhost-stack.sh:308-309` 抄，不凭记忆拼）：
+
+```bash
+docker run --rm -i --entrypoint node supersync:selfhost-verify --input-type=commonjs - \
+  < research/tools/dump-installed-tree.js > /tmp/tree.json
+node research/tools/selfhost-license-coverage-arms.mjs --installed-tree /tmp/tree.json
+```
+
+**两种载体各 4 条腿，都是 0 不符**：
+
+| 载体 | 对照组 | A 摘掉一枚真登记 | B 幽灵登记 | C `carrier` 后门 |
+|---|---|---|---|---|
+| `snapshot` | `rc=0` 无 ❌ | 摘 `@node-rs/argon2-linux-x64-gnu@2.2.1` ⇒ `rc=1` **两层**红 | 红"已经不在快照里了" | 红"不是 snapshot / installed-tree 之一" |
+| `installed-tree`（真镜像里那棵树，`145 = 126 + 16 + 3`） | `rc=0` 无 ❌ | 摘 `@node-rs/argon2-linux-arm64-musl@2.2.1` ⇒ `rc=1`，报的是**"真镜像里装上的那棵树里有 1 条门禁从没见过"** | 红"已经不在真树里了" | 同上 |
+
+⚠️ 真树这一趟挑的是**在这棵树里**的登记项，这一点是装置自己判的（`firstKeyIn` 拿 dump 的
+`name@version` 集合求交，交不出就抛错）—— 表里有些条目声明 `carrier: 'snapshot'`，
+在真树那趟本来就不参与判定，摘那种会"什么都没摘"而被读成"这条臂没牙"，正是 §8.101 那次空臂事故的形状。
+
+**所以这一节的主张现在到这一句**：这张登记表在**两种载体上都有牙**（摘掉/塞假/走后门各红一次，
+对照组未变异时不红）。仍**不**主张的是：这棵真树来自 6 小时前那次 verify 的镜像，不是当前产物的树 ——
+"发出去的字节里有牙"要等落地后 `verify:selfhost-stack` 重跑那一趟（那趟会顺手把 dump 导成当天的）。

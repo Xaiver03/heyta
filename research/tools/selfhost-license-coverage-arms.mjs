@@ -13,10 +13,16 @@
  *                             （这个字段只能声明"我属于哪种载体"，不能当逃避过期检查的开关）
  * 外加**未变异对照组**：门禁绿时这三条臂都不该被触发。
  *
- * 🔴 只覆盖 `snapshot` 这一种载体。`--installed-tree` 那一趟（真树）需要跑起来的镜像，
- *    排在落地后的低负载窗口，与 #28（docker build 输出可观测）同一趟做。
+ * 两种载体都能跑：
+ *   · 不带参数 ⇒ `snapshot`（提交物锁导出的那棵树，不需要 docker）。
+ *   · `--installed-tree <dump.json>` ⇒ **跑起来的镜像里那棵树**。导那份 dump 不是"构建窗口级"的贵事
+ *     （这里一度把它登记成"排在落地后"，那句是错的）：一条秒级的一次性容器就够，
+ *     命令形状照 `scripts/verify-selfhost-stack.sh` 里那一条抄，不要凭记忆拼：
+ *       docker run --rm -i --entrypoint node supersync:selfhost-verify --input-type=commonjs - \
+ *         < research/tools/dump-installed-tree.js > /tmp/tree.json
  *
  * 用法：node research/tools/selfhost-license-coverage-arms.mjs
+ *       node research/tools/selfhost-license-coverage-arms.mjs --installed-tree /tmp/tree.json
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -49,8 +55,24 @@ const firstKey = (s) => {
   return m[1];
 };
 
-export function coverageArms(base) {
-  const one = firstKey(base);
+/** 真树载体下必须挑一枚**在这棵树里**的登记项：表里有些条目声明 `carrier: 'snapshot'`，
+ *  它们在真树那趟本来就不参与判定 —— 摘那种等于什么都没摘，而"什么都没摘"会被读成"这条臂没牙"
+ *  （上一轮那条空臂事故就是这个形状）。找不到任何一枚命中就直接抛错。 */
+const treeIds = (file) => {
+  const dump = JSON.parse(readFileSync(file, 'utf8'));
+  if (!Array.isArray(dump.packages)) throw new Error(`dump 里没有 packages 数组：${file}`);
+  return new Set(dump.packages.map((x) => `${x.name}@${x.version}`));
+};
+const firstKeyIn = (s, ids) => {
+  const keys = [...s.slice(s.indexOf(HEAD) + HEAD.length).matchAll(/^\s*'([^']+)': \{/gm)].map((m) => m[1]);
+  if (!keys.length) throw new Error('表里取不出任何登记项（臂的前提没了）');
+  const hit = keys.find((k) => ids.has(k));
+  if (!hit) throw new Error(`表里 ${keys.length} 枚登记项没有一枚在这棵真树里 —— 这条臂会什么都没摘，别把它读成"没牙"`);
+  return hit;
+};
+
+export function coverageArms(base, ids) {
+  const one = ids ? firstKeyIn(base, ids) : firstKey(base);
   return [
     ['对照 未变异（门禁必须绿，且这三条臂都没被触发）', (s) => s, null],
     [`A 摘掉一枚真登记（${one}）`, (s) => dropEntry(s, one), '许可证门禁**从没见过**'],
@@ -63,13 +85,14 @@ export function coverageArms(base) {
   ];
 }
 
-function run(text, tag) {
+function run(text, tag, tree) {
   const copy = join(ROOT, `research/tools/.covmut-${tag}.tmp.mjs`);
   let out = '';
   let rc = 0;
   try {
     writeFileSync(copy, text);
-    out = execFileSync(process.execPath, [copy], { cwd: ROOT, encoding: 'utf8' });
+    out = execFileSync(process.execPath, [copy, ...(tree ? ['--installed-tree', tree] : [])],
+      { cwd: ROOT, encoding: 'utf8' });
   } catch (e) {
     rc = e.status ?? -1;
     out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
@@ -79,19 +102,25 @@ function run(text, tag) {
   return { out, rc };
 }
 
+const argi = process.argv.indexOf('--installed-tree');
+if (argi >= 0 && !process.argv[argi + 1]) {
+  console.error('❌ --installed-tree 后面要跟文件路径');
+  process.exit(2);
+}
+const TREE = argi < 0 ? null : process.argv[argi + 1];
 const base = readFileSync(SRC_FILE, 'utf8');
 let bad = 0;
-for (const [name, apply, needle] of coverageArms(base)) {
-  const { out, rc } = run(apply(base), name.split(' ')[0]);
+for (const [name, apply, needle] of coverageArms(base, TREE ? treeIds(TREE) : null)) {
+  const { out, rc } = run(apply(base), name.split(' ')[0], TREE);
   // 对照组判"绿"，三条变异臂判"rc≠0 且报错里出现那一行判据本体"——
   // 只看 rc≠0 不够：任何语法错误都会红，而那条红与这张表无关。
   const ok = needle === null ? rc === 0 : (rc !== 0 && out.includes(needle));
   if (!ok) bad += 1;
   console.log(`${ok ? '  ok' : 'RED '} ${name} ⇒ rc=${rc}${needle ? `，判据句「${needle}」${out.includes(needle) ? '命中' : '没命中'}` : ''}`);
 }
-console.log(`许可证登记表变异臂：4 条 · 不符 ${bad}`);
+console.log(`许可证登记表变异臂：载体=${TREE ? 'installed-tree（跑起来的镜像里那棵树）' : 'snapshot（提交物锁导出的树）'} · 4 条 · 不符 ${bad}`);
 if (bad) {
   console.log('❌ 有臂没红 ⇒ 那张表在这一侧没有牙（或者锚点漂了，看上面那行 rc 与命中）');
   process.exit(1);
 }
-console.log('✅ 摘掉/塞假/走后门 三条各红一次；对照组未变异时不红。仅覆盖 snapshot 载体，真树那趟见 --installed-tree（排在落地后）。');
+console.log('✅ 摘掉/塞假/走后门 三条各红一次；对照组未变异时不红。');
