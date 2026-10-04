@@ -2296,14 +2296,34 @@ Goal 第③条要求"§6 六条明文不做"逐项有账。开工前 §6 没被�
 | 2 空态插画 | 8 | 本批新增图片/矢量资产 **20** 枚，全部在 `apps/web/evidence/`（§6.2 规定一要求的验收截图）；**进界面的**插画/图形资产 = **0** 枚；界面新增 **1791** 行里引用图形的形状 = **0** 条 | 🔴 当时没有 → **18:2x 起有了**：常驻门禁 `check:detail-pane-slot` 的腿 A/B（§8.74） |
 | 3 空态引导卡 | 9 | 界面新增 1791 行里引导卡形状 = **0** 条；分母：merge-base 上含「引导/新手」的文件 **88** 枚 | 🔴 当时没有 → **18:2x 起有了**：同一道门禁的腿 D（§8.74） |
 | 4 番茄钟塞进列表模型 | 5 | focus 相关源文件 **17** 枚里，五条列表形状的命中 = **0** | 🟡 部分：`check:layering` 管"外壳不许自己拼 op"，不管"番茄页不许变成列表" |
-| 5 设置/搜索改路由、搬右栏 | 7 | `App.tsx` 里"settings\|search 挂路由"的形状 = **0**；浮层那两套（`.ht-sheet` / `role="dialog"`）仍在 = **true** | 🔴 没有（这条的既有判据是两条界面用例，不是门禁） |
+| 5 设置/搜索改路由、搬右栏 | 7 | `App.tsx` 里"settings\|search 挂路由"的形状 = **0**；浮层那两套（`.ht-sheet` / `role="dialog"`）仍在 = **true** | ✅ **有，而且此前被我误记成"没有"**（18:4x 现跑：`cd apps/web && node ./node_modules/vitest/vitest.mjs run tests/settings-sheet-ia.spec.tsx tests/search-overlay-ia.spec.tsx`
+⇒ `IA_RC=0`、`Test Files 2 passed`、`Tests 8 passed`。⚠️ linked worktree 里**没有**根 `node_modules/.bin/vitest`，
+按那条老纪律走包内的 `node ./node_modules/vitest/vitest.mjs`）：判据不必是 `check:*` 门禁 —— `apps/web/tests/settings-sheet-ia.spec.tsx`（4 条）+ `apps/web/tests/search-overlay-ia.spec.tsx`（4 条）断的正是这一行的行为："打开设置/搜索后**侧栏与下层视图都还在 DOM 里**""`aria-modal=false` 且能回到原来那个视图""Esc / ✕ / ⌘K / 点 scrim 都出得去"。它们是 `@heyta/web` 的 vitest 套件（`include: ['tests/**/*.spec.{ts,tsx}']`），而 `pnpm check` 末尾跑 `pnpm -r test` ⇒ **每次 check 都在守**。⚠️ 口径要说清：这两族判的是**行为**（浮层不替换视图），不是"有没有人新加一条 `settings` 路由"的字样 —— 后者探针 7 量的就是那个，而字样级判据改名即静默失效（§8.74 那条边界）。**教训：写"没有常驻载体"之前要先问"常驻"的判据是谁跑的，别只搜 `check:*`。** |
+
 | 6 `Habit`/`FocusSession` 加必填字段 | 4 | 两块 interface 逐行对 merge-base，新增行里的必填字段 = **0**；对照：真 `Habit` 块里必填字段 **1** 条（`name: string;`） | 🟡 部分：hydration 侧有测试，但没有"新字段必须可选"的形状检查 |
 | 7 bump `CURRENT_SCHEMA_VERSION` | 1 | `packages/shared-schema/src/schema-version.ts`：merge-base = **1** / HEAD = **1** | ✅ `check:migrations` + 死链外的 schema 版本对账 |
 | 8 `apps/*` 里判断该发哪条 op | 10 | `check:layering` → **RC=0**，「✅ apps/\* 分层边界完好（扫描 **332** 个文件，**9** 条规则）」；本批改过的 `apps/*` **47** 枚全在这 332 个里；`no-op-construction-in-apps` 在源码 `id:` 清单里 = **true** | ✅ 常驻，`pnpm check` 每次都跑 |
 | 9 调高两道棘轮基线 | 2 | `check:l4`：`baseline:104`（web）+ `baseline:90`（mobile）改前=改后；`check:row-single-source`：`HT_FAMILY_BASELINE=28` 改前=改后 | ✅ 两道棘轮自己就是载体（余量为 0 ⇒ 净增即红） |
 | —（AGENTS §3.1/3.2） | 3 | 本批改过的 `package.json` = **0** 枚；新增依赖行 = **0** 条 | ✅ `license-inventory.mjs` + `pnpm -r build` 的 deps 预检 |
 
+### 1b. 两行标 🟡 的为什么这批**不**升级成常驻门禁（裁决指针，不是"以后再说"）
+
+- **第 4 行「番茄钟塞进列表模型」**：`check:layering` 管的是"外壳不许自己拼 op"，确实不管"番茄页不许变成列表"。
+  可建的形状是"focus 相关源文件里不许出现列表渲染的三种形状（`.map(` 之外的虚拟列表组件 / 排序拖拽 / 批量选择）"，
+  但 §6 那一行禁止的是**产品形态**（把专注记录做成任务列表那种可排序可批选的表），它没有唯一的代码形状 ——
+  今天任何一枚共享列表组件被番茄页复用都合法，只要它呈现的是记录而不是待办。⇒ 这一行由**界面判据 + 看图**守
+  （W7 那三张图、`apps/web/tests/focus-detail-pane.spec.tsx` 与 `e2e/tests/focus-detail-pane.spec.ts` 两族同名不同载体），**不建门禁**，且这一格不许读成"待办"。
+- **第 6 行「`Habit`/`FocusSession` 加必填字段」**：AGENTS §3.3 那条的真正机制是"消费侧给运行时默认值"，
+  而我探了一遍**全仓没有集中的默认值表可以对账**：`packages/op-log/src` 里 `hydrat` 命中 **0** 处，
+  `packages/domain/src` 只有 `entities.ts` / `habit-resilience.ts` 两处提到 hydration，默认值是**散在每个消费点**的。
+  ⇒ "interface 字段 ↔ hydration 默认值"两侧对账的门禁**建不出来**（要建先得把默认值收拢成一张表，那是另一单）。
+  本批可行的只有棘轮形状（按 interface 数必填字段、净增即红，同 `check:l4` 的基线套路），
+  但那等于在**别人正在改的** `packages/domain` 上立一道新大门禁（§8.13 的"不越界"），
+  且必填字段这件事 `pnpm -r typecheck` 对新数据是绿的、只在**已落盘数据的回放**上炸 —— 棘轮抓不到那一层。
+  ⇒ 本批只留探针 4 的读数 + 这块边界，**不建门禁**，也**不**把它记成"待办"：要做就得连"默认值收拢"一起拍。
+
 **探针 6 的口径改了三次**才站得住，三版的命中数都留着：整行扫 → **43**（全是注释里的状态记号 🔴⚠️）；
+
 逐行剥注释 → 仍若干（跨行块注释中段那些行**没有可辨认的行首记号**）；
 只扫"会被渲染"的两种形状 + **筛完再剥一遍** → **0**，而那 2 条被剥掉的正是注释（`renderedCommentHits=2` 是这行的承重数）。
 📌 射程窄但每个命中都能判，好过射程宽而把 43 条注释记号一起报成违规。
