@@ -134,11 +134,17 @@ t=0 截图上**三道字形全透明**，画面只剩一块空蓝底板 —— �
 2. **RN 内容层的首屏动画未做**：iOS 的动效按平台事实只能落在 storyboard **之后**那一层，
    那一层需要一个宿主无关的 RN 组件（消费同一批 token 的 `duration.splash-*`）。
    本轮刻意没做：它要改 `apps/mobile/src/**`，那片正被并行会话重写。
-3. **`check-brand-assets` 还没有自动消费者**：`package.json` 正被别的会话改着，
-   本轮没有把 `check:brand-assets` 加进 `pnpm check`。待接线的一行：
-   `"check:brand-assets": "node scripts/check-brand-assets.mjs"` 并把
-   `pnpm check:brand-assets &&` 插进 `check` 链（建议紧跟 `check:tokens` 之后）。
-4. **`docs/plans/README.md` 的入口行**同样因为该文件正被别人改而未加，待补一行指向本文。
+3. ~~**`check-brand-assets` 还没有自动消费者**~~ ✅ **已接线（2026-10-04，`2b116072`）**：
+   `package.json` 里加了 `"check:brand-assets": "node scripts/check-brand-assets.mjs"`，并把
+   `pnpm check:brand-assets &&` 插在 `check:tokens` 之后（生成物对账紧跟 token 真源）。
+   🔴 **当时那句"待接线的一行"本身是这条缺口存在的原因**：`pnpm check:gate-wiring` 抓不到
+   "文件在、别名从来没写过"这种形态 —— 它枚举的是 **package.json 里定义过的门禁**，
+   没定义过的目标根本不在它的枚举集合里，于是链外门禁可以既没有别名、也没有消费者，
+   还让它自己报绿（§7 第 191 条同族）。现量：`--pkg <那笔的 package.json>` ⇒ 定义 80→81、
+   链 83→84、rc=0。
+4. ~~**`docs/plans/README.md` 的入口行**~~ ✅ 已补（同一批）；那条"该文件正被别人改着"的
+   理由对**提交动作**成立、对**能不能写这一行**不成立 —— 混合文件按 hunk 取，
+   别人那一行留在工作树里没被带走。
 5. **暗色启动帧未实测**：`HeytaSplashBackground.colorset` 写了亮/暗两档（值来自
    `tokens.json` 的 dark 覆盖），但"暗色模式下不先闪亮板"要真机/模拟器切换外观才能判，属第 1 条。
 6. **鸿蒙**：`apps/mobile` 下没有鸿蒙工程（壳未建），谈不上启动帧。
