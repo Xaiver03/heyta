@@ -536,6 +536,11 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    而本验收第 0 步就会 `pm clear` 手机库 —— 探测必须排在破坏性步骤**之前**，否则代价是"设备已清空、跨设备那条腿没做成"。
    启动器已加这道门（缺就打印该按的顺序并退 3）。⇒ **③ 之前必须有 `pnpm -r build`**，
    而 ① 的第 0 段正是它 —— 顺序 ①→②→③ 不是偏好，是被这两个缺件逼出来的。
+   ✅ **19:22 现量把"四个全缺"这一格翻过来了**：载体里 `apps/node-host/dist`、`packages/app-host/dist`、
+   `packages/ui/dist`、`packages/sync-core/dist` **四枚全在**，`apps/node-host/dist/cli.js` 也在
+   ⇒ ③ 不会被启动器那道"缺件退 3"的门拦下，窗口里也不必为它专门排一次 `pnpm -r build`
+   （链会不会重建是另一件事：它按"构建输入跨了 51 笔"自己判）。
+   ⚠️ 上面那两行描述的是 **01:5x 那一刻**的载体状态，别当现状读 —— 瞬时读数写成持久身份是同一族老毛病。
    ✅ **两条启动器的"会拒跑"这道门本轮已被现量验证有牙**（不是装饰）：
    `bash /tmp/heyta-run-checks.sh`（不带 `--go`）退 **3**，打印 `:4318 = busy / :4319 = busy`；
    `bash /tmp/heyta-run-notes.sh`（已改指向载体，不带 `--go`）退 **3**，打印 `GATE_EXIT=3 / VERDICT=NOT-RUNNING`。
@@ -1072,3 +1077,9 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   我当时读到的就是"实现里只有 android/ios/windows 三张"。改成 `[A-Za-z0-9._-]+` 后四张齐。
   **同族规矩**：断"实现里没有 X"之前，先把 pattern 喂一枚**必然命中**的样本（这里就是那张我自己
   启动器里写了六天的 `mac-installed.png`）；命中不了先改探针，不许先改结论。
+- ✅ **闸门那两条"有能力否决退码却没有 WHY_ 旗标"的无关腿，现量对 C 分支是惰性的**（19:3x 逐条读 main 那版）：
+  `:318` 的 MANIFEST 腿 grep 的是 `verify-mobile-due-time.sh`（**不是** ③ 那枚），而它在
+  `scripts/check-script-snapshot.mjs` 里命中 1、`verify-mobile-notes.sh` 也命中 1 ⇒ 那条 `warn()` 不会触发；
+  "服务端没在 :PORT" 那一支只在 `HEYTA_GATE_SERVER_PORT` 非空时才走（链不设它，走的是 `:266` 的纯 `echo`）。
+  ⚠️ 但 `warn() { …; FAIL=$((FAIL + 1)); }` **本身没改** ⇒ 这条"惰性"取决于**现场那两个条件**，
+  不是结构保证；链仍然保留那条单独归因（`REDS` 全空却退非 0 ⇒ 记「被无关腿否决」，不混进设备/负载红）。
