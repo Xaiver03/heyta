@@ -567,7 +567,12 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
 **从不制造愧疚**。关键裁决见下面 ADR-0022 与
 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
 
-### 2026-10-03：倒数纪念日 批次二（✅ **已完成质量审计、合并，并已进 `main`**：`origin/main` = `a5891fde`）
+### 2026-10-03：倒数纪念日 批次二（✅ **已完成质量审计、合并，并已进 `main`**）
+
+> ⚠️ **本标题不写 `origin/main` 的 SHA** —— 写进正文的那一刻它就开始漂（本批实测：同一个 tip 在
+> 40 分钟里被引用 8 次、跨 4 份文档，其中 2 处是"当前状态"声明）。当前 tip 请现量：
+> `git -c credential.helper='!gh auth git-credential' ls-remote https://github.com/Xaiver03/heyta.git refs/heads/main`
+> （SSH 通道被本机代理挡时的备用读法，见计划 §8.5 第 14 条）。
 
 > 逐项状态与全部读数：[`docs/plans/countdown-anniversary.md`](docs/plans/countdown-anniversary.md) §8.2 / §8.4。
 > **本轮质量审计 + 分组提交 + 合并的逐条裁决与合并态读数：同文 §8.5**（2026-10-04）。
