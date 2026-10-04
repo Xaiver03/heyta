@@ -3774,3 +3774,38 @@ Total frames rendered: 27          ← 计数是**新进程的**，不是旧进�
 首次 `17:16:42`、末次 `17:56:55`（约 40 分钟），17:57:40 起换成新的一枚。
 ⇒ 与 §7 那条"判据从名字里解析数字要先验证解析本身"同族，这次栽的是**我读日志的临时 awk**。
 **换人时刻表要重新生成才能引用**（这条 awk 现在是坏的，别接着用）。
+
+#### 7.31.27 ③ 的取证归位从"我手敲 cp"改成生成器 + 五臂夹具（18:01–18:03 现量）
+
+**为什么**：③ 跑完要把**载体里**那三张图归位到主检出 `apps/mobile/evidence/`，
+而"拷过去了"与"拷的是这一趟的"是两件事 —— 手敲 `cp` 既没有前后 md5 对账，
+也分不清"目的地位于本来就是这张图"（那种时候拷一遍会制造一条**假的 git 脏项**，
+下一轮闸门就把它读成"有人在改源码"）。
+
+**落地**：`~/.heyta-window-rigs/heyta-evidence-collect.sh`（durable，不占 `/tmp`）。行为：
+逐枚给出 `before/after/源 md5 + 字节数`，**回读判据**是"目的地 md5 与字节数都等于来源"而不是 `cp` 的退出码；
+逐字节相同就**不拷**；载体里没有或**空文件**都算"这张不算本轮取证"并以 `COLLECT=PARTIAL` + **退 2** 结束
+（退 2 不是 0 —— 缺第三张不能让收口看起来是成功的）；只读载体、只写那三枚路径，不 commit、不 push。
+
+**夹具** `heyta-evidcollect-fixture.sh` 五臂 GREEN（全程临时目录，不碰真库真载体）：
+D1 两枚相同 + 一枚不同 ⇒ `copied=1 same=2` 且第三枚归位后与来源 `cmp` 相同；
+D2 第三枚根本没有 ⇒ 点名 + `missing=[…]` + 退 2；
+D3 目的地原本没有 ⇒ `before=[]` 仍回读对账；
+D4 载体里是空文件 ⇒ 视同缺（判据用 `-s` 不是 `-f`）；
+**D5 变异**：把 `cp -p` 换成空操作 ⇒ 必须被"拷完回读不一致"抓到（证 D1 的回读判据承重，
+而不是只要 `cp` 退 0 就报成功 —— 这正是本仓库 §7 #197 那一族）。
+
+**对着真目录干跑一次（18:03，此时 ③ 还没跑）**：
+`已相同 notes-1 md5=fa8180d293d9…(48,768 B)`、`已相同 notes-2 md5=f6718cb1963b…(181,177 B)`、
+`缺 android-notes-3-from-search.png` ⇒ `SUMMARY copied=0 same=2 missing=[…3…]`、`COLLECT=PARTIAL`。
+零写入，主检出 `apps/mobile/evidence/` 里那些 `M`/`??` 条目都是**别条线的**
+（`ios-reminder-*`、`android-vault-*`），不是这趟造出来的。
+
+**读数的取代表数**（③ 成交后按顺序跑，两条都要贴进 §7.30 的 ③ 位）：
+```bash
+bash ~/.heyta-window-rigs/heyta-notes-readout.sh /tmp/notes-run8.log        # 第 6/7/8/8b/9/10/11/12 步逐条
+bash ~/.heyta-window-rigs/heyta-evidence-collect.sh                          # 三张图归位 + 前后 md5 对账
+bash ~/.heyta-window-rigs/heyta-evidcollect-fixture.sh                       # EVID_COLLECT_FIXTURE=GREEN arms=5
+```
+⚠️ 一处**已知未做**：`判决行`与`第 12 步`两行在日志不存在时打空串（现在就是这样）。
+这是刻意的"空 ≠ 通过"形状 —— 收口时若这两行还是空，就是 ③ 没跑过，不是"读不到所以算了"。
