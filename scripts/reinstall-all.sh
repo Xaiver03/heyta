@@ -199,7 +199,7 @@ if printf '%s' "$WANT" | grep -q "mac"; then
   RESULT_mac=FAIL
   # 🔴 删之前把"删的是哪个目录、里面有什么"打进日志：这一句的失败模式是**安静**，
   #    出事后日志里连"原来那里有东西"都读不出来。
-  echo "  macOS 输出目录 = $MAC_OUT（覆盖旋钮 HEYTA_MACOS_DIST_DIR）"
+  echo "  macOS 输出目录 = ${MAC_OUT}（覆盖旋钮 HEYTA_MACOS_DIST_DIR）"
   if [ -d "$MAC_OUT" ]; then
     echo "  清空前里面有 $(ls -1 "$MAC_OUT" 2>/dev/null | wc -l | tr -d ' ') 项："
     ls -1 "$MAC_OUT" 2>/dev/null | head -8 | sed 's/^/     /'
