@@ -966,6 +966,18 @@ tree=$(git merge-tree --write-tree main feat/self-host-distribution) || exit 1
 git commit-tree "$tree" -p "$(git rev-parse main)" -p "$(git rev-parse feat/self-host-distribution)" -F <msg-file>
 ```
 
+🔴 **这三行只在"零冲突"那一趟成立，而 2026-10-04 08:0x 现量它已经不成立了**（§8.61 ①：
+`git merge-tree --write-tree --name-only main feat/self-host-distribution` ⇒ **rc=1**，
+`self-host-distribution-audit.md` 与 `package.json` 两条内容冲突）。
+量过的一件事：`--write-tree` 在**有冲突时照样写出一棵树**，而那棵树里两个文件**都带 `<<<<<<<` 标记**
+（现量 `f3f3b234` 那棵树：`package.json` 1 处、审计文档 1 处；负向对照本分支 HEAD 的 `package.json` = 0 处）。
+所以这三行现在**只剩"退出"这一条路**：`|| exit 1` 会接住 rc=1，逐字照抄的人得到的是一个失败，
+不是一枚坏载体 —— 这一点要说准，别写成"照抄就会把冲突提交进历史"（那是**去掉守卫**之后的形状）。
+真正过期的是它上面那句话："SHA 一定变 ⇒ 用**下面几行**重算一次"。落地的机制已经是
+`research/tools/selfhost-merge-carrier.mjs`：它把冲突**分族逐个解**
+（pkg 并集 / .gitignore 两块都留 / evidence PNG 取 main / 审计文档并集 / 族外一律 die 交人判）再落笔，
+而这三行只是它内部的**一步**，不是给人的手册。
+
 🔴 **尚未实测的边界（写明，不主张）**：`pnpm -r typecheck` 与 `pnpm -r test` **没跑**。
 本轮现场是负载 81.90 / 16 核、OrbStack 的 docker daemon 未运行；且此时 dist 半新半旧
 （只重建了 i18n），typecheck 量不到东西。所以"合并树编译绿 / 测试绿"目前是**主张，
@@ -3902,7 +3914,43 @@ dev 条目本来就被排除在等式之外，删掉它们不改变非 dev 那 1
 `rev-parse --verify MERGE_HEAD`（rc=128 ⇒ 没有进行中的合并）问一次，只在真有的时候才 abort；
 两棵树上各实测该探针 rc=128。
 
+### 8.61 落地前的一次**只读预检**：冲突面 2 条都在预置四族里、并集真跑一次判 OK，而"main 前进"这一格是 git 自己占的（08:0x）
 
+这三件事都能在等负载窗口的空档做 —— 它们不动载体、不建工作树、几乎不吃 CPU，
+而回答的问题是"那条 30-60 分钟的链跑起来会不会白跑"。
 
+① **冲突面现量**：`git merge-tree --write-tree --name-only main feat/self-host-distribution` ⇒ **rc=1**，
+两条路径：`docs/research/self-host-distribution-audit.md` 与 `package.json`。都在预置四族内
+⇒ `fam.other` 为空 ⇒ 载体不会 `die(2, 预置四族之外的冲突)`。
+🔴 顺带**否证了 §8.16 里还活着的一段手册**（已在原节旁边挂了指针）：那三行
+`tree=$(git merge-tree --write-tree …) || exit 1` **只在零冲突时成立**。现在 rc=1，
+而实测 `--write-tree` 写出的那棵树里两个文件**都带 `<<<<<<<`**（`f3f3b234`：pkg 1 处 / 审计文档 1 处，
+负向对照本分支 HEAD = 0 处）⇒ 这三行今天只剩"靠 `|| exit 1` 响亮退出"这一条路，
+它**不再能算出载体**。载体机制是 `research/tools/selfhost-merge-carrier.mjs`（分族解冲突再落笔）。
+另一个自动结论：`research/tools/check-image-license-coverage.mjs` 与 `server/image-npm-tree.json`
+在**提交层根本不冲突**（main 相对 merge-base 没改过它们）⇒ 载体自动取本分支版；
+他们那两份编辑只活在主检出的工作树里，所以 §8.59 ⑩ 那条门禁读数是"他们若把自己那版提交上去会红"，
+而不是"现在会冲突"。这两件事以前没分开写。
 
+② **并集真跑一次**（真的 `selfhost-audit-union.mjs` + 三个真 blob，不建载体）：verdict = **OK**，
+stats = `mainOnly=50 srcOnly=1598 lostMain=0 lostSrc=0 invented=0 markers=false extraMainHeadings=1 droppedBase=24`。
+逐条读法：main 那 50 行是他们相对 base 新增的（含 1 个本分支没有的节标题），一条不少；
+`droppedBase=24` 是**两侧都删掉**的 base 行 ⇒ 并集规则允许它消失。
 
+③ 🔴 **"main 前进到该载体"这一格是 git 占的，不是规矩占的。** 两件现量：
+`git worktree list` 显示 `refs/heads/main` 正检出在主检出 `/Users/…/heyta`（那侧未提交 220 枚）；
+临时小仓实测**对一个已被别处检出的分支**做 `git fetch . other:two` ⇒
+`rc=128` / `fatal: refusing to fetch into branch 'refs/heads/two' checked out at '…'`。
+⇒ 在"不动主检出、不 `git branch -f main`、不 push"三条之下，#1 的最后一格**机械上只能由主检出的
+所有者执行**。我这侧能交出的最远的东西是：`feat/self-host-merge-main` 指向一枚"第一父 = main、
+且**在载体上跑过完整链**"的提交，外加一条"main 是否仍是那枚第一父"的现量判据：
+
+```bash
+git merge-base --is-ancestor "$(git rev-parse feat/self-host-merge-main^1)" main \
+  && echo '载体第一父仍在 main 历史里 ⇒ 载体可直接进' \
+  || echo 'main 又前进了 ⇒ 必须重算载体（新鲜度守卫会自己拦）'
+```
+
+⚠️ 这一条把 #1 的关闭形状改写了：它不是"我做完了"，是"我把可交出的部分做到底并交出指针 + 判据"。
+现场证据支持这个改写的必要性 —— 记这三条的十分钟里 main 从 `ae6ec473` 走到 `af4e4b32`（两笔），
+并行会话提交频率高于载体重算频率，所以任何"SHA 对得上"的印象都必须在落笔那一步重取。
