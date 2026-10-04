@@ -6941,11 +6941,22 @@ sweep 残留 PWA 承诺时命中 `zh-CN.ts:3602` / `en.ts:3402`
 #### ④ 顺带查出来的两条，一条入档一条只是读数
 
 - **G-60（新登记，未关）**：`/app/manifest.webmanifest` 线上回 **`application/octet-stream`**
-  （nginx 的 `mime.types` 里没有 `.webmanifest`）。两处既有用例都**只把这个值放进 probe 里记录、
-  没有一条 expect**（`live-domain.spec.ts` 的 `manifestType` 字段就是它），所以这个值今天
-  **没有任何一层在守**。要关它需要一次决定：给 nginx 补 mime 类型并补断言，或明确接受并写明理由。
-  🔴 不许从线上值推断自托管载体的值 —— 那边是 `@fastify/static` 在发，走的是另一套 mime 解析，
-  它的读数只能等第 2 项那趟真栈量。
+  （nginx 的 `mime.types` 里没有 `.webmanifest`）。~~两处既有用例都**只把这个值放进 probe 里记录、
+  没有一条 expect**~~ ⇒ 🔴 **这半句在写下的一小时内被我自己否证**：自托管载体那一侧
+  **早就有一条断言** —— `e2e/selfhost-stack/selfhost-web.spec.ts:220`
+  `expect(manifest.headers()['content-type']).toContain('application/manifest+json')`
+  （它今天没跑过，因为浏览器那三条判据还等负载窗口，见第 2 项）。
+  ⇒ **G-60 的范围因此缩成一侧**：**只有线上（nginx）那一侧是"有读数、无判据"**。
+  而且自托管那一侧的期望值这次有了**代码层依据**（不是猜的）：镜像锁里
+  `node_modules/mime 3.0.0`（**prod**）+ `@fastify/send@4.1.1` 的 `lib/send.js:508`
+  写的是 `mime.getType(path) || mime.default_type`，而 `mime@3.0.0/types/standard.js` 里
+  **有** `"application/manifest+json":["webmanifest"]` 那一条。
+  ⚠️ 顺带记一次我自己的探针形状错：`new (require('mime/Mime.js'))()` 直接实例化那个类
+  会拿到**空表**（`getType` 回 `null`），差点被我读成"mime@3 不认识 webmanifest"。
+  表在 `types/standard.js`，而装配好的实例是 `index.js` 的默认导出 —— **判"某个库认不认识 X"
+  要读它导出的那个实例，不是它内部的类**。
+  要关它只剩一件事：给发布主机的 nginx 补 `mime.types` 那一行，**或**明确接受并写明理由。
+  ⚠️ 别把这条读成"自托管那边也等着复验" —— 那边是**已有断言、还没跑**，跑的结果无论绿红都归第 2 项那趟。
 - 一条**观察不是缺陷**：全新上下文（Chromium 报 `en-US`）直开 `/app/` 渲染的是整套英文界面 +
   英文同意弹窗（截图 `e2e/test-results/live-pwa-app.png`，人已看：Inbox/Today/四象限/清单/标签
   全在，主蓝按钮 `Agree and connect`）。这是语言解析链第三层（`navigator.language`）的设计行为。
