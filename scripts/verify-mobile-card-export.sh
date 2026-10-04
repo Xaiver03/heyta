@@ -187,7 +187,7 @@ MENU_TPL=$(zh web.countdown.a11y.menu)
 #    读数器退 2 时这条管道的退出码是 `tr` 的 0 —— 拿退出码判会恒等于"取到了"。
 CARD_TITLE=$(node "$READER" card-title "$UI_XML" "$MENU_TPL" 2>/dev/null | tr -d '\r\n')
 if [ -n "$CARD_TITLE" ]; then
-  ok "复用屏上已有卡片「$CARD_TITLE」（正向证据：它的菜单 a11y 名在树里）"
+  ok "复用屏上已有卡片「${CARD_TITLE}」（正向证据：它的菜单 a11y 名在树里）"
 elif grep -qF -- "$(zh web.countdown.empty)" "$UI_XML"; then
   echo "   屏上是空态 ⇒ 建一条：$NEW_CARD_TITLE"
   CARD_TITLE="$NEW_CARD_TITLE"
@@ -280,12 +280,12 @@ else
       [ -n "$CAND" ] && { FOUND="$CAND"; break; }
     done
     if [ -z "$FOUND" ]; then
-      bad "点了导出、${ATTEMPTS}×3 秒内没有「名字里带这张卡标题、且 mtime ≥ 点击时刻（设备时钟 $T0）」的 png —— 栅格化没跑 / 原生模块没接 / 写盘失败"
+      bad "点了导出、${ATTEMPTS}×3 秒内没有「名字里带这张卡标题、且 mtime ≥ 点击时刻（设备时钟 ${T0}）」的 png —— 栅格化没跑 / 原生模块没接 / 写盘失败"
       echo "   那一刻目录快照（判据的输入，原样打出来）："; snap | sed 's/^/     /'
       dump
       grep -qF -- "$(zh web.countdown.export.failed)" "$UI_XML" && echo "   界面上有失败句（那句说了什么由 i18n 真源定）"
     else
-      ok "这张卡的导出文件落盘了：$FOUND（mtime 晚于点击时刻）"
+      ok "这张卡的导出文件落盘了：${FOUND}（mtime 晚于点击时刻）"
       case "$FOUND" in
         heyta-*.png) ok "文件名形状是 heyta-….png（前缀/后缀都由共享层 cardExportFileName 给）" ;;
         *) bad "文件名不符合 heyta-….png：$FOUND" ;;

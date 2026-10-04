@@ -92,7 +92,7 @@ press_raw() { ax "$1" --pressable --press --json >/dev/null 2>&1; }
 press() {
   local lbl="$1" vis
   vis=$(ax "$lbl" --pressable --scroll-into-view --json)
-  [ "$(jget "$vis" visible)" = "True" ] || { echo "   ↳ 「$lbl」滚不进可见区（$(jget "$vis" found)/$(jget "$vis" scrollRc)）"; return 1; }
+  [ "$(jget "$vis" visible)" = "True" ] || { echo "   ↳ 「${lbl}」滚不进可见区（$(jget "$vis" found)/$(jget "$vis" scrollRc)）"; return 1; }
   ax "$lbl" --pressable --press --json >/dev/null 2>&1
 }
 # ⚠️ **底部标签栏不适用**上面那个：shim 的"可见"定义是 `中心 y < 屏高-120`（给标签栏让位），
@@ -129,7 +129,7 @@ if [ -z "$UDID" ]; then
   fi
   UDID=$(xcrun simctl list devices booted 2>/dev/null | grep -F "$DEVICE_NAME" \
     | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/' | head -1)
-  [ -n "$UDID" ] || { echo "❌ 没有**已启动**且名字含「$DEVICE_NAME」的模拟器 ⇒ 本轮无效（不是产品失败）"; exit 3; }
+  [ -n "$UDID" ] || { echo "❌ 没有**已启动**且名字含「${DEVICE_NAME}」的模拟器 ⇒ 本轮无效（不是产品失败）"; exit 3; }
 fi
 xcrun simctl list devices booted 2>/dev/null | grep -qF "$UDID" \
   || { echo "❌ $UDID 不在 Booted 列表里 ⇒ 先 xcrun simctl boot $UDID"; exit 3; }
@@ -158,7 +158,7 @@ JSB="$APP_DIR/main.jsbundle"
 [ -f "$JSB" ] || { echo "❌ $JSB 不在（装了个没有 bundle 的东西？）⇒ 本轮无效"; exit 3; }
 JSB_M=$(stat -f %m "$JSB"); SRC_M=$(newest_src)
 if [ -z "$SRC_M" ]; then echo "❌ 新鲜度门没有输入（源码目录扫不到 .ts/.tsx？）⇒ 本轮无效"; exit 3; fi
-echo "   新鲜度门输入：bundle $JSB_M（$(date -r "$JSB_M" '+%m-%d %H:%M:%S')）／源码最新 $SRC_M"
+echo "   新鲜度门输入：bundle ${JSB_M}（$(date -r "$JSB_M" '+%m-%d %H:%M:%S')）／源码最新 $SRC_M"
 if [ "$SRC_M" -gt "$JSB_M" ]; then
   echo "   ❌ 装的是旧产物：源码最新 $SRC_M > bundle $JSB_M"
   echo "      先 pnpm reinstall:mobile（或 --only ios）。显式跨过：HEYTA_CARD_EXPORT_ALLOW_STALE=1"
@@ -201,7 +201,7 @@ for _i in 1 2 3 4 5 6 7 8; do
 done
 [ "$TREE_OK" = 1 ] || { echo "❌ AX 树里没有本 App 的内容（label 数 ${TREE_N:-?}，且主屏/同意面板/欢迎页三个候选标签都不在）";
   echo "   label 数 0 ⇒ §7 #63 那种卡死形态，重启模拟器可自愈；非 0 却没有候选标签 ⇒ 界面停在别的屏。两种都是探针未到位 ⇒ 本轮无效"; exit 3; }
-ok "无障碍树能读到 App 内容（label 数 $TREE_N）"
+ok "无障碍树能读到 App 内容（label 数 ${TREE_N}）"
 
 # 🔴 key 一律从读数器取，界面字面量不抄进脚本（抄件必漂）。
 #    这三个键名是**读数器验出来的**，不是我推的：第一版写了
@@ -212,8 +212,8 @@ CONSENT_TITLE=$(zh common.privacy.consent.title)
 if ax_found "$CONSENT_TITLE"; then
   LOCAL_ONLY=$(zh common.privacy.consent.localOnly)
   press_until_gone "$LOCAL_ONLY" "$CONSENT_TITLE" 4 \
-    && ok "隐私同意面板已按「$LOCAL_ONLY」收掉" \
-    || { echo "❌ 同意面板在，但按「$LOCAL_ONLY」没收掉 ⇒ 探针未到位（本轮无效）"; exit 3; }
+    && ok "隐私同意面板已按「${LOCAL_ONLY}」收掉" \
+    || { echo "❌ 同意面板在，但按「${LOCAL_ONLY}」没收掉 ⇒ 探针未到位（本轮无效）"; exit 3; }
 fi
 WELCOME=$(zh mobile.welcome.offline)
 if ax_found "$WELCOME"; then
@@ -230,15 +230,15 @@ step "3. 走到倒数日屏（W8 移动半那条注册表）"
 # 不是"按得到就算到了"：`press` 对不在树上的标签是静默空操作。
 TAB_READY=0
 for _i in 1 2 3 4 5 6; do ax_found "$TAB_LABEL" && { TAB_READY=1; break; }; sleep 3; done
-[ "$TAB_READY" = 1 ] || { echo "   ❌ 浮层归一化之后仍读不到「$TAB_LABEL」标签 —— 探针未到位（本轮无效）"; exit 3; }
+[ "$TAB_READY" = 1 ] || { echo "   ❌ 浮层归一化之后仍读不到「${TAB_LABEL}」标签 —— 探针未到位（本轮无效）"; exit 3; }
 press_raw "$TAB_LABEL"; sleep 3
 ENTRY=$(zh mobile.countdown.entry)
 if ! ax_found "$ENTRY"; then
-  echo "   ❌ 「$TAB_LABEL」页里没有倒数日入口「$ENTRY」"; exit 3
+  echo "   ❌ 「${TAB_LABEL}」页里没有倒数日入口「${ENTRY}」"; exit 3
 fi
 # 🔴 rc 必须收下：入口在「我的」页的滚动区里，屏外那一档 `press` 现在是**会返回 1** 的
 #    （旧版静默按空、然后靠下一节的"屏没开到"去反推，红落在哪里全靠运气）。
-press "$ENTRY" || { echo "   ❌ 入口「$ENTRY」滚不进可见区 ⇒ 按不到，本轮无效（不是产品失败）"; exit 3; }
+press "$ENTRY" || { echo "   ❌ 入口「${ENTRY}」滚不进可见区 ⇒ 按不到，本轮无效（不是产品失败）"; exit 3; }
 sleep 3
 # 🔴 判据**不能**用 web.shell.views.countdown：它的 zh 值与入口标签是**同一个串**
 #    （两个都是「倒数纪念日」，实测读数），于是"点了入口没开屏"时树上仍有那个串 ⇒
@@ -247,18 +247,18 @@ sleep 3
 PLACEHOLDER=$(zh web.countdown.composer.placeholder)
 EMPTY=$(zh web.countdown.empty)
 if ax_found "$PLACEHOLDER" || ax_found "$EMPTY"; then
-  ok "倒数日屏开到前台（读到「$PLACEHOLDER」或空态「$EMPTY」）"
+  ok "倒数日屏开到前台（读到「${PLACEHOLDER}」或空态「${EMPTY}」）"
 else
   bad "点了入口却没开到倒数日屏（输入框与空态都不在树上）"
 fi
 
-step "4. 自建一条卡片（标题 $CARD_TITLE，日期取 7 天后）"
+step "4. 自建一条卡片（标题 ${CARD_TITLE}，日期取 7 天后）"
 ADD_LABEL=$(zh web.countdown.add)
 # 🔴 上一节"placeholder 或 空态任一在树里"就够了，这一节不够：`--field --set` 打的是
 #    "树上第一个输入域"，而"placeholder 不在树里"意味着 composer 没在前台（空态句在
-#    屏幕上，输入框可能要展开）—— 那样会把标题写进**别的**字段，然后用「$ADD_LABEL」
+#    屏幕上，输入框可能要展开）—— 那样会把标题写进**别的**字段，然后用「${ADD_LABEL}」
 #    的 enabled 当"成功"读数。所以这里必须正向确认 placeholder 在树里。
-ax_found "$PLACEHOLDER" || { echo "   ❌ 倒数日屏上读不到输入框占位符「$PLACEHOLDER」⇒ 探针够不着 composer，本轮无效"; exit 3; }
+ax_found "$PLACEHOLDER" || { echo "   ❌ 倒数日屏上读不到输入框占位符「${PLACEHOLDER}」⇒ 探针够不着 composer，本轮无效"; exit 3; }
 # 🔴 输入框**不能**走上面那个 `press()`：它带着 `--pressable` 这层过滤，而 shim 的
 #    `is_pressable` 认的是 Button 那一类 —— `AXTextField` 不算，于是"定位"直接返回
 #    found=False，`scroll_into_view` 把它报成 `element-left-tree`（09:1x 那趟的 exit 3
@@ -266,7 +266,7 @@ ax_found "$PLACEHOLDER" || { echo "   ❌ 倒数日屏上读不到输入框占�
 focus_field() {
   local lbl="$1" vis
   vis=$(ax "$lbl" --field --scroll-into-view --json)
-  [ "$(jget "$vis" visible)" = "True" ] || { echo "   ↳ 输入框「$lbl」不可达（found=$(jget "$vis" found) scrollRc=$(jget "$vis" scrollRc)）"; return 1; }
+  [ "$(jget "$vis" visible)" = "True" ] || { echo "   ↳ 输入框「${lbl}」不可达（found=$(jget "$vis" found) scrollRc=$(jget "$vis" scrollRc)）"; return 1; }
   ax "$lbl" --field --press --json >/dev/null 2>&1
 }
 # 🔴 顺序错了整节就废：共享层 `packages/ui/src/countdown/EventBoard.tsx:367` 写的是
@@ -275,7 +275,7 @@ focus_field() {
 #    打字之后、选日期之前去读 enabled 的，那条判据在产品规则下**永远为假**，
 #    于是它报的红（"标题没进得去"）说的不是那件事。现在按产品的顺序走：
 #    打字 → 选日期 → **这时候** enabled 才是"标题+日期都进了应用的态"的亲口确认。
-focus_field "$PLACEHOLDER" || { echo "   ❌ 输入框「$PLACEHOLDER」不可达 ⇒ 焦点进不去，本轮无效"; exit 3; }
+focus_field "$PLACEHOLDER" || { echo "   ❌ 输入框「${PLACEHOLDER}」不可达 ⇒ 焦点进不去，本轮无效"; exit 3; }
 sleep 1
 TT=$(ax - --field --type-text "$CARD_TITLE" --json 2>&1); sleep 1
 echo "   type-text 回读：${TT:-（空 ⇒ shim 自己没输出，先看这一行）}"
@@ -293,41 +293,41 @@ echo "   type-text 回读：${TT:-（空 ⇒ shim 自己没输出，先看这一
 #    另外先把键盘收掉再开日期格：日期面板在键盘那一侧，键盘不收起会整片按不到。
 ax - --dismiss-keyboard --json >/dev/null 2>&1; sleep 1
 DATE_BTN_LABEL=$(zh web.countdown.field.date)
-press "$DATE_BTN_LABEL" || { echo "   ❌ 「$DATE_BTN_LABEL」按钮不可达 ⇒ 日期选不了，本轮无效"; exit 3; }
+press "$DATE_BTN_LABEL" || { echo "   ❌ 「${DATE_BTN_LABEL}」按钮不可达 ⇒ 日期选不了，本轮无效"; exit 3; }
 sleep 2
 MON_NUM=$(date -v+7d +%-m 2>/dev/null || date -d '+7 days' +%-m)
 DAY_NUM=$(date -v+7d +%-d 2>/dev/null || date -d '+7 days' +%-d)
 DAY_TPL=$(zh mobile.datePicker.dayLabel)
 DAY_DESC=$(printf '%s' "$DAY_TPL" | sed "s/{title}//g; s/{month}/$MON_NUM/g; s/{day}/$DAY_NUM/g")
-ax_found "$DAY_DESC" || { echo "   ❌ 日期格里找不到「$DAY_DESC」⇒ 探针未到位（本轮无效）"; exit 3; }
-press "$DAY_DESC" || { echo "   ❌ 日期格「$DAY_DESC」滚不进可见区 ⇒ 按不到，本轮无效"; exit 3; }
+ax_found "$DAY_DESC" || { echo "   ❌ 日期格里找不到「${DAY_DESC}」⇒ 探针未到位（本轮无效）"; exit 3; }
+press "$DAY_DESC" || { echo "   ❌ 日期格「${DAY_DESC}」滚不进可见区 ⇒ 按不到，本轮无效"; exit 3; }
 sleep 1
 ax - --dismiss-keyboard --json >/dev/null 2>&1; sleep 1
 FILLED=0
 [ "$(jget "$(ax "$ADD_LABEL" --pressable --list --json)" enabled)" = "True" ] && FILLED=1
 # 判据用的是 **应用自己算出来的那个 enabled**（标题为空 或 日期没选 都点不动），不是"我按过了"。
-[ "$FILLED" = 1 ] || { echo "   ❌ 打完字也选了日期，「$ADD_LABEL」仍然不可点 —— 探针未到位（本轮无效，不是产品失败）"
+[ "$FILLED" = 1 ] || { echo "   ❌ 打完字也选了日期，「${ADD_LABEL}」仍然不可点 —— 探针未到位（本轮无效，不是产品失败）"
   echo "   ↳ 输入框此刻回读：$(ax - --field --list --json 2>&1)"; exit 3; }
-ok "标题与日期都进了应用的态（「$ADD_LABEL」启用 = 它亲口确认，判据条件就是 canSubmit 那一条）"
+ok "标题与日期都进了应用的态（「${ADD_LABEL}」启用 = 它亲口确认，判据条件就是 canSubmit 那一条）"
 press "$ADD_LABEL"; sleep 3
 ax_found "$CARD_TITLE" && ok "新卡片上了屏（「点了」之后「看得见」）" \
-  || { echo "   ❌ 建卡之后屏上找不到标题「$CARD_TITLE」"; bad "建卡没生效"; }
+  || { echo "   ❌ 建卡之后屏上找不到标题「${CARD_TITLE}」"; bad "建卡没生效"; }
 
 step "5. 判据②：点导出**前**沙盒里没那个文件名，点之后必须出现"
 DATA_DIR=$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null | tr -d '\r')
 [ -n "$DATA_DIR" ] && [ -d "$DATA_DIR/tmp" ] \
-  || { echo "   ❌ 读不到沙盒 data 容器（$DATA_DIR）⇒ 探针够不着，本轮无效"; exit 3; }
+  || { echo "   ❌ 读不到沙盒 data 容器（${DATA_DIR}）⇒ 探针够不着，本轮无效"; exit 3; }
 EXPORT_DIR="$DATA_DIR/tmp/card-export"
 BEFORE_LIST=$(ls -1 "$EXPORT_DIR" 2>/dev/null | tr -d '\r')
 [ -n "$BEFORE_LIST" ] && echo "   目录里已有 $(printf '%s\n' "$BEFORE_LIST" | grep -c .) 个文件（不清它 —— 判的是"这一次点下去有没有写下那张卡"）"
 
 MENU_TPL=$(zh web.countdown.a11y.menu)
 MENU_DESC=$(printf '%s' "$MENU_TPL" | sed "s/{title}/$CARD_TITLE/g")
-ax_found "$MENU_DESC" || { echo "   ❌ 卡片上没有「$MENU_DESC」这颗菜单钮"; bad "菜单钮没找到"; }
+ax_found "$MENU_DESC" || { echo "   ❌ 卡片上没有「${MENU_DESC}」这颗菜单钮"; bad "菜单钮没找到"; }
 press "$MENU_DESC" || { echo "   ❌ 菜单钮滚不进可见区 ⇒ 按不到，本轮无效"; exit 3; }
 sleep 2
 EXPORT_LABEL=$(zh web.countdown.export)
-ax_found "$EXPORT_LABEL" || { echo "   ❌ 菜单里没有「$EXPORT_LABEL」那一格（宿主没接 onExportCard？）"; bad "导出格没找到"; }
+ax_found "$EXPORT_LABEL" || { echo "   ❌ 菜单里没有「${EXPORT_LABEL}」那一格（宿主没接 onExportCard？）"; bad "导出格没找到"; }
 # 🔴 判据②**不看"有没有新增文件"**：文件名由共享层 `cardExportFileName` 决定，
 #    是**确定性**的（标题 + 日期），所以同一张卡再点一次导出是**覆盖**而不是新增 ——
 #    链 M 在 Android 那一半就是这样把一条真通过判成红的。这里判的是这件事真正的不变量：
@@ -337,7 +337,7 @@ ax_found "$EXPORT_LABEL" || { echo "   ❌ 菜单里没有「$EXPORT_LABEL」那
 #    （后者量的是同一台机器的同一个钟，多一次进程开销而已）。
 T0=$(date +%s)
 [ -n "$T0" ] || { echo "   ❌ 取不到时钟 ⇒ 判据②没有输入，本轮无效"; exit 3; }
-press "$EXPORT_LABEL" || { echo "   ❌ 「$EXPORT_LABEL」滚不进可见区 ⇒ 按不到，本轮无效"; exit 3; }
+press "$EXPORT_LABEL" || { echo "   ❌ 「${EXPORT_LABEL}」滚不进可见区 ⇒ 按不到，本轮无效"; exit 3; }
 snap() { find "$EXPORT_DIR" -maxdepth 1 -name '*.png' -exec stat -f '%m|%N' {} + 2>/dev/null; }
 FOUND=""
 for _i in $(seq 1 12); do
@@ -350,10 +350,10 @@ for _i in $(seq 1 12); do
   [ -n "$CAND" ] && { FOUND="$CAND"; break; }
 done
 if [ -z "$FOUND" ]; then
-  bad "点了导出，沙盒 $EXPORT_DIR 里没有属于「$CARD_TITLE」且 mtime ≥ $T0 的 png —— 原生那一步没落盘（或 bundle 是旧的）"
+  bad "点了导出，沙盒 $EXPORT_DIR 里没有属于「${CARD_TITLE}」且 mtime ≥ $T0 的 png —— 原生那一步没落盘（或 bundle 是旧的）"
   summary "纪念卡片设备出图（iOS）" "判据②没成立，③未跑" 1
 fi
-ok "点下去之后写下的是 $FOUND（mtime 落在 $T0 之后 ⇒ 出现与覆盖两态都算）"
+ok "点下去之后写下的是 ${FOUND}（mtime 落在 $T0 之后 ⇒ 出现与覆盖两态都算）"
 case "$FOUND" in heyta-*.png) ok "文件名形状是 heyta-….png（前缀/后缀由共享层 cardExportFileName 给）";; *) bad "文件名形状不对：$FOUND";; esac
 
 step "6. 判据③：那串字节的 IHDR 逐字等于契约"
@@ -371,10 +371,10 @@ SHARE_DISMISSED=""
 for _m in "$DISMISS_CANCEL" "Done" "好"; do   # Done / 好 是 UIKit 系统控件，不在我们的 i18n 里
   if ax_found "$_m"; then press "$_m"; SHARE_DISMISSED="$_m"; break; fi
 done
-[ -n "$SHARE_DISMISSED" ] && echo "   ℹ️ 分享/系统面板出现过，已按「$SHARE_DISMISSED」收掉（这是读数，不是判据）"
+[ -n "$SHARE_DISMISSED" ] && echo "   ℹ️ 分享/系统面板出现过，已按「${SHARE_DISMISSED}」收掉（这是读数，不是判据）"
 PERM_HIT=""
 for _p in "想访问" "允许访问" "无线局域网与蜂窝数据" "照片"; do
-  ax_found "$_p" && PERM_HIT="$PERM_HIT「$_p」"
+  ax_found "$_p" && PERM_HIT="${PERM_HIT}「${_p}」"
 done
 [ -z "$PERM_HIT" ] && ok "AX 树里没有任何系统权限页文案（$PERM_HIT 为空）" \
   || bad "出现了系统权限页文案：$PERM_HIT —— 与条款「不申请照片」相违，必须查 Info.plist 的 usage key"
