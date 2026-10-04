@@ -54,19 +54,38 @@ const cut = (u) => {
   // 实测第三趟的分母自检抓到 `[文本](https://…html)界定` 这种写法 —— 右括号后面紧跟汉字、中间没有空格，
   // 只切标点的话 `界定` 会粘在 URL 上，而它看起来"像一条 URL"，于是又被判成一条假死链。
   let x = (u.split(/[`"'\s\u4e00-\u9fff（），。、：；「」]/)[0] || '').replace(/[.,;:!?]+$/, '');
-  while (x.endsWith(')') && (x.match(/\)/g) || []).length > (x.match(/\(/g) || []).length) {
-    x = x.slice(0, -1);
+  // 收尾要**反复剥到不动点**，三种尾巴会互相挡：
+  //   `…/Anki_(software)>)` —— CommonMark 的角括号目标 `<…>` 与链接的右括号叠在一起。
+  //   先剥 `>` 的话会被那个 `)` 挡住，先剥 `)` 的话剩下的 `>` 又让这条真 URL 被误判成模板
+  //   （实测它就是这样从分母里**消失**的 —— 既不在可取集合也不在模板清单的 tail 里）。
+  for (;;) {
+    const before = x;
+    if (x.endsWith('>')) x = x.slice(0, -1);
+    while (x.endsWith(')') && (x.match(/\)/g) || []).length > (x.match(/\(/g) || []).length) x = x.slice(0, -1);
+    x = x.replace(/[.,;:!?]+$/, '');
+    if (x === before) break;
   }
   return x;
 };
-const raw = text.match(/https?:\/\/[^\s`"'<>]+/g) || [];
-const urls = [...new Set(raw.map(cut).filter((u) => /^https?:\/\/[^\s]+\.[^\s]+/.test(u)))];
-// 🔴 分母自检：解析结果里只要还剩 `<` `>` 反引号 引号 或**任何中日韩字符**，那就是**截断层坏了**，
+// 🔴 第三类不是"死链"也不是"探针坏了"，而是**模板 URL**：文档里写的是取法，不是可取的地址 ——
+// 实测本档有两条：`…/human-interface-guidelines/<slug>.json`（Apple HIG 正文通道）与
+// `https://help.dida365.com/articles/<任一 id>`。它们含 `<…>` ⇒ 单独归一档 **TEMPLATE，不发请求**。
+// 把它们算进 DEAD 会得到"文档有死链"这个假结论；把它们悄悄丢掉又会让分母少两枚而没人知道。
+// 🔴 匹配集合里必须**排除汉字与全角标点**（不只是截断层排除）。
+// 实测：同一行连着两条链接 `…/wiki/Anki)、[Anki（软件）](<…/wiki/Anki_(software)>)` ——
+// 只让截断层管中文的话，第一条的 match 会一路吞到下一个空白，把**第二条整条 URL 吃进自己肚子里**，
+// 于是分母少一枚而没有任何东西报红（截断层随后把它切成第一条，看起来完全正常）。
+const raw = text.match(/https?:\/\/[^\s`"'[\]一-鿿　-〿＀-￯]+/g) || [];
+const parsed = [...new Set(raw.map(cut))];
+const isTemplate = (u) => u.includes('<') || u.includes('>');
+const templates = parsed.filter(isTemplate);
+const urls = parsed.filter((u) => !isTemplate(u) && /^https?:\/\/[^\s]+\.[^\s]+$/.test(u));
+// 🔴 分母自检：解析结果里只要还剩反引号、引号或**任何中日韩字符**，那就是**截断层坏了**，
 // 不是"文档里有个带这些字符的 URL"。必须响亮失败，不许拿脏分母去判生死 ——
 // 本装置头两趟各踩了一次这个形状：第一趟没切反引号与中文标点（12 条"死链"里 9 条是脏的），
 // 第二趟修第一趟时把 `>` 从切分集合里丢了（`<https://…>` 这种自动链接全部带尾 `>` ⇒ 31 条"死链"）。
 // 症状一模一样：一批 404。差别只在**是谁**的 URL 被拼坏了。
-const dirty = urls.filter((u) => /[<>`"'（）【】、，。：；\u3000-\u303f\u4e00-\u9fff]/.test(u));
+const dirty = urls.filter((u) => /[`"'（）【】、，。：；\u3000-\u303f\u4e00-\u9fff]/.test(u));
 if (dirty.length > 0) {
   console.log(`VERDICT=PROBE_BROKEN 解析出 ${dirty.length} 条含非法字符的 URL —— 先修截断，别拿脏分母判生死：`);
   for (const d of dirty.slice(0, 10)) console.log(`  ${JSON.stringify(d)}`);
@@ -77,7 +96,8 @@ if (dirty.length > 0) {
 // 这一档让"解析层坏了"与"链接都活着"在输出上长得不一样。
 if (process.argv.includes('--list')) {
   for (const u of urls) console.log(u);
-  console.log(`URLS_PARSED=${urls.length}`);
+  for (const t of templates) console.log(`TEMPLATE ${t}`);
+  console.log(`URLS_PARSED=${urls.length} TEMPLATE=${templates.length}`);
   process.exit(0);
 }
 if (urls.length === 0) {
@@ -153,12 +173,18 @@ for (const r of results) {
   console.log(`${r.kind.padEnd(8)} ${r.first}→${r.final} ${r.url}${r.err ? ` [${r.err}]` : ''}`);
   if (r.kind === 'REDIRECT' || r.kind === 'DEAD') console.log(`         落点 ${r.effective}`);
 }
+for (const t of templates) console.log(`TEMPLATE 不取（写的是取法，不是地址） ${t}`);
 console.log(
-  `分母：URL ${urls.length} 条｜LIVE=${by('LIVE').length} REDIRECT=${by('REDIRECT').length} ` +
-    `BLOCKED=${by('BLOCKED').length} DEAD=${by('DEAD').length} OTHER=${by('OTHER').length}`,
+  `分母：可取 URL ${urls.length} 条 + 模板 ${templates.length} 条｜LIVE=${by('LIVE').length} ` +
+    `REDIRECT=${by('REDIRECT').length} BLOCKED=${by('BLOCKED').length} DEAD=${by('DEAD').length} ` +
+    `OTHER=${by('OTHER').length}`,
 );
 const out = join(tmpdir(), 'dp-citations.json');
-writeFileSync(out, JSON.stringify({ doc: DOC, at: new Date().toISOString(), results }, null, 1), 'utf8');
+writeFileSync(
+  out,
+  JSON.stringify({ doc: DOC, at: new Date().toISOString(), templates, results }, null, 1),
+  'utf8',
+);
 console.log(`明细 JSON=${out}`);
 if (by('DEAD').length) {
   console.log('VERDICT=DEAD 有出处取不到，逐条点名见上');
