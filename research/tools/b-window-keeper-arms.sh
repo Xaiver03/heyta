@@ -17,6 +17,8 @@
 # 用法：bash research/tools/b-window-keeper-arms.sh
 set -u
 cd "$(dirname "$0")/../.." || exit 1
+# L 臂的基线读数与看守用的是同一份谓词（否则臂在测自己那套 ps 写法）。
+. scripts/lib/ps-scan.sh
 KEEPER_SRC=research/tools/b-window-keeper.sh
 FIX=$(mktemp -d /tmp/ht-bkeeper.XXXXXX)
 trap 'rm -rf -- "$FIX"' EXIT
@@ -54,6 +56,7 @@ cat > "$FIX/hprobe" <<'SH'
 cat "$FIX/hpid" 2>/dev/null
 SH
 cp "$KEEPER_SRC" "$FIX/keeper"
+cp scripts/lib/ps-scan.sh "$FIX/ps-scan-lib"
 
 mk_fixture() {
   rm -rf "$FIX/main" "$FIX/heyta-wt-reinstall" "$FIX/home"
@@ -63,6 +66,12 @@ mk_fixture() {
     git config user.email rig@local; git config user.name rig
     cp "$FIX/keeper" research/tools/b-window-keeper.sh
     echo '#!/bin/bash' > scripts/verify-mobile-window-gate.sh
+    # 🔴 看守现在会 `source scripts/lib/ps-scan.sh`（取不到就 exit 4，不冒充"没人在跑"）⇒
+    #    一次性夹具必须带上这枚**新增的被依赖文件**，否则整臂一起红在缺文件上而不是红在行为上
+    #    （本仓那把 `r14c-carrier-heal.sh` 就是为同一件事存在的）。
+    mkdir -p scripts/lib
+    cp "$FIX/ps-scan-lib" scripts/lib/ps-scan.sh || \
+      { echo "夹具建不起来：一次性载体里没有 scripts/lib/ps-scan.sh"; exit 1; }
     git add -A; git commit -q -m base )
   git -C "$FIX/main" worktree add -q --detach "$FIX/heyta-wt-reinstall" HEAD
 }
@@ -200,6 +209,43 @@ KLINE=$(printf '%s\n' "$OUT" | grep -E 'BROKEN=载体里没有重装脚本|STEP 
 if [ "$(RCV)" = 4 ] && printf '%s\n' "$KLINE" | grep -q "$FIX/heyta-wt-reinstall/scripts/reinstall-all.sh"; then
   ok "K 不注入重装脚本 ⇒ 默认落在**载体**那份（$(printf '%s\n' "$KLINE" | cut -c1-52)…），夹具里不存在才 BROKEN"
 else no "K rc=$(RCV) 默认值那行读不出载体路径：${KLINE}"; fi
+
+# ── L：让路那一格的**默认探针**（不注入桩，让它走真实 `ps` 图案）。
+#    K 臂的教训同一族：前面十二臂全用 H_PROBE 桩，真实图案从没被量过 ——
+#    而这次改的正是图案本身（从"看守活着"改成"e2e 在跑"），改错了两边都不会响。
+#    两腿必须**相反**：在等的看守 ⇒ 不许挡 B；真在跑的 e2e ⇒ 必须挡。恒挡或恒不挡都只红一腿。
+mk_fixture
+# 🔴 图案里的 `[-]` 不是装饰：第一版这里写的是字面串，基线数出 **1**（后来 3），
+#    而真读数是 0 —— grep 把自己的 argv 照进去了（`ps` 拍快照时 grep 还活着），
+#    连我敲的那条 `zsh -c` 包装命令行都带着那串。基线假脏 = 这一臂永远判"此刻不能判"，
+#    而它看起来像在防"现场真空假设"，实际在防一个不存在的东西。
+# 🔴 光挡自匹配还不够（M4 实测）：**调用我的那条命令行**里带着 needle 时，ps 会把它当成现场进程。
+#    所以基线必须豁免**自己这一树**（本进程 + 全部祖先）—— 这件事不在这儿重写一遍，
+#    走看守同一份 `ht_ps_has`（`scripts/lib/ps-scan.sh`）：臂若自己实现一套 ps 读法，测的就是臂的抄件。
+BASE_HIT=$(ht_ps_has 'ht-h-flaky[-]trace' | wc -l | tr -d ' ')
+if [ "${BASE_HIT:-0}" != "0" ]; then
+  no "L 现场基线不干净（已有 ${BASE_HIT} 行含 ht-h-flaky-trace）⇒ 这一臂此刻判不了，别把它的绿当成证据"
+else
+  run_L() {
+    echo 0 > "$FIX/cnt"; : > "$FIX/calls"; printf '0\n' > "$FIX/gseq"; printf '0\n' > "$FIX/oplog_rc"; : > "$FIX/hpid"
+    _sp=""
+    if [ -n "$1" ]; then ( exec -a "$1" sleep 25 ) & _sp=$!; sleep 1.2; fi
+    OUT=$( ( FIX="$FIX" GSEQ="$FIX/gseq" GATE="$FIX/gate" OPLOG="$FIX/oplog" REINSTALL="$FIX/reinstall" \
+        H_PROBE= LOG="$FIX/logL" STABLE="$FIX/stableL" BUDGET=60 INTERVAL=0 DEFER_MAX=0 \
+        IOS_DEVICE_NAME=rig-iphone RUN=1 CARRIER="$FIX/heyta-wt-reinstall" \
+        bash "$FIX/main/research/tools/b-window-keeper.sh" ) 2>&1; echo $? > "$FIX/rc" )
+    [ -n "$_sp" ] && kill "$_sp" 2>/dev/null
+    printf '%s' "$OUT"
+  }
+  L1=$(run_L "bash research/tools/.h-flaky-window-watcher.sh.snap.99998")
+  if [ "$(RCV)" = 0 ] && [ "$(NCALLS)" = 1 ] && printf '%s' "$L1" | grep -q '没有 H 的 e2e 在跑'; then
+    ok "L1 只在**等门**的看守不再锁住 B（照旧开窗起跑，重装 1 次）"
+  else no "L1 rc=$(RCV) 重装=$(NCALLS) 次 ⇒ 一个等待器还在这格上锁着 B"; fi
+  L2=$(run_L "node --output=$FIX/ht-h-flaky-trace.999/run1")
+  if [ "$(RCV)" = 1 ] && [ "$(NCALLS)" = 0 ] && printf '%s' "$L2" | grep -q '不硬抢'; then
+    ok "L2 真在跑的 e2e（argv 带独占 --output）确实挡住了 B（重装 0 次、照实报不硬抢）"
+  else no "L2 rc=$(RCV) 重装=$(NCALLS) 次 ⇒ 默认图案认不出「H 真在跑」，两边会在同一窗口同时开火"; fi
+fi
 
 echo "b-window-keeper 臂：pass=$PASS fail=$FAIL"
 [ "$FAIL" = 0 ] || exit 1

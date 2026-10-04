@@ -31,6 +31,8 @@ esac
 set -u
 cd "$(dirname "$0")/../.." || exit 4   # 本脚本住在 research/tools/，仓库根就是它的 ../..
 . scripts/lib/wait-for-quiet-host.sh
+# 让路那一层的 ps 读数与 B 看守**同一份谓词**（豁免自己这一树，理由见 lib 文件头）。
+. scripts/lib/ps-scan.sh
 
 # 🔴 日志名每跑唯一（与 `r14c-window-retry.sh` 同一纪律，本会话前一轮刚为它修过）：
 #    原来这里靠 `mv "$LOG" "$LOG.prev"` 保上一趟 —— 只有**一层**，第三次跑就把第二次的现场挤掉了，
@@ -51,7 +53,17 @@ if [ -n "${LOG:-}" ]; then STABLE_TIED=0
 elif [ "$MODE" = "run" ]; then LOG="/tmp/ht-h-flaky.$(date +%Y%m%d-%H%M%S).$$.log"; ln -sf "$LOG" "$STABLE_LOG" && STABLE_TIED=1 || STABLE_TIED=0
 else STABLE_TIED=0; fi
 RUNS="${RUNS:-3}"
-STRICT_MAX="${STRICT_MAX:-9}"
+# 🔴 规范门是 `hw.ncpu × 3/4`（本机 12），两处消费者都从常量推：闸门
+#    （`scripts/verify-mobile-window-gate.sh:133`）与 `scripts/lib/wait-for-quiet-host.sh:38`。
+#    本装置在它之上**还有一层严格层**，值来自 §5 H 那格写死的开工判据
+#    「4318/4319 为空 **且** 负载落回个位」⇒ `HT_PLAN_LIMIT=9`。
+# 🔴 **这一层不许在这台看守里放宽**（硬约束原话：负载门不达标就登记等待，不降级判据）。
+#    10-05 实测它的代价并把代价打进日志：规范门过了 **4 次**（负载 12 三次、负载 10 一次）全被这层退回
+#    ⇒ 差距是 **1–3** 而不是"从没落下来过"，但改这个值要改**那一格判据**（要人拍板），不是改这里。
+#    想临时按规范门跑：显式传 `STRICT_MAX=12`，日志首行会照实写明它与规范门的关系。
+HT_NORM_LIMIT=$(( $(sysctl -n hw.ncpu) * 3 / 4 ))
+HT_PLAN_LIMIT=9
+STRICT_MAX="${STRICT_MAX:-$HT_PLAN_LIMIT}"
 BUDGET="${BUDGET:-900}"   # 外层窗口预算
 # 🔴 内层 `wait_for_quiet_host` 有自己的预算（HEYTA_LOAD_GATE_WAIT，默认 900s），
 #    到点会 return 非零。第二趟实测证明了这一点：外层写 BUDGET=3600，
@@ -61,6 +73,16 @@ export HEYTA_LOAD_GATE_WAIT="${HEYTA_LOAD_GATE_WAIT:-$BUDGET}"
 export HEYTA_LOAD_GATE_INTERVAL="${HEYTA_LOAD_GATE_INTERVAL:-30}"
 PORTS="4318 4319"
 CONTROLS="4358 5399"   # 阳性对照：这些端口上常有别人的进程，lsof 必须数得出东西才算探针活着
+# 🔴 让路图案做成旋钮（默认值就是原来写死的那串，逐字等价），理由是要让 selftest 能对着**真进程**
+#    验这两条正则认不认得"快照运行形态"：`reinstall-all` 跑起来时 argv 是
+#    `scripts/.reinstall-all.sh.snap.<pid>`（闸门 §3b 同一读数），只写原文件名会读成"没人在跑"。
+#    图案里的 `[.]` 是挡 pgrep 自匹配（本进程 argv 里就带着这串字面）。
+CO_CHAIN_RE="${CO_CHAIN_RE:-r14c-carrier-chain[.]sh}"
+CO_REINSTALL_RE="${CO_REINSTALL_RE:-scripts/[.]?reinstall-all}"
+# 🔴 走共用的 `ht_ps_has`（`scripts/lib/ps-scan.sh`）而不是裸 pgrep：投这看守起来的那条命令行
+#    里只要带着同一串图案，裸 pgrep 就把**我自己的祖先**读成"别人在跑"，于是恒让路。
+#    与 B 看守那次 M4 实测是同一个坑（那次它白让 1800s 后 exit 1）。
+ht_pgrep(){ ht_ps_has "$1" | tr '\n' ' '; }
 
 # 🔴 取证留存（2026-10-04 09:1x 加）。默认输出目录是**共享的** `e2e/test-results/`，
 #    谁下一趟都会把它清掉 —— 23:19 那次失败的 `trace.zip` 就是这么没的，
@@ -177,7 +199,17 @@ if [ "${1:-}" = "--scan" ]; then
   exit 2
 fi
 
-# selftest 只测「跑 + 留证 + 判别式计数」这一层；等窗口那一层的读数在它之前（lsof 阳性对照）。
+# 🔴 `--co-probe <pgrep -f 正则>`：把"让路那一层"的读数拿出来单独验（臂 10 靠它）。
+#    它**不建日志、不挂稳定名**（MODE 允许名单的形状：只有 run 档才挂），所以拿它做探针
+#    不会摘走正在等的那趟看守的现场 —— 这正是 09:2x 与 10:5x 两起事故的判据。
+if [ "${1:-}" = "--co-probe" ]; then
+  if [ -z "${2:-}" ]; then echo "用法: bash $0 --co-probe '<pgrep -f 正则>'" >&2; exit 1; fi
+  ht_pgrep "$2"
+  exit 0
+fi
+
+# selftest 测「跑 + 留证 + 判别式计数」那一层，外加让路那一层的**图案识别**（臂 10）；
+# 等窗口的完整循环（负载门 + 端口对照）不在 selftest 里，它的读数在真看守的日志里。
 if [ "${1:-}" = "--selftest" ]; then
   ST=$(mktemp -d /tmp/ht-h-flaky-st.XXXXXXXX) || exit 4
   bad=0
@@ -370,21 +402,86 @@ STUB
   else
     echo "❌ 臂8 正向：run 档没有挂稳定名（${T2}）⇒ 装置与真实看守的行为已经不一样，负向那条不算证据"; bad=$((bad+1))
   fi
+  # ── 臂 9（10-05 00:5x，钉我这一轮改的那一层）。这一臂的方向**不是**"把严格层放宽到规范门"，
+  #    而是两件事：① 严格层的默认值必须仍然是 §5 H 那格写死的开工判据（个位 9）——
+  #    这台机器上"窗口一直没开"是真的（规范门过了 4 次全被这层退回），但**降级判据不在这里做**；
+  #    ② 它比规范门严多少必须**打进日志**，否则下一位只能从"零趟 e2e"反推是谁挡的（我 00:0x 就是这么撞上的）。
+  #    再加一层防漂：`ncpu×3/4` 现在是三个消费者的抄件（本装置 / 闸门 / lib）⇒ 对账那三个分数字面。
+  ht_frac(){ sed -nE 's/.*[lL][iI][mM][iI][tT]=\$\(\(.*\* *([0-9]+) *\/ *([0-9]+).*$/\1\/\2/p' "$1" 2>/dev/null | head -1; }
+  FR_W=$(ht_frac research/tools/h-flaky-window-watcher.sh)
+  FR_G=$(ht_frac scripts/verify-mobile-window-gate.sh)
+  FR_L=$(ht_frac scripts/lib/wait-for-quiet-host.sh)
+  if [ -z "$FR_W" ] || [ -z "$FR_G" ] || [ -z "$FR_L" ]; then
+    echo "❌ 臂9 分数抽取取空（w=${FR_W} g=${FR_G} l=${FR_L}）⇒ 装载式换了形状，这一臂此刻没有读数而不是「一致」"; bad=$((bad+1))
+  elif [ "$FR_W" != "$FR_G" ] || [ "$FR_G" != "$FR_L" ]; then
+    echo "❌ 臂9 负载阈值的表达式漂了：本装置=${FR_W} 闸门=${FR_G} lib=${FR_L} ⇒ 严格层与规范门不再是同一个裁判"; bad=$((bad+1))
+  else
+    printf 'limit=$((cores * 1 / 2))\n' > "$ST/frac-bad.sh"
+    if [ "$(ht_frac "$ST/frac-bad.sh")" = "$FR_W" ]; then
+      echo "❌ 臂9 抽取器把 1/2 也读成 ${FR_W} ⇒ 上面那条「一致」是恒值，没有牙"; bad=$((bad+1))
+    else
+      echo "   ✅ 臂9a 三个消费者的阈值表达式逐字相同（=${FR_W}），且抽取器分得开 1/2"
+    fi
+  fi
+  EXP_LIM=$(( $(sysctl -n hw.ncpu) * 3 / 4 ))
+  # 9b：默认必须还是 §5 H 那格写的"个位"（这里**故意写死 9** —— 它的权威是那一格判据，不是本脚本；
+  #     谁把默认改成规范门，这一腿就红，逼他先去改那一格并留拍板人）。
+  LOG="$ST/a9-def.log" env -u STRICT_MAX SKIP_GATE=1 RUNS=0 BUDGET=1 PW_CMD=true bash "$0" >/dev/null 2>&1
+  grep -q "严格负载门≤9（规范门≤${EXP_LIM}）" "$ST/a9-def.log" 2>/dev/null \
+    || { echo "❌ 臂9b 默认严格层不再是 §5 H 开工判据的个位 9（日志首行：$(sed -n '1p' "$ST/a9-def.log" 2>/dev/null)）⇒ 判据被这台看守悄悄放宽了"; bad=$((bad+1)); }
+  grep -q "严格层 9 比规范门 ${EXP_LIM} 严 $(( EXP_LIM - 9 ))" "$ST/a9-def.log" 2>/dev/null \
+    || { echo "❌ 臂9b 默认档没在日志里点名与规范门的差额 ⇒ 下一位仍旧要从「零趟 e2e」反推是谁挡的"; bad=$((bad+1)); }
+  # 9b′：反向对照 —— 显式按规范门传值时那句差额警告**必须不打**（否则它是恒打，9b 那条不算证据）。
+  LOG="$ST/a9-norm.log" STRICT_MAX="$EXP_LIM" SKIP_GATE=1 RUNS=0 BUDGET=1 PW_CMD=true bash "$0" >/dev/null 2>&1
+  if grep -q '比规范门' "$ST/a9-norm.log" 2>/dev/null; then
+    echo "❌ 臂9b′ 按规范门跑还打「比规范门严」⇒ 那句话不再携带信息"; bad=$((bad+1))
+  else
+    echo "   ✅ 臂9b 默认仍是个位 9 且点名差额；9b′ 按规范门传值时不打警告"
+  fi
+  LOG="$ST/a9-strict.log" STRICT_MAX=0 SKIP_GATE=1 RUNS=0 BUDGET=1 PW_CMD=true bash "$0" >/dev/null 2>&1
+  grep -q "比规范门 ${EXP_LIM} 严 ${EXP_LIM}" "$ST/a9-strict.log" 2>/dev/null \
+    || { echo "❌ 臂9c 显式 STRICT_MAX=0 没打出与规范门的差额 ⇒ 更严的那层再次隐形"; bad=$((bad+1)); }
+  [ "$bad" = 0 ] && echo "   ✅ 臂9c 更严的显式值会在日志里点名差额"
+  # ── 臂 10（10-05 00:3x）：让路那一层**只验过形状不够** —— 那两条 pgrep 正则必须真的认得
+  #    重装的两个形态（源码名 `reinstall-all.sh` / 快照名 `.reinstall-all.sh.snap.<pid>`），
+  #    而"认得"要有对照：现场基线先量（不假设真空），再各起一枚真进程数增量，
+  #    并钉住**字面图案本身不算**（`[.]?` 若被当字面匹配，探针会把自己数成别人）。
+  BASE_RE=$(bash "$0" --co-probe "$CO_REINSTALL_RE" 2>/dev/null | wc -w | tr -d ' ')
+  ( exec -a "scripts/reinstall-all.sh" sleep 25 ) & P1=$!
+  ( exec -a "scripts/.reinstall-all.sh.snap.$P1" sleep 25 ) & P2=$!
+  ( exec -a "scripts/[.]?reinstall-all" sleep 25 ) & P3=$!
+  sleep 1.2
+  HITLIST=$(bash "$0" --co-probe "$CO_REINSTALL_RE" 2>/dev/null)
+  HIT=$(printf '%s' "$HITLIST" | wc -w | tr -d ' ')
+  if [ "$HIT" != "$(( BASE_RE + 2 ))" ]; then
+    echo "❌ 臂10 基线 ${BASE_RE} → 起两枚后 ${HIT}（应 $(( BASE_RE + 2 ))）：[${HITLIST}] ⇒ 让路图案没认全这两个形态"; bad=$((bad+1))
+  fi
+  case " $HITLIST " in *" $P1 "*) ;; *) echo "❌ 臂10 源码形态（pid ${P1}）没被数到 ⇒ B 真在跑时 H 会当成没人跑"; bad=$((bad+1));; esac
+  case " $HITLIST " in *" $P2 "*) ;; *) echo "❌ 臂10 快照形态（pid ${P2}）没被数到 ⇒ 同上一格，只是换了运行形态就失明"; bad=$((bad+1));; esac
+  case " $HITLIST " in *" $P3 "*) echo "❌ 臂10 把**字面图案串**（pid ${P3}）当成了重装 ⇒ 这条正则会自匹配，读数不可信"; bad=$((bad+1));; *) echo "   ✅ 臂10 两个运行形态都数到、字面图案串没被误数";; esac
+  SL3="$ST/stable3.lnk"; printf 'KEEPME\n' > "$ST/keep.log"; ln -sf "$ST/keep.log" "$SL3"
+  bash "$0" --co-probe "$CO_REINSTALL_RE" >/dev/null 2>&1
+  [ "$(readlink "$SL3")" = "$ST/keep.log" ] \
+    || { echo "❌ 臂10 --co-probe 摘走了稳定名 ⇒ 又一档「新档位偷现场」（09:2x/10:5x 同族）"; bad=$((bad+1)); }
+  kill $P1 $P2 $P3 2>/dev/null
   # 留证这一层的两腿就是臂 1 与臂 3：「恒删」坏在臂 3，「恒留」坏在臂 1。
-  [ "$bad" = 0 ] && { echo "✅ selftest 八臂成立（带对的 --output / 判别式数得出来 / 绿删红留 / 摘掉必分得开 / 前缀行不算通道活着 / trace 扫得出来且空 zip 会自报瞎 / 空格路径与空夹具两种「0」分得开 / 新档位摘不走稳定名而 run 档照挂）"; exit 0; }
+  [ "$bad" = 0 ] && { echo "✅ selftest 十臂成立（带对的 --output / 判别式数得出来 / 绿删红留 / 摘掉必分得开 / 前缀行不算通道活着 / trace 扫得出来且空 zip 会自报瞎 / 空格路径与空夹具两种「0」分得开 / 新档位摘不走稳定名而 run 档照挂 / 严格层默认仍按 §5 H 的个位 9、且点名与规范门的差额 / 让路图案认得重装的两个运行形态且不自匹配）"; exit 0; }
   echo "selftest 有 $bad 条不成立 ⇒ 装置坏（exit 4），不是产品坏"; exit 4
 fi
 
 # 🔴 原来这一行是 `mv "$LOG" "$LOG.prev"`：换成每跑唯一之后**必须删掉** ——
 #    它会把本轮刚建的唯一日志搬走，后面的 `>> "$LOG"` 再新建一份空的，等于自己截掉自己的现场。
-echo "start $(date '+%T') 连跑=$RUNS 严格负载门≤$STRICT_MAX 总预算=${BUDGET}s 日志=$LOG 稳定名=$STABLE_LOG(挂上=$STABLE_TIED)" >> "$LOG"
+echo "start $(date '+%T') 连跑=$RUNS 严格负载门≤${STRICT_MAX}（规范门≤${HT_NORM_LIMIT}） 总预算=${BUDGET}s 日志=$LOG 稳定名=$STABLE_LOG(挂上=$STABLE_TIED)" >> "$LOG"
+if [ "$STRICT_MAX" -lt "$HT_NORM_LIMIT" ]; then
+  echo "  ⚠️ 严格层 ${STRICT_MAX} 比规范门 ${HT_NORM_LIMIT} 严 $(( HT_NORM_LIMIT - STRICT_MAX ))（值来自 §5 H 那格的开工判据「负载落回个位」；要按规范门跑得显式传 STRICT_MAX=${HT_NORM_LIMIT}）" >> "$LOG"
+fi
 
 START=$(date +%s)
 while [ "${SKIP_GATE:-0}" != "1" ]; do
   wait_for_quiet_host >> "$LOG" 2>&1 || { echo "GATE=timeout rc=3" >> "$LOG"; exit 3; }
   LOAD=$(uptime | sed 's/.*load averages: //' | awk '{print int($1)}')
   if [ "$LOAD" -gt "$STRICT_MAX" ]; then
-    echo "  严格层：负载 $LOAD > ${STRICT_MAX}，再等" >> "$LOG"
+    echo "  严格层：负载 ${LOAD} > ${STRICT_MAX}（规范门≤${HT_NORM_LIMIT}），再等" >> "$LOG"
   else
     # 阳性对照：先证明 lsof 数得出"有人在听"，再要求被测端口为空
     CONTROL_HIT=0
@@ -405,9 +502,15 @@ while [ "${SKIP_GATE:-0}" != "1" ]; do
       #    让的是"真在跑的 C 链"而不是"C 的看守"：C 才是这条线的硬缺口，H 只是收窄一枚已登记的 flaky；
       #    若按"有没有人在等"让路，一个等待器就能把另一个等待器锁住（那种粗粒度在
       #    `r14c-window-retry.sh` 的 CO_PATTERN 那一侧，已登记为待办，不改正在跑的那份）。
-      CHAIN_PID=$(pgrep -f 'r14c-carrier-chain[.]sh' 2>/dev/null | tr '\n' ' ')
+      CHAIN_PID=$(ht_pgrep "$CO_CHAIN_RE")
+      # 🔴 让路那一格原来只认 C 链，而 B 的四端重装跑起来是 30 分钟量级、会把这道门的负载
+      #    整个抬走（10-05 00:2x 补）：B 看守那边让的是"H 看守在**等**"，H 这边让的是"别人在**跑**"，
+      #    两边各缺一格时会在同一个窗口里同时开火 —— 重装和 e2e 的读数互相污染。
+      RE_PID=$(ht_pgrep "$CO_REINSTALL_RE")
       if [ -n "$CHAIN_PID" ]; then
         echo "  CO_CHAIN=alive pid=${CHAIN_PID% } —— 让路给设备链，本轮不开 e2e" >> "$LOG"
+      elif [ -n "$RE_PID" ]; then
+        echo "  CO_REINSTALL=alive pid=${RE_PID% } —— 让路给四端重装，本轮不开 e2e" >> "$LOG"
       else
         echo "  ✅ 负载 $LOAD ≤ ${STRICT_MAX}，4318/4319 无人监听（对照端口有数 = lsof 可信）" >> "$LOG"
         break

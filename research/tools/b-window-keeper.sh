@@ -14,7 +14,8 @@
 #    docs/plans/calendar-profile-handoff.md §4.05 (9)(10)(26)。
 #
 # 步骤（门开之后，逐条落账，任何一步非零就停在那里、不许继续）：
-#   1 让路：H 那条线的 flaky 看守还活着 ⇒ 先不抢同一道负载门（它一趟只跑几分钟，等得起）
+#   1 让路：H 那条线的 flaky **那一趟 e2e 正在跑** ⇒ 先不抢同一道负载门（它一趟只跑十几分钟，等得起；
+#     只在**等门**的看守不算挡路 —— 10-05 改，理由见下面第 2 段）
 #   2 载体必须干净（脏了就停：那意味着有人在载体里写）
 #   3 追平到当时的 `main` 尖（**记录追平前后的 sha**：B 的主张是"装的是当前源码"）
 #   4 `pnpm --filter @heyta/op-log build` 必须 exit 0
@@ -50,6 +51,9 @@ set -u
 
 MAIN="$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null)"
 [ -n "$MAIN" ] || { echo "❌ 找不到仓库根（看守不猜路径）"; exit 4; }
+# 让路那一格用的谓词与 H 看守、验证台**同一份**（`ht_ps_has`：豁免自己这一树的 ps 读数）。
+[ -f "$MAIN/scripts/lib/ps-scan.sh" ] || { echo "❌ 缺 scripts/lib/ps-scan.sh ⇒ 让路判断测不了（不冒充「没人在跑」）"; exit 4; }
+. "$MAIN/scripts/lib/ps-scan.sh"
 
 RUN="${RUN:-}"
 GATE="${GATE:-$MAIN/scripts/verify-mobile-window-gate.sh}"
@@ -111,25 +115,32 @@ while :; do
   sleep "$INTERVAL"
 done
 
-# ── 2. 让路给 H 的 flaky 看守（同一道负载门，一趟只几分钟）──────────────
+# ── 2. 让路给 H 的 flaky **那一趟 e2e**（同一道负载门，一趟只几分钟）────────
+#    🔴 让的是"真在跑"，不是"在等"（10-05 00:4x 改）。原来只要那把看守**活着**，B 就会让满
+#    DEFER_MAX 再 exit 1 —— 一个等待器锁住了另一个等待器（与 H 那侧"让真在跑的 C 链、不让在等的
+#    看守"是同一条规则，B 这边当时漏了一半）。代价不对称：B 的窗口还要 `src==0`，比 H 的窗口稀得多，
+#    错过一次可能是再等半天，而 H 的一趟 e2e 只有十几分钟。
+#    现量依据：H 开跑时 argv 必带它**独占**的 `--output=/tmp/ht-h-flaky-trace.$$`；等门阶段没有这个进程。
+#    ⚠️ 已登记的敞口：B 过了这一格之后到真正起跑之间，H 仍可能恰好开火（两边各 30s 轮询）。
 H_START=$(date +%s)
 while :; do
   if [ -n "$H_PROBE" ]; then
     HPID=$(bash "$H_PROBE" 2>/dev/null | head -1)
   else
-    # 快照运行形态是 `.h-flaky-window-watcher.sh.snap.<pid>`，源码形态是原文件名 ——
-    # 两种都要认，否则"看守正在等这道门"会被读成"没有看守"（与闸门里那条快照形态同族）。
-    HPID=$(ps -Ao pid,command | awk '/h-flaky-window-watcher/ && !/awk/ {print $1; exit}')
+    # 现量依据：H 开跑时 argv 必带它**独占**的 `--output=/tmp/ht-h-flaky-trace.$$`；等门阶段没有这个进程。
+    # 🔴 走共用的 `ht_ps_has` 而不是裸 pgrep：投这看守起来的那条命令行本身就带着图案时，
+    #    裸 pgrep 会把我自己的祖先读成"H 在跑"（M4 实测：白让 1800s 后 exit 1，B 整条脱靶）。
+    HPID=$(ht_ps_has 'ht-h-flaky[-]trace' | head -1)
   fi
   if [ -z "$HPID" ]; then
-    say "DEFER=没有 H 看守在跑（或已收笔），不等了"
+    say "DEFER=没有 H 的 e2e 在跑（那把看守只在等门 ⇒ 不算挡路），不等了"
     break
   fi
   if [ $(( $(date +%s) - H_START )) -ge "$DEFER_MAX" ]; then
-    say "DEFER=让路超 ${DEFER_MAX}s 而 H 看守（pid=${HPID}）仍在 ⇒ 照实报，不硬抢"
+    say "DEFER=让路超 ${DEFER_MAX}s 而 H 的 e2e（pid=${HPID}）仍在跑 ⇒ 照实报，不硬抢"
     exit 1
   fi
-  say "DEFER=让 H 看守 pid=${HPID} 先用这道门，再等 30s"
+  say "DEFER=让 H 的 e2e pid=${HPID} 先用这道门，再等 30s"
   sleep 30
 done
 
