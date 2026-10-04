@@ -4564,9 +4564,56 @@ sed -n '54,64p' scripts/check-md-table-rows.mjs
   打出来的 `ARM2_RC=0` 是 `tail` 的码，而 gate 明明打印了 `✖ … 4 处`。
   这一族第三次（§7 第 45 / 179 条）。之后所有 rc 都改成**先重定向到文件、再取 `$?`**。
 
+---
 
+### 8.73 §8.67 那四张图**人看过的那份字节**现在在库里（`b9d11ed9`），而"要不要第六族"被一次 merge-tree 干跑变成了读数（10:4x）
 
+§8.67 写"四张图逐张人看过"，而那四张里三张当时只活在**工作树**：
 
+| 文件 | HEAD（05:53 那一趟 `5a369e0b`） | 人看过的 09:3x 那一趟 |
+|---|---|---|
+| `s1-app-loaded.png` | `02a937b6` | `02a937b6`（未变） |
+| `s2-signed-in.png` | `cb9a891a` | `cea55108` |
+| `s3-device-a-synced.png` | `889dc870` | `e0247fb5` |
+| `s3-device-b-recovered.png` | `b0eba0b4` | `9309f623` |
 
+截图目录是**定名覆盖式**的（`scripts/verify-selfhost-stack.sh:487` 把 `e2e/selfhost-stack-results/` 交给新鲜度探针），
+任何一趟新跑都会覆盖掉 —— 而"主张指向的字节不在库里"没有任何一层会报红
+（同族：证据 md5 被别人的 e2e 趟重写而无人报红）。所以三枚按路径提交，md5 逐枚写进提交说明，
+让那句话指向**对象**而不是工作树。
 
+#### ① 本来要加"第六族"，干跑之后没加
 
+提交前的判断是：这几枚 PNG 两侧历史上都动过 ⇒ 会与 main 冲突，而 `selfhost-merge-carrier.mjs` 的
+PNG 族只匹配 `apps/web/evidence/`，冲突会落进 `fam.other` 并 `die(2)`。
+差一步就照这个判断写代码了。先跑一次不建工作树、不碰现场的干跑：
+
+```bash
+git merge-tree --write-tree --name-only main feat/self-host-distribution
+```
+
+出来三枚：`docs/research/self-host-distribution-audit.md`、`package.json`、`server/image-npm-tree.json`
+—— **正是已预置的 audit / pkg / snap 三族**，四枚 PNG 全部 auto-merge（main 侧那几枚等于共同基线）。
+⇒ 不写第六族。为一个没发生的冲突预置解法 = 给脚本加一段没有消费者的代码，
+还要跟着改"每族至多一处"那条守卫。**真冲突该由 `die(2)` 响，那是设计好的响亮失败。**
+📌 可迁移的形状：**"要加一族"这类判断先在 merge-tree 上干跑一次；成本几秒，收益是把推测变成读数。**
+
+#### ② 载体第二次读数（分支 `b9d11ed9` 之后）
+
+```
+✅ 载体 5c08885b = main(2281f68e) × feat/self-host-distribution(b9d11ed9)，门禁 6 道全 exit 0
+```
+
+· `main` 期间又前进两笔（`fc324e12 → 2281f68e`），所以 §8.71 的 `6c4f5692` 已被替换 ——
+  "只认分支不认 SHA、main 每进一步就重跑"这条规则第二次被真实消费。
+· 完整 `pnpm check` 仍由 `/tmp/g60-carrier-check-then-attribution.sh` 在**窗口开的那一秒**重算后跑，
+  所以这里连算两次载体不是重复劳动：载体必须是"被判那一秒的载体"。
+
+#### ③ 一条只登记、不动手的环境读数
+
+分支 worktree 现在剩 `?? e2e/node_modules`，`ls -ld` 是 `lrwxr-xr-x`（**软链**），
+而 `.gitignore:1` 写的是 `node_modules/` —— **带尾斜杠只匹配目录**，软链挡不住（§7 第 196 条本机又现一次）。
+本批**不碰它**：那枚软链是别的会话为 e2e 依赖搭的，删掉会让对方下一趟死在 `MODULE_NOT_FOUND`；
+改成不带斜杠的 `node_modules` 要同时动本批的 `.gitignore` 族解法前提，属于撞车面。
+后果边界写清楚：**任何用 `git ls-files -co --exclude-standard` 取打包集合的流程，在这个 worktree 里会把这枚软链当未跟踪文件送出去**
+（§6.1.1 的 Windows 段正是这个形状；它跑在主检出，所以这一枚不在它的取集路径上）。
