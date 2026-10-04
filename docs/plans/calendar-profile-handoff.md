@@ -860,6 +860,49 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   `scripts/verify-mobile-due-time.sh`，所以不必等入库也能生效 —— 但已入库才谈得上"载体落后也不是旧判据"）。
   19:3x 现量窗口闸门：rc=3、`REDS=load,src,dev,apk`（18:2x 那次是 `load,src,apk` ⇒ **`dev` 又红了**，
   设备面又有人在跑；`apk` 那格由链自己在窗口里补）。
+- (16) **20:0x：第二次开窗 —— 装置按设计工作，而这一趟**一条产品判据都没跑到**（通道死 + 前台不是本应用）。**
+  🔴 **链这一段是对的，要记**：`WINDOW=open 20:03:57` → `SYNC 目标 671020ac` → `install/build_all/stack_up/build_android/preflight` 全 rc=0 →
+  **`REGATE try=1 rc=3 REDS=load`（负载 22 > 12）⇒ 链没有动设备，等 60 秒重问 → `try=2 rc=0`（负载 12）⇒
+  `REGATE_OK —— 下面是第一次也是最后一次动设备`**。
+  这正是 (13) 之后补的那道"打完包再问一次闸门"的现场价值：Gradle 自己把负载抬到 22，而窗口在开跑**之前**就已经不是开窗那个状态了。
+  🔴 **读数本身无效，且无效得毫无争议（两条原文，不是推断）**：
+  第 2 步 `⚠️ uiautomator 连续 10 次抓不到界面` + `**/tmp/ui.xml 已被截成空文件** —— 接下来任何断言都会报「找不到 X」，
+  那是假红，不是产品缺陷`（这一句是共享库自己打的）；第 3 步 `screen_txt` 打出来的前台是
+  **`SIM Toolkit / USIM Card / TMoble`** —— 设备前台此刻根本不属于本应用。
+  ⇒ 那一趟的 8 条红**一条都不算产品结论**，而判据集（第 5 步起）从未开始。**为什么被顶走没有证据**，
+  不写因果（并行会话在动这台模拟器 / 镜像自己的弹窗 / uiautomator 自己挂了，三种都还没排除）。
+  🔴 **本轮修两处，两处都是"让无效来得早、来得响亮"**（都不是新装置，是仓内既有那把）：
+  1. **第 1 步的"应用已启动"换了承重判据**。原来只有 `has_text "任务"`，而共享库那段注释
+     （`lib/mobile-e2e.sh:1497` 起）**早就写着这一句是假绿**：欢迎页说明文字里也有「任务」二字，
+     窗口归属只能读 `mCurrentFocus`。现量：`verify-mobile-notes.sh:240` / `verify-mobile-trash.sh`
+     用的是 `settle_foreground`（6 次拉起仍不进前台就停），我的脚本一条都没有 ⇒ 补上，
+     排在 `dismiss_welcome_if_present` **前后各一次**（照 notes 那两行的顺序），停法是 `exit 3`（读数无效 ≠ 产品失败）。
+  2. **新增 `assert_channel <在哪一步之前>`，卡在第 5 步头上**——判据集从这里开始，所以从这里开始
+     必须先满足两件事：`hierarchy` 非空（`require_screen`，空则它自己 exit 3）且 `mCurrentFocus == PKG`。
+     理由就是这一趟：`dump()` 重试 10 次之后**不退出**，只把 `/tmp/ui.xml` 留成空文件，
+     脚本于是继续往下收红。红要落在"通道死了"那一行，不能落在"移动端没把 time prop 传下去"那种话上。
+  🟡 现量（20:1x）：`bash -n` rc=0；`node scripts/check-shell-unicode-vars.mjs` rc=**0**（扫 116 个 `.sh`）；
+  `bash research/tools/r14c-time-empty-arms.sh` rc=**0**、`pass=7 fail=0`（新加的 `assert_channel` 不在抽取范围内，
+  那把 rig 量的仍是归一那对，没有因为这次改动失去牙）。
+  ⏭️ **仍然没闭合的两件事，都不许在这一格被读成"已验"**：
+  ① **修过的判据集至今没有被任何一趟真设备跑到**（19:1x 那趟用的是修之前的判据，20:0x 那趟在判据集之前就废了）
+  ⇒ 它的现场证明还欠着，下一发窗口才谈得上；
+  ② (14) 那条"⑧ 之后停在「我的」页"仍未定性（这一趟连第 4 步都没到，`screen_txt` 那条新取证腿**也没被喂到**）。
+  现量命令：`grep -n '❌\|REGATE\|SIM Toolkit' /tmp/ht-r14c-chain.71648.log`、
+  `sed -n '1035,1064p' /tmp/ht-r14c-chain.71648.log`（第 2 步通道死的原文与第 3 步的前台）。
+  🔴 **这两道新的"停止条件"不当它们只有静态级**：新 rig `research/tools/r14c-channel-arms.sh`
+  现量 `pass=8 fail=0`（A 放过 / B 别人的包 ⇒ rc=3 且读数带"是谁的前台" / **C 取不到前台 ⇒ 也 rc=3** /
+  D hierarchy 空时由**真的** `require_screen` 先停 / **E 变异**：把那条比较摘成恒假后 B 形与 C 形两腿都不再停
+  ⇒ 那两臂的 rc=3 是被测那段给的；G/H/I 抽**共享库**的 `settle_foreground` 原文跑三条腿：
+  前 2 次别人的包第 3 次对上 ⇒ rc=0 且重试 2 次留痕 / 6 次全错 ⇒ rc=1 / 🔴 前台行恒空 ⇒ 也 rc=1）。
+  ⚠️ **写这把 rig 时自己造的三个坏读数**（都记下来，因为它们第一眼的样子都像"被测的东西不会停"）：
+  ① 桩 adb 是**另一个进程**，`FAKE_FOCUS=` 没 export ⇒ 三臂齐读"取不到"，症状是正向腿红、负向腿反而绿；
+  ② 夹具尾部只 `echo "rc=$?"` 而**没有把码转成脚本退出码** ⇒ 脚本的码是那句 echo 的（恒 0）；
+  ③ 桩回的 `mCurrentFocus` 帧形状是自己编的（少一个空格）⇒ 被测那两级 `sed` 裁出来的不是包名。
+  ③ 的更正方式是先拿真设备打一帧原话照抄（`adb -s emulator-5554 shell dumpsys window | grep -m1 mCurrentFocus`
+  ⇒ `Window{424eb1a u0 com.heyta/com.heytamobile.MainActivity}`）。
+  🟡 三条腿都补了**"桩真的被问过"的前提**（读计数文件，`<3`/`<6` 直接判前提不成立而不是判绿）——
+  少了这条，①那种坏会表现成"库里的函数不会停"，而那是装置坏了。
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
 
 

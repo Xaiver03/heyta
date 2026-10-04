@@ -212,6 +212,24 @@ clear_time() {
   time_value
 }
 
+# 判据开跑之前的**通道自检**：hierarchy 非空 **且** 前台还是本应用。
+# 🔴 为什么两条都要：`dump()` 自己有 10 次重试，但它失败之后**不退出**，只是把
+#    `/tmp/ui.xml` 留成空文件（20:0x 实测：lib 自己打印了「已被截成空文件」那一句，
+#    脚本却继续往下走，于是第 2、3 步收了 6 条假红）。而"非空"也不等于"是我们的界面"。
+assert_channel() {  # <在哪一步之前>
+  dump || true
+  require_screen                       # 空 hierarchy 由它响亮地 exit 3
+  local cur
+  cur=$($ADB shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r' | sed 's/.*u0 //;s/\/.*//')
+  if [ "$cur" != "$PKG" ]; then
+    bad "「${1}」之前通道自检失败：前台是「${cur:-空}」而不是 ${PKG}"
+    echo "   ⇒ 从这里起的每一条「找不到 X」都是打在别人的界面上，不是产品没画。" >&2
+    screen_txt
+    exit 3
+  fi
+  return 0
+}
+
 # 打开/关闭详情面板（与 `verify-mobile-task-edit.sh` 同一条理由：
 # RN 的 Modal 开着时，底下的行**不在**无障碍树里，行上的断言必须在关掉之后做）。
 open_sheet() {
@@ -378,10 +396,18 @@ ok "安装成功（rc=0 且输出含 Success；APK sha256=${APK_SHA:-未取}）"
 $ADB shell pm clear $PKG >/dev/null 2>&1
 $ADB shell am force-stop $PKG; sleep 1
 launch_app; sleep 6
+# 🔴 「应用已启动」的**承重判据是窗口归属**（`mCurrentFocus == 本应用`），不是界面文字。
+#    共享库里那句注释已经写过：欢迎页说明文字里也有「任务」二字 ⇒ `has_text 任务` 单独用是**假绿**；
+#    而 20:0x 这趟把它演成了现场版 —— 第 2 步起 `uiautomator` 十次抓不到界面、
+#    第 3 步的 dump 里前台是 **SIM Toolkit**，那之后每一条"找不到"都是打在别人的界面上，
+#    而报出来的每一句都长得像产品缺陷。`settle_foreground` 是仓内既有的那把
+#    （`verify-mobile-notes.sh:240` / `verify-mobile-trash.sh` 都用），不是新装置。
+if ! settle_foreground; then bad "6 次拉起后 mCurrentFocus 仍不是 ${PKG} ⇒ 根本没进应用，本轮读数全部无效"; screen_txt; exit 3; fi
 dismiss_welcome_if_present
+if ! settle_foreground; then bad "离开欢迎页之后应用不在前台 ⇒ 本轮读数全部无效"; screen_txt; exit 3; fi
 dump
 require_screen
-if [ "$(has_text "任务")" = "1" ]; then ok "应用已启动"; else bad "应用没起来"; screen_txt; fi
+if [ "$(has_text "任务")" = "1" ]; then ok "应用已启动（窗口归属 + 界面都读到）"; else bad "应用没起来"; screen_txt; fi
 
 step "2. 配置同步凭据"
 configure_sync_credentials
@@ -435,6 +461,10 @@ ok "对照（负）：不存在的 testID 数出 0（匹配器没在过度匹配
 #    用的还是 ④⑤⑥ 同一个读数通道 —— 通道坏了一致地坏，四步会一起红，一眼能认出来。
 #    `enabled` 只在旁边**打印**作诊断，不参与判定。
 step "5. 判据 ①②③ —— 未设日期时的时刻栏"
+# 🔴 从这里起才是**产品判据**：通道一旦是死的或前台不是本应用，后面每一条"找不到"
+#    都会长得像产品缺陷。先自检一次再开判据集（20:0x 那趟没有这一句，收了 6 条假红、
+#    一条产品判据都没跑到）。
+assert_channel "第 5 步（判据 ①②③）之前"
 
 # 🔴 **空框读数的自校准锚点，必须在任何敲字之前取**（19:1x 那趟的现场形状：
 #    ④ 报「填进了 1」而 ② 与 ④b 报「框里是 '时:分'」—— 同一个框、同一个通道，
