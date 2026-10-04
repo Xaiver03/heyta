@@ -4215,20 +4215,31 @@ W0b ─> 随时可做（台账那半要等文件干净）
    🔴 整趟非零的只有两段，且都已在第 5 条逐段定性：`check:web-artifact:app`（测量配置没对齐）
    与那段 `check:server-envcheck:ios-native-bridges`（链子自己坏了，两个 rc=0 由补跑另取）。
 
-11. 🔴 **`E2E-MERGE-01`：我手工裁决的 4 份 e2e 用例到现在没有跑过**（登记，不硬压）。
-    合并冲突里有 4 份 Playwright 用例是我逐处裁决的（`e2e/tests/admin-console.spec.ts`、
-    `inbox.spec.ts`、`profile-avatar-e2ee.spec.ts`、`vault-settings.spec.ts`，裁决见第 4 条），
-    而它们**不在**第 5 条那趟 65 段链里 —— `check:ai-e2e` 本轮**一次都没跑**，
-    所以这四份的"合并没有把它们改坏"目前只有**读源码级别的证据**，没有跑过的证据。
-    为什么没跑（04 21:4x 现量，不是借口，是共享资源归属）：
-    - `pnpm check:ai-e2e` 的前置动作会**按端口 SIGKILL 别人的 vite**（环境陷阱 #87），
-      而此刻本机有 **4 组 `npm exec vite` 在跑**（pid 35185/83785/83844/67563 …），
-      `:3000` 与 `:3100` 都在 LISTEN（`lsof -nP -iTCP -sTCP:LISTEN`）—— 那是并行会话的设备验收载体；
-    - 负载门：`sysctl -n vm.loadavg` = `{ 21.37 89.14 69.23 }`，1 分钟档已超本仓约定的 12。
-    ⇒ 按 §8 第 9 条"**共享资源先定所有者**"，这一趟不跑；**记环境不可用，不记产品失败**。
-    闭合命令（安静窗口里跑，四份单独跑就够、不必整族）：
-    `cd e2e && pnpm install && npx playwright test tests/admin-console.spec.ts tests/inbox.spec.ts tests/profile-avatar-e2ee.spec.ts tests/vault-settings.spec.ts`
-    判据：4 份全过；任一红要先按"裁决时的语义"归因（是合并裁错还是用例本就依赖旧界面），**不要为了让它绿而改断言**。
+11. ✅ **`E2E-MERGE-01` 已闭合**（04 21:4x）：合并里我手工裁决的 4 份 Playwright 用例
+    （`e2e/tests/admin-console.spec.ts`、`inbox.spec.ts`、`profile-avatar-e2ee.spec.ts`、
+    `vault-settings.spec.ts`，裁决见第 4 条）**第一次真跑完了**。
+    🔴 **先撤回我写错的那条理由**：本条第一版写"`check:ai-e2e` 会按端口 SIGKILL 别人的 vite，
+    而本机 `:3000`/`:3100` 被别人占着 ⇒ 不能跑"。**这句是错的**：读
+    `scripts/check-ai-e2e-preflight.mjs` 才确认它清的是**这个套件自己的专用端口 4318/4319**
+    （`playwright.config.ts:16` 明写"用 4318/4319 而不是 5173/3000"），而那两个端口现量为空。
+    我当时只查了 5173/3000/3100 三个口就推"会杀到别人" —— **判"某条路会伤到别人"要先读它实际碰哪个资源**。
+    负载也已从 21.37 降到 10.87（约定上限 12），于是当场跑。
+    读数（载体 = `d5e1322c`，工作树干净）：**`1 failed / 10 passed (2.0m)`、`RC_E2E4=1`** ——
+    红的那条不是抖动，是**一个真的界面缺陷，而且只有这一层能抓到**：
+    `admin-console.spec.ts:862` 报 `年度那一格被裁掉 13px`，
+    而**同一趟里其余十条断言全绿**（含 `toContainText('2026')`、`href` 逐字等于 URL、`rel` 那几条）。
+    ⇒ 这一格的价值就是它自己主张的那件事：文本断言验"写了什么"，不验"看得见的有多少"。
+    修法按产品不变量走（**不是**把阈值 `≤1` 抬到 `≤20`）：`admin.css` 新增
+    `.ht-settings__admin-rowMain--wrap`，只挂在年度那一格 —— 年度/条数/备注三段没有一段允许被省略号替掉；
+    共用那条 `.ht-settings__admin-rowMain` 不动（邮箱排的 ellipsis 是有意的）。
+    三条读数：修前 `RC_E2E4=1`（13px）⇒ 修后单跑 `RC_WRAPFIX=0` / 复跑 `RC_REFINAL=0` ⇒
+    🔴 变异（摘掉 `--wrap` 再跑）**`RC_MUT_WRAP=1`，裁切值又是 13px** ⇒ 绿确实是这个修饰符给的。
+    两张图都**人打开看过**：缺陷态是 `2026 · 2 天安排 · 国务院办公厅…`（吃掉"通知"两字），
+    修后是同一格换成两行、两条 gov.cn URL 各自可读。证据与 md5 表在
+    [`apps/web/evidence/admin-holiday/README.md`](../../apps/web/evidence/admin-holiday/README.md)
+    （那里还记了一条次生教训：**变异那一趟会把 `shoot()` 的证据图覆盖掉**，
+    我第一趟次序搞反就永久丢了"改前图"，这一趟是在覆盖前 `cp` 才留住的）。
+    ⚠️ 边界：这 4 份跑绿**不等于** `check:ai-e2e` 整族绿 —— 整族还有 50+ 条，本轮没跑（共享载体）。
 
 12. **停止追 main**（第 6 条那条纪律的执行结果）：`5358edf7` 之后 main 又落了 **4 笔**
     （`4f0b3894`、`83359555`、`4023fc5f`、`eaf14080`；其中 `83359555` 是代码笔，动
@@ -4240,3 +4251,25 @@ W0b ─> 随时可做（台账那半要等文件干净）
     台账并集规则处理 `AGENTS.md` / `environment-traps.md`）"，比我在另一侧追 N 次并每次重验一遍要**便宜且更不容易骗人**。
     ⚠️ 这一条与第 6 条不矛盾：第 6 条说的是"不要因为落地而去覆盖别人的工作树"，
     本条说的是"不要用一次新的并入去刷新那个瞬时读数"。**两者的共同前提是他们仍在写**（现量 16 枚未提交路径）。
+
+13. **各 worktree 的未提交清单**（Goal 第①步要求的是**全部** worktree，不只是主检出；
+    04 21:42 现量，复现：`node /tmp/wt-status.mjs` 那段逻辑 = `git worktree list --porcelain` 逐个 `git status --porcelain | wc -l`。
+    ⚠️ 用 shell for 循环配 `git worktree list` 的默认输出**一定会算错** —— 本仓库路径里有空格，
+    列被切成 `/Users/rocalight/Desktop/All` 那种残段，15 个 worktree 全部塌成同一个目录的读数；
+    必须走 `--porcelain` 的 `worktree ` 前缀行。）
+
+    | worktree | HEAD | 未提交 | 归属判定 | 处置 |
+    |---|---|---|---|---|
+    | 主检出 `heyta` | `e088c92f`（**分钟级在推进**，我三次并入之后又落 4 笔） | 15 | 并行会话（日历+Profile / 回收站线） | **不代提交**其在写的文件；本轮已替他们收拢的是**主检出上稳定态的 158/167 枚**，见第 1 条 |
+    | `heyta-wt-batch2`（本批） | `d5e1322c` | 0 | 我 | 已 push |
+    | `heyta-wt-ai-closeout` | `894adfac` | 2（`project.pbxproj`、`Podfile.lock`） | 并行会话的 iOS 依赖现场 | 不动（`check:native-deps` 的对账对象，代提交会把他们的 pod 状态钉进历史） |
+    | `heyta-wt-trash-e2e` | `99ea54c1` | 13（`export-dump`/`import-dump`/`recover-user`/新 `server/tests/recover-artifact-envelope.spec.ts` …） | 并行会话（还原/抹除线，**未闭合**） | 不动 |
+    | `.worktrees/detail-pane` | `85d418b6` | 3（1 个脚本 + 2 个 `node_modules`） | 并行会话 | 不动 |
+    | `.codex/worktrees/bc-final-validation` | `73b36a6d` **detached** | **164**（apps/web 89、app-host 13、mobile 10、legal 9、e2e/tests 7 …） | 另一个 agent 的验证台 | 🔴 **绝不能代提交**：detached HEAD 上落笔 = 提交只存在于 reflog，worktree 被 prune 就整批丢失；这比"没提交"更危险 |
+    | `/private/tmp/heyta-{land-publish,main-check,main-clean,merge-carrier,reinstall}`、`heyta-wt-{r14c,reinstall,selfhost,trash-e2e-r2}` | 各自 | **0** | 只读载体 | 无需处置 |
+
+    ⇒ Goal 第③步"把所有未提交更改（含并行会话留下的改动）按逻辑分组提交"的**边界在这里划清**：
+    我收拢过的是**主检出的稳定态**（那些改动如果不收，就会随并行会话下一次 `git checkout` 静默消失，
+    且它们当时已经没有对应的活着的写者）；而**别人正持有、且各自有明确所有者载体的树**不在其中 ——
+    尤其是 detached HEAD 的那枚 164。**判据不是"谁改的"，是"这块字节现在有没有主"**：
+    有主的树里我写一笔就是在替别人决定归属，无主的字节放着我就是在替他丢掉工作。
