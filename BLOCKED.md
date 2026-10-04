@@ -4520,6 +4520,29 @@ git grep -n '20261009000000_add_holiday_adjustments' HEAD
 >   本线不会为重跑一整条链去挤负载门（现在 14.35 > 12），也不把 ② 改判成未完成 —— 它是**有载体的历史读数**，
 >   新那段归它的主人复量。
 
+> **B76 补记 #10（10-04 15:0x 本地 / 07:0x UTC）—— ① 在**当前** main 上重新复量过；③ 那趟死等从 4h 涨到 ~12h 且 PID 集合换了人，而本条下面那段"复现命令"里的号已经全是旧的**
+>
+> - **① 现在是可以当场复量的，不是"记得做过"**：`for c in dd8f2210 f2d7ed40 fd34c42a de296b9d; do git merge-base --is-ancestor $c HEAD; done`
+>   ⇒ 四条**全部**是当前 `HEAD`（`d45fad0c`）的祖先。这一句顶掉"落地那一刻的读数"作为 ① 的证据，
+>   因为落地之后 main 又前进了几十笔，**祖先关系会随载体变**（traps 里"引用 N 项要带哪一趟"同族）。
+> - **③ 的性质判定维持"客户端侧死等"，并且拿到了第二条独立证据**：`find /tmp/heyta-reinstall -newermt '-2 hours' -type f` = **0 个文件**，
+>   而整棵树的**最新一次写入是今天 03:12**（`find … -exec stat -f '%Sm' -t '%m-%d %H:%M' {} + | sort | tail -1`）
+>   ⇒ 已经 **~12 小时没有任何产物落盘**。🔴 我第一版把这句写成"停在昨天 22:20"，那是**带错的**：
+>   那条命令我只 `maxdepth 2`、格式串只印 `%H:%M` 不带日期，于是拿 node_modules 的建包时刻当成了"最新写入"，
+>   而真正最新的是一枚 03:12 的文件 —— 数字方向没错（早已停止进展），**理由却是错的**。
+>   ⇒ 这类"取最大值"的取证必须**带日期**并**不限深度**，否则会把旧层读成新层。
+>   与 12:41 那条「`notarytool` 累计 CPU 四小时恒为 `0:00.03`」互相独立，两条都指向同一件事：**它不会自己走**。
+> - 🔴 **占位的那批 PID 换过人了，本条下面那段复现命令里的号全是旧的**：现量 `queue-reinstall-all.sh` = **81007 / 93771**
+>   （`etime` 11h57m）、`.reinstall-all.sh.snap.93817`（11h54m）、`notarytool` 仍是 **98934**（11h53m）；
+>   而 `heyta-deliver-on-window.sh` 那一代（28485）**已经不在** —— 命令里的 `pgrep` 那行照抄会读到空，
+>   空读数在这种场合最危险（它长得像"槽位空了"）。设备面：**5 台 Booted 模拟器 + 1 台 adb 设备**，负载 16.06。
+>   ⇒ 下面那段保留原文（它是 12:4x 那一趟的记录），新的现量命令补在它后面，**两代各带各的时刻**。
+> - **④ 的那条 PROGRESS.md 改道仍然没解开**：`git diff --numstat -- PROGRESS.md` 现在是 **+41/−1**（登记改道时是 +23）
+>   ⇒ 别人那一段还在长，本线照旧不往它追加。上面那条待办里那句原文**继续有效**，
+>   搬运时那句里的 SHA 必须现取（`HEAD` 此刻是 `d45fad0c`，但搬运那一刻要重新量）。
+> - **② 没有被本线改动**：本线今天下午到现在的几笔提交（`78cdff67` 起的界面单 + 四笔收口）**没有新增任何 `check:*` 段**，
+>   所以 75 段那个数不因本线变；`CHAIN-OK total=74` 那句仍旧只对载体 `d544d73c` 成立，本线不重述它的结论。
+
 **复现本条全部读数的现量命令**（只读，不起负载）：
 
 
@@ -4530,6 +4553,17 @@ ps -o pid,ppid,lstart,etime,time,command -p 93772 95477 98934
 lsof -a -d cwd -p 93772 -Fn | grep '^n'                      # 归属：/tmp/heyta-reinstall
 cd heyta && git status --porcelain PROGRESS.md && git diff --numstat PROGRESS.md
 tail -6 ~/scratch-heyta/deliver-123436-28485/run.log          # 第 2 轮那本账；上一行现取实例号，目录名带 pid
+```
+
+**15:0x 本地那一代的现量命令**（补记 #10 用的就是这五条；上面那代别照抄，`pgrep` 那行现在读空）：
+
+```bash
+sysctl -n vm.loadavg                                                     # 16.06
+ps -o pid,etime,time,command -p 81007 93771 93817 98934                   # 现取，别信这四个号
+find /tmp/heyta-reinstall -newermt '-2 hours' -type f | wc -l             # 死等的第二条证据：0
+find /tmp/heyta-reinstall -type f -exec stat -f '%Sm' -t '%m-%d %H:%M' {} + | sort | tail -1
+xcrun simctl list devices booted | grep -c Booted; adb devices | tail -n +2 | grep -c device
+for c in dd8f2210 f2d7ed40 fd34c42a de296b9d; do git merge-base --is-ancestor $c HEAD && echo "$c IN"; done
 ```
 
 ## B77. 🟠 ④ 要求的"traps 编号按工作树现量"量出三件事：AGENTS 让下一位用的那条计数命令**数的不是条数**、4 组真重号、号段表落后 2 个号（改号那件事早已登记，本线不代拍）
