@@ -554,6 +554,31 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    **回退不写 SHA**（写了就会漂，我自己刚漂过一次）：这条线**没合进 main**，所以"回退"就是不合流；
    真要逐层退，在分支上现量 `git log --oneline 0a61c0a6..feat/list-parent`（写侧 / 界面 / 行为判据 / 注释各一笔），
    从尾往头 `git revert`。
+   🔴 **19:48 现量：上面两句是死话，"一条命令回退"到此刻仍未闭合**，逐条写清为什么：
+   ① 分支已不存在（`git branch --list feat/list-parent` 空）⇒ `0a61c0a6..feat/list-parent` 这条现量命令跑不出来；
+   ② 改成"按层逐笔 revert"也**不成立** —— 在一次性 detached 检出（HEAD=`f3805908`，用完已回收）实测：
+      `git revert --no-commit 06c0bfd9` ⇒ **rc=1**，`packages/domain/src/project-hierarchy.ts` 留 `UU`
+      （`f41221a8` 那笔重构与 `00b5065c` 回收站批次重写过同一文件），其后 `f9032878` / `776fc23c`
+      直接 **rc=128 `unmerged`** ⇒ "历史形状已不允许整体回退"是读数，不是推测；
+      （同趟顺手量的一条对照：回退到一半时 `node scripts/check-layering.mjs` 仍 rc=0 ——
+      它管的是 `apps/*` 不许重新长出业务/接线，**管不到**这层撤得干不干净，别拿它的绿当这条腿的证据。）
+   ③ 所以**够得着的回退是"撤范围"而不是"撤历史"**，位置现取到行：
+      删 `apps/mobile/src/screens/ListsSection.tsx` 的 **`:237`–`:272`**
+      （`:237` 是那段块注释的 `/*`，`:245` 是 `renderItemExtra={(item) => (`，`:272` 是它的 `)}`；
+      下一行 `:273` 是 `onRename=…`，边界不在它里面）。
+      共享层与写侧一行不动 ⇒ web 那半不受影响，`OrganizerList` 行骨架本来就没改（两端不传时渲染逐字不变）。
+      ⚠️ **残留辅助量这件事有读数额外支持，但最后一步仍未跑**：
+      全仓 `**/tsconfig*.json` 里 `noUnusedLocals` / `noUnusedParameters` **零枚命中**
+      （阳性对照是同一条 Grep 换 needle `"strict"` ⇒ 命中 5 枚，所以那个 0 是"确实没开"不是"探针没吃到"）
+      ⇒ 删掉那 36 行后，只在里面用的 `folderTargets` / `parentOf` / `setFolderError` **不会**让
+      `@heyta/mobile` 的 `tsc --noEmit` 转红；而 19:34 现取的 82 段 `check` 清单里**没有 eslint 段**
+      ⇒ 也没有别的常驻门禁会因为"留下未用的辅助量"判红。
+      🔴 所以真正的代价是**回退要连那几枚辅助量一起摘干净**，而不是"回退会被门禁拦"。
+      还剩没做的一步：在那枚临时检出里真删一次并跑 `pnpm --filter @heyta/mobile typecheck`
+      （临时检出要另配 `node_modules` 软链才不会假红）——**这条腿到记为止是"由配置事实推出可行"，
+      不是"跑过"**。⇒ ④ 的登记状态：功能五项全在 HEAD（19:3x 逐条 file:line 核过），
+      "一条命令回退"的形式已钉到 `ListsSection.tsx:237-:272` 这一段，可行性有上面那两条现额支持，
+      终验（删+typecheck）待跑。
    🔴 唯一没做的是**在 main 上落那一笔**：图层上已经**快进可合**
    （`git merge-base --is-ancestor main feat/list-parent` → 0，且合并零冲突、并集已核对，见 §3.3），
    但主检出里那两张词条表还是 `M` ⇒ `--ff-only` 会被 git 拒（它不替你 stash 别人的改动）。
