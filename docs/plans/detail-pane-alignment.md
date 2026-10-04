@@ -2594,16 +2594,16 @@ PIXELS_IDENTICAL=true  VERDICT=SAYING_HAS_TEETH_AND_ZERO_VISUAL
 
 | 闸门 | 这一单的读数 |
 |---|---|
-| 归属门 | 改动 **8 枚源码/文档 + 5 张 png**，全部本单：`scripts/check-selection-single-source.mjs`（F 的三条规则）、`packages/ui/src/timeline/TimelineBoard.tsx`（产品）、`packages/ui/tests/timeline-row-selection-trace.spec.ts`（新增 7 条）、`research/tools/mutation-rigs/{mutate-selection-f,mutate-timeline-face}.mjs`、`e2e/{tests/selection-projections.spec.ts,playwright.detail-pane.config.ts}`、本篇。主检出同路径**零脏** |
+| 归属门 | 改动 **8 枚源码/文档 + 5 张 png**，全部本单：`scripts/check-selection-single-source.mjs`（F 的三条规则）、`packages/ui/src/timeline/TimelineBoard.tsx`（产品）、`packages/ui/tests/timeline-row-selection-trace.spec.ts`（新增 7 条）、`research/tools/mutation-rigs/{mutate-selection-f,mutate-timeline-face}.mjs`、`e2e/{tests/selection-projections.spec.ts,playwright.detail-pane.config.ts}`、本篇。主检出（`e2e/` 前缀下）有 **6 枚**脏：`auth-journey/auth-journey.spec.ts`、`auth-journey/helpers.ts`、`legal-links/legal-links.spec.ts`、`tests/vault-settings.spec.ts`、`vault/vault-journey.spec.ts`、`windows-shell/auth-journey.spec.ts` —— 逐枚都不是本单判据的输入（本单读的三枚 e2e 文件在它那里干净，`packages/ui`、门禁脚本、本篇也各零脏） |
 | 两道余量为 0 的棘轮 | 零 CSS/`ht-*` 改动：`check:l4` rc=0（"三道断言都通过"）、`check:row-single-source` rc=0 —— **两道都没读基线数字，因为没有任何输入进它们** |
 | 干净检出复跑 | 判据输入 = 门禁脚本 + 一枚共享组件 + 两份判据文件，全部在本检出内；`check:rn-aria` / `check:layering`（332 文件 9 规则）/ `check:design` / `check:ui-language`（zh 2864 = en 2864）/ `check:selection-single-source` **各 rc=0**，末行逐字未变 |
 | `packages` 改完先 build | 🔴 这一格本轮**真的用上了**：`packages/ui` tsup → `apps/web` `tsc -b && vite build` → 才跑 e2e（A/B 两趟各重打一次，`UI_BUILD_RC=0/WEB_BUILD_RC=0` 与 `UI_BUILD2/WEB_BUILD2` 四条都在输出里）。**代价先付过一次**：A/B 第一版中间用 `cd ../apps/web` 换目录，从 `packages/ui` 出发深度不对 ⇒ `WEB_BUILD_RC=1` 而 e2e 照跑，那一趟量的是**上一轮的 dist**（那次失败恰好是真探针故障，所以没被误当成产品缺陷，但这是运气不是纪律） |
 
 **其余读数**：`packages/ui` **27 文件 / 474 passed**（+7）、`apps/web` **1595 passed / 12 skipped**、
 `apps/mobile` 607 passed；`tsc --noEmit -p tsconfig.spec.json` 在 `packages/ui` 与 `apps/web` 各 **0 error**；
-e2e 详情面整族 **25 passed**（含本单这一族 3 条）。
+e2e 详情面整族 **29 passed**（12:2x 电池复跑现量：`detail-column-slot` 3 + `detail-pane-collapse` 7 + `detail-pane-overlay` 2 + `focus-detail-pane` 6 + `keyboard-cursor` K1–K8 共 8 + 本单 `selection-projections` 3）。
 
-### 11. 两条探针错（都是"看着像门禁红/看着像绿"那一族）
+### 11. 三条探针错（前两条是"看着像门禁红/看着像绿"那一族，第三条是"同一个数两种取法给两个答案"）
 
 1. 🔴 **门禁脚本文件名拼错时 `rc=1` 长得和"门禁红"一模一样**。我把电池写成 `scripts/check-$g.mjs` 循环，
    `l4` 与 `design` 的真实路径是 `scripts/check-l4-no-style.mjs` 与 `design-system/heyta/check-hardcoded.mjs`
@@ -2612,6 +2612,11 @@ e2e 详情面整族 **25 passed**（含本单这一族 3 条）。
 2. **管道后 `$?` 是 `tail` 的**（§7 老账，本轮又付一次）：`tsc … | tail -5; echo TC_RC=$?` 报了 `TC_RC=0`
    而同一趟日志里明明有一条 `error TS2554`。改成先重定向到文件、再 `echo $?`，那条类型错才现形
    （`expect(x).toMatch(re, '消息')` —— `toMatch` 只收一个实参，消息要挂在 `expect(x, 消息)` 上）。
+3. **同一枚集合我用两种取法数出 2 和 4**。数 FACES 有几枚，第一版 `grep -c "    kind:"`（四个空格）给 **2**，
+   改成 `awk '/^const FACES = \[/,/^\];/' | grep -cE "kind: '"` 给 **4** —— 原因现量了：那张数组里**两种字面形状并存** —— 两枚是多行对象（`kind:` 在行首、四个空格），另两枚是单行对象（`  { kind: 'note', … }`，`kind:` 前面是 `{ `）。
+   ⇒ **按某一种形状数的取法必少算**，而两个读数都"看着合理"：只信第一版就会把"4 面 → 5 面"写成"2 面 → 3 面"。
+   📌 正解不是"更小心地写 grep"，是**拿被计数者自己的打印当交叉对照**：门禁那句 `✅ F：5 处渲染面…` 是第三个读数，
+   三个里只有它由生产代码维护，所以它才是锚。
 
 ### 12. 镜像那一格：递送层不许"一边递、一边自己出痕迹"（12:2x 现量 + 新规则 + 两臂）
 
@@ -2656,3 +2661,21 @@ H11/H14 是它的外部对照；② 它挡"递 + 算并存"，**不**挡"既不�
   挡它的是断言 F 的"表外面"那条（`unlisted.length`），不是本节这两条。
 - 本单没动 `check:ai-e2e` 的名单，也没把新 rig 挂进 `pnpm check`（与 `mutation-rigs/` 其余台子同口径：
   原地变异源码，不能进每次 push 的门禁）。
+
+### 14. 整链电池复跑（12:2x，载体 `f2379dec`，25 步 RC=0 / `BATTERY_RESULT=ALL_GREEN`）
+
+这一格是**提交之后**补的，理由是前两节那两条更正只有在"全部改动已进 HEAD"的状态下才量得准：
+七道门禁 + token 生成两步 + 六包 typecheck + 六包全量单测 + `apps/web` 重打两步 + e2e 族 typecheck + e2e 族，
+逐步 RC=0，`SELF_CHECK log_names=25 unique=25 dupes=[]`（电池自己那条"步骤名不许撞"的自检也在跑）。
+其中 `test ui` 这一格现在含本单那 7 条（该包 **27 文件 / 474 passed**）。
+
+🔴 **这一趟顺手量出一件比"截图会漂"更细的事**：电池重跑 e2e 族改写了 **10 枚** evidence png，
+其中 3 枚是本单两分钟前刚提交的 `selection-projections/{01-list,03-timeline,04-switch}.png` ——
+也就是说 §8.42 第 9 节那句"随构建漂"还**低估**了它：**同一份构建、同一个 spec，两趟之间也会漂**
+（`01-list` 126515→126506、`04-switch` 126260→126267）。
+而 `03-timeline.png` 是 **字节数完全相同（31106 = 31106）但内容不同** ——
+📌 所以"大小一样就没变"这种快捷判据在这批证据上是**错的**，`cmp` 才是；
+第 7 节那个 `PIXELS_IDENTICAL=true` 之所以还成立，是因为它是**同一趟里**变异前后两张图直接 `cmp`，
+不是"和上一次提交的图比"。措辞边界：这一条不推翻任何结论，它划清的是"逐字节相同"这句话**比的是哪两张图**。
+10 枚全部 `git restore` 还原（本单提交的版本是刚看过、且断言全绿那一趟的产物；
+别的单的 4 枚由它们的所有者管），还原后 `git status` 只剩别人那枚 `scripts/mutate-closeout-gates.sh` 与两枚软链。
