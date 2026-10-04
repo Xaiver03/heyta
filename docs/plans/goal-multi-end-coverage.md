@@ -3152,3 +3152,42 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   "不是内部或外部命令"乱码；那**是宿主上没有那个工具**，不是打包机坏了。要洗 `\r` 就在本机侧洗（`ssh … | tr -d "\r"`）。
 - 外层再套一层 `bash -c '…'` 时，**内层的 `"…$?"` 会把我自己的引号吃掉**（实测 `unexpected EOF while looking for matching "'`）
   ⇒ 需要读退出码就先把远端输出重定向到本机文件，再单独 `echo` 那个码。
+
+#### 7.31.13 ④ 在 HEAD 里的现状量核（代码级确已并入），外加 `pnpm check` 段数漂到 **81** —— 以及我第一次把它量成"0 次"的那个探针形状（14:24–14:25 现量）
+
+**① ④ 的代码级现状量：不需要再动一行。** HEAD 是 `0a0b63f6`，四条独立读数：
+
+| 问的 | 命令 | 读数 |
+|---|---|---|
+| 那一支在不在 HEAD 的祖先里 | `git merge-base --is-ancestor c983a7cf HEAD` | `ANCESTOR=YES` |
+| 领域层文件在不在提交里 | `git ls-tree -r HEAD --name-only \| grep -c project-hierarchy` | **2** |
+| 写侧声明处数 | `git grep -c setParent HEAD -- packages/app-host/src` | `actions.ts:3`、`project-actions.ts:6` |
+| 三处落点有没有未提交差异 | `git status --porcelain packages/domain/src/project-hierarchy.ts apps/web/src/features/projects/ apps/mobile/src/screens/ListsSection.tsx` | 空 |
+
+顺带一条对收尾有用的接线事实：`e2e/tests/list-folder.spec.ts` 落在 `e2e/playwright.config.ts:22` 的
+`testDir: './tests'` 里 ⇒ **窗口内那一趟 `pnpm check` 会顺带把 ④ 的界面取证再跑一次**，
+本线不必为它单开一趟 Playwright。
+
+**② 段数：`pnpm check` 现在是 81 段，任务书那句"62 段"是口径不是尺。**
+现量命令（可重跑）：
+
+```
+node -e 'const p=require("./package.json");process.stdout.write(String(p.scripts.check.split(" && ").length))'
+```
+
+上一趟**真实跑过**的读数是 74 段（载体 `940af1c0`，记在 §7.30）。74→81 这 7 段是别条线这两天往
+`scripts.check` 串里加的门禁，不是本线的事 —— 但下一位报"可过段数"时**必须同时报载体和现量段数**，
+只报"57/62"这种分数会被读成"漏做了 5 段"。
+
+**③ 🔴 我在这次量段数时踩到的探针形状，值得单独留一行**：第一次问"三段 e2e 在不在 `pnpm check` 链里"，
+我写的是 `x.includes('check:ai-e2e ')`（**带尾空格**）。`split(" && ")` 出来的元素是
+`pnpm check:ai-e2e` 这种**没有尾空格**的形状 ⇒ 三段全报 **0 次**，读起来正好是"这三个 Playwright 段
+不在全量链里"—— 而真相是**各 1 次**（`check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e`
+都在链里，链末段是 `pnpm -r test`）。改成 `x.trim() === 'pnpm ' + s` 才拿到正确读数。
+这是"空测量看着最干净"的又一副面目：**凡在 `split` 结果上做 `includes`，pattern 里的尾空格会让整条判据恒假，
+而恒假的判据报出来的 0 比报错更难被怀疑。**
+
+**④ 窗口现量（14:23:56）**：链第 84 轮仍是「设备在线但**不空闲**」——
+android `pidof_com.heyta=[3383]`（第 84 轮焦点已切到 nexuslauncher，但那个进程还在），
+`uptime` 的 1min load **28.34** / 阈值 **12**（ncpu 16 × 3/4），本趟日志里 `判据成立` 计数 **0**。
+⇒ **①③ 仍未起**，这一节只记读数，没有改动任何判据、任何断言。
