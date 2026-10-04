@@ -172,7 +172,24 @@ scroll_to_rid() {  # <testID>
 }
 
 # 读时刻输入框的当前内容（空串 = 框里没有字）。
-time_value() { dump; rid_attr task-due-time-input text; }
+# 🔴 **这一条在 19:1x 之前是坏的，而且坏的方向是"假红"**：无障碍里的 `text` 在框为空时
+#    回的是**占位符**（词条 `common.due.timePlaceholder`，zh 值是「时:分」）而不是空串 ——
+#    现场读数：判据 ④b「清空后框里还剩 '时:分'」。于是
+#      · ②（"未设日期敲字敲不进去"判 `text != ""`）**恒红**，
+#      · ④b（清空生效判 `text == ""`）**恒红**，
+#    这两条红与产品无关，是读数通道把"没字"和"占位符"混成一件事。
+#    ⚠️ 不把「时:分」这个字面值抄进脚本（抄件必漂；词条改一次这里就静默失效）：
+#    改成**自校准** —— 第 5 步开跑前这条任务是刚建的、只有标题、没有时刻，
+#    所以此刻的读数就是"空"在这个设备/这份语言下的字面形状，记成 `TIME_EMPTY`，
+#    之后凡等于它的都归一成空串。若某台设备上空框真的回空串，`TIME_EMPTY` 就是空串，
+#    归一成为**无操作** —— 这个设计两个方向都不会引入假绿。
+TIME_EMPTY=""
+time_value_raw() { dump; rid_attr task-due-time-input text; }
+time_value() {
+  local v; v=$(time_value_raw)
+  [ -n "$TIME_EMPTY" ] && [ "$v" = "$TIME_EMPTY" ] && v=""
+  printf '%s' "$v"
+}
 
 # 清空时刻输入框（全选 + 删除，与 `clear_and_type` 同一手法；不循环 DEL —— 会 ANR）。
 # 🔴 清完必须读回"真的空了"：清空失败时后面那条"填不进字"的负向判据会因为
@@ -406,21 +423,43 @@ ok "对照（负）：不存在的 testID 数出 0（匹配器没在过度匹配
 #    用的还是 ④⑤⑥ 同一个读数通道 —— 通道坏了一致地坏，四步会一起红，一眼能认出来。
 #    `enabled` 只在旁边**打印**作诊断，不参与判定。
 step "5. 判据 ①②③ —— 未设日期时的时刻栏"
-if [ "$(rid_count task-due-time-input)" -ge 1 ]; then
-  ok "① 时刻输入框画出来了（testID=task-due-time-input）"
-else
-  bad "① 时刻输入框不在无障碍树里 —— 移动端没把 time prop 传下去，或共享层没画这一行"
-fi
+
+# 🔴 **空框读数的自校准锚点，必须在任何敲字之前取**（19:1x 那趟的现场形状：
+#    ④ 报「填进了 1」而 ② 与 ④b 报「框里是 '时:分'」—— 同一个框、同一个通道，
+#    三条互相打脸，红的原因是占位符被当成了内容，不是 enabled 接线）。
+#    此刻这条任务只有标题、没有时刻 ⇒ 这一读就是"空"在这台设备 + 这份语言下的
+#    字面形状。空框若真回空串，`TIME_EMPTY` 就是空串，归一为无操作 —— 两个方向
+#    都不会引入假绿（见上面 `time_value` 的注释）。
+TIME_EMPTY=$(time_value_raw)
+echo "   空框锚点 TIME_EMPTY='${TIME_EMPTY}'（长度 ${#TIME_EMPTY}；凡等于它的读数归一成空串）"
+
+RAW_COUNT=$(rid_count task-due-time-input)
 XY_NO_DATE=$(scroll_to_rid task-due-time-input)
+# 🔴 ① 原来读的是**上一次没滚动的 dump** 的 `rid_count`，而 ②④ 走 `scroll_to_rid` ——
+#    同一个节点两条通道。19:1x 实测就是这么自相矛盾的：① 报"不在无障碍树里"，
+#    下一行 ② 却拿到了可点坐标。"没滚进可点区"被说成"没画"，与
+#    `verify-mobile-edit` 记过的同一族（ScrollView 折叠线以下的节点在树里但不 sane）。
+#    现在 ① 与 ②④ 同通道，原始枚数**另打一行**做归因：
+#      数得出却没滚到 = 探针/布局问题；一枚都数不出 = 共享层真的没画这一行。
+if [ -n "$XY_NO_DATE" ]; then
+  ok "① 时刻输入框画出来了，且已滚进可点区（testID=task-due-time-input，树里共 $RAW_COUNT 枚）"
+elif [ "$RAW_COUNT" -ge 1 ]; then
+  bad "① 判不了：树里数得出 $RAW_COUNT 枚时刻输入框，但滚了 6 次都没进可点区 —— 探针/布局问题，不是产品没画"
+else
+  bad "① 时刻输入框不在无障碍树里（0 枚）—— 移动端没把 time prop 传下去，或共享层没画这一行"
+fi
 if [ -z "$XY_NO_DATE" ]; then
   bad "② 判不了：滚了 6 次都没把时刻输入框送进可点区（读数通道此刻不可用）"
 else
   $ADB shell input tap $XY_NO_DATE; sleep 1.2
   $ADB shell input text "1"; sleep 1.2
-  if [ "$(time_value)" = "" ]; then
+  # 🔴 读数取一次、两个分支共用（原来 `if` 里调 `time_value`、bad 分支里什么都不打，
+  #    于是"红了但看不出框里是什么"—— 与 19:1x 那趟要靠翻 ④b 才知道占位符这件事同族）。
+  NO_DATE_READ=$(time_value)
+  if [ "$NO_DATE_READ" = "" ]; then
     ok "② 未设日期时敲字敲不进去（框里仍是空）—— enabled 读数：$(rid_attr task-due-time-input enabled)"
   else
-    bad "② 未设日期却把字填进了时刻框 —— '没有日子也能填几点'，enabled 接线没生效"
+    bad "② 未设日期却把字填进了时刻框（归一后读到 '$NO_DATE_READ'，空框锚点是 '${TIME_EMPTY}'）—— '没有日子也能填几点'，enabled 接线没生效"
   fi
 fi
 if [ "$(rid_count task-due-time-all-day)" = "0" ]; then
@@ -442,10 +481,11 @@ if [ -z "$XY" ]; then bad "找不到「今天」快捷项"; screen_txt; else
   else
     $ADB shell input tap $XY2; sleep 1.2
     $ADB shell input text "1"; sleep 1.2
-    if [ "$(time_value)" = "1" ]; then
+    WITH_DATE=$(time_value)
+    if [ "$WITH_DATE" = "1" ]; then
       ok "④ 设了「今天」之后同一个框能填进字（②/④ 双向：这条通道既不是恒空也不是恒满）"
     else
-      bad "④ 设了日期之后仍然填不进字（框里是 '$(time_value)'）—— enabled 恒假，输入框被灰死"
+      bad "④ 设了日期之后仍然填不进字（框里是 '$WITH_DATE'）—— enabled 恒假，输入框被灰死"
     fi
     AFTER_CLEAR=$(clear_time)
     if [ "$AFTER_CLEAR" = "" ]; then
@@ -499,18 +539,28 @@ fi
 step "9. 判据 ⑧ —— 重开面板后时刻仍在（落库，不是本地态）"
 if ! close_sheet; then bad "面板没关掉"; screen_txt; fi
 if open_sheet "$TITLE"; then
-  if [ -z "$(scroll_to_rid task-due-time-input)" ]; then
-    bad "⑧ 重开后面板上找不到时刻输入框（面板没绑到这一条任务？或渲染回退了）"
+  XY8=$(scroll_to_rid task-due-time-input)
+  RAW8=$(rid_count task-due-time-input)
+  # 🔴 红了要**当场**把"现在停在哪一屏"打出来。19:1x 那趟从 ⑧ 起连红五条，
+  #    而我是在**下一步**（⑨ 的 screen_txt）里才看出界面当时停在「我的」页 ——
+  #    那条读数离出事点已经隔了两步，只支持推断、不算取证（AGENTS §8.7：
+  #    归因要写在产生它的那一步）。枚数一起打，好让下一轮能分辨
+  #    "树里就没有"（产品/渲染回退）与"有但滚不到"（探针/布局）。
+  if [ -z "$XY8" ]; then
+    bad "⑧ 重开后面板上取不到时刻输入框的可点坐标（树里 $RAW8 枚）—— 面板没绑到这一条任务？还是整页已经不是详情面板？"
+    screen_txt
   else
     GOT=$(time_value)
     if [ "$GOT" = "$TIME_FULL" ]; then
-      ok "⑧ 重开后框里仍是 $TIME_FULL —— 写进了 op-log"
+      ok "⑧ 重开后框里仍是 ${TIME_FULL} —— 写进了 op-log"
     else
-      bad "⑧ 重开后框里是 '$GOT' —— 上一次写的时刻没落库"
+      bad "⑧ 重开后框里是 '$GOT'（空框锚点是 '${TIME_EMPTY}'）—— 上一次写的时刻没落库"
+      screen_txt
     fi
   fi
 else
   bad "⑧ 重开面板失败"
+  screen_txt
 fi
 
 # ── 判据 ⑨：换日子要**搬运**已有的时刻（TaskDetailSheet 的 onChange 里那句
@@ -572,7 +622,8 @@ step "12. 判据 ⑪ —— 「全天」把时刻清掉、日子留住"
 if open_sheet "$TITLE"; then
   ALLDAY_XY=$(scroll_to_rid task-due-time-all-day)
   if [ -z "$ALLDAY_XY" ]; then
-    bad "⑪a 找不到「全天」按钮（前一步明明出现过）"
+    bad "⑪a 找不到「全天」按钮（前一步明明出现过；树里 $(rid_count task-due-time-all-day) 枚）"
+    screen_txt
   else
     $ADB shell input tap $ALLDAY_XY; sleep 2.5
     GOT=$(time_value)
@@ -588,6 +639,14 @@ if open_sheet "$TITLE"; then
     fi
   fi
   if ! close_sheet; then bad "面板没关掉"; screen_txt; fi
+else
+  # 🔴 这一条以前**不存在**，而 19:1x 那趟的后果是：第 12 步整步没有打印任何一条 ⑪
+  #    判据（日志里那一步只有"笔记本已下载"和 ⑪c），界面已经不在任务页，
+  #    脚本却一路跑到汇总 —— 两条判据被**静默跳过**，而总数仍报"通过 27 / 失败 10"，
+  #    读起来像"⑪ 判过了"。跳过必须是看得见的一条红，不能是缺两行。（§7 #46 同族：
+  #    没跑到的那一段不会自己报错，它只是不在输出里。）
+  bad "⑪ 判不了：详情面板没重开，第 12 步的两条判据（⑪a/⑪b）一条都没跑到"
+  screen_txt
 fi
 
 $ADB shell input tap "$OK_X" "$TAB_Y"; sleep 3
