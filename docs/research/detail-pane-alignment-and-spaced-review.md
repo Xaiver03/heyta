@@ -316,6 +316,9 @@
 
 ### C1b-Q8（= C1 #8：详情面里"无数据的区块"是空即隐藏还是常驻）
 
+> 取证日期 **2026-10-03**。🔴 **2026-10-04 09:5x 复扫这一节时照出三行没有 URL 出处**（Things 4 / Todoist / Outlook），
+> 已逐行标成「**未核实 · 未附来源**」—— 本节顶部那句"一手取证"对这三行**不成立**，宁可挂未核实，也不补猜链接。
+
 一手取证后**最重要的发现是问题本身问错了**：没有任何一家把这件事写成"空即隐藏 vs 永远都在"，它们写的是**这个区块是不是动作的入口**。
 
 | 来源 | 站哪边 | 原文 |
@@ -324,14 +327,18 @@
 | Apple SwiftUI `ContentUnavailableView` | 不藏 | "recommended … where a view's content cannot be displayed … a list without items"（[documentation](https://developer.apple.com/documentation/swiftui/contentunavailableview)） |
 | IBM Carbon · Empty states | 不藏，但**空间小就只留文案** | "If space is limited, use just text." + "In situations where there could be multiple empty states showing at once, we recommend using a tertiary button" + 设计必答第一问就是 "What will the pages … and **side panels** look like without content?"（[carbondesignsystem.com](https://carbondesignsystem.com/patterns/empty-states-pattern/)） |
 | Microsoft Power BI | 藏（但藏的是**数据行**，不是功能） | "Power BI doesn't display all possible data by default" + "Turning on the option to show items with no data can negatively affect performance"（[learn.microsoft.com](https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-show-items-no-data)） |
-| Things 4 | 藏 | "those fields are neatly tucked away in the corner until you need them" |
-| Todoist 任务详情 | 常驻可操作 | "Click the project name to move… Click Date to add a date, time, and duration … Click Labels to add a label"（同一 help 页） |
-| Outlook | 一行字，不给插画 | "you will see 'Select an item to Read'" |
+| Things 4 | 藏 | "those fields are neatly tucked away in the corner until you need them"（**未核实 · 未附来源**） |
+| Todoist 任务详情 | 常驻可操作 | "Click the project name to move… Click Date to add a date, time, and duration … Click Labels to add a label"（**未核实 · 未附来源**：原记"同一 help 页"却没落 URL） |
+| Outlook | 一行字，不给插画 | "you will see 'Select an item to Read'"（**未核实 · 未附来源**：那是客户端界面串，不是文档句子） |
 
 **推荐**：三态契约 **`affordance`（写入口，常驻，空态只占一行按钮级文案）/ `record`（纯记录，可隐藏但区块头留"添加"）/ `hidden`**，而且**这个判断住在共享组件层、四个壳不许各写一份**（AGENTS §3.5 的形状；所有空态文案进 `packages/i18n` 中英成对）。
 - 为什么不选"全部常驻"：详情栏一屏七八个空行，正是 Apple 两条 progressive disclosure 告诫的形态。
 - 🔴 为什么不选"全部空即隐藏"：本仓库已经吃过这个形状的反果 —— `tagIds` 全仓零读写那段记的是"零件都在、产品里没有这个功能"。**界面上隐藏空区块是最容易悄悄把一个功能变成"没有功能"的地方**，而这类失败从来不会报错。
 - Carbon 那句 "use just text" 与本仓库已拍的「不抄空态插画」同向，可直接引用为一致依据。
+- 🔴 **这条推荐不靠上面那三行未附来源的话撑着**（逐条对过）：`affordance 常驻` 的已附来源依据是 Apple 那句
+  "Place controls that people are most likely to use at the top of the disclosure hierarchy so they're always visible"，
+  `record 可隐藏` 的依据是 Apple 第一句 + Power BI 的性能那句，`空态只给一行文案` 的依据是 Carbon。
+  ⇒ 上面 Todoist / Things 4 / Outlook 三行**即使复核后被推翻，本推荐不动** —— 这才敢在只标了"待复核"的情况下继续用。
 
 ### C1b-Q2（= C1 #2：习惯统计三处口径 A 日历月 vs 韧性 / B 自然月 vs 滚动 / C 天 vs 次）
 
@@ -352,14 +359,19 @@
 | **次住在哪一轴** | Loop | 频率轴**表达不了**"一天 N 次"：取数器收尾 `if (numerator >= denominator  numerator < 1) { numerator = 1; denominator = 1 }` ⇒ `3次/1天` 被**折叠成"每天一次"**。要表达只能建成**数值习惯**（`targetValue=3`、`unit="次"`） | `FrequencyPickerDialog.kt:174-177`（**逐行回读确认**）、`Frequency.kt:22-47` | **一手代码** |
 | | 滴答 | 同上：`频率` 那一轴只写"一周完成3次"这类**周期内次数**；"一天几次"放**目标**轴（"当天完成一定量"） | 《开始坚持一个习惯》 | **一手文档** |
 | | Habitica | "次"下放给另一条实体（Habit `counterUp += times`），而 **Habit 不计连续**（`scoreTask.js:204-210`） | 同左 | **一手代码** |
-| ⇒ | **竞品共识：`一天 N 次` 属于"目标/数量"轴，不属于"频率/排期"轴。** heyta 现状已在正确的一侧（`HabitFrequency` 只有 `daily / weekly{daysOfWeek} / interval{everyNDays}`，**无** per-period 配额，次数在 `Habit.target/unit` + `HabitLog.value`）⇒ **不用改模型** | `packages/domain/src/entities.ts:302-305`（行号 2026-10-03 自核） | 仓库现状 |
+| ⇒ | **竞品共识：`一天 N 次` 属于"目标/数量"轴，不属于"频率/排期"轴。** heyta 现状已在正确的一侧（`HabitFrequency` 只有 `daily / weekly{daysOfWeek} / interval{everyNDays}`，**无** per-period 配额，次数在 `Habit.target/unit` + `HabitLog.value`）⇒ **不用改模型** | — | `packages/domain/src/entities.ts:302-305`（行号 2026-10-03 自核） | 仓库现状 |
 | **"5 次一周"有两副面孔** | 排期日模型 | Streaks（"Set the days … Go to the gym **(3 days per week)**"）、Habitica（`frequency:'weekly'` + `daysOfTheWeek` + `everyX`，`cron.js:154-178`）、**heyta 现状** ⇒ 分母是**计划日**，非计划日既不算漏也不断链 | 同左 | 一手 |
 | | 窗口配额模型 | Loop `Frequency(5,7)`：配额**不产生"未达标"判定**，而是把散落的 YES_MANUAL 折算成区间并**自动补 YES_AUTO 天**，再按**自然日相邻**数连续；自己注释写着 "gaps are eliminated and **streaks are maximized**" | `EntryList.kt:100-103,222-245,247-273` | **一手代码** |
-| 🔴 | **同一个使用序列（周三/五/日各一次 ×4 周）两种口径给的不是同一个数**：排期日 = **12**，配额（被自动补格连成一片）可达 **28** ⇒ **判据必须先声明用哪一种，否则"期望值"没有意义** | — | 推论 |
+| 🔴 | **同一个使用序列（周三/五/日各一次 ×4 周）两种口径给的不是同一个数**：排期日 = **12**，配额（被自动补格连成一片）可达 **28** ⇒ **判据必须先声明用哪一种，否则"期望值"没有意义** | — | — | 推论 |
 | **部分完成的那天**（目标 5、实际 3） | 四家 + 两个平台**一致**：数量照记、**天数不记** | Loop 未达标格子画 **GREY**（达标 ON / 未达标 GREY，`HistoryCard.kt:165-184`）但 `groupedSum` 把 3 计入月总量；Habitica 的 checklist 比例**只减轻扣分**、不给那天 streak（`scoreTask.js:39-47`）；滴答原话 **"即使哪一天没有背够5页的单词，也能记录自己完成3页的付出和努力"**；Apple `HKActivitySummary` = "data for a given day" + 成对 `…/…Goal` 字段，Google Fit 日桶边界 = "midnight of the current day" | 同左 | **一手** |
-| **自然月 vs 滚动 30** | 滴答**同时用两者并分别精确标注**：习惯热力图 = "追踪**本月**中每一天"，任务完成统计小组件 = "**近30天内**每天完成的任务数量" ⇒ **没有一家把滚动 30 天叫"本月"** | 《🌮 小组件》正文 | **一手文档** |
-| | Loop 也两者混用，且留下一处**名与算式不同源**的反面样本：Target 卡按 `TruncateField.MONTH` 日历截断（`TargetCard.kt:71-74`），区间标签却写死 `intervals.add(30/91/365)`（`:153-158`，**逐行回读确认**）；Overview 卡的分数差值用 `today.minus(30)`（滚动，`OverviewCard.kt:41-42`） | 同左 | **一手代码** |
-| **"累计"那一格数的是什么** | Loop 的 `totalCount` = `originalEntries.filter { value == YES_MANUAL }.count()` ⇒ **手动打卡的天数，不是次数**（`OverviewCard.kt:47-50`，**逐行回读确认**） | 同左 | **一手代码** |
+| **自然月 vs 滚动 30** | 滴答**同时用两者并分别精确标注**：习惯热力图 = "追踪**本月**中每一天"，任务完成统计小组件 = "**近30天内**每天完成的任务数量" ⇒ **没有一家把滚动 30 天叫"本月"** | — | 《🌮 小组件》正文 | **一手文档** |
+|  | Loop 也两者混用，且留下一处**名与算式不同源**的反面样本：Target 卡按 `TruncateField.MONTH` 日历截断（`TargetCard.kt:71-74`），区间标签却写死 `intervals.add(30/91/365)`（`:153-158`，**逐行回读确认**）；Overview 卡的分数差值用 `today.minus(30)`（滚动，`OverviewCard.kt:41-42`） | — | 同左 | **一手代码** |
+| **"累计"那一格数的是什么** | Loop 的 `totalCount` = `originalEntries.filter { value == YES_MANUAL }.count()` ⇒ **手动打卡的天数，不是次数**（`OverviewCard.kt:47-50`，**逐行回读确认**） | — | 同左 | **一手代码** |
+
+📌 **这张表在 2026-10-04 09:5x 补过五行的缺列**（那五行把"谁怎么做"与"精确判据"并成了一格，
+导致渲染时**出处/一手性两列整体左移一格** —— 也就是说读的人会看到贴错栏的一手性）。
+补的是 `—` 占位、**内容一个字没动**。检查是**一次性**的（口径与两条对照记在工单 §8.33，
+没挂成常驻门禁的理由也在那一节）。
 
 🔴 **heyta 现状的三处说谎点**（这才是 W8 必须先拍口径的原因，逐条带 file:line）：
 
