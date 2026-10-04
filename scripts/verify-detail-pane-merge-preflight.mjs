@@ -48,12 +48,14 @@ const ROOT = process.cwd();
 const git = (args, opts = {}) =>
   execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28, ...opts });
 
-// 这两道看的是**文档**（截图引用能不能落位 / C1 与 C1b 对不对账），合流当场就是它们最该说话的时刻：
-// 合并会把两边各自新写的引用拼进同一篇文档，而"引用一枚只有对面那棵树里才有的截图"这种红
-// 在各自的检出里都看不见。它们进 GATES 的代价是要用 `--root`（见下面 runOne 那条注释）。
+// 这三道看的是**文档**（截图引用能不能落位 / C1 与 C1b 对不对账 / §8 落地记录表的形状与词表），
+// 合流当场就是它们最该说话的时刻：合并会把两边各自新写的引用与行拼进同一篇文档，
+// 而"引用一枚只有对面那棵树里才有的截图""表格被合并内容截断"这种红在各自的检出里都看不见。
+// 它们进 GATES 的代价是要用 `--root`（见下面 runOne 那条注释）。
 const TREE_ROOT_GATES = [
   'scripts/check-detail-pane-evidence-refs.mjs',
   'scripts/check-detail-pane-c1-coverage.mjs',
+  'scripts/check-detail-pane-status-table.mjs',
 ];
 
 // 纯 fs 门禁：全部是 `pnpm check` 已经消费的同一批脚本，一个都不新造判据。
