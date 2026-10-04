@@ -51,19 +51,26 @@ const POINTERS = {
   minors: 's9',
   terms: 's13',
   'personal-info-list': 's9',
+  privacy: 's15',
+  'third-parties': 's7',
+  permissions: 's5',
 };
 
 /**
- * 今天还**不该**有 GDPR 节的三份，逐份写明为什么（这一栏本身就是断言，要现量复核）。
- * 三份的落点都正在被并行会话整片重写：`git status --porcelain packages/legal/src/documents/`
- * 于 2026-10-04 04:0x 现量，那三份逐个是 `M`（同一趟还量到另外六份也是 `M`，那六份是我这一轮改的）。
- * 闭合条件：那三份的未提交 diff 清空之后，把路径从这里删掉、在 `POINTERS` 里补一节。
+ * 今天还**不该**有 GDPR 节的文档。2026-10-04 12:0x 起这张表**为空**，三条历史理由逐条被现量否证：
+ *
+ * · `privacy` / `third-parties`：原理由"正被并行会话整片重写"取于 10-04 04:0x。同一份文件的脏行
+ *   后来按 `git show HEAD:<file> | grep` 逐行核过，是**本批自己**在改注销承诺那几句，不是别人在飞；
+ * · `permissions`：原理由"W7 成品图导出的权限清单还没落地"。现量 `git grep -E
+ *   "PHOTO_LIBRARY|NSPhotoLibrary|WRITE_EXTERNAL_STORAGE|ACCESS_MEDIA" HEAD -- apps server packages`
+ *   只命中 `CardExportModule.kt:25` 的一句**注释**（写明走 `MediaStore` 插入、不申请权限），
+ *   `apps/mobile/ios/Heyta/Info.plist` 里没有任何 Photo usage description ⇒ 那个集合已经落定且没变。
+ *
+ * 这张表**留着**不是装饰：它是"封闭集合"那一腿的另一半 —— 新增文档而没在 `FULL_TABLE`/`POINTERS`/
+ * `BLOCKED` 三处任一处登记归属会判红，而哪一份真的该进 `BLOCKED`（今天写不了、且写清为什么）
+ * 也由这条判据逼出理由。空表 + 有理由的历史，比一张悄悄缩小的白名单好。
  */
-const BLOCKED = {
-  privacy: '该文件正被并行会话整片重写（隐私政策那节的留存与出境表述是它的在途内容），改它等于造一次没人能干净解的冲突',
-  'third-parties': '同上；而且第三方那节的逐项披露要跟着工具目录走，目录此刻还在动',
-  permissions: '同上；W7 成品图导出的权限清单还没落地，此刻写"第 5 条相称性"会写进一个将要变化的集合',
-};
+const BLOCKED = {};
 
 /** 登记条文号（顺序无关，按集合比）。加一条要同时改文本与这里。 */
 const EXPECTED_ARTICLES = [13, 14, 15, 16, 17, 18, 20, 21, 22, 32, 33];
@@ -325,9 +332,24 @@ if (argv.includes('--self-test')) {
     const s = docs.find((d) => d.id === 'terms').sections['zh-CN'].find((x) => x.id === POINTERS.terms);
     s.title = '其它口径';
   });
-  mk('白名单过期（BLOCKED 里那份长出了节）', (docs) => {
-    docs.find((d) => d.id === 'privacy').sections['zh-CN'].push({ id: 's99', title: 'GDPR 附录', blocks: [{ kind: 'p', text: '一段足够长的中文说明，用来让遍历层不空。'.repeat(30) }] });
-  });
+  // 🔴 这一臂以前靠"真白名单里恰好有 privacy"才跑得动。2026-10-04 把三份补完 GDPR 节之后
+  // `BLOCKED` 成了空表，那一臂就**静默变成空转**（变异打在一张没有登记的表上，判据照样绿），
+  // 是 self-test 自己把它报成"存活 ✖（这条判据没有牙）"的。修法不是把某份文档塞回白名单，
+  // 而是让这一臂自己造出那个形状：临时把一份文档挂进 BLOCKED、跑一次、立刻还原并断言还原成功。
+  const mkWithBlocked = (name, docId, extra) => {
+    BLOCKED[docId] = '变异：假装这一份还不该有 GDPR 节';
+    let fails;
+    try {
+      const docs = clone(LEGAL_DOCUMENTS);
+      if (extra) extra(docs);
+      fails = checkDocs(docs);
+    } finally {
+      delete BLOCKED[docId];
+    }
+    const restored = Object.keys(BLOCKED).length === 0;
+    arms.push({ name: `${name}（还原=${restored ? '成功' : '失败'}）`, fails: restored ? fails : ['变异后 BLOCKED 没有还原，这臂的读数不可信'] });
+  };
+  mkWithBlocked('白名单过期（BLOCKED 里那份已经长出 GDPR 节）', 'privacy');
   mk('文档清单里多出一份没登记的', (docs) => {
     docs.push({ id: 'newcomer', sections: { 'zh-CN': [{ id: 's1', title: '甲', blocks: [{ kind: 'p', text: '一' }] }], en: [{ id: 's1', title: 'A', blocks: [{ kind: 'p', text: 'a' }] }] } });
   });

@@ -1053,7 +1053,13 @@ resolve_idb() {
   return 0
 }
 
-idb_ui() { "$IDB_BIN" --companion-path "$IDB_COMPANION" ui "$@" --udid "$IDB_UDID"; }
+idb_ui() {
+  if [[ "$IDB_COMPANION" == *:* && "$IDB_COMPANION" != /* ]]; then
+    "$IDB_BIN" --companion "$IDB_COMPANION" ui "$@" --udid "$IDB_UDID"
+  else
+    "$IDB_BIN" --companion-path "$IDB_COMPANION" ui "$@" --udid "$IDB_UDID"
+  fi
+}
 
 # 无障碍树只从这一个入口取，落到文件再交给解析器
 # （`cmd | python3 - <<'PY'` 的 heredoc 会顶掉管道 —— AGENTS §7 第 36 条）。
@@ -1080,7 +1086,7 @@ idb_dump() { idb_ui describe-all > "$IDB_DUMP_FILE" 2>/dev/null; }
 # 那套把戏 —— 实测那套会把函数体里的引号/续行打散，包出来的函数**永远返回 0**，
 # 于是"变异生效了"和"变异把工具弄坏了"看起来一模一样（正是 §7 陷阱 58 的形状）。
 _idb_ax_count_raw() {
-  "$IDB_BIN" --companion-path "$IDB_COMPANION" ui describe-all --udid "$IDB_UDID" 2>/dev/null \
+  idb_ui describe-all 2>/dev/null \
     | python3 -c "
 import json,sys
 try: d=json.load(sys.stdin)
