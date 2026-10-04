@@ -256,6 +256,23 @@ pnpm check:legal-copy                         # rc=0
 在本单之后**仍然逐字为真**，而且这不是靠"我没改那个文件"成立的：声明面（Android 1 条 / iOS 0 条）
 与那九项"不申请"由门禁**对账**。W7 那条前置闸门（计划 §8.2 L' 第 1 条）到此有答案了 —— **不变**。
 
+🔴 **04 18:38 在合并后的载体上重量，上面那两行 [E2]/[E4] 的读法要分两类**（这类区分是防回潮的，不是补锅）：
+
+| 项 | 那一趟的读数 | 在 `HEAD`（合并 `608fa5b1` 之后）重量 |
+|---|---|---|
+| [E2] Android 声明条数 | 本单前 1 / 后 1，`[INTERNET]` | **仍然成立，但只在"逐 revision 比"这一读法下成立**：`git show 79e116cf^:…Manifest.xml` 与 `git show 79e116cf:…` 各数出 **1 条 [INTERNET]**，本单加的只有 `<provider>` 与注释 |
+| — 同一条命令读 `HEAD` | — | **3 条** `[INTERNET, POST_NOTIFICATIONS, SCHEDULE_EXACT_ALARM]` —— 后两条来自 **W9 的 `b0ba4a35`**（提醒的原生投递，ADR-0051），经 `608fa5b1` 那次"main 进批次二"的合并进入本分支 |
+| [E4] `check:legal-permissions` | rc=0 | **rc=1，7 条红**：六句「移动端不申请通知权限」+ `SCHEDULE_EXACT_ALARM` 未登记。`git log` 现量归到 `b0ba4a35` ⇒ **是 W9 那条线欠的"六个位置一起翻"，不是 W7 的、也不是本批的**（本批不代改、不吸收凑绿） |
+
+⇒ **W7 的"零法务变更"这句没有被推翻**，它证的是"**本单那一笔**没往申请面加权限"，
+所以它的正确读法永远是 `79e116cf^` ↔ `79e116cf`，**不是** `HEAD`。
+⚠️ 但反过来读也成立并且更重要：**"通知"这一档确实被申请了**，
+`permissions.ts` 里那句否表承诺此刻是假话 —— 那一档归 W9，本批只负责把它**量出来并指明在谁手里**。
+复跑：`P=apps/mobile/android/app/src/main/AndroidManifest.xml; for r in 79e116cf^ 79e116cf HEAD; do git show "${r}:${P}" | grep -c '<uses-permission android:name'; done`
+（⚠️ 这条里 `${r}` **必须带花括号** —— 写成 `$r:apps/…` 会被 zsh 当成 `:a` 修饰符吃掉，`git show` 收到的是拼出来的绝对路径，
+报 `ambiguous argument`，而 `grep -c` 对着空输入照样回 **0** —— 我 18:38 那一趟就是这样先量出一个假"0 条"的，
+是门禁自己打印的"3 条"把它照出来的。全文见 `countdown-anniversary.md` §8.4 ㊥）。
+
 ---
 
 ## 6. 变异臂清单（每条判据都要能失败）
