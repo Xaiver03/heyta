@@ -3617,3 +3617,28 @@ F1/F1b/F1c/F3/F4 五条钉住：值要等于所选解析器的真实 md5、路�
 **状态**：① 的两条腿 = RIVAL 真空（两条口径交叉核对）+ mac-dist 仍被 `diskimage/98171` 的 dmg 句柄挡着；
 ③ 被设备占用挡着；17:34 负载 38–65 区间。⇒ **①②③ 仍未起**，但互斥面这两节补到了
 "探针输入的形状"与"第二个消费者"这两层。
+
+#### 7.31.23 我自己在 §7.31.22 里落了一枚**过期指纹**（12 分钟前那次打印的），现量更正（17:36）
+
+§7.31.22 原文写的是「启动器随之到 **v7**（md5 `84a214fb0401`…）」—— **这枚是错的**，
+它是 17:23:28 那一次打印的值；17:23:56 我又给那段加了 marker（`rpi-attribution begin/end`，
+为的是让 `heyta-attr-fixture.sh` 能按标记抽**发货的那段**跑），内容变了、指纹也变了，
+而我 17:24:37 那次只跑了 `md5 -q … | sort -u | wc -l`（拿的是**"几份不同"=1**，不是值本身），
+于是把上一次的值当成本次读数抄进了台账。
+
+**现量（17:36:20，三处副本逐字节相同）**：
+```
+启动器 v7      md5 3ae7b7307f5c3ed8d3f382c5e6cf237a   ← /tmp/heyta-run-reinstall.sh
+                                              ~/.heyta-window-rigs/heyta-run-reinstall.sh
+                                              ~/.heyta-window-rigs/run-reinstall.v7.sh
+真运行者解析器  md5 38ba8828036a…（§7.31.22 记的那枚 cfe12315cb7c 是 argv[0] 那一修**之前**的）
+v6 归档        md5 efda9d97e314dfd9ec28f808d2f04222（用"摘掉 attribution 块"重建后核对逐字节相同 ⇒ 归档名不说谎）
+```
+⚠️ 也就是说 §7.31.22 里那两句"md5 已被取代"的更正**本身也需要一次更正** —— 这正是本仓库
+"引用必带现量、读数不能从上一次打印抄"那条纪律的由来，留着这两节就是为了让人看见它是怎么漂的。
+**取代表数的复跑命令**（别抄我的数，现跑）：
+```bash
+md5 -q /tmp/heyta-run-reinstall.sh ~/.heyta-window-rigs/heyta-run-reinstall.sh ~/.heyta-window-rigs/run-reinstall.v7.sh | sort -u
+md5 -q ~/.heyta-window-rigs/heyta-real-runner-pids.sh /tmp/heyta-real-runner-pids.sh | sort -u
+```
+两行都应只回**一枚**值 —— 那才是"三处/两处副本一致"的判据本身。
