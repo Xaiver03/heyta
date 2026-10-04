@@ -16,7 +16,7 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -68,27 +68,65 @@ check(
   `RC=${a0.rc}｜原因行 ${(a0.out.match(/ERR_PNPM\S{0,40}/) || ['<没打出 pnpm 码>'])[0]}`,
 );
 
-// A1 —— 历史对照：同一棵树喂 **HEAD 那版**门禁（按 blob 取，不手搓脱牙）
-// 🔴 为什么不用"手工摘掉那一档"当对照臂：摘法是我编的，它坏在哪、坏得和历史上真发生过的一不一样，
-//    都要另外证一次。而 HEAD 那版就是**真出过这次假红**的那份代码 —— 拿它跑同一棵树，
-//    报出来的就是当时那句"黄金夹具与重建结果不一致"，一句话都不用推。
-const headSrc = execFileSync('git', ['-C', ROOT, 'show', `HEAD:${GATE}`], { encoding: 'utf8' });
-const headHasUnjudged = /fixturesUnjudged/.test(headSrc);
-const a1 = run(headSrc);
+// A1 —— 历史对照：喂"该文件历史里最新一版**没有**这一档"的代码
+// 🔴 为什么不按 HEAD 取（第一版就是这么写的）：**这一档提交进 HEAD 的那一刻**，
+//    `git show HEAD:<gate>` 就含未判档了，A1 立刻退化成一条永不成立的臂 ——
+//    提交后实测 🔴，detail 印着 `含未判档=true`。这是本项目记过的那类"对照版按 blob 取、
+//    而且不能按 HEAD 取"的又一次现身，只是这次的"被吸收"是**我自己那一笔提交**。
+// 🔴 也不手搓脱牙：摘法是我编的，它坏得和真发生过的一不一样还得另外证。
+// ⇒ 办法只有一个：沿该文件自己的历史往回走，取第一个"不含这一档且不等于当前版"的 blob。
+const revs = execFileSync('git', ['-C', ROOT, 'log', '--format=%H', '--', GATE], { encoding: 'utf8' })
+  .trim()
+  .split('\n')
+  .filter(Boolean);
+let control = null;
+for (const [i, rev] of revs.entries()) {
+  const src = execFileSync('git', ['-C', ROOT, 'show', `${rev}:${GATE}`], { encoding: 'utf8' });
+  if (!/fixturesUnjudged/.test(src) && src !== ORIG) {
+    control = { rev, src, i };
+    break;
+  }
+}
+if (control === null) {
+  restore();
+  console.error(`🔴 历史里找不到"还没有未判档"的那一版（走了 ${String(revs.length)} 版）⇒ A1 没有对象，装置不算跑成`);
+  process.exit(1);
+}
+const a1 = run(control.src);
 check(
-  'A1 同一棵树喂 HEAD 那版（没有未判档）→ RC=1 且谎报"黄金夹具不一致"，而它直接跑那枚 spec 是 4 passed',
-  !headHasUnjudged && a1.rc === 1 && /黄金夹具与重建结果\*\*不一致\*\*/.test(a1.out),
-  `HEAD 那版含未判档=${headHasUnjudged}｜RC=${a1.rc}｜它带出的"代码"首行 ${(a1.out.match(/代码：(\S{0,60})/) || ['', ''])[1]}`,
+  'A1 同一棵树喂"还没有未判档"那一版（按该文件历史取 blob，不按 HEAD）→ RC=1 且谎报"黄金夹具不一致"，而它直接跑那枚 spec 是 4 passed',
+  a1.rc === 1 && /黄金夹具与重建结果\*\*不一致\*\*/.test(a1.out),
+  `对照版 ${control.rev.slice(0, 8)}｜往回第 ${String(control.i + 1)} 版｜RC=${a1.rc}｜它带出的"代码"首行 ${(a1.out.match(/代码：(\S{0,60})/) || ['', ''])[1]}`,
+);
+// A1p —— A1 的前置：当前版必须**有**这一档。没有它，A1 那次红说的是"有人把这一档拿掉了"，
+//        而不是"这次补的是真发生过的假红"。
+const currentHasUnjudged = /fixturesUnjudged/.test(ORIG);
+check(
+  'A1p 当前门禁含未判档（A1 那条红才是在证"历史假红"，不是在证"这一档被人拿掉了"）',
+  currentHasUnjudged,
+  `当前版含未判档=${String(currentHasUnjudged)}`,
 );
 // A1b —— 真值对照：同一棵树里**直接**跑那枚 spec，证明 A1 的红是假红
-// ⚠️ 两条都是本仓记过的读数纪律：① vitest 的汇总要 `NO_COLOR=1` 才拿得到纯文本
-//    （带 ANSI 时 needle 恒 0 命中，看起来像"没跑"）；② 判绿只认 summary 行 **和** 退出码，两者都要。
-const direct = spawnSync('./node_modules/.bin/vitest', ['run', 'tests/fixtures.spec.ts'], {
+// ⚠️ 三条读数纪律都在这一臂上：① vitest 的汇总要 `NO_COLOR=1` 才拿得到纯文本
+//    （带 ANSI 时 needle 恒 0 命中，看起来像"没跑"）；② 判绿只认 summary 行 **和** 退出码；
+//    ③ 这一臂自己也要有"没跑成"那一档 —— 在没装依赖/没 build 过的裸检出里，vitest 打得开但
+//    收不到用例（实测 `Test Files 1 failed (1) / Tests  no tests`）。那**不是臂不符合，是载体未判**：
+//    让它计入"9 臂里红一臂"就是这个装置自己犯它抓的那个错。
+const VITEST = join(ROOT, 'packages/widget-core/node_modules/.bin/vitest');
+const direct = spawnSync(VITEST, ['run', 'tests/fixtures.spec.ts'], {
   cwd: join(ROOT, 'packages/widget-core'),
   encoding: 'utf8',
   env: { ...process.env, NO_COLOR: '1' },
 });
 const directOut = `${direct.stdout}${direct.stderr}`.replace(/\u001b\[[0-9;]*m/g, '');
+if (!/^\s*Tests\s+\d+\s+(passed|failed)/m.test(directOut)) {
+  restore();
+  rmSync(scratch, { recursive: true, force: true });
+  console.error('🔴 载体未判：直接跑那枚 spec 没有产出 `Tests N passed|failed` 汇总行 ⇒ A1b 这条真值臂没有对象，装置不算跑成（不是"臂不符合"）。');
+  console.error(`   二进制=${existsSync(VITEST) ? '在' : '不在'}｜exit=${String(direct.status)}｜vitest 那两行=${(directOut.match(/(Test Files|Tests)[^\n]*/g) || ['<一行都没打>']).join(' / ').trim()}`);
+  console.error('   要真跑这一臂：在装了依赖并 `pnpm -r build` 过的检出里跑（主检出或本仓 linked worktree）。');
+  process.exit(2);
+}
 const a1b = direct.status === 0 && /Tests\s+4 passed/.test(directOut) && /Test Files\s+1 passed/.test(directOut);
 check(
   'A1b 真值：用该包自己的 vitest 直接跑那枚 spec → 4 passed / RC=0 ⇒ A1 那句"夹具不一致"确证是假红',

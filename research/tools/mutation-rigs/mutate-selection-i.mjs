@@ -133,13 +133,42 @@ const deadParse = ORIG.replace(
 check('I10 把解析改成读空 → 红在"解析出 0 项"（空集合上的"全部交代过"是永真）', deadParse !== ORIG && redWithLeg(deadParse, 'ViewKey 解析出 0 项').ok);
 
 // ---- I11 同一棵树喂"还没有断言 I 的那版" ----------------------------------
-const preSrc = execFileSync('git', ['-C', ROOT, 'show', `HEAD:${GATE}`], { encoding: 'utf8' });
-const preHasI = /断言 I：/.test(preSrc);
+// 🔴 **不按 HEAD 取**（第一版就是按 HEAD 取的）：断言 I 提交进 HEAD 的那一刻，
+//    `git show HEAD:<gate>` 就含 I 了 ⇒ 这条臂在"补完的下一笔"上自己变红
+//    （实测 15/16，detail 印 `HEAD 那版含 I=true｜它打印过 I 那行=true`）。
+//    同一个形状在 mutate-detail-pane-status-table.mjs 的 P4 那臂已经写过一遍教训，我仍重犯了 ——
+//    ⇒ 沿该文件历史按**内容**取第一个"不含断言 I 且不等于当前版"的 blob；找不到就响亮失败，
+//    绝不许拿当前版冒充旧版。
+const histRevs = execFileSync('git', ['-C', ROOT, 'log', '--format=%H', '--', GATE], { encoding: 'utf8' })
+  .trim()
+  .split('\n')
+  .filter(Boolean);
+let preSha = '';
+let preSrc = '';
+for (const sha of histRevs) {
+  const src = execFileSync('git', ['-C', ROOT, 'show', `${sha}:${GATE}`], { encoding: 'utf8' });
+  if (!/断言 I：/.test(src) && src !== ORIG) {
+    preSha = sha;
+    preSrc = src;
+    break;
+  }
+}
+if (!preSha) {
+  restore();
+  throw new Error(`该文件历史里 ${String(histRevs.length)} 版都没有"还没有断言 I"的那版 —— 窗口要放宽，但绝不许拿当前版冒充旧版。`);
+}
 const preRun = run(preSrc);
 check(
-  'I11 同一份当前代码喂 HEAD 那版门禁 → RC=0 且它自己不含断言 I（补的是实测存在的缺口，不是顺手加严）',
-  !preHasI && preRun.rc === 0,
-  `HEAD 那版含 I=${preHasI}｜RC=${preRun.rc}｜它打印过 I 那行=${/✅ I：/.test(preRun.out)}`,
+  'I11 同一份当前代码喂"还没有断言 I 的那版"（按该文件历史取 blob，不按 HEAD）→ RC=0 且它没打印过 I 那行（补的是实测存在的缺口，不是顺手加严）',
+  preRun.rc === 0 && !/✅ I：/.test(preRun.out),
+  `对照版 ${preSha.slice(0, 8)}｜往回第 ${String(histRevs.indexOf(preSha) + 1)} 版｜RC=${preRun.rc}｜它打印过 I 那行=${/✅ I：/.test(preRun.out)}`,
+);
+// I11p —— I11 的前置：当前版必须**有**断言 I。没有它，I11 那次红说的是"这一档被人拿掉了"。
+const currentHasI = /断言 I：/.test(ORIG);
+check(
+  'I11p 当前门禁含断言 I（I11 才是在证"历史缺口"，不是在证"这一档被人拿掉了"）',
+  currentHasI,
+  `当前版含 I=${String(currentHasI)}`,
 );
 
 // ---- 收尾：复原 + 复跑回绿 + 哈希对账 ------------------------------------
