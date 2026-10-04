@@ -579,14 +579,17 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
 | W9 原生投递 | 🔄 **实施中，真实验收未完成** | 已有 Android/iOS 原生桥与编译证据；共享排程、回执持久化和 occurrence 竞态仍在修正。首轮 Android 验收因包身份/安装失败未形成有效证据，不能据此宣称通知已投递。范围与判据见 [ADR-0051](docs/adr/0051-mobile-reminder-delivery.md) 和 [原计划](docs/plans/goal-multi-end-coverage.md) §4。 |
 | W5 卡片网格 | ✅ | e2e **6 passed**（整族 15 passed）、三张图**人看过**；看图照出"逾期卡整行不画日期"并修掉（两腿变异各红一次） |
 | W0b 遗留缺口 | 🟡 ①② | `/tmp/ui.xml`/`_xy.py`/库名改成带默认值的旋钮（默认值逐字不变），harness 22 绿 0 红 |
-| W7 成品图导出 / W4b 调休通道 / W8 三端接线 | 🔄 并行 | 各自 worktree 在跑；本表**不代它们主张读数** |
-| L' 法务联动 | 🟡 判定表已出 | 普查 82 行候选 ⇒ 唯一真命中是 `ai-and-transfer` 的本机接口工具表漏了 W10 那 4 条 EVENT 工具（条款把那张表当授权面）。已修 + 版本 `1.0→1.1`（进同意指纹）+ 新门禁 `check:legal-tools` 四臂变异全红。**还留一条前置闸门**：`permissions.ts` 那句"不申请照片"要等 W7 的 manifest 才知会不会变假 |
+| W7 成品图导出 | ✅ **两端设备读数都取到** | 共享版面 `packages/ui/src/countdown/card-export-layout.ts` + web `<canvas>` + 移动原生落盘（Android `cacheDir` / iOS 沙盒，**两端都不走相册** ⇒ 零权限、零法务变更）。Android 04 13:20 `RC_ANDROID=0`；**iOS 04 17:13:17 `RC_PROBE=0`（17 项 / 0 失败）**，两端 IHDR 都逐字等于契约 `1080×1440`，成品图入库 `apps/mobile/evidence/card-export/` 且**人打开看过并互相并排比过**。🔴 iOS 第一次真跑红在 `rasterize-timeout`，**根因是我们自己的调用时机**（RN effect 跑在 Fabric 把挂载事务刷到主队列之前 ⇒ 原生按 tag 查不到视图，而那条分支不回调），修法是**让出一帧再要图**，不是把超时拍长 |
+| W4b 调休通道 | ✅ | 服务端半 + `check:public-facts` 门禁（八臂 8 红 0 存活）+ 客户端拉取三笔 + 后台 `HolidayPanel` 把 `papers` 回显成可点链接；判据①真界面三档截图人已看，三臂变异各红自己那条 |
+| W8 三端接线 + 壳级门禁 | ✅ 三端代码 + 门禁五格全绿 | `check:shell-surfaces` 的"未取证"从 2 栏降到 0：windows 走远端取证文件（`HEYTA_WINDOWS_FACTS`，四臂变异），mac 走 `HEYTA_MACOS_WEB_DIST` 读**包内**那份（链 W，`HEYTA_SKIP_NOTARIZE=1` 去掉的是没有上界的等待，不是判据） |
+| L' 法务联动 | ✅ 前置闸门量完 | 普查 82 行候选 ⇒ 唯一真命中是 `ai-and-transfer` 的本机接口工具表漏了 W10 那 4 条 EVENT 工具（条款把那张表当授权面）。已修 + 版本 `1.0→1.1`（进同意指纹）+ 新门禁 `check:legal-tools` 四臂变异全红。✅ 原先留的那条前置闸门 ——「`permissions.ts` 那句"不申请照片"要等 W7 的 manifest 才知会不会变假」—— **04 16:4x 现量：不变假**（声明面 Android 1 条 INTERNET / iOS plist 28 把键里 `photo\|library` 命中 0、Swift 只写沙盒 `temporaryDirectory`、entitlements 只有 app groups + keychain，每条带阳性对照） |
 
-🔴 **只剩 W6 一条是被撞车面挡住的**（19:2x 现量）：它的落点 `packages/ui/src/calendar/{CalendarBoard,model,CalendarToolbar,date-text}.ts(x)`、
+🔴 ~~**只剩 W6 一条是被撞车面挡住的**（19:2x 现量）：它的落点 `packages/ui/src/calendar/{CalendarBoard,model,CalendarToolbar,date-text}.ts(x)`、
 `apps/web/src/features/calendar/*`、`apps/mobile/src/screens/CalendarScreen.tsx` 在主检出里**逐个都是 `M`**，
-正被并行会话整片重写 ⇒ 现在做它 = 造一次没人能干净解的三方冲突。
-⚠️ **且 W6 的载体刚刚易主**：W4b 开工实测确认"休/班"的自然位置是共享 `CalendarBoard` 的 `DayCell`，
-做法是**给共享组件加一个默认值等于原值的可选 prop**（`dayMarker?`）⇒ **W6 落地时复用那条缝，不要另开一个注入点**。
+正被并行会话整片重写 ⇒ 现在做它 = 造一次没人能干净解的三方冲突。~~
+—— ✅ **04 02:5x 现量否证并落地**（`e2def90f`）：那六个路径的未提交 diff 随 main 推进被各自所有者提交掉了，
+落地前重跑关闭判据（`git status --porcelain -- <那六个路径>` 输出为空）。它复用了 W4b 那条 `dayMarker?` 可选 prop 的缝，
+没有另开注入点。**留一条编号缺口 W6-G1**：接进「今天」/收集箱要先给共享 `TaskList` 一条"不可交互行"的契约变更，不属于这一批。
 
 这一段先前还列过两条，都被**逐文件现量否证**了，留着是为了让后来者认出这个形状：
 ① **W8** —— 我按"日历线在忙"整条线推断把它排后，实际它的落点在主检出里逐个都干净，web 半还早已随 W5 落地；
