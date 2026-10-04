@@ -7146,17 +7146,20 @@ RC 仍 = 1，且那 2 枚 marker 是 `App.tsx` 与 `main-area.css` —— **正�
 
 现量口径（每次重取）：`grep -c "/tmp/dp" docs/plans/detail-pane-alignment.md` 的引用行数、
 `grep -ohE '/tmp/dp_[A-Za-z0-9_.-]+\.(py|mjs|sh|js)' … | sort -u` 的唯一件数，再逐枚 `[ -f ]`。
-本轮读数：**39 行 / 18 枚唯一件 / 还在盘上 15 枚 / 已消失 3 枚**。入仓装置 **15 枚**
-（`research/tools/mutation-rigs/`，覆盖 F / G / H / I、view-universe、c1-coverage、status-table、evidence-refs、
-slot、ownership、preflight、docs-letter、widgets、timeline-face 那些**常驻门禁的臂**）。
+本轮读数：**39 行 / 18 枚唯一件 / 还在盘上 15 枚 / 已消失 3 枚**。入仓装置那一栏**每次现量**
+（`ls -1 research/tools/mutation-rigs | wc -l`）—— 本节写下时是 15，24:0x 再数是 **16**：
+§8.111 那枚臂进了这个目录，而 §8.110 那枚电池进的是 `scripts/`（**不在这条命令的分母里**；
+两个去处对应两种消费者 —— 臂是"证明某道门禁能红"，电池是"这一族的收尾顺序"）。
+这些臂覆盖 F / G / H / I、view-universe、c1-coverage、status-table、evidence-refs、
+slot、ownership、preflight、docs-letter、widgets、timeline-face、focus-empty-state 那些**常驻门禁的判据**。
 
 | 只有 `/tmp` 一份、没有入仓镜像的件 | 它当时量出来的结论 | 今天还能不能复跑 |
 |---|---|---|
 | `/tmp/dp_tablecheck4.mjs` | §8.33 的表格形状读数（33 处 / 14 份文档） | 🔴 **已消失 —— 是我今天清理 `dp_*` 时删的**。当时那句"不进仓"记的是一条**有理由的裁决**（"进仓就要挂门禁、就要替别人修 33 处"），理由仍然成立，**但代价没写清**：代价是这条读数从此不可复跑，只能引用当时写下的那两个数 |
 | `/tmp/dp_gateall.mjs` | §8.100 那趟"43 道纯 fs 门禁"的枚举法 | 🔴 **同样被我删了**。它的**口径**（`package.json` 里 `check:*` 且命令是单条 `node <脚本>`）写在原文里，所以这一枚可重建 —— 这正是该把口径写进句子的原因，脚本丢了口径没丢 |
 | `/tmp/dp_tablecheck2.mjs` | §8 里那条 `TABLE_RC` 的串跑法 | 🔴 已消失（更早，成因未查——**不写成"重启造成的"**，那是没取证的归因） |
-| `/tmp/dp_es_mutate.py` | §8.13 修 `check:empty-state` 的三臂 E1/E2/E3 | 🟡 文件在，但**它自己文件头就写着"一次性 rig，不提交"**，且 e2e 那半依赖一枚同样没入库的 `playwright.detail-pane.config.ts`（§8.21 那条"跑完即删"的覆盖件）⇒ 即便脚本在，那一趟也**跑不全** |
-| `/tmp/dp_w1b_battery.py` | W1b 那格 `25 步 ALL_GREEN` | 🟡 文件在；它的**组成**已写在 §8（门禁 + token 生成 + 六包 typecheck + 六包测试 + web 生产构建 + e2e 整族）⇒ 丢的是编排，不是判据本体 |
+| `/tmp/dp_es_mutate.py` | §8.13 修 `check:empty-state` 的三臂 E1/E2/E3 | ✅ **已入仓**成 `research/tools/mutation-rigs/mutate-focus-empty-state.mjs`（§8.111）：浏览器腿改成显式 `--e2e`，不带时打印 `NOT_JUDGED` 不计入绿。`/tmp` 那份只是历史载体 |
+| `/tmp/dp_w1b_battery.py` | W1b 那格 `25 步 ALL_GREEN` | ✅ **已入仓**成 `scripts/verify-detail-pane-closeout-battery.mjs`（§8.110）：25 步、每步自报 RC、三条自检各有变异臂 |
 | `/tmp/dp_s6_audit2/3.mjs`、`dp_n1_counterfactual.mjs`、`dp_habit_trace_rig.mjs`、`dp_ab_aria.mjs`、`dp_leak_proof.mjs`、`dp_g_merge_probe.mjs`、`dp_listcheck.mjs`、`dp_docscheck.mjs`、`dp_merge_shape.mjs`、`dp_es_renumber_traps.py` | 一次性测量/审计（§6 十探针、断言 H 的反事实、选中痕迹的 A/B、合流形状、台账续号那一次动作等） | 🟢 文件都还在盘上。**结论都已落进文档或已升级成常驻判据**，所以它们是一次性动作的辅助件，不是任何一条当前判据的唯一载体 |
 
 📌 **这一节的产出是一条前置规则，不是道歉**：
