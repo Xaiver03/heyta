@@ -19,16 +19,18 @@
  *     🔴 **候选红而 main 侧没有这个脚本**（`MISS`，本分支新增的门禁）= 没有对照组可减，
  *     但**不是**"信息为空"：本分支自己检出里它是绿的（读数在工单 §8），所以这一档只能读成
  *     "合并把对面的旧内容拼回来了"，处置是取本分支那一侧。它同样计入退出码。
- *     ⚠️ 判档要用**类型**而不是"不等于 0"：`'MISS' !== 0` 为真，早期版本正是这样把这一档
- *     错并进"不含合并信息"，于是**只在新分支存在的那道门禁在产物里变红时既不被数进退出码、
- *     也只打 ⚠️**。
+ *     🔴 **产物自己就没有这道脚本**（`候选=MISS`）= 第四档，"这一道没跑"。它既不能算红也不能算绿，
+ *     计入退出码。`--a main --b main` 那种对照趟里它是**预期**读数（main 还没有本线那三枚文档判据）。
+ *     ⚠️ 判档要用**类型**而不是"不等于 0"：`'MISS' !== 0` 为真 —— 这一条在**修它的过程中又犯了一次**
+ *     （第一版只防了对照组那一侧的 `MISS`，产物侧的 `MISS` 仍被当成"候选红"），
+ *     由本文件自己的回归臂 P3 照出来；过程与读数在工单 §8.70。
  *  ② **静默合流对账**：两侧都改过、而 `merge-tree` 没登记为冲突的文件（零 marker 的那一档）。
  *     逐枚问"两侧各自新增的行，是否**都还在**产物里"，`.mjs` 另跑 `node --check`。
  *     这一档是 §8.42 那个形状（把 main 的函数抄进同一份脚本）唯一的抓手 —— 门禁那一块只能
  *     告诉你"结果红不红"，不能告诉你"哪一侧的改动被无声丢掉了"。
  *
  * 退出码：下面这几项之和 = 0 条才 ⇒ 0，有任何一条 ⇒ 1：合并造成的红、候选红而无对照组、
- *   静默合流丢行/删文件/语法不过、槽位重复、产物仍带 marker 的产品文件、编号台账的号对不上。
+ *   产物里根本没有这道脚本、静默合流丢行/删文件/语法不过、槽位重复、产物仍带 marker 的产品文件、编号台账的号对不上。
  *   候选树都造不出来 ⇒ 2（响亮失败，不静默放行）。
  *
  * ⚠️ 几条边界，别读多（这里不写条数，写过一次"三条"然后就漂了）：
@@ -265,16 +267,21 @@ for (const gate of GATES) {
   // 会被归进"两边都红（环境/载体所致，不含合并信息）"并用 ⚠️ 打印 —— 而那一条红恰恰**只可能**
   // 来自合并（两侧各自都不红：一侧没有这道脚本，另一侧我们量过是绿的）。
   // 更糟的是那一档不进退出码：合并把对面的旧抄件带回来时，这道门禁等于没有自动消费者。
-  // 分成三档：对照绿=合并造成的红 / 对照=两侧都红 / 对照 MISS=**没有对照组**，要拿本分支读数定性。
-  const mergeCaused = p.rc !== 0 && b.rc === 0;
-  const noControl = p.rc !== 0 && b.rc === 'MISS';
-  rows.push({ gate, p, b, mergeCaused, noControl });
+  // 分成四档：对照绿=合并造成的红 / 对照=两侧都红 / 对照 MISS 而产物有=**没有对照组**，要拿本分支读数定性 /
+  // 🔴 **产物自己就缺这道脚本** = 合并把它丢了（或这条线还没落地），这一档必须响亮，不能被当成"红"或"绿"。
+  // ⚠️ 第四档是被自己的回归臂 P3 照出来的：`--a main --b main` 时**两侧都没有**这些脚本，
+  // `p.rc` 同样是 `'MISS'`，而 `'MISS' !== 0` 为真 —— 第一版修法把"没在跑"记成了三条"候选红但缺对照"，
+  // 也就是**一道没跑的判据被算成红**。判红之前先问"产物里有没有这个脚本"，跟判对照之前问同一件事。
+  const productMissing = p.rc === 'MISS';
+  const mergeCaused = !productMissing && p.rc !== 0 && b.rc === 0;
+  const noControl = !productMissing && p.rc !== 0 && b.rc === 'MISS';
+  rows.push({ gate, p, b, mergeCaused, noControl, productMissing });
   console.log(
-    `${p.rc === 0 ? '· ' : mergeCaused || noControl ? '🔴' : '⚠️'} ${gate.replace(/^scripts\//, '').padEnd(34)} 候选=${p.rc} ${refA}=${b.rc}  ${p.line}`,
+    `${p.rc === 0 ? '· ' : mergeCaused || noControl || productMissing ? '🔴' : '⚠️'} ${gate.replace(/^scripts\//, '').padEnd(34)} 候选=${p.rc} ${refA}=${b.rc}  ${p.line}`,
   );
   // 需要人处置的红：把门禁的**全文**打出来。只留最后一行 58 字节的结论，
   // 读的人还得自己重新铺一份产物树才能知道红在哪一行 —— 而那些红正是"要人裁决"的那一档。
-  if (p.rc !== 0 && (mergeCaused || noControl)) {
+  if (!productMissing && (mergeCaused || noControl)) {
     const lines = String(p.full || '').trimEnd().split('\n');
     lines.slice(0, 20).forEach((l) => console.log(`      │ ${l}`));
     if (lines.length > 20) console.log(`      │ …（余 ${lines.length - 20} 行未打，全文去产物树里跑同一道脚本）`);
@@ -283,7 +290,18 @@ for (const gate of GATES) {
 
 const bad = rows.filter((r) => r.mergeCaused);
 const noControlRows = rows.filter((r) => r.noControl);
-const same = rows.filter((r) => r.p.rc !== 0 && r.b.rc !== 0 && !r.noControl);
+const productMissingRows = rows.filter((r) => r.productMissing);
+const same = rows.filter((r) => r.p.rc !== 0 && r.b.rc !== 0 && !r.noControl && !r.productMissing);
+
+if (productMissingRows.length) {
+  console.log(
+    `\n🔴 有 ${productMissingRows.length} 道门禁**根本不在产物里**：${productMissingRows.map((r) => r.gate.replace(/^scripts\//, '')).join(' / ')}\n` +
+      `      这一档既不是红也不是绿 —— 它说的是"这一道没跑"。两种成因都要当场分清：` +
+      '      ① 用 --a/--b 拿了一棵还没有这些脚本的树当候选（例如 "--a main --b main" 的对照趟，那是**预期**读数）；' +
+      `② 真的分叉合并时出现这一档 ⇒ 合并把脚本丢了，要在处置冲突时把它请回来。\n` +
+      `      这一档计入退出码：一道没在跑的判据被读成绿，是本项目最贵的一类错。`,
+  );
+}
 
 if (noControlRows.length) {
   console.log(
@@ -527,6 +545,7 @@ console.log(
   `\nTREE=${tree}  冲突=${conflicted.length} 枚（处置见工单 §8.47 第 3 节）  ` +
     `纯 fs 门禁=${GATES.length} 道：合并造成的红=${bad.length}  ` +
     `候选红但 ${refA} 侧没有这道脚本（本分支新增，只能拿本分支读数定性）=${noControlRows.length}  ` +
+    `产物里根本没有这道脚本（这一道没跑）=${productMissingRows.length}  ` +
     `两边都红（环境/载体所致，不含合并信息）=${same.length}  ` +
     `静默合流=${silentRows.length} 枚，其中丢行/删文件/语法不过=${silentBad.length}  ` +
     `槽位重复=${slotBad.length}  台账（缺号 / 号在正文被占 / 同号不同事）=${ledgerBad.length ? `🔴 ${ledgerRows.reduce((s, r) => s + r.collide.length + r.lostA.length + r.lostB.length + r.swA.length + r.swB.length, 0)} 项` : '0'}  ` +
@@ -544,5 +563,13 @@ if (!keep) {
   console.log(`--keep：临时载体留着 —— 产物=${product}  基线=${baseline}（看完请自行删）`);
 }
 process.exit(
-  bad.length + noControlRows.length + silentBad.length + slotBad.length + tainted.length + ledgerBad.length ? 1 : 0,
+  bad.length +
+    noControlRows.length +
+    productMissingRows.length +
+    silentBad.length +
+    slotBad.length +
+    tainted.length +
+    ledgerBad.length
+    ? 1
+    : 0,
 );
