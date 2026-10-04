@@ -109,7 +109,9 @@ describe('系统遮罩的安全区', () => {
     width: number;
     height: number;
   }): number {
-    const corners = [
+    // 🔴 元组标注不是仪式：`noUncheckedIndexedAccess` 下 `[rect.x, rect.y]` 推断成
+    // `number[]`，下面解构出的 `x`/`y` 就是 `number | undefined`，`pnpm -r typecheck` 会红。
+    const corners: [number, number][] = [
       [rect.x, rect.y],
       [rect.x + rect.width, rect.y],
       [rect.x, rect.y + rect.height],
