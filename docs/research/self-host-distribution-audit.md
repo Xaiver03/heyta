@@ -6123,3 +6123,18 @@ objective 那句"**同一个 `apps/web/dist` 不可能两条同时绿**"本轮�
 ⇒ 准确的读数只到这一句：**从快照里摘掉一条"既不在 18 条声明、也不在镜像独有登记、也不是本地包"的普通包，离线三腿全绿；真树载体抓不抓，未测**。要把这条缺口写成结论，得先读全两种载体各自的输入集合，或者跑一趟带 `--installed-tree` 的臂 C（要占一次完整构建窗口）。登记为待查，不当场改判据 —— 这条门禁的哈希腿（臂 A）证明"改输入"有牙，缺的是"改产物内容"那一格。
 
 复原读数（臂本身就是污染源，所以它是读数的一部分）：两把脚本都带 `finally` 复原，跑完 `git status --porcelain -- server/image-npm-tree.json` = 空（与 HEAD 逐字相同）。装置留在 `/tmp/g92-arms.mjs`、`/tmp/g93-armc.mjs`（一次性，未入库）。
+
+### 8.102 臂 C 的边界用真镜像导出的树量准了一半，另一半是我自己的第二次分类器错（2026-10-04 16:3x）
+
+§8.101 留的那句"真树载体抓不抓，未测"**不必占构建窗口**：`check-image-license-coverage.mjs` 的真树载体吃的是 `--installed-tree <文件>`，而那份文件可以用一条 `docker run --rm -i --entrypoint node supersync:selfhost-verify … < research/tools/dump-installed-tree.js` 现导（一次性容器、不占端口、秒级）。导出来与 g76 的打印逐字对得上：`root=/app/node_modules · scannedEntries=160 · packages=145 · lockEntries=158 · license 全有 145/145`；喂回去基线 `rc=0`，等式仍是「145 = 126 + 16 + 3（无解释 0 · 非宽松 0 · 声明对不上 0 · 失效登记 0）」⇒ 喂法没错、载体没错。
+
+✅ **量准的那一半**：从真树里摘掉一条 lock 记着的非 optional 包（`@fastify/accept-negotiator@2.1.0`，145→144），真树载体 **rc=1**：
+
+> ❌ npm 的 lock 认为该装、磁盘上却没有的非 optional 包 1 条：@fastify/accept-negotiator@2.1.0
+
+所以 §8.101 那个"摘一条包没人守"的形状，**只在离线快照载体成立**；真树载体有一条 `lock ↔ 磁盘` 的双向差集守着。缺口比 §8.101 写的小，而且修法被这条读数直接指出来了：把同一个形状搬到快照那一侧（快照本来就是从 `server/package-lock.json` 导出的，`磁盘` 换成 `快照 packages` 即可），不新造机制。
+
+❌ **作废的那一半（我的第二次分类器错，记下来挡我自己）**：本想问"摘一条**镜像独有登记项**会不会红"，但我把"镜像独有"实现成"不在 `lockEntries` 里" ⇒ 算出 **0 条**，`onlyInImage[0]` 是 `undefined`，那一臂 `filter(p => p.name !== undefined)` 等于**什么都没摘**，`rc=0` 是空臂的必然结果，不是"抓不到"。门禁那句"镜像独有 16 条"讲的是**不在 `license-inventory` 扫描集里**（那是 pnpm store 的实际安装树），跟"不在 npm lock 里"是两个集合。脚本打印了「取 undefined 施 C1」才被看见 —— 分母为 0 的臂要自己喊出来，否则它长得就像一条测过的臂。
+⇒ "摘那 16 条镜像独有会不会红"**仍未测**，#29 继续挂着，且已把集合定义钉成"license-inventory 的扫描集"而不是 lock。
+
+⚠️ 一条不据此宣称的边界：真树载体那条牙依赖喂进去的 `lockEntries`。伪造输入（连 `lockEntries` 一起改）不在任何判据射程内 —— 它的守点是"这份文件由一次性容器现导"，而那一层由 #28（build 输出不可观测）管。
