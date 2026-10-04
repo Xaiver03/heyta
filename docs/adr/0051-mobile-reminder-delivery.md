@@ -176,11 +176,27 @@ HOME 后用 SIGKILL 终止普通进程，系统 alarm 保留，22:55 仍交付�
 `RCT_EXTERN_MODULE(HeytaReminderModule, NSObject)`，实际向 JS 导出的是
 `NativeModules.HeytaReminderModule`，而移动端唯一调用方读取 `NativeModules.HeytaReminder`；
 因此原生授权与排程方法根本没有被调用。桥接现改为
-`RCT_EXTERN_REMAP_MODULE(HeytaReminder, HeytaReminderModule, NSObject)`，并保留原生状态日志
-作为排障证据。修复后的 Release 构建 `/tmp/heyta-ios-reminder-release/Build/Products/Release-iphonesimulator/Heyta.app`
+`RCT_EXTERN_REMAP_MODULE(HeytaReminder, HeytaReminderModule, NSObject)`。修复期间曾用构建日志和系统日志
+确认授权与排程调用，生产代码不保留提醒标识或时间日志。修复后的 Release 构建 `/tmp/heyta-ios-reminder-release/Build/Products/Release-iphonesimulator/Heyta.app`
 在模拟器 `1EDCFA59-6A9C-428D-8FE2-160B11318648` 上真实复验：日志记录
 `requestAuthorization completion granted=true`、`authorizationStatus=2` 和
 `schedule completion ... error=none`；`Application Support/heyta-reminder-receipts.json`
 出现对应 `posted`/`receipts`，启动 reconcile 后真 SQLite 中出现 1 条同时含
 `firedAt` 与 `firedForTriggerAt` 的 REMINDER op。隐私覆盖层也先由真实 AX 点击关闭并复核消失。
 这轮证明的是模拟器 OS 投递与回收闭环；实体设备通知权限仍需独立验收，Keychain 也不由这条证据代替。
+`apps/mobile/evidence/ios-reminder-delivery-success.png` 只记录回到应用后的任务详情和业务回执，
+是辅助证据，不是系统通知中心截图。当前 `ios-reminder-notification-center.png` 与
+`ios-reminder-after-reconcile.png` 仍未取得可观察的通知中心画面（一次是多显示器模拟器默认的全黑副屏，
+一次是锁屏壁纸），因此不能挂作成功证据；脚本现显式选择 `primary` display 并用 `png-stats`
+拒绝全黑 PNG，但这只修复取证装置，不能把现有失败截图升级为成功证据；
+下一轮必须在人工看见包含对应提醒标题的系统通知中心后，才能把 OS 级截图判据改为已验证。
+
+2026-10-04 03:56–04:09 的 `pending-cancel` 续验进一步暴露了一个未闭合路径：真实 Release
+包通过 UI 创建未来 occurrence，原生 scheduled ledger 有记录；随后 AX 点击“删除提醒”返回成功，
+但等待 4 秒后真 SQLite 仍只有 REMINDER `CRT`、没有对应 `DEL`，重启 reconcile 后 scheduled
+ledger 仍保留该 occurrence。`firedAt` 没有被伪造。该结果不能记作取消通过；它说明当前验收装置已经
+走到真实删除按钮，但业务写入没有落地，必须先修复或取得可重复的根因证据，再补 OS pending 清空判据。
+
+为避免同类故障重新出现，`pnpm check:ios-native-bridges` 现在逐项核对 Swift 的 `moduleName()`、
+Objective-C bridge 的 `RCT_EXTERN(_REMAP)_MODULE` 导出名，以及 JS `NativeModules` 查找名；构建成功
+本身不再被视为原生模块接线正确的证据。
