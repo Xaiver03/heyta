@@ -3198,3 +3198,25 @@ W0b ─> 随时可做（台账那半要等文件干净）
     ⇒ 所以"三端齐"这句的真话是：**windows 有读数、mac 有读数在路上、linux 有一条会红的反向判据**，
     而不是"三端都拍出了这一屏"。链 S 会把 `check:linux-shell` / `check:windows-shell` / `check:macos-shell`
     三段各自的 rc 取回来（它们在串联第 24 段之后，Y 没跑到）。
+
+- ㊑ **链 Z 收口：iOS 那一腿的探针**自己**拒跑了，而且拒得对**（04 15:16，载体 `117386a1`，`RC_CHAINZ=3`）
+  - 读数（`/tmp/device-closeout-Z.log` + `/tmp/device-Z-ios.txt`）：
+    `RC_REINSTALL_IOS_Z=1`（`pod install` 挂在 `path name contains null byte`，`reinstall-all` 自己判定"沙盒未同步 ⇒ 不跑 xcodebuild"）
+    → 探针那一步在**第 0b 步**就停：
+    `❌ 按 BID=com.heyta 在这台上解析不到已安装的 app —— 没装上，或装的是别的 bundle id ⇒ 本轮无效`，退出 **3**。
+  - ✅ **这条是那道新鲜度门第一次在"重装失败之后"这条路径上起作用**：`reinstall-all.sh` 的 ios 段是
+    **先 `simctl uninstall` 再打包**，所以打包失败会把那台模拟器**留在空的**状态。
+    探针没有拿"上一枚旧 app"继续跑（那正是 §7 第 27/82 条要防的形状），而是把"没装上"如实判成**本轮无效**。
+    ⚠️ 副作用登记：私有模拟器 `heyta-batch2-closeout` 上此刻**没有** `com.heyta`（它是我这轮的私有现场，不涉及别人的设备）。
+  - 🔴 **为什么这条链跑完我没有立刻去试 locale**：链 S 正在逐段跑那 44 段，其中
+    `check:native-deps`（比 `package.json` ↔ `Podfile.lock`）、`check:card-export`（数 pbxproj 里那两个文件）、
+    `check:mobile-bundle` 都**要读 ios 那棵树**，而 `pod install` 会重写 `Pods/` 与工程引用 ——
+    在那中间动它，取回来的既不是"提交态的红"也不是"修完的红"，是第三种没人能复现的东西（§7 那一族"只在混合工作树成立"的红）。
+    同理**也不在这中间改那两枚探针脚本**（任务 #30 的 35 处 `$var` 紧跟中文），
+    尽管 `check:shell-unicode` 排在第 **62** 段、时间上赶得上 —— 它赶得上，但 #52/#54/#55/#65/#66 都可能在它之前读这些文件。
+    ⇒ 顺序定死：**S 的 44 段读数先取完（那是一份对载体诚实的读数，含 `shell-unicode` 那格本批自己的红）**
+    → 再修 #30 → 只复跑受影响的那几段 + 那道门禁本身。
+  - ⏳ **W7-G3 仍未打勾**；Goal ② 的 iOS 那一半现在卡在**一件具体的事**上：`pod install` 在这台机器上跑不通
+    （三种"环境坏了"已排除，见 ㊿；locale 是唯一候选、未证 = 任务 #29）。
+    这不是"再等等"，是要一次有裁决力的实验：**双臂对照**（带 `LC_ALL=en_US.UTF-8` 一次、不带一次），
+    而且要在 S 收口之后做。
