@@ -104,6 +104,14 @@ export function NotesView(): React.JSX.Element {
   // 而不是留着一个指向不存在的 id 的输入框。
   const activeEditing = editing !== undefined ? editing : null;
 
+  /**
+   * 🔴 选中痕迹（工单 W1c）：递给共享板的是**当前打开的那一条**，不是又一个本地状态。
+   * 用 `editing?.id` 而不是 `editingId`：id 在 `notes` 里找不到时（别的设备删了它）
+   * 面板本来就不渲染（上一条已经把 `activeEditing` 判成 `null`），高亮也必须跟着没有 ——
+   * 留着会出现"列表里亮着一条、右边什么都没有"，两种线索互相矛盾。
+   */
+  const activeNoteId = editing?.id;
+
   return (
     <HeytaUiProvider>
       {activeEditing === null ? null : (
@@ -139,6 +147,7 @@ export function NotesView(): React.JSX.Element {
         onEdit={(entityId) => {
           selection.select('note', entityId);
         }}
+        activeNoteId={activeNoteId}
         labels={labels}
         testID="notes-board"
       />
