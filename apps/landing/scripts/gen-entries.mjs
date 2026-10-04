@@ -381,6 +381,37 @@ artifacts.set(
   ].join('\n'),
 );
 
+/* ── robots.txt ───────────────────────────────────────────── */
+
+artifacts.set(
+  'public/robots.txt',
+  [
+    '# heyta 落地页',
+    '#',
+    '# 由 scripts/gen-entries.mjs 生成，不要手改（见该文件的文件头）。',
+    '# 那行 `Sitemap:` 的地址是从站点部署地址的唯一事实源',
+    '# （`src/site/origin.ts` 的 `DEFAULT_SITE_ORIGIN` / 构建参数 `VITE_SITE_URL`）',
+    '# 推出来的 —— 手写它等于留一份"换域名时不会跟着变、也没有门禁会报"的抄件，',
+    '# 而 `check:entries` 现在把它当生成物逐字节对账。',
+    '#',
+    '# 为什么这个文件非有不可：`location /` 有 SPA 兜底（try_files … /index.html），',
+    '# 所以**任何不存在的路径都会返回 HTTP 200 + 落地页 HTML**。',
+    '# /robots.txt 也在此列 —— 爬虫拿到的是一份 HTML，而不是"没有 robots"。',
+    '# 那比没有 robots.txt 更坏：没有文件时爬虫用默认全站可抓，给它 HTML 反而是一次解析失败。',
+    '# （站点文件里已加 `location = /robots.txt { try_files $uri =404; }` 兜住这种情况。）',
+    '',
+    'User-agent: *',
+    'Allow: /',
+    '',
+    '# 应用本体是一个私有 SPA：没有账号的人打开只有登录页，爬不到任何可索引内容。',
+    '# 抓它只会浪费爬虫预算，还会把 `/app/` 变成搜索结果里的一个空壳。',
+    'Disallow: /app/',
+    '',
+    `Sitemap: ${SITE_URL}/sitemap.xml`,
+    '',
+  ].join('\n'),
+);
+
 /* ── 落盘 / 校验 ──────────────────────────────────────────── */
 
 const drift = [];
