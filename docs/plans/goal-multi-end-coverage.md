@@ -2337,6 +2337,14 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     现量 `heyta-wt-reinstall/server/.env` **不存在**（主检出那份有 15 个键），载体起不来自己的服务端；
     而把 `:3100` 那个进程重启掉会打断此刻正在跑的并行走查（设备 `com.heyta` pid 刚 12027→14944），
     按 §8.9 与"只对自己创建的对象动手"，两者都不做，改为把归属写准。
+  - ⚠️ **10:41 `check:docs` 此刻是红的，而且这条红不在我这一笔、也不在 `HEAD` 里 —— 记下来免得下一个人把它读进 §7.30**：
+    三条死链都在 `docs/adr/0051-mobile-reminder-delivery.md:202/203/205`，指向
+    `apps/mobile/evidence/ios-reminder-pending{ -before,-after-delete,-after}.png` 三枚**未跟踪**截图。
+    两条现量把它定性：① `git show HEAD:<那份 ADR> | sed -n '202,205p' | grep -c ios-reminder-pending` = **0**
+    （那三行是他们**未提交**的编辑，`git status` 里这枚文件是 `M`）；② 临时 `git worktree add --detach …  HEAD`
+    里跑同一个 `docs-link-check.mjs` ⇒ **exit 0**（干净检出没有这条死链）。
+    ⇒ 这是"只在混合工作树成立"那一类红：等 W9/iOS 提醒那条线把三枚截图与 ADR 一起提交就自己闭合，
+    关闭判据是 `pnpm check:docs` 退 0；**我不代改他们的 ADR，也不把未跟踪的截图替他们 `git add`**（§8.9 + 只对自己创建的对象动手）。
 - ✅ **05:3x ⑤ 复核**：`B41/B42/B45` 三行仍在 §7.28 那张「完成条件逐条的现量与差什么」表里（`:1220`/`:1221`，状态 🟡，
     各带自己的现量命令），本夜落笔的六笔只改了 `scripts/verify-mobile-notes.sh` 的第 12 步与
     `apps/desktop-macos/scripts/package-app.sh` 的公证段，加上四份文档，
