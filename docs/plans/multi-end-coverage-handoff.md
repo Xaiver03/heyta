@@ -574,11 +574,19 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
       `@heyta/mobile` 的 `tsc --noEmit` 转红；而 19:34 现取的 82 段 `check` 清单里**没有 eslint 段**
       ⇒ 也没有别的常驻门禁会因为"留下未用的辅助量"判红。
       🔴 所以真正的代价是**回退要连那几枚辅助量一起摘干净**，而不是"回退会被门禁拦"。
-      还剩没做的一步：在那枚临时检出里真删一次并跑 `pnpm --filter @heyta/mobile typecheck`
-      （临时检出要另配 `node_modules` 软链才不会假红）——**这条腿到记为止是"由配置事实推出可行"，
-      不是"跑过"**。⇒ ④ 的登记状态：功能五项全在 HEAD（19:3x 逐条 file:line 核过），
-      "一条命令回退"的形式已钉到 `ListsSection.tsx:237-:272` 这一段，可行性有上面那两条现额支持，
-      终验（删+typecheck）待跑。
+      ✅ **终验已跑完（19:50，临时 detached 检出 `@744114f2`，用完 `git worktree remove` 回收，
+      共享主检出零写入）**：`sed '237,272d'` 之后新 `:237` 逐字变成原 `:273` 的 `onRename={(item, next) => {`
+      （边界复核过），两趟 `tsc --noEmit -p apps/mobile/tsconfig.json` 的**错误码集合逐字相同**
+      （`{error TS2345}` 对 `{error TS2345}`，差集为空）⇒ 摘掉那段**不新增**任何类型错误。
+      🔴 必须同时记下那枚基线红的归属：临时检出里报的 `ExportScreen.tsx(218,25) TS2345`
+      在**主检出同一条命令下 rc=0、零错误** ⇒ 它是**我这枚临时检出的装置产物**
+      （软链过去的 `apps/mobile/node_modules` 里 `@heyta/*` 指回主检出，`dist` 与临时那版源码不同步），
+      不是仓里的红。**结论仍然站得住**：判断用的是 A/B 差集，同一装置在两臂里对等地带着那枚假红。
+      ⇒ ④ 的登记状态收口为：**功能五项全在 HEAD（19:3x 逐条 file:line 核过），
+      "一条命令回退"这一腿已验** —— 形式是 `sed -i '' '237,272d' apps/mobile/src/screens/ListsSection.tsx`
+      那一形的摘除（撤的是"代拍"的范围，不是历史），typecheck 无新增错误、
+      共享层与写侧一行不动、web 那半不受影响；要撤干净还需连 `folderTargets` / `parentOf` /
+      `FolderPicker` 这些只服务于那段的辅助量一起摘（它们不会让门禁红，理由见上面那两条现额）。
    🔴 唯一没做的是**在 main 上落那一笔**：图层上已经**快进可合**
    （`git merge-base --is-ancestor main feat/list-parent` → 0，且合并零冲突、并集已核对，见 §3.3），
    但主检出里那两张词条表还是 `M` ⇒ `--ff-only` 会被 git 拒（它不替你 stash 别人的改动）。
