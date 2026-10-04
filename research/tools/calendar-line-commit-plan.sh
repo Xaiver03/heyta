@@ -54,6 +54,12 @@ PATHS=(
   research/tools/r14c-stack-down-arms.sh
   research/tools/r14c-regate-load-arms.sh
   research/tools/r17-pin-path-hygiene.sh
+  # 🔴 这一对是 §4.05 (25) 那笔事故（`9de0e545` 带走别人一枚 trap hunk，三道路径级闸门全绿）的牙：
+  #    归属器 + 它的十三臂（实量 14 条判定）验证台。**两者必须同批入库** ——
+  #    只提归属器不提验证台，HEAD 里就有一枚"不能失败的检查"；只提验证台不提归属器，
+  #    下一轮开窗时 `--only` 会提交一个"闸门没入库、锚点没强制"的载体。
+  research/tools/calendar-line-hunk-ownership.sh
+  research/tools/calendar-line-hunk-ownership-arms.sh
   # 🔴 这一批**成对落地的三枚**（链 + 它依赖的两枚共享起栈脚本）：
   #    `r14c-carrier-chain.sh` 新加的 `stack_isolation` 后置断言依赖 `scripts/mobile-e2e-up.sh`
   #    那两枚新旋钮（`HEYTA_E2E_PIDFILE` / `HEYTA_E2E_LOGFILE`），而载体那份取的是**已提交副本**
@@ -474,6 +480,28 @@ if [ "$R1" != 0 ] || [ "$R2" != 0 ]; then
   fi
   printf '%s\n' "$MDO" "$OFF" | grep . | sort -u | sed 's/^/      · 带不走（不是这一笔的树）：/'
   echo "   ✅ 本笔要提交的文件里没有这类红 ⇒ 继续（别人的红留在别人的树上，本工具不代改、也不替它放宽判据）"
+fi
+
+echo "== 3b. hunk 归属（§4.05 (25)：上面三道闸门判据的单位都是路径，答不了「谁的 hunk」）=="
+#    🔴 事故原文：`9de0e545` 带走 `scripts/verify-mobile-due-time.sh` 里别人那枚 trap hunk ——
+#    那枚路径**就在 PATHS 里**，所以 OUTSIDE_NS / 1b / UNCARRIED 三道全绿。
+#    这一格把问题换成逐枚 hunk 问一句「它碰过的行里有没有本轮申报的锚点」。
+#    干跑不强制（我还想在没想好锚点时先看清单），**--confirm 强制**：缺锚点就 exit 1。
+if [ -z "${ANCHORS:-}" ]; then
+  if [ "$CONFIRM" = 1 ]; then
+    echo "   ❌ --confirm 却没传 ANCHORS ⇒ 无法判归属，拒绝提交（这一格的存在理由见 §4.05 (25)）。"
+    echo "      传法：ANCHORS='本轮新增或改动的标识符、函数名、独有串' MSG='…' bash $0 --confirm"
+    exit 1
+  fi
+  echo "   · 干跑未传 ANCHORS ⇒ 跳过（提交那一腿强制，且牙由 14 臂验证台守着）"
+else
+  ANCHORS="$ANCHORS" bash research/tools/calendar-line-hunk-ownership.sh "${NAMES[@]}"
+  HO_RC=$?
+  if [ "$HO_RC" != 0 ]; then
+    echo "   ❌ 有孤儿 hunk ⇒ 这一笔会带走不是我写的字节，拒绝提交（exit 1）。"
+    echo "      要么补锚点，要么与所有者分开提交；ALLOW_ORPHAN=1 是**承认放行**不是静默绕过（会大字留痕）。"
+    exit 1
+  fi
 fi
 
 echo "== 4. 点名动作（复制即可，本工具不代执行）=="
