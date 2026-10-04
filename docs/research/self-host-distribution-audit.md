@@ -250,7 +250,7 @@
 | G-45 | 台阶 3（镜像 npm 依赖树 vs 许可证门禁扫的 pnpm store）曾是**未证实** | **本批量完并关成"有对账"**（§8.8）：`check:image-license` 逐条对账 + 四条会红的登记自检，7 发变异各自精确报红、阳性对照绿。残余风险（纯传递依赖上游发新版）已改挂 G-47 |
 | G-46 | `server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 的唯一实体）原来是**上游形状**：它自己抄了一份 7 条的镜像输入清单，其中 3 条在本仓库不存在（实测 `[ -e ]` 全不成立），而 `apps/web` / 11 个 `packages/*` / `pnpm-lock.yaml` / `server/` 自己**一条都不在里面**；`GHCR_NAMESPACE` 默认成 `super-productivity`（**别人的组织**）；并且无论给不给版本号都**顺带覆盖 `:latest`** | **本批关闭**（§8.7 第 4 条）。三条各自都会出事，都已改：清单改成 source 同一个读者、namespace 无默认值（不给就在任何 docker 之前 exit 1）、只推点名的那一个 tag。⚠️ 消费者集合是量过的：除 `server/package.json:14` 外只有 `server/tests/migration-sql.spec.ts:345` 读它，而那一发在 `it.skip` 里 ⇒ **不报错也不守** |
 | G-47 | ~~镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会**~~　🔴 **这段到 2026-10-04 05:5x 为止描述的是现实，现在四个事实变了**：`server/package-lock.json` 是提交物并且是 Dockerfile 的一条 `COPY` 输入（"没有 lockfile"为假）、镜像那棵树**由它驱动解析**（鉴别实验：锁里改一个版本，产物跟着改）、快照不再"每次重量"而是**从锁派生**、"改直接依赖才会红"这一句当时就说轻了（14 条在漂、两个还是直接依赖，见下面状态栏）。闭合形状与登记里预期的**不是同一件事**：§8.46（为什么 `pnpm deploy --prod` 与"提交锁 + `npm ci`"两条都走不通）、§8.47（落的形状与全部读数）| ✅ **2026-10-04 已关**（中间态曾是"🔄 对账已做、闭合形状要换"，读数见 §8.20）。现量：镜像树与 pnpm 生产树**同名同版本 125 个、镜像独有 0 个、版本不一致 14 个** —— 14 个全是镜像比 lockfile **新**，其中 12 个是传递依赖（`pino` + `@simplewebauthn/server` 底下 11 个 `@peculiar/asn1-*`，那是 **passkey 验证路径**），2 个是直接依赖（`@fastify/static ^10.1.2` 解到 10.1.5 而 pnpm 是 10.1.4、`ws ^8.18.0` 解到 8.22.0 而 pnpm 是 8.21.3）。⇒ 登记那句"改直接依赖才会漂"其实**说轻了**：没人改任何依赖，只因为版本落在 `^` 范围内，发出去的镜像就跑着一套本仓库任何测试都没跑过的版本。`--check` 新鲜度绿、覆盖率对账绿，两条都管不到这件事。🔴 **原闭合形状实测不成立**：`pnpm deploy --prod` 在 pnpm v10+ 要求 `inject-workspace-packages=true`（全仓依赖解析方式的改动），而 `--legacy` 会去 registry 取 `@heyta/i18n` 直接失败；另外 filter 打错时 `pnpm deploy` **什么都没做还 exit 0**。⇒ 换成：把已提交的那份快照从"记录 npm 这次解出什么"改成**镜像要装的版本就是它**（装配时按快照逐条钉版本），等式判据与钉版本**同一批**落地（不能先加判据把链钉红），复验仍要一轮真构建。🟡 **2026-10-04 00:4x 部分推进**（现量与判据见 §8.26）：那 143 条**仍未钉**（要 docker + 低负载窗口，与 #12 同一个），但镜像里**唯一那一枚手写版本字面量** `prisma@5.22.0` 现在有了等式判据 —— 它是第三份抄件，此前没有任何一层在守；新判据挂成 `check:image-license` 的第三条腿，5 臂注入各自精确报红、未变异对照绿。同时 §8.20 步骤 1 的**形状被改掉**（快照不能既是 install 实参的来源、又是 install 形状的哈希输入，否则等式两边都是它自己）。✅ **2026-10-04 05:5x 关闭**（`1b7d0921`，读数在 §8.47）：落的形状既不是 `pnpm deploy`，也不是"把快照逐条钉进 Dockerfile"，而是**把 npm 自己解出的那棵树提交成 `server/package-lock.json` + 一条 `COPY` 进生产阶段**，三条 `npm install` 一个字未改（实测 `npm install` 认锁、只在范围内取版本，不升级到范围内最新 —— §8.46 结论四的 C1/C2/C3 三档）。复验是**两趟真构建**（含"锁里手工改一个版本 ⇒ 产物跟着改"那一发鉴别实验，它才是"锁在驱动解析"的证据；只看"输出相同"兼容"npm 没读锁"）+ **两种载体对账**（模式 A 146 = 扫描集 126 + 镜像独有 17 + 自家包 3；模式 B 145，磁盘枚举 ⊆ 锁的非 dev 158 且差 13 条全 `optional`）+ 9 臂变异各红一次。⚠️ 别读成"完全可复现构建"：锁钉的是**第三方 registry 层**，三枚自家 tgz 走 `npm install` 的原生行为装**当前字节**（这是要的，本地包跟源码走）；`npm ci` 那条"更彻底"的形状实测会在冷缓存 `EINTEGRITY`、热缓存**静默装上一版自家代码**。G-53（`*-linux-arm64-musl` 那一类平台二进制从没进过扫描集）是这一族剩下的那条，**未闭** |
-| G-48 | `check:web-artifact:app`（核对 `--base=/app/` 那份产物的那一道）**零自动消费者** —— 2026-10-03 由新门禁 `check:gate-wiring` 量出：它是 63 道 `check:*` 里唯一合法落在链外的一道，而全仓 `grep` 只有 `package.json` 自己那一行，没有任何 workflow / 验收脚本 / `deploy.sh` 调用它 ⇒「上线前跑一次」目前只写在脚本头部注释里 | ✅ **已关（2026-10-03，判据与登记见 §8.19）**。登记那半句被否证：`server/Dockerfile:191` 一直在跑同一条判据的**脚本本体**，`grep` 漏它是因为搜的是别名。决定：链**不放**这道判据（`apps/web/dist` 是一个目录、两种载体，链里 `pnpm build` 打的必然是根载体，把 `/app/` 载体放链里就是拿错的字节验对的东西 —— 现量：同一份 dist 上一条 rc=0 一条 rc=1）；改为**每个发布载体各自带对账**：runbook §3.7 的 rsync 之前插入 `pnpm check:web-artifact:app`（两处），`check:gate-wiring` 新增"链外门禁必须点名消费方文件 + 该文件里有一行**以这条命令开头**"，把"没人跑它"从一句注释变成会红的判据。6 臂注入 5 红 1 绿（绿那臂是刻意留的越界对照） |
+| G-48 | `check:web-artifact:app`（核对 `--base=/app/` 那份产物的那一道）**零自动消费者** —— 2026-10-03 由新门禁 `check:gate-wiring` 量出：它是 63 道 `check:*` 里唯一合法落在链外的一道，而全仓 `grep` 只有 `package.json` 自己那一行，没有任何 workflow / 验收脚本 / `deploy.sh` 调用它 ⇒「上线前跑一次」目前只写在脚本头部注释里 | ✅ **已关（2026-10-03，判据与登记见 §8.19）**。登记那半句被否证：`server/Dockerfile:211`（10-04 现量更正：原写 191，Dockerfile 长出 20 行后台账没跟着改；行号会漂 ⇒ 按内容找 `grep -n "check-web-artifact.mjs.*--mount /app/" server/Dockerfile`） 一直在跑同一条判据的**脚本本体**，`grep` 漏它是因为搜的是别名。决定：链**不放**这道判据（`apps/web/dist` 是一个目录、两种载体，链里 `pnpm build` 打的必然是根载体，把 `/app/` 载体放链里就是拿错的字节验对的东西 —— 现量：同一份 dist 上一条 rc=0 一条 rc=1）；改为**每个发布载体各自带对账**：runbook §3.7 的 rsync 之前插入 `pnpm check:web-artifact:app`（两处），`check:gate-wiring` 新增"链外门禁必须点名消费方文件 + 该文件里有一行**以这条命令开头**"，把"没人跑它"从一句注释变成会红的判据。6 臂注入 5 红 1 绿（绿那臂是刻意留的越界对照） |
 | G-48b | G-48 关的是"这一步在不在发布序列里"，**没有**关"这一趟有没有人真的跑过它"：`consumers` 判的是 runbook 里那行命令还在，人工 rsync 前跳不跳过去仍然只取决于人。另外 `apps/web/dist` 一目录两载体没变（§8.19 读数 B），按载体分目录要同时动 `package-app.sh` / `package-msix.ps1` / `reinstall-all.sh` 的同步对账 / `Dockerfile` —— 四端打包输入的变更 | **未关**（本批只登记，理由如上：会新增一个"能碰生产"的对外动作面，或要改四端打包输入）。挂在这里是为了让下一轮别把 G-48 的绿读成"发布已经有守卫" |
 | G-49 | 站内那篇自建指南（`packages/i18n` 的 `site.docs.selfhost.*`）是入口命令的**第 4 份抄件**，而 `check:selfhost-entry-command` 的扫描集里没有它（现有扫描集：`docs/runbooks/self-host.md`、`server/README.md`、`server/env.example`、`docker-compose.migrate-once.yml`、`local-server-verification.md`）| ✅ **本批关闭**，但**登记的前提一半是错的**（读数在 §8.18）：58 条词条里当时**没有一条**是完整入口命令，s7p2 只有 `-f` 那三个 flag 的**碎片**（没前缀、没 `up -d`、**没 `--build`**）。碎片比没抄件更坏 —— 拼起来敲就是 §8.11 那次 `pull access denied`。所以做的是两件事：文章改成给**完整一条**（中英各一份，与 runbook 逐字相同），再把这两份词条文件纳入扫描集（`source: 'copy'`） |
 
@@ -694,7 +694,7 @@ successfully applied`，`caddy` / `supersync` / `postgres` 三个都 `healthy`�
 **登记为缺口，不伪装成"有守卫"**：已编号 **G-48**（见 §7 那张表）。
 
 > ⚠️ **上面那段"零自动消费者"只有一半是对的，2026-10-03 收盘点时否证了后半**（读数见 §8.19）：
-> `grep` 扫的是**别名** `check:web-artifact:app`，而 `server/Dockerfile:191` 跑的是**同一条判据的脚本本体**
+> `grep` 扫的是**别名** `check:web-artifact:app`，而 `server/Dockerfile:211`（10-04 现量更正：原写 191，Dockerfile 长出 20 行后台账没跟着改；行号会漂 ⇒ 按内容找 `grep -n "check-web-artifact.mjs.*--mount /app/" server/Dockerfile`） 跑的是**同一条判据的脚本本体**
 > （`node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/`）⇒ 镜像路径一直有自动载体。
 > 真的没人守的是**人工 rsync 那一趟**（生产 `/app/` 到今天走的正是它）。
 > 原句留着是因为它记的是"那天那次扫描读到了什么"，改成后来修好的样子就抹掉了
@@ -1109,7 +1109,7 @@ G-40⑤（版本来源）因此多了一条硬约束：**它必须和闸门共�
 
 #### 决定（以及被否证的那半句登记）
 
-- `server/Dockerfile:191` 早就在跑这条判据：`RUN node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/`
+- `server/Dockerfile:211`（10-04 现量更正：原写 191，Dockerfile 长出 20 行后台账没跟着改；行号会漂 ⇒ 按内容找 `grep -n "check-web-artifact.mjs.*--mount /app/" server/Dockerfile`） 早就在跑这条判据：`RUN node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/`
   ⇒ 镜像构建那一趟**一直有自动载体**。原登记"零自动消费者"搜的是 npm 别名 `check:web-artifact:app`，
   别名与脚本本体是两种字面形状，只搜一种就会把另一种判成"没人跑"。
 - **链里不放这道判据**（读数 B/C 就是理由）。改成**每个载体各自带对账**：
@@ -1862,7 +1862,7 @@ BFS 停在 18 个直接依赖上，输出"两边差 127 条"。第二版读了 s
 **先记落地这件事本身（全部现量，命令可重跑）：**
 
 - `git merge-base main feat/self-host-distribution` = `b850b1c6` ⇒ **整条分支是 main 的祖先**，
-  本批没有任何一笔还留在外面。带它进来的是两笔 merge：`9a61a88a`（01:43，第二父 `95732679`）
+  ~~本批没有任何一笔还留在外面~~。**🔴 10-04 22:1x 现量否证**：那两笔 merge 带进来的是**当时的分支头** `b850b1c6`，而分支在那之后又前进了 151 笔 —— 现量 `git merge-base --is-ancestor feat/self-host-distribution main` ⇒ **rc=1**、`git rev-list --count main..feat/self-host-distribution` = **151**、差额 **58 个文件**（逐类见 §8.134）。"已经落进 main"这句从今天起只对 02:09 那一刀成立，**不能**再当第 1 项（#7 合并落地）的关闭依据。带它进来的是两笔 merge：`9a61a88a`（01:43，第二父 `95732679`）
   与 `7bac538b`（02:09，第二父 `b850b1c6`，标题就叫"自托管批次尾笔"）。
 - 卡了本批一整轮的那 5 个重叠文件，是**它们的所有者**提交的：`package.json` +
   `scripts/check-script-snapshot.mjs` 在 `102d064f`（00:46），`docs/README.md` + 中英两份词条表在
@@ -1918,7 +1918,7 @@ BFS 停在 18 个直接依赖上，输出"两边差 127 条"。第二版读了 s
   负载 02:1x 现量 `47.40`（阈值 12；同一轮里从 `416.21` → `151.69` → `47.40` 在跌）。
   脚本自带负载门，等满会以 exit 3 收 —— 那记**环境无效 ≠ 产品失败**，不改判据。
 - item #4 G-47 的 A/B：要一次**真镜像构建**才知道"会不会改变产物"，依据与决策表在 §8.30。
-- item #8 `pnpm reinstall:all`：前置条件"**落地之后**"在 02:09 **已满足**，
+- item #8 `pnpm reinstall:all`：前置条件"**落地之后**"在 02:09 ~~已满足~~ —— **10-04 现量限定**：就"本批改过 `apps/web`"这一条而言成立（差额 58 个文件里 `apps/web/` 命中 **0**），但差额里仍有 `packages/i18n/src/locales/{zh-CN,en}.ts`（界面文案会烘进 RN/浏览器包）与 `apps/landing/*`、`server/*` ⇒ **今天重装装出来的四端不含本批的文案修正**，所以这一项仍然排在整批落地之后（理由从"apps/web"换成"词条"，结论不变）。
   但四端重装要占模拟器/打包机与一轮干净负载窗口；本批改过 `apps/web`，所以它必须在落地后跑，
   现在跑只是把窗口让给别人。
 
@@ -6940,7 +6940,7 @@ sweep 残留 PWA 承诺时命中 `zh-CN.ts:3602` / `en.ts:3402`
 
 #### ④ 顺带查出来的两条，一条入档一条只是读数
 
-- **G-60（新登记，未关）**：`/app/manifest.webmanifest` 线上回 **`application/octet-stream`**
+- **G-60（新登记 → ✅ 已关，见 §8.132，2026-10-04 21:5x：生产 nginx 已补类型 + `live-site/live-manifest.spec.ts` 三条判据 + 旧域名红臂）**：`/app/manifest.webmanifest` 线上回 **`application/octet-stream`**
   （nginx 的 `mime.types` 里没有 `.webmanifest`）。~~两处既有用例都**只把这个值放进 probe 里记录、
   没有一条 expect**~~ ⇒ 🔴 **这半句在写下的一小时内被我自己否证**：自托管载体那一侧
   **早就有一条断言** —— `e2e/selfhost-stack/selfhost-web.spec.ts:220`
@@ -8125,3 +8125,85 @@ G-60 这一处已从清单里出去（修在生产、判据已挂 live-site、�
 - 任务 #30 的描述已改成按"三代措辞任一命中"来判，避免下一读的人拿错 needle；
 - 台账里"仍印着那句承诺"这类措辞自本条起以本节为准（原句留在 6761 / 7546 行旁，不删，因为
   "登记过一条不够精确的断言"本身也是要留的现场）。
+
+### 8.134 落地范围被重新量过：差额 151 笔 / 58 个文件，而目标点名的 5 枚重叠只剩 3 枚（2026-10-04 22:1x）
+
+触发点是给八项做"五栏证据"对账（设计／生产接线／失败与恢复／平台验收／当前产物）时，
+第③类报出一处我自己写的断言已经否证不了：**§8.31 说"整条分支是 main 的祖先、本批没有任何一笔还留在外面"**，
+而 §8.125–§8.128 全程还在等落地。两句不可能同时为真，所以先去量，不先改口径。
+
+#### ① 现量（全部可重跑）
+
+```
+git merge-base main feat/self-host-distribution            = b850b1c6（10-04 01:45）
+git merge-base --is-ancestor feat/self-host-distribution main → rc=1     ← 分支不是 main 的祖先
+git rev-list --count main..feat/self-host-distribution     = 151        ← 还没落地的笔数
+git rev-list --count feat/self-host-distribution..main     = 656        ← 分支落后 main 的笔数
+git ls-tree -r main research/tools | grep -c selfhost      = 0
+main 上有：scripts/verify-selfhost-stack.sh ✔   scripts/check-selfhost-entry-command.mjs ✔
+main 上无：research/tools/selfhost-land-main.mjs ✘
+```
+
+⇒ 02:09 那两笔 merge（`9a61a88a` / `7bac538b`）带进来的是**当时的分支头**，之后分支又走了 151 笔。
+**"已经落进 main"从今天起只对那一刀成立**，不能再当第 1 项（#7 合并落地）的关闭依据。
+两处断言已**原地划线**（§8.31 内 10-04 更正，原句保留在旁边）；任务 #7 的标题"已由并行会话完成"是同一句话的另一副面目，已改挂到本条。
+⚠️ §8.31 的**标题本身没动** —— `check:docs` 会验"失效章节引用/失效锚点"（本趟 rc=0 的输出里就有这句），
+改标题的代价是别处的引用跟着失效；更正放在标题下第一行，不另起一节藏起来。
+
+#### ② 差额 58 个文件按"落地时谁会吃它"分类（数字现量，不手抄）
+
+| 枚数 | 类别 | 含义 |
+|---|---|---|
+| 21 | `research/tools/` | 落地工具与闸门本体（含 `selfhost-land-main.mjs`）⇒ **main 上一枚都没有**，这就是 §8.126 那条"落地命令必须写分支绝对路径"的根因 |
+| 8 | `server/` | `Dockerfile`、三份 compose、`package-lock.json`、`image-npm-tree.json`、`env.example`、`README` ⇒ **G-47 的镜像依赖树与安装契约都还没进 main** |
+| 6 | `apps/landing/` | 含那条三栏排错的 `styles/landing.css` 修复与两个测试 |
+| 6 | `e2e/`（live-site 3 + landing 3） | 线上判据（含本趟新增的 `live-manifest.spec.ts`） |
+| 4 | `scripts/` | `verify-selfhost-stack.sh`、`check-gate-wiring.mjs`、`screenshots/` 两枚 |
+| 3 | `docs/` | 台账 + 两份 runbook |
+| 3 | `e2e/selfhost-stack-results/` | 三枚证据 PNG |
+| 2 | `packages/i18n/src/locales/` | **界面文案（含摘掉「可安装」那一代）⇒ 会烘进产物** |
+| 2 | `packages/{shared-schema,sync-core}/package.json` | 包元数据 |
+| 2 | 根文件 | `package.json`（链定义）、`.gitignore` |
+| 1 | `.github/workflows/heyta-server-image.yml` | CI |
+| **0** | **`apps/web/`** | ← 关键，见 ④ |
+
+#### ③ 目标第 1 项点名的 5 枚重叠文件，逐枚现量"还在不在差额里"
+
+```
+docs/README.md                       否   ← 已不再是撞车面
+package.json                         是
+packages/i18n/src/locales/zh-CN.ts   是
+packages/i18n/src/locales/en.ts      是
+scripts/check-script-snapshot.mjs    否   ← 已不再是撞车面
+```
+
+⇒ **撞车面从 5 枚降到 3 枚**，而阻塞集现量只有 1 枚（`package.json` 被别人未提交的工作树压着）——
+词条那两枚此刻在主检出是干净的。这条改变了第 1 项的形状：
+**只剩一枚文件挡在"等别人提交"那一档**，其余前置（负载／端口／main 静止）都是环境给的，
+而 §8.126 已经用数字量过它们为什么凑不齐（main 平均 85s 一笔 vs 链要几十分钟）。
+
+#### ④ 顺带把第 8 项的理由换掉（结论不变）
+
+`apps/web` 命中 0 ⇒ §8.31 那句"本批改过 `apps/web`，所以 reinstall:all 必须排在落地后"里，
+**apps/web 那一刀其实已经落地了**。但差额里仍有两份词条表与落地页 ⇒
+**今天重装出来的四端不含本批的文案修正**，所以排序结论不变、**理由从"apps/web"换成"词条"**。
+（已在 §8.31 原地划线更正，不另写一份。）
+
+#### ⑤ 五栏对账里仍然真缺的格子（不粉饰，逐条给取法）
+
+1. 第 1 项「当前产物」：落地没发生 ⇒ 天然为空，**不是漏**。
+2. **G-61（新登记，待拍板）**：`pnpm verify:selfhost-stack` **不在任何自动链里** —— 现量：
+     `package.json` 的 `check` 链（第 55 行那条）不含它，两个 workflow 里只有注释级提及
+     （`.github/workflows/heyta-server-image.yml` 的说明行）。也就是说第 2 项那条"真镜像 + 真服务端 + 真浏览器"的验收
+     是**人跑一次**的验收，不是门禁：它红了不会挡住任何一次提交。
+     为什么不默认挂链（这是裁决，不是拖延）：它要真构建镜像并起 Docker 栈，挂进 `pnpm check`
+     会把整条门禁变成几十分钟，而且它自带负载门（等满 exit 3）—— 一个"经常因为环境无效而红"的段挂在必过链上，
+     下一位会去调低阈值，那比没人跑更贵（§8.118 与记忆「设备验收自带负载门」同一族）。
+     **要人拍的三选一**：① 保持人跑（现状，但要在 runbook 里写明"每次改了 server/Dockerfile 或 compose 必须跑一次"）；
+     ② 挂进**发布前**那道（`scripts/verify-*` 串）而不是 `pnpm check`；③ 拆成"纯静态的镜像契约对账"进链（`check:image-*` 那三道已经是这个形状）+ 真跑留给人。
+     取法（现量命令）：`grep -n '"check":' package.json` 与 `grep -rn verify:selfhost-stack .github/workflows/`。
+3. G-40 ④/⑤ 的「失败与恢复」：那两句否认式文案与"版本从哪来"至今**没有会红的判据**（只有 rc=0 的通过读数）⇒ 下一条会话的第一件。
+4. 第 8 项「失败与恢复」：`scripts/reinstall-all.sh` 的新鲜度对账（`:150-151`）本批从未被变异验证。
+5. 指针漂移三处：`§7` 表内与 §8.19 写的 `server/Dockerfile:191` 现量是 `COPY packages/storage/`，
+   那条 `RUN …check-web-artifact.mjs … --mount /app/` 在 **211** 行 ⇒ 已原地更正，
+   并把"按内容找"的 grep 一起钉在旁边（行号会漂这件事本身，就是这类指针的默认失效方式）。
