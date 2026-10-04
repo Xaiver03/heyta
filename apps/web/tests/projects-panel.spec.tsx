@@ -17,7 +17,7 @@
  *   A. **层级**：顶层行是列表的直接子节点，子清单行嵌在缩进容器里。
  *   B. **计数口径**：未完成 + 未删除 + 属于这条清单；`0` 不渲染计数位
  *      （与 `App.tsx` 的 `NavButton` 同一条 `count > 0`）。
- *   C. **点一行报给宿主**：`onSelect` 收到的是**用户选了哪个**，
+ *   C. **点一行报给宿主**：`onFilterWith` 收到的是**用户选了哪个**，
  *      不是组件自己改筛选（见 `ProjectsPanel.tsx` 文件头 —— 直接 `setFilter`
  *      会让"人在习惯页点清单"看起来点了没反应）。
  *   D. **删除走宿主 action**：组件不写库。
@@ -147,7 +147,7 @@ function render(): HTMLDivElement {
     root!.render(
       <I18nProvider locale="zh-CN">
         <ProjectsPanel
-          onSelect={(filter) => {
+          onFilterWith={(filter) => {
             selected.push(filter);
           }}
         />
@@ -211,7 +211,7 @@ describe('A/B 清单：层级 + 计数口径', () => {
 });
 
 describe('C/D 清单：点一行报给宿主，删除走 action', () => {
-  it('点清单行 → `onSelect` 收到 `{ kind: "project", projectId }`', () => {
+  it('点清单行 → `onFilterWith` 收到 `{ kind: "project", projectId }`', () => {
     seed();
     const view = render();
     click(byTestId(view, 'project-p1-select'));
@@ -225,7 +225,7 @@ describe('C/D 清单：点一行报给宿主，删除走 action', () => {
     expect(selected).toEqual([{ kind: 'project', projectId: 'p1a' }]);
   });
 
-  it('删除按钮 → 调宿主的 `deleteProject`，且**不**触发 onSelect', () => {
+  it('删除按钮 → 调宿主的 `deleteProject`，且**不**触发 onFilterWith', () => {
     seed();
     const view = render();
     click(byTestId(view, 'project-p1-remove'));

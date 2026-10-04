@@ -127,7 +127,7 @@ export interface OrganizerListProps {
   readonly counts?: Readonly<Record<string, number>>;
   readonly labels: OrganizerListLabels;
   /** 点了某一行（**不是**删除）。不传 = 这些行不可点。 */
-  readonly onSelect?: (item: OrganizerItem, context: OrganizerRowContext) => void;
+  readonly onFilterWith?: (item: OrganizerItem, context: OrganizerRowContext) => void;
   /** 删除某一行。**写库由宿主的 action 层做**（AGENTS.md §3.5）。 */
   readonly onRemove: (item: OrganizerItem) => void;
   /**
@@ -245,7 +245,7 @@ function OrganizerRow({
   context,
   count,
   labels,
-  onSelect,
+  onFilterWith,
   onRemove,
   onRename,
   onArchive,
@@ -263,7 +263,7 @@ function OrganizerRow({
   readonly context: OrganizerRowContext;
   readonly count: number | undefined;
   readonly labels: OrganizerListLabels;
-  readonly onSelect: OrganizerListProps['onSelect'];
+  readonly onFilterWith: OrganizerListProps['onFilterWith'];
   readonly onRemove: OrganizerListProps['onRemove'];
   readonly onRename: OrganizerListProps['onRename'];
   readonly onArchive: OrganizerListProps['onArchive'];
@@ -300,7 +300,7 @@ function OrganizerRow({
     onRename(item, next);
   };
 
-  // 改名态：**整行换成输入框**，且**不再挂 `onSelect`**。
+  // 改名态：**整行换成输入框**，且**不再挂 `onFilterWith`**。
   //
   // 🔴 这一点是结构问题不是审美问题：如果把 `TextInput` 塞进那块可点的
   // `styles.main`（`Pressable`）里，点输入框会同时触发"选中这一行"，
@@ -341,7 +341,7 @@ function OrganizerRow({
   }
 
   /**
-   * 行的主体：可点（`onSelect`）时是 `Pressable`，否则是普通 `View`。
+   * 行的主体：可点（`onFilterWith`）时是 `Pressable`，否则是普通 `View`。
    *
    * 🔴 两种形态的**子节点逐字相同** —— 这样"可点"只是多了一个 `onPress`，
    * 不会长出第二份行骨架。迁移前 web 用 `<button class="ht-nav__item">`、
@@ -364,14 +364,14 @@ function OrganizerRow({
 
   return (
     <View style={styles.row} testID={`${key}-row`}>
-      {onSelect === undefined ? (
+      {onFilterWith === undefined ? (
         <View style={styles.main}>{body}</View>
       ) : (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={item.name}
           onPress={() => {
-            onSelect(item, context);
+            onFilterWith(item, context);
           }}
           style={styles.main}
           testID={`${key}-select`}
@@ -453,7 +453,7 @@ export function OrganizerList({
   items,
   counts,
   labels,
-  onSelect,
+  onFilterWith,
   onRemove,
   onRename,
   onArchive,
@@ -516,7 +516,7 @@ export function OrganizerList({
             context={{ isChild: false }}
             count={counts?.[node.id]}
             labels={labels}
-            onSelect={onSelect}
+            onFilterWith={onFilterWith}
             onRemove={onRemove}
             onRename={onRename}
             onArchive={onArchive}
@@ -539,7 +539,7 @@ export function OrganizerList({
                   context={{ isChild: true }}
                   count={counts?.[child.id]}
                   labels={labels}
-                  onSelect={onSelect}
+                  onFilterWith={onFilterWith}
                   onRemove={onRemove}
                   onRename={onRename}
                   onArchive={onArchive}

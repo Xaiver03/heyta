@@ -1184,6 +1184,12 @@ export function App(): React.JSX.Element {
         label: project.name,
         group: 'project' as const,
         hint: t('web.search.hint.project'),
+        // ⚠️ 这里的 `onSelect` 是**搜索面板自己的字段**（拾取这一条候选），和清单/标签那一格的
+        // "选中"不是一回事：实参走 `goToFilter` ⇒ 容器从来不进选中宇宙（工单 §8.122 / C1 #14 A）。
+        // rail 上那两行同动作的名字已改成 `onFilterWith`，这里没改是因为它属于 `QuickAction` 契约、
+        // 视图项与回收站项也共用同一个字段名。**按 `onSelect` 形状扫选中消费方会把这两行读成已接**
+        // （工单 §8.96 那条 grep 配方就是这类探针）—— 名册（`check-selection-single-source` 断言 I/D）
+        // 认的是 `useSelected('…')` / `selection.select('…')`，所以它不会读错；人读的时候带这句。
         onSelect: () => goToFilter({ kind: 'project', projectId: project.id }),
       })),
       ...projects.tags.map((tag) => ({
@@ -1731,7 +1737,7 @@ export function App(): React.JSX.Element {
               />
             ))}
           </div>
-          <ProjectsPanel onSelect={goToFilter} />
+          <ProjectsPanel onFilterWith={goToFilter} />
           {/* 右边缘的拖拽手柄（绝对定位在这一列上，不占布局）。 */}
           <SidebarResizer />
         </nav>

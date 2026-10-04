@@ -975,7 +975,7 @@ const VIEW_STANCES = [
     stance: 'filters',
     entity: 'project',
     locus: 'apps/web/src/features/projects/ProjectsPanel.tsx',
-    needle: "onSelect({ kind: 'project', projectId: item.id });",
+    needle: "onFilterWith({ kind: 'project', projectId: item.id });",
     because: '点一行清单 = 给任务列表加筛选。🔴 web 与触屏端在这里是两种语义（移动端刻意不传，ListsSection.tsx 文件头写明），那一格是 C1 #14。',
   },
   {
@@ -984,7 +984,7 @@ const VIEW_STANCES = [
     entity: 'tag',
     locus: 'apps/web/src/features/projects/ProjectsPanel.tsx',
     needle: 'toOrganizerNodes(toTagItems(projects.tags))',
-    because: '标签行与清单行走同一条 onSelect 通道，语义同上（C1 #14）。',
+    because: '标签行与清单行走同一条 onFilterWith 通道，语义同上（C1 #14）。',
   },
 ];
 
