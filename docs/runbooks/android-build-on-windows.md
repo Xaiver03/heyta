@@ -101,6 +101,10 @@ pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
   Windows 的 Hyper-V / 虚拟机平台，那是管理员 + 重启级的人工动作，**未做**。
 - **e2e 端口类验收与此无关**：`check:ai-e2e` 那三段跑的是 Playwright + web 构建，
   不碰 gradle，因此不受这条规则约束（AGENTS §6.1 的规则量的是"起 Android 构建或模拟器"）。
+- 🔴 **从哪棵树调用它会决定远端装的是谁的源码**：同步清单是 `git ls-files -co --exclude-standard`
+  （工作树，含**别人未提交的半成品**），而 `C:\src\heyta` 是**共享**的构建宿主 —— MSIX 那条腿也在用它。
+  所以第一次真远程构建应当在**干净的隔离载体**里发起，不是在共享主检出里顺手跑。
+  这与 AGENTS §8.9"共享资源独占验收"是同一件事，只是宿主换成了远端那台。
 - **备用机** `windows-codex`（未探测）不在本手册的路径里；换宿主是改旋钮
   `HEYTA_ANDROID_HOST`（远端仓库根另有 `HEYTA_ANDROID_REMOTE_ROOT`），
   **不是**在 `run-gradle.mjs` 里加一条 fallback 分支 —— 加 fallback 就是这条规则要挡的动作。
