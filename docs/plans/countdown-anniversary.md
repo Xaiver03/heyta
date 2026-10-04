@@ -3891,9 +3891,36 @@ W0b ─> 随时可做（台账那半要等文件干净）
       ⚠️ **也不要拿 05:2x 那趟的"19/19 覆盖"替它**：那一趟的汇总记在下面第 ⑧ 条，而它跑的时候
       `apps/mobile/src` 还没有 `d4d154b4` / `c313914f` 这两笔 —— 覆盖判定要连代码面一起对，
       只数包数会把"当时那份树绿"读成"现在这份树绿"。
-      （顺带一条我这次才量准的事实：`pnpm -r test` 这一趟是**停在第一个失败包**的
+      （顺带一条我这次才量准、㊪ 又量准了一半的事实：`pnpm -r test` 这一趟是**停在第一个失败包**的
       —— `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`，16 个 `Done` 之后不再往下发；
       所以"跑到了第几个包"必须和"哪个包让它停的"一起报，只报前者会读成"后面那些都验过"。）
+
+- ㊪ **`pnpm -r test` 的全量读数取到了（04 19:33:48 `RC_RTEST3=0`），而中间那两趟红全部是负载签名**
+  - 四趟的账（同一条命令、同一棵树，只差宿主负载与外部占用）：
+
+    | 趟 | 时间 | 负载 | 结果 | 停在哪 |
+    |---|---|---|---|---|
+    | 链 FULL2 第 68 段 | 19:17 | 高 | `rc=1`，第 5 个包 | 外部 `verify:routing` 握着 `/tmp/tfa-test.lock`，`sync-core` 拒绝启动 |
+    | 链 RTEST | 19:18–19:19 | 高 | `rc=1`，16 个 `Done` | `apps/mobile`：47 files / **717 passed**，但 5 条 unhandled rejection 被 vitest 判致命 |
+    | 链 RTEST2 | 19:24–19:25 | 起跑 `12` | `rc=1`，18 个 `Done` | `server` 一条 `Test timed out in 15000ms` + `apps/web` 13 条 `×`（中途宿主负载冲到 **235**，web 连汇总都没打完） |
+    | 链 RTEST3 | 19:31 / 19:33 | `12` / `11` | **`RC_WEB=0` 与 `RC_RTEST3=0`** | 没停：`Done 包数=21`、`unhandled=0` |
+
+  - ✅ **两条隔离读数把"是不是仓库里的红"判掉了**：
+    ① `apps/mobile` 单跑那个 spec ⇒ `RC=0 / 14 passed`；单跑整个 mobile 套件 ⇒ `RC=0 / 47 files / 717 passed`、无 unhandled；
+    ② `apps/web` 单跑（19:31，负载 12）⇒ `RC_WEB=0`、`Test Files 120 passed | 2 skipped`、`1639 passed | 13 skipped`、**`×计数=0`**。
+    ⇒ RTEST2 那 13 条 `×` 与 mobile 那 5 条 rejection **都不是断言失败**，是并发 + 负载把 jsdom 用例拖过时限的形状。
+    🔴 但这句只在"同一趟隔离复跑绿"的意义上成立 —— 我没有、也不声称证明了"负载永远不会让它红"。
+    所以这一档的正确读法是**当前提交在安静窗口全量绿**，不是"这条判据对负载免疫"。
+  - 📌 **上一条里那句"`pnpm -r test` 停在第一个失败包"只对了一半，这里量准**：
+    RTEST2 里 `server` 失败时 `apps/web` 仍在打点 —— pnpm 是**并发跑多个包、只停止再发新包**。
+    ⇒ 报"跑到第几个包"要同时报"哪个包让它停的"与"有没有包整条没跑"（本趟 `Done=21 / Scope 20 of 21` 才是全量的凭据）。
+  - ✅ **顺带把 windows / mac 那两格的配对判据第四次复核**：链 FULL2 第 1 段 `pnpm build` 在 19:15 重打了
+    `apps/web/dist`，而 `shasum -a 256 apps/web/dist/index.html` 前缀仍是 **`517c6ba76d00fb25`**，
+    与 18:45 装进 `/Applications/Heyta.app` 那份里的 `Contents/Resources/web-dist/index.html` **逐字相同**
+    ⇒ 10:39 装的 windows 产物与本轮构建仍同一档，那一格不必重打远端。
+  - 🔴 **⑤-1 剩下的那一格此刻在链 FULL3 里**：FULL2 的 65 绿 / 3 红里有一条是我的（第 62 段，`c2d572ba` 已修），
+    修完之后重跑一趟才能把"完整 `pnpm check`"写成 **67 绿 / 1 红（唯一那条归 W9 的 `b0ba4a35`）**。
+    `wait_free` 的阈值与上限沿用原链（负载 >10 或锁在就等，等满 5400s ⇒ `RC_FULL3=3` = 环境无效，不是产品失败）。
 
 
 
