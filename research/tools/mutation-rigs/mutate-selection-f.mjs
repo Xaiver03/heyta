@@ -39,6 +39,7 @@ const files = {
   habitProgress: 'packages/ui/src/habits/HabitProgressList.tsx',
   habitsView: 'apps/web/src/features/habits/HabitsView.tsx',
   notesSection: 'apps/mobile/src/screens/NotesSection.tsx',
+  timeline: 'packages/ui/src/timeline/TimelineBoard.tsx',
   vocab: 'packages/app-host/src/selection.ts',
 };
 const md5 = (p) => createHash('md5').update(readFileSync(`${ROOT}/${p}`)).digest('hex');
@@ -111,6 +112,40 @@ const ARMS = [
     file: 'vocab',
     expect: 'red',
     mutate: (s) => s.replace("= ['task', 'habit', 'note'];", "= ['task', 'habit', 'note', 'event'];"),
+  },
+  {
+    // 🔴 2026-10-04 的新缺陷形状：共享 `TimelineBoard` 自己按 id 等值算、自己上 `rowActive` 底色，
+    //   却登记在"递送层"里 —— 旧规则把 `p ===` 也算"在递"，于是它**合法地躲过了通道要求**。
+    //   这一臂复刻的就是那个形状：面登记删掉 + 加进 RELAYS。规则收紧前它是**绿**的。
+    name: 'H10 把时间线那一面退回"递送层"（复刻这次缺陷的形状）',
+    file: 'gate',
+    expect: 'red',
+    mutate: (s) =>
+      s
+        .replace(/  \{\n    \/\/ 🔴 这一枚是 F[\s\S]*?\n  \},\n\];/, '];')
+        .replace('const RELAYS = [\n', "const RELAYS = [\n  'packages/ui/src/timeline/TimelineBoard.tsx',\n"),
+  },
+  {
+    // 一处底色一条通道：这一臂只摘**第一处**，`carries()` 仍然绿（文件里还有一处），
+    // 只有"底色处数 vs 通道处数"那条新腿会红 —— 它就是为这一臂存在的。
+    name: 'H11 时间线两处底色只摘一处 aria-pressed',
+    file: 'timeline',
+    expect: 'red',
+    minRed: 1,
+    mutate: (s) => s.replace('aria-pressed={rowSelected}', 'aria-hidden={rowSelected}'),
+  },
+  {
+    name: 'H12 时间线两处 aria-pressed 全摘',
+    file: 'timeline',
+    expect: 'red',
+    minRed: 2,
+    mutate: (s) => s.split('aria-pressed={rowSelected}').join('aria-hidden={rowSelected}'),
+  },
+  {
+    name: 'H13 阴性对照：时间线换写法不换语义',
+    file: 'timeline',
+    expect: 'green',
+    mutate: (s) => s.split('aria-pressed={rowSelected}').join('aria-pressed={rowSelected ? true : undefined}'),
   },
 ];
 

@@ -536,6 +536,16 @@ const FACES = [
     driver: 'selected',
     relay: null,
   },
+  {
+    // 🔴 这一枚是 F 原本**看不见**的那种：它自己按 id 等值算、自己上色，却登记在"递送层"里。
+    //   共享 RN 组件，两端同一份 ⇒ 通道只能走 `aria-pressed`（§8.26：RN 的 `AriaProps` 没有 `aria-current`）。
+    kind: 'task',
+    label: '时间线行（共享 RN，web/mobile 两端同一份）',
+    file: 'packages/ui/src/timeline/TimelineBoard.tsx',
+    channel: 'aria-pressed',
+    driver: 'rowSelected',
+    relay: null,
+  },
 ];
 
 /**
@@ -549,7 +559,6 @@ const RELAYS = [
   'apps/web/src/features/quadrant/QuadrantBoard.tsx',
   'apps/web/src/features/timeline/TimelinePanel.tsx',
   'packages/ui/src/quadrant/QuadrantBoard.tsx',
-  'packages/ui/src/timeline/TimelineBoard.tsx',
 ];
 
 /** 该豁免的面，**带它成立所依赖的那件可测事实**。事实变了就必须重新读这一面。 */
@@ -614,6 +623,20 @@ for (const face of FACES) {
         `  🔴 RN 的 AriaProps 里没有 aria-current：在 RN 面写它**不报错、也不生效**，正好是最安静的那种坏。`,
     );
   }
+  /**
+   * 🔴 **每一处底色都要配一条通道**。只查"这个文件里出现过通道"会漏一种真缺陷：
+   *   同一面把选中的行画在**两个地方**（时间线：行区那一行 + 未排期泳道那一条），
+   *   只在其中一处说出来，另一处对读屏就是"没有选中"—— 而上面那条 `carries()` 仍然绿。
+   *   分母不是手写的，是从"这个文件用了几次选中底色"推出来的。
+   */
+  const paintSites = (src.match(/styles\.rowActive/g) ?? []).length;
+  const channelSites = (src.match(new RegExp(`${face.channel}=\\{[^}]*\\b${face.driver}\\b`, 'g')) ?? []).length;
+  if (paintSites > 0 && channelSites < paintSites) {
+    failures.push(
+      `断言 F：面「${face.label}」有 ${paintSites} 处用选中底色表达选中，却只有 ${channelSites} 处把同一件事用 ${face.channel} 说出来。\n` +
+        `  少的那几处不是"样式少了"，是**那一面上的选中对读屏不存在**。`,
+    );
+  }
   const provSrc = readTracked(face.relay ?? face.file, `面「${face.label}」的谓词来源`);
   if (!driverComesFromSelection(provSrc, face.driver)) {
     failures.push(
@@ -635,10 +658,15 @@ if (unlisted.length > 0) {
 }
 for (const rel of RELAYS) {
   const src = readTracked(rel, '递选中那一层');
-  const forwards = SELECTION_ID_PROPS.some((p) => new RegExp(`\\b${p}=\\{`).test(src) || new RegExp(`\\b${p}\\s*===`).test(src));
+  // 🔴 规则在 2026-10-04 收紧过一次：原来"`p={` **或** `p ===`"都算"在递"，
+  //   于是**自己按 id 等值算、自己上色**的那一层（共享 `TimelineBoard`）可以合法地躲在"递送层"里，
+  //   而递送层不要求发无障碍通道 ⇒ 它有底色、没声音，F 看不见。
+  //   "递"和"算"不是一回事：**往下递才算 relay，自己算就是面，面必须说话。**
+  const forwards = SELECTION_ID_PROPS.some((p) => new RegExp(`\\b${p}=\\{`).test(src));
   if (!forwards) {
     failures.push(
-      `断言 F：登记为"把选中往下递"的 ${rel} 现在**既不 JSX 传下去、也不按 id 等值算**了 —— 那条登记过期了，重新读这一面。`,
+      `断言 F：登记为"把选中往下递"的 ${rel} 现在**没有把任何一个选中 id 用 JSX 传下去** —— 那条登记过期了。\n` +
+        `  如果它其实是**自己拿 id 算痕迹**（上底色 / 加图标），那它是一处面：加进 FACES 并写清端与通道，别留在这张表里。`,
     );
   }
 }
