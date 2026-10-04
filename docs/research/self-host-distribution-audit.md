@@ -5202,3 +5202,52 @@ overrides / engines / packageManager`，理由是"一杆对无关改动乱响的
 
 **没做的事，写明**：没碰他那三枚文件、没替他把实现 `git add`、没把他的 5 道门挪进我们这条分支、
 没动任何阈值 —— 这条新判据判的是**结构**（定义指向的文件在不在），不是"谁的实现该不该进链"。
+
+### 8.86 第六族：main 与本批改到了**同一个生成器**上，取本分支侧的理由不是偏好（2026-10-04 14:5x）
+
+`git merge-tree --write-tree --name-only main feat/self-host-distribution` 现量 **4 条冲突**：
+`docs/research/self-host-distribution-audit.md`、`package.json`、`server/image-npm-tree.json`，
+以及新出现的 🔴 **`research/tools/gen-image-npm-tree.mjs`**。它的来历就是 §8.84 那枚刚落地没多久的
+`b60589de`（14:42）：main 侧 +31/−2 把新鲜度哈希收窄到 7 个依赖字段，而本批那版 +152/−91
+是把**整条读取路径换成"从提交物锁派生"**（G-47 形状 C）。两侧都从 base `b850b1c6` 改起 ⇒ 撞在同一文件上。
+
+**为什么这一族取本分支侧不是"选边"**：main 那版钉的键 `serverPackageJsonSha256`
+在本分支版里**已经不存在**，取而代之的是 `image-install-shape.mjs` 的 `readServerInstallInput()`：
+
+- `TREE_AFFECTING` 5 档（`dependencies` / `optionalDependencies` / `overrides` / `peerDependencies` /
+  `bundleDependencies`）+ `INERT` 若干档，**每档写清为什么不进树**；
+- 🔴 **读到没被判定过的顶层字段直接抛** —— 他们那版是"把 `packageManager` 写进 7 字段名单"，
+  本分支这版是"谁将来加 `packageManager`，必须先回答它会不会改变那棵树"。同一个担心，两种强度；
+- `devDependencies` 的惰性是**有条件的**：由 `shape.prunesDevDependencies` 现读生产阶段那条
+  `npm pkg delete devDependencies` 还在不在（G-54 那条实测），不在就自动挪回被哈希的集合。
+
+所以取 main 侧不是"少一点功能"，是**载体的第 6/7/8 道门禁会直接读不到输入**。
+第五族（快照）与第六族（生成器）因此**必须同侧** —— 这正是载体脚本要分两族预置、而不是
+"整个 `research/tools/` 取一侧"的原因。
+
+**载体读数（`6d5602fa`，14:54 现跑）**：
+
+```
+载体 6d5602fa = main(9372a885) × feat/self-host-distribution(adc2c535)
+冲突 4 条 → 分族 pkg=1 gi=0 png=0 audit=1 snap=1 gen=1 other=0
+package.json 并集 scripts 键 146 个 · check 链段 main=76 本批=67 base=66 并集=77（摘段 0/0）
+  （这里"链段"= 按 `&&` 切再剥 `pnpm ` 前缀的**项数**，与 §8.83 那张表同单位）
+审计文档并集：main 节 76、本分支节 193、main 独有行 50、本分支独有行 2543、产出非空行 4138
+gen-image-npm-tree.mjs 取本分支侧（main 侧仍钉旧键 serverPackageJsonSha256、本分支侧走
+  readServerInstallInput 分区指纹；载体上取到的这份含分区指纹=true，两侧行数 292/324）
+合并归属：写 38 枚 / 合并相对 main 改 38 枚 / **集外 0** / 写集里未被改到 0 枚
+八道纯 fs 门禁 exit 0
+```
+
+第 1 道是 §8.85 那条新判据**第一次在别的树上跑**：载体上 `判 73 段 / 跳 8 段 / 缺 0`、`rc=0`
+（`grep -c '实现文件判了' 载体/scripts/check-gate-wiring.mjs` = 1 ⇒ 落地这一笔会把这条判据一起带进 main）。
+
+**§8.84 那条连带预测没有发生，留档**：`git show --stat b60589de` 里
+`server/image-npm-tree.json` **同笔改了 10 行**（外加两枚别人那条线的 vault-panel PNG）——
+他按自己注释里那句"换指纹口径 ⇒ 必须重跑生成器落新快照"做了。
+⇒ 不能把"猜对方漏了那一步"排进落地顺序；能做的是把那一类形状变成**有名字的判据**（§8.85 那条 3b），
+这样不管谁漏都会响亮地红，而不是靠人预言。
+
+**现场**（14:46–14:49，g69 三次 POLL）：阻塞集 **1 枚 = `package.json`**，脏条目 174；
+main 从 `d636b010` 走到 `9372a885`。载体每前进一次都要重算（脚本只认分支不认 SHA），
+落地那一笔仍归人执行守卫序列。
