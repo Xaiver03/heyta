@@ -240,6 +240,15 @@ if [ -z "$BEFORE" ]; then
 else
   echo "   目录里已有 $(printf '%s\n' "$BEFORE" | grep -c .) 个文件"
 fi
+# 🔴 判据②原来判的是"目录里出现一个**新文件名**"，而那在这个产品里**结构上不可能成立**：
+#    文件名由共享层的 `cardExportFileName(stem, dateStem)` 给（**卡片标题 + 锚日**决定，
+#    不带时刻），所以复用同一张卡再导一次 = **覆盖同名文件**。04 09:0x 那趟就是被这条
+#    假红挡住的：设备侧现量
+#      `heyta-w7e2e-073853-10月11日 星期日.png  36493 B  mtime 2026-10-04 09:07`
+#    —— 图**真的画出来了**（那一趟 09:06–09:08 之间写的），而"新文件名"永远数不到它。
+#    现在判的是这件事真正的不变量：**属于这张卡的那个文件，mtime 落在这一次点击之后**
+#    （不存在→出现，也存在→被覆盖，两态都算，且都由设备自己的时钟裁决）。
+snap() { $ADB shell "stat -c '%Y|%n' $CACHE_ON_DEVICE/*.png 2>/dev/null" | tr -d '\r'; }
 
 # CARD_TITLE 由上一节的**两条正向出口**之一给出（复用屏上那张 / 现场建一条），
 # 所以这里不再补"第三路去 XML 里剥"—— 那一层正是上一版静默走空的地方。
@@ -255,24 +264,28 @@ else
   if [ -z "$EXP_XY" ]; then
     bad "菜单里没有「${EXPORT_LABEL}」那一格（宿主没接 onExportCard，或 labels.exportCard 没给）"; screen_txt
   else
+    # 点击时刻由**设备自己的时钟**给（文件 mtime 也是它记的，两边同源才可比）。
+    T0=$($ADB shell date +%s | tr -d '\r')
+    [ -n "$T0" ] || { echo "   ❌ 取不到设备时钟 ⇒ 判据②没有输入，本轮无效"; exit 3; }
     $ADB shell input tap $EXP_XY
     FOUND=""
     ATTEMPTS=0
     while [ $ATTEMPTS -lt 10 ]; do
       ATTEMPTS=$((ATTEMPTS + 1)); sleep 3
-      AFTER=$($ADB shell "ls $CACHE_ON_DEVICE 2>/dev/null" | tr -d '\r')
-      NEW=$(printf '%s\n' "$AFTER" | while IFS= read -r f; do
-             [ -z "$f" ] && continue
-             printf '%s\n' "$BEFORE" | grep -qxF -- "$f" || printf '%s\n' "$f"
-           done)
-      [ -n "$NEW" ] && { FOUND=$(printf '%s\n' "$NEW" | head -1); break; }
+      # 名字里带空格与 CJK（`heyta-<标题>-10月11日 星期日.png`），所以按 `|` 分列而不是按空格。
+      CAND=$(snap | awk -F'|' -v t0="$T0" -v title="$CARD_TITLE" -v pre="$CACHE_ON_DEVICE/" '
+               { name = ""
+                 if (index($2, pre) == 1) name = substr($2, length(pre) + 1)
+                 if (name != "" && index(name, title) > 0 && $1 + 0 >= t0 + 0) { print name; exit } }')
+      [ -n "$CAND" ] && { FOUND="$CAND"; break; }
     done
     if [ -z "$FOUND" ]; then
-      bad "点了导出、缓存目录 ${ATTEMPTS}×3 秒内没有新文件（栅格化没跑 / 原生模块没接 / 写盘失败）"
+      bad "点了导出、${ATTEMPTS}×3 秒内没有「名字里带这张卡标题、且 mtime ≥ 点击时刻（设备时钟 $T0）」的 png —— 栅格化没跑 / 原生模块没接 / 写盘失败"
+      echo "   那一刻目录快照（判据的输入，原样打出来）："; snap | sed 's/^/     /'
       dump
       grep -qF -- "$(zh web.countdown.export.failed)" "$UI_XML" && echo "   界面上有失败句（那句说了什么由 i18n 真源定）"
     else
-      ok "缓存目录里出现了新文件：$FOUND"
+      ok "这张卡的导出文件落盘了：$FOUND（mtime 晚于点击时刻）"
       case "$FOUND" in
         heyta-*.png) ok "文件名形状是 heyta-….png（前缀/后缀都由共享层 cardExportFileName 给）" ;;
         *) bad "文件名不符合 heyta-….png：$FOUND" ;;
@@ -299,12 +312,23 @@ else
   fi
 fi
 
-step "6. 这一趟不该出现任何运行时授权弹窗"
+step "6. 这一趟不该出现任何运行时**授权**弹窗（分享面板不在此列 —— 见下）"
 FOCUS=$($ADB shell dumpsys window 2>/dev/null | grep -m1 'mCurrentFocus' | tr -d '\r')
 echo "   此刻前台：$FOCUS"
+# 🔴 这条判据原先写成"前台不是 $PKG 就红"，而它量的是"没有权限页"，说的却是"不是我们的窗口"。
+#    04 09:0x 现量：导出成功后前台是 `com.android.intentresolver/.ChooserActivityLauncher`
+#    —— 那是**系统分享面板**，而分享面板是这条通道设计上的终点
+#    （`apps/mobile/src/lib/card-export.tsx:173` 就是 `Share.share({ title, url })`）。
+#    所以那一半是假红。现在按**不变量的原形**判：权限页 / 安装页 / 崩溃页才是红，
+#    分享面板是预期（并且把它当成"文件真的交出去了"的**旁证**打印出来）。
 case "$FOCUS" in
-  *"$PKG"*) ok "前台仍是 $PKG —— 这条路没有触发任何权限页（与「不申请照片」那句条款同向）" ;;
-  *) bad "前台不是 ${PKG}（${FOCUS}）—— 要么弹了授权页/系统页，要么应用掉了；本条通道按设计不该有这些" ;;
+  *"$PKG"*) ok "前台仍是 $PKG —— 没弹权限页，分享面板已被收掉" ;;
+  *intentresolver*|*ResolverDrawer*|*chooser*)
+    ok "前台是系统分享面板（${FOCUS}）—— 这是 `Share.share` 的**设计终点**，不是授权页；"
+    echo "   ↳ 旁证：面板能拉起，说明原生给出去的 uri 是可解析的（拿不到文件时它不会开）" ;;
+  *permissioncontroller*|*GrantPermissions*|*packageinstaller*|*SystemUiCrash*|*anr*)
+    bad "前台是权限/安装/崩溃页（${FOCUS}）—— 这条通道按设计不该有这些" ;;
+  *) bad "前台既不是 $PKG 也不是分享面板（${FOCUS}）—— 说不清这是哪一屏，按红处理" ;;
 esac
 
 $ADB unroot >/dev/null 2>&1

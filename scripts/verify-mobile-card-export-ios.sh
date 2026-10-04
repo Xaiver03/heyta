@@ -259,34 +259,38 @@ ADD_LABEL=$(zh web.countdown.add)
 #    屏幕上，输入框可能要展开）—— 那样会把标题写进**别的**字段，然后用「$ADD_LABEL」
 #    的 enabled 当"成功"读数。所以这里必须正向确认 placeholder 在树里。
 ax_found "$PLACEHOLDER" || { echo "   ❌ 倒数日屏上读不到输入框占位符「$PLACEHOLDER」⇒ 探针够不着 composer，本轮无效"; exit 3; }
-press "$PLACEHOLDER"; sleep 1
-FILLED=0
-SET_BACK=''
-for _i in 1 2 3; do
-  # 🔴 `--set` 的回读值**必须收下并打印**：shim 文件头记着它的反面事故 ——
-  #    第一版把 stderr 与 rc 丢掉，于是"工具失败"和"写进去了但回读方式不对"
-  #    在调用方看来完全一样（`set-value` 在同一条命令上**有时 rc=0、有时 rc=1**）。
-  SET_BACK=$(ax - --field --set "$CARD_TITLE" --json 2>&1); sleep 1
-  echo "   set 第 $_i 次回读：${SET_BACK:-（空 ⇒ shim 自己没输出，先看这一行）}"
-  [ "$(jget "$(ax "$ADD_LABEL" --pressable --list --json)" enabled)" = "True" ] && { FILLED=1; break; }
-done
-if [ "$FILLED" != 1 ]; then
-  TT=$(ax - --field --type-text "$CARD_TITLE" --json 2>&1); sleep 1
-  echo "   type-text 回读：${TT:-（空）}"
-  [ "$(jget "$(ax "$ADD_LABEL" --pressable --list --json)" enabled)" = "True" ] && FILLED=1
-fi
-# 判据用的是 **应用自己算出来的那个 enabled**（输入为空时「添加」不可点），不是"我按过了"。
-# 同一条证据形状由 shim 文件头记下：设了文字之后 enabled 由 false 变 true。
-[ "$FILLED" = 1 ] || { echo "   ❌ 标题没进得去（「$ADD_LABEL」始终没启用）—— 探针未到位（本轮无效，不是产品失败）"; exit 3; }
-ok "标题进了应用的态（「$ADD_LABEL」启用 = 它亲口确认）"
-press "$(zh web.countdown.pickDate)"; sleep 2
+# 🔴 顺序错了整节就废：共享层 `packages/ui/src/countdown/EventBoard.tsx:367` 写的是
+#    `canSubmit = draftTitle.trim() !== '' && draftDate !== undefined`（`:358` 的 draftDate
+#    初值是 `undefined`）—— **「添加」在选日期之前必然不可点**。而 09:0x 那一版是在
+#    打字之后、选日期之前去读 enabled 的，那条判据在产品规则下**永远为假**，
+#    于是它报的红（"标题没进得去"）说的不是那件事。现在按产品的顺序走：
+#    打字 → 选日期 → **这时候** enabled 才是"标题+日期都进了应用的态"的亲口确认。
+press "$PLACEHOLDER" || { echo "   ❌ 输入框滚不进可见区 ⇒ 焦点进不去，本轮无效"; exit 3; }
+sleep 1
+TT=$(ax - --field --type-text "$CARD_TITLE" --json 2>&1); sleep 1
+echo "   type-text 回读：${TT:-（空 ⇒ shim 自己没输出，先看这一行）}"
+# ⚠️ 这里**不再**用 `--set`：shim 文件头第 2 条记着 `set-value` 不触发 RN 的 onChangeText，
+#    而 09:0x 那趟现场把它坐实了 —— 连按三次 set 之后字段回读仍是**双份**
+#    （`w7ios-090810w7ios-090810`）：原生被写了字、JS 态不知道，受控 TextInput 再把
+#    键入的那份接上去。先 set 再 type 这条路本身就是在制造脏值。
+PICK_LABEL=$(zh web.countdown.pickDate)
+press "$PICK_LABEL" || { echo "   ❌ 「$PICK_LABEL」滚不进可见区 ⇒ 日期选不了，本轮无效"; exit 3; }
+sleep 2
 MON_NUM=$(date -v+7d +%-m 2>/dev/null || date -d '+7 days' +%-m)
 DAY_NUM=$(date -v+7d +%-d 2>/dev/null || date -d '+7 days' +%-d)
 DAY_TPL=$(zh mobile.datePicker.dayLabel)
 DAY_DESC=$(printf '%s' "$DAY_TPL" | sed "s/{title}//g; s/{month}/$MON_NUM/g; s/{day}/$DAY_NUM/g")
 ax_found "$DAY_DESC" || { echo "   ❌ 日期格里找不到「$DAY_DESC」⇒ 探针未到位（本轮无效）"; exit 3; }
-press "$DAY_DESC"; sleep 1
-press "$(zh web.countdown.add)"; sleep 3
+press "$DAY_DESC" || { echo "   ❌ 日期格「$DAY_DESC」滚不进可见区 ⇒ 按不到，本轮无效"; exit 3; }
+sleep 1
+ax - --dismiss-keyboard --json >/dev/null 2>&1; sleep 1
+FILLED=0
+[ "$(jget "$(ax "$ADD_LABEL" --pressable --list --json)" enabled)" = "True" ] && FILLED=1
+# 判据用的是 **应用自己算出来的那个 enabled**（标题为空 或 日期没选 都点不动），不是"我按过了"。
+[ "$FILLED" = 1 ] || { echo "   ❌ 打完字也选了日期，「$ADD_LABEL」仍然不可点 —— 探针未到位（本轮无效，不是产品失败）"
+  echo "   ↳ 输入框此刻回读：$(ax - --field --list --json 2>&1)"; exit 3; }
+ok "标题与日期都进了应用的态（「$ADD_LABEL」启用 = 它亲口确认，判据条件就是 canSubmit 那一条）"
+press "$ADD_LABEL"; sleep 3
 ax_found "$CARD_TITLE" && ok "新卡片上了屏（「点了」之后「看得见」）" \
   || { echo "   ❌ 建卡之后屏上找不到标题「$CARD_TITLE」"; bad "建卡没生效"; }
 
