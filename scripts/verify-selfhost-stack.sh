@@ -211,8 +211,16 @@ log "    被验镜像的 revision == 当前 HEAD（${TREE_SHA:0:12}…）"
 # 诚实边界：label 只证明"构建时那笔 commit"，**不**证明"构建时工作树是干净的"
 # （构建上下文 = 工作树的字节，不是 commit）。所以把脏不脏打进日志，
 # 让下一读的人能把这趟解释成"这一笔 + N 枚未提交改动"，而不是"这一笔"。
+# 🔴 2026-10-04 改：原来那句把**整棵工作树**的脏条目计数直接冠名为"构建上下文的未提交条目"，
+#    而哪些脏行真进上下文由仓库根的 `.dockerignore` 决定 —— 本脚本不复制那份规则（抄件会漂），
+#    所以这里只打印清单、不替它下结论。旧的措辞是**自我削弱式的错话**：
+#    本机现量那 1 枚是 `?? e2e/node_modules`，而 `.dockerignore` 里有 `**/node_modules`，
+#    它根本进不了镜像，旧文案却读起来像"这趟不是纯提交物"⇒ 把已经成立的证据自己说软了。
 DIRTY_AT_BUILD=$(git status --porcelain | wc -l | tr -d ' ')
-log "    构建上下文的未提交条目=${DIRTY_AT_BUILD}（>0 ⇒ 这趟量的是「这一笔 + 这些脏行」，不是纯提交物）"
+log "    工作树未提交条目=${DIRTY_AT_BUILD}（上下文=仓库根；下列逐条，是否进上下文由 .dockerignore 与 Dockerfile 的 COPY 决定，本脚本不代它判）"
+if [ "$DIRTY_AT_BUILD" != "0" ]; then
+  git status --porcelain | sed 's/^/      /'
+fi
 
 # 🔴 **这一趟验的是哪个架构的产物**必须落在日志里，否则"整套验收过了"会被读成
 #    "要发布的那枚过了"。`docker build` 不带 `--platform` ⇒ 镜像架构 = 构建机架构；
