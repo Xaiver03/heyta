@@ -60,6 +60,7 @@ import { AiPanelHost } from './AiPanelHost.js';
 import { AiPanelHeadHost } from './AiPanelHeadHost.js';
 import { toolRunFailureCopy } from './ai-failure-copy.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
+import { currentAccount, usePanelEphemeral } from './panel-ephemeral.js';
 import { FailureSettingsAction } from './RouteUnavailable.js';
 import { resolveFeatureRoute, type SettingsTarget } from './route-explanation.js';
 import { createAiToolHost } from '../tasks/store.js';
@@ -87,6 +88,24 @@ export interface AiToolRunProps {
 }
 
 type Phase = 'idle' | 'disclose' | 'running' | 'done';
+
+/**
+ * 未决状态的形状与**初始值**（必须是模块级常量：`usePanelEphemeral` 的 `write`
+ * 把它列进依赖，render 里现造字面量会让每次渲染都换一个新回调）。
+ */
+interface ToolRunEphemeralShape {
+  text: string;
+  phase: Phase;
+  outcome: ToolCallOutcome | undefined;
+  confirmed: LocalApiWriteResult | undefined;
+}
+
+const TOOL_RUN_EPHEMERAL: ToolRunEphemeralShape = {
+  text: '',
+  phase: 'idle',
+  outcome: undefined,
+  confirmed: undefined,
+};
 
 /**
  * 写入意图的人话。**只是贴标签**，判断仍在 app-host。
@@ -200,10 +219,22 @@ function focusKindLabel(kind: string, t: I18nValue['t']): string {
 
 export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
   const { t } = useI18n();
-  const [text, setText] = useState('');
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [outcome, setOutcome] = useState<ToolCallOutcome | undefined>(undefined);
-  const [confirmed, setConfirmed] = useState<LocalApiWriteResult | undefined>(undefined);
+  /**
+   * 🔴 未决的四样**不住在这里**，理由与对话助手那三样逐字相同
+   * （`panel-ephemeral.tsx` 文件头）：换挂载点=重挂载，而重挂载会把摆在用户
+   * 眼前的出境披露连同他打了一半的那句一起收回去。
+   * `e2e/tests/ai-tool-run.spec.ts` 那两条 flaky（首趟 60s 等不到 `ai-tool-send`，
+   * retry 3.1s 过）判的就是这一件事 —— retry 把它们掩盖了，缺陷没被修。
+   */
+  const [account] = useState(currentAccount);
+  const ephemeral = usePanelEphemeral('tool-run', account, TOOL_RUN_EPHEMERAL);
+  const { text, phase, outcome, confirmed } = ephemeral.value;
+  const setText = (value: string): void => ephemeral.write(account, { text: value });
+  const setPhase = (value: Phase): void => ephemeral.write(account, { phase: value });
+  const setOutcome = (value: ToolCallOutcome | undefined): void =>
+    ephemeral.write(account, { outcome: value });
+  const setConfirmed = (value: LocalApiWriteResult | undefined): void =>
+    ephemeral.write(account, { confirmed: value });
 
   // 宿主只建一次：它内部只持有几个函数引用，重建没有意义。
   const host = useMemo(() => props.host ?? createAiToolHost(), [props.host]);

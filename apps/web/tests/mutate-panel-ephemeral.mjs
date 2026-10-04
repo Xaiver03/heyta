@@ -1,8 +1,8 @@
 /**
- * AI 面"跨挂载点不掉状态"这一层的变异验证 —— 三条臂，各摘一次。
+ * AI 面板"跨挂载点不掉状态"这一层的变异验证 —— 三条臂，各摘一次。
  *
  * 为什么需要它（AGENTS.md §7 元规则第 2 条：不能失败的检查没有价值）：
- * 这五条判据断言的都是**界面上少了一样东西**（披露没了、草稿没了）。
+ * 这八条判据断言的都是**界面上少了一样东西**（披露没了、草稿没了）。
  * 而"少了"最容易写成一条永远通过的判据 —— 所以每条臂都要打在
  * **落地后真会跑的那一份源码**上，并且断言红的是**恰好那几条**。
  *
@@ -11,7 +11,10 @@
  * · M2 状态住在进程级变量上（= 被否证的第一条修法：同进程反复挂载互相串）
  * · M3 摘掉账号绑定（= 让"换账号带一个字"这条安全判据失效）
  *
- * 用法：`node apps/web/tests/mutate-assistant-ephemeral.mjs`
+ * ⚠️ 臂的期望集合按**面板**列（助手三条 + 单步两条 …）：把两个面板钉在同一条
+ *   存储上是这层的整个理由，所以"只红一个面板"就是判据没覆盖到另一半。
+ *
+ * 用法：`node apps/web/tests/mutate-panel-ephemeral.mjs`
  * 每步用完立刻还原并逐字节校验；中途抛错也会在 finally 里还原。
  */
 import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -21,73 +24,80 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = resolve(HERE, '..');
-const EPHEMERAL = resolve(PKG, 'src/features/ai/assistant-ephemeral.tsx');
-const PANEL = resolve(PKG, 'src/features/ai/AssistantPanel.tsx');
-const SPEC = 'tests/ai-assistant-remount.spec.tsx';
+const EPHEMERAL = resolve(PKG, 'src/features/ai/panel-ephemeral.tsx');
+const SPEC = 'tests/ai-panel-remount.spec.tsx';
 
-/** 五条判据的**身份串**（用标题里独有的片段，不用整句 —— 整句会被措辞改动撞坏）。 */
+/** 八条判据的**身份串**（用标题里独有的片段，不用整句 —— 整句会被措辞改动撞坏）。 */
 const T = {
   disclosure: '披露已经摆在眼前',
   draft: '那句草稿',
   running: '正在飞时换挂载点',
   account: '上一个人的草稿',
   module: '整棵树卸载重装',
+  toolDisclosure: '单步面板的未决披露',
+  toolDraft: '单步面板的草稿',
+  toolAccount: '单步面板的账号绑定',
 };
 
 const MUTATIONS = [
   {
     file: EPHEMERAL,
     name: 'M1 未决状态回到每次挂载（改造前的形状）',
-    from: `  const value = useContext(AssistantEphemeralContext);
-  if (value === null) {
-    throw new Error('AssistantPanel 必须包在 <AssistantEphemeralProvider> 里');
-  }
-  return value;`,
-    to: `  if (useContext(AssistantEphemeralContext) === null) {
-    throw new Error('AssistantPanel 必须包在 <AssistantEphemeralProvider> 里');
-  }
-  const [local, setLocal] = useState<AssistantEphemeralState>({ ...EMPTY, owner: undefined });
+    from: `  const visible = entry !== undefined && entry.owner === account ? entry.value : initial;
   return {
-    ...local,
-    write(account: string | null, patch: Partial<typeof EMPTY>): void {
-      setLocal((previous) =>
-        previous.owner !== account ? { ...EMPTY, owner: account, ...patch } : { ...previous, ...patch },
+    owner: entry?.owner,
+    value: visible as T,
+    write,
+  };`,
+    to: `  const [localValue, setLocalValue] = useState<T>(initial);
+  const [localOwner, setLocalOwner] = useState<string | null | undefined>(undefined);
+  return {
+    owner: localOwner,
+    value: localValue,
+    write(nextAccount: string | null, patch: Partial<T>): void {
+      setLocalOwner(nextAccount);
+      setLocalValue((previous) =>
+        localOwner !== nextAccount ? { ...initial, ...patch } : { ...previous, ...patch },
       );
     },
   };`,
-    expectRed: [T.disclosure, T.draft, T.running],
+    // 两个面板都退回组件内状态 ⇒ 跨挂载点那五条红；助手的账号那条与"新 Provider"那条
+    // 反而**过**（每次挂载都是新的，本来就不会串）—— 这正是 M2/M3 各自要单独钉的原因。
+    // ⚠️ 单步那条账号判据**也**红，但红在换挂载点**之前**：M1 的 write 用闭包里的
+    //   `localOwner` 而不是 `previous.owner`，同一次点击连写两样（清输入 + 置阶段）时
+    //   后一次把前一次覆盖掉 —— 助手那条恰好把 `setPhase` 写在最后所以躲过，单步是先写
+    //   阶段。这不是判据过严，是"同拍多次写必须走函数式 updater"这条约束的现形。
+    expectRed: [T.disclosure, T.draft, T.running, T.toolDisclosure, T.toolDraft, T.toolAccount],
   },
   {
     file: EPHEMERAL,
     name: 'M2 未决状态住在进程级变量上（被否证的那条修法）',
-    from: `  const [state, setState] = useState<AssistantEphemeralState>({ ...EMPTY, owner: undefined });`,
-    to: `  const [state, setStateRaw] = useState<AssistantEphemeralState>(
-    (globalThis as unknown as { __HT_EPH_LEAK?: AssistantEphemeralState }).__HT_EPH_LEAK ?? {
-      ...EMPTY,
-      owner: undefined,
-    },
+    from: `  const [entries, setEntries] = useState<Record<string, Entry>>({});`,
+    to: `  const [entries, setEntriesRaw] = useState<Record<string, Entry>>(
+    (globalThis as unknown as { __HT_PANEL_EPH_LEAK?: Record<string, Entry> }).__HT_PANEL_EPH_LEAK ?? {},
   );
-  const setState: typeof setStateRaw = (update) => {
-    setStateRaw((previous) => {
-      const next = typeof update === 'function' ? update(previous) : update;
-      (globalThis as unknown as { __HT_EPH_LEAK?: AssistantEphemeralState }).__HT_EPH_LEAK = next;
+  const setEntries: typeof setEntriesRaw = (update) => {
+    setEntriesRaw((previous) => {
+      const next = update(previous);
+      (globalThis as unknown as { __HT_PANEL_EPH_LEAK?: Record<string, Entry> }).__HT_PANEL_EPH_LEAK = next;
       return next;
     });
   };`,
     expectRed: [T.module],
   },
   {
-    file: PANEL,
+    file: EPHEMERAL,
     name: 'M3 摘掉账号绑定（换账号照样带字）',
-    from: `  const stale = ephemeral.owner !== undefined && ephemeral.owner !== session.account;`,
-    to: `  const stale = false;`,
-    expectRed: [T.account],
+    from: `  const visible = entry !== undefined && entry.owner === account ? entry.value : initial;`,
+    to: `  const visible = entry?.value ?? initial;`,
+    // 绑定摘掉 ⇒ 两个面板的账号判据都要红（只红一个 = 另一半没被这条守住）。
+    expectRed: [T.account, T.toolAccount],
   },
 ];
 
 const files = [...new Set(MUTATIONS.map((m) => m.file))];
 const backups = new Map();
-const backupDir = mkdtempSync('mutate-assistant-ephemeral-');
+const backupDir = mkdtempSync('mutate-panel-ephemeral-');
 for (const [index, file] of files.entries()) {
   const copy = join(backupDir, `backup-${String(index)}.tsx`);
   copyFileSync(file, copy);
@@ -122,7 +132,7 @@ try {
     writeFileSync(mut.file, source.text);
     if (readFileSync(mut.file, 'utf8') !== source.text) throw new Error(`还原失败：${mut.file}`);
 
-    // 红的是**哪几条**：取每条失败行的用例名（`× … > describe > 标题`），只留最后一段。
+    // 红的是**哪几条**：把失败行的用例名取出来（`× … > describe > 标题` 与 `× 标题` 两种形状都吃）。
     const failed = [
       ...new Set(
         [...out.matchAll(/^\s*(?:×|FAIL)\s+.*> (.+)$/gm)]

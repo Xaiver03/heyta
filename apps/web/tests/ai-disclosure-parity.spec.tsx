@@ -53,6 +53,7 @@ import { AiPrioritize } from '../src/features/ai/AiPrioritize.js';
 import { AiDuration } from '../src/features/ai/AiDuration.js';
 import { AiCapture } from '../src/features/ai/AiCapture.js';
 import { AiToolRun } from '../src/features/ai/AiToolRun.js';
+import { PanelEphemeralProvider } from '../src/features/ai/panel-ephemeral.js';
 
 const SECRETS: SecretStore = { get: () => Promise.resolve(undefined) };
 
@@ -159,7 +160,14 @@ function mount(node: ReactNode): HTMLDivElement {
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root?.render(<I18nProvider locale="zh-CN">{node}</I18nProvider>);
+    // 🔴 五个入口里有两个（单步工具 / 对话助手）的未决状态住在 Provider 里，所以这一层的
+    //    夹具必须**统一**包上 Provider —— 少包一个，那条入口就红在「AI 面板必须包在
+    //    <PanelEphemeralProvider> 里」。Provider 缺位是抛错，不是静默降级（同一条立场）。
+    root?.render(
+      <I18nProvider locale="zh-CN">
+        <PanelEphemeralProvider>{node}</PanelEphemeralProvider>
+      </I18nProvider>,
+    );
   });
   return container;
 }

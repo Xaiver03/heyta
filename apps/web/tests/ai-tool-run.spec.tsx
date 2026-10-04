@@ -30,6 +30,7 @@ import type {
   LocalApiTag,
 } from '@heyta/local-api';
 
+import { PanelEphemeralProvider } from '../src/features/ai/panel-ephemeral.js';
 import { AiToolRun } from '../src/features/ai/AiToolRun.js';
 
 const ROUTING: AiRoutingConfig = {
@@ -92,6 +93,7 @@ async function render(overrides: {
   await act(async () => {
     root!.render(
       <I18nProvider locale={overrides.locale ?? 'zh-CN'}>
+      <PanelEphemeralProvider>
         <AiToolRun
           routing={ROUTING}
           consents={[]}
@@ -100,6 +102,7 @@ async function render(overrides: {
           host={overrides.host}
           {...(overrides.fetchImpl === undefined ? {} : { fetchImpl: overrides.fetchImpl })}
         />
+      </PanelEphemeralProvider>
       </I18nProvider>,
     );
   });

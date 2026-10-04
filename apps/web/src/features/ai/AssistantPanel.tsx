@@ -84,7 +84,6 @@ import { LIST_SEPARATOR } from './locale-punctuation.js';
 import { resolveFeatureRoute, type SettingsTarget } from './route-explanation.js';
 import { intentText } from './AiToolRun.js';
 import { createAiToolHost } from '../tasks/store.js';
-import { loadCredentials } from '../sync/credential-storage.js';
 import {
   clearAssistantHistory,
   type HistoryStorage,
@@ -92,7 +91,7 @@ import {
   saveAssistantHistory,
 } from './assistant-history.js';
 import type { ChatItem, WithoutId } from './assistant-transcript.js';
-import { useAssistantEphemeral, type AssistantPhase } from './assistant-ephemeral.js';
+import { currentAccount, usePanelEphemeral } from './panel-ephemeral.js';
 
 export interface AssistantPanelProps {
   routing: AiRoutingConfig;
@@ -125,19 +124,25 @@ export interface AssistantPanelProps {
 /** 界面上的一条消息（类型定义在 `assistant-transcript.ts`，落盘层共用它）。 */
 
 /**
- * 会话阶段的类型在 `assistant-ephemeral.tsx`（那里是它的**住处**）。
+ * 未决状态的形状与**初始值**（初始值必须是模块级常量：`usePanelEphemeral` 的
+ * `write` 把它列进依赖，render 里现造字面量会让每次渲染都换一个新回调）。
  *
- * ⚠️ 它原来叫 `Phase` 并定义在本文件里 —— 那正是缺陷本身：住在组件里就要跟着
- * 组件一起被重挂载。改名 + 搬家，是为了让"它住在哪儿"这件事在代码里可读。
+ * ⚠️ 这三样原来住在组件里（`type Phase` + 三个 `useState`）—— 那正是缺陷本身：
+ * 住在组件里就要跟着组件一起被重挂载。
  */
+type AssistantPhase = 'idle' | 'disclose' | 'running';
 
-/**
- * 这段会话属于哪个账号 —— 用的是凭据里那个邮箱**标签**（`credential-storage` 里
- * 明确写着它不是秘密）。落盘记录绑它，读的时候不相等就当没有。
- */
-function currentAccount(): string | null {
-  return loadCredentials()?.email ?? null;
+interface AssistantEphemeralShape {
+  draft: string;
+  pending: string | undefined;
+  phase: AssistantPhase;
 }
+
+const ASSISTANT_EPHEMERAL: AssistantEphemeralShape = {
+  draft: '',
+  pending: undefined,
+  phase: 'idle',
+};
 
 export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   const { t, locale } = useI18n();
@@ -160,32 +165,27 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   /**
    * 🔴 未决的三样（草稿 / 等披露确认的那一句 / 阶段指示）**不住在这里**。
    *
-   * 理由在 `assistant-ephemeral.tsx` 文件头：AI 面在右栏与中间列之间换挂载点
+   * 理由在 `panel-ephemeral.tsx` 文件头：AI 面在右栏与中间列之间换挂载点
    * = 换子树 = 重挂载，而重挂载会把**已经摆在用户眼前的出境披露**连同他打了一半
    * 的那句一起收回初始态（等于替他取消一次同意请求）。那三样提到挂载点之上的
    * Provider 里，重挂载就不再是用户的一次损失。
-   *
-   * `stale` 是账号绑定：Provider 里那份若属于别的账号，**渲染成空**（与
-   * `assistant-history.ts` 第 3 条同一判据；登出/换号不重新加载页面，
-   * 而这份状态里躺着用户还没发出去的原话）。
+   * 账号绑定（读写两侧都查）也在那一层，两个面板共用同一份实现。
    */
-  const ephemeral = useAssistantEphemeral();
-  const stale = ephemeral.owner !== undefined && ephemeral.owner !== session.account;
-  const draft = stale ? '' : ephemeral.draft;
-  const phase: AssistantPhase = stale ? 'idle' : ephemeral.phase;
+  const ephemeral = usePanelEphemeral('assistant', session.account, ASSISTANT_EPHEMERAL);
+  const { draft, phase } = ephemeral.value;
   /**
    * 等披露确认后才要发出去的那句。
    *
    * ⚠️ 不复用 `draft`：用户在披露块上按"发送"之前可能又编辑了输入框，
    * 那一句与"他看到披露时的那一句"就不是同一句了。
    */
-  const pending = stale ? undefined : ephemeral.pending;
+  const { pending } = ephemeral.value;
   /**
    * 三个 setter 全部写进 Provider（函数名沿用改造前的 `setXxx`，让 diff 只落在"住哪儿"）。
    *
    * ⚠️ `send()` 一次连写三个（清草稿、记 pending、置阶段），靠的是 `write()` 里的
    * **函数式** updater：同一拍里三次调用逐次基于前一次的结果，不会互相覆盖。
-   * 把 `write` 改成读闭包里的 `state` 就会只留最后一条 —— 这条不是假想，
+   * 把 `write` 改成读闭包里的当前值就会只留最后一条 —— 这条不是假想，
    * `send()` 的"草稿清空但披露没弹出来"就是它的症状。
    */
   const setDraft = (value: string): void => ephemeral.write(session.account, { draft: value });
