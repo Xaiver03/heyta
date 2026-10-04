@@ -61,8 +61,9 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 . "$(dirname "$0")/lib/wait-for-quiet-host.sh"
-
-READER="$HEYTA_REPO_ROOT/scripts/verify-mobile-card-export-read.mjs"
+# 取值层（READER / zh / contract / read_png / field / 判据①自检）的**单一所有者**在
+# lib/card-export-probe.sh —— iOS 那一半（verify-mobile-card-export-ios.sh）source 同一个文件。
+. "$(dirname "$0")/lib/card-export-probe.sh"
 EVIDENCE_DIR="$HEYTA_REPO_ROOT/apps/mobile/evidence/card-export"
 CACHE_ON_DEVICE="/data/data/$PKG/cache/card-export"
 STAMP=$(date +%H%M%S)
@@ -72,30 +73,6 @@ CARD_TITLE="w7e2e-$STAMP"
 # 🔴 软键盘：整轮关掉，退出一定恢复（`input text` 只要焦点在就能注入，不需要 IME 可见）。
 disable_ime
 trap 'restore_ime' EXIT
-
-# ── 取值：一律走读数器，脚本里没有第二个中文抄件 ─────────────────────
-#
-# 🔴 为什么不在这里写字面量「导出成品图」：那会变成 i18n 的**抄件**，改了词条的一侧
-#    不会让这里变红 —— 而本验收的意义恰好是"界面上那句话被点到了"。
-#    读数器取不到就非零退出，下面把它当**环境不成立**（exit 3）而不是"界面上没有"。
-zh() {  # <i18n key>
-  local out
-  out=$(node "$READER" zh "$1" 2>/dev/null) || {
-    echo "   ❌ 词条取不到：$1 —— **探针坏了，不是产品坏了**（本轮无效）" >&2; exit 3; }
-  printf '%s' "$out"
-}
-contract() {  # <导出名>
-  local out
-  out=$(node "$READER" contract "$1" 2>/dev/null) || {
-    echo "   ❌ 契约常量取不到：$1（dist 过期或没 build？本轮无效）" >&2; exit 3; }
-  printf '%s' "$out"
-}
-read_png() {  # <png 路径>
-  node "$READER" png "$1" 2>&1 || printf 'READER_ERROR'
-}
-field() {  # "<读数串>" <字段名>
-  printf '%s' "$1" | tr ' ' '\n' | sed -n "s/^$2=//p" | head -1
-}
 
 step "0. 现场门：设备在线、没有别的移动端验收、宿主机负载"
 if ! $ADB get-state >/dev/null 2>&1; then
@@ -149,29 +126,11 @@ else
   ok "装的包不比源码旧（${APK_LINE}）"
 fi
 
-step "1. 判据①：PNG 读数器读得对，而且**会区分**"
+step "1. 判据①：PNG 读数器读得对，而且**会区分**（走共享自检，两端同一段）"
 mkdir -p "$EVIDENCE_DIR"
 EXP_W=$(contract EXPORT_CARD_EDGE_PX)
 EXP_H=$(contract EXPORT_CARD_HEIGHT_PX)
-POS="$HEYTA_REPO_ROOT/apps/web/evidence/countdown-export/card-light.png"
-NEG="$HEYTA_REPO_ROOT/apps/web/evidence/countdown-export/probe-3x2.png"
-for f in "$POS" "$NEG"; do
-  [ -f "$f" ] || { echo "   ❌ 自检缺图：${f}（对照不存在 ⇒ 判据①无效，本轮不成立）"; exit 3; }
-done
-POS_R=$(read_png "$POS"); NEG_R=$(read_png "$NEG")
-echo "   正向 $POS_R"
-echo "   反向 $NEG_R"
-if [ "$(field "$POS_R" W)" = "$EXP_W" ] && [ "$(field "$POS_R" H)" = "$EXP_H" ]; then
-  ok "正向对照：web 那张成品图读回 ${EXP_W}×${EXP_H}，与契约逐字相同"
-else
-  echo "   ❌ 自检就把读数器照出来了：契约 ${EXP_W}×${EXP_H}，web 成品图却读回 $(field "$POS_R" W)×$(field "$POS_R" H)"
-  echo "      ⇒ 后面的 IHDR 判据一律不可信（探针坏了 ≠ 产品坏了）"; exit 3
-fi
-if [ "$(field "$NEG_R" W)" != "$EXP_W" ] && [ "$(field "$NEG_R" W)" != "0" ] && [ -n "$(field "$NEG_R" W)" ]; then
-  ok "反向对照：同一台读数器对另一张图读出 $(field "$NEG_R" W)×$(field "$NEG_R" H) ⇒ 它**会区分**，不是恒返回契约值"
-else
-  bad "反向对照不成立：第二张图读出「$(field "$NEG_R" W)」，与契约同值或读不到 ⇒ IHDR 那条判据可能没牙"
-fi
+probe_reader_selfcheck "$EXP_W" "$EXP_H"
 
 step "2. 起应用，走「我的」→ 倒数日（W8 移动半那条注册表）"
 ensure_app_foreground
