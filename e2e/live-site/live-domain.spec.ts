@@ -271,20 +271,56 @@ test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功',
   await page.screenshot({ path: `${SHOT_DIR}/live-app-pwa.png` });
   console.log(`📷 应用（PWA 验收）：${SHOT_DIR}/live-app-pwa.png（#root textContent ${String(rootLength)} 字符）`);
 
-  const probe = await page.evaluate(async () => {
-    const manifestUrl = new URL('manifest.webmanifest', window.location.href);
-    const response = await fetch(manifestUrl);
-    const manifest = (await response.json()) as {
-      start_url: string;
-      scope: string;
-      icons: { src: string }[];
-    };
+  /**
+   * 🔴 线上这一层必须**先答掉那份隐私披露**，再等 SW。
+   *
+   * 注册是刻意排在同意之后的（`apps/web/src/main.tsx` 的 `createStartupNetwork`，
+   * G-12：注册本身会向 `scope` 发一次请求，而那时用户还没决定"这台应用会不会
+   * 跟服务端说话"）。所以未同意时 `getRegistrations()` **恒空、控制台一条错都没有**
+   * —— 这条断言等的是一件产品设计上还没做的事，红的是探针，不是产品。
+   * 实测（2026-10-05 线上）：不点同意 ⇒ `sw:"timeout"` 且 `logs: []`；
+   * 其余六条读数（`start_url` / `scope` / 图标 / `sw.js` 的 200 与
+   * `application/javascript`）当时就已经全对。
+   *
+   * ⚠️ 点，而不是往 `localStorage` 塞一条已同意记录：这条用例的价值一半在
+   * "真人那条路走得通"，预置存储会把同意面板这一段整个绕过去。
+   */
+  const accept = page.locator('[data-testid="privacy-consent-accept"]');
+  await accept.waitFor({ state: 'visible', timeout: 30_000 });
+  await accept.click();
+  await expect(
+    page.locator('[data-testid="privacy-consent-dialog"]'),
+    '点了同意之后披露面板必须收掉（还开着就是决定没落）',
+  ).toHaveCount(0, { timeout: 15_000 });
 
-    // 相对 URL 必须相对 **manifest 自己** 解析（这正是修法的依据）。
-    const resolve = (value: string): string => new URL(value, manifestUrl).pathname;
+  /**
+   * 🔴 这两个资产**不许**在 `page.evaluate` 里用 `fetch` 取 —— 要用 `page.request`。
+   *
+   * 应用把 `globalThis.fetch` 换成了隐私同意闸门（`consent-gate.ts:179`），
+   * 而这条用例开的是**全新 context = 还没答过那份披露**，于是页面里的每一次
+   * `fetch` 都抛 `PrivacyConsentBlockedError`。症状长得像"PWA 资产取不回来"，
+   * 实际取不回来的只有探针 —— 先怀疑探针（§7 元规则 1）。
+   *
+   * ⚠️ 这**不是**产品缺陷，别去给闸门开后门：浏览器为 PWA 取 manifest、注册 SW
+   * 走的是网络栈而不是 `window.fetch`，所以未同意的用户照样装得上 —— 下面那条
+   * `serviceWorker.ready` 断言就是这件事的证据，它必须留在页面里等。
+   */
+  const manifestUrl = new URL('manifest.webmanifest', `${ORIGIN}/app/`);
+  const manifestRes = await page.request.get(manifestUrl.toString());
+  expect(
+    manifestRes.status(),
+    `线上 manifest 取回 ${String(manifestRes.status())}，不是 200`,
+  ).toBe(200);
+  const manifest = (await manifestRes.json()) as {
+    start_url: string;
+    scope: string;
+    icons: { src: string }[];
+  };
+  // 相对 URL 必须相对 **manifest 自己** 解析（这正是修法的依据）。
+  const resolve = (value: string): string => new URL(value, manifestUrl).pathname;
+  const swRes = await page.request.get(new URL('sw.js', manifestUrl).toString());
 
-    const swResponse = await fetch(new URL('sw.js', manifestUrl));
-
+  const sw = await page.evaluate(async () => {
     // SW 真的注册上了吗 —— 这条比"文件取得回来"更强：
     // 它要求浏览器**接受**了那份脚本（MIME 与语法都对）。
     const ready = navigator.serviceWorker.ready.then((registration) => ({
@@ -298,18 +334,18 @@ test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功',
     const timeout = new Promise<'timeout'>((resolveTimeout) => {
       setTimeout(() => resolveTimeout('timeout'), 20_000);
     });
-    const sw = await Promise.race([ready, timeout]);
-
-    return {
-      startUrl: resolve(manifest.start_url),
-      scope: resolve(manifest.scope),
-      iconPath: resolve(manifest.icons[0]?.src ?? ''),
-      swStatus: swResponse.status,
-      swType: swResponse.headers.get('content-type'),
-      manifestType: response.headers.get('content-type'),
-      sw,
-    };
+    return Promise.race([ready, timeout]);
   });
+
+  const probe = {
+    startUrl: resolve(manifest.start_url),
+    scope: resolve(manifest.scope),
+    iconPath: resolve(manifest.icons[0]?.src ?? ''),
+    swStatus: swRes.status(),
+    swType: swRes.headers()['content-type'] ?? null,
+    manifestType: manifestRes.headers()['content-type'] ?? null,
+    sw,
+  };
 
   console.log(`PWA PROBE: ${JSON.stringify(probe)}`);
 
