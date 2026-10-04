@@ -5292,6 +5292,17 @@ tip 是自己 10 秒前造的那笔 —— `git reset --soft HEAD~1` + `git rest
 >   `git diff --name-only ad61621a..HEAD` = 16 笔全落在 `BLOCKED.md` / `PROGRESS.md` / `docs/plans/*`，
 >   去掉这三类后 **0 枚**；受影响的只有 `check:docs` 那一段，已单独在干净检体重跑（`3 → 2`）。
 >   ⇒ ② 的正式读数绑在 `ad61621a`，"整链在 `808d584a` 跑过"这句**不成立**，别往下传。
+>   ✅ **这一句在本条写完后就被自己的下一步否证了**（04:36–04:59 在**同一枚干净载体** `808d584a`
+>   补跑了整链，`heyta-chain.sh`，读数目录 `~/scratch-heyta/chain-ai-closeout-0436`）：
+>   **`pass=82 / fail=1 / skip=1 / total=84 / env-blocked=0`，与 `ad61621a` 那趟逐项同数**，
+>   唯一红仍是第 42 段 `check:docs`（那两条属别线的"引用未提交章节"），
+>   第 69 段仍是 `SKIPPED_BY_RULE`。不变量所在的那几段逐条 `rc=0`：
+>   `check:ai-tools` / `check:ai-coverage` / `check:ai-quota` / `check:layering` /
+>   `check:ui-language` / `check:migrations` / `check:design` / `check:tokens` / 六条 `check:legal-*`。
+>   ⇒ **② 的正式读数现在绑 `808d584a`**（`ad61621a` 那趟成为同数的第二次量，不是唯一一次）。
+>   📌 顺手记一笔自造的计数错：我用一行 `awk` 快数时得出 `total=85 red=2` —— 因为
+>   `segments-rc.txt` 末尾那行 `SUMMARY` 自己也是一个 tab 行，被当成了"第 85 段"和一个"红"。
+>   **权威数是链自己打印的 `SUMMARY`**，手搭的计数器要先把汇总行剔掉，否则"多出一条红"会被当成新缺陷。
 > - 🟡 **载体残留两枚，属 iOS 那条线**（诚实记，不代改）：ios 腿跑完 `git status` 脏
 >   `apps/mobile/ios/Heyta.xcodeproj/project.pbxproj`（条目**换位**，无新增重复）与
 >   `Podfile.lock`（`hermes-engine` spec checksum + `PODFILE CHECKSUM` 两行）
