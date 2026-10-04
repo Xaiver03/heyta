@@ -112,6 +112,32 @@ export interface ExportDocument {
   counts: ExportCounts;
 }
 
+/**
+ * 一份**只声明 op-log** 的还原文档：`entities` 与实体计数缺省，由导入器用
+ * **客户端那份 reducer** 物化。
+ *
+ * 🔴 为什么要有这一格，而不是让产出方自己把 `entities` 填上：
+ * 恢复工具（`server/scripts/recover-user.ts`）手里只有服务端 replay 的结果，而两层对
+ * `DEL` 的语义**不一致且各自都有注释**：服务端是 `delete state[type][id]`
+ * （`server/src/sync/op-replay.ts` 的 `case 'DEL'`），客户端是 field-level tombstone
+ * （`packages/op-log/src/state.ts` 里那句 *"must be materialized even when the create
+ * has not arrived yet, otherwise an out-of-order replay can resurrect the entity"*）。
+ * 让服务端那一份去填 `entities`，产物就**结构上不可能有墓碑** —— 恢复出来的设备上
+ * 用户回收站里的东西全没了，而对端那条活体会被当成"本机缺的"再同步回来（正是上面那句
+ * 注释防的事）。所以这里不是"允许少写一个字段"，是**把实体交给唯一有权物化它的那一层**：
+ * 还原本来就靠重放 op-log 得到状态（见 `import-dump.ts` 文件头），`entities` 只用来核对。
+ *
+ * ⚠️ 代价必须说清：文件不再自己声明一份实体，写之前那次"两个来源交叉"就少了一个来源
+ * （`restoreIntoEmptyTarget` 第 2 步）。剩下的真判据是**写完之后再重放一次比对**，
+ * 它仍然抓得住半截导入 / 引擎物化漂移。
+ */
+export interface RestoreDocument extends Omit<ExportDocument, 'entities' | 'counts'> {
+  /** 缺省 ⇒ 由导入器用客户端 reducer 从 `opLog` 物化。 */
+  entities?: Record<string, unknown[]>;
+  /** 只有 `totalOps` 是必填的（它是唯一能被 op-log 自己证明的计数）。 */
+  counts: Pick<ExportCounts, 'totalOps'> & Partial<Omit<ExportCounts, 'totalOps'>>;
+}
+
 /** `buildExportDocument()` 的输入。 */
 export interface BuildExportOptions {
   /** 物化状态（宿主从 `engine.getState()` 拿）。 */

@@ -60,6 +60,14 @@
  *     **一个字节都不写**。
  *   - **写之后**：本机物化状态必须与 `导出.entities` 逐项一致，
  *     否则报 `verification-failed` 而不是"成功"。
+ *
+ * 🔴 **`entities` 可以缺省**（{@link RestoreDocument}）：缺省时实体由**上面那份客户端
+ * reducer** 从 `opLog` 物化，再拿它当核对基准。这专门给恢复工具那条路 ——
+ * 服务端对 `DEL` 是 `delete`，客户端是 field-level tombstone，让服务端那一半来填
+ * `entities` 会产出**没有墓碑**的产物（见 `export-dump.ts` 里那段说明）。
+ * ⚠️ 代价必须写清：文件自己不声明实体时，**写之前那次交叉少了一个独立来源**
+ * （它变成"重放 == 重放"，恒真）；此时真正还有牙的是**写之后**那次比对
+ * （本机引擎物化 vs 纯重放的结果），半截导入 / 引擎漂移仍然会被抓住。
  */
 
 import { MODELED_ENTITY_TYPES, bucketFor, emptyState, replayOperations } from '@heyta/op-log';
@@ -67,7 +75,12 @@ import type { MaterializedState } from '@heyta/op-log';
 import { CURRENT_SCHEMA_VERSION } from '@heyta/shared-schema';
 import { OpType, type Operation } from '@heyta/sync-core';
 
-import { EXPORT_APP_NAME, EXPORT_FORMAT_VERSION, type ExportDocument } from './export-dump.js';
+import {
+  EXPORT_APP_NAME,
+  EXPORT_FORMAT_VERSION,
+  type ExportDocument,
+  type RestoreDocument,
+} from './export-dump.js';
 
 /**
  * 导入/还原被拒绝的原因。
@@ -95,7 +108,7 @@ export type ExportImportFailureReason =
 
 /** `parseExportDocument()` 的结果。 */
 export type ParseExportResult =
-  | { ok: true; document: ExportDocument }
+  | { ok: true; document: RestoreDocument }
   | { ok: false; reason: ExportImportFailureReason; detail?: string };
 
 /** `restoreIntoEmptyTarget()` 的结果。 */
@@ -180,13 +193,19 @@ export function parseExportDocument(text: string): ParseExportResult {
     };
   }
 
+  // `entities` **可以整格缺省**（恢复工具那类"只交 op-log"的产物，实体由本机的
+  // 客户端 reducer 物化）。但**给了就必须是"类型 → 数组"**：`entities: null`
+  // 与 `entities: []` 都是坏文件，不许被当成"没给"放过去 —— 放过去的代价是
+  // 一份被截断/改坏的产物会走到"由 ops 自己物化"那条路上，而那条路的写前交叉是恒真的。
   const entities = raw['entities'];
-  if (entities === null || typeof entities !== 'object' || Array.isArray(entities)) {
-    return { ok: false, reason: 'invalid-document', detail: 'entities 不是对象' };
-  }
-  for (const [entityType, rows] of Object.entries(entities as Record<string, unknown>)) {
-    if (!Array.isArray(rows)) {
-      return { ok: false, reason: 'invalid-document', detail: `entities.${entityType} 不是数组` };
+  if (entities !== undefined) {
+    if (entities === null || typeof entities !== 'object' || Array.isArray(entities)) {
+      return { ok: false, reason: 'invalid-document', detail: 'entities 不是对象' };
+    }
+    for (const [entityType, rows] of Object.entries(entities as Record<string, unknown>)) {
+      if (!Array.isArray(rows)) {
+        return { ok: false, reason: 'invalid-document', detail: `entities.${entityType} 不是数组` };
+      }
     }
   }
 
@@ -213,7 +232,7 @@ export function parseExportDocument(text: string): ParseExportResult {
     };
   }
 
-  return { ok: true, document: raw as unknown as ExportDocument };
+  return { ok: true, document: raw as unknown as RestoreDocument };
 }
 
 /** 一条 op 的形状校验。返回 `undefined` 表示合法。 */
@@ -264,7 +283,7 @@ function isKnownOpType(value: unknown): boolean {
  */
 export async function restoreIntoEmptyTarget(
   target: ImportTarget,
-  document: ExportDocument,
+  document: RestoreDocument,
 ): Promise<RestoreExportResult> {
   // 1. 目标必须真的是空库。**这一步在写任何东西之前。**
   const existing = await target.engine.countStoredOps();
@@ -278,8 +297,12 @@ export async function restoreIntoEmptyTarget(
 
   // 2. 写之前先证明这份文件自洽：重放它的 op-log 必须得到它自己声称的
   //    entities 与 counts。不一致 = 文件被改坏/半截 —— 一个字节都不写。
-  const expected = replayOperations(emptyState(), document.opLog);
-  if (!stateMatchesDocument(expected, document)) {
+  //
+  //    `entities` 缺省时核对基准由**客户端 reducer** 物化（见文件头那段：这正是
+  //    "恢复产物丢墓碑"的修法），此时第 2 步退化成恒真，还有牙的是第 4 步。
+  const replayed = replayOperations(emptyState(), document.opLog);
+  const reference = referenceOf(document, replayed);
+  if (!stateMatchesDocument(replayed, reference)) {
     return { ok: false, reason: 'inconsistent-document' };
   }
 
@@ -288,7 +311,7 @@ export async function restoreIntoEmptyTarget(
 
   // 4. 写完之后再核对一次。对不上就必须报失败，而不是"看起来成功了"。
   const after = target.engine.getState();
-  if (!stateMatchesDocument(after, document)) {
+  if (!stateMatchesDocument(after, reference)) {
     return {
       ok: false,
       reason: 'verification-failed',
@@ -304,6 +327,70 @@ export async function restoreIntoEmptyTarget(
     entities: totals.total,
     deleted: totals.deleted,
   };
+}
+
+/**
+ * 还原**之前**的预告：这份文档导进空库之后会有什么。
+ *
+ * 🔴 数字来自**重放**，不来自文件自己的声明。原因很具体：`ExportScreen` 的确认面板
+ * 原来直接读 `document.counts.entities.TASK?.total ?? 0`，而"只交 op-log"的恢复产物
+ * 没有那一格 ⇒ `?? 0` 会**安静地显示"0 条记录、0 条已删除"**，
+ * 而真正导进去的是 3 条含 1 墓碑。确认面板说的是"按下去会发生什么"，
+ * 它显示 0 就是界面在说谎 —— 不是"少显示一点信息"。
+ * 文件自己声明了计数时两者本来就相等（写前的自洽校验保证），所以对完整导出零行为变化。
+ */
+export function previewRestore(document: RestoreDocument): {
+  totalOps: number;
+  totalEntities: number;
+  totalDeleted: number;
+  perType: Record<string, { total: number; deleted: number }>;
+} {
+  const state = replayOperations(emptyState(), document.opLog);
+  const perType: Record<string, { total: number; deleted: number }> = {};
+  for (const entityType of MODELED_ENTITY_TYPES) {
+    const records = recordsOf(state, entityType);
+    if (records.length === 0) continue;
+    perType[entityType] = { total: records.length, deleted: records.filter(isTombstone).length };
+  }
+  const totals = countState(state);
+  return {
+    totalOps: document.opLog.length,
+    totalEntities: totals.total,
+    totalDeleted: totals.deleted,
+    perType,
+  };
+}
+
+/**
+ * 核对基准：文件自己声明了 `entities` 就用文件那份（两个独立来源，交叉才有意义）；
+ * 缺省就用**客户端 reducer** 重放出来的那份。
+ *
+ * 🔴 两个来源不能在这里合成一个"看起来更完整"的对象：实体和计数必须**整套**来自同一份，
+ * 否则就是拿 A 的实体去比 B 的计数，红的时候说不清是谁不对。
+ */
+function referenceOf(document: RestoreDocument, replayed: MaterializedState): ExportDocument {
+  if (document.entities !== undefined) return document as ExportDocument;
+
+  const entities: Record<string, unknown[]> = {};
+  const counts: Record<string, { total: number; deleted: number }> = {};
+  for (const entityType of MODELED_ENTITY_TYPES) {
+    const records = recordsOf(replayed, entityType);
+    if (records.length === 0) continue;
+    entities[entityType] = records;
+    counts[entityType] = { total: records.length, deleted: records.filter(isTombstone).length };
+  }
+  const totals = countState(replayed);
+
+  return {
+    ...document,
+    entities,
+    counts: {
+      ...document.counts,
+      entities: counts,
+      totalEntities: totals.total,
+      totalDeleted: totals.deleted,
+    } as ExportDocument['counts'],
+  } as ExportDocument;
 }
 
 /**
