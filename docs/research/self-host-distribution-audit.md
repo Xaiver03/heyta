@@ -7863,3 +7863,39 @@ main 未动=YES      # 副本只可能跑到 merge 之前：rc≠0 ⇒ fails 非
 
 ⚠️ 分支 tip 现为 `25799540`；载体 `fb68cdc5`（建在 `ad76332a` 上）又过期了 —— 落地那一刻仍按 §8.16 现算，
 这一条从 §8.126 起每个数字都在告诉我：**它不是待办，是这条线自己的提交节奏**。
+
+### 8.129 落地前的归属快照：main **自己**今天在这些段上是什么颜色（2026-10-04 21:3x，一次性临时 detached 树）
+
+§8 的关闭判据是"每一枚红仍可归属到非本批"，而这件事可以在等窗口的这段时间先做掉一半：
+把**对外文案那几段**（不需要依赖、不需要构建的门禁）在 main 自己的树上跑一遍。
+做法是 `git worktree add --detach /tmp/g173-main-probe main`（临时树，跑完 `worktree remove`，
+主检出与我自己的工作树一个字节没动），逐条读 `package.json` 里该门禁用的是哪个实现文件再跑。
+
+| 段（main 版实现，main 版内容） | rc | main 自己打出的最后一行 |
+|---|---|---|
+| `check:docs`（`research/tools/docs-link-check.mjs`） | 0 | ✅ 无死链、无"本机有仓库里没有"的链接、无失效章节引用、无失效锚点 |
+| `check:selfhost-entry-command`（本批那条入口命令对账） | 0 | `docs/research/self-host-distribution-audit.md：**故意排除** 1 条…正是 §8.11 记的那条旧命令` |
+| `check:server-design` | 0 | ✅ 已写入 `server/src/design.generated.ts`（颜色 16 / 尺寸 23 / 字体 2）← 🔴 见下，这行本来不该出现 |
+| `check:legal-tools` | 0 | ✅ 本机接口工具表对账通过：目录 26 条 == 中文表 == 英文表，且中英逐行同序 |
+| `check:md-tables` | 0 | ✔ 9 个文件，列数、断行与"是不是表"都一致 |
+| `check:script-snapshot` | 0 | ✅ 自快照 bootstrap 全部在位（40 个脚本 + .gitignore） |
+| `check:gate-wiring` | 0 | ✅ 链与门禁定义对上了（链外 1 道有可验消费方） |
+| `check:claims` | 0 | ✅ 6 个平台都能在 roadmap 里找到对应条目 |
+| `check:legal-copy` | 1 | 🔴 **不是产品红也不是 main 的红**：`Cannot find module`（临时树没有 node_modules）⇒ 这一条判不了，别记成"main 在这里红" |
+
+⇒ 对 item 1 的实际意义：**main 今天在"对外文案/结构类"段上是全绿的**，
+所以落地那一趟若出红，先怀疑的是需要依赖与构建的段（`typecheck` / `-r test` / 三段 e2e），
+不是这批自己改过的那些句子。这条快照省掉的是"红了一起怀疑到本批头上"的那段归因工作。
+
+🔴 两条探针自己的问题，都在这趟里被抓出来（比上面那张表更值得留）：
+
+1. **门禁用的是哪个文件，要从 `package.json` 现读，不能从门禁名猜。**
+   我先写了 `scripts/${g#check:}.mjs`，于是 `check:md-tables` 被拼成 `scripts/md-tables.mjs` ——
+   **八条齐刷刷 rc=1**，而末行都是 `Node.js v22.22.0`（崩溃栈的最后一条），不是任何产品的判红。
+   形状和 §8.101 那次 zsh 不词分割导致的"三腿全红 127"是同一族：**一片红先看它们共享的那层**。
+2. **正则只取 `node <路径>` 把参数丢了**，于是 `… gen-server-design.mjs --check` 变成了**没有 `--check` 的生成**——
+   我以为在跑只读检查，实际跑的是写盘。临时树里 `git status --porcelain` 是空的，
+   说明生成的内容与提交物逐字相同才没留下痕迹 —— **那是运气，不是我的探针有边界**。
+   **参数不是修饰符，`--check` 就是那条命令的语义本身**。
+   下一轮在任何真实树里跑门禁一律走 `pnpm run <gate>`（由 pnpm 自己带参数），
+   要直接调实现文件就必须把整行参数原样抄过去。
