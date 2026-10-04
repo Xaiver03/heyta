@@ -17,7 +17,7 @@
  *   S4 删掉某行的图片引用但留着「截图」→ 红在「写了截图却没带引用」
  *   S5 在 W1 后面插一行普通文字（= 事故复现）→ 掉出表格的行**逐枚**点名，点名数 = 总行数 − 2
  *   S6 删掉表头                      → 响亮地拒绝报绿（"找不到那张表"），不许按"没有违规"处理
- *   S7 只给 `--root`（产物树模式）    → 必须读树里那份文档（提交态旧表时红要报在孤儿腿）
+ *   S7 只给 `--root`（产物树模式）    → 必须读树里那份文档；**红了就得点名**（红在哪一档不写死，见下面那段）
  *   S8 表外插一张**带分隔行**的表     → 不许红（这条挡住假红：本文件另一张表也长这样）
  *   S9 同一张表**去掉分隔行**         → 同一枚行必须点名（证明判的是分隔行，不是状态词）
  *   S10 表外一段、其中一行状态不在三档 → 两行都点名（旧写法会漏掉不合规那一枚）
@@ -27,6 +27,19 @@
  *   N4 把某行的「截图」换成"八张图逐张看过"这类同义措辞**并剥掉图路径** → 仍须点名（触发词表有牙）
  *   N5 同一行只换措辞、图路径还在 → 放过（挡扩射程带来的假红）
  *   对照 ×2                          → 未变异 / 复位后都全绿
+ *
+ * 🔴 19:0x 起多了腿 7（判据条数）与腿 8（臂条数 + 红集），各臂方向**相反**地夹住这两条腿：
+ *   J1 剥掉某一格的判据条数（"判据"二字留着）  → 腿 7 点名那一格
+ *   J2 同一格换成另一种字序（`N 条判据`）        → 放过（两种词形都在射程里，不许收敛成一种）
+ *   J3 把某一格的红集措辞（`⇒ 某层 红`）抹掉      → 腿 8 点名那一格（只剩臂条数不算报过红集）
+ *   J4 光秃秃的「无变异面」不给理由               → 腿 8 红、腿 6 **放过**（两档问的不是同一件事：
+ *                                                  腿 6 判"提没提到变异"，腿 8 判"有没有读数"）
+ *   J5 把"判据"与"N 条"**拆到两个句子**里         → 腿 7 仍须点名（这条钉住"按句取语义"这个决定；
+ *                                                  字符窗口版的假绿就是从这一格进来的）
+ *   脱牙 摘掉腿 7/8 的命中集合                     → J1/J3/J5 三臂全部失能（有一条仍红 = 它没挂在那条腿上）
+ *   S7 的预期被这两条腿改写过：它原来断"提交态那棵树红只能红在孤儿腿"，而 HEAD 的文档还没有本轮
+ *   补进 W0/W1c 两格的判据条数 ⇒ 腿 7/8 在那棵树上合法地红。**把期望钉在某一具体档上 = 把"我这轮
+ *   还没提交"写成前提**，所以改成只断"退 1 必须有一档点名"。
  *
  * 🔴 每臂除了退出码，还断言**红落在点名的那条腿**、且别的腿没有跟着红 ——
  * 只看 RC 的臂会把"判据自己崩了"读成"变异成功"。
@@ -66,6 +79,8 @@ const LEGS = {
   shot: '🔴 读数里声称看过界面图却没带任何图片引用（也没写「无界面格」）',
   orphan: '🔴 表外的孤儿工单行（表格被中途截断的化石 —— 它们渲染成正文，状态等于没人记）',
   mut: '🔴 已开工的行没记变异读数（也没写「无变异面」+理由）',
+  judge: '🔴 已开工的行没写**判据条数**（也没写「无判据面」+理由）',
+  arm: '🔴 变异那一档没有"臂条数 + 红集"两个读数（光提一句不算，纯文档单走「无变异面」+理由）',
 };
 const rowsIn = (out) => Number(out.match(/连续 (\d+) 枚工单行/)?.[1] ?? 0);
 
@@ -165,12 +180,17 @@ check(
 const treeRoot = join(scratch, 'tree');
 execFileSync('sh', ['-c', `mkdir -p "$0/tree" && git -C "$1" archive HEAD -- "$2" | tar -x -C "$0/tree"`, scratch, repoRoot, DOC]);
 const s7 = run(['--root', treeRoot]);
-// 这一臂只守"参数形状"（`--root` 的实参不能被当成文档吃掉），**不**要求树里那份一定绿：
-// 载体是提交态，而修表格这笔可能还没提交 —— 那种情况下它必须**报出原因**（孤儿行），不许静默绿。
+// 这一臂只守"参数形状"（`--root` 的实参不能被当成文档吃掉）+ **红了必须点名**，
+// 不要求树里那份一定绿：载体是提交态，而修表格这笔可能还没提交。
+// ⚠️ 第二档原来写成"红只能报在孤儿行那一档"，19:0x 被自己的新腿否证：那一棵 HEAD 的文档里
+// W0/W1c 两格还没有判据条数与红集读数 ⇒ 腿 7/8 在那棵树上合法地红，而孤儿行是 0。
+// 把期望钉在"某一具体档"上就是把**本轮尚未提交的编辑**写死成前提（同一形状的错误本项目记过多次）。
+// 现在断的是这条臂真正要守的事：**退 1 的时候必须有一档点名，不许安静地红**。
+const sumLegs = (out) => Object.values(LEGS).reduce((s, title) => s + legCount(out, title), 0);
 check(
-  'S7 产物树模式（只给 --root）→ 读的是树里的文档',
-  s7.out.includes(`取样：${DOC}`) && (s7.rc === 0 || legCount(s7.out, LEGS.orphan) > 0),
-  `RC=${s7.rc}｜连续 ${rowsIn(s7.out)} 枚工单行（提交态那棵树可能仍是旧表，红必须报在孤儿行那一档）`,
+  'S7 产物树模式（只给 --root）→ 读的是树里的文档，且红必须带着点名（不许安静地退 1）',
+  s7.out.includes(`取样：${DOC}`) && (s7.rc === 0 || sumLegs(s7.out) > 0),
+  `RC=${s7.rc}｜连续 ${rowsIn(s7.out)} 枚工单行｜各档点名合计 ${sumLegs(s7.out)}（提交态那棵树可以红在任何一档，只要它点名）`,
 );
 
 // S8 / S9 / S10：表外那一段"算不算表"的判别依据是**分隔行**（`|---|---|`），不是状态词。
@@ -285,6 +305,85 @@ expectRed(
 // N5：同一行只是换了措辞、路径还在 ⇒ 必须绿（挡住"把射程扩到全部看图字样"造成的假红）
 const n5 = mutate((t) => reword(t, false));
 check('N5 换了措辞但带着图路径 → 放过', n5.rc === 0 && legCount(n5.out, LEGS.shot) === 0, `RC=${n5.rc}`);
+
+// —— 腿 7（判据条数）与腿 8（臂条数 + 红集）的臂：J1…J5 + 一把脱牙。
+// 这两条腿守的是目标第 4 点点名的两样读数，而它们各自的**失败形状相反**：
+//   腿 7 会被"窗口放宽"退回**假绿**（W4 那格"三条恢复路径、持久化、判据"曾被当成有读数），
+//   腿 8 会被"结果词收窄"退回**假红**（W3/W5/W8a 三格分别用「各红」「⇒ `ui` 红」「→红」三种措辞，
+//   只收"全红"时三格全被误报成没记）。所以 J5 与 J3 一个是防松、一个是防紧，缺一条另一条就会漂回去。
+const editRow = (t, id, fn) => {
+  const ls = t.split('\n');
+  const i = ls.findIndex((l) => l.startsWith(`| ${id} `));
+  if (i === -1) throw new Error(`找不到「| ${id} 」那一行 —— 表被改过形状，本臂没有靶，拒绝猜。`);
+  const next = fn(ls[i]);
+  if (next === ls[i]) throw new Error(`对 ${id} 那行的变异没有生效（needle 与原文不同形）—— 臂是装饰，拒绝继续。`);
+  ls[i] = next;
+  return ls.join('\n');
+};
+
+const j1 = mutate((t) => editRow(t, 'W3', (l) => l.replace('**判据 2 条**', '**判据见下**')));
+expectRed(
+  'J1 剥掉某行的判据条数（保留"判据"二字）→ 腿 7 点名那一行',
+  j1,
+  LEGS.judge,
+  'W3',
+);
+
+const j2 = mutate((t) => editRow(t, 'W6', (l) => l.replace('**判据 47 条，分六层**', '**分六层的 47 条判据**')));
+check(
+  'J2 把 `判据 N 条` 换成 `N 条判据`（另一种字序）→ 仍放过（两种词形都在射程里）',
+  j2.rc === 0 && legCount(j2.out, LEGS.judge) === 0,
+  `RC=${j2.rc} 腿7=${legCount(j2.out, LEGS.judge)}`,
+);
+
+const j3 = mutate((t) => editRow(t, 'W5', (l) => l.replace(/ 红/g, ' 失败')));
+expectRed(
+  'J3 把某一行的"⇒ 某层 红"全换成"⇒ 某层 失败"（臂条数还在）→ 腿 8 点名那一行（光有臂数不算红集）',
+  j3,
+  LEGS.arm,
+  'W5',
+);
+
+const j4 = mutate((t) => editRow(t, 'W0', (l) => l.replace('`无变异面：没有自动判据可供变异`', '`无变异面`')));
+check(
+  'J4 豁免词写光秃秃的一个（不给理由）→ 腿 8 必须仍然红，而腿 6 放过（两档问的不是同一件事）',
+  j4.rc === 1 && legCount(j4.out, LEGS.arm) >= 1 && legCount(j4.out, LEGS.mut) === 0,
+  `RC=${j4.rc} 腿8=${legCount(j4.out, LEGS.arm)} 腿6=${legCount(j4.out, LEGS.mut)}｜` +
+    '腿 6 判"这一格提没提到变异"，那一格提了；腿 8 判"有没有臂条数 + 红集"，光秃秃的豁免词给不出读数 ⇒ 只有腿 8 红才是对的。' +
+    '第一版我把期望写成"两档都红"，那是**我自己猜的**，跑一趟才知道两档分工不同 —— 期望值写错与判据写错一样会误导下一位。',
+);
+
+const j5 = mutate((t) =>
+  editRow(t, 'W3', (l) => l.replace('**判据 2 条**', '**判据**（口径见下） 。这一层另有 2 条别的账')),
+);
+check(
+  'J5 把"判据"与"2 条"**拆到两个句子**里 → 腿 7 仍须点名 W3（这条钉的是"按句取语义"这个决定；写成字符窗口版就在这里假绿）',
+  j5.rc === 1 && legCount(j5.out, LEGS.judge) >= 1 && j5.out.includes('W3'),
+  `RC=${j5.rc} 腿7=${legCount(j5.out, LEGS.judge)}`,
+);
+
+// 脱牙对照：把两条新腿的命中集合清空，J1/J3/J5 三臂都必须失能（有一条仍红 = 它没挂在那条腿上）
+const neuter = join(scratch, 'gate-neutered-78.mjs');
+{
+  const src = readFileSync(GATE, 'utf8');
+  const ANCHOR = 'console.log(`取样：';
+  if (!src.includes(ANCHOR)) throw new Error('判据里找不到"console.log(`取样："那一行，脱牙脚本没有插入点，拒绝猜。');
+  writeFileSync(neuter, src.replace(ANCHOR, 'judgeMissing.length = 0; armMissing.length = 0;\n' + ANCHOR), 'utf8');
+  const survived = [];
+  for (const [name, mk] of [
+    ['J1', () => editRow(ORIGINAL, 'W3', (l) => l.replace('**判据 2 条**', '**判据见下**'))],
+    ['J3', () => editRow(ORIGINAL, 'W5', (l) => l.replace(/ 红/g, ' 失败'))],
+    ['J5', () => editRow(ORIGINAL, 'W3', (l) => l.replace('**判据 2 条**', '**判据**（口径见下） 。这一层另有 2 条别的账'))],
+  ]) {
+    writeFileSync(doc, mk(), 'utf8');
+    const r = spawnSync(process.execPath, [neuter, doc], { encoding: 'utf8' });
+    const out = `${r.stdout}${r.stderr}`;
+    if (legCount(out, LEGS.judge) > 0 || legCount(out, LEGS.arm) > 0) survived.push(name);
+  }
+  writeFileSync(doc, ORIGINAL, 'utf8');
+  check('脱牙对照 摘掉腿 7/8 的命中集合后，J1/J3/J5 都不得仍然报出那两条腿（三臂全部失能）',
+    survived.length === 0, survived.length ? `摘牙后仍红：${survived.join('/')}` : '三臂全部失能');
+}
 
 const control = run();
 check('对照 恢复干净后全绿', control.rc === 0, `RC=${control.rc}`);

@@ -10,7 +10,9 @@
 //
 // 🔴 判据不抄工单清单（那是一份会漂的抄件）：单元 id 从表里现读，只判形状与在场 ——
 //   行闭合、状态词表封闭、id 唯一、"提了截图就得真有引用"、表外不许有工单段（按分隔行判）、
-//   已开工的行必须记到变异那一层（或写明 `无变异面` + 理由）。
+//   已开工的行必须记到变异那一层（或写明 `无变异面` + 理由）、
+//   已开工的行必须给出**判据条数**（目标第 4 条点名的那一样；19:0x 之前这一格只有散文在守，
+//   而现量结果是 W0/W1c 两格真的没有）、变异那一格必须有**臂条数 + 红集**两样在同一句里。
 // ⚠️ 不判"列数等于表头"：本表读数栏**合法地**出现竖线（`ps … | grep …`、`a | b` 式并排列），
 //   要分辨就得掩码码段，而掩码在本表上两次实测都漂（同一批行先读出 7 列再读出 2/4/5/4 列）。
 //   一条在它的样本上说不清对错的判据不该用来拦事 —— 拦"行被拆成多行"这件事，
@@ -174,7 +176,50 @@ const mutMissing = parsed.filter((r) => {
   return !/变异|臂/.test(r.text.replace(/无变异面/g, ''));
 });
 
+// 腿 7：已开工的行必须写出**判据条数**（目标第 4 条点名的三样读数的第一样）。
+// 🔴 判别形状是"**同一句里**同时出现 `判据` 与 `N 条/枚`"，不是"某个固定字符窗口"。
+// 窗口版被现量否证过两次，方向相反：
+//   · 窗口 ≤12 字 ⇒ W4 那格"三条恢复路径、持久化、判据"被当成有读数（**假绿**，那格从没声明过判据条数）；
+//   · 窗口收到 ≤6 字 ⇒ W1 的"判据**：共享层 16 条"和 W8a 的"判据**：`packages/i18n/tests/habit-total-copy.spec.ts` 4 条"
+//     一起掉出射程（**假红**，而且掉的正是真读数那两格）。
+//   两种错都源于"按某一种字面形状判"。分句之后只看语义：**同一句里既有'判据'又有'N 条'**。
+//   （分句按 `。`/`；`/`<br>` 切 —— 本表的读数栏就用这三个分隔。）
+// 豁免沿用腿 6 那条纪律：封闭词 `无判据面：` + 同一格里 ≥4 字理由。⚠️ 写 `判据 0 条 + 为什么是 0`
+//   比走豁免更值钱 —— 0 是一个读数，豁免词不是。
+const NUM = '[0-9一二三四五六七八九十两]+';
+const COUNT = new RegExp(`${NUM}\\s*[条枚]`);
+const sentences = (t) => t.split(/[。；;]|<br\s*\/?>/);
+const CLAIM_JUDGE = (t) => sentences(t).some((s) => s.includes('判据') && COUNT.test(s));
+const JUDGE_EXC = /无判据面[：:][^|]{4,}/;
+const judgeMissing = parsed.filter((r) => {
+  if (r.declared === '未开工') return false;
+  if (JUDGE_EXC.test(r.text)) return false;
+  return !CLAIM_JUDGE(r.text.replace(/无判据面/g, ''));
+});
+
+// 腿 8：变异那一档光"提到"不够（腿 6 已经管那一条），还得同时有**臂条数**与**红集读数**。
+// 目标第 4 条原话是"变异红集"：只有"六臂变异"这一句不够 —— 六臂全红？还是五红一存活？
+// 这两个读数的含义相反（**存活的臂恰恰是一单真正产出的判据**，§8.36 那条 W10 的教训就是这么来的）。
+// 同一句里要求 `N 臂`（或 `臂…N 条`）+ 结果词。⚠️ 结果词表要按表里真实措辞收，别只收"全红"：
+//   "各红在指定那一条"（W3）与"存活"（那是失败读数，仍然算报了红集）都必须算命中。
+const CLAIM_ARM = (s) => new RegExp(`${NUM}\\s*臂|臂[^0-9一二三四五六七八九十两]{0,8}${NUM}\\s*[条枚]`).test(s);
+//   三种都要收，因为表里真有三种写法：W3"三臂各红在指定那一条" / W8a"A1 …→红" /
+//   W5"A1 … ⇒ `ui` + `e2e` 红"（**箭头与'红'之间隔着被点名的是哪几层**，所以箭头式要允许一段间隔）。
+//   ⚠️ 第一版只收"全红/各红/存活"，于是 W5 与 W8a 被报成"没记红集" —— 那是**假红**，
+//   而且方向危险：它会把人推去补一个本来就在的读数，或者更糟，去改判据让它闭嘴。
+//   "逐臂"这种**过程**词不收（"逐臂复原"只说明跑了每一臂，不说明每一臂的结果）。
+const RESULT_WORD = /全红|全部失能|各红|存活|转红|不合格|\d+\s*\/\s*\d+|精确|(?:⇒|→|->|=>)[^。|]{0,30}红/;
+const ARM_EXC = /无变异面[：:][^|]{4,}/;
+const armMissing = parsed.filter((r) => {
+  if (r.declared === '未开工') return false;
+  if (ARM_EXC.test(r.text)) return false;
+  const t = r.text.replace(/无变异面/g, '');
+  return !sentences(t).some((s) => CLAIM_ARM(s) && RESULT_WORD.test(s));
+});
+
+
 console.log(`取样：${doc.startsWith(root + '/') ? doc.slice(root.length + 1) : doc}`);
+
 console.log(`表区间：第 ${head + 1} 行起，连续 ${rows.length} 枚工单行，列结构 = 单/状态/读数`);
 console.log(
   `逐行读数：${parsed.map((r) => `${r.id}=${r.declared ?? '无法判定'}${CLAIM_IMG.test(r.text) ? (IMG.test(r.text) ? '(图✓)' : '(图✗)') : ''}`).join(' ')}`,
@@ -185,14 +230,34 @@ dump('🔴 工单 id 重复', dup, (r) => `:${r.line} ${r.id}`);
 dump('🔴 读数里声称看过界面图却没带任何图片引用（也没写「无界面格」）', shotMissing, (r) => `:${r.line} ${r.id}`);
 dump('🔴 表外的孤儿工单行（表格被中途截断的化石 —— 它们渲染成正文，状态等于没人记）', orphans, (r) => `:${r.line} ${r.text}`);
 dump('🔴 已开工的行没记变异读数（也没写「无变异面」+理由）', mutMissing, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
+dump('🔴 已开工的行没写**判据条数**（也没写「无判据面」+理由）', judgeMissing, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
+dump('🔴 变异那一档没有"臂条数 + 红集"两个读数（光提一句不算，纯文档单走「无变异面」+理由）', armMissing, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
 
-const bad = unclosed.length + badStatus.length + dup.length + shotMissing.length + orphans.length + mutMissing.length;
+// 承重读数：把"这一趟真的扫到了对象"打在输出里 —— 0 枚命中既可能是"全都合规"也可能是"needle 没射程"，
+// 没有这两个数就区分不了（腿 4/6 各自撞过一次，见上面注释）。
+const started = parsed.filter((r) => r.declared !== '未开工' && !EXC.test(r.text));
+const judgeHits = started.filter((r) => CLAIM_JUDGE(r.text)).length;
+const armHits = started.filter((r) => sentences(r.text).some((s) => CLAIM_ARM(s) && RESULT_WORD.test(s))).length;
+console.log(
+  `承重：已开工且未走「无变异面」豁免 ${started.length} 行｜判据条数命中 ${judgeHits}｜臂条数+红集同句命中 ${armHits}`,
+);
+
+const bad =
+  unclosed.length +
+  badStatus.length +
+  dup.length +
+  shotMissing.length +
+  orphans.length +
+  mutMissing.length +
+  judgeMissing.length +
+  armMissing.length;
 if (dumps.length) console.log(dumps.join('\n'));
 console.log(
   `\n结论：${
     bad === 0
-      ? '§8 落地记录表的行闭合、状态词表、id 唯一、截图栏位、表外无工单段（按分隔行判）、已开工行有变异读数 —— 六项都成立 ✅'
+      ? '§8 落地记录表的行闭合、状态词表、id 唯一、截图栏位、表外无工单段（按分隔行判）、已开工行有变异读数、判据条数、变异"臂条数+红集"两样齐 —— 八项都成立 ✅'
       : `🔴 ${bad} 处不成立`
   }`,
 );
 process.exit(bad === 0 ? 0 : 1);
+
