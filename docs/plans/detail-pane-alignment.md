@@ -2679,3 +2679,62 @@ H11/H14 是它的外部对照；② 它挡"递 + 算并存"，**不**挡"既不�
 不是"和上一次提交的图比"。措辞边界：这一条不推翻任何结论，它划清的是"逐字节相同"这句话**比的是哪两张图**。
 10 枚全部 `git restore` 还原（本单提交的版本是刚看过、且断言全绿那一趟的产物；
 别的单的 4 枚由它们的所有者管），还原后 `git status` 只剩别人那枚 `scripts/mutate-closeout-gates.sh` 与两枚软链。
+
+### 15. 合并前把**收紧后的门禁拿到 main 的树上跑一遍**（12:3x，载体 `21c46c35` × main `67049d18`）
+
+为什么做这一趟：本单把门禁改严了，而它合并之后要跑在 **main 的树**上 —— "我这棵树绿"推不出"合起来绿"。
+做法零 `.git` 写入（不开新 worktree、不动别人的索引）：
+
+```bash
+git archive main | tar -x -C /tmp/heyta-main-preflight      # 84 MB，只含跟踪文件
+cp <本检出>/scripts/check-selection-single-source.mjs /tmp/heyta-main-preflight/scripts/
+node scripts/check-selection-single-source.mjs              # 在 main 的树里跑我这版
+```
+
+| 跑法 | RC | 红集分解 |
+|---|---|---|
+| **main 自己的门禁 × main 的树** | **0** | main 自洽（它没有断言 G，`grep -c '断言 G'` = 0） |
+| **我的门禁 × main 的树** | 1 | A/B/C/D 各 **0** 条 · E **1** 条 · F **7** 条 · G **1** 条 · "表外面"（`没在 F 的任何一张表里`）**0** 条 · "文件不在了" **0** 条 |
+
+逐条判读，三条各有各的主：
+
+1. **F 那 7 条不是账** —— 全部是"main 还没有这批源码"（`TaskRow`/`NotesBoard`/`TimelineBoard` 的通道与谓词）。
+   合并把这批源码带进去，它们自己消。
+2. **G 那 1 条正是 #16 那两行**，这趟把它们量化了：点名 `apps/web/src/features/trash/TrashView.tsx busyId` 与
+   `apps/mobile/src/screens/TrashScreen.tsx busyId`。⚠️ 别读成"日历/回收站那条线欠债" ——
+   main 上**根本没有断言 G**（它是我这批改出来的），所以这两处在 main 侧既不是红也不是漏，
+   是**我合并时要补的两行登记表**。
+3. 🔴 **E 那 1 条两边都不是 —— 是探针假红**，而我差点把它登记成别人的缺陷。
+   它点名 `packages/ui/src/calendar/CalendarDayBoard.tsx  onOpenTask`。
+   第一反应是"日历那一面真的断线了"（本单 §8.24 刚为四象限修过同形状的洞，太像了）；
+   去读那一行才看见：`CalendarDayBoard.tsx:107-113` 写的是
+   `const taskListProps = { density, onToggleTask, onOpenTask, busyTaskId, labels }`，
+   下面由 `{...taskListProps}` 展开进 `TaskList` —— **接线是对的**。
+   机制：main 的 `f37ade5b`（10-04 10:13）给 E 加了一枚 `objectSpreadUseOf(src, name)`
+   （"prop 出现在被展开的对象字面量顶层"也算用起来），而本检出从**旧 main** 切出，没有它。
+   📌 **登记别人的缺陷之前先读那一行** —— 这条与 §8.39 那三条探针错同族，
+   新的是它的方向：**"像我们刚修过的那个洞"不是证据**，相似形状只会让人跳过读本体那一步。
+
+#### 🔴 我试着"提前把它搬进来"，搬出一个更坏的陷阱（已撤销）
+
+想法很自然：既然缺的是 main 的一枚容差，提前搬进本检出，合流时这枚文件就"只有一侧要动"。
+搬完当场做三方现量（`git merge-file` 拿 merge-base `f419df75` / 我这侧 / main 那侧）：
+
+| 状态 | merge-file | 产物 |
+|---|---|---|
+| **搬了容差** | `rc=0`、`markers=0`（**看起来干净**） | 🔴 `node --check` 报 `SyntaxError: Identifier 'objectSpreadUseOf' has already been declared` —— **两份函数定义** |
+| **不搬**（撤销后） | `rc=0`、`markers=0` | ✅ `objectSpreadUseOf` **1** 份 · `paintSites`/`ownTrace` 各 **3** 处（我那两条新规则在）· `node --check` OK |
+
+成因：我插的位置（`useOf` 之后）与 main 插的位置不同 ⇒ git 把两处**不重叠的新增**都收下，
+文本层"自动合并成功"，语义层整枚门禁脚本**不能解析**。
+📌 **这是 §8.40 那条判据的一个新面目**：判"合并要不要人"不能只看 `merge-file` 的 rc 与 marker 数，
+**还要看产物能不能解析**（`node --check` 一条命令的成本）。
+而"搬过来之后我这棵树绿"完全不构成理由 —— 它证明的是**这一棵树**，不是**合起来那棵树**。
+处置：`git restore` 撤销搬运（现量 `grep -c '^function objectSpreadUseOf'` = 0、门禁 `RC=0`），
+让这枚文件走自动合并。
+
+⚠️ **边界（三条）**：① "自动合就两侧都在"这句**只在 main 停在 `67049d18` 这一刻成立**，是瞬时读数 ——
+合并程序里要留一条：**合完立刻**跑这道门禁 + 两把 rig（`mutate-selection-f` / `mutate-timeline-face`），
+不能只跑 `pnpm check`（它不含 rig）；② `git archive` 不含未跟踪文件，主检出里别人在途未提交的改动
+不在这份读数里；③ 这趟只对照了**这一枚**门禁，其余 18 道没做同样处理 ——
+要不要逐道做，取决于哪几道在本批里被改过（现量：本批改过的常驻门禁只有这一枚）。
