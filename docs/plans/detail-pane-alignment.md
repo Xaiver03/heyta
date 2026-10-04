@@ -7244,3 +7244,47 @@ grep -cvE '\|0$' /tmp/rc1.txt                                               # �
 
 归属门现量（23:5x 提交前）：`VERDICT=CLEAN`｜主检出未提交 **44** 枚｜点名 **2** 条（本节 + 新脚本）｜
 本地不在场 0｜被占 0。新脚本在主检出**不存在** ⇒ 结构上不可能撞别人未提交。
+
+## 8.111 空态那三臂入仓（`mutate-focus-empty-state.mjs`），第一版被自己的解析层绊了两次（2026-10-04 24:0x 现量，载体续 `982505eb`）
+
+§8.13 那三臂（E1 手写骨架 / E2 摘 `testID` / E3 摘 provider）此前只有 `/tmp/dp_es_mutate.py` 一份，
+而它自己文件头就写着"一次性 rig，不提交"，且 e2e 那半依赖另一枚没入库的覆盖件。
+现在它是 `research/tools/mutation-rigs/mutate-focus-empty-state.mjs`，三臂 + 一枚干净对照，
+**浏览器腿改成显式选择**：不带 `--e2e` 时那一腿打印 `NOT_JUDGED` 且**不计入绿**。
+
+```bash
+node research/tools/mutation-rigs/mutate-focus-empty-state.mjs          # 4/4，EVIDENCE_DIRTY=0
+node research/tools/mutation-rigs/mutate-focus-empty-state.mjs --e2e    # 4/4，EVIDENCE_DIRTY=2
+```
+
+两趟读数（同一棵活树）：
+
+| 臂 | 不带 `--e2e` | 带 `--e2e` |
+|---|---|---|
+| 对照（干净态） | 门禁 0 / jsdom 0 | 同上 |
+| E1 手写骨架 | 门禁 **1** 且点名该文件，jsdom 0（手写也带 `data-testid` ⇒ 只有门禁看得见） | 同上 |
+| E2 摘 `testID` | jsdom **1**，门禁 0（它不看 testID），浏览器腿 `NOT_JUDGED` | jsdom **1** + 浏览器 **1 failed / 5 passed**，红的是 F3，`走到定位=true` |
+| E3 摘 provider | jsdom **1** 且输出含 `useHeytaUiTheme`，门禁 0 | 同上 |
+| 还原证明 | `FINAL_SAME=true`（sha256 与开工前逐字相同） | 同上，且 `dist/` 用复原态**重打**过一遍 |
+
+🔴 **第一版有两个缺陷，都是我自己的解析层，而且都是"看起来合理的空读数"那一族**：
+
+1. **两层同名 spec 被我当成一个常量**：jsdom 那份是 `apps/web/tests/focus-detail-pane.spec.tsx`，
+   e2e 那份是 `e2e/tests/focus-detail-pane.spec.ts` —— 扩展名不同。我把 `.tsx` 那个传给了
+   Playwright ⇒ 文件过滤器指向不存在的文件，它回 `rc=1 / 0 passed / 0 failed`。
+   **那个 1 长得像"变异让用例红了"，其实一条都没跑**。
+2. **逐条计数的正则方向反了**：我照汇总行 `  6 passed (3.5s)` 的形状写了 `^\s*\d+\s+✓`，
+   而 list reporter 的逐条行是 `  ✓  3 [chromium] › …` —— **标记在前、序号在后** ⇒ 两条计数恒 0。
+   两个缺陷叠起来的症状就是上面那行 `FAILED=0 PASSED=0 走到定位=false`。
+
+修法不是"改对正则"就完：那条腿现在**先断言分母**（`跑到=` 取自汇总行，不取自那两条计数），
+`跑到=false` 时无论 `rc` 是几都不判红。📌 可迁移的一条：**新写解析层要先喂一份仓里已有的真实产物验方向** ——
+`/tmp/dp_es_final_e2e.log` 那种旧输出就在盘上，第一版我没喂它，于是把"恒 0"当成了读数。
+这和 §8.39 那条"分母为 0 的 0 命中"、以及刚才 §8.110 里我自己犯的空比较是同一族，**今天第三次**。
+
+归属与共享资源：`FocusDetailPane.tsx` 在主检出**零未提交**（`verify-detail-pane-ownership.mjs` 点名 1 条 ⇒
+`VERDICT=CLEAN`）；这条台子会原地改宿主源码，每臂之后 sha256 复原校验，最后一趟 `FINAL_SAME=true`。
+`--e2e` 那趟重写了两枚提交态截图（`f1-four-cards.png` / `f5-aborted-record.png`），跑完 `git restore`，
+收尾 `apps/web/evidence` 脏 = 0。和其余 rig 一样**不挂 `pnpm check`**。
+
+⚠️ 这一节**不新增任何产品结论**：§8.13 的三臂读数一字未改，改的只是"那一臂今天还能不能再跑一次"。
