@@ -402,9 +402,25 @@ if printf '%s' "$WANT" | grep -q "ios"; then
       PODS_SYNC=FAIL
     elif [ "$LOCK_SHA" != "$MANI_SHA" ]; then
       echo "  Pods 沙盒与 Podfile.lock 不一致（或缺 Manifest.lock）→ 跑 pod install…"
-      if (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
-          RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) \
-          >/tmp/heyta-reinstall-pod.log 2>&1; then
+      # 🔴 允许**一次**重试，而且两趟各自落账。理由不是"重试通常能过"这种印象，是
+      #    2026-10-05 03:0x 现量：CocoaPods 1.17.0 在 "Generating Pods project"
+      #    加 source file 引用那一步偶发崩 `ArgumentError - path name contains null byte`
+      #    （`Pathname#realdirpath`；上游 #12798 / #12866 当时都还 open），
+      #    崩完沙盒是半写状态，而**同一棵载体上 45 分钟前刚成功跑过一遍、手跑第二趟 rc=0**。
+      #    一次就红会把这条偶发报成"ios 腿失败"，而红字里没有一个字指向"可重试" ——
+      #    读的人会去查构建，构建是好的（与 `afe7ff7a`/`d924853e` 那两发同形：
+      #    **红的那一句把原因说反了**）。
+      #    这不是降级判据：两趟都失败仍然整腿判红，两本日志都留着。
+      POD_OK=0
+      for POD_ATTEMPT in 1 2; do
+        POD_LOG="/tmp/heyta-reinstall-pod.${POD_ATTEMPT}.log"
+        (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
+            RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) >"$POD_LOG" 2>&1
+        POD_RC=$?
+        echo "     pod install 第 ${POD_ATTEMPT} 趟 rc=${POD_RC}（日志 ${POD_LOG}）"
+        if [ "$POD_RC" = 0 ]; then POD_OK=1; break; fi
+      done
+      if [ "$POD_OK" = 1 ]; then
         MANI_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Pods/Manifest.lock" 2>/dev/null | cut -d' ' -f1)"
         NEW_LOCK_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | cut -d' ' -f1)"
         if [ "$NEW_LOCK_SHA" != "$LOCK_SHA" ]; then
@@ -412,18 +428,18 @@ if printf '%s' "$WANT" | grep -q "ios"; then
           # 提交态**是**可复现的）。这里只把差异如实打出来，不静默。
           DIFFN=$(diff <(git -C "$ROOT" show HEAD:apps/mobile/ios/Podfile.lock 2>/dev/null) \
                       "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | grep -c '^[<>]')
-          echo "  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 ${DIFFN} 行）—— 见 /tmp/heyta-reinstall-pod.log"
+          echo "  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 ${DIFFN} 行）—— 见 ${POD_LOG}"
         fi
         if [ -n "$MANI_SHA" ] && [ "$MANI_SHA" = "$NEW_LOCK_SHA" ]; then
           echo "  ✅ 沙盒已同步（Manifest.lock == Podfile.lock）"
         else
           echo "  🔴 pod install 之后 Manifest.lock 仍与 Podfile.lock 不一致"
-          tail -10 /tmp/heyta-reinstall-pod.log | sed 's/^/     /'
+          tail -10 "$POD_LOG" | sed 's/^/     /'
           PODS_SYNC=FAIL
         fi
       else
-        echo "  🔴 pod install 失败（日志末尾：）"
-        tail -10 /tmp/heyta-reinstall-pod.log | sed 's/^/     /'
+        echo "  🔴 pod install **两趟**都失败 ⇒ 不是那条偶发崩溃；日志末尾："
+        tail -10 /tmp/heyta-reinstall-pod.2.log | sed 's/^/     /'
         PODS_SYNC=FAIL
       fi
     fi
