@@ -1725,13 +1725,13 @@ export function App(): React.JSX.Element {
             贴底用 `margin-top: auto` 实现，不再插一个 spacer 元素。
             ⚠️ 而「帮助」是**动作**（它切到设置页），所以它在 tablist **外面**（见下）。
           */}
-          {visibleToolTabs.map((v) => (
+          {visibleToolTabs.map((v, i) => (
             <button
               key={v.key}
               type="button"
               role="tab"
               aria-selected={view === v.key}
-              className={`ht-rail__tab ht-rail__tab--tool${view === v.key ? ' ht-rail__tab--active' : ''}`}
+              className={`ht-rail__tab ht-rail__tab--tool${i === 0 ? ' ht-rail__tab--tool-start' : ''}${view === v.key ? ' ht-rail__tab--active' : ''}`}
               onClick={() => {
                 setSettingsFocus(undefined);
                 setView(v.key);
