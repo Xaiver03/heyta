@@ -370,7 +370,6 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
 > ③ `verify-mobile-notes`：**✅ 闭合**（03:19:59，37 项全绿，第 9–11 步三条腿都有读数，第三张截图人看过）。
 > ④ 父子层级：**✅ 闭合**，且 03:33 又对当前 HEAD 复量过一遍（六枚守卫理由 + 两端消费者 + 四条中英词条）。
 > ⑤ B41/B42/B45：登记在位（`BLOCKED.md:2885/2918/2958`），属"要翻冻结判据/动服务端面"，**本批不越权**。
-
 > ✅ **19:04 现量把 ④ 在当前 HEAD 逐项复核过（不重做，只证明它仍然成立）**：
 > `ProjectActions.setParent` 在 `packages/app-host/src/project-actions.ts:109`（接口）与 `:280`（实现），
 > 守卫走 `validateProjectParentChange` 的**封闭集合 verdict** —— 拒绝时抛
@@ -3201,3 +3200,22 @@ pid 46540）⇒ 按 §8.9 让路，不动它。
 拆成两趟的理由也是真的：mac 段有签名+公证（上限 `HEYTA_NOTARY_TIMEOUT` 默认 900s）再叠远端 windows 打包，
 从闸门放行到第一次 `adb uninstall` 之间隔着 **15–25 分钟**，设备那两段前面必须**再过一次闸门**才不动别人的模拟器。
 ⇒ 记账时写"四端由 desktop+mobile 两趟覆盖（等价性见上）"，**不要**写成"跑了 `pnpm reinstall:all`"。
+
+## 03:48 ① 起跑前查过一枚真隐患，结论是**它不成立**（但顺带现量出一枚会影响别线的僵尸实例）
+
+担心过的形状：`/Applications/Heyta.app` 里**有一个 1 天 6 小时没关的实例**
+（03:48 现量：pid **772**，`STARTED Sat Oct 3 21:33:00`，PPID 1 = launchd，用户 `rocalight`；
+盘上那份 `Contents/MacOS/HeytaMac` 是 **02:56** 的 ⇒ 它跑的进程比自己的磁盘文件旧了一整天）。
+如果 ① 的 mac 段是用 `open -a` 拉起，`open` 会**激活这个已有实例**，
+那"安装副本自截屏"量的就是 **10-03 那个旧进程**，而判据全绿 —— §7 第 82 条的第三种面目。
+
+🔴 **现读提交态那份脚本否证了这个担心**（`git show HEAD:scripts/reinstall-all.sh` 的 `:239-240`）：
+mac 段是**按路径直接 exec** 新装的那份二进制，带 `HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE=…`，
+不经过 `open` ⇒ 起的是新进程，量的不是 pid 772。这条担心到此作废，**不需要加护栏**。
+
+🟡 但同一趟现量出两件**别人会用得着**的事，登记不代改：
+1. pid 772 这类"bundle 已被原地换掉、进程还在"的实例，正是 §7 第 81 条第 3 点写的**僵尸实例污染窗口清单**：
+   任何用 `window-id.swift` + `screencapture -l` 按标题选窗的门禁（`check:macos-window` 那条链）
+   都可能选到它而不是新实例。**它不是我起的，我不杀**；要清由它的属主或用户做。
+2. 这条也是"为什么 ① 的 mac 判据刻意用 `HEYTA_SELF_CAPTURE`（应用自截屏）而不是窗口截图"的**现场理由**——
+   自截屏由被 exec 的那个进程自己写文件，天然指对了对象；窗口截图要自己选窗，就会撞上第 1 点那枚坑。
