@@ -2796,3 +2796,30 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 - 现场（12:39 现量）：链 v19 pid 92734 仍在第 16 轮，挡的那一条没变 —— `emulator-5554` 上 `com.heyta`
   pid=22880 在前台（`mCurrentFocus` 三个时刻读数 `1deff6`→`a1f20ec`→`b2e9cbc`，说明那台设备**正在被人反复操作**，
   不是残留窗口）；窗口仍关，①③ 继续等。
+- 🔴 **① 还差一道门我才敢让它起跑：mac 段起跑第一步会 `rm -rf` 别人正在公证的那个目录**（已在**我自己的启动器**里补齐，`/tmp/heyta-run-reinstall.sh` 归档 sha8 `42e10fd7`，夹具 sha8 `d982933c`：**7 臂全绿 / MACDIST_FIXTURE=GREEN**）
+  - 机制（不是猜测，是逐行读的）：`scripts/reinstall-all.sh:196` `MAC_OUT="/tmp/heyta-macos-dist"`，
+    `:199` 紧跟一句 **`rm -rf "$MAC_OUT"`**（注释写的是"清掉旧安装包"），而 `apps/desktop-macos/scripts/package-app.sh:28`
+    的默认输出目录**就是这同一枚** `/tmp/heyta-macos-dist`。
+    12:4x 现量：另一条线那枚挂了的 `notarytool submit --wait` 读的正是
+    `/private/tmp/heyta-macos-dist/Heyta-1.0.0.dmg`（`lsof` 现量：`diskimage/98171 … 5u REG … 2296476` 打开着它）。
+    ⇒ 我若此刻起跑 ①，第一个动作就是把别人那枚在途公证的 dmg 从 underneath 删掉。
+    **这不是"抢窗口"，是毁掉别人已经付出的等待** —— 按 AGENTS §8.9 与"只对自己创建的对象动手"，这种动作必须在起跑前拦掉。
+  - 已有的那道人不够用（说清是哪一半）：启动器原本有 `RIVAL` 那道门（按 argv 形状认"别人的重装在跑"，
+    06:35 那次"别人的 grep 命中自己"的教训修过），**它能拦住今天这个现场**（93817 还活着）。
+    但它认的是"重装在跑"，**认不出父进程已退出、只剩 notarytool/dmg 句柄的孤儿态** —— 而那正是最贵的一种
+    （九小时的等待还挂在服务端）。所以补的是**对象级**的第二道腿，不是再抄一遍名字匹配。
+  - 两条腿都有现量正/负对照（12:4x）：
+    · 进程腿 `pgrep -x notarytool` → `98934`；`pgrep -x notarytool_not_here` → 空。
+    · 句柄腿 `lsof +D /tmp/heyta-macos-dist` → `diskimage/98171`；对不存在的目录同一条命令 → 空。
+    ⚠️ **一度想用 `pgrep -f 'notarytool submit'` 那类 pattern 口径，现量它读不出这枚**（真-runner helper 的
+    argv 形状判定是给 `*.sh` 那种形态设计的，对 notarytool 返回空）—— 拿它当门就是**假绿**。
+  - 夹具四臂 + 两变异 + 对照：`两条腿都空 ⇒ 放行`、`只有进程腿 ⇒ 拦`、**`只有句柄腿（孤儿态）⇒ 拦`**、`两条都命中 ⇒ 拦`；
+    M1 摘句柄腿 ⇒ 孤儿态从 REFUSE 翻成 PASS-THROUGH（这条变异就是"没有这次修复的世界"），
+    M2 摘进程腿 ⇒ F2 翻成 PASS-THROUGH；未变异对照同态仍 REFUSE。
+    切片按 `mac-dist-guard begin/end` 标记抽 shipped 那 6 行，`pgrep`/`lsof` 在假 env 里 shadow，判据本体一个字没动
+    （不 shadow 就得真去起一枚 notarytool 才能测 —— 那是要动别人领域的动作）。
+  - ⚠️ **不代改的部分**：`reinstall-all.sh` 里那枚共享输出目录本身仍是硬编码的（该文件此刻在工作树里干净，
+    属主不是我这条线）。登记给它的属主：`MAC_OUT` 应按载体分开（或起跑前做同样的对象级占用检查），
+    否则**任何两条线各自跑 ① 都会互相删包**，而两边的判据都只看自己的截图 —— 谁都不会报红。
+- 现场（12:44 现量）：链 v19 第 23 轮仍被 `emulator-5554` 上前台的 `com.heyta`（pid 22880）挡着；负载、端口、
+  别人的 iOS 卡片导出验收照旧 ⇒ ①③ 继续等窗口。本轮没有起跑任何设备/Playwright/重装类验收。
