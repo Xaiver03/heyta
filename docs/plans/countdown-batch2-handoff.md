@@ -21,7 +21,18 @@
 > ⚠️ 代价：`card-export-units.ts` 改了 ⇒ 13:20 那趟 Android 读数当场过期，重取排在链 T 第 [4] 步。
 > W8 壳级门禁 = **windows 那栏已有真实读数**（链 S 四臂）、~~mac 那栏仍未取证（两条硬理由见 §0.5 第 W8 行）~~
 > **mac 那栏 14:4x 起改成"排队自取"**：`check-shell-surfaces.mjs:944` 有 `HEYTA_MACOS_WEB_DIST` 覆盖 ⇒ 本批自己打一份到私有 OUT_DIR 就能读（链 W，pid 62956，带 `HEYTA_SKIP_NOTARIZE=1`）；
-> 关不掉的只剩"装进 /Applications"那一格，**三条**硬理由逐条带 pid/行号在计划 §8.4 ㊳ 的"macOS 那一腿的关闭条件"段（新增那条没有绕法：`reinstall-all.sh:198` 要 `rm -rf` 的正是 **pid 772 跑着的那枚包**）；
+> 关不掉的只剩"装进 /Applications"那一格，**三条**硬理由逐条带 pid/行号在计划 §8.4 ㊳ 的"macOS 那一腿的关闭条件"段（新增那条没有绕法：`reinstall-all.sh:198` 要 `rm -rf` 的正是 **pid 772 跑着的那枚包**）
+> —— 🔴 **04 18:2x 这三条"硬理由"里那条 pid 772 的已被现量否证，原地改掉**：18:20 现量 `lsof +D /Applications/Heyta.app` **零行**、
+> `ps -p 772` 给出 `%cpu 0.0 / state S / etime 20h47m` ⇒ 它是**闲置的 leftovers 而不是"谁正在用它"**；
+> 它盘上那份包内 `web-dist/index.html` 是 `217cae2a252d8948`，**不等于**当前 `517c6ba76d00fb25` ⇒ **"装进 /Applications"这一格该由本批关掉**，
+> 不再挂在共享位置的持有者手里（链 MAC 就是这一腿）。⚠️ 动手前查了并行台账 `BLOCKED.md:3419`，
+> 那里**早已把"21:33 那个旧实例挡着"判过否证** ⇒ 我不杀它、也不代它做归属裁决，只把这一腿的读数取回来。
+> 🔴 **同一条台账还证了一件事**：`BLOCKED.md:4375` 把他们的阻塞写成"与我抢同一处固定路径 `/tmp/heyta-macos-dist`"，
+> 那是**他们的链活着时**的读数；18:20 现量 `pgrep -fl 'notarytool|reinstall-all|package-app'` **零命中** ⇒ 对手没了，
+> 但**物证还在原地**（那枚 dmg 被 pid 98171 持有）。所以 mac 段开局那句 `rm -rf "$MAC_OUT"`（`:192/:196`，路径写死）
+> 现在删的不再是"对手的在产物"而是**别人已经交付的证据** ⇒ 本轮处置 = **改名保住**（`/tmp/heyta-macos-dist-0313-held`，非破坏、可逆，
+> 对方 FD 仍指向同一 inode），结构性修法（`HEYTA_MACOS_DIST_DIR` 旋钮、默认值逐字不变）登记任务 #32。
+> 全部现量与缘由在计划 §8.4 ㊣。；
 > W9 原生投递**不归本批**（另一条会话持有）；
 > 收尾四项现在是：①完整 `pnpm check` —— 13:26 那次停在 `check:ui-provider`，14:0x 已修好该判据（四臂变异）并**排在链 X 之后重取**（链 Y）；
 > ②`docs-link-check` **rc=0**（14:04 现量）；③界面结论截图**人已看**（本批的：android 成品图 13:2x、windows 打包图 10:4x、web 三张 23:0x）；
