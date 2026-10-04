@@ -27,7 +27,12 @@
  *   M11 摘掉推荐段、正文里留「推荐」二字 → 仍然点名（挡"把 Apple 的话当成我们的推荐"这种凑数）
  *   M12 抹掉 C1b-Q7 标题里的例外声明     → 腿 4 点名 Q7（证明例外档承重、且读的是标题）
  *   M13 摘掉 C1b-Q1 推荐段              → 点名 Q1，**尽管**正文里有一句"不需要拍板"（例外只从标题认）
- *   脱牙 ×2 摘掉腿 4                     → 同一份文档不再报出那一句；喂缺日期的文档仍红在腿 3
+ *   —— 腿 5（外部锚：URL 或第三方源码行号；只有自家路径不算）20:2x 起加：
+ *   M14 把某节 URL 全换成自家 `packages/…:12` → **只红腿 5**，腿 3（有出处即算）仍绿 —— 两档分工的机器证明
+ *   M15 同一节零 URL 但引第三方行号（裸文件名形状）→ 放过（挡住"必须 URL"那种把口径写窄的改法）
+ *   M16 把 M14 那份文档喂「还没有腿 5 的那版判据」→ RC=0（减法现量）。
+ *                          🔴 旧版按内容从文件历史认，**不按 HEAD** —— 按 HEAD 取会在腿 5 提交后自己变红
+ *   脱牙 ×3 摘掉腿 4 / 腿 5              → 同一份文档不再报出那一句；喂缺日期的文档仍红在腿 3
  *   对照 未变异的副本 / 复位后           → 全绿 RC=0
  *
  * 全程只改 /tmp 副本；仓库工作树与别人的产物不动。
@@ -352,6 +357,94 @@ check(
   n4.status === 1 && legCount(n4out, WEAK) >= 1,
   `RC=${n4.status}｜弱节 ${legCount(n4out, WEAK)} 条`,
 );
+
+// M14 / M15：腿 5「外部锚」（目标第 1 条那句"做**外部**调研（别人怎么做的）"的机器消费者）。
+// 两臂方向相反，钉的是同一个口径决定：**URL 或第三方源码行号都算外部，只有自家路径不算**。
+// M14 还顺带证明腿 5 与 weak 的分工 —— 把 URL 换成自家 `packages/…:12` 之后，
+// weak 那一档**必须仍然绿**（它只问"有没有出处"），只有腿 5 红。写成"两档都红"就是错的期望
+// （同一族的错在 §8.79 的 J4 上犯过一次：期望值自己猜，跑一趟才发现两档分工不同）。
+const NOEXT = '🔴 C1b 节只有自家路径的 file:line 而没有 URL，也没有第三方源码引用（没回答"别人怎么做的"）';
+const swapDocUrls = (t, titleRe, replacement) => {
+  const ls = t.split('\n');
+  const { s, e } = sectionRange(ls, titleRe);
+  const body = ls.slice(s, e).join('\n');
+  const urls = (body.match(/https?:\/\/\S+/g) || []).length;
+  if (!urls) throw new Error(`M14/M15 找不到 ${titleRe} 那一节的 URL —— 那一节的取证形状变了，这两条臂没有靶`);
+  const nextBody = body.replace(/https?:\/\/\S+/g, replacement);
+  if (/https?:\/\//.test(nextBody)) throw new Error('URL 没抹干净');
+  return [...ls.slice(0, s), nextBody, ...ls.slice(e)].join('\n');
+};
+const swapUrls = (titleRe, replacement) => withDoc((t) => swapDocUrls(t, titleRe, replacement));
+const m14 = swapUrls(/C1b-Q1/, 'packages/ui/src/focus/FocusPanel.tsx:12');
+const m14out = m14.out;
+check(
+  'M14 把某一节的 URL 全换成自家路径的行号 → 只有腿 5 红（weak 仍绿：两档问的不是同一件事）',
+  m14.rc === 1 &&
+    legCount(m14out, NOEXT) === 1 &&
+    m14out.includes('C1b-Q1') &&
+    legCount(m14out, WEAK) === 0 &&
+    legCount(m14out, NOREC) === 0,
+  `RC=${m14.rc}｜缺外部锚 ${legCount(m14out, NOEXT)}｜weak ${legCount(m14out, WEAK)}｜缺推荐 ${legCount(m14out, NOREC)}`,
+);
+// M15：同一节只留**第三方形状**的行号（本档真实的引用形状是裸文件名，见判据注释）⇒ 必须放过
+const m15 = swapUrls(/C1b-Q1/, 'StreakList.kt:48');
+check(
+  'M15 同一节零 URL 但引第三方源码行号 → 放过（这一条挡住"必须有 URL"那种把口径写窄的改法）',
+  m15.rc === 0 && legCount(m15.out, NOEXT) === 0,
+  `RC=${m15.rc}｜缺外部锚 ${legCount(m15.out, NOEXT)}`,
+);
+
+// 脱牙对照（腿 5）：摘掉命中集合后 M14 必须不再报出那一句，而其余腿不受影响
+const neuter5Decl = 'const noExt = sections.filter((s) => !hasExternal(s) && !SECTION_EXC.test(s.title));';
+if (!readFileSync(GATE, 'utf8').includes(neuter5Decl)) {
+  console.log('🔴 装置找不到腿 5 的声明行 —— 判据那一行的字面形状变了，脱牙臂会假装成功，拒绝继续。');
+  process.exit(2);
+}
+const neuter5Gate = join(scratch, 'gate-no-leg5.mjs');
+writeFileSync(neuter5Gate, readFileSync(GATE, 'utf8').replace(neuter5Decl, 'const noExt = [];'), 'utf8');
+writeFileSync(doc, swapDocUrls(ORIGINAL, /C1b-Q1/, 'packages/ui/src/focus/FocusPanel.tsx:12'), 'utf8');
+const n5 = spawnSync(process.execPath, [neuter5Gate, doc], { encoding: 'utf8' });
+const n5out = `${n5.stdout}${n5.stderr}`;
+check(
+  '脱牙对照 摘掉腿 5 → 同一份文档不再报出"缺外部锚"那一句（M14 的红确实挂在这条腿上）',
+  n5.status === 0 && !n5out.includes('没有第三方源码引用'),
+  `RC=${n5.status}`,
+);
+writeFileSync(doc, ORIGINAL, 'utf8');
+
+// M16：把 M14 同一份文档喂「还没有腿 5 的那版判据」⇒ 必须 RC=0（减法现量：这一档此前真的没人管）。
+// 🔴 旧版**按内容从文件历史里认，不按 HEAD 取** —— 按 HEAD 取的话，腿 5 一提交这条臂就自己变红
+//   （同一批在 §8 表的 P4 上实测踩过，教训写在工单 §8.87 第 3 节）。
+{
+  const hist = execFileSync('git', ['-C', repoRoot, 'log', '--format=%H', '--', 'scripts/check-detail-pane-c1-coverage.mjs'], {
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .slice(0, 12);
+  let found = '';
+  let oldSrc = '';
+  for (const sha of hist) {
+    const src = execFileSync('git', ['-C', repoRoot, 'show', `${sha}:scripts/check-detail-pane-c1-coverage.mjs`], { encoding: 'utf8' });
+    if (!src.includes(neuter5Decl) && src.includes('const weak =')) {
+      found = sha;
+      oldSrc = src;
+      break;
+    }
+  }
+  if (!found) throw new Error(`前 ${hist.length} 版里找不到"还没有腿 5"的那版判据 —— 窗口要放宽，但绝不许拿当前版冒充旧版。`);
+  const oldGate = join(scratch, 'gate-before-leg5.mjs');
+  writeFileSync(oldGate, oldSrc, 'utf8');
+  writeFileSync(doc, swapDocUrls(ORIGINAL, /C1b-Q1/, 'packages/ui/src/focus/FocusPanel.tsx:12'), 'utf8');
+  const r = spawnSync(process.execPath, [oldGate, doc], { encoding: 'utf8' });
+  writeFileSync(doc, ORIGINAL, 'utf8');
+  check(
+    'M16 同一份变异喂「还没有腿 5 的那版判据」→ RC=0（补的是实测存在的缺口，不是顺手加严）',
+    r.status === 0,
+    `RC=${r.status}｜取的是 ${found.slice(0, 8)}（按内容认）`,
+  );
+}
 
 // 对照：恢复干净后全绿
 const control = withDoc(null);
