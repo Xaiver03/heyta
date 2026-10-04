@@ -69,6 +69,36 @@ async function idOf(page: import('@playwright/test').Page, name: string): Promis
   return hit[0].id;
 }
 
+/**
+ * 🔴 滚进视口 + 截图，全部走**新鲜定位器**并在 detach 时重试（10-04 修）。
+ *
+ * 为什么需要它：移动/展开这类动作之后 op 异步落地、`OrganizerList` 按树重排
+ * 会**换掉整行节点** —— 旧定位器解析到的元素在 `scrollIntoViewIfNeeded()`
+ * 执行瞬间 detach，而 Playwright 对这个动作不自动重试（实测全套件里
+ * 两次确定性红都是这个形状）。重试用 `data-testid` 重新解析，重排完成后
+ * 节点稳定，最多一两趟就过；判据（可见性/计数）不变。
+ */
+async function scrollFreshAndShoot(
+  page: import('@playwright/test').Page,
+  testId: string,
+  shotName: string,
+  attempts = 3,
+): Promise<void> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const loc = page.getByTestId(testId);
+      await loc.waitFor({ state: 'visible', timeout: 5_000 });
+      await loc.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `test-results/${shotName}` });
+      return;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
 test('清单移入文件夹：入口常驻、跨刷新还在、非法目标不给点', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 860 });
 
@@ -101,8 +131,7 @@ test('清单移入文件夹：入口常驻、跨刷新还在、非法目标不�
   //    03:33 那一趟的 `list-folder-2-menu-open.png` 就是这个形状：断言全过（DOM 里确实有），
   //    而 viewport 截图只拍到菜单边框的一小条，人看不出任何事（§6.2 规定一要的是"人看过"，
   //    不是"截了"）。`fullPage: true` 也不行 —— 侧栏是滚动容器，整页截图拍不进它内部。
-  await menu.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: 'test-results/list-folder-2-menu-open.png' });
+  await scrollFreshAndShoot(page, `web-list-folder-${childId}-menu`, 'list-folder-2-menu-open.png');
   await expect(
     menu.getByText('移入文件夹', { exact: true }),
     '菜单标题必须用共享词条，不是宿主自己拼的串',
@@ -112,8 +141,10 @@ test('清单移入文件夹：入口常驻、跨刷新还在、非法目标不�
   // 菜单选定后收起：展开内容**只在 open 时进 DOM**，所以判据是"整个菜单消失"。
   await expect(page.getByTestId(`web-list-folder-${childId}-menu`)).toHaveCount(0);
   // 这张图要证的是「子行现在缩进在父行下面」，而那一行在清单末尾 —— 同上，不滚进视口就拍不到它。
-  await page.getByTestId(`web-list-folder-${childId}-trigger`).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: 'test-results/list-folder-3-after-move.png' });
+  // 🔴 移动点击之后 op 异步落地、`OrganizerList` 按树重排会**换掉子行节点**：旧定位器在
+  //    滚动瞬间 detach（`scrollIntoViewIfNeeded` 不对 detached 自动重试）。必须用新鲜
+  //    定位器重试这一对动作 —— 实测 10-04 全套件里两次确定性红都在这一步。
+  await scrollFreshAndShoot(page, `web-list-folder-${childId}-trigger`, 'list-folder-3-after-move.png');
 
   // 🔴 刷新后仍在（这条是"真的写进 op-log 并物化了"的判据，不是本地态）。
   await page.reload();
