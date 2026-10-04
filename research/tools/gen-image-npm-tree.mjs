@@ -43,6 +43,35 @@ const TARGET = { os: 'linux', cpu: 'x64', libc: 'musl' };
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
+/**
+ * 🔴 新鲜度哈希只盖**依赖相关字段**，不盖整个文件（2026-10-04 收窄）。
+ *
+ * 原先哈希整个 package.json ⇒ 加一条测试脚本名也会让 `--check` 红，
+ * 而那个改动**不影响镜像里装出来的任何东西**。一杆对无关改动乱响的尺子
+ * 会训练人忽略它——真到依赖漂移那天反而当噪声放过去。
+ * 收窄后仍然盖住全部会改变安装结果的面：dependencies / devDependencies /
+ * optionalDependencies / peerDependencies / overrides / engines / packageManager。
+ * ⚠️ 改这个函数的取值集合 = 换了指纹口径 ⇒ 必须重跑生成器落新快照，
+ * 且要在这里写明为什么新集合仍然盖住"真进镜像的东西"。
+ */
+const DEP_FIELDS = [
+  'dependencies',
+  'devDependencies',
+  'optionalDependencies',
+  'peerDependencies',
+  'overrides',
+  'engines',
+  'packageManager',
+];
+function depsFingerprint(pkgJsonText) {
+  const pkg = JSON.parse(pkgJsonText);
+  const picked = {};
+  for (const key of DEP_FIELDS) {
+    if (pkg[key] !== undefined) picked[key] = pkg[key];
+  }
+  return sha256(JSON.stringify(picked));
+}
+
 function fail(msg) {
   console.error(`❌ ${msg}`);
   process.exit(1);
@@ -107,13 +136,13 @@ for (const name of packedNames) {
     );
   }
   const text = readFileSync(p, 'utf8');
-  packedPackageJson[rel] = sha256(text);
+  packedPackageJson[rel] = depsFingerprint(text);
   sources[dir] = JSON.parse(text);
 }
 const INPUTS_BASE = {
   targetPlatform: TARGET,
   registry,
-  serverPackageJsonSha256: sha256(readFileSync(serverPkgPath, 'utf8')),
+  serverPackageJsonSha256: depsFingerprint(readFileSync(serverPkgPath, 'utf8')),
   installShapeSha256: sha256(shape.normalizedShape),
   packedWorkspaceDeps: packedNames,
   packedPackageJsonSha256: packedPackageJson,
