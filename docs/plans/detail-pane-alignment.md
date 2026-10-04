@@ -8481,3 +8481,65 @@ C 缺快照必须 rc=2 / D `--keep` 真的把字节留下 / 收尾工作树零�
   得到的会是比"没跑"更坏的**假绿**。
 - 因此这一节的正确读法是：**静态面全绿**；`#13` 那格的真实前置仍是
   **合流落地 + 低负载窗口重跑单测与 e2e + 四端重装**，一个都没被本节替掉。
+
+## 8.129 调研文档的出处第一次被"真的取回"了一次（2026-10-05 03:3x，装置 `950c004a` + 修复 `378837b1`）
+
+### 1. 这一档以前**没有任何消费者**
+
+目标第 (1) 条要求调研"带日期 + 出处"。两枚既有门禁各守一半，中间那条缝没人管：
+
+| 装置 | 它实际看的 | 它看不到的 |
+|---|---|---|
+| `check:detail-pane-c1-coverage` | 每个对照节**有没有**外部锚（URL 或第三方源码行号）—— 形状 | 锚**取不取到**：它一次网络请求都不发 |
+| `research/tools/docs-link-check.mjs` | markdown 链接 `[文本](目标)` 的目标在不在仓库里 | 行内 `` `path:line` `` 与裸 URL（本档大量出处正是这两种写法）；也不跟外链 |
+
+⇒ 新装置 `research/tools/detail-pane-citation-liveness.mjs`：把文中每条外链**真的取一次**，
+按 `LIVE / REDIRECT / BLOCKED / TEMPLATE / DEAD / OTHER` 分档并打落点。
+🔴 **它不进 `pnpm check`**：判据依赖外网与对端反爬策略，拿它拦提交会得到一批与文档质量无关的红
+（与 `verify:legal-links` 同档：显式调用）。
+
+### 2. 四趟、四种探针病，症状全同
+
+头四趟里**每一趟都报过"一批死链"**，而每一趟的真因都在解析层：
+
+1. 截断集合缺**反引号与中文标点** ⇒ `…/things/` 后面紧跟的正文粘进 URL（12 条"死链"里 9 条这么来）；
+2. 修 1 时把 **`>`** 从匹配集合里丢了 ⇒ markdown 自动链接 `<https://…>` 全部带尾 `>` ⇒ **31 条"死链"**；
+3. 只切中文标点、**不切汉字** ⇒ `[文本](…html)界定`（右括号后紧跟汉字、中间没空格）把汉字粘进 URL；
+   这一条是**分母自检**报出来的，不是我看出来的；
+4. 🔴 最贵的一处：匹配集合不排汉字 ⇒ 同一行两条链接时，第一条的 match 一路吞到下一个空白，
+   **把第二条整条 URL 吃进自己肚子里**。分母从 75 掉到 71，**没有任何一层报红**。
+   被吞回来的样本：`Anki_(software)`、`pmc4492928`、`sspai/post/59522`、`apple review guidelines`、
+   `ticktick features/upgrade`、`todoist reminders`、`omnigroup perspectives`、`samr`。
+
+配套三件让它骗不了人：**分母自检**（解析结果里还剩引号/汉字 ⇒ `exit 2 PROBE_BROKEN`）、
+**`--list`**（只打分母就退出 —— 上一版把 ASCII 冒号当截断字符时，分母静默变 0，而"0 条里 0 条死"看起来是绿的）、
+**`TEMPLATE` 单独一档**（见第 3 节）。
+
+### 3. 权威读数（第四趟，修复后）
+
+`分母：可取 URL 75 条 + 模板 2 条｜LIVE=60 REDIRECT=13 BLOCKED=2 DEAD=0 OTHER=0` ⇒ `VERDICT=OK`、`RC=0`。
+
+**结论：本档的外链出处没有一条是死的。** 两枚"看着像死链"的真相：
+
+- `…/human-interface-guidelines/<slug>.json` 与 `…/help.dida365.com/articles/<任一 id>`
+  是**取法模板**，不是地址 —— 探针取它必然 404。实例今天单独取过：
+  `…/human-interface-guidelines/sidebars.json` ⇒ **200** ⇒ 调研里那句"Apple 正文走这条通道"（C2 第 9 条）仍然成立。
+- `BLOCKED` 那两条是 `developer.android.com` 的规范页：匿名请求返回 302 进 `accounts.google.com` 登录回路，
+  跟进去是 50 跳 ⇒ **对端把探针挡在门外**，不是文档写错。
+
+⚠️ **`BLOCKED` 这一档会漂**：第三趟里 `github.com/iSoron/uhabits/…FrequencyChart.kt` 报 429，
+第四趟同一枚就取到了。所以 `BLOCKED` 不是"这枚出处不可靠"的结论，只是"这一趟没量到"。
+
+### 4. 装置自己的判据与变异面
+
+- **常驻判据 0 条**（它是显式调用的对账工具，不进 `pnpm check` ⇒ 没有"每次提交都跑"的消费者）。
+- **能失败吗：量过了。** 一枚四臂夹具（`/tmp/dp_cite_fixture2.md`，用完即弃）：
+  假域名的真死链 ⇒ `DEAD`；`sidebars.json` ⇒ `LIVE`；两条 android 规范页 ⇒ `BLOCKED`。
+  读数 `分母：URL 4 条｜LIVE=1 REDIRECT=0 BLOCKED=2 DEAD=1 OTHER=0`、`RC=1` ⇒ **四臂各落一档，没有互相串**。
+  加上第 2 节那四趟"每一趟都红过一次"，这枚装置是**被证明会红**之后才拿来报绿的。
+
+### 5. 登记一条合流当时动作（不冒充已做）
+
+外链存活是**时刻性**读数，不是提交属性。⇒ 合流当时（待办 #21 那一组）再跑一趟
+`node research/tools/detail-pane-citation-liveness.mjs`，并把 `DEAD` 与 `BLOCKED` 逐条读完；
+`DEAD` 若不为 0，改的是**调研文档本体**（撤回或换出处），不是放宽装置。
