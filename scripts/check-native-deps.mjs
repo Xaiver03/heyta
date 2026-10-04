@@ -26,6 +26,8 @@
  *   1. **收录**：每个第三方原生依赖的 pod 名，必须出现在 `Podfile.lock` 的 PODS 段。
  *      第 32 号陷阱就是这条被违反。
  *   2. **版本一致**：`Podfile.lock` 记的版本，必须等于该包 `package.json` 的 `version`。
+ *   3. **工程文件不许重复登记**：`project.pbxproj` 里同一个 PBXBuildFile 只能有一条，
+ *      且同一个 `files = (…)` 阶段里不许出现两次。
  *
  * 规则 2 之所以能做成**确定性的**（而不是像最初设想的那样比 mtime）：
  * 实测这四个 podspec 全都用 `s.version = package['version']` 取值
@@ -217,6 +219,67 @@ if (natives.length > 0 && !existsSync(lockPath)) {
   }
 }
 
+// ── 规则 3：Xcode 工程文件里的编译条目不许重复 ───────────────────────────────
+//
+// 为什么这一条住在这里而不是"让 Xcode 自己去说"：同一个模块被机械追加两次
+// （`HeytaCardExportModule.swift` / 它的 `…Bridge.m` 实测各出现 4 次：PBXBuildFile
+// 段 2 次 + Sources 阶段 2 次），xcodebuild 只打一行
+// `warning: Skipping duplicate build file in Compile Sources build phase` 然后
+// **BUILD SUCCEEDED**。警告埋在 16 MB 的构建日志里，而每一次 iOS 构建都有它 ——
+// 于是"日志里有警告"这件事再也不能被当成任何信号。
+const PBXPROJ = join(APP_DIR, 'ios', 'Heyta.xcodeproj', 'project.pbxproj');
+const project = { entries: 0, phases: 0, dupEntries: [], dupInPhase: [] };
+
+if (!isFile(PBXPROJ)) {
+  violations.push({
+    kind: 'no-pbxproj',
+    dep: '(整个 iOS 工程)',
+    pod: '(缺失)',
+    why: `${PBXPROJ} 不存在 —— 工程文件读不到时下面那条"无重复"的结论不成立，所以判红而不是判绿`,
+    fix: `确认 --app-dir 指向带 ios/ 的工程（本仓库是 apps/mobile）`,
+  });
+} else {
+  const text = readFileSync(PBXPROJ, 'utf8');
+  const section =
+    /\/\* Begin PBXBuildFile section \*\/([\s\S]*?)\/\* End PBXBuildFile section \*\//.exec(text);
+  const ids = section
+    ? [...section[1].matchAll(/^\t\t([0-9A-F]{24}) \/\* (.*?) \*\/ = \{isa = PBXBuildFile/gm)]
+    : [];
+  project.entries = ids.length;
+  const seenEntry = new Set();
+  for (const [, id, name] of ids) {
+    if (seenEntry.has(id)) project.dupEntries.push(`${name}（${id}）`);
+    seenEntry.add(id);
+  }
+  for (const phase of text.matchAll(/\t\t\tfiles = \(([\s\S]*?)\n\t\t\t\);/g)) {
+    project.phases += 1;
+    const seenPhase = new Set();
+    for (const m of phase[1].matchAll(/^\t\t\t\t([0-9A-F]{24}) \/\* (.*?) \*\//gm)) {
+      if (seenPhase.has(m[1])) project.dupInPhase.push(`${m[2]}（${m[1]}）`);
+      seenPhase.add(m[1]);
+    }
+  }
+  // 前置断言：读到 0 条 / 0 个阶段 = 探针没看见东西，不是"没有重复"
+  if (project.entries === 0 || project.phases === 0) {
+    violations.push({
+      kind: 'pbxproj-unreadable',
+      dep: '(整个 iOS 工程)',
+      pod: '(解析)',
+      why: `${PBXPROJ} 里解析到 ${String(project.entries)} 条 PBXBuildFile、${String(project.phases)} 个 files 阶段 —— 其中之一为 0 说明解析形状不对，此时"无重复"是假的`,
+      fix: `改 check-native-deps.mjs 的正则前先确认工程文件的段名/缩进没变`,
+    });
+  }
+  for (const dup of [...project.dupEntries, ...project.dupInPhase]) {
+    violations.push({
+      kind: 'pbxproj-dup',
+      dep: '(整个 iOS 工程)',
+      pod: dup,
+      why: `同一个编译条目出现两次 —— 构建只会 succeed 并留下一行 "Skipping duplicate build file" 警告`,
+      fix: `在 ${PBXPROJ} 里删掉多余的那一份（PBXBuildFile 段与 Sources 阶段各一处）`,
+    });
+  }
+}
+
 // ── 输出 ─────────────────────────────────────────────────────────────────────
 
 if (JSON_OUT) {
@@ -226,6 +289,7 @@ if (JSON_OUT) {
         app: APP_DIR,
         lockPath,
         nativeCount: natives.length,
+        project,
         natives: natives.map((n) => ({ dep: n.dep, pod: n.pod, version: n.version })),
         violations,
         failing: violations.length,
@@ -243,7 +307,7 @@ if (violations.length === 0) {
     .sort()
     .join('、');
   console.log(
-    `✅ iOS 原生依赖对账一致（${APP_DIR}：${String(natives.length)} 个原生 pod 全部命中 Podfile.lock：${listed}）。`,
+    `✅ iOS 原生依赖对账一致（${APP_DIR}：${String(natives.length)} 个原生 pod 全部命中 Podfile.lock：${listed}；工程文件 ${String(project.entries)} 条编译条目 / ${String(project.phases)} 个 files 阶段无重复）。`,
   );
   process.exit(0);
 }
