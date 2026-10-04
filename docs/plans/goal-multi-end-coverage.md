@@ -2909,15 +2909,24 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 
 ```
 载体 = heyta-wt-reinstall @ <sha>   scripts/reinstall-all.sh blob = <sha>（03:35 现量为 036ce09a）
+载体身份（收尾）=<sha> ⇒ 与起跑一致          # 04:03 补：这一行**不是仪式** —— 不等时五张图属于两棵树，
+                                            #   启动器 :356 会 VERDICT=NOT-RUNNING 退 3，而 INNER_EXIT 仍是 0
 PHASE1_EXIT=<n>（mac+windows）
 PHASE2_EXIT=<n>（android+ios）        # 或 PHASE2=SKIPPED-BY-GATE / ANDROID-SKIPPED-BY-RULE ⇒ ① 未完成
 INNER_EXIT=<n>   FRESH=<n>/5
-图 1 /tmp/heyta-reinstall-mac-installed.png            size=… mtime=… md5=…  ← 只作参考，主蓝不据它判红
-图 2 …mac-installed.png.webview.png                    size=… mtime=… md5=…  ← 主蓝命中 <n>（阈值 ≥20）
-图 3 /tmp/heyta-reinstall-android.png                  size=… mtime=… md5=…  ← 前台窗口门：mCurrentFocus=…
-图 4 /tmp/heyta-reinstall-ios.png                      size=… mtime=… md5=…  ← 先过新鲜度（不过则根本没这张图）
-图 5 <载体>/dist/windows/packaged-first-run.png        size=… mtime=… md5=…  ← 配 ADD_APPX=OK / RESULT=OK
-人看过：五枚逐张写"看到了什么"（标题/正文/主蓝在不在），不是"截了图"
+本轮新生张数 = <n> / 期望 <n>；证据已抄进 <EVID>    # 启动器 :344 的原话；EVID 目录名带的是**起跑那一版**
+COPY_BAD=<n>                          # 04:03 补：非 0 时启动器退 3。归档失败与"五张都成了"在退出码之外**长得一模一样**
+图 1 <EVID>/heyta-reinstall-mac-installed.png        size=… mtime=… md5=…  ← 只证「有个真 macOS 窗口」，主蓝不据它判红
+图 2 <EVID>/heyta-reinstall-mac-installed.png.webview.png …  ← 主蓝命中 <n>（阈值 ≥20）
+图 3 <EVID>/heyta-reinstall-android.png              …  ← 前台窗口门：mCurrentFocus=…
+图 4 <EVID>/heyta-reinstall-ios.png                  …  ← 先过新鲜度（不过则根本没这张图）
+图 5 归档件 = <EVID>/carrier/packaged-first-run.png   …  ← 🔴 04:03 **读码**更正（不是实测，本批 ① 还没有读数）：
+                                          原件在 <载体>/dist/windows/packaged-first-run.png，
+                                          启动器 :327-328 按"路径是不是绝对"分流 —— **非绝对路径的产物走 $EVID/carrier/**，
+                                          所以要看的那枚在 carrier/ 子目录，且它不随下一趟 reinstall 被覆盖。
+                                          配 ADD_APPX=OK / RESULT=OK；等真读数出现时把这一行的分支回读成实测
+人看过：五枚**都从 <EVID> 里打开**（不是 /tmp），逐张写"看到了什么"（标题/正文/主蓝在不在），不是"截了图"
+inner.log：启动器把整条内层日志也抄进 <EVID>/inner.log（:277）⇒ INNER_EXIT=0 这句话要能在图旁边被读到
 ```
 
 ② 三段 e2e + 全量 `pnpm check` —— **"可过段数"只认整条链那一行**（交接账 03:37 那节）：
