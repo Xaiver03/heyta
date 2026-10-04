@@ -1112,3 +1112,15 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   七臂夹具 `~/.heyta-window-rigs/heyta-reinstall-split-fixture.sh` 现量 GREEN，
   其中 A2 是"门关了不许跑设备面"、A7 是变异臂（把第二次 `run_gate` 摘掉 ⇒ A2 立刻变红），
   所以这道门**有牙**；既有两把夹具（relask 八臂、设备占用六臂）复跑仍 GREEN，无回归。
+- 🔴 **② 的启动器原来盯漏了一个端口，而漏的那个正是"会杀别人的那一段"用的**（19:4x 现读实现查出来的，
+  不是踩出来的）：`heyta-run-checks.sh` 三处端口循环都写死 `4318 4319 4320`，但三条 e2e 各自前置真正
+  会发 `process.kill(..., 'SIGKILL')` 的端口是按**传进去的参数**算的 ——
+  `check-ai-e2e-preflight.mjs:37` 默认 `[4318,4319]`，而 `package.json` 现读
+  `check:privacy-consent-e2e` 传的是 **4322**、`check:landing-e2e` 传 **4320**
+  ⇒ 4322 上别人那台服务端会死在我的读数下面，屏幕上不会说是我杀的（traps #87 的第五种面目）。
+  改法：端口清单抽成一处、来源逐条挂在旁边（`E2E_PORTS="${HEYTA_E2E_PORTS:-4318 4319 4320 4322}"`），
+  表头改成跟着清单打印（原来它印死"4318/4319/4320"，清单一变就是一句假话）。
+  **两臂对照现量**：拿一个真忙的端口喂它 `HEYTA_E2E_PORTS=3000` ⇒ 打印 `:3000 = busy` 且
+  `VERDICT=NOT-RUNNING`、**退 3**；拿一个空闲端口 `4399` ⇒ `free` 且 `rc=0`（PREFLIGHT-OK）。
+  ⚠️ 那个 `HEYTA_E2E_PORTS` 缝**只给夹具做阳性对照用**，不是运营开关；默认值就是实现算出来的那四个。
+  19:45 现场四枚读数：4318/4319/4320/4322 **全 free**（这一格从此不再靠运气）。
