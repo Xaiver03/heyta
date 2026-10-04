@@ -6037,3 +6037,26 @@ node -e 'const fs=require("node:fs");const s=fs.readFileSync("/tmp/heyta-main-ch
    🔴 **这一条差点被两枚假读数改坏**，两枚都记进注释里挡后来者：`ls node_modules | head` **不列点开头条目**，所以真装全的树看着只有 3 项；根 `node_modules/.bin/vitest` 在**四棵真装的树上都不存在**（vitest 是各包的依赖），拿它当缺失信号会让工具恒退 2，反而永久挡死配对。
 
 **本项剩余的一格**：以上都是**分支载体**上的读数。第 1 项落地后要在 **main 侧**再取一次（同一支脚本、同一套判据，载体换成 main），否则"外人一条 compose 起全套"这句在部署态上仍未验证。载体边界也写清：g76 跑在 `feed25c9`，其后那一笔 `360fb91a` 是纯验收工具改动，不在镜像与界面判据的输入里。
+
+### 8.98 落地窗口开好后会不会白跑：载体在新输入下重算 + 一处 `traps #196` 的复发实例（2026-10-04 16:1x–16:2x）
+
+🔴 **本轮抓到的不是合并问题，是"窗口开了以后工具会不会 die"那一格**（§8.90 记过同一族，这次是它自己的第二次实例化）。
+
+`research/tools/selfhost-check-segments.mjs` 的脏树前置在**真树上恒退 2**，报"工作树有 1 条未提交"。那 1 条是 `?? e2e/node_modules` —— linked worktree 里为了不重复装第二份 playwright 而指向主检出的**软链**。它兜在 `git status` 里的原因正是 traps #196 记过的那条：**根 `.gitignore` 写的是带尾斜杠的 `node_modules/`，尾斜杠只匹配目录，挡不住软链**。后果不是难看，是**恒挡**：g74 的扫段与 4b 配对两趟都过不了这道前置，也就是说阻塞集归零、窗口开好之后，那一把会整把 die(2)。
+
+修法是一行（提交 `d0c0802e`）：`node_modules/` → `node_modules`。三条实测，含改前对照：
+
+- `git check-ignore -v e2e/node_modules` → `.gitignore:6:node_modules`（改前：无规则命中）；
+- `git status --porcelain` → 不再出现它（改前：`?? e2e/node_modules` 常驻）；
+- `git ls-files -co --exclude-standard` 命中数 **0** —— 这一条是 #196 原事故的那个方向（打包集合会把未忽略的软链当未跟踪文件送出去），**同一行修两头**。
+- 复跑真树臂：`A_RC=0`，打印 `self=d0c0802e 脏=0 pnpm装过=是 ref=feat/self-host-distribution✓`，那一段真执行且 `rc=0`。
+
+依赖前置那一腿同时被升级（`360fb91a`：读 `node_modules/.modules.yaml` 而不是 `existsSync(node_modules)`），两条被否证的候选记在注释里挡后来者：`ls node_modules | head` 不列点开头条目（真装全的树看着只有 3 项），根 `node_modules/.bin/vitest` 在四棵真装树上都不存在（vitest 是各包的依赖）—— 拿后者当缺失信号会让工具**恒退 2**，比原来的问题更糟。
+
+**载体在新输入下重算**（`ed0a837b = main(4235319d) × feat/self-host-distribution(d0c0802e)`，`CARRIER_RC=0`）：
+
+- 七族解法仍成立，含 `.gitignore` 那一族新增的第 6 行改动 —— 它落在与 main 不同的行上，行并集 + 零丢失断言没被触发。
+- scripts 并集 146 键；`check` 链段 `main=76 本批=67 base=66 并集=77（摘段 0/0）`；非 `scripts` 顶层字段比了 9 个，丢 0。
+- 八道纯 fs 门禁**全 exit 0**（负载 15.99 时跑的：这八道是纯 fs，不需要低负载窗口 —— 需要窗口的是"两边都红⇒非本批"那种配对结论，见 §8.94）。
+- ⚠️ `main` 在本轮内又前进了一次（`8c4cbf1e → 4235319d`，别人那条线的一笔启动器修复）。这坐实了 §8.93 那条：**落地前必须再重算一次载体**，几分钟就 2–3 笔；现量命令就是脚本自己印的那句 `node research/tools/selfhost-merge-carrier.mjs`。
+- ⚠️ 归属边界如实写：这次重算与 g74 用的是**同一个** `/tmp/heyta-merge-carrier`。当时 g74 仍在 POLL 阶段（阻塞集 1 枚，未归零），两趟没有交叠；g74 归零后会自己再重算一次并覆盖本节的 SHA —— 那是设计内的，不是冲突。
