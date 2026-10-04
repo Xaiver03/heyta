@@ -107,7 +107,21 @@ const ARMS = [
     // ⚠️ 第一版这里写成把 `useSelected\(` 换成 `useSelectedZZZ(`（连反斜杠一起摘掉），
     //    结果正则变成 `…['"]task['"]\)` —— 未闭合的分组，`new RegExp` 直接抛，
     //    门禁**崩**在扫描之前，rc=1 来自崩溃而不是分母自检。本臂要的是后者。
-    apply: () => sub1('gate', 'useSelected\\\\(', 'useSelectedZZZ\\\\('),
+    // ⚠️ 第二版（2026-10-05 修）：锚点 `useSelected\\(` 在门禁里涨到**三处**（`readKindRe`
+    //    的构造处、名册 live 判定两处），`sub1` 当场拒绝 —— 臂台红在"锚点不唯一"上，
+    //    而不是红在判据上。
+    // 🔴 第三版才找对靶：第二版换成 `const re = new RegExp(...` 那个"唯一锚点"之后 rc=0，
+    //    看着像"分母自检没牙"。实际是那一行属于**名册 live 判定**（失败串是「断言 I：…」），
+    //    而 `readsSeen` 由 `readKindRe` 喂 —— 我改坏的是另一把尺子，不是这条判据的输入。
+    //    第一反应会是"放宽 expectRed"或"宣布这条分母自检是假的"，两条都搞反了：
+    //    判据本体就写着 `if (readsSeen.length === 0)`，在的。
+    //    📌 变异臂不红时，先确认改的那一行是不是这条判据的**输入**，再谈判据的强度。
+    apply: () =>
+      sub1(
+        'gate',
+        'const readKindRe = (kind) => new RegExp(`useSelected\\\\(',
+        'const readKindRe = (kind) => new RegExp(`useSelectedZZZ\\\\(',
+      ),
     expectRed: ['没扫到任何'],
   },
   {
