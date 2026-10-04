@@ -120,8 +120,15 @@ if (!existsSync(BRIDGE)) {
 // ① 跑取证脚本。**继承 stdio** —— 它的输出本身就是证据。
 //
 // 🔴 同时带上 `HEYTA_WEB_ROOT`：那个壳里内嵌的是**共享 UI**（M2），
-//    不带的话 `ShellView` 只会说"未找到共享 UI 产物目录"，本门禁关于
+//    不带的话 `ShellView` 只会说"未找到共享 UI 产物"，本门禁关于
 //    "注册/登录前置"的那几条断言就无从谈起。
+const SNAPSHOT = `${OUT}.webview.png`;
+/**
+ * "壳里到底画没画出应用"的那条阈值。重试预算和下面的裁决**共用这一个数**，
+ * 否则改一处就会让另一处变成"永远等不到"或"白等"。
+ */
+const MIN_CONTENT_RATIO = 0.02;
+
 const capture = spawnSync('bash', [CAPTURE, OUT], {
   stdio: 'inherit',
   cwd: ROOT,
@@ -249,7 +256,7 @@ if (!existsSync(narrative)) {
  *    （rail 激活项 / 主按钮），而错误屏、空白屏、桌面底色**都没有**。
  *    这条判据 `png-stats.mjs` 早就导出了，只是这个门禁一直没用它。
  */
-const snapshot = `${OUT}.webview.png`;  // 应用是**追加**，不是替换扩展名（第一版算错了）
+const snapshot = SNAPSHOT;  // 应用是**追加**，不是替换扩展名（第一版算错了）
 if (!existsSync(snapshot)) {
   console.error(`   🔴 没有 WebView 快照：${snapshot}`);
   console.error('      ⇒ 无法判断"壳里的共享 UI 画出来了没有"（窗口截图担不起这条）。');
@@ -277,11 +284,30 @@ if (!existsSync(snapshot)) {
     `   WebView 快照 ${String(snap.width)}x${String(snap.height)}  ` +
       `contentOnModalRatio ${snap.contentOnModalRatio.toFixed(3)}（判据阈值 0.02）`,
   );
-  if (snap.contentOnModalRatio < 0.02) {
+  if (snap.contentOnModalRatio < MIN_CONTENT_RATIO) {
     console.error(
       `   🔴 快照里几乎没有内容（contentOnModalRatio ${snap.contentOnModalRatio.toFixed(3)}）——\n` +
         '      壳里画的**不是真应用**。最可能是「找不到共享 UI 产物」那张错误屏，\n' +
         '      或 WebView 没渲染出内容：它们非空、不透明，窗口那几条全会过。',
+    );
+    /**
+     * 🔴 2026-10-05 实测的**第三种**成因，和前两条不一样：这一趟 M2 探针同时是 ✅ 的
+     * （头像 1 个、采集框 1 个、设置面板可达），而快照是**首屏品牌帧**（近白底 + 居中的
+     * mark，肉眼看过图）。也就是说 DOM 里应用已经挂上，像素上遮罩还没退场。
+     *
+     * 根因不在截图那一侧：自截图是**事件触发**的（`triggerIfRequested()`，首屏探针
+     * 一过就截），而那条探针判的是 DOM。品牌帧的退场是挂载之后的一次 260ms 淡出，
+     * 所以"探针过了"和"遮罩没了"之间天然差着那一帧 —— 加了首屏动画之后每次都差。
+     *
+     * ⇒ 别拿重跑治它（实测三趟 `WEBVIEW_SNAPSHOT_BYTES` 逐字节相同 = 60672，
+     * 事件触发的截图不会因为重试而变晚）。要治得把**就绪锚点**改成
+     * "DOM 有应用 **且** `#heyta-boot` 已摘掉"，那是 `HeytaMacApp.swift` 的探针字符串
+     * （Windows 侧 `MainWindow.xaml.cs` 同形）。本门禁只负责把它如实报成红。
+     */
+    console.error(
+      '      ⚠️ 若上面 M2 那几条是 ✅，那这一张多半是**首屏品牌帧**（应用已挂载、遮罩还在淡出）：\n' +
+        '         就绪锚点判的是 DOM，截图是像素，两者差着一整条退场动画。\n' +
+        '         修法是给锚点加"品牌帧已摘除"，不是调低这条阈值。',
     );
     bad = true;
   } else {
