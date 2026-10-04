@@ -5446,6 +5446,12 @@ node scripts/check-detail-pane-slot.mjs --root /tmp/dp-slotcheck   # 未裁决�
     ⇒ 合流即消。它**不是**别人在飞的活（工作树干净），也**不是**别人已提交的债 —— 前两种处置都在这儿失效：既不该"代改"，也不该"吸收凑绿"。
     ⇒ 分辨动作：`git cat-file -e main:<路径>` 为真 **且** `git log --all -1 -- <路径>` 落在 main 侧 ⇒ 登记、不修、合并当时看它自行转绿。
 
+19. 🔴 **给 grep 的结果再套一层"看起来无关"的路径过滤，会把对象本身筛掉**：判"谁传了 `onSelect`"时我跑的是
+    `grep -rn "onSelect=" … | grep -iE "organizer|list|tag"` —— 第二个过滤器筛的是**整行（含路径）**，
+    而真实调用点在 `apps/web/src/features/projects/ProjectsPanel.tsx`：路径里没有 `organizer/list/tag` 任何一个词，
+    于是 9 条命中全被筛掉，我据此写下"零个消费方"。⇒ 教训不是"别用 grep"，是**二次过滤只许筛内容、不许筛对象**；
+    宣布"零消费者"前必须逐文件 `grep -c <needle> <该文件的每个调用点>`（本节就是靠这一步救回来的）。
+    与 §7 元规则 1、本节第 15 条同一族：**0 命中先疑探针，再疑内容**。
 ## 8.77 18:5x 合流面整趟复跑读数（**一次性瞬时量**，合流当时必须重取；载体 `78084007` × 实时 `main`）
 
 `node scripts/verify-detail-pane-merge-preflight.mjs` ⇒ `CARRIER_RC=1`（属"处置未做完"，不是新红）：
@@ -5959,7 +5965,7 @@ Q7 那一行原本引的四行全部落在 `docs/research/dida-view-unification.
 | Goal 原话的那一条 | 现在由什么守着 | 现量取法 | 20:2x 读数 | 还欠谁 |
 |---|---|---|---|---|
 | ①「外部调研，带日期+出处+未核实标记，结论**与推荐**写回 C1 表」 | `check:detail-pane-c1-coverage` **六档**：对照节 / 回指行号 / 日期+出处 / **外部锚** / 推荐那一档 | `node scripts/check-detail-pane-c1-coverage.mjs`（读"逐节读数"那一段） | `RC=0`；`C1 13 行 ⇒ 有节 12 / 例外 1 / 未覆盖 0`；`C1b 9 节（推荐 8 / 标题例外 1 / 缺推荐 0）（外部锚 9 / 缺 0）`；装置 22 臂全符合预期 | ~~🔴 **"未核实标记"那一档仍只有散文**~~ ⇒ 21:3x 起有载体，但**载体的对象换了**：机器判不了"这句话是不是未核实"（那是语义），判得了"每一条未核实项有没有交代下一轮怎么关掉它"（腿 6，§8.94）。仍要人的是 #30 那一行：外部锚证明的是"厂商不披露"，判对口只有人 |
-| ②「执行不依赖拍板的 W0–W8；W1 选中态要跨视图通用」 | §8 那张表的**逐行状态**由 `check:detail-pane-status-table` 腿 2 钉在封闭三档上 | `node scripts/check-detail-pane-status-table.mjs`（读"逐行读数"那一行） | `W0/W1c/W8a=已完成`；`W1/W1b/W2/W3/W4/W5/W6/W7=进行中`（每一格都只剩 AGENTS §6.1.1 四端重装）；`W8/W9–W12=未开工`（各挂拍板或不在本篇）；W1 的跨视图单一所有者与三种投影在 §8.2/§8.26。🔴 **21:4x 逐面现量后要有界更正**：`清单`与`标签`两张面**不在**"只差四端重装"那一档里 —— 它们的行连"可点"都没接（§8.95 第 1 节），缺的是语义与一枚拍板，不是重装。 | #13（四端重装，前置=合流落地+截图重出）、#17、#5/#7/#8/#9/#10/#11 八格同一前置 |
+| ②「执行不依赖拍板的 W0–W8；W1 选中态要跨视图通用」 | §8 那张表的**逐行状态**由 `check:detail-pane-status-table` 腿 2 钉在封闭三档上 | `node scripts/check-detail-pane-status-table.mjs`（读"逐行读数"那一行） | `W0/W1c/W8a=已完成`；`W1/W1b/W2/W3/W4/W5/W6/W7=进行中`（每一格都只剩 AGENTS §6.1.1 四端重装）；`W8/W9–W12=未开工`（各挂拍板或不在本篇）；W1 的跨视图单一所有者与三种投影在 §8.2/§8.26。🔴 **21:4x 逐面现量后要有界更正**：`清单`与`标签`两张面**不在**"只差四端重装"那一档里 —— 它们的"点一行"在 web 走的是**过滤**、在移动端**刻意不接**（两端不一致本身就是目标②说的"各处同一套"没做到的地方），缺的是语义与一枚拍板，不是重装（§8.95 与 §8.96）。 | #13（四端重装，前置=合流落地+截图重出）、#17、#5/#7/#8/#9/#10/#11 八格同一前置 |
 | ③「§1 四道前置闸门」 | 逐道**载体形态**量过：第 4 道结构性守着、第 2 道半有牙、第 1 道 21:0x 起有载体（§8.92）、第 3 道有装置不在链里 | 见 §8.83（每道都写了读的是哪个文件哪一行） | 两道余量为 0 的棘轮**没被调高**：`check:l4-no-style` 与 `check-row-single-source` 本轮各跑一趟 `RC=0`，基线常数逐字未改 | #28（"不许调高基线"要不要硬化成机器判据 —— 改的是共享门禁语义，要人） |
 | ④「回填 §8 落地记录，读数含判据条数 / 变异红集 / 截图路径」 | 同一条门禁的腿 6/7/8/9 | 同上 + `node research/tools/mutation-rigs/mutate-detail-pane-status-table.mjs` | `承重：已开工且未走豁免 10 行｜判据条数命中 10｜臂条数+红集同句命中 10`；`承重(腿9)` 一行给出射程分母与"跳过 0 枚"；装置 30 臂全符合预期 | —（这一条本轮补齐；§8.87 记下共享门禁在本支之外还管着列数/折行/碎片三档） |
 | ⑤「点名路径提交、不代改别人在飞的活、不 push 不 merge」 | 纪律（无机器消费者） | `git log --name-only --format= 79f575d6..HEAD`（取并集）/ `git log --format=%h 79f575d6..HEAD -- scripts/mutate-closeout-gates.sh` / `git branch -r --contains HEAD` | 12 笔带过的路径**并集只有 6 枚**，全部在本线范围内（两份文档 + 两枚判据 + 两枚装置）；含那枚恒脏脚本的笔数 = **0**；`branch -r --contains HEAD` 为空 ⇒ 未推；无 merge 提交 | — |
@@ -6321,14 +6327,16 @@ grep -nE "selectedId|activeId|active[A-Z][A-Za-z]*Id|onOpen[A-Za-z]*:|onSelect" 
 | 任务（列表 / 四象限 / 日历 / 时间线 / 搜索） | web `App.tsx`；mobile `TasksScreen.tsx` | `TaskList.tsx`、`TaskRow.tsx`、`QuadrantBoard.tsx`、`CalendarBoard.tsx`、`TimelineBoard.tsx`、`SearchPanel.tsx` 各有 `activeTaskId` 与 `onOpenTask` 形状 | ✅ 同一套 |
 | 习惯 | web `HabitsView.tsx:181` 与 `:300` | **`HabitProgressList.tsx:133-134`（`selectedId` + `onSelect`）** | ✅ 同一套 —— 但它**不在** `HabitBoard.tsx` 里：那张面零命中，扫错文件就会判成"没接" |
 | 便签 | web `NotesView.tsx`；mobile `NotesSection.tsx` | `NotesBoard.tsx:121`（`activeNoteId`） | ✅ 同一套 |
-| 清单 PROJECT | **零个消费方传** `onSelect` | `OrganizerList.tsx:130` 有可选 `onSelect`，`:367` 明写"没传就是普通 `View`，不可点" | ❌ "点一条清单"在界面上**不存在** |
-| 标签 TAG | 同上（`TagsSection.tsx` 也没传） | 同一个组件 | ❌ 同上 |
+| 清单 PROJECT | ~~**零个消费方传**~~ ⇒ **web 两个调用点都传了**（`ProjectsPanel.tsx:248` 与 `:350`），但那个 `onSelect` 指向的是**过滤**（回传 `TaskFilter`），不是共享选中 | `OrganizerList.tsx:130` 有可选 `onSelect`，`:367` 明写"没传就是普通 `View`，不可点" | ⚠️ **有**，但语义是"过滤任务"而不是"选中一条清单" ⇒ 这一格的题面见 §8.96 |
+| 标签 TAG | web 传（同一个 `onSelect` → `TaskFilter`，`ProjectsPanel.tsx:350-351`）；mobile `TagsSection.tsx` **刻意不传**，理由在 `ListsSection.tsx:174`："移动端没有侧栏筛选这个概念" | 同一个组件 | ⚠️ 两端给的答案**不一样** —— 这正是"各处同一套"要拍的那一格 |
 | 回收站 | mobile `TrashScreen.tsx`；web 对应面 | `TrashBoard.tsx:63-73` 只有 `onRestore`、`onPurge`、`busyTaskId`（防连点，**不是**选中） | ⚪ 该面无选中语义（合法设计；§8.36 那两行 busyId 豁免记的就是它） |
 | 提醒（详情面里的子列表） | —— | `ReminderList.tsx` 对上面那个词表零命中 | ⚪ 同上：它是某条任务的**从属项**，就地编辑，不参与"选中哪一条" |
 
 🔴 清单/标签那条 `onSelect` 缝隙**不是本批造的**：`git log -S onSelect -- packages/ui/src/projects/OrganizerList.tsx`
 落在 `192a516d`（"把清单/标签/习惯的改名与删除在两端接上"那一批）。本批既没造它、也从没声称接上它 ——
 但目标第②条把"清单/标签"列进了"各处同一套"，所以这两格**不能**读成"已完成、只差四端重装"（§8.89 的②已就地改判）。
+⚠️ **本节初稿把这两格写成"零个消费方传 onSelect ⇒ 点一条清单不存在"，那句已被现量否证**（21:5x，同一轮内）：
+取证行、为什么探针会漏、以及更正后的题面都在 **§8.96**。原句划线留在这里，不删。
 
 ### 2. 为什么不顺手补一条正向名册
 
@@ -6345,3 +6353,43 @@ grep -nE "selectedId|activeId|active[A-Z][A-Za-z]*Id|onOpen[A-Za-z]*:|onSelect" 
 贵的是下一问：**点一条清单时，详情面那一格放什么**（清单自己的统计？它的任务列表？还是与"无选中"共用同一格？）。
 那是产品决定。⇒ 目标第①条那套动作对这一格同样适用：先查"别人点一条项目时右栏给什么"，
 带日期＋出处＋未核实标记写进 C1，再给推荐 ⇒ 新增 **C1 #14** 与对照节 **C1b-Q14**（六档门禁会自动来收这一行的账）。
+
+## 8.96 §8.95 的"零个消费方"是探针产物 —— 现量更正后的题面比原句窄，但更需要人（2026-10-04 21:5x，载体续 `ce5ca22b`）
+
+本节是**同一轮之内**的自我否证，写下来是因为错法本身可迁移。
+
+### 1. 错在哪一步
+
+我跑的是 `grep -rn "onSelect=" apps/web/src apps/mobile/src packages/ui/src` **再套一层** `grep -iE "organizer|list|tag"`，
+第二个过滤器筛的是整行（含路径），而真实调用点在 `apps/web/src/features/projects/ProjectsPanel.tsx` ——
+路径里没有 `organizer`/`list`/`tag` 任何一个词 ⇒ 9 条命中**全被筛掉** ⇒ 我写下"零个消费方传 `onSelect`"。
+救回来的动作只有一条：`grep -c onSelect <每个调用点文件>`（先列调用点，再逐文件数）。
+
+### 2. 更正后的现量
+
+| 调用点 | 传不传 `onSelect` | 那个回调做的是什么事 |
+|---|---|---|
+| web `ProjectsPanel.tsx:248-249`（project 行） | ✅ 传 | `onSelect({kind: 'project', projectId})` → **过滤任务列表**（`TaskFilter`） |
+| web `ProjectsPanel.tsx:350-351`（tag 行） | ✅ 传 | 同上，`kind: 'tag'` |
+| mobile `ListsSection.tsx:183` | ❌ 不传 | **有主的刻意决定**，理由就写在 `:174`："移动端没有侧栏筛选这个概念" |
+| mobile `TagsSection.tsx:121` | ❌ 不传 | 同上 |
+
+而且 web 那个文件头（`:13`、`:16`）已经把"点一行清单"**写成一条规矩**了：**必须经由 `onSelect`，不能直接 `tasks.setFilter`**，
+`:329` 还补了一句"`onSelect` 必须传下去 —— 否则这个空洞会静默回来"。⇒ `OrganizerList.onSelect` **不是死缝**，
+它有消费者、有测试过的意图，我先前那个"共享层留一条没人传的缝隙"的担心在这一格不成立（#33 的表述里也没这么写，是对的）。
+
+### 3. 于是 C1 #14 的题面被改窄了
+
+- ❌ 旧题面（本节初稿）："点一条清单这件事在界面上不存在，要不要加？" —— 假。
+- ✅ 现题面：**同一个动作（点一行清单/标签）在两端是两件不同的事** —— web 是"过滤任务"，移动端是"什么都不做"。
+  目标第②条要的"各处同一套"正好卡在这里。三个合法答案：
+  A. 承认它是**过滤**，那移动端要么补同一个过滤语义，要么写明"移动端侧栏概念不存在"是有意差异（现状就是这个，但没登记成决定）；
+  B. 让它同时是**选中**（`project`/`tag` 进 `SelectableKind`，详情面那一格显示清单自己的属性/统计）；
+  C. 两个动作分开：点行=过滤，行尾"⋯"或"i"图标=进清单详情。
+  ⇒ 这是产品决定，不是我该在工单里替他填的；但**外部调研现在就能做**（Linear 是"点项目开整页 overview"，滴答帮助里"清单详情页"走的是**编辑页**而不是详情列 —— 两条已取到一手，见 C1b-Q14）。
+
+### 4. 判据层面顺带的一条
+
+断言 D 的口径是"词表里每一类要有宿主真的选中过它"。这一格现量后要看清它**问不到**这里：
+`onSelect` 在 web 传的是过滤回调，压根不碰选中 store ⇒ 就算产品拍成 B，D 也不会自动变成"过滤 vs 选中"的裁判。
+⇒ 记进 #33：正向覆盖那一名册要能区分**同一个字面形状（`onSelect`）承载的两种语义**，否则名册会把 web 读成"已接选中"。
