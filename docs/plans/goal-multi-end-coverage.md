@@ -4006,3 +4006,23 @@ D3 无人驱动 ⇒ 走到 `DRY-RUN` 并打印那条命令；D4 `.reinstall-all.
 **另一条现量，别读成缺陷**：启动器 3b 那道门把**任何**移动端验收都算冲突，包括只跑 iOS 模拟器的这一条。
 它会挡 ①（刚才 `REDS=load,dev` 里 `dev` 那一半就是它给的）。这是保守侧，不是错 —— 我不为了让自己早跑而把它收窄；
 要收窄得由设备面归属规则的主人动，不是这条 Goal 的顺手动机。
+
+#### 7.31.32 ① 的四条腿在窗口外逐条探完可达性：Windows 主机可达、公证服务与凭据可用且**今天那趟 submit 从没到达 Apple**（18:30–18:33 现量）
+
+**为什么现在做**：① 是四端串行，任何一条腿在窗口里才发现"到不了"，就把整段窗口烧在那条腿上。
+这些前置全都不需要设备、不需要负载，本来就该在等窗期做完。
+
+| 腿 | 现量（时刻随各条） | 结论 |
+|---|---|---|
+| Windows 打包机 | `ssh -o BatchMode=yes windows-pc` RC=0（18:30:46，还回了 Windows 版本横幅 `10.0.26200.9457`）；两条 ASCII 判据串 `if exist … echo` ⇒ **`HAVE_TREE`**（`C:\src\heyta\package.json` 在）、**`HAVE_WEBDIST`**（`C:\src\heyta\apps\web\dist\index.html` 在）；`HeytaWindows.exe` 计数 **0**（没人正在跑那端） | 主机可达、树在位、无并发占用。`tasklist` 第一次那条 `… \| head -3` 是**我在远端用了 Unix 命令**，报的是"不是内部或外部命令"，不是主机故障 |
+| mac 公证 | `security find-identity -p codesigning -v` ⇒ Developer ID Application **1** 枚 ⇒ `package-app.sh:186-194` 会走 `SIGN_KIND=developer-id` ⇒ **公证这一腿真会执行**（不是 adhoc 跳过）；ASC key 三个候选路径前两个 `[ -f ]` = **yes**（只报布尔，值不进任何输出）；`notarytool history` **RC=0、9,407 字节**（18:32:23） | 服务与凭据可用。历史 **49 条 = 45 Accepted / 4 Invalid**，最新 Accepted = `2026-10-03T15:05`，`In Progress` 计数 **0** |
+| 由上一条推出的归因（**间接证据，不是证明**） | 今天 **03:13** 那趟 mac 段挂在 `notarytool … --wait`（14 h+，`diskimages-helper/98171` 的 ppid=1 launchd），而 18:32–18:33 两次 `notarytool history` 里**没有任何 2026-10-04 的条目**（默认那一页共 49 条，跨度回溯到 05-25） | 想判"是不是被返回上限截了"，试过 `--page-size 200` ⇒ **`Error: Unknown option '--page-size'`（RC=64）**，这版 notarytool 没有分页旋钮，所以拿不到第二页。⇒ 只能说"Apple 侧看不到今天那次提交"，**不能**证成"提交从没发出去"。能确定的只有：服务与凭据当下可达、昨天 15:05 还出过 Accepted、且 `HEYTA_NOTARY_TIMEOUT` 默认 **900 s** 有上限、超时会**判红不判绿**（`package-app.sh:311,314` 两条分支都 `|| notary_rc=$?`，读过原文） |
+| iOS | 启动器体检段现取到 **5 台 booted**，含目标 `heyta-iphone-17pro`（另有 `heyta-batch2-closeout`/`heyta-bc-reminders`/`heyta-ios-isolated`/`iPhone Duo heyta`），链会显式传 `IOS_DEVICE_NAME` 而非取列表第一台 | 名字切片那条老缺陷（UDID 被贪心粘进名字）没有复发：打印出来的名字是干净的、`iPhone Duo heyta` 的空格也保住了 |
+
+🔴 **又抓到一次"0 命中先查格式"**：我第一次数公证条目用的是 `grep -c '"id"'`（按 JSON 形状猜），得 **0** 条、RC 却 0 ——
+差一点写成"这台账号没有过公证记录"。`notarytool history` 打的其实是 **`id: …` 这种 YAML 样式**，
+条目数按 `status:` 数出来是 49。**"空测量 + 退出码 0"是最干净也最误导人的组合**，
+必须先确认自己那份 pattern 的字段在这工具的输出格式里真的存在（同 §7 #197 那一族，也印证本文件 §7.31.29 里那条）。
+同一趟还撞了它的**另一半**：想证明"49 条不是被分页截的"，试 `--page-size 200` ⇒ `Unknown option`、RC=64，
+这版 `notarytool` 根本没有分页旋钮 —— **"没有条目"与"我够不到后面的条目"在这台工具上区分不了**，
+所以那条归因只能写成间接证据（§7 元规则一：探针够不着的，在输出上和"不存在"长得一模一样）。
