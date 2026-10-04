@@ -3793,6 +3793,16 @@ W0b ─> 随时可做（台账那半要等文件干净）
     「在使用联网功能之前」（中英双份、`服务条款`/`隐私政策` 两个链接、`同意并联网` 是主蓝实心钮、`只用本机` 是次级钮），
     中文零豆腐块。**没有**看到倒数日那一屏 —— 这张图证的是"装进 /Applications 的是当前源码的界面"，
     倒数日那一屏在包里由上面那条 sha 逐字相同 + 9 chunk 集合对账来证（与 Android/windows 那两格同一条边界，不混着说）。
+  - ✅ **证据已常驻入库**（不再只躺在 `/tmp`，那是 W5-G1 与任务 #27 同一种病）：
+    `apps/desktop-macos/evidence/installed-20261004-1845-mac-app.png`、
+    `apps/desktop-macos/evidence/installed-20261004-1845-mac-app.webview.png` 与配好的
+    `apps/desktop-macos/evidence/installed-20261004-1845-mac-app.txt` 三枚 +
+    `apps/desktop-macos/evidence/README.md` 加了一行。⚠️ 配好的 `.txt` 里那条**复现命令是现跑验证过的形状**：
+    `png-stats.mjs` 是**模块不是 CLI**（直接 `node scripts/screenshots/png-stats.mjs <file>` 静默无输出，
+    我第一版就把这条写错了），要 `node --input-type=module -e "import('./scripts/screenshots/png-stats.mjs')…"`；
+    🔴 而且那 **1266 全部来自暗色板** —— 同一枚图 `countColor(p, HEYTA_BLUE)` = **0**、`countColor(p, HEYTA_BLUE_DARK)` = **1266**，
+    判据用的是两档相加的 `countBrandBlue`（`png-stats.mjs:399-401`）。
+    ⇒ 后来人单拿亮色那一档去复现必然得到 0 并误判"这张图是假的"，这条已经写在 `.txt` 里挡着。
   - 📌 一条与 ㊣ 同一族的现场更新：**pid 772 还在跑**（18:49 现量 `etime 21:16:21 / %cpu 0.0 / state S`），
     而它的 bundle 已经在 18:44 被 `rm -rf` + 覆盖 ⇒ 它现在执行的是**已从盘上摘掉的那份二进制**。
     按 ㊣ 那条撤回报案处理：**不动它**（并行台账 `BLOCKED.md:3419` 早把"旧实例挡路"判过否证，本批的判据也不按窗口名选目标），
