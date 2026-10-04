@@ -84,7 +84,12 @@ const PRIVACY_ITEMS = [
 ];
 
 /** 声明了也不构成说谎的权限（`INTERNET` 不是隐私权限，句子本来就不该提它）。 */
-const NON_PRIVACY_ANDROID_PERMISSIONS = new Set(['INTERNET']);
+const NON_PRIVACY_ANDROID_PERMISSIONS = new Set([
+  'INTERNET',
+  // ADR-0051: timing capability only, no personal-data read access. Its purpose
+  // and inexact fallback are disclosed in permissions.ts in both languages.
+  'SCHEDULE_EXACT_ALARM',
+]);
 
 /**
  * 🔴 **今天这张表是空的**，意思是 heyta 一个隐私权限都不申请。

@@ -11,14 +11,9 @@
  * 会被判成"超范围申请"，少写一项会被判成"隐瞒"。所以每一项都带 `文件:行号`，
  * 证据在 `docs/research/legal-dataflow-client.md` B17。
  *
- * ⚠️ 两处**当前状态**必须如实写，不要因为"以后会加"而提前列进表里：
- * ① Android 只声明了 `INTERNET`，**没有** `POST_NOTIFICATIONS`；移动端代码里也没有任何
- *    系统通知实现（无 `UNUserNotificationCenter` / `notifee` / `NotificationManager` 调用点），
- *    提醒目前只在应用内显示 —— 🔴 系统通知目前**只有 Web 有**（浏览器级授权 + 可选 Web Push）；
- * ② iOS 没有任何 `NS*UsageDescription`（即不申请任何需要说明的隐私权限）。
- * 加了就必须同步这张表 —— 这是本文件唯一会随版本变的部分。
- * 另：`apps/mobile/src/lib/reminders.ts` 与 `apps/web/src/features/reminders/notify.ts`
- * 是"提醒"这件事的两条不同落地路径，写这张表前先看它们，不要凭印象。
+ * 当前移动端使用系统本地通知：Android POST_NOTIFICATIONS 与 SCHEDULE_EXACT_ALARM，
+ * iOS UNUserNotificationCenter。权限、用途与拒绝后的行为须和原生实现一起更新。
+ * 参见 ADR-0051；本地通知不等于接入第三方推送 SDK。
  */
 
 import type { LegalDocument } from '../types.js';
@@ -38,7 +33,7 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '一句实话：因为 heyta 的任务数据**全部由你自己输入**，它没有任何需要向你申请的系统权限理由。唯一必须的 `INTERNET` 也不是"个人信息权限"，它只是让应用能联网。',
+        text: '你创建提醒时，heyta 会申请系统通知授权；Android 精确闹钟授权影响提醒的准点性。拒绝通知授权不影响创建、编辑和查看任务，提醒仍保留在应用内。',
       },
     ],
   },
@@ -65,15 +60,22 @@ const zh = [
             'Android',
             '通知（POST_NOTIFICATIONS）',
             '系统横幅提醒',
-            '🔴 **未申请**：清单里没有这一项，且移动端代码目前不产生任何系统通知',
-            '不适用：提醒只在应用内显示',
+            '你主动创建提醒时申请（Android 13 及以上）；系统通知开关和通知频道仍由你控制',
+            '拒绝后保留应用内提醒，不写入已触发状态；重新授权并打开应用后重算到期提醒',
+          ],
+          [
+            'Android',
+            '精确闹钟（SCHEDULE_EXACT_ALARM）',
+            '尽量按设定时刻投递本地提醒，不读取其他个人信息',
+            '清单声明此能力；是否允许由系统特殊访问设置决定，应用不会在启动时跳转索取授权',
+            '未获授权时使用系统非精确排程，通知可能延迟；任务和应用内提醒照常可用',
           ],
           [
             'iOS / iPadOS',
-            '（无任何权限申请）',
-            '不适用',
-            '🔴 清单文件里**没有任何 `NS…UsageDescription`**，也不申请通知授权',
-            '不适用：提醒只在应用内显示',
+            '通知授权（UNUserNotificationCenter）',
+            '任务到期时的系统本地通知',
+            '你主动创建提醒时申请；由系统显示通知授权弹窗，可随时在系统设置关闭',
+            '拒绝后保留应用内提醒，不写入已触发状态；重新授权并打开应用后重算到期提醒',
           ],
           [
             'Web（浏览器）',
@@ -165,7 +167,7 @@ const en = [
       },
       {
         kind: 'callout',
-        text: 'One honest sentence: because all of your heyta data is **typed in by you**, there is no reason for the app to ask for any personal-information permission at all. The only required entry, `INTERNET`, is not a personal-information permission either — it just lets the app reach the network.',
+        text: 'When you create a reminder, heyta requests notification authorisation. Exact-alarm access on Android affects punctual delivery. Declining notifications does not prevent creating, editing or viewing tasks; reminders remain available inside the app.',
       },
     ],
   },
@@ -192,15 +194,22 @@ const en = [
             'Android',
             'Notifications (POST_NOTIFICATIONS)',
             'System banner reminders',
-            '🔴 **Not requested**: the manifest has no such entry, and the mobile code currently raises no system notification at all',
-            'Not applicable: reminders are shown inside the app only',
+            'Requested when you create a reminder (Android 13 and later); you control the system notification switch and channel',
+            'Reminders remain in the app and are not marked as delivered. After granting permission and reopening the app, due reminders are reconciled',
+          ],
+          [
+            'Android',
+            'Exact alarms (SCHEDULE_EXACT_ALARM)',
+            'Deliver local reminders at the configured time; no access to other personal information',
+            'Declared in the manifest and controlled by system special-access settings; the app does not open that setting on startup',
+            'Without access, the app uses inexact scheduling and notifications may be delayed; tasks and in-app reminders remain available',
           ],
           [
             'iOS / iPadOS',
-            '(no permission requests at all)',
-            'Not applicable',
-            '🔴 The plist contains **no `NS…UsageDescription` entries**, and notification authorisation is not requested either',
-            'Not applicable: reminders are shown inside the app only',
+            'Notification authorisation (UNUserNotificationCenter)',
+            'System local notifications when tasks are due',
+            'Requested when you create a reminder, through the system permission prompt; you can turn it off in system settings',
+            'Reminders remain in the app and are not marked as delivered. After granting permission and reopening the app, due reminders are reconciled',
           ],
           [
             'Web (browser)',
@@ -279,9 +288,9 @@ const en = [
 
 export const permissions: LegalDocument = {
   id: 'permissions',
-  version: '1.0',
+  version: '1.1',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': '应用权限清单',
     en: 'App Permissions Inventory',
