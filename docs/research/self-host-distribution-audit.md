@@ -6558,3 +6558,100 @@ RC=0
 被我自己写成"必须等 g130 结束 + 负载 ≤12 + 闸门空"三个条件同时成立才起跑，
 等满按环境无效收尾（`CAP=5400s`）。这两把的读数没拿到之前，
 §8.107 的"这一档还没到界面已验"和 G-51 步骤④⑤都**不提前标闭合**。
+
+### 8.109 一把变异 rig 被两个缺陷绊住，第二个差点让我把"别人的 node_modules 删了"（2026-10-04 17:3x）
+
+G-51 那条新用例要拿"基线 + 三臂变异 + 复原对账"。第一版 rig（`/tmp/g130-arms.sh`）跑出
+**基线绿、三臂全被挡**的读数，看着像"环境不配合"，实际是**我自己两条缺陷**，
+而且第一条有跨树破坏性 —— 值得单独入档。
+
+#### ① 🔴 在软链过 `node_modules` 的隔离 worktree 里用 `pnpm --dir e2e …` 起跑，会让 pnpm 想 **purge 别人那棵树的 node_modules**
+
+基线日志（`/tmp/g130/00-baseline.log`）的原文：
+
+```
+[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY
+If you are running pnpm in CI, set the CI environment variable to "true", or set "confirmModulesPurge" to "false".
+[ERROR] Command failed with exit code 1: pnpm install
+    at runDepsStatusCheck (…/pnpm 11.8.0/dist/pnpm.mjs:248210:7)
+```
+
+成因是本 worktree 的建法：`e2e/node_modules` 是**软链**，指向主检出那棵树
+（17:3x 现量：`readlink e2e/node_modules` → `/Users/…/heyta/e2e/node_modules`，链建于 10-03 11:22）。
+`pnpm exec` 跑前的 deps-status 检查因此判定"这个 modules 目录不属于当前这棵树"，
+下一步就是**删掉重建**。这次它没删成，只因为**没有 TTY**、它自己中止了 —— 运气，不是保护。
+🔴 如果照它给的提示去设 `CI=true` 或 `confirmModulesPurge=false`，被删的就是
+**别人正在跑套件的 `e2e/node_modules`**（当时确实有人在跑：锁的持有者 17:2x–17:3x 依次是
+`37974` → `67378` → `15242` → `35771`）。**那两个变量一个都不设。**
+
+改法不是加锁，是**换起跑通道**：`cd e2e && npx playwright test -c playwright.landing.config.ts …`。
+这条通道不是新造的 —— `scripts/verify-selfhost-stack.sh:546-548` 用的就是它
+（先 `[ -d node_modules/@playwright/test ] || die`，再 `npx playwright test`），
+所以它本来就验过软链可用。
+⚠️ 代价要说清：`npx` **不经过** tfa-shield 那层 pnpm 包装，全局内存闸门不再自动拦并发。
+所以 rig 自己承担同一条前置：起跑前查 `/tmp/tfa-test.lock`、锁在就等、锁没了还无条件再等 20s
+（外层进程退出会删锁，"锁不在"不等于窗口真的开着）—— 协调性质不变，只是从工具层搬到脚本层。
+
+#### ② 第二条缺陷更普通，也更贵：**起跑失败被我当成绿色基线**
+
+v1 的 `run_spec()` 只要日志开头不是"闸门拒绝"就返回 0，于是那条 `RC=1` 的
+purge 失败被记成"基线跑过了"，三臂照常施上去。
+🔴 这正是本仓那条元规则的第三次现身（§7 的"**一条永远通过的判据比没有判据更糟**"）：
+判据把"没报我认识的那个错"当成了"跑绿了"。
+v2 改成：`run_spec` 透传 Playwright 自己的 RC，**基线 RC≠0 就整把停住、不落任何臂的读数**
+（`exit 4`），并把红条标题打出来。这一条改动让 rig 从"能产出读数的装置"变成"能拒绝产出读数的装置"。
+
+#### ③ 落地那一步**只能用 `--ff-only`**，理由是现量：主检出的索引里躺着别人的东西
+
+载体由 `research/tools/selfhost-merge-carrier.mjs` 在隔离 worktree（`/tmp/heyta-merge-carrier`）
+里用 `merge --no-commit --no-ff` + 一次正常 `git commit` 造出来，双亲断言为
+`(mainSha, srcSha)`，再把 `feat/self-host-merge-main` 指过去。
+那么"让 main 前进到载体"这最后一步，如果做成 **`git merge --no-ff feat/self-host-merge-main`**
+（在主检出里合），git 会**新建一笔提交，而新提交的内容 = 整个索引**。
+17:3x 现量主检出索引里有 **2 枚纯暂存条目**，都是别人那条线的取证文件：
+
+```
+A  apps/mobile/evidence/android-vault-revocation-20261004.txt
+A  apps/mobile/evidence/ios-reminder-ax-companion-20261004.txt
+```
+
+（同一时刻：工作树脏 135 枚 + 未跟踪 24 枚，共 160 条 `git status` 行。）
+⇒ 那两枚会被我的合并提交吞掉，而它们与本批毫无关系。这是 §7 那族
+"`git commit` 提交的是整个索引"在**合并**这一动作上的形态，而合并比点名提交更没法 `--only`。
+**唯一不造提交的推进是 fast-forward**：载体的第一父恰好是推进那一刻的 `main`，
+所以 `git merge --ff-only feat/self-host-merge-main` 只做 ref + 工作树更新，不产生新对象。
+守卫顺序（落地那一次严格按这个走，中间不许插别的动作）：
+
+1. 重跑 `node research/tools/selfhost-merge-carrier.mjs`（它自带"main 在重算期间又前进 ⇒ 不落笔"的新鲜度守卫，退 4）；
+2. 现查 `git rev-parse main` == 载体的 `HEAD^1`（不等就回到 1，不硬合）；
+3. `git merge --ff-only feat/self-host-merge-main` —— **只有这一条**动 main；
+4. 完整 `pnpm check` 的逐段归属读数**必须在 ff 之前**于载体上拿（ff 之后 main 就是载体，
+   再跑一次只为确认"ff 没改变字节"）。
+
+#### ④ 陷阱台账的三个副本，号差得很多
+
+`docs/reference/environment-traps.md` 在三处的最大号（`grep -oE '^[0-9]+\. ' | sort -n | tail -1`）：
+
+| 副本 | 最大号 |
+|---|---|
+| 本分支（`feat/self-host-distribution`）里的那份 | **177** |
+| `main` 提交里的那份 | **228** |
+| 主检出**工作树**里那份 | **261** |
+
+⇒ 本节 ①② 那两条（软链 node_modules 的 purge 危险 / "没报我认识的错"当跑绿）**要入陷阱台账，
+取号按落笔那天的主检出工作树现量**（17:3x = 261 ⇒ 至少 #262），不写进本分支那份，
+也不按本分支的 177 编号 —— 那是同一族"按 HEAD 取号"的错。
+另：`git diff --name-only main...HEAD -- docs/reference/environment-traps.md` **空**
+⇒ 本批从没碰过这个文件，落地时它不会成为冲突面（这一条对 §8.16 的族枚举是有用的：
+它不在 45 个改动文件里）。
+
+#### ⑤ 阻塞集与排队状态（都是瞬时读数，引用要现取）
+
+- 阻塞集 = **本批 45 个改动文件 ∩ 主检出脏集合**，17:3x 现量 **4 枚**：
+  `.gitignore`、`package.json`、两份词条表。这个交集定义比"那 5 个重叠文件"更准，
+  因为 `scripts/check-script-snapshot.mjs` 与 `docs/README.md` 已被他们提交掉了。
+- 1 分钟负载 17:34 = **314**、17:35 = 313 —— 比 §8.107 记的 19.6 又高一个数量级。
+  `g134`（rig v2）与 `g131`（`verify:selfhost-stack` 全跑）都在等：rig 等锁，
+  `g131` 等 rig 结束 **且** 负载 ≤12 **且** 锁空；两条都是等满按环境无效收尾，不调阈值。
+- `g74` 落地预检仍在轮询（上限 18:55 左右到点）。**它到点不等于窗口关**，
+  也不等于我可以提前落地；到点后按 §8.16 重跑一轮预检再说。
