@@ -16,7 +16,7 @@
 #      那种破坏在输出上长得和"重拍成功"一模一样。
 #
 # 用法：
-#   bash research/tools/r17-reshoot-stale.sh              # dry-run：打印待重拍清单 + 四格前置读数
+#   bash research/tools/r17-reshoot-stale.sh              # dry-run：打印待重拍清单 + 五格前置读数
 #   bash research/tools/r17-reshoot-stale.sh --confirm    # 真的跑（前置全绿才走到这一步）
 #   LOAD_MAX=8 bash research/tools/r17-reshoot-stale.sh   # 收紧负载门（默认按 核数×3/4 现算）
 #   bash research/tools/r17-reshoot-stale.sh --only calendar-day   # 只重拍一枚目录
@@ -57,6 +57,11 @@ spec_for() {
     #    用 `SHOT('day-timed'|'day-timed-hour16'|'day-hour-labels')` 拍的。14:2x 逐条 grep 对出来的，
     #    不是"名字像就归过去"。
     calendar-day-time) echo calendar-day.spec.ts ;;
+    # 15:5x 加：`--all` 现在把 profile-panel 也报成过期（钉在 39032107，而 HEAD 之后
+    # profile 面的判据源码动了）。映射**不是按名字猜的**：
+    #   grep -rln 'profile-panel' e2e/tests/*.ts  →  只有 profile-avatar-e2ee.spec.ts，
+    # 它第 58 行的 SHOT() 写的就是 `../apps/web/evidence/profile-panel/<name>.png`。
+    profile-panel) echo profile-avatar-e2ee.spec.ts ;;
     *) echo "" ;;
   esac
 }
@@ -100,7 +105,7 @@ STALE_BLOCK
 [ "$MISS" = "0" ] || { echo "   ⇒ $MISS 枚映射不了，先修映射再谈重拍（exit 1）。" >&2; exit 1; }
 [ -n "$PLAN" ] || { echo "   ❌ --only '$ONLY' 一枚都没匹配上（待重拍清单见上面）⇒ 参数写错了，不能当成「无事可做」。" >&2; exit 1; }
 
-echo "== 3. 窗口门四格前置 =="
+echo "== 3. 前置五格（端口 / 负载 / dist / 依赖 / 载体）=="
 GATES=""
 BUSY=""
 for p in $PORTS; do
@@ -146,6 +151,61 @@ else
   echo "   ✅ e2e/node_modules 在"
 fi
 
+# 🔴 第五格「载体」：**拍的树必须就是锚点声称的那一份**。
+#    15:5x 实测：dev 端口空、负载 11 ≤ 12、dist 新鲜、spec 全在 —— 四格全绿，
+#    而 `packages/i18n/src/locales/{zh-CN,en}.ts` 正被另一条线改着（+116/−60，设备撤销与
+#    口令措辞那批词条）。dev server 读的是**工作树**，所以这一刻拍出来的图里渲染的是
+#    别人未提交的文案，而我要钉的 UIPIN 写的是 `packages/i18n@<某个提交>` ⇒
+#    锚点会从"这张图对应那份代码"变成"这张图对应一份我当时并说不清谁的树"。
+#    这与 `scripts/reinstall-all.sh` 的 src 不变量是同一件事（四端重装也要求"无别人未提交源码"），
+#    也与 traps #82/#178（"装上了当前产物"要有判据）同族 —— 只不过这里产物换成截图。
+#    判据范围**只取本线锚点自己列出的那些判据路径**（不吞整仓 100+ 枚脏行）：
+#    谁的改动会改掉这张图，由锚点说了算，不由我的直觉说了算。
+echo "   ── 载体：UIPIN 的判据路径里有没有未提交的改动"
+DIRTY=$(git -C "$MAIN" status --porcelain | cut -c4- | sed 's/.* -> //')
+SRC_HIT=""
+# 一枚锚点行 = `UIPIN <文件> <提交> <判据路径…>`；把每条判据路径与脏行做前缀比对。
+# 🔴 用函数包 `set --`：在顶层做位置参数替换会把脚本自己的 "$@" 打掉（这一腿之后
+#    还有别的格读参数），而函数内的位置参数只在函数内有效。判据路径都不含空格，
+#    所以这里按空白拆是安全的（目录路径含空格那一坑在上面的 STALE 循环里已经踩过）。
+check_pin_line() {
+  set -- $1
+  [ "$#" -ge 4 ] || return 0
+  shift 3
+  local p pp f
+  for p in "$@"; do
+    pp=${p%%@*}                                  # 允许 `path@commit` 的写法
+    case "$pp" in packages/*|apps/*|scripts/*) ;; *) continue ;; esac
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      case "$f" in
+        "$pp"|"$pp"/*) SRC_HIT="$SRC_HIT$NAME ← $pp  （未提交：${f}）
+" ;;
+      esac
+    done <<DIRTY_BLOCK
+$DIRTY
+DIRTY_BLOCK
+  done
+}
+while IFS= read -r item; do
+  [ -n "$item" ] || continue
+  d=${item%|*}; NAME=$(basename "$d")
+  [ -f "$d/README.md" ] || continue
+  while IFS= read -r pl; do
+    [ -n "$pl" ] && check_pin_line "$pl"
+  done < <(grep -h '^UIPIN ' "$d/README.md" 2>/dev/null || true)
+done <<PLAN_BLOCK
+$PLAN
+PLAN_BLOCK
+N_SRC=$(printf '%s\n' "$SRC_HIT" | grep -c . || true)
+if [ "$N_SRC" != "0" ]; then
+  printf '%s' "$SRC_HIT" | sort -u | sed 's/^/      · /'
+  echo "   ❌ 载体不干净：这张图会把**未提交的判据源码**渲染进去，而锚点钉的是提交态（exit 3，等其所有者提交）"
+  GATES="$GATES,src"
+else
+  echo "   ✅ 判据路径没有未提交改动 ⇒ 拍出来的就是 HEAD 那份形状"
+fi
+
 if [ -n "$GATES" ]; then
   echo "   ⇒ 前置不达标：GATES=${GATES#,} —— 这是**环境无效**，不是产品失败（exit 3，不降级、不硬跑）。" >&2
   exit 3
@@ -153,7 +213,7 @@ fi
 
 if [ "$CONFIRM" != "1" ]; then
   echo "== 4. dry-run 收尾 =="
-  echo "   四格前置全绿，**但没有 --confirm ⇒ 一张图都没重拍、一个字节都没动**。"
+  echo "   五格前置全绿，**但没有 --confirm ⇒ 一张图都没重拍、一个字节都没动**。"
   echo "   要动：bash research/tools/r17-reshoot-stale.sh --confirm"
   echo "   ⚠️ 重拍之后仍必须：① 逐张打开看图，② 改 README 里那行「人看到的」，③ 重钉 UIPIN。"
   echo "      这个脚本**不做** ②③ —— 没有「人看过」的锚点就是没锚点。"
