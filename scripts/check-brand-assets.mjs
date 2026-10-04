@@ -256,6 +256,62 @@ check(
 checkOnTree('ios：colorset 在提交物里', 'apps/mobile/ios/Heyta/Images.xcassets/HeytaSplashBackground.colorset/Contents.json');
 checkOnTree('ios：mark 图集在提交物里', 'apps/mobile/ios/Heyta/Images.xcassets/HeytaLaunchMark.imageset/Contents.json');
 
+/* ── 3a. xcassets 的 Contents.json 必须**解析得开**（存在性挡不住坏字节） ──
+ *
+ * 🔴 这条是 10-05 01:2x 四端重装的 ios 段**当场炸出来的**：`xcodebuild Release` 报
+ *   `error: failed to read asset tags: … actool --print-asset-tag-combinations …`
+ *   `Badly formed object around line 6, column 62` —— 出处是 `gen-boot-splash.mjs:445`
+ *   写 `blue` 那一档时**少了一个收尾引号**（`"0.988, ` 而不是 `"0.988", `），
+ *   于是提交物里的 colorset 从来不是合法 JSON。
+ *   而 `pnpm check` 那一路**一直是绿的**：上面那两格只问"在不在提交物里"。
+ *   ⇒ 这就是本仓库登记过的形状：**存在性判据把"有这个文件"当成"这个文件能用"**
+ *     （§7 那条「断言只会验界面写了什么，不会验界面少了什么」的字节版）。
+ *   生成器与提交物可以**逐字一致而一起是坏的** —— 所以牙齿要长在"读得开 + 形状对"上，
+ *   不是长在"和生成器比一致"上。 */
+function checkAssetJson(label, rel, shape) {
+  check(label, rel, (t) => {
+    let doc;
+    try {
+      doc = JSON.parse(t);
+    } catch (err) {
+      // 把解析器给的行列原样带出来：这次事故的证据就是那两个数字，人拿它能直接定位
+      return `不是合法 JSON（actool 会整趟构建失败）—— ${String(err.message ?? err).trim()}`;
+    }
+    return shape(doc);
+  });
+}
+
+checkAssetJson(
+  'ios：colorset 解析得开且亮暗两档各带四个分量',
+  'apps/mobile/ios/Heyta/Images.xcassets/HeytaSplashBackground.colorset/Contents.json',
+  (doc) => {
+    const colors = doc?.colors;
+    if (!Array.isArray(colors) || colors.length !== 2) return `colors 不是亮/暗两档（读到 ${Array.isArray(colors) ? colors.length : typeof colors}）`;
+    if (!colors[1]?.appearances?.some((a) => a?.appearance === 'luminosity' && a?.value === 'dark'))
+      return '第二档没写 luminosity=dark ⇒ 暗色模式下这张板是亮的';
+    for (const [i, c] of colors.entries()) {
+      const comp = c?.color?.components ?? {};
+      for (const k of ['alpha', 'blue', 'green', 'red']) {
+        if (!/^\d\.\d{3}$/.test(String(comp[k] ?? '')))
+          return `第 ${i} 档的 ${k} 不是 "0.xxx" 四字面量（读到 〈${comp[k] ?? '∅'}〉）—— Xcode 按字符串读分量`;
+      }
+    }
+    return true;
+  },
+);
+
+checkAssetJson(
+  'ios：mark 图集解析得开且真挂着图',
+  'apps/mobile/ios/Heyta/Images.xcassets/HeytaLaunchMark.imageset/Contents.json',
+  (doc) => {
+    const images = doc?.images;
+    if (!Array.isArray(images) || images.length === 0) return 'images 是空的 —— 启动帧会是一张透明图';
+    if (!images.every((im) => typeof im?.filename === 'string' && im.filename.length > 0))
+      return '有档位没挂 filename';
+    return true;
+  },
+);
+
 /* ── 3b. 四个资产目录里不许躺着未跟踪的位图（c9fe6f56 的原始形状） ──── */
 checkNoUntrackedAssets('资产：生成物全部已跟踪', [
   'apps/mobile/android/app/src/main/res/mipmap-mdpi',
