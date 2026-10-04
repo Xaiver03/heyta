@@ -19,7 +19,7 @@
 | 2 | web 侧真的导出成品图（复用 `avatar-encode.ts` 的 canvas 形状与平台边界） | ✅ 代码 + 单测 + e2e 五条件证跑绿（1080×1440 真落盘、图人看过），六条变异臂全红 | §3 §4.3 §6.3 |
 | 3 | 判据：导出全程**零网络请求**（真浏览器 + 正向对照） | ✅ 5 passed / rc=0：双计数器同时为零 + 页面自发的 `/api/*` 各 +1 + 载体 `SW=NONE` 实测 | §4 |
 | 4 | "零法务变更"的**现量**复核（不是引用那句话） | ✅ 完成：`uses-permission` 声明数**前后都是 1（INTERNET）**、iOS plist/Podfile 零 diff、`NSPhotoLibrary*` 键 0 条，两条既有对账门禁 rc=0 | §5 |
-| 5 | 移动端也真导出（原工单的"成品图"不分端） | ✅ **两端真机 IHDR 读数都取到了**（Android 04 13:20 `RC_ANDROID=0`；iOS 04 17:13:17 `RC_PROBE=0` ⇒ `1080×1440`，W7-G2 那条"折算仍是推的"随之闭合）；🔴 **Android 那趟当场过期**：让帧修复改了 `card-export-units.ts`，要在新树上重取 —— ⚠️ **04 18:1x 重取已开跑并以环境无效收口**：装包 `RC_REINSTALL_ANDROID=0`（17:57:21）／探针 `RC_ANDROID=3`（18:12:23，等满**默认 900s**、负载 164），补跑在链 T2（显式 3600s + 先重装）。**这一行在补跑取到读数前只能算"iOS 端已到最终态、Android 端装包绿而出图未取到"**，缘由见 `countdown-anniversary.md` §8.4 ㊢ | §2.4 §7 |
+| 5 | 移动端也真导出（原工单的"成品图"不分端） | ✅ **两端真机 IHDR 读数都取到了**（Android 04 13:20 `RC_ANDROID=0`；iOS 04 17:13:17 `RC_PROBE=0` ⇒ `1080×1440`，W7-G2 那条"折算仍是推的"随之闭合）；🔴 **Android 那趟当场过期**：让帧修复改了 `card-export-units.ts`，要在新树上重取 —— ⚠️ **04 18:1x 重取已开跑并以环境无效收口**：装包 `RC_REINSTALL_ANDROID=0`（17:57:21）／探针 `RC_ANDROID=3`（18:12:23，等满**默认 900s**、负载 164），补跑在链 T2（显式 3600s + 先重装）。~~**这一行在补跑取到读数前只能算"iOS 端已到最终态、Android 端装包绿而出图未取到"**~~ 🔴 **04 19:0x 补跑到账 ⇒ 两端读数都在当前提交上**：链 T2b `RC_REINSTALL_T2=0`（18:46:47，先重装再探针）→ `RC_ANDROID_T2=0`（19:00:50，`通过 11 项 / 失败 0 项`、IHDR `1080×1440` 逐字等于契约、`BYTES=35286 SHA=2821b4820f8f`、`TRANSPARENT=false`、全程零授权页、成品图我打开看过）。缘由见 `countdown-anniversary.md` §8.4 ㊢/㊧ | §2.4 §7 |
 
 
 ---
@@ -378,5 +378,6 @@ list reporter 的 `✘` 前是**两个**空格而正则要求一个，加上没�
    我的链脚本没传 `HEYTA_LOAD_GATE_WAIT`，阈值 12 没动）。补跑在链 T2：**显式 3600s + 先重装**
    （臂收尾的 `git checkout --` 会把源码 mtime 推到装进去的 bundle 之前，新鲜度门按规矩就该拒）。
    缘由与那条可迁移的坑在 `countdown-anniversary.md` §8.4 ㊢。
+   ✅ **04 19:0x：那一趟补到了，这一格不再是"未取到"** —— 链 T2b `RC_REINSTALL_T2=0`（18:46:47）→ `RC_ANDROID_T2=0`（19:00:50）：`通过 11 项 / 失败 0 项`、`W=1080 H=1440 BYTES=35286 TRANSPARENT=false BLANK=false SMEARED=false SHA=2821b4820f8f`、卡面标题 `w7e2e-184647`、设备侧原名 `heyta-w7e2e-184647-10月11日 星期日.png`、收尾 `mCurrentFocus` 仍是 `com.heyta`。**图我打开了看过**：白卡 + 左侧竖条 + 居中「还有 7 天」+ 底部「10月11日 星期日」，与 iOS 17:13 那张四处同构（标题位 / 天数行 / 日期行 / 竖条）⇒ 这一趟补的不是"另一种画法也能出图"，而是**同一套共享版面在另一端的当前产物上出得来图**。字节差（34360 → 35286）来自卡片标题进了卡面与文件名，不是行为变了。🔴 证据 `apps/mobile/evidence/card-export/latest-card.png` 是**已跟踪**路径，而链 FULL2 收尾那条 `git checkout -- .` 会把它连同 e2e 重写的图一起回滚 ⇒ **先提交、链后收尾**。
 3. ⏹ iOS pbxproj 那 8 行的**构建级**验证（`plutil -lint` 只证 XML 合法，不证编译进 target）。
 4. ⏹ 与 `feat/countdown-batch2` 合流（W7 三笔 + W8 那四笔），合流后 `pnpm reinstall:all` 四端重装。
