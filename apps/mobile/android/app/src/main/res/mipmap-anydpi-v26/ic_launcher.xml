@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  生成物（scripts/gen-app-icons.mjs）—— 不要手改。
+  改图标去改 packages/design-system/src/brand-mark.ts（几何）或
+  packages/design-system/src/tokens.css（颜色），然后重跑本脚本。
+
+  三层各干什么：
+    background：token 主蓝（值见 values/ic_launcher_background.xml）；
+    foreground：只有「h」字形、底透明，字形落在中心 66dp 保留圆内；
+    monochrome：同一层 —— Android 13 的"主题图标"会拿它去做单色剪影，
+                没有这一层时主题模式下会退回整枚彩色图标（等于没适配）。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>
