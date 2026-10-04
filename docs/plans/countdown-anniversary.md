@@ -4271,7 +4271,8 @@ W0b ─> 随时可做（台账那半要等文件干净）
     我第一趟次序搞反就永久丢了"改前图"，这一趟是在覆盖前 `cp` 才留住的）。
     ⚠️ 边界：这 4 份跑绿**不等于** `check:ai-e2e` 整族绿 —— 整族还有 50+ 条，本轮没跑（共享载体）。
 
-12. ✅ **本批已经进 `main`**（04 22:0x，`origin/main` = `91a672f6`）。
+12. ✅ **本批已经进 `main`**（04 22:0x，`origin/main` = `91a672f6`。⚠️ **这是那一趟的瞬时 tip，不是当前 tip** ——
+    其后又落了两笔收口，当前 `origin/main` 见第 14 条 = `a5891fde`；引用"进没进 main"以第 14 条为准）。
     🔴 **这一条同时是对本条第一版的否证与撤回**：第一版写的是"**停止追 main**——并行会话正以分钟级
     往 main 落笔，任何'我已把 main 并进来'的声明都只是瞬时读数，落地留给主检出持有者"。
     那段推理**把两件事混成了一件**：
@@ -4327,6 +4328,20 @@ W0b ─> 随时可做（台账那半要等文件干净）
 
 14. ✅ **落地态（`9adb5f08`）重跑门禁与关键判据的新读数**（Goal 第⑤步要求的最后一格；04 22:2x–22:3x）。
     载体 = 本分支 HEAD `9adb5f08`（= 已推上去的 `origin/feat/countdown-batch2`，且已被 `origin/main` 收下）。
+    本笔落档后 tip 前进到 **`a5891fde`**，`origin/main` == `origin/feat/countdown-batch2` == 本地 `HEAD`（逐条现量，
+    见下面那条"单次推送通道"）。
+
+    🔴 **推送通道这一格要单独记，因为它换了**：`git fetch origin` / `ssh -T git@github.com` 本轮**整窗失效** ——
+    `Connection closed by 198.18.0.73 port 22`，换 `-p 443 git@ssh.github.com` 同样超时（`198.18.x.x` 是本机代理的
+    fake-ip 段，所以那不是"GitHub 挂了"，是代理这一跳不给非 HTTP(S) 协议放行）。同一时刻
+    `curl https://api.github.com/zen` 回 **200**。⇒ 单次改用 HTTPS + `gh` 的凭据助手推：
+    `git -c credential.helper='!gh auth git-credential' push https://github.com/Xaiver03/heyta.git <sha>:refs/heads/feat/countdown-batch2 <sha>:refs/heads/main`。
+    ⚠️ **这不是给仓库换默认 remote**（`origin` 仍是 SSH，没改任何配置），只这一笔走 HTTPS。
+    🔴 **换通道之后必须复核落点**（`ls-remote` 两个 ref 逐条读回 = `a5891fde`）—— 链接工作树里
+    `push origin main` 推的是别人的分支而且照样 exit 0，这条老坑在换了传输方式之后**风险更高不是更低**。
+    ⚠️ 顺带一条小的探针坑：`git rev-parse --short A B`（两个参数）在这里直接
+    `fatal: Needed a single revision`，我第一次把它读成了"`origin/feat/countdown-batch2` 这个 ref 不存在"。
+    **它只是不接受多参数**，逐个调用即可 —— 探针自己的失败别升级成现场的事实（AGENTS §7 元规则 1）。
 
     | 件 | 读数 | 日志 |
     |---|---|---|
