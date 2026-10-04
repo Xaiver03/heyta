@@ -1322,7 +1322,7 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 两台 booted 模拟器里 `com.heyta` 都在跑 ⇒ 这里**没有读数可记**，也不写"预计能过"。
 每个槽位写死"待填 + 现量命令"，填的时候只替换那一条。
 
-- ① 四端重装：`INNER_EXIT=` **待填** —— 现量命令 `bash /tmp/heyta-run-reinstall.sh --go`（载体 `heyta-wt-reinstall`）；截图逐张写明钉到哪一步、人看到什么，跟在这条后面。
+- ① 四端重装：`INNER_EXIT=` **待填** —— 现量命令 `bash /tmp/heyta-run-reinstall.sh --go`（载体 `heyta-wt-reinstall`）；截图逐张写明钉到哪一步、人看到什么，跟在这条后面。 —— 🔴 **截图↔步骤对照已按实现读好（见 §7.31.7）**，窗口里只填每张的 mtime/字节/md5 与是否「本轮新生」，另外两条「当前产物」的问题由 mac 的 web-dist 带分母对账与 ios 的新鲜度门各自回答，不外包给截图。
   - 🔴 **04:02 现量"为什么还没成交"**（三条同时成立才算窗口开，它们不会在同一刻成立）：
     ① **另一条会话正在跑 `reinstall:all`** —— `pid 81007`/`93771  sh /tmp/queue-reinstall-all.sh`，
     实际那一跑是 `pid 93817 bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817`
