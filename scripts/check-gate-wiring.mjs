@@ -118,6 +118,11 @@ const REQUIRED_ANCHORS = [
   'pnpm -r test',
   // packages/*/dist 是各端打包输入，不先 build 就是在验旧产物（§7 第 27 条）。
   'pnpm build',
+  // 🔴 判据 1 抓的是"定义在、链里没有"。而**整文件覆盖**会同时抹掉定义与链段 ——
+  // 那种形状下判据 1 看不到任何东西（2026-10-04 现量：把两者一起摘掉 ⇒ rc=0）。
+  // 这是自托管批次往链里加的唯一一段（载体 77 段 = main 76 + 它），
+  // 落地后谁拿自己那份 stale base 提交 `package.json`，它就会静默消失。
+  'pnpm check:image-build-args',
 ];
 
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
