@@ -2741,3 +2741,35 @@ W0b ─> 随时可做（台账那半要等文件干净）
   本批**没有把这两处 pod-install 产物提交**（`Podfile.lock` 与 `project.pbxproj` 的引用重排
   都已 `git checkout` 回 HEAD）—— 把本机值钉进提交态只是把漂移挪到另一台机器上。
   链 R 用的是已经装好的那枚 app，不再需要构建，所以这个不一致不影响它的读数。
+
+- ㊲ **链 S：windows 那一栏从"未取证"转成真实读数 —— 走的是 `reinstall-all.sh` 的 windows 那一腿的两条命令，不是整条 `reinstall:all`**（04 10:36–10:41，载体 `6105ba3b`，无设备参与）
+  - **为什么只跑一腿**（归属读数写在跑之前，不是事后解释）：另一条会话的 `queue-reinstall-all.sh` 从 03:13 起卡在 macOS 公证，
+    `notarytool submit --wait`（pid 98934）到 10:36 已 **7 小时 22 分**，而 `lsof -p 98934` 现量 27 个 fd 里**零个网络 fd**（只有 REG/PIPE/DIR/CHR）
+    ⇒ 它并没有在跟苹果的服务说话；同一分钟 `/Applications/Heyta.app/Contents/Resources/web-dist/index.html` 的 mtime 仍停在 10-03 23:05。
+    整条 `reinstall:all` 会撞它的 `/tmp/heyta-macos-dist` 与 `/Applications/Heyta.app` ⇒ **不并发**（AGENTS §8.9）。
+  - **远端归属读数**：`C:\src\heyta` 上次写入 = 10-04 **07:11:57**（我自己那一趟），`Get-Process` 里**没有** dotnet / msbuild，
+    唯一的 powershell 是这次 ssh 自己 ⇒ 打包机空闲，这一腿的所有者是我。
+  - **读数**：`RC_SYNC=0`（`web-dist/index.html=517c6ba76d00fb25…` 本地/远端逐字相同 + `bridge=2623f10e…` + `assets/*.js` 7 枚一致）、
+    `RC_PACKAGE=0`、`MISSING_FACTS=（无，七条齐）`：
+    `ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` / `M2D=OK` /
+    `PAYLOAD_INDEX_SHA=517C6BA76D00FB257817B808701C2093F367CFEA7D09A186C56205AE731E0F3C` / `PAYLOAD_CHUNK_TOTAL=2` / `PAYLOAD_CHUNK_PRESENT=2`。
+  - ✅ 门禁那一栏因此从**未取证**转成真实读数：`check:shell-surfaces` **`RC_SURFACES=0`、5 绿 0 红、未取证从 2 栏降到 1 栏**，
+    D4 那一行打印的是「装进包的字节与本工作树 dist **sha256 逐字相同**（`517C6BA76D00`），且那份里有 `"countdown-view"`（chunk 2/2 齐）」。
+    剩下那一栏是 `desktop-macos / countdown · 产物`，报的是"包里那份 `index.html` 与本工作树 sha256 不符"——
+    那是**上面那条 hung 链的包**，门禁没有把它顺推成绿。
+  - 🔴 **这条 D4 有牙，四臂各量一次**（拿**真**取证文件改一个值，经 `HEYTA_WINDOWS_FACTS` 注入，真文件跑完 `cmp -s` 复量未动）：
+    `PAYLOAD_WEBDIST=False` ⇒ **rc=1**「装出来的包里**没有** web-dist/index.html」；
+    `PAYLOAD_CHUNK_PRESENT=1`（total 2）⇒ **rc=1**「index.html 引用的资源文件没全部落在包里」；
+    sha 首位 `517C→0000` ⇒ **rc=0 但那一栏转回未取证**「那是别的检出／别的会话打的包，不能当本轮的取证」；
+    删掉那三行 ⇒ **rc=0 未取证**「取证文件在，但缺判据行 ⇒ 生产方没测这些事实」。
+    后两臂**故意不是红**：取证文件是"上一趟打包"的属性，判据比现场新时不能折成产品缺陷（§7 第 50 条那一族）——
+    但它**不许**被读成通过，这正是这一栏此前一直空着的原因。
+  - 👁 **人打开过 `dist/windows/packaged-first-run.png`**（1152×587、75 289 字节）：窗口标题 `heyta`；左侧 rail 的头像菜单是**开着**的，
+    第一项是高亮的「→ 登录 / 注册」、下面「设置」，**没有**「退出登录」（＝ `M2D=OK` 那条判据的界面形状）；
+    主区是「收集箱」页头 + 排序方式「默认（按截止时间）」+「未同步」chip；弹层是首装那张「在使用联网功能之前」授权卡
+    （两条 bullet + 服务条款/隐私政策两个链接 + 右上 X）；左下能看到「已完成」与「四象限」两组（红/蓝各一颗点）；中文零豆腐块、蓝白一套。
+    ⚠️ 与 Android 那一格**同一条边界**：这张图证的是"装上的是当前源码的界面"，
+    而"倒数日这一屏在装出来的包里"是由上面那条 **sha 逐字相同 + 那份字节里搜得到 `countdown-view`** 证的，**不是**由这张图证的。
+  - 📌 关闭 **W8-GAP-W1 / 任务 #20**：08:2x 那次是"通道就位 + 七臂离线台架"，这一趟是**第一次在真打包机上跑到那三行**。
+    ⚠️ 一条限制写在这里：这份取证文件落在 `dist/windows/`（**被 gitignore**）⇒ 它是"本机这一趟"的读数，不是仓库里的常驻证据；
+    下一次干净检出上这一栏仍会报未取证，除非再打一趟。这不是缺陷（macOS 那一栏同理），但别把它读成"永久关上了"。
