@@ -10049,3 +10049,50 @@ dry-run 也会写盘、也会上负载。判"这一步是不是零成本"要看*
 **③ 到点这件事不重抄数字**：哨兵实例的 CAP 与"main 多久动一笔"都在 §8.164 ②（那里是现量），
 本条只加一句判读：**到点而窗口没开 = 环境无效（不是产品失败）**，处置是重开实例继续等，不是改阈值。
 🔴 这一格刻意只留指针不留数值 —— 同一个结论句落在两份文档里，改一处必漏一处（本批已为此 sweep 过五次）。
+
+### 8.166 我自己那条"批量跑门禁报 rc"的循环是坏的：它把**不存在的脚本**读成 rc=0，而我把那句"四道文档门禁复跑 rc=0"写进了两笔提交（2026-10-05 03:5x 现量更正）
+
+**① 坏在哪（一行命令就能复现的形状）**
+
+```sh
+for g in A B C; do node "$g" >/dev/null 2>&1; echo "$(basename $g) rc=$?"; done   # 🔴 全废
+node A >/dev/null 2>&1; rc=$?; printf '%s rc=%s\n' "A" "$rc"                       # ✅ 唯一正确写法
+```
+
+`echo` 里的 `$(basename …)` **先执行**，把 `$?` 换成 `basename` 的退出码（恒 0）。
+所以我对产品负责人那句"四道文档门禁复跑 rc=0"**不是读数**，是 `basename` 的返回值
+（§8.164 与 §8.165 两次追加各用了这种循环；三节正文本身没有复述过那些 rc，所以**不需要撤回结论**，
+要撤回的是"我验过了"这句话）。这不是措辞问题：同一轮我因此**没有发现路径是我编的** ——
+循环里我放了 `scripts/check-doc-citations.mjs`，本分支根本没有这枚文件（`node` 打 `MODULE_NOT_FOUND`），
+而我的探针照样报 `rc=0`。**"不存在的门禁看起来绿"是这条陷阱最贵的地方。**
+🔴 与 §7 第 45/179/184 条同族（管道后 `$?` 是 `tail` 的、`cmd > log 2>&1` 之后接 `tee -a log` 的码、zsh 里 `${PIPESTATUS[0]}` 是空值），
+这是这张表目的**第四种面目**：命令替换把 `$?` 换掉。正对照现成——把不存在的路径丢进正确写法，rc 必须是 1（本轮已量到 1）。
+
+**② 重测（用正确写法，退出码紧跟命令）**：`docs-link-check` rc=**0** · `check-docs-voice` rc=**0** ·
+`check-selfhost-entry-command` rc=**0** · `check-script-snapshot` rc=**0**。
+⇒ §8.163–§8.165 那三笔追加的内容本身仍然干净，只是**当时没说清它没被验证**。
+
+**③ 顺带查出的两件真事**（都是这一轮把手伸进 main 才看见的）
+
+1. **main 上新增了一道门 `check:doc-citations`**：`git cat-file -e main:scripts/check-doc-citations.mjs` = 存在，
+   `HEAD` = **不存在**；而它默认只查 `docs/research/performance-hotpaths-audit.md`（`:67`），
+   要 `--doc` 才换对象。⇒ 载体那九道落笔前门禁**不含**它（那道门是本批写集之外的 main 新增），
+   它只在第 4 道那几十分钟的完整 `pnpm check` 里跑；本批的文档不是它的默认对象，
+   所以它红的话是 main 自己的账（要逐段归属），不是"本批带进去的"。
+2. 🔴 **登记 G-66（不归本批改）**：对外那份 `server/README.md`「Clients and version coupling」里带着**行号引用**
+   （`storage-quota.service.ts:417`），而**没有任何一道门钉它**——现量：
+   `grep -n "417\|storage-quota\|snapshot-handler" server/tests/version-coupling.spec.ts` = **空**，
+   `check:doc-citations` 又默认不查这份文档。
+   今天它是**对的**（`:417-419` 正是 "Deletion is authorized by the newest CAUSAL full-state op…" 那段注释），
+   但"对"没有消费者守着就只是此刻对。
+   ⚠️ 修法**不在本批**：把 `scripts/check-doc-citations.mjs` 复制到本分支去扩 `--doc`，
+   会变成 add/add 冲突（该文件 main 有、本批没有）⇒ 给落地添一整族。
+   关闭判据：由性能那条线的所有者把这道门的文档清单扩到 `server/README.md`（或对本批公开文档单列一次），
+   并配一臂"把 `:417` 改成 `:999` 必须红"。
+
+**④ 这一轮另外两条仍然成立的复验**（用绝对路径与现取符号，不引用记忆）
+`appVersion` 在本批树上的**生产者仍是空集**：全仓（排除 `node_modules`/`dist`）`*.ts(x)` 命中 19 处，
+逐条分属服务端消费者（`sync.routes.ts:157/165`、`checkpoint-gate.ts`、`device.service.ts`、`admin.routes.ts`）、
+线契约（`supersync-http-contract.ts:191` 是 `z.string().optional()`）、管理台面（`admin-client.ts:156` 只是投影类型）；
+唯一构造下载查询的 `packages/sync-client/src/client.ts:1324-1327` 设的是 `sinceSeq` / `limit` / `excludeClient`
+三枚，**与 README 那句逐字一致**，没设 `appVersion` ⇒ 目标第 6 项那句对外承诺在当前产物上仍为真。
