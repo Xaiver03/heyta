@@ -3100,3 +3100,35 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 - 🔴 顺带记一次自己的命令形状错：我为了预测重建与否写了 `git diff --name-only "$S" …`，而 `$S` 当时是中文占位串「（无）」
   ⇒ stderr 出 `fatal: bad revision`，可我的 `wc -l` 仍然打出 **`diff 数=0`** —— 一个空测量长得像"零差异、不用重建"的干净结论。
   这是记忆里"空测量看着最干净"的又一次命中：**负向分支的读数必须先看 stderr，或者先断言输入是合法 rev**。
+#### 7.31.11 ① 的 mac 段会不会被公证拖住：会跑、有上限、而且**上限与 `INNER_EXIT` 无关**（14:16–14:17 现量）
+
+- 为什么先算这笔：① 的四条腿是**串行**的（mac → windows → android → ios），而设备窗口是稀缺资源。
+  mac 段里 `package-app.sh` 会调 `xcrun notarytool submit … --wait`，另一条会话同一枚脚本已经挂了 **11 小时**
+  （pid 98934）。如果不先量清楚，① 有可能"窗口开着、但整趟卡在 mac 的公证上，android/ios 永远轮不到"。
+- 三项现量：
+  1. **我们的运行会走公证那支**：脚本用 `security find-identity -v -p codesigning | grep -o 'Developer ID Application: .*'`
+     选身份（`:185`），本机现量 `Developer ID Application` 数 = **1** ⇒ `SIGN_KIND=developer-id`；
+     ASC key 三个候选路径里两个存在（`~/Library/Private/AppStoreConnect/`、`~/Desktop/`，**内容不打印**）
+     ⇒ 三条跳过分支（非 developer-id / 没 key）都不成立。
+  2. **有上限，且不是永久挂**：main 那份 `:283 NOTARY_TIMEOUT=${HEYTA_NOTARY_TIMEOUT:-900}` + `:291 run_bounded()`，
+     先看 GNU `timeout` 在不在（`:286`），裸 macOS 上**没有**它，于是退化成纯 bash 看门狗（`:298-299` `local pid=$! waited=0` / `while kill -0 "$pid"`）
+     —— 这一条正是"没有 timeout 就等于没修"的守卫。
+     对照那台挂死的载体：`/tmp/heyta-reinstall/apps/desktop-macos/scripts/package-app.sh` 里 `run_bounded` 命中 **0**、
+     `HEYTA_NOTARY_TIMEOUT` 旋钮**不存在** ⇒ **它就是 §7 那一族"载体落后于修复"的现场**，也解释了 11 小时。
+     我们的载体每次窗口前会 `checkout` 到 main ⇒ 带修复。
+  3. 🔴 **公证结果不影响 `INNER_EXIT`**：脚本 `:23` 有 `set -euo pipefail`（我第一版只看了头 8 行，
+     据此写了"没有 `set -e`"，差点又写错一条判据 —— 现量纠正），但那条会失败的命令写成
+     `run_bounded … || notary_rc=$?`（`:311`，不设限那支同形在 `:314`），**被 `\|\| notary_rc=$?` 吸收掉**；
+     而公证超时/失败那两支（`:325`、`:327`）**只 `echo`，不 `exit`**，脚本最后一句是
+     `echo "  签名档位：$SIGN_KIND"`（`:335`）⇒ `package-app.sh` 的退出码与公证结果无关，
+     而 `reinstall-all.sh:200` 判的正是这个退出码。
+     推论两条，都要在 ① 记账里写清：**`INNER_EXIT=0` 不证明公证通过**（mac 的 ① 判据是"安装副本自截屏非空白+主蓝命中"
+     与 `:207-222` 那条带分母的 web-dist 对账），**公证 🔴 也不是 ① 失败**，它是一条**独立事实**（分发用，本机装不用），
+     照实报，不并进 ① 的判决，也不拿它当"① 红了"的理由。
+- ⚠️ 一个我**决定不做**的优化，理由写下来免得下一位替我重做：把 `HEYTA_NOTARY_TIMEOUT` 调小（比如 120）能让 mac 段少占几分钟窗口。
+  但那等于为了省窗口去**取消一次本来会成功的票据装订**，而它换来的几分钟相对于我们已经等的小时并不值钱；
+  况且第 3 条已经证明公证不参与判决。⇒ 用默认 900，不改旋钮。
+- 🔴 顺带再踩一次自家探针的形状：我写的是 `grep -c 'run_bounded' <文件> || echo 读不到`，
+  而 `grep -c` **零命中时也返回 1** ⇒ 输出里同时出现 `=0` 和 `读不到` 两行。
+  正确读法是那个 **0**（命中数），不是后面那句。同一条陷阱记忆里已经写过（"`grep -c` 零命中 rc=1 但打印的 0 才是要读的东西"），
+  这次是它**在 echo 拼接里**的新面目：**判"读不到"和判"零命中"不能用同一个退出码**。
