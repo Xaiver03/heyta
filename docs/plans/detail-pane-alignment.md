@@ -365,12 +365,15 @@ cd "$(git rev-parse --show-toplevel)/.." && git status --porcelain docs/research
    （`vite --port 4318` + 假端点 4319），三条分别是助手那条多轮旅程、单步"规则命中零出境→披露后出境"、
    以及**"写工具只出提案：确认前不落库、确认后一次都不再多出境"** —— 最后这条正是隐私那条
    在界面上的读数，搬动之后仍然成立。这一格至此不再是缺口。
-2. `docs-link-check` 在 06:5x 复跑时变成 **1 红**：`docs/adr/0050-…:83` 新增的
-   `../../apps/mobile/evidence/ios-node-vault-interop-20261004.txt` **本机存在、git 未跟踪**
-   （那枚证据 14:57 刚生成）。**归属 = Vault 那条线**（ADR-0050 在他们手里 +66/−10 未提交）；
-   `git show HEAD:docs/adr/0050-e2ee-key-lifecycle-and-recovery.md` 的第 83 行**没有**这个链接
-   ⇒ 干净检出是绿的，这条红**只在混合工作树成立**，由他们下一次提交（带那枚证据的 `git add`）关闭。
-   上面"门禁全绿"那一格读的是 06:5x 那趟，当时确实绿。
+2. ~~`docs-link-check` 在 06:5x 复跑时变成 **1 红**：`docs/adr/0050-…:83` 新增的
+   `../../apps/mobile/evidence/ios-node-vault-interop-20261004.txt` **本机存在、git 未跟踪**（那枚证据 14:57 刚生成）。
+   **归属 = Vault 那条线**（ADR-0050 在他们手里 +66/−10 未提交）；`git show HEAD:…` 的第 83 行**没有**这个链接
+   ⇒ 干净检出是绿的，这条红**只在混合工作树成立**。~~
+   ✅ **15:1x 复跑 `node research/tools/docs-link-check.mjs` RC=0**，关闭方式正是那条门禁自己列的三条出路里的第 ① 条：
+   现量 `git diff --cached --name-only` = 那枚 `ios-node-vault-interop-20261004.txt` —— **它的主人已经把它 `git add` 了**
+   （检查器读的是跟踪集合，所以暂存即关闭，不必等它提交）。本线全程没代改（既没替他 add，也没动他那一行）。
+   📌 留这一条的意义：**"工作树红"与"仓库红"是两件事**，前者会随别人的一次暂存自己消失
+   ⇒ 登记时必须写明**读到的是跟踪态还是暂存态**，否则下一个人会以为有人改过判据。
 
 📌 **本批给合流面添了 2 枚，逐枚写清落点与意图**（07:0x 现量：
 `git merge-tree --write-tree feat/detail-pane 23bbf2f1` = **15** 枚，`… HEAD` = **17** 枚，
