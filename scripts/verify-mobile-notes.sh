@@ -67,11 +67,23 @@ trap 'rm -f -- "$0"' EXIT
 #   bash scripts/verify-mobile-notes.sh
 #   PORT=3100 bash scripts/verify-mobile-notes.sh   # 换端口起栈时
 #
-# 前置：模拟器在跑、服务端在该端口（TEST_MODE）、
-#       /tmp/heyta_mobile_{token,email,e2ee}.txt 存在。
+# 前置：模拟器在跑、服务端在该端口（TEST_MODE）。
+#       凭据**不需要预先存在** —— 本脚本自己准备一个专属新账号（见下面 ensure_account）。
 
 set -u
 export PATH="/opt/homebrew/bin:$PATH"
+# ── 先准备账号，再加载共享库（顺序不能反，见 lib 文件头）────
+#
+# 🔴 为什么这一条是补上来的，而不是"顺手统一风格"：这一枚脚本原先直接吃外部喂进来的
+#    共享三件套（`/tmp/heyta_mobile_{token,email,e2ee}.txt`），而它是八个 `verify-mobile-*`
+#    里唯一不建号的。共享件每被别的会话重登一次，服务端就把同账号的旧 token 作废 ——
+#    03:0x 实测症状：第 1–8 步全绿（都不依赖同步），第 8b 步第二个宿主同步报
+#    `HTTP 401 — Invalid token`，整趟 25 分钟设备时间烧完而跨设备三条腿一条没走到。
+#    另一半理由在 lib 文件头：同一账号的 client 数每轮 +2，第 11 轮越过
+#    `MAX_VECTOR_CLOCK_SIZE=20` 后时钟被裁，该设备**每一条**写入都被判 CONFLICT_CONCURRENT，
+#    而症状长得像"手机没报冲突"。一个会随运行次数漂移的台架本身就是缺陷。
+. "$(dirname "$0")/lib/mobile-e2e-fresh-account.sh"
+heyta_e2e_ensure_account || exit 1
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 # 负载门与"别人正在用这台设备"的探测，必须在**任何破坏性动作之前**
 # （`pm clear` / `install -r` 都算）—— 判据晚了，一轮无效的运行先把别人的现场清掉。
