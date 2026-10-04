@@ -9832,3 +9832,64 @@ G-61 的 ②（挂进发布前那道链）与 ③（把静态腿拆进链）**�
 `docs/reference/build-matrix.md` 那 9 条否定句属于别的条线（RN / 桌面壳 / 代理），本批没动它们，
 而该文件 main 侧自 merge-base 有 1 处改动、本分支 0 处 ⇒ **不去碰**：为一处并不虚假的句子新增一枚重叠文件，
 是把 sweep 的成本换成落地的成本。
+### 8.161 落地前把载体重算先跑一遍：十一族对今天的 main 仍然全覆盖（`other=0`），但一趟"全绿"里藏着一枚没人检查的环境前提（2026-10-05 03:2x）
+
+窗口一开，`land-main --confirm` 就是一整趟：载体重算 → 配对归属 → 完整 `pnpm check`。如果它死在
+"第十/十一族之外"或者一棵树的环境前提上，代价不是十分钟，是那一枚等了三小时、条件刚凑齐的窗口。
+所以趁 `阻塞集=1`（别人的 `package.json` 还没提交）把**同一份脚本**先跑一遍 —— 不是复刻逻辑，是
+把它的三个 env 旋钮指向一次性目录：
+
+```bash
+cd heyta-wt-selfhost && HEYTA_CARRIER_WT=/tmp/heyta-pf-carrier \
+  HEYTA_CARRIER_PAIR_WT=/tmp/heyta-pf-carrier-pair \
+  HEYTA_CARRIER_BRANCH=preflight/selfhost-carrier-1005 \
+  node research/tools/selfhost-merge-carrier.mjs
+```
+
+（三个旋钮本来就在脚本里读 env，所以预检与真跑是同一段代码；预检不碰 `/tmp/heyta-merge-carrier`
+—— 那棵树与并行那条线的打包共用，也不碰 `feat/self-host-merge-main`。）
+
+**① 预检的结论：十一族够用。** 四趟读数（main 在这十几分钟里从 `0de18b87` 走到 `741c31c4`，
+每趟都重取）：`分族：pkg=1 gi=0 png=0 audit=1 snap=1 gen=1 cov=1 cap=1 dock=1 deploy=1 lspec=1 **other=0**` ·
+`合并归属：写 73 枚 / 合并相对 main 改 73 枚 / 集外 0 / 写集里未被改到 0 枚` ·
+`check 链段 main=84 本批=67 base=66 并集=85（摘段 0/0）` · 第八族 17 臂红 0、第十/十一族 9 臂不符 0、
+归属判据 12 臂红 0。⇒ 落笔不会被"新来一族"挡住。冲突稳定是 9 条，逐条都有族认领。
+
+**② 顺带量到一条落地前不会失效的前提。** 载体那侧的 `node_modules/.pnpm` 是 **10-04 07:03 由人装进去的**
+（脚本既不装、也不检查它存不存在）。现量 `depsFresh(/tmp/heyta-merge-carrier)`：根锁 `0f3c1bf6…` 与
+`main:pnpm-lock.yaml` 逐字节相同、e2e 锁 `021a9df4…` 相同、`stale=[]`；而并集相对 main 的 7 行
+`package.json` diff **全部在 `scripts` 里**（`dependencies`/`devDependencies` 一行没动，实测
+`git diff a5fedf16 main -- package.json`）。⇒ 重算的 `reset --hard` 不会让 store 变得不同源，
+land-main 第 3 道 gate 不挡。**这句是"现在成立"** —— main 一旦改根依赖就要重装，而那时挡的是第 3 道 gate，
+不是这里。
+
+**③ 真正的产出是一句假判据的注释**（元规则二那一族）。脚本头部先前写着"`--quiet` 的 coverage 与
+install-contract 只读提交物锁 / Dockerfile / 快照 / `server/package.json` ⇒ 两条都 exit 0、**不联网、
+不要 node_modules**"。前半句对（输出里的 `node_modules/<name>` 确实是锁里的键形状），后半句错：第 2 腿调
+`license-inventory.mjs --json`，而那一步先要有已安装的树。错因很具体 —— **在一棵恰好有 store 的树上量到一次
+exit 0，就把"这次跑得动"写成了"不需要这个环境"**。一次性载体（没有 store）当场把它照出来：第 2 腿非零 ⇒
+归属层收到"这道门没有缺陷行提取式 ⇒ 判不了"⇒ 建议"先在解法侧修掉"，可那个现场没有解法可修，缺的是一棵树。
+
+**④ 隔壁还有一条更坏的形状：假归属。** 配对树每次由 `worktree add` 新建，**永远没有 store**。所以
+"载体侧点名了缺陷 + 配对侧读不到 store" 会让 `attributeRed` 得出"缺陷只在载体 ⇒ 本批带进去的"——
+而真相是那一侧没被问成功。本次没走到它（第 2 腿本来就没有提取式，先被 ③ 那条拦住），但任何**带提取式的门**
+（`check:docs`、`链里每条脚本目标都在树里`）红的时候都走得到。
+
+**⑤ 做了什么**（判据方向一条没动，改的是它说的那句话真不真）：
+- 在任何归属判定**之前**把"两侧任一侧读不到 store"摘出来，按**配不了**退 3，并把两棵树的 store 在场、
+  目录路径、恢复命令（`cd <缺的那侧> && pnpm install --frozen-lockfile && cd e2e && pnpm install --frozen-lockfile`）
+  打全。结论仍然不放行 —— 这一支不是把"判不了"改成"过"。
+- 归属没全过的那条消息现在把"这条红是本批的"与"这条红判不了"分开念：后者要补的是**点名形状**，不是缺陷。
+- 每次重算落一行运行前提读数：`落笔前门禁的运行前提：载体 store 在场=false（/tmp/heyta-pf-carrier5）· 门禁 9 道`。
+  这是"打包输入由门禁隐提供"那一族的同一条规律：**环境也是被测对象的一部分**，它得出现在读数里。
+- 顺手修了自己写的一处计数 bug：`reds.filter((g) => !blind.includes(g))` 里 `blind` 装的是 `{g, m2}`，
+  恒不等 ⇒ "另外 N 道红"数成了全部（第五趟改按 label 集合后现量读成"另外 1 道红 … check:docs"）。
+
+**⑥ 复现**（不是"待验证"）：上面那条命令连跑两趟即可。旧文本只印 1 道"判不了"、第二道是谁只能靠再跑一趟去猜；
+改后点名全部红集并把 `check:docs` 单独列出。⚠️ **边界**：预检没证明"配对层会把 `check:docs` 归到非本批"
+—— 那半段要有 store 的载体才走得到，落地那一刻才是它的现场。载体侧有 store 时第 2 腿根本不红，
+⑤ 那条分支平时不被触发；它守的是"当它红的时候，别把人引到错的方向"。
+
+**⑦ 一般规律**：**"在某棵树上跑通过"不等于"这条判据不依赖那棵树的环境"**。要写的不是"不需要 X"，
+而是"这一趟 X 在场=${…}"——把前提落成一行现量读数，下一读的人就不用猜，也不会有人把一次偶然的
+成功读成一条不受环境约束的规则。
