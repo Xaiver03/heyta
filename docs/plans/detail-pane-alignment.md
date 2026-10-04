@@ -5122,6 +5122,18 @@ R2 那枚 `名册=3` 是**预期**读数：模式改坏后三枚在册项全部�
 📌 §8.72 那张消费者表的读数是 18:0x 的**当时**状态（三枚"只有预检载体"、预检"没有自动载体"），
 留原样不改成现在这个样子；本条就是它的更正指针。预检载体自己**仍然**没有自动消费者 —— 这一点没变。
 
+### 5. §1 四道前置闸门对本笔的复验
+
+| 闸门 | 读数 |
+|---|---|
+| 归属门 | `git log main..HEAD -- package.json` 里改这一行的只有本批自己；主检出那份 `M` 属于并行会话，**本笔没有写进它的工作树** |
+| 两道余量为 0 的棘轮 | 不涉及（没动样式/内联） |
+| 干净检出复跑 | 一次性 detached 检出 `01a36e9b`：三枚判据 `RC=0 / RC=0 / RC=0`，`docs-link-check` 仍只有 PROGRESS.md 那一枚外来死链（⑤，合流自愈）；载体跑完即 `worktree remove` |
+| packages 改完先 build | 不适用（本笔零 `packages/`、零 `apps/` 改动） |
+
+挂接动作因此**不是"等谁把 package.json 交出来"**：它是一笔普通提交，代价在合流那一刻付（并集 + 跑一次
+`pnpm check:gate-wiring`），而那一趟本来就要过 §8.47。
+
 复跑：`node scripts/check-detail-pane-status-table.mjs && node scripts/check-detail-pane-c1-coverage.mjs && node scripts/check-detail-pane-evidence-refs.mjs`（三枚 RC=0）
 + `node research/tools/mutation-rigs/mutate-detail-pane-merge-preflight.mjs`（臂数与红集以输出为准）。
 
