@@ -448,11 +448,19 @@ if [ -z "$XY" ]; then bad "任务页没有「打开搜索」入口"; screen_txt;
 ok "任务页顶栏有「打开搜索」入口（坐标现取：${XY}）"
 $ADB shell input tap $XY; sleep 3
 dump
-if [ "$(has_sub "输入关键词")" != "1" ]; then
-  bad "搜索浮层没打开（没有那条「输入关键词」提示）"; screen_txt; exit 1
+# 🔴 这一档原来是 `has_sub "输入关键词"` —— 那个字符串**早就不是产品的了**，22:01 实测界面正常开着而判据恒红。
+#    移动端这格的现值在 `packages/i18n/src/locales/zh-CN.ts:458`
+#    `'web.shell.search.placeholder': '搜索任务'`（aria 值在同文件 :459），needle 自 `0840ab79`
+#    （i18n 多入口拆分）之后就再也命中不到 ⇒ 一条恒假判据（§7 元规则二）。
+#    改判**结构**：任务页本身没有可编辑输入框，浮层里必有一个（`autoFocus` 那枚）——
+#    这件事不随语种与文案改动而漂。屏上的提示文字只作**读数**打印，不再当判决用。
+SXY=$(xy_edit_any)
+if [ -z "$SXY" ]; then
+  bad "搜索浮层没打开（浮层里找不到可编辑输入框）"; screen_txt; exit 1
 fi
-ok "搜索浮层已打开"
-XY=$(xy_edit_any)
+ok "搜索浮层已打开（输入框坐标现取：${SXY}）"
+echo "   读数（不参与判决，只留证据）：屏上出现「搜索任务」提示行 = $(has_sub "搜索任务")"
+XY="$SXY"
 if [ -z "$XY" ]; then
   bad "搜索浮层里没有输入框"; screen_txt
 else
