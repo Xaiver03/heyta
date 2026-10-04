@@ -133,7 +133,7 @@ W0 文档纠正、W6 value 那一米：与上面全部正交，随时可插队
 
 | 单 | 状态 | 读数（判据条数 / 变异臂红集 / 截图路径 / 四端是否重装） |
 |---|---|---|
-| W0 | ✅ 已完成（2026-10-03） | 两处过期都改在**文档本体**：① `docs/reference/architecture.md` 的实体清单里 `FocusSession` 原写 `mode(pomo/stopwatch), duration` —— 三个字段**都不存在**，真实形状是 `kind(work/shortBreak/longBreak) + plannedMs + actualMs? + completed? + startedAt? + endedAt?`（逐字段核对 `packages/domain/src/entities.ts` 的 `FocusSessionKind` 与 `interface FocusSession`）；② `docs/README.md` 对 ADR-0043 那句「⚠️ 代码未开工」改成已落地并留了更正痕迹（指向调研 A0.8 的取证）。**判据**：`docs-link-check` 无死链 + 两份文档不再与代码冲突（人工核对，无自动判据 —— 按 §2 那一行写明的"允许只做人工核对并在此登记"，这条**没有**变异臂，别把它当成有牙的）。⚠️ 归属：`docs/README.md` 同一文件里另有别人 7 行未提交的改动，所以我**没有**单独提交那一行，改动作废在工作树里，由下一次整文件提交带进去 |
+| W0 | ✅ 已完成（① 2026-10-03；② 补落地 2026-10-04 09:2x，见 §8.25 第一档） | 两处过期都改在**文档本体**：① `docs/reference/architecture.md` 的实体清单里 `FocusSession` 原写 `mode(pomo/stopwatch), duration` —— 三个字段**都不存在**，真实形状是 `kind(work/shortBreak/longBreak) + plannedMs + actualMs? + completed? + startedAt? + endedAt?`（逐字段核对 `packages/domain/src/entities.ts` 的 `FocusSessionKind` 与 `interface FocusSession`）；② `docs/README.md` 对 ADR-0043 那句「⚠️ 代码未开工」改成已落地并留了更正痕迹（指向调研 A0.8 的取证）。**判据**：`docs-link-check` 无死链 + 两份文档不再与代码冲突（人工核对，无自动判据 —— 按 §2 那一行写明的"允许只做人工核对并在此登记"，这条**没有**变异臂，别把它当成有牙的）。⚠️ 归属：`docs/README.md` 同一文件里另有别人 7 行未提交的改动，所以我**没有**单独提交那一行，改动作废在工作树里，由下一次整文件提交带进去。🔴 **那句"由下一次整文件提交带进去"落空了**（2026-10-04 09:1x 现量：本分支 HEAD 与 `main` 两份 `docs/README.md` 里 `代码未开工` 那句**都还在**，工作树也没有那笔改动 ⇒ ② **从来没有落地**，而本行此前写着"✅ 已完成" —— 这是一次过度主张，不是措辞不严）。当场按**五条逐项现量**改掉（每条给了 `file:line`，见 §8.25 第一档），并复跑 `check:docs-voice` / `check:claims` / `check:reachability` 各 **RC=0**、`docs-link-check` 对本文件 **0 命中**、README 那张表 **139 行列数零不一致** |
 | W1 | 🔄 **进行中**（接线、判据、**真浏览器截图 + 人看图**都已闭合；只剩 AGENTS §6.1.1 的**四端重装**，所以还不算已完成） | **已落地**：单一所有者收拢 —— `packages/app-host/src/selection.ts`（封闭词表 + `createSelectionStore` + 纯函数 `pruneMissingSelection`/`pruneSelection`），四份本地 `useState` 全删，两端各只留一份宿主胶水 `apps/{web,mobile}/src/lib/selection.ts`。🔴 **词表从 6 类改成 3 类**（`task|habit|note`）：`project`/`tag`/`event` 是**投机项** —— 两侧的 prune 谓词照着写了 project/tag，而**没有任何一处界面会选中一条清单或标签**（它们在两端都是筛选/导航），"支持六类"读起来像已完成、实际只有三类活着。这条被升级成常驻门禁的**断言 D**（逐类扫宿主有没有 `select/useSelected`，零消费者即红；词表从数组字面量现读，解析出 0 项也算红）。💥 **本轮现场抓出的两个真缺陷**：① `apps/web/src/features/quadrant/QuadrantBoard.tsx` 把 `onOpenTask`/`activeTaskId` **声明了、解构了、没往共享板子传** ⇒ "三种投影接同一个选中"实际只有两种接上，而两个 prop 都是可选的 ⇒ **typecheck 全绿、当时四条门禁全绿**，症状只是"四象限不跟随选中"（→ §7 #179）；② `openNoteFromSearch` **签名里不收 id** ⇒ 搜索结果点便签只换视图、什么都不打开。③ 顺手补掉一条既有的端间不一致：web 时间线的行体此前**根本不可点**，而触屏端早能。**判据**：共享层 16 条（`packages/app-host/tests/selection.spec.ts`）+ web 选中 16 条（`task-selection.spec.tsx`）+ mobile 13 条（`selection-single-owner.spec.ts`）+ 三种投影各自的行为判据（`quadrant-row-parity.spec.tsx` 新增 2 条、`timeline-board.spec.tsx` 新增 3 条、`notes-view.spec.tsx` 新增 3 条）+ 门禁 `check:selection-single-source` **五条断言 A–E**（E 是本轮新增：同文件内比"声明"与"使用"）。🔴 **载体发现（写进 §7 #178）**：RNW 在 jsdom 里把样式编译成 class（`r-backgroundColor-*`），`el.style.backgroundColor` **恒为 `''`** —— 用它当判据第一次就得到"三种投影全都没底色"这种**看起来像三个真缺陷**的空读数；底色一律走 `getComputedStyle`（未选中是 `rgba(0, 0, 0, 0)`，不是空串）。**变异臂（两趟 rig 共 18 臂，每臂跑完复原并复跑回到绿；终态 Z2 = web/mobile/门禁三处 RC=0）**：14 条正臂按设计转红（门禁 A/B/B2/B3/C/A2/D/E/E2/E3-分母自检 + TaskList 底色 + TimelineBoard 两处底色 + 两处 `onPress` + NotesView 退回本地态 + 搜索丢 id + web 四处投影断一处 + mobile 回落摘一处 + mobile 三处投影全摘）；🔴 **一条第一次跑活了**：把 web 便签换回**裸名** `const [editingId] = useState(null)` 时门禁**全绿** —— 而文档块里当时写着"仍未覆盖：不带实体名的 editingId"，即这条缺口我**登记过但没验证**。补上裸名分支（`detailId|selectedId|editingId`，刻意不含 `active`/`open`：四象限的 `activeId` 是 dnd-kit 正在拖哪一颗）后重跑**转红**；为此把 `PasskeyPanel` 那份行内改名编辑器的状态改名 `editingRowId`（第一次我改成 `renamingId`，撞上 store 里已有的"请求在途那条"——两个概念不能并成一个名字，断言把它挡在写盘前）。两条负向对照绿：字样只写进注释、以及树上活着的 `activeId`/`editingRowId` 不被误伤。**读数**：门禁绿（`词表 3 类全有消费者（task 10 / habit 7 / note 13）、接线声明 17 处全部用起来`）；本轮直接跑的 `task-selection + timeline-board + quadrant-row-parity + notes-view` = **55 passed / 0 failed**；web/mobile/app-host/ui 四包 typecheck RC=0；`check:docs` 归因见 §8.1（三处死链指向**别人未提交**的在途文档，已把链接改成带状态的指针）。**真浏览器取证已闭合（2026-10-03 22:4x，载体 `feat/detail-pane` = `d5b835b5`）**：新增 `e2e/tests/selection-projections.spec.ts` **3 条**，跑法与读数：生产构建载体（`vite build` + `vite preview`，端口 4358）上 **3 passed / 0 failed**；截图五张落在 `apps/web/evidence/selection-projections/{01-list,02-quadrant,03-timeline,04-switch,05-search}.png`，**五张都逐张打开看过**：列表与搜索那两张里选中那条带浅蓝底、另一条白底；四象限那张选中那条落在"先不做"格里且带同一种蓝；时间线那张"未排期（2）"里只有第一条带蓝；换选中那张是**第二条**带蓝、第一条回到白底。看图还照出一件断言看不见的事：`switchView` 用鼠标点 rail，**rail 的 tooltip 会留在下一张图上**，第一版 `03-timeline.png` 里那句"四象限"正好压在选中那条的标题上 ⇒ 截图前 `parkCursor`（把鼠标挪开），这不是美化，§6.2 要的是"人能看懂的那张图"。🔴 **23:5x 两处更正（载体 `0de58095` + `0c159f7f`）**：① 那五张图已随 W2 的第四列整体重跑并**逐张重看**（选中态在四种投影里读数不变）；② 更要紧的是读底色的探针里有一条**会假绿**的机制被照出来了 —— Chromium 对**已从文档分离**的节点 `getComputedStyle` 返回空串，而判据写的是"选中那条 ≠ 同屏没选中的那条"，空串永远不等于任何真实底色 ⇒ **"根本没读到值"会被判成"画上选中色了"**。症状先以一次假红出现（两遍连跑全绿、第三遍红），所以这类"偶发红"要按**探针故障**查，不要按产品抖动放过。现在探针先等到算得出来为止，自检臂（把读数改成恒返回空串）实测 3 条全红。
 🔴 **四臂变异（每条改完重新 `vite build` 再跑，判据读的是产物）**：A1 宿主不给四象限传选中 → **1 红**（红在那条跨投影用例）；A2 包装层声明了不转发（§7 #179 的形状）→ **1 红**；A3 宿主不给时间线传选中 → **1 红**；A4 点行根本不写选中 → **2 红**，而**搜索那条不红** —— 这不是漏网：搜索出口的生产者本来就是 `openTaskFromSearch` 不是 `openTask`，两臂各打一半正好证明这两个入口是**两条独立的线**。四臂跑完 `apps/web/src` 复原并复跑回 3 绿。
 ⚠️ **载体边界（不写成"门禁已验"）**：这条 spec 落在 `e2e/tests/` 里，`pnpm check:ai-e2e` 用的是 **dev 载体**，而 **linked worktree 里 dev 载体结构性起不来** —— vite 默认 `fs.allow` 只有 worktree 根，`node_modules` 软链到主检出，`@sqlite.org/sqlite-wasm` 的 wasm 走 `/@fs` 被拒（实测日志原文：`The request id ".../sqlite-wasm/dist/sqlite3.wasm" is outside of Vite serving allow list.`），症状是"三条全红、红在 `openApp` 第一步找不到输入框"，长得像产品坏了而其实是载体。所以我用**主检出的 dev 服务**（端口 4362，只读源码、跑完按 PID 关掉）做了一次"载体形状对照"：**3 failed，每条都红在 `task-item-* 一直没画上选中色`** —— 而主检出那棵树上没有本分支的 W1 接线。这条读数是双向有用的：它同时证明①这条 spec 不依赖生产构建、dev 载体上照常执行；②它会在"接线不存在"的树上响亮地红。
@@ -1368,17 +1368,25 @@ cd apps/web && ./node_modules/.bin/vite \
 - 反过来一条真结论：本 worktree 的构建与测试通道**没有**被这趟重装占用（`apps/web/node_modules/.bin/vitest`
   实存、`packages/*/node_modules` 是本检出自己的真目录，只有**根** `node_modules` 是指向主检出的软链）。
 
-### 第七次重装窗口读数（09:0x）：负载在降，但**那一趟装的不是本批**
+### 第七次重装窗口读数（09:0x）：负载在降，而那一趟**只装到本批的前半**（这一句在下一档被现量改过一次，见 §8.25 第二档）
 
 | 读数 | 值 | 和前五次的关系 |
 |---|---|---|
 | `sysctl -n vm.loadavg` | **26.57 / 31.17 / 26.25** | 第五次 32.87 → 第六次 99.14 → 现在回落；仓库负载门阈值 **12** ⇒ **仍未到我可以起活的窗口** |
 | `ps -eo pid,etime,command` | `81007` `sh /tmp/queue-reinstall-all.sh`（5h54m）、`93771` 同（5h51m）、**`93772` `pnpm reinstall:all`（5h51m）**、`93817` `bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817` | 排队的那条已经进到 **`pnpm reinstall:all` 本体在跑**（上一记只看到 wrapper 与 snap），载体是隔离检出 `/tmp/heyta-reinstall` —— 这正是 memory 里"重装改在隔离检出里跑"那条配方 |
 | 那个载体的 HEAD | `git -C /tmp/heyta-reinstall rev-parse --short HEAD` = **`d0a81927`**，`## HEAD (no branch)` | |
-| 本批在不在里面 | `git -C /tmp/heyta-reinstall merge-base --is-ancestor 6ee85fda HEAD` ⇒ **RC=1** | 🔴 **这一趟四端重装装不出本批的产物**：`feat/detail-pane` 的 tip 不是它的祖先。所以 §8.14 那句"需要持有者介入"没有因为这趟跑起来而失效，W1/W1b/W1c/W2–W7 那一栏**仍然一格没装** |
+| 本批在不在里面 | `git -C /tmp/heyta-reinstall merge-base --is-ancestor 6ee85fda HEAD` ⇒ **RC=1** | ~~这一趟四端重装装不出本批的产物，W1/W1b/W1c/W2–W7 一格没装~~ → **09:1x 逐笔现量否证了这个一刀切**（过程见 §8.25 第二档）：tip 确实不在，但 `d5b835b5` / `0de58095` / `0c159f7f` / `84d5bd86` / `f419df75` 对这枚载体都 RC=0 ⇒ **W1 的真浏览器载体段、W2 的第四列槽位、W5 的描边即优先级会随这一趟装上**；而 `dbb3a297`(W4) / `ca2cf606`+`577c0f3e`(W6) / `9bdab17e`+`edd9971b`(W7) / `1dd23d25`+`4b17213a`+`de5d4ef6`(W1b 后半) / `b3a5a17d`(第三批调研) / `6ee85fda`(W1c) 仍 RC=1 ⇒ **这几单一格没装**，§8.14 那句"需要持有者介入"对它们继续成立 |
 
-结论没变、理由更硬了一格：**不是"别人在占用所以我不跑"，而是"这一趟跑的载体里根本没有我的代码"**。
-本轮因此没有起任何装/构建类动作，只做了下面这些只读现量。
+~~结论没变、理由更硬了一格：不是"别人在占用所以我不跑"，而是"这一趟跑的载体里根本没有我的代码"~~
+→ 09:1x 否证：**载体里有我的代码，只是只有前半批**（那五笔在 `f419df75` 之前就已并进 main）。
+正确的问法是**逐笔** `--is-ancestor`，不是"整批在不在"——一句"根本没有"让我差点把
+"W2 的槽位与 W5 的描边此刻正在被装上设备"这件真事写成"什么都没装"。
+本轮没有起任何装/构建类动作，只做了下面这些只读现量。
+🔴 但有一笔要记在我自己头上：我把 `check:docs` / `check:docs-voice` 用 `pnpm run …` 跑了一趟，
+pnpm 的 deps-status 预检当场试图**移除共享的 modules 目录**，只因无 TTY 才中止
+（`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`）。复核现量：主检出根 `node_modules` 仍是
+3 个可见项 + `.pnpm` **1185** 个包，没被删 —— 这是 §8.15 第 1 行那条的复发，
+而这一次差一点撞在别人那趟正在跑的四端重装上（第三档写明了改法）。
 
 ### 合流面第二次现量（plumbing 预演，**没有对任何分支做合并**）
 
@@ -1463,3 +1471,62 @@ cd apps/web && ./node_modules/.bin/vite \
 而 226 之后是不是我的号，取决于收口那一刻谁先落笔 —— 这正是上一批被整文件 `git add` 抹回去的成因。
 ⚠️ 顺带一条量法提醒：`grep -cE '^[0-9]+\. '` 在这份文件上是 **235** ≠ 最大编号 226，
 因为条目正文里的有序子列表也顶格。取号只认 `sort -n | tail`，别拿条数当号。
+
+## 8.25 同一趟里量出的三件事：半批其实已经在 main 里、W0 的②从来没有落地、`pnpm run` 差点拆掉共享 modules（2026-10-04 09:1x 现量）
+
+### 第一档：W0 的第②项**从未落地**，本行此前写"✅ 已完成"是过度主张 —— 当场按五档逐项现量改掉
+
+登记时我写的是"改动作废在工作树里，**由下一次整文件提交带进去**"。
+09:1x 复量：`git show feat/detail-pane:docs/README.md | grep -c '代码未开工'` = **1**、
+`git show main:docs/README.md` 同句 = **2**（一处是 ADR-0043 那行，一处是我自己那份调研行里合法的另一句），
+而工作树对该文件干净 ⇒ **那句"下一次整文件提交"没有发生**。
+📌 这是一条通用错法：**把交付挂在"别人下一次会顺带带走"上，等于没交付**，
+而登记句本身读起来像已经安排好了。状态列因此不能写 ✅ —— 它当时就该是 🔄。
+
+改之前先把"未开工"这句证否（不是把它反过来写一句新断言），ADR-0043 §7 那五档逐条取代表：
+
+| §7 那一档 | 现量 |
+|---|---|
+| 1 `Task` 两字段 + `TaskActions.setSchedule` + store 外观 | `packages/domain/src/entities.ts:143 startDate?`；`setSchedule` 在 `packages/app-host/src/actions.ts`，消费方 `apps/web/src/features/tasks/store.ts`、`App.tsx`、`features/timeline/TimelinePanel.tsx` |
+| 2 三态推导 + note 回退 | `deriveTaskTimePosition` 在 `packages/app-host/src/timeline-plan.ts`，读时回退在 `packages/app-host/src/duration-note.ts` |
+| 3 `range` 条渲染接线 + 拖拽手势 | `packages/ui/src/timeline/TimelineBoard.tsx:133-219` 那组 `onStartShouldSetResponder` + `dragRef` / `dragPreview` |
+| 4 判据（op 形状 / 离线刷新 / 绕过 dispatch 的变异） | `apps/web/tests/timeline-schedule.spec.tsx`（describe 原句「拖拽 → setSchedule → 恰好一条形状正确的 op」）、`packages/app-host/tests/set-schedule.spec.ts`、`packages/app-host/tests/timeline-plan.spec.ts`、`packages/domain/tests/timeline.spec.ts` |
+| 5 i18n 中英同步 | 排期相关键 zh **7** / en **7**（`sort -u \| wc -l` 两侧同数） |
+
+⇒ README 那一行改成"🔄 P2 的五档代码到 2026-10-04 已全部落地"并逐条带上 `file:line`；
+同一句"未开工"**还留在那份 ADR 的 §7 标题里**，本单不动别人的 ADR（AGENTS §8），登记为抄件漂移。
+复跑（都用 `node` 直调，见第三档）：`check:docs-voice` **RC=0**（扫 1028 条、禁词 30 项零命中）、
+`check:claims` **RC=0**、`check:reachability` **RC=0**、`docs-link-check` 对 `docs/README.md` 与本文件各 **0 命中**
+（外来那两条不变），README 那张表 **139 行、列数零不一致**。
+
+### 第二档：本批的**前半已经在 `main` 里**，所以"装的不是本批"那句是错的（已原地划线）
+
+`git branch -a --contains 84d5bd86` 列出 `main`、`integrate/2026-10-03-closeout`、`feat/self-host-merge-main`
+⇒ 这条线在 **2026-10-04 01:16（+08）** 那一笔（`f419df75`，"W5 逐项对账…"）**及其之前的整段**已被吸收进 `main`。
+逐笔 `git merge-base --is-ancestor <c> main`（同一趟也逐笔对 `/tmp/heyta-reinstall` 的 `d0a81927`）：
+
+| 载体笔 | 在 main | 在那趟重装载体 | 意味着 |
+|---|---|---|---|
+| `d5b835b5` / `0de58095` / `0c159f7f` | ✅ | ✅ | W1 的真浏览器取证段与 W2 的第四列**已经在 main**，也会随那趟装上设备 |
+| `84d5bd86` / `f419df75` | ✅ | ✅ | W5 的描边即优先级（共享 `TaskRow`，四端同受益）同上 |
+| `dbb3a297` / `ca2cf606` / `577c0f3e` / `9bdab17e` / `edd9971b` | ❌ | ❌ | W4 / W6 / W7 未合并 |
+| `de5d4ef6` / `b3a5a17d` / `6ee85fda` / `5d5965b5` | ❌ | ❌ | W1 的 ViewKey 对账、第三批调研、W1c、§8.24 未合并 |
+
+⇒ 三条改写：**①** §8.24 那句"载体里根本没有我的代码"已划线更正；**②** 下一轮看图或做设备验收时，
+"W2/W5 在、W4/W6/W7 不在"是**当前设备的真实状态**，不许把它读成回归；
+**③** 报"落后多少"必须两边各 count 并带 ref 名 —— `feat/detail-pane..main` = **416**（里面含我自己已被吸收的那些）、
+`main..feat/detail-pane` = **37**（这才是真正待合的笔数，`git log --oneline main..feat/detail-pane` 可逐笔核）。
+
+### 第三档：`pnpm run <门禁>` 在这棵树上会试图**删掉共享的 modules 目录**，无 TTY 才没删成
+
+现量（09:1x）：`pnpm run check:docs-voice` 与 `pnpm run check:docs` 各自 **RC=1**，
+而日志末行是 `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY`
++ 栈 `runDepsStatusCheck → runPnpmCli → sync`。两件事分开判：
+- **RC=1 不是门禁红**，是载体没跑起来（§8.15 第 1 行同一条）。真读数在直调那趟：`node scripts/check-docs-voice.mjs` **RC=0**、
+  `node research/tools/docs-link-check.mjs` 只剩那两条外来红。
+- 🔴 **危险的是那半句"Aborted removal"**：它已经决定要删，只是没终端才停手。
+  而这棵树的根 `node_modules` 是**软链到主检出**的，同一时刻另一条会话的 `pnpm reinstall:all` 正在用它。
+  ⇒ 所以那条"不许用 `CI=true` 绕开 deps-status 预检"的纪律不是洁癖：**给它 TTY 等于授权它 purge 别人正在用的目录**。
+  本检出的固定写法只有两种：`node <脚本路径>`，或 `./node_modules/.bin/<bin>`（需要 pnpm 时加
+  `--config.verify-deps-before-run=false`，**绝不是** `CI=true`）。
+📌 复现现量命令（安全，只读）：`node -e "const s=require('./package.json').scripts;…"` 取真入口 → `node scripts/<file>.mjs`。
