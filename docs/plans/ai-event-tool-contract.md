@@ -4085,3 +4085,71 @@ DONE 需要两件事同时成立：装的是当前源码（LANDING-CURRENT） + 
 - 差点误登记一条：`scripts/check-legal-{closure-truth,gdpr}.mjs` 在推导里显示成"没有 pnpm 脚本消费者的门"，
   看着像孤儿门禁。现量是 **`??` 未跟踪**（`git ls-files --error-unmatch` 报 did not match、`git cat-file -e HEAD:` 说不存在），
   属回收站那条线在飞的东西 ⇒ 不是 main 的缺陷。也正因此，推导只认 `git ls-files`（干净检出里跑的载体自然没有它们）。
+
+#### §15.43al（10-04 08:5x）证据目录名只到分钟 ⇒ 两趟共用一本账；我按同前缀 glob 删"废弃目录"时删掉的是**活着那趟**的证据
+
+先记 08:41 那次重启本身（理由与两条真闸腿），再记它顺带暴露的事故 —— 事故的严重性高于重启。
+
+**重启的理由**：07:59 那趟是在 §15.43a(e/f/i/j/k) 那批修法**之前**起的，bash 持旧 inode，
+真跑到阶段 5 会用旧的 `PAX_WIN` 覆盖块和旧的单条件 `DONE`。停它之前先取证归属：
+`4574  1  Sun Oct 4 08:41:16 2026  bash heyta-deliver-on-window.sh`，cwd=`~/scratch-heyta`，
+日志目录是我的 —— 只可能杀我自己这一枚。重启后两闸腿都在真实现场走过（不是夹具）：
+
+| 腿 | 现量 |
+|---|---|
+| pid 已死 ⇒ 让路（防 PID 复用把交付永久卡死） | `rc.txt: TAKEOVER old=66947 mine=4574` |
+| 真第二趟 ⇒ 响亮拒绝 | `第二趟 rc=6（期望 6）`，拒绝行打印 pid 与起跑时刻 |
+
+**事故链（三步，每步都有读数）**：
+
+1. `OUT="$HOME/scratch-heyta/deliver-$(date +%H%M)"` **只到分钟** ⇒ 08:41 起跑的两趟拿到同一个目录名。
+2. 单实例闸在 `: > "$RC"` **之后**（表头顺序：`OUT`(21) → `mkdir`(22) → `: > "$RC"`(25) → 闸(47)），
+   所以被拒的第二趟先把活那趟的 rc **截空**再退出。
+3. 我随后清理"第二趟留下的废弃目录"，用的是同前缀 glob（`deliver-08*`）⇒ 删掉的正是活那趟（4574）的证据目录。
+   于是 4574 成了一条**每条 `say` 都写进不存在的路径**的瞎队列：83 处 `say` + 9 处 `bail` 全失败，
+   `set -uo pipefail` 没有 `-e`，它继续跑了 4 分钟，直到我这次查 `ls -dt` 才发现目录不在。
+
+**否证一条我自己写的诊断**（臂6 实测）：我原话说"白屏在自动化里最阴的地方是它什么都不报"，把它套到了这里，
+好像 bash 对不存在的重定向默不作声。**错**：
+6a 前台形态 = `rc=0` 而 stderr 明明白白有 `No such file or directory`；
+6b 真实起跑形态（`nohup … </dev/null >/dev/null 2>&1`）= `rc=0`、零输出、目录不存在。
+**静默的成因是起跑形态吞 stderr，不是不报错** —— 差别有实际后果：光看退出码会把瞎跑判成成功（6a/6b 都是 0）。
+
+**四处修法**（都在 `~/scratch-heyta/heyta-deliver-on-window.sh`，仓库外）：
+
+| # | 修法 | 抓住的那一步 |
+|---|---|---|
+| 1 | 名字带秒与 pid：`deliver-$(date +%H%M%S)-$$`（可 `HEYTA_DELIVER_OUT` 覆盖） | 撞名在结构上不可能 |
+| 2 | `[ -e "$OUT" ]` ⇒ 打 stderr 并 **退 8**，不静默共用别人的目录 | 万一撞名也不共账 |
+| 3 | `say` 前挂 `out_alive`：目录没了就地重建 + 把断点写成账的一行（`EVIDENCE-LOST`）；**丢第二次直接退 8** | 静默瞎跑 |
+| 4 | 响亮死亡同时落 **OUT 之外**两条通道：`/tmp/heyta-deliver-ORPHAN.log` 为主、scratch 为副（副通道先 `mkdir -p`） | 吞 stderr 时死亡仍留得住 |
+
+**夹具读数**（`~/scratch-heyta/test-hdr-guard.sh`，只取表头到"写 pidfile"那行，切点按字面 `grep -n '> "$PIDFILE"$'` 现取，
+不写死行号 —— 上一版写 `1,86`，表头一加行就会从中间切断）：**8 臂全绿 `pass=8 fail=0`**，
+臂1 现量 `deliver-085143-31171`，臂3 是阴性对照（没丢目录 ⇒ 账里**不许**出现 `EVIDENCE-LOST`），
+臂5/6c 用**本臂独有的 `out=` 键**断言而不是光查 `ORPHAN-DIE` —— 臂5 已往同一份文件写过，只查 needle 会在 6c 自己没写时判绿。
+
+**三条变异臂，各打中该打的腿**：
+
+| 变异 | 期望 | 现量 |
+|---|---|---|
+| M1 摘掉 `say` 里的 `out_alive` | 4/5/6c 红 | `SUMMARY pass=5 fail=3`，红的正是这三条 |
+| M2 把撞名检查的条件改成恒假 | 2 红 | `pass=7 fail=1`，臂2 `rc=0（期望 8）` |
+| M3 删掉两条 `ORPHAN-DIE` append | 5/6c 红 | `pass=6 fail=2`，`rc` 仍是 8 但死亡记录 0 命中 |
+
+M3 那条形状值得单独记：**摘掉记录后退出码照样对**，只有"死亡是否留痕"转红 ——
+如果验收只看退出码，这条腿就没有牙。
+
+**顺带一条现场登记（不是我的缺陷，也不代别人改）**：08:5x 现量别的泳道正在跑四端重装
+（`sh /tmp/queue-reinstall-all.sh` ×2 / `bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817` /
+`bash apps/desktop-macos/scripts/package-app.sh /tmp/heyta-macos-dist`）。
+权威窗口闸 `scripts/verify-mobile-window-gate.sh` 的单所有者探针是 `pgrep -f 'scripts/[.]?reinstall-all[.]sh'`，
+**认得出那枚 `.snap.`**（`[.]?` 正是为它加的），我的队列阶段 5 委托给它 ⇒ 不会双重装。
+但 `/tmp/queue-reinstall-all.sh` 这一形**不匹配**该正则（没有 `scripts/` 前缀）——
+它只在真的派生出 reinstall-all 时才被抓到，纯"排队等窗口"的那一段在探针眼里不存在。
+登记为闸的边界；改它属于那条线，不在本批动。
+
+**新实例读数**：pid **33337**（08:52:26），`OUT=deliver-085226-33337`，`rc.txt: TAKEOVER old=4574 mine=33337`，
+`载体 HEAD=1ebcf136 未提交项=0 main=3771edb2`，`集成线是否已在 main：YES`，此刻在阶段 1 等现场。
+③ 仍未完成（前置仍是那三条人为条件），本条不宣布任何交付结论。
+
