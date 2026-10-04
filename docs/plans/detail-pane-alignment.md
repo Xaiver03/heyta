@@ -3181,3 +3181,168 @@ node /tmp/dp_w1b_battery.py      # 载体必须是当前 HEAD；电池内部按�
 （`scripts/check-selection-single-source.mjs:275-285`，只收 `.ts/.tsx`），
 而这条 spec 住在 `apps/mobile/tests/` —— 不在 `src` 下，**根本不是门禁的输入**。
 所以"删掉 spec 后 H 照样红"这句不需要运行就有依据，也不必拿它当一次变异读数。
+
+## 8.47 合并执行顺序（给**有授权**的那一轮）：把现场一次采齐，让接手的人不必重新取证（2026-10-04 13:3x）
+
+### 0. 这一节是什么，以及它明确不是什么
+
+是 runbook：**顺序 + 每一步"过 / 不过"的退出码来源**。
+🔴 **不是合并授权** —— 用户指令是"不 push 不 merge 除非明确要求"，§6 六条明文不做里就有这条。
+本批到目前为止对合并的所有动作都是**读取**（`merge-tree --write-tree` 写的是 object 库里的候选树，
+不碰任何工作树、不产生提交）。
+
+⚠️ 下面第 1 节每一枚数字都是**瞬时读数**（取号趟 13:38）。接手时**先重跑那两条命令**，
+不要把这一节的数字当成"当前状态"来引用 —— 这正是 §8.40 立下的规则（台账数字不手抄），
+而它对我自己这一节同样生效。
+
+### 1. 现场（2026-10-04 13:38 那一趟的现量）
+
+| 项 | 值 | 现量命令 |
+|---|---|---|
+| 载体 | `feat/detail-pane` @ `ba2051c3`，worktree `.worktrees/detail-pane` | `git rev-parse --short HEAD` |
+| main | `e8645f51`；merge-base `f419df75` | `git rev-parse --short main` / `git merge-base HEAD main` |
+| 落后 / 领先 | 落后 **519**、领先 **71**（13:1x 记的是 516/68 —— 三小时里 main 又走了 3 笔） | `git rev-list --count HEAD..main` / `main..HEAD` |
+| 候选树 | `b1f7e5d8`（`MT_RC=1`） | `git merge-tree --write-tree --name-only main HEAD` |
+| 冲突 | **15 枚** = 二进制 10 + 文档台账 2 + 代码 3 | 同上一条命令的输出 |
+| Q1 交叠 | **7 枚**（本批触及 98、主检出未提交 139） | `node scripts/verify-detail-pane-merge-window.mjs` |
+| Q3 | marker 5 枚 / 解析不过 2 枚，且**全部由 marker 解释**（合并新造成且无 marker = **0**，本来就坏 = **0**）；PARSED 98 | 同上一条命令 |
+| 负载 / 设备 | `vm.loadavg` 1 分钟 **20.58**（16 核，闸门阈值 12）；`ps … \| grep -F verify-mobile` **为空** | `sysctl -n vm.loadavg` |
+
+Q1 那 7 枚交叠：`apps/web/evidence/detail-column-slot/no-sidebar-view.png`、
+`apps/web/evidence/selection-projections/03-timeline.png`、`docs/README.md`、
+`docs/reference/environment-traps.md`、`packages/app-host/src/index.ts`、
+`packages/i18n/src/locales/en.ts`、`packages/i18n/src/locales/zh-CN.ts`。
+
+### 2. 步骤 0 —— 门：`OVERLAP=0`，两条不阻塞的走法
+
+`node scripts/verify-detail-pane-merge-window.mjs` 判 `OVERLAP=0`。
+不为 0 时有两条**都不需要人签字**的路：
+
+1. **等对方提交**（这 7 枚的所有者各自动手），然后重跑那条命令；
+2. **在独立干净检出里合**：`git worktree add ../dp-merge -b merge/detail-pane main`
+   再把 `feat/detail-pane` 合进去 —— 主检出的未提交改动根本不参与判定。
+   🔴 但合完的产物**不能冒充主检出已验**（AGENTS §8.9：共享检出仍有其他写入者时，
+   隔离副本通过不能替代主检出的后续改动）。
+
+🔴 **`OWNED` 不等于"要人"** —— 这 7 枚里没有一枚需要拍板：2 枚 PNG 在 §3e 整片重出，
+2 枚文档台账是并行那条线的追加，3 枚（`app-host/src/index.ts` + 两份 i18n 词条）等对方提交就自己消失。
+把这个混数犯过一次的地方是 §8.44，它的代价是把"等一等"包装成了"找人"。
+
+### 3. 15 枚冲突的逐枚处置（§3a–§3e）
+
+#### 3a. `packages/app-host/src/habit-actions.ts`（代码）：取并集，零语义判断
+
+单个 hunk，住在 import 块里：main 侧加 `byCreatedAtOrder, isLive`，HEAD 侧加 `habitLogValue`。
+**三条都留。** 合完的判据：`./node_modules/.bin/tsc -b packages/app-host`（RC=0）+ 第 5 步 app-host 全量测试。
+
+#### 3b. `packages/app-host/tests/habit-actions.spec.ts`（代码）：两块都留，另删一行**不是 marker 的**残留
+
+两侧各自在文件末尾 append 了自己的 describe 块 ⇒ 拼接即可，不选边。
+⚠️ main 那一侧的块顶部留着一行 `── 追加到 packages/app-host/tests/habit-actions.spec.ts ──`
+—— 那是搬运时的**叙述残留，不是冲突 marker**。把 marker 删干净之后它仍然在文本里，
+要单独删；反过来把它跟 marker 一起当作"冲突残留"处理则会删掉一行本来属于 main 的内容。
+（这一行是**别人文件里的**，本批不预改；记在这里是因为只有合流那一刻会同时看到两侧。）
+
+#### 3c. `apps/web/src/styles/app/main-area.css`（代码）：这一枚才真的要人
+
+两个 hunk，而**两侧是同一道题各做了一遍**：都在页头做"允许折行 + 不许固定高度"。
+差异实测在五项：`flex-shrink: 0` / `gap` / `padding` / `justify-content` / `flex: 0 1 auto`。
+
+- **承重、哪一侧都不许丢的两条**：`flex-wrap` 与 `min-block-size`（HEAD 侧注释写明理由 ——
+  详情列 + 可拖宽侧栏把主区压到 624px，而日历页头需要 ~918px；
+  原来的 `block-size` 固定高度让控件"在 DOM 里、在视口外"，`calendar-cells.spec.ts` 一条断言红、
+  另一条 `locator.click` 超时 90s）。
+- 🔴 **不要把两套规则手工叠起来。** 叠会出现两条 `min-block-size`，后一条赢 ——
+  那不是"两边都保住"，是掷硬币。择一形态保留，然后用承重判据复验。
+- 判据：`pnpm check:design`（裸值）+ `pnpm check:row-single-source`（**28/28，余量为 0 —— 红了不许调基线**）
+  + `pnpm check:l4`（mobile 内联样式同样余量为 0）+ §5 表第 6 行的重出截图并**人看图**。
+
+#### 3d. `docs/README.md` + `docs/reference/environment-traps.md`（文档台账）：保留双方
+
+都是追加型。traps 是编号台账：**只增不改号、不要插行**，两侧新增的号段按行 splice 到末尾
+（同一节里两边各自起的号如果撞了，以"先落 main 的号不动、后到的重排到末尾续号"处理，
+并把改号写在条目自己那一行里，不要只写在别处）。
+判据：`pnpm check:docs`（死链）+ `pnpm check:docs-voice`。
+⚠️ 表格列对齐那道自检是 `/tmp/dp_tablecheck4.mjs` 里的**临时探针，没有入库** ——
+§5 那张表不要把它写成前置；要么先用 `git show` 目测，要么把这枚装置补进 `research/tools/`（那是另一单）。
+
+#### 3e. 10 枚 PNG（二进制证据）：**不选边，整片重出**
+
+`apps/web/evidence/{detail-column-slot,detail-pane-overlay,selection-projections}/` 下 10 张，
+由三个 spec 生成：`e2e/tests/detail-column-slot.spec.ts`、`e2e/tests/detail-pane-overlay.spec.ts`、
+`e2e/tests/selection-projections.spec.ts`。
+两侧都是各自那一趟 e2e 的产物 ⇒ 选任何一侧都是**拿旧截图冒充新产物**（§7 第 27 / 82 条同一个形状）。
+
+处置：合并时先随便取一侧让 tree 干净（`--ours`/`--theirs` 都行，反正要被覆盖掉），
+**合并完成后重跑这三个 spec 重出全部 10 张，逐张看图**：
+
+```bash
+pnpm -r build                      # apps/web/dist 是 preview 的输入，不能省
+cd e2e && npx playwright test \
+  tests/detail-column-slot.spec.ts tests/detail-pane-overlay.spec.ts tests/selection-projections.spec.ts \
+  --config playwright.detail-pane.config.ts
+```
+
+🔴 这条 config 的边界就是判据本体，**不要换成默认 config 跑**：端口 **4371 + `--strictPort`**、
+`vite preview` 服务 `apps/web/dist`、`DP_SWEEP=1` 才放开 testMatch、**不起 4319 假端点**，
+且不得占用 3000 / 4318 / 4319 / 4358（别人的）。
+判据：重出的 10 张 md5 与合并前**两侧都不同**（说明真的重出过，不是把某一侧搬回来），
+且人打开看图。现量命令（不依赖任何未入库脚本）——
+⚠️ 路径必须点到那三个目录，`apps/web/evidence/*/*.png` 现在会展开成 **112 张**（整棵证据树），
+比"10 枚冲突"多出一百倍，读数会对不上：
+
+```bash
+md5 apps/web/evidence/detail-column-slot/*.png apps/web/evidence/detail-pane-overlay/*.png \
+    apps/web/evidence/selection-projections/*.png     # 恰好 10 行，与两侧各自的 10 行三列并排比
+```
+
+### 4. 步骤 5 —— 合完立刻补的两行豁免，顺序不能反
+
+`ROW_ID_EXEMPT` 里已经有这两枚文件的 `confirmingId` 行（`scripts/check-selection-single-source.mjs:383` 与 `:391`）。
+合流后要加的是同两个文件的 **`busyId`（类别 `in-flight`）**：
+`apps/web/src/features/trash/TrashView.tsx`、`apps/mobile/src/screens/TrashScreen.tsx`。
+
+- 现量（13:39）：main 侧 `TrashView.tsx:104` 与 `TrashScreen.tsx:89` 各有一处 `busyId`，
+  **HEAD 侧 grep 为空** ⇒ 这两枚只存在于 main，所以 G 在本载体是绿的、合并后才会需要。
+- 已用两种方法复量枚数 = 2（§8.36）。
+- 🔴 **先跑、红了才加**：`node scripts/check-selection-single-source.mjs`。
+  不该红的时候把这两行写进去 = 销账，和"不能失败的检查没有价值"是同一句话的反面。
+  不要因为这一节写着"预期 2 枚"就直接加。
+- 同一趟复核 **F 的 5 面表**：main 若新增了会"说出选中"的面，`FACES` 要么登记，
+  要么那条分母自检（`anyTrace.length < FACES.length`）会红 —— 两种红含义不同，看清是哪一条。
+
+### 5. 步骤 6 —— 合并产物的验真顺序（每步只认退出码）
+
+| # | 动作 | 过 | 为什么排在这个位置 |
+|---|---|---|---|
+| 1 | 逐枚语法解析：`.mjs` 用 `node --check`，TS/TSX 用 §8.44 那把 in-memory host | 全部无诊断 | 挡 §8.42 第 15 节那个形状（把 main 的函数**抄进**我的门禁脚本：文本层干净、零 marker、解析层两条同名声明） |
+| 2 | `pnpm -r typecheck` | RC=0 | |
+| 3 | `pnpm --filter @heyta/app-host test`；mobile 侧 **cd 进 `apps/mobile`** 用 `./node_modules/.bin/vitest` | 各自全量，且 app-host 那趟含 3b 拼接进来的两侧用例 | 根目录**没有** `./node_modules/.bin/vitest`（§8.45 那条 `MOBILE_TEST_RC=127` 就是这么来的） |
+| 4 | `node scripts/check-selection-single-source.mjs` | 四行结论都打印（A–H + 总结） | 含 §4 那两行豁免与 F 的复核 |
+| 5 | `pnpm check` | RC=0 | 两道余量为 0 的棘轮在这里；红了先查是不是 main 侧带来新的裸值 / 内联样式，**不许调基线** |
+| 6 | §3e 那三个 spec + 看图 | 10 张重出、md5 三列两两不同、人看过 | 界面类判据必须截图且人看图（AGENTS §6.2 规定一） |
+| 7 | `pnpm reinstall:all` | 四端各自那条判据 | §6.1.1 —— 这是 W1/W2/W3/W5/W6 **唯一仍未闭合的验收格**（#13） |
+
+第 5/6/7 步的负载前置（现量，别凭记忆）：
+
+```bash
+ps Axo command | grep -F verify-mobile | grep -v grep    # 期望：空
+sysctl -n vm.loadavg                                      # 1 分钟值要低于 12
+```
+
+13:38 那一趟：**第一条已过（空）、第二条没过（20.58 > 12）** ⇒ 全链电池、web 全量、e2e 这三样
+在当前窗口仍然不该起（§8.45 同一条前置，那趟是负载 427 + 5 台 booted 模拟器）。
+
+### 6. 这一节自己防的两件事
+
+1. **防"数字被当现状读"**：第 1 节标明瞬时并给取号趟，第 2 节把"等一等"和"要人"拆开。
+2. **防"顺序被当判据"**：六步每步都有退出码来源；15 枚冲突里我只把**一枚**（`main-area.css`）
+   写成要人，并且写清了要人拍的到底是哪五项差异 —— 不是"看着合一下"。
+
+⚠️ 两处我原本想写进 runbook、经查证**在本载体不存在**的东西，记下来挡下一次同样的引用：
+`scripts/verify-mobile-window-gate.sh` 与 `r17-evidence-md5-check.sh`（那是日历/Profile 那条线的装置，
+不在本分支的 `scripts/` 里）；表格列对齐自检 `/tmp/dp_tablecheck4.mjs` 也没入库。
+⇒ 第 3e 步的判据换成了仓库里一定有的 `md5` 三列并排比。这正好是 C1b 那条的形状：
+**runbook 里引用一个不存在的东西，比引用一个会消失的东西更糟，因为它连"曾经存在"都不留证据。**
+
+状态：**未执行**（本节只是顺序与判据，不含任何合并动作）。
