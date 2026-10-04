@@ -1108,7 +1108,11 @@ export {
  * 而**中间那张路由表只能有一份** —— Web 的设置页与移动壳的「我的」今晚各自要显示
  * 同一句"账号还在、本机没动"。各写一份的结局是漂，而漂掉的那一侧通常话说得更满。
  */
-export { liveTaskCountsByTag } from './projects/model.js';
+export {
+  accountClosureMessageKey,
+  type AccountClosureMessageKey,
+} from './auth/model.js';
+
 
 /**
  * ── 批次二 W6：日历的**第二个日期数据源**（倒数日 / 纪念日）──
@@ -1125,7 +1129,3 @@ export {
   type CalendarDayEvent,
   type CalendarEventBarLabels,
 } from './calendar/model.js';
-export {
-  accountClosureMessageKey,
-  type AccountClosureMessageKey,
-} from './auth/model.js';
