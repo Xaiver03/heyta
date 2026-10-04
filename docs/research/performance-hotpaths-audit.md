@@ -669,10 +669,10 @@ echo "  其中 M $(grep -c '^ M' /tmp/dirty.txt) / ?? $(grep -c '^??' /tmp/dirty
 > ```bash
 > git rev-parse --short HEAD; git log -1 --format='%ad %s' --date=format:'%m-%d %H:%M'
 > #   22:5x 那趟 = 0a61c0a6 前后        00:2x 这趟 = d27bccde 10-04 00:10
-> git show HEAD:packages/op-log/src/state.ts | grep -c 'selectVersion'    # 22:5x = 0 → 00:2x = 3
-> git show HEAD:packages/op-log/src/state.ts | grep -c 'FIELD_VERSIONS'   # 22:5x = 0 → 00:2x = 6
-> git show HEAD:packages/op-log/src/state.ts | grep -c 'shouldAcceptWrite' # 22:5x = 3 → 00:2x = 0（旧闸门已被替换）
-> git show HEAD:packages/op-log/src/state.ts | wc -l                      # 22:5x = 371 → 00:2x = 599
+> git show <SHA>:packages/op-log/src/state.ts | grep -c 'selectVersion'   # 6077e05e = 0 → f522dcb1 = 3 ✅ 两列都已按锚复现
+> git show <SHA>:packages/op-log/src/state.ts | grep -c 'FIELD_VERSIONS'  # 6077e05e = 0 → f522dcb1 = 6 ✅
+> git show <SHA>:packages/op-log/src/state.ts | grep -c 'shouldAcceptWrite' # 6077e05e = 3 → f522dcb1 = 0（旧闸门已被替换）✅
+> git show <SHA>:packages/op-log/src/state.ts | wc -l                     # 6077e05e = 371 → f522dcb1 = 599 ✅
 > ```
 >
 > ⇒ **当前仓库事实**：per-field 版本前沿**已经入库**，`selectVersion` 在 `git show HEAD:packages/op-log/src/state.ts` 的 **198** 行、`addUnique` **211**、`materializeVersions` **273**、`legacyFieldVersions` **246**、`applyOperationToEntity` **498**。所以"嵌在 per-field 循环里"这半句**是对的**，而我 22:5x 用来推翻它的整个前提**已经不存在**。
@@ -728,7 +728,7 @@ echo "  其中 M $(grep -c '^ M' /tmp/dirty.txt) / ?? $(grep -c '^??' /tmp/dirty
   grep -n 'JSON.stringify' packages/storage/src/memory/memory-adapter.ts                               # 只有 90，参数是 key
   ```
 
-- 🔴 **入库状态这一维在 00:10 那笔提交前后翻转过，两个读数都记下来**：22:5x 量到的是「三遍里**只有第③遍**已入库 —— `checkpoint.ts` 是 `??` 未跟踪、`engine.ts`/`db-op-log-store.ts` 是 ` M`」；00:2x 重量是「**三遍全部已入库**」（`git cat-file -e HEAD:packages/storage/src/checkpoint.ts` 现在通过，且 `git show HEAD:packages/storage/src/checkpoint.ts | grep -nE 'JSON.stringify|return checksum ==='` 直接给出 `:14` 与 `:41` 两行）。⇒ 本条的**分档结论没变**（web 2 遍 / SQLite 3 遍，逐行取证仍然成立），变的只是"这条是别人的在飞代码还是仓库现状"这一标签 —— 而**那一标签曾经是本条降级 P0-2 系数的理由之一**。📌 教训：把"未入库"当降级理由是**有时间保质期**的，写完要复查，见 §7 第 10 条同一趟的完整复盘。
+- 🔴 **入库状态这一维在 00:10 那笔提交前后翻转过，两个读数都记下来**：22:5x 量到的是「三遍里**只有第③遍**已入库 —— `checkpoint.ts` 是 `??` 未跟踪、`engine.ts`/`db-op-log-store.ts` 是 ` M`」；00:2x 重量是「**三遍全部已入库**」（`git cat-file -e f522dcb1:packages/storage/src/checkpoint.ts` 现在通过，且 `git show f522dcb1:packages/storage/src/checkpoint.ts | grep -nE 'JSON.stringify|return checksum ==='` 直接给出 `:14` 与 `:41` 两行。**⚠️ 这一句原来写的是裸 `git show HEAD:`**（没有锚），10-04 03:0x 被本文件 §8 第 17 步 a 条落成的小检查（`node scripts/check-doc-citations.mjs`）当场照出来、就地补锚；补锚时顺手在当时 HEAD `22bd3d05` 上复跑，两行仍在 `:14`/`:41`。`f522dcb1` 是这个文件的**引入笔**（2026-10-03 23:58 +0800，ADR-0046/0047 那笔）。⇒ 本条的**分档结论没变**（web 2 遍 / SQLite 3 遍，逐行取证仍然成立），变的只是"这条是别人的在飞代码还是仓库现状"这一标签 —— 而**那一标签曾经是本条降级 P0-2 系数的理由之一**。📌 教训：把"未入库"当降级理由是**有时间保质期**的，写完要复查，见 §7 第 10 条同一趟的完整复盘。
 - 🔴 与已定论那条的关系不变：这条是 P0-2 的**系数**，不是新问题。改法要留校验本身（`checkpoint.ts:6-9` 写明它防的是撕裂写/截断/不兼容载荷），可省的是**重复**那一份 —— 而且**省的位置很明确**：②是①的纯重复计算（同一个函数、同一个 `base`），合并只需把 ① 算出的串传进校验、或在 `writeCheckpoint` 里复用已算好的 checksum。③是存储格式，省不掉（除非改 SQLite 表的存法）。
 - 置信度：📊 **已复核并闭合**（三遍逐行读到、三档适配器逐个穷举、入库/未入库状态逐文件查）。
 - **这条判据怎么才会红**：① 常驻门禁断言「一次 `writeCheckpoint` 上，`checkpointChecksum` 被调用次数 == 1」—— 今天是 **2**（①与②各一次），这一条就是 §8 第 7 步 `scripts/measure-checkpoint.mjs` 应当量的东西；② 断言「`grep -c 'JSON.stringify' packages/storage/src/checkpoint.ts` 与 `isValidCheckpoint` 里那次复用同一份串」—— 有人把 ② 改成"重新 stringify 一次"就会红；③ 若哪天 `indexeddb-adapter.ts` 的 `JSON.stringify` 命中从 **0** 变成非 0 ⇒ "web 只有两遍"这半条当场作废，两档合成一档、本条要重写。
@@ -1348,3 +1348,307 @@ git show HEAD:docs/plans/countdown-anniversary.md | sed -n '1091p'              
 📌 **第 3、4、6 三步是收齐三条扫描线之后才排进来的**，它们的共同点是"改动面小 + 零产品决策 + 有现成参照"。原来那张表里没有它们，是因为当时只复核到渲染侧与取数侧。
 
 ⚠️ **本文不主张任何一条已经"决定要改"**——research 层给证据，改与不改、以及优先级，走 `docs/plans/` 与 ADR。
+
+> ⚠️ **这句在 2026-10-04 过期了**：产品负责人当日 01:0x 明确授权"按产品定义决定并把代码的工作做完"，
+> §8 表里的八条已落成代码（连同它们自己的判据与变异验证）。**原句留在上面不删**，
+> 是为了让后来者看清它当时说的是什么：**research 层的"不主张"是写作纪律，不是"这事没人做"**。
+> 逐行状态在下面的 **§8.1**，那一节才是现状。
+
+---
+
+## 8.1 落地状态台账（2026-10-04 批）
+
+读法：**每行的"判据/变异"两栏都是能复跑的**，命令就写在单元格里；数字一律现量，不抄上面任何一栏。
+落在 `HEAD` 的意思是本批改动**已被并行会话的提交带走**（本批自身不 commit、不 push）；
+落在"活树"的意思是在未提交改动里，**下一次 `git checkout` 会没**。
+
+| §8 序 | 工单 | 状态 | 落点 | 判据 | 变异 |
+|---|---|---|---|---|---|
+| 1 | **P1-8** `state:'settled'` 恒 0 | ✅ 已落（HEAD） | `server/src/admin/admin.routes.ts:205-208`（改判 `settledAt: { not: null }`） | `server/tests/admin-routes.spec.ts` | ✅ 现量（03:33，`research/tools/mutation-rigs/mutate-p18.mjs`）：写回 `state:'settled'` ⇒ `失败=2 通过=16`，红集逐条点名「数的是 `settledAt` 那一列」与「核销状态字面量必须全部来自词表（真源只有一处）」；还原后 `失败=0 通过=18`。⚠️ **这台装置本身刚被修过一个自己的 bug**：它把"恢复后全绿"写成 `passed === 15`（spec 早就长到 18 条），于是**判据明明有牙、装置整体报红** —— 现改成"先跑未变异对照拿总数，再和对照比"。日志 `/tmp/heyta-perf-scan/mut-p18-final.log` |
+| 2 | **P1-1** `pause()` 不停表 | ✅ 已落（HEAD） | `apps/web/src/features/focus/store.ts:156-165` | `apps/web/tests/focus-pause-stops-ticking.spec.ts:52,83`（暂停后 2 秒 tick 不涨 + 中止停的是同一个句柄） | ✅ 四臂全对（`research/tools/mutation-rigs/mutate-p11.mjs`）：对照 2 条全绿；摘掉 `pause` 里的 `stopTicking()` ⇒ `failed=1` 且红在「暂停后还在涨」；**臂 B 专门防假修** —— 只在 `resume` 里补停表 ⇒ 仍然红；还原后复绿。装置搬进仓库后又从新位置重跑过一次，四臂仍全对（`WAITED=40s RC=0`）。04:0x 加了 `--selftest`（三臂，不跑 vitest 也不改源码），**它第一次跑就抓到装置自己的正则漏了行首空格**（`^Tests` 在真实 summary 上恒不命中 ⇒ `ran` 永远是 -1）—— 也就是说这台装置原本的对照臂在"什么都没跑起来"时是**假绿**的 |
+| 3 | **P0-11** 上传 per-op `encrypt()` 在 `Promise.all` 里 | ✅ 已落（活树） | `packages/sync-client/src/client.ts`（`toWireOp` 具名闭包 + 串行 `for`） | `packages/sync-client/tests/upload-key-derivation-once.spec.ts`（3 条：探针正/反对照、一次 sync 只派生 1 次、5 条密文互不相同） | ✅ 三臂全对：并行臂 ⇒「Argon2id 派生数 = 1」红；"复用同一密文"臂 ⇒「密文各不相同」红；未变异对照 ⇒ 3 passed。装置 `research/tools/mutation-rigs/mutate-p011.mjs`，复跑读数：`node research/tools/mutation-rigs/mutate-p011.mjs` |
+| 4 | **P0-9 第一刀**（i18n 两份表同 chunk） | ❌ 未落 | — | — | 见下面「未落的那些行」第 ① 条 |
+| 5 | **P0-6** web 成长视图五个选择器 | ✅ 已落（活树） | `apps/web/src/features/motivation/GrowthView.tsx` | `apps/web/tests/growth-view-derived-memoized.spec.tsx:123,149`（输入没变的重渲染不再算 + `now` 变了必须重算） | ✅ 与 P1-2 同一台装置的**八臂全对**（`mutate-p12-p06.mjs`，日志 `mut-p12-p06.log`）：摘掉六个 `useMemo` ⇒ 两腿全红（「输入没变却重跑了」+「不吃 `now` 的投影跟着 60 秒那一跳重算」）；只把 `now` 漏出依赖 ⇒ 红在「推进 60 秒却没重算」。🔴 该装置每臂**先重打包 `@heyta/ui`**，因为 `apps/web` 读的是 dist —— 不重打包跑的就是旧产物（§7 第 27 条那个形状） |
+| 6 | **P1-10** `OpLogStore` 计数/存在性 | ✅ 已落（活树） | 接口 `packages/storage/src/op-log-store.ts`；实现 `db-op-log-store.ts:338-`；桥 `sqlite/oplog-worker-bridge.ts:327,330,333`；消费者 `packages/op-log/src/engine.ts:174`、`packages/app-host/src/import-dump.ts`、`packages/app-host/src/host.ts` | 三层：`packages/storage/tests/contract/op-log-store.contract.ts`（计数与物化同数、含归档、且不读回行，跑遍三个后端）、`packages/storage/tests/op-log-bridge-forwarding.spec.ts`（接口 ↔ 桥逐方法对账）、`packages/op-log/tests/op-log-count-reads.spec.ts`（消费者真的改用计数） | ✅ 四臂：删桥转发 ⇒ 点名 `countPendingUpload` 红；`countAllOps` 只数热区 ⇒ 三个后端各红一次（`failed=6 ran=344`）；引擎闸门退回 `findPendingUpload().length` ⇒ 「队列判定又把整条队列读回来」红；未变异对照 ⇒ 全绿。装置 `research/tools/mutation-rigs/mutate-p110.mjs` |
+| 7 | `measure-checkpoint.mjs` 常驻门禁 | ❌ 未落 | — | — | 见「未落的那些行」第 ② 条 |
+| 8 | **P0-10** `validateParentChange` O(N³) | ❌ 未落 | — | — | 见「未落的那些行」第 ③ 条 |
+| 9 | **P0-1** `TaskRow` memo + 18 处整店订阅 | ❌ 未落 | — | — | 见「未落的那些行」第 ④ 条 |
+| 10 | **P0-7** 提醒读侧 O(任务×提醒) | ✅ 已落（活树） | `packages/app-host/src/reminder-actions.ts:205-215`（`aliveByTask` 一次遍历）、`:434` `listByTask`、宿主 `apps/web/src/features/reminders/store.ts:202` | `packages/app-host/tests/reminder-actions.spec.ts:643`（五面：一遍 / 逐任务读 N 遍的活体对照 / 逐条等价 / 墓碑不进归组 / 无提醒任务不进键） | ✅ 四臂（`mutate-p07b.mjs`，日志 `/tmp/heyta-perf-scan/mut-both2.log`）：A 归组退回 O(任务×提醒) ⇒ `failed=1 ran=37`，红在第①面；B 不滤墓碑 ⇒ `failed=3 ran=37`，红集里除第④面还有「墓碑不占上限名额」「删除是软删除」两条；C 丢 id 序 ⇒ `failed=1`，红在第③面；D 未变异对照 ⇒ `failed=0` |
+| 11 | 长列表虚拟化（`scroll={false}` / web 侧另立） | ❌ 未落 | — | — | 见「未落的那些行」第 ⑤ 条 |
+| 12 | **P1-2** `DatePicker` 的 `weeks` | ✅ 已落（HEAD） | `packages/ui/src/date-picker/DatePicker.tsx:166`（`useMemo(…, [month])`，依赖刻意不是 `[]`） | `apps/web/tests/date-picker-months-memoized.spec.tsx` | ✅ 与 P0-6 同一台装置的八臂里的 P1-2 那三臂（`mut-p12-p06.log`，逐臂带 `ran=2`）：臂 A 摘 `useMemo` ⇒ 红在「同参数重渲染」那一腿；臂 B 依赖写空 ⇒ 红在「换月必须重算」那一腿；还原后全绿 |
+| — | **P1-18**（§8 表外，Goal 点名）记忆层关着也付 | ✅ 已落（HEAD） | `apps/web/src/App.tsx:678`、`:749`（`memoryEnabled !== true` 时**在调用点**就不展开全表） | `apps/web/tests/memory-gate-no-read.spec.tsx:138,153`（关着读数为 0 + 开着必须读到的正向对照） | ⚠️ **整臂读数仍缺**（装置要原地改 `apps/web/src/App.tsx`，该文件此刻被并行会话脏着 —— 见「归属登记」）。✅ 但 04:0x 给这台装置补了 `--selftest`，**不跑 vitest、不碰那两个文件**也能交出一层证据：`node research/tools/mutation-rigs/mutate-p118.mjs --selftest` ⇒ `SELFTEST=PASS（四臂）`（全绿行 passed=2 · 一红一绿 passed=1 · 集合期失败 passed=-1 · **集合期失败时 `expect()` 抛而不是把对照臂判绿**）。最后那一臂就是它自己以前的假绿形状：对照臂的期望是 `failed ∈ [0,0]`，而没跑起来的趟恰好回 `failed=0` ⇒ **判绿**。装置根目录同批补了 `mutate-p11.mjs --selftest`（三臂，同形状） |
+| 13 | `check-mobile-bundle` 加两条判据 | ❌ 未落 | — | — | 见「未落的那些行」第 ⑥ 条 |
+| 14 | **P0-6** 算法侧 `habit-streak` | ❌ 未落 | — | — | 见「未落的那些行」第 ⑦ 条 |
+| 15 | **P0-8** 物化层换数据结构 | ❌ 未落 | — | — | 见「未落的那些行」第 ⑧ 条 |
+| 16 | **P0-4** 上传批次按形状上界数发数 | ⛔ 本批不动 | — | — | 见「不可逆层」 |
+| 17 | 本条线自己掉出的两条门禁缺口 **a)** SHA 锚 **b)** 路径存在性 | ✅ 已落（活树，但**没挂进 `pnpm check`** —— 接线补丁 03:5x 已验过可直接落地，差的是 `package.json` 的所有权，见「归属登记」） | `scripts/check-doc-citations.mjs`（两个维度 + 自带 `SELFTEST` 三臂自检） | 同文件：`SELFTEST=pass（路径维=抓到 · 无锚维=抓到 · 假 SHA 维=抓到）` | ✅ 三臂由 `SELFTEST` 自己跑（造违规样本喂进去必须红）；另外本文 `:672-675` 与 `:731` 五处裸 `git show HEAD:` 已锚 SHA，**其中 `:731` 这一条就是新检查自己抓出来的** |
+
+现量命令（台账里这几条的数，跑一次就重算一次）：
+
+```bash
+node scripts/check-doc-citations.mjs                 # 第 17 行
+NO_COLOR=1 pnpm --filter @heyta/storage test         # 第 6 行：契约 + 桥对账
+NO_COLOR=1 pnpm --filter @heyta/op-log test          # 第 6 行：消费者
+NO_COLOR=1 pnpm --filter @heyta/app-host test        # 第 6、10 行
+NO_COLOR=1 pnpm --filter @heyta/sync-client test     # 第 3 行
+```
+
+> 🔴 **变异装置自己也要被变异**：这一批里 P0-7 的 B 臂第一趟报的是「判据存活」，
+> 实际是装置把 `aliveReminders(` 剥掉后留下**多余的右括号** ⇒ 变异体语法错误 ⇒ vitest 走
+> 集合期失败 ⇒ `Tests` 行里没有 `N failed` ⇒ 装置读到 `failed=0`。**一条没跑起来的臂
+> 长得和一条没牙的判据一模一样。** 现在两个装置都加了 `ran <= 0 ⇒ 直接报错` 的前置。
+> 同族：P1-10 的 B 臂原计划断言的短语「总数没算 ARCHIVE」也没出现 —— 因为**先**失败的是
+> 它前面那条 `counted === getAllOps().length`（无消息的 `toBe`）。变异读数要按
+> **断言顺序**写，不是按"我以为哪条是专门钉这件事的"写。
+
+### 本批读到的包级读数（现量 2026-10-04 03:2x–03:4x，载体 = 主检出活树）
+
+| 包 | 读数 | 现量命令 |
+|---|---|---|
+| `@heyta/storage` | `Test Files 8 passed (8)` / `Tests 417 passed (417)` | `NO_COLOR=1 pnpm --filter @heyta/storage test` |
+| `@heyta/op-log` | `Test Files 9 passed (9)` / `Tests 111 passed (111)` | `NO_COLOR=1 pnpm --filter @heyta/op-log test` |
+| `@heyta/app-host` | `Test Files 64 passed (64)` / `Tests 1307 passed (1307)` | `NO_COLOR=1 pnpm --filter @heyta/app-host test` |
+| `@heyta/sync-client` | `Tests 132 passed (132)`（02:5x 那一趟，含 P0-11 新增 3 条） | `NO_COLOR=1 pnpm --filter @heyta/sync-client test` |
+| `@heyta/web` | `Test Files 1 failed \| 131 passed \| 2 skipped (134)` / `Tests 1 failed \| 1751 passed \| 13 skipped (1765)`。**唯一那条红不是本批的**（见「归属登记」） | `NO_COLOR=1 pnpm --filter @heyta/web test` |
+| `@heyta/mobile` | `Test Files 1 failed \| 47 passed (48)` / `Tests 1 failed \| 719 passed (720)`。那条红同样不是本批的 | `NO_COLOR=1 pnpm --filter @heyta/mobile test` |
+
+静态门禁同一趟（03:32，退出码逐条现量，脚本 `/tmp/heyta-perf-scan/gates-rc.sh`）：
+
+| 门禁 | 退出码 | 备注 |
+|---|---|---|
+| `check:layering` | 0 | |
+| `check:ui-language` | 0 | |
+| `check:migrations` | 0 | 本批零迁移 |
+| `check:tokens` | 0 | |
+| `check:design` | **1** | 2 处，全在别人未跟踪的 `apps/web/src/features/settings/CloseAccountPanel.tsx`（85 / 143） |
+| `check-doc-citations`（新落的那把尺子） | 0 | 它抓到过本批自己写的一处（见 §8.1 第 17 行） |
+| `docs-link-check`（就是 `pnpm check:docs` 那一步） | **1** | 28 条全部来自被忽略的 `tmp/` 草稿，被跟踪文件贡献 0 条。**所以 `pnpm check` 现在整体是红的，而红不在本批** |
+| `pnpm -r typecheck` | 全绿（逐包 `Done`，0 报错） | 载体：主检出活树 |
+
+
+> ⚠️ 上面几行是**某一趟的快照**，HEAD 每动一次就旧一次（本批这几分钟里 `git rev-parse --short HEAD` 就从 `62576fa3` 走到 `391e4c27` —— 并行会话在提交，所以**载体只写"主检出活树"，不写 SHA**：写了就是一条会过期又说不出错的话）。
+> 要现量就跑右列命令，别引用本节。
+> 载体写成"主检出活树"是因为本批改动**未提交**（见下面「归属登记」）——
+> 同一组命令在干净检出上跑出来的数**会比这里小**（少了这些新用例）。
+
+### 变异读数的规矩（本表按它写）
+
+规矩：**每条变异臂必须 ① 先跑未变异对照拿到"这套件共几条、当前全绿"，② 要求红在该红的那一腿
+（按断言名字点名，不接受"红了就行"），③ 跑完立刻还原并逐字节比对。**
+装置最后一行固定打印 `MUTATE-<工单>=PASS|FAIL（N 项）` 或"×臂全对"。
+
+> ⚠️ 这一节的前一版写过"上表里 P1-8 / P1-1 / P0-6 / P1-2 / P1-18 五格只给装置路径、
+> 因为那几趟没落盘成日志"。**那句已过期**：五格里有四格后来都重跑拿到了读数
+> （P1-18 那条例外，原因写在「归属登记」里），而装置本身已从 `/tmp` 搬进仓库 —— 见下面一节。
+> 原句留在这里而不是删掉，是因为它记的那件事仍然成立：**"我记得它红了"不算证据。**
+
+### 装置在仓库里，日志不在了（本表为什么有几格只给命令）
+
+那批 `mutate-*.mjs` 装置已经**从 `/tmp` 落进 `research/tools/mutation-rigs/`**（那里有 README，
+逐台写清它钉哪条工单、几臂、每臂要求红在哪一腿；枚数**别抄这句**，现量
+`ls research/tools/mutation-rigs/*.mjs | wc -l`，10-04 03:5x 是 8 枚 —— 其中
+`verify-gate-wiring-candidate.mjs` 不改工作树，它改的是候选副本，见「归属登记」那条）。
+它们的 `ROOT` 现在**从文件自己的位置推导**，
+不再钉死某台机器的检出路径。
+
+**为什么这是一条必须写的话，而不是搬家顺手**：这份台账前一版直接引 `/tmp/heyta-perf-scan/mutate-*.mjs`
+作为证据。`/tmp` 是重启即失的目录，也是 git 忽略的目录 —— 也就是说
+**"证据"住在一个既不持久、也永远不会被别人拿到的地方**，而文档里那句话看起来完全正常。
+这和本文 §5 记录过的那次失效（引用根本不存在的文件）是同一个形状，只是这次失效方式是"当时存在"。
+
+所以本表的规矩改成：**格子里给"能重跑的装置路径 + 现量命令"，读数写明是哪一趟的快照**。
+`/tmp/heyta-perf-scan/mut-*.log` 那几份日志仍是本机一次性产物 —— 它们只是"这一批确实跑过"的
+旁证，不是可传递的证据；要传证据就重跑装置（每台都以"未变异对照"开头、以"逐字节还原"结尾）。
+
+- 本批新增的**未跟踪**目录：`research/tools/mutation-rigs/`（7 台装置 + README + 两个等窗口的壳）。
+  现量：`git status --porcelain -- research/tools/mutation-rigs`。它没挂进 `pnpm check`
+  （和 `scripts/check-doc-citations.mjs` 同一笔债，理由见上一条）。
+
+### 本表自己的现量命令（"八条已落"这句不许手抄）
+
+```bash
+awk '/^## 8\.1/,/^### 未落的那些行/' docs/research/performance-hotpaths-audit.md \
+  | grep -c '^| .* | ✅ 已落'      # 已落的行数
+awk '/^## 8\.1/,/^### 未落的那些行/' docs/research/performance-hotpaths-audit.md \
+  | grep -c '^| .* | ❌ 未落'      # 未落的行数
+awk '/^## 8\.1/,/^### 未落的那些行/' docs/research/performance-hotpaths-audit.md \
+  | grep -c '^| .* | ⛔'           # 本批不动的不可逆层
+```
+
+三个数读法（03:43 现量）：**9 已落 / 8 未落 / 1 本批不动**。
+9 里只有 **8 是工单**（`§8` 表 17 步中的 1/2/3/5/6/10/12 加表外的 P1-18），
+第 9 条是 §8 表第 **17** 步那把"引用尺子"门禁 —— 它是工具，不是工单。
+总行数 18 = 原表 17 步 + 表外那条 P1-18。
+"落了 8 条工单"这句话在 `docs/README.md` 与本节都出现过，两处都是这个口径。
+
+
+
+① **§8-4 / P0-9 第一刀（i18n chunk）** —— 差的是一个**构建期决定**，不是代码量：把 en 表改成动态
+`import()` 会把首屏变成两段瀑布（词条没到齐前界面只能空着），而"空着多久"是可感知行为。
+需要载体：`apps/web` 的一次真实构建 + `check:entries` 复跑 + **两张截图**（首屏与词条到位后），
+以及产品负责人对"首屏先渲染骨架还是等词条"拍板。本批没动它，**不是因为难，是因为它会改用户看到的东西**。
+
+② **§8-7 `measure-checkpoint.mjs`** —— 这条是"先让它红"的观测门禁，写它本身约 120 行，
+但**它要的量程**（checkpoint 序列化字节数 × op 数 × 重算次数）需要一份**真库规模**的样本：
+本机 IndexedDB 里没有万级 op 的库。需要载体：一份导出现场（`export-dump` 产物）+ 在 node-host
+上把它灌进 SQLite。灌进去之后这条就是纯机械的。
+
+③ **§8-8 / P0-10** —— 前置是一句注释里写明的既有立场：**`canSetParent` 是环防护的唯一实现**
+（"土办法会漏掉后代这一整类"）。所以改 `validateParentChange` 必须先有一条
+"改前改后候选集逐任务相等"的等价判据，而那个判据要在**带深层父子结构的夹具**上跑。
+约 1 个文件改动 + 1 份夹具，但等价判据写歪的后果是**静默失去环防护**，风险不对称。
+
+④ **§8-9 / P0-1** —— 18 处整店订阅 / 11 个文件 + `React.memo` + 三个回调收 `useCallback`。
+这是本批**唯一一条会同时改多个界面**的，而 §6.2 规定一要求"界面结论必须截图并人看过"，
+本批的时间窗里 e2e 通道被别人占着（见下面「归属登记」）。
+
+⑤ **§8-11** —— web 侧要引 `@tanstack/react-virtual`，它**从未被声明**，
+所以第一步不是改代码而是过 §3.1（近五年在更）+ §3.2（许可证）两道门并逐项登记；
+移动端那一半是"有 FlatList 被外层击穿"，需要一个能拿到确定高度的 `Screen` 形态。
+两端的修法不同，不能并成一步（原表已经这样写）。
+
+⑥ **§8-13** —— 纯门禁加法，但它会**当场把移动端打红包红**（体积判据的基线要先量一次
+`check-mobile-bundle` 的现量产物大小），而那条脚本跑一次要起 Metro。属于"能做、需要独占共享资源"。
+
+⑦ **§8-14 / P0-6 算法侧** —— 改的是**用户能看到的连续天数**，原表就要求先垫一条
+"改前改后连续天数逐习惯相等"的等价判据；而且 ADR-0022 的"冻结余额只能放宽不能收紧"
+这条纪律意味着等价判据要**同时**钉住派生值不减。不是一行改动。
+
+⑧ **§8-15 / P0-8** —— 原表明写它**威胁两条既有不变量**（reducer 纯性 ⇒ checkpoint 确定性
+checksum；就地 mutate ⇒ ADR-0047 的回退判定失效），且必须排在第 7 步的基线之后。
+顺序前置没满足，跳过去做就是把 P0-2 那套东西拆了。
+
+### 不可逆层与需要 ADR 级拍板的（本批一条没动，理由与载体写在这里）
+
+- **§8-16 / P0-4 上传批次按形状上界数发数**：判据要的是**服务端真实接受/拒绝的形状**，
+  而上界本身写在 `server/src/sync/services/validation.service.ts` 一侧。改客户端发数策略 =
+  改线协议上"一批"的定义 ⇒ 属不可逆层。需要载体：真服务端 + 一份能触发批次边界的 op 序列，
+  以及一条 ADR（现在的做法没有任何一处文档写"为什么是这个上界"）。
+- **`limitVectorClockSize` 上线**：ADR-0008 把墙从 20 挪到 100，而**裁剪本身仍然没有开启**。
+  开启会让**存量已带 >100 维时钟的账号**在下次写入时被压平，而 ADR §5 自己列的三件事
+  （因果安全的压缩、存量自愈、warning 在 Hermes 上可见）**一件都没实测**。
+  需要载体：一台装着受害账号的 node-host + 真服务端，先证"自愈"，再谈上线。
+- **向量时钟的因果安全压缩**：同上，且它改的是**收敛语义**，属于"新写一份 ADR"级别。
+
+### 真机 / profiler / EXPLAIN 类：本批取不到的，写清差什么
+
+- P1-7（`/api/admin/overview` 15 条聚合里 6 条无索引）需要**真库 `EXPLAIN ANALYZE`**：
+  本机跑的是 Pglite/测试夹具，计划形状不可比。载体：服务器上一次只读 EXPLAIN（需要 DB 访问，
+  本批没有，也不该有）。
+- P0-1/P0-3/P0-5 的"到底慢不慢"需要**profiler 采样 + 真机**：本批只落了它们的**代码侧前置**
+  中不需要设备的那部分，读数仍然缺。
+- P1-2 的界面效果**没有重新截图**：改动是 `useMemo`，判据是"重建次数"，
+  视觉零变化 —— 这条按"无视觉变更"处理，不主张看过图。
+
+### 归属登记（共享工作树，本批没改、也没替别人改）
+
+- `pnpm check:design` 现在**红在** `apps/web/src/features/settings/CloseAccountPanel.tsx`
+  （未跟踪文件，`size={16}` 两处）。它属并行那条注销账号线，本批不吸收、不代改。
+  现量：`pnpm check:design 2>&1 | tail`。
+- `scripts/check-doc-citations.mjs` **已能跑绿，但没挂进 `pnpm check`** —— 挂它要改
+  根 `package.json` 的 `check` 脚本，而该文件正被并行会话改着。
+  现量：`git status --porcelain -- package.json`。**这是本批留的最大一条债**：
+  一把能失败的尺子放在没人每次跑的地方，等于放回抽屉里。
+  🔴 **03:5x 把这条债从"描述"升级成"可直接落地的补丁"**，而且**没碰那个文件**：
+  `scripts/check-gate-wiring.mjs` 自带 `--pkg <候选 package.json>` 旋钮（它是为了注入验证
+  才有的），所以可以把候选喂给它验，而不是去改工作树。四臂读数（装置
+  `research/tools/mutation-rigs/verify-gate-wiring-candidate.mjs`，日志 `/tmp/heyta-perf-scan/gate-wiring-candidate.log`）：
+
+  | 臂 | 候选 | 期望 | 现量 |
+  |---|---|---|---|
+  | C0 | 当前工作树那份 | RC=0 | `RC=0`（定义 72 · 链内 75 段 · 链外 1 道在允许表） |
+  | C1 | 加定义 **并**插进链 | RC=0 | `RC=0`（定义 73 · 链内 **76** 段 · 链外仍 1）⇒ **这条改动可以照抄落地** |
+  | C2 | **只**加定义、没进链 | RC≠0 | `RC=1`，红点名 `check:doc-citations` —— 它是 C1 的阳性对照：只做一半会被立刻拦下，不会留下"看起来挂了"的门禁 |
+  | C3 | 往链里插出一个 `&&&` | RC≠0 | `RC=1`，红点名的**不是**新加那道，而是被 `&&` 拆坏而掉出链的下一段 `check:md-tables` |
+
+  📌 C3 是我自己第一次拼候选时的手误，不是造的假样本 —— 而它正好当场演示了这道门禁存在的理由
+  （`check` 是一串 `&&`，掉出去的那段不会失败，只是**不再被跑**）。它还证明检测面覆盖
+  **任意一道**门禁，不是只盯着新名字。
+  ⚠️ 顺带一条对 owner 有用的机制：`check:gate-wiring` 会把"定义在、链里没有"的**任何**一道
+  判红，除非它进允许表并写明理由 + 一个**可验的消费方**（它真去 `docs/runbooks/deployment.md`
+  与 `server/Dockerfile` 里数引用）。所以"先加定义、以后再接链"这个常见做法**当场就会红** ——
+  两处必须一起改：
+
+  ```text
+  # 1) scripts 里加定义（位置紧跟 "check:docs" 那条定义）
+  "check:doc-citations": "node scripts/check-doc-citations.mjs",
+  # 2) check 链里插在 pnpm check:docs 之后（本批验的就是这一档位置）
+  … && pnpm check:docs && pnpm check:doc-citations && pnpm check:md-tables && …
+  ```
+
+  复跑：`node research/tools/mutation-rigs/verify-gate-wiring-candidate.mjs`（只写 `/tmp` 下的
+  候选副本，工作树零改动 —— 验完 `git status --porcelain -- package.json` 仍是那一个 ` M`，
+  且属于并行会话）。
+
+- 本批所有改动**未 commit、未 push**（未获授权）。落在 HEAD 的那四条（P1-8/P1-1/P1-2/P1-18）
+  是被并行会话的整文件提交带走的，不是本批自己提交的 —— 归属要说清，否则下次"谁改了 focus store"
+  会查错人。
+  🔴 **04:0x 现量：判据 spec 落在哪一份"跟着源码走"并不显然**，逐条量过（存在 ≠ 内容，
+  所以每条都拿用例标题的 needle 在 `git show HEAD:` 里数过命中数）：
+
+  | 判据文件 | 落在 | HEAD 里含本批用例？ |
+  |---|---|---|
+  | `apps/web/tests/focus-pause-stops-ticking.spec.ts` | HEAD | ✅ needle「暂停后」命中 5 |
+  | `apps/web/tests/date-picker-months-memoized.spec.tsx` | HEAD | ✅ 「换月」4 |
+  | `apps/web/tests/memory-gate-no-read.spec.tsx` | HEAD | ✅ 「memoryEnabled」3 |
+  | `apps/web/tests/growth-view-derived-memoized.spec.tsx` | 活树 `??` | —— 未入库 |
+  | `packages/sync-client/tests/upload-key-derivation-once.spec.ts` | 活树 `??` | —— 未入库 |
+  | `packages/storage/tests/op-log-bridge-forwarding.spec.ts` | 活树 `??` | —— 未入库 |
+  | `packages/op-log/tests/op-log-count-reads.spec.ts` | 活树 `??` | —— 未入库 |
+  | `packages/app-host/tests/reminder-actions.spec.ts` | 活树 ` M` | ❌ HEAD 里 `listByTask` 命中 **0**（本批那 94 行还没入库） |
+
+  ⇒ **P1-8/P1-1/P1-2/P1-18 四条现在干净检出也跑得动；P0-6/P0-7/P0-11/P1-10 四条不能**，
+  它们连同各自的源码只在这棵活树里（`git checkout` 会没）。
+  复跑这张表：对每个路径
+  `git cat-file -e "HEAD:<路径>" && git show "HEAD:<路径>" | grep -c '<用例标题片段>'`，
+  再配 `git status --short`。
+  ⚠️ 探"某文件在不在 HEAD"时**别看 `git status` 有没有输出** —— 它只说明工作树与索引一致，
+  不说明这个文件在 HEAD 里就是**当前这份内容**；上面那个 0 就是这么来的：
+  `reminder-actions.spec.ts` 早就在 HEAD 里（所以文件名能查到），但本批的 94 行不在。
+
+- 🔴 **`@heyta/mobile` 现在有一条红不是本批的**：`tests/account-closure-entry.spec.ts`
+  （未跟踪文件，属注销那条线）里「注销也是出境：请求必须过本机同意闸门」那条源码正则判据
+  不匹配 —— 它扫的是同样未跟踪的 `apps/mobile/src/screens/AccountClosureScreen.tsx`。
+  同趟读数：`Test Files 1 failed | 47 passed (48)` / `Tests 1 failed | 719 passed (720)`。
+  本批**不代改**，也**不把它算进本批的账**。
+  同趟还有 5 条 `RolldownError: Parse failure: Flow is not supported`，落在
+  react-native 入口文件头部的 Flow 注释上（`tests/auth-flow.spec.ts` 运行期）——
+  是既有的工具链噪声，不是本批引入的，也不是失败用例。
+- **P1-18 的变异读数本机现在取不到**：它的装置 `mutate-p118.mjs` 要原地改
+  `apps/web/src/App.tsx`，而该文件此刻正被注销那条线脏着（`CloseAccountPanel` 的 8 行插入）。
+  带着别人的未提交改动跑"改文件→跑→还原"的装置，一次竞写就能把别人的活覆盖掉，
+  所以本批**不跑它**，而不是宣称它没牙。需要载体：`App.tsx` 干净（或本批改动已提交）之后重跑那台装置。
+- **`docs-link-check` 现在红 28 条死链，28 条全部来自 `tmp/`**（该目录被 `.gitignore:204` 忽略，
+  是各条线 agent 的 scratch：`mutant-pipe.md`、`trap-head.md` 等）。
+  现量：`NO_COLOR=1 node research/tools/docs-link-check.mjs > /tmp/x.log 2>&1; echo $?` 再看
+  死链来源是否被 `git ls-files` 跟踪 —— 本批实测**被跟踪文件贡献 0 条**。
+  这正是"只在混合工作树成立"的那种红（干净检出上恒绿，本机恒红，而红的全是没人会修的草稿）。
+  本批**不删别人的 scratch、不改这台尺子**，登记一条建议：给 `docs-link-check` 加"跳过被忽略路径"，
+  让它的红 always 可归因给某个文档作者。
+- 🔴 **`@heyta/web` 现在也有一条红不是本批的**：`tests/close-account-panel.spec.tsx`
+  （同样未跟踪，同一条注销线）里「唯一"状态未知"那一支…」那条 —— 它要的文案片段
+  「本机数据也没动」在对方正在写的词条里还没有。同趟 `1751 passed / 1 failed / 13 skipped`。
+  本批**不代改文案**（改了就等于替别人决定那条错误分支说什么），只登记。
+- **本批不主张任何"界面看起来对"的结论**，因此**没有配图**：八条工单改的全是
+  调用形状（串行加密、计数取代物化、`useMemo`、一次遍历归组），判据是"派生被算了几次 /
+  读回了几行 / 结果逐条相同"这一类可机械断言的东西。
+  界面回归目前只由**单元测试 + 类型 + 门禁**承担；`check:ai-e2e`（真浏览器那一层）
+  此刻正被并行会话占着（03:33 起，它还会 SIGKILL 别人的 dev server），
+  所以本批**没有跑它**，也不把别人那一趟算成自己的证据。
+  需要载体：窗口空了跑一次 `pnpm check:ai-e2e`，并按 §6.2 规定一**人真的看**那几张图
+  （成长视图 / 提醒面板 / 日期选择器三个面各一张）。
+- 🔴 **有一台装置自己是坏的**：`/tmp/heyta-perf-scan/mutate-p1-8.mjs` 第 19 行有语法错，
+  **import 期就炸**，从来没跑到测试 —— 而它的退出码 1 和"判据不够用"在输出上长得一样。
+  能跑的那台叫 `research/tools/mutation-rigs/mutate-p18.mjs`（同一条工单的两版装置，坏的那版留在目录里）。
+  这和本批在 P0-7 上踩到的是同一件事的第三种面目：**装置的失败与判据的失败不可混淆**，
+  所以从现在起每条变异读数都要带 `ran=`（跑到几条用例）。
+
+### 本批顺带照出来的、还没做的一件（不是登记成"以后再说"，是它需要一次判断）
+
+`packages/op-log/src/engine.ts` 的 `getOpById()` 现在仍然是 `getAllOps().find(...)` ——
+P1-10 给了计数方法，但**这一处换成"存在性/计数"是换不掉的**：它要的是那条 op 本身。
+正解要走 `by_opId` 唯一索引，而索引只在热区，归档区没有这个索引
+（`db-op-log-store.ts` 的归档注释明写"冷历史故意扫"）。所以它是**"热区/归档两跳查找"的正确性
+决定**，不是机械替换：要么给 ARCHIVE 加索引（存储层改动），要么接受"用户手动解决冲突时
+若那条 op 已归档则要扫冷区"。本批没替它拍板。
+
