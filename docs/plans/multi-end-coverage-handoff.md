@@ -1883,3 +1883,25 @@ cwd 在别条线 `heyta-wt-ai-closeout/apps/mobile/ios/Pods`）。
 - ② 落账时用的口径（就这一句）：**分母 82 段**（载体 691a4b28，23:07 现量），其中 e2e 三段是
   `check:ai-e2e`（SIGKILL 4318+4319）、`check:privacy-consent-e2e`（4322）、`check:landing-e2e`（4320）。
   `check:web-artifact:app` 有意不在串里（由产物那条路单独消费），**不许把它算进"可过段数"的分子**。
+
+## 23:09 ④ 用**当前 HEAD** 重核一遍（不拿 19:3x 那次读数充现量），顺带抓到我自己两个空读数
+
+重核对象 `72e198e8`（不是本线当初那两笔 `f33b8d0f`/`4ca77b58`——引用落后于现状是第三种漂移）：
+
+| 要求项 | 现量落点 |
+|---|---|
+| `ProjectActions.setParent(entityId, parentId?)` | `packages/app-host/src/project-actions.ts:100-105`（注释即分工声明）＋任务侧同名动作 `packages/app-host/src/actions.ts:288`（接口）与 `:613`（实现） |
+| 一层深度 / 环 / 自指 三条守卫 | **在领域层**：`packages/domain/src/project-hierarchy.ts:66` 的 `validateProjectParentChange`，判序逐条可读 —— `project_not_found`(L19) → `self`(L23) → `parent_not_found`(L26) → `cycle`(L31，带 `seen` 防死循环 L33) → `parent_not_top_level`(L38) → `has_children`(L41) → `ok`(L44)。动作层注释明写"不在这里自己算" |
+| 两端选择器界面 | web：`apps/web/src/features/projects/store.ts:130` 调 `projectActions.setParent`；mobile：`apps/mobile/src/screens/ListsSection.tsx:264` 调 `actions.setParent(...).catch(...)`（`:109` 记了"非 async 会同步抛出 ⇒ unhandled rejection"那条坑）；任务侧父级选择器 `apps/web/src/features/tasks/SubtaskPicker.tsx` + `mobile/.../TaskDetailSheet.tsx` |
+| 中英词条 | `zh-CN.ts` 与 **`en.ts`** 都有：`common.organizer.folder.reject.parentNotFound`（en `:2498` = `'That folder …'`）、`…parentNotTopLevel`（en `:2501`）、`mobile.detail.field.parent`（en `:2470` = `'Parent task'`）。键集对等由常驻测试 `packages/i18n/tests/catalog.spec.ts` 守，不靠我这次抽三条 |
+| 一条命令回退 + 标明代拍 | 已在前一节闭合（`0e112269` 的 A/B 差集终验：摘掉 `ListsSection.tsx` 那段后两趟 tsc 错误码集合逐字相同） |
+
+🔴 **这一趟我自己造出两个空读数，都记下来**（因为它们全都长得像"仓库缺东西"）：
+1. `git grep -n -- "$k" $R -- path` 这个参数顺序是错的 —— `--` 之后 **`$R` 和路径一起被当成 pathspec**，
+   pattern 消失，命令报错走 stderr（我当时没看 stderr），循环里三条键于是全部"不在"。
+   ⇒ 固定形状：`git grep -n -F "<pattern>" <rev> -- <path>`，且**判"某文件里没有 X"必须把 stderr 一起收进读数**。
+2. 我按 `en-US.ts` 这个**记忆里的文件名**去搜，而真身是 `packages/i18n/src/locales/en.ts`
+   ⇒ `git ls-tree` 直接报 `path ... does not exist in '72e198e8'`、`wc -l` 得 0，
+   我那句"键集对照"其实**一个字节都没读到**。⇒ 文件清单先 `git ls-tree -r --name-only` 现取，别按命名习惯猜。
+3. 附带第三条同一族：`node -e '…'` 的载荷里含 `\s`/引号时被 zsh 拆成**一个 pathspec**（报错 `no matches found`），
+   整段没执行 ⇒ 台账里那条老规矩（改正则一律用 Write 落成文件）这次是第 N 次现形。
