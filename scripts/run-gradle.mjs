@@ -317,11 +317,11 @@ function runRemote() {
       ? { status: 0, stdout: '', stderr: '' }
       : runCapture('bash', [
           '-c',
-          `source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST}`,
+          `source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST} '${REMOTE_ROOT}'`,
         ]);
     if (DRY) {
       console.log(
-        `   [dry-run] 将执行（**未执行**）：\n      bash -c 'source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST}'`,
+        `   [dry-run] 将执行（**未执行**）：\n      bash -c 'source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST} '${REMOTE_ROOT}''`,
       );
       break;
     }

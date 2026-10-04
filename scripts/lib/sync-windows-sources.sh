@@ -133,6 +133,17 @@ _heyta_windows_sync_push() {
 # `apps/web/dist/index.html` 那一组对 APK 什么都不证明。
 sync_windows_sources_for_android() {
   local host="$1"
+  # 🔴 远端仓库根由**调用方**给（run-gradle 手里那份 `HEYTA_ANDROID_REMOTE_ROOT`）。
+  #    为什么这条要紧：那一侧读 `HEYTA_ANDROID_REMOTE_ROOT`，这一侧读 `HEYTA_WINDOWS_REPO_ROOT`，
+  #    两个默认值逐字相同 ⇒ 平时看不出问题；**只移一个**就变成"同步解包到 A、gradle 在 B 里构建"
+  #    —— 与 §7 第 82 条同一种形状，只是搬到了远程路径上。
+  #    不传（第二枚实参为空）时沿用本文件的默认值 ⇒ MSIX 那一腿逐字不受影响。
+  #    `local` 是刻意的：bash 是动态作用域，被调的 `_heyta_windows_sync_push` 读到的就是这一份，
+  #    而函数返回后不会把值泄漏给调用方的 shell。
+  #    `${2:-}` 这层中转也是刻意的：调用方普遍 `set -u`，直接写 `${2:-…}` 在未传第二枚实参时
+  #    会先把 `$2` 当未绑定变量打死。
+  local _android_remote_root="${2:-}"
+  local HEYTA_WINDOWS_REPO_ROOT="${_android_remote_root:-$HEYTA_WINDOWS_REPO_ROOT}"
   local dist_list="" d
   for d in packages/*/dist; do
     [ -d "$d" ] || continue

@@ -2172,3 +2172,39 @@ git -C …/heyta-wt-batch2 show HEAD:AGENTS.md | grep -c 'windows-pc' → 2     
 `check:docs` rc=0 / `check:doc-citations`、`check:md-tables`、`check:docs-voice`、`check:claims`、
 `check:script-snapshot`、`check:verify-script-copy` 全 rc=0。
 窗口仍未开（00:1x 现量负载 77.14，阈值 12；`:4318/4319/4322` 空、`:3000/:3100` 忙）。
+
+## 00:2x 远程宿主的只读前置：**全在位**（这消掉了"第一发实弹会不会红在环境档"这一整档不确定性）
+
+探针：`~/.heyta-window-rigs/heyta-android-host-probe.sh`（**只读**：不写远端一个字节、不起 gradle、不起模拟器；
+`bash heyta-android-host-probe.sh`，rc 0=READY / 2=HAS-GAPS / 3=不可达 / 4=装置坏了）。现量读数：
+
+| 读数 | 值 | 这一条为什么重要 |
+|---|---|---|
+| `gradlew.bat` | True | 远端有 wrapper，`gradlew.bat assembleRelease` 才打得起来 |
+| `apps/mobile/node_modules` | True | RN 的 autolinking/codegen 读的就是这一枚（**这才是前置**） |
+| `node_modules/.pnpm` | True | 根依赖在位 |
+| `ANDROID_HOME` | `C:\Users\41478\AppData\Local\Android\Sdk` | 存在 |
+| `platforms` / `build-tools` | `android-36` / `35.0.0,36.0.0` | 与本仓**现取**的 `compileSdkVersion = 36` 对上（期望值从 `apps/mobile/android/build.gradle` 推导，不抄数） |
+| `JAVA_HOME` / `bin\java.exe` | `C:\Program Files\Microsoft\jdk-21.0.12.101-hotspot` / True | gradlew 起得来的前提 |
+| `local.properties` | False | 没有残留的 Mac `sdk.dir`（它不入库，同步永远不会覆盖它） |
+| `emulator` / `system-images` | False / False | **已知边界**（runbook §五）：Windows 侧不做设备验收，不判红 |
+| 盘 | C 剩 92.3G / D 剩 105G | AGP 写缓存够 |
+| `node` / `pnpm` | v24.19.0 / 10.33.4 | 远端工具链在 |
+| 远端树 | `fc608b7`、`DIRTY=1493` | 同步是**覆盖式解包**（只增不减，§7 第 175 条），那 1493 条是历史残留；本批不代它清理，但"远端字节 == 本地那一篇"由 sha256 对账兜住 |
+| `apps/mobile/android/node_modules` | **False** | 🔴 这一枚**故意不作为前置**：它不是工作区包，pnpm 永不建它 —— 门禁 G7 钉的就是"不许拿它当前置" |
+
+⇒ **①/③ 的第一发远程构建没有环境档障碍了**，剩下的未知只有"真跑一次"本身。
+
+探针自己被照出来的两处形状（都改成了判据，不是注意事项）：
+
+1. **`rc=0` 不等于有读数**。第一版走嵌套引号被 cmd.exe 拆坏 ⇒ stdout 全空、rc=0，
+   于是每条 `Test-Path` 都读成"不是 True"，**编造出四条根本不存在的缺口**。
+   现在整段 PS 走 `-EncodedCommand`（UTF-16LE→base64，单 token 无引号可破坏），
+   并且在判缺口**之前**先断言读到的 `K=` 行数（`PROBE=CHANNEL-DEAD`，rc 4）。
+2. **`$ErrorActionPreference="SilentlyContinue"` 会把原生命令的 stderr 吞掉**：
+   PS 5.1 把 `java -version` 的 stderr 当 error record，静默丢弃后 `JAVA=` 恒为空。
+   前置真正要问的是"`JAVA_HOME` 解析得到且 `bin\java.exe` 在位"，换成 `Test-Path` 拿它。
+   配套加了一条 `val()` 标签缺失检查（缺标签 ⇒ `PROBE=LABEL-MISSING`，rc 4，**先判装置再判远端**）：
+   变异验证 —— 一次性副本里把 `JAVA_HOME|JAVAEXE` 从过滤器摘掉 ⇒
+   `PROBE=LABEL-MISSING 这些标签在读数里不存在：… JAVAEXE JAVA_HOME`、rc=4；
+   正跑 ⇒ `PROBE=READY`、rc=0。
