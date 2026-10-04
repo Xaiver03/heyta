@@ -5768,3 +5768,68 @@ stale base 提交 `package.json`（整文件覆盖，不是三方合并），本
 复跑：`pnpm check:gate-wiring`（链第一段）；注入：
 `node scripts/check-gate-wiring.mjs --pkg /tmp/ht-armA.json`（armA 的生成方式在本节 ② ③，
 摘段 + 删定义，两行 `node -e` 就能重造）。
+
+### 8.94 逐段归属对拍器搬进仓（`research/tools/selfhost-check-segments.mjs`）—— 顺手抓到配对树自己过期，并把"只在载体红 = ∅"在纯 fs 子集上先取到（2026-10-04 15:4x）
+
+#### ① 为什么这件事要在落地之前做
+
+第 1 项的关闭判据要求"完整 `pnpm check` 的**每一枚红**仍可逐条归属到非本批"。而 `scripts.check`
+是一长串 `&&`：**第一段红就整体退出** ⇒ 完整跑只给我一个失败点，看不出后面几十段的状态。
+归属要靠"两棵树各跑一遍再取差集"，而那套逻辑原先只活在 `/tmp/check-segments.mjs` +
+`/tmp/attrib-two-trees.sh` 两份临时脚本里 —— 落地那一刻要用的东西捏在 `/tmp`，本身就是风险
+（main 上 `65567666` 那笔记的就是"同一台机器上 `/tmp` 取证文件被别人污染"）。
+
+#### ② 写这版工具的第一跑就抓到一条真缺陷（不是设计出来的）
+
+现量：`/tmp/heyta-main-check` 的 HEAD 是 **`dcbb94ab`**，而 `main` 当时已经是 **`f0afe884`**。
+也就是说 §8.88 之后任何拿它做"main 也红"配对的读数，都是在**拿一笔旧运行给新结论背书** ——
+这是"两边都对上"里最贵的一种假绿：它不报错、不异常，只是把差集算在一张过期的表上。
+⇒ 工具把这件事变成前置判据：`--tree <路径> --ref <引用>` 时先 `rev-parse` 两侧比对，
+不等就**退 2**（用法/探针码），并打出两枚 SHA。同一趟还断言工作树 0 脏、`node_modules` 在位
+（没有它的红是 `MODULE_NOT_FOUND`，不是判据红）。
+
+#### ③ 六臂（每条都真跑，含"必须能红"那条）
+
+| 臂 | 形状 | 期望 | 现量 |
+|---|---|---|---|
+| 1 | `--only zzz-not-a-gate`（空选择器） | 2 | **2** |
+| 2 | `--max-load 1`（负载门） | 3 | **3** |
+| 3 | 配对树落后于 `--ref` | 2 | **2**（打出 `dcbb94ab` vs `f0afe884`） |
+| 4 | 树脏（指主检出，154 条未提交） | 2 | **2** |
+| 5 | 正样本真跑（carrier 上 `check:gate-wiring`） | 0 | **0** |
+| 6 | 真造一枚红（一次性假树里 `scripts.check = "false && pnpm check:gate-wiring"`） | 1 | **1**，且"只在 fake 红 (2)"非空、"链里没有的段"按 `ABSENT` 分开登记 |
+
+臂 1 有第二次价值：它最初**走不到**。第一版把选择器检查排在负载门**之后**，
+那一趟负载 13.77 ⇒ 直接退 3，我差点把"这条臂没红"读成"选择器检查是多余的"。
+⇒ 用法错（码 2）比环境（码 3）便宜且确定，必须排在前面 —— 顺序不是风格，是能不能看见自己探针坏了。
+
+#### ④ 纯 fs 子集的先量归属（第 26 项的前半）
+
+载体 `7c8b8173`（= main `8c4cbf1e` × 分支 `cdc7126e`）与**当前** main 两棵树各跑 6 段
+（`check:gate-wiring` / `docs` / `docs-voice` / `md-tables` / `selfhost-entry-command` / `script-snapshot`）：
+
+```
+链并集 77 段（carrier=77 / main=76）· 本次判定 6 段
+只在 carrier 红 (0)：∅    只在 main 红 (0)：∅    两边都红 (0)：∅
+明细 TSV：/tmp/fsattrib.tsv（12 行 = 6 段 × 2 棵）   PAIR_RC=0
+```
+
+`check:gate-wiring` 在**两棵树都绿**这一条顺带证明了 §8.93 那枚锚点不会把 main 判红
+（main 那份链里没有这一段，但它那份文件里也没有这条锚点 —— 两边各自自洽）。
+
+⚠️ **这一趟的 `--max-load 20` 要写明理由，不许读成"我调了阈值"**：负载门防的是**超时与端口争抢**
+（重型段：build / `-r test` / 各 e2e），而这 6 段是纯文件系统计算，单段实测 0–1 秒、不起进程不抢端口
+⇒ 负载对这类读数不构成有效性条件。默认阈值仍是 12，且**完整链那一趟必须用默认值跑**；
+把这条写在这里是因为"同一台机器上为了拿到读数而放宽旋钮"是最容易滑过去的一步。
+
+#### ⑤ 与落地那一刻的接法
+
+```sh
+node research/tools/selfhost-check-segments.mjs \
+  --tree /tmp/heyta-merge-carrier --as carrier --ref feat/self-host-merge-main \
+  --tree /tmp/heyta-main-check    --as main    --ref main \
+  --out /tmp/land-attrib.tsv            # 不加 --only = 全链 77 段逐段跑（默认负载门 12）
+```
+落地前必须先把 `main-check` 那棵树 `checkout -f $(git rev-parse main)` 同步到当前 main ——
+工具会拦住不同步的情况，但拦住 ≠ 白跑一趟，所以命令仍要连着写。
+"只在 carrier 红"非空时**不许落地**，逐段回本批写集解释（§8.88 的基线方向已翻：干净 main 现在全绿）。
