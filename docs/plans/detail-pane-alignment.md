@@ -332,7 +332,7 @@ cd "$(git rev-parse --show-toplevel)/.." && git status --porcelain docs/research
 | 改动 | `apps/web`：`PRIMARY_NAV` 去掉 `{ kind: 'all' }`、`navCounts` 去掉 `all`、rail「任务」那格按"是否已停在任务视图"分叉、`aiPanels` 一份实现两个挂载点、`.ht-app__detail` 装 AI 面 + `padding-inline`。`apps/landing`：mockup 的 `SHELL_PRIMARY_NAV` 同步减一项（对账门禁逼的，见下）。 |
 | typecheck | `apps/web` rc=0、`apps/landing` rc=0 |
 | 单元测试 | `apps/web/tests/app-mount.spec.tsx` **23 条**（改写的那条在内）、`apps/landing` 全套 **1317 条** |
-| 真浏览器 | `e2e/tests/ai-row-layout.spec.ts` + `inbox-dida.spec.ts` 等 **21 条**，两张关键图**人已打开看**：1280 ⇒ 右栏是「AI 工具调用」+「对话助手」、侧栏只剩 今天/最近 7 天/已完成、页头写「收集箱」；660 ⇒ AI 面退回中间列 |
+| 真浏览器 | `e2e/tests/ai-row-layout.spec.ts` + `inbox-dida.spec.ts` 等 **21 条**，两张关键图**人已打开看**：1280 ⇒ 右栏是「AI 工具调用」+「对话助手」、侧栏只剩 今天/最近 7 天/已完成、页头写「收集箱」；660 ⇒ AI 面退回中间列。<br>07:0x 端口空出来后补跑 `ai-assistant` + `ai-tool-run`（这两条是搬动唯一的剩余回归面）⇒ **3 passed / 0 failed**，含"写工具只出提案：确认前不落库、确认后一次都不再多出境"那条。合计 **24 条**，载体都是主检出工作树 + dev 服务（4318/4319） |
 | 门禁（**提交后**复跑） | `check:design` / `check:ui-language`（329 文件、zh 3103 = en 3103 词条）/ `check:row-single-source`（`ht-*` 族未新增，走 `.ht-app__detail`）/ `check:layering`（361 文件 9 规则）/ `docs-link-check` 无死链 —— 全绿 |
 | 变异 | **半臂**：把「收集箱」加回 `PRIMARY_NAV` ⇒ web **1 红** / landing **1 红**，复原后 `cmp` 逐字节相同。第二臂（拿掉 rail「任务」的重置分支）**未做** —— 要原地改带别人未提交 hunk 的 `App.tsx` ⇒ 登记为待补 |
 | 未闭合 | **AGENTS §6.1.1 四端重装**：06:5x 现量 `notarytool` pid 98934 已跑 **11h42m**（别人那趟公证的 `--wait`，不动它），`vm.loadavg` **31.60**（仓库负载门阈值 12）⇒ 按红线记为**环境无效**，不起装、不放宽判据、不 push |
@@ -353,12 +353,16 @@ cd "$(git rev-parse --show-toplevel)/.." && git status --porcelain docs/research
 
 📌 **两件没闭合的，各自写明在谁手里**（下一个跑全链的人不要替它们代改）：
 
-1. `e2e/tests/ai-assistant.spec.ts` 与 `ai-tool-run.spec.ts` **本轮没复跑**：06:5x 现量
+1. ~~`e2e/tests/ai-assistant.spec.ts` 与 `ai-tool-run.spec.ts` **本轮没复跑**：06:5x 现量
    `lsof -nP -iTCP:4318 -sTCP:LISTEN` = pid 53715、`4319` = 53701 —— 并行会话那趟浏览器套件
    正在跑，而 `playwright.config.ts` 是 `--strictPort` + `reuseExistingServer: false`，
    起不来也不去抢（那把按端口 SIGKILL 的刀在仓库 `check:ai-e2e` 的包装里，不在配置里）。
    按"环境占用如实记录"处理，**不算**这两条已过。风险面读过：两条用例全部走 `data-testid`，
-   不含列几何 ⇒ 位置改动理论上够不着它们，但"理论上"不是证据。
+   不含列几何 ⇒ 位置改动理论上够不着它们，但"理论上"不是证据。~~
+   ✅ **07:0x 端口空出来后复跑，3 passed / 0 failed（15.0s）**：载体是**主检出工作树 + dev 服务**
+   （`vite --port 4318` + 假端点 4319），三条分别是助手那条多轮旅程、单步"规则命中零出境→披露后出境"、
+   以及**"写工具只出提案：确认前不落库、确认后一次都不再多出境"** —— 最后这条正是隐私那条
+   在界面上的读数，搬动之后仍然成立。这一格至此不再是缺口。
 2. `docs-link-check` 在 06:5x 复跑时变成 **1 红**：`docs/adr/0050-…:83` 新增的
    `../../apps/mobile/evidence/ios-node-vault-interop-20261004.txt` **本机存在、git 未跟踪**
    （那枚证据 14:57 刚生成）。**归属 = Vault 那条线**（ADR-0050 在他们手里 +66/−10 未提交）；
