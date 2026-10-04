@@ -1135,8 +1135,11 @@ export const zhCN = {
   //   与 `catalog.spec.ts` 的 `1 <复数名词>` HAZARD 同族 —— 词条表没有 ICU，
   //   这些句子必须对 1 和 N 都成立，不配 `…One` 兄弟键。
   'web.habits.stats.monthDays': '本月打卡 {count} 天',
-  'web.habits.stats.monthRate': '本月完成率 {percent}%',
-  'web.habits.stats.monthRatePending': '本月完成率 —',
+  // 🔴 率那一格必须自己说清"按天"：计数型习惯同屏会出现「完成率 0%」与「完成量 3 杯」
+  //   （目标 8 杯、今天 3 杯 ⇒ 今天不算达成），两个数都对、读起来自相矛盾（工单 §8.121 看图照出，
+  //   #39 的拍板：在率格里点明口径，而不是改算式或藏掉其中一个）。
+  'web.habits.stats.monthRate': '本月完成率（按天） {percent}%',
+  'web.habits.stats.monthRatePending': '本月完成率（按天） —',
   'web.habits.stats.monthValue': '本月完成量 {value}',
   'web.habits.stats.monthValueUnit': '本月完成量 {value} {unit}',
   'web.habits.stats.totalValue': '总完成量 {value}',

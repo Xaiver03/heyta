@@ -731,4 +731,24 @@ describe('G. W8 四格：存在性、分母为 0 走占位句、求和走 monthV
       }
     }
   });
+
+  it('G6 🔴 率那两格的**词条本体**带着口径（#39 的拍板不能被改词改掉）', () => {
+    // 为什么钉在词条层而不是渲染层：计数型习惯同屏会出现「完成率 0%」与「完成量 3 杯」，
+    // 两个数都对、读起来像矛盾（工单 §8.121 看图照出）。拍板的处置是**让率格自己说清按天**。
+    // 渲染层断言不了这件事（宿主给的是桩 label），所以这一条读的是两份词条源文件里
+    // 那两行的字面值 —— 谁把口径词删掉，这条立刻红。
+    const lineOf = (src: string, key: string) =>
+      (src.match(new RegExp(`'${key}':\\s*'([^']*)',?`)) || [null, ''])[1];
+    for (const [locale, rel, needle] of [
+      ['zh-CN', '../../../packages/i18n/src/locales/zh-CN.ts', /按天/],
+      ['en', '../../../packages/i18n/src/locales/en.ts', /by\s+days/i],
+    ] as const) {
+      const src = readFileSync(resolve(WEB_SRC, rel), 'utf8');
+      for (const key of ['web.habits.stats.monthRate', 'web.habits.stats.monthRatePending']) {
+        const value = lineOf(src, key);
+        expect(value, `${locale} 的 ${key} 词条行读不到（键名或引号形状变了？）`).not.toBe('');
+        expect(needle.test(value), `${locale} 的 ${key} 丢了口径（值="${value}"）`).toBe(true);
+      }
+    }
+  });
 });

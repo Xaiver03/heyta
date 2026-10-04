@@ -1051,8 +1051,12 @@ export const en = {
   // never "0%"). English uses noun-first shapes so each sentence holds for
   // both 1 and N — no `…One` siblings needed (catalog HAZARD rule).
   'web.habits.stats.monthDays': 'Check-in days this month: {count}',
-  'web.habits.stats.monthRate': 'Completion rate this month: {percent}%',
-  'web.habits.stats.monthRatePending': 'Completion rate: no scheduled days yet',
+  // The rate cell says "by days" on purpose: a count-type habit can show
+  // "0%" next to "3 cups" on the same screen (target 8, today 3 => today does
+  // not count as achieved). Both numbers are right; the label carries the unit
+  // so the pair does not read as a contradiction (work order §8.121 / #39).
+  'web.habits.stats.monthRate': 'Completion rate this month (by days): {percent}%',
+  'web.habits.stats.monthRatePending': 'Completion rate (by days): no scheduled days yet',
   'web.habits.stats.monthValue': 'Done this month: {value}',
   'web.habits.stats.monthValueUnit': 'Done this month: {value} {unit}',
   'web.habits.stats.totalValue': 'Done in total: {value}',
