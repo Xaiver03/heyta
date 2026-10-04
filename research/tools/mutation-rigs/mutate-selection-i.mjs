@@ -31,6 +31,25 @@ const run = (src) => {
 };
 const restore = () => writeFileSync(`${ROOT}/${GATE}`, ORIG, 'utf8');
 
+// 🔴 崩了也要复原：臂是靠"把变异写进门禁文件再跑一遍"实现的，任何一处 throw 都会把门禁**留在变异态**。
+//    实测踩过一次（I18 的 needle 选错 ⇒ throw ⇒ 门禁文件里少了一行豁免和一格名册，
+//    而 `git status` 只显示"这个文件是 M"，看不出来它已经被装置改过）。
+process.on('exit', () => {
+  try {
+    if (md5(readFileSync(`${ROOT}/${GATE}`, 'utf8')) !== BASE) restore();
+  } catch {
+    /* 文件已经不在了就别再写回去 */
+  }
+});
+
+// 前置：I18 那两条臂的对象是"fail() 退出前会 flush 已收集的红"这一行。没有它就不是"少一条红"，
+// 而是**装置没有对象** —— 那种情况响亮退出（未判），不许让剩下的臂拿一份注定不一样的门禁跑完再报"19/19"。
+if (!ORIG.includes('先前收集的红')) {
+  console.error('🔴 装置未判：当前门禁里没有 fail() 前 flush 已收集红的那一行 ⇒ I18/I18b 两条臂没有对象。');
+  console.error('   要么这一档被拿掉了（那正是要红的事），要么在别的分支/载体上跑（那边还没有它）。');
+  process.exit(2);
+}
+
 let pass = 0;
 let failArms = 0;
 const results = [];
@@ -169,6 +188,49 @@ check(
   'I11p 当前门禁含断言 I（I11 才是在证"历史缺口"，不是在证"这一档被人拿掉了"）',
   currentHasI,
   `当前版含 I=${String(currentHasI)}`,
+);
+
+// ---- I18 / I18b 一条红不许把别的断言的红藏起来 ------------------------------
+// 起因（工单 §8.104，合流产物上实测）：断言 I 的内容级红原本走 fail() 直接 exit，
+// 而 A–H 是把红累积在 `failures` 里最后一起报 —— 于是 I 一红，**前面已经成立的 G 类红一行都不打**。
+// 症状不是"红得不对"而是"红得比实际少"：那一趟真正要加的两行 trash `busyId` 豁免就是这么被吞掉的，
+// 而 §8.47 第 4 步的执行器正因为读不到它才拒绝执行（读不到 ≠ 不存在，是最贵的那类误读）。
+const G_MUT = "  ['apps/web/src/features/calendar/CalendarView.tsx', 'busyId', 'in-flight'],\n";
+const I_MUT_RE = /  \{\n    view: 'tasks',[\s\S]*?because: '列表是任务的第一个投影，选中就是共享 store 里那一个值。',\n  \},\n/;
+const both = (src) => {
+  const g = src.replace(G_MUT, '');
+  const gi = g.replace(I_MUT_RE, '');
+  return { src: gi, gApplied: g !== src, iApplied: gi !== g };
+};
+const b1 = both(ORIG);
+const r18 = run(b1.src);
+check(
+  'I18 同一趟造出 G 类红（摘一行豁免）与 I 类红（少登记一格）→ 两条都要打印（一条红不许吞掉另一条）',
+  b1.gApplied && b1.iApplied && r18.rc === 1 && /断言 G：/.test(r18.out) && /断言 I：/.test(r18.out) &&
+    /CalendarView\.tsx\s+busyId/.test(r18.out) && /交代过立场：tasks/.test(r18.out),
+  `豁免摘掉=${b1.gApplied}｜名册摘掉=${b1.iApplied}｜RC=${r18.rc}｜G 在场=${/断言 G：/.test(r18.out)}｜I 在场=${/断言 I：/.test(r18.out)}`,
+);
+// I18b：同一份双变异喂"还没有 flush 那一行的那版"（按内容从文件历史认，**不按 HEAD** —— 同 I11 的教训）
+// ⚠️ 判据串要选**唯一的**形状：第一版用 `for (const f of failures) console.error(`，
+//    而文件末尾那段本来就有这一句 ⇒ 历史里每一版都"含 flush"，臂直接被自己的 needle 打死。
+const FLUSH = '✗ 选中态门禁（先前收集的红）';
+let histOld = '';
+let histOldSha = '';
+for (const sha of histRevs) {
+  const src = execFileSync('git', ['-C', ROOT, 'show', `${sha}:${GATE}`], { encoding: 'utf8' });
+  if (!src.includes(FLUSH)) {
+    histOld = src;
+    histOldSha = sha;
+    break;
+  }
+}
+if (!histOld) throw new Error('找不到"还没有 flush 那一行"的那版门禁 —— 窗口要放宽，但绝不许拿当前版冒充旧版');
+const b2 = both(histOld);
+const r18b = run(b2.src);
+check(
+  'I18b 同一份双变异喂"还没有 flush 的那版"→ 只打 I、G 那条被吞 ⇒ I18 那句"两条都在"是有牙读数，不是默认成立',
+  b2.gApplied && b2.iApplied && r18b.rc === 1 && /断言 I：/.test(r18b.out) && !/断言 G：/.test(r18b.out),
+  `旧版 ${histOldSha.slice(0, 8)}｜两处变异都生效=${b2.gApplied && b2.iApplied}｜RC=${r18b.rc}｜G 在场=${/断言 G：/.test(r18b.out)}｜I 在场=${/断言 I：/.test(r18b.out)}`,
 );
 
 // ---- 收尾：复原 + 复跑回绿 + 哈希对账 ------------------------------------

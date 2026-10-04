@@ -117,6 +117,7 @@
  * | E 删掉 web 四象限那两行 `onOpenTask={…}` / `activeTaskId={…}`（**现场那次事故**） | 红：断言 E（一段里点名两行）+ 四象限真 DOM 判据 2 条 |
  * | E2 同上但**只删** `activeTaskId` 那一行 | 红：断言 E 一行（逐 prop 判，不是"整文件没用才算"） |
  * | E3 把 `WIRE_DIRS` 清空（扫描层没了） | 红：断言 E 的**分母自检** —— "没有断线"与"没在线可断"是两件事 |
+ * | **I18** 同一趟里让 G 类红与 I 类红同时成立（摘一行 `ROW_ID_EXEMPT` + 名册少登记一格） | **两条都要打印**。🔴 曾经只打 I：断言 I 用 `fail()` 早退，把前面累积在 `failures` 里的红**整批吞掉**（合流产物上实测：G 那两行 trash `busyId` 一行都没打，于是 §8.47 第 4 步的执行器读不到自己的前提）。I18b 拿"还没有 flush 那一行的那版"（按内容从文件历史认，不按 HEAD）复现这个吞红 ⇒ 这条臂不是白给的 |
  * | **I1** 摘掉 `tasks` 那一格登记 | 红：断言 I，点名缺的是哪一面 |
  * | **I1b** 同一份变异喂"分母改成名册自己"的脱牙版 | 不红（证明 I1 的牙挂在"分母来自真身"那一腿） |
  * | **I2–I8** 词表外立场／类别不在选中词表／needle 过期／登记与代码相反 等 | 各自红在指定那一腿 |
@@ -156,8 +157,15 @@ import process from 'node:process';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
-/** 响亮失败：锚点没了就红，不许静默跳过（跳过 = 这道门禁从此只是装饰）。 */
+/** 收集式断言（A–H 与 I 的内容级红）的红都累积在这里，最后一起报。 */
+const failures = [];
+
+/** 响亮失败：锚点没了就红，不许静默跳过（跳过 = 这道门禁从此只是装饰）。
+ * 🔴 退出前**先把已累积的红打出来**：早退吞掉别人的红，症状是"红得比实际少"，
+ *    而下一个人只会看到这一条 —— 合流那一步的前提就这样变成"读不出来"（工单 §8.104）。 */
 function fail(message) {
+  for (const f of failures) console.error(`✗ 选中态门禁（先前收集的红）：${f}\n`);
+  failures.length = 0;
   console.error(`✗ 选中态门禁：${message}`);
   process.exit(1);
 }
@@ -376,8 +384,6 @@ for (const dir of WIRE_DIRS) {
     }
   }
 }
-
-const failures = [];
 
 /**
  * 🔴 **号不占 F**：F 这个号 §8.24 已经预留给"每张有选中态的面必须把选中说出来"的常驻判据
@@ -1001,33 +1007,40 @@ function readViewKeys() {
 
 const viewKeys = readViewKeys();
 const viewLoci = new Map();
+
+// 🔴 这一块的红一律 `failures.push`（收集后一起报），不 fail() 早退：A–H 的红累积在前面，
+//    一 exit 就把它们吞掉。合流产物上实测过 —— I 报 countdown 时 G 那两行 trash `busyId`
+//    一行都没打，把 I 变绿后立刻出现（工单 §8.104）。只有"分母/扫描层读不到"那一类才 fail()。
 for (const e of VIEW_STANCES) {
   if (viewLoci.has(e.view)) {
-    fail(`断言 I：视图「${e.view}」被登记了两次（${viewLoci.get(e.view)} 与 ${e.stance}）—— 两个立场等于没有立场`);
+    failures.push(`断言 I：视图「${e.view}」被登记了两次（${viewLoci.get(e.view)} 与 ${e.stance}）—— 两个立场等于没有立场`);
   }
   viewLoci.set(e.view, e.stance);
   if (!STANCE_VOCAB.includes(e.stance)) {
-    fail(`断言 I：视图「${e.view}」的立场「${e.stance}」不在封闭词表 ${STANCE_VOCAB.join('/')} 里`);
+    failures.push(`断言 I：视图「${e.view}」的立场「${e.stance}」不在封闭词表 ${STANCE_VOCAB.join('/')} 里`);
   }
   if (e.stance === 'selects') {
-    if (!Array.isArray(e.kinds) || e.kinds.length === 0) fail(`断言 I：「${e.view}」登记为 selects 却没报是哪几类`);
-    for (const k of e.kinds) {
-      if (!vocab.includes(k)) fail(`断言 I：「${e.view}」登记的类别「${k}」不在选中词表 ${vocab.join('/')} 里`);
+    if (!Array.isArray(e.kinds) || e.kinds.length === 0) {
+      failures.push(`断言 I：「${e.view}」登记为 selects 却没报是哪几类`);
+    } else {
+      for (const k of e.kinds) {
+        if (!vocab.includes(k)) failures.push(`断言 I：「${e.view}」登记的类别「${k}」不在选中词表 ${vocab.join('/')} 里`);
+      }
     }
   } else if (e.stance === 'pending-decision' && !/C1 #\d+/.test(e.because || '')) {
-    fail(`断言 I：「${e.view}」用 pending-decision 绕过这条，却没写明等哪一格拍板（要写 C1 #N）`);
+    failures.push(`断言 I：「${e.view}」用 pending-decision 绕过这条，却没写明等哪一格拍板（要写 C1 #N）`);
   }
 }
 const unknownViews = [...viewLoci.keys()].filter((v) => !viewKeys.includes(v) && !v.startsWith('rail:'));
 if (unknownViews.length > 0) {
-  fail(
+  failures.push(
     `断言 I：名册里有 ${unknownViews.length} 个键既不是 ViewKey、也没有 rail: 前缀：${unknownViews.join(', ')} —— ` +
       `写错名字的登记不会被任何视图读到，它只会让那条视图看起来"有人交代过了"。`,
   );
 }
 const missingViews = viewKeys.filter((v) => !viewLoci.has(v));
 if (missingViews.length > 0) {
-  fail(
+  failures.push(
     `断言 I：视图全集有 ${viewKeys.length} 个 ViewKey，其中 ${missingViews.length} 个没对"选中"交代过立场：${missingViews.join(', ')}。\n` +
       '  新增一路由时必须写明它属于哪一档（selects / filters / row-actions-only / no-rows / not-a-route / pending-decision），\n' +
       '  并挂一条指向那一行真代码的证据 —— 这一条要挡的不是"接错了"，是"新视图没人想过这件事"。',
@@ -1041,32 +1054,34 @@ for (const e of VIEW_STANCES) {
   try {
     src = stripComments(readFileSync(abs, 'utf8'));
   } catch {
-    fail(`断言 I：「${e.view}」的证据文件 ${e.locus} 不在了 —— 判红而不是跳过（静默跳过等于这条只描述空气）`);
+    // 文件不在 ⇒ 这一条后面没法再读它（读 `undefined` 会变成 TypeError 崩栈，那是"红得不响亮"）。
+    failures.push(`断言 I：「${e.view}」的证据文件 ${e.locus} 不在了 —— 判红而不是跳过（静默跳过等于这条只描述空气）`);
+    continue;
   }
   if (!src.includes(e.needle)) {
-    fail(
+    failures.push(
       `断言 I：「${e.view}」（立场 ${e.stance}）的证据 needle 在 ${e.locus} 里找不到了：\n  ${e.needle}\n` +
         '  名册的牙就长在这上面：登记还在、事实已经没了，就是过期登记。',
     );
   }
   anchorHits += 1;
   if (e.stance === 'selects') {
-    for (const k of e.kinds) {
+    for (const k of e.kinds ?? []) {
       const cap = k[0].toUpperCase() + k.slice(1);
       const re = new RegExp(`useSelected\\(['"]${k}['"]\\)|selection\\.select\\(['"]${k}['"]|active${cap}Id=`);
       if (!re.test(src)) {
-        fail(`断言 I：「${e.view}」登记为选中 ${k}，但 ${e.locus} 里没有该类的消费形状（useSelected / selection.select / active${cap}Id=）`);
+        failures.push(`断言 I：「${e.view}」登记为选中 ${k}，但 ${e.locus} 里没有该类的消费形状（useSelected / selection.select / active${cap}Id=）`);
       }
     }
   } else {
     if (e.entity && vocab.includes(e.entity)) {
-      fail(`断言 I：「${e.view}」把「${e.entity}」登记成非选中立场，而它已经在词表 ${vocab.join('/')} 里了 —— 两边必须挑一边`);
+      failures.push(`断言 I：「${e.view}」把「${e.entity}」登记成非选中立场，而它已经在词表 ${vocab.join('/')} 里了 —— 两边必须挑一边`);
     }
     const ownFile = !e.locus.endsWith('App.tsx');
     if (ownFile) {
       const live = vocab.filter((k) => new RegExp(`useSelected\\(['"]${k}['"]\\)|selection\\.select\\(['"]${k}['"]`).test(src));
       if (live.length > 0) {
-        fail(
+        failures.push(
           `断言 I：「${e.view}」登记的立场是 ${e.stance}，但 ${e.locus} 现在读/写 ${live.join('/')} 的选中 —— 这条登记过期了。\n` +
             '  要么它已经进了选中机制（改成 selects 并报类别），要么那段接线不该在这里。',
         );
