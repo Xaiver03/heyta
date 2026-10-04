@@ -567,11 +567,43 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
 **从不制造愧疚**。关键裁决见下面 ADR-0022 与
 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
 
-### 2026-10-03：倒数纪念日 批次二（🔄 **进行中，全在本地分支，未 push 未 merge**）
+### 2026-10-03：倒数纪念日 批次二（✅ **已完成质量审计与合并**；🔴 `main` 这个 ref 还没指过来）
 
 > 逐项状态与全部读数：[`docs/plans/countdown-anniversary.md`](docs/plans/countdown-anniversary.md) §8.2 / §8.4。
+> **本轮质量审计 + 分组提交 + 合并的逐条裁决与合并态读数：同文 §8.5**（2026-10-04）。
 > 分支：`feat/countdown-batch2`（W0/W0b/W2/W5/W10）、`feat/countdown-w9`、
 > `feat/countdown-w4b`、`feat/countdown-w7`、`feat/countdown-w8`（后三条由并行子 Agent 在独立 worktree 里跑）。
+
+🔴 ~~全在本地分支，**未 push、未 merge 进 main**~~ —— ✅ **04 21:3x 现量更正**：
+`feat/countdown-batch2` **已 push 到 origin**（同名远端分支），main **已三次并入本分支**
+（`75114cd3` / `f92491ac` / `5358edf7`；13 处冲突逐处裁决，裁决理由写在 `git show 75114cd3` 的提交信息里，
+后两次都是并行会话在上一笔合并之后又落的文档笔、`git merge-tree` 预检冲突 0 处）。
+**只剩**"把 `main` 这个 ref 指过来"那一格：合并要改写主检出的工作树，而那里 04 21:3x 现量仍有
+**16 枚**未提交路径（含 `AGENTS.md`、`docs/reference/environment-traps.md`、`package.json`）正被并行会话持有
+⇒ 等他们提交之后落地。**落地形态取决于他们提交后 main 是否已推进过本分支的合并基**：
+先现量 `git rev-list --count HEAD..main`（在 batch2 里跑）—— 为 **0** 才是一次快进
+`cd heyta && git merge --ff-only feat/countdown-batch2`；非 **0** 就**先在 batch2 侧 `git merge main`
+再落地**，不要到 main 侧现解冲突。⚠️ 本批改了 `AGENTS.md` §9 与两份计划文档，
+而主检出的 `AGENTS.md`/`environment-traps.md` 正被别人写 ⇒ **下一次并存的这两份大概率冲突**，
+届时照 §8.5 第 4 条的做法：**台账类按行并列取并集，不改写别人的编号与措辞**（不 force、不重写历史）。
+⚠️ **"仍可快进"是瞬时属性**，每次落地前都要现量一次，别按上一轮的读数行动。
+🔴 **本批不代并行会话推他们那 3 笔未推的 main 提交**（`a244d24b`、`894adfac`、`74b3b566`，全是他们自己的
+交接文档笔）：把别人**尚未公开**的提交推上共享 `main`，会让他们的任何一次
+`commit --amend` / rebase 都变成 **force push 才能推**——而"不改写已公开历史"是硬边界。
+现量：`git log --oneline origin/main..main`（在主检出）。
+
+**这一批收拢了并行会话的改动**：主检出上 158/167 个未提交路径按逻辑分组成 **13 笔提交**
+（设备撤销共享层 / mobile / web / node-host+op-log / vault e2e / 抹除设备脚本+门禁 / iOS 提醒投递 /
+门禁装置 / 法务六份+中英词条 / 回收站锚点 / 帮助中心+ADR / 33 张证据图 / 卡片导出桥）。
+每笔提交信息里写明"这条线的工作由并行会话产生，我按用户指令代为收拢"，**归属没有改写**；
+7 枚当时仍在被写的 live 文件**没有代提交**，逐枚登记在 §8.5 第 1 条。
+
+**审计当场修完的 7 条**（每条都做了变异验证，明细在 §8.5 第 2 条）：public-facts 的整批替换语义、
+后台 `papers` 链接的非 http 兜底、服务端匿名读面**新增 7 条判据**（`server/tests/holiday-public-route.spec.ts`）、
+card-export 的失败文案不再把内部 `detail` 拼进界面、让帧判据加了**自己的预算**与作废必 resolve、
+iOS 三座桥的 `RCT_EXTERN_REMAP_MODULE` 名字错位、以及 `sync-client` 那句**没有代码兑现的谎话**
+（"升级服务端之后再同步一次"）连同钉在谎话上的判据。
+🔴 另有 **7 条改不动的登记成 `G-AUDIT-1..7`**（§8.5 第 3 条），逐条写明归属与修法，**没有硬压**。
 
 | 单 | 落到哪一步 | 一条读数 |
 |---|---|---|

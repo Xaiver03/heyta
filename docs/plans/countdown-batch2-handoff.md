@@ -46,7 +46,17 @@
 > ④四端装上当前产物 —— **android 13:20 ✅ / windows 10:39 ✅（13:20 复核 sha 仍逐字相同）/ ios 等链 X / mac 受阻**。
 > 复现命令：`git rev-parse --short HEAD`、`grep -aE 'RC_ANDROID=|RC_REINSTALL_ANDROID=|RC_WINDOWS_LEG=' /tmp/device-closeout-U.log`、
 > `grep -aE 'RC_REINSTALL_IOS=|RC_IOS_PROBE=' /tmp/device-closeout-X.log`、`grep -a 'RC_CHECK=' /tmp/device-closeout-Y.log`。
-> 🔴 **所有成果都在本地分支，没有 push、没有 merge 进 `main`**。
+> 🔴 ~~**所有成果都在本地分支，没有 push、没有 merge 进 `main`**。~~
+> ✅ **04 21:2x 现量更正**：这条已经不成立。`feat/countdown-batch2` 已 push 到 origin
+> （`c36b1d89 → c9f4e2aa → cfdac113 → f92491ac`），`main` 也已 push（`9070e18d → c343b923`，
+> 那 13 笔是把并行会话留在主检出的稳定改动按逻辑簇收拢的），
+> 而 **main 已经整条并进 batch2**（`75114cd3`，13 处冲突逐处裁决，理由在提交信息里）。
+> 还没走完的只剩最后那一格：**main 这个 ref 还没指过来** ——
+> 主检出此刻仍有别人在写的 `AGENTS.md` / `environment-traps.md` / `package.json`，
+> 快进会把它们的工作树改掉，所以按"共享资源先定所有者"等他们提交之后：
+> `cd heyta && git merge --ff-only feat/countdown-batch2`。
+> ⚠️ 这条更正本身就是 §7 里那句"**我没 push"≠"分支不在远端"** 的第二次命中：
+> 原句写的时候是真的，它的保质期取决于别人什么时候动同一件事，所以它旁边必须写核对日期。
 > 交接日期：**2026-10-03**（CST）
 > 给**全新会话**用：不从聊天记录继承任何前提。每条断言都带可复现命令或实测读数。
 >

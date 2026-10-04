@@ -3973,3 +3973,239 @@ W0b ─> 随时可做（台账那半要等文件干净）
 
 
 
+
+---
+
+### 8.5 收口：代码质量审计 + 大规模合并（2026-10-04 20:4x – 21:1x，载体 `feat/countdown-batch2`）
+
+产品负责人本轮指令：审计自己的代码 → 所有更改（含并行会话的）按逻辑分组提交并 push →
+做一次大规模合并，冲突按**产品经理视角**裁决。圈号在这一节**用完了一次**：
+`㊀…㊿` 这一段（含并行那条线用掉的 `㊾ ㊿`）到 `㊿`(U+32BF) 就是码位尽头，
+所以本节改用小节号 + 阿拉伯数字，不再自造字形 —— 自造会造出"看得到但没人能复述"的编号。
+
+1. **主检出那 166 枚未提交改动的归属与分组**（并行会话留下的，全部是稳定态才收）。
+   现场：porcelain 167 行 = 27 枚未跟踪 + 140 枚已跟踪修改；
+   其中 **7 枚 mtime 落在 12 分钟以内**（`AGENTS.md`、`docs/adr/0051`、
+   `docs/plans/trash-and-archive.md`、`docs/reference/environment-traps.md`、
+   `scripts/verify-mobile-ios-reminder.sh` + 两张 `ios-reminder-restart-recovery-*.png`）
+   ⇒ 正被另一条会话写，**不代提交**（AGENTS §8 第 9 条：共享资源先定所有者与运行窗口）；
+   另有 2 枚（`research/tools/r14c-channel-arms.sh`、`scripts/verify-mobile-due-time.sh`）
+   `git diff --quiet` 判为**内容逐字相同的 stat-only 脏**（脚本自快照机制碰了 mtime），也不算改动。
+   剩下 **158 枚**按逻辑簇分成 13 笔（点名路径 + `git commit --only`）：
+   设备撤销共享层 / 手机侧 / web 侧 / node-host + op-log 引擎边界 / vault 旅程与证据图 /
+   抹除设备脚本与三处新门禁 / iOS 提醒投递 / 门禁装置 + `package.json` 接线 /
+   法务六份 + 中英词条 + 服务端生成物 / 回收站锚点 / 帮助中心与研究文档 / 一批 web 证据图 /
+   卡片导出桥补 `import React` + iOS 验收的 TCP companion。
+   `package.json` 是共享文件，只由"门禁接线"那一笔带走一次，提交信息里写明了它同时挂上
+   了别的簇的新入口 —— 免得下一个人以为那些入口是接线那笔自己加的。
+   push：`origin/main` `9070e18d → c343b923`（快进，领先 80 / 落后 0），
+   `origin/feat/countdown-batch2` `c36b1d89 → c9f4e2aa`。**没有 force、没有删分支、没有改写已公开历史。**
+   提交前对 102 枚非图片文件做了凭据扫描（JWT / PEM / 身份证 / 赋值形状），
+   138 次命中**逐行看过真值形态**后全部判为合成夹具：
+   `TOKEN="eyJ….000…0.sub-not-real"`、`PASSWORD="ErasePass123"` 配 `@test.local` 的一次性账号、
+   `'Auth-test-only-928!'`、集成测试自带的 `reminder-http-isolated-integration-secret-32…`；
+   `.env` 那几处全是**路径引用**而不是内容。**命中数不是违规，逐行看才是。**
+
+2. **代码质量审计（三路只读 agent 并回，共 7 条 🔴）**：修法都按产品不变量，没有一条是靠放宽判据变绿的。
+   - **W4b ①**「撤回不落地」（`packages/app-host/src/public-facts.ts:234` 一族）：覆盖表原来只 `set`，
+     运营 DELETE 掉某一年之后那一年永远留在覆盖里，`adjustmentOn()` 继续替部署方说已被收回的话
+     —— 而 ADR-0052 §2.2 承诺的正是"下一次拉取退回随包表"，这条承诺当时**没有任何一层在守**。
+     改成整批替换（三处调用点：启动装缓存 / 304 / 200 应用），
+     新用例「批次少一年 ⇒ 那一年退回随包表，而批次里剩下的那一年不许被牵连」断的是**相对量**
+     （与装覆盖之前现读的那一次随包答案对账），不写死某天是休是班。
+     变异验证：注释掉"先清"那一行 ⇒ `vitest run tests/public-facts.spec.ts` **RC_MUT=1**（命中数先断言 =1 再改），
+     复原后 `git diff --stat` 只剩本意的 +23/−3。
+   - **W4b ②**「匿名读面零测试，而且两处文档指向**不存在**的测试文件」：
+     `packages/shared-schema/src/holiday-adjustment-contract.ts:249` 指 `holiday-public-route.spec.ts`、
+     `server/src/holidays/holiday-adjustment.routes.ts:66` 指 `holiday-anonymous-gate.spec.ts`，
+     `find` 现量两个都不在 ⇒ 那条通道从没打过真服务端（客户端喂桩 fetch、e2e 用 `page.route` 截胡）。
+     补了 `server/tests/holiday-public-route.spec.ts` 七条：匿名可达、`note`/`updatedBy` 不下发而 `papers` 必须下发、
+     `If-None-Match` 四种写法都命中 304 且空 body、不匹配仍 200、
+     两支 500 **不许退化成"空的一份"**（空的一份在客户端表现为"退回随包表"，那是最坏的假绿）、
+     per-route 速率自己注册插件后打满 61 次必须出现 429（去掉 `register` 立刻转红）。
+     第一次跑就撞上契约的 `daysBelongToYear` —— **是判据在起作用**，改的是我的夹具不是判据。
+   - **W4b ③**「渲染层那道防线并不存在」：`apps/web/src/features/admin/AdminPanel.tsx:717` 的 `href={paper}`
+     没有协议过滤，而迁移 SQL 的「手工补充 2/3」写的是"http/https 由契约层 + 渲染层两处钉"。
+     绕过 PUT 入库的行（运维 SQL、将来的导入通道）会让 `javascript:` 直接进 href。
+     现在按**取到值的样子**判（`isHttpPaperUrl`），不过滤的那一份渲染成纯文本 + `data-testid=admin-holiday-paper-rejected`。
+   - **W7 ①**「原生 `detail` 上屏」：`apps/mobile/src/lib/countdown-display.ts:145` 把 detail 拼进界面文案，
+     而它的来源全是非 i18n 串 —— Android 的 `MKDIR_FAILED` 带**沙盒绝对路径**、Java `e.message`、
+     iOS 的 `localizedDescription`（跟系统语言走）、RN `Share` 的平台英文串。
+     违反 §5「界面里不许出现硬编码文案」，也与 09-30 在服务端修掉的"回显内部错误"同一族。
+     改成只走 `console.warn`（失败也不许静默吞掉，但那是日志面的事）。
+   - **W7 ②③**「让帧没有预算」+「没有在途保护」：`requestAnimationFrame` 后台不触发，
+     那段等待落在 `RASTERIZE_SETTLE_MS` 的 15 s **管不到**的地方 ⇒ 挂死 + 回前台突然弹面板；
+     而第二次点击顶掉 `pending` 后第一次的 `complete()` 照样跑完 ⇒ 图是卡 #2 的版面、
+     文件名是卡 #1 的标题、还排两个分享面板。
+     新增 `afterNextFrameWithin`（挂在 `afterNextFrame` 之上而不是另写一个，
+     是为了让 §6.4 那三臂判据量的仍然是产品真正走的那条路）+ effect cleanup 把作废那次结算成 `cancelled`。
+     `apps/mobile/tests/card-export.spec.ts` 里那条"toDataURL 在让帧之后"跟着换成新名字，
+     并**新增**两条断言（`frame-timeout` 必须有结论点、作废必须 resolve 成 `cancelled`）——
+     判据跟着真实形状走，不是为了让它变绿。
+   - **W7 ④（桥）** `HeytaWidgetModuleBridge.m` 改成 `RCT_EXTERN_REMAP_MODULE(HeytaWidget, …)`：
+     `RCT_EXTERN_MODULE` 把 JS 侧名字也定成 `HeytaWidgetModule`，而 `widget-bridge.ts:33` 取的是
+     `NativeModules.HeytaWidget` ⇒ 恒 `undefined`，而 JS 把"模块不存在"降级成"这台设备没有小组件支持"
+     ⇒ 静默失效。改完 `pnpm check:ios-native-bridges` rc=0。
+   - **同步侧那句假承诺**：`packages/sync-client/src/client.ts:820` 的"请先升级服务端，然后再同步一次"
+     没有任何代码兑现（`markRejected` 落 `uploadStatus:'rejected'`，
+     队列只读 `'pending'`（`packages/storage/src/db-op-log-store.ts:409-414`），全仓没有再入队路径）。
+     改成原话："已被移出待上传队列，升级服务端之后也不会自动补传"。
+   - 三笔提交：`62011e20`（W4b 三条）/ `ebb6453d`（W7 三条 + 桥）/ `c9f4e2aa`（sync-client）。
+
+3. **审计查出但**没在本轮修**的，按"改不动的登记编号不硬压"处理**（逐条给归属，不打包成别人的待办）：
+   - `G-AUDIT-1` **rejected op 的再入队路径**：本轮只把界面那句谎改成真话。要么补
+     `rejected→pending` 的显式再入队（要同时守住 §3.4"被回放的 op 不得再触发副作用"），
+     要么给"服务端版本变了就重放一次"的判据。这是热路径，需要单独一趟带变形的落地。
+   - `G-AUDIT-2` **`SyncBar` 对已知 reason 丢弃 message**（`apps/web/src/features/sync/SyncBar.tsx:107`）
+     ⇒ 第 2 条那句诚实的诊断在 web 上仍然看不见；且 `check:ui-language` 的扫描根不含
+     `packages/sync-client`，那段中文没有门禁拦。要修得先把词表与门禁范围一起定。
+   - `G-AUDIT-3` **`check-shell-surfaces` 的严格开关没有自动消费者**：
+     `HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 在 `skipped()` 那一条路是有牙的（`:424` 折成红），
+     所以 `:1089` 那句"有 N 栏没跑"仍然 rc=0 **只在没开开关时成立** —— 真正缺的是
+     **没有任何自动入口开它**（`ci.yml` 跑裸 `pnpm check`、`reinstall-all.sh` 不带）。
+     ⚠️ 这里更正审计原话的一处过头：它说"未取证>0 仍 exit 0"是判据无牙，实际是
+     "开关没人按"。**两件事的修法不同**，按原话去改 `:1089` 会改错地方。
+   - `G-AUDIT-4` **W7 设备腿的内容判据弱于 web 腿**：`verify-mobile-card-export{,-ios}.sh`
+     只判 IHDR/BLANK/TRANSPARENT，读数器算得出的 `SMEARED` **只打印不断言** ⇒
+     文字层整体不画（fill 为 undefined、`fontSize ?? 0`）仍然全绿。
+     web 腿有存在性判据，但按 §8 第 7 条，web 的绿不替设备作证。
+   - `G-AUDIT-5` `CalendarBoard.tsx:420` 的事件投影裁到可见区间、任务源 `:400` 是全量，
+     两端各自夹住而共享层没有类型/断言强制 ⇒ 第三个宿主漏夹不会有东西变红。
+   - `G-AUDIT-6` 导出按钮在途不置灰（`packages/ui/src/countdown/EventBoard.tsx:757` 那一格没配 `disabled`）。
+     **正确性已被第 2 条的 cleanup 修掉**，剩下的只是 UX；刻意**没有**为此给共享组件加
+     "默认值等于原值的可选 prop" —— traps #195 那个形状会把"宿主没接"伪装成"做完了"，
+     而这条要真有牙得连宿主接线与判据一起上，不属于本轮。
+   - `G-AUDIT-7` 审计列的"变异装置只在 `/tmp`/未入库"清单（`check-md-table-rows` 四型反证、
+     `check-shell-unicode-vars`、`check:legal-tools` 的四臂、`research/tools/mutation-rigs/` 在本检出为空）。
+     这批是**判据的可复跑性**问题，不是判据本身错。
+
+4. **大规模合并（`75114cd3`，第一父 = 批次二、第二父 = main）**：13 处冲突逐处写裁决，
+   全部落在 `git show 75114cd3` 的提交信息里（那才是归属处，本节只记形状）。要点三条：
+   - **并集不是万能解法**：`packages/ui/src/index.ts` 按并集解之后 **构建是红的**
+     （esbuild `Multiple exports with the same name "liveTaskCountsByTag"`、tsc TS2300 两处）。
+     成因是冲突 hunk 的 HEAD 侧**从那一行起头**（批次二把 W6 块追加在文件末尾），
+     于是"取并集"留下一枚重复出口、还把注销块的 doc 与它的 export 拆开了。
+     ⇒ 由 `cfdac113` 修掉，判据是 `pnpm --filter @heyta/ui build` rc=0。
+     **一般规律：合并的自检必须是构建，不是"冲突标记没了"。**
+   - **一处事实冲突**（`docs/runbooks/multi-platform-build.md`）：我方写"公证是唯一没有上界的一步"，
+     而 main 那条线把 `HEYTA_NOTARY_TIMEOUT`（默认 900）落进了 `package-app.sh:293`。
+     按产品语义 main 赢 —— 代码里有的东西文档不许说没有；被推翻的原句留在文档里并标了裁决日期。
+   - **同一枚缺陷被两条线各修一次**（`scripts/check-ui-provider.mjs` 的 tokenizer）：
+     取**窄的那一版**（保留泛型守卫、只对 `return|yield` 开口），因为我方那版"只看紧邻字符"
+     会把 `a < b` 这类带空格比较当成标签开始 —— 在挡一个假阴性的同时新增一类假阳性。
+     事故记录留进注释，并写明这次是按"哪一版不新增误认面"拍的，不是按"哪一版是本地写的"拍的。
+   - **顺带关闭任务 #18**：`stubPublicFacts` 与 `stubEmptyHolidayAdjustments` 的 route glob、
+     method 守卫、响应体**逐字节相同**，而自动合并的结果是同一个测试里注册两次同一条 route。
+     收敛成一份（`a5488117`）：判据 = 全仓 grep 旧名 0 命中、`stubPublicFacts` 的定义与调用都还在。
+   - `package.json` 的 `check` 串自动合并成了两边的**并集**（79 条 `check:*` 全在，
+     批次二的 `public-facts`/`card-export`/`ios-native-bridges` 与并行线的
+     `legal-closure-truth`/`legal-gdpr`/`vault-diagnostics`/`verify-script-copy`/`apk-freshness`/
+     `shell-erasure-parity` 同时在场），所以这一处不需要人工接线。
+   - `server/src/legal.generated.ts` 是生成物**不许手工合**：先取一份再按真源重生成。
+     ⚠️ 第一次重生成打印的是**低版本指纹** —— 生成器读的是 `packages/legal/dist`，
+     而我刚合并完 sources 还没重编 ⇒ "改了词条必须重跑生成"这条纪律的前提是**先重编依赖包**，
+     否则生成器会把旧产物当真源写回去、而门禁还报绿。
+
+5. **合并态读数**（载体 = `cfdac113` 之后的 batch2 工作树）：
+   `pnpm -r build` **RC_BUILD=0**（19 个包 Done）、`pnpm -r typecheck` **RC_TYPE=0**、
+   65 段门禁里 **63 段 rc=0**、`pnpm check:server-env` 与 `pnpm check:ios-native-bridges` 各 rc=0（补跑）。
+   🔴 这一趟链子有**两处我自己的探针缺陷**，读数必须带着它们读：
+   - 段清单文件末尾**少一个换行**，`check:server-env` 与 `check:ios-native-bridges` 被粘成
+     一行 ⇒ 那一段既没跑前者也没跑后者，输出的 `RC[check:server-envcheck:ios-native-bridges]=1`
+     是"命令名不存在"，不是产品红。（补跑见上。）
+   - `pnpm -r --filter '!@heyta/sync-server' test` 打印
+     **"No projects matched the filters"** 而退出 0 ⇒ 那条 `RC_RTEST=0` 是**空读数当通过**，
+     与 §7 元规则 2"一条永远通过的判据比没有判据更糟"同族。全量单元测试改用不带过滤的
+     `pnpm -r test` 另起一趟，读数单列在本节第 7 条。
+   - 另外 `check:web-artifact:app`（`--mount /app/`）rc=1 **不是缺陷**：它不在 `check` 串里，
+     判的是"发出去的字节是不是 /app/ 载体的字节"，而 `pnpm -r build` 刚用默认载体把
+     `apps/web/dist` 原地覆盖成根路径那份 —— 这条正是它自己文件里写的第三种成因。
+     ⇒ 我把发布态专项检查当成常规段跑了一次，属**测量配置没对齐**（§7 里"档位名→尺寸"那一族）。
+
+6. **落地 main 的那一步没有完成，且原因不是技术问题**：合并结果在 `feat/countdown-batch2` 上，
+   main 侧要收进来必须**改写主检出的工作树**，而主检出此刻仍有并行会话在写的
+   `AGENTS.md` 与 `docs/reference/environment-traps.md`（两份都是合并要更新的文件）。
+   在这台共享工作机上，为了一条**已经在远端同名分支上的合并**去覆盖别人正在写的台账，
+   代价是他们的验收窗口作废 —— 按 §8 第 9 条，这一步等他们的台账提交之后做一次快进：
+   `cd heyta && git merge --ff-only feat/countdown-batch2`
+   （~~批次二对 main 是快进，不需要再解一次冲突~~
+   —— ⚠️ 这句**随后就被并行会话否证了**：他们又落了 2 笔（`894adfac`、`74b3b566`），
+   `git rev-list --count HEAD..main` 从 0 变成 2 ⇒ 快进属性**不是**一次性结论，是瞬时读数。
+   04 21:3x 已在 batch2 侧第三次并入 main（`5358edf7`，`git merge-tree` 预检冲突 0 处，
+   那 2 笔只动 `docs/plans/multi-end-coverage-handoff.md` 一个文件、批次二没碰过这条线 ⇒
+   **本笔不需要新的产品裁决**）并把这条纪律写进 AGENTS §9：**main 再推进时，修法是在 batch2 侧重做
+   "并入 main"，不是到 main 侧现解冲突** —— 后者会把已经验过的合并态换成没验过的合并态。
+   04 21:3x 现量：主检出未提交 **16** 枚（含 `AGENTS.md`、`docs/reference/environment-traps.md`、
+   `package.json`、`scripts/check-*.mjs` 3 份、`verify-mobile-*` 3 份 + 1 张未跟踪证据图 + 1 份未跟踪脚本），
+   落地通道仍未开。）
+
+7. **合并态的全量单元测试读数**（载体 = batch2 工作树 `f92491ac`，命令 = 不带过滤的 `pnpm -r test`，日志 `/tmp/m4-test.log`）：
+   **`RC_RTEST4=0`**，`Scope: 20 of 21 workspace projects`，20 个包全部 `test: Done`、
+   `grep -E "Test Files" | grep -c failed` = **0**。逐包 `Test Files`：
+   `apps/web 133 passed | 2 skipped (135)`、`server 124`、`packages/app-host 68`、`apps/mobile 52`、
+   `packages/ui 32`、`apps/landing 23`、`packages/domain 37`、`packages/sync-core 19`、
+   `packages/sync-client 9`、`packages/op-log 9`、`packages/local-api 8`、`packages/shared-schema 8`、
+   `packages/storage 8`、`packages/ai 9`、`packages/design-system 6`、`packages/widget-core 6`、
+   `packages/i18n 3`、`packages/legal 2`、`apps/node-host 11`、`apps/desktop 2`。
+   ⚠️ 这份读数是**第三趟**才拿到干净形的：前两趟的形态各不相同，必须写清是哪一条挡住了 ——
+   - 第二趟 `RC_RTEST3=1`，红在 `packages/sync-client/tests/sync.spec.ts:1579`。
+     根因**不是产品坏了**：那条判据写的是 `expect(status.message).toContain('请先升级服务端')`，
+     也就是**判据钉在我这一批改掉的那句谎话上**（§8.5 第 2 条：服务端版本落后时界面承诺"升级后再同步一次"，
+     而全仓库没有 rejected→待上传 的再入队路径，这句话没有任何代码兑现）。
+     修法按产品不变量走：**改文案成真话 + 同时把判据改成真值断言**，三条 `toContain`
+     （'这台服务器的版本落后于客户端' / '这些数据仍完整保存在本机' / '不会自动补传'）
+     加一条反向腿 `not.toMatch(/然后再同步一次|升级服务端（自托管部署尤其注意这一点），然后/)`。
+     🔴 **判据有牙已变异验证**：把 `packages/sync-client/src/client.ts` 的措辞改回旧谎话 ⇒
+     `Test Files 1 failed (1)`、`Tests 1 failed | 57 passed (58)`、命令退出 1（`/tmp/m-sc-mut.log:93-100`），
+     报错原文正是 `expected '…不会重传…' to contain '不会自动补传'`；随后原地复原，
+     `grep -c "不会自动补传" packages/sync-client/src/client.ts` = 1。
+   - 第一趟 `RC_RTEST=0` 是**空读数**（`--filter '!@heyta/sync-server'` 匹配为 0 个项目却退 0），
+     已在第 5 条登记，不计入这里的通过。
+   - `sync-core` 这一趟能进Scope（19 passed）是因为跑的时候 tfa 内存闸没有被别人持有；
+     此前它被拒时按**环境无效**记账，不记产品失败。
+   🔴 **这条读数要带一个限界读**：跑它的时候 `packages/sync-client/tests/sync.spec.ts` 的修正
+   **还没提交** ⇒ "合并态全量绿"量的是 `f92491ac` + 一枚未提交测试文件，不是 `f92491ac` 这个 ref。
+   核对方法（自己复现）：`git show f92491ac:packages/sync-client/tests/sync.spec.ts | grep -c '请先升级服务端'`
+   = **1**，而 `git show f92491ac:packages/sync-client/src/client.ts | grep -c '不会自动补传'` = **1**
+   ⇒ **`f92491ac` 这个 ref 自己是红的**，`pnpm --filter @heyta/sync-client test` 在它上面必失败。
+
+9. 🔴 **我自己这笔提交违反的正是本仓库那条入库不变量**（第 7 条查出来的，归我，不登记成别人的）：
+   `c9f4e2aa` 只把 `client.ts` 的措辞改成真话，**把钉在谎话上的判据留在了工作树里**。
+   入库不变量是"**这一笔带得走的文件里不许有红**"（§8 第 9 条那一族），
+   而这里成的是"**生产改动与判据改动拆在两笔里，中间那个 ref 是红的**"。
+   为什么会漏：我当时把"改文案"记成一条**审计修复**、把"改判据"记成它的**验证副作用**，
+   于是分组提交时按"逻辑分组"把副作用留在了工作树 —— 而**判据和它约束的常量从来不是两个逻辑单元**，
+   它们是同一条承诺的两半。
+   ✅ 已当场补提交（`8503dadf`，只带 `packages/sync-client/tests/sync.spec.ts` 一个路径），
+   并在**新 HEAD 的工作树 == HEAD** 的状态下重跑那一包：
+   `pnpm --filter @heyta/sync-client test` ⇒ `Test Files 9 passed (9)`、`Tests 132 passed (132)`、
+   **`RC_SC=0`**（`/tmp/sc-verify.log`）。这条才是"HEAD 不自洽"的正解，
+   而不是把第 7 条那个带未提交文件的读数当作 ref 的读数。
+
+10. **第三笔合并后的最终读数**（载体 = `5358edf7`，四件文档门禁现跑，**带着本节全部新增文字**跑的）：
+    `RC[check:docs]=0`、`RC[check:md-tables]=0`、`RC[check:docs-voice]=0`、`RC[check:doc-citations]=0`，
+    外加第 9 条在新 HEAD 上重跑的 `pnpm --filter @heyta/sync-client test` **`RC_SC=0`**
+    （`Test Files 9 passed (9)` / `Tests 132 passed (132)`）。
+    合并在**改完 AGENTS 那段最终措辞之后再跑一遍**（第一趟跑的是改措辞前的内容，
+    那趟不构成对提交物的读数）：`RC2[check:docs]=0`、`RC2[check:md-tables]=0`、
+    `RC2[check:docs-voice]=0`、`RC2[check:doc-citations]=0`。
+    合并本身只带进 1 个文件、50 行纯新增（`git show --stat 5358edf7`：
+    `docs/plans/multi-end-coverage-handoff.md`），所以验证范围按**改动面**收窄为文档门禁四件 +
+    sync-client 单包，全量 build/typecheck/test 已由第 5 与第 7 条在 `f92491ac`
+    （其**代码面**与本 ref 逐字节相同 —— 差异只有那一个 md）上取过。
+    ⚠️ **刻意不重跑全量，并写明代价**：如果那 50 行文档会影响某条门禁的行为，要等落地后那一趟才发现。
+    缓解：这四件正是针对这个面穷举的那四类（死链 / 表格行 / 口径词 / 引用），
+    而第四节里 `check:md-tables` 与 `check:docs` 都在本轮对**我自己新写的这张表**有过分辨力（第 8 条）。
+    🔴 **变异对照已实跑**（证明这四条不是恒绿）：脚本 `/tmp/mut-mdtables.mjs` 把
+    本文件第 **31** 行那个三列表格的一行**去掉行尾 `|`** 后重跑 `check:md-tables` ⇒
+    **`RC_MUT_MDTABLES=1`**（`[ELIFECYCLE] Command failed with exit code 1`），
+    随后按原文逐字节复原并现场读回比对 ⇒ `RESTORED=yes`。
+    ⚠️ 变异打在**文件里已有的表**上，不是打在本节新写的文字上 —— 本节只有有序列表，
+    没有新增表格，所以"覆盖我的新内容"这句**不成立**，这里证的是**这四条门禁本身有牙**。
+
+8. **死链与表格门禁在合并态复绿**：第 5 条那趟 65 段链日志（`/tmp/chain-MERGED.log`，
+   载体 = `cfdac113` 之后）里，这两条各自是**独立的一段**、不是被尾换行粘住的那一段：
+   `RC[check:docs]=0`、`RC[check:md-tables]=0`，另附 `RC[check:doc-citations]=0`、
+   `RC[check:docs-voice]=0`、`RC[check:legal-copy]=0`。
+   🔴 整趟非零的只有两段，且都已在第 5 条逐段定性：`check:web-artifact:app`（测量配置没对齐）
+   与那段 `check:server-envcheck:ios-native-bridges`（链子自己坏了，两个 rc=0 由补跑另取）。
