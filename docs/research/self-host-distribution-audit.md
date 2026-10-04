@@ -6771,10 +6771,20 @@ sweep 残留 PWA 承诺时命中 `zh-CN.ts:3602` / `en.ts:3402`
 `icons/…` 相对路径 ⇒ 挂载路径变成构建参数之后这两处都跟着走了。
 
 🔴 但这**不等于线上注册成功**：原来那个缺陷的形态是"线上 `/sw.js` 返回落地页 HTML"，
-要否证它得量**部署态**（`/app/sw.js` 的 `content-type` 与 SW 注册结果），本趟没有取。
+要否证它得量**部署态**（`/app/sw.js` 的 `content-type` 与 SW 注册结果），~~本趟没有取~~
+⇒ **这句"没有取"是错的，2026-10-04 18:3x 撤回**：判据**早就存在**
+（`e2e/live-site/live-domain.spec.ts:256`，它量 `sw.js` 的 content-type、`start_url`/`scope`/图标
+解析路径、`serviceWorker.ready` 的 scope 与 scriptURL、注册失败的 warn 与未捕获异常），
+18:35 那次整套运行里它是**绿的**；另有独立的 `curl` 复量补了一刀更硬的：线上那枚
+`/app/sw.js` 与本地 `apps/web/dist/sw.js` **逐字节相同**（`cmp -s`）。
 ⇒ 那句 `updateNote` 从"疑似错话"改成"**待线上复验**"，登记为 **G-59**：
-补一条 live-site 判据（`/app/sw.js` 返回 JS 而不是 HTML + 注册不报 `SecurityError`），
-跑在落地之后 —— 与 G-51 剩下的 ④ 同一趟，不要各起一次。
+~~补一条 live-site 判据（`/app/sw.js` 返回 JS 而不是 HTML + 注册不报 `SecurityError`），
+跑在落地之后 —— 与 G-51 剩下的 ④ 同一趟，不要各起一次。~~
+⇒ **G-59 已关（§8.113）**：`web.about.updateNote` 那句不是错话。
+⚠️ 但**这不等于"PWA 可安装已被证明"** —— 既有用例判的是"资产拿到真身 + SW 注册并激活"，
+`beforeinstallprompt` 本机自动化通道答不了（§8.57），G-51 摘掉安装承诺那句的裁决不变。
+📌 这条登记本身的教训：**宣布"欠某条证据"之前先按结论句 grep 判据本体**（该搜的是
+`serviceWorker.ready`，不是搜 "G-59"）—— 我上一轮就是没读同目录那份 spec 才立了一条已存在的判据。
 
 ⚠️ 同时把两处**过期状态句**原地更正（不删，划线留原句旁）：`:61` 那句
 "PWA 的 `/sw.js` 与 manifest 里 `start_url/scope/icons` 全是根绝对路径…登记至今**未修**"，
@@ -6867,3 +6877,86 @@ sweep 残留 PWA 承诺时命中 `zh-CN.ts:3602` / `en.ts:3402`
   它会现算载体、校双亲、跑完整 `pnpm check`（红则退 4 并给出逐段归属命令，**不落地**），
   全过才 `git merge --ff-only`。不 push、不 `branch -f main`。
 - `check:gate-wiring` rc=0（新脚本不是门禁，接线检查确认没破它）。
+
+### 8.113 G-59 的"未取证"是**我没读同目录那份 spec**（2026-10-04 18:3x，含一次自我删除）
+
+#### ① 触发：一句我自己写的"本趟没有取"
+
+§8.110 ⑦ 把 `web.about.updateNote` 那句「应用是 PWA，更新由浏览器在后台决定」从"疑似错话"
+降级成"待线上复验"，登记为 G-59，理由写的是"要否证它得量**部署态**，本趟没有取"。
+这一轮先按那句去量部署态。
+
+#### ② 零 CPU 的那一半（curl，绕本机代理 fake-ip）
+
+```
+/app/                    200 text/html                  1361 B
+/app/sw.js               200 application/javascript    16381 B  md5 d0252fcbdefedaec4edb6cf6222cd65e
+/app/manifest.webmanifest 200 application/octet-stream   2361 B
+/sw.js                   200 text/html                  7022 B   ← 落地页，路由事实不是回归
+/health                  200 {"status":"ok","db":"connected","wsConnections":0}
+```
+
+🔴 **关键的一条不是状态码，是字节**：线上那枚 `sw.js` 与本地 `apps/web/dist/sw.js`
+`cmp -s` **逐字节相同**（同一个 md5）。也就是说"部署态与产物态不一致"这个旧缺陷的
+**机制**今天在线上不存在 —— 旧缺陷的形态恰恰是"产物是对的、路由让它落回落地页"，
+所以只看产物会得出假清白，只看状态码（200）也会（落地页也是 200）。
+
+#### ③ 真浏览器的那一半，以及它查出来的**我自己的第二个错**
+
+写了 `e2e/live-site/live-pwa.spec.ts`（3 条腿：挂载路径下 sw.js 是 JS + 根路径 `/sw.js`
+仍是 HTML 做对照；页面里注册成功、scope `/app/`、SW 能**激活**、加载期零 error，
+外加一发**非法 scope 的有牙臂**；manifest 能 `JSON.parse`）。跑出来：
+
+- 真实臂 3 passed：`{"real":{"ok":true,"scope":"…/app/","active":false,…}}`
+  （`active:false` 是注册那一刻的读数，后面的激活等待单独判了 `true`）、加载期控制台 `(无)`；
+- 变异臂 `HEYTA_LIVE_APP_BASE=/` ⇒ **3 failed**，三条各自精确报红
+  （①「`/sw.js` 的**实体**不是 HTML」②「SW 注册应成功」③`SyntaxError: Unexpected token '<'`）。
+
+🔴 然后才读到：**同一目录的 `live-domain.spec.ts:256` 早就在判同一件事**，而且判得更严 ——
+`start_url`/`scope`/`icons[0].src` 必须解析成 `/app/…`、`sw.js` 的 content-type 必须匹配
+`javascript`、`navigator.serviceWorker.ready` 20s 内不许 timeout、scope 与 scriptURL 都要含
+`/app/`、注册失败的 warn 文案 = `[]`、未捕获异常 = `[]`。它在 18:35 那次整套运行里是**绿的**
+（`26 passed (1.1m)`，含 live-domain 7 条 / live-legal 13 条 / live-signin-entry 3 条 / 我那条 3 条）。
+
+⇒ **G-59 那句"未取证"不成立**，而且成因不是"证据不存在"，是**我没读同目录那份 spec 就宣布了缺口**。
+这跟本文档 §8.57 那条"只在 `apps/web` 里搜就会把服务端渲染的流程误判成没做"是同一族的第二种面目：
+上一次是搜错了目录，这一次是**没搜就登记**。
+📌 一般规律：**登记"欠某条证据"之前，先按结论句去 grep 一遍判据本体**（这次该搜的是
+`serviceWorker.ready` 与 `content-type`，不是搜 "G-59"）。
+
+⇒ 新写的那份**已删除**（`e2e/live-site/live-pwa.spec.ts`，未提交、本会话产物）。
+理由：同一结论落进两份文件就是下一轮漂移的来源（本批已有 G-49 那条"第 4 份抄件"的教训）。
+它的三条读数留在上面这三段里，作为**这一趟**的证据；长期载体仍是那两条既有用例：
+
+| 载体 | 判据住在哪 | 本批状态 |
+|---|---|---|
+| 线上（nginx + 已发布产物） | `e2e/live-site/live-domain.spec.ts:256` | ✅ 18:35 绿（26 passed 里的一条） |
+| 自托管（镜像内 fastify 托管 `/app/`） | `e2e/selfhost-stack/selfhost-web.spec.ts` 的 S1 | 🔄 等负载窗口，就是第 2 项那条 `verify:selfhost-stack` |
+
+⇒ **G-59 关闭**：`web.about.updateNote` 那句**不是错话**（部署态已由既有用例 + 独立 curl 两侧量到）。
+⚠️ 但**别读成"PWA 可安装已被证明"** —— 两条用例判的是"资产拿到真身 + SW 注册并激活"，
+`beforeinstallprompt` 这台机器的自动化通道答不了（§8.57），G-51 摘掉那句安装承诺的裁决**不变**。
+
+#### ④ 顺带查出来的两条，一条入档一条只是读数
+
+- **G-60（新登记，未关）**：`/app/manifest.webmanifest` 线上回 **`application/octet-stream`**
+  （nginx 的 `mime.types` 里没有 `.webmanifest`）。两处既有用例都**只把这个值放进 probe 里记录、
+  没有一条 expect**（`live-domain.spec.ts` 的 `manifestType` 字段就是它），所以这个值今天
+  **没有任何一层在守**。要关它需要一次决定：给 nginx 补 mime 类型并补断言，或明确接受并写明理由。
+  🔴 不许从线上值推断自托管载体的值 —— 那边是 `@fastify/static` 在发，走的是另一套 mime 解析，
+  它的读数只能等第 2 项那趟真栈量。
+- 一条**观察不是缺陷**：全新上下文（Chromium 报 `en-US`）直开 `/app/` 渲染的是整套英文界面 +
+  英文同意弹窗（截图 `e2e/test-results/live-pwa-app.png`，人已看：Inbox/Today/四象限/清单/标签
+  全在，主蓝按钮 `Agree and connect`）。这是语言解析链第三层（`navigator.language`）的设计行为。
+  ⚠️ 我这一轮踩的坑恰好是它记过的：`live-domain.spec.ts:264` 那段注释明写"这条用例必须钉
+  `locale: 'zh-CN'`，否则红在那句等中文输入框上，而站点没坏"—— 我第一版抄了它的中文判据、
+  没抄它的 locale，于是红了一次（红在探针取值方式，不是产品）。**同目录那份 spec 的注释里
+  有我需要的答案**，这是本条第二次的现量。
+
+#### ⑤ 这一轮的两条边界（写清楚，免得被读成"跑过了"）
+
+1. 18:36 起 `~/.tfa-shield` 内存闸门以 `pid=43044`（别人的 `pnpm --dir e2e run test:landing`）
+   **拒绝启动**我的 playwright。我**没有**用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕它；
+   所以 ②③ 的读数全部来自 18:30–18:35 那段闸门放行的窗口，之后没再补跑。
+2. 负载全程 18–325，`verify:selfhost-stack` 仍未起跑（看守 `g131-wait.sh` 在等 ≤12），
+   落地那一步的阻塞集仍是 4 枚（看守 `g149-blockers.sh` 在等归零）。**第 1、2、8 项本段没有推进**。
