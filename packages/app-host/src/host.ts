@@ -652,8 +652,14 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       });
     },
 
+    /**
+     * 界面上那个「待上传 N 项」徽标。
+     *
+     * 🔴 走计数，不走 `getPendingUpload().length` —— 后者每次刷新都把整条队列
+     * 连密文正文一起物化进内存，只为了显示一个数字。这个数还在同步前后各读一次。
+     */
     async pendingUploadCount(): Promise<number> {
-      return (await engine.getPendingUpload()).length;
+      return engine.countPendingUpload();
     },
 
     async readOpLog(): Promise<Operation<string>[]> {

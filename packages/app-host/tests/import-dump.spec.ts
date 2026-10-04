@@ -83,7 +83,9 @@ async function device(clientId: string, now: () => number): Promise<Device> {
 
   const created: Device = {
     engine,
-    target: { engine, readOpLog: ops },
+    // 🔴 目标只交引擎 —— `ImportTarget` 上已经没有"读全库"的口子了
+    // （空库守卫改成条数判定），所以这里连 `readOpLog` 都不用再提供。
+    target: { engine },
     ops,
     close: () => adapter.close(),
   };

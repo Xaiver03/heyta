@@ -481,10 +481,10 @@ export async function restoreFromExport(text: string): Promise<RestoreExportResu
   }
 
   const result = await restoreIntoEmptyTarget(
-    {
-      engine: requireEngine(),
-      readOpLog: async () => (await requireStore().getAllOps()).map((row) => row.op),
-    },
+    // 🔴 只交引擎，不再交 `readOpLog`。空库守卫要的是条数，
+    // 而 `(await requireStore().getAllOps()).map(...)` 会在用户点"还原"的那一刻
+    // 把本机整库连密文正文搬进内存数一遍。`engine.countStoredOps()` 走计数。
+    { engine: requireEngine() },
     parsed.document,
   );
   if (result.ok) notify();
