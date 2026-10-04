@@ -4610,13 +4610,22 @@ git grep -n '20261009000000_add_holiday_adjustments' HEAD
 >   **所以本线仍然不手起安装**：现在起 = 在别人正在验的设备面上 `adb uninstall`。
 > - 🔴🔴 **查出一条结构性阻塞，而且它不属于本线**：`scripts/lib/apk-freshness.sh` 在主检出是 **`??`（从未提交过）**，
 >   而 main 上**已提交**的 `scripts/verify-mobile-window-gate.sh` 在 source 它（`git grep -ln 'apk-freshness' main -- scripts`
->   只命中那一个门脚本）。后果不是"少一腿读数"，是**任何干净载体都永不开窗**：
->   lib 不在 ⇒ `heyta_apk_pair` 未定义 ⇒ 走 `declare -F` 那一支 ⇒ `WHY_APK=1` fail-closed。
+>   只命中那一个门脚本）。~~后果不是"少一腿读数"，是**任何干净载体都永不开窗**~~
+>   🔴 **17:5x 自我更正（这句说过头了，而它恰好会误导下一个会话）**：APK 那一腿住在 **`--target c`** 分支里
+>   （`git show main:scripts/verify-mobile-window-gate.sh` 的行号：`b)` 在 **161**、`c)` 在 **223**，
+>   而 `declare -F heyta_apk_pair` / `WHY_APK=1` 落在 **295/300/310/314** ⇒ 全在 c 内）。
+>   17:5x 在载体里实跑 `--target b` 打出的步骤表是「1 负载 / 2 工作树 / 3 reinstall 干净 / 4 设备名 / 3b 设备面」——
+>   **没有 APK 那一格**，`REDS=load` 只红负载。⇒ 正确的范围是：**lib 缺席挡住的是"设备验收"那几路（target c），
+>   不是 ③ 的四端重装（交付队列 770 行自己就写着"不整跑 --target c"）**。
+>   我这句是在"读到一个 fail-closed 分支"之后**没问它属于哪个 case** 就写成全局结论造成的，
+>   与 traps 里"分类器只认权威字段"同族：**判一条判据的影响范围，要量它住在哪个分支，不是量它存不存在**。
 >   ⚠️ 这条的一半别人已经修了（`eb97471a`「闸门的 lib 按自己那棵树取，缺席不许冒充读数」）——
 >   修的是"**缺席不再伪装成产品读数**"（旧症状：打一对 `1970-01-01` 判"APK 比源码旧"，让人去重打一个不必重打的包），
 >   **不是**把文件入库。⇒ 关闭判据只有一条，且要由**引用它的那笔提交的作者**（`b4033742` 那条线）做：
 >   `git ls-tree --name-only main scripts/lib/ | grep -c apk-freshness` = **1**（此刻现量 **0**）。
 >   本线**不代 `git add` 别人的未跟踪文件**（这条纪律在本文里已经有过事故记录）。
+>   ⚠️ 顺带把我那步补 lib 的作用也说准：它**不是 ③ 的前置**（见上面那条更正），
+>   它只让本线这棵载体的 `--target c` 能真测 APK 新鲜度而不是 fail-closed。留着无害，但别把它记成"我解决了开窗"。
 > - **本线能自主解的只有我自己那条集成线的载体**：把 lib 复制进 `heyta-wt-ai-closeout/scripts/lib/`
 >   （两侧 md5 逐字节相同 = **`fbe1a0e1f490ed561dce46f63990282f`**）。为什么这不算污染窗口：
 >   闸门第 2 步只数 `^ ?M`（未跟踪进不了包，所以 `??` 不判），现量该载体 `packages apps server scripts` 的
