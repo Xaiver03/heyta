@@ -68,7 +68,9 @@ EVIDENCE_DIR="$HEYTA_REPO_ROOT/apps/mobile/evidence/card-export"
 CACHE_ON_DEVICE="/data/data/$PKG/cache/card-export"
 STAMP=$(date +%H%M%S)
 # 🔴 标题必须 ASCII：`adb shell input text` 发不了非 ASCII（实测抛异常却可能退 0，§7 #43）。
-CARD_TITLE="w7e2e-$STAMP"
+#    这一枚只在**屏上没有卡可复用**时才当标题用，所以叫 NEW_（上一版直接叫 CARD_TITLE，
+#    于是第 3 节"复用了别的卡"这件事在变量名上看不出来）。
+NEW_CARD_TITLE="w7e2e-$STAMP"
 
 # 🔴 软键盘：整轮关掉，退出一定恢复（`input text` 只要焦点在就能注入，不需要 IME 可见）。
 disable_ime
@@ -162,10 +164,35 @@ VIEW_TITLE=$(zh web.shell.views.countdown)
 if settle_for "$VIEW_TITLE" 8 2; then ok "倒数日屏开到前台（标题「${VIEW_TITLE}」）"
 else bad "点了入口却没开到倒数日屏"; screen_txt; fi
 
-step "3. 保证屏上有一张卡（空态就现场建一条带 ASCII 戳的）"
+step "3. 保证屏上**有一张可点的卡**（先用正向证据，再谈空态）"
 dump; require_screen
-if grep -qF -- "$(zh web.countdown.empty)" "$UI_XML"; then
-  echo "   屏上是空态 ⇒ 建一条：$CARD_TITLE"
+MENU_TPL=$(zh web.countdown.a11y.menu)
+# 🔴 这一节原先写的是"空态句不在树里 ⇒ 屏上已有卡片"，那是一个**恒真分支**，
+#    而且它把本轮唯一一次真读数骗掉了（08:4x，RC=3）：屏上确实有一张卡
+#    （`w7e2e-073853`，是上一趟留下的），但同时也留着上一趟没关掉的卡片菜单
+#    与 composer —— 那种状态下菜单钮的 a11y 名整块不在树里，下一节按标题剥卡片
+#    就没有输入。"没有空态句"回答的是"屏上有没有那句文案"，回答不了
+#    "有没有一张点得到的卡"（AGENTS §7 元规则 2）。
+#    现在判据换成正向的：**读卡片的菜单 a11y 名**，拿不到就按返回收浮层再读一次。
+CARD_TITLE=""
+for _t in 1 2 3; do
+  # 🔴 判"取到了没有"用**值非空**，不用 `&& break`：本脚本只 `set -u`、没有 pipefail，
+  #    所以读数器退 2 时这条管道的退出码是 `tr` 的 0 —— 用退出码判会**每次都 break**，
+  #    于是"没卡片"和"读数器坏了"又长成同一个样子（AGENTS §7 元规则 1）。
+  CARD_TITLE=$(node "$READER" card-title "$UI_XML" "$MENU_TPL" 2>/dev/null | tr -d '\r\n')
+  [ -n "$CARD_TITLE" ] && break
+  echo "   第 $_t 次：树里没有卡片菜单名 ⇒ 按一次返回收掉残留浮层"
+  $ADB shell input keyevent 4 >/dev/null 2>&1; sleep 2; dump
+  # 收浮层不能把应用带离这一屏 —— 带离了就是探针自己改坏了现场（本轮无效，不是产品失败）
+  grep -qF -- "$VIEW_TITLE" "$UI_XML" \
+    || { echo "   ❌ 按返回之后连倒数日屏都没了 ⇒ 现场被探针改坏，本轮无效"; screen_txt; exit 3; }
+  require_screen
+done
+if [ -n "$CARD_TITLE" ]; then
+  ok "复用屏上已有卡片「$CARD_TITLE」（正向证据：它的菜单 a11y 名在树里）"
+elif grep -qF -- "$(zh web.countdown.empty)" "$UI_XML"; then
+  echo "   屏上是空态 ⇒ 建一条：$NEW_CARD_TITLE"
+  CARD_TITLE="$NEW_CARD_TITLE"
   FIELD_XY=$(xy_edit "$(zh web.countdown.composer.placeholder)")
   [ -z "$FIELD_XY" ] && FIELD_XY=$(scroll_to_desc "$(zh web.countdown.composer.placeholder)")
   PICK_XY=$(scroll_to_text "$(zh web.countdown.pickDate)")
@@ -193,8 +220,10 @@ if grep -qF -- "$(zh web.countdown.empty)" "$UI_XML"; then
   if settle_for "$CARD_TITLE" 8 2; then ok "新卡片上了屏（「点了」之后「看得见」）"
   else bad "建卡之后屏上找不到标题「${CARD_TITLE}」"; screen_txt; fi
 else
-  echo "   屏上已有卡片，本轮不新增"
-  CARD_TITLE=""
+  # 🔴 第三种情况必须**响亮地**停：既没有可点的卡、也没有空态句 —— 那说明屏幕停在
+  #    预期外的状态（上一版就是让它静默走到下一节，才把 RC=3 拖成"看不懂的红"）。
+  echo "   ❌ 两样都对不上：卡片菜单名剥不出、空态句「$(zh web.countdown.empty)」也不在树上 ⇒ 现场不是倒数日列表，本轮无效"
+  screen_txt; exit 3
 fi
 
 step "4. 判据②：点导出**前**那个文件名不存在，点之后必须出现"
@@ -214,11 +243,8 @@ else
   echo "   目录里已有 $(printf '%s\n' "$BEFORE" | grep -c .) 个文件"
 fi
 
-MENU_TPL=$(zh web.countdown.a11y.menu)
-if [ -z "$CARD_TITLE" ]; then
-  CARD_TITLE=$(node "$READER" card-title "$UI_XML" "$MENU_TPL" 2>/dev/null) || {
-    echo "   ❌ 从 a11y 名里剥不出卡片标题 —— 探针未到位（本轮无效）"; screen_txt; exit 3; }
-fi
+# CARD_TITLE 由上一节的**两条正向出口**之一给出（复用屏上那张 / 现场建一条），
+# 所以这里不再补"第三路去 XML 里剥"—— 那一层正是上一版静默走空的地方。
 MENU_DESC=$(printf '%s' "$MENU_TPL" | sed "s/{title}/$CARD_TITLE/g")
 MENU_XY=$(xy_desc "$MENU_DESC")
 [ -z "$MENU_XY" ] && MENU_XY=$(scroll_to_desc "$MENU_DESC")

@@ -2395,3 +2395,82 @@ W0b ─> 随时可做（台账那半要等文件干净）
   本轮没有跑打包（打包机也归另一条线在用）。所以"这一栏能关了"的准确说法是
   **消费侧与判据已就位、且离线证明它有牙；生产侧待下一趟真实打包来发那三行**。
   在那之前 windows 的产物栏仍是未取证 —— 本轮**不**代它宣布关闭。
+
+- ㉗ **W7 的「零法务变更」用门禁重取了一遍；同时量出 main 自己就红的那条不由本批吸收**（04 08:4x，载体 `8e4b5097`，无设备参与）
+  ✅ 声明面三处现量：iOS `Info.plist` 里 `Photo|Camera` 命中 **0**；`HeytaCardExportModule.swift:73`
+  写的是 `FileManager.default.temporaryDirectory`；Android `CardExportModule.kt:73` 写的是
+  `File(reactApplicationContext.cacheDir, DIR_NAME)` + `:81` `FileProvider.getUriForFile`，
+  **没有** `MediaStore`/相册写入，manifest 的 `<uses-permission>` 只有
+  `INTERNET / POST_NOTIFICATIONS / SCHEDULE_EXACT_ALARM`。
+  ⇒ "不申请照片"那句对外条款**逐字仍为真**，而且这轮不是我看代码下的结论，是
+  `check:legal-permissions` 自己数出来的（它打印的登记表就是这个集合）。
+  ⚠️ 顺手更正一处**我自己的探针错**：第一次查 Android 时我用 `find … | head -1` 取文件，
+  命中的是 `CardExportPackage.kt`（注册壳），于是 `grep cacheDir` **0 命中** —— 那读起来像
+  "模块没写缓存目录"。0 命中先问"我打的是不是那个对象"，这里换成读模块本体后 `:73` 就在那里。
+
+  🔴 同一趟量到：`node scripts/check-legal-permissions.mjs` 在本树 **rc=1 / 7 条红**，
+  但**七条全部与照片无关**，它们红的是"通知/精确闹钟已声明而条款还写着不申请"。归属逐条查过：
+  `POST_NOTIFICATIONS` 由 `b0ba4a35`（W9 提醒原生投递，ADR-0051）带进来，而这把尺在
+  **`origin/main` 上是同一份文件**（`git diff --stat origin/main HEAD -- scripts/check-legal-permissions.mjs` 为空），
+  `git show origin/main:` 里 manifest 有那行（1）、`third-parties.ts` 里那句"不申请通知"有 2 处
+  ⇒ **`origin/main` 自己就构成红**，不是本批带来的。
+  🔴 而且**修法正在别人手里**：主检出 `packages/legal/src/documents/{permissions,third-parties,data-rights,minors,ai-and-transfer}.ts`
+  五个文件是 ` M`（未提交），在主检出上直接跑这把尺 ⇒ **0 红** —— 也就是那六句正被并行会话翻。
+  ⇒ 本批**不代改**（代改就是造一次三方冲突，且 §0.5 的 L 系列行早写过"六句必须一起翻并重跑 `check:legal-copy`"）。
+  这条债的关闭判据：`node scripts/check-legal-permissions.mjs` rc=0，由 W9/legal 那条线取。
+  ⚠️ 它同时是收尾第 1 项 `pnpm check` 的一处**已归因红灯**：那趟读数会把这一门报红，
+  归因写在这里，不由本批用"翻条款"凑绿。
+
+  探针侧的两条现场（都不算产品结论）：
+  ① **只读前置三验全过**（04 08:3x）：按 `BID=com.heyta` 在那台模拟器上解析到
+  `…/Bundle/Application/497FCD6D-…/Heyta.app`（rc=0）、data 容器下 `tmp/` 存在、
+  新鲜度 `main.jsbundle mtime 1791071463 > 最新源码 1791069065`（差 2398 秒）⇒ 探针的
+  step 0/0b 三个会 exit 3 的门口都不会白拒。
+  ② `verify-mobile-window-gate.sh --target c` 现在**恒报"有移动端验收在跑"**，而报的 pid 每次都不在
+  它自己留下的 `/tmp/_heyta_mobile_e2e_ps.txt` 快照里 —— 用一根改过文件名的副本跑同一段代码 ⇒
+  报"没有别人"。差的就是原件自己的文件名被 `verify-mobile-[a-z-]+\.sh` 那根 needle 命中，
+  而排除只排"自己 + 直接子进程"，命令替换里那个**孙进程**没被排掉。
+  这条也在别人手里（`scripts/lib/mobile-e2e-runner-probe.sh` 的未提交 diff 正在加 window-gate 排除
+  与夹具第 7 行），本批不代改。
+  📌 我自己在这条链上**重新踩了一次 traps #168**：第一版手写
+  `sysctl -n vm.loadavg | tr -d '{} '` ⇒ 三个值粘成 `15.1715.5822`，比较抛
+  `integer expression expected`（日志留着那行）。而仓里那条规范实现的**文件头就写着这个坑**。
+  改成 source `lib/wait-for-quiet-host.sh` 调 `wait_for_quiet_host` 之后才正常等窗口。
+  ⇒ 链 K（`/tmp/device-closeout-K.sh` → `/tmp/device-closeout-K.log`）08:39:46 起跑，
+  08:40:46 `RC_TREE=0` + 设备独占 + `负载 16 > 12` → `负载 11 ≤ 12` 开窗。
+  ~~窗口开了才落 `RC_ANDROID` / `RC_IOS_PROBE` 两行，等满按 exit 3 记**本轮无效**~~
+  —— 04 08:5x 两行都落了，读数与根因在下面的 ㉘（**两趟都是 exit 3：探针缺陷，不是产品失败**）。
+
+- ㉘ **链 K 的两条 exit 3 各自照出探针的一个"恒真/错判"分支，两条都已就地改成正向判据**（04 08:5x，载体 `8e4b5097`）
+
+  | 趟 | 读数 | 表面症状 | 现量根因 |
+  |---|---|---|---|
+  | Android（`/tmp/device-K-android.txt`） | `RC_ANDROID=3` | step 3 打印「屏上已有卡片，本轮不新增」，step 4 报 `❌ 从 a11y 名里剥不出卡片标题 —— 探针未到位` | step 3 那个分支判的是**「空态句不在树里」**，而它把"卡片菜单名读不出"也当成"有卡片"。只读取证（`adb shell uiautomator dump` + `mCurrentFocus=com.heyta/com.heytamobile.MainActivity`）证明屏上**确实**有一张卡 `w7e2e-073853`，但同时留着上一趟（07:41）没关的卡片菜单与 composer（`导出成品图 / 编辑 / 删除 / 置顶 / 给这一天起个名字 / 添加`）—— 那种状态下**菜单钮的 `content-desc` 整块不在树里**，所以下一节没有输入 |
+  | iOS（`/tmp/device-K-ios.txt`） | `RC_IOS_PROBE=3`（step 2） | `❌ AX 树里读不到「我的」—— 树是空的还是没渲染？` | 树**不是空的**：只读 `describe-all` 数出 **11 个 label**，全是隐私同意面板的（`在使用联网功能之前 / 同意并联网 / 只用本机 / 服务条款 …`）。RN 的 modal 会把底部标签栏整个摘出 AX 树，而"归一化掉同意面板"那段代码住在**就绪判据之后** —— 于是就绪判据要求一个"浮层存在时必然不在"的标签。§7 #63 那种卡死形态的区别是 **label 数 0**，不是"某个标签缺失" |
+
+  两处改法同一条口径（**判据要正向**，AGENTS §7 元规则 2）：
+  ① Android step 3 现在**读卡片自己的菜单 a11y 名**作为"有一张点得到的卡"的证据，
+  读不到就按一次返回收浮层再读（最多 3 次），并且每次收完都验「屏还在倒数日屏」——
+  带离现场就 `exit 3` 而不是继续；两条正向出口都不成立时**响亮地** `exit 3`
+  （旧版这里是静默走进下一节，才把红拖成看不懂的那条）。step 4 那段"拿空标题再去 XML 里剥"
+  的兜底随之删掉（它正是被恒真分支喂空的地方）。
+  ② iOS step 2 的就绪判据改成 `label 数 ≥ 2` **且** 三个顶层屏候选（主屏标签 / 同意面板标题 /
+  欢迎页标签，值全部走读数器）任一在树里；step 3 之前新增"等标签真回到树上"的正向轮询
+  （`press` 对不在树上的标签是**静默空操作**）；step 4 之前新增"composer 占位符必须在树里"
+  —— 否则 `--field --set` 打的是"树上第一个输入域"，会把标题写进别的字段，
+  再拿「添加」的 `enabled` 当成功读数（那是假绿，比红贵）。
+
+  这两条新判据**有牙的证据**（同一趟，零设备）：拿 08:42 那份残留现场 `/tmp/ui.xml` 喂读数器
+  ⇒ `READER_FAIL uiautomator 快照里没有带菜单 a11y 名的卡片` **rc=2**（新 step 3 不会 break，
+  会走收浮层/空态/响亮 exit 三条路之一）；同一份文件注入一枚 `content-desc=「{title}」的操作`
+  形式的节点（副本 `/tmp/ui-pos.xml`，用完即删）⇒ **rc=0 且回读标题** `probe-positive-card`。
+  ⚠️ 另一处写法坑（同一趟学到，值得入档）：这两个脚本只 `set -u`、**没有 pipefail**，
+  所以 `CARD_TITLE=$(node … 2>/dev/null | tr -d '\r\n') && break` 里的退出码是 `tr` 的 **0** ——
+  用退出码判"取到了没有"会**每次都 break**，等于把新判据原样阉掉。已改成 `[ -n "$CARD_TITLE" ] && break`
+  并在代码里写明为什么不用退出码。
+
+  🔴 这两条 exit 3 **不**记成产品失败，也**不**算 W7-G3 的关闭：链 L（改后复跑）取到
+  `RC_ANDROID=0` 与 `RC_IOS_PROBE=0`、并且 iOS 那张 `apps/mobile/evidence/card-export/ios-latest-card.png`
+  被人打开看过之前，W7-G3 这一格不打勾。链 K 顺带证到的仍然有效：共享 lib 抽取后的
+  判据①自检在**两端的载体上都跑绿**（正向 `1080×1440 SHA=221f0d78811c` / 反向 `3×2 BLANK=true`），
+  也就是 §8.4 ㉕ 那句"零行为变化的复跑读数还没取"**只欠 step 3 之后的那几节**。

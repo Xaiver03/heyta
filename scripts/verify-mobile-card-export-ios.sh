@@ -164,13 +164,28 @@ xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
 xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1 || { echo "❌ simctl launch 失败 ⇒ 本轮无效"; exit 3; }
 sleep 5
 TREE_OK=0
+# 🔴 「树就绪」**不能**拿「主屏标签在不在」当判据 —— 实测（08:4x 那一趟 exit 3 的真相）：
+#    这台上的 App 起来第一屏是隐私同意面板，而 RN 的 modal 会把底部标签栏整个摘出
+#    AX 树（`describe-all` 11 个 label 全是面板的，「我的」一个都不在）。
+#    §7 #63 那种卡死形态是「只剩一个零尺寸 Application 节点、label 数 0」。
+#    两者的**区别**是 label 数，不是"某个特定标签在不在"；而"读到的确实是本 App
+#    的内容"由**顶层屏的候选标签任一在树里**来证（三个候选 = 主屏 / 同意面板 / 欢迎页，
+#    全部取自 i18n 真源，不抄字面量）。
 TAB_LABEL=$(zh mobile.tab.profile)
-for _i in 1 2 3 4 5 6; do
-  [ "$(jget "$(ax "$TAB_LABEL" --list --json)" found)" = "True" ] && { TREE_OK=1; break; }
+CONSENT_TITLE=$(zh common.privacy.consent.title)
+WELCOME=$(zh mobile.welcome.offline)
+TREE_N=0
+for _i in 1 2 3 4 5 6 7 8; do
+  TREE_N=$(idb_ax_label_count)
+  if [ "${TREE_N:-0}" -ge 2 ] \
+    && { ax_found "$TAB_LABEL" || ax_found "$CONSENT_TITLE" || ax_found "$WELCOME"; }; then
+    TREE_OK=1; break
+  fi
   sleep 3
 done
-[ "$TREE_OK" = 1 ] || { echo "❌ AX 树里读不到「$TAB_LABEL」—— 树是空的还是没渲染？（先怀疑探针：companion / 模拟器状态）"; exit 3; }
-ok "无障碍树能读到 App 内容"
+[ "$TREE_OK" = 1 ] || { echo "❌ AX 树里没有本 App 的内容（label 数 ${TREE_N:-?}，且主屏/同意面板/欢迎页三个候选标签都不在）";
+  echo "   label 数 0 ⇒ §7 #63 那种卡死形态，重启模拟器可自愈；非 0 却没有候选标签 ⇒ 界面停在别的屏。两种都是探针未到位 ⇒ 本轮无效"; exit 3; }
+ok "无障碍树能读到 App 内容（label 数 $TREE_N）"
 
 # 🔴 key 一律从读数器取，界面字面量不抄进脚本（抄件必漂）。
 #    这三个键名是**读数器验出来的**，不是我推的：第一版写了
@@ -195,10 +210,15 @@ DISMISS_LATER=$(zh common.privacy.consent.close)
 for _m in "关闭排序选择" "$DISMISS_CANCEL" "$DISMISS_LATER"; do press "$_m"; done
 
 step "3. 走到倒数日屏（W8 移动半那条注册表）"
+# 上一节可能刚把同意面板收掉 —— 主屏要一会儿才回到前台。等的是**标签本身**，
+# 不是"按得到就算到了"：`press` 对不在树上的标签是静默空操作。
+TAB_READY=0
+for _i in 1 2 3 4 5 6; do ax_found "$TAB_LABEL" && { TAB_READY=1; break; }; sleep 3; done
+[ "$TAB_READY" = 1 ] || { echo "   ❌ 浮层归一化之后仍读不到「$TAB_LABEL」标签 —— 探针未到位（本轮无效）"; exit 3; }
 press "$TAB_LABEL"; sleep 3
 ENTRY=$(zh mobile.countdown.entry)
 if ! ax_found "$ENTRY"; then
-  echo "   ❌ 「我的」页里没有倒数日入口「$ENTRY」"; exit 3
+  echo "   ❌ 「$TAB_LABEL」页里没有倒数日入口「$ENTRY」"; exit 3
 fi
 press "$ENTRY"; sleep 3
 # 🔴 判据**不能**用 web.shell.views.countdown：它的 zh 值与入口标签是**同一个串**
@@ -215,6 +235,11 @@ fi
 
 step "4. 自建一条卡片（标题 $CARD_TITLE，日期取 7 天后）"
 ADD_LABEL=$(zh web.countdown.add)
+# 🔴 上一节"placeholder 或 空态任一在树里"就够了，这一节不够：`--field --set` 打的是
+#    "树上第一个输入域"，而"placeholder 不在树里"意味着 composer 没在前台（空态句在
+#    屏幕上，输入框可能要展开）—— 那样会把标题写进**别的**字段，然后用「$ADD_LABEL」
+#    的 enabled 当"成功"读数。所以这里必须正向确认 placeholder 在树里。
+ax_found "$PLACEHOLDER" || { echo "   ❌ 倒数日屏上读不到输入框占位符「$PLACEHOLDER」⇒ 探针够不着 composer，本轮无效"; exit 3; }
 press "$PLACEHOLDER"; sleep 1
 FILLED=0
 SET_BACK=''
