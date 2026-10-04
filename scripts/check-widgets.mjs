@@ -249,29 +249,66 @@ for (const rule of RULES) {
     );
   } catch (error) {
     const output = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim();
-    violations.push({
-      rel: specRel,
-      line: 1,
-      rule: {
-        what: '黄金夹具与重建结果**不一致**（夹具被人手改了，或契约改了但没重建夹具）',
-        why:
-          '这四份夹具是**四端解析器的锁**：iOS / Android / 鸿蒙的原生解析器' +
-          '都对着它写、对着它测。它一旦与真源不一致，' +
-          '**四个平台会一起照着错的东西实现对**，而且各自的测试全绿 —— ' +
-          '因为它们的"正确"就是这份夹具。这是整个 W0 里唯一一个' +
-          '"错了会让四端同时错"的点。' +
-          '⚠️ 另外：`pnpm check` 的链路是 `build → typecheck → check:*`，' +
-          '**它平时不跑测试**，所以这个断言此前在 `pnpm check` 里完全没有保护 ——' +
-          '本规则把它接进来。',
-        fix:
-          '夹具必须由真实选择器产出，不是手写的。重建命令：\n' +
-          '         `UPDATE_FIXTURES=1 pnpm --filter @heyta/widget-core test tests/fixtures.spec.ts`\n' +
-          '         重建后**必须看一眼 diff** —— 如果变化不是你有意造成的，那是 bug 不是夹具过期。' +
-          '         （⚠️ 本规则**不重新实现**重建逻辑，而是调既有的那个 spec：' +
-          '夹具对不对只能有一个答案，两处实现必然分叉。）',
-      },
-      text: output.split('\n').slice(0, 12).join('\n         '),
-    });
+    // 🔴 **"那个 spec 退出码非零"不等于"夹具与重建结果不一致"**。
+    //   原来这里把所有非零一律报成夹具坏了，并附一句"重建命令：UPDATE_FIXTURES=1 …"。
+    //   实测它会在**探针根本没跑成**时说出这句话并给出那句危险建议：
+    //   2026-10-05 03:1x 那次 `pnpm check`，宿主内存闸门（`~/.tfa-shield`）拒绝启动 vitest
+    //   （别的会话持着 `/tmp/tfa-test.lock`），于是"重建结果"这一栏的内容是
+    //   **闸门那段拒绝文案**，而门禁报的是"黄金夹具与重建结果不一致"。
+    //   照它做的人会把 `UPDATE_FIXTURES=1` 跑一遍 —— 那正是它最坏的一种失败：
+    //   **用一段拒绝文案覆盖掉四端解析器的锁**，而四端测试从此对着假夹具全绿。
+    //   所以：探针没跑到断言，就报"探针没跑成"，并且明写**不许**重建夹具。
+    const probeNeverRan =
+      /内存闸门拒绝启动|TFA_ALLOW_CONCURRENT_TEST|ENOENT|Cannot find (?:package|module)|command not found/i.test(
+        output,
+      ) || !/\bTest Files\b/.test(output);
+    if (probeNeverRan) {
+      violations.push({
+        rel: specRel,
+        line: 1,
+        rule: {
+          what:
+            '夹具对账**没有执行**（探针没跑成，不是夹具坏了）：' +
+            '那条 spec 退出非零，而输出里**没有 vitest 的用例汇总**，' +
+            '也就是说它一条断言都没跑到',
+          why:
+            '把"没跑成"报成"不一致"是**反向**的失败：它引导读者去重建夹具，' +
+            '而这四份夹具是 iOS / Android / 鸿蒙原生解析器共同的锁 —— ' +
+            '用一段启动期文案覆盖它们，四个平台会一起照着假夹具实现对且各自全绿。' +
+            '常见成因是并发测试的内存闸门持锁、依赖缺失、spec 文件本身改名或语法坏。',
+          fix:
+            '先让探针跑起来，再谈夹具：等 `/tmp/tfa-test.lock` 空闲后重跑 ' +
+            '`pnpm check:widgets`（或 `pnpm --filter @heyta/widget-core test tests/fixtures.spec.ts` 单独看）。' +
+            '🔴 **这一步绝对不要加 `UPDATE_FIXTURES=1`** —— 只有当这条门禁报的是' +
+            '"不一致"（即探针确实跑到了断言）时，重建才是正确动作。',
+        },
+        text: output.split('\n').slice(0, 12).join('\n         '),
+      });
+    } else {
+      violations.push({
+        rel: specRel,
+        line: 1,
+        rule: {
+          what: '黄金夹具与重建结果**不一致**（夹具被人手改了，或契约改了但没重建夹具）',
+          why:
+            '这四份夹具是**四端解析器的锁**：iOS / Android / 鸿蒙的原生解析器' +
+            '都对着它写、对着它测。它一旦与真源不一致，' +
+            '**四个平台会一起照着错的东西实现对**，而且各自的测试全绿 —— ' +
+            '因为它们的"正确"就是这份夹具。这是整个 W0 里唯一一个' +
+            '"错了会让四端同时错"的点。' +
+            '⚠️ 另外：`pnpm check` 的链路是 `build → typecheck → check:*`，' +
+            '**它平时不跑测试**，所以这个断言此前在 `pnpm check` 里完全没有保护 ——' +
+            '本规则把它接进来。',
+          fix:
+            '夹具必须由真实选择器产出，不是手写的。重建命令：\n' +
+            '         `UPDATE_FIXTURES=1 pnpm --filter @heyta/widget-core test tests/fixtures.spec.ts`\n' +
+            '         重建后**必须看一眼 diff** —— 如果变化不是你有意造成的，那是 bug 不是夹具过期。' +
+            '         （⚠️ 本规则**不重新实现**重建逻辑，而是调既有的那个 spec：' +
+            '夹具对不对只能有一个答案，两处实现必然分叉。）',
+        },
+        text: output.split('\n').slice(0, 12).join('\n         '),
+      });
+    }
   }
 }
 
