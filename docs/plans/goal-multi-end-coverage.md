@@ -2901,6 +2901,34 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     `[heyta-iphone-17pro] 上 com.heyta 正在跑（running=1，那是别人的走查现场，不动）`
     ⇒ 正确行为（AGENTS §8.9），继续等；② 由排队器 63544 在链退出后接。
 
+#### ①② 的待填模板（字段逐条来自装置的输出契约；填的时候**只抄装置打印的那一行**，不凭记忆）
+
+① 四端重装 —— 少抄下面任何一条就会把"没跑完"读成"跑完了"（理由见交接账 03:38 那节）：
+
+```
+载体 = heyta-wt-reinstall @ <sha>   scripts/reinstall-all.sh blob = <sha>（03:35 现量为 036ce09a）
+PHASE1_EXIT=<n>（mac+windows）
+PHASE2_EXIT=<n>（android+ios）        # 或 PHASE2=SKIPPED-BY-GATE / ANDROID-SKIPPED-BY-RULE ⇒ ① 未完成
+INNER_EXIT=<n>   FRESH=<n>/5
+图 1 /tmp/heyta-reinstall-mac-installed.png            size=… mtime=… md5=…  ← 只作参考，主蓝不据它判红
+图 2 …mac-installed.png.webview.png                    size=… mtime=… md5=…  ← 主蓝命中 <n>（阈值 ≥20）
+图 3 /tmp/heyta-reinstall-android.png                  size=… mtime=… md5=…  ← 前台窗口门：mCurrentFocus=…
+图 4 /tmp/heyta-reinstall-ios.png                      size=… mtime=… md5=…  ← 先过新鲜度（不过则根本没这张图）
+图 5 <载体>/dist/windows/packaged-first-run.png        size=… mtime=… md5=…  ← 配 ADD_APPX=OK / RESULT=OK
+人看过：五枚逐张写"看到了什么"（标题/正文/主蓝在不在），不是"截了图"
+```
+
+② 三段 e2e + 全量 `pnpm check` —— **"可过段数"只认整条链那一行**（交接账 03:37 那节）：
+
+```
+载体 = <sha>   CHECK_SEGMENTS_TOTAL=<装置打印值>
+SEG ai-e2e rc=… tests=… failed=…      # 或 rc=SKIP-PORTS ⇒ 这一趟"跑满"没有读数，如实记
+SEG privacy-consent-e2e rc=… …
+SEG landing-e2e rc=… …
+CHECK_EXIT=<n>   →   可过段数 = <n> / <TOTAL>       # 只有第 4 步能回答"跑满"
+（若 CHECK_EXIT≠0）逐段实测：通过 P / 失败 F / 跳过 S —— 只能当"哪段拦住了"的附表，不冒充上一行
+```
+
 ### 7.31 ③ 的输入多了一道「能不能重放」的门，另一枚探针先被自己作废（2026-10-04 12:4x–13:0x，载体 `458249f6`，窗口仍不在）
 
 - 窗口现量（12:56:10）：`vm.loadavg` 1-min **15.78**（阈值 = ncpu 16 × 3/4 = 12）、`:3000` = node/70256、`:3100` = node/26407、4318/4319/4322 空闲、
