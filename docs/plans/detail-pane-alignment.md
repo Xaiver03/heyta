@@ -365,3 +365,21 @@ cd "$(git rev-parse --show-toplevel)/.." && git status --porcelain docs/research
    `git show HEAD:docs/adr/0050-e2ee-key-lifecycle-and-recovery.md` 的第 83 行**没有**这个链接
    ⇒ 干净检出是绿的，这条红**只在混合工作树成立**，由他们下一次提交（带那枚证据的 `git add`）关闭。
    上面"门禁全绿"那一格读的是 06:5x 那趟，当时确实绿。
+
+📌 **本批给合流面添了 2 枚，逐枚写清落点与意图**（07:0x 现量：
+`git merge-tree --write-tree feat/detail-pane 23bbf2f1` = **15** 枚，`… HEAD` = **17** 枚，
+差集恰是 `apps/web/src/App.tsx` 与本篇；其余 15 枚与 10 枚证据 PNG 不是我添的）：
+
+- **`apps/web/src/App.tsx`**：两边在**同一个锚点附近各插一块状态**（分支 `feat/detail-pane` 在
+  `f419df75` 之后对该文件 **+135/−2**，其中 43 行插在旧 line 613 处 = 工单 **W4「用户主动收起详情列」**
+  的 `data-detail` 状态与三条恢复路径；我那 30 行插在 621 处 = `detailHasRoom`）。
+  解法意图：**两边都要**，不是择一 —— 而且他们那段注释里那句"两处不许合成一个布尔"正好说的是这件事：
+  几何（本档）与用户选择（他们的 `data-detail`）必须是两个量。
+  🔴 **合流后天然成立的一件事，实测取自他们的 CSS**：`base.css:98` 写的是
+  `.ht-app[data-detail='collapsed'] { --ht-detail-track: 0 }` ⇒ 用户收起时那一栏宽度归零，
+  我这句 `width > 0` 自动读成假 ⇒ **AI 面自己退回中间列，一行代码都不用加**。
+  这正是"量实际宽度"换回来的东西：如果当初在 JS 里抄 `1024`，他们的收起功能会**需要有人记得**
+  来这边加一个 `|| collapsed` —— 而没人会想起要加，症状依旧只是"面板不见了"。
+  ⚠️ 别把中间列那行 `{detailHasRoom ? null : aiPanels}` 当重复代码删掉，那是唯一的回退。
+- **本篇**：纯文本撞末尾 + 我这次的两节序号（见 §8.54 开头那块），**无语义冲突**，
+  两边小节全部保留、按各自分支内的相对顺序排在最后即可。
