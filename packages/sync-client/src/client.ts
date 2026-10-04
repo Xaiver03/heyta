@@ -1009,57 +1009,81 @@ export class SyncClient {
     }
     for (const batch of batches) {
 
-      const ops = await Promise.all(
-        batch.map(async (op) => {
-          // 🔴 本地自查实体类型。线协议不校验成员，
-          // 拼错要到上传后才暴露，而且是一条一条地暴露。
-          if (!isEntityType(op.entityType)) {
-            throw new Error(
-              `拒绝上传未知实体类型 "${op.entityType}"（op ${op.id}）。` +
-                `线协议不会校验它，所以必须在本地拦住。`,
-            );
-          }
+      /**
+       * 🔴 **逐条串行加密**。这不是风格选择，是省掉一次移动端首批同步的峰值内存。
+       *
+       * 机制：`encrypt(payload, password)` 每次都走会话密钥缓存，而缓存是
+       * **「同步查一次 → miss 才 await Argon2id」，没有在途 Promise 复用**
+       * （`sync-core/src/encryption/session-cache.ts` 的 `getOrDeriveEncryptKey`）。
+       * Argon2id 单线程、**每次派生占 64 MiB**（`encryption/argon2.ts` 的
+       * `memorySize: 65536`）。
+       * ⇒ 用 `Promise.all` 并发时，会话**第一批**的 N 条 op 全都在第一个 await
+       *   之前查了缓存、全都 miss ⇒ 并发跑 N 次派生 = **N × 64 MiB**，
+       *   而并不会更快（只是微任务交错）。之后缓存命中不再付，所以症状是
+       *   "刚装好那一次同步特别吃力" —— 这类形状最容易长期躲过观察。
+       *
+       * 同一个包的**解密侧早就因为同一条理由改成了串行并写了理由**
+       * （`packages/sync-core/src/encryption.ts` 那段 Phase 2 注释，注意不是本包的文件）。加密侧是漏掉的另一半。
+       *
+       * 串行只改**调度**：密文、`ops` 与 `batch` 的下标配对（`send()` 里按
+       * `batch[index]` 取原始时钟）都不变。
+       */
+      const toWireOp = async (op: Operation<string>) => {
+        // 🔴 本地自查实体类型。线协议不校验成员，
+        // 拼错要到上传后才暴露，而且是一条一条地暴露。
+        if (!isEntityType(op.entityType)) {
+          throw new Error(
+            `拒绝上传未知实体类型 "${op.entityType}"（op ${op.id}）。` +
+              `线协议不会校验它，所以必须在本地拦住。`,
+          );
+        }
 
-          const cipher = await payloadCipher.encrypt(JSON.stringify(op.payload ?? {}), op);
+        const cipher = await payloadCipher.encrypt(JSON.stringify(op.payload ?? {}), op);
 
-          // 自检：服务端会检查形状，本地先确认我们真的产出了合规密文。
-          // 这里失败说明加密层出了问题，而不是网络问题。
-          if (!isEncryptedPayloadTransportShape(cipher)) {
-            throw new Error(
-              `op ${op.id} 的密文不满足服务端传输形状要求 —— 加密层异常`,
-            );
-          }
+        // 自检：服务端会检查形状，本地先确认我们真的产出了合规密文。
+        // 这里失败说明加密层出了问题，而不是网络问题。
+        if (!isEncryptedPayloadTransportShape(cipher)) {
+          throw new Error(
+            `op ${op.id} 的密文不满足服务端传输形状要求 —— 加密层异常`,
+          );
+        }
 
-          const frontier = this.causalFrontier;
-          const relation = frontier ? compareVectorClocks(op.vectorClock, frontier.vectorClock) : undefined;
-          const canCompact = frontier !== undefined && (relation === 'EQUAL' || relation === 'GREATER_THAN');
-          return {
-            id: op.id,
-            clientId: op.clientId,
-            actionType: op.actionType,
-            opType: op.opType,
-            entityType: op.entityType,
-            ...(op.entityId !== undefined ? { entityId: op.entityId } : {}),
-            ...(op.entityIds !== undefined ? { entityIds: op.entityIds } : {}),
-            payload: cipher,
-            ...(op.opType === 'REPAIR' && isHeytaFullStatePayload(op.payload)
-              ? { repairBaseServerSeq: op.payload.repairBaseServerSeq }
-              : {}),
-            // 服务端要求**显式 true**；缺失算违规，不是"当作 false"
-            isPayloadEncrypted: true,
-            vectorClock: canCompact
-              ? compactVectorClockAgainstFrontier(
-                  op.vectorClock,
-                  frontier.vectorClock,
-                  [op.clientId],
-                )
-              : op.vectorClock,
-            ...(canCompact ? { vectorClockEncoding: 'frontier-delta' as const } : {}),
-            timestamp: op.timestamp,
-            schemaVersion: op.schemaVersion,
-          };
-        }),
-      );
+        const frontier = this.causalFrontier;
+        const relation = frontier ? compareVectorClocks(op.vectorClock, frontier.vectorClock) : undefined;
+        const canCompact = frontier !== undefined && (relation === 'EQUAL' || relation === 'GREATER_THAN');
+        return {
+          id: op.id,
+          clientId: op.clientId,
+          actionType: op.actionType,
+          opType: op.opType,
+          entityType: op.entityType,
+          ...(op.entityId !== undefined ? { entityId: op.entityId } : {}),
+          ...(op.entityIds !== undefined ? { entityIds: op.entityIds } : {}),
+          payload: cipher,
+          ...(op.opType === 'REPAIR' && isHeytaFullStatePayload(op.payload)
+            ? { repairBaseServerSeq: op.payload.repairBaseServerSeq }
+            : {}),
+          // 服务端要求**显式 true**；缺失算违规，不是"当作 false"
+          isPayloadEncrypted: true,
+          vectorClock: canCompact
+            ? compactVectorClockAgainstFrontier(
+                op.vectorClock,
+                frontier.vectorClock,
+                [op.clientId],
+              )
+            : op.vectorClock,
+          ...(canCompact ? { vectorClockEncoding: 'frontier-delta' as const } : {}),
+          timestamp: op.timestamp,
+          schemaVersion: op.schemaVersion,
+        };
+      };
+
+      /**
+       * 串行 await 每一条。`ops[i]` 与 `batch[i]` 的下标配对靠顺序 —— `send()`
+       * 里要用 `batch[index].vectorClock` 把压缩过的时钟换回完整时钟。
+       */
+      const ops: Awaited<ReturnType<typeof toWireOp>>[] = [];
+      for (const op of batch) ops.push(await toWireOp(op));
 
       const usesDelta = ops.some((op) => op.vectorClockEncoding === 'frontier-delta');
       const lastKnownServerSeq = await this.options.getLastServerSeq();
