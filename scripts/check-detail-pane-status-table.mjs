@@ -13,7 +13,11 @@
 //   已开工的行必须记到变异那一层（或写明 `无变异面` + 理由）、
 //   已开工的行必须给出**判据条数**（目标第 4 条点名的那一样；19:0x 之前这一格只有散文在守，
 //   而现量结果是 W0/W1c 两格真的没有）、变异那一格必须有**臂条数 + 红集**两样在同一句里、
-//   以及（19:5x 起）任何表格单元的 code span 里不许有裸竖线。
+//   任何表格单元的 code span 里不许有裸竖线（19:5x 起），
+//   以及有序列表块的字面编号必须与位置一致（20:5x 起 —— 本线的"§8.76 第 N 条"是**跨文档**引用，
+//   而渲染层只认块内首项的字面值，编号写错在渲染后完全看不出来）。
+// 🔴 腿 1–9 判的是 §8 那张表；腿 10 判的是**传来的每一份文档**（默认 = 工单 + 调研那两份）。
+//   把表类判据也套到调研文档上没有意义（它没有 `| 单 | 状态 | 读数` 表），但编号引用两边都有。
 // ⚠️ 不判"列数等于表头"：本表读数栏**合法地**出现竖线（`ps … | grep …`、`a | b` 式并排列），
 //   要分辨就得掩码码段，而掩码在本表上两次实测都漂（同一批行先读出 7 列再读出 2/4/5/4 列）。
 //   一条在它的样本上说不清对错的判据不该用来拦事 —— 拦"行被拆成多行"这件事，
@@ -34,8 +38,17 @@ const root =
       })()
     : process.argv[rootIdx + 1];
 const argv = process.argv;
-const docArg = argv.slice(2).find((a, i) => !a.startsWith('--') && a !== root && i + 2 !== rootIdx + 1);
-const doc = docArg ? (docArg.startsWith('/') ? docArg : join(root, docArg)) : join(root, 'docs/plans/detail-pane-alignment.md');
+const positionals = argv
+  .slice(2)
+  .filter((a, i) => !a.startsWith('--') && !(rootIdx !== -1 && i + 2 === rootIdx + 1) && a !== root);
+const PLAN = 'docs/plans/detail-pane-alignment.md';
+const RESEARCH = 'docs/research/detail-pane-alignment-and-spaced-review.md';
+// 🔴 默认扫**两份**：本线的"§8.76 第 N 条"式引用是**跨文档**的（工单引调研、调研引工单），
+//   只守一张表所在那份等于把引用面的一半留在散文里。显式传参时就用传来的那几份（装置要控制自己的副本）。
+const docList = (positionals.length ? positionals : [PLAN, RESEARCH])
+  .map((a) => (a.startsWith('/') ? a : join(root, a)))
+  .filter((p, i) => (i === 0 ? true : existsSync(p)));
+const doc = docList[0];
 if (!existsSync(doc)) {
   console.log(`🔴 取样文档不存在：${doc}`);
   process.exit(1);
@@ -266,9 +279,70 @@ for (const r of tableRowLines) {
   if (hits.length) pipeRows.push({ ...r, id: r.text.match(UNIT)?.[1] ?? '', sample: hits[0].slice(0, 44) });
 }
 
-console.log(`取样：${doc.startsWith(root + '/') ? doc.slice(root.length + 1) : doc}`);
+// 腿 10：有序列表块的**字面编号必须与位置一致**（首项是 start，其后每条 +1）。
+// 为什么这条要常驻，而不是"顺手加严"：本线两份文档靠 `§8.76 第 N 条` 这种**源码里的编号**互相引用，
+// 而渲染层（CommonMark）只认块内首项的字面值、其余一律按 start + 序号重排 ——
+// ⇒ "编号写错"在渲染后**看不出任何异常**，只在按号索引时指错东西，而那正是本批 #20 记的 main 侧台账同款缺陷。
+// 现量起因（2026-10-04 20:4x）：给 §8.76 追加一条时，一次性扫描照出该块**有 6 条**字面编号与位置不一致
+// （写成 6, 8, 7, 8, 9, 10, 11），而前九条腿**一条都不红** —— 表层判据管不到列表层，与腿 9 是同一族的两层。
+// ⚠️ 允许首项不为 1：作者可以故意从 7 起，让编号对上别处的编号表（调研文档 C1 那张逐节清单就这么写，
+//   现量 20 条首项 7 的续编）。判的是"**块内等差 1 递增**"，不是"从 1 开始" —— 写成后者会把合法写法判红。
+// ⚠️ 代码围栏里的 `N. ` 是命令输出/注释，不算列表项；`|` 行与 `#` 标题会结束一个块（表格里出现
+//   "1. " 开头的单元格是常事，把它当列表项会造成一片假红）。
+const LIST_ITEM = /^(\d+)\.\s/;
+const listBad = [];
+const listPerDoc = [];
+const numberingScan = (textLines) => {
+  const bad = [];
+  let blocks = 0;
+  let items = 0;
+  let inFence = false;
+  let i = 0;
+  while (i < textLines.length) {
+    if (/^```/.test(textLines[i])) {
+      inFence = !inFence;
+      i += 1;
+      continue;
+    }
+    if (inFence || !LIST_ITEM.test(textLines[i])) {
+      i += 1;
+      continue;
+    }
+    const block = [];
+    let j = i;
+    while (j < textLines.length) {
+      const text = textLines[j];
+      const m = text.match(LIST_ITEM);
+      if (m) {
+        block.push({ n: Number(m[1]), line: j + 1 });
+        j += 1;
+        continue;
+      }
+      if (text.startsWith('|') || /^#{1,6} /.test(text)) break;
+      if (/^(?:\s+\S|\s*$)/.test(text)) {
+        j += 1;
+        continue;
+      }
+      break;
+    }
+    if (block.length > 1) blocks += 1;
+    items += block.length;
+    block.forEach((b, k) => {
+      if (b.n !== block[0].n + k) bad.push({ line: b.line, n: b.n, expect: block[0].n + k, start: block[0].n });
+    });
+    i = j > i ? j : i + 1;
+  }
+  return { bad, blocks, items };
+};
+for (const p of docList) {
+  if (!existsSync(p)) continue;
+  const label = p.startsWith(root + '/') ? p.slice(root.length + 1) : p;
+  const { bad, blocks, items } = numberingScan(readFileSync(p, 'utf8').split('\n'));
+  listPerDoc.push(`${label.split('/').pop()}：块 ${String(blocks)}／条目 ${String(items)}／不一致 ${String(bad.length)}`);
+  for (const b of bad) listBad.push({ ...b, label });
+}
 
-console.log(`表区间：第 ${head + 1} 行起，连续 ${rows.length} 枚工单行，列结构 = 单/状态/读数`);
+console.log(`取样：${doc.startsWith(root + '/') ? doc.slice(root.length + 1) : doc}`);console.log(`表区间：第 ${head + 1} 行起，连续 ${rows.length} 枚工单行，列结构 = 单/状态/读数`);
 console.log(
   `逐行读数：${parsed.map((r) => `${r.id}=${r.declared ?? '无法判定'}${CLAIM_IMG.test(r.text) ? (IMG.test(r.text) ? '(图✓)' : '(图✗)') : ''}`).join(' ')}`,
 );
@@ -281,6 +355,7 @@ dump('🔴 已开工的行没记变异读数（也没写「无变异面」+理�
 dump('🔴 已开工的行没写**判据条数**（也没写「无判据面」+理由）', judgeMissing, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
 dump('🔴 变异那一档没有"臂条数 + 红集"两个读数（光提一句不算，纯文档单走「无变异面」+理由）', armMissing, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
 dump('🔴 表格单元的 code span 里有裸竖线（GFM 会在这里切格，行不裂但格子裂 —— 前八条腿一条都不红）', pipeRows, (r) => `:${r.line} ${r.id || '(非§8表)'} 码段 ${JSON.stringify(r.sample)}`);
+dump('🔴 有序列表的字面编号与位置不一致（渲染层看不出来，只有按"第 N 条"索引时指错东西）', listBad, (b) => `${b.label ? `${b.label} ` : ''}:${b.line} 写作 ${String(b.n)}. 而按首项 ${String(b.start)}. 应为 ${String(b.expect)}.`);
 
 // 承重读数：把"这一趟真的扫到了对象"打在输出里 —— 0 枚命中既可能是"全都合规"也可能是"needle 没射程"，
 // 没有这两个数就区分不了（腿 4/6 各自撞过一次，见上面注释）。
@@ -293,6 +368,8 @@ console.log(
 // 腿 9 的射程单独报一行：表行总数 / 其中含码段的行数 / 因反引号不成对而跳过的行数。
 // 🔴 没有这行的话"裸竖线 0 处"和"扫到 0 枚表行"在输出里长得一样（这一族在本线已经踩过三次）。
 console.log(`承重(腿9)：表格行 ${tableRowLines.length} 枚｜含 code span ${codedRows} 枚｜反引号不成对而跳过 ${skippedRows} 枚`);
+// 腿 10 的射程同理：逐份文档报"块数／条目数"，"0 处不一致"才知道是"都合规"而不是"没扫到列表"。
+console.log(`承重(腿10)：${listPerDoc.join('｜')}｜首项不为 1 的续编块算合法`);
 
 const bad =
   unclosed.length +
@@ -303,12 +380,13 @@ const bad =
   mutMissing.length +
   judgeMissing.length +
   armMissing.length +
-  pipeRows.length;
+  pipeRows.length +
+  listBad.length;
 if (dumps.length) console.log(dumps.join('\n'));
 console.log(
   `\n结论：${
     bad === 0
-      ? '§8 落地记录表的行闭合、状态词表、id 唯一、截图栏位、表外无工单段（按分隔行判）、已开工行有变异读数、判据条数、变异"臂条数+红集"两样齐、码段无裸竖线 —— 九项都成立 ✅'
+      ? '§8 落地记录表的行闭合、状态词表、id 唯一、截图栏位、表外无工单段（按分隔行判）、已开工行有变异读数、判据条数、变异"臂条数+红集"两样齐、码段无裸竖线、列表编号与位置一致 —— 十项都成立 ✅'
       : `🔴 ${bad} 处不成立`
   }`,
 );
