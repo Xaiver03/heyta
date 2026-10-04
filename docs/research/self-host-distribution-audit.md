@@ -6082,3 +6082,22 @@ objective 第 5 项要的是"让它进对账**且判据能红**"。进对账这�
 复原也是读数的一部分（否则这条臂本身就在污染工作树）：`git checkout --` 那两份之后，`md5` 与臂前基线**逐字相同**、门禁 `RESTORED_GATE_RC=0`、`git status --porcelain` 空。
 
 ⇒ 第 5 项的两腿现在都是**当天现量**：进对账（g76 打印）+ 能红（本节）。装置留在 `/tmp/g85-arm.mjs`（一次性，未入库 —— 它的价值在这次读数，不是一份要长期维护的臂；要长期跑应该挂进 `research/tools/mutation-rigs/`，那是另一件事，登记在此不代做）。
+
+### 8.100 第 3 项 G-48 的两条腿都取到本轮现量，顺带记一条"载体存在 ≠ 这趟真跑"与一条被排除的错误推理（2026-10-04 16:2x–16:3x）
+
+objective 那句"**同一个 `apps/web/dist` 不可能两条同时绿**"本轮直接量了，两跑纯 fs、零写盘：
+
+| 腿 | 命令 | 结果 |
+|---|---|---|
+| 链里那条 | `node scripts/check-web-artifact.mjs --mount /` | **rc=0** ✅ 产物自洽：挂载 `/` 与产物声明一致（5 个本地引用、15 个 manifest 文件、4 个 data URL 落在 `/widgets/`、246 个 `--ht-*`） |
+| 生产那条 | 同一份产物、不改任何东西、`--mount /app/` | **rc=1** ❌ 产物与挂载路径不一致：「产物声明它挂在 `/`（从 index.html 的 2 条 assets 引用**反推**）而你要把它放在 `/app/`」 |
+
+挂载路径是**从产物自己声明反推**的，不是拿参数去比参数 —— 所以这两条互斥是设计使然，不是缺陷。宿主 `apps/web/dist` 是默认构建（`src="/assets/…"`），于是它只能对 `/` 绿。
+
+🔴 **`/app/` 那一腿的自动载体，本轮证明的是"这趟真跑"，不是"历史上跑过"**：`docker build -f server/Dockerfile --target web --no-cache-filter web --progress=plain` ⇒ `[web 36/36] RUN node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/` 后面紧跟 `✅ 产物自洽：挂载 /app/ 与产物声明一致…4 个组件数据 URL 都落在 SW 前缀 **/app/widgets/** 内；246 个 --ht-* 定义对得上`。`--no-cache-filter` 是关键：不加它，缓存命中时只能证明"某趟跑过"，而那正是 §7 第 27 条（旧产物报绿）在镜像层的形态。probe 用的临时 tag 已 `docker rmi`，残留 0。
+
+⚠️ **一条被排除的错误推理，别照着它再推一遍**：`docker history supersync:selfhost-verify | grep check-web-artifact` 命中 **0** —— 这**不**说明那一层没跑。多阶段构建里 `web` 阶段不进最终镜像，历史里天然查不到。当时我差点把它读成"载体没执行"。
+
+🔴 **还剩一格不可观测（登记，未当场改）**：`verify-selfhost-stack.sh` 把 `docker build` 的输出整体吞掉（`grep -c CACHED /tmp/g76.log` = **0**，日志里只有"镜像 OK"那一行）。也就是说**日常跑 verify 时，那一层跑没跑、是 DONE 还是 CACHED，从日志里看不出来** —— 载体存在是真的，可观测性是缺的。补法（下一轮做，不在这里顺手改）：给那条 build 加 `--progress=plain` 并把输出留档，然后**把"产物自洽：挂载 /app/"那一行必须出现**做成判据（找不到 ⇒ die），注入臂 = 临时改 needle 看它会红。离线先验已经有真数据：`/tmp/g88-web.log:508` 就是 plain 输出里那一行，可以直接喂给解析部分，不必占一次完整构建窗口。
+
+⇒ 第 3 项的"做决定 + 注入验证能红"两腿现在是**当天现量**；上面那格是可观测性的欠账，不是判据缺失。
