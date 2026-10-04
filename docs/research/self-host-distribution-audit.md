@@ -8783,4 +8783,15 @@ last=["阻塞集=1","负载=71.03>12","端口被占：4319/13914,4318/13939","�
   ⚠️ 阻塞集从 1 枚涨回 **2 枚**（别人新的未提交工作又压在写集上），这与 §8.84 那条"阻塞集会涨"是同一族，
   再次证明**不许拿上一轮的枚数当现状**。
 
+#### 那两枚阻塞分别是谁（00:1x 现量，枚数与身份都会变，别照这段行动）
+
+| 文件 | 谁手里 | 提交态会不会变成冲突 |
+|---|---|---|
+| `package.json` | 别人未提交（本批也改它：那条 `check` 整行链） | 🔴 **会**，而且已有预置解法（第九族之外的 pkg 族：取并集 + 写回 + round-trip 断言）|
+| `scripts/check-gate-wiring.mjs` | 别人未提交 +20 行；本批相对 main 是 +46 行（第 3b 条那批） | **今天不会** —— 现量命令：`git merge-tree --write-tree --name-only main feat/self-host-distribution`（rc=1，恰好 7 条）里没有它；那 7 条是 `docs/research/self-host-distribution-audit.md` / `package.json` / `research/tools/check-image-license-coverage.mjs` / `research/tools/gen-image-npm-tree.mjs` / `scripts/screenshots/capture.mjs` / `server/Dockerfile` / `server/image-npm-tree.json`，逐条都落在预置族内。它现在是**纯 B 层**：只等他们把 +20 提交掉 |
+
+⇒ 这条区分要紧，因为它决定"落地那一刻会不会多一道要人判的冲突"：`check-gate-wiring` 的落地解法工具自己写着
+**"未预置 ⇒ 交人判（不要猜）"** —— 今天用不上，但他们那 +20 行一旦提交到同一段，就会从"B 层等一等"
+变成"载体拒绝落笔"。所以落地前除了数枚数，还要**现量它是否进了冲突清单**（同一条命令的两行输出）。
+
 
