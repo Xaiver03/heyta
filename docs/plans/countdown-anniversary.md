@@ -2815,7 +2815,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
     ⇒ 两链已按更长的等待重启（U 等 R2 的终哨 180 分钟、V 等 U 的终哨 240 分钟），
     三条链现在都活着：`R3=21982` / `U=45470` / `V=45122`。
     ⚠️ **我在这一步弄丢了一份取证**：链 U 的脚本开头是 `: > "$LOG"`，重启时把上面那两行 `rc=3` 读数**截掉了**
-    —— 后台链的日志如果被复用，收尾读数必须**先抄进台账再重启**（这条已经落进下面的 ㊵ 之前的处置）。
+    —— 后台链的日志如果被复用，收尾读数必须**先抄进台账再重启**（处置见本节末尾那条「修法登记但当场不改」）。
   - **现场负载读数**（同一台 16 核机器，`vm.loadavg` 一分钟列）：`11:18 = 47.72` → `12:07 = 10.35`（**开过一格**，但那一格被别人的 runner 挡）
     → `12:36 = 15` → `12:54 = 55（等满 900s 时是 49）` → `13:07 = 57.59`。
     🔴 **峰值 174** 出现在 12:10 那一趟的探针日志里（`负载 174 > 12`）—— 这台机器此刻由多条并行会话共同打满，
@@ -2828,3 +2828,41 @@ W0b ─> 随时可做（台账那半要等文件干净）
     （截断 = 毁掉上一轮 `rc=3` 的唯一取证；而直接改成追加又会让终哨 `grep` 读到旧趟的"终点"行 ⇒ 提前放行）。
     **不当场改的理由是 traps #110/#113 那一族**：两条链正在跑，bash 按字节偏移增量读脚本，
     运行中编辑会让它从错位字节开始解析、炸出假语法错误 —— 改脚本要等它跑完或停掉。
+
+- ㊵ **链 U 把 Android 那一腿在当前产物上关掉了；链 V 量到 `check:ui-provider` 那一格红（含本批新增的一行，且有设备反证）**（04 13:15–13:26，载体 `b995597a`）
+  - ✅ **链 U 全部读数**（`/tmp/device-closeout-U.log`，13:15 开窗 → 13:20:22 终点）：
+    `[3] RC_REINSTALL_ANDROID=0`（`reinstall-all.sh --only android`：清旧包 → 重打 → 模拟器卸旧装新 → 判据）、
+    `[4] 设备现取 serial=emulator-5554` + **`RC_ANDROID=0`**（`verify:mobile-card-export` 在**当前提交**的产物上复跑成功）、
+    `[4b] 本地 dist sha=517C6BA76D00FB25 包内 sha=517C6BA76D00FB25 ⇒ RC_WINDOWS_LEG=skip`（那一步的自愈逻辑判对了：
+    `pnpm -r build` 没改动 `apps/web/dist` 的字节，所以 ㊲ 那份 windows 取证对本轮仍然成立，不必重打远端）、
+    `[5] RC_SURFACES=0（5 绿 0 红 / 未取证 1 栏）`、`RC_CARD_EXPORT=0`。
+    🔴 **为什么这一腿必须重跑**：09:18 那趟之后 `apps/mobile/src/lib/card-export.tsx` 改了（`settleRasterize`），
+    模拟器里那枚 APK 的 JS bundle 已经不代表当前提交 —— 这正是 §6.1.1 与 §7 第 27/82 条要防的形状，
+    而这一腿现在是在**当前提交**上取的了。
+  - 📌 **一次差点误判的归属**：跑完后工作树里 `apps/mobile/evidence/card-export/latest-card.png` 变成 ` M`，
+    而 `packages/op-log/src/{state,engine}.ts` 与 `packages/sync-core/src/causal-clock.ts` 的 mtime 跳到 13:26:38–45，
+    第一反应是"有别人在写我的隔离检出"。现量之后两件事都归到自己头上：
+    png 是**链 U 那一趟探针自己拉回来的读数**（`md5` 与 HEAD 那份不同、时间戳 13:20:19 与 `RC_ANDROID=0` 同一秒）；
+    三枚源码文件是**链 V 的 `pnpm check` 第一步 `pnpm build` 重写了一遍内容未变的文件**（`git status` 对它们全空、
+    与主检出那份的 inode/大小都不同 ⇒ 不是同一枚文件）。⇒ 报"别人在写"之前先把自己的链时刻对上。
+  - 🔴 **链 V：完整 `pnpm check` 在当前 HEAD 上 `RC_CHECK=1`，红在 `check:ui-provider`，45 秒就停（串联门禁红即停）**（13:26:02–13:26:47，`RC_LINKS=0` 同趟）：
+    它列 4 条"消费者在 `<HeytaUiProvider>` 子树之外"，其中 **`CountdownScreen.tsx:174` 是本批的行**
+    （`git blame` 现量 = `79e116cf`「W7 成品图导出的移动半」），另外三条（`GrowthScreen:298` / `HabitsScreen:365` /
+    `ui/habit-goal-slot.tsx:37`）不是本批的。
+    对这一条我有**两层反证**：① `:68` 是 `import { useTheme } from '../theme'`，而 `apps/mobile/src/theme.tsx:33`
+    写的是 `HeytaUiProvider as ThemeProvider` —— 门禁自己在 `scripts/check-ui-provider.mjs:801` 就注明了
+    "按**词法位置**判会把这类消费者误判成子树之外（false positive）"；② **设备反证**：同一台模拟器同一屏，
+    13:20 那一趟真打开过倒数日屏、真点了导出、真拉回了 `1080×1440` 的 png —— 真在 Provider 之外会当场抛
+    「useHeytaUiTheme 必须在 `<HeytaUiProvider>` 内使用」，跑不到落盘那一步。
+    ⚠️ **处置：不把判据改绿、也不当没看见** —— 登记 **W7-G7 / 任务 #25**：`check:ui-provider` 的可达性要跟着
+    `theme.tsx` 那类别名走（修法方向是给探针加"本地再导出/别名"这一跳，而不是把判据退回"出现过 Provider"）。
+    因此 Goal 第⑤条第 1 项"完整 check 的读数"现在的真话是：**串联到 `check:ui-provider` 停住**，
+    本批自己的门禁全部单独重取过（`check:card-export` / `check:shell-surfaces` / `check-md-table-rows` / `docs-link-check` 各自 rc=0）。
+  - 🔴 **iOS 新鲜度门：两条"更聪明"的替代判据都被实测否证，所以链 X 走最贵但唯一诚实的那条 —— 先重装再测**
+    （这段推理写在链 X 的文件头，摘在这里是因为它是本批第 N 次撞"测试绿 ≠ 当前产物"）：
+    ① 用"最近一次改 bundle 输入的**提交时间**"代替文件 mtime ⇒ 现量 `10:21:53 > bundle 10:19:34`，
+       而那是因为我**先打包、后提交**（提交时间不是内容变更时间）⇒ 照样假红；
+    ② 用"现场重打一份 bundle 逐字节比" ⇒ metro 本身确定性成立（连打两次 `md5 11a0b9e1…`、6 041 554 字节），
+       但 Xcode build phase 装进 `.app` 的那枚是 **7 277 184 字节**，命令不同 ⇒ 字节不可比。
+    ⇒ 链 X：`IOS_DEVICE_NAME=heyta-batch2-closeout bash scripts/reinstall-all.sh --only ios`（重装本身也是 Goal 第⑤条第 4 项要的）
+       → 再跑探针取 `RC_IOS_PROBE`。
