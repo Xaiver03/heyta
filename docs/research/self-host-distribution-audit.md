@@ -6360,3 +6360,113 @@ en  'site.platforms.web.body': The full product, not a demo. It keeps working wh
 
 按 §8.20 的纪律，那条"`site.platforms.web.body` 不含「可安装 / Installable」"的 live-site 判据
 **现在不落**：线上站点仍是旧句，提前挂上去只会红在"还没发布"这件事上，而不是红在代码上。
+
+### 8.107 G-51 第四档做到一半：两条包测试补到了、界面判据落成一条有自动消费者的用例，而真浏览器读数被别人的套件挡在门外（2026-10-04 17:2x）
+
+§8.106 末尾欠的两件事，这一节把**能免费拿的那一半**拿完，另一半**照实记成没拿到**。
+
+#### ① 两条包测试：第一次跑到了（不是绕闸）
+
+17:17 那把被拒之后，17:1x 末闸门空了一小段（`/tmp/tfa-test.lock` 不存在），补跑：
+
+| 命令 | 读数 |
+|---|---|
+| `pnpm --filter @heyta/i18n test` | `Test Files 2 passed (2) · Tests 22 passed (22)`，`I18N_RC=0` |
+| `pnpm --filter @heyta/landing test` | `Test Files 22 passed (22) · Tests 1312 passed (1312)`，`LANDING_RC=0` |
+
+退出码取自日志里我自己追加的哨兵行，**不是**后台通知那个包装码（§7 第 164/179 条）。
+⇒ §8.106 那条"两条包测试没跑"闭合，改成本节的"跑了、全绿"。
+
+#### ② 界面级判据：写成一条真浏览器用例，落在**本地 build 产物**
+
+新文件 `e2e/landing/platforms-install-claim.spec.ts`（3 条用例）。它盯的是一句
+**没有载体的对外承诺**：`site.platforms.web.body` 原来写「可安装、可离线用」，
+而 Web 端到今天也没有可安装的 PWA（`SW_URL='/sw.js'` 在 `/app/` 挂载下返回落地页 HTML，
+§8.57 / deployment.md §3.7）。G-51 的处置是把整条安装承诺摘掉，这条用例负责**不让它回来**。
+
+两个形状决定，都不是审美：
+
+- **载体 = `playwright.landing.config.ts` 的 build + preview（端口 4320、`strictPort`、独立
+  `outputDir: ./landing-results`），不是 `e2e/live-site/`**。线上那一份还等重新发布（步骤⑤），
+  把判据挂到 live-site 会红在"还没发布"上而不是红在代码上 —— 按 §8.20 的纪律不落。
+  落在本地产物上，它拦的是**代码往回退**，落地即有效。
+- **断言范围收在 `section#web`，不写全页级"没有安装字样"**。同一页另外三张卡合法地含「安装」：
+  `zh-CN.ts:3051` iOS「在模拟器上完整跑通：**安装**、建库…」、`:3055` 鸿蒙「能打出**安装**包」、
+  `:3057` self-host「不是零思考的一键**安装**」。全页级判据会红在这三条正确的文案上。
+  这条不是推测 —— 用例里第三条就是把它钉成断言（`#main` 全文**应当**含「安装」），
+  将来谁把那三句里的「安装」也顺手改掉，这条会告诉他范围为什么收在这里。
+
+每条都按 §6.2 规定一写：**先截图再断言**、固定文件名（`platforms-web-card-zh.png` /
+`-en.png` / `platforms-page.png`）、`console.error` 与 `pageerror` 进断言，
+并且**负向断言配正向锚点**（先要求新句含「断网也能照常记」/ `keeps working when you are offline`，
+才有资格说「可安装」「Installable」不在 —— 空串的 `not.toContain` 是无条件成立的假绿）。
+
+**自动消费者现量**：`check:landing-e2e` 已经在 `pnpm check` 链里（两棵树的 `package.json` 都是：
+`node scripts/check-ai-e2e-preflight.mjs 4320 && pnpm --dir e2e run test:landing`），
+而 `playwright.landing.config.ts` 的 `testDir: './landing'` 是**目录枚举** ⇒ 新 spec 自动进套件，
+**不需要动 `package.json`**。这一点是刻意的：那枚文件现在正躺在阻塞集里（③）。
+
+**起跑即被挡**：`pnpm --dir e2e exec playwright test -c playwright.landing.config.ts
+platforms-install-claim.spec.ts` 回 `内存闸门拒绝启动：已有测试在跑（pid=37974，它是
+`pnpm --dir e2e run test`）`，`SPEC_RC=1`，**一条用例都没执行**（`landing-results/` 里
+没有新图，最新时间戳还是 00:03）。同一时刻 `vm.loadavg` = **176.63**。**没有**用
+`TFA_ALLOW_CONCURRENT_TEST=1` 绕 —— 拒绝是环境读数。等待器 `/tmp/g128-wait.sh`（pid 45068）
+每 60s 查锁、锁空后无条件再等 20s 才起跑，上限 3600s，等满按"环境无效≠产品失败"收尾。
+
+⇒ 所以 G-51 这一档**现在只到**"判据已写、静态预验过、有自动消费者"，**不到**"界面已验"。
+在拿到那张图并看过之前，不声称界面上那句话已经不见了。
+
+#### ③ 等窗口期间做的零 CPU 预验（它能证明什么、不能证明什么）
+
+扫 `apps/landing/dist/assets`（**5 份** JS/HTML，1,649,058 字节，UTF-8 原样与 `\uXXXX` 两种形状各试一遍）：
+
+| needle | 命中 |
+|---|---|
+| `断网也能照常记` | 1（`assets/zh-CN-Ds4-fmdC.js`） |
+| `keeps working when you are offline` | 1（`assets/en-DTpLKdU2.js`） |
+| `数据就存在你自己的浏览器里` | 1（中文 chunk） |
+| `可安装` | **0** |
+| `Installable` | **0** |
+
+这证明的是**当前构建字节里有锚点、没有旧承诺**（顺带挡掉 §7 第 27/82 条那个"跑在旧产物上照样绿"）。
+它**不证明**浏览器把它渲染出来了 —— 词条在 chunk 里而 `dist/platforms/index.html` 里
+`indexOf('完整产品，不是演示') = -1`（本站文案是客户端渲染的），所以那条正向断言只能由真浏览器给。
+
+#### ④ 阻塞集从 2 枚回弹到 4 枚，而"不撞车"这句仍然成立（附阳性对照）
+
+17:10 那三格记录的是「只剩 `.gitignore` 与 `package.json`」；**这句六分钟后就过期了** ——
+`selfhost-landing-blockers.mjs` 现在报 4 枚，两枚词条表又被写上未提交改动。逐条看了他们改的是什么：
+`mobile.vault.devices*`（16 个键）、`site.docs.passphrase.sum`、`site.help.a.passphrase`、
+`web.sync.devices.*` —— 9 个 hunk / 两表各 88 行里 **`site.platforms` 命中 0**。
+🔴 **阳性对照**：同一条正则 `^[+-].*(platforms\.web|可安装)` 喂给我自己那笔 `88c6e91a`
+命中 2 行（旧句 − / 新句 +）⇒ 那个 0 是"他们没碰这一行"，不是"探针读不到"（§7 第 46 条那一族）。
+结论：**不撞车**仍成立，但"表是干净的"要按每次现量读，别抄本节数字。
+
+同一段时间里 `main` 自己前进了两笔（`eb97471a`、`406edd5e`，都是别人那条线的闸门/文档修复，
+17:22:31 刚落）⇒ 载体的 `^1` 又落后了，落地前**必须重算**，这条协议没有因为读数变新而松动。
+
+#### ⑤ G-55 的三条 needle 在**新的公开 SHA** 上重量：结论一个字没改，代价那一格变了 48 倍
+
+`git fetch`（只读；本批仍然不 push）。现量 `origin/main = 9070e18d`、本地 `main = 406edd5e`：
+
+| needle | 17:2x 读数 | 复核命令 |
+|---|---|---|
+| 公开树 `server/package.json` 的 devDeps 里那三枚工作区包 | `@heyta/app-host` / `storage` / `sync-client` 全 `"*"` | `git show origin/main:server/package.json` |
+| 公开树生产阶段有没有 prune | `npm pkg delete devDependencies` 命中 **0** | `git show origin/main:server/Dockerfile \| awk '/AS production/,0' \| grep -c …` |
+| 修法在不在公开树上 | 不在（修在我这条分支，`--is-ancestor` 到 `origin/main` 为假） | 同 §8.89 那三条 |
+
+⇒ **「外人 clone 那棵树今天仍然建不出镜像」这句仍是当前事实**，G-55 继续待拍板。
+
+但**口径 A 的代价那一格必须重写**（这正是 §8.64 末尾那条更正立的规矩）：
+
+| 时间 | `git rev-list --count origin/main..main` |
+|---|---|
+| 08:5x（§8.64 原文） | 116 |
+| 15:0x（§8.89 更正） | 97 |
+| **17:2x（本节）** | **2** |
+
+也就是说"push 等于替别人未过目的提交对外发布"这个理由**今天几乎不成立了** —— 只差的就是
+别人这两笔，而这两笔已经在本机 `main` 上。⚠️ **这不构成我可以推**：硬约束仍然是不推远端，
+而且这个数字会在落地之后重新变大（载体带进来的那几十笔是本批的）。
+它改变的是**拍板时看到的形状**：口径 A 现在很便宜，口径 B 那条"分叉"的代价相对就变高了。
+本批做到的部分不变：机制已修、判据已挂、缺口编号 + 可复核命令 + 现取数字。
