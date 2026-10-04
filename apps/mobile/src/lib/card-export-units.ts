@@ -50,6 +50,59 @@ export function rasterRequestFor(
     : { width: layoutWidth, height: layoutHeight };
 }
 
+/**
+ * 栅格化"等多久算没等到"。
+ *
+ * 🔴 为什么需要这条常量：`toDataURL` 的回调**可以永远不来**。iOS 侧
+ * `RNSVGSvgViewModule.mm:57-59` 与 `:45-48` 那两条分支都是
+ * `RCTLogError(...) + return` —— 既不回调也不报错。04 10:0x 在 iPhone 模拟器上
+ * 量到的正是这一档：点「导出成品图」之后既没有图、也没有那一句失败文案，
+ * 界面上什么都没错，而 Promise 永远悬着。
+ * 15 秒取的是"比任何真机栅格化都宽、又短到人不回头就能等到"：Android 那趟
+ * 从点击到落盘是秒级（`apps/mobile/evidence/card-export/README.md` 记的 11 项里
+ * 判据②是"点之后立刻数得到文件"）。
+ */
+export const RASTERIZE_SETTLE_MS = 15_000;
+
+export type RasterizeOutcome =
+  | { readonly fired: true; readonly base64: string }
+  | { readonly fired: false; readonly reason: 'timeout' | 'threw' };
+
+/**
+ * 把"原生可能永远不回调"折成一个**值**。
+ *
+ * 单独成函数、且不 import `react-native`，是为了让这条判据能在这个壳里真跑
+ * （本壳没有 RN 组件测试栈，见文件头）：调用方交进来的 `invoke` 在测试里就是一颗
+ * 什么都不做的桩，于是"不回调 ⇒ 在 `RASTERIZE_SETTLE_MS` 内拿到 `fired:false`"
+ * 是可判的，而不是"我保证会兜底"。
+ */
+export function settleRasterize(
+  invoke: (onBase64: (base64?: string) => void) => void,
+  timeoutMs: number = RASTERIZE_SETTLE_MS,
+): Promise<RasterizeOutcome> {
+  return new Promise<RasterizeOutcome>((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      resolve({ fired: false, reason: 'timeout' });
+    }, timeoutMs);
+    try {
+      invoke((base64?: string) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve({ fired: true, base64: base64 ?? '' });
+      });
+    } catch {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve({ fired: false, reason: 'threw' });
+    }
+  });
+}
+
 /** 一条文字指令在该端要画出的每一行（含坐标）。 */
 export interface CardTextLine {
   readonly line: string;
