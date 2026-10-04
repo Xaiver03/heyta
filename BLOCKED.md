@@ -4899,3 +4899,48 @@ for c in dd8f2210 f2d7ed40 fd34c42a de296b9d; do git merge-base --is-ancestor $c
 `cd <载体> && HEYTA_LOAD_GATE_WAIT=0 timeout 200 bash scripts/verify-mobile-window-gate.sh --target c` 读 `REDS=`；
 运行者 `cd <主检出> && . scripts/lib/mobile-e2e-runner-probe.sh; MOBILE_E2E_PROBE_ME=$$ mobile_e2e_runner_lines`。
 本线不动 `scripts/verify-mobile-notes.sh`（19:06 现量它在主检出是 `M`，别人正在改）。
+
+> **B76 补记 #17（10-04 23:0x–00:0x）—— ③ 四端补齐 + 生产部署真跑完了；顺带照出"镜像从 10-03 起建不出来"和一条我自己带出来的 flake**
+>
+> 产品负责人授权："你来解决这个阻塞，完成部署和四端构建，并且装到目前的应用当中来"，
+> 并允许停掉挡路的其他进程。已停的（都带归属证据，见上一段）：48362 chain27、
+> 38457 queue-checks-after-chain、97865/908 回收站线设备验收，以及我自己的队列与两枚监督器。
+> **AI Guard 那个项目的 pytest 故意没停**（不是本线的挡路者）。
+>
+> **③ 四端**：mac / windows / android 在 22:2x 那趟判据全绿（Windows 五条读数齐、
+> mac/android 逐字节 MATCH）；iOS 那一端 22:49 用 `IOS_DEVICE_NAME="heyta-iphone-17pro"`
+> 补跑成功 —— 五台 Booted 里没有一台名字含默认值 `"iPhone 17 Pro"`，
+> 按 #169 fail-closed "不猜"是**正确行为**，不是缺陷。读数：构建成功 → 全新安装 →
+> 包比源码新 → 窗口 1206x2622、内容占比 60.1%、**主蓝命中 4152**，
+> 人已打开那张图看过（是首启的联网同意页，浅色，中文，主蓝按钮在位）。
+>
+> **生产部署**（细节与全部读数在 `docs/runbooks/deployment.md` §3.8 第五次重建）：
+> 站点先发 → 服务端镜像重建 → 先迁移（`_prisma_migrations` 45→52，7 条全成功）→
+> 换容器 → §3.8.1 五条线上判据全绿 → 应用产物 `--base=/app/` + `check:web-artifact:app` 先过再 rsync。
+> 🔴 **这一轮必须连服务端一起发**：旧镜像 `ENTITY_TYPES` 15 枚不含 `EVENT`，
+> 而 `validation.service.ts:25` 直接拿它当白名单 ⇒ 只发前端会把倒数纪念日那条 op **硬拒**，
+> 那正是 ADR-0009/0016 那一族"一条硬拒卡死整台设备"的形状。
+>
+> 照出来的两条别人的/自己的缺陷，都已当场修到能红：
+> ① `b3397cda` 往 `server/package.json` 的 devDeps 放了三枚 workspace 包 ⇒
+>    `npm install --omit=dev` 照样解析 devDeps ⇒ **镜像 20 多个小时建不出来**，
+>    而 `pnpm check` 全绿。修：`715b25eb`。会拦它的那一层（`verify:selfhost-stack`）存在但没人跑。
+> ② `apps/landing/public/robots.txt` 的 `Sitemap:` 还印着旧域名（旧站点还活着 ⇒ 爬虫拿到
+>    整套旧 URL，不报错）。修：并进 `gen-entries` 的生成物集合，`check:entries` 覆盖面 **75→76**（两边实测）。
+>
+> 🔴 **未修、要拍板的一条（我自己 78cdff67 带出来的）**：AI 面在右栏/中间列之间换挂载点
+> = 换子树，于是**一次未决的出境披露连同草稿被悄悄取消**。触发不需要人拖窗口 ——
+> `fullPage` 截图会让 Chromium 在捕获期间把右栏算成 `display:none`
+> （探针现量 `{"mounted":true,"w":0,"disp":"none"}`），整趟 `check:ai-e2e` 约一半运行红在
+> 等 `[data-testid="ai-assistant-send"]` 超时（改前 5 趟 通过=1 失败=4）。
+> 两臂修复都试过、都凭读数否证：portal 合并挂载点（换容器同样重挂载，4 次 PROBE-MOUNT）、
+> 模块级 ephemeral（`vitest` 那四个套件 16 failed —— 同进程反复挂载互相串状态）。
+> 本笔只把判据挪到成因上（`687f5735`：截图后先断"披露还在"）。
+> 剩下两条正解各自要动别人的一条判据，**不代拍**：
+> A) 窄屏让右栏换行不换位 —— 与 `e2e/tests/detail-column-slot.spec.ts`
+>    "900px 档详情列必须 hidden"那条直接冲突；
+> B) 把这一段搬进 `assistant-history` 的盘上记录 —— 要 bump 版本，而那条记录
+>    `items.length === 0` 就整条 drop，恰好装不下"第一句还没发出去"的草稿。
+>
+> **② 仍欠的那一格**：链尾 `pnpm -r test` 在本尖端还没有一次完整读数
+> （`-r build` 与 `-r typecheck` 已在同一窗口量过）。不拿"build 绿"冒充"test 绿"。
