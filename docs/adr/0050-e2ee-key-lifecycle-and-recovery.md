@@ -40,6 +40,8 @@ heyta 的数据密钥采用三层模型：
 
 移动端 port 的初始 4 条 Node 测试（后续扩充为下述 12 条），Android Kotlin 与 iOS workspace Debug 构建通过。2026-10-03 Android 已完成安装产物的 Keystore 运行时验收：[`verify-android-vault-storage.sh`](../../scripts/verify-android-vault-storage.sh) 构建并安装当前 Debug 与 instrumentation APK，执行两个 scope 的隔离、四个独立进程的 seed/verify/remove/clean，并在 verify 与 remove 之间真实重启设备。各进程核对 PID 与系统启动编号，持久文件只含 envelope，删除 A 后 B 仍可读，随后 B 的删除也能跨进程读回。五个测试阶段均通过；[证据](../../apps/mobile/evidence/android-vault-storage.txt) 包含 APK SHA-256，不包含 root key。测试 fixture 是合成密钥，且不进入产品入口。Android wrapping key 当前不要求用户认证，因此本轮不声称锁屏禁读。iOS Keychain 的跨进程/锁屏运行时证据仍待验证，最终交付还须重装 Release。
 
+2026-10-04 Android Release 续验完成了真实认证后的 Vault 首次旅程：登录、保存并启用同步、创建 Vault、恢复码二次确认、显式选择“记住解锁”，以及解锁状态显示均在当前安装产物上通过；[截图证据](../../apps/mobile/evidence/android-vault-created.png) 已人工查看，未保存恢复码、root 或口令。该证据只覆盖首次认证会话和 opt-in 保存，不能推导出 force-stop/冷启动后再次认证会自动恢复 root；本轮也没有形成真实 UI 登出后再认证的 fence 闭环证据。冷启动恢复仍必须以同一账号重新认证后由 host 首次 `getVaultSession()` 读取安全存储为判据，logout 则继续以“先写 fence、再 invalidate、最后清理 native root”为规则。
+
 原生验收探针应按同一个 scope 矩阵执行：在 Android 真机上用两个账号 scope 写入两把不同的 32-byte root key，分别 load，删除 A 后确认 A 不可读且 B 仍可读；再从第二个进程/重启后的应用进程读取 B，确认 Keystore 解包和普通存储重载有效。iOS 用两个 Keychain account 做同样的交叉读取/删除检查，并在设备锁定时确认 `WhenUnlockedThisDeviceOnly` 读取失败、首次解锁后恢复。每一步都要记录 app 包身份、scope、返回码和截图/日志；不要把 root key 明文写入日志。若当前测试壳没有第二进程入口，先把“跨进程”标为未验证，不能用同进程线程测试冒充。
 
 2026-10-04 续验把“登出时禁止自动加载”与“原生密钥实际删除”分成两条判据：同 scope 的
@@ -81,9 +83,9 @@ Web 宿主还必须把普通同步与 root migration 视为同一账号的一条
 | 生产宿主默认启用 vault codec | 部分完成 | Web 与通用宿主在有稳定 accountId 时走 vault session；首次加载读取服务端 `payloadKeyVersion`；Web 旧 op 经界面完整迁移和新设备重建已验，移动安装产物仍待验 |
 | 存量旧 op 的原子迁移与中断恢复 | 服务端 staging/发布边界与宿主编排、Web/移动端入口完成；真实安装产物互操作待验收 | manifest + chunk + commit/cancel/status、持久化 reservation/回执；`@heyta/app-host` 已具备服务端 inventory 分页、snapshot 安全边界、内存解密/重加密、分片、status/commit 丢响应恢复与 cancel port；session 只在完整迁移成功后安装新 root/package/generation；真实 PostgreSQL/HTTP 覆盖 inventory、snapshot replay base、普通 upload 竞争 reservation、迁移覆盖与原子发布（10/10）；真实 SQLite 文件关闭/重开续传通过 |
 | OS 安全存储原生适配 | Android 与 iOS 模拟器运行时已验 | Android Keystore envelope 的 scope 隔离、四个独立进程、设备重启、删除持久性共五阶段通过；iOS 真实生产 Swift 路径在模拟器完成 scope 隔离、save/load、跨进程重启 load、remove 后重启为空，并直接读取 `kSecAttrAccessible`。实体设备锁屏语义仍需另验 |
-| OS 安全存储与恢复码 UI | 代码/编译完成，原生安全存储模拟器已验 | 移动端设置面板已接入创建、二次确认、口令/恢复码解锁、强制恢复轮换、锁定、opt-in 记住解锁和登出清除；host 首次同步前恢复、持久 remembered-unlock fence、同步 invalidate/epoch、server/token 绑定与 native remove 失败重试已由 `packages/app-host/tests/host.spec.ts`、`apps/mobile/tests/vault-secure-storage.spec.ts` 覆盖；iOS Keychain runtime 探针已覆盖账号隔离、跨进程重启与删除持久性。没有默认记住解锁或生物识别承诺 |
+| OS 安全存储与恢复码 UI | Android 首次真实旅程已验；冷启动/登出 UI 闭环待验 | 移动端设置面板已接入创建、二次确认、口令/恢复码解锁、强制恢复轮换、锁定、opt-in 记住解锁和登出清除；Android Release 已通过真实认证、创建、恢复码确认、记住解锁和解锁状态显示（[证据](../../apps/mobile/evidence/android-vault-created.png)），但尚未形成重新认证后的冷启动自动恢复及真实 UI logout 再认证证据。host 首次同步前恢复、持久 remembered-unlock fence、同步 invalidate/epoch、server/token 绑定与 native remove 失败重试已由 `packages/app-host/tests/host.spec.ts`、`apps/mobile/tests/vault-secure-storage.spec.ts` 覆盖；iOS Keychain runtime 探针已覆盖账号隔离、跨进程重启与删除持久性。没有默认记住解锁或生物识别承诺 |
 | Web 恢复码 UI 与浏览器存储边界 | 已完成当前边界 | `e2e/tests/vault-settings.spec.ts`：创建/确认发布、reload 后锁定、错误恢复码拒绝、恢复码解锁、锁定、更换口令和新恢复码确认；明暗截图已人工复查。HTTP fixture 仅覆盖 transport，不替代真实 PostgreSQL |
-| Android/iOS/Web 跨端互操作 | 部分完成 | Web/PG 三设备与 legacy 旅程已通过；Android 当前 Release 安装产物已重建并通过无 Metro 自足启动/非空截图门禁，移动 Vault UI 仍需在真实认证会话下完成创建、恢复、轮换和跨端任务互读；iOS 原生安装产物互操作仍待验收 |
+| Android/iOS/Web 跨端互操作 | 部分完成 | Web/PG 三设备与 legacy 旅程已通过；Android 当前 Release 安装产物已重建并通过无 Metro 自足启动/非空截图门禁，真实认证下的 Vault 创建、恢复码确认和 opt-in 记住解锁已验，但冷启动自动恢复、轮换、跨端任务互读和真实 logout 再认证仍待验收；iOS 原生安装产物互操作仍待验收 |
 
 ### 真实浏览器与 PostgreSQL 续验入口
 
@@ -155,9 +157,11 @@ bash apps/mobile/scripts/verify-release-builds.sh android
 
 Android Vault UI 必须先通过既有 `verify-mobile-auth.sh` 建立真实认证会话；只在同步设置里
 粘贴 JWT 只会配置同步，不会产生 Vault 的 authenticated `accountId`，此时「加密数据钥匙」
-显示“请先登录”是正确结果。真实旅程仍需在同一个 TEST_MODE 服务端生命周期内完成认证后再测，
-不得把“服务端进程在启动脚本退出后已被清理”或旧 UI 截图记成 Vault 失败/成功。所有恢复码
-截图必须先遮挡，再写入 evidence；恢复码、root、口令不能进入 dump、logcat、trace 或文档。
+显示“请先登录”是正确结果。首次 UI 旅程必须在同一个 TEST_MODE 服务端生命周期内完成认证后再测，
+并单独记录创建/确认/opt-in 与冷启动恢复、logout fence、轮换、跨端互读这些判据；不能用首次
+会话的“记住解锁”状态代替冷启动后重新认证的自动恢复证据。不得把“服务端进程在启动脚本退出后已被清理”
+或旧 UI 截图记成 Vault 失败/成功。所有恢复码截图必须先遮挡，再写入 evidence；恢复码、root、口令不能进入
+dump、logcat、trace 或文档。
 
 ### 验证纪律
 
