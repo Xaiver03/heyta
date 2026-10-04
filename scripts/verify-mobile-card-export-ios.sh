@@ -214,18 +214,27 @@ else
 fi
 
 step "4. 自建一条卡片（标题 $CARD_TITLE，日期取 7 天后）"
+ADD_LABEL=$(zh web.countdown.add)
 press "$PLACEHOLDER"; sleep 1
 FILLED=0
+SET_BACK=''
 for _i in 1 2 3; do
-  ax - --field --set "$CARD_TITLE" --json >/dev/null 2>&1; sleep 1
-  [ "$(jget "$(ax "$(zh web.countdown.add)" --pressable --list --json)" enabled)" = "True" ] && { FILLED=1; break; }
+  # 🔴 `--set` 的回读值**必须收下并打印**：shim 文件头记着它的反面事故 ——
+  #    第一版把 stderr 与 rc 丢掉，于是"工具失败"和"写进去了但回读方式不对"
+  #    在调用方看来完全一样（`set-value` 在同一条命令上**有时 rc=0、有时 rc=1**）。
+  SET_BACK=$(ax - --field --set "$CARD_TITLE" --json 2>&1); sleep 1
+  echo "   set 第 $_i 次回读：${SET_BACK:-（空 ⇒ shim 自己没输出，先看这一行）}"
+  [ "$(jget "$(ax "$ADD_LABEL" --pressable --list --json)" enabled)" = "True" ] && { FILLED=1; break; }
 done
 if [ "$FILLED" != 1 ]; then
-  ax - --field --type-text "$CARD_TITLE" >/dev/null 2>&1; sleep 1
-  [ "$(jget "$(ax "$(zh web.countdown.add)" --pressable --list --json)" enabled)" = "True" ] && FILLED=1
+  TT=$(ax - --field --type-text "$CARD_TITLE" --json 2>&1); sleep 1
+  echo "   type-text 回读：${TT:-（空）}"
+  [ "$(jget "$(ax "$ADD_LABEL" --pressable --list --json)" enabled)" = "True" ] && FILLED=1
 fi
-[ "$FILLED" = 1 ] || { echo "   ❌ 标题没进得去（「$(zh web.countdown.add)」始终没启用）—— 探针未到位"; exit 3; }
-ok "标题进了应用的态（「$(zh web.countdown.add)」启用 = 它亲口确认）"
+# 判据用的是 **应用自己算出来的那个 enabled**（输入为空时「添加」不可点），不是"我按过了"。
+# 同一条证据形状由 shim 文件头记下：设了文字之后 enabled 由 false 变 true。
+[ "$FILLED" = 1 ] || { echo "   ❌ 标题没进得去（「$ADD_LABEL」始终没启用）—— 探针未到位（本轮无效，不是产品失败）"; exit 3; }
+ok "标题进了应用的态（「$ADD_LABEL」启用 = 它亲口确认）"
 press "$(zh web.countdown.pickDate)"; sleep 2
 MON_NUM=$(date -v+7d +%-m 2>/dev/null || date -d '+7 days' +%-m)
 DAY_NUM=$(date -v+7d +%-d 2>/dev/null || date -d '+7 days' +%-d)
