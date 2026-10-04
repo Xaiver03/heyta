@@ -4153,3 +4153,56 @@ M3 那条形状值得单独记：**摘掉记录后退出码照样对**，只有"
 `载体 HEAD=1ebcf136 未提交项=0 main=3771edb2`，`集成线是否已在 main：YES`，此刻在阶段 1 等现场。
 ③ 仍未完成（前置仍是那三条人为条件），本条不宣布任何交付结论。
 
+#### §15.43am（10-04 08:5x）第三个洞：`DONE` 只**打印**四端取证，不**要求**它们合格
+
+修完 §15.43al 那三处后，我按"还有没有别的静默放过"这条路系统扫了一遍收尾块，扫出来的是本条 ——
+它比前两处（`dev_wait` 的假到手、`PAX_WIN` 的 `LIB-MISSING`）更靠中心，因为
+**"rc.txt 里有没有 DONE 行"就是本脚本给 ③ 定的唯一成功标志**（§15.43ae 是我自己写下的这句）。
+
+旧代码那行长这样：
+
+```
+echo "DONE chain=… ai_e2e=$(grep -c 'AI_E2E rc=0' "$RC") … win=$PAX_WIN mac=$PAX_MAC ios=$PAX_IOS and=$PAX_AND"
+```
+
+四个变量**进了字符串，没进判据** ⇒ `DONE … win=NO-EVIDENCE mac=NO-PAYLOAD ios=NOT-READABLE and=NOT-INSTALLED`
+是能写出来的。而 AGENTS §6.1.1 对四端重装的话是"**任一端失败 ⇒ 整体退出 1，没有静默跳过**"。
+`ai_e2e=` 那一格同病：它是个计数，`0`（没跑或红）和 `NOT-RUN` 都照样 DONE。
+
+**标签集合是现量枚举的，不是凭记忆**（`grep -oE 'PAX_[A-Z]+=[A-Za-z0-9_-]+' | sort -u`）：
+
+| 变量 | 好 | 坏 |
+|---|---|---|
+| `PAX_WIN` | `FACTS-OK` | `FACTS-INCOMPLETE` `LIB-MISSING` `NO-BASELINE` `NO-EVIDENCE` `STALE-EVIDENCE` |
+| `PAX_MAC` | `MATCH`、`CONTENT-OK-BYTES-DIFF` | `MISMATCH` `NO-PAYLOAD` |
+| `PAX_IOS` | `MATCH` | `MISMATCH` `NOT-READABLE` |
+| `PAX_AND` | `MATCH` | `NOT-INSTALLED` `SIZE-DIFF` |
+
+`CONTENT-OK-BYTES-DIFF` 算好是有理由的，不是松：mac 那条判据本身是"安装副本启动自截屏**非空白且主蓝命中**"（§7 #82），
+签名让字节必然不同；把它判坏会把"确实装上了"读成"没装上"。**未列出的标签一律落坏那支**（`FACTS-OKy` 这种手滑不会蒙过去），
+空值按"未赋值"判坏 —— 和 `decide_final` 一样先怀疑没量到。
+
+**夹具**（`~/scratch-heyta/test-decide-pax.sh`，函数从真脚本按行号区间抽出来，**不在夹具里重抄一份** —— 重抄的那份不是被测对象）：
+`pass=9 fail=0`。腿1 全好；腿2 专测 `CONTENT-OK-BYTES-DIFF` 仍算好（防止我把判据收得过窄，这是一条**反向腿**）；
+腿3 逐个坏标签必须**点出属于哪一端**（11 个标签）；腿4 空标签；腿5 三档 ai_e2e（`1`/`0`/空）；
+腿6 陌生标签；腿7 五端同时坏 ⇒ 五个键都得列出（分母）。
+
+**三条变异臂**：
+
+| 变异 | 现量 |
+|---|---|
+| M1 摘掉 `ai_e2e=0` 那一支 | `pass=7 fail=2`：腿5a 得 `PAX-OK`、腿7 分母从 5 掉到 4 |
+| M2 把 `PAX_MAC` 的好集放宽成 `*` | `pass=8 fail=3`：两条 mac 腿不再被点出、腿7 分母 4 |
+| M3 把 `DONE` 行挪到 PAX 闸**之前** | `pass=8 fail=1`：结构腿红（`闸=766 DONE=765`） |
+
+M3 那条值得单独入档：**"判定顺序"这类断言函数级夹具测不到**（`decide_pax` 本身一字未改照样正确）。
+所以我给它加了一条按行号比较的结构腿（两个 `grep -n` 取行号，比较大小），它一被挪就红。
+形状可迁移：**判据的对象是"谁先谁后"时，就断言那个先后，别只断言各自存在。**
+
+**队列第三次重启**（同一台机器上换 inode，理由与 §15.43al 相同：真跑到收尾的必须是带 PAX 闸的那份）：
+33337 → **72523**（08:58:47，`TAKEOVER old=33337 mine=72523`，`载体 HEAD=41cf6217 未提交项=0 main=41cf6217`，
+`集成线是否已在 main：YES`）。启动那一瞬 `pgrep -fl` 报出两枚 pid（72523/72582），查 `ps -o pid,ppid,etime` 后确认
+72582 是父壳 fork 的瞬时子壳、已消失，pidfile 单值 = 72523 ⇒ **不是双跑**（单实例闸这次没被触发，也就没被绕过）。
+08:5x 现场仍是 `闸门 rc=3 · 负载 16 > 12`，别的泳道那四枚重装进程还在。③ 未完成，本条不宣布交付结论。
+
+
