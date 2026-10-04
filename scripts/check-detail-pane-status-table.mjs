@@ -12,7 +12,8 @@
 //   行闭合、状态词表封闭、id 唯一、"提了截图就得真有引用"、表外不许有工单段（按分隔行判）、
 //   已开工的行必须记到变异那一层（或写明 `无变异面` + 理由）、
 //   已开工的行必须给出**判据条数**（目标第 4 条点名的那一样；19:0x 之前这一格只有散文在守，
-//   而现量结果是 W0/W1c 两格真的没有）、变异那一格必须有**臂条数 + 红集**两样在同一句里。
+//   而现量结果是 W0/W1c 两格真的没有）、变异那一格必须有**臂条数 + 红集**两样在同一句里、
+//   以及（19:5x 起）任何表格单元的 code span 里不许有裸竖线。
 // ⚠️ 不判"列数等于表头"：本表读数栏**合法地**出现竖线（`ps … | grep …`、`a | b` 式并排列），
 //   要分辨就得掩码码段，而掩码在本表上两次实测都漂（同一批行先读出 7 列再读出 2/4/5/4 列）。
 //   一条在它的样本上说不清对错的判据不该用来拦事 —— 拦"行被拆成多行"这件事，
@@ -218,6 +219,49 @@ const armMissing = parsed.filter((r) => {
 });
 
 
+// 腿 9：任何**表格行**的 code span 里都不许有裸竖线。
+// 起因是 19:5x 的现量：本轮我自己往这张表里补读数时写出三处 `` `…a|b…` ``（`grep -cE 'it\(|test\('`、
+// 一条正则字面量、一条 import 口径正则），GFM 在解析行内结构**之前**先按未转义竖线切单元，
+// 所以码段里的 `|` 一样会把一格劈成两格 —— 症状和腿 1 那类"行往外漏"不同（行仍是闭合的、
+// 也仍在表区间里），因此前八条腿**一条都不会红**。这三处是 `/tmp` 一次性扫描照出来的，
+// 扫完就没了 ⇒ 没有常驻消费者的话，下一轮补读数还会再从同一处漏回去。
+// 🔴 射程是**整份文档里所有表格行**，不只 §8 那一张：三处里有两处在别的表（腿序登记表、合流面读数表），
+//   只扫 §8 区间等于把这一半对象排除在外。这条判据与"哪张表"无关，所以能扫得开。
+// ⚠️ 转义式 `\|` 不算违规（那是 GFM 要求的写法）；反引号**不成对**的行跳过并单独报数 ——
+//   宁可少判一行，也不要造出一条说不清对错的假红。跳过数打在承重读数里，K>0 就是探针没射程的信号。
+const tableRowLines = lines
+  .map((text, i) => ({ line: i + 1, text }))
+  .filter((r) => /^\|.*\|\s*$/.test(r.text));
+const codeBare = (line) => {
+  const segs = line.split(/(`+)/);
+  const hits = [];
+  let open = null;
+  let spanCount = 0;
+  for (const seg of segs) {
+    const isRun = /^`+$/.test(seg);
+    // 定界符：闭合串必须与开启串**等长**（CommonMark），不等长的那一串是码段里的字面反引号
+    if (isRun && (open === null || seg.length === open)) {
+      if (open === null) spanCount += 1;
+      open = open === null ? seg.length : null;
+      continue;
+    }
+    if (open !== null && /[^\\]\|/.test(seg)) hits.push(seg);
+  }
+  return { hits, spanCount, unbalanced: open !== null };
+};
+const pipeRows = [];
+let codedRows = 0;
+let skippedRows = 0;
+for (const r of tableRowLines) {
+  const { hits, spanCount, unbalanced } = codeBare(r.text);
+  if (unbalanced) {
+    skippedRows += 1;
+    continue;
+  }
+  if (spanCount > 0) codedRows += 1;
+  if (hits.length) pipeRows.push({ ...r, id: r.text.match(UNIT)?.[1] ?? '', sample: hits[0].slice(0, 44) });
+}
+
 console.log(`取样：${doc.startsWith(root + '/') ? doc.slice(root.length + 1) : doc}`);
 
 console.log(`表区间：第 ${head + 1} 行起，连续 ${rows.length} 枚工单行，列结构 = 单/状态/读数`);
@@ -232,6 +276,7 @@ dump('🔴 表外的孤儿工单行（表格被中途截断的化石 —— 它�
 dump('🔴 已开工的行没记变异读数（也没写「无变异面」+理由）', mutMissing, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
 dump('🔴 已开工的行没写**判据条数**（也没写「无判据面」+理由）', judgeMissing, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
 dump('🔴 变异那一档没有"臂条数 + 红集"两个读数（光提一句不算，纯文档单走「无变异面」+理由）', armMissing, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
+dump('🔴 表格单元的 code span 里有裸竖线（GFM 会在这里切格，行不裂但格子裂 —— 前八条腿一条都不红）', pipeRows, (r) => `:${r.line} ${r.id || '(非§8表)'} 码段 ${JSON.stringify(r.sample)}`);
 
 // 承重读数：把"这一趟真的扫到了对象"打在输出里 —— 0 枚命中既可能是"全都合规"也可能是"needle 没射程"，
 // 没有这两个数就区分不了（腿 4/6 各自撞过一次，见上面注释）。
@@ -241,6 +286,9 @@ const armHits = started.filter((r) => sentences(r.text).some((s) => CLAIM_ARM(s)
 console.log(
   `承重：已开工且未走「无变异面」豁免 ${started.length} 行｜判据条数命中 ${judgeHits}｜臂条数+红集同句命中 ${armHits}`,
 );
+// 腿 9 的射程单独报一行：表行总数 / 其中含码段的行数 / 因反引号不成对而跳过的行数。
+// 🔴 没有这行的话"裸竖线 0 处"和"扫到 0 枚表行"在输出里长得一样（这一族在本线已经踩过三次）。
+console.log(`承重(腿9)：表格行 ${tableRowLines.length} 枚｜含 code span ${codedRows} 枚｜反引号不成对而跳过 ${skippedRows} 枚`);
 
 const bad =
   unclosed.length +
@@ -250,12 +298,13 @@ const bad =
   orphans.length +
   mutMissing.length +
   judgeMissing.length +
-  armMissing.length;
+  armMissing.length +
+  pipeRows.length;
 if (dumps.length) console.log(dumps.join('\n'));
 console.log(
   `\n结论：${
     bad === 0
-      ? '§8 落地记录表的行闭合、状态词表、id 唯一、截图栏位、表外无工单段（按分隔行判）、已开工行有变异读数、判据条数、变异"臂条数+红集"两样齐 —— 八项都成立 ✅'
+      ? '§8 落地记录表的行闭合、状态词表、id 唯一、截图栏位、表外无工单段（按分隔行判）、已开工行有变异读数、判据条数、变异"臂条数+红集"两样齐、码段无裸竖线 —— 九项都成立 ✅'
       : `🔴 ${bad} 处不成立`
   }`,
 );
