@@ -615,12 +615,27 @@ fi
 # >>> step10-scoped end
 
 step "11. 笔记本（node-host 真 SQLite）同步后**解得开**这条 UPD"
+# >>> step11-scoped begin（牙齿夹具按这两枚标记抽，不按行号 —— 行号会被上面任何一次插入打漂）
+# 🔴 标记必须在**取数那一行之前**：抽出来的块要是没有 `LT_SYNC=$(laptop sync)`，
+#    守卫读到的是未绑定的变量，四臂一起红而红字写着 BAD 空 —— 那是夹具坏，不是判据有牙。
 LT_SYNC=$(laptop sync)
+LT_PROBE_RAN=1
+# 🔴 `laptop()` 把 stderr 丢进 /dev/null（lib :95-106 记过这个形状）：node 解析到不可 spawn
+#    的私有垫片时**零输出**，于是"探针一次都没跑"与"对端真没收到"在输出上逐字相同。
+#    空输出必须先按**探针故障**判掉，并且当场把不吞 stderr 的那条命令的原文打出来。
+if [ -z "${LT_SYNC// /}" ]; then
+  bad "笔记本 CLI 一条输出都没有 —— 探针没跑成，不判跨设备结论；不吞 stderr 的复跑：$(laptop_raw sync 2>&1 | head -3 | tr '\n' ' ')"
+  LT_PROBE_RAN=0
+else
 case "$LT_SYNC" in
   *'"ok":true'*) ok "笔记本 sync 成功" ;;
   *undecryptable-ops*) ok "笔记本 sync 完成（含已知的 undecryptable-ops，见 ADR-0016）" ;;
   *) bad "笔记本 sync 失败：$LT_SYNC" ;;
 esac
+fi
+# 🔴 探针没跑成 ⇒ **整段都不判**：笔记本那个库是上一趟留下的，只跳过 case 的话，
+#    下面三条读数会踩在旧库上照样打 OK（夹具实测：摘掉 case 之后仍然 3 条 OK）。
+if [ "$LT_PROBE_RAN" = 1 ]; then
 if [ ! -f "$LAPTOP_DB" ]; then
   bad "笔记本库不存在：$LAPTOP_DB —— 探针自己没跑成，这**不是**「对端没收到」"
 else
@@ -651,6 +666,8 @@ else
     fi
   fi
 fi
+fi
+# <<< step11-scoped end
 
 step "12. 截图证据落库（非空**且本轮新生**）"
 # 🔴 这里判两件事，缺一不可：
