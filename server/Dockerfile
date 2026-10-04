@@ -1,5 +1,23 @@
 # ---- Builder stage ----
-FROM node:24-alpine AS builder
+# 🔧 heyta 改动：基础镜像可覆盖，与下面 `APK_MIRROR` / `NPM_REGISTRY` 是同一族，取舍也一样：
+#
+# **默认值逐字等于今天的行为**（`node:24-alpine`），所以能直连 Docker Hub 的机器一点变化都没有。
+# 但在**连不上 docker.io 的主机上，这一步是整个自托管的第一关**：buildkit 先向
+# `auth.docker.io` 要匿名 token，拿不到就在 `load metadata` 死掉 —— Dockerfile 里
+# 一条指令都还没执行，也就没有任何"哪一层错了"的线索。实测（2026-10-04，本机）：
+#
+# ```
+# #2 [internal] load metadata for docker.io/library/node:24-alpine
+# #2 ERROR: failed to authorize: DeadlineExceeded: failed to fetch anonymous token:
+# #2   Get "https://auth.docker.io/token?scope=repository%3Alibrary%2Fnode%3Apull…": i/o timeout
+# ```
+#
+# 覆盖办法是把 base 换成**你自己拉得到**的那个源，例如
+# `NODE_IMAGE=docker.m.daocloud.io/library/node:24-alpine`。
+# 仓库里**不写死**地域性源 —— 那会让别处的自建者拿到慢源，与 `APK_MIRROR` 同一条理由。
+# ⚠️ `ARG` 不跨 `FROM` 继承，所以三个阶段各声明一次（下面两处各带一行指回这里）。
+ARG NODE_IMAGE=node:24-alpine
+FROM ${NODE_IMAGE} AS builder
 
 # 🔧 heyta 改动：Alpine 仓库源可覆盖。
 #
@@ -121,7 +139,9 @@ RUN rm -rf dist && pnpm run build
 # builder 那一层的缓存被服务端镜像的每一层依赖着。把 web 的源码 COPY 混进去之后，
 # **改一行 UI 会让服务端也重新构建**。分阶段还有一个硬好处：
 # 这一层的失败点（前端打不出来）在服务端失败点之外是**独立可辨**的。
-FROM node:24-alpine AS web
+# base 与 builder 同源（ARG 不跨 FROM 继承，所以这里再声明一次；理由见文件头）。
+ARG NODE_IMAGE=node:24-alpine
+FROM ${NODE_IMAGE} AS web
 
 WORKDIR /repo
 
@@ -191,7 +211,9 @@ RUN HEYTA_WEB_BASE=/app/ pnpm --filter "@heyta/web..." run build
 RUN node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/
 
 # ---- Runtime stage ----
-FROM node:24-alpine AS production
+# base 与 builder 同源；同上。
+ARG NODE_IMAGE=node:24-alpine
+FROM ${NODE_IMAGE} AS production
 ARG VCS_REF=unknown
 # 与 builder 阶段同源；见那里的注释。两个阶段各自声明，因为 ARG 不跨阶段继承。
 ARG APK_MIRROR=dl-cdn.alpinelinux.org
@@ -222,6 +244,20 @@ COPY --from=builder --chown=supersync:nodejs /repo/server/prisma ./prisma
 COPY --from=builder --chown=supersync:nodejs /repo/server/scripts ./scripts
 COPY --from=builder --chown=supersync:nodejs /repo/server/src ./src
 COPY --from=builder --chown=supersync:nodejs /repo/server/package.json ./package.json
+# 🔧 heyta 改动（G-47 的闭合形状，审计 §8.46 结论四）：**提交物锁**作为输入进来，
+# 而下面那三条安装命令**一个字都不改**（仍是 `npm install`，不是 `npm ci`）。
+# 为什么不换成朴素大家都写的 `npm ci` —— 三档实测（审计 §8.46 的表）：
+#  · `npm install` 认锁：锁里钉 2.1.2、范围内有 2.1.3 ⇒ 装的就是 2.1.2，也不改写锁；
+#  · 锁里那三枚 `file:` 条目的 integrity 过期时，`npm install` 装的是**当前 tarball 的字节**（rc=0）；
+#  · 同样条件下 `npm ci` 两样都不成立：冷缓存 `EINTEGRITY` 当场炸，热缓存 rc=0 却**静默装上一版**
+#    —— 后者是 §7 第 27 那族（旧 bundle 进包）在依赖层的翻版，而且它不报错。
+# ⇒ 收益是"老 tag 晚半年 build 也解析出同一棵树"（对自建者是可用性，不只是整洁）。
+# ⚠️ 这把锁取自**构建产物** `/app/package-lock.json`，不是宿主机另解一份：它的根条目里那三枚
+#    依赖写的是 `file:*.tgz`，而仓库 `server/package.json` 声明的是 `"*"` —— 因为下面第一条
+#    install 本来就会把 package.json 改写成那个形状。读着别扭是真的，但它与镜像里实际生效那次
+#    解析逐字同源；手工"归一"成看起来干净的样子就会造出第二事实源。
+#    防它腐烂的门禁在 `research/tools/check-image-install-contract.mjs`。
+COPY --chown=supersync:nodejs server/package-lock.json ./package-lock.json
 # 🔧 heyta 改动：共享 UI 产物进运行时镜像。
 #
 # 目标目录名 `/app/web-dist` 与挂载路径 `/app/` 的**默认值**住在
@@ -249,6 +285,16 @@ COPY --from=builder --chown=supersync:nodejs /repo/packages/domain/heyta-domain-
 # 而 `pnpm pack` 会把 domain 的 `workspace:*` 改写成真实版本号 ——
 # 所以两个 tarball 要在**同一条** `npm install` 里给，npm 才能就地满足它。
 #
+# 🔧 heyta 改动（G-54，2026-10-04）：`npm pkg delete devDependencies` 必须是**第一条 install 之前**的一步。
+# 这不是整洁，是**装不上**：npm 在 `--omit=dev` 下仍然会**解析** devDependencies 的每一枚 spec，
+# 而 main `b3397cda`（ADR-0050 密钥批次）往这里放了 `@heyta/app-host` / `@heyta/storage` /
+# `@heyta/sync-client` —— 这三枚只存在于本机 pnpm 工作区，registry 上没有 ⇒ 当场 404。
+# 实测（**与镜像同款** node:24-alpine / npm 11.19.0，两条 install 按本文件原样跑）：
+#   带着三枚 devDep ⇒ 第一条就 `code E404 … GET …/@heyta%2fapp-host`，rc=1；
+#   先删 devDependencies ⇒ 同样两条 rc=0（`added 4 packages`）。
+# 删掉它**不改变装出来的东西**（`--omit=dev` 本来就不装 dev 包；`prisma` CLI 仍然由下面
+# 那条点名的 `npm install prisma@5.22.0` 供给），只改变"这层能不能建成"。
+# 谁把这一步摘掉或挪到 install 之后，`check:image-license` 的第 5 步会点名到这里。
 # 🔴 `devDependencies` 必须在装之前**剪掉**，而不是靠 `--omit=dev`。
 #    npm 即使带 `--omit=dev` 也要先建完整 ideal tree ⇒ 它照样去 registry
 #    **解析** devDeps。而 `@heyta/app-host` / `@heyta/storage` /
@@ -260,7 +306,7 @@ COPY --from=builder --chown=supersync:nodejs /repo/packages/domain/heyta-domain-
 #    那处 `@heyta/app-host` 是**注释**，值用的是字面量，由
 #    `server/tests/recover-artifact-envelope.spec.ts` 钉住），运行时不需要。
 ARG NPM_REGISTRY=https://registry.npmjs.org/
-RUN node -e 'const fs=require("fs"),f="package.json",p=JSON.parse(fs.readFileSync(f,"utf8"));delete p.devDependencies;fs.writeFileSync(f,JSON.stringify(p,null,2)+"\n")' && \
+RUN npm pkg delete devDependencies && \
     npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npm install --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npm install prisma@5.22.0 --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \

@@ -84,8 +84,9 @@ export function Nav({
   const [floating, setFloating] = useState(false);
   const { t } = useI18n();
   /**
-   * 语言既决定文案，也决定「开始使用」指向的应用地址 —— 英文页必须把 `?lang=en`
-   * 带过去，否则访客读完英文页、进应用看到的却是中文（见 `lib/app-url.ts`）。
+   * 语言既决定文案，也决定「开始使用」指向的应用地址 —— **两种语言都带** `?lang=`，
+   * 否则访客读完英文页进应用看到的是中文、用英文浏览器读中文页的又是另一种错法
+   * （为什么默认语言也要带，见 `lib/app-url.ts`）。
    * 所以它要在算 `cta` **之前**取到。
    */
   const locale = useLocale();

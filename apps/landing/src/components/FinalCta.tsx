@@ -35,7 +35,7 @@ import { Magnetic } from './Magnetic.js';
 export function FinalCta(): React.JSX.Element {
   const preset = useMotionPreset();
   const { t } = useI18n();
-  // 英文页要把 `?lang=en` 带进应用，否则访客进应用看到的是中文（见 `lib/app-url.ts`）。
+  // 两种语言都要把 `?lang=` 带进应用（默认语言也带，理由见 `lib/app-url.ts`）。
   const locale = useLocale();
   const cta = startCta(locale);
 
