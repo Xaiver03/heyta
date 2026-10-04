@@ -85,7 +85,16 @@ if [ "${#TOKEN}" -lt 100 ]; then
   echo "❌ 令牌看起来不对（长度 ${#TOKEN}）—— 先跑建号脚本"; exit 1
 fi
 if [ ! -f "$SERVER_LOG" ]; then
-  echo "⚠️  找不到服务端日志 $SERVER_LOG —— 判据 (a) 会被跳过（判据 (b) 仍然有效）"
+  echo "❌ 判据 (a) 的证据来源不存在：$SERVER_LOG —— **这一条不许跳过**。"
+  echo "   本文件第 52 行自己写过为什么：只有 (b) 的话，失败要等 900 秒，"
+  echo "   而"没触发"和"派生太慢"在日志里长得一样。(a) 就是那条快腿。"
+  echo "   而且现在退出**还没碰任何破坏性动作**（下一步才装包 / 清数据）。"
+  echo ""
+  echo "   修法：把服务端起在 TEST_MODE 并把日志落到那个路径，例如"
+  echo "     <起栈命令> 2>&1 | tee $SERVER_LOG"
+  echo "   或显式指一份现有日志："
+  echo "     HEYTA_SERVER_LOG=/path/to/server.log bash scripts/verify-mobile-autosync.sh"
+  exit 1
 fi
 
 rm -f "$LAPTOP_DB"
@@ -148,27 +157,33 @@ step "3. 判据 (a)：没点按钮，服务端也该收到请求"
 #    第 4 步才开始。所以这段时间里的请求行只可能来自手机。
 SAW_REQUEST=0
 FIRST_AT=0
-if [ "$LOG_BASE" -gt 0 ]; then
-  for i in $(seq 1 24); do
-    sleep 5
-    NEW_REQ=$(sed -n "$((LOG_BASE + 1)),\$p" "$SERVER_LOG" \
-      | grep -cE "\[user:[0-9]+\] (Upload|Download)" | tr -d ' ')
-    if [ "${NEW_REQ:-0}" -gt 0 ]; then
-      SAW_REQUEST=1; FIRST_AT=$((i * 5))
-      echo "     第 $i 轮（约 $((i * 5)) 秒）看到 $NEW_REQ 条同步请求行"
-      break
-    fi
-  done
-  # 只回显**属于本次**的新增行，避免把上一轮的日志当成本次证据。
-  sed -n "$((LOG_BASE + 1)),\$p" "$SERVER_LOG" \
-    | grep -E "\[user:[0-9]+\)?\]? (Upload|Download)" | head -5 | sed 's/^/     /'
-  if [ "$SAW_REQUEST" = "1" ]; then
-    ok "服务端在**没有点任何同步按钮**的情况下收到了请求（自动同步确实触发了）"
-  else
-    bad "创建任务后 120 秒内服务端**一条请求都没有** —— 自动同步没有触发"
+# 🔴 原来这里是 `if [ "$LOG_BASE" -gt 0 ]`，那是一个**会静默消失的判据**，而且恰好在
+#    最该跑的时候消失：自己新起的栈，日志是刚从 `tee` 出来的空文件 ⇒ 基线 = 0 ⇒ 整条 (a)
+#    被跳过，而脚本仍然可以只靠 (b) 报 PASS。基线 0 是**合法输入**（从头数整个文件），
+#    只有"读出来不是数字"才是探针坏了。上面那个硬退出保证了文件存在，这里管形状。
+case "$LOG_BASE" in
+  ''|*[!0-9]*)
+    bad "判据 (a) 的日志基线不是数字（LOG_BASE=${LOG_BASE}）—— 探针没读到，不许当成"没请求""
+    LOG_BASE=0
+    ;;
+esac
+for i in $(seq 1 24); do
+  sleep 5
+  NEW_REQ=$(sed -n "$((LOG_BASE + 1)),\$p" "$SERVER_LOG" \
+    | grep -cE "\[user:[0-9]+\] (Upload|Download)" | tr -d ' ')
+  if [ "${NEW_REQ:-0}" -gt 0 ]; then
+    SAW_REQUEST=1; FIRST_AT=$((i * 5))
+    echo "     第 $i 轮（约 $((i * 5)) 秒）看到 $NEW_REQ 条同步请求行"
+    break
   fi
+done
+# 只回显**属于本次**的新增行，避免把上一轮的日志当成本次证据。
+sed -n "$((LOG_BASE + 1)),\$p" "$SERVER_LOG" \
+  | grep -E "\[user:[0-9]+\)?\]? (Upload|Download)" | head -5 | sed 's/^/     /'
+if [ "$SAW_REQUEST" = "1" ]; then
+  ok "服务端在**没有点任何同步按钮**的情况下收到了请求（自动同步确实触发了）"
 else
-  echo "     ⏭  跳过（没有服务端日志）"
+  bad "创建任务后 120 秒内服务端**一条请求都没有** —— 自动同步没有触发"
 fi
 
 step "4. 判据 (b)：另一台设备读得到这条任务（全链路）"

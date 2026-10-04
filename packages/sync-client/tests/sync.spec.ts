@@ -1507,6 +1507,43 @@ describe('离线重试调度', () => {
   });
 });
 
+
+describe('vault production sync wiring', () => {
+  it('reports key-provider failures as locked without a rejected promise or network write', async () => {
+    const h = makeHarness(() => okJson({}), { ops: [makeOp()], getPayloadCipher: async () => { throw new Error('secure-store unavailable'); } });
+    expect(await h.client.sync()).toMatchObject({ kind: 'error', reason: 'no-encryption-password' });
+    expect(h.uploads).toHaveLength(0);
+    expect(h.downloads).toHaveLength(0);
+  });
+
+  it('refuses a configured but locked vault even with a legacy password present', async () => {
+    const h = makeHarness(() => okJson({}), {
+      ops: [makeOp()], getPayloadCipher: async () => undefined,
+    });
+    expect(await h.client.sync()).toMatchObject({ kind: 'error', reason: 'no-encryption-password' });
+    expect(h.uploads).toHaveLength(0);
+    expect(h.downloads).toHaveLength(0);
+  });
+
+  it('uploads and downloads through the captured vault session with no password', async () => {
+    const codec = createVaultPayloadCipher({ current: { keyVersion: 1, rootKey: new Uint8Array(32).fill(13) } });
+    const local = makeOp();
+    const remote = makeOp({ id: 'remote-op', clientId: 'device-b', entityId: 'remote-task', vectorClock: { 'device-b': 1 } });
+    const remoteCipher = await codec.encrypt(JSON.stringify(remote.payload), remote);
+    const getCipher = vi.fn(async () => codec);
+    const h = makeHarness((_url, init) => init?.method === 'POST'
+      ? okJson({ results: [{ opId: local.id, accepted: true, serverSeq: 1 }], latestSeq: 1 })
+      : okJson({ ops: [{ serverSeq: 2, receivedAt: 1000, op: { ...remote, payload: remoteCipher, isPayloadEncrypted: true } }], latestSeq: 2, hasMore: false }),
+      { password: undefined, ops: [local], getPayloadCipher: getCipher });
+    expect(await h.client.sync()).toMatchObject({ kind: 'synced' });
+    expect(getCipher).toHaveBeenCalledTimes(1);
+    const sent = (h.uploads[0]!.body['ops'] as Array<Record<string, unknown>>)[0]!;
+    expect(await codec.decrypt(sent['payload'] as string, local)).toBe(JSON.stringify(local.payload));
+    expect(h.applied.flat().map((op) => op.payload)).toContainEqual(remote.payload);
+    expect(h.cursor.value).toBe(2);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // §2.1 的硬顺序：服务端词表落后于客户端（W2 判据 ②）
 //
@@ -1555,42 +1592,5 @@ describe('§2.1 服务端词表落后于客户端', () => {
     expect(status.reason).toBe('upload-rejected');
     expect(status.message).toContain('INVALID_CLIENT_ID');
     expect(status.message).not.toContain('升级服务端');
-  });
-});
-
-
-describe('vault production sync wiring', () => {
-  it('reports key-provider failures as locked without a rejected promise or network write', async () => {
-    const h = makeHarness(() => okJson({}), { ops: [makeOp()], getPayloadCipher: async () => { throw new Error('secure-store unavailable'); } });
-    expect(await h.client.sync()).toMatchObject({ kind: 'error', reason: 'no-encryption-password' });
-    expect(h.uploads).toHaveLength(0);
-    expect(h.downloads).toHaveLength(0);
-  });
-
-  it('refuses a configured but locked vault even with a legacy password present', async () => {
-    const h = makeHarness(() => okJson({}), {
-      ops: [makeOp()], getPayloadCipher: async () => undefined,
-    });
-    expect(await h.client.sync()).toMatchObject({ kind: 'error', reason: 'no-encryption-password' });
-    expect(h.uploads).toHaveLength(0);
-    expect(h.downloads).toHaveLength(0);
-  });
-
-  it('uploads and downloads through the captured vault session with no password', async () => {
-    const codec = createVaultPayloadCipher({ current: { keyVersion: 1, rootKey: new Uint8Array(32).fill(13) } });
-    const local = makeOp();
-    const remote = makeOp({ id: 'remote-op', clientId: 'device-b', entityId: 'remote-task', vectorClock: { 'device-b': 1 } });
-    const remoteCipher = await codec.encrypt(JSON.stringify(remote.payload), remote);
-    const getCipher = vi.fn(async () => codec);
-    const h = makeHarness((_url, init) => init?.method === 'POST'
-      ? okJson({ results: [{ opId: local.id, accepted: true, serverSeq: 1 }], latestSeq: 1 })
-      : okJson({ ops: [{ serverSeq: 2, receivedAt: 1000, op: { ...remote, payload: remoteCipher, isPayloadEncrypted: true } }], latestSeq: 2, hasMore: false }),
-      { password: undefined, ops: [local], getPayloadCipher: getCipher });
-    expect(await h.client.sync()).toMatchObject({ kind: 'synced' });
-    expect(getCipher).toHaveBeenCalledTimes(1);
-    const sent = (h.uploads[0]!.body['ops'] as Array<Record<string, unknown>>)[0]!;
-    expect(await codec.decrypt(sent['payload'] as string, local)).toBe(JSON.stringify(local.payload));
-    expect(h.applied.flat().map((op) => op.payload)).toContainEqual(remote.payload);
-    expect(h.cursor.value).toBe(2);
   });
 });

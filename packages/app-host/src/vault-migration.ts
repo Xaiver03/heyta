@@ -14,7 +14,7 @@ import {
   createVaultPayloadCipher,
   type SyncPayloadIdentity,
 } from '@heyta/sync-client';
-import type { VaultKeyPackage } from '@heyta/sync-core';
+import { vaultRootKeyFingerprint, type VaultKeyPackage } from '@heyta/sync-core';
 import { META_KEYS, STORES, type DbAdapter } from '@heyta/storage';
 import { randomId } from './ids.js';
 import { joinEndpointUrl } from './endpoint-url.js';
@@ -152,6 +152,12 @@ export interface VaultMigrationOptions {
   journalScope: string;
   /** Keep below the server's 32 MiB payload budget to leave HTTP body headroom. */
   maxChunkPayloadBytes?: number;
+  /**
+   * The low-level orchestrator historically acknowledged a published
+   * migration itself. Production hosts disable that behaviour so the journal
+   * remains durable until the new package/root has been installed locally.
+   */
+  clearJournalOnPublished?: boolean;
   onProgress?: (progress: VaultMigrationProgress) => void;
 }
 
@@ -296,9 +302,15 @@ const toIdentity = (operation: VaultMigrationInventoryOperation): SyncPayloadIde
   schemaVersion: operation.schemaVersion,
 });
 
-const validateStage = (stage: VaultKeyMigrationStageResponse): VaultKeyMigrationStageResponse => {
+const validateStage = (
+  stage: VaultKeyMigrationStageResponse,
+  expectedRequestId: string,
+): VaultKeyMigrationStageResponse => {
   const parsed = vaultKeyMigrationStageResponseSchema.safeParse(stage);
   if (!parsed.success) throw new VaultMigrationError('Malformed key migration stage response', 'migration_failed');
+  if (parsed.data.requestId !== expectedRequestId) {
+    throw new VaultMigrationError('Key migration stage response request id does not match the request', 'migration_failed');
+  }
   return parsed.data;
 };
 
@@ -330,14 +342,41 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
     // A journal is the sole resume source after a process restart. It is
     // intentionally checked before inventory/decryption so ciphertext and its
     // nonce are reused byte-for-byte rather than randomly re-encrypted.
-    if (JSON.stringify(prior.manifest.package) !== JSON.stringify(options.package) ||
-        prior.manifest.expectedKeyVersion !== options.expectedKeyVersion ||
-        prior.manifest.targetPayloadKeyVersion !== options.targetPayloadKeyVersion) {
+    const journalMatchesRequest = JSON.stringify(prior.manifest.package) === JSON.stringify(options.package) &&
+      prior.manifest.expectedKeyVersion === options.expectedKeyVersion &&
+      prior.manifest.targetPayloadKeyVersion === options.targetPayloadKeyVersion;
+    if (!journalMatchesRequest) {
+      // A process can die after saveBound() commits the new package but before
+      // the host acknowledges the journal. There is then no pending draft,
+      // and a subsequent rotation must not be blocked by that completed old
+      // request. Only self-heal when all local-generation evidence matches
+      // the old manifest *and* the authenticated server says it is PUBLISHED.
+      const priorWasInstalled = options.requestId === undefined &&
+        prior.manifest.package.keyVersion === options.expectedKeyVersion &&
+        prior.manifest.targetPayloadKeyVersion === options.currentPayloadKeyVersion &&
+        vaultRootKeyFingerprint(options.currentRootKey) === prior.manifest.package.rootKeyFingerprint;
+      if (priorWasInstalled) {
+        try {
+          const published = validateStage(await options.remote.status(prior.requestId), prior.requestId);
+          if (published.state === 'PUBLISHED' &&
+              published.requestId === prior.requestId &&
+              published.keyVersion === prior.manifest.package.keyVersion &&
+              published.payloadKeyVersion === prior.manifest.targetPayloadKeyVersion) {
+            await options.journal.clear(options.journalScope, prior.requestId);
+            return migrateVaultPayloads(options);
+          }
+        } catch {
+          // Keep the journal on an unavailable/malformed status response;
+          // clearing it without server confirmation would lose resumability.
+        }
+      }
       throw new VaultMigrationError('Migration journal does not match the requested key transition', 'inventory_changed');
     }
-    let resumedStage = validateStage(await options.remote.begin(prior.manifest));
+    let resumedStage = validateStage(await options.remote.begin(prior.manifest), requestId);
     if (resumedStage.state === 'PUBLISHED') {
-      await options.journal.clear(options.journalScope, requestId);
+      if (options.clearJournalOnPublished !== false) {
+        await options.journal.clear(options.journalScope, requestId);
+      }
       return {
         requestId: resumedStage.requestId,
         keyVersion: resumedStage.keyVersion,
@@ -347,18 +386,20 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
       };
     }
     for (const chunk of prior.chunks) {
-      resumedStage = validateStage(await options.remote.uploadChunk(chunk));
+      resumedStage = validateStage(await options.remote.uploadChunk(chunk), requestId);
     }
     try {
-      resumedStage = validateStage(await options.remote.commit(requestId));
+      resumedStage = validateStage(await options.remote.commit(requestId), requestId);
     } catch (error) {
-      resumedStage = validateStage(await options.remote.status(requestId));
+      resumedStage = validateStage(await options.remote.status(requestId), requestId);
       if (resumedStage.state !== 'PUBLISHED') throw error;
     }
     if (resumedStage.state !== 'PUBLISHED') {
       throw new VaultMigrationError('Server did not publish the resumed key migration', 'migration_failed');
     }
-    await options.journal.clear(options.journalScope, requestId);
+    if (options.clearJournalOnPublished !== false) {
+      await options.journal.clear(options.journalScope, requestId);
+    }
     return {
       requestId: resumedStage.requestId,
       keyVersion: resumedStage.keyVersion,
@@ -440,9 +481,11 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
     journalChunks.push(vaultKeyMigrationChunkSchema.parse({ requestId, chunkId: `${requestId}-${String(journalChunkIndex)}`, chunkIndex: journalChunkIndex, operations: journalChunk }));
   }
   await options.journal.save({ scope: options.journalScope, requestId, manifest, chunks: journalChunks });
-  let stage = validateStage(await options.remote.begin(manifest));
+  let stage = validateStage(await options.remote.begin(manifest), requestId);
   if (stage.state === 'PUBLISHED') {
-    await options.journal.clear(options.journalScope, requestId);
+    if (options.clearJournalOnPublished !== false) {
+      await options.journal.clear(options.journalScope, requestId);
+    }
     return {
       requestId: stage.requestId,
       keyVersion: stage.keyVersion,
@@ -453,23 +496,25 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
   }
 
   for (const payload of journalChunks) {
-    stage = validateStage(await options.remote.uploadChunk(payload));
+    stage = validateStage(await options.remote.uploadChunk(payload), requestId);
     options.onProgress?.({ phase: 'staging', completed: stage.uploadedOperationCount, total: replacements.length });
   }
 
   options.onProgress?.({ phase: 'committing', completed: replacements.length, total: replacements.length });
   try {
-    stage = validateStage(await options.remote.commit(requestId));
+    stage = validateStage(await options.remote.commit(requestId), requestId);
   } catch (error) {
     // The commit is idempotent. A response lost after the database commit must
     // never cause a second request or tell the UI that migration failed.
-    stage = validateStage(await options.remote.status(requestId));
+    stage = validateStage(await options.remote.status(requestId), requestId);
     if (stage.state !== 'PUBLISHED') throw error;
   }
   if (stage.state !== 'PUBLISHED') {
     throw new VaultMigrationError('Server did not publish the complete key migration', 'migration_failed');
   }
-  await options.journal.clear(options.journalScope, requestId);
+  if (options.clearJournalOnPublished !== false) {
+    await options.journal.clear(options.journalScope, requestId);
+  }
   return {
     requestId: stage.requestId,
     keyVersion: stage.keyVersion,
@@ -483,7 +528,7 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
 export const cancelVaultPayloadMigration = async (
   remote: VaultKeyMigrationRemote,
   requestId: string,
-): Promise<VaultKeyMigrationStageResponse> => validateStage(await remote.cancel(requestId));
+): Promise<VaultKeyMigrationStageResponse> => validateStage(await remote.cancel(requestId), requestId);
 
 /** Cancel the unfinished server reservation identified by the local journal. */
 export const cancelVaultPayloadMigrationForScope = async (
@@ -497,6 +542,20 @@ export const cancelVaultPayloadMigrationForScope = async (
   await journal.clear(journalScope, pending.requestId);
   return stage;
 };
+
+/**
+ * Acknowledge a migration only after the host has installed its published
+ * package and payload generation. Keeping this explicit prevents a process
+ * exit or credential invalidation between server commit and local install
+ * from destroying the only retry record.
+ */
+export async function acknowledgeVaultPayloadMigration(
+  journal: VaultMigrationJournal,
+  journalScope: string,
+  requestId: string,
+): Promise<void> {
+  await journal.clear(journalScope, requestId);
+}
 
 export const VAULT_KEY_MIGRATION_INVENTORY_PATH = '/api/sync/key-migration/inventory';
 export const VAULT_KEY_MIGRATION_PATH = '/api/sync/key-migration';
@@ -546,20 +605,20 @@ export const createVaultKeyMigrationRemote = (options: VaultKeyMigrationRemoteOp
   async begin(manifest) {
     return parseResponse(await httpRequest(options, VAULT_KEY_MIGRATION_PATH, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(manifest),
-    }), (value) => validateStage(value as VaultKeyMigrationStageResponse));
+    }), (value) => validateStage(value as VaultKeyMigrationStageResponse, manifest.requestId));
   },
   async uploadChunk(chunk) {
     return parseResponse(await httpRequest(options, `${VAULT_KEY_MIGRATION_PATH}/${encodeURIComponent(chunk.requestId)}/chunks`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(chunk),
-    }), (value) => validateStage(value as VaultKeyMigrationStageResponse));
+    }), (value) => validateStage(value as VaultKeyMigrationStageResponse, chunk.requestId));
   },
   async status(requestId) {
-    return parseResponse(await httpRequest(options, `${VAULT_KEY_MIGRATION_PATH}/${encodeURIComponent(requestId)}`, { method: 'GET' }), (value) => validateStage(value as VaultKeyMigrationStageResponse));
+    return parseResponse(await httpRequest(options, `${VAULT_KEY_MIGRATION_PATH}/${encodeURIComponent(requestId)}`, { method: 'GET' }), (value) => validateStage(value as VaultKeyMigrationStageResponse, requestId));
   },
   async commit(requestId) {
-    return parseResponse(await httpRequest(options, `${VAULT_KEY_MIGRATION_PATH}/${encodeURIComponent(requestId)}/commit`, { method: 'POST' }), (value) => validateStage(value as VaultKeyMigrationStageResponse));
+    return parseResponse(await httpRequest(options, `${VAULT_KEY_MIGRATION_PATH}/${encodeURIComponent(requestId)}/commit`, { method: 'POST' }), (value) => validateStage(value as VaultKeyMigrationStageResponse, requestId));
   },
   async cancel(requestId) {
-    return parseResponse(await httpRequest(options, `${VAULT_KEY_MIGRATION_PATH}/${encodeURIComponent(requestId)}`, { method: 'DELETE' }), (value) => validateStage(value as VaultKeyMigrationStageResponse));
+    return parseResponse(await httpRequest(options, `${VAULT_KEY_MIGRATION_PATH}/${encodeURIComponent(requestId)}`, { method: 'DELETE' }), (value) => validateStage(value as VaultKeyMigrationStageResponse, requestId));
   },
 });

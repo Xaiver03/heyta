@@ -26,6 +26,8 @@ import {
   applyFeedbackCorrections,
   applyPreferenceCorrections,
   computeFocusGaps,
+  emptyFeedbackPreferenceSet,
+  emptyPreferenceSet,
   groupTasksByDate,
   inferFeedbackPreferences,
   inferPreferences,
@@ -75,6 +77,7 @@ import {
   useTaskStore,
   type TaskFilter,
 } from './features/tasks/store.js';
+import { wantsSignInOnLoad } from './lib/auth-deep-link.js';
 import { type DueDisplayMode } from './lib/due-display.js';
 import { TaskRowMeta } from './features/tasks/row-meta.js';
 import { loadDueDisplay, saveDueDisplay } from './features/tasks/due-display-pref.js';
@@ -152,6 +155,7 @@ import { ImportPanel } from './features/settings/ImportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 // 通行密钥自助管理（列 / 删）—— 服务端早就有端点，此前界面没有任何入口。
 import { PasskeyPanel } from './features/settings/PasskeyPanel.js';
+import { CloseAccountPanel } from './features/settings/CloseAccountPanel.js';
 // 个人信息（R10）：昵称与头像的增删改查。入口在头像菜单的「编辑个人信息」，
 // 面板本体开在设置浮层第一段 —— 它需要令牌，而令牌就住在同步设置里。
 import { ProfilePanel } from './features/settings/ProfilePanel.js';
@@ -175,6 +179,7 @@ import { FocusTimer } from './features/focus/FocusTimer.js';
 import { TrashView } from './features/trash/TrashView.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
 import { onEngineChange, readRecentOps } from './lib/oplog.js';
+import { pruneSelectionFromEntities, selection, useSelected } from './lib/selection.js';
 import { applyTheme, rememberThemeChoice, resolveInitialTheme, type Theme } from './lib/theme.js';
 
 import './styles/app.css';
@@ -213,6 +218,27 @@ export function App(): React.JSX.Element {
    */
   const visible = useTaskStore(useShallow(selectVisibleTasks));
   const counts = useTaskStore(useShallow(selectQuadrantCounts));
+  /**
+   * 详情面的**选中态**（W1）。它住 `@heyta/app-host`，web 只有这一行胶水。
+   *
+   * 🔴 为什么不是 `useState`：选中要能跨视图（列表 / 日历 / 四象限 / 时间线 /
+   * 搜索 / 回收站是同一批任务），而各视图各存一份的结果就是"从搜索点进一条、
+   * 切回日历，选中丢了；而在习惯页它又是另一套回落规则"。
+   * 此前它确实散成三份：web 任务侧**根本没有**（行体不可点）、
+   * web 习惯侧一个 `useState`、移动端任务侧另一个 `useState`。
+   *
+   * ⚠️ 返回的是**原始值**，所以不需要 `useShallow` —— 上面那段"引用稳定"
+   * 的教训对它同样成立，只是它天然满足。
+   */
+  const selectedTaskId = useSelected('task');
+  /**
+   * 🔴 必须是 `useCallback` 而不是行内箭头：`TaskList` 把 `onOpenTask` 放进了
+   * 行渲染的 `useMemo` 依赖里，每次渲染换新函数 = 整表所有行重建，
+   * 而这一栏是要装常驻详情面的（W2），白重渲染的代价会从"看不见"变成"看得见地卡"。
+   */
+  const openTask = useCallback((taskId: string) => {
+    selection.select('task', taskId);
+  }, []);
   const [view, setView] = useState<ViewKey>('tasks');
   /**
    * 已启用的功能模块（**设备本地**，见 `features/shell/modules.ts`）。
@@ -247,11 +273,10 @@ export function App(): React.JSX.Element {
     const tasks = Object.values(store.entities.tasks);
     const count = (filter: TaskFilter): number => filterTasks(tasks, filter, { now: store.now }).length;
     return {
-      all: count({ kind: 'all' }),
       today: count({ kind: 'today' }),
       next7Days: count({ kind: 'next7Days' }),
       completed: count({ kind: 'completed' }),
-    } as Record<'all' | 'today' | 'next7Days' | 'completed', number>;
+    } as Record<'today' | 'next7Days' | 'completed', number>;
   }, [store.entities.tasks, store.now]);
 
   /**
@@ -362,6 +387,36 @@ export function App(): React.JSX.Element {
    */
   useEffect(() => {
     if (shouldAskOnFirstLaunch()) usePrivacyStore.getState().openSheet('first-launch');
+  }, []);
+
+  /**
+   * 落地页的「登录」带 `?signin` 进来时，**直接把认证面板打开**。
+   *
+   * 只在挂载时看一次：用户手动关掉面板之后地址还在，但"每次重渲染都抢回来"不是
+   * 我们要的行为（刷新才重新打开，是可预期的）。消化点为什么在壳而不在 `AuthPanel`，
+   * 理由写在 `lib/auth-deep-link.ts` 文件头。
+   *
+   * 🔴 但**不在首启隐私浮层还等着回答的时候叠上去**。两个模态同屏的样子是
+   * "登录表单被一张卡片盖住一半"，读起来就是界面坏了（2026-10-03 线上截图实测到的
+   * 正是这个，而它是我这次改动**新引入**的：以前那一层上面只有隐私面板）。
+   * 判据用 `shouldAskOnFirstLaunch()` 而不是 store 里的 `open` —— 那一层是**上面那个
+   * effect 在同一次提交的 effect 阶段**打开的，读状态的 hook 拿到的是渲染期的 `false`，
+   * 于是"看着没开"而实际会开。深链的意图记住一次，等那一层落下再兑现。
+   */
+  useEffect(() => {
+    if (!wantsSignInOnLoad()) return;
+    if (!shouldAskOnFirstLaunch()) {
+      useSyncStore.getState().openSignIn();
+      return;
+    }
+    const unsubscribe = usePrivacyStore.subscribe((state) => {
+      if (state.open) return;
+      unsubscribe();
+      useSyncStore.getState().openSignIn();
+    });
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   /**
@@ -547,12 +602,14 @@ export function App(): React.JSX.Element {
    * 而任务视图当时可能停在「今天」这类筛选上，被点的那条**根本不在列表里**。
    * 用户看到的是"点了没反应"（与 `goToFilter` 那条注释记的 bug 同一类）。
    *
-   * 所以两件事一起做：① 筛选切到「全部」（保证它在列表里）；
-   * ② 滚到那一行 —— 列表有几十行时"它在列表里"与"你看得见它"不是一回事。
+   * 所以三件事一起做：① 选中它（W1 —— 行的高亮与详情面都读这一个值）；
+   * ② 筛选切到「全部」（保证它在列表里）；
+   * ③ 滚到那一行 —— 列表有几十行时"它在列表里"与"你看得见它"不是一回事。
    * ⚠️ 滚要在**下一帧**：这一帧 React 还没把新筛选下的行画出来。
    */
   const openTaskFromSearch = useCallback(
     (taskId: string) => {
+      selection.select('task', taskId);
       goToFilter({ kind: 'all' });
       requestAnimationFrame(() => {
         document
@@ -564,6 +621,36 @@ export function App(): React.JSX.Element {
   );
   // 🔴 密钥只在内存里，只活在这个标签页（Web 没有系统钥匙串）
   const [aiSecrets] = useState(createSessionSecretStore);
+
+  /**
+   * 右栏（`.ht-app__detail`）此刻**占不占位置**。
+   *
+   * 🔴 2026-10-04 产品负责人把 AI 面搬进这一栏：「把那个 AI 的功能移到右边那个区，
+   * 就是最右边那一栏区……无状态的时候就可以默认显示 AI Chatbot」。
+   * 搬过去就必须回答另一件事：**这一栏在窄屏是不出现的**（≤1023px，账算在
+   * `styles/app/narrow.css`），直接搬等于让平板档与小窗用户的 AI 功能凭空消失。
+   *
+   * 所以这里不写 `min-width: 1024px` —— 那条规则的**真源是 CSS**，JS 里再抄一个
+   * 数字就是一份会漂的抄件（改 CSS 的人不会被告知这里有一条，而它的表现是
+   * "AI 面板在某档宽度上不见了"）。这里量的是那一列**实际有没有宽度**：
+   * 有 ⇒ AI 面挂在右栏；没有 ⇒ 退回中间列。**功能一个都不少**是这条的判据。
+   *
+   * ⚠️ 跨这一步会**重挂载**面板（换父级 = 换子树）。助手的会话历史本来就从本机
+   * 持久化里恢复（`AssistantPanel` 的 `restored`），丢的只是"正在飞的那一发请求"；
+   * 拖窗口跨过断点不是正常用户动作，这里不为它加复杂度。
+   */
+  const detailRef = useRef<HTMLElement>(null);
+  const [detailHasRoom, setDetailHasRoom] = useState(true);
+  useEffect(() => {
+    const sync = (): void => {
+      setDetailHasRoom((detailRef.current?.getBoundingClientRect().width ?? 0) > 0);
+    };
+    sync();
+    window.addEventListener('resize', sync);
+    return () => {
+      window.removeEventListener('resize', sync);
+    };
+  }, []);
   /**
    * 截止时间的呈现方式。
    *
@@ -607,18 +694,38 @@ export function App(): React.JSX.Element {
    * 被抑制的偏好已经不在纠正后的集合里了。
    */
   const memory = useMemo(() => {
+    /**
+     * 🔴 总开关关着时**一个集合都不取**。
+     *
+     * `inferPreferences` 内部本来就有这道闸门（`memoryEnabled:false` ⇒ 空集），
+     * 但实参在**调用点先求值**：`Object.values(store.entities.tasks)` 会把整张任务表
+     * 物化成数组，`focusSessions` / `aiFeedback` / `preferenceCorrections` 同理。
+     * 闸门在被调方里 ⇒ 关着的时候照样付全额的 O(全部实体)，付完立刻扔掉。
+     *
+     * 隐私语义也要求这一刀在**取数之前**：ADR-0014 的承诺是"关着就不推断",
+     * 而不是"推断完不显示"。放在这里之后，关闭态连一次属性读取都不发生。
+     */
+    if (aiSettings.memoryEnabled !== true) {
+      return {
+        preferenceSet: emptyPreferenceSet(false),
+        feedbackSet: emptyFeedbackPreferenceSet(false),
+        rawPresentIds: [] as string[],
+        corrections: [] as { id: string; preferenceId: string; kind: 'suppress'; deletedAt?: number }[],
+        focusGaps: null,
+      };
+    }
+
     const offsets = { now: Date.now(), utcOffsetMinutes: -new Date().getTimezoneOffset() };
 
     /**
      * 🔴 「说的 vs 做的」落差 —— 记忆护城河第一次真正接到界面上。
      *
-     * 只在**记忆开启**且**事件流已就绪**时计算：
-     *   - 关闭时连算都不算（隐私红线：不留"算了但没显示"的中间态）；
+     * 只在**事件流已就绪**时计算：
      *   - `opWindow === null` 时传 `null`，面板据此说明"暂时算不出推迟次数"
      *     —— 绝不能退化成"推迟 0 次"（那是编造）。
      */
     const focusGaps =
-      aiSettings.memoryEnabled === true && opWindow !== null
+      opWindow !== null
         ? computeFocusGaps({
             tasks: Object.values(store.entities.tasks),
             focusSessions: Object.values(store.entities.focusSessions),
@@ -694,6 +801,22 @@ export function App(): React.JSX.Element {
       unsubscribe();
     };
   }, [aiSettings.memoryEnabled]);
+
+  /**
+   * 选中态的**回落**（W1）：实体不在了就把选中丢掉，免得详情面继续显示一条
+   * 已经不存在的东西 —— 那是界面在说谎。
+   *
+   * 🔴 判据是"**实体还在不在**"，**不是**"它在当前筛选下可不可见"。
+   * 写成后者的话，用户从「今天」切到「收集箱」的那一刻，正在详情面里编辑的
+   * 那条任务会被判定"不存在"、面板自己关掉。这条红线在 `app-host` 的
+   * `selection.ts` 文件头，判据钉在 `packages/app-host/tests/selection.spec.ts`；
+   * 本行只是它的**消费者**，所以这里连比较都不写，只把物化状态递进去。
+   *
+   * ⚠️ 软删除（进回收站）**算"不在了"**：详情面跟着关，恢复动作在回收站里做。
+   */
+  useEffect(() => {
+    pruneSelectionFromEntities(store.entities);
+  }, [store.entities]);
 
   // 主题应用到 <html data-theme>，tokens.css 的暗色覆盖挂在那里
   useEffect(() => {
@@ -1188,10 +1311,16 @@ export function App(): React.JSX.Element {
   }, []);
 
   /**
-   * 打开一条便签结果 = **进便签视图**（浮层挂在 `view` 上，切过去就自然关掉）。
+   * 打开一条便签结果 = **选中它并进便签视图**（浮层挂在 `view` 上，切过去就自然关掉）。
    * 点与 ↵ 共用这一条，出口才不会漂成两份。
+   *
+   * 🔴 `noteId` 以前是**丢掉的**（回调签名不带参数，TS 不报错），于是"点了搜索结果
+   * 里的便签"只换来一次视图切换 —— 与上面 `openTaskFromSearch` 那条 2026-09-30 修掉的
+   * 缺陷同一个形状。选中态成为一等状态之后，这里必须把它写进去，
+   * 便签面板才知道要打开哪一条。
    */
-  const openNoteFromSearch = useCallback(() => {
+  const openNoteFromSearch = useCallback((noteId: string) => {
+    selection.select('note', noteId);
     setSettingsFocus(undefined);
     setView('notes');
   }, []);
@@ -1209,7 +1338,7 @@ export function App(): React.JSX.Element {
         return;
       }
       if (entry.kind === 'note') {
-        openNoteFromSearch();
+        openNoteFromSearch(entry.id);
         return;
       }
       // 跳转项的动作住在宿主给的 `quickActions` 里，这里只按 id 找回它。
@@ -1362,6 +1491,75 @@ export function App(): React.JSX.Element {
   }, []);
 
 
+  /**
+   * AI 面：**单步工具 + 对话助手**（原样两段接线，一处定义）。
+   *
+   * 🔴 2026-10-04 产品负责人把它们搬到最右那一栏（「把那个 AI 的功能移到右边那个区
+   * …无状态的时候就可以默认显示 AI Chatbot」）。这一份 JSX 同时是右栏的内容与
+   * 窄屏时的回退内容，所以**挂载点有两个、实现只有一个**。
+   * 搬之前这里的注释写着「没有选中态时往槽里塞装饰」被主计划 §5.4 否决 ——
+   * 那条现在由产品负责人推翻了，留痕在 `docs/plans/multi-end-unified-strategy.md`。
+   *
+   * ⚠️ `AiPrioritize` **不在这里**：它是批量的（「哪件事更重要」只在互相比较时成立），
+   * 只能待在列表上方。
+   */
+  const aiPanels = (
+    <>
+      {/* AI 工具调用（功能 ⑤）。
+          🔴 它不新增路由/页面：作为任务视图里的一个面板挂在**右栏**
+          （≤1023px 右栏不出现时退回中间列 —— 见 `detailHasRoom`）。
+          规则命中时**一个字节都不发**（面板会明说）；只有规则处理不了时才披露 + 发送。
+          写工具只产出提案，必须用户再点「确认执行」才落库。 */}
+      {contentView === 'tasks' && (
+        <AiToolRun
+          routing={aiSettings.routing}
+          consents={aiSettings.consents}
+          // 🔴 工具授权复用设置里那份 `localApi.grants` —— 不另建一套权限。
+          grants={aiSettings.localApi.grants}
+          secrets={aiSecrets}
+          healthSnapshot={aiSettings.health}
+          onHealth={(health) => {
+            setAiSettings((previous) => {
+              const next = {
+                ...previous,
+                health: toHealthSnapshot(health, Date.now()),
+              };
+              saveAiSettings(next);
+              return next;
+            });
+          }}
+        />
+      )}
+
+      {/* 对话式助手（W12 / ADR-0045）。
+          🔴 它的工具范围来自 `assistantTier`（设置里的**第二个授权前端**），
+          **不是** `localApi.grants` —— 那张表管的是外部程序（MCP）能不能调工具。
+          两档最后都汇到同一个 `isToolGranted()` 判据，授权仍只有一份。
+          ⚠️ 与上面单步面板**并存**是刻意的：单步那条有"规则命中零出境"的短路，
+          多轮循环还没有（缺口按编号登记在 `docs/plans/ai-assistant-closure.md` §7.2 第 4 条）。 */}
+      {contentView === 'tasks' && (
+        <AssistantPanel
+          routing={aiSettings.routing}
+          consents={aiSettings.consents}
+          tier={aiSettings.assistantTier}
+          secrets={aiSecrets}
+          healthSnapshot={aiSettings.health}
+          onHealth={(health) => {
+            setAiSettings((previous) => {
+              const next = {
+                ...previous,
+                health: toHealthSnapshot(health, Date.now()),
+              };
+              saveAiSettings(next);
+              return next;
+            });
+          }}
+        />
+      )}
+    </>
+  );
+
+
   return (
     /*
       🔴 共享层的主题在**这里**交出去（唯一的 `value`）。
@@ -1490,6 +1688,22 @@ export function App(): React.JSX.Element {
               onClick={() => {
                 // 用户自己导航 = 不定位。见 `settingsFocus` 的说明。
                 setSettingsFocus(undefined);
+                /*
+                  🔴 「任务」这一格**同时是收集箱的入口**（2026-10-04 产品负责人删掉了
+                  侧栏里那行重复的「收集箱」，理由见 `PRIMARY_NAV` 文件头）。
+
+                  ⚠️ 但它**不能无条件重置筛选** —— 那会推翻 R9（2026-10-02 同一位
+                  产品负责人的实测："回到任务视图应当看到他离开时停着的那一格，
+                  那是他的位置，不是垃圾"）。两条要求靠**点的时机**分开：
+                  · 人在别的视图 ⇒ 这一格是"回我的任务视图"，位置保留；
+                  · 人已经在任务视图 ⇒ 再点一次是明确的"回收集箱"手势
+                   （与移动端点当前 tab 回到顶部同一类），这是删掉侧栏那一行之后
+                    唯一回到收集箱的路径，判据在 `tests/app-mount.spec.tsx`。
+                */
+                if (v.key === 'tasks' && view === 'tasks') {
+                  useTaskStore.getState().setFilter({ kind: 'all' });
+                  return;
+                }
                 setView(v.key);
               }}
             >
@@ -1511,13 +1725,13 @@ export function App(): React.JSX.Element {
             贴底用 `margin-top: auto` 实现，不再插一个 spacer 元素。
             ⚠️ 而「帮助」是**动作**（它切到设置页），所以它在 tablist **外面**（见下）。
           */}
-          {visibleToolTabs.map((v) => (
+          {visibleToolTabs.map((v, i) => (
             <button
               key={v.key}
               type="button"
               role="tab"
               aria-selected={view === v.key}
-              className={`ht-rail__tab ht-rail__tab--tool${view === v.key ? ' ht-rail__tab--active' : ''}`}
+              className={`ht-rail__tab ht-rail__tab--tool${i === 0 ? ' ht-rail__tab--tool-start' : ''}${view === v.key ? ' ht-rail__tab--active' : ''}`}
               onClick={() => {
                 setSettingsFocus(undefined);
                 setView(v.key);
@@ -1581,15 +1795,13 @@ export function App(): React.JSX.Element {
                 key={entry.labelKey}
                 entry={entry}
                 count={
-                  entry.filter.kind === 'all'
-                    ? navCounts.all
-                    : entry.filter.kind === 'today'
-                      ? navCounts.today
-                      : entry.filter.kind === 'next7Days'
-                        ? navCounts.next7Days
-                        : entry.filter.kind === 'completed'
-                          ? navCounts.completed
-                          : undefined
+                  entry.filter.kind === 'today'
+                    ? navCounts.today
+                    : entry.filter.kind === 'next7Days'
+                      ? navCounts.next7Days
+                      : entry.filter.kind === 'completed'
+                        ? navCounts.completed
+                        : undefined
                 }
                 active={isActive(store.filter, entry.filter)}
                 onClick={() => goToFilter(entry.filter)}
@@ -1876,56 +2088,12 @@ export function App(): React.JSX.Element {
             />
           )}
 
-          {/* AI 工具调用（功能 ⑤）。
-              🔴 它不新增路由/页面：作为任务视图里的一个面板挂在这里。
-              规则命中时**一个字节都不发**（面板会明说）；只有规则处理不了时才披露 + 发送。
-              写工具只产出提案，必须用户再点「确认执行」才落库。 */}
-          {contentView === 'tasks' && (
-            <AiToolRun
-              routing={aiSettings.routing}
-              consents={aiSettings.consents}
-              // 🔴 工具授权复用设置里那份 `localApi.grants` —— 不另建一套权限。
-              grants={aiSettings.localApi.grants}
-              secrets={aiSecrets}
-              healthSnapshot={aiSettings.health}
-              onHealth={(health) => {
-                setAiSettings((previous) => {
-                  const next = {
-                    ...previous,
-                    health: toHealthSnapshot(health, Date.now()),
-                  };
-                  saveAiSettings(next);
-                  return next;
-                });
-              }}
-            />
-          )}
 
-          {/* 对话式助手（W12 / ADR-0045）。
-              🔴 它的工具范围来自 `assistantTier`（设置里的**第二个授权前端**），
-              **不是** `localApi.grants` —— 那张表管的是外部程序（MCP）能不能调工具。
-              两档最后都汇到同一个 `isToolGranted()` 判据，授权仍只有一份。
-              ⚠️ 与上面单步面板**并存**是刻意的：单步那条有"规则命中零出境"的短路，
-              多轮循环还没有（缺口按编号登记在 `docs/plans/ai-assistant-closure.md` §7.2 第 4 条）。 */}
-          {contentView === 'tasks' && (
-            <AssistantPanel
-              routing={aiSettings.routing}
-              consents={aiSettings.consents}
-              tier={aiSettings.assistantTier}
-              secrets={aiSecrets}
-              healthSnapshot={aiSettings.health}
-              onHealth={(health) => {
-                setAiSettings((previous) => {
-                  const next = {
-                    ...previous,
-                    health: toHealthSnapshot(health, Date.now()),
-                  };
-                  saveAiSettings(next);
-                  return next;
-                });
-              }}
-            />
-          )}
+          {/*
+            AI 面（单步工具 + 对话助手）在**右栏没位置**时才退回这里（≤1023px）。
+            两个挂载点共用下面 `aiPanels` 那一份 JSX —— 不抄第二份。
+          */}
+          {detailHasRoom ? null : aiPanels}
 
           {/*
             任务列表。**一行只有一个实现** —— 就是 `@heyta/ui` 的 `TaskList`
@@ -1964,6 +2132,8 @@ export function App(): React.JSX.Element {
               <TaskList
                 tasks={visible}
                 sort={taskSort}
+                onOpenTask={openTask}
+                activeTaskId={selectedTaskId}
                 onToggleTask={(taskId) => {
                   void store.toggleComplete(taskId);
                 }}
@@ -2028,6 +2198,8 @@ export function App(): React.JSX.Element {
                         <TaskList
                           tasks={group.tasks}
                           sort={taskSort}
+                          onOpenTask={openTask}
+                          activeTaskId={selectedTaskId}
                           onToggleTask={(taskId) => {
                             void store.toggleComplete(taskId);
                           }}
@@ -2095,7 +2267,14 @@ export function App(): React.JSX.Element {
             </div>
           )}
           {contentView === 'calendar' && <CalendarView />}
-          {contentView === 'quadrant' && <QuadrantBoard />}
+          {/**
+           * 四象限 = 同一批任务的另一种投影（共享 `QuadrantBoard` 每格直接渲染
+           * 共享 `TaskList`）。🔴 所以**选中必须接同一个值**：在列表里选中一条再切过来，
+           * 那一条要还是高亮的那一条 —— 各投影各留一份选中，就是各答一遍回落规则。
+           */}
+          {contentView === 'quadrant' && (
+            <QuadrantBoard onOpenTask={openTask} activeTaskId={selectedTaskId} />
+          )}
           {contentView === 'habits' && <HabitsView />}
           {/**
            * 番茄钟。**计时核心来自 `@heyta/ui` 的共享 `FocusPanel`**
@@ -2136,6 +2315,10 @@ export function App(): React.JSX.Element {
                   .addTask(t('web.board.untitledTask'), { startDate: atMs })
                   .catch((e) => console.error('DBG onCreateAt failed:', e));
               }}
+              // 点行 = 选中，与列表/四象限同一个值（同一批任务的第三种投影）。
+              // 触屏端早就接了，web 这边此前行体不可点 ⇒ 两端同一个界面两种能力。
+              onOpenTask={openTask}
+              activeTaskId={selectedTaskId}
             />
           )}
           {contentView === 'growth' && <GrowthView />}
@@ -2293,6 +2476,13 @@ export function App(): React.JSX.Element {
               {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
               <PasswordPanel />
               {/*
+                账号安全：注销账号（批次 E3）。服务端 `DELETE /api/account` 一直在，
+                缺的是调用点 —— 而 E2 那条"收到注销信号就清本机"的反应也等在这里
+                被主动触发一次，不然它只能靠下一次同步的回声。
+                🔴 未登录时这个面板自己返回 null（没有令牌就没有"哪个账号"可注销）。
+              */}
+              <CloseAccountPanel />
+              {/*
                 Windows 小组件的后台刷新（Web Push）。
                 🔴 **能力不可用时这个面板自己不画** —— http:// 上、没配 VAPID 的
                 自托管实例上、权限被拒之后，它都是一个点了必然失败的开关。
@@ -2322,6 +2512,35 @@ export function App(): React.JSX.Element {
           )}
         </div>
       </main>
+      {/*
+       * 🔴 详情列（工单 W2）：`.ht-app` 的**直接子项**，与 `<main>` 平级。
+       *
+       * 为什么必须是兄弟而不是 `.ht-content` 的后代：那一层带
+       * `max-inline-size: var(--ht-layout-content-max)` + `margin-inline: auto`，
+       * 挂在里面的列**永远贴不到窗口右边缘**，读起来就不是"三栏 + 右详情"而是
+       * "中间一坨里再分两栏"。这条是 W2 的承重判据（`boundingBox` 右边缘相等），
+       * 变异臂就是把这一列搬回 `.ht-content` 里面 —— 搬回去它必须转红。
+       *
+       * ⚠️ 它**曾经**是空的，而且那是设计不是半成品：产品负责人当时的原话是
+       * "即使没东西也空在那里，一旦选中任何东西右边就出详细的面单"，
+       * 被主计划 §5.4 否决的是"没有选中态时往槽里塞装饰"。
+       * 🔴 **2026-10-04 这条被同一个人推翻**：「右边那一栏……无状态的时候就可以
+       * 默认显示 AI Chatbot」⇒ 任务视图里这一栏装的就是 AI 面（`aiPanels`）。
+       * "选中某条 ⇒ 右边出详情面"那一半**没有**被推翻，它仍属于"详情面本体"那单
+       *（阻塞在拍板 #1/#8）；那一单接进来时替换的是**这一块位置**，不另开第三处。
+       * ⚠️ 这一栏仍然**没有无障碍名**：里面两个面板各自带标题，而这一栏的名字要
+       * 等详情面那单一起定（定名字就要新词条，中英必须成对，不为一半的答案先抄一个）。
+       *
+       * ⚠️ 窄屏（≤1023px）这一列不出现，规则与算过的账在 `styles/app/narrow.css`。
+       * AI 面在那一档**退回中间列**，不跟着这一栏一起消失（判据见 `detailHasRoom`）。
+       */}
+      <aside
+        ref={detailRef}
+        className="ht-app__detail"
+        data-testid="detail-column"
+      >
+        {detailHasRoom ? aiPanels : null}
+      </aside>
       </div>
       </AiSettingsNavigationContext.Provider>
     </HeytaUiProvider>

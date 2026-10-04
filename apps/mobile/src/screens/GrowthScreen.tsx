@@ -86,7 +86,7 @@
  *      "验证过里面就是这段"。设备级读回判据（点完去粘贴框贴一次）本轮没做 → BLOCKED.md
  *   3. **没传 `onRepair` / `onFreshStart`** ⇒ 补打卡 / 重新开始**只有文字**。
  *      `onRepair` 的接法本来就现成（`createHabitActions(host).checkIn(habitId, date)`，
- *      `HabitsScreen.tsx:372` 已在用），但共享层的按钮渲染条件是
+ *      `HabitsScreen.tsx:401` 已在用），但共享层的按钮渲染条件是
  *      `onRepair !== undefined && labels.repairAction !== undefined`
  *      （`HabitStreakList.tsx:269`），而判卷文件
  *      `apps/mobile/tests/growth-display.spec.ts:302` 断言

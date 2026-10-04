@@ -13,7 +13,10 @@
 
 set -uo pipefail
 
-PIDFILE="/tmp/heyta-e2e-server.pid"
+# 🔴 与 `mobile-e2e-up.sh` 同一枚旋钮（默认值逐字不变）。写死的时候它是**跨树共享**的名字：
+#    17:5x 现量 pidfile 里躺着死 pid 95105，而 :3000 的真实监听者 70256 没被任何地方记下
+#    —— 那一趟 down 会"成功退出而什么都没停"。
+PIDFILE="${HEYTA_E2E_PIDFILE:-/tmp/heyta-e2e-server.pid}"
 
 if [ ! -f "$PIDFILE" ]; then
   echo "   ⏭  没有 pidfile（${PIDFILE}）—— 本脚本起的服务端不在运行。"

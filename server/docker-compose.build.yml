@@ -24,6 +24,11 @@ services:
         APK_MIRROR: ${APK_MIRROR:-dl-cdn.alpinelinux.org}
         # npm registry，同理：默认官方，连不上时用 NPM_REGISTRY 覆盖。
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
-    image: supersync:local
+    # 🔴 必须与 `docker-compose.yml` / `docker-compose.migrate-once.yml` **同一个表达式**。
+    # 写死 `supersync:local` 会盖掉 `SUPERSYNC_IMAGE`，而一次性迁移服务读的是那个变量 ⇒
+    # 设了它的人会让**应用容器与迁移容器跑两枚不同镜像**（实测：应用 `supersync:local`、
+    # 迁移 `my.reg/heyta:v1`），正是 `docker-compose.migrate-once.yml` 文件头声明"刻意不能发生"的那件事。
+    # 用同一个表达式还顺带做对了另一件事：带 build override 时 compose 会把本地构建**打成你给的那个 tag**。
+    image: ${SUPERSYNC_IMAGE:-supersync:local}
     environment:
       - MIGRATE_RECOVERY_BUILD_LOCAL=true

@@ -205,13 +205,6 @@ export const META_KEYS = {
   ENCRYPTION_ENABLED: 'encryptionEnabled',
   /** 最后成功同步的时间。 */
   LAST_SYNCED_AT: 'lastSyncedAt',
-  /** 上一次成功拉到的公共事实响应体（`HolidayAdjustmentsResponse` 的 JSON）。 */
-  PUBLIC_FACTS_JSON: 'publicFactsJson',
-  /** 它对应的版本令牌（服务端 ETag 的候选值），条件请求时原样回传。 */
-  PUBLIC_FACTS_ETAG: 'publicFactsEtag',
-  /** 那次拉取的本地毫秒时间戳（只用于"缓存多旧"，不参与任何裁决）。 */
-  PUBLIC_FACTS_FETCHED_AT: 'publicFactsFetchedAt',
-
   /**
    * 服务端已确认的因果前沿。
    *
@@ -227,6 +220,12 @@ export const META_KEYS = {
   VAULT_KEY_SCOPE: 'vaultKeyScopeV1',
   /** Ciphertext-only durable key-migration journal; no root/plaintext/password. */
   VAULT_MIGRATION_JOURNAL: 'vaultMigrationJournalV1',
+  /** 上一次成功拉到的公共事实响应体（`HolidayAdjustmentsResponse` 的 JSON）。 */
+  PUBLIC_FACTS_JSON: 'publicFactsJson',
+  /** 它对应的版本令牌（服务端 ETag 的候选值），条件请求时原样回传。 */
+  PUBLIC_FACTS_ETAG: 'publicFactsEtag',
+  /** 那次拉取的本地毫秒时间戳（只用于"缓存多旧"，不参与任何裁决）。 */
+  PUBLIC_FACTS_FETCHED_AT: 'publicFactsFetchedAt',
   /** Active encrypted-payload generation paired with the local key package. */
   VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
   /** Encrypted pending root-rotation target; never stores a plaintext root. */

@@ -32,6 +32,10 @@ class MainApplication : Application(), ReactApplication {
           // autolinking 看不到它。⚠️ 忘了这一行时 JS 侧拿到 undefined，
           // 界面会显示"这台设备读不了本地文件" —— 是响亮的，不会静默。
           add(LocalFsPackage())
+          add(ReminderPackage())
+          // Vault root keys are opt-in persisted only through OS secure storage.
+          // This module is separate from the widget's device-key alias/cache.
+          add(VaultSecureStoragePackage())
           // 成品图落盘（W7 设备出图）。栅格化由 react-native-svg 的原生模块做，
           // 这里补的是"base64 → 能被分享的文件"那一环。
           // ⚠️ 忘了这一行时 `NativeModules.HeytaCardExport` 是 undefined，

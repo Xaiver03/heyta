@@ -152,6 +152,10 @@ shot_ok_logged() {
 #    Windows 旅程验收（`scripts/verify-windows-shell-journey.mjs`）用的是**同一份**。
 #    两份实现会漂移成"一个送新树、一个送旧树"，正是 §7 第 82 条那次事故的形状。
 source "$ROOT/scripts/lib/sync-windows-sources.sh"
+# 🔴 Windows 取证的判据清单同样只有一个所有者（`package-msix.sh` 也调它）。
+#    以前只有这里有一份四项清单，而打包脚本**一条都不判** ⇒ 快捷方式那条新判据
+#    只加进了生成它的一侧，读它的另一侧看不见。
+source "$ROOT/scripts/lib/msix-install-facts.sh"
 
 # ── 段选择 ────────────────────────────────────────────────────────────────
 ALL="mac windows android ios"
@@ -277,20 +281,13 @@ if printf '%s' "$WANT" | grep -q "windows"; then
         > /tmp/heyta-reinstall-win.log 2>&1; then
       echo "  ✅ 远端打包 + 安装 + 启动截图完成（日志 /tmp/heyta-reinstall-win.log）"
       FACTS="$WIN_OUT/install-capture.txt"
-      # 判据四件套（缺一不可）：
-      #   ADD_APPX=OK      装上了
-      #   RESULT=OK        起来了、截了图
-      #   PAYLOAD_WEBDIST  包里带**真共享 UI**（否则是通道试验页，不是产品）
-      #   M2D=OK           壳自己的身份菜单判据（第一项=登录/注册、无退出登录）
-      MISSING=""
-      for fact in "ADD_APPX=OK" "RESULT=OK" "PAYLOAD_WEBDIST=True" "M2D=OK"; do
-        grep -q "$fact" "$FACTS" 2>/dev/null || MISSING="$MISSING $fact"
-      done
-      if [ -z "$MISSING" ]; then
-        echo "  ✅ 远端取证：装上的是**当前源码的真应用**，且身份菜单判据成立"
+      # 判据清单的单一所有者：`scripts/lib/msix-install-facts.sh`
+      # （打包脚本 `package-msix.sh` 现在也调同一条，所以两处不会漂成两套标准）
+      if msix_fact_out=$(msix_check_facts "$FACTS"); then
+        echo "  ✅ 远端取证：${msix_fact_out}"
         RESULT_windows=OK
       else
-        echo "  🔴 远端取证不完整 —— 缺：${MISSING# }（${FACTS}：）"
+        echo "  🔴 远端取证不完整 —— ${msix_fact_out}"
         [ -f "$FACTS" ] && sed 's/^/     /' "$FACTS"
       fi
     else

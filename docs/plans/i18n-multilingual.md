@@ -753,6 +753,33 @@ node scripts/check-pricing-consistency.mjs
    理由与它抓出的那个缺陷见 §7.14 第 1 条；"派生 ≠ 硬编码两种"这条也已在
    **隔离检出**里用真变异证完（见 §7.14 第 2 条），不再是没有证据的边界。
    落地页复刻改用同一份 `LOCALES`/`LOCALE_LABEL_KEY`。
+   🔴 **2026-10-03 形态变更（上面"一排 `.ht-chip`"那句随之过期）**：产品负责人
+   「中英文的那个切换组件太离谱了，你看一下规范应该是什么样子的」。查到的规范
+   **四条全在仓库里**，逐条的令牌名与实测数字记在
+   [`apps/web/src/styles/app/main-area.css`](../../apps/web/src/styles/app/main-area.css)
+   那段 `.ht-header__lang*` 头上：① 顶栏的控件必须**自己说明自己是什么**
+   （同位置同错法已判过两次：`App.tsx` 排序下拉那段、`.ht-header__view`，原话
+   "用户根本不知道它们是什么"）；② `.ht-chip` 是**设置/AI 面板内的筛选胶囊**，
+   顶栏借错了层（那一区的既有语言是 `.ht-btn`）；③ 它的盒高 ~20px，而
+   `MASTER.md` §3 写的是触控目标 ≥ 44px；④ 它的选中态用主色边框，而
+   `--ht-color-ring` 在两套主题里**就是**主色 —— 截图里那枚"看起来一直被聚焦"的蓝框。
+   **换的是摆位与外观，语义一条没动**：`LOCALES` 驱动、自称、`lang`、`aria-current`、
+   点当前项不写不回传，全部保留；新增的是可见标签（`web.shell.lang.label`，
+   中英各一条）+ `role="group"` + `aria-labelledby`（名字由可见标签提供，不抄第二份）
+   + 当前项一枚 `Check` 勾（「不靠颜色单独表意」）。
+   **不做成下拉**（落地页那颗 globe 是营销面、切语言是整页跳转的 `<a>`；这里切语言是
+   当场改状态，弹层多一次点击，而且收起状态就看不见"我当前是哪门语言"）。
+   用例 **12 条 → 14 条**；改前实测：把这 14 条跑在**旧组件**上 ⇒ **4 红 10 绿**
+   （红的全是形态那四条，10 条行为判据两边都绿 —— 说明这次加的是形态的牙，
+   没有顺手削弱行为覆盖）。e2e 侧另加一支取证配置
+   `e2e/playwright.lang-shots.config.ts`（私有端口 4327：`check:ai-e2e` 的预检
+   会对 4318/4319 下 SIGKILL，不能共用），它含"顶栏只有一个入口且入口自己说明自己"
+   与中/英 × 浅/暗 × 1280/660 共 16 张图。
+   ⚠️ **一处日期更正**：这一批改动的注释与文档最初把形态变更写成"2026-10-04"，
+   实际提交时间戳是 **2026-10-03**（`git log` 可查），已由 `fb0d7b0a` 改回。
+   🔴 那条提交信息里"当时已经过了午夜"这句归因是**错的** —— 时间戳是 17:55，
+   没有任何午夜可言，写错就是写错。留在这里是因为提交信息改不掉：
+   **写进历史里的因果句也是断言**，被否证就要在能改的地方撤回。
 9. **`packages/sync-client` 的 `describeConflictPayload` 仍是中文，且会吐出内部标识符。**
    它返回一句中文（空载荷 `（空）`），其中一支还会把载荷的**字段名**拼进去（`completedAt: 123`）。
    现在加了一个结构化兄弟函数 `summarizeConflictPayload(payload)` →
@@ -1515,7 +1542,8 @@ case 'ollama': return t('common.ai.preset.ollama.label');
   判据：`verify-i18n-failures.mjs` 的 `readiness` 组 **12 条**（/tmp 副本隔离，不动真实仓库），
   含"塞规则但漏 locale""把 en 的 forbidden 拿掉""已迁移文件里写硬编码文案"等注入。
 - ✅ **web 切换器从二态 toggle 改 `LOCALES` 列表**（本轮）：`LanguageSwitcher.tsx` 渲染
-  `LOCALES.map(…)` 的一排 `.ht-chip`（复用既有 `.ht-chip--on`，零新增 CSS），语言名用**自称**词条
+  `LOCALES.map(…)` 的一排语言项（2026-10-03 起是页头那个**带可见标签的分组**，
+  见上面 §7.8 最后那段；此前是复用 `.ht-chip--on` 的一排胶囊），语言名用**自称**词条
   `common.lang.*`；自称 key 登记成 `LOCALE_LABEL_KEY`（`satisfies Record<Locale, MessageKey>`）
   —— **加 `Locale` 忘了登记自称 = 编译错误**，这就是"准备好但先不做"的具体形状。
   落地页复刻（`AppWindow.tsx`）用同一份 `LOCALES`/`LOCALE_LABEL_KEY`，不再自己列一份。

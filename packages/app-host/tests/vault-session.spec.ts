@@ -37,7 +37,7 @@ describe('vault key session', () => {
       get: async () => pending.package,
       put: async (pkg, expected) => {
         expect(expected).toBe(0);
-        return pkg;
+        return { package: pkg, payloadKeyVersion: 1 };
       },
     };
     await session.confirmAndPublish(pending, pending.recoveryCode, remote);
@@ -141,6 +141,9 @@ describe('vault key session', () => {
     const committedRemote: VaultKeyPackageRemote = {
       serverOrigin: scope.serverOrigin,
       get: async () => remoteState.package,
+      getState: async () => remoteState.package === undefined
+        ? undefined
+        : { package: remoteState.package, payloadKeyVersion: 1 },
       put: async (pkg) => { remoteState.package = pkg; throw new Error('response lost'); },
     };
     await session.confirmAndPublish(initial, initial.recoveryCode, committedRemote);
@@ -162,12 +165,12 @@ describe('vault key session', () => {
     await expect(locked.refreshFromRemote({
       serverOrigin: scope.serverOrigin,
       get: async () => pending.package,
-      put: async () => pending.package,
+      put: async () => ({ package: pending.package, payloadKeyVersion: 1 }),
     })).rejects.toMatchObject({ code: 'remote-downgrade' });
     await expect(locked.refreshFromRemote({
       serverOrigin: scope.serverOrigin,
       get: async () => ({ ...changed.package, rootKeyFingerprint: 'b'.repeat(64) }),
-      put: async () => changed.package,
+      put: async () => ({ package: changed.package, payloadKeyVersion: 1 }),
     })).rejects.toMatchObject({ code: 'remote-root-conflict' });
   });
 
@@ -201,7 +204,7 @@ describe('vault key session', () => {
       serverOrigin: scope.serverOrigin,
       get: async () => changed.package,
       getState: async () => ({ package: changed.package, payloadKeyVersion: 1 }),
-      put: async () => changed.package,
+      put: async () => ({ package: changed.package, payloadKeyVersion: 1 }),
     });
     const cipher = await session.getPayloadCipher();
     const encoded = await cipher!.encrypt('payload', {
@@ -296,5 +299,39 @@ describe('vault key session', () => {
       payloadKeyVersion: 2,
     }));
     expect(restarted.getPendingRootRotation()).toBeUndefined();
+  });
+
+  it('keeps the old package when refresh observes a server-published pending target', async () => {
+    const store = await makeStore();
+    const first = await createVaultKeySession({ store, scope });
+    const initial = await first.beginCreation('old passphrase');
+    await first.confirmAndPublish(initial, initial.recoveryCode);
+    const pending = await first.beginRootRotation('new passphrase');
+    first.lock();
+
+    const restarted = await createVaultKeySession({ store, scope });
+    await restarted.refreshFromRemote({
+      serverOrigin: scope.serverOrigin,
+      get: async () => pending.package,
+      getState: async () => ({ package: pending.package, payloadKeyVersion: 2 }),
+      put: async () => ({ package: pending.package, payloadKeyVersion: 2 }),
+    });
+    expect(restarted.keyPackage?.rootKeyFingerprint).toBe(initial.package.rootKeyFingerprint);
+    expect((await store.load())?.rootKeyFingerprint).toBe(initial.package.rootKeyFingerprint);
+
+    await restarted.unlockWithPassphrase('old passphrase');
+    const resumed = restarted.getPendingRootRotation();
+    expect(resumed?.package.rootKeyFingerprint).toBe(pending.package.rootKeyFingerprint);
+    await restarted.confirmAndMigrateRootRotation(resumed!, pending.recoveryCode, async (input) => ({
+      keyVersion: input.targetPackage.keyVersion,
+      payloadKeyVersion: 2,
+    }));
+    expect(restarted.keyPackage?.rootKeyFingerprint).toBe(pending.package.rootKeyFingerprint);
+    const root = restarted.copyUnlockedRootKey();
+    try {
+      await expect(store.loadPendingRootRotation(scope, root)).resolves.toBeUndefined();
+    } finally {
+      root.fill(0);
+    }
   });
 });

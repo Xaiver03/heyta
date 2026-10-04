@@ -53,6 +53,10 @@ HTTP + PostgreSQL 对照也复现了：一条带完整 101 维时钟的历史写
 
 - 单测：`packages/sync-core/tests/vector-clock-a1.spec.ts`、
   `packages/op-log/tests/engine.spec.ts`。
+- 2026-10-04 当前工作树定向复核：`@heyta/sync-core` 的
+  `causal-clock.spec.ts`、`vector-clock-a1.spec.ts`、`conflict-classification.spec.ts`
+  共 3 个文件 / 14 条通过；当前环境未设置 `DATABASE_URL`，HTTP/PostgreSQL 集成没有
+  被 `skipIf` 的未执行误记为通过，真实链路仍以其独立 PostgreSQL 载体记录为准。
 - 真实 frontier：`server/tests/integration/causal-frontier-http.integration.spec.ts`。
 - 真实服务端 P1：`/tmp/heyta-aed-p1-final.log`，12 条通过；其中包括受害时钟经
   完整源产生 REPAIR，受损目标通过共享 app-host wiring 接收、重启后保留

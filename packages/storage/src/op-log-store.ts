@@ -137,6 +137,22 @@ export interface OpLogStore<
   /** 全量操作（用于导出、快照）。**必须分页**，不要一次拉全库。 */
   getAllOps(range?: DbKeyRange, limit?: number): Promise<StoredOperation<TOperation>[]>;
 
+  /**
+   * 全库条数（**热区 + 归档**），不物化任何一行。
+   *
+   * 🔴 为什么接口上必须有它：在此之前，"库里有多少条 / 库里有没有东西"
+   * 只能 `getAllOps().length` —— 把**含密文正文的全表**读进内存再数一下。
+   * 三个真实消费者都付这份钱：备份还原的空库守卫、同步检查点的前置判定、
+   * 以及界面上的待上传数。
+   *
+   * ⚠️ 必须**含归档**：归档的那些 op 仍然是这台设备的历史。只数热区会让
+   * 「还原只允许空库」这条守卫在一台有归档历史的设备上放行，
+   * 于是还原把数据写进一个**其实不空**的库。
+   *
+   * 与 {@link getAllOps} 的语义等价性由契约测试钉住（同一份夹具两条路必须同数）。
+   */
+  countAllOps(): Promise<number>;
+
   // ── 崩溃恢复 ─────────────────────────────────────────────
 
   /**
@@ -148,6 +164,14 @@ export interface OpLogStore<
   findPendingApply(): Promise<StoredOperation<TOperation>[]>;
 
   /**
+   * 「有没有已落盘未应用的 op」的**便宜版本**（条数，不物化行）。
+   *
+   * 检查点前置判定只需要一个 `> 0`，而它以前把整条队列（含密文正文）读进内存
+   * 再数。语义等价性由契约测试与 {@link findPendingApply} 对账。
+   */
+  countPendingApply(): Promise<number>;
+
+  /**
    * 待上传的本地 op（离线队列），按本地 seq 升序。
    *
    * ⚠️ 与 {@link findPendingApply} 是**两个不同的队列**，不要混用：
@@ -157,6 +181,18 @@ export interface OpLogStore<
    * 也可能是"已应用"但"待上传"（本地 op）。这就是为什么它们是两个字段。
    */
   findPendingUpload(): Promise<StoredOperation<TOperation>[]>;
+
+  /**
+   * 待上传队列的条数（不物化行）—— 界面上那个「待上传 N 项」徽标要用它。
+   *
+   * 🔴 它与 `engine.getPendingUpload().length` 的**等价性不是免费的**：
+   * 引擎那边会再 `filter(r => r.source === 'local')`。之所以可以直接数索引，
+   * 是因为 `uploadStatus === 'pending'` 只在**本地写入**那一处被赋值
+   * （`db-op-log-store.ts` 里 `source === 'local' ? 'pending' : 'uploaded'`）。
+   * 那条不变量由本包的契约测试钉住 —— 谁哪天让远端 op 也进 pending，
+   * 这个计数就会开始多报，而那正是"徽标说谎"的形状。
+   */
+  countPendingUpload(): Promise<number>;
 
   /** 标记 op 已上传，并回写服务端分配的 seq。返回更新条数。 */
   markUploaded(serverSeqsByOpId: ReadonlyMap<string, number>): Promise<number>;
@@ -206,24 +242,6 @@ export interface OpLogStore<
   /** 写入同步游标。 */
   setLastServerSeq(seq: number): Promise<void>;
 
-  /**
-   * 读 `STORES.META` 里的一个键（原样返回存的值）。
-   *
-   * 🔴 为什么把 META 的通用读法开在**这个接口**上，而不是让调用方自己拿 `DbAdapter`：
-   *   web 的默认存储路径是 **Worker + OPFS SQLite**，桌面壳那条是**壳里的 SQLite** ——
-   *   这两条路上**页侧根本没有 `DbAdapter`**，只有一个 `OpLogStore` 代理。
-   *   如果这个能力只存在于 `DbAdapter`，"公共事实缓存在 web 上能用"就会**静默地假**
-   *   （ADR-0052 §2.5 点名要进 `STORES.META`，而三条后端路径都得进得了）。
-   *   开在接口上之后，桥上的转发列表是**显式列出的**（见 `oplog-worker-bridge.ts` 那条
-   *   "不用 Proxy"的理由），漏转发会在**第一次调用时响亮报错**，不是返回空值。
-   *
-   * 键名只在 `META_KEYS` 定义一次；这里不认识具体键，避免把语义复制进存储层。
-   */
-  getMetaValue(key: string): Promise<string | number | undefined>;
-
-  /** 写 `STORES.META` 里的一个键。值只允许 `string | number`（要过结构化克隆）。 */
-  setMetaValue(key: string, value: string | number): Promise<void>;
-
   /** Optional materialized-state checkpoint hooks (older hosts may omit them). */
   readCheckpoint?(): Promise<MaterializedCheckpoint | undefined>;
   writeCheckpoint?(checkpoint: MaterializedCheckpoint): Promise<void>;
@@ -245,6 +263,23 @@ export interface OpLogStore<
 
   /** Permanently mark history as incomplete; there is intentionally no clear hook. */
   markHistoryIncomplete?(): Promise<void>;
+  /**
+   * 读 `STORES.META` 里的一个键（原样返回存的值）。
+   *
+   * 🔴 为什么把 META 的通用读法开在**这个接口**上，而不是让调用方自己拿 `DbAdapter`：
+   *   web 的默认存储路径是 **Worker + OPFS SQLite**，桌面壳那条是**壳里的 SQLite** ——
+   *   这两条路上**页侧根本没有 `DbAdapter`**，只有一个 `OpLogStore` 代理。
+   *   如果这个能力只存在于 `DbAdapter`，"公共事实缓存在 web 上能用"就会**静默地假**
+   *   （ADR-0052 §2.5 点名要进 `STORES.META`，而三条后端路径都得进得了）。
+   *   开在接口上之后，桥上的转发列表是**显式列出的**（见 `oplog-worker-bridge.ts` 那条
+   *   "不用 Proxy"的理由），漏转发会在**第一次调用时响亮报错**，不是返回空值。
+   *
+   * 键名只在 `META_KEYS` 定义一次；这里不认识具体键，避免把语义复制进存储层。
+   */
+  getMetaValue(key: string): Promise<string | number | undefined>;
+
+  /** 写 `STORES.META` 里的一个键。值只允许 `string | number`（要过结构化克隆）。 */
+  setMetaValue(key: string, value: string | number): Promise<void>;
 }
 
 /** 存储层的失败原因，供上层区分处理。 */

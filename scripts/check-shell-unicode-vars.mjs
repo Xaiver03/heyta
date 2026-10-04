@@ -54,6 +54,11 @@ const SKIP_DIRS = new Set([
   'build',
   '.pnpm-store',
   'release',
+  // 各并行线 agent 的 scratch（`.gitignore` 的 `tmp/`）。与 docs-link-check
+  // 跳过它同一条理由：实测 4 个 `tmp/*.sh` 的红全部来自草稿，被跟踪脚本
+  // 贡献 0 条——那种红不可归因给任何脚本作者，也永远不会在 CI 出现。
+  // 草稿被正式收进 `scripts/` 的那一刻起就在扫描面里（那正是该挡的时刻）。
+  'tmp',
 ]);
 
 /** 与 Python 修复器**同一套判定**，避免"门禁说没问题、修复器却改了"这种不一致。 */

@@ -10,7 +10,8 @@
  * 覆盖面是按**实测**选的，不是猜的：两个契约文件里用到的 API 只有
  *   `describe` / `it` / `expect`，
  * 匹配器只有 `toBe` / `toEqual` / `toHaveLength` / `toBeDefined` /
- * `toBeUndefined` / `toBeGreaterThanOrEqual`，外加 `rejects.toThrow(...)`。
+ * `toBeUndefined` / `toBeGreaterThan` / `toBeGreaterThanOrEqual` / `toBeLessThan` / `.not` / `resolves.toMatchObject(...)`,
+ * `expect.any(...)`，外加 `rejects.toThrow(...)`。
  * **没有任何生命周期钩子**（无 beforeEach/afterEach），所以替身不需要它们。
  *
  * ⚠️ 这是替身，不是 vitest：断言失败时的报错文案与 vitest 不同。
@@ -148,6 +149,51 @@ const fail = (message: string): never => {
   throw new Error(message);
 };
 
+const ASYMMETRIC = Symbol('vitest-shim-asymmetric');
+type AsymmetricMatcher = {
+  readonly [ASYMMETRIC]: (actual: unknown) => boolean;
+  readonly description: string;
+};
+
+function isAsymmetricMatcher(value: unknown): value is AsymmetricMatcher {
+  return typeof value === 'object' && value !== null && ASYMMETRIC in value;
+}
+
+/** `toMatchObject` 的递归子集语义，另支持 `expect.any(...)`。 */
+function matchesObject(actual: unknown, expected: unknown): boolean {
+  if (isAsymmetricMatcher(expected)) return expected[ASYMMETRIC](actual);
+  if (Object.is(actual, expected)) return true;
+  if (expected === null || typeof expected !== 'object' || actual === null || typeof actual !== 'object') {
+    return false;
+  }
+  if (Array.isArray(expected)) {
+    if (!Array.isArray(actual) || actual.length !== expected.length) return false;
+    return expected.every((item, index) => matchesObject(actual[index], item));
+  }
+  if (Array.isArray(actual)) return false;
+  const expectedRecord = expected as Record<string, unknown>;
+  const actualRecord = actual as Record<string, unknown>;
+  return Object.keys(expectedRecord).every(
+    (key) => Object.hasOwn(actualRecord, key) && matchesObject(actualRecord[key], expectedRecord[key]),
+  );
+}
+
+function asymmetricAny(expectedType: unknown): AsymmetricMatcher {
+  if (typeof expectedType !== 'function') {
+    throw new TypeError(`expect.any 需要构造器，实得 ${show(expectedType)}`);
+  }
+  const name = (expectedType as { name?: unknown }).name;
+  return {
+    [ASYMMETRIC]: (actual: unknown) => {
+      if (expectedType === Number) return typeof actual === 'number' || actual instanceof Number;
+      if (expectedType === String) return typeof actual === 'string' || actual instanceof String;
+      if (expectedType === Boolean) return typeof actual === 'boolean' || actual instanceof Boolean;
+      return actual instanceof (expectedType as abstract new (...args: never[]) => unknown);
+    },
+    description: `Any<${typeof name === 'string' ? name : 'unknown'}>`,
+  };
+}
+
 export function expect(actual: unknown): Record<string, unknown> {
   const expectAny = actual as never;
 
@@ -179,7 +225,92 @@ export function expect(actual: unknown): Record<string, unknown> {
         fail(`toBeGreaterThanOrEqual 失败：期望 >= ${expected}，实得 ${show(actual)}`);
       }
     },
+    toBeGreaterThan(expected: number) {
+      if (typeof actual !== 'number' || !(actual > expected)) {
+        fail(`toBeGreaterThan 失败：期望 > ${expected}，实得 ${show(actual)}`);
+      }
+    },
+    toBeLessThan(expected: number) {
+      if (typeof actual !== 'number' || !(actual < expected)) {
+        fail(`toBeLessThan 失败：期望 < ${expected}，实得 ${show(actual)}`);
+      }
+    },
+    toMatchObject(expected: unknown) {
+      if (!matchesObject(actual, expected)) {
+        fail(`toMatchObject 失败：期望包含 ${show(expected)}，实得 ${show(actual)}`);
+      }
+    },
   };
+
+  /** `expect(value).not.matcher(...)`：先运行原断言，成功则反转为失败。 */
+  Object.defineProperty(matchers, 'not', {
+    get() {
+      const negated: Record<string, unknown> = {};
+      for (const [name, matcher] of Object.entries(matchers)) {
+        if (name === 'not' || name === 'rejects' || name === 'resolves') continue;
+        negated[name] = (...args: unknown[]) => {
+          try {
+            (matcher as (...values: unknown[]) => unknown)(...args);
+          } catch {
+            return;
+          }
+          fail(`not.${name} 失败：实值满足了被否定的断言`);
+        };
+      }
+      return negated;
+    },
+  });
+
+  const promiseMatchers = (mode: 'resolves' | 'rejects') => {
+    const resolved: Record<string, unknown> = {};
+    for (const [name, matcher] of Object.entries(matchers)) {
+      if (name === 'not' || name === 'rejects' || name === 'resolves') continue;
+      resolved[name] = (...args: unknown[]) => Promise.resolve(expectAny).then(
+        (value) => {
+          if (mode === 'rejects') {
+            throw new Error(`rejects.${name} 失败：期望 Promise 被拒绝，但它兑现了`);
+          }
+          return (expect(value) as Record<string, (...values: unknown[]) => unknown>)[name]!(...args);
+        },
+        (error: unknown) => {
+          if (mode === 'resolves') {
+            throw new Error(`resolves.${name} 失败：期望 Promise 兑现，但它被拒绝：${describeError(error)}`);
+          }
+          throw new Error(`rejects.${name} 未实现：只允许使用 rejects.toThrow(...)`);
+        },
+      );
+    }
+    return resolved;
+  };
+
+  Object.defineProperty(matchers, 'resolves', {
+    get() {
+      const resolved = promiseMatchers('resolves');
+      Object.defineProperty(resolved, 'not', {
+        get() {
+          const negated: Record<string, unknown> = {};
+          for (const [name, matcher] of Object.entries(resolved)) {
+            if (name === 'not') continue;
+            negated[name] = (...args: unknown[]) => Promise.resolve(expectAny).then(
+              (value) => {
+                try {
+                  (expect(value) as Record<string, (...values: unknown[]) => unknown>)[name]!(...args);
+                } catch {
+                  return;
+                }
+                fail(`resolves.not.${name} 失败：实值满足了被否定的断言`);
+              },
+              (error: unknown) => {
+                throw new Error(`resolves.not.${name} 失败：Promise 被拒绝：${describeError(error)}`);
+              },
+            );
+          }
+          return negated;
+        },
+      });
+      return resolved;
+    },
+  });
 
   /**
    * `await expect(promise).rejects.toThrow(msg?)`
@@ -217,4 +348,8 @@ export function expect(actual: unknown): Record<string, unknown> {
   });
 
   return matchers;
+}
+
+export namespace expect {
+  export const any = asymmetricAny;
 }

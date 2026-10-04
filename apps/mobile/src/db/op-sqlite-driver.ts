@@ -36,7 +36,7 @@
  */
 
 import { open, type DB, type Scalar } from '@op-engineering/op-sqlite';
-import type { SqliteDriver, SqlValue } from '@heyta/storage';
+import type { SqliteContainerRemoval, SqliteDriver, SqlValue } from '@heyta/storage';
 
 export interface OpSqliteDriverOptions {
   /** 数据库名（不含路径）。op-sqlite 会放到平台约定的目录下。 */
@@ -65,9 +65,11 @@ const UNIQUE_PATTERNS = [
 
 export class OpSqliteDriver implements SqliteDriver {
   private readonly db: DB;
+  private readonly name: string;
   private closed = false;
 
   constructor(options: OpSqliteDriverOptions) {
+    this.name = options.name;
     this.db = open(
       options.location !== undefined
         ? { name: options.name, location: options.location }
@@ -114,6 +116,33 @@ export class OpSqliteDriver implements SqliteDriver {
           : String((error as { message?: unknown } | null)?.message ?? '');
     if (message === '') return false;
     return UNIQUE_PATTERNS.some((re) => re.test(message));
+  }
+
+  /**
+   * 删掉原生侧那个库文件（`DB.delete()`）。
+   *
+   * 🔴 **不在 `assertOpen()` 后面**：契约规定的顺序是"适配器先 close，再让驱动删文件"，
+   * 所以走到这里时 `closed` **必然是 true**。把它放在断言之后就会得到
+   * "已关闭的驱动"这个错，而症状是"报告说没删干净"—— 一次会把人引向
+   * 完全错误方向的假故障。
+   *
+   * ⚠️ op-sqlite 在 **web** 构建里把这个方法实现成"抛 unsupported"
+   *   （`src/functions.web.ts`），而 mobile 的 web 目标恰好会走到那份实现。
+   *   这里不装作它不存在：捕获后如实报 `containerRemoved: false` 并带上原因，
+   *   界面上那句"这台设备上的我没清干净"就是靠它说出来的。
+   */
+  removeDatabase(): SqliteContainerRemoval {
+    const target = this.name;
+    try {
+      this.db.delete();
+      return { target, containerRemoved: true };
+    } catch (error) {
+      return {
+        target,
+        containerRemoved: false,
+        reason: `database-delete-failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   }
 
   private assertOpen(): void {

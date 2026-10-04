@@ -269,6 +269,18 @@ export async function stubLegalRecheck(page: Page, origin: string = STUB_ORIGIN)
   });
 }
 
+/** 与本测试主题无关的公开调休日历：只响应合法空年度，未知请求仍由各夹具判红。 */
+export async function stubEmptyHolidayAdjustments(page: Page, origin: string = STUB_ORIGIN): Promise<void> {
+  await page.route(`${origin}/api/holiday-adjustments**`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ version: '0.0.0', years: [] }),
+    });
+  });
+}
+
 /**
  * 给"公共事实"那条通道一个**中性**的应答（`GET /api/holiday-adjustments`）。
  *
@@ -573,4 +585,25 @@ export async function disableAiMasterSwitch(page: Page): Promise<void> {
   await page.locator('#ai-enabled').uncheck();
   // 关掉之后端点那段应当整体消失（界面上不残留"可用"的错觉）。
   await expect(page.locator('#ai-allow-remote')).toHaveCount(0);
+}
+
+/**
+ * 截图前把鼠标挪开。
+ *
+ * 🔴 这条不是美化：`switchView` 用鼠标点 rail，rail 的 tooltip 会**留在下一张图上**。
+ * 两次实测同一个形状：`selection-projections/03-timeline.png` 里那句"四象限"压在
+ * 选中那条任务的标题上；`detail-column-slot/no-sidebar-view.png` 里它压在 rail 与
+ * 内容区的交界上。断言全绿，而证据图看不清（§6.2 规定一要的是"人能看懂的那张图"）。
+ *
+ * ⚠️ 落点是**按视口算的右下角**，不是常数坐标：第一版写死 `(640, 40)`，
+ * 而 1280 宽的顶栏在那个位置上恰好是「同步」按钮 ⇒ 图里那个按钮带着 hover 环
+ * （看图时才发现的，断言同样全绿）。右下角落在详情列里 —— 那里今天没有任何控件。
+ *
+ * ⚠️ 它住在**单一所有者**这里而不是各 spec 抄一份：这是 `switchView` 的副作用，
+ * 而 `switchView` 的调用方只会越来越多。
+ */
+export async function parkCursor(page: Page): Promise<void> {
+  const vp = page.viewportSize() ?? { width: 1280, height: 720 };
+  await page.mouse.move(vp.width - 180, vp.height - 60);
+  await page.waitForTimeout(120);
 }

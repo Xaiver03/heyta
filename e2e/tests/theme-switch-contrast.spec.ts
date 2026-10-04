@@ -7,12 +7,21 @@
  * `.ht-chip` 只给 `background` 上了 `transition`，而 `color` 是瞬切的：
  * 切换后的头几十毫秒里，**新主题的字压在旧主题的底上**。
  *
+ * ⚠️ **2026-10-03 的载体变更（判据一条没动）**：顶栏那个语言控件不再是 `.ht-chip`，
+ * 换成了带可见标签的分组（`LanguageSwitcher.tsx` 文件头记着为什么）。
+ * 本文件量的载体随之换成 `.ht-header__lang-option`，而**定位符仍按 testID 找**
+ * —— 它测的是"页头那个语言项在切主题的那一瞬读不读得出"，与它穿哪件 CSS 无关。
+ * 🔴 新那件 CSS 刻意**不写任何 transition**（`main-area.css` 里写了这条理由），
+ * 所以判据 1 现在是"保持"而不是"修复"。变异：往 `.ht-header__lang-option` 上加
+ * `transition: background var(--ht-duration-fast)` ⇒ 判据 1 当场红。
+ *
+ *
  * 实测（`getComputedStyle` + WCAG 公式，2026-10-03）：
  *   稳态 16.40:1 → 0ms **1.01:1** → 30ms 2.29:1 → 60ms 6.79:1 → 100ms 13.35:1
  *
  * ## 🔴 为什么这条判据长这样（两条，缺一不可）
  *
- * 1. **样式契约**（确定性）：chip 上不得存在任何会动到"字色/底色这一对"的过渡。
+ * 1. **样式契约**（确定性）：语言项上不得存在任何会动到"字色/底色这一对"的过渡。
  *    这一条不依赖时序，所以它是 CI 里真正承重的那条。
  *    ⚠️ 不能只写"不含 background"：Chromium 下没声明过渡时计算值是 `all`，
  *       而 `all` **确实包含** background —— 所以 `all` 必须被当成"时长为 0"来放行，
@@ -31,7 +40,11 @@ import { openApp } from './helpers';
 
 /** 与 `calendar-cells.spec.ts` 同一个理由：不钉 `?lang=` 会得到英文界面。 */
 const APP_ZH = '/?lang=zh-CN';
-const CHIP = '[data-testid="language-option-zh-CN"]';
+/**
+ * 载体：页头语言分组里**当前语言那一项**（中文界面 ⇒ zh 项是选中态）。
+ * 按 testID 找而不是按类名 —— 类名 2026-10-03 换过一次，而这条判据不该跟着漂。
+ */
+const LANG_OPTION = '[data-testid="language-option-zh-CN"]';
 const AA_BODY = 4.5;
 
 /** 会动到"字色 / 底色 / 边框色"这一对对比度参与者的属性。 */
@@ -86,7 +99,7 @@ function contrastOf(page: Page, selector: string) {
   }, selector);
 }
 
-test('🔴 主题切换的那一瞬，页头 chip 的文字不许压在旧主题的底上', async ({ page }) => {
+test('🔴 主题切换的那一瞬，页头语言项的文字不许压在旧主题的底上', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openApp(page, APP_ZH);
 
@@ -96,8 +109,8 @@ test('🔴 主题切换的那一瞬，页头 chip 的文字不许压在旧主题
   });
   page.on('pageerror', (e) => errors.push(e.message));
 
-  const steady = await contrastOf(page, CHIP);
-  expect(steady, '页头找不到语言 chip —— 后面量的都是空气').not.toBeNull();
+  const steady = await contrastOf(page, LANG_OPTION);
+  expect(steady, '页头找不到语言控件那一项 —— 后面量的都是空气').not.toBeNull();
   // 前提：稳态本身得合规。稳态就不合规的话，下面那条"切换瞬间 ≥ 4.5"没有意义。
   expect(
     steady!.ratio,
@@ -114,7 +127,7 @@ test('🔴 主题切换的那一瞬，页头 chip 的文字不许压在旧主题
     : [];
   expect(
     animated,
-    `语言 chip 上存在会动到字色/底色这一对的过渡（${steady!.transitionProperty} / ` +
+    `语言项上存在会动到字色/底色这一对的过渡（${steady!.transitionProperty} / ` +
       `${steady!.transitionDuration}）—— 切主题时另一半是瞬切的，中间态必然掉对比。` +
       `实测这个中间态是 1.01:1。`,
   ).toEqual([]);
@@ -122,7 +135,7 @@ test('🔴 主题切换的那一瞬，页头 chip 的文字不许压在旧主题
   // ── 判据 2：行为（两个方向各量一次"点完立刻"）───────────────────────
   const toDark = page.getByRole('button', { name: '切换到暗色主题' });
   await toDark.click();
-  const midDark = await contrastOf(page, CHIP);
+  const midDark = await contrastOf(page, LANG_OPTION);
   expect(
     midDark!.ratio,
     `亮→暗刚切完的这一刻只有 ${midDark!.ratio.toFixed(2)}:1（字 ${midDark!.color} / 底 ${midDark!.bg}）`,
@@ -130,7 +143,7 @@ test('🔴 主题切换的那一瞬，页头 chip 的文字不许压在旧主题
 
   const toLight = page.getByRole('button', { name: '切换到亮色主题' });
   await toLight.click();
-  const midLight = await contrastOf(page, CHIP);
+  const midLight = await contrastOf(page, LANG_OPTION);
   expect(
     midLight!.ratio,
     `暗→亮刚切完的这一刻只有 ${midLight!.ratio.toFixed(2)}:1（字 ${midLight!.color} / 底 ${midLight!.bg}）`,

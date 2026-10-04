@@ -229,11 +229,110 @@ var opLogDb = Path.Combine(workDir, "oplog.sqlite");
         Check(n >= 1, $"C# 独立读壳的 .sqlite ⇒ ops 表里有 {n} 行（数据真的在壳的库里）");
     }
 
+    // ── 9. 销毁（批次 E）：`oplog-destroy` 经宿主边界 ⇒ **库文件真的从磁盘消失** ──
+    //
+    // 上面第 8 段已经在**同一个库**里真写了一条 op，所以这里删的是有内容的文件。
+    //
+    // 🔴 判据必须**跨过 JS 边界**取，而不是在 C# 里直接调那个新方法：
+    //    壳侧加一个 CLR 方法 **不等于** TS 侧看得见它。`wrapDriver` 只在
+    //    `typeof native.removeDatabase === 'function'` 时才挂上那一个键，
+    //    没挂上时适配器回的是"内容已清空，文件仍在"（`sqlite-adapter.ts:278`），
+    //    而界面上**一切正常** —— 这正是那条契约"为什么这一层可选"的代价。
+    var destroyed = opApi.HandleHostMessage("{\"type\":\"oplog-destroy\"}");
+    Check(destroyed.Count == 1, "oplog-destroy ⇒ 壳回且只回一条消息");
+    var containerRemoved = false;
+    var removalTarget = string.Empty;
+    var removalReason = string.Empty;
+    if (destroyed.Count == 1)
+    {
+        using var doc = JsonDocument.Parse(destroyed[0]);
+        var root = doc.RootElement;
+        Check(
+            root.GetProperty("type").GetString() == "oplog-destroyed",
+            $"那条消息是 oplog-destroyed 回执（实得 {root.GetProperty("type").GetString()}）");
+        var report = root.GetProperty("report");
+        containerRemoved = report.GetProperty("containerRemoved").GetBoolean();
+        removalTarget = report.GetProperty("target").GetString() ?? string.Empty;
+        removalReason = report.TryGetProperty("reason", out var reason)
+            ? reason.GetString() ?? string.Empty
+            : string.Empty;
+    }
+    Check(
+        containerRemoved,
+        $"原生驱动真的把容器删掉了 —— 即 TS 侧确实看得见 removeDatabase（reason：{(removalReason.Length == 0 ? "无" : removalReason)}）");
+    Check(
+        removalTarget == Path.GetFullPath(opLogDb),
+        $"report.target 是**真的那个文件**（{removalTarget}），不是 'sqlite' 这种占位串");
+    Check(!File.Exists(opLogDb), "主文件已从磁盘消失");
+    Check(
+        !Directory.GetFiles(workDir).Any(f => Path.GetFileName(f).StartsWith("oplog.sqlite")),
+        "主文件与 -wal / -shm 一个都不剩（只剩旁挂文件 = 明文还能重放）");
+
     // ⚠️ 如实记边界：`markUploaded` 的 `ReadonlyMap` 过不了**裸 JSON**，
     //    必须有线码。那一格由 `packages/storage/tests/contract.spec.ts` 的
     //    「宿主边界（裸 JSON + 两侧线码）」契约项在本机判（252/252），
     //    这里不重复造一套断言 —— 而 C# 只搬字符串，不会改坏载荷。
 }
+
+// ── 10. 驱动侧删文件的三条独立判据（不需要 JS 引擎，因此也不需要 bundle）──
+//
+// 第 9 段验的是"通"，这一段验的是三条**只有本机这一层能验**的形状：
+//   · 清扫范围：WAL 旁挂文件在**正常关闭后仍然留在原地**（实测），
+//     所以这里手写三个文件、验三个都被扫掉 —— 只删主文件的实现在这儿会红。
+//   · 失败必须变成**原因**而不是异常。
+//   · 原因必须纯 ASCII（它随报告落进 `Set-Content -Encoding ASCII` 写的证据文件）。
+var sweepDir = Path.Combine(workDir, "sweep");
+Directory.CreateDirectory(sweepDir);
+var sweepDb = Path.Combine(sweepDir, "gone.sqlite");
+File.WriteAllText(sweepDb, "main");
+File.WriteAllText(sweepDb + "-wal", "wal");
+File.WriteAllText(sweepDb + "-shm", "shm");
+using (var swept = JsonDocument.Parse(SqliteContainer.Remove(sweepDb)))
+{
+    Check(
+        swept.RootElement.GetProperty("containerRemoved").GetBoolean(),
+        "手写的主文件 + -wal + -shm ⇒ 报告 containerRemoved:true");
+    var left = Directory.GetFiles(sweepDir);
+    Check(left.Length == 0, $"三个文件都被扫走（实剩 {left.Length} 个：{string.Join(" ", left.Select(Path.GetFileName))}）");
+}
+
+// (b) 删不掉：父目录不存在。`.NET` 在这个形状上抛 `DirectoryNotFoundException`，
+// 而驱动**必须**把它降级成一条原因。
+var orphanDb = Path.Combine(workDir, "no-such-dir", "gone.sqlite");
+string orphanJson;
+var threw = false;
+try
+{
+    orphanJson = SqliteContainer.Remove(orphanDb);
+}
+catch
+{
+    threw = true;
+    orphanJson = string.Empty;
+}
+Check(!threw, "删不掉时**不抛**（抛出会让 destroy() 整体失败，剩下几类存储一条都不被清）");
+using (var orphan = JsonDocument.Parse(threw ? "{}" : orphanJson))
+{
+    var root = orphan.RootElement;
+    Check(
+        root.TryGetProperty("containerRemoved", out var cr) && !cr.GetBoolean(),
+        "删不掉时报的是 containerRemoved:false");
+    var reason = root.TryGetProperty("reason", out var r) ? r.GetString() ?? string.Empty : string.Empty;
+    Check(reason.Length > 0, $"带一条非空原因（{reason}）");
+    Check(
+        reason.Length == 0 || reason.All(c => c < 0x80),
+        $"原因是纯 ASCII（{reason}）—— 中文 Windows 上的异常原文会毁掉证据文件");
+}
+
+// 私有内存库没有磁盘容器：与 node 驱动同一档处理，报 true 而不是报"失败"。
+using (var memory = JsonDocument.Parse(SqliteContainer.Remove(":memory:")))
+{
+    Check(
+        memory.RootElement.GetProperty("containerRemoved").GetBoolean()
+            && memory.RootElement.GetProperty("target").GetString() == ":memory:",
+        ":memory: ⇒ containerRemoved:true 且 target 原样带回");
+}
+
 
 try
 {

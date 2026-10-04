@@ -71,7 +71,7 @@ export interface HabitResilience {
   current: number;
   /** 历史最长连续。**只增不减**。 */
   longest: number;
-  /** 累计达成次数。**只增不减**。 */
+  /** 累计达成**天数**（`achieved.size`）。**只增不减**。 */
   total: number;
   /** 当前可用冻结数（0–`FREEZE_MAX_HELD`）。 */
   freezesHeld: number;
@@ -269,7 +269,7 @@ export interface FreshStartOffer {
   daysSinceLast: number;
   /** 会**原样保留**的历史最长（只增不减）。 */
   longest: number;
-  /** 会**原样保留**的累计次数。 */
+  /** 会**原样保留**的累计达成天数。 */
   total: number;
 }
 

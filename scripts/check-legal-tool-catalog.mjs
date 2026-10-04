@@ -32,17 +32,56 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TOOLS_FILE = path.join(ROOT, 'packages/local-api/src/tools.ts');
+const REGISTRY_FILE = path.join(ROOT, 'packages/local-api/src/tools/registry.ts');
+const TOOLS_DIR = path.join(ROOT, 'packages/local-api/src/tools');
 const LEGAL_FILE = path.join(ROOT, 'packages/legal/src/documents/ai-and-transfer.ts');
 
-/** 目录里 `LOCAL_API_TOOLS` 那一段的 `name:`，按声明顺序。 */
+/**
+ * 目录里的工具名**集合**（排序后返回）。
+ *
+ * 🔴 为什么不再从 `tools.ts` 里找 `export const LOCAL_API_TOOLS`：目录已按实体拆包，
+ * `tools.ts` 那一行现在只是 `export { LOCAL_API_TOOLS } from './tools/registry.js'`，
+ * 定义搬到了 `tools/registry.ts` 的装配表 + 各实体文件。继续按旧形状扫的结果是
+ * 门禁对着合并态直接抛异常（"目录解析不到"），而它要拦的那件事——**加了工具没写进条款**——
+ * 反而没人说了。
+ *
+ * 取数口径：**只认装配表真的并进来的那些实体文件**，所以一个新工具不会因为
+ * 写在别的文件里就悄悄漏掉，也不会因为多写了一行 `name:` 就凭空多出来。
+ * 这里刻意**不复刻** registry 的"读在前、写在后"顺序规则 —— 那是 `buildToolPackRegistry`
+ * 的不变量，由 `packages/local-api/tests/server.spec.ts` 与 node-host 的 stdio 用例逐字钉着；
+ * 本门禁要的是集合相等 + 中英两表**互相**同序（见下面的 `join(',')` 比较）。
+ */
 function catalogNames() {
-  const text = readFileSync(TOOLS_FILE, 'utf8');
-  const start = text.indexOf('export const LOCAL_API_TOOLS');
-  if (start < 0) throw new Error(`${TOOLS_FILE} 里找不到 \`export const LOCAL_API_TOOLS\``);
-  const end = text.indexOf('\n];', start);
-  if (end < 0) throw new Error(`${TOOLS_FILE} 里 \`LOCAL_API_TOOLS\` 数组没有闭合（判据的前提破了，不是文档的问题）`);
-  return [...text.slice(start, end).matchAll(/^\s+name: '([a-z_]+)',$/gm)].map((m) => m[1]);
+  const reg = readFileSync(REGISTRY_FILE, 'utf8');
+  const block = /export const LOCAL_API_TOOL_PACKS[^\n]*\n([\s\S]*?)\n\];/.exec(reg);
+  if (block === null) {
+    throw new Error(`${REGISTRY_FILE} 里找不到 \`export const LOCAL_API_TOOL_PACKS\` —— 装配表就是这个集合的定义处，解析前提破了，不是文档的问题`);
+  }
+  const symbols = [...block[1].matchAll(/^\s*(\w+),/gm)].map((m) => m[1]);
+  if (symbols.length === 0) throw new Error('装配表里一个 pack 都没有 ⇒ 这条判据没有分母');
+  const moduleOf = new Map(
+    [...reg.matchAll(/import \{ (\w+) \} from '\.\/([a-z-]+)\.js'/g)].map((m) => [m[1], m[2]]),
+  );
+  const names = [];
+  for (const symbol of symbols) {
+    const mod = moduleOf.get(symbol);
+    if (mod === undefined) {
+      throw new Error(`装配表并进了 ${symbol}，但 ${REGISTRY_FILE} 里读不到它的结构导入 —— 无法判断它来自哪个实体文件`);
+    }
+    const src = readFileSync(path.join(TOOLS_DIR, `${mod}.ts`), 'utf8');
+    const marks = [...src.matchAll(/^\s+name: '([a-z_]+)',$/gm)];
+    for (let i = 0; i < marks.length; i += 1) {
+      const seg = src.slice(marks[i].index, i + 1 < marks.length ? marks[i + 1].index : src.length);
+      // 只认工具对象（带 kind 的那一段），不认参数 schema 里同名的键
+      if (/kind: '(read|write)',/.test(seg)) names.push(marks[i][1]);
+    }
+    if (marks.length === 0) throw new Error(`${mod}.ts 里解析不到任何 \`name:\` —— ${symbol} 声称有工具却没有声明`);
+  }
+  const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+  if (dupes.length > 0) {
+    throw new Error(`同一个工具名出现在两个实体文件里：${[...new Set(dupes)].join(', ')} —— registry 运行时会抛，但门禁不能等到运行时`);
+  }
+  return [...names].sort();
 }
 
 /** 从法务文件里取出两张工具表（按出现顺序：中、英）。 */

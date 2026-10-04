@@ -18,6 +18,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LOCAL_API_CONFIG,
   LOCAL_API_TOOLS,
+  LOCAL_API_TOOL_PACKS,
+  MAX_TOOLS_PER_ENTITY,
   authorizeToolCall,
   findTool,
   isLoopbackAddress,
@@ -81,10 +83,32 @@ describe('默认值 —— 一切都是关的', () => {
     expect(LOCAL_API_TOOLS.length).toBeGreaterThan(0);
   });
 
-  it('工具目录保持很小（每多一个，"默认关"清单就长一条）', () => {
-    // 这是个防膨胀断言：Joplin 有 11 个，那是笔记应用。
-    // 这里是任务管理，超过 10 个就该先问"真的需要吗"。
-    expect(LOCAL_API_TOOLS.length).toBeLessThanOrEqual(10);
+  it('目录规模按**实体**判上限，不按总数（每实体至多五个工具）', () => {
+    // 这条取代了 2026-10-03 之前的 `LOCAL_API_TOOLS.length <= 10`。
+    // 那句的问题不是"太严"，是**严在了错的那一列**：八个实体每实体一读一写的下限就要 16 席，
+    // 所以它会在补齐覆盖面的中途把最后一个实体挡在门外 —— 而那正是它自己不回答的"真的需要吗"。
+    // 现在拦的是"某一个实体膨胀"，而总量由覆盖面门禁从分母推导（`check-ai-coverage.mjs` §10）。
+    // 上限的推导（为什么是 5）写在 `src/tools/shared.ts` 的 `MAX_TOOLS_PER_ENTITY` 上。
+    const perEntity = new Map<string, string[]>();
+    for (const pack of LOCAL_API_TOOL_PACKS) {
+      for (const tool of pack.tools) {
+        const list = perEntity.get(pack.entityType) ?? [];
+        list.push(tool.name);
+        perEntity.set(pack.entityType, list);
+      }
+    }
+    for (const [entityType, names] of perEntity) {
+      expect(
+        names.length,
+        `${entityType} 有 ${String(names.length)} 个工具（${names.join('、')}），` +
+          `超过每实体 ${String(MAX_TOOLS_PER_ENTITY)} 个的上限 —— 要加第六个，先回答它属于哪一档`,
+      ).toBeLessThanOrEqual(MAX_TOOLS_PER_ENTITY);
+    }
+    // 分组本身要有牙齿：目录里出现一个**没有 pack 认领**的工具，上面那个循环就数不到它。
+    expect(perEntity.size, '有工具不属于任何 pack').toBeGreaterThan(0);
+    const owned = new Set([...perEntity.values()].flat());
+    const orphans = LOCAL_API_TOOLS.map((t) => t.name).filter((n) => !owned.has(n));
+    expect(orphans, `目录里没有 pack 认领的工具：${orphans.join('、')}`).toEqual([]);
   });
 
   it('读写工具都有，且名字唯一', () => {

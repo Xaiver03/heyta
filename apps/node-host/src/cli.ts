@@ -19,19 +19,16 @@
  *     --token <jwt> --password <口令> sync
  *
  * 参数也可以走环境变量：HEYTA_DB / HEYTA_SERVER_URL / HEYTA_TOKEN /
- * HEYTA_PASSWORD / HEYTA_CLIENT_ID。加 `--json` 输出机器可读结果。
+ * HEYTA_PASSWORD / HEYTA_ACCOUNT_ID / HEYTA_CLIENT_ID。加 `--json` 输出机器可读结果。
  */
 
 import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 
 import { parseLocalDate } from '@heyta/domain';
-import {
-  parseExportDocument,
-  serializeExportDocument,
-  type NewTaskFields,
-} from '@heyta/app-host';
+import { parseExportDocument, serializeExportDocument, type NewTaskFields } from '@heyta/app-host';
 import { openNodeHost } from './host.js';
 import { runAuthCommand } from './cli-auth.js';
+import { runAccountCommand } from './cli-account.js';
 import type { SyncStatus } from '@heyta/sync-client';
 
 const VALUE_FLAGS = new Set([
@@ -39,12 +36,13 @@ const VALUE_FLAGS = new Set([
   'server',
   'token',
   'password',
+  'account-id',
   'client-id',
   'due',
   'out',
   'in',
 ]);
-const BOOL_FLAGS = new Set(['json', 'all', 'help']);
+const BOOL_FLAGS = new Set(['json', 'all', 'help', 'confirm']);
 
 interface ParsedArgs {
   command: string | undefined;
@@ -183,6 +181,7 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   --server <url>       同步服务端（或 HEYTA_SERVER_URL）
   --token <jwt>        访问令牌（或 HEYTA_TOKEN）
   --password <口令>    **端到端加密口令**（或 HEYTA_PASSWORD）—— 与「auth」收的那条登录口令**不是同一个秘密**
+  --account-id <id>    认证账号 id（或 HEYTA_ACCOUNT_ID）—— 启用 Vault key-package / payload codec
   --client-id <id>     覆盖设备 id（或 HEYTA_CLIENT_ID）
   --json               机器可读输出
 
@@ -217,6 +216,16 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   export --out <路径>       导出全部数据到 JSON 文件（含已删除记录与完整操作日志）
   import --in <路径>        从导出的 JSON 还原 —— **只支持还原到空库**；
                             本机已有数据时拒绝，且不会改动任何现有数据
+  account close             注销账号：**服务端那份删掉 + 这台设备上的明文库销毁**
+                            不带 --confirm 时是**预览**：不发请求、不动磁盘，
+                            只列出会清掉多少条、多少条还没上传，并提示先 export
+                            🔴 这台设备清不掉**别的设备**和**备份**（ADR-0048），
+                            所以句子永远不说"彻底销毁"
+      --server <url>        必填（或 HEYTA_SERVER_URL）
+      --token <jwt>         必填（或 HEYTA_TOKEN）—— 先跑 auth login 拿
+      --confirm             真的执行。没有它这条命令什么都不做；
+                            本机还有**没上传**的 op 时即使带它也照样拒绝 ——
+                            那时唯一的出口是先 sync（或先 export 留一份）
 `;
 
 /**
@@ -260,23 +269,34 @@ async function main(): Promise<number> {
   const serverUrl = stringFlag(flags, 'server') ?? process.env['HEYTA_SERVER_URL'];
   const token = stringFlag(flags, 'token') ?? process.env['HEYTA_TOKEN'];
   const password = stringFlag(flags, 'password') ?? process.env['HEYTA_PASSWORD'];
+  const accountId = stringFlag(flags, 'account-id') ?? process.env['HEYTA_ACCOUNT_ID'];
   const clientId = stringFlag(flags, 'client-id') ?? process.env['HEYTA_CLIENT_ID'];
 
-  if (command === 'sync') {
+  if (command === 'sync' || command === 'account') {
     // 在打开库之前就把配置错误说清楚。反过来的话，baseUrl='' 会让 fetch
     // 抛 TypeError，而 SyncClient 会把它归类成「离线」——看起来像网络问题，
     // 实际是参数没给。诊断方向直接被带偏。
-    if (serverUrl === undefined) throw new Error('sync 需要 --server <url>（或 HEYTA_SERVER_URL）');
-    if (token === undefined) {
-      throw new Error('sync 需要 --token <jwt>（或 HEYTA_TOKEN）—— 没有的话先跑一条命令拿：auth login');
-    }
-    if (password === undefined) {
+    if (serverUrl === undefined) {
       throw new Error(
-        'sync 需要 --password <端到端加密口令>（或 HEYTA_PASSWORD）；没有口令不会以明文上传。\n' +
-          '🔴 这一个**不是**登录口令（那条在 `auth login` 的 stdin 里）：' +
-          '拿登录口令当加密口令的症状是"能登录、同步却解不开自己的数据"。',
+        `${command} 需要 --server <url>（或 HEYTA_SERVER_URL）—— ` +
+          (command === 'account'
+            ? '注销的对象是"哪个实例上的哪个账号"，没有地址时这条命令不知道在对谁说话'
+            : '没有地址就没得同步'),
       );
     }
+    if (token === undefined) {
+      throw new Error(
+        `${command} 需要 --token <jwt>（或 HEYTA_TOKEN）—— 没有的话先跑一条命令拿：auth login`,
+      );
+    }
+  }
+
+  if (command === 'sync' && password === undefined) {
+    throw new Error(
+      'sync 需要 --password <端到端加密口令>（或 HEYTA_PASSWORD）；没有口令不会以明文上传。\n' +
+        '🔴 这一个**不是**登录口令（那条在 `auth login` 的 stdin 里）：' +
+        '拿登录口令当加密口令的症状是"能登录、同步却解不开自己的数据"。',
+    );
   }
 
   const host = await openNodeHost({
@@ -284,6 +304,7 @@ async function main(): Promise<number> {
     ...(serverUrl !== undefined ? { serverUrl } : {}),
     ...(token !== undefined ? { token } : {}),
     ...(password !== undefined ? { password } : {}),
+    ...(accountId !== undefined ? { accountId } : {}),
     ...(clientId !== undefined ? { clientId } : {}),
   });
 
@@ -592,6 +613,28 @@ async function main(): Promise<number> {
           out('注意：还原只作用在本机。服务端不会因此收到这些数据。');
         }
         return 0;
+      }
+
+      case 'account': {
+        // E3：自助注销在这台设备上**曾经没有调用点**。命令的解析与打印留在这里，
+        // 需要注入网络的那一段在 `cli-account.ts`（`auth` 同款拆法），这样判据
+        // 可以拿**真 SQLite 文件**跑一遍销毁，而不是拿一个假适配器。
+        const result = await runAccountCommand(
+          {
+            action: positionals[0],
+            confirm: flags['confirm'] === true,
+            json,
+          },
+          {
+            serverUrl: serverUrl ?? '',
+            token: token ?? '',
+            pendingUploadCount: () => host.pendingUploadCount(),
+            exportDocument: () => host.exportDocument(),
+          },
+        );
+        if (result.stdout !== '') out(result.stdout.replace(/\n$/, ''));
+        if (result.stderr !== '') err(result.stderr.replace(/\n$/, ''));
+        return result.code;
       }
 
       default:

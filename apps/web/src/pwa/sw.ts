@@ -36,26 +36,12 @@ import {
   appendClick,
   isRecordStale,
   kindFromTag,
+  kindFromWidgetDataPath,
   parsePageMessage,
   parseWidgetClick,
   widgetTag,
 } from './sw-core.js';
 import type { RawWidgetClick, WidgetDataRecord } from './sw-core.js';
-
-/**
- * 组件数据文件的 URL 前缀（`/widgets/<kind>.data.json`）。
- * 与 `gen-pwa.mjs` 里 manifest 的 `data` 字段共用同一套拼法。
- */
-const WIDGET_DATA_PREFIX = '/widgets/';
-const WIDGET_DATA_SUFFIX = '.data.json';
-
-/** 从 `data` 请求的路径里解出是哪一款组件的数据。不是数据请求则返回 null。 */
-function kindFromDataPath(pathname: string): AdaptiveCardKind | null {
-  if (!pathname.startsWith(WIDGET_DATA_PREFIX)) return null;
-  const rest = pathname.slice(WIDGET_DATA_PREFIX.length);
-  if (!rest.endsWith(WIDGET_DATA_SUFFIX)) return null;
-  return kindFromTag(`heyta-${rest.slice(0, -WIDGET_DATA_SUFFIX.length)}`);
-}
 
 // ─────────────────────────────────────────────────────────────────────
 // 最小的 self 类型（避免为一个文件把整个项目的 lib 改成 WebWorker）
@@ -286,7 +272,11 @@ sw.addEventListener('fetch', (event: FetchEventLike) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-  const kind = url.origin === self.location.origin ? kindFromDataPath(url.pathname) : null;
+  // 🔴 前缀取自 SW **自己所在的目录**，不是写死的 `/widgets/` —— 理由见
+  // `sw-core.ts` 的 `kindFromWidgetDataPath`：挂 `/app/` 时写死根绝对会让这里
+  // **静默不拦**，组件从此只吃 manifest 里那份静态占位态。
+  const kind =
+    url.origin === self.location.origin ? kindFromWidgetDataPath(url.pathname, self.location.href) : null;
 
   if (kind !== null) {
     // 🔴 **Windows 上唯一一个"应用不在也能跑"的过期判定点。**

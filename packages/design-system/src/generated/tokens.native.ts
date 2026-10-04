@@ -160,6 +160,9 @@ export interface HeytaNativeTokens {
   readonly 'layout.sidebar-max-width': number;
   readonly 'layout.header-height': number;
   readonly 'layout.content-max': number;
+  readonly 'layout.detail-width': number;
+  readonly 'layout.detail-min-width': number;
+  readonly 'layout.detail-max-width': number;
   /** 相对单位依赖当前字号，无法换算为原生数值常量；已原样导出为字符串。 */
   readonly 'layout.prose-max': string;
   readonly 'layout.quadrant-min-height': number;
@@ -369,6 +372,9 @@ export const lightTokens: HeytaNativeTokens = {
   'layout.sidebar-max-width': 416,
   'layout.header-height': 56,
   'layout.content-max': 1200,
+  'layout.detail-width': 352,
+  'layout.detail-min-width': 288,
+  'layout.detail-max-width': 480,
   'layout.prose-max': "65ch",
   'layout.quadrant-min-height': 192,
   'layout.panel-max-height': 384,
@@ -573,6 +579,9 @@ export const darkTokens: HeytaNativeTokens = {
   'layout.sidebar-max-width': 416,
   'layout.header-height': 56,
   'layout.content-max': 1200,
+  'layout.detail-width': 352,
+  'layout.detail-min-width': 288,
+  'layout.detail-max-width': 480,
   'layout.prose-max': "65ch",
   'layout.quadrant-min-height': 192,
   'layout.panel-max-height': 384,

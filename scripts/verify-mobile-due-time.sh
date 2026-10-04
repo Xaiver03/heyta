@@ -89,10 +89,21 @@ LAPTOP_DB=/tmp/heyta-duetime-laptop.sqlite
 # 🔴 定位器写**进程私有**路径，不复用 `/tmp/_xy.py` 那个名字：共享库每轮 `cat >` 重写它
 #    再执行，两轮并发就会执行到对方写到一半的那份（`countdown-anniversary.md:894` 记的同类事故）。
 RID_PY="/tmp/_heyta_rid_$$.py"
+# 🔴 **界面 dump 也走每跑私有路径**，与上面那把同一个理由，而且是 lib 自己留好的旋钮
+#    （`mobile-e2e.sh:38-48` 记过：并行两轮共用 `/tmp/ui.xml` 时，后写的那趟**覆盖前者的证据**
+#    而没人报红）。现量：`scripts/verify-mobile-*.sh` 里 **29 枚**都在用默认那枚共享路径，
+#    只有 `verify-mobile-account-erasure.sh` 改成私有了（它还给了一条更硬的理由：
+#    dump 会把输入框里的令牌抄进本机明文）。
+#    ⚠️ 必须在 source lib **之后**直接改 `UI_XML`（lib 在 source 那一刻已经读过 env，:48），
+#      且本脚本的三个 `rid_*` 助手从此**只读 $UI_XML** —— 一半走变量一半走字面量，
+#      就是 lib 注释里说的"半套现场比全套更难查"。
+#    ⚠️ 边界要说清：设备侧 `/sdcard/ui.xml` 仍是共享的，本改法消掉的是**本机文件被别人的
+#      cat 覆盖**这一族；界面归属那一道由 `assert_channel`（读 `mCurrentFocus`）守。
+UI_XML="/tmp/heyta-duetime-ui.$$.xml"
 # 🔴 这个 trap **替换**了 lib 里的 `trap restore_ime EXIT`（`mobile-e2e.sh:596`）——
 #    所以必须把 `restore_ime` 一起接上，否则本脚本 `disable_ime` 之后就把设备
 #    软键盘永久留在关闭状态，下一个跑这台模拟器的人拿到的是改过的设备。
-trap 'rm -f -- "$RID_PY"; restore_ime' EXIT
+trap 'rm -f -- "$RID_PY" "$UI_XML"; restore_ime' EXIT
 
 TIME_HALF="16:0"   # 半截：只该活在草稿里
 TIME_FULL="16:00"  # 整形：该提交
@@ -156,9 +167,12 @@ else:
     sys.exit(1)
 PY
 
-rid_count() { python3 "$RID_PY" count "$1" /tmp/ui.xml; }
-rid_xy()     { python3 "$RID_PY" xy "$1" /tmp/ui.xml "$TAB_Y"; }
-rid_attr()   { python3 "$RID_PY" attr "$1" /tmp/ui.xml "$TAB_Y" "$2"; }
+# 🔴 三枚助手**只读 $UI_XML**（上面那枚每跑私有的路径）。原来这里写死 `/tmp/ui.xml`，
+#    而同一个脚本里 `dump`/`require_screen`/`screen_txt` 读的是 `$UI_XML` ——
+#    那就是"半套现场"：换路径时一半判据在读**别人的**界面，而它不会报错，只会读到别人的屏。
+rid_count() { python3 "$RID_PY" count "$1" "$UI_XML"; }
+rid_xy()     { python3 "$RID_PY" xy "$1" "$UI_XML" "$TAB_Y"; }
+rid_attr()   { python3 "$RID_PY" attr "$1" "$UI_XML" "$TAB_Y" "$2"; }
 
 # 滚到某个 testID 进可点区（失败返回空坐标）。
 scroll_to_rid() {  # <testID>
@@ -172,7 +186,36 @@ scroll_to_rid() {  # <testID>
 }
 
 # 读时刻输入框的当前内容（空串 = 框里没有字）。
-time_value() { dump; rid_attr task-due-time-input text; }
+# 🔴 **这一条在 19:1x 之前是坏的，而且坏的方向是"假红"**：无障碍里的 `text` 在框为空时
+#    回的是**占位符**（词条 `common.due.timePlaceholder`，zh 值是「时:分」）而不是空串 ——
+#    现场读数：判据 ④b「清空后框里还剩 '时:分'」。于是
+#      · ②（"未设日期敲字敲不进去"判 `text != ""`）**恒红**，
+#      · ④b（清空生效判 `text == ""`）**恒红**，
+#    这两条红与产品无关，是读数通道把"没字"和"占位符"混成一件事。
+#    ⚠️ 不把「时:分」这个字面值抄进脚本（抄件必漂；词条改一次这里就静默失效）：
+#    改成**自校准** —— 第 5 步开跑前这条任务是刚建的、只有标题、没有时刻，
+#    所以此刻的读数就是"空"在这个设备/这份语言下的字面形状，记成 `TIME_EMPTY`，
+#    之后凡等于它的都归一成空串。若某台设备上空框真的回空串，`TIME_EMPTY` 就是空串，
+#    归一成为**无操作** —— 这个设计两个方向都不会引入假绿。
+TIME_EMPTY=""
+time_value_raw() { dump; rid_attr task-due-time-input text; }
+time_value() {
+  local v; v=$(time_value_raw)
+  [ -n "$TIME_EMPTY" ] && [ "$v" = "$TIME_EMPTY" ] && v=""
+  printf '%s' "$v"
+}
+# 🔴 归一这把刀**自己也要有一道闸门**，否则它会把上面那个"假红"换成一个更贵的"假绿"：
+#    锚点一旦取晚了（或某设备上这条新任务真带了一个默认时刻），`TIME_EMPTY` 就等于
+#    后面各步要填进去的内容值 ⇒ ② 会报"填不进字"、④b 会报"清空生效"，**两条都绿**，
+#    而它们读的是被自己的锚点吃掉的真空。便宜地排除掉能排除的那一半：
+#    锚点不许与本轮任何一步"要填进去的值"同形。
+calibrate_time_empty() {
+  TIME_EMPTY=$(time_value_raw)
+  case "$TIME_EMPTY" in
+    "1" | "$TIME_HALF" | "$TIME_FULL") return 1 ;;
+  esac
+  return 0
+}
 
 # 清空时刻输入框（全选 + 删除，与 `clear_and_type` 同一手法；不循环 DEL —— 会 ANR）。
 # 🔴 清完必须读回"真的空了"：清空失败时后面那条"填不进字"的负向判据会因为
@@ -181,6 +224,45 @@ clear_time() {
   $ADB shell input keycombination 113 29; sleep 0.6
   $ADB shell input keyevent 67; sleep 0.8
   time_value
+}
+
+# 红了要**顺带打一句"此刻还有谁在抢这台设备"**。
+# 🔴 这是 (14)/(16) 那两条未定性的唯一可判定形状：`⑧ 之后界面漂到「我的」页` 与
+#    `20:0x 前台是 SIM Toolkit`，在只有画面文字时**两种解释都成立**（我们自己的导航把面板关了 /
+#    另一条线在同一台模拟器上跑它自己的验收），而处置完全相反。
+#    一台设备只有一个前台 ⇒ 这一枚读数（进程级）与 `mCurrentFocus`（窗口级）并排打出来就能分开。
+# ⚠️ `another_mobile_e2e_running` 返回的是 awk 的码（恒 0），**判据是输出非空**，不是退出码。
+who_else() {
+  # 先打**窗口级**归属，再打**进程级**粗筛 —— 前者分得开"我们的应用但走错了屏"与
+  # "整个前台已经不是我们的应用"，后者告诉你谁干的。两枚都要，缺一枚还剩一半解释。
+  local fg other
+  fg=$($ADB shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r' | sed 's/.*Focus=//')
+  echo "      此刻前台窗口：${fg:-〈dumpsys 取不到〉}" >&2
+  other=$(another_mobile_e2e_running)
+  if [ -n "$other" ]; then
+    printf '%s\n' "$other" | sed 's/^/      同一时刻在这台设备上的进程：/' >&2
+  else
+    echo "      同一时刻没有别的移动端验收在跑（这是第 0 步那把粗筛，非权威）" >&2
+  fi
+}
+
+# 判据开跑之前的**通道自检**：hierarchy 非空 **且** 前台还是本应用。
+# 🔴 为什么两条都要：`dump()` 自己有 10 次重试，但它失败之后**不退出**，只是把
+#    `/tmp/ui.xml` 留成空文件（20:0x 实测：lib 自己打印了「已被截成空文件」那一句，
+#    脚本却继续往下走，于是第 2、3 步收了 6 条假红）。而"非空"也不等于"是我们的界面"。
+assert_channel() {  # <在哪一步之前>
+  dump || true
+  require_screen                       # 空 hierarchy 由它响亮地 exit 3
+  local cur
+  cur=$($ADB shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r' | sed 's/.*u0 //;s/\/.*//')
+  if [ "$cur" != "$PKG" ]; then
+    bad "「${1}」之前通道自检失败：前台是「${cur:-空}」而不是 ${PKG}"
+    echo "   ⇒ 从这里起的每一条「找不到 X」都是打在别人的界面上，不是产品没画。" >&2
+    who_else
+    screen_txt
+    exit 3
+  fi
+  return 0
 }
 
 # 打开/关闭详情面板（与 `verify-mobile-task-edit.sh` 同一条理由：
@@ -259,6 +341,9 @@ SCROLL_FROM_Y=$((SH - 500))
 SCROLL_TO_Y=$((SH - 900))
 OK_X=$((SW - 135))
 ok "设备在线：${SCREEN}，坐标 TAB_Y=$TAB_Y MID_X=$MID_X 我的=$OK_X,$TAB_Y"
+# 🔴 把**读数的落点**也打进日志：这一族脚本历史上共用 `/tmp/ui.xml`，
+#    而"我读的这份界面是谁写的"必须能从日志里回答，不能事后靠猜。
+ok "界面 dump 每跑私有：UI_XML=${UI_XML}（设备侧 /sdcard/ui.xml 仍共享 ⇒ 归属由 assert_channel 读 mCurrentFocus 判）"
 
 HEALTH=$(curl -s --noproxy '*' -m 5 "${HOST_SERVER}/health" 2>/dev/null)
 if ! printf '%s' "$HEALTH" | grep -q '"status":"ok"'; then
@@ -295,6 +380,15 @@ if [ "$NEWEST_SRC" -gt "$APK_MT" ]; then
   exit 3
 fi
 ok "APK 不比源码旧（APK $(date -r "$APK_MT" '+%F %T') ≥ 最新源码 $(date -r "$NEWEST_SRC" '+%F %T')）"
+# 🔴 读数要能归因到**具体那一枚产物**：mtime 只说"新不新"，说不了"是哪一份"。
+# 并行会话在同一个路径上重打过 APK（本仓 §7 #27 那一族），事后拿日志对源码时
+# 只有内容指纹能回答"这轮装进去的到底是哪个字节集合"。
+APK_SHA=$(shasum -a 256 "$APK" 2>/dev/null | awk '{print $1}')
+if [ -z "$APK_SHA" ]; then
+  echo "   ❌ 取不到 APK 的 sha256（shasum 失败或文件不可读）—— 这轮的产物无法归因" >&2
+  exit 3
+fi
+echo "   APK sha256=${APK_SHA} size=$(stat -f %z "$APK")"
 
 DEV_TZ=$($ADB shell getprop persist.sys.timezone 2>/dev/null | tr -d '\r')
 if [ -z "$DEV_TZ" ]; then
@@ -322,14 +416,36 @@ rm -f "$LAPTOP_DB"
 
 # ── 第 1 步：装包、离开首启覆盖层、配凭据
 step "1. 装包并启动"
-$ADB install -r "$APK" 2>&1 | tail -1 | sed 's/^/   /'
+# 🔴 原来这一行是 `$ADB install -r "$APK" 2>&1 | tail -1 | sed …`：管道的退出码是 sed 的（§7 #45），
+# 装失败**什么都不会说**，然后继续用设备上那台旧包跑完整轮判据 —— 假绿形状与 #27 同一个。
+INSTALL_OUT=$($ADB install -r "$APK" 2>&1)
+INSTALL_RC=$?
+printf '%s\n' "$INSTALL_OUT" | sed 's/^/   /'
+if [ "$INSTALL_RC" -ne 0 ]; then
+  bad "adb install 退出码 $INSTALL_RC ⇒ 停：装失败还往下跑，验的是设备上残留的旧包"
+  screen_txt
+  exit 1
+fi
+if ! printf '%s\n' "$INSTALL_OUT" | grep -q "Success"; then
+  bad "adb install 退出码 0 但输出里没有 Success —— 不能把「命令没报错」当「装上了」（AGENTS §6.1.1）"
+  exit 1
+fi
+ok "安装成功（rc=0 且输出含 Success；APK sha256=${APK_SHA:-未取}）"
 $ADB shell pm clear $PKG >/dev/null 2>&1
 $ADB shell am force-stop $PKG; sleep 1
 launch_app; sleep 6
+# 🔴 「应用已启动」的**承重判据是窗口归属**（`mCurrentFocus == 本应用`），不是界面文字。
+#    共享库里那句注释已经写过：欢迎页说明文字里也有「任务」二字 ⇒ `has_text 任务` 单独用是**假绿**；
+#    而 20:0x 这趟把它演成了现场版 —— 第 2 步起 `uiautomator` 十次抓不到界面、
+#    第 3 步的 dump 里前台是 **SIM Toolkit**，那之后每一条"找不到"都是打在别人的界面上，
+#    而报出来的每一句都长得像产品缺陷。`settle_foreground` 是仓内既有的那把
+#    （`verify-mobile-notes.sh:240` / `verify-mobile-trash.sh` 都用），不是新装置。
+if ! settle_foreground; then bad "6 次拉起后 mCurrentFocus 仍不是 ${PKG} ⇒ 根本没进应用，本轮读数全部无效"; screen_txt; exit 3; fi
 dismiss_welcome_if_present
+if ! settle_foreground; then bad "离开欢迎页之后应用不在前台 ⇒ 本轮读数全部无效"; screen_txt; exit 3; fi
 dump
 require_screen
-if [ "$(has_text "任务")" = "1" ]; then ok "应用已启动"; else bad "应用没起来"; screen_txt; fi
+if [ "$(has_text "任务")" = "1" ]; then ok "应用已启动（窗口归属 + 界面都读到）"; else bad "应用没起来"; screen_txt; fi
 
 step "2. 配置同步凭据"
 configure_sync_credentials
@@ -383,21 +499,53 @@ ok "对照（负）：不存在的 testID 数出 0（匹配器没在过度匹配
 #    用的还是 ④⑤⑥ 同一个读数通道 —— 通道坏了一致地坏，四步会一起红，一眼能认出来。
 #    `enabled` 只在旁边**打印**作诊断，不参与判定。
 step "5. 判据 ①②③ —— 未设日期时的时刻栏"
-if [ "$(rid_count task-due-time-input)" -ge 1 ]; then
-  ok "① 时刻输入框画出来了（testID=task-due-time-input）"
-else
-  bad "① 时刻输入框不在无障碍树里 —— 移动端没把 time prop 传下去，或共享层没画这一行"
+# 🔴 从这里起才是**产品判据**：通道一旦是死的或前台不是本应用，后面每一条"找不到"
+#    都会长得像产品缺陷。先自检一次再开判据集（20:0x 那趟没有这一句，收了 6 条假红、
+#    一条产品判据都没跑到）。
+assert_channel "第 5 步（判据 ①②③）之前"
+
+# 🔴 **空框读数的自校准锚点，必须在任何敲字之前取**（19:1x 那趟的现场形状：
+#    ④ 报「填进了 1」而 ② 与 ④b 报「框里是 '时:分'」—— 同一个框、同一个通道，
+#    三条互相打脸，红的原因是占位符被当成了内容，不是 enabled 接线）。
+#    此刻这条任务只有标题、没有时刻 ⇒ 这一读就是"空"在这台设备 + 这份语言下的
+#    字面形状。空框若真回空串，`TIME_EMPTY` 就是空串，归一为无操作 —— 两个方向
+#    都不会引入假绿（见上面 `time_value` 与 `calibrate_time_empty` 的注释）。
+if ! calibrate_time_empty; then
+  echo "   ❌ 空框锚点取到了'要填进去的内容值'（'${TIME_EMPTY}' 与 '1'/'${TIME_HALF}'/'${TIME_FULL}' 同形）" >&2
+  echo "      这时归一会把**真空**吞成空串 ⇒ ② 与 ④b 会变成两条**假绿**（比原来的假红更贵）。" >&2
+  echo "      本轮读数无效 ⇒ 停。要么是锚点取晚了（脚本侧），要么这条新任务真的自带默认时刻（产品侧）。" >&2
+  screen_txt
+  exit 3
 fi
+echo "   空框锚点 TIME_EMPTY='${TIME_EMPTY}'（长度 ${#TIME_EMPTY}；凡等于它的读数归一成空串）"
+
+RAW_COUNT=$(rid_count task-due-time-input)
 XY_NO_DATE=$(scroll_to_rid task-due-time-input)
+# 🔴 ① 原来读的是**上一次没滚动的 dump** 的 `rid_count`，而 ②④ 走 `scroll_to_rid` ——
+#    同一个节点两条通道。19:1x 实测就是这么自相矛盾的：① 报"不在无障碍树里"，
+#    下一行 ② 却拿到了可点坐标。"没滚进可点区"被说成"没画"，与
+#    `verify-mobile-edit` 记过的同一族（ScrollView 折叠线以下的节点在树里但不 sane）。
+#    现在 ① 与 ②④ 同通道，原始枚数**另打一行**做归因：
+#      数得出却没滚到 = 探针/布局问题；一枚都数不出 = 共享层真的没画这一行。
+if [ -n "$XY_NO_DATE" ]; then
+  ok "① 时刻输入框画出来了，且已滚进可点区（testID=task-due-time-input，树里共 $RAW_COUNT 枚）"
+elif [ "$RAW_COUNT" -ge 1 ]; then
+  bad "① 判不了：树里数得出 $RAW_COUNT 枚时刻输入框，但滚了 6 次都没进可点区 —— 探针/布局问题，不是产品没画"
+else
+  bad "① 时刻输入框不在无障碍树里（0 枚）—— 移动端没把 time prop 传下去，或共享层没画这一行"
+fi
 if [ -z "$XY_NO_DATE" ]; then
   bad "② 判不了：滚了 6 次都没把时刻输入框送进可点区（读数通道此刻不可用）"
 else
   $ADB shell input tap $XY_NO_DATE; sleep 1.2
   $ADB shell input text "1"; sleep 1.2
-  if [ "$(time_value)" = "" ]; then
+  # 🔴 读数取一次、两个分支共用（原来 `if` 里调 `time_value`、bad 分支里什么都不打，
+  #    于是"红了但看不出框里是什么"—— 与 19:1x 那趟要靠翻 ④b 才知道占位符这件事同族）。
+  NO_DATE_READ=$(time_value)
+  if [ "$NO_DATE_READ" = "" ]; then
     ok "② 未设日期时敲字敲不进去（框里仍是空）—— enabled 读数：$(rid_attr task-due-time-input enabled)"
   else
-    bad "② 未设日期却把字填进了时刻框 —— '没有日子也能填几点'，enabled 接线没生效"
+    bad "② 未设日期却把字填进了时刻框（归一后读到 '$NO_DATE_READ'，空框锚点是 '${TIME_EMPTY}'）—— '没有日子也能填几点'，enabled 接线没生效"
   fi
 fi
 if [ "$(rid_count task-due-time-all-day)" = "0" ]; then
@@ -419,10 +567,11 @@ if [ -z "$XY" ]; then bad "找不到「今天」快捷项"; screen_txt; else
   else
     $ADB shell input tap $XY2; sleep 1.2
     $ADB shell input text "1"; sleep 1.2
-    if [ "$(time_value)" = "1" ]; then
+    WITH_DATE=$(time_value)
+    if [ "$WITH_DATE" = "1" ]; then
       ok "④ 设了「今天」之后同一个框能填进字（②/④ 双向：这条通道既不是恒空也不是恒满）"
     else
-      bad "④ 设了日期之后仍然填不进字（框里是 '$(time_value)'）—— enabled 恒假，输入框被灰死"
+      bad "④ 设了日期之后仍然填不进字（框里是 '$WITH_DATE'）—— enabled 恒假，输入框被灰死"
     fi
     AFTER_CLEAR=$(clear_time)
     if [ "$AFTER_CLEAR" = "" ]; then
@@ -476,18 +625,31 @@ fi
 step "9. 判据 ⑧ —— 重开面板后时刻仍在（落库，不是本地态）"
 if ! close_sheet; then bad "面板没关掉"; screen_txt; fi
 if open_sheet "$TITLE"; then
-  if [ -z "$(scroll_to_rid task-due-time-input)" ]; then
-    bad "⑧ 重开后面板上找不到时刻输入框（面板没绑到这一条任务？或渲染回退了）"
+  XY8=$(scroll_to_rid task-due-time-input)
+  RAW8=$(rid_count task-due-time-input)
+  # 🔴 红了要**当场**把"现在停在哪一屏"打出来。19:1x 那趟从 ⑧ 起连红五条，
+  #    而我是在**下一步**（⑨ 的 screen_txt）里才看出界面当时停在「我的」页 ——
+  #    那条读数离出事点已经隔了两步，只支持推断、不算取证（AGENTS §8.7：
+  #    归因要写在产生它的那一步）。枚数一起打，好让下一轮能分辨
+  #    "树里就没有"（产品/渲染回退）与"有但滚不到"（探针/布局）。
+  if [ -z "$XY8" ]; then
+    bad "⑧ 重开后面板上取不到时刻输入框的可点坐标（树里 $RAW8 枚）—— 面板没绑到这一条任务？还是整页已经不是详情面板？"
+    who_else
+    screen_txt
   else
     GOT=$(time_value)
     if [ "$GOT" = "$TIME_FULL" ]; then
-      ok "⑧ 重开后框里仍是 $TIME_FULL —— 写进了 op-log"
+      ok "⑧ 重开后框里仍是 ${TIME_FULL} —— 写进了 op-log"
     else
-      bad "⑧ 重开后框里是 '$GOT' —— 上一次写的时刻没落库"
+      bad "⑧ 重开后框里是 '$GOT'（空框锚点是 '${TIME_EMPTY}'）—— 上一次写的时刻没落库"
+      who_else
+      screen_txt
     fi
   fi
 else
   bad "⑧ 重开面板失败"
+  who_else
+  screen_txt
 fi
 
 # ── 判据 ⑨：换日子要**搬运**已有的时刻（TaskDetailSheet 的 onChange 里那句
@@ -549,7 +711,8 @@ step "12. 判据 ⑪ —— 「全天」把时刻清掉、日子留住"
 if open_sheet "$TITLE"; then
   ALLDAY_XY=$(scroll_to_rid task-due-time-all-day)
   if [ -z "$ALLDAY_XY" ]; then
-    bad "⑪a 找不到「全天」按钮（前一步明明出现过）"
+    bad "⑪a 找不到「全天」按钮（前一步明明出现过；树里 $(rid_count task-due-time-all-day) 枚）"
+    screen_txt
   else
     $ADB shell input tap $ALLDAY_XY; sleep 2.5
     GOT=$(time_value)
@@ -565,6 +728,14 @@ if open_sheet "$TITLE"; then
     fi
   fi
   if ! close_sheet; then bad "面板没关掉"; screen_txt; fi
+else
+  # 🔴 这一条以前**不存在**，而 19:1x 那趟的后果是：第 12 步整步没有打印任何一条 ⑪
+  #    判据（日志里那一步只有"笔记本已下载"和 ⑪c），界面已经不在任务页，
+  #    脚本却一路跑到汇总 —— 两条判据被**静默跳过**，而总数仍报"通过 27 / 失败 10"，
+  #    读起来像"⑪ 判过了"。跳过必须是看得见的一条红，不能是缺两行。（§7 #46 同族：
+  #    没跑到的那一段不会自己报错，它只是不在输出里。）
+  bad "⑪ 判不了：详情面板没重开，第 12 步的两条判据（⑪a/⑪b）一条都没跑到"
+  screen_txt
 fi
 
 $ADB shell input tap "$OK_X" "$TAB_Y"; sleep 3
@@ -597,8 +768,19 @@ else
 fi
 
 step "13. 直接查 Postgres"
-psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
-  "SELECT (SELECT count(*) FROM operations) AS ops, (SELECT count(*) FROM sync_devices) AS devices" 2>/dev/null \
-  | sed 's/^/      ops|devices = /'
+# 🔴 连接参数走 env（与 `verify-mobile-lists.sh:386` / `verify-mobile-notes.sh:460` 同一套约定，仓内理由写在 `lib/mobile-e2e.sh:57-61`）：
+#    原来这里硬印 `-U rocalight -d heyta_mobile_smoke`，换一台机器就连不上，而失败形态被 `2>/dev/null` 吞成"什么都没打印"。
+#    默认值与原来逐字相同（库名同源、用户默认当前登录者），所以现有跑法行为不变。
+PG_DB="${HEYTA_E2E_DB:-heyta_mobile_smoke}"
+PG_USER="${HEYTA_E2E_DB_USER:-$(whoami)}"
+PG_HOST="${HEYTA_E2E_DB_HOST:-127.0.0.1}"
+PG_PORT="${HEYTA_E2E_DB_PORT:-5432}"
+PG_SERVER_STATS=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
+  "SELECT (SELECT count(*) FROM operations) AS ops, (SELECT count(*) FROM sync_devices) AS devices" 2>&1)
+if printf '%s' "$PG_SERVER_STATS" | grep -qE '^[0-9]+\|[0-9]+$'; then
+  ok "服务端现场 ops|devices = ${PG_SERVER_STATS}（库 ${PG_DB} @ ${PG_HOST}:${PG_PORT}，用户 ${PG_USER}）"
+else
+  bad "读不到服务端的 ops/devices 计数（库 ${PG_DB} @ ${PG_HOST}:${PG_PORT}，用户 ${PG_USER}）—— 原始输出：$PG_SERVER_STATS"
+fi
 
 summary "移动端截止时刻输入侧闭环"

@@ -124,6 +124,13 @@ export interface QuadrantBoardProps {
   readonly onToggleTask: (taskId: string) => void;
   /** 点整行的行为。**给了就打开详情；不给时整行不可点**（理由见 `TaskList`）。 */
   readonly onOpenTask?: (taskId: string) => void;
+  /**
+   * 选中的那一行 —— 原样转给 `TaskList` 的 `activeTaskId`，四格共用一个值。
+   *
+   * 🔴 「列表」与「四象限」是同一批任务的两种投影，用户在哪儿选中都得在另一处
+   * 看得见"还是它"。省略 = 不画高亮（默认值等于加这个 prop 之前的行为）。
+   */
+  readonly activeTaskId?: string | null;
   /** 行级无障碍文案，原样转给 `TaskList`。 */
   readonly taskLabels?: TaskListLabels;
   /** 标题下方的元信息行，原样转给 `TaskList`（内容归宿主，见文件头第 3 条）。 */
@@ -305,6 +312,7 @@ export function QuadrantBoard({
   labels,
   onToggleTask,
   onOpenTask,
+  activeTaskId,
   taskLabels,
   renderMeta,
   renderTrailing,
@@ -368,6 +376,7 @@ export function QuadrantBoard({
                     tasks={card.tasks}
                     onToggleTask={onToggleTask}
                     onOpenTask={onOpenTask}
+                    activeTaskId={activeTaskId}
                     labels={taskLabels}
                     renderMeta={renderMeta}
                     renderTrailing={renderTrailing}

@@ -95,6 +95,101 @@ WORKDIR /repo/server
 RUN pnpm exec prisma generate
 RUN rm -rf dist && pnpm run build
 
+# ---- Web stage（共享 UI）----
+#
+# ## 为什么镜像里必须有它
+#
+# 自建者 `docker compose up` 起来之后**没有任何界面可用** —— 镜像里只有 `/api/`，
+# 而 heyta 的界面是一个独立的前端产物（`apps/web/dist`），此前**从来没有进过镜像**：
+# 我们自己线上那份是靠 `vite build --base=/app/` 手动打包再 rsync 到 nginx 的
+# （`docs/runbooks/deployment.md` §3.7）。所以"一条 compose 起全套"这句话
+# 在补上这一段之前**根本不成立**。
+#
+# 同类项目里可比对的六家有五家把前端 bake 进服务端镜像（Vaultwarden / Immich /
+# Uptime Kuma / Vikunja / Actual，逐家出处见 `docs/research/self-host-distribution-audit.md` §5）。
+# 这也是唯一能让"一条 compose + 打开浏览器就能用"成立的形态：
+# 界面与 API 同一个容器 ⇒ 同一个 origin（没有 CORS 那一类事故）、版本天然配对。
+#
+# ## 为什么在这里构建，而不是 COPY 宿主上打好的 dist
+#
+# 根 `.dockerignore` 里有一行 `**/dist` —— 宿主上打的产物**根本进不了构建上下文**。
+# 这不是疏漏（带上开发者的旧产物会让"跑旧镜像配新迁移"那类事故换个面目重来）。
+# 结论：`docker compose build` 必须能只靠源码打出界面，所以在容器里构建。
+#
+# ## 为什么是一个独立的阶段而不是塞进 builder
+#
+# builder 那一层的缓存被服务端镜像的每一层依赖着。把 web 的源码 COPY 混进去之后，
+# **改一行 UI 会让服务端也重新构建**。分阶段还有一个硬好处：
+# 这一层的失败点（前端打不出来）在服务端失败点之外是**独立可辨**的。
+FROM node:24-alpine AS web
+
+WORKDIR /repo
+
+RUN corepack enable && corepack prepare pnpm@11.8.0 --activate
+
+# 先只拷清单，让依赖层可缓存（与 builder 阶段同一套做法）。
+#
+# 🔴 下面这 13 个包**就是 `@heyta/web` 的工作区依赖闭包**，不是"顺手多拷几个"：
+# `pnpm install --frozen-lockfile` 看到 `@heyta/ui: workspace:*` 而 `packages/ui/package.json`
+# 不在，会直接报找不到 workspace 清单。少一个包 = 构建红，且红得看不出来为什么。
+# `packages/legal` 不在列表里 —— web 不依赖它。
+#
+# ⚠️ 新增 `@heyta/*` 依赖时必须同时在这里加两行（清单 + 源码）。
+# 这条约束的失败方向是**构建失败**（不是静默产出坏界面），所以没有配门禁；
+# 但 `apps/web/tests/pwa.spec.ts` 与 `scripts/check-web-artifact.mjs` 会拦住产物层的问题。
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
+COPY packages/ai/package.json ./packages/ai/
+COPY packages/app-host/package.json ./packages/app-host/
+COPY packages/design-system/package.json ./packages/design-system/
+COPY packages/domain/package.json ./packages/domain/
+COPY packages/i18n/package.json ./packages/i18n/
+COPY packages/local-api/package.json ./packages/local-api/
+COPY packages/op-log/package.json ./packages/op-log/
+COPY packages/shared-schema/package.json ./packages/shared-schema/
+COPY packages/storage/package.json ./packages/storage/
+COPY packages/sync-client/package.json ./packages/sync-client/
+COPY packages/sync-core/package.json ./packages/sync-core/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/widget-core/package.json ./packages/widget-core/
+COPY apps/web/package.json ./apps/web/
+
+# registry 可覆盖的理由与 builder 完全同形（那里有实测数据）。
+# 同理必须用 `pnpm config set`，`npm_config_registry` 环境变量会被 pnpm 忽略。
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+RUN pnpm config set registry "$NPM_REGISTRY" \
+ && pnpm install --frozen-lockfile --ignore-scripts
+
+# 源码 + 那条自洽判据（`scripts/` 根脚本零依赖，可以单拷）。
+COPY packages/ai/ ./packages/ai/
+COPY packages/app-host/ ./packages/app-host/
+COPY packages/design-system/ ./packages/design-system/
+COPY packages/domain/ ./packages/domain/
+COPY packages/i18n/ ./packages/i18n/
+COPY packages/local-api/ ./packages/local-api/
+COPY packages/op-log/ ./packages/op-log/
+COPY packages/shared-schema/ ./packages/shared-schema/
+COPY packages/storage/ ./packages/storage/
+COPY packages/sync-client/ ./packages/sync-client/
+COPY packages/sync-core/ ./packages/sync-core/
+COPY packages/ui/ ./packages/ui/
+COPY packages/widget-core/ ./packages/widget-core/
+COPY apps/web/ ./apps/web/
+COPY scripts/check-web-artifact.mjs ./scripts/
+
+# 🔴 挂载路径必须是**构建参数**：产物里 `index.html` 引用的资源前缀、manifest 的
+# `start_url`/`scope`/图标路径、`sw.js` 的注册 URL 全由它决定。
+# `HEYTA_WEB_BASE=/app/` 与运行时 `WEB_APP_PATH` 的默认值必须一致 ——
+# 下一行的判据就是专门用来抓"两边不一致"的（它从产物自身反推挂载路径）。
+#
+# `--filter "@heyta/web..."`（三个点）= web 本身 + 它的全部工作区依赖，
+# 由 pnpm 按拓扑序构建。写成 `-r build` 会去构建这个仓库里**所有**包（含没装依赖的）。
+RUN HEYTA_WEB_BASE=/app/ pnpm --filter "@heyta/web..." run build
+
+# 产物自洽判据在**构建现场**跑一次，而不是只在 CI 跑：
+# 这一层能拦住"镜像里的界面挂在 /app/ 下打不开"这一整类事故，
+# 而那类事故此前只在真浏览器里才现形（§7 第 82 条：一致地错也能对账通过）。
+RUN node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/
+
 # ---- Runtime stage ----
 FROM node:24-alpine AS production
 ARG VCS_REF=unknown
@@ -127,6 +222,14 @@ COPY --from=builder --chown=supersync:nodejs /repo/server/prisma ./prisma
 COPY --from=builder --chown=supersync:nodejs /repo/server/scripts ./scripts
 COPY --from=builder --chown=supersync:nodejs /repo/server/src ./src
 COPY --from=builder --chown=supersync:nodejs /repo/server/package.json ./package.json
+# 🔧 heyta 改动：共享 UI 产物进运行时镜像。
+#
+# 目标目录名 `/app/web-dist` 与挂载路径 `/app/` 的**默认值**住在
+# `server/src/config.ts`（`webAppDir` / `webAppPath`），这里**故意不再写一遍 `ENV`** ——
+# 同一个值抄两处就会漂，而漂了的后果是"镜像里有界面但没人去读它"（静默无效，不报错）。
+# web 阶段末尾那条 `check-web-artifact --mount /app/` 判的是**产物自己声明**的路径，
+# 所以"这两个默认值不一致"会在构建期变红，不需要靠这里两份注释互相提醒。
+COPY --from=web --chown=supersync:nodejs /repo/apps/web/dist ./web-dist
 # 🔧 heyta 改动：tarball 名字 sp-* → heyta-*
 COPY --from=builder --chown=supersync:nodejs /repo/packages/sync-core/heyta-sync-core-*.tgz ./sync-core.tgz
 COPY --from=builder --chown=supersync:nodejs /repo/packages/shared-schema/heyta-shared-schema-*.tgz ./shared-schema.tgz

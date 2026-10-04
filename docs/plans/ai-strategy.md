@@ -215,6 +215,11 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 | **偏好纠正持久化** | `PREFERENCE_CORRECTION`（走 op-log，跨设备同步） | `packages/domain/src/preference-corrections.ts` | 17 测试 |
 | **AI 工具调用 P0–P2** | 复用既有工具目录/授权/执行器（不新建）：规则选择（零出境）→ 模型路径（`tools`/`tool_calls`，新 `AiFeature` `'tool-calling'`）→ 读即执行、写只提案、确认才落库 | `packages/app-host/src/ai-tool-{selection,run,call}.ts`、`apps/web/src/features/ai/AiToolRun.tsx`、`packages/ai` 工具线格式 | 见 [ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md) 与 [计划](ai-tool-calling.md) |
 
+| **工具目录按实体拆包 + 覆盖面门禁** | ~~8 个用户可操作实体各一组工具（读 10 / 写 12，合计 **22**，上限"每实体 5 × 8 = 40 席"）~~ —— **10-04 现量更正**：**9 个实体**（批次二加了 `EVENT`）、**读 12 / 写 14 合计 26**，上限"每实体 5 × 分母 9 = **45 席**（已用 26，剩 19）"；MCP 与内置 AI **共用同一份目录**（不另建）；🔴 `check:ai-coverage` 已进 `pnpm check` 链 —— "覆盖面"从一句主张变成**会红的判据**，且分子分母都由门自己打印（不再手抄） | `packages/local-api/src/tools/`（**9 个实体 pack** + `pack.ts`/`shared.ts`/`registry.ts`）、`scripts/check-ai-coverage.mjs` | `node scripts/check-ai-coverage.mjs` 打印「实体覆盖面 9/9 … 已登记缺口 0 项 … 目录 26 个工具 ≤ 每实体 5 × 分母 9 = 45 席」；细节见 [EVENT 工具契约](ai-event-tool-contract.md) §15 |
+| **批量写入做成一个提案** | 「把这 3 个都完成」= **一个提案 N 条 op**（不是 N 个提案，也不是 N 次确认）；确认前零写入 | `packages/app-host/src/ai-tool-run.ts` | `packages/app-host/tests/ai-tool-run.spec.ts`、`apps/web/tests/ai-tool-run.spec.tsx` |
+| **裸「X 号」解析带边界守卫** | 「15 号」这类只说日期的话进 `capture` 的日期档；🔴 守卫防止把「第 3 号任务」「房间 204 号」里的编号读成日期 | `packages/domain/src/capture.ts` | `packages/domain/tests/capture.spec.ts`（正反样本成对） |
+| **助手会话历史的本机持久化** | 刷新/重开后对话还在，**过期提案不可再确认**；🔴 只落本机、**不进 op-log、不同步**（跨设备会把对话变成第二个数据面） | `apps/web/src/features/ai/assistant-history.ts` | `apps/web/tests/assistant-history.spec.ts` + `assistant-history-panel.spec.tsx`，变异台 `apps/web/tests/mutate-assistant-history.mjs` |
+
 > 测试数字为 2026-09-29 在 `main` 上实测；四个包的总数是
 > `@heyta/ai` 151 / `@heyta/domain` 475 / `@heyta/app-host` 435 / `@heyta/local-api` 79（均 0 skip）。
 > ⚠️ 上面这行是**当时的快照**；AI 工具调用落地后已变为
@@ -228,6 +233,17 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 | **AI-3** 规划 | 有意推迟（需要真实数据） |
 | **AI-4** 复盘 | 受限分支，未开工 |
 | 密钥库的其他平台 | 只有 macOS 实现了；Windows / Linux / 移动端未实现（发布时再做） |
+
+> **2026-10-03 逐条复核（载体 `4107e234`）**：上面四条"未落地"**目前仍然成立** ——
+> 托管 AI 仍被 `assertEnableable()` 抛 `retention-undecided` 挡着（`packages/ai/src/supply.ts`）、
+> AI-3 / AI-4 无实现、密钥库仍只有 macOS。本节 §7.1 新增的四行是**这一天的落地项**，
+> 不是对上面任何一条的改判。
+>
+> ⚠️ 一条同时暴露出来的文档缺口：本线的headline（覆盖面跑满 —— 落地时 8/8、10-04 现量 9/9 + 覆盖面门禁进链）
+> 在 `AGENTS.md §9` 与 `roadmap.md §1.1`（AI-0…AI-5 那张表）**都没有落点** ——
+> 那两张表按"分支"组织，而"每实体动作覆盖面"是一条新轴。
+> 补哪一行由产品负责人定（`AGENTS.md` 按 §8 要用户点头才改），候选文本在
+> [EVENT 工具契约](ai-event-tool-contract.md) §15.13。
 
 #### 7.2.1 🔴 价格锚点：这条路线的真实经济约束
 

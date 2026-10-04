@@ -19,7 +19,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { I18nProvider, en, zhCN } from '@heyta/i18n';
 import type { AiRoutingConfig } from '@heyta/ai';
-import type { LocalApiConfig, LocalApiHost, LocalApiItem } from '@heyta/local-api';
+import type {
+  LocalApiConfig,
+  LocalApiFocusSession,
+  LocalApiHabitLog,
+  LocalApiHost,
+  LocalApiItem,
+  LocalApiNoteRow,
+  LocalApiReminder,
+  LocalApiTag,
+} from '@heyta/local-api';
 
 import { AiToolRun } from '../src/features/ai/AiToolRun.js';
 
@@ -49,6 +58,15 @@ function fakeHost(): LocalApiHost & { submits: number } {
     listTasks: () => Promise.resolve(items),
     getTask: () => Promise.resolve(items[0]),
     listProjects: () => Promise.resolve([]),
+    listHabits: () => Promise.resolve([]),
+    listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+    listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+    listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listEvents: () => Promise.resolve([]),
+    getEvent: () => Promise.resolve(undefined),
+    listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
     submit: () => {
       host.submits += 1;
       return Promise.resolve({ ok: true as const, taskId: 'created-1' });

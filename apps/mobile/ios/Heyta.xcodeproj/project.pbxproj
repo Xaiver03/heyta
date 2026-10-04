@@ -26,6 +26,8 @@
 		E10761774B4ACA38F1304981 /* HeytaReminderModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = E10761784B4ACA38F1304981 /* HeytaReminderModuleBridge.m */; };
 		E10761794B4ACA38F1304981 /* HeytaVaultSecureStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E107617A4B4ACA38F1304981 /* HeytaVaultSecureStorage.swift */; };
 		E107617B4B4ACA38F1304981 /* HeytaVaultSecureStorageBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = E107617C4B4ACA38F1304981 /* HeytaVaultSecureStorageBridge.m */; };
+		08A586DCA89443645736DBA3 /* HeytaCardExportModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A570098A9418530328BCED /* HeytaCardExportModule.swift */; };
+		39D6C8C223EFBC8A1BFA779C /* HeytaCardExportModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E4F69A1BDAFCBF9E9DFF5AA /* HeytaCardExportModuleBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -118,6 +120,8 @@
 				E10761784B4ACA38F1304981 /* HeytaReminderModuleBridge.m */,
 				E107617A4B4ACA38F1304981 /* HeytaVaultSecureStorage.swift */,
 				E107617C4B4ACA38F1304981 /* HeytaVaultSecureStorageBridge.m */,
+				C3A570098A9418530328BCED /* HeytaCardExportModule.swift */,
+				5E4F69A1BDAFCBF9E9DFF5AA /* HeytaCardExportModuleBridge.m */,
 			);
 			name = Heyta;
 			sourceTree = "<group>";
@@ -385,6 +389,8 @@
 				E10761774B4ACA38F1304981 /* HeytaReminderModuleBridge.m in Sources */,
 				E10761794B4ACA38F1304981 /* HeytaVaultSecureStorage.swift in Sources */,
 				E107617B4B4ACA38F1304981 /* HeytaVaultSecureStorageBridge.m in Sources */,
+				08A586DCA89443645736DBA3 /* HeytaCardExportModule.swift in Sources */,
+				39D6C8C223EFBC8A1BFA779C /* HeytaCardExportModuleBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

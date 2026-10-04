@@ -29,6 +29,14 @@
 `existingClock`、重复幂等和计时增量例外；reducer 测试覆盖删除、同毫秒
 clientId 决胜、创建/更新交换后的收敛。
 
+E1 的状态机边界还由 `packages/op-log/tests/semantic-invariants.spec.ts` 负责：固定
+seed 生成合法因果图后，两台独立 `OpLogEngine` 以不同批次、乱序和重复投递接收同一
+历史，并分别与纯 reducer 的规范投影、逐维最大向量时钟和彼此的可见状态对账；重试
+必须返回空的 `applied` 且不改变时钟。定向运行该文件为 1 个文件 / 5 条通过；同窗口
+的完整 `@heyta/op-log` 运行为 9 个文件 / 112 条通过；
+`scripts/mutate-op-log-semantics.mjs` 的九类 A/D/E 变异均能让至少一条断言失败。
+因此“收敛”覆盖存储和幂等闸门，而不只是一个 reducer 调用。
+
 ## A/D 的边界
 
 - checkpoint 恢复不能把“服务端已知 clock”当成“每个 op 已应用”；必须恢复

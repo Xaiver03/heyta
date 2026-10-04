@@ -181,6 +181,10 @@
 1. **注销账号 = 服务端物理删除。** `prisma.user.delete` + 数据库级联，
    口径真源是**引用 `users` 且 `ON DELETE CASCADE` 的外键：16 条 / 覆盖 15 张表**
    （`referrals` 占两条，所以条数 ≠ 表数）。
+   ⚠️ **这两个数在 2026-10-04 04:27 被 `structure.spec.ts` 重量为 19 条 / 18 张表** ——
+   增量来自 vault 批次（ADR-0050）新长的三张级联表，而这一节写在它之前。
+   政策侧已跟着改（`data-rights` 第五节 GDPR 行 + 该文件头注释各带一条"旧数留原文旁边"的更正），
+   **本节原句不删**，因为"16/15 曾经是现量"本身就是这一族抄件会漂的证据。
    ⚠️ 本 ADR 与政策文案此前抄的「19 处」「18 处」是**另一个口径**（全部迁移里
    `ON DELETE CASCADE` 的累计出现次数，含与账号无关的级联、且历史重建重复计数）—— 已更正，
    并由 `packages/legal/tests/structure.spec.ts` 从 `server/prisma/migrations` 现量对账，
@@ -204,3 +208,62 @@
 **与本 ADR §3 那条"没有冷静期"的冲突要单独裁决**：GDPR Art.17 要求"无不当延迟"，苹果 5.1.1(v) 要求应用内可注销，
 而 E2 落地后"注销"会连带清掉各设备上**尚未同步出去**的明文数据。若产品负责人选择加冷静期，
 那是**变更 §3 的结论** ⇒ 按仓库纪律要另写一份 ADR 取代这句，而不是在这里改它。当前状态：**已登记为 P-11，未拍**。
+
+---
+
+## 12. 增补（2026-10-04 凌晨，批次 E 第二笔）：§11 里那四句"今天还缺"已经被产品动作追平了三句半
+
+⚠️ **这一节只更正 §11 的"当前状态"读数，不改 §1–§11 的任何决策**。§11.4 本来就把 E2/E3 写成
+"缺的是两件产品动作而不是文案"，所以动作落地之后回来改写状态栏是这节计划的一部分；
+而 §11.3 那条**政策口径要求仍然成立**（下面第 4 条写清它今天该怎么落字）。
+所有读数逐条现量，命令就写在旁边。
+
+1. **"其它设备上的本地明文库一行都不会少"（§11.2 ⑤）已经不再成立** —— 不是被推翻，是被产品动作
+   补上了：那台设备**下一次同步**拿到 `ACCOUNT_CLOSED` 时会自己把本机明文销毁。
+   现量：`git show HEAD:packages/sync-client/src/client.ts | grep -c eraseLocalData` = **2**，
+   处置在 `client.ts:929-977`，判据 `packages/sync-client/tests/account-closed-erasure.spec.ts`
+   （含"401 + 该码同样算注销"与"**除该码外每一个失效码都不许触发销毁**"两条）。
+   ⇒ 这句话的准确版本是"**不会立刻少**"：设备离线、或用户不再打开它，那份明文就一直在那儿。
+2. **`DbAdapter` 连 `destroy` 都没声明、`destroy()` 零调用方（§11.4）已过期**。现量：
+   `git show HEAD:packages/storage/src/db.types.ts | grep -c destroy` = **5**（契约），
+   三套实现各有 `async destroy`：`indexeddb/indexeddb-adapter.ts:570`、`sqlite/sqlite-adapter.ts:255`、
+   `memory/memory-adapter.ts:196`（三份的 HEAD 命中数都是 **1**），调用方是
+   `apps/web/src/lib/local-data-destruction.ts:234`。
+3. **"只删一类会被另一类复活"那一档，Web 侧已闭合**：`eraseWebLocalData` 一次清**四层** ——
+   主库走适配器自己的 `destroy`、`localStorage` 前缀键、`sessionStorage` 前缀键 + 令牌那几把**无前缀精确键**、
+   service worker 层。注册点 `apps/web/src/main.tsx:53`（刻意放在入口而不是同步 store：销毁是设备级的）。
+   另有两条形状值得记：`deleteDatabase` 的 `onblocked` **只等待不作决议**，决议只来自
+   `onsuccess` / `onerror` —— 当场 resolve 会让销毁报告在"别的标签页还握着连接、库其实还在"时说"删了"；
+   代价是那个 Promise 可能一直挂着，这是**诚实的挂起**，界面层若要给期限就该在这一层的调用点做超时并说明原因。
+4. **§11.3 那句边界要改的是措辞，不是取消**。政策文本现在必须写"其它设备上的本地明文**不会立刻**清除，
+   要等那台设备下一次同步"，而不能继续写"不会清除"。常驻判据不受影响，因为它钉的是**语义在场**而不是
+   字面：`structure.spec.ts:557-563` 那四组是 `BOUNDARY_ZH = /本地.{0,16}(库|数据)/`、
+   `BOUNDARY_EN = /local(?:\s+\w+){0,3}\s+(data|databases?|store)/i`、`DEVICE_ZH = /(其它|其他)设备/`、
+   `DEVICE_EN = /other device/i`。
+   🔴 这一条不是推演，**实测过**（04:1x 用四条正则各跑一遍新措辞）：中英两句命中
+   `BOUNDARY + DEVICE` 全为 **true**；反向对照"只提设备、不提本地库/数据"的那句命中为 **false** ——
+   也就是新措辞能活，把边界删掉照样红（该判据自己的变异 M7 也验过同一件事）。
+   ⇒ 记这条是因为它给了一个可迁移的形状：**要求"必须提到某件事"的判据，能在事实变化时原样活着；
+   要求"必须是某个字面句子"的判据，会在事实变化那天变成谎言的守卫**。
+5. 🔴 **§11.2 里还开着的三档，本轮没有假装闭掉**：
+   ② `payment_events` 无账号外键（仍在）；③ 整库备份没有"从既有快照里定点删掉某一个人"的能力
+   （P-12，运维侧）；④ 服务端日志的邮箱明文轮转与到期删除（P-4 已改写入侧，历史日志仍在）。
+   加上**设备侧新登记的三档**：
+   (a) macOS / Windows 原生壳的**第二份存储**（WebKit 持久 `websiteData`、WebView2 profile）没有销毁通道，
+   现量 `apps/desktop-macos/Sources` 里 `WKWebsiteDataStore` 只有 1 处且是 `HeytaMacApp.swift:416` 的
+   `.nonPersistent()`（只在 `HEYTA_WEBKIT_EPHEMERAL=1` 下生效），`apps/desktop-windows` 里
+   `DeleteProfile|BrowsingData` **0 处** ⇒ 那两个壳上"点下注销"目前只清壳自己那份 SQLite，
+   **Web 层那第二份还在盘上**；这一处例外已经写进对外文本（`data-rights` 第五节中英把"不承诺"从一处
+   扩成两处，`minors` 第七节改为指向那一节而不是抄第二份，2026-10-04 04:2x），接上销毁通道后这两句要回写；
+   (b) 本机销毁器注册表是**模块级单例且不分归属**，早一步注册的兜底会一直赢，于是
+   `eraseLocalData()` 可能报 `containerRemoved: true` 而那台设备的库还在（假成功；修复落点
+   `packages/app-host/src/host.ts:340-342` 那句 `if (!hasLocalEraser())`，该文件本轮现量仍是别人的未提交 diff）；
+   (c) 隐私政策与第三方清单里"**今天还不存在**"那三句（`privacy` 中英、`third-parties` 中文）——
+   被 §12.1 否证，但那两份文件的 `version` 行正被别人改，实质修改必须 bump ⇒ 挂起，形状见计划 §10.7。
+
+**验收与未验收要分开写**：上面第 1–3 条是**代码 + 单元判据**层面的事实（其中 web/mobile/node-host
+三个注销入口的 spec 本轮第一次真跑：`cli-account` 11/11、`account-closure-entry` 11/11、
+`local-data-destruction` 11/11、`account-closure-model` 10/10）。**跨设备那半条今天仍未取证** ——
+也就是"B 设备离线一段时间后重新联网同步，界面上真的空了"这句话目前只有单元层的支撑，
+没有真机那一跑（载体：`pnpm verify:mobile-trash`，设备窗口与负载门本轮不在手里）。
+本 ADR 不把它写成已成立。

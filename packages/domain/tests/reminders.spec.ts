@@ -12,14 +12,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ALL_REMINDER_OFFSET_PRESETS_MS,
   MAX_REMINDERS_PER_TASK,
   MAX_REMINDER_LEAD_MS,
   MAX_SNOOZE_MS,
+  REMINDER_LONG_OFFSET_PRESETS_MS,
   REMINDER_OFFSET_PRESETS_MS,
   REMINDER_PAST_GRACE_MS,
   aliveReminders,
+  daysBetween,
   dueReminders,
   isReminderPending,
+  localDayBefore,
   nextTriggerAfterRepeat,
   reminderEffectiveAt,
   reminderIsFired,
@@ -180,8 +184,88 @@ describe('常量自检（界面预设与上限必须自洽）', () => {
     expect(Math.max(...presets)).toBeLessThan(MAX_REMINDER_LEAD_MS);
   });
 
+  /**
+   * 🔴 这条钉的是**下标契约**的左半边。
+   *
+   * `packages/ui` 的 `ReminderList` 按 `labels.offsets[i] ↔ offsetPresets()[i]`
+   * 取文案，而两端各自写了一份 key 数组（web 的 `REMINDER_OFFSET_KEYS`、
+   * mobile 的 `offsetMessageKey`）。往这个数组里**追加**一项就等于同时改
+   * 那两个宿主 + 两份词条，而移动端那份缺 key 会**在打开面板时抛**。
+   * ⇒ 更长的档位走 `REMINDER_LONG_OFFSET_PRESETS_MS`（新增一档 = 改一处），
+   *   这条断言就是"没人顺手把长档位抄回短数组"的兜底。
+   */
+  it('🔴 短档位数组一字未动（6 档、逐项 —— `as const` 的下标契约）', () => {
+    expect([...REMINDER_OFFSET_PRESETS_MS]).toEqual([
+      0, 5 * MINUTE, 15 * MINUTE, 30 * MINUTE, HOUR, DAY,
+    ]);
+  });
+
+  it('🔴 W9 ①：日级以上档位是**纯可加**的，合起来仍是升序无重复', () => {
+    expect([...REMINDER_LONG_OFFSET_PRESETS_MS]).toEqual([2 * DAY, 3 * DAY, 7 * DAY, 30 * DAY]);
+    expect([...ALL_REMINDER_OFFSET_PRESETS_MS]).toEqual([
+      ...REMINDER_OFFSET_PRESETS_MS,
+      ...REMINDER_LONG_OFFSET_PRESETS_MS,
+    ]);
+    const sorted = [...ALL_REMINDER_OFFSET_PRESETS_MS].sort((a, b) => a - b);
+    // 两档同值 = 两端的下标会错位（共享组件按下标取文案）。
+    expect(sorted).toEqual([...new Set(sorted)]);
+    expect(sorted).toEqual([...ALL_REMINDER_OFFSET_PRESETS_MS]);
+    // 闸门：最大档也必须落在 `MAX_REMINDER_LEAD_MS` 之内（提前 30 天在一年内）。
+    expect(Math.max(...ALL_REMINDER_OFFSET_PRESETS_MS)).toBeLessThan(MAX_REMINDER_LEAD_MS);
+    // 短档 ⊂ 全集：老的提前量在新档位表里仍解析到同一个数字。
+    for (const preset of REMINDER_OFFSET_PRESETS_MS) {
+      expect(ALL_REMINDER_OFFSET_PRESETS_MS).toContain(preset);
+    }
+  });
+
   it('每任务上限是正整数', () => {
     expect(Number.isInteger(MAX_REMINDERS_PER_TASK)).toBe(true);
     expect(MAX_REMINDERS_PER_TASK).toBeGreaterThan(0);
+  });
+});
+
+describe('日级提前量按**本地日历日**算（不假设本机有夏令时的那部分判据）', () => {
+  /**
+   * ⚠️ 这一组刻意**不假设**本机时区有夏令时 —— 完整版在
+   * `reminders-dst.spec.ts`（那里显式钉了 `America/New_York`）。
+   * 这里只钉"在任何时区都必须成立"的三条：自然日距离、同一套钟表时间、
+   * 亚日档位仍是瞬时减法。
+   */
+  const due = NOW + 10 * DAY + 9 * HOUR + 30 * MINUTE;
+
+  it('提前 N 天 = 自然日距离正好 N，且时分秒不变', () => {
+    for (const [offset, n] of [
+      [DAY, 1],
+      [2 * DAY, 2],
+      [3 * DAY, 3],
+      [7 * DAY, 7],
+      [30 * DAY, 30],
+    ] as const) {
+      const trigger = reminderTriggerFromOffset(due, offset);
+      expect(daysBetween(due, trigger), `提前 ${String(n)} 天`).toBe(n);
+      const src = new Date(due);
+      const got = new Date(trigger);
+      expect(
+        [got.getHours(), got.getMinutes(), got.getSeconds()],
+        `提前 ${String(n)} 天漂了钟表时间`,
+      ).toEqual([src.getHours(), src.getMinutes(), src.getSeconds()]);
+    }
+  });
+
+  it('localDayBefore(0 天) 原样返回；跨年由原生 Date 负责', () => {
+    expect(localDayBefore(due, 0)).toBe(due);
+    expect(daysBetween(due, localDayBefore(due, 365))).toBe(365);
+  });
+
+  it('🔴 亚日档位仍是逐字相减（要改这一档得显式改判据，不许顺手"也按天算"）', () => {
+    for (const offset of [0, 5 * MINUTE, 15 * MINUTE, 30 * MINUTE, HOUR]) {
+      expect(reminderTriggerFromOffset(due, offset)).toBe(due - offset);
+    }
+  });
+
+  it('提前量与截止时间的形状校验不变（负数 / 非有限数抛错）', () => {
+    expect(() => reminderTriggerFromOffset(due, -DAY)).toThrow();
+    expect(() => reminderTriggerFromOffset(Number.NaN, DAY)).toThrow();
+    expect(() => reminderTriggerFromOffset(due, Number.POSITIVE_INFINITY)).toThrow();
   });
 });

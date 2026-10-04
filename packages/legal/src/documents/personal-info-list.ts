@@ -433,7 +433,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '一处必须逐端说清、不能拿一份最全的说法套所有端：**移动端的所有凭据（地址、令牌、口令）刻意完全不落盘**，冷启动后都要重填；Web 的同步凭据落 `localStorage` 且是明文。两者是不同的取舍，也不同风险。另有一条要说白：**目前任何一端都没有「一键抹掉本机全部数据」的按钮**——彻底清除本机明文数据要靠卸载应用或清除浏览器站点数据。',
+        text: '一处必须逐端说清、不能拿一份最全的说法套所有端：**移动端的所有凭据（地址、令牌、口令）刻意完全不落盘**，冷启动后都要重填；Web 的同步凭据落 `localStorage` 且是明文。两者是不同的取舍，也不同风险。另有一条要说白：**任何一端都没有「不注销也能一键抹掉本机全部数据」的独立按钮**——会在本机抹掉可读数据的那个动作就是注销账号（点下它的那台当场抹掉，其它设备在下次同步拿到注销信号时各自抹掉）；不注销而只想清干净这台设备，走系统层面：卸载应用，或清除浏览器站点数据。',
       },
     ],
   },
@@ -526,7 +526,7 @@ const zh = [
           [
             '账户、凭据、订阅、订单、邀请与通知记录',
             '直到你**注销账号**',
-            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站。🔴 这一行删的是服务端那一份：你其它设备上的本地明文库不会因为注销而消失 —— 今天还没有“账号已注销就清除本机数据”这个动作',
+            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站。🔴 这一行删的是服务端那一份；本机那一层：你点下注销的设备当场清掉本地明文库，其它设备在下次同步拿到“账号已注销”信号时各自清掉自己那一份 —— 从此不再上线的设备我们无法远程擦除',
           ],
           [
             '一次性令牌',
@@ -548,6 +548,51 @@ const zh = [
       {
         kind: 'p',
         text: '两句要一起写、否则这段会被读成承诺：**45 天是产品当前设定，不是你可以自选的选项**，界面上没有「更短保留期」的开关，改它要发版本。而「你在应用里点了彻底删除」**不会缩短**这个期限——它让这条数据从你的所有设备界面里消失。🔴 还要如实补第三句：按当前版本，服务器上那条加密历史**等不到「保留期届满」**——每日清扫对我们的数据一条都不命中（见上表那一行），它真的不在，目前只有注销账号这一条路。另有一条边界要如实登记：主机与网络层（如前置代理）的访问日志留存由部署环境决定，法定底线是网络日志留存不少于六个月；官方实例当前配置的具体留存期需运营在发布前确认。',
+      },
+    ],
+  },
+  {
+    id: 's9',
+    title: '欧盟 GDPR 口径：这份清单能当哪半份用、不能当哪半份用',
+    blocks: [
+      {
+        kind: 'p',
+        text: '这份清单是按《个人信息保护法》的口径写的：它逐类说明收集什么、存在哪儿、服务端能不能读到。GDPR 里最接近它的是第 30 条的处理活动记录（ROPA），但 ROPA 还要求**每一类各自的处理目的、法律依据与留存期** —— 那三列本清单没有，所以这里写清它能顶哪一半、不能顶哪一半，而不是把它改名成 ROPA 交出去。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 30 条（处理活动记录）',
+            '有没有一份按 GDPR 格式写成的处理活动记录',
+            '清单确实逐类写了"存什么、存在哪、谁能读到"，端到端加密那一列还写明服务端只拿到密文',
+            '但它**没有**为每一类标出法律依据与留存期，分类也是按中国法而不是按 GDPR 的分组；补上那两列之前，这份文件不能自称 ROPA'
+          ],
+          [
+            '第 9 条（特殊类别数据）对照"敏感个人信息"',
+            '两套"敏感"定义是不是同一批数据',
+            '清单里的敏感项严格按中国法的列举写，没有擅自加宽也没有收窄',
+            '两个集合**不相等**：GDPR 把生物识别与基因数据明确列入第 9 条，中国法的敏感信息口径与之不同。符合这边的表不自动符合那边，所以本文件不做任何一一对应的换算'
+          ],
+          [
+            '第 15 条（访问权）',
+            '这份清单是不是"你能看到的关于你的一切"',
+            '不是，而且清单自己就这么写：访问权走**导出**，三个端都有，导出含墓碑与完整操作日志',
+            '清单给的是类别，不是你的数据本身；而类别表与实际库不一致时以实际数据为准（本文件第八节写明的那条），这类不一致目前没有逐字段的常驻对账'
+          ],
+          [
+            '第 13(1)(c) 条（留存期限或其确定标准）',
+            '每一类要写明存多久、按什么标准到期',
+            '清单不写期限，期限统一放在《隐私政策》与保留策略里，避免同一件事两处各写一个数字',
+            '留存期今天只能写到"标准"而不能写到"日期"：托管侧的备份是整库快照，代码里**没有**"从既有备份中单独删掉某一条或某一个人"的能力，所以任何按类写死的到期日都会变成一句做不到的话'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: '《隐私政策》：处理目的、法律依据与留存期在那里逐条给出；本清单只回答"有哪些类、存在哪儿、服务端看得见吗"。',
       },
     ],
   },
@@ -990,7 +1035,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'One point that must be stated per platform instead of applying the most generous description everywhere: **on mobile, all credentials (address, token, passphrase) are deliberately kept off disk** and re-entered after a cold start, whereas on Web the sync credentials are persisted to `localStorage` in cleartext. Different trade-offs, different risks. And one more, said plainly: **no platform currently has a "wipe all local data" button** — physically clearing local cleartext means uninstalling the app or clearing browser site data.',
+        text: 'One point that must be stated per platform instead of applying the most generous description everywhere: **on mobile, all credentials (address, token, passphrase) are deliberately kept off disk** and re-entered after a cold start, whereas on Web the sync credentials are persisted to `localStorage` in cleartext. Different trade-offs, different risks. And one more, said plainly: **no platform has a standalone "wipe all local data" button that works without closing the account** — the one action that erases readable local data on a device is account closure (the device you press it on immediately, each other device the next time it synchronises and receives the closure signal); to clear this device without closing the account, use the operating-system route: uninstall the app, or clear browser site data.',
       },
     ],
   },
@@ -1083,7 +1128,7 @@ const en = [
           [
             'Accounts, credentials, subscriptions, orders, referrals and notifications',
             'Until you **close your account**',
-            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals and notifications all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin. 🔴 What this removes is the server copy: the readable local databases on your other devices survive closure — the action "the account was closed, so wipe this device" does not exist today',
+            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals and notifications all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin. 🔴 What this removes is the server copy; for the local plaintext data, the device you press closure on is wiped on the spot and every other device wipes its own readable copy the next time it syncs and receives the "account closed" signal — a device that never comes back online is one we cannot wipe remotely',
           ],
           [
             'One-time tokens',
@@ -1105,6 +1150,51 @@ const en = [
       {
         kind: 'p',
         text: 'Two sentences that must travel together with that table, or it reads like a promise: **45 days is the product\'s current setting, not an option you can choose**, there is no shorter-retention switch in the interface, and changing it takes a release. And pressing "delete forever" in the app **does not shorten it** — the item disappears from every one of your screens. 🔴 A third sentence has to be added, also honestly: under the current version that encrypted history **never reaches "the retention window expiring"** — the daily sweep does not match our data at all (see that row above), so the one route by which it really stops existing is closing the account. One more boundary, registered honestly: access-log retention at the host and network layer (for example a fronting proxy) is decided by the deployment environment, and the statutory floor is that network logs are kept for no less than six months; the retention actually configured for the official instance needs to be confirmed by operations before this document is published.',
+      },
+    ],
+  },
+  {
+    id: 's9',
+    title: 'The EU GDPR view: which half of a record of processing this inventory is, and which half it is not',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'This inventory is written against the PIPL: category by category it says what is collected, where it lives, and whether the server can read it. The closest GDPR instrument is the record of processing activities under Article 30, but a record of processing also requires **the purpose, lawful basis and retention for each category** - three columns this inventory does not have. So the cells below state which half this document can stand in for and which it cannot, rather than renaming it and handing it over.',
+      },
+      {
+        kind: 'table',
+        head: ['Where in the GDPR', 'What it asks', 'What heyta can produce', 'What does not line up'],
+        rows: [
+          [
+            'Article 30 (record of processing activities)',
+            'Is there a record of processing activities in the GDPR\'s shape',
+            'The inventory really does state per category "what is stored, where, and who can read it", and one column records that under end-to-end encryption the server receives ciphertext only',
+            'It carries **no** lawful basis and no retention period per category, and its categories follow Chinese law rather than the GDPR grouping; until those two columns exist this document must not call itself a record of processing'
+          ],
+          [
+            'Article 9 (special categories) against "sensitive personal information"',
+            'Whether the two "sensitive" definitions cover the same data',
+            'The sensitive items listed here follow the Chinese enumeration exactly - neither widened on our own initiative nor narrowed',
+            'The two sets are **not equal**: the GDPR puts biometric and genetic data inside Article 9 while the Chinese definition differs, so a table that satisfies one side does not automatically satisfy the other and no one-to-one mapping is performed here'
+          ],
+          [
+            'Article 15 (access)',
+            'Whether this inventory is "everything we hold about you"',
+            'It is not, and the inventory says so: access is exercised through **export**, available on all three clients, including tombstones and the full operation log',
+            'The inventory gives categories, not your data; and where the category table and the real database disagree, the database governs (section eight of this document) - that kind of disagreement has no field-by-field standing reconciliation today'
+          ],
+          [
+            'Article 13(1)(c) (the retention period, or the criteria used to set it)',
+            'Each category must state how long it is kept, or by what criterion it expires',
+            'The inventory states no periods at all; retention lives in the Privacy policy and the retention rules, so one fact is never written as two different numbers',
+            'Retention can currently be given as a **criterion** but not as a date: hosted backups are whole-database snapshots and the code has **no** ability to remove a single row or a single person from an existing backup, so any hard-coded expiry per category would become a promise we cannot keep'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: 'Privacy policy: purposes, lawful bases and retention periods are given there article by article; this inventory answers only "which categories exist, where they are stored, and whether the server can see them".',
       },
     ],
   },
@@ -1144,9 +1234,9 @@ const en = [
 
 export const personalInfoList: LegalDocument = {
   id: 'personal-info-list',
-  version: '1.0',
+  version: '1.2',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': '个人信息收集清单',
     en: 'Personal Information Collection Inventory',

@@ -285,12 +285,56 @@ elif [ -z "$KEY_FILE" ]; then
   echo "  ⏭ 跳过：找不到 ASC API key（试过 ~/Library/Private/AppStoreConnect、~/Desktop、~/.appstoreconnect/private_keys）"
 else
   echo "  用 key：$(basename "$KEY_FILE")（内容不打印）"
-  if xcrun notarytool submit "$DMG" --key "$KEY_FILE" --key-id "$KEY_ID" --issuer "$ISSUER" --wait 2>&1 | tail -8 | awk '{print "  " $0}'; then
+  # 🔴 `--wait` 原来**没有上限**：Apple 侧不回话时整段永久挂住。2026-10-04 05:1x 实测另一条会话的
+  #    `reinstall:all` 卡在这一行 1h57m：进程累计 CPU 0:00.03、**一条 TCP 连接都没有**
+  #    （即它连"正在重试"都不是，就是在等一个不会来的东西），而它同时是"有别人在重装"那道互斥门的
+  #    持有者 ⇒ 一个外部调用把并行会话的固定收尾一起钉死了。上限走 `HEYTA_NOTARY_TIMEOUT`
+  #    （默认 900s；设 `0` = 显式要旧行为"不设限"）。**超时不等于通过**：走 🔴 那一支，不装订票据。
+  NOTARY_TIMEOUT="${HEYTA_NOTARY_TIMEOUT:-900}"
+  TIMEOUT_BIN=""
+  for t in timeout gtimeout; do
+    command -v "$t" >/dev/null 2>&1 && { TIMEOUT_BIN="$t"; break; }
+  done
+  NOTARY_LOG="$(mktemp)"
+  # 🔴 裸 macOS **不带** timeout（它属于 GNU coreutils / homebrew），所以"没有 timeout"是
+  #    打包机的默认情况而不是边角；那种时候退化成"不设限"就等于没修。这里用纯 bash 看门狗兜底。
+  run_bounded() {
+    local limit="$1"; shift
+    if [ "$TIMEOUT_BIN" != "" ]; then
+      "$TIMEOUT_BIN" "$limit" "$@"
+      return $?
+    fi
+    "$@" &
+    local pid=$! waited=0
+    while kill -0 "$pid" 2>/dev/null; do
+      if [ "$waited" -ge "$limit" ]; then
+        kill -TERM "$pid" 2>/dev/null; sleep 2; kill -KILL "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+        return 124
+      fi
+      sleep 2; waited=$((waited + 2))
+    done
+    wait "$pid" 2>/dev/null
+  }
+  notary_rc=0
+  if [ "$NOTARY_TIMEOUT" != "0" ]; then
+    run_bounded "$NOTARY_TIMEOUT" xcrun notarytool submit "$DMG" --key "$KEY_FILE" --key-id "$KEY_ID" --issuer "$ISSUER" --wait >"$NOTARY_LOG" 2>&1 || notary_rc=$?
+  else
+    echo "  ⚠️ HEYTA_NOTARY_TIMEOUT=0 ⇒ 显式要求不设限（旧行为）"
+    xcrun notarytool submit "$DMG" --key "$KEY_FILE" --key-id "$KEY_ID" --issuer "$ISSUER" --wait >"$NOTARY_LOG" 2>&1 || notary_rc=$?
+  fi
+  tail -8 "$NOTARY_LOG" | awk '{print "  " $0}'
+  rm -f "$NOTARY_LOG"
+  # ⚠️ 输出走临时文件而不是管道：`set -o pipefail` 下管道能保住退出码，但**区分不了**
+  #    "Apple 拒绝"与"到点没回话"（124），而这两种要说的话不一样。
+  if [ "$notary_rc" -eq 0 ]; then
     echo "  ✅ 公证通过，开始装订票据"
     xcrun stapler staple "$DMG" 2>&1 | tail -2 | awk '{print "  " $0}'
     xcrun stapler validate "$DMG" 2>&1 | tail -2 | awk '{print "  " $0}'
+  elif [ "$notary_rc" -eq 124 ]; then
+    echo "  🔴 公证在 ${NOTARY_TIMEOUT}s 内没有返回（Apple 侧未回话）。包本身已签名可用，但**没通过公证**，不装订票据。"
   else
-    echo "  🔴 公证失败（上面的输出是 Apple 的原话）。包本身已签名可用，但**没通过公证**。"
+    echo "  🔴 公证失败（上面的输出是 Apple 的原话，rc=$notary_rc）。包本身已签名可用，但**没通过公证**。"
   fi
 fi
 

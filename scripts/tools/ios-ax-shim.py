@@ -194,7 +194,7 @@ def label_of(n):
     return (n.get("AXLabel") or n.get("title") or "").strip()
 
 
-def find(nodes, label, want_pressable, want_field, role, exact_only=False):
+def find(nodes, label, want_pressable, want_field, role, exact_only=False, occurrence=0):
     """
     先找**精确标签**，找不到再退化成子串匹配。
 
@@ -216,16 +216,16 @@ def find(nodes, label, want_pressable, want_field, role, exact_only=False):
     if label and label != "-":
         exact = [n for n in pool if label_of(n) == label]
         if exact:
-            return exact[0]
+            return exact[occurrence] if occurrence < len(exact) else None
         if exact_only:
             return None
         sub = [n for n in pool if label in label_of(n)]
         if sub:
-            return sub[0]
+            return sub[occurrence] if occurrence < len(sub) else None
         return None
 
     # 标签是 `-`：只要有一个符合类别约束的就行（原 AXPRESS 的 `-` 语义）
-    return pool[0] if pool else None
+    return pool[occurrence] if occurrence < len(pool) else None
 
 
 def frame_of(n):
@@ -486,7 +486,7 @@ def idb_swipe(idb, companion, udid, x0, y0, x1, y1, duration):
         return -1, str(e)[:120]
 
 
-def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role):
+def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence=0):
     """
     把 label 指向的元素**真的滚进可见区**。返回 emit 用的 dict。
 
@@ -519,7 +519,7 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
         for _ in range(5):
             ns = dump_nodes(idb, companion, udid)
             if ns:
-                return find(ns, label, want_pressable, want_field, role, False), ns
+                return find(ns, label, want_pressable, want_field, role, False, occurrence), ns
             time.sleep(1)
         return None, None
 
@@ -557,8 +557,16 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
         if y + hh // 2 >= vis_limit:
             # 元素在折叠线以下：向上滚（拖拽距离 = 超出量 + 余量，直接操纵无惯性）。
             # 起点在**底部**找（那里才有向上的行程）。
-            dist = min((y + hh // 2) - vis_limit + 60, max(y - 40, 60))
-            sx, sy = find_dead_zone(nodes, w, no_go, y_from=no_go - 15, y_to=max(no_go - 240, 200))
+            # A short 60–90px drag can be accepted by idb/HID yet ignored by
+            # RN ScrollView when the node is only just below the fold. Keep a
+            # real gesture distance even for that edge case; otherwise the AX
+            # tree is healthy but every retry sees the same y coordinate.
+            dist = max((y + hh // 2) - vis_limit + 60, 180)
+            dist = min(dist, max(y - 40, 60))
+            # Leave a larger bottom margin. On iOS 27 a swipe beginning at
+            # h-95 can be accepted by HID but land in the ScrollView's
+            # non-scrolling tail; the same gesture from ~h-170 scrolls.
+            sx, sy = find_dead_zone(nodes, w, no_go, y_from=no_go - 80, y_to=max(no_go - 300, 200))
             if sx is None:
                 out["scrollRc"] = "no-dead-zone"
                 return out
@@ -598,7 +606,7 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
             node, nodes = locate_now()
             if node is not None:
                 out["scrollRc"] = f"recovered-after-{recoveries}"
-                return scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role)
+                return scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence)
             if nodes is None:
                 # 恢复拖拽之后树读空了：停手，绝不能拿着坏数据再拖一次。
                 out["scrollRc"] = "tree-empty-repeated"
@@ -618,7 +626,7 @@ RETURN_KEY_LABELS = ("换行", "return", "Return", "done", "Done", "go", "Go",
                      "发送", "下一步", "完成")
 
 
-def type_text(idb, companion, udid, label, want_pressable, want_field, role, value):
+def type_text(idb, companion, udid, label, want_pressable, want_field, role, value, occurrence=0):
     """
     **聚焦输入框 + 模拟键盘输入**。返回 emit 用的 dict。
 
@@ -630,13 +638,14 @@ def type_text(idb, companion, udid, label, want_pressable, want_field, role, val
     """
     out = {"found": "False", "typedRc": "", "detail": ""}
     # 🔴 先滚进可见区：tap 对屏外坐标是空操作（不报错）—— 2026-10-02 实测。
-    vis = scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role)
+    vis = scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence)
     if vis.get("visible") != "True":
         out["typedRc"] = f"not-visible ({vis.get('found')}/{vis.get('scrollRc')})"
         return out
     node, nodes = locate(argparse.Namespace(
         label=label, pressable=want_pressable, field=want_field, role=role,
-        wait=3, exact=False, idb=idb, companion=companion, udid=udid))
+        wait=3, exact=False, occurrence=occurrence,
+        idb=idb, companion=companion, udid=udid))
     if node is None:
         out["typedRc"] = "not-found"
         return out
@@ -753,7 +762,7 @@ def locate(args):
     deadline = time.time() + max(args.wait, 0)
     while True:
         nodes = dump_nodes(args.idb, args.companion, args.udid)
-        n = find(nodes, args.label, args.pressable, args.field, args.role, args.exact)
+        n = find(nodes, args.label, args.pressable, args.field, args.role, args.exact, args.occurrence)
         if n is not None:
             return n, nodes
         if time.time() >= deadline:
@@ -774,6 +783,8 @@ def main():
     #    恒真（"按了取消还开着"的假卡住，verify 两轮红在同一处）。
     #    撞车的通用形态：探针的 label 是某真实元素 label 的**子串**。
     p.add_argument("--exact", action="store_true")
+    p.add_argument("--occurrence", type=int, default=0,
+                   help="同名 AX 节点按树顺序选择第几个（从 0 开始）")
     p.add_argument("--role")
     p.add_argument("--wait", type=int, default=0)
     p.add_argument("--list", action="store_true")
@@ -805,13 +816,14 @@ def main():
 
     if args.scroll_into_view:
         emit(scroll_into_view(args.idb, args.companion, args.udid,
-                              args.label, args.pressable, args.field, args.role))
+                              args.label, args.pressable, args.field, args.role,
+                              args.occurrence))
         return 0
 
     if args.type_text is not None:
         emit(type_text(args.idb, args.companion, args.udid,
                        args.label, args.pressable, args.field, args.role,
-                       args.type_text))
+                       args.type_text, args.occurrence))
         return 0
 
     if args.tap is not None:

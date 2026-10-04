@@ -13,21 +13,30 @@
  * delete every copy once recovery is confirmed. The script logs only sequence
  * numbers, timestamps and entity-type counts — never task content, never the key.
  *
- * Status: UNVERIFIED against real encrypted data — test against a known account
- * first. See docs/backup-and-recovery.md for the full procedure.
+ * Status: the decrypt + replay path is now pinned by `tests/recover-replay-roundtrip.spec.ts`
+ * (real `encryptBatch`/`decryptBatch`, real `replayOpsToState`, 2026-10-04). What is
+ * still NOT proven by that spec, and why the caution below stays: it never opened a
+ * real account's rows — reading `operations.payload` out of a live Postgres, with the
+ * `payloadBytes` / compression behaviour of that column, is a different exposure than
+ * handing the same functions a ciphertext I produced myself. So: **still test against
+ * a known account first.** See docs/backup-and-recovery.md for the full procedure.
  */
 
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { CURRENT_SCHEMA_VERSION } from '@heyta/shared-schema';
 import { prisma, disconnectDb } from '../src/db';
 import { replayOpsToState, type ReplayOperationRow } from '../src/sync/op-replay';
+import { REPLAY_OPERATION_SELECT } from '../src/sync/services/snapshot-generation.service';
 
-// sync-core lives in a sibling package. Loaded via require() so the server's
-// `tsc` build (rootDir = this package) never tries to compile its source;
-// ts-node --transpile-only resolves and transpiles the .ts on demand at runtime.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { decryptBatch } = require('../../sync-core/src/encryption') as {
-  decryptBatch: (items: string[], password: string) => Promise<string[]>;
-};
+// 🔴 `@heyta/sync-core`, not `require('../../sync-core/src/encryption')`. The old
+// form reached a **source path two directories up** and hand-stubbed the type,
+// which meant (a) it only resolved under `ts-node --transpile-only`, (b) nothing
+// checked the signature, and (c) the file could not be imported from a test —
+// and an unimportable decrypt path is how "UNVERIFIED against real encrypted
+// data" survived this long. Every other server module already imports this
+// package statically (`src/sync/conflict.ts` etc.), so the `rootDir` reason in
+// the old comment was about the *relative source path*, not the package.
+import { decryptBatch } from '@heyta/sync-core';
 
 const FULL_STATE_OP_TYPES = ['SYNC_IMPORT', 'BACKUP_IMPORT', 'REPAIR'];
 
@@ -170,7 +179,7 @@ const inspect = async (userId: number): Promise<void> => {
 };
 
 /** Decrypt the encrypted ops in place, returning a seq-indexed payload map. */
-const decryptPayloads = async (
+export const decryptPayloads = async (
   ops: { id: string; isPayloadEncrypted: boolean; payload: unknown }[],
   key: string,
 ): Promise<Map<number, unknown>> => {
@@ -217,6 +226,128 @@ const decryptPayloads = async (
   return decrypted;
 };
 
+/**
+ * An `operations` row as returned by `RECOVER_ARTIFACT_OPERATION_SELECT`
+ * (= replay select + the three columns the **wire** shape needs).
+ */
+export type RecoveredOperationRow = {
+  id: string;
+  serverSeq: number;
+  clientId: string;
+  vectorClock: unknown;
+  clientTimestamp: bigint;
+  opType: string;
+  entityType: string;
+  entityId: string | null;
+  entityIds: string[];
+  payload: unknown;
+  schemaVersion: number;
+  isPayloadEncrypted: boolean;
+  repairBaseServerSeq: number | null;
+};
+
+/**
+ * Map stored rows onto `replayOpsToState`'s input.
+ *
+ * 🔴 The two conditional spreads are load-bearing, not tidiness. Measured
+ * 2026-10-04 against the real replay fed with real `encryptBatch` ciphertexts:
+ *   - a batch DEL replayed WITHOUT `entityIds` deletes only the scalar
+ *     `entityId` (= `entityIds[0]`), so entities 2..n **come back to life in the
+ *     recovered file the user then imports** — the #8340 bug, second copy;
+ *   - a REPAIR replayed WITHOUT `repairBaseServerSeq` throws
+ *     `LEGACY_REPAIR_REPLAY_UNSUPPORTED`, i.e. every account that ever repaired
+ *     was silently unrecoverable by this tool.
+ * Empty arrays are omitted so replay takes its documented scalar fallback
+ * (same shape as `vault-key-migration.service.ts`). Pinned by
+ * `tests/recover-replay-roundtrip.spec.ts`.
+ */
+export const buildReplayRows = (
+  ops: RecoveredOperationRow[],
+  decryptedByIndex: Map<number, unknown>,
+): ReplayOperationRow[] =>
+  ops.map((op, i) => ({
+    id: op.id,
+    serverSeq: op.serverSeq,
+    opType: op.opType,
+    entityType: op.entityType,
+    entityId: op.entityId,
+    ...(op.entityIds.length > 0 ? { entityIds: op.entityIds } : {}),
+    payload: decryptedByIndex.has(i) ? decryptedByIndex.get(i) : op.payload,
+    schemaVersion: op.schemaVersion,
+    // Payloads are plaintext at this point — replay rejects encrypted rows.
+    isPayloadEncrypted: false,
+    ...(op.repairBaseServerSeq != null ? { repairBaseServerSeq: op.repairBaseServerSeq } : {}),
+  }));
+
+/** Replay select plus the wire columns (see `RecoveredOperationRow`). */
+export const RECOVER_ARTIFACT_OPERATION_SELECT = {
+  ...REPLAY_OPERATION_SELECT,
+  clientId: true,
+  vectorClock: true,
+  clientTimestamp: true,
+} as const;
+
+/**
+ * The recovery artifact: a **ops-only** heyta export document.
+ *
+ * 🔴 It deliberately does NOT carry `entities`, and that is the whole point.
+ * The server's replay materialises `DEL` as `delete state[type][id]`, while the
+ * client reducer materialises it as a field-level `deletedAt` tombstone. Any
+ * `entities` this script wrote would therefore be **structurally unable to
+ * contain a tombstone** — the recovered device would show an empty trash, and a
+ * peer still holding the live record would sync it back (exactly the
+ * "resurrect the entity" case `packages/op-log/src/state.ts` warns about).
+ * Importing the op-log instead lets the ONE layer that owns materialisation do
+ * it — see `RestoreDocument` in `packages/app-host/src/export-dump.ts` and the
+ * drill in `tmp/e5-drill.sh` (arms D/E).
+ *
+ * ⚠️ `counts` only carries `totalOps`: it is the one number the op-log can
+ * prove by itself. Record counts written here would be a second, server-flavoured
+ * source of truth for the importer to cross-check against.
+ */
+export const buildRecoverArtifact = (
+  ops: RecoveredOperationRow[],
+  decryptedByIndex: Map<number, unknown>,
+  exportedAt: string,
+): {
+  formatVersion: number;
+  app: { name: string; host: string };
+  exportedAt: string;
+  schemaVersion: number;
+  opLog: unknown[];
+  counts: { totalOps: number };
+} => {
+  const opLog = ops
+    .map((op, i) => ({
+      id: op.id,
+      clientId: op.clientId,
+      opType: op.opType,
+      entityType: op.entityType,
+      ...(op.entityId != null ? { entityId: op.entityId } : {}),
+      ...(op.entityIds.length > 0 ? { entityIds: op.entityIds } : {}),
+      payload: decryptedByIndex.has(i) ? decryptedByIndex.get(i) : op.payload,
+      vectorClock: op.vectorClock,
+      schemaVersion: op.schemaVersion,
+      // BigInt never reaches JSON — the wire timestamp is epoch ms as a number.
+      timestamp: Number(op.clientTimestamp),
+    }))
+    // Deterministic, same key as the client's own exporter sorts by.
+    .sort((a, b) => a.timestamp - b.timestamp || String(a.id).localeCompare(String(b.id)));
+
+  return {
+    // Kept as literals on purpose: `@heyta/app-host` is a **devDependency** of the
+    // server, so importing EXPORT_APP_NAME/EXPORT_FORMAT_VERSION here would break
+    // `docker exec` (production image installs with --omit=dev). Pinned equal to
+    // app-host's constants by server/tests/recover-artifact-envelope.spec.ts.
+    formatVersion: 1,
+    app: { name: 'heyta', host: 'server-recovery' },
+    exportedAt,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    opLog,
+    counts: { totalOps: opLog.length },
+  };
+};
+
 const recover = async (
   userId: number,
   targetSeq: number,
@@ -234,16 +365,13 @@ const recover = async (
   const ops = await prisma.operation.findMany({
     where: { userId, serverSeq: { lte: targetSeq } },
     orderBy: { serverSeq: 'asc' },
-    select: {
-      id: true,
-      serverSeq: true,
-      opType: true,
-      entityType: true,
-      entityId: true,
-      payload: true,
-      schemaVersion: true,
-      isPayloadEncrypted: true,
-    },
+    // 🔴 Shared with the snapshot path on purpose. This script's header promises
+    // "the SAME replay the server's generateSnapshotAtSeq uses" — a hand-copied
+    // column list is exactly where that stopped being true (see buildReplayRows).
+    // The three extra columns are NOT for replay — replay never reads them.
+    // They are what makes the *artifact* a document the client's importer accepts
+    // (clientId / vectorClock / timestamp are shape-checked by `parseExportDocument`).
+    select: RECOVER_ARTIFACT_OPERATION_SELECT,
   });
   if (ops.length === 0) {
     throw new Error('No operations found at or below the target sequence.');
@@ -278,17 +406,7 @@ const recover = async (
   const decryptedByIndex =
     encryptedCount > 0 && key ? await decryptPayloads(ops, key) : new Map();
 
-  const rows: ReplayOperationRow[] = ops.map((op, i) => ({
-    id: op.id,
-    serverSeq: op.serverSeq,
-    opType: op.opType,
-    entityType: op.entityType,
-    entityId: op.entityId,
-    payload: decryptedByIndex.has(i) ? decryptedByIndex.get(i) : op.payload,
-    schemaVersion: op.schemaVersion,
-    // Payloads are plaintext at this point — replay rejects encrypted rows.
-    isPayloadEncrypted: false,
-  }));
+  const rows = buildReplayRows(ops, decryptedByIndex);
 
   const state = replayOpsToState(rows);
 
@@ -314,9 +432,13 @@ const recover = async (
   // 🔴 产物是某个用户的**全量明文**，默认权限（umask 022 ⇒ 0644）会让它对所有本机账户可读
   //   —— 一台跑同步服务的机器上还有别人（CI、其它运维脚本、被拖走的备份）。
   //   `mode` 只在创建时生效，所以已存在的文件要再显式 chmod 一次。
-  writeFileSync(outPath, JSON.stringify(state, null, 2), { encoding: 'utf8', mode: 0o600 });
+  const artifact = buildRecoverArtifact(ops, decryptedByIndex, new Date().toISOString());
+  writeFileSync(outPath, JSON.stringify(artifact, null, 2), { encoding: 'utf8', mode: 0o600 });
   chmodSync(outPath, 0o600);
-  console.log(`\nWrote recovered state to ${outPath}`);
+  console.log(
+    `\nWrote recovery artifact to ${outPath} ` +
+      `(${artifact.counts.totalOps} operations, no entities block — the client ` +
+      `materialises state, including tombstones, on import).`);
   console.log(
     "This file contains the user's COMPLETE plaintext data. Transmit it over a\n" +
       'secure channel and delete every copy once recovery is confirmed.\n' +
@@ -346,9 +468,18 @@ const main = async (): Promise<void> => {
   await recover(userId, args.targetSeq, readKey(args.keyFile), args.out, args.dryRun);
 };
 
-main()
-  .catch((e) => {
-    console.error(`\nERROR: ${(e as Error).message}`);
-    process.exitCode = 1;
-  })
-  .finally(() => disconnectDb());
+// 🔴 Guard, not decoration: `main()` reads argv, hits the database and calls
+// `disconnectDb()` — an operator script that runs itself on `import` cannot be
+// imported. `tests/recover-replay-roundtrip.spec.ts` imports the two pure
+// helpers below, so it would otherwise parse vitest's own argv and disconnect a
+// client it never created. `npm run recover-user` (ts-node) and `node
+// dist/scripts/recover-user.js` are both CJS entry points, where
+// `require.main === module` holds; verified by running `--help` after the change.
+if (require.main === module) {
+  main()
+    .catch((e) => {
+      console.error(`\nERROR: ${(e as Error).message}`);
+      process.exitCode = 1;
+    })
+    .finally(() => disconnectDb());
+}

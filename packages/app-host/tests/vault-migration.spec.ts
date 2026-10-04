@@ -5,12 +5,14 @@ import { join } from 'node:path';
 import {
   createVaultKeyMigrationRemote,
   createVaultMigrationJournal,
+  acknowledgeVaultPayloadMigration,
   migrateVaultPayloads,
   type VaultKeyMigrationRemote,
   type VaultMigrationInventoryOperation,
   type VaultMigrationInventoryPage,
 } from '../src';
 import { createVaultPayloadCipher } from '@heyta/sync-client';
+import { vaultRootKeyFingerprint } from '@heyta/sync-core';
 import type { VaultKeyMigrationManifest, VaultKeyMigrationStageResponse } from '@heyta/shared-schema';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 import { INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
@@ -20,7 +22,9 @@ const newRoot = new Uint8Array(32).fill(9);
 const journal = () => {
   const records = new Map<string, Parameters<NonNullable<import('../src').VaultMigrationJournal['save']>>[0]>();
   return {
-    load: async (_scope: string, requestId: string) => records.get(requestId),
+    load: async (_scope: string, requestId?: string) => requestId === undefined
+      ? [...records.values()][0]
+      : records.get(requestId),
     save: async (record: Parameters<NonNullable<import('../src').VaultMigrationJournal['save']>>[0]) => { records.set(record.requestId, record); },
     clear: async (_scope: string, requestId: string) => { records.delete(requestId); },
   };
@@ -192,18 +196,18 @@ describe('vault payload migration orchestration', () => {
     let loseOneResponse = true;
     let inventoryCalls = 0;
     const remote: VaultKeyMigrationRemote = {
-      async begin() { return stage(); },
+      async begin(manifest) { return stage({ requestId: manifest.requestId }); },
       async uploadChunk(chunk) {
         staged.set(chunk.chunkId, chunk.operations[0]!.payload);
         if (loseOneResponse && chunk.chunkIndex === 1) {
           loseOneResponse = false;
           throw new Error('chunk response lost after durable insert');
         }
-        return stage({ uploadedOperationCount: staged.size });
+        return stage({ requestId: chunk.requestId, uploadedOperationCount: staged.size });
       },
-      async status() { return stage({ state: 'PUBLISHED', uploadedOperationCount: 2, migratedOperationCount: 2 }); },
-      async commit() { return stage({ state: 'PUBLISHED', uploadedOperationCount: 2, migratedOperationCount: 2 }); },
-      async cancel() { return stage({ state: 'CANCELLED' }); },
+      async status(requestId) { return stage({ requestId, state: 'PUBLISHED', uploadedOperationCount: 2, migratedOperationCount: 2 }); },
+      async commit(requestId) { return stage({ requestId, state: 'PUBLISHED', uploadedOperationCount: 2, migratedOperationCount: 2 }); },
+      async cancel(requestId) { return stage({ requestId, state: 'CANCELLED' }); },
     };
     const options = {
       inventory: { getPage: async (cursor?: string) => { inventoryCalls += 1; return inventory.getPage(cursor); } },
@@ -292,5 +296,181 @@ describe('vault payload migration orchestration', () => {
       secondAdapter.close();
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('retains a published journal until the host acknowledges local installation', async () => {
+    const durableJournal = journal();
+    const requestId = 'published-awaiting-install-1';
+    const published = stage({
+      requestId,
+      state: 'PUBLISHED',
+      uploadedOperationCount: 0,
+      migratedOperationCount: 0,
+      expectedOperationCount: 0,
+      expectedPayloadBytes: 0,
+    });
+    const remote: VaultKeyMigrationRemote = {
+      async begin() { return published; },
+      async uploadChunk() { return published; },
+      async status() { return published; },
+      async commit() { return published; },
+      async cancel() { return stage({ requestId, state: 'CANCELLED' }); },
+    };
+    await migrateVaultPayloads({
+      inventory: { getPage: async () => ({ operations: [], latestSeq: 0, retainedFromSeq: 1, complete: true, snapshot: { present: false } }) },
+      remote,
+      package: keyPackage,
+      expectedKeyVersion: 1,
+      currentPayloadKeyVersion: 1,
+      targetPayloadKeyVersion: 2,
+      currentRootKey: oldRoot,
+      targetRootKey: newRoot,
+      requestId,
+      journal: durableJournal,
+      journalScope: 'scope-published',
+      clearJournalOnPublished: false,
+    });
+    await expect(durableJournal.load('scope-published', requestId)).resolves.toBeDefined();
+    await acknowledgeVaultPayloadMigration(durableJournal, 'scope-published', requestId);
+    await expect(durableJournal.load('scope-published', requestId)).resolves.toBeUndefined();
+  });
+
+  it('self-heals a journal left after local saveBound before ack, allowing the next rotation', async () => {
+    const durableJournal = journal();
+    const installedPackage = { ...keyPackage, rootKeyFingerprint: vaultRootKeyFingerprint(newRoot) };
+    const nextRoot = new Uint8Array(32).fill(11);
+    const nextPackage = { ...installedPackage, keyVersion: 3 as const, rootKeyFingerprint: vaultRootKeyFingerprint(nextRoot) };
+    const firstRequestId = 'crash-after-install-1';
+    const emptyInventory = { getPage: async () => ({
+      operations: [], latestSeq: 0, retainedFromSeq: 1, complete: true, snapshot: { present: false },
+    }) };
+    const publishedFor = (manifest: VaultKeyMigrationManifest): VaultKeyMigrationStageResponse => stage({
+      requestId: manifest.requestId,
+      state: 'PUBLISHED',
+      keyVersion: manifest.package.keyVersion,
+      payloadKeyVersion: manifest.targetPayloadKeyVersion,
+      expectedLatestSeq: manifest.expectedLatestSeq,
+      expectedOperationCount: manifest.expectedOperationCount,
+      expectedPayloadBytes: manifest.expectedPayloadBytes,
+      uploadedOperationCount: manifest.expectedOperationCount,
+      uploadedPayloadBytes: manifest.expectedPayloadBytes,
+      migratedOperationCount: manifest.expectedOperationCount,
+      latestSeq: manifest.expectedLatestSeq,
+    });
+    const firstRemote: VaultKeyMigrationRemote = {
+      async begin(manifest) { return publishedFor(manifest); },
+      async uploadChunk() { throw new Error('unexpected chunk'); },
+      async status() { throw new Error('unexpected status'); },
+      async commit() { throw new Error('unexpected commit'); },
+      async cancel() { return stage({ requestId: firstRequestId, state: 'CANCELLED' }); },
+    };
+    await migrateVaultPayloads({
+      inventory: emptyInventory,
+      remote: firstRemote,
+      package: installedPackage,
+      expectedKeyVersion: 1,
+      currentPayloadKeyVersion: 1,
+      targetPayloadKeyVersion: 2,
+      currentRootKey: oldRoot,
+      targetRootKey: newRoot,
+      requestId: firstRequestId,
+      journal: durableJournal,
+      journalScope: 'scope-crash',
+      clearJournalOnPublished: false,
+    });
+    // Model saveBound having installed keyPackage/generation 2, followed by a
+    // process exit before acknowledgeVaultPayloadMigration.
+    await expect(durableJournal.load('scope-crash')).resolves.toBeDefined();
+    let statusRequestId: string | undefined;
+    const secondRemote: VaultKeyMigrationRemote = {
+      async begin(manifest) { return publishedFor(manifest); },
+      async uploadChunk() { throw new Error('unexpected chunk'); },
+      async status(requestId) { statusRequestId = requestId; return publishedFor({
+        requestId: firstRequestId,
+        expectedKeyVersion: 1,
+        expectedLatestSeq: 0,
+        targetPayloadKeyVersion: 2,
+        package: keyPackage,
+        expectedOperationCount: 0,
+        expectedPayloadBytes: 0,
+      }); },
+      async commit() { throw new Error('unexpected commit'); },
+      async cancel() { return stage({ state: 'CANCELLED' }); },
+    };
+    await migrateVaultPayloads({
+      inventory: emptyInventory,
+      remote: secondRemote,
+      package: nextPackage,
+      expectedKeyVersion: 2,
+      currentPayloadKeyVersion: 2,
+      targetPayloadKeyVersion: 3,
+      currentRootKey: newRoot,
+      targetRootKey: nextRoot,
+      journal: durableJournal,
+      journalScope: 'scope-crash',
+      clearJournalOnPublished: false,
+    });
+    expect(statusRequestId).toBe(firstRequestId);
+    await expect(durableJournal.load('scope-crash')).resolves.toBeDefined();
+  });
+
+  it('does not clear an installed journal when status returns another request id', async () => {
+    const durableJournal = journal();
+    const installedPackage = { ...keyPackage, rootKeyFingerprint: vaultRootKeyFingerprint(newRoot) };
+    const nextRoot = new Uint8Array(32).fill(11);
+    const nextPackage = { ...installedPackage, keyVersion: 3 as const, rootKeyFingerprint: vaultRootKeyFingerprint(nextRoot) };
+    const firstRequestId = 'crash-after-install-mismatched-status-1';
+    const scope = 'scope-crash-mismatched-status';
+    const priorManifest: VaultKeyMigrationManifest = {
+      requestId: firstRequestId,
+      expectedKeyVersion: 1,
+      expectedLatestSeq: 0,
+      targetPayloadKeyVersion: 2,
+      package: installedPackage,
+      expectedOperationCount: 0,
+      expectedPayloadBytes: 0,
+    };
+    await durableJournal.save({ scope, requestId: firstRequestId, manifest: priorManifest, chunks: [] });
+
+    let statusRequestId: string | undefined;
+    const remote: VaultKeyMigrationRemote = {
+      async begin() { throw new Error('unexpected next rotation'); },
+      async uploadChunk() { throw new Error('unexpected chunk'); },
+      async status(requestId) {
+        statusRequestId = requestId;
+        return stage({
+          requestId: 'different-published-migration',
+          state: 'PUBLISHED',
+          keyVersion: 2,
+          payloadKeyVersion: 2,
+          expectedLatestSeq: 0,
+          expectedOperationCount: 0,
+          uploadedOperationCount: 0,
+          expectedPayloadBytes: 0,
+          uploadedPayloadBytes: 0,
+          migratedOperationCount: 0,
+          latestSeq: 0,
+        });
+      },
+      async commit() { throw new Error('unexpected commit'); },
+      async cancel() { return stage({ requestId: firstRequestId, state: 'CANCELLED' }); },
+    };
+
+    await expect(migrateVaultPayloads({
+      inventory: { getPage: async () => ({ operations: [], latestSeq: 0, retainedFromSeq: 1, complete: true, snapshot: { present: false } }) },
+      remote,
+      package: nextPackage,
+      expectedKeyVersion: 2,
+      currentPayloadKeyVersion: 2,
+      targetPayloadKeyVersion: 3,
+      currentRootKey: newRoot,
+      targetRootKey: nextRoot,
+      journal: durableJournal,
+      journalScope: scope,
+      clearJournalOnPublished: false,
+    })).rejects.toMatchObject({ code: 'inventory_changed' });
+
+    expect(statusRequestId).toBe(firstRequestId);
+    await expect(durableJournal.load(scope, firstRequestId)).resolves.toBeDefined();
   });
 });

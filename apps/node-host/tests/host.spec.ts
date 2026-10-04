@@ -1,18 +1,21 @@
 /**
  * Node 宿主：真实 SQLite 文件上的读写与持久化。
  *
- * 这里**没有任何 mock**：每个用例都打开一个临时目录里的真实 `.sqlite` 文件。
- * 因此它证明不了同步（那需要真实服务端，见 `scripts/verify-p2-node-host.mjs`），
- * 但能证明本地这一半：写入经 op-log 落盘、重启后从**整个日志**重建。
+ * 本地存储路径**没有 mock**：每个用例都打开一个临时目录里的真实 `.sqlite` 文件。
+ * 远端 Vault HTTP 仅在需要构造失败路径时注入最小 `fetchImpl` fixture；因此它证明不了
+ * 真实同步（那需要真实服务端，见 `scripts/verify-p2-node-host.mjs`），但能证明本地这一半：
+ * 写入经 op-log 落盘、重启后从**整个日志**重建，以及构造失败会关闭生产 SQLite 驱动。
  */
 
 import { mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { openNodeHost, type NodeHost } from '../src/host.js';
+import { createVaultKeyPackage, getArgon2Params, setArgon2ParamsForTesting } from '@heyta/sync-core';
+import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 
 const tempDirs: string[] = [];
 const opened: NodeHost[] = [];
@@ -29,6 +32,56 @@ afterEach(() => {
 });
 
 describe('Node 宿主：真实 SQLite 文件', () => {
+  it.each([
+    ['远端 Vault refresh 失败', async () => new Response('upstream unavailable', { status: 503 })],
+    ['Vault 解锁失败', async () => {
+      const created = await createVaultKeyPackage('right passphrase');
+      return new Response(JSON.stringify({ package: created.package, payloadKeyVersion: 1 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }],
+  ])('%s 时保持本地宿主可打开，并由显式 sync 暴露失败', async (_label, response) => {
+    const previousArgon2 = getArgon2Params();
+    const closeSpy = vi.spyOn(NodeSqliteDriver.prototype, 'close');
+    try {
+      setArgon2ParamsForTesting({ parallelism: 1, memorySize: 8, iterations: 1 });
+      const dbPath = tempDbPath();
+      const fetchMock = vi.fn(async () => response());
+      const fetchImpl = fetchMock as unknown as typeof fetch;
+
+      const host = await openNodeHost({
+        dbPath,
+        serverUrl: 'https://sync.example.test',
+        token: 'test-token',
+        accountId: 'test-account',
+        password: 'wrong passphrase',
+        fetchImpl,
+      });
+      // Opening and reading a local SQLite file is a local-first operation;
+      // Vault refresh/unlock belongs to the explicit sync boundary.
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect((await host.addTask('本地任务')).length).toBeGreaterThan(0);
+      expect(host.listTasks().map((task) => task.title)).toEqual(['本地任务']);
+      expect(await host.pendingUploadCount()).toBe(1);
+      expect((await host.exportDocument()).counts.totalOps).toBeGreaterThan(0);
+      expect(fetchMock).not.toHaveBeenCalled();
+      await expect(host.sync()).rejects.toBeDefined();
+      expect(fetchMock).toHaveBeenCalled();
+      host.close();
+
+      // The caller owns the host and closes it after the failed explicit
+      // operation; reopening is a secondary persistence sanity check.
+      expect(closeSpy).toHaveBeenCalledTimes(1);
+      const reopened = await openNodeHost({ dbPath });
+      opened.push(reopened);
+      expect(reopened.listTasks().map((task) => task.title)).toEqual(['本地任务']);
+    } finally {
+      setArgon2ParamsForTesting(previousArgon2);
+      closeSpy.mockRestore();
+    }
+  });
+
   it('add → 关闭 → 重开新引擎：任务仍在（从整个日志重建，不是内存缓存）', async () => {
     const dbPath = tempDbPath();
 

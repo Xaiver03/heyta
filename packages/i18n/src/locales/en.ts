@@ -61,6 +61,17 @@ export const en = {
   // Without the second one the first reaction is "did I lose my data?", and people
   // respond to that by wiping the local store.
   'common.sync.error.unauthorized': 'This device’s sign-in credential is no longer valid (you may have signed out on another device, or changed your password), so syncing stopped — your local data is intact and still readable; it will continue syncing once you sign in again',
+  // reason === 'account-closed': the account itself was deleted (stable code
+  // ACCOUNT_CLOSED). This sentence and the one above are a pair that MUST stay
+  // apart - each promises the opposite about the local store. Merging them lies
+  // in both directions: reading "wrong password" as "closed" destroys the user's
+  // data, and reading "closed" as "just sign in again" leaves the plaintext here.
+  // Wording boundary (ADR-0048): this states the *rule* - closing an account
+  // erases this device's copy - not the outcome of this particular run. A failed
+  // erasure surfaces through the status' `message` and the console; this sentence
+  // must not promise success on their behalf, and must not claim that backups or
+  // other devices were handled.
+  'common.sync.error.accountClosed': 'This account has been closed and can no longer sign in, so syncing stopped — closing an account erases the local copy on this device. Contact the server operator if this is unexpected.',
   // reason === 'consent-required': no consent yet, so not a single request was sent.
   // Do not fold this into "not configured" or "offline": those tell the user to fill in
   // an address or check the network, while the only useful action here is to decide.
@@ -86,7 +97,7 @@ export const en = {
   // by declining - that is the minimum "fully informed" requires, not a style choice.
   'common.privacy.consent.title': 'Before any network feature runs',
   'common.privacy.consent.intro': 'heyta is local-first: your tasks, lists, notes and history are written to this device first. This choice decides one thing only - whether this device may talk to a server.',
-  'common.privacy.consent.localOnlyGuarantee': 'With "This device only", everything still works: creating, editing, calendar, quadrants, focus timer, habits and export. Nothing is synced, no account is used, and no notifications are delivered.',
+  'common.privacy.consent.localOnlyGuarantee': 'With "This device only", everything still works: creating, editing, calendar, quadrants, focus timer, habits and export. Nothing is synced, no account is used, and no server push notifications are received. Local reminders on mobile remain available after you grant system notification permission.',
   'common.privacy.consent.acceptedGuarantee': 'With "Agree and connect", this device may talk to the server you configured - and it sends only end-to-end encrypted data plus sync cursors, so the server never sees your plaintext.',
   'common.privacy.consent.termsLink': 'Terms of Service',
   'common.privacy.consent.privacyLink': 'Privacy Policy',
@@ -219,7 +230,7 @@ export const en = {
   'landing.privacy.noteProgress': 'Encrypted {done} / {total} characters',
 
   // ── Landing · self-host ───────────────────────────────────
-  'landing.selfhost.title': 'Your own server, one command away',
+  'landing.selfhost.title': 'Your own server, one command to bring up the whole stack',
   'landing.selfhost.lede': 'No account and no subscription. The server only relays ciphertext and orders concurrent changes: replace it, shut it down, or move it to another machine and your data is unaffected.',
   // 🔴 No shell commands, repository paths or database internals in this
   // section -- the criterion and the reason live in
@@ -232,7 +243,7 @@ export const en = {
   'landing.selfhost.step2.body': 'On first launch, pick one: your own server address or the hosted option. You can switch whenever you want.',
   'landing.selfhost.step3.title': 'You set the secrets',
   'landing.selfhost.step3.body': 'There are no default credentials — it is not a zero-thought installer, but every step is documented.',
-  'landing.selfhost.guide.title': 'The full walk-through lives in the repo',
+  'landing.selfhost.guide.title': 'The full walk-through is in the self-hosting guide',
   'landing.selfhost.guide.body': 'Every command, requirement and config file is in the self-hosting guide; follow it once and it comes up.',
   'landing.selfhost.guide.link': 'Open the self-host guide',
 
@@ -399,6 +410,11 @@ export const en = {
   'web.shell.nav.q3': 'Urgent, not important',
   'web.shell.nav.q4': 'Not important, not urgent',
   'web.shell.sidebar.resize': 'Resize the sidebar',
+  // Visible label of the header language group (`LanguageSwitcher.tsx`). It has to be
+  // text on screen, not just an `aria-label` - this exact spot was judged twice for
+  // "the user has no idea what these are". The options themselves stay in their own
+  // language (`中文` / `English`), see the `common.lang.*` note above.
+  'web.shell.lang.label': 'Language',
   'web.shell.views.aria': 'Views',
   'web.shell.views.groupMain': 'Main',
   'web.shell.modules.title': 'Feature modules',
@@ -589,9 +605,9 @@ export const en = {
   // Three-part split around `<strong>`, same as the landing page's
   // ledeLead/ledeStrong/ledeTail: markup boundaries are never guessed from
   // symbols inside a translated string.
-  'web.sync.password.lead': 'The passphrase is ',
+  'web.sync.password.lead': 'This legacy passphrase is ',
   'web.sync.password.strong': 'never',
-  'web.sync.password.tail': ' saved to disk - it lives only in this session. If it is lost, already-synced data can no longer be decrypted, so keep it safe. Sync is refused without it; the server only accepts end-to-end encrypted payloads.',
+  'web.sync.password.tail': ' saved to disk; it lives only in this session. Data protected by an encrypted data key can be unlocked below with its passphrase or saved recovery code. Unmigrated legacy data still needs its original passphrase. Resetting your sign-in password does not decrypt data.',
   'web.sync.vault.title': 'Encrypted data key',
   'web.sync.vault.description': 'This key unlocks your synced data. It is separate from your sign-in password and is never stored in the browser.',
   'web.sync.vault.accountRequired': 'Sign in first to manage this account’s encrypted data key.',
@@ -844,6 +860,33 @@ export const en = {
   'web.passkeys.error.lastPasskey': 'This is the account’s only passkey, and removing it would leave no way to sign in at all, so it cannot be removed. Add a new passkey first - or set a sign-in password on the settings page - then delete this one.',
   'web.passkeys.error.unauthorized': 'Your sign-in has expired — sign in again.',
   'web.passkeys.error.network': 'Could not reach the server. Try again later.',
+  // Account closure (batch E3). Mirror of the zh block above.
+  // 🔴 Every failure sentence states BOTH "the account is still there" and
+  // "nothing on this device was touched": the downstream action is irreversible,
+  // so a user who assumes a 5xx already closed the account will take the next
+  // step (sell the device) while it is still unsafe.
+  'common.accountClosure.title': 'Delete account',
+  'common.accountClosure.lead': 'Deleting this account permanently erases all of its data on the server (sync history and device records). It cannot be undone.',
+  'common.accountClosure.exportHint': 'If you want to keep that data, export a backup first. After deletion the server can no longer read it back.',
+  'common.accountClosure.confirmLocal': 'I understand that data on this device which has not been synced yet, including its local plaintext store, will also be erased.',
+  'common.accountClosure.action': 'Delete this account',
+  'common.accountClosure.busy': 'Deleting…',
+  'common.accountClosure.pending': 'This device still has {count} change(s) that have not been synced. Deleting the account erases them too - the server never had them, and they cannot be recovered afterwards.',
+  'common.accountClosure.cancel': 'Not now',
+  'common.accountClosure.confirmTitle': 'Delete this account?',
+  'common.accountClosure.entryHint': 'Delete the cloud account and erase the data on this device',
+  'common.accountClosure.needLogin': 'This device is not signed in, so there is no account to delete.',
+  'common.accountClosure.done.erased': 'The account has been deleted and the copy on this device has been erased. Backups and your other devices are outside the scope of this action.',
+  'common.accountClosure.done.partial': 'The account has been deleted, but only part of the local data on this device was erased - you will need to handle the rest manually.',
+  'common.accountClosure.done.eraseFailed': 'The account has been deleted, but the local data on this device could not be erased - you will need to handle it manually.',
+  'common.accountClosure.failed.unconfigured': 'No server address is configured, so not a single request was sent - the account is intact and nothing on this device changed.',
+  'common.accountClosure.failed.consentRequired': 'You have not agreed to this device\'s privacy rules yet, so not a single request was sent - the account is intact and nothing on this device changed.',
+  'common.accountClosure.failed.unauthorized': 'Your sign-in session is no longer valid, so nothing was deleted - the account is intact and nothing on this device changed. Sign in again and retry.',
+  'common.accountClosure.failed.rateLimited': 'Too many deletion requests, so this one was refused for now. The account is intact and nothing on this device changed - try again later.',
+  'common.accountClosure.failed.serverError': 'The server did not finish the deletion. The account is intact and nothing on this device changed - try again later.',
+  'common.accountClosure.failed.network': 'The server could not be reached, so nothing was deleted. The account is intact and nothing on this device changed.',
+  'common.accountClosure.failed.malformedResponse': 'The server reply was not something we can recognise, so this is not treated as a deletion. The account may still exist - check, then retry. Nothing on this device changed.',
+  'common.accountClosure.failed.other': 'The deletion did not complete. The account is intact and nothing on this device changed.',
 
   // ── Settings "sign-in password" panel: where the two secrets are separated ──
   //
@@ -1067,8 +1110,8 @@ export const en = {
   'web.habits.freshStartAction': 'Start again today',
   'web.habits.a11y.freshStart': 'Check in "{name}" again today',
   // The third metric: the one that only ever grows (never reset by a break).
-  'web.habits.streak.total': '{count} check-ins',
-  'web.habits.streak.totalOne': '{count} check-in',
+  'web.habits.streak.total': 'Total {count} days',
+  'web.habits.streak.totalOne': 'Total {count} day',
   // Heatmap copy is passed *by us* to react-activity-calendar; its defaults are English-only.
   // `{{count}}` is the library's own placeholder and must survive verbatim.
   // ── M3 knife 7 (habits): copy for the self-drawn heatmap ──
@@ -1508,6 +1551,23 @@ export const en = {
   'web.ai.tools.intentCreate': 'Create task "{title}"',
   'web.ai.tools.intentUpdate': 'Update task {id}',
   'web.ai.tools.intentComplete': 'Mark task {id} as done',
+  'web.ai.tools.intentCompleteBatch': 'Mark {count} tasks as done',
+  'web.ai.tools.intentCreateProject': 'Create list "{name}"',
+  'web.ai.tools.intentCreateHabit': 'Create habit "{name}"',
+  'web.ai.tools.intentCreateTag': 'Create tag "{name}"',
+  'web.ai.tools.intentSetTaskTags': 'Replace the tags of task {id} with {count} tags',
+  'web.ai.tools.intentCreateNote': 'Create note: {content}',
+  'web.ai.tools.intentUpdateNote': 'Replace the text of note {id}: {content}',
+  'web.ai.tools.intentRecordCheckin': 'Record a check-in for habit {habitId} on {date}',
+  'web.ai.tools.todayLabel': 'today',
+  'web.ai.tools.intentLogFocus': 'Log a {kind} session: {planned} min planned',
+  'web.ai.tools.intentLogFocusWithActual': 'Log a {kind} session: {planned} min planned, {actual} min actual',
+  'web.ai.tools.focusKindWork': 'work',
+  'web.ai.tools.focusKindShortBreak': 'short break',
+  'web.ai.tools.focusKindLongBreak': 'long break',
+  'web.ai.tools.intentCreateReminderAt': 'Add a reminder for task {id}: {when}',
+  'web.ai.tools.intentCreateReminderBeforeDue': 'Add a reminder for task {id}: {minutes} min before due',
+  'web.ai.tools.intentCreateReminderIncomplete': 'Add a reminder for task {id}, but no time was given — pick a time or a "minutes before due"',
   // 🔴 W10: every new closed variant of `LocalApiWriteIntent` must grow a sentence here
   // in the same commit - a proposal card must never render "unknown operation",
   // that is asking the user to confirm something they were never shown.
@@ -1702,6 +1762,8 @@ export const en = {
   'web.ai.chat.noTrace': 'No tools were called',
   'web.ai.chat.stoppedLead': 'Stopped at a limit: ',
   'web.ai.chat.disclaimer': 'AI output can be wrong. Check it before you rely on it.',
+  'web.ai.chat.historyLocalOnly': 'This chat is kept on this device only — never synced, never sent anywhere.',
+  'web.ai.chat.expiredProposal': 'This chat was restored from this device. A change you had not confirmed is no longer actionable — ask again to make it.',
   'web.ai.chat.resultAria': 'Assistant reply',
   'web.ai.assistant.failure.emptyText': 'Nothing to send yet.',
   'web.ai.assistant.failure.textTooLong': 'That is too long - the assistant handles short commands.',
@@ -2070,6 +2132,18 @@ export const en = {
   'web.reminder.notify.denied': 'Notifications are blocked by the browser. To re-enable, change it in the site settings.',
   'web.reminder.notify.limit': 'Notifications only fire while heyta is open. They do not fire when the app is closed - background wake-up needs a separate protocol we do not have yet.',
   'web.reminder.notify.body': 'Due: {title}',
+  // ── Long reminder leads (W9 ①, 2026-10-03) ──
+  // 🔴 These four must stay 1:1 with `REMINDER_LONG_OFFSET_PRESETS_MS`; the mapping
+  //    lives in apps/web/src/features/reminders/reminder-tiers.ts
+  //    (its `default` branch throws on purpose).
+  // The 2d / 3d / 1w / 30d in the key names are part of the contract: the label says
+  // "3 days before", so the host must schedule 3 *calendar* days before the due time
+  // (not 72 hours - that drifts an hour across DST, see W9 ③).
+  'web.reminder.offset.groupLabel': 'Earlier (by day)',
+  'web.reminder.offset.2d': '2 days before',
+  'web.reminder.offset.3d': '3 days before',
+  'web.reminder.offset.1w': '1 week before',
+  'web.reminder.offset.30d': '30 days before',
   'web.search.title': 'Search',
   'web.search.placeholder': 'Search task titles, notes and note bodies',
   'web.search.tasksSection': 'Tasks',
@@ -2416,6 +2490,17 @@ export const en = {
   // both states leaves the user guessing what the second press does.
   'common.organizer.archive.button': 'Archive "{name}"',
   'common.organizer.archive.unarchive': 'Unarchive "{name}"',
+  'common.organizer.folder.button': 'Move "{name}" into a folder',
+  'common.organizer.folder.title': 'Move into folder',
+  'common.organizer.folder.none': 'No folder (top level)',
+  'common.organizer.folder.current': '(current location)',
+  'common.organizer.folder.reject.projectNotFound': 'That list is gone (it may have been deleted, or sync has not arrived yet)',
+  'common.organizer.folder.reject.parentNotFound': 'That folder does not exist',
+  'common.organizer.folder.reject.self': 'A list cannot go inside itself',
+  'common.organizer.folder.reject.cycle': 'That would create a loop: a list cannot go inside one of its own sublists',
+  'common.organizer.folder.reject.parentNotTopLevel': 'A folder holds lists — it cannot hold another folder',
+  'common.organizer.folder.reject.hasChildren': 'This list contains other lists, so it cannot go inside a folder',
+  'common.organizer.folder.reject.unknown': 'Could not move it — please try again later',
   'common.organizer.showArchived': 'Show archived',
   'common.organizer.hideArchived': 'Hide archived',
   // Delete confirmation (trash & archive W4b, 2026-10-03) — consumed by the
@@ -2552,6 +2637,34 @@ export const en = {
   'mobile.profile.clearCredentials': 'Clear credentials saved on this device',
   'mobile.vault.title': 'Encrypted data key',
   'mobile.vault.description': 'This key unlocks synced data. It is separate from your sign-in password. The passphrase and recovery code stay on this device.',
+  'web.sync.devices.title': 'Connected devices',
+  'web.sync.devices.description': 'Revoking a device signs every device out, including this one. An offline device is not remotely erased; after signing in again, use a trusted device to rotate the data key and migrate retained ciphertext.',
+  'web.sync.devices.loading': 'Loading devices…',
+  'web.sync.devices.empty': 'No devices are available to manage yet.',
+  'web.sync.devices.lastSeen': 'Last activity: {date}',
+  'web.sync.devices.revoke': 'Revoke device',
+  'web.sync.devices.revoking': 'Revoking…',
+  'web.sync.devices.confirm': 'Revoking signs every device out. Local data on an offline device is not remotely erased. Continue?',
+  'web.sync.devices.revoked': 'Device revoked. Every device must sign in again. After signing in on a trusted device, rotate the data key and migrate retained ciphertext.',
+  'web.sync.devices.revocationUncertain': 'The revoke response was lost. This browser was signed out locally; sign in again and verify the device list before rotating the data key.',
+  'web.sync.devices.unauthorized': 'The session has expired. Sign in again to manage devices.',
+  'web.sync.devices.sessionChanged': 'The account or server changed while you were confirming. No device was revoked.',
+  'web.sync.devices.error': 'The device request failed. Check the network and try again.',
+  'mobile.vault.devicesTitle': 'Connected devices',
+  'mobile.vault.devicesDescription': 'Revoking a device signs every device out, including this one. An offline device is not remotely erased; after signing in again, use a trusted device to rotate the data key and migrate retained ciphertext.',
+  'mobile.vault.devicesLoading': 'Loading devices…',
+  'mobile.vault.devicesEmpty': 'No devices are available to manage yet.',
+  'mobile.vault.devicesLastSeen': 'Last activity: {date}',
+  'mobile.vault.devicesRevoke': 'Revoke device',
+  'mobile.vault.devicesRevoking': 'Revoking…',
+  'mobile.vault.devicesConfirmTitle': 'Revoke device',
+  'mobile.vault.devicesConfirm': 'Revoking signs every device out. Local data on an offline device is not remotely erased. Continue?',
+  'mobile.vault.devicesRevoked': 'Device revoked. Every device must sign in again. After signing in on a trusted device, rotate the data key and migrate retained ciphertext.',
+  'mobile.vault.devicesRevocationUncertain': 'The revoke response was lost. This device was signed out locally; sign in again and verify the device list before rotating the data key.',
+  'mobile.vault.devicesUnauthorized': 'The session has expired. Sign in again to manage devices.',
+  'mobile.vault.devicesSessionChanged': 'The account or server changed while you were confirming. No device was revoked.',
+  'mobile.vault.devicesCleanupFailed': 'The session was signed out, but secure local cleanup needs a retry before this device is trusted again.',
+  'mobile.vault.devicesError': 'The device request failed. Check the network and try again.',
   'mobile.vault.accountRequired': 'Sign in first to manage this account’s encrypted data key.',
   'mobile.vault.createTitle': 'Create the encrypted data key',
   'mobile.vault.passphrase': 'Encryption passphrase',
@@ -2568,6 +2681,7 @@ export const en = {
   'mobile.vault.unlockRecovery': 'Unlock with recovery code',
   'mobile.vault.ready': 'Encrypted data is unlocked on this device.',
   'mobile.vault.recoveryRotationRequired': 'Recovery unlock succeeded. Set a new passphrase and save the new recovery code before encrypted data can be used.',
+  'mobile.vault.legacyMigrationRequired': 'Legacy encrypted data has not been migrated. Use the old encryption passphrase to complete data-key rotation before syncing or writing encrypted data.',
   'mobile.vault.lock': 'Lock data key',
   'mobile.vault.remember': 'Remember unlock on this device',
   'mobile.vault.changeTitle': 'New passphrase and recovery code',
@@ -3019,7 +3133,7 @@ export const en = {
   'site.integrations.e2ee.title': 'End-to-end encrypted sync',
   'site.integrations.e2ee.body': 'Tasks are encrypted on your device before they ever upload; the server only ever handles ciphertext. There is **no readable copy** of your tasks on the server — anyone who takes it holds nothing but noise.',
   'site.integrations.e2ee.item.ingress': 'The server accepts ciphertext only — plaintext is refused outright. Not a setting, a hard rule',
-  'site.integrations.e2ee.item.keys': 'Keys stay with you. Forget the passphrase and even we cannot help — that is what real encryption means',
+  'site.integrations.e2ee.item.keys': 'Decryption keys stay on your devices. After setting up a data key, you can unlock with its saved recovery code; if both passphrase and recovery code are lost, the server cannot decrypt for you',
   'site.integrations.selfhost.title': 'Self-host it, free forever',
   'site.integrations.selfhost.body': 'The sync server runs entirely on your own machine: one docker compose file brings up the whole stack, and data lands on your own disk. No fees, and no permission needed from us.',
   'site.integrations.selfhost.item.compose': 'One command brings up the whole stack; data lands on your own disk',
@@ -3070,9 +3184,9 @@ export const en = {
   'site.help.q.sync': 'I have a new device — how does my data get there?',
   'site.help.a.sync': 'Enter the sync server address and an access token in settings. Data is uploaded encrypted, so **the passphrase must match** — data encrypted under a different passphrase cannot be decrypted. That is the cost of end-to-end encryption, not a bug.',
   'site.help.q.passphrase': 'I forgot my encryption passphrase. What now?',
-  'site.help.a.passphrase': '**There is no recovery, and that is by design, not an oversight.** End-to-end encryption means the server holds only ciphertext and has no passphrase that unlocks it — any "recovery" would mean the server could read your data. What you can do: export your data from an old device that can still unlock, then start fresh with a new passphrase on the new one. So keep the passphrase safe.',
+  'site.help.a.passphrase': 'If you have set up an encrypted data key and saved its recovery code, **unlock with that code** in sync settings, then set a new passphrase and save the new recovery code. Resetting your sign-in password does not unlock data. If both the passphrase and recovery code are lost, the server cannot recover them; export from an old device that can still read your data. Unmigrated legacy ciphertext still needs its original passphrase.',
   'site.help.q.passkey': 'How do passkeys work?',
-  'site.help.a.passkey': 'Choose "passkey" when signing in and confirm with your device\'s face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the sign-in page offers "Lost your passkey?", which emails a recovery link where you register a new one. ⚠️ **The last remaining credential cannot be deleted** — delete it and you are locked out.',
+  'site.help.a.passkey': 'Choose "passkey" when signing in and confirm with your device\'s face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the app\'s sign-in panel offers "Lost your passkey?", which emails a recovery link where you register a new one. ⚠️ **The last remaining credential cannot be deleted** — delete it and you are locked out.',
   'site.help.q.quadrant': 'How are the four quadrants classified?',
   'site.help.a.quadrant': 'Quadrants are **computed on the spot**, not labels you attach to a task: "urgent" depends on whether the due date falls inside the near-term window, and "important" comes from the flag you set yourself (falling back to priority when you never set it). Change the due date or priority and the task changes cell — so the quadrants can never disagree with your tasks.',
   'site.help.q.repeat': 'How do I set up a repeating task?',
@@ -3082,7 +3196,7 @@ export const en = {
   'site.help.q.export': 'How do I take my data with me?',
   'site.help.a.export': 'All three ends can **export**: on the web under Settings, on mobile under "Mine" via the system share sheet, and `export` on the command line. But **only the web and the CLI can import it back**, and only into an empty library — mobile has no import entry point. See "Taking your data with you".',
   'site.help.q.selfhost': 'How do I run my own server?',
-  'site.help.a.selfhost': 'You can, but this is "operate a service yourself", not one command and you are done: **no prebuilt image is published** (you build it), **bringing the service up is not a deployment** (the table-structure changes have to be applied explicitly, once). Registration and sign-in run on **email + password**; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with `REQUIRE_EMAIL_VERIFICATION=false`. See "Running your own sync server".',
+  'site.help.a.selfhost': 'You can, but this is "operate a service yourself": **no prebuilt image is published** (you build it), and **upgrading is not one command** — the one-shot migration service exits after it runs and compose does not restart an exited service, so after a table-structure change you re-run the command that names `supersync-migrate`. Registration and sign-in run on **email + password**; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with `REQUIRE_EMAIL_VERIFICATION=false`. See "Running your own sync server".',
   'site.help.q.privacy': 'Where does my data actually live?',
   'site.help.a.privacy': 'On your own device first; once sync is on, the cloud holds ciphertext only — the server rejects plaintext outright. **Metadata is not encrypted**, though — sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise "we can see nothing".',
 
@@ -3149,37 +3263,39 @@ export const en = {
   // Accounts, tokens, and how you sign in
   'site.docs.account.title': 'Accounts, tokens, and how you sign in',
   'site.docs.account.seo.title': 'Accounts, tokens, and how you sign in — heyta',
-  'site.docs.account.sum': 'heyta has no password to remember and none to credential-stuff — so where does the access token that syncing needs come from?',
-  'site.docs.account.s1': 'Three boxes, that is all',
-  'site.docs.account.s1p1': 'The sync settings have exactly three fields: server address, access token, end-to-end encryption passphrase.',
+  'site.docs.account.sum': 'Registration and sign-in run on email plus password, and the passkey and the emailed link both stayed — so where does the access token that syncing needs come from?',
+  'site.docs.account.s1': 'Sync settings and data unlock',
+  'site.docs.account.s1p1': 'Sync settings contain the server connection and separate encrypted data key controls. After signing in, you can create a key, save its recovery code, or unlock existing data.',
   'site.docs.account.s1i1': 'Server address: the sync server you want to connect to. Leave everything empty and you are using heyta purely locally — the data stays on this device.',
   'site.docs.account.s1i2': 'Access token: issued by the server, it stands for "this account\'s space on that server". If you already have one, paste it straight in.',
-  'site.docs.account.s1i3': 'Encryption passphrase: **never stored on disk**, it exists only in this session\'s memory. It gets its own article — see "The encryption passphrase".',
+  'site.docs.account.s1i3': 'Encryption passphrase: never sent to the server, and separate from your sign-in password. See “The encryption passphrase” for recovery codes and remembering unlock on a device.',
   'site.docs.account.s2': 'Three ways in, with email plus password as the main one',
   'site.docs.account.s2p1': 'Registration and sign-in run on **email plus password**; the emailed link and the passkey both stayed. What the server holds for your password is not something it can read back or hand to anyone — if you forget it, "Forgot your password" mails a one-time reset link, which is a real reset rather than a way around the password.',
   'site.docs.account.s2i1': 'Email plus password: give your address, set a password (at least 8 characters), click the link in the verification mail to activate, then sign in with that password.',
   'site.docs.account.s2i2': 'Emailed link (when you would rather not remember anything): enter your address, open the mail, click the link — signed in.',
-  'site.docs.account.s2i3': 'Passkey: confirm with the device itself — face, fingerprint, or system PIN. Nothing to remember, so nothing to leak. Lost it? The sign-in page offers "Lost your passkey?" and mails a recovery link; that step has to call the platform authenticator in a real browser, so it opens a standalone page rather than an in-app sheet.',
+  'site.docs.account.s2i3': 'Passkey: confirm with the device itself — face, fingerprint, or system PIN. Nothing to remember, so nothing to leak. Lost it? The app\'s sign-in panel offers "Lost your passkey?" and mails a recovery link; that step has to call the platform authenticator in a real browser, so it opens a standalone page rather than an in-app sheet.',
   'site.docs.account.s3': 'Why the desktop shells hand off to your browser',
   'site.docs.account.s3p1': 'Passkeys do not work inside the macOS and Windows shells (measured: the embedded WebView exposes no platform authenticator). So the shell sends you to your **system browser** to sign in and takes the result back automatically; if the operating system never hands the address back, that page also shows a link you can click yourself.',
   'site.docs.account.s4': 'The terms belong to "that server"',
   'site.docs.account.s4p1': 'The checkbox at registration reads "the terms of service and privacy policy **offered by this server**". Because anyone can deploy heyta — who runs the server you connect to, and which terms apply, is that server\'s decision.',
+  'site.docs.account.s5': 'Why signing in happens in the app, not on the website',
+  'site.docs.account.s5p1': 'The server address used for signing in is **the same one** as in your sync settings — the two have to match, or you get "signed in against server A while the token was stored for B", which is brutally hard to trace. So the sign-in page on this site does one thing: it carries you into the app\'s sign-in panel instead of duplicating a form. A passkey has one more constraint — it must be bound to one specific domain, and that step can only happen in a real browser.',
 
   // The encryption passphrase
   'site.docs.passphrase.title': 'The encryption passphrase',
   'site.docs.passphrase.seo.title': 'The encryption passphrase — heyta',
-  'site.docs.passphrase.sum': 'It is the only key in the whole design, and losing it genuinely cannot be undone — that is the definition of end-to-end encryption, not something we failed to build.',
+  'site.docs.passphrase.sum': 'The encryption passphrase is separate from your sign-in password. After setting up a data key, keep its recovery code so you can unlock if you forget the passphrase.',
   'site.docs.passphrase.s1': 'What the passphrase is',
-  'site.docs.passphrase.s1p1': 'The passphrase encrypts your data on your device before it is uploaded. It is **never sent to the server**, and the server holds no copy of it.',
-  'site.docs.passphrase.s1p2': 'It is never written to disk either: it lives only in the current session\'s memory, so every new session asks for it again. That is not friction — not persisting it is what makes the encryption end-to-end.',
-  'site.docs.passphrase.s2': 'Why there is no "forgot password"',
-  'site.docs.passphrase.s2p1': 'Any mechanism that could "recover" the passphrase means somewhere there is a credential able to decrypt everything you have, and that credential would live on the server or with a third party — which is the end of end-to-end encryption. So there is no support channel and no back-end switch. **Lose the passphrase and the synced data cannot be decrypted.**',
-  'site.docs.passphrase.s2i1': 'On an old device that can still unlock: export your data first.',
-  'site.docs.passphrase.s2i2': 'Then set a new passphrase on the new device and start writing again.',
-  'site.docs.passphrase.s2i3': 'Keep the passphrase in your own password manager — that is where it belongs.',
+  'site.docs.passphrase.s1p1': 'The passphrase unlocks your data key on your device, and data is encrypted before upload. The passphrase, recovery code and unlocked key are **never sent to the server**; it stores only encrypted key packages and data.',
+  'site.docs.passphrase.s1p2': 'Reopening the browser requires another unlock. On mobile, you can opt in to remembering unlock, which stores the data key in OS secure storage; this is off by default and does not save the passphrase. Locking the data key stops use of the sync key; it does not encrypt or hide existing local data.',
+  'site.docs.passphrase.s2': 'Recovering when you forget the passphrase',
+  'site.docs.passphrase.s2p1': 'Setting up a data key displays a recovery code once and asks you to enter it again to confirm. If you saved it, choose “Unlock with recovery code” in sync settings. After recovery, you must set a new passphrase and save a new recovery code before using encrypted data. Neither the server nor support can retrieve either secret, and resetting your sign-in password cannot replace this step.',
+  'site.docs.passphrase.s2i1': 'Keep the recovery code in your own password manager or an offline record, not only on the device you might lose.',
+  'site.docs.passphrase.s2i2': 'If both the passphrase and recovery code are lost, first export from an old device that can still read the data; the server has no decryption copy.',
+  'site.docs.passphrase.s2i3': 'Creating a recovery code does not automatically migrate legacy ciphertext. Existing legacy data must be migrated using its original encryption passphrase before the new data key protects it.',
   'site.docs.passphrase.s3': 'What happens if it is wrong',
-  'site.docs.passphrase.s3p1': 'Records written under a different passphrase cannot be decrypted. heyta neither falls over nor substitutes plaintext: it **skips** what it cannot open, or **pauses syncing** when this is plainly a misconfiguration, and tells you which of the two it is.',
-  'site.docs.passphrase.s3w1': 'A "the passphrase may be wrong" message is the second case — it is not a network problem, and reconnecting will not fix it.',
+  'site.docs.passphrase.s3p1': 'An incorrect passphrase or recovery code fails to unlock and does not overwrite data. Changing the passphrase updates protection of the key; rotating the data key and migrating data re-encrypts synced history and requires migration to finish and a new recovery code to be confirmed. If migration is interrupted, resume or cancel through the interface rather than creating another key to replace it.',
+  'site.docs.passphrase.s3w1': 'If the passphrase is reported as incorrect, check the current account, server and encryption passphrase. Reconnecting the network cannot fix an unlock failure.',
 
   // Conflicts
   'site.docs.conflict.title': 'When two devices change the same thing',
@@ -3195,13 +3311,13 @@ export const en = {
   // Self-hosting
   'site.docs.selfhost.title': 'Running your own sync server',
   'site.docs.selfhost.seo.title': 'Running your own sync server — heyta',
-  'site.docs.selfhost.sum': 'You can, and it is one of the reasons heyta exists — but it means operating a service yourself, not one command and you are done.',
+  'site.docs.selfhost.sum': 'You can, and it is one of the reasons heyta exists — but it means operating a service yourself: bringing it up is the easy part; everything after that is your operations (backup and restore, upgrades, TLS, and nobody reading your logs when it breaks).',
   'site.docs.selfhost.s1': 'The difficulty, up front',
   'site.docs.selfhost.s1p1': 'These four are what make people quit halfway, so they go first:',
   'site.docs.selfhost.s1i1': '**No prebuilt image is published** — you build it on your own machine.',
-  'site.docs.selfhost.s1i2': 'Bringing the service **up** is not a deployment: schema changes are applied explicitly by the migration step in the deploy flow — the service itself never touches the schema at startup.',
+  'site.docs.selfhost.s1i2': 'Bringing the service **up** is not the end of it: on first boot the one-shot migration service creates the schema for you, with no manual step — but `docker compose` never re-runs a service that has already exited, so **after a schema change, upgrading means naming that step again** (see "The database and schema changes" below).',
   'site.docs.selfhost.s1i3': 'What it takes is a machine that stays on, a domain of your own, and the basic operational habits — reading service logs, letting certificates renew on time.',
-  'site.docs.selfhost.s1i4': 'The key, the database password and the public hostname are yours to set — **there are no defaults**. Missing any one of them, the service **refuses to boot**; that is deliberate, so nobody can ship on a default secret.',
+  'site.docs.selfhost.s1i4': 'Three settings have **no defaults** and are yours to generate: without `JWT_SECRET` or `PASSWORD_PEPPER` (or with either shorter than 32 characters) the service **refuses to boot**; without `POSTGRES_PASSWORD` the database container exits immediately. That is deliberate, so nobody can ship on a default secret. The public hostname is a different kind of knob and fails in a different way: `DOMAIN` is only the gateway site address (the sync service never reads it, and left empty it is the gateway that fails to start), while `PUBLIC_URL` defaults to `http://localhost:1900` — leaving it alone raises no error, it quietly points the links in emails at localhost.',
   'site.docs.selfhost.s2': 'What has to be configured',
   'site.docs.selfhost.s2i1': 'SMTP: it covers the **account activation** step (the verification email) and nothing else. Registration and sign-in run on **email + password**, so an account can still be created without SMTP — the link simply never arrives, and the app says that out loud instead of pretending it did: configure SMTP and submit again, or set `REQUIRE_EMAIL_VERIFICATION=false` to skip the step.',
   'site.docs.selfhost.s2i2': 'Public address: in production, a non-https public URL makes the service refuse to start. Plaintext HTTP is a legitimate self-hosting choice on a LAN, not on the public internet.',
@@ -3223,14 +3339,14 @@ export const en = {
   'site.docs.selfhost.s6p2': 'So debug in reverse: look at the browser console for a cross-origin error before you look at the server. A quiet log does not mean a healthy service — it can mean nobody asked it anything.',
   'site.docs.selfhost.s6i1': 'Which origins get through is the server setting `CORS_ORIGINS`, a comma-separated list; in production a wildcard there makes the service refuse to start.',
   'site.docs.selfhost.s7': 'How to install: no ready-made images, two routes to pick from',
-  'site.docs.selfhost.s7p1': 'Upstream publishes no versioned images — only `latest` and `master-<commit>` tags that follow the main branch. To pin a version, point `SUPERSYNC_IMAGE` at a specific `master-<commit>`; without pinning, every pull is an upgrade to the latest main branch.',
-  'site.docs.selfhost.s7p2': 'The deploy script is the only supported entry point: it brings up the whole stack (app, PostgreSQL database, Caddy gateway), runs the database migration **before** swapping in the new container, and checks the health endpoint afterwards. Note that `docker compose up` by itself is **not** a deployment: automatic migrations at container startup are off by default (so a restart cannot race the migrator) — a stack started that way runs against an unmigrated schema.',
+  'site.docs.selfhost.s7p1': 'No heyta images are published today, so there is no version number to pin here. Do **not** point `SUPERSYNC_IMAGE` at upstream `master-<commit>` tags: those images belong to a different project, whose table layout and encryption requirements have already diverged from heyta. Doing so leaves you with a server that **starts fine and passes its health check while running an unfamiliar schema**. To pin a version, build from this repository and pass that source revision into the build as its version label.',
+  'site.docs.selfhost.s7p2': 'Both entries are supported, and the difference shows up when you upgrade. `./scripts/deploy.sh --build` brings up the whole stack (app, PostgreSQL database, Caddy gateway), applies the database migration **while the old containers are still serving**, **refuses to swap in** the new container if that fails, and checks the health endpoint afterwards. The other one is a single command that brings the whole stack up: `docker compose -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml up -d --build`. Neither the build override nor the one-shot migration override can be left out, and neither can `--build` — without `docker-compose.build.yml` compose goes after an image that does not exist, while without `--build` nothing gets built, and both shortcuts end at the same failure to start. And it migrates **only on the first boot**: to upgrade, either use the deploy script or explicitly re-run that one-shot migration service. Note that a bare `docker compose up` is **not** a deployment: automatic migrations at container startup are off by default (so a restart cannot race the migrator) — a stack started that way runs against an unmigrated schema.',
   'site.docs.selfhost.s7p3': 'With `--build` the image is compiled right on the deploy host — a full build of the whole repository: expect a peak of 1.5 GB of extra RAM (the containers already reserve about 2.5 GB), and a build cache that grows by roughly 1.4 GB per build and is **never pruned for you**. On a small machine, build elsewhere and push the image, or pin a ready-made tag. `--build` also refuses to build from dirty sources — a build artifact must trace back to one exact source tree.',
-  'site.docs.selfhost.s7i1': 'The three required settings (signing secret, database password, public domain) leave no room for defaults: with any one missing, the service **refuses to start**. There is deliberately no "launch with a default secret" path.',
+  'site.docs.selfhost.s7i1': 'The three required settings (`JWT_SECRET`, `PASSWORD_PEPPER`, `POSTGRES_PASSWORD`) leave no room for defaults: the first two are enforced by the service itself, which **refuses to start**, the third by the database container, which exits immediately. There is deliberately no "launch with a default secret" path. The public hostname is not on that list and fails in a different way: `DOMAIN` is only the gateway site address (the sync service never reads it, and left empty it is the gateway that fails to start), while `PUBLIC_URL` defaults to `http://localhost:1900` — leaving it alone raises no error, it quietly points the links in emails at localhost.',
   'site.docs.selfhost.s7i2': 'The deploy script cross-checks the image\'s source-revision label so an old image cannot run new migrations. Custom images must pass the same revision; there is an explicit switch to skip the check, and it exists for deliberate overrides — not for oversights.',
   'site.docs.selfhost.s8': 'The environment variables, one by one',
   'site.docs.selfhost.s8p1': 'All configuration lives in one `.env` file in the deploy directory (copy it from the repository\'s env.example and edit). Changes take effect on container restart. Each one below is explained by what goes wrong when it is wrong:',
-  'site.docs.selfhost.s8i1': '`DOMAIN` / `PUBLIC_URL`: the public domain and full public address. The links in emails are generated from it — a wrong value shows up as "the link in the email does not open".',
+  'site.docs.selfhost.s8i1': '`DOMAIN` / `PUBLIC_URL`: the first is **only the Caddy site address** (the server itself never reads it), while the second is **where the links inside emails come from**. A wrong `PUBLIC_URL` shows up as "the link in the email does not open"; leaving it at the default (`http://localhost:1900`) raises **no error at all** — the server starts, the mail goes out, and the link points at your laptop.',
   'site.docs.selfhost.s8i2': '`JWT_SECRET`: the signing secret for login tokens. Empty means the service refuses to start; once set at first deployment, **do not change it** — rotating it signs out every logged-in device immediately and voids any email link already in flight.',
   'site.docs.selfhost.s8i3': '`POSTGRES_PASSWORD`: the database password, also with no default. When you use the bundled database there is no separate connection string to set — the default points at the stack\'s own PostgreSQL 16.',
   'site.docs.selfhost.s8i4': '`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN`: the domain passkeys are bound to. It holds exactly **one** value, so changing the domain invalidates every passkey registered on this server (accounts survive; sign in with an email link and register a new passkey). It must be a real domain — browsers reject bare IP addresses.',
@@ -3239,12 +3355,12 @@ export const en = {
   'site.docs.selfhost.s8i7': '`HOST`: the address the service itself listens on, all interfaces by default. Behind a gateway you can tighten it to the local machine.',
   'site.docs.selfhost.s9': 'The database and schema changes',
   'site.docs.selfhost.s9p1': 'The database is PostgreSQL. Schema changes are **forward-only**: an applied migration file is never edited — a fix ships as a new migration. So when an upgrade goes wrong, the way back is your backup, not rewriting history.',
-  'site.docs.selfhost.s9p2': 'Migrations run once per deployment, before the container is swapped. Some changes build indexes in the background and may wait on locks on a busy large database — upgrade off-peak and give the migration a generous timeout (15 minutes by default, adjustable). A timeout has its own exit code; clear the blocking transaction and re-run.',
+  'site.docs.selfhost.s9p2': 'The two paths differ in timing. With `./scripts/deploy.sh` the deploy script runs migrations once before swapping containers; with `docker compose` the one-shot migration service (named `supersync-migrate`) runs them on first boot and then exits — and compose never re-runs an exited service, **so after a schema change, upgrading means naming that step once more**. Some changes build indexes in the background and may wait on locks on a busy large database — upgrade off-peak and give the migration a generous timeout (15 minutes by default, adjustable). A timeout has its own exit code; clear the blocking transaction and re-run.',
   'site.docs.selfhost.s9p3': 'The minimal backup discipline: back the database up regularly. A backup holds ciphertext payloads plus surrounding metadata — it is everything you need to restore the service, and not a photo album you can flip through (see "your backup is ciphertext" below).',
   'site.docs.selfhost.s10': 'What your server actually stores',
-  'site.docs.selfhost.s10p1': 'Every change is one **encrypted operation record**: the client derives a key from the user\'s passphrase (Argon2id) and encrypts the payload with AES-GCM before upload. The server **rejects plaintext outright**, so the database contains no "forgot to encrypt" plaintext payloads.',
+  'site.docs.selfhost.s10p1': 'Each change is an **encrypted operation record**. After setting up a data key, the passphrase or recovery code unlocks that key on the device; operation payloads are encrypted before upload. Unmigrated legacy records still use their original encryption passphrase. The server stores ciphertext and cannot decrypt its contents.',
   'site.docs.selfhost.s10p2': 'The surrounding metadata is plaintext: action types, entity types and ids, timestamps, the ordering of devices\' versions, ciphertext sizes. A sync protocol cannot work without these — and one of the points of self-hosting is precisely that they end up in **your** hands, not a third party\'s.',
-  'site.docs.selfhost.s10p3': 'Corollary: the only things that can decrypt the data are the devices holding each account\'s encryption passphrase. The server cannot help a user who forgot the passphrase — the other side of "your backup is ciphertext".',
+  'site.docs.selfhost.s10p3': 'Recovering synced data requires a device-held decryption key or the passphrase or recovery code that unlocks it. A sign-in password reset and a server backup cannot replace those credentials. If both are lost, first export from an old device that can still read your data. Unmigrated legacy ciphertext still needs its original passphrase.',
   'site.docs.selfhost.s11': 'The command-line host: using heyta without a browser',
   'site.docs.selfhost.s11p1': 'Besides the web and mobile, the repository ships a **command-line host**: it opens a real local database file and creates, lists and syncs tasks from a terminal. It speaks exactly the same sync protocol as every other end — pointed at the same server, it is just one more "device".',
   'site.docs.selfhost.s11i1': 'Configuration comes from flags or environment variables: `--db` the local database file (required), `--server` the sync server, `--token` the access token, `--password` the end-to-end encryption passphrase; uppercase environment variables (`HEYTA_DB` / `HEYTA_SERVER_URL` / `HEYTA_TOKEN` / `HEYTA_PASSWORD`) work too.',
@@ -3390,9 +3506,9 @@ export const en = {
   'site.docs.reminders.s2p2': '⚠️ Close the page and nothing fires: the trigger times were computed locally in advance, but **nobody is reading them**. That limit is written into the code comments as a known boundary, not a temporary state.',
   'site.docs.reminders.s2p3': 'Mobile: Android and iOS use their system local notification centers. Delivery still depends on platform permission and OS scheduling; a missing permission or uncertain receipt keeps the reminder due instead of inventing a sent fact.',
   'site.docs.reminders.s2p4': 'Time has bounds: a trigger may sit at most **one year** out; snoozing defaults to **10 minutes** and caps at **7 days**, and past the cap it is **clamped to the cap with the real value shown** instead of letting your click fail. Landing slightly before now is allowed — a one-minute window, because milliseconds pass between computing the moment and writing it down.',
-  'site.docs.reminders.s2i1': 'Three conditions to hear anything: the time arrived, the app is open, you already granted permission — miss one and it stays quiet.',
+  'site.docs.reminders.s2i1': 'Web needs the page open and notification permission granted. Android/iOS reminders already scheduled with the OS can be delivered after the app process exits, subject to permission, OS scheduling and device state.',
   'site.docs.reminders.s2i2': 'Muting and snoozing are different roads: the first stops that one reminder from popping, the second moves its trigger time wholesale.',
-  'site.docs.reminders.s2i3': 'The only way to get background delivery today is to build a server-side push channel of your own — this version has none, and does not pretend to.',
+  'site.docs.reminders.s2i3': 'Mobile local notifications do not need server push. After an Android force-stop, reopen the app for catch-up. iOS schedules the earliest 64 reminders and fills the queue on launch or return to the foreground. Offline devices may each notify; there is no global once-only delivery guarantee.',
   'site.docs.reminders.s3': 'Reminders on repeating tasks move with it',
   'site.docs.reminders.s3p1': 'Ticking a repeating task re-queues the reminders **computed from an offset** onto the next occurrence; a reminder pinned to an absolute moment stays where it was.',
   'site.docs.reminders.s3p2': 'So "daily 9am, 10 minutes before" advances by itself, while "March 5 at 14:00" does not — it has no idea which task occurrence it hangs off.',
@@ -3458,21 +3574,21 @@ export const en = {
   'site.docs.loss.seo.title': 'Losing a device, a passkey, or the passphrase — heyta',
   'site.docs.loss.sum': 'A device, a passkey, the end-to-end encryption passphrase — the three have completely different consequences, and knowing in advance is cheaper than finding out after.',
   'site.docs.loss.s1': 'One: a device',
-  'site.docs.loss.s1p1': 'Sign in on a new device and the data is **replayed** back from the server — that is exactly what syncing is for. "Local-first" never meant "only on this one machine".',
+  'site.docs.loss.s1p1': 'Sign in on a new device, then unlock with your encryption passphrase or saved recovery code to **replay** synced data from the server. Signing in alone does not provide decryption, and data never uploaded is not on the server.',
   'site.docs.loss.s1p2': 'But a device that never had sync on holds its data only in that machine\'s local database. If it is gone, it is gone — there is no server-side backup anywhere on that route.',
   'site.docs.loss.s2': 'Two: a passkey (recoverable)',
   'site.docs.loss.s2p1': 'Tapping "Lost your passkey?" inside the app sends a recovery email; the page it links to is rendered by the server, and from there you can register a new passkey.',
   'site.docs.loss.s2p2': 'The condition is **that you can still receive mail at the address**. Proving the mailbox is yours is enough — the old credential does not have to still be present.',
-  'site.docs.loss.s2p3': 'One more thing you can do: in Settings, list **your own** passkeys and rename or delete them. That is the only credential management entry there is.',
-  'site.docs.loss.s2w1': '⚠️ There is **no** "sign out of every device" button in the interface and no "revoke all sessions" action. To pull access back from an old device, delete each key you do not recognise one at a time — while you can still sign in.',
-  'site.docs.loss.s3': 'Three: the end-to-end passphrase (not recoverable)',
-  'site.docs.loss.s3p1': 'That passphrase is the key used to encrypt and decrypt outside the server. It is **not stored on the server**, so the server has no ability to "reset it for you" — not unwillingness: building that would mean the encryption does not exist.',
-  'site.docs.loss.s3p2': 'Forgetting it is not losing sign-in: you may still get in, still see the plaintext fields, but the encrypted content stays undecryptable and the interface will tell you honestly that it cannot open it.',
-  'site.docs.loss.s3p3': 'The only self-rescue is **export**: take a complete JSON while you can still decrypt. Restore only works into an empty library, so this is a server-migration and disaster tool, not an everyday "backup" button.',
+  'site.docs.loss.s2p3': 'You can manage your passkeys in Settings, renaming or deleting credentials you no longer use. Deleting a passkey is different from revoking an already issued sign-in session.',
+  'site.docs.loss.s2w1': 'A lost device may still hold local plaintext and old keys. Revoking sign-in access cannot erase offline copies; protecting subsequent sync also requires a trusted device to rotate the data key and migrate data.',
+  'site.docs.loss.s3': 'Three: lost the passphrase? Find your recovery code',
+  'site.docs.loss.s3p1': 'The encryption passphrase is never given to the server. If you set up a data key and saved its recovery code, use that code to unlock on your device, then set a new passphrase and recovery code.',
+  'site.docs.loss.s3p2': 'Forgetting the encryption passphrase does not mean losing sign-in access; conversely, resetting your sign-in password does not restore decryption. If both the passphrase and recovery code are lost, the server cannot decrypt synced data for you.',
+  'site.docs.loss.s3p3': 'An old device that can still read the data can **export a complete JSON** for recovery through the import flow. Unmigrated legacy ciphertext needs its original passphrase; creating a recovery code cannot bypass decryption of old data.',
   'site.docs.loss.s4': 'So the sensible order is this',
-  'site.docs.loss.s4p1': 'Write the passphrase somewhere you will **not lose along with it**. Keeping it in a note on the same device is hanging the key on the doorknob.',
+  'site.docs.loss.s4p1': 'Keep the passphrase and recovery code somewhere you will not lose with the device, such as your own password manager or an offline record.',
   'site.docs.loss.s4p2': 'Before turning sync on, confirm you can sign in and the mailbox still receives. After it is on, export now and then — and actually verify once that it restores. An unverified backup is not a backup.',
-  'site.docs.loss.s4p3': 'None of this is scare copy: the benefit of end-to-end encryption (the server cannot see your content) and its cost (nobody can recover your password for you) are two sides of one decision. Want one side, manage the other.',
+  'site.docs.loss.s4p3': 'You hold the recovery code yourself. It provides another on-device unlock path without giving the server decryption capability. If neither secret is available, recovery still depends on a readable local copy or a previous export.',
 
   // ── Changelog ──
   'site.changelog.seo.title': 'What\'s new — heyta',
@@ -3496,21 +3612,24 @@ export const en = {
   'site.changelog.note': 'Older updates are archived.',
 
   // ── Sign in ──
+  //   🔴 This page is a **doorway**, not an explainer for a login form (D5).
+  //   It used to say "there are exactly two ways in, and there is no password"
+  //   plus three paragraphs of justification — while the product's main path is
+  //   **email plus password** (`site.docs.account.s2`, and the password API the
+  //   app actually calls). That is a false outward statement, not a tone issue,
+  //   so the whole block was removed on 2026-10-03: the explanation moved into
+  //   the docs centre ("Accounts, tokens, and how you sign in", s5) and the page
+  //   keeps only the things you can actually click.
   'site.signin.seo.title': 'Sign in — heyta',
-  'site.signin.seo.description': 'Sign in to heyta with a passkey or an emailed sign-in link.',
+  'site.signin.seo.description': 'Sign in to heyta with email plus password, a passkey, or an emailed link — all of them inside the app.',
   'site.signin.title': 'Sign in',
-  'site.signin.lede': 'There are exactly two ways in, and there is no password.',
-  'site.signin.method.passkey.title': 'Passkey (recommended)',
-  'site.signin.method.passkey.body': 'Sign in with the device itself — face, fingerprint or system PIN. The key never leaves your device, and there is no password to be reused or leaked.',
-  'site.signin.method.magic.title': 'Emailed sign-in link',
-  'site.signin.method.magic.body': 'Enter an address, get a one-time link, click it and you are in. Handy on a device whose passkey is not set up yet.',
-  'site.signin.noPassword': '⚠️ Why there is no "email + password": a credential that can be stuffed, phished, and needs a hash stored server-side is the one weak link in a product whose server cannot read your content.',
-  // R2: `site.signin.cta` was here with zero source references; the page's CTAs
-  // come from `site.signin.recover.link` and the nav's sign-in entry.
-  'site.signin.recover.title': 'Lost your passkey?',
-  'site.signin.recover.body': 'Inside the app, "Lost your passkey?" emails a recovery link where you can register a new one.',
-  'site.signin.why.title': 'Why signing in happens in the app, not on this page',
-  'site.signin.why.body': 'A passkey must be bound to **one specific domain**, and the server address used for signing in is the very one in the app’s sync settings. Copying the auth UI onto this page would recreate "sign in against server A while the token is stored for B" — so this page is a doorway, not a second login box.',
+  'site.signin.lede': 'Signing in happens inside the app: email plus password, a passkey and an emailed link are all supported.',
+  'site.signin.cta': 'Sign in in the app',
+  'site.signin.helpLink': 'How signing in works, and where the token comes from, is in the docs centre article "Accounts, tokens, and how you sign in"',
+  // R2 deleted `site.signin.cta` as a zero-reference key (back then this page's
+  // only CTA was passkey recovery). It has a consumer again now that the
+  // explainer is gone — the lifetime of that claim depends on the page
+  // structure, not on the dictionary.
 
   'web.about.title': 'Help & about',
   'web.about.lead': 'The help centre, the changelog and pricing all live on the website — they need to be indexable and shareable on their own, so there is only one copy of each.',

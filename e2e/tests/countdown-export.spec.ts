@@ -85,9 +85,9 @@ interface ExportContract {
   readonly contentType: string;
 }
 
-/** 从**构建产物**读契约（见文件头：不在测试里重推导那条公式）。 */
+/** 从 ESM 构建产物读契约；Node 24 + Playwright 动态导入 CJS 会触发 loader 内部断言。 */
 async function exportContract(): Promise<ExportContract> {
-  const dist = fileURLToPath(new URL('../../packages/shared-schema/dist/index.js', import.meta.url));
+  const dist = fileURLToPath(new URL('../../packages/shared-schema/dist/index.mjs', import.meta.url));
   let mod: Record<string, unknown>;
   try {
     mod = (await import(dist)) as unknown as Record<string, unknown>;

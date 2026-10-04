@@ -38,3 +38,30 @@
 旧历史迁移、新设备重建、chunk 网络中断后的重启续传、commit 响应丢失后的同请求恢复及取消。
 这些浏览器证据不替代 Android/iOS 当前安装产物验收。隐私文档中的存储类别、用途、留存与
 账号注销范围同时维护在 `packages/legal/src/documents/privacy.ts`，由已有级联对账测试检查。
+
+## 本机 API 与 AI 出境
+
+同步 E2EE 只约束服务端能看见什么。本机 API 在可信客户端读取已物化的明文，它不需要同步
+root key；因此“锁定数据密钥”不是“锁定本地应用”，不能承诺锁定后本机 API 无法读本地库。
+当前本地业务库未加密，获得同用户文件权限的恶意进程本就可能直接读库。回环监听也不等于
+可信调用方，浏览器恶意页面、扩展和同机进程都属于这一攻击面。
+
+已有防线由同一套代码执行：`packages/local-api/src/tools.ts` 的 `authorizeToolCall` 先查
+总开关与 bearer token，再查工具存在性及逐工具 grant，未登记的授权默认拒绝；
+`projectForTool` / `readItemForTool` 做字段投影，宿主 `isReadable` 决定条目是否可读。
+当前产品没有“受保护条目”概念，生产宿主显式允许普通任务，不能把保留的过滤接口宣传为
+已存在的逐条隐私隔离。持有有效本机 token 并获授权的调用者能读到相应明文，随后如何使用
+不再受同步加密保护；撤销 token/工具权限只能停止后续访问，不能追回已读取的内容。
+
+内置 AI 与本机 API 共用工具目录和 `isToolGranted`，内置 AI 的写调用只形成提案，确认后
+经 app-host 的动作进入唯一 op-log 写入口。托管 AI 的出境授权仍由 `packages/ai/src/egress.ts`
+按功能和目的地判定，并披露发送字段；同意任务拆解不等于允许习惯和专注记录出境。provider 为完成推断会看到
+已授权的明文；HKDF 的 `sync`、`ai-task-planning`、`ai-feedback` 密钥域隔离不能替代字段
+投影和授权，也不能被描述成“模型处理时仍看不到明文”。不得把 root 或 sync 派生密钥交给
+provider；功能派生密钥只约束相应密文用途，不提升调用者权限。
+
+这些边界的运行时判据在 `packages/local-api/tests/`、`packages/ai/tests/` 与
+`packages/app-host/tests/ai-tool-run.spec.ts`。本轮全量测试中 local-api 103 条、AI 222 条通过；
+它们与 Vault 迁移判据分别成立，不能互相替代。
+
+验收自身也属于秘密边界。`pnpm check:vault-diagnostics` 通过真实浏览器失败验证自动 aria 快照、输入调用日志和断言不会把恢复表单内容落盘；负向对照移除保护时必须检出运行时合成秘密。Vault 截图仍显式遮罩恢复码，trace/video 关闭，密钥与存储泄漏断言只输出布尔值；模型请求观察器只保留内存数据。该门禁已进入全仓检查及 `verify:vault-web` 前置，不能仅凭截图已打码就认定诊断产物安全。

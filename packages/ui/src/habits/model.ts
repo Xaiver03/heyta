@@ -86,7 +86,7 @@ export type HabitHeatLevel = 0 | 1 | 2 | 3 | 4;
  */
 export type HabitHeatToken = (typeof HEAT_TOKENS)[number];
 
-/** 热力图里的一天。`count` 是**事实**（那天打了几次），`level` 是展示分档。 */
+/** 热力图里的一天。`count` 今天是 **0/1**（那天有没有打卡），`level` 是展示分档。 */
 export interface HeatmapDay {
   readonly date: LocalDate;
   readonly count: number;

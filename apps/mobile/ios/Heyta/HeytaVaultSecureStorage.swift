@@ -140,4 +140,100 @@ final class HeytaVaultSecureStorage: NSObject {
     NSError(domain: NSOSStatusErrorDomain, code: Int(status),
             userInfo: [NSLocalizedDescriptionKey: "Keychain \(operation)失败（OSStatus \(status)）"])
   }
+
+#if DEBUG
+  /// Test-only probe invoked by `verify-ios-vault-keychain.sh`. It exercises
+  /// the same scope hashing, Keychain service, accessibility attribute, and
+  /// query shape as the production bridge without adding a second store.
+  static func runProbe(stage: String) {
+    let scopes = ["probe-a@example", "probe-b@example"]
+    let values = [Data(repeating: 0x11, count: rootKeyBytes), Data(repeating: 0x22, count: rootKeyBytes)]
+    var result: [String: Any] = ["stage": stage, "process": ProcessInfo.processInfo.processIdentifier]
+    do {
+      let accounts = try scopes.map { try scope(serverOrigin: "https://probe.invalid", accountId: $0).account }
+      let instance = HeytaVaultSecureStorage()
+      func bridgeError(_ message: String?) -> NSError {
+        NSError(domain: "HeytaVaultSecureStorageProbe", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: message ?? "native bridge operation failed"])
+      }
+      func save(_ accountId: String, _ value: Data) throws {
+        let done = DispatchSemaphore(value: 0)
+        var failure: Error?
+        var success = false
+        instance.save("https://probe.invalid", accountId: accountId, rootKeyBase64: value.base64EncodedString(),
+          resolve: { value in success = (value as? Bool) == true; done.signal() },
+          reject: { _, message, error in failure = error ?? bridgeError(message); done.signal() })
+        done.wait()
+        if let failure { throw failure }
+        guard success else { throw bridgeError("native save returned false") }
+      }
+      func read(_ accountId: String) throws -> Data? {
+        let done = DispatchSemaphore(value: 0)
+        var failure: Error?
+        var encoded: String?
+        instance.load("https://probe.invalid", accountId: accountId,
+          resolve: { value in encoded = value as? String; done.signal() },
+          reject: { _, message, error in failure = error ?? bridgeError(message); done.signal() })
+        done.wait()
+        if let failure { throw failure }
+        guard let encoded else { return nil }
+        guard let data = Data(base64Encoded: encoded) else { throw bridgeError("native load returned invalid Base64") }
+        return data
+      }
+      func remove(_ accountId: String) throws {
+        let done = DispatchSemaphore(value: 0)
+        var failure: Error?
+        var success = false
+        instance.remove("https://probe.invalid", accountId: accountId,
+          resolve: { value in success = (value as? Bool) == true; done.signal() },
+          reject: { _, message, error in failure = error ?? bridgeError(message); done.signal() })
+        done.wait()
+        if let failure { throw failure }
+        guard success else { throw bridgeError("native remove returned false") }
+      }
+      if stage == "invalid" {
+        do {
+          try save(scopes[0], Data(repeating: 0x33, count: rootKeyBytes - 1))
+          result["invalidSaveRejected"] = false
+        } catch {
+          result["invalidSaveRejected"] = true
+          result["invalidSaveError"] = error.localizedDescription
+        }
+      }
+      func readAttributes(_ account: String) throws -> String? {
+        var query = baseQuery(account: account)
+        query[kSecReturnAttributes as String] = true
+        var value: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &value)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess,
+              let attrs = value as? [String: Any] else { throw keychainError(status, operation: "探针属性读取") }
+        return attrs[kSecAttrAccessible as String] as? String
+      }
+      if stage == "clean" {
+        for account in scopes { try remove(account) }
+        for (account, value) in zip(scopes, values) { try save(account, value) }
+      } else if stage == "remove" {
+        try remove(scopes[0])
+      }
+      let loaded = try scopes.map(read)
+      let access = try accounts.map(readAttributes)
+      result["loadLengths"] = loaded.map { $0?.count ?? 0 }
+      result["loadMatches"] = loaded.enumerated().map { $0.element == values[$0.offset] }
+      result["accessible"] = access
+      result["scopeIsolated"] = loaded[0] != loaded[1]
+      result["aMissingAfterRemove"] = loaded[0] == nil
+      result["bRetainedAfterRemove"] = loaded[1] == values[1]
+      if stage == "remove" { try remove(scopes[1]) }
+      result["cleanAfterRemove"] = try scopes.map(read).allSatisfy { $0 == nil }
+    } catch { result["error"] = error.localizedDescription }
+    do {
+      let url = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        .appendingPathComponent("heyta-keychain-probe.json")
+      let data = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
+      try data.write(to: url, options: .atomic)
+      NSLog("[keychain-probe] stage=%@ result=%@", stage, String(data: data, encoding: .utf8) ?? "{}")
+    } catch { NSLog("[keychain-probe] write failed: %@", error.localizedDescription) }
+  }
+#endif
 }

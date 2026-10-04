@@ -376,3 +376,117 @@ test('凭据页脚本无 JS 报错，且按钮真的有反应', async ({ page })
     `凭据页抛了未捕获异常（用户看到的就是"按钮点了没反应"）：\n${hard.join('\n')}`,
   ).toEqual([]);
 });
+
+/**
+ * 🔴 「停掉对外错话」这条**只能在线上判**，在仓库里判不算。
+ *
+ * 本批改写过两条对外自托管文案（词条 `site.docs.selfhost.sum` 与 `site.help.a.selfhost`），
+ * 依据是 `docs/research/self-host-distribution-audit.md` §8.21：那句
+ * 「不是一个命令就完事」**被本批自己的交付否证** —— `docker-compose.migrate-once.yml`
+ * 让首次安装真的是"一条命令起全套"（一次性迁移服务在第一次开机时自己跑）。
+ *
+ * 但**词条改了 ≠ 页面改了**：那两句由构建期烘进 `apps/landing` 产物里各页面的
+ * `index.html`（meta description / og / twitter / JSON-LD）。所以这条判的是"线上现在到底印着谁"。
+ * 2026-10-04 00:5x 第一次跑它时它是**红的**，而那条红就是这一项的当前状态，不是测试坏了。
+ *
+ * 两条腿成对写（本仓规矩：负向断言必须配阳性对照）——
+ * 「旧句 0 命中」单独不构成证据：页面整块没构建、404 兜底、meta 压根没渲染，
+ * 给出的都是同一个 0。
+ */
+test('自托管文案：线上不许再印那句已被现量否证的话', async ({ page }) => {
+  const logs = attachLogs(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  await page.goto(`${ORIGIN}/docs/selfhost/`, { waitUntil: 'domcontentloaded' });
+  // 先让正文真的渲染出来再截图（同 `settleLanding` 的理由：domcontentloaded 时 React 还没跑）。
+  await page.locator('h1').first().waitFor({ state: 'visible', timeout: 30_000 });
+  await page.screenshot({ path: `${SHOT_DIR}/live-selfhost-copy.png` });
+  console.log(`📷 线上自建指南页：${SHOT_DIR}/live-selfhost-copy.png`);
+
+  const STALE = '不是一个命令就完事';
+  /**
+   * `ANCHOR` 是**改前改后都在场**的那半句（「自己运维一套服务」两句都留着），
+   * 所以它证明的是"这一页真的烘了自托管文案"，而不是"修复已经上线"。
+   *
+   * 🔴 第一版我把阳性对照写成了"新句在位"，结果它比那条真判据先红 ——
+   * 红在一个**本来就不该在场**的东西上，把"线上还挂着旧句"这个可执行的结论盖掉了。
+   * 阳性对照必须在**待验状态之外**取，否则它与被验的那条同生同死，等于没有对照。
+   */
+  const ANCHOR = '自己运维一套服务';
+  /**
+   * 每页的 `fresh` 取自**被替换的那一条词条本身**，不是随便挑一句在场的中文：
+   * `/docs/selfhost/` 烘的是 `site.docs.selfhost.sum`，`/docs/` 烘的是 `site.help.a.selfhost`。
+   */
+  const targets = [
+    { path: '/docs/selfhost/', fresh: '把服务起来那条命令不难' },
+    { path: '/docs/', fresh: '升级不是一条命令' },
+  ];
+
+  /** 用页面内的 fetch 拿**原始 HTML** —— 这些句子住在 meta 与 JSON-LD 里，不在可见文本里。 */
+  const countNeedle = async (p: string, needle: string): Promise<number> =>
+    page.evaluate(
+      async ({ path, s }: { path: string; s: string }) =>
+        (await (await fetch(path)).text()).split(s).length - 1,
+      { path: p, s: needle },
+    );
+
+  for (const t of targets) {
+    const htmlMarks = await countNeedle(t.path, '<html');
+    const anchor = await countNeedle(t.path, ANCHOR);
+    const stale = await countNeedle(t.path, STALE);
+    const fresh = await countNeedle(t.path, t.fresh);
+    console.log(
+      `${t.path}  anchor=${String(anchor)}（${ANCHOR}）  stale=${String(stale)}  fresh=${String(fresh)}（${t.fresh}）`,
+    );
+    expect(htmlMarks, `${t.path} 取回来的不是一份 HTML 文档（<html 数到 ${String(htmlMarks)}）`).toBeGreaterThan(0);
+    // 对照必须在被验状态**之外**取：它红了说明这一页根本不在判据射程里，
+    // 此时那条 stale=0 什么都证明不了（404 兜底 / 构建没跑 / 词条没接线都是同样的 0）。
+    expect(
+      anchor,
+      `对照落空：${t.path} 里连改前改后都在场的「${ANCHOR}」都数不到 —— ` +
+        `这一页压根没烘自托管文案，下面的"错话停了"就没有意义。`,
+    ).toBeGreaterThan(0);
+    expect(
+      stale,
+      `${t.path} 仍在线上印「${STALE}」${String(stale)} 处。` +
+        `仓库里那句已改掉并被 §8.21 现量否证，但落地页要**重新发一次**才会变 ——` +
+        `发布命令见 docs/runbooks/deployment.md。`,
+    ).toBe(0);
+    // 走到这里说明旧句确实没了；这一条再确认**换上去的那句**真的发了出去
+    // （只判"旧的不在"会放过一种很具体的坏态：新文案没接进词条、页面只剩半句）。
+    expect(fresh, `${t.path} 旧句已停，但新句「${t.fresh}」没在场 —— 发的是半份文案`).toBeGreaterThan(0);
+  }
+
+  /**
+   * 上面那三处量的是**元数据**（meta / og / twitter / JSON-LD）。但这一页真正被访客读到的
+   * 是**渲染出来的正文**，而正文里有一句被本批自己的交付否证得更直接的话：
+   *
+   *   `site.docs.selfhost.s1i2` 旧值：「…服务自己不在启动时动表结构。」
+   *
+   * 同一页 §7 让访客敲的那条入口命令**就带着** `-f docker-compose.migrate-once.yml`
+   * —— 也就是说"起来"那一次，表结构正是由一个服务在启动时建的。这句话错在正文里，
+   * 比错在 meta 里更该停，所以单独判，而且判的是**渲染后的文本**（词条在 JS bundle 里，
+   * 抓原始 HTML 数不到它）。
+   */
+  const bodyText = await page.locator('body').innerText();
+  const hits = (needle: string) => bodyText.split(needle).length - 1;
+  console.log(
+    `正文：章节标题=${String(hits('先把难度说清楚'))}  旧句=${String(hits('服务自己不在启动时动表结构'))}  ` +
+      `新句=${String(hits('首次开机由那份一次性迁移服务'))}`,
+  );
+  // 对照：这一页真的渲染完了（hydration 没做时正文也会是"0 命中"）。
+  expect(hits('先把难度说清楚'), '正文里连本节标题都没有 —— 页面没渲染完，下面的 0 命中不算证据').toBeGreaterThan(0);
+  expect(
+    hits('服务自己不在启动时动表结构'),
+    '线上正文仍写着「服务自己不在启动时动表结构」，而同一页 §7 给的入口命令带着 ' +
+      '`docker-compose.migrate-once.yml` —— 首次开机就是由一个服务在启动时动的表结构。' +
+      '词条已改（`site.docs.selfhost.s1i2`），要**重新发一次落地页**才会变。',
+  ).toBe(0);
+  expect(
+    hits('首次开机由那份一次性迁移服务'),
+    '旧句已停，但 §1 的新表述没渲染出来 —— 发出去的可能是旧 bundle（缓存/没重构建）',
+  ).toBeGreaterThan(0);
+
+  const hard = hardErrors(logs);
+  expect(hard, `线上文档页抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+});

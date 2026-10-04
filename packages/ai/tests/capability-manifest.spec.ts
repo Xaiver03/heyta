@@ -19,7 +19,7 @@
  *   3. **fixture**：往输入里注入一个新工具，产物里必须出现它；判不出实体的工具、
  *      归到没模型实体的工具、进了分母的视图名 —— 三种都必须让生成**当场失败**。
  *
- * 只有"现状基线 2/8"那一条是**故意钉住今天的事实**：W10 扩目录时它会红，
+ * 只有"现状基线 N/8"那一条是**故意钉住今天的事实**：W10 扩目录时它会红，
  * 而那正是要求的动作 —— 重新判断一次，而不是让它悄悄跟着变。
  *
  * ## 关于"从测试里 import 一个 Node 脚本"
@@ -79,6 +79,14 @@ interface FixtureManifest {
   coverage: { covered: number; denominator: number; ratio: string };
   userOperableEntityTypes: readonly string[];
   entityTypesWithoutTools: readonly string[];
+  entities: readonly {
+    entityType: string;
+    materialized: boolean;
+    countsTowardCoverage: boolean;
+    coverage: 'read-write' | 'read-only' | 'write-only' | 'none';
+    readToolNames: readonly string[];
+    writeToolNames: readonly string[];
+  }[];
   tools: readonly {
     name: string;
     kind: string;
@@ -308,15 +316,10 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     // 工具还没接"这件事显形。W10 做完之后它必须**不再**出现（这条改向就是那件事
     // 做完了的机器化证据；反向漏做 ⇒ 这条与上面 3/9 那条一起红）。
     expect(manifest.entityTypesWithoutTools).not.toContain('EVENT');
-    // 顺序由实体清单决定，所以断言**排序后**的集合（口径是"还剩谁"，不是"谁先谁后"）
-    expect([...manifest.entityTypesWithoutTools].sort()).toEqual([
-      'FOCUS_SESSION',
-      'HABIT',
-      'HABIT_LOG',
-      'NOTE',
-      'REMINDER',
-      'TAG',
-    ]);
+    // 2026-10-03 合流后 9/9 全覆盖：分母里的实体**全部**有工具，
+    // 所以"有实体没工具"那句点名现在必须是空的。哪天目录丢了一个实体的工具，
+    // 这里会重新出现名字 —— 那就是这条判据重新开始咬人的时候。
+    expect([...manifest.entityTypesWithoutTools].sort()).toEqual([]);
   });
 
   it('分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体', async () => {
@@ -358,15 +361,36 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     }
   });
 
-  it('现状基线 3/9：TASK / PROJECT / **EVENT** 有工具（再扩目录时这条会红，那是要的）', () => {
+  it('现状基线 9/9：分母里每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
+    // 2026-10-03 两次搬这条基线，都在这里重新判断过：
+    // ① PROJECT 补 `create_project`、HABIT 补 `list_habits` + `create_habit`（3/8）；
+    // ② 补齐 TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER 的读写工具（8/8）。
+    // 下一个动目录的人同样必须在这里重新判断一次 —— 改成从上游推导就是永真判据。
+    //
+    // ⚠️ 现在这个数已经顶到分母，**它不再能靠"加实体"变红**：往后新实体进了分母却没工具时，
+    // 报的是 `check-ai-coverage` 那条门禁，不是这个常数。
     const withTools = manifest.entities
       .filter((e) => e.countsTowardCoverage && e.coverage !== 'none')
       .map((e) => e.entityType);
-    // W10 把 EVENT 接上了四个工具（读 2 / 写 2），覆盖面从 2/9 进到 3/9。
-    // 这条点名是**判据**不是内容：目录再扩一个实体而这里没跟上，说明那批没做完。
-    expect(withTools.sort()).toEqual(['EVENT', 'PROJECT', 'TASK']);
-    expect(manifest.coverage.covered).toBe(3);
-    expect(manifest.coverage.ratio).toBe('3/9');
+    expect(withTools.sort()).toEqual([
+      'EVENT',
+      'FOCUS_SESSION',
+      'HABIT',
+      'HABIT_LOG',
+      'NOTE',
+      'PROJECT',
+      'REMINDER',
+      'TAG',
+      'TASK',
+    ]);
+    // 2026-10-03 合流：EVENT 的四条工具随 W10 移植进 pack 目录（读 2 / 写 2），
+    // 基线从 8/8（W11 批次）与 3/9（批次二当时的中间态）收拢为 9/9。
+    expect(manifest.coverage.covered).toBe(9);
+    expect(manifest.coverage.ratio).toBe('9/9');
+    // `covered` 是分母名单的**统计结果**，`userOperableEntityTypes.length` 是名单本身：
+    // 两个数取自生成器里两条不同的路径，这里要求它们当下确实相等 ——
+    // 不等就是那两条口径漂了（比如覆盖率把某个已剔除的视图又算了进去）。
+    expect(manifest.coverage.covered).toBe(manifest.userOperableEntityTypes.length);
   });
 
   it('🔴 EVENT 的四个工具**读写都有**，且归因走的是名字（不是 override 名单）', async () => {
@@ -415,12 +439,38 @@ describe('注入一个工具，清单里必须出现它（证明"生成"而不�
     expect(injected, '新加的工具没进清单 —— 生成器在抄旧清单').toBeTruthy();
     expect(injected!.entityType).toBe('REMINDER');
     expect(injected!.kind).toBe('write');
-    // 🔴 注入**改变了结论**：REMINDER 不再是"没有工具的实体"，覆盖面 +1。
+    // 🔴 注入**改变了结论**：REMINDER 不再是"没有工具的实体"。
     //    这一条才是"生成在跟随上游"的正面证据 —— 抄件做不到这件事。
     expect(built.entityTypesWithoutTools).toEqual(['PROJECT']);
     expect(built.coverage.denominator).toBe(3);
     expect(before.coverage.covered).toBe(1);
-    expect(built.coverage.covered).toBe(before.coverage.covered + 1);
+    // ⚠️ 但覆盖面**一格都没动**：只加了一个写工具，REMINDER 现在是 `write-only`。
+    //    口径见 `countsAsCovered` —— "读得到也改得动"才算覆盖，
+    //    所以这里必须钉住 `1/3` 而不是旧的那句 `2/3`（旧口径把只读/只写都算成已覆盖，
+    //    那正是 `2/8` 那句虚报的来源）。
+    expect(
+      built.entities.find((e) => e.entityType === 'REMINDER')!.coverage,
+    ).toBe('write-only');
+    expect(built.coverage.covered).toBe(before.coverage.covered);
+    expect(built.coverage.ratio).toBe('1/3');
+  });
+
+  it('🔴 补齐读 + 写两个工具，覆盖面才 +1 —— 「读得到也改得动」这条口径有牙齿', async () => {
+    const gen = await loadGenerator();
+    const built = gen.buildCapabilityManifest(
+      fixtureInput({
+        tools: [
+          { name: 'list_tasks', kind: 'read', description: '列出任务。', schemaRecorded: true, args: [] },
+          { name: 'create_task', kind: 'write', description: '新建任务。', schemaRecorded: true, args: [] },
+          { name: 'list_reminders', kind: 'read', description: '列提醒。', schemaRecorded: true, args: [] },
+          { name: 'create_reminder', kind: 'write', description: '给任务建一条提醒。', schemaRecorded: true, args: [] },
+        ],
+      }),
+    );
+    expect(
+      built.entities.find((e) => e.entityType === 'REMINDER')!.coverage,
+    ).toBe('read-write');
+    expect(built.coverage.covered).toBe(2);
     expect(built.coverage.ratio).toBe('2/3');
   });
 
