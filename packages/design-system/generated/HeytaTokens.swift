@@ -152,6 +152,10 @@ enum HeytaTokens {
     static let durationSlow: Double = 300  // ms
     static let durationExit: Double = 140  // ms
     static let durationPress: Double = 100  // ms
+    static let durationSplashEnter: Double = 420  // ms
+    static let durationSplashStagger: Double = 90  // ms
+    static let durationSplashHold: Double = 200  // ms
+    static let durationSplashExit: Double = 260  // ms
     static let easeStandard: String = "cubic-bezier(0.2, 0, 0.2, 1)"
     static let easeEnter: String = "cubic-bezier(0, 0, 0.2, 1)"
     static let easeExit: String = "cubic-bezier(0.4, 0, 1, 1)"
@@ -164,6 +168,7 @@ enum HeytaTokens {
     static let zPopover: Double = 500
     static let zToast: Double = 600
     static let zTooltip: Double = 700
+    static let zSplash: Double = 900
     static let iconXs: Double = 14  // px
     static let iconSm: Double = 16  // px
     static let iconMd: Double = 20  // px
@@ -183,6 +188,7 @@ enum HeytaTokens {
     static let layoutProseMax: String = "65ch"
     static let layoutQuadrantMinHeight: Double = 192  // px
     static let layoutPanelMaxHeight: Double = 384  // px
+    static let layoutSplashMark: Double = 96  // px
     static let layoutTwoColumnMin: Double = 768  // px
     static let layoutInputMin: Double = 224  // px
     static let layoutModalMax: Double = 640  // px
@@ -335,6 +341,10 @@ enum HeytaTokens {
     static let durationSlow: Double = 1  // ms
     static let durationExit: Double = 1  // ms
     static let durationPress: Double = 1  // ms
+    static let durationSplashEnter: Double = 1  // ms
+    static let durationSplashStagger: Double = 1  // ms
+    static let durationSplashHold: Double = 1  // ms
+    static let durationSplashExit: Double = 1  // ms
   }
 }
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  生成物（scripts/gen-boot-splash.mjs）—— 不要手改。
+
+  Android 12+ 冷启动那一帧由**系统**画，应用代码插不进去，只能配置主题项。
+  父样式是 values/styles.xml 里的 AppTheme.Base —— 主题只在那一份里定义，
+  这里**只加**启动屏那三项，避免同一个 AppTheme 存在两份逐字拷贝（那种
+  形状在本仓库已经吃过两次：抽出来之后旧的那份没删，于是两套裁决标准）。
+
+  windowSplashScreenAnimatedIcon 复用自适应图标的前景层（mipmap/ic_launcher_foreground）：
+  它本来就是按"中心 66dp 保留圆"做的，与启动屏的遮罩规则同一条，
+  所以图标与启动动画在用户眼里是同一个东西在不同时刻的样子。
+-->
+<resources>
+    <style name="AppTheme" parent="AppTheme.Base">
+        <item name="android:windowSplashScreenBackground">@color/heyta_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenAnimationDuration">800</item>
+    </style>
+</resources>

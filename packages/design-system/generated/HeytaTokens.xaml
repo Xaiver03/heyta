@@ -116,6 +116,10 @@
     <x:Double x:Key="HeytaDurationSlow">300</x:Double>
     <x:Double x:Key="HeytaDurationExit">140</x:Double>
     <x:Double x:Key="HeytaDurationPress">100</x:Double>
+    <x:Double x:Key="HeytaDurationSplashEnter">420</x:Double>
+    <x:Double x:Key="HeytaDurationSplashStagger">90</x:Double>
+    <x:Double x:Key="HeytaDurationSplashHold">200</x:Double>
+    <x:Double x:Key="HeytaDurationSplashExit">260</x:Double>
     <x:String x:Key="HeytaEaseStandard">cubic-bezier(0.2, 0, 0.2, 1)</x:String>
     <x:String x:Key="HeytaEaseEnter">cubic-bezier(0, 0, 0.2, 1)</x:String>
     <x:String x:Key="HeytaEaseExit">cubic-bezier(0.4, 0, 1, 1)</x:String>
@@ -128,6 +132,7 @@
     <x:Double x:Key="HeytaZPopover">500</x:Double>
     <x:Double x:Key="HeytaZToast">600</x:Double>
     <x:Double x:Key="HeytaZTooltip">700</x:Double>
+    <x:Double x:Key="HeytaZSplash">900</x:Double>
     <x:Double x:Key="HeytaIconXs">14</x:Double>
     <x:Double x:Key="HeytaIconSm">16</x:Double>
     <x:Double x:Key="HeytaIconMd">20</x:Double>
@@ -147,6 +152,7 @@
     <x:String x:Key="HeytaLayoutProseMax">65ch</x:String>
     <x:Double x:Key="HeytaLayoutQuadrantMinHeight">192</x:Double>
     <x:Double x:Key="HeytaLayoutPanelMaxHeight">384</x:Double>
+    <x:Double x:Key="HeytaLayoutSplashMark">96</x:Double>
     <x:Double x:Key="HeytaLayoutTwoColumnMin">768</x:Double>
     <x:Double x:Key="HeytaLayoutInputMin">224</x:Double>
     <x:Double x:Key="HeytaLayoutModalMax">640</x:Double>

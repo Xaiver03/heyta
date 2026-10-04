@@ -23,6 +23,145 @@
     <title>heyta</title>
   </head>
   <body>
+    <!--
+      首屏（启动）动画。这一段是**生成物**：样式与骨架由
+      `scripts/gen-boot-splash.mjs` 从 design-system token 写进来，
+      因为 tokens.css 打进 JS bundle，而这一帧要在 bundle 到货**之前**画出来。
+      时长/颜色/层级都不许在这里手写 —— 改 token 后重跑生成器。
+    -->
+    <!-- HEYTA-BOOT-SPLASH:BEGIN 生成物（scripts/gen-boot-splash.mjs）—— 不要手改 -->
+<style id="heyta-boot-style">
+  /*
+   * 这一段是**生成物**：每个字面值都是 packages/design-system/src/tokens.css 里
+   * 那条 token 的当前值（真源只有一份，改动 token 后重跑本脚本，
+   * 对账模式会逐字节抓到没重跑的那次）。
+   *
+   * 为什么不能直接写 var(--ht-*)：tokens.css 打进 JS bundle，而这一帧要在
+   * bundle **到货之前**画出来 —— 那时所有 var() 都还没定义，画出来是空的，
+   * 而"空"正是首屏动画要挡掉的那个观感。
+   *
+   * 命名前缀用 heyta-boot 而不是 ht-boot：这一段不与 tokens.css 的命名空间抢名字。
+   */
+  :root {
+    /* token: color.primary / color.on-primary / color.background */
+    --heyta-boot-plate: #2563eb;
+    --heyta-boot-glyph: #ffffff;
+    --heyta-boot-bg: #f8fafc;
+    /* token: layout.splash-mark */
+    --heyta-boot-size: 6rem;
+    /* token: duration.splash-enter / -stagger / -hold / -exit */
+    --heyta-boot-enter: 420ms;
+    --heyta-boot-stagger: 90ms;
+    --heyta-boot-hold: 200ms;
+    --heyta-boot-exit: 260ms;
+    /* token: ease.enter / ease.exit */
+    --heyta-boot-ease-enter: cubic-bezier(0, 0, 0.2, 1);
+    --heyta-boot-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    /* token: z.splash —— 必须压得住首启的隐私同意面板，所以是阶梯最上一档 */
+    --heyta-boot-z: 900;
+    /* 一个入场循环的总时长 = enter + 2×stagger + hold（由上面四档推导，不是第五个数字） */
+    --heyta-boot-cycle: calc(var(--heyta-boot-enter) + var(--heyta-boot-stagger) * 2 + var(--heyta-boot-hold));
+  }
+
+  .heyta-boot {
+    position: fixed;
+    inset: 0;
+    z-index: var(--heyta-boot-z);
+    display: grid;
+    place-items: center;
+    background: var(--heyta-boot-bg);
+    /* 退场之后由 JS 摘掉节点；这里只负责不被点击穿透误触 */
+    pointer-events: none;
+  }
+
+  .heyta-boot__mark {
+    width: var(--heyta-boot-size);
+    height: var(--heyta-boot-size);
+    display: block;
+    overflow: visible;
+  }
+
+  .heyta-boot__plate {
+    fill: var(--heyta-boot-plate);
+  }
+
+  .heyta-boot__bar {
+    fill: var(--heyta-boot-glyph);
+    /* 每块各自的包围盒做缩放原点，否则三道会从画布中心"飞"而不是各自升起 */
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: heyta-boot-rise var(--heyta-boot-enter) var(--heyta-boot-ease-enter) both;
+  }
+
+  /* 三道依次入场：第二道晚一个 stagger，第三道晚两个。
+     顺序就是字的书写顺序（左竖 → 右竖 → 横），读起来像"heyta 正在被写出来"。 */
+  .heyta-boot__bar--1 { animation-delay: var(--heyta-boot-stagger); }
+  .heyta-boot__bar--2 { animation-delay: calc(var(--heyta-boot-stagger) * 2); }
+
+  /* 底板先落到位（它不是"被写的笔"），随后整个 mark 轻微呼吸 ——
+     启动时间超过一个循环时，这一档循环是**给等待一个交代**，
+     而不是把入场时长拍长（Android 那条"超过 1000ms 改用循环"的做法）。 */
+  .heyta-boot__mark { animation: heyta-boot-breathe var(--heyta-boot-cycle) var(--heyta-boot-ease-enter) infinite alternate; }
+
+  @keyframes heyta-boot-rise {
+    /* 🔴 from 那一帧**必须已经读得出是 mark** —— 这是首屏动画存在的全部理由。
+       第一版这里写的是 `opacity: 0; transform: scaleY(0.2)`，真浏览器 t=0 截图
+       上三道字形**全透明**，画面只剩一块空蓝底板：产品负责人投诉的"完全没有 logo"
+       在我们自己生成的第一帧上原样复现了（而 22 条 CSS 断言全绿，因为断的是
+       "元素在不在、色对不对"，不是"这一帧看不看得见"）。
+       现在不透明度全程 1，只用纵向压缩表达"正在被写出来"，
+       最短那一档也留 62% 高度 —— 入场仍然有，第一帧不再空白。 */
+    from { transform: scaleY(0.62); }
+    to { transform: scaleY(1); }
+  }
+
+  @keyframes heyta-boot-breathe {
+    from { transform: scale(1); }
+    to { transform: scale(1.03); }
+  }
+
+  /* 退场：淡出 + 略微上收。走 ease.exit（比进入快），与界面里其他浮层同一条纪律。 */
+  .heyta-boot--leaving {
+    animation: heyta-boot-leave var(--heyta-boot-exit) var(--heyta-boot-ease-exit) forwards;
+  }
+
+  @keyframes heyta-boot-leave {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(1.06); }
+  }
+
+  /*
+   * 尊重系统"减少动效"：时长压到 1ms 是 tokens.css 里那条媒体查询在做的事，
+   * 但这一段自带字面值、拿不到那次覆盖 ⇒ 必须**在这里**也处理一遍，
+   * 否则"应用内遵守、启动那一帧不遵守"—— 而那恰恰是最容易让人头晕的一帧。
+   *
+   * 做法：入场与呼吸**全关**，直接停在画满的那一帧（静态品牌帧），
+   * 只保留退场的淡出（透明度变化不属于"非必要位移"）。
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .heyta-boot__bar,
+    .heyta-boot__mark {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+    :root {
+      --heyta-boot-enter: 1ms;
+      --heyta-boot-stagger: 1ms;
+      --heyta-boot-hold: 1ms;
+      --heyta-boot-exit: 1ms;
+    }
+  }
+</style>
+<div class="heyta-boot" id="heyta-boot" role="img" aria-label="heyta">
+  <svg class="heyta-boot__mark" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+    <rect class="heyta-boot__plate" x="0" y="0" width="512" height="512" rx="112"/>
+      <rect class="heyta-boot__bar heyta-boot__bar--0" x="140" y="120" width="52" height="272" rx="22"/>
+      <rect class="heyta-boot__bar heyta-boot__bar--1" x="320" y="228" width="52" height="164" rx="22"/>
+      <rect class="heyta-boot__bar heyta-boot__bar--2" x="140" y="228" width="232" height="48" rx="22"/>
+  </svg>
+</div>
+<!-- HEYTA-BOOT-SPLASH:END -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

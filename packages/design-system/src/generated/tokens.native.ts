@@ -131,6 +131,10 @@ export interface HeytaNativeTokens {
   readonly 'duration.slow': number;
   readonly 'duration.exit': number;
   readonly 'duration.press': number;
+  readonly 'duration.splash-enter': number;
+  readonly 'duration.splash-stagger': number;
+  readonly 'duration.splash-hold': number;
+  readonly 'duration.splash-exit': number;
   /** cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。 */
   readonly 'ease.standard': string;
   /** cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。 */
@@ -147,6 +151,7 @@ export interface HeytaNativeTokens {
   readonly 'z.popover': number;
   readonly 'z.toast': number;
   readonly 'z.tooltip': number;
+  readonly 'z.splash': number;
   readonly 'icon.xs': number;
   readonly 'icon.sm': number;
   readonly 'icon.md': number;
@@ -167,6 +172,7 @@ export interface HeytaNativeTokens {
   readonly 'layout.prose-max': string;
   readonly 'layout.quadrant-min-height': number;
   readonly 'layout.panel-max-height': number;
+  readonly 'layout.splash-mark': number;
   readonly 'layout.two-column-min': number;
   readonly 'layout.input-min': number;
   readonly 'layout.modal-max': number;
@@ -347,6 +353,10 @@ export const lightTokens: HeytaNativeTokens = {
   'duration.slow': 300,
   'duration.exit': 140,
   'duration.press': 100,
+  'duration.splash-enter': 420,
+  'duration.splash-stagger': 90,
+  'duration.splash-hold': 200,
+  'duration.splash-exit': 260,
   'ease.standard': "cubic-bezier(0.2, 0, 0.2, 1)",
   'ease.enter': "cubic-bezier(0, 0, 0.2, 1)",
   'ease.exit': "cubic-bezier(0.4, 0, 1, 1)",
@@ -359,6 +369,7 @@ export const lightTokens: HeytaNativeTokens = {
   'z.popover': 500,
   'z.toast': 600,
   'z.tooltip': 700,
+  'z.splash': 900,
   'icon.xs': 14,
   'icon.sm': 16,
   'icon.md': 20,
@@ -378,6 +389,7 @@ export const lightTokens: HeytaNativeTokens = {
   'layout.prose-max': "65ch",
   'layout.quadrant-min-height': 192,
   'layout.panel-max-height': 384,
+  'layout.splash-mark': 96,
   'layout.two-column-min': 768,
   'layout.input-min': 224,
   'layout.modal-max': 640,
@@ -554,6 +566,10 @@ export const darkTokens: HeytaNativeTokens = {
   'duration.slow': 300,
   'duration.exit': 140,
   'duration.press': 100,
+  'duration.splash-enter': 420,
+  'duration.splash-stagger': 90,
+  'duration.splash-hold': 200,
+  'duration.splash-exit': 260,
   'ease.standard': "cubic-bezier(0.2, 0, 0.2, 1)",
   'ease.enter': "cubic-bezier(0, 0, 0.2, 1)",
   'ease.exit': "cubic-bezier(0.4, 0, 1, 1)",
@@ -566,6 +582,7 @@ export const darkTokens: HeytaNativeTokens = {
   'z.popover': 500,
   'z.toast': 600,
   'z.tooltip': 700,
+  'z.splash': 900,
   'icon.xs': 14,
   'icon.sm': 16,
   'icon.md': 20,
@@ -585,6 +602,7 @@ export const darkTokens: HeytaNativeTokens = {
   'layout.prose-max': "65ch",
   'layout.quadrant-min-height': 192,
   'layout.panel-max-height': 384,
+  'layout.splash-mark': 96,
   'layout.two-column-min': 768,
   'layout.input-min': 224,
   'layout.modal-max': 640,
@@ -659,6 +677,10 @@ export const reducedMotionTokens: Partial<HeytaNativeTokens> = {
   'duration.slow': 1,
   'duration.exit': 1,
   'duration.press': 1,
+  'duration.splash-enter': 1,
+  'duration.splash-stagger': 1,
+  'duration.splash-hold': 1,
+  'duration.splash-exit': 1,
 };
 
 /** `prefers-reduced-transparency` 的覆盖层（亮色解析；ADR-0042 §4）。 */

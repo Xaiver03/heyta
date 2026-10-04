@@ -277,6 +277,23 @@
      就出现，等待超过 ~100ms 就开始"发木"。 */
   --ht-duration-press: 100ms;
 
+  /* ── 首屏（启动）动画 ─────────────────────────────────────────────
+     为什么单独立三档而不是复用 instant/fast/slow：启动动画的时长**不是**
+     "手感参数"，它受两条外部约束夹住 ——
+       · 上限：Android 官方建议整段 ≤ 1000ms，超了就该改成循环动画
+         （developer.android.com/develop/ui/views/launch/splash-screen）；
+       · 下限：短于 ~300ms 的入场读不出"正在打开"，等于白做。
+     所以这三档是从那两个数**推出来的**，不是拍的：
+       enter 420 + stagger 90×2 + hold 200 = 800ms（留 200ms 余量给退出），
+       exit 260ms 走"退出比进入快"的同一条纪律但这里是遮罩淡出。
+     🔴 各端（CSS keyframe / RN Animated / 原生壳）必须从这三档取值，
+     否则"同一支动画"会变成四个速度。动机与判据见
+     `docs/plans/brand-icon-and-splash.md` §4。 */
+  --ht-duration-splash-enter: 420ms;
+  --ht-duration-splash-stagger: 90ms;
+  --ht-duration-splash-hold: 200ms;
+  --ht-duration-splash-exit: 260ms;
+
   --ht-ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
   --ht-ease-enter: cubic-bezier(0, 0, 0.2, 1);     /* ease-out：进入 */
   --ht-ease-exit: cubic-bezier(0.4, 0, 1, 1);      /* ease-in：退出 */
@@ -291,6 +308,10 @@
   --ht-z-popover: 500;
   --ht-z-toast: 600;
   --ht-z-tooltip: 700;
+  /* 首屏遮罩：必须压得住之后挂载的任何浮层（包括首启的隐私同意面板与
+     Modal），所以它在阶梯**之上**而不是插在中间 —— 插进 modal/popover 之间
+     会让启动期间弹出的模态盖住品牌帧，读起来像"闪屏坏了"。 */
+  --ht-z-splash: 900;
 
   /* 图标尺寸。禁止混用 20/24/28 这类随手值。 */
   --ht-icon-xs: 0.875rem; /* 14px */
@@ -358,6 +379,11 @@
      所以属于 layout。24rem 大约是"半屏多一点"：再高浮层就盖住了它
      透出的那一层（搜索浮层是**透出下层视图**的，不是全屏页）。 */
   --ht-layout-panel-max-height: 24rem;
+  /* 首屏动画里品牌 mark 的边长。它不是图标尺寸（icon.* 管的是界面里 14–32px
+     的功能图标），而是一帧**构图**的尺寸，所以属于 layout 而非 icon。
+     96px 的来由：三块字形在 512 画布上最细的一条是 52/512 ≈ 10%，
+     缩到 96px 时约 10px —— 再小，入场时那三道"升起"就糊成一片白。 */
+  --ht-layout-splash-mark: 6rem;
   /* 🔴 响应式断点（2026-09-29）：容器可用宽度低于它时，"两列"布局降为单列。
      首个消费者是四象限（2×2 十字网格 ↔ 手机单列）。
      768px ≈ 平板竖屏 —— 它之下两列的每格放不下一个可读的任务行。 */
@@ -699,6 +725,14 @@
     /* 压到 1ms 而不是删掉 duration —— 删掉会让依赖 transitionend 的逻辑
        永远不触发。按下反馈同理：仍要有"瞬间发生"，只是不再可见。 */
     --ht-duration-press: 1ms;
+    /* 首屏动画：压到 1ms 之后品牌帧**直接停在画满的那一帧**（静态占位），
+       而不是连续循环 —— 这既是 WCAG 2.2.2 的方向，也是 Android 那条
+       "内容已就绪就优雅跳过"的同一件事。消费侧还须配合把循环关掉
+       （见 docs/plans/brand-icon-and-splash.md §4.4 的三端做法）。 */
+    --ht-duration-splash-enter: 1ms;
+    --ht-duration-splash-stagger: 1ms;
+    --ht-duration-splash-hold: 1ms;
+    --ht-duration-splash-exit: 1ms;
   }
 }
 
