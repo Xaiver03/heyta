@@ -2943,3 +2943,28 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   实际它是 `:82` source 进来的探针提供的 ⇒ **判"没有 X"之前要先问 X 该住在哪个文件、有没有被 source**
   （同族：只 grep 符号名不读被调方本体、以及上一节那枚不带 `-ax` 的 `ps`）。
   修法落成动作：核对"某个能力有没有实现"时，先 `grep -n -E '^\. |^source ' <入口文件>` 把被引入的文件列出来，再对这些文件各打一次 needle。
+#### 7.31.5 ⑤ 的复核结果：三条登记里两条的**取证行号/指针是错的**，B46 已由属主带修落地（13:38–13:46 现量）
+
+- 逐条把 `BLOCKED.md` 里点名要"保持登记不越权"的三条对当前代码核过：
+  - **B41 成立** —— `apps/mobile/tests/growth-display.spec.ts:365` 仍是 `expect(labels.heatmap.grid({ total: 42, days: 365 })).toBe('')`；
+    那句"9 处 `activityDays`"是**源码级**计数（上一轮把它数成 15 的那次把 `packages/*/dist` 混进去了，更正仍有效）。
+  - **B42 结论成立、取证行号错**：原句「`HabitsScreen.tsx:372` 已经这么用了」里 `:372` 是 `common.habits.rename.label`；
+    现量 `:401` 才是 `runFor(habitId, actions.checkIn(habitId, date))`，`git blame` 指到 `b756dc85`（10-01 15:42）⇒ 它一直在 401，
+    是当时没打开那一行就抄了。**登记里被引用的行号必须能重跑对上** —— 否则下一个人按 `:372` 去找"已经有人这么用"会一无所获。
+  - **B45 裁断成立、指针错位**：`HostedEntitlementReading` 的类型真身在 `packages/domain/src/subscription.ts:146-158`
+    （`entitled` 分支就是 `{ readonly kind: 'entitled' }`，没有日期字段；`currentPeriodEnd?: number` 只挂在 `denied` 且可选），
+    而原句写的 `packages/app-host/src/entitlement.ts:71` 是**产出它的函数**、不是定义处；界面位置补成 `apps/mobile/src/screens/EntitlementSection.tsx`。
+- **B46 被现量否证，而否证的方向是"债已清"**：`structure.spec.ts` 的 HEAD 版与工作树**都是 616 行且逐字节相同**，
+  FK 表名推导连同 `if (name === undefined || column === undefined) throw` 那枚守卫**已进 `main`**，
+  `pnpm --filter @heyta/legal typecheck` EXIT=0 ⇒ 那笔红**不再挡全量 typecheck**（只跑了 legal 这一格，没重取 `-r` 的聚合读数）。
+  ⇒ 可迁移的读法：**"这笔红只在混合工作树成立"是瞬时读数**，保质期取决于属主什么时候提交；
+  每次要拿它当理由时必须重新 `diff <(git show HEAD:<f>) <f>`，不能引用上一节留下的结论。
+- 落地：`BLOCKED.md` 两笔 plumbing（`77a88f3f` = 20/8、`5e315252` = 1/1）。第二笔单独存在是因为第一笔里我写了"读数 `/tmp/legal-tc-1342.log`" ——
+  **账本里挂一条只在这台机器、只在这一趟之前存在的 `/tmp` 路径，等于把可复现物只放在 `/tmp`**，已换成命令本身（10 秒级可复跑）。
+  四道文档门禁 13:46 现量 EXIT=0：`check:doc-citations` / `check:docs` / `check:md-tables` / `check:docs-voice`。
+- 🔴 生成 patched blob 时我自己犯的两条，都靠"提交前逐行读 `git diff --no-index -U1`"抓住：
+  ① 锚替换写成"插入新行但没删旧行"，于是 `所以 entitled 只说…` 与 `grep -c "推不出表名" …` **各出现两遍**
+  ⇒ 生成脚本里补了 `assert out.count(needle) == 1` 这类**重复行断言**（比目检可靠，且它便宜）；
+  ② python 载荷里嵌套 ASCII 双引号又炸一次（`SyntaxError` —— 第三次栽在同一类上）⇒ 改「」。
+- ⑤ 的越权边界：三条**都没有翻判据** —— 没动 `server/` 与计费、没动 `growth-display.spec.ts` 里那条冻结断言、没动 `EntitlementSection.tsx`。
+  B42 即便"比 B41 便宜"也仍需真机确认"点了以后连续天数真的回来"，那要窗口，不属于现在的动作。
