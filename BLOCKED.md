@@ -4799,3 +4799,39 @@ for c in dd8f2210 f2d7ed40 fd34c42a de296b9d; do git merge-base --is-ancestor $c
 `check:doc-citations` 报它是"不存在的路径"也只证明了不存在、没证明它本该存在）；
 ② 那条待办里的第 4 步需要**产品负责人拍板**（改号牵动跨文档引用），我不代拍、也不建一条"一上来就红"的门禁去逼别人改号。
 新号段/新条目的纪律照旧：**追加到文件末尾、号只增不改**，取号按工作树最大号（本趟是 232 ⇒ 下一枚 233），不按 HEAD。
+
+
+## B78. 🔴 19:08 现量：钉住 ①③ 一整天的"公证死等门"**已经消失**，现在只剩别人的移动端验收与负载；同批把本线设备面那一格改成**归因**（旧形状 614/618 轮永不开）
+
+**为什么这条值得单独编号**：B66/B67/B70/B76 四条把 ①③ 描述成"卡在那条挂在 notarization 上的对端进程"，
+而那个描述到 19:08 已经**不成立**了 —— 下一位若照它去等 `pid 95477` 消失，等的是一件已经发生的事。
+
+1. **18:44:56 现量**：`pgrep -f 'package-app\.sh'` 空、`pgrep -f notarytool` 空、`pgrep -f 'reinstall-all\.sh'` 空，
+   `93817 / 95477 / 98934` 三代全不在。⇒ B67 那条"处置权在人"的按住**自己解除了**，
+   而且 main 里 `package-app.sh:283` 的 `HEYTA_NOTARY_TIMEOUT`（默认 900s 看门狗）在载体 checkout 后**会生效**
+   —— 上一代"永久挂住"对下一趟已关闭（19:02 现量首候选公证 key 存在：`~/Library/Private/AppStoreConnect/AuthKey_T2H876K8MJ.p8`）。
+2. **19:06–19:08 现量的真拦路**换成两条：别人的移动端验收（18:47 是 batch2 的 `.verify-mobile-card-export.sh.snap.84443`，
+   19:01 起是 `scripts/.verify-mobile-ios.sh.snap.19156`）与负载（`16.87 / 18.47 / 33.56 / 118.61`，阈值 12）。
+   规范闸门 `--target c` 18:49 现量 `REDS=load,src,dev,apk`。
+3. **本线装置改的一处承重判据**：看守链的设备面那一格原来把"com.heyta 立着"直接判成忙，
+   而任何一趟 android 验收/重装收尾都把 App 留在前台 ⇒ 实际永不开
+   （`/tmp/heyta-chain17.log` 现量 **614/618 轮**卡这一格，只有 4 轮走到下一格）。
+   权威闸门 `verify-mobile-window-gate.sh:193-199 / :226-234` 用的从来是唯一那份运行者探针，**没看过实例**。
+   改成三态 + 归因（读不到设备⇒拦／有实例且有安卓运行者⇒让路／有实例无运行者⇒遗留放行）。
+   ✅ **判据**：`~/.heyta-window-rigs/heyta-device-occupancy-fixture.sh` 六臂 ——
+   第一趟就照出 `android_heyta_gate` 声明了 `runners` 却漏接 `$1`，
+   任何"有运行者"的读数都被读成空（两条必拦的臂退 0 ⇒ 门形同虚设）。
+   19:00:48 现场生效：链从设备格走到负载格。
+4. **① 的起跑前就绪表**（19:02–19:06，都是只读探）：mac ✓（notarytool 空、`/tmp/heyta-macos-dist` 零句柄）、
+   windows ✓（`WEBDIST=YES`、远端 0 个 dotnet）、ios ✓（链钉死 `heyta-iphone-17pro`，现量 running=0，
+   不会挑到别线的 `litopia-l7-probe`）、android ⚠️ APK 15:02:47 比源码旧（35 个 `.ts/.tsx` 更新）
+   ⇒ 由链的 prep 腿在窗口内重打，**不在等窗口期间起这个重活**。
+5. 📌 **待入 traps #264**（`environment-traps.md` 工作树最大号 263、该书 +746 行未提交 ⇒ 按"正脏着几百行时
+   不往它追加"的规矩先落这里与 handoff）：**判据比规范判据严，本身就是一种坏判据** ——
+   表现为"每次拦、理由听起来都对"，代价是这条线永远交付不了；写门之前先问"规范裁判是谁、它看什么"。
+   同批第二格（取证形状）：`cut -c1-170` 从**头**截把"拦的原因（被点名的运行者）"整段截掉 ⇒ 取 `tail`。
+
+**下一次判"窗口开没开"的现量命令**（别抄本条读数）：
+`cd <载体> && HEYTA_LOAD_GATE_WAIT=0 timeout 200 bash scripts/verify-mobile-window-gate.sh --target c` 读 `REDS=`；
+运行者 `cd <主检出> && . scripts/lib/mobile-e2e-runner-probe.sh; MOBILE_E2E_PROBE_ME=$$ mobile_e2e_runner_lines`。
+本线不动 `scripts/verify-mobile-notes.sh`（19:06 现量它在主检出是 `M`，别人正在改）。
