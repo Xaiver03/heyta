@@ -56,6 +56,14 @@ JUDG_PATHS=(
   scripts/lib/wedged-runner.sh
   scripts/lib/apk-freshness.sh
   scripts/lib/wait-for-quiet-host.sh
+  # 🔴 下面两枚**不是判据，是起栈的运行依赖**，规则一样："链依赖的东西必须与 dependent 同列"。
+  #    17:5x 实测到不带它们会怎样：链给 `mobile-e2e-up.sh` 传了新旋钮 `HEYTA_E2E_PIDFILE/LOGFILE`，
+  #    而载体那份是**已提交副本**（现量 `grep -n 'PIDFILE=' 载体那份` = 第 46 行写死 `/tmp/heyta-e2e-server.pid`）
+  #    ⇒ 旋钮被静默忽略，本线那趟起栈照样**覆盖了两枚跨树共享件**（pidfile 从死 pid 95105 变成我的 34466、
+  #    共享日志被我的启动输出续写）。这条链新加的后置断言（`stack_isolation` 那一格）会把这种"传了却不生效"
+  #    当场判红 —— 覆盖清单让它是**绿的来路**，断言保证它不是"我以为生效了"。
+  scripts/mobile-e2e-up.sh
+  scripts/mobile-e2e-down.sh
 )
 # 🔴 可覆盖只是为了让本步自己的臂（缺文件 / 点名产品代码 / 载体脏）能在隔离克隆里试；
 #    下面那条 `packages/*|apps/*|server/*)` 守卫**不认来源**，覆盖也越不过去。
@@ -159,6 +167,37 @@ echo "PORT=${PORT}（候选=${PORT_CANDIDATES}）" >> "$LOG"
 # 演练旋钮：只验挑端口这一段就退出（02:2x 用它做阳性对照：候选里放进 3000 就必须被跳过）
 if [ "${PORT_ONLY:-0}" = 1 ]; then echo "PORT_ONLY=${PORT}"; exit 0; fi
 
+# ── 0b. 服务端的运行输入：载体里没有 `server/.env`，这两枚必须由链带过来 ──────────
+# 🔴 17:4x 现量的失败形状：`STEP install rc=0`、`STEP build_all rc=0`，然后 `STEP stack_up rc=1`，
+#    整条日志里唯一的线索是那一发 `Error: JWT_SECRET environment variable is required`
+#    （抛点在 `server/dist/src/auth.js:63` = `server/src/auth.ts:34`）。
+#    机制：`scripts/mobile-e2e-up.sh:208` 那个启动 env 块里**没有** JWT_SECRET，
+#    主检出能起栈靠的是 `server/src/index.ts:1` 的 `import 'dotenv/config'` 去读**未跟踪**的
+#    `server/.env` —— 而 linked worktree 不带来未跟踪文件
+#    （现量 `ls "$CARRIER/server/.env"` = No such file；同刻主检出那枚有 JWT_SECRET 58 字符、
+#    PASSWORD_PEPPER 70 字符 ⇒ "起得来"这件事从来没被任何判据量过）。
+#    ⇒ 这是"运行输入由主检出里恰好有那个文件隐提供"那一族（本文件头那条"打包输入"与 §7 第 82 条同形）。
+# 🔴 **不许就地生成一枚随机值了事**：`PASSWORD_PEPPER` 进的是**库里已存账号的口令哈希**
+#    （`server/src/password/hash.ts:47`），换一枚 ⇒ 验收脚本拿老账号登录失败，
+#    而那个红长得像"这条功能坏了"，不像"你把 pepper 换了"。
+#    ⇒ 只从主检出那枚真源**显式带过来**，并且**只打名字与长度，值一个都不进日志**（AGENTS §8.10）。
+# ⚠️ 优先级写成行为而不是巧合：dotenv **不覆盖已存在的 `process.env`**，所以下面 export 的两枚
+#    压过载体那侧的任何 `.env`（载体此刻没有 ⇒ 现在这一条是"以后有也照这个走"，不是"现在没事"）。
+# 这一格排在 install **之前**是刻意的：它是纯文件读，而窗口是稀缺资源（白烧一次 = 别人多等一轮）。
+SERVER_ENV_SRC="${SERVER_ENV_SRC:-$MAIN/server/.env}"
+srv_env_get() { sed -n "s|^$1=||p" "$SERVER_ENV_SRC" 2>/dev/null | tail -1; }   # 同名多行取最后一行（覆盖式写法的语义）
+JWT_SECRET_VAL=$(srv_env_get JWT_SECRET)
+PASSWORD_PEPPER_VAL=$(srv_env_get PASSWORD_PEPPER)
+if [ -z "$JWT_SECRET_VAL" ] || [ -z "$PASSWORD_PEPPER_VAL" ]; then
+  echo "CHAIN_STOPPED_AT=server_env（从 ${SERVER_ENV_SRC} 取到 JWT_SECRET=${#JWT_SECRET_VAL} PASSWORD_PEPPER=${#PASSWORD_PEPPER_VAL} 字符，两枚都必须非空）" >> "$LOG"
+  echo "  ⇒ 这不是产品失败，也不是「再等一个窗口就好」：载体的运行输入缺了一整类，下一个窗口还是这一发。" >> "$LOG"
+  exit 4
+fi
+export JWT_SECRET="$JWT_SECRET_VAL" PASSWORD_PEPPER="$PASSWORD_PEPPER_VAL"
+echo "SERVER_ENV src=${SERVER_ENV_SRC} JWT_SECRET_len=${#JWT_SECRET_VAL} PASSWORD_PEPPER_len=${#PASSWORD_PEPPER_VAL} carrier_env=$([ -f "$CARRIER/server/.env" ] && echo present || echo absent)（值不进日志；export 的这两枚压过 dotenv）" >> "$LOG"
+# 演练旋钮：只验这一格就退出（两腿：真 MAIN ⇒ rc=0 并打长度；MAIN 指到空目录 ⇒ rc=4 且停在 server_env）
+if [ "${SERVER_ENV_ONLY:-0}" = 1 ]; then echo "SERVER_ENV_ONLY ok jwt_len=${#JWT_SECRET_VAL} pepper_len=${#PASSWORD_PEPPER_VAL}"; exit 0; fi
+
 run() { # <步骤名> <命令...>
   local name="$1"; shift
   echo "----- STEP ${name} begin $(date '+%T') -----" >> "$LOG"
@@ -179,7 +218,20 @@ case "$RESOLVED" in
 esac
 
 run build_all pnpm -r build || { echo "CHAIN_STOPPED_AT=build_all" >> "$LOG"; exit 1; }
-run stack_up env PORT="$PORT" bash scripts/mobile-e2e-up.sh || { echo "CHAIN_STOPPED_AT=stack_up" >> "$LOG"; exit 1; }
+# 🔴 载体这趟起栈**不许写那两枚跨树共享的名字**（`scripts/mobile-e2e-up.sh` 的 pidfile/logfile
+#    原本写死 `/tmp/heyta-e2e-server.{pid,log}`，主检出与任何 worktree 载体共用同一个文件）。
+#    17:5x 现量的后果两条，都是真的而不是推的：
+#    ① 载体那趟起栈失败后，pidfile 里躺着一枚**死** pid（`95105 alive=no`），
+#       而此刻 :3000 的真实监听者（`70256`）**没有任何地方记下它** ⇒ 那一棵的主人跑
+#       `mobile-e2e-down.sh` 会"成功退出而什么都没停"（traps #191 一族：报绿的动作没碰到被测对象）；
+#    ② 同一枚 logfile 被后起的那一棵截断覆盖 ⇒ 前一棵的服务端日志（判据读数）直接没了。
+#    旋钮默认值逐字不变，所以这里传的是**本线自己隔离**，不改别人的行为。
+#    路径打进链自己的日志：留下"这棵起过栈、怎么停"的口径，别留一枚没人知道的活进程。
+E2E_PIDFILE="${E2E_PIDFILE:-/tmp/heyta-e2e-server.carrier.$$.pid}"
+E2E_LOGFILE="${E2E_LOGFILE:-/tmp/heyta-e2e-server.carrier.$$.log}"
+echo "E2E_PIDFILE=${E2E_PIDFILE} E2E_LOGFILE=${E2E_LOGFILE}（停它：HEYTA_E2E_PIDFILE=${E2E_PIDFILE} bash scripts/mobile-e2e-down.sh）" >> "$LOG"
+run stack_up env PORT="$PORT" HEYTA_E2E_PIDFILE="$E2E_PIDFILE" HEYTA_E2E_LOGFILE="$E2E_LOGFILE" \
+  bash scripts/mobile-e2e-up.sh || { echo "CHAIN_STOPPED_AT=stack_up" >> "$LOG"; exit 1; }
 # 🔴 起栈失败**不再往下走**（原来这里只 `echo NOTE` 然后继续，等于把"没服务端"留给验收脚本来个 exit 3 ——
 #    白烧一个窗口）。失败就停在哨兵 `CHAIN_STOPPED_AT=stack_up` 上。
 # 阳性对照：栈起来之后这个端口必须真的在听。
@@ -187,6 +239,21 @@ if [ -z "$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)" ]; the
   echo "CHAIN_STOPPED_AT=stack_listen（PORT=${PORT} 起栈后没在听）" >> "$LOG"; exit 1
 fi
 echo "STACK_UP_OK port=${PORT} listener=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)" >> "$LOG"
+# 🔴 后置断言：**"传了旋钮"不等于"接住旋钮的那份代码被跑了"**。载体那份 up 若是旧的已提交副本，
+#    它照旧写那两枚跨树共享名，而副作用落在**别的树的读数**上、本线任何门禁都不会红
+#    （§7 第 82 条同族："另一棵的状态 == 我以为的那份"要有判据，不能靠调用路径隐式决定）。
+#    三条一起成立才算隔离住了：① 本线那枚 pidfile 在；② 里面那枚 pid **活着**；③ 它就是 $PORT 的监听者。
+ISO_PID=""
+[ -f "$E2E_PIDFILE" ] && ISO_PID=$(cat "$E2E_PIDFILE" 2>/dev/null)
+ISO_LISTEN=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)
+if [ -z "$ISO_PID" ] || [ "$ISO_PID" != "$ISO_LISTEN" ] || ! kill -0 "$ISO_PID" 2>/dev/null; then
+  echo "CHAIN_STOPPED_AT=stack_isolation（pidfile=${E2E_PIDFILE} 里的 pid=${ISO_PID:-〈空〉}，:${PORT} 的监听者=${ISO_LISTEN:-〈无〉}）" >> "$LOG"
+  echo "  ⇒ 载体那份 scripts/mobile-e2e-up.sh 不认这两个旋钮 = 它是旧的已提交副本（第 0 步的覆盖清单没带到它）。" >> "$LOG"
+  echo "    这一趟已经写过共享的 /tmp/heyta-e2e-server.{pid,log}；收尾前先 `ps -o pid,command -p ${ISO_LISTEN:-0}` 确认那是本线这棵，" >> "$LOG"
+  echo "    **不要**停不是自己那棵的服务端（AGENTS §8.9：共享资源的动作要认所有者）。" >> "$LOG"
+  exit 1
+fi
+echo "STACK_ISOLATION_OK pid=${ISO_PID}（就是 :${PORT} 的监听者；共享那两枚本线没碰）" >> "$LOG"
 run build_android pnpm build:android || { echo "CHAIN_STOPPED_AT=build_android" >> "$LOG"; exit 1; }
 # 🔴 刚打出来的 APK 里必须数得出本轮判据要点的三枚 testID 片段（§7 第 27 条那一族的正面补强：
 #    "APK 不比源码旧"只比 mtime，比不出"判据要点的那几个字符串在不在产物里"）。

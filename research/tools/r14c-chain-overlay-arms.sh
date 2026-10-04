@@ -125,12 +125,49 @@ grep -q '仍脏：' "$D/a3.log" || { echo "   ❌ 没把脏的那枚列出来（
 
 echo "== A4：对照在克隆里（干净树）也应绿，且 OVERLAY 数 == 推导出的清单枚数 =="
 git -C "$CLONE" checkout -- packages/domain/src/index.ts
+# 🔴 逐枚期望**从清单 + 跑之前的现量推导**，不钉具体文件名。
+#    原来这里钉着两行"这一枚该还在 / 那一枚该被 REMOVED"，而 17:46 看守把载体从 `2ac93e54`
+#    同步到 `a5d11125` ⇒ `research/tools/r14c-bundle-testid-preflight.sh` 从"覆盖前不存在"
+#    变成"覆盖前就存在"，A4 于是红在一条**过期的前提**上，而链的行为一字未变 ——
+#    正是本文件头写的那一族（别把上游当前状态写死进断言）。现在的前置是"跑之前现量每一枚在不在"。
+BEFORE_A4="$D/a4-before"; : > "$BEFORE_A4"
+for p in $(list_body | grep -vE '^[[:space:]]*#' | grep -vE '^[[:space:]]*(JUDG_PATHS=\(|\))'); do
+  if [ -e "$CLONE/$p" ]; then
+    printf 'E\t%s\t%s\n' "$p" "$(md5of "$CLONE/$p")" >> "$BEFORE_A4"
+  else
+    printf 'A\t%s\t-\n' "$p" >> "$BEFORE_A4"
+  fi
+done
+N_EXISTED=$(grep -c '^E' "$BEFORE_A4" || true)
+N_ABSENT=$(grep -c '^A' "$BEFORE_A4" || true)
+printf '   覆盖前现量：已存在 %s 枚 / 不存在 %s 枚（合计应为 %s）\n' "$N_EXISTED" "$N_ABSENT" "$WANT_N"
+[ "$((N_EXISTED + N_ABSENT))" = "$WANT_N" ] || { echo "   ❌ 分母对不上清单枚数 ⇒ 上面的遍历漏了条目"; fail=1; }
 PORT_ONLY=1 CARRIER="$CLONE" LOG="$D/a4.log" bash "$CHAIN" >"$D/a4.out" 2>&1; A4=$?
-echo "   rc=$A4  OVERLAY 行数=$(grep -c '^OVERLAY ' "$D/a4.log")  RESTORED/REMOVED 行数=$(grep -cE 'RESTORED|REMOVED' "$D/a4.log")"
+echo "   rc=$A4  OVERLAY 行数=$(grep -c '^OVERLAY ' "$D/a4.log")  RESTORED/REMOVED 行数=$(grep -cE '^(RESTORED|REMOVED) ' "$D/a4.log")"
 [ "$A4" = 0 ] || { echo "   ❌ 克隆里的对照没绿"; tail -5 "$D/a4.log" | sed 's/^/      /'; fail=1; }
 [ "$(grep -c '^OVERLAY ' "$D/a4.log")" = "$WANT_N" ] || { echo "   ❌ 克隆里 OVERLAY≠${WANT_N}"; fail=1; }
-[ -f "$CLONE/scripts/verify-mobile-due-time.sh" ] || { echo "   ❌ 还原把已存在的那枚删掉了（existed 标志位坏了）"; fail=1; }
-[ -e "$CLONE/research/tools/r14c-bundle-testid-preflight.sh" ] && { echo "   ❌ 覆盖前不存在的枚没被 REMOVED"; fail=1; }
+[ "$(grep -cE '^(RESTORED|REMOVED) ' "$D/a4.log")" = "$WANT_N" ] \
+  || { echo "   ❌ 还原动作的枚数≠清单枚数（有的那枚没被还原 = 载体会一直脏着挡住下一次 checkout）"; fail=1; }
+A4_BAD=0
+while IFS=$'\t' read -r kind p h; do
+  [ -n "$p" ] || continue
+  case "$kind" in
+    E) if [ ! -f "$CLONE/$p" ]; then
+         echo "   ❌ 覆盖前存在的枚被还原成不存在：${p}（existed 标志位坏了）"; A4_BAD=1
+       elif [ "$(md5of "$CLONE/$p")" != "$h" ]; then
+         echo "   ❌ 覆盖前存在的枚没回到原字节：$p"; A4_BAD=1
+       elif ! grep -q "^RESTORED ${p}" "$D/a4.log"; then
+         echo "   ❌ 该枚走了还原动作却没打 RESTORED：$p"; A4_BAD=1
+       fi ;;
+    A) if [ -e "$CLONE/$p" ]; then
+         echo "   ❌ 覆盖前不存在的枚没被 REMOVED：$p"; A4_BAD=1
+       elif ! grep -q "^REMOVED ${p}" "$D/a4.log"; then
+         echo "   ❌ 该枚被摘掉了却没打 REMOVED：$p"; A4_BAD=1
+       fi ;;
+  esac
+done < "$BEFORE_A4"
+[ "$A4_BAD" = 0 ] && echo "   ✅ 逐枚还原对得上跑之前的现量（E 枚回到原字节、A 枚摘干净）"
+[ "$A4_BAD" = 0 ] || fail=1
 
 [ "$fail" = 0 ] && echo "结论：第 0 步有牙（缺文件停 / 产品代码停且不动手 / 脏载体停并列出脏行 / 对照绿且逐枚还原）"
 exit $fail
