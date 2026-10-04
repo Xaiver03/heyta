@@ -42,6 +42,15 @@
  *      不是工作区包 ⇒ `pnpm install` 永远不会在那儿建目录，远程构建**恒定**红在步骤 1，
  *      而它给出的修法执行完照样红（§7 元规则 2）。期望值靠**推导**工作区清单，
  *      不靠"这路径在不在" —— 后者在干净检出上必假红。
+ *   G8 **远端仓库根单源**：路由必须把 `${REMOTE_ROOT}` 传给同步、同步必须把第二枚实参绑回
+ *      `HEYTA_WINDOWS_REPO_ROOT`，且 dry-run 打印的那条要与真跑同形。两个旋钮只移一个就是
+ *      "同步解包到 A 树、gradle 在 B 树里构建"（§7 第 82 条的远程形态）。三条腿各一臂。
+ *   G9 **步骤 1 的依赖前置要逐包、要先证明探针跑成了**：名单由 `apps/mobile/package.json`
+ *      推导、`DEPCHECK`/`DEPMISS` 分两条输出、判定侧有"数不对 ⇒ 判探针故障"的守卫。
+ *      理由同样是真事故：2026-10-05 第一次真远程构建红了 18m18s，而步骤 1 当时只
+ *      `Test-Path` 那枚**目录** ⇒ 远端少两枚已声明的包被伪装成"前置过了"。
+ *      与 G7 是同一族（"目录存在"被当成"构建输入齐"），但不是同一件事：G7 拦的是
+ *      探错了地方（永不开的门），G9 拦的是探对了地方却只看了目录。
  *
  * ## 怎么跑
  *
@@ -429,6 +438,41 @@ function checkRouterInvariants(baseRoot) {
   if (callBlock && CALL_SHAPE.test(callBlock[0]) && occ === 2 && /local HEYTA_WINDOWS_REPO_ROOT="\$\{_android_remote_root:-\$HEYTA_WINDOWS_REPO_ROOT\}"/.test(lib)) {
     readings.push('G8 远端仓库根单源（路由把 REMOTE_ROOT 传进同步，同步绑回局部）');
   }
+
+  /* G9：步骤 1 的远端依赖前置必须是**逐包**判定，而且**先证明探针跑成了再说"缺 0 个"**。
+   * 这条判据是被 2026-10-05 那次 18m18s 的失败照出来的（runbook §7.1）：当时 preCmd 只
+   * `Test-Path apps\mobile\node_modules`（目录级），远端少两枚**已声明**的包而它报 ✅，
+   * 真红要等 Metro 在 18 分钟后打那句 `Unable to resolve module`。
+   * 三个形状缺任何一个都会退回那个状态，所以三条各自一条红腿：
+   *   1. 名单由 `apps/mobile/package.json` 的 dependencies **推导**（写死一份名单会自己漂）；
+   *   2. `DEPCHECK` 与 `DEPMISS` **分两条 Write-Output** —— 同一行会被 `marker()` 的
+   *      `[^\r\n]*` 贪婪读成 `19 DEPMISS=2`，`Number()` 得 NaN，于是守卫把一次**正常探测**
+   *      误判成探针故障。这不是风格问题，是形状（第 3 条守卫建立在第 2 条之上）；
+   *   3. 判定侧有"读不到 / 数不对 ⇒ 判探针故障"的守卫，否则"没数过"会被放行成"缺 0 个"。 */
+  const DERIVE = /Object\.keys\(mobilePkg\.dependencies/;
+  const SPLIT_MARKERS = /Write-Output \('DEPCHECK=' \+ \$n\.Count\); Write-Output \('DEPMISS=' \+ \$m\.Count\)/;
+  const PROBE_GUARD = /Number\.isFinite\(depChecked\) \|\| depChecked !== declaredDeps\.length/;
+  if (!DERIVE.test(router)) {
+    out.push(
+      'G9 步骤 1 的依赖名单不是从 apps/mobile/package.json 推导的 —— 逐包前置要么被摘掉了，' +
+        '要么换成了一份会自己漂的写死名单。那次 18m18s 的失败就是"目录级判据伪装成前置过了"。',
+    );
+  }
+  if (!SPLIT_MARKERS.test(router)) {
+    out.push(
+      'G9 DEPCHECK / DEPMISS 不是两条独立输出 —— 同一行会让 marker() 的 [^\\r\\n]* 贪婪读到整串，' +
+        'Number() 得 NaN，于是探针故障守卫把一次**正常探测**判成故障（或者反过来把故障读成正常）。',
+    );
+  }
+  if (!PROBE_GUARD.test(router)) {
+    out.push(
+      'G9 判定侧缺"DEPCHECK 读不到 / 数不等于名单长度 ⇒ 判探针故障"那条守卫 —— ' +
+        '没有它，"没数过"与"缺 0 个"在输出上长得一样，而放行读的是后者。',
+    );
+  }
+  if (DERIVE.test(router) && SPLIT_MARKERS.test(router) && PROBE_GUARD.test(router)) {
+    readings.push('G9 步骤 1 逐包前置（名单由 package.json 推导 ／ 两标记分行 ／ 探针故障守卫在位）');
+  }
   return out;
 }
 
@@ -718,6 +762,43 @@ function selfTest() {
       if (countRed(msgs, 'G8 ') === 1) console.log('   ✅ 臂 10b 转红：同步侧不绑定第二枚实参，被 G8 抓到（恰好 1 条）');
       else {
         console.log(`   🔴 臂 10b 存活：摘掉绑定后 G8 报了 ${countRed(msgs, 'G8 ')} 条（应当恰好 1）`);
+        fail = 1;
+      }
+    }
+    /* 臂 11 / 11b / 11c：G9 的三条腿，各自摘一边 ⇒ 必须恰好 1 条红。
+     * 这三条不是假想的病灶，就是 2026-10-05 那次 18m18s 失败当时的形状（臂 11 = 目录级前置
+     * 没有逐包名单；臂 11b = 两个标记挤同一行，marker() 贪婪读坏；臂 11c = 缺"先证明探针跑成了"
+     * 的守卫，于是"没数过"被放行成"缺 0 个"）。每条都只动自己那一处，所以期望恰好 1。 */
+    const g9Arms = [
+      {
+        name: '11（名单不是从 package.json 推导）',
+        from: 'Object.keys(mobilePkg.dependencies ?? {})',
+        to: '["react","react-native"]',
+      },
+      {
+        name: '11b（DEPCHECK/DEPMISS 挤在同一行输出）',
+        from: `Write-Output ('DEPCHECK=' + $n.Count); Write-Output ('DEPMISS=' + $m.Count)`,
+        to: `Write-Output ('DEPCHECK=' + $n.Count + ' DEPMISS=' + $m.Count)`,
+      },
+      {
+        name: '11c（缺"数不等于名单长度 ⇒ 判探针故障"那一半守卫）',
+        from: '!Number.isFinite(depChecked) || depChecked !== declaredDeps.length',
+        to: '!Number.isFinite(depChecked)',
+      },
+    ];
+    for (const arm of g9Arms) {
+      seed();
+      const mutated = router.split(arm.from).join(arm.to);
+      if (mutated === router) {
+        console.log(`   🔴 臂 ${arm.name} 没施上：run-gradle.mjs 里读不到那一串 —— G9 的这条腿无从求值`);
+        fail = 1;
+        continue;
+      }
+      write('scripts/run-gradle.mjs', mutated);
+      msgs = checkRouterInvariants(dir);
+      if (countRed(msgs, 'G9 ') === 1) console.log(`   ✅ 臂 ${arm.name} 转红：G9 抓到（恰好 1 条）`);
+      else {
+        console.log(`   🔴 臂 ${arm.name} 存活：G9 报了 ${countRed(msgs, 'G9 ')} 条（应当恰好 1）`);
         fail = 1;
       }
     }
