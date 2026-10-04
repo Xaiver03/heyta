@@ -31,7 +31,7 @@
  *   FORCE_OPEN=1 node … --run-on-open --run-cmd 'echo 演练：这里没有真的落地'   # 演练开窗那一支
  *   node research/tools/selfhost-window-sentinel.mjs --selftest          # 12 条臂：每一臂都写明它凭什么会红
  *   node research/tools/selfhost-window-sentinel.mjs --alive             # 只读心跳：哨兵还活着吗（不用 kill -0）
- * 旋钮（默认值都能跑）：LOG PIDF CAP STEP QUIET_MIN LOAD_MAX HEYTA_CARRIER_WT FORCE_OPEN
+ * 旋钮（默认值都能跑）：LOG PIDF CAP STEP QUIET_MIN LOAD_MAX MAX_ATTEMPTS HEYTA_CARRIER_WT FORCE_OPEN
  *
  * 🔴 心跳不是装饰：v4 那一趟 23:19 起跑、23:21 之后静死（日志里没有退出行，是父 shell 被收走的）。
  *    "有个东西在等窗口"这件事必须能**被读出来**，否则下一轮会把"没人跑"读成"还没到窗口"。
@@ -50,6 +50,7 @@ const CAP = Number(process.env.CAP || 14400);
 const STEP = Number(process.env.STEP || 150);
 const QUIET_MIN = Number(process.env.QUIET_MIN || 15);
 const LOAD_MAX = Number(process.env.LOAD_MAX || 12);
+const MAX_ATTEMPTS = Number(process.env.MAX_ATTEMPTS || 3);
 const CARRIER_DIR = process.env.HEYTA_CARRIER_WT || '/tmp/heyta-merge-carrier';
 const LANDER = join(ROOT, 'research/tools/selfhost-land-main.mjs');
 const BLOCKERS = join(ROOT, 'research/tools/selfhost-landing-blockers.mjs');
@@ -104,6 +105,21 @@ export function sampleVerdict(s, prevMain, loadMax = LOAD_MAX) {
 /** 连续成立需要几样：向上取整，别用整除把 15 分钟截成 14.5。 */
 export function needStreak(quietMin, step) {
   return Math.ceil((quietMin * 60) / step);
+}
+
+/**
+ * 一次 `--confirm` 之后怎么办。
+ * 退 1（main 在算完载体之后又动了）与退 3（负载/端口/载体没守住）说的是**这一趟的时机不对**，
+ * 不是产品红 —— 而窗口是按分钟计的稀缺资源，直接退出等于把已经拿到的窗口还给随机性。
+ * 🔴 但不许无限重试：每一趟完整链要几十分钟高负载，重试会把一次干扰变成 N 次。两道闸：
+ *    ① 只对 {1,3} 重试；退 2（探针坏）与退 4（载体上完整 `pnpm check` 红）都要人，再跑一遍只会拿同一个坏东西再跑；
+ *    ② 重试前必须**重新凑满**连静要求 —— 由“回到循环后照样 sleep STEP 才计一样”保证，
+ *       不许不等够就立刻重样（那样 15 分钟这个代理指标会在几十秒内被凑满 = 自己把判据摘掉）。
+ */
+export function decideAfterLand(rc, attempts, maxAttempts) {
+  if (rc === 0) return { action: 'landed', retry: false, exitCode: 0 };
+  const retry = (rc === 1 || rc === 3) && attempts < maxAttempts;
+  return { action: retry ? 'retry' : 'stop', retry, exitCode: rc };
 }
 
 /* ── 探针：全部只读，任何一条读不出形状都按"不成立"处理 ─────────────────── */
@@ -184,6 +200,13 @@ export function sentinelArms() {
   // parseBlockers 的正向对照：真输出形状（BLOCK 行缩进两格 + 中文汇总）要数得出 1
   push('A13 BLOCK 行**缩进两格**也数得到（锚定行首会恒得 0）', 1,
     parseBlockers('夹具：写集 64 枚 · **阻塞集 1 枚**\n  BLOCK package.json\n').count);
+  // decideAfterLand：这六条臂各钉住一条"不许"
+  push('B1 rc=0 ⇒ landed、不重试、退 0', 'landed|false|0', (()=>{const d=decideAfterLand(0,1,3);return [d.action,d.retry,d.exitCode].join("|");})());
+  push('B2 rc=1 且还没用满尝试 ⇒ 回等待循环（窗口不许还给随机性）', true, decideAfterLand(1,1,3).retry);
+  push('B3 rc=3 且已用满尝试 ⇒ 停，退出码原样透出去', false, decideAfterLand(3,3,3).retry);
+  push('B4 rc=4（载体上完整 check 红）⇒ **不重试**，那是要人逐段归属的', false, decideAfterLand(4,1,3).retry);
+  push('B5 rc=2（探针坏）⇒ **不重试**，拿同一个坏探针再跑一遍还是坏的', false, decideAfterLand(2,1,3).retry);
+  push('B6 停止时退出码必须是 LAND 的原码，不许被改写成 0', 4, decideAfterLand(4,1,3).exitCode);
   return arms;
 }
 
@@ -195,7 +218,7 @@ function runSelftest() {
     if (!hit) bad += 1;
     console.log(`${hit ? '  ok' : 'RED '} ${a.name}（期望 ${JSON.stringify(a.expect)}，实得 ${JSON.stringify(a.got)}）`);
   }
-  console.log(`哨兵自检：臂数 ${arms.length} · 红 ${bad} · 拒绝臂 ${arms.filter((a) => /^A\d+ /.test(a.name)).length} 条`);
+  console.log(`哨兵自检：臂数 ${arms.length} · 红 ${bad} · 拒绝臂 ${arms.filter((a) => /^[AB]\d+ /.test(a.name)).length} 条`);
   if (arms.length < 12 || bad > 0) { console.log('❌ 自检没过 ⇒ 不许拿这条哨兵去等窗口'); process.exit(1); }
   console.log('✅ 五件判据各被单独打红过一次，负载解析证明取的是 1 分钟位，BLOCK 行按 trimStart 认。');
   process.exit(0);
@@ -255,6 +278,7 @@ beat(`起步(v5) SELF_PID=${process.pid} CAP=${CAP}s STEP=${STEP}s QUIET_MIN=${Q
 let elapsed = 0;
 let prevMain = '';
 let streak = 0;
+let attempts = 0;
 let mainChanges = 0;
 while (elapsed < CAP) {
   const s = takeSample();
@@ -270,12 +294,24 @@ while (elapsed < CAP) {
     beat(`WINDOW_OPEN${process.env.FORCE_OPEN === '1' ? '【FORCE_OPEN=1 演练，不是真窗口】' : ''} 五件同时成立已连续 ${streak * STEP}s ≥ ${QUIET_MIN} 分钟（负载=${s.load} main=${s.main} 观察期内 main 变过 ${mainChanges} 次）`);
     beat(`    手工等价命令：cd "${mainTree}" && node "${LANDER}" --confirm`);
     if (runOnOpen) {
+      attempts += 1;
       const body = runCmd || `node "${LANDER}" --confirm`;
-      beat(`    开窗即执行：cd "${mainTree}" && ${body}`);
+      beat(`    开窗即执行（第 ${attempts}/${MAX_ATTEMPTS} 次尝试）：cd "${mainTree}" && ${body}`);
       const r = spawnSync('sh', ['-c', body], { cwd: mainTree, stdio: 'inherit' });
       const rc = r.status ?? 1;
-      beat(`    LAND_RC=${rc}（0=已落地或按 dry-run 语义；1/2/3/4 见 selfhost-land-main.mjs 文件头）`);
-      process.exit(rc);
+      const d = decideAfterLand(rc, attempts, MAX_ATTEMPTS);
+      beat(`    LAND_RC=${rc}（0=已落地；1=main 在算完载体后又动了；2=探针坏；3=负载/端口/载体没守住；` +
+        `4=载体上完整 pnpm check 红 ⇒ 要人逐段归属。见 selfhost-land-main.mjs 文件头）⇒ ${d.action}`);
+      if (!d.retry) process.exit(d.exitCode);
+      // 🔴 回到等待循环，且**必须重新凑满**连静要求：靠下面这一次 STEP 睡眠计时，
+      //    不许"不等够就立刻重样"（那样 15 分钟这个代理指标会在几十秒内被凑满 = 自己把判据摘了）。
+      beat('    ↩ 时机不对不等于产品红 ⇒ 回等待循环，重新凑满连静要求后再试');
+      prevMain = s.main || prevMain;
+      streak = 0;
+      const tRetry = Date.now();
+      execFileSync('sleep', [String(STEP)]);
+      elapsed += Math.max(STEP, Math.round((Date.now() - tRetry) / 1000));
+      continue;
     }
     beat('    ⚠️ 本哨兵没加 --run-on-open ⇒ 只报不开工。');
     process.exit(0);
