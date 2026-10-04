@@ -285,6 +285,20 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
 
 ## 5. 下一步（有序，一次一个会话做得完的量）
 
+> ✅ **19:04 现量把 ④ 在当前 HEAD 逐项复核过（不重做，只证明它仍然成立）**：
+> `ProjectActions.setParent` 在 `packages/app-host/src/project-actions.ts:109`（接口）与 `:280`（实现），
+> 守卫走 `validateProjectParentChange` 的**封闭集合 verdict** —— 拒绝时抛
+> `改父被拒绝（reason）：entityId → 顶级`，**不静默降级成空操作**；清除写成 `undefined → null`
+> （JSON 里键必须存在才表达"清掉"）。两端消费者：web `apps/web/src/features/projects/store.ts`
+> 与 `features/tasks/SubtaskPicker.tsx`、mobile `apps/mobile/src/screens/ListsSection.tsx`、
+> 共享 `packages/ui/src/projects/FolderPicker.tsx`。词条两侧都在：
+> `common.organizer.folder.{title,button,current,none,reject.cycle}` 与 `mobile.detail.field.parent`
+> 在 `zh-CN.ts` 与 `en.ts` 各命中 1 次。
+> ⚠️ 顺手记一条**探针形状**（它差点产出一句假结论）：i18n 那两个文件名是不对称的
+> （`zh-CN.ts` / `en.ts`）。按 `en-US.ts` 去 grep 得到的是 `No such file` + 空计数 ——
+> **那是探针坏了，不是"英文词条缺失"**。⇒ 待入 traps（现量工作树最大号 263，该书仍 +735 行未提交，
+> 按"正脏着几百行时不往它追加"的规矩先落本文件）。
+
 > 📌 **18:44:56 现量：§7.30 ① 那条"死等门"已经消失** ——
 > `pgrep -f 'package-app\.sh'` 空、`pgrep -f notarytool` 空、`pgrep -f 'reinstall-all\.sh'` 当时也空，
 > `93817 / 95477 / 98934` 三代（05:1x 起钉住 ① 与 ③ 的那条 `notarytool submit --wait`）**都不在了**。
