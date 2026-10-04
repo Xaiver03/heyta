@@ -1083,3 +1083,17 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   "服务端没在 :PORT" 那一支只在 `HEYTA_GATE_SERVER_PORT` 非空时才走（链不设它，走的是 `:266` 的纯 `echo`）。
   ⚠️ 但 `warn() { …; FAIL=$((FAIL + 1)); }` **本身没改** ⇒ 这条"惰性"取决于**现场那两个条件**，
   不是结构保证；链仍然保留那条单独归因（`REDS` 全空却退非 0 ⇒ 记「被无关腿否决」，不混进设备/负载红）。
+- ✅ **① 的两个外部依赖现量都在位**：Windows 打包机 `ssh -o ConnectTimeout=6 -o BatchMode=yes windows-pc` 正常连上
+  （⚠️ 我那次 `ssh windows-pc "echo HOST_OK; whoami"` 远端**把整串原样打回来** —— 那是 cmd/PowerShell 的
+  `echo` 形状，不是"命令没跑成"，也不是读数；**判可达只能看 SSH 本身成没成**，别拿 `echo` 的回显当证据）；
+  载体的 mac 段分母也在位 —— `../heyta-wt-reinstall/apps/web/dist/` 6 项、`assets/` **9 项**
+  （与主检出 `assets/` 的 9 项同数，`reinstall-all.sh:213-215` 那段比的就是**文件名集合**，
+  Vite 的名字是内容寻址的 ⇒ 集合等才是对账）。
+  ⚠️ 一条边界要写清：mac 段装的是 `/Applications/Heyta.app` 这个**全机共享位置**，对账比的是
+  "刚装出来的那份 vs 载体自己的 `apps/web/dist`" ⇒ 若别人在我装完与对账之间也往那个路径装一次，
+  集合会当场不等并打 🔴（**失败是响亮的**，不会把我的读数记成他的）。
+- ✅ ③ 的服务端归属已打进链的读数（v27 起）：`:3100` = pid 26407（19:3x 仍活着，`/health` 回 ok），
+  库名 `heyta_mobile_smoke` = ③ 第 10 步的默认查询目标；`~/.heyta-window-rigs/heyta-run-notes.sh`
+  已从**只住 `/tmp`** 复制到 durable（两枚 md5 现量相同 `8ac4f228…`，原件 mtime 04:05）——
+  注意它是**手跑那一趟**用的启动器，链跑 ③ 走的是链里那段（不经它），所以这条只是让
+  §5 里那句"不带 `--go` 退 3"的演示在 `/tmp` 被清之后仍然可复现。
