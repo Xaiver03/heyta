@@ -276,10 +276,14 @@
 | 10 | 复习对象挂在谁身上（任务 / 便签 / 新卡片） | B | 是 IA 决策，牵动 [multi-end-unified-strategy.md §7.1e](../plans/multi-end-unified-strategy.md) 那张次级表面表 |
 | 11 | 免费还是付费 | B | 牵动"收费的是服务器不是功能"的既有口径 |
 | 12 | 界面上允许出现哪些科学宣称 | B | **对外话术的合规边界**，不是工程问题（B2 的收窄 + B6 第 1 条未补一手） |
+| 13 | **用户主动收起那一栏时**，格里的常驻内容是跟着藏还是退回中间列 —— 🔴 这是 2026-10-04 15:2x 由工单 §8.54 核对合并产物时**照出来的新一格**，不是 #1/#8 的重复（#1 问"那一格放什么"、#8 问"同一格内部的空区块"） | A | 合并产物上那一格的行为语义（AI 面与本批 W7 的专注概览都住在同一格）；两种答案都要改同一处代码，只是方向相反 —— 现量链在工单 §8.54 第 1 节。对照与代价见 **C1b-Q13** |
 
-> 🔴 这 12 项里**卡住工单**的那几条，业界实际怎么答、推荐与代价已落在 **C1b**：
+> 🔴 这张表里**卡住工单**的那几条，业界实际怎么答、推荐与代价已落在 **C1b**（条数别抄这里的，现取：
+> `sed -n '/^## C1\. /,/^> 🔴/p' docs/research/detail-pane-alignment-and-spaced-review.md | grep -cE '^\| [0-9]+ \|'`）：
 > #1 / #2 / #8 / #9–12 来自 2026-10-03 第二批一手调研（#2 的对照在 19:27 到齐）；
-> **2026-10-04 08:0x 第三批把 #4 / #5 / #6 也补齐了，并把 #7 从"要确认"改成"已核"**（四节都在 C1b 末尾）。
+> **2026-10-04 08:0x 第三批把 #4 / #5 / #6 也补齐了，并把 #7 从"要确认"改成"已核"**（四节都在 C1b 末尾）；
+> **15:2x 第四批补 #13**（三条一手 —— VS Code / Android canonical layouts / Apple HIG Sidebars，另附三条明文边界；
+> 它比这张表里其他节都窄，因为它问的是一**格**的收起语义而不是一个功能面 —— 引用时带上"窄"这一句）。
 > 本节仍是"要拍"的清单 —— C1b 只把选择题变成**有出处的**选择题，不替谁拍。
 > ⚠️ 但 #5 / #6 那一格里**连问题本身都被现量改写过**（原来写的前提是错的），这类更正要看 C1b-Q5 / Q6，别看这张表。
 
@@ -306,6 +310,10 @@
 >    🔴 这一句在本节写完的**同一小时内就兑现了**：那三份临时载体已经没了
 >    （13:2x 现量 `ls /tmp/heyta-research` → 目录不存在），现量、仓库层实际留下多少出处、以及丢了什么
 >    都写在 C1b 开头那段。
+>
+> 📏 **15:2x 新增那节不并进上面这张表**（它是 13:1x 那一趟的读数，混进来就假报了趟次）：
+> C1b-Q13 的同形态读数现取 = **URL 4（去重 4）/ 日期串 3 / 明文边界 3 条**（取法：把该节切出来 `grep -oE 'https?://…'` 现数）。
+> 三条一手分别是 VS Code、Android canonical layouts、Apple HIG Sidebars，其中 Apple 那条走的是本文件 C2 第 9 条写好的 JSON 通道。
 >
 > ⇒ 这张表现在**没有一条"缺调研"**，只有"缺拍板"；#3 那一格已从"要拍"改成"是工程缺口、已随 W6 落码"。
 
@@ -605,6 +613,53 @@ done
 而工单 §6 那一行（"右栏是概览 + 记录"）本来就把**记录列表放在右栏**，所以"W7 的番茄右栏渲染 `<ul data-testid="focus-records">`"
 与这条禁令**不冲突** —— 禁令管的是**中栏**（计时器）不能被换成列表模型。
 判据从此可复跑，不必再等人确认。
+
+### C1b-Q13（= C1 #13，本轮新增的一格：用户**主动收起**那一栏时，格里的常驻内容跟着藏还是搬家）—— 2026-10-04 15:2x 第四批一手调研
+
+题面不是"那一栏放什么"（那是 #1 剩余的半条），也不是"空区块显不显示"（那是 #8，同一格**内部**的规则）。
+它问的是**收起这个动作的语义**：详情面里常驻着东西（本批 W7 的专注概览 / 已落 main 的 AI 面）之后，
+用户点页头那个开关把它收起来 —— 那些东西应该**跟着不见**，还是**退回中间列**？
+
+这题是工单 §8.54 在核对合并产物时照出来的：main 的 `detailHasRoom` 只在 mount 与 `resize` 重算，
+而 HEAD 把"这一栏不出现"四档全部实现成 `display: none` ⇒ 合并后这一格的现状是**副作用**而不是意图。
+两种答案各要改不同的东西，所以它必须拍，不能靠"看代码现在怎样"定。
+
+**一手分布**（访问日期 **2026-10-04**，三条均为官方文档页；取回方式是文本抽取层，不是原始 HTML 存档 —— 引用时带这一句）：
+
+| # | 出处 | 说了什么（逐字引本轮取回的句子） | 管到哪 |
+|---|---|---|---|
+| 1 | VS Code《Custom layout》`https://code.visualstudio.com/docs/editor/custom-layout`（页面自标 Last Updated **9/30/2026**） | 收起（toggle off）Secondary Side Bar 只是 **conceals its attached elements without detaching them or redirecting them elsewhere**，重新打开时**原地回来**；`VS Code will remember the layout of views and panels across your sessions`；要回默认位置用 `Reset Location` / `View: Reset View Locations` | **用户主动收起**这一档 |
+| 2 | Android Developers《Canonical layouts》`https://developer.android.google.cn/develop/adaptive-apps/guides/canonical-layouts?hl=en`（页面自标 Last updated **2026-09-22 UTC**） | 尺寸不够那一档是**换可见性**不是挤：`Medium- and compact-width displays show either the list or the detail, depending on user interaction with the app.`；辅助内容的去处写的是 `place the supporting content below the main content or inside a bottom sheet`；尺寸变化要保状态：`A list-detail layout responds accordingly, preserving app state:` | **几何不可行**那一档（与本格是两件事） |
+| 3 | Apple HIG《Sidebars》`https://developer.apple.com/design/human-interface-guidelines/sidebars`（正文经本节末那条 JSON 通道取到；HTML 页本身对 `WebFetch` 是 noscript 壳） | 收起是**为了腾地方/减干扰**、不是搬家事件：`People sometimes want to hide the sidebar to create more room for content details or to reduce distraction.`；尺寸变化时是**那一栏自己塌**、把空间让给主内容：`Consider automatically hiding and revealing a sidebar when its container window resizes. For example, reducing the size of a Mail viewer window can automatically collapse its sidebar, making more room for message content.`；可发现性是一条独立要求：`Avoid hiding the sidebar by default to ensure that it remains discoverable.`；紧凑档的替代物写的是 **tab bar**（`a more compact control such as a tab bar may provide a better navigation experience`），**没有**写"塞进 sheet / 搬进主列" | **用户主动收起** + 窗口 resize 两档 |
+
+🔴 **三条合起来给的是"分两档"，而且在一件事实上没有分歧**：**用户主动收起 ⇒ 内容跟着藏、原地保留、不 redirect**（第 1、3 条各说一遍，第 3 条还把 resize 自动塌也归到"那一栏自己没、空间让给主内容"）。
+"搬到别处"的说法只出现在**几何不够**那一档，而且 Android 给的去处是 `below the main content or inside a bottom sheet`（第 2 条），**不是"塞进旁边那一列"**。
+⇒ 把前者套到后者上（"用户收起 ⇒ 内容退回中间列"）在这三条一手里**没有对应表述** —— 那正是本仓库 `base.css:96` 注释早就写下的纪律
+（"这一条只管用户收没收，视口够不够是另一件事，两处的理由不同，不许合成一个布尔"），现在它有外部出处了。
+
+⚠️ **本轮取到的边界，不许读多**：
+① Apple 那一页**明确没有**规定"藏在侧栏里的控件/内容在收起之后必须怎样"（取回结果原话：no specific sentences describe the required behavior…），
+   唯一相邻的一条就是上面那句 discoverability ⇒ **它管"栏本身别默认藏"，不管"栏里功能的入口去哪"**。这一格的补位要求仍是我们自己的产品判断。
+② HIG 的 **Inspectors 专页仍未取到**（C2 第 9 条那六个 slug 还是 404 壳）⇒ 本节不引"HIG 对 inspector 的规定"这种话。
+③ VS Code 那一页现在**只**文档化 Secondary Side Bar，旧名 Auxiliary Bar 未在该页出现 —— 重命名还是另有一页，本轮没查。
+📌 **可迁移的取法（本轮把它跑活了）**：Apple 的 HIG / 营销页对 `WebFetch` 返 noscript 壳，正文要走
+`https://developer.apple.com/tutorials/data/design/human-interface-guidelines/<slug>.json` —— 这条手法本来就记在**本节 C2 第 9 条**，
+本轮第一次真用它取到正文（`sidebars.json`，2026-10-04）。⇒ 登记"取不到"之前先查仓内有没有已经写好的通道，我这次差点把一条已解的题当缺口登进去。
+
+**推荐（带代价；⚠️ 推荐不是拍板）**：拍**「跟着藏」**这一支。三条理由：① 一手形状如此（上表第 1、3 行，两条互不相关的官方来源各说一遍）；
+② 本仓库的**发现性条件已经成立** —— 页头那个开关在收起态仍然可见
+（`narrow.css:134/156/198` 只在三档**几何**不可行时才连开关一起藏，W4 判据 `detail-pane-collapse.spec.ts` 的 T2/T3a-c/T4 钉着这件事），
+而默认态是展开的（Apple 那句 "avoid hiding by default" 我们没违反）；③ "退回中间列"会把"收起"变成"搬家"，
+而用户对"收起"的心智是"我不要在这里看见它"，不是"请把它放到别处"。
+
+🔴 **代价两条，选这支也要认**：
+(a) 那一格里如果住着**功能入口**（AI 助手就是），收起之后该功能在界面上**入口数为零** ——
+VS Code 敢这么设计是因为每个 view 还能从命令面板/菜单到达。⇒ 这一支需要一条"功能不消失"的补位判据
+（收起态给中间列或菜单留一个入口，或明文接受"这一档就是要没有"）。
+(b) **现状不等于这支**：现在"跟着藏"是 `detailHasRoom` 没重算的副作用，镜像情形还更糟（载入时就是收起 ⇒ 展开后右栏是空的）。
+⇒ 选这支**仍要改代码**：那个布尔要跟着 `data-detail` 一起重算，让"藏"变成可预测行为，
+并补一条交叉判据（工单 §8.54 第 3 节点名了它缺谁：`detail-pane-collapse` 五条从不看 `ai-tool-run`）。
+选另一支（退回中间列）改的是同一处，但期望值相反 —— 所以说**两种答案都要动那一行**，只是动的方向不同。
 
 ---
 
