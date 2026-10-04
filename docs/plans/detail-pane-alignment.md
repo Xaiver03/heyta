@@ -3028,3 +3028,52 @@ theirs 在文件靠后处加**同一条声明**（两处相隔足够远，git �
 读数是 RC=1 但**停在 Q2 之后**、没有 `REASONS=` 行 —— 也就是说如果我只看退出码，会把"我的脚本崩了"
 读成"窗口被挡住了"。⇒ 这条脚本的判据从来看的不是退出码而是**它有没有打印出 `REASONS=` 那一行**；
 第 6 节"引用读数要带那一趟"也因此多一条含义：**没有结论行的读数不是读数**。
+
+---
+
+## 8.45 这一轮四笔提交的收口读数，以及**为什么全链电池这一轮没跑**（2026-10-04 13:1x）
+
+四笔：`54f32b65`（§8.43 第 7 节自我否证）· `dfd019a8`（§8.44 判据落成命令）·
+`9ae46b30`（§8.44 OWNED/NEED_HUMAN 拆开 + BROKEN 合成复现）· `cb5d7dbc`（调研文档 C1 表逐项对账）。
+全部**零产品源码**（改的是判据、rig、脚本、文档），所以 §1 四道闸门里"`packages` 改完先 build"一格不适用。
+
+| 判据/门禁 | 读数 |
+|---|---|
+| `apps/mobile` 那条判据 | **14 passed / 0 failed**（单文件） |
+| `apps/mobile` 全量 | **38 文件 / 608 passed**，`tsc --noEmit` **0 error** |
+| `mutate-selection-fallback.mjs` | `ARMS=4 AS_EXPECTED=4 FAIL=0 FINAL_SAME=true`、`POST_RESTORE 红=0/14` |
+| `check:selection-single-source` | RC=0，结论行现打："2 份实例…词表 3 类全有消费者（task 10 / habit 7 / note 13），接线声明 17 处全部用起来" |
+| `check:layering` | RC=0，"扫描 332 个文件，9 条规则" |
+| 文档三项 | 工单表格自检 **398 行零错位**（加进本节之前那一趟是 388 —— 差 10 行就是本节这张表自己）· 调研文档 136 行零错位 · `docs-link-check` 本篇命中 **0**（另两条红在别人文件，归因见 §8.43 第 6 节）· `check-docs-voice` RC=0 |
+| 反事实探针（§8.43 第 7 节） | `A 13/13 绿 · B 13/13 绿 + 门禁 RC=0 + tsc RC=0 · C 14/14 绿`，`RESTORED=true`（两枚 md5 逐字相同），`VERDICT=SILENT_NO_LAYER_GOES_RED` |
+| 合成形状探针（§8.44 第 7 节） | `MERGE_RC=0 MARKER=false 顶层同名声明=2` → `node --check RC=1` → `SHAPE_REACHABLE_PRODUCE_BY_CLEAN_MERGE` |
+| `verify-detail-pane-merge-window.mjs` | `REASONS=OWNED(7) NEED_HUMAN(15) MARKER(5)`，RC=1 |
+
+### 🔴 全链电池（`/tmp/dp_w1b_battery.py`，25 步：门禁 + token 生成 + 六包 typecheck + 六包测试 + web 生产构建 + e2e 整族）这一轮**没跑**
+
+原因不是"忘了"也不是"没必要"，是**现量到的共享资源占用**（AGENTS §8.9 的独占验收）：
+
+```
+ps Axo command | grep -F verify-mobile  →  bash …/heyta-wt-batch2/scripts/.verify-mobile-card-export.sh.snap.79671
+xcrun simctl list devices booted | grep -c Booted  →  5
+adb devices  →  emulator-5554 device
+sysctl -n vm.loadavg  →  { 14.34 39.65 66.57 }   （16 核，1 分钟已经越过仓库那道 12 的负载门）
+```
+
+⇒ 此刻起"六包全量测试 + `vite build` + Playwright 整族"会把负载再顶上去，而**另一条线正在这台机器上跑设备验收**，
+它的判据自带负载门 —— 我把机器压过阈值的后果是**它那趟变成"环境无效"**（不是产品失败，但没人会这么读）。
+按 §8.9 与既有裁决：不在别人的设备验收窗口里起自己的重活。
+
+**下一趟的命令与前置**（谁接手都照这个跑，别凭记忆）：
+
+```bash
+# 前置两条：verify-mobile 不在跑，且 vm.loadavg 的 1 分钟值 < 12
+ps Axo command | grep -F verify-mobile | grep -v grep; sysctl -n vm.loadavg
+node /tmp/dp_w1b_battery.py      # 载体必须是当前 HEAD；电池内部按包取 ./node_modules/.bin，不用 pnpm
+```
+
+⚠️ 这条"没跑"必须在**这一轮**就写明。**最近一趟全链电池不是在本轮这四个载体上跑的**：
+它是 §8.42 第 14 节那趟（12:2x，载体 `f2379dec`，25 步 RC=0 / `BATTERY_RESULT=ALL_GREEN`），
+比本轮四笔（`54f32b65`…`cb5d7dbc`）早。本轮四笔里没有一枚动产品源码，所以缺这一格**不改变任何一单的界面结论**，
+但它改变"当前载体全链绿"这句话能不能说 —— **不能说**。§8 状态表里 W1–W7 那几行仍然只到"只剩四端重装"，
+不许因为本轮又补了判据/文档而往上加"全链已复绿"。
