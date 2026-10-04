@@ -11,7 +11,7 @@
  * 跑法（仓库根；linked worktree 里不要 `pnpm run`，它会先做 deps-status 预检）：
  *   node research/tools/mutation-rigs/mutate-selection-f.mjs
  *
- * 九臂**各自带预期**（两条阴性对照的"不红"就是它们合格本身）：
+ * 十五臂**各自带预期**（三条阴性对照的"不红"就是它们合格本身）：
  *   H1 摘掉 TaskRow 的 aria-current          → 红：那一面没说
  *   H2 把 RN 面的通道换成 aria-current        → 红：登记通道没用 + 挂错通道（RN 上它不生效）
  *   H3 web 习惯面属性值里去掉谓词             → 红：属性在、说的不是选中
@@ -21,9 +21,15 @@
  *   H7 把某处面的路径指到不存在的文件        → 红：响亮失败，不静默跳过
  *   H8 把三元写法换成 `aria-current={selected}` → **必须不红**（改写法不改语义不该挨打）
  *   H9 词表里加一类而没有任何面对它说话      → 红：加一类选中就要留一处痕迹
+ *   H10 把时间线那一面退回"递送层"           → 红：§8.42 那个类别漏洞的形状（收紧前**绿**，见工单）
+ *   H11 时间线两处底色只摘一处通道           → 红：一处底色就要配一条通道
+ *   H12 时间线两处通道全摘                   → 红 ≥2
+ *   H13 时间线换写法不换语义                 → **必须不红**（门禁不判属性值语义，那一腿在 e2e）
+ *   H14 递送层在递的同时自己发痕迹           → 红：§8.42 的**镜像**（两条规则分别都满足过）
+ *   H15 同样的字样只写进注释                 → **必须不红**（两侧规则都跑在剥过注释的源码上）
  *
- * 判定按每臂预期走；九臂全 OK 且 `FINAL_SAME=true` 才 exit 0。
- * `FINAL_SAME` 覆盖**六枚**被改文件（门禁 + 五枚源码）—— 这台子真改源码，没有还原证明不算跑过。
+ * 判定按每臂预期走；十五臂全 OK 且 `FINAL_SAME=true` 才 exit 0。
+ * `FINAL_SAME` 覆盖**八枚**被改文件（门禁 + 七枚源码/宿主层）—— 这台子真改源码，没有还原证明不算跑过。
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -40,6 +46,7 @@ const files = {
   habitsView: 'apps/web/src/features/habits/HabitsView.tsx',
   notesSection: 'apps/mobile/src/screens/NotesSection.tsx',
   timeline: 'packages/ui/src/timeline/TimelineBoard.tsx',
+  quadrantScreen: 'apps/mobile/src/screens/QuadrantScreen.tsx',
   vocab: 'packages/app-host/src/selection.ts',
 };
 const md5 = (p) => createHash('md5').update(readFileSync(`${ROOT}/${p}`)).digest('hex');
@@ -146,6 +153,28 @@ const ARMS = [
     file: 'timeline',
     expect: 'green',
     mutate: (s) => s.split('aria-pressed={rowSelected}').join('aria-pressed={rowSelected ? true : undefined}'),
+  },
+  {
+    // 🔴 §8.42 那条规则的**镜像**：递送层既往下递、又自己出痕迹 —— 两条规则分别都满足
+    //   （`p={` 在、面表里没它），所以痕迹那一半没人要求它说话。这一臂给它牙。
+    name: 'H14 mobile 四象限那层在递的同时自己发 aria-pressed',
+    file: 'quadrantScreen',
+    expect: 'red',
+    mutate: (s) =>
+      s.replace(
+        'activeTaskId={activeTaskId}',
+        'activeTaskId={activeTaskId}\n      aria-pressed={activeTaskId !== null}',
+      ),
+  },
+  {
+    name: 'H15 阴性对照：同样的字样只写进注释',
+    file: 'quadrantScreen',
+    expect: 'green',
+    mutate: (s) =>
+      s.replace(
+        'activeTaskId={activeTaskId}',
+        '// 反例长这样：aria-pressed={activeTaskId !== null}\n      activeTaskId={activeTaskId}',
+      ),
   },
 ];
 

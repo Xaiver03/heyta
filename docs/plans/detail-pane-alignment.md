@@ -2594,7 +2594,7 @@ PIXELS_IDENTICAL=true  VERDICT=SAYING_HAS_TEETH_AND_ZERO_VISUAL
 
 | 闸门 | 这一单的读数 |
 |---|---|
-| 归属门 | 改动 6 枚，全部本单：`scripts/check-selection-single-source.mjs`（F 的两条规则）、`packages/ui/src/timeline/TimelineBoard.tsx`（产品）、`packages/ui/tests/timeline-row-selection-trace.spec.ts`（新增 7 条）、`research/tools/mutation-rigs/{mutate-selection-f,mutate-timeline-face}.mjs`、`e2e/{tests/selection-projections.spec.ts,playwright.detail-pane.config.ts}`、本篇。主检出同路径**零脏** |
+| 归属门 | 改动 **8 枚源码/文档 + 5 张 png**，全部本单：`scripts/check-selection-single-source.mjs`（F 的三条规则）、`packages/ui/src/timeline/TimelineBoard.tsx`（产品）、`packages/ui/tests/timeline-row-selection-trace.spec.ts`（新增 7 条）、`research/tools/mutation-rigs/{mutate-selection-f,mutate-timeline-face}.mjs`、`e2e/{tests/selection-projections.spec.ts,playwright.detail-pane.config.ts}`、本篇。主检出同路径**零脏** |
 | 两道余量为 0 的棘轮 | 零 CSS/`ht-*` 改动：`check:l4` rc=0（"三道断言都通过"）、`check:row-single-source` rc=0 —— **两道都没读基线数字，因为没有任何输入进它们** |
 | 干净检出复跑 | 判据输入 = 门禁脚本 + 一枚共享组件 + 两份判据文件，全部在本检出内；`check:rn-aria` / `check:layering`（332 文件 9 规则）/ `check:design` / `check:ui-language`（zh 2864 = en 2864）/ `check:selection-single-source` **各 rc=0**，末行逐字未变 |
 | `packages` 改完先 build | 🔴 这一格本轮**真的用上了**：`packages/ui` tsup → `apps/web` `tsc -b && vite build` → 才跑 e2e（A/B 两趟各重打一次，`UI_BUILD_RC=0/WEB_BUILD_RC=0` 与 `UI_BUILD2/WEB_BUILD2` 四条都在输出里）。**代价先付过一次**：A/B 第一版中间用 `cd ../apps/web` 换目录，从 `packages/ui` 出发深度不对 ⇒ `WEB_BUILD_RC=1` 而 e2e 照跑，那一趟量的是**上一轮的 dist**（那次失败恰好是真探针故障，所以没被误当成产品缺陷，但这是运气不是纪律） |
@@ -2613,7 +2613,39 @@ e2e 详情面整族 **25 passed**（含本单这一族 3 条）。
    而同一趟日志里明明有一条 `error TS2554`。改成先重定向到文件、再 `echo $?`，那条类型错才现形
    （`expect(x).toMatch(re, '消息')` —— `toMatch` 只收一个实参，消息要挂在 `expect(x, 消息)` 上）。
 
-### 12. 边界（别读多）
+### 12. 镜像那一格：递送层不许"一边递、一边自己出痕迹"（12:2x 现量 + 新规则 + 两臂）
+
+同一类错误的另一半。第 4 节那条收紧只挡住"**整个**躲进 RELAYS 免检"，
+没有挡住"**既** `p={` 往下递、**又**自己拿 id 上色" —— 后者两张表都各让一步：
+递送层判据看见 `p={` 就放行，面判据根本不扫它（它不在 FACES）⇒ **痕迹那一半永远没人要求它说话**。
+
+先现量，再决定要不要写规则（不现量就写 = 给一个不存在的需求加门禁）：
+
+| 登记为递送层的那五处 | 选中 id 出现在哪几行 / 什么形态 | 自己出痕迹？ |
+|---|---|---|
+| `apps/mobile/src/screens/QuadrantScreen.tsx` | 87 声明 / 99 解构 / 111 `activeTaskId={activeTaskId}` | **无**（三枚 needle 各 0 命中：`styles.*select` / `styles.rowActive` / `aria-current=` 与 `aria-pressed=`） |
+| `apps/mobile/src/screens/TimelineScreen.tsx` | 48 / 52 / 63 | 无（同上，各 0 命中） |
+| `apps/web/src/features/quadrant/QuadrantBoard.tsx` | 152 / 155 / 277 | 无 |
+| `apps/web/src/features/timeline/TimelinePanel.tsx` | 53 / 61 / 76 | 无 |
+| `packages/ui/src/quadrant/QuadrantBoard.tsx` | 133 / 315 / 379 | 无 |
+
+⇒ **今天没有缺陷**，所以这一条是**挡未来**的。而"挡未来"的判断本身可能错，
+所以它必须带臂（H14 注入 / H15 阴性对照），否则就是一句会慢慢烂掉的装饰 ——
+第 1 节那个漏洞的成因正是"看起来不像缺陷的地方没人写判据"。
+
+规则：RELAYS 循环里加一枚 `ownTrace` 扫描（`styles.<…>[Ss]elect` / `styles.rowActive` /
+`aria-(current|pressed)={`），命中即红，文案点名出口："递"和"算"同时成立时，
+"算"那一半必须按面登记。跑完读数：门禁 **RC=0**（五层各 0 命中），
+`mutate-selection-f.mjs` 从 13 臂变 **15 臂，AS_EXPECTED=15 FAIL=0 FINAL_SAME=true POST_RESTORE rc=0**，
+其中 `H14 rc=1 断言F行数=1`（在 mobile 四象限那层的转发行旁注入一行 `aria-pressed={activeTaskId !== null}`）、
+`H15 rc=0`（同样的字样只写进注释 —— 与 T6 一道构成"两侧规则都跑在剥过注释的源码上"的正反两面）。
+
+⚠️ **边界**：① needle 是**字样**级的，把 `rowActive` 改名会让这一腿静默失效 —— 与第 4 节那条同一个边界，
+H11/H14 是它的外部对照；② 它挡"递 + 算并存"，**不**挡"既不递也不算"（那是 `forwards` 那条的射程）；
+③ 它不判"该不该有痕迹" —— 哪一层哪天真的开始上色，正确动作是**把它加进 FACES 并写清端与通道**，
+而不是把这一腿关掉。
+
+### 13. 边界（别读多）
 
 - 🔴 **RN 那一端仍没有行为级判据**：这一格补的是**源码级** 7 条 + 门禁两条，
   真浏览器腿在 web。触屏端"读屏念不念这一行"要等 iOS/Android 的无障碍实测（`verify:mobile-*` 那一族今天不测 AX 属性），
