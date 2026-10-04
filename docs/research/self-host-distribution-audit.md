@@ -8207,3 +8207,73 @@ scripts/check-script-snapshot.mjs    否   ← 已不再是撞车面
 5. 指针漂移三处：`§7` 表内与 §8.19 写的 `server/Dockerfile:191` 现量是 `COPY packages/storage/`，
    那条 `RUN …check-web-artifact.mjs … --mount /app/` 在 **211** 行 ⇒ 已原地更正，
    并把"按内容找"的 grep 一起钉在旁边（行号会漂这件事本身，就是这类指针的默认失效方式）。
+
+### 8.135 G-40⑤/G-44 那两格从"只有通过读数"补成会红的判据：`server/tests/version-coupling.spec.ts`（2026-10-04 22:37 现量）
+
+**为什么落在测试而不是又一条 `check:*`**：落地阻塞集现在只剩根 `package.json` 一枚（哨兵 22:36 现量 `阻塞集=1`），
+而新增一条 `check:*` 必须改那个文件 —— 净增只会把本批的落点变成又一枚"等别人提交"的东西。
+`server` 的 `test` 就是 `vitest run`，`pnpm -r test` 每次都会跑它 ⇒ 判据一进仓库就有自动消费方，零净增文件以外的改动。
+（这也是 §8.134 那张五栏表里"三格缺牙"的一条真解法：**判据的载体选择本身是被别人的未提交约束的**。）
+
+**它钉住的是那节文档的对外说法**：`server/README.md`「Clients and version coupling」写的是一串**否定**
+（没有 heyta 客户端发 `appVersion`、没有客户端创建因果 full-state 边界、没有东西消费那个闸门）。
+G-44 改道之后（§8.17）这些"还没有"就是承诺本身 —— 一旦有人在别处补上了生产者却没人回看这段，文档立刻变成错话。
+五个检查各配**同趟阳性对照**，因为"0 命中"单独看什么都证明不了（扫描器坏了／目录改名／正则写窄，输出上和"确实没有"一模一样）。
+
+| 检查 | 钉住的句子 | 阳性对照（同一趟里必须成立） |
+|---|---|---|
+| C1 | README 抄的阈值 = 代码常量，且**恰好一处** | 同一抽取器对 `is \`9.9.9\`` 必须读出 `9.9.9`（否则它可能只是复述常量） |
+| C2 | 本仓库任何工作区版本都**满足不了**闸门（= "上报了也判不出新客户端"的事实基础） | `isCheckpointSafeAppVersion(阈值)` 必须为 `true`；每个 workspace glob 必须枚举到 ≥1 份 package.json |
+| C3 | sync-client 全目录读不到 `appVersion`，且下载查询串**只**发那三个键 | 同一 `filesWith` 在 `server/src` 必须读得到 `appVersion`（实得 5 份文件） |
+| C4 | 8 个"能构造 op"的客户端目录里没有任何 full-state/`REPAIR`/`SYNC_IMPORT`/`BACKUP_IMPORT` 构造点 | 同一正则对 `packages/shared-schema/src` 必须命中（契约层的枚举声明） |
+| C5 | `isAccountCheckpointSafe` 模块外 0 引用；阈值常量模块外只被 `cleanup.ts` 引用，且那里是那行日志 | C5 的常量腿本身是 `accountSafeRefs` 那条 0 命中的对照（它必须非空） |
+
+**现量读数**（这行由用例自己 `console.log` 出来，下一读的人不用重量）：
+
+```
+[version-coupling] readings {"readmeGateCopies":["18.21.2"],"workspaceCount":20,
+"workspaceVersions":["0.0.0","1.0.0"],"workspaceGlobs":["packages/*","apps/*","server"],
+"syncClientFiles":[…4 个…],"downloadQueryKeys":["sinceSeq","limit","excludeClient"],
+"fullStateScope":["packages/sync-client/src","packages/app-host/src","packages/op-log/src",
+"apps/desktop/src","apps/landing/src","apps/mobile/src","apps/node-host/src","apps/web/src"],
+"fullStateScanned":{"packages/sync-client/src":4,"packages/app-host/src":41,"packages/op-log/src":3,
+"apps/desktop/src":6,"apps/landing/src":62,"apps/mobile/src":86,"apps/node-host/src":10,"apps/web/src":147},
+"checkpointRefsOutsideModule":{"accountSafeRefs":[],"constantRefs":["server/src/sync/cleanup.ts"]}}
+```
+
+**注入臂 8 条全按预期只点红自己那一组**（`Tests 9 passed (9)`，基线 `failures=[]` 是每条臂的前置断言）：
+
+| 臂 | 变异 | 期望响 | 读数 |
+|---|---|---|---|
+| 1 | README 阈值抄件改数 | `[C1]` | ✅ |
+| 2 | `packages/sync-client` 版本改 `18.22.0` | `[C2]` | ✅ |
+| 3 | 客户端加 `url.searchParams.set('appVersion', …)` | `[C3]` | ✅ |
+| 4 | `packages/app-host/src` 新造 `{ opType: 'REPAIR' }` | `[C4]` | ✅ |
+| 5 | `server/src/sync/` 新增调用 `isAccountCheckpointSafe` 的文件 | `[C5]` | ✅ |
+| 6 | 摘掉 `packages/sync-client/src` 整棵 | `[C3,C4]` | ✅（两族共用该目录，所以**两族都该响** —— 单 id 断言会把正确的行为读成臂失败） |
+| 7 | 摘掉 `apps` 整棵 | `[C2,C4]` | ✅ |
+| 8 | 摘掉 `server/README.md` | `[C1]` | ✅ |
+
+臂 6–8 是**专门为止住"假 0"而加的**：作用域塌了的时候判据必须响，而不是安静地读出一堆 0。
+🔴 前两版就在这里红过两次，红的原因都不是判据而是我自己写错了：
+① `manifestRels` 的深度过滤按 `split('/').length === 2` 筛 `packages/i18n/package.json`（那是 3 段）⇒ 工作区清单恒空，
+② 覆盖树的 `walk` 只过滤了合成文件、没过滤 base 的结果 ⇒ 摘除后仍去 `read` 被摘的路径直接抛。
+两个都是"判据在恒真的方向上坏掉"，靠臂 6/7 才抓出来 —— **没有塌缩臂，这两条 bug 会带着一条永远绿的判据进仓库**。
+
+**为什么不写死"工作区应有 20 个"**：那会把上游当前状态抄进判据（下一个人加一个包就红，而那条红什么都没说）。
+改成把作用域下限**钉回真源** —— 读 `pnpm-workspace.yaml` 的 glob，要求每个 glob 枚举到至少一份 package.json。
+`@heyta/sync-server` / `@heyta/sync-client` 两个名字仍写死，因为那两条句子点名的就是它们。
+
+**这条判据不证明什么**（别读多）：它证明的是"文档此刻那串否定还成立、并且一旦不成立有人会响"。
+它**不**证明 G-44 已经关闭 —— 字面项（补生产者）仍然**刻意不做**，理由见 §8.17：阈值 `18.21.2` 住在
+*Super Productivity* 的版本空间里，heyta 补上上报只会让 `Cleanup [checkpoint-gate]` 那行日志往"全安全"漂，
+而它保护的性质（客户端创建因果 full-state 边界）依然不存在。将来真补生产者时 C3 会红 ——
+**那时该做的是改那节文档并重新判 G-44，不是改这条判据**。
+
+复跑：`cd server && npx vitest run tests/version-coupling.spec.ts`（1.4 s，零端口、零设备、零 Docker）。
+同批回跑的门禁（都 `rc=0`）：`check:layering` `check:script-snapshot` `check:docs` `check:ui-language`
+`node scripts/check-journey-coverage.mjs`。
+📌 待入 `docs/reference/environment-traps.md`（多人台账，编号按主检出工作树现量取：22:39 量到**工作树最大号 270 / `git show HEAD:` 最大号 228**，
+差 42 段**不在这份 HEAD 里**（在未提交的脏工作树里还是在别的分支上没测）—— 按 HEAD 取号会撞车）：
+**"覆盖树/夹具的 walk 忘了过滤 base 结果"与"深度过滤按猜的段数"这两族，症状都是臂自己红而不是判据红** ——
+所以新写作用域类判据时，先把"摘掉一整棵目录"做成一条臂，再看它期望响的 id 集合。
