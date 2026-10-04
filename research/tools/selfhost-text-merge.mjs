@@ -22,7 +22,7 @@
  *       其余模块以函数形式 import 它。
  */
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -225,4 +225,10 @@ function runSelftest() {
   process.exit(bad === 0 ? 0 : 1);
 }
 
-if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) runSelftest();
+// 🔴 用 realpath 比，不能用字符串比：载体在 `/tmp/…` 而 macOS 的 `/tmp` 是 `/private/tmp`
+//    的软链，Node 把入口解析成真实路径 ⇒ 直接比会把"我是入口"判成假，自检一条臂都不跑，
+//    而输出长得和"没跑"一模一样（这正是调用那道闸门按输出内容判、不按 rc 判的理由）。
+const isEntry = process.argv[1]
+  ? realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))
+  : false;
+if (isEntry) runSelftest();
