@@ -4085,8 +4085,16 @@ heyta-selfhost-verify-supersync-migrate-1 heyta-selfhost-verify   Exited (0)
 3. `declare -F down_stack` 那一层不是装饰：`down_stack` 定义在起栈之后，而 `die` 在那之前也会走到
    trap（容器名冲突那条就是），bash 对未定义函数是 **127**，不会"温柔地跳过"。
 
-**验的是控制流，函数体从真文件里 `awk` 抽出来**（不手抄第二份，见 `/tmp/teardown-trap-harness.sh`），
-`compose()` 换成只记参数的桩，四臂：
+**验的是控制流，函数体从真文件里 `awk` 抽出来**（不手抄第二份）。
+这副夹具**已经进仓库**：`research/tools/mutate-teardown-trap.sh` ——
+`bash research/tools/mutate-teardown-trap.sh` 一次跑完五臂对照 + 两枚变异，< 1 秒，
+不碰 docker、不起容器、不联网。它**不是门禁**：没挂进 `pnpm check`，命名也刻意不带 `check-` 前缀，
+免得 `check:gate-wiring` 那张表把它当"门禁没有消费者"。
+不落 `/tmp` 的理由是可复现物那一条：这行修法是**已发布行为的一部分**，
+"通过=五臂"如果只活在 `/tmp`，一次重启就降级成主张。
+`compose()` 换成只记参数的桩（⚠️ 桩收到的就是 `compose down …` 那几个参数，所以行首是
+`COMPOSE down` 而不是 `COMPOSE -p … down` —— 第一版按真脚本的形状写 grep，三条臂一起报"却没拆栈"，
+那是探针坏了，不是修法坏了）。五臂：
 
 | 臂 | 输入 | 断言 | 结果 |
 |---|---|---|---|
@@ -4094,8 +4102,17 @@ heyta-selfhost-verify-supersync-migrate-1 heyta-selfhost-verify   Exited (0)
 | B | `STACK_UP=0` | **一条 compose 都不许调**（否则会去动别人的同名资源） | ✅ |
 | C | `KEEP=1` | 不拆栈**也不删 env**（那条手工拆栈命令要能用） | ✅ |
 | D | `down_stack` 还没定义 | 不 127、且 env 删除这一步没被一起吞掉 | ✅ |
-| 变异 | 摘掉那三行 | **恰好红在 A**：`ARM_BAD: A: STACK_UP=1 却没拆栈`（rc=1），还原后 rc=0 | ✅ |
+| E | 正常结束那条路：先**显式** `down_stack` 再由 trap 走 `cleanup` | `COMPOSE down` 只许出现 **1** 次 | ✅ |
+| 变异 M1 | 摘掉 trap 里那三行 | **恰好红在 A**（`STACK_UP=1 却没拆栈`，rc=1） | ✅ |
+| 变异 M2 | 摘掉 `down_stack` 末尾的 `STACK_UP=0` | **恰好红在 E**（`正常结束那条路拆了 2 遍（应当 1）`，rc=1） | ✅ |
+| 还原 | 真文件 | 五臂全过 rc=0 | ✅ |
 | 门禁 | `check:script-snapshot` | ✅ 31 个脚本 + .gitignore（MARKER 那行没被我碰坏） | rc=0 |
+
+⚠️ E 那一臂与 M2 是补上来的，起因不是洁癖：加完 trap 之后我去数了 `down_stack` 的调用点
+（`grep -n down_stack` → 定义 344、显式调用 **362 与 507**、trap 150）⇒
+**正常结束那条路会拆两遍**。`compose down -v` 幂等，不会坏，但日志里会有两行 `==> 拆栈`，
+而下一个人读到两行会先怀疑"起栈是不是失败走了两条分支"。修法是在 `down_stack` 末尾把
+`STACK_UP` 清零（谁真拆过谁负责改状态），而不是在调用点各加一句判断。
 
 🔴 **两条边界，别把上面读成"真拆过一次"**：
 
