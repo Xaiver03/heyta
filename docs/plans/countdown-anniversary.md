@@ -4272,7 +4272,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
     ⚠️ 边界：这 4 份跑绿**不等于** `check:ai-e2e` 整族绿 —— 整族还有 50+ 条，本轮没跑（共享载体）。
 
 12. ✅ **本批已经进 `main`**（04 22:0x，`origin/main` = `91a672f6`。⚠️ **这是那一趟的瞬时 tip，不是当前 tip** ——
-    其后又落了两笔收口，当前 `origin/main` 见第 14 条 = `a5891fde`；引用"进没进 main"以第 14 条为准）。
+    其后又落了收口笔；"当前进没进 main / 当前 tip"一律按第 14 条给的现量命令读，不要引用本条的 SHA）。
     🔴 **这一条同时是对本条第一版的否证与撤回**：第一版写的是"**停止追 main**——并行会话正以分钟级
     往 main 落笔，任何'我已把 main 并进来'的声明都只是瞬时读数，落地留给主检出持有者"。
     那段推理**把两件事混成了一件**：
@@ -4328,8 +4328,8 @@ W0b ─> 随时可做（台账那半要等文件干净）
 
 14. ✅ **落地态（`9adb5f08`）重跑门禁与关键判据的新读数**（Goal 第⑤步要求的最后一格；04 22:2x–22:3x）。
     载体 = 本分支 HEAD `9adb5f08`（= 已推上去的 `origin/feat/countdown-batch2`，且已被 `origin/main` 收下）。
-    本笔落档后 tip 前进到 **`a5891fde`**，`origin/main` == `origin/feat/countdown-batch2` == 本地 `HEAD`（逐条现量，
-    见下面那条"单次推送通道"）。
+    本笔（以及它后面那笔收口）落档后 tip 又前进过 —— **这里不写当前 tip 的 SHA，写了就是第二份会漂的抄件**；
+    现量：`git ls-remote origin refs/heads/main refs/heads/feat/countdown-batch2`（SSH 被代理挡时见下面那条"推送通道"）。
 
     🔴 **推送通道这一格要单独记，因为它换了**：`git fetch origin` / `ssh -T git@github.com` 本轮**整窗失效** ——
     `Connection closed by 198.18.0.73 port 22`，换 `-p 443 git@ssh.github.com` 同样超时（`198.18.x.x` 是本机代理的
