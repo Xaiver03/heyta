@@ -132,11 +132,85 @@ if (!(L <= maxLoad)) {
 
 
 const results = new Map(); // as -> Map(cmd -> {rc, secs, tail, present})
+// 🔴 端口安全：**有些段会把自己那套 preflight 跑成"把默认端口上的进程 SIGKILL 掉"**
+// （`scripts/check-ai-e2e-preflight.mjs` 只 kill 它拿到参数的那几枚端口：ai-e2e 默认 4318/4319，
+//  privacy 传 4322，landing 传 4320，从不碰 3000）。逐段扫链时如果别人正听着这些端口，
+// 跑下去就是**杀掉别人的 dev server** —— 那是硬约束，不是效率问题。
+// ⇒ 这一档**不参与差集**，而是响亮地登记成 SKIP_SAFETY：静默跳过等于把"没跑"读成"跑了且绿"。
+const SEG_PORTS = [
+  [/check:ai-e2e/, ['4318', '4319']],
+  [/privacy-consent/, ['4322']],
+  [/test:landing|check:landing-e2e/, ['4320']],
+];
+const portsOf = (cmd) => {
+  for (const [re, ps] of SEG_PORTS) if (re.test(cmd)) return ps;
+  return [];
+};
+const listenersOn = (ports) => {
+  if (ports.length === 0) return [];
+  const args = ['-nP'];
+  for (const p of ports) args.push('-iTCP:' + p);
+  // 🔴 `-sTCP:LISTEN` **只能出现一次**。2026-10-04 实测：每个端口各带一个 ⇒
+  // `lsof: duplicate TCP inclusion: LISTEN`、stdout 空、**rc=1** ——
+  // 而"端口空闲"同样 rc=1 且 stdout 空，两者在退出码上完全同形。
+  // 那一版的守卫会把"别人正听着 4318"读成"没人占"，然后放行 `pnpm check:ai-e2e`，
+  // 它的 preflight 就把别人的 dev server SIGKILL 掉。这是"假 0 会咬人"的实弹版本。
+  args.push('-sTCP:LISTEN');
+  const r = spawnSync('lsof', args, { encoding: 'utf8' });
+  const err = (r.stderr || '').trim();
+  // ⚠️ **rc 不是判据**（实测：有监听时也退 1）。探针坏的信号是 stderr 有字。
+  if (err.length > 0) {
+    console.error(`🔴 lsof 探针坏了（stderr: ${err.split('\n')[0].slice(0, 120)}）—— 拒跑。\n` +
+      '      不拿"读不到"当"没人占"：那一档的后果是杀掉别人的 dev server。');
+    process.exit(2);
+  }
+  return (r.stdout || '').split('\n').slice(1).map((l) => l.split(/\s+/).filter(Boolean).join('/')).filter(Boolean);
+};
+// ── 阳性对照：同一趟里必须抓到一次"必然存在的监听" ─────────────────────
+// 拿系统里**已经在监听**的一枚端口喂给同一个解析器。抓不到 ⇒ 解析层坏 ⇒ 退 2，
+// 因为下面所有"端口空闲"的读数都建立在这个解析器上（AGENTS §7 元规则 2）。
+// 系统当前零监听时这条对照不适用（那种机器上本来也没有端口会被 SIGKILL），打印出来而不是假装验过。
+function portProbeSelfCheck() {
+  if (!picked.some((c) => portsOf(c).length > 0)) {
+    console.log('   端口探针阳性对照：本次没有会腾端口的段 ⇒ 不做（不假装验过）');
+    return;
+  }
+  const all = spawnSync('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN'], { encoding: 'utf8' });
+  const allErr = (all.stderr || '').trim();
+  if (allErr.length > 0) {
+    console.error(`🔴 阳性对照这一步的 lsof 就坏了（${allErr.split('\n')[0].slice(0, 100)}）—— 拒跑。`);
+    process.exit(2);
+  }
+  const rows = (all.stdout || '').split('\n').slice(1).filter((l) => l.trim().length > 0);
+  const portHit = rows.map((l) => l.match(/:(\d+)\s*\(LISTEN\)/u)).filter(Boolean)[0];
+  if (!portHit) {
+    console.log('   端口探针阳性对照：系统当前 0 枚监听 ⇒ 不适用（守卫也不会跳过任何段）');
+    return;
+  }
+  const known = portHit[1];
+  const found = listenersOn([known]);
+  if (found.length === 0) {
+    console.error(`🔴 端口探针的阳性对照没抓到（系统正在监听 :${known} 却读不到）⇒ 解析层坏，拒跑。`);
+    process.exit(2);
+  }
+  console.log(`   端口探针阳性对照：已监听端口 :${known} 抓到 ${found.length} 行（同一条命令形状）`);
+}
+portProbeSelfCheck();
+const skipped = new Map();
+for (const cmd of picked) {
+  const ps = portsOf(cmd);
+  if (ps.length === 0) continue;
+  const busy = listenersOn(ps);
+  if (busy.length > 0) skipped.set(cmd, `${ps.join('/')} ← ${busy.slice(0, 3).join(', ')}`);
+}
+for (const [cmd, why] of skipped) console.log(`   SKIP_SAFETY ${cmd}：端口被占（${why}）—— 这一段不跑，也不进差集`);
+
 for (const b of byTree) {
   const m = new Map();
   for (const cmd of picked) {
     const present = b.segs.includes(cmd);
     if (!present) { m.set(cmd, { present: false }); continue; }
+    if (skipped.has(cmd)) { m.set(cmd, { present: true, skipped: true, rc: null, secs: 0, tail: skipped.get(cmd) }); continue; }
     const started = Date.now();
     const r = spawnSync(cmd, {
       cwd: b.t.path,
@@ -158,14 +232,15 @@ for (const b of byTree) {
 const redOf = (as) =>
   picked.filter((cmd) => {
     const r = results.get(as).get(cmd);
-    return r && r.present && r.rc !== 0;
+    return r && r.present && !r.skipped && r.rc !== 0;
   });
 const missingOf = (as) => picked.filter((cmd) => !results.get(as).get(cmd).present);
 
 const [first, second] = trees.map((t) => t.as);
 const lines = [];
 for (const as of trees.map((t) => t.as)) {
-  console.log(`\n[${as}] 红 ${redOf(as).length} 段 · 链里没有的段 ${missingOf(as).length} 段`);
+  const sk = picked.filter((c) => results.get(as).get(c).skipped).length;
+  console.log(`\n[${as}] 红 ${redOf(as).length} 段 · 链里没有的段 ${missingOf(as).length} 段 · 端口安全跳过 ${sk} 段（不参与差集）`);
   for (const cmd of redOf(as)) console.log(`   RED ${as}  ${cmd}`);
 }
 
@@ -194,7 +269,7 @@ const rows = [];
 for (const as of trees.map((t) => t.as)) {
   for (const cmd of picked) {
     const r = results.get(as).get(cmd);
-    rows.push(`${as}\t${r.present ? String(r.rc) : 'ABSENT'}\t${r.present ? r.secs : ''}\t${cmd}\t${(r.present ? r.tail : '').replace(/\t/gu, ' ')}`);
+    rows.push(`${as}\t${!r.present ? 'ABSENT' : r.skipped ? 'SKIPPED' : String(r.rc)}\t${r.present && !r.skipped ? r.secs : ''}\t${cmd}\t${(r.present ? r.tail : '').replace(/\t/gu, ' ')}`);
   }
 }
 writeFileSync(outPath, rows.join('\n') + '\n', 'utf8');
