@@ -42,6 +42,13 @@
  *     脚本自己有一段 `[ "$SCRIPT_ENTRY_FILES" = "…两份…" ]`，它把**当时的形状**写死成
  *     期望值 —— 那不是判据，是快照：脚本再漂一次（只要漂成同一个值）它就跟着一起漂。
  *     期望值必须由**被验的那句话**导出，不能由抄件自己导出。
+ *  R8 🔴 **漏登记哨兵**（2026-10-05 加）：全仓凡出现「`docker compose` … `docker-compose.build.yml`」
+ *     这个形状的**文本**跟踪文件，必须落在 SCAN_SET（按抄件判）/ EXCLUDES（豁免且承重）/
+ *     NON_COPIES（不是抄件，逐份写凭什么不是）三张表之一。R1–R7 只管登记过的抄件，
+ *     新抄件不登记就**一条都不红**。两个方向都会红：多出来没人管的红，登记的豁免读不到
+ *     那个形状了也红；分母读不出来（git 不在/非仓库/git grep 空）响亮地红，不按"没有漏"过。
+ *     射程边界写进输出的那条 note 里：`git grep -I` 跳过二进制 ⇒ **图片里印的文案不在这里**
+ *     （那是 G-58，走 `screenshot:capture` 重打，属于已登记边界，不是静默漏洞）。
  *
  * ## 🔴 R7 抓到的那个洞（为什么"脚本自己打镜像"不是省掉 build override 的理由）
  *
@@ -89,6 +96,7 @@
  * 「永远用不上的豁免」和「永远通过的判据」是同一类东西。
  */
 import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -438,6 +446,110 @@ for (const ex of EXCLUDES) {
   }
 }
 
+// ── R8 漏登记哨兵：全仓带这个形状的文件必须落在三张表之一里 ─────────────
+/**
+ * 🔴 为什么这是常驻判据而不是一次性普查：R1–R7 只管**登记过的**抄件。一份新抄件（新人往
+ * 计划表、运维手册、脚本注释里再抄一条 `docker compose … build.yml`）不会让这里任何一条红 ——
+ * 它会安静地漂，直到某个外人照它敲。2026-10-05 的普查现量：**12 枚**文本跟踪文件带这个形状，
+ * 逐枚落在三张表里（每趟运行由下面那条 R8 note 现量打印枚数，别把数字抄进注释——抄进来就会漂）。
+ * 那条普查的结论本身会漂，所以把它钉成判据。
+ *
+ * 判两件事（两个方向都会红）：
+ *   ① 命中形状但不在 SCAN_SET ∪ EXCLUDES ∪ NON_COPIES 里 ⇒ 红（多了一份没人管的）；
+ *   ② NON_COPIES 里登记的 `needle` 在那个文件里读不到了 ⇒ 红（豁免对象没了 = 清单漂了，
+ *      与 R-excl 防的是同一件事）。
+ * 分母读不出来（git 不在、非仓库、报错）⇒ 响亮地红，**绝不**按"没有漏登记"过。
+ */
+const NON_COPIES = [
+  {
+    // 🔴 这条是**自指**的：本文件的头部与 COPY_SHAPE 常量里就带着那个形状，所以 R8 第一次跑
+    //    就把自己的裁判文件判成了漏登记。它不是抄件（这里没有供人照抄的命令，只有判据本体），
+    //    但豁免必须**登记**而不是在代码里写一句"跳过自己"——后者就是"探针不检自己"的那种洞。
+    file: 'scripts/check-selfhost-entry-command.mjs',
+    needle: 'R8 漏登记哨兵',
+    reason: '这道门禁自己：它带着这个形状是因为它是**判据本体**（规则说明 + COPY_SHAPE 常量），不是抄件。',
+  },
+  {
+    file: 'docs/plans/phase-2-multi-platform.md',
+    needle: 'docker-compose.build.yml build',
+    reason: '计划表里的**构建**命令（`… build`），不是外人起全套那条 `up`；它不需要 migrate-once。',
+  },
+  {
+    file: 'docs/runbooks/deployment.md',
+    needle: 'docker-compose.monitoring.yml -f docker-compose.build.yml up',
+    reason: '我们自己那台生产机的运维命令（带 monitoring override），不是外人照抄的那句；' +
+      '它点名服务 `supersync` 且迁移走 deploy 流程，不是 R3/R4 管的那个形状。',
+  },
+  {
+    file: 'server/docker-compose.build.yml',
+    needle: 'docker compose -f docker-compose.yml -f docker-compose.build.yml build',
+    reason: 'override 文件自己的头注释，教的是**怎么把镜像 build 出来**（`build`，不是 `up`）。',
+  },
+  {
+    file: 'server/docker-compose.test.yml',
+    needle: 'docker-compose.build.yml',
+    reason: '内部验收用的 test override 的用法示例（三文件里第三枚是 test 那份，不是 migrate-once）。',
+  },
+  {
+    file: 'server/scripts/migrate-deploy.sh',
+    needle: 'PRISMA_RECOVERY_CMD=',
+    reason: 'CONCURRENTLY 失败后打印的**带外恢复命令**，它是 R7 那条对账的另一端' +
+      '（`MIGRATE_RECOVERY_BUILD_LOCAL` 的唯一开关），由 R7 管着，不在这里重复判。',
+  },
+];
+
+/* 🔴 形状必须是 **POSIX** 的，不能写 JS 的 `[^\n]`：这里第一版写成
+ *    `docker compose[^\n]*docker-compose\.build\.yml`，git grep 把它读成"除反斜杠和字母 n 之外"，
+ *    于是带 `monitoring` 的那行**静默不命中** —— 分母被探针自己缩小（实测同一棵树：
+ *    正写法 12 枚、`[^\n]` 写法 11 枚，少的正是 `docs/runbooks/deployment.md`）。
+ *    这条不是理论：第一次跑 R8 就是被这个坏形状判成"豁免读不到那个形状"，
+ *    也就是**新判据自己把自己的分母改了**。POSIX 按行匹配用 `.*` 就够。 */
+const COPY_SHAPE = 'docker compose.*docker-compose\\.build\\.yml';
+let census = null;
+try {
+  // `-I` 跳过二进制 ⇒ 图片里印着的话（G-58 那批 `screenshots/landing/*.png`）不在这个哨兵的射程里，
+  // 那是**已登记的边界**，不是静默漏洞：图要重打得靠 screenshot:capture（任务 #31/#30）。
+  census = execFileSync('git', ['grep', '-I', '-l', '-E', COPY_SHAPE], { cwd: repoRoot, encoding: 'utf8' })
+    .split('\n').map((l) => l.trim()).filter(Boolean);
+} catch (e) {
+  const out = String(e.stdout ?? '').trim();
+  const msg = String(e.stderr ?? e.message ?? '').split('\n')[0];
+  // git grep 没命中时退 1 且 stdout 空 —— 那正是 R6 防的"探针瞎了"，不能读成"全仓干净"。
+  red('scripts/check-selfhost-entry-command.mjs', null, 'R8',
+    out ? `分母读出来一半就断了：${msg}` :
+      `全仓一条带「docker compose … ${BUILD_OVERRIDE}」的文本都没有 ⇒ 漏登记哨兵没有分母（这不是"没有漏"，是探针没接上）：${msg}`, '');
+}
+
+if (census) {
+  const registered = new Set([
+    ...SCAN_SET.map((e) => e.file),
+    ...EXCLUDES.map((e) => e.file),
+    ...NON_COPIES.map((e) => e.file),
+  ]);
+  const unlisted = census.filter((f) => !registered.has(f)).sort();
+  for (const f of unlisted) {
+    red(f, null, 'R8',
+      `这份文件里有「docker compose … ${BUILD_OVERRIDE}」这个形状，但它不在 SCAN_SET / EXCLUDES / NON_COPIES 任何一张表里。` +
+      `要么是**新增的抄件**（那就进 SCAN_SET，接受 R1–R6 判），要么它不是抄件（那就登记进 NON_COPIES，逐份写清它凭什么不是）。`, '');
+  }
+  for (const e of NON_COPIES) {
+    if (!census.includes(e.file)) {
+      red(e.file, null, 'R8', `NON_COPIES 登记的豁免已经读不到那个形状了（文件被改名/删掉/换写法）⇒ 这条豁免没有对象，删掉它或改成有效登记`);
+      continue;
+    }
+    const abs = join(repoRoot, e.file);
+    if (!existsSync(abs) || !readFileSync(abs, 'utf8').includes(e.needle)) {
+      red(e.file, null, 'R8', `豁免的承重断言不成立：那里读不到「${e.needle}」了 —— 那个形状换了，豁免要跟着改。${e.reason}`);
+    }
+  }
+  if (unlisted.length === 0 && census.length > 0) {
+    const hitRegistered = census.filter((f) => registered.has(f)).length;
+    notes.push(`R8 全仓普查：命中 ${census.length} 枚带这个形状的文件，逐枚都在表里（未登记 0 枚）；` +
+      `三张表合计登记 ${registered.size} 份，其中 ${registered.size - hitRegistered} 份当前不带这个形状（正常：扫描集里有些抄件走的是别的写法）` +
+      `。边界：\`git grep -I\` 跳过二进制 ⇒ 图片里印的文案不在本哨兵射程（G-58 走 screenshot:capture）`);
+  }
+}
+
 if (failures.length > 0) {
   console.error(`❌ 自托管入口命令对账失败（${failures.length} 处）：`);
   for (const f of failures) console.error(`  - ${f}`);
@@ -447,5 +559,5 @@ if (failures.length > 0) {
 }
 
 const total = TOTAL_MATCHES;
-console.log(`✅ 自托管入口命令对账：扫描集 ${SCAN_SET.length} 份文件 + 故意排除 ${EXCLUDES.length} 份，命中 ${total} 条入口命令，逐行过了 R1–R6，R7 把验收载体也钉在同一套文件上`);
+console.log(`✅ 自托管入口命令对账：扫描集 ${SCAN_SET.length} 份文件 + 故意排除 ${EXCLUDES.length} 份 + 非抄件登记 ${NON_COPIES.length} 份，命中 ${total} 条入口命令，逐行过了 R1–R6，R7 把验收载体也钉在同一套文件上，R8 确认全仓没有第四张表之外的抄件`);
 for (const n of notes) console.log(`   · ${n}`);
