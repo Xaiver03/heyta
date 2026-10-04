@@ -331,6 +331,138 @@ if (slotRows.length) {
 }
 const slotBad = slotRows.filter((r) => r.bad);
 
+// —— 4. 编号台账的**同号不同事**判据（`docs/reference/environment-traps.md`，工单 §3d① / #20）
+// 台账的规矩是"只增不改号、不要插行"，但两个并行会话**各自取号**时必然撞上同一个号，
+// 而撞上之后每一边单独看都"没问题"—— main 上已经因此攒了 4 组同号不同事（#20 那一格要的就是这个）。
+// ⇒ 这一道**不重写台账**（改号要连 sweep 全仓引用，机器不能替谁拍），它只把三件事量出来：
+//   L1 两侧各自新增的条目号，在产物里必须**都还在** —— 少一号 = 有一侧整块被吞
+//   L2 两侧都新增、正文却不同的号 = **同号不同事** ⇒ 处置固定是"先落的号不动、后到的续号"（§3d①）
+//   L3 续号目标与要 sweep 的引用行数**现取** —— §3d 写着"不许抄这里的数"，那这枚探针就是让它不抄
+const LEDGERS = ['docs/reference/environment-traps.md'];
+const norm = (s) => s.replace(/\s+/g, ' ').trim();
+// 一条条目 = `^\d+. ` 那一行 + 其后直到下一条目或顶级标题为止的行。
+// 🔴 一个号**允许多块**：带冲突 marker 的产物里同一个号会出现两次（两侧各一条），
+//    用 `Map<号,正文>` 单值的话**后写的会静默盖掉前一条**，于是"有一侧被吞"这种产物恰好读成"都在"
+//    （A3 那一趟实测到的：产物换成 main 单独一份时，#215/#216 号还在、内容却是 main 那两条不同的事）。
+const entryMap = (text) => {
+  const out = new Map();
+  let key = null;
+  let buf = [];
+  const flush = () => {
+    if (key !== null) {
+      const arr = out.get(key) || [];
+      arr.push(norm(buf.join(' ')));
+      out.set(key, arr);
+    }
+    buf = [];
+  };
+  for (const line of text.split('\n')) {
+    const m = /^(\d+)\.\s/.exec(line);
+    if (m) {
+      flush();
+      key = m[1];
+      buf.push(line);
+    } else if (key !== null && /^#{1,6} /.test(line)) {
+      flush();
+      key = null;
+    } else if (key !== null) {
+      buf.push(line);
+    }
+  }
+  flush();
+  return out;
+};
+// "这一侧写的那条"在产物里还在不在：号要在，且该号下的**某一块**正文逐字相同
+const missingNum = (pm, k) => !pm.has(k);
+// ⚠️ 比对前先把 marker 分隔行剥掉：`<<<<<<< main` / `=======` / `>>>>>>> HEAD` 三行既不是条目行也不是标题行，
+//    不剥就会被并进**相邻那一条**的正文里，于是"两侧内容其实都在"的产物也能报成"正文没留下"（本趟实测假阳性 3 条）。
+//    剥完的形状就是"两支都留"，正是这一档要比的东西。
+const stripMarkers = (t) => t.split('\n').filter((l) => !/^(<{7} |={7}$|>{7} )/.test(l)).join('\n');
+const ledgerRows = [];
+const repoRoot = git(['rev-parse', '--show-toplevel']).trim();
+for (const rel of LEDGERS) {
+  const tA = git(['show', `${refA}:${rel}`]);
+  const tB = git(['show', `${refB}:${rel}`]);
+  const tBase = git(['show', `${base}:${rel}`]);
+  const a = entryMap(tA);
+  const b = entryMap(tB);
+  const mb = entryMap(tBase);
+  const newA = [...a.keys()].filter((k) => !mb.has(k));
+  const newB = [...b.keys()].filter((k) => !mb.has(k));
+  const pFile = join(product, rel);
+  const pm = existsSync(pFile) ? entryMap(stripMarkers(readFileSync(pFile, 'utf8'))) : null;
+  const lostA = pm ? newA.filter((k) => missingNum(pm, k)) : [];
+  const lostB = pm ? newB.filter((k) => missingNum(pm, k)) : [];
+  // "被吞"= 号还在，但**这一侧写的那条正文一块都没留下**（号被另一侧的内容占了）
+  const swA = pm ? newA.filter((k) => pm.has(k) && !a.get(k).some((t) => (pm.get(k) || []).includes(t))) : [];
+  const swB = pm ? newB.filter((k) => pm.has(k) && !b.get(k).some((t) => (pm.get(k) || []).includes(t))) : [];
+  // 同号"不同事"= 两侧都新起了这个号，而**没有任何一块**逐字相同（一块相同就是同一件事双方都写，可去重不算红）
+  const collide = newA.filter((k) => newB.includes(k) && !a.get(k).some((t) => b.get(k).includes(t)));
+  const maxA = a.size ? Math.max(...[...a.keys()].map(Number)) : 0;
+  // 🔴 引用 sweep 用 node 走，不用 `git grep -nE '#(215|216)\b'`：git grep 的 ERE **不认 `\b`**，
+  //    那条命令静默返回 0 行（本趟实测：带 `\b` 0 行 / 不带 9 行），而"0 行"读起来正是"没有引用要改"。
+  //    ⇒ 空读数必须带**分母**：扫了几个文件、命中几行、共几处，三个数一起打。
+  let refs = null;
+  if (collide.length) {
+    const pat = new RegExp(`#(${collide.join('|')})(?![0-9])`, 'g');
+    const patLine = new RegExp(`#(${collide.join('|')})(?![0-9])`);
+    const mdFiles = git(['ls-files', '--', '*.md']).split('\n').filter((l) => l.trim());
+    let lines = 0;
+    let hits = 0;
+    let filesWith = 0;
+    for (const rel2 of mdFiles) {
+      let body = '';
+      try {
+        body = readFileSync(join(repoRoot, rel2), 'utf8');
+      } catch {
+        continue;
+      }
+      const m = body.match(pat);
+      if (m && m.length) {
+        lines += body.split('\n').filter((l) => patLine.test(l)).length;
+        hits += m.length;
+        filesWith += 1;
+      }
+    }
+    refs = { lines, hits, filesWith, scanned: mdFiles.length };
+  }
+  ledgerRows.push({
+    rel,
+    nA: a.size,
+    nB: b.size,
+    newA: newA.length,
+    newB: newB.length,
+    lostA,
+    lostB,
+    swA,
+    swB,
+    collide,
+    maxA,
+    refs,
+    bad: lostA.length + lostB.length + swA.length + swB.length + collide.length > 0,
+  });
+}
+const ledgerBad = ledgerRows.filter((r) => r.bad);
+if (ledgerRows.length) {
+  console.log('\n编号台账（只增不改号那条规矩，逐枚量，不代谁改）：');
+  for (const r of ledgerRows) {
+    const lostTxt = [...r.lostA.map((k) => `${refA}#${k}`), ...r.lostB.map((k) => `${refB}#${k}`)].join(',');
+    const swTxt = [...r.swA.map((k) => `${refA}#${k}`), ...r.swB.map((k) => `${refB}#${k}`)].join(',');
+    console.log(
+      `${r.bad ? '🔴' : '· '} ${r.rel}  条目 ${refA}=${r.nA} / ${refB}=${r.nB}；新增 ${refA}=+${r.newA} ${refB}=+${r.newB}` +
+        (lostTxt ? ` · 🔴 产物里**缺号**：${lostTxt}` : '') +
+        (swTxt ? ` · 🔴 号在但**这一侧写的那条正文没留下**（号被另一侧内容占了）：${swTxt}` : '') +
+        (!lostTxt && !swTxt ? ' · 两侧新增号与各自正文在产物里都在' : '') +
+        (r.collide.length
+          ? `\n      🔴 同号不同事 ${r.collide.length} 组（号 ${r.collide.join('/')}）⇒ 处置固定是"` +
+            `先落 ${refA} 的号不动、后到的续到 ${refA} 最大号 ${r.maxA} 之后"，即从 ${r.maxA + 1} 起；` +
+            `要 sweep 的引用**现量 ${r.refs ? `${r.refs.lines} 行 / ${r.refs.hits} 处（命中在 ${r.refs.filesWith} 个文件，共扫 ${r.refs.scanned} 个 .md）` : '未扫'}**` +
+            ` —— 本条不自动改，改号要人认领`
+          : ''),
+    );
+  }
+}
+
 if (tainted.length) {
   console.log(
     `\n🔴 产物里还有 ${tainted.length} 枚产品源码/样式带冲突 marker ⇒ 上面 ${GATES.length} 道门禁量的**不是一个能编译、能运行的状态**：` +
@@ -345,10 +477,11 @@ console.log(
   `\nTREE=${tree}  冲突=${conflicted.length} 枚（处置见工单 §8.47 第 3 节）  ` +
     `纯 fs 门禁=${GATES.length} 道：合并造成的红=${bad.length}  两边都红（环境/载体所致，不含合并信息）=${same.length}  ` +
     `静默合流=${silentRows.length} 枚，其中丢行/删文件/语法不过=${silentBad.length}  ` +
-    `槽位重复=${slotBad.length}  产物仍带 marker 的产品文件=${tainted.length ? `${tainted.length} 枚 ⇒ 本趟 tally 不算"合流验过"` : '0（这一趟的 tally 量的是一个可运行状态）'}`,
+    `槽位重复=${slotBad.length}  台账（缺号 / 号在正文被占 / 同号不同事）=${ledgerBad.length ? `🔴 ${ledgerRows.reduce((s, r) => s + r.collide.length + r.lostA.length + r.lostB.length + r.swA.length + r.swB.length, 0)} 项` : '0'}  ` +
+      `产物仍带 marker 的产品文件=${tainted.length ? `${tainted.length} 枚 ⇒ 本趟 tally 不算"合流验过"` : '0（这一趟的 tally 量的是一个可运行状态）'}`,
 );
 console.log(`候选树里带 marker 的门禁脚本=${markersIn(product).join('/') || '无'} —— 有就说明 §8.47 第 3 节还没做完`);
-if (bad.length || silentBad.length || slotBad.length || tainted.length) {
+if (bad.length || silentBad.length || slotBad.length || tainted.length || ledgerBad.length) {
   console.log('  ⇒ 逐条按 §8.47 第 3–4 节处置后再跑一次；这里绿了才去动真分支。');
 }
 
@@ -358,4 +491,4 @@ if (!keep) {
 } else {
   console.log(`--keep：临时载体留着 —— 产物=${product}  基线=${baseline}（看完请自行删）`);
 }
-process.exit(bad.length + silentBad.length + slotBad.length + tainted.length ? 1 : 0);
+process.exit(bad.length + silentBad.length + slotBad.length + tainted.length + ledgerBad.length ? 1 : 0);
