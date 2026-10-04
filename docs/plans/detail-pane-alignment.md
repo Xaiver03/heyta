@@ -4816,3 +4816,27 @@ node research/tools/mutation-rigs/mutate-detail-pane-status-table.mjs
 
 **状态：进行中。** 本条（四趟读数 + 判据修订 + 载体修订 + 三条臂 + ⑦ 的登记）已完成；
 #5/#7/#8/#9/#10/#11 那六单未闭合的那一格仍是 §6.1.1 的四端重装（待办 **#13**，前置是合流落地）。
+
+### 6. §1 那道"干净检出复跑"，对**本条这几笔**（`96ca7892` / `da28773f` / `f1671f3f`）现量
+
+载体：`git archive HEAD | tar -x`（HEAD = `f1671f3f`，无索引、无 node_modules）⇒ 只跑纯 fs 那一批：
+
+| 脚本 | 干净检出 RC |
+|---|---|
+| `check-detail-pane-status-table.mjs` | 0 |
+| `check-detail-pane-evidence-refs.mjs`（**必须带 `--root`**） | 0 |
+| `check-detail-pane-c1-coverage.mjs` | 0 |
+| `check-selection-single-source.mjs` | 0 |
+| `check-l4-no-style.mjs`（mobile 90 = 基线，没调） | 0 |
+| `check-row-single-source.mjs`（28 = 基线，没调） | 0 |
+| `check-ui-language.mjs` | 0 |
+
+⚠️ 第一趟我在 `evidence-refs` 那一行**没传 `--root`**（那批命令是我用 `[ ] && echo` 现拼的，展开成了空串），
+于是它在非 git 的裸树里以 git 模式跑并回了 **1** —— 那是探针够不着载体，不是产物红（同一趟带 `--root`
+复跑 = 0，图片 token 43 / 引用 60 / 位置 33 全部成立）。**这条要记住**：非 git 载体上这一道只有
+`--root` 一档，预检里那三枚走的就是这一档（§8.64）。
+
+`#23`（把三枚文档判据挂进 `pnpm check`）仍然不能做，现量原因是**主检出的 root `package.json` 此刻是 `M`**
+（2026-10-04 17:2x `git status --porcelain -- package.json` ⇒ `M package.json`，最后一次提交是别人的
+`39c4ce47`）。这条不写"等它干净"就完事 —— **它是一个瞬时读数**，下一趟要动它得重新现量，
+理由与 §9 那条"脏清单每次都要重新现量"相同。
