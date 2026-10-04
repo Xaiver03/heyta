@@ -367,6 +367,11 @@ grep -oE "✓[^│|]*[0-9]{3,}ms" /tmp/alltests.log | grep -v "tests)" | \
         RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install
     ```
 
+    ⚠️ 2026-10-04 补：这一串现在由 `check:native-deps` 的第三条规则与
+    `scripts/reinstall-all.sh` 里那条调用**对账钉住**（改一处不改另一处会红），
+    不再是三份各抄的文档句子。四臂实测：**`LC_ALL` 不承重**（只给 `LANG` 就成功），
+    两个 locale 都不给才崩 —— 见 #154 的那段更正。
+
 31. 🔴 **装上原生图标库后 iOS 才能构建，而 Android 从来不受影响。**
     `react-native-svg`（Lucide 图标的底层）的子 pod `RNSVG-RNSVGFilters` 把
     `IPHONEOS_DEPLOYMENT_TARGET` 声明成 **12.4**，而 Xcode 27.1 支持范围是 **15.0–27.1.x**。
@@ -4033,13 +4038,24 @@ ArgumentError - path name contains null byte
 真正把它分开的是 **A/B**：同一个 commit `840effb1` 现开新克隆（`git clone --no-hardlinks` +
 `pnpm install`，热 store 下 **4.4–4.9 秒**），`pod install` **两次都 exit 0**
 （一次放 `/Users/…/heyta-ios-ri`、一次放 `/tmp/heyta-ios-ab`）。
-🔴 **路径不是变量**（`/tmp` 那一次也成功），变量是**这棵长活的树本身**。
+🔴 ~~**路径不是变量**（`/tmp` 那一次也成功），变量是**这棵长活的树本身**~~。
+🔴 **这句已被 2026-10-04 的四臂否证**（保留原文是为了让后来者认出这个推理形状）：
+同一棵长活树、同一分钟、同一串 env 的四个臂 —— 只给 `LANG`（显式 `-u LC_ALL`）✅、
+`LANG`+`LC_ALL` ✅、两个都不给 ⇒ 崩在 `config.rb:167`（ASCII-8BIT，**另一种**错）、
+`LANG`+`LC_ALL` 再来一趟 ⇒ **`null byte` 崩**。日志 `/tmp/pod-arms-{A-no-lcall,
+B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_ALL` 无关，
+**是逐趟非确定性**（A/B 成功后 5 秒的 D 崩在同一个调用上）。
+那条"换一棵新克隆"的否证依然成立，只是解释力更弱：新克隆同样可能崩，只是没撞上。
+📌 我最初把 `LC_ALL` 当成承重项写进脚本，正是**没有先跑对照**——四臂一跑它就倒了。
 
 📌 **一般规律（这条比 bug 本身值钱）**：`pnpm install --frozen-lockfile` 的
 "Already up to date" 只拿 lockfile 和**它自己那份状态文件**比，**不扫树**。所以它既不能证明
 树是好的，也不能作为"排除依赖树这个变量"的证据 —— 我当时正是拿它做的排除，结论写反了。
 **判"这棵树可用"要用下游消费者能不能跑来判**（这里是 `pod install`），
 或者干脆换一棵新的 —— 本仓库的克隆 + 安装只要 5 秒，**没有理由在旧树上重试**。
+⚠️ 后半句按上面的否证要打个折：换树**不构成**"这次不会崩"的证明，因为它不是树的问题；
+`scripts/reinstall-all.sh` 现在的处置是**有界重试**（≤3 趟，逐趟落
+`/tmp/heyta-reinstall-pod-<n>.log`，判据仍是 `Manifest.lock == Podfile.lock`，三趟全崩照红）。
 
 ⚠️ **未证实的部分**（别照它行动）：具体是哪个路径让 Ruby 4.0.7 的 `realdirpath` 拿到 NUL，
 没有定位到（要扫 `node_modules` 里 1.9 GB 的文件名）。已排除的只有：路径前缀、

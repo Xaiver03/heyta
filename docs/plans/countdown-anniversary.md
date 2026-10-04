@@ -3175,6 +3175,8 @@ W0b ─> 随时可做（台账那半要等文件干净）
     本机 `LANG`/`LC_ALL`/`LC_CTYPE` **全未设置**（这是唯一还站得住的候选，与上游 issue #12798/#12866 那批形状同源），
     但**尚未证**——要证它得重跑一次 `pod install`，而链 Z 此刻正拿着那枚（旧）已装 app 跑探针，
     同一时刻动 `ios/` 就是抢它正在读的树。⇒ 排到 Z 收口之后，与链 S 串行。
+    ⚠️ **04 16:1x 已被否证**（四臂，见下面 ㊙）：locale 缺失只会造成**另一种**错（`installation_root`），
+    它不是 `null byte` 的成因；这一句留原文是为了让后来者看到"唯一候选"这种判断是怎么倒的。
   - ⚠️ **Z 现在这趟探针的读数是"装在设备上的那枚 app"的**，不是当前提交的 —— 它自己的新鲜度判据
     （`verify-mobile-card-export-ios.sh` 开头那条"装的 app 不比源码旧"）会替我说这句话，
     我不替它宣布结论。**W7-G3 仍然不打勾。**
@@ -3234,6 +3236,9 @@ W0b ─> 随时可做（台账那半要等文件干净）
     （三种"环境坏了"已排除，见 ㊿；locale 是唯一候选、未证 = 任务 #29）。
     这不是"再等等"，是要一次有裁决力的实验：**双臂对照**（带 `LC_ALL=en_US.UTF-8` 一次、不带一次），
     而且要在 S 收口之后做。
+    ✅ **04 16:1x 这趟实验做了，答案是否定的**（四臂，见 ㊙）：`LC_ALL` 有无都成功；
+    两个 locale 都不给是**另一种**错；`null byte` 在同一 env 形状下 3 趟 2 成 1 崩 ⇒ 逐趟非确定性。
+    上面那句"locale 是唯一候选、未证"随之作废，处置改成了 `reinstall-all.sh` 的**有界重试**。
 
 - ㊒ **链 S 的 44 段读数到手 + 链 W 把 mac 那三格取回来 + 那两张图我打开了**（04 15:1x–15:2x）
   - **链 S**（`/tmp/device-closeout-S.log`，载体 `117386a1`）：`RC_SEGMENTS=绿38/红6`，
@@ -3390,3 +3395,64 @@ W0b ─> 随时可做（台账那半要等文件干净）
       **不是同一次运行**。这条"名字像但不是"的排查过程写在上面第 359 行那条里，别再看错一遍）。
   - ⏳ **Goal ⑤-1 现在只剩一格**：`check:ai-e2e`（链 V3 排队，判据＝锁空 且 负载 < 12 且 把"闸门拒跑行数"打进读数）。
     链 Q 走到 `[2]` 时现量负载 **110.23**（别的会话起了重活）⇒ 它在等窗口，不是卡住；pod 重试与 iOS 那三格排在它后面。
+    ✅ **这一格已于 04 16:0x 由链 V3 取到**：`RC_AI_E2E_V3=0 闸门拒跑行=0 起跑负载=11.53`，读数 **145 passed (5.9m)**。
+    ⚠️ **代价是我这一趟把别人三行的证据图覆盖了**：`check:ai-e2e` 按固定文件名写 `e2e/test-results/`，
+    而**其中 37 枚是入库跟踪的**（别的线把截图当证据提交进了 `*/evidence/`），跑一次就重写一次。
+    当场 `git checkout -- <那 37 个跟踪路径>` 复原；📌 **一般规律：跑 e2e 族门禁前先 `git ls-files` 数一遍
+    它的输出目录里有多少枚已入库**，那些不是临时产物而是别人的证据。（这条与 §7 里"共用 test-results 会删掉唯一证据"同族，
+    面目不同：那次是**删**，这次是**重写**，重写不会让 `git status` 之外的任何东西报警。）
+
+- ㊙ **我自己那条"缺 `LC_ALL`"的诊断被四臂否证了；`null byte` 既不是 locale 也不是那棵树 —— 是逐趟非确定性**（04 16:1x）
+  - 🔴 **先记我错在哪**：15:5x 我从"裸 `pod install` 崩 `Unicode Normalization`"那一次直接推出"`LC_ALL` 是缺的那一项"，
+    还把它写进了 `reinstall-all.sh` 的注释并准备提交。**四臂一跑它就倒了**（同一棵长活树、同一分钟，
+    `/tmp/pod-arms-{A-no-lcall,B-with-lcall,C-no-locale,D-restore}.txt`）：
+
+    | 臂 | env | `default_external` | 结果 |
+    |---|---|---|---|
+    | A | `LANG` 有、**显式 `-u LC_ALL`**、两个 `RCT_*` | UTF-8 | ✅ RC=0（10 s）`Pod installation complete!` 84 deps / 83 pods |
+    | B | `LANG`+`LC_ALL`+`RCT_*` | UTF-8 | ✅ RC=0（9 s）同上 |
+    | C | 两个 locale **都不给** | US-ASCII | ❌ RC=1（1 s）`config.rb:167 installation_root` `Unicode Normalization not appropriate for ASCII-8BIT` |
+    | D | 与 B **逐字相同** | UTF-8 | ❌ RC=1（4 s）**`ArgumentError - path name contains null byte`** |
+
+    ⇒ 承重的是"**至少一个 locale 变量**"（C），`LC_ALL` 本身不承重（A）；
+    而 `null byte`（D）在 A/B 成功后 5 秒、同一 env 形状下出现 ⇒ **与 locale 无关、与树无关，是逐趟非确定性**
+    （上游 CocoaPods #12798 / #12866 都 open，后者标题写着 "sometimes"）。
+  - 🔴 **这同时否证了 traps #154 的结论**"变量是这棵长活的树本身"。它当时的 A/B（新克隆两次都 exit 0）依然成立，
+    只是**解释力更弱**：换树不构成"这次不会崩"的证明。已**原地划线更正**写进 #154（保留原句），
+    并在 #30 那条"可用的 `pod install` 命令"下面补了"这串现在由门禁钉住"。
+  - ✅ **落地的两件事**（都不靠"我记得正确值"）：
+    1. `check:native-deps` 加了**第三条规则**：`POD_ENV` 常量是本文件打印的"修法"与
+       `scripts/reinstall-all.sh` 里那条真实调用的**唯一事实源**（shell 那条注释"改一处要改两处"以前只是注释）。
+       比对前先把续行折回一行、把引号里的字符串挖空 —— 否则 `echo "…pod install 失败…"` 那四行**文案**会被当成四条调用，
+       第一版就是这么错的（4 条假阳性，而假阳性教人忽略红色）。
+       **三臂都是拿真门禁原地跑的**（改真文件 → 跑 → `cp` 回来 → `md5` 逐字节相同）：
+       未变异 ⇒ 绿（5 个 pod 全命中，rc=0）；把 shell 那条调用里的 `LANG=` 写成 `LAng=`（= 那个 token 不在）
+       ⇒ **rc=1** 且精确报"带缺的 env：`LANG=en_US.UTF-8`"；把 `pod install` 整个词换掉
+       ⇒ **rc=1** 且报"**里没有一条 `pod install` 调用（这条对账失去对象）**"，
+       所以调用被人删掉的那天这条门禁不会安静地不执行（§7 里 #191 那个形状）。
+       两趟变异后都 `RC_AFTER_RESTORE=0`、`md5=SAME`。
+    2. `reinstall-all.sh` 的 pod 步改成**有界重试**（≤3 趟，逐趟 `/tmp/heyta-reinstall-pod-<n>.log`，
+       每趟把首条错误打进输出）。判据**没有放松**：仍然要求 `Manifest.lock == Podfile.lock`，三趟全崩照旧判红。
+       这是对着"崩不崩是逐趟的事"设计的，不是对着 env 设计的。
+  - 📌 **顺带量到但没动的东西**：这一趟 `pod install` 把 `Podfile.lock` 改动了 **2 行 diff（=1 行）**，
+    只有 `hermes-engine` 的校验和（HEAD `208b0dcd…` → 现量 `d25a17a7…`），`project.pbxproj` 改 5 行。
+    **没有提交**：它不是本批的产品改动，而且"提交态是否可复现"归 `check:native-deps` / #150 那条主张管 ——
+    我打算 iOS 腿跑完后**还原成 HEAD 再原地复跑一次 pod**，看它回到哪一枚哈希，再决定这是"提交态不可复现"
+    （要更正 #150）还是"我这棵树的 `node_modules` 与提交态不同"（那是本机状态）。⚠️ 现在两种都不能主张。
+  - 🔴 **第一趟 iOS 腿 26 秒就判红，根因是"半写沙盒满足了哈希一致判据"**（16:18，`/tmp/ios-leg-1st-fail.log`
+    + `/tmp/heyta-reinstall-ios-build.log` 16901 行）：`Manifest.lock == Podfile.lock`（都是 `461f4ffa…`）
+    让脚本**跳过**了 pod install，但上面那趟崩掉的 D 臂把 `Pods/Headers/Public/RCTSwiftUI/` 整层留空 ⇒
+    xcodebuild 报 `fatal error: module map file '…/RCTSwiftUI.modulemap' not found`，4 个 target 全挂。
+    ⚠️ 这次失败是**响亮**的（不是假绿），但它把"缺构建输入"伪装成"产品构建不过"——
+    正是 `reinstall-all.sh:396` 那行注释自己描述过的形状，只不过换了个入口。
+    ⇒ 改成**哈希相等也照跑**（幂等 ~10 s），"沙盒完整"交给生成器而不是交给一个哈希；
+    修好后 `RCTSwiftUI.modulemap` / `-umbrella.h` 两枚软链回来了（`RC_REPAIR=0`），第二趟腿 16:22 起跑。
+  - 📌 **本批的门禁当天也照出了我自己的新代码**：写重试段时又落下 `（日志 $POD_LOG）` 这一处
+    `$var` 紧跟全角括号，`check:shell-unicode` 报 **rc=1** 精确指到 439 行 ⇒ 改 `${POD_LOG}` 后 rc=0（扫 81 个 .sh）。
+    这与 ㊒ 那批 35 处是同一个坑的第 36 处，**门禁比我先想起来**。
+  - ⏳ **iOS 腿**：第一趟 pid 63682（16:18）**判红**，根因见上一条；第二趟 pid 85248（16:22）起跑，
+    `IOS_DEVICE_NAME=heyta-batch2-closeout` 钉我自己的模拟器
+    （防 #169 那条"盲选卸载目标"），随后 `IOS_UDID=919C5F50-…` 跑 `verify-mobile-card-export-ios.sh` 取 W7-G3。
+    起跑归属现量：另有一条 `queue-reinstall-all.sh`（pid 93817）**跑了 13 小时**、0.0% CPU，
+    卡在 **mac 段** `package-app.sh /tmp/heyta-macos-dist` —— 与本腿不同相位，且它是别人那条线明确登记过"不杀"的孤儿链，
+    所以我按相位并行跑，不代它收尾、也不等它。
