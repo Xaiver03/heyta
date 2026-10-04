@@ -1592,3 +1592,47 @@ Goal 那句"各处同一套状态与回落规则"我此前只回写到"三张面
 - **变异两臂（一次性，跑在 `/tmp` 的副本上，仓库文件没动）**：① 把 W3 改成"基本完成" ② 把 W10 改回旧措辞
   ⇒ `MUTATED_BAD=2`，且逐臂点名到 `W3` / `W10` 两行。这条量法因此**有牙**，但它是**一次性读数不是常驻门禁**
   （同 §8.23 那句：这一类没有常驻检查器）—— 下次动 §8 那张表时把同一段逻辑再跑一遍。
+
+## 8.28 "选中态只有一个所有者"从**按名字**升级为**按机制逐处裁过**（2026-10-04 09:3x；本节零代码改动）
+
+W1 那句"四份本地 `useState` 全删了"此前只由门禁的**名字表**守着（`detailId|selectedId|editingId` 那几支，
+刻意不含 `active`/`open`）。名字表挡不住"第二个人改叫别的名字"—— 所以这回收齐两端所有"记住某一行的 id"的
+本地态，**逐处问它在屏上决定什么**。现量集合 15 处（取法见本节末那条），按名字分组：
+
+| 名字 × 处数 | 出现处 | 它在屏上决定什么 | 为什么不是"选中" |
+|---|---|---|---|
+| `busyId` × 6 | web `CalendarView.tsx:70`、`HabitsView.tsx:169`；mobile `CalendarScreen.tsx:56`、`HabitsScreen.tsx:117`、`TasksScreen.tsx:694`、`SecurityScreen.tsx:115` | 哪一行的动作**在路上**（转圈 / 禁用） | 动作完成就清空，不参与"右栏显示谁" |
+| `renamingId` × 3 | web `HabitsView.tsx:188`；mobile `HabitsScreen.tsx:124`、`SecurityScreen.tsx:116` | 哪一行开着**就地改名输入框** | 是编辑焦点，与展示选中无关 |
+| `confirmingId` × 3 与 `confirmDeleteId` × 1 | web `TrashView.tsx:60`、`PasskeyPanel.tsx:156`；mobile `TrashScreen.tsx:63`、`SecurityScreen.tsx:118` | 哪一行开着**二次确认** | 同上，那是危险动作的门 |
+| `editingRowId` × 1 | `PasskeyPanel.tsx:158` | 哪一行在就地改名 | 这名字就是上一轮**为绕开门禁词表**特意改的（原名撞上 store 里"请求在途那条"，见 §8 表 W1 行） |
+| 🔴 `activeId` × 1 | `apps/web/src/features/quadrant/QuadrantBoard.tsx:158` | dnd-kit **正在拖**哪一颗 | 同文件 `:152` 的 `activeTaskId` 才是选中，`:277` 把它转发给共享板子；`:146-148` 已写明"两个名字像但不是一件事" |
+
+⇒ **两端没有任何第二处实体选中**：`selection` 的三档词表（`task|habit|note`）在这一维也是完备的，
+与 §8.20 那次按 `ViewKey` 全枚举的对账互相咬合（那一次问"哪些面有选中"，这一次问"还有谁自己记着选中"）。
+📌 而且 §8.20 当场就误读过一次 —— 某个只读 agent 把 mobile `TasksScreen.tsx:1046` 报成选中态，
+逐行读回是 `busyTaskId={busyId}`（不采信）。**这一次给那一类状态立了类别名**：下一回再见到
+`busy*` / `confirm*` / `renaming*` / dnd 的 `activeId`，不必重新推它是不是"第二个人"。
+
+🔴 顺带给还没落的**断言 F** 两条具体约束（都是现量，不是推测）：
+① F **不许按 `active` 字样认选中** —— 那会把 `QuadrantBoard.tsx:158` 的拖拽态读成"这张面已经把选中说出来了"，
+而真正说话的是 `:277` 转发下去的 `activeTaskId`；
+② F 的**豁免名单**就是上面这五类语义（在路上 / 就地改名 / 二次确认 / 正在拖），
+再加 §8.26 第③条那种"选中只在浮层里可见"的面（mobile 便签）。两条写死，F 才不会第一次跑就批量假红。
+
+⚠️ 这一趟自己的一条**探针形状错**（0 命中长得像"干净"，与 §8.25/§8.27 那几条同族，但位置是新的）：
+第一版写 `grep -E 'const \[[A-Za-z]+Id\] = useState'` ⇒ **恒 0 命中**。原因是解构的字面形状是
+`[name, setter]` —— **逗号在 `]` 之前**，`Id]` 这个串在产品代码里根本不存在。
+正确形状是 `const \[[A-Za-z]+Id(s)?, `；阳性对照用已知的两枚 `confirmingId`（web 回收站与 `PasskeyPanel`）各命中 1
+才允许信这个集合。⇒ **"判有没有某类声明"和"判有没有某类调用"是同一条纪律的两侧：形状要从被扫文件现取一行。**
+
+📌 本节提交前的三道读数（本工单 §1 那道"落笔前复跑"的闸门，09:3x 现量）：
+① 本节引用的 **17 处 `文件:行号`** 逐行 `sed -n '<N>p'` 回读，needle 命中 **17/17**（含 `:146-148` 那段
+注释原文，它是"两个名字像但不是一件事"这句话的出处，不是我复述的）；
+② `node scripts/check-docs-voice.mjs` → exit **0**（1028 条、禁词表 30 项零命中）；
+③ `node research/tools/docs-link-check.mjs` → exit **1**，两条都在**别人名下**且**文件全干净**
+（`git status --porcelain` 对 `docs/plans/countdown-anniversary.md` / `PROGRESS.md` / `docs/adr/README.md` 零输出）：
+`countdown-anniversary.md:1280 → docs/adr/README.md §1`（章节号不存在）与 `PROGRESS.md:1362 →
+docs/research/aed-implementation-evidence.md`（死链）。⇒ **本批没有把文档门禁改红**，处置沿用 §8.24：
+登记、不代改。⚠️ 与 §8.24 那条读数的差别要说清，别读成"主检出已修而这里没修"就完了：
+countdown 那一句在 **main** 上已被改写成页内锚点，而**本检出落后 main 416 笔**，所以这里必然还看得见它 ——
+**同一门禁在不同载体上的红集不同，报数时必须带载体**（§8.25 第二档那条是同一个机制的代码版）。
