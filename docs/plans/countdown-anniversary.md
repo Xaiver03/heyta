@@ -2913,3 +2913,22 @@ W0b ─> 随时可做（台账那半要等文件干净）
     不是凭 §0.5 的勾）、iOS 落点确认（探针 `:360` 写 `apps/mobile/evidence/card-export/ios-latest-card.png`）、任务 #26（AGENTS §9 三处过期）。
   - ⚠️ **三条链的脚本都在 `/tmp`**（`device-closeout-{X,Y,Z}.sh`，日志同名 `.log`）⇒ 它们是**本机这一趟的现场**，不是仓库里的常驻证据；
     会话若中断，后来者要按本表重排，别假设它们还在跑（现量：`ps -p 18000,4157,37214` + `tail -1` 各自日志）。
+
+- ㊸ **Goal 范畴②的"零法务变更"现量补上 iOS 那一路（此前 ㉗ 的四路都在 Android/条款侧），并且当场抓住一条会产假读数的 zsh glob 坑**（04 14:13，载体 `d7963bb4`，纯只读、无设备参与）
+  - 五条读数，逐条可重跑：
+    | # | 问的是哪一层 | 现量 |
+    |---|---|---|
+    | ① | 原生写盘去向 | `HeytaCardExportModule.swift:73` = `FileManager.default.temporaryDirectory` + `:77` `data.write(…, options: .atomic)` ⇒ 只落**自己沙盒的 tmp**；该文件头第 21 行自己就引了 `packages/legal/src/documents/permissions.ts` 那句"不申请照片权限" |
+    | ② | JS 侧出图后的通道 | `apps/mobile/src/lib/card-export.tsx:183` 是 `Share.share({ title, url })`（分享面板，不是写相册）；对 `apps/mobile/src/lib/card-export.tsx` + `packages/ui/src/countdown/*` 扫 `requestPermission\|CameraRoll\|Photos\|writeToPhotos\|saveToCameraRoll` 命中 **0** |
+    | ③ | Info.plist 有没有申请相册用途 | `apps/mobile/ios/Heyta/Info.plist` 里 `<key>` 共 **28** 个（阳性对照，证明扫描接上了），`photo\|library` 命中 **0** ⇒ 没有 `NSPhotoLibraryAddUsageDescription` |
+    | ④ | entitlements 有没有相册能力 | `Heyta/Heyta.entitlements` 只有两把键：`com.apple.security.application-groups`、`keychain-access-groups` |
+    | ⑤ | 这两枚文件被谁改过 | `git log --oneline -- apps/mobile/ios/Heyta/Heyta.entitlements apps/mobile/ios/Heyta/Info.plist` = **2 条**（`b0ba4a35` W9 提醒投递 / `3c35b65a` 工程改名），其中标题提到卡片/导出的 **0 条**；W7 iOS 那笔 `d4d154b4` 的 `--stat` 六个文件里也没有它们 |
+
+    ⇒ 合起来是：**iOS 这一路同样是"零新通道、零新权限"**，所以 `permissions.ts` 那句"不申请照片"对外条款在 W7 落地之后**逐字仍为真**（与 ㉗ 的 Android 侧同向，也与 07:41/13:20 两趟"全程没出现系统权限页"的设备读数同向）。
+  - 🔴 **当场抓住的探针坑**：我第一条命令写的是
+    `grep -rniE 'photo\|library' …/Info.plist apps/mobile/ios/*.entitlements` —— 这台机器的默认 shell 是 zsh，
+    **glob 无匹配时它直接报错并中止整条命令**，于是第一个文件（Info.plist）的 grep **根本没跑**，
+    输出里只有一行 `no matches found: …entitlements`。若照那次的空输出宣布"没有照片键"，
+    拿到的是**没有跑过的判据**而不是零命中（§7 元规则第一条"先怀疑探针"的第 N 次现形）。
+    改法：文件枚举用 `find -name`，并且给零命中那条配**阳性对照**（这里是"键总数 28"）。
+  - ⚠️ 本条**不关闭 W7-G3**：法务侧现量补全是范畴②的另一半，iOS **设备出图读数**仍在链 X / 链 Z 手里（14:10 现量负载 30.17）。
