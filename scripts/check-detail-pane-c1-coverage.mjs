@@ -126,9 +126,30 @@ const SECTION_EXC = /已核[^。]{0,20}不需要拍|不需要拍/;
 const noRec = sections.filter((s) => !hasRec(s) && !SECTION_EXC.test(s.title));
 const excusedSections = sections.filter((s) => !hasRec(s) && SECTION_EXC.test(s.title));
 
+// 腿 5：回指**待拍值**的对照节必须有**外部锚** —— URL，或指向第三方源码的 `file:line`。
+// 为什么单独一条：目标第 1 条的原话是"做**外部**调研（**别人怎么做的**），带日期+出处"，
+// 而上面那条 weak 只问"有没有出处"，自家代码的 `packages/x.ts:12` 也算 ——
+// 于是"只读了我们自己的代码"那种节可以全绿过关，而它恰恰没有回答"别人怎么做的"。
+// 🔴 自家/第三方**按路径形状分**，不靠登记表：本仓顶层目录（AGENTS §2 那张仓库地图）开头的算自家，
+//   其余（裸文件名 `StreakList.kt:48`、克隆里的相对路径 `cards/OverviewCard.kt:47`、
+//   `website/common/script/ops/scoreTask.js:326`、`research/…` 下的 vendored 克隆）算第三方。
+//   20:2x 现量：本档**没有一条**第三方引用写成 `research/` 前缀（33 条全写成裸文件名/相对路径），
+//   所以第一版按 `research/` 认出来的第三方数 = 0 —— 一条没有样本的分支不算判据，改成按顶层目录反向认。
+// ⚠️ 这一条**不是**"必须有 URL"：把口径写成"必须 URL"会逼那种节塞链接凑数，
+//   那正是目标第 1 条反过来的东西（与 weak 那条同一个理由）。
+// 例外档仍只从**节标题**认（`不需要拍`）：那一行的题本身不需要"别人怎么做的"，所以对它这一档不适用。
+// ⚠️ 例外**只从标题认，绝不扫正文** —— 理由与腿 4 同一件事故（正文里现成的别人那句话会顶掉我们这一档）。
+const OWN_PATH = /^(packages|apps|server|scripts|e2e|docs)\//;
+const flsOf = (body) => body.match(new RegExp(FILELINE.source, 'g')) || [];
+const extFlOf = (body) => flsOf(body).filter((p) => !OWN_PATH.test(p));
+const ownFlOf = (body) => flsOf(body).filter((p) => OWN_PATH.test(p));
+const hasExternal = (s) => URLRE.test(s.body) || extFlOf(s.body).length > 0;
+const noExt = sections.filter((s) => !hasExternal(s) && !SECTION_EXC.test(s.title));
+const excusedExt = sections.filter((s) => !hasExternal(s) && SECTION_EXC.test(s.title));
+
 console.log(`取样：${doc.startsWith(root + '/') ? doc.slice(root.length + 1) : doc}（C1 表 ${lines.slice(start, end).length} 行区间）`);
 console.log(
-  `C1 行 ${rows.length} 行 ⇒ 有对照节 ${rows.length - uncov.length} / 例外 ${excused.length} / 未覆盖 ${unexcused.length}；C1b 节 ${sections.length} 个（有推荐 ${sections.filter(hasRec).length} / 标题写明不需要拍 ${excusedSections.length} / 缺推荐 ${noRec.length}）`,
+  `C1 行 ${rows.length} 行 ⇒ 有对照节 ${rows.length - uncov.length} / 例外 ${excused.length} / 未覆盖 ${unexcused.length}；C1b 节 ${sections.length} 个（有推荐 ${sections.filter(hasRec).length} / 标题写明不需要拍 ${excusedSections.length} / 缺推荐 ${noRec.length}）（有外部锚 ${sections.filter(hasExternal).length} / 缺外部锚 ${noExt.length} / 标题豁免 ${excusedExt.length}）`,
 );
 
 const dump = (title, list, line) => {
@@ -155,26 +176,32 @@ dump('🔴 C1b 节没有「推荐/建议」那一档，标题也没写明不需�
   const labels = s.body.split('\n').filter((l) => REC_LABEL.test(l)).map((l) => l.match(REC_LABEL)[1]);
   return `  :${s.line} ${s.title.split('（')[0]} —— 行首加粗标签=[${labels.join(' / ') || '（无）'}]`;
 });
+dump('🔴 C1b 节只有自家路径的 file:line 而没有 URL，也没有第三方源码引用（没回答"别人怎么做的"）', noExt, (s) => {
+  const own = ownFlOf(s.body);
+  const shown = own.length ? `${own.slice(0, 4).join(' ')}${own.length > 4 ? ' …' : ''}` : '（无）';
+  return `  :${s.line} ${s.title.split('（')[0]} —— 自家路径引用=[${shown}]`;
+});
 dump('· 例外（只从节标题里认）', excusedSections, (s) => `  :${s.line} ${s.title.slice(0, 46)}`);
 
 // 逐节读数（含覆盖到的行号），让覆盖面可数而不是一个总数
 console.log('\n逐节读数：');
 for (const s of sections) {
   const urls = (s.body.match(/https?:\/\/\S+/g) || []).length;
-  const fls = (s.body.match(new RegExp(FILELINE.source, 'g')) || []).length;
+  const fls = flsOf(s.body).length;
+  const extFl = extFlOf(s.body).length;
   const dates = new Set((s.body.match(new RegExp(DATE.source, 'g')) || [])).size;
   console.log(
-    `  :${String(s.line).padStart(4)} ${s.title.split('（')[0].padEnd(9)} 覆盖=[${s.refs.join(',')}] 日期=${dates} URL=${urls} file:line=${fls} 未核实标记=${(s.body.match(/未核实/g) || []).length} 推荐=${
+    `  :${String(s.line).padStart(4)} ${s.title.split('（')[0].padEnd(9)} 覆盖=[${s.refs.join(',')}] 日期=${dates} URL=${urls} file:line=${fls}（第三方 ${extFl}） 外部锚=${hasExternal(s) ? '有' : '🔴无'} 未核实标记=${(s.body.match(/未核实/g) || []).length} 推荐=${
       hasRec(s) ? '有' : SECTION_EXC.test(s.title) ? '例外(标题)' : '🔴无'
     }`,
   );
 }
 
-const bad = unexcused.length + orphanSections.length + weak.length + noRec.length;
+const bad = unexcused.length + orphanSections.length + weak.length + noRec.length + noExt.length;
 console.log(
   `\n结论：${
     bad === 0
-      ? 'C1 每一行要么有对照节、要么写明例外类别；每个对照节都有日期、出处与推荐那一档（或标题写明不需要拍）✅'
+      ? 'C1 每一行要么有对照节、要么写明例外类别；每个对照节都有日期、出处、**外部锚**（URL 或第三方源码行号）与推荐那一档（或标题写明不需要拍）✅'
       : `🔴 ${bad} 处不成立`
   }`,
 );
