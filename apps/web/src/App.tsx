@@ -635,9 +635,17 @@ export function App(): React.JSX.Element {
    * "AI 面板在某档宽度上不见了"）。这里量的是那一列**实际有没有宽度**：
    * 有 ⇒ AI 面挂在右栏；没有 ⇒ 退回中间列。**功能一个都不少**是这条的判据。
    *
-   * ⚠️ 跨这一步会**重挂载**面板（换父级 = 换子树）。助手的会话历史本来就从本机
-   * 持久化里恢复（`AssistantPanel` 的 `restored`），丢的只是"正在飞的那一发请求"；
-   * 拖窗口跨过断点不是正常用户动作，这里不为它加复杂度。
+   * ⚠️ 这里原来写的是"跨这一步会重挂载面板，丢的只是正在飞的那一发请求，而拖窗口
+   *    不是正常用户动作"。**那句话被实测否证了，两条都不成立**（2026-10-04）：
+   *    ① 丢的不止请求 —— 一次性**出境披露**那个对话框连同用户已经打出来的草稿
+   *      一起回到初始态，等于替用户悄悄取消了一次同意请求；
+   *    ② 不需要人拖窗口就会跨这一步：`e2e/tests/ai-assistant.spec.ts` 里那张
+   *      `fullPage` 截图会改视口，`resize` 监听因此来回各触发一次
+   *      （现量：探针打出 `hasRoom=false` → 两次挂载 → `hasRoom=true` → 两次挂载）。
+   *    ⇒ 重挂载本身保留（它是这条设计的代价），但**会话的进行中状态不再住在
+   *      组件里** —— 见 `features/ai/AssistantPanel.tsx` 那个模块级 ephemeral。
+   *    试过用 portal 把两个挂载点合成一份子树：**不成立**，换 portal 的容器
+   *    同样会重挂载子树（上面那组探针就是量着这个才撤掉的）。
    */
   const detailRef = useRef<HTMLElement>(null);
   const [detailHasRoom, setDetailHasRoom] = useState(true);
