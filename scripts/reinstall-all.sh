@@ -189,9 +189,23 @@ fi
 if printf '%s' "$WANT" | grep -q "mac"; then
   echo ""
   echo "═══ 1. macOS：清旧包 → 打包 → 卸旧 → 装新 ═══"
-  MAC_OUT="/tmp/heyta-macos-dist"
+  # 🔴 这个输出目录以前是**写死的**，而它下面第一句就是 `rm -rf`。
+  #    2026-10-04 实测：另一条会话 03:13 那一趟的证据正好落在同一个路径上，
+  #    本脚本一跑就会把**别人的现场**整个删掉 —— 当时靠起跑前手动改名保住，
+  #    而"我记得先改名"不是判据（AGENTS §8 第 9 条：共享资源要先定所有者与运行窗口）。
+  #    旋钮的默认值逐字不变，所以不带 env 的行为与今天完全一致。
+  MAC_OUT="${HEYTA_MACOS_DIST_DIR:-/tmp/heyta-macos-dist}"
   INSTALLED_APP="/Applications/Heyta.app"
   RESULT_mac=FAIL
+  # 🔴 删之前把"删的是哪个目录、里面有什么"打进日志：这一句的失败模式是**安静**，
+  #    出事后日志里连"原来那里有东西"都读不出来。
+  echo "  macOS 输出目录 = $MAC_OUT（覆盖旋钮 HEYTA_MACOS_DIST_DIR）"
+  if [ -d "$MAC_OUT" ]; then
+    echo "  清空前里面有 $(ls -1 "$MAC_OUT" 2>/dev/null | wc -l | tr -d ' ') 项："
+    ls -1 "$MAC_OUT" 2>/dev/null | head -8 | sed 's/^/     /'
+  else
+    echo "  清空前该目录不存在（首次运行）"
+  fi
   rm -rf "$MAC_OUT"                                   # 清掉旧安装包
   if bash apps/desktop-macos/scripts/package-app.sh "$MAC_OUT" > /tmp/heyta-reinstall-mac.log 2>&1; then
     echo "  ✅ 打包完成（.app + .dmg，含打包即启动的自截屏验证；日志 /tmp/heyta-reinstall-mac.log）"
