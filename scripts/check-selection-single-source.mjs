@@ -350,6 +350,101 @@ for (const dir of WIRE_DIRS) {
 
 const failures = [];
 
+/**
+ * 🔴 **号不占 F**：F 这个号 §8.24 已经预留给"每张有选中态的面必须把选中说出来"的常驻判据
+ * （`aria-current` 或 `aria-pressed` 择一 + 豁免浮层型面），那条才是工单等的 F。本节这条按字母顺位取 **G**。
+ *
+ * G：把"宿主里再没有人自己记着选中"从**一次人工审计**变成一个**余量为 0 的棘轮**。
+ *
+ * 为什么 B 不够：B 认的是它那张**名字表**。§8.28 逐处读完两端所有"记住某一行的 id"的
+ * 本地 `useState`（现量 **15 处**），结论是那些都不是选中 —— 但那是**那次读的结果**，
+ * 它不会自己守住下一次：下一处写成任何不在 B 词表里的名字，B 就看不见它，
+ * 而"界面上悄悄多出第二个所有者"这件事从来不报错（本仓库 tagIds 那段是原件）。
+ * ⚠️ 实测确认这 15 处**没有一处**被 B 命中（取法见本节末那条 `TOTAL=15` 的读数）——
+ * 也就是说 B 对这一整族**本来就是零射程**，不是"射程小"。
+ *
+ * 🔴 表按 `文件 + 变量名` 索引，**不按行号**：同一棵树里产品文件与剥掉块注释后的行号
+ * 差了 40+ 行（取数时量到的），拿行号当键的话这条门禁会在任何人加一段注释时批量假红。
+ * 🔴 类别是**封闭词表**（四档，§8.28 立的那四类）。填一个不在词表里的词**按未登记处理** ——
+ * 否则"随便写个理由"就能绕过这条，而绕过判据最省力的写法恰好就是填一张表。
+ * 🔴 **过期豁免也判红**：表里一条在当前代码里找不到对应声明，就是那条豁免已经不再命中。
+ *     让它悄悄躺着，等于用一张"看起来很全"的表把真正的覆盖面盖住（元规则二那种病）。
+ */
+const ROW_ID_CLASSES = ['in-flight', 'inline-rename', 'confirm-gate', 'dragging'];
+
+/** §8.28 那一趟逐处归类后的 15 处。改名／删掉某处时必须同时改这里，否则 G 报过期豁免。 */
+const ROW_ID_EXEMPT = [
+  ['apps/web/src/features/calendar/CalendarView.tsx', 'busyId', 'in-flight'],
+  ['apps/web/src/features/habits/HabitsView.tsx', 'busyId', 'in-flight'],
+  ['apps/web/src/features/habits/HabitsView.tsx', 'renamingId', 'inline-rename'],
+  ['apps/web/src/features/quadrant/QuadrantBoard.tsx', 'activeId', 'dragging'],
+  ['apps/web/src/features/settings/PasskeyPanel.tsx', 'confirmingId', 'confirm-gate'],
+  ['apps/web/src/features/settings/PasskeyPanel.tsx', 'editingRowId', 'inline-rename'],
+  ['apps/web/src/features/trash/TrashView.tsx', 'confirmingId', 'confirm-gate'],
+  ['apps/mobile/src/screens/CalendarScreen.tsx', 'busyId', 'in-flight'],
+  ['apps/mobile/src/screens/HabitsScreen.tsx', 'busyId', 'in-flight'],
+  ['apps/mobile/src/screens/HabitsScreen.tsx', 'renamingId', 'inline-rename'],
+  ['apps/mobile/src/screens/SecurityScreen.tsx', 'busyId', 'in-flight'],
+  ['apps/mobile/src/screens/SecurityScreen.tsx', 'renamingId', 'inline-rename'],
+  ['apps/mobile/src/screens/SecurityScreen.tsx', 'confirmDeleteId', 'confirm-gate'],
+  ['apps/mobile/src/screens/TasksScreen.tsx', 'busyId', 'in-flight'],
+  ['apps/mobile/src/screens/TrashScreen.tsx', 'confirmingId', 'confirm-gate'],
+];
+
+/** 只看**单数** `…Id`：复数 `…Ids` 是筛选范围（"当前看哪几条"），不是"当前看的是哪一条"。 */
+const ROW_ID_NAME = /^[A-Za-z0-9_$]*Id$/;
+
+const rowIdSeen = [];
+const rowIdKey = (file, name) => `${file}  ${name}`;
+for (const file of files) {
+  const rel = path.relative(ROOT, file);
+  stripComments(readFileSync(file, 'utf8'))
+    .split('\n')
+    .forEach((line) => {
+      LOCAL_STATE_DECL.lastIndex = 0;
+      let m;
+      while ((m = LOCAL_STATE_DECL.exec(line)) !== null) {
+        if (ROW_ID_NAME.test(m[1])) rowIdSeen.push(rowIdKey(rel, m[1]));
+      }
+    });
+}
+
+/** 词表自检：登记表本身先要合法，否则"表里有这条"可能指的是一个根本不存在的类别。 */
+for (const [, , tag] of ROW_ID_EXEMPT) {
+  if (!ROW_ID_CLASSES.includes(tag)) {
+    failures.push(
+      `断言 G：豁免登记里有一档类别「${tag}」不在封闭词表 ${ROW_ID_CLASSES.join('/')} 里 —— ` +
+        `这条登记按未登记处理（填个词不该能绕过判据）。`,
+    );
+  }
+}
+
+const exemptKeys = new Set(ROW_ID_EXEMPT.map(([f, n]) => rowIdKey(f, n)));
+// B 已经管住的那些名字不算 G 的射程：两处判同一件事会各报一遍，改的人不知道先满足哪个。
+const unregistered = [...new Set(rowIdSeen)].filter((k) => !exemptKeys.has(k) && !SELECTION_NAME.test(k.split('  ')[1]));
+if (unregistered.length > 0) {
+  failures.push(
+    `断言 G：宿主里有 ${unregistered.length} 处本地 \`…Id\` useState 没有语义登记：\n  ${unregistered.join('\n  ')}\n` +
+      `  先问它在这一屏决定什么：是"当前看的是哪一条"⇒ 那是**第二个选中所有者**，删掉它、改用 @heyta/app-host 的 selection；\n` +
+      `  是四类瞬态之一（${ROW_ID_CLASSES.join(' / ')}）⇒ 在 ROW_ID_EXEMPT 里登记一行并写明是哪一类。`,
+  );
+}
+const stale = ROW_ID_EXEMPT.filter(([f, n]) => !rowIdSeen.includes(rowIdKey(f, n)));
+if (stale.length > 0) {
+  failures.push(
+    `断言 G：登记表里有 ${stale.length} 条**当前代码里已经不存在**的豁免：\n` +
+      `  ${stale.map(([f, n, t]) => `${f}  ${n} (${t})`).join('\n  ')}\n` +
+      `  过期豁免和永真判据是同一种病 —— 删掉它，或把改名后的新那条一起登记进来。`,
+  );
+}
+// 分母自检：一个 `…Id` 都没扫到 = 扫描层坏了，"零未登记"就是假的绿。
+if (rowIdSeen.length === 0) {
+  failures.push(
+    `断言 G：在 ${HOSTS.join(' / ')} 的 src 里一处 \`…Id\` 的 useState 都没扫到。\n` +
+      `  「全部已登记」和「没东西可登记」是两件事 —— 判红，让下一个来看的人先修扫描。`,
+  );
+}
+
 // A：数量要对，而且必须落在各宿主的 lib/selection.* 里。
 if (instances.length !== REQUIRED_STORE_INSTANCES) {
   failures.push(
@@ -406,6 +501,12 @@ if (failures.length > 0) {
   console.error('  改法：读 `@heyta/app-host` 的 `selection.ts`，宿主只留 lib/selection 那一层胶水。');
   process.exit(1);
 }
+
+console.log(
+  `✅ G：宿主内 …Id 本地态 ${rowIdSeen.length} 处全部有语义登记（四类：` +
+    ROW_ID_CLASSES.map((c) => `${c} ${ROW_ID_EXEMPT.filter(([, , t]) => t === c).length}`).join(' / ') +
+    `），过期豁免 0 条`,
+);
 
 const counts = vocab.map((kind) => `${kind} ${consumersByKind.get(kind).length}`).join(' / ');
 console.log(
