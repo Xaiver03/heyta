@@ -4169,7 +4169,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
    = **1**，而 `git show f92491ac:packages/sync-client/src/client.ts | grep -c '不会自动补传'` = **1**
    ⇒ **`f92491ac` 这个 ref 自己是红的**，`pnpm --filter @heyta/sync-client test` 在它上面必失败。
 
-9. 🔴 **我自己这笔提交违反的正是本仓库那条入库不变量**（第 7 条查出来的，归我，不登记成别人的）：
+8. 🔴 **我自己这笔提交违反的正是本仓库那条入库不变量**（第 7 条查出来的，归我，不登记成别人的）：
    `c9f4e2aa` 只把 `client.ts` 的措辞改成真话，**把钉在谎话上的判据留在了工作树里**。
    入库不变量是"**这一笔带得走的文件里不许有红**"（§8 第 9 条那一族），
    而这里成的是"**生产改动与判据改动拆在两笔里，中间那个 ref 是红的**"。
@@ -4182,9 +4182,9 @@ W0b ─> 随时可做（台账那半要等文件干净）
    **`RC_SC=0`**（`/tmp/sc-verify.log`）。这条才是"HEAD 不自洽"的正解，
    而不是把第 7 条那个带未提交文件的读数当作 ref 的读数。
 
-10. **第三笔合并后的最终读数**（载体 = `5358edf7`，四件文档门禁现跑，**带着本节全部新增文字**跑的）：
+9. **第三笔合并后的最终读数**（载体 = `5358edf7`，四件文档门禁现跑，**带着本节全部新增文字**跑的）：
     `RC[check:docs]=0`、`RC[check:md-tables]=0`、`RC[check:docs-voice]=0`、`RC[check:doc-citations]=0`，
-    外加第 9 条在新 HEAD 上重跑的 `pnpm --filter @heyta/sync-client test` **`RC_SC=0`**
+    外加第 8 条在新 HEAD 上重跑的 `pnpm --filter @heyta/sync-client test` **`RC_SC=0`**
     （`Test Files 9 passed (9)` / `Tests 132 passed (132)`）。
     合并在**改完 AGENTS 那段最终措辞之后再跑一遍**（第一趟跑的是改措辞前的内容，
     那趟不构成对提交物的读数）：`RC2[check:docs]=0`、`RC2[check:md-tables]=0`、
@@ -4200,7 +4200,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
     （其**代码面**与本 ref 逐字节相同 —— 差异只有那一个 md）上取过。
     ⚠️ **刻意不重跑全量，并写明代价**：如果那 50 行文档会影响某条门禁的行为，要等落地后那一趟才发现。
     缓解：这四件正是针对这个面穷举的那四类（死链 / 表格行 / 口径词 / 引用），
-    而第四节里 `check:md-tables` 与 `check:docs` 都在本轮对**我自己新写的这张表**有过分辨力（第 8 条）。
+    而第四节里 `check:md-tables` 与 `check:docs` 都在本轮对**我自己新写的这张表**有过分辨力（第 10 条）。
     🔴 **变异对照已实跑**（证明这四条不是恒绿）：脚本 `/tmp/mut-mdtables.mjs` 把
     本文件第 **31** 行那个三列表格的一行**去掉行尾 `|`** 后重跑 `check:md-tables` ⇒
     **`RC_MUT_MDTABLES=1`**（`[ELIFECYCLE] Command failed with exit code 1`），
@@ -4208,9 +4208,35 @@ W0b ─> 随时可做（台账那半要等文件干净）
     ⚠️ 变异打在**文件里已有的表**上，不是打在本节新写的文字上 —— 本节只有有序列表，
     没有新增表格，所以"覆盖我的新内容"这句**不成立**，这里证的是**这四条门禁本身有牙**。
 
-8. **死链与表格门禁在合并态复绿**：第 5 条那趟 65 段链日志（`/tmp/chain-MERGED.log`，
+10. **死链与表格门禁在合并态复绿**：第 5 条那趟 65 段链日志（`/tmp/chain-MERGED.log`，
    载体 = `cfdac113` 之后）里，这两条各自是**独立的一段**、不是被尾换行粘住的那一段：
    `RC[check:docs]=0`、`RC[check:md-tables]=0`，另附 `RC[check:doc-citations]=0`、
    `RC[check:docs-voice]=0`、`RC[check:legal-copy]=0`。
    🔴 整趟非零的只有两段，且都已在第 5 条逐段定性：`check:web-artifact:app`（测量配置没对齐）
    与那段 `check:server-envcheck:ios-native-bridges`（链子自己坏了，两个 rc=0 由补跑另取）。
+
+11. 🔴 **`E2E-MERGE-01`：我手工裁决的 4 份 e2e 用例到现在没有跑过**（登记，不硬压）。
+    合并冲突里有 4 份 Playwright 用例是我逐处裁决的（`e2e/tests/admin-console.spec.ts`、
+    `inbox.spec.ts`、`profile-avatar-e2ee.spec.ts`、`vault-settings.spec.ts`，裁决见第 4 条），
+    而它们**不在**第 5 条那趟 65 段链里 —— `check:ai-e2e` 本轮**一次都没跑**，
+    所以这四份的"合并没有把它们改坏"目前只有**读源码级别的证据**，没有跑过的证据。
+    为什么没跑（04 21:4x 现量，不是借口，是共享资源归属）：
+    - `pnpm check:ai-e2e` 的前置动作会**按端口 SIGKILL 别人的 vite**（环境陷阱 #87），
+      而此刻本机有 **4 组 `npm exec vite` 在跑**（pid 35185/83785/83844/67563 …），
+      `:3000` 与 `:3100` 都在 LISTEN（`lsof -nP -iTCP -sTCP:LISTEN`）—— 那是并行会话的设备验收载体；
+    - 负载门：`sysctl -n vm.loadavg` = `{ 21.37 89.14 69.23 }`，1 分钟档已超本仓约定的 12。
+    ⇒ 按 §8 第 9 条"**共享资源先定所有者**"，这一趟不跑；**记环境不可用，不记产品失败**。
+    闭合命令（安静窗口里跑，四份单独跑就够、不必整族）：
+    `cd e2e && pnpm install && npx playwright test tests/admin-console.spec.ts tests/inbox.spec.ts tests/profile-avatar-e2ee.spec.ts tests/vault-settings.spec.ts`
+    判据：4 份全过；任一红要先按"裁决时的语义"归因（是合并裁错还是用例本就依赖旧界面），**不要为了让它绿而改断言**。
+
+12. **停止追 main**（第 6 条那条纪律的执行结果）：`5358edf7` 之后 main 又落了 **4 笔**
+    （`4f0b3894`、`83359555`、`4023fc5f`、`eaf14080`；其中 `83359555` 是代码笔，动
+    `scripts/verify-mobile-due-time.sh` 与 `research/tools/calendar-line-commit-plan.sh`）。
+    现量：`git rev-list --count HEAD..main` = 4。
+    这一轮**不再做第四次并入**，理由不是省事：**并行会话正以分钟级往 main 落笔**，
+    任何"我已把 main 并进来"的声明在他们停笔之前都只是瞬时读数 —— 把落地那一步的形态
+    写成"等主检出干净时由持有者一次 `git merge feat/countdown-batch2`（届时按第 4 条的
+    台账并集规则处理 `AGENTS.md` / `environment-traps.md`）"，比我在另一侧追 N 次并每次重验一遍要**便宜且更不容易骗人**。
+    ⚠️ 这一条与第 6 条不矛盾：第 6 条说的是"不要因为落地而去覆盖别人的工作树"，
+    本条说的是"不要用一次新的并入去刷新那个瞬时读数"。**两者的共同前提是他们仍在写**（现量 16 枚未提交路径）。
