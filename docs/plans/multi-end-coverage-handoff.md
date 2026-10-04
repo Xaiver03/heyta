@@ -1975,3 +1975,26 @@ platforms android-36 + build-tools 35/36 + NDK 齐，**没有 emulator 本体与
 
 现量窗口：23:11 负载 26.92 → 23:12 25.10 → **23:29 50.95**（阈值 12，16 核）；完成旗 `notes`/`reinstall` 仍两枚都没有；
 链 81245、排队器 82449、哨兵 11786 三枚都活着。**这一段没有起任何设备/Playwright/重装类动作。**
+
+## 23:32 等待期两条自检：② 与新规不相容吗（读本体核过），以及哨兵的 7 臂有没有死臂
+
+**一、`pnpm check` 会不会替我起一次本机 gradle**（Android 新规落地后这是 ② 的前置问题，不能靠段名猜）。
+现量：`scripts.check` 82 段里含移动端字样的只有 5 段 —— 38 `check:mobile-settings`、62 `check:ios-native-bridges`、
+63 `check:mobile-bundle`、78 `check:apk-freshness`、80 `check:mobile-first-run-gate`。逐条读到底：
+`check:apk-freshness` = `bash scripts/lib/apk-freshness.sh --self-test`，而那个文件里出现的
+`pnpm build:android` **只在第 83/88 行的 `echo` 提示串里**（给人看的"该怎么修"），`--self-test` 走的是
+`heyta_apk_freshness_selftest`；`check-mobile-bundle.mjs` 只有第 130 行一处 `react-native` 字样，不调 gradle。
+⇒ **② 与新规不相容这一条被否证**，② 照原计划跑，不需要为它加豁免。
+
+**二、哨兵（`heyta-wait-verdict.sh`）的 NEEDLE 有没有"永远不响的臂"**。做法是不凭记忆比：
+从文件里把 `NEEDLE` 那行原样 `sed` 出来（不重敲），再拿链里**可执行行**的模板逐臂对照 ——
+七臂全部落在真的 `say`/`printf` 模板上（`:392` ③ 没有判决行、`:436/443/447/459` ① 不起、`:467` ① 真的跑过了、
+`:389/395/408` NOTES_EXIT、`:465/470` INNER_EXIT 两种走向、末行 `链 ${CHAIN_TAG} 退出` ⇒ `CHAIN_TAG=v27` 代进去就是 `链 v27 退出`）。
+再把六条**发射态**样本喂回同一个 NEEDLE：**6/6 命中**。
+（这两个行号第一遍是我凭记忆写的 `:393` / `:146`，现量重核才发现都不对 —— 写进这里是为了让下一位知道
+"台账里的行号也是断言"，改一句就要重跑一次 `grep -n`，而不是复述。）
+⚠️ 同时量到一条用法上的边界：`① 不起` 那一族在**每一轮**都可能打，所以哨兵是"有判决就交回"而不是
+"等全部成交"—— 它提前退出之后 ③/① 仍在链里重试，**要重挂哨兵**；② 那一侧不受影响（排队器等的是链进程退出，不是这一行）。
+
+现量哨兵时刻：负载 43.66（1min）/ 46.50（5min）；`:4318` 与 `:4319` **忙**（别人那趟 `playwright test` 正在用套件端口），
+`:4320`/`:4322` 空 —— 这正是我刚重造的那把 `port_busy`（bind ∨ HTTP）该读成 busy 的形状，链的门会因此继续让路。
