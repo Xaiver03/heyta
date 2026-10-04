@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { waitHeadRevealed } from './head-reveal';
+
 /**
  * `/platforms` 的 Web 卡：那句「可安装」不能回来（G-51）
  * =====================================================
@@ -85,8 +87,14 @@ test('英文 Web 卡：同一句承诺在英文页也不能回来', async ({page
 
 test('整页仍有「离线」这一档承诺，摘掉的只是「可安装」', async ({page}) => {
   await page.goto('/platforms/');
-  await page.locator('section#web').scrollIntoViewIfNeeded();
-  await page.screenshot({path: 'landing-results/platforms-page.png', fullPage: true});
+  // 🔴 先等页头那次遮罩揭示**落位**再拍，否则这张"给人看的证据图"会稳定地谎报一个
+  //   不存在的缺陷：实测不等待时图顶留一条 180px 空白带，而 DOM 里 H1 的
+  //   rect / opacity / transform 全部正常（另拍视口图标题在）。
+  //   `animations:'disabled'` **单独不够** —— 它只完成 CSS 动画/过渡，遮罩那一下是
+  //   framer-motion 的 WAAPI transform；加上它之后 lede 与主蓝按钮回来了，H1 仍空白。
+  //   等待逻辑住在 `./head-reveal.ts`（与文档中心那 16 处共用一份，不抄第二份）。
+  await waitHeadRevealed(page);
+  await page.screenshot({path: 'landing-results/platforms-page.png', fullPage: true, animations: 'disabled'});
 
   // 阳性对照：这一趟读的字节是**当前构建产物**，不是上一轮留在 dist 里的旧树
   // （AGENTS §7 第 27/82 条那个失效形态：判据跑在旧产物上照样绿）。
