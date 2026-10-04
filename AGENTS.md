@@ -604,12 +604,20 @@ card-export 的失败文案不再把内部 `detail` 拼进界面、让帧判据�
 iOS 三座桥的 `RCT_EXTERN_REMAP_MODULE` 名字错位、以及 `sync-client` 那句**没有代码兑现的谎话**
 （"升级服务端之后再同步一次"）连同钉在谎话上的判据。
 🔴 另有 **7 条改不动的登记成 `G-AUDIT-1..7`**（§8.5 第 3 条），逐条写明归属与修法，**没有硬压**。
-🔴 **本轮唯一未闭合的验证格 `E2E-MERGE-01`**：合并里我手工裁决的 4 份 Playwright 用例
-（`admin-console` / `inbox` / `profile-avatar-e2ee` / `vault-settings`）**一次都没跑过** ——
-`check:ai-e2e` 的前置会按端口 SIGKILL 别人的 vite，而本机 04 21:4x 现量有 4 组 vite 在跑、
-`:3000`/`:3100` 都在 LISTEN、`vm.loadavg` 1 分钟档 21.37（约定上限 12）。
-⇒ 按 §8 第 9 条"共享资源先定所有者"**这一趟不跑，记环境不可用、不记产品失败**；
-闭合命令与判据在 §8.5 第 11 条。
+🔴 **`E2E-MERGE-01` 已闭合，而且它抓到一条真缺陷**：合并里手工裁决的 4 份 Playwright 用例
+第一次真跑 ⇒ `1 failed / 10 passed`，红的是后台「调休/补班」年度那一格被裁掉 **13px**
+（`admin-console.spec.ts:862` 的**几何**判据 `scrollWidth − clientWidth ≤ 1`），
+而**同一趟里 `toContainText('2026')`、`href` 逐字、`rel` 那十条文本断言全绿** ——
+这是"断言只验写了什么、不验看得见的有多少"在本轮的第二次实证，也是**唯一**跑到它的那一层。
+修法按不变量走：`admin.css` 新增 `.ht-settings__admin-rowMain--wrap` 只挂年度那一格
+（年度/条数/备注没有一段允许被省略号替掉；邮箱排的 ellipsis 是有意的，共用那条不动），
+**没有**去抬阈值。三条读数：修前 `RC_E2E4=1` ⇒ 修后 `RC_REFINAL=0` ⇒
+🔴 摘掉修饰符变异 `RC_MUT_WRAP=1`（裁切值又是 13px）。两张图人都看过，
+证据与 md5 表在 `apps/web/evidence/admin-holiday/README.md`。
+⚠️ 边界：这 **不等于** `check:ai-e2e` 整族绿（整族还有 50+ 条，本轮共享载体上没跑）。
+📌 顺带撤回一条我自己写错的判断：曾记"`check:ai-e2e` 会 SIGKILL 别人的 vite（`:3000`/`:3100`）"——
+读 `scripts/check-ai-e2e-preflight.mjs` 后否证，它清的是本套件专用端口 **4318/4319**。
+**判"某条路会伤到别人"要先读它实际碰哪个资源**，别从"端口被占"推。
 
 | 单 | 落到哪一步 | 一条读数 |
 |---|---|---|
