@@ -171,7 +171,7 @@ echo "== 1b. 防「漏登记」：本线命名空间里改了却没点名的文�
 #   ② 新加的五个目录**只把 `README.md` 划进本线命名空间，png 不划**：
 #      那些字节是别人的 e2e 趟写的，工作树相对 HEAD 干净 ⇒ 划进来会让 1b 去点名不属于本线的文件。
 # ⚠️ `docs/reference/environment-traps.md` **刻意不在这里、也不在 PATHS**：那是并行会话共用的台账
-#    （14:1x 现量 ` M`、+318/-7，其中本线只占 #241–#246 六条），点名它 = 把别人几百行未提交内容
+#    （14:1x 现量 ` M`、+318/-7；**本线占哪几条不抄在这里** —— 号段会漂而且不连续，唯一现量口径在交接 §4.05 那条 `for n in …grep -cE` 命令），点名它 = 把别人几百行未提交内容
 #    一起提交进去。本线条目的可复跑归属口径写在交接 §4.05。
 NS_RE='^research/tools/(r14c-|r17-|h-flaky-|calendar-line-|b-|f-boundary-)|^docs/plans/(calendar-year-time-and-mobile-profile|calendar-profile-handoff)\.md$|^scripts/(verify-mobile-window-gate|verify-mobile-due-time)\.sh$|^scripts/lib/(mobile-e2e-runner-probe|wedged-runner)\.sh$|^apps/web/evidence/(calendar-day|calendar-view-options|profile-panel)/[^/]+\.(md|png)$|^apps/web/evidence/(calendar-year|calendar-day-time|calendar-cells|calendar-week|calendar-capture)/README\.md$'
 # 🔴 11:0x 加 `f-boundary-`（不写裸 `f-`：那个前缀太短，别的线随时会撞上，撞上了就把别人的文件
@@ -289,6 +289,8 @@ fi
 #    本线这笔提交既带不走它们、也不该替别人修它们。
 #    "门禁红"与"红会进我这笔提交"是两件事，不分开写就会把别人的临时夹具读成"本线入库被挡住了"。
 #    🔺 判据**没有放宽**（仍然 exit 3，绝不放行一次带红的提交），这里只补"红在哪一方"的读数。
+OFF=""   # 🔴 必须先初始化：下面第 3 格末尾要按 NAMES 归类时，R2 可能是 0（这一格不进 if），
+         #    而脚本是 `set -u` —— 未初始化会在这里直接崩，崩在"红没红"之前。
 if [ "$R2" != 0 ]; then
   OFF=$(grep -oE '❌ [^[:space:]]+\.sh' "$SH_OUT" | awk '{print $2}' | sort -u)
   N_OFF=$(printf '%s\n' "$OFF" | grep -c . || true)
@@ -303,12 +305,42 @@ if [ "$R2" != 0 ]; then
       printf '      · 未跟踪且未被忽略：%s\n' "$one"
     fi
   done <<< "$OFF"
-  echo "   SHELL_UNICODE_OFFENDERS=${N_OFF} 已跟踪=${N_TRACKED} ignored=${N_IGNORED}（红仍按 exit 3 走，这里只是别把别人的临时夹具读成本线的门）"
+  echo "   SHELL_UNICODE_OFFENDERS=${N_OFF} 已跟踪=${N_TRACKED} ignored=${N_IGNORED}（这一格只报归属；会不会拦这一笔，由下面那格「带得走的红」决定）"
 fi
 
 if [ "$R1" != 0 ] || [ "$R2" != 0 ]; then
-  echo "   ❌ 本线自己的结构门禁红 ⇒ 先修（exit 3）。红读在 $MD_OUT 与 $SH_OUT"
-  exit 3
+  # 🔴 18:1x 把这一条的**范围**改对（判据没放宽，改的是它量的那个集合）。
+  #    原样是"仓库里这两道有任何红 ⇒ exit 3"，可这一腿提交走的是
+  #    `git commit --only -- <NAMES>`，**它的提交集合恰好等于 NAMES** ——
+  #    也就是说别人工作树里的红**结构上进不了这一笔**，却被这条前置当成了本线的红。
+  #    今天现场两趟都是这个形状：第一趟 `scripts/verify-mobile-ios-reminder.sh:867`
+  #    （`$IOS_MODE` 后面紧跟那个全角冒号，别人正在编辑的那枚文件；现量
+  #    `grep -c verify-mobile-ios-reminder` 在本清单 = 0，带不走）。
+  #    ⚠️ 这行注释自己**一开始把全角冒号写在反引号里面**（变量名紧贴冒号），被这把门禁判成 red、
+  #    并被上面那格归类成"会进这一笔"而 exit 3 —— 门禁**不跳注释**（注释里变量名紧跟非 ASCII
+  #    也算同一种形状）。写说明的时候别把那个形状复制出来。scoped 版上线头两趟抓到的都是这一枚自己。
+  #    带不走）；上一趟同一条门禁的红落在 `tmp/*.sh`（被 gitignore，同样带不走）。
+  #    真正的不变量只有一句：**这一笔带得走的文件里不许有红**。所以按 NAMES 归类，
+  #    带得走的红 ⇒ exit 3（与原来同样响亮），带不走的红 ⇒ 打印归属 + 继续（口径与 docs-link 那格一致）。
+  CARRY=""
+  MDO=$(grep -oE '^  [^ :]+\.md:[0-9]+' "$MD_OUT" 2>/dev/null | sed 's/^  //; s/:.*//' | sort -u)
+  while IFS= read -r one; do
+    [ -z "$one" ] && continue
+    for p in "${NAMES[@]}"; do
+      [ "$p" = "$one" ] && CARRY="$CARRY$one
+"
+    done
+  done <<< "$(printf '%s\n' "$MDO"; printf '%s\n' "$OFF")"
+  N_CARRY=$(printf '%s\n' "$CARRY" | grep -c . || true)
+  N_REPO=$(printf '%s\n%s\n' "$MDO" "$OFF" | grep -c . || true)
+  echo "   仓库内这两道的红：$N_REPO 枚文件；其中**本笔带得走的**：$N_CARRY 枚"
+  if [ "$N_CARRY" != "0" ]; then
+    printf '%s\n' "$CARRY" | grep . | sort -u | sed 's/^/      ❌ 会进这一笔：/'
+    echo "   ⇒ 先修自己那几枚（exit 3）。红读在 $MD_OUT 与 $SH_OUT"
+    exit 3
+  fi
+  printf '%s\n' "$MDO" "$OFF" | grep . | sort -u | sed 's/^/      · 带不走（不是这一笔的树）：/'
+  echo "   ✅ 本笔要提交的文件里没有这类红 ⇒ 继续（别人的红留在别人的树上，本工具不代改、也不替它放宽判据）"
 fi
 
 echo "== 4. 点名动作（复制即可，本工具不代执行）=="
