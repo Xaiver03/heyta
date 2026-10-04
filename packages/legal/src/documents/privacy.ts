@@ -397,7 +397,7 @@ const zh = [
           [
             '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像密文、条款接受时刻）',
             '到你注销账号为止。',
-            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录，按数据库外键级联删除（共 19 处级联，覆盖 18 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据不会因注销而消失。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库；当前代码里没有任何"账号已注销 ⇒ 清除本机数据"的路径，界面上也还没有注销入口（注销靠邮件申请）。把这一条写成"你的所有数据立即彻底销毁"就是假话。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
+            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录，按数据库外键级联删除（共 19 处级联，覆盖 18 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。所以这一条既不写成"你的所有数据立即彻底销毁"，也不写成"你在所有设备上的数据都会被删除" —— 一台从此不再上线、也不再登录的设备，我们没有远程擦除它的能力。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
           ],
           [
             '订阅、订单与优惠码核销记录',
@@ -486,7 +486,7 @@ const zh = [
           '**查阅与复制**：✅ 三个端（Web、命令行、移动端）都能导出**全量**数据 —— 你看得见的全部内容、完整的事件日志、已删除记录（墓碑），外加可核对的计数。**导出文件本身是明文 JSON、不加任何保护**，它落在哪里、要不要转给别人，由你负责。',
           '**更正与补充**：✅ 任务、清单、标签、习惯等业务字段你在任一端改一次，就会同步到其他所有端。⚠️ 服务器上那些事件是密文，我们**无法读取、也无法替你改写**其中某一条 —— 只能由你登录后自行修改。❌ **邮箱不可更换**：产品目前没有换绑邮箱的能力，我们如实写这条限制，而不是摆一个点了没反应的入口。',
           '**删除**：✅ 应用内的删除在事件模型里是**追加一条删除事件**，不是抹掉记录。它从你的所有设备与界面上消失。🔴 至于服务器上承载它的那段加密历史：**当前不会定期清理**。我们部署了每日运行的保留期清扫（窗口 45 天），但它只对已经存在"完整状态边界"的账号动手，而本产品当前的客户端不会产生那种边界 —— 实测每天清掉的条数是 0。所以在那之前，这段加密历史实际只有一条路真的消失：**注销账号**。界面里的"彻底删除"**只是一个标记**，它不缩短任何期限，也不等于"已从服务器销毁"。我们不会把"会到期清理"写成承诺，除非它真的对我们的数据成立。',
-          '**注销账号**：⚠️ 服务端有真正的硬删除能力，但**应用界面里目前没有这个入口**。所以现在的路径是**写信给我们**（`heyta@waytofuture.cn`，从你注册时用的那个邮箱发出，以便我们核验归属），我们在 15 个工作日内完成核查与删除。注销之后仍可能存在的副本有**三处**，我们逐处写明：① 上条那个 14 天的整库备份窗口；② 🔴 **你其它设备上的本地数据** —— 本地优先意味着每台设备自己存着一份可读的库，而"账号已注销就清除本机数据"这个动作今天还不存在（所以我们不写"你在所有设备上的数据都会被删除"）；③ 支付事件的审计行，它没有账号外键，注销后指向订阅的指针被置空、只剩金额与时间，仅用于履行法定留存义务。',
+          '**注销账号**：服务端有真正的硬删除能力，**入口也在三个面上给了**：网页版设置页、手机端「我的」与命令行版（`account close`），三处都要先勾一次"我知道这会把本机上包括还没同步出去的数据一起清掉"、再做第二次确认，并且都先提示导出。也可以**写信给我们**（`heyta@waytofuture.cn`，从你注册时用的那个邮箱发出，以便我们核验归属），我们在 15 个工作日内完成核查与删除。注销之后仍可能存在的副本有**四处**，我们逐处写明：① 上条那个 14 天的整库备份窗口；② 🔴 **你其它设备上的本地数据** —— 本地优先意味着每台设备自己存着一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份，所以我们只写"下次联网的设备会自己清掉"，不写"你在所有设备上的数据都会被删除" —— 一台从此不再上线的设备，我们没有远程擦除它的能力；③ 🟡 **macOS 与 Windows 的桌面壳**：这一层清到哪一格、边界在哪，以《你的数据权利》第五节为准，本文件不抄第二份；④ 支付事件的审计行，它没有账号外键，注销后指向订阅的指针被置空、只剩金额与时间，仅用于履行法定留存义务。',
           '**撤回同意**：✅ **联网这件事有它自己的撤回入口** —— 设置页里那一项叫「隐私同意」，点「撤回同意」之后这台设备**立刻**停止对外发出任何请求，**已经建立的实时连接当场关掉**，而且状态清回"没问过"：界面会重新问你一次，不是默默换成"你已经拒绝了"。本地数据一条都不动。此外 AI 出境授权、记忆偏好层、推送订阅三处也各自能撤回，关掉之后**下一次调用连输入都不再被读取**（不是只在数据库里标成"已关闭"）。限制：撤回不溯及已经发出的请求。',
           '**要求解释说明**：✅ 你有权要求我们对这份处理规则作出解释，同样走上面的邮箱。',
         ],
@@ -577,6 +577,51 @@ const zh = [
     ],
   },
   {
+    id: 's15',
+    title: '欧盟 GDPR 口径：这份政策能顶到哪几条、哪几条它今天顶不上',
+    blocks: [
+      {
+        kind: 'p',
+        text: '这份政策是按《个人信息保护法》的口径写的，它逐类说明收集什么、存在哪儿、服务端能不能读到。GDPR 问的问题和它并不完全重合，所以这一节的作用不是给政策贴一个"符合 GDPR"的标签，而是**把两套问题摆在同一张表上，指出对不上的那一列**。逐条对照的总表只维护在《你的数据权利》里一份，本节不抄第二份 —— 同一对抄件长期一定漂。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 6(1)(a) 条与第 7 条（同意作为合法性基础、同意的条件）',
+            '每一类处理是不是各自有合法性基础；同意是不是自由作出、可撤回，且撤回不比作出同意更难',
+            '任何数据出站之前都有一道按功能打开的同意闸门：出境要总开关、允许远程、逐功能授权三道都过；本机端点失败时不许悄悄改发云端，这条由常驻判据钉住；用户在同一处就能把该项关掉',
+            '但同意的**粒度**是"功能开关"，不是按 GDPR 的处理目的逐项采集的，两者之间没有做过一张对应表。所以"每一类处理都各自有一条有效同意"这句话我们今天说不出，也不把它写在承诺的位置上'
+          ],
+          [
+            '第 25 条（默认数据保护与设计即隐私）',
+            '默认值本身是不是最小的；有没有一份写过的设计与定期评估',
+            '默认值是先本地、服务端只见密文，而不是先上传再让用户去关；托管那一档在保留策略定下来之前是**开不了**的状态，代码里让它失败是刻意的，不是没写完',
+            '没有一份按第 25 条口径归档的设计评估文档，也没有独立于开发方的验证者。政策自己不能同时充当那份评估 —— 它在这里被写成缺口，而不是被写成"我们遵循隐私-by-design"'
+          ],
+          [
+            '第 33 条（个人数据泄露时向监管机构通知）',
+            '真出事的时候，由谁、在多长时间内、按什么程序通知谁',
+            '到今天为止没有向任何监管机构作过此类通知，也没有收到过相关询问',
+            '🔴 **这一条今天靠人，不靠机制**：没有成文的泄露响应程序，没有指定责任人与送达渠道，也没有演练过。把"72 小时内通知"写进政策而不写它背后的程序，等于把一句此刻做不到的话放在承诺的位置上'
+          ],
+          [
+            '第 17 条与第 5(1)(c) 条（擦除权、数据最小化）',
+            '删除是不是真的删除；留下来的是不是必要范围',
+            '注销走数据库外键级联的硬删除，你点下注销的那台设备当场清掉本机的明文，其它设备各自那份本地数据在下次同步拿到"账号已注销"信号时才清掉；服务端只存密文，明文元数据逐类列在《个人信息清单》',
+            '两处顶不上，而且都写在正文里而不是只写在这一格：**整库备份**是快照，代码层没有"从既有备份里单独摘掉某一个人或某一条"的能力，副本要等那份备份自己过期；**从此不再上线、也不再登录的设备**我们没有远程擦除它的手段。级联的逐处条数只在《你的数据权利》里给一份，本文件不抄第二份'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '《你的数据权利》：GDPR 条文的逐条对照表（含我们拿得出的与拿不出的那一列）只在那一份里维护；本节只回答"这份政策自己顶到哪几条"。',
+      },
+    ],
+  },
+  {
     id: 's14',
     title: '版本记录',
     blocks: [
@@ -588,6 +633,8 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
         rows: [
+          ['1.5', '`2026-10-04` 新增第十五节《欧盟 GDPR 口径》：把这份政策与 GDPR 的条文逐格摆开，写明哪几格顶得上、哪几格顶不上，并指向《你的数据权利》里那张逐条对照表（本文件不抄第二份）。这一节里最要紧的一格是**第 33 条**：泄露通知今天只有人、没有程序。具体口径只写在那一节的正文里，本行不复述 —— 复述就会漂。**状态：草案，尚未经法务复核、尚未生效。**'],
+          ['1.4', '`2026-10-04` 改的原因不是措辞，是**代码变了**：注销入口现在在网页版设置页、手机端「我的」与命令行版三处都有（勾一次风险确认、再做第二次确认、并先提示导出），随注销信号清除本机明文那一步也已经落地 —— 点下注销的设备当场清掉，其它设备在下次同步拿到「账号已注销」信号时各自清掉自己那一份；从此不再上线的设备仍然是我们不承诺的那一格。第四节那一行的副本清单因此按四处逐处写明，桌面壳那一层的边界改成指针交给《你的数据权利》第五节，本文件不抄第二份。**状态：草案，尚未经法务复核、尚未生效。**'],
           ['1.3', '`2026-10-04` 更正权限清单的交叉引用：移动端已使用系统通知与 Android 精确闹钟能力，不能再写成 Android 只有 `INTERNET`、iOS 没有需要说明的权限；具体申请时机与拒绝后的行为以《应用权限清单》为准。**状态：草案，尚未经法务复核、尚未生效。**'],
           ['1.2', '`2026-10-04` 补充密钥包、恢复码、系统安全存储与密文迁移记录的用途和留存边界；注销范围增加三类记录，按迁移真源更新级联数量。业务本地库仍为明文。**状态：草案，尚未经法务复核、尚未生效。**'],
           [
@@ -924,7 +971,7 @@ const en = [
           [
             'The account itself (email address, password hash, passkeys, language, nickname, avatar ciphertext, moment of accepting the terms)',
             'Until you close the account.',
-            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones, push subscriptions, wrapped key packages, key migration records and revoked device records — are deleted (19 cascades in total, across 18 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices is not removed by closure.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database; there is currently no code path that wipes a device when its account is closed, and no closure button in the interface (closure is by email request). Writing this as "all your data is destroyed immediately" would be false. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
+            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones, push subscriptions, wrapped key packages, key migration records and revoked device records — are deleted (19 cascades in total, across 18 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database: the device you press it on wipes its local plaintext **on the spot**, and every other device wipes its own copy **the next time it synchronises and receives the "account closed" signal**. So we write neither "all your data is destroyed immediately" nor "your data is gone from every device" — a device that never connects or signs in again is one we cannot wipe remotely. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
           ],
           [
             'Subscriptions, orders and coupon redemptions',
@@ -1013,7 +1060,7 @@ const en = [
           '**Access and copy**: ✅ all three ends (web, command line, mobile) can export **everything** — the materialised entities, the complete event log and the deleted records (tombstones) — with counts you can check against. **The export file is itself unguarded plaintext JSON**: where it lands, and whether you pass it on, is your responsibility.',
           '**Correction and completion**: ✅ business fields — tasks, lists, labels, habits — are changed once on any end and propagate to every other end. ⚠️ The events on our server are ciphertext: we **cannot read them and cannot rewrite one of them for you**; only you, once signed in, can. ❌ **The email address cannot be changed**: the product has no re-binding capability today, and we state the limitation plainly rather than mounting a control that does nothing when pressed.',
           '**Deletion**: ✅ deleting inside the app is, in the event model, **appending a delete event**, not erasing a record. The item disappears from all your devices and from every interface. 🔴 As for the encrypted history carrying it on our server: **it is not periodically pruned today**. We do run a daily retention sweep (45-day window), but it only acts on accounts that already contain a “full-state boundary”, which the clients this product ships never produce — the measured number of records removed per day is 0. So until that changes, there is exactly one route by which that history really disappears: **closing your account**. The “delete permanently” affordance in the interface **is only a marker** — it shortens no period and does not mean “destroyed on the server”. We will not phrase “it gets cleaned up after the retention period” as a promise while it is not true of your data.',
-          '**Account closure**: ⚠️ the server does have a genuine hard-delete capability, but **there is currently no entry point for it in the app interface**. The path today is therefore **to write to us** (`heyta@waytofuture.cn`, sent from the address you registered with, so that we can verify ownership), and we complete verification, deletion and our reply within 15 working days. 🔴 Three copies may still exist afterwards, and we name each one: (1) the 14-day whole-database backup window described in section 7; (2) **local data on your other devices** — local-first means every device keeps its own readable database, and the action "the account was closed, so wipe this device" does not exist in the product today, which is why we never write "your data is deleted on all your devices"; (3) payment-event audit rows, which carry no account foreign key — closure nulls their subscription pointer, leaving only an amount and a timestamp kept solely to discharge our statutory record-keeping duty.',
+          '**Account closure**: the server does have a genuine hard-delete capability, and **the entry point now exists on all three surfaces** — web settings, the mobile “Mine” tab, and the command-line client (`account close`). All three make you tick "I understand this also erases this device’s data, including anything not yet synced", then confirm a second time, and all three tell you to export first. You may also **write to us** (`heyta@waytofuture.cn`, sent from the address you registered with, so that we can verify ownership), and we complete verification, deletion and our reply within 15 working days. 🔴 Four copies may still exist afterwards, and we name each one: (1) the 14-day whole-database backup window described in section 7; (2) **local data on your other devices** — local-first means every device keeps its own readable database: the device you press it on is wiped on the spot, and each other device wipes its own copy the next time it synchronises and receives the "account closed" signal, which is why we write "devices that come back online will clear themselves" rather than "your data is deleted on all your devices" — a device that never connects again is one we cannot wipe remotely; (3) 🟡 the macOS and Windows desktop shells: where that boundary sits is set out in section 5 of *Your Data Rights*, and this file does not copy a second version of it; (4) payment-event audit rows, which carry no account foreign key — closure nulls their subscription pointer, leaving only an amount and a timestamp kept solely to discharge our statutory record-keeping duty.',
           '**Withdrawal of consent**: ✅ **going online has its own entry point** — the item in Settings is named “Privacy consent”, and pressing “Withdraw consent” makes this device stop sending any outbound request **immediately**, **closes the live sync connection on the spot**, and resets the state to “never asked”: the app asks you again rather than quietly filing your choice as “you declined”. Not one byte of local data moves. Beyond that, the AI egress consent, the memory preference layer and push subscriptions can each be withdrawn as well, and after you turn one off **the next call does not even read the input** (this is not a row quietly flagged as “off” while the behaviour continues). Limitation: withdrawal is not retroactive to requests already sent.',
           '**Requesting an explanation**: ✅ you may ask us to explain these rules of processing, through the same email address.',
         ],
@@ -1104,6 +1151,51 @@ const en = [
     ],
   },
   {
+    id: 's15',
+    title: 'The EU GDPR view: which articles this policy actually reaches, and which it does not',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'This policy was written against China\u2019s Personal Information Protection Law: it states, category by category, what is collected, where it lives, and whether our servers can read it. GDPR asks overlapping but not identical questions, so the point of this section is **not** to stamp the policy as "GDPR-compliant" but to put both sets of questions on one table and name the column that does not line up. The article-by-article master table is maintained in exactly one place, *Your Data Rights*; this section does not copy a second version of it, because two copies of the same pair always drift apart eventually.',
+      },
+      {
+        kind: 'table',
+        head: ['Where GDPR sits', 'What it asks', 'What heyta can show today', 'What does not line up'],
+        rows: [
+          [
+            'Articles 6(1)(a) and 7 (consent as a lawful basis, and the conditions for consent)',
+            'Does each processing activity have its own lawful basis; is consent freely given, as easy to withdraw as to give, and not bundled?',
+            'Nothing leaves the device before a per-feature consent gate: outbound traffic needs the master switch, the remote-allowance flag and a per-feature authorisation all three; if the local endpoint fails we are not allowed to silently fall back to the cloud, and a standing check pins that; the user can switch the same item off from the same screen',
+            'But the **granularity** of our consent is a feature switch, not per-purpose collection in the GDPR sense, and no mapping table between the two has ever been made. So "each processing activity has its own valid consent" is a sentence we cannot say today, and it is not written here as a promise'
+          ],
+          [
+            'Article 25 (data protection by design and by default)',
+            'Are the defaults themselves minimal, and is there a written design assessment that gets re-checked?',
+            'The default is local-first with ciphertext on the server rather than upload-first with opt-out; the managed tier is **impossible to enable** until a retention decision exists \u2014 that failure is deliberate in the code, not unfinished work',
+            'There is no archived design assessment written to the Article 25 standard and no verifier independent of the people writing the code. A privacy policy cannot double as that assessment, so this is recorded as a gap rather than as a claim that we "follow privacy by design"'
+          ],
+          [
+            'Article 33 (notifying the supervisory authority of a personal data breach)',
+            'If it actually happens, who notifies whom, within what window, following what procedure?',
+            'No such notification has been made to any authority to date, and no related inquiry has been received',
+            '\ud83d\udd34 **Today this depends on people, not on a mechanism**: there is no written breach-response procedure, no named owner, no delivery channel, and it has never been exercised. Putting "within 72 hours" into a policy without the procedure behind it places a sentence we cannot currently perform where a promise would sit'
+          ],
+          [
+            'Articles 17 and 5(1)(c) (right to erasure, data minimisation)',
+            'Is deletion really deletion, and is what remains within what is necessary?',
+            'Closing an account is a genuine foreign-key cascade hard delete: the device you press closure on wipes its plaintext on the spot, and the local database on each other device is wiped the next time it synchronises and receives the "account closed" signal. The server holds ciphertext only, and the cleartext metadata is itemised in the *Personal Information Inventory*',
+            'Two places do not reach, and both are stated in the body text rather than only in this cell: whole-database **backups** are snapshots and there is no capability in the code to excise one person or one record from an existing backup, so those copies wait for the backup to expire of itself; and a device that **never comes back online** is one we cannot wipe remotely. The cascade counts are given in exactly one place, *Your Data Rights*, and are not copied here'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '*Your Data Rights*: the article-by-article GDPR table, including the column of what we cannot show, is maintained only there. This section answers one question only: which articles this policy itself reaches.',
+      },
+    ],
+  },
+  {
     id: 's14',
     title: 'Version history',
     blocks: [
@@ -1115,6 +1207,8 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date and summary of changes'],
         rows: [
+          ['1.5', '`2026-10-04` Added section 15, *The EU GDPR view*: it lays this policy against the GDPR articles cell by cell, states which ones it reaches and which it does not, and points at the article-by-article table in *Your Data Rights* rather than copying it here. The most consequential cell in that section is **Article 33**: breach notification rests on people today, with no written procedure. The substance lives in that section alone — restating it in a changelog row is exactly how a second copy starts to drift. **Status: draft, not yet reviewed by counsel or in effect.**'],
+          ['1.4', '`2026-10-04` The reason for this revision is not wording — **the code changed**: the closure entry point now exists on all three surfaces (web settings, the mobile “Mine” tab, the command-line client), each behind a risk tick, a second confirmation and an export prompt, and the step that wipes local plaintext on the closure signal has landed — the device you press it on is wiped on the spot while the others clear their own copy the next time they sync and receive the “account closed” signal; a device that never comes back online remains the one case we do not undertake. The retention row in section four therefore names four surviving copies, and the desktop-shell boundary is now a pointer to section 5 of *Your Data Rights* rather than a second copy of it. **Status: draft, not yet reviewed by counsel or in effect.**'],
           ['1.3', '`2026-10-04` Corrects the permissions cross-reference: mobile now uses system notifications and Android exact-alarm access, so the policy must not say that Android lists only `INTERNET` or that iOS has no permission requiring explanation; request timing and decline behaviour are set out in the App Permissions Inventory. **Status: draft, not yet reviewed by counsel or in effect.**'],
           ['1.2', '`2026-10-04` Adds purposes and retention boundaries for wrapped keys, recovery codes, OS secure storage and ciphertext migration records. Adds three categories to account deletion and updates cascade counts from migrations. Local application data remains plaintext. **Status: draft, not yet reviewed by counsel or in effect.**'],
           [
@@ -1133,7 +1227,7 @@ const en = [
 
 export const privacy: LegalDocument = {
   id: 'privacy',
-  version: '1.3',
+  version: '1.5',
   status: 'draft',
   updatedDate: '2026-10-04',
   title: {

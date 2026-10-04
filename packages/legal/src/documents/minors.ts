@@ -219,7 +219,7 @@ const zh = [
         rows: [
           ['查阅、复制其数据', '与孩子一起在设备上使用导出功能（明文只有使用者一侧能解开，我们读不到内容，因此无法代为导出）', '即时，自助完成'],
           ['更正、补充其数据', '在设备上直接修改；改完经同步到达其他设备', '即时，自助完成'],
-          ['删除某条数据或注销整个账号', '邮箱申请；注销是服务端级联硬删除，做完不可恢复，所以请先导出。🔴 点下注销的那台设备当场清掉**本机那份可读的本地库**，其它设备在下次同步收到注销信号时各自清掉自己那一份；⚠️ 从此不再联网、不再登录的那台设备上的副本，我们没有能力远程清除。🟡 逐端清到哪一层（macOS 与 Windows 桌面壳上还有一层今天没接进本机销毁通道）以《个人权利行使与请求响应》第五节为准，本文件不抄第二份', '收到请求后 15 个工作日内'],
+          ['删除某条数据或注销整个账号', '邮箱申请；注销是服务端级联硬删除，做完不可恢复，所以请先导出。🔴 点下注销的那台设备当场清掉**本机那份可读的本地库**，其它设备在下次同步收到注销信号时各自清掉自己那一份；⚠️ 从此不再联网、不再登录的那台设备上的副本，我们没有能力远程清除。🟡 逐端清到哪一层以《个人权利行使与请求响应》第五节为准，本文件不抄第二份，也不在这里点名具体哪一端', '收到请求后 15 个工作日内'],
           ['撤回同意、停止某项处理', '在设置的对应开关上关闭（AI 出境、记忆与偏好、推送、本机接口）', '即时'],
           ['退订与退款、投诉与举报、要求解释说明', '邮箱申请', '收到请求后 15 个工作日内'],
         ],
@@ -508,7 +508,7 @@ const en = [
         rows: [
           ['Access and copy their data', 'Use the export function on the device, together with the child (only the user side can turn ciphertext back into plaintext, so we cannot export it for you)', 'Immediate, self-service'],
           ['Correct or supplement their data', 'Edit it on the device; the change reaches your other devices through sync', 'Immediate, self-service'],
-          ['Delete particular records, or close the whole account', 'By email; closure is a cascading hard delete on the server and cannot be undone, so export first. 🔴 The device you press it on wipes its own readable local database on the spot, and every other device wipes its own copy the next time it syncs and receives the closure signal; ⚠️ a device that never comes back online and never signs in again is beyond our power to erase remotely. 🟡 how far each platform actually clears - on the macOS and Windows desktop shells one further layer is not yet wired into that path - is stated in section five of the data-rights document, and this document keeps no second copy of it', 'Within 15 working days of receipt'],
+          ['Delete particular records, or close the whole account', 'By email; closure is a cascading hard delete on the server and cannot be undone, so export first. 🔴 The device you press it on wipes its own readable local database on the spot, and every other device wipes its own copy the next time it syncs and receives the closure signal; ⚠️ a device that never comes back online and never signs in again is beyond our power to erase remotely. 🟡 how far each platform actually clears is stated in section five of the data-rights document; this document keeps no second copy of it and names no shell here', 'Within 15 working days of receipt'],
           ['Withdraw consent, stop a processing activity', 'Switch it off in settings (AI egress, memory and preferences, push, the local interface)', 'Immediate'],
           ['Cancellation and refund, complaints and reports, a request to explain our rules', 'By email', 'Within 15 working days of receipt'],
         ],

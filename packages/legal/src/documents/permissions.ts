@@ -134,6 +134,45 @@ const zh = [
     ],
   },
   {
+    id: 's5',
+    title: '欧盟 GDPR 口径：这张清单能顶第 5(1)(c) 条的一半，顶不上另一半',
+    blocks: [
+      {
+        kind: 'p',
+        text: '系统权限是一份**事实清单**：每一项都能在 Android 的清单文件或 iOS 的说明文件里指回一行真写进去的申请，也有一条常驻对账在盯它和真身是否一致。GDPR 里最接近它的是第 5(1)(c) 条（数据最小化）与第 25 条第 2 款（默认只处理必要的），但这两条问的是**相称性**，而相称性是一份论证，不是一张清单 —— 所以这一节写明哪一半顶得上、哪一半顶不上。逐条对照的总表只在《你的数据权利》一份里维护。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 5(1)(c) 条与第 25(2) 条（数据最小化、默认即最小）',
+            '每一项权限是不是功能所必需，且默认就是关的',
+            '清单里没有"以防万一先写上"的项：每一项都对应一处真的用到的能力，而那份"没有申请什么"的否定清单**只在本文件第一节写一处**，本节不抄第二份（同一对抄件长期一定漂）',
+            '但我们**没有逐项写过**"这一项为什么对该功能必要"的相称性说明，今天靠人工评审而不是靠一份归档的论证。清单能证明"没多申请"，证明不了"每一项都必要到可以申请" —— 这两件事不能互相顶替'
+          ],
+          [
+            '第 32 条（处理安全，含定期测试与评估）',
+            '措施是不是与风险相称，并且**定期验证过**',
+            '加密在数据离开设备之前完成，出站之前还有同意闸门；两端都有各自的常驻判据在盯这条路径',
+            '但第 32 条第 2 款要的是"定期测试、评估与衡量措施有效性"—— 渗透测试、第三方安全审计、红队演练**一次都没有做过**，也没有一个周期性的自评在跑。所以这一格只能写成措施存在、验证缺失'
+          ],
+          [
+            '第 7(3) 条（撤回同意的便利）落到系统层',
+            '用户在操作系统里关掉某一项权限，等于撤回吗？关掉之后应用会不会静默改变行为',
+            '系统权限由操作系统把守，用户随时可以在系统设置里关掉，不需要经过我们，也不会有一条"必须联系我们才能关"的路径',
+            '但**逐项验证过"关掉之后应用怎么降级"的只有少数几项**：其余项在权限被关闭后的行为没有各自的测试，界面可能只是不再刷新而不告诉你为什么。把系统层的可关闭性直接写成"撤回方便"会盖住这一层没测过的事实'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '《你的数据权利》持有 GDPR 条文的逐条对照表；这张清单只回答"申请了什么、有没有真的用到"，两栏不一致时以操作系统里的实际清单为准。',
+      },
+    ],
+  },
+  {
     id: 's4',
     title: '这张表什么时候会变',
     blocks: [
@@ -268,6 +307,45 @@ const en = [
     ],
   },
   {
+    id: 's5',
+    title: 'The EU GDPR view: this table reaches half of Article 5(1)(c), and not the other half',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'System permissions are a **factual list**: every entry points back to a line really written into the Android manifest or the iOS Info.plist, and a standing check reconciles the list against those files. The closest GDPR questions are Article 5(1)(c) (data minimisation) and Article 25(2) (processing only what is necessary by default) \u2014 but both ask about **proportionality**, and proportionality is an argument, not a list. So this section says which half it reaches and which it does not. The article-by-article master table is maintained in exactly one document, *Your Data Rights*.',
+      },
+      {
+        kind: 'table',
+        head: ['Where GDPR sits', 'What it asks', 'What heyta can show today', 'What does not line up'],
+        rows: [
+          [
+            'Articles 5(1)(c) and 25(2) (data minimisation, minimal by default)',
+            'Is every permission necessary for a feature, and is the default off?',
+            'Nothing on the list was requested "just in case": each entry maps to a capability genuinely used, and the list of what we **do not** request is written in exactly one place, section 1 of this document \u2014 this section deliberately does not copy a second version of it, because two copies of the same pair always drift',
+            'But we have never written the proportionality argument **item by item**: today the justification for each entry rests on human review rather than on an archived assessment. The list can prove that nothing extra was requested; it cannot prove that each request is necessary enough to be made. One does not substitute for the other'
+          ],
+          [
+            'Article 32 (security of processing, including periodic testing)',
+            'Are the measures proportionate to the risk, and have they been **verified on a cycle**?',
+            'Encryption happens before data leaves the device, and a consent gate sits in front of every outbound path; both ends have their own standing checks watching that route',
+            'But Article 32(1)(d) asks for regular testing, assessment and evaluation of those measures: no penetration test, no third-party security audit and no red-team exercise has ever been run, and there is no periodic self-assessment loop. So this cell can only read "measures exist, verification is missing"'
+          ],
+          [
+            'Article 7(3) (withdrawal of consent) applied at the system layer',
+            'Does switching a permission off in the operating system count as withdrawal, and does the app change behaviour silently when you do?',
+            'Permissions are held by the operating system: the user can revoke any of them from system settings at any time, without going through us, and there is no path that requires contacting us to turn one off',
+            'But **only a few items have a per-permission fallback test**. For the rest, what the app does once the permission is revoked is unverified \u2014 the interface may simply stop refreshing without saying why. Writing OS-level revocability up as "consent is easy to withdraw" would cover that untested layer up'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '*Your Data Rights* holds the article-by-article GDPR table. This table answers only "what is requested, and is it actually used"; where the two disagree, the operating system\u2019s own manifest is authoritative.',
+      },
+    ],
+  },
+  {
     id: 's4',
     title: 'When this table changes',
     blocks: [
@@ -288,7 +366,7 @@ const en = [
 
 export const permissions: LegalDocument = {
   id: 'permissions',
-  version: '1.1',
+  version: '1.2',
   status: 'draft',
   updatedDate: '2026-10-04',
   title: {
