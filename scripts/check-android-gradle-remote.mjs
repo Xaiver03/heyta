@@ -394,6 +394,41 @@ function checkRouterInvariants(baseRoot) {
     }
   }
   readings.push('G6 同步机制一枚（两个入口共用 _heyta_windows_sync_push）');
+  // 🔴 G8：**远端仓库根只有一个事实源**。路由侧读 `HEYTA_ANDROID_REMOTE_ROOT`，
+  //    同步侧读 `HEYTA_WINDOWS_REPO_ROOT`，两个默认值逐字相同 ⇒ 平时看不出来，
+  //    **只移一个**就变成"同步解包到 A、gradle 在 B 里构建"——§7 第 82 条搬到远程路径上。
+  //    所以：调用侧必须把手里那枚根**传进**同步入口，同步入口必须把它绑回局部变量。
+  const CALL_SHAPE = /sync_windows_sources_for_android \$\{HOST\} '\$\{REMOTE_ROOT\}'/;
+  // 🔴 判的是**真跑那一支**：同一串在 dry-run 的打印里也出现一次，整文件计数会把
+  //    "只改了打印、真调用没传"那种情况读成绿（臂 10 第一趟就是这么存活过去的 —— 摘掉实参
+  //    仍然 0 条红，因为剩下那条命中在 `console.log` 里）。所以先用 runCapture 的块圈定范围。
+  const callBlock = /runCapture\('bash', \[[\s\S]*?\]\);/.exec(router);
+  if (!callBlock) {
+    out.push('G8 读不到 `runCapture(\'bash\', […])` 那一块 —— 调用侧这条判据无从求值，不要当它成立。');
+  } else if (!CALL_SHAPE.test(callBlock[0])) {
+    out.push(
+      'G8 run-gradle.mjs 调 `sync_windows_sources_for_android` 时没把自己那枚 `${REMOTE_ROOT}` 传过去 —— ' +
+        '远端仓库根又变成两个旋钮（`HEYTA_ANDROID_REMOTE_ROOT` 与 `HEYTA_WINDOWS_REPO_ROOT`），' +
+        '只移一个就是"同步解包到 A、gradle 在 B 里构建"（§7 第 82 条的远程形态）。',
+    );
+  }
+  // 第二条腿：打印出来的计划必须与真跑那一条同形，否则 dry-run 是在骗人。
+  const occ = (router.match(new RegExp(CALL_SHAPE.source, 'g')) || []).length;
+  if (callBlock && CALL_SHAPE.test(callBlock[0]) && occ !== 2) {
+    out.push(
+      `G8 dry-run 打印的同步命令与真跑那一条**不同形**（现量命中 ${occ}，要求 2 = 真调用 + 计划打印）—— ` +
+        `按计划跑的人会漏掉远端根那一枚实参。`,
+    );
+  }
+  if (!/local HEYTA_WINDOWS_REPO_ROOT="\$\{_android_remote_root:-\$HEYTA_WINDOWS_REPO_ROOT\}"/.test(lib)) {
+    out.push(
+      'G8 sync-windows-sources.sh 的 `sync_windows_sources_for_android` 不再绑定第二枚实参到 ' +
+        '`HEYTA_WINDOWS_REPO_ROOT` —— 传进来的远端根会被静默丢弃，两个旋钮又分开了。',
+    );
+  }
+  if (callBlock && CALL_SHAPE.test(callBlock[0]) && occ === 2 && /local HEYTA_WINDOWS_REPO_ROOT="\$\{_android_remote_root:-\$HEYTA_WINDOWS_REPO_ROOT\}"/.test(lib)) {
+    readings.push('G8 远端仓库根单源（路由把 REMOTE_ROOT 传进同步，同步绑回局部）');
+  }
   return out;
 }
 
@@ -625,6 +660,64 @@ function selfTest() {
       if (countRed(msgs, 'G7 ') === 1) console.log('   ✅ 臂 9 转红：非工作区包的 node_modules 前置被 G7 抓到（恰好 1 条，永不开的门）');
       else {
         console.log(`   🔴 臂 9 存活：前置换成非工作区包目录后 G7 报了 ${countRed(msgs, 'G7 ')} 条（应当恰好 1）`);
+        fail = 1;
+      }
+    }
+    /* 臂 10 / 10b：G8 的两条腿各摘一边 —— 远端仓库根是**两个旋钮**，
+     * 只移一个就变成"同步解包到 A、gradle 在 B 里构建"（§7 第 82 条的远程形态）。
+     * 所以调用侧与同步侧各有一臂：摘任一边都必须恰好 1 条红。 */
+    seed();
+    const noArgRouter = router.replace(
+      "sync_windows_sources_for_android ${HOST} '${REMOTE_ROOT}'",
+      'sync_windows_sources_for_android ${HOST}',
+    );
+    if (noArgRouter === router) {
+      console.log('   🔴 臂 10 没施上：run-gradle.mjs 里找不到"把 REMOTE_ROOT 传给同步"那一串 —— G8 的调用侧无从求值');
+      fail = 1;
+    } else {
+      write('scripts/run-gradle.mjs', noArgRouter);
+      msgs = checkRouterInvariants(dir);
+      if (countRed(msgs, 'G8 ') === 1) console.log('   ✅ 臂 10 转红：调用侧不传远端根，被 G8 抓到（恰好 1 条）');
+      else {
+        console.log(`   🔴 臂 10 存活：摘掉传参后 G8 报了 ${countRed(msgs, 'G8 ')} 条（应当恰好 1）`);
+        fail = 1;
+      }
+    }
+
+    /* 臂 10c：只动 dry-run 的**打印**那一支 ⇒ 真调用仍然正确，但计划与实跑不同形。
+     * 这条腿的存在理由：dry-run 是本手册推荐的第一动作，它骗人比真跑错还难发现。 */
+    seed();
+    const badPrint = router.replace(
+      "\\n      bash -c 'source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST} '${REMOTE_ROOT}''",
+      "\\n      bash -c 'source scripts/lib/sync-windows-sources.sh && sync_windows_sources_for_android ${HOST}'",
+    );
+    if (badPrint === router) {
+      console.log('   🔴 臂 10c 没施上：读不到 dry-run 打印那一串 —— 这条腿无从求值');
+      fail = 1;
+    } else {
+      write('scripts/run-gradle.mjs', badPrint);
+      msgs = checkRouterInvariants(dir);
+      if (countRed(msgs, 'G8 ') === 1) console.log('   ✅ 臂 10c 转红：dry-run 打印与真跑不同形，被 G8 抓到（恰好 1 条）');
+      else {
+        console.log(`   🔴 臂 10c 存活：只改打印后 G8 报了 ${countRed(msgs, 'G8 ')} 条（应当恰好 1）`);
+        fail = 1;
+      }
+    }
+
+    seed();
+    const noBindLib = lib.replace(
+      'local HEYTA_WINDOWS_REPO_ROOT="${_android_remote_root:-$HEYTA_WINDOWS_REPO_ROOT}"',
+      '  # 变异臂 10b：绑定点被摘掉，传进来的根会被静默丢弃',
+    );
+    if (noBindLib === lib) {
+      console.log('   🔴 臂 10b 没施上：同步入口里找不到那行绑定 —— G8 的同步侧无从求值');
+      fail = 1;
+    } else {
+      write('scripts/lib/sync-windows-sources.sh', noBindLib);
+      msgs = checkRouterInvariants(dir);
+      if (countRed(msgs, 'G8 ') === 1) console.log('   ✅ 臂 10b 转红：同步侧不绑定第二枚实参，被 G8 抓到（恰好 1 条）');
+      else {
+        console.log(`   🔴 臂 10b 存活：摘掉绑定后 G8 报了 ${countRed(msgs, 'G8 ')} 条（应当恰好 1）`);
         fail = 1;
       }
     }

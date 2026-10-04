@@ -114,6 +114,12 @@ pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
   （工作树，含**别人未提交的半成品**），而 `C:\src\heyta` 是**共享**的构建宿主 —— MSIX 那条腿也在用它。
   所以第一次真远程构建应当在**干净的隔离载体**里发起，不是在共享主检出里顺手跑。
   这与 AGENTS §8.9"共享资源独占验收"是同一件事，只是宿主换成了远端那台。
+- ✅ **宿主的只读前置已经量过**（2026-10-05 00:2x，探针 `~/.heyta-window-rigs/heyta-android-host-probe.sh`，
+  只读：不写远端字节、不起 gradle/模拟器）：`gradlew.bat` / `apps/mobile/node_modules` / `node_modules/.pnpm`
+  / `ANDROID_HOME` + `android-36`（与本仓**现取**的 `compileSdkVersion` 对上）/ `JAVA_HOME` + `bin\java.exe`
+  全在位，`local.properties` 没有残留 Mac 路径，盘剩 92G+。逐条读数与两条装置判据
+  （`CHANNEL-DEAD` / `LABEL-MISSING`）记在 `../plans/multi-end-coverage-handoff.md` 的 00:2x 那节。
+  🔴 这不等于"远程构建跑过"——判据 2 仍是未实测，它只消掉了"会不会红在环境档"这一整档不确定性。
 - **备用机** `windows-codex`（未探测）不在本手册的路径里；换宿主是改旋钮
   `HEYTA_ANDROID_HOST`（远端仓库根另有 `HEYTA_ANDROID_REMOTE_ROOT`），
   **不是**在 `run-gradle.mjs` 里加一条 fallback 分支 —— 加 fallback 就是这条规则要挡的动作。
