@@ -8503,3 +8503,89 @@ git show main:scripts/check-md-table-rows.mjs | grep -c self-host-distribution-a
 ⚠️ **"把本档加进 `FILES`"这轮的代价现量 = 0 处（整档 rc=0），但这一轮不加**：
 `scripts/check-md-table-rows.mjs` 不在本批写集里，而且它正是回收站那条线今天动过的那枚脚本（清单注释里写着"2026-10-04 加入，逐文件现量 rc=0"）
 ⇒ 我加一行 = 给自己新增一枚撞车面，而落地等的就是撞车面归零。登记成**落地之后**的候选（谁做都要重新现量"代价 0 处"这句，它和本档所有其他数字一样有保质期）。
+
+### 8.141 载体第九族（`server/Dockerfile`）：**两侧各修了同一个缺陷**时，"取哪一侧"仍要由判据决定；而拒绝的那一趟必须把现场擦干净（2026-10-04 23:3x–23:5x）
+
+23:0x 那一趟重算撞到的**族外冲突**就是这一枚。现量的形状（下一次重算必须重量，这组数字有保质期）：
+`main=c9fe6f56` · `feat/self-host-distribution=f106e8b3` · `merge-base=b850b1c6`，
+`git merge-tree` 报 **7 条**冲突：本档、`package.json`、`check-image-license-coverage.mjs`、
+`gen-image-npm-tree.mjs`、`scripts/screenshots/capture.mjs`、`server/image-npm-tree.json`、**`server/Dockerfile`**。
+⚠️ `.gitignore` 这一轮**不再冲突**（自动并好了）——第八族之前它还在那张表里，所以"预置八族"这句话本身也是一条会漂的抄件。
+
+**两侧改的是同一个缺陷，写法不同**：main `b3397cda` 往 `server/package.json` 的 `devDependencies` 里放了
+三枚只存在于本机 pnpm 工作区的 `@heyta/*`，npm 在 `--omit=dev` 下照样**解析** dev 的每一枚 spec ⇒
+registry 404 ⇒ 镜像那一层建不出来（`pnpm -r build` 与 `pnpm check` 全绿，AGENTS §7 第 75 条那个形状）。
+main 的修法是一句内联 `node -e '…delete p.devDependencies…'`，本批的修法是 `npm pkg delete devDependencies`。
+`server/Dockerfile` 相对 merge-base：main +17/−3，本批 +52/−4，而**只有 1 块**冲突。
+
+#### 取舍不是偏好，是判据
+
+`image-install-shape.mjs` 的 `PRUNE_DEV_DEPS_RE` 只认 `npm pkg delete devDependencies` 那一种形状，
+而它是**契约门禁第 5 步与快照指纹共用的唯一一份**判定（`check-image-install-contract.mjs:314` 消费 `shape.prunesDevDependencies`）。
+取 main 侧会连红两处，且两处都是本批自己的门：
+
+1. 第 5 步直接点名"生产阶段没有在第一条 install 之前删掉 devDependencies"；
+2. `prunesDevDependencies=false` 会把 `devDependencies` 从 `INERT` 档挪回被哈希的集合 ⇒
+   `serverInstallInputSha256` 变 ⇒ 第五族那份快照新鲜度那一腿也红。
+
+⇒ 命令形状取**本分支**。但**注释不取**：main 那一段独有注释里是它自己的取证理由
+（"剪掉是安全的：这三枚只有测试与 `scripts/*.ts` 用，`recover-user.ts` 里那处是注释、值用字面量，
+由 `server/tests/recover-artifact-envelope.spec.ts` 钉住"）——结论相同不等于论证可以丢，
+所以解法把 main 独有的注释行**逐字保留**（保留几行由载体读数现量，不在这里抄死）。
+
+#### 🔴 这一族特别不能 `checkout --theirs`
+
+前几族里"取本分支侧"是 `git checkout --theirs -- <path>`，那一句拿的是**整文件**。
+本文件只有 1 块冲突，其余几块是 git **自动并好**的 —— 整文件取一侧会把 main 那些**没冲突的块**
+一行不留地丢掉，而归属检查（`diff(main, 载体) ⊆ diff(base, 本分支)`）**抓不到**这一条：
+这一路径本来就在写集里，产出看着完全合法。这就是本文件头部第 1 族那句
+"摘掉的那段会被当成另一边没有而**静默消失**"换了个文件重演。
+⇒ 解法**只改写冲突块本身**，块外一个字节不动；判据与守卫抽进
+`research/tools/selfhost-dockerfile-merge.mjs`（单一所有者，可离线变异，不必为验一条判据就在真载体里留一次半合状态）。
+
+#### 新判据的牙：17 条自检 + 四道守卫各做一次摘除变异
+
+`--selftest` 现量：**17 条臂（control 10 条 + 拒绝类 7 条），红 0，rc 0**。变异读数（一次性副本 `/tmp/g190mut2`，真树未动）：
+
+- 摘掉"本分支侧没有剪枝句 ⇒ 拒" ⇒ 红 1 条：`A1`；
+- 摘掉"main 侧有非注释、非替代写法的行为行 ⇒ 拒" ⇒ 红 1 条：`A2`；
+- 摘掉"产出里剪枝不在第一条 install 之前 ⇒ 拒" ⇒ 红 1 条：`A7`；
+- 摘掉"没有 `ARG`/`RUN` 锚点 ⇒ 拒" ⇒ 红 1 条：`A5`；
+- 未变异对照：rc 0、红 0。
+
+🔴 **"按理由认领"这件事救了一次**：臂的第一版只断言"它拒了"，于是 `A1` 那条输入在前置守卫被摘掉之后
+**仍然红不了** —— 它会被**另一道**守卫（产出的形状自检）兜住，症状是"M2 变异 rc=0、一条红臂都没有"。
+改成比对 `verdict` 里的 needle（每条臂认领自己那道守卫的措辞）之后，第一版夹具立刻暴露出
+`A5`/`A7` 其实走到了**别的**守卫上（main 侧那句 `ARG NPM_REGISTRY=…` 与夹具里的 theirs 不相等，
+于是先撞上"main 独有的非注释行"那道），两臂的夹具 accordingly 改窄。
+⇒ 可迁移的口径：**同一件事有多道守卫会各自拒绝**，"拒了"作为断言只证明"有一道在"，
+不证明"我要验的那道在"；拒绝类臂必须认领**理由**，否则它对自己那道守卫的失效是盲的。
+
+#### 🔴 拒绝的那一趟把载体留在了半合状态 —— 代价是下一次连我自己都进不来
+
+23:0x 那一趟撞到族外冲突 ⇒ 退 2，但退 2 只做了"打印 + 退出"，`/tmp/heyta-merge-carrier` 留在
+`MERGE_HEAD=f106e8b3` + **61 条脏**。当时以为代价是"树脏了"，实际代价更绕：第 0a 步那道闸门把
+`MERGE_HEAD` 认成"**别人的现场**"⇒ 从那一刻起**挡住的是我自己**。
+手工 `git merge --abort` 后现量 `MERGE_HEAD=无` / `DIRTY=0`，然后把这道动作固化成 `die()` 里的 `teardown()`：
+合并一开始就置 `mergeStarted`（挂在 merge 尝试**之前**，不是挂在 `MERGE_HEAD` 核对通过之后 ——
+第 0 步已经 abort + reset 过，此后树上任何进行中的合并都是我自己起的），
+每一条 die 路径 abort 之后**再量一次** `MERGE_HEAD` 与脏条数，没擦干净时把恢复命令原样印出来
+（不改退出码：原始失败才是归因对象）。
+
+顺带把这轮碰到的两处**数字抄件**改成现量：`GATES` 的道数用 `GATES.length`、提交说明里的族数用
+`Object.keys(fam).length − 1`（原来写死的"七族冲突的解法"在加第八族时就已经是错的了）。
+
+#### 抽出 `readImageInstallShapeFromText` 的零行为变化证明
+
+第九族需要"拿着**还没写盘**的那个产出先问一次形状"，所以把 `readImageInstallShape` 的纯计算抽成
+`shapeOfStageLines`，路径版与新文本版都是它的一层薄壳（不是第二份实现）。现量三条相等：
+`HEAD 版(路径) == 新版(路径)`、`新版(文本) == 新版(路径)`，且两个消费者复跑
+`gen-image-npm-tree --check` / `check-image-license-coverage --quiet` / `check-image-install-contract` 全 rc=0，
+`prunes=true · install 3 条 · normalizedShape 263 字符`。载体侧另外落了一条**磁盘再判**的自检
+（写回后回读逐字节相同 + 磁盘那份的 `normalizedShape` 与本分支侧相同 ⇒ "保留注释"没有改变镜像装出来的东西，
+第五族取的那份快照仍然对得上）。
+
+⚠️ 未做 / 边界：① **这一跑的真载体重算尚未完成**（下一步走 `selfhost-merge-carrier.mjs`，
+读数以它打印的为准，本条不代它主张）；② 哨兵从 `.sh` 端口成 `.mjs` 仍未做（§8.139 登记的那条），
+它挡的是 bash 字节偏移那一族（§7 第 110/113 条），与本轮无关；③ main 侧那句 `node -e` 的**出处 SHA**
+由载体读数打印（`main 那一版的出处=`），不手抄进本条。
