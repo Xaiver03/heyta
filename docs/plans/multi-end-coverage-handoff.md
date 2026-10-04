@@ -54,7 +54,7 @@
 | 任务 2：反向验证"拿掉 onEdit ⇒ 用例必红" | ✅ | 红→绿两段输出记在 goal §7 任务 2 那节 |
 | 任务 3：清单/标签改名、归档入口、习惯改名与删除 | ✅ | `organizer-rename.spec.ts` **26 passed**；`renameTag` 与习惯改名是本轮新建的 action（一个意图一个 op，未 fan-out） |
 | 任务 3 验收：两端各一组用例 + `check:reachability` 绿 | ✅ | reachability 现量 exit 0 |
-| **Goal 第④步：父子层级选择器**（`setParent` + 一层/环/自指守卫 + 两端界面与词条） | ✅ **做完，且分支侧已把 main 合进来** | `feat/list-parent` @ `c983a7cf`（零冲突、并集与归属核对齐，见 §3.3）。**跨端形态是代拍**（依据 + 回退写在 §5 第 4 步）。⚠️ 这一行旧账写"合流被七个 `M` 挡住"—— 只剩**两张词条表**（检出层）。🔴 01:3x 现量：main 又前进 7 笔 ⇒ **不再是快进**，要落的是一笔合并提交；零冲突已改用免检出的 `git merge-tree` 现量证过（全部更正见 §5 第 4 步） |
+| **Goal 第④步：父子层级选择器**（`setParent` + 一层/环/自指守卫 + 两端界面与词条） | ✅ **做完，且分支侧已把 main 合进来** | `feat/list-parent` @ `c983a7cf`（零冲突、并集与归属核对齐，见 §3.3）。**跨端形态是代拍**（依据 + 回退写在 §5 第 4 步）。⚠️ 这一行旧账写"合流被七个 `M` 挡住"—— 只剩**两张词条表**（检出层）。🔴 01:3x 现量：main 又前进 7 笔 ⇒ **不再是快进**，要落的是一笔合并提交；零冲突已改用免检出的 `git merge-tree` 现量证过（全部更正见 §5 第 4 步）。🔴 19:3x 再更正一处**身份**：`feat/list-parent` 已删 （`git branch --list feat/list-parent` 现量为空）、五项内容以 HEAD 为准（逐条 file:line 见 §3 第 127 行下面那段）， 本行的 `c983a7cf` 只作为 00:5x 那一刻的图关系读数保留 |
 | Goal 第④步的"守卫不许漂移" | ✅ 有常驻判据 | 领域那条"候选集 = `validateProjectParentChange` 的展开（唯一差别 = 归档不进候选）"逐对断言，两端都走同一个 `folderTargetsFor`；web 6 条 DOM 级判据 + 8 臂变异（`aria-disabled` 那种"说了但没禁用"的漂法也被"点它什么都不该发生"那条抓住） |
 | 任务 4：移动端传 `share`（周小结） | ✅ | `growth-share-summary.spec.ts` **13 passed** + 变异两臂 |
 | 任务 4：词条 `{{count}}` 与 `{count}` 字形统一 | ✅ | **定论是"本来就只有一种"**：`{{`/`}}` 各 2 行且**全是注释**，真值 `web.growth.year.heatmap` 两端都是单层 `{count}`；交付物 = 三条测量 + 一条常驻判据 + 一次变异（goal §7.27） |
@@ -129,6 +129,20 @@
      `packages/domain/src/project-hierarchy.ts`（自指 / 悬空父 / 环 / 文件夹不进文件夹 / 一级深度，
      判序逐条带变异）；界面是共享 `FolderPicker`，经 `OrganizerList` **已有**的 `renderItemExtra`
      插槽挂在两端 ⇒ 行骨架零改动；词条中英各 11 句（7 句是拒绝原因的人话）。
+     ⚠️ **19:3x 现量更正这一行的"在未合并分支"身份**（那句只在 02:3x 之前成立；
+     `git branch --list feat/list-parent` 此刻为**空**）⇒ 五项全部改按 **HEAD** 现读为准：写侧
+     `ProjectActions.setParent(entityId, parentId?)` = `packages/app-host/src/project-actions.ts:109`（impl `:280`）；
+     守卫 = `packages/domain/src/project-hierarchy.ts:66`，判序逐行现读为
+     `project_not_found` → `parentId===undefined`（顶级，直接放行）→ `self` → `parent_not_found` →
+     `cycle` → `parent_not_top_level` → `has_children`；单测两处
+     （`packages/domain/tests/project-hierarchy.spec.ts`、`packages/ui/tests/list-parent-wiring.spec.ts`）；
+     两端调用点 `apps/web/src/features/projects/store.ts:130` 与
+     `apps/mobile/src/screens/ListsSection.tsx:264`（后者用 `.catch` 接住被拒的 throw ——
+     同文件 `:109` 那条注释就是为了这一格）；词条家族 `common.organizer.folder.*` 逐键对账
+     **zh 11 / en 11、仅 zh 0、仅 en 0、逐字相同对数 0、英文值含汉字 0**（19:3x，
+     比的是键集与值层，不是数词频）。
+     🔴 **同一句结论在本文件里落三处**（本行、§3 表第 57 行、§0 表第 19 行），上一轮只改了第 19 行
+     —— 这就是记忆里"改一处必 sweep 全仓"那条说的漂移，本轮把第 127 与 57 行补齐。
      判据三层：领域 15 条 / 动作层 10 条（真引擎 + 真 SQLite，含"B 端 applyRemote 后同父同裁决"）/
      界面 6 条 **DOM 级** + 8 条源码级形状；变异 **8 臂全红**、每臂复原后复绿并断言逐字复原。
      🔴 跨端形态是**代拍**（原话要求"两端同时做嵌套"而非"移动端先做"），理由与回退：
