@@ -45,11 +45,15 @@ const run = (src) => {
 };
 const restore = () => writeFileSync(`${ROOT}/${GATE}`, ORIG, 'utf8');
 
-const CALL = "    'pnpm',\n    ['--filter', '@heyta/widget-core', 'exec', 'vitest', 'run', 'tests/fixtures.spec.ts'],";
+// 定位那处调用**本身**，不写死它的参数形状（形状变了要响亮失败，不能静默"没换"然后假装臂跑过了）。
+const CALL_RE = /spawnSync\(\s*'pnpm',\s*\[[\s\S]*?\],/;
 const withShim = (src, path) => {
-  if (!src.includes(CALL)) throw new Error('找不到夹具规则里那处 spawn 调用 —— 形状变了，臂没有对象');
-  return src.replace(CALL, `    ${JSON.stringify(path)},\n    [],`);
+  if (!CALL_RE.test(src)) throw new Error('找不到夹具规则里那处 spawnSync(pnpm, […]) —— 形状变了，臂没有对象');
+  return src.replace(CALL_RE, `spawnSync(\n    ${JSON.stringify(path)},\n    [],`);
 };
+const ENV_LINE = "      env: { ...process.env, NO_COLOR: '1' },\n";
+const STRIP = ".replace(/\\u001b\\[[0-9;]*m/g, '')";
+const FLAG_LINE = "      '--config.verify-deps-before-run=false',\n";
 
 let pass = 0;
 let bad = 0;
@@ -60,12 +64,12 @@ const check = (name, cond, detail) => {
   else bad += 1;
 };
 
-// A0 —— 真载体（pnpm 在这个检出里跑不起来）：必须是**未判**，不许报"夹具不一致"
+// A0 —— 真载体（本检出：pnpm exec 跑得动）：必须**真跑出结果**，既不谎报违规也不停在"未判"
 const a0 = run(ORIG);
 check(
-  'A0 linked worktree 里 pnpm 跑不起来 → 退出码 2（未判），且不再谎报"黄金夹具不一致"',
-  a0.rc === 2 && /没跑成 ⇒ 等于没验过/.test(a0.out) && !/黄金夹具与重建结果\*\*不一致\*\*/.test(a0.out),
-  `RC=${a0.rc}｜原因行 ${(a0.out.match(/ERR_PNPM\S{0,40}/) || ['<没打出 pnpm 码>'])[0]}`,
+  'A0 真载体 → 真判：RC=0、绿句在场，且不报"没跑成"',
+  a0.rc === 0 && /小组件边界完好/.test(a0.out) && !/没跑成 ⇒ 等于没验过/.test(a0.out),
+  `RC=${a0.rc}｜首行 ${a0.out.split('\n')[0].slice(0, 56)}`,
 );
 
 // A1 —— 历史对照：喂"该文件历史里最新一版**没有**这一档"的代码
@@ -158,7 +162,8 @@ check(
   `RC=${a4.rc}｜${(a4.out.split('\n').find((l) => /小组件边界/.test(l)) || '（没打结论行）').slice(0, 70)}`,
 );
 
-// A5 —— 同形对照：shim 打出与 A0 相同的 pnpm 故障文本，也必须走未判档（判的是"有没有汇总"，不是"有没有错误字样"）
+// A5 —— 同形对照：shim 打出与 A6 那种真实故障逐字同形的文本（无汇总行），也必须走未判档
+//        ⇒ 分档认的是"有没有被调方的汇总"，不是"日志里有没有 ERR 字样"。
 const a5 = run(withShim(ORIG, sNoSummary));
 check(
   'A5 shim 原样复现 pnpm 故障（无汇总行）→ RC=2 未判，证明分档认的是"跑成没跑成"而不是 grep 错误字样',
@@ -166,10 +171,39 @@ check(
   `RC=${a5.rc}`,
 );
 
+// A6 —— 减掉"载体修复"那一半：不带 `--config.verify-deps-before-run=false` ⇒ 本检出退回未判。
+//       没有这一臂，"给命令加个 flag"就只是一句读起来像改进的话；它到底有没有让判据真跑起来，只有减法能答。
+const noFlag = ORIG.replace(FLAG_LINE, '');
+const a6 = run(noFlag);
+check(
+  'A6 摘掉 `--config.verify-deps-before-run=false` → 本检出 RC=2 未判（那个 flag 是承重的：它决定这道门禁在本检出**能不能真判**）',
+  noFlag !== ORIG && a6.rc === 2 && /没跑成 ⇒ 等于没验过/.test(a6.out),
+  `替换生效=${noFlag !== ORIG}｜RC=${a6.rc}`,
+);
+
+// A7 / A8 —— 防色那一档的**两层各分量**：一层单独够，两层一起摘就瞎。
+// 🔴 A8 是本装置里唯一"红的是判据自己的解析层"那一臂：汇总行带 ANSI 时 needle 恒 0 命中，
+//    症状与"runner 没跑成"**逐字相同**（都走未判档）—— 也就是说一个能跑的判据会永久变成哑的，
+//    而且哑得方向是"不产绿"，最容易被人当成"载体问题"放过去。
+const noEnv = ORIG.replace(ENV_LINE, '');
+const a7 = run(noEnv);
+check(
+  'A7 只摘 `NO_COLOR` → 仍 RC=0（剥色那一层单独就够 —— 两层不是冗余装饰）',
+  noEnv !== ORIG && a7.rc === 0 && /小组件边界完好/.test(a7.out),
+  `替换生效=${noEnv !== ORIG}｜RC=${a7.rc}`,
+);
+const noBoth = noEnv.replace(STRIP, '');
+const a8 = run(noBoth);
+check(
+  'A8 两层一起摘 → RC=2 未判（带色的汇总行让 needle 恒 0 命中；这是"判据被 carrier 静默变哑"的形状）',
+  noBoth !== noEnv && a8.rc === 2 && /没跑成 ⇒ 等于没验过/.test(a8.out),
+  `两层都摘掉了=${noBoth !== noEnv}｜RC=${a8.rc}`,
+);
+
 restore();
 const back = createHash('md5').update(readFileSync(`${ROOT}/${GATE}`, 'utf8')).digest('hex') === BASE;
 const after = run(ORIG);
-check('复原后复跑回到同一读数（RC=2），且门禁文件逐字节回到原样', after.rc === 2 && back, `RC=${after.rc}｜BACK_TO_CLEAN=${back}`);
+check('复原后复跑回到同一读数（RC=0 真判），且门禁文件逐字节回到原样', after.rc === 0 && back, `RC=${after.rc}｜BACK_TO_CLEAN=${back}`);
 
 rmSync(scratch, { recursive: true, force: true });
 for (const l of rows) console.log(l);
