@@ -81,7 +81,7 @@ pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
 | # | 判据 | 状态 |
 |---|---|---|
 | 1 | 门禁：`node scripts/check-android-gradle-remote.mjs --self-test` 逐臂按预期转红/转绿 | ✅ 实测 2026-10-05 00:1x `rc=0`；00:4x 复跑加了臂 9（G7：远程前置不许是一条永不开的门）后**仍 rc=0**。
-|    | 逐臂含义：臂 0 = 阳性对照，臂 1–6 各抓一条 G1–G6，臂 7/8 = "门禁文件只描述不执行"那条豁免的正反两腿，臂 9 = G7。**臂数别抄进文档 —— 现取 `--self-test` 末行** |
+|    | 逐臂含义：臂 0 = 阳性对照，臂 1–6 各抓一条 G1–G6，臂 7/8 = "门禁文件只描述不执行"那条豁免的正反两腿，臂 9 = G7，臂 10/10b/10c = G8 三条腿，臂 11/11b/11c = G9 三条腿。**臂数别抄进文档 —— 现取 `--self-test` 末行** |
 | 1.5 | 前置：远端**逐个声明依赖**解析得到（不是"node_modules 目录在"），且 dry-run 里这枚探测照跑、照打读数 | ✅ 实测 2026-10-05 01:33 `--dry-run` 现量 `RNDEPS=True ROOTDEPS=True LOCALPROPS=absent DEPCHECK=19 DEPMISS=2`；01:36 远端补装后同一条复量 **`DEPMISS=0`**（同棵树上的正反对账）。🔴 这一格**是被 18 分钟的失败照出来的**，见 §7.1；旧形状在同一条命令里报 ✅ |
 | 2 | 远程真打出 Release APK，`apksigner verify` 通过 | 🔴 **未通过**（01:26 现量：`BUILD FAILED in 18m 18s`，死在 `:app:createBundleReleaseJsAndAssets`）。⚠️ 但**分流本身走通了**：步骤 0–4 全部执行、远端 gradle 真跑到 native 编译与 Metro 打包，成因是远端依赖过期（§7.1），不是路由缺陷。补装依赖后需重跑才算 |
 | 3 | APK 拉回本机装进模拟器，启动截图**非空白且主蓝命中**（§6.1.1 判据） | 🔴 未实测 |
@@ -142,7 +142,7 @@ node scripts/check-android-gradle-remote.mjs --root <候选树>   # 注入验证
 | 读数 | 值 |
 |---|---|
 | 真树 | `rc=0`，`G1/G2 扫描到 gradlew 落点 5 处（白名单 3 ／ 基线命中 2 ／ 违规 0）` |
-| `--self-test` | `rc=0`：臂 0 阳性对照 0 红，臂 1–6 **各恰好 1 条**红，臂 7/8 是豁免的正反两腿，臂 9 是 G7（臂数以它自己打印的末行为准） |
+| `--self-test` | `rc=0`：臂 0 阳性对照 0 红，臂 1–6 各恰好 1 条红，臂 7/8 是豁免的正反两腿，臂 9 是 G7，臂 10/10b/10c 是 G8 的三条腿，臂 11/11b/11c 是 G9 的三条腿（01:54 现量：**16 枚 ✅ 臂、0 枚存活**；臂数以它自己打印的逐条为准，别抄进别的文档） |
 | 喂旧内容 | `git show 0858032e^:scripts/run-gradle.mjs`（分流之前那份）放进候选树 ⇒ `rc=1`、🔴 4 条（G5 三条 + G6 一条） |
 | 存量基线 | `scripts/verify-mobile-aed.sh`、`scripts/verify-android-vault-storage.sh` 两条**待迁**，各自登记了"为什么还留着"；迁走而基线不撤 ⇒ G2 红 |
 | 扫描面 | 不含 `.md` 与 `.ps1`；`scripts/check-*.mjs` 里**只描述命令**的行按形状豁免（每一处都点名到 `file:line` 打进读数） |
