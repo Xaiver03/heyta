@@ -538,7 +538,9 @@ PY
   then ok "取消前原生 scheduled ledger 有未来 occurrence"; else bad "取消前没有 scheduled occurrence 正向对照"; fi
   snapshot "$CANCEL_SCREENSHOT" || bad "取消前截图为空白或不可解析"
   REMINDER_DELETE_LABEL="删除 ${DUE_MD} ${DUE_HM} 的提醒"
-  if press "$REMINDER_DELETE_LABEL" >/dev/null 2>&1 || press_scroll "$REMINDER_DELETE_LABEL"; then
+  # Use the scroll-aware AX path only: the plain press can report a stale
+  # element success while the underlying Pressable did not receive the event.
+  if press_scroll "$REMINDER_DELETE_LABEL"; then
     ok "通过提醒面板 UI 删除未来 occurrence"
     # The button acknowledgement is synchronous at the AX layer, while the
     # host action writes its op asynchronously. Give the real SQLite writer a
