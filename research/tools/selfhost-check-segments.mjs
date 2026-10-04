@@ -74,7 +74,14 @@ const readiness = [];
 for (const t of trees) {
   const head = git(t, ['rev-parse', 'HEAD']);
   const dirty = git(t, ['status', '--porcelain']).split('\n').filter(Boolean).length;
-  const hasNodeModules = existsSync(join(t.path, 'node_modules'));
+  // 🔴 「装过依赖」的判据是 pnpm 自己写的元数据，不是 `node_modules` 目录在不在，
+  //    也不是里面有几枚条目 —— 后两种都是探针造成的假读数（2026-10-04 实测两轮反转）：
+  //    · `ls node_modules | head` **不列点开头条目**，所以真装全的树看着只有 3 项，
+  //      差点把一条正确的守卫改坏；
+  //    · 根 `node_modules/.bin/vitest` 在**四棵真装的树上都不存在**（vitest 是各包的依赖，
+  //      根 package.json 没有它），拿它当缺失信号会让这工具永远 exit 2，反而永久挡死配对。
+  //    `.modules.yaml` 是 pnpm 每次完整安装必写的文件；软链替身／半棵树不会有它。
+  const installMeta = join(t.path, 'node_modules', '.modules.yaml');
   let expect = null;
   if (t.ref) {
     expect = git(t, ['rev-parse', t.ref]);
@@ -91,11 +98,14 @@ for (const t of trees) {
     console.error(`🔴 ${t.as}: 工作树有 ${dirty} 条未提交 —— 配对读数量的就不再是提交物了。`);
     process.exit(2);
   }
-  if (!hasNodeModules) {
-    console.error(`🔴 ${t.as}: 没有 node_modules —— 这里的红会是 MODULE_NOT_FOUND，不是判据红（探针没接上）。`);
+  if (!existsSync(installMeta)) {
+    console.error(
+      `🔴 ${t.as}: 没有 node_modules/.modules.yaml ⇒ 这棵树没被 pnpm 完整装过 —— 这里的红会是 MODULE_NOT_FOUND，不是判据红（探针没接上）。\n` +
+        `      先 \`cd ${t.path} && pnpm install --frozen-lockfile\` 再来。`,
+    );
     process.exit(2);
   }
-  readiness.push(`${t.as}=${head.slice(0, 8)} 脏=0 node_modules=在${t.ref ? ` ref=${t.ref}✓` : ''}`);
+  readiness.push(`${t.as}=${head.slice(0, 8)} 脏=0 pnpm装过=是${t.ref ? ` ref=${t.ref}✓` : ''}`);
 }
 
 // 链的**分段单位**必须与 `check-gate-wiring` 逐字相同（&& 切分 + trim + 去空），
