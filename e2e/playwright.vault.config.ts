@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Playwright 1.63 otherwise writes a page aria snapshot to error-context.md
+// even with trace/video/screenshot disabled. Recovery-code forms are secrets.
+// Keep assertion diagnostics, but never capture an unmasked page tree.
+process.env['PLAYWRIGHT_NO_COPY_PROMPT'] = '1';
+
 /** Isolated ports and result directory: never stop another suite's server.
  * The runner builds a static artifact first. Live edits must not HMR-reset a
  * vault session halfway through a recovery or key migration assertion.

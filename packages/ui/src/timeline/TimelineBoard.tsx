@@ -99,6 +99,13 @@ export interface TimelineBoardProps {
    * 硬搬鼠标手势不是触屏的最佳实践）。不给 = 行不可点。
    */
   readonly onOpenTask?: (taskId: string) => void;
+  /**
+   * 选中的那一条（行与未排期泳道里的条目共用同一个值）。
+   *
+   * 🔴 「列表」与「时间线」是同一批任务的两种投影：在哪儿选中都得在另一处
+   * 看得见"还是它"。省略 = 不画高亮（默认值等于加这个 prop 之前的行为）。
+   */
+  readonly activeTaskId?: string | null;
 }
 
 export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
@@ -112,6 +119,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
     onScheduleTask,
     onCreateAt,
     onOpenTask,
+    activeTaskId,
   } = props;
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -296,6 +304,14 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
         },
 
         row: { flexDirection: 'row', alignItems: 'center' },
+        /**
+         * 选中的那一条。与 `TaskRow.rowActive` 同一对 token、同一条理由：
+         * 只加底色与圆角，**不动几何** —— 选中变化时行宽与条的位置不能跳。
+         */
+        rowActive: {
+          backgroundColor: tokens['color.primary-subtle'],
+          borderRadius: tokens['radius.md'],
+        },
         rowHead: {
           width: pct(BOARD_HEADER_PERCENT),
           paddingRight: tokens['space.2'],
@@ -503,7 +519,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
               key={row.taskId}
               testID={`timeline-row-${row.taskId}`}
               role="listitem"
-              style={styles.row}
+              style={activeTaskId === row.taskId ? [styles.row, styles.rowActive] : styles.row}
               onPress={onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId)}
               accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
             >
@@ -671,7 +687,9 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
             <Pressable
               key={row.taskId}
               testID={`timeline-lane-item-${row.taskId}`}
-              style={styles.laneItem}
+              style={
+                activeTaskId === row.taskId ? [styles.laneItem, styles.rowActive] : styles.laneItem
+              }
               onPress={onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId)}
               accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
               {...(onScheduleTask === undefined ? {} : laneResponderProps(row))}

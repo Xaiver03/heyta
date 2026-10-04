@@ -16,6 +16,8 @@ import { createRoot } from 'react-dom/client';
 
 import { StorageError } from '@heyta/storage';
 
+import { registerLocalEraser } from '@heyta/app-host';
+
 import { App } from './App.js';
 import { holdPendingLogin, releasePendingLogin } from './features/auth/pending-login.js';
 import { createStartupNetwork } from './features/privacy/startup-network.js';
@@ -32,8 +34,23 @@ import { storageHintKey } from './features/shell/error-hint.js';
 import { startPublicFacts } from './features/calendar/public-facts.js';
 import { initOpLog } from './features/tasks/store.js';
 import { LocaleHost } from './lib/locale-host.js';
+import { eraseWebLocalData } from './lib/local-data-destruction.js';
 import { startWidgetLifecycle } from './pwa/lifecycle.js';
 import { registerWidgetServiceWorker } from './pwa/register.js';
+
+/**
+ * 本机数据销毁器（E2）。
+ *
+ * 🔴 必须是**入口的第一批语句**，而且要早于任何一次同步：`createSyncClient()`
+ * 在共享接缝装的默认回调读的就是这个注册表，注册晚于第一次同步的话，
+ * 那一次 `ACCOUNT_CLOSED` 会走到"没有销毁器"的分支。
+ *
+ * 为什么注册在这里而不是 `features/sync/store.ts`（同步客户端的构造点）：
+ * 销毁是**设备级**的，不属于任何一个界面状态机；而入口是这个文件里
+ * 唯一"必定先于所有宿主动作"的位置。判据：
+ * `apps/web/tests/local-data-destruction.spec.ts`。
+ */
+registerLocalEraser(eraseWebLocalData);
 
 /**
  * 🔴 **同意之前，一个字节都不许出这个进程**（计划 G-12）。

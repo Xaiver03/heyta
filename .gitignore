@@ -86,6 +86,15 @@ landing-results/
 # 而这两个目录里放的正是"人必须打开看一眼"的那批截图，最容易顺手 add。
 legal-links-results/
 live-site-results/
+# `playwright.lang-shots.config.ts` 的 trace/失败现场目录（同上一条的理由）。
+# ⚠️ 它旁边那个 `e2e/lang-shots-evidence/` **不忽略**，那是刻意的两件事：
+# `-results` 是"每次跑都不一样"的调试残留，而 `e2e/lang-shots-evidence/` 里是
+# AGENTS §6.2 规定一要求的那批**改前/改后取证图**（文件名带 before/after 前缀，
+# 改前那一趟跑完就再也复现不出来），与 `apps/desktop-macos/evidence/` 同类。
+lang-shots-results/
+# `live-signin-entry.spec.ts` 的专属取证目录（同上一条理由：不跟共享目录挤，
+# 否则别的套件跑一轮就把人还没看的图删了）。
+live-signin-results/
 playwright-report/
 blob-report/
 e2e/.playwright/
@@ -182,6 +191,8 @@ docs/operations/cac-algorithm-filing/
 
 # 运行中验收脚本的自快照（traps #110/#113）：bootstrap 拷贝 + exec 的隐藏副本
 scripts/.*.snap.*
+# 同一条机制的第二处：住在 `research/tools/` 的**长等待器**（`h-flaky-window-watcher.sh`，11:0x 起）
+research/tools/.*.snap.*
 
 # 并行 agent 在本项目里落的本机记忆目录（WorkBuddy）。它记的是**别的会话的待办与
 # 现场判断**，不是本仓库的产物；一旦以跟踪态进来，就会被当成项目文档引用。
@@ -198,3 +209,12 @@ e2e/playwright.probe.config.ts
 e2e/vault-results/
 .vitest/
 tmp-commit-plan.sh
+# `playwright.selfhost.config.ts` 的**运行态**：上一轮哪些用例失败了。
+# 它跟着每次本地跑改变 ⇒ 每跑一次自托管验收就往 git status 里丢一个脏文件。
+# 与上面 `test-results/`、`e2e/password-web-results/` 同一族：跑批输出跟着
+# outputDir 改名，所以这里必须**逐目录点名**。
+# 🔴 只忽略这一枚：同目录的 s1–s3 截图是 §6.2 规定一要的**取证**，必须仍可提交 ——
+# 所以不能像 `password-web-results/` 那样整目录忽略。
+# ⚠️ 它此前以跟踪态进过仓库；**忽略规则不会让已跟踪的文件消失**，要让它真正不再脏
+# 需要一次 `git rm --cached e2e/selfhost-stack-results/.last-run.json`（索引动作，留给所有者）。
+e2e/selfhost-stack-results/.last-run.json

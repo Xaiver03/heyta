@@ -9,9 +9,15 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, View } from 'react-native';
 import {
   type AppHost,
+  HostedDeviceManagementError,
   VaultSessionError,
+  listHostedSyncDevices,
+  runHostedDeviceRevocation,
+  type HostedSyncAuthSnapshot,
+  type HostedSyncDevice,
   type PendingVaultCreation,
   type VaultKeySession,
   type VaultMigrationProgress,
@@ -22,6 +28,12 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 import { Button, Card, Checkbox, SectionHeader, Stack, Text, TextField } from '../ui/kit';
 import { readSyncConfig } from '../sync/config';
 import { openTaskHost } from '../db/open-host';
+import { clearMobileVaultSession } from '../lib/vault-session-cleanup';
+import {
+  clearDeviceRevocationGuidance,
+  hasDeviceRevocationGuidance,
+  saveDeviceRevocationGuidance,
+} from '../lib/device-revocation-guidance';
 import {
   loadVaultRootKey,
   removeVaultRootKey,
@@ -68,7 +80,12 @@ function errorKey(error: unknown): MessageKey {
   }
 }
 
-export function VaultSettingsSection(): React.JSX.Element {
+export function VaultSettingsSection({
+  onVaultCleanupPending,
+}: {
+  /** Keep native-root deletion retryable after device-revoke clears auth. */
+  onVaultCleanupPending?: (scope: VaultSecureStorageScope) => void;
+} = {}): React.JSX.Element {
   const { t } = useI18n();
   const [session, setSession] = useState<VaultKeySession>();
   const [host, setHost] = useState<AppHost>();
@@ -77,6 +94,9 @@ export function VaultSettingsSection(): React.JSX.Element {
   const [error, setError] = useState<MessageKey>();
   const [passphrase, setPassphrase] = useState('');
   const [newPassphrase, setNewPassphrase] = useState('');
+  // Legacy password is a migration-only bridge. It is deliberately separate
+  // from the new root passphrase and is never persisted in sync config.
+  const [legacyPassphrase, setLegacyPassphrase] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const [pendingCode, setPendingCode] = useState('');
   const [pending, setPending] = useState<PendingVaultCreation>();
@@ -84,9 +104,15 @@ export function VaultSettingsSection(): React.JSX.Element {
   const [rememberUnlock, setRememberUnlock] = useState(false);
   const [revision, setRevision] = useState(0);
   const [migrationProgress, setMigrationProgress] = useState<{ completed: number; total: number }>();
+  const [devices, setDevices] = useState<readonly HostedSyncDevice[]>([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [deviceError, setDeviceError] = useState<MessageKey>();
+  const [deviceBusy, setDeviceBusy] = useState<string>();
+  const [deviceNotice, setDeviceNotice] = useState<MessageKey>();
 
   const accountId = readSyncConfig()?.accountId;
   const serverUrl = readSyncConfig()?.serverUrl;
+  const token = readSyncConfig()?.token;
   const scope = useMemo(currentScope, [accountId, serverUrl]);
 
   const rememberCurrentRoot = useCallback(async (nextSession: VaultKeySession, enabled = rememberUnlock): Promise<void> => {
@@ -109,6 +135,7 @@ export function VaultSettingsSection(): React.JSX.Element {
     setPendingAction(undefined);
     setError(undefined);
     setRememberUnlock(false);
+    setLegacyPassphrase('');
     setMigrationProgress(undefined);
     if (scope === undefined || accountId === undefined || accountId.trim() === '' || serverUrl === undefined) {
       return undefined;
@@ -158,6 +185,119 @@ export function VaultSettingsSection(): React.JSX.Element {
       cancelled = true;
     };
   }, [accountId, scope, serverUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDevices([]);
+    setDeviceError(undefined);
+    if (accountId === undefined || accountId.trim() === '' || serverUrl === undefined || serverUrl.trim() === '' || token === undefined) {
+      setDevicesLoading(false);
+      return undefined;
+    }
+    const capturedAuth: HostedSyncAuthSnapshot = {
+      accountId: accountId.trim(),
+      baseUrl: serverUrl,
+      token,
+    };
+    setDeviceNotice(
+      hasDeviceRevocationGuidance(capturedAuth.accountId, capturedAuth.baseUrl)
+        ? 'mobile.vault.devicesRevoked'
+        : undefined,
+    );
+    setDevicesLoading(true);
+    void listHostedSyncDevices({ baseUrl: capturedAuth.baseUrl, getToken: async () => capturedAuth.token })
+      .then((next) => {
+        if (!cancelled) setDevices(next);
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) setDeviceError(caught instanceof HostedDeviceManagementError && caught.code === 'unauthorized'
+          ? 'mobile.vault.devicesUnauthorized'
+          : 'mobile.vault.devicesError');
+      })
+      .finally(() => {
+        if (!cancelled) setDevicesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId, serverUrl, token]);
+
+  const revokeDevice = (clientId: string): void => {
+    if (deviceBusy !== undefined) return;
+    const config = readSyncConfig();
+    const configAccountId = config?.accountId?.trim() ?? '';
+    const capturedAuth = config === undefined || configAccountId === '' || config.serverUrl.trim() === '' || config.token === undefined
+      ? undefined
+      : {
+          accountId: configAccountId,
+          baseUrl: config.serverUrl,
+          token: config.token,
+        } satisfies HostedSyncAuthSnapshot;
+    if (capturedAuth === undefined) {
+      setDeviceError('mobile.vault.devicesError');
+      return;
+    }
+    Alert.alert(t('mobile.vault.devicesConfirmTitle'), t('mobile.vault.devicesConfirm'), [
+      { text: t('mobile.vault.cancel'), style: 'cancel' },
+      {
+        text: t('mobile.vault.devicesRevoke'),
+        style: 'destructive',
+        onPress: () => {
+          setDeviceBusy(clientId);
+          setDeviceError(undefined);
+          let guidanceSaved = false;
+          let cleanupError: unknown;
+          void runHostedDeviceRevocation({
+            auth: capturedAuth,
+            readCurrentAuth: () => {
+              const current = readSyncConfig();
+              const currentAccountId = current?.accountId?.trim() ?? '';
+              if (current === undefined || currentAccountId === '' || current.serverUrl.trim() === '' || current.token === undefined) return undefined;
+              return { accountId: currentAccountId, baseUrl: current.serverUrl, token: current.token };
+            },
+            clientId,
+            persistRotationGuidance: () => {
+              guidanceSaved = saveDeviceRevocationGuidance(capturedAuth.accountId, capturedAuth.baseUrl);
+            },
+            clearCurrentSession: async () => {
+              const scopeForCleanup = { serverOrigin: new URL(capturedAuth.baseUrl).origin, accountId: capturedAuth.accountId };
+              const cleanup = await clearMobileVaultSession(scopeForCleanup);
+              cleanupError = cleanup.secureStorageError;
+              if (cleanup.secureStorageError !== undefined) {
+                // clearMobileVaultSession has already fenced auto-unlock and
+                // invalidated the live session. Preserve the scope in the
+                // parent so the existing settings retry action survives the
+                // credential clear and the resulting authStillCurrent=false.
+                onVaultCleanupPending?.(scopeForCleanup);
+              }
+            },
+          })
+            .then(async (outcome) => {
+              setDeviceNotice(outcome.status === 'ambiguous'
+                ? 'mobile.vault.devicesRevocationUncertain'
+                : 'mobile.vault.devicesRevoked');
+              if (!outcome.authStillCurrent) return;
+              if (!guidanceSaved || cleanupError !== undefined) {
+                setDeviceError('mobile.vault.devicesCleanupFailed');
+              }
+              if (outcome.status === 'committed') {
+                setDevices((current) => current.filter((device) => device.clientId !== outcome.revocation.clientId));
+              }
+            })
+            .catch((caught: unknown) => {
+              setDeviceError(caught instanceof HostedDeviceManagementError
+                ? caught.code === 'unauthorized'
+                  ? 'mobile.vault.devicesUnauthorized'
+                  : caught.code === 'session-changed'
+                    ? 'mobile.vault.devicesSessionChanged'
+                    : 'mobile.vault.devicesError'
+                : 'mobile.vault.devicesError');
+            })
+            .finally(() => setDeviceBusy(undefined));
+        },
+      },
+    ]);
+  };
 
   const run = async (action: () => Promise<void>): Promise<void> => {
     setBusy(true);
@@ -209,6 +349,7 @@ export function VaultSettingsSection(): React.JSX.Element {
 
   const unlocked = session?.state === 'unlocked';
   const requiresRecoveryRotation = session?.requiresRecoveryRotation === true;
+  const legacyPayloadMigrationRequired = session?.payloadKeyVersion === null;
   const hasPackage = session?.keyPackage !== undefined;
   // Session state is a live getter; this counter gives React a repaint after
   // lock/unlock without introducing a second session state machine.
@@ -225,6 +366,30 @@ export function VaultSettingsSection(): React.JSX.Element {
         <Text variant="caption" tone="subtle">{t('mobile.vault.accountRequired')}</Text>
       ) : null}
       {error !== undefined ? <Text variant="caption" tone="danger">{t(error)}</Text> : null}
+      {deviceNotice !== undefined ? <Text variant="caption" tone="subtle">{t(deviceNotice)}</Text> : null}
+
+      {scope !== undefined && serverUrl !== undefined && token !== undefined ? (
+        <Card>
+          <Stack>
+            <Text variant="row-title">{t('mobile.vault.devicesTitle')}</Text>
+            <Text variant="caption" tone="subtle">{t('mobile.vault.devicesDescription')}</Text>
+            {devicesLoading ? <Text variant="caption" tone="subtle">{t('mobile.vault.devicesLoading')}</Text> : null}
+            {deviceError !== undefined ? <Text variant="caption" tone="danger">{t(deviceError)}</Text> : null}
+            {!devicesLoading && deviceError === undefined && devices.length === 0 ? <Text variant="caption" tone="subtle">{t('mobile.vault.devicesEmpty')}</Text> : null}
+            {devices.map((device) => (
+              <Stack key={device.clientId} gap="tight">
+                <Text>{device.clientId}</Text>
+                <Text variant="caption" tone="subtle">{t('mobile.vault.devicesLastSeen', { date: new Date(device.lastSeenAt).toLocaleString() })}</Text>
+                <Button
+                  label={deviceBusy === device.clientId ? t('mobile.vault.devicesRevoking') : t('mobile.vault.devicesRevoke')}
+                  onPress={() => revokeDevice(device.clientId)}
+                  disabled={deviceBusy !== undefined}
+                />
+              </Stack>
+            ))}
+          </Stack>
+        </Card>
+      ) : null}
 
       {!loading && session !== undefined && !hasPackage && pending === undefined ? (
         <Card>
@@ -311,23 +476,42 @@ export function VaultSettingsSection(): React.JSX.Element {
                 if (pendingAction === 'rotate') {
                   await activeHost.confirmVaultRootRotation(pending, pendingCode, (progress: VaultMigrationProgress) => {
                     setMigrationProgress({ completed: progress.completed, total: progress.total });
-                  });
+                  }, legacyPayloadMigrationRequired && legacyPassphrase !== ''
+                    ? { legacyPassword: legacyPassphrase }
+                    : undefined);
                 } else {
                   await session!.confirmAndPublish(pending, pendingCode, activeHost.getVaultKeyPackageRemote());
                 }
-                await rememberCurrentRoot(session!);
+                // The server/package commit is the durable boundary. Clear the
+                // one-shot pending UI before the optional secure-store write:
+                // a Keychain/Keystore failure must not make an already-consumed
+                // recovery code look retryable (the next click would be
+                // `pending-invalid`). The error remains visible and the user
+                // can explicitly retry the remember toggle afterwards.
+                if (pendingAction === 'rotate' && accountId !== undefined && serverUrl !== undefined) {
+                  clearDeviceRevocationGuidance(accountId, serverUrl);
+                  setDeviceNotice(undefined);
+                }
                 setPending(undefined);
                 setPendingAction(undefined);
                 setMigrationProgress(undefined);
                 setPendingCode('');
                 setPassphrase('');
+                setLegacyPassphrase('');
+                await rememberCurrentRoot(session!);
               })}
               tone="primary"
-              disabled={busy || pendingCode.length === 0}
+              disabled={busy || pendingCode.length === 0 ||
+                (pendingAction === 'rotate' && legacyPayloadMigrationRequired && legacyPassphrase.length === 0)}
             />
             <Button
               label={t('mobile.vault.cancel')}
               onPress={() => void run(async () => {
+                // This is migration-only input. Drop it before attempting
+                // remote cancellation so a failed cancel cannot retain an old
+                // password in the component state while the pending operation
+                // remains visible for retry.
+                setLegacyPassphrase('');
                 if (pendingAction === 'rotate') {
                   const activeHost = host ?? await openTaskHost();
                   await activeHost.cancelVaultRootRotation();
@@ -340,6 +524,20 @@ export function VaultSettingsSection(): React.JSX.Element {
             />
             {pendingAction === 'change' ? <Text variant="caption">{t('mobile.vault.changeTitle')}</Text> : null}
             {pendingAction === 'rotate' ? <Text variant="caption">{t('mobile.vault.rootRotationHint')}</Text> : null}
+            {pendingAction === 'rotate' && legacyPayloadMigrationRequired ? (
+              <>
+                <TextField
+                  label={t('web.sync.vault.legacyPassphrase')}
+                  value={legacyPassphrase}
+                  onChangeText={setLegacyPassphrase}
+                  secure
+                  testID="mobile-vault-legacy-passphrase"
+                />
+                <Text variant="caption" tone="subtle">
+                  {t('web.sync.vault.legacyPassphraseHint')}
+                </Text>
+              </>
+            ) : null}
             {migrationProgress !== undefined ? <Text>{t('mobile.vault.rootRotationProgress', migrationProgress)}</Text> : null}
           </Stack>
         </Card>
@@ -348,9 +546,18 @@ export function VaultSettingsSection(): React.JSX.Element {
       {!loading && session !== undefined && unlocked && pending === undefined ? (
         <Card>
           <Stack>
-            <Text variant={requiresRecoveryRotation ? 'caption' : 'row-title'} tone={requiresRecoveryRotation ? 'warning' : undefined}>
-              {requiresRecoveryRotation ? t('mobile.vault.recoveryRotationRequired') : t('mobile.vault.ready')}
-            </Text>
+            <View testID={legacyPayloadMigrationRequired ? 'mobile-vault-legacy-migration' : 'mobile-vault-status'}>
+              <Text
+                variant={requiresRecoveryRotation || legacyPayloadMigrationRequired ? 'caption' : 'row-title'}
+                tone={requiresRecoveryRotation || legacyPayloadMigrationRequired ? 'warning' : undefined}
+              >
+                {requiresRecoveryRotation
+                  ? t('mobile.vault.recoveryRotationRequired')
+                  : legacyPayloadMigrationRequired
+                    ? t('mobile.vault.legacyMigrationRequired')
+                    : t('mobile.vault.ready')}
+              </Text>
+            </View>
             <Button
               label={t('mobile.vault.lock')}
               onPress={() => {
@@ -377,7 +584,7 @@ export function VaultSettingsSection(): React.JSX.Element {
                 setPendingAction('change');
                 setPendingCode('');
               })}
-              disabled={busy || newPassphrase.length === 0}
+              disabled={busy || newPassphrase.length === 0 || legacyPayloadMigrationRequired}
             />
             <Button
               label={t('mobile.vault.rotateRoot')}

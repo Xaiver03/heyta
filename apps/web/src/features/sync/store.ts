@@ -35,7 +35,11 @@ import { createHostRealtimeClient, createSyncClient } from '@heyta/app-host';
 
 // W4：凭据持久化。**只存 baseUrl 与 token，绝不存口令** —— 见该文件头。
 import { clearStoredCredentials, loadCredentials, saveCredentials } from './credential-storage.js';
-import { getWebVaultSession, invalidateWebVaultSession } from '../../lib/vault-session.js';
+import {
+  getWebVaultSession,
+  invalidateWebVaultSession,
+  withWebSyncMutationExclusive,
+} from '../../lib/vault-session.js';
 
 // 🔴 同意闸门（G-12）。这个文件**只**用它做两件事：给客户端注入带闸的 `fetch`，
 // 以及在闸门关闭时不建实时通道。判定逻辑全在 `@heyta/app-host`。
@@ -246,9 +250,10 @@ function buildClient(
  * 2. **把信号翻成一次普通同步**：`onNewOps` → `syncNow()`。
  *    🔴 契约见 `realtime.ts` 文件头：**这条通道只传"有新 op 了"，不传内容**，
  *    真正的 op 密文仍走 `/api/sync/ops`。不要顺手把内容搬进来。
- * 3. **合并并发**：`syncNow()` **没有**在途保护（它每次都会新建客户端并发请求），
- *    而服务端可能连续推。所以在途时**直接丢掉这一次信号**而不是排队 ——
- *    下一次推送会把状态带过来，排队只会把"几次变化"放大成"几次全量同步"。
+ * 3. **合并并发**：实时信号仍用 `syncInFlight` 合并重复通知；真正的同步请求
+ *    还要经过 `withWebSyncMutationExclusive`，与 root migration 共用同一条
+ *    进程内队列。否则 inventory/stage/commit 窗口中的本地上传会制造自发的
+ *    `stale_latest_seq`，把本来可以完成的迁移变成用户可见的失败。
  */
 let realtime: RealtimeClient | undefined;
 /** 在途同步标记（见上面第 3 条）。 */
@@ -421,8 +426,16 @@ function consentGate(): SyncStatus | null {
  *
  * 判据用 `dataEgressAllowed()`，**不在这里重判 `phase`**：漏掉 `checking` 就是
  * "冷启动先把数据推出去、再收到要补签"，那道闸只剩弹个窗。
+ *
+ * 🔴 但先要 `await legalRecheck.settled()`。原来这里是同步判的，于是
+ * "还没问到答案"被写成了 `legal-reconfirm-required`，界面上那句话是
+ * "条款文本已经更新，而这个账号还没有重新确认" —— 而实测（自建栈真浏览器，
+ * 全新设备登录后第一次点同步）服务端对同一账号已答 `needsReconfirm:false`，
+ * 下载请求一个都没发，再点一次才同步成功。**既谎了，又拦住了一件本来该成的事。**
+ * 等一问落定再判不是新增等待：那一问在登录时就已经发出去了，等的是同一个请求。
  */
-function reconfirmGate(): SyncStatus | null {
+async function reconfirmGate(): Promise<SyncStatus | null> {
+  await legalRecheck.settled();
   if (requireLegalReconfirm()) return null;
   return { kind: 'error', reason: 'legal-reconfirm-required', retryable: false };
 }
@@ -573,15 +586,15 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     }
 
     // 🔴 第二道闸（G-27）。两处出站动作都要过，一处理由见 `reconfirmGate()`。
-    const reconfirm = reconfirmGate();
+    const reconfirm = await reconfirmGate();
     if (reconfirm !== null) {
       set({ status: reconfirm });
       return reconfirm;
     }
 
-    const status = await c.sync((s) => {
+    const status = await withWebSyncMutationExclusive(async () => c.sync((s) => {
       set({ status: s });
-    });
+    }));
 
     // 出现冲突就自动打开一次 —— 否则用户只会看到状态栏变了字，
     // 不知道需要自己去点一下
@@ -609,14 +622,14 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     }
 
     // 🔴 第二道闸（G-27）。两处出站动作都要过，一处理由见 `reconfirmGate()`。
-    const reconfirm = reconfirmGate();
+    const reconfirm = await reconfirmGate();
     if (reconfirm !== null) {
       set({ status: reconfirm });
       return reconfirm;
     }
 
     set({ status: { kind: 'syncing', phase: 'upload' } });
-    const status = await c.resolveConflict(conflict, choice);
+    const status = await withWebSyncMutationExclusive(() => c.resolveConflict(conflict, choice));
 
     // 解决完后把剩下的冲突（可能还有别的）一并反映到状态里
     set({ status });

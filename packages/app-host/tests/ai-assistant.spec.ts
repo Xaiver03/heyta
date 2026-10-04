@@ -25,8 +25,7 @@ import {
   type AiRoutingConfig,
   type EgressConsent,
 } from '@heyta/ai';
-import { LOCAL_API_TOOLS } from '@heyta/local-api';
-import type { LocalApiHost, LocalApiItem, LocalApiProject } from '@heyta/local-api';
+import { LOCAL_API_TOOLS, type LocalApiHabit, type LocalApiHost, type LocalApiItem, type LocalApiProject } from '@heyta/local-api';
 
 import {
   assistantEgressFields,
@@ -49,6 +48,16 @@ function fakeHost(items: readonly LocalApiItem[] = [], projects: readonly LocalA
     getTask: (taskId: string): Promise<LocalApiItem | undefined> =>
       Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: (): Promise<readonly LocalApiProject[]> => Promise.resolve(projects),
+    listHabits: (): Promise<readonly LocalApiHabit[]> =>
+      Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
+    listTags: () => Promise.resolve([]),
+    listNotes: () => Promise.resolve([]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([]),
+    listFocusSessions: () => Promise.resolve([]),
+    listReminders: () => Promise.resolve([]),
+    listEvents: () => Promise.resolve([]),
+    getEvent: () => Promise.resolve(undefined),
     submit: (): Promise<{ ok: true; taskId: string }> => {
       host.submits += 1;
       return Promise.resolve({ ok: true, taskId: 'created-1' });
@@ -381,6 +390,10 @@ describe('🔴 出境披露：循环前一次算完，越界就停', () => {
   it('计划里的上界就是从常量推导的（不是另写一个数）', () => {
     const plan = planAssistantEgress('read-only');
     expect(plan.maxRequests).toBe(MAX_ASSISTANT_TOOL_STEPS + 1);
+    // ⚠️ 12 = 目录**当前**的读工具条数（上面那 10 条 + W10 的 `list_events` /
+    // `get_event`，2026-10-03 合流进 pack 目录之后）。
+    // 写成 `LOCAL_API_TOOLS.filter(…)` 的长度就是拿被验的那份推导去当期望值 —— 一条永真判据。
+    expect(plan.tools.length).toBe(12);
     // 🔴 这句以前写的是 `toBe(3)` —— 一个**手抄的**读工具数。W10 给目录加了
     // `list_events` / `get_event`，那条硬编码会红，而红的原因不是缺陷。
     // 正确形状与这条用例的标题同义：**从常量推导**，即"读-only 档 = 目录里全部读工具"。
@@ -486,6 +499,40 @@ describe('🔴 三个硬上界：触顶要明说，不许静默截断', () => {
 describe('授权前端有两个，判断只有一个', () => {
   it('`assistantGrants` 由**目录**推导，不是一份手写的名单', () => {
     const grants = assistantGrants('read-only');
+    // ⚠️ 下面这 26 个名字是**目录当前的内容**（2026-10-03 合流：W11 补齐五实体 + W10 的
+    // EVENT 四条进 pack 目录），不是一份"允许清单"：
+    // 判据是"键集合 == 目录"，所以目录扩了就必须跟着列全 ——
+    // 把它换成 `LOCAL_API_TOOLS.map(...)` 会让这条断言变成自己比自己的**永真判据**。
+    expect(Object.keys(grants).sort()).toEqual(
+      [
+        'complete_task',
+        'create_habit',
+        'create_note',
+        'create_project',
+        'create_event',
+        'create_reminder',
+        'create_tag',
+        'create_task',
+        'get_event',
+        'get_note',
+        'get_task',
+        'list_checkins',
+        'list_events',
+        'list_focuses',
+        'list_habits',
+        'list_notes',
+        'list_projects',
+        'list_reminders',
+        'list_tags',
+        'list_tasks',
+        'log_focus',
+        'record_checkin',
+        'set_task_tags',
+        'update_event',
+        'update_note',
+        'update_task',
+      ].sort(),
+    );
     // 🔴 判据与这条用例的标题对齐：名单**由目录推导**，不是手抄一份工具名。
     // 手抄的那版在 W10 目录扩到 10 条时红了 —— 而那一次红没有任何信息量。
     expect(Object.keys(grants).sort()).toEqual(LOCAL_API_TOOLS.map((t) => t.name).sort());

@@ -639,16 +639,22 @@ function providerNodesOf(file) {
  * 实测：`apps/web/src/dev/universal-slice.tsx` 的 `<SliceBadges>` 正是这种形态，
  * 只看 `file.nodes` 会把它算成"在 Provider 之外"，误报。
  *
- * 判据：`<` 的**紧邻前一个字符**不能是标识符字符或 `)` `]`（排除 TS 泛型
- * `useState<Foo>`、`Array<Foo>`、`a<b`），`</` 闭合标签不匹配。
+ * 判据与 `isTagOpen` 一致：`<` 前一个非空字符不能是标识符字符（排除 TS 泛型
+ * `useState<Foo>`）；这里另外接受 `return <Foo>` / `yield <Foo>`，因为这是合法
+ * 的 JSX 返回形状，不能把 `return` 的末尾字母误当成泛型边界。
  *
- * 🔴 **以前这里是"跳过空白后看前一个非空字符"，那会把 `return <X />` 整类边吃掉**
- * ——`return` 的 `n` 是标识符字符，于是"直接返回一个组件"这种最常见形态
- * （`function featureScreen(){ case 'growth': return <GrowthScreen/> }`）
- * 既不成为独立节点、也不进可达集，被误判成 TS 泛型。
- * 实测代价：04 13:2x 完整 `pnpm check` 停在这条上，4 处消费者被判"子树之外"，
+ * 🔴 这条规则为什么存在（04 13:2x 实测；同一枚缺陷两条线各修过一次、修法不同）：
+ * 原先这里既不跳过空白也不认 `return`，于是 `return <X />` 整类边被吃掉 ——
+ * `return` 的末尾 `n` 是标识符字符，而「直接返回一个组件」是最常见的形态
+ * （`function featureScreen(){ case 'growth': return <GrowthScreen/> }`）：
+ * 它既不成为独立节点、也不进可达集，被误判成 TS 泛型。
+ * 实测代价：完整 `pnpm check` 停在这条上，4 处消费者被判「子树之外」，
  * 而运行时无一不在 Provider 之内（同一台模拟器 13:20 真打开过倒数日屏、真导出成功）。
- * 文档原本写的例子 `useState<Foo>` 本身就是**无空格**写法，跳过空白是超出它自己要防的东西。
+ *
+ * ⚠️ 合并裁决（本批大规模合并时拍的）：另一版修法是「只看紧邻的前一个字符」，
+ * 它同样放行 `return <X />`，代价是把 `a < b` 这类**带空格的比较**当成标签开始。
+ * 这里取**窄的那一版**（保留泛型守卫、只对 return/yield 开口），因为它不新增误认面；
+ * 两版都在挡同一个假阴性，差别只在有没有顺手制造新的假阳性。
  */
 function renderedTags(file, from, to) {
   const out = [];
@@ -656,8 +662,15 @@ function renderedTags(file, from, to) {
   let m;
   while ((m = re.exec(file.structural)) !== null) {
     if (m.index < from || m.index >= to) continue;
-    const prev = m.index > 0 ? file.structural[m.index - 1] : '';
-    if (/[A-Za-z0-9_$)\]]/.test(prev)) continue;
+    let p = m.index - 1;
+    while (p >= 0 && (file.structural[p] === ' ' || file.structural[p] === '\t')) p--;
+    // `return <Screen />` is JSX even though the previous non-space character
+    // is the final `n` of the JavaScript keyword. Keep the generic-expression
+    // guard for `value<Foo>`, while accepting JSX returned directly from a
+    // function (the mobile feature-screen registry uses this shape).
+    const before = file.structural.slice(Math.max(0, m.index - 32), m.index);
+    const followsReturn = /\b(?:return|yield)\s*$/.test(before);
+    if (p >= 0 && /[A-Za-z0-9_$)\]]/.test(file.structural[p]) && !followsReturn) continue;
     out.push({ name: m[1], offset: m.index });
   }
   return out;

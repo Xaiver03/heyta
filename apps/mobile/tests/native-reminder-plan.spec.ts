@@ -42,4 +42,28 @@ describe('native reminder plan', () => {
     );
     expect(plans.map(({ id }) => id)).toEqual(['a', 'b']);
   });
+
+  it('iOS 的 64 条窗口只保留最早的 64 个 occurrence，窗口外不会挤掉更早的提醒', () => {
+    const reminders = Array.from({ length: 65 }, (_, index) => reminder(
+      `r-${String(index + 1).padStart(2, '0')}`,
+      't',
+      { triggerAt: index + 1 },
+    ));
+
+    const plans = planNativeReminders(reminders, { t: task('t', '窗口') }, 0, 64);
+
+    expect(plans).toHaveLength(64);
+    expect(plans[0]?.occurrenceId).toBe('r-01|1');
+    expect(plans.at(-1)?.occurrenceId).toBe('r-64|64');
+    expect(plans.some(({ occurrenceId }) => occurrenceId === 'r-65|65')).toBe(false);
+
+    const afterWindowMoves = planNativeReminders(
+      reminders.map((item, index) => index < 64 ? { ...item, firedAt: 10_000 } : item),
+      { t: task('t', '窗口') },
+      0,
+      64,
+    );
+    expect(afterWindowMoves).toHaveLength(1);
+    expect(afterWindowMoves[0]?.occurrenceId).toBe('r-65|65');
+  });
 });

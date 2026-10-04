@@ -15,10 +15,16 @@ export * from './task-order.js';
 export * from './quadrant.js';
 export * from './task-filter.js';
 export * from './subtasks.js';
+export * from './project-hierarchy.js';
 export * from './reminders.js';
 export * from './timeline.js';
 export * from './timeline-position.js';
 export * from './notes.js';
+export * from './trash-rows.js';
+
+export * from './events.js';
+// W8：跨端唯一一份的**功能域词表**（为什么在这里而不是 app-host，见那个文件头）。
+export * from './feature-modules.js';
 export * from './events.js';
 // W8：跨端唯一一份的**功能域词表**（为什么在这里而不是 app-host，见那个文件头）。
 export * from './feature-modules.js';

@@ -80,6 +80,19 @@ export const zhCN = {
    */
   'common.sync.error.unauthorized': '这台设备的登录凭据已失效（可能是在别的设备上退出了登录，或改过口令），同步已停止 —— 本地数据完好、仍可读写，重新登录后会继续同步',
   /**
+   * 🔴 `reason === 'account-closed'`：账号**注销**了（稳定码 `ACCOUNT_CLOSED`）。
+   *
+   * 这一句与上面那句 `unauthorized` 是**一对必须分开的防线**：两句对本机数据许的是
+   * **相反**的承诺（完好 / 清除），合成一句就在两个方向上说谎 ——
+   * 把"口令打错"读成"注销"会当场毁掉用户的数据，把"注销"读成"重新登录就好"
+   * 会让明文永远留着。
+   *
+   * ⚠️ 措辞边界（ADR-0048）：这里说的是**规则**（注销后本机会清除这份副本），
+   * 不是这一次的**结果** —— 清除失败时状态里的 `message` 与 console 会另行说明，
+   * 这句不许替它承诺成功。其它设备与备份各有边界，那句话在隐私政策里。
+   */
+  'common.sync.error.accountClosed': '这个账号已经注销，无法再次登录，同步已停止 —— 注销后这台设备上的本地副本会被清除。如果这不是你的操作，请联系服务端运营者',
+  /**
    * 🔴 `reason === 'consent-required'`：**还没同意，所以一个请求都没发**（计划 G-12）。
    *
    * 这句不许写成"还没配置同步服务"或"当前离线"：那两种的用户动作是"填地址"和"查网络"，
@@ -108,7 +121,7 @@ export const zhCN = {
   // "充分知情"的最小要求，不是文案风格。
   'common.privacy.consent.title': '在使用联网功能之前',
   'common.privacy.consent.intro': 'heyta 是本地优先的：你的任务、清单、笔记与历史先写在这台设备上。这个选择只决定一件事 —— 这台设备能不能与服务器通信。',
-  'common.privacy.consent.localOnlyGuarantee': '选「只用本机」时，所有功能照常可用：新建、编辑、日历、四象限、番茄钟、习惯、导出，一个都不少。只是不会同步、不会登录、不会推送提醒。',
+  'common.privacy.consent.localOnlyGuarantee': '选「只用本机」时，所有功能照常可用：新建、编辑、日历、四象限、番茄钟、习惯、导出，一个都不少。不会同步、不会登录，也不会接收服务器推送；移动端本地提醒仍可在授予系统通知权限后使用。',
   'common.privacy.consent.acceptedGuarantee': '选「同意并联网」后，这台设备才会与你配置的那台服务器通信，而且只发端到端加密之后的密文与同步游标 —— 服务器看不到你的明文。',
   'common.privacy.consent.termsLink': '服务条款',
   'common.privacy.consent.privacyLink': '隐私政策',
@@ -256,7 +269,7 @@ export const zhCN = {
   'landing.privacy.noteProgress': '已加密 {done} / {total} 个字',
 
   // ── 落地页 · 自建 ─────────────────────────────────────────
-  'landing.selfhost.title': '自己的服务器，一条命令的事',
+  'landing.selfhost.title': '自己的服务器，一条命令起全套',
   'landing.selfhost.lede': '不需要注册账号，不需要订阅。服务端只负责转发密文与判并发，换掉它、关掉它、搬到别的机器上，你的数据都不受影响。',
   // 🔴 这一节**不许**出现命令行、内部路径或数据库机制（判据与理由见
   // `apps/landing/tests/public-copy-register.spec.tsx`）。需要逐条执行的东西
@@ -267,7 +280,7 @@ export const zhCN = {
   'landing.selfhost.step2.body': '首次启动时二选一：填自己的服务器地址，或者用托管。选了随时能换。',
   'landing.selfhost.step3.title': '密钥与口令自己配',
   'landing.selfhost.step3.body': '没有默认值，要自己设 —— 不是零思考的一键安装，但每一步都有指南。',
-  'landing.selfhost.guide.title': '完整步骤在仓库里',
+  'landing.selfhost.guide.title': '完整步骤在自建指南里',
   'landing.selfhost.guide.body': '要逐条执行的命令、依赖与配置文件都写在自建指南里，跟着跑一遍就能起来。',
   'landing.selfhost.guide.link': '打开自建指南',
 
@@ -451,6 +464,11 @@ export const zhCN = {
   'web.shell.nav.q3': '紧急不重要',
   'web.shell.nav.q4': '不重要不紧急',
   'web.shell.sidebar.resize': '调整侧栏宽度',
+  // 顶栏语言分组的**可见**标签（`LanguageSwitcher.tsx`）。它必须看得见而不是只挂在
+  // `aria-label` 上：同一个位置已经判过两次"用户根本不知道它们是什么"
+  // （`App.tsx` 排序下拉那段、`main-area.css` 的 `.ht-header__view`）。
+  // 选项本身**不翻**（永远是 `中文` / `English` 的自称，见上面 `common.lang.*` 那段）。
+  'web.shell.lang.label': '语言',
   'web.shell.views.aria': '视图',
   'web.shell.views.groupMain': '主要',
   'web.shell.modules.title': '功能模块',
@@ -651,11 +669,24 @@ export const zhCN = {
   'web.sync.password.label': '端到端加密口令',
   // `<strong>不会</strong>` 的三段拆分，与落地页 ledeLead/ledeStrong/ledeTail 同一做法：
   // 强调标记的边界不能靠翻译字符串里的符号去猜。
-  'web.sync.password.lead': '口令',
+  'web.sync.password.lead': '旧格式的加密口令',
   'web.sync.password.strong': '不会',
-  'web.sync.password.tail': '被保存到磁盘，只存在于本次会话的内存中。它一旦丢失，已同步的数据将无法解密 —— 请自行妥善保管。没有口令时同步会被拒绝，服务端只接受端到端加密的载荷。',
+  'web.sync.password.tail': '被保存到磁盘，只存在于本次会话。已设置加密数据钥匙的数据，可在下方使用口令或已保存的恢复码解锁；尚未迁移的旧格式数据仍需要原口令。重置登录密码不能解密数据。',
   'web.sync.vault.title': '加密数据钥匙',
   'web.sync.vault.description': '这把钥匙用于解锁已同步的数据。它与登录密码分开，绝不会保存在浏览器里。',
+  'web.sync.devices.title': '已连接设备',
+  'web.sync.devices.description': '撤销会让这个账号的所有设备（包括当前设备）退出登录。设备离线时不会被远程擦除；重新登录后，请在可信设备上轮换数据密钥并迁移保留的密文。',
+  'web.sync.devices.loading': '正在加载设备…',
+  'web.sync.devices.empty': '暂时没有可管理的设备。',
+  'web.sync.devices.lastSeen': '最近活动：{date}',
+  'web.sync.devices.revoke': '撤销设备',
+  'web.sync.devices.revoking': '正在撤销…',
+  'web.sync.devices.confirm': '撤销后所有设备都必须重新登录。离线设备上的本地数据不会被远程擦除。确定继续吗？',
+  'web.sync.devices.revoked': '设备已撤销，所有设备都必须重新登录。请在可信设备重新登录后轮换数据密钥并迁移保留的密文。',
+  'web.sync.devices.revocationUncertain': '撤销请求的响应丢失了。本机已先退出登录；重新登录后请核对设备列表，再轮换数据密钥。',
+  'web.sync.devices.unauthorized': '会话已失效，请重新登录后再管理设备。',
+  'web.sync.devices.sessionChanged': '确认期间账号或服务器发生了变化，没有撤销任何设备。',
+  'web.sync.devices.error': '设备列表或撤销请求失败，请检查网络后重试。',
   'web.sync.vault.accountRequired': '请先登录，再管理这个账号的加密数据钥匙。',
   'web.sync.vault.createTitle': '创建加密数据钥匙',
   'web.sync.vault.passphrase': '加密口令',
@@ -904,6 +935,37 @@ export const zhCN = {
   'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，而删掉它就没有任何登录方式了，所以不能删除。先添加一条新的，或者去设置页设一个登录密码，再删这条。',
   'web.passkeys.error.unauthorized': '登录状态已失效，请重新登录。',
   'web.passkeys.error.network': '连不上服务端，请稍后重试。',
+  // ── 注销账号（批次 E3）────────────────────────────────────────
+  // 🔴 失败那几句必须**同时**说"账号还在"和"本机没动"。这条路的下游是不可逆删除：
+  // 用户如果在一次 5xx 之后以为"已经注销了"，他会接着做下一步（比如把设备转卖），
+  // 而那一步此时是不安全的。
+  // 成功那句也划清作用域：这次动作只覆盖服务端 + **这台设备**，
+  // 备份与其它设备有各自的边界（ADR-0048 的分层实话，不写"彻底销毁"）。
+  'common.accountClosure.title': '注销账号',
+  'common.accountClosure.lead': '注销会永久删除这个账号在服务端的全部数据（同步历史与设备记录），而且不可撤销。',
+  'common.accountClosure.exportHint': '如果还想留着这些数据，先去「导出数据」存一份备份再回来。注销之后服务端就再也读不出来了。',
+  'common.accountClosure.confirmLocal': '我确认：这台设备上还没同步出去的数据，连同本机明文存储，也会一起被清除。',
+  'common.accountClosure.action': '注销这个账号',
+  'common.accountClosure.busy': '正在注销…',
+  // 🔴 `{count}` 是**现量**，不是修辞：这一句的存在理由就是把"这台设备上还有多少
+  // 东西没出去"变成一个具体的数，让用户在按下去之前看得见它。写成"可能有未同步数据"
+  // 等于没说。
+  'common.accountClosure.pending': '这台设备上还有 {count} 条改动没同步出去。注销会把它们一起清掉 —— 云端没有它们，之后也拿不回来。',
+  'common.accountClosure.cancel': '先不注销',
+  'common.accountClosure.confirmTitle': '确认注销这个账号？',
+  'common.accountClosure.entryHint': '删除云端账号，并清除这台设备上的数据',
+  'common.accountClosure.needLogin': '这台设备还没有登录，也没有可注销的账号。',
+  'common.accountClosure.done.erased': '账号已注销，这台设备上的本地副本也已清除。备份和你其它设备上的数据不在这次操作的范围里。',
+  'common.accountClosure.done.partial': '账号已注销，但这台设备上的本地数据只清掉了一部分，剩下的需要你手动处理。',
+  'common.accountClosure.done.eraseFailed': '账号已注销，但这台设备上的本地数据没能清干净，需要你手动处理。',
+  'common.accountClosure.failed.unconfigured': '还没有配置服务端地址，所以一个请求都没发 —— 账号还在，本机数据也没动。',
+  'common.accountClosure.failed.consentRequired': '你还没有同意这台设备的隐私规则，所以一个请求都没发 —— 账号还在，本机数据也没动。',
+  'common.accountClosure.failed.unauthorized': '登录状态已经失效，所以没有执行注销 —— 账号还在，本机数据也没动。请重新登录再来一次。',
+  'common.accountClosure.failed.rateLimited': '注销请求太频繁，暂时被拒绝了。账号还在，本机数据也没动，请过一会儿再试。',
+  'common.accountClosure.failed.serverError': '服务端没有完成注销。账号还在，本机数据也没动，请稍后重试。',
+  'common.accountClosure.failed.network': '连不上服务端，所以没有执行注销。账号还在，本机数据也没动。',
+  'common.accountClosure.failed.malformedResponse': '服务端回的内容我们认不出来，所以不算注销成功。账号可能还在 —— 确认之后再重试一次。本机数据也没动。',
+  'common.accountClosure.failed.other': '注销没有完成。账号还在，本机数据也没动。',
 
   // ── 设置页「修改登录密码」：两个秘密的界线在这里划一次 ──────────────
   //
@@ -1147,13 +1209,13 @@ export const zhCN = {
   'web.habits.repairAction': '补上',
   'web.habits.a11y.repair': '把 {date} 的「{name}」补上',
   // 新鲜开始：**不出现"你已经落后了"** —— 只陈述"过去的没有被清掉"。
-  'web.habits.freshStart': '已经 {days} 天没打卡了。最长 {longest} 天、累计 {total} 次都还在，重新开始不会清掉它们。',
+  'web.habits.freshStart': '已经 {days} 天没打卡了。最长 {longest} 天、累计 {total} 天都还在，重新开始不会清掉它们。',
   'web.habits.freshStartAction': '今天重新开始',
   'web.habits.a11y.freshStart': '今天为「{name}」重新打卡',
   // 三个指标里的第三个：**只增不减**的那个（累计）。
   // 中文无单复数，两句刻意逐字相同（en 侧才会不同）。
-  'web.habits.streak.total': '累计 {count} 次',
-  'web.habits.streak.totalOne': '累计 {count} 次',
+  'web.habits.streak.total': '累计 {count} 天',
+  'web.habits.streak.totalOne': '累计 {count} 天',
   // 热力图文案由**我们**传给 react-activity-calendar —— 它的默认文案是英文，
   // 而 `{{count}}` 是**库自己的**占位符，必须原样留着（不是我们的 `{name}` 形状）。
   // ── M3 第七刀（habits）：共享热力图的两条文案 ──────────────
@@ -1190,7 +1252,7 @@ export const zhCN = {
   'web.habits.week.done': '{date} 已打卡',
   'web.habits.week.missed': '{date} 没打卡',
   // 整行的读法：**三个数字一次说完**，屏幕阅读器不必逐 chip 猜。
-  'web.habits.row.aria': '「{name}」连续 {current} 天，最长 {longest} 天，累计 {total} 次',
+  'web.habits.row.aria': '「{name}」连续 {current} 天，最长 {longest} 天，累计 {total} 天',
   'web.habits.row.selectA11y': '查看「{name}」的打卡记录',
 
   // ── Web · 热力图共用文案（习惯页与成长页）─────────────────
@@ -1610,6 +1672,23 @@ export const zhCN = {
   'web.ai.tools.intentCreate': '新建任务「{title}」',
   'web.ai.tools.intentUpdate': '修改任务 {id}',
   'web.ai.tools.intentComplete': '把任务 {id} 标记完成',
+  'web.ai.tools.intentCompleteBatch': '把这 {count} 个任务标记完成',
+  'web.ai.tools.intentCreateProject': '新建清单「{name}」',
+  'web.ai.tools.intentCreateHabit': '新建习惯「{name}」',
+  'web.ai.tools.intentCreateTag': '新建标签「{name}」',
+  'web.ai.tools.intentSetTaskTags': '把任务 {id} 的标签整组换成 {count} 个',
+  'web.ai.tools.intentCreateNote': '新建便签：{content}',
+  'web.ai.tools.intentUpdateNote': '改写便签 {id} 的正文：{content}',
+  'web.ai.tools.intentRecordCheckin': '给习惯 {habitId} 在 {date} 记一次打卡',
+  'web.ai.tools.todayLabel': '今天',
+  'web.ai.tools.intentLogFocus': '记一段{kind}：计划 {planned} 分钟',
+  'web.ai.tools.intentLogFocusWithActual': '记一段{kind}：计划 {planned} 分钟，实际 {actual} 分钟',
+  'web.ai.tools.focusKindWork': '工作',
+  'web.ai.tools.focusKindShortBreak': '短休息',
+  'web.ai.tools.focusKindLongBreak': '长休息',
+  'web.ai.tools.intentCreateReminderAt': '给任务 {id} 加一条提醒：{when}',
+  'web.ai.tools.intentCreateReminderBeforeDue': '给任务 {id} 加一条提醒：比截止早 {minutes} 分钟',
+  'web.ai.tools.intentCreateReminderIncomplete': '给任务 {id} 加提醒，但没说清时刻 —— 要选一个时间或填"提前几分钟"',
   // 🔴 W10：`LocalApiWriteIntent` 每加一个封闭变体，这里就**必须**同时长出一句 ——
   // 提案卡不许出现"未知操作"，那是让用户对着没读过的东西点确认。
   // 谁来拦：两道**编译期**的闸，都比测试硬 ——
@@ -1810,6 +1889,8 @@ export const zhCN = {
   'web.ai.chat.noTrace': '没有调用工具',
   'web.ai.chat.stoppedLead': '在上界处停下了：',
   'web.ai.chat.disclaimer': '内容由 AI 生成，可能有错。落库前请自己看一眼。',
+  'web.ai.chat.historyLocalOnly': '这段对话只保存在这台设备上：不同步到其他设备，也不会发送到任何地方。',
+  'web.ai.chat.expiredProposal': '这段对话是从本机恢复的。其中那条你还没确认的改动已经失效 —— 要改请重新说一次。',
   'web.ai.chat.resultAria': '助手的回答',
   'web.ai.assistant.failure.emptyText': '还没有输入内容。',
   'web.ai.assistant.failure.textTooLong': '这句话太长了，助手只处理短命令。',
@@ -2227,6 +2308,20 @@ export const zhCN = {
   'web.reminder.notify.denied': '通知已被浏览器拒绝。要重新开启，请在浏览器的站点设置里改。',
   'web.reminder.notify.limit': '⚠️ 通知只在 heyta 开着的时候发得出来。应用关掉后不会响 —— 后台唤醒需要另一套协议，目前还没有。',
   'web.reminder.notify.body': '该做「{title}」了',
+  // ── 提醒的**长提前量档位**（W9 ①，2026-10-03）──
+  // 🔴 这四条**必须与 `REMINDER_LONG_OFFSET_PRESETS_MS` 一一对应**，映射写在
+  //    `apps/web/src/features/reminders/reminder-tiers.ts` 的 `longOffsetMessageKey`
+  //    （`default` 分支直接抛，就是防"领域层加了一档、这里忘了补 key"）。
+  // ⚠️ 键名里的 `2d/3d/1w/30d` 是契约的一部分：文案说"提前 3 天"，宿主就必须建
+  //    "截止前 3 个**日历日**"（不是 72 小时 —— 跨夏令时会漂一小时，见 W9 ③）。
+  // 为什么单独一组、不并进上面的 `reminder.offset.*`：那一组是共享组件
+  // `ReminderList` 的下标契约（web 与 mobile 各有一份 key 数组），移动端还没有
+  // 这几档的词条，硬并进去会让移动端一打开提醒面板就抛。
+  'web.reminder.offset.groupLabel': '更早（按天）',
+  'web.reminder.offset.2d': '提前 2 天',
+  'web.reminder.offset.3d': '提前 3 天',
+  'web.reminder.offset.1w': '提前 1 周',
+  'web.reminder.offset.30d': '提前 30 天',
   'web.search.title': '搜索',
   'web.search.placeholder': '搜任务标题、备注、便签正文',
   'web.search.tasksSection': '任务',
@@ -2595,6 +2690,17 @@ export const zhCN = {
   // 两个状态都叫同一个名字的按钮，用户按第二下时不知道自己在做什么。
   'common.organizer.archive.button': '归档「{name}」',
   'common.organizer.archive.unarchive': '取消归档「{name}」',
+  'common.organizer.folder.button': '把「{name}」移入文件夹',
+  'common.organizer.folder.title': '移入文件夹',
+  'common.organizer.folder.none': '不放进文件夹（顶级）',
+  'common.organizer.folder.current': '（当前位置）',
+  'common.organizer.folder.reject.projectNotFound': '这条清单已经不在了（可能刚被删除，或同步还没到）',
+  'common.organizer.folder.reject.parentNotFound': '目标文件夹不存在',
+  'common.organizer.folder.reject.self': '清单不能放进它自己里面',
+  'common.organizer.folder.reject.cycle': '这样会形成循环：清单不能放进自己的子清单里',
+  'common.organizer.folder.reject.parentNotTopLevel': '文件夹里只能放清单，不能再放一个文件夹',
+  'common.organizer.folder.reject.hasChildren': '这条清单里面有别的清单，文件夹不能再放进文件夹',
+  'common.organizer.folder.reject.unknown': '移动失败，请稍后重试',
   'common.organizer.showArchived': '显示已归档',
   'common.organizer.hideArchived': '收起已归档',
   // ── 删除确认（2026-10-03 回收站与归档 W4b）────────────────────
@@ -2749,6 +2855,21 @@ export const zhCN = {
   'mobile.profile.clearCredentials': '清除本机保存的凭据',
   'mobile.vault.title': '加密数据钥匙',
   'mobile.vault.description': '这把钥匙用于解锁已同步的数据。它与登录密码分开，口令和恢复码只留在这台设备上。',
+  'mobile.vault.devicesTitle': '已连接设备',
+  'mobile.vault.devicesDescription': '撤销会让这个账号的所有设备（包括当前设备）退出登录。设备离线时不会被远程擦除；重新登录后，请在可信设备上轮换数据密钥并迁移保留的密文。',
+  'mobile.vault.devicesLoading': '正在加载设备…',
+  'mobile.vault.devicesEmpty': '暂时没有可管理的设备。',
+  'mobile.vault.devicesLastSeen': '最近活动：{date}',
+  'mobile.vault.devicesRevoke': '撤销设备',
+  'mobile.vault.devicesRevoking': '正在撤销…',
+  'mobile.vault.devicesConfirmTitle': '撤销设备',
+  'mobile.vault.devicesConfirm': '撤销后所有设备都必须重新登录。离线设备上的本地数据不会被远程擦除。确定继续吗？',
+  'mobile.vault.devicesRevoked': '设备已撤销，所有设备都必须重新登录。请在可信设备重新登录后轮换数据密钥并迁移保留的密文。',
+  'mobile.vault.devicesRevocationUncertain': '撤销请求的响应丢失了。本机已先退出登录；重新登录后请核对设备列表，再轮换数据密钥。',
+  'mobile.vault.devicesUnauthorized': '会话已失效，请重新登录后再管理设备。',
+  'mobile.vault.devicesSessionChanged': '确认期间账号或服务器发生了变化，没有撤销任何设备。',
+  'mobile.vault.devicesCleanupFailed': '本机已退出登录，但安全本地清理需要重试后才能再次信任这台设备。',
+  'mobile.vault.devicesError': '设备列表或撤销请求失败，请检查网络后重试。',
   'mobile.vault.accountRequired': '请先登录，再管理这个账号的加密数据钥匙。',
   'mobile.vault.createTitle': '创建加密数据钥匙',
   'mobile.vault.passphrase': '加密口令',
@@ -2765,6 +2886,7 @@ export const zhCN = {
   'mobile.vault.unlockRecovery': '用恢复码解锁',
   'mobile.vault.ready': '这台设备上的加密数据已经解锁。',
   'mobile.vault.recoveryRotationRequired': '恢复码解锁成功。请先设置新口令并保存新的恢复码，才能使用加密数据。',
+  'mobile.vault.legacyMigrationRequired': '旧版加密数据尚未迁移。请使用原加密口令完成数据密钥轮换后，才能同步或写入加密数据。',
   'mobile.vault.lock': '锁定数据钥匙',
   'mobile.vault.remember': '在这台设备上记住解锁状态',
   'mobile.vault.changeTitle': '新的口令与恢复码',
@@ -2902,10 +3024,10 @@ export const zhCN = {
   'mobile.growth.streak.empty': '还没有习惯。在网页端建好习惯后会自动同步到这里。',
   'mobile.growth.streak.current': '当前连续（天）',
   'mobile.growth.streak.longest': '最长 {days} 天',
-  'mobile.growth.streak.total': '累计 {count} 次',
+  'mobile.growth.streak.total': '累计 {count} 天',
   'mobile.growth.streak.repair': '昨天还能补回来——补完是 {days} 天',
-  'mobile.growth.streak.freshStart': '距上次 {days} 天。最长 {longest} 天、累计 {total} 次都还在。',
-  'mobile.growth.streak.a11y': '{name}：当前连续 {current} 天，最长 {longest} 天，累计 {total} 次',
+  'mobile.growth.streak.freshStart': '距上次 {days} 天。最长 {longest} 天、累计 {total} 天都还在。',
+  'mobile.growth.streak.a11y': '{name}：当前连续 {current} 天，最长 {longest} 天，累计 {total} 天',
 
   // 里程碑（L3）。累计只加不减，没有扣分项。
   'mobile.growth.milestones.title': '里程碑',
@@ -3239,7 +3361,7 @@ export const zhCN = {
   'site.integrations.e2ee.title': '端到端加密同步',
   'site.integrations.e2ee.body': '任务在你的设备上加密之后才上传，服务器只经手密文。所以服务器上**不存在**一份可读的任务库 —— 就算有人拿到，也只是一串乱码。',
   'site.integrations.e2ee.item.ingress': '服务器只收密文 —— 明文一律拒绝。这不是设置项，是写死的',
-  'site.integrations.e2ee.item.keys': '密钥只在你手里。忘了口令，连我们也帮不了你 —— 这正是它真的加密的意思',
+  'site.integrations.e2ee.item.keys': '解密钥匙留在你的设备上。设置数据钥匙后可用保存的恢复码解锁；口令与恢复码都丢失时，服务端无法替你解密',
   'site.integrations.selfhost.title': '自建服务器，永久免费',
   'site.integrations.selfhost.body': '同步服务器可以完整跑在你自己的机器上：一条 docker compose 起全套，数据落在你自己的磁盘。不产生费用，也不需要经过我们同意。',
   'site.integrations.selfhost.item.compose': '一条命令起全套服务，数据落在你自己的磁盘上',
@@ -3290,9 +3412,9 @@ export const zhCN = {
   'site.help.q.sync': '换设备了，数据怎么过去？',
   'site.help.a.sync': '在设置里填同步服务器地址与访问令牌即可。数据是加密后上传的，所以**口令必须填对** —— 换了口令的旧数据解不开（这是端到端加密的代价，不是 bug）。',
   'site.help.q.passphrase': '忘了加密口令怎么办？',
-  'site.help.a.passphrase': '**没有找回途径，这是设计而不是疏漏。** 端到端加密意味着服务端只有密文、没有能解开它的口令 —— 任何"找回"都等于服务端能读你的数据。能做的是：在还能解锁的旧设备上把数据导出，然后在新设备上设一个新口令重新开始。所以口令请自己存好。',
+  'site.help.a.passphrase': '如果已经设置加密数据钥匙并保存了恢复码，可以在同步设置中**用恢复码解锁**，随后设置新口令并保存新的恢复码。登录密码重置不能解锁数据。若口令和恢复码都丢失，服务端无法替你恢复；仍能读取数据的旧设备可以先导出留底。尚未迁移的旧口令密文仍需要原口令。',
   'site.help.q.passkey': '通行密钥怎么用？',
-  'site.help.a.passkey': '登录时选「通行密钥」，用设备本身的人脸 / 指纹 / 系统 PIN 确认即可，没有密码可记，也没有密码可撞库。丢了的话，登录页有「丢失了通行密钥？」，会发一封找回邮件，点进去可以注册一条新的。⚠️ **最后一条凭据不允许被删除** —— 删掉就进不去了。',
+  'site.help.a.passkey': '登录时选「通行密钥」，用设备本身的人脸 / 指纹 / 系统 PIN 确认即可，没有密码可记，也没有密码可撞库。丢了的话，应用里的登录面板有「丢失了通行密钥？」，会发一封找回邮件，点进去可以注册一条新的。⚠️ **最后一条凭据不允许被删除** —— 删掉就进不去了。',
   'site.help.q.quadrant': '四象限是怎么归类的？',
   'site.help.a.quadrant': '象限是**当场算出来的**，不是给任务打的标签：紧迫与否看截止日期是否落在近期窗口内，重要与否看你自己标的重要标记（没标过就按优先级推导）。所以改截止日期或优先级，任务会自动换格 —— 不会出现"象限和任务对不上"。',
   'site.help.q.repeat': '重复任务怎么设？',
@@ -3302,7 +3424,7 @@ export const zhCN = {
   'site.help.q.export': '怎么把数据带走？',
   'site.help.a.export': '三端都能**导出**：Web 在设置页、移动端在「我的」里走系统分享面板、命令行用 `export`。但**只有 Web 与命令行能导回**，而且只能还原到一个空库 —— 移动端没有导入入口。详见「把数据带走、带回来」。',
   'site.help.q.selfhost': '怎么自己搭一套？',
-  'site.help.a.selfhost': '可以，但它是「自己运维一套服务」，不是一个命令就完事：目前**没有发布任何现成镜像**（要自己构建），**把服务起来不等于部署完成**（数据表结构的变更要显式执行一次）。注册与登录走的是**邮箱 + 口令**；邮件服务只管「激活账号」那一步 —— 不配也建得了号，界面会明说那封信没发出去，只给自己人用时也可以显式跳过（`REQUIRE_EMAIL_VERIFICATION=false`）。详见「自建一套同步服务器」。',
+  'site.help.a.selfhost': '可以，但它是「自己运维一套服务」：目前**没有发布任何现成镜像**（要自己构建），而**升级不是一条命令** —— 那个一次性迁移服务跑完就退出，compose 不会重跑一个已退出的服务，改过表结构之后要照指南里点名 `supersync-migrate` 的那条再执行一次。注册与登录走的是**邮箱 + 口令**；邮件服务只管「激活账号」那一步 —— 不配也建得了号，界面会明说那封信没发出去，只给自己人用时也可以显式跳过（`REQUIRE_EMAIL_VERIFICATION=false`）。详见「自建一套同步服务器」。',
   'site.help.q.privacy': '数据到底放在哪？',
   'site.help.a.privacy': '先落在你自己的设备上；开了同步之后，云端也只存密文 —— 服务端收到明文会直接拒绝。但**元数据不是密的**：同步时间、设备标识、以及"有一个任务被改过"这件事服务端能看到。我们不会把"什么都看不到"拿来宣传。',
 
@@ -3366,37 +3488,39 @@ export const zhCN = {
   // 账号、令牌与登录方式
   'site.docs.account.title': '账号、令牌与登录方式',
   'site.docs.account.seo.title': '账号、令牌与登录方式 —— heyta',
-  'site.docs.account.sum': 'heyta 没有密码可记、也没有密码可撞 —— 那同步要用的访问令牌是从哪来的。',
-  'site.docs.account.s1': '同步设置里就三个框',
-  'site.docs.account.s1p1': '同步设置只有三个输入项：服务端地址、访问令牌、端到端加密口令。',
+  'site.docs.account.sum': '注册与登录走的是邮箱 + 口令，通行密钥与邮件链接也一直在 —— 那同步要用的访问令牌是从哪来的。',
+  'site.docs.account.s1': '同步设置与数据解锁',
+  'site.docs.account.s1p1': '同步设置包含服务端连接信息，以及独立的加密数据钥匙管理。登录后可以创建钥匙、保存恢复码或解锁已有数据。',
   'site.docs.account.s1i1': '服务端地址：你要连的那台同步服务器。什么都不填就是纯本地使用，数据只留在这台设备上。',
   'site.docs.account.s1i2': '访问令牌：由服务端签发，代表「这个账号在这台服务器上的那块空间」。已经有令牌的可以直接粘贴。',
-  'site.docs.account.s1i3': '加密口令：**不会存盘**，只存在于这次会话的内存里。它单独写一篇，见「端到端加密口令」。',
+  'site.docs.account.s1i3': '加密口令：不发给服务端，与登录密码分开。恢复码与设备记住解锁的边界见「端到端加密口令」。',
   'site.docs.account.s2': '三条登录方式，邮箱 + 口令是主路',
   'site.docs.account.s2p1': '注册与登录走的是**邮箱 + 口令**，另外邮箱链接与通行密钥也一直在。服务器上存的口令不是能读回来的样子，也没有任何人能把它交还给你 —— 忘了就走「忘记密码」，它会发一封带一次性重置链接的信，那是真重置，不是绕过口令的后门。',
   'site.docs.account.s2i1': '邮箱 + 口令：填邮箱、设一个口令（至少 8 个字符）、点验证邮件里的链接激活，之后每次输口令登录。',
   'site.docs.account.s2i2': '邮箱链接（不想记口令时）：填邮箱、收邮件、点里面的链接，登录就完成了。',
-  'site.docs.account.s2i3': '通行密钥：用设备本身的人脸 / 指纹 / 系统 PIN 确认，没有可记的东西，也就没有可泄露的东西。丢了就走登录页的「丢失了通行密钥？」，那一步必须在真实浏览器里完成，所以它打开的是一个独立页面。',
+  'site.docs.account.s2i3': '通行密钥：用设备本身的人脸 / 指纹 / 系统 PIN 确认，没有可记的东西，也就没有可泄露的东西。丢了就走应用里登录面板上的「丢失了通行密钥？」，那一步必须在真实浏览器里完成，所以它打开的是一个独立页面。',
   'site.docs.account.s3': '桌面壳里为什么要跳到浏览器',
   'site.docs.account.s3p1': 'macOS 与 Windows 的桌面壳里通行密钥不可用（实测：内嵌 WebView 不提供平台认证器）。所以壳会把你送到**系统浏览器**里完成登录，成功后再自动回到壳里；万一系统没有把地址交回来，那个页面上另有一条可以直接点的回跳链接。',
   'site.docs.account.s4': '条款是「该服务端」的',
   'site.docs.account.s4p1': '注册时勾选的同意书写的是「**该服务端**提供的服务条款与隐私政策」。因为 heyta 的部署方可以是任何人 —— 你连的那台服务器由谁运营、适用哪套条款，由那台服务器决定。',
+  'site.docs.account.s5': '为什么登录发生在应用里，不在网站上',
+  'site.docs.account.s5p1': '登录要用的服务器地址，**就是**同步设置里那个地址 —— 两者必须是同一个，否则会出现「对着 A 服务器登录、令牌却存进 B」这种极难排查的错位。所以网站上那个登录页只做一件事：把你送进应用里的登录面板，它自己不复制一套表单。通行密钥还多一条限制：它必须绑定一个确定的域名，那一步只能在真实浏览器里完成。',
 
   // 端到端加密口令
   'site.docs.passphrase.title': '端到端加密口令',
   'site.docs.passphrase.seo.title': '端到端加密口令 —— heyta',
-  'site.docs.passphrase.sum': '它是整套设计里唯一的一把钥匙，而它丢了真的没有找回途径 —— 这是端到端加密的定义，不是我们没做。',
+  'site.docs.passphrase.sum': '加密口令与登录密码分开。设置数据钥匙后，保存好恢复码，才能在忘记口令时自行恢复解锁。',
   'site.docs.passphrase.s1': '口令是什么',
-  'site.docs.passphrase.s1p1': '口令用来在你的设备上把数据加密后再上传。它**不发给服务端**，服务端也没有它的任何副本。',
-  'site.docs.passphrase.s1p2': '它不会被写到磁盘上：只存在于当前这次会话的内存里，所以每开一个新会话都要再填一次。这不是麻烦你，是它不落盘才叫端到端。',
-  'site.docs.passphrase.s2': '为什么没有「忘记密码」',
-  'site.docs.passphrase.s2p1': '任何能"找回"口令的机制，都意味着某处存着一份能解开你全部数据的凭据，而那份凭据要么在服务端、要么在第三方 —— 那端到端加密就没有了。所以这里没有客服通道，也没有后台开关。**丢了口令 = 那些已同步的数据解不开。**',
-  'site.docs.passphrase.s2i1': '在还能解锁的旧设备上：先把数据导出留底。',
-  'site.docs.passphrase.s2i2': '然后在新设备上设一个新口令，从头开始写。',
-  'site.docs.passphrase.s2i3': '把口令存进你自己的密码管理器 —— 那是它该待的地方。',
+  'site.docs.passphrase.s1p1': '加密口令在你的设备上解锁数据钥匙，数据在上传前加密。口令、恢复码和解锁后的钥匙**不发给服务端**；服务器保存的是加密的钥匙包与数据。',
+  'site.docs.passphrase.s1p2': '浏览器重新打开后需要再次解锁。移动端可主动选择「记住解锁」，将数据钥匙保存在系统安全存储中；默认不启用，也不会保存口令。锁定数据钥匙仅停止使用同步密钥，不会加密或隐藏设备上已有的本地数据。',
+  'site.docs.passphrase.s2': '忘记加密口令时如何恢复',
+  'site.docs.passphrase.s2p1': '设置数据钥匙时会显示一次恢复码，并要求再次输入确认。保存了这串码，就可以在同步设置中选择「用恢复码解锁」。恢复后必须设置新口令并保存新的恢复码，才能继续使用加密数据。服务端和客服都无法替你找回口令或恢复码；重置登录密码也不能代替这一步。',
+  'site.docs.passphrase.s2i1': '把恢复码保存到自己的密码管理器或离线记录中，不要只存放在可能丢失的那台设备上。',
+  'site.docs.passphrase.s2i2': '如果口令和恢复码都丢失，先在仍能读取数据的旧设备上导出留底；服务器没有解密副本。',
+  'site.docs.passphrase.s2i3': '创建恢复码不会自动迁移旧口令密文。已有旧数据需要使用原加密口令完成迁移，之后才由新的数据钥匙保护。',
   'site.docs.passphrase.s3': '填错口令会怎样',
-  'site.docs.passphrase.s3p1': '换过口令之后，旧口令写的那批记录解不开。heyta 不会因此崩掉，也不会拿明文去凑：它会把解不开的那些**跳过**，或在明显是配错的时候**暂停同步**并告诉你属于哪一种。',
-  'site.docs.passphrase.s3w1': '看到"口令可能不对"就是后一种 —— 它不是网络问题，重连不会变好。',
+  'site.docs.passphrase.s3p1': '填错口令或恢复码会解锁失败，不会覆盖原有数据。更换加密口令会更新钥匙的保护方式；「轮换数据钥匙并迁移数据」则会重新加密同步历史，必须完成迁移并确认新的恢复码。迁移中断时按界面提示继续或取消，不要另建一份钥匙来覆盖它。',
+  'site.docs.passphrase.s3w1': '提示口令不正确时，请核对当前账号、服务端与加密口令。重新连接网络不能修复解锁失败。',
 
   // 冲突
   'site.docs.conflict.title': '当两台设备改了同一条',
@@ -3412,13 +3536,13 @@ export const zhCN = {
   // 自建
   'site.docs.selfhost.title': '自建一套同步服务器',
   'site.docs.selfhost.seo.title': '自建一套同步服务器 —— heyta',
-  'site.docs.selfhost.sum': '可以，而且这是 heyta 存在的理由之一 —— 但它是"自己运维一套服务"，不是一个命令就完事。',
+  'site.docs.selfhost.sum': '可以，而且这是 heyta 存在的理由之一 —— 但它是"自己运维一套服务"：把服务起来那条命令不难，难的是后面全是你的运维（备份与恢复、升级、TLS、出问题时没人替你看日志）。',
   'site.docs.selfhost.s1': '先把难度说清楚',
   'site.docs.selfhost.s1p1': '这四条会让人中途放弃，所以放在最前面：',
   'site.docs.selfhost.s1i1': '目前**没有发布任何现成镜像**，你要在自己的机器上把它构建出来。',
-  'site.docs.selfhost.s1i2': '把服务**起来**不等于部署完成：表结构变更由部署流程里的迁移步骤显式应用，服务自己不在启动时动表结构。',
+  'site.docs.selfhost.s1i2': '服务**起来**不等于以后都不用管：首次开机由那份一次性迁移服务把表结构建好，不用你手动跑；但 `docker compose` 不会重跑一个已经退出的服务，**改了表结构之后的升级要再点名执行它一次**（见下面「数据库与表结构变更」）。',
   'site.docs.selfhost.s1i3': '它需要的是一台长期开着的机器、一个你自己的域名，以及"会看服务日志、能让证书按时续期"这类基本运维能力。',
-  'site.docs.selfhost.s1i4': '密钥、数据库口令、对外域名都要自己配，**没有默认值** —— 缺任何一项服务会拒绝启动。这是刻意的，它不给"用默认密钥上线"留活路。',
+  'site.docs.selfhost.s1i4': '三个必填项**没有默认值**，要自己生成：`JWT_SECRET`、`PASSWORD_PEPPER` 不给或短于 32 个字符，服务**拒绝启动**；`POSTGRES_PASSWORD` 不给，数据库容器直接退出。这是刻意的，它不给"用默认密钥上线"留活路。对外域名是另一档，它坏的形态不一样：`DOMAIN` 只给网关当站点地址（服务端本体不读它，空着是网关自己起不来），`PUBLIC_URL` 有默认值 `http://localhost:1900` —— 留着不改不会报错，坏得很安静：邮件里的链接指向 localhost。',
   'site.docs.selfhost.s2': '要配的东西',
   'site.docs.selfhost.s2i1': '邮件服务：只管**激活账号**那一步（发验证邮件）。注册与登录本身走**邮箱 + 口令**，不配 SMTP 也建得了号 —— 只是那封信发不出去，而界面会明说这件事：要么让管理员配好再提交一次，要么设 `REQUIRE_EMAIL_VERIFICATION=false` 跳过这一步。',
   'site.docs.selfhost.s2i2': '对外地址：生产环境下把它填成非加密地址，服务会拒绝启动。局域网内用明文地址是自建的正当场景，公网不是。',
@@ -3440,14 +3564,14 @@ export const zhCN = {
   'site.docs.selfhost.s6p2': '所以排查的顺序是反的：先看浏览器控制台的跨域报错，再看服务端日志。日志安静不等于服务正常，也可能只是没有人问到它。',
   'site.docs.selfhost.s6i1': '放行哪些前端来源由服务端的 `CORS_ORIGINS` 决定，多个来源用逗号分开写；生产环境下"全都放行"会被直接拒绝启动。',
   'site.docs.selfhost.s7': '怎么装：没有现成镜像，两条路自己选',
-  'site.docs.selfhost.s7p1': '上游不发布带版本号的镜像，只发布跟随主干的 `latest` 与 `master-〈提交号〉` 两种标签。想把版本钉住，就把 `SUPERSYNC_IMAGE` 显式指到某个 `master-〈提交号〉`—— 不钉的话，每次拉镜像都等于升到最新主干。',
-  'site.docs.selfhost.s7p2': '部署脚本是唯一被支持的入口：它把整套栈（应用、PostgreSQL 数据库、Caddy 网关）一起拉起来，换上新容器**之前**先跑一次数据迁移，起来之后还会验一次健康检查。注意 `docker compose up` 本身**不是**部署：容器启动时的自动迁移默认是关的（防止重启和迁移互相踩），所以"只把容器拉起来"会跑在没迁移过的表结构上。',
+  'site.docs.selfhost.s7p1': '目前**没有发布任何 heyta 镜像**，所以这里没有可钉的版本号。不要把 `SUPERSYNC_IMAGE` 指向上游的 `master-〈提交号〉`：那是另一个项目的服务端，它的数据表结构与加密要求早已和 heyta 分开——照做只会得到一台**能正常启动、健康检查也通过、跑的却是陌生的表结构**的服务器。要钉版本，就从本仓库源码构建，并把那份源码的提交号作为版本标识传进构建。',
+  'site.docs.selfhost.s7p2': '两条路都受支持，差别在升级时。`./scripts/deploy.sh --build` 把整套栈（应用、PostgreSQL 数据库、Caddy 网关）一起拉起来，在**旧容器还在服务**的时候先把迁移跑完，迁移不成就**不换容器**，起来之后还会验一次健康检查。另一条是一条 `docker compose` 起全套：`docker compose -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml up -d --build`。构建与一次性迁移那两份 override 都不能省，`--build` 也不能省 —— 少掉 `docker-compose.build.yml` 它就会去拉一个根本不存在的镜像，而少了 `--build` 它也不会自己把镜像打出来，两种省法最后都停在同一个"起不来"上。而它**只在第一次开机时迁移**：升级要么回到部署脚本，要么显式把那个一次性迁移服务再跑一遍。注意裸的 `docker compose up` **不是**部署：容器启动时的自动迁移默认是关的（防止重启和迁移互相踩），所以"只把容器拉起来"会跑在没迁移过的表结构上。',
   'site.docs.selfhost.s7p3': '加 `--build` 可以在部署机上自己构建镜像，但那是把整个仓库在部署机上完整编译一遍：峰值内存要额外 1.5 GB 以上（容器本身已占约 2.5 GB），构建缓存每构建一次涨约 1.4 GB 且**不会自动清理**。小机器的正确姿势是在别处构建好再推过去，或者直接钉住现成标签。`--build` 还会拒绝在源码不干净时构建 —— 构建产物必须能对回到某一份确切的源码。',
-  'site.docs.selfhost.s7i1': '三个必填项（签名密钥、数据库口令、对外域名）不配好，服务**拒绝启动**，这是故意的：没有"用默认密钥上线"这条路的活口。',
+  'site.docs.selfhost.s7i1': '三个必填项（`JWT_SECRET`、`PASSWORD_PEPPER`、`POSTGRES_PASSWORD`）不给齐，这套栈起不来：前两个是服务自己抛、**拒绝启动**，第三个是数据库容器直接退出。没有"用默认密钥上线"这条路的活口，这是故意的。对外域名不在必填里，它坏的形态也不一样：`DOMAIN` 只给网关当站点地址（服务端本体不读它，空着是网关自己起不来），`PUBLIC_URL` 有默认值 `http://localhost:1900` —— 留着不改不会报错，坏得很安静：邮件里的链接指向 localhost。',
   'site.docs.selfhost.s7i2': '部署脚本会核对镜像的源码版本标签，防止"拿旧镜像跑新迁移"。自建自定义镜像时要传入同样的版本标识；确信要跳过这份核对也有显式开关，但那是给你的故意，不是给你的疏忽。',
   'site.docs.selfhost.s8': '要配的环境变量，逐个说',
   'site.docs.selfhost.s8p1': '配置全在部署目录的 `.env` 一个文件里（从仓库的 env.example 复制来改）。改完重启容器生效。下面按"配错了会发生什么"来讲：',
-  'site.docs.selfhost.s8i1': '`DOMAIN` / `PUBLIC_URL`：对外域名与完整对外地址。邮件里的链接就按它生成 —— 填错的症状是"邮件里的链接打不开"。',
+  'site.docs.selfhost.s8i1': '`DOMAIN` / `PUBLIC_URL`：前者**只给 Caddy 当站点地址**（服务端本体不读它），后者才是**邮件里那些链接的来源**。`PUBLIC_URL` 填错的症状是"邮件里的链接打不开"；而它留着默认值（`http://localhost:1900`）时**不会有任何报错** —— 服务照常起、邮件照常发，只是链接指向你自己的笔记本。',
   'site.docs.selfhost.s8i2': '`JWT_SECRET`：登录令牌的签名密钥。空着拒绝启动；**部署定好之后不要再换** —— 换掉它，所有已登录设备立刻全部登出，在途的邮件链接一并作废。',
   'site.docs.selfhost.s8i3': '`POSTGRES_PASSWORD`：数据库口令。同样没有默认值。用栈里自带的数据库时不用另配连接串，默认连本栈的 PostgreSQL 16。',
   'site.docs.selfhost.s8i4': '`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN`：通行密钥绑定的域名。它只能取**一个**值，所以换域名 = 这台服务器上注册过的通行密钥全部作废（账号不丢，用邮件链接重新登入再注册一把即可）。必须是真实域名，纯 IP 浏览器不收。',
@@ -3456,12 +3580,12 @@ export const zhCN = {
   'site.docs.selfhost.s8i7': '`HOST`：服务自己监听的地址，默认所有网卡。放在网关后面时可以收紧到本机。',
   'site.docs.selfhost.s9': '数据库与表结构变更',
   'site.docs.selfhost.s9p1': '数据库用 PostgreSQL。表结构的变更**只向前发**：已经应用过的变更文件永不被改动，要修就再发一份新的 —— 所以升级出问题时，退路是回备份，不是去改历史。',
-  'site.docs.selfhost.s9p2': '迁移由部署脚本在换容器前跑一次；个别变更用了"后台建索引"的方式，在繁忙的大库上可能等锁 —— 挑低峰期做升级，给迁移留足超时时间（默认 15 分钟，可调）。超时退出有专门的退出码，清掉堵住的事务重跑即可。',
+  'site.docs.selfhost.s9p2': '两条路的时机不一样：走 `./scripts/deploy.sh` 时，迁移由部署脚本在换容器前跑一次；走 `docker compose` 时，它由那份一次性迁移服务（服务名 `supersync-migrate`）在第一次开机跑完就退出 —— 而 compose 不会重跑一个已退出的服务，**所以改过表结构之后的升级要再点名执行它一次**。个别变更用了"后台建索引"的方式，在繁忙的大库上可能等锁 —— 挑低峰期做升级，给迁移留足超时时间（默认 15 分钟，可调）。超时退出有专门的退出码，清掉堵住的事务重跑即可。',
   'site.docs.selfhost.s9p3': '备份的最小口径：定期备份数据库。备份里是密文载荷加上外围信息 —— 它是恢复服务的完整来源，但不是能直接翻看内容的相册（见下面「备份是密文」一节）。',
   'site.docs.selfhost.s10': '你的服务器上到底存了什么',
-  'site.docs.selfhost.s10p1': '每一笔改动是一条**加密的操作记录**：客户端从用户的加密口令派生密钥（Argon2id），载荷用 AES-GCM 加密后才上传。服务端收到明文会**直接拒收**，所以库里不存在"忘了加密"的明文载荷。',
+  'site.docs.selfhost.s10p1': '每一笔改动是一条**加密的操作记录**。设置数据钥匙后，口令或恢复码在设备上解锁钥匙，操作载荷加密后才上传；尚未迁移的旧格式记录仍使用原加密口令。服务端只保存密文，不能解密内容。',
   'site.docs.selfhost.s10p2': '外围信息是明的：动作类型、涉及的实体类型与编号、时间戳、各设备的版本先后、密文大小。这些是同步协议工作的必需品，躲不掉 —— 但自建的意义之一正是：它们落在**你**手里，不落在第三方手里。',
-  'site.docs.selfhost.s10p3': '推论：能解开数据的只有持有各账号加密口令的那些设备。服务端帮不了"忘了口令"的用户 —— 这是"备份是密文"的另一面。',
+  'site.docs.selfhost.s10p3': '恢复同步数据需要设备上的解密钥匙，或用于解锁钥匙的口令、恢复码。登录密码重置和服务端备份都不能替代这些凭据；口令与恢复码都丢失时，先从仍能读取数据的旧设备导出留底。尚未迁移的旧格式密文仍需要原口令。',
   'site.docs.selfhost.s11': '命令行宿主：不开浏览器也能用',
   'site.docs.selfhost.s11p1': '除了 Web 与手机，仓库里还有一个**命令行宿主**：它连一个真实的本地数据库文件，在终端里建任务、列任务、同步。它走的是和其它端完全相同的同步协议 —— 配上同一个服务端，它就是又一台"设备"。',
   'site.docs.selfhost.s11i1': '配置走参数或环境变量：`--db` 本地数据库文件（必填）、`--server` 服务端地址、`--token` 访问令牌、`--password` 端到端加密口令；也可以用大写环境变量（`HEYTA_DB` / `HEYTA_SERVER_URL` / `HEYTA_TOKEN` / `HEYTA_PASSWORD`）。',
@@ -3607,9 +3731,9 @@ export const zhCN = {
   'site.docs.reminders.s2p2': '⚠️ 页面关了就什么都不会响：触发时间在本地早就算好了，但**没人在读它**。这条限制写在代码注释里，是一个已知的边界，不是临时状态。',
   'site.docs.reminders.s2p3': '移动端：Android 与 iOS 都使用系统本地通知中心。投递仍受平台权限和系统调度限制；没有权限或回执不确定时，提醒保持为到期，不伪造已投递事实。',
   'site.docs.reminders.s2p4': '时间上有几条边界：触发时刻最多排在**一年**以内；「稍后提醒」默认 **10 分钟**、最多 **7 天**，超出上限是**钳到上限并显示实际值**，而不是让你的点击失败；比当下早一点点是允许的（一分钟的窗口），因为算出时刻与真正落库之间本来就要过几百毫秒。',
-  'site.docs.reminders.s2i1': '会响的三个前提：时间到了、应用开着、你已经授权过通知 —— 少一个都安静。',
+  'site.docs.reminders.s2i1': 'Web 需要页面开着并已授权通知。Android/iOS 已排入系统的提醒可在应用进程退出后由系统投递，但仍受权限、系统调度和设备状态限制。',
   'site.docs.reminders.s2i2': '静音与"稍后提醒"是两条不同的路：前者只是这一条不再弹，后者会把触发时间整体推后。',
-  'site.docs.reminders.s2i3': '想让提醒在后台跑，现在唯一的办法是自建一个服务端的推送通道 —— 这一版没有，也不假装它有。',
+  'site.docs.reminders.s2i3': '移动端本地通知不需要服务端推送。Android 强行停止后要重新打开应用才能补算；iOS 只排最早的 64 个提醒，之后的提醒在启动或回前台时补排。多台设备离线时可能各自提醒，不能保证全局只响一次。',
   'site.docs.reminders.s3': '重复任务的提醒会跟着挪',
   'site.docs.reminders.s3p1': '勾掉一条重复任务时，**按提前量算出来**的那些提醒会重新排到下一次到期；写死某个时刻的提醒不动。',
   'site.docs.reminders.s3p2': '所以"每天 9 点、提前 10 分钟"会自己顺延，而"就定在 3 月 5 日 14:00"不会 —— 它不知道自己挂着哪条任务的下一次。',
@@ -3675,21 +3799,21 @@ export const zhCN = {
   'site.docs.loss.seo.title': '丢了设备、通行密钥、加密口令会怎样 —— heyta',
   'site.docs.loss.sum': '设备、通行密钥、端到端加密口令 —— 三件事的后果完全不同，提前知道比事后聪明便宜。',
   'site.docs.loss.s1': '一、丢了设备',
-  'site.docs.loss.s1p1': '换一台设备重新登录，数据会从服务器**回放**回来 —— 这正是同步该做的事，"本地优先"的意思不是"只在这一台"。',
+  'site.docs.loss.s1p1': '换一台设备重新登录，再用加密口令或已保存的恢复码解锁，已同步的数据才能从服务器**回放**回来。登录本身不提供解密能力；没有上传的数据也不在服务器上。',
   'site.docs.loss.s1p2': '但没开同步的那台设备，数据只在那台机器的本地库里。设备没了就是没了，这条路上没有任何服务端备份兜底。',
   'site.docs.loss.s2': '二、丢了通行密钥（找得回）',
   'site.docs.loss.s2p1': '在应用里点「丢失了通行密钥？」会发一封找回邮件；那个页面由服务端渲染，点进去可以注册一把新的。',
   'site.docs.loss.s2p2': '前提是**邮箱还能收信**。能证明这个邮箱属于你，凭据本身不需要旧密钥还在场。',
-  'site.docs.loss.s2p3': '另一件你能做的事：在设置页列出**你自己**的通行密钥，改名或删掉。这是唯一的凭据管理入口。',
-  'site.docs.loss.s2w1': '⚠️ 界面上**没有**"一键退出所有设备"这颗按钮，也没有"吊销所有会话"这类动作。要把旧设备的访问收回来，只能在还登得进去的时候，把不认识的每一把密钥逐个删掉。',
-  'site.docs.loss.s3': '三、丢了端到端加密口令（找不回）',
-  'site.docs.loss.s3p1': '这把口令是在服务器之外用来加解密的钥匙。它**没有存在服务器上**，所以服务器没有"给你重置一下"这个能力 —— 不是不想做，是做了就等于加密不存在。',
-  'site.docs.loss.s3p2': '忘记口令不等于失去登录：你可能仍然登得进去、仍然看得见明文那部分字段，但那些加密内容解不开，界面上会老实告诉你解不开。',
-  'site.docs.loss.s3p3': '唯一的自救是**导出**：在还解得开的时候导出一份完整 JSON。还原只能导进一个空库，所以它是搬服务器与灾后重建的工具，不是日常那个"备份"按钮。',
+  'site.docs.loss.s2p3': '可以在设置里管理自己的通行密钥，改名或删除不再使用的凭据。删除通行密钥与撤销已经签发的登录会话不是同一件事。',
+  'site.docs.loss.s2w1': '丢失设备可能仍保有本地明文和旧钥匙。撤销登录访问不能擦除离线副本；保护后续同步还需要由受信任设备轮换数据钥匙并迁移数据。',
+  'site.docs.loss.s3': '三、丢了加密口令：先找恢复码',
+  'site.docs.loss.s3p1': '加密口令不会交给服务器。如果已经设置数据钥匙并保存恢复码，可以用恢复码在设备上解锁，再设置新口令和新的恢复码。',
+  'site.docs.loss.s3p2': '忘记加密口令不等于失去登录；反过来，重置登录密码也不会恢复解密能力。口令和恢复码都丢失时，服务器无法替你解开同步数据。',
+  'site.docs.loss.s3p3': '仍能读取数据的旧设备可以**导出完整 JSON**留底，再按导入流程恢复。尚未迁移的旧口令密文需要原口令；新建恢复码不能跳过旧数据的解密步骤。',
   'site.docs.loss.s4': '所以顺序应该是这样',
-  'site.docs.loss.s4p1': '把口令写在你**不会一起丢掉**的地方。放在同一台设备的备忘录里，等于把钥匙挂在门把上。',
+  'site.docs.loss.s4p1': '把口令与恢复码保存在不会随设备一起丢失的地方，例如自己的密码管理器或离线记录。',
   'site.docs.loss.s4p2': '开同步之前先确认你登得进去、邮箱还收得到；开同步之后偶尔导出一份，并真的验一次它能还原 —— 没验过的备份不叫备份。',
-  'site.docs.loss.s4p3': '这些不是吓唬人：端到端加密的收益（服务器看不到内容）和它的代价（没人能替你找回密码）是同一件事的两面。想要其中一面，就得管住另一面。',
+  'site.docs.loss.s4p3': '恢复码由你自己保管，它提供另一条端上解锁路径，不会让服务端获得解密能力。口令和恢复码都无法取得时，仍需依靠可读的本地副本或之前的导出。',
 
   // ── 更新动态 ──
   'site.changelog.seo.title': '更新动态 —— heyta',
@@ -3713,21 +3837,20 @@ export const zhCN = {
   'site.changelog.note': '更早的更新记录已归档。',
 
   // ── 登录 ──
+  //   🔴 这一页是**跳板**，不是登录表单的说明页（依据 D5）。它过去写着
+  //   "只有两种进入方式，没有密码"，还配了三段解释 —— 而产品的主路恰恰是
+  //   **邮箱 + 口令**（`site.docs.account.s2` 与应用里的口令接口都是这么做的）。
+  //   那是**对外说错话**，不是措辞风格问题，所以 2026-10-03 整段撤掉：
+  //   解释搬进文档中心「账号、令牌与登录方式」的 s5，这一页只留能点的两个出口。
   'site.signin.seo.title': '登录 —— heyta',
-  'site.signin.seo.description': '登录 heyta：支持通行密钥（Passkey）与邮件登录链接两种方式。',
+  'site.signin.seo.description': '登录 heyta：邮箱 + 口令、通行密钥、邮件链接三种方式，都在应用里完成。',
   'site.signin.title': '登录',
-  'site.signin.lede': 'heyta 的账号只有两种进入方式，没有密码。',
-  'site.signin.method.passkey.title': '通行密钥（推荐）',
-  'site.signin.method.passkey.body': '用设备本身的人脸 / 指纹 / 系统 PIN 登录。密钥永不离开你的设备，也没有可以被撞库的密码。',
-  'site.signin.method.magic.title': '邮件登录链接',
-  'site.signin.method.magic.body': '填邮箱，收一封含一次性链接的邮件，点开即登录。适合还没配好通行密钥的设备。',
-  'site.signin.noPassword': '⚠️ 为什么没有「邮箱 + 密码」：一个可被撞库、可被钓鱼、需要在服务端存哈希的凭据，在我们这个"服务端看不到明文"的产品里是唯一的薄弱环节。',
-  // R2：`site.signin.cta`（"去应用登录"）曾在这里，源码里 0 引用，已删
-  // —— 这一页的 CTA 用的是 `site.signin.recover.link` 与导航里的登录入口。
-  'site.signin.recover.title': '通行密钥丢了？',
-  'site.signin.recover.body': '在应用里点「丢失了通行密钥？」会发一封找回邮件，点进去可以注册新的。',
-  'site.signin.why.title': '为什么登录在应用里、不在这一页',
-  'site.signin.why.body': '通行密钥必须绑定**一个确定的域名**，而登录要用的服务器地址就是应用同步设置里那个地址。把认证界面复制到这一页，会出现"对着 A 服务器登录、令牌却存到 B"的问题 —— 所以这一页是入口，不是第二个登录框。',
+  'site.signin.lede': '登录在应用里完成：邮箱 + 口令、通行密钥、邮件链接三种方式都支持。',
+  'site.signin.cta': '去应用登录',
+  'site.signin.helpLink': '登录方式与令牌的来龙去脉，写在文档中心「账号、令牌与登录方式」',
+  // R2 曾把 `site.signin.cta` 当 0 引用删掉（那时这一页的 CTA 只有找回通行密钥
+  // 一条）。上面那句撤掉解释之后它重新有了消费者 —— 记着这条键的保质期取决于
+  // 页面结构，不取决于字典。
 
   // ── 应用内的「帮助与关于」（指向站点，见 apps/web/src/lib/site-url.ts）──
   //    站点的三块内容在这里只做**入口**，不复制正文：正文复制过去就是第二份
@@ -3846,6 +3969,8 @@ export const zhCN = {
   //   当天完全可以在 16:00 挂一条（R14 之后这是常态），那句话就成了谎话，
   //   而它下面 20 行就是那条任务。两条句子各说各的范围。
   'common.calendar.dayAllDayEmpty': '「全天」里还没有任务；定到具体时刻的在下面那条轴上。',
+  // 日历格子里的「休 / 班」（W4b 公共事实）。同一份词表既当可见字符也当读屏名 ——
+  // `calendarDayMarkerView` 里 `spoken` 直接取它，所以英文侧必须是能念出来的词，不能是符号。
 
   // ─────────────────────────────────────────────────────────────
   // 提醒（B1-1 的界面层；web 与 mobile 共用同一批词条）

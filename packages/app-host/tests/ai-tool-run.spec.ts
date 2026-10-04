@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 
 import type {
   LocalApiEventItem,
+  LocalApiHabit,
   LocalApiHost,
   LocalApiItem,
   LocalApiProject,
@@ -36,6 +37,16 @@ function fakeHost(items: readonly LocalApiItem[] = []): LocalApiHost & { submits
       Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: (): Promise<readonly LocalApiProject[]> =>
       Promise.resolve([{ id: 'p1', name: '工作', taskCount: 2 }]),
+    listHabits: (): Promise<readonly LocalApiHabit[]> =>
+      Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
+    listTags: () => Promise.resolve([]),
+    listNotes: () => Promise.resolve([]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([]),
+    listFocusSessions: () => Promise.resolve([]),
+    listReminders: () => Promise.resolve([]),
+    listEvents: () => Promise.resolve([]),
+    getEvent: () => Promise.resolve(undefined),
     submit: (): Promise<{ ok: true; taskId: string }> => {
       host.submits += 1;
       return Promise.resolve({ ok: true, taskId: 'created-1' });
@@ -290,6 +301,13 @@ function eventHost(): LocalApiHost & { submits: number } {
       Promise.resolve(UNRELATED_TASKS.find((x) => x.id === taskId)),
     listProjects: (): Promise<readonly LocalApiProject[]> =>
       Promise.resolve([{ id: 'p1', name: '工作', taskCount: 2 }]),
+    listHabits: (): Promise<readonly never[]> => Promise.resolve([]),
+    listTags: (): Promise<readonly never[]> => Promise.resolve([]),
+    listNotes: (): Promise<readonly never[]> => Promise.resolve([]),
+    getNote: (): Promise<undefined> => Promise.resolve(undefined),
+    listHabitLogs: (): Promise<readonly never[]> => Promise.resolve([]),
+    listFocusSessions: (): Promise<readonly never[]> => Promise.resolve([]),
+    listReminders: (): Promise<readonly never[]> => Promise.resolve([]),
     listEvents: (): Promise<readonly LocalApiEventItem[]> => Promise.resolve(EVENT_ITEMS),
     getEvent: (eventId: string): Promise<LocalApiEventItem | undefined> =>
       Promise.resolve(EVENT_ITEMS.find((e) => e.id === eventId)),

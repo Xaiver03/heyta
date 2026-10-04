@@ -340,6 +340,22 @@ export const SuperSyncDevicesResponseSchema = z
   .passthrough();
 
 /**
+ * Response of `DELETE /api/sync/devices/:clientId`.
+ *
+ * Revoking a device invalidates the account token version and therefore
+ * deliberately returns a rotation signal instead of pretending that deleting
+ * the advisory device row is enough to protect E2EE data already obtained by
+ * that device.
+ */
+export const SuperSyncRevokeDeviceResponseSchema = z
+  .object({
+    success: z.literal(true),
+    clientId: SuperSyncClientIdSchema,
+    requiresKeyRotation: z.literal(true),
+  })
+  .passthrough();
+
+/**
  * Response of `POST /api/replace-token`: a fresh JWT for the calling client.
  * Issuing it bumps the account's `tokenVersion`, signing out every other device.
  */
@@ -403,6 +419,7 @@ export type SuperSyncSnapshotUploadResponse = z.infer<
 export type SuperSyncStatusResponse = z.infer<typeof SuperSyncStatusResponseSchema>;
 export type SuperSyncDevice = z.infer<typeof SuperSyncDeviceSchema>;
 export type SuperSyncDevicesResponse = z.infer<typeof SuperSyncDevicesResponseSchema>;
+export type SuperSyncRevokeDeviceResponse = z.infer<typeof SuperSyncRevokeDeviceResponseSchema>;
 export type SuperSyncReplaceTokenResponse = z.infer<
   typeof SuperSyncReplaceTokenResponseSchema
 >;

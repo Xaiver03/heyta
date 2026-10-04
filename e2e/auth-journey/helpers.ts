@@ -270,6 +270,34 @@ export function authStatus(dialog: Locator) {
 }
 
 /**
+ * 把「我自己部署」那一栏露出来，返回"这一轮到底有没有地址栏可填"。
+ *
+ * 🔴 2026-10-02 起**未配置 ≠ 地址栏在场**：G-28（`4774b07e`）把自建地址与粘贴令牌
+ * 收进了展开入口，默认 DOM 里既没有 `auth-form-server-url` 也没有 `auth-form-paste`
+ * （产品契约钉在 `apps/web/tests/auth-entry-default.spec.tsx` 的 B 段）。
+ * 探针原来只写 `if (isVisible) fill` ⇒ 这一档从此**静默跳过填地址**，
+ * 于是要么红在"元素没找到"（`verify:legal-links` 实测 4 红），
+ * 要么更糟：整条旅程对着**应用自身来源**而不是 `SERVER` 跑 yet 判据全绿。
+ *
+ * 三种现场分开处理，且**不许再用"看不见就当没事"**：
+ *   1. 栏已可见 —— 宿主没给折叠入口（移动壳现状），直接可用；
+ *   2. 有展开入口 —— web 未配置服务端：点它，并断言栏真的出现；
+ *   3. 两者都没有 —— 这台已经在同步设置里配好服务端，产品明令
+ *      "不给第二个地址来源"（`auth-journey.spec.tsx` 那条），所以不填。
+ */
+export async function revealSelfHostField(dialog: Locator): Promise<boolean> {
+  const field = dialog.getByTestId('auth-form-server-url');
+  if (await field.isVisible().catch(() => false)) return true;
+
+  const toggle = dialog.getByTestId('auth-form-self-host-toggle');
+  if (!(await toggle.isVisible().catch(() => false))) return false;
+
+  await toggle.click();
+  await expect(field, '点「我自己部署」之后服务端地址栏必须出现').toBeVisible();
+  return true;
+}
+
+/**
  * 把表单走到**第二屏**（口令 / 通行密钥 / 魔法链接那一屏）。
  *
  * 🔴 现在第一屏**只要邮箱**，其余一条链都藏在「继续」后面（FIDO 混合登录的
@@ -277,13 +305,20 @@ export function authStatus(dialog: Locator) {
  * 「用通行密钥登录」的调用方都必须先走这一步 —— 少了它，按钮根本不在 DOM 里。
  *
  * 🔴 **幂等**，理由同 `openAuthPanel`：桌面壳是常驻进程，用例之间界面状态会留存，
- * 可能已经停在第二屏；而地址栏只在 `baseUrl` **未配置**时才渲染
- * （宿主那边由 `isUnconfigured(baseUrl)` 门控），上一轮配好以后它就不存在了。
+ * 可能已经停在第二屏；而地址栏只在 `baseUrl` **未配置**时才存在
+ * （宿主那边由 `isUnconfigured(baseUrl)` 门控），且未配置时它现在还要**先展开**
+ * （见 `revealSelfHostField`），上一轮配好以后它就不存在了。
  * 两种"已经点过了"都当成正常路径，不再点第二次。
+ *
+ * ⚠️ `SERVER` 为空时**一个字都不写**：调用方里有一组（`verify:legal-links` 的
+ * "没人碰过地址栏"那一档）判的正是"草稿保持宿主的预填值"，
+ * 在这里 `fill('')` 会把它变成"用户把地址清空了"——那是另一件事。
+ * 缺地址的套件本来就被 `requireServer()` 当场拦下，不靠这里兜。
  */
 export async function toCredentialStage(dialog: Locator, email: string): Promise<void> {
-  const serverUrl = dialog.getByTestId('auth-form-server-url');
-  if (await serverUrl.isVisible().catch(() => false)) await serverUrl.fill(SERVER);
+  if (SERVER !== '' && (await revealSelfHostField(dialog))) {
+    await dialog.getByTestId('auth-form-server-url').fill(SERVER);
+  }
 
   const continueButton = dialog.getByTestId('auth-form-continue');
   if (!(await continueButton.isVisible().catch(() => false))) return;

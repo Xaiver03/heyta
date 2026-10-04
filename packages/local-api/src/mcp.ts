@@ -10,7 +10,7 @@
  * MCP 客户端（Claude Code / Cursor 等）会把服务端返回的工具列表
  * **整个塞进模型的上下文**，模型于是知道"有这么个工具可以调"。
  *
- * 所以如果用户只授权了 `list_tasks` 却把全部 10 个工具报过去：
+ * 所以如果用户只授权了 `list_tasks` 却把目录里的全部工具都报过去：
  * - 模型会去调没授权的工具 → 每次都撞权限错误 → 用户以为是 bug
  * - 更糟的是，**工具的"存在"本身就是信息**：
  *   "有个 create_task 工具"告诉模型这台机器上有什么能力
@@ -33,11 +33,11 @@
  */
 
 import {
-  LOCAL_API_TOOLS,
   authorizeToolCall,
   type LocalApiConfig,
   type LocalApiTool,
 } from './tools.js';
+import { LOCAL_API_TOOLS, inputSchemaForTool } from './tools/registry.js';
 
 /** 我们按这个版本的 MCP 形状输出。 */
 export const MCP_PROTOCOL_VERSION = '2025-06-18';
@@ -50,7 +50,8 @@ export const MCP_SERVER_NAME = 'heyta';
  *
  * `inputSchema` 用 JSON Schema（MCP 的规定），**在我们这边是手工写的** ——
  * 因为 `@heyta/local-api` 是零依赖包，不引 schema 生成库；
- * 而且工具只有 10 个，手写比引入一套生成器更清楚。
+ * 而且工具数量有限，手写比引入一套生成器更清楚。
+ * 写的位置是各个 `src/tools/<entity>.ts`（一个工具一处声明），本文件只做投影。
  */
 export interface AuthorizedToolDefinition {
   name: string;
@@ -73,157 +74,10 @@ export interface AuthorizedToolDefinition {
  */
 export type McpToolDefinition = AuthorizedToolDefinition;
 
-/** 每个工具的参数 schema。 */
-const INPUT_SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
-  list_tasks: {
-    type: 'object',
-    properties: {
-      projectId: { type: 'string', description: '只列某个清单里的任务。' },
-      completed: {
-        type: 'boolean',
-        description: 'true 只列已完成的，false 只列未完成的，不传则都要。',
-      },
-      dueOn: {
-        type: 'string',
-        description:
-          '只要截止日正好是这一天的任务，格式 YYYY-MM-DD（**按日**比：带时刻的任务属于它那一天）。' +
-          '返回里的 dueDate 可能是 `2026-03-15` 或 `2026-03-15T16:00`，前 10 位就是这一天。' +
-          '与 dueFrom / dueTo 互斥。没有截止日的任务不属于任何一天，不会出现在结果里。',
-      },
-      dueFrom: {
-        type: 'string',
-        description:
-          '日期范围起点（包含这一天），格式 YYYY-MM-DD，必须与 dueTo 一起给。' +
-          '与 dueOn 互斥。范围含两端，最多 14 天。',
-      },
-      dueTo: {
-        type: 'string',
-        description:
-          '日期范围终点（包含这一天），格式 YYYY-MM-DD，必须与 dueFrom 一起给。' +
-          '与 dueOn 互斥。范围含两端，最多 14 天。',
-      },
-      limit: {
-        type: 'number',
-        description: '最多返回多少条，默认 50。在按清单 / 完成状态 / 截止日期筛完之后才生效。',
-      },
-    },
-    additionalProperties: false,
-  },
-  get_task: {
-    type: 'object',
-    properties: {
-      taskId: { type: 'string', description: '任务 id。' },
-    },
-    required: ['taskId'],
-    additionalProperties: false,
-  },
-  list_projects: {
-    type: 'object',
-    properties: {},
-    additionalProperties: false,
-  },
-  create_task: {
-    type: 'object',
-    properties: {
-      title: { type: 'string', description: '任务标题。' },
-      dueDate: {
-        type: 'string',
-        description: '截止日期：`YYYY-MM-DD`（只到日），或 `YYYY-MM-DDTHH:MM`（本地时区的某一分钟）。',
-      },
-      priority: { type: 'string', description: '优先级：high / medium / low。' },
-      projectId: { type: 'string', description: '放进哪个清单。' },
-    },
-    required: ['title'],
-    additionalProperties: false,
-  },
-  update_task: {
-    type: 'object',
-    properties: {
-      taskId: { type: 'string', description: '要改的任务 id。' },
-      fields: {
-        type: 'object',
-        description: '要改的字段。只改这里给出的字段，其余不动。',
-      },
-    },
-    required: ['taskId', 'fields'],
-    additionalProperties: false,
-  },
-  complete_task: {
-    type: 'object',
-    properties: {
-      taskId: { type: 'string', description: '要标记完成的任务 id。' },
-    },
-    required: ['taskId'],
-    additionalProperties: false,
-  },
-  // ── 倒数日 / 纪念日（W10）──────────────────────────────────────────
-  //
-  // 🔴 这四条**必须**登记。`listAuthorizedTools()` 对没登记的工具静默回退成
-  // 空 `properties`（见下面 `schema ?? {...}` 那一行），于是"这个工具不接任何参数"
-  // 与"忘了登记参数"在两个前端（MCP 客户端与内置 AI 的 `tools` 数组）上
-  // **长得一模一样**，而模型照着空 schema 永远传不出 eventId / date。
-  // 生成器能标 `schemaRecorded:false`（能力清单里会明说"字段清单不完整"），
-  // 但清单**不会因此红** —— 所以这一处漏了是⚠️静默的，只能靠测试钉。
-  list_events: {
-    type: 'object',
-    properties: {
-      limit: {
-        type: 'number',
-        description: '最多返回多少条，默认 50。顺序与界面一致（置顶在前、距下一次近的在前）。',
-      },
-    },
-    additionalProperties: false,
-  },
-  get_event: {
-    type: 'object',
-    properties: {
-      eventId: { type: 'string', description: '倒数日 id（来自 list_events）。' },
-    },
-    required: ['eventId'],
-    additionalProperties: false,
-  },
-  create_event: {
-    type: 'object',
-    properties: {
-      title: { type: 'string', description: '倒数日标题。' },
-      date: {
-        type: 'string',
-        description: '锚点日期，格式 YYYY-MM-DD。倒数日没有"几点"，不要传时间戳。',
-      },
-      kind: {
-        type: 'string',
-        description:
-          '类型档位：countdown（还没到的）/ anniversary（已发生的）/ birthday / festival 四档之一。' +
-          '不传 = 用户没选过，界面按日期方向显示。App 不替他决定含义。',
-      },
-      isLunar: {
-        type: 'boolean',
-        description: 'true = 每年重复时按农历那一天推（默认 false = 公历）。',
-      },
-      recurrence: {
-        type: 'string',
-        description: 'RRULE 重复规则，例如 "FREQ=YEARLY;INTERVAL=1"。不传 = 一次性倒数日。',
-      },
-      notes: { type: 'string', description: '备注（卡片上的那行小字）。' },
-    },
-    required: ['title', 'date'],
-    additionalProperties: false,
-  },
-  update_event: {
-    type: 'object',
-    properties: {
-      eventId: { type: 'string', description: '要改的倒数日 id。' },
-      fields: {
-        type: 'object',
-        description:
-          '要改的字段：title / date / kind / isLunar / recurrence / pinned / notes。' +
-          '只改这里给出的字段，其余不动；要把某项清空请显式传 null。',
-      },
-    },
-    required: ['eventId', 'fields'],
-    additionalProperties: false,
-  },
-};
+/**
+ * 每个工具的参数 schema 现在住在 `src/tools/<entity>.ts` 的 `schemas` 里
+ * （一个工具一处声明）。这里只留**投影**，不再有一份按工具名手抄的清单。
+ */
 
 /**
  * 这个工具的参数 schema **有没有被登记过**。
@@ -237,12 +91,14 @@ const INPUT_SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> 
  * 新增工具时不登记就红（见 `tests/mcp.spec.ts`），而不是逐工具抄名字。
  */
 export function hasInputSchemaFor(toolName: string): boolean {
-  return Object.prototype.hasOwnProperty.call(INPUT_SCHEMAS, toolName);
+  // pack 结构下 schema 只能经 registry 登记（认领不齐在模块求值期就抛），
+  // 所以"有没有登记"直接问 registry —— 不存在第二份 INPUT_SCHEMAS 抄件。
+  return inputSchemaForTool(toolName) !== undefined;
 }
 
 /** `INPUT_SCHEMAS` 里登记过的工具名（用于查"孤儿抄件"：有 schema、目录里却没这个工具）。 */
 export function recordedInputSchemaNames(): readonly string[] {
-  return Object.keys(INPUT_SCHEMAS);
+  return LOCAL_API_TOOLS.filter((t) => inputSchemaForTool(t.name) !== undefined).map((t) => t.name);
 }
 
 /**
@@ -275,6 +131,13 @@ export function listMcpTools(config: LocalApiConfig): readonly McpToolDefinition
  *
  * ⚠️ 它**不看** `enabled` / `token`：列表是"这个用户授权过哪些工具"，
  * 与"服务有没有在监听"无关（后者由 `authorizeToolCall` 在调用时管）。
+ *
+ * 🔴 最后那个 `??` 兜底**别删**：pack 的 `schemas` 是**按工具名**登记的，
+ * 一个 pack 完全可以先在 `tools` 里声明工具、还没来得及写 schema —— 这条路径今天
+ * 仍然可达（`scripts/gen-ai-capability-manifest.mjs` 靠它把 `schemaRecorded:false`
+ * 写进给模型看的能力清单，并在 stderr 里点名）。
+ * 有了 pack 接缝之后，"漏登记 schema"不再需要跨三个文件同步，但它**仍然会被写错**，
+ * 而"字段清单不完整"这件事只在这条回退还在的时候才可观察。
  */
 export function listAuthorizedTools(
   grants: LocalApiConfig['grants'],
@@ -282,7 +145,7 @@ export function listAuthorizedTools(
   const granted = LOCAL_API_TOOLS.filter((tool) => grants?.[tool.name] === true);
 
   return granted.map((tool) => {
-    const schema = INPUT_SCHEMAS[tool.name];
+    const schema = inputSchemaForTool(tool.name);
     return {
       name: tool.name,
       description: describeForMcp(tool),
@@ -299,10 +162,15 @@ export function listAuthorizedTools(
  * 写清楚能减少"请求没授权的能力"这类无用往返。
  */
 function describeForMcp(tool: LocalApiTool): string {
+  // 🔴 这句提醒里不许出现内部架构词（`op-log` / `dispatch` / ADR 编号…）：
+  // 它是**出境数据**，模型读不懂的行话只会变成错调用 —— 而它原来写的正是
+  // 「必须经 heyta 的正常写入路径（op-log）」，被 `tests/mcp.spec.ts` 那条
+  // "整份目录无黑话"的判据扫出来（那条判据原来只看 `list_tasks`，所以这句话活了很久）。
+  // 对 MCP 的调用方，真正相关的事实是**这条调用会不会改数据、什么时候生效**：
+  // 外部工具调用是直接落库的（`executeTool` 的写分支 `host.submit`），
+  // 而"要用户在界面上确认"是 heyta **内置助手**那条路，不是这条。
   const kindNote =
-    tool.kind === 'write'
-      ? '（会修改数据：必须经 heyta 的正常写入路径）'
-      : '（只读，不会修改任何数据）';
+    tool.kind === 'write' ? '（会修改数据：调用即生效）' : '（只读，不会修改任何数据）';
   return `${tool.description} ${kindNote}`;
 }
 

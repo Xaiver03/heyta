@@ -191,13 +191,38 @@ another_mobile_e2e_running() {
 #      空快照会让断言**失败**，而不是让它读着过期数据通过。宁可假红，不可假绿。
 #   2. 重试几次 —— "界面还在动"通常几秒后就结束了。
 dump() {
-  local tries
+  local tries errfile last_err causes all_err non_idle
+  # 🔴 归因用的输出落在这文件里，**不**是 `/sdcard` 上（那是往设备写东西）。
+  #    命名跟着 `$UI_XML` 走，因为它是同一个旋钮的产物。
+  errfile="${UI_XML}.dump-err"
+  # 🔴 归因是**附加**职责，抓界面才是主职责。要是为了落一个临时文件把主职责弄坏了，
+  #    就成了探针自己制造故障：bash 的重定向失败会**中止整条命令**（adb 根本不会被调用），
+  #    于是 `$UI_XML` 永远为空、每条断言都报「找不到 X」。写不进去就退回 /dev/null。
+  if ! : >"$errfile" 2>/dev/null; then
+    [ "${HEYTA_E2E_DUMPERR_WARNED:-0}" = 1 ] || {
+      HEYTA_E2E_DUMPERR_WARNED=1
+      echo "   ⚠️ 写不了 $errfile —— 归因信息退回 /dev/null（dump 本身照常跑）" >&2
+    }
+    errfile=/dev/null
+  fi
+  all_err=""
   # 🔴 5 次不够：同步进行中界面一直在动，实测要等好几秒才会安静下来。
   # 代价只是变慢，而"抓不到"的代价是整轮结论作废。
+  # 🔴 这三条设备调用带 `|| true`：`dump` 对调用方的**契约是"软失败 + 打出归因"**，
+  #    而这个契约原本悄悄取决于调用方开没开 errexit —— 开了的话第一次 `uiautomator`
+  #    非零退出就当场死在循环里，10 次重试和整段归因输出**都不会发生**，
+  #    日志只剩半句，比"没有归因"更难读。现量（2026-10-04）：28 个 `verify-mobile-*.sh`
+  #    里唯一的 `set -euo pipefail` 是 `verify-mobile-aed.sh`，而它**不 source 本库**，
+  #    所以今天没有活着的触发路径 —— 这条是把契约钉住，不是修当前的红。
+  #    ⚠️ 保证范围只到"抓界面 + 归因"这一段；ANR 分支里那三条 `$(python3 …)` 没做同样处理。
   for tries in 1 2 3 4 5 6 7 8 9 10; do
-    $ADB shell rm -f /sdcard/ui.xml >/dev/null 2>&1
-    $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    $ADB shell cat /sdcard/ui.xml > "$UI_XML" 2>/dev/null
+    $ADB shell rm -f /sdcard/ui.xml >/dev/null 2>&1 || true
+    # 🔴 这一行以前是 `>/dev/null 2>&1`，把 `uiautomator` **自己说的原因**丢了，
+    #    于是下面的失败分支只能在「设备不空闲 / 宿主机过载」之间**猜**。
+    #    一次搜索浮层的验收里连排 10 次失败，日志给出的两种猜测哪种都对不上
+    #    —— 而原因本来就在 stderr 里。成功路径行为零变化（只是输出改落文件）。
+    $ADB shell uiautomator dump /sdcard/ui.xml >"$errfile" 2>&1 || true
+    $ADB shell cat /sdcard/ui.xml > "$UI_XML" 2>/dev/null || true
     if grep -q '<hierarchy' "$UI_XML" 2>/dev/null; then
       # 🔴 **系统 ANR 弹窗要当场关掉，否则整轮验收都在看弹窗。**
       #
@@ -235,6 +260,11 @@ dump() {
       fi
       return 0
     fi
+    # 把这一次的原因记下来（压成一行）。10 次全攒着，最后按次数去重打印 ——
+    # "10 次同一句" 和 "10 次换了 4 句" 是两种完全不同的故障。
+    last_err=$(tr '\r\n' ' ' <"$errfile" 2>/dev/null | sed -E 's/ +/ /g; s/^ //; s/ $//' | cut -c1-160)
+    all_err="${all_err}${last_err}
+"
     sleep 1
   done
   # 🔴 **抓不到界面时不要在这里 `exit` —— 有些"不空闲"是正常的。**
@@ -253,7 +283,32 @@ dump() {
   #   - 调用方：在"必须在真实界面上断言"的地方用 `require_screen`，
   #     由**它**决定是否终止整轮（退出码 3 = 这轮在环境上不成立，不是产品失败）。
   echo "" >&2
-  echo "   ⚠️ uiautomator 连续 10 次抓不到界面（设备不空闲 / 宿主机过载）。" >&2
+  echo "   ⚠️ uiautomator 连续 10 次抓不到界面。" >&2
+  # 🔴 这句话原来是「（设备不空闲 / 宿主机过载）」—— 那是**猜**，因为 stderr 被丢了。
+  #    现在按设备**实际说的话**分岔。判据不是"出现过一句 idle"，而是"**除了** idle
+  #    之外有没有别的"：10 次里混进一句别的原因时，把它整体归成「界面在动，等一等」
+  #    会把人按在原地等一个不会自己好的故障。
+  causes=$(printf '%s' "$all_err" | sed '/^$/d' | sort | uniq -c | sort -rn | head -4)
+  # `|| true` 是必需的：`grep -vc` 在计数为 0 时**退出 1**，少了它这条纯归因的读数
+  # 会反过来打死调用方（同上面那三条的理由）。
+  non_idle=$(printf '%s' "$all_err" | sed '/^$/d' | grep -vc 'could not get idle state' || true)
+  if [ -z "$causes" ]; then
+    # 🔴 这条分支单独存在：10 次里它一个字都没说，和"说了但没抓到界面"是两件事
+    #    —— 前者是命令根本没跑起来（adb 侧、设备侧），后者才是它跑完后拒绝出图。
+    echo "        ⚠️ 10 次里 uiautomator **一个字都没输出** —— 命令没跑起来，不是它跑完后拒绝出图。" >&2
+  elif [ "$non_idle" = 0 ]; then
+    echo "      10 次全是「取不到空闲状态」⇒ 界面一直在重绘（同步中转圈 / 计时器在跑），预期内：等它安静再跑。" >&2
+  elif printf '%s' "$all_err" | grep -q 'could not get idle state'; then
+    echo "      **混合**：既有「取不到空闲状态」也有别的 ⇒ 不能整轮按「界面在动」处置，逐句读下面。" >&2
+  else
+    echo "      设备报的**不是**「取不到空闲状态」⇒ 等待解决不了它，读下面那句原话。" >&2
+  fi
+  if [ -n "$causes" ]; then
+    echo "        10 次里的原因（次数 × 设备原话）：" >&2
+    while IFS= read -r line; do
+      printf '        %s\n' "$line" >&2
+    done <<<"$causes"
+  fi
   echo "      **$UI_XML 已被截成空文件** —— 接下来任何断言都会报「找不到 X」，" >&2
   echo "      那是假红，不是产品缺陷。需要在真实界面上断言的地方请用 require_screen。" >&2
   echo "      本机负载：$(uptime | sed 's/.*load averages: //')" >&2
@@ -386,21 +441,31 @@ wait_synced() {  # <轮数>，每轮 5 秒；默认 60 轮 = 300 秒
   return 1
 }
 
-# 触发一次手机同步：按「立即同步」再等结果。
+# 触发一次手机同步：让它开始，再等结算。
 #
 # 🔴 **这一步一度写在 `verify-mobile-lists.sh` 里**，而标签验收要的是同一件事
-#    （同一个按钮、同一个等待、同一条"按坐标点的是**上一次** dump 的树"的坑）。
-#    放在共用库里的理由是它**不是清单的业务语义** —— 它纯粹是"驱动这台设备"，
-#    与 `wait_synced` / `dump` / `require_screen` 是同一类东西。
-#    各写一份的话，"按钮改了位置"这种改动会只修一处。
+#    （同一个按钮、同一个等待）。放在共用库里的理由是它**不是清单的业务语义** ——
+#    它纯粹是"驱动这台设备"，与 `wait_synced` / `dump` / `require_screen` 是同一类东西。
 #
-# ⚠️ `xy_text` 读的是**上一次 dump 的树**。不重新 dump 就会拿着别的页面的
-#    坐标去点 —— 清单验收的第一版就在这里报过"找不到「立即同步」"。
+# 🔴 **发起那半原本由本函数自己找按钮**：`xy_text "立即同步"`，取不到就
+#    `bad "找不到「立即同步」"`。那是 traps 第 67 条记过的**假红**第三种变体：
+#    自动同步抢跑时按钮处于 `loading`，只渲染菊花，`text` 里没有「立即同步」，
+#    busy 文案也**只在 `content-desc`** —— 于是"同步正在正常进行"被报成"找不到按钮"。
+#    2026-10-04 现量：`verify-mobile-notes.sh` 第 9 步那两条 ❌（「找不到「立即同步」」
+#    「手机同步没成功」）就是这个形状，而**同一份库里 `ensure_phone_sync` 早已把三种
+#    情形分开处理**（空闲=点下去、忙=只等、两者都没有=响亮地红）。
+#    "抽出了一个共享实现不等于重复被消除"在这里现形：新实现有六个脚本在用，
+#    旧实现还留着三个调用点（`verify-mobile-notes.sh`、`verify-mobile-lists.sh`、
+#    `verify-mobile-tags.sh`）。现量命令（别抄这里的数字，它会漂）：
+#      grep -rl ensure_phone_sync scripts/*.sh | grep -v snap        # 用它的人
+#      grep -rnE '^[[:space:]]*(if )?phone_sync\b' scripts/verify-mobile-*.sh   # 还走旧入口的人
+# ⇒ 现在只有一条实现：**发起归 `ensure_phone_sync`（单一所有者），本函数只负责等结算**。
+#
+# ⚠️ `ensure_phone_sync` 自己先 `dump` 再取坐标，所以这里不许在前面补一次"取上一次树"的
+#    读取 —— 清单验收的第一版就是拿着**别的页面**的坐标去点，报的也是"找不到「立即同步」"。
 phone_sync() {
-  dump
-  local ax_xy; ax_xy=$(xy_text "立即同步")
-  if [ -z "$ax_xy" ]; then bad "找不到「立即同步」"; return 1; fi
-  $ADB shell input tap $ax_xy; sleep 5
+  ensure_phone_sync || return 1
+  sleep 5
   wait_synced 180
 }
 
@@ -988,7 +1053,13 @@ resolve_idb() {
   return 0
 }
 
-idb_ui() { "$IDB_BIN" --companion-path "$IDB_COMPANION" ui "$@" --udid "$IDB_UDID"; }
+idb_ui() {
+  if [[ "$IDB_COMPANION" == *:* && "$IDB_COMPANION" != /* ]]; then
+    "$IDB_BIN" --companion "$IDB_COMPANION" ui "$@" --udid "$IDB_UDID"
+  else
+    "$IDB_BIN" --companion-path "$IDB_COMPANION" ui "$@" --udid "$IDB_UDID"
+  fi
+}
 
 # 无障碍树只从这一个入口取，落到文件再交给解析器
 # （`cmd | python3 - <<'PY'` 的 heredoc 会顶掉管道 —— AGENTS §7 第 36 条）。
@@ -1015,7 +1086,7 @@ idb_dump() { idb_ui describe-all > "$IDB_DUMP_FILE" 2>/dev/null; }
 # 那套把戏 —— 实测那套会把函数体里的引号/续行打散，包出来的函数**永远返回 0**，
 # 于是"变异生效了"和"变异把工具弄坏了"看起来一模一样（正是 §7 陷阱 58 的形状）。
 _idb_ax_count_raw() {
-  "$IDB_BIN" --companion-path "$IDB_COMPANION" ui describe-all --udid "$IDB_UDID" 2>/dev/null \
+  idb_ui describe-all 2>/dev/null \
     | python3 -c "
 import json,sys
 try: d=json.load(sys.stdin)

@@ -40,3 +40,20 @@ const openDown = rect.bottom + 500 < innerHeight || rect.top < 500;
 📌 一般规律：**弹层的放置判据不能只测"通常那一档"** —— 它的失败模式是
 "锚点落在某个 y 之后整块东西消失"，而那个 y 由**页面上方有多少块面板**决定，
 不由弹层自己决定。所以判据要断"每一格都在视口内"（全量），不是"某一格点得到"（抽样）。
+
+## md5 钉（2026-10-04 00:2x 现取）
+
+`md5 -r apps/web/evidence/due-editor-placement/*.png`：
+
+```
+3d09b3141043a00cae36eac35a19c448  after-panel-inside-viewport.png
+2653cf3140eaf1c9901759b81803879d  before-clipped-by-viewport.png
+```
+
+这几枚与 `git show HEAD:…` **逐字节相同**（00:2x 实测），所以钉的是**已入库的那一趟**。
+⚠️ md5 不是恒定属性，它是"哪一趟运行"的身份：谁重跑那条 e2e 覆盖了同名文件，
+`bash research/tools/r17-evidence-md5-check.sh --all` 就会报 MISMATCH，届时"人看过的那张图"要重看。
+这一段只给已有的看图记录补上**字节级对账**，不新增任何"看过"的主张。
+
+📌 这两张是 R14 时刻编辑器**落位**那一对（改前被视口裁掉 / 改后整块在视口内）——
+它属于日历+Profile 那条线，所以那条线的常驻对账现在覆盖它。

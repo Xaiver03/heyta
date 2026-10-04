@@ -19,7 +19,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, after } from 'node:test';
 
-import { inspectPng, looksBlank, looksSmeared } from './png-stats.mjs';
+import {
+  inspectPng,
+  looksBlank,
+  looksSmeared,
+  countColor,
+  countBrandBlue,
+  HEYTA_BLUE,
+  HEYTA_BLUE_DARK,
+  HEYTA_BLUE_TOLERANCE,
+} from './png-stats.mjs';
 
 const workdir = mkdtempSync(join(tmpdir(), 'heyta-png-stats-'));
 after(() => rmSync(workdir, { recursive: true, force: true }));
@@ -203,4 +212,60 @@ test('糊字启发式：横向涂抹判为糊，清晰文本判为不糊', { ski
     b.edgeOnContent < a.edgeOnContent,
     `涂抹后边缘密度应下降：清晰 ${a.edgeOnContent.toFixed(3)} vs 涂抹 ${b.edgeOnContent.toFixed(3)}`,
   );
+});
+
+// ── 品牌蓝判据（`countColor` / `countBrandBlue`）──────────────────────────────
+// 🔴 这四条原来**一条都没有**：安装包与壳级门禁的"装上来的是不是 heyta 的界面"整条判据
+//    就落在这两个函数上（§7 第 82 条），而它自己没有任何常驻用例 —— 采样密度、容差、
+//    暗色那一支哪天被改动，产出的仍是一个像样的小整数，没有任何一层会失败。
+//    所以这里刻意做成**判别对**：同一张图在"非空白"上过得去、在"品牌蓝"上必须被拦住。
+
+test('小块主蓝在大图上仍数得出（采样密度是这条判据的承重，不是装饰）', { skip: !hasMagick }, () => {
+  // 1200x800 白底上放一块 24x24 的主蓝 —— 对应界面上的复选框/图标这类小元素。
+  const file = makeImage('brand-blue-small.png', [
+    '-size', '1200x800', 'xc:white',
+    '-fill', `rgb(${HEYTA_BLUE.join(',')})`, '-draw', 'rectangle 100,100 123,123',
+  ]);
+  const hits = countColor(file, HEYTA_BLUE);
+  assert.ok(hits > 0, `大图上的小块主蓝必须命中（实测 ${hits}）`);
+  // 判据实际用的阈值来自 reinstall-all / check-macos-window 那一侧的 >=20，
+  // 这里按同一条口径断言，而不是只断"> 0"——否则采样退化成 2 万点也会照样通过。
+  assert.ok(hits >= 20, `命中数要过真实阈值（20），实测 ${hits}`);
+  assert.ok(countBrandBlue(file) >= hits, 'countBrandBlue 是浅色+暗色之和，不该比单支少');
+});
+
+test('暗色主题那一支单独有用：同一张暗色图，浅色支命中 0、暗色支命中 >0', { skip: !hasMagick }, () => {
+  const file = makeImage('brand-blue-dark.png', [
+    '-size', '400x300', `xc:rgb(${HEYTA_BLUE_DARK.join(',')})`,
+  ]);
+  assert.equal(countColor(file, HEYTA_BLUE), 0, '暗色图不该被浅色那一支误认');
+  assert.ok(countColor(file, HEYTA_BLUE_DARK) > 0, '暗色那一支必须认得自己的颜色');
+  assert.ok(countBrandBlue(file) > 0, '两条合起来才是"这是 heyta 的界面"');
+});
+
+test('🔴 错误屏判别对：内容很多（非空白过得去）而品牌蓝命中 0', { skip: !hasMagick }, () => {
+  // 复刻 §7 第 82 条那个"找不到共享 UI 产物"的报错屏：浅底 + 深灰标题与正文块。
+  // 它 contentRatio 很高（`looksBlank` 永远放行），但没有一个像素是品牌色。
+  const file = makeImage('error-screen.png', [
+    '-size', '1200x800', 'xc:#F8FAFC',
+    '-fill', '#0F172A', '-draw', 'rectangle 80,80 720,140',
+    '-fill', '#334155', '-draw', 'rectangle 80,200 1080,240',
+    '-fill', '#475569', '-draw', 'rectangle 80,270 960,310',
+    '-fill', '#64748B', '-draw', 'rectangle 80,340 1010,380',
+  ]);
+  const stats = inspectPng(file);
+  assert.equal(looksBlank(stats), false, '前提：这张图在"非空白"这条判据下是**通过**的');
+  assert.ok(stats.contentRatio > 0.01, `内容占比要真的很高（实测 ${stats.contentRatio.toFixed(4)}）`);
+  assert.equal(countBrandBlue(file), 0, '而品牌蓝必须一条都不命中 —— 这才是拦住错误屏的那半');
+});
+
+test('容差从被约束的常量推导：差 HEYTA_BLUE_TOLERANCE 算命中，再多 1 就不算', { skip: !hasMagick }, () => {
+  const inside = makeImage('tol-inside.png', [
+    '-size', '60x60', `xc:rgb(${HEYTA_BLUE[0] + HEYTA_BLUE_TOLERANCE},${HEYTA_BLUE[1]},${HEYTA_BLUE[2]})`,
+  ]);
+  const outside = makeImage('tol-outside.png', [
+    '-size', '60x60', `xc:rgb(${HEYTA_BLUE[0] + HEYTA_BLUE_TOLERANCE + 1},${HEYTA_BLUE[1]},${HEYTA_BLUE[2]})`,
+  ]);
+  assert.ok(countColor(inside, HEYTA_BLUE) > 0, '正好落在容差上的像素要算命中');
+  assert.equal(countColor(outside, HEYTA_BLUE), 0, '超出容差 1 就必须不算 —— 阈值是有边的');
 });

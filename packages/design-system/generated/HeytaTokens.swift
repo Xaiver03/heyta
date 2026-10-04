@@ -177,6 +177,9 @@ enum HeytaTokens {
     static let layoutSidebarMaxWidth: Double = 416  // px
     static let layoutHeaderHeight: Double = 56  // px
     static let layoutContentMax: Double = 1200  // px
+    static let layoutDetailWidth: Double = 352  // px
+    static let layoutDetailMinWidth: Double = 288  // px
+    static let layoutDetailMaxWidth: Double = 480  // px
     static let layoutProseMax: String = "65ch"
     static let layoutQuadrantMinHeight: Double = 192  // px
     static let layoutPanelMaxHeight: Double = 384  // px

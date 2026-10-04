@@ -48,6 +48,7 @@
 
 import type { OpLogEngine } from '@heyta/op-log';
 import type { OpLogStore } from '@heyta/storage';
+import { eraseLocalData } from './local-erasure.js';
 import type { EntityType } from '@heyta/shared-schema';
 import type { Operation, OpType } from '@heyta/sync-core';
 import {
@@ -80,6 +81,15 @@ export type SyncWiringOptions = SyncEncryptionOptions & {
   applyRemote: (ops: Operation<string>[]) => Promise<void>;
   /** 网络实现。原生宿主用它注入证书固定等平台能力。 */
   fetchImpl?: typeof fetch;
+  /**
+   * 账号注销时要做的本机销毁。**不传就用注册表里的那一个**
+   * （`registerLocalEraser`，见 `./local-erasure.ts` 文件头讲的两条理由）。
+   *
+   * 这里给默认值不是"方便"，是**承重**：`openAppHost()` 与各壳的构造点都在
+   * 这个包外面，如果默认值不存在，那条路径上的宿主会静默没有销毁器 ——
+   * 而"信号收到了、本机什么都没少"正是这批工单要修的那个缺陷。
+   */
+  onAccountClosed?: () => Promise<void>;
 }
 
 /**
@@ -132,6 +142,9 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
       });
     },
     ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+    // 账号注销 ⇒ 销毁本机明文。**默认值读注册表**，所以经这条路的所有宿主
+    // 都有反应，包括构造点在别的文件里、这一轮改不动的那些。
+    onAccountClosed: options.onAccountClosed ?? (async () => void (await eraseLocalData())),
   });
 }
 /**

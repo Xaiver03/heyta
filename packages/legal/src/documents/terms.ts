@@ -375,6 +375,56 @@ const zh = [
     ],
   },
   {
+    id: 's13',
+    title: '欧盟 GDPR 口径：条款这一侧只剩三个问题，逐个写明做不做的到',
+    blocks: [
+      {
+        kind: 'p',
+        text: '服务条款是一份合同，而 GDPR 看合同的视角很窄：它不问条款写得是否公平，只问**"使用服务"有没有被拿来搭售不必要的处理**（第 7(4) 条），以及这份合同是不是落在它的适用范围里、该配的代表配了没有。下面每一格都只写代码或现有文本撑得住的话，撑不住的直接写成缺口，不写成承诺。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 7(4) 条（同意不得与服务捆绑）',
+            '要用服务，是不是必须先同意与服务本身无关的处理',
+            '本地功能在没同意时可用，任何出站之前都有一道同意闸门（"未同意零出站"），关掉某一项不影响其它项',
+            '这一格完全靠那道闸门一直被守住，所以条款不写"永远如此"；如果将来某个处理被改成"服务的必要条件"，这一格就得跟着改写，而不是留着一句仍然好听的旧话'
+          ],
+          [
+            '第 3(2) 条（域外适用）',
+            '向欧盟境内的人提供服务时，这套规则是不是落到我们头上',
+            '条款写明主体与住所都在中国杭州，也不做任何面向欧盟的投放、推广或语言版本',
+            '我们没有做过"是否落入第 3(2) 条"的判断，因此**不能**把这一格写成"不适用"；一旦有欧盟用户注册并使用托管同步，它就从"我们没判断过"变成"需要判断"，而今天没有人替它做过判断'
+          ],
+          [
+            '第 27 条（在欧盟境内设立代表）',
+            '非欧盟的控制者是否需要、以及是否指定了一名欧盟境内代表',
+            '没有。我们**没有指定**欧盟代表，也没有欧盟境内的送达地址',
+            '这一格记录的是一个尚未闭合的缺口，不是既成事实；欧盟代表与数据保护专员今天都没有指定过，任何把这一格说成已经落实的措辞都不成立'
+          ],
+          [
+            '第 13 与 14 条（处理信息与法律依据）',
+            '条款有没有写明处理目的、法律依据与留存期',
+            '条款刻意不重复这些：目的、逐类法律依据与留存期在《隐私政策》与《个人信息清单》里，各只有一份',
+            '因此读者要跳一次才能看全，而"跳到哪一份"由下面的引用固定住、不靠猜；同一件事在条款里再抄一遍只会产生第二份会漂的抄件'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: '《隐私政策》：处理目的、法律依据与留存期在那里；本条款只管服务与责任边界。',
+      },
+      {
+        kind: 'docRef',
+        docId: 'personal-info-list',
+        text: '《个人信息清单》：逐类数据收集了什么、存在哪儿；那里也写着这份清单按中国法口径分类，与 GDPR 的分类不是一一对应。',
+      },
+    ],
+  },
+  {
     id: 's12',
     title: '版本记录',
     blocks: [
@@ -388,6 +438,7 @@ const zh = [
         rows: [
         ['1.0', '2026-10-01 首次起草，尚未经法务复核'],
         ['1.1', '2026-10-02 英文栏在转写名之外补上登记的中文主体名称（此前该栏只有转写名，而本条款是九份里唯一规定合同主体的那份）；s10 的指纹示例改写成不钉死版本号的形式。'],
+        ['1.2', '2026-10-04 新增第十三节（GDPR 口径）。四格各写一个可核对的事实：第 7(4) 条这一格靠"未同意零出站"那道闸门成立，因此不写"永远如此"；第 3(2) 条**没有判断过**，所以不许写成"不适用"；第 27 条我们**没有**欧盟境内代表，这一格记录的是未闭合的缺口；第 13/14 条的目的与依据只在《隐私政策》与《个人信息清单》各写一份，条款只以引用固定跳转目标。'],
       ],
       },
     ],
@@ -742,6 +793,56 @@ const en = [
     ],
   },
   {
+    id: 's13',
+    title: 'The EU GDPR view: three questions the terms actually face, answered one by one',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'The terms are a contract, and the GDPR looks at a contract through a narrow lens: it does not ask whether the clauses are fair, only whether **using the service is bundled with processing that the service does not need** (Article 7(4)), whether the contract falls inside its territorial reach, and whether the representative it requires has been appointed. Each cell below says only what the code or the existing text supports; where there is no support it is written as a gap rather than as a promise.',
+      },
+      {
+        kind: 'table',
+        head: ['Where in the GDPR', 'What it asks', 'What heyta can produce', 'What does not line up'],
+        rows: [
+          [
+            'Article 7(4) (no bundling of consent)',
+            'Must a user consent to processing unrelated to the service in order to use it',
+            'Local features work without agreement, a consent gate stands in front of every outbound request ("not a byte leaves before consent"), and switching one feature off leaves the others alone',
+            'This row holds only while that gate keeps being defended, so the terms do not say "always"; if some processing is later reclassified as necessary to the service, this row has to be rewritten instead of keeping a sentence that still sounds good'
+          ],
+          [
+            'Article 3(2) (extraterritorial reach)',
+            'Whether these rules attach to us when serving people located in the EU',
+            'The terms name an entity and address in Hangzhou, China, and we run no EU-targeted advertising, promotion or language edition',
+            'We have never made the "does Article 3(2) catch us" determination, so this cell **cannot** be written as "not applicable"; the moment an EU user registers and uses hosted sync it moves from "never assessed" to "needs assessment", and nobody has assessed it today'
+          ],
+          [
+            'Article 27 (a representative in the Union)',
+            'Whether a non-EU controller must appoint an EU representative, and whether one exists',
+            'No. We have **not appointed** an EU representative and have no address for service inside the EU',
+            'This row records an open gap, not a settled fact; no EU representative and no data protection officer have ever been designated, and any wording that presents this cell as settled is false'
+          ],
+          [
+            'Articles 13 and 14 (information and lawful basis)',
+            'Whether the terms state the purposes, lawful bases and retention periods',
+            'The terms deliberately do not repeat them: purposes, per-category lawful bases and retention live in the Privacy policy and the Personal information inventory, one copy each',
+            'So the reader has to follow one hop to see the whole picture, and where that hop goes is pinned by the references below, not guessed; copying the same facts into the terms would only create a second copy that drifts'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: 'Privacy policy: purposes, lawful bases and retention periods live there; these terms govern only the service and the boundaries of responsibility.',
+      },
+      {
+        kind: 'docRef',
+        docId: 'personal-info-list',
+        text: 'Personal information inventory: what is collected category by category and where it is stored; that document also states that the categories follow Chinese law and do not map one-to-one onto the GDPR categories.',
+      },
+    ],
+  },
+  {
     id: 's12',
     title: 'Version record',
     blocks: [
@@ -755,6 +856,7 @@ const en = [
         rows: [
         ['1.0', '2026-10-01 first drafted; has not yet been reviewed by counsel'],
         ['1.1', '2026-10-02 the English column now carries the operator’s registered Chinese name next to its transliteration (it previously showed only the transliteration, in the one document of the nine that defines the contracting party); the consent-fingerprint example in s10 is no longer pinned to a version number.'],
+        ['1.2', '2026-10-04 added section thirteen (the GDPR view). Each of its four cells states one checkable fact: the Article 7(4) cell holds only because of the "not a byte leaves before consent" switch, so it does not say "always"; the Article 3(2) determination has **never been made**, so the cell may not read "not applicable"; for Article 27 we have **no** EU representative and the cell records an open gap; and the Article 13/14 purposes and bases stay written once each in the privacy policy and the personal-information inventory, with the terms fixing the hop target by reference rather than repeating it.'],
       ],
       },
     ],
@@ -763,9 +865,9 @@ const en = [
 
 export const terms: LegalDocument = {
   id: 'terms',
-  version: '1.1',
+  version: '1.2',
   status: 'draft',
-  updatedDate: '2026-10-02',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': 'heyta 服务条款',
     en: 'heyta Terms of Service',

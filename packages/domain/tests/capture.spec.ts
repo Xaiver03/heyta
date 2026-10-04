@@ -166,6 +166,81 @@ describe('parseCapture —— 绝对日期', () => {
   });
 });
 
+describe('parseCapture —— 裸「N 号」（月内日）', () => {
+  // 这一组的存在理由写在 `capture.ts` 的裸号规则注释里：中文的「N 号」同时是
+  // **日子**和**编号**，而误伤的后果是删掉用户写的字。所以正例证明它认得出，
+  // 反例证明三层守卫各挡各的 —— 反例必须**逐条不同挡点**，否则一条守卫坏了
+  // 而其余守卫碰巧也挡住，测试会跟着一起绿。
+  const FEB = Date.parse('2026-02-01T10:00:00');
+  const DEC = Date.parse('2026-12-20T10:00:00');
+
+  it('本月还没过 = 本月；本月已过 = 下月（不是明年）', () => {
+    // 今天 2026-09-25
+    expect(parseCapture('26号交周报', { now: FRIDAY }).dueDate).toBe('2026-09-26');
+    expect(parseCapture('15号交材料', { now: FRIDAY }).dueDate).toBe('2026-10-15');
+    // 说的就是今天 → 今天，不跳到下个月
+    expect(parseCapture('25号', { now: FRIDAY }).dueDate).toBe('2026-09-25');
+  });
+
+  it('数字与「号」之间的空格照认，且 raw 原样带回（UI 要能撤销的就是这段字）', () => {
+    const r = parseCapture('5 号之前交', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-10-05');
+    expect(r.matches).toHaveLength(1);
+    expect(r.matches[0]!.raw).toBe('5 号');
+    expect(r.title).toBe('之前交');
+  });
+
+  it('🔴 这个日子在本月**不存在**时往后找，而不是夹到月末', () => {
+    // 2026 年 2 月没有 29 日（非闰年）也没有 31 日。
+    // 夹到月末会把"31 号"变成"28 号" —— 那不是用户说的日子。
+    expect(parseCapture('29号复查', { now: FEB }).dueDate).toBe('2026-03-29');
+    expect(parseCapture('31号交报告', { now: FEB }).dueDate).toBe('2026-03-31');
+  });
+
+  it('年末说"3 号"是明年 3 号，跨年由同一个循环完成', () => {
+    expect(parseCapture('3号交税', { now: DEC }).dueDate).toBe('2027-01-03');
+    expect(parseCapture('1号元旦', { now: DEC }).dueDate).toBe('2027-01-01');
+  });
+
+  it('🔴 编号不是日子：每一行挡点各不相同', () => {
+    const cases: readonly [string, string][] = [
+      ['买 5 号电池', '后缀黑名单（电）'],
+      ['37 号楼取快递', '后缀黑名单（楼）+ 日期存在性（37 不是任何月的日）'],
+      ['7号楼', '后缀黑名单（楼）—— 7 在范围内，只有这一层挡得住'],
+      ['3号会议室', '后缀黑名单（会）'],
+      ['房间8号', '前缀黑名单（间）'],
+      ['3单元8号取件', '前缀黑名单（元）'],
+      ['第5号', '前缀黑名单（第）'],
+      ['2026号', '双侧非数字边界'],
+      ['0号', '日期存在性（没有 0 号）'],
+      ['32号', '日期存在性（没有 32 号）'],
+      ['几月5号再说', '前缀黑名单（月）：月份没定的日子不是一个日期'],
+    ];
+    for (const [input, reason] of cases) {
+      const r = parseCapture(input, { now: FRIDAY });
+      expect(r.dueDate, `${input} 应当被拒（${reason}）`).toBeUndefined();
+      // 没认出来就一个字都不许动
+      expect(r.title, `${input} 的标题不该被改（${reason}）`).toBe(input);
+      expect(r.matches, `${input} 不该产生识别（${reason}）`).toHaveLength(0);
+    }
+  });
+
+  it('🔴 「10月8号」仍由月规则整段认领，裸号规则不抢第二段', () => {
+    const r = parseCapture('10月8号交', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-10-08');
+    // 去重叠生效时这里恰好是 1；裸号规则没有守卫就是 2 条。
+    expect(r.matches).toHaveLength(1);
+    expect(r.title).toBe('交');
+  });
+
+  it('两个裸号：只采纳第一条，第二条留在标题里（不变量 3）', () => {
+    const r = parseCapture('5号 6号 交', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-10-05');
+    expect(r.title).toContain('6号');
+    expect(r.matches.filter((m) => m.applied)).toHaveLength(1);
+  });
+});
+
 describe('parseCapture —— 优先级', () => {
   it('!1..!4 映射到 Priority', () => {
     expect(parseCapture('交周报 !1', { now: FRIDAY }).priority).toBe(Priority.High);

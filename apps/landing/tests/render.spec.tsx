@@ -33,9 +33,14 @@
  * 所以 3D 那一节的验证方式是构建产物 + 真实浏览器。
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { signInHref } from '../src/lib/app-url.js';
 import { pageFromPath } from '../src/site/paths.js';
 import { SITE_PAGES } from '../src/site/pages.js';
 import {
@@ -55,6 +60,15 @@ installPageRenderer();
  */
 const ALL_PAGE_IDS = SITE_PAGES.map((page) => page.id);
 
+/**
+ * 仓库根。**用这个惯用法而不是 `new URL(相对路径, import.meta.url)`**：
+ * 后者的结果取决于 Vite 把该模块当文件模块还是当 dev-server 资源（实测同一个
+ * `tests/` 目录里两种都出现过），而跨 `apps/` 读源码的判据不能建在会变的锚点上。
+ * 同一写法已在 `tests/mockup-focus-ring.spec.tsx` 用了很久。
+ */
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = resolve(HERE, '../../..');
+
 describe('每一页都能渲染，且外壳完整', () => {
   it.each(ALL_PAGE_IDS)('%s：渲染不抛错，有 #main、有 H1、有页脚免责声明', (pageId) => {
     const view = renderPage(pageId);
@@ -70,7 +84,18 @@ describe('每一页都能渲染，且外壳完整', () => {
     expect(view.textContent).toContain('无任何关系');
   });
 
-  it.each(ALL_PAGE_IDS)('%s：正文有实质内容（不是空壳）', (pageId) => {
+  /**
+   * 🔴 「正文有实质内容」这一条对**每一页**成立，除了一页：`signin`。
+   *
+   * 2026-10-03 那一页被改成纯跳板（产品负责人实测：点「登录」先读到一段说明是错的
+   * 形状，说明该在文档中心）。而"标题 + 两个出口"的页面**按定义**凑不满 500 字。
+   * 这里的空不叫空壳：它的判据换成"有没有能点的出口"，写在下面的 signin 专项用例里。
+   * ⚠️ 刻意不把 500 调低 —— 调低阈值会让真正的空壳页从这条判据里溜过去，
+   * 而这条判据存在的意义正是抓住"页面在、内容不在"。
+   */
+  const CONTENT_PAGE_IDS = ALL_PAGE_IDS.filter((id) => id !== 'signin');
+
+  it.each(CONTENT_PAGE_IDS)('%s：正文有实质内容（不是空壳）', (pageId) => {
     const view = renderPage(pageId);
     expect(view.textContent?.length ?? 0).toBeGreaterThan(500);
   });
@@ -331,16 +356,19 @@ describe('首页（原有断言，一个都不放松）', () => {
     }
   });
 
-  it('子页面上配了应用地址时，导航与页头都有应用入口（不是只有导航）', () => {
+  it('子页面上配了应用地址时，正文里就有应用入口（不是只有导航）', () => {
     vi.stubEnv('VITE_APP_URL', 'https://app.example.com/');
 
     const view = renderPage('features');
     const appLinks = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].filter(
       (a) => a.getAttribute('href')?.startsWith('https://app.example.com') === true,
     );
-    // 两处：导航一条 + 页头一条。页头那条少了的话，访客读完一整页
-    // 必须滚回顶部才有入口。
-    expect(appLinks.length).toBe(2);
+    // 四条：导航「立即使用」+ 导航「登录」（这两条在窄屏菜单里各再出现一次）
+    // + 页头一条。2026-10-03 之前是两条 —— 多的那两条是「登录」改指应用带来的。
+    expect(appLinks.length).toBe(4);
+    // 🔴 真正要钉的是**正文里那条存在**：少了它，访客读完一整页必须滚回顶部
+    // 才有入口。只数总数会被"导航多了一条"顶掉，数"正文里有几条"才是判据本身。
+    expect(appLinks.filter((a) => a.closest('#main') !== null).length).toBe(1);
   });
 });
 
@@ -448,10 +476,101 @@ describe('子页面的正文真的挂上了', () => {
     }
   });
 
-  it('/signin 说清两种方式与为什么认证在应用里', () => {
+  /**
+   * 🔴 `/signin` 是一页**出口**，不是一段说明（2026-10-03 产品负责人实测否掉了旧形状）。
+   *
+   * 判据数的是**说明的渲染形状**（能力行 `.lp-row`、方式卡 `.lp-methods__item`、
+   * 折叠块 `<details>`），不是某句话的措辞 —— 措辞会改，而"这一页没有阅读材料"
+   * 不会改。当初那一页排着两张方式卡 + 两节解释 + 一条 ⚠️ 注脚，
+   * 想登录的人点开先读了一篇说明；解释现在住在文档中心那篇《账号、令牌与登录方式》。
+   */
+  it('/signin 只剩出口，正文里没有一节说明', () => {
     const view = renderPage('signin');
-    expect(view.querySelectorAll('.lp-methods__item').length).toBe(2);
-    expect(view.textContent).toContain('通行密钥');
+    const body = view.querySelector('#main')!;
+    expect(body.querySelectorAll('.lp-row').length).toBe(0);
+    expect(body.querySelectorAll('.lp-methods__item').length).toBe(0);
+    expect(body.querySelectorAll('details').length).toBe(0);
+
+    // 未配置应用：主行动退回站内的自建那一节（不猜地址），但**仍然有出口**。
+    const primary = view.querySelector<HTMLAnchorElement>('.lp-page__cta a');
+    expect(primary).not.toBeNull();
+    expect(primary!.getAttribute('href')).toBe('#selfhost');
+
+    // 说明的去处：文档中心那一页必须在这一页上链得到（用 `pageFromPath` 反解，
+    // 而不是把 `/docs/account/` 写死 —— 语言前缀与尾斜杠由注册表决定）。
+    const docsLink = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].find(
+      (a) => pageFromPath(a.getAttribute('href')!).id === 'account',
+    );
+    expect(docsLink, '公页上没有任何链接指向文档中心的「账号、令牌与登录方式」').toBeDefined();
+  });
+
+  /**
+   * 🔴 两个包各抄了一份 `signin` 这个**参数名字面量**：
+   * `apps/landing/src/lib/app-url.ts` 写，`apps/web/src/lib/auth-deep-link.ts` 读
+   * （落地页不能 import 应用里的模块，那会把整个领域包拖进落地页的 bundle）。
+   *
+   * 所以这里不写死那个名字，而是**读回应用那一侧的源码**，用它解析出来的参数名
+   * 去查落地页生成的 URL。任何一边改名都会红 —— 而不是等到用户点了没反应才发现。
+   */
+  it('落地页加的那个参数名，就是应用那一侧读的那个名', () => {
+    const webSource = readFileSync(
+      join(REPO, 'apps/web/src/lib/auth-deep-link.ts'),
+      'utf8',
+    );
+    const defined = /SIGNIN_QUERY_PARAM\s*=\s*'([^']+)'/.exec(webSource);
+    const paramName = defined?.[1];
+    if (paramName === undefined) {
+      throw new Error(
+        'apps/web/src/lib/auth-deep-link.ts 里没有 SIGNIN_QUERY_PARAM 的定义 —— 那一侧改名或删了这个常量，' +
+          '这条判据要跟着改，不能空转。',
+      );
+    }
+
+    vi.stubEnv('VITE_APP_URL', 'https://heyta.finlaw.cloud/app/');
+    const href = signInHref('zh-CN');
+    if (href === null) {
+      throw new Error('配了 VITE_APP_URL 而 signInHref() 返回 null —— 这一侧坏了，比对无从做起');
+    }
+    expect(new URL(href).searchParams.get(paramName)).toBe('1');
+  });
+
+  /**
+   * 🔴 那段说明**真的渲染出来了**，不是只进了字典。
+   *
+   * 这是本仓库最高发的那类"看起来搬完了"：词条加进 `site.docs.account.s5`、
+   * 中英同步、`check:ui-language` 全绿，而 `docs.ts` 的分区清单里没挂它 ——
+   * 于是那句话在**任何页面上都不存在**，而 `/signin` 那页已经把它删了。
+   * 两侧一起改的那次改动，恰好是这种断链最容易发生的时候。
+   */
+  it('文档中心那篇「账号、令牌与登录方式」把第五节真的挂上了', () => {
+    const view = renderPage('account');
+    // 五节：三个框 / 三条登录方式 / 桌面壳跳浏览器 / 条款归谁 / 为什么登录在应用里。
+    expect(view.querySelectorAll('.lp-row').length).toBe(5);
+    // 取一句**只可能来自那段说明**的话做 needle（措辞改了要跟着改这里，这是刻意的：
+    // 它意味着"这段内容真的在页面上"这件事有一个会红的判据）。
+    expect(view.textContent).toContain('对着 A 服务器登录');
+    // 锚点由 `docs.ts` 的 section id 给，链接要能指到这一节。
+    expect(view.querySelector('#why-in-app')).not.toBeNull();
+  });
+
+  /**
+   * 🔴 导航那个「登录」的落点随构建期配置换**意图的目标**，但意图本身不换：
+   * 配了应用 → 应用（带打开认证面板的参数）；没配 → 站内那一页。
+   * 两种状态都必须出现过（与 `app-url.spec.ts` 文件头那条纪律同一条）。
+   */
+  it('导航「登录」：配了应用直接进应用，没配才落站内那一页', () => {
+    const bare = renderPage('home');
+    const bareLink = bare.querySelector<HTMLAnchorElement>('.lp-nav__signin')!;
+    expect(bareLink.getAttribute('href')).toBe('/signin/');
+    // 站内链接不许带 rel（它是同源导航，`noopener` 会拦掉本该保留的引用）。
+    expect(bareLink.getAttribute('rel')).toBeNull();
+    cleanupPage();
+
+    vi.stubEnv('VITE_APP_URL', 'https://heyta.finlaw.cloud/app/');
+    const wired = renderPage('home');
+    const wiredLink = wired.querySelector<HTMLAnchorElement>('.lp-nav__signin')!;
+    expect(wiredLink.getAttribute('href')).toBe('https://heyta.finlaw.cloud/app?signin=1');
+    expect(wiredLink.getAttribute('rel')).toBe('noopener noreferrer');
   });
 });
 

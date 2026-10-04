@@ -47,3 +47,55 @@ cd e2e && npx playwright test tests/calendar-day.spec.ts
 - **不证明现在线画得准**。它按 `小时 × size.row-min-height` 推导，
   位置由 `apps/web/tests/calendar-day-view.spec.tsx` 那两条钉；
   图里只能看到"有这根线"。
+
+## 为什么这一目录**故意没有**常驻 md5（00:2x 现量核过）
+
+`bash research/tools/r17-evidence-md5-check.sh --all` 对本目录打印 `EMPTY`，那是**预期**，不是漏登记。
+两条按构造成立的原因：
+
+1. 图里有**随机任务名**：`e2e/tests/calendar-day.spec.ts:49` 是
+   `const STAMP = Date.now().toString().slice(-6);`，第 306 行把它拼成 `挂在十六点-${STAMP}`
+   并直接渲染进 16:00 那一格 ⇒ 每跑一趟像素就不同。
+2. 图里有**"今天"的日期**：页头「10月4日 星期日」与侧栏迷你月历跟着系统日期走 ⇒ 隔天必变。
+
+任何一条都让"钉住的 md5"变成**下一趟必然 MISMATCH** 的判据 —— 那比没有判据更糟（AGENTS §8.3 的对偶：
+一条永远红的常驻判据会把人训练成忽略它）。所以这里不钉 md5，改用可复跑的两条：
+
+- 重新拍：`cd e2e && npx playwright test tests/calendar-day.spec.ts`，产物在 `e2e/test-results/` 后复制到本目录。
+- 看图（00:2x 这一趟我打开三张看过，与上面那张表逐条对得上）：
+  `day-timed-hour16.png` = 16:00 那一格里有那条任务、"全天"块是空态文案；
+  `day-timed.png` = 未定时刻的那条**不在**轴上（轴从 0:00 起、全天块给的是同一句空态）；
+  `day-hour-labels.png` = 小时标签逐档 0:00/1:00/2:00/3:00/4:00，"这一天没有到期的任务。"
+
+🟢 要让它**可以**常驻对账，前置是把上面两条随机源消掉（`STAMP` 改成可注入定值 + 把"今天"冻进夹具），
+这属于 e2e 夹具改造、且 `e2e/` 正被并行会话使用 ⇒ 登记不代做。
+
+## 🔴 13:5x 补：这三张此前**一条常驻判据都没有**（工具打 `EMPTY`），现按代码锚点钉上
+
+复跑 `bash research/tools/r17-evidence-md5-check.sh --all` 现量：本目录曾报
+`EMPTY apps/web/evidence/calendar-day-time（README 里解析到 0 条 md5 条目、0 条 UIPIN）`
+—— 也就是"这三张图是当前的交付形状"这句话**没有任何一层会为此变红**（正是那把装置文件头要拦的那件事）。
+
+为什么钉**代码锚点**而不是 md5：图里的任务名带**每趟随机后缀**（现量 `挂在十六点-867223`），
+同一状态重跑必然不同字节 ⇒ md5 是"每跑必红"的判据，§8.3 说它会把人训练成忽略红。
+
+```
+UIPIN day-hour-labels.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN day-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN day-timed-hour16.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+```
+
+钉 `39032107` 的理由（现取，不是抄 HEAD）：上面五条路径里最后一次动过的提交就是它
+（10-04 10:11，那一笔把 `.ht-header` 改成可换行 + 加纵向 padding），而三张的字节是 **10-04 12:41**
+（`stat` 现量）⇒ **拍图晚于决定形状的代码**。字节是别人那一趟跑的，13:5x 由本线**逐张打开看过**。
+
+## 人看到的（13:5x 逐张复核，三张是三种不同状态，别当同一张的三个副本）
+
+| 文件 | 看到的东西 | 它单独断的那一条 |
+|---|---|---|
+| `day-hour-labels.png` | 视图=日、10月4日 星期日；「全天」卡里是「**这一天没有到期的任务。**」；下面时刻轴 `0:00 / 1:00 / 2:00 / 3:00 / 4:00` **每行左侧都画得出小时标签** | 空日子也要有**完整小时刻度**（不是"有任务才画轴"） |
+| `day-timed.png` | 同一视图，但「全天」卡里换成了「**「全天」里还没有任务；定到具体时刻的在下面那条轴上。**」；顶部 `0:00…4:00` 各行是空的 | 有"定到时刻"的任务时，**全天区不许把它收进去**，且空态文案是**另一句**（两句各是一条主张，混用会假绿） |
+| `day-timed-hour16.png` | 滚到 `14:00…18:00`：那条「挂在十六点-867223」**正好落在 16:00 那一行**，14/15/17/18 各行空 | 🔴 R14 的核心：时刻任务落在**它自己那一小时**的行里，既不堆顶部也不进「全天」 |
+
+⚠️ 这三张与 `../calendar-day/` 那五张是**两批**取证（那五张字节 10-03 11:09、已因页头形状过期而留红待重拍；
+本目录这三张字节 12:41、晚于那笔改动 ⇒ 锚点成立）。别把两批混成一句"日视图的图都旧了"。

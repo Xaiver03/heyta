@@ -12,7 +12,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { appPathHref, appUrl, startCta } from '../src/lib/app-url.js';
+import { appPathHref, appUrl, signInHref, startCta } from '../src/lib/app-url.js';
 
 afterEach(() => {
   // 每个用例都从"没配置"这个默认状态开始。漏了这行，前一个用例设的
@@ -152,5 +152,39 @@ describe('appPathHref', () => {
   it('漏写开头的斜杠也能拼对', () => {
     vi.stubEnv('VITE_APP_URL', 'https://example.com/app');
     expect(appPathHref('recover-passkey')).toBe('https://example.com/recover-passkey');
+  });
+});
+
+/**
+ * `signInHref`：导航上那个「登录」的落点。
+ *
+ * 🔴 它与 `startCta` 是**两个意图**，共用同一条"没配置就不猜"的纪律：
+ *   · 「立即使用」= 我要开始用 → 应用根；
+ *   · 「登录」= 我已有账号 → 应用根 **加一个打开认证面板的参数**。
+ * 把后者做成站内那张 `/signin/` 页面，症状是"点登录先读到一篇说明"
+ * —— 2026-10-03 产品负责人实测否掉了它，这个函数就是那次改动的事实源。
+ */
+describe('signInHref()：「登录」直接进应用并打开认证面板', () => {
+  it('配置了应用：地址带 signin 参数', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://heyta.finlaw.cloud/app/');
+    const href = signInHref('zh-CN');
+    expect(href).not.toBeNull();
+    expect(new URL(href!).searchParams.get('signin')).toBe('1');
+    // 仍然落在**应用**上，不是域名的根。
+    expect(new URL(href!).pathname).toBe('/app');
+  });
+
+  it('🔴 未配置应用时返回 null —— 调用点据此退回站内那一页，而不是猜一个地址', () => {
+    vi.stubEnv('VITE_APP_URL', '');
+    expect(signInHref('zh-CN')).toBeNull();
+  });
+
+  it('语言参数与 signin 参数共存，互不覆盖', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://example.com/app/');
+    const href = signInHref('en');
+    expect(href).toBe('https://example.com/app?lang=en&signin=1');
+    // 默认语言不带 lang，但**必须**带 signin —— 否则英文那条能跳、中文那条不能，
+    // 是最难复现的一种"只在一种语言下坏"。
+    expect(signInHref('zh-CN')).toBe('https://example.com/app?signin=1');
   });
 });

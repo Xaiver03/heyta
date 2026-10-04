@@ -46,12 +46,14 @@ import { readFileSync, existsSync } from 'node:fs';
 
 const MANIFEST = [
   'scripts/verify-android-vault-storage.sh',
+  'scripts/verify-ios-vault-keychain.sh',
   'scripts/reinstall-all.sh',
   'scripts/verify-harmony-rnoh-js.sh',
   'scripts/verify-harmony-rnoh.sh',
   'scripts/verify-harmony-toolchain.sh',
   'scripts/verify-ios-lan-http.sh',
   'scripts/verify-mobile-account.sh',
+  'scripts/verify-mobile-account-erasure.sh',
   'scripts/verify-mobile-aed.sh',
   'scripts/verify-mobile-auth.sh',
   'scripts/verify-mobile-autosync.sh',
@@ -62,6 +64,7 @@ const MANIFEST = [
   'scripts/verify-mobile-focus.sh',
   'scripts/verify-mobile-inbox.sh',
   'scripts/verify-mobile-ios.sh',
+  'scripts/verify-mobile-ios-account-erasure.sh',
   'scripts/verify-mobile-lists.sh',
   'scripts/verify-mobile-notes.sh',
   'scripts/verify-mobile-trash.sh',
@@ -79,6 +82,9 @@ const MANIFEST = [
   'scripts/verify-mobile-ticktick-import.sh',
   'scripts/verify-mobile-timeline.sh',
   'scripts/verify-multi-end-sync.sh',
+  // 2026-10-03 补：它一跑就是「打镜像 → 起栈 → 真浏览器 → 等健康（最长 240s）」，
+  // 是清单里最长的那一档之一；文件头本来就写着"新增长跑 .sh 要加进来"，它漏了。
+  'scripts/verify-selfhost-stack.sh',
   'scripts/verify-sync-rejection-recovery.sh',
   'scripts/verify-universal-slice.sh',
 ];

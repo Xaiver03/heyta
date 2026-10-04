@@ -115,7 +115,7 @@
         "name": "I forgot my encryption passphrase. What now?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "There is no recovery, and that is by design, not an oversight. End-to-end encryption means the server holds only ciphertext and has no passphrase that unlocks it — any \"recovery\" would mean the server could read your data. What you can do: export your data from an old device that can still unlock, then start fresh with a new passphrase on the new one. So keep the passphrase safe."
+          "text": "If you have set up an encrypted data key and saved its recovery code, unlock with that code in sync settings, then set a new passphrase and save the new recovery code. Resetting your sign-in password does not unlock data. If both the passphrase and recovery code are lost, the server cannot recover them; export from an old device that can still read your data. Unmigrated legacy ciphertext still needs its original passphrase."
         }
       },
       {
@@ -123,7 +123,7 @@
         "name": "How do passkeys work?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Choose \"passkey\" when signing in and confirm with your device's face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the sign-in page offers \"Lost your passkey?\", which emails a recovery link where you register a new one. ⚠️ The last remaining credential cannot be deleted — delete it and you are locked out."
+          "text": "Choose \"passkey\" when signing in and confirm with your device's face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the app's sign-in panel offers \"Lost your passkey?\", which emails a recovery link where you register a new one. ⚠️ The last remaining credential cannot be deleted — delete it and you are locked out."
         }
       },
       {
@@ -163,7 +163,7 @@
         "name": "How do I run my own server?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "You can, but this is \"operate a service yourself\", not one command and you are done: no prebuilt image is published (you build it), bringing the service up is not a deployment (the table-structure changes have to be applied explicitly, once). Registration and sign-in run on email + password; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with REQUIRE_EMAIL_VERIFICATION=false. See \"Running your own sync server\"."
+          "text": "You can, but this is \"operate a service yourself\": no prebuilt image is published (you build it), and upgrading is not one command — the one-shot migration service exits after it runs and compose does not restart an exited service, so after a table-structure change you re-run the command that names supersync-migrate. Registration and sign-in run on email + password; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with REQUIRE_EMAIL_VERIFICATION=false. See \"Running your own sync server\"."
         }
       },
       {

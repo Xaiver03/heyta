@@ -112,13 +112,17 @@ export interface ShellPanelSection {
 }
 
 /**
- * 侧栏主导航：**4 项**。`App.tsx` 的 `PRIMARY_NAV` ——
- * 收集箱 / 今天 / 最近 7 天 / 已完成。「已完成」曾经漏掉，是 §2 #1 的漂移；
+ * 侧栏主导航：**3 项**。`App.tsx` 的 `PRIMARY_NAV` ——
+ * 今天 / 最近 7 天 / 已完成。「已完成」曾经漏掉，是 §2 #1 的漂移；
  * 「最近 7 天」是**同一种漂移的第二次**（真应用 2026-10-01 加了它，登记处没跟上，
  * 于是 `pnpm -r test` 在 `mockup-shell-shape` 上红了整整一天）。
+ *
+ * 🔴 「收集箱」这一项在 2026-10-04 被**删掉**（不是这里漏画）：产品负责人
+ * 「已经有一个收集箱的标题了，为什么还要个收集箱？在信息架构上面是重复的」。
+ * 画一张"外壳形状"的图，就要跟着真外壳变 —— 这条对账判据（本文件 #1）
+ * 的存在正是为了让它没法悄悄不跟。
  */
 export const SHELL_PRIMARY_NAV: readonly ShellPrimaryNavItem[] = [
-  { labelKey: 'web.shell.nav.inbox', icon: 'inbox' },
   { labelKey: 'web.shell.nav.today', icon: 'sun' },
   { labelKey: 'web.shell.nav.next7Days', icon: 'calendar-range' },
   { labelKey: 'web.shell.nav.completed', icon: 'check-circle' },

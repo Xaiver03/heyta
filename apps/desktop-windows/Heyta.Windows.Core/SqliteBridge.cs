@@ -25,8 +25,15 @@ public sealed class SqliteBridge : IDisposable
 {
     private readonly SqliteConnection _connection;
 
+    /// <summary>
+    /// 打开时用的路径原样留着 —— <see cref="removeDatabase" /> 报的 `target`
+    /// 必须是**真的那个文件**，而不是一个便于实现的占位串。
+    /// </summary>
+    private readonly string _path;
+
     public SqliteBridge(string path)
     {
+        _path = path;
         _connection = new SqliteConnection($"Data Source={path}");
         _connection.Open();
 
@@ -67,6 +74,38 @@ public sealed class SqliteBridge : IDisposable
         {
             _connection.Close();
         }
+    }
+
+    /// <summary>
+    /// 移除库文件本身（不是清空表）。返回**跨边界的 JSON 文本** ——
+    /// <c>exec</c> / <c>run</c> / <c>all</c> 已经是字符串过界，这一个同一条形状。
+    ///
+    /// 🔴 **不抛**，也不走 <c>{"__heytaDriverError":…}</c> 信封：调用方是
+    /// <c>SqliteAdapter.destroy()</c>，从这儿抛出去会让**整次销毁**失败，
+    /// 于是剩下几类存储一条都不被清 —— 而"删不掉"本来就是允许的结果。
+    /// </summary>
+    public string removeDatabase()
+    {
+        try
+        {
+            // 适配器已经调过一次 close()；这里只是幂等兜底。
+            close();
+            if (_path != ":memory:")
+            {
+                // 🔴 实测：`Close()` 之后**进程仍然持有这个库的文件句柄**
+                // （`lsof` 看得见，`ClearPool()` 之后才消失）—— `Microsoft.Data.Sqlite`
+                // 默认开连接池。POSIX 上带着句柄也删得掉，所以本机看不出任何问题；
+                // Windows 上那是 ERROR_SHARING_VIOLATION：报告写"已删除"而明文还在，
+                // 正是这条契约存在的理由。
+                SqliteConnection.ClearPool(_connection);
+            }
+        }
+        catch (Exception)
+        {
+            // 关不掉也继续删：真正的失败由下面的 reason 报出去。
+        }
+
+        return SqliteContainer.Remove(_path);
     }
 
     /// <summary>高精度时钟（微秒）。Jint 里没有 <c>performance.now()</c>，计时走宿主。</summary>

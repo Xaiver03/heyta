@@ -1,14 +1,60 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
 import {
+  HostedDeviceManagementError,
   VaultSessionError,
+  listHostedSyncDevices,
+  runHostedDeviceRevocation,
+  type HostedSyncAuthSnapshot,
   type PendingVaultCreation,
+  type HostedSyncDevice,
   type VaultKeySession,
 } from '@heyta/app-host';
 import { cancelWebVaultRootRotation, confirmWebVaultRootRotation, getWebVaultRemote, getWebVaultSession } from '../../lib/vault-session.js';
 import { useSyncStore } from './store.js';
 
 type PendingAction = 'create' | 'change' | 'rotate';
+
+const DEVICE_REVOCATION_GUIDANCE_PREFIX = 'heyta.device-revocation-guidance.v1:';
+
+function deviceRevocationGuidanceKey(accountId: string, baseUrl: string): string | undefined {
+  try {
+    return `${DEVICE_REVOCATION_GUIDANCE_PREFIX}${new URL(baseUrl).origin}\u0000${accountId}`;
+  } catch {
+    return undefined;
+  }
+}
+
+function hasDeviceRevocationGuidance(accountId: string, baseUrl: string): boolean {
+  const key = deviceRevocationGuidanceKey(accountId, baseUrl);
+  if (key === undefined || typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(key) === 'pending';
+  } catch {
+    return false;
+  }
+}
+
+function saveDeviceRevocationGuidance(accountId: string, baseUrl: string): void {
+  const key = deviceRevocationGuidanceKey(accountId, baseUrl);
+  if (key === undefined || typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, 'pending');
+  } catch {
+    // Guidance is still shown for this mounted panel; storage is only the
+    // recovery path for a later re-authentication/remount.
+  }
+}
+
+function clearDeviceRevocationGuidance(accountId: string, baseUrl: string): void {
+  const key = deviceRevocationGuidanceKey(accountId, baseUrl);
+  if (key === undefined || typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // A storage failure must not make an already completed rotation fail.
+  }
+}
 
 function errorKey(error: unknown): string {
   if (!(error instanceof VaultSessionError)) return 'web.sync.vault.error';
@@ -42,6 +88,11 @@ export function VaultSettingsPanel() {
   const [pendingAction, setPendingAction] = useState<PendingAction>();
   const [revision, setRevision] = useState(0);
   const [migrationProgress, setMigrationProgress] = useState<{ completed: number; total: number }>();
+  const [devices, setDevices] = useState<readonly HostedSyncDevice[]>([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [deviceError, setDeviceError] = useState<string>();
+  const [deviceBusy, setDeviceBusy] = useState<string>();
+  const [deviceNotice, setDeviceNotice] = useState<string>();
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +127,89 @@ export function VaultSettingsPanel() {
       cancelled = true;
     };
   }, [sync.accountId, sync.baseUrl, sync.token]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDevices([]);
+    setDeviceError(undefined);
+    if (sync.accountId === undefined || sync.accountId === '' || sync.baseUrl === '' || sync.token === undefined) {
+      setDevicesLoading(false);
+      return undefined;
+    }
+    setDeviceNotice(
+      hasDeviceRevocationGuidance(sync.accountId, sync.baseUrl)
+        ? 'web.sync.devices.revoked'
+        : undefined,
+    );
+    setDevicesLoading(true);
+    void listHostedSyncDevices({ baseUrl: sync.baseUrl, getToken: async () => sync.token })
+      .then((next) => {
+        if (!cancelled) setDevices(next);
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) setDeviceError(caught instanceof HostedDeviceManagementError && caught.code === 'unauthorized'
+          ? 'web.sync.devices.unauthorized'
+          : 'web.sync.devices.error');
+      })
+      .finally(() => {
+        if (!cancelled) setDevicesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sync.accountId, sync.baseUrl, sync.token]);
+
+  const revokeDevice = (clientId: string): void => {
+    if (deviceBusy !== undefined) return;
+    const currentBeforeConfirm = useSyncStore.getState();
+    if (currentBeforeConfirm.accountId === undefined || currentBeforeConfirm.accountId.trim() === '' ||
+        currentBeforeConfirm.baseUrl.trim() === '' || currentBeforeConfirm.token === undefined) {
+      setDeviceError('web.sync.devices.error');
+      return;
+    }
+    const capturedAuth: HostedSyncAuthSnapshot = {
+      accountId: currentBeforeConfirm.accountId.trim(),
+      baseUrl: currentBeforeConfirm.baseUrl,
+      token: currentBeforeConfirm.token,
+    };
+    if (!window.confirm(t('web.sync.devices.confirm'))) return;
+    setDeviceBusy(clientId);
+    setDeviceError(undefined);
+    void runHostedDeviceRevocation({
+      auth: capturedAuth,
+      readCurrentAuth: () => {
+        const current = useSyncStore.getState();
+        if (current.accountId === undefined || current.accountId.trim() === '' || current.baseUrl.trim() === '' || current.token === undefined) return undefined;
+        return { accountId: current.accountId.trim(), baseUrl: current.baseUrl, token: current.token };
+      },
+      clientId,
+      persistRotationGuidance: () => {
+        saveDeviceRevocationGuidance(capturedAuth.accountId, capturedAuth.baseUrl);
+      },
+      clearCurrentSession: () => {
+        useSyncStore.getState().clearCredentials();
+      },
+    })
+      .then((outcome) => {
+        setDeviceNotice(outcome.status === 'ambiguous'
+          ? 'web.sync.devices.revocationUncertain'
+          : 'web.sync.devices.revoked');
+        if (!outcome.authStillCurrent) return;
+        if (outcome.status === 'committed') {
+          setDevices((devicesNow) => devicesNow.filter((device) => device.clientId !== outcome.revocation.clientId));
+        }
+      })
+      .catch((caught: unknown) => {
+        setDeviceError(caught instanceof HostedDeviceManagementError
+          ? caught.code === 'unauthorized'
+            ? 'web.sync.devices.unauthorized'
+            : caught.code === 'session-changed'
+              ? 'web.sync.devices.sessionChanged'
+              : 'web.sync.devices.error'
+          : 'web.sync.devices.error');
+      })
+      .finally(() => setDeviceBusy(undefined));
+  };
 
   const run = async (action: () => Promise<void>, fallbackError?: string): Promise<void> => {
     setBusy(true);
@@ -118,6 +252,39 @@ export function VaultSettingsPanel() {
       ) : null}
       {error !== undefined ? (
         <p role="alert" data-testid="vault-error" className="ht-settings__danger">{t(error as never)}</p>
+      ) : null}
+      {deviceNotice !== undefined ? (
+        <p role="status" data-testid="vault-device-notice" className="ht-settings__hint">{t(deviceNotice as never)}</p>
+      ) : null}
+
+      {sync.accountId !== undefined && sync.accountId !== '' && sync.baseUrl !== '' && sync.token !== undefined ? (
+        <div data-testid="vault-devices" className="ht-settings__section">
+          <strong>{t('web.sync.devices.title')}</strong>
+          <p className="ht-settings__hint">{t('web.sync.devices.description')}</p>
+          {devicesLoading ? <p className="ht-settings__hint">{t('web.sync.devices.loading')}</p> : null}
+          {deviceError !== undefined ? <p role="alert" className="ht-settings__danger">{t(deviceError as never)}</p> : null}
+          {!devicesLoading && deviceError === undefined && devices.length === 0 ? (
+            <p className="ht-settings__hint">{t('web.sync.devices.empty')}</p>
+          ) : null}
+          {devices.length > 0 ? (
+            <ul>
+              {devices.map((device) => (
+                <li key={device.clientId}>
+                  <span>{device.clientId} · {t('web.sync.devices.lastSeen', { date: new Date(device.lastSeenAt).toLocaleString() })}</span>
+                  <button
+                    type="button"
+                    className="ht-btn ht-btn--ghost"
+                    data-testid={`vault-device-revoke-${device.clientId}`}
+                    disabled={deviceBusy !== undefined}
+                    onClick={() => revokeDevice(device.clientId)}
+                  >
+                    {deviceBusy === device.clientId ? t('web.sync.devices.revoking') : t('web.sync.devices.revoke')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
 
       {!loading && session !== undefined && !hasPackage && pending === undefined ? (
@@ -223,6 +390,10 @@ export function VaultSettingsPanel() {
                     ...(legacyPassphrase !== '' ? { password: legacyPassphrase } : {}),
                     onProgress: (progress) => setMigrationProgress({ completed: progress.completed, total: progress.total }),
                   });
+                  if (sync.accountId !== undefined && sync.accountId !== '') {
+                    clearDeviceRevocationGuidance(sync.accountId, sync.baseUrl);
+                    setDeviceNotice(undefined);
+                  }
                 } else {
                   await session!.confirmAndPublish(pending, pendingCode, remote);
                 }

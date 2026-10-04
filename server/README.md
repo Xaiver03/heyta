@@ -39,10 +39,14 @@ Deploy hosts need Docker with the Compose plugin, `curl`, `git`, and `jq`.
 The image revision check requires Docker Compose support for
 `docker compose config --format json`.
 
-> **There are no release tags.** `ghcr.io/super-productivity/supersync` publishes
-> only `latest` and `master-<sha>`, both built from `master`, so a default deploy
-> tracks upstream `master` rather than a released version. Pin `SUPERSYNC_IMAGE`
-> to a `master-<sha>` tag if you need a fixed one.
+> **🔴 No images are published for heyta, and the upstream ones are not substitutes.**
+> `ghcr.io/super-productivity/supersync` ships only `latest` and `master-<sha>`, both built
+> from Super Productivity's own server — whose entity list, migrations and encryption
+> enforcement have diverged from this repository. Pointing `SUPERSYNC_IMAGE` at it starts
+> fine, passes `/health`, and runs **someone else's schema**. The compose default is
+> therefore the locally built `supersync:local` (see `docker-compose.yml`); build it with
+> `./scripts/deploy.sh --build`, or push your own build to a registry you control and set
+> `SUPERSYNC_IMAGE` to it (passing the same `VCS_REF` — see the revision check below).
 
 ```bash
 # 1. Enter the server directory **of this repository**.
@@ -56,19 +60,80 @@ cd server
 # 2. Copy environment example
 cp env.example .env
 
-# 3. Configure .env (Set JWT_SECRET, DOMAIN, POSTGRES_PASSWORD)
+# 3. Configure .env
+#    Refuses to start without these three: JWT_SECRET (>= 32 chars),
+#    PASSWORD_PEPPER, POSTGRES_PASSWORD.
+#    🔴 Two more have defaults that are WRONG for you and fail silently:
+#    DOMAIN and PUBLIC_URL (default http://localhost:1900) — leave them at the
+#    default and every verification / password-reset email points at localhost.
 nano .env
 
 # 4. Deploy the stack and run database migrations
-./scripts/deploy.sh
+#    🔴 `--build` is not optional today: heyta publishes no image, and the default
+#    image name is `supersync:local`. Without `--build`, deploy.sh tries to PULL it
+#    and you get `pull access denied for supersync … may require 'docker login'`
+#    (there is no registry to log in to).
+./scripts/deploy.sh --build
 ```
+
+**`./scripts/deploy.sh` is the supported entry point, and the reason is the migrations.**
+It applies them **while the previous app container is still serving**, and only swaps the
+container if that succeeded — so a bad migration leaves you running the old build instead of
+leaving you with a new build against a schema it does not know.
+
+Plain `docker compose up -d` does **not** do that, on purpose: `RUN_MIGRATIONS_ON_STARTUP`
+defaults to `false` here (see the Configuration table below) because startup migrations make
+replicas fight over Prisma's migration lock, and because adding a migrate step to the default
+service graph would collide with the migrator `deploy.sh` already owns. The honest consequence
+is that bare `up -d` on a fresh volume **starts an app against an unmigrated schema**.
+
+If you want compose alone to be enough — first boot, no `deploy.sh` — opt into the one-shot
+migrator, which is the same shape as the Helm chart's `migrate-db` init container:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml \
+  -f docker-compose.migrate-once.yml up -d --build
+```
+
+🔴 **Do not drop `docker-compose.build.yml` unless you already have the image.** No heyta images
+are published, and the default `image:` value is `${SUPERSYNC_IMAGE:-supersync:local}` — without
+the build override compose has neither a build definition nor a local tag, so it tries to
+**pull** and you get `pull access denied for supersync, repository does not exist or may require
+'docker login'`. That hint is the misleading part: there is no registry to log in to. The build
+override is also where `APK_MIRROR` and `NPM_REGISTRY` live, so it is the file that makes this
+path work on a machine that cannot reach Alpine's CDN or npm's registry.
+
+The override adds exactly one service and does not touch the default graph. It waits for
+Postgres to be healthy, runs `scripts/migrate-deploy.sh` from the image, and only then lets the
+app start (`service_completed_successfully`). ⚠️ It migrates on **first** boot: a one-shot
+container whose config hash did not change is not re-run by a later `up -d`, so upgrades still
+need `deploy.sh` (or `--force-recreate supersync-migrate`). A migration entry that quietly only
+works once, documented as if it worked always, would be worse than none — it would make the
+operator believe the schema is current.
+
+**That is the whole setup — there is no separate frontend to build or host.** The image
+contains the web client, built from the same commit as the server it ships with, and the
+server serves it at `/app/` (default; `WEB_APP_PATH` moves it, `WEB_APP_DIR=` turns it
+off). The app container publishes `127.0.0.1:1900` only, so on the deploy host it is
+`http://127.0.0.1:1900/app/`, and for other people it is `https://<your-domain>/app/`
+through the bundled Caddy service — which reverse-proxies everything to 1900, so it needs
+no per-path configuration for the UI. The startup log line
+`[web-app] 共享 UI 挂在 /app/（来自 ...）` is what "this container really has a UI"
+looks like; no such line means the directory was absent, which is a legitimate API-only
+deployment rather than an error.
+
+`CORS_ORIGINS` does **not** need an entry for the bundled client: it is same-origin with
+the API by construction. That variable is for clients served from *another* origin.
 
 `./scripts/deploy.sh --build` builds the image locally instead of pulling it.
 That compiles the whole monorepo **on the deploy host**, beside the running
 stack: expect several minutes and a peak above 1.5 GB of RAM on top of the
 ~2.5 GB the containers already reserve, plus a BuildKit cache that grows by
-~1.4 GB per build and is never pruned for you. On a small VPS, prefer the pull,
-or build elsewhere and set `SUPERSYNC_IMAGE` (passing the same `VCS_REF`, see
+~1.4 GB per build and is never pruned for you. 🔴 **`--build` is the only path that
+works today** — heyta publishes no image, so "prefer the pull" is not available here
+(the pull now fails loudly with a message naming `--build`, rather than Docker's
+misleading "may require 'docker login'"). On a small VPS, build elsewhere and set
+`SUPERSYNC_IMAGE` to a tag in **your own** registry (passing the same `VCS_REF`, see
 below). `--build` also refuses to run if the image inputs have uncommitted or
 untracked changes; the error names the offending files.
 
@@ -271,13 +336,15 @@ All configuration is done via environment variables.
 | `HOST`                                  | `0.0.0.0`                            | Server bind address. Use `::` for IPv6-only deployments.                                                                                       |
 | `DATABASE_URL`                          | -                                    | PostgreSQL connection string (e.g. `postgresql://user:pass@localhost:5432/db`)                                                                 |
 | `JWT_SECRET`                            | -                                    | **Required.** Secret for signing JWTs (min 32 chars)                                                                                           |
-| `PUBLIC_URL`                            | -                                    | **Required.** Public URL used for email links (e.g. `https://sync.example.com`)                                                                |
+| `PUBLIC_URL`                            | `http://localhost:1900`              | 🔴 **Has a default, and that default is wrong for any real deployment.** It is the base for every email link (verify / reset). Leave it and the server starts fine while the emails point at localhost — the failure is silent, not a crash. Under `NODE_ENV=production` a *public* host must be https (that one does throw); loopback / private IPs over http are deliberately allowed. |                                                                |
 | `CORS_ORIGINS`                          | `https://app.super-productivity.com` | Allowed CORS origins. `*` allows any origin — never do this in production, CORS runs with `credentials: true`.                                 |
 | `SMTP_HOST`                             | -                                    | SMTP Server for emails                                                                                                                         |
 | `WEBAUTHN_RP_ID`                        | `localhost`                          | **Required for passkeys.** Your domain, without protocol or port. Passkeys bind to this — changing it invalidates every registered credential. |
 | `WEBAUTHN_ORIGIN`                       | `http://localhost:1900`              | **Required for passkeys.** Where users reach the auth UI, with protocol.                                                                       |
 | `WEBAUTHN_RP_NAME`                      | value of `WEBAUTHN_RP_ID`            | Name shown in your users' OS passkey prompt.                                                                                                   |
 | `ALLOWED_EMAILS`                        | - (anyone may register)              | Comma-separated exact addresses and/or `*@domain` rules.                                                                                       |
+| `WEB_APP_DIR`                           | `/app/web-dist` (in the image)       | Where the built web client lives on disk. The switch is "does this directory exist", not a boolean: empty value = serve no UI, a non-empty path **without `index.html` is not an error** — it logs one line and serves API only (that is a legitimate deployment, e.g. someone hosting the UI elsewhere), and a path starting with a reserved segment (`/api`, `/health`, `/live`, `/ws`) **is** refused at startup rather than silently relocated. |
+| `WEB_APP_PATH`                          | `/app/`                              | URL prefix the client is served under. It must match how the UI was **built** (`HEYTA_WEB_BASE` at build time) — mismatched pairs load HTML where CSS is expected. ⚠️ Nothing checks this pair **at runtime**: the build-time gate (`check:web-artifact`) only runs in our pipeline, so setting `WEB_APP_PATH=/ui/` against an image baked for `/app/` starts cleanly and serves a blank page. Change both or neither. |
 | `SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES` | `104857600` (100 MB)                 | Quota for accounts created from now on. Existing accounts keep the value stored on their row.                                                  |
 
 ### Legal pages
@@ -371,12 +438,65 @@ Check sync status and storage info. Not used by the production client — intend
 GET /api/sync/status
 ```
 
-## Client Configuration
+## Clients and version coupling
 
-In Super Productivity, configure the Custom Sync provider with:
+heyta is local-first with end-to-end encryption: the server stores ciphertext and op-logs,
+so what a client must agree on with a server is the **wire contract**
+(`packages/shared-schema`) and the entity list, not a REST surface.
 
-- **Base URL**: `https://sync.your-domain.com` (or your deployed URL)
-- **Auth Token**: JWT token from login
+There are two cases, and they are deliberately different:
+
+- **The web client shipped in this image.** It is built from the same commit as the server
+  and served at `/app/`, so there is no matrix to consult — the coupling is resolved by
+  construction. `deploy.sh`'s `org.opencontainers.image.revision` check is what keeps a
+  "same tag, different content" image from sneaking past it.
+- **Any other client** (the mobile shells, the desktop shells, `apps/node-host`, or a UI
+  you host separately): the only supported combination is **a client built from the same
+  source revision as the server image it talks to**. Point a separately-hosted UI at your
+  API and you own keeping the two in step, including `CORS_ORIGINS`.
+
+Why there is no "N-1 works" or "same major only" promise yet — stated plainly because a
+policy that cannot be enforced is decoration:
+
+- Nothing has been released, so there is no older version to be compatible with.
+- The server can already see a client's version (`appVersion` on the download request is
+  parsed and recorded per device in `server/src/sync/checkpoint-gate.ts` /
+  `sync.routes.ts`), but **no heyta client sends it today**: the one place that builds the
+  download query (`packages/sync-client/src/client.ts`) sets `sinceSeq` and `excludeClient`
+  only, and every host goes through it. A version gate would therefore match nothing, and a
+  "supported versions" table would be unreadable by the software it describes.
+
+The trigger to revisit this: the first time images are published (see
+`docs/research/self-host-distribution-audit.md` §7 G-40⑤/⑥). Reporting `appVersion` is
+**one** prerequisite, not the pair the sentence used to claim — the full chain is:
+
+1. a **version source** for client builds (G-40⑤) whose space matches the gate's constant.
+   `MIN_CHECKPOINT_SAFE_APP_VERSION` is `18.21.2`, a *Super Productivity* release number, and
+   heyta versions are `0.x` — so a heyta-space value always compares as "old" and reporting
+   it changes nothing except the wording an operator reads.
+2. a client that **creates** a causal full-state boundary. The sweep authorizes deletion from
+   the newest causal full-state op (`storage-quota.service.ts:417`), and no heyta client
+   creates one. To be exact about which half is missing: the **server side is fully
+   implemented** (`sync/sync.routes.snapshot-handler.ts` parses `snapshotOpType` and writes
+   the boundary), while the client side never calls it — `SYNC_IMPORT` / `BACKUP_IMPORT` /
+   `REPAIR` appear in heyta's code only as enum members
+   (`packages/shared-schema/src/supersync-http-contract.ts:20-22`,
+   `packages/sync-core/src/operation.types.ts:18/26/34`); `packages/sync-client` contains no
+   snapshot or checkpoint path at all (4 files, zero case-insensitive matches), and no
+   `apps/*` source constructs one. Practical consequence today: for accounts that only ever
+   use heyta clients nothing is pruned, so history grows — a storage cost, not a data-loss
+   risk. An upstream *Super Productivity* client pointed at this server **does** create
+   boundaries, which is precisely why the version check can't be loosened to fit heyta's
+   numbers: a `0.x` value would have to be compared against a cut meaningfully expressed in
+   `18.x` space.
+3. something that **acts** on the gate. Right now its only consumer is the daily
+   `Cleanup [checkpoint-gate]` log line (`sync/cleanup.ts`); no automatic cadence exists.
+
+⚠️ Which is also why (2) can't be skipped: sending a version without a client-side
+full-state path would push `safeAccounts` toward "all safe" while the property the gate
+protects is still absent — the log would read safer than the software is. All three land
+together, or a "supported versions" table stays what it is today: unreadable by the
+software it describes.
 
 ## Maintenance
 

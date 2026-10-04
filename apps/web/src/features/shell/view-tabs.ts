@@ -71,8 +71,19 @@ export const QUADRANT_NAV: NavEntry[] = [
   },
 ];
 
+/**
+ * 第二列顶部的「智能清单」组。
+ *
+ * 🔴 **这里没有「收集箱」那一行**（2026-10-04 产品负责人：「已经有一个收集箱的
+ * 标题了，为什么还要个收集箱？在信息架构上面是重复的」）。中间那一列的页头
+ * 本来就按当前筛选显示「收集箱」，侧栏再放一行同名入口等于让同一个目的地
+ * 有两个名字相近、高亮状态还各自独立的控件。
+ * ⇒ `{ kind: 'all' }` 的入口搬到 **rail 的「任务」**：点它 = 进任务视图并把筛选
+ * 重置到收集箱（见 `App.tsx` 视图 tab 的 `onClick`）。这条不是"顺手加的补丁"，
+ * 而是删掉那一行之后**唯一**能回到收集箱的路径，所以它必须有判据（`tests/
+ * app-mount.spec.tsx`）。
+ */
 export const PRIMARY_NAV: NavEntry[] = [
-  { filter: { kind: 'all' }, labelKey: 'web.shell.nav.inbox', icon: Inbox },
   { filter: { kind: 'today' }, labelKey: 'web.shell.nav.today', icon: Sun },
   /**
    * 「最近 7 天」—— 滴答那三个智能清单里的中间一个（收集箱 / 今天 / 最近 7 天）。
@@ -83,7 +94,8 @@ export const PRIMARY_NAV: NavEntry[] = [
    * 也不许把 7 写成字面量 —— 侧栏标签上的数与该常数的同源关系钉在
    * `tests/task-groups.spec.tsx`。
    *
-   * 顺序放在「今天」之后：两条都是"按日期看的未完成"，收集箱垫底看全部。
+   * 这一组只剩「今天」与「最近 7 天」两条都属"按日期看的未完成"；
+   * 看全部（收集箱）走 rail 的「任务」，理由见上面 `PRIMARY_NAV` 的文件头。
    */
   { filter: { kind: 'next7Days' }, labelKey: 'web.shell.nav.next7Days', icon: CalendarRange },
   /**

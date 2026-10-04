@@ -35,7 +35,18 @@ export const MAX_SNAPSHOT_SIZE_BYTES = 50 * 1024 * 1024;
  */
 export const MAX_SNAPSHOT_DECOMPRESSED_BYTES = 100 * 1024 * 1024;
 
-const REPLAY_OPERATION_SELECT = {
+/**
+ * The column set a correct `replayOpsToState` input needs.
+ *
+ * 🔴 Exported because it is NOT snapshot-internal: `scripts/recover-user.ts`
+ * replays the same op-log for operator-side recovery, and a column dropped here
+ * silently changes what a *recovered file* contains (measured 2026-10-04: without
+ * `entityIds` a batch DEL resurrected entities 2..n in the recovered state;
+ * without `repairBaseServerSeq` any account that ever used REPAIR could not be
+ * recovered at all). Two hand-written copies of this set is how that drifted —
+ * there is now one.
+ */
+export const REPLAY_OPERATION_SELECT = {
   id: true,
   serverSeq: true,
   opType: true,

@@ -13,6 +13,27 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+#if DEBUG
+    if let stage = ProcessInfo.processInfo.arguments.drop(while: { $0 != "-HEYTA_KEYCHAIN_PROBE" }).dropFirst().first {
+      HeytaVaultSecureStorage.runProbe(stage: stage)
+    }
+#endif
+#if HEYTA_REMINDER_PROBE
+    if let marker = ProcessInfo.processInfo.arguments.firstIndex(of: "-HEYTA_REMINDER_PROBE") {
+      let argument = marker + 1 < ProcessInfo.processInfo.arguments.count
+        ? ProcessInfo.processInfo.arguments[marker + 1] : "0"
+      HeytaReminderProbe.run(after: Int(argument) ?? 0)
+      // A probe is an OS boundary observation, not an app launch. Starting
+      // React Native here would run startup reconcile while the caller is
+      // trying to inspect pre-recovery pending/delivered state and could
+      // manufacture the very receipt the probe is meant to distinguish.
+      // Keep the process alive until the delayed callback writes its file.
+      DispatchQueue.main.async {
+        RunLoop.main.run(until: Date(timeIntervalSinceNow: 30))
+      }
+      return true
+    }
+#endif
     UNUserNotificationCenter.current().delegate = self
     UNUserNotificationCenter.current().setNotificationCategories([
       UNNotificationCategory(identifier: HeytaReminderReceipts.category, actions: [],

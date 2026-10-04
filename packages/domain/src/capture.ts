@@ -185,6 +185,86 @@ const WEEKDAY_CHAR: Record<string, number> = {
   天: 7,
 };
 
+/**
+ * 裸「N 号」的取值范围（月内日）。
+ *
+ * ⚠️ **这条不是守卫，是早退。** 实测（变异：整段摘掉 ⇒ 用例 0 红）：
+ * 「37 号」「0 号」被拒**靠的是 `makeLocalDate` 的日期存在性校验**，
+ * 不是这里的 1..31。留着它的理由只有两条，都不涉及正确性：
+ * 不可能的日子不必再试满 12 个月；以及读代码的人一眼看得出上限是 31。
+ * 所以**别把它当防线** —— 要改误伤面就改下面两张黑名单。
+ */
+const DAY_OF_MONTH_MIN = 1;
+const DAY_OF_MONTH_MAX = 31;
+
+/**
+ * 「号」**后面**接这些字 ⇒ 这个「N 号」是编号/地址，不是日子。
+ *
+ * 每一项都对应一个真实中文说法（楼/栋/座/院/单元 → 地址，门/口/层/区/排/列 →
+ * 位置编号，电/会/字/文/车/票/码/线/站/路/街/巷/弄/床/铺/船/舰/车 → 物件名）。
+ * ⚠️ 刻意**不含**「中」「上」「下」「晚」「之」「那」「生」——
+ * 「5 号中午」「5 号下午三点」「5 号之前」「5 号生日」都是日子，
+ * 把它们挡掉的代价远大于「5 号中央大厅」这种漏网。
+ */
+const DAY_NUMBER_LABEL_AFTER = new Set([
+  '楼',
+  '栋',
+  '座',
+  '幢',
+  '院',
+  '区',
+  '层',
+  '门',
+  '口',
+  '排',
+  '列',
+  '线',
+  '站',
+  '路',
+  '街',
+  '巷',
+  '弄',
+  '室',
+  '电',
+  '会',
+  '字',
+  '文',
+  '车',
+  '票',
+  '码',
+  '牌',
+  '床',
+  '铺',
+  '船',
+  '舰',
+]);
+
+/**
+ * 「N 号」**前面**接这些字 ⇒ 同样是编号（「房间 8 号」「3 单元 8 号」「第 5 号」）。
+ *
+ * 与上面那张表分开列是因为它们判的是**不同的字符位置**，合并会看不出漏了哪一侧。
+ * 「月/日/年」在这里是必要的而不是冗余的：`M月D日` 规则会整段认领「10 月 8 号」，
+ * 去重叠那一层已经挡掉了；这一条兜的是**月规则自己没匹配上**的写法
+ * （「几月 5 号」—— 没有数字前缀，月规则不成立，此时「5 号」也不该被当日子，
+ * 因为用户说的是一件还没定月份的事）。
+ */
+const DAY_NUMBER_LABEL_BEFORE = new Set([
+  '月',
+  '日',
+  '年',
+  '第',
+  '房',
+  '间',
+  '室',
+  '楼',
+  '栋',
+  '座',
+  '床',
+  '铺',
+  '元',
+  '号',
+]);
+
 interface Resolved {
   display: string;
   dueDate?: LocalDate;
@@ -380,6 +460,57 @@ const RULES: Rule[] = [
         d = next;
       }
       return { display: d, dueDate: d };
+    },
+  },
+  {
+    field: 'dueDate',
+    re: /(\d{1,2})\s*号/g,
+    resolve: (m, ctx) => {
+      // 裸「14 号」= 月内日。这条是**最后加**的绝对日期写法，因为它在中文里
+      // 天生有歧义：「37 号楼」「5 号电池」「3 号会议室」里的「N 号」是**编号**，
+      // 不是日子。误伤的后果是把用户写的字从标题里删掉并挂上一个错日期，
+      // 所以这里的立场和本文件一致：**宁可少认，不可错认**（见文件头）。
+      //
+      // 三层守卫，缺一不可（每一层都由不同的反例钉住，见 capture.spec.ts）：
+      //   1. **日期存在性** —— `makeLocalDate` 判"这个月有没有这一天"，
+      //      「37 号」「0 号」在这里被拒（不是靠下面那个 1..31 的早退）；
+      //   2. 双侧非数字 —— 挡掉「2026 号」被切成「26 号」、以及「5 号101」；
+      //   3. 前后不接编号用语 —— 挡掉「号楼/号电池/会议室」与「房间 8 号 / 单元 8 号」。
+      // 守卫 3 是**黑名单**而不是白名单，这是有意的取舍：白名单（"号后面必须是
+      // 交/开/去/下午…"）会把「5 号体检」「5 号见客户」这类无穷无尽的动词全漏掉，
+      // 少认少到这条规则几乎没有产出；黑名单只放过"最常见的确实是日子"的形状，
+      // 代价是新出现一个编号词（如「5 号站台」）时会被误认 —— 而那一处用户
+      // 可以在识别条里点掉（`matches` + `exclude`，见文件头不变量 2）。
+      const before = m.index > 0 ? ctx.input.charAt(m.index - 1) : '';
+      const afterIdx = m.index + m[0].length;
+      const after = afterIdx < ctx.input.length ? ctx.input.charAt(afterIdx) : '';
+      if (isDigit(before) || isDigit(after)) return undefined;
+      if (DAY_NUMBER_LABEL_BEFORE.has(before) || DAY_NUMBER_LABEL_AFTER.has(after)) {
+        return undefined;
+      }
+
+      const day = Number(m[1]);
+      if (!Number.isInteger(day) || day < DAY_OF_MONTH_MIN || day > DAY_OF_MONTH_MAX) {
+        return undefined;
+      }
+
+      // 从**本月**开始往后找第一个"这个日子存在、且不早于今天"的月份。
+      // 两个都必须查：29/30/31 号在有些月份根本不存在（不能像 `addMonths` 那样
+      // 夹到月末 —— 用户说 31 号，给他 28 号是错的），而这个日子在本月往往已过。
+      let year = Number(ctx.today.slice(0, 4));
+      let month = Number(ctx.today.slice(5, 7));
+      for (let step = 0; step < 12; step += 1) {
+        const candidate = makeLocalDate(year, month, day);
+        if (candidate !== undefined && candidate >= ctx.today) {
+          return { display: candidate, dueDate: candidate };
+        }
+        month += 1;
+        if (month > 12) {
+          month = 1;
+          year += 1;
+        }
+      }
+      return undefined;
     },
   },
   {

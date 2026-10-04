@@ -219,7 +219,7 @@ const zh = [
         rows: [
           ['查阅、复制其数据', '与孩子一起在设备上使用导出功能（明文只有使用者一侧能解开，我们读不到内容，因此无法代为导出）', '即时，自助完成'],
           ['更正、补充其数据', '在设备上直接修改；改完经同步到达其他设备', '即时，自助完成'],
-          ['删除某条数据或注销整个账号', '邮箱申请；注销是服务端级联硬删除，做完不可恢复，所以请先导出。🔴 它删的是服务端那一份：你其它设备上的本地数据不会因为注销而消失（今天还没有随注销清除本机数据的动作）', '收到请求后 15 个工作日内'],
+          ['删除某条数据或注销整个账号', '邮箱申请；注销是服务端级联硬删除，做完不可恢复，所以请先导出。🔴 点下注销的那台设备当场清掉**本机那份可读的本地库**，其它设备在下次同步收到注销信号时各自清掉自己那一份；⚠️ 从此不再联网、不再登录的那台设备上的副本，我们没有能力远程清除。🟡 逐端清到哪一层以《个人权利行使与请求响应》第五节为准，本文件不抄第二份，也不在这里点名具体哪一端', '收到请求后 15 个工作日内'],
           ['撤回同意、停止某项处理', '在设置的对应开关上关闭（AI 出境、记忆与偏好、推送、本机接口）', '即时'],
           ['退订与退款、投诉与举报、要求解释说明', '邮箱申请', '收到请求后 15 个工作日内'],
         ],
@@ -232,6 +232,51 @@ const zh = [
         kind: 'docRef',
         docId: 'ai-and-transfer',
         text: '给监护人的一条具体提醒：heyta 的 AI 功能默认全部关闭，你可以让它一直保持关闭。一旦开启并授权出境，发出去的是任务标题与备注的**原文**，没有任何脱敏或摘要环节 —— 这是未成年人使用场景下最需要知道的一件事，逐项字段清单见《AI 功能与数据流向》。',
+      },
+    ],
+  },
+  {
+    id: 's9',
+    title: '欧盟 GDPR 口径：年龄这一条在 GDPR 里对不上，而且对不上的原因要说清',
+    blocks: [
+      {
+        kind: 'p',
+        text: '本文件的年龄线是按中国法写的：《个人信息保护法》第三十一条与《未成年人网络保护条例》用的是**不满十四周岁**这个界，而 GDPR 第八条用的是另一套（默认十六岁，成员国可以下调但不低于十三岁），并且**只在"以同意为合法性基础"时**才起作用。两条界线数字不同、触发条件不同，所以这里不做任何"满足了这边的年龄线就等于满足那边"的换算 —— 那是把两套规则当成一套用，恰恰是最容易写错的地方。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 8 条（儿童同意的有效性）',
+            '直接向儿童提供的信息服务，同意是不是在法定年龄之上取得的',
+            '第二节把"我们不核验年龄"这件事写在最前面，没有任何一处声称会验证',
+            '正因为不核验，第八条那套"核验年龄并取得监护人授权"的机制我们**运作不了**：既没有年龄字段，也没有监护人身份确认的路径。所以对欧盟用户，本文件不能承诺"儿童的同意经过了有效性控制"'
+          ],
+          [
+            '第 12 条第 1 款（面向儿童的易懂表述）',
+            '给儿童看的文本是不是按儿童能理解的方式写的',
+            '全部对外文本都写成"能不能做到、做不到找谁"这种可直接核对的句子，没有法律套话',
+            '但它们仍是**给成年人写的**，我们没有儿童版本；而在不采集年龄的前提下，我们也没法判断谁需要那一版'
+          ],
+          [
+            '序言第 38 条与第 6(1)(f) 条（儿童应获特别保护）',
+            '产品本身有没有把儿童暴露在与成年人相同的处理强度下',
+            'heyta 没有广告、没有画像、没有动态流、没有评论区、没有协作看板，也没有排行榜 —— 那些通常构成儿童风险的机制一个都不存在',
+            '但这一格对得上是因为**这些功能我们根本没做**，不是因为针对儿童额外设了防护；把它读成"我们有未成年人保护机制"是本文件不允许的读法'
+          ],
+          [
+            '第 7 条第 1 款（能证明取得同意）',
+            '如果使用者是儿童，事后能不能证明是谁同意的',
+            '同意记录里存的是**版本号与时间戳**，能回答"他在哪一版上点过头"',
+            '它回答不了"点他的人几岁、是不是监护人"——那需要年龄与身份核验，而我们没有；监护人行使权利目前只有邮件一条路（第七节）'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '监护人能主张哪些权利、走什么渠道、答复时限多长，与每个用户那套是同一张表；GDPR 逐条对账也在那份文件里。本节只处理"年龄"这一条两侧规则的不同。',
       },
     ],
   },
@@ -260,6 +305,16 @@ const zh = [
             '1.1',
             '2026-10-02',
             '第四节的"在线状态"一行改了一个前提：Service Worker 注册与实时连接**不是**"开启同步"就发生的，它前面还有一道首启隐私面板上作出的联网同意（这一道闸已经落地）。没有那份同意，服务器看不到任何在线状态 —— 因为一个请求都没发出。',
+          ],
+          [
+            '1.2',
+            '2026-10-04',
+            '第七节那张"替孩子做事"的表里，注销一行从"其它设备上的数据不会因为注销而消失（今天还没有随注销清除本机数据的动作）"改成分层实话：点下注销的设备当场清除本机明文，其它设备在下次同步收到注销信号时各自清除，⚠️ 唯一不承诺的是从此不再上线的设备。自助注销入口同时落到网页版设置页、手机端「我的」与命令行版三处。',
+          ],
+          [
+            '1.3',
+            '2026-10-04',
+            '新增第九节：GDPR 一侧的年龄规则。写清两件对不上的——第八条假设"核验年龄并取得监护人授权"这套机制能被运作，而本文件第二节已经承认我们完全核验不了年龄；第十二条第一款要的儿童易懂版本我们也没有。同时写明十四岁（中国法）与十六岁（GDPR 默认线，成员国可下调至十三岁）是两条不同的界线，不做任何换算，也不把"没有广告、没有画像、没有社交功能"写成针对儿童的额外保护。同一版把第七节注销那一行的**本地数据边界**补成可核对的说法（原来只写"清掉本机明文"，没有"本地库"这种可判定的措辞），并把"逐端清到哪一层"指向《个人权利行使与请求响应》第五节，本文件不抄第二份。',
           ],
         ],
       },
@@ -453,7 +508,7 @@ const en = [
         rows: [
           ['Access and copy their data', 'Use the export function on the device, together with the child (only the user side can turn ciphertext back into plaintext, so we cannot export it for you)', 'Immediate, self-service'],
           ['Correct or supplement their data', 'Edit it on the device; the change reaches your other devices through sync', 'Immediate, self-service'],
-          ['Delete particular records, or close the whole account', 'By email; closure is a cascading hard delete on the server and cannot be undone, so export first. 🔴 It removes the server copy: local data on your other devices is not deleted by closure (no such per-device wipe exists today)', 'Within 15 working days of receipt'],
+          ['Delete particular records, or close the whole account', 'By email; closure is a cascading hard delete on the server and cannot be undone, so export first. 🔴 The device you press it on wipes its own readable local database on the spot, and every other device wipes its own copy the next time it syncs and receives the closure signal; ⚠️ a device that never comes back online and never signs in again is beyond our power to erase remotely. 🟡 how far each platform actually clears is stated in section five of the data-rights document; this document keeps no second copy of it and names no shell here', 'Within 15 working days of receipt'],
           ['Withdraw consent, stop a processing activity', 'Switch it off in settings (AI egress, memory and preferences, push, the local interface)', 'Immediate'],
           ['Cancellation and refund, complaints and reports, a request to explain our rules', 'By email', 'Within 15 working days of receipt'],
         ],
@@ -466,6 +521,51 @@ const en = [
         kind: 'docRef',
         docId: 'ai-and-transfer',
         text: 'One reminder addressed specifically to guardians: every AI feature in heyta is switched off by default, and you can leave them all off. Once a feature is enabled and authorised for egress, what is sent is the **original** text of task titles and notes, with no redaction or summarisation. This is the single most important thing to know when a minor uses the app; the field-by-field list is in AI Features and Where Your Data Goes.',
+      },
+    ],
+  },
+  {
+    id: 's9',
+    title: 'The EU GDPR view: the age rule does not line up, and why not has to be said',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'The age line in this document is written against Chinese law: Article 31 of the PIPL and the minors-online-protection regulation both use **under fourteen**, while Article 8 of the GDPR uses a different band (sixteen by default, which member states may lower but not below thirteen) and applies **only where consent is the lawful basis**. The two lines differ in the number and in what triggers them, so this document performs no conversion between them - "meets the age line over here, therefore meets it over there" treats two rule sets as one, which is exactly the mistake most easily made here.',
+      },
+      {
+        kind: 'table',
+        head: ['Where in the GDPR', 'What it asks', 'What heyta can produce', 'What does not line up'],
+        rows: [
+          [
+            'Article 8 (validity of a child\'s consent)',
+            'For an information society service offered directly to a child, was consent obtained above the relevant age',
+            'Section two states up front that **we do not verify age**, and nothing anywhere claims that we do',
+            'Because we do not verify, we cannot **operate** what Article 8 assumes - age checking and parental authorisation. There is no age field and no path to confirm who the guardian is, so this document cannot promise that a child\'s consent was subject to a validity control'
+          ],
+          [
+            'Article 12(1) (child-friendly transparency)',
+            'Whether text addressed to a child is written so that child can understand it',
+            'Every outward-facing text is written as "can we do it, and who to ask if we cannot", which is checkable sentence by sentence and free of legal boilerplate',
+            'They are still written **for adults**; there is no children\'s edition, and without collecting age we also cannot tell who would need one'
+          ],
+          [
+            'Recital 38 with Article 6(1)(f) (children deserve specific protection)',
+            'Whether the product exposes a child to the same processing intensity as an adult',
+            'heyta has no advertising, no profiling, no activity feed, no comment area, no shared boards and no leaderboard - none of the mechanisms that usually create the risk for a child exist',
+            'But this row lines up because **we simply never built those features**, not because of protection added for children. Reading it as "there is a minor-protection mechanism" is a reading this document does not permit'
+          ],
+          [
+            'Article 7(1) (being able to demonstrate consent)',
+            'If the user is a child, can it later be shown who consented',
+            'A consent record stores the **version number and timestamp**, so it answers "which version did this person agree to"',
+            'It cannot answer "how old was the person, was it the guardian" - that needs age and identity verification, which we do not have; a guardian\'s route for exercising a right is currently email only (section seven)'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: 'What a guardian may claim, through which channel, and within what deadline is the same table as for any user, and the article-by-article GDPR comparison lives there too. This section deals only with how the age rule differs between the two regimes.',
       },
     ],
   },
@@ -495,6 +595,16 @@ const en = [
             '2026-10-02',
             'One precondition changed in the "Online presence" row of section four: registering the Service Worker and opening the realtime connection do **not** follow from "sync is on" alone — in front of them sits the consent to going online made on the first-launch privacy panel (that gate has landed). Without that consent the server observes no presence at all, because not one request is sent.',
           ],
+          [
+            '1.2',
+            '2026-10-04',
+            'The “act for your child” table in section seven rewrites the closure row from “data on your other devices is not deleted by closure (no such per-device wipe exists today)” into layered truth: the device you press it on is wiped on the spot, other devices wipe themselves on the next sync that receives the closure signal, and ⚠ the only thing not promised is a device that never comes back online. Self-service closure entries now exist in Web settings, the mobile “Mine” tab and the command-line client.',
+          ],
+          [
+            '1.3',
+            '2026-10-04',
+            'Added section nine on the GDPR age rules, stating the two things that do not line up: Article 8 presumes that age checking and parental authorisation can be operated, while section two of this document already concedes that we cannot verify age at all; and the child-friendly version that Article 12(1) asks for does not exist. It also fixes the boundary in words: fourteen (Chinese law) and sixteen (the GDPR default, which member states may lower to thirteen) are two different lines, no conversion between them is performed, and “no advertising, no profiling, no social features” is not written up as protection added for children. The same version completes the **local data boundary** in the closure row of section seven (it said only that local plaintext is wiped, without a checkable wording naming the local database), and points "how far each platform actually clears" at section five of the data-rights document rather than keeping a second copy here.',
+          ],
         ],
       },
     ],
@@ -503,9 +613,11 @@ const en = [
 
 export const minors: LegalDocument = {
   id: 'minors',
-  version: '1.1',
+  // 🔴 1.2 → 1.3：新增第九节（GDPR 年龄规则）。改的是"哪一条我们做不到"的披露面，
+  // 不是措辞：同意留痕必须能回答"他同意的那一版里，有没有写明我们不运作第八条"。
+  version: '1.3',
   status: 'draft',
-  updatedDate: '2026-10-02',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': '未成年人保护',
     en: 'Protection of Minors',

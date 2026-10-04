@@ -50,11 +50,13 @@ import { decodeBase64 } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 import type { VaultKeyMigrationResponse } from '@heyta/shared-schema';
 import { randomId } from './ids.js';
+import { hasLocalEraser, registerLocalEraser } from './local-erasure.js';
 import { createSyncClient } from './sync-wiring.js';
 import {
   createVaultKeyMigrationRemote,
   createVaultMigrationInventorySource,
   createVaultMigrationJournal,
+  acknowledgeVaultPayloadMigration,
   cancelVaultPayloadMigrationForScope,
   migrateVaultPayloads,
   type VaultMigrationProgress,
@@ -172,6 +174,7 @@ export interface AppHost {
     pending: PendingVaultCreation,
     enteredRecoveryCode: string,
     onProgress?: (progress: VaultMigrationProgress) => void,
+    options?: VaultRootRotationOptions,
   ): Promise<VaultKeyMigrationResponse>;
   /** Release any staged root migration and remove its local encrypted draft. */
   cancelVaultRootRotation(): Promise<void>;
@@ -225,6 +228,15 @@ export interface AppHost {
 
   /** 关闭 SQLite 连接。之后不可再用。 */
   close(): void;
+}
+
+/**
+ * Optional bridge for accounts whose retained payloads still use the legacy
+ * password cipher. The value is supplied by the explicit migration UI and is
+ * never persisted in the sync configuration.
+ */
+export interface VaultRootRotationOptions {
+  legacyPassword?: string;
 }
 
 /**
@@ -312,6 +324,22 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     driverFactory: options.driverFactory,
     ...(options.clientId !== undefined ? { clientId: options.clientId } : {}),
   });
+
+  /**
+   * 本机数据销毁器的**兜底注册**（E2）。
+   *
+   * 🔴 为什么在宿主内部注册，而不是要求每个壳自己传一个回调：
+   * `createSyncClient()` 的构造点有四个宿主（node-host、移动端、两个桌面壳），
+   * 而它们都经这一个函数拿到 adapter。写在这里，"这个宿主忘了接"就**不是**
+   * 一个可能的状态 —— 那正是 §10.2 那条取证量的东西（信号收到了、没人清）。
+   *
+   * ⚠️ **只在没人注册时注册**：Web 有自己的销毁器（要清 OPFS/`localStorage`/
+   * SW 那四类，adapter 一份清不完），它先注册 ⇒ 这里就不许把它盖掉。
+   * 反过来如果这里无条件注册，症状是"Web 注销后 OPFS 里那份库还在"。
+   */
+  if (!hasLocalEraser()) {
+    registerLocalEraser(async () => [await adapter.destroy()]);
+  }
 
   const engine = new OpLogEngine({
     store,
@@ -541,6 +569,7 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       pending: PendingVaultCreation,
       enteredRecoveryCode: string,
       onProgress?: (progress: VaultMigrationProgress) => void,
+      rotationOptions?: VaultRootRotationOptions,
     ): Promise<VaultKeyMigrationResponse> {
       return withVaultExclusive(async () => {
         const session = await readVaultSession();
@@ -553,6 +582,7 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
         const migrationToken = config.token;
         const currentPayloadKeyVersion = session.payloadKeyVersion ?? null;
         const targetPayloadKeyVersion = (session.payloadKeyVersion ?? 0) + 1;
+        const legacyPassword = rotationOptions?.legacyPassword ?? config.password;
         const remoteOptions = {
           baseUrl: config.serverUrl,
           getToken: async () => migrationToken,
@@ -572,17 +602,21 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
             targetPayloadKeyVersion,
             currentRootKey: input.currentRootKey,
             targetRootKey: input.targetRootKey,
-            ...(currentPayloadKeyVersion === null && config.password !== undefined
-              ? { legacyPassword: config.password }
+            ...(currentPayloadKeyVersion === null && legacyPassword !== undefined
+              ? { legacyPassword }
               : {}),
             journal: vaultMigrationJournal,
             journalScope,
+            clearJournalOnPublished: false,
             onProgress,
           });
           return published;
         });
         if (migrationEpoch !== vaultEpoch) throw new Error('Vault migration was invalidated by credential changes');
         if (published === undefined) throw new Error('Vault migration did not publish a result');
+        // The migration journal is acknowledged only after confirmAndMigrate...
+        // has atomically installed the package, payload generation, and root.
+        await acknowledgeVaultPayloadMigration(vaultMigrationJournal, journalScope, published.requestId);
         return published;
       });
     },
@@ -630,8 +664,14 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       });
     },
 
+    /**
+     * 界面上那个「待上传 N 项」徽标。
+     *
+     * 🔴 走计数，不走 `getPendingUpload().length` —— 后者每次刷新都把整条队列
+     * 连密文正文一起物化进内存，只为了显示一个数字。这个数还在同步前后各读一次。
+     */
     async pendingUploadCount(): Promise<number> {
-      return (await engine.getPendingUpload()).length;
+      return engine.countPendingUpload();
     },
 
     async readOpLog(): Promise<Operation<string>[]> {

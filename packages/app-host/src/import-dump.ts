@@ -42,7 +42,7 @@
  *
  * ## 🔴 导入**绝不**清空或覆盖现有数据
  *
- * `restoreIntoEmptyTarget()` 在写任何东西**之前**先读目标 op-log：
+ * `restoreIntoEmptyTarget()` 在写任何东西**之前**先数目标 op-log（含归档）：
  * 只要里面**有任何一条 op**，就返回 `target-not-empty` 并**什么都不写**。
  * 所以"导入把用户数据清了"这条路径在代码里根本不存在 —— 不是靠界面拦，
  * 而是靠这里拦。界面还会再确认一次（见 `ImportPanel`），那是第二道。
@@ -60,6 +60,14 @@
  *     **一个字节都不写**。
  *   - **写之后**：本机物化状态必须与 `导出.entities` 逐项一致，
  *     否则报 `verification-failed` 而不是"成功"。
+ *
+ * 🔴 **`entities` 可以缺省**（{@link RestoreDocument}）：缺省时实体由**上面那份客户端
+ * reducer** 从 `opLog` 物化，再拿它当核对基准。这专门给恢复工具那条路 ——
+ * 服务端对 `DEL` 是 `delete`，客户端是 field-level tombstone，让服务端那一半来填
+ * `entities` 会产出**没有墓碑**的产物（见 `export-dump.ts` 里那段说明）。
+ * ⚠️ 代价必须写清：文件自己不声明实体时，**写之前那次交叉少了一个独立来源**
+ * （它变成"重放 == 重放"，恒真）；此时真正还有牙的是**写之后**那次比对
+ * （本机引擎物化 vs 纯重放的结果），半截导入 / 引擎漂移仍然会被抓住。
  */
 
 import { MODELED_ENTITY_TYPES, bucketFor, emptyState, replayOperations } from '@heyta/op-log';
@@ -67,7 +75,12 @@ import type { MaterializedState } from '@heyta/op-log';
 import { CURRENT_SCHEMA_VERSION } from '@heyta/shared-schema';
 import { OpType, type Operation } from '@heyta/sync-core';
 
-import { EXPORT_APP_NAME, EXPORT_FORMAT_VERSION, type ExportDocument } from './export-dump.js';
+import {
+  EXPORT_APP_NAME,
+  EXPORT_FORMAT_VERSION,
+  type ExportDocument,
+  type RestoreDocument,
+} from './export-dump.js';
 
 /**
  * 导入/还原被拒绝的原因。
@@ -95,7 +108,7 @@ export type ExportImportFailureReason =
 
 /** `parseExportDocument()` 的结果。 */
 export type ParseExportResult =
-  | { ok: true; document: ExportDocument }
+  | { ok: true; document: RestoreDocument }
   | { ok: false; reason: ExportImportFailureReason; detail?: string };
 
 /** `restoreIntoEmptyTarget()` 的结果。 */
@@ -116,17 +129,21 @@ export type RestoreExportResult =
 /**
  * 还原要落到的目标。
  *
- * `AppHost` **结构上**满足它（`engine` + `readOpLog`），所以宿主直接把 host 传进来；
- * `apps/web` 没有 AppHost 对象，就传一个 `{ engine, readOpLog }` 的薄适配。
- * 刻意收窄而不是要求完整 `AppHost`：还原只该看到"日志里有什么""写进去""状态是什么"。
+ * `AppHost` **结构上**满足它（`engine.countStoredOps`），所以宿主直接把 host 传进来；
+ * `apps/web` 没有 AppHost 对象，就传一个 `{ engine }` 的薄适配 —— 引擎自己就能数。
+ * 刻意收窄而不是要求完整 `AppHost`：还原只该看到"库里有多少条""写进去""状态是什么"。
+ *
+ * 🔴 以前这里要的是 `readOpLog()`（读**全库**）。空库守卫只需要一个 `> 0`，
+ * 却把用户正要保护的那份数据连密文正文一起搬进内存数一遍 —— 每次点"还原"付一次。
+ * 换成计数之后，接口上**没有**能把全库读回来的口子了，这条成本就不可能再被引进来。
  */
 export interface ImportTarget {
   engine: {
     importOperations(ops: readonly Operation<string>[]): Promise<{ imported: number; skipped: number }>;
     getState(): MaterializedState;
+    /** 全库条数（热区 + 归档），不物化任何一行。 */
+    countStoredOps(): Promise<number>;
   };
-  /** 读**完整**本地 op-log（判断目标是否为空，以及拒绝后回报条数）。 */
-  readOpLog(): Promise<Operation<string>[]>;
 }
 
 // ── 解析 ────────────────────────────────────────────────────
@@ -176,13 +193,19 @@ export function parseExportDocument(text: string): ParseExportResult {
     };
   }
 
+  // `entities` **可以整格缺省**（恢复工具那类"只交 op-log"的产物，实体由本机的
+  // 客户端 reducer 物化）。但**给了就必须是"类型 → 数组"**：`entities: null`
+  // 与 `entities: []` 都是坏文件，不许被当成"没给"放过去 —— 放过去的代价是
+  // 一份被截断/改坏的产物会走到"由 ops 自己物化"那条路上，而那条路的写前交叉是恒真的。
   const entities = raw['entities'];
-  if (entities === null || typeof entities !== 'object' || Array.isArray(entities)) {
-    return { ok: false, reason: 'invalid-document', detail: 'entities 不是对象' };
-  }
-  for (const [entityType, rows] of Object.entries(entities as Record<string, unknown>)) {
-    if (!Array.isArray(rows)) {
-      return { ok: false, reason: 'invalid-document', detail: `entities.${entityType} 不是数组` };
+  if (entities !== undefined) {
+    if (entities === null || typeof entities !== 'object' || Array.isArray(entities)) {
+      return { ok: false, reason: 'invalid-document', detail: 'entities 不是对象' };
+    }
+    for (const [entityType, rows] of Object.entries(entities as Record<string, unknown>)) {
+      if (!Array.isArray(rows)) {
+        return { ok: false, reason: 'invalid-document', detail: `entities.${entityType} 不是数组` };
+      }
     }
   }
 
@@ -209,7 +232,7 @@ export function parseExportDocument(text: string): ParseExportResult {
     };
   }
 
-  return { ok: true, document: raw as unknown as ExportDocument };
+  return { ok: true, document: raw as unknown as RestoreDocument };
 }
 
 /** 一条 op 的形状校验。返回 `undefined` 表示合法。 */
@@ -260,22 +283,26 @@ function isKnownOpType(value: unknown): boolean {
  */
 export async function restoreIntoEmptyTarget(
   target: ImportTarget,
-  document: ExportDocument,
+  document: RestoreDocument,
 ): Promise<RestoreExportResult> {
   // 1. 目标必须真的是空库。**这一步在写任何东西之前。**
-  const existing = await target.readOpLog();
-  if (existing.length > 0) {
+  const existing = await target.engine.countStoredOps();
+  if (existing > 0) {
     return {
       ok: false,
       reason: 'target-not-empty',
-      detail: `本机已有 ${String(existing.length)} 条操作日志`,
+      detail: `本机已有 ${String(existing)} 条操作日志`,
     };
   }
 
   // 2. 写之前先证明这份文件自洽：重放它的 op-log 必须得到它自己声称的
   //    entities 与 counts。不一致 = 文件被改坏/半截 —— 一个字节都不写。
-  const expected = replayOperations(emptyState(), document.opLog);
-  if (!stateMatchesDocument(expected, document)) {
+  //
+  //    `entities` 缺省时核对基准由**客户端 reducer** 物化（见文件头那段：这正是
+  //    "恢复产物丢墓碑"的修法），此时第 2 步退化成恒真，还有牙的是第 4 步。
+  const replayed = replayOperations(emptyState(), document.opLog);
+  const reference = referenceOf(document, replayed);
+  if (!stateMatchesDocument(replayed, reference)) {
     return { ok: false, reason: 'inconsistent-document' };
   }
 
@@ -284,7 +311,7 @@ export async function restoreIntoEmptyTarget(
 
   // 4. 写完之后再核对一次。对不上就必须报失败，而不是"看起来成功了"。
   const after = target.engine.getState();
-  if (!stateMatchesDocument(after, document)) {
+  if (!stateMatchesDocument(after, reference)) {
     return {
       ok: false,
       reason: 'verification-failed',
@@ -300,6 +327,70 @@ export async function restoreIntoEmptyTarget(
     entities: totals.total,
     deleted: totals.deleted,
   };
+}
+
+/**
+ * 还原**之前**的预告：这份文档导进空库之后会有什么。
+ *
+ * 🔴 数字来自**重放**，不来自文件自己的声明。原因很具体：`ExportScreen` 的确认面板
+ * 原来直接读 `document.counts.entities.TASK?.total ?? 0`，而"只交 op-log"的恢复产物
+ * 没有那一格 ⇒ `?? 0` 会**安静地显示"0 条记录、0 条已删除"**，
+ * 而真正导进去的是 3 条含 1 墓碑。确认面板说的是"按下去会发生什么"，
+ * 它显示 0 就是界面在说谎 —— 不是"少显示一点信息"。
+ * 文件自己声明了计数时两者本来就相等（写前的自洽校验保证），所以对完整导出零行为变化。
+ */
+export function previewRestore(document: RestoreDocument): {
+  totalOps: number;
+  totalEntities: number;
+  totalDeleted: number;
+  perType: Record<string, { total: number; deleted: number }>;
+} {
+  const state = replayOperations(emptyState(), document.opLog);
+  const perType: Record<string, { total: number; deleted: number }> = {};
+  for (const entityType of MODELED_ENTITY_TYPES) {
+    const records = recordsOf(state, entityType);
+    if (records.length === 0) continue;
+    perType[entityType] = { total: records.length, deleted: records.filter(isTombstone).length };
+  }
+  const totals = countState(state);
+  return {
+    totalOps: document.opLog.length,
+    totalEntities: totals.total,
+    totalDeleted: totals.deleted,
+    perType,
+  };
+}
+
+/**
+ * 核对基准：文件自己声明了 `entities` 就用文件那份（两个独立来源，交叉才有意义）；
+ * 缺省就用**客户端 reducer** 重放出来的那份。
+ *
+ * 🔴 两个来源不能在这里合成一个"看起来更完整"的对象：实体和计数必须**整套**来自同一份，
+ * 否则就是拿 A 的实体去比 B 的计数，红的时候说不清是谁不对。
+ */
+function referenceOf(document: RestoreDocument, replayed: MaterializedState): ExportDocument {
+  if (document.entities !== undefined) return document as ExportDocument;
+
+  const entities: Record<string, unknown[]> = {};
+  const counts: Record<string, { total: number; deleted: number }> = {};
+  for (const entityType of MODELED_ENTITY_TYPES) {
+    const records = recordsOf(replayed, entityType);
+    if (records.length === 0) continue;
+    entities[entityType] = records;
+    counts[entityType] = { total: records.length, deleted: records.filter(isTombstone).length };
+  }
+  const totals = countState(replayed);
+
+  return {
+    ...document,
+    entities,
+    counts: {
+      ...document.counts,
+      entities: counts,
+      totalEntities: totals.total,
+      totalDeleted: totals.deleted,
+    } as ExportDocument['counts'],
+  } as ExportDocument;
 }
 
 /**

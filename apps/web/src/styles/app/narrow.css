@@ -70,7 +70,8 @@
     opacity: 1;
   }
 
-  .ht-rail__tab--tool:first-of-type {
+  .ht-rail__tab--tool:first-of-type,
+  .ht-rail__tab--tool-start {
     margin-top: 0;
   }
 
@@ -124,6 +125,32 @@
 
   .ht-content {
     padding: var(--ht-space-4);
+  }
+
+  /* 详情列（W2 的槽位）在塌缩态里没有位置：单列 + 底部导航里再插一根竖列
+     会把 main 挤没。W4 会把它换成"看高也看宽"的正式出现条件。 */
+  .ht-app__detail {
+    display: none;
+  }
+}
+
+
+/* 平板横屏到小笔记本（769–1023px）：详情列**先不出现**。
+ *
+ * 🔴 这条不是"还没做 W4"的遮羞布，是一个能算出来的账：这一档里
+ * rail 4rem + 侧栏 15rem + 详情 22rem 已经吃掉 ~41rem，800px 的窗口只剩 ~256px
+ * 给中间那一列（真正的任务列表）—— 那不是"三栏变窄"，那是列表没了。
+ * 所以 W2 交付槽位的同时必须交付它的**下限视口**，正式的出现条件（看高也看宽 +
+ * 三条恢复路径）在 W4。轨道用 `0` 而不是删掉声明：`--ht-detail-track` 只在
+ * `.ht-app` 上算一次，这里覆盖它，两条 `grid-template-columns` 都不用重抄。
+ */
+@media (min-width: 769px) and (max-width: 1023px) {
+  .ht-app {
+    --ht-detail-track: 0;
+  }
+
+  .ht-app__detail {
+    display: none;
   }
 }
 

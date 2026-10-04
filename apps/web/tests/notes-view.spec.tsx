@@ -32,6 +32,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emptyState } from '@heyta/op-log';
 import { I18nProvider, zhCN } from '@heyta/i18n';
 
+import { selection } from '../src/lib/selection.js';
 import { __resetOpLogForTests, initOpLog, useTaskStore } from '../src/features/tasks/store.js';
 import { useNoteStore } from '../src/features/notes/store.js';
 
@@ -188,5 +189,73 @@ describe('便签视图', () => {
 
     // 墓碑还在（软删除）：实体没有消失，只是 `deletedAt` 被写上。
     expect(useTaskStore.getState().entities.notes[noteId!]?.deletedAt).toBeDefined();
+  });
+});
+
+/**
+ * 便签这一类：**"正在编辑哪一条"就是选中**（工单 W1）。
+ *
+ * 这三条各钉一个此前没有任何一层会失败的空洞：
+ *
+ * 1. **从别处写进选中 ⇒ 视图打开那一条**。搜索面板点便签时只能把 id 交进选中态
+ *    （它没有别的通道），而 `openNoteFromSearch` 此前**签名里不收 id** ——
+ *    用户看到的是"视图换了、什么都没打开"。这条不挂搜索，挂的是它唯一的后果：
+ *    选中里有 id，界面就必须显示出**那一条**。
+ * 2. **关掉面板 = 取消选中**，不是"本地 state 清零"（否则下一个视图读不到收起了）。
+ * 3. **实体没了面板自己关**。这条量的是视图侧的回落（`notes.find()` 落空 ⇒ 不渲染
+ *    编辑器）—— 只测 `pruneSelection` 那一层证不了界面读的是同一条规则。
+ */
+describe('便签：正在编辑哪一条 = 选中的那一条', () => {
+  afterEach(() => {
+    // 🔴 选中态是模块级单例：不清就把这一组的选中带进下一组，
+    //    而"一进来就开着面板"在断言里长得和正常情况一模一样。
+    selection.clear();
+  });
+
+  /** 用真 store 落一条便签，返回它的 id（等条件，不等固定 tick —— 见文件头）。 */
+  async function seedNote(content: string): Promise<string> {
+    await act(async () => {
+      await useNoteStore.getState().addNote(content);
+    });
+    await waitFor(`便签「${content}」落进 store`, () => useNoteStore.getState().notes.length > 0);
+    const id = useNoteStore.getState().notes[0]?.id;
+    expect(id, '便签没落库').toBeDefined();
+    return String(id);
+  }
+
+  it('🔴 选中里有一条便签 ⇒ 挂上视图就打开**那一条**的编辑器', async () => {
+    const id = await seedNote('把书还了');
+    selection.select('note', id);
+
+    const view = await mount();
+    const input = byTestId(view, 'notes-editor-input') as HTMLInputElement | null;
+    expect(input, '选中了一条便签，视图却没打开编辑面板').not.toBeNull();
+    expect(input?.value).toContain('把书还了');
+    expect(selection.get('note')).toBe(id);
+  });
+
+  it('点「取消」⇒ 面板关掉，而且清空的是**选中**', async () => {
+    const id = await seedNote('买牛奶');
+    const view = await mount();
+    click(view, `note-edit-${id}`);
+    await waitFor('编辑面板出现', () => byTestId(view, 'notes-editor') !== null);
+
+    click(view, 'notes-editor-cancel');
+    await waitFor('编辑面板关闭', () => byTestId(view, 'notes-editor') === null);
+    expect(selection.get('note'), '面板关了但选中还留着 —— 下一个读选中的界面会以为仍在编辑').toBeNull();
+  });
+
+  it('🔴 选中的那条在别处没了 ⇒ 面板自己关，不留指向空 id 的输入框', async () => {
+    const id = await seedNote('另一端会删掉的一条');
+    const view = await mount();
+    click(view, `note-edit-${id}`);
+    await waitFor('编辑面板出现', () => byTestId(view, 'notes-editor') !== null);
+
+    // 模拟"另一台设备同步过来的墓碑"：列表里没有它了，而选中里还留着 id。
+    await act(async () => {
+      useNoteStore.setState({ notes: [] });
+    });
+    await waitFor('面板随实体消失而关', () => byTestId(view, 'notes-editor') === null);
+    expect(view.textContent ?? '').not.toContain('另一端会删掉的一条');
   });
 });

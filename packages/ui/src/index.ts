@@ -574,6 +574,20 @@ export {
   type OrganizerListProps,
   type OrganizerRowContext,
 } from './projects/OrganizerList.js';
+/**
+ * 清单「移入文件夹」的行内选择器（经 `OrganizerList` 已有的 `renderItemExtra`
+ * 插槽接入 ⇒ 共享行骨架一行没改）。
+ *
+ * 🔴 候选集**由宿主按领域层 `validateProjectParentChange` 筛过再传进来** ——
+ * 组件自己不算"能不能移"，否则两端各有一套裁决标准（AGENTS §3.5）。
+ */
+export {
+  FolderPicker,
+  folderRejectionMessageKey,
+  type FolderPickerLabels,
+  type FolderPickerProps,
+  type FolderRejectionMessageKey,
+} from './projects/FolderPicker.js';
 export {
   aliveProjects,
   archivedProjects,
@@ -960,6 +974,34 @@ export {
 } from './date-picker/DatePicker.js';
 
 /**
+ * ── R14（时刻输入侧）：芯片"时刻该念什么"的那一处判定 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 为什么单独转出一个函数，而不是让两端各自 `chip.field === 'dueTime'`：
+ * 宿主注入的 `valueLabel` 原本只有"日期 / 优先级"两条分支，时刻芯片掉进
+ * 优先级那条会念成**「不设置」**。判定写在共享层，两端只剩"取它给的串"，
+ * 新增字段时就不会有一端整块分支漏掉（AGENTS §3.5）。
+ */
+export { captureChipTimeLabel } from './capture/model.js';
+
+/**
+ * ── 多端第二批（便签编辑链）：**"改一张便签的正文"只有这一个实现** ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * "点开便签、什么都没改、点一下保存"在过去会推进 `updatedAt`，而 `updatedAt`
+ * 是列表排序的第二段 —— 那条 no-op 的闸门在 `@heyta/app-host#updateNoteContent`
+ * （写不写 op 是产品语义），这里只有视图和它的交互挡板。
+ */
+export {
+  NoteEditor,
+  type NoteEditorLabels,
+  type NoteEditorProps,
+} from './notes/NoteEditor.js';
+export { isNoteDraftBlank } from './notes/model.js';
+
+/**
  * ── 批次二 W0：锚点弹层的定位算术 ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
@@ -1006,6 +1048,18 @@ export {
   type EventCardTextLabels,
   type EventCardTexts,
 } from './countdown/model.js';
+
+/**
+ * ── 回收站与归档 W4b：删除确认的那份**影响面**取数 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 与 `openTagCounts` 不是同一件事：那个是行右侧常驻的"还有几件没做完"，
+ * 这个是确认框里那句"删了会动到几条任务"（**含已完成**）。口径差别与理由
+ * 写在 `./projects/model.ts#liveTaskCountsByTag`。两端各数一遍的话，
+ * "删标签到底会不会动到已完成的任务"这个问题就会出现两个答案。
+ */
+export { liveTaskCountsByTag } from './projects/model.js';
 /**
  * 成品图（W7）的**版面**。各端只许 import 这一份再画一遍 ——
  * 在 `apps/web` 与 `apps/mobile` 各写一套版面 = 两张会漂移的图，
@@ -1025,43 +1079,34 @@ export {
   type TextMeasurer,
 } from './countdown/card-export-layout.js';
 
-/**
- * ── R14（时刻输入侧）：芯片"时刻该念什么"的那一处判定 ──
- *
- * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
- *
- * 为什么单独转出一个函数，而不是让两端各自 `chip.field === 'dueTime'`：
- * 宿主注入的 `valueLabel` 原本只有"日期 / 优先级"两条分支，时刻芯片掉进
- * 优先级那条会念成**「不设置」**。判定写在共享层，两端只剩"取它给的串"，
- * 新增字段时就不会有一端整块分支漏掉（AGENTS §3.5）。
- */
-export { captureChipTimeLabel } from './capture/model.js';
+
 
 /**
- * ── 多端第二批（便签编辑链）：**"改一张便签的正文"只有这一个实现** ──
+ * ── 详情面对齐 W5：**优先级 → 语义色 token 名，全仓唯一的一份** ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
  *
- * "点开便签、什么都没改、点一下保存"在过去会推进 `updatedAt`，而 `updatedAt`
- * 是列表排序的第二段 —— 那条 no-op 的闸门在 `@heyta/app-host#updateNoteContent`
- * （写不写 op 是产品语义），这里只有视图和它的交互挡板。
+ * 这一刀搬的是「颜色」那一半，不是「文案」那一半：`packages/ui` 依赖不了
+ * `@heyta/i18n`（`MessageKey`），但已经依赖 `@heyta/domain`（`Priority`）。
+ * 之前那份"依赖不了 i18n ⇒ 整个文件都不能共享"的理由只挡住了标签，
+ * 却把颜色也一起留在了两个宿主里各写一遍 —— 逐字相同的两份，
+ * 而"复选框描边即优先级"正因为没人是它的唯一所有者而没落地。
+ * 理由与两边的分工表在 `task-list/priority-color.ts` 的文件头。
  */
 export {
-  NoteEditor,
-  type NoteEditorLabels,
-  type NoteEditorProps,
-} from './notes/NoteEditor.js';
-export { isNoteDraftBlank } from './notes/model.js';
+  priorityColorToken,
+  type PriorityColorToken,
+} from './task-list/priority-color.js';
 
 /**
- * ── 回收站与归档 W4b：删除确认的那份**影响面**取数 ──
+ * ── 追加：注销账号（批次 E3）的"结局 → 词条 key"收在这里一份 ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
  *
- * 与 `openTagCounts` 不是同一件事：那个是行右侧常驻的"还有几件没做完"，
- * 这个是确认框里那句"删了会动到几条任务"（**含已完成**）。口径差别与理由
- * 写在 `./projects/model.ts#liveTaskCountsByTag`。两端各数一遍的话，
- * "删标签到底会不会动到已完成的任务"这个问题就会出现两个答案。
+ * 形状与 `authFailureMessageKey` 完全一致：封闭集合在 `@heyta/app-host`
+ * （`ClosureDisposition` / `HostedAuthFailureReason`），句子在 `packages/i18n`，
+ * 而**中间那张路由表只能有一份** —— Web 的设置页与移动壳的「我的」今晚各自要显示
+ * 同一句"账号还在、本机没动"。各写一份的结局是漂，而漂掉的那一侧通常话说得更满。
  */
 export { liveTaskCountsByTag } from './projects/model.js';
 
@@ -1080,3 +1125,7 @@ export {
   type CalendarDayEvent,
   type CalendarEventBarLabels,
 } from './calendar/model.js';
+export {
+  accountClosureMessageKey,
+  type AccountClosureMessageKey,
+} from './auth/model.js';

@@ -30,7 +30,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Sparkles, X } from 'lucide-react';
 
-import { useI18n, type I18nValue } from '@heyta/i18n';
+import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
 import {
   buildDisclosure,
   fromHealthSnapshot,
@@ -104,6 +104,68 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t']): stri
       return t('web.ai.tools.intentUpdate', { id: intent.taskId });
     case 'complete-task':
       return t('web.ai.tools.intentComplete', { id: intent.taskId });
+    case 'complete-tasks':
+      // 说**条数**不说 id：一屏 20 串 id 用户读不动，而"这是一次批量"正是必须看清的那件事
+      // （同 `set-task-tags` 只写数量的那条理由）。
+      return t('web.ai.tools.intentCompleteBatch', { count: String(intent.taskIds.length) });
+    // 🔴 每条**新写的**意图都要在这里有一句人话。这里没有 `default`：
+    // 加了写入动作而不改这里就编译不过 —— 而漏改的症状是"提案卡上一片空白"，
+    // 用户点确认时看不见将要发生什么（那才是这套确认机制唯一起作用的地方）。
+    case 'create-project':
+      return t('web.ai.tools.intentCreateProject', { name: intent.name });
+    case 'create-habit':
+      return t('web.ai.tools.intentCreateHabit', { name: intent.name });
+    case 'create-tag':
+      return t('web.ai.tools.intentCreateTag', { name: intent.name });
+    case 'set-task-tags':
+      // 说的是**换成几个**，不是"打上哪个"：这个动作是整组覆盖，
+      // 而用户在确认那一刻必须看得见"这是一次替换"（只写数量是刻意的 ——
+      // 标签在这里只有 id，把 id 念给用户等于念一串他读不懂的字符）。
+      return t('web.ai.tools.intentSetTaskTags', {
+        id: intent.taskId,
+        count: String(intent.tagIds.length),
+      });
+    case 'create-note':
+      return t('web.ai.tools.intentCreateNote', { content: intent.content });
+    case 'update-note':
+      return t('web.ai.tools.intentUpdateNote', { id: intent.noteId, content: intent.content });
+    case 'record-checkin':
+      return t('web.ai.tools.intentRecordCheckin', {
+        habitId: intent.habitId,
+        date: intent.date ?? t('web.ai.tools.todayLabel'),
+      });
+    case 'log-focus':
+      // 两句说法：有没有"实际时长"是两种不同的记录，而卡片要说的是将要落下的那一件。
+      return intent.actualMinutes === undefined
+        ? t('web.ai.tools.intentLogFocus', {
+            kind: focusKindLabel(intent.kind, t),
+            planned: intent.plannedMinutes,
+          })
+        : t('web.ai.tools.intentLogFocusWithActual', {
+            kind: focusKindLabel(intent.kind, t),
+            planned: intent.plannedMinutes,
+            actual: intent.actualMinutes,
+          });
+    case 'create-reminder': {
+      // 两种形态两句说法：省略哪一个都说不出"什么时候会响"。
+      if (intent.minutesBeforeDue !== undefined) {
+        return t('web.ai.tools.intentCreateReminderBeforeDue', {
+          id: intent.taskId,
+          minutes: intent.minutesBeforeDue,
+        });
+      }
+      if (intent.date !== undefined && intent.time !== undefined) {
+        return t('web.ai.tools.intentCreateReminderAt', {
+          id: intent.taskId,
+          when: `${intent.date} ${intent.time}`,
+        });
+      }
+      // 🔴 两种形态都凑不齐时说"没说清时刻"，**不拼一句看起来正常的话**：
+      // 提案卡的确认键就在旁边，含糊的一句话等于让用户替系统猜。
+      // `create_reminder` 的 pack 已经拦过这一步，所以这条落不到内置助手的路径上 ——
+      // 但 MCP 那条路的参数是外部程序给的，而这一层自己也得站得住。
+      return t('web.ai.tools.intentCreateReminderIncomplete', { id: intent.taskId });
+    }
     // 🔴 W10：目录长了两个写工具 ⇒ 这里的**每个封闭变体都必须有一句人话**。
     // 少一个 case 不是"少一句文案"那么轻：TypeScript 会因为这个 switch 不再穷尽
     // 而直接报 `TS2366`（函数缺返回值）—— 这是**好事**，它把"提案卡对着用户
@@ -113,6 +175,27 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t']): stri
     case 'update-event':
       return t('web.ai.tools.intentUpdateEvent', { id: intent.eventId });
   }
+}
+
+/**
+ * 专注类型的中文说法。
+ *
+ * 🔴 出境的数据里 `kind` 是机器词（`work` / `shortBreak` / `longBreak`），
+ * 词表的所有者在 `@heyta/domain`，翻译只能在这里 —— 把中文写进工具描述就是第二份抄件。
+ *
+ * ⚠️ 认不出来时**原样显示那个词**而不是兜到「工作」：
+ * 用户在提案卡上看见"工作"而实际写进去的是别的字符串，那张卡就在撒谎；
+ * 看见一个陌生的英文词至少是"这里有一件我没见过的东西"，而那是会让人停下来的信号。
+ */
+const FOCUS_KIND_KEY = {
+  work: 'web.ai.tools.focusKindWork',
+  shortBreak: 'web.ai.tools.focusKindShortBreak',
+  longBreak: 'web.ai.tools.focusKindLongBreak',
+} satisfies Record<string, MessageKey>;
+
+function focusKindLabel(kind: string, t: I18nValue['t']): string {
+  const key = (FOCUS_KIND_KEY as Readonly<Record<string, MessageKey | undefined>>)[kind];
+  return key === undefined ? kind : t(key);
 }
 
 export function AiToolRun(props: AiToolRunProps): React.JSX.Element {

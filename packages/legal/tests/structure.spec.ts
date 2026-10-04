@@ -373,6 +373,12 @@ describe('对外承诺里的主体不许错', () => {
  * **引用 `users` 且 CASCADE 的外键 16 条 / 覆盖 15 张表**（`referrals` 有邀请人、被邀请人两条）。
  * ⇒ 这里改成从迁移里推导"**引用 users 且 CASCADE**"的约束**集合**，
  *   并且除了比数字，还要求文案**逐类点名**每一张表（少一类就红 —— 那才是用户读得到的东西）。
+ *
+ * ⚠️ **2026-10-04 补**：上面那组"现量 16 条 / 15 张表"已经漂了 —— 本判据今天量到
+ * **19 条 / 18 张表**（增量是 vault 批次 ADR-0050 新长的 `vault_key_packages` /
+ * `vault_key_migrations` / `revoked_sync_devices`）。旧数字留着是 10-03 那次更正的现场，
+ * **不要照它们抄文案**：本轮 `data-rights` 第六节那行就是这么抄的，被这条判据当场报红。
+ * 文案里的数字只能从 `userCascades.size` / `cascadeTables.length` 来，不能从注释、ADR 或上一版文案来。
  */
 describe('对外文本里可复算的数字，回到真源对账', () => {
   /** 迁移目录相对本包：`packages/legal/tests` → 仓库根的 `server/prisma/migrations`（上三级）。 */
@@ -447,6 +453,10 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
     { table: 'user_consents', zh: '条款接受记录', en: 'consent' },
     { table: 'tombstones', zh: '墓碑', en: 'tombstone' },
     { table: 'widget_push_subscriptions', zh: '推送订阅', en: 'push subscription' },
+    // 2026-10-03 vault 批次（ADR-0050）新长的三张级联表。
+    { table: 'vault_key_packages', zh: '密钥包', en: 'key package' },
+    { table: 'vault_key_migrations', zh: '密钥迁移记录', en: 'key migration record' },
+    { table: 'revoked_sync_devices', zh: '撤销设备记录', en: 'revoked device record' },
   ];
 
   it('🔴 推导本身有产出（数不出约束 = 探针坏了，不是"没有级联"）', () => {
@@ -472,17 +482,26 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
     expect(extra, `登记了这些类别，但真源里没有对应的 users 级联约束：${extra.join(', ')}`).toEqual([]);
   });
 
-  it('🔴 所有抄了「N 处级联 / N cascades」的文档、中英两栏，都等于真源条数', () => {
+  it('🔴 所有抄了「N 处级联 / N cascades / N foreign keys」的文档、中英两栏，都等于真源条数', () => {
     // 三个可复算的量各自有形状：级联**条数**、覆盖的**表数**（`referrals` 有两条外键，
     // 所以条数 ≠ 表数），以及下面那条"逐类点名"的判据。只钉第一个的话，
     // "16 条级联、12 张表"这种半对的写法会溜过去。
+    //
+    // 🔴 **形状必须中英各列一遍**（2026-10-04 实测补）：这一条以前只认
+    // `共 N 处级联`/`覆盖 N 张表`/`N cascades … total`/`across N tables` 四种写法，
+    // 而英文 GDPR 那行写的是 `19 foreign keys … covering 18 tables` —— **四种都不匹配**。
+    // 于是 `data-rights` 英文栏把旧数 `16 / 15` 原样对外发布，而本套件 66 条全绿。
+    // 少一种形状 = 那一格没有任何一层在守（同一条纪律见 `docs/plans/trash-and-archive.md` §10.16）。
     const checks: Array<{ pattern: RegExp; truth: number; label: string }> = [
       { pattern: /共\s*(\d+)\s*处级联/g, truth: userCascades.size, label: '处级联' },
       { pattern: /覆盖\s*(\d+)\s*张表/g, truth: cascadeTables.length, label: '张表' },
       { pattern: /(\d+)\s+cascades?\b[^)）]{0,24}total/gi, truth: userCascades.size, label: 'cascades in total' },
       { pattern: /across\s+(\d+)\s+tables/gi, truth: cascadeTables.length, label: 'tables' },
+      { pattern: /(\d+)\s+foreign keys\b/gi, truth: userCascades.size, label: 'foreign keys' },
+      { pattern: /covering\s+(\d+)\s+tables/gi, truth: cascadeTables.length, label: 'covering tables' },
     ];
 
+    const hitsByLabel = new Map<string, number>(checks.map((c) => [c.label, 0]));
     let checked = 0;
     const offenders: string[] = [];
     for (const document of LEGAL_DOCUMENTS) {
@@ -491,6 +510,7 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
         for (const { pattern, truth, label } of checks) {
           for (const match of text.matchAll(pattern)) {
             checked += 1;
+            hitsByLabel.set(label, (hitsByLabel.get(label) ?? 0) + 1);
             if (Number(match[1]) !== truth) {
               offenders.push(
                 `${document.id}/${locale} 的「${label}」写的是 ${match[1]}，而真源是 ${truth}（引用 users 且 CASCADE 的外键 ${userCascades.size} 条 / ${cascadeTables.length} 张表）`,
@@ -501,9 +521,15 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
       }
     }
     expect(offenders, '\n' + offenders.join('\n')).toEqual([]);
-    // 悬空守卫：一处都没命中 = 这句话被改写掉了，本条判据已经抓不到任何东西。
-    expect(checked, '一处"N 处级联/N cascades in total"都没命中 —— 判据已悬空，要么改措辞要么改判据，不能都留着').toBeGreaterThanOrEqual(
-      4,
+    // 悬空守卫：**逐形状**查载体，而不是只查一个总数。
+    // 总数够（>= 4）挡不住"其中三种形状一处都没命中"—— 那三种写下的数字从此没人比。
+    const dangling = checks.filter((c) => (hitsByLabel.get(c.label) ?? 0) === 0).map((c) => c.label);
+    expect(
+      dangling,
+      `这些形状在九份文档 × 中英两栏里一处都没命中，本条判据对它们已经悬空：${dangling.join('、')}`,
+    ).toEqual([]);
+    expect(checked, '"N 处级联 / N cascades / N foreign keys" 的命中总数过少 —— 判据接近悬空').toBeGreaterThanOrEqual(
+      checks.length,
     );
   });
 

@@ -23,6 +23,7 @@ export {
   type AppHost,
   type AppHostOptions,
   type SyncConfig,
+  type VaultRootRotationOptions,
 } from './host.js';
 
 export {
@@ -90,6 +91,7 @@ export {
   cancelVaultPayloadMigration,
   cancelVaultPayloadMigrationForScope,
   createVaultMigrationJournal,
+  acknowledgeVaultPayloadMigration,
   migrateVaultPayloads,
   VAULT_KEY_MIGRATION_INVENTORY_PATH,
   VAULT_KEY_MIGRATION_PATH,
@@ -152,6 +154,45 @@ export {
 } from './sync-wiring.js';
 
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';
+
+/**
+ * Hosted device listing and revocation. The server invalidates every session
+ * when one device is revoked; callers must re-authenticate all devices and
+ * perform the root-key rotation separately.
+ */
+export {
+  HOSTED_SYNC_DEVICES_PATH,
+  HostedDeviceManagementError,
+  listHostedSyncDevices,
+  revokeHostedSyncDevice,
+  revokeHostedSyncDeviceBound,
+  runHostedDeviceRevocation,
+  type HostedDeviceManagementErrorCode,
+  type HostedDeviceManagementOptions,
+  type HostedDeviceRevocation,
+  type BoundHostedDeviceRevocation,
+  type HostedDeviceRevocationControllerOptions,
+  type HostedSyncAuthSnapshot,
+  type HostedSyncDevice,
+} from './device-management.js';
+
+/**
+ * 本机数据销毁器：宿主在自己的启动路径注册，`createSyncClient()` 在共享接缝
+ * 装默认回调（为什么是注册表而不是逐端传参，见 `local-erasure.ts` 文件头）。
+ */
+export {
+  eraseLocalData,
+  hasLocalEraser,
+  lastErasureReports,
+  type LocalEraser,
+  registerLocalEraser,
+} from './local-erasure.js';
+
+/**
+ * 注销账号那条**主动**路径（批次 E3）：服务端级联硬删 + 本机销毁，
+ * 以及"服务端没删成就不许清本机"这条顺序。见 `account-closure.ts` 文件头。
+ */
+export { closeAccountAndEraseLocal, type ClosureDisposition, type ClosureResult } from './account-closure.js';
 
 /**
  * 权益探测。**所有宿主共用这一份** —— 见 `entitlement.ts` 文件头：
@@ -288,6 +329,7 @@ export {
   uploadAccountAvatar,
   verifyEmailAddress,
   verifyMagicLink,
+  closeAccount,
   type AccountAvatarImage,
   type AvatarDecodeResult,
   type DisplayNameWritePlan,
@@ -544,6 +586,7 @@ export {
   type BuildExportOptions,
   type ExportCounts,
   type ExportDocument,
+  type RestoreDocument,
   type ExportEntityCount,
   type ExportFormat,
   type ExportTaskRow,
@@ -559,6 +602,7 @@ export {
  */
 export {
   parseExportDocument,
+  previewRestore,
   restoreIntoEmptyTarget,
   stateMatchesDocument,
   type ExportImportFailureReason,
@@ -688,3 +732,38 @@ export {
   type VaultKeySession,
   type VaultSessionState,
 } from './vault-session.js';
+
+/**
+ * 公共事实（调休 / 补班）的下行（W4b，ADR-0052）。
+ *
+ * 🔴 这是 heyta 第一条服务端→客户端的**内容**通道，宿主必须只从 `app-host` 拿它：
+ * 判断（匿名、失败不动缓存、坏形状不覆盖好数据、装进 domain 的覆盖表）出现在
+ * `apps/*` 里就是 AGENTS.md §3.5 那个分界线上的一次后退 —— 四个壳会各抄一份，
+ * 而"抄了没抄"在界面上完全看不出来（它的失败态就是"日历少一块"，判据①禁的正是这个）。
+ *//**
+ * 跨视图、跨端的**选中态**（详情面的地基）。
+ *
+ * 🔴 「哪一类当前选中了哪一条」此前散成三份实现（web 任务侧**根本没有**、
+ * web 习惯侧一个 `useState`、移动端任务侧另一个 `useState`），
+ * 三份 = 三套回落规则。它和任务 op 构造同一条理由待在这里（AGENTS.md §3.5）：
+ * **每个宿主都要做、且必须一模一样**，而"选中对象消失时怎么办"正是最容易各写各的那一行。
+ *
+ * ⚠️ 它**不是数据**：不进 op-log、不参与向量时钟、绝不同步。
+ * 所以这里一个 op 都不构造 —— 也别指望 `check:layering` 的
+ * `no-op-construction-in-apps` 会管它，它管不着没有 op 的东西，
+ * 这条由 `pnpm check:selection-single-source` 钉（宿主重新长出本地选中态即红）。
+ *
+ * 🔴 React 绑定**不在**本包：`@heyta/ui` 不依赖 `@heyta/app-host`（实测零 import），
+ * 而本包对宿主是"可直接 require 的接线层"，拽进 react 会让 node-host / CLI 跟着背上 UI 依赖。
+ * 所以宿主各留三行 `useSyncExternalStore` 的胶水 —— 胶水里不许有规则，
+ * 有规则的那几行（词表 / 替换 / 回落 / 通知）全在这里。
+ */
+export {
+  SELECTABLE_KINDS,
+  createSelectionStore,
+  pruneMissingSelection,
+  pruneSelection,
+  type SelectableKind,
+  type SelectionSnapshot,
+  type SelectionStore,
+} from './selection.js';

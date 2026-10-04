@@ -49,8 +49,8 @@ describe('habitBoardLabels：映射到共享层契约', () => {
     expect(enLabels.streakCurrent(3)).toBe('Streak 3 days');
     expect(enLabels.streakLongest(1)).toBe('Longest 1 day');
     expect(enLabels.streakLongest(4)).toBe('Longest 4 days');
-    expect(enLabels.streakTotal(1)).toBe('1 check-in');
-    expect(enLabels.streakTotal(9)).toBe('9 check-ins');
+    expect(enLabels.streakTotal(1)).toBe('Total 1 day');
+    expect(enLabels.streakTotal(9)).toBe('Total 9 days');
   });
 
   it('冻结说明**说的是"保住了几天"，不是余额**（ADR-0022：余额不上界面）', () => {

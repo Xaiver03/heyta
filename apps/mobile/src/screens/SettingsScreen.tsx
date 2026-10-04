@@ -90,6 +90,7 @@ export function SettingsScreen({
   onClearCredentials,
   vaultCleanupPending,
   onRetryVaultCleanup,
+  onVaultCleanupPending,
 }: {
   /** 「我的」持有这个状态；关闭只是把它拨回 `false`，不卸载「我的」。 */
   visible: boolean;
@@ -101,6 +102,7 @@ export function SettingsScreen({
   /** A failed native secure-store delete stays visible until it succeeds. */
   vaultCleanupPending?: boolean;
   onRetryVaultCleanup?: () => void;
+  onVaultCleanupPending?: (scope: import('../lib/vault-secure-storage').VaultSecureStorageScope) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
@@ -391,7 +393,7 @@ export function SettingsScreen({
               </View>
             </Card>
 
-            <VaultSettingsSection />
+            <VaultSettingsSection onVaultCleanupPending={onVaultCleanupPending} />
             {vaultCleanupPending && onRetryVaultCleanup !== undefined ? (
               <Card>
                 <Stack>

@@ -324,10 +324,13 @@ export function createWorkerOpLogSession<TOperation extends Operation<string> = 
     getLastLocalSeq: () => call('getLastLocalSeq', []) as Promise<number>,
     getAllOps: (range, limit) =>
       call('getAllOps', [range, limit]) as ReturnType<OpLogStore<TOperation>['getAllOps']>,
+    countAllOps: () => call('countAllOps', []) as Promise<number>,
     findPendingApply: () =>
       call('findPendingApply', []) as ReturnType<OpLogStore<TOperation>['findPendingApply']>,
+    countPendingApply: () => call('countPendingApply', []) as Promise<number>,
     findPendingUpload: () =>
       call('findPendingUpload', []) as ReturnType<OpLogStore<TOperation>['findPendingUpload']>,
+    countPendingUpload: () => call('countPendingUpload', []) as Promise<number>,
     markUploaded: (serverSeqsByOpId) =>
       call('markUploaded', [serverSeqsByOpId]) as Promise<number>,
     discardPendingUpload: (opIds) => call('discardPendingUpload', [opIds]) as Promise<number>,

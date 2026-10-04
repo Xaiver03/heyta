@@ -33,6 +33,12 @@ type Script = { status: number; body: unknown } | { throw: true };
 /** 按顺序答的脚本；队尾自动重复最后一个，免得每条用例都要预填一堆应答。 */
 const queue: Script[] = [];
 const requests: { method: string; url: string; body: unknown }[] = [];
+/**
+ * 设了它 ⇒ **下一个**请求先挂在这儿（用一次自动清）。
+ * 造的是"询问还在路上"那个窗口 —— 本文件原来没有这个形态，
+ * 因为它测的是"答案已经回来了之后"，而那恰好是缺陷藏在的那半边。
+ */
+let hangNext: Promise<void> | undefined;
 
 const fetchSpy = vi.fn(
   async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -42,6 +48,12 @@ const fetchSpy = vi.fn(
       url: typeof input === 'string' ? input : String(input),
       body: init?.body === undefined ? undefined : JSON.parse(String(init.body)),
     });
+    // 挂在**记账之后**：这条请求确实发出去了，只是答案还没回来 —— 那才是 `checking` 的真实形状。
+    if (hangNext !== undefined) {
+      const gate = hangNext;
+      hangNext = undefined;
+      await gate;
+    }
     if ('throw' in script) throw new Error('网络层抛错');
     return new Response(JSON.stringify(script.body), {
       status: script.status,
@@ -112,6 +124,7 @@ async function ask(needsReconfirm: boolean): Promise<void> {
 beforeEach(async () => {
   queue.length = 0;
   requests.length = 0;
+  hangNext = undefined;
   fetchSpy.mockClear();
   localStorage.clear();
   // 设备级闸门开着的起点：本文件测的是**第二道**闸，第一道必须不构成噪声。
@@ -247,6 +260,41 @@ describe('同步这条出站路真的被拦住', () => {
     // 拦下时顺手把面板打开：用户点的是同步，得有一条走出去的路。
     expect(useLegalReconfirmStore.getState().open).toBe(true);
     expect(useLegalReconfirmStore.getState().reason).toBe('required-for-action');
+  });
+
+  it('🔴 询问还在路上时点同步 ⇒ **等答案落地再判**（"还没问到"不是"要重新确认"）', async () => {
+    // 这一条测的是上面那两条**都没覆盖到**的半边：登录后那一问还挂在线上的时候用户就点了同步。
+    // 实测形态（自建栈真浏览器，全新设备登录后第一次点同步）：状态栏出现
+    // "条款文本已经更新，而这个账号还没有重新确认"，而服务端对同一账号已答
+    // `needsReconfirm:false`，下载请求一个都没发，再点一次才同步成功 —— **既谎了，
+    // 又拦住了一件本来该成的事**。原来的用例全部先 `await ask(...)` 把答案等回来了，
+    // 所以这条路径在整个套件里从未被走到。
+    let release: () => void = () => {};
+    hangNext = new Promise<void>((r) => {
+      release = r;
+    });
+    queue.push({ status: 200, body: statusBody(false) });
+    useSyncStore.setState({ baseUrl: 'https://heyta.test', token: 'TK-1', password: 'pw' });
+    syncLegalRecheckCredentials({ token: 'TK-1', baseUrl: 'https://heyta.test' });
+    await flush();
+    expect(legalRecheck.current().phase, '前置：这一条要对着"还在问"验').toBe('checking');
+
+    const pendingSync = useSyncStore.getState().syncNow();
+    await flush();
+    expect(
+      requests.filter((r) => r.url.includes('/api/sync/')),
+      '答案还没回来就把数据放出去了'
+    ).toHaveLength(0);
+
+    release();
+    const status = await pendingSync;
+    expect(JSON.stringify(status), '还没问到答案就对外说"要重新确认"').not.toContain(
+      'legal-reconfirm-required',
+    );
+    expect(requests.some((r) => r.url.includes('/api/sync/')), '答案说不用补签，同步却没走出去').toBe(
+      true,
+    );
+    expect(useLegalReconfirmStore.getState().open, '没问到答案就弹了补签面板').toBe(false);
   });
 
   it('补签完成之后再点同步 ⇒ 请求发得出去（闸门不是单向的）', async () => {

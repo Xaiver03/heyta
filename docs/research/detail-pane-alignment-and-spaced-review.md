@@ -54,7 +54,7 @@
 | 既有裁决 | 出处 | 本文的关系 |
 |---|---|---|
 | 右栏 36.2% 被量成"详情面板 ↔ 空态插画，**同一个可复用插槽**" | [multi-end-unified-strategy.md:605](../plans/multi-end-unified-strategy.md) §5.2 | 槽位概念**早就在案**，不是新想法 |
-| 🔴 不抄"右栏 36% 宽空态插画区"（"无详情时纯浪费；窄屏/移动端必须回收"） | 同文 §5.4 `:622` | ✅ **被印证，继续有效、不重开**。但它管的是**里面放什么**，不是**要不要这个槽**：槽常驻（R-1）+ 里面放视图级概览（滴答番茄页自己的做法）+ 窄屏回收与可收起（R-2/R-4）⇒ 三条同时满足就是"对齐了交互逻辑又没违反裁决" |
+| 🔴 不抄"右栏 36% 宽空态插画区"（"无详情时纯浪费；窄屏/移动端必须回收"） | 同文 §5.4 `:622` | ✅ **被印证，继续有效、不重开**。但它管的是**里面放什么**，不是**要不要这个槽**：槽常驻（R-1）+ 里面放视图级概览（滴答番茄页自己的做法）+ 窄屏回收与可收起（R-2/R-4）⇒ 三条同时满足就是"对齐了交互逻辑又没违反裁决"。**2026-10-04 那一格"放什么"有了新答案**：产品负责人拍板"无选中态时放 AI 面（对话助手）"，裁决本身没被推翻 —— 现量与判据都记在主计划 §5.4 末尾那段 dated 说明里，本条不重抄 |
 | 侧栏「清单/过滤器」**空态引导卡**不抄（吃大量纵向空间） | 同文 §5.4 `:624` | ✅ **第二次印证**：A3 状态一里两张灰底引导卡吃掉侧栏约 1/4 纵向，传达的信息只有一句"这里可以建清单" |
 | 习惯"进度三层"（表头环形 + 卡片 7 点阵 + ⚡/ 徽标）= **最值得抄的第 5 条** | 同文 §5.3 `:615` | 习惯中栏那部分**已有授权** |
 | 🔴 **复选框颜色即优先级** = 最值得抄的第 3 条（"不占第二个字段位，白赚一档信息密度"） | 同文 §5.3 `:613` | ❌ **至今未落地**：我们的优先级是行内一枚 Flag 徽标 + 同色文字（[`packages/ui/src/task-list/TaskBadges.tsx:158-163`](../../packages/ui/src/task-list/TaskBadges.tsx)） |
@@ -98,7 +98,7 @@
 | 总专注时长 | ✅ `milestones.ts:59-65` → [`packages/app-host/src/motivation.ts:105-111`](../../packages/app-host/src/motivation.ts)，但**只活在分享纯文本与里程碑阶梯里** | 有数、没面 |
 | 「专注记录」列表 | ❌ **一条专注记录都没被逐条渲染过**：`listSessions()` 全仓唯一消费者是 `FocusScreen.tsx:196`，且只喂给 `focusStatsForDay` 做当日汇总 | 界面层（数据在） |
 | 「添加专注记录」表单（任务/开始/结束/类型/**笔记**） | ❌ **缺整条写路径**：`FocusActions` 只有 `log`/`listSessions`（[`packages/app-host/src/focus-actions.ts:35-53`](../../packages/app-host/src/focus-actions.ts)），且 `log` 前置明写"**只接受已经结束的轮次**"；`FocusSession` **无 `note`**；全仓 `FOCUS_SESSION` 写入点只有 `focus-actions.ts:139` 一处 | 领域 + 动作 + 界面 |
-| （对照）滴答桌面端"仅可补记不可删" | 我们 `FOCUS_SESSION` **连删除动作都没有**（[trash-and-archive-best-practice.md:181](trash-and-archive-best-practice.md)、`:191`），且"不做删除"是**已拍决定**（[trash-and-archive.md:237](../plans/trash-and-archive.md)） | 要改先重开那条决定 |
+| （对照）滴答桌面端"仅可补记不可删" | 我们 `FOCUS_SESSION` **连删除动作都没有**（`docs/research/trash-and-archive-best-practice.md:181`、`:191`），且"不做删除"是**已拍决定**（`docs/plans/trash-and-archive.md:237`）。⚠️ 这两份按 2026-10-03 现量**只活在主检出的未提交改动里**（`git log --all --diff-filter=A` 查不到）⇒ 写成路径而不是链接，否则干净检出上是死链；那条决定的正文归回收站那条线自己提交 | 要改先重开那条决定 |
 
 ⚠️ 另有一处**文档与代码不符**：[`docs/reference/architecture.md:129`](../reference/architecture.md) 写着 `FocusSession — … mode(pomo/stopwatch), duration` —— **代码里没有这两个字段**，不能拿它当"已建模"的证据。
 

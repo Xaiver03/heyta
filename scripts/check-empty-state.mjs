@@ -481,6 +481,22 @@ const EMPTY_SITES = {
      * `check:mobile-bundle` 盯着），模板只能留在有 i18n 的那一侧。
      */
     'apps/web/src/features/countdown/CountdownView.tsx',
+    /**
+     * Vault 设备管理（2026-10-04，并行会话的在制品功能）。
+     *
+     * 🔴 **真 +1**：设备列表在此之前不存在，`web.sync.devices.empty`
+     * （"还没有其它设备"那一句 hint）随功能新生。
+     *
+     * **为什么登记而不是收编**：与 `notes` / `reminders` 那两条**同一形状** ——
+     * 这是设置面板里的一行区块级 hint（`ht-settings__hint` 的 `<p>`），
+     * 不是页面级空态；共享 `EmptyState` 是居中、带 icon/detail 槽位的
+     * 页面级组件，塞进设置行是视觉回归，而这两个面没有任何端到端视觉
+     * 判据兜底。"区块级要不要成为 EmptyState 的一档（size: page|section）"
+     * 已挂在 `site-and-parity-alignment.md` 的欠账上，这一条跟着那笔走。
+     * ⚠️ 该文件此刻仍被并行会话活跃编辑，收编动作留给它那条线或空态
+     * 收编轮——现在动它等于制造三方冲突。
+     */
+    'apps/web/src/features/sync/VaultSettingsPanel.tsx',
   ],
   '空态文案 prop': [
     /**

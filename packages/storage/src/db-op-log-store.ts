@@ -335,6 +335,14 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
     });
   }
 
+  async countAllOps(): Promise<number> {
+    // 🔴 两个 store 都要数。ARCHIVE 里的 op 仍然是这台设备的日志 ——
+    // 只数热区会让「还原只允许空库」那条守卫在有归档历史的设备上放行。
+    // 与 getAllOps 同一个只读事务 ⇒ 不会看到"移动前后各数一次"或两次之间漏掉。
+    return this.db.transaction([STORES.OPS, STORES.ARCHIVE], 'readonly', async (tx) =>
+      (await tx.count(STORES.OPS)) + (await tx.count(STORES.ARCHIVE)));
+  }
+
   // ── 崩溃恢复 ────────────────────────────────────────────
 
   /**
@@ -352,6 +360,16 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
       'pending',
     );
     return rows.sort((a, b) => a.seq - b.seq);
+  }
+
+  /**
+   * 「队列空不空」的便宜版本：走索引计数，不把整条队列（含密文正文）搬进内存。
+   *
+   * ⚠️ 查询条件与 {@link findPendingApply} 逐字相同（查字符串 `'pending'`，
+   * **不能查布尔 `true`** —— IndexedDB 不索引布尔值，索引条目会被静默跳过）。
+   */
+  async countPendingApply(): Promise<number> {
+    return this.db.countFromIndex(STORES.OPS, OP_INDEXES.PENDING_APPLY, 'pending');
   }
 
   // ── 压缩 / 归档 ──────────────────────────────────────────
@@ -413,6 +431,19 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
       'pending',
     );
     return rows.sort((a, b) => a.seq - b.seq);
+  }
+
+  /**
+   * 待上传队列的条数，不物化行（查询条件与 {@link findPendingUpload} 逐字相同）。
+   *
+   * 🔴 它**没有**再按 `source === 'local'` 收窄，而调用方（引擎的
+   * `getPendingUpload()`）收窄了。两者等价的前提是那条写入不变量：
+   * `uploadStatus = source === 'local' ? 'pending' : 'uploaded'` ——
+   * 只有本地写入会进 pending。它由 `op-log-store` 契约测试钉住，
+   * 不是靠这段注释自称成立。
+   */
+  async countPendingUpload(): Promise<number> {
+    return this.db.countFromIndex(STORES.OPS, OP_INDEXES.PENDING_UPLOAD, 'pending');
   }
 
   /**
@@ -498,17 +529,6 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
     });
   }
 
-  async getMetaValue(key: string): Promise<string | number | undefined> {
-    const rec = await this.db.get<{ key: string; value: string | number }>(STORES.META, key);
-    return rec?.value;
-  }
-
-  async setMetaValue(key: string, value: string | number): Promise<void> {
-    await this.db.transaction([STORES.META], 'readwrite', async (tx) => {
-      await writeMeta(tx, key, value);
-    });
-  }
-
   async readCheckpoint(): Promise<MaterializedCheckpoint | undefined> {
     const record = await this.db.get<{ key: string; value: MaterializedCheckpoint }>(
       STORES.META,
@@ -591,6 +611,17 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
         [META_FIELDS.KEY]: META_KEYS.HISTORY_INCOMPLETE,
         [META_FIELDS.VALUE]: true,
       });
+    });
+  }
+
+  async getMetaValue(key: string): Promise<string | number | undefined> {
+    const rec = await this.db.get<{ key: string; value: string | number }>(STORES.META, key);
+    return rec?.value;
+  }
+
+  async setMetaValue(key: string, value: string | number): Promise<void> {
+    await this.db.transaction([STORES.META], 'readwrite', async (tx) => {
+      await writeMeta(tx, key, value);
     });
   }
 }

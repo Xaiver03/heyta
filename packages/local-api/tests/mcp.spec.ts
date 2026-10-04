@@ -156,10 +156,36 @@ describe('🔴 list_tasks 的日期参数：schema 与出境描述', () => {
     expect(range).toContain('14');
   });
 
-  it('🔴 描述里没有内部黑话（这是出境数据，模型读不懂的行话会直接变成错调用）', () => {
-    const json = JSON.stringify(listTasksProperties());
-    for (const jargon of ['ADR', 'op-log', 'dispatch', 'W3', 'AI-G3', 'createLocalApiHost', 'LocalApiHost']) {
-      expect(json, jargon).not.toContain(jargon);
+  it('🔴 整份目录的描述里没有内部黑话（这是出境数据，模型读不懂的行话会直接变成错调用）', () => {
+    // 原来只扫 `list_tasks` 一个工具 —— 那意味着**每加一个工具就自动脱离这条判据**。
+    // 现在按整份目录扫：工具自己的 `description` 和它的 `inputSchema` 一起进 JSON，
+    // 因为模型两边都读。
+    const allGrants = Object.fromEntries(LOCAL_API_TOOLS.map((t) => [t.name, true]));
+    const tools = listMcpTools({ ...CONFIG, grants: allGrants });
+    // 前提：这份扫描真的覆盖了目录。授权漏一个就少扫一个工具，而那句断言不会报。
+    expect(tools.length).toBe(LOCAL_API_TOOLS.length);
+
+    const json = JSON.stringify(tools);
+    // 一次报**全部**命中，而不是撞到第一个就停 —— 否则修掉一个词之后，
+    // 第二个词要再跑一轮才现形，而那一轮可能根本不会有人跑。
+    const hits = [
+      'ADR',
+      'op-log',
+      'dispatch',
+      'W3',
+      'AI-G3',
+      'createLocalApiHost',
+      'LocalApiHost',
+      'EntityModelMap',
+      'LOCAL_API_TOOLS',
+      'egressFields',
+    ].filter((jargon) => json.includes(jargon));
+    expect(hits).toEqual([]);
+
+    // 阳性对照：同一份 JSON 里**必须**数得出这些真实存在的串。
+    // 少了这一句，"没有黑话"和"什么都没扫到"长得一模一样（比如 grants 少给一片）。
+    for (const needle of ['YYYY-MM-DD', '（只读，不会修改任何数据）', '（会修改数据：调用即生效）']) {
+      expect(json, needle).toContain(needle);
     }
   });
 

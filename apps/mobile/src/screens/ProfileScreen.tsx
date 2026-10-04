@@ -79,6 +79,7 @@ import { Button, Card, Divider, HStack, Screen, SectionHeader, Text, TextField }
 import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
 import { AvatarBadge } from '../ui/avatar';
 import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
+import { AccountClosureScreen } from './AccountClosureScreen';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
@@ -96,7 +97,7 @@ import { TrashScreen } from './TrashScreen';
 import { formatStamp } from '../lib/date';
 import { useTokens } from '../theme';
 import { useSyncCredentialForm } from '../sync/credential-form';
-import { clearSyncConfig, readSyncConfig } from '../sync/config';
+import { readSyncConfig, writeSyncConfig } from '../sync/config';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
 import { useMobileSync, refreshPendingUpload } from '../sync/store';
 import { currentSignedInEmail, forgetSignedInUser } from '../auth/session';
@@ -104,11 +105,9 @@ import { privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate
 import { wipeCredentialsAndWidgets } from '../widgets/credential-wipe';
 import { clearWidgetState } from '../widgets/widget-bridge';
 import {
-  disableVaultRootAutoUnlock,
-  removeVaultRootKey,
   type VaultSecureStorageScope,
 } from '../lib/vault-secure-storage';
-import { invalidateTaskHostVaultSession } from '../db/open-host';
+import { clearMobileVaultSession } from '../lib/vault-session-cleanup';
 
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
@@ -145,6 +144,18 @@ export function ProfileScreen(): React.JSX.Element {
    * 把刚拿到的令牌覆盖掉 —— 症状是"明明登录成功了，一同步就说未配置"。
    */
   const onSignedIn = (saved: SavedAuthSession): void => {
+    // The form is already mounted while AuthScreen is open.  Replaying its
+    // three controlled values can run its input effect between React commits;
+    // that effect intentionally omits accountId because ordinary manual edits
+    // must not invent an authenticated binding.  Re-assert the complete
+    // authenticated tuple here so a login cannot leave VaultSettingsSection
+    // with a token but no account scope.
+    writeSyncConfig({
+      serverUrl: saved.serverUrl,
+      token: saved.token,
+      password: saved.password,
+      ...(saved.accountId === undefined ? {} : { accountId: saved.accountId }),
+    });
     form.setServerUrl(saved.serverUrl);
     form.setToken(saved.token);
     form.setPassword(saved.password);
@@ -183,27 +194,18 @@ export function ProfileScreen(): React.JSX.Element {
       }
     }
 
-    // Fence remembered unlock before touching the live credentials. This is a
-    // synchronous device-local write, so a failed native delete cannot make a
-    // stale root usable during the next cold start.
-    if (scope !== undefined) {
-      try {
-        disableVaultRootAutoUnlock(scope);
-      } catch (error: unknown) {
-        setVaultCleanupPending(scope);
-        console.warn('[vault] logout remembered-unlock fence failed', error);
-      }
-    }
-    // Only an already-open host may be invalidated. Logout must never await
-    // opening it or perform a remote GET before clearing the token.
-    invalidateTaskHostVaultSession();
-
     void (async () => {
+      // This shared helper fences remembered unlock, invalidates the already
+      // open host, clears live credentials synchronously, and removes the
+      // native root key. Device revocation uses the same sequence.
+      const cleanupPromise = clearMobileVaultSession(scope);
 
-      // `wipeCredentialsAndWidgets` clears sync config synchronously before
-      // its first await, so no token remains usable while native cleanup runs.
+      // Credentials were already cleared by the shared helper. Keep the
+      // widget wipe in this existing composition point; it is unrelated to
+      // the vault security boundary and must still happen if secure cleanup
+      // later reports a native deletion failure.
       const wipePromise = wipeCredentialsAndWidgets({
-        clearCredentials: clearSyncConfig,
+        clearCredentials: () => undefined,
         clearWidgets: clearWidgetState,
         onWidgetError: (error) => {
           console.warn('[widgets] 清除凭据时没能清掉小组件状态', error);
@@ -212,17 +214,12 @@ export function ProfileScreen(): React.JSX.Element {
       form.clear();
       forgetSignedInUser();
       await wipePromise;
-
-      if (scope !== undefined) {
-        try {
-          await removeVaultRootKey(scope);
-          setVaultCleanupPending(undefined);
-        } catch (error: unknown) {
-          // Keep the scope in memory for an explicit retry. The auth material
-          // is already gone, so a failed native delete cannot re-enable sync.
-          setVaultCleanupPending(scope);
-          console.warn('[vault] logout secure root cleanup failed', error);
-        }
+      const cleanup = await cleanupPromise;
+      if (cleanup.secureStorageError !== undefined) {
+        setVaultCleanupPending(scope);
+        console.warn('[vault] logout secure root cleanup failed', cleanup.secureStorageError);
+      } else {
+        setVaultCleanupPending(undefined);
       }
     })();
   };
@@ -230,11 +227,14 @@ export function ProfileScreen(): React.JSX.Element {
   const retryVaultCleanup = useCallback((): void => {
     const scope = vaultCleanupPending;
     if (scope === undefined) return;
-    void removeVaultRootKey(scope)
-      .then(() => setVaultCleanupPending(undefined))
-      .catch((error: unknown) => {
-        console.warn('[vault] retry secure root cleanup failed', error);
-      });
+    void clearMobileVaultSession(scope, {
+      // Retry only the native item; credentials are already gone and the host
+      // fence is harmless but must not be replaced with a weaker direct call.
+      clearCredentials: () => undefined,
+    }).then((cleanup) => {
+      if (cleanup.secureStorageError === undefined) setVaultCleanupPending(undefined);
+      else console.warn('[vault] retry secure root cleanup failed', cleanup.secureStorageError);
+    });
   }, [vaultCleanupPending]);
 
   /**
@@ -256,6 +256,7 @@ export function ProfileScreen(): React.JSX.Element {
   const [openFeature, setOpenFeature] = useState<MobileFeatureEntryKey | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [closureOpen, setClosureOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
 
@@ -670,6 +671,17 @@ export function ProfileScreen(): React.JSX.Element {
         setExportOpen(true);
       },
     },
+    {
+      kind: 'action',
+      // 🔴 就排在「导出数据」的**下面一格**，不是随手追加在末尾：注销那道屏要求的
+      // 第一步恰恰是"先导出留一份"。两格相邻，那句话才有一个抬眼就够得着的出口。
+      testID: 'profile-entry-close-account',
+      label: t('common.accountClosure.title'),
+      hint: t('common.accountClosure.entryHint'),
+      onPress: () => {
+        setClosureOpen(true);
+      },
+    },
   ];
 
   /**
@@ -722,6 +734,17 @@ export function ProfileScreen(): React.JSX.Element {
         onBack={() => {
           setExportOpen(false);
         }}
+      />
+    );
+  }
+
+  if (closureOpen) {
+    return (
+      <AccountClosureScreen
+        onBack={() => {
+          setClosureOpen(false);
+        }}
+        onClosed={onClearCredentials}
       />
     );
   }
@@ -1005,6 +1028,7 @@ export function ProfileScreen(): React.JSX.Element {
         onClearCredentials={onClearCredentials}
         vaultCleanupPending={vaultCleanupPending !== undefined}
         onRetryVaultCleanup={retryVaultCleanup}
+        onVaultCleanupPending={setVaultCleanupPending}
       />
     </Screen>
   );

@@ -1,0 +1,40 @@
+B / iOS Release ↔ Node host 互操作与旧 JWT fence
+====================================================
+
+日期：2026-10-04
+服务端：临时 Fastify + 真实 PostgreSQL，http://127.0.0.1:3257
+iOS 载体：当前源码构建的 Heyta Release 模拟器包，专用模拟器；未使用 Web 证据代替
+Node 载体：apps/node-host/dist/cli.js + 新建真实 SQLite 文件（不是 :memory:）
+
+1. iOS → Node
+   - iOS 真包在已认证会话中显式解锁 Vault，随后“立即同步”；本地 pending 从 1 变为
+     uploaded/applied。
+   - Node host 同时提供 authenticated accountId、轮换后的 E2EE 口令和当前 JWT，执行
+     sync：status.kind=synced。
+   - Node list --all 读出 iOS 创建的 1 条任务（标题为本轮脱敏探针标题，entity id
+     仅用于本轮对账）。keyVersion=2、payloadKeyVersion=2。
+
+2. Node → iOS
+   - Node host 新建第二条任务并 sync，pending=0。
+   - iOS 真包再次 sync 后，AX 树同时出现两条任务，其中包含“B Node to iOS task
+     20261004”；这条读取发生在 iOS Release 安装产物内。
+
+3. JWT 撤销 fence
+   - 用撤销前 JWT DELETE 一个 Node 设备，服务端返回 success=true、requiresKeyRotation=true。
+   - 同一旧 JWT 对 GET key-package、GET ops、GET status、POST ops 均返回 401，body code
+     为 TOKEN_REVOKED；因此旧 token 既不能下载也不能上传。
+   - 用重新认证得到的新 JWT 对照 status：旧 token 失败上传前后 latestSeq 都是 2，证明
+     失败请求没有改变服务端操作序列。
+
+4. root key 边界
+   - 生产 Vault session 不把 root key 持久化；进程结束后无法从 iOS 安装目录取出“轮换前
+     root”来伪造一个所谓的真包旧 root 证据。
+   - 当前确定性 fixture 已通过 fingerprint-matching root gate：错误 root 抛
+     VaultSessionError.code=root-key-mismatch；迁移后的新世代密文用旧 root/旧世代解密
+     被拒绝。当前 sync-core 测试套件与 app-host 测试套件分别通过（303 与 1341 项）。
+   - 因此本文件不把 fixture 结果夸成“iOS 进程外旧 root 真值验收”；若要补这条，必须在
+     root rotation 尚未丢弃旧内存 root 的同一受控旅程中记录布尔结果，仍不得落盘或打印
+     root 明文。
+
+所有凭据、恢复码、JWT、root key 和服务端账号值只在 /tmp 的 600 权限临时文件/进程内使用，
+没有进入仓库、截图或本证据文件。

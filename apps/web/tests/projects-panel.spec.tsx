@@ -56,6 +56,7 @@ const actions = vi.hoisted(() => ({
   deleteProject: vi.fn(() => Promise.resolve()),
   deleteTag: vi.fn(() => Promise.resolve()),
   setProjectColor: vi.fn(() => Promise.resolve()),
+  setProjectParent: vi.fn(() => Promise.resolve()),
 }));
 
 const projectsState = vi.hoisted(() => ({
@@ -405,6 +406,141 @@ describe('取色入口（宿主插槽）逐行挂上', () => {
     const view = render();
     // p1 / p1a / p2 三行（p9 归档不渲染）。
     expect(view.querySelectorAll('.ht-slot-picker')).toHaveLength(3);
+  });
+});
+
+/**
+ * H「移入文件夹」：按**渲染结果**判，不按源码里有没有那几个字判
+ * =============================================================
+ *
+ * 现场（`seed()`）：p1「工作」= 文件夹（下面挂着 p1a），p1a「汇报」在 p1 里，
+ * p2「生活」= 顶级，p9「旧项目」= 已归档。领域规则（`folderTargetsFor`）在这份数据上
+ * 给出的答案是三种互不相同的形状，所以下面每条都只钉一个形状：
+ *
+ *   - **p2**：能进 p1；p1a 不进（它自己就在文件夹里 = 挂过去是第三层）；
+ *     p9 不进（归档父默认不画，挂进去这条会从侧栏消失）。
+ *   - **p1a**：p1 是它现在的父 —— 候选里但**不许点**（点它 = 写一条内容不变的 UPD，
+ *     违反 §3.4"一个用户意图 = 一个 op"）；p2 可点；「不放进文件夹」= 提为顶级，可点。
+ *   - **p1**：它是文件夹，`has_children` 把所有目标都挡掉 → 一个候选都没有，
+ *     而「不放进文件夹」就是它的当前位置，同样不可点。
+ *
+ * ⚠️ 这批用例**必须用 `dist/`**（同文件头那条）：改完 `packages/ui` 不 build，
+ * 这里验的是上一次构建的组件。
+ */
+describe('H 移入文件夹：菜单只在选择后出现，选项就是领域给的那些', () => {
+  /** 菜单里画出来的候选目标 id（按渲染顺序）。前缀带行 id，所以那个参数是必需的。 */
+  const optionIds = (menu: HTMLElement, rowId: string): string[] =>
+    Array.from(menu.querySelectorAll(`[data-testid^="web-list-folder-${rowId}-to-"]`)).map((el) =>
+      // 🔴 用 `getAttribute` 不用 `dataset.testID`：`data-testid` 在 HTML 里映射成
+      // `dataset.testid`（全小写），`dataset.testID` 恒 `undefined` —— 实测那样会得到
+      // `Cannot read properties of undefined (reading 'slice')`，症状长得像"候选集坏了"，
+      // 而坏的是探针自己。
+      el.getAttribute('data-testid')!.slice(`web-list-folder-${rowId}-to-`.length),
+    );
+
+  function openFolderMenu(view: HTMLDivElement, id: string): HTMLElement {
+    click(byTestId(view, `web-list-folder-${id}-trigger`));
+    const menu = byTestId(view, `web-list-folder-${id}-menu`);
+    expect(menu, `点「${id}」那行的移入文件夹没有展开菜单`).not.toBeNull();
+    return menu!;
+  }
+
+  const ariaDisabled = (el: HTMLElement): boolean =>
+    el.getAttribute('aria-disabled') === 'true';
+
+  it('没点触发按钮时菜单**不在 DOM 里**（不是"渲染出来但看不见"）', () => {
+    seed();
+    const view = render();
+    expect(byTestId(view, 'web-list-folder-p1-trigger'), '入口没逐行挂上').not.toBeNull();
+    expect(byTestId(view, 'web-list-folder-p2-menu')).toBeNull();
+
+    openFolderMenu(view, 'p2');
+    expect(byTestId(view, 'web-list-folder-p2-menu')).not.toBeNull();
+    // 另一行的菜单不许被一起打开（`open` 是每条行自己的状态）。
+    expect(byTestId(view, 'web-list-folder-p1-menu')).toBeNull();
+  });
+
+  it('p2 的候选恰好是 p1 —— 别人文件夹里的清单与已归档的清单都不给', () => {
+    seed();
+    const view = render();
+    const menu = openFolderMenu(view, 'p2');
+    expect(byTestId(menu, 'web-list-folder-p2-to-p1'), 'p1 是合法目标却没画').not.toBeNull();
+    const options = menu.querySelectorAll('[data-testid^="web-list-folder-p2-to-"]');
+    expect(
+      options,
+      `多画了非法目标：${optionIds(menu, 'p2').join(', ') || '（只剩这一条 p1）'}`,
+    ).toHaveLength(1);
+  });
+
+  it('p1a 的候选 = 它的当前父 p1（标着当前位置、不可点）+ 同为顶级的 p2（可点）', () => {
+    seed();
+    const view = render();
+    const menu = openFolderMenu(view, 'p1a');
+    expect(optionIds(menu, 'p1a')).toEqual(['p1', 'p2']);
+
+    const current = byTestId(menu, 'web-list-folder-p1a-to-p1')!;
+    expect(ariaDisabled(current), '当前所在文件夹还能点 = 会写一条内容不变的 op').toBe(true);
+    expect(current.textContent ?? '').toContain('当前位置');
+    expect(ariaDisabled(byTestId(menu, 'web-list-folder-p1a-to-p2')!)).toBe(false);
+    // 🔴 光看 `aria-disabled` 不够：那只是"说给自己听的"。真判据是**点它什么都不该发生**
+    // —— 把 `disabled` 摘掉而留着 `aria-disabled` 是最坏的一种漂法（读屏说"不可点"，
+    // 而鼠标照样能点出一条 no-op op）。
+    click(current);
+    expect(actions.setProjectParent, '点了"当前位置"却发出了写入').not.toHaveBeenCalled();
+
+    const none = byTestId(menu, 'web-list-folder-p1a-none')!;
+    expect(ariaDisabled(none), '在文件夹里的清单应该能提为顶级').toBe(false);
+  });
+
+  it('p1 是文件夹：一个候选都没有，而「不放进文件夹」是它的当前位置 → 整块菜单没有可点的', () => {
+    seed();
+    const view = render();
+    const menu = openFolderMenu(view, 'p1');
+    expect(menu.querySelectorAll('[data-testid^="web-list-folder-p1-to-"]')).toHaveLength(0);
+    const none = byTestId(menu, 'web-list-folder-p1-none')!;
+    expect(ariaDisabled(none)).toBe(true);
+    expect(none.textContent ?? '').toContain('当前位置');
+    click(none);
+    expect(actions.setProjectParent, '顶级清单点「不放进文件夹」= 一条 no-op op').not.toHaveBeenCalled();
+  });
+
+  it('点候选调 `setProjectParent(这条, 目标)`；点「不放进文件夹」传的是 `undefined` 而不是字符串', () => {
+    seed();
+    const view = render();
+
+    openFolderMenu(view, 'p2');
+    click(byTestId(view, 'web-list-folder-p2-to-p1'));
+    expect(actions.setProjectParent).toHaveBeenCalledWith('p2', 'p1');
+
+    openFolderMenu(view, 'p1a');
+    click(byTestId(view, 'web-list-folder-p1a-none'));
+    // 🔴 必须是 `undefined`：传 `''` 会走到 `parent_not_found`，传 `null` 过不了类型。
+    expect(actions.setProjectParent).toHaveBeenLastCalledWith('p1a', undefined);
+    // 单独再钉**元数**：`toHaveBeenCalledWith(x, undefined)` 对"只传了一个参数"也成立，
+    // 而 `parentId` 键在不在载荷里是动作层文件头第 1 条要区分的那件事。
+    const lastCall = actions.setProjectParent.mock.calls.at(-1) as unknown[] | undefined;
+    expect(lastCall, '一次都没调用').not.toBeUndefined();
+    expect(lastCall!.length, '提到顶级必须显式传第二个参数').toBe(2);
+    expect(lastCall![1]).toBeUndefined();
+  });
+
+  it('🔴 写失败时，那句"为什么不能移"要出现在界面上（不许只 console）', async () => {
+    seed();
+    const view = render();
+    actions.setProjectParent.mockRejectedValueOnce(
+      new Error('改父被拒绝（cycle）：p2 → p1'),
+    );
+
+    openFolderMenu(view, 'p2');
+    await act(async () => {
+      click(byTestId(view, 'web-list-folder-p2-to-p1'));
+    });
+
+    const failed = byTestId(view, 'list-folder-failed');
+    expect(failed, '移动失败了，但界面上没有任何一句话告诉用户').not.toBeNull();
+    // 认的是**机器可读的原因**映射出来的词条原文，不是错误串（里面带着原始 id）。
+    expect(failed!.textContent).toBe('这样会形成循环：清单不能放进自己的子清单里');
+    expect(failed!.getAttribute('role')).toBe('alert');
   });
 });
 

@@ -114,7 +114,10 @@ L_SIGNIN="注册 / 登录"
 L_OFFLINE="先离线使用"
 L_EMAIL="邮箱"
 L_PASTE="粘贴邮件里的链接或令牌"
-L_PASSWORD="端到端加密口令"
+# The auth form's visible label is the shorter mobile-only wording. Keep the
+# test locator aligned with the actual native field; the explanatory copy still
+# spells out that this is the end-to-end encryption passphrase.
+L_PASSWORD="加密口令"
 L_TOKEN="访问令牌"
 L_TERMS="我同意该服务端提供的服务条款与隐私政策"
 L_REGISTER="注册新账号"

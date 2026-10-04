@@ -27,6 +27,16 @@ import SQLite3   // macOS SDK 自带；`.linkedLibrary("sqlite3")` 只负责链�
 /// 信封用的键。⚠️ 改它必须同步改 `packages/app-host/src/native-bridge.ts`。
 private let driverErrorKey = "__heytaDriverError"
 
+/// 句柄已关时的**固定**消息（`lastError()` 用同一个字符串，两处不许漂成两种说法）。
+///
+/// 🔴 不能把 `NULL` 递给 `sqlite3_exec` / `sqlite3_prepare_v2`：SQLite 对已关闭的库指针
+/// 只承诺 `SQLITE_MISUSE`，而实测 macOS 系统库在那条路上给的 `errmsg` 是 `NULL`
+/// ⇒ 我们只能回出一个 `"unknown"`（等于把"句柄已关"这件确定事实说成不确定）。
+/// 而"关闭之后又被调用"是**真可达**的：`destroy()` 之后 `native-bridge.ts` 清空模块态，
+/// 下一条消息经 `driverFactory()` 拿回的是**同一个**已关闭对象（`ScriptHost.swift:39`
+/// 的工厂返回 `globalThis.__heytaDriver`）。
+private let closedHandleMessage = "database is closed"
+
 private func errorEnvelope(_ message: String) -> String {
     guard let data = try? JSONSerialization.data(withJSONObject: [driverErrorKey: message]),
           let text = String(data: data, encoding: .utf8) else {
@@ -36,12 +46,16 @@ private func errorEnvelope(_ message: String) -> String {
 }
 
 /// JS 侧看到的形状。`JSExport` 让它能直接被 JavaScriptCore 暴露成 JS 对象。
-/// 三个方法都返回 `String`（信封），**没有一个会抛**。
+///
+/// `exec` / `run` / `all` 返回 `String`（**信封**），`removeDatabase` 返回 `String`
+/// （**处置凭据**，形状 = `SqliteContainerRemoval` 的 JSON）。
+/// 🔴 **没有一个会抛**，而 `removeDatabase` 连"删不掉"都不许走信封 —— 理由见它自己那段。
 @objc public protocol SqliteDriverExports: JSExport {
     func exec(_ sql: String) -> String
     func run(_ sql: String, _ paramsJson: String) -> String
     func all(_ sql: String, _ paramsJson: String) -> String
     func close()
+    func removeDatabase() -> String
 }
 
 public final class SqliteBridge: NSObject, SqliteDriverExports {
@@ -71,6 +85,7 @@ public final class SqliteBridge: NSObject, SqliteDriverExports {
     deinit { close() }
 
     public func exec(_ sql: String) -> String {
+        guard handle != nil else { return errorEnvelope(closedHandleMessage) }
         var error: UnsafeMutablePointer<CChar>?
         if sqlite3_exec(handle, sql, nil, nil, &error) != SQLITE_OK {
             let message = error.map { String(cString: $0) } ?? "unknown"
@@ -139,10 +154,59 @@ public final class SqliteBridge: NSObject, SqliteDriverExports {
         handle = nil
     }
 
+    /// **移除库文件本体**（连 `-wal` / `-shm` 旁挂），返回 `SqliteContainerRemoval` 的 JSON 文本。
+    ///
+    /// 🔴 与 `exec`/`run`/`all` 不同：**这一条不许回信封、也不许抛。**
+    /// 调用方是 `SqliteAdapter.destroy()`（`packages/storage/src/sqlite/sqlite-adapter.ts:286`），
+    /// 它把"删不掉"当成一份**书面凭据**继续清别的存储；
+    /// 而信封会被 `native-bridge.ts` 的 `throwIfDriverError` 拆成 `throw`
+    /// ⇒ 整个销毁失败、其余几类明文一类都不清 —— 那正是这条契约存在的理由。
+    ///
+    /// 🔴 返回值刻意是**字符串**：跨 JSContext 只有字符串可靠（与 `all`/`run` 同一个约定）。
+    ///
+    /// ⚠️ 旁挂文件**必须**一起删：只删主文件会留下一份能重放回明文的 WAL 日志。
+    public func removeDatabase() -> String {
+        // 契约写明"必须在 close() 之后"（`sqlite-driver.ts` 的实现要点），但这里**不假设**调用方记得：
+        // 句柄还开着就删，在 POSIX 上是"文件消失了但数据还活着"。`close()` 本身幂等。
+        close()
+
+        // 与 node 侧逐字同形（`node-sqlite-driver.ts:56-77`）：内存库没有文件，"没文件可删"就是成功。
+        if path == ":memory:" { return removalJson(removed: true, reason: nil) }
+
+        var failure: String?
+        for slot in Self.removalSlots {
+            let result = unlink(path + slot.suffix)
+            if result == 0 { continue }
+            // ENOENT = 本来就不存在 = 幂等成功（契约明写"不是错误"），继续扫下一个。
+            if errno == Int32(ENOENT) { continue }
+            // 只留**第一个**失败（与 node 侧 `failure ??= error` 同语义，Swift 没有那个运算符），
+            // 且 reason 必须是 ASCII：它会进证据文件
+            // （`error.localizedDescription` 会跟系统语言走，中文机子上就不是 ASCII 了）。
+            if failure == nil { failure = "unlink-failed-\(slot.name):errno=\(errno)" }
+        }
+        return removalJson(removed: failure == nil, reason: failure)
+    }
+
     // ── 内部 ────────────────────────────────────────────────────────
 
+    /// 要一起带走的文件：主文件 + SQLite 的两个旁挂。`name` 只为把失败归到具体哪一档。
+    private static let removalSlots: [(suffix: String, name: String)] = [
+        ("", "main"), ("-wal", "wal"), ("-shm", "shm"),
+    ]
+
+    private func removalJson(removed: Bool, reason: String?) -> String {
+        var payload: [String: Any] = ["target": path, "containerRemoved": removed]
+        if let reason { payload["reason"] = reason }
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let text = String(data: data, encoding: .utf8) else {
+            // 连这条凭据都编不出来时，也要回一条**能解析**的 false，而不是抛。
+            return "{\"target\":\"sqlite\",\"containerRemoved\":false,\"reason\":\"removal-json-encoding-failed\"}"
+        }
+        return text
+    }
+
     private func lastError() -> String {
-        guard let handle else { return "database is closed" }
+        guard let handle else { return closedHandleMessage }
         return String(cString: sqlite3_errmsg(handle))
     }
 
@@ -153,6 +217,7 @@ public final class SqliteBridge: NSObject, SqliteDriverExports {
 
     /// 把 JS 传来的 `JSON.stringify(params)` 绑到 `?` 上（位置由我们自己数）。
     private func prepare(_ sql: String, _ paramsJson: String) -> Prepared {
+        guard let handle else { return .failure(closedHandleMessage) }
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(handle, sql, -1, &statement, nil) == SQLITE_OK, let prepared = statement else {
             return .failure(lastError())

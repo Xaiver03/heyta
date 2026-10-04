@@ -1,0 +1,35 @@
+Android Vault lifecycle evidence (redacted)
+============================================
+
+Device: emulator-5554
+Package: com.heyta
+Server: TEST_MODE on localhost:3000
+
+PASS=remembered-root-after-cold-start
+  A remembered root was loaded by the host's first vault session after a
+  cold-start reauthentication; the Settings UI reported that encrypted data
+  was unlocked.
+
+PASS=logout-fence-before-reauthentication
+  The real Settings UI logout path cleared the local credentials and the
+  subsequent Vault UI required authentication again.
+
+PASS=post-logout-reauthentication-does-not-auto-unlock
+  After the real UI logout fence, a fresh password login reached the session
+  state and saved the sync credentials. Opening Settings then showed the
+  existing Vault's passphrase/recovery unlock controls; it did not show an
+  unlocked key or a remembered-root status. The Vault stayed locked until the
+  passphrase was entered explicitly.
+
+PASS=rotation-and-cross-device-read
+  On the same Android Release installation, root rotation was confirmed in
+  the real Settings UI with the displayed recovery code and the old legacy
+  passphrase. The UI reported migration progress through 2/2 and returned to
+  “这台设备上的加密数据已经解锁”. A fresh Node/SQLite device, authenticated
+  as the same account and unlocked with the rotated passphrase, synced the
+  task `android-b-vault-rotation-cross-device-20261004`; result was one task,
+  synced, and zero pending uploads. The Node host was required to receive the
+  account id so it selected the Vault key-package/payload codec.
+
+Secrets (tokens, root keys, recovery codes, and passphrases) are intentionally
+absent from this file.

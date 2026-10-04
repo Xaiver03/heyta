@@ -98,13 +98,13 @@ const LABELS: HabitBoardLabels = {
   checkInA11y: ({ name, doneToday }) => (doneToday ? `撤销「${name}」` : `为「${name}」打卡`),
   streakCurrent: (count) => `连续 ${String(count)} 天`,
   streakLongest: (count) => `最长 ${String(count)} 天`,
-  streakTotal: (count) => `累计 ${String(count)} 次`,
+  streakTotal: (count) => `累计 ${String(count)} 天`,
   freeze: (count) => `这段连续里有 ${String(count)} 天是冻结保住的`,
   repair: ({ date, count }) => `${date} 那天漏了。现在补上，就是连续 ${String(count)} 天。`,
   repairAction: '补上',
   repairA11y: ({ date, name }) => `把 ${date} 的「${name}」补上`,
   freshStart: ({ days, longest, total }) =>
-    `已经 ${String(days)} 天没打卡了。最长 ${String(longest)} 天、累计 ${String(total)} 次都还在。`,
+    `已经 ${String(days)} 天没打卡了。最长 ${String(longest)} 天、累计 ${String(total)} 天都还在。`,
   freshStartAction: '今天重新开始',
   freshStartA11y: (name) => `今天为「${name}」重新打卡`,
   empty: '还没有习惯。添加一个开始打卡。',
@@ -366,6 +366,16 @@ describe('E. web 视图不再有第二份实现（源码级判据）', () => {
   });
 
   it('用真词条渲染一次：累计数字与中文文案对得上', () => {
+    // 🔴 这条原来把句子写成字面量 `'累计12次'`，于是**词条一改它就漂**（W8a 把"次"改成"天"
+    // 的当轮就红了 —— 红了是对的，但它当时只能靠人来发现漂移）。
+    // 现在两件事分开钉：字面量仍然是**可读的期望**，另外加一条**漂移自检**，
+    // 让"改了词条没同步这条"由测试自己报出来，而不是等人。
+    const expected = '累计12天';
+    const squeeze = (value: string): string => value.replace(/\s+/gu, '');
+    expect(
+      squeeze(expected),
+      '这条字面量与 `web.habits.streak.total` 漂移了 —— 改词条必须同步这条期望',
+    ).toBe(squeeze(zhCN['web.habits.streak.total'].replace('{count}', '12')));
     const view = render(
       <HabitBoard
         habits={[habit()]}
@@ -381,6 +391,8 @@ describe('E. web 视图不再有第二份实现（源码级判据）', () => {
         onUndoCheckIn={() => undefined}
       />,
     );
-    expect((view.textContent ?? '').replace(/\s+/gu, '')).toContain('累计12次');
+    expect((view.textContent ?? '').replace(/\s+/gu, '')).toContain(
+      expected.replace(/\s+/gu, ''),
+    );
   });
 });

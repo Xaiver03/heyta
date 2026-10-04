@@ -73,9 +73,8 @@ import { ICON_SIZE } from '@heyta/design-system';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
-import { placeAnchoredPanel } from '@heyta/ui';
-
 import { avatarInitialFromEmail } from '@heyta/shared-schema';
+import { placeAnchoredPanel } from '@heyta/ui';
 import { CircleUser, LogIn, LogOut, Settings, TrendingUp, UserRoundPen } from 'lucide-react';
 
 /**

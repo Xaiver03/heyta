@@ -80,9 +80,10 @@ import {
 } from '@heyta/ui';
 
 const { TaskRowMeta } = await import('../src/features/tasks/row-meta.js');
-const { priorityBadgeText, priorityColorToken } = await import(
-  '../src/features/tasks/priority-display.js'
-);
+// ⚠️ `priorityColorToken` 以前也从这里取 —— 那是 web 自己的一份镜像，
+// W5 已抽进 `@heyta/ui`（见下面 D 组那条"不许有第二份"的门禁）。
+// 文案那一半（`priorityBadgeText`）仍然必须留在宿主，因为它要 `@heyta/i18n` 的 `MessageKey`。
+const { priorityBadgeText } = await import('../src/features/tasks/priority-display.js');
 /** 🔴 必须在 `globalThis.indexedDB` 装好之后 import（理由见上面那段注释）。 */
 const { useProjectStore } = await import('../src/features/projects/store.js');
 
@@ -151,6 +152,26 @@ afterEach(() => {
 function metaHtml(el: HTMLElement): string | null {
   const node = el.querySelector('[data-testid="task-meta"]');
   return node === null ? null : node.outerHTML;
+}
+
+/**
+ * 把一个颜色取值换算成**这台 jsdom 自己序列化出来的形态**。
+ *
+ * 🔴 不许拿 `#dc2626` 去 `toContain`：jsdom 的 `cssstyle` 会把 hex 序列化回
+ * `rgb(220, 38, 38)`，所以"字面量对得上"和"画出来了"是两件事。
+ * 让期望值走**同一台 jsdom** 的转换，两边比的就是同一种形态 ——
+ * 与 `THEME.tokens` 写成 hex 还是 `oklch()` 无关，也不必测试里再抄一份换算表。
+ */
+function cssColor(value: string): string {
+  const probe = document.createElement('div');
+  probe.style.color = value;
+  document.body.appendChild(probe);
+  const computed = getComputedStyle(probe).color;
+  probe.remove();
+  // 换算失败（值不被 jsdom 认）时它返回空串 —— 那会让下面所有断言变成
+  // `toContain('')`（恒真）。判据不能有这么一条静默的通路。
+  if (computed === '') throw new Error(`jsdom 算不出这个颜色：${value}`);
+  return computed;
 }
 
 /**
@@ -303,11 +324,39 @@ describe('徽章文案是语言，不是数字', () => {
     expect(metaHtml(none)).toBeNull();
   });
 
-  it('四个档位的色槽各就各位（`undefined` 落到 none，不是 crash）', () => {
-    expect(priorityColorToken(Priority.High)).toBe('color.priority-high');
-    expect(priorityColorToken(Priority.Medium)).toBe('color.priority-medium');
-    expect(priorityColorToken(Priority.Low)).toBe('color.priority-low');
-    expect(priorityColorToken(Priority.None)).toBe('color.priority-none');
+  /**
+   * 🔴 W5 之后这一条换了问法。
+   *
+   * 原来它断言的是"四个档位各映射到哪个 token 名" —— 那是**映射本身**的判据，
+   * 而映射的唯一所有者已经在 `packages/ui/src/task-list/priority-color.ts`，
+   * 判据跟着它进了 `packages/ui/tests/task-row-priority.spec.ts`。
+   * 留在这里再抄四行，等于把同一个判断放进第三个包。
+   *
+   * 这一条现在量的是**web 这一端真画出来了什么**：`TaskRowMeta` 交出去的
+   * 颜色必须是共享映射那个 token 的**取值**，而且不许串档
+   * （写 `High` 的行里不许出现 `Medium` 那个色）。
+   */
+  it('🔴 行元信息画的是共享映射的取值，而且不串档', () => {
+    const tiers = [
+      [Priority.High, 'color.priority-high'],
+      [Priority.Medium, 'color.priority-medium'],
+      [Priority.Low, 'color.priority-low'],
+    ] as const;
+
+    for (const [priority, token] of tiers) {
+      const html = metaHtml(
+        mount(<TaskRowMeta row={rowOf(task({ priority }))} mode="countdown" now={NOW} />),
+      );
+      expect(html, `${token} 那一行的元信息槽整个没渲染`).not.toBeNull();
+      const mine = cssColor(THEME.tokens[token]);
+      expect(html, `行上没出现 ${token}（=${mine}）`).toContain(mine);
+      for (const [, other] of tiers) {
+        if (other === token) continue;
+        expect(html, `档位 ${Priority[priority]} 的行串到了 ${other}`).not.toContain(
+          cssColor(THEME.tokens[other]),
+        );
+      }
+    }
   });
 });
 
@@ -429,15 +478,43 @@ describe('D. web 的优先级镜像与移动端同一批词条', () => {
     expect(webSource).toContain("t('mobile.priority.badge'");
   });
 
-  it('语义色 token 名两边一致（色值仍由设计系统给，这里比的是名字）', () => {
-    for (const token of [
-      'color.priority-none',
-      'color.priority-low',
-      'color.priority-medium',
-      'color.priority-high',
-    ]) {
-      expect(webSource, token).toContain(token);
-      expect(mobileSource, token).toContain(token);
+  /**
+   * 🔴 这一条原本是"两边的 token 名逐字相同"（镜像对账）。W5 把颜色那一半抽进
+   * `packages/ui` 之后，**那句已经不可能失败** —— 宿主里根本没有 token 名了。
+   * 留着它就是本仓反复吃的那个形状：**抽取之后没把旧判据改写成新不变量，
+   * 于是它变成一条永远通过的装饰**。
+   *
+   * 现在它量的是抽取的**收尾**两件事（AGENTS §3.5）：
+   *   ① 两份镜像里不许再出现颜色映射（"删掉旧的那份"）；
+   *   ② 三个消费者必须从 `@heyta/ui` 取（"接上单一所有者"）。
+   * 全仓"只有一个人定义它"那条更宽的门禁在
+   * `packages/ui/tests/task-row-priority.spec.ts`（要遍历目录，不属于本文件的职责）。
+   */
+  it('🔴 颜色那一半没有留在宿主里，三个消费者都从 @heyta/ui 取', () => {
+    for (const [rel, src] of [
+      ['apps/web/src/features/tasks/priority-display.ts', webSource],
+      ['apps/mobile/src/lib/priority.ts', mobileSource],
+    ] as const) {
+      expect(src, `${rel} 里还有语义色 token 名`).not.toMatch(/color\.priority-/);
+      expect(src, `${rel} 里还自己定义着 priorityColorToken`).not.toMatch(
+        /function\s+priorityColorToken/,
+      );
+    }
+
+    const read = (rel: string): string =>
+      strip(readFileSync(resolve(process.cwd(), rel), 'utf8'));
+    const consumers = [
+      ['apps/web 的行元信息', '../../apps/web/src/features/tasks/row-meta.tsx'],
+      ['mobile 的任务屏', '../../apps/mobile/src/screens/TasksScreen.tsx'],
+      ['mobile 的任务详情浮层', '../../apps/mobile/src/screens/TaskDetailSheet.tsx'],
+    ] as const;
+
+    for (const [label, rel] of consumers) {
+      const src = read(rel);
+      expect(src, `${label} 没有用 priorityColorToken`).toContain('priorityColorToken');
+      expect(src, `${label} 的 priorityColorToken 不是从 @heyta/ui 取的`).toMatch(
+        /import\s*\{[\s\S]*?\bpriorityColorToken\b[\s\S]*?\}\s*from\s*'@heyta\/ui'/,
+      );
     }
   });
 

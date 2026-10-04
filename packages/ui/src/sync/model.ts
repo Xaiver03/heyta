@@ -252,6 +252,7 @@ export type SyncFailureMessageKey =
   | 'common.sync.error.undecryptablePage'
   | 'common.sync.error.uploadRejected'
   | 'common.sync.error.unauthorized'
+  | 'common.sync.error.accountClosed'
   | 'common.sync.error.consentRequired'
   | 'common.sync.error.legalReconfirmRequired';
 
@@ -267,6 +268,11 @@ const SYNC_FAILURE_MESSAGE_KEY: Record<string, SyncFailureMessageKey> = {
   // 令牌被服务端拒了：句子必须同时说"为什么停下"和"本地数据没事"，
   // 否则用户的第一反应是删库重装 —— 而那才是真的会丢东西的动作。
   'unauthorized': 'common.sync.error.unauthorized',
+  // 🔴 注销与"凭据失效"必须各有各的句子：两句对本机数据许的是**相反**的承诺
+  // （完好 / 已清除），合成一句就在两个方向上说谎。
+  // 这条 key 与 `SyncFailureReason` 的 `'account-closed'` 成对；
+  // 判据：`apps/web/tests/sync-reason-coverage.spec.ts`。
+  'account-closed': 'common.sync.error.accountClosed',
   // 🔴 G-12：还没同意隐私规则，所以**一个请求都没发**。这句必须与"网络坏了"、
   // "没配服务端"分开 —— 那两种的用户动作是"检查网络"和"填地址"，而这里的动作是"去同意"。
   // 写成前两者之一会让用户改一遍地址、回来还是不同步。
