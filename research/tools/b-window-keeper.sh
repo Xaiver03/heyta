@@ -101,6 +101,19 @@ while :; do
     break
   fi
   if [ "$RC" = 3 ]; then
+    # 🔴 载体这一路**不吃 `src` 这一格**（下面是读脚本本体的现量，不是印象）：
+    #   · `scripts/reinstall-all.sh:183` 第 0 步就是 `pnpm -r build`，而看守是 `( cd "$CARRIER" && … )` 起它的
+    #     ⇒ 构建读的是**载体**那棵树；
+    #   · `:214-225` 再把 `.app` 里的 `web-dist` 与"本机 `apps/web/dist` 是同一次构建"逐 chunk 对账；
+    #   · 本脚本第 2 步要求载体工作树干净、第 3 步把它追平到 `main` 的**提交**尖并记 from/to sha。
+    #   ⇒ 主检出里别人那几枚未提交字节**进不了产物**，而 `src` 这一格防的正是"把别人 WIP 打进产物"
+    #     （§7 第 82 条）。所以等它 = 等一个对本路没有因果的读数 —— 与 C 链那条例子 `FIRE=apk-deferred` 同形。
+    #   ⚠️ 只放行"红集**恰好**是 src 一种"：`load`/`dev`/`apk`/任何别的红（或**没打 REDS**）一律继续等。
+    #     负载门与设备门一个字没动（硬约束那句"负载门不达标就登记等待，不降级判据"仍然成立）。
+    if [ "$REDS" = "REDS=src" ]; then
+      say "FIRE=src-deferred try=${N} ${REDS}（载体那一路结构性不吃 src；理由见本段注释与台账 (32)）"
+      break
+    fi
     say "try=${N} rc=3 ${REDS:-〈闸门没打 REDS，装置可疑〉}"
   else
     say "BROKEN=闸门 rc=${RC}（不是 0/3 ⇒ 用法或装置坏，不继续等）"

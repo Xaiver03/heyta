@@ -247,5 +247,22 @@ else
   else no "L2 rc=$(RCV) 重装=$(NCALLS) 次 ⇒ 默认图案认不出「H 真在跑」，两边会在同一窗口同时开火"; fi
 fi
 
+# ── M/N/O：`FIRE=src-deferred` 这一格必须**只**在红集恰好是 src 一种时放行。
+#    M = 正向（src 单独红 ⇒ 起跑）；N = 反向（src+load 并存 ⇒ 仍等，挡"见 src 就放行"）；
+#    O = 闸门没打 REDS ⇒ 仍等（缺机器通道按可疑处理，不许当成"红集为空"）。
+mk_fixture; BK_BUDGET=60; run_keeper "3:src" > "$FIX/out"
+if [ "$(RCV)" = 0 ] && [ "$(NCALLS)" = 1 ] && grep -q 'FIRE=src-deferred' "$FIX/out"; then
+  ok "M 红集恰好只有 src ⇒ 载体那一路放行起跑（重装 1 次）"
+else no "M rc=$(RCV) 重装=$(NCALLS) 次 ⇒ src-deferred 没接上，B 还在等一格对本路没有因果的读数"; fi
+mk_fixture; BK_BUDGET=1; run_keeper "3:src,load" > "$FIX/out"
+if [ "$(RCV)" = 3 ] && [ "$(NCALLS)" = 0 ] && ! grep -q 'FIRE=src-deferred' "$FIX/out"; then
+  ok "N src 与 load 并存 ⇒ 继续等（重装 0 次）⇒ 那一格不是「见 src 就放行」"
+else no "N rc=$(RCV) 重装=$(NCALLS) 次 ⇒ 放行条件被写宽了，负载红会被 src 一起放过"; fi
+mk_fixture; BK_BUDGET=1; run_keeper "3:-" > "$FIX/out"
+if [ "$(RCV)" = 3 ] && [ "$(NCALLS)" = 0 ]; then
+  ok "O 闸门没打 REDS ⇒ 仍等（缺机器通道不当成「红集为空」）"
+else no "O rc=$(RCV) 重装=$(NCALLS) 次 ⇒ 没读数被读成没红，这一腿没有牙"; fi
+BK_BUDGET=30
+
 echo "b-window-keeper 臂：pass=$PASS fail=$FAIL"
 [ "$FAIL" = 0 ] || exit 1
