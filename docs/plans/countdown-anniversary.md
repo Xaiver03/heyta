@@ -4324,3 +4324,49 @@ W0b ─> 随时可做（台账那半要等文件干净）
     且它们当时已经没有对应的活着的写者）；而**别人正持有、且各自有明确所有者载体的树**不在其中 ——
     尤其是 detached HEAD 的那枚 164。**判据不是"谁改的"，是"这块字节现在有没有主"**：
     有主的树里我写一笔就是在替别人决定归属，无主的字节放着我就是在替他丢掉工作。
+
+14. ✅ **落地态（`9adb5f08`）重跑门禁与关键判据的新读数**（Goal 第⑤步要求的最后一格；04 22:2x–22:3x）。
+    载体 = 本分支 HEAD `9adb5f08`（= 已推上去的 `origin/feat/countdown-batch2`，且已被 `origin/main` 收下）。
+
+    | 件 | 读数 | 日志 |
+    |---|---|---|
+    | `pnpm -r build` | `RC_M6_BUILD=0` | `/tmp/m6-build.log` |
+    | `pnpm -r typecheck` | `RC_M6_TYPE=0` | `/tmp/m6-type.log` |
+    | 15 道门禁（design / l4 / row-single-source / ui-language / public-facts / legal-copy / layering / script-snapshot / verify-script-copy / ios-native-bridges / tokens / docs / md-tables / docs-voice / doc-citations） | **逐条 rc=0**（`/tmp/final-gates.rc.txt`，每条一行 `RC_G_<name>=0`） | `/tmp/fingate-*.log` |
+    | 全量单测 `pnpm -r test` | 🔴 **`RC_M6_RTEST=1`** —— 见下面两条 attribution | `/tmp/m6-rtest.clean.log` |
+
+    🔴 **全片 rc=0 不成结论，除非摘掉的那道门会红**：本表里唯一当场做了**阳性对照**的是 `check:design`
+    —— 往 `admin.css` 追加一行 `color: #123456;` ⇒ `RC_MUT_DESIGN=1` 且日志把 `#123456` **原文点出来**，
+    复原后 `RC_RESTORED=0` 且 `git status -- admin.css` 为空。⚠️ 其余 14 道这一趟**没有重新做变异**；
+    它们各自"能失败"的证据在第 3、9、10 条和第 11 条里（`check:md-tables` 是 `RC_MUT_MDTABLES=1`/`RESTORED=yes`），
+    本表不代它们主张。**"跑了一趟全绿"和"这 15 道都有牙"是两个结论，别合并成一句。**
+
+    🔴 **`RC_M6_RTEST=1` 归因（这一条是本轮最容易被读错的一格）**：红**不来自任何一条用例**。
+    日志里 16 个 workspace 全部打印了 `Test Files … passed`，`apps/mobile` 也是
+    `52 passed (52)` / `754 passed (754)`，紧跟的是 `Vitest caught 5 unhandled errors during the test run`，
+    五条同一句 `RolldownError: Parse failure: … Flow is not supported`（解析 `react-native/index.js`）。
+    pnpm 在第一个失败处停住 ⇒ **另外 4 个包根本没跑**。两条腿把它拆开：
+    ① 单独跑那一端：`RC_MOB_SOLO=0`、`52 passed (52)` / `754 passed (754)`（`/tmp/mob-solo.log`）
+    ⇒ 那些 rejection 是**并发跑整棵树时**才出现的，不是移动端测试自己的属性；
+    ② 把没跑到的 4 个包**串行补齐**：node-host `RC_GAP[@heyta/node-host]=0`（`11 files / 186 tests`）、
+    web `RC_GAP[@heyta/web]=0`（`133 passed | 2 skipped (135)` / `1767 passed | 13 skipped (1780)`）、
+    desktop `RC_GAP[@heyta/desktop]=0`（`2 / 12`）。⇒ **合起来这一批的每一个包都有一份绿读数**，
+    只是它不是"一趟 `-r test` 全绿"这一种形状。**边界写清**：这不推翻"`pnpm -r test` 在当前载体会以 rc=1 结束"，
+    那一格仍未闭合，登记在下面 `RTEST-UNHANDLED-01`。
+
+    🔴 **空过滤器假通过 —— 同一个坑第二轮，这次是我自己又踩的**：补第三个包时我写的是
+    `pnpm --filter @heyta/server test`，日志 `/tmp/gap-_heyta_server.log` **整篇只有一行**
+    `No projects matched the filters in "…/heyta-wt-batch2"`，而 `RC_GAP[@heyta/server]=0`。
+    ⇒ 那条 0 是**跑了 0 个包**的 0。真名是 `@heyta/sync-server`（`server/package.json`），重跑
+    `RC_GAP_SERVER2=0`、`124 passed (124)` / `2241 passed | 1 skipped (2242)`。
+    ⚠️ **为什么它比第一次更危险**：第一次是 `--filter '!@heyta/sync-server'`（排除式，我怀疑了它、去查了原因）；
+    这次是**肯定式**、而且夹在一条"四个包串行"的链里，链尾的 `RC_GAPCHAIN=0` 看起来像四条都过了。
+    **过滤器类命令的 0 一律不构成通过，判"跑到了"要数日志里的 `Test Files` 行数而不是只看 rc**
+    （复现：`sed -E 's/\x1b\[[0-9;]*m//g' <log> | grep -c 'Test Files'` —— 空过滤器给 **0**）。
+    这条与 AGENTS §7 里"空测量看着最干净"是同一族，但**新增的面是：它会伪装成"补上了上一个读数没覆盖的包"**。
+
+    - `RTEST-UNHANDLED-01`（登记，未闭合）：`pnpm -r test` 在 `apps/mobile` 上因 5 条 Rolldown Flow 解析
+      unhandled rejection 以 rc=1 结束。现状是**并行整树才现、单跑不现**（两腿读数见上），
+      所以它落在"并发/harness"还是"环境"没有定；**不是产品缺陷**，但也不许写成"抖动、忽略"。
+      要它闭合得先有一条能定责的判据（最小方案：把 `apps/mobile` 从 `-r test` 的并行度里摘出来单跑，
+      并让 `-r test` 汇总里带"哪几个包根本没跑到"的行数 —— 这条本身要能失败）。
