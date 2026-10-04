@@ -5062,3 +5062,58 @@ tip 是自己 10 秒前造的那笔 —— `git reset --soft HEAD~1` + `git rest
 >   跨断点，`turn()` 还在跑但 `append` 落在已卸载的组件上 ⇒ 回包那一句丢。
 >   症状从"悄悄取消一次同意"降级成"少了一条回答"，**不是同一件事**。
 >   要修它得把在飞的请求本身也搬到 Provider 里（或给会话一个 owner 组件包住两个挂载点）。
+
+> **B79 补记 #2（10-05 02:1x–02:3x）—— ③ 四端第一次全部装在同一棵树上；两发"门禁全绿但打不出包"当场补了判据**
+>
+> 载体：`heyta-wt-ai-closeout` @ **`afe7ff7a`**（含 `bfbdc5f2` + `3faf5480` + `d924853e` + `afe7ff7a`）。
+> 四端分两趟跑完（同一台机器上安装类验收不并行）：
+>
+> | 端 | 趟次 | 一条读数 |
+> |---|---|---|
+> | android | 02:13:05 | 远端 `windows-pc` **BUILD SUCCESSFUL in 41s / 19 tasks executed**，APK `66,915,556 B`、`sha256=ea6fb4421d3df38f…`、远端完成 `2026-10-04T18:14:24Z`；本地哈希逐字相同 + mtime 回写；`adb install` Success；截图 `1080x2400`、内容占比 **56.7%**、主蓝命中 **4001** |
+> | ios | 同趟 | `** BUILD SUCCEEDED **` → `simctl install` 全新安装 → **已装的包比源码新**；截图 `1206x2622`、内容占比 **60.1%**、主蓝命中 **4152** |
+> | mac | 02:19:58 | `.app` 内 `web-dist/assets` 与本机 `apps/web/dist/assets` **同一次构建**（9 个 chunk，文件名集合逐字相等）；`.webview.png` 主蓝命中 **2169** |
+> | windows | 同趟 | 源码包 50M / 清单 **3307 条**、tar `sha256=3d9555f65b2e220e…` 远端逐字相同、新鲜度对账（`index.html=d6e0173d3b7c10b1…`、`bridge=f2dde17ac2bc419e…`、`assets/*.js=7 枚一致`）；远端取证 **`ADD_APPX=OK` `PAYLOAD_WEBDIST=True` `SHORTCUT_CREATED=True` `SHORTCUT_RESOLVES=True` `M2D=OK` `RESULT=OK`** |
+>
+> - 🔴 **这一趟是 AGENTS §6.1 那条"远程真打出 APK"判据的第一次实测**（原话写的是
+>   "⚠️ 那条判据尚未实测，别把分流当成已经替换了本机通道"）。现在它有了读数：远端 gradle
+>   真执行了 19 个 task、产物身份四条判据全过、拉回的 APK 装进模拟器并画出共享 UI。
+>   ⚠️ 但**别把这一格当成 §6.1 的文档已更新** —— `AGENTS.md` 此刻正被并行会话脏着
+>   （` M AGENTS.md`），改不动也不该由我整文件提交。这条读数住在本条，谁收口 AGENTS 谁取。
+> - **四端的图都人眼看过**（§6.2 规定一 #4）：android 与 ios 是全新安装后的首屏
+>   「在使用联网功能之前」同意卡（中文、主蓝按钮、服务条款/隐私政策两个链接都在），
+>   mac 的 `.webview.png` 是**首屏品牌帧**（近白底 + 主蓝圆角 h mark），
+>   windows 的 `dist/windows/packaged-first-run.png`（`md5=8ab347e5…`，02:23 那一趟）
+>   是**真应用 + 头像菜单开着**：左 rail 的今天/四象限、页头「收集箱」、
+>   右栏那一格写着「AI 工具调用」（`78cdff67` 那次 IA 改动在装机产物里看得见），
+>   菜单第一项是「登录 / 注册」、下面是「设置」—— 与 §6.2 那条身份入口判据一致。
+> - 🔴 **mac 的"窗口"那一张是几乎全黑的（内容占比 1.1%）** —— `screencapture` 对
+>   WKWebView 那一层拿不到像素，这是 §7 第 170 条的形状（窗口截图当内容载体会**同时**
+>   假红和假绿）。这一趟没被骗是因为判据数的是壳自己写的 `.webview.png`，
+>   而**不是**因为流程里有人盯着窗口那张。留此一格：如果哪天有人把主蓝判据换回窗口图，
+>   它会以 1.1% 的内容占比稳定假红，或以"黑屏也算有内容"假绿。
+> - 品牌帧停在截图上引出的那条锚点问题（补记 #1 说的"就绪锚点不知道有品牌帧"）**没有**
+>   被这张截图回答：自截屏在 +3s 抓的是品牌帧，而"应用能走到真界面"要另一条判据。
+>   本条用的是**装好的那份**跑 M2 探针：`HEYTA_NO_FOCUS=1 HEYTA_M2_EVIDENCE=… /Applications/Heyta.app/…`
+>   → `M2-macOS ✅ 身份入口成立（头像 1 个、采集框 1 个）；身份菜单合规；设置里的滴答导入面板可达`。
+>   也就是说 mac 端现在有两层：品牌帧渲染（像素）+ 真界面可导航（DOM 探针）。
+> - **生产同步重发**（同一棵树，站点先发 → 再发应用）：landing build rc=0 →
+>   `check:entries` rc=0（**76 份**入口与注册表一致）→ rsync rc=0 →
+>   `HEYTA_WEB_BASE=/app/` web build rc=0 → `check:web-artifact:app` rc=0
+>   （挂载 `/app/` 与产物声明一致、`index.html` 5 个本地引用 + manifest 15 个文件全在、
+>   256 个 `--ht-*` 对得上）→ rsync rc=0。
+>   ⚠️ 发布后的**线上验收套件（`playwright.live-site.config.ts`）还没跑成**：
+>   宿主内存闸门（`~/.tfa-shield`）拦下并发测试，当时另一条线的 `vitest run` 正持锁。
+>   这条与第 69 段 `check:ai-e2e` 是**同一类没闭合的读数**，不是新问题。
+> - **顺带修掉的两发"门禁看不见"的构建级缺陷**（都各自补了能失败的判据，逐臂量过）：
+>   `d924853e` 启动屏 storyboard **从来编不过**（生成器给 `<color>` 写了 `id` ⇒ `ibtool`
+>   rc=255 且零输出；`check:brand-assets` 现在既拒结构、又真调 `ibtool` 并**断言
+>   `.storyboardc` 存在** —— rc=0 单独不算证据）；`afe7ff7a` 远程 APK 的 mtime 探针
+>   **在 PowerShell 5.1 上从来没读到过值**（`ToUnixTimeSeconds()` 不存在 ⇒ 空串 ⇒
+>   `Number('')===0` ⇒ 一次**成功**的远端构建被判成"1970 年的旧产物"），
+>   `check:android-gradle-remote` 新增 G10 四条腿 + 四臂自检。
+>   两发的共同形状：**红的那一句把原因说反了**。前者报"编译失败"而不指出哪一行，
+>   后者报"产物是旧的"而真相是"探针读不到" —— 照它修会去查构建，而构建是好的。
+> - `c3049c88` 又一发 drive-by：`project.pbxproj` 里两枚模块被登记两次
+>   （每次 iOS 构建一行 `Skipping duplicate build file` 然后照样 succeed ⇒
+>   "日志里有警告"再也不是信号）。`check:native-deps` 规则 3 钉住，两臂变异各 rc=1。
