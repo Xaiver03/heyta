@@ -2751,3 +2751,19 @@ main 并在 01:42 把载体构建跑成 `BUILD rc=0`）。这一段做的全是�
 `check:docs` / `check:md-tables` / `check:android-build-host` / `check:android-gradle-remote` 四道 rc=0。
 
 摘掉的残留：上一笔 `d730e4d3` 把一行字面量 `
+## 02:4x：为 ① 的 Android 段做一次**只读前置复核**（不进窗口、不跑设备，四项全现量）
+
+链还在让路（02:4x 现量：第 258 轮 `设备在线但不空闲`，`pidof com.heyta` 从 12027 变成 14944、
+`mCurrentFocus` 依次落到 `com.android.int…` / `com.google.andro…` ⇒ 回收站那条线仍在点）。
+等待回合换成读证，四项都是**会决定 ① 第一趟成败**的：
+
+| 复核 | 读数 | 为什么值得量 |
+|---|---|---|
+| 载体对齐可行性 | `heyta-wt-reinstall` @ `24be9a85`，落后 main 5 笔；**被跟踪脏路径 0 枚**（`git status --porcelain \| grep -v '^??'` 空）⇒ 链下一轮 `git checkout $MH` 不会撞"拒绝覆盖本地改动" | 链的对齐那一步是 ① 的输入版本闸门；脏一枚且该路径在两提交间有差异就会**整轮不起跑**（chain:218 那条分支） |
+| ② 启动器的分母 | `heyta-run-checks.sh:158` 的 `TOTAL` 是 `require("./package.json").scripts.check.split(" && ").length` **现取**，不是抄来的 62 | Goal 原文写"62 段"，实际链现在是 84 段。写死的分母会把"跑满"判成假缺段 |
+| 远程时钟 vs 本机 | `ssh windows-pc "echo [%TIME%] [%DATE%]"` ⇒ `2:43:56.99 / 2026-10-05`（UTC+8），同趟本机 `date -u` = `18:43:55Z`↔`18:43:56Z` ⇒ **偏差 < 1 s** | 步骤 7 把本地 APK 的 mtime 回写成**远端**完成时刻，而 `apk-freshness` 判的是"APK mtime ≥ 源码 mtime"，源码 mtime 是 `git checkout` 那一刻的**本机**时间。远端慢过构建时长（41 s）就会让 ① 的 Android 段被**环境**判红 —— 这类红最费人，因为它长得像产品问题 |
+| ssh 噪声是否会破坏探针 | 那一趟输出里夹着 4 行 `** WARNING: connection is not using a post-quantum key exchange algorithm` | `run-gradle.mjs` 的 `marker()` 是按 `NAME=([^\r\n]*)` 逐行正则在**合并后的全文**里取 ⇒ 警告行不含被取的键，实测判据 2 那趟 `DEPCHECK=19 DEPMISS=0` 读数照常解析成功。**记下它是为了以后别把"警告"当成"探针坏了"** |
+
+同批补进 runbook 的两处（`3d15d745` + 本笔）：未决 2 就地标闭合（修法已在 HEAD：
+`run-gradle.mjs:397` 传第二枚实参、`sync-windows-sources.sh:145-146` 绑回局部、G8 臂 10/10b 各摘一边会红），
+以及上面那条时钟前提写进 §7.3 —— 它标的是"**不是永久属性**：换主机或那台机器休眠/改时区后要重量一次"。
