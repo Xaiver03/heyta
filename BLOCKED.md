@@ -2996,7 +2996,7 @@ pnpm --filter @heyta/app-host --filter @heyta/i18n --filter @heyta/ui --filter @
 `structure.spec.ts` 的 HEAD 版与工作树**都是 616 行且逐字节相同**（`diff <(git show HEAD:packages/legal/tests/structure.spec.ts) packages/legal/tests/structure.spec.ts` 无输出），
 FK 表名推导连同 `if (name === undefined || column === undefined) throw new Error(...)` 那枚守卫**已经进了 `main`** ——
 也就是说 TS18048 是属主自己带修落地的，不是「工作树里没人管的在飞代码」。
-`pnpm --filter @heyta/legal typecheck` **13:42 现量 EXIT=0**（读数 `/tmp/legal-tc-1342.log`，只跑这一格，没有重取全量 `-r` 的聚合读数）。
+`pnpm --filter @heyta/legal typecheck` **13:42 现量 EXIT=0**（这条命令 10 秒级、可复跑；只跑了 legal 这一格，没有重取全量 `-r` 的聚合读数）。
 `packages/legal` 此刻的脏文件是另外四份（`src/documents/permissions.ts` / `personal-info-list.ts` / `privacy.ts` / `third-parties.ts`），
 仍不在本条线地界 ⇒ **不代改的结论不变**，但本条登记的那笔红**不再挡 `pnpm -r typecheck`**。
 
