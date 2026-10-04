@@ -29,7 +29,7 @@
  *   node research/tools/selfhost-window-sentinel.mjs                     # 只等只报（打印那条命令）
  *   node research/tools/selfhost-window-sentinel.mjs --run-on-open       # 开窗即真的跑 --confirm（授权范围内：ff-only，不 push）
  *   FORCE_OPEN=1 node … --run-on-open --run-cmd 'echo 演练：这里没有真的落地'   # 演练开窗那一支
- *   node research/tools/selfhost-window-sentinel.mjs --selftest          # 12 条臂：每一臂都写明它凭什么会红
+ *   node research/tools/selfhost-window-sentinel.mjs --selftest          # 每一臂都写明它凭什么会红（臂数由输出现量，不抄进注释）
  *   node research/tools/selfhost-window-sentinel.mjs --alive             # 只读心跳：哨兵还活着吗（不用 kill -0）
  * 旋钮（默认值都能跑）：LOG PIDF CAP STEP QUIET_MIN LOAD_MAX MAX_ATTEMPTS HEYTA_CARRIER_WT FORCE_OPEN
  *
@@ -38,7 +38,7 @@
  *    ⇒ 每一样落一行心跳到 PIDF（`pid=… epoch=…`），`--alive` 用 `ps -o pid= -p` 比回显再算年龄。
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, writeFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync, readFileSync, openSync, closeSync, fstatSync, readSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deriveKillPorts, listenersOn } from './selfhost-kill-ports.mjs';
@@ -112,14 +112,74 @@ export function needStreak(quietMin, step) {
  * 退 1（main 在算完载体之后又动了）与退 3（负载/端口/载体没守住）说的是**这一趟的时机不对**，
  * 不是产品红 —— 而窗口是按分钟计的稀缺资源，直接退出等于把已经拿到的窗口还给随机性。
  * 🔴 但不许无限重试：每一趟完整链要几十分钟高负载，重试会把一次干扰变成 N 次。两道闸：
- *    ① 只对 {1,3} 重试；退 2（探针坏）与退 4（载体上完整 `pnpm check` 红）都要人，再跑一遍只会拿同一个坏东西再跑；
+ *    ① 只对 {1,3} 重试，外加 {2 且输出点名了未预置族}；退 4（载体上完整 `pnpm check` 红）也要人，
+ *       再跑一遍只会拿同一个坏东西再跑；
  *    ② 重试前必须**重新凑满**连静要求 —— 由“回到循环后照样 sleep STEP 才计一样”保证，
  *       不许不等够就立刻重样（那样 15 分钟这个代理指标会在几十秒内被凑满 = 自己把判据摘掉）。
+ *
+ * ⚠️ 退 2 里混着**两种完全不同的东西**，v5 早期把它们都当成"探针坏 ⇒ 停"：
+ *  - 真的探针坏（读不出形状、脚本自己崩）⇒ 停，等修；
+ *  - `fam.other` ⇒ 载体撞到**预置族之外**的冲突路径。这不是坏，是"这件事还没人写解法"，
+ *    而写解法的人可能正在别的会话里 —— 停下来 = 把已经等到的窗口扔了，还要人重新起一实例。
+ *    所以这一支按"时机不对"处理：**回等待循环继续等**，并把它点名的路径打进日志，
+ *    让下一位从日志里就能看到该补哪一族。判定靠输出里的针，不靠猜（针就是 `FAM_OTHER_MARK`，
+ *    它是载体 `selfhost-merge-carrier.mjs` 那句 die() 的字面措辞 ⇒ 判针和抽路径共用同一个字面量，
+ *    不抄第二份；抄两遍就是从"同一个判断写两次"开始漂的）。
  */
-export function decideAfterLand(rc, attempts, maxAttempts) {
+export const FAM_OTHER_MARK = '预置十一族之外';
+
+export function decideAfterLand(rc, attempts, maxAttempts, landOut = '') {
   if (rc === 0) return { action: 'landed', retry: false, exitCode: 0 };
+  if (rc === 2) {
+    const famOther = String(landOut).includes(FAM_OTHER_MARK);
+    const canRetry = famOther && attempts < maxAttempts;
+    return {
+      action: canRetry ? 'retry' : 'stop',
+      retry: canRetry,
+      exitCode: rc,
+      why: famOther
+        ? (canRetry ? '冲突面有未预置族 ⇒ 等解法被写进来，不算探针坏'
+                    : `冲突面有未预置族，但尝试次数已用满（第 ${attempts}/${maxAttempts} 次）⇒ 停，这一族要人来补`)
+        : '探针坏 ⇒ 拿同一个坏探针再跑一遍还是坏的',
+    };
+  }
   const retry = (rc === 1 || rc === 3) && attempts < maxAttempts;
   return { action: retry ? 'retry' : 'stop', retry, exitCode: rc };
+}
+
+/**
+ * 载体在 `fam.other` 那一支点名后紧跟的行是 `  - <路径>`。
+ * 把它们抽出来进日志，"该补哪一族"就不用下一位再去翻几十 MB 的输出文件。
+ * 只认针句**之后连续**的那一段：notes 行用的是 `     · ` 前缀，不会被误收。
+ */
+export function famOtherPaths(text) {
+  const at = String(text).indexOf(FAM_OTHER_MARK);
+  if (at < 0) return [];
+  const paths = [];
+  for (const line of String(text).slice(at).split('\n').slice(1)) {
+    const m = line.match(/^ {2}- (\S+)/);
+    if (!m) break;
+    paths.push(m[1]);
+  }
+  return paths;
+}
+
+/** 只读文件末尾 bytes 字节（完整链的输出可能有几十 MB，判针不需要全文进内存）。 */
+function tailFile(path, bytes = 300_000) {
+  let fd;
+  try {
+    fd = openSync(path, 'r');
+    const size = fstatSync(fd).size;
+    const len = Math.min(size, bytes);
+    if (!len) return { text: '', size };
+    const buf = Buffer.allocUnsafe(len);
+    readSync(fd, buf, 0, len, size - len);
+    return { text: buf.toString('utf8'), size };
+  } catch {
+    return { text: '', size: -1 };
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
 }
 
 /* ── 探针：全部只读，任何一条读不出形状都按"不成立"处理 ─────────────────── */
@@ -205,8 +265,32 @@ export function sentinelArms() {
   push('B2 rc=1 且还没用满尝试 ⇒ 回等待循环（窗口不许还给随机性）', true, decideAfterLand(1,1,3).retry);
   push('B3 rc=3 且已用满尝试 ⇒ 停，退出码原样透出去', false, decideAfterLand(3,3,3).retry);
   push('B4 rc=4（载体上完整 check 红）⇒ **不重试**，那是要人逐段归属的', false, decideAfterLand(4,1,3).retry);
-  push('B5 rc=2（探针坏）⇒ **不重试**，拿同一个坏探针再跑一遍还是坏的', false, decideAfterLand(2,1,3).retry);
+  push('B5 rc=2 且输出里**没有**未预置族的针 ⇒ 不重试（拿同一个坏探针再跑一遍还是坏的）', false,
+    decideAfterLand(2, 1, 3, '🔴 载体 —— 载体脚本判不了（退 2）：🔴 载体目录 /tmp/heyta-merge-carrier 不存在').retry);
   push('B6 停止时退出码必须是 LAND 的原码，不许被改写成 0', 4, decideAfterLand(4,1,3).exitCode);
+  // B7–B10：退 2 的另一支。夹具用的是载体 die() 的字面形状（❌ + 两格 - 路径 + 已量到的读数用 · 前缀）
+  const FAM_OUT = '   已量到的读数：\n     · 分族：pkg=1 gi=0 png=0\n' +
+    '❌ 出现**预置十一族之外**的冲突路径，不许自动决定：\n  - docs/README.md\n  - package.json\n' +
+    '   现场：已擦干净';
+  push('B7 rc=2 且输出点名了未预置族 ⇒ 重试（"还没人写解法"≠"探针坏"，窗口不该还给随机性）', true,
+    decideAfterLand(2, 1, 3, FAM_OUT).retry);
+  push('B8 未预置族那一支照样受 MAX_ATTEMPTS 挡（第 3 次仍这样 ⇒ 停）', false,
+    decideAfterLand(2, 3, 3, FAM_OUT).retry);
+  push('B9 针命中要带出点名的路径（下一位不必去翻那几十 MB 输出）', 'docs/README.md,package.json',
+    famOtherPaths(FAM_OUT).join(','));
+  push('B10 非 fam.other 的输出 ⇒ 空集（notes 那种 `     · ` 行不许被收成路径）', 0,
+    famOtherPaths('❌ 载体脚本判不了（退 2）：\n     · pkg=1\n   现场：已擦干净').length);
+  // B11：判针的**出处**。哨兵是按载体的字面措辞判的，那边改了词而这里没跟着改 ⇒ 哨兵悄悄退化成
+  //      "退 2 永远算探针坏 ⇒ 永远停"，症状是"窗口明明到了却没落地"，日志里看不出是针失效。
+  const carrierReading = (() => {
+    try {
+      const src = readFileSync(join(ROOT, 'research/tools/selfhost-merge-carrier.mjs'), 'utf8');
+      if (!src.includes(`出现**${FAM_OTHER_MARK}**的冲突路径`)) return '针无出处';
+      if (!src.includes("fam.other.join('\\n  - ')")) return '路径行形状变了';
+      return 'ok';
+    } catch { return '读不到载体'; }
+  })();
+  push('B11 判针有出处（载体 die() 带着同一个字面量，路径行仍是两格 `- `）⇒ 那边改措辞这里就红', 'ok', carrierReading);
   return arms;
 }
 
@@ -218,7 +302,7 @@ function runSelftest() {
     if (!hit) bad += 1;
     console.log(`${hit ? '  ok' : 'RED '} ${a.name}（期望 ${JSON.stringify(a.expect)}，实得 ${JSON.stringify(a.got)}）`);
   }
-  console.log(`哨兵自检：臂数 ${arms.length} · 红 ${bad} · 拒绝臂 ${arms.filter((a) => /^[AB]\d+ /.test(a.name)).length} 条`);
+  console.log(`哨兵自检：臂数 ${arms.length} · 红 ${bad} · 判定臂 ${arms.filter((a) => /^[AB]\d+ /.test(a.name)).length} 条`);
   if (arms.length < 12 || bad > 0) { console.log('❌ 自检没过 ⇒ 不许拿这条哨兵去等窗口'); process.exit(1); }
   console.log('✅ 五件判据各被单独打红过一次，负载解析证明取的是 1 分钟位，BLOCK 行按 trimStart 认。');
   process.exit(0);
@@ -296,12 +380,31 @@ while (elapsed < CAP) {
     if (runOnOpen) {
       attempts += 1;
       const body = runCmd || `node "${LANDER}" --confirm`;
-      beat(`    开窗即执行（第 ${attempts}/${MAX_ATTEMPTS} 次尝试）：cd "${mainTree}" && ${body}`);
-      const r = spawnSync('sh', ['-c', body], { cwd: mainTree, stdio: 'inherit' });
+      // 🔴 输出先落文件再读，不许 `stdio: 'inherit'` 一走了之：退 2 那两支（探针坏 / fam.other）
+      //    靠输出里的针才分得开，而后台实例的 inherit 输出落不进任何下一位能复核的地方。
+      //    重定向不带管道 ⇒ 退出码还是被测命令的（环境陷阱 #179/#164 那一族）。
+      const landOutPath = `${LOG}.land-${attempts}.log`;
+      beat(`    开窗即执行（第 ${attempts}/${MAX_ATTEMPTS} 次尝试）：cd "${mainTree}" && ${body} > '${landOutPath}' 2>&1`);
+      const r = spawnSync('sh', ['-c', `${body} > '${landOutPath}' 2>&1`], { cwd: mainTree });
       const rc = r.status ?? 1;
-      const d = decideAfterLand(rc, attempts, MAX_ATTEMPTS);
-      beat(`    LAND_RC=${rc}（0=已落地；1=main 在算完载体后又动了；2=探针坏；3=负载/端口/载体没守住；` +
-        `4=载体上完整 pnpm check 红 ⇒ 要人逐段归属。见 selfhost-land-main.mjs 文件头）⇒ ${d.action}`);
+      const { text, size } = tailFile(landOutPath);
+      const d = decideAfterLand(rc, attempts, MAX_ATTEMPTS, text);
+      beat(`    LAND_RC=${rc}（0=已落地；1=main 在算完载体后又动了；2=探针坏**或**冲突面有未预置族；3=负载/端口/载体没守住；` +
+        `4=载体上完整 pnpm check 红 ⇒ 要人逐段归属。见 selfhost-land-main.mjs 文件头）⇒ ${d.action}` +
+        (d.why ? `（${d.why}）` : ''));
+      const paths = famOtherPaths(text);
+      if (paths.length) beat(`    未预置族点名的路径（该补的这一族，下一位从这里看）：\n      - ${paths.join('\n      - ')}`);
+      // 判针与抽路径共用一个字面量，但行形状是两件事：命中了针却抽不出路径 = 载体那句 die() 改了行。
+      if (rc === 2 && !paths.length && text.includes(FAM_OTHER_MARK)) {
+        beat(`    🔴 针命中但抽不出路径 ⇒ 载体 die() 的行形状变了（判定仍按 fam.other 走，"该补哪一族"要去 ${landOutPath} 里读）`);
+      }
+      // 空读数要自证：判针没语料时"没命中"不等于"不是 fam.other"，这里明写出来。
+      if (rc === 2 && size <= 0) {
+        beat(`    🔴 退 2 但输出读不到（${landOutPath} size=${size}）⇒ 针没有语料可比，按"停"处理是保守，不是判据`);
+      }
+      beat(`    完整输出：${landOutPath}（${size < 0 ? '读不到' : `${size} 字节`}）`);
+      const tailLines = text.trim().split('\n').slice(-3);
+      for (const l of tailLines) beat(`      │ ${l.slice(0, 160)}`);
       if (!d.retry) process.exit(d.exitCode);
       // 🔴 回到等待循环，且**必须重新凑满**连静要求：靠下面这一次 STEP 睡眠计时，
       //    不许"不等够就立刻重样"（那样 15 分钟这个代理指标会在几十秒内被凑满 = 自己把判据摘了）。

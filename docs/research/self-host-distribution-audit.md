@@ -9410,7 +9410,7 @@ git worktree remove --force /tmp/ht-selfhost-gatepair
    （AGENTS §8.3 那句，与 §8.153 ② 把"读不出"和"坏了"分两档是同一个理由）。
    落笔前该挂的是**纯 fs 的**那几道 —— 也就是 §8.153 新加的链悬空判据所属的那一类。
 
-⚠️ 别把"11 绿"读成"这些门禁在载体上一定绿"：没有 node_modules 的树里，绿只证明
+⚠️ 别把"8 绿"读成"这些门禁在载体上一定绿"：没有 node_modules 的树里，绿只证明
 "不依赖构建产物的那部分逻辑成立"。完整链的读数仍然只有窗口里那一趟给得出（第 1 项的关闭判据不变）。
 
 #### ⑤ 这一趟里唯一一条真的、且能点名的落地前风险，是 §8.154 的 G-65
@@ -9419,3 +9419,90 @@ git worktree remove --force /tmp/ht-selfhost-gatepair
 没离线跑，理由写在 ② 那一段末尾）。只有 `check:shell-exit-chain`
 那一条是**链条目已经进了别人要提交的那版 `package.json`，而它指向的脚本还没进版本库** ——
 那种红不是环境给的，`pnpm build` 也补不出来。
+
+### 8.156 退 2 里混着的两种东西分成两支：哨兵不再把"没人写解法"当"探针坏"，从而把已经等到的窗口扔掉（2026-10-05 02:0x，25 臂自检 + 三趟摘除变异 + 两趟演练）
+
+#### ① 动因：代价只在真落地那一刻才付，所以必须现在改
+
+`selfhost-land-main.mjs` 在载体重算退 2 时把它标成 `probe` 并整体退 2，而哨兵 v5 早先对退 2 只有一条
+规则：**探针坏 ⇒ 停**。可退 2 里其实混着两种完全不同的东西：
+
+| 退 2 的那一支 | 它说的是 | 应该做的 | v5 早先做的 |
+|---|---|---|---|
+| 真探针坏（读不出形状、载体目录不在、脚本自己崩） | 这个装置不能用 | 停，等人修 | 停 ✅ |
+| `fam.other`（`selfhost-merge-carrier.mjs:345`） | **这件事还没人写解法** | 回等待循环继续等，并把点名的路径打进日志 | 停 ❌ |
+
+第二支停下来 = 把"五件同时成立且连静 15 分钟"这种按分钟计的东西还给随机性，还要人重新起一实例。
+而它**不是**修不好的东西：解法可能就是另一条会话此刻正在写的第十二族。
+
+#### ② 改了什么（三处，都在决策层）
+
+1. `decideAfterLand(rc, attempts, maxAttempts, landOut)` 多了第 4 个实参：`rc === 2` 时先看输出里有没有
+   载体那句 die() 的字面针，有就按"时机不对"走重试，且**照样受 `MAX_ATTEMPTS` 挡**（第 3 次仍这样 ⇒ 停，
+   不拿窗口刷尝试）；没有就维持原口径停。两支的 `why` 分别为"冲突面有未预置族 ⇒ 等解法被写进来，不算探针坏"
+   与"…但尝试次数已用满（第 N/M 次）⇒ 停，这一族要人来补"——早先那种"stop 却印着 retry 的理由"的措辞
+   在演练里露出来了（同一个 `why` 被两种动作共用），已拆开。
+2. 开窗那一支不再 `stdio: 'inherit'`：改成 `body > '${LOG}.land-N.log' 2>&1`，退出码仍取 `sh` 的 status。
+   **不带管道**（环境陷阱 #179/#164 那一族：`| tee` 之后那个码是 `tee` 的）。落点后读末尾 300 KB 判针，
+   把 `LAND_RC` + 判定 + 未预置族点名的路径 + 完整输出落点 + 末尾三行打进心跳日志。
+   退 2 而输出文件读不到时**明写"针没有语料可比，按停处理是保守，不是判据"** —— 空读数不许冒充判定。
+   输出落点从 `LOG` 派生（原来写死 `/tmp/selfhost-sentinel-land-N.log`，会和并行实例撞同一枚文件名 ——
+   本轮已经被别人的 `/tmp/ct-st2.log` 撞过一次）。
+3. 判针与抽路径共用同一个字面量 `FAM_OTHER_MARK`（`decideAfterLand` 与 `famOtherPaths` 都从它取），
+   不抄第二份；再加一条 **B11 判针有出处**：从载体源里核对那句 `出现**预置十一族之外**的冲突路径`
+   和 `fam.other.join('\n  - ')` 两件事，载体那边改措辞 ⇒ 这里红。否则哨兵会悄悄退化成
+   "退 2 永远算探针坏 ⇒ 永远停"，症状是"窗口明明到了却没落地"，日志里看不出是针失效。
+
+#### ③ 自检与摘除变异（全部实量；`cp` 复原后 `cmp -s` 逐字节相同）
+
+| 趟 | 摘掉的东西 | 红集 | rc |
+|---|---|---|---|
+| 基线 | —— | 臂数 25 · 红 **0** | 0 |
+| M1 | `famOther = String(landOut).includes(FAM_OTHER_MARK)` → 恒 `false` | **B7** 一条 | 1 |
+| M2 | `retry` 里那个 `attempts < maxAttempts` | **B8** 一条 | 1 |
+| M3 | 字面量改成 `预置十一族以外` | **B7 + B9 + B11** 三条 | 1 |
+
+M3 一把照出三处共用同一个针（决策、抽路径、出处对账），这正是"抄两遍就漂"反过来用的样子。
+
+#### ④ 演练读数（`FORCE_OPEN=1` + 一次性夹具，一个字节都没落地）
+
+- **A 腿**（夹具照 land-main 转发载体 die() 的字面形状打 stdout 并退 2，`MAX_ATTEMPTS=2`）：
+  第 1 次 `⇒ retry（冲突面有未预置族 ⇒ 等解法被写进来，不算探针坏）`，并把两行点名路径
+  （`docs/research/self-host-distribution-audit.md`、`package.json`）与 357 字节的完整输出落点打进日志；
+  第 2 次 `⇒ stop（冲突面有未预置族，但尝试次数已用满（第 2/2 次）⇒ 停，这一族要人来补）`；
+  哨兵退出码 = LAND 原码 **2**。
+- **B 腿**（真·探针坏夹具，`MAX_ATTEMPTS=3`）：第 1 次就 `⇒ stop（探针坏 ⇒ 拿同一个坏探针再跑一遍还是坏的）`，
+  没有多烧一趟。
+- 夹具在 `/tmp/selfhost-drill-{famother,probebad}.sh`，一次性，未入库。
+
+#### ⑤ 顺带把"现在这一趟会不会撞 fam.other"量了：不会（9 枚全在族内）
+
+`main = 48061d4e`（02:0x 现量）下 `git merge-tree --write-tree main feat/self-host-distribution` 报
+**9 枚 content 冲突**，逐枚对到**载体分族表自己的键**（不是对 prose grep）：
+`package.json`→pkg（字面比较）、`self-host-distribution-audit.md`→AUDIT、`deployment.md`→DEPLOY、
+`e2e/live-site/live-domain.spec.ts`→LSPEC、`check-image-license-coverage.mjs`→COV、
+`gen-image-npm-tree.mjs`→GEN、`scripts/screenshots/capture.mjs`→CAPTURE_PATH（cap）、
+`server/Dockerfile`→DOCKERFILE_PATH（dock）、`server/image-npm-tree.json`→SNAPSHOT ⇒ **other = 0**。
+
+🔴 这一条差点被我自己写的探针判错：我先写了个"从源码抽 `const X = '…';` 再比"的一次性核对器，
+它把 9 枚里的 **3 枚判成 OTHER** —— 因为 `package.json` 在 if-chain 里是字面量、
+`CAPTURE_PATH`/`DOCKERFILE_PATH` 是从兄弟模块 `import` 进来的，两种形状都不长那样，
+而它还把 `ORPHAN/REPLAY/DMERGE/TMERGE/ATTR` 这些**不是族键**的常量一并收进"键常量 11 个"。
+也就是说那个探针会把"全部有解法"读成"要死一次窗口"。已删，结论以逐条读常量定义为准。
+可迁移的一句：**抽判据的语法形状必须和被抽方的写法一致，否则"看着最干净"的空读数会替你下结论**
+（AGENTS §7 元规则 1"先怀疑探针"的又一种面目）。
+
+#### ⑥ 实例与旋钮
+
+旧实例 51157（装的是没有这一支的老代码）先停 ⇒ `pgrep` 数到 0 ⇒ 起新实例 pid **3361**，
+旋钮逐字未改（`CAP=28800 STEP=150 QUIET_MIN=15 LOAD_MAX=12 MAX_ATTEMPTS=3 --run-on-open`）。
+起步读数仍是 `阻塞集=1`、`负载=25.14>12` ⇒ 第 1 项仍未开窗。
+
+#### ⑦ 边界（别读多）
+
+- 只动**决策层**，没有加"每个 tick 预跑一次 merge-tree"的判据：那会往共享对象库写不可达对象，
+  而 ⑤ 的现量说明"当下会不会撞"本来就是随 main 每分钟漂移的瞬时读数（§8.153 已量过 prose-grep 类
+  代理指标不够格）。留下的代价是：真撞 `fam.other` 会烧掉**一次尝试** —— 而载体是在第一个写动作之前
+  就退 2 的，那一趟只花几十秒，不是几十分钟。
+- 载体那侧 `fam.other` 的"不许自动决定"一个字没动。这里改的是"哨兵怎么读那个退 2"，不是"冲突能不能自动解"。
+
