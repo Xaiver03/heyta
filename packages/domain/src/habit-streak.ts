@@ -15,8 +15,11 @@
 import type { Habit, HabitFrequency, HabitLog } from './entities.js';
 import {
   addDays,
+  daysInMonth,
   diffDays,
   isoWeekday,
+  startOfMonth,
+  toLocalDate,
   type LocalDate,
 } from './date.js';
 
@@ -240,4 +243,162 @@ export function completionRatio(habit: Habit, log: HabitLog | undefined): number
   const target = habit.target ?? 1;
   if (target <= 0) return 0;
   return Math.min(1, habitLogValue(habit, log) / target);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 习惯统计的读侧（工单 W8）：本月四格 + 历史两格
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 一个自然月的打卡统计 + 两个历史总量。**全部从 op-log 物化状态推导**，
+ * 不落任何新字段（AGENTS §3.3；ADR-0022 的"派生不上库存"同一条纪律）。
+ *
+ * 口径是**已拍板的裁决**（工单 W8 的 A/B/C/D 四条，证据见
+ * `docs/research/detail-pane-alignment-and-spaced-review.md` C1b-Q2），
+ * 不是外部事实的复刻 —— 改这里任何一条前先看注释里的理由。
+ */
+export interface HabitPeriodStats {
+  /** `'YYYY-MM'`：传入 `today` 所在的**自然月**（裁决 B：不用滚动 30 天）。 */
+  monthKey: string;
+  /**
+   * 该月**达成天数**（裁决 C：天 = 唯一的连续性单位）。
+   * 一条存在的 log 没写 `value` 时按 {@link habitLogValue} 的缺省算，
+   * 未达标的那天不记分数天，但它的量照记进 {@link monthValue}。
+   */
+  achievedDays: number;
+  /**
+   * 该月**已到期**的计划日数（分母，见 {@link computeHabitPeriodStats} 的 🔴 注释）。
+   * 0 表示"这个月还没有'率'可言"—— 界面此时必须显示占位符而不是 0%。
+   */
+  scheduledDays: number;
+  /**
+   * 完成率 = 到期计划日中达成的天数 / {@link scheduledDays}。
+   * 🔴 `scheduledDays === 0` 时**必须是 0**（绝不产生 NaN / Infinity），
+   * 由界面按 `scheduledDays === 0` 显示占位符。
+   */
+  rate: number;
+  /** 该月完成量 = `Σ habitLogValue`（含未达标的那天；裁决 C 的另一条腿）。 */
+  monthValue: number;
+  /** 历史总完成量 = `Σ habitLogValue`，**不限当月**（裁决 D：`unit` 只做显示，求和按纯数）。 */
+  totalValue: number;
+  /**
+   * 历史达成天数。与 `computeHabitResilience().total` **同一口径**
+   * （同是"未删除且达成的去重日期数"），供"总打卡 N 天"那一格消费。
+   */
+  totalAchievedDays: number;
+}
+
+/**
+ * 计算某个自然月的习惯统计。
+ *
+ * @param habit 习惯定义
+ * @param logs  该习惯的、**或未经过滤的全集**都行：函数内部按
+ *              `habitId === habit.id` 收窄，并按 `deletedAt === undefined`
+ *              滤墓碑。🔴 **这里必须自己滤**，而
+ *              `@heyta/app-host#habitGrowth` 那层不滤 —— 因为 `computeStreak`
+ *              内部各自判墓碑，而这里的**求和路径不经过它们**。漏掉这层过滤
+ *              就是一个真 bug：一条已撤销的打卡量会留在"本月完成量"里。
+ *              谓词与 `computeStreak`/`achievedDates` 逐字同一
+ *              （`deletedAt === undefined` 才算活着），两份判据不许长两个样子。
+ * @param today 今天（本地日历日）。**必须显式传入**（本文件既有纪律：内部读
+ *              `Date.now()` 会让"月中/月末"这类边界条件不可测）。
+ *
+ * 🔴 **分母只数"已经到期"的计划日** —— 这条是**本线 2026-10-05 拍的裁决**（产品负责人把
+ * 仓库内的产品决策权交了下来，原话与代价记在工单 §8.119 与调研 C1b-Q2 的拍板记录），
+ * 外部竞品没有一手对照（滴答《成就值》只支撑"分母是安排量而非自然日"那一半）。
+ * 即：`scheduledDays` 数的是 `date <= min(today, 该月末)` 且
+ * `date >= max(该月首日, 该习惯创建日)` 的计划日。理由有三：
+ *   1. 未完成的本月剩余天数不是"做得不好"。用全月当分母会得到一个
+ *      **只有到月末才等于真实值、每天自己往下掉**的数 —— 那是倒计时，不是完成率；
+ *   2. heyta 的激励体系红线是"从不制造愧疚"（`docs/plans/roadmap.md` §1.2），
+ *      一个必然从 100% 起步往下掉的百分比违反它；
+ *   3. 该月还没有任何计划日到期时**没有"率"可言**：`scheduledDays` 返回 0、
+ *      `rate` 返回 0，由界面显示占位符（这也是 `rate` 在 0 分母时不取 NaN 的原因）。
+ *
+ * 分母用**该年该月的实际计划日数**（2 月/闰年/跨月都算对，`daysInMonth` 交给
+ * 原生 `Date`）—— 调研 C1b-Q2 点名了 Loop 那处"卡片按日历月截断、区间标签写死
+ * 30/91/365"的名实错位，这一层不许复发。
+ *
+ * `rate` 的**分子**只数"到期计划日中达成"的天（分母裁决的同一把尺）。
+ * 它与 {@link achievedDays} 在"达成日全落在计划日"时相等（绝大多数情形）；
+ * 若某条达成记录写在**非计划日**（用户手动补了个周日之外的日子），
+ * `achievedDays` 会包含它而分子不包含 —— 于是"本月打卡 10 天"与"完成率 9/9"
+ * 并存是**事实**而不是矛盾，两边各自有定义。
+ */
+export function computeHabitPeriodStats(
+  habit: Habit,
+  logs: readonly HabitLog[],
+  today: LocalDate,
+): HabitPeriodStats {
+  const monthKey = today.slice(0, 7);
+  const first = startOfMonth(today);
+  const year = Number(monthKey.slice(0, 4));
+  const month = Number(monthKey.slice(5, 7));
+  const last = `${monthKey}-${String(daysInMonth(year, month)).padStart(2, '0')}`;
+  /**
+   * 下界取"该月首日与该习惯创建日的较晚者"。
+   * `Habit.createdAt` 在 `EntityBase` 上是**必填**的 epoch ms
+   * （`entities.ts` 文件头：LWW 要确定性比较），所以这里没有"缺创建日"的分支 ——
+   * 若哪个宿主造出 `createdAt: 0` 的数据，下界落到 1970-01-01，
+   * 与"该月首日"取较晚者后仍是该月首日，行为不变。
+   */
+  const created = toLocalDate(habit.createdAt);
+  const lower = created > first ? created : first;
+  // `monthKey` 就是从 `today` 切的，所以 `upper` 恒等于 `today`；
+  // 写成 `min(today, 月末)` 是把裁决的**定义**原样落地，不是多余分支。
+  const upper = today < last ? today : last;
+
+  // 逐日扫描收集"已到期计划日"。一个月至多 31 个刻度；`lower > upper`
+  // （比如数据里 created 在未来）时循环一次都不进，分母自然为 0。
+  const dueScheduled: LocalDate[] = [];
+  if (lower <= upper) {
+    let cursor = lower;
+    // 防御：损坏的日期串（如 `2024-02-30`）会让 addDays 抛；循环上界由
+    // diffDays 钉死，最多一个月。
+    const steps = diffDays(lower, upper);
+    for (let i = 0; i <= steps; i += 1) {
+      if (isScheduledOn(habit.frequency, cursor)) dueScheduled.push(cursor);
+      cursor = addDays(cursor, 1);
+    }
+  }
+  const scheduledDays = dueScheduled.length;
+
+  const alive = logs.filter(
+    (l) => l.habitId === habit.id && l.deletedAt === undefined,
+  );
+
+  let monthValue = 0;
+  let totalValue = 0;
+  const achievedInMonth = new Set<LocalDate>();
+  const achievedAll = new Set<LocalDate>();
+  for (const log of alive) {
+    const value = habitLogValue(habit, log);
+    totalValue += value;
+    const inMonth = log.date.slice(0, 7) === monthKey;
+    if (inMonth) {
+      monthValue += value;
+    }
+    if (isAchieved(habit, log)) {
+      achievedAll.add(log.date);
+      if (inMonth) achievedInMonth.add(log.date);
+    }
+  }
+
+  const achievedDays = achievedInMonth.size;
+  // 分子与分母同一把尺：只数"到期计划日里达成"的天。
+  let achievedDue = 0;
+  for (const day of dueScheduled) {
+    if (achievedInMonth.has(day)) achievedDue += 1;
+  }
+  const rate = scheduledDays === 0 ? 0 : achievedDue / scheduledDays;
+
+  return {
+    monthKey,
+    achievedDays,
+    scheduledDays,
+    rate,
+    monthValue,
+    totalValue,
+    totalAchievedDays: achievedAll.size,
+  };
 }

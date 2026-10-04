@@ -1044,6 +1044,19 @@ export const en = {
   // The third metric: the one that only ever grows (never reset by a break).
   'web.habits.streak.total': 'Total {count} days',
   'web.habits.streak.totalOne': 'Total {count} day',
+  // ── W8: habit period stats (this-month chips) ──
+  // Semantics live in `@heyta/domain#computeHabitPeriodStats`; these lines
+  // are its projection only. "check-in" counts DAYS, the rate denominator
+  // counts DUE scheduled days (a zero denominator renders the pending line,
+  // never "0%"). English uses noun-first shapes so each sentence holds for
+  // both 1 and N — no `…One` siblings needed (catalog HAZARD rule).
+  'web.habits.stats.monthDays': 'Check-in days this month: {count}',
+  'web.habits.stats.monthRate': 'Completion rate this month: {percent}%',
+  'web.habits.stats.monthRatePending': 'Completion rate: no scheduled days yet',
+  'web.habits.stats.monthValue': 'Done this month: {value}',
+  'web.habits.stats.monthValueUnit': 'Done this month: {value} {unit}',
+  'web.habits.stats.totalValue': 'Done in total: {value}',
+  'web.habits.stats.totalValueUnit': 'Done in total: {value} {unit}',
   // Heatmap copy is passed *by us* to react-activity-calendar; its defaults are English-only.
   // `{{count}}` is the library's own placeholder and must survive verbatim.
   // ── M3 knife 7 (habits): copy for the self-drawn heatmap ──

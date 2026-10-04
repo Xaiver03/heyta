@@ -143,7 +143,7 @@ W0 文档纠正、W6 value 那一米：与上面全部正交，随时可插队
 | W5 | 🔄 **进行中**（代码链、三层判据、六臂变异、三张图逐张看过、十七道 RC=0 都闭合；只剩 AGENTS §6.1.1 的**四端重装**，所以还不算已完成） | 载体 `feat/detail-pane` = `84d5bd86`（15 文件 / +705）。**这一单真正搬走的是"颜色"那半边判断，不是新加一个控件。** 之前 `priorityColorToken` 在 `apps/web/src/features/tasks/priority-display.ts` 与 `apps/mobile/src/lib/priority.ts` 各有一份**逐字相同**的实现，两份的文件头都写着"`packages/ui` 依赖不了 `@heyta/i18n` ⇒ 共享不了" —— **那句话只对文案那半边成立**：档位 → 色 token 名只需要 `Priority`（`@heyta/domain`，`packages/ui` 早就依赖）。于是"复选框描边即优先级"（调研 A2 那条"最值得抄"）一直没人能落地，因为**行组件够不到那份映射**。现在唯一所有者在 `packages/ui/src/task-list/priority-color.ts`，`TaskRow` 用 `row.source.priority` 查它给 `box` 上色，两份镜像**删掉**（AGENTS §3.5：抽取的收尾是删旧那份 + 加门禁，不是再写一份更好的）。<br>🔴 **预期差在哪**（这条改了视觉，所以判据里不许出现"改前后逐字节相同"那类零视觉断言）：高 `color.border-strong`(slate-300) → **`color.priority-high`**(light #dc2626 / dark #f87171)、中 → `priority-medium`(#b45309 / #fbbf24)、低 → `priority-low`(#0284c7 / #38bdf8)、**无优先级/字段缺失** → `priority-none`(#94a3b8 / #64748b，比原来那圈略深，仍是中性灰)、**已完成不变**（主色实心 + 主色描边 + 白勾）。<br>**判据 15 条，分三层**：① `packages/ui/tests/task-row-priority.spec.ts` **11 条** —— 映射穷尽（含 `undefined` 与 `None` 同值、档位清单从 `Priority` 现取不抄字面量）、四个 token 名在 light/dark 两张表里**真的存在**、三档取值两两不同 × 两个主题、`none` 不与任何一档撞色、dark 与 light 四枚全不同值（"暗色实际切了看"的数据层证据）、源码级（`TaskRow` 必须 `priorityColorToken(row.source.priority)` 且 `styles.box` 里**不许**再有 `color.border-strong`）、逐行色排在 `box` 之后 `boxDone` 之前、**全仓只有一份定义**（遍历 `apps/`+`packages/` 源码，跳过 `node_modules`/`dist`/`dist-types`；刻意不用点名清单 —— 点名挡不住"在第四个文件里再写一份"）；② `apps/web/tests/row-meta-shared.spec.tsx` 的 A 组换了一条**行元信息画的是共享映射的取值、而且不串档**（jsdom 里 `cssColor()` 探针把 token 取值过一遍这台 jsdom 自己的序列化，不拿 hex 去 `toContain`），D 组那条"两边 token 名一致"**原地改写成新不变量**（原来那句在抽取后**不可能失败**，留着就是装饰）：宿主里不许再有 `color.priority-*` 与 `function priorityColorToken`，三个消费者必须从 `@heyta/ui` 取；③ `e2e/tests/task-priority-checkbox.spec.ts` **3 条**真浏览器 —— 优先级经**真的在捕获框里打 `!1/!2/!3`** 写进去（输入框占位文案就写着「可写『明天』『下周三』『!1』」），每条先断**徽章在场**（那是载体前提，不是产品判据），再断四行描边**各等于该 token 在当前主题下的解析值**（`colorOfCssVar` 页内探针，不抄色值）**且两两不同**，第三条 `data-theme==='dark'` 正对照后同样量一遍。<br>💥 **变异 6 臂，逐臂复原 + 字节比对 + 收尾重建两个 dist**：A1 描边写死回中性色（工单点名的那条）⇒ `ui` + `e2e` 红；A2 `undefined` 改投 High ⇒ `ui` 红；A3 摘掉 `boxDone` 的描边 ⇒ `ui` + `e2e` 红；A4 在 web 宿主里再写一份定义 ⇒ `ui` + `web` 红（两道"抽取收尾"门各抓一次）；A5 逐行色排到 `boxDone` 之后 ⇒ `ui` 红；A6 `High` 指向 `medium` 的 token ⇒ `ui` + `web` + `e2e` 红。**如实记哪层没抓到**：A1/A2/A3/A5 在 `apps/web` 那一趟**是绿的** —— 那一份判据量的是徽章那条通道，勾选框不在它范围内，这不是漏判，是分层；勾选框的渲染层读数只有 `e2e` 那一层有。<br>**门禁与测试 17 项 RC=0**：`check:design` / `check:row-single-source`（`ht-*` 族 **28 = 基线 28**）/ `check:l4`（web 98≤104、mobile **90 = 90**，**没调基线**；`packages/ui` 本来就在 L4 门外，见该脚本第 24 行）/ `check:layering` / `check:ui-language` / `check:selection-single-source` / `check:ui-provider` / `check:rn-aria` / `check:licenses` / `check:docs-voice` / token 生成 + `--check` / 全量测试 **ui 453 · web 1524（12 skipped）· mobile 604 · design-system 489，零失败**；`packages/ui` 改完先 `tsup` 再跑判据（工单 §1 闸门 4）。<br>**截图 3 张**（`apps/web/evidence/task-priority-checkbox/{light-four-tiers,dark-four-tiers,light-done-overrides-priority}.png`）**逐张打开看过**：亮色四行的圈分别是红/琥珀/天蓝/中性灰，且**只有前三行带徽章**（"没有优先级不是信息"那条纪律没被破坏）；暗色同样四色且都读得出来（`#f87171`/`#fbbf24`/`#38bdf8`/`#64748b`）；完成那张是**实心主蓝 + 白勾**，优先级没有盖过"做完了没有"。<br>🔴 **看图照出、断言看不见的一件事**：默认 720 高的那张图里**只有三行** —— 第四行"无优先级"在折叠线下面（AI 面板占了半屏，那是 `enableAllModules` 的结果）。判据量四行而证据图只有三行 = 图与读数不对齐，所以本套件自己 `test.use({ viewport: 1280×1000 })`。<br>**边界（别读多）**：① 描边**不是也不许变成唯一通道** —— 颜色对色觉障碍用户不成立，所以行内那枚**带文字**的徽章必须留着（描边管"扫一眼"，徽章管"读得准"）；删徽章是另一个产品决定，不是这一单的副产品。② 移动端与桌面三壳用的是**同一个** `TaskRow` ⇒ 四端同时受益，但 `apps/mobile/tests/` 里 **0 个用例 render 组件**，所以 RN 侧没有渲染级判据，那一层的证据只有 §6.1.1 的四端重装 + 模拟器截图，**本轮未跑**。③ 未 push 未 merge。 |
 | W6 | 🔄 **进行中**（代码链、六层判据、十一臂变异、三张图逐张看过、七道门禁 RC=0 都闭合；只剩 AGENTS §6.1.1 的**四端重装**，所以还不算已完成） | 载体 `feat/detail-pane` = **`ca2cf606`**（17 文件 / +1101 −24）+ **`577c0f3e`**（判断层那 6 条被我第一笔点名路径漏掉了，单独补了一笔 —— ⚠️ 记下来是为了让后来者别把"提交过了"读成"那一笔就是全部"）。<br>**这一单真正动的是"几格"这个数从数据走到界面再走回数据的那条通道**。`HabitLog.value` 在数据层无处不在（reducer 物化它、`isAchieved` 按它判达成、AI 那侧也能传），唯独**没有任何界面能写出 5**：主按钮一键记满 `target` ⇒ "每天 8 页、今天读 5 页"只能记 8，而界面长得和"做完了"一模一样。<br>💥 **抽取时照出来的两个真缺陷**（不是重构副产物，是先已存在的错）：① "这条记录算几格"有**三份断面**（`isAchieved` 缺省落 `target`、`completionRatio` 缺省落 **0**、移动端详情自己写 `?? target ?? 1`），症状是同一条没写量的记录**同时**"算达成"和"完成度 0%"，两边都不报错 ⇒ 唯一所有者现在是 `packages/domain/src/habit-streak.ts#habitLogValue`，两个领域函数都读它，第三份断面删掉（AGENTS §3.5 的收尾是删旧的，不是再写一份更好的）；② `target: 0`（"一次都不碰"那档）的缺省原来是 **0**，而 `atMost` 按 `value <= target` 判 ⇒ **破戒被记成守戒**，缺省改成 1 并钉成判据。<br>**工单三条判据的读数**：① 目标 8、界面点出 5 ⇒ 落盘 UPD `value=5` 且显示 `今天 5/8 杯`，`page.reload()` 后仍是 5（这条才是"落盘"，不是"状态变了"）；② 不传 value **逐字旧行为** —— 主按钮调用处仍是 `onCheckIn(row.habit.id)` 一个实参，已打卡且没给新值 ⇒ **零 op**（幂等纪律没被削弱，且比较的是 `habitLogValue` 的**有效值**不是原始键：先用 `engine.dispatch` 直接塞一条没写量的 HABIT_LOG，再 `checkIn(id, DAY1, 8)` 必须仍返回 false）；③ 撤销仍走 `OpType.Delete` 而不是记一条 0（「−」减到 ≤0 时改调 `onUndoCheckIn`）。<br>**判据 47 条，分六层**：`packages/domain/tests/habit-amount.spec.ts` **13**（缺省表 + `target∈{1,8}×三种 goalType` 的"两个函数读成同一个数"穷举循环 + 源级不许出现第二个缺省）；`packages/app-host/tests/habit-actions.spec.ts` **+10**（套件 42）；`packages/ui/tests/habits-model.spec.ts` **+6**（36，`todayValue` 四张表 + `hasCountableGoal` 六种合法组合）；`apps/web/tests/habits-board.spec.tsx` **F 组 12**（27，含源码级：主按钮必须单实参、步进必须带 `row.todayValue + 1`、不许用 `Math.round(todayRatio*…)` 反算格数）；`apps/mobile/tests/habits-display.spec.ts` **+3**（18，含与 web 的 `common.habits.amount.*` **键集对等**）；`e2e/tests/habit-counted-amount.spec.ts` **3**（真浏览器，含暗色腿）。<br>💥 **变异 11 臂（W6-M1…M11），红 11/11，每臂复原后逐字节比对 + 收尾重建四个 dist**：M1 摘掉"缺省落 target"（**工单点名的那一条**）⇒ `app-host` 红；M2 同值也发 UPD ⇒ `app-host`；M3 比较键不比较有效值 ⇒ `app-host`；M4 写入侧校验摘掉（0/负数/NaN 静默落盘）⇒ `app-host`；M5 缺省落 1 不落 target ⇒ `domain`+`app-host`+`ui`；M6 `completionRatio` 自己写回 `?? 0` ⇒ `domain`；M7 数量行对所有习惯都出现（默认那条会长出「1/1」）⇒ `ui`+`web`；M8 判据写回 `> 1` ⇒ `ui`+`web`；M9 主按钮开始带值 ⇒ `web`；M10 宿主漏透传第三参（步进器画出来了、点了没反应）⇒ `web`；M11 新词条 zh 变纯占位符 ⇒ `check:ui-language` 那道层红。<br>🔴 **如实记哪层没抓到**：M1 在 `apps/web` 那一趟**是绿的** —— jsdom 层永远传显式 value，缺省那条路只有 `app-host` 与 e2e 真走；M10 只红 `web` 不红 `mobile`，因为 `apps/mobile/tests/` 里 **0 个用例 render 组件**（同 W5 那行登记过的边界）。<br>🔴 **我这把判据自己被照出来的两个洞**（都当场改掉并把原因写进注释）：① `hasCountableGoal` 第一版写成 `target > 1` ⇒ `target: 0.5` 那类小数目标**整行不显示**，被 F5b 那条界面用例抓红（"按钮不存在 ⇒ 点击没反应"会让断言双双假绿，所以 F5b 里加了 `expect(row).not.toBeNull()` 正对照）⇒ 判据改成 `!== 1`，合法域由 `setHabitGoal` 决定（它只拦负数与非有限数）；② e2e T2 第一版写 `toHaveAttribute('aria-disabled','false')` ⇒ 真浏览器红，因为 RNW 在**启用**时根本不写这个属性（缺席 ≠ false）⇒ 改 `not.toHaveAttribute('aria-disabled','true')`；③ 还有一条假红是我自己的：源级判据把 `completionRatio` 的 **docblock** 里引用禁令字面量那句话当成了违规 ⇒ 判据前先剥注释。<br>**截图三张**（`apps/web/evidence/habit-counted-amount/{light-five-of-eight,light-after-undo-and-full,dark-counted-row}.png`）**逐张打开看过**：第一张那行是 `今天 5/8 杯` 且**只有这一条习惯带数量行**（默认那条纯打卡习惯没长出「1/1」）；第二张是减到 0（回到"今天没做"、主按钮重新可读）再一键记满后的 `8/8 杯`；暗色那张字是前景色、`−`/`+` 两个步进按钮各有带习惯名的无障碍名。<br>**门禁七道 RC=0**（回填时刚复跑，2026-10-04 现量）：`check:layering`（329 文件 / 9 规则）· `check:row-single-source`（`ht-*` 族 **28 = 基线 28**）· `check:selection-single-source`（词表 3 类全有消费者）· `check:l4`（web **98 ≤ 104**、mobile **90 = 90**，**两道余量为 0 的棘轮都没调基线**）· `check:ui-language`（zh 2849 / en **2849** 条，中英同步）· `check:design` · token 产物 `--check`（8 文件 204 token，本单**没动 tokens.css**）。<br>⚠️ **提交信息里那句"判据 34 条"是过期读数**（写于 F 组补齐之前），现量是 **47 条 / 六层**，按上面那行拆开对账 —— 以本行为准。<br>**边界（别读多）**：① 步进是**固定 1 格**、加不封顶（记 10/目标 8 就显示 10，比例那条腿仍被 `Math.min(1,…)` 截断 —— 两个字段刻意不等价）；② 单位为空时句子回落到既有 `web.habits.goal.defaultUnit`，没有新造词条；③ `HabitGoalEditor` 提交后不收面板 = **既有行为**，本单没动；④ 真机/模拟器**未跑**（RN 侧无渲染级判据，那一层的证据只有 §6.1.1 的四端重装）；⑤ 未 push 未 merge。 |
 | W7 | 🔄 **进行中**（读侧出口、四层判据、十二臂变异、三张图逐张看过、九道门禁 + 六包 typecheck/全量测试 RC=0 都闭合（🔴 **那句"九道门禁"是 9/56，不是全部门禁**：2026-10-04 的全量扫描当场照出第 10 道 `check:empty-state` 红在**本单自己新写的手写空态**上，已修 `edd9971b`，逐项归属与三臂读数见 §8.13）；只剩 AGENTS §6.1.1 的**四端重装**，所以还不算已完成） | 载体 `feat/detail-pane` = **`9bdab17e`**（24 文件 / +1258 −85）。**这一单动的是"记录从来没有被逐条画过"这件事**：`listSessions()` 唯一的消费者只做当日汇总，所以专注页右边一块记录都没有；而"今日专注时长"web 没有、mobile 有 ⇒ 判据 ③ 要的是**同一个出口**，不是两份长得一样的实现。新增 `packages/app-host/src/focus-overview.ts` 一个函数：当日 → `focusStatsForDay`、累计 → `activityTotalsFromState`（与里程碑/分享摘要同一个）、列表 → `listSessions()`（滤墓碑与排序的唯一所有者），界面拿到什么画什么。<br>🔴 **拆掉的两处会繁殖的东西**：① `ActivityTotals` 缺 `focusCount` —— 补上并钉住**段数不能由时长推出**（同样 50 分钟，一段与两段是两个读数），且与 `FocusDayStats.completedWorkCount` 同一条口径（只数 `completed === true`）；② `focus.ts` 里那个返回**写死中文**、零界面消费者的 `formatFocusDuration` 删掉（时长分档唯一所有者是 `durationParts`，词归 i18n）。web 新增 `FocusDetailPane`（四张卡 + 记录列表 + 空态一句话），mobile `FocusScreen` 改读同一个 `focusOverview` 并**删掉自己那份 sessions 状态**。<br>**判据 27 条 / 四层**：`packages/app-host/tests/focus-overview.spec.ts` **11**（真 `OpLogEngine` + `:memory:` SQLite；判据② 写成"条数 == `listSessions()` 里工作段条数"并带 `> 0` 正对照；新到旧、`endedAt` 归属、`actualMs` 退回 `plannedMs`、标题解析/缺失/任务删后仍在/幽灵 id）；`apps/web/tests/focus-detail-pane.spec.tsx` **9**（A 值随出口、B 行数==出口条数 + 空态 + 未关联 + 中途放弃只出现在未完成行、C **挂整个 App** 按可见文本点 rail 进专注面、D 源码级：剥注释后不许出现 `.reduce(` / `focusStatsForDay` / `computeActivityTotals` / `listSessions`）；`packages/domain/tests/motivation.spec.ts` **+1**（`completed` 整个缺失不算一个番茄）；`e2e/tests/focus-detail-pane.spec.ts` **6**（四张卡都在详情列**那一格的矩形内**、`tabular-nums` 取 computed style、空态那句话、与 W4 那颗开关收起/展开的接缝、**F5 真点「开始」→「中止」产出一条真 `FOCUS_SESSION` op ⇒ 界面多一行"中途放弃"而「今日番茄」仍是 0**、日历/习惯/时间线不许借这一格）。<br>💥 **变异 12 臂（W7-M1…M12），红 12/12，每臂复原后 sha256 逐字节比对 + 收尾重建 dist/产物**：M1 摘 `shouldPersistSession` 过滤 ⇒ 1 红（**工单点名的判据②**）；M2 `focusCount = round(focusMs/60000)` ⇒ 3 红（**工单点名的判据①**）；M3 去 `.reverse()` ⇒ 4 红（含"新到旧"）；M4 归属改 `createdAt` ⇒ 4 红；M5 `actualMs` 不退回 `plannedMs` ⇒ 4 红；M6 标题不解析 ⇒ 5 红；M7 `completed` 恒真 ⇒ 3 红；M8 `completed !== false` ⇒ **第一趟存活**（§8.8 第 4 条）；M9 摘掉 `contentView === 'focus'` ⇒ 1 红（C 组"默认那一面是空的"）；M10 界面自己 `reduce` ⇒ 1 红（D 组源码级）；M11 删 `font-variant-numeric` ⇒ 1 红（F2，量的是 computed style 不是源码里那行字）；M12 把 `.ht-rail__tab--active` 改到没人命中 ⇒ 1 红（F1 那条"视觉上高亮的格子必须就是当前视图"）。<br>**门禁九道 + 六包 typecheck + 六包全量测试 RC=0**：`check:design` / `check:l4`（web 98≤104、mobile **90 = 90**，**两道余量为 0 的棘轮都没调基线**）/ `check:row-single-source`（**28 = 28**）/ `check:layering`（331 文件 9 规则）/ `check:ui-language`（zh **2864** = en **2864**，9 条新词条中英同步）/ `check:materialized-reads`（26 屏）/ `check:selection-single-source` / `check:rn-aria` / token 产物 `--check`（8 文件 204 token，本单**没动 tokens.css**）；测试 domain 834 · app-host 1011 · i18n 26 · ui 459 · web 1561（12 skipped）· mobile 607，零失败。<br>🔴 **`check:design` 抓到我两处自拼排版**（xs+regular / sm+regular）：正解不是往 `PAIRED_TYPOGRAPHY_ALLOW` 加两行（那张表"只许删不许加"，加行就是繁殖第二套排版），而是回 `TEXT_STYLES` 找语义档位 —— `sm+regular+normal` 就是 `row-meta`、小标签就是 `caption`；顺手把同块里另外两条"只写字号+行高"的也整条消费掉，避免一个块里两种写法并存。<br>**截图 3 张**（`apps/web/evidence/focus-detail-pane/{f1-four-cards,f3-empty-records,f5-aborted-record}.png`）**逐张打开看过**，md5 各不相同：f5 那一行是 `10/4 04:02 · 0 分钟 / 未关联任务 / 中途放弃`，而四张卡是 `0 / 0 分钟 / 0 / 0 分钟` —— 判据 ① 那两套口径在同一张图里同时成立。<br>**边界（别读多）**：① 时长设置仍是 **web 特有**入口（mobile 用领域默认值），没搬进共享层，理由写在 `FocusTimer.tsx` 文件头那段；② `records` 每次现算不缓存（同步回来的对端记录因此自动进数），**没有为此加缓存**；③ 移动端**没有**记录列表 —— 这一单只要求两端的"今日专注时长"同源，把列表搬到 RN 是另一单；④ 真机/模拟器未跑（§6.1.1 的四端重装留到合并载体）；⑤ 未 push 未 merge；⑥ 🔴 **`check:docs` 现在是红的，两处死链都不在本单**（`PROGRESS.md:1362` → 不存在的 `docs/research/aed-implementation-evidence.md`，来自 `96f3293d`；`countdown-anniversary.md:1280` 引用的那份 ADR 台账里对应章节编号不存在（⚠️ 第一版这里照抄了那条坏引用的字面形状，结果被同一个检查器读成第三条坏链 —— **描述坏链要说形状，不要照抄那串**），来自 `33eea3e5`）—— 两个文件在 HEAD 里都是**干净的**（不是别人在飞的活），但正确的目标只有那两条线自己知道，**不代改、不吸收凑绿**。🔴 **13:5x 更正（§8.48）**：①那枚不是倒数纪念日那条线的缺陷，而是 `check:docs` 自己的**假红**（引用写 `§1a`，解析器只吃数字、截成 `§1` 再查标题）—— 已连五条自检臂一起修掉，同一截断在 `§4d` 那侧造成的是**假绿**（目标同时有 `## 4.` 与 `## 4d.`），也在同一单里修；②那枚仍然只是本分支落后 main 的读数，合流自愈。⇒ 那句"正确的目标只有那两条线自己知道"只对②成立，对①根本不存在"目标"要选 —— 文档本来就是对的。现量命令：`node research/tools/docs-link-check.mjs`。 |
-| W8 | ⏸ 未开工（阻塞于 C1#2 **拍板**，不再阻塞于证据） | 一手对照已落调研 [C1b-Q2](../research/detail-pane-alignment-and-spaced-review.md)（2026-10-03 19:27 到齐）：Loop / Habitica 给了逐行 `file:line`，Streaks / 滴答 / Apple / Google 给了一手文档。**推荐与代价都写好了**，剩的是拍"天 vs 次 / 自然月 vs 滚动 / 日历 vs 韧性"这三个值。🔴 拍板前必读那节末尾的**依赖声明**：凡期望值涉及"一天打 N 次"的，W6 落地前不可达 —— ✅ **这条依赖已解除**（W6 落在 `ca2cf606`：`HabitLog.value` 现在可写、可读、可落盘），所以 W8 现在**只差拍板 #2 那三个值**，证据侧没有欠账 |
+| W8 | 🔄 进行中（读数见 §8.121；未闭合的是 #13 四端重装与 #39 看图照出的可读性 ⇒ 按 §8.119 那条口径不许写"已完成"） | **判据 23 条**（domain 手算夹具 11、app-host 3、web jsdom G 组 5、真浏览器 4；`packages/ui` 那两个文件是桩与断言补强，新增用例 **0** 条，如实记）。**变异臂 4 条 ⇒ 4/4 红、0 存活**，红集逐臂：P1=`T1,T2,T3,T6,T7,T8`、P2=`T1,T2,T3,T6,T7`（T8 必须不红，today 放月末的分离设计）、P3=`T5`、P4=`T4b`，`COUNT_DRIFT=无`。**界面图 4 张，人已逐张看过**：`apps/web/evidence/habit-month-stats/light-two-cards.png`、`apps/web/evidence/habit-month-stats/light-after-checkin.png`、`apps/web/evidence/habit-month-stats/light-unit-vs-no-unit.png`、`apps/web/evidence/habit-month-stats/dark-month-cells.png` —— 看图照出 M4 第一版是假绿（`emulateMedia` 切不动本应用的主题）与 #39 那处并排矛盾。**移动端无截图**（不是"无界面格"：这一面真的做了，只是没在模拟器上看过 ⇒ 挂在 #13）。三个值的拍板记录在调研 C1b-Q2 末尾（§8.119），一手对照出处同节；W6 那条依赖已解除（`ca2cf606`），本单的分母判据踩着它写 |
 | W8a 值与词同源 | ✅ 已完成（2026-10-03，载体 `feat/detail-pane` = `9fc414b5`） | 它是缺陷不是选择，所以从 C1#2 拆出来先做。`resilience.total` = **达成天数**（`habit-resilience.ts:197`），七个键却印成"累计 N 次"（en `{count} check-ins`）⇒ 全改在**句子**侧：zh `web.habits.streak.total{,One}` / `row.aria` / `freshStart` / `mobile.growth.streak.{total,freshStart,a11y}` + en 两条 chip（`Total {count} days`，与同族 `Streak {count} days` 同形）；生产者侧四条**注释**同一个谎（`habit-resilience.ts:74/272`、`HabitBoard.tsx:145`、`HabitStreakList.tsx:6`）一并改；`ui/src/habits/model.ts:89` 那句"`count` 是那天打了几次"与 `:279` 的 `count = done ? 1 : 0` 自相矛盾，按后者改。**判据**：`packages/i18n/tests/habit-total-copy.spec.ts` 4 条。**变异六臂**：A1 row.aria 说回"次"→红 / A2 两条 chip 说回"次"→红 / A3 en 说回 check-ins→红 / A4 把 `累计 {total}` 搬进未登记的键→红（漏登记门）/ A5 把 `{total}` **改名**→红 / C0 负向对照"打卡 N 天"→**仍绿**（认语义不认字面）。🔴 **A5 是这单真正产出的判据**：第一版写 `if (!value.includes('{total}')) continue`，占位符一改那条被**静默跳过**，实测**整套 26 条全绿** —— 即"跟着数据走的循环用 `continue` 做前提校验"这个形状本身就是一个洞。另两条顺手账：`habits-board.spec.tsx` 那条把句子写成字面量 ⇒ 改成"字面量 + 与词条的漂移自检"（第一版自检因两侧空格不同而假红，去空白后再比）；`packages/ui/tests/projects-model.spec.ts` **从 `192a516d` 起就是红的**（那笔提交给 `OrganizerNode` 加了承重的 `archived`，没同步白名单）⇒ 补齐清单、判据强度不变，**归属在别人那笔提交，这里只修断言不动行为**。**读数**：i18n 26 / ui 442 / domain 821 / app-host 990 / mobile 601 / web 1512 passed \| 12 skipped，零失败；九道门禁 rc=0（含余量为 0 的 `check:l4`、`check:row-single-source`，**没调基线**）。⚠️ 未做四端重装（本单只改词条与注释，无产物形态变化；固定收尾留到 W1/W2 那批界面单一起跑） |
 | W9 | ⏸ 未开工（阻塞于补打卡窗口决定） | |
 | W10 | ⏸ **未开工**（本篇不排这一单，见 §2 第二批那行；阻塞于 C1#9–12） | |
@@ -7931,5 +7931,92 @@ C1 #2 的三值 + 新拆出的 A′/A″ 拍完（`e589292a`）⇒ W8 不再有"
 | 死链 | `docs-link-check` **RC=1，仍只有 `PROGRESS.md:1362` 那一枚在册的**（载体＝本分支：那个目标只在 `main`）；本线两份文档 0 命中 |
 | 共享的 `check:md-tables` | **不在本分支的 `package.json` 里**（它在 `main` 上）⇒ 本节新写的四张表只由本线那把 §8 表判据（上一行第一列）守；合流当时它会再扫一遍（这条不是"没人守"，是"守它的那一把在另一棵树上"） |
 | 归属门 | 点名上述 3 条 ⇒ `VERDICT=CLEAN`（主检出未提交现量 **40 枚**，全是别的线，与本节点名路径零交叠） |
+
+## 8.121 W8 读侧落地：`computeHabitPeriodStats` 一个所有者 + 七格消费者（2026-10-05 02:0x 现量，载体 `176b60be`→本笔）
+
+### 1. 交付面（谁改了什么，按归属分）
+
+| 层 | 文件 | 一句话 |
+|---|---|---|
+| 算式唯一所有者 | `packages/domain/src/habit-streak.ts` | `HabitPeriodStats` + `computeHabitPeriodStats(habit, logs, today)`：自然月四数两总量；分母 = **已到期**计划日，下界 `max(该月首日, createdAt)`、上界 `min(today, 月末)` |
+| 宿主无关取数 | `packages/app-host/src/motivation.ts` | `HabitGrowthRow` 加**必填** `month`（不是可选 prop ⇒ 宿主没接是编译红，不是运行时静默） |
+| 共享层 | `packages/ui/src/habits/{model.ts,HabitBoard.tsx}` | 行透传不重算；四格在既有 `styles.metrics` 块内、与原三枚 chip 同一套样式，各带 `testID` |
+| 两份宿主 | `apps/web/src/features/habits/HabitsView.tsx`、`apps/mobile/src/lib/habits-display.ts` | 各接 5 个 label 字段，**同一批 i18n key** |
+| 词条 | `packages/i18n/src/locales/{zh-CN,en}.ts` | 成对新增 7 键（`web.habits.stats.*`） |
+| 判据 | `packages/domain/tests/habit-period-stats.spec.ts`（新，11 条手算）、`packages/app-host/tests/motivation.spec.ts`（+3）、`packages/ui/tests/{habits-model,motivation-model}.spec.ts`、`apps/web/tests/habits-board.spec.tsx`（G 组 +5） | 期望值全部手算，每条旁边写了手算过程 |
+| 臂 | `research/tools/mutation-rigs/mutate-habit-period-stats.mjs`（新，四臂） | 见第 2 节 |
+| 真浏览器 | `e2e/tests/habit-month-stats.spec.ts`（新，4 条）+ 本族 `testMatch` 加一枚 | 见第 3 节 |
+| 载体 | `scripts/verify-detail-pane-closeout-battery.mjs` | 补四步库包重建（见第 4 节 —— 这一条是本单照出的**我自己装置的洞**） |
+
+### 2. 独立复验（不抄执行者的回报：每一步我自己重跑）
+
+| 判据 | 我这一趟的读数 |
+|---|---|
+| 电池 30 步（含新加的 `build domain/i18n/ui/app-host`） | `BATTERY_RESULT=ALL_GREEN`；逐包单测 `domain 845 / app-host 1023 / i18n 26 / ui 474 / web 1600 passed + 12 skipped / mobile 608`；逐包 typecheck 6 枚 RC=0；`build web vite` ✓ built in 2.92s |
+| 七道门禁 | `layering`（332 文件 9 规则）、`selection-single-source`（11 个 ViewKey / selects 6 / 锚点 13）、`l4`（mobile **90 = 基线**、web 98 ≤ 104）、`row-single-source`（`.ht-*` **28 = 基线**）、`ratchet-ceilings`（三行全部"未动"，`ANCHOR=f419df75`）、`design`、`ui-language`（zh 2871 / en 2871）、`migrations` ⇒ **全部 RC=0，基线一字未改** |
+| W8 四臂 | `RIG_RESULT=臂 4/4 红 + 对照干净`、`SURVIVED=无`、`COUNT_DRIFT=无`：P1 红 6（分母换成自然日数）、P2 红 5 且 **T8 必须不红**（today 放月末的分离设计）、P3 红 1（求和绕开 `habitLogValue`）、P4 红 1（摘墓碑过滤）；还原后基线复跑 11 passed |
+| 新 e2e | `4 passed (4.3s)`、`tsc -p tsconfig.detail-pane.json` RC=0 |
+
+⚠️ 一处**期望值与现实的出入**如实登记：任务书写"臂 P1 期望恰好红在 9/9 那一条"，实测 `daysInMonth` 会同时命中所有断言分母的用例（6 条）。
+处理不是放宽，是把每臂红集**钉成白名单** —— 数量对但红集不符也报 `COUNT_DRIFT`。
+
+### 3. 看图（§6.2 规定一第 4 条：不是截了就算，是看了才算）
+
+四枚落在 `apps/web/evidence/habit-month-stats/`：`light-two-cards`、`light-after-checkin`、`light-unit-vs-no-unit`、`dark-month-cells`。
+
+🔴 **看图照出两处，都不是断言照出来的**：
+
+1. **M4 那一版是假绿**。第一版写 `page.emulateMedia({colorScheme:'dark'})` 再截图，
+   4 passed —— 而图**整张是亮色**：本应用的主题由自己的开关写 `html[data-theme]`，`prefers-color-scheme` 切不动它。
+   用例名字（"暗色下四格读得清"）比断言强。改法：点真的那个 `切换到暗色主题` 按钮 +
+   断言 `html[data-theme]='dark'` + 逐层合成 alpha 后量字色与底色的**亮度**，
+   并且**亮色档在同一趟里先量一次当对照**（没有对照，"亮度差"可以恒真）。
+   重跑后的 `apps/web/evidence/habit-month-stats/dark-month-cells.png` 确实是暗的，四格是浅字压深底。
+   📌 可迁移：**`emulateMedia` 不是产品的主题开关** —— 凡是"界面跟着系统设置走"的断言，先确认应用自己有没有覆盖它。
+2. **「本月完成率 0%」与「本月完成量 3 杯」并排**（目标 8 杯、今天 3 杯那一屏）。
+   按已拍口径（天 = 唯一连续性单位）这是**正确结果**：3 < 8 ⇒ 今天不算达成 ⇒ 率 0/1。
+   但两个数同屏读起来自相矛盾，正是本工单反复记的那一族"两边都不报错"。
+   登记为 **#39**，我拍的处置是**先不动界面**，等 #13 四端重装看图后再定三个候选（率格里加"按天计" / 计数型改显示"量/目标" / 保持并在帮助页解释）。
+
+另两处只是排版读数，不构成判据：新四格接在既有三枚 chip 之后，第一屏自然折成"上五下二"两行；
+左列每行仍是既有的三枚小数字，四格**没有**挤进左列（这是 §6 第 5 行"详情面才放统计"的口径，看图确认没漂）。
+
+### 4. 本单照出的装置洞（我自己的电池，当场修）
+
+电池原来只有 `build web tsc -b` + `build web vite` 两步重打，**没有重打 `packages/*/dist`** ——
+而 `vite build` 打进产物的是 dist，不是 src。⇒ 改了 `packages/domain` 之后跑电池，
+typecheck、单测与 e2e 量的都可能是旧 bundle：AGENTS §7 第 27 条那个形状在我自己写的装置里原地复发。
+补四步（`build domain → i18n → ui → app-host`，放在 typecheck 之前，因为后三者的 dts 要读前者 dist），
+并按纪律 3 从各包 `package.json` 的 `build` 真源读回来对账（不一致 ⇒ `PREFLIGHT=… != 'tsup'` 并 exit 1，不静默）。
+本族的 `testMatch` 同时加进 `habit-month-stats` ⇒ 电池步骤数从 26 涨到 **30**（口径：`--list` 现量，不落笔）。
+
+⚠️ 边界：`packages/storage|op-log|sync-*|shared-schema` 的 dist **不在**电池射程里 —— 本族不碰它们；
+哪天碰了要一起加，否则这一条洞会换个包名复发。
+
+### 5. 口径与实现的五条出入（执行者报的，我逐条核过）
+
+1. `Habit.createdAt` 在 `EntityBase` 上是必填 epoch ms ⇒ 任务书预留的"没有创建日就用月首"分支**不存在也不需要**，下界直接取较晚者（判据 T3 钉它）。
+2. "六格"这个说法与实现**不等**：既有 3 枚 + 新增 4 枚 = 7 枚，因为任务书清单里的"总打卡天数"与既有「累计」是同一个数同一把尺（`resilience.total`）⇒ 加第八枚会造出两个入口说同一个数。做法：`month.totalAchievedDays` 字段照建，并由 app-host 判据钉它 `=== resilience.total`（**只有一处真相**）。
+3. "today 晚于该月末"的二月夹具在 `monthKey = today.slice(0,7)` 的定义下不成立 ⇒ 实现为 today = 该月末（2024-02-29 ⇒ 29、2025-02-28 ⇒ 28），另加 2024-02-15 ⇒ 15 一刀，让"名写月算用 30"与"整月化"两种复发形状都有判据。
+4. `labels` 确实是宿主注入 ⇒ 两份宿主各接、同 key，G5 用源码级判据钉（F9 手法），`HabitGrowthFn` 返回类型写必填 ⇒ 漏接是编译红。
+5. `rate` 的**分子**只数"到期计划日中达成"，与 `achievedDays`（含非计划日的达成）可以不等 ⇒ "本月打卡 10 天"与"完成率 9/9"并存是事实不是矛盾，两边各自有定义（写进 JSDoc，不靠人记）。
+
+🔴 一处**归属措辞**我改了：代码注释与 spec 文件头原先把"分母只数已到期计划日"写成"**产品负责人的裁决**"。
+这句是错的 —— 那三个值是本线按交下来的决策权拍的（原话与代价记在 §8.119 与调研 C1b-Q2 的拍板记录），
+把它写成别人的名字会让下一位去问错人、并且以为推翻它要过一道审批。两处各命中 1 次改掉，改后 domain typecheck RC=0。
+
+### 6. 边界（别读多）
+
+- **移动端只到编译与单测**（`apps/mobile` 608 passed、typecheck RC=0），**没有移动端截图** ——
+  模拟器窗口不在本趟射程（#13/#17 那一档）。这一格不许被读成"两端都看过图"。
+- W8 状态是**进行中**不是已完成：未闭合的是 #13（四端重装）与 #39（看图照出的可读性）。
+- ⚠️ 本趟电池那一步 e2e **重写了 8 枚别族的在册证据图**（`focus-detail-pane/f1-four-cards.png`、
+  `f5-aborted-record.png`、`detail-pane-collapse/t5-header-with-toggle.png`、`keyboard-cursor/k6–k8`、
+  `selection-projections/01-list.png`、`03-timeline.png`）—— 字节变了，判据没变（那几族的断言仍全绿）。
+  **本笔不提交它们**：一张被"谁最后跑"决定的图，提交进去等于把别人的读数换成我的趟。
+  处置登记为 **#40**（要么给这几族补 md5 对账判据再统一重出一版，要么把它们从"引用为证"降级成一次性产物）。
+  📌 这与项目记忆里那条"证据 md5 会被别人的 e2e 趟重写而无人报红"是同一件事的**我这侧**：这次重写者是我。
+- 本节没动两道棘轮的基线，也没新增顶层 `ht-*` 族（四格复用 `styles.metrics` 既有块）。
+
 
 

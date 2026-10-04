@@ -137,6 +137,25 @@ export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
       }),
     amountPlusA11y: ({ name }) => t('common.habits.amount.plus', { name }),
     amountMinusA11y: ({ name }) => t('common.habits.amount.minus', { name }),
+    /*
+      工单 W8 的四格（本月打卡 / 本月完成率 / 本月完成量 / 总完成量）。
+      五个字段在 `HabitBoardLabels` 里都是**必填**：少接一个编译就红 ——
+      与上面三个同一个纪律（可选 prop 会把"宿主没接"伪装成"做完了"）。
+      句子只是 `month` 统计的投影，口径（天/自然月/到期分母）全在 domain 层；
+      完成率的分母为 0 时共享层改点 `monthRatePending`，这里不判断。
+      单位为空时退化成**不带单位**的那条句子（裁决 D：不替用户猜量纲）。
+    */
+    monthDays: (count) => t('web.habits.stats.monthDays', { count }),
+    monthRate: (percent) => t('web.habits.stats.monthRate', { percent }),
+    monthRatePending: t('web.habits.stats.monthRatePending'),
+    monthValue: ({ value, unit }) =>
+      unit === ''
+        ? t('web.habits.stats.monthValue', { value })
+        : t('web.habits.stats.monthValueUnit', { value, unit }),
+    totalValue: ({ value, unit }) =>
+      unit === ''
+        ? t('web.habits.stats.totalValue', { value })
+        : t('web.habits.stats.totalValueUnit', { value, unit }),
     freeze: (count) => t('web.habits.freeze', { count }),
     repair: ({ date, count }) => t('web.habits.repair', { date, count }),
     repairAction: t('web.habits.repairAction'),

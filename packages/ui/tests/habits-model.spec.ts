@@ -11,7 +11,7 @@
  */
 
 import { HEAT_TOKENS } from '@heyta/design-system';
-import type { Habit, HabitLog, HabitResilienceView, LocalDate, StreakResult } from '@heyta/domain';
+import type { Habit, HabitLog, HabitPeriodStats, HabitResilienceView, LocalDate, StreakResult } from '@heyta/domain';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -56,19 +56,35 @@ function log(date: LocalDate, over: Partial<HabitLog> = {}): HabitLog {
 function stubGrowth(result?: {
   streak: StreakResult;
   resilience: HabitResilienceView;
+  month?: HabitPeriodStats;
 }): { fn: HabitGrowthFn; calls: Array<{ habitId: string; logCount: number; today: LocalDate }> } {
   const calls: Array<{ habitId: string; logCount: number; today: LocalDate }> = [];
   const fn: HabitGrowthFn = (h, logs, today) => {
     calls.push({ habitId: h.id, logCount: logs.length, today });
     return (
-      result ?? {
-        streak: { current: 3, longest: 9 },
-        resilience: { resilience: { current: 3, longest: 9, total: 12, freezesHeld: 1, frozenDays: 2, frozenInCurrentRun: 0 } },
+      // W8：`month` 与 streak/resilience 一样**原样透传**，桩默认给一份
+      // 与 streak 数字处处不同的值，免得巧合相等时断言指错地方。
+      {
+        ...(result ?? {
+          streak: { current: 3, longest: 9 },
+          resilience: { resilience: { current: 3, longest: 9, total: 12, freezesHeld: 1, frozenDays: 2, frozenInCurrentRun: 0 } },
+        }),
+        month: result?.month ?? MONTH_STUB,
       }
     );
   };
   return { fn, calls };
 }
+
+const MONTH_STUB: HabitPeriodStats = {
+  monthKey: '2026-09',
+  achievedDays: 6,
+  scheduledDays: 9,
+  rate: 6 / 9,
+  monthValue: 14,
+  totalValue: 77,
+  totalAchievedDays: 33,
+};
 
 describe('热度分档只有两档，且与迁移前的 web 口径逐字一致', () => {
   it('0 次 = 0 档，≥1 次 = 4 档（不发明中间档）', () => {
@@ -224,10 +240,12 @@ describe('进度投影：连续/韧性由注入的配对函数给，model 不自
       },
       repair: { date: '2026-09-27', streakIfRepaired: 5 },
     };
-    const { fn } = stubGrowth({ streak, resilience });
+    const { fn } = stubGrowth({ streak, resilience, month: MONTH_STUB });
     const rows = toHabitProgressRows([habit()], [], NOW, fn);
     expect(rows[0]?.streak).toBe(streak);
     expect(rows[0]?.resilience).toBe(resilience);
+    // W8：月统计同一条纪律 —— 由注入函数给，共享层不重算。
+    expect(rows[0]?.month).toBe(MONTH_STUB);
   });
 });
 

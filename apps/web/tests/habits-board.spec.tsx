@@ -49,7 +49,7 @@ import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import type { Habit, HabitLog } from '@heyta/domain';
+import type { Habit, HabitLog, HabitPeriodStats } from '@heyta/domain';
 import { I18nProvider, zhCN } from '@heyta/i18n';
 import {
   HabitBoard,
@@ -81,8 +81,25 @@ function log(date: string, over: Partial<HabitLog> = {}): HabitLog {
 }
 
 /** 桩：连续 / 韧性由"宿主"给 —— 共享层不认识 `@heyta/app-host`。 */
+/**
+ * 月统计桩（工单 W8）。`HabitGrowthFn` 的返回类型把它写成**必填** ——
+ * 桩不给就编译不过，这正是"宿主没接会被逼出来"的形状。
+ * 数字取"月中今日 2026-09-28、完成 6 天 / 到期 9 天"这种处处不相等的形状，
+ * 免得某两个字段巧合相等时断言指错地方。
+ */
+const MONTH_STUB: HabitPeriodStats = {
+  monthKey: '2026-09',
+  achievedDays: 6,
+  scheduledDays: 9,
+  rate: 6 / 9,
+  monthValue: 14,
+  totalValue: 77,
+  totalAchievedDays: 33,
+};
+
 const growth: HabitGrowthFn = () => ({
   streak: { current: 3, longest: 9 },
+  month: MONTH_STUB,
   resilience: {
     resilience: {
       current: 3,
@@ -102,6 +119,13 @@ const LABELS: HabitBoardLabels = {
   streakCurrent: (count) => `连续 ${String(count)} 天`,
   streakLongest: (count) => `最长 ${String(count)} 天`,
   streakTotal: (count) => `累计 ${String(count)} 天`,
+  // 工单 W8 那五个（`HabitBoardLabels` 里是**必填**，少接一个编译就红）。
+  // 与 amount 三兄弟同一个纪律：桩故意用另一种格式，判据读到的是桩的产出。
+  monthDays: (count) => `桩月天:${String(count)}`,
+  monthRate: (percent) => `桩率:${String(percent)}`,
+  monthRatePending: '桩率:无',
+  monthValue: ({ value, unit }) => `桩月量:${String(value)}|${unit}`,
+  totalValue: ({ value, unit }) => `桩总量:${String(value)}|${unit}`,
   freeze: (count) => `这段连续里有 ${String(count)} 天是冻结保住的`,
   repair: ({ date, count }) => `${date} 那天漏了。现在补上，就是连续 ${String(count)} 天。`,
   repairAction: '补上',
@@ -274,6 +298,7 @@ describe('B. 打卡按钮：状态、语义与动作', () => {
 describe('C. 补打卡 / 重新开始：只渲染领域层给出的机会', () => {
   const withRepair: HabitGrowthFn = () => ({
     streak: { current: 0, longest: 9 },
+    month: MONTH_STUB,
     resilience: {
       resilience: {
         current: 0,
@@ -289,6 +314,7 @@ describe('C. 补打卡 / 重新开始：只渲染领域层给出的机会', () =
 
   const withFreshStart: HabitGrowthFn = () => ({
     streak: { current: 0, longest: 21 },
+    month: MONTH_STUB,
     resilience: {
       resilience: {
         current: 0,
@@ -607,5 +633,102 @@ describe('F. 数量行：读数与步进', () => {
       logs: [log('2026-09-28', { value: 3 })],
     });
     expect(byTestId(view, 'habit-amount-h1')?.textContent).toContain('桩:3/2|杯');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// G. 工单 W8 的四格（本月打卡 / 本月完成率 / 本月完成量 / 总完成量）
+// ─────────────────────────────────────────────────────────────────────────
+// 判据按 §7 第 82 条同族的教训写成**存在性**："少了一格"才是这单最怕的失效，
+// 逐条给"我以为会有的那几行"写内容判据挡不住它。
+// 桩的 `month` 处处取互不相等的数字（见 `MONTH_STUB`），断言读到的是**桩的产出**，
+// 不是词条句子 —— 那证明格子真的接在 `row.month` 上，而不是硬编码。
+describe('G. W8 四格：存在性、分母为 0 走占位句、求和走 monthValue', () => {
+  it('G1 🔴 四格都在场（存在性判据），且各自读的是 month 的对应字段', () => {
+    const view = renderBoard({ habits: [habit()], logs: [] });
+    // 四枚 testID 都必须存在 —— 摘掉任意一格渲染，这条红。
+    expect(byTestId(view, 'habit-month-days-h1')).not.toBeNull();
+    expect(byTestId(view, 'habit-month-rate-h1')).not.toBeNull();
+    expect(byTestId(view, 'habit-month-value-h1')).not.toBeNull();
+    expect(byTestId(view, 'habit-total-value-h1')).not.toBeNull();
+    // 桩的 month：achievedDays 6、monthValue 14、totalValue 77（无单位）。
+    expect(byTestId(view, 'habit-month-days-h1')?.textContent).toBe('桩月天:6');
+    expect(byTestId(view, 'habit-month-value-h1')?.textContent).toBe('桩月量:14|');
+    expect(byTestId(view, 'habit-total-value-h1')?.textContent).toBe('桩总量:77|');
+    // 桩的 rate = 6/9，分母 9 > 0 ⇒ 走百分比那一支：round(0.666…×100) = 67。
+    expect(byTestId(view, 'habit-month-rate-h1')?.textContent).toBe('桩率:67');
+  });
+
+  it('G2 🔴 scheduledDays 为 0 时显示占位句，绝不显示 "0%"', () => {
+    const zeroDenom: HabitGrowthFn = () => ({
+      streak: { current: 0, longest: 0 },
+      resilience: {
+        resilience: { current: 0, longest: 0, total: 0, freezesHeld: 0, frozenDays: 0, frozenInCurrentRun: 0 },
+      },
+      // 分母 0、率 0（domain 保证不是 NaN）。
+      month: { ...MONTH_STUB, scheduledDays: 0, rate: 0 },
+    });
+    const view = renderBoard({ habits: [habit()], logs: [], growthFn: zeroDenom });
+    const cell = byTestId(view, 'habit-month-rate-h1');
+    expect(cell?.textContent).toBe('桩率:无'); // 占位句，不是数字
+    expect(cell?.textContent).not.toContain('0%');
+  });
+
+  it('G3 四格的单位来自 habit.unit（与数量行同一个约定：无单位为**空串**，不猜「次」）', () => {
+    const seen: Array<{ value: number; unit: string }> = [];
+    const view = renderBoard({
+      habits: [habit({ unit: '页' })],
+      logs: [],
+      labels: {
+        ...LABELS,
+        monthValue: (info) => {
+          seen.push(info);
+          return '桩';
+        },
+      },
+    });
+    expect(byTestId(view, 'habit-month-value-h1')).not.toBeNull();
+    // monthValue 14（桩），unit '页'。
+    expect(seen).toEqual([{ value: 14, unit: '页' }]);
+  });
+
+  it('G4 🔴 四格走的是**注入的 month**，不在共享层重算（换桩即换数）', () => {
+    const spy: HabitGrowthFn = () => ({
+      streak: { current: 1, longest: 2 },
+      resilience: {
+        resilience: { current: 1, longest: 2, total: 3, freezesHeld: 0, frozenDays: 0, frozenInCurrentRun: 0 },
+      },
+      month: { ...MONTH_STUB, achievedDays: 5, monthValue: 12 },
+    });
+    const view = renderBoard({ habits: [habit()], logs: [], growthFn: spy });
+    // 桩给什么格子读什么：与 G1 的 6/14 不同 —— 证明数字来自注入对象，不是硬编码。
+    expect(byTestId(view, 'habit-month-days-h1')?.textContent).toBe('桩月天:5');
+    expect(byTestId(view, 'habit-month-value-h1')?.textContent).toBe('桩月量:12|');
+  });
+
+  it('G5 🔴 两份宿主 labels 构造器都接了 W8 那五个字段，且用的是同一批 key（F9 的手法）', () => {
+    // 必填字段本身会挡"整端没接"（编译红）；这条挡的是更细的一种：
+    // 接了，但两端各建一条同义键 —— 同义键不会让任何单元测试变红，
+    // 只会让同一个数在两端长成两句话。
+    for (const [where, rel] of [
+      ['web', 'features/habits/HabitsView.tsx'],
+      ['mobile', '../../../apps/mobile/src/lib/habits-display.ts'],
+    ] as const) {
+      const src = readFileSync(resolve(WEB_SRC, rel), 'utf8');
+      for (const field of ['monthDays', 'monthRate:', 'monthRatePending', 'monthValue', 'totalValue']) {
+        expect(src, `${where} 的 labels 构造器没接 ${field}`).toContain(`${field}`);
+      }
+      for (const key of [
+        'web.habits.stats.monthDays',
+        'web.habits.stats.monthRate',
+        'web.habits.stats.monthRatePending',
+        'web.habits.stats.monthValue',
+        'web.habits.stats.monthValueUnit',
+        'web.habits.stats.totalValue',
+        'web.habits.stats.totalValueUnit',
+      ]) {
+        expect(src, `${where} 没有用 ${key}（同义键苗头）`).toContain(key);
+      }
+    }
   });
 });
