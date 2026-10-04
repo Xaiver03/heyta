@@ -246,6 +246,20 @@ for (const gate of GATES) {
 const bad = rows.filter((r) => r.mergeCaused);
 const same = rows.filter((r) => r.p.rc !== 0 && r.b.rc !== 0);
 
+// 🔴 门禁**污染探针**（起因与我一度写错的机制，都记在工单 §8.56）。
+// 这一道的**不是**"marker 会把门禁数搞错" —— 那个假设被本趟的 A/B 否证了：
+// 对 `check-row-single-source` / `check:l4` / `check:ui-language` / `check-hardcoded` 四道，
+// 剥掉 marker 分隔行前后**读数逐字相同**（28/28、三道断言、330 文件 428 处、无硬编码），
+// 因为它们是文本扫描器，`<<<<<<<` 对它们只是一行普通文本。
+// 它判的是更前面一件事：**带 marker 的产物不是一个能编译、能运行的状态**，
+// 所以那一趟"绿"证明的是"扫描器没被绊倒"，**不是**"合好的代码没问题"——
+// 真会被 marker 绊倒的是 §8.47 的第 2 步（typecheck）与第 5 步（测试/e2e）。
+// ⇒ 判据只到"产物里还有带 marker 的产品源码/样式"这一层：那一趟门禁 tally **不算合流验过**，要清完再跑。
+// ⚠️ 这里**不抄各道门禁的扫描范围**（那是一份会漂的抄件，本仓刚为同样的病修过一轮，见 §8.55）。
+const tainted = markersIn(product).filter(
+  (rel) => /^(apps|packages)\//.test(rel) && /\.(ts|tsx|css|mjs)$/.test(rel),
+);
+
 const silentBad = silentRows.filter(
   (r) => r.absent || r.missingA.length || r.missingB.length || r.syntax || r.unparsed,
 );
@@ -317,14 +331,24 @@ if (slotRows.length) {
 }
 const slotBad = slotRows.filter((r) => r.bad);
 
+if (tainted.length) {
+  console.log(
+    `\n🔴 产物里还有 ${tainted.length} 枚产品源码/样式带冲突 marker ⇒ 上面 ${GATES.length} 道门禁量的**不是一个能编译、能运行的状态**：` +
+      `那一列"候选=0"证明的是文本扫描器没被绊倒，**不是**"合好的代码没问题"（真被绊倒的是 §8.47 第 2 步 typecheck 与第 5 步测试/e2e）。` +
+      `⚠️ 不是"数被搞错"——本趟 A/B 实测：剥掉 marker 分隔行前后这四道读数逐字相同（见工单 §8.56）。\n` +
+      `      带 marker 的产品文件：${tainted.join(' / ')}\n` +
+      `      ⇒ 清完这些 marker 再跑一次；那一趟的红/绿才算合流验过。`,
+  );
+}
+
 console.log(
   `\nTREE=${tree}  冲突=${conflicted.length} 枚（处置见工单 §8.47 第 3 节）  ` +
     `纯 fs 门禁=${GATES.length} 道：合并造成的红=${bad.length}  两边都红（环境/载体所致，不含合并信息）=${same.length}  ` +
     `静默合流=${silentRows.length} 枚，其中丢行/删文件/语法不过=${silentBad.length}  ` +
-    `槽位重复=${slotBad.length}`,
+    `槽位重复=${slotBad.length}  产物仍带 marker 的产品文件=${tainted.length ? `${tainted.length} 枚 ⇒ 本趟 tally 不算"合流验过"` : '0（这一趟的 tally 量的是一个可运行状态）'}`,
 );
 console.log(`候选树里带 marker 的门禁脚本=${markersIn(product).join('/') || '无'} —— 有就说明 §8.47 第 3 节还没做完`);
-if (bad.length || silentBad.length || slotBad.length) {
+if (bad.length || silentBad.length || slotBad.length || tainted.length) {
   console.log('  ⇒ 逐条按 §8.47 第 3–4 节处置后再跑一次；这里绿了才去动真分支。');
 }
 
@@ -334,4 +358,4 @@ if (!keep) {
 } else {
   console.log(`--keep：临时载体留着 —— 产物=${product}  基线=${baseline}（看完请自行删）`);
 }
-process.exit(bad.length + silentBad.length + slotBad.length ? 1 : 0);
+process.exit(bad.length + silentBad.length + slotBad.length + tainted.length ? 1 : 0);
