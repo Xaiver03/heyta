@@ -9290,3 +9290,60 @@ CAP=28800 STEP=150 QUIET_MIN=15 LOAD_MAX=12 MAX_ATTEMPTS=3 \
   要把它们纳进来得先把包名映射回目录（读 `pnpm-workspace.yaml`），本批没做，记在这里。
 - "悬空 0"证明的是**这一族洞此刻没开**，不是"落地一定会绿"：完整链里其余 60+ 道（要 node_modules、要起栈、
   `check:ai-e2e` 会按端口 SIGKILL）仍然只有窗口里那一趟给得出读数。
+
+### 8.154 那道新判据在**真实预测形状**上量到一枚悬空（登记 **G-65**，不是本批能修的），顺带把自己写的那个"import 也跑 CLI"的洞关掉（2026-10-05 01:4x，`354a1489` 之后）
+
+#### ① 现量：阻塞集那一枚 `package.json` 里，有一条链的目的地是**未跟踪文件**
+
+主检出的未提交差异（只读，`git diff -- package.json`）往链里加了**一道**、往 scripts 里加了**一个名字**：
+
+| 他们 pending 的新增 | 指向 | 那个文件此刻在 git 里是什么状态 |
+|---|---|---|
+| `check:shell-exit-chain`（**进 `check` 链**） | `scripts/check-shell-exit-chain.mjs` | 🔴 **未跟踪**（`?? `），工作树里在 |
+| `verify:macos-account-erasure`（不进 `check` 链，是 `verify:*`） | `scripts/verify-macos-account-erasure.sh` | 未跟踪；它不在链上 ⇒ 不产生悬空，但 §8.153 ③ 第一条说过：`check:script-snapshot` 的 `MANIFEST` 是显式清单，**它不查"漏登记"**，所以那枚新长跑 `.sh` 没进清单也不会红 |
+
+把这**一版 package.json** 配上 **main 已提交那棵树**的文件清单喂给刚落地的判据
+（新增的跨树模式：链条目与文件清单可以来自**两棵不同的树**，两个根都打进输出，
+免得"两边相等"其实是把同一棵树量了两次）：
+
+```bash
+node research/tools/selfhost-chain-targets.mjs --pkg ../heyta/package.json --tree main
+```
+
+```
+链条目来自文件 …/heyta/package.json · 文件清单来自 …/heyta 里的引用 main（tree 14e0e8179ae4，3333 条）
+悬空/判不了  pnpm check:shell-exit-chain  不在树里：scripts/check-shell-exit-chain.mjs
+链步 85 · 取到脚本目标 82 枚并逐枚判在位 · checked 77 · no-target 7 · unresolved 0 · 悬空 1
+❌ 有悬空或读不到的链步 ⇒ pnpm check 走到那里会以 Cannot find module 收尾      （退 1）
+```
+
+同一把尺子的其余三档也一并量过：`--pkg package.json --tree HEAD` 退 0；
+只给 `--pkg` 不给 `--tree` 退 2（跨树比较必须两边都给）；`--ref` 与 `--tree` 混用退 2。
+
+#### ② 它预示的是**什么形状的红**，以及现在谁会先接住它
+
+如果他们那一笔把 `package.json` 提交了而 `scripts/check-shell-exit-chain.mjs` 没在同一笔里进版本库，
+那么落地那一刻的完整链会在 `check:shell-exit-chain` 处以 `Cannot find module` 收尾。
+§8.153 那道新判据把它**提前到落笔之前**：载体的 `GATES` 里这一道会打出上面那行 `悬空/判不了`，
+归属层拿干净 main 的配对树去比 —— main 那侧的链**不跑这一道**（它还没提交），所以配对复跑是 `rc=0`，
+于是归属**不成立**、载体 `die(3)` 不落笔。`die(3)` 属于时序/环境那一档 ⇒ 哨兵按 `MAX_ATTEMPTS` 重试，
+**不会把那几十分钟的完整链烧掉**。这是这道判据存在的理由第一次被真实数据量到，不是夹具。
+
+⚠️ 别把它读成"本批欠一笔修复"：修法是**他们把两个路径同一笔提交**（或先提交脚本再提交链）。
+本批不动主检出、不代改他们的 `package.json`。登记成 **G-65**，关闭判据 = 下一次开窗前 ① 那条复跑打印
+`悬空 0`；如果开窗时它仍 `悬空 1`，载体在落笔前就停，读数里点名的是 `check:shell-exit-chain` 而不是本批的解法。
+
+#### ③ 同一个探针顺手照出自己的洞（已修，且是 traps `#193` 的第三个实例）
+
+第一次跑这个读数用的是**一次性 `import` 探针**（现在的持久形态就是 ① 那条 `--pkg/--tree`），
+结果输出的是**判据自己 CLI 段的"全绿"结论**（`链步 67 … 悬空 0`），
+而我注入的 `has` 一次都没被用上 —— 因为这一版工具把 CLI 段写在模块顶层，**没有入口守卫**：
+`import` 也算"被跑到"。症状不是崩，是**安静地量了另一棵树**（比 §8.152 那枚更糟：那枚至少是被闸门拦住的空跑）。
+修法与本仓另一处一致：CLI 段收进 `runCli(argv)`，入口判断**两边都 `realpathSync` 之后**再比。
+修完同一条命令才打出上面那行 `悬空 1`。自检仍 `臂数 11 · 不符 0`、磁盘/`--ref` 两模式仍 `rc=0`。
+
+📌 一般规律：**能被 import 的判据模块必须有入口守卫**，否则"注入 `has`/注入 root"这类可测性设计
+只是看上去能测 —— 调用方拿到的结论是模块自己那棵树的，而字形与真话一致。
+这条**待入 `docs/reference/environment-traps.md`**（多写台账，编号按主检出工作树现量取；
+`#193` 讲的是"字符串比 argv ⇒ 自检空跑"，这一枚是"根本没有守卫 ⇒ import 也跑 CLI"，
+是同一家族的第二种面目，是否并条由后来者按条目原文判）。

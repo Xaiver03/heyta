@@ -42,7 +42,7 @@
  * 退出码：0 = 没有悬空；1 = 有悬空或有 unresolved；2 = 探针自己读不到（`git ls-tree` 失败等）。
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
@@ -232,9 +232,15 @@ function runSelftest() {
   console.log(`✅ 自检过（${arms.length} 臂，其中 ${fArms.length} 臂是登记过的敞口）`);
 }
 
-/* ── CLI ─────────────────────────────────────────────────────────── */
-const argv = process.argv.slice(2);
+/* ── CLI ───────────────────────────────────────────────────────────
+ * 🔴 入口判断比的是**两边都 realpath 之后的路径**。`/tmp` 是 `/private/tmp` 的软链，
+ * 比字符串会让"被 import"和"被直接跑"在输出上长得一模一样；而 CLI 段一旦在 import 时也跑，
+ * 调用方注入的 `has` 就被静默丢掉 —— 读出来是"全绿"，量的却是另一棵树。
+ * 同族见 traps `#193` 与本仓 `research/tools/selfhost-text-merge.mjs` 的那处修法。 */
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/** 三种跑法（`--selftest` / `--ref` / 磁盘）都在这一支里；被 import 时一行都不执行。 */
+function runCli(argv) {
 
 if (argv.includes('--selftest')) {
   runSelftest();
@@ -242,20 +248,54 @@ if (argv.includes('--selftest')) {
 }
 
 const refAt = argv.indexOf('--ref');
+const pkgAt = argv.indexOf('--pkg');
+const treeAt = argv.indexOf('--tree');
+if (refAt >= 0 && (pkgAt >= 0 || treeAt >= 0)) {
+  console.error('退 2：--ref 是"同一枚提交同时当 package.json 与文件清单"的捷径，不与 --pkg/--tree 混用');
+  process.exit(2);
+}
+if ((pkgAt >= 0) !== (treeAt >= 0)) {
+  console.error('退 2：跨树比较必须**两边都给** —— --pkg <文件> 给链条目那一侧，--tree <引用> 给文件清单那一侧');
+  process.exit(2);
+}
 let pkgText = '';
 let has = null;
-if (refAt >= 0) {
+const gitOpts = (cwd) => ({ cwd, encoding: 'utf8', maxBuffer: 1 << 26 });
+
+if (pkgAt >= 0) {
+  // 🔴 跨树比较：链条目来自一棵树（通常是别人**还没提交**的那份工作树），
+  // 文件清单来自另一棵树（通常是那棵树已提交的那一侧）。两个根都必须打出来，
+  // 否则"两边相等"可能是把同一棵树量了两次。
+  const pkgFile = argv[pkgAt + 1];
+  const treeRef = argv[treeAt + 1];
+  if (!pkgFile || !treeRef) {
+    console.error('退 2：--pkg / --tree 后面各要跟一个参数');
+    process.exit(2);
+  }
+  const pkgDir = dirname(resolve(pkgFile));
+  try {
+    pkgText = readFileSync(resolve(pkgFile), 'utf8');
+    const listing = execFileSync('git', ['ls-tree', '-r', '--name-only', treeRef], gitOpts(pkgDir));
+    const set = new Set(listing.split('\n').filter(Boolean));
+    has = (p) => set.has(p);
+    const top = execFileSync('git', ['rev-parse', `${treeRef}^{tree}`], gitOpts(pkgDir)).trim();
+    console.log(`链条目来自文件 ${resolve(pkgFile)} · 文件清单来自 ${pkgDir} 里的引用 ${treeRef}（tree ${top.slice(0, 12)}，${set.size} 条）`);
+  } catch (e) {
+    console.error(`退 2：跨树取数失败 —— ${String(e.message).split('\n')[0]}（探针坏，不是产品红）`);
+    process.exit(2);
+  }
+} else if (refAt >= 0) {
   const ref = argv[refAt + 1];
   if (!ref) {
     console.error('退 2：--ref 后面没给引用');
     process.exit(2);
   }
   try {
-    pkgText = execFileSync('git', ['show', `${ref}:package.json`], { encoding: 'utf8', maxBuffer: 1 << 26 });
-    const listing = execFileSync('git', ['ls-tree', '-r', '--name-only', ref], { encoding: 'utf8', maxBuffer: 1 << 26 });
+    pkgText = execFileSync('git', ['show', `${ref}:package.json`], gitOpts(ROOT));
+    const listing = execFileSync('git', ['ls-tree', '-r', '--name-only', ref], gitOpts(ROOT));
     const set = new Set(listing.split('\n').filter(Boolean));
     has = (p) => set.has(p);
-    console.log(`裁判对象 = 提交 ${ref}（tree 条目 ${set.size} 条 · 没读磁盘，也没进任何工作树）`);
+    console.log(`裁判对象 = ${ROOT} 这个仓里的提交 ${ref}（tree 条目 ${set.size} 条 · 没读磁盘，也没进任何工作树）`);
   } catch (e) {
     console.error(`退 2：读 ${ref} 失败 —— ${String(e.message).split('\n')[0]}（探针坏，不是产品红）`);
     process.exit(2);
@@ -279,3 +319,9 @@ console.log(rc === 0
   ? '✅ 链里每一条点名的脚本都在这棵树里（no-target 那几条形成本身已由 F 臂登记为已知敞口）'
   : '❌ 有悬空或读不到的链步 ⇒ pnpm check 走到那里会以 Cannot find module 收尾');
 process.exit(rc);
+}
+
+const isEntry = process.argv[1]
+  ? realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))
+  : false;
+if (isEntry) runCli(process.argv.slice(2));
