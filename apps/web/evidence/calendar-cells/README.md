@@ -68,11 +68,11 @@
   那就是上面"看图才现形的两件事"第 2 条讲的中间态，图拍在修好**之前**，
   所以它是那条已修缺陷的**证据**，不是新缺陷。别拿这张图去报 bug。
 
-UIPIN calendar-cells.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
-UIPIN calendar-cells-dark.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
-UIPIN calendar-cells-empty.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
-UIPIN calendar-tall-viewport.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
-UIPIN calendar-toolbar.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+UIPIN calendar-cells.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-cells-dark.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-cells-empty.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-tall-viewport.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-toolbar.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
 
 钉的是**拍这五张图那一刻**最后一次动过上面那组路径的提交（`5340c126`，10-03 02:10，
 字节 mtime 02:58）。🔴 **补完锚点之后 `--all` 当场报这五枚 UISTALE**，而且报得对：

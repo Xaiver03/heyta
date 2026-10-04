@@ -33,8 +33,8 @@ ae8ad61d4a136625748ce465dfba46fb  view-tabs-year.png
 ⚠️ **未定性，本轮不再往下查**（要往下查得能连跑多趟，而跑 e2e 要窗口）。
 
 ```text
-UIPIN view-select-closed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN view-tabs-year.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN view-select-closed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN view-tabs-year.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
 ```
 
 ⚠️ **路径集是判断，不是事实，所以把它的边界写死在这里**：这五条是"本会话认为决定这张图形状的地方"

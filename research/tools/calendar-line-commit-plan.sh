@@ -46,6 +46,14 @@ PATHS=(
   # 🔴 与链的 `ask_gate()` + `verify rc=3 有界重跑`**同批落地**：那 22 行窗口判据现在有两个消费者
   #    （开窗前与重跑前），而"rc=3 才重跑、rc=1 绝不重跑、闸门关着就一个字不跑"只能由这把六臂 rig 答。
   research/tools/r14c-verify-retry-arms.sh
+  # 🔴 **与 `r14c-carrier-chain.sh` 这一批同列**（链依赖的 rig 要与 dependent 同列，否则
+  #    `--only` 会提一个"改了判据但牙没入库"的 HEAD —— 17:46 那次 `stack_up` 事故的同一条规矩）：
+  #    ① `stack_down` 的四臂 + 两条静态不变量 + 变异；
+  #    ② `ask_gate` 的负载落位从"次数"改"时间预算"后的九臂（含 F1 正对照 / F2 变异）；
+  #    ③ UIPIN 路径清单的常驻护栏（它拦的是 27 枚钉行的触发源，改的是 8 枚 README）。
+  research/tools/r14c-stack-down-arms.sh
+  research/tools/r14c-regate-load-arms.sh
+  research/tools/r17-pin-path-hygiene.sh
   # 🔴 这一批**成对落地的三枚**（链 + 它依赖的两枚共享起栈脚本）：
   #    `r14c-carrier-chain.sh` 新加的 `stack_isolation` 后置断言依赖 `scripts/mobile-e2e-up.sh`
   #    那两枚新旋钮（`HEYTA_E2E_PIDFILE` / `HEYTA_E2E_LOGFILE`），而载体那份取的是**已提交副本**

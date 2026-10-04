@@ -80,9 +80,9 @@ cd e2e && npx playwright test tests/calendar-day.spec.ts
 同一状态重跑必然不同字节 ⇒ md5 是"每跑必红"的判据，§8.3 说它会把人训练成忽略红。
 
 ```
-UIPIN day-hour-labels.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN day-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
-UIPIN day-timed-hour16.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN day-hour-labels.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN day-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN day-timed-hour16.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
 ```
 
 钉 `39032107` 的理由（现取，不是抄 HEAD）：上面五条路径里最后一次动过的提交就是它

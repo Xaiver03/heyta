@@ -1020,8 +1020,81 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   （打印出来才现形：一行"理由"糊了 15 个文件名的表）。`bash -n` 完全看不出（语法没错），
   只有**把理由打印出来读**才看得见 ⇒ 已在 `calendar-line-commit-plan.sh` 里把"条目正文一律不写反引号"写成注释。
 
+- (20) **21:44–22:0x：一发窗口被链自己漏下的三枚服务端烧掉 —— 根因是"链只有 stack_up、从来没有 stack_down"；顺手把 UIPIN 形状锚点的触发源收窄。**
+  🔴 **形状是"装置写了一句承诺、从没执行它"**：链在 `E2E_PIDFILE=` 那行的注释里写着
+  "留下'这棵起过栈、怎么停'的口径，**别留一枚没人知道的活进程**"，而**停它的那条命令一次都没被执行过** ——
+  链的步骤表里只有 `stack_up`。三发窗口各留一枚活服务端：现量 pid **75311 / 77431 / 18909**
+  与 `/tmp/heyta-e2e-server.carrier.{73068,75095,17219}.pid` **一一对得上号**（`cat` 出来逐个 `kill -0` 全 alive），
+  于是 21:44 那一发在 `CHAIN_STOPPED_AT=port（候选 3100 3120 3140 3160 全被占）` 上烧掉，**没动设备**。
+  ⚠️ 归因注意：`26407`（:3100，etime **15:42:04**）**不是**本线漏的 —— 没有任何一枚 carrier pidfile 指向它，
+  所以四个候选里只有三个是本线的账，清理只清这三个
+  （`HEYTA_E2E_PIDFILE=<该文件> bash scripts/mobile-e2e-down.sh` 逐枚停，三行都打 `✅ 服务端已停止`，
+  之后 `3120/3140/3160` 现量空闲、`:3100` 仍归 26407）。
+  **修的四层**（都在 `research/tools/r14c-carrier-chain.sh`）：
+  ① `stack_down()`：走**仓内那把按 pidfile 认人**的 `mobile-e2e-down.sh`（不按端口/进程名乱杀，理由写在它文件头）；
+  ② 挂在 **EXIT 与 TERM/INT 两道 trap 上且排在 `restore_carrier` 之前**（down 脚本自己在覆盖清单里，
+     先还原就会拿"载体那份"去停）；`STACK_UP=1` **排在 `run stack_up` 之前** —— 排晚了的话，
+     17:46 那种停在 `stack_up` 半途的路上就没有收尾；
+  ③ **后置断言**：down 退 0 **不算**（它没有 pidfile 时也退 0），端口必须真的空出来，
+     否则打 `STACK_DOWN=still-listening` 并点名残留 pid 与命令；
+  ④ 端口全占时把每枚占有者的 `etime` 与命令一起打出来，并列出本线自己的 pidfile ——
+     21:44 那次我跑了三条 `ps` 才分清"是不是自己漏的"，这一格本来就该在日志里。
+  ✅ 牙：新 rig `research/tools/r14c-stack-down-arms.sh` ⇒ `pass=7 fail=0`
+  （A 正常收尾真杀进程 / B `STACK_UP=0` 一道都不许动 / **C 桩假绿（rc=0 什么都没停）而 :8641 仍有人听 ⇒ 必须点名 still-listening** /
+  D·E 两道 trap 与 `STACK_UP=1` 的**顺序**静态不变量 / F 变异：摘掉 EXIT 里的 `stack_down` ⇒ D 的正读数从 1 变 0）。
+  ⚠️ 写这把 rig 时又造了一次自己的坏读数并留在文件注释里：`grep -c . f || echo 0` 对**空文件**
+  会既打印 0 又退出 1，于是 `||` 那一支再补一个 0，臂 B 的计数读成 `"0\n0"` —— 计数一律改 `wc -l`。
+  🔴 **野外第一次读数（修完立刻撞上一发真窗口）**：21:49:47 开窗、链跑到 `preflight_after_build rc=0`，
+  然后 `REGATE who=pre try=1/2/3 rc=3 REDS=load` 三次用尽 ⇒ 停在 regate、**没动设备**，
+  而日志末尾出现 `STEP stack_down rc=0` + `STACK_DOWN=port-free（PORT=3120）` —— 泄漏在这一形上不再发生。
+  **但这一发又白跑了**，而且原因不是"3 次太少"这么简单：当时同分钟现量 `loadavg 16.7 20.8 33.4 / 16 核`
+  （15 分钟均值 33 ⇒ 这台机被打了很久，不是"我刚打完 build"那一下）。⇒ 把"等多久"从**次数**改成**时间预算**
+  （`REGATE_LOAD_DEADLINE=420s`，`REGATE_TRIES` 降级为防死循环的绝对上限）：旧值 3 是我随手写的数，
+  **不是从被约束的量推出来的**（§8.3 元规则），而"秒"这个单位与"负载落位"这个对象对得上。
+  ⚠️ 这**不改变**"没动设备"的结论，也不保证下一发能挤进去 —— 它只是让"等位"这件事说得出界。
+  ✅ 牙：新 rig `research/tools/r14c-regate-load-arms.sh` ⇒ `pass=9 fail=0`
+  （A 开着一次即止 / B load,load,open 等到开 / C 恒 load 用尽预算返回 3 且日志带"已等 Ns / 预算 M" /
+  **D `REDS=dev` 一次都不许多问**（这条腿只给 load 开）/ E `REDS` 行缺失 = 装置坏，当场停 /
+  F1 `D=0` 的正对照 / **F2 变异：删掉时间预算那一枚条件 ⇒ 同一串输入从 RET=3 翻成 RET=0** / G 默认值排在 `ask_gate` 之前）。
+  ⚠️ 这把 rig 自己先错了两处，都留在注释里：① 桩的序列用完后 `exit ""` 以 **255** 收场，被臂 C 读成"闸门回了个怪码"
+  （**夹具坏 ≠ 判据坏**，先分这一层）；② `ask_gate` 的判决写在 `$LOG` 而不是 stdout，
+  所以臂 D/E 那两条**负向**断言原本**无条件成立** —— 负向断言测错载体 = 自证，改成把日志一起回显并每臂先清空。
+  ⏭️ **C 的欠账不变**：②/④b/⑪ 三处修完后的"转绿读数"仍然没拿到（两发窗口一发烧在 port、一发烧在 load）。
+  看守已重挂（本笔提交后），下一发判据同 (19) 末。
+
+  **另一件顺手做的事（§5 第 11 号的一半，零负载）**：把 `UIPIN` 形状锚点的**触发源**收窄。
+  现量 `r17 --all` ⇒ `14 目录 / 8 有红 / 27 枚 UISTALE`，而 **27 枚点名的全是同一笔** `baf125e5`
+  （20:45「法务条款六份 + 中英词条」）：它在 `packages/i18n` 里动的是 `common.privacy.consent.*`
+  与 `site./web./mobile.` 的措辞，全仓只有一行提到 calendar，还是隐私文案里列举功能名的一个词
+  ⇒ **对这些图零像素影响**。触发率现量：近 3 天 `packages/i18n` **78 笔** vs 同期 `packages/ui/src/calendar` **4 笔**。
+  ⇒ 27 枚钉行的路径清单里都写着 `packages/i18n`，这就是"每二十笔提交必红一次、且红得与图无关"的构造式，
+  也正是 `r17` 文件头当年为 COMMITPIN 写过的那种坑**换了触发源**（`calendar-view-options/README.md` 第 42–44 行
+  甚至已经为 `App.tsx` 写过同一条"不收进来是因为它一天动好几笔"的理由 —— 却没人为 `packages/i18n` 写）。
+  动作：① 从 27 枚钉行里摘掉 `packages/i18n`（一次 node 批写、**命中数等于 27 才落盘**，否则一个字节都不写）；
+  ② 复测 `r17 --all` ⇒ `有红目录 8 → 5`、`UISTALE 27 → 14`，**剩下的 14 枚全部点名 `39032107`**
+  （那笔真的改了主区页头的换行行为）= 摘掉噪声之后剩下的都是真信号；
+  ③ 常驻护栏 `research/tools/r17-pin-path-hygiene.sh`（deny 表逐条带理由；**不测提交频率**，
+  那是上游状态，写进判据就变成"今天恰好如此"）。它的牙现量三条：干净时 `rc=0` 且报分母 `27 枚`；
+  第一版探针因 `grep -rn` 的 `路径:行号:` 前缀读空 ⇒ **`rc=4`「探针坏」当场响**（这条自检不是装饰）；
+  阳性对照 = 往 `calendar-year` 的一枚钉行塞回 `packages/i18n` ⇒ `rc=1` 且点到那一枚，之后 `cmp` 逐字节复原。
+  ⚠️ **第 11 号没做完的部分写清楚**：`calendar-view-options/` 那两枚我**打开看过**（页头折成两行、
+  月档格子里有「休/班」、年档 12 张月格里**一个都没有** —— 见 §4.1 的 G0），
+  其余 **5 个有红目录 / 14 枚** 要"人看图 + 重钉"或重拍，而**重拍要负载落回个位且 4318/4319 空闲**，
+  本批刻意不在等设备窗口的同时再压负载 ⇒ 仍挂 §5 第 11 号，分母换成现量 `5 目录 / 14 枚 / md5bad 4`。
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
 
+**G0. 调休标记（休/班）只画在月档，年档那 12 张月格里一颗都没有，而文档里没有"刻意不做"的登记。**
+看图看出来的（22:0x，`calendar-view-options/view-select-closed.png` 月档里 10-01…10-07 与 10-09 带绿色「休」、
+10-10 带橙色「班」；同目录 `view-tabs-year.png` 的年档 12 张月格**零枚**标记）。
+🔴 **判"年档没画"读了被调方本体**，不是看图猜：`packages/ui/src/calendar/CalendarBoard.tsx:425-434` 的
+`view === 'year'` 分支只把 `tasks/today/year/onPickMonth/labels/testID` 传给 `CalendarYearBoard`，
+**`dayMarker` 与 `dayMarkerLabels` 两个都没传**，而 `CalendarYearBoard.tsx` 全文 `dayMarker` **0 处引用** ⇒
+年档**结构上画不出**这个标记（宿主那份 `dayMarker` 在 `apps/web/src/features/calendar/CalendarView.tsx:221` 确实给了）。
+现量命令：`grep -n 'dayMarker' packages/ui/src/calendar/CalendarYearBoard.tsx`（空）·
+`sed -n '425,434p' packages/ui/src/calendar/CalendarBoard.tsx`。
+⚠️ **本条不判它是缺陷还是刻意**：`docs/plans/countdown-anniversary.md` 里 `grep -n '年档\|年视图' | grep -E '休|班|dayMarker'`
+现量 **0 命中** ⇒ 既没登记"不做"，也就不能主张"故意留白"。归属＝倒数纪念日那条线（W4b 的落点），本线只登记。
 
 **G. `docs/plans/README.md` 第 17 行是一张错位行。** 「一、权威入口」那张表表头是 3 列
 （我想知道 / 看这一份 / 说明），而 `| [countdown-anniversary.md](countdown-anniversary.md) | …`

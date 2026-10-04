@@ -145,7 +145,7 @@ pnpm --filter @heyta/web build
 本张 12:43 那趟的 md5 现量 5ddcbf4f1e33921a569c1452187f3d20。
 
 ```
-UIPIN r15b-3-ready-dark.png 39032107 apps/web/src/features/settings/ProfilePanel.tsx packages/design-system/src/tokens.css apps/web/src/styles/app/main-area.css packages/i18n
+UIPIN r15b-3-ready-dark.png 39032107 apps/web/src/features/settings/ProfilePanel.tsx packages/design-system/src/tokens.css apps/web/src/styles/app/main-area.css
 ```
 
 钉 `39032107` 的理由（不是"随手取 HEAD"）：上面四条路径里**最后一次**动过的提交就是它
