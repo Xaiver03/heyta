@@ -154,6 +154,36 @@ export interface HabitBoardLabels {
   /** 累计达成天数（生产者 = `resilience.total`，不是打卡次数）。 */
   readonly streakTotal: (count: number) => string;
   /**
+   * 本月打卡天数（工单 W8；生产者 = `month.achievedDays`，口径 = **天**不是次）。
+   * `count` 给宿主做单复数分支的余地（词条表没有 ICU，与上面三个同一个形状）。
+   */
+  readonly monthDays: (count: number) => string;
+  /**
+   * 本月完成率（整数百分比，生产者 = `Math.round(month.rate * 100)`，四舍五入
+   * 在共享层做一次，两端不许各写一遍）。
+   * 🔴 **只在 `month.scheduledDays > 0` 时被调用** —— 分母为 0 时"没有率可言"
+   * 是裁决，不是数据缺失，界面必须走 {@link monthRatePending} 而不是 "0%"。
+   */
+  readonly monthRate: (percent: number) => string;
+  /** 分母为 0 时的占位句（"本月还没有到期的计划日"）。静态文案，无参数。 */
+  readonly monthRatePending: string;
+  /**
+   * 本月完成量（生产者 = `month.monthValue`，含未达标的那天的量）。
+   *
+   * `unit` 与 {@link amount} 同一个约定：**去掉空白后的 `habit.unit`，空串 = 没有单位**。
+   * 有单位走 `本月完成量 {value} {unit}`，没有单位退化成不带单位的句子
+   * （裁决 D：`unit` 只做显示，求和按纯数，不新建量纲封闭词表）。
+   */
+  readonly monthValue: (info: {
+    readonly value: number;
+    readonly unit: string;
+  }) => string;
+  /** 历史总完成量（生产者 = `month.totalValue`，**不限当月**）。形状同 {@link monthValue}。 */
+  readonly totalValue: (info: {
+    readonly value: number;
+    readonly unit: string;
+  }) => string;
+  /**
    * 今天记了几格（工单 W6）。只在 {@link hasCountableGoal} 为真时调用。
    *
    * `unit` 是**去掉空白后的**那个字（`habit.unit`），空串表示习惯没有单位 ——
@@ -504,6 +534,15 @@ export function HabitBoard({
                   断链那天用户最需要看见它，所以它必须常驻。
                   ⚠️ 前两个走的是**韧性口径**（`r`），不是日历口径的 `row.streak`；
                   两个"连续"数字**永远不能相减**（ADR-0022）。
+
+                  工单 W8 在这排后面**追加**四格（本月打卡 / 本月完成率 /
+                  本月完成量 / 总完成量）—— 同一套 `styles.metrics`/`styles.metric`
+                  样式、同一处渲染，所以 web 与移动端两端一起吃到。
+                  "总打卡天数"那一格**不重复加**：它 = 上面的「累计」
+                  （`month.totalAchievedDays` 与 `resilience.total` 同口径，
+                  domain 侧注释写明了这一等式，app-host 的判据钉住它）。
+                  四格的存在性判据见 `apps/web/tests/habits-board.spec.tsx` 的 W8 组
+                  （§7 第 82 条同族的教训：断言要写成**存在性**，"少了一格"才抓得住）。
                 */}
                 <View style={styles.metrics}>
                   <View style={styles.metric}>
@@ -539,6 +578,59 @@ export function HabitBoard({
                     ]}
                   >
                     {labels.streakTotal(r.total)}
+                  </Text>
+                  <Text
+                    style={[
+                      text.caption,
+                      styles.numeric,
+                      { color: tokens['color.foreground-muted'] },
+                    ]}
+                    testID={`habit-month-days-${row.habit.id}`}
+                  >
+                    {labels.monthDays(row.month.achievedDays)}
+                  </Text>
+                  <Text
+                    style={[
+                      text.caption,
+                      styles.numeric,
+                      { color: tokens['color.foreground-muted'] },
+                    ]}
+                    testID={`habit-month-rate-${row.habit.id}`}
+                  >
+                    {/*
+                      🔴 分母为 0 走占位句而不是 "0%"（W8 裁决：那时**没有率可言**，
+                      给 0% 是把"还没到期"说成"一个都没完成"——制造愧疚的形状）。
+                      四舍五入只在这里做一次，两端的宿主不许各自再算。
+                    */}
+                    {row.month.scheduledDays === 0
+                      ? labels.monthRatePending
+                      : labels.monthRate(Math.round(row.month.rate * 100))}
+                  </Text>
+                  <Text
+                    style={[
+                      text.caption,
+                      styles.numeric,
+                      { color: tokens['color.foreground-muted'] },
+                    ]}
+                    testID={`habit-month-value-${row.habit.id}`}
+                  >
+                    {labels.monthValue({
+                      value: row.month.monthValue,
+                      unit: (row.habit.unit ?? '').trim(),
+                    })}
+                  </Text>
+                  <Text
+                    style={[
+                      text.caption,
+                      styles.numeric,
+                      { color: tokens['color.foreground-muted'] },
+                    ]}
+                    testID={`habit-total-value-${row.habit.id}`}
+                  >
+                    {labels.totalValue({
+                      value: row.month.totalValue,
+                      unit: (row.habit.unit ?? '').trim(),
+                    })}
                   </Text>
                 </View>
 

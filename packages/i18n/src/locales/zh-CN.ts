@@ -1127,6 +1127,20 @@ export const zhCN = {
   // 中文无单复数，两句刻意逐字相同（en 侧才会不同）。
   'web.habits.streak.total': '累计 {count} 天',
   'web.habits.streak.totalOne': '累计 {count} 天',
+  // ── 工单 W8：习惯统计的读侧（本月四格）。口径全在
+  //   `@heyta/domain#computeHabitPeriodStats`，这些句子只是它的投影：
+  //   「打卡」量的是**天**（不是次），完成率的分母是**已到期计划日**
+  //   （分母为 0 时没有率可言 ⇒ 界面上是占位句，不是 0%）。
+  //   ⚠️ 英文侧刻意用"名词在前、数字在后"的形状（`Check-in days…: {count}`），
+  //   与 `catalog.spec.ts` 的 `1 <复数名词>` HAZARD 同族 —— 词条表没有 ICU，
+  //   这些句子必须对 1 和 N 都成立，不配 `…One` 兄弟键。
+  'web.habits.stats.monthDays': '本月打卡 {count} 天',
+  'web.habits.stats.monthRate': '本月完成率 {percent}%',
+  'web.habits.stats.monthRatePending': '本月完成率 —',
+  'web.habits.stats.monthValue': '本月完成量 {value}',
+  'web.habits.stats.monthValueUnit': '本月完成量 {value} {unit}',
+  'web.habits.stats.totalValue': '总完成量 {value}',
+  'web.habits.stats.totalValueUnit': '总完成量 {value} {unit}',
   // 热力图文案由**我们**传给 react-activity-calendar —— 它的默认文案是英文，
   // 而 `{{count}}` 是**库自己的**占位符，必须原样留着（不是我们的 `{name}` 形状）。
   // ── M3 第七刀（habits）：共享热力图的两条文案 ──────────────

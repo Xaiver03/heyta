@@ -47,10 +47,14 @@ function pkgScript(pkg, key) {
   return json.scripts?.[key];
 }
 
+// 只重建"本族的 src 会变、又被 `apps/web` 的产物静态吃进去"的四枚库包（顺序=依赖序）。
+// `packages/storage|op-log|sync-*|shared-schema` 不在本族射程里 —— 它们的 dist 由 `pnpm -r build` 管，
+// 这一族不碰它们；哪天碰了，这里要一起加，否则第 27 条那个形状会原地复发。
+const BUILD_PKGS = ['packages/domain', 'packages/i18n', 'packages/ui', 'packages/app-host'];
+
 const STEPS = [
   // 门禁：本单直接相关的两条在前（分层 + 选中态单一来源），再带上会串行触发的三道样式门。
-  ['gate layering', '.', 'node scripts/check-layering.mjs'],
-  ['gate selection-single-source', '.', 'node scripts/check-selection-single-source.mjs'],
+  ['gate layering', '.', 'node scripts/check-layering.mjs'],  ['gate selection-single-source', '.', 'node scripts/check-selection-single-source.mjs'],
   ['gate l4', '.', 'node scripts/check-l4-no-style.mjs'],
   ['gate row-single-source', '.', 'node scripts/check-row-single-source.mjs'],
   // 棘轮的**另一半**（不许把基线本身抬高）：上面两步守"实测 ≤ 基线"，这一步守"基线 ≤ 锚点"。
@@ -61,6 +65,12 @@ const STEPS = [
   ['gate migrations', '.', 'node scripts/check-migrations.mjs'],
   ['build token-gen', 'packages/design-system', './node_modules/.bin/tsup --config tsup.generate.config.ts'],
   ['gate tokens', 'packages/design-system', 'node dist/generate-cli.js --check'],
+  // 🔴 这四步补的是一个洞：`build web vite` 打进产物的是 **`packages/*/dist`**，不是 `src`。
+  //   这一族改了 `packages/domain` 与 `packages/app-host` 而电池只重打 web ⇒ 后面的 typecheck、
+  //   单测与 e2e 量的是旧 bundle，正是 AGENTS §7 第 27 条（"测试全绿 ≠ 这是当前产物"）
+  //   在我自己的电池里复发。顺序按依赖：domain → i18n → ui → app-host（后三者的 dts 要读前者 dist）。
+  //   命令从各包 `package.json` 的 `build` 真源读回来对账（纪律 3），不一致就响亮报红。
+  ...BUILD_PKGS.map((p) => [`build ${p.split('/')[1]}`, p, './node_modules/.bin/tsup']),
   ...PACKAGES.map((p) => [`typecheck ${p}`, p, `./node_modules/.bin/${pkgScript(p, 'typecheck')}`]),
   ...PACKAGES.map((p) => [`test ${p.split('/')[1]}`, p, './node_modules/.bin/vitest run']),
   ['build web tsc -b', 'apps/web', './node_modules/.bin/tsc -b'],
@@ -102,6 +112,18 @@ if (missingTest.length) {
 } else {
   console.log(`SELF_CHECK test_steps=${PACKAGES.length} 包全覆盖`);
 }
+
+// 预检一之二：那四条 build 步骤假设各库包的 `build` 脚本就是 `tsup`（纪律 3：命令从真源读回来对账）。
+// 谁把它改成 `tsup && node x.mjs`，这里就报出来，而不是让那四步继续跑一份没人声明的命令。
+const buildDrift = BUILD_PKGS.filter((p) => pkgScript(p, 'build') !== 'tsup');
+if (buildDrift.length) {
+  for (const p of buildDrift) {
+    console.log(`PREFLIGHT=${p} build_script=${JSON.stringify(pkgScript(p, 'build'))} != 'tsup'`);
+  }
+  console.log('SELF_CHECK=FAIL 那四条 build 步骤的命令与真源不一致 ⇒ 它们量的是没人声明的东西');
+  process.exit(1);
+}
+console.log(`SELF_CHECK build_steps=${BUILD_PKGS.length} 包 build 脚本逐一对上真源（tsup）`);
 
 // 预检三：日志文件名撞车会把前一步的读数盖掉（步骤名里带 `/`，直接拼就是往不存在的目录写）。
 const slugs = STEPS.map((s) => s[0].replace(/[^A-Za-z0-9_.-]/g, '_'));

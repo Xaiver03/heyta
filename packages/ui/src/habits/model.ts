@@ -40,6 +40,7 @@ import {
   toLocalDate,
   type Habit,
   type HabitLog,
+  type HabitPeriodStats,
   type HabitResilienceView,
   type LocalDate,
   type StreakResult,
@@ -141,20 +142,37 @@ export interface HabitProgressRow {
    * 界面上显示的是它（与 `streak` 并存，但**不许相减** —— ADR-0022）。
    */
   readonly resilience: HabitResilienceView;
+  /**
+   * 自然月统计 + 历史总量（工单 W8）。
+   *
+   * 🔴 **必填**（来自注入的 {@link HabitGrowthFn}，而它由宿主接
+   * `@heyta/app-host#habitGrowth`）—— 可选字段会把"宿主没接"伪装成"做完了"，
+   * 那条教训在上一批工单里记过。口径（天 vs 次、自然月、到期分母）全部在
+   * `@heyta/domain#computeHabitPeriodStats`，这一层一个都不重写。
+   */
+  readonly month: HabitPeriodStats;
 }
 
 /**
- * 连续 + 韧性的配对函数。**宿主注入**，共享层不认识 `@heyta/app-host`。
+ * 连续 + 韧性 + 月统计的配对函数。**宿主注入**，共享层不认识 `@heyta/app-host`。
  *
  * 两端都传 `habitGrowth`（`packages/app-host/src/motivation.ts`）——
  * 那里是配对的唯一实现。测试传一个桩，就能在不碰领域层的前提下把
  * 本文件的每一个分支跑到。
+ *
+ * 🔴 返回类型上的 `month` 是**必填**（工单 W8）：与 `streak`/`resilience`
+ * 同一个理由 —— 可选字段会把"宿主没接"伪装成"做完了"。桩也必须给出 `month`，
+ * 否则编译不过；这正是想要的效果。
  */
 export type HabitGrowthFn = (
   habit: Habit,
   logs: readonly HabitLog[],
   today: LocalDate,
-) => { readonly streak: StreakResult; readonly resilience: HabitResilienceView };
+) => {
+  readonly streak: StreakResult;
+  readonly resilience: HabitResilienceView;
+  readonly month: HabitPeriodStats;
+};
 
 /**
  * 习惯 + 全部打卡记录 → 每个习惯一行的进度。
@@ -175,7 +193,7 @@ export function toHabitProgressRows(
   const today = toLocalDate(now);
   return habits.map((habit) => {
     const todayLog = logs.find((log) => log.habitId === habit.id && log.date === today);
-    const { streak, resilience } = growth(habit, logs, today);
+    const { streak, resilience, month } = growth(habit, logs, today);
     return {
       habit,
       todayLog,
@@ -185,6 +203,9 @@ export function toHabitProgressRows(
       todayValue: habitLogValue(habit, todayLog),
       streak,
       resilience,
+      // 与 streak/resilience **同一次 growth 调用**的产出：月统计和连续数字
+      // 必须出自同一份日志、同一个 today（`habitGrowth` 文件头的同一条纪律）。
+      month,
     };
   });
 }
