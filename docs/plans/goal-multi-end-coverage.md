@@ -3539,7 +3539,7 @@ A1 有判决行 ⇒ 执行了、落旗、旗里带 `NOTES_EXIT=`；A2 旗已在 
   父=launchd，10:39 起，子进程只有 `sleep 600`）—— 它本身不碰共享对象，起跑重装时走的是
   `reinstall:all` 的字面命令 `bash scripts/reinstall-all.sh`（相对路径，basename 命中）⇒
   **修好后的这道门能在它真动手的那一刻看见它，而在它只是睡着时不该命中**。这不是放宽判据，是把"命中时刻"说清。
-- **mac-dist 腿仍然挡着 ①**：`diskimage/98171` 还开着 `/private/tmp/heyta-macos-dist/Heyta-1.0.0.dmg`，
+- **mac-dist 腿仍然挡着 ①**〔⚠️ 此"挡"字 18:08 实测否证 —— 句柄不挡 rm，`rm -rf` 会**成功删掉**它；见 §7.31.28〕：`diskimage/98171` 还开着 `/private/tmp/heyta-macos-dist/Heyta-1.0.0.dmg`，
   而 `pgrep -x notarytool` 已经**空**（98934 那趟 `notarytool submit --wait` 早退了）。
   ⇒ 这正是当初加第二条腿时写的"**别人的公证可能比它的父进程活得久**"的**第二个实测实例**，
   也说明这条腿按对象（句柄）而不按进程名判是对的形状。不动它（§8.9：只对自己创建的对象动手）。
@@ -3614,7 +3614,7 @@ bash ~/.heyta-window-rigs/heyta-rpi-resolver-fixture.sh  # GREEN=五臂全对
 F1/F1b/F1c/F3/F4 五条钉住：值要等于所选解析器的真实 md5、路径要在读数里、解析器坏时该行仍要打印、
 摘掉 echo 必须没读数。
 
-**状态**：① 的两条腿 = RIVAL 真空（两条口径交叉核对）+ mac-dist 仍被 `diskimage/98171` 的 dmg 句柄挡着；
+**状态**：① 的两条腿 = RIVAL 真空（两条口径交叉核对）+ mac-dist 的 dmg 句柄仍在〔"挡着"是措辞错误：它挡不住 rm，见 §7.31.28；真正成立的是"里面还有别人的产物，不该删"〕；
 ③ 被设备占用挡着；17:34 负载 38–65 区间。⇒ **①②③ 仍未起**，但互斥面这两节补到了
 "探针输入的形状"与"第二个消费者"这两层。
 
@@ -3727,7 +3727,7 @@ ppid 1(launchd)  状态 SNs  累计 CPU 0:00.14  已存在 14:39:13  FD 5u → /
 **① 的关闭判据（谁都能复跑，不依赖我的叙述）**：
 ```bash
 pgrep -x notarytool | tr '\n' ' '; echo                       # 期望：空（已空）
-lsof +D /tmp/heyta-macos-dist 2>/dev/null | awk 'NR>1{print $1"/"$2}' | sort -u   # 期望：空 ← 现在非空（98171）
+lsof +D /tmp/heyta-macos-dist 2>/dev/null | awk 'NR>1{print $1"/"$2}' | sort -u   # 期望：空 ← 现在非空（98171）｜⚠️这条证明的是「里面没有别人的产物」，不是「删得动」—— 见 §7.31.28
 bash ~/.heyta-window-rigs/heyta-real-runner-pids.sh 'reinstall-all\.sh'            # 期望：空（已空）
 ```
 三条同时为空才谈 ①；第二条不是我的对象，我不去清。**要人拍板的只有一件事**：
