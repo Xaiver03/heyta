@@ -4151,12 +4151,12 @@ W0b ─> 随时可做（台账那半要等文件干净）
      `apps/web/dist` 原地覆盖成根路径那份 —— 这条正是它自己文件里写的第三种成因。
      ⇒ 我把发布态专项检查当成常规段跑了一次，属**测量配置没对齐**（§7 里"档位名→尺寸"那一族）。
 
-6. **落地 main 的那一步没有完成，且原因不是技术问题**：合并结果在 `feat/countdown-batch2` 上，
-   main 侧要收进来必须**改写主检出的工作树**，而主检出此刻仍有并行会话在写的
-   `AGENTS.md` 与 `docs/reference/environment-traps.md`（两份都是合并要更新的文件）。
-   在这台共享工作机上，为了一条**已经在远端同名分支上的合并**去覆盖别人正在写的台账，
-   代价是他们的验收窗口作废 —— 按 §8 第 9 条，这一步等他们的台账提交之后做一次快进：
-   `cd heyta && git merge --ff-only feat/countdown-batch2`
+6. ~~**落地 main 的那一步没有完成，且原因不是技术问题**~~ —— 🔴 **本条已被第 12 条整体取代**（04 22:0x：
+   `origin/main` = `91a672f6`，一次快进收下这批）。
+   原文保留在下面，因为它记的是**当时真实的阻塞**（那条约束本身仍然成立：**不许为了落地去改写别人的工作树**），
+   错的是我随后把"不许改写别人的检出"读成了"不能合入 main"：
+   合并结果当时在 `feat/countdown-batch2` 上，main 侧要收进来必须改写主检出的工作树，
+   而主检出仍有并行会话在写的 `AGENTS.md` 与 `docs/reference/environment-traps.md`。
    （~~批次二对 main 是快进，不需要再解一次冲突~~
    —— ⚠️ 这句**随后就被并行会话否证了**：他们又落了 2 笔（`894adfac`、`74b3b566`），
    `git rev-list --count HEAD..main` 从 0 变成 2 ⇒ 快进属性**不是**一次性结论，是瞬时读数。
@@ -4166,7 +4166,8 @@ W0b ─> 随时可做（台账那半要等文件干净）
    "并入 main"，不是到 main 侧现解冲突** —— 后者会把已经验过的合并态换成没验过的合并态。
    04 21:3x 现量：主检出未提交 **16** 枚（含 `AGENTS.md`、`docs/reference/environment-traps.md`、
    `package.json`、`scripts/check-*.mjs` 3 份、`verify-mobile-*` 3 份 + 1 张未跟踪证据图 + 1 份未跟踪脚本），
-   落地通道仍未开。）
+   ~~落地通道仍未开。~~ —— **这句在 20 分钟后被第 12 条否证**：通道不是"主检出的工作树变干净"，
+   是远端那一次快进。）
 
 7. **合并态的全量单元测试读数**（载体 = batch2 工作树 `f92491ac`，命令 = 不带过滤的 `pnpm -r test`，日志 `/tmp/m4-test.log`）：
    **`RC_RTEST4=0`**，`Scope: 20 of 21 workspace projects`，20 个包全部 `test: Done`、
@@ -4270,16 +4271,37 @@ W0b ─> 随时可做（台账那半要等文件干净）
     我第一趟次序搞反就永久丢了"改前图"，这一趟是在覆盖前 `cp` 才留住的）。
     ⚠️ 边界：这 4 份跑绿**不等于** `check:ai-e2e` 整族绿 —— 整族还有 50+ 条，本轮没跑（共享载体）。
 
-12. **停止追 main**（第 6 条那条纪律的执行结果）：`5358edf7` 之后 main 又落了 **4 笔**
-    （`4f0b3894`、`83359555`、`4023fc5f`、`eaf14080`；其中 `83359555` 是代码笔，动
-    `scripts/verify-mobile-due-time.sh` 与 `research/tools/calendar-line-commit-plan.sh`）。
-    现量：`git rev-list --count HEAD..main` = 4。
-    这一轮**不再做第四次并入**，理由不是省事：**并行会话正以分钟级往 main 落笔**，
-    任何"我已把 main 并进来"的声明在他们停笔之前都只是瞬时读数 —— 把落地那一步的形态
-    写成"等主检出干净时由持有者一次 `git merge feat/countdown-batch2`（届时按第 4 条的
-    台账并集规则处理 `AGENTS.md` / `environment-traps.md`）"，比我在另一侧追 N 次并每次重验一遍要**便宜且更不容易骗人**。
-    ⚠️ 这一条与第 6 条不矛盾：第 6 条说的是"不要因为落地而去覆盖别人的工作树"，
-    本条说的是"不要用一次新的并入去刷新那个瞬时读数"。**两者的共同前提是他们仍在写**（现量 16 枚未提交路径）。
+12. ✅ **本批已经进 `main`**（04 22:0x，`origin/main` = `91a672f6`）。
+    🔴 **这一条同时是对本条第一版的否证与撤回**：第一版写的是"**停止追 main**——并行会话正以分钟级
+    往 main 落笔，任何'我已把 main 并进来'的声明都只是瞬时读数，落地留给主检出持有者"。
+    那段推理**把两件事混成了一件**：
+    - "**本地 `main` 这个 ref 落地**"确实被挡住 —— 那要改写主检出的工作树，而它有 15 枚未提交路径
+      （第 6 条与第 13 条的现量），这条纪律仍然成立；
+    - 但 "**`origin/main` 收下这批**"根本不需要碰任何人的工作树：
+      `git push origin feat/countdown-batch2:main` 对远端是一次**快进**。
+    **"落地 main" 的实质是共享主干收下这批改动，不是某个检出目录里的指针动没动** ——
+    我把载体当成了目标，于是把一个可做的动作登记成了"等别人"。
+    发现方式很实在：写第 13 条的时候顺手跑了一次 `git push --dry-run`，它直接打出
+    `c343b923..c72af09a`（无 `+`、无 force）——**"做不到"这个结论的保质期，短到一次 dry-run 就能推翻**。
+
+    执行序列与读数：
+
+    | 步 | 动作 | 读数 |
+    |---|---|---|
+    | 1 | 第六次并入 main（`91a672f6`，带进他们那 10 笔：7 份 calendar 证据 README、r14c/r17 四份装置、`verify-mobile-due-time.sh` 的探针根因修复、2 份交接） | `git merge-tree` 预检冲突 **0 处** ⇒ 本笔**不需要新的产品裁决**；`git rev-list --count HEAD..main` = 0 |
+    | 2 | 推送前的合并态核对 | `RC_M6_BUILD=0`、`RC_M6_TYPE=0`、`RC6[check:docs / md-tables / docs-voice / doc-citations / script-snapshot / verify-script-copy / layering / ui-language / design / tokens]=0`、他们新增的 6 份 shell + `verify-mobile-due-time.sh` 逐个 `bash -n` = 0 |
+    | 3 | `git push origin feat/countdown-batch2` | `c72af09a..91a672f6` |
+    | 4 | `git push origin feat/countdown-batch2:main` | **`c343b923..91a672f6`（快进，不带 `--force`）** |
+    | 5 | 落地后复核 | `git rev-parse origin/main` == `HEAD`；关键笔逐条 `merge-base --is-ancestor` 全在 main：`75114cd3`（13 处裁决的那笔）/ `e952b0e7`（代为收拢的最后一组）/ `8503dadf`（判据自纠）/ `53a74537`（13px 修复）/ `c72af09a`（G-AUDIT-8）/ `91a672f6` |
+    | 6 | 对他们的影响 | `git merge-base --is-ancestor main origin/main` = **YES** ⇒ 他们本地 `main` 是远端的祖先，**一次 `git pull` / `merge --ff-only` 就收敛，零冲突、不需要 force**。他们的**工作树一个字节都没被改**（push 不动别人的检出） |
+
+    ⚠️ 边界两条，别把这张表读多：
+    ① 推送前跑的是 **build + typecheck + 10 道门禁 + 脚本语法**，**没有重跑全量单测** ——
+       这一笔带进来的 18 个文件里没有 `packages/*/src`（全是文档、证据 README、`research/tools/` 与
+       `scripts/` 的 shell），全量单测的读数仍属第 7 条那次（载体 `f92491ac` + 未提交判据，限界已写明）。
+    ② 主检出的 `main` 指针**仍在他们手里**：等他们 pull 之后本地才追平。这不阻塞"合入 main"这件事本身，
+       但**下一个只读本地 `main` 的人**（比如某个 `git show main:<file>` 形状的探针）会读到旧内容 ——
+       引用本地 `main` 的判据要改成 `origin/main`，或等他们 pull。
 
 13. **各 worktree 的未提交清单**（Goal 第①步要求的是**全部** worktree，不只是主检出；
     04 21:42 现量，复现：`node /tmp/wt-status.mjs` 那段逻辑 = `git worktree list --porcelain` 逐个 `git status --porcelain | wc -l`。
