@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * 详情面合流里**四步纯机械处置**的执行器（工单 §8.47 第 3a / 3b / 第 4 步，以及 §8.108 的 #34 那一行）。
+ * 详情面合流里**六步纯机械处置**的执行器（工单 §8.47 第 3a / 3b / 第 4 步、§8.108 的 #34 那一行，
+ * 以及 §8.117 把原来"要人"的 §3c / §3f 两枚转成的第 6 / 第 7 步）。
  *
- * 为什么要有它：那三步的"规则"已经写在工单里并被 14:0x 那一趟执行验真过（§8.50 / §8.52），
+ * 为什么要有它：那几步的"规则"已经写在工单里并被 14:0x 那一趟执行验真过（§8.50 / §8.52），
  * 但规则是散文 —— 合流那一刻要靠人重新读散文再手工改文件，而改动本身是可判定的
  * （marker 归零、语法过、用例数对得上）。这里把"判定"和"改法"绑在一个脚本里，
  * **前提不成立就拒绝改**，而不是替人猜。
@@ -14,10 +15,14 @@
  *         # 改在 §8.52 那趟 `--keep` 留下的载体上（人已经手工处置过别的文件时用它）
  *
  * 🔴 三条硬边界：
- *  ① 它**只**动 §3a / §3b / 第 4 步那三处，且每处都有"形状前提"（单 hunk、两侧只追加、
- *     未登记行全部落在 §8.36 预审过的名单里）。前提一变就整枚跳过并报错 —— 不是"降级处理"。
+ *  ① 它**只**动点名的那六处，且每处都有"形状前提"（单 hunk、两侧只追加、
+ *     未登记行全部落在 §8.36 预审过的名单里、CSS 两侧逐条比过只有拍下那几个键）。
+ *     前提一变就整枚跳过并报错 —— 不是"降级处理"。
  *  ② 它**不碰任何分支、不做 merge、不 commit**。改的是 `git archive` 铺出来的临时目录。
- *  ③ `main-area.css` 那一枚（第 3c 步）**不在射程里** —— 那是要人拍的（页头许不许被压窄）。
+ *  ③ 第 6 / 第 7 步改的是**产品形态**（页头许不许被压窄、同一格里 AI 面与专注概览怎么共处）。
+ *     那两条 2026-10-05 起已由本线按下来的拍板驱动（工单 §8.117 写了裁决、代价与可推翻方式）——
+ *     所以这一枚**不是"脚本自己决定"**：裁决变了要回来改这里那几个 EXPECT 常量，
+ *     脚本会在取值漂移时拒绝，而不是跟着新形状走。
  */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
@@ -33,6 +38,8 @@ const productArg = process.argv.includes('--product') ? process.argv[process.arg
 const IMPSRC = 'packages/app-host/src/habit-actions.ts';
 const SPECSRC = 'packages/app-host/tests/habit-actions.spec.ts';
 const GATE = 'scripts/check-selection-single-source.mjs';
+const CSSSRC = 'apps/web/src/styles/app/main-area.css';
+const APPSRC = 'apps/web/src/App.tsx';
 /** §8.36 / §8.47 第 4 步**预审过**的豁免（"先跑、红了才加"里那句"红了"的白名单）。 */
 const PREAUDITED = [
   ['apps/web/src/features/trash/TrashView.tsx', 'busyId', 'in-flight'],
@@ -485,13 +492,261 @@ const STANCE_ROSTER = {
   }
 }
 
+// —— 第 6 / 7 步共用：按 marker 走 hunk，返回 [{start,end,ours,theirs}]，枚数不对就 null
+const HUNK_RE = /^<{7} main\n([\s\S]*?)^={7}\n([\s\S]*?)^>{7} HEAD\n/gm;
+const walkHunks = (text, n) => {
+  const hunks = [...text.matchAll(HUNK_RE)].map((m) => ({
+    start: m.index,
+    end: m.index + m[0].length,
+    ours: m[1],
+    theirs: m[2],
+  }));
+  return hunks.length === n ? hunks : null;
+};
+const linesOf = (s) => {
+  const l = s.split('\n');
+  if (l.at(-1) === '') l.pop();
+  return l;
+};
+const applyHunks = (text, hunks, out) => {
+  let t = text;
+  for (let i = hunks.length - 1; i >= 0; i -= 1) t = t.slice(0, hunks[i].start) + out[i] + t.slice(hunks[i].end);
+  return t;
+};
+
+// —— 第 6 步（§3c）：`main-area.css` 的两枚 hunk —— 这一枚**曾经是要人的那一枚**
+//
+// 🔴 拍板已下（2026-10-05，本线自决：产品级决策权 2026-10-03 已由产品负责人交下来，
+// 见工单 §8.117）：**页头这一条不许被压窄 —— 折行那一套（HEAD）是形态，main 独有的声明一条不丢**。
+// 改法绑在"按声明名→值逐条比"的前提上：任何一侧多出一个没预料到的声明、或那几枚取值被人改过
+// ⇒ **整枚拒绝、交回人工** —— 这不是"降级取一侧"。
+{
+  const DECL_RE = /^\s*([a-z-]+)\s*:\s*([^;]+);\s*$/;
+  const fp = join(product, CSSSRC);
+  if (!existsSync(fp)) {
+    failures.push(`${CSSSRC}：产物里没有这个文件`);
+  } else {
+    const raw = readFileSync(fp, 'utf8');
+    const hunks = walkHunks(raw, 2);
+    if (!hunks) {
+      if (!/^<{7}\s/m.test(raw)) notes.push(`${CSSSRC}：产物里已经没有 marker ⇒ 已处置过，这一枚跳过`);
+      else failures.push(`${CSSSRC}：marker 枚数不是恰好 2，或形状不是标准的 "<<<<<<< main / ======= / >>>>>>> HEAD" —— 前提变了，本脚本不改它`);
+    } else {
+      const toMap = (lines) => {
+        const m = new Map();
+        for (const l of lines) {
+          const g = DECL_RE.exec(l);
+          if (!g) continue;
+          if (m.has(g[1])) return null; // 同一侧同名两条 ⇒ 不是"一 property 一行"，比不动
+          m.set(g[1], g[2].trim());
+        }
+        return m;
+      };
+      let cssBroken = 0;
+      const SC = (lines) => {
+        const r = splitCss(lines);
+        if (!r) {
+          cssBroken += 1;
+          return { code: lines, comment: [] };
+        }
+        return r;
+      };
+      const notesOnly = (lines) => SC(lines).comment;
+      /** CSS 注释要按**状态**剥，不能按行首形状猜：这一枚 hunk 里那段注释的续行既不以 `*`
+       *  也不以 `/*` 开头（`第一版只在 .ht-header 上加了 wrap ⇒ …`），按行首过滤会把它们
+       *  当成代码行 ⇒ 误判"HEAD 有独有行为"。第一趟就是这样拒的。
+       *  做法：在拼起来的整段文本上走一遍注释状态机，得到每一行"去掉注释后还剩什么"。 */
+      function splitCss(lines) {
+        const text = lines.join('\n');
+        const kept = [];
+        let inC = false;
+        let out = '';
+        for (let i = 0; i < text.length; i += 1) {
+          if (inC) {
+            // 🔴 注释里的换行必须**原样留着**，否则整段的行数会塌，后面按行号对齐就全错位
+            //（症状：HEAD 侧那张声明表解析出来是**空的**，于是"前提不成立"被误报）。
+            if (text[i] === '\n') {
+              out += '\n';
+              continue;
+            }
+            if (text[i] === '*' && text[i + 1] === '/') {
+              inC = false;
+              i += 1;
+            }
+            continue;
+          }
+          if (text[i] === '/' && text[i + 1] === '*') {
+            inC = true;
+            i += 1;
+            continue;
+          }
+          out += text[i];
+        }
+        const stripped = out.split('\n');
+        // 分母自检：剥注释是**等行**操作，行数对不上就是状态机错位 —— 宁可拒绝整枚，
+        // 也不要拿一张空表去判"前提不成立"（这正是上一趟的假红形状）。
+        if (stripped.length !== lines.length) return null;
+        for (let i = 0; i < lines.length; i += 1) {
+          const codePart = (stripped[i] ?? '').trim();
+          if (codePart === '') {
+            if (lines[i].trim() !== '' && lines[i] !== stripped[i]) kept.push('comment');
+            else kept.push('blank');
+          } else kept.push('code');
+        }
+        return {
+          code: lines.filter((_, i) => kept[i] === 'code'),
+          comment: lines.filter((_, i) => kept[i] === 'comment'),
+          kept,
+        };
+      }
+      const sameKeys = (m, want) => m.size === want.length && want.every((k) => m.has(k)) && [...m.keys()].every((k) => want.includes(k));
+      const o1 = toMap(SC(linesOf(hunks[0].ours)).code);
+      const t1 = toMap(SC(linesOf(hunks[0].theirs)).code);
+      // 🔴 hunk#2 **不能**按"一张属性表"比 —— 那一枚 hunk 跨了**两条规则**
+      // （`.ht-header__actions` 的余下声明 + main 侧一整条新规则 `.ht-header__lang`），
+      // 平展成一张表必然出现"同名两条"（第一趟就是这样拒的）。
+      // 无损改判成**逐行**：HEAD 那一侧每一条非注释行，必须能在 main 侧原样找到。
+      const h2Ours = linesOf(hunks[1].ours);
+      const h2TheirsNonComment = SC(linesOf(hunks[1].theirs)).code;
+      const h2Missing = h2TheirsNonComment.filter((l) => !h2Ours.includes(l));
+      const bad = [];
+      if (cssBroken) bad.push(`注释状态机的"等行"自检失败 ${cssBroken} 次（剥完注释行数对不上）⇒ 这张表比不动，交回人工`);
+      if (!o1 || !t1) bad.push('hunk#1 某一侧出现同名两条声明（"一 property 一行"的前提不成立）');
+      const SHARED = { 'flex-wrap': 'wrap', 'align-items': 'center', 'min-block-size': 'var(--ht-layout-header-height)' };
+      const MAIN_ONLY = { 'flex-shrink': '0' };
+      const DIFFER = {
+        gap: { main: 'var(--ht-space-3)', head: 'var(--ht-space-2) var(--ht-space-3)' },
+        padding: { main: 'var(--ht-space-2) var(--ht-space-6)', head: '0 var(--ht-space-6)' },
+      };
+      if (!bad.length) {
+        const want1 = [...Object.keys(SHARED), ...Object.keys(MAIN_ONLY), ...Object.keys(DIFFER)];
+        if (!sameKeys(o1, want1)) bad.push(`hunk#1 main 侧的声明集合变了：${[...o1.keys()].join(', ')}`);
+        if (!sameKeys(t1, [...Object.keys(SHARED), ...Object.keys(DIFFER)])) bad.push(`hunk#1 HEAD 侧的声明集合变了：${[...t1.keys()].join(', ')}`);
+        for (const [k, v] of Object.entries({ ...SHARED, ...MAIN_ONLY })) if (o1.get(k) !== v) bad.push(`hunk#1 main 侧 ${k} 不再是拍下那条：${o1.get(k)}`);
+        for (const [k, v] of Object.entries(SHARED)) if (t1.get(k) !== v) bad.push(`hunk#1 HEAD 侧 ${k} 与 main 不一致了 —— 那正是"要不要人"重新成立的地方：${t1.get(k)}`);
+        for (const [k, v] of Object.entries(DIFFER)) {
+          if (o1.get(k) !== v.main) bad.push(`hunk#1 main 侧 ${k} 的取值不是拍下那条：${o1.get(k)}`);
+          if (t1.get(k) !== v.head) bad.push(`hunk#1 HEAD 侧 ${k} 的取值不是拍下那条：${t1.get(k)}`);
+        }
+      }
+      if (!bad.length && h2Missing.length) bad.push(`hunk#2 HEAD 侧有 main 侧原样找不到的行：${h2Missing.map((l) => l.trim()).join(' / ')} ⇒ HEAD 有独有行为，本步不再无损`);
+      if (bad.length) {
+        failures.push(`${CSSSRC}：${bad.join('；')} ⇒ 整枚交回人工重拍`);
+      } else {
+        const h1 = [
+          ...notesOnly(linesOf(hunks[0].theirs)),
+          '  flex-wrap: wrap;',
+          '  flex-shrink: 0;',
+          '  align-items: center;',
+          `  gap: ${t1.get('gap')};`,
+          `  min-block-size: ${t1.get('min-block-size')};`,
+          `  padding: ${o1.get('padding')};`,
+        ];
+        const h2 = [...notesOnly(linesOf(hunks[1].theirs)), ...linesOf(hunks[1].ours)];
+        // 🔴 按**块**查重复，不按 hunk 数组查：hunk#2 跨两条规则，按数组查会把
+        // `.ht-header__actions` 与 `.ht-header__lang` 各自合法的 `display` 读成"同名两条"
+        // —— 那是一条会自己咬自己的判据（第一趟就是这样）。
+        const dupInBlock = (text) => {
+          const hits = [];
+          for (const b of text.matchAll(/\{([^{}]*)\}/g)) {
+            const seen = new Set();
+            for (const l of b[1].split('\n')) {
+              const g = /^\s*([a-z-]+)\s*:/.exec(l);
+              if (!g) continue;
+              if (seen.has(g[1])) hits.push(g[1]);
+              seen.add(g[1]);
+            }
+          }
+          return hits;
+        };
+        const text = applyHunks(raw, hunks, [h1.join('\n') + '\n', h2.join('\n') + '\n']);
+        const dup = dupInBlock(text);
+        if (dup.length) {
+          failures.push(
+            `${CSSSRC}：合并后的全文里出现块内同名两条声明 ${[...new Set(dup)].join(', ')} —— ` +
+              `那正是 §3c 警告的"叠两套规则、后一条赢、掷硬币"形状，拒绝写盘`,
+          );
+        } else {
+          write(CSSSRC, text);
+          notes.push(
+            `第 6 步 ${CSSSRC}：hunk#1 按已拍下的裁决合成（HEAD 的折行形态 + HEAD 的 gap + main 独有的 \`flex-shrink: 0\` 与 \`padding\` 取值，` +
+              `HEAD 那 ${notesOnly(linesOf(hunks[0].theirs)).length} 行解释注释保留）；` +
+              `hunk#2 逐行验过 HEAD 独有项 = 0 ⇒ 取 main 侧 ${h2Ours.length} 行 + HEAD 那 ${notesOnly(linesOf(hunks[1].theirs)).length} 行解释注释`,
+          );
+        }
+      }
+    }
+  }
+}
+
+// —— 第 7 步（§3f）：`App.tsx` 那一格（AI 面 vs 专注概览）—— 同样已从"要人"转成机械
+//
+// 裁决（工单 §8.117）：**同一格先按视图分派，再按宽窄分派位置**，
+// 并把 main 已有的那条窄档规则（中间列那个挂载点）扩成同一形式 —— 于是专注概览在窄档
+// 也**退回中间列**，与 AI 面共用一条规则，不另开第三处。
+// 🔴 \`ref={detailRef}\` 必须一起搬进合并形状：它是 \`detailHasRoom\` 唯一的测量点，
+// 留着 HEAD 那支裸 \`<aside>\` ⇒ \`detailRef.current\` 恒 null ⇒ 布尔恒 false ⇒ AI 面**永远**挂中间列。
+{
+  const fp = join(product, APPSRC);
+  if (!existsSync(fp)) {
+    failures.push(`${APPSRC}：产物里没有这个文件`);
+  } else {
+    const raw = readFileSync(fp, 'utf8');
+    const hunks = walkHunks(raw, 1);
+    if (!hunks) {
+      if (!/^<{7}\s/m.test(raw)) notes.push(`${APPSRC}：产物里已经没有 marker ⇒ 已处置过，这一枚跳过`);
+      else failures.push(`${APPSRC}：marker 枚数不是恰好 1 —— 这一枚要人的成分比合并形状多，本脚本不改它`);
+    } else {
+      const ours = linesOf(hunks[0].ours);
+      const theirs = linesOf(hunks[0].theirs);
+      const cnt = (arr, s) => arr.filter((l) => l.includes(s)).length;
+      const MID = '{detailHasRoom ? null : aiPanels}';
+      const bad = [];
+      if (cnt(ours, 'ref={detailRef}') !== 1) bad.push(`main 侧 ref={detailRef} 命中 ${cnt(ours, 'ref={detailRef}')}（期望 1）`);
+      if (cnt(ours, '{detailHasRoom ? aiPanels : null}') !== 1) bad.push('main 侧那一栏的内容表达式不是 `{detailHasRoom ? aiPanels : null}`');
+      if (cnt(theirs, "{contentView === 'focus' ? <FocusDetailPane /> : null}") !== 1) bad.push('HEAD 侧那一栏不是专注面分派那一条');
+      if (cnt(theirs, 'ref={detailRef}') !== 0) bad.push('HEAD 侧已经带 ref —— 合并形状的前提变了');
+      const closeIdx = theirs.findIndex((l) => l.trim() === '*/}');
+      if (closeIdx < 0) bad.push('HEAD 侧那半段注释的收尾 `*/}` 找不到 ⇒ 注释并不过来');
+      if (cnt(ours, 'AI 面在那一档') !== 1) bad.push(`main 侧那句窄档注释命中 ${cnt(ours, 'AI 面在那一档')}（期望 1）`);
+      if (raw.split(MID).length - 1 !== 1) bad.push(`中间列那个窄档挂载点 \`${MID}\` 全文命中 ${raw.split(MID).length - 1} 次（期望 1）—— 裁决的第二半没有落点`);
+      if (bad.length) {
+        failures.push(`${APPSRC}：${bad.join('；')} ⇒ 交回人工`);
+      } else {
+        const merged = [
+          '       * 这一格的内容（专注概览 / AI 面）在窄档**退回中间列**，不跟着这一栏一起消失（判据见 `detailHasRoom`）。',
+          ...theirs.slice(0, closeIdx),
+          '       */}',
+          '      <aside',
+          '        ref={detailRef}',
+          '        className="ht-app__detail"',
+          '        data-testid="detail-column"',
+          '      >',
+          "        {detailHasRoom ? (contentView === 'focus' ? <FocusDetailPane /> : aiPanels) : null}",
+        ];
+        const step1 = applyHunks(raw, hunks, [merged.join('\n') + '\n']);
+        const text = step1.replace(MID, "{detailHasRoom ? null : contentView === 'focus' ? <FocusDetailPane /> : aiPanels}");
+        if (text === step1) {
+          failures.push(`${APPSRC}：中间列那处替换没生效 ⇒ 不写盘`);
+        } else {
+          write(APPSRC, text);
+          notes.push(
+            `第 7 步 ${APPSRC}：按已拍下的裁决合成那一格（ref 搬进合并形状 + 视图分派 + 窄档退中间列同一条规则），` +
+              `并把 hunk 外的中间列挂载点 1 处扩成同一分派；两侧注释都留下`,
+          );
+        }
+      }
+    }
+  }
+}
+
 // —— 验真：写完必须回读。"我改了"不是读数，"回读出来 marker 归零、语法过、门禁绿"才是。
 // ⚠️ 只数 `<<<<<<<` / `>>>>>>>` 两串：`=======` 会撞上门禁脚本自己写的那条正则（`/^={7}$/`），
 //    那是一处假报警，而假报警的代价是别人开始忽略这一栏。
 const verify = [];
 let verifyBad = 0;
 if (apply) {
-  for (const rel of [IMPSRC, SPECSRC, GATE]) {
+  for (const rel of [IMPSRC, SPECSRC, GATE, CSSSRC, APPSRC]) {
     const p = join(product, rel);
     if (!existsSync(p)) {
       verifyBad += 1;
@@ -500,7 +755,26 @@ if (apply) {
     }
     const text = readFileSync(p, 'utf8');
     const markers = countOf(text, /^(?:<{7}|>{7})\s/m);
-    const errs = rel.endsWith('.mjs') ? [] : parseErrors(text, rel);
+    // CSS 不交给 TS 解析器（那不是它的语言，报错是必然的、也就没有分辨力）。
+    // 它这一档用**花括号配平 + 每个块里同名声明不重复**这两条来当"语法过"的等价判据 ——
+    // 后者正是 §3c 警告的"叠两套规则 ⇒ 后一条赢，掷硬币"那个形状。
+    let cssDup = 0;
+    let errs;
+    if (rel.endsWith('.mjs')) errs = [];
+    else if (rel.endsWith('.css')) {
+      errs = [];
+      if (braceDelta(text) !== 0) cssDup += 1;
+      for (const block of text.matchAll(/\{([^{}]*)\}/g)) {
+        const seen = new Set();
+        for (const l of block[1].split('\n')) {
+          const g = /^\s*([a-z-]+)\s*:/.exec(l);
+          if (!g) continue;
+          if (seen.has(g[1])) cssDup += 1;
+          seen.add(g[1]);
+        }
+      }
+      if (cssDup) errs = [`花括号/重复声明 计数 ${cssDup}`];
+    } else errs = parseErrors(text, rel);
     if (markers || errs.length) verifyBad += 1;
     verify.push(`${markers || errs.length ? '🔴' : '✅'} ${rel}：marker ${markers} 处 / 语法诊断 ${errs.length} 条`);
   }
