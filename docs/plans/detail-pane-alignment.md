@@ -335,7 +335,7 @@ cd "$(git rev-parse --show-toplevel)/.." && git status --porcelain docs/research
 | 真浏览器 | `e2e/tests/ai-row-layout.spec.ts` + `inbox-dida.spec.ts` 等 **21 条**，两张关键图**人已打开看**：1280 ⇒ 右栏是「AI 工具调用」+「对话助手」、侧栏只剩 今天/最近 7 天/已完成、页头写「收集箱」；660 ⇒ AI 面退回中间列。<br>07:0x 端口空出来后补跑 `ai-assistant` + `ai-tool-run`（这两条是搬动唯一的剩余回归面）⇒ **3 passed / 0 failed**，含"写工具只出提案：确认前不落库、确认后一次都不再多出境"那条。合计 **24 条**，载体都是主检出工作树 + dev 服务（4318/4319） |
 | 门禁（**提交后**复跑） | `check:design` / `check:ui-language`（329 文件、zh 3103 = en 3103 词条）/ `check:row-single-source`（`ht-*` 族未新增，走 `.ht-app__detail`）/ `check:layering`（361 文件 9 规则）/ `docs-link-check` 无死链 —— 全绿 |
 | 变异 | **半臂**：把「收集箱」加回 `PRIMARY_NAV` ⇒ web **1 红** / landing **1 红**，复原后 `cmp` 逐字节相同。第二臂（拿掉 rail「任务」的重置分支）**未做** —— 要原地改带别人未提交 hunk 的 `App.tsx` ⇒ 登记为待补 |
-| 未闭合 | **AGENTS §6.1.1 四端重装**：06:5x 现量 `notarytool` pid 98934 已跑 **11h42m**（别人那趟公证的 `--wait`，不动它），`vm.loadavg` **31.60**（仓库负载门阈值 12）⇒ 按红线记为**环境无效**，不起装、不放宽判据、不 push |
+| 未闭合 | **AGENTS §6.1.1 四端重装**：06:5x 现量 `notarytool` pid 98934 已跑 **11h42m**（别人那趟公证的 `--wait`，不动它），`vm.loadavg` **31.60**（仓库负载门阈值 12）⇒ 按红线记为**环境无效**，不起装、不放宽判据、不 push。<br>🔴 **07:0x 第二次读数把性质改了**：`queue-reinstall-all.sh`（pid 81007 / 93771）已活 **11h57m**，`/tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817` 同批 **11h54m** —— **四端重装那把槽位本身被一趟 ~12h 没动的运行占着**（`notarytool` 仍在、5 台 Booted 模拟器、1 台 adb 设备、负载 16）。⇒ 不是"等窗口空出来"，是**需要持有者介入或由产品负责人决定停掉那趟**；我现在起它 = 用 `adb uninstall` / `simctl uninstall` 清掉别人的设备现场。另一个结构性原因同 W1/W2 那行：**唯一有意义的重装时机在合流之后**。 |
 
 两条顺带钉住的机制（不是这次的选择，是现量）：
 
