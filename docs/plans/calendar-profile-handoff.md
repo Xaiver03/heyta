@@ -1269,6 +1269,19 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   入库配对：`calendar-line-hunk-ownership.sh` + `-arms.sh` + 本工具的 3b 格**同批**（只提闸门不提验证台 = HEAD 里躺着一枚不能失败的检查）。
   五道常驻门禁对这两枚新脚本的现量：`shell-unicode / script-snapshot / verify-script-copy / shell-erasure-parity / shell-surfaces` **全 rc=0**。
 
+- (28) **23:3x：H 那一格的"引用前重取"真的重取了一次，并补上一条此前只是推断的形状读数。**
+  复跑 `bash research/tools/r17-evidence-md5-check.sh --dir apps/web/evidence/calendar-view-options` ⇒ **rc=0**，
+  `entries=1 pins=2 mismatch=0 md5bad=0 pinbad=0 pinunknown=0`；再逐枚对 HEAD 核一次（这条不是门禁做的，是人该做的）：
+  `git show HEAD:<png> | md5 -r` 与盘上 `md5 -r` **逐字相同**（`14e74b5e…` / `ae8ad61d…`），
+  `git status --porcelain -- <该目录>` **0 行** ⇒ README 里"人打开这两张图看见了什么"那两行，
+  钉的仍是**当前字节**，不是某一趟的历史。
+  🟢 **补上的那条形状读数（以前只在别处推断过，这一次当场量到）**：两枚 png 的 mtime 是 **22:30 / 22:32**
+  —— 也就是我 21:5x 看过之后**又有一趟把它们重写过**，而 md5 **一个字符都没变**
+  ⇒ **判"人看过"作废的条件是字节变，不是 mtime 变**。这与"md5 是哪一趟运行的身份"是同一句话的补集：
+  同一屏在两趟里可以逐字节相同，`mtime` 却一定不同 —— 只看 mtime 会把"确定性渲染"误记成"证据过期"。
+  📌 归属闸门（(27)）在同一次的 `cbd18178` 上自己走了一遍：`== 3b ==` 打 `合计：hunk 6 枚 / 孤儿 0 枚`。
+
+
 
 
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
