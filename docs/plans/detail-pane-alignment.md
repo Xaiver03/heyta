@@ -2462,3 +2462,12 @@ main 侧 −143/−157/−341 ⇒ **同两个函数**），连带它的 spec）�
 - ⚠️ **边界**：这族判据覆盖的是 **web 的视图全集**（`ViewKey` 那一维）。
   触屏端没有" ↑↓ 走列表"这回事（§8 的 W1b 边界②），它的"面"由断言 F 的四处渲染面 + 六处递送层顶着；
   把 mobile 的 27 枚 screen/section 也建成一张全集表需要**先拍"触屏端的选中是什么"**，那是拍板 #1 的题面，不在这里顺手做。
+
+### 6. §1 四道闸门在这一格怎么打勾（11:3x 现量，载体 `d0f323ca`→`29903ba0`）
+
+| 闸门 | 这一单的读数 |
+|---|---|
+| 归属门 | 我**写**的只有三处：`apps/web/tests/keyboard-cursor.spec.tsx`（本单的）、`research/tools/mutation-rigs/mutate-view-universe.mjs`（新增，本单的）、本篇。两处被读的源码（`view-tabs.ts` / `keyboard-cursor.ts`）**只读不改**，且在主检出与 HEAD 上都干净 |
+| 两道余量为 0 的棘轮 | 零样式改动 ⇒ 没碰；`check:l4` 与 `check:row-single-source` 的基线数字本轮**未被读过也不需读**（没有任何 CSS/`ht-*` 文件进 diff） |
+| 干净检出复跑 | 判据的全部输入相对 HEAD 未提交数 = **0**（`git status --porcelain -- apps/web/src apps/web/tests research/tools/mutation-rigs docs/plans/detail-pane-alignment.md`）。主检出同路径上有 **1** 枚脏（`features/sync/VaultSettingsPanel.tsx`），它**不是**这条判据的输入，而且 linked worktree 各有自己的工作树 ⇒ 我这趟读的是自己那份 |
+| `packages` 改完先 build | 本轮零 `packages/*` 改动 ⇒ 不适用（`git diff --name-only d0f323ca^..29903ba0` 里 `packages/` 命中 0） |
