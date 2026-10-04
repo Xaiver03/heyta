@@ -3985,7 +3985,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
 
 1. **主检出那 166 枚未提交改动的归属与分组**（并行会话留下的，全部是稳定态才收）。
    现场：porcelain 167 行 = 27 枚未跟踪 + 140 枚已跟踪修改；
-   其中 **7 枚 mtime 落在 12 分钟以内**（`AGENTS.md`、`docs/adr/0051`、
+   其中 **7 枚 mtime 落在 12 分钟以内**（`AGENTS.md`、`docs/adr/0051-mobile-reminder-delivery.md`、
    `docs/plans/trash-and-archive.md`、`docs/reference/environment-traps.md`、
    `scripts/verify-mobile-ios-reminder.sh` + 两张 `ios-reminder-restart-recovery-*.png`）
    ⇒ 正被另一条会话写，**不代提交**（AGENTS §8 第 9 条：共享资源先定所有者与运行窗口）；
@@ -4078,6 +4078,35 @@ W0b ─> 随时可做（台账那半要等文件干净）
    - `G-AUDIT-7` 审计列的"变异装置只在 `/tmp`/未入库"清单（`check-md-table-rows` 四型反证、
      `check-shell-unicode-vars`、`check:legal-tools` 的四臂、`research/tools/mutation-rigs/` 在本检出为空）。
      这批是**判据的可复跑性**问题，不是判据本身错。
+   - `G-AUDIT-8` **本节（§8.5）与整份计划的 file:line 锚点没有任何自动消费者**。
+     现量：`node scripts/check-doc-citations.mjs --doc docs/plans/countdown-anniversary.md`
+     ⇒ **`RC_CITE_PLAN=1`，25 条命中**。其中 **1 条是我自己写错、已在本笔改掉**：
+     我把某个 ADR 的**编号短写**当成了文件路径（少了目录里的 `.md` 全名），指向一个不存在的路径。
+     剩 24 条按形状分四类，**没有一类是文档写错**：
+     ① **包内/产物内**路径（安装包 bundle 里、`web-dist` 里、RN 打出来的 bundle 里的那些）；
+     ② **依赖树与临时采集目录**（`node_modules` 之下、以及 Playwright 用完即弃的截图目录）；
+     ③ **第三方源码行**（vendored 的 gem 里某个 `.rb` 的某一行）；
+     ④ **形状限制**：形如"路径冒号跟符号名"的写法（文件真实存在，解析器把整串当路径）。
+     另有 2 条 `git show HEAD:` 缺锚（行 2298、2318 附近，都不是本节写的）。
+     **为什么不顺手把这份文档接进门禁**：`check:doc-citations` 的默认范围与"什么形状的路径允许不在仓库里"
+     这张豁免表属于性能热路径审计那条线（脚本头部自己写明了），那是它的**所有者**该拍的语义；
+     我在自己文档里绕过它 = 把豁免规则散成第二套事实源。修法两条候选：给它加四类豁免（带形状断言），
+     或把 ①②③ 那三类在文档里改成非路径写法。
+     🔴 **这一条登记的过程自己撞上了第 ①②③ 类**：我第一稿为了"举例清楚"，
+     把那四类**按路径形状原样抄进了正文** ⇒ 同一把尺子当场从 25 涨到 29（净 +4：修掉 1 条、自己造了 5 条）。
+     **举例不是引用**：文档里描述"坏引用长什么样"时，把它写成可解析的路径形状，
+     就等于自己提交了一条坏引用。本稿已改成描述形状，重写后的现量记在本笔提交信息里
+     （正文不写自指读数，理由见第 10 条）。
+     ⚠️ 这条也是 `G-AUDIT-7` 那个形状的实例：**审计给的每条 `file:line` 都会漂**。
+     本轮手工核了 10 条（04 21:5x，载体 = `169e188e`）**全部仍成立**：
+     `SyncBar.tsx:107` = `const known = syncFailureMessageKey(status.reason);`、
+     `check-shell-surfaces.mjs:424` = `if (REQUIRE_ARTIFACT) {`、`:1089` = `if (unverified.length > 0) {`、
+     `CalendarBoard.tsx:420` = `const eventsByDate = useMemo(() => {`、
+     `:400` = `const byDate = useMemo(() => groupTasksByDueDate(tasks), [tasks]);`、
+     `EventBoard.tsx:757` = `{onExportCard !== undefined && labels.exportCard !== undefined ? (`、
+     `public-facts.ts` 里 `installWholeBatch` 命中 4、`client.ts` 真话命中 1、
+     `HeytaWidgetModuleBridge.m` 里 `RCT_EXTERN_REMAP_MODULE` 命中 1。
+     **"这次核过"不等于"下轮还有人核"** —— 所以它要的是门禁，不是我的信心。
 
 4. **大规模合并（`75114cd3`，第一父 = 批次二、第二父 = main）**：13 处冲突逐处写裁决，
    全部落在 `git show 75114cd3` 的提交信息里（那才是归属处，本节只记形状）。要点三条：
