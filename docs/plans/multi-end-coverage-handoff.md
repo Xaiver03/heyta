@@ -1060,3 +1060,15 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   ⚠️ **待入 traps #266**（按工作树取号：`grep -oE '^[0-9]+\. '` 现量最大 **265**、HEAD 最大 **228**、
   该文件此刻是 ` M` 且工作树比 HEAD 多 **750 行** ⇒ 这正是记忆里"目标台账正脏着几百行时不要往它追加，
   改投单写者文档并登记待入号"那一档，本条只是**登记**，不是已入档）。
+
+- ✅ **① 的"五张图"与实现对得上**（逐条现读，不是我数出来的五）：
+  `scripts/reinstall-all.sh`（main 与载体同 blob `036ce09a`）里**字面写出的只有四张**
+  （`:148 dist/windows/packaged-first-run.png`、`:308 …-android.png`、`:462 …-ios.png`、
+  `…-mac-installed.png`），**第五张是壳自己派的**：`apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift:197`
+  在自截屏后另写 `path + ".webview.png"`（README 同文件 `:36/:43` 写明那张证的是"壳里那份共享 UI
+  真的渲染出来了"，窗口那张只证"有个窗口"）⇒ 启动器 `PNGS=(…)` 的 `EXPECTED=5` 不是硬凑的数。
+- 🔴 **我这一轮的第二枚"探针够不着 ⇒ 读成缺席"**：第一版正则写成
+  `/tmp/heyta-reinstall-[a-z]+\.png`，`mac-installed` 里的**连字符**不在字符类里 ⇒ 那张直接不命中，
+  我当时读到的就是"实现里只有 android/ios/windows 三张"。改成 `[A-Za-z0-9._-]+` 后四张齐。
+  **同族规矩**：断"实现里没有 X"之前，先把 pattern 喂一枚**必然命中**的样本（这里就是那张我自己
+  启动器里写了六天的 `mac-installed.png`）；命中不了先改探针，不许先改结论。
