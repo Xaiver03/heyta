@@ -309,3 +309,32 @@ cd "$(git rev-parse --show-toplevel)/.." && git status --porcelain docs/research
 > 📌 取号事实（2026-10-04 06:5x 现量）：`docs/reference/environment-traps.md` 此刻被别人
 > **+355/−7 未提交**占着，活树最大号 **246**（HEAD 只到 228）。按"目标台账正脏着几百行时
 > 不往它追加"的纪律，这三条不落本体，落在本节；追加时**先重新现量尾号**再取号。
+
+## 8.6 落地记录：AI 面进右栏 + 删重复的「收集箱」行（2026-10-04，载体 `78cdff67` + `ff22777c`）
+
+产品负责人两条界面指令的落地行（它不属于 W1–W12 任何一单，但改的是 W2 那一列的内容，
+所以记在本篇，而不是另建一个"记忆"文件）。
+
+| 面 | 读数 |
+|---|---|
+| 改动 | `apps/web`：`PRIMARY_NAV` 去掉 `{ kind: 'all' }`、`navCounts` 去掉 `all`、rail「任务」那格按"是否已停在任务视图"分叉、`aiPanels` 一份实现两个挂载点、`.ht-app__detail` 装 AI 面 + `padding-inline`。`apps/landing`：mockup 的 `SHELL_PRIMARY_NAV` 同步减一项（对账门禁逼的，见下）。 |
+| typecheck | `apps/web` rc=0、`apps/landing` rc=0 |
+| 单元测试 | `apps/web/tests/app-mount.spec.tsx` **23 条**（改写的那条在内）、`apps/landing` 全套 **1317 条** |
+| 真浏览器 | `e2e/tests/ai-row-layout.spec.ts` + `inbox-dida.spec.ts` 等 **21 条**，两张关键图**人已打开看**：1280 ⇒ 右栏是「AI 工具调用」+「对话助手」、侧栏只剩 今天/最近 7 天/已完成、页头写「收集箱」；660 ⇒ AI 面退回中间列 |
+| 门禁（**提交后**复跑） | `check:design` / `check:ui-language`（329 文件、zh 3103 = en 3103 词条）/ `check:row-single-source`（`ht-*` 族未新增，走 `.ht-app__detail`）/ `check:layering`（361 文件 9 规则）/ `docs-link-check` 无死链 —— 全绿 |
+| 变异 | **半臂**：把「收集箱」加回 `PRIMARY_NAV` ⇒ web **1 红** / landing **1 红**，复原后 `cmp` 逐字节相同。第二臂（拿掉 rail「任务」的重置分支）**未做** —— 要原地改带别人未提交 hunk 的 `App.tsx` ⇒ 登记为待补 |
+| 未闭合 | **AGENTS §6.1.1 四端重装**：06:5x 现量 `notarytool` pid 98934 已跑 **11h42m**（别人那趟公证的 `--wait`，不动它），`vm.loadavg` **31.60**（仓库负载门阈值 12）⇒ 按红线记为**环境无效**，不起装、不放宽判据、不 push |
+
+两条顺带钉住的机制（不是这次的选择，是现量）：
+
+- **落地页那枚对账门禁是真的会挡人**：`apps/landing/tests/mockup-shell-shape.spec.tsx`
+  从源码里解析 `PRIMARY_NAV` 与 `SHELL_PRIMARY_NAV` **逐项同 key、同序**比对 ⇒ 删掉侧栏那一行
+  必须同时改 mockup，否则 landing 套件红。这条正是"同一结论抄两处"的常驻哨兵。
+- **隐私五条不变量零改动**：搬动的是同一段 JSX（`contentView === 'tasks'` 那道闸、
+  `grants` / `tier` / `consents` / `secrets` / `onHealth` 逐个 prop 原样），
+  没有新词条、没有新的授权前端、写工具仍然只出提案。
+
+📌 **待入 PROGRESS.md**（本篇这行就是那条台账内容）：`PROGRESS.md` 此刻被并行会话
+**+41/−1 未提交**占着，且项目记忆已记下"两种提交办法都不许用"（整文件 `git add` 会带走别人的行；
+临时索引构造 HEAD+我的 EOF 追加会在别人随后整文件提交时被抹回去）。等该文件干净时由收口的人
+把本节搬过去，**不要**在这里插队提交。
