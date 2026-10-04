@@ -166,6 +166,10 @@ if ! resolve_idb; then
   echo "   ❌ 找不到 idb —— iOS 验收需要它来从设备内部驱动界面" >&2
   exit 1
 fi
+# Keep the executable separate from the connection address. In TCP mode
+# `IDB_COMPANION` is replaced with HOST:PORT below; simulator-restart recovery
+# must still be able to launch the companion binary.
+IDB_COMPANION_BIN="$IDB_COMPANION"
 
 # ── 辅助 ────────────────────────────────────────────────────────────────────
 
@@ -497,7 +501,11 @@ if [ ! -f "$IS_AX_SHIM" ]; then bad "缺少 $IS_AX_SHIM"; summary "iOS 输入侧
 #    一个把"App 没起"错报成"工具链坏了"的误诊，方向完全反了。
 companion_ok() {
   local out
-  out=$("$IDB_BIN" --companion-path "$1" ui describe-all --udid "$UDID" 2>/dev/null)
+  if [[ "$1" == *:* && "$1" != /* ]]; then
+    out=$("$IDB_BIN" --companion "$1" ui describe-all --udid "$UDID" 2>/dev/null)
+  else
+    out=$("$IDB_BIN" --companion-path "$1" ui describe-all --udid "$UDID" 2>/dev/null)
+  fi
   # 只要有合法的 JSON 输出就算通（`[` 开头即可 —— 主屏、App、锁屏都是 JSON 数组）
   case "$out" in
     \[*\]) return 0 ;;
@@ -510,7 +518,47 @@ companion_ok() {
 #      Failed to connect to companion at address DomainSocketAddress(path='...sock'): [Errno 2]
 #    而这一段的旧版只做"连得上吗"的判断，于是报出来的是"AX 桥不通"，
 #    方向偏到 App 上（实测：整轮验收就卡在这儿）。
-ensure_idb_companion || true
+if [ -n "${HEYTA_IOS_IDB_GRPC_PORT:-}" ]; then
+  # Xcode 27 / iOS 27 occasionally creates a Unix socket that accepts no
+  # gRPC calls.  Keep the TCP fallback explicit and opt-in so the default
+  # path remains unchanged; the shim accepts HOST:PORT via --companion.
+  IDB_PORT="$HEYTA_IOS_IDB_GRPC_PORT"
+  nohup "$IDB_COMPANION" --udid "$UDID" --grpc-port "$IDB_PORT" --only simulator \
+    >"/tmp/heyta-idb-ios-${UDID}-tcp.log" 2>&1 &
+  IDB_COMPANION_PID=$!
+  for _i in $(seq 1 30); do
+    if python3 - "$IDB_PORT" <<'PY'
+import socket, sys
+s = socket.socket(); s.settimeout(0.2)
+try:
+    s.connect(('127.0.0.1', int(sys.argv[1])))
+except OSError:
+    raise SystemExit(1)
+finally:
+    s.close()
+PY
+    then break; fi
+    sleep 1
+  done
+  if ! python3 - "$IDB_PORT" <<'PY'
+import socket, sys
+s = socket.socket(); s.settimeout(0.2)
+try:
+    s.connect(('127.0.0.1', int(sys.argv[1])))
+except OSError:
+    raise SystemExit(1)
+finally:
+    s.close()
+PY
+  then
+    bad "TCP idb companion 未在端口 ${IDB_PORT} 监听（见 /tmp/heyta-idb-ios-${UDID}-tcp.log）"
+    summary "iOS 输入侧"
+  fi
+  IDB_COMPANION="127.0.0.1:${IDB_PORT}"
+  ok "使用 TCP idb companion：${IDB_COMPANION}（PID ${IDB_COMPANION_PID}）"
+else
+  ensure_idb_companion || true
+fi
 
 if companion_ok "$IDB_COMPANION"; then
   ok "idb companion 已连上（${IDB_COMPANION}）"
@@ -834,7 +882,45 @@ if ! ax_ready 20; then
   xcrun simctl boot "$UDID" >/dev/null 2>&1
   xcrun simctl bootstatus "$UDID" -b >/dev/null 2>&1
   sleep 3
-  ensure_idb_companion || true
+  if [ -n "${HEYTA_IOS_IDB_GRPC_PORT:-}" ]; then
+    IDB_PORT="$HEYTA_IOS_IDB_GRPC_PORT"
+    nohup "$IDB_COMPANION_BIN" --udid "$UDID" --grpc-port "$IDB_PORT" --only simulator \
+      >"/tmp/heyta-idb-ios-${UDID}-tcp.log" 2>&1 &
+    IDB_COMPANION_PID=$!
+    for _i in $(seq 1 30); do
+      if python3 - "$IDB_PORT" <<'PY'
+import socket, sys
+s = socket.socket(); s.settimeout(0.2)
+try:
+    s.connect(('127.0.0.1', int(sys.argv[1])))
+except OSError:
+    raise SystemExit(1)
+finally:
+    s.close()
+PY
+      then break; fi
+      sleep 1
+    done
+    if ! python3 - "$IDB_PORT" <<'PY'
+import socket, sys
+s = socket.socket(); s.settimeout(0.2)
+try:
+    s.connect(('127.0.0.1', int(sys.argv[1])))
+except OSError:
+    raise SystemExit(1)
+finally:
+    s.close()
+PY
+    then
+      bad "模拟器重启后 TCP idb companion 未在端口 ${IDB_PORT} 监听"
+      summary "iOS 输入侧"
+    fi
+    IDB_COMPANION="127.0.0.1:${IDB_PORT}"
+    ok "模拟器重启后 TCP idb companion 已恢复（${IDB_COMPANION}）"
+  else
+    IDB_COMPANION="$IDB_COMPANION_BIN"
+    ensure_idb_companion || true
+  fi
   # ⚠️ 重启后 App 是**全新进程**，会话内的 E2EE 凭据没了 —— 下面还会重新填，
   #    代价是**再付一次约 50 秒的 Argon2id 派生**。这只在卡死这条路上发生。
   xcrun simctl launch "$UDID" "${BID}" >/dev/null 2>&1
@@ -1332,7 +1418,42 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
     #    派生（~50 秒）的中途弹出，登录链被打断，120 秒窗口就不够了。
     #    提前清掉，让"派生 → 登录 → 同步" uninterrupted 地跑完。
     grant_network_consent_if_asked || true
-    ax "验证并登录" --pressable --press --json >/dev/null 2>&1
+    VERIFY_RESULT=""
+    for _press_try in 1 2 3; do
+      VERIFY_RESULT=$(ax "验证并登录" --pressable --press --exact --json)
+      if [ "$(jget "$VERIFY_RESULT" result)" = "success" ]; then break; fi
+      # A stale keyboard/AX frame can reject the tap without rejecting the
+      # token. Re-normalize and retry, and keep the actual result in the log.
+      ax --dismiss-keyboard --json >/dev/null 2>&1 || true
+      sleep 2
+    done
+    if [ "$(jget "$VERIFY_RESULT" result)" != "success" ]; then
+      bad "「验证并登录」按压未确认成功（result=$(jget "$VERIFY_RESULT" result)）——没有把它记成令牌失败"
+    fi
+    # The paste-token path deliberately stops at a local session. Saving the
+    # returned session is a separate user action; waiting for Profile's
+    # "立即同步" before pressing it makes a successful token exchange look
+    # like an auth failure and silently sends the run to the legacy fallback.
+    for _i in $(seq 1 20); do
+      # The AuthScreen is longer than one iPhone viewport.  After token
+      # redemption the session action is rendered below the paste field, so a
+      # viewport-only list can miss a real button and send the run into the
+      # manual fallback.  Scroll and require visibility in the same frame
+      # before treating the stage as present.
+      _save_stage=$(ax "保存并启用同步" --scroll-into-view --exact --json)
+      _save_button=$(ax "保存并启用同步" --pressable --list --exact --json)
+      if [ "$(jget "$_save_stage" found)" = "True" ] && [ "$(jget "$_save_stage" visible)" = "True" ] \
+        && [ "$(jget "$_save_button" found)" = "True" ]; then
+        ok "登录令牌已兑换，回读到「保存并启用同步」阶段"
+        _save_press=$(ax "保存并启用同步" --pressable --press --exact --json)
+        if [ "$(jget "$_save_press" result)" != "success" ]; then
+          bad "「保存并启用同步」按压未确认成功（result=$(jget "$_save_press" result)）"
+        fi
+        sleep 3
+        break
+      fi
+      sleep 3
+    done
     # 首次同步含纯 JS Argon2id 派生，实测约 50 秒 —— 给足时间，并轮询而不是定长 sleep。
     # 🔴 轮询期间**顺路处理两个会悄悄盖住页面的东西**：
     #    · 首启隐私同意门（登录也要联网）；

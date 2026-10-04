@@ -1,4 +1,5 @@
 import Foundation
+import React
 
 /**
  * 把一段 base64 PNG 写进沙盒的临时目录，回一个 `file://` URI（W7 成品图落盘）。
