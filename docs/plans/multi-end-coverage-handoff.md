@@ -325,6 +325,19 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
 > 这正是"同一个结论句落在多处 ⇒ 改一处必 sweep 全仓"的一次现量复现。
 > 本线只登记不代改：`AGENTS.md` 此刻是 `M`（别人在写），§7.31.7 也在正被另一条线写的文件里。
 
+> ✅ **19:20:44 现量：把"拦路的是活的还是在挂"这件事量出来了** —— 别再照 B67 那一版去等一个已经消失的进程。
+> 此刻占设备的是**日历/r14c 那条线**：`heyta-wt-r14c/scripts/.verify-mobile-due-time.sh.snap.77184`
+> （规范探针报的是它的子 bash `2434`，年龄 13 秒；驱动者 `77184`），
+> 它把日志写在 `/private/tmp/ht-r14c-chain.83401.log`（`lsof -a -p <探针给的 pid> -F fn` 读出来的）。
+> **判"活着"的证据不是 CPU 时间**（bash 驱动者在 `adb`/`sleep` 上本来就是 `0:00.2x` 不动），
+> 而是**子进程在轮转 + 它的日志在长**：`ps -o etime= -p <探针 pid>` 每次都是新的十几秒，
+> `lsof -a -p <pid> -F fn` 里那枚 `.log` 的 mtime 跟着走。
+> 两件事都成立 ⇒ 这是**对手在干活**，处置方式只能是等；
+> 反之若两者都停（子进程不换、日志 mtime 冻结、累计 CPU 不动），那才是 B67 那种"要人拍板"的挂住。
+> 现量命令（每次自己跑，别抄这一行）：
+> `. scripts/lib/mobile-e2e-runner-probe.sh; MOBILE_E2E_PROBE_ME=$$ mobile_e2e_runner_lines`，
+> 然后对报出来的 pid 跑 `ps -o etime=,time= -p <pid>` 两次隔 20 秒、再 `lsof -a -p <pid> -F fn | grep '\\.log$'`。
+
 ## 5. 下一步（有序，一次一个会话做得完的量）
 
 > ✅ **19:04 现量把 ④ 在当前 HEAD 逐项复核过（不重做，只证明它仍然成立）**：
