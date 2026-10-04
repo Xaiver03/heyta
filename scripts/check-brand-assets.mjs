@@ -24,11 +24,16 @@
  *
  * ## 判据能失败吗
  *
- * 能。至少这几处摘掉会红（都实测过，见计划文档 §6）：
+ * 能。至少这几处摘掉会红（臂与读数写在计划文档 §6）：
  *   - 从 `main.tsx` 删掉 `armBootSplashDismiss` 调用 ⇒「退场已接线」红
  *   - 把那次调用挪到 `root.render` **之后** ⇒「顺序」红（漏掉早渲染的竞态）
- *   - 从提交物里删掉任意一档 `ic_launcher_foreground.png` ⇒「前景层在提交物里」红
+ *   - 让任意一档 `ic_launcher_foreground.png` **不在 HEAD 里** ⇒「前景层在提交物里」红
  *   - 把 `AndroidManifest` 的 `android:icon` 改掉 ⇒「清单引用」红
+ *
+ * 🔴 第三条原来**抓不到它自己举的那个例子**：它写的是 `existsSync`（判工作树），
+ * 而本文件开头讲的事故恰恰是"工作树里在、HEAD 里没有"。标签写着"在树上"，
+ * 判据量的是另一棵树 —— 这是同一文件第 20 行那句"因为它扫的是工作树，不是提交物"
+ * 的复发，只不过这次复发在它自己头上。现在这条走 `git ls-tree -r HEAD`。
  *
  * @see docs/plans/brand-icon-and-splash.md
  */
@@ -61,9 +66,68 @@ function check(label, rel, predicate) {
   else problems.push(`${label}${typeof verdict === 'string' ? `：${verdict}` : ''}`);
 }
 
-function checkExists(label, rel) {
-  if (existsSync(join(ROOT, rel))) ok.push(label);
-  else problems.push(`${label}：缺 ${rel}`);
+/**
+ * **提交物**里有没有这个路径（`git ls-tree -r HEAD`），与工作树无关。
+ *
+ * 🔴 取不到清单必须是**响亮地红**，不能退化成"跳过"（§7 第 191 条）：所以这里
+ * 不 catch 后返回空集合，而是把 git 的失败本身登记成一条 problem。
+ */
+let tree = null;
+let treeError = null;
+try {
+  tree = new Set(
+    execFileSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+    })
+      .split('\n')
+      .filter(Boolean),
+  );
+  // 阳性对照：git 在"不在仓库里"时也会退 0 并输出空串，那时每条"在树上"都会
+  // 以"缺失"失败 —— 但那句失败讲的是探针，不是产品。空集合直接点名探针。
+  if (tree.size < 500) treeError = `只列出 ${tree.size} 个路径 —— 这不像一个 HEAD`;
+} catch (err) {
+  treeError = `git ls-tree 失败：${String(err.message ?? err).trim()}`;
+}
+
+function checkOnTree(label, rel) {
+  if (treeError !== null) {
+    problems.push(`${label}：提交物清单取不到（${treeError}）—— 这条判据不能凭空放行`);
+    return;
+  }
+  if (tree.has(rel)) ok.push(label);
+  else problems.push(`${label}：${rel} 在工作树里，但**不在 HEAD 里** —— 干净检出不含它`);
+}
+
+/**
+ * 四个品牌资产目录里不许有**未跟踪**的文件。
+ *
+ * 只判未跟踪，不判"已跟踪但有未提交修改"：后者是别人正在做的事（那枚图标
+ * 还在被人调），拿它当红等于把工作树干净度挂成 check 链的前提。而未跟踪的
+ * 位图**不可能**在 HEAD 里，是 `c9fe6f56` 那个事故的原始形状。
+ */
+function checkNoUntrackedAssets(label, dirs) {
+  if (treeError !== null) {
+    problems.push(`${label}：提交物清单取不到（${treeError}）`);
+    return;
+  }
+  let out;
+  try {
+    out = execFileSync(
+      'git',
+      ['ls-files', '--others', '--exclude-standard', '--', ...dirs],
+      { cwd: ROOT, encoding: 'utf8' },
+    );
+  } catch (err) {
+    problems.push(`${label}：git ls-files 失败：${String(err.message ?? err).trim()}`);
+    return;
+  }
+  const untracked = out.split('\n').filter(Boolean);
+  if (untracked.length === 0) ok.push(label);
+  else
+    problems.push(
+      `${label}：${untracked.length} 个未跟踪资产文件 —— ${untracked.slice(0, 4).join(', ')}`,
+    );
 }
 
 /* ── 1. 两个生成器：产物与 token 逐字节对账 ─────────────────────────── */
@@ -131,7 +195,7 @@ check(
 /* ── 3. Android：前景层必须在**提交物**里，且清单真的指向它 ─────────── */
 const FOREGROUND_DENSITIES = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi'];
 for (const d of FOREGROUND_DENSITIES) {
-  checkExists(`android：前景层 ${d} 在树上`, `apps/mobile/android/app/src/main/res/mipmap-${d}/ic_launcher_foreground.png`);
+  checkOnTree(`android：前景层 ${d} 在提交物里`, `apps/mobile/android/app/src/main/res/mipmap-${d}/ic_launcher_foreground.png`);
 }
 check(
   'android：自适应图标引用前景层',
@@ -189,8 +253,20 @@ check(
   'apps/mobile/ios/Heyta/LaunchScreen.storyboard',
   (t) => t.includes('name="HeytaSplashBackground"') || '底色是内联字面值，暗色模式会先闪一张亮板',
 );
-checkExists('ios：colorset 在树上', 'apps/mobile/ios/Heyta/Images.xcassets/HeytaSplashBackground.colorset/Contents.json');
-checkExists('ios：mark 图集在树上', 'apps/mobile/ios/Heyta/Images.xcassets/HeytaLaunchMark.imageset/Contents.json');
+checkOnTree('ios：colorset 在提交物里', 'apps/mobile/ios/Heyta/Images.xcassets/HeytaSplashBackground.colorset/Contents.json');
+checkOnTree('ios：mark 图集在提交物里', 'apps/mobile/ios/Heyta/Images.xcassets/HeytaLaunchMark.imageset/Contents.json');
+
+/* ── 3b. 四个资产目录里不许躺着未跟踪的位图（c9fe6f56 的原始形状） ──── */
+checkNoUntrackedAssets('资产：生成物全部已跟踪', [
+  'apps/mobile/android/app/src/main/res/mipmap-mdpi',
+  'apps/mobile/android/app/src/main/res/mipmap-hdpi',
+  'apps/mobile/android/app/src/main/res/mipmap-xhdpi',
+  'apps/mobile/android/app/src/main/res/mipmap-xxhdpi',
+  'apps/mobile/android/app/src/main/res/mipmap-xxxhdpi',
+  'apps/desktop-windows/assets',
+  'apps/web/public/icons',
+  'apps/mobile/ios/Heyta/Images.xcassets',
+]);
 
 /* ── 5. token：动效档位必须还在（生成器靠它，界面也靠它） ──────────── */
 check(
