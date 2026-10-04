@@ -80,8 +80,8 @@ Web 宿主还必须把普通同步与 root migration 视为同一账号的一条
 | 全会话 tokenVersion 撤销 | 已完成当前边界 | 设备撤销后旧 JWT 全部 401；新 tokenVersion JWT 仍可读取当前 key package |
 | 生产宿主默认启用 vault codec | 部分完成 | Web 与通用宿主在有稳定 accountId 时走 vault session；首次加载读取服务端 `payloadKeyVersion`；Web 旧 op 经界面完整迁移和新设备重建已验，移动安装产物仍待验 |
 | 存量旧 op 的原子迁移与中断恢复 | 服务端 staging/发布边界与宿主编排、Web/移动端入口完成；真实安装产物互操作待验收 | manifest + chunk + commit/cancel/status、持久化 reservation/回执；`@heyta/app-host` 已具备服务端 inventory 分页、snapshot 安全边界、内存解密/重加密、分片、status/commit 丢响应恢复与 cancel port；session 只在完整迁移成功后安装新 root/package/generation；真实 PostgreSQL/HTTP 覆盖 inventory、snapshot replay base、普通 upload 竞争 reservation、迁移覆盖与原子发布（10/10）；真实 SQLite 文件关闭/重开续传通过 |
-| OS 安全存储原生适配 | Android 运行时已验，iOS 运行时待验 | Android Keystore envelope 的 scope 隔离、四个独立进程、设备重启、删除持久性共五阶段通过；iOS `WhenUnlockedThisDeviceOnly` Keychain 当前仅代码/编译证据，TS port 12 tests |
-| OS 安全存储与恢复码 UI | 代码/编译完成，实机待验收 | 移动端设置面板已接入创建、二次确认、口令/恢复码解锁、强制恢复轮换、锁定、opt-in 记住解锁和登出清除；host 首次同步前恢复、持久 remembered-unlock fence、同步 invalidate/epoch、server/token 绑定与 native remove 失败重试已由 `packages/app-host/tests/host.spec.ts`、`apps/mobile/tests/vault-secure-storage.spec.ts` 覆盖；`apps/mobile` typecheck 通过。账号隔离、重启/锁屏可用性、第二进程探针仍需在当前安装产物上执行；没有默认记住解锁或生物识别承诺 |
+| OS 安全存储原生适配 | Android 与 iOS 模拟器运行时已验 | Android Keystore envelope 的 scope 隔离、四个独立进程、设备重启、删除持久性共五阶段通过；iOS 真实生产 Swift 路径在模拟器完成 scope 隔离、save/load、跨进程重启 load、remove 后重启为空，并直接读取 `kSecAttrAccessible`。实体设备锁屏语义仍需另验 |
+| OS 安全存储与恢复码 UI | 代码/编译完成，原生安全存储模拟器已验 | 移动端设置面板已接入创建、二次确认、口令/恢复码解锁、强制恢复轮换、锁定、opt-in 记住解锁和登出清除；host 首次同步前恢复、持久 remembered-unlock fence、同步 invalidate/epoch、server/token 绑定与 native remove 失败重试已由 `packages/app-host/tests/host.spec.ts`、`apps/mobile/tests/vault-secure-storage.spec.ts` 覆盖；iOS Keychain runtime 探针已覆盖账号隔离、跨进程重启与删除持久性。没有默认记住解锁或生物识别承诺 |
 | Web 恢复码 UI 与浏览器存储边界 | 已完成当前边界 | `e2e/tests/vault-settings.spec.ts`：创建/确认发布、reload 后锁定、错误恢复码拒绝、恢复码解锁、锁定、更换口令和新恢复码确认；明暗截图已人工复查。HTTP fixture 仅覆盖 transport，不替代真实 PostgreSQL |
 | Android/iOS/Web 跨端互操作 | 部分完成 | Web/PG 三设备与 legacy 旅程已通过；Android 当前 Release 安装产物已重建并通过无 Metro 自足启动/非空截图门禁，移动 Vault UI 仍需在真实认证会话下完成创建、恢复、轮换和跨端任务互读；iOS 原生安装产物互操作仍待验收 |
 
@@ -109,6 +109,29 @@ root rotation，证明本地安装成功后 journal 已清理且不会阻止下�
 该结果不覆盖移动原生互操作，
 后者继续单独验收。
 持久证据截图必须遮住恢复码，测试关闭 trace/video，错误日志不能携带口令或 root。
+
+迁移 stage response 的 `requestId` 是恢复凭据的一部分，不能只依赖请求 URL 或传输层的类型校验。
+客户端所有 `begin`、`upload`、`status`、`commit`、`cancel` 响应都必须通过同一个带有
+`expectedRequestId` 的校验器，并要求返回值逐字等于本次请求的 id。尤其是 saveBound 后的
+journal 自愈：若 `status(oldRequestId)` 返回另一个已发布 migration，即使 key version 和
+payload generation 相同，也必须保留旧 journal、拒绝清理并停止下一次 rotation；不能安装或
+接受错配响应。该规则由 app-host 的错配响应反例测试固定。
+
+### iOS Keychain runtime 续验（2026-10-04）
+
+[`verify-ios-vault-keychain.sh`](../../scripts/verify-ios-vault-keychain.sh) 使用当前生产
+`HeytaVaultSecureStorage.swift` 编译进 iOS 模拟器的 Keychain 专用 Release 配置（为启用
+Debug-only probe 入口而带 `DEBUG` 条件，并排除当前工作树中独立的 CardExport 编译错误；这不是
+正常 Release 产物，也不替代最终四端重装），通过 AppDelegate 的 probe 入口执行五次独立进程：`clean` 写入两个不同 account scope，读取并校验 32 字节值与
+`kSecAttrAccessible`；`verify` 终止后重新启动再读两个 scope；`remove` 删除 A、确认 B 仍可读，
+再清除 B 并确认重启后两者均为空。模拟器实际返回的 accessibility 属性为同一系统值（JSON 中保留
+原始值），对应生产设置 `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`。本轮五阶段均通过，证据保留在
+`/tmp/heyta-keychain-probe-{clean,verify,invalid,remove,empty}.json`；探针还以真实生产 `save` 调用
+31 字节无效 root，确认该错误路径拒绝写入。探针没有复制 Keychain 实现，也没有使用
+macOS Keychain。模拟器不提供真实锁屏/设备迁移语义，因此这两项仍明确待实体设备验收。
+持久证据：[clean](../../apps/mobile/evidence/ios-keychain-probe-clean.json)、[verify](../../apps/mobile/evidence/ios-keychain-probe-verify.json)、
+[invalid](../../apps/mobile/evidence/ios-keychain-probe-invalid.json)、[remove](../../apps/mobile/evidence/ios-keychain-probe-remove.json)、
+[empty](../../apps/mobile/evidence/ios-keychain-probe-empty.json)。
 
 ### Android Release 续验（2026-10-04）
 

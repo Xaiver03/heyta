@@ -12,7 +12,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { decidePrivacyConsent, enableAllModules, stubLegalRecheck } from './helpers';
+import { decidePrivacyConsent, enableAllModules, stubEmptyHolidayAdjustments, stubLegalRecheck } from './helpers';
 import { installMissingProducerShims } from './shims';
 
 const SERVER = 'http://sync.vault.e2e.test';
@@ -98,6 +98,7 @@ async function installHttpFixture(page: Page): Promise<{
   await page.route(`${SERVER}/api/admin/overview`, (route) =>
     route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'Forbidden' }) }));
   await stubLegalRecheck(page, SERVER);
+  await stubEmptyHolidayAdjustments(page, SERVER);
   await page.routeWebSocket('ws://sync.vault.e2e.test/**', () => undefined);
 
   // The fixture is deliberately strict. A new endpoint must be added here

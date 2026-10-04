@@ -23,6 +23,7 @@ export {
   type AppHost,
   type AppHostOptions,
   type SyncConfig,
+  type VaultRootRotationOptions,
 } from './host.js';
 
 export {
