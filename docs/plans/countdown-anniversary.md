@@ -3704,6 +3704,41 @@ W0b ─> 随时可做（台账那半要等文件干净）
     所以"不并发"这条现在只剩**半个**理由：没有对手了，可 `rm -rf` 照样会落在别人的产物上 ——
     我按后半处理（改名保住），没有因为前半消失就直接开删。
 
+- ㊤ **三条让帧判据的变异臂全部转红（各红自己那一条、28 passed 不动），而它们第一次起跑时三条臂一起 `PATCH_FAIL` —— 是我传的路径少了前缀**（04 18:3x）
+  - ✅ **臂的读数**（`/tmp/chain-T4.log`，负载 18 那一格）：
+    `RC_MUT_A=1` / `RC_MUT_B=1` / `RC_MUT_C=1`，每条都是
+    **`Test Files 1 failed (1)` + `Tests 1 failed | 28 passed (29)`** ——
+    红集**恰好**是我点名的那一条（needle 命中 A=2 行 / B=2 行 / C=3 行），多出来的一条都没有；
+    每条后面跟一行 `已复原（git status 该路径为空）`，收尾对账 `apps/mobile/src/lib/card-export-units.ts` 与 `…/card-export.tsx` **两枚都干净**。
+    ⇒ **边界第 7 条（判据必须证明能失败）对"让出一帧"这三条新判据成立**：
+    A 抓"注入的调度器没跑 ⇒ 不许结算"、B 抓"`toDataURL` 的调用点必须在让帧之后"、C 抓"帧间卸载那一支必须 resolve 出一个说法"。
+  - ⚠️ **形状上值得留一条**：负载高**只能让臂多红**（超时、别的用例也红），**不可能让一条变异臂少红** ——
+    "改了还全绿"这个失败模式与争抢无关。所以臂的读数除了 needle 命中数还打 `Test Files / Tests` 全量汇总：
+    **红集宽于点名的那条 ⇒ 该臂读数无效重跑**，不许当成"判据有牙"。这次三条都是 `1 failed | 28 passed`，没有越界。
+    🔴 顺带量到一件与我先前的默认假设相反的事：三条臂**各只跑了几秒钟**（`18:32:30` → `18:32:34` 全走完），
+    node 判据对宿主机负载根本不敏感 ⇒ 我给它们排的窗口是**过度保守**的。
+    但**这不是"下次别等"的理由**，因为同一把门在设备那两腿上仍然必须按 ≤12 走，而这次也确实被它挡了 16 分钟；
+    记下来的是**读数**（秒级），不是**规矩**（规矩不动）。
+  - 🔴 **第一次起跑（链 T3，18:31:01）三条臂全部 `PATCH_FAIL`**，原文是
+    `FileNotFoundError ... '/Users/.../heyta-wt-batch2/src/lib/card-export-units.ts'` ——
+    真因：**我传的相对路径少了 `apps/mobile/` 这一层**（写成 `arm A src/lib/...`，而工作树根下没有 `src/`）。
+    ⚠️ 这个错**不是 T3 引入的**，它原样躺在链 T 的脚本里（那三条 `arm` 调用同样写 `src/lib/...`），
+    而链 T 的三条臂**从未走到过 apply 那一步**（全被负载门挡在 `wait_free` 里）⇒
+    **"一条从没被执行到的臂，它的路径对不对本身就没有读数"** ——
+    这是"不能失败的检查没有价值"的另一个方向：**没跑过的取证代码本身也是未验证代码**。
+    ✅ 这条错是**响亮失败且不动文件**的（`HITS != 1` 与异常都走 `PATCH_FAIL` 分支、收尾 `git status` 为空），
+    所以它没有污染任何读数；改前/改后各跑一次，改后三条全部转红。
+  - ✅ **顺带把与设备无关的读数先垫上**（18:30–18:31 @ 载体 `de93cd2a`，每条带退出码）：
+    `check:native-deps` / `check:card-export` / `check:layering` / `check:legal-tools` / `check:md-tables` /
+    `check:public-facts` / `check:shell-unicode` / `check:design` / `check:ui-language` **九条全 rc=0**，
+    `pnpm --filter @heyta/mobile test` **`47 files / 717 passed`**，`docs-link-check` rc=0，
+    `check:shell-surfaces` 裸跑 rc=0（5 绿 0 红 / 未取证 1 栏，见 ㊣）。
+    ⚠️ **这些不构成 ⑤-1 的"完整读数"** —— 完整那趟是链 FULL 的 68 段逐段，`pnpm -r test` 与 `check:ai-e2e` 都在里面；
+    这一批只是**把负载无关的那几段先钉住**，万一 FULL 等不到窗口，账面也不是一片空白。
+    复跑：`cat /tmp/chain-T4.log`、`grep -aE 'MUT_|RC_MUT_|PATCH_FAIL' /tmp/chain-T3.log`
+    （那三条失败臂的原文留着别删 —— 它就是这条教训的证据）。
+
+
   - 🔴 **改名这一刀有代价，而且代价量出来了**：`check-shell-surfaces.mjs` 的 macOS "产物"栏默认读的就是
     **同一个路径** `/tmp/heyta-macos-dist/Heyta.app/Contents/Resources/web-dist`。18:22 裸跑现量
     `RC_SURFACES_BARE=0` / 判定 5 格 **5 绿 0 红**，但 **未取证 1 栏**（原文 `产物判据未跑：…不存在（这台机器上没打过 macOS 包）`）。
