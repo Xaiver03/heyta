@@ -14,8 +14,12 @@
  *
  * 跑法（仓库根或任一 linked worktree 皆可）：
  *   node scripts/verify-detail-pane-merge-window.mjs [--base main] [--head HEAD]
- * 退出码：0 = 窗口开（三条全绿），1 = 需要人（有冲突/重叠/坏产物），2 = **探针自己坏了**
- * （自检臂没过、解析器不可用、候选树读不出来 —— 坏探针不许报"窗口开"，也不许报"要人"）。
+ * 退出码：0 = 三条全绿；1 = 被挡住（`REASONS=` 逐条列出）；2 = **探针自己坏了**
+ * （解析器不可用 / 候选树读不出分母 / 自检臂没过 —— 坏探针不许报"绿"，也不许报"要人"）。
+ *
+ * 🔴 `REASONS=` 里 **OWNED 与 NEED_HUMAN 是两件事**，故意不并成一个"窗口未开"：
+ *   §8.40 纠正的正是把它们混着数（交叠枚数衡量的是"文件名撞上没有"，冲突衡量的是"有几处要判断"）。
+ *   OWNED 要的是"等对方提交 / 或在干净检出里合"，不是找人拍板。
  */
 import { execFileSync } from 'node:child_process';
 import { readdirSync, existsSync, writeFileSync, mkdtempSync } from 'node:fs';
@@ -55,7 +59,6 @@ const DUP_CODES = new Set([2300, 2451]);
 const MARKER = /^(<{7}|>{7}|={7})(?: |$)/m;
 
 const bad = [];
-const notes = [];
 
 // ── 0. 载体自检 ────────────────────────────────────────────────────────────
 const topLevel = git(['rev-parse', '--show-toplevel']).trim();
@@ -201,7 +204,7 @@ for (const p of conflicted) {
 for (const [k, list] of Object.entries(groups)) {
   if (list.length > 0) console.log(`   ${k} ${list.length} 枚：${list.join(', ')}`);
 }
-if (conflicted.length > 0) notes.push(`Q2 有 ${conflicted.length} 枚冲突要处置（"要人"的枚数是文档裁决，不由本脚本判）`);
+if (conflicted.length > 0) console.log(`   （Q2 只分类不裁决："要人的枚数"是判断，归 §8.40/§8.44 的文档）`);
 
 // ── 4. Q3：候选树里每枚本批文件的内容 ────────────────────────────────────
 let markerHits = [];
@@ -239,8 +242,14 @@ console.log(
 for (const p of markerHits) console.log(`   MARKER ${p}`);
 for (const [p, e, side] of parseHits) {
   console.log(`   PARSE_BAD ${p}\n      ${e}`);
-  console.log(`      归属：合并前 HEAD 侧=${side.head} / ${BASE} 侧=${side.base}` +
-    `${side.head === false && side.base === false ? ' ⇒ 🔴 两侧都不坏，是**合并本身**造出来的' : ' ⇒ 本来就坏，不由本批吸收'}`);
+  console.log(
+    `      归属：合并前 HEAD 侧=${side.head} / ${BASE} 侧=${side.base} / 带 marker=${markerHits.includes(p)}` +
+      (side.head === false && side.base === false
+        ? markerHits.includes(p)
+          ? ' ⇒ 两侧都不坏，但这就是 marker 造成的（记 NEED_HUMAN，不重复记 BROKEN）'
+          : ' ⇒ 🔴 两侧都不坏、也没有 marker —— **文本层全干净的合并把产物弄坏了**（§8.42 第 15 节那个形状）'
+        : ' ⇒ 本来就坏，不由本批吸收'),
+  );
 }
 if (read === 0) {
   console.log('VERDICT=PROBE_BROKEN 候选树里一枚本批文件都读不出来 —— 分母为空不算绿');
@@ -253,15 +262,32 @@ if (markerHits.length > 0) bad.push(`Q3 有 ${markerHits.length} 枚合并产物
 if (parseHits.length > 0) bad.push(`Q3 有 ${parseHits.length} 枚合并产物**解析不过**（文本层可能全干净）`);
 
 // ── 5. 结论 ───────────────────────────────────────────────────────────────
-console.log(`CONFLICTED=${conflicted.length} OVERLAP=${overlap.length} MARKERS=${markerHits.length} PARSE_BAD=${parseHits.length} PARSED=${read}`);
-if (bad.length > 0) {
-  for (const b of bad) console.log(`🔴 ${b}`);
-  console.log('VERDICT=NEEDS_HUMAN_OR_DIRTY 窗口未开');
-  process.exit(1);
+/**
+ * 三个理由**分开列**，不并成一个"窗口未开"：
+ *   OWNED     = Q1，别人有未提交改动落在本批文件上 ⇒ 该在**他们提交之后**、或在干净检出里合，
+ *               这不是"要人裁决"（§8.40 纠正的正是把这两件事并成一句）。
+ *   NEED_HUMAN= Q2/Q3，有冲突或有 marker ⇒ 每处都要做一次判断。
+ *   BROKEN    = Q3，**没有 marker、两侧都不坏、而合并产物解析不过** ⇒ 就是 §8.42 第 15 节那次
+ *               的形状（文本层全干净、`node --check` 才看得见）。带 marker 的那几枚已经算进
+ *               NEED_HUMAN/MARKER，不再重复计入，否则同一个现象会被数两遍。
+ */
+const reasons = [];
+if (overlap.length > 0) reasons.push(`OWNED(${overlap.length})`);
+if (conflicted.length > 0) reasons.push(`NEED_HUMAN(${conflicted.length})`);
+if (markerHits.length > 0) reasons.push(`MARKER(${markerHits.length})`);
+const mergeOnlyBad = parseHits.filter(([p, , side]) => !markerHits.includes(p) && side.head === false && side.base === false);
+if (mergeOnlyBad.length > 0) reasons.push(`BROKEN(${mergeOnlyBad.length})`);
+const inheritedBad = parseHits.length - parseHits.filter(([, , side]) => side.head === false && side.base === false).length;
+console.log(
+  `CONFLICTED=${conflicted.length} OVERLAP=${overlap.length} MARKERS=${markerHits.length} ` +
+    `PARSE_BAD=${parseHits.length}（只由 marker 解释=${parseHits.filter(([p]) => markerHits.includes(p)).length} / ` +
+    `合并新造成且无 marker=${mergeOnlyBad.length} / 本来就坏=${inheritedBad}）PARSED=${read}`,
+);
+if (reasons.length === 0) {
+  console.log('VERDICT=MERGE_WINDOW_OPEN 三条判据全绿（本批文件无人占用 / 零冲突零 marker / 合并产物全部可解析）');
+  process.exit(0);
 }
-if (conflicted.length > 0) {
-  console.log('⚠️ 无 marker、无重叠、产物可解析，但 merge-tree 报了冲突 —— 冲突内容已含在上面的候选树读数里');
-}
-console.log('VERDICT=MERGE_WINDOW_OPEN 三条判据全绿（主检出不占本批文件 / 零 marker / 合并产物全部可解析）');
-void notes;
-process.exit(0);
+for (const r of bad) console.log(`🔴 ${r}`);
+console.log(`REASONS=${reasons.join(' ')}`);
+console.log('VERDICT=BLOCKED 逐条理由见上（OWNED 不等于"要人"，它要的是"等对方提交或在干净检出里合"）');
+process.exit(1);
