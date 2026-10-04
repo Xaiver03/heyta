@@ -146,6 +146,7 @@ import { AiDuration } from './features/ai/AiDuration.js';
 import { AiToolRun } from './features/ai/AiToolRun.js';
 import { AssistantPanel } from './features/ai/AssistantPanel.js';
 import { AiSettingsNavigationContext } from './features/ai/ai-settings-navigation.js';
+import { AssistantEphemeralProvider } from './features/ai/assistant-ephemeral.js';
 import type { SettingsTarget } from './features/ai/route-explanation.js';
 import { AiSettings } from './features/settings/AiSettings.js';
 import { AdminPanel } from './features/admin/AdminPanel.js';
@@ -642,10 +643,17 @@ export function App(): React.JSX.Element {
    *    ② 不需要人拖窗口就会跨这一步：`e2e/tests/ai-assistant.spec.ts` 里那张
    *      `fullPage` 截图会改视口，`resize` 监听因此来回各触发一次
    *      （现量：探针打出 `hasRoom=false` → 两次挂载 → `hasRoom=true` → 两次挂载）。
-   *    ⇒ 重挂载本身保留（它是这条设计的代价），但**会话的进行中状态不再住在
-   *      组件里** —— 见 `features/ai/AssistantPanel.tsx` 那个模块级 ephemeral。
-   *    试过用 portal 把两个挂载点合成一份子树：**不成立**，换 portal 的容器
-   *    同样会重挂载子树（上面那组探针就是量着这个才撤掉的）。
+   *    ⇒ 重挂载本身保留（它是这条设计的代价），但**未决的那三样不再住在组件里**
+   *      —— 见 `features/ai/assistant-ephemeral.tsx`：草稿、等披露确认的那一句、
+   *      阶段指示提到这里的 Provider，跨挂载点存活。
+   *    试过并**否证**掉的两条：portal 把两个挂载点合成一份子树（换 portal 的容器
+   *    同样重挂载，探针数到 4 次挂载）；模块级 ephemeral（同一进程里反复挂载的
+   *    vitest 用例互相串状态 ⇒ 4 个套件 16 failed）。**Provider 是第三种**：
+   *    状态由一次挂载拥有，不落在模块上。
+   *    ⚠️ 一条**已知没修完**的边界：请求正在飞的时候跨断点，返回的那一句会随
+   *    旧实例一起丢掉（`turn()` 仍在跑，但 `append` 落在已卸载的组件上）。
+   *    症状从"悄悄取消一次同意"降级成"少了一条回答"，不是同一件事，登记在
+   *    BLOCKED.md B79。
    */
   const detailRef = useRef<HTMLElement>(null);
   const [detailHasRoom, setDetailHasRoom] = useState(true);
@@ -1582,6 +1590,13 @@ export function App(): React.JSX.Element {
       而不是为一个导航参数去改别的功能。
     */
     <HeytaUiProvider value={uiTheme}>
+      {/*
+        🔴 助手面那份**未决状态**必须住在两个挂载点的**共同祖先**下，
+        所以 Provider 只能开在这里（`assistant-ephemeral.tsx` 文件头写了为什么：
+        换挂载点=换子树=重挂载，而它不能让一次未决的出境披露跟着没）。
+        挂在 `aiPanels` 那一份 JSX 里等于没有 —— 两份子树会各得一个 Provider 实例。
+      */}
+      <AssistantEphemeralProvider>
       <AiSettingsNavigationContext.Provider value={openAiSettings}>
       <div className={`ht-app${withSidebar ? ' ht-app--with-sidebar' : ''}`}>
       {/*
@@ -2551,6 +2566,7 @@ export function App(): React.JSX.Element {
       </aside>
       </div>
       </AiSettingsNavigationContext.Provider>
+      </AssistantEphemeralProvider>
     </HeytaUiProvider>
   );
 }

@@ -92,6 +92,7 @@ import {
   saveAssistantHistory,
 } from './assistant-history.js';
 import type { ChatItem, WithoutId } from './assistant-transcript.js';
+import { useAssistantEphemeral, type AssistantPhase } from './assistant-ephemeral.js';
 
 export interface AssistantPanelProps {
   routing: AiRoutingConfig;
@@ -123,7 +124,12 @@ export interface AssistantPanelProps {
 
 /** 界面上的一条消息（类型定义在 `assistant-transcript.ts`，落盘层共用它）。 */
 
-type Phase = 'idle' | 'disclose' | 'running';
+/**
+ * 会话阶段的类型在 `assistant-ephemeral.tsx`（那里是它的**住处**）。
+ *
+ * ⚠️ 它原来叫 `Phase` 并定义在本文件里 —— 那正是缺陷本身：住在组件里就要跟着
+ * 组件一起被重挂载。改名 + 搬家，是为了让"它住在哪儿"这件事在代码里可读。
+ */
 
 /**
  * 这段会话属于哪个账号 —— 用的是凭据里那个邮箱**标签**（`credential-storage` 里
@@ -143,21 +149,50 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
    * （属于哪个账号）必须在整段会话里固定 —— 中途换账号还继续显示，
    * 就绕过了 `assistant-history.ts` 文件头第 3 条那道绑定。
    */
-  const [restored] = useState(() =>
-    loadAssistantHistory(currentAccount(), props.historyStorage ?? null),
-  );
+  const [session] = useState(() => {
+    const account = currentAccount();
+    return { account, history: loadAssistantHistory(account, props.historyStorage ?? null) };
+  });
+  const restored = session.history;
   const [items, setItems] = useState<readonly ChatItem[]>(restored?.items ?? []);
-  const [draft, setDraft] = useState('');
-  const [phase, setPhase] = useState<Phase>('idle');
-  /** 🔴 本段会话是否已经看过一次性披露。`新会话` 把它清掉。 */
+  /** 本段会话是否已经看过一次性披露。`新会话` 把它清掉。 */
   const [disclosed, setDisclosed] = useState(restored?.disclosed ?? false);
+  /**
+   * 🔴 未决的三样（草稿 / 等披露确认的那一句 / 阶段指示）**不住在这里**。
+   *
+   * 理由在 `assistant-ephemeral.tsx` 文件头：AI 面在右栏与中间列之间换挂载点
+   * = 换子树 = 重挂载，而重挂载会把**已经摆在用户眼前的出境披露**连同他打了一半
+   * 的那句一起收回初始态（等于替他取消一次同意请求）。那三样提到挂载点之上的
+   * Provider 里，重挂载就不再是用户的一次损失。
+   *
+   * `stale` 是账号绑定：Provider 里那份若属于别的账号，**渲染成空**（与
+   * `assistant-history.ts` 第 3 条同一判据；登出/换号不重新加载页面，
+   * 而这份状态里躺着用户还没发出去的原话）。
+   */
+  const ephemeral = useAssistantEphemeral();
+  const stale = ephemeral.owner !== undefined && ephemeral.owner !== session.account;
+  const draft = stale ? '' : ephemeral.draft;
+  const phase: AssistantPhase = stale ? 'idle' : ephemeral.phase;
   /**
    * 等披露确认后才要发出去的那句。
    *
    * ⚠️ 不复用 `draft`：用户在披露块上按"发送"之前可能又编辑了输入框，
    * 那一句与"他看到披露时的那一句"就不是同一句了。
    */
-  const [pending, setPending] = useState<string | undefined>(undefined);
+  const pending = stale ? undefined : ephemeral.pending;
+  /**
+   * 三个 setter 全部写进 Provider（函数名沿用改造前的 `setXxx`，让 diff 只落在"住哪儿"）。
+   *
+   * ⚠️ `send()` 一次连写三个（清草稿、记 pending、置阶段），靠的是 `write()` 里的
+   * **函数式** updater：同一拍里三次调用逐次基于前一次的结果，不会互相覆盖。
+   * 把 `write` 改成读闭包里的 `state` 就会只留最后一条 —— 这条不是假想，
+   * `send()` 的"草稿清空但披露没弹出来"就是它的症状。
+   */
+  const setDraft = (value: string): void => ephemeral.write(session.account, { draft: value });
+  const setPhase = (value: AssistantPhase): void =>
+    ephemeral.write(session.account, { phase: value });
+  const setPending = (value: string | undefined): void =>
+    ephemeral.write(session.account, { pending: value });
   // 恢复出来的条目占用了 1..n（见 `assistant-history.ts` 的重新编号），
   // 计数器必须从 n 之后接着走，否则第一条新消息会和恢复出来的一条撞 key。
   const idRef = useRef(restored?.items.length ?? 0);
@@ -399,7 +434,14 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         </AiPanelHost>
       )}
 
-      {phase === 'running' && <p className="ht-ai__note">{t('web.ai.loading.waiting')}</p>}
+      {/* ⚠️ 这个 testid 是给判据用的，不是装饰：`ai-assistant-remount.spec.tsx`
+          要靠它区分"请求还在飞"与"阶段被重挂载归零"—— 发送键在两种情况下都是禁用的
+          （草稿已被清空），所以拿它当判据会一条都测不出来。 */}
+      {phase === 'running' && (
+        <p className="ht-ai__note" data-testid="ai-assistant-waiting">
+          {t('web.ai.loading.waiting')}
+        </p>
+      )}
 
       <div className="ht-ai__actions">
         <input
