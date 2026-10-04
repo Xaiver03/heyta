@@ -135,6 +135,14 @@ EXP_H=$(contract EXPORT_CARD_HEIGHT_PX)
 probe_reader_selfcheck "$EXP_W" "$EXP_H"
 
 step "2. 起应用，走「我的」→ 倒数日（W8 移动半那条注册表）"
+# 🔴 **冷启动**：先 force-stop 再拉前台。lib :653 那句注释写的就是这件事 ——
+#    `ensure_app_foreground` **不** force-stop，"调用方要冷启动时自己先 force-stop（现有脚本都这样做）"，
+#    而这一趟原先没做，于是上一趟留下的卡片菜单 / composer **跟着热启动活了下来**
+#    （04 08:4x 那趟的现场：屏上有卡、菜单项 `导出成品图/编辑/删除/置顶` 也全在树上）。
+#    更贵的一层是：08:5x 想靠"按一次返回"清那个浮层，结果 **BACK 直接把应用退出到桌面**
+#    （`screen_txt` 打出来的是 Gmail/Photos/YouTube/…）—— 所以"归一化残留状态"这件事
+#    不能交给 BACK，只能交给一次干净的冷启动。
+$ADB shell am force-stop "$PKG" >/dev/null 2>&1; sleep 1
 ensure_app_foreground
 sleep 2
 handle_privacy_consent
@@ -173,21 +181,11 @@ MENU_TPL=$(zh web.countdown.a11y.menu)
 #    与 composer —— 那种状态下菜单钮的 a11y 名整块不在树里，下一节按标题剥卡片
 #    就没有输入。"没有空态句"回答的是"屏上有没有那句文案"，回答不了
 #    "有没有一张点得到的卡"（AGENTS §7 元规则 2）。
-#    现在判据换成正向的：**读卡片的菜单 a11y 名**，拿不到就按返回收浮层再读一次。
-CARD_TITLE=""
-for _t in 1 2 3; do
-  # 🔴 判"取到了没有"用**值非空**，不用 `&& break`：本脚本只 `set -u`、没有 pipefail，
-  #    所以读数器退 2 时这条管道的退出码是 `tr` 的 0 —— 用退出码判会**每次都 break**，
-  #    于是"没卡片"和"读数器坏了"又长成同一个样子（AGENTS §7 元规则 1）。
-  CARD_TITLE=$(node "$READER" card-title "$UI_XML" "$MENU_TPL" 2>/dev/null | tr -d '\r\n')
-  [ -n "$CARD_TITLE" ] && break
-  echo "   第 $_t 次：树里没有卡片菜单名 ⇒ 按一次返回收掉残留浮层"
-  $ADB shell input keyevent 4 >/dev/null 2>&1; sleep 2; dump
-  # 收浮层不能把应用带离这一屏 —— 带离了就是探针自己改坏了现场（本轮无效，不是产品失败）
-  grep -qF -- "$VIEW_TITLE" "$UI_XML" \
-    || { echo "   ❌ 按返回之后连倒数日屏都没了 ⇒ 现场被探针改坏，本轮无效"; screen_txt; exit 3; }
-  require_screen
-done
+#    现在两件事分开做：**残留状态由第 2 节的冷启动负责**（08:5x 实测：想用 BACK 收浮层
+#    会把应用整个退到桌面，所以那一版已撤）；**"有没有卡"由读卡自己的菜单 a11y 名负责**。
+#    ⚠️ 判"取到了没有"用**值非空**，不用退出码：本脚本只 `set -u`、没有 pipefail，
+#    读数器退 2 时这条管道的退出码是 `tr` 的 0 —— 拿退出码判会恒等于"取到了"。
+CARD_TITLE=$(node "$READER" card-title "$UI_XML" "$MENU_TPL" 2>/dev/null | tr -d '\r\n')
 if [ -n "$CARD_TITLE" ]; then
   ok "复用屏上已有卡片「$CARD_TITLE」（正向证据：它的菜单 a11y 名在树里）"
 elif grep -qF -- "$(zh web.countdown.empty)" "$UI_XML"; then
