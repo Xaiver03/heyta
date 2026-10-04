@@ -16,9 +16,10 @@
 #      那种破坏在输出上长得和"重拍成功"一模一样。
 #
 # 用法：
-#   bash research/tools/r17-reshoot-stale.sh              # dry-run：打印待重拍清单 + 五格前置读数
+#   bash research/tools/r17-reshoot-stale.sh              # dry-run：打印待重拍清单 + 全部前置门读数
 #   bash research/tools/r17-reshoot-stale.sh --confirm    # 真的跑（前置全绿才走到这一步）
 #   LOAD_MAX=8 bash research/tools/r17-reshoot-stale.sh   # 收紧负载门（默认按 核数×3/4 现算）
+#   HEYTA_MEM_GATE_MIN_PCT=20 bash research/tools/r17-reshoot-stale.sh   # 收紧内存门（默认可回收/空闲 ≥ 物理内存的 10%）
 #   bash research/tools/r17-reshoot-stale.sh --only calendar-day   # 只重拍一枚目录
 set -u
 
@@ -41,6 +42,13 @@ while [ $# -gt 0 ]; do
 done
 
 cd "$MAIN" || exit 1
+# 🔴 负载与内存这两格**都用那份共享实现里的谓词**，不在这里另写一把尺
+#    （`scripts/lib/wait-for-quiet-host.sh` 是这台机器"现在能不能开工"的唯一所有者；
+#     设备验收那五条脚本也 source 它 —— 同一台机器上两套"能不能跑"比没有判据更糟）。
+#    这里用的是**一次性**的 `host_memory_gate`，不是内层带等待循环的 `wait_for_quiet_host`：
+#    本脚本的契约是"不达标就 exit 3 让看守隔 INTERVAL 再问一次"，自己憋着等会把看守的
+#    让路逻辑（B/H 真在跑时要让路）堵在里面。
+. scripts/lib/wait-for-quiet-host.sh
 
 # 证据目录名 → 产出它的 spec。⚠️ 只登记**本线实测过**的对应关系（14:2x 逐条 grep
 # `page.screenshot({ path:` 对出来的），别的线的目录要加就先把它验证明白再加。
@@ -105,7 +113,7 @@ STALE_BLOCK
 [ "$MISS" = "0" ] || { echo "   ⇒ $MISS 枚映射不了，先修映射再谈重拍（exit 1）。" >&2; exit 1; }
 [ -n "$PLAN" ] || { echo "   ❌ --only '$ONLY' 一枚都没匹配上（待重拍清单见上面）⇒ 参数写错了，不能当成「无事可做」。" >&2; exit 1; }
 
-echo "== 3. 前置五格（端口 / 负载 / dist / 依赖 / 载体）=="
+echo "== 3. 前置门（端口 / 负载 / 内存 / dist / 依赖 / 载体 —— 以实际打印的 GATES= 为准）=="
 GATES=""
 BUSY=""
 for p in $PORTS; do
@@ -126,15 +134,21 @@ fi
 #   ⇒ 两条一般规律：**抄现成实现之前先读它注释里那句"为什么不用另一种写法"**；
 #      新写的门**第一次 dry-run 就要拿一个必然超阈值的现场喂它**（这里负载本来就 31，
 #      所以第一跑就该红 —— 它报绿才是信号）。
-CORES=$(sysctl -n hw.ncpu)
-LOAD_LIMIT="${LOAD_MAX:-$((CORES * 3 / 4))}"
-LOAD1=$(uptime | sed 's/.*load averages: //' | awk '{print int($1)}')
-if [ "$LOAD1" -gt "$LOAD_LIMIT" ]; then
-  echo "   ❌ 负载 load1=$LOAD1 > ${LOAD_LIMIT}（$CORES 核 × 3/4，与设备验收同一把尺）"
-  GATES="$GATES,load"
+# ✅ 17:4x 再收一层：这一格原来还**自带一份读法和一份阈值推导**（`sysctl -n hw.ncpu` 加
+#    `uptime | sed … | awk …`），也就是我一边写着"与设备验收同一把尺"一边**抄了第二把尺**。
+#    现在读法、阈值、字形校验（含 #168 那串粘连读数 ⇒ 判探针故障而不是判 0）全在
+#    `host_load_gate` 里，本脚本只把 `LOAD_MAX` 桥成 `HEYTA_LOAD_GATE_MAX`、把两条现量原样打印。
+if HEYTA_LOAD_GATE_MAX="${LOAD_MAX:-}" host_load_gate; then
+  echo "   ✅ 负载 ${HOST_LOAD_READING} ≤ ${HOST_LOAD_LIMIT}"
 else
-  echo "   ✅ 负载 load1=$LOAD1 ≤ $LOAD_LIMIT"
+  echo "   ❌ 负载 ${HOST_LOAD_READING} 没过（阈值 ${HOST_LOAD_LIMIT}）"
+  GATES="$GATES,load"
 fi
+# 🔴 「内存」这一格：这台机上的弹窗与失控是**内存形状**的，产品负责人的硬规矩第二条
+#    是「测试开始之前必须探查好系统还剩多少内存」—— 那条规矩在此之前只有话、没有装置。
+#    判据与设备验收共用 `host_memory_gate`（占物理内存的百分比，不写死 GB、不拿 swap 当地板；
+#    读不到数字按**探针故障**判不过）。
+host_memory_gate || GATES="$GATES,mem"
 DF_OUT=$(node "$MAIN/scripts/dist-freshness.mjs" --only "$DIST_PKGS" --strict 2>&1)
 DF_RC=$?
 if [ "$DF_RC" != "0" ]; then
@@ -151,7 +165,7 @@ else
   echo "   ✅ e2e/node_modules 在"
 fi
 
-# 🔴 第五格「载体」：**拍的树必须就是锚点声称的那一份**。
+# 🔴 「载体」这一格：**拍的树必须就是锚点声称的那一份**。
 #    15:5x 实测：dev 端口空、负载 11 ≤ 12、dist 新鲜、spec 全在 —— 四格全绿，
 #    而 `packages/i18n/src/locales/{zh-CN,en}.ts` 正被另一条线改着（+116/−60，设备撤销与
 #    口令措辞那批词条）。dev server 读的是**工作树**，所以这一刻拍出来的图里渲染的是
@@ -213,7 +227,7 @@ fi
 
 if [ "$CONFIRM" != "1" ]; then
   echo "== 4. dry-run 收尾 =="
-  echo "   五格前置全绿，**但没有 --confirm ⇒ 一张图都没重拍、一个字节都没动**。"
+  echo "   全部前置门都绿，**但没有 --confirm ⇒ 一张图都没重拍、一个字节都没动**。"
   echo "   要动：bash research/tools/r17-reshoot-stale.sh --confirm"
   echo "   ⚠️ 重拍之后仍必须：① 逐张打开看图，② 改 README 里那行「人看到的」，③ 重钉 UIPIN。"
   echo "      这个脚本**不做** ②③ —— 没有「人看过」的锚点就是没锚点。"
