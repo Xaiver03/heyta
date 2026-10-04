@@ -98,9 +98,13 @@
 | 总专注时长 | ✅ `milestones.ts:59-65` → [`packages/app-host/src/motivation.ts:105-111`](../../packages/app-host/src/motivation.ts)，但**只活在分享纯文本与里程碑阶梯里** | 有数、没面 |
 | 「专注记录」列表 | ❌ **一条专注记录都没被逐条渲染过**：`listSessions()` 全仓唯一消费者是 `FocusScreen.tsx:196`，且只喂给 `focusStatsForDay` 做当日汇总 | 界面层（数据在） |
 | 「添加专注记录」表单（任务/开始/结束/类型/**笔记**） | ❌ **缺整条写路径**：`FocusActions` 只有 `log`/`listSessions`（[`packages/app-host/src/focus-actions.ts:35-53`](../../packages/app-host/src/focus-actions.ts)），且 `log` 前置明写"**只接受已经结束的轮次**"；`FocusSession` **无 `note`**；全仓 `FOCUS_SESSION` 写入点只有 `focus-actions.ts:139` 一处 | 领域 + 动作 + 界面 |
-| （对照）滴答桌面端"仅可补记不可删" | 我们 `FOCUS_SESSION` **连删除动作都没有**（`docs/research/trash-and-archive-best-practice.md:181`、`:191`），且"不做删除"是**已拍决定**（`docs/plans/trash-and-archive.md:237`）。⚠️ 这两份按 2026-10-03 现量**只活在主检出的未提交改动里**（`git log --all --diff-filter=A` 查不到）⇒ 写成路径而不是链接，否则干净检出上是死链；那条决定的正文归回收站那条线自己提交 | 要改先重开那条决定 |
+| （对照）~~滴答桌面端"仅可补记不可删"~~ → **这句在本表里曾是硬规则，2026-10-04 一手调研后改成"平台不对称"**（详见下面 C1b-Q6 那一节：滴答**移动端可删**、桌面端明文"不支持删除番茄记录"；被两家明文拒绝的是**改时长**，不是删除） | 我们 `FOCUS_SESSION` **连删除动作都没有**（`docs/research/trash-and-archive-best-practice.md:181`、`:191`），且"不做删除"是**已拍决定**（`docs/plans/trash-and-archive.md:237`）。⚠️ 这两份按 2026-10-03 现量**只活在主检出的未提交改动里**（`git log --all --diff-filter=A` 查不到）⇒ 写成路径而不是链接，否则干净检出上是死链；那条决定的正文归回收站那条线自己提交。🔴 **"已拍决定"这一格仍然成立，但它现在是我们自己的立场，不再有同行依据**（三家提供删除，见 C1b-Q6）⇒ 要继续挂着就得补一条我们自己的理由 | 要改先重开那条决定，并**为"不给删除"补一条第一方理由** |
 
-⚠️ 另有一处**文档与代码不符**：[`docs/reference/architecture.md:129`](../reference/architecture.md) 写着 `FocusSession — … mode(pomo/stopwatch), duration` —— **代码里没有这两个字段**，不能拿它当"已建模"的证据。
+⚠️ ~~另有一处**文档与代码不符**：`docs/reference/architecture.md:129` 写着 `FocusSession — … mode(pomo/stopwatch), duration` —— 代码里没有这两个字段，不能拿它当"已建模"的证据。~~
+🔴 **这句已经过期（2026-10-04 08:0x 现量）**：那一行是**本单 W0 自己修掉的**（载体 `0275867a`，10-03 19:25），
+`docs/reference/architecture.md` 现在第 129 行写的是 `FocusSession — id, taskId?, kind(work/shortBreak/longBreak), plannedMs, actualMs?`，
+与 `packages/domain/src/entities.ts:319-331` 逐字一致；全仓 `pomo/stopwatch` 现在只剩本行与工单 W0 那一格在**引用**它。
+⇒ 保留原句（划掉）是因为它记着一个真事实：**"计时模式"从来没有被建模过**，而这一条正是下面 C1b-Q5 的起点。
 
 ## A5. 习惯：逐元素对照
 
@@ -263,18 +267,21 @@
 | 1 | 详情栏放"仅选中项"还是"永远放概览+记录+选中项" | A | 决定 A0.5 那条裁决要不要动；决定右栏无内容时是否允许装饰 |
 | 2 | 习惯统计三处口径：日历 vs 韧性 / 自然月 vs 滚动 / 天 vs 次 | A | 六张卡里五张的数值与句子 |
 | 3 | 计数型习惯先修 `HabitLog.value` 那一米 | A | 「每日完成量」图 + 月/总完成量两卡有没有数据源 |
-| 4 | 非时间单位在分类体系里怎么安放 | A | 「65 页」这类量的图表口径 |
-| 5 | 番茄"正计时"要不要做 | A | 它要先动数据模型（`FocusSessionKind` 无该值），牵动线协议与 `EntityModelMap` |
-| 6 | 专注记录可否补录/删除 | A | 滴答桌面端做法是"可补记不可删"；我们"不做删除"是已拍决定 |
-| 7 | 确认"番茄页不许塞进列表模型"继续有效 | A | 任何三栏改造的形状 |
+| 4 | 非时间单位在分类体系里怎么安放 | A | 「65 页」这类量的图表口径 ⇒ **别人怎么做已补齐**，见 C1b-Q4（六款产品一手） |
+| 5 | 番茄"正计时"要不要做 | A | 🔴 **前提被现量改写了**：`FocusSessionKind` 是**阶段**（work/short/long），不是计时模式；真正卡住的是 `FocusActions.log` 要求 `plannedMs > 0`。一手对照与代价见 C1b-Q5 |
+| 6 | 专注记录可否补录/删除 | A | 🔴 原句"滴答做法是可补记不可删"**只对了一半**：那是**平台**不对称（桌面端可补记、不支持删除），真正写死的规则是**时长不可改**。逐产品一手见 C1b-Q6 |
+| 7 | ~~确认"番茄页不许塞进列表模型"继续有效~~ ⇒ **已核，不需要拍**（2026-10-04 现量，见 C1b-Q7） | A | ~~任何三栏改造的形状~~ ⇒ 已确认仍有效，且给了可复跑命令 |
 | 8 | 详情面里"无数据的区块"要不要显示（空即隐藏 vs chip 常驻） | A | 详情面第一屏的信息密度与能力可发现性 |
 | 9 | 背诵做不做，走 R1 / R2 / R3 / 都不做 | B | B6 第 5 条：需求侧一手证据为零，这是产品判断 |
 | 10 | 复习对象挂在谁身上（任务 / 便签 / 新卡片） | B | 是 IA 决策，牵动 [multi-end-unified-strategy.md §7.1e](../plans/multi-end-unified-strategy.md) 那张次级表面表 |
 | 11 | 免费还是付费 | B | 牵动"收费的是服务器不是功能"的既有口径 |
 | 12 | 界面上允许出现哪些科学宣称 | B | **对外话术的合规边界**，不是工程问题（B2 的收窄 + B6 第 1 条未补一手） |
 
-> 🔴 这 12 项里**卡住工单**的那几条（#1 / #2 / #8 / #9–12），业界实际怎么答、推荐与代价已落在 **C1b**
-> （2026-10-03 第二批一手调研，#2 的对照在 19:27 到齐）。本节仍是"要拍"的清单 —— C1b 只把选择题变成**有出处的**选择题，不替谁拍。
+> 🔴 这 12 项里**卡住工单**的那几条，业界实际怎么答、推荐与代价已落在 **C1b**：
+> #1 / #2 / #8 / #9–12 来自 2026-10-03 第二批一手调研（#2 的对照在 19:27 到齐）；
+> **2026-10-04 08:0x 第三批把 #4 / #5 / #6 也补齐了，并把 #7 从"要确认"改成"已核"**（四节都在 C1b 末尾）。
+> 本节仍是"要拍"的清单 —— C1b 只把选择题变成**有出处的**选择题，不替谁拍。
+> ⚠️ 但 #5 / #6 那一格里**连问题本身都被现量改写过**（原来写的前提是错的），这类更正要看 C1b-Q5 / Q6，别看这张表。
 
 ## C1b. 别人怎么做的 × 推荐（2026-10-03 第二批一手调研）
 
@@ -430,6 +437,126 @@ OmniFocus 的 Review 是**项目级元审查**（"Each project has a Next review
 - R2 的触发条件（写下来免得下次重吵）：只有当复习对象需要"一张卡自身"才有的字段（完形填空、图片挖空、一父多子卡、卡级媒体）才值得新建实体。管道成本不是问题（批次二 W2 已实测 `ENTITY_TYPES` 加一项穿过整链零改动），**贵的是产品面**：卡片编辑器 + 复习队列 + 空态，每个端一遍。
 
 
+
+### C1b-Q4（= C1 #4：非时间单位在分类体系里怎么安放）—— 2026-10-04 第三批一手调研
+
+| 产品 | 单位是不是**一等公民** | 数值住在哪个概念 | 非时间量怎么画图 | 一手来源（访问 2026-10-04） |
+|---|---|---|---|---|
+| 滴答清单（中文库 help.dida365.com） | ❌ 中英两版帮助都**没有"单位"字段** | Goal =「当天完成一定量」，例「背了 3 页」「一杯」 | **不画量**：打卡概览 / 月度打卡表 / 年度热力图 / 时间轴回顾 | <https://help.dida365.com/articles/6950379816176582656> · <https://help.dida365.com/articles/6950379455722291200> · <https://help.dida365.com/articles/7005344825801179136> |
+| TickTick（英文库，与中文库两套内容） | ❌ 同上（UI 里有没有藏单位输入框：**未核实**） | "Reach a certain amount"（例 5 words / read 2 pages per day），打卡方式 自动 / 手动输入量 / 完成全部 | 同上，量不单独成图 | <https://help.ticktick.com/articles/7055781878401335296> · <https://help.ticktick.com/articles/7055781805944733696> |
+| Loop Habit Tracker（官方仓库源码） | ✅ **`unit` 是自由文本字段** | `Habit` 只有 `YES_NO / NUMERICAL` 两型；数值习惯 = `targetValue` + `targetType(At least/At most)` + `unit`，占位符原文 "e.g. 15" / "e.g. miles"，示例问题就是 "How many pages did you read?" | **一图一习惯**：ScoreChart（指数平滑达成度）/ HistoryChart / FrequencyChart（数值习惯按 maxFreq 归一缩放） | <https://github.com/iSoron/uhabits/blob/master/uhabits-core/src/jvmMain/java/org/isoron/uhabits/core/models/Habit.kt> · <https://github.com/iSoron/uhabits/blob/master/uhabits-android/src/main/java/org/isoron/uhabits/activities/common/views/FrequencyChart.kt> |
+| Streaks（官网 + App Store） | 🟡 只有**封闭列表**：非时间量经 HealthKit 活动类型带入（Walk 5,000 steps / Run 5 miles） | "每日完成"布尔 | 时长与 Health 量最终都折成"当天完成与否"的 streak 布尔 | <https://streaks.app/> · <https://apps.apple.com/us/app/streaks/id963034692> |
+| Strides（官网 + App Store） | ❌ 无单位字段（组织靠 tag） | 四型 tracker（Habit/Target/Average/Milestone）+ goal value + 时间窗 | **pace/达成率 + 折线**，可按周/月/年 | <https://www.stridesapp.com/> · <https://apps.apple.com/us/app/strides-habit-tracker-goals/id672401817> |
+| North Star（App Store） | 量被拆成**并列的另一件工具** "Measures" | Habits 与 Measures 分家 | — | <https://apps.apple.com/us/app/north-star-goals-habits/id1480448999>（🔴 同一页显示最后更新 **2022-12-27 v2.1**） |
+| Habitica / Todoist | ❌ Habitica 无非/正布尔之外概念；**Todoist 官方确认没有原生习惯功能** | — | — | <https://translate.habitica.com/browse/habitica/faq/en/>（key `webFaqAnswer25`） · <https://www.todoist.com/help/articles/use-the-habit-tracker-extension-with-todoist-A0r7wtPfk> |
+
+**别人怎么答这道题（三条，都有上表来源）**：
+① **没有任何一款把"时长"和"页数"画进同一张图** —— 全部靠"一图一习惯"或"归一成达成度"绕开单位问题；
+② 单位要么**自由文本**（Loop）、要么**封闭列表**（Streaks 走 HealthKit）、要么**干脆不做单位**（滴答 / TickTick / Strides，数值裸存）；
+③ 数值习惯的图**不是"总量"而是"达成率"**（Loop 的 ScoreChart、Strides 的 pace line）。
+
+**代价（有来源的）**：Loop 的 `At most` 语义长期出错，官方 CHANGELOG 到 2025 年才修
+"Never mark 'at most' habits as completed" / "Trim unit labels"（<https://github.com/iSoron/uhabits/blob/master/CHANGELOG.md>）
+⇒ 引入"上限型 + 单位"是一条**多年才磨平**的缝；Streaks 上限 24 个任务（App Store 描述）；
+North Star 把量拆成独立工具后**停止更新**（2022-12-27）。
+**未找到一手来源**：任何产品"时长 + 数量混排同图"的实例；Streaks counter 的自定义 ± 标签（官网 help 路径全部回落首页）。
+
+**推荐（不替谁拍）**：走 ① + ③ —— 计数型习惯的图**画达成率不画绝对量**，单位作为可选自由文本 `unit?`
+（AGENTS §3.3：新字段一律可选 + 运行时默认值，不 bump schema）。这样"65 页"不需要分类体系里给它腾位置，
+而六张卡里那两句需要单位的话术（C1 #2 的"天 vs 次"）可以只读 `unit?` 有没有值来决定措辞。
+
+---
+
+### C1b-Q5（= C1 #5：番茄"正计时"要不要做）—— 先记一条**前提更正**
+
+🔴 **本表原来写的前提是错的**："它要先动数据模型（`FocusSessionKind` 无该值），牵动线协议与 `EntityModelMap`"。
+现量（2026-10-04 08:0x）：`packages/domain/src/entities.ts:317` 的 `FocusSessionKind = 'work' | 'shortBreak' | 'longBreak'`
+是**阶段**（番茄的 work/短休/长休），不是计时模式；把"正计时"塞进这个枚举是把两个正交概念合并成一个。
+**真正卡住的是两条**：`packages/app-host/src/focus-actions.ts:130` 校验 `plannedMs` 必须 **> 0**（`:128` 注释写明
+"0 或负数记录下来会污染统计"），以及统计侧 `completed` 的语义（自然完成 vs 手动中止，`:11-12`）。
+⇒ 所以这道题不是"要不要动线协议"，而是"**正计时那一轮的 `plannedMs` 写什么、它算不算一个番茄**"。
+
+| 产品 | 有没有正计时 | 官方原话 / 建模方式 | 来源（访问 2026-10-04） |
+|---|---|---|---|
+| 滴答清单（中文库） | ✅ | 开始前选模式：「番茄计时：以倒计时方式进行，每轮 25 分钟专注 + 5 分钟休息」／「正计时：以正计时的方式持续记录专注时长，适合不希望被打断、希望沉浸式计时的人群」；每个「常用专注」可各自绑一种 | <https://help.dida365.com/articles/6950408124297641984>（页面 modifiedTime 2026-08-04） · <https://help.dida365.com/articles/7031082644146225152> |
+| TickTick（英文库） | ✅ 叫 **Stopwatch** | "Tracks focus time in a count-up format"；🔴 **严格模式与 App 白名单在 Stopwatch 下不可用**（"not available in Stopwatch mode"） | <https://help.ticktick.com/articles/7055782010496745472> · <https://help.ticktick.com/articles/7055781994591944704> |
+| Super Productivity（**我们的上游**，官方仓库 master，pushed_at 2026-10-03） | ✅ 叫 **Flowtime** | `FocusModeMode = Flowtime \| Pomodoro \| Countdown`，`Flowtime.initialSessionDuration = 0 // doesn't have a fixed duration`；🔴 **模式是计时器状态上的判别字段，落库的专注记录里没有模式字段**（metric 侧 `focusSessions: number[]` 只有时长），UI 靠派生量 `isCountTimeDown = mode() !== Flowtime` 决定往哪数 | <https://github.com/super-productivity/super-productivity> |
+| 专注旅人（App Store 官方条目 v3.12.0，2026-09-04） | ✅ | 「同时提供 无限计时 与 倒数计时 模式」，写在免费功能里 | <https://apps.apple.com/cn/app/id1559730367> |
+| Forest / Be Focused Pro / Flow / pomofocus.io | 🟡 官方文案**未提**正计时（不等于"没有"） | — | iTunes 官方条目 id866450515 / id953426154 / id1423210932 · <https://pomofocus.io> |
+
+**统计口径（两家都明文合并）**：中文「番茄专注和正计时的时长都可算作有效时长，**无效的番茄时长不计入**」
+（<https://help.dida365.com/articles/7223896922350682112>）；英文 "Both Pomo and Stoptime are counted as valid hours"
+（原文拼写如此，<https://help.ticktick.com/articles/7082279841969471488>）。
+🔴 **正计时那一轮算不算"一个番茄"= 两家都没写**（未找到一手来源）—— 这恰好是工单 §8.4 W11 那一族"存在性判据"要防的位置。
+
+**代价（有来源）**：严格模式 / 白名单在正计时下失效（TickTick）；iOS 控制中心要为「正计时」单开一个控件（专注旅人条目）；
+勋章口径必须新增"两模式合并"这条规则（滴答 7223896922350682112）。**未找到**任何产品官方声明"故意不做正计时"或把它单列收费。
+
+**推荐（不替谁拍）**：照上游 Super Productivity 的形状做 —— **不给 `FocusSessionKind` 加值、不加持久字段**，
+把计时模式当作**计时器状态里的判别量**，记录仍只落 `kind='work'` + `plannedMs` + `actualMs` + `completed`
+（正计时的 `plannedMs` 取实际时长，绕开 `:130` 那条 >0 校验，零 schema 变更）；
+代价是**事后无法区分这一轮是倒计时还是正计时** —— 如果产品要"只有番茄才计个数、正计时只计时长"，
+那就必须有一个持久标记（可选字段 `timedMode?`，仍然不必 bump schema）。**这条取舍是 #5 真正要拍的东西**，
+不是原来那道"要不要动数据模型"。
+
+---
+
+### C1b-Q6（= C1 #6：专注记录可否补录 / 删除）—— 原句"可补记不可删"**只对了一半**
+
+🔴 现量更正：滴答那条规则的不对称轴**不是"补记 vs 删除"**，而是**平台**与**字段**两条轴：
+
+| 产品 | 补录 | 删除 | 改时长 | 一手来源（访问 2026-10-04） |
+|---|---|---|---|---|
+| 滴答清单（中文库） | ✅「找到专注记录点击右边「+」，即可补记专注记录」 | 🟡 移动端有「删除记录」「批量编辑 & 清空」；**桌面端明文"不支持删除番茄记录"** | ❌ MCP 原文「**专注时间不可修改**」 | <https://help.dida365.com/articles/6950408300395495424> · <https://help.dida365.com/articles/6950408124297641984> · <https://help.dida365.com/articles/7438132116019216384> |
+| TickTick（英文库） | ✅ "If you need to add a focus record retroactively, you can also click "+ Add Record"" | ✅ "To delete a record, open the record and tap Delete Record at the bottom" + "Bulk Select & Delete All" | ❌ "update_focus \| Focus duration cannot be changed" | <https://help.ticktick.com/articles/7055781980423585792>（页面 modifiedTime 2026-09-27） · <https://help.ticktick.com/articles/7055781966800486400> · <https://help.ticktick.com/articles/7438129581631995904> |
+| Super Productivity（上游） | 结构上**没有"一条记录"可补**：worklog 是派生视图（"not a separate store of time…built from `task.timeSpentOnDay`"），补录＝改那天时长 | 同上（无对象可删） | ✅ "Inline time correction — the corrected time is reflected in History, reports, and metrics" | <https://github.com/super-productivity/super-productivity/blob/master/docs/wiki/4.21-Worklog.md> |
+| Toggl Track（时间记录，对照） | ✅ 手录是默认路径 | ✅ 且有 "Undo option will show up briefly"；**Premium/Enterprise 的 Lock 可以禁止补录与删除**（"Regular users will be unable to edit, add, or delete any time entries dated July 16 or earlier"） | ✅ | <https://support.toggl.com/en-us/article/creating-a-time-entry-wg8nug/> · <https://support.toggl.com/en-us/article/locking-time-entries-xsvs45/>（Updated 2026-06-16） |
+| Forest / Focus To-Do / Be Focused | **未找到一手来源**（forestapp.cc 的 /faq /help /support 实测 404；focustodo.cn 官网无帮助入口；Be Focused 官网域名不可定位） | 同左 | 同左 | — |
+
+**三条一手结论**：① **没有任何产品明文说"专注记录不可删除"**（最接近的是滴答桌面端与 Toggl 的 Lock）；
+② 真正被写成硬规则的是**时长不可改**（滴答与 TickTick 的 MCP 层都是这句）；
+③ **补录是否与真实计时记录在统计上区分** —— 两家帮助中心都**没有**"手动/补记"标记字样（本次对整页做过全量检索），
+统计只分"有效 / 无效"，补记算不算进勋章与热力图**文档未写**（未核实）。
+
+**我们自己的位置**（现量）：`FocusActions` 只有 `log` 与 `listSessions`，**没有删除动作**；
+`packages/app-host/src/focus-actions.ts:121` 的 `isDeleted` 只是读侧过滤（尊重 `EntityBase.deletedAt` 的墓碑约定），
+不构成写入口。⇒ "不做删除"这条既有立场在代码里是**默认而非明文的决定**，正计时/补录（W11）要落地时
+必须先把它写成一次可引用的裁决（要么立 ADR，要么在工单 §6 里补一行"专注记录不提供删除，理由是…"）。
+
+**推荐（不替谁拍）**：把 #6 拆成两问拍 —— (a) **补录要不要做**（滴答 / TickTick 都做，形态是"记录页 + 一个 +"）；
+(b) **改时长要不要做**（两家都明文拒绝，理由能推给统计不可复算；我们如果做补录，"能新建但不能改"是**有同行依据的最小组合**）。
+删除那一档：三家（滴答移动 / TickTick / Toggl）都提供，而我们"不做删除"若要继续，需要一条自己的理由写进文档，
+因为**"别人都不这么干"这个依据已经被本轮调研否证**。
+
+---
+
+### C1b-Q7（= C1 #7：确认"番茄页不许塞进列表模型"继续有效）—— 已核，**不需要拍**
+
+规范侧四处一致（不是单一出处）：`docs/research/dida-view-unification.md` 的 §4.3 视图表把「番茄钟 / 成长」标成
+**非列表（单一大组件 / 图表）**（第 383 行）、正文「**统一是契约一致，不是形状一致**」（第 387 行）、
+禁止表「把番茄钟/成长硬塞进列表模型」（第 445 行）、迁移纪律「别为了迁 web 而把 RN 原语强塞进不需要它的地方」（第 494 行）。
+
+代码侧现量（2026-10-04 08:0x，只匹配**调用形状**，不匹配注释）：
+
+```bash
+for pat in '<TaskList' '<TaskRow' '<ListSurface' 'toTaskRow(' 'useTaskList'; do
+  printf '%s ' "$pat"; grep -rho "$pat" apps/web/src/features/focus/ apps/mobile/src/screens/FocusScreen.tsx packages/ui/src/focus/ | wc -l
+done
+```
+
+读数：**五条全为 0**。🔴 但同一条检索**第一版踩了两个坑**，都要留档：
+① 宽口径 `grep -E 'ListSurface|TaskList|TaskRow|toTaskRow'` 命中 **1 处**，位置是
+`packages/ui/src/focus/FocusPanel.tsx:23` 的**注释**（拿 `TaskList.tsx` 的文件头解释 i18n 边界）——
+**"命中不为 0"在这里不代表产品违规**，剥掉注释后才是 0；
+② web 的专注面根本没有 `FocusPanel.tsx`（只有 `FocusTimer.tsx` / `FocusDetailPane.tsx` / `store.ts`），
+共享的 `FocusPanel` 在 `packages/ui` 里 —— 只在 `apps/web` 搜会得到一个"看起来很干净"的空集合。
+
+⇒ 边界（别读多）：**这条命令只证"专注面没引用列表模型的零件"**，不证明别的面对；
+而工单 §6 那一行（"右栏是概览 + 记录"）本来就把**记录列表放在右栏**，所以"W7 的番茄右栏渲染 `<ul data-testid="focus-records">`"
+与这条禁令**不冲突** —— 禁令管的是**中栏**（计时器）不能被换成列表模型。
+判据从此可复跑，不必再等人确认。
+
+---
 
 ## C2. 未核实项（Part A）
 
