@@ -14,7 +14,13 @@ import { describe, expect, it } from 'vitest';
 import { OpType } from '@heyta/sync-core';
 import type { Operation, VectorClock } from '@heyta/sync-core';
 import { reminderIsFired } from '@heyta/domain';
-import { IndexedDbAdapter, IndexedDbOpLogStore } from '@heyta/storage';
+import {
+  DbOpLogStore,
+  INDEXEDDB_SCHEMA,
+  IndexedDbAdapter,
+  IndexedDbOpLogStore,
+  MemoryDbAdapter,
+} from '@heyta/storage';
 
 import { OpLogEngine } from '../src/engine.js';
 import { applyOperation, emptyState, replayOperations } from '../src/state.js';
@@ -109,6 +115,35 @@ function shuffled<T>(input: readonly T[], seed: number): T[] {
   return output;
 }
 
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, entry]) => [key, canonical(entry)]),
+    );
+  }
+  return value;
+}
+
+function visibleState(state: ReturnType<typeof emptyState>): string {
+  // Entity insertion order is delivery-order noise. Symbols contain reducer
+  // metadata and are intentionally excluded from the wire/domain projection.
+  return JSON.stringify(canonical(state));
+}
+
+function maxClock(operations: readonly Operation<string>[]): VectorClock {
+  return operations.reduce((clock, op) => mergeClock(clock, op.vectorClock), {});
+}
+
+async function memoryEngine(clientId: string): Promise<OpLogEngine> {
+  const db = new MemoryDbAdapter(INDEXEDDB_SCHEMA);
+  await db.init();
+  const store = new DbOpLogStore<Operation<string>>(db);
+  return new OpLogEngine({ store, clientId });
+}
+
 describe('E1 reducer state-machine invariants', () => {
   it('提醒的 create/fired/snooze 任意到达顺序都收敛，旧 occurrence 不会遮蔽新 occurrence', () => {
     const id = 'task-reminder';
@@ -165,6 +200,44 @@ describe('E1 reducer state-machine invariants', () => {
       for (const delivered of deliveryOrders) {
         expect(replayOperations(emptyState(), delivered), `seed=${seed}`).toEqual(expected);
       }
+    }
+  });
+
+  it('two independent engines converge under random batching, duplicates and out-of-order delivery', async () => {
+    for (let scenarioSeed = 1; scenarioSeed <= 8; scenarioSeed += 1) {
+      const operations = buildCausalScenario(10_000 + scenarioSeed);
+      const expected = replayOperations(emptyState(), operations);
+      const left = await memoryEngine(`left-${scenarioSeed}`);
+      const right = await memoryEngine(`right-${scenarioSeed}`);
+
+      // Deliver the same history through two distinct state machines. The
+      // left side sees singleton and duplicate batches; the right side sees
+      // larger batches in a different order. This models retry/reconnect
+      // behaviour instead of only calling the pure reducer once.
+      const leftOrder = shuffled(operations, scenarioSeed * 17);
+      const rightOrder = shuffled(operations, scenarioSeed * 31);
+      for (let offset = 0; offset < operations.length; offset += 3) {
+        const leftBatch = leftOrder.slice(offset, offset + 3);
+        const rightBatch = rightOrder.slice(offset, offset + 5);
+        await left.applyRemote(leftBatch);
+        if (leftBatch.length > 0) await left.applyRemote([leftBatch[0]!]);
+        await right.applyRemote(rightBatch);
+        if (rightBatch.length > 1) await right.applyRemote(rightBatch.slice(0, 2));
+      }
+
+      expect(visibleState(left.getState()), `left seed=${scenarioSeed}`).toBe(visibleState(expected));
+      expect(visibleState(right.getState()), `right seed=${scenarioSeed}`).toBe(visibleState(expected));
+      expect(left.getClock(), `left clock seed=${scenarioSeed}`).toEqual(maxClock(operations));
+      expect(right.getClock(), `right clock seed=${scenarioSeed}`).toEqual(maxClock(operations));
+      expect(visibleState(left.getState())).toBe(visibleState(right.getState()));
+
+      // Idempotence is checked at the engine boundary too: retrying the full
+      // history must not create a second material change or a new clock edge.
+      const beforeClock = left.getClock();
+      const retry = await left.applyRemote(operations);
+      expect(retry.applied, `retry applied seed=${scenarioSeed}`).toEqual([]);
+      expect(visibleState(left.getState())).toBe(visibleState(expected));
+      expect(left.getClock()).toEqual(beforeClock);
     }
   });
 

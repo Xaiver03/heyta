@@ -19,7 +19,7 @@
  *     --token <jwt> --password <口令> sync
  *
  * 参数也可以走环境变量：HEYTA_DB / HEYTA_SERVER_URL / HEYTA_TOKEN /
- * HEYTA_PASSWORD / HEYTA_CLIENT_ID。加 `--json` 输出机器可读结果。
+ * HEYTA_PASSWORD / HEYTA_ACCOUNT_ID / HEYTA_CLIENT_ID。加 `--json` 输出机器可读结果。
  */
 
 import { readFileSync, writeFileSync, writeSync } from 'node:fs';
@@ -36,6 +36,7 @@ const VALUE_FLAGS = new Set([
   'server',
   'token',
   'password',
+  'account-id',
   'client-id',
   'due',
   'out',
@@ -180,6 +181,7 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   --server <url>       同步服务端（或 HEYTA_SERVER_URL）
   --token <jwt>        访问令牌（或 HEYTA_TOKEN）
   --password <口令>    **端到端加密口令**（或 HEYTA_PASSWORD）—— 与「auth」收的那条登录口令**不是同一个秘密**
+  --account-id <id>    认证账号 id（或 HEYTA_ACCOUNT_ID）—— 启用 Vault key-package / payload codec
   --client-id <id>     覆盖设备 id（或 HEYTA_CLIENT_ID）
   --json               机器可读输出
 
@@ -267,6 +269,7 @@ async function main(): Promise<number> {
   const serverUrl = stringFlag(flags, 'server') ?? process.env['HEYTA_SERVER_URL'];
   const token = stringFlag(flags, 'token') ?? process.env['HEYTA_TOKEN'];
   const password = stringFlag(flags, 'password') ?? process.env['HEYTA_PASSWORD'];
+  const accountId = stringFlag(flags, 'account-id') ?? process.env['HEYTA_ACCOUNT_ID'];
   const clientId = stringFlag(flags, 'client-id') ?? process.env['HEYTA_CLIENT_ID'];
 
   if (command === 'sync' || command === 'account') {
@@ -301,6 +304,7 @@ async function main(): Promise<number> {
     ...(serverUrl !== undefined ? { serverUrl } : {}),
     ...(token !== undefined ? { token } : {}),
     ...(password !== undefined ? { password } : {}),
+    ...(accountId !== undefined ? { accountId } : {}),
     ...(clientId !== undefined ? { clientId } : {}),
   });
 
