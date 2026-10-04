@@ -3955,6 +3955,21 @@ W0b ─> 随时可做（台账那半要等文件干净）
   - 📌 **收尾四项到此全部有读数**：第 1 条 = 本条（67/1，红归 W9）；第 2 条 `docs-link-check` `rc=0`（19:01 与 20:00 各一次）；
     第 3 条 = ㊫（`ON-DISK-untracked 0`，四端图都打开看过）；第 4 条 = ㊧/㊪（四端 `RC_*` 全 0）。
 
+- ㊭ **边界 1/2 的现量读数（04 20:16）：本批这一轮没 push、没 merge，但"分支全在本地"这句在本文件里是假的**
+  - 现量：`origin/feat/countdown-batch2` 的 tip 是 **`c36b1d89`**（10-03 23:50，作者 邓湘雷，
+    标题「feat(admin,app-host): 后台补上「调休 / 补班」录入面」），而 `merge-base --is-ancestor` 判它**是本地 HEAD 的祖先**、
+    `HEAD..远端 = 0` / `远端..HEAD = 211` ⇒ 远端那份是**这条分支的旧 tip，被并行会话在 10-03 夜里推过**，
+    与本地是**可快进关系、不是分叉**。本轮（10-04 17:0x 之后）我一次 `push` 都没发过。
+  - 🔴 **所以要更正的是账本里那句话**：本文与交接文档多处写过"批次二全在本地分支、未 push"。
+    准确的写法是：**"本批这一轮没有 push；但 `feat/countdown-batch2` 这个分支名在 origin 上有一个 10-03 23:50 的旧 tip，
+    它是本地的祖先"** —— 差别很实在：下一个人若照"未 push"判断，会以为远端没有这条线，
+    而 `git push` 一旦发出就是把 211 笔（**别人的在飞状态 + 本批**混在一起）推上去，那不在本批边界内。
+  - ✅ 其余边界同趟复核：`git diff --name-only origin/main...HEAD -- packages/shared-schema/src/version.ts` **0 个文件**
+    （没 bump `CURRENT_SCHEMA_VERSION`）；`HEAD..origin/main = 502` / `origin/main..HEAD = 135` ⇒ **没有 merge 进 main**；
+    工作树未提交 **0 枚**。
+  - 📌 **同一句假话还在 `AGENTS.md` §9 的表头**（「进行中，全在本地分支，未 push 未 merge」）—— 改法就是上面那两句，
+    但 `AGENTS.md` 此刻正被并行会话未提交（任务 #26 已登记），**合流时一起改、不代改**。
+
 
 
 
