@@ -1280,3 +1280,28 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   先落在本节，取号 **待入 traps #269+**，由台账的下一次单写者收口带上。⚠️ 登记时请连"它不报错"一起写 ——
   台账里已有的 GNU-only `sed -i` 与 C locale 两条都会**响亮地**失败，正因为如此，后来者才会以为
   "sed 的不兼容总会留痕迹"。
+
+#### 20:15 同族第三刀：四枚夹具把"被测体"钉在了**不会再跑的那条链**上
+
+顺着 20:1x 的 sweep 往下查（零 CPU），发现比"needle 停在旧版本"更静默的一种漂移：
+
+- 现量（20:14）：`heyta-gateleg-fixture.sh` 的 `CHAIN` 默认 **/tmp/heyta-window-chain18.sh**、
+  `heyta-chain-rpi-fixture.sh` **/tmp/…chain24.sh**、`heyta-credpin-fixture.sh` **/tmp/…chain25.sh**、
+  `heyta-notesdone-fixture.sh` **durable 的 chain24.sh** —— 而 `ps` 里真正在跑、真正会执行 ③① 的是
+  **`bash ~/.heyta-window-rigs/heyta-window-chain27.sh`（pid 48362，已 42 分钟）**。
+  这三枚还钉在 `/tmp` 副本上：机器重启或谁清一次 /tmp，它们就 `FAIL=读不到链本体` 而**看起来像夹具坏了**；
+  更糟的是**不坏的时候**，它们逐字绿，而绿的是历史。
+- ✅ 新增单所有者 `~/.heyta-window-rigs/heyta-latest-chain.sh`：**优先"正在跑的那条"**（`ps -eo args` 里
+  出现且 `-s` 非空的 `heyta-window-chainNN.sh`），没有运行中的才退到"号最大的那枚"（按号 `sort -n`，
+  不是按字典序 —— `chain9 > chain27` 这种排序错会让它永远选中老链）。两条都打印，且当
+  "正在跑的 ≠ 号最大的"时往 stderr 喊一声 —— 那正是"换代了但夹具没跟上"的形状。
+- ✅ 四枚夹具的默认值都改成走这枚解析器，并**当场打印被测体路径**（读数里能看见 `被测链=…chain27.sh`）。
+  复跑读数（20:15，全在窗口外）：`credpin` **CREDPIN_FIXTURE=GREEN arms=6**（含它自己的变异臂 P4）、
+  `notesdone` **GREEN**、`gateleg` **GREEN 臂通过=12 臂失败=0**、`chain-rpi` **GREEN arms=7**。
+  ⚠️ 这四枚的抽段边界都是 `grep -n` **现取**的（gateleg:17-21 是样本），所以换成 27 之后不是"行号挪了但测错行"
+  —— 这一点我是查过才敢写的。
+- 📌 **可迁移的第四条**：夹具漂移有三级，越靠后越静默 ——
+  ① needle 停在旧版本（**会报错或红**，最便宜）；② 依赖的名字没传进子进程（**不报错，分支悄悄选边**）；
+  ③ **被测体指向"曾经跑过的那份"**（**不报错、不选边，逐字绿，只是与今晚要跑的东西无关**）。
+  ⇒ 凡是"抽段/复刻/对账"类装置，被测体路径要么来自**运行中的进程**，要么来自**显式旋钮**，
+  并且读数里必须打印出它选的是哪一份 —— 只写"我测了链"不构成证据。
