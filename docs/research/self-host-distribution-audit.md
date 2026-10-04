@@ -4995,3 +4995,111 @@ prune 修法 `89cda0df` **是** `959fd1e6` 的祖先 ⇒ 那趟构建**带着**�
 它本身是 fs 类、可以当场补，但它会**重新生成入口页并与提交物逐字节比** ⇒
 与正在跑的 `check:ai-e2e` 同时动 4318/4319 会互相造红 ⇒ 命令记在这里，排在 g66 之后跑：
 `pnpm --filter @heyta/landing check:entries`（在载体树上）。
+
+### 8.83 g66：把"等窗口才起跑"换成"绿即结案"之后，真该等的**不是负载，是那把锁**（2026-10-04 14:3x）
+
+（读数取自分支 `feat/self-host-distribution` 上的 `/tmp/g66-readings.log`、`/tmp/g66-summary.txt`、
+`/tmp/g60-carrier-check.log`、`/tmp/g60-seg-{c,m}-check:landing-e2e.log`，时间戳 2026-10-04 14:15–14:35。）
+
+**① 协议换掉了，两条立刻从"没执行"变成结案。** g60 那趟是"没有干净窗口就不起跑"，
+于是五段里四段压根没执行；g66 改成**先在载体上无窗口跑：绿就是读数，红才复跑/配对**。
+理由是负载造成的是**假红**（超时、抢不到端口），它不制造假绿 —— 所以绿不需要窗口。
+
+| 段 | g60 | g66（载体，load=39.3） |
+|---|---|---|
+| `check:widgets` | rc=1 内存闸门=1（没跑） | 14:15:10 RUN1 **rc=0** ⇒ 14:15:12 SETTLED |
+| `check:journey-coverage` | rc=1 内存闸门=1（没跑） | 14:15:12 RUN1 **rc=0 passed=36** ⇒ 14:15:14 SETTLED |
+
+**② 但"绿"要能被认出来，而 `counts()` 认不出。** 第一趟我就是这么把一枚 rc=0 读成"没执行"的：
+`scripts/check-widgets.mjs:245` 用 `execFileSync(..., {stdio:'pipe'})` 跑 vitest，**成功时把输出整个吞掉**，
+只有失败才打 ⇒ 日志里没有 `N passed`。修法不是改判据放宽，是**两层结案**：看得见条数就按条数，
+看不见就按**那条门禁自己打的覆盖标记**（widgets 打"扫描 12 个文件 + 4 份黄金夹具，5 条规则"，
+journey 打"web 旅程验收跑通"）。rc=0 本身已经证明被吞掉的那次 vitest **退的是 0**
+（`execFileSync` 非零即 throw），而"一个测试文件都没找到"在 vitest 下是非零退出，伪装不成绿。
+
+**③ `check:ai-e2e`：稳定红，配对**没**执行 —— 卡它的是锁，不是负载 12。**
+两趟同树同签名（RUN1 14:15:14→14:21:24、RUN2 紧随），`rc=1 passed=154 skipped=2 failed=1`，
+败的是 `tests/list-folder.spec.ts:72`，两趟收集到的失败集合哈希逐字相同（`c1=c2=7e7a96bad838a397b91645c451b8e0e0`），
+归属已由结构层在 §8.82 结案（写集 ∩ 该段消费的输入 = 0 + 载体"集外 0" + 正向对照 landing-e2e=5）。
+等待连串的心跳把真实原因打在日志里：
+
+```
+14:28:52 load=39.8 tfa=yes ports=none
+14:29:53 load=42.2 tfa=yes ports=none
+14:30:54 load=50.2 tfa=yes ports=none
+```
+
+`ports=none` —— 4318/4319 **是空的**，端口面根本没挡；挡的是 `tfa=yes`。
+14:35 现量那把锁的持有者是 pid 79513：
+
+```
+/bin/sh /Users/rocalight/.tfa-shield/bin/node scripts/run-gated.mjs --heap-mb=1024 --limit-mb=1024 \
+  -- node --test --test-concurrency=1 --test-reporter=spec scripts/test/{gates,host-headroom,host-shield,run-gated}.test.ts
+```
+
+**这是别的仓库的测试，不是 heyta 的**（锁 `/tmp/tfa-test.lock` 是主机级串行装置）。
+⇒ "等 load≤12"这一条对这几段本来就是错的条件：它们等的是一次**全局验证窗口**，
+负载降到 12 也照样会被闸门拒绝。我不去摘那把锁，也不绕过那个 shim —— 它和用户那条
+"跑验收不得抢别人的东西"是同一件事。
+
+**④ 那两段的归属，用 g60 已有的同签名对读数结案，不需要新窗口**：
+
+| 段 | 载体（g60） | main（g60） | 判 |
+|---|---|---|---|
+| `check:landing-e2e` | rc=1 内存闸门=1 | rc=1 内存闸门=1 | **两棵树同一把锁同一签名**（日志里连 pid=89651 与那句"它是：…/scratch-owner-transfer/rbac-d2/push-gated.test.mjs"都逐字相同）⇒ 环境，不是本批 |
+| `check:privacy-consent-e2e` | rc=1 内存闸门=1（没跑） | rc=1 内存闸门=0，跑到了编译：`avatar-encode.ts(96,55) TS2322`、`ErrorScreen.tsx(27,24) TS2307 Cannot find module '@heyta/design-system'` | main 侧那枚红是 **main 自己的债**（它连我们改的都没碰）；载体侧仍是**未执行**，不假装结案 |
+
+**⑤ §8.82 登记的那条覆盖缺口当场补掉了**：`pnpm --filter @heyta/landing check:entries`
+在载体树 `a250e6da` 上 **rc=0**，打的是"入口文件与注册表一致（**75** 份）"。
+⚠️ 第一次我是拿管道读的退出码，`${PIPESTATUS[0]}` 在 zsh 里是**空值** ⇒ 打成 `ENTRIES_RC=NA`；
+把输出重定向到文件再取 `$?` 才拿到 0（§7 第 184 条同族）。
+
+**⑥ 🔴 这一趟里 main 前进了两回，载体自己重算了两次 —— 现在这枚载体不是落地那一枚。**
+
+```
+14:1x  载体=d4b63beb 第一父=6fdb517f
+14:3x  载体=a250e6da 第一父=a49c4f19 第二父=e2b8d764
+main 现量（14:35）= 1930f2b5，分支现量 = 5a4b9e35
+git merge-base --is-ancestor feat/self-host-distribution main ⇒ NO（还没落地）
+```
+
+`a250e6da` 的两个父**都**旧了（main 又走了一笔 `1930f2b5`，分支又落了一笔 §8.82 的文档）。
+所以本节的每一条段读数都是**那一枚具名载体上的**读数，它不等于落地那一刻的读数 ——
+落地前必须重算 + 重扫（载体脚本自己就写了这条：只认分支不认 SHA，main 每进一步都要重跑）。
+⚠️ 连**分母**都要现数，而且**先钉死计数单位**——同一棵树上能数出三个不同的数：
+
+| 数的是哪棵树 | 按 `&&` 切的项数 | 其中 `pnpm <段名>` 形状的段 |
+|---|---|---|
+| 载体 `a250e6da` | 77 | **75** |
+| main 现 tip `1930f2b5` | 76 | **74**（另 2 项是 RAW：`pnpm --filter @heyta/landing check:entries` 与 `pnpm -r test`） |
+| 🔴 主检出**工作树**（就是那枚阻塞文件） | 81 | **79** |
+
+`git show main:package.json` 与工作树逐名对账，工作树比 main **多 5 条门**：
+`check:legal-closure-truth`、`check:legal-gdpr`、`check:vault-diagnostics`、`check:apk-freshness`、
+`check:shell-erasure-parity`（全是别人那笔未提交改动挂上去的，不是我们的）。
+⇒ **等 `package.json` 那笔提交上去，落地那一枚载体的并集会自动带上这 5 条** ——
+落地扫描的分母既不是 75 也不是 81，是那趟现场数出来的数；本节这些读数**不**声称覆盖它。
+现数命令（对着哪棵树就在哪棵树下跑）：
+
+```bash
+node -e 'const p=require("./package.json");const i=(p.scripts.check||"").split("&&").map(x=>x.trim()).filter(Boolean);
+console.log("项数="+i.length+" 段名数="+i.filter(s=>/^pnpm [\w:-]+$/.test(s)).length)'
+```
+
+**⑦ 顺手把"本节那张表被 md-tables 判过了"这个误读挡掉**：`scripts/check-md-table-rows.mjs` 的
+`FILES` 是**显式清单，9 枚**（现量：`node -e` 数载体上那份脚本的数组，本档 `含本档=false`），
+`docs/research/self-host-distribution-audit.md` **不在里面** —— 所以 §8.83 这三张表**没有被那道门判过**，
+那道门对它们既不是绿也不是红，是**没看**。这条不是新缺口，就是 §8.82 末登记的那条
+"等它的所有者下次碰它时把本档加进 `FILES`"同一件事；今天把代价**重新现量了一遍**：
+把那枚脚本的 `FILES` 换成只剩本档的一枚拷贝、在分支树上跑 ⇒ `rc=0`，打的是
+"✔ markdown 表格行：1 个文件，列数、断行与“是不是表”都一致"（文件 5095 行，含本节新写的三张表）。
+⚠️ 另外记一笔形状：**在分支树里直接 `node scripts/check-md-table-rows.mjs` 得到的是
+`MODULE_NOT_FOUND`** —— 那道门是 main 侧的，分支上还没有这个文件。它不是红，是**走错了树**；
+把它当红报就会把"我没带那个工具"说成"这条门禁挂了"。
+
+**⑧ 阻塞集现量（14:35）**：夹具 5/5 · 写集 37 枚 · 主检出脏条目 169 枚 · **阻塞集 1 枚 = `package.json`**。
+main 最近 8 笔全是别的线的文档（`docs(ai-goal)` ×6、`docs(handoff)`、`docs(selfhost)`），
+他们正在往里落，`package.json` 那一笔是同一批的活 —— 等它，不代改。
+**下一步（已起成一次性后台链 g69，它不含 merge 动作）**：轮询阻塞集归零 → 重算载体 →
+在**新载体**上逐段扫链（端口面按段现查，占着就响亮跳过，绝不 SIGKILL 别人的 dev server）→ 出报告。
+落地那一笔（`git merge --no-ff`，§8.61 ④ 的守卫序列）等报告齐了再由人拍。
