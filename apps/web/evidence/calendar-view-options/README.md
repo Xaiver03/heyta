@@ -30,7 +30,13 @@ ae8ad61d4a136625748ce465dfba46fb  view-tabs-year.png
 不是"每跑必变"。所以"不能钉常驻 md5"的结论**不变**（10:11 与 11:55 就是同一笔代码下的两个形态），
 但**根因方向换了**：不是随机种子（这张图里没有 `STAMP`），而是某个**运行态**在两三个值之间切换
 （候选：rail 那条「日历」提示条的显示/淡入帧、`selectOption` 之后焦点落在哪 ⇒ `:focus-visible` 环）。
-⚠️ **未定性，本轮不再往下查**（要往下查得能连跑多趟，而跑 e2e 要窗口）。
+🟢 **22:2x 拿到一枚免费的同窗分母**（H 的 flaky 看守 `RUNS=3` 连跑三趟，每趟收尾打印取证 md5）：
+`RUN_1=bb9f449a…` / `RUN_2=64fabbde…` / `RUN_3=bb9f449a…` ⇒ **同一窗口、同一笔代码下三趟只出两个形态，且其中一个重复**。
+同趟 `view-tabs-year.png` 三趟**逐字节同一个 `ae8ad61d…`** —— 那枚是常驻锚点，这一趟正好给它一次"跨趟相同"的复验。
+⇒ 这把"切换"从推断升成**可复现读数**（n=3 在同窗内），也再次否证"每跑必变"；
+⚠️ 但**仍未定到那个运行态是什么**（要定得逐帧比这两枚图的差异带落在哪个元素上，本目录现在只有 HEAD 那一份字节：
+看守重拍出来的 `bb9f449a…` 已按"没人看过的新字节不进 HEAD"还原，`git checkout --` 后 `md5` 回到 `14e74b5e…`、该目录脏行 **0**）。
+旧句留原处：**未定性，本轮不再往下查**（要往下查得能连跑多趟，而跑 e2e 要窗口）。
 
 ```text
 UIPIN view-select-closed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
