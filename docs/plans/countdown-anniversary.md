@@ -2858,6 +2858,8 @@ W0b ─> 随时可做（台账那半要等文件干净）
     `theme.tsx` 那类别名走（修法方向是给探针加"本地再导出/别名"这一跳，而不是把判据退回"出现过 Provider"）。
     因此 Goal 第⑤条第 1 项"完整 check 的读数"现在的真话是：**串联到 `check:ui-provider` 停住**，
     本批自己的门禁全部单独重取过（`check:card-export` / `check:shell-surfaces` / `check-md-table-rows` / `docs-link-check` 各自 rc=0）。
+    ⚠️ **这条里「门禁自己在 :801 注明别名误判」的判读在 ㊶ 被否证** —— 别名一直跟得上，
+    真根因是 `renderedTags()` 把 `return <X />` 当成 TS 泛型吃了；W7-G7 已在 ㊶ 当场修完并带四条变异臂读数。
   - 🔴 **iOS 新鲜度门：两条"更聪明"的替代判据都被实测否证，所以链 X 走最贵但唯一诚实的那条 —— 先重装再测**
     （这段推理写在链 X 的文件头，摘在这里是因为它是本批第 N 次撞"测试绿 ≠ 当前产物"）：
     ① 用"最近一次改 bundle 输入的**提交时间**"代替文件 mtime ⇒ 现量 `10:21:53 > bundle 10:19:34`，
@@ -2866,3 +2868,29 @@ W0b ─> 随时可做（台账那半要等文件干净）
        但 Xcode build phase 装进 `.app` 的那枚是 **7 277 184 字节**，命令不同 ⇒ 字节不可比。
     ⇒ 链 X：`IOS_DEVICE_NAME=heyta-batch2-closeout bash scripts/reinstall-all.sh --only ios`（重装本身也是 Goal 第⑤条第 4 项要的）
        → 再跑探针取 `RC_IOS_PROBE`。
+
+- ㊶ **W7-G7 当场修完了，但根因不是我 ㊵ 里判读的那条 —— 是探针把 `return <X />` 当成 TS 泛型吃了**（04 14:00–14:02，载体 `f5ff4bce`）
+  - 🔴 **㊵ 里那句"门禁自己在 `check-ui-provider.mjs:801` 注明了按词法位置判会误判别名消费者"的判读是错的**，划线留原文不删（下面这条否证它）：
+    `resolveName`/`resolveExported` **本来就跟着别名走**（`theme.tsx:33` 的 `HeytaUiProvider as ThemeProvider` 被正确解析成 Provider，
+    `providers=1` 就是从 `App.tsx` 里数出来的）。真正坏的是 `renderedTags()` 的前置字符启发式：
+    它为了排除 `useState<Foo>` 写成"**跳过空白**后看前一个非空字符不能是标识符字符"，
+    于是 `return <GrowthScreen />` 里 `return` 的 `n` 被当成紧邻字符 ⇒ **"直接返回一个组件"整类边不进可达集**。
+    它自己的文档例子（`useState<Foo>`）本来就是无空格写法 —— 跳过空白超出了它自己要防的东西。
+  - 🔴 **这 4 条红是我自己那笔 W8 改动照出来的**（不是别人的存量债）：`b8f39cae`「W8 移动端倒数日接线与特性开关」
+    把两段 `if (xxxOpen)` 换成穷尽 switch 的模块级 `featureScreen()`，屏幕从 `{cond ? <X/> : null}`（判据认识）
+    挪到 `case …: return <X />`（判据不认识）。现量：`git show b8f39cae^:apps/mobile/src/screens/ProfileScreen.tsx | grep -E 'return <(Growth|Habits)Screen'` 命中 **0**
+    ⇒ 改动前这条边不存在于该形态，门禁是绿的。第 4 条 `ui/habit-goal-slot.tsx:37` 是**传递性**红：它只从 `HabitsScreen` 可达。
+  - ✅ **修法（一行判据，不是放宽判据）**：`renderedTags` 改成看**紧邻**那一个字符、不跳空白。
+    修后 `pnpm check:ui-provider` **rc=0**，可达集 `apps/mobile/src` 32→**36**（恰好那 4 个文件）、`apps/web/src` 65→**66**，**零新增红**。
+  - ✅ **四条变异臂**（全部在 `/tmp` 的一次性副本上跑，真实树全程未动 —— 那一刻链 X 正在 Metro 打包 `apps/mobile/src`，
+    加/碰任何 `.ts/.tsx` 都会翻掉 iOS 新鲜度门；三处替换各自断言 `split(from).length-1===1` 并回显替换体）：
+    | 臂 | 改动 | 读数 |
+    |---|---|---|
+    | CONTROL | 未变异副本 | `RC=0 / RED_LINES=0` |
+    | ARM1 | tokenizer 退回"跳空白"版 | `RC=1 / RED_LINES=4`（逐字是那 4 条 ⇒ 绿只来自这一行） |
+    | ARM2 | 摘掉 mobile 宿主的 Provider 节点 | `RC=1 / NO_PROVIDER_LINES=1`（这个宿主真在被判，不是静默跳过） |
+    | ARM3 | 冻结可达性 BFS | `RC=1 / RED_LINES=93`（"子树之内"这条有牙，不是只查"文件里出现过 Provider"） |
+  - 📌 **运行时反证与判据读数彼此自洽**：13:20 那一趟在**同一台模拟器**真打开过倒数日屏、真点导出、真拉回 `1080×1440` 的 png；
+    真落在 Provider 之外会当场抛「useHeytaUiTheme 必须在 `<HeytaUiProvider>` 内使用」，跑不到落盘那一步。
+  - ✅ **于是 Goal 第⑤条第 1 项解锁**：完整 `pnpm check` 在 `f5ff4bce` 之后可以再取一次读数（链 V 那一趟 45 秒就停在这里）。
+    排在链 X 之后跑 —— 它第一步是 `pnpm -r build`，会抢 Metro 的 CPU 并改 `apps/web/dist` 的 mtime。
