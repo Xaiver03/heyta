@@ -161,6 +161,39 @@ export function replayVerdict(r) {
   return r.problems.length ? r.problems.join(' · ') : null;
 }
 
+/**
+ * `--selftest` 那段输出的**内容**判据 —— 给消费方（载体脚本）用。
+ *
+ * 🔴 为什么不能只看退出码：把自检里那句"每条臂是否通过"的判定改成恒真之后，脚本仍然 `rc=0`。
+ *   （⚠️ 这条注释原先**逐字抄了那行代码**，于是后来拿 `replace(那行, …)` 做变异臂时，
+ *   替换落进了注释、代码原封不动 —— 变异"成功"了却什么都没变。
+ *   文档注释里不要抄将被当作变异 needle 的字面串，这是 §"replace 只换第一处"那一族的又一副面目。）
+ *   也就是说"跑了自检、rc 0"这一条腿对**被摘牙的自检**没有分辨力。
+ *   判内容才判得动：control 必须 0 条问题、每一条变异臂必须 ≥1 条、且要有收尾复绿那句。
+ *
+ * @returns {string|null} null = 这段输出确实证明六臂各按预期
+ */
+export function selftestOutputVerdict(stdout) {
+  const lines = String(stdout).split('\n');
+  const numOf = (line) => {
+    const m = line.match(/问题 (\d+) 条/);
+    return m ? Number(m[1]) : null;
+  };
+  const ctrl = lines.filter((l) => l.includes('臂 control'));
+  if (ctrl.length !== 1) return `control 臂打印了 ${ctrl.length} 行（应当恰好 1）`;
+  if (numOf(ctrl[0]) !== 0) return `control 臂的问题数不是 0 —— 判据在合法输入上就红，产出不可信`;
+  const arms = lines.filter((l) => /臂 (?!control)/.test(l) && numOf(l) !== null);
+  if (arms.length < 5) return `变异臂只数到 ${arms.length} 条（五臂是这套判据的最低配置）`;
+  const alive = arms.filter((l) => (numOf(l) ?? 0) >= 1);
+  if (alive.length !== arms.length) {
+    return `${arms.length - alive.length} 条变异臂的问题数为 0 ⇒ 自检被摘了牙或某一臂不再可达，不能用它证明判据有牙`;
+  }
+  if (!lines.some((l) => l.includes('收尾复绿') && l.includes('问题 0 条'))) {
+    return '缺"收尾复绿"那一行 ⇒ 无法证明变异没留在对象里';
+  }
+  return null;
+}
+
 export function replayReading(r) {
   const want = expectedDelta();
   return `四处重放命中数=[${r.hits.map((h) => h.hits).join(',')}] · 删 ${want.removed.length} 行 · 增 ${want.added.length} 行 · main 侧两个新函数都在 · 产出 ${r.text.split('\n').length} 行`;

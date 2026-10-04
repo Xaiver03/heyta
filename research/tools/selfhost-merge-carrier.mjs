@@ -86,7 +86,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { unionAudit, unionAuditVerdict, ownershipVerdict, pkgFieldVerdict } from './selfhost-audit-union.mjs';
-import { replayCapture, replayVerdict, replayReading, CAPTURE_PATH } from './selfhost-capture-replay.mjs';
+import { replayCapture, replayVerdict, replayReading, selftestOutputVerdict, CAPTURE_PATH } from './selfhost-capture-replay.mjs';
 
 const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
 const MAIN = process.env.HEYTA_MAIN_REF || 'main';
@@ -207,6 +207,28 @@ if (fam.other.length) {
 notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} cov=${fam.cov.length} cap=${fam.cap.length} other=${fam.other.length}`);
 if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1 || fam.gen.length > 1 || fam.cov.length > 1 || fam.cap.length > 1) {
   die(2, '同一族出现多于一份文件 —— 分族前提（各一处）不成立，交人判');
+}
+
+/* ── 第八族那条判据自己的牙 ───────────────────────────────────────────
+ * 为什么挂在这里、而不是往 `pnpm check` 的链里加一段：这条判据唯一被用到的时刻
+ * 就是载体解第八族，而**每次要落地都必须重算载体** ⇒ 挂在这里它就有"每次都被跑"的保证；
+ * 加进链反而要再动 `"check"` 那一整行（= §8.41 那族冲突的成因：一侧改能自动并，两侧都改才冲突）。
+ * 🔴 "手动跑过一次"不算消费方 —— 那是 G-48 收口时立下的口径：它不是"手动跑的那一条"，
+ * 它是"没有人跑的那一条"。 */
+const REPLAY = 'research/tools/selfhost-capture-replay.mjs';
+let capSelftestReading = '';
+if (!existsSync(join(WT, REPLAY))) {
+  die(2, `第八族的判据文件不在载体树上（${REPLAY}）⇒ 没有它就不许解这一族，也不许当"没有这一族"混过去`);
+}
+try {
+  const st = execFileSync('node', [join(WT, REPLAY), '--selftest'], { encoding: 'utf8', maxBuffer: 8 << 20 });
+  const v = selftestOutputVerdict(st);
+  if (v) die(2, `第八族的自检**退出码 0 却证明不了它有牙**：${v}`);
+  capSelftestReading = '第八族判据自检：control 0 条 + 五臂各 ≥1 条 + 收尾复绿（按**输出内容**判，不是只看 rc）';
+  notes.push(capSelftestReading);
+} catch (e) {
+  const arms = String(e.stdout || '').split('\n').filter((l) => l.includes('臂') || l.includes('自检')).slice(0, 8).join('\n');
+  die(2, `第八族的重放判据**自检不过**（没牙了，或被改坏了）⇒ 不用它解冲突：\n${arms}`);
 }
 
 /* ── package.json ─────────────────────────────────────────────────── */
@@ -609,5 +631,8 @@ git(['branch', '-f', BRANCH, carrierSha]);
 console.log(`✅ 载体 ${carrierSha.slice(0, 8)} = ${MAIN}(${mainSha.slice(0, 8)}) × ${SOURCE}(${srcSha.slice(0, 8)})，分支 ${BRANCH} 已指过去`);
 console.log(`   ${pkgReading}`);
 console.log(`   ${giReading}`);
+// 🔴 自检这条必须在**成功路径**上也打出来：只进 notes（失败时才 dump）的判据，
+//    在成功时是静默的，而"静默的通过"会被下一轮读成"没跑"或"跑了但没人看"。
+console.log(`   ${capSelftestReading}`);
 console.log(`   门禁 ${GATES.length} 道全 exit 0；完整 pnpm check 留给落地那一刻`);
 console.log(`   main 若再前进 ⇒ 重跑：node research/tools/selfhost-merge-carrier.mjs`);
