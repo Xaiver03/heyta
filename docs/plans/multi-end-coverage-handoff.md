@@ -3314,3 +3314,23 @@ preflight 不碰它们 ⇒ 我们不会杀别人，但别人在那几枚上时�
 命中另一枚同前缀的路径** —— 本项目所有载体/仓库路径都带 `All in one Data`（含空格），所以这不是边角料：
 正主永远不被匹配，而输出里读起来一切正常。判据写法：**提取锚必须是生产者打印它的那一行**
 （`证据已抄进 <path>`），不是"长得像路径的一串"；并且第一次用就喂假日志 + 一条阴性对照。
+
+
+## 04:06 收口对账（回合预算将尽）：五项逐项的**现量命令**，不抄读数
+
+这段只干一件事：把"这一项现在归谁、用什么命令一眼看出它到哪一步"钉成命令。
+**不写状态与数字** —— 状态会漂（本档 03:59 那张候选计数表两分钟内就漂过一次，理由见 04:04 那节），
+命令不会。§5 顶部横幅是导航，本节是恢复入口。
+
+| 项 | 一条现量命令（跑它，别抄本档） | 归属 / 边界 |
+|---|---|---|
+| ① 四端重装 | `ls -l /tmp/heyta-chain8.reinstall-done`（有 ⇒ 按 §7.30 模板从 `<EVID>` 逐张看图；无 ⇒ 看 `tail -3 /tmp/heyta-chain18.log` 的拦因） | 链 pid 见 `pgrep -f heyta-window-chain`；**不许**代拍拆成两趟（AGENTS §6.1.1，理由在 03:38 那节） |
+| ② 三段 e2e + 全量 check | `D=$(ls -dt $HOME/.heyta-evidence/checks-queued-*/ \| head -1); ls -l "$D"; grep -E 'CHECK_EXIT=|可过段数' "$D"/*.log` —— ⚠️ 不要写成 `ls …/checks-queued-*/rc.txt`：**目录里现在还没有 `rc.txt`**（还在等），未匹配的 glob 在 zsh 下会让**整行中止**（本项目路径还带空格），那会被读成"装置没了"。取"最新一枚目录"再在目录里找文件，两步都不依赖 glob 命中 | 排队器 pid 见 `pgrep -f heyta-queue-checks`；"可过段数"**只认 `CHECK_EXIT`**（03:37 那节） |
+| ③ `verify-mobile-notes` | `cat /tmp/heyta-chain8.notes-done` | ✅ 已闭合（03:19:59，37 项），恢复时**不要重跑** |
+| ④ 父子层级选择器 | `pnpm -s check:layering` 之外没有新门禁；功能面现量看 `packages/app-host/src/project-actions.ts` 的 `setParent` 与两端选择器 | ✅ 已闭合（03:33 对当前 HEAD 复量过） |
+| ⑤ B41 / B42 / B45 | `grep -nE "B41|B42|B45" BLOCKED.md`（04:06 实跑：命中 5 行；**带反斜杠的写法实测 0 命中** —— `grep -E` 里 `\|` 是字面竖线，那会把"登记在位"读成"没有登记"） | 🔴 **登记不越权**：要翻冻结判据 / 动服务端面，本批不动 |
+| 判据 4（Android 连续两轮重打） | `bash $HOME/.heyta-window-rigs/heyta-judge4-two-rounds.sh --carrier <载体> --go`（含 03:31 加的路由自检三臂） | 需要窗口；窗口判据用仓内那道 `scripts/verify-mobile-window-gate.sh --target b` |
+
+⚠️ 恢复时有**两枚哨兵/排队器可能已经不在了**（上下文压缩会杀掉后台任务，03:55 实测过）：
+先把 `pgrep -f 'heyta-watch-12|heyta-queue-checks|heyta-window-chain'` 跑一遍，
+缺哪一枚就按 §03:58 那节的命令行重起 —— 尤其**别让 ② 的 `CAP_CHAIN` 又短于链的寿命**。
