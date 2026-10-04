@@ -1884,3 +1884,97 @@ comm -12 /tmp/a.txt /tmp/b.txt | tee /tmp/intersect.txt | wc -l
 ② 修 ① 时一次 `Edit` 把逗号吃成了 `，，`（`old_string` 少带了行尾那个字符，`new_string` 又补了一个）——
 相邻字符被编辑顺手改动是这一族的老形状，所以每次 `Edit` 之后除了跑判据，
 还要 `grep` 一眼**被改那一行本身**（本行现在读起来是 `第一行**，` 一个逗号）。
+
+## 8.34 W1c 的那格空档补上了：RN 端习惯行的选中痕迹**第一次有判据，也有臂**（2026-10-04 10:1x–10:2x，新增 1 份测试文件）
+
+§8.26 逐处现量时数到**五处渲染点**，但 §8.22 那六条变异臂（N1–N4 / T1 / H1）**全部打在 web 的便签与任务上** ——
+也就是说 mobile 那一处（共享 `packages/ui/src/habits/HabitProgressList.tsx` 的 habit 行）**一直是零断言**：
+`grep -rln "HabitProgressList" packages/ui/tests/` 现量**零命中**，`aria-pressed` 在那张面上没有任何一层会管。
+这一格不是"锦上添花"，是本单 §4 第 1、3、4 条的欠账：判据没配臂的那一处，等于**这一处的"选中要说出来"从未被要求过**。
+
+新增 `packages/ui/tests/habit-row-selection-trace.spec.ts`（**8 条**，源码级；为什么源码级写在文件头：
+`packages/ui` 不引 jsdom 不 render，而 `apps/mobile/tests/` 今天**一个 render 用例都没有** ⇒
+这一处的痕迹只有源码级这一条通道能守住）。判据分三组：
+
+| 组 | 断的东西 | 为什么只能这么断 |
+|---|---|---|
+| A 通道在 | 平铺 `aria-pressed={selected}` 在；`accessibilityState=` **不许出现**；且属性离它最近的开标签是 `<Pressable` 而不是里层 `<View`/`<Text` | RNW 0.21 会把对象形态整组丢掉；挂错那颗时视觉照常、只有读屏用户受影响 ⇒ **没有任何行为测试会红** |
+| B 两条线索同源 | 选中谓词必须是 `const selected = habit.id === selectedId;`（不许按 index）；描边与底色必须挂在**同一个** `selected` 三元上；`rowSelected` 必须同时给 `borderColor: color.primary` 与 `backgroundColor: color.primary-subtle` | 改一条漏一条在截图上看不出来；按位置选中则列表一排序就跟着错行（W1b 正在动排序） |
+| C 没选中时零行亮 | `selectedId` 必须是**可选** prop；谓词那一行不许掺 `index` / 布尔常量 | 变必填会让没接的宿主在运行时炸（AGENTS §3.3 同族）；`selectedId` 为 undefined 时等式全 false ⇒ 零行亮是**推导**出来的，不是靠额外分支 |
+
+💥 **变异七臂**（`/tmp/dp_habit_trace_rig.mjs`，一次性；每臂：改源码 → 跑这份 spec → 还原 → 比 md5）：
+**未变异对照先跑一次全绿**（`rc=0 / passed=8`）才允许信后面的红 —— 台子自己会造红。
+
+| 臂 | 改法 | 红集（点名到标题） |
+|---|---|---|
+| M1 | `aria-pressed={selected}` → `accessibilityState={{ pressed: selected }}` | **3 红**（A①平铺、A②不许对象形态、A③住在可点那颗） |
+| M2 | 删掉整行 `aria-pressed` | **2 红**（A①、A③） |
+| M3 | `style={selected ? [row, rowSelected] : row}` → `style={styles.row}` | **1 红**（B②两条线索同源） |
+| M4 | 谓词 → `Boolean(selectedId)`（整列表一起亮） | **1 红**（B①id 相等） |
+| M5 | `selectedId?: string` → 必填 | **1 红**（C①可选） |
+| M6 | 从 `rowSelected` 里删掉 `borderColor` 那一行 | **1 红**（B③两条线索都在） |
+| M7 | 谓词 → `const selected = true;` | **2 红**（B①、C②不掺布尔） |
+
+🔴 **判据无臂审计**（这条是本节真正的方法）：台子把八条 `it('…')` 与七臂的红集做集合对账 ⇒
+`IT_COUNT=8 ARMS_KILLED=8 UNCOVERED=0` —— **每条判据都有能把它打红的那一臂**，
+不是"做过变异"而是"逐条红过"。（第一版只有五臂时这里会是 `UNCOVERED=2`：B③ 与 C② 没人打，M6/M7 就是那么补出来的。）
+
+**还原证明**：`FINAL_MD5 = BASE_MD5 = 8241c8e7c51b377502e21a4114a03517 SAME=true`，
+且台子每臂跑完都单独比过一次 md5（不是只在最后比）。
+**读数**：`packages/ui` 全量 **26 文件 / 467 passed**（本批前是 459，+8 正好是这一份；数对得上才算这份真被收进套件），
+`tsconfig.spec.json` 的 typecheck RC=0；门禁五道 RC=0（`check:selection-single-source` 末行照旧：
+`2 份实例 / 宿主内本地选中态 0 处 / 词表 3 类全有消费者（task 10 / habit 7 / note 13）/ 接线声明 17 处全部用起来`、
+`check:layering`、`check:design`、`check:l4`、`check:ui-language`）。
+⚠️ **本节没有改任何 `packages/ui/src` 的字节**（七臂全在跑完当场还原），所以 §1 第四道"改完先 build"这一趟不适用；
+`HabitProgressList.tsx` 的 md5 与开工前逐字相同就是那件事的直接证据。
+🔴 这仍然是**源码级判据**，不是界面级：RN 端真机上那条痕迹有没有落到可访问性树上，
+要等 §8.14 那批设备窗口 + 四端重装，不能拿本节的绿去主张"装出来的手机上选中看得出来"。
+
+## 8.35 本分支上 `check:docs` 有一枚**先前就红的死链**，归因量到了；抓它的那趟探针自己坏了（2026-10-04 10:3x 现量；本节零改动）
+
+跑 `node research/tools/docs-link-check.mjs` → **RC=1，两枚红，都在本单之外的文件里、且本节开工前就在**
+（对照读数：加 §8.35 之前那趟同样是"1 处失效章节引用 + 1 个死链"，之后仍是这两枚 ⇒ **本节零新增红**，
+中途我自己写的那条相对链接错了一次，已当场改回并复跑确认）。
+
+**① `PROGRESS.md:1362` → `docs/research/aed-implementation-evidence.md`（死链）。不是本单造的、也不是仓库缺陷，是这条分支落后 main 的读数**，三条 ref 现量：
+
+| ref | 那条引用（`grep -c`） | 目标文件在不在树里 |
+|---|---|---|
+| 本分支 HEAD | 1 | **不在** |
+| merge-base `f419df75` | 1 | **不在** |
+| `main` | 2 | 在 |
+
+补两条把归属钉死的读数：目标文件由 **`c25960cb`** 加进 main，而 `git merge-base --is-ancestor c25960cb HEAD` → **不是本分支祖先**；
+本分支从未碰过 PROGRESS（`git diff --name-only f419df75 HEAD -- PROGRESS.md` 输出为空）。
+⇒ **合并/变基到 main 之后这枚红自己消失**。本单**不动它**：PROGRESS.md 此刻在主检出正脏着（`M`），
+按 §1 归属门与 Goal 第⑤条，代改别人在飞的活不在授权范围内。
+
+**② `docs/plans/countdown-anniversary.md:1280` → "ADR 台账 §1 不存在"（失效章节引用）。这一枚是检查器自己的假阳性**，
+机制量出来了：那一行原文写的是 `§1a`，而 `docs/adr/README.md` 里确实有 `### 1a. 「勘误段」…`（第 31 行）⇒ **引用本身是对的**。
+检查器的 `SECTION_REF_RE` 只吃 `§\d+(\.\d+)*`，遇到 `§1a` 的尾巴 `a` 不解析，把它**截成 `§1`** 再去查 `## 1` 标题 ⇒ 判"不存在"。
+这和它自己注释里记过的 `§3.3.1` 被截成 `§3.3` 是同一个病的第二种面目（那一版修了小数尾巴，没修字母尾巴）。
+🔴 本单**不改检查器**：那是文档门禁本身的行为，动它要配变异臂、且会同时影响别的线正在写的引用。
+在这里记的是**机制 + 一条复现**（`node research/tools/docs-link-check.mjs` 现量 RC=1，红指到 1280 行），
+等这条门禁的所有者来收。
+
+📌 记这两枚的用途：下一个人在这个 worktree 跑整条 `pnpm check` 会看到 `check:docs` 红，
+**别把它读成"本批把文档改坏了"** —— 一枚是分支落后、一枚是探针坏，本单的文件里一枚都没有。
+（§8.34 那句"门禁五道 RC=0"没有把 `check:docs` 算进去，所以那里没有需要更正的主张。）
+
+💥 **顺手照出一个会咬人的 shell 陷阱**（就发生在我取上面那三个读数的第一趟）：
+
+```bash
+for ref in HEAD $MB main; do git show "$ref:PROGRESS.md" | grep -c "aed-implementation-evidence"; done
+# → 三个全报 0。而直接写 git show HEAD:PROGRESS.md | grep -c → 报 1。
+```
+
+成因不是 git，是 **zsh 把 `$ref:PROGRESS.md` 里的 `:P` 当成了修饰符**（`:P` = 逻辑路径解析），
+于是实参被拆成"对 `HEAD` 做 `:P`" + 字面量 `ROGRESS.md`，git 报错；而那条命令里有 `2>/dev/null` ——
+**错误被吞掉，`grep` 收到空输入，打印 0**。
+同一个循环里 `"$ref:docs/research/…"` 却是对的（`:d` 不是修饰符），所以这趟读数**一半可信一半是空集**，
+而两者在输出上长得一模一样。修法：**永远写成 `"${ref}:PROGRESS.md"`**。
+🔴 这正是本仓库反复吃过的形状（"空测量看着最干净"）：**`grep -c` 报 0 从来不区分"没有匹配"和"根本没读到东西"**，
+而把 git 的 stderr 丢进 `/dev/null` 就把唯一的区别信号也删了。
+⚠️ 待入 [环境陷阱](../reference/environment-traps.md) 一条（zsh 参数展开的 `:P` 修饰符吃掉 `git show ref:path`，
+且 `2>/dev/null` 把它伪装成空读数）—— **本单不往那张台账里追加**：它在主检出正脏着几百行，
+按既有纪律取号要按工作树、插行会撞车，登记在这里等收口的人并进去。
