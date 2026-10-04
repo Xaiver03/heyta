@@ -8983,3 +8983,31 @@ node research/tools/selfhost-license-coverage-arms.mjs --installed-tree /tmp/tre
 **所以这一节的主张现在到这一句**：这张登记表在**两种载体上都有牙**（摘掉/塞假/走后门各红一次，
 对照组未变异时不红）。仍**不**主张的是：这棵真树来自 6 小时前那次 verify 的镜像，不是当前产物的树 ——
 "发出去的字节里有牙"要等落地后 `verify:selfhost-stack` 重跑那一趟（那趟会顺手把 dump 导成当天的）。
+
+### 8.150 全栈现量**现在还是不是**当前产物的读数：一条命令答完（差额 172 笔，产品构建输入 0 改动）（2026-10-05 00:5x）
+
+目标第 2 项那句"`pnpm verify:selfhost-stack` 全跑拿现量"闭在 §8.118（`STACK_RC=0 / 3 passed / FRESH=4/4`，四张图人看过）。
+但它此后又落了十几笔本批提交 ⇒ "那次读数还成立吗"这一问题每次都要重答，**答法不能靠印象**。
+判据就一条，量的是**自那次读数以来有没有动过产品构建输入**：
+
+```bash
+git diff --name-only 37639f11..HEAD -- apps packages server/src server/Dockerfile \
+  server/package.json server/package-lock.json server/prisma server/scripts   # 枚数 = 0
+```
+
+这一趟读数：**0 枚**。期间变的 7 个文件全在判定与证据那一侧（两枚 `e2e/live-site/*.spec.ts`、
+三枚 `e2e/selfhost-stack-results/*.png`、`server/README.md`、`server/tests/version-coupling.spec.ts`）
+—— 它们改的是"怎么判"和"判完留下什么"，不是"发出去什么"。
+所以：**§8.118 那趟全栈现量仍然覆盖当前产物**，不需要为了"读数新鲜"重跑一次十几分钟的 docker 构建。
+
+🔴 这句话的边界要写清，它**不是**"不需要重跑"：
+① 落地之后必然要重跑（载体的 `pnpm check` 里就含 e2e，且 main 那侧别人的改动会进构建输入）；
+② 本命令只覆盖 `apps/ packages/ server/` 这几条路径，若哪天有构建输入住在别处（例如根配置），
+   这条判据的射程就要跟着改 —— 它的强度取决于**列出来的路径是不是全部输入**，不是"跑过了"。
+
+顺带两条现量（都会漂，留命令）：
+- 全批差额 **`git rev-list --count main..HEAD` = 172 笔**（这一天的凌晨还是几十笔量级，main 一夜在走）。
+- 哨兵 43552 活着（37 分钟），它最新两样报的是 **端口被占：4319/57632、4318/57643** ——
+  也就是说这一晚挡住落地的不止负载与那一枚 `package.json`，还有别人的 dev server 站在 `--confirm`
+  会 SIGKILL 的那一段射程上。这条正是哨兵第三条判据**在做它该做的事**：与其开窗后被
+  gate 5 打回来，不如不开。**别把它读成"哨兵太严"**，更别去调那个阈值。
