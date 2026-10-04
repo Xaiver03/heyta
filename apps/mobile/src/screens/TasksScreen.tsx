@@ -50,9 +50,11 @@ import { CaptureComposer, priorityColorToken, type CaptureSubmitPlan } from '@he
 import { useCaptureLabels } from '../lib/capture-labels';
 import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import {
+  createNoteActions,
   createProjectActions,
   createTaskActions,
   type AppHost,
+  type NoteActions,
   type ProjectActions,
   type TaskActions,
 } from '@heyta/app-host';
@@ -523,6 +525,12 @@ export function TasksScreen({
     [host],
   );
   /**
+   * 便签动作集。**这一屏自己就挂着便签编辑层**（`editingNoteId` 决定 `NoteEditScreen`
+   * 开不开），所以它和 `NotesSection` / `SearchScreen` 一样是"手里有便签实体全集"的屏 ——
+   * 回落要在这里也跑一次，理由见下面 `refresh` 里那条注释。
+   */
+  const noteActions = useMemo<NoteActions | null>(() => (host ? createNoteActions(host) : null), [host]);
+  /**
    * 可选的清单。**与「我的」页读的是同一份物化状态**，所以两处永远一致。
    *
    * 🔴 这里**不含「收集箱」**：「收集箱」不是一条清单，而是
@@ -551,13 +559,23 @@ export function TasksScreen({
      * 那一截。写成后者的话，用户切一下视图，正在详情面里看的那条就被判成
      * "不存在"、面板凭空关掉 —— 而这条规则本身在共享层（`app-host/selection.ts`），
      * 这里只负责把事实源递进去。
+     *
+     * 🔴 `note` 这一项是 2026-10-04 补的（工单 §8.43）：**这一屏自己就挂着便签编辑层**
+     * （`editingNoteId` 决定 `NoteEditScreen` 开不开），而回落只跑"这一屏递进去的那几类"。
+     * 少递一项的确切症状：从这一屏的搜索里点开一条便签，它在另一台设备上被删了 ——
+     * 编辑层不会自己关，一直显示"这条便签已经不在了"，直到用户手动返回。
+     * 那两条已经接了回落的屏（`NotesSection` / `SearchScreen`）此刻**没挂载**，替不了它。
      */
-    pruneSelectionAgainst({ task: aliveTasks.map((task) => task.id) });
+    const aliveNotes = noteActions === null ? undefined : noteActions.listNotes();
+    pruneSelectionAgainst({
+      task: aliveTasks.map((task) => task.id),
+      ...(aliveNotes === undefined ? {} : { note: aliveNotes.map((note) => note.id) }),
+    });
     if (projectActions) {
       setProjects(projectActions.listProjects());
       setTags(projectActions.listTags());
     }
-  }, [actions, projectActions]);
+  }, [actions, projectActions, noteActions]);
 
   /**
    * 离开这一屏时收起"详情"这一层。
