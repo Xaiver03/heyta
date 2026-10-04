@@ -3957,3 +3957,44 @@ LIB-MISSING / NO-BASELINE / NO-EVIDENCE / STALE-EVIDENCE`（前两个各出现 2
 
 换体仍走"副本编辑 → `bash -n` → 喂腿 → `mv`"，现役 66947（已跑 17 分钟）不受影响；
 队列现在停在阶段 1 测试通道（累计 960s / 7200s，持有者 `29093 29434`）。
+
+#### §15.43ai（10-04 08:2x）把 §15.43ah 那条教训反过来当探针用：数"被调用却不存在的东西"，照出设备独占门是一处**看不见的放行**
+
+§15.43ah 收口后我把同一个动作推广到整条队列：枚举"脚本里出现的函数名"与"脚本自己定义的函数 + 那份 lib 提供的函数"，
+取差集逐个读原文。现量 **28 个定义、差集 37 个候选**（写这一句时把探针重跑了一遍，第一趟数出的是 40 ——
+差 3 个是因为我把 `elif`/`tee` 这类词纳不纳入白名单动过一次；**计数改动要连命令一起交，别只交数字**。
+这 37 个里绝大多数是注释/路径/字符串里的词，**必须逐个读那一行**才能定档），真命中一处：
+
+`dev_wait()`（阶段 5"设备独占到手"那道门）第 308 行是
+`. "$MAIN/scripts/lib/mobile-e2e-runner-probe.sh"`，第 310 行紧接着 `busy=$(mobile_e2e_runner_lines | awk …)`。
+**source 失败没人接**：函数没定义 ⇒ 命令替换里 `command not found` 走 stderr ⇒ 而队列是
+`nohup … >/dev/null 2>&1` 起的，stderr 哪儿都不去 ⇒ `busy` 空 ⇒ 日志写下
+`阶段5 设备独占：到手（等 0s）` 并 `return 0`。
+⇒ 一处**读起来完全像放行**的放行：这道门挡的是 `adb uninstall` / `pm clear` / `simctl uninstall` 会不会清掉别人的现场，
+误"到手"的代价落在别人身上，而我这条链只会留下一行绿灯。
+
+变异臂（同一份 `dev_wait` 体、`MAIN` 指向没有那份 lib 的临时树）：
+
+| 臂 | 现量 |
+|---|---|
+| 改造前 | `bash: line 10: mobile_e2e_runner_lines: command not found` → `SAY …：到手（等 0s）` → `RC=0` |
+| 改造后 | `SAY …：探针函数没拿到（…没能 source 上）⇒ 判**不到手**，不许空跑成到手` → `RC=1`（调用点转成 `env_retry`，退 64 有界重起） |
+
+正向腿也跑了：`MAIN` 指向真仓、此刻没有移动端验收在跑 ⇒ `到手（等 0s） RC=0` —— 改判据不能只证会红，
+还要证它该放的时候照样放（§7 元规则 2）。
+
+**同一轮把三处 source 全数了一遍**，另两处本来就接得住，差别很有用：
+
+| 位置 | 形状 | source 失败时 |
+|---|---|---|
+| `win_gate` | `bash scripts/verify-mobile-window-gate.sh`（子进程 + 显式读 `rc`） | `rc=127` ≠ 0 ⇒ 继续等 ⇒ 等满 `return 1` ⇒ **本来就 fail-closed** |
+| `wait_load` | `if ! ( cd "$CARRIER" && . ./scripts/lib/wait-for-quiet-host.sh && wait_for_quiet_host )` | `&&` 短路 ⇒ 子 shell 非 0 ⇒ `if !` 走"等满"那支 ⇒ **fail-closed**（且相对路径前有 `cd`，不是悬空 CWD） |
+| `dev_wait` | `. lib` 后在**命令替换**里调用 | 无人消费退出码 ⇒ **fail-open**（本轮修） |
+
+⇒ 可迁移的形状规律：**`source` 之后要用的东西如果出现在 `$(…)` 里，失败就不可能被发现**；
+要么像另两处那样把它放进带退出码的位置，要么在 source 之后立刻 `declare -F <函数> >/dev/null || 判不到`。
+现量 `grep -c 'declare -F'` = 1（这条队列第一次有这种断言）。
+探针自身的账也记一句：那 37 个差集候选里没有一个是我脚本的函数名拼错，三个是**lib 提供的真函数**
+（`msix_check_facts` / `mobile_e2e_runner_lines` / `wait_for_quiet_host`）—— 也就是说这套办法的产出是
+"37 个待读 + 1 个真洞"，**别把"命中一处"读成"脚本刚好只有这一个洞"，也别把"绝大多数是噪声"读成"办法没用"**；
+它能命中是因为形状对得上（`source` 之后在命令替换里调用），不是因为运气。
