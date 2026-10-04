@@ -98,3 +98,31 @@ test('整页仍有「离线」这一档承诺，摘掉的只是「可安装」',
   expect(pageText.includes('安装'), '本页应当还有别的卡合法地提到「安装」').toBe(true);
   expect(pageText, '整页出现的「可安装」应当为 0 次').not.toContain('可安装');
 });
+
+/**
+ * 🔴 页末那条说明**不许是 flex**（本轮看截图时撞见的真缺陷）。
+ *
+ * `.lp-note` 原来是 `display:flex` + `gap`。它的子节点不是"图标 + 文字"，
+ * 而是 `RichText`（`apps/landing/src/site/PageSections.tsx:77`）把一条词条按
+ * `**粗体**` / `` `代码` `` 切出来的一串**兄弟文本节点** —— flex 把它们各排一栏，
+ * 于是 `/platforms` 那条「未签名」说明被排成三列，第二列以「，需要右键打开」起头
+ * （改前图：`/tmp/g138-before/platforms-page.png`，md5 `1c6798b6…`）。
+ * ⚠️ 图标 `⚠️` 住在**词条文本里**，不是元素 —— 所以这一条不是"缺了图标所以要 flex"。
+ */
+test('页末说明是一段 flowing 文本，不是一排 flex 栏', async ({page}) => {
+  await page.goto('/platforms/');
+  const note = page.locator('.lp-note').first();
+  await expect(note, '本页应当渲染出那条「未签名」说明').toBeVisible();
+
+  const display = await note.evaluate((el) => getComputedStyle(el).display);
+  expect(['flex', 'inline-flex', 'grid', 'inline-grid'],
+    `.lp-note 的 display=${display} 会把 RichText 的文本切片排成多栏`).not.toContain(display);
+
+  // 非空前提（否则上面那条会在"这一页根本没有带标记的说明"时无条件成立）：
+  // 说明里必须真的渲染出 ≥2 个切片，且粗体那一段的字在文本流里读得到。
+  const kids = await note.evaluate((el) => el.children.length);
+  expect(kids, '这条说明应当被 RichText 切成 ≥2 个兄弟切片（少于 2 条上面那条就没牙）').toBeGreaterThanOrEqual(2);
+  await expect(note.locator('strong').first()).toBeVisible();
+  expect((await note.innerText()).includes('双击会被系统拦下'),
+    '粗体那一段应当出现在正文流里').toBe(true);
+});
