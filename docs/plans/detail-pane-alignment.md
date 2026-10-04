@@ -6146,6 +6146,7 @@ cd /tmp/dp_detached && node research/tools/mutation-rigs/mutate-detail-pane-stat
 | 与 Q1 的分工 | `node scripts/verify-detail-pane-merge-window.mjs` | `Q1 …本批触及=113 枚；交叠=1 枚`、`CONFLICTED=18 MARKERS=8 PARSE_BAD=3（只由 marker 解释=3 / 合并新造成=0 / 本来就坏=0）`、`REASONS=OWNED(1) NEED_HUMAN(18) MARKER(8)` ⇒ 两道判据看的是**不同集合**（提交前的点名 vs 合流时的已提交），互不取代 |
 | 装置 | `node research/tools/mutation-rigs/mutate-detail-pane-ownership.mjs` | `RIG_RC=0`，**8 臂全部符合预期**（`R1 R2 R3 R4 R5 R6 R7` + 一把脱牙）；红集：R2/R3 → `RC=1 BLOCKED=1`，R4/R5/R6 → `RC=2`，摘牙后这五臂**全部失能**。夹具是 `git init` 出来的**临时真仓库**，不碰任何真检出（活树状态类判据拿真仓当夹具，第二天读数就不成立，还会给别人制造脏改动） |
 | 门禁本体语法 | `node --check` 两份文件 | 都过 |
+| §1 第 3 道"干净检出复跑" | `git worktree add --detach /tmp/dp_det2 HEAD` 后在那棵树里跑（用完 `git worktree remove`） | `DET_GATE_RC=0`（§8 表十腿）、`DET_C1_RC=0`、归属装置 **8/8**、§8 表装置 **37/37** ⇒ 本轮新增的两份文件在**只有提交态内容**的载体上同样成立（裸解包树不行，理由见 §8.91 第 6 节） |
 
 ⚠️ 第一版把它命名成 `check-detail-pane-ownership.mjs`，随即被预检的名册自检（`OWN_GATE_GLOB = /^check-detail-pane-.*\.mjs$/`）
 判成"在产物树却不在名册 ⇒ 合流当场一次都不会跑它"。那不是要挂进去的信号 —— **它读的是活树瞬时状态、又必须要点名参数**，
