@@ -246,10 +246,12 @@ function toDomainTask(task: (typeof SHOWCASE_TASKS)[number]): Task {
 }
 
 describe('#1 主导航：登记处 ⟷ 真应用 `PRIMARY_NAV`', () => {
-  it('登记的四项与 `App.tsx` 的 `PRIMARY_NAV` 逐项同 key、同序', () => {
+  it('登记的每一项与 `App.tsx` 的 `PRIMARY_NAV` 逐项同 key、同序', () => {
     const appKeys = fieldValues(arrayBlock(viewTabsSource(), 'const PRIMARY_NAV'), 'labelKey');
+    // ⚠️ 「收集箱」在 2026-10-04 被删（产品负责人：与页头标题重复 = 同一目的地两个入口）。
+    // 这条字面清单是**解析器的阳性对照**：它证明上面那串真读出了东西，
+    // 而不是在 `PRIMARY_NAV` 改名/挪位置之后恒返回空集。
     expect(appKeys).toEqual([
-      'web.shell.nav.inbox',
       'web.shell.nav.today',
       'web.shell.nav.next7Days',
       'web.shell.nav.completed',
