@@ -1340,3 +1340,21 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   （4318/4319/4320/4322 现量全空）、tfa 内存锁（无锁文件）、以及 `:3000 = busy`（这一格只打印不拦：
   现量确认 `scripts/check-ai-e2e-preflight.mjs` 的 kill 射程是**参数传进去的那几枚端口**，
   `DEFAULT_PORTS=[4318,4319]`，**不含 :3000** ⇒ 别人的 vite 不在这次射程里）。
+
+#### 20:22 开窗前置的现量清单（每条带复量命令，全部是"这一刻"的读数，不是结论）
+
+| 格 | 20:2x 现量 | 复量命令 |
+|---|---|---|
+| 负载 | 第 53 轮 **19.55**（阈值 12；1 分钟值在 16–190 之间来回跳） | `bash scripts/verify-mobile-window-gate.sh --target c` 读 `REDS=` |
+| iOS 模拟器 | **三台** Booted：`heyta-batch2-closeout`、`heyta-bc-reminders`（别人的 W9 提醒线）、`heyta-iphone-17pro`（我这台的落点） | `xcrun simctl list devices booted` |
+| Android | `emulator-5554 device` 在线 | `adb devices` |
+| 别人的验收 | `sup-reinstall.sh` **9h42m**、另有两条 6–10 分钟的 `bash …`（`-c` 包着的路径在 `All in one Data/…`） | `ps -eo pid,etime,args \| grep -E 'verify-mobile\|package-app\|sup-reinstall'` |
+| 载体 | `git status --porcelain` **0 枚**、无进程 cwd 持有者、HEAD `671020ac`、reflog 20:03 有一枚**不是我做的** checkout ⇒ 见上面 v11 | `git -C ../heyta-wt-reinstall status --porcelain \| wc -l`；`lsof -a -d cwd -Fn \| grep heyta-wt-reinstall` |
+| ① 的 iOS 落点 | 链 `:463` 是 `IOS_DEVICE_NAME="$IOS_TARGET_NAME" bash "$RL" --go`，`:428` 默认 **`heyta-iphone-17pro`**，而这个名字**确实在 booted 列表里** ⇒ 仓里那条"没一台名字含 X 就**不猜**"（`reinstall-all.sh:379`）不会触发。**这一格我以前只是假设，20:22 才第一次把两侧对齐看过** | `grep -n 'IOS_TARGET_NAME' ~/.heyta-window-rigs/heyta-window-chain27.sh` |
+| ② 的端口 | 4318/4319/4320/4322 **全空**；`:3000 = busy`（pid 70256）但**不在 kill 射程** | `bash ~/.heyta-window-rigs/heyta-run-checks.sh`（不带 `--go`，退 0=PREFLIGHT-OK） |
+| ③ 的服务端 | `:3100` 由 pid **26407** 持有（06:02 起，库 `heyta_mobile_smoke`＝第 10 步查的那枚） | `ps eww -p 26407 \| tr ' ' '\n' \| sed -n 's/^DATABASE_URL=.*\///p'` |
+| ① 的四张旧图 | mac **18:45**／android **18:46**／ios **17:04** 存在但都比本轮早 ⇒ 会被判 `陈旧-早于本轮起跑`；第 5 张 `dist/windows/packaged-first-run.png` 在载体里**不存在** | 见启动器那张表（每行带 mtime + md5 前 12 位） |
+
+- ⚠️ 这张表的用途**不是**"证明现在能跑"。开窗的裁判仍是规范闸门；表里任何一格变了都只意味着
+  "这一格的读数要重取"。列出来是因为 ①②③ 三单**共享**这些前置，而它们各自过期速度不同
+  （负载分钟级、别人进程十分钟级、载体 checkout 一枚 reflog 级）。
