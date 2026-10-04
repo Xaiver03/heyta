@@ -4223,3 +4223,16 @@ git grep -n '20261009000000_add_holiday_adjustments' HEAD
 `grep -c '^EVIDENCE-SETTLE' <OUT>/rc.txt` = 1 且那行以 `after=0` 结尾，
 随后 `gate-b.txt` 的第 2 节应变成 `pass`（负载/设备/`reinstall-all.sh` 自身干净这三条仍可能各挡一次，那是真的现场）。
 闸门那侧的口径不一致**留在这里等它的 owner 拍**，本线不代改。
+
+## B74. 🔴 ③ 的窗口判断跑的是**载体里那份落后 40 笔的闸门** —— `3b 设备面独占` 与 `reinstall_other_pids()` 在它里面根本不存在，于是重装会直接拆别人正在量的现场（10-04 10:2x 已闭合到"由规范实现判定"）
+
+- **怎么撞上的**：读 `deliver-095424-81000/gate-b.txt` 时看到「下一步 1) 等并行会话把上面列出的文件提交」，而第 2 节早就是 ✅。main 上那份闸门在 06:0x 已经把这段改成**只列真红的几条**（`· ` 开头，见 `scripts/verify-mobile-window-gate.sh:317-323`）—— 格式对不上，说明我跑的不是 main 那份实现。
+- **现量**：队列 `win_gate()`（`:476-489`）是 `( cd "$CARRIER" && bash scripts/verify-mobile-window-gate.sh --target b )` ⇒ 用**载体副本**。载体 HEAD `d544d73c`，`git rev-list --count d544d73c..main` = **40**；md5 载体 `e59093c5…` ≠ main `e317a784…`。
+- **缺的不是文案，是判定**：diff 出载体那份没有 `════ 3b. B 专属：设备面独占`、没有 `reinstall_other_pids()`、`scripts/lib/wedged-runner.sh` 这个文件在载体里 `ls` 直接不存在。
+- **为什么这条是贵的**：B 分支接下来做 `simctl uninstall` + `adb uninstall` + 覆盖 `/Applications/Heyta.app`。当时现量 `pgrep -fl reinstall-all` = **93817**（`/tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817`）加两枚排队者 81007/93771。载体快进后**同一次判断**打出：
+  `❌ 有另一趟 reinstall-all 在跑（pid：93817）—— 两趟并行会互相卸装` ／ `🔴 很可能已经楔住：叶子 pid=98934 已活 25747s 而累计 CPU=0s，卡在 … notarytool submit` ／ `REDS=load,dev`。
+  旧副本只报「负载 29 > 12」⇒ 负载一落窗口就开，我就去拆别人的现场。main 那段 3b 注释（04:1x 补）拦的正是这一形。
+- **为什么不能"跑 main 那份脚本、判载体"**：闸门 `:103`/`:106` 是 `. scripts/lib/wait-for-quiet-host.sh`、`. scripts/lib/wedged-runner.sh` —— **按 CWD 取源**，落后载体里没有后者 ⇒ 炸在取源那一行，症状和"现场不成立"完全同形。所以正确动作是**对齐载体**，不是借脚本。
+- **我做的（只动自己的东西）**：① 停自己那枚等窗口的实例 81000，归属三重印证后才动（`lstart` 09:54:24 == OUT 目录名里的 `095424-81000`、`lsof -a -d cwd` 是我的 scratch、唯一子进程 `sleep 90`）；别人的 93817/81007/93771 一枚没碰。② 载体**纯快进** `d544d73c → e47bf28e`（前提逐条量：同口径脏项 0、`merge-base --is-ancestor` YES）⇒ 闸门 md5 两边一致、`设备面独占` 命中 1、`reinstall_other_pids` 命中 3。③ 队列新增 `carrier_canonical_gate()`（定义 `:308`），**两处** `win_gate b` 前都接上（`:603`、`:762`）：干净且是祖先 ⇒ 纯 FF；否则或 md5 不等 ⇒ 退 1 并明写"窗口判断不可信"。它不快进脏载体、不接管分叉载体。④ 夹具 `~/scratch-heyta/test-canonical-gate.sh` **11 腿全绿**（定义早于每处调用 / 每处 win_gate 前都对齐 / 三处 `-- packages apps server` 口径字字一致 + 5 条行为腿在临时 git 仓库里造"已对齐 / 可 FF / 脏在 `packages/`" / 分叉 / 副本被删"+ 真载体现跑）；**正证**：同一把夹具在未打补丁的活文件上 `rc=1` ⇒ 不是恒绿。⑤ 六把夹具替换后复跑 **57 腿全绿**（11/8/16/5/9/8），脚本 914→959 行、md5 `8f3632…→2eac5e…`、`bash -n` 过。⑥ 重起实例 **7370**（pidfile `/tmp/heyta-deliver-on-window.pid` 单值，`ps`+`lsof` 取证在跑）。
+- **③ 这轮的诚实终点很可能是 exit 3**：93817 那趟已楔约 7 小时且只有它能被判定"要么醒、要么由人拍板"，规范闸门自己写明"下一步**不是**继续等窗口""本装置不杀、不接管"。本线照此：等满就记 `NOT-DONE` + `REDS=load,dev`，不降级判据、不去动它。实例 7370 现卡在阶段 1「测试通道被占」（`别人在算的 test runner=4095`，上限 7200s），后面才轮到规范闸门。
+- **待入 traps 建议 #229**（现量：条目 `grep -cE '^[0-9]+\. '` = 237、最大号 228）。traps 正被别人高频写，本条先落本账与契约文档 §15.43as。可复现：`git -C <载体> rev-list --count <载体HEAD>..main`、`md5 -q` 两边闸门、`NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target b`（读 `REDS=`）。
