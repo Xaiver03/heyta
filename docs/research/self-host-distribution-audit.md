@@ -8206,7 +8206,10 @@ scripts/check-script-snapshot.mjs    否   ← 已不再是撞车面
      ② 挂进**发布前**那道（`scripts/verify-*` 串）而不是 `pnpm check`；③ 拆成"纯静态的镜像契约对账"进链（`check:image-*` 那三道已经是这个形状）+ 真跑留给人。
      取法（现量命令）：`grep -n '"check":' package.json` 与 `grep -rn verify:selfhost-stack .github/workflows/`。
 3. G-40 ④/⑤ 的「失败与恢复」：那两句否认式文案与"版本从哪来"至今**没有会红的判据**（只有 rc=0 的通过读数）⇒ 下一条会话的第一件。
+   ✅ **10-05 01:0x 已闭**：判据落在 `server/tests/version-coupling.spec.ts`（§8.135，5 条检查各配同趟阳性对照 + 8 条注入臂含 3 条塌缩臂）。
 4. 第 8 项「失败与恢复」：`scripts/reinstall-all.sh` 的新鲜度对账（`:150-151`）本批从未被变异验证。
+   ✅ **10-05 01:0x 已闭（判据本体换了主人）**：判据不在 `reinstall-all.sh:150-151`（那是注释，本体在 `scripts/lib/sync-windows-sources.sh`），
+   而 main 已把那份重写成 `_heyta_windows_sync_push` ⇒ 变异臂在**两份实现上各跑一遍**，读数与一处新敞口（G-63）在 §8.151。
 5. 指针漂移三处：`§7` 表内与 §8.19 写的 `server/Dockerfile:191` 现量是 `COPY packages/storage/`，
    那条 `RUN …check-web-artifact.mjs … --mount /app/` 在 **211** 行 ⇒ 已原地更正，
    并把"按内容找"的 grep 一起钉在旁边（行号会漂这件事本身，就是这类指针的默认失效方式）。
@@ -9011,3 +9014,94 @@ git diff --name-only 37639f11..HEAD -- apps packages server/src server/Dockerfil
   也就是说这一晚挡住落地的不止负载与那一枚 `package.json`，还有别人的 dev server 站在 `--confirm`
   会 SIGKILL 的那一段射程上。这条正是哨兵第三条判据**在做它该做的事**：与其开窗后被
   gate 5 打回来，不如不开。**别把它读成"哨兵太严"**，更别去调那个阈值。
+
+### 8.151 重装新鲜度对账第一次有牙（两份实现各 7 臂，5 支精确报红），并照出一处**空对空**敞口（登记 **G-63**）（2026-10-05 01:0x）
+
+触发点是 §8.134 ⑤ 那张"仍然真缺的格子"表里的第 3、4 格。两格现在各有各的下落，**先记下落再记读数**：
+
+- **第 3 格（G-40④/⑤ 的"失败与恢复"没有会红的判据）已由 §8.135 关闭** —— `server/tests/version-coupling.spec.ts`
+  5 条检查各配同趟阳性对照，外加 8 条注入臂（其中 3 条是**塌缩臂**，专门拦"作用域塌了却读出一堆 0"）。本条只做对账，没有重跑它的必要。
+- **第 4 格（重装新鲜度从未被变异验证）本条做掉**，但动手前先量了载体，量出两件必须先写的事。
+
+#### ① 那条登记自己的指针就是漂的，而判据本体**换了主人**
+
+§8.134 写的是"`scripts/reinstall-all.sh` 的新鲜度对账（`:150-151`）"。现量：那两行是**注释**，判据早在 09-30 就抽到了
+`scripts/lib/sync-windows-sources.sh`（`reinstall-all.sh` 那里只剩一行 `source`）。取法：
+
+```bash
+grep -n 'local_hash="$(shasum' scripts/lib/sync-windows-sources.sh   # 判据在这里
+grep -n 'sync-windows-sources' scripts/reinstall-all.sh              # 命中两行：一条注释 + 一行 source（source 那行才是消费方）
+```
+
+🔴 更要紧的是**这份文件在我这条分支上一行没动、在 main 上被重写了三笔**（`f4fe87d2` 加"按枚数"的对账、
+`0858032e` + `5be80374` 把公共半抽成 `_heyta_windows_sync_push`：清单 → tar → scp → **tar 的 sha256 对账** → 远端先清后解，
+并让 Android 远程构建那一腿共用同一份）。现量与取法：
+
+```bash
+git rev-parse main:scripts/lib/sync-windows-sources.sh HEAD:scripts/lib/sync-windows-sources.sh   # 两个 blob 不同
+git diff 'main...HEAD' -- scripts/lib/sync-windows-sources.sh | wc -l                              # = 0 ⇒ 本分支自合并基以来没动
+```
+
+⇒ 落地时这一路径**没有冲突**（只有一侧改过），走"取 main 侧"。所以**只在 branch 那份上跑出"有牙"是不算数的** ——
+读的是落地后不会跑的那份代码。这是 §8.136 那条"判据要拿到落地后的树上预跑"的镜像版本：这回连预跑都不用等，
+直接把 `main:` 那一份取进装置就行。
+
+#### ② 装置：一次性临时 git 仓 + `ssh`/`scp` 垫片，两种来源各跑一遍
+
+`research/tools/selfhost-windows-sync-arms.mjs`。**为什么必须垫片**：这一族判据的本体是"远端字节 == 本地字节"这个**裁决**，
+而真跑一次会把 `C:\src\heyta` 覆盖成我这棵树的状态 —— 那是另一条会话（Windows / Android 远程构建那条线）**正在用的构建输入**，
+不是可以拿来"验一次判据"的耗材。装置做的事：
+
+- 在 `mkdtemp` 出来的临时 git 仓里放一份被测库（`--source branch` 取工作树那份，`--source main` 取 `git show main:` 那份）、
+  两枚构建输入（`apps/web/dist`，桥的 bundle 由桩脚本生成）、以及 `bin/ssh` + `bin/scp` 两个垫片；
+- 垫片只认三类远端命令（解包、`Get-FileHash`、`Measure-Object` 计数），**认不出的命令退 9 并打印原文** ——
+  "判据读了一个装置没模拟的形状"会响，不会静当成通过（§8.147 那条"桩必须能回答不"的同一件事）；
+- 装置会写 `/tmp/heyta-src.tar.gz` 与 `/tmp/heyta-src-files.txt` —— 那正是真脚本硬编码的两个临时名，
+  所以它**先查有没有活着的远程构建宿主**（`reinstall-all.sh` / `run-gradle.mjs` / `verify-windows-shell-journey` / `package-msix`），
+  有就退 3 并点名是谁（环境无效 ≠ 判据红）。
+
+#### ③ 读数（2026-10-05 01:0x，两份实现**逐臂相同**；臂数与每臂读数由装置自己打印，台账不抄分母）
+
+| 臂 | 伪造什么 | 期望 | branch 侧 `d127ad37…` | main 侧 `17d3d47b…` |
+|---|---|---|---|---|
+| 对照 | 什么都不改 | 绿 | `rc=0` +「远端新鲜度对账通过」 | 同 |
+| A | 远端 `index.html` 解包后多一字节 | 红，且点名 index.html | ✅ | ✅ |
+| B | 远端桥 bundle 多一字节 | 红，「桥的 bundle 不新鲜」 | ✅ | ✅ |
+| C | 远端 `assets/` 留一枚旧 chunk（"只增不减"那一族） | 红，「远端 chunk 数」 | ✅ | ✅ |
+| D | 远端 `Get-FileHash` 读不到 | 红（**不是**当成两边相等） | ✅ | ✅ |
+| E | 远端 chunk 计数读不到 | 红，「数不到远端」 | ✅ | ✅ |
+| F | **本地 `apps/web/dist` 里没有 `index.html`** | 期望红 | 🔴 **绿** | 🔴 **绿** |
+
+A–E 五支精确点红自己那一句、对照组不红 ⇒ §8.134 ⑤ 第 4 格要的"有牙"这件事**现在有了**，
+而且是在**落地后真正会跑的那一份**上有的。
+
+#### ④ F 这一臂照出来的敞口，登记为 **G-63**（未闭，且**不归本批改**）
+
+形状：本地 `apps/web/dist` 目录**存在**（过得了那句构建输入存在性的 `[ -e "$p" ]`）但里面**没有 `index.html`** ——
+比如一次半途失败的 vite 构建留下的目录。此时：
+
+- `local_hash` 空（`shasum` 读不到文件），`remote_hash` 也空（远端那个路径同样不存在，被 `grep -E '^[0-9a-f]{64}$'` 滤成空）
+  ⇒ `[ "$local_hash" != "$remote_hash" ]` **不成立**；
+- 桥的 bundle 两条都在 ⇒ 红不了；`assets/*.js` 两侧**枚数相同**（都是这一份残包里的数量）⇒ 红不了；
+- 于是判据打印「✅ 远端新鲜度对账通过」并 `return 0` ⇒ 打包继续，装出来的包里那枚 `index.html` 根本不存在。
+
+🔴 **main 新加的那条整包 tar sha256 对账挡不住这一发**：它证的是"远端拿到的是不是**这一包**"，
+而这一包本来就与本地逐字节相同 —— 包里缺东西，两边一样缺。**"两边一致"从来不等于"两边都有内容"**
+（与 §8.135 那三条塌缩臂、以及"空测量看着最干净"同一族）。
+
+修法（三行，写在这里是为了让下一读的人不用重新推）：把 main 已经用在远端 tar 上的那条"读不到就拒"搬到**本地侧** ——
+`local_hash` / `local_bridge` 必须匹配 `^[0-9a-f]{64}$`、`local_chunks` 必须 ≥ 1，任一不成立即 `return 1`。
+
+**为什么不在本批顺手改**：这个文件本分支一行没动，我改它 = **两侧都改** = 落地时多一枚冲突族，
+而 `research/tools/selfhost-merge-carrier.mjs` 登记的九族里**没有它** ⇒ 载体退 2 点名、落地要人现场拍"取哪侧、怎么并"。
+那等于把别人正在承重的判据变成"本批落地的阻塞"：收益是三行代码，代价是整批多一族冲突面，而**那三行由那条线自己改是零成本**。
+装置 F 臂就是这条登记的复现与关闭判据 —— **哪天那三行落下去，F 臂会自己转红并打印"把这条臂的 expect 改成 red"**，
+敞口不会静着烂掉。
+
+#### ⑤ 边界（别读多）
+
+- 装置证的是**裁决逻辑**（比较、拒绝、"读不到算红"），不证真 PowerShell 的 stdout 能被那个 `grep` 解析 ——
+  那是真跑过的读数（`M2D=OK` 那一族）给的，两者不互相覆盖。
+- 装置不跑 `reinstall-all.sh` 本体（那要真设备 / 真打包），所以它**不**关闭第 8 项的"平台验收"与"当前产物"两格 ——
+  那两格仍然只在落地后的 `pnpm reinstall:all` 那一趟上。
+- 这格现在算闭到：**"失败与恢复"从"只有通过读数"变成"5 支有牙 + 1 支敞口已编号"**。
