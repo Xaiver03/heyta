@@ -32,6 +32,9 @@
 
 import { IndexedDbAdapter, type DbDestroyReport } from '@heyta/storage';
 
+// 🔴 销毁 OPFS 之前要能关掉那个持句柄的 worker（为什么必须，见 `removeOpfsDirectory` 上面那段实测）。
+import { releaseStorageWorker } from './oplog.js';
+
 /**
  * 这个宿主管辖的 IndexedDB 数据库名。
  *
@@ -119,29 +122,54 @@ function deleteDatabase(name: string): Promise<DbDestroyReport> {
 /**
  * 删掉 OPFS 里的那个池目录。
  *
+ * 🔴 **先关存储 worker，再删**（这一步是 2026-10-04 真浏览器实测逼出来的）：
+ * 池的同步访问句柄住在 worker 那一侧，句柄还开着时 `removeEntry` 必然被拒 ——
+ * 实测三臂对照：不跑应用的空白页能删、应用活着但换别的目录名也能删、
+ * **只有池自己那个目录删不掉**（`NoModificationAllowedError`），
+ * 且重新加载后明文串仍在文件里（明细与读数量在 `docs/plans/trash-and-archive.md` §10.59）。
+ * 在那之前这一类**每次都失败**，而 11 条单测看不见，是因为它们的桩无条件接受删除。
+ *
+ * ⚠️ `terminate()` 之后句柄**不是立刻**消失的，所以这里是**有界重试**（不是重试到永远）：
+ *   按下面的时间表逐次重试，用完还不行就**如实报失败**，由调用方决定怎么说。
+ *   🔴 时间表**必须超过 1 秒**，这不是保守而是实测出来的：真浏览器对照（§10.60 的 B4 臂）
+ *   现量 `beforeRelease: blocked:NoModificationAllowedError` →
+ *   `afterRelease: removed-after-release`，而中间等的是 **1000 ms**。
+ *   第一版只等约 150 ms（`setTimeout(0)` + 两次 50 ms），同一枚真浏览器判据**照旧红** ——
+ *   那一版的失败不是方向错，是预算按想象给的。
  * ⚠️ `NotFoundError`（目录本来就没有）算**成功**：销毁的语义是"事后不存在"，
- * 不是"我删了一次"。
- * ⚠️ 池里的文件可能被 storage worker 的同步句柄占着 —— 那种失败**如实报出去**，
- * 由调用方决定怎么说（不静默、不重试到永远）。
+ *   不是"我删了一次"。
  */
+const OPFS_DELETE_SCHEDULE_MS = [0, 150, 400, 800, 1400];
+
 async function removeOpfsDirectory(): Promise<DbDestroyReport> {
-  const root = globalThis.navigator?.storage?.getDirectory;
-  if (typeof root !== 'function') {
-    return report(`opfs:${WEB_OPFS_DIRECTORY}`, false, {
-      reason: 'opfs-unavailable',
-    });
+  const target = `opfs:${WEB_OPFS_DIRECTORY}`;
+  await releaseStorageWorker();
+
+  let lastError = 'opfs-unavailable';
+  for (let attempt = 0; attempt < OPFS_DELETE_SCHEDULE_MS.length; attempt++) {
+    const waitMs = OPFS_DELETE_SCHEDULE_MS[attempt] as number;
+    if (waitMs > 0) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, waitMs);
+      });
+    }
+    const getDirectory = globalThis.navigator?.storage?.getDirectory;
+    if (typeof getDirectory !== 'function') {
+      // 这个环境根本没有 OPFS（不是"删失败"）—— 没什么可删，也不再重试。
+      return report(target, false, { reason: 'opfs-unavailable' });
+    }
+    try {
+      const root = await getDirectory.call(globalThis.navigator.storage);
+      await root.removeEntry(WEB_OPFS_DIRECTORY, { recursive: true });
+      return report(target, true);
+    } catch (error) {
+      if ((error as { name?: string } | undefined)?.name === 'NotFoundError') {
+        return report(target, true);
+      }
+      lastError = `opfs-delete-failed: ${(error as Error).message}`;
+    }
   }
-  try {
-    const dir = await root.call(globalThis.navigator.storage);
-    await dir.removeEntry(WEB_OPFS_DIRECTORY, { recursive: true });
-    return report(`opfs:${WEB_OPFS_DIRECTORY}`, true);
-  } catch (error) {
-    const notFound = (error as { name?: string } | undefined)?.name === 'NotFoundError';
-    if (notFound) return report(`opfs:${WEB_OPFS_DIRECTORY}`, true);
-    return report(`opfs:${WEB_OPFS_DIRECTORY}`, false, {
-      reason: `opfs-delete-failed: ${(error as Error).message}`,
-    });
-  }
+  return report(target, false, { reason: lastError });
 }
 
 /** 前缀扫掉一个 Storage 上属于本应用的键。返回删掉的个数。 */

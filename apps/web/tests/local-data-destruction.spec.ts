@@ -30,6 +30,32 @@ import {
 } from '../src/lib/local-data-destruction.js';
 
 const WEB_SRC = join(process.cwd(), 'src');
+
+/**
+ * 🔴 这一组是给 §10.59 那条**真浏览器实测**用的模型桩（不是自造的假 API）：
+ * 实测三臂 —— 空白页能删 `.heyta-web`、应用活着但换别的目录名也能删、
+ * **只有池自己那个目录删不掉**（`NoModificationAllowedError`），
+ * 因为 SAH Pool 的同步访问句柄住在 storage worker 那一侧。
+ *
+ * 这里把"句柄占着 ⇒ 删不掉；关掉 worker ⇒ 能删"这件事照下来，于是**调用顺序**有了判据：
+ * 摘掉 `removeOpfsDirectory()` 里那句 `await releaseStorageWorker()`，下面第一条立刻红。
+ * ⚠️ "terminate 真的会释放句柄"这一层**不在这里证** —— 那是 `e2e/tests/local-data-destruction-browser.spec.ts`
+ *   的活（纵深防御要求两层各有判据，见本文件头）。
+ */
+const poolLock = vi.hoisted(() => ({
+  held: false,
+  releaseCalls: 0,
+  removeCalls: 0,
+  /** 第几次 `removeEntry` 之后才肯放行（0 = 永远不放行，用来量"有界重试"的上界）。 */
+  succeedFromAttempt: 0,
+}));
+
+vi.mock('../src/lib/oplog.js', () => ({
+  releaseStorageWorker: async () => {
+    poolLock.releaseCalls += 1;
+    poolLock.held = false;
+  },
+}));
 // `process.cwd()` 在不同调用方式下会是仓库根或 `apps/web`，所以路径一律从
 // `WEB_SRC` 反推，不写死相对层数（写死的那版在这里指向 apps/packages/…）。
 const REPO_ROOT = resolve(WEB_SRC, '../../..');
@@ -374,5 +400,87 @@ describe('E2 —— 这个宿主的销毁器真的被接到了同步层上', () 
       offenders,
       `这些键不带前缀、也不在点名清单里 ⇒ 注销后留着：\n${offenders.join('\n')}`,
     ).toEqual([]);
+  });
+});
+
+describe('E2 —— OPFS 那一类：先关持句柄的 worker，再删（有界重试）', () => {
+  /** 装一把"池占着就删不掉"的 OPFS 桩 —— 这是真浏览器实测的形状，不是想象。 */
+  function installLockedOpfs(): void {
+    const removeEntry = vi.fn(async () => {
+      poolLock.removeCalls += 1;
+      const allowed =
+        poolLock.succeedFromAttempt === 0
+          ? !poolLock.held
+          : poolLock.removeCalls >= poolLock.succeedFromAttempt;
+      if (!allowed) {
+        const error = new Error(
+          `Failed to execute 'removeEntry' on 'FileSystemDirectoryHandle': An attempt was made to modify an object where modifications are not allowed.`,
+        );
+        error.name = 'NoModificationAllowedError';
+        throw error;
+      }
+    });
+    override(globalThis.navigator, 'storage', { getDirectory: async () => ({ removeEntry }) });
+  }
+
+  function resetLock(held: boolean, succeedFromAttempt = 0): void {
+    poolLock.held = held;
+    poolLock.releaseCalls = 0;
+    poolLock.removeCalls = 0;
+    poolLock.succeedFromAttempt = succeedFromAttempt;
+  }
+
+  /** 只取 OPFS 那一条凭据（其余几类由上面那组判据管）。 */
+  async function eraseOpfsReport() {
+    const reports = await eraseWebLocalData();
+    return reports.find((r) => r.target.startsWith('opfs:'));
+  }
+
+  it('🔴 句柄占着 ⇒ 销毁必须先把 worker 关掉，关掉之后就删得掉', async () => {
+    resetLock(true);
+    installLockedOpfs();
+    const opfs = await eraseOpfsReport();
+    expect(poolLock.releaseCalls, 'erase 没关 worker 就去删 OPFS（这正是真浏览器里每次都失败的那条路）').toBeGreaterThan(
+      0,
+    );
+    expect(opfs?.containerRemoved, `关了 worker 仍报删不掉：${String(opfs?.reason)}`).toBe(true);
+    expect(opfs?.reason, '成功却不该带原因').toBeUndefined();
+    // 顺序判据的牙齿：摘掉 `await releaseStorageWorker()` ⇒ 上面三条同时红。
+  });
+
+  it('terminate 之后句柄不是同步消失 ⇒ 重试一次要能接住（第一发被拒不算失败）', async () => {
+    resetLock(false, 2);
+    installLockedOpfs();
+    const opfs = await eraseOpfsReport();
+    expect(poolLock.removeCalls, '一次被拒就放弃 ⇒ 没有那层有界重试').toBeGreaterThanOrEqual(2);
+    expect(opfs?.containerRemoved, `第二发已经能删了却报失败：${String(opfs?.reason)}`).toBe(true);
+  });
+
+  it('🔴 一直删不掉 ⇒ 如实报 false，且**重试有上界**（不许热循环）', async () => {
+    // `succeedFromAttempt=99`：时间表跑完永不放行（`held` 会被 release 清掉，所以不能靠它挡）。
+    resetLock(true, 99);
+    installLockedOpfs();
+    const opfs = await eraseOpfsReport();
+    expect(opfs?.containerRemoved, '一次都没删掉却报成功').toBe(false);
+    expect(opfs?.reason ?? '', `失败却没写为什么失败：${String(opfs?.reason)}`).toContain(
+      'opfs-delete-failed',
+    );
+
+    // 上界从**真源那张时间表**推导，不抄常数（抄的那版六天内就会漂）。
+    const source = readFileSync(join(WEB_SRC, 'lib/local-data-destruction.ts'), 'utf8');
+    const schedule = /OPFS_DELETE_SCHEDULE_MS\s*=\s*\[([^\]]*)\]/.exec(source);
+    expect(schedule, '时间表常量 `OPFS_DELETE_SCHEDULE_MS` 不见了 ⇒ 这条判据失去参照').not.toBeNull();
+    const waits = (schedule?.[1] ?? '')
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n));
+    expect(waits.length, '时间表是空的（一次都不试）').toBeGreaterThan(0);
+    expect(poolLock.removeCalls, `重试次数没有上界（跑了 ${String(poolLock.removeCalls)} 发）`).toBeLessThanOrEqual(
+      waits.length,
+    );
+    // 🔴 预算下限来自**实测**（§10.60 的 B4 臂：等到 1000 ms 才删得掉），
+    // 不是保守取值。谁把预算剪到释放句柄的延迟以下，这条就红。
+    const lastWait = waits[waits.length - 1] as number;
+    expect(lastWait, `重试预算只到 ${String(lastWait)} ms —— 低于实测的句柄释放延迟`).toBeGreaterThanOrEqual(1000);
   });
 });
