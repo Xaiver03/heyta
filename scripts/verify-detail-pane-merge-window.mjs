@@ -72,7 +72,8 @@ if (ts === null || typeof ts.createProgram !== 'function') {
   process.exit(2);
 }
 
-/** Q3 的两条腿：.mjs 走 V8（重复声明是 early error），.ts/.tsx 走 TS（语法 + 重复标识符）。 */
+/** Q3 的三条腿：.mjs/.cjs/.js 走 V8（重复声明是 early error），.ts/.tsx 走 TS（语法 + 重复标识符），
+ *  .css 数剥过注释的花括号；**其余扩展名一律算"未判"**，不算过（见 parseOf 里那条哨兵）。 */
 const tmpDir = mkdtempSync(join(tmpdir(), 'dp-merge-parse-'));
 const parseJs = (name, text) => {
   const file = join(tmpDir, name.replace(/[^\w.-]/g, '_'));
@@ -112,6 +113,13 @@ const parseTs = (ext, text) => {
     .filter((d) => d.category === ts.DiagnosticCategory.Error)
     .map((d) => `TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
 };
+// 🔴 类型不在解析射程 ⇒ 返回哨兵，绝不返回空表。
+//    空表在这里的语义是"语法过"，而 `.md`/`.json`/`.png`/`.swift` 这些**一枚都没被解析过**：
+//    本机实测 `node --check` 对 `.ts` 两个方向都是错的（合法的 `const a: number = 1;` 退 1，
+//    带三行冲突标记的 `.ts` 退 0），所以按扩展名分派尺子这件事不能"以后再说"，
+//    漏一种扩展名的表现就是"全绿"。
+const NOT_JUDGED = 'NOT_JUDGED_EXT（这一枚没被任何解析器看过，不许读成语法过）';
+const isJudged = (errs) => !(errs.length === 1 && errs[0] === NOT_JUDGED);
 const parseOf = (path, text) => {
   const ext = extname(path);
   if (ext === '.ts' || ext === '.tsx') return parseTs(ext, text);
@@ -124,7 +132,7 @@ const parseOf = (path, text) => {
     const close = (body.match(/\}/g) ?? []).length;
     return open === close ? [] : [`CSS 花括号不平衡（已剥注释）：${open} vs ${close}`];
   }
-  return [];
+  return [NOT_JUDGED];
 };
 
 // ── 1. 自检臂：Q3 必须能红 ────────────────────────────────────────────────
@@ -135,11 +143,24 @@ const CONTROLS = [
   { name: 'C5 TS 语法坏（半截表达式）', path: 'mem5.ts', text: 'export const a = ;\n', expect: 'bad' },
   { name: 'C6 marker 文本', path: 'mem6.ts', text: 'export const a = 1;\n<<<<<<< HEAD\nexport const b = 2;\n', expect: 'bad' },
   { name: 'C4 干净样本', path: 'mem2.ts', text: 'export const a = 1;\nexport function f(): number {\n  return a;\n}\n', expect: 'ok' },
+  // C7 证的不是"能报错"，是**扩展名漏出射程时这一枚要算未判而不是算过** ——
+  // 少了这条臂，上面那个哨兵就只是注释：没人会知道它到底有没有被触发过。
+  { name: 'C7 类型不在射程（坏 JSON 也不许判过）', path: 'mem7.json', text: '{"a": ,}\n', expect: 'not_judged' },
 ];
 for (const c of CONTROLS) {
   const errs = parseOf(c.path, c.text);
-  const flagged = errs.length > 0 || (c.expect === 'bad' && MARKER.test(c.text));
+  const blind = !isJudged(errs);
+  const flagged = (errs.length > 0 && !blind) || (c.expect === 'bad' && MARKER.test(c.text));
   const want = c.expect === 'bad';
+  if (c.expect === 'not_judged') {
+    if (!blind) {
+      console.log(`CONTROL_FAIL ${c.name}: 期望"未判"，实得 ${JSON.stringify(errs)} ⇒ 哨兵没生效，这类文件会被读成"语法过"`);
+      console.log('VERDICT=PROBE_BROKEN 解析臂不能失败 ⇒ 它报什么都不是证据');
+      process.exit(2);
+    }
+    console.log(`CONTROL_OK ${c.name} → 未判（哨兵生效，不进"过"那一档）`);
+    continue;
+  }
   if (flagged !== want) {
     console.log(`CONTROL_FAIL ${c.name}: 期望 ${want ? '红' : '绿'}，实得 ${flagged ? `红 ${JSON.stringify(errs)}` : '绿'}`);
     console.log('VERDICT=PROBE_BROKEN 解析臂不能失败 ⇒ 它报什么都不是证据');
@@ -209,6 +230,7 @@ if (conflicted.length > 0) console.log(`   （Q2 只分类不裁决："要人的
 // ── 4. Q3：候选树里每枚本批文件的内容 ────────────────────────────────────
 let markerHits = [];
 let parseHits = [];
+let notJudged = [];
 let readSkipped = [];
 let read = 0;
 for (const p of batch) {
@@ -222,6 +244,10 @@ for (const p of batch) {
   read += 1;
   if (MARKER.test(text)) markerHits.push(p);
   const errs = parseOf(p, text);
+  if (!isJudged(errs)) {
+    notJudged.push(p);
+    continue;
+  }
   if (errs.length > 0) {
     /** 立刻分辨"合并造成的"与"本来就坏"—— 不分辨就得手工查，而手工查的那次我查错了方向。 */
     const side = (ref) => {
@@ -237,7 +263,8 @@ for (const p of batch) {
 }
 console.log(
   `Q3 候选树读到=${read} 枚 / 读不到=${readSkipped.length} 枚（合并里被删/改名）；` +
-    `marker=${markerHits.length} 枚；解析坏=${parseHits.length} 枚`,
+    `marker=${markerHits.length} 枚；解析坏=${parseHits.length} 枚；` +
+    `解析未判=${notJudged.length} 枚（扩展名不在射程，**不是**"语法过"：${[...new Set(notJudged.map((p) => extname(p) || '无扩展名'))].join(' ') || '无'}）`,
 );
 for (const p of markerHits) console.log(`   MARKER ${p}`);
 for (const [p, e, side] of parseHits) {

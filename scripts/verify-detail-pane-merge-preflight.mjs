@@ -25,7 +25,9 @@
  *     （第一版只防了对照组那一侧的 `MISS`，产物侧的 `MISS` 仍被当成"候选红"），
  *     由本文件自己的回归臂 P3 照出来；过程与读数在工单 §8.70。
  *  ② **静默合流对账**：两侧都改过、而 `merge-tree` 没登记为冲突的文件（零 marker 的那一档）。
- *     逐枚问"两侧各自新增的行，是否**都还在**产物里"，`.mjs` 另跑 `node --check`。
+ *     逐枚问"两侧各自新增的行，是否**都还在**产物里"，再按扩展名分四把尺子：
+ *     `.mjs/.cjs/.js` 走 `node --check`、`.ts/.tsx` 走 TS 解析器、`.css` 走剥注释后的花括号配平、
+ *     🔴 **其余一律登记为"语法未判"**（这一档 2026-10-04 之前不存在，`.css`/`.md` 被读成"语法过"）。
  *     这一档是 §8.42 那个形状（把 main 的函数抄进同一份脚本）唯一的抓手 —— 门禁那一块只能
  *     告诉你"结果红不红"，不能告诉你"哪一侧的改动被无声丢掉了"。
  *
@@ -215,9 +217,42 @@ const tsSyntaxOf = (file) => {
   return d.length ? `${ts.flattenDiagnosticMessageText(d[0].messageText, ' ')}（共 ${d.length} 条）` : null;
 };
 
+// 静默合流的语法腿分四档。🔴 `blind` 是一档**读数**，不是"没这一步"：
+// 这一支以前根本不存在，`.css`/`.md` 落进两个 if 之外 ⇒ `syntax` 与 `unparsed` 都是假，
+// 于是"行全在、语法过"被打印出来，而**没有一把尺子看过它**（本机实测：这一趟 13 枚里有 3 枚是这种）。
+const legFor = (rel) =>
+  /\.(m|c)?js$/.test(rel) ? 'js' : /\.tsx?$/.test(rel) ? 'ts' : rel.endsWith('.css') ? 'css' : 'blind';
+const cssBraceErr = (text) => {
+  const body = text.replace(/\/\*[\s\S]*?\*\//g, ''); // 不剥注释会被本批注释里的 `}` 误杀（§8.44 那一课）
+  const open = (body.match(/\{/g) ?? []).length;
+  const close = (body.match(/\}/g) ?? []).length;
+  return open === close ? null : `CSS 花括号不平衡（已剥注释）：${open} vs ${close}`;
+};
+
+// —— 语法腿自己的三臂（每次跑预检都自带，不靠人记得去跑臂台）——
+// C1 坏的必须红、C2 好的必须绿、C3 射程外必须落在 blind 档。少任何一条，上面那行"语法过"就没有信息量。
+const LEG_ARMS = [
+  { name: 'C1 css 失衡 → 必须红', got: cssBraceErr('.a { color: red;\n'), want: 'red' },
+  { name: 'C2 css 配平（注释里带 `}`）→ 必须绿', got: cssBraceErr('/* 尾部有个 } 在这里\n*/\n.a { color: red }\n'), want: 'green' },
+  { name: 'C3 扩展名不在射程 → 必须报 blind，不许报过', got: legFor('notes.md'), want: 'blind' },
+  { name: 'C4 `.ts` 不许走 node --check（本机实测它对合法 .ts 退 1、对带 marker 的 .ts 退 0）', got: legFor('a.ts'), want: 'ts' },
+];
+for (const a of LEG_ARMS) {
+  const ok =
+    a.want === 'red' ? typeof a.got === 'string'
+    : a.want === 'green' ? a.got === null
+    : a.got === a.want;
+  if (!ok) {
+    console.log(`LEG_CONTROL_FAIL ${a.name} —— 实得 ${JSON.stringify(a.got)}`);
+    console.log('VERDICT=PROBE_BROKEN 语法腿不能失败 ⇒ 它报的"语法过"不是证据');
+    process.exit(2);
+  }
+  console.log(`LEG_CONTROL_OK ${a.name}`);
+}
+
 for (const rel of silent) {
   const productFile = join(product, rel);
-  const row = { rel, missingA: [], missingB: [], syntax: null, absent: false, nA: 0, nB: 0, parsed: false, unparsed: false };
+  const row = { rel, missingA: [], missingB: [], syntax: null, absent: false, nA: 0, nB: 0, parsed: false, unparsed: false, blindBy: null };
   if (!existsSync(productFile)) {
     row.absent = true; // 两侧都改过、产物里却没有 ⇒ 一侧把它删了（这本身就是要知道的事）
     silentRows.push(row);
@@ -234,20 +269,32 @@ for (const rel of silent) {
   row.nB = b.length;
   row.missingA = a.filter((l) => !prod.has(l));
   row.missingB = b.filter((l) => !prod.has(l));
-  if (rel.endsWith('.mjs')) {
+  const leg = legFor(rel);
+  if (leg === 'js') {
     try {
       execFileSync('node', ['--check', productFile], { encoding: 'utf8' });
     } catch (e) {
       row.syntax = `${e.stderr || e.stdout || ''}`.trim().split('\n').find((l) => l.trim()) || 'node --check 失败';
     }
     row.parsed = true;
-  } else if (/\.tsx?$/.test(rel)) {
+  } else if (leg === 'css') {
+    row.syntax = cssBraceErr(readFileSync(productFile, 'utf8'));
+    row.parsed = true;
+  } else if (leg === 'ts') {
     if (ts) {
       row.syntax = tsSyntaxOf(productFile);
       row.parsed = true;
     } else {
       row.unparsed = true; // 拿不到解析器 ⇒ 这一枚没判过，不算通过
+      row.blindBy = 'no_ts';
     }
+  } else {
+    // 🔴 第三档以前不存在：`.md`/`.json`/二进制落进两个 if 之外，`syntax` 留 null、
+    //    `unparsed` 留 false ⇒ 它被读成"行全在且语法过"，而**没有一把尺子看过它**。
+    //    本机实测 `node --check` 对 `.ts` 两个方向都错（合法的 `const a: number = 1;` 退 1，
+    //    带三行冲突标记的 `.ts` 退 0），所以"顺手用 JS 的尺子量一下"不是保守做法，是反的。
+    row.unparsed = true;
+    row.blindBy = 'ext';
   }
   silentRows.push(row);
 }
@@ -375,18 +422,29 @@ const tainted = markersIn(product).filter(
   (rel) => /^(apps|packages)\//.test(rel) && /\.(ts|tsx|css|mjs)$/.test(rel),
 );
 
+// 🔴 两档"未判"要分开，不是一档：
+//   · blindBy='no_ts' ⇒ 有尺子却拿不到 ⇒ 真缺口，计红。
+//   · blindBy='ext'   ⇒ 这一类**根本没有语法尺子**（`.md`/`.json`/二进制）。它对合并的真实风险是"丢行"，
+//     而丢行那一档逐枚量过了，所以把 `.md` 计成红只会训练人忽略这一栏（假报警的代价记在 §8.44）。
+//     它仍然**大字打印**在分母里，不许被读成"过"。
+const silentBlind = silentRows.filter((r) => r.blindBy === 'ext');
 const silentBad = silentRows.filter(
-  (r) => r.absent || r.missingA.length || r.missingB.length || r.syntax || r.unparsed,
+  (r) => r.absent || r.missingA.length || r.missingB.length || r.syntax || (r.unparsed && r.blindBy !== 'ext'),
 );
 if (silentRows.length) {
   console.log(`\n静默合流（两侧都改过、merge-tree 没报冲突）= ${silentRows.length} 枚 —— 逐枚查"两侧新增的行是否都还在产物里"：`);
   for (const r of silentRows) {
-    const badRow = r.absent || r.missingA.length || r.missingB.length || r.syntax || r.unparsed;
+    const badRow =
+      r.absent || r.missingA.length || r.missingB.length || r.syntax || (r.unparsed && r.blindBy !== 'ext');
     const parseTag = r.parsed
-      ? ` · 语法过（${r.rel.endsWith('.mjs') ? 'node --check' : 'ts transpile'}）`
-      : r.unparsed
-        ? ' · 🔴 语法**未判**（这一侧拿不到 typescript）'
-        : '';
+      ? ` · 语法过（${
+          /\.(m|c)?js$/.test(r.rel) ? 'node --check' : r.rel.endsWith('.css') ? 'CSS 剥注释配平' : 'ts transpile'
+        }）`
+      : r.blindBy === 'ext'
+        ? ' · ⚠️ 语法**未判**（扩展名不在解析射程，没有一把尺子看过它 —— 不许读成"语法过"；它的合并风险由"丢行"那一档承着）'
+        : r.unparsed
+          ? ' · 🔴 语法**未判**（这一侧拿不到 typescript）'
+          : '';
     const verdict = r.absent
       ? `🔴 产物里没有这个文件（有一侧把它删了）`
       : r.missingA.length || r.missingB.length
@@ -595,7 +653,7 @@ console.log(
     `产物里根本没有这道脚本（这一道没跑）=${productMissingRows.length}  ` +
     `两边都红（环境/载体所致，不含合并信息）=${same.length}  ` +
     `名册漏跑/探针坏=${rosterBad.length}  ` +
-    `静默合流=${silentRows.length} 枚，其中丢行/删文件/语法不过=${silentBad.length}  ` +
+    `静默合流=${silentRows.length} 枚，其中丢行/删文件/语法不过=${silentBad.length}（另有语法**未判**=${silentBlind.length} 枚：射程外，不计红也不计过）  ` +
     `槽位重复=${slotBad.length}  台账（缺号 / 号在正文被占 / 同号不同事）=${ledgerBad.length ? `🔴 ${ledgerRows.reduce((s, r) => s + r.collide.length + r.lostA.length + r.lostB.length + r.swA.length + r.swB.length, 0)} 项` : '0'}  ` +
       `产物仍带 marker 的产品文件=${tainted.length ? `${tainted.length} 枚 ⇒ 本趟 tally 不算"合流验过"` : '0（这一趟的 tally 量的是一个可运行状态）'}`,
 );
