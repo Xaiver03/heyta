@@ -385,6 +385,20 @@
   margin-top: auto;
 }
 
+/*
+ * 工具段**自己**也要贴底（2026-10-04 产品负责人：「回收站那个 logo 应该放到帮助那上面，
+ * 就是放到左下角」）。
+ *
+ * 🔴 上面那条 `:first-of-type` **选不到回收站**：它的父元素是 `.ht-rail__tabs`，
+ * 而那里面第一个 `<button>` 是「任务」。`:first-of-type` 按"同类型里的第一个"匹配，
+ * 于是那条规则实际只作用在 tablist **外面**的铃铛上 —— 回收站因此一直贴在
+ * 上段列表的尾巴上，与下段之间裂着一整块空白。
+ * 所以 `App.tsx` 给工具段的第一项另打一个类，这里按类贴底。
+ */
+.ht-rail__tab--tool-start {
+  margin-top: auto;
+}
+
 .ht-rail {
   display: flex;
   flex-direction: column;
@@ -400,6 +414,11 @@
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-2);
+  /* 🔴 必须**撑满**rail 的剩余高度，否则段内的 `margin-top: auto` 没有空白可分配，
+     回收站就还贴在上段列表的尾巴上（`min-height: 0` 是给 `overflow-y: auto` 的
+     rail 留的：不写它，视图开多了时这一列会顶穿容器而不是滚动）。 */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .ht-rail__tab {

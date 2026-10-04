@@ -86,6 +86,16 @@ if [ -n "$BUSY" ]; then
 fi
 step "负载门"
 wait_for_quiet_host || exit 3
+# >>> apk-freshness guard begin（自检：heyta-apk-guard-fixture.sh 按这两个标记之间抽同一段跑）
+# 🔴 §7 第 27 条（"packages/ 改了、APK 里是旧 JS bundle，验收对旧代码报绿"）的算法抽在
+#    `scripts/lib/apk-freshness.sh` 这个单一所有者里，但**会装包的 26 枚脚本只有 1 枚接过线**
+#    （18:40 现量：`install -r "$APK"` 命中 26 枚，`heyta_apk_freshness_guard` 命中 1 枚 = trash）。
+#    本条验的是手机里的便签，装的就是那枚 APK ⇒ 不接这道门，读数可能属于几小时前的源码
+#    （18:39 现量：载体 APK mtime 05:36:40，同树最新源码 14:49:16，落后 33,156 秒）。
+#    位置在负载门之后、第 0 步任何破坏性动作（pm clear / install -r）之前 —— 拒绝就要拒在没弄脏设备之前。
+. "$(dirname "$0")/lib/apk-freshness.sh"
+heyta_apk_freshness_guard "$APK" "verify-mobile-notes" || exit 3
+# <<< apk-freshness guard end
 
 # 独立库：与其它验收各用一份，否则会互相看到对方的便签。
 LAPTOP_DB=/tmp/heyta-notes-laptop.sqlite

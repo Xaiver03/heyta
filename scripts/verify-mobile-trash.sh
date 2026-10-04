@@ -76,6 +76,7 @@ export PATH="/opt/homebrew/bin:$PATH"
 heyta_e2e_ensure_account || exit 1
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 . "$(dirname "$0")/lib/wait-for-quiet-host.sh"
+. "$(dirname "$0")/lib/apk-freshness.sh"
 
 # 🔴 负载门 + "这台设备有没有别人在用"必须放在**任何破坏性动作之前**：
 #    下面的 `install -r` / `pm clear` 都会把别人的现场清掉，两边报的红会互相冒充。
@@ -211,6 +212,14 @@ sys.exit(0 if hit else 1)
 }
 
 step "0. 装包并启动（全新初态）"
+# 🔴 装包之前当场判新鲜度（§7 第 27 条）。这条判据此前**只住在** `verify-mobile-window-gate.sh`
+#    的第 4 步 —— 也就是说"忘了先跑闸门"的人照样会装旧 bundle 并拿到一串全绿，
+#    那道防线等于只存在于"人记得先量一次"。判据要生效就得住在**被约束的那一步**上。
+#    拒装发生在任何设备侧写动作（install / pm clear / force-stop）之前。
+heyta_apk_freshness_guard "$APK" "verify-mobile-trash" || {
+  bad "装包被拒（见上面那两行时间戳与扫描根）"
+  exit 1
+}
 if $ADB logcat -c -b crash >/dev/null 2>&1; then
   echo "   crash 缓冲区已清空（崩溃归因只认本趟）"
 else

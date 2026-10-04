@@ -70,7 +70,8 @@
     opacity: 1;
   }
 
-  .ht-rail__tab--tool:first-of-type {
+  .ht-rail__tab--tool:first-of-type,
+  .ht-rail__tab--tool-start {
     margin-top: 0;
   }
 
