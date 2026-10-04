@@ -7544,3 +7544,20 @@ main:packages/i18n/src/locales/en.ts:3053     '…Installable, works offline…'
 1. 重发落地页后**复跑本文件**取绿（两条 locale），并保留 `live-site-results/platforms-web-card-{zh-CN,en}.png` 两张图给人看；
 2. 那时那条三栏提示应当自动变好（同一棵树），要**再看一眼图**确认，而不是推断；
 3. 任务 #20/#21 与 G-58（`screenshots/landing/*.png` 仍印着那句承诺与旧域名）在同一趟收口。
+
+#### ⑥ 整条线上套件同时跑了一遍：23 绿 / 2 红，而两枚红全是这条新判据
+
+```
+Running 25 tests using 1 worker
+  2 failed
+    [chromium] › live-site/live-install-claim.spec.ts:68:3 › 线上 zh-CN Web 卡…
+    [chromium] › live-site/live-install-claim.spec.ts:68:3 › 线上 en Web 卡…
+  23 passed (1.1m)
+LIVEALL_RC=1
+```
+这条读数的用处是**把"站点坏了"这个解释排除掉**：既有的 23 条线上判据（解析 / TLS / canonical /
+`/app/` 加载 / 登录入口 / `/docs/selfhost/` / PWA 资产与 SW 注册…）全绿，红的只有新加那两条，
+且报错原文就是 `main` 的词条内容。⇒ 生产没有回归，缺的仍然只是"落地 + 从落地后的 main 重发"。
+（对账口径不是"总数相等"而是**既有用例一条都没变红**。顺带把三次读数的差说清，免得下一读的人以为掉了什么：
+09:31 是 23 条（§8.27 前），18:35 是 26 条 —— 多的那 3 条是当时挂在树里、**未提交**的
+`live-site/live-pwa.spec.ts` 三条腿（§8.118 记着它后来被删），本趟 25 = 既有 23 + 本条新增 2。）
