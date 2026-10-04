@@ -437,4 +437,110 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
     await parkCursor(page);
     await page.screenshot({ path: SHOT('k7-notes-editor-follows-cursor') });
   });
+
+  /**
+   * K8 便签面的**可见痕迹**（工单 W1c，看图照出来的那条）
+   * ------------------------------------------------
+   *
+   * K7 证的是"编辑器内容跟着光标走"，而它顺手照出另一件事：**列表里那一行没有任何痕迹** ——
+   * 任务面有浅底（`TaskRow.rowActive`）、习惯面有 `aria-current` + 浅底，便签面两样都没有。
+   * 也就是说同一个一等状态在三张面上有三种可见性。K8 钉补齐之后的形状：
+   *
+   * ① 按键**之前**一行都不亮（与习惯面刻意不同：那边有"派生回落第一行"，
+   *    便签没有回落 —— 没选中就是没选中，这正是 §8.20 那张全枚举表记的口径差别）；
+   * ② 按键之后 `aria-current` 与浅底**始终同一行**，且那一行的摘要就是编辑器里正在编辑的正文；
+   * ③ ↑↓ 逐格跟，夹住不环绕。
+   *
+   * 🔴 判据不写死那个颜色值（同 K6 的理由：抄 token 就是造第二份事实源）。
+   */
+  test('K8 🔴 便签面的选中看得见：aria-current、浅底、编辑器内容三者同一行', async ({ page }) => {
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '便签');
+    await addNote(page, '便签痕迹甲');
+    await addNote(page, '便签痕迹乙');
+    await addNote(page, '便签痕迹丙');
+
+    const read = async () => {
+      const rows = await page.locator('[data-testid^="note-row-"]').evaluateAll((els) =>
+        els.map((el) => {
+          const id = (el.getAttribute('data-testid') ?? '').replace(/^note-row-/, '');
+          const excerpt = el.querySelector(`[data-testid="note-edit-${id}"]`);
+          return {
+            id,
+            current: el.getAttribute('aria-current') === 'true',
+            bg: getComputedStyle(el).backgroundColor,
+            excerpt: (excerpt?.textContent ?? '').replace(/…$/, ''),
+          };
+        }),
+      );
+      const others = new Set(rows.filter((r) => !r.current).map((r) => r.bg));
+      expect(
+        others.size,
+        `未选中的行有 ${others.size} 种底色，无法定义"少数派"：${JSON.stringify(rows)}`,
+      ).toBe(1);
+      const base = [...others][0] as string;
+      return {
+        count: rows.length,
+        current: rows.map((r, i) => (r.current ? i : -1)).filter((i) => i >= 0),
+        painted: rows.map((r, i) => (r.bg !== base ? i : -1)).filter((i) => i >= 0),
+        excerptOf: (i: number): string => (rows[i]?.excerpt ?? ''),
+      };
+    };
+
+    const rows0 = await read();
+    expect(rows0.count, '便签列表没渲染出三行（数据没灌进去，这条判据量不到东西）').toBe(3);
+    expect(
+      rows0.current,
+      `没按键时不该有任何一行带 aria-current（便签没有"回落第一行"）：${JSON.stringify(rows0)}`,
+    ).toEqual([]);
+    expect(rows0.painted, '没按键时就有行被画了底色').toEqual([]);
+
+    const editor = page.getByTestId('notes-editor-input');
+    await releaseFocus(page);
+
+    await press(page, 'ArrowDown');
+    const one = await read();
+    expect(
+      one.current.length === 1,
+      `一次 ↓ 之后 aria-current 应恰好一个，实际 ${JSON.stringify(one)}`,
+    ).toBe(true);
+    expect(
+      one.painted,
+      `浅底与 aria-current 不在同一行：${JSON.stringify(one)}`,
+    ).toEqual(one.current);
+    // 🔴 第三种线索：编辑器开的必须就是那一行。三处一致才叫"同一套选中"。
+    await expect(editor, '↓ 之后编辑器没开').toBeVisible();
+    const shown = await editor.inputValue();
+    expect(
+      shown.startsWith(one.excerptOf(one.current[0] as number)),
+      `编辑器内容与被选中那行对不上：编辑器 ${JSON.stringify(shown)} / 行 ${JSON.stringify(one)}`,
+    ).toBe(true);
+
+    await press(page, 'ArrowDown');
+    await press(page, 'ArrowDown');
+    const bottom = await read();
+    expect(
+      bottom.current.length === 1 && (bottom.current[0] as number) === 2,
+      `两次 ↓ 之后光标没走到第三行：${JSON.stringify(bottom)}`,
+    ).toBe(true);
+    expect(bottom.painted, '到底之后两种线索分叉').toEqual(bottom.current);
+
+    await press(page, 'ArrowDown');
+    const clamped = await read();
+    expect(
+      clamped.current,
+      `越界之后应夹住不环绕，实际 ${JSON.stringify(clamped)}`,
+    ).toEqual([2]);
+
+    await press(page, 'ArrowUp');
+    const back = await read();
+    expect(
+      back.current.length === 1 && (back.current[0] as number) === 1,
+      `↑ 没往回走一格：${JSON.stringify(back)}`,
+    ).toBe(true);
+    expect(back.painted, '↑ 之后浅底没跟着走').toEqual(back.current);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('k8-notes-selection-visible') });
+  });
 });
