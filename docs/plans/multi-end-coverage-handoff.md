@@ -2102,3 +2102,23 @@ package.json 2/1 两次都是空交集）：
 ⇒ 下一次 ①/③ 里 `pnpm build:android` 那一段将是远程路径的第一发实弹。
 它红的時候要先分三档：① 远端主机不可达 / 依赖缺失（环境）② 远端 gradle 编不过（可能是产品，
 也可能那台机的 SDK 与 Mac 不同版）③ 回传 sha256 对不上（装置）。别一上来当产品判据读。
+
+### 00:2x 那条新规其实有**两份**注记，而用户手写的那份不随 main 走
+
+读证（不占窗口）：用户 2026-10-04 手写的迁移注记在 `heyta-wt-batch2/AGENTS.md:356/362`
+（`🔵 2026-10-04 起统一 windows-pc 打包机`）。现量它的归属：
+
+```
+git worktree list | grep batch2   →  … heyta-wt-batch2  d1ab7f26 [feat/countdown-batch2]
+git -C …/heyta-wt-batch2 status --porcelain -- AGENTS.md  →   M AGENTS.md      ← 未提交
+git -C …/heyta-wt-batch2 show HEAD:AGENTS.md | grep -c 'windows-pc' → 2        ← 分支上还是旧的那两处
+```
+
+⇒ 那份注记既**没进任何一条 ref**，又落在**另一条未合并分支的工作树**里。
+而 main 现在有我落的规则本体（`0858032e`，AGENTS §6.1 + runbook + 门禁）。
+同一句结论从此有两个抄件，`feat/countdown-batch2` 合回来时**必然在 AGENTS.md §6.1 撞车**。
+
+处置（不代它做，理由在最后）：合流时**保留 main 这一份**（它带门禁名与 runbook 指针，
+信息量比那份手写注记大），把分支那份重复注记删掉 —— 这是"同一结论句落在两份文档 ⇒
+改一处必 sweep 全仓"的第三次出现。我不去动 `heyta-wt-batch2/AGENTS.md`：
+它是**用户自己手写的未提交改动**，不是本线的落点，改它 = 替别人（这次是本人）处置在途工作。
