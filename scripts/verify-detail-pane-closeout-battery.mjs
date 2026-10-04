@@ -53,6 +53,9 @@ const STEPS = [
   ['gate selection-single-source', '.', 'node scripts/check-selection-single-source.mjs'],
   ['gate l4', '.', 'node scripts/check-l4-no-style.mjs'],
   ['gate row-single-source', '.', 'node scripts/check-row-single-source.mjs'],
+  // 棘轮的**另一半**（不许把基线本身抬高）：上面两步守"实测 ≤ 基线"，这一步守"基线 ≤ 锚点"。
+  // 不进电池的话，它就是一道"有脚本、没消费者"的门禁（工单 §8.72 那本账数过这一档）。
+  ['gate ratchet-ceilings', '.', 'node scripts/check-ratchet-ceilings.mjs'],
   ['gate design', '.', 'node design-system/heyta/check-hardcoded.mjs'],
   ['gate ui-language', '.', 'node scripts/check-ui-language.mjs'],
   ['gate migrations', '.', 'node scripts/check-migrations.mjs'],
@@ -106,6 +109,18 @@ const dupes = [...new Set(slugs.filter((s, i) => slugs.indexOf(s) !== i))];
 console.log(`SELF_CHECK steps=${STEPS.length} log_names=${slugs.length} unique=${new Set(slugs).size} dupes=${dupes.join(',') || 'none'}`);
 if (dupes.length) bad.push('self-check:log-name-collision');
 
+// 🔴 `--list`：只报名册就退出，不跑任何一步。理由不是省事：文档里"这条命令是 N 步"是一句
+// 需要现量的抄件（工单 §8.109 规则 1），而取这个数的**唯一旧办法**是跑完整趟 —— 它要几分钟，
+// 还会原地重写 `apps/web/evidence/` 里那批"人看过"的截图。拿一个步数要付这个代价，
+// 结果就是没人去拿，散文里的数字开始漂。
+if (process.argv.includes('--list')) {
+  console.log(`ROOT=${ROOT}`);
+  console.log(`LIST_ONLY steps=${STEPS.length}`);
+  for (const [name, cwd, cmd] of STEPS) console.log(`  ${name} :: cd ${cwd} :: ${cmd}`);
+  if (bad.length) console.log('BATTERY_RESULT=' + `RED:${bad.join(',')}`);
+  process.exit(bad.length ? 1 : 0);
+}
+
 const LOG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'heyta-detail-pane-battery-'));
 console.log(`ROOT=${ROOT}`);
 console.log(`LOG_DIR=${LOG_DIR}`);
@@ -137,6 +152,12 @@ for (const [name, cwd, cmd] of STEPS) {
         .slice(-3)
         .map((l) => l.trim().slice(0, 90))
         .join(' / ');
+  }
+  // 🔴 棘轮上限这一道要现量报**三个基线此刻各是多少 vs 锚点多少**：只报 `RC=0` 回答不了
+  //    "这一趟到底有没有人动过常数"，而那正是它管的事（§8.82 的 A/B：绿灯和"基线被抬高了"
+  //    在原读数上长得一模一样）。
+  if (name === 'gate ratchet-ceilings') {
+    extra = ' || ' + lines.filter((l) => l.includes('基线')).map((l) => l.trim().replace(/\s+/g, ' ').slice(0, 58)).join(' / ');
   }
   // 🔴 单测那六条不能打印"最后一行"：vitest 的末行是 `learn more: https://…`，
   // 它既不含条数也不含失败数 —— 打印它等于把这一族的判据条数从读数里丢掉。

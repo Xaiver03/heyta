@@ -3550,7 +3550,7 @@ sysctl -n vm.loadavg                                      # 1 分钟值要低于
 第 5 步第 2 行往后（typecheck / 全量测试 / `pnpm check` / 重出截图 / 四端重装）**未执行** ——
 它们要的载体是真分支，本节不含任何合并动作。
 📌 但**别再手抄那七行**：第 2/3 行与"重出截图之前的重打产物"已经是一条命令
-`node scripts/verify-detail-pane-closeout-battery.mjs`（§8.110；25 步、每步自报 RC、
+`node scripts/verify-detail-pane-closeout-battery.mjs`（§8.110；步数现量取 `… --list` 的 `LIST_ONLY steps=`，本笔 26；每步自报 RC、
 三条自检有变异臂、末尾报 `EVIDENCE_DIRTY`）。`pnpm check` 全量与四端重装**不在它射程内**。
 机械路径（§3a/§3b/第 4 步）在 10-05 00:1x 那棵候选树上又重跑过一次并回读验真，见 §8.113。
 
@@ -7183,7 +7183,7 @@ slot、ownership、preflight、docs-letter、widgets、timeline-face、focus-emp
 | `/tmp/dp_gateall.mjs` | §8.100 那趟"43 道纯 fs 门禁"的枚举法 | 🔴 **同样被我删了**。它的**口径**（`package.json` 里 `check:*` 且命令是单条 `node <脚本>`）写在原文里，所以这一枚可重建 —— 这正是该把口径写进句子的原因，脚本丢了口径没丢 |
 | `/tmp/dp_tablecheck2.mjs` | §8 里那条 `TABLE_RC` 的串跑法 | 🔴 已消失（更早，成因未查——**不写成"重启造成的"**，那是没取证的归因） |
 | `/tmp/dp_es_mutate.py` | §8.13 修 `check:empty-state` 的三臂 E1/E2/E3 | ✅ **已入仓**成 `research/tools/mutation-rigs/mutate-focus-empty-state.mjs`（§8.111）：浏览器腿改成显式 `--e2e`，不带时打印 `NOT_JUDGED` 不计入绿。`/tmp` 那份只是历史载体 |
-| `/tmp/dp_w1b_battery.py` | W1b 那格 `25 步 ALL_GREEN` | ✅ **已入仓**成 `scripts/verify-detail-pane-closeout-battery.mjs`（§8.110）：25 步、每步自报 RC、三条自检各有变异臂 |
+| `/tmp/dp_w1b_battery.py` | W1b 那格 `25 步 ALL_GREEN` | ✅ **已入仓**成 `scripts/verify-detail-pane-closeout-battery.mjs`（§8.110）：入仓那趟 25 步（步数以 `--list` 现量为准，§8.118 起 26）、每步自报 RC、三条自检各有变异臂 |
 | `dp_s6_audit2.mjs`、`dp_s6_audit3.mjs`、`dp_n1_counterfactual.mjs`、`dp_habit_trace_rig.mjs`、`dp_ab_aria.mjs`、`dp_leak_proof.mjs`、`dp_g_merge_probe.mjs`、`dp_listcheck.mjs`、`dp_docscheck.mjs`、`dp_merge_shape.mjs`、`dp_es_renumber_traps.py` | 一次性测量/审计（§6 十探针、断言 H 的反事实、选中痕迹的 A/B、合流形状、台账续号那一次动作等） | 🟢 文件都还在盘上。**结论都已落进文档或已升级成常驻判据**，所以它们是一次性动作的辅助件，不是任何一条当前判据的唯一载体 |
 | `/tmp/dp_gates_sweep.py` | §8.13 那趟"全 `check` 组合逐条扫"（当时 56/58 道） | ✅ **已入仓**成 `scripts/verify-detail-pane-gate-sweep.mjs` + 臂 `mutate-gate-sweep.mjs`（§8.116）：三处旧缺陷修掉（写死路径 / 硬编码展开表 / 无条件 exit 0） |
 | `/tmp/dp_w1c_mutate.py` | §8.22 那六臂（N1–N4 / T1 / H1） | ✅ **已入仓**成 `research/tools/mutation-rigs/mutate-notes-selection-trace.mjs`（§8.116）：复跑 **6/6 全红、无存活、无计数漂移**，红条数按臂钉住 |
@@ -7229,7 +7229,7 @@ comm -23 <(grep -ohE '/tmp/dp_[A-Za-z0-9_.-]+\.(py|mjs|sh|js)' docs/plans/detail
 ⚠️ 上一轮我把腿10 的"块"读成表格/代码块，按那个理解去凑增量会凑不上（本节的表 + 名册代码块就有 4 处）。
 **计数类判据报错单位是常态**：先读定义处那段代码里数的是什么，再引用它的数字。
 
-## 8.110 收尾电池入仓成一条命令（25 步），三趟现量 + 一条自检臂（2026-10-04 23:5x，载体续 `a91b2fde`）
+## 8.110 收尾电池入仓成一条命令（入仓那趟 25 步；步数以 `--list` 现量为准，§8.118 起 26），三趟现量 + 一条自检臂（2026-10-04 23:5x，载体续 `a91b2fde`）
 
 按上一节那条规则 1 执行的第一件事：`/tmp/dp_w1b_battery.py`（W1b 那格 `25 步 ALL_GREEN` 的唯一载体）
 现在是 `scripts/verify-detail-pane-closeout-battery.mjs`。搬的理由不是"整洁"，是**合流当时要用它** ——
@@ -7238,7 +7238,8 @@ comm -23 <(grep -ohE '/tmp/dp_[A-Za-z0-9_.-]+\.(py|mjs|sh|js)' docs/plans/detail
 所以换载体（本检出 / 主检出 / 预检铺的产物树）不需要改脚本。
 
 ```bash
-node scripts/verify-detail-pane-closeout-battery.mjs   # 25 步，每步单独打印自己的 RC
+node scripts/verify-detail-pane-closeout-battery.mjs   # 每步单独打印自己的 RC
+# 步数别抄进散文：同一条命令加 `--list`，它只报名册不跑任何一步（§8.118）
 ```
 
 三趟现量（同一棵活树、源码零改动）：
@@ -7671,3 +7672,111 @@ hunk#2（`.ht-header__actions` + main 那条新规则 `.ht-header__lang`）按 �
   （要 `narrow.css` 那一档的实测 + 截图）。这一条不是"预计没问题"，是**待验**，排在 #21 那条重跑里。
 - 两道棘轮在这一节没动：`check:l4` mobile 仍 **90 = 基线**、`check:row-single-source` 仍 **28 = 基线**
   （第 6 步不新增顶层 `ht-*` 族 —— `.ht-header__lang` 是 main 侧带来的，不是本线新开的）。
+
+## 8.118 棘轮"不许调高基线"那一半从散文变成门禁（`check-ratchet-ceilings`），四条拒绝臂 + 电池第 26 步（2026-10-05 01:1x 现量，载体 `47883c93`→本笔）
+
+§8.82 在那格留的是**一格要人的裁决**，题面是两个选项：
+
+> (A) 最便宜但动共享语义、(B) 最不动别人但要先验 ref 可得性。
+
+**这一格由本线拍了 (B)**，理由和 §8.117 那两枚一样 —— 产品决策权已交下来（用户原话 2026-10-03
+"产品级的决策你也可以来做呀"）。🔴 **这条是我拍的，推翻它的代价**：改回 (A) 要动 `check:l4` 与
+`check:row-single-source` 那两枚**别人也在改**的共享门禁的语义（加一档"往上不许动"的判定），
+代价不是代码量而是撞车面；(B) 的代价是**多一道门禁 + 一个 git 历史依赖**（下面边界第 1 条就是它的账）。
+选完剩下的是把它做成**会拒绝的东西**，不是把它写成一个结论。
+
+### 它钉的是哪一半
+
+| 哪一半 | 谁守 | 之前会红吗 |
+|---|---|---|
+| 实测 ≤ 基线（"不许回潮"） | `check:l4` / `check:row-single-source` 自己 | ✅ 会（§8.82 实测过） |
+| **基线本身不许抬高** | 🔴 **此前只有散文**（工单 §1 闸门第 2 条那句"不许调高基线"） | ❌ **不会** —— §8.82 的 A/B：常数 +1 后两道门禁都退 **0**，还把自己那句打印成"已降 1 处"= 一次改进 |
+
+第二行那个"打印成改进"是这道门禁非建不可的理由：不是"没人管"，是**管它的那两件工具会把它读成好事**。
+
+### 三档常量、两种解析形状
+
+| 档 | 住哪 | 形状 | 现量 |
+|---|---|---|---|
+| `mobile_l4` | `scripts/check-l4-no-style.mjs` | `label: '…（L4 视图）'` 所在对象里的 `baseline: N` | **90** |
+| `web_l4` | 同上 | 同上（同一文件里的**另一个**对象） | **104** |
+| `ht_family` | `scripts/check-row-single-source.mjs` | `const HT_FAMILY_BASELINE = N;` | **28** |
+
+两种形状都要有，因为这两枚脚本本来就不是一个人写的 —— 只支持一种就会在下一枚脚本改写法时
+静默漏档（漏档在这道门禁上的表现是"那一档永远不比"，不是报错）。
+
+### 锚点：`git merge-base main HEAD`，不是 `main`
+
+`main` 那一侧的值会**惩罚"落后于 main"**：别的线把基线降了而这条分支还没合，就会被判成
+"你抬高了" —— 那是错归因（AGENTS §7 元规则 1 的反面用法：**探针拿错参照，读数就会指控错人**）。
+merge-base 是这条分支**出发时**的值，于是三种情形各得其所：分支内抬高 ⇒ 红；分支减了债 ⇒ 绿；
+合并之后 merge-base == main，比的正是 main 的当前值，语义仍然对。
+
+现量 `ANCHOR=f419df75e590880483f7532aac6feb1c4b1d688f（merge-base main HEAD）`。
+取不到锚点（浅克隆 / 没有 main / `git archive` 铺的产物树）**一律 exit 2 报 `NOT_JUDGED`**，
+不当成通过。
+
+### 落地读数
+
+| 判据 | 读数 |
+|---|---|
+| 未变异 | `✅ mobile_l4 90 vs 90 / ✅ web_l4 104 vs 104 / ✅ ht_family 28 vs 28`、`ROWS=3/3`、`RATCHET_RESULT=OK`、**RC=0** |
+| **R1** mobile 基线 90→91 | **RC=1**，`RED`，行内点名 `🔴 mobile_l4 … 调高了 1`，另两档仍 `✅` |
+| **R2** ht_family 28→29 | **RC=1**，`RED`，点名 `ht_family`（另一枚脚本、另一种解析形状各红一次） |
+| **R3** **删掉** web 那一档的 `baseline:` 行 | **RC=2**，`PROBE_BROKEN`，web_l4 报"解析不到基线"；🔴 同趟 `✅ mobile_l4 90 vs 90` **照常打** —— 守卫压住的是结论，不是把别人一起静音 |
+| **R4** `HEYTA_RATCHET_REF` 指向不存在的 ref | **RC=2**，`NOT_JUDGED`，打印"解析不到提交"（绝不 RC=0） |
+| 臂台汇总 | `RIG_RESULT=臂 4/4 红 + 对照双向干净`、`RESTORE ✅ 两枚脚本与基线 md5 逐字节相同`、`BACK_TO_CLEAN=true`、`[CTRL2] 还原后 ⇒ rc=0 OK` |
+| 载体 | `research/tools/mutation-rigs/mutate-ratchet-ceilings.mjs`（负载门理由现在会打出来；独占门：两枚目标脚本相对 HEAD 不干净就 `REFUSED_NOT_EXCLUSIVE` 拒跑） |
+| 电池 | 新增第 **26** 步 `gate ratchet-ceilings`；`--list` ⇒ `LIST_ONLY steps=26`、`SELF_CHECK steps=26 log_names=26 unique=26 dupes=none` |
+
+R3 这一条是整个设计里最值得留的臂：它测的不是"能不能红"，是**读不到时会不会瞎读**。
+解析器如果写成"从 label 往后找第一条 `baseline`"，删行之后它会滑进**邻居**读出 90，
+于是报出"web_l4 降了 14"这种**有凭有据的假读数** —— 比空值危险，因为它听起来像好消息。
+修法是把取值范围截在该对象自己的花括号里（`{` → 配平的 `}`），不靠行号也不靠缩进。
+
+### 这一节照出来的三处装置缺陷（都已改掉，记下来是因为都会复发）
+
+1. **自锚差一层**：`resolve(dirname, '..', '..')` 从 `research/tools/mutation-rigs/` 只退到
+   `research/`。症状**不是**"找不到文件"，而是负载门报 `No such file or directory` ⇒ 看起来像
+   环境问题，于是我第一趟把它读成了 `ENV_INVALID`。🔴 所以现在有一条**自锚自检**：三枚目标路径
+   任一不存在就打 `PROBE_MISANCHORED` 并**把 ROOT 印出来**，RC=2（臂自己的寻径错，不该冒充门禁结果）。
+2. **`ANCHOR=…（HEYTA_RATCHET_REF）` 那句 provenance 是假的**：`anchorHow` 的初值写成了环境变量那一档，
+   而 merge-base 成功的路径没覆写它 ⇒ 正常跑法会自称"锚点是别人用 env 传进来的"。
+   这不是 cosmetic：这道门禁的**全部价值在于指控准人**，参照系来源写错就是它的同类错误。
+   现在初值是空串，三条来源各写各的。
+3. **臂的 needle 凭记忆写**：判据写 `调高 1`，门禁打的是 `调高**了** 1` ⇒ 两道**明明红对了**的臂
+   被判成"存活"，`RIG_RESULT` 报 `🔴 存活臂=R1,R2`。第一反应容易去"修门禁"，那是彻底搞反 ——
+   红的东西是对的，错的是尺子。所以判据现在锁在**同一行**（`[^\n]*`）并注明字面形状必须从真实输出抄
+   （记忆里那条"pattern 别凭记忆写，先 Grep/Read 看字面形式"第三次命中，第一次命中在 `node -e`，
+   第二次在 CSS 注释，这次在正则臂）。
+
+### 边界（别读多）
+
+- 🔴 **它在没有 git 历史的载体上没有牙**。产物树（`git archive` 铺的 /tmp 目录）、浅克隆里它一定
+  `NOT_JUDGED` —— 这是**设计**（拒绝报绿），但要说清后果：合流预检那一趟**不会**判这一档。
+  那里唯一有人守的窗口是"在真实检出里跑"，登记成 #23 的一部分（挂进 `pnpm check` 后由 CI/本地检出覆盖）。
+- **本线没把它挂进 `pnpm check`**（根 `package.json` 正被别的线改，#23 那条等干净）。
+  在挂之前它的自动消费者只有电池那一步 —— 而电池是本线合流当时跑的，不是每次 push 跑。
+  ⚠️ 这条要按 §8.72 那本账读：**"有脚本 + 有臂"不等于"有人每次跑"**。
+- 这道门禁管的是**调高**，不管"实测离基线还有多少余量"。所以别说"web_l4 余量为 0"：
+  104 是基线，`check:l4` 现量实测是 98（余量 6）；本线那**两道余量为 0** 的是 mobile **90 = 90** 与
+  `ht-*` 族 **28 = 28**。这一节一个字都没动这三档里的任何一档（R1–R4 都在臂台里改、md5 复原）。
+- 没重跑整条电池（26 步）。理由不是省时间：第 24 步 e2e 会**原地重写** `apps/web/evidence/` 下
+  那批"人看过"的提交态截图，而那批图要留到合流当时按 #21 重出。新步的单条读数就是上面那行
+  未变异 RC=0，注册进名册由 `--list` 证。⚠️ 因此"26 步 ALL_GREEN"这一格**本轮没有读数**，别引用。
+
+### 收尾读数（2026-10-05 01:2x 现量；本节改了 2 枚脚本 + 新增 2 枚 + 本文，产品源码零字节变化）
+
+| 闸门 | 读数 |
+|---|---|
+| 归属门 | `verify-detail-pane-ownership.mjs` 点名 4 条 ⇒ `VERDICT=CLEAN`｜主检出未提交 **26** 枚、本地不在场 0、被占 0 |
+| 文档门禁 | `status-table` / `c1-coverage` / `evidence-refs` / `check-docs-voice`（site.* 1028 条、禁词表 30 项零命中）/ `slot` / `selection-single-source` / **新增的 `ratchet-ceilings`** ⇒ 七道 **RC=0** |
+| 死链 | `docs-link-check` **RC=1，仍只有那 1 枚**：`PROGRESS.md:1362 → docs/research/aed-implementation-evidence.md`，**不在本线两份文档里**（归属见 §8.106，登记不代改）。跨文档章节引用现量 **443** 处、页内锚点 **54** 处 |
+| 三档基线 | mobile_l4 **90 = 锚点 90**、web_l4 **104 = 锚点 104**、`ht-*` 族 **28 = 锚点 28** —— 本节一个字都没动过它们（臂里动过，md5 复原） |
+| 腿10 | 本文 **49 块／169 条目／不一致 0**（另一份 8／56）。⚠️ 上一格记数是 §8.109 的 44／156，中间 §8.110–§8.117 **没记** ⇒ 这 +5／+13 归因不到具体小节，是**记账缺口**不是回归；本节起收尾读数带上这一行 |
+
+🔴 **一条容易读错的对照**：`check-selection-single-source` 在本线**工作树**打的是
+`I：视图全集 11 个 ViewKey…证据锚点 13 条`，而 §8.117 记的是 **12 个／14 条** —— 那两个数**都对**，
+差的那一档是 `main` 带进来的倒数纪念日面。§8.117 那一趟跑在 `git archive` 铺的**合并候选产物树**上，
+本行跑在**分支工作树**上。引用这一族数字必须带载体（工单 §8.109 规则 1 的另一面：
+不是"件会不会丢"，是"同一句话在两棵树上本来就有两个值"）。
