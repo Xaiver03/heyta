@@ -1632,3 +1632,23 @@ hdiutil/ssh/scp/tar/rsync/pod/ohpm/hvigorw`，调用即 `VETO-BLOCKED` + 退 97�
   另有两根要靠上下文区分：`时前台是本应用` 在 `:663`（第 12 步逐张打，`$f` 会被替换成文件名，
   所以**不能整行 grep**，要 grep 这半句）；`手机同步完成` 只出现在第 9 步的 `ok`，但同一步另有
   `手机同步没成功` 的 `bad` —— 引用时带上前缀 `ok` 那一行的完整文本，不要只写这四个字。
+
+#### 21:36 ① 的一处真缺陷当场修掉：第五条截图是相对路径，而它靠 270 行之前那一次 `cd`
+
+读自己的启动器时抓到 `PNGS` 里第五条写的是裸相对串 `dist/windows/packaged-first-run.png` —— 它只对
+**第 16 行那一次** `cd "$W"` 成立。中途任何一次插入 `cd`（或有人从别的 cwd 直接调它）都会让那张读不到，
+后果不是报错而是 `FRESH=4/5` ⇒ `VERDICT=NOT-RUNNING` ⇒ **白烧一个窗口**，症状还长得像"产物没生成"。
+同族第 N 次命中：20:34 的 step10 夹具因为相对 `SRC` 抽到 0 行而报"锚点漂了"。
+
+- 改成 `"$W/dist/windows/packaged-first-run.png"`，并**把基准目录打进读数**
+  （`截图基准：前四条=/tmp 共享路径…第五条按载体绝对路径读：$W`）——绝对化了还要让人看得见是谁给的基准。
+- 🔴 光"改对了"不算：给它加了**形状门 + 变异臂**。`heyta-evid-fixture.sh` 开头新增
+  `REL_PNG=$(grep -cE '^[[:space:]]+dist/windows/packaged-first-run\.png' "$SRC")`，非 0 就
+  `GUARD_FAIL=第五条截图路径又变回相对路径` 直接退 1；`heyta-evid-mutation.sh` 新增 **M5**
+  把这一条改回相对串喂给夹具。21:36 实测：**`GREEN=5/5 条变异全被抓到`**，
+  九臂夹具本身不回归（`1-all-fresh`…`9-carrier-midrun-realign` 全对），全量普查 `SWEEPED=25 不合要求 0`。
+- 🔴 **顺带抓到一份"抄件漂移"的现行实例**：`/tmp/heyta-run-reinstall.sh` 与 durable 那份在同步前
+  **md5 不同**（我 21:35 只改了 durable）。链的取用顺序是"durable 优先、/tmp 兜底"，所以本轮不会用错，
+  但只要那句 `for cand in` 的顺序被换掉，跑的就是旧的那条相对路径。
+  同步后两枚逐字相同：`d4184c8449a80e070525bd6d6dff5d22` × 2。
+  ⇒ **改启动器要同时改两份**，并在收尾把两枚 md5 一起打出来；只做"我觉得 durable 优先"是不可靠的。
