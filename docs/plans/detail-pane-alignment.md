@@ -7331,3 +7331,38 @@ git merge-base HEAD main          # f419df75（10-04 01:16，是我自己那一�
 边界同 §8.107：**4 枚 marker 未清 ⇒ 本趟 tally 不算"合流验过"**；那一列"候选=0"证明的是
 文本扫描器没被绊倒。清 marker 的机械路径（`resolve-detail-pane-merge-mechanical.mjs --apply`）
 之后要在**同一棵产物树**上复跑，才算 #16/#34 那两格的最终读数。
+
+## 8.113 机械路径在**午夜后这棵候选树**上重跑：合并造成的红再次退到 0，产品 marker 只剩 #19 那两格（2026-10-05 00:1x 现量，一次性载体，分支一字未动）
+
+§8.53 验的是 14:5x 那棵树，§8.108 验的是 23:3x 那棵。这一趟用 §8.112 同一对 ref（`main` × `HEAD`，
+`TREE=0024b092…`），跑序与 §8.108 相同：
+
+| 步 | 命令 | 读数 |
+|---|---|---|
+| 1 | `resolve-detail-pane-merge-mechanical.mjs --apply` | 改法 **3** 条 / 拒绝 **0** 条；§3a 并集 2+1⇒3 行、markers 0 / 语法过 / 重名 0（新增项 `byCreatedAtOrder` / `isLive` / `habitLogValue`）；§3b 补 2 条 `});` ⇒ describe 10 / 用例 48 / markers 0 / 语法 0 诊断；第 4 步补 2 行 trash `busyId` 豁免 |
+| 2 | 回读验真（`--apply` 才有） | 三枚文件各自 `marker 0 处 / 语法诊断 0 条` |
+| 3 | 把 §8.108 那段 countdown 原文插进产物的 `VIEW_STANCES`（口径：在数组闭合的 `];` 前插，插前 `hits=0`、插后 `hits=1`） | `PRE hits=0 → POST hits=1` |
+| 4 | `verify-detail-pane-merge-preflight.mjs --product <同一目录>` | **合并造成的红 = 0**（21 道）｜本分支新增无对照 = 2｜两边都红 = 0｜名册漏跑/探针坏 = 0｜静默合流 13 枚零丢行｜槽位重复 0｜台账 🔴 2 项 |
+| 5 | 产品 marker | 4 枚 ⇒ **2 枚**：只剩 `apps/web/src/App.tsx` 与 `apps/web/src/styles/app/main-area.css` |
+
+🔴 **这一趟真正产出的，是一个可以直接交给产品负责人的数**。18 枚冲突**逐枚列出来**
+（`git merge-tree --name-only --write-tree main HEAD`，本趟实测 = 10 枚 PNG + 8 枚文本）：
+
+- **10 枚 PNG** —— 不选边，由 #21 那一格整片重出（跑 `detail-column-slot` / `detail-pane-overlay` /
+  `selection-projections` 那几份 spec 就覆盖）；
+- **3 枚文本机械可解**：`packages/app-host/src/habit-actions.ts`（§3a 并集）、它的 spec（§3b 补闭合）、
+  `docs/README.md`（两侧各改过 ADR-0043 那一行，**取带限定那一版** —— 这个裁决就写在 HEAD 侧那一行自己的文字里）；
+- 🔴 **2 枚文本要人**：`apps/web/src/styles/app/main-area.css` = §3c「页头这一条许不许被压窄」，
+  `apps/web/src/App.tsx` = §3f「同一格里 AI 面与专注概览怎么共处」—— **两枚都是 #19，没有新增**；
+- **3 枚文本有既有处置**：本计划文档（§3g 取 HEAD 行 + 接回 main 侧那 2 个句段）、
+  `environment-traps.md`（#22 续号，起点 **229**）、`package.json`（#23 / #29）。
+
+⚠️ 顺手纠正一处**我此前一直写错的归类**：`scripts/check-selection-single-source.mjs` **不在这 18 枚里** ——
+它是"两侧都改过而 git 零 marker 静默拼接"那 13 枚之一（本趟读数 `main+61 / HEAD+537` 全在）。
+执行器的"第 4 步"补的两行 trash 豁免动的就是这枚静默合流件，**不是**冲突枚。
+countdown 那一行（#34）同理：它是**门禁红**，不占冲突枚数。
+
+⚠️ 三条边界，别把这一趟读多：① 产物仍带 2 枚 marker ⇒ tally **不算**"合流验过"，
+那两枚清完再跑一次才算；② 全程只写在这趟自己铺的临时目录里，**分支一字未动**（收尾 `git status` 干净）；
+③ 步 3 那个插入脚本是一次性的（`/tmp/dp_insert_countdown_row.mjs`，按 §8.109 规则 2 连代价一起写：
+**它不可复跑**，可复跑的是 §8.108 那段原文 + 这里写的插入口径"数组闭合 `];` 之前"）。
