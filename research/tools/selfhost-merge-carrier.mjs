@@ -852,6 +852,13 @@ const GATES = [
   ['check:script-snapshot', ['scripts/check-script-snapshot.mjs']],
   ['check:docs', ['research/tools/docs-link-check.mjs'], DOC_DEFECT],
   ['check:md-tables', ['scripts/check-md-table-rows.mjs']],
+  // 🔴 并集链特有的洞（落笔前判据再加一道）：**链条目来自一侧、脚本文件被另一侧删了**
+  //  ⇒ `pnpm check` 走到那一步以 `Cannot find module` 收尾。两种收场都不是"落地"：
+  //  要么当场烧掉一整枚窗口（要 node_modules、要起栈的那一步才发现），要么配对树那一侧根本不跑这一道、
+  //  归属只能把它记成"本批带进来的"。所以把它放在**落笔前**，而不是等完整链。
+  //  10-05 01:3x 现量：载体 85 步 / 目标 82 枚 / 悬空 0，main 84 步 / 81 枚 / 悬空 0 —— 洞此刻没开，
+  //  这一道是防它开的。射程边界（`--filter`/`-r`/扩展名集合外）由该工具自己点名打印，不静默。
+  ['链里每条脚本目标都在树里', ['research/tools/selfhost-chain-targets.mjs'], /^悬空\/判不了\s/],
   // 第五族的裁判：`check:image-license` 的**三条腿原样**挂进来（不是只挂第 1 腿）。
   // 🔴 排除的只有 `--installed-tree` 那一**模式**（它要真镜像里 dump 出来的树，消费者是
   //    `verify:selfhost-stack`），不是第 2/3 腿本身。10-04 13:5x 在载体上实测过：
