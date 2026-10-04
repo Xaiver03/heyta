@@ -80,6 +80,16 @@
  * `git commit` 之前再取一次 `main`：与本次检出用的 SHA 不同 ⇒ 退 4 且不提交。
  * 没有这条守卫时会产出一笔"第一父已经不在 main 上"的载体，而它看起来和合法载体一模一样。
  * 重跑本脚本就是全部恢复动作。
+ *
+ * ## 落笔前的现场守卫（第 0a 步，在任何写动作之前）
+ *
+ * 载体目录**与并行那条线共用**（他们的启动器在这里做公证 + 远端打包，一趟 15–25 分钟），
+ * 而本脚本第 0 步是 `worktree add` / `merge --abort` / `reset --hard`。所以先问一句
+ * "这棵树此刻是不是别人的现场"：argv 腿（命令行里点了这个目录）+ cwd 腿（进程坐在里面）
+ * + `MERGE_HEAD` 三条，任何一条命中 ⇒ **退 6 且一个字节都不写**；两条腿读不到 ⇒ **退 2**
+ * （"判不了"不等于"没人用"）。判据本体在 `selfhost-carrier-busy.mjs`（九臂自检）。
+ * `HEYTA_CARRIER_BUSY_FORCE` 只能把它**逼红**（`busy`/`blind`），没有让它放行的取值 ——
+ * 那是给变异复现用的，不是给绕过用的：写错值本身按"判不了"退 2。
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -87,6 +97,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { unionAudit, unionAuditVerdict, ownershipVerdict, pkgFieldVerdict } from './selfhost-audit-union.mjs';
 import { replayCapture, replayVerdict, replayReading, selftestOutputVerdict, CAPTURE_PATH } from './selfhost-capture-replay.mjs';
+import { liveCarrierUsers } from './selfhost-carrier-busy.mjs';
 
 const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
 const MAIN = process.env.HEYTA_MAIN_REF || 'main';
@@ -119,6 +130,45 @@ try {
   process.exit(0);
 } catch { /* 不是祖先 ⇒ 要做合并，继续 */ }
 notes.push(`main=${mainSha.slice(0, 8)} · ${SOURCE}=${srcSha.slice(0, 8)} · merge-base=${baseSha.slice(0, 8)}`);
+
+/* ── 0a. 任何写动作之前：这棵载体树此刻是不是别人的现场 ─────────────────
+ * 下面那段（`worktree add` / `merge --abort` / `checkout --force` / `reset --hard`）是**破坏性**的，
+ * 而 `/tmp/heyta-merge-carrier` 不只我在用：并行那条线的启动器（main `f7e193e9` 升到 v11）
+ * 在同一棵树上做公证 + 远端打包，一趟 15–25 分钟。撞进去毁掉的是**别人这段工作的全部现场**，
+ * 而他们那侧的守卫拦的是"我的图是不是这一棵树的"，拦不住我这边把树换掉 ——
+ * 那侧的读数会**句句真话**（`INNER_EXIT=0`/`FRESH=5/5`）而产出属于另一棵树。
+ * 🔴 所以这条闸门必须挂在**第一个写动作之前**，而不是"跑之前检查一遍"那种口头约定；
+ *    判据本体在 `selfhost-carrier-busy.mjs`（单一所有者 + 自带九臂自检），这里只消费。
+ * 🔴 没有绕过取值：`HEYTA_CARRIER_BUSY_FORCE` 只能把它**逼红**（busy/blind），
+ *    写别的值按"判不了"退 —— 有人打错字也过不去。 */
+let mergeHeadBefore = false;
+if (existsSync(WT)) {
+  try {
+    git(['-C', WT, 'rev-parse', '--verify', 'MERGE_HEAD'], { stdio: 'ignore' });
+    mergeHeadBefore = true;
+  } catch { /* 没有进行中的合并 */ }
+}
+const FORCE_BUSY = process.env.HEYTA_CARRIER_BUSY_FORCE;
+if (FORCE_BUSY && FORCE_BUSY !== 'busy' && FORCE_BUSY !== 'blind') {
+  die(2, `不认识 HEYTA_CARRIER_BUSY_FORCE=${FORCE_BUSY} ⇒ 这道闸门没有"绕过"取值，打错就当判不了`);
+}
+const busyProbe = FORCE_BUSY === 'blind'
+  ? { error: `变异注入：强制判不了（HEYTA_CARRIER_BUSY_FORCE=blind）` }
+  : FORCE_BUSY === 'busy'
+    ? { users: [{ pid: 999999, via: 'argv', what: `变异注入：强制有人在用（HEYTA_CARRIER_BUSY_FORCE=busy）` }], psRows: 0, cwdRows: 0, exempt: [process.pid] }
+    : liveCarrierUsers({ dir: WT, mergeHead: mergeHeadBefore });
+if (busyProbe.error) {
+  die(2, `载体在用者**判不了**：${busyProbe.error}\n` +
+    `   不拿"读不到"当"没人用" —— 那正是 §8.122 端口探针那个假 0 的形状，代价是硬重置别人的现场。`);
+}
+if (busyProbe.users.length) {
+  die(6, `载体 ${WT} 此刻有 ${busyProbe.users.length} 个**别人的**进程在用：\n` +
+    busyProbe.users.map((u) => `     pid=${u.pid} [${u.via}] ${u.what}`).join('\n') +
+    `\n   ⇒ 不重算、不硬重置、不动这棵树（本工具**不提供绕过开关**）。` +
+    `   等那一趟跑完再重跑本脚本；要现在就落地，得由那个现场的所有者自己挪开，不是由我替他决定。`);
+}
+notes.push(`载体空闲（argv+cwd 两腿：ps ${busyProbe.psRows} 行 · cwd ${busyProbe.cwdRows} 行 · ` +
+  `豁免自己链 ${busyProbe.exempt.join('←')} · MERGE_HEAD=${mergeHeadBefore ? '有' : '无'}）`);
 
 if (!existsSync(WT)) {
   git(['worktree', 'add', '--detach', WT, mainSha]);

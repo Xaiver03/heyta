@@ -154,7 +154,25 @@ const branchSha = git(['rev-parse', BRANCH_REF], branchTree.path);
 let carrierSha = OPT('carrier');
 gate(1, '载体双亲对上', () => {
   if (!carrierSha) {
-    const out = run('node', ['research/tools/selfhost-merge-carrier.mjs'], branchTree.path);
+    /* 🔴 载体脚本现在在**第一个写动作之前**就会退场（第 0a 步：那棵树是不是别人的现场）。
+     *    退 6 不是产品红，是"协作没到位" ⇒ 按 sev 3 记，与负载/端口同一档；
+     *    退 2 是探针没接上 ⇒ blind，不许被下面那句"没报出 ✅ 载体"洗成读数问题。 */
+    let out;
+    try {
+      out = run('node', ['research/tools/selfhost-merge-carrier.mjs'], branchTree.path);
+    } catch (e) {
+      const text = `${e.stdout ?? ''}${e.stderr ?? ''}`.trim();
+      if (e.status === 6) refuse(`载体是别人的现场，脚本一个字节都没写（退 6）：\n${text}\n` +
+        '   ⇒ 等那一趟跑完再重跑本体检。**不提供绕过开关，也不替他挪。**', 3);
+      if (e.status === 2) {
+        const pe = new Error(`载体脚本判不了（退 2）：\n${text}`);
+        pe.probe = true;
+        throw pe;
+      }
+      const fe = new Error(`载体脚本 rc=${e.status ?? '?'}：\n${text.slice(-900)}`);
+      fe.sev = 1;
+      throw fe;
+    }
     const m = out.match(/✅ 载体 ([0-9a-f]{7,40}) = /);
     if (!m) {
       const e = new Error(`载体脚本没报出"✅ 载体 <sha>"：\n${out.slice(-600)}`);
