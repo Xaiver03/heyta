@@ -501,7 +501,7 @@ rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 `node research/tools/publish-public-sites.mjs`（不带 `--confirm` 时只打印将要执行的每一条；它拒绝发"不是正好
 `main` 那一笔"的字节，也不发服务端镜像）。这一节仍是**命令本体**的说明与手敲逃生门（脚本自己被守卫挡掉时照这里走）；
 两份抄件的**目的目录**由脚本自己的 `--selftest` P19 臂与这里对账 —— 改了这里不改脚本，那条臂就红。
-`--mutation` 是那 20 条臂各自的变异读数（12 条腿，含未变异对照）。
+`--mutation` 是那批臂各自的变异读数（臂数与腿数以命令自己打印的那一行为准，这里不抄数字：抄一次就漂一次）。
 
 🔴 **第 2 条不是仪式，它挡的是这一族里最难归因的那一发**：`apps/web/dist` 是**一个目录、两种载体**
 （`/` 给 dev/preview/`pnpm check`，`/app/` 给生产），谁最后构建谁覆盖谁。
