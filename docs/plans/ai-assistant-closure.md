@@ -593,3 +593,30 @@ W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的�
 - 新文件用临时索引 + `commit-tree` + `update-ref`，**完全不碰共享索引**。
 - 提交后必须回读 `git diff --cached --name-only HEAD` 确认别人的 staged 条目**还在**（没被带走）。
 依据：`AGENTS.md` §7 与仓库自报事故提交 `2206542c`。
+
+## 8. D-3 收口对账矩阵（2026-10-04 15:1x 本地 / 07:1x UTC；载体尖端 `44019d40`）
+
+Goal 只有四件事，所以矩阵就四行。**每行的"证据"只写当场能复跑的读数**，
+其余一律进"未闭合"那列 —— 依据 AGENTS §8 第 7 条（完成范围逐项对账）与 §7 元规则 2。
+
+| 项 | 状态 | 证据（带载体） | 未闭合的那一半是什么 |
+|---|---|---|---|
+| ① 合并 | ✅ **已闭合** | 四条源提交在当前 `HEAD` 上逐条 `git merge-base --is-ancestor` **全部 IN**：`dd8f2210`、`f2d7ed40`、`fd34c42a`、落地那笔 `de296b9d`（B76 补记 #10 记的就是这次复量）。 | 无。⚠️ 但这条**只在"祖先关系"这一层成立** —— 落地之后 main 又前进了几十笔，所以引用 ① 必须带当时那个 SHA，不能写"三条分支已合并"就完事。 |
+| ② 集成态验证 | 🟡 **有载体的历史读数 + 本批自己那一层当场复跑** | 链：73 段 @载体 `187057bb`（64 绿 / 8 红 / 1 按规则不跑）、74 段 @载体 `d544d73c` 打印 `CHAIN-OK total=74 pass=64 fail=9 skip=1 env=0`；段数今天已到 **75**（`39c4ce47` 加的 `check:ios-native-bridges`，归它的主人复量）。<br>本批界面单当场：`apps/web` 与 `apps/landing` typecheck RC=0、`app-mount` 23 条、landing 1317 条、真浏览器 **24 条**（含"写工具只出提案、确认前不落库"那条隐私读数）、`check:design`/`ui-language`/`row-single-source`/`layering`/`selection-single-source`/`ai-tools`/`ai-coverage`/`ai-quota`/`legal-tools`/`claims` + `docs-link-check` **RC=0**。 | 🔴 **`apps/web` 全量套件在当前 HEAD 上没跑成**：内存闸门（`/tmp/tfa-test.lock`）连着 5 次拒绝启动，持锁的是别人那趟 `pnpm --dir e2e run test`（pid 21302）⇒ 排队跑者仍在重试，**这道读数没有之前不许写"web 全量已过"**。<br>另：全量 `pnpm -r build` 那句"18 项 Done"是**别的线 06:24 那趟隔离副本**的读数，不是当前 HEAD；`-r typecheck` 当前 HEAD 也未整仓跑。 |
+| ③ 交付：四端重装 | ❌ **未交付（环境无效，如实记录）** | 现场读数两条独立：`notarytool` pid 98934 累计 CPU 四小时恒 `0:00.03`（12:41 那趟）、`find /tmp/heyta-reinstall -newermt '-2 hours' -type f` = **0** 且整棵树最新写入是 03:12（15:1x 复量）⇒ 那趟 ~12h 没产出。🔴 **15:1x 又量了一次那枚 CPU：`etime` 已到 12:07:10 而 `time` 仍是 `0:00.03`** —— 从 12:41 到现在的两个半小时里**一个 CPU tick 都没走**，这不是"慢"，是死等。占位 PID 现量 `queue-reinstall-all.sh` 81007/93771、snap 93817；设备面 5 台 Booted + 1 台 adb；负载 16.06 > 阈值 12。 | 🔴 **Windows 那条腿的"证据面"是空的**：`fd34c42a` 把"装完自动写桌面快捷方式"做成了硬判据、`5fe19343` 把五项清单搬进单一所有者并两处都改成会失败，但 `e8508736` 当场登记 **`SHORTCUT_OK` 这条腿的证据面为空**（且"五事实对账"原来能被一句散文满足）。⇒ **快捷方式这件事"代码 + 门禁已落地"，"读数"必须等一趟真的重装跑完打印出来**，二者不许混写。<br>起装本身被上面那趟挂死的运行挡着：`reinstall-all.sh` 第一步就是 `adb uninstall` / `simctl uninstall`，现在起 = 清掉别人的设备现场。 |
+| ④ 台账 | 🟡 **BLOCKED 已逐条打勾，PROGRESS 那一行仍卡在别人手里** | BLOCKED.md **B76 补记 #10**（`425e83c3`）：① 复量、③ 第二条独立证据、占位 PID 换代、旧复现命令标成"那一代"并补新五条。traps 编号现量：活树最大号 **246**、HEAD 228，台账本体被别人 +355/−7 占着 ⇒ 三条载体教训按"脏台账不追加"的纪律落在工单的具名小节（`ff22777c`）。死链：`docs-link-check` RC=0；`check:doc-citations` RC=0 且 SELFTEST 三维都抓到。 | 🔴 **PROGRESS.md 那一行还没落**：`+41/−1 未提交`（登记改道时是 +23，还在长），两种提交办法都不许用（整文件 `git add` 会带走别人的行；HEAD+我的 EOF 追加会被别人随后整文件提交抹回去）。待办那句原文有效、继续由"文件干净时收口的人"搬：见 B76 改道那一段。 |
+
+**这一矩阵存在的理由**：③ 的两个半件事（快捷方式的**判据**与快捷方式的**读数**）此前在本线文档里被写成同一件事。
+"代码落地 + 门禁会失败"是真的，"装出来的桌面上有那个快捷方式"**从来没有过读数** ⇒ 分开写之后，
+下一轮重装跑完要取的就是 `SHORTCUT_OK` + `PAYLOAD_WEBDIST=True` + `M2D=OK` + sha256 对账这四枚字面量。
+
+**复跑命令**（只读，不起负载）：
+
+```bash
+for c in dd8f2210 f2d7ed40 fd34c42a de296b9d; do git merge-base --is-ancestor $c HEAD && echo "$c IN"; done
+find /tmp/heyta-reinstall -newermt '-2 hours' -type f | wc -l
+ps -o pid,etime,time,command -p 98934                     # notarytool 是否还挂着
+git status --porcelain docs/reference/environment-traps.md PROGRESS.md   # 两本台账在谁手里
+grep -c '^## 8\.' docs/plans/detail-pane-alignment.md    # 本副本；分支那侧要 git show <branch> 另量
+```
+
