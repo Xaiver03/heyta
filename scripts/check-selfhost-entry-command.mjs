@@ -49,6 +49,11 @@
  *     那个形状了也红；分母读不出来（git 不在/非仓库/git grep 空）响亮地红，不按"没有漏"过。
  *     射程边界写进输出的那条 note 里：`git grep -I` 跳过二进制 ⇒ **图片里印的文案不在这里**
  *     （那是 G-58，走 `screenshot:capture` 重打，属于已登记边界，不是静默漏洞）。
+ *  R9 🔴 **链外真跑验收的消费方点名**（2026-10-05 加，G-61 的①档）：`pnpm verify:selfhost-stack`
+ *     是"真镜像 + 真服务端 + 真浏览器"唯一那一趟，而它刻意不在 `pnpm check` 链里（要 docker、
+ *     自带负载门）。G-48 那套机制在这里复用：消费方文档必须有一行**以这条命令开头**、
+ *     且触发条件那句还在；同时**前提本身是判据**（哪天真挂进链里，这条判据就永远不可能命中 ⇒
+ *     响亮地红，要人换形或删）。边界照 G-48b：R9 钉的是义务写在哪儿，不是义务被执行过。
  *
  * ## 🔴 R7 抓到的那个洞（为什么"脚本自己打镜像"不是省掉 build override 的理由）
  *
@@ -100,7 +105,17 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+/* 🔴 `--repo-root <路径>`：把"仓库根"换成另一棵树。真实消费者**不带**它（默认就是本文件所在的仓库），
+ *    它存在的唯一理由是让变异臂能拿一棵假树去测 R9 那条**前提判据**（"命令已经在链里"这一档
+ *    只能靠改 `package.json` 才能成立，而那是不该被一次测试动的文件）。
+ *    零参自锚的函数传实参会被静默丢弃（AGENTS §7 同族），所以这里把根显式打出来。 */
+const ARG_ROOT = (() => {
+  const i = process.argv.indexOf('--repo-root');
+  return i > 0 && process.argv[i + 1] ? resolve(process.argv[i + 1]) : null;
+})();
+const repoRoot = ARG_ROOT ?? resolve(dirname(fileURLToPath(import.meta.url)), '..');
+if (ARG_ROOT) process.stdout.write(`R9 变体载体：repoRoot=${repoRoot}（不是本文件所在的仓库）\n`);
+
 
 const BUILD_OVERRIDE = 'docker-compose.build.yml';
 const MIGRATE_OVERRIDE = 'docker-compose.migrate-once.yml';
@@ -550,6 +565,70 @@ if (census) {
   }
 }
 
+/* ── R9 ── 链外那道**真跑验收**的消费方点名（登记 G-61 的①档，2026-10-05）────────
+ * `pnpm verify:selfhost-stack` 是唯一会把镜像真 build 出来、把栈真起起来、用真浏览器打开
+ * `/app/` 点一遍的一趟，而它**不在 `pnpm check` 链里** —— 那是裁决不是遗漏（它要 docker、
+ * 自带负载门，挂在必过的链上就会有人去调低阈值，那比没人跑更贵）。
+ * G-48 已经给过这一类的解法：**"没人跑它"不许只是一句注释，要变成一次失败。**
+ *
+ * 判三件事，缺一即红：
+ *   ① **前提**：这命令确实还在链外（读 `package.json` 的 `scripts.check`）。哪天真挂进链里，
+ *      这条判据就成了永不命中的装饰 ⇒ 响亮地红，要人把它换形或删掉（R6 防的是同一件事）；
+ *   ② **消费方**：点名的那份文档里必须有一行**以这条命令开头**。写在句子中间不算 ——
+ *      那是散文不是指令，R1–R6 对入口命令用的就是同一条口径；
+ *   ③ **时机**：同一份文档里必须还在说**什么时候该跑**。摘掉那句 ⇒ 红。
+ *
+ * 🔴 边界（别读多）：R9 钉的是**义务写在哪儿**，不是**义务被执行过**。
+ * "这趟真的跑过没有"在这一层结构上就不可观测（它是几十分钟的真构建），那半段仍记在 **G-48b**
+ * 同一档里 —— 别把 R9 的绿读成"发布已经有守卫"。
+ */
+const OUTSIDE_CHAIN_GATES = [
+  {
+    command: 'pnpm verify:selfhost-stack',
+    file: 'docs/runbooks/local-server-verification.md',
+    triggerNeedle: '改了下面**任何一件**，在落地/发布之前必须跑一次',
+    why: '它是"真镜像 + 真服务端 + 真浏览器"那条主张唯一的载体（§8.118 的闭合读数在它上面）',
+  },
+];
+{
+  const pkgPath = join(repoRoot, 'package.json');
+  let chain = null;
+  try {
+    chain = JSON.parse(readFileSync(pkgPath, 'utf8')).scripts?.check ?? null;
+    if (chain === null) red('package.json', null, 'R9', '读不到 `scripts.check` ⇒ 前提判不了（不拿"判不了"当"还在链外"）');
+  } catch (e) {
+    red('package.json', null, 'R9', `读不出 scripts.check ⇒ R9 没有分母（前提判不了不等于前提成立）：${String(e.message ?? e).split('\n')[0]}`);
+  }
+  for (const g of OUTSIDE_CHAIN_GATES) {
+    if (chain === null) continue;
+    if (chain.includes(g.command)) {
+      red(g.file, null, 'R9',
+        `前提变了：「${g.command}」已经在 \`pnpm check\` 链里 ⇒ 这条"链外门禁必须点名消费方"永远不可能再命中。` +
+        `要么把它换成"链内即自动消费"的形状、要么删掉，不许留一道永远通过的路径`);
+      continue;
+    }
+    const abs = join(repoRoot, g.file);
+    if (!existsSync(abs)) {
+      red(g.file, null, 'R9', `消费方那份文档读不到 ⇒「${g.command}」重新变成没人点名的一趟（它：${g.why}）`);
+      continue;
+    }
+    const text = readFileSync(abs, 'utf8');
+    const cmdLine = text.split('\n').findIndex((l) => l.trimStart().startsWith(g.command));
+    if (cmdLine < 0) {
+      red(g.file, null, 'R9',
+        `这份文档里**没有一行以「${g.command}」开头** ⇒ 义务没有落点。写在句子中间不算（那是散文不是指令）`);
+    }
+    if (!text.includes(g.triggerNeedle)) {
+      red(g.file, null, 'R9',
+        `命令那行还在，但**什么时候该跑**那句被改了或摘掉了 ⇒ 读的人无法判断自己是否踩到了条件：「${g.triggerNeedle}」`);
+    }
+    if (cmdLine >= 0 && text.includes(g.triggerNeedle)) {
+      notes.push(`R9 链外真跑验收的对账：「${g.command}」确认不在 check 链里（前提由 package.json 的 scripts.check 现量导出，` +
+        `不是写死的），消费方 ${g.file}:${cmdLine + 1} 有以它开头的一行，且触发条件那句仍在`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error(`❌ 自托管入口命令对账失败（${failures.length} 处）：`);
   for (const f of failures) console.error(`  - ${f}`);
@@ -559,5 +638,5 @@ if (failures.length > 0) {
 }
 
 const total = TOTAL_MATCHES;
-console.log(`✅ 自托管入口命令对账：扫描集 ${SCAN_SET.length} 份文件 + 故意排除 ${EXCLUDES.length} 份 + 非抄件登记 ${NON_COPIES.length} 份，命中 ${total} 条入口命令，逐行过了 R1–R6，R7 把验收载体也钉在同一套文件上，R8 确认全仓没有第四张表之外的抄件`);
+console.log(`✅ 自托管入口命令对账：扫描集 ${SCAN_SET.length} 份文件 + 故意排除 ${EXCLUDES.length} 份 + 非抄件登记 ${NON_COPIES.length} 份，命中 ${total} 条入口命令，逐行过了 R1–R6，R7 把验收载体也钉在同一套文件上，R8 确认全仓没有第四张表之外的抄件，R9 把链外那道真跑验收的消费方点名钉住`);
 for (const n of notes) console.log(`   · ${n}`);
