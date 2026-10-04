@@ -495,12 +495,191 @@ if (brokenWires.length > 0) {
   );
 }
 
+/**
+ * F：§8.24 立项的那一条，也是 W1c 从"一次性判据"变常驻的那一条 ——
+ * **「选中态存续期间列表仍可见」的每一处渲染面，必须把选中说出来**，通道按端择一：
+ * web / DOM 走 `aria-current`，RN 走 `aria-pressed`（RN 的 `AriaProps` 里**没有** `aria-current`，
+ * 写了等于没写 —— 见 `packages/ui/src/habits/HabitProgressList.tsx:252-256` 自己那段说明）。
+ *
+ * 🔴 §8.28 给 F 立的两条约束在这里落地，两条都是**构造层面**挡住的而不是注释里劝：
+ * ① **不许按 `active` 字样认选中**：一个面"说出来了"的判据是那条属性的**值来自一个选中 id 的等值式**
+ *   （谓词行里必须出现 `activeTaskId` / `activeNoteId` / `selectedId` 之一并且有 `===`），
+ *   而不是"有个 `active` 属性"。`QuadrantBoard.tsx` 那份 dnd 的 `activeId` 不在这三个词里，
+ *   所以它**结构上**当不了证据 —— 把 `TaskList` 的谓词换成 `active: true` 会直接红（臂 H4）。
+ * ② **豁免面是量出来的不是拍的**：mobile 便签那一处不接 `activeNoteId`，
+ *   现量 `NotesSection.tsx` 传它 0 次，而编辑器是全屏 `Modal` ⇒ 列表可见期间那个 id 恒为 null。
+ *   这条豁免带**可伪证的基础**：一旦那个文件开始传 `activeNoteId=`，豁免的理由就失效，F 判红（臂 H6）。
+ *
+ * ⚠️ 覆盖面是 **§8.26 现量的四处渲染**，不是"三张面"：习惯两端各有一份实现（web 本地 DOM 清单、
+ * mobile 共享 RN 清单），两边都早就有两种线索 —— 少计一处就会把"本来做对了"读成"没做"。
+ */
+const SELECTION_ID_PROPS = ['activeTaskId', 'activeNoteId', 'selectedId'];
+
+/** 每一处**说出选中**的渲染面：`file` 发属性，`driver` 是那条属性的值里必须出现的谓词名。 */
+const FACES = [
+  {
+    kind: 'task',
+    label: 'web 任务行（列表 / 四象限 / 时间线共用 TaskRow）',
+    file: 'packages/ui/src/task-list/TaskRow.tsx',
+    channel: 'aria-current',
+    driver: 'active',
+    // 谓词不在渲染行自己手里算，在上一级 —— 所以这条面的"值来自选中 id"要到 relay 那个文件去验。
+    relay: 'packages/ui/src/task-list/TaskList.tsx',
+  },
+  { kind: 'note', label: 'web 便签', file: 'packages/ui/src/notes/NotesBoard.tsx', channel: 'aria-current', driver: 'active', relay: null },
+  { kind: 'habit', label: 'web 习惯（本地 DOM 清单）', file: 'apps/web/src/features/habits/HabitsList.tsx', channel: 'aria-current', driver: 'selected', relay: null },
+  {
+    kind: 'habit',
+    label: 'mobile 习惯（共享 RN 清单）',
+    file: 'packages/ui/src/habits/HabitProgressList.tsx',
+    channel: 'aria-pressed',
+    driver: 'selected',
+    relay: null,
+  },
+];
+
+/**
+ * 声明了选中 id、但**本身不发属性**的那些文件 —— 它们的职责是把选中往下递。
+ * 这一张表的用途不是描述现状，是让"**新冒出来一个接选中的面、却没人要求它把选中说出来**"变红：
+ * 扫描到的声明者凡是不在 FACES 也不在这里，就判红（臂 H5）。
+ */
+const RELAYS = [
+  'apps/mobile/src/screens/QuadrantScreen.tsx',
+  'apps/mobile/src/screens/TimelineScreen.tsx',
+  'apps/web/src/features/quadrant/QuadrantBoard.tsx',
+  'apps/web/src/features/timeline/TimelinePanel.tsx',
+  'packages/ui/src/quadrant/QuadrantBoard.tsx',
+  'packages/ui/src/timeline/TimelineBoard.tsx',
+];
+
+/** 该豁免的面，**带它成立所依赖的那件可测事实**。事实变了就必须重新读这一面。 */
+const TRACE_EXEMPT = [
+  {
+    file: 'apps/mobile/src/screens/NotesSection.tsx',
+    prop: 'activeNoteId',
+    reason: '编辑器是全屏 Modal，列表可见期间该 id 恒为 null（§8.26 第③条现量）',
+  },
+];
+
+const readTracked = (rel, who) => {
+  const abs = path.join(ROOT, rel);
+  if (!statSync(abs, { throwIfNoEntry: false })) {
+    fail(`断言 F：${who} 指的文件 ${rel} 不在了 —— 判红而不是跳过（静默跳过等于这条判据从此只描述空气）`);
+  }
+  return stripComments(readFileSync(abs, 'utf8'));
+};
+
+/**
+ * 谓词那一行的**右半边**必须同时有 `===` 和一个选中 id —— 这才是"值来自选中"的可判形式。
+ *
+ * 💥 第一版是"取整行来看"，被自己的臂 H4 当场照出假绿：
+ * `TaskList.tsx:280` 原文是 `{...(activeTaskId === undefined ? {} : { active: activeTaskId === row.id })}`，
+ * 把 `active:` 后面换成常量 `{ active: true }` 之后，**同一行左半边那句 `activeTaskId === undefined` 还在**，
+ * 整行判据照样看见 `===` 与 `activeTaskId` ⇒ 门禁绿，而那一面已经不会跟随选中了。
+ * 所以必须只看**右半边**（谓词自己那一段），不能看整行。
+ * ⚠️ 边界：右半边按"到行尾"取，把等值式换行写的人会被判红 —— 那是源码级判据的取法，
+ *   宁可红得难看，也不留一个能藏常量的口径。
+ */
+const driverComesFromSelection = (src, driver) => {
+  const re = new RegExp(`(?:const\\s+${driver}\\s*=|\\b${driver}\\s*:)`, 'g');
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    const rhs = src.slice(m.index + m[0].length).split('\n')[0];
+    if (rhs.includes('===') && SELECTION_ID_PROPS.some((p) => rhs.includes(p))) return true;
+  }
+  return false;
+};
+
+const traceFiles = WIRE_DIRS.flatMap((dir) => walk(dir));
+const declarers = traceFiles
+  .map((f) => path.relative(ROOT, f))
+  .filter((rel) => {
+    const src = stripComments(readFileSync(path.join(ROOT, rel), 'utf8'));
+    return SELECTION_ID_PROPS.some((p) => new RegExp(`readonly\\s+${p}\\??\\s*:`).test(src));
+  });
+
+for (const face of FACES) {
+  const src = readTracked(face.file, `面「${face.label}」`);
+  const other = face.channel === 'aria-current' ? 'aria-pressed' : 'aria-current';
+  const carries = (ch) => new RegExp(`${ch}=\\{[^}]*\\b${face.driver}\\b`).test(src);
+  if (!carries(face.channel)) {
+    failures.push(
+      `断言 F：面「${face.label}」（${face.file}）没有用 ${face.channel} 把选中说出来（谓词 ${face.driver} 不在那条属性里）。\n` +
+        `  这一面是"选中的那一条正在右边显示"唯一的无障碍通道 —— 只有底色没有属性，读屏用户拿不到这件事。`,
+    );
+  }
+  if (carries(other)) {
+    failures.push(
+      `断言 F：面「${face.label}」把谓词 ${face.driver} 挂在了 ${other} 上，而它登记的通道是 ${face.channel}。\n` +
+        `  🔴 RN 的 AriaProps 里没有 aria-current：在 RN 面写它**不报错、也不生效**，正好是最安静的那种坏。`,
+    );
+  }
+  const provSrc = readTracked(face.relay ?? face.file, `面「${face.label}」的谓词来源`);
+  if (!driverComesFromSelection(provSrc, face.driver)) {
+    failures.push(
+      `断言 F：面「${face.label}」的谓词 ${face.driver} **不是从一个选中 id 等值算出来的**（要看到 === 与 ${SELECTION_ID_PROPS.join('/')} 之一）。\n` +
+        `  否则"这一面把选中说出来了"只是句字面话：常量、拖拽态、hover 态都能让它有形状没内容。`,
+    );
+  }
+}
+
+const listedDeclarers = new Set([...FACES.map((f) => f.file), ...(FACES.map((f) => f.relay).filter(Boolean)), ...RELAYS]);
+const unlisted = declarers.filter((rel) => !listedDeclarers.has(rel));
+if (unlisted.length > 0) {
+  failures.push(
+    `断言 F：有 ${unlisted.length} 个文件**接了选中 id**（声明了 ${SELECTION_ID_PROPS.join('/')} 之一）却没在 F 的任何一张表里：\n  ` +
+      `${unlisted.join('\n  ')}\n` +
+      `  它要么是一处该发痕迹的面（加进 FACES，并写清端与通道），要么是把选中往下递的一层（加进 RELAYS）。\n` +
+      `  "多了一处接选中的面而没人要求它把选中说出来"正是这条断言存在的理由。`,
+  );
+}
+for (const rel of RELAYS) {
+  const src = readTracked(rel, '递选中那一层');
+  const forwards = SELECTION_ID_PROPS.some((p) => new RegExp(`\\b${p}=\\{`).test(src) || new RegExp(`\\b${p}\\s*===`).test(src));
+  if (!forwards) {
+    failures.push(
+      `断言 F：登记为"把选中往下递"的 ${rel} 现在**既不 JSX 传下去、也不按 id 等值算**了 —— 那条登记过期了，重新读这一面。`,
+    );
+  }
+}
+for (const ex of TRACE_EXEMPT) {
+  const src = readTracked(ex.file, '豁免面');
+  if (new RegExp(`\\b${ex.prop}=\\{`).test(src)) {
+    failures.push(
+      `断言 F：豁免面 ${ex.file} 现在**把 ${ex.prop} 传下去了** —— 它豁免的理由（${ex.reason}）不再成立。\n` +
+        `  这一面从此要求痕迹：把它加进 FACES，别把这条豁免留着。`,
+    );
+  }
+}
+/** 词表是从真身读的（断言 D 读的那份）。加一类选中而不给它在任何端留一处会说话的面 ⇒ 红。 */
+const kindsWithoutFace = vocab.filter((kind) => !FACES.some((f) => f.kind === kind));
+if (kindsWithoutFace.length > 0) {
+  failures.push(
+    `断言 F：词表里的 ${kindsWithoutFace.join('/')} 在任何端都没有一处会"说出选中"的面。\n` +
+      `  "界面上有这一类"与"读屏用户知道现在看的是哪一条"是两件事 —— 后者要靠这一面的属性。`,
+  );
+}
+// 分母自检：痕迹属性一个都扫不到 = 探针坏了，"四处都有痕迹"就是假的绿。
+const anyTrace = traceFiles.filter((f) => /aria-(?:current|pressed)=\{/.test(stripComments(readFileSync(f, 'utf8'))));
+if (anyTrace.length < FACES.length) {
+  failures.push(
+    `断言 F：整棵树只扫到 ${anyTrace.length} 个文件带 aria-current/aria-pressed 属性，少于登记的 ${FACES.length} 处面。\n` +
+      `  「每处都有」与「扫不到所以没人缺」是两件事 —— 判红，先修扫描再庆祝。`,
+  );
+}
+
 if (failures.length > 0) {
   console.error('✗ 选中态的所有者不唯一：\n');
   for (const f of failures) console.error(f + '\n');
   console.error('  改法：读 `@heyta/app-host` 的 `selection.ts`，宿主只留 lib/selection 那一层胶水。');
   process.exit(1);
 }
+
+console.log(
+  `✅ F：${FACES.length} 处渲染面各按端把选中说出来（` +
+    FACES.map((f) => `${path.basename(f.file)} ${f.channel}`).join(' / ') +
+    `），接选中的递送层 ${RELAYS.length} 处逐条还在递，豁免 ${TRACE_EXEMPT.length} 处的事实基础未变`,
+);
 
 console.log(
   `✅ G：宿主内 …Id 本地态 ${rowIdSeen.length} 处全部有语义登记（四类：` +
