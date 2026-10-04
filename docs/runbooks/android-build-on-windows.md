@@ -82,7 +82,8 @@ pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
 |---|---|---|
 | 1 | 门禁：`node scripts/check-android-gradle-remote.mjs --self-test` 逐臂按预期转红/转绿 | ✅ 实测 2026-10-05 00:1x `rc=0`；00:4x 复跑加了臂 9（G7：远程前置不许是一条永不开的门）后**仍 rc=0**。
 |    | 逐臂含义：臂 0 = 阳性对照，臂 1–6 各抓一条 G1–G6，臂 7/8 = "门禁文件只描述不执行"那条豁免的正反两腿，臂 9 = G7。**臂数别抄进文档 —— 现取 `--self-test` 末行** |
-| 2 | 远程真打出 Release APK，`apksigner verify` 通过 | 🔴 **未实测** —— 分流落地后还没有跑过一次真构建 |
+| 1.5 | 前置：远端**逐个声明依赖**解析得到（不是"node_modules 目录在"），且 dry-run 里这枚探测照跑、照打读数 | ✅ 实测 2026-10-05 01:33 `--dry-run` 现量 `RNDEPS=True ROOTDEPS=True LOCALPROPS=absent DEPCHECK=19 DEPMISS=2`；01:36 远端补装后同一条复量 **`DEPMISS=0`**（同棵树上的正反对账）。🔴 这一格**是被 18 分钟的失败照出来的**，见 §7.1；旧形状在同一条命令里报 ✅ |
+| 2 | 远程真打出 Release APK，`apksigner verify` 通过 | 🔴 **未通过**（01:26 现量：`BUILD FAILED in 18m 18s`，死在 `:app:createBundleReleaseJsAndAssets`）。⚠️ 但**分流本身走通了**：步骤 0–4 全部执行、远端 gradle 真跑到 native 编译与 Metro 打包，成因是远端依赖过期（§7.1），不是路由缺陷。补装依赖后需重跑才算 |
 | 3 | APK 拉回本机装进模拟器，启动截图**非空白且主蓝命中**（§6.1.1 判据） | 🔴 未实测 |
 | 4 | 连续两轮「改 JS 源码 → 远程重打 → 装机」验产物是当前源码（防 §7 第 27 条旧 bundle） | 🔴 未实测 |
 
@@ -163,13 +164,62 @@ node scripts/check-android-gradle-remote.mjs --root <候选树>   # 注入验证
 而是 §三 判据 2 起跑之前的前置；但它们**拦不住人** —— 前面几步的对账全绿时，
 谁都会以为问题在分流本身，而不是在这三条里。
 
+🔴 **01:37 更正这一节的自我评估（现量见 §7.1/§7.2）**：第一次真构建**确实跑了**，
+而它红在**这张表没列的第四件事**上 —— 远端 `node_modules` 里少两枚已声明的包。
+⇒ 这张表当时是**没牙的**：三条前置全对上了（未决 1/2 由那一趟换成实量、未决 3 与构建无关），
+红却来自第 0 件事，而第 0 件事当时被一条"目录级"判据伪装成 ✅。
+补法已落地：§三 判据 1.5（逐包 + 先证明探针跑成了）。留下的教训是
+**"前置清单齐了"不等于"前置齐了"** —— 清单之外那一格由谁照出来，才是判据真正的强度。
+
 | # | 未决的事 | 现量依据（三个说法互不一致） | 它会在哪一步现形 |
 |---|---|---|---|
-| 1 | **windows-pc 上 Android SDK 到底在哪个盘** | ① 仓外迁移文档（仓库同级 `ANDROID_BUILD_ON_WINDOWS.md`，2026-10-04）写 `C:\Users\41478\AppData\Local\Android\Sdk` 并称 `ANDROID_HOME` 已设；② 上一位 agent 的**只读探测**报 SDK 实际在 `D:\android-sdk`；③ 同一次探测报 `C:\Android\cmdline` 是一枚**半安装的坏路径**，会让 gradle 报 `Invalid android command`。**三个说法一个都没被真机构建证实过** —— 本批的分工禁止真跑构建（现量 `sysctl -n vm.loadavg` 1 分钟均值 89.68 / 00:0x，另一条会话在跑 Playwright），所以这一格只有转述、没有读数 | 步骤 4（远端 gradle）。gradle 解析 SDK 只认 `local.properties` 的 `sdk.dir` 或 `ANDROID_HOME`，而步骤 1 只验"那一行不是一条 Mac 路径"（`/Users/` 或 `/opt/homebrew`），**不验 SDK 真的存在**。指错盘、或指向半安装的那一枚 ⇒ 症状是一句与平台无关的 SDK 报错，而步骤 0–3 全绿 |
+| 1 | **windows-pc 上 Android SDK 到底在哪个盘** | ① 仓外迁移文档（仓库同级 `ANDROID_BUILD_ON_WINDOWS.md`，2026-10-04）写 `C:\Users\41478\AppData\Local\Android\Sdk` 并称 `ANDROID_HOME` 已设；② 上一位 agent 的**只读探测**报 SDK 实际在 `D:\android-sdk`；③ 同一次探测报 `C:\Android\cmdline` 是一枚**半安装的坏路径**，会让 gradle 报 `Invalid android command`。**三个说法一个都没被真机构建证实过** —— 本批的分工禁止真跑构建（现量 `sysctl -n vm.loadavg` 1 分钟均值 89.68 / 00:0x，另一条会话在跑 Playwright），所以这一格只有转述、没有读数 | 步骤 4（远端 gradle）。gradle 解析 SDK 只认 `local.properties` 的 `sdk.dir` 或 `ANDROID_HOME`，而步骤 1 只验"那一行不是一条 Mac 路径"（`/Users/` 或 `/opt/homebrew`），**不验 SDK 真的存在**。指错盘、或指向半安装的那一枚 ⇒ 症状是一句与平台无关的 SDK 报错，而步骤 0–3 全绿。**⇒ 01:37 已闭合**：那一趟真构建走到了 ninja（三个 ABI 的 CMake 编译），三个说法被区分开 —— 见 §7.2 表第二行 |
 | 2 | 两个"远端仓库根"旋钮**不成对** | `scripts/run-gradle.mjs` 读 `HEYTA_ANDROID_REMOTE_ROOT`，而它调用的 `scripts/lib/sync-windows-sources.sh` 读 `HEYTA_WINDOWS_REPO_ROOT`。两个默认值**逐字相同**（现量：`bash -c 'cd "$(git rev-parse --show-toplevel)" && source scripts/lib/sync-windows-sources.sh && echo "$HEYTA_WINDOWS_REPO_ROOT"'` ⇒ `C:\src\heyta`）⇒ 此刻没有影响 | **只移一个**就变成"同步解包到 A 树、gradle 在 B 树里构建"，而 B 是那台机器上永远不动的旧树 —— 这是 §7 第 82 条那个形状（旧树构建、判据全绿）在远程路径上的复现。修法是一行（远程模式把同一个值同时导出给同步那一侧），但它要连着一次真远程构建才验得动 ⇒ 排在判据 2 之后，不"顺手改" |
 | 3 | §八 那枚门禁的**接线待定** | `check:android-build-host` **刻意不进** `pnpm check` 的 `&&` 串（§六 那枚已经在链里了）。链的分母正被并行会话计数 ⇒ 现量，别手抄：`node -e 'console.log(JSON.parse(require("child_process").execSync("git show HEAD:package.json")).scripts.check.split("&&").length)'` | 摘除条件：并行那批不再引用链段数之后，把它并进链，并**同时删掉** `scripts/check-gate-wiring.mjs` 允许表里那条登记 —— 登记留着而它已进链，`check:gate-wiring` 会红（那枚门禁自己写着"留着就是在掩护下一道"） |
 
-### 7.1 2026-10-05 01:0x–01:1x：**第一次真实远端构建正在跑**（判据 2 的前置读数）
+### 7.1 2026-10-05 01:0x–01:3x：**第一次真远程构建跑了，红了 18 分钟，根因是远端依赖过期**
+
+🔴 先说归属：这一趟**不是本批起的**，是并行会话的窗口看门狗在隔离载体 `heyta-wt-reinstall`
+（HEAD `bc606fef`，含 §一 那套分流）里跑 `reinstall-all` 的 Android 段。本批做的是读它的日志、
+复现它的根因、并把 §七 未决 1/2 那两格换成读数（见 7.2）。
+
+| 时刻 | 读数 |
+|---|---|
+| 01:08:19 | 远端时钟记的构建起点（步骤 3 打的就是远端 UTC，不是本机时间） |
+| 01:0x–01:1x | 步骤 0–3 全绿：`源码包 54M / 清单 3314 条` → `tar sha256=909b07b4b7a61f50…` 两端逐字相同 → `14 个 packages/*/dist 远端已先清后解` |
+| 01:26 | `BUILD FAILED in 18m 18s`；`Execution failed for task ':app:createBundleReleaseJsAndAssets'` ⇒ `Process 'command 'cmd'' finished with non-zero exit value 1` |
+| 同一份日志往上 | `Error: Unable to resolve module @react-native-documents/picker from C:\src\heyta\apps\mobile\src\screens\ProfileScreen.tsx` |
+| 01:29（本批复现） | 逐包只读探测：`CHECKED=19 APP=17 ROOT=0 MISSING=2` ⇒ 缺 `@react-native-documents/picker`、`@heyta/widget-core` |
+| 01:33（修复后首跑） | `--dry-run` 的同一条探测打 `RNDEPS=True ROOTDEPS=True LOCALPROPS=absent DEPCHECK=19 DEPMISS=2` |
+| 01:36 | 远端 `pnpm install --frozen-lockfile` ⇒ `Done in 38.7s`、`INSTALL_RC=0`；复量同一枚探测 ⇒ **`DEPMISS=0`** |
+
+**成因分类：环境，不是产品，也不是分流本身。** 三条依据：
+`apps/mobile/package.json:31` 声明了它、本机 `apps/mobile/node_modules/@react-native-documents` 在位、
+lockfile 里有它 ⇒ 源码是自洽的；远端那次 install 早于这两笔新增（`git log -S` 现取：`6a0e26fa`），
+而 §二 那条同步**按设计不送 node_modules**（被 gitignore）。
+
+🔴 **为什么步骤 1 当时报 ✅ 而构建 18 分钟后才炸**：那一格量的是 `Test-Path apps\mobile\node_modules`
+——**目录级**判据对"少两枚包"零分辨力。这正是 §7 元规则二那一族（一条永远通过的判据比没有更糟），
+而且它和这个文件里上一条学费（"按 `android/node_modules` 判 ⇒ 永不开的门"）是**同一族**：
+两个形状都是"拿目录存在当构建输入齐"。修法已进代码：名单从 `apps/mobile/package.json` 推导、
+逐包判、**并且先证明探针跑成了**（`DEPCHECK` 读不到或数不对 ⇒ 判探针故障，绝不放行成"缺 0 个"）。
+
+⚠️ **一条会被误读的地方**：`DEPMISS=0` **不等于**"远程构建验证通过"。它只说明前置过了；
+判据 2（真打出 APK + `apksigner verify`）**仍未通过**，要重跑一趟真构建才算。
+
+📌 **代拍的运维动作（写明是代拍）**：本批自己在远端跑了 `pnpm install --frozen-lockfile`。
+依据：这条命令是 §三 判据 1.5 失败提示里写着的官方修法，`--frozen-lockfile` 不改 lockfile、
+只补齐声明过的包（实测 38.7 s、`INSTALL_RC=0`），且当刻远端没有别人的构建在跑（现量
+`pgrep -f 'reinstall-all\.sh'` 为空）。回退：无需回退（新增的是 `node_modules` 里的软链与解包，
+源码与 lockfile 一个字节没动）。⚠️ **本批没有把它做成自动步骤** —— 每次 lockfile 变化后仍需人
+（或下一趟构建前的这条探测）触发；要不要让 `run-gradle.mjs` 在 `DEPMISS>0` 时**自动**远端 install，
+是一条待拍的运维默认值（自动装意味着构建路径会改共享主机的状态，不该默认发生）。
+
+📌 一条顺手量到的环境事实：远端 `pnpm --version` 报 **10.33.4**，而 install 的收尾行写
+`using pnpm v11.8.0` ⇒ 那台机器上**裸命令与仓库内命令走的不是同一个 pnpm**（`packageManager` 经
+corepack 生效）。以后在远端跑 pnpm 类命令要预期这一档差异，别把版本号抄成单值。
+
+### 7.2 2026-10-05 01:0x–01:1x：第一次真实远端构建**跑到步骤 4** 的过程读数（§七 未决 1/2 由这一趟换成实量）
 
 ⚠️ 先说归属，免得下一段把它读成"这批自己跑通过"：**这一趟不是我起的**。
 是并行会话的窗口看门狗（父进程 `research/tools/.b-window-keeper.sh.snap.27336`）在**隔离检出
