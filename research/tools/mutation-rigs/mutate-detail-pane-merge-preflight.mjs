@@ -12,13 +12,19 @@
  *   node research/tools/mutation-rigs/mutate-detail-pane-merge-preflight.mjs
  * 前提：`main` 与本检出可见，且 §8 落地记录表**已修好**（否则第一档的靶会换，脚本会响亮报错而不是猜）。
  *
- * 三条臂：
+ * 分档臂（名字列在下面，不写条数 —— 加了臂就会漂）：
  *   P1 未处置的候选树（对面那 13 行旧抄件还在）⇒ 第二档 = 1、那一行打 🔴、退出码里数着它
  *   P2 把对面那 13 行丢掉（= §8.16 §4 的 ⑦ 那一步处置）⇒ 第二档 = 0
  *      🔴 P1 与 P2 必须**成对**：只有 P1 就不知道这一档是不是恒红（装饰），只有 P2 就不知道它会不会响。
  *   P3 对照 `--a main --b main` ⇒ 不该有"合并造成的红"、不该有"候选红但缺对照"，而**必须**有
  *      "产物里没这些脚本" ≥ 1（main 还没有本线那三枚判据 —— 这一条就是第四档存在的理由）
  * 另外 P1 还断言那枚红带着门禁全文（不是 `not a git repository` 那一类探针故障）。
+ *
+ * 名册自检那一档（`scripts/check-detail-pane-*.mjs` 在产物树里却没被 GATES 列出 ⇒ 零次执行）另有臂：
+ *   R1 往产物树里放一枚 ghost 判据（**不改名册**）⇒ 那一档必须点名它
+ *   R3 把 ghost 摘掉 ⇒ 那一档归零，且 P1 的两档读数不受影响（成对：只有 R1 不知道它会不会自己响）
+ *   R2 把族模式字面量改坏 ⇒ 枚举会安静地返回空集合，只有名册自己的 basename 撞上模式才报得出"探针坏了"
+ *   并且 P3（main×main 的对照趟）那一档必须是 0 —— "产物里没有对象"不等于"漏挂"。
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
@@ -119,6 +125,7 @@ const tally = (out) => {
     noControl: num(/没有这道脚本（本分支新增，只能拿本分支读数定性）=(\d+)/),
     missing: num(/产物里根本没有这道脚本（这一道没跑）=(\d+)/),
     both: num(/不含合并信息）=(\d+)/),
+    roster: num(/名册漏跑\/探针坏=(\d+)/),
   };
 };
 
@@ -161,6 +168,64 @@ check(
   `全文命中 表外的孤儿工单行=${p1.out.includes('表外的孤儿工单行')}`,
 );
 
+// —— 名册自检那一档的三条臂：R1 会响（漏挂）、R2 会响（探针坏）、R3 归零（把靶摘掉）。
+// 这一档守的是本批那几道文档判据**唯一的**自动消费者：产物树里有一道 `scripts/check-detail-pane-*.mjs`
+// 而名册没列出它 ⇒ 合流当场一次都不会跑它。而"没跑"在输出上长得像"没有这条问题"。
+// ⚠️ 这里刻意用**往真产物树里加一枚真文件**来做靶，不去改 GATES 那张名册：改名册的变异会让载体
+//    连门禁都不跑，读到的红来自别的档，就分不清这条判据到底在不在。
+const ghost = join(raw, 'scripts', 'check-detail-pane-ghost.mjs');
+if (existsSync(ghost)) {
+  console.error('🔴 产物树里已经有那枚 ghost 靶 —— R1 的前提（变异确实改了东西）不成立，拒绝跑。');
+  rmSync(scratch, { recursive: true, force: true });
+  process.exit(2);
+}
+writeFileSync(ghost, "// 变异装置临时放进去的一枚'新写了却忘了挂进名册'的门禁\nconsole.log('ghost');\n", 'utf8');
+const r1 = runCarrier(raw);
+const t1r = tally(r1.out);
+check(
+  'R1 产物树里多一道本线判据而名册没列 → 名册那一档必须点名它',
+  t1r.roster >= 1 && r1.out.includes('check-detail-pane-ghost.mjs') && r1.out.includes('一次都不会跑'),
+  `名册=${t1r.roster} 点名 ghost=${r1.out.includes('check-detail-pane-ghost.mjs')}`,
+);
+rmSync(ghost, { force: true });
+const r3 = runCarrier(raw);
+const t3r = tally(r3.out);
+check(
+  'R3 把靶摘掉 → 名册那一档归零（证明 R1 不是恒红装饰），且 P1 那两档读数不受影响',
+  t3r.roster === 0 && t3r.noControl === t1.noControl && t3r.missing === t1.missing,
+  `名册 ${t1r.roster} → 0；没有对照组=${t3r.noControl}（与 P1 的 ${t1.noControl} 一致）产物缺脚本=${t3r.missing}`,
+);
+
+// R2 探针自检：把族模式改坏（`check-detail-pane-` → `check-detailpane-`）。
+// 枚举会安静地返回**空集合** —— 没有那条自检时这一档整条不会红，而它的输出与"全部在册"逐字相同。
+// 自检拿名册自己（TREE_ROOT_GATES 的 basename）去撞那个模式：那是**声明**一侧的事实，
+// 与枚举（文件系统一侧）不同源，所以这不是自己抄自己。
+const broken = join(scratch, 'carrier-broken-glob.mjs');
+const carrierSrc = readFileSync(CARRIER, 'utf8');
+const GLOB_LITERAL = '/^check-detail-pane-.*\\.mjs$/';
+if (!carrierSrc.includes(GLOB_LITERAL)) {
+  console.error('🔴 载体里找不到那族模式的字面量 —— 形状变了，R2 不知道怎么把它改坏，拒绝猜。');
+  rmSync(scratch, { recursive: true, force: true });
+  process.exit(2);
+}
+writeFileSync(broken, carrierSrc.replace(GLOB_LITERAL, '/^check-detailpane-.*\\.mjs$/'), 'utf8');
+let r2;
+try {
+  r2 = { rc: 0, out: execFileSync(process.execPath, [broken, '--product', raw], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 1 << 28 }) };
+} catch (e) {
+  r2 = { rc: e.status ?? 1, out: `${e.stdout || ''}${e.stderr || ''}` };
+}
+const t2r = tally(r2.out);
+check(
+  'R2 族模式写坏（枚举会安静地返回空集合）→ 自检必须响亮地报"探针坏了"',
+  t2r.roster >= 1 && /探针坏了/.test(r2.out),
+  `名册=${t2r.roster}，输出含"探针坏了"=${/探针坏了/.test(r2.out)}`,
+);
+rmSync(broken, { force: true });
+
+// 对照趟（main×main）里这一档必须是 0：产物树没有本线判据，"没有对象"不许被报成红。
+check('P3 那一趟的名册档也必须 0（没有对象 ≠ 漏挂）', t3.roster === 0, `名册=${t3.roster}`);
+
 rmSync(scratch, { recursive: true, force: true });
 if (!existsSync(CARRIER)) console.error('🔴 载体脚本不在了');
 
@@ -170,4 +235,4 @@ if (fail.length) {
   console.log(`\n🔴 ${fail.length}/${notes.length + fail.length} 臂不合格`);
   process.exit(1);
 }
-console.log('\n结论：预检的门禁分档本身有回归臂（成对的"会响 / 会归零" + 那一趟只许报缺脚本的对照）✅');
+console.log('\n结论：预检的门禁分档 + 名册自检都有回归臂（成对的"会响 / 会归零" + 那一趟只许报缺脚本的对照 + 探针写坏要响亮报"探针坏了"）✅');

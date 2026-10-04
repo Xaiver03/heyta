@@ -30,7 +30,9 @@
  *     告诉你"结果红不红"，不能告诉你"哪一侧的改动被无声丢掉了"。
  *
  * 退出码：下面这几项之和 = 0 条才 ⇒ 0，有任何一条 ⇒ 1：合并造成的红、候选红而无对照组、
- *   产物里根本没有这道脚本、静默合流丢行/删文件/语法不过、槽位重复、产物仍带 marker 的产品文件、编号台账的号对不上。
+ *   产物里根本没有这道脚本、静默合流丢行/删文件/语法不过、槽位重复、产物仍带 marker 的产品文件、编号台账的号对不上、
+ *   名册漏跑（产物树里有一道 `scripts/check-detail-pane-*.mjs` 却没被 GATES 列出 —— 这一趟是本批那几道
+ *   文档判据**唯一**的自动消费者，漏挂等于零次执行；main 的 `check:gate-wiring` 只看 npm 别名，管不到它们）。
  *   候选树都造不出来 ⇒ 2（响亮失败，不静默放行）。
  *
  * ⚠️ 几条边界，别读多（这里不写条数，写过一次"三条"然后就漂了）：
@@ -48,7 +50,7 @@
  *     拿不到 typescript 时**响亮地跳过并数出来**，不静默按通过处理。
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -68,7 +70,10 @@ const TREE_ROOT_GATES = [
   'scripts/check-detail-pane-status-table.mjs',
 ];
 
-// 纯 fs 门禁：全部是 `pnpm check` 已经消费的同一批脚本，一个都不新造判据。
+// 纯 fs 门禁。🔴 这张名册里**混着两种消费者**：大部分是 `pnpm check` 已经在跑的同一批脚本（这里只是
+// 提前在合并产物上量一遍，好把"本来就红"和"合并造成的红"分开）；`TREE_ROOT_GATES` 那几道是本批新写的
+// 文档判据，**没有 npm 别名、不在 `pnpm check` 链里** ⇒ 这一趟是它们唯一的自动消费者。
+// 正因为"唯一"，下面有一道名册自检：产物树里存在、却没被这张名册列出的本线判据 ⇒ 判红。
 const GATES = [
   'scripts/check-selection-single-source.mjs',
   'scripts/check-layering.mjs',
@@ -314,6 +319,42 @@ if (noControlRows.length) {
   );
 }
 
+// —— 名册自检：本批那几道"只有这一趟会跑"的判据，漏挂进名册就是**零次执行**。
+// 比较的两边必须**不同源**：一边是产物树里真实存在的文件名（文件系统给的），一边是 GATES（手写的）。
+// 拿 GATES 对 GATES 只会恒真，那正是"看起来在保护一件事，其实保护的是另一件"。
+// 🔴 main 在 2026-10-03 为 `pnpm check` 链写了同一条形状的常驻门禁 `scripts/check-gate-wiring.mjs`，
+// 但它只看 package.json 里的 `check:*` **别名** —— 本批这几道没有别名 ⇒ 落在它的射程之外，只能由这里守。
+const OWN_GATE_GLOB = /^check-detail-pane-.*\.mjs$/;
+const rosterBad = [];
+try {
+  const inTree = readdirSync(join(product, 'scripts'))
+    .filter((f) => OWN_GATE_GLOB.test(f))
+    .map((f) => `scripts/${f}`);
+  for (const g of inTree) {
+    if (!GATES.includes(g)) {
+      rosterBad.push(
+        `${g} 在产物树里，却不在本趟名册中 ⇒ 合流当场**一次都不会跑**它。` +
+          `它没有 npm 别名、不在 \`pnpm check\` 链里，这一趟是它唯一的消费者 —— 要么挂进 GATES/TREE_ROOT_GATES，` +
+          `要么给它另找一个可点名的载体并把这件事写进工单 §8（不许只是放着）。`,
+      );
+    }
+  }
+} catch (e) {
+  rosterBad.push(`读不到产物树的 scripts/ 目录（${e.code || ''} ${String(e.message).split('\n')[0].slice(0, 60)}）⇒ 名册这一档**没判成**，按红处理`);
+}
+// 探针自检（断言前提确实成立）：名册里挂在 TREE_ROOT_GATES 上的每一项，都必须命中上面那个族模式。
+// 不写这一条的话，模式一旦被我改坏（比如 `check-detail-pane-` 打成 `check-detailpane-`），
+// 枚举会安静地返回**空集合**，"漏挂"判红与"全部在册"在输出上一模一样。
+for (const g of TREE_ROOT_GATES) {
+  if (!OWN_GATE_GLOB.test(g.split('/').pop())) {
+    rosterBad.push(`探针坏了：TREE_ROOT_GATES 里的 ${g} 不匹配名册自检用的族模式 ${OWN_GATE_GLOB} ⇒ 这一档枚举不到它`);
+  }
+}
+if (rosterBad.length) {
+  console.log(`\n🔴 名册自检（${rosterBad.length} 条）：`);
+  rosterBad.forEach((t) => console.log(`      · ${t}`));
+}
+
 // 🔴 门禁**污染探针**（起因与我一度写错的机制，都记在工单 §8.56）。
 // 这一道的**不是**"marker 会把门禁数搞错" —— 那个假设被本趟的 A/B 否证了：
 // 对 `check-row-single-source` / `check:l4` / `check:ui-language` / `check-hardcoded` 四道，
@@ -547,12 +588,13 @@ console.log(
     `候选红但 ${refA} 侧没有这道脚本（本分支新增，只能拿本分支读数定性）=${noControlRows.length}  ` +
     `产物里根本没有这道脚本（这一道没跑）=${productMissingRows.length}  ` +
     `两边都红（环境/载体所致，不含合并信息）=${same.length}  ` +
+    `名册漏跑/探针坏=${rosterBad.length}  ` +
     `静默合流=${silentRows.length} 枚，其中丢行/删文件/语法不过=${silentBad.length}  ` +
     `槽位重复=${slotBad.length}  台账（缺号 / 号在正文被占 / 同号不同事）=${ledgerBad.length ? `🔴 ${ledgerRows.reduce((s, r) => s + r.collide.length + r.lostA.length + r.lostB.length + r.swA.length + r.swB.length, 0)} 项` : '0'}  ` +
       `产物仍带 marker 的产品文件=${tainted.length ? `${tainted.length} 枚 ⇒ 本趟 tally 不算"合流验过"` : '0（这一趟的 tally 量的是一个可运行状态）'}`,
 );
 console.log(`候选树里带 marker 的门禁脚本=${markersIn(product).join('/') || '无'} —— 有就说明 §8.47 第 3 节还没做完`);
-if (bad.length || silentBad.length || slotBad.length || tainted.length || ledgerBad.length) {
+if (bad.length || silentBad.length || slotBad.length || tainted.length || ledgerBad.length || rosterBad.length) {
   console.log('  ⇒ 逐条按 §8.47 第 3–4 节处置后再跑一次；这里绿了才去动真分支。');
 }
 
@@ -569,7 +611,8 @@ process.exit(
     silentBad.length +
     slotBad.length +
     tainted.length +
-    ledgerBad.length
+    ledgerBad.length +
+    rosterBad.length
     ? 1
     : 0,
 );
