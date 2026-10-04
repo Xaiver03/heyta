@@ -3792,6 +3792,7 @@ image-license, crosslang-contract, journey-coverage, ai-tools, ai-coverage, web-
 |---|---|---|
 | **G-54** | 🔴 **修法已提交在本分支，判据已落，真构建那一层证据未取** | `server/package.json` 的 devDependencies 里有 registry 上取不到的本地包 ⇒ `npm install --omit=dev` **在 `--omit=dev` 下仍解析 dev spec** ⇒ 镜像生产阶段第一条 install 就 E404。归属：main `b3397cda`（不是本批引入），但**它同样挡在本批的落地件上**，因为载体取的是 main 那一版 `server/package.json`。修法 `server/Dockerfile` 装之前 `npm pkg delete devDependencies` + 第 5 步两腿判据 + 新鲜度哈希按字段分区。⚠️ **本批那句"外人一条 compose 起全套"在 main 当下的树上是假的** —— 而它不在任何一道 `pnpm check` 的可见范围里（链从不构建镜像），这正是 §8.11 那条"验收脚本把自己要验的默认值换掉"的又一种面目 |
 | **G-54b** | 登记，不动 | "往 `dependencies` 里加一枚 `@heyta/*` 却没给 tgz" 这一类由第 5b 腿挡住了；**往 devDependencies 加**这一类只被 prune 挡住。两种形状不同源，注释里各写了一句，别合并成一句 |
+| **G-55** | 🔴 待拍板（本批不推远端） | **外人 clone 的那棵公开树 `origin/main`(`95ac4662`) 今天建不出镜像**：`b3397cda`（ADR-0050）把三枚只存在于本机工作区的 `@heyta/*` 放进了 `server/package.json` 的 **devDependencies**，而那棵树的 `server/Dockerfile` 生产阶段**没有 prune** ⇒ 落地页那篇指南让外人敲的 `docker compose … --build` 在第一条 install 就 E404。修法在本分支（G-54），**关闭要靠一次 push 或改对外那句话**，两者都不是本批能自己拍的。证据与三种关闭口径在 §8.64 |
 
 #### 同一轮补的两条现量（不是欠项，是为了下一轮别把预期读成回归）
 
@@ -4049,6 +4050,9 @@ git merge --no-ff feat/self-host-merge-main -m "merge: 自托管批次（第 N �
    另一半是链里那把纯 fs 腿在 `CHECK_RC` 里的读数。
 3. 🔴 **main 那棵树今天仍然会 E404**：修法只在本分支里，落地之前外人从 main 照抄 compose 依旧起不来。
    所以 G-54 的"对外不再错话"这一半，**关闭位置是落地那一刻**，不是本分支绿那一刻。
+   ⚠️ **这句在同一天 08:5x 被 §8.64 推翻了一半**：外人拿到的不是本地 `main`，是 `origin/main`，
+   而那棵树今天同样会 E404（实测在 §8.64 那张表里）。"落地那一刻"只关掉了本地那一半，
+   对外那一半要么配一次 push（与本批硬约束冲突），要么改指南那句 —— 编号 **G-55**。
 
 
 ### 8.63 `VERIFY_EXIT=1` 那趟把三个容器留在机器上 23 分钟 —— 拆栈从来不是 trap 的职责（08:4x）
@@ -4104,4 +4108,43 @@ heyta-selfhost-verify-supersync-migrate-1 heyta-selfhost-verify   Exited (0)
 
 我自己留下的那三枚容器与两枚卷已在 08:3x 拆掉（`docker ps -a --filter label=…=heyta-selfhost-verify -q` → **0**，
 `:1900` 监听数 → **0**）。
+
+### 8.64 🔴 G-55：这一批把"对外错话"找对了位置——外人 clone 的那棵树，今天根本建不出镜像（08:5x）
+
+§8.62 写"关闭位置是落地那一刻"。这一条把它**推翻了半步**：落地只动本地 `main`，
+而外人拿到的不是本地 `main`，是 `origin/main`。逐条现量（全部**不联网构建**、只读 git 与 GitHub 公开 API）：
+
+| 量 | 读数 | 怎么复核 |
+|---|---|---|
+| 仓库是否匿名可读 | `api.github.com/repos/Xaiver03/heyta` → **HTTP 200**、`private=false`、`default_branch=main` | 未认证 GET |
+| 远端 main 的头 | `95ac46627b78917b…`，与本地 `origin/main` **逐字相同** | `…/commits/main` 的 `sha` 对 `git rev-parse origin/main` |
+| 公开那棵树的 `server/package.json` | `dependencies`: `@heyta/domain` / `shared-schema` / `sync-core` 全 `"*"`；**`devDependencies`: `@heyta/app-host` / `storage` / `sync-client` 全 `"*"`** | `git show origin/main:server/package.json` |
+| 公开那棵树的生产阶段 | 三条 `npm install … --omit=dev`，`npm pkg delete devDependencies` 命中数 **0** | `git show origin/main:server/Dockerfile` 取 `AS production` 之后 |
+| 谁带进来的 | `b3397cda feat(server,app-host,web,mobile): vault/E2EE 密钥生命周期与找回（ADR-0050）`，`--is-ancestor b3397cda origin/main` = **真** | 两条 git 命令 |
+
+⇒ §8.59 那枚机制（`--omit=dev` 仍然**解析** devDeps 的每一条 spec，工作区包在 registry 上不存在 ⇒ E404）
+**今天就在公开那棵树上成立**。而指南（`docs/runbooks/self-host.md:35` 是 `git clone https://github.com/Xaiver03/heyta.git`，
+站内那篇文章 `s7p1` 明写"要钉版本，就从本仓库源码构建"）指的就是这一棵。
+🔴 所以对外那句"一条 compose 起全套、打开浏览器就能用"，**在本批全部落地之后仍然不成立** ——
+落地动的是本地 `main`，外人拿不到，除非有人 push。
+
+顺带被这次现量**否证的两条我自己的说法**（都留在原处，别当现状引用）：
+
+1. 站内词条里有一句注释写"仓库当前是私有的"（`packages/i18n/src/locales/zh-CN.ts:3606` 附近，
+   是给"为什么那些条目是命令不是链接"的理由）。实测 `private=false`。
+   ⚠️ 这条**只是注释**、不在界面上，所以它不是一句对外错话，但它会误导下一个改词条的人 ——
+   登记，等那两枚表空出来时随 G-51 一起改（改词条要中英同步 + 重跑生成 + `check:entries`）。
+2. §8.62 里那句"main 那棵树今天仍然会死在第一条 install"读起来像"只有本地 main 的事"。
+   真实范围更大：**公开那棵也是**，而且它才是外人那一侧。
+
+#### 三种关闭口径（要人拍板，本批不代拍）
+
+| 口径 | 动作 | 代价 / 风险 |
+|---|---|---|
+| A | 落地之后 **push `main` 到 `origin/main`** | 一次推 116 笔（`git rev-list --count origin/main..main`），**其中绝大多数不是本批的** ⇒ 等于替别人未过目的提交对外发布。硬约束里"不推远端"挡的就是这个 |
+| B | 只把**修 prune 那一笔**摘出来单独 push（cherry-pick 到 `origin/main` 之上） | 快、面窄，但会造出一条"公开树 ≠ 本地 main"的分叉；下一个人 push 时要先处理 |
+| C | 暂不动远端，把**指南那句改成实话**："当前从源码构建会失败（原因 + 已修在哪个分支），要么等一次推送，要么用我们给出的产物" | 要动那两枚 i18n 表（` M`，别人占着）+ `docs/runbooks/self-host.md` + 落地页重发（§8.27 那次一起做）；**不新建承诺**，只是停止兑现不了的那句 |
+
+🔴 三条都要人拍板，且 **A 与本批硬约束直接冲突**。本批做到的部分是：机制已修（G-54，载体上 `镜像 OK` 有读数）、
+判据已挂（第 5/5b 腿 + 10 臂变异）、**这一条缺口已编号并带可复核命令**。
 
