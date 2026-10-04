@@ -14,15 +14,22 @@ PASS=logout-fence-before-reauthentication
   The real Settings UI logout path cleared the local credentials and the
   subsequent Vault UI required authentication again.
 
-PENDING=post-logout-reauthentication-does-not-auto-unlock
-  The server accepted a fresh password login and the authenticated sync
-  channel reconnected, but the current Release AuthScreen did not transition
-  to its session / “保存并启用同步” state. No UI result is recorded as a
-  Vault assertion until that transition is observed and the Settings screen
-  confirms the Vault remains locked.
+PASS=post-logout-reauthentication-does-not-auto-unlock
+  After the real UI logout fence, a fresh password login reached the session
+  state and saved the sync credentials. Opening Settings then showed the
+  existing Vault's passphrase/recovery unlock controls; it did not show an
+  unlocked key or a remembered-root status. The Vault stayed locked until the
+  passphrase was entered explicitly.
 
-PENDING=rotation-and-cross-device-read
-  No mobile installation-artefact evidence yet.
+PASS=rotation-and-cross-device-read
+  On the same Android Release installation, root rotation was confirmed in
+  the real Settings UI with the displayed recovery code and the old legacy
+  passphrase. The UI reported migration progress through 2/2 and returned to
+  “这台设备上的加密数据已经解锁”. A fresh Node/SQLite device, authenticated
+  as the same account and unlocked with the rotated passphrase, synced the
+  task `android-b-vault-rotation-cross-device-20261004`; result was one task,
+  synced, and zero pending uploads. The Node host was required to receive the
+  account id so it selected the Vault key-package/payload codec.
 
 Secrets (tokens, root keys, recovery codes, and passphrases) are intentionally
 absent from this file.

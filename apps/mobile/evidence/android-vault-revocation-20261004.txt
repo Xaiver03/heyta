@@ -12,8 +12,18 @@ Android Release Vault 设备撤销与恢复证据（脱敏）
    生成并确认发布新的恢复码，UI 回到“这台设备上的加密数据已经解锁”。
 4. 服务端 key package 的脱敏状态：旋转前 `keyVersion=1`，旋转后
    `keyVersion=2`，且 `payloadKeyVersion=2`。root fingerprint 只在进程内用于
-   对账，没有写入本文件。
+   对账，没有写入本文件；本轮没有单独保存 `fingerprintChanged=true` 的布尔判据，
+   因此版本号变化只能证明 wrapper/载荷世代推进，不能单独证明 root key 已更换。
 
 边界：本文件证明 Android Release 的撤销、重新认证、恢复码解锁与 wrapper/载荷世代
 轮换顺序；不证明离线设备被远程擦除，也不替代 iOS 真包的本地 token/Vault session/
-Keychain 清理与可信设备轮换验收。所有 token、root key、恢复码和口令均未写入证据。
+ Keychain 清理与可信设备轮换验收。所有 token、root key、恢复码和口令均未写入证据。
+
+5. 非空双向互操作（同一真实服务端生命周期，非空历史）：
+   - Android Release 真 UI 创建 `android_ui_to_node_20261004_1791105927`；解锁加密数据钥匙后点“立即同步”，UI 显示“已是最新”、待上传“已全部上传”，服务端 `latestSeq=1`。
+   - 新建真实 SQLite 文件的 Node host 使用同一账号、当前 JWT 和轮换后口令同步，`status.kind=synced`，`list --all` 读到上述 Android 标题。
+   - Node host 创建 `node_to_android_20261004_1791106750` 并同步；Android Release 再次进入任务页，真 AX 树同时读到两条标题。
+   - 该轮服务端 GET `/api/sync/ops?sinceSeq=0` 在 Android 首次上传后返回 `latestSeq=1`，Node 上传第二条后返回非空历史（两条操作）；没有使用空历史或“synced + 空列表”作为成功判据。
+
+本节只保留标题、状态和序号等脱敏事实；数据库文件与 JWT 仅在 `/tmp` 临时路径使用，
+root key、root fingerprint、恢复码和口令只在进程内存中使用，未写入临时文件、日志或仓库。
