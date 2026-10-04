@@ -8416,7 +8416,19 @@ C 缺快照必须 rc=2 / D `--keep` 真的把字节留下 / 收尾工作树零�
 
 ### 7. 第 3 道闸门：这一批在干净检出里复跑过
 
-载体：`git worktree add --detach /tmp/dp_clean_8127 HEAD`（HEAD = 本批提交后的那一笔），
-跑完 `git worktree remove --force` 摘掉。跑的是第 6 节那五道文档门禁 —— 它们**只读仓库内容**，
-不碰 `node_modules`，因此不受 §8.126 第 2 节那条"混合载体"边界影响。
-读数：五道在干净检出里与本地**同判**（前四道 RC=0；`docs-link-check` 两边都是同一枚 `PROGRESS.md` 死链 ⇒ RC=1、本文件 0 命中）。
+载体：`git worktree add --detach /tmp/dp_clean_8127 7fc99e01`（`7fc99e01` = 本批那一笔提交），
+跑完 `git worktree remove --force` 摘掉（`REMOVE_RC=0`，本文件不留在盘上的临时树）。
+跑的是第 6 节那五道文档门禁 —— 它们**只读仓库内容**，不碰 `node_modules`，因此不受 §8.126 第 2 节那条"混合载体"边界影响；
+"不碰依赖树"这件事本轮是**量出来的**而不是推断的：那棵干净树里没有任何 `node_modules`，五道照样给出下表读数。
+
+| 门禁 | 干净检出 RC | 本地工作树 RC | 同判 |
+|---|---|---|---|
+| `check-detail-pane-status-table` | 0 | 0 | ✅ |
+| `check:docs-voice` | 0 | 0 | ✅ |
+| `check:claims` | 0 | 0 | ✅ |
+| `check:reachability` | 0 | 0 | ✅ |
+| `research/tools/docs-link-check.mjs` | 1（本文件命中 0） | 1（本文件命中 0） | ✅ 同一枚别线死链 `PROGRESS.md:1362` |
+
+⚠️ **顺序如实记**：第 6/7 节的文字先随 `7fc99e01` 落库，随后才在那笔的干净树里复跑 ——
+也就是说这一栏在写下那一刻是**待验主张**，复跑后才成为读数。这里不把它改写成"先测后写"的样子，
+因为"读数在写作之前"和"读数在写作之后"是两件不同的事，后者需要留痕才不至于被下一个人当成前者。
