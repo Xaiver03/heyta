@@ -1342,7 +1342,10 @@ W0b ─> 随时可做（台账那半要等文件干净）
     revert 后 `card-export-layout.ts` 的 sha 回到链条开头的基线 `42708dc95156`。
   - ⏹ **W7 剩下的那条不是判据，是证据**：设备真机出图读数（`pnpm verify:mobile-card-export`）
     排在收尾第 4 项那一趟里，见 `docs/plans/countdown-w7-device-export.md` §7 第 2 条。
-  - 🔴 **W7-G3（04 05:2x 编号登记）：那条装置只覆盖 Android，iOS 那一半没有设备读数**。
+  - 🔴 ~~**W7-G3（04 05:2x 编号登记）：那条装置只覆盖 Android，iOS 那一半没有设备读数**~~
+    ⇒ ✅ **04 17:13:17 关闭**（链 S `RC_PROBE=0`，通过 17 项 / 失败 0 项）：装置 `scripts/verify-mobile-card-export-ios.sh` 已落库并跑通，
+    iOS 设备出图 `W=1080 H=1440 BYTES=64619` 逐字等于契约，成品图入库 `apps/mobile/evidence/card-export/ios-latest-card.png` 且人打开看过
+    （并与 Android 那张并排比过：四处结构同构、只差平台字体）。逐条读数在第 ㊝ 条。
     现量：`scripts/verify-mobile-card-export.sh` 305 行里 `adb`/`$PKG`/`keyevent` 是唯一的驱动通道，
     而 `grep -icE "ios|simctl|swift"` 在它全文里命中 **0**（连注释都没提 iOS）——
     iOS 侧停在"代码 + node 侧单测"这一档 ——
