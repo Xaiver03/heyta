@@ -2450,3 +2450,20 @@ M2 摘第 9 步数字守卫、M3 摘第 11 步零输出守卫，各自把对应�
    在**当前 main 附近**的提交上是走得通的，且 mac 段那条"`.app` 里的 web-dist 与本机 dist 同源"
    对账真的会打数（9 个 chunk）。这不构成 ① 的任何一格完成 —— 它只是把"会不会红在装置上"这一档
    不确定性又压掉一块。
+
+## 01:08 ② 的两条已知红：**成因条件都已解除**（这是预检，不是读数）
+
+② 要在窗口内跑三段 e2e，账上挂着两条历史红。逐条去读**它当初的成因**现在还在不在：
+
+| 红 | 当初的成因 | 01:08 现量 | 结论 |
+|---|---|---|---|
+| `check:landing-e2e` 2 条（B24） | 判据断 `img[src^="/assets/docs/"]`，而产物目录只有 `help` ⇒ 判据恒红 | `apps/landing/public/assets/docs/` **在位**（`concepts first-run trash views`），`helpFigures.ts:232` 的 `URL_PREFIX = '/assets/docs'`，spec 在 `e2e/landing/docs-centre.spec.ts:954/997/1058` 断的也是 `/assets/docs/…` | 三方（产物目录 / 生成物 URL / 判据）**同一口径**了。⇒ 那 2 条**预计**不再复现 |
+| `check:ai-e2e` 3 条（B22） | "提交态落后于别人未提交的工作"：`view-tabs.ts` / `App.tsx` / `CalendarView.tsx` / `DueEditor.tsx` 当时全是 `M` | 四枚现在逐个 `git status --porcelain` **全空**（主检出另有 20 枚脏，但不是这四枚） | 成因条件消失。⇒ **预计**不再复现 |
+
+🔴 这两格写的是"**成因没了**"，不是"跑绿了"。② 的读数只能来自窗口内那一趟；
+如果复跑仍然红，按 §7 元规则一先怀疑探针（载体落后 / 端口被占 / 别人正在写同一套界面），
+再判产品，**不许**拿这张预检表去抵一次实际读数。
+
+顺带一条不属于我这条线的登记：`apps/landing/src/site/helpFigures.ts:8` 的注释写生成器是
+`scripts/gen-help-figures.mjs`，真身在 `apps/landing/scripts/gen-help-figures.mjs`（`find` 现取）。
+只差一层目录、且是注释，但该文件不在我手里（也不是我这条线的落点）⇒ **登记不代改**。
