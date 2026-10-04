@@ -70,6 +70,7 @@ const TREE_ROOT_GATES = [
   'scripts/check-detail-pane-evidence-refs.mjs',
   'scripts/check-detail-pane-c1-coverage.mjs',
   'scripts/check-detail-pane-status-table.mjs',
+  'scripts/check-detail-pane-slot.mjs',
 ];
 
 // 纯 fs 门禁。🔴 这张名册里**混着两种角色**：大部分是 `pnpm check` 已经在跑的同一批脚本（这里只是
