@@ -2467,3 +2467,46 @@ M2 摘第 9 步数字守卫、M3 摘第 11 步零输出守卫，各自把对应�
 顺带一条不属于我这条线的登记：`apps/landing/src/site/helpFigures.ts:8` 的注释写生成器是
 `scripts/gen-help-figures.mjs`，真身在 `apps/landing/scripts/gen-help-figures.mjs`（`find` 现取）。
 只差一层目录、且是注释，但该文件不在我手里（也不是我这条线的落点）⇒ **登记不代改**。
+
+## 01:1x 第一次真实远端 Gradle 构建（**由别线触发**，读数入账）
+
+归属先写清楚，因为它决定这些读数算谁的：这一趟**不是我起的**。并行会话的窗口看门狗
+（父 `research/tools/.b-window-keeper.sh.snap.27336`，日志 `/tmp/ht-b-window.log` →
+`.20261005-010143.27336.log`）在隔离检出 `heyta-wt-reinstall` 里跑 `reinstall-all`，
+Android 段走到我这批的分流（那棵树 HEAD 含 `5be80374`）。我做的只有读日志 + 一条只读 ssh 探测。
+
+01:11 / 01:13 现取的读数（`/tmp/heyta-reinstall-apk.log`，日志末行时刻 `01:13:05`）：
+
+- 步骤 0–3 全绿，且**每一步打的是数不是形容词**：10 个 workspace dist 在位 → 源码包 54M /
+  清单 3314 条 → **tar sha256 `909b07b4b7a61f50…` 两端逐字相同** → 14 个 `packages/*/dist`
+  远端**先清后解** → 1 个产物路径远端已清 + 构建起点取**远端时钟**（`2026-10-04T17:08:19.000Z`）。
+- 步骤 4 在跑，进到 `op-sqlite` 的 CMake/ninja（arm64-v8a、armeabi-v7a、x86_64 三个 ABI），
+  ninja 自报工作目录 `C:\src\heyta\apps\mobile\node_modules\@op-engineering\op-sqlite\android\.cxx\…`。
+- ⇒ **runbook §七 的未决 1 从"只有转述"升级成有读数**：远端 `local.properties=absent`（脚本自己打的），
+  所以 SDK 只能来自 `ANDROID_HOME`；只读探测 `ssh windows-pc "echo [%ANDROID_HOME%]"` ⇒
+  **`C:\Users\41478\AppData\Local\Android\Sdk`**，与仓外那份迁移文档**逐字相同**，
+  而上一位 agent 转述的 `D:\android-sdk` / 半安装的 `C:\Android\cmdline` 两支被这一步**否证**
+  （指错盘的构建走不到 ninja）。顺带这条探测还钉住一个以后一定会踩的事实：
+  `%VAR%` 能展开 ⇒ **该 ssh 的默认 shell 是 cmd 不是 PowerShell**，远端命令的语法按 cmd 写。
+- ⇒ 未决 2（两个远端根旋钮不成对）在行为上闭合：同一个值出现在**三个独立来源**
+  （本机打印 `远端仓库根 = C:\src\heyta` / 同步回执"已先清后解" / 远端编译器回显的绝对路径），
+  不是同一个变量打印两次。G8 钉形状，这一趟钉"形状之外真的同一棵树"。
+
+🔴 **这一格没闭合的部分要说死**：步骤 4 之后的四条（回传产物落盘、产物 mtime ≥ 构建起点、
+`adb install` 出 `Success`、启动截图非空白且主蓝命中）**一条都还没读到**，所以
+"远程构建已验证通过"这句话现在**不许写**。我能写的只有"跑到步骤 4、前置四条对账全绿"。
+它红了也不改我的 ①②③ 的账 —— 那是它那一趟的读数。
+
+一条元规则级别的副产品（§7 元规则二的形状）：**"Mac 上不再起新 Gradle 构建"这条规则的判据
+不能写成"本机 java/gradle 进程计数为 0"** —— 01:12 现量该计数是 **2**（`GradleDaemon 9.0.0` +
+一枚 Worker Daemon），但 `%CPU 0.0`、ELAPSED 7h52m / 13h25m ⇒ 历史驻留的 idle daemon。
+这一趟在本机的构建进程只有一枚 `ssh … windows-pc … gradlew.bat assembleRelease`（pid 69670）。
+⇒ 可写成判据的形状是"**本机不存在非零 CPU 的 gradle 进程，且存在一枚到 windows-pc 的 ssh 子进程**"，
+不是"java 计数为 0"。这条以后要落进 `check:android-build-host` 时才成立，此刻只是登记（不代改别人那枚门禁）。
+
+同刻的另一条环境读数：我的链 `/tmp/heyta-chain18.log` 到 01:11 第 **151** 轮仍
+`负载 13.24 > 12`（01:08 起 20.87 → 19.01 → 13.24，是被那趟远端构建 + 它自己的本地 gradle 前置顶着的）。
+⇒ 窗口不在，**我没有起任何设备/Playwright/重装类验收**；这一格只做文档与只读探测。
+另外：01:10:51 那一轮闸门自己打了一次"设备面有遗留实例、宿主侧无驱动者 ⇒ 按权威闸门口径放行"
+（`emulator-5554` 上 `com.heyta` pidof=4083、`mCurrentFocus=com.heytamobile.MainActivity`）——
+放行的是**设备**那一栏，负载仍然拦着，别读成"窗口开了"。

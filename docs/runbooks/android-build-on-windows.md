@@ -169,6 +169,29 @@ node scripts/check-android-gradle-remote.mjs --root <候选树>   # 注入验证
 | 2 | 两个"远端仓库根"旋钮**不成对** | `scripts/run-gradle.mjs` 读 `HEYTA_ANDROID_REMOTE_ROOT`，而它调用的 `scripts/lib/sync-windows-sources.sh` 读 `HEYTA_WINDOWS_REPO_ROOT`。两个默认值**逐字相同**（现量：`bash -c 'cd "$(git rev-parse --show-toplevel)" && source scripts/lib/sync-windows-sources.sh && echo "$HEYTA_WINDOWS_REPO_ROOT"'` ⇒ `C:\src\heyta`）⇒ 此刻没有影响 | **只移一个**就变成"同步解包到 A 树、gradle 在 B 树里构建"，而 B 是那台机器上永远不动的旧树 —— 这是 §7 第 82 条那个形状（旧树构建、判据全绿）在远程路径上的复现。修法是一行（远程模式把同一个值同时导出给同步那一侧），但它要连着一次真远程构建才验得动 ⇒ 排在判据 2 之后，不"顺手改" |
 | 3 | §八 那枚门禁的**接线待定** | `check:android-build-host` **刻意不进** `pnpm check` 的 `&&` 串（§六 那枚已经在链里了）。链的分母正被并行会话计数 ⇒ 现量，别手抄：`node -e 'console.log(JSON.parse(require("child_process").execSync("git show HEAD:package.json")).scripts.check.split("&&").length)'` | 摘除条件：并行那批不再引用链段数之后，把它并进链，并**同时删掉** `scripts/check-gate-wiring.mjs` 允许表里那条登记 —— 登记留着而它已进链，`check:gate-wiring` 会红（那枚门禁自己写着"留着就是在掩护下一道"） |
 
+### 7.1 2026-10-05 01:0x–01:1x：**第一次真实远端构建正在跑**（判据 2 的前置读数）
+
+⚠️ 先说归属，免得下一段把它读成"这批自己跑通过"：**这一趟不是我起的**。
+是并行会话的窗口看门狗（父进程 `research/tools/.b-window-keeper.sh.snap.27336`）在**隔离检出
+`heyta-wt-reinstall`** 里跑 `reinstall-all`，它的 Android 段走到了我这批的分流（那棵载体的
+HEAD 含 `5be80374` 的收口点改动）。我只做了两件事：读它的日志、加一条只读 ssh 探测。
+
+| 未决 | 现在有了什么读数（时刻 01:13 现取） | 还差什么 |
+|---|---|---|
+| 1（SDK 在哪个盘） | 🔴 **三个说法被真机区分开了**：远端 `local.properties=absent`（步骤 1 自己打的），所以 gradle 只能认 `ANDROID_HOME`；只读探测 `ssh windows-pc "echo [%ANDROID_HOME%]"` ⇒ **`C:\Users\41478\AppData\Local\Android\Sdk`**（与仓外迁移文档那条**逐字相同**；`%…%` 能展开同时证明 ssh 默认 shell 是 cmd，不是 PowerShell —— 这决定了以后写远端命令的语法）。而步骤 4 已经进到 `:op-engineering_op-sqlite:buildCMakeRelWithDebInfo[arm64-v8a / armeabi-v7a / x86_64]` 并真的在跑 ninja ⇒ **SDK 与 NDK/CMake 全链解析成功** —— 指向 `D:\android-sdk` 或那枚半安装的 `C:\Android\cmdline` 都到不了这一步 | 不需要了。**这一格从"只有转述"升级为"有读数"**，但要写明它证到的是"这一台远端、这一棵 `C:\src\heyta` 上 SDK 可用"，不构成换远端根/换主机后可复用 |
+| 2（两个远端根旋钮不成对） | 已被 `5be80374` 的接线改掉并被这一趟**行为上**证实：日志里 `远端仓库根 = C:\src\heyta`（run-gradle 打印）、`✅ Android 构建输入已同步（14 个 packages/*/dist，远端已先清后解）`（同一条 REMOTE_ROOT 传给同步）、ninja 的工作目录是 `C:\src\heyta\apps\mobile\node_modules\@op-engineering\op-sqlite\android\.cxx\...`（**构建那一侧自己报出的绝对路径**）。⇒ "同步进 A 树、构建在 B 树"这一趟**没有发生**，且证据不是同一个变量打印两次，而是三个不同来源（本机打印 / 同步回执 / 远端编译器回显）互相指认同一棵树 | G8 只钉形状（传参调用式 + dry-run 打印 + lib 绑定正则），"真的同一棵树"要**每次真构建**看 ninja 那条回显 —— 把这一条当成判据 2 的配套肉眼步骤，写进 §三 |
+| 3（`check:android-build-host` 接线） | 与本趟无关，仍是待拍 | 不变 |
+
+🔴 这一格**还没闭合**的东西：步骤 4 之后还有回传产物、产物 mtime ≥ 构建起点（远端时钟）、
+`adb install` 的 `Success`、启动截图非空白且主蓝命中。**这些一条都没读到之前，"远程构建已验证通过"
+这句话不许写进任何地方** —— 现在只能写"跑到步骤 4 且前置四条对账全绿"。
+另外两条同刻读数：本机 `pgrep -f 'GradleDaemon|org.gradle'` = 2 枚但 **%CPU 0.0、ELAPSED 7h52m / 13h25m**
+⇒ 是历史驻留的 idle daemon，不是这一趟起的（这一趟的构建进程在本机只有一个
+`ssh -o ConnectTimeout=10 windows-pc cd /d C:\src\heyta\apps\mobile\android && gradlew.bat assembleRelease`）；
+"Mac 上不再起新的 Gradle 构建"这条规则在第一次真实调用上是**成立的**，且它的证据形态是
+"本机只有 ssh 子进程 + idle daemon 零 CPU"，不是"本机 java 计数为 0"（后者永远不为 0，拿它当判据会恒红）。
+</think>
+
 ## 八、第二枚门禁：`check:android-build-host`（规则的另一半）
 
 规则原话里有**两个**被禁的东西："不要再在 Mac 起新的 Gradle 构建**或模拟器**"。
