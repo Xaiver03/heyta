@@ -2644,3 +2644,18 @@ W0b ─> 随时可做（台账那半要等文件干净）
   不是产品没有输入框。修法：输入框走 `--field` 那一侧（新增 `focus_field()`：
   `--field --scroll-into-view` 再 `--field --press`），按按钮仍走 `--pressable`。
   ⏳ W7-G3 仍然不打勾，直到链 O 取到 `RC_IOS_PROBE=0` 且那张 iOS 成品图被打开看过。
+
+- ㉟ **链 O：打字这一档过了，下一档又露出"iOS 的 AX 树只给 accessibilityLabel、不给子文本"**（04 09:2x，载体 `abd14e6e`）
+
+  `RC_IOS_PROBE=3`，但两处前进是实的：`type-text` 回读 `{"found":"True","typedRc":"0","detail":"w7ios-092535"}`
+  —— **单份、干净**（㉞ 那个 `--field` 修法生效，双份字符串那个症状没了）；就绪判据也读到 `label 数 21`。
+  红在下一行：`↳ 「选日期」滚不进可见区（False/element-left-tree）`。根因还是探针：
+  `EventBoard.tsx:443` 那颗按钮的 `accessibilityLabel` 是 `labels.fieldDate`（键
+  `web.countdown.field.date` = 「日期」），而「选日期」是它**里面的 Text 子节点**（`:456`）。
+  RN-Android 的 uiautomator 会把子文本一起序列化（所以 Android 那趟按「选日期」是对的），
+  iOS 的 AX 树只暴露 `accessibilityLabel` —— 09:0x 的 `describe-all` 里那颗按钮就是
+  `'日期' | {{226.7,191},{85.3,44}} | AXButton`，树上根本没有「选日期」三个字。
+  ⇒ 探针改按 `web.countdown.field.date` 走，并在开日期面板前先收键盘（面板与键盘在同一侧，
+  不收会整片按不到）。**四个键名在碰设备之前先过读数器**（`zh` 模式逐条 rc=0）——
+  这是同一把尺第三次在开工前抓住探针自己的假设（前两次：㉘ 的三个假键、㉞ 的 pressable 过滤）。
+  ⏳ 仍然不打勾，等链 P 的 `RC_IOS_PROBE=0` + 那张图被打开看过。

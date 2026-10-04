@@ -283,8 +283,17 @@ echo "   type-text 回读：${TT:-（空 ⇒ shim 自己没输出，先看这一
 #    而 09:0x 那趟现场把它坐实了 —— 连按三次 set 之后字段回读仍是**双份**
 #    （`w7ios-090810w7ios-090810`）：原生被写了字、JS 态不知道，受控 TextInput 再把
 #    键入的那份接上去。先 set 再 type 这条路本身就是在制造脏值。
-PICK_LABEL=$(zh web.countdown.pickDate)
-press "$PICK_LABEL" || { echo "   ❌ 「$PICK_LABEL」滚不进可见区 ⇒ 日期选不了，本轮无效"; exit 3; }
+# 🔴 iOS 上这颗按钮**只能按 `web.countdown.field.date`（「日期」）按，不能按「选日期」**：
+#    `EventBoard.tsx:443` 的 `accessibilityLabel` 是 `labels.fieldDate`，而「选日期」是它
+#    **里面那个 Text 子节点**（`:456` 的 `draftDate === undefined ? labels.pickDate : …`）。
+#    RN-Android 的 uiautomator 会把子文本也序列化出来（所以 Android 那趟 `scroll_to_text 选日期` 是对的），
+#    而 iOS 的 AX 树只给 `accessibilityLabel` —— 09:0x 的 `describe-all` 里那颗按钮就是
+#    `'日期' | {{226.7,191},{85.3,44}} | AXButton`，「选日期」三个字在树上根本不存在。
+#    ⇒ 探针按「选日期」找不到东西，报的是 `element-left-tree`（第三处"探针够不着被读成产品没有"）。
+#    另外先把键盘收掉再开日期格：日期面板在键盘那一侧，键盘不收起会整片按不到。
+ax - --dismiss-keyboard --json >/dev/null 2>&1; sleep 1
+DATE_BTN_LABEL=$(zh web.countdown.field.date)
+press "$DATE_BTN_LABEL" || { echo "   ❌ 「$DATE_BTN_LABEL」按钮不可达 ⇒ 日期选不了，本轮无效"; exit 3; }
 sleep 2
 MON_NUM=$(date -v+7d +%-m 2>/dev/null || date -d '+7 days' +%-m)
 DAY_NUM=$(date -v+7d +%-d 2>/dev/null || date -d '+7 days' +%-d)
