@@ -2908,7 +2908,14 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 ① 四端重装 —— 少抄下面任何一条就会把"没跑完"读成"跑完了"（理由见交接账 03:38 那节）：
 
 ```
-载体 = heyta-wt-reinstall @ <sha>   scripts/reinstall-all.sh blob = <sha>（03:35 现量为 036ce09a）
+载体当前=<shortsha>  main 现在=<shortsha>        # 启动器 :41 的打印名。🔴 04:13 二次更正：模板原来写
+                                            #   "载体 = heyta-wt-reinstall @ <sha>"，而 `grep "载体 = "` 在日志里命中 **0 行** ——
+                                            #   HEAD_START=/HEAD_END= 这类名字只是脚本里的**赋值**，从不进输出：
+                                            #   我上一轮那份"token 清单"是拿 `grep KEY=` 扫**源码**得到的，
+                                            #   它分不清"被赋值的变量"与"被打印的 token" ⇒ 判据必须是**在日志里能逐字 grep 到**，
+                                            #   不是"在源码里出现过"。
+reinstall-all.sh blob = <sha>                  # 03:35 现量为 036ce09a —— 这一行是我自己要记的归属，**不是装置打印的**，
+                                            #   取法：`git -C <载体> rev-parse HEAD:scripts/reinstall-all.sh`
 载体身份（收尾）=<sha> ⇒ 与起跑一致          # 04:03 补：这一行**不是仪式** —— 不等时五张图属于两棵树，
                                             #   启动器 :356 会 VERDICT=NOT-RUNNING 退 3，而 INNER_EXIT 仍是 0
 PHASE1_EXIT=<n>（mac+windows）
@@ -2939,11 +2946,18 @@ inner.log：启动器把整条内层日志也抄进 <EVID>/inner.log（:277）�
 ② 三段 e2e + 全量 `pnpm check` —— **"可过段数"只认整条链那一行**（交接账 03:37 那节）：
 
 ```
-载体 = <sha>   CHECK_SEGMENTS_TOTAL=<装置打印值>
+CARRIER_SHA=<sha>   CHECK_SEGMENTS_TOTAL=<装置打印值>
+CARRIER_SHA_AT_END=<sha>              # 04:13 现读 heyta-run-checks.sh：这两个 token 才是装置的打印名
+                                        #   （原来模板写"载体 = <sha>"，grep "载体 = " 命中 0 行 —— 与我刚在 ① 那边
+                                        #   犯的"变量名当输出 token"是同一族，只是方向相反：这次是**中文别名当 token**）。
+FULL_CHECK_SKIPPED=<0|1>              # 🔴 承重：=1 时"跑满"**没有读数**，可过段数那一行必须留空并如实写原因
+                                        #   （:171 那一带的分支），拿逐段表冒充整条链等于把"没跑"写成"跑过 62 段"
+PREBUILD_RC=<n>                       # 第 4 步之前的 packages 预构建：非 0 时 CHECK_EXIT 的红可能是旧 dist（§7 第 27 条）
 SEG ai-e2e rc=… tests=… failed=…      # 或 rc=SKIP-PORTS ⇒ 这一趟"跑满"没有读数，如实记
 SEG privacy-consent-e2e rc=… …
 SEG landing-e2e rc=… …
 CHECK_EXIT=<n>   →   可过段数 = <n> / <TOTAL>       # 只有第 4 步能回答"跑满"
+VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VERDICT=…）；记账时**连同上面三行一起抄**
 （若 CHECK_EXIT≠0）逐段实测：通过 P / 失败 F / 跳过 S —— 只能当"哪段拦住了"的附表，不冒充上一行
 ```
 
