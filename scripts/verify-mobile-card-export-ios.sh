@@ -319,27 +319,41 @@ DATA_DIR=$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null | tr -
   || { echo "   ❌ 读不到沙盒 data 容器（$DATA_DIR）⇒ 探针够不着，本轮无效"; exit 3; }
 EXPORT_DIR="$DATA_DIR/tmp/card-export"
 BEFORE_LIST=$(ls -1 "$EXPORT_DIR" 2>/dev/null | tr -d '\r')
-[ -n "$BEFORE_LIST" ] && echo "   目录里已有 $(printf '%s\n' "$BEFORE_LIST" | grep -c .) 个文件（不清它 —— 只判"新增加没新增"）"
+[ -n "$BEFORE_LIST" ] && echo "   目录里已有 $(printf '%s\n' "$BEFORE_LIST" | grep -c .) 个文件（不清它 —— 判的是"这一次点下去有没有写下那张卡"）"
 
 MENU_TPL=$(zh web.countdown.a11y.menu)
 MENU_DESC=$(printf '%s' "$MENU_TPL" | sed "s/{title}/$CARD_TITLE/g")
 ax_found "$MENU_DESC" || { echo "   ❌ 卡片上没有「$MENU_DESC」这颗菜单钮"; bad "菜单钮没找到"; }
-press "$MENU_DESC"; sleep 2
+press "$MENU_DESC" || { echo "   ❌ 菜单钮滚不进可见区 ⇒ 按不到，本轮无效"; exit 3; }
+sleep 2
 EXPORT_LABEL=$(zh web.countdown.export)
 ax_found "$EXPORT_LABEL" || { echo "   ❌ 菜单里没有「$EXPORT_LABEL」那一格（宿主没接 onExportCard？）"; bad "导出格没找到"; }
-press "$EXPORT_LABEL"
+# 🔴 判据②**不看"有没有新增文件"**：文件名由共享层 `cardExportFileName` 决定，
+#    是**确定性**的（标题 + 日期），所以同一张卡再点一次导出是**覆盖**而不是新增 ——
+#    链 M 在 Android 那一半就是这样把一条真通过判成红的。这里判的是这件事真正的不变量：
+#    **属于这张卡的那个文件，mtime 落在这次点击之后**（不存在→出现，存在→被覆盖，两态都算）。
+#    时钟同源：iOS 的沙盒就是宿主机上的一个目录，写 mtime 的是宿主内核，
+#    读 mtime 的也是它，所以取时刻用宿主 `date` 而不是设备 `simctl spawn … date`
+#    （后者量的是同一台机器的同一个钟，多一次进程开销而已）。
+T0=$(date +%s)
+[ -n "$T0" ] || { echo "   ❌ 取不到时钟 ⇒ 判据②没有输入，本轮无效"; exit 3; }
+press "$EXPORT_LABEL" || { echo "   ❌ 「$EXPORT_LABEL」滚不进可见区 ⇒ 按不到，本轮无效"; exit 3; }
+snap() { find "$EXPORT_DIR" -maxdepth 1 -name '*.png' -exec stat -f '%m|%N' {} + 2>/dev/null; }
 FOUND=""
 for _i in $(seq 1 12); do
   sleep 3
-  AFTER=$(ls -1 "$EXPORT_DIR" 2>/dev/null | tr -d '\r')
-  NEW=$(comm -13 <(printf '%s\n' "$BEFORE_LIST" | sort) <(printf '%s\n' "$AFTER" | sort) | grep -v '^$' | head -1)
-  [ -n "$NEW" ] && { FOUND="$NEW"; break; }
+  # 名字里带空格与 CJK（`heyta-<标题>-10月11日 星期日.png`），所以按 `|` 分列而不是按空格。
+  CAND=$(snap | awk -F'|' -v t0="$T0" -v title="$CARD_TITLE" -v pre="$EXPORT_DIR/" '
+           { name = ""
+             if (index($2, pre) == 1) name = substr($2, length(pre) + 1)
+             if (name != "" && index(name, title) > 0 && $1 + 0 >= t0 + 0) { print name; exit } }')
+  [ -n "$CAND" ] && { FOUND="$CAND"; break; }
 done
 if [ -z "$FOUND" ]; then
-  bad "点了导出，沙盒 $EXPORT_DIR 里没有出现新文件 —— 原生那一步没落盘（或 bundle 是旧的）"
+  bad "点了导出，沙盒 $EXPORT_DIR 里没有属于「$CARD_TITLE」且 mtime ≥ $T0 的 png —— 原生那一步没落盘（或 bundle 是旧的）"
   summary "纪念卡片设备出图（iOS）" "判据②没成立，③未跑" 1
 fi
-ok "沙盒里出现了新文件：$FOUND"
+ok "点下去之后写下的是 $FOUND（mtime 落在 $T0 之后 ⇒ 出现与覆盖两态都算）"
 case "$FOUND" in heyta-*.png) ok "文件名形状是 heyta-….png（前缀/后缀由共享层 cardExportFileName 给）";; *) bad "文件名形状不对：$FOUND";; esac
 
 step "6. 判据③：那串字节的 IHDR 逐字等于契约"
