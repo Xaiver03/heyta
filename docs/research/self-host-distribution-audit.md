@@ -4854,3 +4854,39 @@ B 的读数一到（五条各两侧都执行），#1 的平台验收那一格就
 
 **这一节真正要留给下一轮的一句话**：判"某条腿在某个载体上跑不了"，
 要跑一次再说 —— 注释里那句理由是关于**另一种模式**的，而它挡住了两条本来免费的落笔前判据。
+
+### 8.80 落地那一刻的两条外部条件：一条已满足、一条仍在别人手里（2026-10-04 14:0x）
+
+**先把"现在能不能落"量清楚**，免得下一轮再重新推：
+
+| 判据 | 命令 | 14:04 现量 |
+|---|---|---|
+| 落地守卫的前提（载体第一父就在 main 上） | `git merge-base --is-ancestor "$(git rev-parse feat/self-host-merge-main^1)" main` | **成立** —— `载体^1 == main == a789687b`（逐字相同） |
+| 阻塞集 | `node research/tools/selfhost-landing-blockers.mjs` | 夹具 5/5 · 写集 37 · 脏条目 148 · **仍是 1 枚 = `package.json`**（法务/GDPR 那条线） |
+| 冲突面 | `git merge-tree --write-tree --name-only main HEAD` | rc=1，3 条，全在五族内 |
+
+⇒ **机械上唯一还差的动作是别人提交 `package.json`**，而 main 每分钟都在动，所以"守卫前提成立"
+这一格**每交接一次都要重取**，它不是属性（§8.16 起就记过这条）。
+
+**落地前顺带把 main 新带的 5 枚迁移量了一遍**（`git diff --name-only b850b1c6 main -- server/prisma/migrations` = 5，
+含 `20261009…add_vault_key_packages` / `20261011…atomic_vault_key_migration` / `20261013…add_holiday_adjustments`）：
+
+- `node scripts/check-migrations.mjs` 在**载体树**上 = **exit 0**（47 个迁移文件、其中 9 枚含 CONCURRENTLY）。
+  这一条不是"载体专属门禁"，所以我**没有**把它挂进 GATES —— 挂进去只会让"别人自己的迁移不合规"
+  变成"我这侧永远算不出载体"，那是把合并的可用性扣在别人的债上。**它属于落地那一刻的完整链**。
+- 为什么值得当场量：D-3 那句对外承诺是"外人一条 override 就把表结构起来"，走的是
+  `migrate-deploy.sh`（不是 `prisma migrate deploy`），而校验器检查的正是那个解析器的前提
+  （整行注释、语句行尾分号、CONCURRENTLY 单语句形状）。形状层**没有**被这 5 枚撞坏。
+- 🔴 边界写清楚：**"静态形状合规"不等于"新库上跑得过"**。这 5 枚在首次安装的**空库**上没有运行读数 ——
+  那要么等落地后在载体上重跑 `verify:selfhost-stack`（第 2 项那一格会因此需要一次新读数），
+  要么由它们的所有者在自己的 pglite/集成用例里给。**本批不在分支树上替 main 的迁移取这个读数** ——
+  分支树里根本没有这 5 枚文件（`git diff … main -- server/prisma/migrations` 就是它们）。
+
+**G-50 仍挂着，但阻塞理由换了**（14:03 现量）：`packages/i18n/src/locales/{zh-CN,en}.ts`
+在主检出**仍是 `M`**。所以今天动它 = 把**两枚**新文件加进落地阻塞集（§8.52 那套口径），
+而不是"等它们变干净"。⇒ 结论不变（登记，不现在动），但理由从"5 个重叠文件之二"改成
+"现在做会让阻塞集从 1 枚涨到 3 枚"。
+
+**本节的自查读数**：`docs-link-check` exit 0；`check:md-tables` 在装了本台账的臂里 exit 0 / 10 个文件
+（§8.79 那张两列表在内）；载体脚本改完后的两次重算分别打出 `ad15b4a7` / `1e18b22c`（8 道门禁全 exit 0）——
+**SHA 都不作交接依据**，交接只给分支名 + 重算命令。
