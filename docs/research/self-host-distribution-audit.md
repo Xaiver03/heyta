@@ -9941,3 +9941,41 @@ fixture 与真实形状对不上就会在这里现形，而不是等到落地那
 **⑧ 一条收尾纪律，是踩过才写下来的：** 软链进临时树之后，清理必须**先 `rm` 掉那两枚软链**，
 再 `git worktree remove --force` —— 递归删目录的工具跟着软链走就会删掉**借来的那棵树**（那是主检出的
 `node_modules`，也是并行那条线正在用的东西）。删完回读主检出的 `node_modules/.pnpm` 仍在（1185 条目）。
+
+### 8.163 落地的阻塞面从 5 枚收窄到 2 枚，且这两枚是**同一车道的一件事**；顺带把"他们只提交一半会怎样"量成了具体形状（2026-10-05 03:4x）
+
+**为什么这一格值得单独记**：#7 的关闭判据不是"载体算得出"，是"那 5 枚重叠文件被其所有者提交"。
+03:2x 我登记的是 5 枚，现量已经变了 —— 而**变的方向决定我是继续等还是重算**，所以每次都要现量，不引用上一格的数字。
+
+**① 现量（03:4x，主检出）**：`main` = `9192445d`（比 03:2x 那趟预检的 `d9da78ea` 多 **7 笔**）。
+重叠 5 枚里 **3 枚已干净**（`docs/README.md`、`packages/i18n/src/locales/zh-CN.ts`、`packages/i18n/src/locales/en.ts`），
+仍脏的是 **`package.json` 与 `scripts/check-script-snapshot.mjs`**。
+复现：`git status --porcelain -- docs/README.md package.json packages/i18n/src/locales/en.ts packages/i18n/src/locales/zh-CN.ts scripts/check-script-snapshot.mjs`。
+🔴 我第一次量这五枚时把两份词条表写成了 `packages/i18n/src/zh-CN.json` / `en-US.json`（**不存在的路径**），
+于是那条命令"什么都没打印"被我读成"已经有人提交了"。**路径要现取**：`git ls-files packages/i18n | grep locales`
+⇒ 真表是 `.ts`。一次假 0 差点写成一条"阻塞已解除"的账。
+
+**② 那两枚脏文件是**同一件事**的两半**（这是判断"等不等得来"的依据，不是印象）：
+它们的未提交 diff 只做一件事 —— 把 macOS 账号注销那条线接进门禁链：
+`package.json` 加 `check:shell-exit-chain` 与 `verify:macos-account-erasure` 两条 script，
+`scripts/check-script-snapshot.mjs` 的 MANIFEST 加 `scripts/verify-macos-account-erasure.sh` 一行。
+它们引用的两枚脚本此刻**都还是未跟踪**：`?? scripts/check-shell-exit-chain.mjs`（01:33）、
+`?? scripts/verify-macos-account-erasure.sh`（01:14），且 `git cat-file -e main:scripts/<那一枚>` 两枚都 NOT@main。
+
+**③ 于是 G-65（任务 #42）有了可判的形状**（以前我只写了"指向未跟踪脚本，落地前会悬空"）：
+他们**必须两枚脏的 + 两枚未跟踪的一起提交**。只提交那两枚 `M` 的话，main 上的 `pnpm check`
+会死在**第一道**门 `check:gate-wiring`（`package.json` 里那条 `node scripts/check-shell-exit-chain.mjs` 找不到文件），
+`check:script-snapshot` 同时会因为 MANIFEST 里那行指向不存在的脚本而红 —— 也就是说
+"**卡住我落地的那笔提交**"如果只做一半，会把**整条链**变成红的，而我的载体在那种 main 上跑不出可用读数。
+这条不该我修（绝不代改他们的文档与脚本），但**它是我落地条件的一部分**：载体重算时 main 必须是自洽的。
+🔴 共享工作树里 `git commit` 提交的是整个索引 ⇒ 他们那笔若顺手 `git add -A`，会把**并行会话正在用的东西**一起带走；
+这一条只能由写的那个人遵守，我这边唯一的自保是"每次落地前重算载体 + 提交只点名自己的路径"。
+
+**④ 多出来的 7 笔不挡路**（现量）：`git diff --name-only d9da78ea..main` 只有三枚文档
+（`docs/plans/goal-multi-end-coverage.md`、`docs/plans/multi-end-coverage-handoff.md`、`docs/runbooks/android-build-on-windows.md`），
+与本批文件集**零交叠**（`git diff --name-only main...feat/self-host-distribution` 里 grep 那三枚 = 空）。
+⇒ 载体重算时十一族不会因这 7 笔新增集外路径；main 前进会把 03:2x 那次预检的基线换掉，
+但换的只是文档，**归属基线要重取**（`check:docs` 的缺陷条数是从 main 现量的，不抄这里的数字）。
+
+**⑤ 状态**：哨兵（pid 3361，02:04:32 起跑）仍在等连静 15 分钟；main 每前进一笔，"main 未变"那一格重新起算 ——
+这是设计，不是故障。等窗口期间本轮**不起任何重活**：负载与端口是它要量的两格，我自己跑一条门禁就会把窗口吃掉。
