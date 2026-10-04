@@ -433,7 +433,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '一处必须逐端说清、不能拿一份最全的说法套所有端：**移动端的所有凭据（地址、令牌、口令）刻意完全不落盘**，冷启动后都要重填；Web 的同步凭据落 `localStorage` 且是明文。两者是不同的取舍，也不同风险。另有一条要说白：**目前任何一端都没有「一键抹掉本机全部数据」的按钮**——彻底清除本机明文数据要靠卸载应用或清除浏览器站点数据。',
+        text: '一处必须逐端说清、不能拿一份最全的说法套所有端：**移动端的所有凭据（地址、令牌、口令）刻意完全不落盘**，冷启动后都要重填；Web 的同步凭据落 `localStorage` 且是明文。两者是不同的取舍，也不同风险。另有一条要说白：**任何一端都没有「不注销也能一键抹掉本机全部数据」的独立按钮**——会在本机抹掉可读数据的那个动作就是注销账号（点下它的那台当场抹掉，其它设备在下次同步拿到注销信号时各自抹掉）；不注销而只想清干净这台设备，走系统层面：卸载应用，或清除浏览器站点数据。',
       },
     ],
   },
@@ -526,7 +526,7 @@ const zh = [
           [
             '账户、凭据、订阅、订单、邀请与通知记录',
             '直到你**注销账号**',
-            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站。🔴 这一行删的是服务端那一份：你其它设备上的本地明文库不会因为注销而消失 —— 今天还没有“账号已注销就清除本机数据”这个动作',
+            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站。🔴 这一行删的是服务端那一份；本机那一层：你点下注销的设备当场清掉本地明文库，其它设备在下次同步拿到“账号已注销”信号时各自清掉自己那一份 —— 从此不再上线的设备我们无法远程擦除',
           ],
           [
             '一次性令牌',
@@ -1035,7 +1035,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'One point that must be stated per platform instead of applying the most generous description everywhere: **on mobile, all credentials (address, token, passphrase) are deliberately kept off disk** and re-entered after a cold start, whereas on Web the sync credentials are persisted to `localStorage` in cleartext. Different trade-offs, different risks. And one more, said plainly: **no platform currently has a "wipe all local data" button** — physically clearing local cleartext means uninstalling the app or clearing browser site data.',
+        text: 'One point that must be stated per platform instead of applying the most generous description everywhere: **on mobile, all credentials (address, token, passphrase) are deliberately kept off disk** and re-entered after a cold start, whereas on Web the sync credentials are persisted to `localStorage` in cleartext. Different trade-offs, different risks. And one more, said plainly: **no platform has a standalone "wipe all local data" button that works without closing the account** — the one action that erases readable local data on a device is account closure (the device you press it on immediately, each other device the next time it synchronises and receives the closure signal); to clear this device without closing the account, use the operating-system route: uninstall the app, or clear browser site data.',
       },
     ],
   },
@@ -1128,7 +1128,7 @@ const en = [
           [
             'Accounts, credentials, subscriptions, orders, referrals and notifications',
             'Until you **close your account**',
-            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals and notifications all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin. 🔴 What this removes is the server copy: the readable local databases on your other devices survive closure — the action "the account was closed, so wipe this device" does not exist today',
+            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals and notifications all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin. 🔴 What this removes is the server copy; for the local plaintext data, the device you press closure on is wiped on the spot and every other device wipes its own readable copy the next time it syncs and receives the "account closed" signal — a device that never comes back online is one we cannot wipe remotely',
           ],
           [
             'One-time tokens',
@@ -1234,7 +1234,7 @@ const en = [
 
 export const personalInfoList: LegalDocument = {
   id: 'personal-info-list',
-  version: '1.1',
+  version: '1.2',
   status: 'draft',
   updatedDate: '2026-10-04',
   title: {

@@ -254,6 +254,24 @@ resulting file via **Settings → Import/Export → Import from File**.
 
 **Notes:**
 
+- **What the recovery file carries — and what has to accept it.** `recover-user`
+  writes an **op-log only** envelope: `formatVersion`, `app`, `exportedAt`,
+  `schemaVersion`, `opLog`, `counts.totalOps` — deliberately **no `entities`**
+  section. Entities are materialized by *the client's own reducer* while it
+  replays that op-log, because a server-side view of a delete is not a tombstone:
+  `op-replay.ts` emits one `delete` per batch, which would silently bring
+  already-deleted records back. ⇒ **Import from File only works on a build whose
+  importer accepts an omitted `entities` section.** Verify before offering the
+  path to a user:
+
+  ```bash
+  grep -c 'entities !== undefined' packages/app-host/src/import-dump.ts   # >= 1
+  ```
+
+  On `0` the importer still requires `entities` to be an object, so it rejects the
+  recovery file with `invalid-document` — the user's data is intact in
+  `recovered.json`, but this route is not available yet; keep the file (it holds
+  plaintext) and wait for an importer that replays instead of demanding.
 - The encryption key is read only from `RECOVER_ENCRYPT_KEY` or `--key-file` —
   never a CLI argument (process lists / shell history).
 - Run it from a dev checkout — it needs `ts-node` and the Prisma client, which

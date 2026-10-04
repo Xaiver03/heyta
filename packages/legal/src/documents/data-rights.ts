@@ -203,7 +203,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '服务端侧的注销是**真删除**，不是打标记：账号行连同它名下的同步数据、设备记录、通行密钥、订阅与订单、邀请关系与通知一并级联清除，口令与令牌随之失效，活动连接被踢下线。这一步没有冷静期、没有回收站，做完不可恢复。🔴 本地优先意味着每台设备自己存着一份可读的库，所以注销还得回答"其它设备上那一份怎么办"：**你点下注销的这台设备当场清掉本机明文**，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。⚠️ **今天不承诺的有两处**：① 那台**从此再也不联网、再也不登录**的设备 —— 我们没有远程擦除未连接设备的能力，它上面的副本只能靠系统层面的卸载并清除应用数据交还干净；② 🟡 **macOS 与 Windows 的桌面壳**：那两个壳把存储**托管给了桌面程序自己那一份本地库** —— 界面一起来就改用壳交出来的存储，可读的那份数据从此写进**桌面程序自己的库文件**；而本机销毁通道接的是**界面那一层在设备上存的本地数据**（网页版就是浏览器为这个站点留的本地存储与缓存）—— 在这两个壳上"当场清掉"清掉的是界面那一份（连同改版之前留在浏览器本地存储里的那份旧副本），**桌面程序自己的那个库文件还在盘上**。手机端与网页版没有这一层，这条会在接上之后改写。',
+        text: '服务端侧的注销是**真删除**，不是打标记：账号行连同它名下的同步数据、设备记录、通行密钥、订阅与订单、邀请关系与通知一并级联清除，口令与令牌随之失效，活动连接被踢下线。这一步没有冷静期、没有回收站，做完不可恢复。🔴 本地优先意味着每台设备自己存着一份可读的库，所以注销还得回答"其它设备上那一份怎么办"：**你点下注销的这台设备当场清掉本机明文**，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。⚠️ **今天不承诺的有两处**：① 那台**从此再也不联网、再也不登录**的设备 —— 我们没有远程擦除未连接设备的能力，它上面的副本只能靠系统层面的卸载并清除应用数据交还干净；② 🟡 **Linux 桌面壳**：那台机器上的本机销毁通道今天只走到「把内容清空并重写这个库文件」，**删不掉文件本体** —— 那个壳的驱动没有把「删掉容器」这一步递给界面这一层，而清空 + 重写这个补救按我们自己的说法是**不完备**的：空闲页里仍可能翻得出旧内容。✅ **macOS 与 Windows 的桌面壳已在 2026-10-04 接上这一步**：那两个壳把存储托管给桌面程序自己那一份本地库（界面一起来就改用壳交出来的存储，可读的那份数据从此写进壳的库文件），而现在本机销毁通道会连那个库文件一起删掉，连它的 WAL 日志与共享内存旁挂一个都不留。手机端与网页版没有「壳自己的库」这一层。',
       },
       {
         kind: 'p',
@@ -337,12 +337,13 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '本文件里的每一处"目前不能"都是**带着触发条件的**，不是敷衍的措辞。下面三项一变，文本就跟着改；改版会提升版本号，因为同意记录里存的就是版本号。',
+        text: '本文件里的每一处"目前不能"都是**带着触发条件的**，不是敷衍的措辞。下面四项一变，文本就跟着改；改版会提升版本号，因为同意记录里存的就是版本号。',
       },
       {
         kind: 'ul',
         items: [
           '**如果我们具备远程擦除未连接设备的能力**（今天不具备）：第五节里"再也不联网、再也不登录的那台设备"这条边界就会消失，文本跟着改。原先挂在这里的"注销做出界面入口之后"那一条已在 1.2 兑现，不再是一个待触发的改写条件。',
+          '**Linux 桌面壳把「删掉容器」这一步递给界面这一层之后**：第五节 ② 那条"删不掉文件本体"就会消失，"今天不承诺的"从两处回到一处。（macOS 与 Windows 两个桌面壳已在 2026-10-04 接上这一步，所以这里只剩 Linux 一端。）',
           '**邮箱换绑实现之后**：第三节那条"邮箱不可更换"会被删除，并换成换绑流程。',
           '**保留期调整之后**：第四节的 45 天要跟着改。它是产品设定、不是你可以自选的选项，改它需要发版。还有第二件事也要让文案跟着改：**清理真正开始对我们的数据生效**的那一天（见第四节如实补出的那条边界）。',
         ],
@@ -360,7 +361,7 @@ const zh = [
           [
             '1.2',
             '2026-10-04',
-            '第五节从"承诺渠道"改写为**自助表述**：注销入口在网页版设置页、手机端「我的」与命令行版三处都有，并逐条写明二次确认、先导出提示、命令行版对未上传操作的硬拒。同节把本地副本那条边界改成分层实话——点下注销的设备当场清除、其它设备在下次同步收到注销信号时各自清除，**唯一不承诺的是从此不再上线的设备**。第一节与第七节两张表的对应行同步改写。同批新增《欧盟 GDPR 口径：逐条对得上什么、对不上什么》一节：八条条文各自对到一条代码事实，**每一行都带"对不上的部分"那一栏**（数据保护专员与欧盟代表、邮箱不可改、无远程擦除、整库备份无单点删除、转移机制不声称），中英两份逐段镜像。同一版还把"不承诺"从一处扩成**两处**：除了那台从此离线的设备，🟡 macOS 与 Windows 桌面壳上**壳自己那份本地库文件**今天没接进本机销毁通道（那两个壳从这一轮起把界面上的可读数据托管进壳的库，而销毁通道接的是界面自己那个运行环境的存储）—— 接上之后这一句要回写。',
+            '第五节从"承诺渠道"改写为**自助表述**：注销入口在网页版设置页、手机端「我的」与命令行版三处都有，并逐条写明二次确认、先导出提示、命令行版对未上传操作的硬拒。同节把本地副本那条边界改成分层实话——点下注销的设备当场清除、其它设备在下次同步收到注销信号时各自清除，**唯一不承诺的是从此不再上线的设备**。第一节与第七节两张表的对应行同步改写。同批新增《欧盟 GDPR 口径：逐条对得上什么、对不上什么》一节：八条条文各自对到一条代码事实，**每一行都带"对不上的部分"那一栏**（数据保护专员与欧盟代表、邮箱不可改、无远程擦除、整库备份无单点删除、转移机制不声称），中英两份逐段镜像。同一版还把"不承诺"从一处扩成**两处**：除了那台从此离线的设备，🟡 **Linux 桌面壳**上那条本机销毁通道今天只走到"把内容清空并重写库文件"，**删不掉文件本体**。✅ macOS 与 Windows 两个桌面壳在同一天（2026-10-04）把这一步接上了——它们把界面上可读的那份数据托管进壳自己那一份本地库，而本机销毁通道现在连那个库文件带它的 WAL 日志与共享内存旁挂一起删掉；两端各自在壳级验收里真跑到 `containerRemoved:true`，并从壳外确认文件已不在盘上。第八节的触发条件跟着改成"只剩 Linux 一端"。',
           ],
         ],
       },
@@ -525,7 +526,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'On the server side, account closure is a **real delete**, not a marker: the account row and everything under it — synced data, device records, passkeys, subscriptions and orders, referral relationships and notifications — are removed by cascade. Passwords and tokens die with it, and live connections are dropped. There is no cooling-off period and no Trash: once done, it cannot be undone. 🔴 Local-first means each device keeps its own readable database, so closure also has to answer "what about the copies on the other devices": **the device you press it on wipes its local plaintext on the spot**, and every other device wipes its own copy **the next time it syncs and receives the "account closed" signal**. ⚠️ **Two things we do not promise today**: (1) a device that **never comes back online and never signs in again** — we have no way to remotely erase a device that is not connected, and the copy on it is returned to a clean state only by uninstalling at the operating-system level and clearing the app’s data; (2) 🟡 **the macOS and Windows desktop shells**: those shells **keep the storage themselves** — the interface switches to the storage the shell hands it as it starts, and from then on its readable copy is written into **the desktop program’s own database file** — while the local destruction path is wired to the **local data the interface layer itself keeps on the device** (in the web app that is the local storage and cache the browser holds for this site). So on those shells "wiped on the spot" wipes the interface copy (the older copy left behind in the browser’s local storage before the switch included) and **the desktop program’s own database file stays on disk**. The phone and the web app do not have this layer; this sentence will be rewritten once it is wired.',
+        text: 'On the server side, account closure is a **real delete**, not a marker: the account row and everything under it — synced data, device records, passkeys, subscriptions and orders, referral relationships and notifications — are removed by cascade. Passwords and tokens die with it, and live connections are dropped. There is no cooling-off period and no Trash: once done, it cannot be undone. 🔴 Local-first means each device keeps its own readable database, so closure also has to answer "what about the copies on the other devices": **the device you press it on wipes its local plaintext on the spot**, and every other device wipes its own copy **the next time it syncs and receives the "account closed" signal**. ⚠️ **Two things we do not promise today**: (1) a device that **never comes back online and never signs in again** — we have no way to remotely erase a device that is not connected, and the copy on it is returned to a clean state only by uninstalling at the operating-system level and clearing the app’s data; (2) 🟡 **the Linux desktop shell**: there the path that is supposed to wipe this device’s local data stops at "empty the content and rewrite the database file" and **cannot remove the file itself** — that shell\'s driver does not hand "remove the container" to the interface layer, and by our own account empty-and-rewrite is an **incomplete** remedy: old content may still be recoverable from free pages. ✅ **The macOS and Windows desktop shells were wired up on 2026-10-04**: those shells keep the storage themselves (the interface switches to the storage the shell hands it as it starts, and its readable copy is written into the desktop program\'s own database file), and the local destruction path now removes that file too, together with its WAL log and shared-memory side files. The phone and the web app do not have a "shell\'s own database" layer.',
       },
       {
         kind: 'p',
@@ -659,12 +660,13 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'Every "not today" in this document comes with its trigger condition; none of them is filler wording. When the three items below change, the text changes with them. A change also raises the version number, because the version number is what your consent record stores.',
+        text: 'Every "not today" in this document comes with its trigger condition; none of them is filler wording. When the four items below change, the text changes with them. A change also raises the version number, because the version number is what your consent record stores.',
       },
       {
         kind: 'ul',
         items: [
           '**If we ever gain the ability to remotely erase a device that is not connected** (we do not have it today): the boundary in section five about “a device that never comes back online” disappears and the text changes with it. The item that used to sit here — “once account closure has an interface entry” — was fulfilled in 1.2 and is no longer a pending trigger.',
+          '**Once the Linux desktop shell hands the "remove the container" step down to the interface layer**: item (2) in section five — "the file itself cannot be removed" — disappears and the list of what is not promised goes back from two items to one. (The macOS and Windows desktop shells were wired up on 2026-10-04, so Linux is the only shell left.)',
           '**Once email rebinding is implemented**: "the email address cannot be changed" in section three is deleted and replaced by the rebinding procedure.',
           '**Once the retention period changes**: the 45 days in section four changes with it. It is a product setting, not an option you can pick, and changing it requires a release. A second event also requires this text to change: **the day the sweep really starts applying to our data** (see the boundary spelled out in section four).',
         ],
@@ -682,7 +684,7 @@ const en = [
           [
             '1.2',
             '2026-10-04',
-            'Section five moves from “a channel, not self-service” to a **self-service statement**: closure entries exist in Web settings, in the mobile “Mine” tab and in the command-line client, each with the tick-box acknowledgement, the export-first prompt, and the command line refusing to run while un-uploaded operations exist. The same section now states the local-copy boundary as **layered truth** — the device you press it on is wiped on the spot, other devices wipe themselves on the next sync that receives the closure signal, and the only thing not promised is a device that never comes back online. The matching rows of the tables in sections one and seven are rewritten with it. A new section, “The GDPR position: what lines up, article by article, and what does not”, was added in the same change: eight articles each mapped to one code fact, and **every row carries its own “where it does not line up” cell** (no data-protection officer or EU representative, the e-mail address cannot be corrected, no remote wipe of an offline device, no targeted removal from a whole-database snapshot, no claimed transfer mechanism), mirrored block by block in both languages. The same version widens the list of what is not promised from one item to **two**: besides the device that never comes back online, 🟡 on the macOS and Windows desktop shells **the shell’s own local database file** is not yet wired into the local destruction path (those shells now host the interface’s readable copy inside the shell’s database, while the destruction path reaches the interface’s own runtime storage) - that sentence will be rewritten once it is.',
+            'Section five moves from “a channel, not self-service” to a **self-service statement**: closure entries exist in Web settings, in the mobile “Mine” tab and in the command-line client, each with the tick-box acknowledgement, the export-first prompt, and the command line refusing to run while un-uploaded operations exist. The same section now states the local-copy boundary as **layered truth** — the device you press it on is wiped on the spot, other devices wipe themselves on the next sync that receives the closure signal, and the only thing not promised is a device that never comes back online. The matching rows of the tables in sections one and seven are rewritten with it. A new section, “The GDPR position: what lines up, article by article, and what does not”, was added in the same change: eight articles each mapped to one code fact, and **every row carries its own “where it does not line up” cell** (no data-protection officer or EU representative, the e-mail address cannot be corrected, no remote wipe of an offline device, no targeted removal from a whole-database snapshot, no claimed transfer mechanism), mirrored block by block in both languages. The same version widens the list of what is not promised from one item to **two**: besides the device that never comes back online, 🟡 on the **Linux desktop shell** the path that is supposed to wipe this device’s local data still stops at "empty the content and rewrite the database file" and **cannot remove the file itself**. ✅ The macOS and Windows desktop shells were wired up on the same day (2026-10-04): those two shells hand the interface’s readable copy to their own local database, and the destruction path now removes that database file together with its WAL log and shared-memory sidecar — both shells were measured doing it end to end at shell level (`containerRemoved:true`, with the files confirmed gone from outside the shell). Section eight’s trigger list is rewritten with it, so the outstanding item there is Linux only.',
           ],
         ],
       },

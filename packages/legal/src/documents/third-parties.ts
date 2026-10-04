@@ -287,13 +287,52 @@ const zh = [
           '不开启同步：第二节表里的第 2–5 行照常发生（它们是账号与支付必需的），但你的任务内容不会以密文形式离开你的设备。',
           '不开启 AI 远程、不填自建端点：第三节整张表都是空的。',
           '不开启提醒通知：推送那一行从不发生。',
-          '注销账号：服务端按表外键级联删除同步数据、设备记录、凭据、订阅与订单；备份是整库快照，**代码层没有「从备份里定点删除某条数据」的能力**，这一点我们在《你的数据权利》里如实写明，不承诺即时从备份中清除。；🔴 同样不承诺的是“注销会清掉你所有设备上的本地数据”——本地优先意味着每台设备自己有一份可读的库，而随注销信号清除本机数据的动作今天还不存在',
+          '注销账号：服务端按表外键级联删除同步数据、设备记录、凭据、订阅与订单；备份是整库快照，**代码层没有「从备份里定点删除某条数据」的能力**，这一点我们在《你的数据权利》里如实写明，不承诺即时从备份中清除。；🔴 同样不承诺的是**从此不再上线的那台设备**：本地优先意味着每台设备自己有一份可读的库，你点下注销的那台当场清掉本机明文，其它设备在下次同步拿到注销信号时各自清掉自己那一份，而我们没有远程擦除一台再也不联网的设备的能力',
         ],
       },
       {
         kind: 'docRef',
         docId: 'data-rights',
         text: '你要行使查阅、复制、更正、删除或注销时走哪条路径、多久会有回音，见《你的数据权利》。',
+      },
+    ],
+  },
+  {
+    id: 's7',
+    title: '欧盟 GDPR 口径：这份第三方清单回答的是"数据去哪儿"，不是"谁与我共同负责"',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'GDPR 对第三方的兴趣点和中国法不太一样：它先问**这个角色是控制者、处理者还是联合控制者**（第 26、28 条），再问**跨境有没有转移机制**（第 44、46 条）。这份清单按"数据以哪种身份离开我们"组织，所以下面逐格写明它顶得上哪一问、顶不上哪一问。逐条对照的总表只在《你的数据权利》一份里维护，本文件不抄第二份。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 26 条（联合控制者）与第 28 条（处理者）',
+            '每一个碰到你数据的对象，角色有没有定过；作为处理者有没有按第 28 条签下义务、列出分包',
+            '清单确实逐条写出了"请求是谁发出的、目的地是谁指定的"：自托管时那台服务器由用户自己部署与持有凭据，我们既碰不到明文也不在链路上；托管时它是唯一一个"我们替用户存密文"的角色',
+            '但角色从来没有按第 26 / 第 28 条的口径**逐项定过一次**：我们既没有一份共同控制的安排，也没有一份分包处理者清单。第 28(2) 条要求在处理开始前逐类告知分包，这一项目前是空的 —— 所以清单不能写成"所有处理者均已签约"'
+          ],
+          [
+            '第 44 条与第 46 条（向第三国转移数据的机制）',
+            '数据一旦离开欧盟，靠什么机制走得出去',
+            '政策已经写明这一层的实情：**没有标准合同条款，没有充分性决定，没有做过转移影响评估**，AI 出境那一档只在用户逐功能同意之后才真的发生',
+            '正因为这三样都没有，这一格不能用"我们不涉及转移"来写。主体与服务器都在中国境内，一旦有欧盟用户注册并使用托管同步，数据就落在第三国 —— 而**这个判断今天没有人替它做过**。机制的缺失是实情，把它写成"不适用"就是假话'
+          ],
+          [
+            '第 30 条（处理活动记录）',
+            '这份清单能不能直接当处理活动记录交出去',
+            '它把对外请求按"谁发出"分栏列全，并逐项写明带出去的是什么字段，这已经是 ROPA 需要的一半天',
+            '但它按**数据流方向**组织，不是按处理活动组织，也没有为每一项标目的与法律依据；把它改名成 ROPA 交出去是不行的，改名之前它只是一份第三方披露清单'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '《你的数据权利》持有 GDPR 条文的逐条对照表；本清单只回答"数据以哪种身份离开我们、目的地由谁指定"，出境那一层另见《人工智能与数据出境》。',
       },
     ],
   },
@@ -578,13 +617,52 @@ const en = [
           'Do not enable sync: rows 2–5 of Section 2 still occur (they are inherent to the account and to payment), but your task content no longer leaves your device even as ciphertext.',
           'Do not enable remote AI and do not configure a self-hosted server: Section 3 is empty in its entirety.',
           'Do not turn on reminder notifications: the push row never occurs.',
-          'Close your account: the server deletes synced data, device records, credentials, subscriptions and orders by foreign-key cascade. Backups are whole-database snapshots and **there is no capability in the code to excise one record from a backup** — we state that plainly in Your Data Rights rather than promising instant removal from backups.; nor do we promise that closure wipes local data on your other devices — local-first means each device keeps a readable database, and wiping on the closure signal does not exist today',
+          'Close your account: the server deletes synced data, device records, credentials, subscriptions and orders by foreign-key cascade. Backups are whole-database snapshots and **there is no capability in the code to excise one record from a backup** — we state that plainly in Your Data Rights rather than promising instant removal from backups.; nor do we promise to wipe a device that never comes back online — local-first means each device keeps a readable database, so the one you press closure on is wiped on the spot while the others clear their own copy the next time they sync and receive the closure signal, and a device that never connects again cannot be wiped remotely',
         ],
       },
       {
         kind: 'docRef',
         docId: 'data-rights',
         text: 'Which route to take for access, portability, correction, deletion or account closure, and what response time to expect, is described in Your Data Rights.',
+      },
+    ],
+  },
+  {
+    id: 's7',
+    title: 'The EU GDPR view: this inventory answers "where does data go", not "who is jointly responsible"',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'GDPR is interested in third parties for different reasons than Chinese law: it first asks **what role each party touching your data has** \u2014 controller, processor, or joint controller (Articles 26 and 28) \u2014 and then **what transfer mechanism, if any, carries data out of the EEA** (Articles 44 and 46). This inventory is organised by the capacity in which data leaves us, so the table below states, cell by cell, which of those questions it answers and which it does not. The article-by-article master table lives in exactly one document, *Your Data Rights*; nothing here copies a second version of it.',
+      },
+      {
+        kind: 'table',
+        head: ['Where GDPR sits', 'What it asks', 'What heyta can show today', 'What does not line up'],
+        rows: [
+          [
+            'Article 26 (joint controllers) and Article 28 (processors)',
+            'Has each party that touches your data been classified; where it acts as our processor, are the Article 28 obligations signed and the sub-processors listed?',
+            'The inventory does state, entry by entry, who sends each request and who chose the destination: under self-hosting that server is deployed and its credentials held by the user, so we neither see plaintext nor sit on the path; under our hosting it is the single role of "we store ciphertext for you"',
+            'But the roles have never been **classified one by one** against Articles 26 or 28: there is no joint-controller arrangement and no list of sub-processors. Article 28(2) requires prior notice of sub-processor categories before processing starts, and that field is empty today \u2014 which is why this inventory cannot be worded as "all processors are under contract"'
+          ],
+          [
+            'Articles 44 and 46 (transfers to a third country)',
+            'Once data leaves the EEA, what mechanism carries it out?',
+            'The policy already states this layer plainly: **there are no standard contractual clauses, no adequacy decision, and no transfer impact assessment has been made**, and the AI outbound case only ever happens after a per-feature user authorisation',
+            'Because none of those three exists, this cell cannot be written as "transfers do not apply to us". The operator and the servers are in China, so the moment an EU user registers and uses hosted sync their data sits in a third country \u2014 and **nobody has made that determination**. Recording the missing mechanism is the honest version; calling it "not applicable" would be false'
+          ],
+          [
+            'Article 30 (record of processing activities)',
+            'Can this inventory be handed over as a record of processing activities?',
+            'It lists every outbound request grouped by who emits it and names the fields carried, which is already half of what a ROPA needs',
+            'But it is organised by **data-flow direction**, not by processing activity, and it does not attach a purpose and a lawful basis to each entry. Renaming it a ROPA would not work: until those columns exist it is a third-party disclosure inventory and nothing more'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '*Your Data Rights* holds the article-by-article GDPR table; this inventory answers "in what capacity does data leave us, and who chose the destination". The outbound-AI layer is covered by *AI and Transfers*.',
       },
     ],
   },
@@ -624,7 +702,7 @@ const en = [
 
 export const thirdParties: LegalDocument = {
   id: 'third-parties',
-  version: '1.1',
+  version: '1.3',
   status: 'draft',
   updatedDate: '2026-10-04',
   title: {
