@@ -909,5 +909,11 @@ console.log(`   ${giReading}`);
 console.log(`   ${capSelftestReading}`);
 console.log(`   ${dockSelftestReading}`);
 if (attribution.length) console.log(`   🔴 载体红 ${attribution.length} 道，已逐条归属到非本批（那条红仍在 main 上，不由本批修）：\n     ${attribution.join('\n     ')}`);
-console.log(`   门禁 ${GATES.length} 道全 exit 0；完整 pnpm check 留给落地那一刻`);
+// 🔴 这句是**推导**出来的，不是写死的"全 exit 0"：归属过的红仍然是红（缺陷还躺在 main 上），
+//    把它印成"8 道全 exit 0"就是本批一直在拦的那类对外错话，只不过读者是下一轮的我（§8.143 实测撞到的）。
+console.log(`   门禁 ${GATES.length} 道：${GATES.length - attribution.length} 道 exit 0` +
+  (attribution.length === 0
+    ? '，全 exit 0'
+    : ` + ${attribution.length} 道**红**已逐条归属到非本批（不吸收、不代改）`) +
+  '；完整 pnpm check 留给落地那一刻');
 console.log(`   main 若再前进 ⇒ 重跑：node research/tools/selfhost-merge-carrier.mjs`);
