@@ -103,7 +103,9 @@ UI_XML="/tmp/heyta-duetime-ui.$$.xml"
 # 🔴 这个 trap **替换**了 lib 里的 `trap restore_ime EXIT`（`mobile-e2e.sh:596`）——
 #    所以必须把 `restore_ime` 一起接上，否则本脚本 `disable_ime` 之后就把设备
 #    软键盘永久留在关闭状态，下一个跑这台模拟器的人拿到的是改过的设备。
-trap 'rm -f -- "$RID_PY" "$UI_XML"; restore_ime' EXIT
+#    同理也要把第 19 行那条**快照自删**接上：`"$0"` 不抄进来，这条替换就把它摘掉了
+#    （`docs/plans/trash-and-archive.md` §10.87 的 F 腿实测的就是这个形状）。
+trap 'rm -f -- "$0" "$RID_PY" "$UI_XML"; restore_ime' EXIT
 
 TIME_HALF="16:0"   # 半截：只该活在草稿里
 TIME_FULL="16:00"  # 整形：该提交
