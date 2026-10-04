@@ -647,6 +647,11 @@ git merge-tree --write-tree --name-only main feat/detail-pane   # rc=1 = 有冲�
 "解成能编译"是最容易也最错的做法 —— 要两单的所有者一起确认**四条判据在合流后都还在**。
 这一节是留给合流那一趟的现量，不是给谁的待办。
 
+⚠️ **别照本节的数字行动**（这三行读数会漂）：`main` 在 09:4x–09:5x 又前进 7 笔后，
+**冲突是 4 枚不是 3 枚**（新增 `docs/README.md`，两条线各修过同一行 —— 见 §8.29），
+**"自动合干净"是 8 枚不是 6 枚**（新增 `e2e/tests/helpers.ts` 与 `packages/ui/src/notes/NotesBoard.tsx`，
+两枚的语义逐枚判过 —— 见 §8.31）。复跑口径在 §8.30 末段那三条命令。
+
 ## 8.12 本单复跑里红过一次的一条用例：不归本单，但机制量清了（2026-10-04 05:41 现量）
 
 电池第 22 步 `test web` 报 **1 failed / 1584 passed**，红的是
@@ -1751,3 +1756,28 @@ comm -12 /tmp/a.txt /tmp/b.txt | tee /tmp/intersect.txt | wc -l
 那条编辑至今仍未提交（`main` 与本检出的门禁字节**逐行相同**：两侧都 415 行、`git diff --quiet` 无输出），
 所以断言 F 的阻塞理由从"它在飞"升级为"**它已经 7 小时没动、也 7 小时没提交**" ——
 这两件事对"要不要继续等"的含义相反，留给产品负责人判，本篇不代它决定要不要催。
+
+## 8.31 "自动合干净"从 6 枚变 **8 枚**，新进来的两枚逐枚判过语义（2026-10-04 09:5x 现量；本节零代码改动）
+
+§8.11 那张表记的是 05:0x 的现场：3 枚冲突 + 6 枚"自动合干净"。`main` 又前进了 7 笔
+（`MAIN_TOUCHED=769` 个文件、`BEHIND=423`），拿 `merge-base..` 两侧各自比一次，
+**交叠面 = 12 枚**：3 枚冲突（traps / `habit-actions.ts` / 它的 spec）+ `docs/README.md`（§8.29 那枚）+
+**8 枚自动合**。§8.11 那 6 枚没变，新进来的是 `e2e/tests/helpers.ts` 与 `packages/ui/src/notes/NotesBoard.tsx`。
+🔴 自动合**不等于**语义合，所以这两枚逐枚判：
+
+| 新交叠的 | `main` 侧 | 本分支侧 | 撞不撞得着？现量根据 |
+|---|---|---|---|
+| `NotesBoard.tsx` | 删掉 `NOTE_EXCERPT_LENGTH` 的 import、把 JSDoc 改成"领域层的 `NOTE_EXCERPT_LENGTH`"、**把默认参数 `excerptLength = NOTE_EXCERPT_LENGTH` 摘掉**（pre-image `:68`/`:95`/`:213`） | 五处插入（pre-image `:110`/`:177`/`:218`/`:282`/`:294`） | **不撞**。我这侧新增的代码**一处都不读 `excerptLength`**（`git diff … \| grep excerptLength` 零命中），而 main 那三个落点离我最近的插入只差 5 行 —— 相邻、不重叠，这才是 merge-tree 敢自动合的原因。⇒ 摘要默认长度改由 model 兜底这条**行为变化是 main 自己的**，不是我把它带歪的 |
+| `e2e/tests/helpers.ts` | `enableAllModules` 里加 `countdown: true`、`switchView` 的标签联合加 `'倒数纪念日'`（即 **rail 会多出一格**） | `parkCursor` 等 +32 | **不撞，而且这条能证明**：`focus-detail-pane.spec.ts:100` 那条"视觉上高亮的那一格必须就是当前视图"是**按背景筛、不按位置索引**，而 `apps/web/src/styles/app/inbox.css` 现量 `:484 .ht-rail__tab:hover` **只改 `color`**、`:495 :focus-visible` **只画 `outline`**，唯一给 `background` 的是 `:488 --active` ⇒ 新增那一格不带背景，断言 `toEqual(['番茄钟'])` 与"rail 有几格"无关 |
+
+📌 这一节真正可迁移的是那句**判据的形状决定合流风险**：同一个"界面多了一格"的变化，
+写成 `tabs[3]` / `nth-child` 的断言会**静默合到错的行上**（不报红、读别人的行），
+写成"按语义筛 + 断言整个集合相等"的断言会**要么红要么对**。
+⇒ 合流前不必逐条跑，先按这个维度把本批 e2e 断言分成"能静态判定安全的"和"只能靠跑的那几条"。
+
+⚠️ **本节的边界（别读多）**：以上全是**静态可证**的部分 —— 合并态**一次都没跑过**。
+跑不了的原因不是懒：本检出的 `node_modules` 与 `e2e/node_modules` 是指向主检出的**软链**，
+临时 worktree 里根本没有依赖，而按 §8.25 第三档那条纪律，**这里绝不能用 `pnpm install` 去补**
+（它会试图移除共享 modules 目录，那正是别人那趟重装正在用的）。
+⇒ 合并态的运行时读数（尤其 `habit-actions.ts` 那枚语义冲突之后**四条判据是否都还在**）
+仍然只有合流那一趟能给，沿用 §8.11 末段的处置：两单所有者一起确认，不"解成能编译"。
