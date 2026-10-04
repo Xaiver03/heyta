@@ -112,6 +112,18 @@ export interface ReminderActions {
   /** 某任务的未删除提醒，按 id 字典序（两端顺序一致）。 */
   listForTask(taskId: string): Reminder[];
   /**
+   * 一次遍历得到**全部任务**的未删除提醒（按 `taskId` 归组，组内按 id 字典序）。
+   *
+   * 🔴 为什么要有这个方法（P0-7）：宿主刷新时本来要"对每个任务各调一次
+   * `listForTask`"，而每一次调用都把整张提醒表摊平再滤 ⇒ **任务数 × 提醒数**，
+   * 且这条刷新挂在每一条 op 上。归组一遍就够 ⇒ O(提醒数)。
+   *
+   * ⚠️ 返回的键**只包含有存活提醒的任务**。宿主如果要"每个任务都有一格"
+   *   （面板逐行读），要自己去补空数组 —— 把补空放进这里会让这个方法
+   *   反过来依赖任务表，两件事就混了。
+   */
+  listByTask(): Record<string, Reminder[]>;
+  /**
    * **已到点、还没投递、且所属任务还活着**的提醒，顺序确定（领域层 `dueReminders`）。
    *
    * 🔴 "任务活着"这一道在本方法里，**不在调用方**：墓碑任务与它的提醒是两条独立
@@ -183,10 +195,24 @@ export function createReminderActions(
     return reminder;
   };
 
-  const aliveOfTask = (taskId: string): Reminder[] =>
-    aliveReminders(
-      Object.values(ctx.getState().reminders).filter((reminder) => reminder.taskId === taskId),
-    );
+  /**
+   * 🔴 一次遍历把存活提醒按任务归好组（P0-7）。
+   *
+   * `aliveReminders` 已经按 id 字典序排过 ⇒ 从这份全局有序序列里依次塞进各桶，
+   * **每个桶内部仍是 id 字典序**，与原来"逐任务滤完再排"的结果逐条相同。
+   * 这条改动唯一的风险就在"顺序"上，所以判据里有一条专门钉它。
+   */
+  const aliveByTask = (): Map<string, Reminder[]> => {
+    const grouped = new Map<string, Reminder[]>();
+    for (const reminder of aliveReminders(Object.values(ctx.getState().reminders))) {
+      const bucket = grouped.get(reminder.taskId);
+      if (bucket === undefined) grouped.set(reminder.taskId, [reminder]);
+      else bucket.push(reminder);
+    }
+    return grouped;
+  };
+
+  const aliveOfTask = (taskId: string): Reminder[] => aliveByTask().get(taskId) ?? [];
 
   /**
    * 每任务的写链。
@@ -403,6 +429,15 @@ export function createReminderActions(
 
     listForTask(taskId) {
       return aliveOfTask(taskId);
+    },
+
+    listByTask() {
+      const grouped = aliveByTask();
+      const byTask: Record<string, Reminder[]> = {};
+      grouped.forEach((reminders, taskId) => {
+        byTask[taskId] = reminders;
+      });
+      return byTask;
     },
 
     /**

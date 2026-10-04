@@ -192,10 +192,19 @@ async function attempt(
 /** 从动作层重新读 —— "哪些算未删除""顺序"都是产品语义，不在这里过滤或排序。 */
 function refresh(): void {
   const tasks = currentState().tasks;
+  /**
+   * 🔴 一遍归组，不是"对每个任务各调一次"（P0-7）。
+   *
+   * 原先这里逐任务调 `listForTask`，而每次都把整张提醒表摊平再滤 ⇒
+   * **任务数 × 提醒数**，且这条刷新挂在每一条 op 上（本地写、远端应用、
+   * 同步回来的每一批都算）。1000 × 1000 ≈ 10⁶ 次比较，为了一屏界面。
+   */
+  const grouped = reminderActions.listByTask();
   const byTask: Record<string, Reminder[]> = {};
-  for (const taskId of Object.keys(tasks)) {
-    byTask[taskId] = reminderActions.listForTask(taskId);
-  }
+  // 键集合仍然按任务表补：**没有提醒的任务是空数组，不是缺键**。
+  // 面板逐行读 `byTask[taskId]`，改成缺键会让它读到 undefined —— 那是一条
+  // 只在"某任务恰好没提醒"时才现形的红，而它今天是被上面那个循环兜住的。
+  for (const taskId of Object.keys(tasks)) byTask[taskId] = grouped[taskId] ?? [];
   useReminderStore.setState({ byTask, due: reminderActions.due() });
 }
 

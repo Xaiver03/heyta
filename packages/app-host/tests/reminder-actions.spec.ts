@@ -612,3 +612,97 @@ describe('W9 ③ 长档位跨夏令时不漂（真实写路径，TZ = America/Ne
     expect(state().reminders[id]!.triggerAt).not.toBe(nextDue - 3 * DAY);
   });
 });
+
+/**
+ * 读侧：一次刷新只许把提醒表摊**一遍**（P0-7）
+ * ==============================================
+ *
+ * ## 原先的形状为什么贵
+ *
+ * 宿主 `refresh()` 对**每个任务**各调一次 `listForTask`，而每次调用都把整张提醒表
+ * `Object.values` 摊平再按 `taskId` 滤 ⇒ 代价是 **任务数 × 提醒数**，
+ * 并且这条刷新挂在**每一条 op** 上（本地写、远端应用、同步回来的每一批）。
+ * 1000 任务 + 1000 提醒 ≈ 10⁶ 次比较，为的是一屏早就画好的界面。
+ *
+ * ## 为什么这几条要一起走
+ *
+ * "只读一遍"单独断是**没有区分力**的：把归组实现改成什么都不返回，读数也是 1。
+ * 所以五面一起钉：
+ *
+ *   1. `listByTask()` 一趟 ⇒ `getState` 恰好 **1** 次；
+ *   2. 同一个计数器下逐任务调 `listForTask` ⇒ 读数 = **任务数**（活体对照，
+ *      证明这个计数器数的就是"摊表"这件事，而不是恒 1 的摆设）；
+ *   3. 归组结果与逐任务结果**逐条相同**（含组内顺序 —— `aliveReminders` 按 id
+ *      字典序排，从全局有序序列分桶后每桶仍有序，这条就是钉这件事的）；
+ *   4. 墓碑提醒**不在**归组结果里，而同任务的存活提醒在（防止"一遍扫"顺手把
+ *      D1 那道滤挪走 —— 注释里明写那道滤是防已删任务到点照样弹的）；
+ *   5. 没有提醒的任务**不出现在键里**，而 `listForTask` 对它回 `[]`。
+ *      这条钉的是接口边界：补空数组是宿主的事，不是这里的。
+ */
+describe('🔴 提醒读侧一次遍历归组（P0-7）', () => {
+  it('listByTask 只摊一遍表，且结果与逐任务读逐条相同', async () => {
+    const TASK_COUNT = 8;
+    const PER_TASK = 3;
+
+    const taskIds: string[] = [];
+    for (let i = 0; i < TASK_COUNT; i += 1) {
+      const taskId = await makeTask();
+      taskIds.push(taskId);
+      for (let j = 1; j <= PER_TASK; j += 1) {
+        await actions.createReminder(taskId, clock + j * MINUTE);
+      }
+    }
+    // 一个没有任何提醒的任务（钉第 5 面用）。
+    const emptyTask = await makeTask();
+    // 一条被删掉的提醒（钉第 4 面用）。
+    const firstTask = taskIds[0]!;
+    const removedId = reminderId(firstTask, clock + PER_TASK * MINUTE);
+    await actions.removeReminder(removedId);
+
+    let reads = 0;
+    const countingContext: ActionContext = {
+      getState: () => {
+        reads += 1;
+        return engine.getState();
+      },
+      dispatch: (intent) => engine.dispatch(intent),
+    };
+    const counted = createReminderActions(countingContext, { now });
+
+    // ① 一遍
+    reads = 0;
+    const grouped = counted.listByTask();
+    expect(
+      reads,
+      `listByTask 把提醒表摊了 ${String(reads)} 遍 ⇒ 归组没有做成一次`,
+    ).toBe(1);
+
+    // ② 活体对照：同一个计数器下，逐任务读就是任务数遍
+    reads = 0;
+    for (const taskId of taskIds) counted.listForTask(taskId);
+    expect(
+      reads,
+      `逐任务调 ${String(TASK_COUNT)} 次 listForTask，计数器只读到 ${String(reads)} ⇒ 它数的不是"摊表"，① 那个 1 没有意义`,
+    ).toBe(TASK_COUNT);
+
+    // ③ 等价：每个任务的归组结果与逐任务读**逐条相同**（顺序也算）
+    for (const taskId of taskIds) {
+      expect(grouped[taskId] ?? [], `${taskId} 的归组结果与逐任务读不同`).toEqual(
+        counted.listForTask(taskId),
+      );
+    }
+
+    // ④ 那道"滤存活"还在：墓碑不在，同任务的存活那几条在
+    const groupedIds = (grouped[firstTask] ?? []).map((reminder) => reminder.id);
+    expect(groupedIds, '被删的提醒出现在归组结果里 ⇒ "一遍扫"把防 D1 那道滤带走了').not.toContain(
+      removedId,
+    );
+    expect(groupedIds, '同任务的存活提醒不该一起消失').toContain(
+      reminderId(firstTask, clock + MINUTE),
+    );
+
+    // ⑤ 接口边界：没提醒的任务不留键，而补空是宿主的事
+    expect(grouped[emptyTask], '没有提醒的任务不应产生键（补空由宿主做）').toBeUndefined();
+    expect(counted.listForTask(emptyTask), '逐任务读仍然回空数组').toEqual([]);
+  });
+});
