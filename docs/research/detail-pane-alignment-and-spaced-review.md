@@ -263,9 +263,12 @@
 ## C1. 要拍才能继续的值（两条轨合在一张表）
 
 🔴 这张表和下面的 C1b 各节之间有一条**常驻对账门禁**：`node scripts/check-detail-pane-c1-coverage.mjs`
-（每行要么有对照节、要么在自己那一行写明属于哪一类例外；每个对照节必须有日期 + 出处，URL 或 `file:line` 择一即可。
-判据与六臂读数在工单 §8.59）。写这张表的人不必再靠自觉去数"13 行有没有漏对照节"。
-🔴 臂已固化成装置（`research/tools/mutation-rigs/mutate-detail-pane-c1-coverage.mjs`，10/10），
+（每行要么有对照节、要么在自己那一行写明属于哪一类例外；每个对照节必须有日期 + 出处，URL 或 `file:line` 择一即可，
+**并且必须有「推荐/建议」那一档** —— 行首加粗标签，或由节标题写明不需要拍。那一档 2026-10-04 才补上，
+它对应的正是目标第 1 条原话里"把结论**与推荐**写回"这半句：此前摘掉整节推荐段，门禁照样报绿（工单 §8.79）。
+判据读数在工单 §8.59 / §8.79）。写这张表的人不必再靠自觉去数"这一行有没有对照节、这一节有没有给答案"。
+🔴 臂已固化成装置（`research/tools/mutation-rigs/mutate-detail-pane-c1-coverage.mjs`；**臂数不抄在这里** ——
+抄一次就漂一次，现取：跑它，最后一行就是）
 且两枚本线判据都已挂进**合流预检**的 GATES（`scripts/verify-detail-pane-merge-preflight.mjs`，
 产物树模式 `--root`）—— 两趟读数在工单 §8.64 / §8.65。
 
@@ -328,13 +331,22 @@
 
 > 🔴 **本节不替产品负责人拍**，它只做一件事：把"这 5 项要拍的值，业界实际怎么答"摆出来，
 > 每条带**出处 + 访问日期 + 一手/二手**，并给一个带代价的推荐。
+> ⚠️ 那句"每条都带"里只有**出处、日期、推荐那一档**三项有常驻机器消费者
+> （`scripts/check-detail-pane-c1-coverage.mjs` 的腿 1–4，工单 §8.79）；
+> **"一手/二手"与"带代价"没有**。现量（2026-10-04 19:1x，按节标题切区段数 `代价` 二字）：**5/9 节出现**
+> （Q1 / Q2 / Q4 / Q5 / Q13），另外四节里 Q8、Q9~Q12、Q6 写的是"为什么不选另一支 / 贵的是产品面 /
+> 有同行依据的最小组合"这类**同义形状**，Q7 是标题写明不需要拍的那一档（本来就不给推荐）。
+> 给它建行首词表会造出一批假红，所以这一档留在散文里，靠评审。
+> （与 §8.78 那条"触发词表只认一种字面形状就静默失去对象"是同一件事的另一侧。）
 > ~~完整表在 `/tmp/heyta-research/q1-q2-detail-pane-content-and-disclosure.md`（18 条来源）、
 > `/tmp/heyta-research/q4-srs-in-task-managers-and-claims.md`（24 条 URL）与
 > `/tmp/heyta-research/q3-habit-statistics-conventions.md`（Loop/Habitica 逐行 file:line + Streaks/滴答/Apple/Google 一手文档）~~
 > 🔴 **那三份已经没了**（2026-10-04 13:2x 现量：`ls /tmp/heyta-research` → `No such file or directory`，
-> 距写下"会随机器没掉"这句不到一天）。⇒ 本节从"摘要 + 承重出处"**升格为唯一记录**，
-> 现在仓库里实际留下的取证量是现量出来的：C1b 区段内 **URL 出现 56 次 / 去重 55 条**（全篇 69 次 / 68 条 / 49 行），
-> `file:line` 形式的源码指认 **5 处**。
+> 距写下"会随机器没掉"这句不到一天）。⇒ 本节从"摘要 + 承重出处"**升格为唯一记录**。
+> 🔴 **取证量这里不写数**（原来那两个数 56/55 与"file:line 5 处"没带口径，19:1x 用另一种口径复跑读到
+> 区段内 URL 55 次 / 去重 54 条、`file:line` 38 处 —— 差的那一档正是"5 处"没有写明它排不排 Q2 那张逐行表的 33 处）。
+> 现取命令（口径写在命令里，不再落抄件）：
+> `node -e 'const t=require("fs").readFileSync("docs/research/detail-pane-alignment-and-spaced-review.md","utf8").split("\n");const s=t.findIndex(l=>/^## C1b[.．]/.test(l.trim())),e=t.findIndex((l,i)=>i>s&&/^## /.test(l));const r=t.slice(s,e).join("\n");const u=(r.match(/https?:\/\/\S+/g)||[]).map(x=>x.replace(/[)>.，、；]+$/,""));console.log("URL 出现",u.length,"去重",new Set(u).size,"file:line",new Set(r.match(/[\w./-]+\.(ts|tsx|js|mjs|json|css|md|swift|kt|ets|java|py|sh):\d+/g)||[]).size)'`
 > ⚠️ **丢了什么要说清**：那三份里的"逐条原文与未采用的对照行"不可恢复 —— 也就是说
 > 本节每一行的**出处**还在，**得出该结论的中间过程**（哪些来源被比过、比出什么差异）没了。
 > 下一轮若要引这些结论做产品决策，要重新取证的正是后者，不是重新找 URL。

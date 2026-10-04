@@ -2,16 +2,17 @@
 /**
  * `scripts/check-detail-pane-c1-coverage.mjs` 的变异臂（工单 §8.59 / §8.64）。
  *
- * 那条判据把目标第 1 条「每个待拍值都要有外部调研，带日期 + 出处」从散文承诺变成能失败的属性：
- * C1 每行要么有 C1b 对照节、要么写明封闭例外类别；每个对照节都要有日期与出处（URL 或 `file:line`）。
+ * 那条判据把目标第 1 条「每个待拍值都要有外部调研，带日期 + 出处，把结论**与推荐**写回」从散文承诺
+ * 变成能失败的属性：C1 每行要么有 C1b 对照节、要么写明封闭例外类别；
+ * 每个对照节都要有日期与出处（URL 或 `file:line`），并且要有**推荐那一档**（或标题写明不需要拍）。
  * §8.59 那趟 M1–M6 是手敲的一次性命令，之后判据加了 `--root`（合流预检要在**产物树**里跑）——
  * 参数形状一变，"文档路径"和"`--root` 的实参"就会互相吃掉，所以把手敲的臂固化成装置，
- * 并补两条守 `--root` 的臂（M7/M8）。
+ * 并补两条守 `--root` 的臂（M7/M8）。腿 4（推荐那一档）是 2026-10-04 补的，M9–M13 + 两条脱牙在它身上。
  *
  * 跑法（linked worktree 里别用 `pnpm run`，它会先做 deps-status 预检）：
  *   node research/tools/mutation-rigs/mutate-detail-pane-c1-coverage.mjs
  *
- * 十臂的**预期**（M7/M8 与两条对照是守载体的臂）：
+ * 各臂的**预期**（M7/M8 与对照/脱牙是守载体的臂；条数不写在标题里，写在标题里的数字一定会漂）：
  *   M1 表里加一行既无对照节也不写例外   → 红在「没有 C1b 对照节…」，且点名 `#14`
  *   M2 把例外的理由改成词表外的一句话   → 同一腿红，且**例外数从 1 掉到 0**（证明类别是封闭的）
  *   M3 加一节回指表里不存在的行号       → 红在「回指了表里不存在的行号」
@@ -20,7 +21,14 @@
  *   M6 把整张表删掉                     → 红在「C1 表解析出 0 行」（拒绝在空集合上报绿）
  *   M7 指一篇不存在的文档               → 红并把**传入的原样路径**打出来（守绝对路径被 `join` 拼坏）
  *   M8 只给 `--root` 不给文档           → 必须**绿**且读的是那棵树里的文档（守 `--root` 实参被当成文档吃掉）
- *   对照 未变异的副本                   → 全绿 RC=0
+ *   M9a 腿 4 的披露行自身可解析         → `有推荐 + 例外 == 节数` 且缺推荐为 0
+ *   M9 摘掉某节的推荐段                 → 红**只**落在腿 4，点名那一节（其余三腿读数仍为 0）
+ *   M10「推荐」换成「建议」             → 放过（钉住两个词形都认，挡假红）
+ *   M11 摘掉推荐段、正文里留「推荐」二字 → 仍然点名（挡"把 Apple 的话当成我们的推荐"这种凑数）
+ *   M12 抹掉 C1b-Q7 标题里的例外声明     → 腿 4 点名 Q7（证明例外档承重、且读的是标题）
+ *   M13 摘掉 C1b-Q1 推荐段              → 点名 Q1，**尽管**正文里有一句"不需要拍板"（例外只从标题认）
+ *   脱牙 ×2 摘掉腿 4                     → 同一份文档不再报出那一句；喂缺日期的文档仍红在腿 3
+ *   对照 未变异的副本 / 复位后           → 全绿 RC=0
  *
  * 全程只改 /tmp 副本；仓库工作树与别人的产物不动。
  */
@@ -71,6 +79,7 @@ const counts = (out) => {
 const UNCOV = '🔴 要拍的值没有 C1b 对照节，也没写清属于哪一类例外';
 const ORPHAN = '🔴 C1b 节回指了表里不存在的行号（研究了不存在的题）';
 const WEAK = '🔴 C1b 节缺日期或缺出处（URL 或 file:line 择一即可）';
+const NOREC = '🔴 C1b 节没有「推荐/建议」那一档，标题也没写明不需要拍（取证齐了但没给答案）';
 
 // 定位辅助：表里最后一行 / 某个节的正文区间
 const lastRowIdx = (text) => {
@@ -80,6 +89,25 @@ const lastRowIdx = (text) => {
   let idx = -1;
   for (let i = start; i < end; i += 1) if (/^\|\s*\d+\s*\|/.test(lines[i])) idx = i;
   return { lines, end, idx };
+};
+
+// 定位某一节，返回 [起, 止) 行区间（止＝下一个 `### ` 或 `## `）
+const sectionRange = (lines, titleRe) => {
+  const s = lines.findIndex((l) => /^### /.test(l) && titleRe.test(l));
+  if (s === -1) throw new Error(`装置找不到节标题 ${titleRe}（原文形状变了，臂要跟着改）`);
+  let e = s + 1;
+  while (e < lines.length && !/^###? /.test(lines[e])) e += 1;
+  return { s, e };
+};
+// 摘掉那一节的推荐段（从行首加粗的推荐标签起，到本节末尾或下一处 `---` 为止）
+const cutRec = (text, titleRe, replacement = []) => {
+  const lines = text.split('\n');
+  const { s, e } = sectionRange(lines, titleRe);
+  const rec = lines.findIndex((l, i) => i > s && i < e && /^\*\*[^*\n]{1,40}\*\*[：:]/.test(l) && /推荐|建议/.test(l.match(/^\*\*([^*\n]{1,40})\*\*[：:]/)[1]));
+  if (rec === -1) throw new Error('装置找不到该节的推荐行（原文形状变了，臂要跟着改）');
+  let stop = rec + 1;
+  while (stop < e && !/^---\s*$/.test(lines[stop])) stop += 1;
+  return [...lines.slice(0, rec), ...replacement, ...lines.slice(stop)].join('\n');
 };
 
 const base = withDoc(null);
@@ -202,16 +230,139 @@ check(
   `RC=${m8.rc}｜${JSON.stringify(counts(m8.out))}`,
 );
 
+// M9–M13：腿 4「每个对照节必须有推荐那一档」的臂（目标第 1 条那句"结论**与推荐**写回"的机器消费者）
+const recCount = (out) => {
+  const m = out.match(/C1b 节 (\d+) 个（有推荐 (\d+) \/ 标题写明不需要拍 (\d+) \/ 缺推荐 (\d+)）/);
+  return m ? { sections: +m[1], withRec: +m[2], excused: +m[3], missing: +m[4] } : null;
+};
+const baseRec = recCount(base.out);
+check(
+  'M9a 读数行自身可解析（腿 4 的承重披露不是装饰）',
+  baseRec !== null && baseRec.withRec + baseRec.excused === baseRec.sections && baseRec.missing === 0,
+  `${JSON.stringify(baseRec)}`,
+);
+
+// M9 会响：摘掉 C1b-Q6 的推荐段 ⇒ 只有腿 4 红，别的腿一律不跟着红
+const m9 = withDoc((t) => cutRec(t, /C1b-Q6/));
+const m9out = m9.out;
+check(
+  'M9 摘掉推荐段 → 红只落在腿 4，点名 C1b-Q6',
+  m9.rc === 1 &&
+    legCount(m9out, NOREC) === 1 &&
+    m9out.includes('C1b-Q6 —— 行首加粗标签=') &&
+    legCount(m9out, UNCOV) === 0 &&
+    legCount(m9out, ORPHAN) === 0 &&
+    legCount(m9out, WEAK) === 0 &&
+    recCount(m9out)?.missing === 1,
+  `RC=${m9.rc}｜缺推荐 ${recCount(m9out)?.missing}｜其余腿 ${legCount(m9out, UNCOV)}/${legCount(m9out, ORPHAN)}/${legCount(m9out, WEAK)}`,
+);
+
+// M10 会放过：把「推荐」换成同义词「建议」⇒ 仍须绿
+// （§8 表腿 7 的教训：触发词只认一种字面形状，下一轮换措辞判据就静默失去对象 —— 这条钉住"两个词形都认"）
+const m10 = withDoc((t) => {
+  const next = t.replace('**推荐（不替谁拍）**：把 #6 拆成两问拍', '**建议（不替谁拍）**：把 #6 拆成两问拍');
+  if (next === t) throw new Error('M10 的替换没命中（静默空改动 = 臂是装饰）');
+  return next;
+});
+check(
+  'M10 换写成「建议」→ 放过（不许因为措辞就假红）',
+  m10.rc === 0 && recCount(m10.out)?.missing === 0,
+  `RC=${m10.rc}｜${JSON.stringify(recCount(m10.out))}`,
+);
+
+// M11 会响：摘掉推荐段、只在正文里留「推荐」二字 ⇒ 仍须点名
+// （挡住"把别人的话当成我们的推荐"这条最省力的凑数写法：腿 4 判的是行首加粗标签，不是整节含词）
+const m11 = withDoc((t) =>
+  cutRec(t, /C1b-Q6/, ['> 装置注入：这一节里仍然留着"推荐"两个字（Apple 原文 we recommend using a tertiary button）。', '']),
+);
+const m11out = m11.out;
+check(
+  'M11 正文里留「推荐」二字不算推荐段 → 仍然点名 C1b-Q6',
+  m11.rc === 1 && legCount(m11out, NOREC) === 1 && m11out.includes('C1b-Q6') && m11out.includes('推荐'),
+  `RC=${m11.rc}`,
+);
+
+// M12 会响：把 C1b-Q7 标题里的例外声明抹掉 ⇒ 那一节必须转为红
+// （证明例外档是**承重**的，也证明它读的是标题）
+const m12 = withDoc((t) => {
+  const next = t.replace('### C1b-Q7（= C1 #7：确认"番茄页不许塞进列表模型"继续有效）—— 已核，**不需要拍**', '### C1b-Q7（= C1 #7：确认"番茄页不许塞进列表模型"继续有效）');
+  if (next === t) throw new Error('M12 的替换没命中');
+  return next;
+});
+const m12out = m12.out;
+check(
+  'M12 抹掉标题里的例外声明 → 腿 4 点名 C1b-Q7',
+  m12.rc === 1 && legCount(m12out, NOREC) === 1 && m12out.includes('C1b-Q7') && recCount(m12out)?.excused === 0,
+  `RC=${m12.rc}｜例外 ${baseRec.excused}→${recCount(m12out)?.excused}`,
+);
+
+// M13 会响：C1b-Q1 正文里本来就有一句"不需要拍板"（讲的是**别的事**）——
+// 摘掉 Q1 的推荐段后，那句**不许**把它豁免掉（例外只从标题认；这条臂就是那个设计选择的本体）
+const m13 = withDoc((t) => {
+  const lines = t.split('\n');
+  const { s, e } = sectionRange(lines, /C1b-Q1/);
+  if (!/不需要拍板/.test(lines.slice(s, e).join('\n'))) throw new Error('M13 的前提不成立：Q1 正文里没有那句"不需要拍板"');
+  const next = cutRec(t, /C1b-Q1/);
+  // 🔴 前提要在**变异后的文档**上量：这句"不需要拍板"必须还留着（它住在推荐段之前），
+  // 否则这一臂就退化成普通的"摘掉推荐段"，什么也没证明。
+  const { s: s2, e: e2 } = sectionRange(next.split('\n'), /C1b-Q1/);
+  if (!/不需要拍板/.test(next.split('\n').slice(s2, e2).join('\n'))) throw new Error('M13 的前提被自己的变异抹掉了：摘完推荐段后那句"不需要拍板"不在了');
+  if (next.split('\n').slice(s2, e2).some((l) => /^\*\*([^*\n]{1,40})\*\*[：:]/.test(l) && /推荐|建议/.test(l.match(/^\*\*([^*\n]{1,40})\*\*[：:]/)[1])))
+    throw new Error('M13 没摘干净：Q1 里还留着推荐类的行首加粗标签');
+  return next;
+});
+const m13out = m13.out;
+// ⚠️ 断言里**不许**写 `m13out.includes('不需要拍板')`：判据从不回显文档正文，那句是文档里的话，
+// 不是判据的输出 —— 第一版就这么写，症状是"臂红而 RC 是对的"（期望值写错与判据写错一样会误导下一位）。
+// 这一臂要证的"正文那句没把它豁免掉"，可读形态是**例外数没涨**（Q1 仍落在"缺推荐"那一档）。
+const m13rec = recCount(m13out);
+check(
+  'M13 正文里的"不需要拍板"不构成豁免 → 腿 4 点名 C1b-Q1',
+  m13.rc === 1 &&
+    legCount(m13out, NOREC) === 1 &&
+    m13out.includes('C1b-Q1 —— 行首加粗标签=') &&
+    m13rec.missing === 1 &&
+    m13rec.excused === baseRec.excused,
+  `RC=${m13.rc}｜缺推荐 ${m13rec.missing}｜标题例外 ${baseRec.excused}→${m13rec.excused}`,
+);
+
+// 脱牙对照：把腿 4 摘掉后喂 M9 那份文档 ⇒ 必须**不再报出那一句**（证明 M9 的红来自这条腿），
+// 且其余腿不受影响（再喂 M4 那份仍红在 WEAK —— 否则"摘一条腿"其实摘了整个判据）。
+const neuterDecl = 'const noRec = sections.filter((s) => !hasRec(s) && !SECTION_EXC.test(s.title));';
+if (!readFileSync(GATE, 'utf8').includes(neuterDecl)) {
+  console.log('🔴 装置找不到腿 4 的声明行 —— 判据那一行的字面形状变了，脱牙臂会假装成功，拒绝继续。');
+  process.exit(2);
+}
+const neuterGate = join(scratch, 'gate-no-leg4.mjs');
+writeFileSync(neuterGate, readFileSync(GATE, 'utf8').replace(neuterDecl, 'const noRec = [];'), 'utf8');
+writeFileSync(doc, cutRec(ORIGINAL, /C1b-Q6/), 'utf8');
+const withLeg = run([doc]);
+const n9 = spawnSync(process.execPath, [neuterGate, doc], { encoding: 'utf8' });
+const n9out = `${n9.stdout}${n9.stderr}`;
+check(
+  '脱牙对照 摘掉腿 4 → 同一份文档不再报出那一句（且别处不新增红）',
+  withLeg.rc === 1 && n9.status === 0 && !n9out.includes('C1b 节没有「推荐'),
+  `带腿 RC=${withLeg.rc}｜脱牙 RC=${n9.status}`,
+);
+writeFileSync(doc, ORIGINAL.replace(/20\d\d-\d\d-\d\d/g, '（日期被装置抹掉）'), 'utf8');
+const n4 = spawnSync(process.execPath, [neuterGate, doc], { encoding: 'utf8' });
+const n4out = `${n4.stdout}${n4.stderr}`;
+check(
+  '脱牙对照 摘腿 4 后其余腿仍在（不是摘了整个判据）',
+  n4.status === 1 && legCount(n4out, WEAK) >= 1,
+  `RC=${n4.status}｜弱节 ${legCount(n4out, WEAK)} 条`,
+);
+
 // 对照：恢复干净后全绿
 const control = withDoc(null);
 check('对照 恢复干净后全绿', control.rc === 0, `RC=${control.rc}`);
 
 rmSync(scratch, { recursive: true, force: true });
 
-console.log(`\n读数：判据 ${GATE.split('/').pop()}｜C1 ${bc.rows} 行（有节 ${bc.covered} / 例外 ${bc.excused} / 未覆盖 ${bc.unexcused}）｜C1b ${bc.sections} 节`);
+console.log(`\n读数：判据 ${GATE.split('/').pop()}｜C1 ${bc.rows} 行（有节 ${bc.covered} / 例外 ${bc.excused} / 未覆盖 ${bc.unexcused}）｜C1b ${bc.sections} 节（推荐 ${baseRec?.withRec} / 标题例外 ${baseRec?.excused}）`);
 console.log(`\n${[...notes, ...fail].join('\n')}`);
 if (fail.length) {
   console.log(`\n🔴 ${fail.length}/${notes.length + fail.length} 臂不合格`);
   process.exit(1);
 }
-console.log(`\n结论：${notes.length}/${notes.length + fail.length} 臂符合预期（8 变异臂 + 3 条对照/守载体）✅`);
+console.log(`\n结论：${notes.length}/${notes.length + fail.length} 臂符合预期（臂的分解见文件头，不在这里写死条数）✅`);
