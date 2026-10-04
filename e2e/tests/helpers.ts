@@ -269,18 +269,6 @@ export async function stubLegalRecheck(page: Page, origin: string = STUB_ORIGIN)
   });
 }
 
-/** 与本测试主题无关的公开调休日历：只响应合法空年度，未知请求仍由各夹具判红。 */
-export async function stubEmptyHolidayAdjustments(page: Page, origin: string = STUB_ORIGIN): Promise<void> {
-  await page.route(`${origin}/api/holiday-adjustments**`, async (route) => {
-    if (route.request().method() !== 'GET') return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ version: '0.0.0', years: [] }),
-    });
-  });
-}
-
 /**
  * 给"公共事实"那条通道一个**中性**的应答（`GET /api/holiday-adjustments`）。
  *
