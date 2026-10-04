@@ -3848,3 +3848,73 @@ hdiutil detach /dev/disk11s1   ⇒ 自己那枚已收掉
 **闭合判据不变，但含义要更正**：`lsof +D /tmp/heyta-macos-dist` 期望空 —— 它证明的是
 "**没有别人的产物在里面**"，不是"删得动"（后者已由上面的实测确定永远成立，因此**没有**判别力）。
 ① 现在真正缺的仍然是窗口（18:10 负载 77→181 之间、`emulator-5554` 上 `com.heyta` pid 9826 一直在前台）。
+
+#### 7.31.29 ③ 的读数装置拿真历史日志做过阳性对照；run7 那个红的**第一失败段在第 5 步，而报错文案指错了对象**（18:13–18:17 静态预检）
+
+**先说结论里最有用的一条**：③ 若再红，红点在第 5 步，且第 5 步的现场证据**已经打在日志里**，不需要为它加探针。
+
+**1) 读数装置拿真日志验过（不是只过夹具）** —— `heyta-notes-readout.sh /tmp/notes-run7.log`（07:06 那趟真跑的 7,074 B 日志）
+逐段解析出 `第 6 步 小计 ok=0 bad=2`、`第 7 步 ok=2 bad=4`、`第 8 步 ok=0 bad=1`，
+并 `MISSING_STEPS=[8b 9 10 11 12]`、`READOUT_RC=2` —— 它**区分得出"没跑到"和"没问题"**，
+拿不到判决行时不报成功。这一步要是空转，窗口开了也白开，所以先在等窗期验掉。
+
+**2) run7 的第一失败段**（`grep -E '════|❌|✅'` 从头数）：
+
+| 段 | 读数 |
+|---|---|
+| 负载门 | `负载 11 ≤ 12` ⇒ 当时过的是**只有负载**那道门（设备空闲那条是后来加进链的） |
+| 0–4 步 | 全 ✅（装包、凭据、建便签、NOTE/CRT 落库、编辑屏打开且**初值精确相等**） |
+| **5 步** | ❌ `新正文没输进编辑框（期望「note-e2e-070220-edited」，实际「」）` |
+| 6/7/8 步 | 全部是第 5 步的**下游**（0 条 UPD、找不到「编辑便签「…-edited」」、切不到任务页） |
+
+**3) 🔴 那句文案指错了对象**：失败时脚本自己 `screen_txt` 打出来的屏上文本是
+`Sun, Oct 4 / Gmail / Photos / YouTube / Phone / Messages / Chrome / heyta` ——
+**那是 launcher 桌面，不是编辑屏**。也就是说"输入没落地"这个说法根本不成立，成立的是
+"**前台已经不是我们的应用**"。而 `blame_crash`（`scripts/lib/mobile-e2e.sh:1532-1541` 本体逐字读过）
+只读 `logcat -d -b crash` 里的 `FATAL EXCEPTION` ⇒ `force-stop`、`pm clear`、原生崩、ANR-kill **都留不下 FATAL**，
+于是它返回 1，caller 就打了那句把人引向产品缺陷的话。（本仓库 §7 #197 教的正是"归因要指到第一个失败的段"。）
+
+**4) 产品侧这次不像坏的**（四条静态核对，都有行号）：
+`packages/ui/src/notes/NoteEditor.tsx:149,163-169` 是 `useState(initialContent)` + `value={draft}` + `onChangeText={setDraft}`，
+没有参与输入路径的"空草稿挡板"；无障碍名两端拼得上 ——
+词条 `packages/i18n/src/locales/zh-CN.ts:4023` = `编辑便签「{excerpt}」`，
+消费点 `NotesBoard.tsx:301` = `labels.a11yEdit(row.excerpt)`（mobile 侧 `apps/mobile/src/lib/notes-display.ts:48` 同一个 key）；
+`noteExcerpt`（`packages/domain/src/notes.ts:154-162`）取**首个非空行 trim**，长度 ≤ `NOTE_EXCERPT_LENGTH=60`（:73）时原样返回，
+而本轮正文只有 22/25 字符 ⇒ 无障碍名应当逐字命中。
+🔴 顺带否证我自己一次：先在 `packages/ui/src/notes/*.ts` 里 grep `NOTE_EXCERPT_LENGTH` 得 0 命中，
+差点写成"这个常量不存在"，实际它住在 `packages/domain/src/notes.ts` —— "搜不到"要换搜索面，不是断言不存在。
+
+**5) 载体与端口的新鲜度顺带核掉（都是给 ③ 起跑用的前置）**：
+载体 `heyta-wt-reinstall` 现量 HEAD=`1341d71b`、脏项 0，且 `git merge-base --is-ancestor 1341d71b main` 成立
+⇒ 链在窗口里 `git checkout -q $(git rev-parse main)` 是**前进不是降级**（这条以前只是假设）；
+`scripts/verify-mobile-notes.sh` 里 grep `3000|playwright|chromium|localhost:` **0 命中** ⇒ ③ 不碰 :3000，
+那个被 `node/70256` 占着的 vite **不挡 ③**（现量 18:09:13：`:3100/health` = `{"status":"ok","db":"connected","wsConnections":0}`）；
+链的窗口门只要求 4318/4319/4322 空闲，而 `:3100` 要求的是**有可用服务端**（:132-138 注释自己写明
+"仓里没有任何 verify 脚本调用 mobile-e2e-up.sh"）⇒ 这两条不互相矛盾，不存在"等端口空 ⇒ ③ 必挂"的死锁。
+
+**6) 不做的事与理由**：不给 `mobile-e2e.sh` / `verify-mobile-notes.sh` 加"前台还是不是编辑屏"那一行。
+①别条线可能正跑着 source 这枚文件的脚本，就地改 bash 会错位执行（AGENTS §8.9）；
+②最关键的：**窗口那一趟的日志本来就带 `screen_txt`**，缺的证据已经有了，不缺那行探针。
+如果窗口那趟第 5 步又红、且 screen_txt 显示的是编辑屏（值真没进去），那才轮到改产品；
+显示的是桌面，就是设备被抢，判据一个字都不动。
+
+**7) 顺带撤回我上一段里的一句（同族第三种漂移：拿旧台账的话当下场）**：
+本条第 6 段初稿写着"动这枚脚本要先重算链的覆盖层"—— **不成立**。链从 v21 起已经没有覆盖层，
+③ 的输入门是（`/tmp/heyta-window-chain25.sh:236-250` 逐字读过）：
+`NB=$(git -C "$R" hash-object "$NOTES_F")` 与 `HB=$(git -C "$R" rev-parse HEAD:scripts/verify-mobile-notes.sh)` **必须相等**，
+不相等就"有人未提交地改它 ⇒ 不起跑 ③"；再过四枚 needle（`step "8b`、`shot_evidence`、
+`# >>> step10-scoped begin`、`blame_crash`）。也就是说这枚文件现在是**只读输入 + 相等门**，
+提交新样子链会跟着走，未提交的改动则被拦 —— 方向是安全的，不需要同步重算什么合并态。
+
+**8) ③ 的输入门现在实测是绿的（18:18:14）** —— 我自己照链的口径复量一遍，不等它自己报：
+
+```
+needle 命中数            主检出            载体
+step "8b                 1                 1
+shot_evidence            6                 6
+# >>> step10-scoped begin 1                 1
+blame_crash              7                 7
+载体 工作树 sha = df46f473 ；载体 HEAD sha = df46f473   ⇒ 相等门成立
+```
+
+⇒ 窗口一开，③ 不会因为"输入不是当前提交"或"缺 needle"被拦；剩下的只有负载与设备那两格（18:18 仍红）。
