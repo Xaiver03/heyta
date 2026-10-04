@@ -3992,3 +3992,54 @@ merge-base 直接相减，不受载体新鲜度影响）。
 git merge-base --is-ancestor "$(git rev-parse feat/self-host-merge-main^1)" main && \
 git merge --no-ff feat/self-host-merge-main -m "merge: 自托管批次（第 N 次落地）"
 ```
+
+
+### 8.62 G-54 的**真构建那一格拿到了**，而 `VERIFY_EXIT=1` 死在载体的 e2e 依赖 —— 以及 ⑧ 那条预测被现量改了两个字（08:1x）
+
+链在 08:04 拿到窗口（负载 10.4），载体重算到 **`54f66626` = main(`a5583840`) × 分支(`229e4dcd`)**，
+`INSTALL_RC=0`，然后跑 `pnpm verify:selfhost-stack`。这一趟把 §8.59 "还欠的"第 1 条**前半**做掉了：
+
+| 环节 | 读数（全部来自 `/tmp/g54-chain.log`，载体 `54f66626`） |
+|---|---|
+| 生产阶段构建 | `==> 打镜像（… VCS_REF=54f66626）` → **`镜像 OK`** ⇒ 加了 prune 之后 `npm install --omit=dev` 在**载体这棵树**上不再 E404（这就是 G-54 修的那一层，main 那棵树今天仍然会死在第一条 install） |
+| 架构披露 | `linux/arm64`，照旧响亮地声明它**不等于**发布 workflow 钉的 `linux/amd64` |
+| 真镜像树 × 许可证扫描集 | ✅ `145 = 126 + 16 + 3`（无解释 0 · 非宽松 0 · **声明对不上 0** · 失效登记 0） |
+| 双载体对账 | 磁盘枚举 145 ⊆ 镜像内锁的非 dev 158，差集 13 条**全是 optional**；G-53 那 14 枚平台条目里 13 枚不在本次载体树上 |
+| D-3 | 一次性容器 `exited(0)` · 应用侧 `RUN_MIGRATIONS_ON_STARTUP=false` · **已应用 47/47** · 悬挂 0 · 重复完成 0 |
+| 界面挂载 | 服务端真日志 `[web-app] 共享 UI 挂在 /app/（来自 /app/web-dist）` |
+| 入口命令对账 | 7 份扫描 + 1 份故意排除，9 条命令逐行过 R1–R7 |
+| 真浏览器三条 | 🔴 **没跑成**：`❌ e2e 的依赖没装` ⇒ `VERIFY_EXIT=1` |
+
+🔴 **这一条红的归属**：`e2e/` 刻意不在根 pnpm 工作区内（`e2e/pnpm-workspace.yaml`），
+所以根目录 `pnpm install --frozen-lockfile` **不会**装它 —— 必须先 `cd e2e && pnpm install`。
+这是**我这条链少了一步**（harness 缺口），不是产品缺陷；已在 08:1x 于载体里补装（rc=0）。
+⚠️ 重跑不能与链后半的 `pnpm check` 并行：两者都往 `/tmp/heyta-merge-carrier/e2e/test-results` 写同名截图
+（§7 里"共用 test-results 会删掉唯一证据"那一族），所以浏览器那一腿等 `CHECK_RC` 之后再取。
+
+#### ⑧ 那条预测：方向对了，两个细节是错的
+
+`docker run --entrypoint sh supersync:selfhost-verify` 直接读镜像里的东西（现量，非推断）：
+
+| 我 ⑧ 里写的 | 镜像里的实测 | 结论 |
+|---|---|---|
+| 锁"只剩非 dev 条目" | `lock_packages=159`（修前那趟是 **321**），`dev_entries=0` | ✅ 字节确实变了，dev 全没了 |
+| 根条目的 `devDependencies` 变 **`null`** | **`absent`** —— 字段整个不在，不是 `null` | 🔴 我猜了形状。`npm pkg delete` 是删键 |
+| "装出来的生产树不变" | 真镜像树 `145` 与修前那趟**同一读数**，`差集 13 条全是 optional`；`prisma` CLI 与 client 都是 `5.22.0` | ✅ 承重的那句成立 |
+| （⑧ 没预料到） | **`/app/package.json` 里 `devDependencies` 键也整个不见了** —— prune 改的是镜像内那份 manifest，不只是锁 | 🔴 副作用比 ⑧ 写的多一处 |
+
+那一句"要看的是非 dev 那 158 条是否仍逐字对得上"也量了：`158` 一字没动（`159 − 根条目 = 158`），
+而 `readImageLock()` 在 `image-lock-platform.mjs:74` 就 `if (entry.dev) continue` ——
+⇒ **下一次真构建把镜像里那把锁取回提交物时（321→159 键），模式 A 的非 dev 集合不变**，
+`check:image-license` 不会因为换代而变红。唯一跟着变的是打印出来的 `entryCount`
+（全仓 `entryCount` 只有 `gen-image-npm-tree.mjs:139/320` 两处是**这个字段**，另一处是本文档自己；
+`server/tests/{sync-types,conflict-detection}.spec.ts` 里那几处是**同名局部变量**（向量时钟条目数），
+不吃这个字段 ⇒ 没有任何断言消费它）。
+
+#### 这一趟之后 G-54 还欠的（别把上面当成整条闭合）
+
+1. 真浏览器三条判据 + 四张截图（人逐张看过）—— 载体上重跑，等链后半的 `pnpm check` 结束。
+2. `check:image-license` 在**载体**上从 🔴 变 ✅ 这条已经由上面那行"真镜像树对账 ✅"覆盖了一半，
+   另一半是链里那把纯 fs 腿在 `CHECK_RC` 里的读数。
+3. 🔴 **main 那棵树今天仍然会 E404**：修法只在本分支里，落地之前外人从 main 照抄 compose 依旧起不来。
+   所以 G-54 的"对外不再错话"这一半，**关闭位置是落地那一刻**，不是本分支绿那一刻。
+
