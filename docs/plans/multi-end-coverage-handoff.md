@@ -1480,3 +1480,32 @@ hdiutil/ssh/scp/tar/rsync/pod/ohpm/hvigorw`，调用即 `VETO-BLOCKED` + 退 97�
   `icloudmailagent`，以及 **另一个项目** `litopia12` 的 5 枚 esbuild/vite —— 没有一枚是本线的；
   `:3000` 有 1 个监听、`:3100` 有 1 个监听（③ 要的就是它，属于前置而非拦项）、4318/4319/4320/4322 全空；
   booted 模拟器 **5** 台。⇒ **①②③ 继续等**，这一格没有例外。
+
+#### 20:43 ② 的载体前置体检（把"段数会随载体漂"这层坐实，并顺手抓了自己一次假读数）
+
+- **载体与 main 的 `check` 段数不是同一个数**（20:43 现量，同一把尺
+  `require("./package.json").scripts.check.split(" && ").length`）：
+  载体 `heyta-wt-reinstall` @ `671020ac` = **76** 段，三段 e2e 落在 **65/66/67**；
+  主检出 @ `0e7ff0a9` = **82** 段，三段落在 **68/69/70**；载体落后 main **11** 笔。
+  ⇒ 这给"报可过段数必须带**同一趟**的分母"补上了一对具体数字：**76 与 82 都不是错的，
+  它们属于两棵树**。② 的启动器 `heyta-run-checks.sh` 里 `$W` 是**硬编码的载体绝对路径**（`:6`），
+  `AI_E2E_IDX`（`:114`）与 `TOTAL`（`:154`）都从**当前那棵树**的 package.json 现算 ⇒ 不会抄错，
+  但它必须在链把工作树对齐之后再跑，否则报出来的就是"落后 11 笔那一版"的 76。
+- **e2e 那一段在载体里的前置已核**（这是 ② 唯一可能"到窗口里才发现装不全"的一格）：
+  `e2e/node_modules/.pnpm` 存在，唯一的软链 `@playwright/test → ../.pnpm/@playwright+test@1.63.0/...`
+  **落在载体树内**（不是软回主检出 ⇒ 不会触发"pnpm 清别人那棵树"那一族）；
+  13 份 `playwright*.config.ts` **逐份**量过（不是抽样）：12 份各声明**一个** `name: 'chromium'` 的 project
+  且都不声明 `browserName`，第 13 份（`playwright.windows-shell.config.ts`）根本没有 `projects` 块 ⇒ 走默认 chromium；
+  `firefox` / `webkit` 字样在**配置与用例里 0 处**（只在 `node_modules` 里 playwright 自己的 bundle 中出现）。
+  而 1.63.0 要求的 `chromium-1243` + `chromium_headless_shell-1243` + `ffmpeg-1011` 都在
+  `~/Library/Caches/ms-playwright` 里 ⇒ 缺的 `webkit`（要 2359，本机 2311）与 `firefox`（要 1543，无）
+  **不构成拦项**，因为没有任何一份配置消费它们。
+  ⚠️ 这一格**第一版写的是"13 份 config 的 project 名全部是 chromium（12 处声明）"** —— 那是把
+  `grep -c` 的总数当结论的抽样读法，留在那儿会让人以为 13 份里有一份根本不该出现。
+  逐份列出来才知道"12 处声明 + 1 份没有 `projects` 块"是两件事：**后者靠的是 Playwright 的默认值，
+  不是谁的声明**（默认值会变，所以它得单独写）。
+- 🔴 **我自己刚造的一次假读数（记下来是因为它的形状和真缺陷一模一样）**：
+  我用 `ls -1 e2e/node_modules | wc -l` 得到 **1**，读成"这棵树没装过 e2e 依赖"。
+  实际顶层是 **6** 项，只是 `.bin`/`.pnpm`/`.modules.yaml` 全是**点开头**、`ls -1` 默认不列。
+  否证它的不是我想通了，是**把同一把尺放到主检出上量到同一个 1** ⇒ 那才是"命令看不见"而不是"对象是空的"。
+  ⇒ 计数类读数的口径要写进读数旁边（`ls -1` vs `ls -1a`），能 A/B 就 A/B。
