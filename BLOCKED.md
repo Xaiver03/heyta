@@ -4287,3 +4287,54 @@ git grep -n '20261009000000_add_holiday_adjustments' HEAD
 > - 现在挡路的是测试通道：`门持有=40397`，`ps` 给 `/bin/sh …/pnpm --dir e2e run test`、
 >   `lsof -a -d cwd` 给 `~/.codex/worktrees/bc-final-validation/heyta`（10:42:19 起、活 4m19s）
 >   ⇒ **真实持有者，不是僵尸锁**，所以这个等待是有意义的；上限 7200s，等满以 exit 3 收尾。
+
+## B76. 🟠 ③ 的四端重装：10:57 现量只剩**三条别人的现场**，本线一条都不碰；④ 的 PROGRESS 打勾因此改投本条（台账正被另一条线写着）
+
+**本线此刻的状态（不是"卡住了"，是"排在别人的现场后面，且排队机制是有牙的"）**：
+
+- 交付队列实例 **85881**（OUT `scratch-heyta/deliver-105244-85881`，10:52:44 起跑，轮 1/5），
+  起跑读数：`载体 HEAD=6e38d5ce 未提交项=0 main=6e38d5ce`、`集成线是否已在 main：YES`。
+  10:57 现量 `main` 已走到 **240c1051**（别的线又落了两笔）⇒ 载体再次落后，
+  这正是 B74 补记 2 那条**每轮对齐**要吃的情况：下一次取闸门源之前会再做一次纯 `merge --ff-only`，
+  不合并、不产生新提交、非祖先/有脏就退 1 且**不碰载体**。
+- 阶段 1（测试通道）10:52 / 10:54 / 10:57 三轮的读数分别写着
+  `test runner=无 / 89651 89673 / 8447`，`门持有=77272` 不变；
+  而 10:57 我另开一条 `ps -p 77272` 已经**查无此进程** ⇒ 持有者在这一分钟里刚退出，
+  下一轮（间隔 120s）大概率放行。**这三轮等待都不是白等**：探针的"在算"判据是 5 秒窗口 CPU 增量 ≥0.2s，
+  锁的持有者判据是 `kill -0` + `lsof -a -d cwd`，两条都在现场被兑现过（见 B74 补记里那枚僵尸锁的反例）。
+
+**剩下的前置，逐条写明是谁的（全部现量，不猜）**：
+
+| # | 前置 | 读数 | 归属证据 | 本线动作 |
+|---|---|---|---|---|
+| ① | 内存门锁 | 持有者 77272 于 10:57 前后退出（其 cwd = `~/.codex/worktrees/bc-final-validation/heyta`，另一条线的 `pnpm --dir e2e run test`） | `ps` + `lsof -a -d cwd` | 等；由队列自己重读 |
+| ② | 负载 | `vm.loadavg` = **17.48 / 18.03 / 21.98**，阈值 **12**（= 8 核 × 3/4，从被约束常量推导） | 1 分钟均load 已 >12，5/15 分钟更高 ⇒ 不是尖峰 | 等窗口；等满按**环境无效 exit 3** 收尾，不降阈值 |
+| ③ | 设备面独占 | 另一条会话的 `pnpm reinstall:all` **93772** 起于 03:12:10，**已 7h45m、累计 CPU 0:00.32**；其 mac 腿 `package-app.sh /tmp/heyta-macos-dist`（**95477**）卡在 `notarytool submit … Heyta-1.0.0.dmg --wait`（**98934**，7h44m，CPU **0:00.03**） | 母 pnpm 的 ppid 链、`lsof -a -d cwd` = `/tmp/heyta-reinstall`（**不是我的载体**） | **不碰**：它与我抢同一处固定路径 `/tmp/heyta-macos-dist` + `/Applications/Heyta.app`，同时跑会拆掉它正在产的产物 ⇒ 这就是 3b 那条门存在的理由（B74）；也不是我能停的进程（归属不是本线） |
+
+🔴 三条里 **③ 是唯一可能没有终点的**：`notarytool --wait` 挂 7h44m 且零 CPU，苹果那边要么在排队要么这发请求已经死了 ——
+两种都不是我这侧能判的。**后果不是"③ 失败"，是"③ 本轮不成立"**：队列等满 → exit 3 如实记录（环境无效 ≠ 产品失败），
+监督器（**16137**）只会"再起一次我的队列"（≤10 次 / 10 小时 / 间隔 600s），**绝不自动起任何重装** ——
+重装是那条队列过了规范闸门之后才做的事。
+
+**④ 的一条改道（这条要留痕，否则下一轮会有人以为 PROGRESS.md 忘了打勾）**：
+
+- 现量 `git status --porcelain PROGRESS.md` = ` M`，`git diff --numstat` = **23 行新增 / 单 hunk `@@ -1580,0 +1581,23 @@`**，
+  内容逐段是另一条线的 B/C 阅读（Vault 五条旅程、iOS 取消续验、`check:ai-e2e` 154 通过）—— **不是本线的字节**。
+- `git commit --only PROGRESS.md` 提交的是**整个工作树里那枚文件** ⇒ 会把那 23 行一起记到我名下，
+  这正是本仓库记过的事故（"我 plumbing 提进多人台账的段落，会被别人整文件 `git add` 抹回去"）。
+  所以本线**不往正被别人写着的台账追加**。④ 的"③ 现场只剩别人"这一行落在本条 +
+  `docs/plans/ai-assistant-closure.md` 的执行记录里（那两份现在归本线写）。
+- **待办（谁落 PROGRESS.md 谁做）**：那 23 行落地后，把下面这句原样搬进 PROGRESS.md 对应小节，
+  并且**其中的 SHA 必须现取**（待办里的数字没有任何东西会重算它）：
+  `① 合并 / ② 集成态验证已落 main；③ 四端重装因别人的 reinstall 卡在 notarytool 而判为环境无效（exit 3），由交付队列等窗口重跑；④ 台账见 BLOCKED B74/B75/B76。`
+
+**复现本条全部读数的现量命令**（只读，不起负载）：
+
+```bash
+sysctl -n vm.loadavg
+pgrep -f 'heyta-deliver-on-window[.]sh'                      # 我的队列 = 85881
+ps -o pid,ppid,lstart,etime,time,command -p 93772 95477 98934
+lsof -a -d cwd -p 93772 -Fn | grep '^n'                      # 归属：/tmp/heyta-reinstall
+cd heyta && git status --porcelain PROGRESS.md && git diff --numstat PROGRESS.md
+tail -6 ~/scratch-heyta/deliver-105244-85881/run.log
+```
