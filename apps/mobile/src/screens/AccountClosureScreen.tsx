@@ -34,18 +34,49 @@
  * 账号邮箱），这屏一件都没做，它只知道"账号没了"。
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { Modal, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Modal, StyleSheet, View } from 'react-native';
 
 import { closeAccountAndEraseLocal, type ClosureResult } from '@heyta/app-host';
 import { useI18n } from '@heyta/i18n';
 import { accountClosureMessageKey } from '@heyta/ui';
+import type { HeytaNativeTokens } from '@heyta/design-system';
 
 import { openTaskHost } from '../db/open-host';
 import { consentFetch } from '../privacy/consent-gate';
 import { readSyncConfig } from '../sync/config';
 import { useTheme, useTokens } from '../theme';
 import { Button, Card, Checkbox, HStack, Screen, Text } from '../ui/kit';
+
+/**
+ * 面板样式：模块级工厂 + `useMemo`（与 `PrivacyConsentSheet`、
+ * `packages/ui/src/settings/Settings.tsx` 同一惯用法）。
+ * 🔴 静态样式不写 `style={{…}}` 内联 —— L4 视图只减不增（`check:l4`），
+ * 且内联对象每次渲染都是新建的，`StyleSheet.create` 走 RN 的 ID 引用路径；
+ * 取值一律经 tokens 表，不写裸数字（`check:design` 同盯）。
+ */
+function makeStyles(tokens: HeytaNativeTokens) {
+  return StyleSheet.create({
+    /** 确认对话框的半透明底：铺满、内容居中、四周留出屏幕排水沟。 */
+    scrim: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: tokens['screen.gutter'],
+      backgroundColor: tokens['color.overlay'],
+    },
+    /** 对话框卡片。阴影不在这里给 —— 它来自 `native.shadow()`（见 JSX）。 */
+    dialog: {
+      gap: tokens['space.4'],
+      padding: tokens['space.5'],
+      borderRadius: tokens['radius.lg'],
+      backgroundColor: tokens['color.surface-raised'],
+    },
+    /** 取消与确认等宽（`flex: 1`），与 `PrivacyConsentSheet` 的 `action` 同一裁决。 */
+    dialogAction: {
+      flex: 1,
+    },
+  });
+}
 
 export function AccountClosureScreen({
   onBack,
@@ -61,6 +92,7 @@ export function AccountClosureScreen({
   const { t } = useI18n();
   const tokens = useTokens();
   const { native } = useTheme();
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   const config = readSyncConfig();
   const baseUrl = config?.serverUrl ?? '';
@@ -195,23 +227,12 @@ export function AccountClosureScreen({
           }}
           accessibilityViewIsModal
         >
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-              padding: tokens['screen.gutter'],
-              backgroundColor: tokens['color.overlay'],
-            }}
-          >
+          <View style={styles.scrim}>
             <View
               testID="account-closure-confirm-dialog"
               style={[
-                {
-                  gap: tokens['space.4'],
-                  padding: tokens['space.5'],
-                  borderRadius: tokens['radius.lg'],
-                  backgroundColor: tokens['color.surface-raised'],
-                },
+                styles.dialog,
+                // 阴影只给真正的浮层（AGENTS.md §5），而对话框就是浮层。
                 native.shadow('shadow.lg') ?? undefined,
               ]}
             >
@@ -232,7 +253,7 @@ export function AccountClosureScreen({
                 <Button
                   label={t('common.accountClosure.cancel')}
                   tone="secondary"
-                  style={{ flex: 1 }}
+                  style={styles.dialogAction}
                   onPress={() => {
                     setConfirming(false);
                   }}
@@ -241,7 +262,7 @@ export function AccountClosureScreen({
                   label={t('common.accountClosure.action')}
                   tone="danger"
                   disabled={busy}
-                  style={{ flex: 1 }}
+                  style={styles.dialogAction}
                   onPress={() => {
                     void submit();
                   }}
