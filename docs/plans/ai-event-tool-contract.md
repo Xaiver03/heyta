@@ -4040,3 +4040,10 @@ say "逐段非绿共 ${NG_N} 条（含 rc=SKIPPED_BY_RULE=按规则不跑，不�
 ⇒ `awk: syntax error` ⇒ 读数成"0 条非绿"，看起来像"这条日志一直是空的"。
 改成**从脚本里 `sed -n '404p'` 原样取那一行再 eval** 才拿到真读数（15/14）。
 规则还是那条：复现脚本里的判断要抄它的字节，不要凭记忆重敲。
+
+被丢掉的那条不是别家的事，它正好是 ② 唯一那条"全量 test"红，所以顺藤追到了归属，记在
+**[`BLOCKED.md` B71](../../BLOCKED.md)**：HEAD 的 `server/tests/holiday-adjustment-migration.pglite.spec.ts:35`
+硬编码 `20261009000000_add_holiday_adjustments`，而 `git ls-tree HEAD` 里只有 `20261013000000…`（13 号来自
+`57ff8c55 merge: W4b 服务端半`），HEAD 里还有 3 处指着 09 号（那份 spec + `docs/adr/0052` + `docs/plans/countdown-batch2-handoff`）。
+⇒ **② 的读数里那条 `pnpm -r test` 红属 W4b 线，不属本线**；本线不代拍改哪个号、也不吸收别人的债凑绿，
+只把归属与可复跑命令交出去（细节只在 B71 一处，这里不留副本，免得又长出第二套号）。
