@@ -9176,8 +9176,10 @@ HEYTA_CARRIER_PAIR_WT=/tmp/heyta-tm-probe-pair node research/tools/selfhost-merg
 1. 🔴 **`/tmp` 是 `/private/tmp` 的软链**：模块用字符串比 `argv[1]` 与 `import.meta.url` 判"我是入口"，
    在载体路径下判成假 ⇒ 自检**一条臂都没跑，而 rc 还是 0**。是调用方那道"按输出内容判、不按 rc 判"的
    闸门把它拦成退 2 的（`臂数行：（没有这一行）`）。修成 `realpathSync` 两边都比。
-   📌 **待入 `docs/reference/environment-traps.md`**（编号按主检出工作树现量取，别按 HEAD —— 多人台账，
-   理由见 §8.135 那条同款）：**"入口判断比字符串"的症状不是崩，是安静地什么都不跑**；
+   📌 ~~**待入 `docs/reference/environment-traps.md`**（编号按主检出工作树现量取，别按 HEAD —— 多人台账，
+   理由见 §8.135 那条同款）~~ ⇒ **10-05 01:4x 撤回，读数见 §8.153 ③**：这条机制 main 那边已经入档
+   （`#193`，比这条更完整的两版本），本批再插一行就是给载体添第十二族。
+   **"入口判断比字符串"的症状不是崩，是安静地什么都不跑**；
    凡是消费侧只看退出码，它就会以"通过"的样子烂掉。同族的正面做法即第八/九族那条"判输出内容"口径。
 2. `fam.other ⇒ 退 2` 这道闸门**本身是好的**（这次就是它把两枚没预置解法的路径点名的），
    但它只在**真跑载体时**响。所以这一批把"冲突面枚数与族覆盖"变成一条可以在**开窗之前**跑的命令
@@ -9189,3 +9191,102 @@ HEYTA_CARRIER_PAIR_WT=/tmp/heyta-tm-probe-pair node research/tools/selfhost-merg
   下一次 `--confirm` 之前必须重量 ① 那三行 —— 这一夜 main 走了 30+ 笔，涨出来的可能不止这两枚。
 - 装置跑在 throwaway 副本 ⇒ 它不替代第 1 项的关闭判据（载体上**完整** `pnpm check`）；
   它替代的是"开窗后才发现要现场拍"。
+
+### 8.153 并集链的第三种洞（链条目在、脚本没了）关在窗口之外：新增 `selfhost-chain-targets.mjs`（11 臂自检，三个裁判对象现量 0 悬空）+ 换掉那枚只活到 04:15 的哨兵（2026-10-05 01:2x–01:4x）
+
+#### ① 为什么这件事排在第 1 项之前
+
+第 1 项要求"在合并载体上跑**完整 `pnpm check`**"，而完整链这辈子只在落地那一刻真跑过一次。
+10-05 01:3x 现量两侧链条目数与"每条点名的脚本在不在树里"：
+
+| 裁判对象 | 链步 | 取到脚本目标 | 不在射程 | 悬空 |
+|---|---|---|---|---|
+| 载体提交 `feat/self-host-merge-main` | 85 | 82 | 7 | 0 |
+| `main` | 84 | 81 | 7 | 0 |
+| 本分支 `HEAD` | 67 | 64 | 7 | 0 |
+
+"不在射程"那 7 条三棵树**逐字同一份名单**（4 条 `--filter`：`check:entries`/`check:adaptive-cards`/`check:pwa`/`check:tokens`，
+3 条 `-r` 或指向 `-r` 的根条目：`build`/`typecheck`/`-r test`），按名字打全，不是静默跳过 —— 数法见 ②。
+
+**现量差本身就是要防的东西**：main 的链比本分支多 18 道、本分支比 main 多 1 道
+（只在 main：`check:shell-surfaces` `check:op-log-semantics` `check:selection-single-source` `check:legal-tools`
+`check:legal-permissions` `check:legal-closure-truth` `check:legal-gdpr` `check:doc-citations` `check:md-tables`
+`check:brand-assets` `check:public-facts` `check:card-export` `check:ios-native-bridges` `check:vault-diagnostics`
+`check:verify-script-copy` `check:android-gradle-remote` `check:apk-freshness` `check:shell-erasure-parity`；
+只在 branch：`check:image-build-args`）。第一族对根 `package.json` 取的是**两侧链的并集**，
+于是有一类红既不在这棵树上也不在那棵树上，只在**并起来那棵树**上：
+**链条目留着，脚本文件被另一侧删了** ⇒ 完整链走到那里以 `Cannot find module` 收尾。
+两种收场都不是"落地"：要么当场烧掉一整枚窗口，要么配对树那一侧根本不跑这一道、
+归属只能把它记成"本批带进来的"。
+
+#### ② 判据本体 `research/tools/selfhost-chain-targets.mjs`
+
+- 逐条链步 `pnpm X` → `scripts[X]`（展开一层嵌套，带环守卫），从命令体里取"像仓库内脚本"的 token
+  （`.mjs/.cjs/.js/.ts/.sh`、不以 `-` 开头、不含 `node_modules/`），`cd <dir> &&` 前缀换基目录；
+- 🔴 **三档分类都要点名打印，且不许把"读不出"和"坏了"混成同一档**：`checked` / `no-target`
+  （`-r`、`--filter`、纯 shell 一步）/ `unresolved`（链点了名字但 `scripts` 里没有 —— **只有这一档自己就是红**）。
+  把前两档也判红 = 一条在正常的树上恒红的门禁 = 没有门禁（AGENTS §8.3 同一句理由）；
+- `--ref <rev>` 模式用 `git ls-tree -r --name-only` 当"树里有什么"，所以能审**将要落地的那枚提交**，
+  而不必把进程 cwd 落进哨兵那枚热载体 —— 那会踩掉载体空闲判据的 argv+cwd 两腿，等于自己把窗口关掉；
+- 接线：挂进 `selfhost-merge-carrier.mjs` 落笔前的 `GATES`，带缺陷行抽取式 `^悬空/判不了\s`，
+  于是它红的时候配对树能逐条归属。**不**加进 `pnpm check` 链：它判的是**合并后**那棵树，
+  单棵树上的通过是它的日常状态，真正需要它的时刻只有落地前那一次；
+  加进链要多改一次根 `package.json`（冲突面第一族），代价换不到东西。
+
+自检 **11 臂**：对照 + A 悬空 + B/C `cd` 基目录两形态 + D `node_modules` 假阳性（就是 ① 里那条
+`ts-node --transpile-only`，我第一版手拼的正则把它读成了"脚本缺失"）+ E `unresolved` 不静默 +
+F[敞口] 扩展名集合外改名 + G/H 递归步骤与自指链 + I/J `--filter`/`-r` 不许恒红。
+F 臂断言的是**当前真实行为**（`.mts` 掉进 `no-target` 而不判红），修好了它会自己报"敞口已闭" ——
+与 §8.151 的 G-63 那条臂同一个做法。
+
+```bash
+node research/tools/selfhost-chain-targets.mjs --selftest                     # 臂数 11 · 不符 0 · 退 0
+node research/tools/selfhost-chain-targets.mjs                                # 本工作树 67 步 / 悬空 0
+node research/tools/selfhost-chain-targets.mjs --ref main                     # main 84 步 / 悬空 0
+node research/tools/selfhost-chain-targets.mjs --ref feat/self-host-merge-main # 载体 85 步 / 悬空 0
+```
+
+同一趟把落笔前那 8 道纯 fs 门禁在本工作树逐道跑过：全部 `rc=0`（含新加的这道）。
+
+#### ③ 顺手关掉的三条"会白跑一趟"的怀疑（都现量，不是推断）
+
+| 怀疑 | 现量 | 结论 |
+|---|---|---|
+| 本批新增的 `research/tools/selfhost-*.mjs` 要不要进 `check:script-snapshot` 清单，否则载体红？ | 该门禁的 `MANIFEST` 只覆盖 `scripts/verify-*.sh` + `reinstall-all.sh`，文件头明写 `.mjs` 不受 bash 错位读坑影响、刻意不在清单里 | **不需要 re-bless**（它自己也不查"漏登记"，这条边界写在它文件头） |
+| G-58 那批旧 landing PNG 会不会让落笔前的链红？ | `scripts/screenshots/verify-artifacts.mjs` 判的是数量/尺寸/无 alpha/非空白，不判像素里印的字 | 不会；#30 仍是对外错话要办的那一条，但不是落地前的债 |
+| §8.152 欠的"待入 `environment-traps.md`"要不要本批再插一行？ | 主检出的 `#193` 已经在档（`git show main:docs/reference/environment-traps.md` 里行首号 4590 行，含 `realpathSync(argv[1])` 修法 + "判绿认结论行"第二层，比本批那次更完整）；该文件在 main 是 `M`，本分支那份最大号 177 而 main 工作树 270 | **待入已闭合**，§8.152 ④ 那句就地划线撤回；本批不往多写台账插行（插了就是第十二族） |
+
+#### ④ 哨兵换实例（四条阈值一字未动）
+
+上一枚是 `CAP=14400`、00:14 起算 ⇒ 04:15 到点。窗口需要"别人把根 `package.json` 提交掉 + main 连静 15 分钟"，
+而 01:2x 现量是 main 每 2–3 分钟走一笔、`连静=0/6` —— **排队器寿命不够长 = 静默少一整段交付**。
+先停旧实例再数进程（`ps` 清单里 `[s]elfhost-window-sentinel` 计数 0），然后按同一套旋钮起长命实例，只改 `CAP`：
+
+```bash
+CAP=28800 STEP=150 QUIET_MIN=15 LOAD_MAX=12 MAX_ATTEMPTS=3 \
+  node research/tools/selfhost-window-sentinel.mjs --run-on-open
+# 心跳 /tmp/selfhost-window-sentinel.pid：pid=51157 … cap=28800 quiet_min=15 run_on_open=1
+```
+
+`LOAD_MAX=12`／`QUIET_MIN=15`／`STEP=150`／`MAX_ATTEMPTS=3` 四条一条没动（§7 元规则：不许调阈值凑绿）。
+判存活用 `ps -o pid= -p` 或进程清单，不用裸 `kill -0`。
+
+#### ⑤ G-64 的承重判定：把"回补一条会红的护栏"降级成"形状统一"
+
+`.first()` 在第十一族取 main 侧时被丢（§8.152），但它**承不承重是可量的**，不必等落地后撞运气：
+全仓 `data-testid="privacy-consent-accept"` 的**生产者一枚**
+（`apps/web/src/features/privacy/PrivacyConsentSheet.tsx:266`）、**挂载点一枚**（`apps/web/src/App.tsx:1770`），
+`LegalReconfirmSheet` 用的是别的 testid ⇒ 同一页不可能出现两枚 ⇒ main 那版不带 `.first()` 的
+`locator(...).click()` 撞不到严格模式。所以 #41 的主张改成：
+**与 sibling 用例统一形状**（main 的 `e2e/live-site/live-signin-entry.spec.ts` 四处都带 `.first()`），
+闭合读数挂在 #20 那一趟 —— 落地后跑 main 那版能点过 = 证明"无第二枚"；若报 strict mode，
+它承重，当场回补并取证。留在原地的判断不变：**不在载体里现写第三种没跑过的写法**。
+
+#### ⑥ 边界（别读多）
+
+- ① 那张表是 **01:3x 那一枚载体提交**的读数。载体每次落地前重算，链的结构跟着 main 走；
+  下一次 `--confirm` 之前要重量那四条命令，不抄这张表。
+- 这道判据只管**根链**。子包自己的 `scripts`（那 4 条 `--filter`）不在射程里，工具按名字把它们打出来；
+  要把它们纳进来得先把包名映射回目录（读 `pnpm-workspace.yaml`），本批没做，记在这里。
+- "悬空 0"证明的是**这一族洞此刻没开**，不是"落地一定会绿"：完整链里其余 60+ 道（要 node_modules、要起栈、
+  `check:ai-e2e` 会按端口 SIGKILL）仍然只有窗口里那一趟给得出读数。
