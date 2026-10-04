@@ -173,10 +173,31 @@ for name in supersync-server supersync-postgres; do
   fi
 done
 
+# 挂载前缀**从 Dockerfile 现取**，不写死 `/app/`：这条判据要回答的正是"构建里那条 RUN 与
+# 镜像里那份产物说的是不是同一个挂载值"，而把答案抄进脚本就又造出一份抄件（§8 那一族）。
+# 读不到、或读到**不止一条**（那时"该对哪一个挂载"这个问题没有唯一答案）都 die ——
+# 判据没有唯一输入时不许按空值/首值通过（与 R6/R7 那两条哨兵同一设计）。
+# 不用 `sed … | head -1`：本脚本开着 `pipefail`，head 先退出会给 sed 留一个 SIGPIPE，
+# 那是"成功读取却以 141 退出"的形状（§7 第 45 条同一族），所以在这里不借管道取首行。
+EXPECT_MOUNT=$(sed -n 's|^RUN node scripts/check-web-artifact\.mjs .*--mount \([^ ]*\)$|\1|p' \
+  "$REPO_ROOT/server/Dockerfile")
+EXPECT_MOUNT_LINES=$(printf '%s\n' "$EXPECT_MOUNT" | wc -l | tr -d ' ')
+if [ -z "$EXPECT_MOUNT" ] || [ "$EXPECT_MOUNT_LINES" != "1" ]; then
+  die "从 server/Dockerfile 里没能取到**唯一**那条 check-web-artifact 的 --mount 值（现量取到 ${EXPECT_MOUNT_LINES} 行）。
+   要么那条 RUN 改了形状，要么 Dockerfile 里现在有多条 —— 后者说明"该对哪个挂载"没有答案，
+   要人先决定，不要为了让这一行过去而在这里写死 /app/ 或取首行。"
+fi
+
 if [ "$BUILD" = "1" ]; then
-  log "==> 打镜像（${IMAGE}，VCS_REF=$(git rev-parse --short HEAD)）"
+  log "==> 打镜像（${IMAGE}，VCS_REF=$(git rev-parse --short HEAD)，Dockerfile 那条 RUN 声明的挂载=${EXPECT_MOUNT}）"
   # 构建上下文 = 仓库根（与 docker-compose.build.yml 的 context: .. 一致）。
-  DOCKER_BUILDKIT=1 docker build -f server/Dockerfile \
+  # 🔴 `--progress=plain`（2026-10-04，#28 那笔可观测性欠账）：默认输出只打 step 名、
+  # 不打 RUN 的 stdout，于是"构建里那条产物自洽判据跑没跑"这件事在留档里**根本读不到**。
+  # G-48 当初的取证是我手工重跑一遍 `docker build --no-cache-filter web` 才拿到的 ——
+  # "判据的证据要靠手工重跑才拿得到"就等于这条判据没有自动消费者。
+  # ⚠️ 但 plain 也不保证看得见：BuildKit 命中缓存时那一层只打 `CACHED`。所以下面不拿它当唯一读数，
+  #    缓存态另有一条与缓存无关的判据（在**建出来的镜像里**跑同一个 checker）。
+  DOCKER_BUILDKIT=1 docker build --progress=plain -f server/Dockerfile \
     --build-arg VCS_REF="$(git rev-parse HEAD)" \
     ${NODE_IMAGE:+--build-arg NODE_IMAGE=$NODE_IMAGE} \
     ${APK_MIRROR:+--build-arg APK_MIRROR=$APK_MIRROR} \
@@ -185,9 +206,22 @@ if [ "$BUILD" = "1" ]; then
       tail -30 /tmp/heyta-selfhost-image.log
       die "镜像构建失败（完整日志 /tmp/heyta-selfhost-image.log）"
     }
-  log "    镜像 OK"
+  # 构建层那条 RUN 的读数：两种合法形状，命中哪一种都打进日志（不写死"必须执行过"，
+  # 因为缓存命中时"这趟没执行"是正常的，硬判红会把探针坏和产品坏混成一坨）。
+  if grep -qF -- "✅ 产物自洽：挂载 ${EXPECT_MOUNT}" /tmp/heyta-selfhost-image.log; then
+    WEB_STEP=ran
+  elif grep -qF -- "check-web-artifact.mjs --dist apps/web/dist --mount ${EXPECT_MOUNT}" /tmp/heyta-selfhost-image.log; then
+    WEB_STEP=cached-or-silent
+  else
+    die "构建日志里既没有那条 RUN 的执行输出、也没有它的命令行本身（/tmp/heyta-selfhost-image.log）。
+   要么 Dockerfile 里那条产物自洽检查整条没了，要么 --progress=plain 没生效 ——
+   两种都不是"构建成功"可以代替的结论。"
+  fi
+  log "    镜像 OK（构建层产物自洽那条 RUN 的读数形状=${WEB_STEP}；完整日志 /tmp/heyta-selfhost-image.log）"
 else
   docker image inspect "$IMAGE" >/dev/null 2>&1 || die "--no-build 但本地没有 $IMAGE"
+  WEB_STEP=skipped-no-build
+  log "==> 复用本地镜像（--no-build）：本轮没有构建层读数，下面那条镜像内判据仍然跑"
 fi
 
 # 🔴 **被验的那枚镜像必须来自这一棵树**。这是 AGENTS §6.1.1 那条"送到别处构建／运行的流程，
@@ -221,6 +255,28 @@ log "    工作树未提交条目=${DIRTY_AT_BUILD}（上下文=仓库根；下�
 if [ "$DIRTY_AT_BUILD" != "0" ]; then
   git status --porcelain | sed 's/^/      /'
 fi
+
+# 🔴 **在镜像里**跑同一条产物自洽检查（2026-10-04，#28）。为什么不拿上面那条构建层读数当结论：
+#  · 构建阶段那条判的是 `/repo/apps/web/dist`（**拷贝之前**），而外人拿到的是 `COPY --from=web`
+#    之后的 `/app/web-dist` —— 挂载前缀与产物落点这两件事一旦说不上（G-48 就是这个形状），
+#    构建阶段那条照样绿；
+#  · BuildKit 命中缓存时那一层根本不出声。
+# 这条与两者都无关：它读的是**发出去的那份字节**，`--no-build` 复用时也照跑。
+# checker 本体从宿主只读挂进去（不在镜像里再抄一份判定 —— 那份判定的实现只该有一处）。
+log "==> 在被验镜像里跑产物自洽检查（挂载=${EXPECT_MOUNT}，产物=/app/web-dist）"
+IN_IMAGE_RC=0
+IN_IMAGE_OUT=$(docker run --rm --entrypoint node \
+  --volume "$REPO_ROOT/scripts:/heyta-chk:ro" \
+  "$IMAGE" /heyta-chk/check-web-artifact.mjs --dist /app/web-dist --mount "$EXPECT_MOUNT" 2>&1) ||
+  IN_IMAGE_RC=$?
+if [ "$IN_IMAGE_RC" != "0" ]; then
+  printf '%s\n' "$IN_IMAGE_OUT" | tail -20
+  die "镜像里那份产物对它自己声明的挂载（${EXPECT_MOUNT}）不自洽，或 checker 没跑起来（rc=${IN_IMAGE_RC}）。
+   这一条红有两种成因，分别要修：产物落点/挂载漂了（G-48 那一族），
+   或者宿主目录挂不进容器（OrbStack 的文件共享）—— 后者是环境，不是产品，但也要人来看一眼再判。"
+fi
+log "    ${IN_IMAGE_OUT}"
+log "    WEB_ARTIFACT_IN_IMAGE=OK（构建层那条的形状=${WEB_STEP}）"
 
 # 🔴 **这一趟验的是哪个架构的产物**必须落在日志里，否则"整套验收过了"会被读成
 #    "要发布的那枚过了"。`docker build` 不带 `--platform` ⇒ 镜像架构 = 构建机架构；
