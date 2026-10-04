@@ -3027,6 +3027,10 @@ mac 端产出两枚（壳自截屏 + 内嵌 WebView 那张），所以"逐张看
 ② 第五条是**绝对路径**（原来是相对的，靠前面一次 `cd` 才落对；换 cwd 会让 `FRESH=4/5` 把整趟判成
 NOT-RUNNING，白烧一个窗口）。
 
+本格**不主张任何读数** —— 它是待看清单。① 的现场此刻仍被别线挡着（03:23–03:26 连续多轮
+`设备面归因判拦`：`heyta-wt-trash-e2e` 的 `verify-mobile-trash.sh` 正驱动 `emulator-5554`，
+pid 46540）⇒ 按 §8.9 让路，不动它。
+
 ## 03:27 ② 的分母在**一个半小时里又动了**：84 → 85（动的不是载体，是别人未提交那一份）
 
 现量（同一趟，四条命令各打各的对象）：
@@ -3048,6 +3052,15 @@ NOT-RUNNING，白烧一个窗口）。
 `heyta-run-checks.sh:158` 用 `split(" && ").length` 现取正是为了这件事，
 所以**任何把段数写进文档当"当前值"的做法都是抄件**，只能写"某时刻某对象上量到 N"。
 
-本格**不主张任何读数** —— 它是待看清单。① 的现场此刻仍被别线挡着（03:23–03:24 连续三轮
-`设备面归因判拦`：`heyta-wt-trash-e2e` 的 `verify-mobile-trash.sh` 正驱动 `emulator-5554`，
-pid 46540）⇒ 按 §8.9 让路，不动它。
+### 若这一趟的回合先用完：①② 的读数会自己落在这些地方（写给下一位，也包括下一次的我）
+
+自动链不需要人陪跑，两格都会自己把读数落盘 ⇒ **别因为"我没看到它跑完"就重跑一遍**（那正是抢设备）：
+
+| 格 | 完成旗 / 终态 | 证据在哪 |
+|---|---|---|
+| ③ | `/tmp/heyta-chain8.notes-done`（已成交：`NOTES_EXIT=0`） | `/tmp/notes-run8.log`，已归档 `~/.heyta-evidence/notes-1005-031922/` |
+| ① | `/tmp/heyta-chain8.reinstall-done`（**只在输出里真有 `INNER_EXIT=` 时才写**；门拒绝不写） | 启动器 `heyta-run-reinstall.sh` 打印的 `$EVID/`（五枚图的私有归档 + 回读校验），链日志 `/tmp/heyta-chain18.log` |
+| ② | `~/.heyta-evidence/checks-queued-1005-004455/rc.txt`（三种终态之一：`QUEUE=EXPIRED` / `WINDOW-NOT-OPEN` / `CHECKS_RC=n`） | 同目录 `checks.log`（含 `CHECK_SEGMENTS_TOTAL` 那一行）与 `queue.log` |
+
+⚠️ 两枚旗都在 `/tmp`，**重启机器就没了** ⇒ 判决以证据目录里那份为准。
+① 那五枚图**只有私有归档那一份才是"人看过的那张"**（`/tmp` 那四条是共享路径，别线会覆盖）。
