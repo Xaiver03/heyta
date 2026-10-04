@@ -4617,3 +4617,54 @@ git merge-tree --write-tree --name-only main feat/self-host-distribution
 改成不带斜杠的 `node_modules` 要同时动本批的 `.gitignore` 族解法前提，属于撞车面。
 后果边界写清楚：**任何用 `git ls-files -co --exclude-standard` 取打包集合的流程，在这个 worktree 里会把这枚软链当未跟踪文件送出去**
 （§6.1.1 的 Windows 段正是这个形状；它跑在主检出，所以这一枚不在它的取集路径上）。
+
+---
+
+### 8.74 🔴 逐段归属拿到了 `只在载体红：（空）`，而这句话**不够关闭 #1** —— 七条红里有六条在载体侧根本没执行（10:51–10:54）
+
+窗口在 10:51:27 开了一次（`load=10.4 tfa=no e2e_ports=0`），链一条命令跑完：
+载体重算 `de66746d` = main(`6e38d5ce`) × 分支(`8fb9d488`)`CARRIER_RC=0`、`INSTALL_RC=0`、`E2E_INSTALL_RC=0`、
+整链 `CHECK_RC=1`（`&&` 链只给第一红，所以逐段是必需的）、载体逐段 75 段、配对基线跑 main 那棵树。
+
+| 段 | 载体 rc | 载体「内存闸门拒绝启动」行数 | main rc | main 拒绝行数 |
+|---|---|---|---|---|
+| `check:op-log-semantics` | 1 | **1** | 1 | 1 |
+| `check:widgets` | 1 | **1** | 1 | 1 |
+| `check:crosslang-contract` | **134** | 0 | **134** | 0 |
+| `check:journey-coverage` | 1 | **1** | 1 | 1 |
+| `check:ai-e2e` | 1 | **1** | 1 | 1 |
+| `check:privacy-consent-e2e` | 1 | **1** | 1 | **0** |
+| `check:landing-e2e` | 1 | **1** | 1 | 1 |
+
+归属输出：**只在载体红：（空）** / 只在 main 红：（空）。
+
+#### ① 🔴 但这张表**没有**关闭 #1，因为"rc 相同"不是"事实相同"
+
+归属那一环比的是**段名 + 退出码**。逐条读日志才看见 `privacy-consent-e2e` 两侧的红**不是同一件事**：
+
+· 载体侧根本没跑：`内存闸门拒绝启动：已有测试在跑（pid=89651，锁 /tmp/tfa-test.lock；它是：…/scratch-owner-transfer/rbac-d2/push-gated.test.mjs）`。
+· main 侧真跑了，红在装配：`src/worker/storage.worker.ts(39,33): error TS2307: Cannot find module '@heyta/app-host'` → `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL @heyta/web build`。
+
+⇒ 载体这一趟对这六条**没有任何产品结论**（宿主内存闸门在起跑之后被别人拿走，正是 §8.65 ③
+"起跑前的闸门不构成起跑后的许可"的第二次现量）。
+`只在载体红：空` 在这里证明的是"**两侧一样红**"，而其中六条两侧都**没执行** ——
+两个"没执行"相等不是"合并没坏"。**空集必须是执行过的空集。**
+📌 可迁移的形状：**配对判据要比失败签名，不能只比退出码。** 退出码是两个集合的公共标签，
+而"同一个标签下装着不同的事实"这一族本档已经记过三次（同 rc 的白屏/同 rc 的 404/同 rc 的拒绝启动）。
+
+#### ② 两条自己装置的缺陷（都入档并要修，不掩盖）
+
+· 链的 `BLOCKERS_AFTER` 报 `MODULE_NOT_FOUND`：第 4 段 `cd "$MT"` 之后再没回过分支目录，
+  而 `research/tools/selfhost-landing-blockers.mjs` 是**批内工具、main 那棵树里没有**。
+  "脚本假设 cwd 是真源仓库"这一族的又一次。事后在分支 worktree 里补现量：**阻塞集 1 枚 = `package.json`**
+  （夹具 5/5 通过 ⇒ 这个"1"是可信读数）。
+· main 那棵树的 `@heyta/app-host` 类型缺失提示：**配对基线跑之前没有 `pnpm -r build`**。
+  载体侧整链跑过所以部分包已产 `dist`，main 侧只 install 不 build ⇒ 装配性红。
+  ⇒ 这不是产品缺陷，是**载体没铺平**；下一趟两棵树都要先 build，否则"两侧一样红"可能只是"两侧都没铺平"。
+
+#### ③ 阻塞集回到 1 枚意味着落地那一格又关上了
+
+`package.json` 在主检出又是 ` M`（10:31 那一趟它是 0 枚）。#1 的第一句话就是
+"等它被**其所有者**提交"，本批不代改、不动主检出。所以现在的状态是：
+**载体可算、六道 fs 门禁绿、逐段可跑；落地被一枚别人的未提交 `package.json` 挡着，完整链被宿主内存闸门挡着。**
+两件事各自有归属，不合并成一句"在等窗口"。
