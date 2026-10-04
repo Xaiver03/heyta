@@ -18,7 +18,7 @@
  * `split('\n')` 段 = `wc -l` 的 213 行（文件以换行结尾）。**手抄的数字连单位都会错**，
  * 所以这里的读数全部由脚本自己拼进提交说明，不由人复述。
  *
- * ## 五条冲突族与它们的解法（§8.22 预置，本文件是唯一执行者）
+ * ## 八条冲突族与它们的解法（§8.22 预置 + 后续每次新增一族都写在这里，本文件是唯一执行者）
  *
  *  1. `package.json`：scripts 键并集 + `check` 链并集，带四条断言
  *     （两侧键不缺 / 两侧链段不缺 / 两侧各自相对顺序不颠倒 / 两侧相对 base 都不得摘段）。
@@ -54,7 +54,14 @@
  *     而不冲突）。所以判据不写在解法里，而是把**生产那一道门禁原样挂进 GATES 在载体树上跑**：
  *     复制一遍哈希比较就等于制造下一个漂移点，而它只比 `inputs` 里的四枚哈希之一。
  *
- * 任何不属于这七族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
+ *  8. `scripts/screenshots/capture.mjs`（**第八族**，10-04 19:1x 出现）：取 **main 为底**，
+ *     再把本批那四处改动**逐字面重放**上去（判据在 `selfhost-capture-replay.mjs`）。
+ *     为什么不是行级并集：两侧改的是**同一段**（截图前的等待），并集会把
+ *     "先等 600ms 再等揭示"这种**刚被摘掉的形状**装回去 —— 那是一种
+ *     "什么都没丢"的错产出。重放要求每处 needle **恰好命中一次**，
+ *     0 次（main 又改了形状）与 >1 次（needle 太宽）都当场退 2 交人判。
+ *
+ * 任何不属于这八族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
  *
  * ## 落笔前的门禁（只跑纯文件系统的那八道）
  *
@@ -79,6 +86,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { unionAudit, unionAuditVerdict, ownershipVerdict, pkgFieldVerdict } from './selfhost-audit-union.mjs';
+import { replayCapture, replayVerdict, replayReading, CAPTURE_PATH } from './selfhost-capture-replay.mjs';
 
 const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
 const MAIN = process.env.HEYTA_MAIN_REF || 'main';
@@ -180,7 +188,7 @@ const GEN = 'research/tools/gen-image-npm-tree.mjs';
 const COV = 'research/tools/check-image-license-coverage.mjs';
 const ORPHAN = 'research/tools/image-deps-fingerprint.mjs';
 
-const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], gen: [], cov: [], other: [] };
+const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], gen: [], cov: [], cap: [], other: [] };
 for (const p of conflicts) {
   if (p === 'package.json') fam.pkg.push(p);
   else if (p === '.gitignore') fam.gi.push(p);
@@ -189,14 +197,15 @@ for (const p of conflicts) {
   else if (p === SNAPSHOT) fam.snap.push(p);
   else if (p === GEN) fam.gen.push(p);
   else if (p === COV) fam.cov.push(p);
+  else if (p === CAPTURE_PATH) fam.cap.push(p);
   else fam.other.push(p);
 }
 if (fam.other.length) {
-  die(2, `出现**预置七族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
+  die(2, `出现**预置八族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
     `   先把它加进本文件的分族与解法，再重跑。`);
 }
-notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} cov=${fam.cov.length} other=${fam.other.length}`);
-if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1 || fam.gen.length > 1 || fam.cov.length > 1) {
+notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} cov=${fam.cov.length} cap=${fam.cap.length} other=${fam.other.length}`);
+if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1 || fam.gen.length > 1 || fam.cov.length > 1 || fam.cap.length > 1) {
   die(2, '同一族出现多于一份文件 —— 分族前提（各一处）不成立，交人判');
 }
 
@@ -375,6 +384,31 @@ if (fam.png.length) {
   git(['-C', WT, 'checkout', '--ours', '--', ...fam.png]);
   git(['-C', WT, 'add', '--', ...fam.png]);
   notes.push(`evidence PNG ${fam.png.length} 枚取 main 侧（产物，谁主张谁出图）：${fam.png.map((p) => p.split('/').pop()).join(', ')}`);
+}
+
+/* ── 截图流水线（第八族，10-04 19:1x 出现）─────────────────────────────
+ * main 在 10-04 往 `scripts/screenshots/capture.mjs` 的**同一段**加了
+ * `dismissOverlays` / `clearHoverAndFocus`，而本批把那一段里的固定 600ms 换成了
+ * "等揭示落位"（G-57）。解法不是行级并集（那会把两条等待都留下，
+ * 看起来什么都没丢、语义上却是刚摘掉的形状又装回去），而是
+ * **取 main 为底 + 逐字面重放本批那四处**，判据与产出在
+ * `research/tools/selfhost-capture-replay.mjs`（单一所有者，带 `--selftest` 六臂）。
+ * 🔴 断言落在**磁盘那个对象**上（§8.34 那一族的教训：内存里算对、写盘写错）。 */
+if (fam.cap.length) {
+  const mainTxt = stage(CAPTURE_PATH, 2);
+  const r = replayCapture(mainTxt);
+  const verdict = replayVerdict(r);
+  if (verdict) die(2, `${CAPTURE_PATH} 重放：${verdict} ⇒ 绝不提交，交人判`);
+  writeFileSync(join(WT, CAPTURE_PATH), r.text);
+  git(['-C', WT, 'add', '--', CAPTURE_PATH]);
+  const onDisk = readFileSync(join(WT, CAPTURE_PATH), 'utf8');
+  if (onDisk !== r.text) die(5, `${CAPTURE_PATH} 写回后回读与产出逐字节不同（磁盘 ${onDisk.length}B vs 产出 ${r.text.length}B）`);
+  try {
+    execFileSync('node', ['--check', join(WT, CAPTURE_PATH)], { encoding: 'utf8', stdio: 'pipe' });
+  } catch (e) {
+    die(5, `${CAPTURE_PATH} 在载体上**语法不过**：${String(e.stderr || e.message).split('\n').slice(0, 3).join(' / ')}`);
+  }
+  notes.push(`${CAPTURE_PATH} ${replayReading(r)}`);
 }
 
 /* ── 审计文档：两边都是"追加型台账" ⇒ 解法是**并集**，择一会静默删掉别人的节 ──
