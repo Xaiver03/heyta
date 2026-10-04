@@ -259,13 +259,23 @@ ADD_LABEL=$(zh web.countdown.add)
 #    屏幕上，输入框可能要展开）—— 那样会把标题写进**别的**字段，然后用「$ADD_LABEL」
 #    的 enabled 当"成功"读数。所以这里必须正向确认 placeholder 在树里。
 ax_found "$PLACEHOLDER" || { echo "   ❌ 倒数日屏上读不到输入框占位符「$PLACEHOLDER」⇒ 探针够不着 composer，本轮无效"; exit 3; }
+# 🔴 输入框**不能**走上面那个 `press()`：它带着 `--pressable` 这层过滤，而 shim 的
+#    `is_pressable` 认的是 Button 那一类 —— `AXTextField` 不算，于是"定位"直接返回
+#    found=False，`scroll_into_view` 把它报成 `element-left-tree`（09:1x 那趟的 exit 3
+#    就是这个形状：屏上明明有输入框，探针却说它消失了）。输入框要走 `--field` 那一侧。
+focus_field() {
+  local lbl="$1" vis
+  vis=$(ax "$lbl" --field --scroll-into-view --json)
+  [ "$(jget "$vis" visible)" = "True" ] || { echo "   ↳ 输入框「$lbl」不可达（found=$(jget "$vis" found) scrollRc=$(jget "$vis" scrollRc)）"; return 1; }
+  ax "$lbl" --field --press --json >/dev/null 2>&1
+}
 # 🔴 顺序错了整节就废：共享层 `packages/ui/src/countdown/EventBoard.tsx:367` 写的是
 #    `canSubmit = draftTitle.trim() !== '' && draftDate !== undefined`（`:358` 的 draftDate
 #    初值是 `undefined`）—— **「添加」在选日期之前必然不可点**。而 09:0x 那一版是在
 #    打字之后、选日期之前去读 enabled 的，那条判据在产品规则下**永远为假**，
 #    于是它报的红（"标题没进得去"）说的不是那件事。现在按产品的顺序走：
 #    打字 → 选日期 → **这时候** enabled 才是"标题+日期都进了应用的态"的亲口确认。
-press "$PLACEHOLDER" || { echo "   ❌ 输入框滚不进可见区 ⇒ 焦点进不去，本轮无效"; exit 3; }
+focus_field "$PLACEHOLDER" || { echo "   ❌ 输入框「$PLACEHOLDER」不可达 ⇒ 焦点进不去，本轮无效"; exit 3; }
 sleep 1
 TT=$(ax - --field --type-text "$CARD_TITLE" --json 2>&1); sleep 1
 echo "   type-text 回读：${TT:-（空 ⇒ shim 自己没输出，先看这一行）}"

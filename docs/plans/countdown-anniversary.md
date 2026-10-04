@@ -1342,13 +1342,20 @@ W0b ─> 随时可做（台账那半要等文件干净）
       `pnpm verify:mobile-card-export` ⇒ **`RC=0`**，逐条读数在 §8.4 第 ㉓ 条；
       设备写进沙盒、再拉回本机入库的那张成品图在
       [`apps/mobile/evidence/card-export/latest-card.png`](../../apps/mobile/evidence/card-export/latest-card.png)，
-      **人打开看过**，看见了什么与四条机器判据写在同目录的 `README.md`）
-      ／ [ ] 🔄 **iOS 那一半仍未取设备读数**（编号 **W7-G3**，任务 #21）—— 而且这一轮新量出一条更硬的：
-      iOS 原生模块**根本编不过**，见 §8.4 第 ㉔ 条（`import React` 已修，但"修完能不能建"还没验）
-      ⚠️ **04 06:3x 现量：这一趟还开不了工**，`bash scripts/verify-mobile-window-gate.sh --target b` ⇒ `RC_WINGATE_B=3`
-      （负载 18 > 阈值 12；`adb devices` 在线 **0 台** ⇒ 那一端此刻连"可达"都不成立），
-      而别人那条装包链挂在 `notarytool submit --wait` 上已 3h21m、不会自己结束 ——
-      取证、共享目标清单与"等满按任务书第 8 条记 exit 3"写在 **§8.4 第 ⑬ 条**。
+      **人打开看过**，看见了什么与四条机器判据写在同目录的 `README.md`）。
+      ✅ **04 09:18 在同一台设备上复跑过第二趟，仍然 `RC_ANDROID=0`（通过 11 项 / 失败 0 项，载体 `7806f6ae`）**
+      —— 这一趟补的是抽取之后欠着的"零行为变化"读数：拉回来的字节 `shasum` 前 12 位
+      `d6d2a88788d1`，与 07:41 那趟记下的**同一枚 SHA 逐字相同**（两趟之间隔着取值层抽取与三条判据修复）。
+      读数与两次看图的差别写在 `apps/mobile/evidence/card-export/README.md`
+      ／ [ ] 🔄 **iOS 那一半仍未取设备读数**（编号 **W7-G3**，任务 #21）—— 探针已从"step 2 就拒跑"
+      推进到 step 4，链 K/L/M/N 四趟各照出一处探针缺陷（就绪判据、BACK 归一化、屏外 press、
+      `--pressable` 过滤把输入框读成"消失"），逐条读数与修法见 §8.4 第 ㉘/㉚/㉜/㉞ 条
+      —— 同一格里还挂着那条更硬的：**iOS 原生模块曾经根本编不过**（§8.4 第 ㉔ 条，`import React` 已修，
+      而"修完能不能建"由 07:51 那一次 Release 构建 + 本趟新鲜度门 `bundle 1791071463 > 源码 1791069065` 证到）。
+      ⚠️ ~~04 06:3x 现量：这一趟还开不了工~~ —— **09:17 那趟原地作废**：`verify-mobile-window-gate` 之外
+      本探针自己那两道门（设备独占 + 负载 11 ≤ 12）都开了，链 N 就是在那一刻跑完 Android 段的；
+      当时那句"`adb devices` 在线 0 台"与"notarytool 已 3h21m 不会自己结束"里，**只有后半句仍然成立**
+      （09:1x 现量：同一条 `queue-reinstall-all.sh` 的 `notarytool --wait` 已挂 **6h04m**，见 §8.4 第 ㉙ 条）。
   - ~~✅ 后半（设备出图）到最终态待变异读数~~ —— 🔴 **04 06:3x 这句原地更正：它和上一行自相矛盾**
     （上一行刚写"真机那一趟读数未取"）。这一格在 `verify:mobile-card-export` 跑绿之前**不能**写成"到最终态"，
     已完成的只有：版面收共享层 + RN 栅格化 + 原生落盘 + `check:card-export` 门禁 + A1/A3 两臂各自转红 +
@@ -2414,8 +2421,14 @@ W0b ─> 随时可做（台账那半要等文件干净）
   **`origin/main` 上是同一份文件**（`git diff --stat origin/main HEAD -- scripts/check-legal-permissions.mjs` 为空），
   `git show origin/main:` 里 manifest 有那行（1）、`third-parties.ts` 里那句"不申请通知"有 2 处
   ⇒ **`origin/main` 自己就构成红**，不是本批带来的。
-  🔴 而且**修法正在别人手里**：主检出 `packages/legal/src/documents/{permissions,third-parties,data-rights,minors,ai-and-transfer}.ts`
-  五个文件是 ` M`（未提交），在主检出上直接跑这把尺 ⇒ **0 红** —— 也就是那六句正被并行会话翻。
+  🔴 而且**修法正在别人手里**：主检出 `packages/legal/src/documents/…` 一片是 ` M`（未提交），
+  在主检出上直接跑这把尺 ⇒ **0 红** —— 也就是那六句正被并行会话翻。
+  ~~五个文件是 ` M`~~ —— **这个枚数在 09:1x 已经过期，原地改成本轮现量**：
+  `git -C <主检出> status --porcelain -- packages/legal | wc -l` = **10**，其中
+  `documents/` 下具名九份（`ai-and-transfer data-rights minors permissions personal-info-list
+  privacy subscription-refund terms third-parties`）。
+  📌 枚数是**活树读数**不是属性（AGENTS §9 那段早在写同一件事：那句"3 个"六天内就变成"6 个"，
+  现在轮到我自己把"5 个"写成"10 个"）—— 所以这一行往后只准写"现量命令 + 那一刻的数"。
   ⇒ 本批**不代改**（代改就是造一次三方冲突，且 §0.5 的 L 系列行早写过"六句必须一起翻并重跑 `check:legal-copy`"）。
   这条债的关闭判据：`node scripts/check-legal-permissions.mjs` rc=0，由 W9/legal 那条线取。
   ⚠️ 它同时是收尾第 1 项 `pnpm check` 的一处**已归因红灯**：那趟读数会把这一门报红，
@@ -2587,3 +2600,47 @@ W0b ─> 随时可做（台账那半要等文件干净）
   任一步滚不进可见区都 `exit 3` 并打印回读，不再靠下一节的连锁失败反推。
   ⏳ 链 N（`/tmp/device-closeout-N.log`）取到 `RC_ANDROID=0` + `RC_IOS_PROBE=0` 之前，
   W7-G3 与"Android 设备出图"这两格都还不打勾 —— ㉜ 说的只是**判据被修对**，不是**读数取到**。
+
+- ㉝ **两条过期读数原地改正 + 一处"我自己的门禁第二次抓到我自己"**（04 09:1x）
+
+  · ㉗ 里那句"主检出的 `packages/legal` **五个文件**是 ` M`"已过期：本轮现量
+  `git status --porcelain -- packages/legal | wc -l` = **10**（`documents/` 下具名九份 + index 形状一枚）。
+  划线留原句旁边，并把"枚数是活树读数不是属性"写进那一行 —— 同一条错在 AGENTS §9 那段
+  已经发生过一次（"3 个"六天后变"6 个"），我自己在同一批里又犯了第三次。**从这次起，
+  引用别人的脏文件数只准写现量命令 + 那一刻的数。**
+  · §0.5 的「同步」行补了合流义务的**现量受阻**：主检出脏 **240** 枚，而 `AGENTS.md`、
+  `package.json`、`e2e/tests/helpers.ts`、`e2e/tests/admin-console.spec.ts`、
+  `scripts/lib/mobile-e2e-runner-probe.sh` **逐个都是 ` M`** ⇒ 三件事同时做不了
+  （AGENTS §9 补写 / #18 那两份开机拉取夹具收敛 / window-gate 自匹配修复），
+  全部登记为"在别人提交之后才有一步可做"，不代改、也不把"欠着"包装成"已排期"。
+  · 🔴 而这次**我自己写这两处文档时又 broke 了一次表**：第一次是格子里写了裸 `|`
+  （`git status --porcelain | wc -l`）⇒ 报"第 4/5 格"；第二次是转义之后我**把行尾的闭合 `|`
+  删掉了没带回**（python 里 `line[:-1].rstrip() + add`，`add` 结尾没有竖线）⇒ 报"列数 3（本表表头是 4）"。
+  两次都是 DOCS-GATE-G1（§8.4 第 ⑲ 条那把尺）在**提交之前**拦下来的，也是它这一批里
+  第二次抓到作者本人 —— 这条记在这里是为了让下一个改这张表的人知道：
+  **改完就 `node scripts/check-md-table-rows.mjs`，别靠眼睛。**
+
+- ㉞ **链 N：Android 设备出图跑到最终态（`RC_ANDROID=0`，11 项全过），iOS 又往下露出一处探针缺陷**（04 09:1x–09:2x，载体 `7806f6ae`）
+
+  · `RC_ANDROID=0`，`通过 11 项，失败 0 项`。三条判据的读数：
+  ① 读数器双对照（正向 `1080×1440 SHA=221f0d78811c` / 反向 `3×2 BLANK=true`）；
+  ② **复用屏上已有卡** `w7e2e-073853`（正向证据 = 它的菜单 a11y 名在树里），点导出后
+  `heyta-w7e2e-073853-10月11日 星期日.png` 的 mtime 晚于本次点击（设备时钟）；
+  ③ 拉回本机数 IHDR：`W=1080 H=1440 BYTES=36493 TRANSPARENT=false BLANK=false SMEARED=false SHA=d6d2a88788d1`
+  = 契约那一对数；末了前台仍是 `com.heyta`（分享面板已收），全程零权限页。
+  🔴 **这同时把 ㉕ 欠的那句"零行为变化的复跑读数"补上了**：07:41 与 09:18 两趟之间隔着
+  取值层抽取 + 三条判据修复，而**产物字节的 SHA 逐字相同** —— 这比"测试仍然绿"强，
+  因为比的是字节不是断言。
+  · 第二次人看图时做了一件第一次没做的事：把设备那张与 web 那张
+  （`apps/web/evidence/countdown-export/card-light.png`）**并排比版面**，逐项对得上 ⇒
+  "中间那一大片空白"是共享版面的设计，不是设备栅格化画歪了。这句话只看单张图说不出来，
+  已写进 `apps/mobile/evidence/card-export/README.md`。
+  · `RC_IOS_PROBE=3`：step 2/3 这次**全过**（屏开到倒数日屏），红在 step 4 第一行
+  `↳ 「给这一天起个名字」滚不进可见区（False/element-left-tree）`。根因是探针自己的：
+  ㉚ 那版 `press()` 带着 `--pressable` 这层过滤，而 shim 的 `is_pressable` 只认 Button 那一类
+  —— **`AXTextField` 不算 pressable**，于是"定位"返回 found=False，`scroll_into_view`
+  把它报成"元素从树上离开"。屏上明明有输入框（09:0x 那趟的 `describe-all` 里它是
+  `{{17,192},{200.7,42}}` 的 `AXTextField`），探针却说它消失了 —— 这是**探针够不着**，
+  不是产品没有输入框。修法：输入框走 `--field` 那一侧（新增 `focus_field()`：
+  `--field --scroll-into-view` 再 `--field --press`），按按钮仍走 `--pressable`。
+  ⏳ W7-G3 仍然不打勾，直到链 O 取到 `RC_IOS_PROBE=0` 且那张 iOS 成品图被打开看过。
