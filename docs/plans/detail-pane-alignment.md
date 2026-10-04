@@ -6635,3 +6635,79 @@ M1 的职责是"往 C1 表加一行既无对照节也不写例外 ⇒ 红且点�
 新开 #34（合流当时：给 `countdown` 补那一行登记，并把本工单 §6 的合并步骤里"红了才加"那一格并进来）。
 本批 **#16 那两行 trash `busyId` 豁免**同一形状 —— 都是"合并产物上才会红、红了才加"的登记，
 区别只是 #16 已经预写过改法、这一格现在连 needle 都取好了。
+
+
+## 8.100 全仓纯 fs 门禁一趟跑：红 3 道，逐条归属 —— 其中一道是**别人门禁里的假红**，当场修掉（2026-10-04 22:3x 现量，载体续 `41ad0189`）
+
+做这一步的理由不是"顺手体检"：§1 的闸门要求"本批不撞红别的面"，而我此前只跑本线那几道 ——
+**"我这侧绿"不等于"全仓那 43 道绿"**，而合流以后别人念的是后者。
+一趟 43 道（跑法 `node /tmp/dp_gateall.mjs` 的那套枚举：`package.json` 里 `check:*` 且命令是单条 `node <脚本>`，
+**刻意排除**会开窗 / 起 Metro / 碰容器 / 要外部工具链的那些 —— 不抢前台、不占别人端口设备）。
+
+| 红的道 | 归属与判定 |
+|---|---|
+| `check:docs` | 已知：`PROGRESS.md:1362` → `docs/research/aed-implementation-evidence.md`，**本支落后**造成、合流自愈（main 已跟踪该文件、main 的检出里 RC=0）⇒ 登记不代改 |
+| `check:widgets` | 🔴 **本批当场修掉**：它把"runner 没跑成"报成"黄金夹具与重建结果不一致"（=四端解析器的锁坏了）。假红，已证 |
+| `check:journey-coverage` | 同一形状的错法，但**这个文件在主检出是 `M`**（别人正在飞）⇒ 归属门挡住代改，只登记（见第 3 节） |
+
+### 1. `check:widgets` 那枚假红是怎么确证的
+
+三段，缺一不可：
+
+1. **症状**：本检出跑它 ⇒ `🔴 … 黄金夹具与重建结果不一致`，而"代码"那一栏打出来的原文是
+   `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY` —— 那根本不是断言失败，是 pnpm 的预检拒绝动手。
+2. **真值**：同一棵树里用该包自己的 runner 直接跑那枚 spec（`cd packages/widget-core && ./node_modules/.bin/vitest run tests/fixtures.spec.ts`）
+   ⇒ `Test Files 1 passed (1) / Tests 4 passed (4)`、RC=0 ⇒ 夹具**没有**漂，红的是载体。
+3. **机制**：旧写法是 `try { execFileSync('pnpm', …) } catch { violations.push(违规) }` ——
+   被调方**有没有真的跑出结果**这件事，一条都没问。
+
+### 2. 修法（按产品不变量改，不是为跑绿）
+
+不变量：**判"违规"必须基于被测对象真的跑出过结果**。于是那一档分成三个退出码 ——
+`0` 跑过且一致 · `1` 跑过但违规 · `2` **没跑成 = 未判**（不是绿）。
+分辨器只认 vitest **自己打出的汇总行**（`^\\s*Tests\\s+\\d+\\s+(passed|failed)`），
+不认退出码、也不 grep 错误字样（`Operation not permitted` 在成功运行里也会出现；`rc=0` 的日志里也可能有 FAIL 字样）：
+
+- 没有汇总行 ⇒ 未判，并把原因那一行原样打出来，附上"在这个检出里要怎么真验"的那条命令；
+- 有汇总但是 `Tests 0 passed` ⇒ **也算未判**（0 条用例上的"通过"是永真）；
+- 有汇总且 `failed`/非零 ⇒ 真违规，违规句里带上那两行汇总，不再只带"退出码非零"这件事。
+
+装置 `research/tools/mutation-rigs/mutate-widgets-unjudged.mjs` **8/8**：
+A0 真载体=未判且不再谎报违规 · **A1 同一棵树喂 HEAD 那版**（按 blob 取，不手搓脱牙）⇒ RC=1 且谎报"夹具不一致"，
+证明补的是真发生过的假红 · **A1b 真值**=直接跑 spec 得 4 passed · A2 真违规仍有牙（带 vitest 汇总行）·
+A3 `Tests 0 passed` ⇒ 未判 · A4 正对照 4 passed ⇒ 不产违规 · A5 shim 原样复现 pnpm 故障 ⇒ 仍走未判档
+（这一臂证明分档认的是"跑成没跑成"，不是"日志里有没有 ERR 字样"）· 收尾 md5 复原 `BACK_TO_CLEAN=true`。
+⚠️ 顺带又撞一次自己的老坑：A1b 第一版 needle 恒 0 命中，因为 vitest 默认带 ANSI ——
+补 `NO_COLOR=1` + 剥色才拿到汇总行。**"没匹配上"的第一嫌疑人永远是探针自己**（§8.76 第 1、10、13 条那一族）。
+
+CI 语义没变：`pnpm check` 只看非零，原先 1 现在 2 都是失败，而 CI 里 pnpm 本来跑得动 ⇒ 那一档在 CI 仍是 `0/1`。
+
+### 3. `check:journey-coverage`：同一形状，但在别人手里 ⇒ 只登记
+
+现量 `scripts/check-journey-coverage.mjs:398-417`：`execFileSync(…)` 包在 `try` 里，
+`catch { console.error('❌ web 的旅程验收**跑不过** —— 入口在，但它不成立。') }` ——
+连"跑出过汇总没有"都不问，症状同样是 pnpm 预检被无 TTY 挡掉。
+归属门：该文件在主检出是 `M`（正被并行会话改）⇒ **本批不动它一行**。
+要搬的改法已经在 `check-widgets.mjs` 里落成一个可读的样板（三档 + 只认被调方汇总），
+它的所有者可以直接照搬；照搬时注意那条 spec 是 web 的，不在本单射程。
+
+### 4. 本批四道前置闸门
+
+| 闸门 | 本批 |
+|---|---|
+| ① 归属门 | **这一道在本批真的挡过一次代改**。点名 4 条（含 `check-journey-coverage.mjs`）那一趟：`承重：主检出未提交 18 枚｜点名 4 条｜本地不在场 0 条｜被占 1 条` → `🔴 scripts/check-journey-coverage.mjs 主检出状态码 " M"` → `BLOCKED=1`。第一版我准备把两道同形状的错法一起修，是这道门把我拦下来的。要提交的三条另跑一趟 ⇒ **VERDICT=CLEAN**（点名 3 条｜本地不在场 0｜被占 0；\`承重\` 那一栏是瞬时读数，同一天两次跑分别是 18 枚和 19 枚，它只用于判"点名这几枚有没有被占"，不构成合流面规模） |
+| ② 两道余量为 0 的棘轮 | **不适用**（未碰样式 / `apps/` / `packages/ui`；`check:l4` 与 `check:row-single-source` 都在本批那 40 道全绿里，基线未动） |
+| ③ 干净检出复跑 | 提交后跑：`check-widgets` 在干净检出里预期仍是 **RC=2（未判）** —— 干净检出同样没有 TTY，pnpm 预检同样会拒；装置预期 8/8（它要 git 历史 ⇒ 必须真 worktree，不能 `git archive` 裸树） |
+| ④ packages 改完先 build | **不适用**（本批没改 `packages/` 源码；A1b 只是把既有 spec 原样跑一遍取真值，不写任何产物） |
+
+同趟其余 40 道读数全绿（含 `check:layering` 332 文件、`check:ui-language` zh 2864=en 2864、`check:licenses`、`check:migrations`、`check:design`、`check:ai-quota`、`check:pricing`、本线四道与 `check:selection-single-source` 的 A–I）。
+
+### 5. 一条可迁移的读法：**"门禁红了"这句话必须先问"被它调起来跑的那个东西，真的跑出过结果吗"**
+
+现量 `grep -ln pnpm scripts/check-*.mjs` = **16 道**门禁的脚本里出现 `pnpm` —— 也就是说这一档"把载体的失败当成产品的违规"
+在仓库里有 16 个可能的落点，而我这一轮只确证了其中 2 个（1 个已修、1 个在别人手里）。
+判法只有一个，且不属于调用方：**要求被调方自己打出一行结果汇总，并在没有这行时下"未判"**；
+"退出码非零"永远不能单独构成违规，因为它同时兼容"产品坏了"和"根本没跑"。
+🔴 而这一档最贵之处是它**两种方向都坏**：载体挡下来时它假红（本轮 `check:widgets`），
+runner 挪了汇总行格式或 0 条用例时它假绿（本轮 A3 那一臂）。所以修的时候两臂都要配。
+下一轮读到这句的人可以直接拿这 16 个文件名逐个问那一个问题，不必重新发明探针。
