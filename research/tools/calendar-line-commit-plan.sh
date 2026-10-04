@@ -35,6 +35,10 @@ PATHS=(
   research/tools/r14c-install-guard-arms.sh
   research/tools/r14c-drift-teeth.sh
   research/tools/r14c-chain-overlay-arms.sh
+  # 🔴 与 `scripts/verify-mobile-due-time.sh` 里那对「TIME_EMPTY 自校准 + 归一」**同批落地**：
+  #    那把刀写错方向会把假红换成更贵的假绿，而它只有这一把 rig 会红。
+  #    少了它，判据改了却没有任何一层能失败那段归一（§8.7：改了判据要能失败它）。
+  research/tools/r14c-time-empty-arms.sh
   # 🔴 这一批**成对落地的三枚**（链 + 它依赖的两枚共享起栈脚本）：
   #    `r14c-carrier-chain.sh` 新加的 `stack_isolation` 后置断言依赖 `scripts/mobile-e2e-up.sh`
   #    那两枚新旋钮（`HEYTA_E2E_PIDFILE` / `HEYTA_E2E_LOGFILE`），而载体那份取的是**已提交副本**
