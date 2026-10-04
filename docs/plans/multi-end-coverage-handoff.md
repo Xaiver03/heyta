@@ -1905,3 +1905,73 @@ cwd 在别条线 `heyta-wt-ai-closeout/apps/mobile/ios/Pods`）。
    我那句"键集对照"其实**一个字节都没读到**。⇒ 文件清单先 `git ls-tree -r --name-only` 现取，别按命名习惯猜。
 3. 附带第三条同一族：`node -e '…'` 的载荷里含 `\s`/引号时被 zsh 拆成**一个 pathspec**（报错 `no matches found`），
    整段没执行 ⇒ 台账里那条老规矩（改正则一律用 Write 落成文件）这次是第 N 次现形。
+
+## 23:29 两件事：③ 的前置已经**全部现量成立**（只剩负载），以及一条新规落到了我这侧装置上
+
+### 一、新规：Android 构建一律 `ssh windows-pc`（用户 23:2x 拍板，本 Goal 受它约束）
+
+规则原话：**「之后 Android 任务一律 ssh windows-pc，不要再在 Mac 起新的 Gradle 构建或模拟器」**。
+仓外迁移文档：`All in one Data/ANDROID_BUILD_ON_WINDOWS.md`（windows-pc 现状实测：JDK21 + SDK
+platforms android-36 + build-tools 35/36 + NDK 齐，**没有 emulator 本体与 system-images** ⇒ 装机/模拟器
+迁移期仍在 Mac 兜底；Mac 侧释放清单约 22G，要等三条验收判据过了才动）。仓内落地由并行 Agent 在做
+（收口点只有一个：`scripts/run-gradle.mjs` —— 根与 `apps/mobile` 的全部 `build:android*` 都汇到它）。
+
+**我先把自己装置那一侧堵上**（不依赖 Agent 的进度，也不改别人的脚本）：
+
+- 新增 `~/.heyta-window-rigs/heyta-android-route-guard.sh`（唯一所有者）：判据不是"我在哪台机器"，
+  而是**载体里那条收口有没有已经改走远端**（`grep -q windows-pc $R/scripts/run-gradle.mjs`），
+  没落地就 `return 3` 并点名"豁免条件：run-gradle.mjs 落上远端分流"⇒ **落地后这一档自己就不响**，
+  不需要人回来改装置。
+- `heyta-prep-apk.sh`：在**判到需要重打之后、起跑之前**挂这条守卫，红成 `VERDICT=ANDROID-RULE` + exit 3
+  （挂在起跑之前，才挡得住；挂在 skip 之前会把"本来不用重打"那一档也饿死）。
+- `heyta-run-reinstall.sh`：第二趟（android+ios）按守卫分流 —— 落地前只跑 `--only ios` 并大字印
+  `PHASE2=ANDROID-SKIPPED-BY-RULE（这轮**没装 android**，不是产品红）`，落地后恢复 `reinstall:mobile`。
+- **三臂读数**（23:29 现跑）：未落地目录 ⇒ rc=3 且打印那句；把 `run-gradle.mjs` 里塞进 `windows-pc`
+  ⇒ rc=0；路径不存在 ⇒ rc=3。五枚装置 `bash -n` 全过。
+- ⚠️ 对本 Goal 的直接影响：**① 的 android 腿在收口落地前拿不到读数**（只能交 mac/windows/ios 三端 +
+  一条明写的"这轮没装 android"）。这不是把 ① 判成完成，也不是产品红 —— 是新规换掉了它的执行宿主。
+
+### 二、③ 的三项前置全部现量成立（23:12–23:13），阻塞只剩负载
+
+链的 v27 把这三项做成了门，但我这一轮**手动各量了一遍**，为的是"窗口一开就直接跑得动"而不是跑到一半
+才发现缺什么：
+
+| 前置 | 读数 |
+|---|---|
+| `:3100` 有可用服务端 | `{"status":"ok","db":"connected","wsConnections":0}`，pid 26407 |
+| 服务端归属（决定第 10/11 步证的是哪台机器） | cwd = **主检出** `…/heyta/server`；`HEAD=d5cb910d`；`dist/src/index.js` 比自身 `server/src` 里更新的 `.ts` = **0** 条 |
+| 库身份（第 10 步直查 Postgres 的那张库） | 进程 env 里的 `DATABASE_URL` 库名 = `heyta_mobile_smoke`，与链里 `WDB=${HEYTA_E2E_DB:-heyta_mobile_smoke}` **同库** ⇒ 第 10/11 步的任何红都不必再先怀疑"两边不是同一张库" |
+| 凭据三件套 | `token 227 字节`（脚本第 113 行要求 ≥100）、`email 33`、`e2ee 20`、`account_id 3`，全部 22:47 刷新 |
+
+顺带把 `verify-mobile-notes.sh` 的文件头读了一遍（第 100–130 行）：库是**独立两份**
+（`/tmp/heyta-notes-{laptop,phone}.sqlite`，与其它验收不共用），截图落 `apps/mobile/evidence/`，
+判红那条不是像素统计而是**拍的那一刻前台是不是我们**（`mCurrentFocus`），像素读数照打不判红。
+
+### 三、把"会误杀别人"的那道端口门重造了一遍，并补上它一直声称存在的夹具
+
+`heyta-run-checks.sh` 的文件头一直写着 `HEYTA_E2E_PORTS`"只给夹具做阳性对照"。现量：**全仓没有那枚夹具**
+（`grep -rl HEYTA_E2E_PORTS ~/.heyta-window-rigs` 只命中它自己）⇒ 那道门从写下那天起没被证明过会闭。
+读被调方本体时又发现第二件事：`scripts/check-ai-e2e-preflight.mjs:83` 的杀伤判据是
+`lsof -ti tcp:<port> -sTCP:LISTEN`（**有没有人 bind**），而我的门用的是 `curl … --max-time 1`
+（**1 秒内答不答 HTTP**）⇒ 一台 bind 了但不答 HTTP 的进程在我这侧读成 free、在它那侧被 SIGKILL。
+
+改法（三处，都抽进唯一所有者 `heyta-port-probe.sh`：`port_busy` 回码 + `$PORT_BUSY_WHY` 成因，
+`port_state` 给"只打印状态"的那几档）：`heyta-run-checks.sh` 两道判决点、`heyta-run-folderspec.sh`
+一道（它的清单顺手做成旋钮 `FS_PORTS`，否则夹具喂不进"真忙"的那一枚）。
+`bash /tmp/heyta-run-folderspec.sh` 同时改成 durable 路径（重启就是一条永不开的门）。
+
+**改的过程中被自己的夹具照出三枚装置错**（没有一条是产品缺陷）：
+① 把 rc 型 `port_busy` 当字符串用（`s=$(port_busy …)` ⇒ 恒为空 ⇒ **门静默失效**，正是这枚夹具要挡的形状）；
+② `python3 -c` 里把端口当**字符串**插进地址元组 ⇒ OSError 子进程当场退出，而夹具既不报"现场没起来"又开始数臂；
+③ awk 程序串里拼带空格的样式被 shell 拆成多个词（`non-terminated regular expression ^for`），
+   以及改对之后**只取第一个同名循环** ⇒ 抓到"只打印状态"那一枚、判决门永远抽不到。
+现在改成：起止用整行相等、收集所有 `for…done` 块、只留含指定探针调用的那块且**要求恰好一块**；
+现场两枚临时监听必须先 `wait_bound` 现量到位（读不到 = 全部臂作废，不是红）。
+
+夹具 `heyta-portgate-fixture.sh`（9 臂 + 一刀变异 `heyta-portgate-mutate.mjs`）目前**还没有一次干净的正跑**：
+23:25 那一跑被它自己的并发守卫挡回 `rc=7`，而守卫**没有误报** —— `pgrep -lf` 当场量到另一条会话正在跑
+`pnpm --dir e2e exec playwright test tests/tmp-probe-samp.spec.ts`（载体 `heyta-wt-ai-closeout`）。
+⇒ 留作窗口内第一件小事（它不碰 4318-4322，只占 4397-4399，机器一空就能跑）。
+
+现量窗口：23:11 负载 26.92 → 23:12 25.10 → **23:29 50.95**（阈值 12，16 核）；完成旗 `notes`/`reinstall` 仍两枚都没有；
+链 81245、排队器 82449、哨兵 11786 三枚都活着。**这一段没有起任何设备/Playwright/重装类动作。**
