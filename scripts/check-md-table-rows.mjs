@@ -91,6 +91,11 @@ const FILES = [
   // 之后才加的；加之前它有 **4 处**（三处段落紧贴表尾 + 一处我上轮改表格留下的重复尾巴行）。
   'docs/plans/countdown-anniversary.md',
   'docs/plans/countdown-batch2-handoff.md',
+  // W7 设备出图那一单（04 17:0x 加）。前提与上面几份一样是**现量干净**：
+  // 加进来之前先跑过一遍同套判据 rc=0，而且它**当场照出过我写的一行少一格**
+  // （`| 🔴 **W7-G6b** |` 那一行 3 格 vs 表头 4 格 —— 不在清单里时门禁一声不出）。
+  // 那句话的完整意思：**不在清单里的文档，判据再硬也不咬它。**
+  'docs/plans/countdown-w7-device-export.md',
 ];
 
 /** 未被 `\` 转义的竖线的位置。 */

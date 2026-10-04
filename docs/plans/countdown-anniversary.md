@@ -1390,7 +1390,9 @@ W0b ─> 随时可做（台账那半要等文件干净）
       —— 这一趟补的是抽取之后欠着的"零行为变化"读数：拉回来的字节 `shasum` 前 12 位
       `d6d2a88788d1`，与 07:41 那趟记下的**同一枚 SHA 逐字相同**（两趟之间隔着取值层抽取与三条判据修复）。
       读数与两次看图的差别写在 `apps/mobile/evidence/card-export/README.md`
-      ／ [ ] 🔄 **iOS 那一半仍未取设备读数**（编号 **W7-G3**，任务 #21）—— 探针已从"step 2 就拒跑"
+      ／ ✅ [x] **iOS 那一半的设备读数取到了**（编号 **W7-G3**，任务 #21；原写"仍未取设备读数"，
+      04 17:13:17 由链 S 关闭：`RC_PROBE=0`／通过 17 项 0 失败，读数在 §8.4 第 ㊝ 条）——
+      探针曾从"step 2 就拒跑"
       推进到 step 4，链 K/L/M/N 四趟各照出一处探针缺陷（就绪判据、BACK 归一化、屏外 press、
       `--pressable` 过滤把输入框读成"消失"），逐条读数与修法见 §8.4 第 ㉘/㉚/㉜/㉞ 条
       🔴 **04 10:0x 更正：上面那三行的"五趟都红在探针上"已经过期到链 P 为止。** 链 P（载体 `198603f5`）
@@ -3477,3 +3479,96 @@ W0b ─> 随时可做（台账那半要等文件干净）
     （`idb` 找得到、companion 起得来、AX shim 在位、模拟器 Booted —— 它是走到第 150 行的负载门才退的，
     那四条都在 146–149 行）；`--only ios` 的汇总段**如实列出没装的三端**（"这端**没有**验证当前产物"）；
     以及 ㊙ 说的"D 臂崩过一次"的沙盒**不需要人工识别**——新的"每次都跑"把它自己修回来了。
+
+- ㊛ **L 系列那条"要等 W7 的 manifest 才知 `不申请照片` 会不会变假"的前置闸门，今天量完了：不变假**（04 16:4x）
+  - 采样口径写全，因为"0 命中"这种结论只有带分母才算证据：
+    **3 份清单**（`apps/mobile/ios/Heyta/Info.plist`、`HeytaWidgetExtension/Info.plist`、
+    `apps/mobile/android/app/src/main/AndroidManifest.xml`）× **4 个 needle**
+    （`PhotoLibrary` / `PHAsset` / `READ_MEDIA_IMAGES` / `ACCESS_MEDIA_LOCATION`）= **12 次计数全 0**；
+    同一趟的**阳性对照**：`CFBundleDisplayName` 与 `UIRequiredDeviceCapabilities` 在 iOS 清单里各命中 **1**
+    ⇒ 证明 grep 读的是对的文件形状，不是"扫了个空文件"。
+  - **读的是被调方本体，不是关键字**：`HeytaCardExportModule.swift:77` 是 `data.write(to: file, options: .atomic)`
+    （ app 容器内），`:22` 的注释明写"这条路刻意**不**走相册（`PHPhotoLibrary`）—— 那要加权限"；
+    Android 侧 `CardExportModule.kt:73-81` 是 `cacheDir` + `FileProvider.getUriForFile` + `Share`，
+    `:25` 同样写明"写相册要么申请 `ACCESS_MEDIA_LOCATION` / 走 `MediaStore` 插入"。
+    全仓 JS/native 里 `CameraRoll|saveToCameraRoll|PHPhotoLibrary|MediaStore.Images` **只命中 2 行，两行都是注释**。
+  - 🔴 **同一道门上真正变红的是别的承诺，而且不归本批**：`check:legal-permissions` 现在 **rc=1 / 7 条红**，
+    逐条读过去全部指向**通知与闹钟**（`POST_NOTIFICATIONS` 命中 7 次、`SCHEDULE_EXACT_ALARM` 2 次、
+    `照片/photos` **0 次**），红句写的是"Android 行的依据仍写着「移动端代码目前不产生任何系统通知」"这类 ——
+    那是 **W9 原生投递那一半**欠的条款更新（另有一条会话持有），**不是** W7 的。
+    按硬边界"不吸收别人的债凑绿"，这里只登记归属，不动 `packages/legal`。
+  - ⇒ **Goal ② 那句"零法务变更现量复核"到此有读数了**：W7 两端都是**零新权限**，
+    `permissions.ts:37 / :164`（中英）那句"不申请…照片…"**逐字仍为真**，而且这次不是我读代码下的结论，
+    是上面那 12+2 个计数与两段本体。
+
+- ㊜ **iOS 设备出图那一红抓到真根因了：不是 15 秒不够，是 effect 跑在原生挂载之前**（04 16:4x–16:5x）
+  - 探针第二趟拿到窗口跑了：**通过 11 项 / 失败 1 项**（`/tmp/ios-probe-2-run.txt`，`RC_PROBE=1`）。
+    红的那条是判据②：`tmp/card-export/` 里没有出现属于「w7ios-164319」的 png。
+    🔍 **现场取证三件**：① 容器 `tmp/` 是**空的**（连 `card-export/` 目录都没建，`find` 全容器今天零 png）；
+    ② 设备日志里有一条 `E Heyta[…] [com.facebook.react.log:native] Invalid svg returned from registry,
+    expecting RNSVGSvgView, got: (null)`（16:44:31，就在点击那一刻）；
+    ③ 我打开看了那张界面截图（`/tmp/ios-after-fail.png`）——卡片菜单开着、「导出成品图」在屏上、
+    顶部一条红框错误：**「系统没能把卡片画成图。倒数日没有丢，也没有发出任何请求。（rasterize-timeout）」**
+    ⇒ 兜底那条**按设计工作了**（把"永远不回来"折成一句人话），所以这不是探针坏，也不是假红。
+  - 🔴 **这同时把 W7-G6 的框架改写了**：那一格写的是"15 s 这个上限没有实测依据，负载高的模拟器上可能不够 ⇒
+    只会造成假红"。今天量到的不是"不够"——**是回调永远不会来**，超时只是把它变成可见的错误。
+    根因在 `RNSVGSvgViewModule.mm:31` 那条 `viewForReactTag:` 拿到 nil、而那条分支 `RCTLogError + return` 不回调；
+    JS 侧 `Svg.tsx:84-92` 走的是 `findNodeHandle(this.root)`，**effect 跑在 commit 之后、原生挂载事务刷到主队列之前**，
+    那一刻 tag 查不到。（Android 同一串代码出得来图 ⇒ 两端在这一点上不对称。）
+  - ✅ **修复 = 让出一帧再问原生要图**，不是再拍一个更长的毫秒数：
+    `card-export-units.ts` 新增 `afterNextFrame(nextFrame)`（调度器**注入**，因为这个文件要在 node 里判定），
+    `card-export.tsx` 的 effect 改成 `afterNextFrame((run) => requestAnimationFrame(run)).then(...)`，
+    并在帧里**重新读一次 ref** —— 视图可能在这一帧里被卸载，那一支 resolve 成
+    `rasterize-empty / svg-unmounted-in-frame`，不许静默。
+    判据三条（`apps/mobile/tests/card-export.spec.ts` 末尾）：注入的调度器没跑 ⇒ 不结算；
+    源码里 `.toDataURL(` 的调用点必须排在 `afterNextFrame(` **之后**（用本文件既有的 `codeOf` 剥注释后比下标，
+    "我记得加了"不算）；`svg-unmounted-in-frame` 那一支必须在源码里存在。
+  - ⏳ **读数排在链 S**（`/tmp/chain-S.log`，pid 24852）：等内存闸门空 + 负载 ≤ 10 → 跑判据 →
+    `--only ios` 重装 → 探针。⚠️ 这一趟的负载门**没动阈值**（仍是核数 ×3/4 = 12），
+    只是把等待上限换成闸门自带的 `HEYTA_LOAD_GATE_WAIT`；第一趟 `rc=3` 是等满 900 s，按硬边界第 8 条
+    记环境无效。**如果让帧之后还是 `(null)`**，那就不是时机而是上游 Fabric 查表的缺口，
+    届时登记成 **W7-G9**（带这条日志原文），不把"iOS 设备出图"这格打勾。
+- ㊝ **让帧之后 iOS 出图了：W7-G3 关闭（04 17:13:17，`RC_PROBE=0`，通过 17 项 / 失败 0 项）**
+  - 链 S 三格全绿（`/tmp/chain-S.log`，读数只从日志的 `RC_*` 行取，§7 #164）：
+    `RC_SPEC=0`（17:00:20，`apps/mobile` 那份 `card-export.spec.ts` **29 passed**，含新加的三条让帧判据）→
+    `RC_REINSTALL=0`（17:04:57，`--only ios`，新鲜度门 `bundle 1791104679 > 源码 1791104211`）→
+    `RC_PROBE=0`（17:13:17）。⚠️ 探针**先被负载门挡了 420 s**（167→12，阈值仍是核数 ×3/4 = 12 没动，
+    只把等待上限换成 `HEYTA_LOAD_GATE_WAIT=1800`）—— 这一段是环境账，不是产品账。
+  - 🔴 **上一趟那枚 `(null)` 没有再出现**：设备日志里零条 `Invalid svg returned from registry`，
+    沙盒里写下的是 `heyta-w7ios-170457-10月11日 星期日.png`。所以 ㊜ 那条根因判定
+    （effect 跑在原生挂载之前）**是被这一趟证实的，不是被"再试一次碰巧绿"蒙过去的** ——
+    两次运行之间唯一变化的就是那一次 `afterNextFrame`（同一台设备、同一个签名态、同一份探针）。
+  - 三条硬判据的读数：① 读数器**会区分**（正向 web 那张 1080×1440 / 反向 3×2 读出 `BLANK=true`）；
+    ② 点导出**前**沙盒没那个文件名、点之后出现且 mtime 落在起跑时刻之后；
+    ③ IHDR `W=1080 H=1440 BYTES=64619 TRANSPARENT=false BLANK=false SMEARED=false SHA=13e10d6cde3b`
+    = 契约尺寸，与 web / Android 同口径。第 7 格：整趟 AX 树里**零条系统权限页文案**（与 ㊛ 那条
+    "不申请照片"的现量同向）。
+  - ✅ **人打开看过**（§6.2 规定一）：`apps/mobile/evidence/card-export/ios-latest-card.png`
+    （md5 `d3b0f62f…`，64619 B）。看见的是：浅底上一张白卡、左侧一条竖向主色条、顶部标题
+    `w7ios-170457`、中部大字「还有 7 天」、底部「10月11日 星期日」；**中文没有豆腐块**。
+    并且**与 Android 那张并排比过**（`latest-card.png`，标题 `w7e2e-131811`）：色条/标题位/大数字位/
+    底部日期四处逐位同构，差别只有平台字体（iOS 走 SF、Android 走 Roboto 的数字与拉丁字形）
+    ⇒ 共享版面在两端画出的是同一套结构，**没有"iOS 少画一行"那种 W5 式缺口**。
+  - ⚠️ **这一趟把 Android 那格的读数变成了欠账**（W7-G6b 自己写明的代价）：`card-export-units.ts`
+    改了 ⇒ 04 09:18 那趟 `RC_ANDROID=0` 验的是**改动前**的 bundle。**iOS 绿不构成 Android 的证据**
+    （两端本来就在这条路上不对称，㊜ 已量到）。排在探针之后重取。
+- ㊞ **`Podfile.lock` 里 hermes 那枚 checksum 与提交态不互复现 —— 机制量到了，登记待入 traps**（04 17:1x）
+  - 现量：`git diff` 只有一行 `hermes-engine: 208b0dcd… → d25a17a7…`，而**版本没变**
+    （两边都是 `- hermes-engine (250829098.0.9)`）。
+  - 🔴 **机制（一条命令就能自己复验）**：`shasum "apps/mobile/ios/Pods/Local Podspecs/hermes-engine.podspec.json"`
+    = `d25a17a7bfcc1d16cd383e90d3438144511b5a8b`，**逐字等于**新生成的那枚 ⇒
+    本地路径 pod 的 `SPEC CHECKSUMS` 就是**渲染后那份 podspec JSON 的 SHA1**，不是源文件的哈希
+    （源文件 `shasum` 是 `4a4c61b1…`，两个都不是）。
+  - 而渲染结果里写进了 `source.http` 那枚 **Maven tarball URL**（本机这次是 `…-hermes-ios-debug.tar.gz`），
+    `hermes-utils.rb:44 hermes_source_type()` 的分支由**四个 env 变量**决定
+    （override dir / `HERMES_ENGINE_TARBALL_PATH` / commit / force-build-from-tag），
+    podspec 第 100–101 行自己还写着 `PRODUCTION` 标记会影响下载哪一版
+    ⇒ **同一版本可以渲染出两份不同的 spec，checksum 随之不同**。
+  - ⚠️ **只到"不互复现"为止，没有取第二臂**：我没有在另一档 env 下重跑 `pod install` 去复现
+    `208b0dcd`（那要再花一趟几分钟，而且会在探针之后动沙盒）。所以这条**不写成**
+    "HEAD 那枚是 `PRODUCTION=1` 跑出来的"，只写成：**提交态的 lock 不是钉住的那条命令的产物**，
+    而钉住的命令每次都会把它改回来 ⇒ 干净检出的工作树在 iOS 段永远不干净。
+  - 处置：把新生成的 `Podfile.lock` 与 `project.pbxproj`（后者是 `pod install` 把 W7 那 4 枚
+    CardExport 引用排进它自己的排序位，5 进 5 出、**内容零变化**）一起提交，
+    并把上面那条 `shasum` 复验命令留在本条里。**待入 traps**（编号按主检出工作树取，不在本分支插号）。
+

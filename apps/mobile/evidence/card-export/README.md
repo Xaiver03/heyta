@@ -1,4 +1,7 @@
-# W7 · 纪念卡片**设备出图**证据（Android）
+# W7 · 纪念卡片**设备出图**证据（Android + iOS）
+
+> 上面「看见了什么 / 机器判据」两节讲的是 **Android** 那张 `latest-card.png`；
+> iOS 那半在文件末尾同名的两节里。
 
 > 本目录的产物文件名：Android 是 `latest-card.png`，iOS 是 `ios-latest-card.png`（探针 `verify-mobile-card-export-ios.sh:360` 落盘）。
 > 盘点「哪些图有人看过」时按这两个**文件名**去对，别按「这张图」这类指代对 —— 那样数出来是 0，而 0 不是证据。
@@ -60,3 +63,39 @@
 
 契约那两个数不是抄来的：`EXPORT_CARD_EDGE_PX` / `EXPORT_CARD_HEIGHT_PX` 在运行时从
 `packages/shared-schema` 的**构建产物**里读回，所以"设备出图 = 契约"这句话两端都换了实现。
+
+---
+
+## iOS · 看见了什么（人打开这张图核对到的）
+
+图 = `ios-latest-card.png`（64619 B，`shasum` = `d3b0f62fa223120802b6ef21182738ea9b7645ba`）。
+产生它的那一趟：2026-10-04 17:13:17，`scripts/verify-mobile-card-export-ios.sh` **`RC_PROBE=0`**
+（通过 17 项 / 失败 0 项，链日志 `/tmp/chain-S.log`）。
+
+- 竖版卡片，与 Android 那张**同一套版面**：浅底外框 + 白卡 + 左侧一条竖向主色条；
+  标题 `w7ios-170457` 在左上，中部大字「还有 7 天」，底部「10月11日 星期日」。
+- **中文没有豆腐块**（这条在 iOS 上不是显然的：本批早前 iOS 段量过 `check:shell-unicode` 那一族坑，
+  而 Hermes 字节码里的中文是 UTF-16LE，`grep` 恒 0 —— 所以只有看图能证）。
+- 🔴 **和 Android 那张并排比过**（`latest-card.png`，标题 `w7e2e-131811`）：色条位/标题位/大数字位/
+  底部日期**四处逐位同构**，唯一差别是平台字体（iOS 的 SF 与 Android 的 Roboto 在数字与拉丁字形上不同）。
+  这一条专门挡 W5 那个教训的 iOS 版本 ——「断言只会验界面写了什么，不会验界面少了什么」。
+- ⚠️ **这格差点被读成"15 秒不够"**：上一趟（16:44）红的是 `rasterize-timeout`，
+  真根因是 effect 跑在原生挂载之前（设备日志 `Invalid svg returned from registry, got: (null)`），
+  修法是**让出一帧再问原生要图**，不是把毫秒数拍得更长。全部过程在
+  `docs/plans/countdown-anniversary.md` §8.4 第 ㊜/㊝ 条。
+
+## iOS · 机器判据（同一趟打印的）
+
+| 判据 | 读数 |
+|---|---|
+| ⓪ 载体新鲜度 | 装的 app `bundle 1791104679`（10-04 17:04:39）≥ 源码最新 `1791104211` ⇒ 不比源码旧 |
+| ① 读数器会区分 | 正向：web 那张读出 `1080×1440 SHA=221f0d78811c`；反向：`probe-3x2.png` 读出 `3×2 BLANK=true` ⇒ 不是恒返回契约值 |
+| ② 点了才生效 | 点之前沙盒没有该文件名，点之后出现 `heyta-w7ios-170457-10月11日 星期日.png`，mtime 落在起跑时刻之后（最硬的那种形态） |
+| ③ 字节等于契约 | `W=1080 H=1440 BYTES=64619 TRANSPARENT=false BLANK=false SMEARED=false SHA=13e10d6cde3b` |
+| ④ 零授权弹窗 | 整趟 AX 树里零条系统权限页文案 ⇒ 与 `packages/legal` 那句"不申请照片"同向 |
+
+🔴 **载体写清楚**：这一趟装的是 `2a1fa25a` **加上未提交的让帧修复**
+（`apps/mobile/src/lib/card-export.tsx` / `-units.ts`）。所以这条读数**证明的是那处修复**，
+在它提交之前不能拿它当"提交态绿"的读数。
+⚠️ **它同时把 Android 那格变成欠账**：`card-export-units.ts` 改了 ⇒ 13:20 那趟 `RC_ANDROID=0`
+验的是改动前的 bundle，两端在这条路上本来就不对称（iOS 绿不构成 Android 的证据）。
