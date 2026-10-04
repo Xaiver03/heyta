@@ -76,6 +76,8 @@ import {
   type AppHost,
   type ExportCounts,
   type ExportDocument,
+  previewRestore,
+  type RestoreDocument,
   type ExportFormat,
   type ExportImportFailureReason,
   type TickTickImportResult,
@@ -112,6 +114,25 @@ const RESTORE_FAILURE_KEYS: Record<ExportImportFailureReason, MessageKey> = {
   'inconsistent-document': 'mobile.restore.error.inconsistent',
   'verification-failed': 'mobile.restore.error.verification',
 };
+
+/**
+ * 确认面板那几个数字。
+ *
+ * 🔴 走 `previewRestore`（重放）而不是 `document.counts`（文件自己声明的那一格）：
+ * 只交 op-log 的恢复产物没有 `counts.entities`，照原来那样 `?? 0` 会让面板说
+ * "0 条记录、0 条已删除"，而按下去真的会导进 3 条含 1 墓碑 —— 那是界面在说谎。
+ */
+function restorePreviewVars(doc: RestoreDocument): Record<string, number> {
+  const p = previewRestore(doc);
+  return {
+    tasks: p.perType.TASK?.total ?? 0,
+    projects: p.perType.PROJECT?.total ?? 0,
+    tags: p.perType.TAG?.total ?? 0,
+    entities: p.totalEntities,
+    deleted: p.totalDeleted,
+    ops: p.totalOps,
+  };
+}
 
 function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -171,7 +192,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
 
   // ── 从备份还原（批五，多端覆盖审计 P1-2）─────────────────────────
   const [restoreText, setRestoreText] = useState('');
-  const [restorePreview, setRestorePreview] = useState<ExportDocument | undefined>(undefined);
+  const [restorePreview, setRestorePreview] = useState<RestoreDocument | undefined>(undefined);
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreResult, setRestoreResult] = useState<
     { importedOps: number; entities: number } | undefined
@@ -494,12 +515,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           <Stack>
             <Text variant="caption" tone="muted">
               {t('mobile.restore.previewCounts', {
-                tasks: restorePreview.counts.entities.TASK?.total ?? 0,
-                projects: restorePreview.counts.entities.PROJECT?.total ?? 0,
-                tags: restorePreview.counts.entities.TAG?.total ?? 0,
-                entities: restorePreview.counts.totalEntities,
-                deleted: restorePreview.counts.totalDeleted,
-                ops: restorePreview.counts.totalOps,
+                ...restorePreviewVars(restorePreview),
               })}
             </Text>
             <Button
