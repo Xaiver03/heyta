@@ -116,9 +116,10 @@
  * ⚠️ 这道门禁**不拦**的形状（如实登记，别把它当成"选中态再也回不去了"）：
  * 模块级 `let selectedTaskId: string | null = null`、`useReducer` 里的选中、
  * 以及"多选取中"（`selectedIds` 复数 —— 那是筛选范围，不是"当前看哪一条"）。
- * E 还有一条**已知边界**：它比的是"同一个文件里声明了有没有用"，所以
- * 用 `{...props}` 整体转发会被判红（现在没有这种写法）。真要用就得把名字
- * 加进 `WIRE_PROPS` 旁边那条说明里并改掉这条的判法 —— 不要靠注释绕过。
+ * E 还有一条**已知边界**：它比的是"同一个文件里声明了有没有用"。对象字面量
+ * 转发现在也纳入判定：`const taskListProps = { onOpenTask, ... }` 后以
+ * `<TaskList {...taskListProps} />` 传下去，算作真实使用；单纯的
+ * `const { onOpenTask } = props` 解构仍然不算。动态 `React.createElement` 仍不在范围内。
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -257,6 +258,80 @@ const useOf = (name) => [
 ];
 
 /**
+ * 对象属性 → JSX spread 的接线形状。
+ *
+ * 只接受同一文件里可定位的对象字面量：对象本身必须声明了该 wire prop，
+ * 并且这个对象名必须出现在 JSX 开标签的 `{...name}` 中。这样不会把 props
+ * 解构、普通对象合并或注释里的名字误算成使用。
+ */
+function objectSpreadUseOf(src, name) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const hasTopLevelProperty = (body) => {
+    let depth = 0;
+    let quote;
+    let start = 0;
+    const segments = [];
+    for (let i = 0; i <= body.length; i++) {
+      const char = body[i];
+      if (quote !== undefined) {
+        if (char === '\\') i++;
+        else if (char === quote) quote = undefined;
+        continue;
+      }
+      if (char === '"' || char === "'" || char === '`') {
+        quote = char;
+        continue;
+      }
+      if (char === '{' || char === '[' || char === '(') {
+        depth++;
+        continue;
+      }
+      if (char === '}' || char === ']' || char === ')') {
+        depth = Math.max(0, depth - 1);
+        continue;
+      }
+      if ((char === ',' || i === body.length) && depth === 0) {
+        segments.push(body.slice(start, i).trim());
+        start = i + 1;
+      }
+    }
+    return segments.some((segment) => new RegExp(`^${escapedName}(?:\\s*:|\\s*$)`).test(segment));
+  };
+  const objectDecl = new RegExp(`\\b(?:const|let|var)\\s+([A-Za-z0-9_$]+)\\s*=\\s*\\{`, 'g');
+  const objectNames = [];
+  let declaration;
+  while ((declaration = objectDecl.exec(src)) !== null) {
+    const open = declaration.index + declaration[0].lastIndexOf('{');
+    let depth = 0;
+    let quote;
+    let close = -1;
+    for (let i = open; i < src.length; i++) {
+      const char = src[i];
+      if (quote !== undefined) {
+        if (char === '\\') i++;
+        else if (char === quote) quote = undefined;
+        continue;
+      }
+      if (char === '"' || char === "'" || char === '`') {
+        quote = char;
+        continue;
+      }
+      if (char === '{') depth++;
+      else if (char === '}' && --depth === 0) {
+        close = i;
+        break;
+      }
+    }
+    if (close < 0) continue;
+    const body = src.slice(open + 1, close);
+    if (hasTopLevelProperty(body)) objectNames.push(declaration[1]);
+  }
+  return objectNames.some((objectName) =>
+    new RegExp(`<[^>]*\\{\\s*\\.\\.\\.\\s*${objectName.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b[^>]*>`).test(src),
+  );
+}
+
+/**
  * 先把注释剥掉再匹配。
  *
  * 🔴 这不是可选的整洁：本仓库的门禁吃过两次"注释里的字样被当成代码"的亏 ——
@@ -341,7 +416,7 @@ for (const dir of WIRE_DIRS) {
     for (const name of WIRE_PROPS) {
       if (!declOf(name).test(src)) continue;
       declaredWires.push(`${path.relative(ROOT, file)}  ${name}`);
-      if (!useOf(name).some((re) => re.test(src))) {
+      if (!useOf(name).some((re) => re.test(src)) && !objectSpreadUseOf(src, name)) {
         brokenWires.push(`${path.relative(ROOT, file)}  ${name}`);
       }
     }

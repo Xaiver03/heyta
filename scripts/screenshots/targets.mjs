@@ -113,6 +113,18 @@ export const SITES = {
 };
 
 /**
+ * 首启同意闸门上「不联网」那颗按钮的**逐语言**文案。
+ *
+ * 🔴 键必须与 `TARGETS` 里的 `locale` 取值同名（`zh-CN` / `en`）。
+ * 值抄自 `packages/i18n`（`common.privacy.consent.localOnly`，zh-CN:137 / en:111）——
+ * 抄件会被 `verify-artifacts.mjs` 逐条对账，见 `dismissTexts` 那段说明。
+ */
+export const CONSENT_LOCAL_ONLY = {
+  'zh-CN': '只用本机',
+  en: 'This device only',
+};
+
+/**
  * 目标清单。
  *
  * 字段说明：
@@ -167,15 +179,29 @@ export const TARGETS = [
   { id: 'W03-en', name: 'Habits', site: 'web', openVia: 'tab', view: 'habits', locale: 'en', readyText: 'Habits' },
   { id: 'W05-en', name: 'Timeline', site: 'web', openVia: 'tab', view: 'timeline', locale: 'en', readyText: 'Timeline' },
   { id: 'W07-en', name: 'Trash', site: 'web', openVia: 'tab', view: 'trash', locale: 'en', readyText: 'Trash' },
-].map((target) => ({
-  device: 'desktop',
-  fullPage: false,
-  authRequired: false,
-  dismissTexts: [],
-  appStore: false,
-  locale: 'zh-CN',
-  ...target,
-}));
+].map((target) => {
+  const merged = {
+    device: 'desktop',
+    fullPage: false,
+    authRequired: false,
+    appStore: false,
+    locale: 'zh-CN',
+    ...target,
+  };
+  return {
+    ...merged,
+    // 🔴 web 站点默认要清掉**首启同意闸门**（`PrivacyConsentSheet`，10-02 `881aa92a`）。
+    //    它是全屏遮罩，挡的不只是"看"，而是**点导航标签**那一下 ⇒ 不处理它，
+    //    `openVia: 'tab'` 的 web 目标在**全新 context**（Playwright 每次都是空的 IndexedDB）
+    //    上全都点不动。本轮实测：`--only W07` 两趟都卡在 `aria-selected` 回读上。
+    //    选「只用本机」而不是「同意并联网」：截图环境连不上服务器，而这条主张正是要演示的东西。
+    // ⚠️ 这两个串是 `packages/i18n` 的**抄件** —— `scripts/` 不在 pnpm 工作区里，
+    //    `import('@heyta/i18n')` 实测 `ERR_MODULE_NOT_FOUND`，读不到真源。
+    //    所以由 `verify-artifacts.mjs` 常驻对账"串还在不在对应语言的词条表里"（改词条不改这里 ⇒ 门禁红）。
+    dismissTexts:
+      merged.dismissTexts ?? (merged.site === 'web' ? [CONSENT_LOCAL_ONLY[merged.locale]] : []),
+  };
+});
 
 /** 截图产物的落盘根目录（相对仓库根）。 */
 export const ARTIFACT_ROOT = 'screenshots';

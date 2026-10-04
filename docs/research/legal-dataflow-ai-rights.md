@@ -607,7 +607,7 @@ AGENTS.md 那条纪律"隐私开关关不掉当下的行为是不可接受的"�
 | 加密变体 | `PostgreSQL → gzip → OpenSSL` 流式加密，`.sql.gz.enc`；**不落未加密临时文件**；口令从 `/run/secrets/backup_passphrase` 读，缺了就直接失败 | `server/tools/backup-encrypted.sh:1-4`、`:11-14`、`:34-40` |
 | 运维告警侧 | 长查询豁免只认这个 `PGAPPNAME`，豁免 6 小时到期后**卡死的 dump 仍会告警** | `backup.sh:39-44`、`server/scripts/health-alert.sh:341` |
 | 脚本有测试 | 转储失败不留全量文件、账号 dump 仍在 | `server/tests/backup-script.spec.ts:20`、`:88` |
-| 恢复侧 | **E2EE 决定了服务端帮不上忙**：`backup-and-recovery.md:150-153` 明写应用内"从历史恢复"对端到端加密账号**不起作用，服务端无法解密 op**；`scripts/recover-user.ts` 能带用户密钥回放 op-log 到指定 `serverSeq`，但 🔴 文档自己标注 **"Status: unverified against real encrypted data"**（`:213-220`），且其产物是**用户完整明文**、必须当明文用户数据保护（`:245-250`） | 同左 |
+| 恢复侧 | **E2EE 决定了服务端帮不上忙**：`backup-and-recovery.md:150-153` 明写应用内"从历史恢复"对端到端加密账号**不起作用，服务端无法解密 op**；`scripts/recover-user.ts` 能带用户密钥回放 op-log 到指定 `serverSeq`，但 🔴 文档自己标注 **"Status: unverified against real encrypted data"**（`:213-220`），且其产物是**用户完整明文**、必须当明文用户数据保护（`:245-250`）。⚠️ **2026-10-04 更正（并写明这段会漂）**：那两处行号已随本轮改动移到 `:218-235` 与 `:262-264`；那句 "unverified" 也已改写 —— 解密 + 重放那一段现在有常驻判据（`server/tests/recover-replay-roundtrip.spec.ts`，真 `encryptBatch`/`decryptBatch` + 真 `replayOpsToState`），**"没对着真实账号端到端跑过"仍然成立**，所以"先对一个已知账号试"留着。把真代码跑起来之后照出两个当时无人知晓的缺陷（脚本自己抄的那份列集合少了 `entityIds` 与 `repairBaseServerSeq`：前者让批量删除在还原文件里复活，后者让用过 REPAIR 的账号根本恢复不了） | 同左 |
 | 用户侧备份 | 真正的"用户可控备份"只有 D24.1 的**导出 dump**（无自动备份、无定时导出）。`backup-and-recovery.md:191` 在事故流程里也正是这么要求操作者的："Export a full backup from that client and protect it as plaintext user data." | 同左 |
 
 ⚠️ 顺带一条事实登记（会影响政策文本里的主体名称）：备份脚本与文档里的产品名**仍是 `SuperSync`**

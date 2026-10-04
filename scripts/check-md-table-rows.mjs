@@ -36,6 +36,14 @@
  * ⇒ 现量命令登记在本轮交接 §4 G，由倒数那条线自己收；在它收掉之前把 README 加进清单
  * = 造一条天生红的门禁。
  *
+ * 🔴 **同一条理由挡掉了另外两份法务调研**（2026-10-04 给清单加回收站那条线的五个文件时现量）：
+ * `docs/research/legal-dataflow-ai-rights.md` **5 处**（`:24` 是 4 列而表头 5 列；`:243-246` 各 2 列而表头 3 列）、
+ * `docs/research/legal-pipl-baseline.md` **3 处**（`:1593` 与 `:1623-1625` 各 3 列而表头 4 列）。
+ * 两份在 10-04 现量**都没有未提交 diff**（所以不是别人的半成品），但最近提交分别是
+ * `6e447033`（GDPR 对齐批次）与 `881aa92a`（同意闸门 G-11/G-12），**都不是回收站那条线写的**
+ * ⇒ 按"谁写谁收"逐文件登记进 `docs/plans/trash-and-archive.md` §10.6，不由本门禁代它们红。
+ * 它们收掉之后只需把路径加进下面的 `FILES`，**判据本身不用改**。
+ *
  * 其余的**逐文件登记**在本轮计划 §6，谁写谁收。
  *
  * 跑法：`node scripts/check-md-table-rows.mjs`（退出码 0 = 干净；非 0 = 有错位，
@@ -48,6 +56,12 @@ const FILES = [
   'docs/plans/ui-review-fill-zh-timeline.md',
   'docs/plans/calendar-profile-handoff.md',
   'docs/plans/calendar-profile-reflection.md',
+  // 回收站与归档那条线的台账/ADR/调研（2026-10-04 加入，逐文件现量 rc=0）。
+  'docs/plans/trash-and-archive.md',
+  'docs/adr/0048-deletion-four-states-and-the-no-physical-erase-boundary.md',
+  'docs/research/trash-and-archive-best-practice.md',
+  'docs/research/legal-dataflow-client.md',
+  'docs/research/legal-dataflow-server.md',
 ];
 
 /** 未被 `\` 转义的竖线的位置。 */
