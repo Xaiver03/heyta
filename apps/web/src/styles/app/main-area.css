@@ -8,10 +8,12 @@
 
 .ht-header {
   display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--ht-space-3);
-  block-size: var(--ht-layout-header-height);
-  padding: 0 var(--ht-space-6);
+  min-block-size: var(--ht-layout-header-height);
+  padding: var(--ht-space-2) var(--ht-space-6);
   border-bottom: 1px solid var(--ht-color-border);
   background: var(--ht-color-surface);
 }
@@ -29,9 +31,15 @@
 .ht-header__actions {
   margin-inline-start: auto;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: var(--ht-space-2);
-  /* 同上：右侧动作（日期/倒计时/同步状态/主题）不被压窄 */
-  flex: 0 0 auto;
+  /* 详情列与可拖宽侧栏会缩小主区。动作整体可换行，不能溢出到详情列下方。
+     各控件保留触控尺寸，页头随实际行数增高。 */
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  max-inline-size: 100%;
 }
 
 /*

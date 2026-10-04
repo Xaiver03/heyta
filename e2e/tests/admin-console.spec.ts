@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openApp, openSettingsView, stubLegalRecheck } from './helpers';
+import { openApp, openSettingsView, stubEmptyHolidayAdjustments, stubLegalRecheck } from './helpers';
 
 /**
  * 运营管理后台：真浏览器契约（截图为判据）。
@@ -273,6 +273,8 @@ async function seed({
       body: JSON.stringify({ displayName: null, avatarHash: null }),
     });
   });
+
+  await stubEmptyHolidayAdjustments(page, SERVER);
 
   const adminCalls: string[] = [];
 
