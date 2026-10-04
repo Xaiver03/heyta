@@ -1177,3 +1177,13 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   文本就能提交 ⇒ 证明 L2 的红来自撞行而不是提交器坏了）、L4 锚点命中多行拦、L5 锚点不存在拦。
   ⚠️ 本条线**今天仍没用过它**（①/③ 的读数还没产生，没有东西要落）；建它不是为了好看，
   是因为窗口开的那一刻正是最不该临场发挥 plumbing 的时刻。
+- ✅ **一条"看着像饿死形状"的怀疑，现量排掉了**（19:52，记下来是因为它下一次还会被人怀疑）：
+  `heyta-prep-apk.sh:24` 那道"载体不许并发写"的 pgrep 里含 `GradleDaemon|gradle`，
+  而 gradle daemon 按设计**不会随构建退出** ⇒ 直觉结论是"我第一次打完 APK，后面每一轮都会被
+  自己的 daemon 判成 BUSY，③ 就永久饿死"。现量否证：这台机器上此刻三枚 java 进程
+  （pid 5263 / 18969 / 19881）的 cwd 分别是 `~/Library/Application Support/kotlin/daemon`、
+  `~/.gradle/workers`、`~/.gradle/daemon/9.0.0` —— **daemon 会 chdir 到 `~/.gradle` 下**，
+  不落在我这棵载体里 ⇒ 只进 `OTHER`（那句"别的检出在打包，只抢负载"）而不进 `BUSY`。
+  加上 `pnpm -r build` 本身不起 gradle（gradle 只在 `build:android` 里）、① 排在 ③ 之后不同趟 ⇒
+  这条门不是永不开的那一类。⚠️ 前提写清楚：判据靠的是 **cwd**（`lsof -a -d cwd`），
+  哪天有构建把 daemon 的 cwd 留在载体里，这一格会立刻变成真饿死 —— 归因先查 cwd，别先改判据。
