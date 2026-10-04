@@ -29,7 +29,7 @@
  * 它只是从此多一个没人读的所有者。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 五条断言
+ * 九组断言（A–E 写在下面，F/G/H/I 各自的理由在各自小节开头）
  * ─────────────────────────────────────────────────────────────────────────
  *
  * A. **宿主各有一份实例，且只有那一份**：`createSelectionStore(` 在 `各宿主的 src 目录`
@@ -73,9 +73,32 @@
  * **可选 prop 会把"宿主没接"伪装成"做完了"**，这是本仓库共享层惯用法自带的盲区，
  * 只有把声明与使用放在同一个文件里比一次才拦得住。
  *
+ * I. **每一面都交代过"选中在你这儿是什么"**：分母是 `ViewKey` 的联合类型（`view-tabs.ts`），
+ *    解析出 0 项即红；少登记一面即红并点名是哪一面；立场只许六档
+ *    （`selects / filters / row-actions-only / no-rows / not-a-route / pending-decision`）；
+ *    每条登记挂一枚**证据 needle**（那一行真代码的原样片段），needle 找不到 ⇒ 红。
+ *    承重的是**过期**那一腿：登记成非选中立场的面，如果它自己的文件里出现了
+ *    `useSelected(…)`/`selection.select(…)`，那条登记就成了谎 ⇒ 红。
+ *    🔴 这一条补的是"负向判据的盲区"：A–H 拦的是"多了一份所有者／只声明不接／词表里有死类别"，
+ *    而"新加一路由，没人想过选中算不算"这件事**永远不会红** —— 目标第②条要的是跨视图通用，
+ *    它的可判形式是"每一面都被迫回答过"，不是"三张面都实现了"。
+ *
+ * ⚠️ 断言 I 的两条**有意**的边界（别读成"所有面都验过了"）：
+ *  1. 射程只有 **web 的 ViewKey**。触屏端那 26 个 `apps/mobile/src/screens/*.tsx` 不在名册里 ——
+ *     试过把行族（`` testID={`prefix-${…}`} ``）当分母：两宿主 + 共享层现量 **115 族 / 120 处**，
+ *     绝大多数是按钮与图表单元，当"实体行"的分母只会逼出 115 条噪音登记。**否证，没采用。**
+ *     触屏端由 H 按"谁读哪一类就得自己喂回落"逐文件钉（那是另一条轴，不要求"没读的屏"作答）。
+ *  2. `rail:project` / `rail:tag` 两条是**手写**的：清单/标签是侧栏容器、不是一路由，
+ *     今天没有机器可读的"侧栏面全集"源。⇒ 新加一个侧栏容器不会被这条照出来。
+ *     词表那一侧由 D/F 守着（往 `SELECTABLE_KINDS` 加一类而没有界面消费它 = 红），
+ *     所以"把清单变成可选中"这条路是有牙的；没有的只是"新增一个不选中的容器面"。
+ *
  * ─────────────────────────────────────────────────────────────────────────
  * 怎么确认它能失败（不要删这一段）
  * ─────────────────────────────────────────────────────────────────────────
+ *
+ * 断言 I 单独一趟装置：`research/tools/mutation-rigs/mutate-selection-i.mjs`（臂只改门禁自己那份表，
+ * 不碰产品源码 —— 产品文件在共享工作树里正被别人改，往他们手里插变异就是制造别人名下的假红）。
  *
  * 实测（2026-10-03 两趟 rig：正臂 + 负向对照 + 分母自检，每臂跑完复原并复跑确认回到绿；
  * 终态 Z2 = web / mobile / 本门禁三处 RC=0）。**下面每一行都是跑过的**，不是设想：
@@ -94,6 +117,12 @@
  * | E 删掉 web 四象限那两行 `onOpenTask={…}` / `activeTaskId={…}`（**现场那次事故**） | 红：断言 E（一段里点名两行）+ 四象限真 DOM 判据 2 条 |
  * | E2 同上但**只删** `activeTaskId` 那一行 | 红：断言 E 一行（逐 prop 判，不是"整文件没用才算"） |
  * | E3 把 `WIRE_DIRS` 清空（扫描层没了） | 红：断言 E 的**分母自检** —— "没有断线"与"没在线可断"是两件事 |
+ * | **I1** 摘掉 `tasks` 那一格登记 | 红：断言 I，点名缺的是哪一面 |
+ * | **I1b** 同一份变异喂"分母改成名册自己"的脱牙版 | 不红（证明 I1 的牙挂在"分母来自真身"那一腿） |
+ * | **I2–I8** 词表外立场／类别不在选中词表／needle 过期／登记与代码相反 等 | 各自红在指定那一腿 |
+ * | **I9a/I9b** 分母源读不到 / 联合类型写法换了 | 红且点名断言 I —— 🔴 I9a 第一趟**不符合预期**：那时读不到文件抛的是裸 ENOENT 栈，RC=1 但输出里没有"断言 I"，**栈也是红，可它不说明是哪条判据在红**；补 try/catch 才有这条臂 |
+ * | **I10** 解析改成读空 | 红在"ViewKey 解析出 0 项"（空分母上的"全部交代过"是永真） |
+ * | **I11** 同一份当前代码喂 HEAD 那版门禁 | RC=0 且那版不含断言 I ⇒ 补的是实测存在的缺口，不是顺手加严 |
  * | **负向对照 N1**：把这些字样**只写进注释** | 绿（剥注释生效，不误伤） |
  * | **负向对照 N2**：树上本来就活着 `const [activeId] = useState(…)`（dnd-kit 正在拖）与改名编辑器的 `editingRowId` | 绿（第二条不在 `WIRE_PROPS`，第一条不在裸名分支的词表里） |
  *
@@ -817,6 +846,236 @@ if (readsSeen.length === 0) {
   );
 }
 
+/**
+ * I：**每一面都交代过"选中在你这儿是什么"** —— 视图轴的名册（工单 §8.95/§8.96 的机器化）。
+ *
+ * 为什么 A–H 不够：它们全是**负向**的（不许有第二份所有者、不许只声明不接、词表里不许有死类别），
+ * 所以"这一面今天没对选中交代过任何事"永远不会红。目标第②条要的是**跨视图通用**的机制，
+ * 而"通用"的可判形式不是"三张面都实现了"，是**"每一面都被迫回答过"**：
+ * 回答"选同一份 store"、"点行改的是筛选"、"这面没有实体行"里的哪一个都行，**没回答不行**。
+ * 新加一路由时红，就是这条的全部价值。
+ *
+ * 🔴 分母从真身读，不抄清单：`ViewKey` 的联合类型（`apps/web/src/features/shell/view-tabs.ts`，
+ *   它同时是顶栏按钮与页面标题的唯一来源）。解析出 0 项即红 —— "没有缺口"与"没在可查"是两件事。
+ *   名册里出现 ViewKey 之外的键**也红**（挡手抖写错名），只有一个例外前缀 `rail:`：
+ *   清单/标签是侧栏容器、不是一路由，而"侧栏面全集"今天**没有**机器可读的源 ——
+ *   试过拿 `` testID={`prefix-${…}`} `` 的行族当分母：两宿主 + 共享层现量 **115 族 / 120 处**，
+ *   绝大多数是按钮与图表单元，用它当"实体行"的分母只会逼出 115 条噪音登记（现量否证，记在这儿）。
+ *   所以那两条是手写的，边界如实登记在下面。
+ *
+ * 立场词表（封闭六档，词表外即红）：
+ *   `selects` —— 这一面把选中接进共享 store（必须报是哪几类，且证据文件里真有那一类的消费形状）
+ *   `filters` —— 点这一面的行改的是**筛选**而不是选中（必须点名哪一类实体，且该类不许在词表里）
+ *   `row-actions-only` —— 有实体行，但行上没有"看哪一条"这回事（回收站：恢复 / 彻底删除）
+ *   `no-rows` —— 这一面没有"某一条实体"的概念（日历的"当前"是一天，专注页是计时状态机）
+ *   `not-a-route` —— 它是浮层，`contentView` 根本不落在这里
+ *   `pending-decision` —— 等拍板（必须带 C1 编号，否则等于用"待定"绕过这条）
+ *
+ * 承重的是**过期**那一腿：登记成 `filters`/`no-rows` 的面，如果它自己的文件里哪天出现了
+ * `useSelected(…)`/`selection.select(…)`，这条登记就成了谎 ⇒ 红。那一腿只在证据文件
+ * **不是** `App.tsx` 时生效（App.tsx 是中央宿主，任何视图的 needle 都可能落在它里面，
+ * 拿它判"这面没接选中"必然假红 —— 这是设计约束，不是宽松）。
+ */
+const VIEWKEY_FILE = path.join(ROOT, 'apps/web/src/features/shell/view-tabs.ts');
+const STANCE_VOCAB = ['selects', 'filters', 'row-actions-only', 'no-rows', 'not-a-route', 'pending-decision'];
+
+/** 名册。2026-10-04 逐面现量：每条 needle 都是从那一行原样抄下来的，不是描述。 */
+const VIEW_STANCES = [
+  {
+    view: 'tasks',
+    stance: 'selects',
+    kinds: ['task'],
+    locus: 'apps/web/src/App.tsx',
+    needle: "const selectedTaskId = useSelected('task');",
+    because: '列表是任务的第一个投影，选中就是共享 store 里那一个值。',
+  },
+  {
+    view: 'quadrant',
+    stance: 'selects',
+    kinds: ['task'],
+    locus: 'apps/web/src/App.tsx',
+    needle: '<QuadrantBoard onOpenTask={openTask} activeTaskId={selectedTaskId} />',
+    because: '同一批任务的第二种投影，接的是同一个值（断言 E 那次事故就出在这一行）。',
+  },
+  {
+    view: 'timeline',
+    stance: 'selects',
+    kinds: ['task'],
+    locus: 'apps/web/src/App.tsx',
+    needle: 'onOpenTask={openTask}',
+    because: '第三种投影；web 此前时间线行体不可点，是 W1 顺手补齐的端间不一致。',
+  },
+  {
+    view: 'habits',
+    stance: 'selects',
+    kinds: ['habit'],
+    locus: 'apps/web/src/features/habits/HabitsView.tsx',
+    needle: "const selectedId = useSelected('habit');",
+    because: '习惯板自己读共享选中，不再持有本地态。',
+  },
+  {
+    view: 'notes',
+    stance: 'selects',
+    kinds: ['note'],
+    locus: 'apps/web/src/features/notes/NotesView.tsx',
+    needle: "const editingId = useSelected('note');",
+    because: '便签的"选中"今天同时就是"在编辑哪一条"—— 那正是拍板 #1 的题面（C1 #1）。',
+  },
+  {
+    view: 'search',
+    stance: 'selects',
+    kinds: ['task', 'note'],
+    locus: 'apps/web/src/App.tsx',
+    needle: "selection.select('note', noteId)",
+    because: '搜索结果的点击写进同一个 store；它自己那条 ↑↓ 走结果数组而不是 DOM。',
+  },
+  {
+    view: 'calendar',
+    stance: 'no-rows',
+    locus: 'apps/web/src/features/calendar/store.ts',
+    needle: 'selected: LocalDate;',
+    because: '这一面的"当前"是**某一天**（日期锚点），不是"选中一行"；把日历做成可走的是另一件事，前置是拍板 C1 #1 的延伸。',
+  },
+  {
+    view: 'focus',
+    stance: 'no-rows',
+    locus: 'apps/web/src/features/focus/store.ts',
+    needle: 'state: FocusState;',
+    because: '计时状态机，没有"哪一项"；关联任务只由 start(taskId?) 带进来（工单 §6 明文不许把番茄页塞进列表模型）。',
+  },
+  {
+    view: 'growth',
+    stance: 'no-rows',
+    locus: 'apps/web/src/features/motivation/GrowthView.tsx',
+    needle: 'function heatmapLabels(',
+    because: '面本身是图与卡，没有可走的实体行。',
+  },
+  {
+    view: 'trash',
+    stance: 'row-actions-only',
+    locus: 'apps/web/src/features/trash/TrashView.tsx',
+    needle: 'const [confirmingId, setConfirmingId] = useState<string | undefined>(undefined);',
+    because: '有实体行，但行上的动作是恢复/彻底删除；confirmingId 是"哪条在二次确认"，不是"在看哪一条"（它登记在断言 G 的行 id 类别里）。',
+  },
+  {
+    view: 'settings',
+    stance: 'not-a-route',
+    locus: 'apps/web/src/App.tsx',
+    needle: "const contentView = view === 'settings' || view === 'search' ? settingsBaseView : view;",
+    because: '设置是浮层，底下那一栏还挂着 —— 所以它没有自己的选中语义可交代。',
+  },
+  {
+    view: 'rail:project',
+    stance: 'filters',
+    entity: 'project',
+    locus: 'apps/web/src/features/projects/ProjectsPanel.tsx',
+    needle: "onSelect({ kind: 'project', projectId: item.id });",
+    because: '点一行清单 = 给任务列表加筛选。🔴 web 与触屏端在这里是两种语义（移动端刻意不传，ListsSection.tsx 文件头写明），那一格是 C1 #14。',
+  },
+  {
+    view: 'rail:tag',
+    stance: 'filters',
+    entity: 'tag',
+    locus: 'apps/web/src/features/projects/ProjectsPanel.tsx',
+    needle: 'toOrganizerNodes(toTagItems(projects.tags))',
+    because: '标签行与清单行走同一条 onSelect 通道，语义同上（C1 #14）。',
+  },
+];
+
+function readViewKeys() {
+  let src;
+  try {
+    src = readFileSync(VIEWKEY_FILE, 'utf8');
+  } catch {
+    fail(
+      `断言 I：读不到视图全集的来源 ${path.relative(ROOT, VIEWKEY_FILE)}。\n` +
+        '  换地方了还是被删了？判红而不是跳过 —— 读不到分母时，"每一面都交代过"是一句永真的话。',
+    );
+  }
+  const m = src.match(/export type ViewKey =([\s\S]*?);/);
+  if (!m) fail('断言 I：在 view-tabs.ts 里找不到 `export type ViewKey = …;` —— 视图全集的来源换地方了，先修扫描');
+  const keys = [...m[1].matchAll(/'([a-z][a-z0-9-]*)'/g)].map((x) => x[1]);
+  if (keys.length === 0) fail('断言 I：ViewKey 解析出 0 项 —— 解析器坏了，不是"没有视图"');
+  return keys;
+}
+
+const viewKeys = readViewKeys();
+const viewLoci = new Map();
+for (const e of VIEW_STANCES) {
+  if (viewLoci.has(e.view)) {
+    fail(`断言 I：视图「${e.view}」被登记了两次（${viewLoci.get(e.view)} 与 ${e.stance}）—— 两个立场等于没有立场`);
+  }
+  viewLoci.set(e.view, e.stance);
+  if (!STANCE_VOCAB.includes(e.stance)) {
+    fail(`断言 I：视图「${e.view}」的立场「${e.stance}」不在封闭词表 ${STANCE_VOCAB.join('/')} 里`);
+  }
+  if (e.stance === 'selects') {
+    if (!Array.isArray(e.kinds) || e.kinds.length === 0) fail(`断言 I：「${e.view}」登记为 selects 却没报是哪几类`);
+    for (const k of e.kinds) {
+      if (!vocab.includes(k)) fail(`断言 I：「${e.view}」登记的类别「${k}」不在选中词表 ${vocab.join('/')} 里`);
+    }
+  } else if (e.stance === 'pending-decision' && !/C1 #\d+/.test(e.because || '')) {
+    fail(`断言 I：「${e.view}」用 pending-decision 绕过这条，却没写明等哪一格拍板（要写 C1 #N）`);
+  }
+}
+const unknownViews = [...viewLoci.keys()].filter((v) => !viewKeys.includes(v) && !v.startsWith('rail:'));
+if (unknownViews.length > 0) {
+  fail(
+    `断言 I：名册里有 ${unknownViews.length} 个键既不是 ViewKey、也没有 rail: 前缀：${unknownViews.join(', ')} —— ` +
+      `写错名字的登记不会被任何视图读到，它只会让那条视图看起来"有人交代过了"。`,
+  );
+}
+const missingViews = viewKeys.filter((v) => !viewLoci.has(v));
+if (missingViews.length > 0) {
+  fail(
+    `断言 I：视图全集有 ${viewKeys.length} 个 ViewKey，其中 ${missingViews.length} 个没对"选中"交代过立场：${missingViews.join(', ')}。\n` +
+      '  新增一路由时必须写明它属于哪一档（selects / filters / row-actions-only / no-rows / not-a-route / pending-decision），\n' +
+      '  并挂一条指向那一行真代码的证据 —— 这一条要挡的不是"接错了"，是"新视图没人想过这件事"。',
+  );
+}
+
+let anchorHits = 0;
+for (const e of VIEW_STANCES) {
+  const abs = path.join(ROOT, e.locus);
+  let src;
+  try {
+    src = stripComments(readFileSync(abs, 'utf8'));
+  } catch {
+    fail(`断言 I：「${e.view}」的证据文件 ${e.locus} 不在了 —— 判红而不是跳过（静默跳过等于这条只描述空气）`);
+  }
+  if (!src.includes(e.needle)) {
+    fail(
+      `断言 I：「${e.view}」（立场 ${e.stance}）的证据 needle 在 ${e.locus} 里找不到了：\n  ${e.needle}\n` +
+        '  名册的牙就长在这上面：登记还在、事实已经没了，就是过期登记。',
+    );
+  }
+  anchorHits += 1;
+  if (e.stance === 'selects') {
+    for (const k of e.kinds) {
+      const cap = k[0].toUpperCase() + k.slice(1);
+      const re = new RegExp(`useSelected\\(['"]${k}['"]\\)|selection\\.select\\(['"]${k}['"]|active${cap}Id=`);
+      if (!re.test(src)) {
+        fail(`断言 I：「${e.view}」登记为选中 ${k}，但 ${e.locus} 里没有该类的消费形状（useSelected / selection.select / active${cap}Id=）`);
+      }
+    }
+  } else {
+    if (e.entity && vocab.includes(e.entity)) {
+      fail(`断言 I：「${e.view}」把「${e.entity}」登记成非选中立场，而它已经在词表 ${vocab.join('/')} 里了 —— 两边必须挑一边`);
+    }
+    const ownFile = !e.locus.endsWith('App.tsx');
+    if (ownFile) {
+      const live = vocab.filter((k) => new RegExp(`useSelected\\(['"]${k}['"]\\)|selection\\.select\\(['"]${k}['"]`).test(src));
+      if (live.length > 0) {
+        fail(
+          `断言 I：「${e.view}」登记的立场是 ${e.stance}，但 ${e.locus} 现在读/写 ${live.join('/')} 的选中 —— 这条登记过期了。\n` +
+            '  要么它已经进了选中机制（改成 selects 并报类别），要么那段接线不该在这里。',
+        );
+      }
+    }
+  }
+}
+if (anchorHits === 0) fail('断言 I：名册一条证据都没落到文件上 —— 扫描层坏了，"全部成立"是假的绿');
+
 if (failures.length > 0) {
   console.error('✗ 选中态的所有者不唯一：\n');
   for (const f of failures) console.error(f + '\n');
@@ -850,4 +1109,12 @@ console.log(
   `✅ 选中态只有一个所有者：${REQUIRED_STORE_INSTANCES} 份实例（${HOSTS.join(', ')}）` +
     `，宿主内本地选中态 0 处，词表定义 0 处，词表 ${vocab.length} 类全有消费者（${counts}）` +
     `，接线声明 ${declaredWires.length} 处全部用起来`,
+);
+
+console.log(
+  `✅ I：视图全集 ${viewKeys.length} 个 ViewKey 全部对"选中"交代过立场（selects ${
+    VIEW_STANCES.filter((e) => e.stance === 'selects').length
+  } / 其余 ${VIEW_STANCES.filter((e) => e.stance !== 'selects').length}），侧栏容器手登记 ${
+    VIEW_STANCES.filter((e) => e.view.startsWith('rail:')).length
+  } 条，证据锚点 ${anchorHits} 条逐条还在文件里（立场词表 ${STANCE_VOCAB.length} 档）`,
 );
