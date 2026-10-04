@@ -825,8 +825,9 @@ export class SyncClient {
         if (vocabularyRejects.length > 0) {
           parts.push(
             `其中 ${String(vocabularyRejects.length)} 条是服务端**不认识它的实体类型** —— ` +
-              '这台服务器的版本落后于客户端。这些数据仍完整保存在本机，' +
-              '请先升级服务端（自托管部署尤其注意这一点），然后再同步一次。',
+              '这台服务器的版本落后于客户端。这些数据仍完整保存在本机，但已被移出待上传队列：' +
+              '当前没有 rejected→待上传 的再入队路径，所以**升级服务端之后它也不会自动补传**。' +
+              '这句话刻意不写成"升级后再同步一次" —— 那是一条没有任何代码兑现的承诺。',
           );
         }
         if (this.transientRejects.length > 0) {
