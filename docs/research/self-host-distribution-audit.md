@@ -5251,3 +5251,43 @@ gen-image-npm-tree.mjs 取本分支侧（main 侧仍钉旧键 serverPackageJsonS
 **现场**（14:46–14:49，g69 三次 POLL）：阻塞集 **1 枚 = `package.json`**，脏条目 174；
 main 从 `d636b010` 走到 `9372a885`。载体每前进一次都要重算（脚本只认分支不认 SHA），
 落地那一笔仍归人执行守卫序列。
+
+### 8.87 第 2 项（`verify:selfhost-stack` 现量重跑）的就绪表：把"端口被别人占"这条**错的阻塞**摘掉（2026-10-04 14:58）
+
+这一项之前一直挂着两条"现场前置"，其中**一条是我记错的**。14:58 逐条现量：
+
+| 前置 | 现量 | 判 |
+|---|---|---|
+| Docker 上下文 / daemon | `orbstack` ｜ `29.4.0 / OrbStack / 16 C / 16 GB` | ✅ 起 |
+| 磁盘 | `/` 可用 **83 Gi**（已用 14%） | ✅ |
+| 三文件解析出的服务集 | `docker compose -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml config --services` = `postgres / supersync-migrate / supersync / caddy` | 记录 |
+| **这一跑起哪些服务** | `scripts/verify-selfhost-stack.sh:335` = `compose up -d postgres supersync` ⇒ **caddy 不进这一跑** | 🔴 纠正 |
+| 宿主端口面 | `docker-compose.yml` 全文只有 **2 处 `ports:`**：`:110` supersync = `127.0.0.1:${SUPERSYNC_HOST_PORT:-1900}:1900`、`:280` caddy = `80/443` | 记录 |
+| 1900 / 80 / 443 | 14:58 现量**三个都空** | ✅ |
+| 别人占着的端口 | `3000` = pid 70256 `node dist/src/index.js`（13.5 小时）、`5432` = pid 1334 homebrew `postgresql@15`（17 小时） | 🔴 **与本跑无关** |
+
+🔴 **纠正的那条**：我此前把"宿主端口被别人占着"写进这一项的前置，比的是 **3000 与 5432** ——
+那两个端口**我们的栈根本不映射**（postgres 在 compose 里没有宿主端口映射，只走内部网络；
+服务端默认落在 **1900**，且 `SUPERSYNC_HOST_PORT` 可换）。那枚 homebrew postgres 与那枚
+`dist/src/index.js` 属于别的线，挡不到这一跑。把不相干的占用算成前置，后果是**永远等不到窗口**：
+等的是一个本来就不存在的条件。
+同一条也解释了 AGENTS 里那句"`deploy.sh` 会拉起 caddy 而本机 :80 被宿主 nginx 占"为什么**不适用于这一项**——
+不是 :80 空了（它此刻确实是空的），是这一跑**不带 caddy**。
+
+**仍然挡着的只剩两条**（都写清属于哪一类）：
+
+1. **窗口**：14:58 现量 load **34.3**，`/tmp/tfa-test.lock` 被 pid 79513 持有
+   （`~/.tfa-shield/.../run-gated.mjs … node --test scripts/test/{gates,host-headroom,host-shield,run-gated}.test.ts`
+   —— 别的仓库的测试，见 §8.83 ③）。这一跑要 `docker build` 当前树 ⇒ 它自己也会把负载顶上去，
+   所以它必须排在**本线那把逐段扫（g69）之后**，两条重活挤同一个窗口的话双方读数都不可归因（AGENTS §8）。
+2. **"真镜像"这三个字有现成的新鲜度判据，别用 mtime 猜**：脚本自己就在
+   `scripts/verify-selfhost-stack.sh:179-181` 打 `DOCKER_BUILDKIT=1 docker build -f server/Dockerfile
+   --build-arg VCS_REF="$(git rev-parse HEAD)"`，镜像 tag 是 `:92` 那行写死的 `supersync:selfhost-verify`。
+   现量：盘上那枚 `cabb721a918c` 是 **5 小时前**的，而树在那之后又动了（§8.83–§8.86 那几笔 + 载体换六族）。
+   ⇒ 这一项的读数**必须来自重跑**，而"装的是不是这一批"有一条可核对的判据：
+   **构建出来的镜像里那个 `VCS_REF` 要等于起跑那棵树自己的 `git rev-parse HEAD`**（拿旧镜像冒充就是把
+   §6.1.1 那句"测试全绿 ≠ 这是当前产物"再犯一遍）。构建输入清单另有 `server/scripts/image-inputs.sh` 那 22 枚路径。
+
+⇒ 这一项的下一步不是"继续等"，是**排在 g69 之后起一条**：`pnpm verify:selfhost-stack`（默认旋钮，
+不带 `--only`/`--skip`），日志落 `/tmp/heyta-selfhost-up.log` 之外再自己写一份带时间戳的读数文件，
+等满负载门就按 exit 3 记"环境无效 ≠ 产品失败"，**不动阈值**。
