@@ -233,6 +233,24 @@
   flex-wrap: wrap;
 }
 
+/**
+ * 🔴 年度那一格**整条不许裁切**（`white-space: nowrap` + 省略号是共用的
+ * `.ht-settings__admin-rowMain` 的行为，对邮箱那排是对的，对这一排是缺陷）。
+ *
+ * 上一条 `--papers` 让徽标那排肯收缩了，但**没解决这一格自己有多长**：
+ * "2026 · 2 天安排 · 国务院办公厅通知" 是一条 nowrap 的整串，
+ * 行内没有多余空间时它仍然被裁掉 13px ⇒ 年份看不见（实测读数，非推断）。
+ * 年度、条数、备注三条都是运营要核对的内容，**没有一条是可以被省略号替掉的**，
+ * 所以这里按"内容必须全部可见"改，而不是把 URL 拍短。
+ *
+ * 不动共用那条的理由与 `--papers` 同：邮箱排里 ellipsis 是**有意的**。
+ */
+.ht-settings__admin-rowMain--wrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .ht-settings__admin-badge {
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-border-subtle);
