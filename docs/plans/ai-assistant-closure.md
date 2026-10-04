@@ -602,8 +602,8 @@ Goal 只有四件事，所以矩阵就四行。**每行的"证据"只写当场�
 | 项 | 状态 | 证据（带载体） | 未闭合的那一半是什么 |
 |---|---|---|---|
 | ① 合并 | ✅ **已闭合** | 四条源提交在当前 `HEAD` 上逐条 `git merge-base --is-ancestor` **全部 IN**：`dd8f2210`、`f2d7ed40`、`fd34c42a`、落地那笔 `de296b9d`（B76 补记 #10 记的就是这次复量）。 | 无。⚠️ 但这条**只在"祖先关系"这一层成立** —— 落地之后 main 又前进了几十笔，所以引用 ① 必须带当时那个 SHA，不能写"三条分支已合并"就完事。 |
-| ② 集成态验证 | 🟡 **有载体的历史读数 + 本批自己那一层当场复跑** | 链：73 段 @载体 `187057bb`（64 绿 / 8 红 / 1 按规则不跑）、74 段 @载体 `d544d73c` 打印 `CHAIN-OK total=74 pass=64 fail=9 skip=1 env=0`；段数今天已到 **75**（`39c4ce47` 加的 `check:ios-native-bridges`，归它的主人复量）。<br>本批界面单当场：`apps/web` 与 `apps/landing` typecheck RC=0、`app-mount` 23 条、landing 1317 条、真浏览器 **24 条**（含"写工具只出提案、确认前不落库"那条隐私读数）、`check:design`/`ui-language`/`row-single-source`/`layering`/`selection-single-source`/`ai-tools`/`ai-coverage`/`ai-quota`/`legal-tools`/`claims` + `docs-link-check` **RC=0**。 | 🔴 **`apps/web` 全量套件在当前 HEAD 上没跑成**：内存闸门（`/tmp/tfa-test.lock`）连着 5 次拒绝启动，持锁的是别人那趟 `pnpm --dir e2e run test`（pid 21302）⇒ 排队跑者仍在重试，**这道读数没有之前不许写"web 全量已过"**。<br>另：全量 `pnpm -r build` 那句"18 项 Done"是**别的线 06:24 那趟隔离副本**的读数，不是当前 HEAD；`-r typecheck` 当前 HEAD 也未整仓跑。 |
-| ③ 交付：四端重装 | ❌ **未交付（环境无效，如实记录）** | 现场读数两条独立：`notarytool` pid 98934 累计 CPU 四小时恒 `0:00.03`（12:41 那趟）、`find /tmp/heyta-reinstall -newermt '-2 hours' -type f` = **0** 且整棵树最新写入是 03:12（15:1x 复量）⇒ 那趟 ~12h 没产出。🔴 **15:1x 又量了一次那枚 CPU：`etime` 已到 12:07:10 而 `time` 仍是 `0:00.03`** —— 从 12:41 到现在的两个半小时里**一个 CPU tick 都没走**，这不是"慢"，是死等。占位 PID 现量 `queue-reinstall-all.sh` 81007/93771、snap 93817；设备面 5 台 Booted + 1 台 adb；负载 16.06 > 阈值 12。 | 🔴 **Windows 那条腿的"证据面"是空的**：`fd34c42a` 把"装完自动写桌面快捷方式"做成了硬判据、`5fe19343` 把五项清单搬进单一所有者并两处都改成会失败，但 `e8508736` 当场登记 **`SHORTCUT_OK` 这条腿的证据面为空**（且"五事实对账"原来能被一句散文满足）。⇒ **快捷方式这件事"代码 + 门禁已落地"，"读数"必须等一趟真的重装跑完打印出来**，二者不许混写。<br>起装本身被上面那趟挂死的运行挡着：`reinstall-all.sh` 第一步就是 `adb uninstall` / `simctl uninstall`，现在起 = 清掉别人的设备现场。 |
+| ② 集成态验证 | 🟡 **有载体的历史读数 + 本批自己那一层当场复跑** | 链：73 段 @载体 `187057bb`（64 绿 / 8 红 / 1 按规则不跑）、74 段 @载体 `d544d73c` 打印 `CHAIN-OK total=74 pass=64 fail=9 skip=1 env=0`；段数今天已到 **75**（`39c4ce47` 加的 `check:ios-native-bridges`，归它的主人复量）。<br>本批界面单当场：`apps/web` 与 `apps/landing` typecheck RC=0、`app-mount` 23 条、landing 1317 条、真浏览器 **24 条**（含"写工具只出提案、确认前不落库"那条隐私读数）、`check:design`/`ui-language`/`row-single-source`/`layering`/`selection-single-source`/`ai-tools`/`ai-coverage`/`ai-quota`/`legal-tools`/`claims` + `docs-link-check` **RC=0**。<br>✅ **`apps/web` 全量套件在当前 HEAD 上跑成了**（15:24:48 落盘，队列跑者第 6 次尝试）：`Test Files 132 passed \| 2 skipped (134)`、`Tests 1756 passed \| 13 skipped (1769)`、`Duration 20.31s`、**RC=0**、`NO_COLOR=1 grep -cE '✗\|failed\|FAIL '` = **0**。<br>🔴 **载体这一栏不许省，而它当时并没有被跑者记下来** —— 跑者脚本只把 HEAD 往 `.att` 里追加，而启动那枚 `.boot` 是 **0 字节**（重定向写进去的是"内存闸门拒绝"那三行，成功那一趟反而没写）。⇒ 我用**包含关系**补上，而不是猜一个号：**起跑 ≈ 15:14:42，跑者启动时的 `HEAD` 实测 = `d45fad0c`**（`git rev-list -1 --before='2026-10-04 15:14:42' main`），完成时已到 `8590ae02`；而 `git diff --name-only d45fad0c..8590ae02 -- apps/web packages` = **0 个文件** ⇒ 这枚读数对**当前 HEAD 同样成立**，因为它跑的就是当前那棵 `apps/web` + `packages` 树。<br>补一句"拒绝长什么样"（这是 5 次拒绝的形态，别把它当成测试失败）：`内存闸门拒绝启动：已有测试在跑（pid=…，锁 /tmp/tfa-test.lock）`，rc 非 0、日志只有那三行。 | 🔴 ~~`apps/web` 全量套件在当前 HEAD 上没跑成：内存闸门连着 5 次拒绝启动，排队跑者仍在重试，这道读数没有之前不许写"web 全量已过"~~ **这一条在 15:24 被同一趟队列自己关闭了**（读数与载体在左栏）。原句留着，因为**它的成因仍然活着**：内存闸门（`/tmp/tfa-test.lock`）当天连续 5 次拒绝启动，而持锁人换过两届（先是别人那趟 `pnpm --dir e2e run test` pid 21302，最后挡路的是 `scratch-owner-transfer/rbac-d2/push-gated.test.mjs` pid 98897）—— **闸门拒绝不是测试失败**：它的形状是 rc≠0 + 日志只有"内存闸门拒绝启动"那三行。下一轮读到 rc≠0 先分辨这两者，别把门的拒绝记成产品的红。<br>另：全量 `pnpm -r build` 那句"18 项 Done"是**别的线 06:24 那趟隔离副本**的读数，不是当前 HEAD；`-r typecheck` 当前 HEAD 也未整仓跑。⚠️ **这两句没有被上面那趟覆盖** —— `apps/web` 一个包的套件不等于全仓 build/typecheck。 |
+| ③ 交付：四端重装 | ❌ **未交付（环境无效，如实记录）** | 🔴 **承重的那条不是 CPU，是服务端台账**（四条完整证据在 `BLOCKED.md` B76「③ 那条'唯一可能没有终点的前置'」那一段）：只读地问了一次 `notarytool history` ⇒ 49 条记录 **45 Accepted / 4 Invalid，`In Progress`/`In Queue` 零条**，而最新一条 `createdDate` = `2026-10-03T15:05:06Z`，比这枚进程起跑（本机 10-04 03:13）**早约 4 小时** ⇒ 这一次 submit **从未在服务端建立过提交记录**，所以停掉它不丢任何服务端进度。<br>~~现场读数两条独立……这不是"慢"，是死等~~ **15:2x 的推理更正（原句留着，不悄悄删）**：那句"是死等"当时靠「CPU 恒 `0:00.03`」+「零套接字」立论，而**这两条单独都分不清"死等"与"合法的 `--wait` 轮询"** —— 两次轮询之间本来就可以没有连接，而一轮轮询的 CPU 只是毫秒级。⇒ **结论不变，换的是承重证据**（换成上面那条服务端台账）。<br>**15:2x 现量**（一条前台命令直接出时序，不落中间文件）：`etime` 从 `12:12:34` 走到 `12:13:30` 的 56 秒里采 12 次，累计 CPU **12/12 全是 `0:00.03`**（`time` 是累计值不是瞬时快照，所以这才是"零增量"的正证）、网络 FD **12/12 全是 0**；阳性对照同一趟 `lsof -nP -iTCP:443 -sTCP:ESTABLISHED` = **88** ⇒ 那个 0 是真读数，不是探针看不见套接字；98934 的 26 枚 FD 全是 `txt`（dyld / DiskImages framework / ICU 表）加 fd 0/1/2，**`Heyta-1.0.0.dmg` 命中 0** —— 既没在读那个文件，也没在传。<br>⚠️ 「`/tmp/heyta-reinstall-mac.log` 停在 03:13 没再写」**不算独立证据**：那条腿是 `notarytool … \| tail -8 \| awk`，而 `tail -8` 在 EOF 之前一个字都不会吐 —— 日志静默与"子进程沉默"在这条管道里是同一个形状。<br>占位 PID 现量 `queue-reinstall-all.sh` 81007/93771、snap 93817；设备面 5 台 Booted + 1 台 adb；负载 **13.66** > 阈值 12（15:2x 复量，12:4x 那趟记的是 16.06）。 | 🔴 **Windows 那条腿的"证据面"是空的**：`fd34c42a` 把"装完自动写桌面快捷方式"做成了硬判据、`5fe19343` 把五项清单搬进单一所有者并两处都改成会失败，但 `e8508736` 当场登记 **`SHORTCUT_OK` 这条腿的证据面为空**（且"五事实对账"原来能被一句散文满足）。⇒ **快捷方式这件事"代码 + 门禁已落地"，"读数"必须等一趟真的重装跑完打印出来**，二者不许混写。<br>起装本身被上面那趟挂死的运行挡着：`reinstall-all.sh` 第一步就是 `adb uninstall` / `simctl uninstall`，现在起 = 清掉别人的设备现场。 |
 | ④ 台账 | 🟡 **BLOCKED 已逐条打勾，PROGRESS 那一行仍卡在别人手里** | BLOCKED.md **B76 补记 #10**（`425e83c3`）：① 复量、③ 第二条独立证据、占位 PID 换代、旧复现命令标成"那一代"并补新五条。traps 编号现量：活树最大号 **246**、HEAD 228，台账本体被别人 +355/−7 占着 ⇒ 三条载体教训按"脏台账不追加"的纪律落在工单的具名小节（`ff22777c`）。死链：`docs-link-check` RC=0；`check:doc-citations` RC=0 且 SELFTEST 三维都抓到。 | 🔴 **PROGRESS.md 那一行还没落**：`+41/−1 未提交`（登记改道时是 +23，还在长），两种提交办法都不许用（整文件 `git add` 会带走别人的行；HEAD+我的 EOF 追加会被别人随后整文件提交抹回去）。待办那句原文有效、继续由"文件干净时收口的人"搬：见 B76 改道那一段。 |
 
 **这一矩阵存在的理由**：③ 的两个半件事（快捷方式的**判据**与快捷方式的**读数**）此前在本线文档里被写成同一件事。
@@ -616,7 +616,41 @@ Goal 只有四件事，所以矩阵就四行。**每行的"证据"只写当场�
 for c in dd8f2210 f2d7ed40 fd34c42a de296b9d; do git merge-base --is-ancestor $c HEAD && echo "$c IN"; done
 find /tmp/heyta-reinstall -newermt '-2 hours' -type f | wc -l
 ps -o pid,etime,time,command -p 98934                     # notarytool 是否还挂着
+lsof -nP -p 98934 | grep -cE 'IPv[46]'                    # 网络 FD（单点读数，配合下一条一起看）
+lsof -nP -iTCP:443 -sTCP:ESTABLISHED | grep -c IPv        # 阳性对照：探针能不能看见套接字（15:2x = 88）
+lsof -nP -p 98934 | grep -c 'Heyta-1.0.0.dmg'             # 它有没有在读写那枚 dmg（15:2x = 0）
 git status --porcelain docs/reference/environment-traps.md PROGRESS.md   # 两本台账在谁手里
 grep -c '^## 8\.' docs/plans/detail-pane-alignment.md    # 本副本；分支那侧要 git show <branch> 另量
 ```
+
+🔴 **上面那枚"零套接字"单点读数不许单独引用**（这一句是给下一轮的，不是给本文的）：
+它只有在和**累计 CPU 的时序**（12 次采样恒 `0:00.03`）以及**服务端台账零记录**放在一起时才有含义。
+要重取时序，用一条**不落中间文件**的前台命令：
+
+```bash
+for i in $(seq 1 12); do printf "%s cpu=%s etime=%s netfd=%s\n" "$(date '+%H:%M:%S')" \
+  "$(ps -o time= -p 98934 | tr -d ' ')" "$(ps -o etime= -p 98934 | tr -d ' ')" \
+  "$(lsof -nP -p 98934 | grep -cE 'IPv[46]')"; sleep 5; done
+```
+
+### §8.1 载体教训：公共 `/tmp` 文件名不能当证据载体（待入 traps #247，现量活树最大号 246）
+
+15:2x 这一趟实测到的，而且**它差点让我记下一条错读数**：
+
+- 我把采样器写成 `/tmp/notary-sample.sh`，输出落 `/tmp/notary-sample.txt`，用后台任务跑再 `cat` 回来。
+- 后台完成通知回读到的那份内容里，出现了一枚**我的脚本里根本没有的字符串**（我的脚本写的是
+  `"<时刻> gone"`，那份输出里是 `"process gone"`），而且行序自相矛盾（`SAMPLE_DONE` 排在 20 行采样之前）。
+- 待我改在前台重跑时，`/tmp/notary-sample.txt` **已经不存在了**（`head` 报 No such file），
+  而 `/tmp/notary-sample.sh` 的 md5 与内容仍是我的那一份。
+- ⇒ 我**弃掉那一整份读数**，改用上面那条无中间文件的前台时序命令重取。
+  如果照那份读下去，结论会是"98934 已经退出"—— 而它当时（和现在）都活着。
+
+**为什么单独登记这一条**：本机同时有 3–4 条会话在写 `/tmp`（`ls /tmp` 里那些 `731xx-block.md`、
+`*-draft.md` 就是别人的工单草稿），文件名撞车是常态而不是意外。
+仓库里已有的那条"证据 md5 会被别人的趟重写而无人报红"讲的是**产物目录**，这一条是同一个失效模式
+在**临时取证文件**上的面目，而且这里更隐蔽：**它不是覆盖内容，是把别人的内容与我的混在同一个文件里**，
+于是读数会"看起来合理"却指向另一个对象。
+
+**改法（不是"少用 /tmp"）**：取证命令**直接把读数打到 stdout**；确实需要落盘时，文件名带上本趟 pid
+与前缀（`/tmp/heyta-<线>-<pid>.txt`），并在读回后**先确认字符串集合是本项目产生的**再引用它。
 
