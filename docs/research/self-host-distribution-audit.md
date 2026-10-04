@@ -8277,3 +8277,76 @@ G-44 改道之后（§8.17）这些"还没有"就是承诺本身 —— 一旦�
 差 42 段**不在这份 HEAD 里**（在未提交的脏工作树里还是在别的分支上没测）—— 按 HEAD 取号会撞车）：
 **"覆盖树/夹具的 walk 忘了过滤 base 结果"与"深度过滤按猜的段数"这两族，症状都是臂自己红而不是判据红** ——
 所以新写作用域类判据时，先把"摘掉一整棵目录"做成一条臂，再看它期望响的 id 集合。
+
+### 8.136 判据写完先拿到**落地后的那棵树**上预跑一遍 —— 这一跑同时照出判据错、和对外那份也错了（2026-10-04 22:43–22:50）
+
+§8.135 那条判据在我自己的分支跑绿之后，我做了一件此前没做过的事：**把它拷进合并载体 `/tmp/heyta-merge-carrier`（`fb68cdc5`，第一父 = main）跑一遍**。
+载体 = 落地之后所有判据真正要面对的那棵树。跑出来是 **9 条全红**，其中两条是基线红：
+
+```
+C4: packages/sync-client/src 出现 full-state op 构造：packages/sync-client/src/client.ts
+C4: packages/op-log/src 出现 full-state op 构造：packages/op-log/src/engine.ts
+```
+
+现量（都在载体那棵树上取的，我这棵树里还没有）：
+
+| 事实 | 读数 |
+|---|---|
+| `packages/op-log/src/engine.ts` 有 `createSyncCheckpoint()`，派发 `{ entityType:'ALL', entityId:'*', opType: OpType.Repair, payload:{isFullState:true,…} }` | 是 ADR-0046/ADR-0047 的**显式维护 API**，无自动 timer，前置是三道拒绝（历史完整 / 队列排空 / 实体类型可表示） |
+| 它的调用者 | 只有测试：`packages/op-log/tests/full-state-recovery.spec.ts`、`packages/op-log/tests/op-log-count-reads.spec.ts`、`apps/web/tests/e2e-sync.integration.spec.ts`。**产品层零调用**（`packages/{sync-client,app-host}` 与 `apps/*/src` 各目录 0 命中） |
+| `packages/sync-client/src` | 现在 **5 个文件**（多了 `payload-cipher.ts`），`client.ts:1005-1006,1063` 三处 `op.opType === 'REPAIR'` —— 那是上传**分桶与密文**用的**比较**，不是构造 |
+
+### ① 判据自己错了：词级正则把"这个词出现过"当成了"这条路径存在"
+
+我原来那条 C4 的失效方式有三层，全部由载体这一跑照出来：
+
+1. **比较形状被读成构造**（sync-client 那处）；
+2. **作用域把机制本体所在目录也算进"不许有构造"** —— op-log 是这条机制**该在**的地方，把它当违规等于把上游当前状态写死在判据里，别人正常落地就误红；
+3. **生成物里的方法定义会被当成调用**：`packages/app-host/bridge-bundle/native-bridge.js` 打包了 op-log 的类，里面有 `createSyncCheckpoint() {`。这条我在写正则时先想到并用"调用要带接收者点号"挡掉了（`.createSyncCheckpoint\s*\(`），否则判据会把一个**打包产物**判成产品路径。
+
+改后的形状（同一趟里的四条对照都落进 `readings.fullStateShapeControls`）：
+
+```
+{"构造命中":true,"比较不误伤":false,"枚举成员不误伤":false,"调用命中":true,"定义不误伤":false}
+```
+
+- 构造判据 = `opType:` **冒号**后跟 full-state 枚举 ⇒ `op.opType === 'REPAIR'` 与 `Repair = 'REPAIR',` 都不算；
+- 调用判据 = 带接收者的 `.createSyncCheckpoint(` ⇒ 打包产物里的定义不算；
+- 作用域 = 产品层（`packages/sync-client/src`、`packages/app-host/src`、`apps/*/src`）；
+- 机制那一侧单独记账：`packages/op-log/src` 里允许有构造点，但**只允许 0 或 1 个文件**含它 —— 0 = 这棵树还没有机制，1 = 机制在 designated 位置，>1 = 多了一条边界来源（那不会是产品层，所以产品层的判据永远看不见它）。
+- 臂从 8 条加到 **11 条**：新增"宿主层调用维护检查点""机制侧冒出第二个构造点"，以及一条**反向臂** —— 往上传路径真加一处 `op.opType === 'REPAIR'`，判据**必须不响**。
+  🔴 反向臂是这条判据能不能长期活着的钥匙：宽到误伤的判据会在别人正常落地时变红，而误红判据的下场就是被放宽，放宽通常放宽到没牙。
+
+### ② 更贵的那半：对外那份（本批自己写的）在合并树上是错的
+
+`server/README.md` 前置条件 2 里这两句，是 §8.17 那次改道时按**当时的**读数写的：
+
+> ~~`SYNC_IMPORT` / `BACKUP_IMPORT` / `REPAIR` appear in heyta's code only as enum members … `packages/sync-client` contains no snapshot or checkpoint path at all (4 files, zero case-insensitive matches)~~
+
+合并树上：op-log **有**构造点、sync-client **有** REPAIR 相关代码（虽然是识别不是构造）、文件数是 5 不是 4。这句一旦随本批落地就是对外错话 —— 而且它是那种"没人会主动发现"的错：它读起来像在说缺口很深，实际缺口只剩"没人调用"。
+
+已就地改写（不是删：原句说了什么以引用形式留在更正段里）：
+
+- 服务端那半照旧"fully implemented"（`sync.routes.snapshot-handler.ts` 解 `snapshotOpType` 并写边界）；
+- 客户端那半缺的是 **"a product path that runs it"**，机制存在且是显式维护 API（点名 ADR-0046/0047），调用者只有测试；
+- 上传路径"只*识别*这类 op（分桶、密文），不构造"；
+- ⚠️ 一条**给下一个人的话**：如果哪天 `createSyncCheckpoint` 被接进产品路径（`engine.ts` 那句注释已经在说"检查点会在每次同步后尝试"），C4 会红 —— **那时要重判的是 §8.17 那条"上报 appVersion 会造假信号"的结论**（前置条件 2 成立之后，这个推论的前提就没了），不是把判据改窄。两处都写进了本体。
+- 顺带把"下载查询只设 `sinceSeq` 与 `excludeClient`"补全成实测的三个键（`sinceSeq`/`limit`/`excludeClient`）—— 这就是 C3 那条腿钉的东西。
+
+sweep 过没有第三份抄件：`only as enum members` / `no snapshot or checkpoint path` / `zero case-insensitive matches` / `枚举成员` 在 `docs` `server` `packages` `apps` `research` 全仓各 **0 命中**（只有 README 那一处，已改）。
+
+### 为什么这必须现在做，不能在窗口里做
+
+`pnpm -r test` 会在落地链里跑到这条判据。判据在窗口里红的代价是把几十分钟的稀缺窗口花在自家事上；改判据 + 改文档是十几分钟的事，而且**不需要别人任何东西**。载体跑完已清理：`cp` 进去 → 跑 → `rm` → `git status --porcelain` = **0**。
+
+### 读数与复跑
+
+- 我这棵树：`Tests 12 passed (12)`（1 条现量 + 11 条臂）；`fullStateProductConstructions=[]`、`fullStateProductCallers=[]`、`fullStateMechanismFiles=[]`（我这棵树还没有机制）、`opLogFileCount=3`。
+- 合并载体 `fb68cdc5`：同样 `Tests 12 passed (12)`；`syncClientFiles` 5 枚（含 `payload-cipher.ts`）、`fullStateScanned` `app-host 54 / mobile 105 / web 162`、`fullStateMechanismFiles=["packages/op-log/src/engine.ts"]`。
+  🔴 **两棵树都绿、但读数不同** —— 这正是想要的形状：判据不写死上游状态，机制进来之后它改记的是"构造点在 designated 位置、产品层没人调用"。
+- 同批回跑：`check:docs rc=0`（改的是 README 本体）。
+- 复跑：`cd server && npx vitest run tests/version-coupling.spec.ts`；载体预检 = `cp server/tests/version-coupling.spec.ts /tmp/heyta-merge-carrier/server/tests/ && cd /tmp/heyta-merge-carrier/server && npx vitest run tests/version-coupling.spec.ts`，跑完 `rm` 并核 `git -C /tmp/heyta-merge-carrier status --porcelain | wc -l` 回到 0。
+
+📌 待入 `docs/reference/environment-traps.md`（编号按主检出工作树现量取，22:39 量到最大号 270）：
+**新写的作用域/形状类判据，要拿"落地后的那棵树"（现成的合并载体）预跑一遍** —— 只在本分支跑绿证明的是"我和我上游还没分叉的那部分"，
+而判据真正要活的环境是合并之后。词级正则把"词出现过"当"路径存在"是这一族的典型失效（比较形状 / 枚举声明 / 打包产物里的定义三种误伤）。

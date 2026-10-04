@@ -90,15 +90,27 @@ const overlayTree = (
 // ── 判据本体 ──────────────────────────────────────────────────────────────
 
 const README_GATE_LINE = /`MIN_CHECKPOINT_SAFE_APP_VERSION` is `(\d+\.\d+\.\d+)`/g;
-const FULL_STATE_RE =
-  /snapshotOpType|OpType\.(?:REPAIR|SYNC_IMPORT|BACKUP_IMPORT)|'(?:REPAIR|SYNC_IMPORT|BACKUP_IMPORT)'/i;
+/**
+ * 🔴 构造形状，不是比较形状。`opType:` 后跟 full-state 枚举 = 造了一条边界 op；
+ * 而 `op.opType === 'REPAIR'` 只是上传分桶时的比较 —— 后者在 sync-client 里存在且合法（实测三处）。
+ * 用宽松的词级正则会把比较读成构造 ⇒ 判据在别人把机制落进 op-log 之后恒红（这条我在合并载体上量到过）。
+ */
+const FULL_STATE_CONSTRUCT_RE =
+  /opType:\s*(?:OpType\.(?:Repair|REPAIR|SyncImport|SYNC_IMPORT|BackupImport|BACKUP_IMPORT)|'(?:REPAIR|SYNC_IMPORT|BACKUP_IMPORT)')/;
+/** 调用形状要带接收者：生成物里的方法定义 `createSyncCheckpoint() {`（bridge-bundle 打包了 op-log 的类）不是调用。 */
+const FULL_STATE_CALL_RE = /\.createSyncCheckpoint\s*\(/;
 const DOWNLOAD_URL_MARKER = '/api/sync/ops';
 const GATE_DECL_REL = 'server/src/sync/checkpoint-gate.ts';
 const CLEANUP_REL = 'server/src/sync/cleanup.ts';
 const CLIENT_SRC_DIR = 'packages/sync-client/src';
 const CLIENT_REL = `${CLIENT_SRC_DIR}/client.ts`;
-/** 客户端侧"能构造一条 op"的层：同步编排 / 宿主接线 / reducer / 各壳的 TS 源码。 */
-const CLIENT_SCOPE_BASE = [CLIENT_SRC_DIR, 'packages/app-host/src', 'packages/op-log/src'];
+/**
+ * 产品层 = 会替用户做事的那些层（同步编排 / 宿主接线 / 各壳的 TS 源码）。
+ * `packages/op-log/src` **不在**此列：那是维护机制本体该在的地方（ADR-0046/0047 明写它是"显式维护 API，
+ * 没有自动 timer"），对它单独有一条"构造点数只能 0 或 1"的账。
+ */
+const PRODUCT_SCOPE_BASE = [CLIENT_SRC_DIR, 'packages/app-host/src'];
+const OP_LOG_SRC = 'packages/op-log/src';
 
 /** 有 TS 源码的移动/桌面/节点壳（新增一个带 src 的壳会自动进作用域）。 */
 const appShellSrcDirs = (reader: TreeReader): string[] => {
@@ -236,8 +248,10 @@ const assess = (reader: TreeReader): Assessment => {
     }
   }
 
-  // C4 —— 客户端侧没有任何一层构造因果 full-state 边界。
-  const scope = [...CLIENT_SCOPE_BASE, ...appShellSrcDirs(reader)];
+  // C4 —— 没有任何**产品路径**创建因果 full-state 边界（前置条件 2 的精确形态）。
+  // 机制本体在 op-log，这是设计（ADR-0046/0047：显式维护 API，无自动 timer）；这条判据管的是
+  // "有没有人把它接进替用户做事的那几层"，不是"机制存不存在"。
+  const scope = [...PRODUCT_SCOPE_BASE, ...appShellSrcDirs(reader)];
   readings.fullStateScope = scope;
   if (scope.length < 5) {
     fail('C4', `作用域只有 ${scope.length} 个目录（<5）—— apps/*/src 的枚举坏了`);
@@ -247,21 +261,49 @@ const assess = (reader: TreeReader): Assessment => {
     fail('C4', `只枚举到 ${shellCount} 个带 TS 的 apps/*/src（<4）`);
   }
   const scannedPerDir: Record<string, number> = {};
+  const productConstructions: string[] = [];
+  const productCallers: string[] = [];
   for (const dir of scope) {
     const rels = reader.walk(dir, ['ts', 'tsx']);
     scannedPerDir[dir] = rels.length;
     if (rels.length === 0) fail('C4', `${dir} 扫到 0 个文件 —— 判据在此会静默`);
-    const hits = filesWith(reader, rels, FULL_STATE_RE);
-    if (hits.length > 0) {
-      fail('C4', `${dir} 出现 full-state op 构造：${hits.join(', ')} ⇒ README 前置条件 2 过期了`);
+    for (const rel of rels) {
+      const text = reader.read(rel);
+      if (FULL_STATE_CONSTRUCT_RE.test(text)) productConstructions.push(rel);
+      if (FULL_STATE_CALL_RE.test(text)) productCallers.push(rel);
     }
   }
   readings.fullStateScanned = scannedPerDir;
-  // 阳性对照：同样的词形在契约层确实存在（枚举声明），所以上面那些 0 命中是真 0。
-  if (
-    filesWith(reader, reader.walk('packages/shared-schema/src', ['ts']), FULL_STATE_RE).length === 0
-  ) {
-    fail('C4', 'full-state 阳性对照失效：shared-schema 契约层本应读得到这些词');
+  readings.fullStateProductConstructions = productConstructions;
+  readings.fullStateProductCallers = productCallers;
+  if (productConstructions.length > 0) {
+    fail('C4', `产品层自己造了 full-state op：${productConstructions.join(', ')} ⇒ README 前置条件 2 过期了`);
+  }
+  if (productCallers.length > 0) {
+    fail('C4', `产品层开始调用维护检查点 ${FULL_STATE_CALL_RE.source}：${productCallers.join(', ')} ⇒ 前置条件 2 已经成立，那节文档要重读`);
+  }
+  // 机制本体的账：op-log src 里允许有构造点，但只允许 0 或 1 个文件含它。
+  // 0 = 这棵树还没有机制；1 = 机制在 designated 位置。**第二个**构造点意味着有人新加了一条边界来源，
+  // 而那不会是产品层，所以现在这条判据看不见它 —— 这一条就是让它看得见的方式。
+  const opLogFile = reader.walk(OP_LOG_SRC, ['ts']);
+  const mechanismFiles = filesWith(reader, opLogFile, FULL_STATE_CONSTRUCT_RE);
+  readings.fullStateMechanismFiles = mechanismFiles;
+  readings.opLogFileCount = opLogFile.length;
+  if (opLogFile.length === 0) fail('C4', `${OP_LOG_SRC} 扫到 0 个 .ts —— 机制那一侧无从对账`);
+  if (mechanismFiles.length > 1) {
+    fail('C4', `${OP_LOG_SRC} 出现 ${mechanismFiles.length} 个 full-state 构造点（${mechanismFiles.join(', ')}）⇒ 多了一条边界来源，前置条件 2 的措辞要重写`);
+  }
+  // 形状对照（与树无关）：四种形状必须各归各位，否则上面那些 0 命中只是正则太窄。
+  const shape = {
+    构造命中: FULL_STATE_CONSTRUCT_RE.test("engine.dispatch({ opType: OpType.Repair })"),
+    比较不误伤: FULL_STATE_CONSTRUCT_RE.test("if (op.opType === 'REPAIR') {"),
+    枚举成员不误伤: FULL_STATE_CONSTRUCT_RE.test("  Repair = 'REPAIR',"),
+    调用命中: FULL_STATE_CALL_RE.test("await engine.createSyncCheckpoint();"),
+    定义不误伤: FULL_STATE_CALL_RE.test("    createSyncCheckpoint() {"),
+  };
+  readings.fullStateShapeControls = shape;
+  if (!shape.构造命中 || shape.比较不误伤 || shape.枚举成员不误伤 || !shape.调用命中 || shape.定义不误伤) {
+    fail('C4', `形状对照失效 ${JSON.stringify(shape)} —— 这几条 0 命中不能算证明`);
   }
 
   // C5 —— 闸门唯一的消费者是那行日志；没有任何东西**分支于**它。
@@ -361,6 +403,38 @@ describe('注入臂（不能失败的判据没有价值）', () => {
       expectIds: ['C4'],
     },
     {
+      label: 'C4 宿主层开始调用维护检查点（= 前置条件 2 成立了）',
+      tree: overlayTree(realTree, [
+        {
+          'packages/app-host/src/arm-caller.ts':
+            "export const arm = (engine) => engine.createSyncCheckpoint();\n",
+        },
+      ]),
+      probe: (t) => expect(t.read('packages/app-host/src/arm-caller.ts')).toContain('.createSyncCheckpoint('),
+      expectIds: ['C4'],
+    },
+    {
+      label: 'C4 机制那一侧冒出第二个构造点',
+      tree: overlayTree(realTree, [
+        {
+          'packages/op-log/src/arm-second-a.ts': "export const a = { opType: OpType.Repair };\n",
+          'packages/op-log/src/arm-second-b.ts': "export const b = { opType: 'SYNC_IMPORT' };\n",
+        },
+      ]),
+      probe: (t) => expect(t.exists('packages/op-log/src/arm-second-b.ts')).toBe(true),
+      expectIds: ['C4'],
+    },
+    {
+      label: 'C4 上传路径那种比较形状**不该**被判成构造（反向臂：真的加了它才会红）',
+      tree: overlayTree(realTree, [
+        {
+          'packages/sync-client/src/client.ts': `${realTree.read(CLIENT_REL)}\nconst armCompare = (op) => op.opType === 'REPAIR';\n`,
+        },
+      ]),
+      probe: (t) => expect(t.read(CLIENT_REL)).toContain("op.opType === 'REPAIR'"),
+      expectIds: [],
+    },
+    {
       label: 'C5 有人加了分支于闸门的自动 cadence',
       tree: overlayTree(realTree, [
         {
@@ -392,12 +466,18 @@ describe('注入臂（不能失败的判据没有价值）', () => {
   ];
 
   for (const arm of arms) {
-    it(`臂「${arm.label}」只让 [${arm.expectIds.join(', ')}] 响`, () => {
+    it(`臂「${arm.label}」只让 [${arm.expectIds.join(', ') || '（空集：这是反向臂）'}] 响`, () => {
       expect(baseline.failures, '基线必须先干净，否则任何臂都证明不了什么').toEqual([]);
       arm.probe(arm.tree);
       const { failures } = assess(arm.tree);
       const firedIds = [...new Set(failures.map((f) => f.slice(0, 2)))].sort();
-      expect(failures.length, '变异后必须至少一条响').toBeGreaterThan(0);
+      if (arm.expectIds.length === 0) {
+        // 反向臂：这条变异是"真实存在但形状不算"的写法，判据必须**不**响。
+        // 它挡的是"正则宽到把合法写法也判成违规" —— 那种判据会在别人正常落地时误红，
+        // 而误红的判据下场就是被放宽，放宽通常是放宽到没牙。
+        expect(failures, `不该响却响了：${failures.join(' | ')}`).toEqual([]);
+        return;
+      }
       expect(firedIds, failures.join(' | ')).toEqual([...arm.expectIds].sort());
     });
   }
