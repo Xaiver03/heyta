@@ -161,10 +161,16 @@ function runLogged(bin, args, opts = {}) {
 
 /** 要读输出的执行（哈希、大小、标记行）。 */
 function runCapture(bin, args, opts = {}) {
-  if (DRY) {
+  // 🔴 `readOnly` 的探测**在 dry-run 里也照跑**。dry-run 的承诺是"不发网络写操作、不写本地文件"，
+  //    而步骤 1 那枚 ssh 探测只读文件系统的存在性，不碰这一条边界。
+  //    跟着 DRY 一起跳过的代价是实测出来的（01:33 那趟）：打印出来的是
+  //    `RNDEPS=（无） … DEPCHECK=（无）`，也就是说"远端 PowerShell 不接受这条命令"
+  //    和"远端缺哪几枚包"这两类**只能等 18 分钟后由 Metro 暴露** —— 预检就白做了。
+  if (DRY && !opts.readOnly) {
     console.log(`   [dry-run] 将执行并读取输出（**未执行**）：\n${planLine(bin, args)}`);
     return { status: 0, stdout: '', skipped: true };
   }
+  if (DRY) console.log(`   [dry-run] 只读探测**照跑**（它不写任何东西）：\n${planLine(bin, args)}`);
   const r = spawnSync(bin, args, {
     cwd: opts.cwd ?? repoRoot,
     encoding: 'utf8',
@@ -258,20 +264,52 @@ function runRemote() {
   //    `apps/mobile/node_modules` 存在、`apps/mobile/android/node_modules` 不存在，
   //    而 Mac 上 APK 打得出来 —— 说明这条路径从来就不是构建输入。
   //    原来按它判 ⇒ 远程构建会**恒定**红在步骤 1，而给出的修法（远端 pnpm install）做完也还是红。
+  // 🔴 但"目录在"离"构建输入齐"还差一层，而 2026-10-05 第一次真远程构建就是死在这一层的缺失上：
+  //    远端 `apps/mobile/node_modules` 存在（RNDEPS=True），Metro 却在 18 分钟后报
+  //    `Unable to resolve module @react-native-documents/picker`（`ProfileScreen.tsx:50`）。
+  //    逐包探测现量：`CHECKED=19 APP=17 ROOT=0 MISSING=2` ⇒ 缺
+  //    `@react-native-documents/picker` 与 `@heyta/widget-core`，而这两个**本机都装好了**
+  //    （`apps/mobile/package.json:31` 声明、本机 `apps/mobile/node_modules` 里有）
+  //    ⇒ 这是**环境**（远端那次 install 早于这两笔新增；同步只送源码与 `packages/*/dist`，
+  //    永不送 node_modules，因为它被 gitignore）。目录级判据对此**零分辨力**。
+  //    ⇒ 现在按**声明面推导**逐包判：名单取自 `apps/mobile/package.json` 的 dependencies，
+  //      两个位置（包自己的 / 根的）任一存在即算解析到 —— 后者是防"哪天 hoisting 变了"把这里
+  //      变成一条永不开的门（上面那条学费的同族）。
+  const declaredDeps = Object.keys(mobilePkg.dependencies ?? {});
+  const unsafeNames = declaredDeps.filter((n) => !/^[@A-Za-z0-9._/-]+$/.test(n));
+  if (unsafeNames.length > 0) {
+    die(
+      '步骤 1（依赖名单）',
+      `这些依赖名含路径分隔符以外的字符，不放进远端命令：${unsafeNames.join(', ')}`,
+      '   这是探针的安全边界，不是构建输入的问题 —— 改这里之前先想清楚为什么要用那种名字。',
+    );
+  }
+  const depArray = declaredDeps.map((n) => `'${n}'`).join(',');
   const preCmd =
     `powershell -NoProfile -Command "Write-Output ('RNDEPS=' + (Test-Path '${REMOTE_ROOT}\\apps\\mobile\\node_modules')); ` +
     `Write-Output ('ROOTDEPS=' + (Test-Path '${REMOTE_ROOT}\\node_modules\\.pnpm')); ` +
     `if (Test-Path '${localProps}') { if ((Get-Content -Raw '${localProps}') -match '/Users/|/opt/homebrew') ` +
     `{ Write-Output 'LOCALPROPS=MAC-PATH' } else { Write-Output 'LOCALPROPS=ok' } } ` +
-    `else { Write-Output 'LOCALPROPS=absent' }"`;
-  const preflight = runCapture('ssh', ['-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes', HOST, preCmd]);
+    `else { Write-Output 'LOCALPROPS=absent' }; ` +
+    `$n=@(${depArray}); $m=@(); foreach($x in $n){ $p='${REMOTE_ROOT}\\apps\\mobile\\node_modules\\'+$x.Replace('/','\\'); $q='${REMOTE_ROOT}\\node_modules\\'+$x.Replace('/','\\'); if(Test-Path -LiteralPath $p){} elseif(Test-Path -LiteralPath $q){} else {$m+=$x} }; ` +
+    `Write-Output ('DEPCHECK=' + $n.Count); Write-Output ('DEPMISS=' + $m.Count); foreach($x in $m){ Write-Output ('DEPMISS-'+$x) }"`;
+  const preflight = runCapture('ssh', ['-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes', HOST, preCmd], {
+    readOnly: true,
+  });
   const pre = preflight.stdout ?? '';
   const marker = (name) => {
     const m = new RegExp(`${name}=([^\\r\\n]*)`).exec(pre);
     return m ? m[1].trim() : '';
   };
   if (DRY) {
-    console.log('   [dry-run] 探测结果读不到，后续步骤按计划打印');
+    // 🔴 dry-run 也照实**打印探测读数**（探测本来就是只读的，且它就是给预检用的）。
+    //    上一版这里写的是"探测结果读不到"，后果是：那条探测字符串本身坏了 / 远端 PowerShell
+    //    语法不接受 —— 这些只能等真构建跑到 18 分钟后由 Metro 暴露。预检的意义就没了。
+    console.log(
+      `   [dry-run] 探测读数：RNDEPS=${marker('RNDEPS') || '（无）'} ROOTDEPS=${marker('ROOTDEPS') || '（无）'} ` +
+        `LOCALPROPS=${marker('LOCALPROPS') || '（无）'} DEPCHECK=${marker('DEPCHECK') || '（无）'} ` +
+        `DEPMISS=${marker('DEPMISS') || '（无）'}`,
+    );
   } else {
     if (preflight.status !== 0 || pre.trim() === '') {
       die(
@@ -290,6 +328,35 @@ function runRemote() {
           '\n   （工具链没装则见 scripts/windows/setup-build-host.ps1，手册 §4）',
       );
     }
+    // 🔴 逐包判定：**先证明探针自己跑成了**，再证明"缺 0 个"。
+    //    缺前一半的话，"DEPMISS 行不在"会被读成"没缺"—— 那正是本次要修的那个形状
+    //    （目录在 ⇒ ✅，而真正缺的两枚包从未被问起）。
+    const depChecked = Number(marker('DEPCHECK'));
+    const depMissCount = Number(marker('DEPMISS'));
+    if (!Number.isFinite(depChecked) || depChecked !== declaredDeps.length) {
+      die(
+        '步骤 1（远端依赖逐包探测没跑成）',
+        `探针该数出 ${declaredDeps.length} 个声明依赖，实际读到 DEPCHECK=[${marker('DEPCHECK') || '（无此行）'}]。`,
+        '   ⇒ 这是**探针故障**，不是"依赖齐"。不要放行；先看远端 PowerShell 的报错（同一份 stdout 里 RNDEPS 行有没有）。',
+      );
+    }
+    if (!Number.isFinite(depMissCount)) {
+      die(
+        '步骤 1（远端依赖逐包探测没跑成）',
+        `DEPCHECK 有读数（${depChecked}）但 DEPMISS 读不到 ⇒ 探测中途断了。`,
+        '   同样按**探针故障**处理，不按"缺 0 个"放行。',
+      );
+    }
+    if (depMissCount > 0) {
+      const missList = [...pre.matchAll(/^DEPMISS-(\S+)/gm)].map((x) => x[1]);
+      die(
+        '步骤 1（远端声明依赖缺失）',
+        `远端解析不到 ${depMissCount}/${depChecked} 个 apps/mobile 声明依赖：\n      ${missList.join('\n      ')}`,
+        `   这是**环境**，不是产品：本机这两个都装好了，而同步**永不送 node_modules**（被 gitignore）。\n` +
+          `   修它：ssh ${HOST} "cd /d ${REMOTE_ROOT} && pnpm install --frozen-lockfile"` +
+          '\n   ⚠️ 不要改成本机跑（AGENTS §6.1），也不要因为"目录在"就摘掉这一格 —— 上一次就是那样红了 18 分钟。',
+      );
+    }
     // local.properties 被 gitignore ⇒ **同步永远不会覆盖它**。
     // 远端若留着一条 Mac 的 sdk.dir，症状是 gradle 报一句和平台无关的 SDK 找不到 ——
     // 先在这里点名，别让它变成一次神秘的构建失败。
@@ -301,7 +368,9 @@ function runRemote() {
           '\n   或把它改成远端真实的 SDK 路径。',
       );
     }
-    console.log(`  ✅ 远端依赖在位；local.properties=${marker('LOCALPROPS') || '（探测无读数）'}`);
+    console.log(
+      `  ✅ 远端依赖在位（声明的 ${depChecked} 个逐包解析得到）；local.properties=${marker('LOCALPROPS') || '（探测无读数）'}`,
+    );
   }
 
   /* 步骤 2：同步当前工作树（复用 MSIX 那一腿的同一枚同步机制）*/
