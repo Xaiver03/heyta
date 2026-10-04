@@ -4385,3 +4385,46 @@ EVIDENCE-SETTLE n=52 prev_run=52 archived_to=…/carrier-evidence after=0
 
 ① 逐条 `merge-base --is-ancestor` 此刻仍全 YES，但 `main` 已被并行线推到 `dcd37d36`（我这条读到的是 `c1f7daca`）
 ⇒ 引用红线读数必须带 sha，跨 sha 重跑是另一条读数的权利，不是同一条的延续。
+#### §15.43ar（10-04 10:0x）两件"登记而不做"的事，理由都要写在账上（否则下一位会以为是漏了）
+
+**(1) `check:legal-permissions` 与 `check:ai-e2e` 留在"本线命名门禁"里，是刻意的宽。**
+`scratch-heyta/heyta-own-gates.mjs` 的 `OWNER` 正则匹配 `check-(ai|legal|journey)…`，
+现量推出 10 条（`check:ai-coverage / ai-e2e / ai-quota / ai-tools / journey-coverage / landing-e2e /
+legal-host / legal-permissions / legal-tools / privacy-consent-e2e`）。其中 B64、B69 两条红的**缺陷所有者不是本线**。
+后果写清楚：**③ 在它们关闭之前会如实退出 7**（四端装上了、取证合格，但本线命名的门有红）。
+本轮把这段推理写进那个脚本的文件头注释，并证明**零行为变化** —— 改注释前后
+`node heyta-own-gates.mjs <载体>` 的名单输出**逐字节相同**（`cmp -s`，10 条）。
+收窄那条正则技术上 5 秒就能做，但"窄掉的那一条以后红了也不会挡住 DONE"正是红线那句
+"不降级判据、不为跑绿放宽门禁"要防的事 ⇒ **不做**，把代价写在账上（§15.43m 那条"闭合代价那栏也是断言"的同族）。
+
+**(2) 这五把夹具 + 队列本体现在住在 `~/scratch-heyta/`，仓里没有 —— 这是已知的持久化缺口，本轮不搬，因为"搬"的正确顺序还没到。**
+仓里已有的同类先例是 `research/tools/mutation-rigs/`（AGENTS §2 把 `research/` 定为"一次性脚本 / 归档性质"），
+所以目的地是明确的。但现在**不能复制进去**：那样同一份脚本会有两个所有者，而本条线已经犯过两次"抄件一定漂"
+（§15.43ah 抽了新的没删旧的、§15.43aq 的 sha 措辞）。正确顺序是：
+① 等一趟实例**自然退出**（`pgrep -f 'heyta-deliver-on-window.sh'` 为空，且 `rc.txt` 末行是 `DONE`/`NOT-DONE`/`BAIL` 之一）；
+② `mv` 而不是 `cp` 到 `research/tools/ai-closeout-rigs/`，原路径留**软链**（`env_retry` 用 `bash "$SELF"` 接力，路径不能断）；
+③ 搬完立刻重跑那五把夹具（`8/16/9/8/5` 腿）并确认 `check:script-snapshot` 的覆盖集合不含这些新文件
+（现量它是**显式白名单**：`scripts/reinstall-all.sh`、`scripts/verify-*.sh` 等逐条列出，不是目录扫描 ⇒ 不冲突）；
+④ `pnpm check:docs` + `check:md-tables` 各跑一次。
+在 ① 之前动它 = 造一次"跑着的实例持旧 inode、接力找不到新 inode"的现场，与本轮已吃过三次的坑同形。
+
+**现场（10:05，供下一位对账）**：队列 81000 阶段 1 等窗口累计 540s / 上限 5400s；
+`vm.loadavg = { 104.38 62.83 45.41 }`。挡路的重装**逐条取过 cmdline 与 lstart**（不靠探针计数下结论）：
+`81007 sh /tmp/queue-reinstall-all.sh` 起于 **03:09:04**、`93771` 同形起于 03:12:10、
+`93817 bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817` 起于 03:12:11
+⇒ 别的泳道这一趟已经占了 **6 小时 53 分**且还活着（与另一条线记的 `notarytool --wait` 同形）。
+③ 的**输入侧**则已全部就绪：载体 `git status --porcelain`（任何状态、任何路径）= **0 条**，
+打包输入与提交态逐字节一致，`IOS_DEVICE_NAME` 显式带默认值（`heyta-iphone-17pro`，不靠 `head -1`）。
+
+🔴 **一个要说出口的期限风险（不是抱怨，是让下一位不必重新推）**：队列的等待预算是
+`MAX_ROUNDS=5 × 5400s ≈ 7.5 小时`，而对端已占 6h53m 且**看不到结束点**。
+预算用尽时它按红线那句"环境无效 ≠ 产品失败"**退出 3 并如实留痕**，不会硬装、也不会降级判据 ——
+也就是说 ③ 有可能需要**外部再起一次**而不是自愈。重启命令就是 **B67** 记的那一条（第 3915 行），无需新参数：
+
+```bash
+nohup bash ~/scratch-heyta/heyta-deliver-on-window.sh </dev/null >/dev/null 2>&1 &
+```
+
+判"要不要再起"的可复现读法：`tail -2 <最新 OUT>/rc.txt`（有 `RE-ARM-ENV` 就是它自己接上了，不用管；
+只有 `BAIL … rc=3` 才需要人起）。本轮**不**为了让窗口开而调低负载阈值、也不代别人停那三枚进程 ——
+它们的 owner 不是我，取证只到 cmdline 与 lstart 为止。

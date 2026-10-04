@@ -3920,6 +3920,17 @@ nohup bash ~/scratch-heyta/heyta-deliver-on-window.sh </dev/null >/dev/null 2>&1
 （"这些会被打进产物，而判据看不出来"）。⇒ ③ 的闭合条件是两件事：**那五枚被处置** + **并行会话把它们的
 源码落定**。任一时刻重跑 `bash scripts/verify-mobile-window-gate.sh --target b` 就能知道窗口开没开。
 
+> 🔴 **10:05 增量读数 + 一句前置更正**（本条的两个闭合条件里第二条问错了对象，细节见 B72 的补记与 B73）：
+> 对端三枚进程仍在，逐条取过 `cmdline` 与 `lstart`：`81007 /tmp/queue-reinstall-all.sh` 03:09:04、
+> `93771` 同形 03:12:10、`93817 /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817` 03:12:11
+> ⇒ **已连续占用 6 小时 53 分**，`vm.loadavg = { 104.38 62.83 45.41 }`。
+> 而"并行会话把它们的源码落定"**不是本线 ③ 的前置**：③ 从载体 `heyta-wt-ai-closeout` 打包
+> （阶段 5 实测 `cd "$CARRIER" && bash scripts/reinstall-all.sh`），载体现量 `git status --porcelain`
+> 任何状态、任何路径 = **0 条**。⇒ 本条真正等的只有"**那五枚被处置**"（含负载落回阈值内），
+> 主检出脏与否只影响别的泳道从主检出打包的那条路。
+> 队列等待预算 `MAX_ROUNDS=5 × 5400s ≈ 7.5 小时`与对端占用同量级 ⇒ 有可能预算用尽后按环境无效退出 3，
+> 届时用上面那条 `nohup` 命令再起一次即可（判据一条不放宽；不代别人停进程，取证只到 cmdline 与 lstart）。
+
 **06:31 更新：队列不等处置就重起了（pid 10581，读数目录 `~/scratch-heyta/deliver-0631/`），两处行为变了**
 
 - 阶段 5 的"别人的重装仍在本机存在"从**一次性 bail** 改成**有界等**（默认 21600s、每 120s 一轮、
