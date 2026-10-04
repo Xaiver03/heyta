@@ -7138,3 +7138,46 @@ RC 仍 = 1，且那 2 枚 marker 是 `App.tsx` 与 `main-area.css` —— **正�
 `宿主内 …Id 本地态 17 处全部有语义登记（in-flight 8 / inline-rename 4 / confirm-gate 4 / dragging 1）` ——
 **17** 是本分支的 15 + main 带来的那两枚（`§8.36` 的预测），而注释里那句"15 处"早在 §8.52 就改成了
 "以 G 打印的实时命中数为准"，所以这次没有再漂一遍。这是那条改动的**第一次跨载体复验**。
+
+## 8.109 证据寿命盘点：本篇有 39 行把取证件写在 `/tmp`，其中 3 枚已经不在了（2026-10-04 23:3x 现量）
+
+起因是我自己今天清理临时件时**删掉了两枚被文档点名的探针**（见下表）。所以这一节不是"顺手记账"，
+是把 §4 那句"判据必须配变异臂证明能红"往后再问一层：**那一臂今天还能不能再跑一次。**
+
+现量口径（每次重取）：`grep -c "/tmp/dp" docs/plans/detail-pane-alignment.md` 的引用行数、
+`grep -ohE '/tmp/dp_[A-Za-z0-9_.-]+\.(py|mjs|sh|js)' … | sort -u` 的唯一件数，再逐枚 `[ -f ]`。
+本轮读数：**39 行 / 18 枚唯一件 / 还在盘上 15 枚 / 已消失 3 枚**。入仓装置 **15 枚**
+（`research/tools/mutation-rigs/`，覆盖 F / G / H / I、view-universe、c1-coverage、status-table、evidence-refs、
+slot、ownership、preflight、docs-letter、widgets、timeline-face 那些**常驻门禁的臂**）。
+
+| 只有 `/tmp` 一份、没有入仓镜像的件 | 它当时量出来的结论 | 今天还能不能复跑 |
+|---|---|---|
+| `/tmp/dp_tablecheck4.mjs` | §8.33 的表格形状读数（33 处 / 14 份文档） | 🔴 **已消失 —— 是我今天清理 `dp_*` 时删的**。当时那句"不进仓"记的是一条**有理由的裁决**（"进仓就要挂门禁、就要替别人修 33 处"），理由仍然成立，**但代价没写清**：代价是这条读数从此不可复跑，只能引用当时写下的那两个数 |
+| `/tmp/dp_gateall.mjs` | §8.100 那趟"43 道纯 fs 门禁"的枚举法 | 🔴 **同样被我删了**。它的**口径**（`package.json` 里 `check:*` 且命令是单条 `node <脚本>`）写在原文里，所以这一枚可重建 —— 这正是该把口径写进句子的原因，脚本丢了口径没丢 |
+| `/tmp/dp_tablecheck2.mjs` | §8 里那条 `TABLE_RC` 的串跑法 | 🔴 已消失（更早，成因未查——**不写成"重启造成的"**，那是没取证的归因） |
+| `/tmp/dp_es_mutate.py` | §8.13 修 `check:empty-state` 的三臂 E1/E2/E3 | 🟡 文件在，但**它自己文件头就写着"一次性 rig，不提交"**，且 e2e 那半依赖一枚同样没入库的 `playwright.detail-pane.config.ts`（§8.21 那条"跑完即删"的覆盖件）⇒ 即便脚本在，那一趟也**跑不全** |
+| `/tmp/dp_w1b_battery.py` | W1b 那格 `25 步 ALL_GREEN` | 🟡 文件在；它的**组成**已写在 §8（门禁 + token 生成 + 六包 typecheck + 六包测试 + web 生产构建 + e2e 整族）⇒ 丢的是编排，不是判据本体 |
+| `/tmp/dp_s6_audit2/3.mjs`、`dp_n1_counterfactual.mjs`、`dp_habit_trace_rig.mjs`、`dp_ab_aria.mjs`、`dp_leak_proof.mjs`、`dp_g_merge_probe.mjs`、`dp_listcheck.mjs`、`dp_docscheck.mjs`、`dp_merge_shape.mjs`、`dp_es_renumber_traps.py` | 一次性测量/审计（§6 十探针、断言 H 的反事实、选中痕迹的 A/B、合流形状、台账续号那一次动作等） | 🟢 文件都还在盘上。**结论都已落进文档或已升级成常驻判据**，所以它们是一次性动作的辅助件，不是任何一条当前判据的唯一载体 |
+
+📌 **这一节的产出是一条前置规则，不是道歉**：
+
+1. **凡是"合流当时/下一轮还要用它"的读数，写它的那一刻就把件落进 `research/tools/mutation-rigs/`**，
+   或者把**口径**（怎么算的、分母从哪来）写进引用它的那句话里 —— 二者必须有一个。
+   §8.108 就是按这条做的：那一行名册登记的**原文抄进了文档**，没留在临时件里。
+2. **"不进仓"是一个允许的裁决，但要连代价一起写**：`tablecheck4` 那句只写了理由（不替别人修 33 处），
+   没写"于是这条读数变成历史值"。下一轮凡是写"不进仓"，后面必须跟一句"它变成不可复跑的历史读数"。
+3. ⚠️ **清理临时件之前先按名字回查文档**：我今天删那两枚时并没有 `grep -rn "/tmp/dp_gateall" docs`。
+   自己造的 scratch 文件当然可以删，但**被结论引用过的**就不是我一个人的东西了 —— 这一步以后写在动作前面。
+
+**这一节的收尾读数**（2026-10-04 23:4x 现量，纯文档改动，源码零字节变化）：
+
+| 闸门 | 读数 |
+|---|---|
+| 归属门 | `verify-detail-pane-ownership.mjs` ⇒ `VERDICT=CLEAN`｜主检出未提交 **43** 枚、点名 1 条、本地不在场 0、被占 0 |
+| 文档门禁 | `check-detail-pane-status-table` / `-c1-coverage` / `-evidence-refs` / `check-docs-voice` / `check-detail-pane-slot` 五道 **RC=0** |
+| 死链 | `research/tools/docs-link-check.mjs` **RC=1，唯一一枚**在 `PROGRESS.md:1362 → docs/research/aed-implementation-evidence.md`，**不在本线两份文档里**（§8.106 已复核归属：那一枚随 `c25960cb` 只存在于 main，本分支不是它的所有者 ⇒ 登记、不代改） |
+| 两道余量为 0 的棘轮 | `check:l4` mobile **90 = 基线 90**；`check:row-single-source` ht-* 族 **28 = 基线 28**（web 侧 98 ≤ 104 未动） |
+| 腿10 增量 | 42→**44** 块／151→**156** 条目，逐条对得上：新增 2 块分别在本文第 7075–7080 行（2 项）与第 7164–7169 行（3 项）—— 腿10 数的是**有序列表块与条目**，不是表格与代码块，这次先把单位问清楚再报数 |
+
+⚠️ 上一轮我把腿10 的"块"读成表格/代码块，按那个理解去凑增量会凑不上（本节的表 + 名册代码块就有 4 处）。
+**计数类判据报错单位是常态**：先读定义处那段代码里数的是什么，再引用它的数字。
