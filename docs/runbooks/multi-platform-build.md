@@ -65,11 +65,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\setup-build-
 
 ## 1. Android
 
-### 1.1 本机（macOS）
+> 🔴 **2026-10-04 起：Android 任务一律 `ssh windows-pc`，不要再在这台 Mac 上起 Gradle 构建或模拟器。**
+> 分流落在唯一收口点 `scripts/run-gradle.mjs`，所以下面这些命令**一个字都不用改**，
+> 只是在 Mac/Linux 上它们会在远端执行并把产物回传到原来的路径。
+> 规则本体见 [`android-build-on-windows.md`](android-build-on-windows.md)（怎么打 / 验收判据 /
+> Mac 释放清单 / 边界），AGENTS §6.1 旁边那一行是拍板记录。
+> ⚠️ **装机与模拟器目前仍在这台 Mac 上**（windows-pc 没有 emulator 与 system-images）。
+
+### 1.1 Mac/Linux 上调用（实际在 windows-pc 构建）
 
 ```bash
 pnpm -r build
-pnpm build:android            # Release APK
+pnpm build:android            # Release APK（远端构建 → 回传到这个路径）
+```
+
+想先看计划、确认它不会在本机起 gradle：
+
+```bash
+node scripts/run-gradle.mjs assembleRelease --dry-run   # 只打印计划，0 次网络写、0 个本地写
 ```
 
 产物：
@@ -108,6 +121,13 @@ pnpm build:android
 **仓库怎么落到 Windows 上**（`C:\src\heyta` 不是靠 `git clone` 得来的）：
 GitHub 在 Windows 上必须经代理，而 `git clone` 私有仓库还需要凭据
 （PAT 或 deploy key），这台机器上**没有配**。当前做法是把 Mac 的工作树打成源码包送过去：
+
+> 🔴 下面这套 `git add -A` + `git archive` 是**一次性 bootstrap**（首次建那棵树）。
+> **日常同步走 `scripts/lib/sync-windows-sources.sh`**：它用
+> `git ls-files` + `--others --exclude-standard` 列清单（工作树内容，不动索引），
+> 并带 sha256 对账。在**共用工作树**里跑 `git add -A` 会把别人的未提交改动暂存进来 ——
+> 那是本仓明令禁止的动作（AGENTS §8 第 9 条、§7 第 196 条：带尾斜杠的 `node_modules/`
+> 只匹配目录，软链挡不住，`ls-files -co` 形状的打包集合还得靠那道对账兜）。
 
 ```bash
 # Mac 侧：导出当前工作树（含未提交改动），排除 node_modules 与已提交的 npm 缓存
