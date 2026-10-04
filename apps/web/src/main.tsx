@@ -19,6 +19,7 @@ import { StorageError } from '@heyta/storage';
 import { registerLocalEraser } from '@heyta/app-host';
 
 import { App } from './App.js';
+import { armBootSplashDismiss } from './boot-splash.js';
 import { holdPendingLogin, releasePendingLogin } from './features/auth/pending-login.js';
 import { createStartupNetwork } from './features/privacy/startup-network.js';
 import {
@@ -98,6 +99,18 @@ if (container === null) {
 }
 
 const root = createRoot(container);
+
+/**
+ * 🔴 首屏遮罩的退场接线 —— 必须在**任何** `root.render()` 之前挂上。
+ *
+ * `index.html` 里那段生成物是一层 `position: fixed; inset: 0` 的满屏品牌帧，
+ * 本文件在它下面有**四条**渲染出口（`?shell=1` / `?slice=1` / 正常 `<App />` /
+ * 存储不可用的 `ErrorScreen`）。观察者挂在容器上而不是某条分支里，
+ * 是为了让"漏掉某条出口"这件事结构上不可能发生 ——
+ * 漏掉的后果不是报错，是**装出来的桌面端永远停在品牌帧上**
+ * （而截图判据还全是绿的：那块底板就是主蓝）。详见 `boot-splash.ts` 文件头。
+ */
+armBootSplashDismiss(container);
 
 /**
  * 🔴 M1 垂直切片的验证入口（`?slice=1`）。

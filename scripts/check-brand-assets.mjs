@@ -1,0 +1,220 @@
+#!/usr/bin/env node
+/**
+ * `scripts/check-brand-assets.mjs` —— 品牌产物（图标 + 首屏动画）的**接线对账**
+ *
+ * ## 它和两个生成器的分工
+ *
+ * `gen-app-icons.mjs --check` 与 `gen-boot-splash.mjs --check` 已经钉住了
+ * "产物 == 从 token 生成的那一份"。本文件钉的是它们**结构上看不见**的那一半：
+ * **产物有没有被清单引用、被代码消费**。
+ *
+ * 为什么要单独钉这一半 —— 本轮实测抓到的两件事都在这里：
+ *
+ * 1. 图标那笔提交（`c9fe6f56`）把自适应图标的 `foreground android:drawable=
+ *    "@mipmap/ic_launcher_foreground"` 写进了 XML 并提交，而**五档前景层 PNG
+ *    从没被提交** ⇒ `git ls-tree -r HEAD | grep -c foreground` = **0**，
+ *    干净检出打 APK 时 AAPT 直接找不到资源。工作树里文件在、生成器对账全绿、
+ *    `pnpm check` 全绿 —— 因为它扫的是工作树，不是**提交物**。
+ * 2. `index.html` 里那层满屏品牌帧生成之后，**没有任何代码把它摘掉**。
+ *    装出来的桌面端会永远停在品牌帧上，而截图判据"非空白 + 数得出主蓝"
+ *    会满分通过 —— 那块底板本身就是 `#2563eb`。
+ *
+ * 两件事的形状是同一个：**东西都在，没人引用它 / 没人消费它**。
+ * 所以这里的每一条判据问的都是"谁指向它"，不是"它在不在"。
+ *
+ * ## 判据能失败吗
+ *
+ * 能。至少这几处摘掉会红（都实测过，见计划文档 §6）：
+ *   - 从 `main.tsx` 删掉 `armBootSplashDismiss` 调用 ⇒「退场已接线」红
+ *   - 把那次调用挪到 `root.render` **之后** ⇒「顺序」红（漏掉早渲染的竞态）
+ *   - 从提交物里删掉任意一档 `ic_launcher_foreground.png` ⇒「前景层在提交物里」红
+ *   - 把 `AndroidManifest` 的 `android:icon` 改掉 ⇒「清单引用」红
+ *
+ * @see docs/plans/brand-icon-and-splash.md
+ */
+
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+const problems = [];
+const ok = [];
+
+/** 读一个必须存在的文件；读不到就是**判据红**，不是跳过（§7 第 191 条）。 */
+function mustRead(rel) {
+  const abs = join(ROOT, rel);
+  if (!existsSync(abs)) {
+    problems.push(`${rel}：文件不存在 —— 这条判据不能因为目标缺失而静默放行`);
+    return null;
+  }
+  return readFileSync(abs, 'utf8');
+}
+
+function check(label, rel, predicate) {
+  const text = rel === null ? '' : mustRead(rel);
+  if (text === null) return;
+  const verdict = predicate(text);
+  if (verdict === true) ok.push(label);
+  else problems.push(`${label}${typeof verdict === 'string' ? `：${verdict}` : ''}`);
+}
+
+function checkExists(label, rel) {
+  if (existsSync(join(ROOT, rel))) ok.push(label);
+  else problems.push(`${label}：缺 ${rel}`);
+}
+
+/* ── 1. 两个生成器：产物与 token 逐字节对账 ─────────────────────────── */
+for (const [label, script] of [
+  ['应用图标生成器对账', 'scripts/gen-app-icons.mjs'],
+  ['首屏动画生成器对账', 'scripts/gen-boot-splash.mjs'],
+]) {
+  try {
+    execFileSync(process.execPath, [script, '--check'], { cwd: ROOT, stdio: 'pipe' });
+    ok.push(label);
+  } catch (err) {
+    const out = `${String(err.stdout ?? '')}${String(err.stderr ?? '')}`.trim().split('\n').slice(0, 6).join(' | ');
+    problems.push(`${label}：${script} --check 非零退出 —— ${out || String(err)}`);
+  }
+}
+
+/* ── 2. web：品牌帧在 HTML 里，并且有人负责把它摘掉 ─────────────────── */
+check(
+  'web：index.html 含生成物标记与遮罩节点',
+  'apps/web/index.html',
+  (t) =>
+    t.includes('HEYTA-BOOT-SPLASH:BEGIN') &&
+    t.includes('id="heyta-boot"') &&
+    t.includes('HEYTA-BOOT-SPLASH:END') ||
+    '缺 BEGIN/END 标记或 #heyta-boot 节点',
+);
+check(
+  'web：退场模块存在',
+  'apps/web/src/boot-splash.ts',
+  (t) => t.includes('export function armBootSplashDismiss') || '没有导出 armBootSplashDismiss',
+);
+check(
+  'web：退场已接线（main.tsx 引用并调用）',
+  'apps/web/src/main.tsx',
+  (t) =>
+    (t.includes("from './boot-splash.js'") && t.includes('armBootSplashDismiss(')) ||
+    '没有 import 或没有调用 —— 后果是遮罩永远盖在应用上，而截图判据全绿',
+);
+/**
+ * 剥掉注释后再做位置判断。
+ *
+ * 这不是防御性冗余，是**当场踩到的**：第一版直接对 `main.tsx` 原文做
+ * `indexOf('root.render(')`，结果它命中的是我自己写的那句注释
+ * "在任何 `root.render()` 之前调用" —— 于是这条判据报"接线晚于渲染"，
+ * 而代码顺序是对的。**门禁命中它自己读的文档残留**（同类：§7 第 191 条、
+ * 取证定位命中套件自己留下的字符串）。
+ */
+function stripComments(text) {
+  return text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/^\s*\/\/.*$/gm, '');
+}
+
+check(
+  'web：接线早于任何一次 root.render',
+  'apps/web/src/main.tsx',
+  (t) => {
+    const code = stripComments(t);
+    const arm = code.indexOf('armBootSplashDismiss(');
+    const firstRender = code.indexOf('root.render(');
+    if (arm === -1) return '找不到调用点';
+    if (firstRender === -1) return '找不到 root.render —— 这条判据的对照物没了';
+    return arm < firstRender || `调用在第 ${arm} 字节、第一次 render 在第 ${firstRender} 字节：晚于渲染会漏掉早挂载的分支`;
+  },
+);
+
+/* ── 3. Android：前景层必须在**提交物**里，且清单真的指向它 ─────────── */
+const FOREGROUND_DENSITIES = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi'];
+for (const d of FOREGROUND_DENSITIES) {
+  checkExists(`android：前景层 ${d} 在树上`, `apps/mobile/android/app/src/main/res/mipmap-${d}/ic_launcher_foreground.png`);
+}
+check(
+  'android：自适应图标引用前景层',
+  'apps/mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml',
+  (t) => t.includes('@mipmap/ic_launcher_foreground') || 'adaptive-icon 没有引用 ic_launcher_foreground',
+);
+check(
+  'android：Manifest 引用图标与主题',
+  'apps/mobile/android/app/src/main/AndroidManifest.xml',
+  (t) =>
+    (t.includes('android:icon="@mipmap/ic_launcher"') && t.includes('android:theme="@style/AppTheme"')) ||
+    'android:icon / android:theme 不再指向我们那一份',
+);
+check(
+  'android：12+ 启动屏三项挂在主题上',
+  'apps/mobile/android/app/src/main/res/values-v31/styles.xml',
+  (t) =>
+    (t.includes('windowSplashScreenBackground') &&
+      t.includes('windowSplashScreenAnimatedIcon') &&
+      t.includes('windowSplashScreenAnimationDuration')) ||
+    '缺 windowSplashScreen* 主题项 —— Android 12+ 那一帧就不是我们说了算',
+);
+check(
+  'android：刻意不设 brandingImage（官方设计指南劝退）',
+  'apps/mobile/android/app/src/main/res/values-v31/styles.xml',
+  (t) => !t.includes('windowSplashScreenBrandingImage') || '出现了 brandingImage',
+);
+check(
+  'android：主题只有一份内容（Base + 叠加，不是两份逐字拷贝）',
+  'apps/mobile/android/app/src/main/res/values/styles.xml',
+  (t) =>
+    (t.split('<style name="AppTheme.Base"').length - 1 === 1 &&
+      t.includes('<style name="AppTheme" parent="AppTheme.Base"')) ||
+    'AppTheme 又长出第二份内容体 —— 那是两套裁决标准的形状',
+);
+
+/* ── 4. iOS：静态启动帧必须挂在清单上、画的是我们的 mark ───────────── */
+check(
+  'ios：Info.plist 仍指向 LaunchScreen',
+  'apps/mobile/ios/Heyta/Info.plist',
+  (t) => /<key>UILaunchStoryboardName<\/key>\s*<string>LaunchScreen<\/string>/.test(t) || 'UILaunchStoryboardName 不再是 LaunchScreen',
+);
+check(
+  'ios：启动帧用的是品牌 mark，且零文案',
+  'apps/mobile/ios/Heyta/LaunchScreen.storyboard',
+  (t) =>
+    (t.includes('image="HeytaLaunchMark"') &&
+      t.includes('launchScreen="YES"') &&
+      !t.includes('Powered by React Native') &&
+      !t.includes('<label')) ||
+    '启动帧回到脚手架文案 / 带上了文字 —— storyboard 在 bundle 之前渲染，i18n 够不着它',
+);
+check(
+  'ios：底色走 color asset（亮/暗两档）',
+  'apps/mobile/ios/Heyta/LaunchScreen.storyboard',
+  (t) => t.includes('name="HeytaSplashBackground"') || '底色是内联字面值，暗色模式会先闪一张亮板',
+);
+checkExists('ios：colorset 在树上', 'apps/mobile/ios/Heyta/Images.xcassets/HeytaSplashBackground.colorset/Contents.json');
+checkExists('ios：mark 图集在树上', 'apps/mobile/ios/Heyta/Images.xcassets/HeytaLaunchMark.imageset/Contents.json');
+
+/* ── 5. token：动效档位必须还在（生成器靠它，界面也靠它） ──────────── */
+check(
+  'token：首屏四档时长 + 层级 + mark 尺寸齐备',
+  'packages/design-system/src/tokens.css',
+  (t) =>
+    ['--ht-duration-splash-enter', '--ht-duration-splash-stagger', '--ht-duration-splash-hold', '--ht-duration-splash-exit', '--ht-z-splash', '--ht-layout-splash-mark']
+      .filter((n) => !t.includes(n))
+      .join(', ') === '' || '缺 token（首屏动画不许自带字面时长）',
+);
+
+/* ── 出口 ─────────────────────────────────────────────────────────── */
+// 阳性对照：上面所有判据都可能因为"读不到文件"而一个都不执行，
+// 那正是 §7 第 191 条的形状 —— 所以这里断言**跑到的条数**有下限。
+const MIN_CHECKS = 18;
+if (ok.length + problems.length < MIN_CHECKS) {
+  problems.push(`只执行了 ${ok.length + problems.length} 条判据（下限 ${MIN_CHECKS}）—— 枚举面或文件面坏了，不算通过`);
+}
+
+if (problems.length > 0) {
+  console.error(`🔴 品牌产物接线对账失败（${problems.length} 条）：`);
+  for (const p of problems) console.error(`   - ${p}`);
+  console.error('   闭合命令：node scripts/gen-app-icons.mjs && node scripts/gen-boot-splash.mjs');
+  process.exit(1);
+}
+
+console.log(`  ✅ 品牌产物接线对账通过（${ok.length} 条：生成物逐字节 + 清单引用 + 消费方接线）`);

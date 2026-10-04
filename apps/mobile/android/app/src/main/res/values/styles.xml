@@ -1,10 +1,22 @@
 <resources>
 
-    <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <!--
+      Base application theme.
+
+      🔴 拆成 `AppTheme.Base` + `AppTheme` 两层的唯一理由：**Android 12+ 的启动屏
+      配置只能写在主题项上**（`windowSplashScreen*` 是 API 31 的属性），
+      而把它直接写进这一份 `AppTheme` 就等于在 `values-v31/styles.xml` 里
+      再抄一遍整个主题 —— 本仓库已经吃过两次这个形状（抽出共享实现后旧的那份
+      没删，于是两套裁决标准）。所以：内容只在 Base 里一份，
+      v31 那份是 `parent="AppTheme.Base"` 的**叠加**。
+    -->
+    <style name="AppTheme.Base" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     </style>
+
+    <!-- API < 31 的默认档：就是 Base，没有额外项。 -->
+    <style name="AppTheme" parent="AppTheme.Base" />
 
     <!--
       小组件里的一行任务。

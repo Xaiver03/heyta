@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  生成物（scripts/gen-boot-splash.mjs）—— 不要手改。
+  两个色值都是 design-system token（color.background / color.primary），
+  cycle_ms 由 duration.splash-enter + 2 x stagger + hold 推导，不是第五个数字。
+-->
+<resources>
+    <color name="heyta_splash_background">#f8fafc</color>
+    <color name="heyta_splash_plate">#2563eb</color>
+    <item name="heyta_splash_cycle_ms" format="integer" type="integer">800</item>
+</resources>

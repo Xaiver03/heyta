@@ -95,6 +95,17 @@ export {
 export type { BrandMarkOptions, BrandMarkTransform } from './brand-mark.js';
 export type { TextStyleName, TextStyleSpec, RnTextStyle } from './typography.js';
 
+/**
+ * tokens.css 的**读取层**。
+ *
+ * 为什么把它导出来：`scripts/gen-app-icons.mjs` 与 `scripts/gen-boot-splash.mjs`
+ * 要把 token 的字面 CSS 值搬到"运行时读不到 tokens.css"的地方（内联在 HTML 里的
+ * 首屏样式、Android 主题项）。那些搬运**不许自带一份解析器** —— 自写正则读
+ * tokens.css 就是第二个事实源，而它坏的方式是"静默搬错值"，不是报错。
+ * 用这里这份，等于和生成 Swift/ArkTS 产物走的是同一个解析器。
+ */
+export { extractVars, extractReducedMotion, resolveAllVars } from './css-tokens.js';
+
 // 任务行的**形状契约**（一行用哪些 token / 哪条语义文字样式）。
 // 🔴 它只**登记**已有取值，不引入新取值 —— 但它让"共享的 RN 行"与
 // "落地页的 DOM 复刻件"能从**同一份**形状派生，而不是各抄一组字号与间距。
