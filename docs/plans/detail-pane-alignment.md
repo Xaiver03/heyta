@@ -7170,7 +7170,27 @@ slot、ownership、preflight、docs-letter、widgets、timeline-face、focus-emp
 | `/tmp/dp_tablecheck2.mjs` | §8 里那条 `TABLE_RC` 的串跑法 | 🔴 已消失（更早，成因未查——**不写成"重启造成的"**，那是没取证的归因） |
 | `/tmp/dp_es_mutate.py` | §8.13 修 `check:empty-state` 的三臂 E1/E2/E3 | ✅ **已入仓**成 `research/tools/mutation-rigs/mutate-focus-empty-state.mjs`（§8.111）：浏览器腿改成显式 `--e2e`，不带时打印 `NOT_JUDGED` 不计入绿。`/tmp` 那份只是历史载体 |
 | `/tmp/dp_w1b_battery.py` | W1b 那格 `25 步 ALL_GREEN` | ✅ **已入仓**成 `scripts/verify-detail-pane-closeout-battery.mjs`（§8.110）：25 步、每步自报 RC、三条自检各有变异臂 |
-| `/tmp/dp_s6_audit2/3.mjs`、`dp_n1_counterfactual.mjs`、`dp_habit_trace_rig.mjs`、`dp_ab_aria.mjs`、`dp_leak_proof.mjs`、`dp_g_merge_probe.mjs`、`dp_listcheck.mjs`、`dp_docscheck.mjs`、`dp_merge_shape.mjs`、`dp_es_renumber_traps.py` | 一次性测量/审计（§6 十探针、断言 H 的反事实、选中痕迹的 A/B、合流形状、台账续号那一次动作等） | 🟢 文件都还在盘上。**结论都已落进文档或已升级成常驻判据**，所以它们是一次性动作的辅助件，不是任何一条当前判据的唯一载体 |
+| `dp_s6_audit2.mjs`、`dp_s6_audit3.mjs`、`dp_n1_counterfactual.mjs`、`dp_habit_trace_rig.mjs`、`dp_ab_aria.mjs`、`dp_leak_proof.mjs`、`dp_g_merge_probe.mjs`、`dp_listcheck.mjs`、`dp_docscheck.mjs`、`dp_merge_shape.mjs`、`dp_es_renumber_traps.py` | 一次性测量/审计（§6 十探针、断言 H 的反事实、选中痕迹的 A/B、合流形状、台账续号那一次动作等） | 🟢 文件都还在盘上。**结论都已落进文档或已升级成常驻判据**，所以它们是一次性动作的辅助件，不是任何一条当前判据的唯一载体 |
+| `/tmp/dp_gates_sweep.py` | §8.13 那趟"全 `check` 组合逐条扫"（当时 56/58 道） | ✅ **已入仓**成 `scripts/verify-detail-pane-gate-sweep.mjs` + 臂 `mutate-gate-sweep.mjs`（§8.116）：三处旧缺陷修掉（写死路径 / 硬编码展开表 / 无条件 exit 0） |
+| `/tmp/dp_w1c_mutate.py` | §8.22 那六臂（N1–N4 / T1 / H1） | ✅ **已入仓**成 `research/tools/mutation-rigs/mutate-notes-selection-trace.mjs`（§8.116）：复跑 **6/6 全红、无存活、无计数漂移**，红条数按臂钉住 |
+| `/tmp/dp_insert_countdown_row.mjs` | §8.47 步 3 那一次插入 | ✅ 由**执行器第 5 步**取代（§8.114），臂 `mutate-merge-resolver-step5.mjs`（§8.115）；这一枚的处置写在 §8.114 ③，不在本表 |
+
+⚠️ 这一行的第一版把前两枚写成 **`dp_s6_audit2/3.mjs`** 那种省写 —— 它当场被上面那条差集命令
+抓成"没有处置"（差集按**字面文件名**比，`dp_s6_audit2.mjs` 不等于 `dp_s6_audit2/3.mjs`）。
+名册要能被机器数，所以**一枚一行写全名**；省写在这类表里省掉的是判据的牙，不是字数（§6 那条
+"封闭句式指的那个集合必须有对账门禁"的同一族）。
+
+⚠️ **本节标题与开头那句"39 行 / 18 枚唯一件"是 2026-10-04 23:3x 那一趟的读数**（原句留着，
+因为它记的就是那一刻的盘）。00:4x 现量：**52 引用行 / 19 枚唯一件 / 在盘 16 / 已消失 3**，
+多的那枚是 §8.114 引用的 `dp_insert_countdown_row.mjs`。**而且这一节自己漏了两枚**
+（`dp_gates_sweep.py`、`dp_w1c_mutate.py`）—— 漏法与补法见 §8.116 开头那条差集命令。
+分母是活的，这一栏每次重取：
+
+```bash
+grep -c '/tmp/dp' docs/plans/detail-pane-alignment.md
+comm -23 <(grep -ohE '/tmp/dp_[A-Za-z0-9_.-]+\.(py|mjs|sh|js)' docs/plans/detail-pane-alignment.md | sed 's#.*/##' | sort -u) \
+         <(sed -n '/^## 8.109/,$p' docs/plans/detail-pane-alignment.md | grep -ohE 'dp_[A-Za-z0-9_.-]+\.(py|mjs|sh)' | sort -u)
+```
 
 📌 **这一节的产出是一条前置规则，不是道歉**：
 
@@ -7431,3 +7451,117 @@ node research/tools/mutation-rigs/mutate-merge-resolver-step5.mjs   # 全程不�
 ⚠️ 对照趟允许 `rc` 非零（产物里那两枚产品 marker 与台账同号本来就会让它非零），
 判的是"**不许出现变异趟独有的那句症状**"，不是"对照必须绿" —— 把对照写成"必须 rc=0"会变成一条
 永远在红的假判据（§8.53 那次期望值写漏的形状）。
+
+## 8.116 §8.109 规则 1 的第二批收口：两枚"合流当时还要用"的一次性件入仓，全 `check` 组合第一次有人逐条扫（2026-10-05 00:4x 现量，载体 `7bdc72f3`→本笔）
+
+上一节的盘点表把 18 枚唯一件逐枚定了性，但**漏了两枚**：`/tmp/dp_gates_sweep.py` 与
+`/tmp/dp_w1c_mutate.py`（它们既不在"已入仓"那两行，也不在 7173 那一行的组名册里）。
+漏法值得记：**按行做盘点 ≠ 按集合做盘点** —— 我是照着"表里已有的行"往下补结论的，
+而没先取一次"文档点名的唯一件全集"再与表做差集。这一趟把差集命令写死在下面，
+下一轮谁再盘点，先跑它再写字：
+
+```bash
+comm -23 \
+  <(grep -ohE '/tmp/dp_[A-Za-z0-9_.-]+\.(py|mjs|sh|js)' docs/plans/detail-pane-alignment.md | sed 's#.*/##' | sort -u) \
+  <(sed -n '/^## 8.109/,$p' docs/plans/detail-pane-alignment.md | grep -ohE 'dp_[A-Za-z0-9_.-]+\.(py|mjs|sh)' | sort -u)
+# 打印的每一枚都必须在这一节或 §8.109 的表里有一句处置
+```
+
+两枚的处置都是"入仓"，判据是同一条：**合流当时还要问它第二次吗**。
+
+| 一次性件 | 它当时量什么 | 新载体 | 为什么必须入仓 |
+|---|---|---|---|
+| `/tmp/dp_gates_sweep.py` | 根 `check` 组合里**别的**门禁有没有被本分支弄坏 | `scripts/verify-detail-pane-gate-sweep.mjs`（臂 `research/tools/mutation-rigs/mutate-gate-sweep.mjs`） | 收尾电池自己就写明"不覆盖 `pnpm check` 全量"（§8.110 边界），而合流当时要回答的正是那句 —— 不留一件装置，下一轮只会重演"只验了我那一族" |
+| `/tmp/dp_w1c_mutate.py` | W1c 选中痕迹那六臂（N1–N4/T1/H1） | `research/tools/mutation-rigs/mutate-notes-selection-trace.mjs` | 它钉的是**便签/任务两面选中痕迹 + 宿主接线**有没有牙；§8.22 那次 H1 存活（共享组件的默认值 prop 把"宿主没接"伪装成"做完了"）是这一族最容易犯回来的形状，臂不能只活在一台 /tmp 上 |
+
+### 扫描器这枚：把 /tmp 那版的三处缺陷一次修掉
+
+| # | 旧版（`/tmp/dp_gates_sweep.py`）的形状 | 后果 | 本版 |
+|---|---|---|---|
+| 1 | worktree 绝对路径写死 | 换载体就在**错的树**上跑，读数还长得一样 | 自锚 `import.meta.dirname` 上一级，并把 `ROOT=` 打出来 |
+| 2 | `pnpm --filter` 的展开靠一张**硬编码表**（4 条抄件） | 抄错/抄漏 ⇒ 那道门禁静默不跑，"没报红"被读成"验过" | 现读各包自己的 `package.json`（包名→目录从 workspace 遍历得出，不写死包清单）；解不出记 **UNRESOLVED** 并让整体退 1，**不降级成 SKIP** |
+| 3 | 无条件 `sys.exit(0)` | 扫出 7 道红与全绿在退出码上**完全一样** | `RED`/`UNRESOLVED`/`MISSING_SCRIPT` 任一 > 0 ⇒ 退 1；分母自检（每一道出现一次且只一次）不过 ⇒ 退 2 并报 `PROBE_BROKEN` |
+
+第一趟就把自己的**射程**照出来了：`COMPOSED=60`（工单 §8.13 当年是 56/58 —— 分母一直在长，
+所以这个数每次必须现取），跳过分浏览器/设备/远端/全量构建 **3** 道，另有 `check:server-copy`
+一道 **NOT_JUDGED**（未判 ≠ 通过），`JUDGED=56/60` 那行就是给读者的分母：
+60 道里 3 道刻意不跑、1 道在这棵树上跑不成。
+
+🔴 **NOT_JUDGED 那一档第一次是探针的锅，不是环境的**：首趟 `check:tokens` 与 `check:server-copy`
+双双 `MISSING_BIN`，前者报 `tsup: command not found`。`pnpm` 跑脚本时会把该包自己的 `node_modules/.bin`
+注进 PATH，而我直接 `/bin/sh` —— 少注一层就等于用一套更严的环境跑别人的门禁。补 PATH 后
+`check:tokens` 转 OK（127 ⇒ rc=0），剩下 `check:server-copy` 仍 NOT_JUDGED，因为 `server/node_modules`
+在这棵 linked worktree 里**确实没有**（那种"没跑成"要如实报，不许折成绿）。
+**两枚同名的读数，一枚是探针坏、一枚是真缺依赖 —— 分不开就会去"修"那道不需要修的。**
+
+### 这五道红没有一道属于本批 —— 但"不属于"是逐枚读日志读出来的，不是推出来的
+
+| 红的那道 | 日志里的原话（截断） | 归因 |
+|---|---|---|
+| `check:docs` | `PROGRESS.md:1362 → docs/research/aed-implementation-evidence.md` 死链 | **别人的**（§8.106 已复核：那一枚只存在于 main 的未跟踪文件，登记不代改） |
+| `check:journey-coverage` | `Scope: all 21 workspace projects` 后 `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY]` | **载体**（linked worktree） |
+| `check:mobile-bundle` | `Unable to resolve module react-native-get-random-values … ../../../../node_modules` | **载体**（metro 从软链根往上找依赖） |
+| `check:web-migration` / `check:web-storage` | `The request id "…/@sqlite.org/sqlite-wasm/dist/sqlite3.wasm" is outside of Vite serving allow list` ⇒ `waitForFunction` 超时 | **载体**（vite 的 realpath 落在 `server.fs.allow` 外） |
+
+🔴 **`journey-coverage` 那一条顺带把一条老纪律的量测出来了**：它内部调 `pnpm`，而 pnpm 认定这棵树的
+modules 目录"不是它的"，**要 purge**，只因无 TTY 才停在 `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`。
+AGENTS/本线那条"绝不用 `CI=true` 绕 pnpm deps-status 预检"此前是一条纪律 —— 这一趟给了它一个
+具体后果：**带上 `CI=true`，这道门禁会真的去删主检出那份共享 `node_modules`**。
+这不是"顺手加个环境变量"，那是把整条工作树清掉。（同族：`--config.verify-deps-before-run=false`
+才是允许的那条逃生门，因为它只跳过预检、不动目录。）
+
+因为上面这四道载体红是**软链树**的性质而不是产品的性质，扫描器现在自己把这件事打出来，
+下一轮不必重新读四份日志：
+
+```
+CARRIER=linked-worktree（根 node_modules 是软链；上面点名的四类形状的红按载体读，不按产品读）
+```
+
+### 这台扫描器自己的三条臂（`mutate-gate-sweep.mjs`，`RIG_RESULT=臂 3/3 红 + 对照干净`）
+
+一台读数机器的价值全在"命中了会不会响亮地失败"，所以臂不测产品，测**这台机器会不会漏报**：
+
+| 臂 | 注入 | 实测 |
+|---|---|---|
+| A1 | 往 `check` 组合塞一道 `node -e "process.exit(1)"` | `rc=1`、`RED=` 里点名那道、`COMPOSED=1`、带 `FILTERED` 标记 ⇒ **OK** |
+| A2 | 塞一道 `pnpm --filter @heyta/web zz-does-not-exist` | `rc=1`、落 **UNRESOLVED**、没有误落 RED ⇒ **OK**（这一臂就是"解不开不许跳过"那颗牙） |
+| A3 | `--only` 传一道不在组合里的名字 | `rc=2` + `SWEEP_RESULT=PROBE_BROKEN` ⇒ **OK**（分母外的注入若被读成"没红"，臂就变成假绿） |
+| 对照 | 还原后全量跑 | `md5复原=true`、两条注入症状都不在、`COMPOSED=60` ⇒ **OK** |
+
+⚠️ **这一臂第一趟四条全红，而红的是臂自己**：它把扫描器路径裸拼进 `node ${SWEEP} …` 交给 shell，
+而这个仓库的路径里有空格（`…/All in one Data/…`）⇒ node 去执行 `/Users/…/All`，四臂同时
+`COMPOSED=NaN`。读起来像"新扫描器一装就坏"，实际是探针把路径拆断了 —— §7 元规则 1
+（先怀疑探针）第五次命中我自己。改法：`spawnSync(process.execPath, [SWEEP, ...argv])`，不经 shell。
+
+### W1c 六臂搬到常驻装置时补的三颗牙
+
+`mutate-notes-selection-trace.mjs` 照搬旧臂（六条改法、红集期望来自 §8.22 那张表），另外补三条旧的没有的：
+
+1. **红条数按臂钉住**（N1=2 / N2=4 / N3=2 / N4=4 / T1=1 / H1=1）。只判"红了"会漏掉
+   "红在别的用例上"那种漂移 ⇒ 数量对不上单独报 `COUNT_DRIFT`，与"存活"分开记。
+2. **分母断言**：基线那趟必须 `Test Files 2 passed`（两层同名 spec 的教训，§8.111 ——
+   过滤器打空会得到"一条都没跑"却长得像红的读数）。
+3. **负载门复用仓里那把**（`scripts/lib/wait-for-quiet-host.sh`，阈值 = `hw.ncpu × 3/4`），
+   位置在任何写盘之前；不自己写第二把（那正是它被抽成共享文件的理由，traps #168）。
+   这一条也配了读数：负载 125 时 `HEYTA_LOAD_GATE_WAIT=1` 跑 ⇒ `RIG_RESULT=ENV_INVALID`、
+   **退出码 3**（环境无效 ≠ 产品失败）、`git status` 里那三份源文件零改动。
+
+实测（本机负载 125–149 这一趟）：**六臂 6/6 全红、`SURVIVED=无`、`COUNT_DRIFT=无`、
+基线 25 passed（notes-selection-trace 9 + task-selection 16）、还原后 md5 逐字节相同、
+`BACK_TO_CLEAN=true`** —— 与 §8.22 当年那张表逐臂一致，也就是那次的读数今天可复跑，不再是历史值。
+🔴 还有一条**旧版根本没有的保险**：进程被 kill 在中途时，exit/SIGINT 钩子用**进程序读进来的那份内存副本**
+还原，绝不 `git checkout`（那会把工作树里别人未提交的实现整片打回 HEAD）。
+
+### 边界（别读多）
+
+- 扫描器**不替代** `pnpm check`：它跳过浏览器/设备/远端/全量构建那几道（文件头写明理由），
+  并且把没跑成的记成 NOT_JUDGED。想主张"全量绿"仍然只有 `pnpm check` + 真机那条路。
+- 它**不改任何分支**：只在 `ROOT` 上读 `package.json` 的清单再逐条执行。臂改 `package.json`
+  也只改 `scripts` 那两处，每臂跑完 md5 复原（CTRL 那行 `md5复原=true` 就是它的证明）。
+- 本批的两道新门禁（`check:selection-single-source` / `check:detail-pane-slot`）**还不在这 60 道的分母里**
+  （task #23：挂进 `pnpm check` 的动作等主检出 `package.json` 干净）⇒ 这一趟"没弄坏别的门禁"
+  **不包含**"我这两道已经进链"。那句要单独跑 `verify-gate-wiring-candidate.mjs` 那族才成立。
+- 五道红里**没有一道**由本批造成，但"合流当时的全组合扫描要在**主检出**跑"这句仍是**待验**：
+  这四道载体红在干净检出里会不会转绿，本段没量（没在主检出跑过它们 —— `journey-coverage`
+  会触发 pnpm 对共享 `node_modules` 的动作，`mobile-bundle` 会往别人那棵树写产物）。
+  登记为合流当时的动作，判据就是这条命令 + 上面那张归因表。
