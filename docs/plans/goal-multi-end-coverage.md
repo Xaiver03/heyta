@@ -2124,6 +2124,27 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     09:28 现量：负载 **9.21**（≤12，闸门这一项已过）但设备仍被 `com.heyta` pid `12027` 前台占着
     （`mCurrentFocus` 指向 `com.heytamobile.MainActivity`）⇒ **窗口不在，③ 继续等**。
     日志另起 `/tmp/heyta-chain12.log`；产物副本现在 **29 枚**。
+  - 🔴 **① 多了一条外部阻塞，而它的形状恰好是「看起来像死了」：别人那棵重装的公证等待已挂 6h18m**。
+    09:31 现量（一条命令可复跑）：`bash /tmp/heyta-real-runner-pids.sh 'reinstall-all\.sh'` 打出三枚 ——
+    `81007`/`93771 queue-reinstall-all.sh`、`93817 /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817`；
+    往上走祖先链**没断**（`95477 package-app.sh → 93817 → 93772 node → 93771 → 81007 → ppid 1`），
+    所以我的「无重装」门**认得出**这个对手 ⇒ ① 会在它活着期间一直被拦，这是设计而不是故障。
+    ⚠️ **但我不据此判它死**：`/tmp/heyta-macos-dist` 里 `Heyta-1.0.0.dmg`、`packaged-first-run.png`
+    的 mtime 全是 03:13（= 6h18m 前），25 秒两次采样零变化 —— 而 `notarytool submit --wait` 等的是**苹果侧**，
+    本地静默是它的正常形态（§7 元规则第 1 条：本地零变化 ≠ 它没在工作）。
+    可复跑：`ps -o pid,etime,command -p 95477,98934`、`find /tmp/heyta-macos-dist -maxdepth 1 -type f -exec stat -f '%N %m' {} \;`。
+    ✅ **这一棵不钉 ③**：它的进程树里没有 `adb`（`ri_on_device_path` 判「够不着设备」），
+    ③ 现在唯一的阻塞项是**设备被 `com.heyta` 前台占着**（那一头是别人正在做的移动端验收）。
+    ⇒ Goal 的两项未完成因此是**两个不同的持有者**：③ 等设备，① 等那枚公证等待结束；
+    两者都不许由我动手摘除（AGENTS §8.9「不杀别人正在跑的验收」+ 只对自己创建的对象动手）。
+  - ✅ **09:33 ③ 的前置逐条现量：只剩设备这一条**。`:3100/health` 回的是
+    `{"status":"ok","db":"connected","wsConnections":0}`（:3000 也 ok，但 ③ 用的是 3100）、
+    凭据 `/tmp/heyta_mobile_token.txt` **227 字节**（≥100 那条过）、e2e 三个端口 4318/4319/4322 全空、
+    负载 9.21 ≤ 12、上面那棵 `real-runner` 够不着设备 ⇒ 不钉 ③。
+    ⚠️ **顺带核对了一条并行线记的相反判断**（「verify-mobile-* 不自己起栈 ⇒ 等端口空是死胡同」）：
+    现量在 `scripts/verify-mobile-notes.sh:69` 的前置注释与本链 `:104-106` —— **这条链早已改对**
+    （门的第 3 项就是 `curl /health` 命中 `"status":"ok"`，`free_port` 只用在 4318/4319/4322 上）。
+    写在这里是为了让下一次读到那条判断的人知道：它说的是链的**上一版**，不是当前这一版。
 - ✅ **05:3x ⑤ 复核**：`B41/B42/B45` 三行仍在 §7.28 那张「完成条件逐条的现量与差什么」表里（`:1220`/`:1221`，状态 🟡，
     各带自己的现量命令），本夜落笔的六笔只改了 `scripts/verify-mobile-notes.sh` 的第 12 步与
     `apps/desktop-macos/scripts/package-app.sh` 的公证段，加上四份文档，
