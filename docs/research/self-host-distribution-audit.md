@@ -4190,7 +4190,8 @@ heyta-selfhost-verify-supersync-migrate-1 heyta-selfhost-verify   Exited (0)
 🔴 三条都要人拍板，且 **A 与本批硬约束直接冲突**。本批做到的部分是：机制已修（G-54，载体上 `镜像 OK` 有读数）、
 判据已挂（第 5/5b 腿 + 10 臂变异）、**这一条缺口已编号并带可复核命令**。
 
-> ⚠️ **本节那格 `116 笔` 是 08:5x 的瞬时读数，15:0x 现量已变成 `97`**（同一把尺
+> ⚠️ **本节那格 `116 笔` 是 08:5x 的瞬时读数，15:0x 现量已变成 `97`，18:4x 再取是 `26`**
+> （`origin/main` 已到 `9070e18d`；全部读数与命令见 §8.115。同一把尺
 > `git rev-list --count origin/main..main`；`origin/main` 从 `95ac4662` 走到 `8a254bcd`，
 > 今天 10:13 有人 push 过 —— 那不是本批推的）。口径 A 的**代价会随别人每次 push 自己变小**，
 > 所以引用它时必须现取，不能抄本节。其余三条 needle（devDeps 里那 3 枚 `@heyta/*`、
@@ -7012,3 +7013,29 @@ e2e 那一侧同理：Playwright 的 loader 能不能解析这条跨目录 `.mjs
 **解析不了就是响亮地红，不是静默放行**。
 
 ⇒ G-57 的状态从"未关（判据缺失）"改成"**代码已落、判据分叉有读数、复跑等 G-58 那趟**"。
+
+### 8.115 G-55 的三个数今天全部重取（2026-10-04 18:4x）—— 公开树仍建不出镜像，但"要推几笔"从 97 掉到 26
+
+G-55 的登记（§8.64）里那三个数当时是 `origin/main = 95ac4662`、本地 main 领先 **116 笔**；
+16:1x 重取是 **97 笔**。这一轮按同一条命令再取，**两个数都变了**：
+
+```
+origin/main = 9070e18d          （16:1x 时是 8a254bcd ⇒ 有人 push 过）
+main        = 5de78a14
+git rev-list --count origin/main..main = 26
+git show origin/main:server/Dockerfile  | grep -cE '^\s*RUN.*npm pkg delete' = 0
+git show feat/self-host-distribution:server/Dockerfile | 同式 = 1
+origin/main 的 server/package.json devDependencies 里 @heyta/* 工作区包 = 3
+```
+
+🔴 **结论没变，代价变了**：外人 clone 到的那棵公开树**今天仍然建不出镜像** ——
+它带着三枚只存在于本机 pnpm 工作区的 devDependencies，而带 `npm pkg delete devDependencies`
+那一修的那一行**还没进公开树**（判据锚定 `^\s*RUN`，不锚这个的话分支上会数出 2：
+第 286 行是注释、297 行才是 `RUN`）。
+但"口径 A（push）"的代价从"一次推 116 笔别人的提交"变成 **26 笔**，
+而"口径 C（把指南那句改成实话）"的落点（两份 i18n 表 + 落地页重发）**这轮没重新量**，
+它仍挂在阻塞集里。⇒ **要人拍板的这条，数字必须以这一趟为准**，
+引用 §8.64 那句"116 笔"就是拿一个会过期的数去做不可逆判断。
+
+⚠️ 这一轮**没有**动任何对外动作：没 push、没发布镜像、没改指南措辞。
+`origin/main` 这次前进是别人推的，不是我 —— 我全程只读。
