@@ -467,7 +467,7 @@ G-47 已按这个形状关闭（2026-10-04），不在本批做的理由是当�
 
 | 要成立的东西 | 现量 |
 |---|---|
-| `s7p1` 在 main 上是否仍教人指向上游 | 是：`git show HEAD:packages/i18n/src/locales/zh-CN.ts` 第 3302 行仍是「把 `SUPERSYNC_IMAGE` 显式指到某个 `master-〈提交号〉`」 |
+| `s7p1` 在 main 上是否仍教人指向上游 | ~~是：`git show HEAD:packages/i18n/src/locales/zh-CN.ts` 第 3302 行仍是「把 `SUPERSYNC_IMAGE` 显式指到某个 `master-〈提交号〉`」~~ 🔴 **04:0x 被现量否证，且那句命令本身没锚（正是 `check:doc-citations` 拦的那一类）**：`git show c1c203c8:packages/i18n/src/locales/zh-CN.ts \| grep -n site.docs.selfhost.s7p1` = 第 **3567** 行，措辞已经是**反的**（"不要把 `SUPERSYNC_IMAGE` 指向上游的 `master-〈提交号〉`"）⇒ 台阶 0 这条对外错话**在 main 上已经由那条线自己修掉了**；本批那份不再是唯一来源（§8.168 ①）。以后写这种话要用**键**而不是行号，且 ref 要锚 SHA |
 | heyta 有没有发布镜像 | **没有**：`git tag -l 'v*.*.*'` = 0（唯一的 tag 是 `ai-remediation-fork`，非 semver 形状），`git ls-remote --tags origin` = 0 行 |
 | 那条被 contradict 的纪律还在不在 | 在：`server/docker-compose.yml:27-31` 的 🔧 注释仍是「拉上游镜像跑的是**别人的代码**，而且看起来一切正常」 |
 | 与并行会话**在途（未提交）**改动的碰撞 | **0 处**：`git diff -- packages/i18n` 里这四个键名命中 0（他那 59/10 行是另一件事）——这才是"能不能动 i18n"的真正判据，而不是"文件脏不脏" |
@@ -3480,6 +3480,14 @@ grep -rl -E 'ubuntu-jcli|windows-pc|124\.223\.13\.226' apps/landing/dist | wc -l
 `git show HEAD:research/tools/check-image-license-coverage.mjs | grep -n websocket` = **0 行**
 （连注释都没有），同趟阳性对照列出该文件在 main 上真有 14 条 `IMAGE_ONLY` 登记
 （`@fastify/static@10.1.5`、`ws@8.22.0`、12 条 `@peculiar/*`）。
+🔴 **04:0x 复量：这一句的 ref 没锚，所以它今天讲的是另一件事** ——
+`git show c1c203c8:research/tools/check-image-license-coverage.mjs | grep -c websocket` = **1**，
+那一枚就是 `'@fastify/websocket@11.3.3'` 的**登记条目本身**（`checkedAt: '2026-10-04'`），不是注释。
+⇒ "防御只活在我分支"已被**main 自己加上这条登记**否证；留下来的含义换成两条：
+① 台阶 0/G-47 那一族在 main 上也有了 ⇒ 落地时这枚文件是**两侧都改**的形状，
+   载体第七族（对账器本体）第一次会在真窗口里被真走到（§8.168 ②）；
+② 同趟 `grep -c IMAGE_ONLY` 在 main 上是 **7**，与本句当时写的"14 条"不是同一个计数单位
+   （枚举行 vs 含该词的行）⇒ 引用"N 条"要带它是怎么数出来的（[[feedback-duplicate-facts-drift]]）。
 含义写准：**`@fastify/websocket` 的防御只活在我分支和另一条会话的未提交改动里。**
 ⚠️ 但"main 现在红不红"不是这一段能主张的 —— 它取决于 `gen --check` 在干净树上重解析到 `^11.3.0`
 里的哪一枚，那是**下一条要量的事**（要跑就得在 main 的干净 linked worktree 里跑，不在混合树上读）。
@@ -10096,3 +10104,72 @@ node A >/dev/null 2>&1; rc=$?; printf '%s rc=%s\n' "A" "$rc"                    
 线契约（`supersync-http-contract.ts:191` 是 `z.string().optional()`）、管理台面（`admin-client.ts:156` 只是投影类型）；
 唯一构造下载查询的 `packages/sync-client/src/client.ts:1324-1327` 设的是 `sinceSeq` / `limit` / `excludeClient`
 三枚，**与 README 那句逐字一致**，没设 `appVersion` ⇒ 目标第 6 项那句对外承诺在当前产物上仍为真。
+
+### 8.167 借 main 那道新门（`--root`/`--doc`）扫本批两份对外文档：runbook 里抓到两条真错话并已修，另抓到那道门自己的一个结构性盲区（2026-10-05 04:0x）
+
+**① 用法**：`git show main:scripts/check-doc-citations.mjs > /tmp/cdc.mjs`，再
+`node /tmp/cdc.mjs --root . --doc docs/runbooks/self-host.md`。
+🔴 刻意走它的两个旋钮而不是自己重写一遍判据 —— 换实现就是从"同一个判断写两次"开始漂的地方。
+它每次先跑内置三维阳性对照：本轮 `SELFTEST=pass（路径维=抓到 · 无锚维=抓到 · 假 SHA 维=抓到）`。
+
+**② runbook 报 3 条，其中两条是真错话**（`docs/runbooks/self-host.md` §7「升级与备份」）：
+原句写 `./scripts/deploy.sh --build` 与 `./scripts/backup.sh`，而 §3 那句 `cd server`（`:52`）离 §7 有 170 行 ——
+跳到"升级与备份"的人站在仓库根照敲，得到的是 `No such file or directory`。
+这就是目标后半句"停掉对外错话"里最实在的一类：**句子没错，路径在它不在的那个上下文里**。
+改成仓库根相对的唯一形状 `server/scripts/deploy.sh` / `server/scripts/backup.sh`
+（与 `docs/runbooks/deployment.md:201/713` 的既有写法同一口径），并补一句 `BACKUP_DIR` 可覆写
+（现量 `server/scripts/backup.sh:33` = `BACKUP_DIR="${BACKUP_DIR:-$SERVER_DIR/backups}"`；
+原句"pg_dump 到 `server/backups/`"本身是对的，留着）。
+第三条（§6 里指回第 3 节的那句）改成不带路径 span 的写法 —— 那一处指的是第 3 节代码块，不是一条新命令。
+修后：`126 span · 无问题` rc=**0**。
+
+**③ 🔴 那道门自己的盲区，是 G-66 的续集**：同一把尺扫 `server/README.md` 报 **6 条**（`:48 :79 :152 :166 :176 :177`），
+而这 6 条**都不是错** —— 那份文档自己在 `:56` 写着"（`env.example`、`scripts/deploy.sh` 都在这里）"，读者先 `cd server`。
+尺子把路径 span 一律按**仓库根**解析，它没有"这段指令的工作目录"这一维。
+⇒ 给 G-66 的所有者加一条前置：**先把 cwd 约定定下来**（文档统一写仓库根相对，或那道门支持 per-doc 的 cwd 声明），
+再谈把清单扩到 `server/README.md`；否则扩容第一次跑就红 6 条，被下一位读成"对外文档坏了"而去"修"一堆对的东西。
+
+**④ 顺手否证我自己差点写的一条担心**：`server/scripts/deploy.sh:153` 那句
+"`deploy.sh --build` 在**文档写明的部署方式下永远跑不起来**"，我差点据此把 runbook 让人带 `--build` 判成错话。
+现量：`:153` 讲的是**已被修掉的因** —— 同一个函数里 `:159-165` 遇到非 git 工作树时打 WARNING、
+说明"脏树守卫做不了"并 `return 0` 继续跑。⇒ 带 `--build` 不是错话；真实代价是镜像 revision 标签退化成 `local`（不可回溯到 commit），
+而那条脚本自己已经把代价讲清了，runbook 不需要另加警告。
+
+**读数**：`docs-link-check` / `check-docs-voice` / `check-selfhost-entry-command` 各 rc=**0**
+（`rc=$?` 紧跟命令、`printf` 参数里不做命令替换 —— 形状见 §8.166 ①）。
+
+### 8.168 用 main 那道新门回头扫自己的台账，扫出两条**已被 main 否证的旧断言**，顺带量清这道门能扩到哪里（2026-10-05 04:0x）
+
+**① 台阶 0 那条对外错话，main 已经自己修了**（现量，带锚）：
+`git show c1c203c8:packages/i18n/src/locales/zh-CN.ts | grep -n site.docs.selfhost.s7p1` = 第 **3567** 行，
+措辞已是**反的**："不要把 `SUPERSYNC_IMAGE` 指向上游的 `master-〈提交号〉`"。
+⇒ 台账 `:470` 那句"`s7p1` 在 main 上仍教人指向上游 = 是"就地划线更正（原句留着，理由同 §8.166：
+带日期的"仍然是"不会自己通知你失效）。对本批的含义是好的：**落地不会把它带回去**，
+而两份词条表在两侧都改 ⇒ 走 i18n 那一族。
+🔴 我原来那一句的取证命令用的是 `git show HEAD:` **没锚**，而 `HEAD` 在哪个树上取决于谁跑 ——
+这正是那道门存在的理由，我自己的台账里也有两枚这种句子。
+
+**② G-47 那一族：main 现在也有 `@fastify/websocket@11.3.3` 的登记了**（不是注释，是条目本体，`checkedAt: '2026-10-04'`；
+`git show c1c203c8:research/tools/check-image-license-coverage.mjs | grep -c websocket` = **1**，本批 HEAD = 4）。
+⇒ 台账 `:3480` 那句"防御只活在我分支和另一条会话的未提交改动里"被 main 自己否证，已就地更正。
+落地含义：这枚文件变成**两侧都改**的形状 ⇒ **载体第七族（对账器本体）第一次会在真窗口里被真走到** ——
+这一格先前只有合成臂的读数（#27），现在有真输入了。
+⚠️ 另一条可迁移的：同趟 `grep -c IMAGE_ONLY` 在 main 上是 **7**，而那句当时写"14 条登记"
+⇒ 两个数不是同一件东西（含该词的行 vs 登记的枚举行）—— 引用"N 条"要带数法（[[feedback-duplicate-facts-drift]]）。
+
+**③ 这道门能扩到哪里（110 条这个数字本身就是答案）**：
+把 `check:doc-citations` 的尺子拿 `--root/--doc` 指向本台账（10 052 行取证文档），报 **110 条**
+（那一趟量于追加本节之前；本节自己又添了几条"被引用成示例"的串，所以这个数字下一轮会变——它的作用是**形状分布**，不是水位），
+其中**只有 2 条**是本批该改的（就是 ①② 那两句没锚的 `git show HEAD:`，已修）；其余的形状是
+npm 包名（`@fastify/accept-negotiator@2.1.0`）、被引用成"错误示范"的字符串（`./scripts/deploy.sh` 在 §8.167 里是**被纠正的对象**）、
+尚未创建的目录（`server/backups`）、上游历史路径（`packages/super-sync-server`）、运行期文件（`server/.env`）。
+⇒ 三条边界，都写进 G-66 的移交里，一条都不能省：
+(a) **对外指令文档**（runbook / `server/README.md`）适用，但要先解决 §8.167 ③ 的 **cwd 维**；
+(b) **长篇取证台账**不能直接进清单 —— 它需要 per-doc 的模式（只查 `git show` 锚 + 显式"这是仓库路径"的形状）或豁免表（那道门已自带 5 条逐条带理由的豁免）；
+(c) **被引用成错误的字符串**与**指令**在语法上同形，只有"这句是不是要人照敲"这个语义能区分 ⇒ 任何扩容都要先有一条"引用-作为-错误"的登记形状，否则下一位会去"修"一批对的句子。
+
+**读数**：`SELFTEST=pass`（三维都抓到）· runbook 修后 rc=**0** · 本台账 rc=**1**（110 条，见 ③）·
+`docs-link-check` / `check-docs-voice` / `check-selfhost-entry-command` 各 **0**。
+🔴 这三枚 `rc` 是用 §8.166 ① 那个正确形状量的；同轮我又踩了一次老坑 ——
+`node X | tail -6; echo $?` 读的是 `tail`（`AUDIT_RC` 一度显示 0，其实是 1），
+以及 `$M:research/…` 在 zsh 里被当成 `${M:r}` 修饰符把路径啃成 `esearch/…` ⇒ ref 一律**加引号**写 `"${M}:path"`。

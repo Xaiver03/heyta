@@ -164,7 +164,7 @@ or may require 'docker login'
 应用容器要等它成功才启动。
 
 ⚠️ **它只在第一次开机迁移。** compose 不会重跑一个已经退出的 `restart: "no"` 服务，
-所以升级时要么用第 3 节的 `./scripts/deploy.sh`，要么显式补一刀：
+所以升级时要么用第 3 节那个部署脚本（`server/scripts/deploy.sh`，第 3 节先 `cd server`），要么显式补一刀：
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.build.yml \
@@ -218,8 +218,8 @@ curl -fsS https://你的域名/health
 
 ## 7. 升级与备份
 
-- 升级：`git checkout <新 commit>` → `./scripts/deploy.sh --build`（迁移在换容器**之前**跑）。
-- 备份：`./scripts/backup.sh`（pg_dump 到 `server/backups/`）。
+- 升级：`git checkout <新 commit>` → `server/scripts/deploy.sh --build`（迁移在换容器**之前**跑）。
+- 备份：`server/scripts/backup.sh`（pg_dump 到 `server/backups/`；`BACKUP_DIR` 可覆写，默认落在 `$SERVER_DIR/backups`）。
   🔴 端到端加密下**备份就是全部** —— 我们这边没有任何一份你的明文可以还原给你。
 - 数据是事件溯源（op-log）而不是"当前状态表"：`prisma` 表里的行是可重放的日志，
   不要手改。
