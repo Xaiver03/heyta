@@ -36,7 +36,110 @@ enum HeytaReminderReceipts {
       }
     }
   }
+
+  /// Read the local ledger without acknowledging, scheduling, or cancelling anything.
+  /// This is intentionally separate from `update`: the Release reminder probe must be
+  /// observational even when it runs while the JS reconcile pass is in flight.
+  static func readOnly() throws -> State {
+    lock.lock()
+    defer { lock.unlock() }
+    let url = try file()
+    guard FileManager.default.fileExists(atPath: url.path) else { return State() }
+    return try JSONDecoder().decode(State.self, from: Data(contentsOf: url))
+  }
 }
+
+#if HEYTA_REMINDER_PROBE
+/// Release-build, opt-in diagnostic for the iOS notification-center boundary.
+///
+/// The probe is enabled only by passing `SWIFT_ACTIVE_COMPILATION_CONDITIONS=...
+/// HEYTA_REMINDER_PROBE` to a dedicated xcodebuild invocation and is triggered by
+/// `-HEYTA_REMINDER_PROBE [delayMs]`. It never calls `add`, `remove`, or
+/// `HeytaReminderReceipts.update`; its JSON is a read-only observation of the OS
+/// lists plus the local receipt ledger. This keeps the probe useful for permission,
+/// restart, uncertain-delivery, and the iOS 64-request window without making a
+/// diagnostic run manufacture a product event.
+enum HeytaReminderProbe {
+  static func run(after delayMs: Int) {
+    let delay = max(0, delayMs)
+    DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay)) {
+      let center = UNUserNotificationCenter.current()
+      center.getNotificationSettings { settings in
+        center.getPendingNotificationRequests { pending in
+          center.getDeliveredNotifications { delivered in
+            var result: [String: Any] = [
+              "schema": 1,
+              "process": ProcessInfo.processInfo.processIdentifier,
+              "delayMs": delay,
+              "authorization": authorization(settings.authorizationStatus),
+              "pending": pending
+                .filter { $0.content.categoryIdentifier == HeytaReminderReceipts.category }
+                .map { request in
+                  [
+                    "id": request.identifier,
+                    "triggerDate": triggerDate(request.trigger) ?? NSNull(),
+                  ] as [String: Any]
+                },
+              "delivered": delivered
+                .filter { $0.request.content.categoryIdentifier == HeytaReminderReceipts.category }
+                .map { notification in notification.request.identifier },
+            ]
+            do {
+              let ledger = try HeytaReminderReceipts.readOnly()
+              result["ledger"] = [
+                "scheduled": ledger.scheduled.keys.sorted(),
+                "posted": ledger.posted.sorted(),
+                "receipts": ledger.receipts.sorted(),
+              ]
+            } catch {
+              result["ledgerError"] = error.localizedDescription
+            }
+            write(result)
+          }
+        }
+      }
+    }
+  }
+
+  private static func authorization(_ status: UNAuthorizationStatus) -> String {
+    switch status {
+    case .notDetermined: return "default"
+    case .denied: return "denied"
+    case .authorized: return "granted"
+    case .provisional: return "provisional"
+    case .ephemeral: return "ephemeral"
+    @unknown default: return "unknown"
+    }
+  }
+
+  private static func triggerDate(_ trigger: UNNotificationTrigger?) -> String? {
+    guard let trigger else { return nil }
+    let date: Date?
+    if let interval = trigger as? UNTimeIntervalNotificationTrigger {
+      date = interval.nextTriggerDate()
+    } else if let calendar = trigger as? UNCalendarNotificationTrigger {
+      date = calendar.nextTriggerDate()
+    } else {
+      date = nil
+    }
+    guard let date else { return nil }
+    return ISO8601DateFormatter().string(from: date)
+  }
+
+  private static func write(_ result: [String: Any]) {
+    do {
+      let url = try FileManager.default.url(for: .applicationSupportDirectory,
+        in: .userDomainMask, appropriateFor: nil, create: true)
+        .appendingPathComponent("heyta-reminder-probe.json")
+      let data = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
+      try data.write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+      NSLog("[reminder-probe] %@", String(data: data, encoding: .utf8) ?? "{}")
+    } catch {
+      NSLog("[reminder-probe] write failed: %@", error.localizedDescription)
+    }
+  }
+}
+#endif
 
 @objc(HeytaReminderModule)
 final class HeytaReminderModule: NSObject {
@@ -81,7 +184,15 @@ final class HeytaReminderModule: NSObject {
         let shouldSchedule = try HeytaReminderReceipts.update { state -> Bool in
           if state.posted.contains(identifier) { return false }
           if pending.contains(where: { $0.identifier == identifier }) { return false }
-          if let acceptedAt = state.scheduled[identifier], acceptedAt <= Date().timeIntervalSince1970 * 1000 {
+          // A request that was scheduled before a force-stop or device
+          // shutdown may be due by the time startup reconciliation runs.  The
+          // JS planner deliberately converts that missed occurrence into an
+          // immediate delivery attempt while keeping the original occurrence
+          // id.  An expired ledger entry is therefore not evidence that the
+          // OS delivered it; only a still-future entry suppresses a duplicate
+          // while the request is being restored in the notification center.
+          if let acceptedAt = state.scheduled[identifier],
+            acceptedAt > Date().timeIntervalSince1970 * 1000 {
             return false
           }
           return true
