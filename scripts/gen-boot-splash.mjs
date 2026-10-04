@@ -442,7 +442,7 @@ emitText(
     {
       "color" : {
         "color-space" : "srgb",
-        "components" : { "alpha" : "1.000", "blue" : "${channel(BACKGROUND, 2, 255)}, "green" : "${channel(BACKGROUND, 1, 255)}", "red" : "${channel(BACKGROUND, 0, 255)}" }
+        "components" : { "alpha" : "1.000", "blue" : "${channel(BACKGROUND, 2, 255)}", "green" : "${channel(BACKGROUND, 1, 255)}", "red" : "${channel(BACKGROUND, 0, 255)}" }
       },
       "idiom" : "universal"
     },
