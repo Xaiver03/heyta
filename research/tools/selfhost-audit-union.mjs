@@ -90,3 +90,25 @@ export function ownershipVerdict({ writeSet, mergedSet }) {
   const unfused = [...w].filter((p) => !m.has(p));
   return { ok: outside.length === 0, outside, unfused, counts: { write: w.size, merged: m.size } };
 }
+
+/**
+ * 根 `package.json` 并集**之外**那一档：非 `scripts` 的顶层字段。
+ *
+ * 并集是把 main 那份深拷贝之后只往 `scripts` 里加东西，所以"本批改过而 main 没改"的
+ * 任何非 scripts 字段（`dependencies` / `devDependencies` / `pnpm.overrides` / `packageManager`…）
+ * 都会被**静默丢掉**，而现有那六条 scripts 断言一条都不会响。丢掉的这一档如果同时是
+ * `pnpm-lock.yaml` 的构建输入，落地的第一步 `pnpm install --frozen-lockfile` 会红；
+ * 更糟的是它**不红**的那些情况（比如只改 `pnpm.overrides`）—— 那就没有任何一层知道。
+ *
+ * @returns {{ok: boolean, dropped: string[], counts: {compared: number}}}
+ */
+export function pkgFieldVerdict({ base, ours, theirs, out }) {
+  const keys = [...new Set([...Object.keys(theirs), ...Object.keys(ours)])].filter((k) => k !== 'scripts');
+  const dropped = [];
+  for (const k of keys) {
+    const t = JSON.stringify(theirs[k]);
+    if (t === JSON.stringify(base[k])) continue; // 本批没动这一档 ⇒ main 的值就是正解
+    if (t !== JSON.stringify(out[k])) dropped.push(k);
+  }
+  return { ok: dropped.length === 0, dropped, counts: { compared: keys.length } };
+}

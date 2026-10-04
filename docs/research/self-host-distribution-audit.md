@@ -5532,3 +5532,80 @@ main 上 `depsFingerprint` 的引用者集合（`/tmp/heyta-main-check` 干净�
 g69 已**主动停掉**（不是等满超时）：它的重算步骤用的工具缺第七族，`die(2)` 会让窗口白开。
 补完并实测通过后，等窗口那把重开成 g71，条件不变（阻塞集归零 → 重算 → 逐段扫链 → 出报告），
 它现在拿到的是**带第七族的工具**。阻塞集现量仍是 1 枚（`package.json`，在别人手里）。
+
+### 8.91 载体第一族还有一档没人守的字段：`scripts` **之外**那九枚顶层键，本批改了也会被静默丢掉（2026-10-04 15:2x）
+
+#### ① 起点是一个具体问题：落地扫链的第一步会不会注定红
+
+g71 的扫链序列是 `pnpm install --frozen-lockfile` → `pnpm -r build` → `e2e` 装依赖 → 逐段跑链。
+第一步红 ⇒ 后面整把读数作废（§8.90 刚为"工具在窗口开之前先修好"付过一次代价，这是同一件事的另一面）。
+而第一族的解法是"**深拷贝 main 那份 `package.json`，只把 `scripts` 做并集**"，
+同时 `pnpm-lock.yaml` 这次**不在冲突集里**（git 三方文本自动合并了它）。
+"文本层自动合并的锁"配"非文本层并集的清单"，就是 `--frozen-lockfile` 的经典死法。
+
+#### ② 现量：今天这一笔是干净的，但干净是运气
+
+| 量 | 读数 | 装置 |
+|---|---|---|
+| root importer 的 `devDependencies` | 载体 / 干净 main / 本分支三棵树都是 `pkg=4 lock=4 锁缺=0 锁多=0` | `/tmp/g72-lock-preflight.mjs`（带阳性对照：往 pkg 塞一枚锁里没有的 ⇒ 精确报 `锁缺=zzz-not-in-lock`） |
+| 根 `package.json` 非 `scripts` 顶层字段 | base / main / branch / 载体四份两两相同；顶层键各 10 枚，无单侧独有键 | `git show <ref>:package.json` 后按值比 |
+
+⇒ 今天不红。但"今天不红"和"有东西守着"是两件事：
+
+🔴 **潜在洞**：如果本批往根 `package.json` 的 `dependencies` / `devDependencies` / `pnpm.overrides` /
+`packageManager` 里加过任何东西，并集会**把它丢掉**，而现有六条 scripts 断言（缺键 / 缺链段 /
+两侧顺序 / 两侧摘段）**一条都不会响**。掉的那一档如果同时是锁的构建输入 ⇒ 落地第一步红；
+更糟的是它**不红**那一支（只改 `pnpm.overrides` 这类不进锁口径的字段）—— 从此没有任何一层知道。
+
+#### ③ 补的判据：`pkgFieldVerdict`，判在**磁盘那个对象**上
+
+实现进 `research/tools/selfhost-audit-union.mjs`（纯函数，和 `unionAudit` / `ownershipVerdict` 同一模块、同一风格），
+调用点在载体脚本 `package.json` 那一族里，位置刻意选在 `writeFileSync` **之后**、
+与既有那条"写完回读再验"的断言同一个对象上：
+
+```js
+const fields = pkgFieldVerdict({ base, ours, theirs, out: backPkg });
+if (!fields.ok) die(2, `package.json 并集把本批改过的**非 scripts 顶层字段**丢了 …交人判`);
+```
+
+判据语义只有一条：**本批相对 base 改过的**每一个顶层字段，必须在产出对象里逐字节等于本批那份。
+它**不管** main 单方的改动（`out` 就是从 main 深拷贝来的，那是基线，不该响）——
+这条边界是故意的：替 main 的决定报红会让这道门变成噪音源。
+
+#### ④ 注入臂（装置已入库：`research/tools/selfhost-merge-carrier-arms.mjs`，五臂全中，`rc=0`）
+
+它**不是一份只能看不能跑的表**：默认旋钮自己取 `merge-base(main, 本分支)` 与两侧的
+`package.json` blob，臂 1 读的是**当前磁盘上那份载体**（`feat/self-host-merge-main`），
+所以每次载体重算之后重跑它，判的都是现量而不是快照。
+🔴 同一趟里既有"必须 ok"的臂也有"必须红"的臂 ⇒ 它**结构上不可能恒绿**（少任何一边的分辨力都会让某条臂 ❌）。
+
+| 臂 | 输入 | 期望 | 实读 |
+|---|---|---|---|
+| 1 | 真实四份（磁盘载体对象） | `ok=true` | ✅ `ok=true 比了=9` —— 证明**不是生来就红** |
+| 1b | 真实三份 + 并集构造 | `ok=true` | ✅ 同上 |
+| 2 | 本批往 `devDependencies` 加一枚 | 红，点名 `devDependencies` | ✅ `dropped=[devDependencies]` |
+| 3 | 本批新增 main 没有的顶层 `pnpm.overrides` | 红，点名 `pnpm` | ✅ `dropped=[pnpm]`（比了 10 个键——新键也进了分母） |
+| 4 | 本批改 `packageManager` | 红，点名 `packageManager` | ✅ `dropped=[packageManager]` |
+| 5 | **只有 main** 改了 `devDependencies` | `ok=true` | ✅ —— 证明它不替别人响 |
+
+#### ⑤ 这一节自己的探针差点骗过我（同一个家族，第三种面目）
+
+`g72` 第一版把 root importer 解析成 **0 条依赖**，三棵树读数**完全一样**、且都写着"锁缺=4"。
+那是解析器坏了（pnpm-lock v9 的 importer 键是 `  .:` 无引号、条目在 6 格缩进且带引号，我按 4 格无引号写的），
+不是三棵树真的都少 4 条。
+🔴 可迁移的一句：**跨树比较里"三棵树读数一样"不是"世界一致"的证据，它同样是"尺子坏了"的证据**；
+唯一能区分两者的是**阳性对照**（造一个必然不一致的对象喂进去，看它会不会报不一致）。
+加完对照之后这次跑才第一次有分辨力（`pkg=5 lock=4 锁缺=zzz-not-in-lock`）。
+
+#### ⑥ 重算后的载体（带新断言，main 又挪了一笔）
+
+```
+✅ 载体 75c98496 = main(cc0cb6a8) × feat/self-host-distribution(0c2f1fa0)
+   并集 scripts 键 146 · check 链段 main=76 本批=67 base=66 并集=77（摘段 0/0）
+   · 非 scripts 顶层字段比了 9 个，两侧改动全落进磁盘对象（丢 0）
+   门禁 8 道全 exit 0
+```
+
+⚠️ 与 §8.90 同一句提醒：`main` 从 `7471d45d` 又走到 `cc0cb6a8`（这一天里第四次），
+载体每次都要重算。等待链 g71 仍在轮询（最近 `15:21:15 POLL blockers_rc=0 BLOCK行=1`），
+它拿到的工具现在是**带第七族 + 带字段断言**的那一版。

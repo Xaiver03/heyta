@@ -78,7 +78,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unionAudit, unionAuditVerdict, ownershipVerdict } from './selfhost-audit-union.mjs';
+import { unionAudit, unionAuditVerdict, ownershipVerdict, pkgFieldVerdict } from './selfhost-audit-union.mjs';
 
 const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
 const MAIN = process.env.HEYTA_MAIN_REF || 'main';
@@ -284,7 +284,8 @@ if (fam.pkg.length) {
   // 🔴 写完**回读磁盘**再验一次并集。少这一步时踩过一次：脚本报告四族都解完了、门禁却红在
   //    "本批五道门禁不在链里" —— 磁盘上的 package.json 当时是 main 那份（63 段），
   //    而"我算出的并集"只在内存里被断言过。断言要落在**要提交的那个对象**上。
-  const back = JSON.parse(readFileSync(join(WT, 'package.json'), 'utf8')).scripts;
+  const backPkg = JSON.parse(readFileSync(join(WT, 'package.json'), 'utf8'));
+  const back = backPkg.scripts;
   const backSegs = seg(back.check);
   const lostSegs = [...new Set([...oChain, ...tChain])].filter((s) => !backSegs.includes(s));
   const lostKeys = [...new Set([...Object.keys(ours.scripts), ...Object.keys(theirs.scripts)])]
@@ -293,6 +294,18 @@ if (fam.pkg.length) {
     die(5, `package.json 并集写回后回读**不含**完整并集：缺链段 ${lostSegs.length}（${lostSegs.slice(0, 6).join(', ')}）· 缺键 ${lostKeys.length}（${lostKeys.slice(0, 6).join(', ')}）` +
       ` —— 磁盘 segs=${backSegs.length}，应当=${result.length}`);
   }
+  /* 非 `scripts` 那一档：并集是"深拷贝 main + 只加 scripts"，所以本批改过的任何依赖/overrides/
+   * packageManager 都会在这里被**静默丢掉**，而上面四条 scripts 断言一条都不会响。
+   * 判在**磁盘那个对象**上（理由见上面那条注释：断言要落在要提交的对象上）。
+   * 它挡的是两件事：`pnpm install --frozen-lockfile` 在落地第一步红；
+   * 以及更糟的"不红"那一支（只改 `pnpm.overrides` 这类不进口径的字段）从此没有任何一层知道。 */
+  const fields = pkgFieldVerdict({ base, ours, theirs, out: backPkg });
+  if (!fields.ok) {
+    die(2, `package.json 并集把本批改过的**非 scripts 顶层字段**丢了 ${fields.dropped.length} 个：${fields.dropped.join(', ')}` +
+      ` —— 依赖类字段不许自动决定（要么两侧同值、要么显式并），载体不落笔，交人判。` +
+      `   比了 ${fields.counts.compared} 个两侧共有的顶层键。`);
+  }
+  pkgReading += ` · 非 scripts 顶层字段比了 ${fields.counts.compared} 个，两侧改动全落进磁盘对象（丢 0）`;
 }
 
 /* ── .gitignore ───────────────────────────────────────────────────── */
