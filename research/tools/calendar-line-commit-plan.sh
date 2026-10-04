@@ -43,6 +43,9 @@ PATHS=(
   #    20:0x 那趟"通道死了却一路收假红"就是缺这道停止条件，而它会不会真的停只能由这把 rig 答
   #    （八臂：A–E 通道自检 + G/H/I 抽共享库 `settle_foreground` 原文跑的三条腿）。
   research/tools/r14c-channel-arms.sh
+  # 🔴 与链的 `ask_gate()` + `verify rc=3 有界重跑`**同批落地**：那 22 行窗口判据现在有两个消费者
+  #    （开窗前与重跑前），而"rc=3 才重跑、rc=1 绝不重跑、闸门关着就一个字不跑"只能由这把六臂 rig 答。
+  research/tools/r14c-verify-retry-arms.sh
   # 🔴 这一批**成对落地的三枚**（链 + 它依赖的两枚共享起栈脚本）：
   #    `r14c-carrier-chain.sh` 新加的 `stack_isolation` 后置断言依赖 `scripts/mobile-e2e-up.sh`
   #    那两枚新旋钮（`HEYTA_E2E_PIDFILE` / `HEYTA_E2E_LOGFILE`），而载体那份取的是**已提交副本**
