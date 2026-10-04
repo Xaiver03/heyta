@@ -3745,6 +3745,27 @@ W0b ─> 随时可做（台账那半要等文件干净）
     （这与"别把等待闸门与生产发布串进同一条后台命令"是同族，但更常见：门禁在前、提交在后、中间没有我的判断）。
     入库不变量是"**这一笔带得走的文件里不许有红**"，而不是"门禁跑过了"。
 
+- ㊥ **`check:legal-permissions` 在合并后的载体上重量 = rc=1 / 7 条红，全部归 W9；而我把这一档量出来的时候先用 zsh 量出一个假"0 条"**（04 18:38）
+  - 现量：`pnpm run check:legal-permissions` ⇒ **rc=1**，原文末行打印
+    `Android 声明 3 条 [INTERNET, POST_NOTIFICATIONS, SCHEDULE_EXACT_ALARM]、NS…UsageDescription 1 条、句子项数 zh=9 en=9、登记表 9 项、REVIEWED_REQUESTED 0 项、通知授权 已声明（六个承诺位置命中 6/6）`，
+    七条红 = 六句「移动端不申请通知权限」（`permissions.ts` 的 Android/iOS × 中英 + `third-parties.ts` 推送 SDK 否表行 × 中英）+ `SCHEDULE_EXACT_ALARM` 未登记。
+    `git log --oneline -- …AndroidManifest.xml` 现量：**后两条声明由 `b0ba4a35`（W9 提醒的原生投递，ADR-0051）带来，经 `608fa5b1` 那次"main 进批次二"进入本分支**。
+    ⇒ **本批不代改、不吸收凑绿**（那是 W9 那条线欠的"六个位置一起翻"）；⑤-1 那趟 68 段跑到这一段的结构就是"红在别人已提交的状态上"，
+    报数的时候必须写"第 24 段红、7 条、归属 `b0ba4a35`"，不能写成"本批门禁没过"。
+  - ✅ **W7 的"零法务变更"没有被推翻，但它的正确读法被这次重量钉住了**：逐 revision 比
+    `git show 79e116cf^:…` 与 `git show 79e116cf:…` 各数出 **1 条 [INTERNET]**（本单只加 `<provider>` 与注释），
+    而**同一条命令读 `HEAD` 是 3 条** ⇒ 这一格证的永远是"**本单那一笔**没往申请面加权限"，不是"分支现在声明了几条"。
+    表已补进 `countdown-w7-device-export.md` §5 末尾。
+  - 🔴 **我这次自己踩的探针坑（要入 traps，取号按工作树现量，别照本文件写死的号抄）**：
+    在 **zsh** 里写 `git show $r:apps/mobile/…` —— **`$r:a` 被当成 zsh 的历史/参数修饰符（`:a` = 转绝对路径）**，
+    `git` 收到的是拼出来的 `<cwd>/79e116cfpps/mobile/…`，报 `fatal: ambiguous argument`；
+    而我把输出管进 `grep -c`，**空输入照样回 0** ⇒ 三个 revision 一起打印"0 条"。
+    症状比"读不到"更糟：**它是一个看起来完全自洽的假读数**（0 条 = 声明面没权限？）。
+    抓住它的是**被验对象自己打印的那行**（门禁明说 3 条）⇒ 规律：**任何"数出来是 0"的取证，先确认被测命令没报错，
+    并让同一趟里有一个必然非 0 的对照**（这次是门禁自己的读数行）。修法就一个字符集：`"${r}:${P}"` 加花括号。
+  - ✅ 顺带把两条负载无关的读数垫上（18:37 @ `de93cd2a`）：`pnpm --filter @heyta/mobile typecheck` **rc=0**（`tsc --noEmit` 全过，含 `afterNextFrame` 那条注入调度器的签名），
+    `pnpm run check:legal-permissions` 的这条 rc=1/7 红也一并 dated。
+
 
   - 🔴 **改名这一刀有代价，而且代价量出来了**：`check-shell-surfaces.mjs` 的 macOS "产物"栏默认读的就是
     **同一个路径** `/tmp/heyta-macos-dist/Heyta.app/Contents/Resources/web-dist`。18:22 裸跑现量
