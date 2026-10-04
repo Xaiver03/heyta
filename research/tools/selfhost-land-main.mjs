@@ -41,6 +41,7 @@ import { createServer, Socket } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { depsFresh, freshReading } from './selfhost-deps-fresh.mjs';
 import { foreignListeners, runChildUnderWatch } from './selfhost-kill-watchdog.mjs';
+import { load1Selfcheck, readLoad1 } from './selfhost-loadavg.mjs';
 
 const MAIN_REF = 'main';
 const BRANCH_REF = process.env.HEYTA_LAND_BRANCH ?? 'feat/self-host-distribution';
@@ -58,15 +59,9 @@ const q = (p) => `"${p}"`;
 /** 本文件的绝对路径（分支上才有，主检出一枚 `selfhost-*` 都没有 ⇒ 相对路径必失败）。 */
 const SELF = fileURLToPath(import.meta.url);
 const TOOL = (name) => q(join(dirname(SELF), name));
-/**
- * 🔴 只认"数字形状"：`Number('')` 是 **0**，而 0 恰好是"负载很低"——
- *    这就是 §8.122 那族假 0 的第三个面目（读空 ⇒ 判成安静）。
- *    读不出形状一律交 NaN，让调用方按"判不了"处理。
- */
-const parseLoadRaw = (raw) => {
-  const t = String(raw ?? '').replace(/[{}]/g, '').trim().split(/\s+/)[0];
-  return /^\d+(?:\.\d+)?$/u.test(t) ? Number(t) : Number.NaN;
-};
+/* 1 分钟负载的解析与自检搬进 `selfhost-loadavg.mjs`（唯一所有者）。原先这里一份 `parseLoadRaw`、
+ * 哨兵 v3 里一份 `sysctl | tr | awk '{print $1}'` —— 同一个数两套算法，而它在这仓里坏过两回
+ * （§7 第 168 条：`tr -d '{} '` 侥幸还对；"修它"那版用 `$2` ⇒ 静默读成 5 分钟那位）。 */
 
 const ARGS = process.argv.slice(2);
 const FLAG = (n) => ARGS.includes(`--${n}`);
@@ -412,14 +407,8 @@ await gate(1, '阻塞集为空', () => {
  *   还要逐段归属去证明它不是本批的。多花两分钟把"这一刻真的安静"判准，
  *   比事后拆几十分钟的假红便宜。阈值本身一个字没动。
  *   三样之间要真等（不是"连续调用三次"）—— 紧挨着的三样是同一个读数抄三遍。 */
-const loadParseSelfcheck = () => {
-  const one = parseLoadRaw('{ 11.11 22.22 33.33 }');
-  if (one !== 11.11) return `负载解析取的不是 1 分钟位（合成样读到 ${one}）`;
-  if (Number.isFinite(parseLoadRaw(''))) return '空读数被解析成了数（应当是 NaN ⇒ 按判不了处理）';
-  return null;
-};
 await gate(3, '负载可用', () => {
-  const bad = loadParseSelfcheck();
+  const bad = load1Selfcheck();
   if (bad) {
     const e = new Error(`${bad} ⇒ 这一档判不了，不拿"判不了"当"负载低"`);
     e.probe = true;
@@ -429,8 +418,7 @@ await gate(3, '负载可用', () => {
   const seen = [];
   for (let i = 0; i < need; i++) {
     if (i > 0) execFileSync('sleep', [String(LOAD_STEP)], { stdio: 'ignore' });
-    const raw = execFileSync('sysctl', ['-n', 'vm.loadavg'], { encoding: 'utf8' });
-    const v = parseLoadRaw(raw);
+    const { raw, value: v } = readLoad1();
     if (!Number.isFinite(v)) {
       const e = new Error(`第 ${i + 1} 样读不出数（原始 ${JSON.stringify(raw.trim())}）⇒ 判不了`);
       e.probe = true;

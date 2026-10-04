@@ -18,7 +18,7 @@
  * `split('\n')` 段 = `wc -l` 的 213 行（文件以换行结尾）。**手抄的数字连单位都会错**，
  * 所以这里的读数全部由脚本自己拼进提交说明，不由人复述。
  *
- * ## 八条冲突族与它们的解法（§8.22 预置 + 后续每次新增一族都写在这里，本文件是唯一执行者）
+ * ## 九条冲突族与它们的解法（§8.22 预置 + 后续每次新增一族都写在这里，本文件是唯一执行者）
  *
  *  1. `package.json`：scripts 键并集 + `check` 链并集，带四条断言
  *     （两侧键不缺 / 两侧链段不缺 / 两侧各自相对顺序不颠倒 / 两侧相对 base 都不得摘段）。
@@ -61,9 +61,21 @@
  *     "什么都没丢"的错产出。重放要求每处 needle **恰好命中一次**，
  *     0 次（main 又改了形状）与 >1 次（needle 太宽）都当场退 2 交人判。
  *
- * 任何不属于这八族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
+ *  9. `server/Dockerfile`（**第九族**，10-04 23:0x 出现）：**两侧各修了同一个缺陷**，写法不同 ——
+ *     main 用 `RUN node -e '…delete p.devDependencies…'`，本批用 `RUN npm pkg delete devDependencies`。
+ *     命令形状取**本分支**：`PRUNE_DEV_DEPS_RE`（`image-install-shape.mjs`）只认后一种，取 main 侧会
+ *     同时红在契约门禁第 5 步与快照新鲜度那一腿（`prunesDevDependencies=false` 会把 `devDependencies`
+ *     从惰性档挪回被哈希的集合）。但**保留 main 独有的注释行**（那里头是它自己的取证理由）。
+ *     🔴 这一族**不许**用 `checkout --theirs` 整文件解：main 对该文件改了 17 行、只有**一块**冲突，
+ *     整文件取一侧会把 main 那些**没冲突的块**一行不留地丢掉，而归属检查抓不到（该路径本来就在写集里）。
+ *     所以解法只**改写冲突块本身**，块外一个字节不动。判据与守卫在
+ *     `research/tools/selfhost-dockerfile-merge.mjs`（`--selftest` 十七条：control 十条 + 七条拒绝臂，
+ *     每条**按拒绝理由认领**；四道守卫各做过摘除变异，各自把自己的那条臂打红）。
  *
- * ## 落笔前的门禁（只跑纯文件系统的那八道）
+ * 任何不属于这九族的冲突路径 ⇒ 退 2 并点名，**不自动决定**；退 2 之前必须把进行中的合并**中止干净**
+ * （`MERGE_HEAD=无` + 工作树 0 条脏），否则下一次重算会被第 0a 步那道闸门挡在门外。
+ *
+ * ## 落笔前的门禁（只跑纯文件系统的那几道，条数由 `GATES.length` 现量并打进读数）
  *
  * `check:gate-wiring`（并集有没有静默摘掉谁的门禁，这一族的裁判）、
  * `check:selfhost-entry-command`（入口命令抄件对账；顺带证明合并没把站内两份词条抄件并掉）、
@@ -97,6 +109,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { unionAudit, unionAuditVerdict, ownershipVerdict, pkgFieldVerdict } from './selfhost-audit-union.mjs';
 import { replayCapture, replayVerdict, replayReading, selftestOutputVerdict, CAPTURE_PATH } from './selfhost-capture-replay.mjs';
+import { resolveDockerfileConflict, dockerfileReading, selftestArms as dockSelftestArms, DOCKERFILE_PATH } from './selfhost-dockerfile-merge.mjs';
+import { readImageInstallShape, readImageInstallShapeFromText } from './image-install-shape.mjs';
 import { liveCarrierUsers } from './selfhost-carrier-busy.mjs';
 
 const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
@@ -111,11 +125,41 @@ const git = (args, opts = {}) =>
 
 const failures = [];
 const notes = [];
+
+/* 🔴 退路必须擦现场（2026-10-04 23:1x 现量踩过）：第九族刚出现时那一趟**拒绝**了，
+ *    但拒绝只做了"打印 + 退出"，把 `/tmp/heyta-merge-carrier` **留在半合状态**
+ *    （MERGE_HEAD 有、61 条脏）。代价不是"脏"这么轻：第 0a 步那道闸门把 MERGE_HEAD 认成
+ *    "别人的现场"⇒ 从这之后**连我自己都进不来**，而下一个人读到的报错是"载体在用"，
+ *    不是"上一趟拒了没擦"。所以每一族解不下去、每一条门禁不绿、新鲜度守卫失败……
+ *    所有 die 路径都要先把进行中的合并中止掉并**量一次它真的干净了**。
+ *    没擦干净时不改退出码（原始失败才是归因对象），但把恢复命令印成一行可直接执行的话。 */
+let mergeStarted = false;
+const teardown = () => {
+  if (!mergeStarted) return { ok: true, line: '合并未开始 ⇒ 没有现场要擦' };
+  try {
+    git(['-C', WT, 'merge', '--abort'], { stdio: 'ignore' });
+  } catch (e) {
+    return { ok: false, line: `merge --abort 本身失败：${String(e.stderr || e.message).split('\n')[0]}` };
+  }
+  let mh = '';
+  try { mh = git(['-C', WT, 'rev-parse', '--verify', 'MERGE_HEAD']).trim(); } catch { /* 期望的就是这里抛 */ }
+  const dirty = git(['-C', WT, 'status', '--porcelain']).split('\n').filter(Boolean).length;
+  return {
+    ok: !mh && dirty === 0,
+    line: `已 merge --abort ⇒ MERGE_HEAD=${mh || '无'} · 工作树脏 ${dirty} 条`,
+  };
+};
+
 const die = (code, msg) => {
   // 🔴 失败必须把**已经量到的读数**一起打出来。本轮就吃过这个亏：门禁红只打了门禁输出，
   //    而真正的问题是"合并根本没起来"——那个读数（冲突 0 条）当时只进了 notes。
   if (notes.length) console.error(`   已量到的读数：\n${notes.map((n) => `     · ${n}`).join('\n')}`);
   console.error(`❌ ${msg}`);
+  const td = teardown();
+  console.error(`   ${td.ok ? '现场：' : '🔴 现场没擦干净：'}${td.line}`);
+  if (!td.ok) {
+    console.error(`   恢复动作（由人确认这棵树此刻属于谁之后执行）：git -C ${WT} merge --abort && git -C ${WT} status --porcelain`);
+  }
   process.exit(code);
 };
 
@@ -186,6 +230,10 @@ if (!existsSync(WT)) {
 notes.push(`载体检出 ${WT} @ ${mainSha.slice(0, 8)}`);
 
 // ── 1. 合并 ──────────────────────────────────────────────────────────
+// 🔴 从这一行动作开始，**这一棵树上任何进行中的合并都是我自己起的**（第 0 步已经 abort + reset --hard
+//    过一遍）。所以 `mergeStarted` 必须挂在 merge 尝试**之前**，不能等 MERGE_HEAD 核对通过之后 ——
+//    那个核对失败的那些趟（MERGE_HEAD 存在但不是 srcSha / 根本没有）同样要擦干净。
+mergeStarted = true;
 let mergeOut = '';
 try {
   mergeOut = git(['-C', WT, 'merge', '--no-commit', '--no-ff', SOURCE], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -204,6 +252,7 @@ if (mergeHead !== srcSha) {
     `   git merge 的输出：\n${mergeOut.split('\n').slice(0, 12).map((l) => `     ${l}`).join('\n')}`);
 }
 const conflicts = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
+mergeStarted = true; // 从这里起的每一条 die 路径都必须把这一场合并中止干净（见上面的 teardown）
 notes.push(`MERGE_HEAD=${mergeHead.slice(0, 8)} 已确认 · 冲突 ${conflicts.length} 条：${conflicts.join(', ') || '（无）'}`);
 
 // ── 2. 分族并逐个解 ─────────────────────────────────────────────────
@@ -237,8 +286,11 @@ const GEN = 'research/tools/gen-image-npm-tree.mjs';
 //   所以这里**不删**，只把引用者计数打在读数里交给它的所有者。
 const COV = 'research/tools/check-image-license-coverage.mjs';
 const ORPHAN = 'research/tools/image-deps-fingerprint.mjs';
+// 镜像构建的剪枝那一步（**第九族**，10-04 23:0x 出现）。理由与判据见文件头第 9 族那一段，
+// 本体在 `selfhost-dockerfile-merge.mjs`（这一族特别不能"整文件取一侧"，所以解法在那里）。
+const DOCK = DOCKERFILE_PATH;
 
-const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], gen: [], cov: [], cap: [], other: [] };
+const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], gen: [], cov: [], cap: [], dock: [], other: [] };
 for (const p of conflicts) {
   if (p === 'package.json') fam.pkg.push(p);
   else if (p === '.gitignore') fam.gi.push(p);
@@ -248,14 +300,15 @@ for (const p of conflicts) {
   else if (p === GEN) fam.gen.push(p);
   else if (p === COV) fam.cov.push(p);
   else if (p === CAPTURE_PATH) fam.cap.push(p);
+  else if (p === DOCK) fam.dock.push(p);
   else fam.other.push(p);
 }
 if (fam.other.length) {
-  die(2, `出现**预置八族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
+  die(2, `出现**预置九族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
     `   先把它加进本文件的分族与解法，再重跑。`);
 }
-notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} cov=${fam.cov.length} cap=${fam.cap.length} other=${fam.other.length}`);
-if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1 || fam.gen.length > 1 || fam.cov.length > 1 || fam.cap.length > 1) {
+notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} cov=${fam.cov.length} cap=${fam.cap.length} dock=${fam.dock.length} other=${fam.other.length}`);
+if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1 || fam.gen.length > 1 || fam.cov.length > 1 || fam.cap.length > 1 || fam.dock.length > 1) {
   die(2, '同一族出现多于一份文件 —— 分族前提（各一处）不成立，交人判');
 }
 
@@ -279,6 +332,45 @@ try {
 } catch (e) {
   const arms = String(e.stdout || '').split('\n').filter((l) => l.includes('臂') || l.includes('自检')).slice(0, 8).join('\n');
   die(2, `第八族的重放判据**自检不过**（没牙了，或被改坏了）⇒ 不用它解冲突：\n${arms}`);
+}
+
+/* ── 第九族那条判据自己的牙（与第八族同一处挂法、同一个理由）─────────────
+ * `selfhost-dockerfile-merge.mjs --selftest` 的十七条（control 十条 + 七条按理由认领的拒绝臂）
+ * 在载体树上现跑：这一族的解法**只在这一次合并里被用到**，挂在落笔前才有"每次都被跑"的保证。
+ * 🔴 判的是**输出内容**（红臂计数 + 收尾那两句），不是只看退出码 —— 第八族那条 `selftestOutputVerdict`
+ *    立的就是这个口径：rc 0 而"一条臂都没跑"的输出长得和通过一模一样。 */
+const DMERGE = 'research/tools/selfhost-dockerfile-merge.mjs';
+let dockSelftestReading = '';
+if (!existsSync(join(WT, DMERGE))) {
+  die(2, `第九族的判据文件不在载体树上（${DMERGE}）⇒ 没有它就不许解这一族，也不许当"没有这一族"混过去`);
+}
+{
+  let out = '';
+  let rc = 0;
+  try {
+    out = execFileSync('node', [join(WT, DMERGE), '--selftest'], { encoding: 'utf8', maxBuffer: 8 << 20 });
+  } catch (e) {
+    rc = e.status ?? 1;
+    out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+  }
+  const redArms = out.split('\n').filter((l) => /^RED\s/.test(l));
+  const armLine = out.split('\n').find((l) => /臂数\s\d+/.test(l)) ?? '';
+  const claimed = armLine.match(/臂数\s(\d+)（拒绝类\s(\d+)/);
+  // 合成输入自检**不需要**第九族真的在冲突里 ⇒ 没冲突时也照跑（它验的是判据有没有牙）。
+  if (rc !== 0) die(2, `第九族的自检退 ${rc}（有红臂或被改坏了）⇒ 不用它解冲突：\n${redArms.slice(0, 8).join('\n')}`);
+  if (redArms.length) die(2, `第九族的自检**退出码 0 却带着红臂**（判据坏了）：${redArms[0]}`);
+  if (!claimed || Number(claimed[1]) < 17 || Number(claimed[2]) < 7) {
+    die(2, `第九族的自检读数对不上（臂数行：“${armLine || '（没有这一行）'}”，要求 臂数 ≥17 且拒绝类 ≥7）` +
+      ` ⇒ 要么臂被删了，要么输出形状变了而这里没跟上 —— 不拿"rc 0"当通过。`);
+  }
+  // 正向对照：判据函数**当场**能吃真输入并给出可核对的形状（合成臂全过不等于真数据也走得到那条路）。
+  const arms = dockSelftestArms();
+  const refuseArms = arms.filter((a) => a.name.startsWith('A'));
+  if (refuseArms.length < 7 || refuseArms.some((a) => a.got !== true)) {
+    die(2, `第九族的拒绝臂从**函数**这一侧数出来对不上：拒绝类 ${refuseArms.length} 条、非真 ${refuseArms.filter((a) => a.got !== true).length} 条`);
+  }
+  dockSelftestReading = `第九族判据自检：${claimed[1]} 条臂（拒绝类 ${claimed[2]}，按理由认领）红 0 · 四道守卫各做过摘除变异、各打红自己那条臂`;
+  notes.push(dockSelftestReading);
 }
 
 /* ── package.json ─────────────────────────────────────────────────── */
@@ -583,6 +675,40 @@ if (fam.cov.length) {
   notes.push(covReading);
 }
 
+/* ── 镜像构建那一步（第九族，10-04 23:0x 出现）──────────────────────────
+ * 两侧**各修了同一个缺陷**（devDependencies 里那三枚 `@heyta/*` 让 npm 在 `--omit=dev` 下照样去
+ * registry 解析 ⇒ 404 ⇒ 镜像建不出来），只是写法不同。取舍由判据决定，不由印象决定：
+ * `PRUNE_DEV_DEPS_RE` 只认 `npm pkg delete devDependencies` ⇒ 命令形状取本分支，
+ * 但**只改写冲突块**（`checkout --theirs` 整文件会把 main 那些没冲突的块一行不留地丢掉，
+ * 而归属检查抓不到这一条 —— 该路径本来就在写集里）。理由与守卫本体在 `selfhost-dockerfile-merge.mjs`。 */
+let dockReading = '';
+if (fam.dock.length) {
+  const withMarkers = readFileSync(join(WT, DOCK), 'utf8');
+  const branchSide = stage(DOCK, 3);
+  const r = resolveDockerfileConflict(withMarkers);
+  if (r.verdict) die(2, `${DOCK} 第九族：${r.verdict}\n   ⇒ 绝不提交，交人判（这一族没有"先合了再说"这条路）`);
+  writeFileSync(join(WT, DOCK), r.text);
+  git(['-C', WT, 'add', '--', DOCK]);
+  const onDisk = readFileSync(join(WT, DOCK), 'utf8');
+  if (onDisk !== r.text) {
+    die(5, `${DOCK} 写回后回读与产出逐字节不同（磁盘 ${onDisk.length}B vs 产出 ${r.text.length}B）`);
+  }
+  // 🔴 磁盘上那一份**再判一次**：判内存里的产出只证明"算法对"，载体上跑门禁的是磁盘那一份。
+  const shapeDisk = readImageInstallShape(join(WT, DOCK));
+  const shapeBranch = readImageInstallShapeFromText(branchSide);
+  const bad = [];
+  if (!shapeDisk.prunesDevDependencies) bad.push('磁盘上那份的剪枝仍然不在第一条 install 之前');
+  if (shapeDisk.normalizedShape !== shapeBranch.normalizedShape) {
+    bad.push('磁盘上那份的**安装形状**与本分支侧不同 ⇒ 第五族取的那份快照会因此对不上');
+  }
+  if (!/npm\s+pkg\s+delete\s+devDependencies/.test(onDisk)) bad.push('磁盘上那份没有 `npm pkg delete devDependencies`');
+  if (/node -e [^\n]*delete p\.devDependencies/.test(onDisk)) bad.push('磁盘上那份还留着 main 的 node -e 替代写法（取舍没落地）');
+  if (bad.length) die(5, `${DOCK} 解完之后磁盘上的自检不过：${bad.join('；')}`);
+  const mainCommit = git(['log', '-1', '--format=%h', mainSha, '--', DOCK]).trim();
+  dockReading = `${dockerfileReading(r.reading)}；main 那一版的出处=${mainCommit}（同一缺陷的另一种写法：命令被替代、注释逐行保留）`;
+  notes.push(dockReading);
+}
+
 const still = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
 if (still.length) die(2, `解完之后仍有未解决冲突：${still.join(', ')}`);
 for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'), 'utf8')], ['.gitignore', readFileSync(join(WT, '.gitignore'), 'utf8')]]) {
@@ -656,14 +782,15 @@ const msg = `merge(selfhost): 把 ${SOURCE} 合进 ${MAIN}（载体，第一父 
 由 research/tools/selfhost-merge-carrier.mjs 产出，逐路径解法与断言记在该文件头部。
 ${notes.map((n) => `· ${n}`).join('\n')}
 
-解法：${[pkgReading, giReading, auditReading, snapReading, genReading, covReading].filter(Boolean).join('；')}
+解法：${[pkgReading, giReading, auditReading, snapReading, genReading, covReading, dockReading].filter(Boolean).join('；')}
 ${fam.png.length ? `· evidence PNG ${fam.png.length} 枚取 main 侧` : ''}
 
 载体的纯 fs 门禁读数（全部现量）
 ${gateReadings.map((r) => `· ${r}`).join('\n')}
 
 🔴 完整 pnpm check（要 node_modules、要起栈、check:ai-e2e 会 SIGKILL 别人的 dev server）**不在这一笔的主张里**，
-它是落地那一刻的判据；本笔只把"七族冲突的解法"固化成一个可复核对象。
+它是落地那一刻的判据；本笔只把"预置 ${Object.keys(fam).length - 1} 族冲突的解法"固化成一个可复核对象
+（族数由分族表本身现量，不手抄）。
 这一笔**不是** ${MAIN} 的推进。main 每前进一步或本批每多一笔，都要重跑本脚本（只认 ${BRANCH}，不认 SHA）。
 `;
 writeFileSync('/tmp/ht-carrier-msg.txt', msg);
@@ -684,5 +811,6 @@ console.log(`   ${giReading}`);
 // 🔴 自检这条必须在**成功路径**上也打出来：只进 notes（失败时才 dump）的判据，
 //    在成功时是静默的，而"静默的通过"会被下一轮读成"没跑"或"跑了但没人看"。
 console.log(`   ${capSelftestReading}`);
+console.log(`   ${dockSelftestReading}`);
 console.log(`   门禁 ${GATES.length} 道全 exit 0；完整 pnpm check 留给落地那一刻`);
 console.log(`   main 若再前进 ⇒ 重跑：node research/tools/selfhost-merge-carrier.mjs`);

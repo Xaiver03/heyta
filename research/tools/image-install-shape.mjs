@@ -19,8 +19,13 @@ import { createHash } from 'node:crypto';
 const PRODUCTION_STAGE = /^FROM\s[^\n]*\bAS\s+production\b/im;
 
 export function readProductionStage(dockerfilePath) {
-  const text = readFileSync(dockerfilePath, 'utf8');
-  const lines = text.split('\n');
+  return productionStageLines(readFileSync(dockerfilePath, 'utf8').split('\n'));
+}
+
+// 这一段以前直接读文件，所以**还没写盘的那个版本**没法问它"这样合有没有改变装出来的东西"。
+// 载体解第九族时必须先算出产出再判它（落盘之后再判就变成"事后诸葛"：红的时候文件已经坏了），
+// 所以把纯计算抽出来，读路径只是它的一层薄壳。
+function productionStageLines(lines) {
   let start = -1;
   for (let i = 0; i < lines.length; i += 1) {
     if (PRODUCTION_STAGE.test(lines[i])) start = i;
@@ -58,13 +63,27 @@ function flattenRunLines(stageLines) {
 }
 
 /**
+ * 同一个判定，输入是 **Dockerfile 全文**而不是路径 —— 给"还没写盘的那个版本"用
+ * （载体解第九族时必须拿着产出先问一次，落盘之后再问就成了事后诸葛）。
+ * 🔴 这不是第二份实现：它和 `readImageInstallShape` 走的是同一条 `shapeOfStageLines`。
+ * @returns 同 `readImageInstallShape`
+ */
+export function readImageInstallShapeFromText(text) {
+  return shapeOfStageLines(text.split('\n'));
+}
+
+/**
  * @returns {{
  *   installs: Array<{raw:string, specs:string[], omitDev:boolean, ignoreScripts:boolean, registry:string|null, usesPnpm:boolean}>,
  *   normalizedShape: string,
  * }}
  */
 export function readImageInstallShape(dockerfilePath) {
-  const runs = flattenRunLines(readProductionStage(dockerfilePath));
+  return shapeOfStageLines(readFileSync(dockerfilePath, 'utf8').split('\n'));
+}
+
+function shapeOfStageLines(allLines) {
+  const runs = flattenRunLines(productionStageLines(allLines));
   const installs = [];
   for (const run of runs) {
     // 一个 RUN 里可以串好几条命令（&& / ;），逐条找 `npm install` / `pnpm install`。
