@@ -421,12 +421,29 @@ describe("W7 · 问原生要图之前必须先让出一帧（iOS 实测到的那
 
   it("card-export.tsx 里 toDataURL 的调用点在让帧之后（不是「我记得加了」）", () => {
     const src = codeOf(MOBILE_LIB("card-export.tsx"));
-    const gate = src.indexOf("afterNextFrame(");
+    /**
+     * 🔴 让帧这一步现在是**带预算的** `afterNextFrameWithin`。
+     *
+     * 改名不是审美：`requestAnimationFrame` 在后台不触发，而 `afterNextFrame` 那个
+     * Promise 永远不结算 ⇒ 这段等待落在 `RASTERIZE_SETTLE_MS` 那 15 s **管不到的地方**。
+     * 症状两枚：点了没反应（挂死）+ 回前台后突然弹出分享面板。
+     * 所以这条判据跟着换成新名字，并加断"等不到帧也要有个结论"。
+     */
+    const gate = src.indexOf("afterNextFrameWithin(");
     const call = src.indexOf(".toDataURL(");
     expect(gate, "源码里没有让帧这一步 ⇒ iOS 会重演 nil registry 然后超时").toBeGreaterThan(-1);
     expect(call, "找不到 toDataURL 调用点，这条判据失去对象").toBeGreaterThan(-1);
     expect(call, "toDataURL 排在让帧之前 —— 那一档原生拿不到 tag 且不回调").toBeGreaterThan(gate);
-    expect(src.match(/afterNextFrame\(/gu)?.length, "让帧被调用了不止一次（每多一次就多等一帧）").toBe(1);
+    expect(src.match(/afterNextFrameWithin\(/gu)?.length, "让帧被调用了不止一次（每多一次就多等一帧）").toBe(1);
+    expect(src.includes("'frame-timeout'"), "等不到帧那一支没有结论点 ⇒ Promise 悬着，回前台再突然弹一次").toBe(true);
+  });
+
+  it("一次点击只能有一个结论点：被顶掉/被卸载的那次必须结算成 cancelled", () => {
+    const src = codeOf(MOBILE_LIB("card-export.tsx"));
+    // cleanup 里结算 —— 少了它，第二次点击会把第一次的 Promise 永远悬着（按钮停在"进行中"），
+    // 而第一次的 complete() 仍会跑完 ⇒ 两张分享面板 + 图与文件名错配。
+    expect(src.includes("resolve({ ok: false, cancelled: true })"), "作废路径没把上一次结算掉 ⇒ 悬着的 Promise 让按钮永远转圈").toBe(true);
+    expect(src.match(/if \(settled\) return;/gu)?.length, "结论点守卫少了（每条分支都得先问一次）").toBeGreaterThanOrEqual(3);
   });
 
   it("让帧之后视图可能已经没了 ⇒ 出一句话，不许静默", () => {
