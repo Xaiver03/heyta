@@ -2737,7 +2737,11 @@ W0b ─> 随时可做（台账那半要等文件干净）
   Swift 的 `@objc(…)` 名。**三臂变异读数**：退回裸 `RCT_EXTERN_MODULE` ⇒ `1 failed | 20 passed`；
   REMAP 两参互换 ⇒ `1 failed | 20 passed`；把 JS 名改错一位 ⇒ `1 failed | 20 passed`；
   复原 ⇒ `21 passed`（RC=0）。
-  ⚠️ 同族登记 **W7-G5**（**本批不改，各有所有者**）：`HeytaWidget`（JS 名）/ `HeytaWidgetModule`（类名）、
+  ⚠️ 同族登记 ~~**W7-G5**~~ **W7-G8**（**本批不改，各有所有者**；🔴 15:4x 改号：这条当初写的是 W7-G5，
+  而 `countdown-w7-device-export.md` 的缺口表里 **W7-G5 已经是"RN 没有等宽数位通道"** ——
+  同一个号在两篇文档里指两件不同的事，下一个按号查的人会把两条结论互相套错。
+  查号后 G6/G8 都空着，G6 留给 `RASTERIZE_SETTLE_MS`（任务 #24），这条桥名错位的改占 **G8**）：
+  `HeytaWidget`（JS 名）/ `HeytaWidgetModule`（类名）、
   `HeytaReminder` / `HeytaReminderModule` 是同一个形状，四座 iOS 桥里只有
   `HeytaVaultSecureStorage` 因为"JS 名 == 类名"侥幸对得上 —— 也就是说小组件那格
   早就记过的"看起来不支持，其实接线错了"，在 iOS 侧的第二种面目就是这一条。
