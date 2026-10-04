@@ -156,6 +156,27 @@ export {
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';
 
 /**
+ * Hosted device listing and revocation. The server invalidates every session
+ * when one device is revoked; callers must re-authenticate all devices and
+ * perform the root-key rotation separately.
+ */
+export {
+  HOSTED_SYNC_DEVICES_PATH,
+  HostedDeviceManagementError,
+  listHostedSyncDevices,
+  revokeHostedSyncDevice,
+  revokeHostedSyncDeviceBound,
+  runHostedDeviceRevocation,
+  type HostedDeviceManagementErrorCode,
+  type HostedDeviceManagementOptions,
+  type HostedDeviceRevocation,
+  type BoundHostedDeviceRevocation,
+  type HostedDeviceRevocationControllerOptions,
+  type HostedSyncAuthSnapshot,
+  type HostedSyncDevice,
+} from './device-management.js';
+
+/**
  * 本机数据销毁器：宿主在自己的启动路径注册，`createSyncClient()` 在共享接缝
  * 装默认回调（为什么是注册表而不是逐端传参，见 `local-erasure.ts` 文件头）。
  */
@@ -565,6 +586,7 @@ export {
   type BuildExportOptions,
   type ExportCounts,
   type ExportDocument,
+  type RestoreDocument,
   type ExportEntityCount,
   type ExportFormat,
   type ExportTaskRow,
@@ -580,6 +602,7 @@ export {
  */
 export {
   parseExportDocument,
+  previewRestore,
   restoreIntoEmptyTarget,
   stateMatchesDocument,
   type ExportImportFailureReason,
