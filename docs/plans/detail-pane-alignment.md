@@ -2069,6 +2069,16 @@ B 认的是它那张**名字表**，而 §8.28 现量确认那 15 处**没有一
 ⇒ **合并时补两行**（谁合并谁补，红出来的消息会点名到 `文件  变量名` 并写清两种改法）。
 这条红是**设计要的行为**：一个我没审过的面上多出一处行 id 态，就该由读到它的人判它是什么。
 
+📌 **13:2x 用另一种方法复量，同一答案**（值得记，因为那一趟之后 main 又走了一批：
+落后从 §8.40 那趟（11:1x）的 **485** 变成 13:2x 现量的 **516** ⇒ 中间 +31 笔，两枚未登记还是这两枚）：
+不起工作树，直接对 ref 做 `git grep`，再与本分支 `ROW_ID_EXEMPT` 的 15 条登记求差集 ——
+`main 侧 …Id 本地态=17 / 本分支侧=15 / 合并后新增=2 / 未登记=2`，
+两枚仍是 `apps/web/src/features/trash/TrashView.tsx busyId` 与 `apps/mobile/src/screens/TrashScreen.tsx busyId`。
+复跑命令（零负载、零检出写入）：`node /tmp/dp_g_merge_probe.mjs` —— ⚠️ 它是 /tmp 里的一次性探针，
+**会随机器没掉**（本次刚在调研文档里领过一次这个教训），所以方法写在这里而不只写在路径里：
+`git grep -nE 'const \[[A-Za-z]*Id, set[A-Za-z]*Id\]' main -- apps/web/src apps/mobile/src` 与
+`git grep … HEAD -- …` 两个集合求差，再拿 `ROW_ID_EXEMPT` 的 `文件 变量名` 键集挡掉已登记的。
+
 同一趟还量到 E 的**版本差**：main 的**原版**门禁跑 main 的树 = `rc=0`，末行"接线声明 **18** 处全部用起来"；
 而我的版本跑同一棵树 ⇒ E 报 `packages/ui/src/calendar/CalendarDayBoard.tsx  onOpenTask` 一处断线。
 差的那一处正是 main 那 79 行（对象 spread 转发）认下来、我这版不认的。
