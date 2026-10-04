@@ -1485,8 +1485,22 @@ W0b ─> 随时可做（台账那半要等文件干净）
     与 04 03:0x 那次读数重新对齐。🔴 顺手否证了我自己写在 §8.4 那行里的一句前瞻：完整 `pnpm check`
     **不可能**在这一格响，因为 `package.json:58` 那条串的第一段就是 `pnpm build` ——
     "必须先重打产物否则必红"只在**单跑门禁**时成立。这张表仍不打勾：剩下的是那 2 栏，只有装包能关。
-- [ ] W8 完成 —— ⏳ **04 06:3x 现量**：唯一还没关的是那两栏 `desktop-{macos,windows} / countdown · 产物`，
-      而 `pnpm reinstall:all` **此刻开不了工**：`verify-mobile-window-gate.sh --target b` ⇒ `RC_WINGATE_B=3`
+- [x] W8 完成 —— ✅ **04 10:4x / 15:1x 两栏都关掉了**（原文照录在下面，因为它那个"开不了工"的形状会复现）。
+      `check:shell-surfaces` 现在的读数是 **判定 5 格：5 绿 / 0 红 / 未取证 0 栏**：
+      · **windows 栏**（链 S，载体 `6105ba3b`）：`RC_SYNC=0` + `RC_PACKAGE=0` + 七条取证齐
+      （`PAYLOAD_INDEX_SHA=517C6BA76D00…` 与本工作树 `apps/web/dist/index.html` 逐字相同、
+      `PAYLOAD_CHUNK_PRESENT/TOTAL=2/2`）⇒ 关闭 **W8-GAP-W1**；四臂各量一次（改 `PAYLOAD_WEBDIST`⇒红、
+      改 `PAYLOAD_CHUNK_PRESENT`⇒红、sha 首位改⇒**转回未取证**、删那三行⇒**未取证**）——
+      后两臂是那条"不许拿别人的字节给自己这一轮作证"的判据本体。
+      · **mac 栏**（链 W，`RC_CHAINW=0`，载体 `117386a1`）：`HEYTA_SKIP_NOTARIZE=1` 打进**自己的** OUT_DIR
+      （`package-app.sh:28` 的第一位置参数）→ `RC_MAC_PACKAGE=0` → 包内 `index.html` sha 与本机 dist 逐字相同
+      → assets 集合对账 **9/9、差异行 0** → `HEYTA_MACOS_WEB_DIST=<包内那份>` 跑门禁 ⇒ 5 绿 / 未取证 0 栏。
+      👁 内容载体 `packaged-first-run.png.webview.png` 人已打开看过（收集箱 + 首启同意卡 + 主蓝实心钮）。
+      ⚠️ **两栏都留一条边界**：windows 的取证文件落在 `dist/windows/`（被 gitignore）⇒ 它是本机这一趟的读数，
+      干净检出上那一栏仍会报未取证；mac 主张的是"**包里有这一屏**"（sha 逐字相同证的），
+      **不主张"屏幕上那个窗口真有内容"**（同名窗口图是空的，而 `package-app.sh:232-242` 早写明不据此判红）。
+      🔴 "装进 `/Applications`"那一格**不在本条**，属收尾第 4 项（链 MAC 在跑，见 §8.4 ㊞ 之后的读数）。
+      ⏳ 原文（04 06:3x 现量，留著认形状）：`verify-mobile-window-gate.sh --target b` ⇒ `RC_WINGATE_B=3`
       （负载 18 > 阈值 12；`adb devices` 在线 **0 台**；工作树与 `reinstall-all.sh` 两条 ✅），
       外加别人那条装包链挂在 `notarytool submit --wait` 上 3h21m 且**它自己不会结束**。
       取证与不并发的理由在 **§8.4 第 ⑬ 条**；等满按任务书第 8 条记 **exit 3 = 环境无效，不是产品失败**。
