@@ -4201,6 +4201,11 @@ node scripts/resolve-detail-pane-merge-mechanical.mjs --product <§8.52 留下�
 | 对照 | 恢复干净后的真文档 | 全绿 | 0 |
 
 A2 用完把那枚临时 png 删掉了，`git status --porcelain apps/web/evidence` 复跑为空。
+⚠️ **这个做法已作废**（§8.64 第 4 节）：往检出里造未跟踪文件正好落在 AGENTS §6.1.1 那条
+"Windows 段送 `git ls-files` + 未跟踪非忽略"的集合里。臂现在整套固化成装置
+`research/tools/mutation-rigs/mutate-detail-pane-evidence-refs.mjs`（11/11，多了 A7 中文路径阳性臂、
+A8 集合守卫臂，并把 A2 改成在 mkdtemp 的**独立索引**副本里 `git rm --cached` 一枚真引用的 png），
+上面这张表留着是为了让"六臂那一趟"仍是可追溯的历史读数，而不是当前跑法。
 A6 存在的理由：分档（腿 4/5）如果规则写宽了，会**连真引用一起吃掉**而整趟照样绿 ——
 A6 的读数必须停在 `引用 1 条 / 成立 1 个`，一旦变成 `引用 0 条` 就说明分档吃穿了，那时它会撞腿 6 自己报红。
 
@@ -4555,3 +4560,42 @@ node scripts/verify-detail-pane-merge-preflight.mjs        PREFLIGHT_RC=1
 
 **状态：进行中。** 判据两枚 + 装置两台 + `GATES` 挂载已落码；
 待办 #23（挂进 `pnpm check`）仍然开着 —— 那要动 root `package.json`，在别人手里。
+
+## 8.65 提交后复跑合流预检：两枚判据在候选树上都是绿的，而这一趟**顺带证明了合并没把引用合坏**（2026-10-04 16:4x，载体 `9d0a15fa`）
+
+§8.64 第 6 节那条"预检跑的是提交态"的现象，提交之后自己消失了 —— 这就是复跑要拿的东西：
+
+```
+node scripts/verify-detail-pane-merge-preflight.mjs        PREFLIGHT_RC=1（不是这两枚造成的）
+·  check-detail-pane-evidence-refs.mjs 候选=0 main=MISS  结论：本线文档每条截图引用都落在一枚合并产物树里的文件上 ✅
+·  check-detail-pane-c1-coverage.mjs   候选=0 main=MISS  结论：C1 每一行要么有对照节、要么写明例外类别；每个对照节都有日期与出处 ✅
+TREE=5b426930  冲突 17 枚  纯 fs 门禁 19 道：合并造成的红=1（`check-selection-single-source`）
+两边都红=**0**（上一趟是 2，就是这两枚）  静默合流 11 枚其中丢行/语法不过=0  槽位重复=0
+台账同号不同事 🔴 2 组（215/216，续号起点 229、要 sweep 现量 15 行 / 27 处）  产物仍带 marker 的产品文件 4 枚
+```
+
+三条读数要分开看，别合成一句：
+
+1. **`main=MISS` 不是红。** 那两个脚本只存在于本线，main 那棵对照树里没有 —— 预检按定义把它记成
+   "这一趟没有 A/B 对照"，不记成"合并造成的红"。所以这两行旁边的 `·` 是对的。
+2. **候选=0 证明的是引用落位，不证明文档没有待裁决段落。** 同一趟明确打着"产物仍带 marker 的产品文件 4 枚
+   ⇒ 本趟 tally 不算合流验过"（`docs/plans/detail-pane-alignment.md` 自己就在 marker 清单里）。
+   两件事不冲突：合并把两边的截图引用拼进同一篇文档之后**每一条都还落在树内的文件上**，
+   而冲突裁决本身没做。前一句是这两枚判据的射程，后一句是它的边界。
+3. **合并造成的红仍然只有 1 条**，这两枚文档判据没有新增红。预检把那行截到 58 字符，只看得到
+   `✗ 选中态的所有者不唯一：`，所以我把候选树（`5b426930`）另解一份、直接跑那一门补全读数：
+
+   ```
+   断言 G：宿主里有 2 处本地 `…Id` useState 没有语义登记：
+     apps/web/src/features/trash/TrashView.tsx  busyId
+     apps/mobile/src/screens/TrashScreen.tsx  busyId
+   ```
+
+   也就是 §8.36 记过、挂在**待办 #16** 的那两行豁免 —— 不是新问题，也不是这两枚判据造成的。
+   📌 顺带一条可复用的：预检表格里 `line` 是被截断的摘要，**要拿全读数就自己 `git archive` 那一枚
+   树号再直接跑那一道门禁**，别把摘要当成结论。
+
+📌 这一步真正买到的东西，用一句话能说清：**目标第 4 条那句"§8 读数含截图路径"现在有了两个自动消费者**
+（合流预检 + 独立入口），而"合并会把两边各自新写的引用拼进同一篇文档"这种红，
+只有在候选树上跑才看得见 —— 在各自的检出里两边都不会红。
+挂在 `pnpm check` 上那一份（待办 #23）仍然是开的：那要动 root `package.json`，在主检出里恒为 ` M`。

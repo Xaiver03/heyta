@@ -265,6 +265,9 @@
 🔴 这张表和下面的 C1b 各节之间有一条**常驻对账门禁**：`node scripts/check-detail-pane-c1-coverage.mjs`
 （每行要么有对照节、要么在自己那一行写明属于哪一类例外；每个对照节必须有日期 + 出处，URL 或 `file:line` 择一即可。
 判据与六臂读数在工单 §8.59）。写这张表的人不必再靠自觉去数"13 行有没有漏对照节"。
+🔴 臂已固化成装置（`research/tools/mutation-rigs/mutate-detail-pane-c1-coverage.mjs`，10/10），
+且两枚本线判据都已挂进**合流预检**的 GATES（`scripts/verify-detail-pane-merge-preflight.mjs`，
+产物树模式 `--root`）—— 两趟读数在工单 §8.64 / §8.65。
 
 | # | 要拍的值 | 属于 | 卡住什么 |
 |---|---|---|---|
