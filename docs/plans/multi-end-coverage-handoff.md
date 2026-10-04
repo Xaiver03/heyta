@@ -1032,3 +1032,24 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   我据此打印出 `GATE_EXIT=`，差点把它记成"闸门退 0"（记忆里这条早就有，落在这里是因为它出现在
   **闸门读数**上——判据的退码读不到时，唯一诚实的写法是"没拿到"，不是补一个猜测值）。
   ⇒ 取被管命令的退码：要么不接管道，要么 `bash -c 'set -o pipefail; …'`。
+
+### 19:3x 开窗前的最后一次静态预检（全部现取，不含任何推断）
+
+- ✅ **对齐那 51 笔不会改动 ①/③ 的任何判据脚本**（逐 blob 现比，路径先 `git ls-tree -r --name-only HEAD`
+  现取，见下面第二条自错）：`scripts/verify-mobile-notes.sh` `df46f473`（main 与载体**同**，673 行）、
+  `scripts/reinstall-all.sh` `036ce09a`（同）、`scripts/lib/msix-install-facts.sh` `f1c2dec1`（同，
+  `MSIX_REQUIRED_FACTS` 现读仍 **5 条**：`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` /
+  `M2D=OK` / `SHORTCUT_OK=True`）、`scripts/screenshots/png-stats.mjs` `6cee9282`（同）。
+  ⇒ 窗口内那三段重活（`git checkout` 对齐 → `pnpm -r build` → 重打 APK）**只换源码，不换判据**，
+  所以 ① 的"五张图 × 每条判据"与 ③ 的四个 needle 都不必重推。
+- ✅ ③ 的四个输入 needle 在 main 那版里逐条命中（`step "8b`=1、`shot_evidence`=6、
+  `# >>> step10-scoped begin`=1、`blame_crash`=7），第三张截图 `android-notes-3-from-search` 命中 **2**
+  （截图点 + 判据点），`pm clear` 命中 4；凭据的三个 `*_FILE` 旋钮在 `scripts/lib/mobile-e2e.sh` 各命中 1。
+- 🔴 **我自己这一轮造出来的第二种假"同"**：`git rev-parse "HEAD:<不存在的路径>"` **不报错、
+  把参数原样回显**（我拿到两行 `main=HEAD:scr 载体=HEAD:scr` 还读出"同"）。
+  ⇒ 两次**同样形状**的失败会彼此相等，比空串更危险——空串我还会看一眼，`HEAD:scr` 看着像截断的 sha。
+  规矩（写下来才拦得住下一次）：**比 blob 之前先 `git ls-tree -r --name-only <ref>` 现取路径，
+  再断言取到的 sha 是 40 位十六进制**；sha 长度不够就当场判"探针坏"，不许把等号写出来。
+  ⚠️ **待入 traps #266**（按工作树取号：`grep -oE '^[0-9]+\. '` 现量最大 **265**、HEAD 最大 **228**、
+  该文件此刻是 ` M` 且工作树比 HEAD 多 **750 行** ⇒ 这正是记忆里"目标台账正脏着几百行时不要往它追加，
+  改投单写者文档并登记待入号"那一档，本条只是**登记**，不是已入档）。
