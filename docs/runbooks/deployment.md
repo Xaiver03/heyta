@@ -485,7 +485,16 @@ pnpm check:web-artifact:app
 
 # 3) 上传
 rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
+
+# 4) 🔴 发布后线上验收（真浏览器 + 真 TLS + 真服务端，打的是刚发出去的那份字节）
+cd e2e && npx playwright test --config playwright.live-site.config.ts   # 判据：0 failed（条数现读，别抄）
 ```
+
+⚠️ **第 4 条为什么在手册里而不是在 `pnpm check` 里**：这一族打的是生产域名，本来就不能进链。
+代价是它**没有别的自动消费者** —— 2026-10-05 那次发布后跑它，抓到两条早就烂在那儿的探针缺陷
+（用例在 `page.evaluate` 里 `fetch`，被应用自己的隐私同意闸门挡下；以及 SW 注册按 G-12
+排在同意之后，而用例没答那份披露就等 `serviceWorker.ready`）。两条的逐条读数与修法见
+`7b9089b2`。**不发一次不会知道，发一次不跑也不会知道。**
 
 🔴 **第 2 条不是仪式，它挡的是这一族里最难归因的那一发**：`apps/web/dist` 是**一个目录、两种载体**
 （`/` 给 dev/preview/`pnpm check`，`/app/` 给生产），谁最后构建谁覆盖谁。
