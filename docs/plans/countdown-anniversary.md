@@ -3164,3 +3164,37 @@ W0b ─> 随时可做（台账那半要等文件干净）
   - ⚠️ **Z 现在这趟探针的读数是"装在设备上的那枚 app"的**，不是当前提交的 —— 它自己的新鲜度判据
     （`verify-mobile-card-export-ios.sh` 开头那条"装的 app 不比源码旧"）会替我说这句话，
     我不替它宣布结论。**W7-G3 仍然不打勾。**
+
+- ㊿ **一道常驻门禁当场照出本批自己的 35 处 shell 变量陷阱；iOS 那三种"环境坏了"再排两种；Goal ③ 的"三端齐"现在有一条可核对的形状**（04 15:1x，载体 `117386a1`）
+  - 🔴 **`check:shell-unicode` 现量 rc=1，点名两处全在本批自己的 W7 设备探针里**：
+    `scripts/verify-mobile-card-export-ios.sh` **32 处** + `scripts/verify-mobile-card-export.sh` **3 处**
+    （`git blame` 现量：`7806f6ae5` / `2987cfdbd`，都是 10-04 本批的提交）。
+    形状是 `$VAR` 紧跟全角字符 ⇒ 变量名被吞（C locale 下 `set -u` 直接 `unbound variable`），
+    **退出码不受影响、打印出来的证据是乱码** —— 正是 §7 第 64 条那一族，而仓里早就有这道门禁
+    （`5599141c` 全仓扫过 172 处、`2f735392` 把它注册进 `pnpm check`）。
+    ⚠️ **这条对本批的读数有直接影响，而且我差点把它写过头**：13:20 那趟 Android 打印的
+    `ok "这张卡的导出文件落盘了：$FOUND（mtime 晚于点击时刻）"` 就在违规清单里。
+    我第一版想写"现量：那句打印是完整无乱码的"—— **那句不成立**：链 U 的日志只留了尾部摘要，
+    `grep '落盘了' /tmp/*.log` 现在只在那道门禁自己的报告里命中，**那趟的原始 echo 没有留下**。
+    现在能主张的只有两件：① 判据用的是 `[ -z "$FOUND" ]` 而不是那句 echo ⇒ 判定不经过这条通道；
+    ② 证据 README 的 ②′ 行记的是**从设备拉回来的那枚文件在盘上的名字**
+    （`heyta-w7e2e-131811-10月11日 星期日.png`），那是另一个通道，不受 `$VAR` 吞名影响。
+    🔴 可迁移的那条：**"打印即证据"以后不能再用** —— 凡是只有 echo 一份读数的判据，
+    要么把原始日志整趟留存，要么把读数写进产物（这次两处都靠后者救回来了）。登记为任务 **#30**，
+    修法用仓里的自动修（`fix-shell-unicode-vars.py --write`，一次 35 处），
+    🔴 **时序硬约束**：链 Z 正在跑那枚 iOS 探针，bash 对运行中的脚本是**增量读取**，跑完之前改它 = 制造一次没人能复现的错乱。
+  - ✅ **pod install 的"环境坏了"再排除两种**（都是现量，不靠猜）：
+    ③ `apps/mobile/node_modules` 里 **35 枚软链、断链 0** ⇒ "dangling symlink 让 `realdirpath` 拿到垃圾字符串"这一支不成立；
+    ④ `check:script-snapshot` **rc=0**（36 个脚本的自快照 bootstrap 全在位）⇒ 探针脚本没被半写坏。
+    剩下唯一候选仍是 **locale 未设**（与本条上面那个 `$VAR` 陷阱同源的环境条件 —— 这不是证明，是"同一把嫌疑现在解释两件事"），
+    验证办法与双臂对照写在任务 **#29**。
+  - 📌 **Goal ③「壳级门禁三端齐」现在有一条能对账的形状**（读 `scripts/check-shell-surfaces.mjs` 本体，不是读台账措辞）：
+    三端各自的**判据种类不同**，不能拿一个的绿去推另一个 ——
+    `desktop-windows` = 正向取证通道（`artifactFacts` + `HEYTA_WINDOWS_FACTS` 读远端回传的 `PAYLOAD_*` 四件套，链 S 已量过四臂）；
+    `desktop-macos` = 正向产物栏（`HEYTA_MACOS_WEB_DIST` 指包内 `web-dist`，链 W 在取）；
+    `desktop-linux` = **登记缺口 `W8-GAP-L1` + 反向判据 L2**（`:1035`：`apps/desktop-linux` 下一旦出现 `web-dist` 引用就红，
+    即"这句缺口现在是真的"是被**量**出来的，不是被声明的；G11 那一臂第一次还没红 —— 因为 `walkSources` 按扩展名过滤，
+    假引用塞进 `Makefile` 不命中，后来换成 `walkAll` 才有牙，见 `:357` 那段）。
+    ⇒ 所以"三端齐"这句的真话是：**windows 有读数、mac 有读数在路上、linux 有一条会红的反向判据**，
+    而不是"三端都拍出了这一屏"。链 S 会把 `check:linux-shell` / `check:windows-shell` / `check:macos-shell`
+    三段各自的 rc 取回来（它们在串联第 24 段之后，Y 没跑到）。
