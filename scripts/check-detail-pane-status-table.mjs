@@ -102,10 +102,16 @@ const badStatus = parsed.filter((r) => r.declared === null);
 // 腿 3：单元 id 不许重（重了就有一单被记两次、另一单没记）
 const dup = rows.filter((r, i) => rows.findIndex((x) => x.id === r.id) !== i);
 
-// 腿 4：读数里出现「截图」这个词的行必须带着图片引用（或写明封闭例外措辞）。
+// 腿 4：读数里**声称看过界面图**的行必须带着图片引用（或写明封闭例外措辞）。
 // ⚠️ 射程只到"声称看过图的那格没写路径"，**不**到"该不该有图" —— 后者要读界面代码，不是文本判据能答的。
+// 🔴 触发词不能只认"截图"：工单 §4 的原话是"必须截图**且人看图**"，而表里的合法写法有
+//   "八张图逐张看过""七张图，逐张打开看过""人已看图"好几种 —— 只认"截图"的话，
+//   下一轮谁换了措辞就把这一档整格读成"没声称看过图"，判据静默失去对象（臂 N4 钉的就是这一条）。
+//   选词只收**指图的**（截图/看图/逐张/张图/人眼复核），不收"看过"：那一格正文里的"没看过代码"
+//   也会被它选中 —— 现量表内 8 枚声称看图的行用这套词同样命中 8 枚，一个不多（假红为零）。
+const CLAIM_IMG = /截图|看图|逐张|张图|人眼复核/;
 const NO_UI = '无界面格';
-const shotMissing = rows.filter((r) => /截图/.test(r.text) && !IMG.test(r.text) && !r.text.includes(NO_UI));
+const shotMissing = rows.filter((r) => CLAIM_IMG.test(r.text) && !IMG.test(r.text) && !r.text.includes(NO_UI));
 
 // 腿 5：表外的工单行 —— 以 `| W…` 开头、属于某一段**连续竖线行**，而那一段里**没有分隔行**
 // （`|---|---|`）⇒ 那一段在 GFM 里根本不是表格，里面的行渲染成正文，状态等于没人记。
@@ -171,12 +177,12 @@ const mutMissing = parsed.filter((r) => {
 console.log(`取样：${doc.startsWith(root + '/') ? doc.slice(root.length + 1) : doc}`);
 console.log(`表区间：第 ${head + 1} 行起，连续 ${rows.length} 枚工单行，列结构 = 单/状态/读数`);
 console.log(
-  `逐行读数：${parsed.map((r) => `${r.id}=${r.declared ?? '无法判定'}${/截图/.test(r.text) ? (IMG.test(r.text) ? '(图✓)' : '(图✗)') : ''}`).join(' ')}`,
+  `逐行读数：${parsed.map((r) => `${r.id}=${r.declared ?? '无法判定'}${CLAIM_IMG.test(r.text) ? (IMG.test(r.text) ? '(图✓)' : '(图✗)') : ''}`).join(' ')}`,
 );
 dump('🔴 数据行没有闭合竖线（多半是一行被写成多行 / 表格正在往外漏）', unclosed, (r) => `:${r.line} ${r.id} 结尾 ${JSON.stringify(r.text.slice(-18))}`);
 dump('🔴 状态没命中封闭三档（已完成/进行中/未开工 —— "基本完成"这类落在这里）', badStatus, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
 dump('🔴 工单 id 重复', dup, (r) => `:${r.line} ${r.id}`);
-dump('🔴 读数里写了「截图」却没带任何图片引用（也没写「无界面格」）', shotMissing, (r) => `:${r.line} ${r.id}`);
+dump('🔴 读数里声称看过界面图却没带任何图片引用（也没写「无界面格」）', shotMissing, (r) => `:${r.line} ${r.id}`);
 dump('🔴 表外的孤儿工单行（表格被中途截断的化石 —— 它们渲染成正文，状态等于没人记）', orphans, (r) => `:${r.line} ${r.text}`);
 dump('🔴 已开工的行没记变异读数（也没写「无变异面」+理由）', mutMissing, (r) => `:${r.line} ${r.id} → 状态格「${r.cell}」`);
 
