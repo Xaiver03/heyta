@@ -53,15 +53,18 @@ if [ -n "${LOG:-}" ]; then STABLE_TIED=0
 elif [ "$MODE" = "run" ]; then LOG="/tmp/ht-h-flaky.$(date +%Y%m%d-%H%M%S).$$.log"; ln -sf "$LOG" "$STABLE_LOG" && STABLE_TIED=1 || STABLE_TIED=0
 else STABLE_TIED=0; fi
 RUNS="${RUNS:-3}"
-# 🔴 规范门是 `hw.ncpu × 3/4`（本机 12），两处消费者都从常量推：闸门
-#    （`scripts/verify-mobile-window-gate.sh:133`）与 `scripts/lib/wait-for-quiet-host.sh:38`。
+# 🔴 规范门是 `hw.ncpu × 3/4`（本机 12）。**这个数从 `host_load_gate` 要，不在这里推**：
+#    原来这里是第三份 `ncpu × 3/4` 的抄件（闸门 / lib / 本装置），而臂 9 只能靠"比对三个
+#    文件里的分数字面"防漂 —— 比对抄件是补丁，**删掉抄件才是修**。
 #    本装置在它之上**还有一层严格层**，值来自 §5 H 那格写死的开工判据
 #    「4318/4319 为空 **且** 负载落回个位」⇒ `HT_PLAN_LIMIT=9`。
 # 🔴 **这一层不许在这台看守里放宽**（硬约束原话：负载门不达标就登记等待，不降级判据）。
 #    10-05 实测它的代价并把代价打进日志：规范门过了 **4 次**（负载 12 三次、负载 10 一次）全被这层退回
 #    ⇒ 差距是 **1–3** 而不是"从没落下来过"，但改这个值要改**那一格判据**（要人拍板），不是改这里。
 #    想临时按规范门跑：显式传 `STRICT_MAX=12`，日志首行会照实写明它与规范门的关系。
-HT_NORM_LIMIT=$(( $(sysctl -n hw.ncpu) * 3 / 4 ))
+host_load_gate >/dev/null 2>&1 || true   # 这里只要它导出的**阈值**，判定不在这一行
+HT_NORM_LIMIT="${HOST_LOAD_LIMIT:-}"
+[ -n "$HT_NORM_LIMIT" ] || { echo "❌ 规范门的数取不到（host_load_gate 没给出 HOST_LOAD_LIMIT）⇒ 探针坏了，不在这里猜一个" >&2; exit 4; }
 HT_PLAN_LIMIT=9
 STRICT_MAX="${STRICT_MAX:-$HT_PLAN_LIMIT}"
 BUDGET="${BUDGET:-900}"   # 外层窗口预算
@@ -402,25 +405,56 @@ STUB
   else
     echo "❌ 臂8 正向：run 档没有挂稳定名（${T2}）⇒ 装置与真实看守的行为已经不一样，负向那条不算证据"; bad=$((bad+1))
   fi
-  # ── 臂 9（10-05 00:5x，钉我这一轮改的那一层）。这一臂的方向**不是**"把严格层放宽到规范门"，
-  #    而是两件事：① 严格层的默认值必须仍然是 §5 H 那格写死的开工判据（个位 9）——
+  # ── 臂 9（10-05 00:5x 立；10-05 17:5x 改形）。方向**不是**"把严格层放宽到规范门"，而是：
+  #    ① 严格层的默认值必须仍然是 §5 H 那格写死的开工判据（个位 9）——
   #    这台机器上"窗口一直没开"是真的（规范门过了 4 次全被这层退回），但**降级判据不在这里做**；
   #    ② 它比规范门严多少必须**打进日志**，否则下一位只能从"零趟 e2e"反推是谁挡的（我 00:0x 就是这么撞上的）。
-  #    再加一层防漂：`ncpu×3/4` 现在是三个消费者的抄件（本装置 / 闸门 / lib）⇒ 对账那三个分数字面。
+  # 🔴 第三腿原来是"对账三份 `ncpu×3/4` 抄件的分数字面"。本装置里那两行抄件刚刚删掉了
+  #    （规范门的数改从 `host_load_gate` 要）—— 如果对账腿**不改**，它会变成恒真：
+  #    抽取器 `.*[lL][iI][mM][iI][tT]=\$\(\(` 照样能从下面 9b 那句 `EXP_LIM=$((...))` 里取出一个分数，
+  #    而那个分数是**这条臂自己算的**，不是本装置的判据（"文本里出现过"挡不住"其实没人用它"）。
+  #    ⇒ 比对抄件的腿换成**钉委托**：本装置必须问 lib 要那个数和那次读数，
+  #      并且留一条变异（把委托换回抄件）证明这条腿会红。
+  #    ⚠️ 谓词按**行首赋值**取，不按"文件里出现过这串"：这一臂自己的文本里就有那几个串，
+  #       按子串匹配的话它会一直读到自己（#191 那一族）。
   ht_frac(){ sed -nE 's/.*[lL][iI][mM][iI][tT]=\$\(\(.*\* *([0-9]+) *\/ *([0-9]+).*$/\1\/\2/p' "$1" 2>/dev/null | head -1; }
-  FR_W=$(ht_frac research/tools/h-flaky-window-watcher.sh)
+  ht_assign(){ sed -nE "/^[[:space:]]*$2=/p" "$1" 2>/dev/null | head -1; }
+  delegation_ok(){ # $1 = 文件；0 = 这一份是把"规范门的数"和"那次读数"都**问 lib 要**的
+    local n l
+    n=$(ht_assign "$1" HT_NORM_LIMIT)
+    l=$(ht_assign "$1" LOAD)
+    case "$n" in *'HOST_LOAD_LIMIT'*) ;; *) return 1 ;; esac
+    case "$l" in *'HOST_LOAD_VALUE'*) ;; *) return 1 ;; esac
+    # 赋值右边**不许再带命令替换**：带了就是本装置自己算了一遍（第二把尺长回来了）。
+    case "$n" in *'$('* | *'`'*) return 1 ;; esac
+    case "$l" in *'$('* | *'`'*) return 1 ;; esac
+    return 0
+  }
   FR_G=$(ht_frac scripts/verify-mobile-window-gate.sh)
   FR_L=$(ht_frac scripts/lib/wait-for-quiet-host.sh)
-  if [ -z "$FR_W" ] || [ -z "$FR_G" ] || [ -z "$FR_L" ]; then
-    echo "❌ 臂9 分数抽取取空（w=${FR_W} g=${FR_G} l=${FR_L}）⇒ 装载式换了形状，这一臂此刻没有读数而不是「一致」"; bad=$((bad+1))
-  elif [ "$FR_W" != "$FR_G" ] || [ "$FR_G" != "$FR_L" ]; then
-    echo "❌ 臂9 负载阈值的表达式漂了：本装置=${FR_W} 闸门=${FR_G} lib=${FR_L} ⇒ 严格层与规范门不再是同一个裁判"; bad=$((bad+1))
+  if ! delegation_ok research/tools/h-flaky-window-watcher.sh; then
+    echo "❌ 臂9 本装置没在问 host_load_gate 要负载的数（HT_NORM_LIMIT/LOAD 的赋值形状不对，或又长出自己那份推导）⇒ 严格层与规范门可能重新变成两把尺"; bad=$((bad+1))
+  elif [ -z "$FR_G" ] || [ -z "$FR_L" ]; then
+    echo "❌ 臂9 闸门/lib 的分数抽取取空（g=${FR_G} l=${FR_L}）⇒ 装载式换了形状，这一臂此刻**没有读数**，不是「一致」"; bad=$((bad+1))
+  elif [ "$FR_G" != "$FR_L" ]; then
+    echo "❌ 臂9 闸门=${FR_G} 与 lib=${FR_L} 漂了 ⇒ 共享资源上那两把尺不是同一个裁判（闸门那份还没删，见台账登记的下一批）"; bad=$((bad+1))
   else
     printf 'limit=$((cores * 1 / 2))\n' > "$ST/frac-bad.sh"
-    if [ "$(ht_frac "$ST/frac-bad.sh")" = "$FR_W" ]; then
-      echo "❌ 臂9 抽取器把 1/2 也读成 ${FR_W} ⇒ 上面那条「一致」是恒值，没有牙"; bad=$((bad+1))
+    if [ "$(ht_frac "$ST/frac-bad.sh")" = "$FR_L" ]; then
+      echo "❌ 臂9 抽取器把 1/2 也读成 ${FR_L} ⇒ 上面那条「一致」是恒值，没有牙"; bad=$((bad+1))
+    fi
+    # 变异（阳性对照 B）：把委托**换回**抄件 ⇒ delegation_ok 必须判不过。
+    # 不落地就红：先数副本里那行确实变了，再判变异结果 —— 否则 rc=0 什么也不证明。
+    sed 's|^HT_NORM_LIMIT="\${HOST_LOAD_LIMIT:-}"$|HT_NORM_LIMIT=$(( $(sysctl -n hw.ncpu) * 3 / 4 ))|' \
+      research/tools/h-flaky-window-watcher.sh > "$ST/watcher-copy.sh"
+    N_MUT=$(grep -c '^HT_NORM_LIMIT=\$(( ' "$ST/watcher-copy.sh" || true)
+    if [ "$N_MUT" != "1" ]; then
+      echo "❌ 臂9 变异没落地（副本里被换的行数=${N_MUT}，期望 1）⇒ 上面的 delegation_ok 没被测到"; bad=$((bad+1))
+    elif delegation_ok "$ST/watcher-copy.sh"; then
+      echo "❌ 臂9 变异存活：把委托换回 ncpu×3/4 抄件后 delegation_ok 照样放行 ⇒ 这条腿是装饰"; bad=$((bad+1))
     else
-      echo "   ✅ 臂9a 三个消费者的阈值表达式逐字相同（=${FR_W}），且抽取器分得开 1/2"
+      echo "   ✅ 臂9a 本装置向 lib 要规范门的数与那次读数；闸门与 lib 的分数仍逐字相同（=${FR_L}）；"
+      echo "      抽取器分得开 1/2，且把委托换回抄件的变异会被判红"
     fi
   fi
   EXP_LIM=$(( $(sysctl -n hw.ncpu) * 3 / 4 ))
@@ -479,7 +513,12 @@ fi
 START=$(date +%s)
 while [ "${SKIP_GATE:-0}" != "1" ]; do
   wait_for_quiet_host >> "$LOG" 2>&1 || { echo "GATE=timeout rc=3" >> "$LOG"; exit 3; }
-  LOAD=$(uptime | sed 's/.*load averages: //' | awk '{print int($1)}')
+  # 🔴 严格层要的是**规范门刚过之后的一次新读数**，所以这里再问一次 `host_load_gate`，
+  #    而不是自己 `uptime | sed | awk`（那第三份抄件已经在上面删掉了；这里当时漏删）。
+  #    判定不在 host_load_gate 那一层（它按规范门判），这一层拿它导出的现量自己比 STRICT_MAX。
+  host_load_gate >> "$LOG" 2>&1 || true
+  LOAD="${HOST_LOAD_VALUE}"
+  [ -n "$LOAD" ] || { echo "GATE=probe-broken 负载读数取不到（HOST_LOAD_VALUE 为空）⇒ 探针坏了，不把它读成「负载为 0」" >> "$LOG"; exit 4; }
   if [ "$LOAD" -gt "$STRICT_MAX" ]; then
     echo "  严格层：负载 ${LOAD} > ${STRICT_MAX}（规范门≤${HT_NORM_LIMIT}），再等" >> "$LOG"
   else

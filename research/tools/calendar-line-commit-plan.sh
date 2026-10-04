@@ -113,6 +113,17 @@ PATHS=(
   # 我方路径暂存≠工作树）。同样是 1b 自己抓出来的（落盘即报 `[??]`）—— 第四次。
   research/tools/calendar-line-commit-only-arms.sh
   research/tools/h-flaky-window-watcher.sh
+  # 10-05 17:5x 两枚：那把"能不能开工"的尺本身，与钉它的验证台。
+  # 🔴 加进清单的理由不是"我改了它"，是**这一笔要落的判据就在它们里面**：
+  #    `host_memory_gate`（产品负责人那条"测试前先看还剩多少内存"的装置）与
+  #    `host_load_gate`（把五份 `uptime|sed|awk` 抄件收成一把尺 + 字形校验）。
+  #    验证台 `mutate-closeout-gates.sh` 里 M/N 两段是它们的牙（含"摘掉那次调用就照样起跑"那条变异）
+  #    —— 判据和它的牙分两笔落，中间那段 HEAD 就是"没牙的判据"。
+  scripts/lib/wait-for-quiet-host.sh
+  scripts/mutate-closeout-gates.sh
+  # 🔴 在册「刻意不带」（见下面那本册子）：**这一枚也要进 PATHS**，否则 §1 遍历不到它，
+  #    那条登记就是装饰 —— 册子的自检会直接判红（"在册却不在 PATHS"），这是它自己的牙。
+  docs/reference/environment-traps.md
   # 边界 F 第二条的现量清点器（11:0x 新写）：台账里那句"188 处"是一条断言，
   # 落成脚本才有可复跑的读数（03:0x 那次就是靠现拼 `$( )` 把探针弄坏的）。
   research/tools/f-boundary-scope-count.sh
@@ -178,6 +189,7 @@ PATHS=(
 #    要引用命令就写全角括号或裸文本；这条也解释了为什么上面那段注释里的反引号是安全的（注释不展开）。
 UNCARRIED=(
   "docs/plans/README.md|21:3x 现量「git diff --stat」= +2 −0，那两行是**回收站／归档那条线**的索引（trash-and-archive.md 与它的任务书），本线在这一枚里没有待落字节 ⇒ 不带走；处置＝那条线自己提交它自己的两行"
+  "docs/reference/environment-traps.md|10-05 17:5x 现量：这一枚里 5 个 hunk、+824 行，其中只有文件末尾我写的第 271、272 两条是本线的，其余四个 hunk 是并行会话正在写的 iOS 通知/输入法那一族 ⇒ pathspec 提交会把他们未完成的段落一起带走。按行写索引那条配方要求开工前索引为空，而此刻索引里有别人 3 条暂存条目（apps/web 那枚 panel-ephemeral 一族）⇒ 也不能无 pathspec 提索引。处置＝下一个索引干净的会话按「grep -nE 行首 271 或 272」复现我那两段再落；账在交接 §4.05 (35) ⑧"
 )
 
 CONFIRM=0

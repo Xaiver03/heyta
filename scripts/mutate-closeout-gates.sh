@@ -80,13 +80,20 @@ else
 fi
 rm -rf "$(dirname "$T")"
 
-say "L) 负载门 wait_for_quiet_host（桩 uptime/sleep，走的是真函数）"
+say "L) 负载门 wait_for_quiet_host（桩 uptime/sleep/memory_pressure，走的是真函数）"
 LIB="$REPO/scripts/lib/wait-for-quiet-host.sh"
 gate() { # $1 = uptime 桩函数体（N 递增时用它自己的形态），$2 = 额外 env
   /bin/bash -c "set -u
 . '$LIB'
 $1
 sleep(){ :; }
+# 🔴 内存那一格从 2026-10-05 起长在 wait_for_quiet_host 的**放行路径**上 ⇒ 不桩它，
+#    L2/L3/L4 的结论就取决于"跑这套臂时这台机还剩多少内存"：机器一紧，负载臂会红在
+#    和它无关的事上（这种臂最坏的地方是它红得看起来很有道理）。桩只喂数，判决走真函数、
+#    真解析。喂的那一行是**照真输出的字形抄的**（/usr/bin/memory_pressure -Q 实测两行，
+#    判决行是第二行）—— 桩自创格式的话，解析器改了也能一直绿。
+#    这一格自己的两向 + 探针故障三臂在下面 M) 段，不靠这里的默认放行蒙过去。
+memory_pressure(){ echo 'The system has 68719476736 (4194304 pages with a page size of 16384).'; echo 'System-wide memory free percentage: 51%'; }
 $2
 wait_for_quiet_host; echo RC=\$?" 2>&1
 }
@@ -111,6 +118,7 @@ uptime(){ N=\$(( \$(cat '$CNT') + 1 )); echo \$N > '$CNT'
   if [ \"\$N\" -le 2 ]; then echo ' 03:30:00 up 1, load averages: 99.11 3 2'
   else echo ' 03:30:00 up 1, load averages: 2.00 3 2'; fi; }
 sleep(){ :; }
+memory_pressure(){ echo 'System-wide memory free percentage: 51%'; }
 export HEYTA_LOAD_GATE_INTERVAL=45 HEYTA_LOAD_GATE_WAIT=900
 wait_for_quiet_host; echo RC=\$?" 2>&1)"
 rm -f "$CNT"
@@ -119,6 +127,89 @@ if printf '%s' "$out" | grep -q '累计 0s' && printf '%s' "$out" | grep -q '累
   ok "L4 等两轮（45s 间隔生效）后第三次读数即放行，且不多等"
 else
   no "L4 等待序列不对：$out"
+fi
+
+# ── 负载那一格的读数**字形**也必须有牙（traps #168 的落地判据）────────────
+# 这一臂不是凑数：`awk '{print int($1)}'` 会把 `junk` 折成 **0**、把 #168 那串
+# `31.4729.0034.04` 折成 **31** —— 也就是说"探针整个读不出来"在原实现里**长得像放行**
+# （0 ≤ 12）。现在 `host_load_gate` 先验字形，两种坏读数都必须响亮地不放行。
+say "M) 负载读数的字形校验：junk 与 #168 粘连串都不许读成一个合法数"
+for shape in 'junk' '31.4729.0034.04' ''; do
+  out="$(gate "uptime(){ echo \" 03:30:00 up 1, load averages: ${shape:-空} 3 2\"; }" 'export HEYTA_LOAD_GATE_WAIT=0')"
+  if printf '%s' "$out" | grep -q '按探针故障处理' && printf '%s' "$out" | grep -q 'RC=1'; then
+    ok "M1 读数为〈${shape:-空}〉 ⇒ 判探针故障且不放行（原来这一路会读成 0 或 31）"
+  else
+    no "M1 坏读数〈${shape:-空}〉没被拦：$out"
+  fi
+done
+
+say "N) 内存门：两向都有读数，低内存必须挡得住，探针坏不许冒充「内存够」"
+memgate(){ # $1 = memory_pressure 桩的那一行，$2 = 额外 env
+  /bin/bash -c "set -u
+. '$LIB'
+uptime(){ echo ' 03:30:00 up 1, load averages: 2.00 3 2'; }
+memory_pressure(){ $1; }
+$2
+host_memory_gate; echo RC=\$?" 2>&1
+}
+out="$(memgate "echo 'System-wide memory free percentage: 3%'" 'export HEYTA_MEM_GATE_MIN_PCT=10')"
+if printf '%s' "$out" | grep -q 'RC=1' && printf '%s' "$out" | grep -q '不达标'; then
+  ok "N1 负载已过、内存 free=3% < 阈值 10% ⇒ 判不过（这一格不是装饰）"
+else
+  no "N1 该红没红：$out"
+fi
+out="$(memgate "echo 'System-wide memory free percentage: 3%'" 'export HEYTA_MEM_GATE_MIN_PCT=1')"
+if printf '%s' "$out" | grep -q 'RC=0'; then
+  ok "N2 同一份低读数、阈值放到 1 ⇒ 放行（阳性对照：N1 的红由阈值造成，不是桩坏了）"
+else
+  no "N2 阳性对照没放行：$out"
+fi
+out="$(memgate "echo 'The system has 68719476736 (4194304 pages with a page size of 16384).'" '')"
+if printf '%s' "$out" | grep -q 'RC=1' && printf '%s' "$out" | grep -q '探针故障'; then
+  ok "N3 输出里没有 free 百分比 ⇒ 判**不过**并点名探针故障（不许读成「内存够」）"
+else
+  no "N3 探针故障没被拦：$out"
+fi
+out="$(memgate "echo 'System-wide memory free percentage: 3%'" 'export HEYTA_MEM_GATE_MIN_PCT=abc')"
+if printf '%s' "$out" | grep -q 'RC=1' && printf '%s' "$out" | grep -q '不是整数'; then
+  ok "N4 阈值旋钮给了非整数 ⇒ 按探针故障处理，不放行"
+else
+  no "N4 坏旋钮被放行了：$out"
+fi
+# N5：长在 wait_for_quiet_host 里的那一次调用必须有牙 —— 摘掉它，低内存就该放行。
+MUTD=$(mktemp -d)
+MUTF="$MUTD/wait-for-quiet-host.sh"
+cp "$LIB" "$MUTF"
+python3 - "$MUTF" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding='utf-8').read()
+needle = "    if host_memory_gate; then\n"
+n = s.count(needle)
+if n != 1:
+    print("MUT_NOT_LANDED=%d" % n)
+    sys.exit(3)
+open(p, "w", encoding="utf-8").write(s.replace(needle, "    if :; then\n"))
+print("MUT_LAND=1")
+PY
+MUT_RC=$?
+out=''
+if [ "$MUT_RC" = "0" ]; then
+  out="$(/bin/bash -c "set -u
+. '$MUTF'
+uptime(){ echo ' 03:30:00 up 1, load averages: 2.00 3 2'; }
+sleep(){ :; }
+memory_pressure(){ echo 'System-wide memory free percentage: 3%'; }
+export HEYTA_MEM_GATE_MIN_PCT=10
+wait_for_quiet_host; echo RC=\$?" 2>&1)"
+fi
+rm -rf "$MUTD"
+if [ "$MUT_RC" != "0" ]; then
+  no "N5 变异没落地（rc=${MUT_RC}，见 MUT_NOT_LANDED）⇒ 下面的 rc 什么都不证明"
+elif printf '%s' "$out" | grep -q 'RC=0'; then
+  ok "N5 摘掉 wait_for_quiet_host 里的那次调用 ⇒ free=3% 也照样起跑（变异转绿正好证明这一格在真代码里是承重的）"
+else
+  no "N5 🔴 摘掉那次调用后低内存仍然不放行 ⇒ 挡它的不是这一格，上面 N1 那条红另有来源（探针？预算？）"
 fi
 
 say "P) 设备占用探针：活的对照组（这条是台账 #180 的正文所依据的实测）"
@@ -145,12 +236,63 @@ fi
 say "S) 单一所有者没有再漂回去"
 # 🔴 判据锚在"行首的定义形状"上，而不是 `grep 'wait_for_quiet_host()'`：
 #    后者会把**本文件自己那一行 grep 命令**算成第二处定义（门禁命中自己的夹具，实测就发生过）。
-defs="$(grep -rlnE '^[[:space:]]*wait_for_quiet_host[[:space:]]*\([[:space:]]*\)[[:space:]]*\{' "$REPO/scripts" 2>/dev/null | grep -v '\.snap\.' | grep -c . || true)"
-srcs="$(grep -rlE '^[[:space:]]*\. .*lib/wait-for-quiet-host\.sh' "$REPO/scripts"/*.sh 2>/dev/null | grep -c . || true)"
-if [ "$defs" = "1" ] && [ "$srcs" = "2" ]; then
-  ok "定义 1 处（就是 lib），restore 与 repeat 恰好各 source 一次（$srcs 个调用方）"
+# ⚠️ 原来这条还钉死了 `source 语句 == 2 处`。**那个 2 是某一天的消费者数量**，
+#    不是不变量 —— 消费者只会越长越多（今天实测 6 处），于是这条臂在第三个人接入的那天
+#    就变成了"新接入 = 红"，而红的含义恰恰和它想防的东西相反（正文别存会漂的值，同一条教训）。
+#    换成真正不变的那条：**凡是调用这三个谓词的文件，都必须 source 那份 lib**
+#    （调用而不 source 只有一种可能 —— 它自带了一份抄件，那才是要拦的事）。
+defs=0
+for fn in wait_for_quiet_host host_load_gate host_memory_gate; do
+  d="$(grep -rlE "^[[:space:]]*${fn}[[:space:]]*\([[:space:]]*\)[[:space:]]*\{" "$REPO/scripts" "$REPO/research/tools" 2>/dev/null | grep -v '\.snap\.' | grep -c . || true)"
+  [ "$d" = "1" ] || { no "S ${fn} 定义了 $d 处（期望恰好 1，且在 lib 里）"; continue; }
+  defs=$((defs + 1))
+done
+CALLERS=$(grep -rlE '^[[:space:]]*(if[[:space:]]+[^;]* )?(wait_for_quiet_host|host_load_gate|host_memory_gate)([[:space:]]|[;&]|$)' "$REPO/scripts" "$REPO/research/tools" \
+  --include='*.sh' 2>/dev/null | grep -v '\.snap\.' | grep -v 'lib/wait-for-quiet-host.sh' | grep -v 'mutate-closeout-gates.sh' | sort -u)
+SRCERS=$(grep -rlE '^[[:space:]]*\. .*lib/wait-for-quiet-host\.sh' "$REPO/scripts" "$REPO/research/tools" --include='*.sh' 2>/dev/null | grep -v '\.snap\.' | sort -u)
+ORPHAN=''
+while IFS= read -r c; do
+  [ -n "$c" ] || continue
+  printf '%s\n' "$SRCERS" | grep -Fxq "$c" || ORPHAN="$ORPHAN${c}
+"
+done <<CALL_BLOCK
+$CALLERS
+CALL_BLOCK
+N_CALL=$(printf '%s\n' "$CALLERS" | grep -c . || true)
+N_SRC=$(printf '%s\n' "$SRCERS" | grep -c . || true)
+N_ORPHAN=$(printf '%s\n' "$ORPHAN" | grep -c . || true)
+if [ "$defs" = "3" ] && [ "$N_CALL" -ge 1 ] && [ "$N_ORPHAN" = "0" ]; then
+  ok "S 三个谓词各定义 1 处；$N_CALL 个调用方全部 source 了那份 lib（$N_SRC 处 source）⇒ 没有第二把尺"
 else
-  no "定义 $defs 处 / source 语句 $srcs 处 —— 期望 1 与 2"
+  no "S 完整度不成立（谓词定义 ${defs}/3，调用方 ${N_CALL}，未 source lib 的调用方 ${N_ORPHAN}）：$(printf '%s' "$ORPHAN" | tr '\n' ' ')"
+fi
+# 阳性对照：拿一份"把 source 那行摘掉、但仍然调用谓词"的副本喂给上面那个孤儿循环，
+# 它必须把这份副本点名成未 source 的调用方（否则"全部 source"是恒值）。
+MUTD2=$(mktemp -d)
+cp "$REPO/research/tools/r17-reshoot-stale.sh" "$MUTD2/" || { no "S2 副本没建出来"; }
+sed -i.bak '/^[[:space:]]*\. scripts\/lib\/wait-for-quiet-host\.sh$/d' "$MUTD2/r17-reshoot-stale.sh" 2>/dev/null
+N_SRC_LINE=$(grep -cE '^[[:space:]]*\. scripts/lib/wait-for-quiet-host\.sh$' "$MUTD2/r17-reshoot-stale.sh" || true)
+N_CALL_LINE=$(grep -cE '^[[:space:]]*(if [^;]* )?host_(load|memory)_gate' "$MUTD2/r17-reshoot-stale.sh" || true)
+MUT_CALLS=$(grep -rlE '^[[:space:]]*(if[[:space:]]+[^;]* )?(wait_for_quiet_host|host_load_gate|host_memory_gate)([[:space:]]|[;&]|$)' "$MUTD2" \
+  --include='*.sh' 2>/dev/null | grep -v 'lib/wait-for-quiet-host.sh' | sort -u)
+ORPHAN2=''
+while IFS= read -r c; do
+  [ -n "$c" ] || continue
+  printf '%s\n' "$SRCERS" | grep -Fxq "$c" || ORPHAN2="$ORPHAN2${c}
+"
+done <<MUT_BLOCK
+$MUT_CALLS
+MUT_BLOCK
+N_ORPHAN2=$(printf '%s\n' "$ORPHAN2" | grep -c . || true)
+rm -rf "$MUTD2"
+if [ "$N_SRC_LINE" != "0" ]; then
+  no "S2 变异没落地（副本里 source 那行还在，计数=${N_SRC_LINE}）⇒ 下面什么都不证明"
+elif [ "$N_CALL_LINE" = "0" ]; then
+  no "S2 变异把调用也一起摘掉了（副本里已经不调谓词）⇒ 测的不是'调用而不 source'那个形状"
+elif [ "$N_ORPHAN2" = "1" ]; then
+  ok "S2 阳性对照成立：同一套谓词、只摘掉 source 的那份副本被点名成孤儿（$N_ORPHAN2 处），真树里是 0 处"
+else
+  no "S2 🔴 摘掉 source 的副本没被抓成孤儿（计数=${N_ORPHAN2}）⇒ 上面那条'全部 source'是恒值"
 fi
 
 say "U) settle_for 的三种时刻：见到才算、见不到必须红、隔几轮才出现也要等到"
