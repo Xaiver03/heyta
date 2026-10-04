@@ -529,10 +529,10 @@ merge 时会在他们改过的那 3 行上冲突，而**一次草率的解冲突
 |---|---|---|
 | `check:shell-unicode` | 🔴 **本批**（10 处，全在我写的两个文件里） | `scripts/verify-selfhost-stack.sh` 9 处 + `server/scripts/deploy.sh:130` 1 处，形状就是 §7 第 64 条：`$var` 紧跟全角括号 ⇒ **变量名被吞、证据行变乱码，而退出码照常 0**。用仓库自带的 `research/tools/fix-shell-unicode-vars.py --write` 修（预演确认只命中这两个文件才 `--write`），修完该段扫 67 个 `.sh` 全绿 |
 | `typecheck` | 🔴 **本批**（`apps/landing` 两条 `TS2345/TS2322`） | 我新写的判据里 `m[1]` 在 `noUncheckedIndexedAccess` 下是 `string \| undefined`。**vitest 全绿而 typecheck 红**（§7 第 162 条的同一族：esbuild 只剥类型）⇒ 按仓库既有写法收成 `?.[1] ?? ''` / 显式 `!== undefined`，改后 `pnpm typecheck` exit 0、该 spec 仍 **175/175** |
-| `check:l4` | ⚪ **不是本批**：红的是 `apps/mobile/src/screens` 内联样式 **98 > 基线 90**（12 个文件）。A/B 现量：同一目录在**基点 `f0db2a3a` 与本分支 tip 上都是 101**（`git grep -c 'style={{' <ref> -- apps/mobile/src/screens` 逐行求和），而本分支只碰过 `apps/mobile/src/sync/store.ts` 与一个 mobile 测试，**没有一个在 `src/screens/` 下**。这是 M3 那笔已提交债（同"98>90 里剩 8 处是 M3 已提交债"），**不吸收、不为凑绿调基线** |
-| `@heyta/sync-server` 的测试 | ⚪ **不是回归，是隔离检出的前置缺失**：`pnpm -r test` 里唯一红的是 `tests/account-profile.spec.ts` **整个文件加载失败**（`测试进程里没有 JWT_SECRET`），而这个 worktree **没有 `server/.env`**（主检出有）。当场 A/B：注入随机 `JWT_SECRET` / `PASSWORD_PEPPER` 后该文件 **27/27 通过** ⇒ 判据本身没坏，缺的是本机凭据文件。其余 **2079 passed / 1 skipped**（111 个文件） |
-| 其余各包 `pnpm -r --filter '!@heyta/sync-server' test` | ✅ exit 0，**6407 passed**（12 个包，最大一包 1502） |
-| `check:web-storage` | ⚪ 单跑 ✅（Worker SQLite + OPFS + 刷新后仍在，五条判据全过）；链里那次红发生在 `loadavg 31–46` 的窗口，**归因为"未定性"**，不写成"环境没问题" |
+| `check:l4` | ⚪ **不是本批** | 红的是 `apps/mobile/src/screens` 内联样式 **98 > 基线 90**（12 个文件）。A/B 现量：同一目录在**基点 `f0db2a3a` 与本分支 tip 上都是 101**（`git grep -c 'style={{' <ref> -- apps/mobile/src/screens` 逐行求和），而本分支只碰过 `apps/mobile/src/sync/store.ts` 与一个 mobile 测试，**没有一个在 `src/screens/` 下**。这是 M3 那笔已提交债（同"98>90 里剩 8 处是 M3 已提交债"），**不吸收、不为凑绿调基线** |
+| `@heyta/sync-server` 的测试 | ⚪ **不是回归，是隔离检出的前置缺失** | `pnpm -r test` 里唯一红的是 `tests/account-profile.spec.ts` **整个文件加载失败**（`测试进程里没有 JWT_SECRET`），而这个 worktree **没有 `server/.env`**（主检出有）。当场 A/B：注入随机 `JWT_SECRET` / `PASSWORD_PEPPER` 后该文件 **27/27 通过** ⇒ 判据本身没坏，缺的是本机凭据文件。其余 **2079 passed / 1 skipped**（111 个文件） |
+| 其余各包 `pnpm -r --filter '!@heyta/sync-server' test` | ✅ 这一段是绿的 | exit 0，**6407 passed**（12 个包，最大一包 1502） |
+| `check:web-storage` | ⚪ **归因未定性**（不是本批） | 单跑 ✅（Worker SQLite + OPFS + 刷新后仍在，五条判据全过）；链里那次红发生在 `loadavg 31–46` 的窗口，不写成"环境没问题" |
 
 **台阶 0 没做完的那一件**：线上落地页仍是旧文案，词条改动不会自己上线；重新发布站点是共享状态动作，**留给产品负责人拍板**。
 
@@ -4441,6 +4441,128 @@ main 那棵树（配对基线 = 载体 `^1`）只跑"载体红的那些段" → 
 别让下一轮把它读成"有人在改我们的工具"。
 
 📌 与并行那条线撞出来的同一条规矩对上：**`M` ≠ 别人在飞 —— 要看脏行是谁写的、什么时候写的**。
+
+---
+
+### 8.71 载体算出来了（`6c4f5692`），代价是合并脚本多一整族 —— 而这一族的"取哪侧"**不由我判，由生产那一道门禁判**（10:1x–10:3x）
+
+10:0x 手算载体时，脚本响亮退 2 并点名：
+
+```
+MERGE_HEAD=bb8ee476 已确认 · 冲突 3 条：docs/research/self-host-distribution-audit.md, package.json, server/image-npm-tree.json
+❌ 出现**预置四族之外**的冲突路径，不许自动决定：
+  - server/image-npm-tree.json
+```
+
+这一族是 §8.70 末尾那两条"终点相同"的路径在合并层的真身：**镜像 npm 依赖树快照**。两侧现量（读 `inputs` 的键集合，不读印象）：
+
+| 侧 | `inputs` 里的键 |
+|---|---|
+| main（`aa2ddea1` 那份，10-03 18:35 生成） | `targetPlatform, registry, serverPackageJsonSha256, installShapeSha256, packedWorkspaceDeps, packedPackageJsonSha256, localTarballs, registryResolvedDeps, skippedForOtherPlatform` —— **没有** `packageLockSha256`，也**没有** `serverInstallInputSha256` |
+| 本分支（`fac86036` 那份，10-03 23:21 生成） | 上面那些 + `serverInstallInputSha256` + `packageLockSha256: d2f9ab857b8e…` |
+
+#### ① 解法写成"取本分支侧"，判据写成"把生产门禁挂进载体那六道"
+
+取舍看着显然（合并后的树里既有那把锁、也有新生成器，取 main 侧一定红在 `check:image-license` 第一腿），
+但**显然不等于量过**。所以我没有在解法块里自己拼一次 `sha256(server/package-lock.json)` 去比 ——
+复制一遍判断就是下一个漂移点，而且真门禁比的是 `inputs` 里**四枚**哈希（安装输入 / 安装形状 / 三枚本地包的 `package.json` / 锁），
+手拼那一枚只覆盖四分之一。改成把 `research/tools/gen-image-npm-tree.mjs --check` **原样**加进 `GATES`（现在六道），
+在合并出来的载体树上现跑。只挂这一腿：`check:image-license` 后面那腿要从**真镜像**里取 `/app/package-lock.json`，
+载体上跑不了 —— 挂进来等于把"载体 fs 门禁"偷换成"载体要建镜像"。
+
+#### ② 新判据的强度是量出来的，不是声称的（一次性 detached worktree，不碰分支 worktree）
+
+| 臂 | 动作 | 读数 |
+|---|---|---|
+| ARM0 | 分支那份快照（基线） | `exit 0`，「输入仍然对得上当下声明」 |
+| ARM1 | 换成 main 那份 | `exit 1`，**5 处失真**（含"server/package-lock.json 变了（快照里的 packageLockSha256 与当下不一致）"） |
+| ARM2 | 只往 `server/package-lock.json` 追加**一个字节**、快照不动 | `exit 1`，**恰好 1 处失真**且点名到锁那一腿 |
+
+ARM2 是必要的：ARM1 一次红五条，分不清"锁这一腿有牙"还是"顺带被别的腿抓住"。
+只动锁能单独转红，才证明"改了锁没重跑快照"这一整类失真有人守。
+
+#### ③ 载体读数（`node research/tools/selfhost-merge-carrier.mjs`，10:31）
+
+```
+✅ 载体 6c4f5692 = main(aa2ddea1) × feat/self-host-distribution(fac86036)，分支 feat/self-host-merge-main 已指过去
+· 冲突 3 条 → 分族 pkg=1 gi=0 png=0 audit=1 snap=1 other=0
+· package.json 并集 scripts 键 146 个 · check 链段 main=76 本批=67 base=66 并集=77（摘段 0/0）
+· 审计文档并集：保留 main 侧 50 行（含 1 个本分支没有的节标题）+ 本分支独有 1999 行，四条断言全过
+· 合并归属：写 37 枚 / 合并相对 main 改 37 枚 / 集外 0 / 写集里未被改到 0 枚
+· 双亲逐条完整 SHA 复核：p1=aa2ddea17ba3…（main）p2=fac860365fcd…（本批）
+· 门禁 6 道全 exit 0
+```
+
+🔴 六道里那道**新**门禁 exit 0 是这一条的真正产出：它量的是"**合并后那棵树里的锁**"，
+不是我 worktree 里那把锁。也就是说"取本分支侧的快照，在这棵合并树上仍然代表当下"这句话
+从印象升级成了读数 —— 而这件事**只有挂门禁才能量到**，写在解法块里的手算比的是我这一侧的锁，
+证的还是我这一侧。
+
+#### ④ 阻塞集与 main 的漂移速率（引用前重取）
+
+· 阻塞集现量（10:31，`selfhost-landing-blockers.mjs`）：夹具 **5/5** 通过 ⇒ "空"是可信读数 · 写集 37 枚 · 主检出脏条目 17 枚 · **阻塞集 0 枚**。
+· main 在这一小时里 `e47bf28e → b5dae92f → aa2ddea1 → fc324e12`（四笔）。载体第一父是 `aa2ddea1`，
+  所以**落笔那一秒它又落后了** —— 这正是脚本头注释写的那条"只认分支不认 SHA、main 每进一步就重跑"的用途，
+  不是异常。
+· 因此完整 `pnpm check` 由一次性链 `/tmp/g60-carrier-check-then-attribution.sh` 在**窗口开的那一秒**重算载体再跑：
+  窗口条件三档全部指回被调方源码（4318/4319 空 ← `check-ai-e2e-preflight.mjs:37` 的 `DEFAULT_PORTS`；
+  `/tmp/tfa-test.lock` 没人拿；负载 ≤12 —— **阈值一格没动**，动的只是 §8.68 那条多出来的 `:3000`）。
+  g59 被我停掉不是它坏了，是它要跑的那个载体**还没有第五族**，check 完了也落不了笔。
+
+#### ⑤ 边界（别读多）
+
+· 载体 `6c4f5692` 不是落地。main 前进这一步仍要**主检出的所有者**执行：本批不动主检出、不 `git branch -f main`、不 push。
+· 链与它的分段日志住在 `/tmp`（重启即失），住在仓库里的是**可重跑的两件装置**：
+  `research/tools/selfhost-merge-carrier.mjs`（五族解法 + 六道门禁，已提交 `fac86036`）与
+  `research/tools/selfhost-landing-blockers.mjs`（阻塞集 + 夹具自检）。读数没了可以重算，装置没了才算丢。
+
+---
+
+### 8.72 `check:md-tables` 对这份台账**一直是空跑**：它按命名白名单扫，而这份文件不在名单里（10:3x）
+
+改完 §8.71 想验一下新加的三张表会不会破坏表格门禁，在分支 worktree 里跑 `node scripts/check-md-table-rows.mjs`
+得到 `MODULE_NOT_FOUND` —— **这个文件在分支上根本不存在**（它是 merge-base 之后 main 那侧新增的门禁），
+而载体（main × 本批）里有，所以载体的六道门禁报 `check:md-tables exit 0` 时读的是 main 那份。
+
+于是在载体树的一次性 detached worktree 里把这份台账拷进去跑，得到 `✔ 9 个文件…一致`。
+**这句话当时被我当成了"我的表没问题"** —— 差一步就问出真相：它为什么恰好是 9 个？
+
+```bash
+sed -n '54,64p' scripts/check-md-table-rows.mjs
+```
+
+`FILES` 是一张**逐条点名的白名单**（9 条：四条日历线的计划 + 回收站那条线的 5 份），
+`docs/research/self-host-distribution-audit.md` **不在里面**，而且第 45 行的注释写明了扩展方式：
+「它们收掉之后只需把路径加进下面的 `FILES`，判据本身不用改」。
+
+⇒ **门禁绿与"我的文件被读过"是两件事**：白名单形状的门禁，报的"N 个文件"就是它的覆盖范围读数，
+不比对文件数就等于把自己的表当成没人在看。这一条与 §7 里"挂在文件名枚举上的门禁，目标文件被删时安静地不执行"
+是同一族的**镜像形状**（那条是文件没了还在报绿，这条是文件一直在但从来没被扫）。
+
+#### ① 把路径塞进白名单实测，这份台账当场有 4 处真错位
+
+| 行 | 症状 |
+|---|---|
+| `:532` `check:l4` 那行 | 表头 3 列（红段 / 是谁的 / 现量与修法），该行只有 2 格 |
+| `:533` `@heyta/sync-server` 的测试 | 同上，归属与现量挤在同一格 |
+| `:534` 其余各包 `pnpm -r test` | 同上 |
+| `:535` `check:web-storage` | 同上 |
+
+不是渲染洁癖：**这四行正是"这条红是不是本批自己造的"那一段的归属结论**，格子错位后
+读者把归属读成现量的一部分，那段的本意（逐段可归属）就丢了。
+修法：把归属收进第二列、现量留在第三列，四行逐条断言"开头串匹配 + 改后竖线数 = 4"再统一落盘
+（一处不匹配就整批不落，不留半改状态）。
+
+#### ② 收口读数与一条边界
+
+· 修完在载体树那份 gate 上复跑：**`exit 0`，10 个文件**（9 + 这份台账），正向对照是同一条 gate 在修之前报的 4 处 ⇒ 它确实读这份文件。
+· 🔴 **本批没有把它加进 `FILES`**：`scripts/check-md-table-rows.mjs` 在分支上不存在，
+  在本批分支里"新建"这个路径 = 与 main 那份同名文件形成 add/add 冲突，而它的主人是并行那条线。
+  ⇒ 记成**代价已经量好的待办**：谁下一次碰那个 gate，加一行 `'docs/research/self-host-distribution-audit.md',` 即可，
+  现量成本 = **0 处违规**（登记"下批再做"之前先量贵不贵，这次量出来是不贵，但仍不归本批改）。
+· 顺带又踩一次老坑：第一次跑那条命令写成 `node … | tail -14; echo RC=$?`，
+  打出来的 `ARM2_RC=0` 是 `tail` 的码，而 gate 明明打印了 `✖ … 4 处`。
+  这一族第三次（§7 第 45 / 179 条）。之后所有 rc 都改成**先重定向到文件、再取 `$?`**。
 
 
 
