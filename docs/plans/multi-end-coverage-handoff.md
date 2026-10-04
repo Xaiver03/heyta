@@ -310,6 +310,20 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
 > 是**放行**的，而闸门在这一格是**拦**的 —— 两边都拦得住是因为链把闸门当最终裁判（v18 起 ③ 必须 `--target c` 退 0）。
 > 下一位若把归因门当唯一裁判，就会比规范判据**宽**，那是与"比规范判据严"相反方向的同一个错。
 
+> 🔴 **19:12 现量：① 的 windows 腿判据是 5 条，不是 4 条** —— 记账时按代码读，不按文档句子读。
+> `scripts/lib/msix-install-facts.sh:17-23` 的 `MSIX_REQUIRED_FACTS` 现在是
+> `ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` / `M2D=OK` / **`SHORTCUT_OK=True`**（第 5 枚是别人加的），
+> 消费方 `:41` 逐条找、`:48` 打印"判据齐了：${#MSIX_REQUIRED_FACTS[@]} 条全在位"（条数现取，不写死）；
+> 生产者也在位：`apps/desktop-windows/scripts/install-and-capture.ps1:236` 写 `SHORTCUT_OK=`。
+> ⇒ **契约两侧齐全，① 不缺东西**。而"四条"这句还留在多处：现量
+> `grep -rn 'M2D=OK' --include='*.md' . | grep -v '/.worktrees/' | grep -v SHORTCUT`
+> 命中 **21 行**（多数是当时的**历史读数**，那类不需要改，也不该改）。
+> 要分清的是**哪一种在替现在的实现说话**：Goal 台账 §7.31.7（`:3017`）那张表把自己的口径写成
+> "**现读实现**"，`AGENTS.md:382` 的收尾表和 `PROGRESS.md:958` 的判据列也是规范性表述
+> —— 这三处照旧读就会漏掉 `SHORTCUT_OK`。`docs/reference/environment-traps.md:5071` 已经跟着改成五条了，
+> 这正是"同一个结论句落在多处 ⇒ 改一处必 sweep 全仓"的一次现量复现。
+> 本线只登记不代改：`AGENTS.md` 此刻是 `M`（别人在写），§7.31.7 也在正被另一条线写的文件里。
+
 ## 5. 下一步（有序，一次一个会话做得完的量）
 
 > ✅ **19:04 现量把 ④ 在当前 HEAD 逐项复核过（不重做，只证明它仍然成立）**：
