@@ -134,7 +134,7 @@ W0 文档纠正、W6 value 那一米：与上面全部正交，随时可插队
 | 单 | 状态 | 读数（判据条数 / 变异臂红集 / 截图路径 / 四端是否重装） |
 |---|---|---|
 | W0 | ✅ 已完成（① 2026-10-03；② 补落地 2026-10-04 09:2x，见 §8.25 第一档；🔴 ② 那一行 09:4x 又按现量修了一次 —— "五档全部落地"把 web 独占的拖拽读成了两端都接，见 §8.29） | 两处过期都改在**文档本体**：① `docs/reference/architecture.md` 的实体清单里 `FocusSession` 原写 `mode(pomo/stopwatch), duration` —— 三个字段**都不存在**，真实形状是 `kind(work/shortBreak/longBreak) + plannedMs + actualMs? + completed? + startedAt? + endedAt?`（逐字段核对 `packages/domain/src/entities.ts` 的 `FocusSessionKind` 与 `interface FocusSession`）；② `docs/README.md` 对 ADR-0043 那句「⚠️ 代码未开工」改成已落地并留了更正痕迹（指向调研 A0.8 的取证）。**判据**：`docs-link-check` 无死链 + 两份文档不再与代码冲突（人工核对，无自动判据 —— 按 §2 那一行写明的"允许只做人工核对并在此登记"，这条**没有**变异臂，别把它当成有牙的）。⚠️ 归属：`docs/README.md` 同一文件里另有别人 7 行未提交的改动，所以我**没有**单独提交那一行，改动作废在工作树里，由下一次整文件提交带进去。🔴 **那句"由下一次整文件提交带进去"落空了**（2026-10-04 09:1x 现量：本分支 HEAD 与 `main` 两份 `docs/README.md` 里 `代码未开工` 那句**都还在**，工作树也没有那笔改动 ⇒ ② **从来没有落地**，而本行此前写着"✅ 已完成" —— 这是一次过度主张，不是措辞不严）。当场按**五条逐项现量**改掉（每条给了 `file:line`，见 §8.25 第一档），并复跑 `check:docs-voice` / `check:claims` / `check:reachability` 各 **RC=0**、`docs-link-check` 对本文件 **0 命中**、README 那张表 **139 行列数零不一致** |
-| W1 | 🔄 **进行中**（接线、判据、**真浏览器截图 + 人看图**都已闭合；只剩 AGENTS §6.1.1 的**四端重装**，所以还不算已完成） | **已落地**：单一所有者收拢 —— `packages/app-host/src/selection.ts`（封闭词表 + `createSelectionStore` + 纯函数 `pruneMissingSelection`/`pruneSelection`），四份本地 `useState` 全删，两端各只留一份宿主胶水 `apps/{web,mobile}/src/lib/selection.ts`。🔴 **词表从 6 类改成 3 类**（`task\|habit\|note`）：`project`/`tag`/`event` 是**投机项** —— 两侧的 prune 谓词照着写了 project/tag，而**没有任何一处界面会选中一条清单或标签**（它们在两端都是筛选/导航），"支持六类"读起来像已完成、实际只有三类活着。这条被升级成常驻门禁的**断言 D**（逐类扫宿主有没有 `select/useSelected`，零消费者即红；词表从数组字面量现读，解析出 0 项也算红）。💥 **本轮现场抓出的两个真缺陷**：① `apps/web/src/features/quadrant/QuadrantBoard.tsx` 把 `onOpenTask`/`activeTaskId` **声明了、解构了、没往共享板子传** ⇒ "三种投影接同一个选中"实际只有两种接上，而两个 prop 都是可选的 ⇒ **typecheck 全绿、当时四条门禁全绿**，症状只是"四象限不跟随选中"（→ §7 #179）；② `openNoteFromSearch` **签名里不收 id** ⇒ 搜索结果点便签只换视图、什么都不打开。③ 顺手补掉一条既有的端间不一致：web 时间线的行体此前**根本不可点**，而触屏端早能。**判据**：共享层 16 条（`packages/app-host/tests/selection.spec.ts`）+ web 选中 16 条（`task-selection.spec.tsx`）+ mobile 13 条（`selection-single-owner.spec.ts`）+ 三种投影各自的行为判据（`quadrant-row-parity.spec.tsx` 新增 2 条、`timeline-board.spec.tsx` 新增 3 条、`notes-view.spec.tsx` 新增 3 条）+ 门禁 `check:selection-single-source` **七道断言 A–G**（E 是同文件内比"声明"与"使用"；F 见 §8.37：四处渲染面各按端把选中说出来（**§8.42 起是五处**：共享时间线那一面原本"自己算、自己上色"却登记在递送层里，合法躲过了通道要求）；G 见 §8.36：宿主内每一处行 id 本地态都要带语义类别逐处登记）。**视图全集那一侧**见 §8.41：`ViewKey` 里每个视图都必须交代过自己站哪边（在 `CURSOR_VIEWS` 表里、或在 `ACCOUNTED_OUT` 登记表里），缺口／重叠／解析读空都红，装置 5 臂按预期 5/5。**面与回落那两侧**见 §8.42 / §8.43：前者把"每张面必须把选中说出来"钉成三条按类别给的规则（并修掉一处"有底色、没声音"的共享时间线面），后者把"该给哪几类喂回落"从**按功能位置数**改成**按谁在读数**（现量出任务屏是第三个持有便签全集的屏，4 臂按用例名点名；🔴 但它第一版那句"编辑层不自己关"的症状已被**§8.43 第 7 节**否证并划线留档，这一格的真实理由是"移除一条挂在别人挂载策略上的隐式依赖"，反事实读数 A/B/C 三层全绿在那节里）。🔴 **载体发现（写进 §7 #178）**：RNW 在 jsdom 里把样式编译成 class（`r-backgroundColor-*`），`el.style.backgroundColor` **恒为 `''`** —— 用它当判据第一次就得到"三种投影全都没底色"这种**看起来像三个真缺陷**的空读数；底色一律走 `getComputedStyle`（未选中是 `rgba(0, 0, 0, 0)`，不是空串）。**变异臂（两趟 rig 共 18 臂，每臂跑完复原并复跑回到绿；终态 Z2 = web/mobile/门禁三处 RC=0）**：14 条正臂按设计转红（门禁 A/B/B2/B3/C/A2/D/E/E2/E3-分母自检 + TaskList 底色 + TimelineBoard 两处底色 + 两处 `onPress` + NotesView 退回本地态 + 搜索丢 id + web 四处投影断一处 + mobile 回落摘一处 + mobile 三处投影全摘）；🔴 **一条第一次跑活了**：把 web 便签换回**裸名** `const [editingId] = useState(null)` 时门禁**全绿** —— 而文档块里当时写着"仍未覆盖：不带实体名的 editingId"，即这条缺口我**登记过但没验证**。补上裸名分支（`detailId\|selectedId\|editingId`，刻意不含 `active`/`open`：四象限的 `activeId` 是 dnd-kit 正在拖哪一颗）后重跑**转红**；为此把 `PasskeyPanel` 那份行内改名编辑器的状态改名 `editingRowId`（第一次我改成 `renamingId`，撞上 store 里已有的"请求在途那条"——两个概念不能并成一个名字，断言把它挡在写盘前）。两条负向对照绿：字样只写进注释、以及树上活着的 `activeId`/`editingRowId` 不被误伤。**读数**：门禁绿（`词表 3 类全有消费者（task 10 / habit 7 / note 13）、接线声明 17 处全部用起来`）；本轮直接跑的 `task-selection + timeline-board + quadrant-row-parity + notes-view` = **55 passed / 0 failed**；web/mobile/app-host/ui 四包 typecheck RC=0；`check:docs` 归因见 §8.1（三处死链指向**别人未提交**的在途文档，已把链接改成带状态的指针）。**真浏览器取证已闭合（2026-10-03 22:4x，载体 `feat/detail-pane` = `d5b835b5`）**：新增 `e2e/tests/selection-projections.spec.ts` **3 条**，跑法与读数：生产构建载体（`vite build` + `vite preview`，端口 4358）上 **3 passed / 0 failed**；截图五张落在 `apps/web/evidence/selection-projections/{01-list,02-quadrant,03-timeline,04-switch,05-search}.png`，**五张都逐张打开看过**：列表与搜索那两张里选中那条带浅蓝底、另一条白底；四象限那张选中那条落在"先不做"格里且带同一种蓝；时间线那张"未排期（2）"里只有第一条带蓝；换选中那张是**第二条**带蓝、第一条回到白底。看图还照出一件断言看不见的事：`switchView` 用鼠标点 rail，**rail 的 tooltip 会留在下一张图上**，第一版 `03-timeline.png` 里那句"四象限"正好压在选中那条的标题上 ⇒ 截图前 `parkCursor`（把鼠标挪开），这不是美化，§6.2 要的是"人能看懂的那张图"。🔴 **23:5x 两处更正（载体 `0de58095` + `0c159f7f`）**：① 那五张图已随 W2 的第四列整体重跑并**逐张重看**（选中态在四种投影里读数不变）；② 更要紧的是读底色的探针里有一条**会假绿**的机制被照出来了 —— Chromium 对**已从文档分离**的节点 `getComputedStyle` 返回空串，而判据写的是"选中那条 ≠ 同屏没选中的那条"，空串永远不等于任何真实底色 ⇒ **"根本没读到值"会被判成"画上选中色了"**。症状先以一次假红出现（两遍连跑全绿、第三遍红），所以这类"偶发红"要按**探针故障**查，不要按产品抖动放过。现在探针先等到算得出来为止，自检臂（把读数改成恒返回空串）实测 3 条全红。
+| W1 | 🔄 **进行中**（接线、判据、**真浏览器截图 + 人看图**都已闭合；只剩 AGENTS §6.1.1 的**四端重装**，所以还不算已完成） | **已落地**：单一所有者收拢 —— `packages/app-host/src/selection.ts`（封闭词表 + `createSelectionStore` + 纯函数 `pruneMissingSelection`/`pruneSelection`），四份本地 `useState` 全删，两端各只留一份宿主胶水 `apps/{web,mobile}/src/lib/selection.ts`。🔴 **词表从 6 类改成 3 类**（`task\|habit\|note`）：`project`/`tag`/`event` 是**投机项** —— 两侧的 prune 谓词照着写了 project/tag，而**没有任何一处界面会选中一条清单或标签**（它们在两端都是筛选/导航），"支持六类"读起来像已完成、实际只有三类活着。这条被升级成常驻门禁的**断言 D**（逐类扫宿主有没有 `select/useSelected`，零消费者即红；词表从数组字面量现读，解析出 0 项也算红）。💥 **本轮现场抓出的两个真缺陷**：① `apps/web/src/features/quadrant/QuadrantBoard.tsx` 把 `onOpenTask`/`activeTaskId` **声明了、解构了、没往共享板子传** ⇒ "三种投影接同一个选中"实际只有两种接上，而两个 prop 都是可选的 ⇒ **typecheck 全绿、当时四条门禁全绿**，症状只是"四象限不跟随选中"（→ §7 #179）；② `openNoteFromSearch` **签名里不收 id** ⇒ 搜索结果点便签只换视图、什么都不打开。③ 顺手补掉一条既有的端间不一致：web 时间线的行体此前**根本不可点**，而触屏端早能。**判据**：共享层 16 条（`packages/app-host/tests/selection.spec.ts`）+ web 选中 16 条（`task-selection.spec.tsx`）+ mobile 13 条（`selection-single-owner.spec.ts`）+ 三种投影各自的行为判据（`quadrant-row-parity.spec.tsx` 新增 2 条、`timeline-board.spec.tsx` 新增 3 条、`notes-view.spec.tsx` 新增 3 条）+ 门禁 `check:selection-single-source` **八道断言 A–H**（A–G 见下，H 见 §8.46：谁读某一类的选中，谁就得把那一类喂进回落 —— §8.43 那次"人工数屏幕"从此变成常驻判据）（E 是同文件内比"声明"与"使用"；F 见 §8.37：四处渲染面各按端把选中说出来（**§8.42 起是五处**：共享时间线那一面原本"自己算、自己上色"却登记在递送层里，合法躲过了通道要求）；G 见 §8.36：宿主内每一处行 id 本地态都要带语义类别逐处登记）。**视图全集那一侧**见 §8.41：`ViewKey` 里每个视图都必须交代过自己站哪边（在 `CURSOR_VIEWS` 表里、或在 `ACCOUNTED_OUT` 登记表里），缺口／重叠／解析读空都红，装置 5 臂按预期 5/5。**面与回落那两侧**见 §8.42 / §8.43：前者把"每张面必须把选中说出来"钉成三条按类别给的规则（并修掉一处"有底色、没声音"的共享时间线面），后者把"该给哪几类喂回落"从**按功能位置数**改成**按谁在读数**（现量出任务屏是第三个持有便签全集的屏，4 臂按用例名点名；🔴 但它第一版那句"编辑层不自己关"的症状已被**§8.43 第 7 节**否证并划线留档，这一格的真实理由是"移除一条挂在别人挂载策略上的隐式依赖"，反事实读数 A/B/C 三层全绿在那节里）。🔴 **载体发现（写进 §7 #178）**：RNW 在 jsdom 里把样式编译成 class（`r-backgroundColor-*`），`el.style.backgroundColor` **恒为 `''`** —— 用它当判据第一次就得到"三种投影全都没底色"这种**看起来像三个真缺陷**的空读数；底色一律走 `getComputedStyle`（未选中是 `rgba(0, 0, 0, 0)`，不是空串）。**变异臂（两趟 rig 共 18 臂，每臂跑完复原并复跑回到绿；终态 Z2 = web/mobile/门禁三处 RC=0）**：14 条正臂按设计转红（门禁 A/B/B2/B3/C/A2/D/E/E2/E3-分母自检 + TaskList 底色 + TimelineBoard 两处底色 + 两处 `onPress` + NotesView 退回本地态 + 搜索丢 id + web 四处投影断一处 + mobile 回落摘一处 + mobile 三处投影全摘）；🔴 **一条第一次跑活了**：把 web 便签换回**裸名** `const [editingId] = useState(null)` 时门禁**全绿** —— 而文档块里当时写着"仍未覆盖：不带实体名的 editingId"，即这条缺口我**登记过但没验证**。补上裸名分支（`detailId\|selectedId\|editingId`，刻意不含 `active`/`open`：四象限的 `activeId` 是 dnd-kit 正在拖哪一颗）后重跑**转红**；为此把 `PasskeyPanel` 那份行内改名编辑器的状态改名 `editingRowId`（第一次我改成 `renamingId`，撞上 store 里已有的"请求在途那条"——两个概念不能并成一个名字，断言把它挡在写盘前）。两条负向对照绿：字样只写进注释、以及树上活着的 `activeId`/`editingRowId` 不被误伤。**读数**：门禁绿（`词表 3 类全有消费者（task 10 / habit 7 / note 13）、接线声明 17 处全部用起来`）；本轮直接跑的 `task-selection + timeline-board + quadrant-row-parity + notes-view` = **55 passed / 0 failed**；web/mobile/app-host/ui 四包 typecheck RC=0；`check:docs` 归因见 §8.1（三处死链指向**别人未提交**的在途文档，已把链接改成带状态的指针）。**真浏览器取证已闭合（2026-10-03 22:4x，载体 `feat/detail-pane` = `d5b835b5`）**：新增 `e2e/tests/selection-projections.spec.ts` **3 条**，跑法与读数：生产构建载体（`vite build` + `vite preview`，端口 4358）上 **3 passed / 0 failed**；截图五张落在 `apps/web/evidence/selection-projections/{01-list,02-quadrant,03-timeline,04-switch,05-search}.png`，**五张都逐张打开看过**：列表与搜索那两张里选中那条带浅蓝底、另一条白底；四象限那张选中那条落在"先不做"格里且带同一种蓝；时间线那张"未排期（2）"里只有第一条带蓝；换选中那张是**第二条**带蓝、第一条回到白底。看图还照出一件断言看不见的事：`switchView` 用鼠标点 rail，**rail 的 tooltip 会留在下一张图上**，第一版 `03-timeline.png` 里那句"四象限"正好压在选中那条的标题上 ⇒ 截图前 `parkCursor`（把鼠标挪开），这不是美化，§6.2 要的是"人能看懂的那张图"。🔴 **23:5x 两处更正（载体 `0de58095` + `0c159f7f`）**：① 那五张图已随 W2 的第四列整体重跑并**逐张重看**（选中态在四种投影里读数不变）；② 更要紧的是读底色的探针里有一条**会假绿**的机制被照出来了 —— Chromium 对**已从文档分离**的节点 `getComputedStyle` 返回空串，而判据写的是"选中那条 ≠ 同屏没选中的那条"，空串永远不等于任何真实底色 ⇒ **"根本没读到值"会被判成"画上选中色了"**。症状先以一次假红出现（两遍连跑全绿、第三遍红），所以这类"偶发红"要按**探针故障**查，不要按产品抖动放过。现在探针先等到算得出来为止，自检臂（把读数改成恒返回空串）实测 3 条全红。
 🔴 **四臂变异（每条改完重新 `vite build` 再跑，判据读的是产物）**：A1 宿主不给四象限传选中 → **1 红**（红在那条跨投影用例）；A2 包装层声明了不转发（§7 #179 的形状）→ **1 红**；A3 宿主不给时间线传选中 → **1 红**；A4 点行根本不写选中 → **2 红**，而**搜索那条不红** —— 这不是漏网：搜索出口的生产者本来就是 `openTaskFromSearch` 不是 `openTask`，两臂各打一半正好证明这两个入口是**两条独立的线**。四臂跑完 `apps/web/src` 复原并复跑回 3 绿。
 ⚠️ **载体边界（不写成"门禁已验"）**：这条 spec 落在 `e2e/tests/` 里，`pnpm check:ai-e2e` 用的是 **dev 载体**，而 **linked worktree 里 dev 载体结构性起不来** —— vite 默认 `fs.allow` 只有 worktree 根，`node_modules` 软链到主检出，`@sqlite.org/sqlite-wasm` 的 wasm 走 `/@fs` 被拒（实测日志原文：`The request id ".../sqlite-wasm/dist/sqlite3.wasm" is outside of Vite serving allow list.`），症状是"三条全红、红在 `openApp` 第一步找不到输入框"，长得像产品坏了而其实是载体。所以我用**主检出的 dev 服务**（端口 4362，只读源码、跑完按 PID 关掉）做了一次"载体形状对照"：**3 failed，每条都红在 `task-item-* 一直没画上选中色`** —— 而主检出那棵树上没有本分支的 W1 接线。这条读数是双向有用的：它同时证明①这条 spec 不依赖生产构建、dev 载体上照常执行；②它会在"接线不存在"的树上响亮地红。
 🔴 **我自己造成的两次共享检出写入（都当场复原，写在这里而不是咽下去）**：① 为了绕开上面那个 403，我把 sqlite-wasm 往主检出的 `node_modules` 里 `cp -R` 过，那一步**替换掉了一枚 pnpm 软链**（换成 2.9M 真目录）⇒ 已按 `.pnpm` 里的原始相对路径把软链恢复并 `cmp` 过字节；② 截图路径最初写的是相对 `../apps/web/...`，Playwright 按**进程 cwd** 解析，我从主检出的 `e2e/` 跑 ⇒ 五张图落进了**主检出**（`?? apps/web/evidence/selection-projections/`，HEAD 里从来没有这个目录）⇒ 已确认未跟踪、逐张比对后 `rm -rf` 掉那五枚，并把 spec 改成按 `import.meta.url` 解析。**教训：先例 `task-row-touch-target.spec.ts` 那种相对写法在单一检出里看不出问题，在 worktree 里就会把证据写到别人的树上。** 两条都够格进 §7，但 `docs/reference/environment-traps.md` 此刻在主检出里有别人 **187 行未提交**（编号已到 #189）⇒ 按"台账正脏着不追加"的规矩，这里只登记**内容**，编号由收口的人按当时现量取。
@@ -2460,7 +2460,7 @@ main 侧 −143/−157/−341 ⇒ **同两个函数**），连带它的 spec）�
 ### 5. 收尾读数与三条探针错
 
 - `apps/web` 全量：**115 files passed / 2 skipped，1595 passed / 12 skipped**；
-  `tsc --noEmit -p tsconfig.spec.json`：**0 error**；`check:selection-single-source`（A–G）：**RC=0**，
+  `tsc --noEmit -p tsconfig.spec.json`：**0 error**；`check:selection-single-source`（**那一趟是 A–G**；§8.46 起该门禁有 A–H 八道）：**RC=0**，
   末行逐字未变（`2 份实例 … 词表 3 类全有消费者（task 10 / habit 7 / note 13）… 接线声明 17 处`）。
 - 🔴 第一版三条 TS 编译错，两条属于**新种类**：
   ① `block[1].matchAll` 在 `noUncheckedIndexedAccess` 下要显式收窄成 `body === undefined` 才抛 ——
@@ -3087,3 +3087,82 @@ node /tmp/dp_w1b_battery.py      # 载体必须是当前 HEAD；电池内部按�
 比本轮四笔（`54f32b65`…`cb5d7dbc`）早。本轮四笔里没有一枚动产品源码，所以缺这一格**不改变任何一单的界面结论**，
 但它改变"当前载体全链绿"这句话能不能说 —— **不能说**。§8 状态表里 W1–W7 那几行仍然只到"只剩四端重装"，
 不许因为本轮又补了判据/文档而往上加"全链已复绿"。
+
+---
+
+## 8.46 断言 H：把"谁读某一类的选中，谁就得把那一类喂进回落"从**人工数屏幕**变成一条门禁（2026-10-04 13:3x）
+
+### 1. 为什么 §8.43 那种"数"不够
+
+§8.43 的产出是一次正确的枚举 —— 按"谁在读这一类"数出任务屏是第三个持有便签全集的宿主。
+但**枚举是一次性的**：判据（`apps/mobile/tests/selection-single-owner.spec.ts`）里那张
+`cases` 表是手写的三行，下一位新加一个读 `useSelected('habit')` 的屏，
+他不在表里的这一格**不会有任何东西变红** —— 症状要等用户碰上才现形。
+⇒ 落成 `check:selection-single-source` 的**断言 H**，逐文件扫，不需要人再数一次。
+
+### 2. 🔴 两端必须是两套规则，理由是那两端的回落**挂载方式**不同（现量，不是偏好）
+
+| 端 | 回落怎么跑 | H 的规则 |
+|---|---|---|
+| `apps/mobile` | 每个屏各自调 `pruneSelectionAgainst({ … })` | **同文件配对**：这一屏读了哪几类，本文件的实参块里就必须有哪几类 |
+| `apps/web` | 一份中央回落挂在物化状态上（`lib/selection.ts` 的 `pruneSelectionFromEntities`） | 中央那份**覆盖本宿主读到的每一类**，且**真的被别处调用过** |
+
+写成一条会两种坏法：按"同文件配对"管 web ⇒ 三个视图整片假红（它们本来就不喂）；
+按"整棵树里找得到喂就算"管 mobile ⇒ 就是 §8.43 第 7 节那个错误本身
+（"别的文件也在喂"不等于"这一屏有人负责"）。
+
+实参块用**大括号配对**取，不用"往后找 N 个字符" —— 同一个调用里 `task:` 在前、`note:` 在 Spread 里，
+松匹配会跨到别处凑出一个键来（§8.43 第 4 节那条教训在门禁层的重述）。
+
+现量读数：`✅ H：6 处读选中的宿主文件各自把读到的类别喂进回落…逐类读方数：task 2 / habit 2 / note 3`
+（web `App.tsx`/`HabitsView`/`NotesView` 各一读 + mobile `HabitsScreen`/`NotesSection`/`TasksScreen`（读两类）= 6 处）。
+
+### 3. 七臂（`research/tools/mutation-rigs/mutate-selection-h.mjs`）
+
+`ARMS=7 AS_EXPECTED=7 FAIL=0 FINAL_SAME=true CONTROL rc=0`：
+
+| 臂 | 改法 | 预期 | 实测 |
+|---|---|---|---|
+| H1 | 触屏端新加一处读 `note` 而不接回落 | 红，点名 `CalendarScreen.tsx` 与 `'note'` | ✅ `rc=1 firing=[H]` |
+| H2 | 任务屏摘掉实参里的 `note` 那一项（仍读 `note`） | 红，点名 `TasksScreen.tsx` | ✅ |
+| H3 | Web 中央回落少一类（摘掉 `habit` 谓词） | 红，点名 `apps/web/src/lib/selection.ts` | ✅ |
+| H4 | Web 中央回落存在但没人调用 | 红：`没有任何文件调用` | ✅ |
+| H5 | 阴性：同样的字样只写进注释 | **必须绿** | ✅ `rc=0` |
+| H6 | 分母自检：把扫描正则改坏到恒不匹配 | 红：`没扫到任何` | ✅ |
+| H7 | 阴性：同文件两处 `prune` 调用、`note` 只在其中一处 | **必须绿**（要聚合，不能只看第一处） | ✅ `rc=0` |
+
+💥 **H6 第一版是坏的，而臂的严格性把它抓了出来**：我原本把 `useSelected\(` 换成 `useSelectedZZZ(`
+（连转义反斜杠一起摘掉）⇒ 正则变成 `…['"]task['"]\)` —— **未闭合分组**，
+`new RegExp` 在扫描之前就抛，门禁**崩**了：`rc=1` 但 `firing=[]`，报错里没有 `断言 H`。
+如果判定只写"期望 rc≠0"，这一臂会当成通过 —— 也就是说**它会用一次崩溃冒充一次红**。
+判定改成"必须出现 `断言 H` 且报错文案点名到文件与类别"之后它才如实报 `BAD`。
+这条形状适用于本仓所有"改脚本让它坏"的臂：**退出码不是判据，判据是它打印了自己那句结论**
+（§8.43 第 6 节那条"跑门禁必须看见它打印自己那句结论"的同族）。
+
+### 4. 顺带修掉产品源码里同一句被否证的注释
+
+`apps/mobile/src/screens/TasksScreen.tsx:563-567` 那段还写着
+"少递一项的确切症状：…编辑层不会自己关…那两条已经接了回落的屏此刻**没挂载**，替不了它" ——
+这正是 §8.43 第 7 节否证掉的那句，它漏在了**产品注释**里。
+按"撤回要写进原文所在处"的规则改写成移除隐式依赖的说法，并就地指到 §8.43 第 7 节的 A/B/C 读数。
+全仓 sweep：`apps/**` 与 `packages/**` 里再没有"没挂载 / 替不了它 / 不会自己关"这三串
+（剩下的命中只有更正句本身）。**零代码行为改动**，只是那段注释在替一个不存在的症状说话。
+
+### 5. §1 四道闸门 + 边界
+
+| 闸门 | 读数 |
+|---|---|
+| 归属门 | 4 枚：门禁脚本、新臂装置、`TasksScreen.tsx`（**只有注释**）、本篇。零 `packages/*`、零样式、零线协议 |
+| 两道余量为 0 的棘轮 | 无输入（没有 CSS / `ht-*` 改动），本轮**没读**基线数字 |
+| 干净检出复跑 | 判据输入是 `scripts/` 与两份 `apps/*` 文件；§8.44 那趟 Q1 的交叠 7 枚里**不含**这几枚 ⇒ 它们在 main 检出干净 |
+| `packages` 改完先 build | 不适用 |
+
+**读数**：`check:selection-single-source` RC=0（F/G/H/总结四行全打印）；
+`apps/mobile` **38 文件 / 608 passed**；H 装置 `AS_EXPECTED=7/7`、`FINAL_SAME=true`、`CONTROL rc=0`。
+
+⚠️ **`apps/web` 那一趟报 1 红，归因为环境而不是产品**：`tests/reminders-panel.spec.tsx`
+的"超过每任务上限时把错误显示出来"（2527ms）——**不是本单的文件**（提醒那条线）。
+单跑那一枚 **6/6 绿**；而单跑那一趟现量 `vm.loadavg` = **{427.84, 177.16, 99.65}**（16 核）。
+⇒ 记为负载抖动，且**没有**在安静窗口里做全量复跑 —— 这句话只能说"单发已复绿"，
+不能说"web 全量在本载体复绿"。全链电池同理（§8.45 那条前置在 13:3x 更紧了：另一条线正在跑
+`.verify-mobile-card-export-ios.sh.snap.84803`，模拟器 5 台 booted，负载 427）。
