@@ -140,15 +140,23 @@ if (base.rc !== 0) {
 }
 
 // M1：加一行既无对照节也无例外
+// 🔴 注入的行号**从文档现取**（= 现有最大号 + 1），不写死：写死成 `#14` 的那版，在
+//    C1 #14 真的被补上对照节之后自己变成了 RC=0（"新行"不再是新行），红的对象换成了历史。
+const nextFreeRow = (t) => {
+  const nums = [...t.matchAll(/^\|\s*(\d+)\s*\|/gm)].map((m) => Number(m[1]));
+  if (!nums.length) throw new Error('C1 表里一行都没解析出来 —— 注入没有对象');
+  return Math.max(...nums) + 1;
+};
+const m1n = nextFreeRow(ORIGINAL);
 const m1 = withDoc((t) => {
   const { lines, idx } = lastRowIdx(t);
-  lines.splice(idx + 1, 0, '| 14 | 装置注入的一格：既没写例外也没对照节 | A | 占位 |');
+  lines.splice(idx + 1, 0, `| ${String(m1n)} | 装置注入的一格：既没写例外也没对照节 | A | 占位 |`);
   return lines.join('\n');
 });
 const m1out = m1.out;
 check(
-  'M1 新行无对照节 → 红且点名 #14',
-  m1.rc === 1 && legCount(m1out, UNCOV) === 1 && m1out.includes('#14') && m1out.includes('🔴 1 处不成立'),
+  `M1 表里加一行既无对照节也不写例外 → 红且点名那枚新号（号从文档现取，本轮 = #${String(m1n)}）`,
+  m1.rc === 1 && legCount(m1out, UNCOV) === 1 && m1out.includes(`#${String(m1n)}`) && m1out.includes('🔴 1 处不成立'),
   `RC=${m1.rc}｜未覆盖 ${counts(m1out)?.unexcused}`,
 );
 
@@ -618,6 +626,62 @@ check(
   const r = spawnSync(process.execPath, [oldGate, doc], { encoding: 'utf8' });
   check(
     'M24 同一份变异喂「还没有腿 6 的那版判据」→ RC=0（补的是实测存在的缺口，不是顺手加严）',
+    r.status === 0,
+    `RC=${r.status}｜取的是 ${found.slice(0, 8)}（按内容认）`,
+  );
+}
+writeFileSync(doc, ORIGINAL, 'utf8');
+
+// —— N1/N1b/N2（腿 5 的第二次加固：裸文件名引用要先跟 `git ls-files` 对一次再定自家/第三方）
+// 21:5x 现量的洞：本批自己在 C1b-Q14 里把自家文件写成 `ListsSection.tsx:174`，
+// 腿 5 第一版按"有没有本仓顶层目录前缀"反向认 ⇒ 这枚**自家**行号被数成"第三方源码引用"，
+// 那一节于是白拿 `外部锚=有` —— 而"自家行号不许冒充外部证据"正是腿 5 存在的唯一理由（§8.88）。
+const bareOwn = swapDocUrls(ORIGINAL, /C1b-Q1/, 'HabitsView.tsx:181');
+const n1 = withDoc(() => bareOwn);
+check(
+  'N1 把某一节的 URL 全换成**裸名自家文件**的行号 → 红腿 5（这一档在加固前会放过，那就是洞）',
+  n1.rc === 1 && legCount(n1.out, NOEXT) === 1 && legCount(n1.out, WEAK) === 0 && n1.out.includes('C1b-Q1'),
+  `RC=${n1.rc}｜缺外部锚 ${legCount(n1.out, NOEXT)}｜weak ${legCount(n1.out, WEAK)}`,
+);
+// N1b：同一形写法但换成**在册没有的**裸名（真第三方源码）⇒ 必须放过。缺这条，加固就成了"裸名一律不算"。
+const n1b = swapUrls(/C1b-Q1/, 'StreakList.kt:133');
+check(
+  'N1b 同一节只留一个**在册查不到**的裸名行号 → 放过（证明认的是"是不是我们的文件"，不是"有没有斜杠"）',
+  n1b.rc === 0 && legCount(n1b.out, NOEXT) === 0,
+  `RC=${n1b.rc}｜缺外部锚 ${legCount(n1b.out, NOEXT)}`,
+);
+// N2：`git` 不可用（产物树模式）⇒ 这一档判不了，必须**如实声明且不改变判决**
+const tree3 = join(scratch, 'tree3');
+execFileSync('sh', ['-c', `mkdir -p "$0/$(dirname "$2")" && cp "$1" "$0/$2"`, tree3, join(repoRoot, DOC), DOC]);
+writeFileSync(join(tree3, DOC), bareOwn, 'utf8');
+const n2 = run(['--root', tree3]);
+check(
+  'N2 产物树里没有 git → 承重(腿5) 写明"判不了、一律按第三方算"，且**不因此报红**（缺信息时不判别人）',
+  n2.rc === 0 && /判不了/.test(n2.out),
+  `RC=${n2.rc}`,
+);
+// N3 减法现量：N1 那份文档喂「还没有裸名归属判定的那版判据」⇒ 必须 RC=0（按内容认，不按 HEAD）
+{
+  const hist = execFileSync('git', ['-C', repoRoot, 'log', '--format=%H', '--', 'scripts/check-detail-pane-c1-coverage.mjs'], {
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .slice(0, 14);
+  let found = '';
+  for (const sha of hist) {
+    const src = execFileSync('git', ['-C', repoRoot, 'show', `${sha}:scripts/check-detail-pane-c1-coverage.mjs`], { encoding: 'utf8' });
+    if (!src.includes('OWN_BY_BASENAME') && src.includes('const noExt =')) {
+      found = sha;
+      writeFileSync(join(scratch, 'gate-before-basename.mjs'), src, 'utf8');
+      break;
+    }
+  }
+  if (!found) throw new Error(`前 ${hist.length} 版里找不到"还没有裸名归属判定"的那版 —— 窗口要放宽，不许拿当前版冒充`);
+  const r = spawnSync(process.execPath, [join(scratch, 'gate-before-basename.mjs'), join(tree3, DOC)], { encoding: 'utf8' });
+  check(
+    'N3 同一份变异喂「还没有裸名归属判定的那版判据」→ RC=0（补的是实测存在的洞，不是顺手加严）',
     r.status === 0,
     `RC=${r.status}｜取的是 ${found.slice(0, 8)}（按内容认）`,
   );

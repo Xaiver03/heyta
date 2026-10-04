@@ -140,9 +140,32 @@ const excusedSections = sections.filter((s) => !hasRec(s) && SECTION_EXC.test(s.
 // 例外档仍只从**节标题**认（`不需要拍`）：那一行的题本身不需要"别人怎么做的"，所以对它这一档不适用。
 // ⚠️ 例外**只从标题认，绝不扫正文** —— 理由与腿 4 同一件事故（正文里现成的别人那句话会顶掉我们这一档）。
 const OWN_PATH = /^(packages|apps|server|scripts|e2e|docs)\//;
+// 🔴 但**裸文件名**不算第三方。腿 5 的第一版按"有没有本仓顶层目录前缀"反向认，
+//   于是自家文件写成 `ListsSection.tsx:174`（2026-10-04 21:5x 实测自己就这么写过）会被数成
+//   "第三方源码引用"，那一节于是拿到 `外部锚=有` —— 而这恰恰是腿 5 存在的理由（自家行号不许冒充外部证据）。
+//   ⇒ 现在把裸名拿 `git ls-files` 的**在册文件名**对一次：在仓库里有同名文件的裸名算自家。
+//   ⚠️ 产物树模式（`--root`，合流预检解到 /tmp 的那棵树）里没有索引 ⇒ 这一档**判不了**，
+//      如实打出来并**不改判**（宁可漏判也不在缺信息时红别人的文档）。
+let trackedNames = null;
+let trackedWhy = '';
+try {
+  trackedNames = new Set(
+    execFileSync('git', ['-C', root, 'ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+      .split('\n')
+      .filter(Boolean)
+      .map((p) => p.split('/').pop()),
+  );
+} catch (e) {
+  trackedWhy = String(e.shortMessage || e.message).split('\n')[0].slice(0, 60);
+}
+const OWN_BY_BASENAME = (ref) => {
+  if (!trackedNames) return false;
+  if (ref.includes('/')) return false;
+  return trackedNames.has(ref.split(':')[0]);
+};
 const flsOf = (body) => body.match(new RegExp(FILELINE.source, 'g')) || [];
-const extFlOf = (body) => flsOf(body).filter((p) => !OWN_PATH.test(p));
-const ownFlOf = (body) => flsOf(body).filter((p) => OWN_PATH.test(p));
+const extFlOf = (body) => flsOf(body).filter((p) => !OWN_PATH.test(p) && !OWN_BY_BASENAME(p));
+const ownFlOf = (body) => flsOf(body).filter((p) => OWN_PATH.test(p) || OWN_BY_BASENAME(p));
 const hasExternal = (s) => URLRE.test(s.body) || extFlOf(s.body).length > 0;
 const noExt = sections.filter((s) => !hasExternal(s) && !SECTION_EXC.test(s.title));
 const excusedExt = sections.filter((s) => !hasExternal(s) && SECTION_EXC.test(s.title));
@@ -208,6 +231,13 @@ const dump = (title, list, line) => {
   console.log(`\n${title}（${list.length} 条）：`);
   for (const r of list) console.log(line(r));
 };
+console.log(
+  `承重(腿5)：在册文件名 ${
+    trackedNames
+      ? `${String(trackedNames.size)} 枚 —— 裸名 file:line 命中它就算**自家**，不算外部锚`
+      : `取不到 ⇒ 裸名这一档判不了，本轮一律按第三方算（原因：${trackedWhy}）`
+  }`,
+);
 dump('🔴 要拍的值没有 C1b 对照节，也没写清属于哪一类例外', unexcused, (r) => `  :${r.line} #${r.n} ${r.body.slice(0, 70)}…`);
 dump('· 例外（类别从那一行自己的文本里认）', excused, (r) => {
   const [name] = EXCATEGORIES.find(([, re]) => re.test(r.body));
