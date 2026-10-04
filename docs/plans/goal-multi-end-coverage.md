@@ -2216,6 +2216,20 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     行数 673、`grep -c 'evidence/${f}'` = 1、`git hash-object` = `df46f473fae55b7763c3f26165d2e9b181e703a8`。
     同轮另一条轻量现量：`pnpm check:script-snapshot` 在**当前混合工作树**里 rc=0（38 枚脚本自快照在位）
     ⇒ 这五枚落进 main 不会撞上那把被别人改过的快照门禁。
+  - ✅ **09:57 载体已对齐到 main 现量 `20b9a078`，五枚补丁在上面存活 ⇒ 窗口一到，读数钉的就是当前版**。
+    此前载体停在 `49e9a2fd`，而 `git diff --name-only 49e9a2fd..20b9a078` 只有 `BLOCKED.md` 与两份文档
+    （`scripts/verify-mobile-notes.sh` 在两版的 blob 逐字相同 `3a9f6890…`）⇒ checkout 不会碰我那枚未提交补丁，
+    实测 `RC=0`、`status` 只剩 `M scripts/verify-mobile-notes.sh`、sha 仍 `fbe0ee72…` / 673 行。
+    这一步买到的东西很具体：链里的 `CARRIER_HEAD == MH` 成立 ⇒ **③ 与 ① 的读数不必再钉在旧版上**，
+    而 `git diff --quiet … -- packages apps shared pnpm-lock.yaml package.json` 仍为空 ⇒ **不触发重建**（没有为此多烧一趟）。
+  - ✅ **09:57 Goal ③ 点名的四条，逐条现量到行号（对象是载体那枚 673 行、sha `fbe0ee72…` 的文件）**：
+    第 6 步 `:358`「恰好一条 NOTE/UPD，且载荷只有 content」＋第 7 步 `:390` 反证腿；
+    第 8 步第三张截图 `:473` `shot_evidence "android-notes-3-from-search.png"`（另两张在 `:332`、`:356`）；
+    第 9 步三条腿 `:520` 手机同步 / `:527`+`:530` 远端 op 计数（读不到与 0 条分开报错）/ `:539` 按 entityId 核；
+    第 10 步 `:547` 服务端 scoped 计数（本轮新写的收范围判据）；第 11 步 `:602` 起笔记本解密收到同一条 UPD、
+    两端 entityId 一致。**这四条不需要新写，缺的一直只是窗口**：09:56 负载 **24.08**（阈 12）、
+    设备仍被 `com.heyta` pid `12027` 占着 ⇒ 链 v13 继续等；① 比 ③ 还多等一枚**别人树里**的
+    `notarytool submit --wait`（它不在我的地界，不摘除、不绕开）。
 - ✅ **05:3x ⑤ 复核**：`B41/B42/B45` 三行仍在 §7.28 那张「完成条件逐条的现量与差什么」表里（`:1220`/`:1221`，状态 🟡，
     各带自己的现量命令），本夜落笔的六笔只改了 `scripts/verify-mobile-notes.sh` 的第 12 步与
     `apps/desktop-macos/scripts/package-app.sh` 的公证段，加上四份文档，
