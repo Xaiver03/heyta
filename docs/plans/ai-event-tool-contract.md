@@ -3912,3 +3912,48 @@ git status --porcelain -- packages/app-host/src/ai-tool-run.ts packages/app-host
 ⇒ 引用这条红线时该用的措辞是"每个写入口恰好一处"，不是"全仓只有一个 `submit`"；
 两处都在确认/授权之后，且 `packages/ai` 那边类型上产不出 op。写成这样是为了下一个数到 2 的人
 不必以为红线破了，也不必反过来把这条更正当成新缺陷再报一遍。
+
+#### §15.43ah（10-04 08:1x）§15.43ac 我自己犯了它警告的那件事：新的判定抽出来了，**旧的那份从没删掉**
+
+翻队列脚本的 Windows 段（用户点名的 `SHORTCUT_OK` 就在这一支）时发现：`decide_win_facts` + 四路 `case`
+之后还留着**改造前的整段 `if/elif`**，它会再算一遍 `PAX_WIN` 并覆盖前面的裁决。
+这正是 AGENTS §3.5 那条教训的形状（"`ids.ts` 抽出来了、文件头还列着漂移对照表，旧的那份却一直活在代码里"），
+而我上一节刚写完"落地过期做成判定"，没去查它的下游还站着一个旧判定。
+
+按可达性如实分档（不把最吓人的那支写成主因）：
+
+| 后果 | 现量 | 可达性 |
+|---|---|---|
+| `rc.txt` 里每轮有**两条** `PAX_WIN`，且最后一行由弱判决定；同一个物理状态两个词表（旧块叫 `STALE`、新裁决叫 `STALE-EVIDENCE`） | 两条都写（`grep -c "printf 'PAX_WIN"` 改前 = 2） | 🔴 **每轮必发** —— 谁按 `PAX_WIN STALE` 去读，读到的就不是那条日志声称的判定 |
+| lib 没 source 到时旧块报 `MISSING-FACTS`（"条码不齐"），把"本线没有判据可读"盖成"装了但不齐" | 腿 `nolib` 改前落错档 | 🟡 载体在阶段 1.5 会 FF 到 main，正常路径 lib 在；但载体一旦落后就是它 |
+| 基线没量到时算术测试报错、`[ -lt ]` 那一支不成立 ⇒ 直落 `msix_check_facts` 判 **`PROVEN`** | 变异臂现量：`臂 old INST_START=empty ⇒ PAX_WIN=PROVEN`，`臂 new … ⇒ NO-BASELINE` | ⚪ **正常路径不可达**（`INST_START=$(date +%s)` 在第 526 行无条件赋值）⇒ 这是"改前会怎样"的对照，不是当前会发生的红 |
+
+修法三处：删掉旧块、清单条数为 0 时升成独立裁决 `LIB-MISSING`（不冒充"条码不齐"）、读数行合一条。
+现量（`grep -o 'PAX_WIN=[A-Z-]*' | sort | uniq -c`）：**六个裁决标签** `FACTS-OK / FACTS-INCOMPLETE /
+LIB-MISSING / NO-BASELINE / NO-EVIDENCE / STALE-EVIDENCE`（前两个各出现 2 次是因为赋值行与 `say` 文案里都写着它，
+所以字面出现 8 次而标签只有 6 个 —— 计数单位要说清，否则又是一次"行 ≠ 条"）；
+`printf 'PAX_WIN` 只剩 **1 行**，带 `facts=/mtime=/msg=` 三列。
+
+七腿离线夹具（`SELF` 不碰真装机，只喂临时载体目录 + 两份取证文件）：
+
+| 腿 | 输入形状 | 现量 |
+|---|---|---|
+| ok | lib 5 条 + CRLF 五事实齐 + 起跑早于 mtime | `FACTS-OK facts=5` |
+| stale | 同上但 mtime=`2020-01-01` | `STALE-EVIDENCE facts=5` |
+| nobase | 取证文件在但基线为空 | `NO-BASELINE facts=5` |
+| nofx | 没有取证文件 | `NO-EVIDENCE facts=5` |
+| nolib | lib 文件不在（载体落后形状） | `LIB-MISSING facts=0` |
+| **prose** | 四条齐 + 一行散文写着 `注：期望 SHORTCUT_OK=True 未满足` | `FACTS-INCOMPLETE facts=5`，msg 精确点到 `缺判据：SHORTCUT_OK=True` |
+| future | 取证文件与起跑同刻 | `FACTS-OK facts=5`（`-lt` 等号判"属本轮"，同秒不误杀） |
+
+`prose` 那条是 §15.43z  tightened matcher（`tr -d '\r'` + `grep -qxF`）在这里的**第二次受控暴露**：
+它同时在"生产侧 reinstall-all"和"我这条链自己再读一次"两处都挡住散文满足，而 `future` 那条
+是配套的正向对照（不剥 `\r` 或整行比太严就会把它误杀成 `FACTS-INCOMPLETE`）。
+
+⚠️ 一处**我自己夹具的探针坏**，按 §7 元规则"先怀疑探针"记下：第七腿本想喂"mtime 远晚于起跑"，
+但 `leg()` 里 `INST_START` 的取法是 `[ "$stmode" = "empty" ] && printf '' || date +%s` ——
+非 `empty` 一律现取 `date`，所以我传的那个未来 epoch 被静默丢弃，那条腿量的其实是"同刻"。
+读数以表格里的 `FACTS-OK（同秒不误杀）` 为准，"未来 mtime"这一档**未被测到**。
+
+换体仍走"副本编辑 → `bash -n` → 喂腿 → `mv`"，现役 66947（已跑 17 分钟）不受影响；
+队列现在停在阶段 1 测试通道（累计 960s / 7200s，持有者 `29093 29434`）。
