@@ -33,6 +33,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { loadavg, cpus } from 'node:os';
+import { defaultsFrom, portsKilledBy, listenersOn } from './selfhost-kill-ports.mjs';
 
 const argv = process.argv.slice(2);
 const only = [];
@@ -142,40 +143,60 @@ if (!(L <= maxLoad)) {
 
 
 const results = new Map(); // as -> Map(cmd -> {rc, secs, tail, present})
-// 🔴 端口安全：**有些段会把自己那套 preflight 跑成"把默认端口上的进程 SIGKILL 掉"**
-// （`scripts/check-ai-e2e-preflight.mjs` 只 kill 它拿到参数的那几枚端口：ai-e2e 默认 4318/4319，
-//  privacy 传 4322，landing 传 4320，从不碰 3000）。逐段扫链时如果别人正听着这些端口，
+// 🔴 端口安全：**有些段会把自己那套 preflight 跑成"把端口上的监听者 SIGKILL 掉"**
+// （`scripts/check-ai-e2e-preflight.mjs` 只 kill 它拿到参数的那几枚：ai-e2e 默认 4318/4319、
+//  privacy 传 4322、landing 传 4320，从不碰 3000）。逐段扫链时如果别人正听着这些端口，
 // 跑下去就是**杀掉别人的 dev server** —— 那是硬约束，不是效率问题。
 // ⇒ 这一档**不参与差集**，而是响亮地登记成 SKIP_SAFETY：静默跳过等于把"没跑"读成"跑了且绿"。
-const SEG_PORTS = [
-  [/check:ai-e2e/, ['4318', '4319']],
-  [/privacy-consent/, ['4322']],
-  [/test:landing|check:landing-e2e/, ['4320']],
-];
+//
+// 🔴 射程的算法只有**一个所有者**（`selfhost-kill-ports.mjs`）。这里原先抄了一份
+//   "段名正则 → 端口"的表：它今天是准的（两棵树逐条 script 新旧端口集相同，见审计 §8.122），
+//   但链里新增一段传别的端口时它**不会自己长出来**，而漏掉的那一段照样会杀进程。
+const scriptsOf = (() => {
+  const cache = new Map();
+  return (path) => {
+    if (!cache.has(path)) {
+      cache.set(path, JSON.parse(readFileSync(join(path, 'package.json'), 'utf8')).scripts ?? {});
+    }
+    return cache.get(path);
+  };
+})();
+const defaultsOf = new Map();
+for (const b of byTree) {
+  const d = defaultsFrom(b.t.path);
+  if (d.error) { console.error(`🔴 ${b.t.as}: 判不了 preflight 的默认端口 ⇒ 拒跑。\n      ${d.error}`); process.exit(2); }
+  defaultsOf.set(b.t.path, d.ports);
+}
+/**
+ * 这一段真跑起来会清哪些端口 —— 对**所有配对树**取并集：任何一棵树上会清、且那枚端口正被占，
+ * 就不在任何一棵上跑它（配对要的是同一段在两边都真跑过）。
+ * 段名在树里查不到脚本时按段本身判（链里也可能直接内联一条命令）。
+ */
 const portsOf = (cmd) => {
-  for (const [re, ps] of SEG_PORTS) if (re.test(cmd)) return ps;
-  return [];
+  const name = cmd.replace(/^pnpm\s+/, '').trim().split(/\s+/)[0];
+  const out = new Set();
+  for (const b of byTree) {
+    const body = scriptsOf(b.t.path)[name];
+    const text = body !== undefined ? String(body) : cmd;
+    for (const p of portsKilledBy(text, defaultsOf.get(b.t.path))) out.add(p);
+  }
+  return [...out].sort((a, c) => a - c);
 };
-const listenersOn = (ports) => {
-  if (ports.length === 0) return [];
-  const args = ['-nP'];
-  for (const p of ports) args.push('-iTCP:' + p);
-  // 🔴 `-sTCP:LISTEN` **只能出现一次**。2026-10-04 实测：每个端口各带一个 ⇒
-  // `lsof: duplicate TCP inclusion: LISTEN`、stdout 空、**rc=1** ——
-  // 而"端口空闲"同样 rc=1 且 stdout 空，两者在退出码上完全同形。
-  // 那一版的守卫会把"别人正听着 4318"读成"没人占"，然后放行 `pnpm check:ai-e2e`，
-  // 它的 preflight 就把别人的 dev server SIGKILL 掉。这是"假 0 会咬人"的实弹版本。
-  args.push('-sTCP:LISTEN');
-  const r = spawnSync('lsof', args, { encoding: 'utf8' });
-  const err = (r.stderr || '').trim();
-  // ⚠️ **rc 不是判据**（实测：有监听时也退 1）。探针坏的信号是 stderr 有字。
-  if (err.length > 0) {
-    console.error(`🔴 lsof 探针坏了（stderr: ${err.split('\n')[0].slice(0, 120)}）—— 拒跑。\n` +
-      '      不拿"读不到"当"没人占"：那一档的后果是杀掉别人的 dev server。');
+/** 监听者行。判不了 = 拒跑，**绝不**把"判不了"当"没人占"（那一档的后果是杀别人的 dev server）。 */
+function rowsOn(ports) {
+  const seen = listenersOn(ports);
+  if (seen.noLsof) {
+    console.error('🔴 这台机器上没有 lsof ⇒ 判不了端口有没有人用，拒跑（不拿"判不了"当"没人占"）。');
     process.exit(2);
   }
-  return (r.stdout || '').split('\n').slice(1).map((l) => l.split(/\s+/).filter(Boolean).join('/')).filter(Boolean);
-};
+  if (seen.brokenProbe) {
+    console.error(`🔴 lsof 探针坏了（${seen.brokenProbe}）—— 拒跑。\n` +
+      '      ⚠️ **rc 不是判据**（实测：有监听时也退 1）；坏探针的信号是 stderr 有字。\n' +
+      '      探针坏时 stdout 同样是空，把它读成"没人占"就会放行 SIGKILL —— 这是"假 0 会咬人"的实弹版本（da3345c3）。');
+    process.exit(2);
+  }
+  return seen.rows;
+}
 // ── 阳性对照：同一趟里必须抓到一次"必然存在的监听" ─────────────────────
 // 拿系统里**已经在监听**的一枚端口喂给同一个解析器。抓不到 ⇒ 解析层坏 ⇒ 退 2，
 // 因为下面所有"端口空闲"的读数都建立在这个解析器上（AGENTS §7 元规则 2）。
@@ -197,8 +218,8 @@ function portProbeSelfCheck() {
     console.log('   端口探针阳性对照：系统当前 0 枚监听 ⇒ 不适用（守卫也不会跳过任何段）');
     return;
   }
-  const known = portHit[1];
-  const found = listenersOn([known]);
+  const known = Number(portHit[1]);
+  const found = rowsOn([known]);
   if (found.length === 0) {
     console.error(`🔴 端口探针的阳性对照没抓到（系统正在监听 :${known} 却读不到）⇒ 解析层坏，拒跑。`);
     process.exit(2);
@@ -206,12 +227,15 @@ function portProbeSelfCheck() {
   console.log(`   端口探针阳性对照：已监听端口 :${known} 抓到 ${found.length} 行（同一条命令形状）`);
 }
 portProbeSelfCheck();
+
 const skipped = new Map();
 for (const cmd of picked) {
   const ps = portsOf(cmd);
   if (ps.length === 0) continue;
-  const busy = listenersOn(ps);
-  if (busy.length > 0) skipped.set(cmd, `${ps.join('/')} ← ${busy.slice(0, 3).join(', ')}`);
+  const rows = rowsOn(ps);
+  if (rows.length > 0) {
+    skipped.set(cmd, `${ps.join('/')} ← ${rows.slice(0, 3).map((r) => `:${r.port} pid=${r.pid} ${r.text.split('/')[0]}`).join('，')}`);
+  }
 }
 for (const [cmd, why] of skipped) console.log(`   SKIP_SAFETY ${cmd}：端口被占（${why}）—— 这一段不跑，也不进差集`);
 
