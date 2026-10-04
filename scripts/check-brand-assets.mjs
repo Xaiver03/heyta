@@ -39,14 +39,17 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const problems = [];
 const ok = [];
+/** 响亮跳过（不是静默）：环境不给的判据列出来，让读输出的人知道这轮**少验了什么**。 */
+const skipped = [];
 
 /** 读一个必须存在的文件；读不到就是**判据红**，不是跳过（§7 第 191 条）。 */
 function mustRead(rel) {
@@ -312,6 +315,94 @@ checkAssetJson(
   },
 );
 
+/* ── 3c. storyboard **编得过**（存在性与文本形状都挡不住 ibtool 崩） ──────
+ *
+ * 🔴 这条是 10-05 01:5x 四端重装的 ios 段第二次炸出来的，而且它换了个死法：
+ *   上一次（01:2x）是 colorset 不是合法 JSON，被 492e2124 的"解析得开"判据接住了；
+ *   这一次 JSON 全合法、`--check` 逐字节全绿，而 `xcodebuild` 报
+ *   `CompileStoryboard LaunchScreen.storyboard … failed with a nonzero exit code`。
+ *   根因是生成器给 <color> 元素写了一个 id 属性 —— **ibtool 对它的反应是
+ *   rc=255 且零输出**（A/B 现量：带 id=255 / 去掉 id=0 并产出 .storyboardc；
+ *   加不加 catalog="Images" 都一样；imageView / constraint 带 id 是合法的）。
+ *   ⇒ 一个**不产生任何诊断**的工具链失败，只能靠"真的编一遍"当判据。
+ *
+ * 两层都要，缺一层就漏：
+ *   · 结构判据（永远跑，含非 macOS 宿主）：color 元素不许带 id；
+ *   · 真编译（有 ibtool 才跑）：跑完还要**看到产物** —— 本仓库已经量过
+ *     "命令 rc=0 而什么都没产出"的假绿（§7 那一族），所以产物存在性是断言的一部分。
+ */
+check(
+  'ios：storyboard 的 color 元素不带 id 属性',
+  'apps/mobile/ios/Heyta/LaunchScreen.storyboard',
+  (t) => {
+    const bad = [...t.matchAll(/<color\b[^>]*\bid=/g)];
+    return (
+      bad.length === 0 ||
+      `有 ${bad.length} 个 <color …> 带 id —— ibtool 以 rc=255 退出且零输出，` +
+        'xcodebuild 只会说 CompileStoryboard failed'
+    );
+  },
+);
+
+{
+  let ibtool = '';
+  try {
+    ibtool = execFileSync('xcrun', ['--find', 'ibtool'], { encoding: 'utf8' }).trim();
+  } catch {
+    ibtool = '';
+  }
+  if (ibtool === '' || !existsSync(ibtool)) {
+    skipped.push('ios：storyboard 真编译（这台机器没有 ibtool —— 非 macOS/无 Xcode 宿主，响亮跳过）');
+  } else {
+    const storyboard = join(ROOT, 'apps/mobile/ios/Heyta/LaunchScreen.storyboard');
+    const out = mkdtempSync(join(tmpdir(), 'heyta-storyboard-'));
+    try {
+      execFileSync(
+        ibtool,
+        [
+          '--errors',
+          '--warnings',
+          '--notices',
+          '--module',
+          'Heyta',
+          '--output-partial-info-plist',
+          join(out, 'partial.plist'),
+          '--auto-activate-custom-fonts',
+          '--target-device',
+          'iphone',
+          '--target-device',
+          'ipad',
+          '--minimum-deployment-target',
+          '17.0',
+          '--output-format',
+          'human-readable-text',
+          storyboard,
+          '--compilation-directory',
+          out,
+        ],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+      );
+      // 🔴 产物必须真在：只判"没抛异常"会被"rc=0 而零输出、零产物"骗过去（实测过）。
+      const built = existsSync(join(out, 'LaunchScreen.storyboardc'));
+      if (!built) {
+        problems.push(
+          'ios：storyboard 真编译 —— ibtool 退出码 0 但**没有产出 LaunchScreen.storyboardc**，' +
+            '这不算通过（装出来的包会没有启动屏）',
+        );
+      } else {
+        ok.push('ios：storyboard 真编译（ibtool 产出 .storyboardc）');
+      }
+    } catch (err) {
+      const detail = String(err.stdout ?? '').trim() || String(err.stderr ?? '').trim() || String(err.message ?? err).trim();
+      problems.push(
+        `ios：storyboard 真编译失败 —— xcodebuild 到了这一步同样会红。诊断：${detail.slice(0, 400)}`,
+      );
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  }
+}
+
 /* ── 3b. 四个资产目录里不许躺着未跟踪的位图（c9fe6f56 的原始形状） ──── */
 checkNoUntrackedAssets('资产：生成物全部已跟踪', [
   'apps/mobile/android/app/src/main/res/mipmap-mdpi',
@@ -349,4 +440,7 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`  ✅ 品牌产物接线对账通过（${ok.length} 条：生成物逐字节 + 清单引用 + 消费方接线）`);
+if (skipped.length > 0) {
+  for (const line of skipped) console.log(`  ⏭  ${line}`);
+}
+console.log(`  ✅ 品牌产物接线对账通过（${ok.length} 条：生成物逐字节 + 清单引用 + 消费方接线 + 真编译）`);
