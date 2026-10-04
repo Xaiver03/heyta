@@ -3362,7 +3362,7 @@ md5 apps/web/evidence/detail-column-slot/*.png apps/web/evidence/detail-pane-ove
 | # | 动作 | 过 | 为什么排在这个位置 |
 |---|---|---|---|
 | 0 | `node scripts/verify-detail-pane-merge-preflight.mjs` | "合并造成的红"= 0 且"静默合流丢行"= 0 | ✅ 已入库（§8.52）。零 VCS 改动地把候选树铺到 `/tmp` 跑**真门禁**，另附一份 main 单独作对照，所以分不清"合并合错了"和"本来就红"的那些情况在这一趟就先解决掉。`--keep` + `--product <目录>` 是"手工处置完冲突后原地复跑"那条路 |
-| 1 | 逐枚语法解析：`.mjs` 用 `node --check`，TS/TSX 用 §8.44 那把 in-memory host | 全部无诊断 | 挡 §8.42 第 15 节那个形状（把 main 的函数**抄进**我的门禁脚本：文本层干净、零 marker、解析层两条同名声明）。⚠️ **射程要含"静默合流"那一档**：这一趟 15 枚冲突之外还有 **10 枚两侧都改过而 git 没报冲突**，其中就有那枚门禁脚本本体 —— `.mjs` 那两枚上面第 0 步的脚本已经覆盖，`.ts/.tsx` 的只剩第 2 步的 typecheck |
+| 1 | 逐枚语法解析：`.mjs` 用 `node --check`，TS/TSX 用 §8.44 那把 in-memory host | 全部无诊断 | 挡 §8.42 第 15 节那个形状（把 main 的函数**抄进**我的门禁脚本：文本层干净、零 marker、解析层两条同名声明）。⚠️ **射程要含"静默合流"那一档**：这一趟 15 枚冲突之外还有 **10 枚两侧都改过而 git 没报冲突**，其中就有那枚门禁脚本本体。第 0 步的脚本对这 10 枚**逐枚跑了语法解析**（`.mjs` 走 `node --check`、`.ts/.tsx` 走 `transpileModule`，读数见 §8.52）⇒ 手工那一步已经不必做。🔴 但**只到语法层**：`transpileModule` 报的是括号/截断这类，"两条同名声明"是语义错，那一档仍然只有第 2 步的 typecheck 抓得住 |
 | 2 | `pnpm -r typecheck` | RC=0 | |
 | 3 | `pnpm --filter @heyta/app-host test`；mobile 侧 **cd 进 `apps/mobile`** 用 `./node_modules/.bin/vitest` | 各自全量，且 app-host 那趟含 3b 拼接进来的两侧用例 | 根目录**没有** `./node_modules/.bin/vitest`（§8.45 那条 `MOBILE_TEST_RC=127` 就是这么来的） |
 | 4 | `node scripts/check-selection-single-source.mjs` | 四行结论都打印（A–H + 总结） | 含 §4 那两行豁免与 F 的复核 |
@@ -3691,7 +3691,7 @@ node scripts/verify-detail-pane-merge-preflight.mjs --product <上一步留下�
 
 机制：`git merge-tree --write-tree` 造候选树 → `git archive | tar -x` 铺到 `/tmp` → 用**真门禁**跑（一条逻辑都不复刻）
 → 再铺一份 **main 单独**当对照载体。只有"候选红而 main 绿"才算**合并造成的红**；两边都红的是环境/载体所致，**不含信息**。
-退出码：合并造成的红 + 静默合流丢行 = 0 ⇒ 0；有 ⇒ 1；连候选树都造不出来 ⇒ 2（响亮失败，不静默放行）。
+退出码：合并造成的红 + 静默合流的（丢行 ∪ 删文件 ∪ 语法不过 ∪ **语法未判**）= 0 ⇒ 0；有 ⇒ 1；连候选树都造不出来 ⇒ 2（响亮失败，不静默放行）。
 
 ### 1. 现量（14:2x，`main` 在 `0a0b63f6`→`73b6df97` 之间走了两次 / HEAD `4d0cbd89` / MB `f419df75` / 落后 532→534 / 领先 78 / 负载 28.11）
 
@@ -3701,8 +3701,9 @@ node scripts/verify-detail-pane-merge-preflight.mjs --product <上一步留下�
 | 纯 fs 门禁 | 17 道：**合并造成的红 = 1**（只有 `check-selection-single-source`），两边都红 = 0 |
 | 那唯一一枚 | `✗ 选中态的所有者不唯一：断言 G：宿主里有 2 处本地 …Id useState 没有语义登记` —— 点名的**恰好**是 §8.47 第 4 节预告的两枚（`apps/web/src/features/trash/TrashView.tsx busyId` / `apps/mobile/src/screens/TrashScreen.tsx busyId`） |
 | 对照趟（`--a main --b main`） | 冲突=0、带 marker=无、**合并造成的红=0**、RC=0 ⇒ 这枚脚本不是"每次都红一次"的仪式 |
-| 静默合流 | 10 枚，**逐枚两侧新增行全在场**（`App.tsx` 50/107、`i18n/en` 376/23、`i18n/zh-CN` 402/27、`app-host/index.ts` 105/9、`helpers.ts` 12/22、`TasksScreen.tsx` 14/19、`focus/store.ts` 6/31、`NotesBoard.tsx` 3/20、`docs-link-check.mjs` 10/33、`check-selection-single-source.mjs` 61/319），两枚 `.mjs` 另过 `node --check` |
-| 静默合流的正对照 | 从产物里删掉 main 新增的**一行注释** ⇒ 恰好那一枚报 `丢行：main 侧缺 1 / HEAD 侧缺 0`、其余 9 枚与 17 道门禁读数一字不变 ⇒ 这一档有分辨力，而不是"永远全绿" |
+| 静默合流 | 10 枚，**逐枚两侧新增行全在场**（`App.tsx` 50/107、`i18n/en` 376/23、`i18n/zh-CN` 402/27、`app-host/index.ts` 105/9、`helpers.ts` 12/22、`TasksScreen.tsx` 14/19、`focus/store.ts` 6/31、`NotesBoard.tsx` 3/20、`docs-link-check.mjs` 10/33、`check-selection-single-source.mjs` 61/319），且**逐枚过语法解析**：2 枚 `.mjs` 走 `node --check`、8 枚 `.ts/.tsx` 走 `transpileModule`（解析器从本检出取，产物树不需要 `node_modules`） |
+| 静默合流的正对照 ①（丢行档） | 从产物里删掉 main 新增的**一行注释** ⇒ 恰好那一枚报 `丢行：main 侧缺 1 / HEAD 侧缺 0`、其余 9 枚与 17 道门禁读数一字不变 |
+| 静默合流的正对照 ②（语法档） | 往 `focus/store.ts` 末尾追加一句 `const dp_broken = ;` ⇒ 恰好那一枚报 `行全在，但语法不过：Expression expected.（共 1 条）`、其余 9 枚不变，且"合并造成的红"仍是 1（那枚已知 G 红）⇒ 两档各自能红，不是同一档重复计数 |
 | 补两行豁免之后 | `RC=0`，且 `F：5 处渲染面…` 一字未变（main 没带来新的"会说出选中"的面）、`G：17 处`、`H：6 处`、`接线声明 18 处全部用起来` |
 
 ⇒ **§8.47 第 4 节那条"先跑、红了才加"现在有了可执行的形式**，而且第 4 节预告的枚数是准的（2 枚，不多不少）。
@@ -3730,8 +3731,11 @@ node scripts/verify-detail-pane-merge-preflight.mjs --product <上一步留下�
   ⇒ **这里绿不等于合并后 `pnpm check` 绿**，第 5 步的 2/3/5/6/7 行一步都不能省。
 - `check:docs` **刻意不在清单里**：它要 `git ls-files` 判"本机有、仓库里没"那一档，而临时目录不是 git 检出 ——
   两个载体都会红成一样的，那种红不含信息。§8.47 第 3d 步的死链判据仍只能在真合并后跑。
-- 静默合流那档只判"**行在不在**"，不判"两侧各往同一个函数里加语句之后行为对不对"。后者唯一的载体是真跑：
-  第 5 步的 `pnpm -r typecheck` + 全量测试。
+- 静默合流那档判两件事：**行在不在** + **语法过不过**（`.mjs` 与 `.ts/.tsx` 都过）。它**不判语义** ——
+  两侧各往同一个函数里加语句、行都在、语法也过，行为仍可能是错的；而"两条同名声明"这种**语义**级重名
+  `transpileModule` 也不报（它只做语法解析）。这两样唯一的载体是真跑：第 5 步的 `pnpm -r typecheck` + 全量测试。
+- 语法解析器取自**跑脚本这一侧**的检出（按 `node_modules` → `apps/web` → `packages/app-host` 三个候选找）。
+  一个都找不到时那一枚报 `🔴 语法**未判**`，**不算通过** —— 没跑成的检查被读成绿，是本项目最贵的一类错。
 - `TREE=` 每趟都不同（这一趟内 `main` 就走了两次）⇒ **树号不是复现凭据**。引用读数要带 `main`/`HEAD` 双 sha 与时刻，
   不然下一个人拿一个已经不存在的树号去 `git cat-file`，会读成"那趟没发生过"。
 - **不挂 `pnpm check`**：它要两侧真的分叉才有意义（同树跑就是 0/0/0 的空读数，见第 1 节对照趟），

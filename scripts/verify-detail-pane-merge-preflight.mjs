@@ -27,15 +27,22 @@
  *  ① 候选树里**未解决的冲突 marker 还留在文本里**（本脚本不替人裁决），所以带 marker 的文件
  *     可能让某些门禁红 —— 那属于 §8.47 第 3 节的处置还没做，不是新问题。脚本会把带 marker 的
  *     文件名打在结论旁边，避免被读成"合并把门禁改坏了"。
- *  ② 只覆盖**纯 fs** 那一批：`pnpm check` 57 段里要 dist / node_modules / 服务端 / 浏览器的
+ *  ② 只覆盖**纯 fs** 那一批：`pnpm check` 那条 `&&` 链里要 dist / node_modules / 服务端 / 浏览器的
  *     一段都不在这里（临时检出没有那些）。这里绿 **不等于** 合并后 `pnpm check` 绿。
+ *     ⚠️ 那条链**有几段不写在这里**（本文件不抄计数，抄了就一定会漂）—— 要现量就读 root `package.json`。
  *  ③ `check:docs` 不在清单里：它要 `git ls-files`（判断"本机有、仓库里没"那一档），
  *     临时目录不是 git 检出，两个载体都会红成一样的 —— 那种红不含信息。
+ *  ④ TS/TSX 的语法解析用的是**跑脚本这一侧**的 typescript（从本检出解析，产物树不需要依赖），
+ *     且只到 `transpileModule` 的**语法层**：括号不闭合、块被截断会报，
+ *     "两条同名声明"那种**语义**错它不报 —— 那一档仍然只有第 5 步的 `pnpm -r typecheck` 抓得住。
+ *     拿不到 typescript 时**响亮地跳过并数出来**，不静默按通过处理。
  */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+
 
 const ROOT = process.cwd();
 const git = (args, opts = {}) =>
@@ -148,9 +155,38 @@ const addedLines = (ref, rel) =>
     .filter((l) => l.length > 3);
 
 const silentRows = [];
+// TS/TSX 语法解析器从**本检出**解析（产物树是 `git archive` 铺出来的，本来就没有 node_modules）。
+// 找不到不算失败，算"这一档没跑"—— 计数打进结论，别让它静默变成通过。
+let ts = null;
+for (const c of [
+  join(ROOT, 'node_modules/typescript'),
+  join(ROOT, 'apps/web/node_modules/typescript'),
+  join(ROOT, 'packages/app-host/node_modules/typescript'),
+]) {
+  if (!existsSync(c)) continue;
+  try {
+    ts = createRequire(join(ROOT, 'package.json'))(c);
+    break;
+  } catch {
+    /* 换下一个候选 */
+  }
+}
+const tsSyntaxOf = (file) => {
+  const out = ts.transpileModule(readFileSync(file, 'utf8'), {
+    reportDiagnostics: true,
+    compilerOptions: {
+      jsx: ts.JsxEmit.Preserve,
+      target: ts.ScriptTarget.ESNext,
+      module: ts.ModuleKind.ESNext,
+    },
+  });
+  const d = (out.diagnostics || []).filter((x) => x && x.messageText);
+  return d.length ? `${ts.flattenDiagnosticMessageText(d[0].messageText, ' ')}（共 ${d.length} 条）` : null;
+};
+
 for (const rel of silent) {
   const productFile = join(product, rel);
-  const row = { rel, missingA: [], missingB: [], syntax: null, absent: false, nA: 0, nB: 0 };
+  const row = { rel, missingA: [], missingB: [], syntax: null, absent: false, nA: 0, nB: 0, parsed: false, unparsed: false };
   if (!existsSync(productFile)) {
     row.absent = true; // 两侧都改过、产物里却没有 ⇒ 一侧把它删了（这本身就是要知道的事）
     silentRows.push(row);
@@ -172,6 +208,14 @@ for (const rel of silent) {
       execFileSync('node', ['--check', productFile], { encoding: 'utf8' });
     } catch (e) {
       row.syntax = `${e.stderr || e.stdout || ''}`.trim().split('\n').find((l) => l.trim()) || 'node --check 失败';
+    }
+    row.parsed = true;
+  } else if (/\.tsx?$/.test(rel)) {
+    if (ts) {
+      row.syntax = tsSyntaxOf(productFile);
+      row.parsed = true;
+    } else {
+      row.unparsed = true; // 拿不到解析器 ⇒ 这一枚没判过，不算通过
     }
   }
   silentRows.push(row);
@@ -203,19 +247,24 @@ const bad = rows.filter((r) => r.mergeCaused);
 const same = rows.filter((r) => r.p.rc !== 0 && r.b.rc !== 0);
 
 const silentBad = silentRows.filter(
-  (r) => r.absent || r.missingA.length || r.missingB.length || r.syntax,
+  (r) => r.absent || r.missingA.length || r.missingB.length || r.syntax || r.unparsed,
 );
 if (silentRows.length) {
   console.log(`\n静默合流（两侧都改过、merge-tree 没报冲突）= ${silentRows.length} 枚 —— 逐枚查"两侧新增的行是否都还在产物里"：`);
   for (const r of silentRows) {
-    const badRow = r.absent || r.missingA.length || r.missingB.length || r.syntax;
+    const badRow = r.absent || r.missingA.length || r.missingB.length || r.syntax || r.unparsed;
+    const parseTag = r.parsed
+      ? ` · 语法过（${r.rel.endsWith('.mjs') ? 'node --check' : 'ts transpile'}）`
+      : r.unparsed
+        ? ' · 🔴 语法**未判**（这一侧拿不到 typescript）'
+        : '';
     const verdict = r.absent
       ? `🔴 产物里没有这个文件（有一侧把它删了）`
       : r.missingA.length || r.missingB.length
         ? `🔴 丢行：${refA} 侧缺 ${r.missingA.length} / ${refB} 侧缺 ${r.missingB.length}`
         : r.syntax
           ? `🔴 ${refA}+${r.nA} ${refB}+${r.nB} 行全在，但语法不过：${r.syntax}`
-          : `✅ ${refA}+${r.nA} ${refB}+${r.nB} 行全在${r.rel.endsWith('.mjs') ? ' · node --check 过' : ''}`;
+          : `✅ ${refA}+${r.nA} ${refB}+${r.nB} 行全在${parseTag}`;
     console.log(`${badRow ? '🔴' : '· '} ${r.rel.padEnd(46)} ${verdict}`);
     for (const [tag, list] of [[refA, r.missingA], [refB, r.missingB]]) {
       for (const l of list.slice(0, 4)) console.log(`      缺(${tag}) ${l.slice(0, 76)}`);
