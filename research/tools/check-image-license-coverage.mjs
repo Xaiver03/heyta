@@ -31,6 +31,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readImageInstallShape } from './image-install-shape.mjs';
+// 新鲜度指纹与生成器共用同一份（两套实现 = 两套裁决标准）。
+import { depsFingerprint } from './image-deps-fingerprint.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url)).replace(/\/$/, '');
 const quiet = process.argv.includes('--quiet');
@@ -108,7 +110,7 @@ for (const needle of ['fastify', '@prisma/client', 'zod']) {
 
 // ── 新鲜度：快照描述的必须是**当下**这套声明 ──────────────────────
 const stale = [];
-const currentPkgSha = sha256(readFileSync(join(repoRoot, 'server/package.json'), 'utf8'));
+const currentPkgSha = depsFingerprint(readFileSync(join(repoRoot, 'server/package.json'), 'utf8'));
 if (currentPkgSha !== snapshot.inputs?.serverPackageJsonSha256) {
   stale.push('server/package.json 变了（快照里的哈希与当下不一致）');
 }
