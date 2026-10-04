@@ -238,6 +238,44 @@ for (const name of chainTokens) {
   }
 }
 
+// 3b) 链里每道门禁的**实现文件**必须在这棵树上存在 —— 判的是"接缝上的红"。
+//
+// 上面第 1/3 条核对的是**定义与链的对齐**，它看不到"定义与链都对、实现文件不在树上"这一种：
+// `package.json` 与 `scripts/*.mjs` 由不同的人分别提交时，链可以先被推进而实现还捏在别人手里没进 git。
+// 后果不是"少跑一段"，是那一整段以 `MODULE_NOT_FOUND` 红，**且排在它后面的链根本不跑**。
+// 2026-10-04 14:4x 现场就是那个形状：主检出的链里多了 5 道门，其中 3 道的实现文件**未跟踪**
+// （审计 §8.85 记了逐枚状态），而 `pnpm check` 当时照样全绿 —— 因为它跑的是工作树，文件在盘上。
+//
+// ⚠️ 只判"定义里认得出 `node|bash|sh <仓库内路径>`"的那些；带 `cd` 的（相对哪个目录不确定）、
+// `pnpm --filter X <script>`（实现住在各包自己的 package.json 里）都不判。
+// 🔴 判了几段、跳了几段**必须打出来**：一个静默的 0 会把"探针没接上"读成"全都对上了"（§7 元规则 2）。
+const implOk = [];
+const implSkipped = [];
+for (const name of chainTokens) {
+  const def = pkg.scripts[name];
+  if (typeof def !== 'string' || /\bcd\s+\S+&&/.test(def.replace(/\s+/g, ' '))) {
+    implSkipped.push(name);
+    continue;
+  }
+  const paths = [...def.matchAll(/(?:^|[\s;&(])(?:node|bash|sh)\s+([\w./-]+\.(?:mjs|cjs|js|ts|sh))(?=$|[\s;&)])/g)]
+    .map((m) => m[1].replace(/^\.\//, ''))
+    .filter((p) => !p.split('/').includes('node_modules'));
+  if (paths.length === 0) {
+    implSkipped.push(name);
+    continue;
+  }
+  for (const rel of paths) {
+    implOk.push(name);
+    if (!existsSync(join(ROOT, rel))) {
+      failures.push(
+        `${name}: 链里有它、定义也在，但它指的 \`${rel}\` **不在这棵树上** —— ` +
+          '要么实现文件没跟着 `package.json` 一起提交，要么被挪走而这里还指着旧路径。' +
+          '链是文本级的，这种断点 `merge-tree` 与第 1/3 条都看不见。',
+      );
+    }
+  }
+}
+
 // 4) 锚点：`pnpm -r test` / `pnpm build` 必须逐字在链里
 for (const anchor of REQUIRED_ANCHORS) {
   if (!chain.includes(anchor)) {
@@ -248,6 +286,9 @@ for (const anchor of REQUIRED_ANCHORS) {
 const outside = defs.filter((n) => !inChain.has(n));
 console.log(
   `门禁定义 ${defs.length} 道 ｜ 链里被引用 ${chainTokens.length} 段 ｜ 链外 ${outside.length} 道（允许表 ${ALLOWED_OUTSIDE_CHAIN.size} 道）`,
+);
+console.log(
+  `   · 实现文件判了 ${implOk.length} 段、跳过 ${implSkipped.length} 段（带 cd / --filter / 非 node|bash|sh 的形状）`,
 );
 for (const r of consumerReadings) console.log(`   · 链外门禁的消费方：${r}`);
 
