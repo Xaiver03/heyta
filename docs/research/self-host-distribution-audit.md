@@ -4050,3 +4050,58 @@ git merge --no-ff feat/self-host-merge-main -m "merge: 自托管批次（第 N �
 3. 🔴 **main 那棵树今天仍然会 E404**：修法只在本分支里，落地之前外人从 main 照抄 compose 依旧起不来。
    所以 G-54 的"对外不再错话"这一半，**关闭位置是落地那一刻**，不是本分支绿那一刻。
 
+
+### 8.63 `VERIFY_EXIT=1` 那趟把三个容器留在机器上 23 分钟 —— 拆栈从来不是 trap 的职责（08:4x）
+
+取 §8.62 那条红的时候顺手查了一下现场（`docker ps -a`，08:3x）：
+
+```
+supersync-server                          heyta-selfhost-verify   Up 23 minutes (healthy)  127.0.0.1:1900
+supersync-postgres                        heyta-selfhost-verify   Up 23 minutes (healthy)
+heyta-selfhost-verify-supersync-migrate-1 heyta-selfhost-verify   Exited (0)
+```
+
+脚本明明有 `trap 'cleanup; rm -f -- "$0"' EXIT`，看起来"退出时会收拾"。**但没有：**
+`cleanup()` 只做两件事——删快照副本、删一次性凭据文件。拆栈是**各个失败分支各自**调
+`down_stack`（起栈失败那条调了，正常结束那条也调了），所以**任何一条没调到的 `die` 都会留下一栈**。
+§8.62 那次 die 的位置恰好就在"栈已起来"与"唯一那条拆栈调用"之间（`e2e` 依赖那条守卫）。
+
+⚠️ 危害比"占内存"大一层。compose 文件里 `container_name` 是写死的，脚本因此有一条 preflight
+"别的栈在跑时必须响亮地失败"——但它的判据是 `owner == $PROJECT` 就 `continue`，
+于是**下一趟复用我自己留下的那一栈**（同 project 名），不会响亮失败；
+紧接着 `compose down -v --remove-orphans` 又把卷清掉 ⇒ 表面看是干净起栈，
+而"这台实例是不是这次建起来的"从来没有判据。在这台机器上（负载 >12 就什么都跑不动）
+留一栈 Up 的代价还会直接把下一个窗口吃掉。
+
+修法三件（`scripts/verify-selfhost-stack.sh`）：
+
+1. `STACK_UP=0` 起栈成功后置 1（**在起栈失败那条分支之后**，那条自己拆过了，不重复拆）。
+2. `cleanup()` 里在 `rm -f "$ENV_FILE"` **之前**调 `down_stack` —— 顺序反了 `compose down` 读不到那份 env，
+   就是"拆了个寂寞"（与文件里既有那条 `--keep` 不能删 env 的注释同一条理由）。
+3. `declare -F down_stack` 那一层不是装饰：`down_stack` 定义在起栈之后，而 `die` 在那之前也会走到
+   trap（容器名冲突那条就是），bash 对未定义函数是 **127**，不会"温柔地跳过"。
+
+**验的是控制流，函数体从真文件里 `awk` 抽出来**（不手抄第二份，见 `/tmp/teardown-trap-harness.sh`），
+`compose()` 换成只记参数的桩，四臂：
+
+| 臂 | 输入 | 断言 | 结果 |
+|---|---|---|---|
+| A | `STACK_UP=1 KEEP=0` | 有一条 `COMPOSE down`，且那一刻 `env_exists=yes`，随后 env 被删 | ✅ |
+| B | `STACK_UP=0` | **一条 compose 都不许调**（否则会去动别人的同名资源） | ✅ |
+| C | `KEEP=1` | 不拆栈**也不删 env**（那条手工拆栈命令要能用） | ✅ |
+| D | `down_stack` 还没定义 | 不 127、且 env 删除这一步没被一起吞掉 | ✅ |
+| 变异 | 摘掉那三行 | **恰好红在 A**：`ARM_BAD: A: STACK_UP=1 却没拆栈`（rc=1），还原后 rc=0 | ✅ |
+| 门禁 | `check:script-snapshot` | ✅ 31 个脚本 + .gitignore（MARKER 那行没被我碰坏） | rc=0 |
+
+🔴 **两条边界，别把上面读成"真拆过一次"**：
+
+1. 夹具量的是 trap 的分支与顺序，**没有真叫过 docker**。首次真消费是下一次真跑，
+   预期读数写死在这里：任一 `die` 之后
+   `docker ps -a --filter label=com.docker.compose.project=heyta-selfhost-verify -q` 必须是 **0**。
+2. **载体那棵树里的脚本副本还是旧的**（follower 跑的是 `54f66626` 那份），
+   所以本修法要等载体重算之后才进入验收路径。这属 §7 第 27 条那一族（改了源码、跑的是旧产物），
+   只是这次旧的是**验收脚本自己**。
+
+我自己留下的那三枚容器与两枚卷已在 08:3x 拆掉（`docker ps -a --filter label=…=heyta-selfhost-verify -q` → **0**，
+`:1900` 监听数 → **0**）。
+

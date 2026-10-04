@@ -98,6 +98,11 @@ PORT="${HEYTA_SELFHOST_PORT:-1900}"
 BASE="http://127.0.0.1:${PORT}/app/"
 BUILD=1
 KEEP=0
+# 🔴 栈起没起来必须由**脚本自己**记着（2026-10-04 现量：08:0x 那趟在浏览器那一腿之前
+# 因缺 e2e 依赖而 die，三个容器在机器上活了 23 分钟，占着 :1900 与内存，而输出里只有一个 rc=1）。
+# `cleanup()` 从来不拆栈 —— 拆栈是各个失败分支**各自**调 `down_stack`，所以任何一条没调到的
+# `die` 都会留一栈。这条标志位就是"trap 有没有活要干"的判据。
+STACK_UP=0
 
 # 🔴 三份 compose 文件写成**一个数组**，因为"带不带 override"就是这条验收的判据本体。
 # 各段自己拼 `-f a -f b` 的写法，漂起来的方向是某个调用忘了带 override ——
@@ -136,6 +141,13 @@ cleanup() {
     # 它里面是一次性随机凭据，所以这里把路径**打出来**，拆完由人顺手 rm。
     log "   一次性凭据文件**保留**（上面那条拆栈命令的 --env-file 就是它）：${ENV_FILE}"
     return 0
+  fi
+  # 🔴 **中途 die 也必须拆栈**。`down_stack` 要读这份 env 才算得出这套资源，
+  # 所以它必须在 `rm -f "$ENV_FILE"` **之前**；顺序反了就是"拆了个寂寞"（compose 报 env file not found）。
+  # `declare -F` 那一层不是装饰：`down_stack` 定义在起栈之后，而 `die` 在那之前也会走到这里
+  # （比如容器名冲突那条），bash 对未定义函数是 127 而不是"跳过"。
+  if [ "$STACK_UP" = "1" ] && declare -F down_stack >/dev/null; then
+    down_stack
   fi
   rm -f "$ENV_FILE"
 }
@@ -325,6 +337,8 @@ compose up -d postgres supersync >/tmp/heyta-selfhost-up.log 2>&1 || {
   [ "$KEEP" = "1" ] || compose down -v >/dev/null 2>&1
   die "compose 起栈失败（/tmp/heyta-selfhost-up.log）"
 }
+# 从这一行起，**任何**一条 die 都欠这台机器一次拆栈（上面那条失败分支自己拆过了，所以标志位在它之后）。
+STACK_UP=1
 cd "$REPO_ROOT"
 
 down_stack() {
