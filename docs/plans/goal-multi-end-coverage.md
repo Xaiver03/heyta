@@ -2939,6 +2939,20 @@ INNER_EXIT=<n>                       # 🔴 04:08 二次更正：装置**从不�
                                           启动器 :327-328 按"路径是不是绝对"分流 —— **非绝对路径的产物走 $EVID/carrier/**，
                                           所以要看的那枚在 carrier/ 子目录，且它不随下一趟 reinstall 被覆盖。
                                           配 ADD_APPX=OK / RESULT=OK；等真读数出现时把这一行的分支回读成实测
+
+🔴 **04:15 起跑前基线（不是本轮读数）** —— 盘上那五枚此刻都是**今天更早**的产物，
+   ① 成交后要拿这张表逐枚比 `mtime` 与 md5：**mtime 没推进 = 这一枚根本没被本轮重打**，
+   而 `本轮新生张数` 那个计数只要比"mtime ≥ 起跑时刻"就会把它算成新生（04:15 现量）。
+   另附：`/tmp` 这五枚会被下一趟 reinstall 原地覆盖 ⇒ 基线只在这一趟有意义，所以现在就抄下来。
+
+| 文件（/tmp 与载体） | 04:15 mtime | md5 前 10 |
+|---|---|---|
+| `heyta-reinstall-mac-installed.png` | 10-05 02:56 | `c4641723a6` |
+| `heyta-reinstall-mac-installed.png.webview.png` | 10-05 02:56 | `5187df4a55` |
+| `heyta-reinstall-android.png` | 10-05 03:00 | `4cf246ccfc` |
+| `heyta-reinstall-ios.png` | 10-05 03:06 | `048a267ea7` |
+| `<载体>/dist/windows/packaged-first-run.png` | 10-05 01:07 | `45f2b1dbca` |
+
 人看过：五枚**都从 <EVID> 里打开**（不是 /tmp），逐张写"看到了什么"（标题/正文/主蓝在不在），不是"截了图"
 inner.log：启动器把整条内层日志也抄进 <EVID>/inner.log（:277）⇒ INNER_EXIT=0 这句话要能在图旁边被读到
 ```
