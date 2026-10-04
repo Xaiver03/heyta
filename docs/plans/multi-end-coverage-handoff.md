@@ -1124,3 +1124,23 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   `VERDICT=NOT-RUNNING`、**退 3**；拿一个空闲端口 `4399` ⇒ `free` 且 `rc=0`（PREFLIGHT-OK）。
   ⚠️ 那个 `HEYTA_E2E_PORTS` 缝**只给夹具做阳性对照用**，不是运营开关；默认值就是实现算出来的那四个。
   19:45 现场四枚读数：4318/4319/4320/4322 **全 free**（这一格从此不再靠运气）。
+- 🔴 **落 ①/③ 读数进 goal §7.30 用的那枚"只提交我自己的行"的 plumbing 提交器已建好并验过牙**
+  （`~/.heyta-window-rigs/heyta-ledger-commit.sh` + 五臂夹具 `heyta-ledger-commit-fixture.sh`，
+  19:47 现量 GREEN，**全程在一次性仓里跑**，因为正向臂会真产生提交）。
+  为什么现在就要它：`docs/plans/goal-multi-end-coverage.md` 此刻是 ` M`，而那一格 **+19/-1 不是我的行**
+  （19:46 现读：那是 B/E2EE 那条线新写的 `### 7.32 B 的 iOS Release ↔ Node host 取证`，
+  引用 `apps/mobile/evidence/ios-node-vault-interop-20261004.txt`，通篇 ADR-0050 的口径）
+  ⇒ `git commit --only <该文件>` 提交的是**工作树内容** = HEAD + 他们那 19 行 + 我的新行，
+  等于替他们主张归属；裸 `git commit` 更糟（会带走仓库索引里别人的暂存）。
+  提交器做的事：从 `git show HEAD:<file>` 那一版出发、只在**锚点恰好一行**的位置插我的段 ⇒ 造 blob ⇒
+  用 `GIT_INDEX_FILE` 隔离索引 `read-tree`/`update-index`/`write-tree`/`commit-tree`/`update-ref`，
+  **不动仓库索引、不动工作树** ⇒ 他们的未提交字节原地不动（L1 的后半条判据就是查这个）。
+  🔴 **第一版在这里没牙，是变异臂照出来的**：反向判据当时写成
+  `git diff … | grep -vF -f "$MINE"` —— **"只要我声称这行是我的，检查就自动失明"**；
+  把别人那行原样放进 `mine2.txt`，旧判据一声不响就以我的名义提交了它（内容没毁掉别人的工作，归属是假的）。
+  现在的规则改成硬判据：**我的插入段里不许出现任何一条与"当前未提交行"逐字相同的文本**，
+  撞上即 ABORT（真需要重复就得改成锚点写法，而不是把字节带走）。
+  五臂：L1 只带自己的行且别人未提交行仍在工作树、L2 撞行必拦、**L3 阳性对照**（把重复那句换成我自己的
+  文本就能提交 ⇒ 证明 L2 的红来自撞行而不是提交器坏了）、L4 锚点命中多行拦、L5 锚点不存在拦。
+  ⚠️ 本条线**今天仍没用过它**（①/③ 的读数还没产生，没有东西要落）；建它不是为了好看，
+  是因为窗口开的那一刻正是最不该临场发挥 plumbing 的时刻。
