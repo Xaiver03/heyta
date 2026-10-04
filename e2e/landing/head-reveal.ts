@@ -1,35 +1,21 @@
 import type {Page} from '@playwright/test';
+// 🔴 判据本体不在这里 —— 单一所有者是 `scripts/screenshots/head-reveal.mjs`。
+import {waitHeadRevealed as revealed} from '../../scripts/screenshots/head-reveal.mjs';
 
 /**
- * 🔴 等页头那一次"遮罩揭示"**真的落位**，再截图。唯一事实源。
+ * 🔴 等页头那一次"遮罩揭示"**真的落位**，再截图。
  *
- * 页头的标题走 `.lp-mask { overflow: hidden }` + 内层 `translateY(112%) → 0%`，
- * 引言再错峰淡入。动画没跑完时，**页头在截图里就是一条空白带** ——
- * 那不是产品缺陷，但它是**不能用的证据**：§6.2 规定一要的是"访客看到的画面"，
- * 而对着这张图去查就会去修一个不存在的问题。
- * 这仍是 §7 第 83 条那一族 —— 探针观测的时刻本身就是判据的一部分。
+ * 为什么这里只剩一层壳：这条判据有**两个消费者**，而它们不在同一个语言里 ——
+ * `e2e/landing/*.spec.ts`（TS，Playwright 跑）与 `scripts/screenshots/capture.mjs`
+ * （纯 Node，`pnpm screenshot:capture` 跑）。判据写两遍就是下一次漂移的来源
+ * （审计文档 §8.110 那批"四张空白页头"的证据图，两个消费者当时各等各的）。
+ * 所以本体搬到 `.mjs`（Node 与 Playwright 都能原生加载），这里只保留**类型壳**
+ * 与调用点需要的报错语境。
  *
- * ⚠️ 两个失效形态都实测过：
- * 1. 不等待 ⇒ 图顶整块空白（`/platforms` 的「平台状态」H1 就是这样被拍没的）；
- * 2. 以为 `screenshot({animations: 'disabled'})` 就够了 ⇒ **不够**：那个参数只完成
- *    CSS 动画/过渡，而 framer-motion 的遮罩走 WAAPI transform，加了它 lede 与按钮
- *    回来了、H1 仍是空白（同一趟实测）。
- *
- * 结构缺失时返回 `false` 而不是抛错 —— 于是 `waitForFunction` 会**超时红**，
- * 不会静默放行（"标题不在了"和"标题还没落位"都必须拦得下来）。
+ * ⚠️ 两个失效形态（详见 `.mjs` 头部）：不等待 ⇒ 图顶整块空白；
+ * 以为 `screenshot({animations: 'disabled'})` 就够了 ⇒ **不够**，那个参数管不到
+ * framer-motion 走 WAAPI 的 transform。
  */
 export async function waitHeadRevealed(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
-    const h1 = document.querySelector<HTMLElement>('.lp-h1');
-    const inner = h1?.querySelector<HTMLElement>('.lp-mask__inner') ?? null;
-    const lede = document.querySelector<HTMLElement>('.lp-lede');
-    if (h1 === null || inner === null || lede === null) return false;
-    const box = h1.getBoundingClientRect();
-    const innerBox = inner.getBoundingClientRect();
-    return (
-      box.height > 0 &&
-      Math.abs(innerBox.top - box.top) < 2 &&
-      getComputedStyle(lede).opacity === '1'
-    );
-  });
+  await revealed(page);
 }

@@ -6960,3 +6960,55 @@ sweep 残留 PWA 承诺时命中 `zh-CN.ts:3602` / `en.ts:3402`
    所以 ②③ 的读数全部来自 18:30–18:35 那段闸门放行的窗口，之后没再补跑。
 2. 负载全程 18–325，`verify:selfhost-stack` 仍未起跑（看守 `g131-wait.sh` 在等 ≤12），
    落地那一步的阻塞集仍是 4 枚（看守 `g149-blockers.sh` 在等归零）。**第 1、2、8 项本段没有推进**。
+
+### 8.114 G-57 落地：截图前的固定 600 ms 换成"等揭示落位"，并把判据抽成**两个语言共用的一份**（2026-10-04 18:4x）
+
+§8.110 登记 G-57 时只写了"capture.mjs 截图前用固定 600ms"。这一轮补上它**为什么是缺陷**
+—— 不是"不够优雅"，是它违反了那个文件自己头部写下的设计约束第 1 条：
+
+> **等文案，不等时间。** 固定 `sleep` 在快机器上浪费、在慢机器上截到半成品。
+
+而落地页页头走的正是 §8.110 那套 `.lp-mask` + `translateY(112%)→0%` 错峰揭示，
+600 ms 就是"慢机器上截到半成品"的那个半成品 —— 已入库的 `screenshots/landing/*.png`
+（G-58）与这条固定等待是**同一个缺陷的两面**：一面产出坏图，一面是坏图为什么还会被产出。
+
+#### 改的形状（三处，一个所有者）
+
+| 文件 | 动作 |
+|---|---|
+| `scripts/screenshots/head-reveal.mjs` | **新增，判据本体**：`headRevealed()`（页面上下文里跑的纯函数）+ `waitHeadRevealed(page)`（等不到就超时抛）+ `settleForShot(page)`（**按这一页有没有 `.lp-h1` 分叉**） |
+| `scripts/screenshots/capture.mjs` | `waitForTimeout(600)` → `await settleForShot(page)`，并把走的那一支（`revealed` / `fallback`）**打进每张图的读数行** |
+| `e2e/landing/head-reveal.ts` | 判据本体删掉，只剩**类型壳** + 一层委托 |
+
+🔴 **为什么必须抽成 `.mjs` 而不是各自留一份**：这条判据有**两个消费者，且不在同一个语言里** ——
+`e2e/landing/*.spec.ts` 由 Playwright 跑（TS），`scripts/screenshots/capture.mjs` 由纯 Node 跑。
+§8.110 那次抽取只把 e2e 内部那 16 处消费者收拢了，**Node 那一侧当时没算进去**；
+不抽到 `.mjs`，这次修 G-57 就是**亲手造出第二份抄件**（正是 G-49 那条"第 4 份抄件"教训的形状）。
+`.mjs` 是两边都能原生加载的最大交集：e2e 那份 `package.json` 是 `"type": "module"`，
+Playwright 用 esbuild 转 `.ts`、`.mjs` 原样交给 Node。
+
+⚠️ **应用视图那批仍走那 600 ms**（`settleForShot` 的 `fallback` 支）。这不是保守：
+那些页面没有可等的揭示，把它们接进新判据 = 让每张应用截图都等一个**永远不成立**的条件，
+30 s × 11 张之后红在一片"探针问题"上。分叉的判据是"这一页有没有 `.lp-h1`"，
+而它本身就是那条承诺的适用范围。
+
+#### 这一轮量到的 / 没量到的（分开写）
+
+已量（全部零浏览器、零 docker）：
+
+```
+node --check scripts/screenshots/head-reveal.mjs   → OK
+node --check scripts/screenshots/capture.mjs      → OK
+pnpm screenshot:list                               → RC=0 （capture.mjs 的新导入链在 Node 侧成立）
+同深度 .mjs 导入 '../../scripts/screenshots/head-reveal.mjs' → RESOLVED typeof= function
+```
+
+🔴 **没量的一条要说死**：`pnpm screenshot:capture` **没跑**（要浏览器 + 要本机起站，
+而负载 167–325、`~/.tfa-shield` 内存闸门此刻被别人 `pid=43044` 的 `test:landing` 持有），
+所以"新等待真的产出带标题的图"这句仍是**待验证**，它随 G-58 那趟一起做（落地 + 重发之后重截）。
+e2e 那一侧同理：Playwright 的 loader 能不能解析这条跨目录 `.mjs` 导入，**本趟没跑**
+（同一条 shield 闸门挡着，而正有人在跑那套套件，不该去抢）。
+兜底在链上：`check:landing-e2e` 是 `pnpm check` 的一环，落地前那次完整 check 会把它跑到 ——
+**解析不了就是响亮地红，不是静默放行**。
+
+⇒ G-57 的状态从"未关（判据缺失）"改成"**代码已落、判据分叉有读数、复跑等 G-58 那趟**"。
