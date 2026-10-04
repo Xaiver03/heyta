@@ -4265,3 +4265,54 @@ M3 那条值得单独入档：**"判定顺序"这类断言函数级夹具测不�
 ① 的三枝 + 集成线 + `1ebcf136` 对当前 `HEAD` 逐条 `merge-base --is-ancestor` = **全部 YES**（本轮重取，不引用上一轮）。
 
 
+#### §15.43ao（10-04 09:4x）③ 的死锁查清了，而且它不在别人身上：闸门 #2 把我**本轮 e2e 自己重写的取证图**当成未提交源码
+
+阶段 5 等窗口时我读了一次 `gate-b.txt`，`❌ 52 枚未提交的源码改动` 那节逐条现量的结果是：
+**52 枚全是 `apps/web/evidence/**/*.png`，非取证/文档的源码 0 枚**（`git -C 载体 status --porcelain -- packages apps server
+| grep -v 'apps/[a-z0-9-]*/evidence/'` 输出 `No matches found`）。这些图是**已跟踪**的，而链里的 e2e 段与
+`check:ai-e2e` 每跑一遍就把它们重写一遍 ⇒ **跑过链的载体必然脏、阶段 5 的窗口必然不开**，
+而队列唯一的自救是 `env_retry`（`MAX_ROUNDS=5` 用尽后按环境无效退 3）。
+这条不是"别人的现场挡我"，是我自己造的条件被自己的门判死 —— 归属与修法都写进 `BLOCKED.md` **B73**。
+
+修法只走窄的那条（闸门那侧一个字没改，它是三条线共用的权威探针）：
+新增 `carrier_evidence_settle()`（队列第 661–688 行，调用在第 693 行 = 阶段 5 那次 `win_gate` 之前）。
+它与闸门**同一条口径**取集合（`status --porcelain -- packages apps server | grep -E '^ ?M'`），
+只有当脏项**全部**落在 `apps/*/docs|evidence/` 才动手：先归档进 `$OUT/carrier-evidence/`（本轮证据不丢），
+再 `git checkout --` 回提交态，然后**现量复核为 0** 才留 `EVIDENCE-SETTLE … after=0`；
+混进任何一枚源码就**一枚都不动**、逐条点名、让闸门照原样挡。
+
+夹具 `test-evidence-settle.sh` **6 腿 `pass=6 fail=0`**（真 `git init`、真脏项、真归位）。
+承重的那条是腿 2（"该挡的时候挡"）：混进一枚 `packages/x/src/index.ts` ⇒
+`rc=1`、两枚脏项**原样都还在**、日志点名到那一枚、归档目录**根本没建**。
+变异臂 `NEVER-REFUSE`（把拒绝分支的条件写成假）⇒ **腿 2 精确转红**
+（`rc=0 仍脏=0(期望 2) 点名=0 归档目录存在=yes`）：这条臂证明的不是"能红"，是**不越权**这件事有牙。
+同批回归：`test-chain-attr.sh 16/0`、`test-decide-pax.sh 9/0`、`test-hdr-guard.sh 8/0`、`test-retro.sh 5/0`
+（对**换上后的活文件**跑，md5 `f79f7818…`，900 行）。
+
+另有一处**读数纸**必须先证明它接上了判定函数：新写的 `eval-gates-retro.sh` 把当前脚本里的
+`decide_pax`/`decide_chain` 按 grep 现取的行号区间抽出来，喂给**已经跑完的那趟**的证据目录 ——
+因为 bash 持旧 inode，在跑的实例即使写出 `DONE`，那份 `DONE` 只代表它起跑时的判定集合。
+它自己的 5 腿夹具（腿 5 断言打印出来的抽取起点 = 独立现取的 `grep -n` 第 181 行，不是我抄的数）全绿后，
+对 72523 那趟的离线补量结果：
+
+```
+链：读数文件行=/Users/…/chain-ai-closeout-0909/segments-rc.txt 存在=yes
+   kv=SUMMARY pass=64 fail=9 skip=1 total=74 env-blocked=0
+   散文=091310 === 汇总（载体 d544d73c）：64 绿 / 9 红 / 0 段被内存门挡下 / 1 按规则不跑 / 共 74 段 ===
+   ⇒ CHAIN-OK total=74 pass=64 fail=9 skip=1 env=0
+   PAX：还没走到收尾块（DONE/NOT-DONE/PAX 三行都缺）⇒ 这一侧尚未量到，不是"没判定"
+```
+
+🔴 这里我第一次写出了一句**错因果**：看到没有 PAX 行就写"它是 §15.43am 之前起跑的 inode"。
+现量否证 —— PAX 行本来就只在收尾块才写，而三行（含 `DONE`）全缺，唯一诚实的读数是"还没走到"。
+所以判据改成三分支：**有 PAX 行**才判、**有 DONE 无 PAX** 才判那份 `DONE` 出自没有闸的 inode 因而无效、
+**三行都缺**只报"尚未量到"。（与 §15.43am 那条"打印 ≠ 判定"是同一条纪律的另一半：
+**缺行也不等于判过**，得先问这行是谁、在哪一步该写的。）
+
+`AI_E2E rc=1` 的那 14 条红本轮**没有一条需要我改判据**：逐条枚举后 9 个 spec 文件各 1–4 条，
+`ai-assistant:65` 的命中测试原文仍是 `detail-column … intercepts pointer events`，
+与 `BLOCKED.md` **B69** 逐字同形（那条已把"裸 `1fr`"这个猜测用 A/B 否证过并摘掉改动），
+缺陷所有者是详情面那条线、且它自己那批未提交界面代码就是让它转绿的那批。
+
+③ 仍未完成。此刻（09:4x）队列 72523 在阶段 5 等窗口，负载门那侧现量 26 > 12；
+新代码从**下一趟实例**起生效。④ 的三个台账文件仍 ` M`（别人在写），traps 取号按工作树现量 = 下一号 228。

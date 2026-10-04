@@ -4140,3 +4140,40 @@ git grep -n '20261009000000_add_holiday_adjustments' HEAD
 但 `/tmp/queue-reinstall-all.sh` 这一形**不匹配**（无 `scripts/` 前缀），只在它真派生出 reinstall-all 时才被抓到 ——
 纯"排队等窗口"的那段在探针眼里不存在。
 
+
+## B73. 🔴 ③ 的死锁不在别人身上，在我自己的载体里：规范闸门 #2 把**本轮 e2e 自己重写的取证图**当成"别人未提交的源码"，于是跑过链的载体永远等不到重装窗口
+
+**现场**（09:35，载体 `heyta-wt-ai-closeout`，队列 pid 72523 阶段 5）：
+`scripts/verify-mobile-window-gate.sh --target b` 回 `rc=3`，第 2 节打印
+`❌ 52 枚未提交的源码改动（这些会被打进产物，而判据看不出来）`。
+逐条现量的结果是这条记录的全部价值所在：**52 枚全部是 `apps/web/evidence/**/*.png`，非 evidence 的源码 0 枚**
+（`git -C 载体 status --porcelain -- packages apps server | grep -v 'apps/[a-z0-9-]*/evidence/'` = 空）。
+那些图是**已跟踪**的，而链里的 e2e 段与 `check:ai-e2e` 会把它们重写一遍。
+
+⇒ 形状是"自己制造、自己被判、永不自愈"的死锁：阶段 2 必然跑 e2e，跑完载体必然脏 52 枚，
+阶段 5 的窗口因此**永远不会开**（队列只会 env_retry 到 `MAX_ROUNDS=5` 用尽后按环境无效退 3，
+而那句"环境无效 ≠ 产品失败"在这里是**真的**——它挡的是我自己的产物，不是任何人的在飞工作）。
+
+**归属**：闸门 #2 那句话的意图是"会被打进产物的源码"。取证图不进产物 —— 本线队列里那把尺子
+（`heyta-deliver-on-window.sh:603` 的 `PKG_INPUT_RE` 配 `:605` 的 `PKG_EXC_RE='^apps/[a-z0-9-]+/(docs|evidence)/'`）
+就显式把 `apps/*/docs|evidence/` 排除在"打包输入"之外，所以两把尺子对同一个概念给了两个答案。
+**闸门那侧我没有动** —— 它是三条线共用的权威探针，
+改它的统计口径要在所有消费者上首跑（见记忆"门禁新维度要在最重消费者上首跑"），
+而且它此刻正被别的泳道轮询。
+
+**我只在自己这侧解**（队列 `carrier_evidence_settle()`，第 661–688 行，调用在第 693 行 = 阶段 5 那次 `win_gate` 之前）：
+与闸门**同一条口径**取集合（`status --porcelain -- packages apps server | grep -E '^ ?M'`），
+只有当脏项**全部**落在 `apps/*/docs|evidence/` 里时才动手：先把这些图归档进
+`$OUT/carrier-evidence/`（本轮证据不丢），再 `git checkout --` 回到提交态，然后**现量复核归位后为 0**；
+只要混进一枚非取证/文档的脏项就**一枚都不动**、逐条点名、把闸门原样让给它挡。
+
+夹具 `scratch-heyta/test-evidence-settle.sh` 6 腿 `pass=6 fail=0`（真 git 仓库、真脏项）：
+腿1 归位＋归档＋留痕 / **腿2 混进源码 ⇒ 退 1 且两枚都原样留着（这条是"不越权"的判据）** /
+腿3 干净树明写 0 枚 / 腿4 与闸门同口径（两条 grep 都拿到 `^ ?M` 那行）/ 腿5 结构腿：调用在闸门之前。
+变异臂 `NEVER-REFUSE`（把拒绝分支的条件写成假）⇒ **腿2 精确转红**
+（`rc=0 仍脏=0(期望 2) 归档目录存在=yes`），证明"该挡的时候挡"不是装饰。
+
+**关闭判据**（下一趟实例起来后自动成立，也可手验）：
+`grep -c '^EVIDENCE-SETTLE' <OUT>/rc.txt` = 1 且那行以 `after=0` 结尾，
+随后 `gate-b.txt` 的第 2 节应变成 `pass`（负载/设备/`reinstall-all.sh` 自身干净这三条仍可能各挡一次，那是真的现场）。
+闸门那侧的口径不一致**留在这里等它的 owner 拍**，本线不代改。
