@@ -3308,3 +3308,23 @@ W0b ─> 随时可做（台账那半要等文件干净）
     `apps/mobile/ios/Heyta/Info.plist` 里 `NS*UsageDescription` **只有一枚** = `NSUserNotificationsUsageDescription`（那是 W9 的），
     `AndroidManifest.xml` 的 `<uses-permission>` 只有 `INTERNET / POST_NOTIFICATIONS / SCHEDULE_EXACT_ALARM` ⇒
     **卡片导出没给任何一端添权限**，`permissions.ts` 那句"不申请照片"逐字仍为真。
+
+- ㊕ **链 V2 的三格读数到手，其中 `RC_r-test=1` 不是产品红 —— 它把"内存闸门会排队"这句我上一轮的假设否证了**（04 15:4x）
+  - ✅ `RC_journey-coverage=0`：打出「✅ web 旅程验收跑通」+「✅ 每一端要么有旅程验收、要么有**显式登记**的缺口（含理由与到期条件）」；
+  - ✅ `RC_shell-unicode=0`：「没有『变量名被非 ASCII 吞掉』的写法（扫了 81 个 .sh）」—— 这是 ㊒ 那笔 `344d2812` 的**复跑确认**，不是我看门禁输出下的结论；
+  - 🔴 `RC_r-test=1`，但明细里那一条红的真身是（`/tmp/device-V2-r-test.txt:42`）：
+    `packages/sync-core test: 内存闸门拒绝启动：已有测试在跑（pid=97013，锁 /tmp/tfa-test.lock；它是：…/scratch-owner-transfer/rbac-ai-queue/test-gated.te）`
+    ⇒ **挡住整条 `-r test` 的是别人一个跟本仓无关的 scratch 测试**，而同趟其余包是绿的
+    （`local-api 130 passed`、`i18n 22 passed`、`design-system 489 passed`，`shared-schema` 只有一条 vite 配置警告）。
+  - ⚠️ **我上一轮写链 V2 时的那句假设当场被否证**：注释里写着"`-r test` 的内存冲突由 `~/.tfa-shield/bin/pnpm` 自己排队（那是它的设计）"——
+    实测它**不排队，是拒绝启动并退 1**。⇒ 重试链起跑前必须**先等 `/tmp/tfa-test.lock` 空**，
+    否则取回来的永远是同一个环境红（这正是 §7 元规则一"探针够不着"与"事情没发生"在输出上长得一样的又一例）。
+  - ⏭ 链 P 已停（它只写了一行起点、**零读数**，停它是为了把 `-r test` 排进同一序列而不是并发）；
+    改由**链 Q**（`/tmp/device-closeout-Q.log`）按序取：等 V2 收口 → 等锁空 → `pnpm -r test` → `pod install` 有界重试（4 趟，逐趟落 `RC_POD_i`）
+    → `reinstall-all --only ios`（`IOS_DEVICE_NAME=heyta-batch2-closeout`，现量 6 台 booted，脚本对多台是"不猜"）
+    → `verify-mobile-card-export-ios.sh`（`IOS_UDID=919C5F50-…` 直接给，不让探针再猜名字）。
+  - 📊 **Goal ⑤-1 现在的完整形状**（这份就是"读数"，不是"差不多跑完了"）：
+    68 段里 **前 23 段全过**；第 24 段 `check:legal-permissions` 红（7 条，`git blame` 归 `b0ba4a35` = W9 那半，不代改）；
+    其后 44 段 = **38 绿**（㊒）+ 本轮再取回 2 绿（`journey-coverage` / `shell-unicode`）+
+    **5 段各有明确的未取原因且都排好了重试**：`-r test`（闸门拒跑 → 链 Q 等锁空重跑）、
+    `check:ai-e2e` / `privacy-consent-e2e` / `landing-e2e`（另一会话的整链 `check` 正在跑、会同抢 4318/4319 → 链 V2 带 3 小时等待上限）。
