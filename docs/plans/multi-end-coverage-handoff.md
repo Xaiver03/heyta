@@ -2384,3 +2384,29 @@ node 解析到不可 spawn 的私有垫片时**零输出**）⇒ "探针一次�
 **读数**：牙齿夹具 `TEETH=GREEN 24/24 臂、FAILS=0`（三刀变异：M1a/M1b 摘第 7 步两道"读不到"守卫、
 M2 摘第 9 步数字守卫、M3 摘第 11 步零输出守卫，各自把对应假绿重现出来）；
 第 12 步夹具 `S12=GREEN 8/8`；`check:shell-unicode` 0、`check:script-snapshot` 0（41 个脚本）。
+
+## 00:5x Goal ④ / ⑤ 的完成度审计（逐项落到 `file:line`，不写"我记得做过"）
+
+**④ 父子层级选择器 —— 五项全在 HEAD**（`git rev-parse main` 当时 `cd689365` 一线）：
+
+| 要求 | 落点（现取自文件） |
+|---|---|
+| `ProjectActions.setParent(entityId, parentId?)` | `packages/app-host/src/project-actions.ts:109` —— 签名逐字是 `setParent(entityId: string, parentId?: string): Promise<void>`，`parentId` **可选**＝提为顶级 |
+| 一层深度守卫 | `packages/domain/src/project-hierarchy.ts` 的 `'parent_not_top_level'`（新父自己在文件夹下）+ `'has_children'`（被移动的自己是文件夹）——第 62 行写明这两条**故意不合成一个 `depth_exceeded`** |
+| 环守卫 | 同文件 `:90` `if (cursor === projectId) return { ok: false, reason: 'cycle' }`（沿父链走子树） |
+| 自指守卫 | 同文件 `:82` `newParentId === projectId ⇒ 'self'` |
+| 两端选择器界面 | 共享层 `packages/ui/src/projects/FolderPicker.tsx`；消费者 `apps/web/src/features/projects/store.ts`、`apps/mobile/src/screens/ListsSection.tsx` |
+| 词条（中英同步） | `packages/i18n/src/locales/zh-CN.ts:2698` `…reject.parentNotFound`、`:2701` `…reject.parentNotTopLevel`（门禁 `check:ui-language` 管中英键集对等） |
+| 用例 | `packages/domain/tests/project-hierarchy.spec.ts`、`packages/app-host/tests/project-parent.spec.ts`（`:79` 允许的移动 / `:96` 省略 `parentId` 提顶级） |
+
+分工也钉住了：动作层只把拒绝翻成一句能定位的话，**一层规则与全部守卫在领域层**，
+且 `:115` 那条"直接复用 `validateProjectParentChange`，不重述规则"意味着 local-api / MCP 那条路
+与界面那条路不可能各算一套（同一文件里另一处 `setParent` 是任务侧，`packages/app-host/src/actions.ts:288`）。
+
+**⑤ 三条冻结判据类登记仍在 BLOCKED，本条线一枚没动**：
+`BLOCKED.md:2885` **B41** 移动端年度热力图（`activityDays`）、`:2918` **B42** 补打卡按钮（`onRepair`）、
+`:2958` **B45** 权益块拿不到"还有几天到期"。三条的共同点是**要翻判据或动服务端面**，
+不是机械阻塞 ⇒ 保持登记、不越权代拍（B42 本体写着"最小一步只有翻判据 + 传一个函数，但仍需真机确认"）。
+
+审计口径：以上每条都是这一轮**现读文件**得到的行号，不是引用先前会话的结论；
+`④` 的用例本轮**没有重跑**（负载 22 > 阈值，不起 vitest 抢窗口），引用的是它们在 HEAD 里的事实存在与上一轮的读数。
