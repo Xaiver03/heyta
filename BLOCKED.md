@@ -2930,7 +2930,10 @@ expect(labels.heatmap.grid({ total: 42, days: 365 })).toBe('');
 要让按钮出现必须给 `repairAction` 一个真句子，而那正是 `:302` 钉成 `undefined` 的东西 ⇒ **仍然要翻冻结判据**。
 
 动作层**不是缺的**：`createHabitActions(host).checkIn(habitId, date)` 能补打历史日期，
-`HabitsScreen.tsx:372` 已经这么用了。所以 B42 的"最小一步"只有翻判据 + 传一个函数，
+`HabitsScreen.tsx:401` 已经这么用了。
+⚠️ **10-04 13:38 复核更正行号**：原句写 `:372` 是当时没打开那一行就抄的 —— 现量 `:401` 才是
+`runFor(habitId, actions.checkIn(habitId, date))`，`git blame` 指到 `b756dc85`（10-01 15:42）说明它一直在 401；而 `:372` 是 `common.habits.rename.label`，与补打卡无关。
+所以 B42 的"最小一步"只有翻判据 + 传一个函数，
 比 B41 更便宜 —— 但它同样需要真机确认"点了以后连续天数真的回来"。
 
 ## B43. `onFreshStart`（重新开始）在动作层**根本没有对应动作**，不许顺手编一个（2026-10-03）
@@ -2957,15 +2960,16 @@ Android `MainReactPackage.kt`、iOS `React/CoreModules/RCTClipboard.mm`）。
 `EntitlementSection.tsx` 只渲两种状态：`entitled`（一句话 + 本地数据那句）与 `denied`
 （按 `PERIOD_ENDED` / 其它原因分"到期"与"暂不可用"两句话）。两条裁断记在这儿：
 
-1. **到期日拿不到**：`HostedEntitlementReading`（`packages/app-host/src/entitlement.ts:71`）
-   只在 `denied` 分支带 `currentPeriodEnd`，`entitled` 分支没有日期字段。
+1. **到期日拿不到**：`HostedEntitlementReading` 的类型真身在 `packages/domain/src/subscription.ts:146-158`
+   （`packages/app-host/src/entitlement.ts:71` 是**产出它的函数**，不是定义处 —— 10-04 13:38 现量确认）。
+   `entitled` 分支是 `{ readonly kind: 'entitled' }`，**没有日期字段**；`currentPeriodEnd?: number` 只挂在 `denied` 分支、且是可选（那里的注释写明「仅当服务端响应体真的带了周期结束时间时才存在」）。
    要显示"到 X 日"得改**服务端响应面** —— 本批明确不许碰 `server/` 与计费。
-   所以 `entitled` 只说"官方托管同步已开启"，**不编一个日期**。
+   所以 `entitled`（界面在 `apps/mobile/src/screens/EntitlementSection.tsx`）只说"官方托管同步已开启"，**不编一个日期**。
 2. **探测失败 ≠ 没权益**：`unconfigured`（没配凭据）与 `unavailable`（拿不到结果）
    都 `return null`。把"我不知道"渲染成"你被降级了"是界面在说谎，
    而这条一旦写错，用户会去看一份并不存在的账单。
 
-## B46. `pnpm -r typecheck` 现在会红在 `packages/legal` —— **不是本条线，且只在混合工作树成立**（2026-10-03 18:3x）
+## B46. ✅ 已闭合（10-04 13:42 现量）：`pnpm -r typecheck` 曾红在 `packages/legal` —— 不是本条线；**但"只在混合工作树成立"这句已被否证**（原记 2026-10-03 18:3x）
 
 ```
 packages/legal typecheck: tests/structure.spec.ts(407,16): error TS18048: 'name' is possibly 'undefined'.
@@ -2975,18 +2979,26 @@ packages/legal typecheck: tests/structure.spec.ts(407,16): error TS18048: 'name'
 归属证据（可复跑）：
 
 ```bash
-git status --porcelain -- packages/legal       # 4 个文件 M + 1 个 ??（都不是我的地界）
-git show HEAD:packages/legal/tests/structure.spec.ts | grep -c "推不出表名"   # 0
+git status --porcelain -- packages/legal       # 13:42 复量：4 M、0 ?? —— 原句那枚 ?? 已不在未跟踪集合（去向没查，本条不主张）
+git show HEAD:packages/legal/tests/structure.spec.ts | grep -c "推不出表名"   # 13:42 复量：1 —— 原句的 0 已过期
 grep -c "推不出表名" packages/legal/tests/structure.spec.ts                 # 1
 ```
 
-那段代码**只在工作树里**（HEAD 版 419 行，工作树 536 行，+117 行是别人在飞的 FK 表名推导），
+~~那段代码**只在工作树里**（HEAD 版 419 行，工作树 536 行，+117 行是别人在飞的 FK 表名推导），~~
 所以这笔红**不在 `main` 上**，也不在我改的任何文件里。`packages/legal` 不在本批白名单 ⇒ 不代改。
 **不受影响的复现**：本条线的五个工程单独 typecheck 是 exit 0 ——
 
 ```bash
 pnpm --filter @heyta/app-host --filter @heyta/i18n --filter @heyta/ui --filter @heyta/mobile --filter @heyta/web typecheck   # EXIT=0
 ```
+
+🔴 **10-04 13:42 复量：本条的前提整块翻了，而翻的方向是"债已清"**：
+`structure.spec.ts` 的 HEAD 版与工作树**都是 616 行且逐字节相同**（`diff <(git show HEAD:packages/legal/tests/structure.spec.ts) packages/legal/tests/structure.spec.ts` 无输出），
+FK 表名推导连同 `if (name === undefined || column === undefined) throw new Error(...)` 那枚守卫**已经进了 `main`** ——
+也就是说 TS18048 是属主自己带修落地的，不是「工作树里没人管的在飞代码」。
+`pnpm --filter @heyta/legal typecheck` **13:42 现量 EXIT=0**（读数 `/tmp/legal-tc-1342.log`，只跑这一格，没有重取全量 `-r` 的聚合读数）。
+`packages/legal` 此刻的脏文件是另外四份（`src/documents/permissions.ts` / `personal-info-list.ts` / `privacy.ts` / `third-parties.ts`），
+仍不在本条线地界 ⇒ **不代改的结论不变**，但本条登记的那笔红**不再挡 `pnpm -r typecheck`**。
 
 ## B47. `docs/research/trash-and-archive-best-practice.md:179` 那句「删习惯的入口本身未接」已被第三批否证 —— 但那份文件不在本条线地界内（2026-10-03）
 
