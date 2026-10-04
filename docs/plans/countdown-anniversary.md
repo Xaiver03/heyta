@@ -3254,3 +3254,40 @@ W0b ─> 随时可做（台账那半要等文件干净）
     而 diff 行**自带前缀字符** ⇒ 那个比较永远不可能成立。**"改了什么"要拿 HEAD 版与工作树版各自归一化再比，不能拿 diff 的输出当输入。**
   - ⏭ **链 V 已起**（`/tmp/device-closeout-V.log`）：把上面那 5 格并发拒跑的段复跑取数，
     起笔现量 `vm.loadavg` 1 分钟 = **31.18 ≥ 12** ⇒ 正在等窗口（不是卡住），上限 5 小时，等满以 `RC_LOAD=3` 收口 = 环境无效。
+
+- ㊓ **链 V 六格全跳过（0 读数）＋ pod 那条"locale 假设"被我量否证**（04 15:3x–15:37）
+  - **链 V 的结果是"一格读数都没取到"**：负载门开了，但每段起跑前数到 2 条"别人的 runner" ⇒ 六段全 `skip`
+    （`汇总：RC_journey-coverage=skip RC_shell-unicode=skip RC_ai-e2e=skip RC_privacy-consent-e2e=skip RC_landing-e2e=skip RC_r-test=skip`）。
+    那两条是 `heyta-wt-hierarchy`（**第三个 worktree**）的 vitest worker 与另一会话的语义变异 rig ——
+    🔴 **两者都不碰我的 `e2e/test-results/`，也不占 4318/4319**。
+    ⇒ **教训：「有没有别人在跑」要按冲突面定义，不是「存在任何别的进程」。过宽的自我拒跑不是保守，是把判据的产出清零**，
+    而且它打印的是"响亮跳过"，看上去尽职，实际零读数——比静默失败更难发现。
+  - 🔴 **重写那一版时探针自检又照出第二条**：macOS 的 `pgrep` **没有 `-a`**，传上去只打 pid ⇒
+    后面那句 `grep -F 'heyta-wt-batch2'` 是在 pid 串里找路径 ⇒ **永远 0 命中，那条守卫是恒绿的空判据**。
+    全部换成 `ps -Ao pid,command | grep`，并按 §7 元规则二给它做**阳性对照**：
+    起一枚 argv 里同时带 `vitest-runner` 与本工作树路径的哑进程 ⇒ 守卫命中 **1**；杀掉 ⇒ 命中 **0**。
+    （第一次哑进程写成 `sleep 25 vitest_dummy …`，`sleep` 把后面两个参数当 interval 报错 ⇒ 对照自己坏了，
+    命中 0 被我读成"守卫没活"——**对照也要能失败**。）
+  - 链 V2（`/tmp/device-closeout-V2.log`）按冲突域分三段跑：静态两段不设门、`-r test` 只看本工作树、
+    e2e 三段等"别的会话的 playwright/vite 收口 + 4318/4319 空"（现量到 pid 27069 那条整链 `check` 正在跑，它会走到 ai-e2e）。
+  - ✅ **Goal ② 的 iOS 阻塞项（#29 的 locale 假设）量完并否证**，四条实测：
+    · `Pathname.new("/a\u0000b").realdirpath` ⇒ **正是** `ArgumentError: path name contains null byte`
+      ⇒ 报错要求字符串里**真有** NUL；
+    · 但把探针指向 CocoaPods 报的那个调用形状（`project.rb:452` 就是 `base_path.realdirpath`），
+      对 `apps/mobile/node_modules/react-native` 全量 5594 条 glob 结果逐条跑 ⇒ **同一份输入连跑六趟，
+      命中数分别 3 / 2 / 5 / 4 / 3 / 2，且每趟命中的是不同文件**（第一趟 `AppleEventBeat.cpp` 等三枚，
+      第二趟换成 `DefaultReactHost.kt` / `RCTHost.mm`）；
+    · 对命中的那串**在同一进程里再调一次** `realdirpath` ⇒ **成功**，且那串 `bytes` 里 **NUL 数 = 0**、
+      `valid_encoding? = true`、`ascii_only? = true`；
+    · ⇒ **这不是任何一条路径的属性**：locale 未设确实让 Ruby 拒绝**解析**含中文的脚本
+      （我自己那条 `ruby -e` 就报了 `invalid multibyte character 0xE7`，与 `check:shell-unicode` 同族，
+      是这台机器一条真实的坑），**但它不是 null byte 的来源**。
+    ⚠️ **诚实边界**：我复现的是"glob 惰性迭代 + realdirpath"这一层的抖动，CocoaPods 那侧先把 glob 结果
+    `uniq`/`flat_map` 物化了，所以我**不主张**这就是它失败的那一步；我主张的只有三句：
+    ①locale 不是判别量；②失败是**非确定性**的 ⇒ 重试有意义；③Ruby 4.0.7（2026-09-15 发布）+ macOS 27.2 是这套组合第一次进这台机器。
+  - 顺带量清一条**为什么每次都要重跑 pod** 的事实：`Pods/Manifest.lock` 与 `Podfile.lock` 只差**一行**
+    （`hermes-engine: d25a17a7…` vs `208b0dcd…`，`cmp` 指到 char 74008 / line 2952），
+    而工作树里那份 `208b0dcd…` 是 **HEAD 的内容**，最后一次改它的是 `b055efc0`（10-03 09:37，不是本批）
+    ⇒ 沙盒是**在那笔之前**装的，`reinstall-all` 判定"不一致 ⇒ 跑 pod"是对的，不是探针误判。
+  - ⏭ 下一步（不等别人）：安静窗口里**重试** `pod install`（非确定性 ⇒ 重试是合法手段，不是碰运气，
+    且失败仍会由 `reinstall-all` 的沙盒判据拦住），成了就 `--only ios` 重装 + `verify-mobile-card-export-ios.sh` 取 W7-G3。
