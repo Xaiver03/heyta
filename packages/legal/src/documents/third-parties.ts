@@ -232,7 +232,7 @@ const zh = [
           ['数据统计 / 埋点 SDK', '否', '`analytics`、`telemetry`、`logEvent`、`track(` 逐项检索，命中 0'],
           ['广告 / 归因 SDK', '否', '`gtag`、`ga(`、`hotjar`、`clarity`、`openreplay` 命中 0'],
           ['崩溃与错误上报 SDK', '否', '`sentry`、`bugsnag`、`captureException`、`crash` 命中 0；锁文件层面也无'],
-          ['App 端推送 SDK（Firebase / 个推 / 厂商通道）', '否', '🔴 移动端不申请通知权限，提醒只在应用内；Web 推送用的是浏览器标准能力，不是 SDK'],
+          ['App 端推送 SDK（Firebase / 个推 / 厂商通道）', '否', '移动端经系统授权使用 Android/iOS 本地通知，标题在设备上生成，未集成第三方推送 SDK；Web 推送使用浏览器标准能力'],
           ['社交登录 SDK（微信 / QQ / Google / Apple 登录）', '否', '登录只有邮箱口令与通行密钥两条路，无第三方登录组件'],
           ['远程字体 / 第三方 CDN 脚本', '否', '前端源码内无外部 CDN、无样式表远程引用、无 Google Fonts，命中 0'],
           ['Apple / Google / 华为商店内购通道', '否', '支付只有微信支付一条路，未接入任何商店内购'],
@@ -523,7 +523,7 @@ const en = [
           ['Analytics / behavioural tracking SDK', 'No', 'Item-by-item search for `analytics`, `telemetry`, `logEvent`, `track(` returns zero hits'],
           ['Advertising / attribution SDK', 'No', '`gtag`, `ga(`, `hotjar`, `clarity`, `openreplay` return zero hits'],
           ['Crash and error reporting SDK', 'No', '`sentry`, `bugsnag`, `captureException`, `crash` return zero hits; the lockfile likewise'],
-          ['Push SDK on mobile (Firebase / Getui / vendor channels)', 'No', '🔴 The mobile app requests no notification permission and shows reminders in-app only; Web push uses the browser\'s standard capability, not an SDK'],
+          ['Push SDK on mobile (Firebase / Getui / vendor channels)', 'No', 'Mobile uses authorised Android/iOS local notifications with titles generated on-device and no third-party push SDK; Web push uses standard browser capabilities'],
           ['Social sign-in SDK (WeChat / QQ / Google / Apple)', 'No', 'Sign-in has exactly two paths — e-mail plus password, or passkey. No third-party login component'],
           ['Remote web fonts / third-party CDN scripts', 'No', 'No external CDN, no remote stylesheet import, no Google Fonts anywhere in the frontend sources'],
           ['App Store in-app purchase (Apple / Google / Huawei)', 'No', 'WeChat Pay is the only payment rail; no store IAP is wired up'],
@@ -624,9 +624,9 @@ const en = [
 
 export const thirdParties: LegalDocument = {
   id: 'third-parties',
-  version: '1.0',
+  version: '1.1',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': '第三方与共享清单',
     en: 'Third Parties and Data Sharing Inventory',

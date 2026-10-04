@@ -359,7 +359,7 @@ const zh = [
       {
         kind: 'docRef',
         docId: 'permissions',
-        text: '《应用权限清单》逐项列出：权限名、对应功能、什么时候申请、拒绝之后哪些功能照常可用（目前 Android 只有 `INTERNET`，iOS 没有任何需要说明的隐私权限申请）。',
+        text: '《应用权限清单》逐项列出：各端声明的系统能力、对应功能、什么时候申请、拒绝之后哪些功能照常可用；通知授权与精确闹钟能力也按端单独说明。',
       },
       {
         kind: 'callout',
@@ -588,6 +588,7 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
         rows: [
+          ['1.3', '`2026-10-04` 更正权限清单的交叉引用：移动端已使用系统通知与 Android 精确闹钟能力，不能再写成 Android 只有 `INTERNET`、iOS 没有需要说明的权限；具体申请时机与拒绝后的行为以《应用权限清单》为准。**状态：草案，尚未经法务复核、尚未生效。**'],
           ['1.2', '`2026-10-04` 补充密钥包、恢复码、系统安全存储与密文迁移记录的用途和留存边界；注销范围增加三类记录，按迁移真源更新级联数量。业务本地库仍为明文。**状态：草案，尚未经法务复核、尚未生效。**'],
           [
             '1.0',
@@ -885,7 +886,7 @@ const en = [
       {
         kind: 'docRef',
         docId: 'permissions',
-        text: 'The “App Permissions List” itemises: the permission name, the feature it serves, when it is requested, and which features keep working if you decline (as of today Android lists `INTERNET` only, and iOS requests no privacy permission that would need explaining).',
+        text: 'The “App Permissions List” itemises the system capabilities declared on each platform, the feature each serves, when it is requested, and which features keep working if you decline; notification authorisation and exact-alarm access are described separately for the platforms that use them.',
       },
       {
         kind: 'callout',
@@ -1114,6 +1115,7 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date and summary of changes'],
         rows: [
+          ['1.3', '`2026-10-04` Corrects the permissions cross-reference: mobile now uses system notifications and Android exact-alarm access, so the policy must not say that Android lists only `INTERNET` or that iOS has no permission requiring explanation; request timing and decline behaviour are set out in the App Permissions Inventory. **Status: draft, not yet reviewed by counsel or in effect.**'],
           ['1.2', '`2026-10-04` Adds purposes and retention boundaries for wrapped keys, recovery codes, OS secure storage and ciphertext migration records. Adds three categories to account deletion and updates cascade counts from migrations. Local application data remains plaintext. **Status: draft, not yet reviewed by counsel or in effect.**'],
           [
             '1.0',
@@ -1131,7 +1133,7 @@ const en = [
 
 export const privacy: LegalDocument = {
   id: 'privacy',
-  version: '1.2',
+  version: '1.3',
   status: 'draft',
   updatedDate: '2026-10-04',
   title: {
