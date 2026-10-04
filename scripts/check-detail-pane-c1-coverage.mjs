@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // C1（要拍的值）与 C1b（别人怎么做的）之间的对账判据 —— 把工单目标第 1 条
-// 「先对卡住工单的待拍值做外部调研，带日期+出处+未核实标记，把结论写回 C1 表」
+// 「先对卡住工单的待拍值做外部调研，带日期+出处+未核实标记，把结论**与推荐**写回 C1 表」
 // 从一句**散文承诺**变成一个能失败的属性。
 //
 // 为什么必须有：C1 那张表用的是"每一行都要有一个 C1b 对照节"这种**封闭句式**，
@@ -105,9 +105,30 @@ const unexcused = uncov.filter((r) => !EXCATEGORIES.some(([, re]) => re.test(r.b
 const orphanSections = sections.filter((s) => s.refs.some((n) => !rows.some((r) => r.n === n)));
 const weak = sections.filter((s) => !DATE.test(s.body) || (!URLRE.test(s.body) && !FILELINE.test(s.body)));
 
-console.log(`取样：${doc.slice(root.length + 1)}（C1 表 ${lines.slice(start, end).length} 行区间）`);
+// 腿 4：每个对照节必须给出**推荐**那一档。
+// 为什么单独一条：目标第 1 条的原话是"把结论**与推荐**写回"，而上面那三档只判"有没有日期与出处" ——
+// 2026-10-04 现量：把 C1b-Q6 的整段推荐摘掉，本判据仍然报绿（那是"取证做完了但没给答案"的形状，
+// 恰恰是这一条要拦的）。
+// 🔴 形状取本文档自己的写法约定：**行首加粗标签 + 冒号**，且标签里含「推荐/建议」
+// （现量 8/9 节全是这个形状，第 9 节走下面的例外档）。
+// ⚠️ 只认行首加粗标签，**不**写成"整节含「推荐」二字即算"：C1b-Q8 那张表里就有 Apple 原文
+//   "we recommend using a tertiary button" 的中文转述 —— 按整节含词判会把**别人的话**当成我们的推荐，
+//   摘掉推荐段照样绿，等于这条腿没有牙。
+// ⚠️ 词形收 推荐|建议 两个：只认「推荐」的话，下一轮谁写成「建议」就把这一节整节读成"没给答案"，
+//   判据静默失去对象（同一批在 §8 表腿 7 上实测过：触发词表只认一种字面形状就是这条路）。
+const REC_LABEL = /^\*\*([^*\n]{1,40})\*\*[：:]/;
+const REC_WORD = /推荐|建议/;
+const hasRec = (s) => s.body.split('\n').some((l) => REC_LABEL.test(l) && REC_WORD.test(l.match(REC_LABEL)[1]));
+// 例外档**只从节标题里认**，不扫正文 —— 现量理由：C1b-Q1 正文里有一句
+// "⇒ 这条可以直接写进 W4 的判据，不需要拍板"，那是**别的事**的措辞。若扫正文，
+// 那一节哪天真的没了推荐就会被这句现成的话豁免掉（绕过判据最省力的写法就是复用别人的句子）。
+const SECTION_EXC = /已核[^。]{0,20}不需要拍|不需要拍/;
+const noRec = sections.filter((s) => !hasRec(s) && !SECTION_EXC.test(s.title));
+const excusedSections = sections.filter((s) => !hasRec(s) && SECTION_EXC.test(s.title));
+
+console.log(`取样：${doc.startsWith(root + '/') ? doc.slice(root.length + 1) : doc}（C1 表 ${lines.slice(start, end).length} 行区间）`);
 console.log(
-  `C1 行 ${rows.length} 行 ⇒ 有对照节 ${rows.length - uncov.length} / 例外 ${excused.length} / 未覆盖 ${unexcused.length}；C1b 节 ${sections.length} 个`,
+  `C1 行 ${rows.length} 行 ⇒ 有对照节 ${rows.length - uncov.length} / 例外 ${excused.length} / 未覆盖 ${unexcused.length}；C1b 节 ${sections.length} 个（有推荐 ${sections.filter(hasRec).length} / 标题写明不需要拍 ${excusedSections.length} / 缺推荐 ${noRec.length}）`,
 );
 
 const dump = (title, list, line) => {
@@ -130,6 +151,11 @@ dump('🔴 C1b 节缺日期或缺出处（URL 或 file:line 择一即可）', we
   const hasFile = FILELINE.test(s.body);
   return `  :${s.line} ${s.title.slice(0, 46)} —— 日期=${hasDate} URL=${hasUrl} file:line=${hasFile}`;
 });
+dump('🔴 C1b 节没有「推荐/建议」那一档，标题也没写明不需要拍（取证齐了但没给答案）', noRec, (s) => {
+  const labels = s.body.split('\n').filter((l) => REC_LABEL.test(l)).map((l) => l.match(REC_LABEL)[1]);
+  return `  :${s.line} ${s.title.split('（')[0]} —— 行首加粗标签=[${labels.join(' / ') || '（无）'}]`;
+});
+dump('· 例外（只从节标题里认）', excusedSections, (s) => `  :${s.line} ${s.title.slice(0, 46)}`);
 
 // 逐节读数（含覆盖到的行号），让覆盖面可数而不是一个总数
 console.log('\n逐节读数：');
@@ -138,10 +164,18 @@ for (const s of sections) {
   const fls = (s.body.match(new RegExp(FILELINE.source, 'g')) || []).length;
   const dates = new Set((s.body.match(new RegExp(DATE.source, 'g')) || [])).size;
   console.log(
-    `  :${String(s.line).padStart(4)} ${s.title.split('（')[0].padEnd(9)} 覆盖=[${s.refs.join(',')}] 日期=${dates} URL=${urls} file:line=${fls} 未核实标记=${(s.body.match(/未核实/g) || []).length}`,
+    `  :${String(s.line).padStart(4)} ${s.title.split('（')[0].padEnd(9)} 覆盖=[${s.refs.join(',')}] 日期=${dates} URL=${urls} file:line=${fls} 未核实标记=${(s.body.match(/未核实/g) || []).length} 推荐=${
+      hasRec(s) ? '有' : SECTION_EXC.test(s.title) ? '例外(标题)' : '🔴无'
+    }`,
   );
 }
 
-const bad = unexcused.length + orphanSections.length + weak.length;
-console.log(`\n结论：${bad === 0 ? 'C1 每一行要么有对照节、要么写明例外类别；每个对照节都有日期与出处 ✅' : `🔴 ${bad} 处不成立`}`);
+const bad = unexcused.length + orphanSections.length + weak.length + noRec.length;
+console.log(
+  `\n结论：${
+    bad === 0
+      ? 'C1 每一行要么有对照节、要么写明例外类别；每个对照节都有日期、出处与推荐那一档（或标题写明不需要拍）✅'
+      : `🔴 ${bad} 处不成立`
+  }`,
+);
 process.exit(bad === 0 ? 0 : 1);
