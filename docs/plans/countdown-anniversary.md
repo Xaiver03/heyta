@@ -1292,6 +1292,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
     |---|---|---|---|
     | A1 | 画布宽 = `(契约 − 8)` | `RC_A1=1` / **2 failed, 3 passed** | `:268`「导出的图是 **1072×1440**，契约要的是 1080×1440」+ `:312`「暗色那一张的尺寸不是一档规格数」 |
     | A3 | 宿主不再把失败文案传下去（`exportFailed={undefined}`） | `RC_A3=1` / **1 failed, 4 passed** | `:360`「拿不到画布时界面必须说话（失败静默吞掉是便签那条高危）」 |
+    
     🔴 **A1 红两条不算越界，但这句话要说清**：`:268` 与 `:312` 是**同一把尺子**（契约尺寸）的两处使用
     —— 亮色那张与暗色那张各自比一次。"一臂只红一条"的正确写法是**只红它所代表的那条不变量**，
     而不是"只红一行"；反过来 A3 只红一行，因为它动的就是那一条承诺。
@@ -1709,6 +1710,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
       | B1 | `href={paper}` → `href={undefined}` | `RC_B1=1` / **1 failed, 5 passed** | `:887` 「`href` 逐字等于那条 URL」 |
       | B2 | `rel="noreferrer noopener"` → `rel=""` | `RC_B2=1` / **1 failed, 5 passed** | `:889` 「新窗口不许把后台这一页的 `window` 交出去」 |
       | B3 | `flex: 1 1 0` → `flex: 0 1 auto`（修复前的默认值） | `RC_B3=1` / **1 failed, 5 passed** | `:909` 「这一格根本没参与布局（`clientWidth=48`），"没被裁切"是空测」 |
+      
       🔴 **B3 这条红的形状值得留**：它红在**正向对照**那一句而不是"被裁掉 N px"那一句（`:911` 没走到）——
       也就是拿掉修复后这一格退回 48px，正是 03:3x 那次"第一版修复什么都没改"被照出来的同一读数。
       三臂的 `revert` 都回显 sha 且**与链条开头的基线逐字节相同**（面板 `76d2959fdde6`、CSS `fc7f6a0e27f6`）——
@@ -1891,7 +1893,6 @@ W0b ─> 随时可做（台账那半要等文件干净）
 | W9 提醒（web 半 + DST） | ✅ web 半 | 可与 W2 并行 | 3 | 42/28/40 passed；变异 9 臂 9/9 红、0 未证；移动端那半**没动** |
 | W10 AI 工具目录 | ✅ | **W2 之后** | 3 + 差集归零 | 130/223/1019 passed；变异**第一趟 3 臂无牙**→补判据→第二趟 6/6 红 |
 | W4b 调休通道 + ADR | ✅ **到最终态（04 04:4x）**：判据①②真界面读数 + 三臂变异各红自己那条 + 载体敞口~~已清零~~**没清零**（04 06:1x 现量：安静窗口复跑照出 `profile-avatar-e2ee` / `vault-settings` 两条夹具仍没登记那条开机拉取 ⇒ 已按同一条纪律补齐，修后 `RC_FIXTURE_E2E=0`；"敞口清零"这句当时只数了报过红的两条，没数**带封闭登记的夹具全集**——现量是 4 条会记 `unexpected` 的 spec（`admin-console` / `inbox` / `profile-avatar-e2ee` / `vault-settings`，第 5 条 `motivation` 里那个变量量的是"非 2xx"、不是封闭登记，实测不受这条拉取影响），当时补了 2 条、漏 2 条，现在 4/4） | 独立（1 条迁移） | 4 | 全链已进 main（`6735cc39`/`b05fbc50`/`67fef701` + 服务端那 4 笔 + `check:public-facts` 八臂 8 红）。**04 03:2x**：判据②的后台面板落了（`AdminPanel.tsx` 的 `HolidayPanel`），`e2e/tests/admin-console.spec.ts` 整套 **6 passed / `ADMIN_RERUN_RC=0`**，图在 `apps/web/evidence/admin-holiday/`。🔴 这一趟最值钱的是**看图照出整格被挤成「2026…」**（04 04:2x 更正：这一句原先写"年份被挤成"，把缺陷说小了 —— 省略号截掉的是「2 天安排 · 国务院办公厅通知」整段，只有打开那张图看得出来）⇒ 修 CSS + 判据改几何（`scrollWidth-clientWidth<=1`）**并自带正向对照**（先断 `clientWidth>100`，否则"没参与布局"的 `0-0=0` 让判据永远通过——这个坑由它自己的第一趟假绿照出来：Playwright 03:21:33 就加载了 spec，判据 03:22:11 才写进去，那趟"6 passed"里根本没有它）。另补 `e2e/tests/helpers.ts:stubPublicFacts`：本批的开机拉取会把任何带"不该有非 2xx"守卫的套件无关地拖红（实测一次红五条）。**04 04:1x 第二版修复的读数**：同一套件 `6 passed / RC_W4B_OK=0`；**04 04:1x–04:4x 收口**：三臂 `RC_B1/B2/B3` 全 =1 且各红自己那条（`:887` / `:889` / `:909` 正向对照），还原后 `RC_RESTORE_ADMIN=0`（6 passed）、四个被改文件的 `shasum` 逐字等于链条开头的基线，`inbox.spec.ts` 先 `RC_INBOX_PRE=1`（2 failed）后 `RC_INBOX_POST=0`（3 passed），修复两笔入库 `87109e9e`（CSS/面板）+ `3b24f5b4`（e2e 载体），装置落版本库 `research/tools/mutate-w4b-papers-arms.mjs`（含一臂 **B4 未跑**，登记在装置文件头）。逐项读数与"第一版修复其实无效"那段在本节 W4b 的表里。 改前/改后两张图 md5 **不同**（`8970c732…` / `f14afbc0…`，早先它们逐字节相同过，那等于什么都没证）， 看图后的两条例外都写进 [`../apps/web/evidence/admin-holiday/README.md`](../../apps/web/evidence/admin-holiday/README.md) |
-看图后的两条例外都写进 [`../apps/web/evidence/admin-holiday/README.md`](../../apps/web/evidence/admin-holiday/README.md) |
 | 收尾四项（§5） | 🟡 **三条已量（第 1 条三趟，末趟一趟跑完 68 段 = 66 绿 / 2 红），第 4 条待跑** | 全部 | 4 | ✅ 第 2 条：`node research/tools/docs-link-check.mjs` 在本检出 ⇒ **rc=0 / 死链 0 处**（⚠️ 那句"33 处"是**主检出**的读数，死链数是"仓库+本机未跟踪文件"的属性，引用必须带在哪跑的）。✅ 第 3 条：W6 五张、W7 六张、W4b 一张**都打开看过**，各自 README 写了"看见了什么"，并且**看图一共照出三处断言抓不到的东西**（W5 少一行日期 / W7 竖条不是主蓝 / W4b 年份被挤没）。✅ 第 1 条完整 `pnpm check`：**第三趟一趟跑完 68 段 = 66 绿 / 2 红**（04 06:17:07–06:27:21 @ 载体 `c4332f86`，其中 `check:ai-e2e` 352s **`rc=0`**；两条红逐条对账见下面第 ⑩ 条、整趟读数见第 ⑪ 条）；此前**分两趟逐段量过 66/68 段**（装置 `research/tools/check-segments.mjs`，段的来源是 `package.json:58` 那条真串而不是抄的名单，`--skip` 的选择器会报分母）。第一趟 04:45–04:49 @ `7d1b85b3`：**67 段 / 60 绿 / 7 红**；四笔提交把其中 4 条按各自真因修掉（`816dea4c` theme / server-legal / shell-unicode，`2924b15d` 取回 main 已落的 6 份测试修复）；第二趟 05:0x–05:12 @ `e25377f7`：**66 段 / 63 绿 / 3 红**；那三条红随后逐条对账，**其中一条当场被现量否证并修掉**（`check:licenses:stamp` —— main 早就重渲染过那份清单，取回即可，见下面第 ⑦ 条），剩下 **2 条是本批之外的已提交状态** —— `check:ui-provider`（探针穿不过 `return featureScreen(...)` 那层，四条点名文件在 `origin/main` 与 HEAD **逐字节相同**）、`check:legal-permissions`（红在 `third-parties.ts` 推送 SDK 的英文否表行 vs `POST_NOTIFICATIONS`/`NSUserNotificationsUsageDescription`，属 **W9 原生投递那条线**，不是 L'）。`pnpm -r test` **全量已在 04 05:2x 量到**（19/19 个有 `test` 脚本的包，**10760 passed / 1 failed / 14 skipped**，逐条见下面第 ⑧ 条）；第 1 条当时只剩 `check:ai-e2e` 的**一趟安静复跑** —— ✅ 04 06:17 那趟跑到且 `rc=0`（第 ⑪ 条）（04 05:24 那趟已经跑过：**142 passed / 3 failed / 2 skipped**，但它与另一条会话的 e2e 并发 ⇒ 那三条红还不能当判据读数，逐条见下面第 ⑨ 条），排在 `/tmp/batch2-closeout2.sh` 的 [A2] 步。⚠️ 这里换了编排，也换了一个**当天现量出来的理由**：另一条会话的 `reinstall:all`（载体 `d0a81927`，不是本批）此刻卡在 macOS 公证的 `notarytool submit … --wait` 上**已经两个多小时**（`/tmp/heyta-reinstall-mac.log` 自 03:13 起没再写），而 `pnpm -r test` 与 `check:ai-e2e` **一台设备都不碰** —— 把它们押在"等对方整串跑完"上是白等，所以链条改成"先量不碰设备的两段，再排设备窗口"；等对方链退出这件事只对**设备那几段**保留（§8.9）。⏹ 第 4 条 `pnpm reinstall:all` 四端 + 私有现场设备验收（排在最后；⚠️ 现场核对 **05:0x 现量**：Android 模拟器 `emulator-5554` 在线、iOS 起了 **两台**（`heyta-iphone-17pro` + 别人的 `heyta-ios-isolated`）、`windows-pc` SSH 可达，而**这三样此刻全在另一条会话的重装链手里** ⇒ 本批这一趟已改成**串行排队**（等对方链退出 + 负载门 ncpu*3/4 + 工作树必须干净 + 4318/4319 与测试锁空才跑 `check:ai-e2e`，等满记 exit 3 = 环境无效而非产品失败） |
 
 🔴 **04 04:45–04:49 收尾第 1 条的第一趟已量**（载体 `7d1b85b3`，命令 `HEYTA_REPO_ROOT=$PWD node research/tools/check-segments.mjs --skip check:ai-e2e`，起点 load 11.97）：**67 段 = 60 绿 / 7 红**，前面还先跑了 `RC_WEB_BUILD=0`（那条红的 W5 产物格因此转绿）。七条红逐条给归属，不打包成"仓库还红着"：
@@ -2265,7 +2266,10 @@ W0b ─> 随时可做（台账那半要等文件干净）
   ✅ 两处都已就地修（① 合并回一行、1665 字符、未转义竖线 **6** = 分隔行；② 那两个改成 `\|`）。
   复扫结果：本单两份文档坏行 **0**。
   ⚠️ **但这两处本来就该由门禁响** —— `check:md-tables` 现在 rc=0 而两处缺陷都在它声称覆盖的范围内
-  （它自己打印"列数、断行与'是不是表'都一致"）。它漏的正是这两型：**行尾少 `|`**、**代码片段内的 `|`**。
+  （它自己打印"列数、断行与'是不是表'都一致"）。~~它漏的正是这两型：**行尾少 `|`**、**代码片段内的 `|`**。~~
+  🔴 **04 08:1x 现量否证了这句**（详见第 ㉕ 条）：三种形状喂进**同一把**现脚本 ⇒ 行尾少 `|` 报
+  `列数 1（表头 2）`、代码段裸 `|` 报 `列数 3（表头 2）`，**两型都抓得到**。真正放走它的是
+  **两型互相抵消**的那一行（少一格 + 多一格 ⇒ 计数恰好等于表头）。我登记的是"当时看到的相关性"，不是机制。
   🔴 加强它之前要先量基线：**全 `docs/**/*.md` 用同一把尺扫出 51 处列数不符**（`docs/README.md:212`、
   `docs/plans/goal-multi-end-coverage.md:106/109` 等，都不是本批的文件）⇒ 新判据必须**带基线**
   （只拦"净增"，像 `check:l4` 那条"内联只减不增"一样），否则一落地就红在别人的旧账上，
@@ -2335,3 +2339,26 @@ W0b ─> 随时可做（台账那半要等文件干净）
   ⚠️ 修完之后**仍未验**（要 `xcodebuild` 再跑一趟，而它顺带把 `Podfile.lock` 的 `hermes-engine` 哈希改了
   一行、把 `project.pbxproj` 重排了 5 行 —— 两处都是工具噪声，已 `git checkout --` 还原，
   但每次跑 ios 段都会再脏一次，这是这台机器的既有条件，不是本轮引入的）。
+  ✅ **后半句已验掉**（04 07:4x，链 J）：`--only ios` 真跑到 `xcodebuild` 并装进我那台新模拟器 ⇒
+  `RC_IOS=0`，`构建日志里 error: 命中` 从 **22 条降到 2 条**，剩下 2 条逐行读是**噪声不是缺陷**：
+  它们是某条**警告引用的 C++ 代码片段本身**（`/tmp/heyta-reinstall-ios-build.log:33575` 与 `:33833` 都是
+  `324 |         " execution error: " + std::string(errorMessage));` —— needle 命中的是那串**字符串字面量**，
+  不是一条编译错误）。我原先按 `grep -c 'error:'` 报数，那是**探针的形状错** —— 判构建好坏只认
+  `RC` + `✅ 构建成功` + 装上了 + 截图非空白且主蓝命中（§7 第 82 条那把尺）。
+
+- ㉕ **W7-G3 的 iOS 探针落地；顺带把"取值层"抽成两端单一所有者**（04 07:5x–08:0x，无设备参与）
+  新文件 `scripts/verify-mobile-card-export-ios.sh` + `scripts/lib/card-export-probe.sh`，
+  入口 `pnpm verify:mobile-card-export:ios`。**跑之前**读数器就抓出我自己三处假设：
+  第一版写的 `web.consent.title` / `mobile.consent.localOnly` / `mobile.welcome.offlineFirst`
+  **三个全部非零退出**（`node scripts/verify-mobile-card-export-read.mjs zh <key>` 逐个量），
+  真源是 `common.privacy.consent.title` / `common.privacy.consent.localOnly` / `mobile.welcome.offline`。
+  🔴 第二条更值得记：导航判据原本用 `web.shell.views.countdown`，而它的 zh 值与「我的」页那个入口
+  **是同一个串**（两个都读成「倒数纪念日」）⇒ "点了入口却没开屏"时树上仍有那个串，**这条永远为真**
+  （§7 元规则二）。换成只有倒数日屏才产出的输入框占位符 / 空态句，判据才有牙。
+  同一条纪律顺手用到树上：树就绪那条 `exit 3` 的门原先写着字面量「我的」，那是 i18n 抄件。
+  ✅ 抽取按 §3.5 的收尾动作做了两半：Android 那条**删掉**本地那四份助手（`READER`/`zh`/`contract`/
+  `read_png`/`field`）改为 source 共享层，判据①的正/反两腿自检也收进同一函数。
+  ⚠️ **"零行为变化"的复跑读数还没取**：那一趟要占 `emulator-5554`，而 08:0x 现量另一条线
+  （self-host 那条的 `queue-reinstall-all.sh`，pid 93817）正卡在 macOS 打包段 **4h51m**、
+  android/ios 段还没轮到 ⇒ 现在上去就是互相制造假红。负载 14.36 也高于本机门槛 12（ncpu×3/4）。
+  设备读数排在窗口之后，取到之前 W7-G3 不打勾。
