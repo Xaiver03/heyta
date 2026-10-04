@@ -165,6 +165,13 @@ ADR-0038 §2 第三条把首版写面钉成"仅三个、都不涉及钱"。W4b �
   （插件级 `requireAdmin` 覆盖，见 ADR-0038 §2）；`packages/domain` 的 `adjustmentOn` 覆盖表入口（commit `7049bfed`，
   该笔的信息自己就写着"后台做完、全绿，客户端读的仍是随包表，判据①根本没有载体"）；
   迁移 `server/prisma/migrations/20261009000000_add_holiday_adjustments` + PGlite 判据。
+  ⚠️ **这一格的名字是"那一趟的名字"**：合流时它与 vault 密钥包那笔撞号，盘上与 `HEAD` 里那笔
+  重编成了 **`20261013000000_add_holiday_adjustments`**（`git ls-tree HEAD server/prisma/migrations/` 现量；
+  改名原因写在那笔 `migration.sql` 的第 2 行注释里）。
+  📌 同族教训：**这份 ADR、交接文档、以及那份 PGlite spec 曾各自抄了同一个目录名**，
+  而真正会因为它炸的是 spec —— 它现在**从盘上推导目录名、不写死**
+  （`server/tests/holiday-adjustment-migration.pglite.spec.ts:37` 的注释记了这次 ENOENT）。
+  ⇒ **值的抄件要分两类**：只有"会被执行的那一份"改成推导/门禁才算修好，正文里的引用不改也只是留了个会漂的句子。
 - 🔴 ~~**尚未落地**（20:30 现量，命令：`grep -rln "holidayAdjustment\|dayMarker" packages/app-host/src packages/ui/src apps/web/src packages/storage/src`）：
   命中集合里**没有** app-host / ui / web / storage 的落点 ⇒ **客户端拉取那半 + `dayMarker` 那个可选 prop 都还没写**。
   所以 W4b 的"判据①（拿不到数据 ⇒ 不报错、不留空块）"目前**仍没有载体**，这条工单**不能打勾**。~~
