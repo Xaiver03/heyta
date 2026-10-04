@@ -131,6 +131,14 @@ export function deriveArtifacts(tasks) {
 const ARTIFACTS = deriveArtifacts(gradleArgs);
 
 /** 仓库相对产物路径 → 远端那棵树里的路径（正斜杠，scp 与 PowerShell 都吃这一形状）。 */
+/**
+ * "这个 mtime 可能是真的吗"的下界。
+ *
+ * 不是业务判据，是**探针自检**：早于它的值只可能来自"那一行没输出被读成 0"，
+ * 因为仓库与工具链都不存在那个年代。
+ */
+const MTIME_FLOOR = Date.parse('2020-01-01T00:00:00Z') / 1000;
+
 function remotePathOf(rel) {
   return `${REMOTE_ANDROID_SCP}/${rel.replace('apps/mobile/android/', '')}`;
 }
@@ -508,7 +516,13 @@ function runRemote() {
         const p = remotePathOf(rel);
         return (
           `Write-Output ('A${i}::SIZE=' + (Get-Item '${p}').Length); ` +
-          `Write-Output ('A${i}::MTIME=' + (Get-Item '${p}').LastWriteTimeUtc.ToUnixTimeSeconds()); ` +
+          // 🔴 这里**不能**用 .ToUnixTimeSeconds()：打包机上的 Windows PowerShell 5.1 里
+          //    [DateTime] 没有这个方法（实测 MTIME_ERR=「方法调用失败，因为
+          //    [System.DateTime] 不包含名为 ToUnixTimeSeconds 的方法」）。它一抛错，
+          //    这一行什么都不输出，而下面 Number('') 恰好是 **0** —— 于是
+          //    一次**成功的构建**被判成"产物是 1970 年的"（10-05 01:4x 实测）。
+          //    跨版本稳的写法：远端只给 ISO-8601（UTC），换算留在本地。
+          `Write-Output ('A${i}::MTIME=' + (Get-Item '${p}').LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')); ` +
           `Write-Output ('A${i}::SHA256=' + (Get-FileHash '${p}' -Algorithm SHA256).Hash)`
         );
       }).join('; ')}"`,
@@ -523,15 +537,31 @@ function runRemote() {
       return m ? m[1].trim() : '';
     };
     const size = Number(grab('SIZE'));
-    const mtime = Number(grab('MTIME'));
+    // 🔴 空串与坏串**不许**被读成 0：`Number('')` 是 0，而 0 是有限数，
+    //    旧的写法因此把"探针没读到"伪装成"产物来自 1970 年"。
+    //    现在按 ISO 解析，解析不出来就是 NaN（下面按"读不到"红，而不是按"旧产物"红）。
+    const mtimeRaw = grab('MTIME');
+    const mtimeParsed = Date.parse(mtimeRaw);
+    const mtime = Number.isNaN(mtimeParsed) ? Number.NaN : mtimeParsed / 1000;
     const sha = grab('SHA256').toLowerCase();
     console.log(`  步骤 5：远端产物身份（第 ${i + 1}/${ARTIFACTS.length} 枚）`);
-    if (!/^[0-9a-f]{64}$/.test(sha) || !Number.isFinite(size) || size <= 0 || !Number.isFinite(mtime)) {
+    if (
+      !/^[0-9a-f]{64}$/.test(sha) ||
+      !Number.isFinite(size) ||
+      size <= 0 ||
+      // 🔴 还要过一道"这个时刻**可能是真的吗**"：mtime 落在 2020 年之前只有一种常见解释 ——
+      //    远端那一行没输出、被某个转换读成了 0。那种情况必须报"探针坏了"，
+      //    不能让它走到下面那条"产物比构建起点旧"的判据上去（它会给出一个**错误的归因**，
+      //    把一次成功的构建说成拿旧产物报绿）。
+      !Number.isFinite(mtime) ||
+      mtime < MTIME_FLOOR
+    ) {
       die(
         '步骤 5（远端产物身份）',
-        `读不到远端产物的 SIZE/MTIME/SHA256：${rel}`,
+        `读不到远端产物的 SIZE/MTIME/SHA256：${rel}（MTIME 原样读到 〈${mtimeRaw || '空'}〉）`,
         `   要么 gradle 没产出它（任务名与产物路径对不上，或该任务在 AGP 里的输出形状不在推导规则内），` +
-          '\n   要么远端路径和这里的假设不同。⚠️ 不接受"读不到就当没问题"。',
+          '\n   要么**这一侧的探针坏了**（远端命令抛错时什么都不输出，而空串会被 Number() 读成 0）。' +
+          '\n   ⚠️ 不接受"读不到就当没问题"，也不接受"读不到"被写成"产物是旧的"。',
       );
     }
     if (buildBeginEpoch !== null && mtime < buildBeginEpoch) {
