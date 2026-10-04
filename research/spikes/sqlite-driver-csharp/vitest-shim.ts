@@ -10,7 +10,7 @@
  * 覆盖面是按**实测**选的，不是猜的：两个契约文件里用到的 API 只有
  *   `describe` / `it` / `expect`，
  * 匹配器只有 `toBe` / `toEqual` / `toHaveLength` / `toBeDefined` /
- * `toBeUndefined` / `toBeGreaterThanOrEqual` / `.not` / `resolves.toMatchObject(...)`,
+ * `toBeUndefined` / `toBeGreaterThan` / `toBeGreaterThanOrEqual` / `toBeLessThan` / `.not` / `resolves.toMatchObject(...)`,
  * `expect.any(...)`，外加 `rejects.toThrow(...)`。
  * **没有任何生命周期钩子**（无 beforeEach/afterEach），所以替身不需要它们。
  *
@@ -223,6 +223,16 @@ export function expect(actual: unknown): Record<string, unknown> {
     toBeGreaterThanOrEqual(expected: number) {
       if (typeof actual !== 'number' || !(actual >= expected)) {
         fail(`toBeGreaterThanOrEqual 失败：期望 >= ${expected}，实得 ${show(actual)}`);
+      }
+    },
+    toBeGreaterThan(expected: number) {
+      if (typeof actual !== 'number' || !(actual > expected)) {
+        fail(`toBeGreaterThan 失败：期望 > ${expected}，实得 ${show(actual)}`);
+      }
+    },
+    toBeLessThan(expected: number) {
+      if (typeof actual !== 'number' || !(actual < expected)) {
+        fail(`toBeLessThan 失败：期望 < ${expected}，实得 ${show(actual)}`);
       }
     },
     toMatchObject(expected: unknown) {

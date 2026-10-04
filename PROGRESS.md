@@ -1551,9 +1551,10 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 
 - 2026-10-04 续验：迁移服务端已 PUBLISHED 但浏览器未收到响应的真实 reload 用例补到 5/5 全绿。生产入口现在保留 ciphertext-only journal，只有新 package/root 与 payload generation 在本地同一事务 `saveBound` 成功后才 ack 清理；随后再次 root rotation 通过，证明 journal 不会阻塞后续迁移。证据见 ADR-0050 与 `apps/web/evidence/vault-panel/pg-commit-restart-*`。Web build 另修正 ServiceWorkerRegistration 的异步注销调用。Goal 仍 active：Android Vault 真实 UI、iOS OS 投递/Keychain、最终全仓门禁与四端当前源码重装未完成。
 
-- Android B 续验边界（2026-10-04）：当前 Release 安装产物已完成真实认证、保存并启用同步、Vault 创建、恢复码二次确认、显式“记住解锁”和解锁状态显示；证据为 [`android-vault-created.png`](apps/mobile/evidence/android-vault-created.png)，已人工查看且不含恢复码、root 或口令。Android Keystore 的跨进程、设备重启、scope 隔离和删除持久性仍以 [`android-vault-storage.txt`](apps/mobile/evidence/android-vault-storage.txt) 的五阶段结果为准。冷启动后重新认证自动恢复 root、真实 UI logout 后再认证的 fence 闭环、轮换和跨端任务互读尚未形成可靠证据，不能用首次会话的 opt-in 结果替代；规则继续维护在 ADR-0050，不另建记忆文档。
+- Android B 续验边界（2026-10-04）：当前 Release 安装产物已完成真实认证、保存并启用同步、Vault 创建、恢复码二次确认、显式“记住解锁”和解锁状态显示；证据为 [`android-vault-created.png`](apps/mobile/evidence/android-vault-created.png)，已人工查看且不含恢复码、root 或口令。Android Keystore 的跨进程、设备重启、scope 隔离和删除持久性仍以 [`android-vault-storage.txt`](apps/mobile/evidence/android-vault-storage.txt) 的五阶段结果为准。后续续验已形成冷启动 remembered-root 与真实 UI logout fence 的脱敏记录（[`android-vault-cold-start.txt`](apps/mobile/evidence/android-vault-cold-start.txt)）；logout 后重新认证的密码请求虽被服务端接受，Release AuthScreen 未进入 session / “保存并启用同步”，所以“再认证后保持锁定”仍未通过。轮换和跨端任务互读也尚未形成移动安装产物证据，不能用首次会话的 opt-in 结果替代；规则继续维护在 ADR-0050，不另建记忆文档。
 
 - 2026-10-04 iOS 提醒续验：修复 `HeytaReminderModuleBridge.m` 的导出名错配（`RCT_EXTERN_MODULE` 实际导出 `HeytaReminderModule`，JS 读取 `HeytaReminder`），改为 `RCT_EXTERN_REMAP_MODULE` 后，Release 模拟器真实日志出现授权 `granted=true`、排程 `error=none`；`heyta-reminder-receipts.json` 有 `posted/receipts`，启动 reconcile 后 SQLite 出现同时含 `firedAt` 与 `firedForTriggerAt` 的 REMINDER op。隐私覆盖层先由 AX 真实关闭并复核消失。证据与限制已写入 ADR-0051：这证明 iOS 模拟器 OS 投递闭环，不替代实体设备通知权限或 iOS Keychain 验收；本轮未取得新的 Keychain 实机证据。
+- C 的容量算法补上独立边界测试：`apps/mobile/tests/native-reminder-plan.spec.ts` 用 65 个按时间排序的 occurrence 验证规划器只返回最早 64 个，并确认第 65 个不会挤掉更早项；移动端测试现为 731/731 通过。此项只关闭共享规划器的确定性规则，不能把它记成 iOS 系统通知中心的 64 条窗口证据；后者仍待真实设备/模拟器窗口滚动验收。
 
 ### 2026-10-04 02:0x–02:2x · D-3 收口：① 落地成事实，②③ 排在同一条等窗口的队列上（落地载体 `de296b9d`）
 
@@ -1570,6 +1571,7 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   现场闸门（pattern 里含**别人那趟链**的每个 argv 形状，不与它挤同一个窗口）→ 仓库那道负载门（阈值 12，不自定）
   → 链逐段读数（载体=落地载体）→ **非 docs 漂移必须为 0 才允许起装** → `check:ai-e2e`（用 4318/4319 端口空闲当门，因为它的 preflight 会 SIGKILL 那两个端口上的进程）
   → 四端重装（`IOS_DEVICE_NAME` 显式给，不 `head -1` 猜设备）。每条前置等满都以 **exit 3** 收尾（环境无效 ≠ 产品失败），全程不 push。
+- **④ 收口对账（10-04 17:5x 现量，尖端 `1cda2053`）**：**①** 已按四条逐枚 `git merge-base --is-ancestor` 复量闭合；**②** 的 `apps/web` 全量套件跑成（`Test Files 132 passed | 2 skipped`、`Tests 1756 passed | 13 skipped`、rc=0；跑者没记起跑 HEAD，故用「两代载体之间 `apps/web|packages` 改动集合 = 0 文件」把这枚读数钉到当前提交），余下的是全仓 `pnpm -r build` + `-r typecheck`；**③** 已按产品负责人授权停掉两棵确定不会自己走的进程（挂死 13h5x 的公证链，服务端零提交记录；无主孤儿 vitest 18h17m，`ppid=1` 且 cwd 指向已删除的工作树），现量窗口五格里设备面与工作树两格已绿，**只剩负载一格**，而此刻吃 CPU 的是交互层（WindowServer / IDE helper / 模拟器 qemu）⇒ 开窗取决于并发会话何时 idle，**不按放宽阈值处理**；四端重装的读数仍由那条等窗口队列产出，DONE 必须打印 `SHORTCUT_OK` + `PAYLOAD_WEBDIST=True` + `M2D=OK` + sha256 对账。明细 `BLOCKED.md` B76 补记 #11–#13 与 `docs/plans/ai-assistant-closure.md` §8 那张矩阵。
 
 - B/C 全量验收补正：隔离工作树固定源码后，门禁抓出 C 权限说明仍声称“移动端不申请通知”。现将 Android/iOS 本地通知、精确闹钟与拒绝后的行为同步写入既有中英权限清单/第三方说明，草案版本更新为 1.1，并重生成服务端版本指纹。安全存储验收要求并入 AGENTS §8.10：探针调用生产入口、实际属性精确比较、跨进程删除在新进程读空，不能把替身或同进程结果记成运行时闭环。
 
@@ -1578,3 +1580,77 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 - B/C 隔离复验（2026-10-04 03:0x）：浏览器原失败项定向复跑 20/21 通过，唯一剩余是固定手势起点落进新详情列；改为目标行几何 + `elementFromPoint` 前提后，日历日档 5/5 通过。已实际打开修复后的日历页头、拖到次日以及助手暗色截图。完整浏览器套件仍须复跑，另有导出契约动态加载器错误在排查；不能把本轮定向结果写成全仓门禁通过。
 
 - B/C 固定源码真实复验（2026-10-04 03:1x）：requestId 绑定修复后，Web＋HTTP＋PostgreSQL 五条 Vault 旅程再次 5/5 通过（15.6 秒），包含三设备、旧历史、迁移中新增任务、重启续传/取消与已提交未收到响应的恢复。固定截图已更新并回看新设备读取旧任务；该结论仍不覆盖未完成的移动端旅程。隔离树完整 `pnpm check` 正在执行。
+
+- 2026-10-04 收尾复核（**后续状态已由本节末尾的 iOS 取消续验更正；本行只保留当时快照**）：隔离树中的 `@heyta/app-host` 64 个文件/1306 项、移动端 47 个文件/709 项、
+  `@heyta/legal` 66 项以及 `@heyta/sync-core` 19 个文件/303 项定向测试通过；完整递归测试仍不能记为绿，
+  因隔离树同步修正后暴露了环境/提交态差异（外部 TFA 锁、过期迁移探针，以及 web/server 用例超时，原因尚待串行对照验证）。
+  这类失败没有被放宽判据。iOS 模拟器提醒已取得真实排程与 `firedAt + firedForTriggerAt` 回执，
+  但通知中心标题截图与未来提醒删除的 `DEL`/ledger 清理仍未形成证据；Android Vault 冷启动恢复、logout fence、
+  轮换和跨端互读也仍未完成。四端 `reinstall:all` 与最终 `pnpm check` 仍是 Goal 的收尾门槛。
+
+- B/C 串行对照（2026-10-04 10:31–10:32）：固定隔离树执行 `pnpm -r --workspace-concurrency=1 test`，
+  20 个包全部执行，11,202 项通过、14 项跳过、退出 0；此前超时的 Web 六文件 43 项和服务端两文件 61 项
+  也分别复跑通过。测试内容与超时阈值未改；该结果只证明此隔离副本，不覆盖主工作树后续变动。
+  主树 `pnpm -r typecheck` 通过（不含未提供该脚本的 server）；完整 `pnpm check` 则在新增存储契约所需的
+  C# shim matcher 处中止。补齐严格大小比较后真实 C# 原样契约 67/67 通过，另有 20 条正反例与 `.not` 自验，
+  规则与结果写回既有 C# spike README。整链、移动端剩余旅程和四端重装仍未完成。
+
+- 固定隔离树后续验证：自托管入口、Web SQLite 存储/旧库迁移、Web 产物、自快照、移动首启、截图校验均通过。
+  再跑完整 `pnpm check` 已通过构建、类型与浏览器套件之前的门禁；在 `check:ai-e2e` 启动前被另一项目
+  的 TFA 测试锁拒绝（已核对持锁进程仍在运行），浏览器本轮未执行，不能记作整链通过。
+  下一轮从浏览器套件继续，不绕过资源锁。
+
+- B/C iOS 取消续验补正（2026-10-04）：真实 UI 的未来提醒取消 21/21 通过，SQLite 同一实体的 DEL、AX 行消失和原生 ledger 清理均成立；已打开删除后截图核对任务详情显示“还没有提醒”。先前失败源自脚本 `10/4` 与实际 AX `10-04` 不匹配，原计划与 ADR 摘要已同步更正。后续审查要求 full 旅程精确绑定本轮实体/毫秒级 occurrence，并在截图前断言同一任务详情，避免旧记录或其他页面误算通过；这些补强及 killed-process/系统通知截图仍在续验中。
+
+- B/C 固定副本浏览器门禁（2026-10-04 10:48）：`check:ai-e2e` 退出 0，154 项通过、2 项跳过；已重新打开 Vault 明暗两张完成态截图，界面与遮密处理正常。`check:shell-unicode` 也通过。隐私同意套件在运行前被另一会话的有效 TFA 锁拒绝，尚未执行；落地页套件及最终当前源码对账仍待完成。固定副本基线为 `73b36a6d` 加本轮验证覆盖文件，不能用它为随后变化的主树背书。
+
+- B/C 帮助入口补齐（2026-10-04）：真实看图抓到“无恢复”和“后台只有自建推送”的过时承诺，修正原有 25 对中英词条并重生成 4 份 FAQ/口令 HTML；原帮助导航不变。i18n 26 项、landing 1317 项、重跑真实浏览器 landing 18 项通过，恢复帮助中英与提醒说明三张图已人工看过并从 ADR-0050/0051 链接。隐私同意浏览器 7/7 也通过。规则已融入 AGENTS §8.17 和原环境陷阱 #212。审查同时发现设备撤销缺用户入口，已继续补实现；B/C Goal 尚未完成。
+
+- B/C 11:42 续验：app-host 构建恢复正常，设备管理及共享撤销编排定向 10/10 通过。iOS 在原 killed-process occurrence 所属模拟器修正直接 idb 的 TCP 参数后，系统通知中心实际显示 `ios-reminder-delivery-105035`，截图已人工核看，SQLite 标题、entityId、triggerAt 与 fired receipt 一一对应。原 ADR-0051 摘要、批次三状态表和环境陷阱 #208 已同步更新；AGENTS §6.2 固化截图清旧文件与传输参数一致规则。跨设备 fired、iOS 权限/容量边界及最终当前产物验收仍未完成。
+
+- 后续取证审查补强：iOS full 验收标题由仅精确到秒改为带当前脚本进程 nonce，避免快速重跑命中通知中心残留的同名旧通知；该规则已写入 AGENTS §8.11 与 ADR-0051。`verify-mobile-ios-reminder.sh` 语法检查、app-host 撤销/提醒定向测试 12/12 通过；未以此替代真实 iOS 权限/容量和四端当前产物验收。
+
+- B 撤销最终接线定向复验：隔离副本补齐 packages/web 源码依赖并逐文件哈希对账后，真实 Web/HTTP/PostgreSQL 六条 Vault 旅程再次 6/6（17.1 秒）；共享 controller 已包含 guidance 持久化失败仍清会话与异步绑定复核。Vault 设置浏览器 1/1，明暗图已人工核看。另修同步设置、集成页与自建文章 5 对过期恢复说明，文案门禁通过。上述结果仍非全仓最终门禁与四端当前安装产物完成。
+
+- C 跨设备协议续验（2026-10-04 13:01）：新增 PostgreSQL 集成入口下的两条真实 HTTP/加密/独立 SQLite 旅程，2/2 通过、零跳过；覆盖远端 fired、pending 取消、重开、改期、贪睡、每日重复及旧回执隔离。首轮账号串扰修为逐例独立账号，不放宽断言。ADR-0051 当前摘要、边界表、原计划批次三和 AGENTS §8.11 同步更新；受控通知 port 不算 OS 投递证据，原生边界仍待验。
+
+- B/C 边界反证续验：提醒 HTTP 三条变异均被具名 AssertionError 抓到，源码逐字恢复并重建。真实 Vault/HTTP/PG + 观察型模型端点的 AI 出境旅程 1/1（3.6 秒），披露/结果截图已人工查看；证明 title 精确投影与账号/root/功能密钥不出境，未把回环模型观察器写成托管 AI 上线。AGENTS、ADR0050/0051、文档入口与原环境陷阱 #188 已同步更新；AI 反向变异仍在继续。
+
+- B AI 字段投影反证完成：既有 `mutate-e2ee-key-lifecycle.mjs --egress` 在固定副本跑正控 1/1、整任务序列化变异命中具名断言、逐字还原及重建后 1/1，三轮零跳过；ADR0050 当前表已同步更正为反证通过。未替代 iOS 安装产物、实体设备 Keychain 或全仓最终收尾。
+
+- B 验收诊断防泄漏：真实反证发现 Playwright 自动 aria 错误上下文独立于截图 mask/trace 开关；Vault 配置、表单 helper 和布尔秘密断言已补齐保护。新 `check:vault-diagnostics` 正反两臂通过并接入全仓门禁与 Vault 入口；当前七条 Vault/AI 测试对固定产物复验 7/7（19.9 秒）。经验融入 AGENTS、ADR0050、原威胁模型与环境陷阱 #199，未另建记忆文档。 HTTP fixture 另验 1/1（3.5 秒），亮暗图已查看；静态生产产物下须关闭 Service Worker 才能可靠命中 HTTP fixture，原因并入 #199。文档死链、表格及门禁接线检查通过。
+
+- B iOS Release ↔ Node host 收口（2026-10-04）：专用 iOS Release 安装产物在真实 Fastify + PostgreSQL 服务端上显式解锁 Vault 后上传任务；独立真实 SQLite Node host 以 authenticated `accountId`、轮换后 E2EE 口令和 JWT 同步并读出该任务。Node host 再写入第二条任务并同步，iOS Release 真包重新同步后 AX 树读到 `B Node to iOS task 20261004`。两端均是 payload codec，`keyVersion=2`、`payloadKeyVersion=2`；脱敏证据见 [`ios-node-vault-interop-20261004.txt`](apps/mobile/evidence/ios-node-vault-interop-20261004.txt)。这次补上的是 iOS 当前 generation 的双向互读，未把它写成 iOS legacy migration。
+
+- B JWT fence 真实 HTTP 证据（2026-10-04）：同一旅程撤销 Node 设备后，撤销前 JWT 对 key package、ops 下载、ops 上传和 status 全部返回 `401 TOKEN_REVOKED`；新 JWT 对照旧上传前后 `latestSeq=2` 不变。此项确认服务端 tokenVersion 边界和“失败请求不改服务端事实”，但不替代 iOS UI 撤销后的本地 session/native root 清理与可信设备 root rotation。旧 root 只保留确定性 fixture 的 `root-key-mismatch`/旧世代解密拒绝证据，未伪称为 iOS 进程外真 root 证据；完整边界已写回 ADR-0050。
+
+- B 移动撤销清理补强（2026-10-04）：审计发现设备撤销后的原生 root 删除失败会发生在 token 已清除之后；原先局部错误会因 `authStillCurrent=false` 提前返回而丢失，无法沿用登出已有的重试入口。`VaultSettingsSection → SettingsScreen → ProfileScreen` 现把失败的 `serverOrigin + accountId` scope 提交给既有 `vaultCleanupPending` 状态，保留 remembered-unlock fence 并让用户重试 native remove；新增源接线回归判据，防止任一父层断开这条状态链。`@heyta/mobile` typecheck、51 个测试文件/732 项与 `git diff --check` 通过；这只是本地失败恢复接线，仍不替代 iOS Release 真包的完整撤销、重新认证、root rotation 与密文迁移证据。
+
+- 2026-10-04 E 状态机验证补强：在独占测试窗口定向运行 `pnpm --filter @heyta/op-log exec vitest run tests/semantic-invariants.spec.ts`，1 个文件 / 5 条通过；同窗口完整 `@heyta/op-log` 运行 9 个文件 / 112 条通过。新增的固定 seed 生成器让两台独立引擎分别经过不同批次、乱序和重复远程投递，再与纯 reducer 规范投影、逐维最大时钟和彼此可见状态对账；完整历史重试返回空 `applied` 且不推进时钟。随后运行 `node scripts/mutate-op-log-semantics.mjs`，A/D/E 九类变异全部被至少一条断言抓到。规则已写入 `AGENTS.md` §8，并同步到 [A/E/D 实施证据](docs/research/aed-implementation-evidence.md) 与 [冲突分类学](docs/research/op-log-e2-conflict-taxonomy.md)；A/D/E 的其它端到端证据仍按原文边界，不把这次定向测试扩大成全仓完成。
+
+- 2026-10-04 D 当前树测量：重建 `packages/storage` 与 `packages/op-log` 后运行 `node scripts/measure-hydration.mjs 100000`，真实 SQLite 100,000 条历史全量恢复 10,790.9ms，checkpoint 后 100 条尾部 40.1ms，`fullScans=0`；脱敏原始输出为 `/tmp/heyta-aed-hydration-current-20261004.log`。这只更新 D 的当前 Node/SQLite 证据，不替代 Hermes 或最终全仓门禁。
+
+- 2026-10-04 A/D 定向复核：`@heyta/sync-core` 的 frontier、100/101 时钟和冲突分类测试 3 个文件 / 14 条通过；`@heyta/op-log` 的 checkpoint 与 full-state recovery 2 个文件 / 39 条通过。当前环境未设置 `DATABASE_URL`，故真实 HTTP/PostgreSQL frontier 集成没有被误记为“通过”（它按 `skipIf` 不执行）；现有真实 HTTP/PG 记录仍按其原载体和边界保留在 ADR-0046/0047 与 A/E/D 证据中。
+
+- B/C 收尾窗口复核（2026-10-04 15:48 CST）：活树上的 `pnpm check` 在 `pnpm -r build` 的 `@heyta/ai` 阶段被外部进程以 `SIGTERM` 终止，退出码 143；日志没有产品断言失败，也没有跑到后续门禁和 workspace tests。因此本轮只能登记为“未完成/环境终止”，不能写成全仓通过。四端重装队列仍在另一棵隔离树运行，当前未抢占设备或重启第二趟。
+
+- 2026-10-04 B 撤销恢复规则补强：代码审查发现 DELETE 首次响应丢失、同绑定重试再次网络失败时，控制器原先会直接抛错，可能跳过本地 token/Vault session/remembered-unlock fence/native root 清理。现统一把二次网络失败、非成功 HTTP 与响应校验失败归为 `ambiguous`，继续执行完整本地围栏，并以固定回归测试证明两次 response loss 不会留下旧 root。该边界已同步写入 `AGENTS.md` §8 的第 19 条与 ADR-0050；未扩大为移动端真实撤销旅程证据。
+- 2026-10-04 B 共享撤销编排修复复验：`@heyta/app-host` 定向运行后实际为 68 个测试文件 / 1343 项通过（含两次 response loss 后 `ambiguous` 与本地清理回归）；`@heyta/mobile` 51 个测试文件 / 732 项通过；app-host/mobile typecheck、文档死链/章节/表格检查及 `git diff --check` 均通过。该结果是实现层与失败恢复证据，仍不替代 iOS 真包完整撤销旅程、实体 Keychain 和 C 的原生 OS 缺口。
+- 2026-10-04 16:xx 全仓门禁续跑：`pnpm check` 的构建、workspace typecheck、`check:reachability` 与 `check:shell-surfaces` 均通过；在 `check:op-log-semantics` 的变异基线处被仓库测试闸门拒绝，原因是另一会话持有 `/tmp/tfa-test.lock`（pid 8721，非产品断言失败），因此本轮退出 1，不能记作全仓通过。待锁释放后须从该门禁重跑并继续完整链。
+- 2026-10-04 16:xx 全仓门禁续跑补记：本轮自行启动的 `pnpm check` 在 `pnpm -r build` 最早四个 tsup 子进程停滞约 18 分钟，`/tmp/audit-pnpm-check16.log` 无新增且进程均为本轮检查树；已仅终止该检查树，未触碰其他会话、模拟器或重装进程。该轮仍按环境挂起记账，不能视为通过；后续改用可轮询日志重跑。
+- 2026-10-04 16:xx 构建复验补记：单独 `pnpm -r build` 已实际打印各 workspace 产物生成成功，但实时输出会令工具会话脱离，残留 tsup/esbuild service 进程不退出；已仅终止本轮自己的构建树，未触碰其他会话。后续使用日志重定向与退出码轮询，避免把输出管道挂起误判为构建失败。
+- 2026-10-04 16:xx 构建日志复核：低输出后台 `pnpm -r build` 在 `shared-schema/sync-core` DTS 启动阶段对应进程消失且未写入退出码；此前各 package 已打印产物成功，但无法证明全链 exit 0。外部隔离 Vitest 仍占用高 CPU，故本轮只记为环境中止，待其结束后重跑，不把部分产物记作完整构建通过。
+
+- B 撤销响应格式失败续验（2026-10-04）：首次成功响应 JSON 损坏或设备标识不符，也可能发生在服务端提交之后；新增两条先红后绿回归，修复共享编排后设备管理两文件 15/15。低层仍拒绝非法响应，上层按不确定提交保留提示并清会话，规则写回 AGENTS §8.19 与 ADR0050。本次串行全工作区测试（修复前基线）11335 通过、14 跳过；修复后 app-host 全包 68 文件、1345 项通过，typecheck 通过。未替代原生平台和当前产物门禁。
+
+- B/C 当前主树门禁续跑（2026-10-04）：完整 `pnpm check` 已通过 build/typecheck 与前置结构、许可证、原生桥/bundle、Vault 诊断门禁；浏览器套件 155 passed、2 flaky、2 skipped（8.2 分钟），两条不稳定项为 AI 助手会话/单步提案切主题后丢失状态，失败图已查看，未隐去重试记录。链在隐私用例启动前被另一会话有效 TFA 锁拦截，未记为完整 check 通过；从该节点续跑，不绕过锁。主树仍有并行变更，最终安装产物必须重新核对。
+
+- B/C 门禁续段：隐私浏览器 7/7、落地页 18/18、Web SQLite/IndexedDB 迁移、产物自洽、移动首启及截图注册检查已通过；存储/迁移截图已查看，不能把仍盖着首启面板的图当成任务列表视觉证据。看图发现首启隐私词条仍误称本机模式禁用所有通知，已中英同步改为不接收服务器推送、授权后的移动本地提醒可用；经验并入 ADR0051 原帮助说明段。
+
+- B/C 首启文案复验：更新词条后的真实隐私浏览器 7/7（8.6 秒），首启图已打开检查；i18n 26/26、build 与文案门禁通过。规则融入 AGENTS §8.18、环境陷阱 #212 与 ADR0051 原帮助段，不新增孤立记忆入口。联网同意不等于系统通知授权；该证据不替代原生投递，也不意味着旧移动安装包已包含新词条。
+- B Node host 本地优先收口（2026-10-04）：`openNodeHost` 不再在构造阶段拉取 key-package；真实 SQLite 的构造、列举、写入、pending、导出均经 `vi.fn` 证明零网络请求，只有显式 `sync()` 才触发远端并把失败交给调用者。`@heyta/node-host` 11 个测试文件 / 186 条通过，typecheck 通过。规则写回 AGENTS §8.10 与 ADR-0050；Android 非空双向互读证据仍不等于独立 fingerprintChanged root 轮换证据。
+- C iOS 边界续验（2026-10-04）：permission-recovery 实际点击“不允许”，probe 读到 denied/pending=0/delivered=0 且 SQLite 无 fired；恢复停在 App-Prefs 未进入 heyta 通知设置，失败截图近黑且已人工查看，未升格为 UI 通过。restart-recovery 已证明关机顺序，但 probe 未产出快照；已修 RunLoop，需重编译复跑。AX 最小滚动距离、UDID 并发门禁和 probe 早于通知 delegate 接线均已修，四模式仍待真实 OS 级通过；文档入口只保留 ADR-0051，不留未跟踪截图死链。
+- C iOS 边界续验更新（2026-10-04）：使用 `/tmp/heyta-ios-reminder-probe-check4` 重编译后重跑 restart-recovery；真实 occurrence `task-muto7yz3-2-ezsapvj0:1791109440000` 在关机状态跨 trigger 并重新 boot，顺序判据通过，但脚本轮询仍先于 iOS 27 冷启动 probe 文件写入而失败，未取得 recovery receipt。统一日志随后确认 probe 最终写出 `authorization=granted`、`pending=[]`、`delivered=[]` 和 scheduled ledger；脚本等待上限已从 45 秒提高到 120 秒。probe 早退生命周期原因仍标为待验证假设，不能据此关闭 restart 边界；Settings 已改为真实 AX 路径 `App → heyta → 通知、横幅、声音、标记 → 允许通知`，下一轮需重跑。
+- C iOS 验收器自愈修复（2026-10-04）：真实 TCP companion 在目标模拟器上连续返回 AX/HID 请求，但 AX 空树触发 shutdown/boot 后，脚本错误地回到 Unix-domain `ensure_idb_companion`，将 TCP 地址当作 socket/二进制路径，导致重启后载体失败。`scripts/verify-mobile-ios.sh` 现单独保存 `IDB_COMPANION_BIN`，TCP 模式在重启后按原端口重启 companion，并继续使用 `idb --companion HOST:PORT`；Unix 模式保持 `--companion-path`。`bash -n` 已通过，修复已写入 [AGENTS.md](AGENTS.md) 与 [ADR-0051](docs/adr/0051-mobile-reminder-delivery.md)。这只改变验收载体的自愈，不能把尚未完成的 iOS 权限恢复、重启补算、不确定回执、64 条窗口或 B 的真包撤销旅程标成完成。
+- C iOS AX 载体继续对照（2026-10-04）：TCP companion 重启自愈已能恢复并接受 gRPC，但共享 `scripts/lib/mobile-e2e.sh` 的 `idb_ui`/AX 计数仍把 TCP 地址传给 `--companion-path`，使健康树被误读为 0。现已让共享 helper 与 `ios-ax-shim.py` 统一按 `HOST:PORT` 选择 `--companion`；同一专用 UDID 的 TCP 11005 只读对照为 `AX_LABELS=11`、`JSON_OK=1`。修复通过两份脚本 `bash -n` 与 `git diff --check`，规则入档为环境陷阱 #264。完整 B/C iOS 旅程仍未闭合。
+- B iOS 主认证路径对账（2026-10-04）：真实 Release iOS 输入验收在 TCP companion 修复后完成 67 项通过；唯一红灯定位为脚本漏按 AuthScreen 真实阶段“保存并启用同步”——粘贴令牌成功只产生内存 session，必须按该按钮才写入 sync config 并启动 `syncNow`。已补 `scripts/verify-mobile-ios.sh` 的阶段回读/点击，并将规则写入 [ADR-0050](docs/adr/0050-e2ee-key-lifecycle-and-recovery.md)、[AGENTS.md](AGENTS.md) 与环境陷阱 #265；此前 67/1 结果不升格为产品失败。需用当前脚本重跑确认主路径绿，其他 B/C 未闭合边界仍保留待验。
