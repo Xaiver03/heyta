@@ -65,14 +65,23 @@ function hardErrors(logs: readonly string[]): string[] {
  * 才叫"应用打开了"。字符数只记进日志，**不做断言**。
  */
 async function waitForAppRender(page: Page): Promise<number> {
+  // 🔴 两条 needle 都是**词条文本**，而这一发进来的语言不一定是中文：
+  //    `withLocale`（`apps/landing/src/lib/app-url.ts`）只给**非默认**那一档打标，
+  //    中文落地页的入口地址就是裸的 `/app`，于是应用自己按浏览器语言选 ——
+  //    Playwright 的浏览器是 en-US，界面就是英文（实测截图：整页外壳都在，
+  //    只是写着 "Add a task…" 与 "Inbox"）。
+  //    这条判据要问的是"**应用外壳在不在**"，不是"它写了哪句中文"，
+  //    所以中英两版**都算**（写死一版 = 一条会在正确的时候变红的判据）。
   await page
-    .locator('input[placeholder*="添加任务"]')
+    .locator('input[placeholder*="添加任务"], input[placeholder*="Add a task"]')
     .first()
     .waitFor({ state: 'visible', timeout: 60_000 });
   // 收件箱标题也要在：只有输入框可能是某个残缺的中间态。
   // ⚠️ 不要用 `getByRole('button', { name: '任务' })` —— 侧栏导航不是 button，
   // 那样写会红在一个**选择器猜错**上，而不是应用有问题。
-  await expect(page.getByText('收集箱').first()).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByText('收集箱').or(page.getByText('Inbox')).first(),
+  ).toBeVisible({ timeout: 30_000 });
   return page.evaluate(() => document.querySelector('#root')?.textContent?.length ?? 0);
 }
 
