@@ -41,6 +41,15 @@
  *   补进 W0/W1c 两格的判据条数 ⇒ 腿 7/8 在那棵树上合法地红。**把期望钉在某一具体档上 = 把"我这轮
  *   还没提交"写成前提**，所以改成只断"退 1 必须有一档点名"。
  *
+ * 🔴 19:5x 起多了腿 9（表格单元 code span 里的裸竖线），四臂 + 一把脱牙：
+ *   P1 §8 表某一格的码段里注入裸竖线            → **只有腿 9 红**（那八条全放过 —— 行闭合、状态、读数都没动）
+ *   P2 同一处写成 GFM 要求的转义式 `\|`          → 放过（判的是"裸"竖线；这条挡住"为了绿把竖线删掉"的改法）
+ *   P3 靶换到 §8 区间**之外**的另一张表          → 同样点名（钉住"射程=整份文档的表行"；本轮真写坏的三处里两处不在 §8 区间）
+ *   P4 同一份变异喂 **HEAD 那版判据**            → 必须 RC=0（减法现量：这一族此前**零消费者**，
+ *                                                  没有这一臂，腿 9 就只是"顺手加严"而不是补实测缺口）
+ *   脱牙 摘掉腿 9 的命中集合                     → P1/P3 两臂全部失能
+ *
+ *
  * 🔴 每臂除了退出码，还断言**红落在点名的那条腿**、且别的腿没有跟着红 ——
  * 只看 RC 的臂会把"判据自己崩了"读成"变异成功"。
  */
@@ -81,6 +90,7 @@ const LEGS = {
   mut: '🔴 已开工的行没记变异读数（也没写「无变异面」+理由）',
   judge: '🔴 已开工的行没写**判据条数**（也没写「无判据面」+理由）',
   arm: '🔴 变异那一档没有"臂条数 + 红集"两个读数（光提一句不算，纯文档单走「无变异面」+理由）',
+  pipe: '🔴 表格单元的 code span 里有裸竖线（GFM 会在这里切格，行不裂但格子裂 —— 前八条腿一条都不红）',
 };
 const rowsIn = (out) => Number(out.match(/连续 (\d+) 枚工单行/)?.[1] ?? 0);
 
@@ -362,6 +372,83 @@ check(
   `RC=${j5.rc} 腿7=${legCount(j5.out, LEGS.judge)}`,
 );
 
+// —— 腿 9（码段里的裸竖线）的臂：P1…P4 + 一把脱牙。
+// 这一族的特殊之处是**旧判据一条都不会红**：行仍闭合、仍在表区间、状态与读数都没动，
+// 只是 GFM 在渲染时把一格劈成两格。所以 P4 专门拿 HEAD 那版判据跑同一份变异文档，
+// 断它 **RC=0** —— 这条不是形式主义，它把"补这条腿"从"顺手加严"钉成"补一个实测存在的缺口"（减法现量）。
+let pTarget = { line: 0, id: '' };
+const injectPipe = (scope, escaped = false) =>
+  mutate((t) => {
+    const ls = t.split('\n');
+    const headIdx = ls.findIndex((l) => /^\|\s*单\s*\|\s*状态\s*\|\s*读数/.test(l));
+    // §8 区间：表头 + 分隔行往下连续以 `|` 开头的行
+    const region = new Set();
+    for (let i = headIdx + 2; i < ls.length; i += 1) {
+      if (!ls[i].startsWith('|')) break;
+      region.add(i);
+    }
+    const idx = ls.findIndex(
+      (l, i) => /^\|.*\|\s*$/.test(l) && /`[^`]+`/.test(l) && (scope === 'out' ? !region.has(i) : i >= headIdx),
+    );
+    if (idx === -1) throw new Error(`P（${scope}）找不到带 code span 的表格行 —— 本文件的表形态变了，这两条臂没有靶`);
+    const row = ls[idx];
+    const span = row.match(/`[^`]+`/)[0];
+    pTarget = { line: idx + 1, id: row.match(/^\|\s*(W[0-9]+[a-z]?)/)?.[1] ?? '' };
+    ls[idx] = row.replace(span, `${span.slice(0, -1)}${escaped ? '\\|' : '|'}a\``);
+    if (ls[idx] === row) throw new Error('注入没有生效（码段形状对不上原文）—— 臂是装饰，拒绝继续。');
+    return ls.join('\n');
+  });
+
+const p1 = injectPipe('in');
+expectRed(
+  'P1 §8 表里某一格的 code span 注入裸竖线 → 只有腿 9 红（行闭合/状态/读数那八条全放过）',
+  p1,
+  LEGS.pipe,
+  pTarget.id || `:${pTarget.line}`,
+  (n) => n === 1,
+);
+
+// P2：同一处把竖线写成 GFM 要求的转义式 → 必须放过（这条挡住"为了绿而删竖线"的修法）
+const p2 = injectPipe('in', true);
+check(
+  'P2 同一格写成转义式 `\\|` → 放过（判的是裸竖线，不是"码段里不许有竖线"）',
+  p2.rc === 0 && legCount(p2.out, LEGS.pipe) === 0,
+  `RC=${p2.rc} 腿9=${legCount(p2.out, LEGS.pipe)}｜靶 ${pTarget.id}@${pTarget.line}`,
+);
+
+// P3：靶换到 §8 **区间之外**的另一张表 → 同样必须点名（这条钉住"射程=整份文档的表行"这个决定；
+// 只扫 §8 区间的话，本轮实际写坏的两处里有一处正好落在射程外）
+const p3 = injectPipe('out');
+expectRed(
+  'P3 表外另一张表的码段注入裸竖线 → 也要点名（腿 9 射程覆盖整份文档的表格行）',
+  p3,
+  LEGS.pipe,
+  `(非§8表) 码段`,
+  (n) => n === 1 && !p3.out.includes(`:${pTarget.line} W`),
+);
+
+// P4：拿 HEAD 那版判据跑 P1 的同一份变异 ⇒ 必须 RC=0（旧判据对此**完全没有消费者**）
+{
+  const oldGate = join(scratch, 'gate-at-HEAD.mjs');
+  const src = execFileSync('git', ['-C', repoRoot, 'show', 'HEAD:scripts/check-detail-pane-status-table.mjs'], { encoding: 'utf8' });
+  if (!src.includes(LEGS.unclosed)) throw new Error('HEAD 那版判据里连腿 1 都读不到 —— 取错了对象，拒绝拿它当对照。');
+  writeFileSync(oldGate, src, 'utf8');
+  const ls = ORIGINAL.split('\n');
+  const headIdx = ls.findIndex((l) => /^\|\s*单\s*\|\s*状态\s*\|\s*读数/.test(l));
+  const idx = ls.findIndex((l, i) => i >= headIdx && /^\|.*\|\s*$/.test(l) && /`[^`]+`/.test(l));
+  const span = ls[idx].match(/`[^`]+`/)[0];
+  ls[idx] = ls[idx].replace(span, `${span.slice(0, -1)}|a\``);
+  writeFileSync(doc, ls.join('\n'), 'utf8');
+  const r = spawnSync(process.execPath, [oldGate, doc], { encoding: 'utf8' });
+  const out = `${r.stdout}${r.stderr}`;
+  writeFileSync(doc, ORIGINAL, 'utf8');
+  check(
+    'P4 同一份变异喂 HEAD 那版判据 → RC=0（这条腿补的是实测存在的缺口，不是顺手加严）',
+    r.status === 0 && out.includes('八项都成立'),
+    `RC=${r.status}`,
+  );
+}
+
 // 脱牙对照：把两条新腿的命中集合清空，J1/J3/J5 三臂都必须失能（有一条仍红 = 它没挂在那条腿上）
 const neuter = join(scratch, 'gate-neutered-78.mjs');
 {
@@ -383,6 +470,39 @@ const neuter = join(scratch, 'gate-neutered-78.mjs');
   writeFileSync(doc, ORIGINAL, 'utf8');
   check('脱牙对照 摘掉腿 7/8 的命中集合后，J1/J3/J5 都不得仍然报出那两条腿（三臂全部失能）',
     survived.length === 0, survived.length ? `摘牙后仍红：${survived.join('/')}` : '三臂全部失能');
+}
+
+// 脱牙对照（腿 9）：摘掉 pipeRows 的命中集合，P1/P3 两臂都必须失能
+{
+  const neuter9 = join(scratch, 'gate-neutered-9.mjs');
+  const src9 = readFileSync(GATE, 'utf8');
+  const ANCHOR9 = 'console.log(`取样：';
+  if (!src9.includes(ANCHOR9)) throw new Error('判据里找不到插入点，脱牙脚本拒绝猜。');
+  writeFileSync(neuter9, src9.replace(ANCHOR9, 'pipeRows.length = 0;\n' + ANCHOR9), 'utf8');
+  const survived = [];
+  for (const scope of ['in', 'out']) {
+    const ls = ORIGINAL.split('\n');
+    const headIdx = ls.findIndex((l) => /^\|\s*单\s*\|\s*状态\s*\|\s*读数/.test(l));
+    const region = new Set();
+    for (let i = headIdx + 2; i < ls.length; i += 1) {
+      if (!ls[i].startsWith('|')) break;
+      region.add(i);
+    }
+    const idx = ls.findIndex(
+      (l, i) => /^\|.*\|\s*$/.test(l) && /`[^`]+`/.test(l) && (scope === 'out' ? !region.has(i) : i >= headIdx),
+    );
+    const span = ls[idx].match(/`[^`]+`/)[0];
+    ls[idx] = ls[idx].replace(span, `${span.slice(0, -1)}|a\``);
+    writeFileSync(doc, ls.join('\n'), 'utf8');
+    const r = spawnSync(process.execPath, [neuter9, doc], { encoding: 'utf8' });
+    if (legCount(`${r.stdout}${r.stderr}`, LEGS.pipe) > 0) survived.push(scope);
+  }
+  writeFileSync(doc, ORIGINAL, 'utf8');
+  check(
+    '脱牙对照 摘掉腿 9 的命中集合后，P1/P3 两臂都不得仍然报出那一档（两臂全部失能）',
+    survived.length === 0,
+    survived.length ? `摘牙后仍红：${survived.join('/')}` : '两臂全部失能',
+  );
 }
 
 const control = run();
