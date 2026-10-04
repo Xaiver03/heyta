@@ -2004,6 +2004,27 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     `grep -c mobile-e2e` 在那份日志里 = **0** ⇒ 我这一笔没有新增违规（同 §7.30 前面那条"混合工作树红"的口径）。
     载体 `heyta-wt-reinstall` 已从 `37052fd5` 推到 `3771edb2`（= 提交前的 main）、工作树 0 条脏；
     run7 那两张原始截图已另存 `~/.heyta-pending/.../run7-*.png`（逐枚 `cmp`），检出里的两张还原成 HEAD 态。
+  - ✅ **08:57 三个补丁落在载体、不落在主检出** —— 边界与交付同时成立：`scripts/verify-mobile-notes.sh`
+    在主检出仍然只有别人那一行（`${f}`），而 ③ 要跑的判据在载体里已经补齐：
+    载体 = `49e9a2fd` + 该文件 blob **`5f37d72984e4de1a1a17388e39b54ce6ae2f71a3`**（main 同路径是 `3a9f6890…`）。
+    现量：`bash -n` OK、634 行、`step "` 15、`step "8b` 1、`shot_evidence` 6、归因层 6、`FOCUS-UNKNOWN` 3，
+    且与 `/tmp/heyta-combo3/C/scripts/verify-mobile-notes.sh` **逐字节相同**（`cmp`）⇒
+    08:4x 那次"顺序无关"的组合测试不是纸面结论，它预测的文件内容和实际落盘的一致。
+  - 🔴 **落补丁的先后是一次真会咬人的顺序**：必须先 `git checkout` 到 main、**再**打三个补丁。
+    因为假红的根修 `53c0ab3a` 落在 `3771edb2` 之后 —— 我先打完补丁才推到 3771edb2，那会儿 lib 里还是旧的
+    `xy_text` 版 `phone_sync`，③ 会带着它跑，第 9 步照样报"找不到「立即同步」"，
+    而补丁里新加的归因腿会把这条红印成"崩了/没在前台"两种猜测之一。
+    现量已核：载体里 `awk '/^phone_sync\(\)/{f=1} f{print} f&&/^\}/{exit}' scripts/lib/mobile-e2e.sh`
+    打出的是 `ensure_phone_sync || return 1` + `sleep 5` + `wait_synced 180`。
+  - ⚠️ **载体现在是脏的，而且是刻意的**：链 v9 那条"载体不干净 ⇒ 不动它"会生效，所以它**不会**再自动把载体
+    推到更新的 main —— ③ 与紧随的 ① 都钉在 `49e9a2fd + 5f37d729` 这一版读数上。
+    下一位要么先把这三个 diff 落到 main 再谈对齐，要么对账时按这个 blob 读；**别把"载体没跟上 main"当成链坏了**。
+  - ✅ **step 8b 取 id 的解析按真源核过**（免得窗口开时白烧一趟 `exit 3`）：
+    `apps/node-host/src/cli.ts:44` 的 `BOOL_FLAGS` 含 `json`，`:322` 在 `--json` 下输出
+    `{ok:true, command:'add', id, due}` ⇒ 补丁里那条"从 JSON 取 `id`"对得上当前源码。
+  - ⚠️ **08:5x 又现形一次"混合工作树红"（口径同上面 08:0x 那条）**：`check:md-tables` 这轮 exit 1，
+    8 处全在 `docs/plans/trash-and-archive.md`（`:734`/`:735`/`:738`/`:1501`…），而 `git status` 那一枚是
+    **`M`（别人正在写的未提交改动）**，本文件 0 处被点名 ⇒ 不由本线代改、也不拿来算本线的门禁账。
 - ✅ **05:3x ⑤ 复核**：`B41/B42/B45` 三行仍在 §7.28 那张「完成条件逐条的现量与差什么」表里（`:1220`/`:1221`，状态 🟡，
     各带自己的现量命令），本夜落笔的六笔只改了 `scripts/verify-mobile-notes.sh` 的第 12 步与
     `apps/desktop-macos/scripts/package-app.sh` 的公证段，加上四份文档，
