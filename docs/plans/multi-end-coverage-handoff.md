@@ -2208,3 +2208,48 @@ git -C …/heyta-wt-batch2 show HEAD:AGENTS.md | grep -c 'windows-pc' → 2     
    变异验证 —— 一次性副本里把 `JAVA_HOME|JAVAEXE` 从过滤器摘掉 ⇒
    `PROBE=LABEL-MISSING 这些标签在读数里不存在：… JAVAEXE JAVA_HOME`、rc=4；
    正跑 ⇒ `PROBE=READY`、rc=0。
+
+## 00:3x 这一批落笔 + 载体差一枚提交（差点把"分流前那版"当成"分流没生效"）
+
+**提交**：`5be80374`（5 档 / +148 −2，未 push）。逐档核过未提交行**全是自己的**：
+`AGENTS.md` 那片未提交 diff 整块是 iOS/Vault/提醒那条线的规则增补（新 13–24 条、traps 索引改成 177–265），
+我那一节 §6.1 早就在 HEAD 里 —— 现取 `git show HEAD:AGENTS.md` 的第 356/362/366/379 行。
+所以 `AGENTS.md` **不进本笔**，别条线的改动一枚没被带走（提交后抽查三档仍 `M`）。
+
+**门禁读数**（00:2x，每条 rc 现取、不接在 `tail` 后面）：
+`check:android-gradle-remote` 真树 **0**（打印含 G7 + G8 两条）· 同档 `--self-test` **0**
+（臂 9 / 10 / 10c / 10b 各要求恰好 1 条红，逐条打 ✅）· `check:android-build-host` **0** ·
+`check:gate-wiring` **0**（链内 84 段、链外 2 道各有消费方，其中 `check:android-build-host` 的消费方是我这份 runbook）·
+`check:md-table-rows` **0**（9 个文件）· `check:script-snapshot` **0**（41 个脚本）· `check:docs` **0**（无死链）。
+
+🔴 **装置坑（候选，待入 traps；现量最大号 270）**：批量跑门禁时我写了
+`f=$(ls scripts/$g.* 2>/dev/null | head -1)`，zsh 的 **glob nomatch 会中断整条命令**——
+`node` 一枚没执行，而紧随其后的 `echo "$g RC=$?"` 拿的是**上一条命令的 0**，于是输出里出现了
+`check-md-tables RC=0` 配一份**空日志**。症状与"这道门禁绿了"逐字相同，靠肉眼才发现（真名是
+`check-md-table-rows.mjs`，`package.json` 现取）。
+可迁移的形状：**空日志 + rc 0** 不是"通过"，是"这条命令根本没跑"；批量遍历里文件名要先从
+`package.json` 取，不要靠 glob 猜，且每条要打印日志首行（首行为空 = 没跑）。
+
+**载体那枚险情**（这条最要紧，因为它会把①的读数指错方向）：
+`heyta-wt-reinstall` 之前在 `691a4b28`，它的 `scripts/run-gradle.mjs` 是**分流前**那一版
+（blob `18ced9e8`，里面只有 `isWindows`，没有远程模式）。我在它上面跑
+`node scripts/run-gradle.mjs --dry-run assembleRelease`，拿到的是**本机 gradle** 的读数
+（`> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE`、`[heyta] 发布签名：keystore = /Users/rocalight/…`），
+看上去完全像"新规没生效 / 还在 Mac 上起 gradle"。真原因是载体陈旧，不是分流逻辑：
+main 那一版 `--dry-run` 会被 `gradleArgs.filter` 剥掉不转给 gradle，且非 win32 默认进 `runRemote`
+（`HEYTA_ANDROID_LOCAL_GRADLE=1` 只是显式例外）。
+⇒ 已把载体对齐到当前 main：`f7da0b9a`，`HEAD:scripts/run-gradle.mjs` = `98a87f29` 与 `main:` 逐字相同，
+脏被跟踪 0 枚 / 未跟踪 0 枚。链自己也会在窗口时对齐（v14 那段按 blob 比），所以这不是必需动作，
+但**下次在载体上做任何 android 预检之前，先比这两枚 blob**。
+⚠️ 诚实登记：那一次确实在这台 Mac 上起了 gradle 的配置阶段（`-m`，不执行任务、无产物），
+违背"Android 任务一律 ssh windows-pc"这条新规 —— 记在这里是为了让后来者别把它当成"验证过远程路径"。
+
+**同步清单分母**（① 的 android 段会推给远端 `C:\src\heyta` 的字节，00:3x 现量）：
+`git ls-files -co --exclude-standard` = **3327** 条，其中含 `node_modules` **0** 条
+（这枚载体的 `node_modules` 与 `apps/mobile/node_modules` 都是**真目录**，被 `.gitignore` 的
+`node_modules/` 正常挡住 ⇒ §7 第 196 条那个"软链挡不住"的形状在这枚载体上不成立）；
+软链 **1** 条 = `.agents/skills/cac-algorithm-filing → ../../../ssos/…`（仓外、与 gradle 输入无关，
+主检出同路径同指向，非本批引入，最多在远端落一枚无意义文件）。
+
+**仍未闭合**：runbook 判据 2（**第一发真远程构建**）还是未实测 —— 宿主的只读前置已在位，
+它只会在窗口内的①里第一次真跑；traps 候选 #271 / #272 也仍待入（台账被别条线占着，不插行）。
