@@ -115,6 +115,7 @@
 | 文件 | 状态 |
 |---|---|
 | [`i18n-multilingual.md`](i18n-multilingual.md) | 进行中 |
+| [`brand-icon-and-splash.md`](brand-icon-and-splash.md) | ✅ 图标与首屏帧已落到 web/Android/iOS（2026-10-04）。**状态与剩余边界只在那份文件里维护**（§7 列 7 条，其中设备端取证与 RN 内容层动效未做），本行只是入口 |
 | [`countdown-anniversary.md`](countdown-anniversary.md) | ⚠️ **本行原来把同一个文件的状态又登记了一遍**（"规划中 → 可开工" + 两道前置闸门），而其中"bundle 体积实测"那道闸门已于 2026-10-03 闭合、批次一已落地 ⇒ 这句成了假话。按"改一处必 sweep 全仓"的规矩，两处登记只留一份：**进度看上面那张表的同名行，落地记录看该文 §3.5**。（保留这行是为了让人看见"状态写两遍"是怎么漂的。） |
 
 ---
