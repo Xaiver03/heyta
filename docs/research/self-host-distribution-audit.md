@@ -5609,3 +5609,78 @@ if (!fields.ok) die(2, `package.json 并集把本批改过的**非 scripts 顶�
 ⚠️ 与 §8.90 同一句提醒：`main` 从 `7471d45d` 又走到 `cc0cb6a8`（这一天里第四次），
 载体每次都要重算。等待链 g71 仍在轮询（最近 `15:21:15 POLL blockers_rc=0 BLOCK行=1`），
 它拿到的工具现在是**带第七族 + 带字段断言**的那一版。
+
+### 8.92 第 2 项的"当前产物"那一档，原来只有**人记着**：`VCS_REF` 打进去却从不读回 —— 补成硬闸，两臂实测（2026-10-04 15:2x）
+
+#### ① 缺口在哪一句里
+
+§8.87 写着"新鲜度由 `VCS_REF == 树 SHA` 现判"。去读被调方本体：
+
+```
+grep -n VCS_REF scripts/verify-selfhost-stack.sh
+  177:  log "==> 打镜像（${IMAGE}，VCS_REF=$(git rev-parse --short HEAD)）"
+  180:    --build-arg VCS_REF="$(git rev-parse HEAD)" \
+```
+
+两行：一行**打印**，一行**传进构建**。没有任何一处把构建出来的那枚镜像的 label **读回来**比对。
+🔴 也就是说那句"新鲜度由 VCS_REF 判"当时的真身是"**由我记得判**"——
+它是人读日志的一次动作，不是这趟运行的一道判据。而同一脚本里紧跟着就有 `IMAGE_ARCH`
+那条**读回**式判据（`docker image inspect … '{{.Os}}/{{.Architecture}}'`，§8.38/G-53 就靠它），
+所以这不是"做不到"，是**少做了一条**。
+
+这正是本仓 §7 第 27／82 条那一族换了个介质：APK 里是旧 JS bundle、Windows 装的是旧树、
+这里是 `--no-build` 复用了一个旧 tag —— 三者的共同点是**症状与"一切正常"逐字相同**。
+
+#### ② 这一档今天就在发生（不是假想敌）
+
+```
+docker image inspect supersync:selfhost-verify
+  → org.opencontainers.image.revision = 959fd1e6b8c9ce25016be2b339e813c18f25b391   （6 小时前那趟）
+git rev-parse HEAD（本分支）
+  → 8bcc53d2dc94c5fffdd324c983ab974d8083bfe6
+```
+
+⇒ 此刻任何人跑 `pnpm verify:selfhost-stack --no-build`，都会拿到一整套 `VERIFY_EXIT=0` 形状的结论，
+而它们全部是在给**另一棵树**的二进制打分。旧那趟（§8.67）本身没问题——它的 label 恰好等于它主张的那笔；
+**问题是没有一条判据能区分"恰好等于"和"差 23 笔"**。
+
+#### ③ 补的判据（`scripts/verify-selfhost-stack.sh:200-215`）
+
+构建／确保镜像那一段之后、任何容器动作之前：
+
+- 读回 `docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}'`；
+- 与 `git rev-parse HEAD` **不等 ⇒ 响亮 die**，把两个完整 SHA 都打出来，并写明
+  "`--no-build` 时这条就是硬闸：要故意验旧镜像请把旧树检出去再跑，**不要为了让这一行过去而改这条判据**"；
+- 相等才继续，并打一行 `被验镜像的 revision == 当前 HEAD（…）`。
+
+🔴 一条诚实边界也跟着打进日志：label 只证明"**构建时那笔 commit**"，**不**证明"构建时工作树干净"
+（构建上下文送的是工作树字节）。所以新增 `构建上下文的未提交条目=N`，
+让下一读的人能把这趟解释成"这一笔 + N 枚脏行"，而不是"这一笔"。
+这一格不是装饰——脏行会不会进上下文取决于跑的人当时有没有未提交改动，
+而**当时那一趟的脏行数没有任何一层记录过**（只有"载体 = 分支 `959fd1e6`"这一句）。
+
+#### ④ 两臂（都不是"改测试凑绿"，两臂都不需要窗口、不碰容器）
+
+| 臂 | 怎么跑 | 读数 |
+|---|---|---|
+| 负（真数据） | `bash scripts/verify-selfhost-stack.sh --no-build` | **`NEG_RC=1`**，`❌ 被验镜像的 OCI revision 与当前树不是同一笔` + 两个完整 SHA；死在 compose 之前，没有起任何容器、没腾任何端口 |
+| 正（同一段代码、输入相配） | 从脚本里 `awk` 抽出那 15 行，把 `TREE_SHA` 预先设成镜像自己那份 revision 再 source | `PASS_BRANCH_RC=0`，打出 `revision == 当前 HEAD（959fd1e6b8c9…）` 与脏行计数 |
+
+⚠️ 正对照用的是**抽出来的同一段**而不是重写一遍——重写的那份不是被测对象。
+（这跟 §8.91 那枚"三棵树读数一样"的教训是同一件事：跨分支/跨输入的比较里，
+必须有一臂走的是"应当不响"的那一支，否则一条恒红的判据看起来像在守护什么。）
+
+#### ⑤ 门禁复跑（这一改动的暴露面）
+
+`check:script-snapshot` `rc=0`（31 个 bootstrap 脚本）、`check:gate-wiring` `rc=0`、
+`check:selfhost-entry-command` `rc=0`（它本来就扫这个文件里的入口命令形状）、
+`docs-link-check` `rc=0`、本文表格对账 `rc=0`。
+
+#### ⑥ 对第 2 项关闭判据的影响（要说清，别读成"第 2 项现在才算做完"）
+
+第 2 项那格 `VERIFY_EXIT=0` 的**读数不变、仍然成立**（§8.76 已逐笔核过零产品字节差，
+四张截图字节入库且人看过）。这一节补的是它缺的**第四层里"当前产物"那一档的机器保证**：
+从现在起，"验的是不是这一棵树的镜像"不再取决于跑的人记得不记得，而 `--no-build`
+那扇逃生门也只剩"这一棵树自己的旧 tag"这一种用法。
+排在 g71 之后的那趟重跑因此**必须**是默认旋钮（`BUILD=1`），否则它会在这里红 ——
+那是正确的红：它拒绝把旧二进制的读数当新读数。
