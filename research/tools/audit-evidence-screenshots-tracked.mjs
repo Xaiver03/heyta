@@ -7,6 +7,16 @@ import { dirname, resolve } from 'node:path';
 const ROOT = process.cwd();
 const files = process.argv.slice(2);
 
+// 🔴 **分母断言**（17:3x 实测照出来的）：不传文件时它扫 0 份，六类**全部**打 `0 个不同路径 / 0 处引用`
+//    并退 0 —— "没有欠账"和"什么都没扫"在输出上逐字同形。这条判据问的是"某句'人已看过'的图
+//    到底在不在库里"，所以它必须先承认自己扫了几份文档，否则它就是一个永远通过的检查。
+if (files.length === 0) {
+  console.error(
+    '🔴 没有输入文件 ⇒ 拒绝以"全 0"收尾。用法：node research/tools/audit-evidence-screenshots-tracked.mjs <doc.md> …',
+  );
+  process.exit(1);
+}
+
 const tracked = new Set(
   execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' })
     .split('\n')
@@ -52,6 +62,9 @@ const rows = [...hits.entries()].map(([p, info]) => {
   return { p, clean, state, count: info.count, where: info.where, pre: info.pre };
 });
 
+// 🔴 分母先打出来：**"扫了 3 份、23 处引用"与"扫了 0 份、0 处"是两种完全不同的读数**，
+//    而它们在没有这行时长得一样。
+console.log(`扫描 ${files.length} 份文档 / 命中 ${rows.reduce((a, r) => a + r.count, 0)} 处图片引用`);
 const order = ['TRACKED', 'TRACKED-by-name', 'ON-DISK-untracked', 'TEMP', 'IGNORED-artifact', 'MISSING'];
 for (const s of order) {
   const g = rows.filter((r) => r.state === s).sort((a, b) => b.count - a.count);
