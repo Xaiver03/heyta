@@ -2741,3 +2741,36 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   那枚 `notarytool submit --wait`（pid 98934）已挂 **9h10m**（父 93817，属另一条线）⇒ 窗口仍关，①③ 继续等。
   链 v19 pid **92734**、哨兵已重启；日志路径**故意不换**（哨兵里 `LOG=/tmp/heyta-chain17.log` 是写死的，
   换名等于再把"探针写死被监视对象名字"犯第三次 —— 版本区分靠行内的 `${CHAIN_TAG}`，不靠文件名）。
+- 🔴 **等窗口的回合用来先静态核两件事：③ 那份输入是不是真的齐、以及"链那把 apk 尺子"和"闸门那把"会不会互相把对方钉死**（都不碰设备、不起 gradle）
+  - **③ 输入核身**（`$HOME/.heyta-pending/notes-e2e-20261004/merged-with-others-f5line.sh`）：
+    `git hash-object` = **`df46f473fae5`**（与链里钉的那枚一致）、**673 行**、`bash -n` OK；
+    `step` 标题现取 **13 段**（负载门 + 0…12 + 8b）。Goal ③ 点名的四段要求**逐段在位**，带行号：
+    第 6 步"恰好一条 NOTE/UPD，且载荷只有 content"(`:358`)、第 7 步反证"不改直接保存 / 点取消都必须一条 op 都不写"(`:390`)、
+    第 8 步第三张截图 `android-notes-3-from-search.png`(`:473`，并已进第 12 步的证据清单 `:642`)、
+    第 9/10/11 步跨设备三条腿（手机上传+下载 `:512`、服务端 Postgres 数那条 UPD `:547`、笔记本 node-host 解得开 `:599`）。
+    第 12 步的截图判据是**三条**而不是"非空白"：`-s` + **mtime ≥ 本轮起跑** + **拍的那一刻前台是本应用**
+    （焦点读不到判 bad 并写明"这不是产品缺陷"），像素/主蓝只打印不设阈值（理由写在 `shot_evidence` 注释里）。
+    ⇒ 这条 attest 的价值：窗口是稀缺资源，不该被一份缺腿的补丁浪费掉；而"齐不齐"这件事**不需要跑起来就能查**。
+  - **两把 apk 尺子会对撞（修在我自己那份 prep 里，没动闸门）**：
+    规范闸门判旧是按 **mtime**（`gate:271-277`，路径集是 `apps/mobile/src packages/{ui,i18n,domain}/src` 的 `.ts/.tsx`），
+    而 `/tmp/heyta-prep-apk.sh` 原来有一支**按提交比内容**的提前 `exit 0`（"零差异就跳过，mtime 不参与判定"）。
+    两者口径不一致 ⇒ 存在可达状态：**内容零差异、但某个源码文件的 mtime 新过 APK**（touch / checkout /
+    别人写过又改回来都能造成）—— 那时 prep 说"不用打"、闸门说"apk 旧"，**两边永远互相等，③ 静默饿死**。
+    v2 改法：内容判定**不再提前豁免**，`SKIP` 必须同时过 mtime 那一腿（prep 的跳过条件严格不松于闸门），
+    两臂都过才打 `VERDICT=SKIP-已有且不比源码旧（且按提交比内容零差异）`。
+    现量对照（载体 `heyta-wt-reinstall`，APK 05:36:40 / 66.9 MB，BUILT_AT `04fa70f6`，载体 HEAD 32391847）：
+    `SAME_CONTENT=0`、闸门那把 = **比源码旧（warn，WHY_APK=1）**、prep 那把的 `NEWER` 命中的是
+    **`apps/mobile/tests/op-sqlite-container-removal.spec.ts`**（闸门那 4 个目录不含 `apps/mobile/tests` ⇒ prep 更严，不会反向饿死）。
+    ⇒ 后果要写明：**下一个合格轮次里 prep 会真打一次 gradle（约 10 分钟、把负载顶上去）**，
+    这是闸门要求的，不绕过；只发生一次，下一轮如果没人改源码就 SKIP。
+  - 🔴 **给闸门属主登记一条缺口，不代改**（该文件此刻在工作树里干净，上次提交 `35dbffe9`，属另一条线）：
+    闸门 apk 腿的 `find` 路径是一份**封闭清单**（4 个目录、只看 `.ts/.tsx`），里面**没有 `packages/app-host/src`**，
+    而 app-host **是**打进 bundle 的（现量 `apps/mobile/src` 里 **54 个文件** import `@heyta/app-host`，
+    含 `App.tsx`；app-host 最新源码 mtime 10:33:43，比那枚 APK 新）。
+    ⇒ 只改 app-host（或 `op-log/storage/shared-schema/sync-client/sync-core/design-system`）时
+    闸门会报"APK 不比源码旧"**而产物确实是旧的** —— 这正是 §7 第 27 条的原形状，只是路径集漏了。
+    我这路不受它影响（prep 看的是整个 `packages`），但**别人单独跑 `--target c` 时受**。
+- 现场（12:33 现量）：负载 `52.64/53.83/38.91`（阈值 12）、`:3000`=70256、`:3100`=26407、
+  `emulator-5554` 上前台仍是 `com.heyta`（pid 22880）、另一条线 `.verify-mobile-card-export-ios.sh.snap.9178` 在跑、
+  那枚 `notarytool submit --wait`（pid 98934，父 93817，属另一条线）已挂 **9h16m** ⇒ 窗口仍关，①③ 继续等。
+  链 v19 pid **92734**（哨兵已重启，日志名不换的理由见上一段）。
