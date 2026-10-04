@@ -89,10 +89,21 @@ LAPTOP_DB=/tmp/heyta-duetime-laptop.sqlite
 # 🔴 定位器写**进程私有**路径，不复用 `/tmp/_xy.py` 那个名字：共享库每轮 `cat >` 重写它
 #    再执行，两轮并发就会执行到对方写到一半的那份（`countdown-anniversary.md:894` 记的同类事故）。
 RID_PY="/tmp/_heyta_rid_$$.py"
+# 🔴 **界面 dump 也走每跑私有路径**，与上面那把同一个理由，而且是 lib 自己留好的旋钮
+#    （`mobile-e2e.sh:38-48` 记过：并行两轮共用 `/tmp/ui.xml` 时，后写的那趟**覆盖前者的证据**
+#    而没人报红）。现量：`scripts/verify-mobile-*.sh` 里 **29 枚**都在用默认那枚共享路径，
+#    只有 `verify-mobile-account-erasure.sh` 改成私有了（它还给了一条更硬的理由：
+#    dump 会把输入框里的令牌抄进本机明文）。
+#    ⚠️ 必须在 source lib **之后**直接改 `UI_XML`（lib 在 source 那一刻已经读过 env，:48），
+#      且本脚本的三个 `rid_*` 助手从此**只读 $UI_XML** —— 一半走变量一半走字面量，
+#      就是 lib 注释里说的"半套现场比全套更难查"。
+#    ⚠️ 边界要说清：设备侧 `/sdcard/ui.xml` 仍是共享的，本改法消掉的是**本机文件被别人的
+#      cat 覆盖**这一族；界面归属那一道由 `assert_channel`（读 `mCurrentFocus`）守。
+UI_XML="/tmp/heyta-duetime-ui.$$.xml"
 # 🔴 这个 trap **替换**了 lib 里的 `trap restore_ime EXIT`（`mobile-e2e.sh:596`）——
 #    所以必须把 `restore_ime` 一起接上，否则本脚本 `disable_ime` 之后就把设备
 #    软键盘永久留在关闭状态，下一个跑这台模拟器的人拿到的是改过的设备。
-trap 'rm -f -- "$RID_PY"; restore_ime' EXIT
+trap 'rm -f -- "$RID_PY" "$UI_XML"; restore_ime' EXIT
 
 TIME_HALF="16:0"   # 半截：只该活在草稿里
 TIME_FULL="16:00"  # 整形：该提交
@@ -156,9 +167,12 @@ else:
     sys.exit(1)
 PY
 
-rid_count() { python3 "$RID_PY" count "$1" /tmp/ui.xml; }
-rid_xy()     { python3 "$RID_PY" xy "$1" /tmp/ui.xml "$TAB_Y"; }
-rid_attr()   { python3 "$RID_PY" attr "$1" /tmp/ui.xml "$TAB_Y" "$2"; }
+# 🔴 三枚助手**只读 $UI_XML**（上面那枚每跑私有的路径）。原来这里写死 `/tmp/ui.xml`，
+#    而同一个脚本里 `dump`/`require_screen`/`screen_txt` 读的是 `$UI_XML` ——
+#    那就是"半套现场"：换路径时一半判据在读**别人的**界面，而它不会报错，只会读到别人的屏。
+rid_count() { python3 "$RID_PY" count "$1" "$UI_XML"; }
+rid_xy()     { python3 "$RID_PY" xy "$1" "$UI_XML" "$TAB_Y"; }
+rid_attr()   { python3 "$RID_PY" attr "$1" "$UI_XML" "$TAB_Y" "$2"; }
 
 # 滚到某个 testID 进可点区（失败返回空坐标）。
 scroll_to_rid() {  # <testID>
@@ -212,6 +226,26 @@ clear_time() {
   time_value
 }
 
+# 红了要**顺带打一句"此刻还有谁在抢这台设备"**。
+# 🔴 这是 (14)/(16) 那两条未定性的唯一可判定形状：`⑧ 之后界面漂到「我的」页` 与
+#    `20:0x 前台是 SIM Toolkit`，在只有画面文字时**两种解释都成立**（我们自己的导航把面板关了 /
+#    另一条线在同一台模拟器上跑它自己的验收），而处置完全相反。
+#    一台设备只有一个前台 ⇒ 这一枚读数（进程级）与 `mCurrentFocus`（窗口级）并排打出来就能分开。
+# ⚠️ `another_mobile_e2e_running` 返回的是 awk 的码（恒 0），**判据是输出非空**，不是退出码。
+who_else() {
+  # 先打**窗口级**归属，再打**进程级**粗筛 —— 前者分得开"我们的应用但走错了屏"与
+  # "整个前台已经不是我们的应用"，后者告诉你谁干的。两枚都要，缺一枚还剩一半解释。
+  local fg other
+  fg=$($ADB shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r' | sed 's/.*Focus=//')
+  echo "      此刻前台窗口：${fg:-〈dumpsys 取不到〉}" >&2
+  other=$(another_mobile_e2e_running)
+  if [ -n "$other" ]; then
+    printf '%s\n' "$other" | sed 's/^/      同一时刻在这台设备上的进程：/' >&2
+  else
+    echo "      同一时刻没有别的移动端验收在跑（这是第 0 步那把粗筛，非权威）" >&2
+  fi
+}
+
 # 判据开跑之前的**通道自检**：hierarchy 非空 **且** 前台还是本应用。
 # 🔴 为什么两条都要：`dump()` 自己有 10 次重试，但它失败之后**不退出**，只是把
 #    `/tmp/ui.xml` 留成空文件（20:0x 实测：lib 自己打印了「已被截成空文件」那一句，
@@ -224,6 +258,7 @@ assert_channel() {  # <在哪一步之前>
   if [ "$cur" != "$PKG" ]; then
     bad "「${1}」之前通道自检失败：前台是「${cur:-空}」而不是 ${PKG}"
     echo "   ⇒ 从这里起的每一条「找不到 X」都是打在别人的界面上，不是产品没画。" >&2
+    who_else
     screen_txt
     exit 3
   fi
@@ -306,6 +341,9 @@ SCROLL_FROM_Y=$((SH - 500))
 SCROLL_TO_Y=$((SH - 900))
 OK_X=$((SW - 135))
 ok "设备在线：${SCREEN}，坐标 TAB_Y=$TAB_Y MID_X=$MID_X 我的=$OK_X,$TAB_Y"
+# 🔴 把**读数的落点**也打进日志：这一族脚本历史上共用 `/tmp/ui.xml`，
+#    而"我读的这份界面是谁写的"必须能从日志里回答，不能事后靠猜。
+ok "界面 dump 每跑私有：UI_XML=${UI_XML}（设备侧 /sdcard/ui.xml 仍共享 ⇒ 归属由 assert_channel 读 mCurrentFocus 判）"
 
 HEALTH=$(curl -s --noproxy '*' -m 5 "${HOST_SERVER}/health" 2>/dev/null)
 if ! printf '%s' "$HEALTH" | grep -q '"status":"ok"'; then
@@ -596,6 +634,7 @@ if open_sheet "$TITLE"; then
   #    "树里就没有"（产品/渲染回退）与"有但滚不到"（探针/布局）。
   if [ -z "$XY8" ]; then
     bad "⑧ 重开后面板上取不到时刻输入框的可点坐标（树里 $RAW8 枚）—— 面板没绑到这一条任务？还是整页已经不是详情面板？"
+    who_else
     screen_txt
   else
     GOT=$(time_value)
@@ -603,11 +642,13 @@ if open_sheet "$TITLE"; then
       ok "⑧ 重开后框里仍是 ${TIME_FULL} —— 写进了 op-log"
     else
       bad "⑧ 重开后框里是 '$GOT'（空框锚点是 '${TIME_EMPTY}'）—— 上一次写的时刻没落库"
+      who_else
       screen_txt
     fi
   fi
 else
   bad "⑧ 重开面板失败"
+  who_else
   screen_txt
 fi
 
