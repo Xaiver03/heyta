@@ -2989,3 +2989,29 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   门禁只扫 `docs/`，代码注释里的行号引用**没有任何一层在守**；它坏了也不会红。
   ⇒ 扫的时候不要带 `--include=*.md`（zsh 还会把没引号的 glob 变成 `no matches found` 直接吃掉整条命令）。
 - 四道文档门禁在改完 BLOCKED.md 之后现量 EXIT=0：`check:doc-citations` / `check:docs` / `check:md-tables` / `check:docs-voice`（13:46 与 13:48 两趟，后者是加了 §7.31.5 之后复跑）。
+#### 7.31.7 ① 那"四张截图逐张写明钉到哪一步"的对照表**先按实现读出来**，窗口里只填读数（13:57 现量）
+
+等窗口的回合不做设备动作，但可以把 ① 收尾最贵的那一步（逐张写明"这张证的是哪一步"）先做完，
+免得窗口开时凭印象写。路径与判据全部现读 `scripts/reinstall-all.sh` 与启动器 `:171-175`：
+
+| 截图（启动器期望的 5 张） | 出自哪一段 | 它钉住的那一步（现读实现，不是推测） |
+|---|---|---|
+| `/tmp/heyta-reinstall-mac-installed.png` | mac | `package-app.sh` 打完 → 拷进 `/Applications/Heyta.app` → **安装副本**自己启动并 `HEYTA_SELF_CAPTURE` 自截屏 ⇒ 证"装上的是这轮产物且能起一个真窗口" |
+| `…mac-installed.png.webview.png` | mac（同段副证） | 主蓝 `countBrandBlue ≥ 20` **数的是这张**（`:235` 写明壳的规定）⇒ 证"那份共享 UI 真渲染了"；窗口那张只证"有个窗口"（10-03 实测：窗口图 48KB / 主蓝 0 是空暗窗口） |
+| `/tmp/heyta-reinstall-android.png` | android | `pnpm build:android` → `adb uninstall` → 模拟器**全新安装** → `exec-out screencap` ⇒ 证"装的是当前 Release APK、首屏是共享 UI" |
+| `/tmp/heyta-reinstall-ios.png` | ios | 🔴 **只有过了新鲜度门才存在**：`FRESH=1`（已装 `main.jsbundle` 比源码新）→ `simctl launch` → sleep 10 → `simctl io screenshot` ⇒ 这张图**出现本身**就证到"装上的包比源码新" |
+| `dist/windows/packaged-first-run.png`（**载体相对路径**） | windows | 远端 `windows-pc` 打包 + `Remove/Add-AppxPackage` + 交互会话启动截图；四条判据 `ADD_APPX=OK`/`RESULT=OK`/`PAYLOAD_WEBDIST=True`/`M2D=OK`（🔴 **出处是 `scripts/lib/msix-install-facts.sh:18-21`，由 `reinstall-all.sh:158` source** —— 不是 `reinstall-all.sh` 自己写的，去那儿 grep 会命中 0） ⇒ 证"MSIX 里带 web-dist 的当前产物，且壳认出自己的界面" |
+
+- 🔴 **这些截图都不回答「装的是不是这一批的产物」**（traps #178 那条分界），这轮现读到有两个专门的替身：
+  mac 段是一条**带分母的对账**（`reinstall-all.sh:207-222`：装出来的 `.app/Contents/Resources/web-dist/assets`
+  的 chunk 集合 vs 本机 `apps/web/dist`，对不上、或**没有分母**（`.app` 里根本没有 web-dist/assets）就直接 🔴）；
+  ios 段是新鲜度门 `BUNDLE_MTIME ≥ SRC_MTIME`，且**两个 mtime 任何一个算不出来就直接判红**（`:450-455`），
+  判红之后连截图都不拍 ⇒ 所以"ios 那张图存在"本身就证到新鲜度门过了。① 记账时这两条要各占一行，
+  不要让截图去回答它回答不了的问题。
+- 窗口里要填的只有两列：**每张的 mtime/字节/md5** 与 **是否 `本轮新生`**。启动器已经把这条做成了硬门：
+  `FRESH != EXPECTED` ⇒ `VERDICT=NOT-RUNNING` 且 **exit 3**（不是 0），所以"拿旧图交差"在启动器这一层就会被拒。
+- 🔴 **`/tmp` 那四条路径是共享的**（另一条会话的 reinstall 写同名文件），而启动器 `:180` 那段已经把每张
+  `cp -p` 进私有证据目录 `$EVID`（载体相对那张另存 `$EVID/carrier/`）⇒ 我这次**没有再造一个采集器**，
+  先读了实现（记忆里"手写探针前先 grep 仓内现成装置"那条正向命中一次）。
+- ⚠️ 一张图都没跑过之前，这张表证的是"**判据规定它钉哪一步**"，不证"它这轮真钉到了"。
+  真钉到 = ① 那趟 `INNER_EXIT=0` + `FRESH=5/5` + 我逐张打开看过。
