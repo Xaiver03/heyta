@@ -133,7 +133,7 @@ W0 文档纠正、W6 value 那一米：与上面全部正交，随时可插队
 
 | 单 | 状态 | 读数（判据条数 / 变异臂红集 / 截图路径 / 四端是否重装） |
 |---|---|---|
-| W0 | ✅ 已完成（① 2026-10-03；② 补落地 2026-10-04 09:2x，见 §8.25 第一档） | 两处过期都改在**文档本体**：① `docs/reference/architecture.md` 的实体清单里 `FocusSession` 原写 `mode(pomo/stopwatch), duration` —— 三个字段**都不存在**，真实形状是 `kind(work/shortBreak/longBreak) + plannedMs + actualMs? + completed? + startedAt? + endedAt?`（逐字段核对 `packages/domain/src/entities.ts` 的 `FocusSessionKind` 与 `interface FocusSession`）；② `docs/README.md` 对 ADR-0043 那句「⚠️ 代码未开工」改成已落地并留了更正痕迹（指向调研 A0.8 的取证）。**判据**：`docs-link-check` 无死链 + 两份文档不再与代码冲突（人工核对，无自动判据 —— 按 §2 那一行写明的"允许只做人工核对并在此登记"，这条**没有**变异臂，别把它当成有牙的）。⚠️ 归属：`docs/README.md` 同一文件里另有别人 7 行未提交的改动，所以我**没有**单独提交那一行，改动作废在工作树里，由下一次整文件提交带进去。🔴 **那句"由下一次整文件提交带进去"落空了**（2026-10-04 09:1x 现量：本分支 HEAD 与 `main` 两份 `docs/README.md` 里 `代码未开工` 那句**都还在**，工作树也没有那笔改动 ⇒ ② **从来没有落地**，而本行此前写着"✅ 已完成" —— 这是一次过度主张，不是措辞不严）。当场按**五条逐项现量**改掉（每条给了 `file:line`，见 §8.25 第一档），并复跑 `check:docs-voice` / `check:claims` / `check:reachability` 各 **RC=0**、`docs-link-check` 对本文件 **0 命中**、README 那张表 **139 行列数零不一致** |
+| W0 | ✅ 已完成（① 2026-10-03；② 补落地 2026-10-04 09:2x，见 §8.25 第一档；🔴 ② 那一行 09:4x 又按现量修了一次 —— "五档全部落地"把 web 独占的拖拽读成了两端都接，见 §8.29） | 两处过期都改在**文档本体**：① `docs/reference/architecture.md` 的实体清单里 `FocusSession` 原写 `mode(pomo/stopwatch), duration` —— 三个字段**都不存在**，真实形状是 `kind(work/shortBreak/longBreak) + plannedMs + actualMs? + completed? + startedAt? + endedAt?`（逐字段核对 `packages/domain/src/entities.ts` 的 `FocusSessionKind` 与 `interface FocusSession`）；② `docs/README.md` 对 ADR-0043 那句「⚠️ 代码未开工」改成已落地并留了更正痕迹（指向调研 A0.8 的取证）。**判据**：`docs-link-check` 无死链 + 两份文档不再与代码冲突（人工核对，无自动判据 —— 按 §2 那一行写明的"允许只做人工核对并在此登记"，这条**没有**变异臂，别把它当成有牙的）。⚠️ 归属：`docs/README.md` 同一文件里另有别人 7 行未提交的改动，所以我**没有**单独提交那一行，改动作废在工作树里，由下一次整文件提交带进去。🔴 **那句"由下一次整文件提交带进去"落空了**（2026-10-04 09:1x 现量：本分支 HEAD 与 `main` 两份 `docs/README.md` 里 `代码未开工` 那句**都还在**，工作树也没有那笔改动 ⇒ ② **从来没有落地**，而本行此前写着"✅ 已完成" —— 这是一次过度主张，不是措辞不严）。当场按**五条逐项现量**改掉（每条给了 `file:line`，见 §8.25 第一档），并复跑 `check:docs-voice` / `check:claims` / `check:reachability` 各 **RC=0**、`docs-link-check` 对本文件 **0 命中**、README 那张表 **139 行列数零不一致** |
 | W1 | 🔄 **进行中**（接线、判据、**真浏览器截图 + 人看图**都已闭合；只剩 AGENTS §6.1.1 的**四端重装**，所以还不算已完成） | **已落地**：单一所有者收拢 —— `packages/app-host/src/selection.ts`（封闭词表 + `createSelectionStore` + 纯函数 `pruneMissingSelection`/`pruneSelection`），四份本地 `useState` 全删，两端各只留一份宿主胶水 `apps/{web,mobile}/src/lib/selection.ts`。🔴 **词表从 6 类改成 3 类**（`task|habit|note`）：`project`/`tag`/`event` 是**投机项** —— 两侧的 prune 谓词照着写了 project/tag，而**没有任何一处界面会选中一条清单或标签**（它们在两端都是筛选/导航），"支持六类"读起来像已完成、实际只有三类活着。这条被升级成常驻门禁的**断言 D**（逐类扫宿主有没有 `select/useSelected`，零消费者即红；词表从数组字面量现读，解析出 0 项也算红）。💥 **本轮现场抓出的两个真缺陷**：① `apps/web/src/features/quadrant/QuadrantBoard.tsx` 把 `onOpenTask`/`activeTaskId` **声明了、解构了、没往共享板子传** ⇒ "三种投影接同一个选中"实际只有两种接上，而两个 prop 都是可选的 ⇒ **typecheck 全绿、当时四条门禁全绿**，症状只是"四象限不跟随选中"（→ §7 #179）；② `openNoteFromSearch` **签名里不收 id** ⇒ 搜索结果点便签只换视图、什么都不打开。③ 顺手补掉一条既有的端间不一致：web 时间线的行体此前**根本不可点**，而触屏端早能。**判据**：共享层 16 条（`packages/app-host/tests/selection.spec.ts`）+ web 选中 16 条（`task-selection.spec.tsx`）+ mobile 13 条（`selection-single-owner.spec.ts`）+ 三种投影各自的行为判据（`quadrant-row-parity.spec.tsx` 新增 2 条、`timeline-board.spec.tsx` 新增 3 条、`notes-view.spec.tsx` 新增 3 条）+ 门禁 `check:selection-single-source` **五条断言 A–E**（E 是本轮新增：同文件内比"声明"与"使用"）。🔴 **载体发现（写进 §7 #178）**：RNW 在 jsdom 里把样式编译成 class（`r-backgroundColor-*`），`el.style.backgroundColor` **恒为 `''`** —— 用它当判据第一次就得到"三种投影全都没底色"这种**看起来像三个真缺陷**的空读数；底色一律走 `getComputedStyle`（未选中是 `rgba(0, 0, 0, 0)`，不是空串）。**变异臂（两趟 rig 共 18 臂，每臂跑完复原并复跑回到绿；终态 Z2 = web/mobile/门禁三处 RC=0）**：14 条正臂按设计转红（门禁 A/B/B2/B3/C/A2/D/E/E2/E3-分母自检 + TaskList 底色 + TimelineBoard 两处底色 + 两处 `onPress` + NotesView 退回本地态 + 搜索丢 id + web 四处投影断一处 + mobile 回落摘一处 + mobile 三处投影全摘）；🔴 **一条第一次跑活了**：把 web 便签换回**裸名** `const [editingId] = useState(null)` 时门禁**全绿** —— 而文档块里当时写着"仍未覆盖：不带实体名的 editingId"，即这条缺口我**登记过但没验证**。补上裸名分支（`detailId|selectedId|editingId`，刻意不含 `active`/`open`：四象限的 `activeId` 是 dnd-kit 正在拖哪一颗）后重跑**转红**；为此把 `PasskeyPanel` 那份行内改名编辑器的状态改名 `editingRowId`（第一次我改成 `renamingId`，撞上 store 里已有的"请求在途那条"——两个概念不能并成一个名字，断言把它挡在写盘前）。两条负向对照绿：字样只写进注释、以及树上活着的 `activeId`/`editingRowId` 不被误伤。**读数**：门禁绿（`词表 3 类全有消费者（task 10 / habit 7 / note 13）、接线声明 17 处全部用起来`）；本轮直接跑的 `task-selection + timeline-board + quadrant-row-parity + notes-view` = **55 passed / 0 failed**；web/mobile/app-host/ui 四包 typecheck RC=0；`check:docs` 归因见 §8.1（三处死链指向**别人未提交**的在途文档，已把链接改成带状态的指针）。**真浏览器取证已闭合（2026-10-03 22:4x，载体 `feat/detail-pane` = `d5b835b5`）**：新增 `e2e/tests/selection-projections.spec.ts` **3 条**，跑法与读数：生产构建载体（`vite build` + `vite preview`，端口 4358）上 **3 passed / 0 failed**；截图五张落在 `apps/web/evidence/selection-projections/{01-list,02-quadrant,03-timeline,04-switch,05-search}.png`，**五张都逐张打开看过**：列表与搜索那两张里选中那条带浅蓝底、另一条白底；四象限那张选中那条落在"先不做"格里且带同一种蓝；时间线那张"未排期（2）"里只有第一条带蓝；换选中那张是**第二条**带蓝、第一条回到白底。看图还照出一件断言看不见的事：`switchView` 用鼠标点 rail，**rail 的 tooltip 会留在下一张图上**，第一版 `03-timeline.png` 里那句"四象限"正好压在选中那条的标题上 ⇒ 截图前 `parkCursor`（把鼠标挪开），这不是美化，§6.2 要的是"人能看懂的那张图"。🔴 **23:5x 两处更正（载体 `0de58095` + `0c159f7f`）**：① 那五张图已随 W2 的第四列整体重跑并**逐张重看**（选中态在四种投影里读数不变）；② 更要紧的是读底色的探针里有一条**会假绿**的机制被照出来了 —— Chromium 对**已从文档分离**的节点 `getComputedStyle` 返回空串，而判据写的是"选中那条 ≠ 同屏没选中的那条"，空串永远不等于任何真实底色 ⇒ **"根本没读到值"会被判成"画上选中色了"**。症状先以一次假红出现（两遍连跑全绿、第三遍红），所以这类"偶发红"要按**探针故障**查，不要按产品抖动放过。现在探针先等到算得出来为止，自检臂（把读数改成恒返回空串）实测 3 条全红。
 🔴 **四臂变异（每条改完重新 `vite build` 再跑，判据读的是产物）**：A1 宿主不给四象限传选中 → **1 红**（红在那条跨投影用例）；A2 包装层声明了不转发（§7 #179 的形状）→ **1 红**；A3 宿主不给时间线传选中 → **1 红**；A4 点行根本不写选中 → **2 红**，而**搜索那条不红** —— 这不是漏网：搜索出口的生产者本来就是 `openTaskFromSearch` 不是 `openTask`，两臂各打一半正好证明这两个入口是**两条独立的线**。四臂跑完 `apps/web/src` 复原并复跑回 3 绿。
 ⚠️ **载体边界（不写成"门禁已验"）**：这条 spec 落在 `e2e/tests/` 里，`pnpm check:ai-e2e` 用的是 **dev 载体**，而 **linked worktree 里 dev 载体结构性起不来** —— vite 默认 `fs.allow` 只有 worktree 根，`node_modules` 软链到主检出，`@sqlite.org/sqlite-wasm` 的 wasm 走 `/@fs` 被拒（实测日志原文：`The request id ".../sqlite-wasm/dist/sqlite3.wasm" is outside of Vite serving allow list.`），症状是"三条全红、红在 `openApp` 第一步找不到输入框"，长得像产品坏了而其实是载体。所以我用**主检出的 dev 服务**（端口 4362，只读源码、跑完按 PID 关掉）做了一次"载体形状对照"：**3 failed，每条都红在 `task-item-* 一直没画上选中色`** —— 而主检出那棵树上没有本分支的 W1 接线。这条读数是双向有用的：它同时证明①这条 spec 不依赖生产构建、dev 载体上照常执行；②它会在"接线不存在"的树上响亮地红。
@@ -1499,12 +1499,18 @@ pnpm 的 deps-status 预检当场试图**移除共享的 modules 目录**，只�
 |---|---|
 | 1 `Task` 两字段 + `TaskActions.setSchedule` + store 外观 | `packages/domain/src/entities.ts:143 startDate?`；`setSchedule` 在 `packages/app-host/src/actions.ts`，消费方 `apps/web/src/features/tasks/store.ts`、`App.tsx`、`features/timeline/TimelinePanel.tsx` |
 | 2 三态推导 + note 回退 | `deriveTaskTimePosition` 在 `packages/app-host/src/timeline-plan.ts`，读时回退在 `packages/app-host/src/duration-note.ts` |
-| 3 `range` 条渲染接线 + 拖拽手势 | `packages/ui/src/timeline/TimelineBoard.tsx:133-219` 那组 `onStartShouldSetResponder` + `dragRef` / `dragPreview` |
-| 4 判据（op 形状 / 离线刷新 / 绕过 dispatch 的变异） | `apps/web/tests/timeline-schedule.spec.tsx`（describe 原句「拖拽 → setSchedule → 恰好一条形状正确的 op」）、`packages/app-host/tests/set-schedule.spec.ts`、`packages/app-host/tests/timeline-plan.spec.ts`、`packages/domain/tests/timeline.spec.ts` |
+| 3 `range` 条渲染接线 + 拖拽手势 | ~~（第一版到这里就停了）~~ 🔴 **09:4x 复测：这一档只落了 web 半，我上一版把它整个记成"落地"是过度主张** —— `packages/ui/src/timeline/TimelineBoard.tsx:133-219` 那组 `onStartShouldSetResponder` + `dragRef` / `dragPreview` 全在 `onScheduleTask === undefined` 的开关后面（`:448`、`:577`、`:617`、`:623`、`:633`、`:658`、`:695` 七处分支），而 web 传（`apps/web/src/App.tsx:2274`）、**mobile 不传**（`apps/mobile/src/screens/TimelineScreen.tsx:59-67` 只给 `rows`/`labels`/`onOpenTask`/`activeTaskId`/`compactTicks`/`testID`）⇒ RN 端那三条 responder 一行都不接。ADR 原文其实把这一档写成"web Pointer 优先，移动端手势在 goal §4 的 P3 列表"，**是它对的、我读漏了半句** |
+| 4 判据（op 形状 / 离线刷新 / 绕过 dispatch 的变异） | `apps/web/tests/timeline-schedule.spec.tsx`（describe 原句「拖拽 → setSchedule → 恰好一条形状正确的 op」）、`packages/app-host/tests/set-schedule.spec.ts`、`packages/app-host/tests/timeline-plan.spec.ts`、`packages/domain/tests/timeline.spec.ts`。⚠️ **骨架 2 的形态要说清**：它不是"真刷新一次浏览器"，而是文件头 `:11`/`:55` 自己写的"引擎重放出的物化状态就是离线刷新后看到的东西"（同一文件 `:14` 把骨架 3 写成"把 `store.setSchedule` 改成绕过 dispatch 直改实体"的**变异设计**）—— **这一臂我这一轮没有取证它跑过**，要取证去 `plans/goal-timeline-rework.md`，别把我"文件存在"读成"三臂都红过" |
 | 5 i18n 中英同步 | 排期相关键 zh **7** / en **7**（`sort -u \| wc -l` 两侧同数） |
 
-⇒ README 那一行改成"🔄 P2 的五档代码到 2026-10-04 已全部落地"并逐条带上 `file:line`；
-同一句"未开工"**还留在那份 ADR 的 §7 标题里**，本单不动别人的 ADR（AGENTS §8），登记为抄件漂移。
+⇒ ~~README 那一行改成"🔄 P2 的五档代码到 2026-10-04 已全部落地"并逐条带上 `file:line`~~
+**这句在同一个 09:4x 被上面的第 3 档否证了一半，已第二次改掉**（现在是"3/4/5 三档已落、第 3 档只有 web 半"）。
+🔴 这一条值得留原句：它不是别人写错、**是我把"共享层有这组代码"读成了"两端都接上了"**，
+而分辨两者的唯一办法是去数消费者传没传那个 prop —— `TimelineScreen.tsx:59` 一眼就看得出来。
+同一句"未开工"~~还留在那份 ADR 的 §7 标题里，本单不动别人的 ADR，登记为抄件漂移~~ ——
+**09:4x 复测：那句标题在 `main` 与本检出逐字节相同**（`git diff --quiet main HEAD -- 那份 ADR` 无输出），
+也就是说两条线各修了 README、**谁都没修 ADR 的 §7**。处置不变（不在本单改别人的 ADR），
+但登记理由换了：进度主人是 `plans/goal-timeline-rework.md`，README 只该是指针。
 复跑（都用 `node` 直调，见第三档）：`check:docs-voice` **RC=0**（扫 1028 条、禁词 30 项零命中）、
 `check:claims` **RC=0**、`check:reachability` **RC=0**、`docs-link-check` 对 `docs/README.md` 与本文件各 **0 命中**
 （外来那两条不变），README 那张表 **139 行、列数零不一致**。
@@ -1629,10 +1635,78 @@ W1 那句"四份本地 `useState` 全删了"此前只由门禁的**名字表**�
 ① 本节引用的 **17 处 `文件:行号`** 逐行 `sed -n '<N>p'` 回读，needle 命中 **17/17**（含 `:146-148` 那段
 注释原文，它是"两个名字像但不是一件事"这句话的出处，不是我复述的）；
 ② `node scripts/check-docs-voice.mjs` → exit **0**（1028 条、禁词表 30 项零命中）；
-③ `node research/tools/docs-link-check.mjs` → exit **1**，两条都在**别人名下**且**文件全干净**
+③ `node research/tools/docs-link-check.mjs` 那一次报 exit **1**、两条都在**别人名下**且**文件全干净**
 （`git status --porcelain` 对 `docs/plans/countdown-anniversary.md` / `PROGRESS.md` / `docs/adr/README.md` 零输出）：
-`countdown-anniversary.md:1280 → docs/adr/README.md §1`（章节号不存在）与 `PROGRESS.md:1362 →
-docs/research/aed-implementation-evidence.md`（死链）。⇒ **本批没有把文档门禁改红**，处置沿用 §8.24：
-登记、不代改。⚠️ 与 §8.24 那条读数的差别要说清，别读成"主检出已修而这里没修"就完了：
-countdown 那一句在 **main** 上已被改写成页内锚点，而**本检出落后 main 416 笔**，所以这里必然还看得见它 ——
+一条是 `countdown-anniversary.md:1280` 指向 ADR 台账的**带 `§` 号小节引用**（那个章节号不存在），
+另一条是 `PROGRESS.md:1362` 指向一份还不存在的 AED 取证文档（死链）。
+⚠️ ~~⇒ **本批没有把文档门禁改红**~~ —— **这句在下一趟复跑就被自己的提交否证了**：我在③那段里
+**把那条坏引用的字面形状原样抄了一遍**（"某文件 → 某路径 §数字"这个形状本身就会被检查器当成一条新引用），
+于是同一道门禁从 1 处变 **2 处**、第二条红指向我自己这一节。
+这正是本篇 W7 那行早就登记过的同一种错（"描述坏链要说形状，不要照抄那串"），**而我是在写了那条记录之后又犯了一次** ——
+登记过不等于免疫，凡是"复述别人的坏引用/坏断言原文"的句子，落笔后要立刻用那道门禁复跑一次。
+改法：把复述换成形状描述（本段现在就是这么写的），复跑回到 1 处、且**我这两个文件零命中**。
+处置沿用 §8.24：外来那两条**登记、不代改**。⚠️ 与 §8.24 那条读数的差别要说清，别读成"主检出已修而这里没修"就完了：
+countdown 那一句在 **main** 上已被改写成页内锚点，而**本检出当时落后 main 416 笔**（这笔数会漂，最新读数在 §8.29），
+所以这里必然还看得见它 ——
 **同一门禁在不同载体上的红集不同，报数时必须带载体**（§8.25 第二档那条是同一个机制的代码版）。
+
+## 8.29 合流面从 3 个文件变 **4 个**，原因不是新撞车而是**同一行被两条线各修了一次**（2026-10-04 09:4x 现量；本节零代码改动）
+
+`git merge-tree --write-tree --name-only main feat/detail-pane` → `MERGE_TREE_RC=1`，冲突清单四条：
+`docs/README.md`、`docs/reference/environment-traps.md`、`packages/app-host/src/habit-actions.ts`、
+`packages/app-host/tests/habit-actions.spec.ts`。§8.24 记的是三条 —— **`docs/README.md` 是新进来的一条**，
+而且它进来了不是因为别人在改它，是因为**我**在 W0② 改了它那一行（`96e7519b` + `91e2a573`），
+而 `main` 上另一条线**独立把同一行也改对了**。同一时点 `BEHIND=423` / `AHEAD=43`（§8.24 那对 416/37 已被吸收，
+这笔数每轮都要重取）。
+
+**两边各写了什么**（`awk '/0043-timeline-p2/'` 各取一行，按公共前缀/后缀切，前缀 332 字符、后缀 26 字符相同）：
+
+| 侧 | 那一行的状态段 | 它的形状 |
+|---|---|---|
+| `main` | `✅ **代码已落地**（P2 的字段、setSchedule、三态生产者、拖拽手势；进度与读数见 plans 两份）` + 一句"原先那个状态是过期半句，取证过程记在调研 A0.8" | **结论 + 指针**（不在索引里逐档举证） |
+| 本检出 | 我那次改的"五档代码已全部落地" + 逐档 `file:line` 枚举 | **结论 + 抄了一份逐档账** |
+
+🔴 两边都删掉了同一句过期话、都没删错，但**我这版是双份事实源**：逐档读数住在计划里就够了，
+索引行抄一份就一定会漂 —— 而它**当场就漂了**（见下面那条现量）。⇒ **合流处置：取 `main` 的指针形状，
+把我那半句限定并进去**（"拖拽手势只有 web 半"），逐档账留在本篇 §8.25 第一档。本检出这一行已经按这个形状改好，
+所以那第四条冲突合流时是**一行对一行择一**，不是三方缠斗。
+
+### 现量：那句"已全部落地"是错的，错在把"共享层有这组代码"读成"两端都接上了"
+
+`TimelineBoard` 那组 responder 的**七处**分支全部挂在 `onScheduleTask` 是否为 `undefined` 上
+（`packages/ui/src/timeline/TimelineBoard.tsx:448`、`:577`、`:617`、`:623`、`:633`、`:658`、`:695`），
+消费者两侧：**web 传**（`apps/web/src/App.tsx:2274` `onScheduleTask={(taskId, change) => {`）、
+**mobile 不传**（`apps/mobile/src/screens/TimelineScreen.tsx:59-67` 只给 `rows`/`labels`/`onOpenTask`/
+`activeTaskId`/`compactTicks`/`today`/`now`/`testID`）⇒ **RN 端拖拽一行都不接**。
+📌 ADR-0043 §7 第 3 档原文就写着"web Pointer 优先，移动端手势在 goal §4 的 P3 列表"——
+**是它对的、我读漏了半句**。这一条的形状和 §8.20 那次"只读 agent 把 `busyTaskId` 报成选中态"是同一族的另一侧：
+那一次是**把不是选中的读成选中**，这一次是**把共享层的代码当成两端的能力**。
+可迁移的判据：**凡是"A 层有这段代码 ⇒ A 的两个消费者都有这个行为"，分辨办法只有一个 —— 去数消费者传没传那个开关**。
+
+顺带把 §7 第 4 档的口径钉准（我上一版把它整档写成"判据存在"）：`timeline-schedule.spec.tsx` 文件头 `:11`/`:55`
+自己写明"骨架 2 的形态 = 引擎重放出的物化状态"，`:14` 把骨架 3 写成"绕过 dispatch 直改实体"的**变异设计**；
+**这一臂本轮没有取证它跑过**，要取证去 `plans/goal-timeline-rework.md`。⇒ 别把"判据文件存在"读成"三臂都红过"
+（本篇 §4 第 3 条那条纪律的同一种违反，是我自己犯的）。
+
+### 本轮被这些改动带出的两条门禁读数（都是现跑，载体 `feat/detail-pane`）
+
+1. `docs-link-check`：我第一次复跑 **exit 1 / 2 处章节引用红**，其中**第二条指向我自己 §8.28 的行**——
+   因为我把那条坏引用的**字面形状原样抄进描述里**了（本篇 W7 那行登记过的同一个坑，我犯在写完它之后）。
+   改成形状描述后复跑回到 **exit 1 / 1 处**（只剩外来那两条家族里的 countdown 一条 + `PROGRESS.md` 一条死链），
+   且 `docs/README.md` 与本文件**各 0 命中**；`check:docs-voice` 与 `check:claims` / `check:reachability` 见下面收尾。
+2. ADR-0043 那份文件在两侧**逐字节相同**（`git diff --quiet main HEAD -- <那份 ADR>` 无输出）⇒
+   我这次没动它，所以它**不会**成为第五条冲突；但也正因如此，它 §7 标题里那句过期话**两条线都没修**，
+   而进度主人是 `plans/goal-timeline-rework.md`（索引行只给结论与指针）⇒ 本篇不代它改，登记在此。
+
+**收尾读数（提交前在同一条命令里逐条现跑，载体 `feat/detail-pane`、本检出）**：
+
+| 命令 | RC | 读数 |
+|---|---|---|
+| `node research/tools/docs-link-check.mjs` | **1** | **1 处**失效章节引用（`docs/plans/countdown-anniversary.md:1280`）+ **1 个**死链（`PROGRESS.md:1362`）；本篇与 `docs/README.md` 各 **0 命中** |
+| `node scripts/check-docs-voice.mjs` | **0** | 扫 `site.*` 1028 条（豁免自托管 120 条），禁词表 30 项零命中 |
+| `node scripts/check-claims.mjs` | **0** | 6 个平台都能在 roadmap 找到对应条目；已建模 10 个实体各有写路径与宿主调用点，未建模清单 5 项已结清 |
+| `node scripts/check-reachability.mjs` | **0** | 通过 |
+
+📌 这一节的**取代表动作**本身也值得留一句：判断"两端有没有这个行为"用的是 `grep -n "onScheduleTask"` 数
+消费者 + `sed -n '59,67p'` 读那一处 JSX 的实参清单，**不是**在共享层里找 `Platform` 分支 —— 共享层根本没有分支，
+差别完全落在"宿主传没传"这一维上。
