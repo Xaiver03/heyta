@@ -8877,6 +8877,14 @@ runbook 那一节加了一段指针，说明谁是命令本体、谁是逃生门
 `node research/tools/docs-link-check.mjs` 打印"无死链…无失效章节引用"（新加的 `.mjs` 散文引用不在扫描集内 —— 它只收 `.md`）；
 dry-run 守卫读数 `HEAD=0ba6df54 · main=cd689365`、构建输入脏 **0** 条 ⇒ 拒发，退 1，一条命令没执行。
 
+**守卫的正反两路都在真实树上各跑过一趟**（不是只有假 git）：在临时 detached worktree
+`/tmp/heyta-pubcheck-<pid>` 里 checkout 本批一笔（`6da18b2f`），`--selftest` 臂数 23·红 0；
+`HEYTA_PUBLISH_REF=<该笔 SHA>` 时守卫成立、九步全打印、`B_RC=0` 且**一步都没执行**（默认 dry-run）；
+把 `pnpm-lock.yaml` 追加一行 ⇒ `C_RC=1` 并点名 `M pnpm-lock.yaml`；还原后把 `apps/web/src/main.tsx`
+追加一行 ⇒ 同样拒并点名。用完 `git worktree remove --force` 清场。
+⚠️ 这一趟的"守卫成立"是**拿 SHA 当 ref** 做的正路验证（模拟"这棵树正好等于要发的那一笔"），
+真实发布时 ref 是 `main` —— 两者走的是同一条比较，但**这不等于线上已经可以发**。
+
 **没有主张的事**：`--confirm` **没有跑过**（对外动作，且现在这棵树不是 `main`）；
 这条链**没有自动消费方** —— 它是落地之后由人敲的一次动作，它的"消费者"是 runbook 那一节 + 它自己的两条自检。
 所以它不进 `pnpm check`（一次发布不该变成每次 push 都跑的东西），但它一旦红了就是"下次发不出去"，
