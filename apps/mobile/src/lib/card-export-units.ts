@@ -88,6 +88,41 @@ export function afterNextFrame(nextFrame: (run: () => void) => void): Promise<vo
 }
 
 /**
+ * 让帧的**预算**。
+ *
+ * 与 `RASTERIZE_SETTLE_MS` 分开是因为它们兜的是两段不同的等待：那一个管"原生回调可以永远不来"，
+ * 这一个管"`requestAnimationFrame` 在**后台不触发**"。取 1 秒的依据：一帧是 16.7 ms，
+ * 而 RN 的调度器让不出帧只可能是"整页被挂起"，那种情况下 1 秒与 5 秒对用户的体感没有区别，
+ * 但 1 秒不会让人以为"应用卡住了"。
+ */
+export const NEXT_FRAME_BUDGET_MS = 1_000;
+
+/**
+ * 让一帧，但**等不到就返回 false**。
+ *
+ * 🔴 为什么不能只有 `afterNextFrame`：那个 Promise 在后台**永远不 resolve**（rAF 不触发），
+ * 于是它兜不住自己 —— 表现是"点了没反应"，而回到前台之后它又会**突然**跑完，
+ * 用户看到的是"几秒后突然弹出一个分享面板"。这一条挂在 `afterNextFrame` 之上而不是另写一个，
+ * 是为了让 §6.4 那三臂判据量的仍然是**产品真正走的那条路**。
+ */
+export function afterNextFrameWithin(
+  nextFrame: (run: () => void) => void,
+  budgetMs: number = NEXT_FRAME_BUDGET_MS,
+): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (framed: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(framed);
+    };
+    const timer = setTimeout(() => finish(false), budgetMs);
+    void afterNextFrame(nextFrame).then(() => finish(true));
+  });
+}
+
+/**
  * 把"原生可能永远不回调"折成一个**值**。
  *
  * 单独成函数、且不 import `react-native`，是为了让这条判据能在这个壳里真跑
