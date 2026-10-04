@@ -694,7 +694,7 @@ function HolidayPanel(props: { store: AdminStoreState }): React.JSX.Element {
             <ul className="ht-settings__admin-list" data-testid="admin-holiday-years">
               {years.years.map((year) => (
                 <li key={year.year} className="ht-settings__admin-staticRow">
-                  <span className="ht-settings__admin-rowMain">
+                  <span className="ht-settings__admin-rowMain ht-settings__admin-rowMain--wrap">
                     {year.year} ·{' '}
                     {t('web.admin.holiday.dayCount').replace('{count}', String(year.dayCount))}
                     {year.note === null ? '' : ` · ${year.note}`}
