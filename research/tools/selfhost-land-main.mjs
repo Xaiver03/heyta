@@ -14,6 +14,11 @@
  *   node research/tools/selfhost-land-main.mjs --attribute     # check 红时接着跑逐段归属
  *   node research/tools/selfhost-land-main.mjs --selftest      # 只验"端口射程判据"有没有牙（不碰任何工作树）
  *
+ * 🔴 **落地那一趟必须用本文件的绝对路径**：这批 `selfhost-*.mjs` 只活在分支上，主检出里
+ *   一枚都没有（2026-10-04 现量：主检出 `research/tools/` 下 `selfhost-*` = 0 枚），而
+ *   `--confirm` 又必须在主检出目录里跑 ⇒ 照抄相对路径得到的是 MODULE_NOT_FOUND，
+ *   它的症状和"脚本坏了"长得一模一样。本脚本自己打印的那两条命令已经是绝对路径。
+ *
  * 🔴 `--confirm` 会先自动跑一遍 `--selftest` 的内容：判据自己坏了的时候，它那句
  *   "这些端口没人用"**不能**当放行（§8.120 那条同一个形状）。
  *
@@ -29,13 +34,33 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { depsFresh, freshReading } from './selfhost-deps-fresh.mjs';
 
 const MAIN_REF = 'main';
 const BRANCH_REF = process.env.HEYTA_LAND_BRANCH ?? 'feat/self-host-distribution';
 const MERGE_REF = 'feat/self-host-merge-main';
 const MAX_LOAD = Number(process.env.HEYTA_LAND_MAX_LOAD ?? 12);
+const LOAD_STEP = Number(process.env.HEYTA_LAND_LOAD_STEP ?? 60);
+
+/**
+ * 🔴 打印给**人复制粘贴**的路径一律带引号：仓库路径里有空格（`All in one Data`），
+ *    裸路径粘进 shell 会拆成两个参数 —— 症状是"命令不存在"，而它跟真故障分不开。
+ */
+const q = (p) => `"${p}"`;
+/** 本文件的绝对路径（分支上才有，主检出一枚 `selfhost-*` 都没有 ⇒ 相对路径必失败）。 */
+const SELF = fileURLToPath(import.meta.url);
+const TOOL = (name) => q(join(dirname(SELF), name));
+/**
+ * 🔴 只认"数字形状"：`Number('')` 是 **0**，而 0 恰好是"负载很低"——
+ *    这就是 §8.122 那族假 0 的第三个面目（读空 ⇒ 判成安静）。
+ *    读不出形状一律交 NaN，让调用方按"判不了"处理。
+ */
+const parseLoadRaw = (raw) => {
+  const t = String(raw ?? '').replace(/[{}]/g, '').trim().split(/\s+/)[0];
+  return /^\d+(?:\.\d+)?$/u.test(t) ? Number(t) : Number.NaN;
+};
 
 const ARGS = process.argv.slice(2);
 const FLAG = (n) => ARGS.includes(`--${n}`);
@@ -147,7 +172,7 @@ say(`主检出=${mainTree.path} · 分支检出=${branchTree.path} · 当前目�
 if (CONFIRM && here !== mainTree.path) {
   say('🔴 落地动作 —— --confirm 只能在主检出里跑');
   say(`   本脚本**故意不跨工作树**去 merge（那是"动主检出"，而主检出的工作树属于别人）。`);
-  say(`   要真的落地：cd ${mainTree.path} && node research/tools/selfhost-land-main.mjs --confirm`);
+  say(`   要真的落地：cd ${q(mainTree.path)} && node ${q(SELF)} --confirm`);
   process.exit(2);
 }
 
@@ -224,21 +249,52 @@ gate(1, '阻塞集为空', () => {
   if (n !== 0) {
     const list = out.split('\n').filter((l) => l.trim().startsWith('BLOCK ')).map((l) => l.trim().slice(6));
     refuse(`${n} 枚未清空：${list.join(' · ')}\n` +
-      '   这些是**别人未提交的工作树**，不是合并冲突（§8.111 ② 量过：提交态零冲突）⇒ 等他们提交。');
+      '   这些是**别人未提交的工作树**，不是合并冲突 —— 冲突面是另一件事，每次落地前用 `merge-tree` 重取' +
+      '（§8.124 已就地更正 §8.111 ② 那句"提交态零冲突"：它是瞬时读数）⇒ 等他们提交。');
   }
   return '夹具绿 ⇒ 这个"空"是可信读数';
 });
 
-/* ── 3. 环境 ──────────────────────────────────────────────────────── */
+/* ── 3. 环境 ────────────────────────────────────────────────────────
+ * 🔴 `--confirm` 要**连续三样**都 ≤ 阈值，dry-run 只取一样。
+ *   理由不是"更严格更安全"，是负载在这台机器上是**剧烈摆**的（20:09=9.7 → 20:10=99.4 →
+ *   20:13=70.4 → 20:20=39.2，现量见哨兵日志）：单样读到 ≤12 之后，几十分钟的完整链
+ *   几乎必然撞进一次尖峰，而尖峰造成的是**假红**（超时、抢不到端口）—— 那一趟红
+ *   还要逐段归属去证明它不是本批的。多花两分钟把"这一刻真的安静"判准，
+ *   比事后拆几十分钟的假红便宜。阈值本身一个字没动。
+ *   三样之间要真等（不是"连续调用三次"）—— 紧挨着的三样是同一个读数抄三遍。 */
+const loadParseSelfcheck = () => {
+  const one = parseLoadRaw('{ 11.11 22.22 33.33 }');
+  if (one !== 11.11) return `负载解析取的不是 1 分钟位（合成样读到 ${one}）`;
+  if (Number.isFinite(parseLoadRaw(''))) return '空读数被解析成了数（应当是 NaN ⇒ 按判不了处理）';
+  return null;
+};
 gate(3, '负载可用', () => {
-  const load1 = Number(
-    execFileSync('sysctl', ['-n', 'vm.loadavg'], { encoding: 'utf8' })
-      .replace(/[{}]/g, '').trim().split(/\s+/)[0],
-  );
-  if (load1 > MAX_LOAD) {
-    refuse(`负载 ${load1} > ${MAX_LOAD} ⇒ 环境无效（不调阈值、不硬跑）。等窗口，或显式 HEYTA_LAND_MAX_LOAD=<n>`, 3);
+  const bad = loadParseSelfcheck();
+  if (bad) {
+    const e = new Error(`${bad} ⇒ 这一档判不了，不拿"判不了"当"负载低"`);
+    e.probe = true;
+    throw e;
   }
-  return `1 分钟负载 ${load1} ≤ ${MAX_LOAD}`;
+  const need = CONFIRM ? 3 : 1;
+  const seen = [];
+  for (let i = 0; i < need; i++) {
+    if (i > 0) execFileSync('sleep', [String(LOAD_STEP)], { stdio: 'ignore' });
+    const raw = execFileSync('sysctl', ['-n', 'vm.loadavg'], { encoding: 'utf8' });
+    const v = parseLoadRaw(raw);
+    if (!Number.isFinite(v)) {
+      const e = new Error(`第 ${i + 1} 样读不出数（原始 ${JSON.stringify(raw.trim())}）⇒ 判不了`);
+      e.probe = true;
+      throw e;
+    }
+    seen.push(v);
+    if (v > MAX_LOAD) {
+      refuse(`第 ${seen.length}/${need} 样负载 ${v} > ${MAX_LOAD} ⇒ 环境无效（不调阈值、不硬跑）。` +
+        `已取到的各样：${seen.join(' → ')}。等窗口，或显式 HEYTA_LAND_MAX_LOAD=<n>`, 3);
+    }
+  }
+  return `${need} 样都在 ${seen.join('/')}，全部 ≤ ${MAX_LOAD}` +
+    (CONFIRM ? '' : '（dry-run 只取一样；--confirm 要连续三样，每样间隔 ' + LOAD_STEP + 's）');
 });
 
 /* ── 3b. 跑链之前：那几个端口上有没有别人的 dev server ─────────────── */
@@ -282,6 +338,15 @@ gate(3, '载体的 node_modules 与当前那把锁同源', () => {
 let checkRan = false;
 let checkOk = false;
 gate(4, '载体上完整 pnpm check', () => {
+  /* 🔴 **dry-run 绝不跑链**，这一条原先是假的：3b 那句"dry-run 不跑链 ⇒ 这条今天不适用"
+   *    写在纸上，而这里没有对应的守卫，于是"只体检"的一次运行真的起了几十分钟的
+   *    `pnpm check`，其中 e2e 前置会按端口 SIGKILL —— 而 3b 那道守卫在 dry-run 里根本没执行。
+   *    13:0x 实测：负载刚好落到 11.29（≤12）⇒ 前置全过 ⇒ 链真的开跑了，
+   *    我是在它跑起来之后才发现并杀掉的（那几枚端口当时无人监听，没有造成实际伤害）。
+   *    "体检"这个词的含义是**不产生副作用**，所以它现在必须响亮地跳过。 */
+  if (!CONFIRM) {
+    skip('dry-run 不跑链（链里 e2e 前置会按端口 SIGKILL，体检不许有这种副作用）⇒ 不适用 ≠ 通过');
+  }
   if (fails.length) {
     skip(`没跑（前面已有 ${fails.length} 条不成立 ⇒ 这一趟本来就不该落地）。跳过不等于通过。`);
   }
@@ -297,7 +362,7 @@ gate(4, '载体上完整 pnpm check', () => {
   } catch (e) {
     writeFileSync(checkLog, `${e.stdout ?? ''}\n---STDERR---\n${e.stderr ?? ''}\n---\n${e.message}`);
     refuse(`rc=${e.status ?? 1} ⇒ **不落地**。关闭判据是"每一枚红仍可归属到非本批"，不是"全绿"。\n` +
-      `   逐段归属：node research/tools/selfhost-check-segments.mjs --tree ${CARRIER_DIR} --as carrier --ref ${MERGE_REF} --out /tmp/attrib.tsv` +
+      `   逐段归属：node ${TOOL('selfhost-check-segments.mjs')} --tree ${CARRIER_DIR} --as carrier --ref ${MERGE_REF} --out /tmp/attrib.tsv` +
       (FLAG('attribute') ? '' : '（或给本脚本加 --attribute）'), 4);
   }
   checkOk = true;
@@ -319,14 +384,17 @@ if (fails.length) {
   process.exit(top.sev);
 }
 
-if (!checkRan || !checkOk) {
+/* 只有**真要落地**时才要求链真的跑过：dry-run 按上面的守卫永不跑链，
+ * 把这条留在 dry-run 上会得到一个"永远不通过的判据"（§7 元规则 2 的反面）。 */
+if (CONFIRM && (!checkRan || !checkOk)) {
   say('🔴 完整 check 没有真的跑过（跳过不等于通过）');
   process.exit(1);
 }
 
 const cmd = `git merge --ff-only ${MERGE_REF}`;
 if (!CONFIRM) {
-  say(`\n✅ 体检全过。要落地，在**主检出**里跑：\n   cd ${mainTree.path} && node research/tools/selfhost-land-main.mjs --confirm`);
+  say(`\n✅ 体检全过。要落地，在**主检出**里跑（脚本用绝对路径 —— 这批工具不在 main 上）：`);
+  say(`   cd ${q(mainTree.path)} && node ${q(SELF)} --confirm`);
   say(`   （等价的裸命令，仅供核对：${cmd}。本脚本不 push。）`);
   process.exit(0);
 }
