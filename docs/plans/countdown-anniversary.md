@@ -2799,7 +2799,9 @@ W0b ─> 随时可做（台账那半要等文件干净）
     本批不替别人决定要不要杀他的 dev server，traps #87 同一族）。
   - 🔴 **macOS 那一腿的关闭条件**（任务 #23）不是"等一等"，而是有两条硬理由不能自己动手：
     ① `package-app.sh:36` 会 `rm -rf "$OUT_DIR"`，而默认 OUT_DIR 正是那条 hung 链**正在公证**的 `/tmp/heyta-macos-dist`；
-    ② `check-shell-surfaces.mjs:263` 的 mac 那一栏读的是**写死的**这个路径、没有 env 覆盖
+    ② ~~`check-shell-surfaces.mjs:263` 的 mac 那一栏读的是**写死的**这个路径、没有 env 覆盖~~
+    —— 🔴 **04 14:19 被现量否证，见 ㊹**：`:944` 一直有 `HEYTA_MACOS_WEB_DIST` 这个 env 覆盖，`:263` 只是默认值；
+    这半句当时把一栏本来能自己关的事登记成了"只能等别人"。仍然成立的是 ①，而它也有绕法（`OUT_DIR` 是位置参数，`package-app.sh:28`）。
     —— 它 957 行那段注释就是上一轮"把别人的包读成自己的"之后加的。⇒ 只能等他们那趟结束（成功或响亮失败）。
 
 - ㊴ **重试预算写成"次数"是错的：秒回型拒跑会把 26 次在 11 分钟内烧光（链 R2 → 链 R3），以及 11:0x–13:1x 的现场读数**（04 11:00–13:10，载体 `ce4bf082` → `f03c1df1`）
@@ -2932,3 +2934,25 @@ W0b ─> 随时可做（台账那半要等文件干净）
     拿到的是**没有跑过的判据**而不是零命中（§7 元规则第一条"先怀疑探针"的第 N 次现形）。
     改法：文件枚举用 `find -name`，并且给零命中那条配**阳性对照**（这里是"键总数 28"）。
   - ⚠️ 本条**不关闭 W7-G3**：法务侧现量补全是范畴②的另一半，iOS **设备出图读数**仍在链 X / 链 Z 手里（14:10 现量负载 30.17）。
+
+- ㊹ **我自己那条"mac 那栏没有 env 覆盖 ⇒ 结构上关不掉"被现量否证 —— 通道一直在，缺的是把包打在自己目录里**（04 14:19–14:20，载体 `c170e4bd`，全程静态、零设备）
+  - 🔴 **否证的句子**：㊳ 里"② `check-shell-surfaces.mjs:263` 的 mac 那一栏读的是**写死的**这个路径、没有 env 覆盖"。
+    现量：`:944` 一直是 `const envKey = HEYTA_ + hostLabel.toUpperCase() + _WEB_DIST`，mac 那格的 hostLabel 是 macOS（`:767`）
+    ⇒ 键名 **`HEYTA_MACOS_WEB_DIST`**，默认值才是 `:263` 那枚 `/tmp/heyta-macos-dist/…` 写死路径。
+    我上一轮把"默认路径写死"读成了"没有覆盖通道"，于是把一栏本来能自己关的事登记成了"只能等别人"。
+  - ✅ **三条通道对照臂**（各跑一次门禁，全部本地目录、零设备）：
+    | 注入 | 读数 |
+    |---|---|
+    | `HEYTA_MACOS_WEB_DIST=apps/web/dist` | `判定 5 格：5 绿 / 0 红；**未取证 0 栏**`（通道接得上） |
+    | `=no/such/dir` | `⚠️ 未取证，不计为通过` + 打印要跑哪条命令 ⇒ 缺包是**响亮**的，不静默绿 |
+    | `=apps/landing/dist` | `包里 d62456524aa0 / 本地 517c6ba76d00 不符 ⇒ 未取证` ⇒ "拿别人的字节给自己这一轮作证"这条路门禁自己堵着（与 windows 那臂同形） |
+  - ✅ **另一条硬理由仍然成立，但有绕法**：`package-app.sh:36` 对 `OUT_DIR` 是盲删（`rm -rf`），默认 `OUT_DIR` 正是那条 hung 链正在公证的 `/tmp/heyta-macos-dist`
+    （14:19 现量：pid 98934 仍在 `notarytool submit … --wait`，已 10 小时）。而 `:28` 写的是 `OUT_DIR="${1:-/tmp/heyta-macos-dist}"` —— **OUT_DIR 是第一个位置参数**，
+    传自己的目录就不碰别人的那一枚。
+  - ✅ **于是排了链 W**（pid 87699）：等 X/Y/Z 三条收口 ⇒ `bash apps/desktop-macos/scripts/package-app.sh /tmp/heyta-macos-dist-b2`
+    → 打印包内 `index.html` 与本地 `apps/web/dist` 的 sha256 对照 → `HEYTA_MACOS_WEB_DIST=<那枚包>/Contents/Resources/web-dist` 跑门禁取那一栏读数
+    → 记下 `packaged-first-run.png`（那张要**人打开看**，是 Goal ⑤-3 里 mac 那一格）。
+    ⚠️ **它关的是 Goal ③ 的壳级门禁 mac 产物栏，不代 Goal ⑤-4 的"装进 `/Applications`"**：后者要 `reinstall-all` 的装步（清 `/Applications/Heyta.app`），
+    那是别人在飞的共享位置，按任务书第 6 条"共享资源先定所有者"我不替它覆盖；等它释放由持有者跑 `pnpm reinstall:desktop`。
+  - 📌 一般规律（本仓第 N 次）：**"这事结构上不可能"这种句子，也要现量**——它比"这事没做"更容易被下一个人照抄，
+    而这次的真相只是我少读了一个 `envKey` 变量。凡是写成"只能等 X"的关闭条件，先问一遍"我是不是没找到那个旋钮"。
