@@ -3959,3 +3959,29 @@ git merge-base --is-ancestor "$(git rev-parse feat/self-host-merge-main^1)" main
 ⚠️ 这一条把 #1 的关闭形状改写了：它不是"我做完了"，是"我把可交出的部分做到底并交出指针 + 判据"。
 现场证据支持这个改写的必要性 —— 记这三条的十分钟里 main 从 `ae6ec473` 走到 `af4e4b32`（两笔），
 并行会话提交频率高于载体重算频率，所以任何"SHA 对得上"的印象都必须在落笔那一步重取。
+
+④ **交接清单（08:0x 现量，本批写集 ∩ 主检出未提交）** —— 主批写集 **35 枚**，与主检出那 220 枚未提交
+的交集**恰好 3 枚**：
+
+| 文件 | main 相对 merge-base 动过吗 | 这一枚的落地解 |
+|---|---|---|
+| `package.json` | **动了**（⇒ 真冲突） | 预置 pkg 族：`scripts` 键并集 + `check` 链并集（§8.16 那套四条断言 + 写回后回读） |
+| `research/tools/check-image-license-coverage.mjs` | **没动**（纯我方） | 提交层根本不冲突 ⇒ 载体自动取本分支版；他们那版若被提交会红，判据见 §8.59 ⑩ |
+| `server/image-npm-tree.json` | **没动**（纯我方） | 同上 |
+
+🔴 这条读数**否证了 Goal 里那句"等那 5 个重叠文件被其所有者提交"**：`docs/README.md`、
+两份 i18n 词条表、`scripts/check-script-snapshot.mjs` 都不在本批写集里 —— 它们未提交会挡住
+**他们自己的提交**，但挡不住这枚载体并进 main。真正需要他们先落笔的只有上面 3 枚，
+其中 2 枚还是"他们动的是我方文件"（协调，不是排队）。
+⚠️ 别拿 `git diff --name-only main feat/self-host-merge-main` 去算这张表：载体 4247c0ed 是对
+main(`60c6fd71`) 算的，而 main 已经走到 `af4e4b32`，那 39 枚里混着**载体还没有的 main 新文件**
+—— 过期载体上的"写集"不是写集。要用就先用 `merge-carrier` 重算，再取交集（本表走的是与本批
+merge-base 直接相减，不受载体新鲜度影响）。
+
+给主检出所有者的那一步（**只有他们能做**，见 ③）：
+
+```bash
+# 前置：上面 3 枚已提交，且载体第一父仍在 main 历史里
+git merge-base --is-ancestor "$(git rev-parse feat/self-host-merge-main^1)" main && \
+git merge --no-ff feat/self-host-merge-main -m "merge: 自托管批次（第 N 次落地）"
+```
