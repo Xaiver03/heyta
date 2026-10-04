@@ -6246,3 +6246,69 @@ objective 那句"**同一个 `apps/web/dist` 不可能两条同时绿**"本轮�
 - 施臂命令写成 `awk … > server/Dockerfile`，而 awk 有语法错：**重定向在 awk 开始工作之前就把文件截成 0 字节**，
   而 `&&` 链里的失败让后续步骤不执行 —— 这次没留下坏文件只是因为复原那条写在了链外（无条件）。
   一般规律：**施臂的复原动作不能排在 `&&` 链里**；改用 node 写文件后同一臂正常施成并复原。
+
+### 8.105 落地前把第 1 族（`package.json` 那条链）的交叉真的量了一遍：并集成立、摘段 0，另登记一条他们的风险（2026-10-04 17:0x）
+
+g74 从 15:55 起一直报阻塞集 2 枚（`.gitignore` + `package.json`），等的过程里第一次去量**这两枚脏的是什么形状**——
+之前只把"阻塞"当一个布尔用，而那两枚的 hunk 到底交不交集决定了落地时会不会停下来要人拍。全部只读
+（`git show` + 把工作树指针指到我这棵树跑别人的脚本），不动主检出。
+
+#### 现量
+
+- 主检出 `.gitignore` 未提交 = **2 行**（`research/tools/.*.snap.*` 一条新忽略 + 它的注释），
+  与本批那枚 `node_modules`（traps #196）在**不同位置**⇒ 零文本交叉；载体第 2 族本来就是行并集。
+- 主检出 `package.json` 未提交 = 重写 `check` 那一整条物理行 + 新增 6 个 scripts 键。
+  🔴 这一枚**是真交叉**：他们改的正是本批也改的那一行（链）。
+- 段数：`base(b850b1c6)=66 · main HEAD(9070e18d)=76 · main 工作树(未提交)=82 · 本分支(a1d03b64)=67`
+  ⇒ `main HEAD ∪ 本分支 = 77`。
+- 载体第 1 族的四条断言在**离线三股**上先跑：并集摘 base 的段 = **0**；main 相对 base 摘段 = **0**；
+  本分支相对 base 摘段 = **0**；main 工作树相对 main HEAD 摘段 = **0**。
+  ⇒ 落地时这一族不会 die 要人拍，也不需要新开第八族——它的解法（键并集 + 链段并集 + 写回 round-trip +
+  磁盘回读 + "只增不减"前提断言）本来就把这种交叉吃掉了。
+
+#### 🔴 登记一条在**他们**手里的落地风险（不代改、不摘段）
+
+`main` 工作树新增的 6 个链段里，有 **4 枚实现文件此刻是未跟踪状态**：
+
+| 链段 | 实现文件 | main 里 |
+|---|---|---|
+| `check:verify-script-copy` | `scripts/check-verify-script-copy.mjs` | **未跟踪** |
+| `check:apk-freshness` | `scripts/lib/apk-freshness.sh` | **未跟踪** |
+| `check:shell-erasure-parity` | `scripts/check-shell-erasure-parity.mjs` | **未跟踪** |
+| `check:vault-diagnostics` | `scripts/check-vault-diagnostics.mjs` | **未跟踪** |
+| `check:legal-closure-truth` | `scripts/check-legal-closure-truth.mjs` | 已跟踪 |
+| `check:legal-gdpr` | `scripts/check-legal-gdpr.mjs` | 已跟踪 |
+
+`git commit` 提的是整个索引 ⇒ 他们如果 `git add package.json` 而没把那 4 枚未跟踪文件一起收进去，
+`main` 前进后链上就会有一段指向**不存在**的实现，载体 `pnpm check` 会红成 MODULE_NOT_FOUND 的形状。
+本批的处理口径先写死在这里：**那一类红逐条归属到非本批**（判据就是他们自己的文件缺失），
+不代他们补文件、也不为了让链绿去摘那一段——摘段会被第 1 族的前提断言拦下来，那正是它该拦的。
+
+#### 一条对**本批**的自查：他们那枚新门禁扫不扫我改的脚本
+
+`check:verify-script-copy` 的输入集合是**按目录枚举** `scripts/verify-*.sh`（不是写死清单，
+这是它自己文件头的主张），所以本批的 `scripts/verify-selfhost-stack.sh` 在它的射程里。
+用 main 那份实现、`cwd` 指到本工作树跑一次（纯读盘）：
+
+```
+本批树：输入脚本=34 needle=196 缺失=1 插值needle=12 词条中文值条数=2531   ⇒ rc=1
+main 树：输入脚本=46 needle=238 缺失=0 插值needle=22 词条中文值条数=2768   ⇒ rc=0
+唯一那条缺失 = scripts/verify-mobile-reminder-ring.sh:193 [exact] "移除"
+```
+
+⇒ **不是本批的文件**（那条属提醒投递那一线），而且 main 侧同跑 `缺失=0` ——
+差别来自本分支的 i18n 落后 main（2531 vs 2768 条中文值），`移除` 这个值是 main 侧才有的。
+预测：载体是 main ∪ 本分支，i18n 那两族按键并集取，`移除` 会在场 ⇒ 这一条在载体上不该红。
+**如果**落地那趟它真的红了，第一个要看的就是这一枚 needle，归属仍然是他们那条线。
+本批两枚 verify 脚本在这次预扫里**零命中**。
+
+#### 一条方法上的（我自己的）
+
+阻塞集当布尔用了三个小时才去量内容，是这一节最贵的地方：**"等谁"必须先等于"等什么形状"**，
+否则窗口开的那一刻才发现要人拍板，窗口就白烧一次（§8.90 / §8.98 是同一族的两次实例）。
+所以这段读数没有留在 `/tmp`，落成了仓里一条可重跑的装置：
+**`research/tools/selfhost-chain-preflight.mjs`**（纯读盘；主检出目录从 `git worktree list` 第一条现取，
+不写死路径；链段切法与 `check:gate-wiring` 和第 1 族逐字一致）。
+它**不挂 scripts 键、不进链** —— 它吃的是"另一棵工作树的磁盘状态"，挂进链就等于让 `pnpm check`
+依赖别人工作树的未提交内容（那不再是可重跑的判据，而是当前状态的照片）。
+今天跑出来的就是上面那三行：摘段四个方向全 0、新增 6 段里 4 段实现未跟踪。
