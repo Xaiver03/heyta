@@ -1302,7 +1302,7 @@ traps #27/#79 那一族），我补跑的 `pnpm -r build` 又撞到 `apps/node-h
 **判据**：`apps/mobile/tests/growth-share-summary.spec.ts` 13 条。mobile 全量
 **40 files / 625 passed / 0 skipped**（基线 39/612，+1 文件 +13 条）；web 全量
 **1564 passed / 13 skipped**（基线 1562/13，跳过数没动）。五个工程 typecheck exit 0
-（`pnpm -r typecheck` 现在会红在 `packages/legal`，那是别人在飞的 +117 行，见 B46）。
+（`pnpm -r typecheck` 曾在 `packages/legal` 红 —— 那是别人在飞的 +117 行；10-04 13:42 复量那一格 exit 0，那笔已由属主带修落地，见 B46）。
 六道门禁各 exit 0：`check:reachability` / `:ui-language` / `:design` / `:l4`（web 98≤104、
 mobile screens **恰在 90**）/ `:payment-entry` / `:pricing`。
 
