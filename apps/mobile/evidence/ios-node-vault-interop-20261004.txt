@@ -31,7 +31,7 @@ Node 载体：apps/node-host/dist/cli.js + 新建真实 SQLite 文件（不是 :
      root”来伪造一个所谓的真包旧 root 证据。
    - 当前确定性 fixture 已通过 fingerprint-matching root gate：错误 root 抛
      VaultSessionError.code=root-key-mismatch；迁移后的新世代密文用旧 root/旧世代解密
-     被拒绝。sync-core 生命周期与 app-host migration 测试分别通过（303 与 1341 项）。
+     被拒绝。当前 sync-core 测试套件与 app-host 测试套件分别通过（303 与 1341 项）。
    - 因此本文件不把 fixture 结果夸成“iOS 进程外旧 root 真值验收”；若要补这条，必须在
      root rotation 尚未丢弃旧内存 root 的同一受控旅程中记录布尔结果，仍不得落盘或打印
      root 明文。
