@@ -41,3 +41,28 @@
 最后撤回生长决定，让两档共用同一条布局规则（剩余空间归清单），
 并把那条差分**反过来写**（行高 720/1200 必须一字不变），
 细节与逐次数在 §7 #144。
+
+## 2026-10-04 14:1x：这三张图**补上常驻判据**（此前一条都没有）
+
+和 `../calendar-cells/` 同一批被 `r17-evidence-md5-check.sh --all` 点名的（3 张图 / 0 条锚点）。
+不钉 md5 的理由相同：`e2e/tests/calendar-week.spec.ts:35` 的
+`STAMP = Date.now().toString().slice(-6)` 会进图（`周视图-0-445927`），每趟随机。
+
+**这次逐张打开看过**，记两点上面那张表没写的：
+
+- `calendar-week-bars.png`：周六那一格里画了 **7 条**条、下面 `+2`，而页头标题是
+  「2026年9月28日 – 10月4日」，下方清单计数 8 —— 三个数字互相对得上，
+  这是"折叠发生在格子里、没发生在清单上"的唯一一张图。
+- `calendar-week-nav.png`：可见周已经跳到「10月5日 – 10月11日」而**下方那一格仍写
+  「10月3日 星期六」**（计数 0）。这不是 bug（选中日与可见区间是两条状态），
+  但**看图才会注意到**，而它正是上面"侧栏迷你月历与它同源"那条主张的边界：
+  迷你月历跟 cursor 走，选中日不跟。别把这张图当成"整屏同步移动"的证据。
+
+UIPIN calendar-week-bars.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+UIPIN calendar-week-nav.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+UIPIN calendar-week-tall.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+
+pin 取拍图（mtime 03:47）之前最后一次动过那组路径的提交 `401bbcd6`（10-03 03:13）。
+🔴 补完锚点后 `--all` 报这三枚 UISTALE —— 与 `../calendar-cells/` 同一个原因
+（`39032107` 10-04 10:11 动了 `main-area.css`，页头形状已变，而这三张图里的页头是旧的）。
+重拍与登记同 §4.1，窗口前置同 §5 的 H。

@@ -19,7 +19,12 @@
 # 用法：
 #   bash research/tools/r14c-bundle-testid-preflight.sh                      # 用默认 release APK
 #   APK=… bash research/tools/r14c-bundle-testid-preflight.sh
-#   NEEDLE_MISSING=task-due bash research/tools/r14c-bundle-testid-preflight.sh   # 自检：这一枚必须让它 exit 1
+#   FRAGMENTS='task-due|-time-input|task-due-NOPE-9f3' bash research/tools/r14c-bundle-testid-preflight.sh
+#       ↑ 自检臂（10:3x 现量 **exit 1** 且指名那枚缺的碎片）：把清单里第三枚换成盘上必然不存在的串，
+#         判据必须转红 —— 这才是"这条判据有牙"的形状。
+#   ⚠️ 这一行以前写的是 `NEEDLE_MISSING=task-due bash …`，**那个旋钮根本不存在**
+#      （全文只有这句注释里出现过它；代码读的是 `FRAGMENTS`），照它跑会得到"自检跑了、仍报绿"，
+#      也就是这条自检是**一条恒不过的假自检**。10:3x 实测：`NEEDLE_MISSING=task-due` ⇒ rc=**0**。
 set -u
 cd "$(dirname "$0")/../.." || exit 2
 

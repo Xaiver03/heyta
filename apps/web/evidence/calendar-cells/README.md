@@ -46,3 +46,40 @@
 
 ⇒ 这两条都是 AGENTS §6.2 规定一（"人必须打开那张图看一眼"）的实锤：
    **判据全绿 + 图是错的**，只有看图能区分。
+
+## 2026-10-04 14:1x：这五张图**补上常驻判据**（此前一条都没有）
+
+`r17-evidence-md5-check.sh --all` 加"有图但 README 里 0 条锚点"那一档时，本目录是被点名的五枚之一
+（5 张图 / 0 条判据）。上面那张表写的是**主张**，主张底下没有任何一层会为此变红 ——
+有人重跑 `calendar-cells.spec.ts` 覆盖字节、或者决定这些形状的源码又动了，都不会有读数。
+
+**为什么不钉 md5**：`e2e/tests/calendar-cells.spec.ts:45` 是
+`const STAMP = Date.now().toString().slice(-6)`，图里的任务名（`日历格-0-479965`）**每趟随机** ⇒
+钉 md5 就是造一条每跑必红的判据。所以钉**代码锚点**（`UIPIN`）：重跑不红，
+**决定形状的源码动了才红**。
+
+**这次逐张打开看过（14:1x，五张都看了）**，看到的就是上面那张表说的那些，另有两点值得记：
+
+- 五张图里**页头不是同一个形状**：`calendar-cells*.png` / `calendar-tall-viewport.png` /
+  `calendar-toolbar.png` 的页头是 `‹ 2026年10月 › 回到今天 未同步 ⚙ 中文/English 主题`，
+  **没有**「日历视图」那个档位下拉；而 12:4x 之后拍的 `../calendar-week/`、
+  `../calendar-capture/` 里有。⇒ 这三枚目录的图**不能互相引用成"同一屏"**。
+- `calendar-cells-dark.png` 里页头那颗语言 chip 确实是一块**没有字的白底** ——
+  那就是上面"看图才现形的两件事"第 2 条讲的中间态，图拍在修好**之前**，
+  所以它是那条已修缺陷的**证据**，不是新缺陷。别拿这张图去报 bug。
+
+UIPIN calendar-cells.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+UIPIN calendar-cells-dark.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+UIPIN calendar-cells-empty.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+UIPIN calendar-tall-viewport.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+UIPIN calendar-toolbar.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css packages/i18n
+
+钉的是**拍这五张图那一刻**最后一次动过上面那组路径的提交（`5340c126`，10-03 02:10，
+字节 mtime 02:58）。🔴 **补完锚点之后 `--all` 当场报这五枚 UISTALE**，而且报得对：
+`39032107`（10-04 10:11「主区头部可换行」）动了 `apps/web/src/styles/app/main-area.css`，
+也就是**这五张图里的页头已经不是当前形状**。
+⇒ 处置**不是**把 pin 改成 `39032107`（那会把"我看过的字节"和"当前形状"混成一件事），
+而是**重拍**。重拍要跑 `cd e2e && npx playwright test tests/calendar-cells.spec.ts`，
+它和 §5 的 H 共用同一个窗口前置（4318/4319 空闲 + 负载落回个位，
+`check:ai-e2e` 会按端口 SIGKILL 别人的 dev server ⇒ 不许在窗口没开时硬跑）。
+登记在 `docs/plans/calendar-profile-handoff.md` §4.1。

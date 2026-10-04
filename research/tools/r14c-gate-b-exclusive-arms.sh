@@ -14,8 +14,11 @@
 #    这样现场有别人也在跑时，臂仍然在测它该测的那件事。
 #
 # 五臂：
-#   T1 基线一致性：无注入时 3b 报出的 pid 集合必须**恰好等于基线**（多一个=误报，少一个=漏报）
-#   T2 注入外部 verify-mobile 运行者 ⇒ 第一道必须点名到它
+#   T1 基线一致性：第一道**至多一枚代表**且必须认得出来源（开跑基线 ∪ 现读）；第二道恰好等于基线
+#       🔴 两道门的**基数契约不同**（第一道走探针，awk 以 `print; exit` 收尾；第二道逐枚累加）——
+#          12:5x 现场三条 verify-mobile 并存时，旧写法把"门报其中一枚"判成 ❌，那是**臂的期望比契约宽**。
+#   T2 注入外部 verify-mobile 运行者 ⇒ 两腿：受控快照腿（把这条真 argv 单独喂探针，必须恰好点名它）
+#       + 现场腿（闸门必须判红，且报出的那枚来路可追）
 #   T3 注入外部 reinstall-all（不带点的普通形态）⇒ 第二道必须点名到它
 #   T3b 注入 reinstall-all 的**真实快照形态** `scripts/.reinstall-all.sh.snap.<pid>` ⇒ 第二道必须认得
 #       （🔴 这一臂是被"配对判据要造出真实那层 wrapper"逼出来的：第一版正则对快照形态**永久失明**，
@@ -34,6 +37,8 @@ PROBE=scripts/lib/mobile-e2e-runner-probe.sh
 for f in "$GATE" "$PROBE"; do
   [ -f "$f" ] || { echo "❌ 前提不成立：$f 不在" >&2; exit 4; }
 done
+# T2 的受控快照腿要直接调探针（它的入口被 `BASH_SOURCE==$0` + `--self-check` 双重挡住 ⇒ source 安全）。
+. "$PROBE"
 D=$(mktemp -d /tmp/ht-gate-b-arms.XXXXXX)
 mkdir -p "$D/fakescripts" "$D/snapcarrier/scripts"
 printf '#!/bin/bash\nsleep 30\n' > "$D/fakescripts/.verify-mobile-fakearm.sh"   # 🔴 名字里不许有数字：探针的正解是 verify-mobile-[a-z-]+ 点 sh
@@ -60,6 +65,17 @@ BASE_VM=""
 for pid in $(pgrep -f 'verify-mobile' 2>/dev/null); do in_tree "$pid" || BASE_VM="$BASE_VM$pid "; done
 BASE_RI=""
 for pid in $(pgrep -f 'scripts/[.]?reinstall-all[.]sh' 2>/dev/null); do in_tree "$pid" || BASE_RI="$BASE_RI$pid "; done
+# 🔴 `EXP_RI`（T1 的第二道期望集 / T4 的"基线外不许冒出一个 pid"）在这一行**定义**，
+#    不是在下面各臂里现算 —— 13:2x 现量：这个赋值**从来没有存在过**，而本文件是 `set -u`，
+#    于是基线非空时 T1 走到 `echo … [$EXP_RI]` 就 `unbound variable` 直接死：
+#    **恰好只在"真有别人的 reinstall 在跑"那一档崩**（基线为空时走的是另一支），
+#    而那一档正是这臂最该出读数的一档。rc=1 而日志里一个 ❌ 都没有 ⇒ 看起来像"臂红"，
+#    其实是装置连判决都没跑到（本机今天第 N 次同一族：臂红之后先读臂）。
+#    期望集 = 开跑基线：注入的假进程都在本树（`in_tree` 豁免）且各臂收尾已 kill。
+# ⚠️ 已知会漂的一档（不改判定式，留给读结果的人）：基线是**开跑那一刻**的活数，
+#    若某枚外部 reinstall 在本趟中途自己退出，T1 的逐字相等会报"集合不符" —— 那是
+#    现场变了，不是门坏了。判据：红的那枚 pid 现在还在不在（`ps -p`）。
+EXP_RI="$BASE_RI"
 echo "基线（外部，已排除自己这一棵树）：verify-mobile=[${BASE_VM:-无}] reinstall=[${BASE_RI:-无}]"
 if [ -n "$BASE_RI" ]; then
   echo "   ⚠️ 此刻**真有**别的 reinstall-all 在跑 —— 第二道的『该红』是现场状态，B 现在不能起（AGENTS §8.9）"
@@ -71,17 +87,46 @@ seg3b() { sed -n '/════ 3b\./,/════ 4\./p' "$1"; }
 # 从 3b 那一行里把 pid 抽出来（只认那一行自己打印的字段，不认我起的名）
 pids_in() { seg3b "$1" | grep "$2" | grep -oE '[0-9]{2,}' | tr '\n' ' '; }
 
-echo "== T1 基线一致性：3b 报的 pid 集合必须恰好等于基线 =="
+echo "== T1 基线一致性：第一道**至多一枚代表**且必须认得出来源；第二道恰好等于基线 =="
+# 🔴 两道门的**基数契约不同**，这是读实现得到的事实，不是我的偏好（12:5x 现场教的）：
+#   · 第一道走 `lib/mobile-e2e-runner-probe.sh`，它的 awk 以 `print; exit` 收尾 ⇒ 契约就是
+#     "至多一枚代表"（它服务的是"有没有人占着设备面"这个布尔门，不是清单）；
+#   · 第二道走本闸门里的 `reinstall_other_pids()`，逐枚累加 ⇒ 报的是全集合。
+#   ⇒ 第一道的臂**不许**断言"恰好等于基线"，也不许断言"必点名到我注入的那一枚"：
+#     12:5x 那趟三条 verify-mobile 并存，门报出其中一枚（23033），旧期望就把它判成 ❌ ——
+#     **那是臂的期望比契约宽，不是门坏**（同族：恒红的等待类读数最贵）。
+#     "注入必被认得"这条真牙搬去 T2 的**受控快照腿**（探针本来就收 psfile 实参）。
 run_gate "$D/t1"
 GOT_VM=$(pids_in "$D/t1" "有移动端验收在跑"); GOT_RI=$(pids_in "$D/t1" "有另一趟 reinstall-all 在跑")
 [ -z "$GOT_VM" ] && GOT_VM="(无)"; [ -z "$GOT_RI" ] && GOT_RI="(无)"
-EXP_VM=${BASE_VM:-"(无)"}; EXP_RI=${BASE_RI:-"(无)"}
-if [ "$(printf '%s' "$GOT_VM" | tr -s ' ' '\n' | sort | tr -d '\n')" = "$(printf '%s' "$EXP_VM" | tr -s ' ' '\n' | sort | tr -d '\n')" ]; then
-  echo "   ✅ 第一道报出 [$GOT_VM] == 基线 [$EXP_VM]"
+GOT_VM_N=$(printf '%s\n' $GOT_VM | grep -c '[0-9]' || true)
+in_set() { case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+LIVE_VM=""
+for pid in $(pgrep -f 'verify-mobile' 2>/dev/null); do in_tree "$pid" || LIVE_VM="$LIVE_VM$pid "; done
+if [ "$GOT_VM_N" -gt 1 ]; then
+  echo "   ❌ 第一道报出 $GOT_VM_N 枚 [$GOT_VM] ⇒ 共享探针的基数契约变了（原来只出一枚代表）"
+  echo "      ⇒ 这一臂要按**新契约**重设计并在台账里写明，不许顺势把期望改成『多枚也行』"; fail=1
+elif [ "$GOT_VM" = "(无)" ]; then
+  if [ -n "$BASE_VM" ]; then
+    echo "   ℹ️ 第一道没报，而开跑时的候选基线非空 [${BASE_VM}]"
+    echo "      探针的规则会排除闸门自身 / 「bash -n」/「-c 包装进程」⇒ 这一格记**未定性**，不判门坏"
+    echo "      （真正的「注入必被认得」在 T2 的受控快照腿上）；候选 argv 逐行："
+    for pid in $BASE_VM; do ps -p "$pid" -o command= 2>/dev/null | sed 's/^/        /' | cut -c1-150; done
+  else
+    echo "   ✅ 第一道没报，候选基线也为空（设备面没人）"
+  fi
 else
-  echo "   ❌ 第一道报出 [$GOT_VM] != 基线 [$EXP_VM]"; fail=1
+  okc=1
+  for p in $GOT_VM; do
+    in_set "$p" "$BASE_VM" || in_set "$p" "$LIVE_VM" || { okc=0; BADP="$p"; }
+  done
+  if [ "$okc" = 1 ]; then
+    echo "   ✅ 第一道报出 [$GOT_VM]（一枚代表）认得出来源（开跑基线 [${BASE_VM:-空}] ∪ 现读 [${LIVE_VM:-空}]）"
+  else
+    echo "   ❌ 第一道报出 [$GOT_VM]：$BADP 既不在开跑基线也不在现读候选里 ⇒ 编出来的读数"; fail=1
+  fi
 fi
-if [ "$(printf '%s' "$GOT_RI" | tr -s ' ' '\n' | sort | tr -d '\n')" = "$(printf '%s' "$EXP_RI" | tr -s ' ' '\n' | sort | tr -d '\n')" ]; then
+if [ "$(printf '%s' "$GOT_RI" | tr -s ' ' '\n' | sort | tr -d '\n')" = "$(printf '%s' "${BASE_RI:-"(无)"}" | tr -s ' ' '\n' | sort | tr -d '\n')" ]; then
   echo "   ✅ 第二道报出 [$GOT_RI] == 基线 [$EXP_RI]"
 else
   echo "   ❌ 第二道报出 [$GOT_RI] != 基线 [$EXP_RI]"; fail=1
@@ -102,10 +147,45 @@ spawn_and_check() {  # $1=臂名 $2=argv $3=匹配关键词 $4=必须新出现�
   esac
 }
 
-echo "== T2 注入外部 verify-mobile 运行者 ⇒ 第一道必须点名到它 =="
+echo "== T2 注入外部 verify-mobile 运行者 ⇒ 两腿：受控快照必须点名它，现场必须判红 =="
 # 注意：这一臂注入的名字必须能被探针的正解认到（`verify-mobile-[a-z-]+\.sh`），
 #       第一版我用了 "fake-e2e"（含数字）不命中，那**是臂坏不是门坏** —— 当时差点据此判门没牙。
-spawn_and_check t2 "$D/fakescripts/.verify-mobile-fakearm.sh" "有移动端验收在跑"
+# 🔴 12:5x 起这一臂拆成两腿：旧写法在现场三条 verify-mobile 并存时假红（门报的是"一枚代表"，
+#    契约如此），而"必点名到我注入的那一枚"这句话比契约宽。真牙搬到受控快照腿。
+spawn_vm_check() {   # $1=臂名 $2=假运行者 argv $3=闸门里的关键词
+  ( exec bash "$2" ) &
+  local fp=$!
+  sleep 1
+  ps -p "$fp" -o pid=,ppid=,command= > "$D/$1.ps" 2>/dev/null
+  if [ ! -s "$D/$1.ps" ]; then echo "❌ 假进程 $1 起不来 ⇒ 装置坏（exit 4）"; exit 4; fi
+  sed 's/^/   真实 ps 行: /' "$D/$1.ps" | cut -c1-170
+  run_gate "$D/$1"
+  kill "$fp" 2>/dev/null; wait "$fp" 2>/dev/null
+  # 腿 A（受控快照）：把**这条真 argv** 单独喂进探针的 psfile 通道 ⇒ 必须恰好点名 fp。
+  #   这一腿才配得上"注入必被认得"：现场有别人时闸门可以报别人，受控快照里只有它自己。
+  local got2
+  got2=$(MOBILE_E2E_PROBE_ME=99999 mobile_e2e_runner_lines "$D/$1.ps" | awk '{print $1}')
+  if [ "$got2" = "$fp" ]; then
+    printf '   ✅ %s 受控快照腿：探针恰好点名注入的那枚（pid %s）\n' "$1" "$fp"
+  else
+    printf '   ❌ %s 受控快照腿：快照里只有它自己却没点名 %s（点名 [%s]）⇒ 门真的没牙\n' "$1" "$fp" "$got2"
+    fail=1
+  fi
+  # 腿 B（现场）：闸门必须把第一道判红，且报出的那一枚来路可追（注入 ∪ 开跑基线 ∪ 现读）
+  local rep okv=1 p2
+  rep=$(pids_in "$D/$1" "$3")
+  if [ -z "$rep" ]; then
+    printf '   ❌ %s 现场腿：注入了运行者，闸门 3b 却没报「%s」⇒ 漏报\n' "$1" "$3"; fail=1
+  else
+    for p2 in $rep; do in_set "$p2" "$BASE_VM $LIVE_VM $fp " || okv=0; done
+    if [ "$okv" = 1 ]; then
+      printf '   ✅ %s 现场腿：闸门报出 [%s]（我注入的是 %s；第一道只出一枚代表）\n' "$1" "$rep" "$fp"
+    else
+      printf '   ❌ %s 现场腿：报出 [%s] 来路不明（既不是注入的也不在基线/现读里）\n' "$1" "$rep"; fail=1
+    fi
+  fi
+}
+spawn_vm_check t2 "$D/fakescripts/.verify-mobile-fakearm.sh" "有移动端验收在跑"
 
 echo "== T3 注入外部 reinstall-all（普通形态）⇒ 第二道必须点名到它 =="
 spawn_and_check t3 "$D/fakescripts/reinstall-all.sh" "有另一趟 reinstall-all 在跑"

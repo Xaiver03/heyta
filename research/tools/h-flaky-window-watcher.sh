@@ -1,4 +1,27 @@
 #!/bin/bash
+# 🔴 HEYTA-SNAPSHOT-BOOTSTRAP v1（traps #110/#113）—— bash 按字节偏移增量读取脚本：
+#    运行中被编辑，后半段就从错位字节开始解析。本装置是**等几十分钟的等待器**，
+#    而 11:0x 实测就发生过"边等边改它"（我先改了源文件、才想起 pid 32016 在跑旧偏移，只能停掉重挂）。
+#    入口先把自己拷成同目录隐藏快照再 exec —— 之后对源文件的任何编辑都影响不到本次运行。
+#    快照名 .原名.snap.PID（`.gitignore` 里加了 `research/tools/.*.snap.*`）；trap 尽力清理。
+case "$(basename "$0")" in
+  .*.snap.*) ;; # 已是快照：正常往下跑
+  *)
+    _snap_dir="$(cd "$(dirname "$0")" && pwd)" || exit 1
+    find "$_snap_dir" -maxdepth 1 -name ".$(basename "$0").snap.*" -mmin +240 -delete 2>/dev/null || true
+    _snap="${_snap_dir}/.$(basename "$0").snap.$$"
+    cat "$_snap_dir/$(basename "$0")" > "$_snap" || exit 1
+    exec bash "$_snap" "$@"
+    ;;
+esac
+# 🔴 清理必须**只清自己创建的那份**：本装置会在 selftest 里 `bash "$0"` 递归调自己，
+#    子进程跳过 bootstrap 时 `$0` 就是**父进程那份快照**的名字 —— 无条件 `trap rm -f "$0"`
+#    会让第一个子进程退出时把父亲的脚本删掉（11:0x 实测：17 条臂当场变 127，
+#    而 `bash -n` 与"脚本文件在不在"全都看不出来，因为文件是在运行中途消失的）。
+#    快照名尾巴是创建者的 PID ⇒ 只有 PID 对得上的那个进程才挂这个 trap。
+case "$0" in
+  *.snap.*) [ "${0##*.snap.}" = "$$" ] && trap 'rm -f -- "$0"' EXIT ;;
+esac
 # 有界窗口 watcher：等负载门 + 4318/4319 空闲，然后把 calendar-view-options 连跑三趟
 # 目的：解释 23:19 那趟留下的 `1 flaky`（① 首趟红在 spec.ts:114 的 VIEW_SELECT 可见性）。
 # 退出码：0 = 三趟全绿（flaky 在本窗口内未复现）；1 = 跑完了但其中至少一趟非零（= flaky 复现，这就是它要抓的东西）；
@@ -17,10 +40,16 @@ cd "$(dirname "$0")/../.." || exit 4   # 本脚本住在 research/tools/，仓�
 #    跑完 selftest 后 `/tmp/ht-h-flaky.log` 指向了一份**空文件**，
 #    下一位照台账里"稳定名"去读"上一趟三跑读数"就会读到零字节，
 #    而那份真读数在它旁边的 `.20261004-060210.25162.log` 里活得好好的。
-STABLE_LOG=/tmp/ht-h-flaky.log
-if [ "${1:-}" = "--selftest" ]; then STABLE_TIED=0
-elif [ -n "${LOG:-}" ]; then STABLE_TIED=0
-else LOG="/tmp/ht-h-flaky.$(date +%Y%m%d-%H%M%S).$$.log"; ln -sf "$LOG" "$STABLE_LOG" && STABLE_TIED=1 || STABLE_TIED=0; fi
+STABLE_LOG="${STABLE_LOG:-/tmp/ht-h-flaky.log}"
+# 🔴 从"排除名单"改成**允许名单**（10:5x，我自己刚复犯之后）：
+#   原来这里是 `if [ "$1" = --selftest ]` ⇒ 后来加 `--scan` 时我照抄进分支，忘了它同样会先跑到这段 `ln`，
+#   于是 `/tmp/ht-h-flaky.log` 被我那次 `--scan` 指到一份近乎空的日志，**正在等的看守（pid 32016）的现场被摘走**
+#   —— 这是第 15–17 行那起 09:2x 事故的第二次，肇事者换成新加的那一档。
+#   排除名单的每一栏都要有人**记得**加；允许名单只有一个 `run`，以后再加档位默认就摘不走。
+MODE="${1:-run}"
+if [ -n "${LOG:-}" ]; then STABLE_TIED=0
+elif [ "$MODE" = "run" ]; then LOG="/tmp/ht-h-flaky.$(date +%Y%m%d-%H%M%S).$$.log"; ln -sf "$LOG" "$STABLE_LOG" && STABLE_TIED=1 || STABLE_TIED=0
+else STABLE_TIED=0; fi
 RUNS="${RUNS:-3}"
 STRICT_MAX="${STRICT_MAX:-9}"
 BUDGET="${BUDGET:-900}"   # 外层窗口预算
@@ -60,10 +89,24 @@ ht_trace_scan() {
   fi
   _x=$(mktemp -d /tmp/ht-h-tr.XXXXXXXX) || { echo "RUN_${_lbl}_TRACE scan=unavailable（建不了临时目录）"; return 0; }
   _n=0
-  for _f in $_z; do
+  # 🔴 两条都必须守：① 用 `-d` 解到目标目录，不 `( cd && unzip )`；② 逐行 `read -r` 取路径，不 `for f in $_z`。
+  #   ①（10:4x 实测）：`find` 交回**相对**路径时，子 shell 一换 cwd 就找不到文件，而 `-q`+`2>/dev/null`
+  #     把失败完全吞掉 ⇒ 解包 0 个 ⇒ `connect=0` ⇒ `viteInTrace=no`，看着像"那趟没有洪泛"。
+  #   ②（同刻实测）：**本仓的绝对路径里就有空格**（`Desktop/All in one Data/…`）⇒
+  #     一枚 `trace.zip` 被空白拆成 4 个"文件"，unzip 四次全失败同样被吞 ⇒ 又一个恒 0 的瞎扫描。
+  #   两种都是 AGENTS §8.3 那一族：**永远走不到的判据不报错，只报"没有"**。
+  while IFS= read -r _f; do
+    [ -z "$_f" ] && continue
     _n=$((_n + 1))
-    ( cd "$_x" && unzip -q -o "$_f" '*.trace' >/dev/null 2>&1 )
-  done
+    unzip -q -o "$_f" '*.trace' -d "$_x" >/dev/null 2>&1
+  done <<ZLST
+$_z
+ZLST
+  if ! ls "$_x"/*.trace >/dev/null 2>&1; then
+    echo "RUN_${_lbl}_TRACE scan=unavailable（traces=${_n} 枚但一个 .trace 都没解出来 ⇒ 下面三列 0 都不是读数）"
+    rm -rf "$_x" 2>/dev/null
+    return 0
+  fi
   _con=$(grep -h -o '\[vite\] connect' "$_x"/*.trace 2>/dev/null | wc -l | tr -d ' '); _con=${_con:-0}
   _hot=$(grep -h -o '\[vite\] hot updated' "$_x"/*.trace 2>/dev/null | wc -l | tr -d ' '); _hot=${_hot:-0}
   _inv=$(grep -h -o 'Could not Fast Refresh' "$_x"/*.trace 2>/dev/null | wc -l | tr -d ' '); _inv=${_inv:-0}
@@ -75,6 +118,64 @@ ht_trace_scan() {
   rm -rf "$_x" 2>/dev/null
   return 0
 }
+
+# 🔴 §5 第 1 条那次「任何读 dist 的判据开跑前先体检新鲜度」由装置**自己打**，不靠谁记得（11:2x 加）。
+#    为什么是**记录**而不是门禁：`scripts/dist-freshness.mjs` 的文件头自己写明"默认永远 exit 0 ——
+#    并行会话正在改源码时『落后』是正常状态"，把它变成红等于本线摘走一条不属于本线的判据（AGENTS §8.3）。
+#    但它必须每趟留下读数，否则"这两张图是当前源码的界面"又是一句没有现场的主张（交接 §6 第 28 条：主张过期）。
+#    包清单**不手抄**：从 `apps/web/package.json` 现取 —— 抄一份就会漂，而漂了的体检只覆盖子集，
+#    打印出来却长得像"全新鲜"。取不到一律明确打 `check=unavailable`，绝不打成 `behind=0`。
+ht_dist_report() {
+  _lbl="$1"
+  if [ -z "${HT_DIST_PKGS:-}" ]; then
+    echo "RUN_${_lbl}_DISTFRESH check=unavailable（取不到 apps/web 的 @heyta/* 依赖清单 ⇒ 这一趟没有新鲜度读数，不是「全新鲜」）"
+    return 0
+  fi
+  _out=$(cd "$REPO_ROOT" && node scripts/dist-freshness.mjs --only "$HT_DIST_PKGS" 2>&1)
+  _behind=$(printf '%s\n' "$_out" | grep -F '落后于源码的产物：' | head -1 | tr -cd '0-9')
+  _miss=$(printf '%s\n' "$_out" | grep -F '缺产物：' | head -1 | tr -cd '0-9')
+  if [ -z "$_behind" ] || [ -z "$_miss" ]; then
+    echo "RUN_${_lbl}_DISTFRESH check=unavailable（体检没打那两行汇总 ⇒ 读数取不到，别读成 0）"
+    printf '%s\n' "$_out" | sed 's/^/    DF /'
+    return 0
+  fi
+  echo "RUN_${_lbl}_DISTFRESH pkgs=${HT_DIST_N} behind=${_behind} missing=${_miss}"
+  # 有落后就把**是哪几个包**留在现场：只留汇总数字的话，下一位还得重跑一次才知道影响的是哪条腿
+  if [ "$_behind" != "0" ] || [ "$_miss" != "0" ]; then
+    printf '%s\n' "$_out" | grep -E '产物比源码旧|package.json 的 main' | sed 's/^/    DF /'
+  fi
+}
+
+# 🔴 只扫现成的 trace，不开跑、不等窗口（2026-10-04 10:4x 加）。
+#   为什么要这一档：判据 (a)「机制存在」要的是**一趟非零趟的 trace**，而本机 `e2e/test-results/` 里
+#   就躺着别人 06:51 那趟红跑的 trace —— 没有这一档，要么重跑（抢窗）、要么手抄一遍 needle 数（第二套实现，等它漂）。
+#   这一档和看守主体用的是**同一个 `ht_trace_scan`**，读数形状逐字相同（`scan=ok traces=… viteInTrace=…`）。
+#   exit：扫到 ≥1 枚 trace 且 viteInTrace=yes ⇒ 0；扫了但没看见 vite 行 ⇒ 2（"扫描没看见"，不是"没有洪泛"）；
+#   目录里根本没有 trace.zip / 没有 unzip ⇒ 3（够不着，不是读数）。
+if [ "${1:-}" = "--scan" ]; then
+  shift
+  if [ "$#" -eq 0 ]; then
+    echo "用法：bash research/tools/h-flaky-window-watcher.sh --scan <trace 目录>[ <更多目录>…]"
+    exit 1
+  fi
+  seen_any=0; seen_vite=0
+  _i=0
+  for d in "$@"; do
+    _i=$((_i + 1))
+    if [ ! -d "$d" ]; then
+      echo "SCAN_${_i} dir=$d scan=unavailable（目录不存在 ⇒ 这一格不是读数）"
+      continue
+    fi
+    seen_any=1
+    line=$(ht_trace_scan "$d" "SCAN_${_i}")
+    printf '%s\n' "$line"
+    case "$line" in *viteInTrace=yes*) seen_vite=1 ;; esac
+  done
+  if [ "$seen_any" = 0 ]; then echo "SCAN 没有任何目录可扫 ⇒ exit 3"; exit 3; fi
+  if [ "$seen_vite" = 1 ]; then exit 0; fi
+  echo "SCAN 扫到了 trace 但没看见任何 [vite] 行 ⇒ 这只否证「扫描看见了」，不否证「那趟没有洪泛」（exit 2）"
+  exit 2
+fi
 
 # selftest 只测「跑 + 留证 + 判别式计数」这一层；等窗口那一层的读数在它之前（lsof 阳性对照）。
 if [ "${1:-}" = "--selftest" ]; then
@@ -138,6 +239,11 @@ STUB
     || { echo "❌ 臂1 的桩没造 trace.zip（这是**预期**：绿趟桩无 zip），但扫描必须把 scan=none 打出来 ⇒ 否则『没扫』与『扫了没有』分不开"; bad=$((bad+1)); }
   grep -q 'SIG optdeps=0 hotupdated=0' "$ST/l1" \
     || { echo "❌ 臂1 没打判别式计数（绿趟也要打：否则下一位分不开「没数到」与「没跑到」）"; bad=$((bad+1)); }
+  # 🔴 臂1 的第四层（11:2x）：新鲜度体检必须**每趟自动打**，且形状里三个数都是现取的。
+  #    这里刻意**不断具体值**（`pkgs` 有几个、有没有落后都由现场决定 —— 那是别人正在改不改源码的事），
+  #    钉的是"这一趟留了可读的体检行"。取不到时装置打的是 `check=unavailable`（臂4 验那一路）。
+  grep -qE 'RUN_1_DISTFRESH pkgs=[0-9]+ behind=[0-9]+ missing=[0-9]+' "$ST/l1" \
+    || { echo "❌ 臂1 没打体检行（§5 第 1 条又被退回「靠人记得」）"; sed -n '1,6p' "$ST/l1" 2>/dev/null; bad=$((bad+1)); }
   # 🔴 臂1 的第二层：桩**没有**打 vite 的横幅 ⇒ 这一趟必须自报 viteChannel=no。
   #    这条是 09:3x 加的：`optdeps=0` 单独看会被读成"排除了重新预打包"，而 vite 那条
   #    `webServer` 没有 `stdout:'pipe'` ⇒ 这一路可能压根没转发。**瞎通道上的 0 不是读数**，
@@ -214,10 +320,58 @@ STUB
     else
       echo "   ✅ 臂4 负向：同一套参数下副本的 argv 里没有 --output（臂1 那条判据两侧都分得开）"
     fi
+    # 🔴 臂4 的第二层 = 体检那条的**负向腿**（行为式，不需要测试专用开关）：
+    #    最小树里没有 `apps/web/package.json` ⇒ 范围取不到 ⇒ 装置必须自报 `check=unavailable`，
+    #    绝不能把"取不到范围"打成一个看起来像读数的 `behind=0`（今天已经为这一族修过两处）。
+    grep -q 'RUN_1_DISTFRESH check=unavailable' "$ST/l4" \
+      || { echo "❌ 臂4 的最小树里没有 apps/web/package.json，体检却报了具体数字或整行没打 ⇒「取不到」被伪装成了读数"; sed -n '1,8p' "$ST/l4" 2>/dev/null; bad=$((bad+1)); }
   fi
   rm -rf "$ST" 2>/dev/null
+  # ── 臂 7（正向 + 负向，钉 10:4x 那两次扫描自己瞎了）：**路径里带空格**的 trace 必须照样解出来。
+  #    起因（都是当场实测到的，不是推的）：`for _f in $_z` 把
+  #    `/Users/…/Desktop/All in one Data/…`（**本仓绝对路径本来就有空格**）拆成 4 个"文件"，
+  #    而 `( cd && unzip )` 在相对路径下找不到文件 —— 两种失败都被 `-q`+`2>/dev/null` 吞掉，
+  #    症状与"那一趟没有洪泛"逐字相同（connect=0 / viteInTrace=no）。
+  #    ⇒ 这一臂不靠活树，靠**自造夹具**：一枚含三条 needle 的 zip，放在带空格的目录里。
+  FD="$ST/dir with space"; mkdir -p "$FD/yes" "$FD/no"
+  if ! command -v zip >/dev/null 2>&1; then
+    echo "   ⚠️ 臂7 未执行（本机没有 zip）⇒ 这一臂此刻没有牙，别把 selftest 的 ✅ 读成「空格路径也验过」"
+  else
+    printf '[vite] connecting...\n[vite] hot updated: /src/foo.ts\nCould not Fast Refresh (invalidation failed)\n' \
+      > "$FD/yes/1-trace.trace"
+    printf 'nothing to see\n' > "$FD/no/1-trace.trace"
+    ( cd "$FD/yes" && zip -q trace.zip 1-trace.trace ) && ( cd "$FD/no" && zip -q trace.zip 1-trace.trace )
+    R7=$(bash "$0" --scan "$FD/yes" >/dev/null 2>&1; echo $?)
+    L7=$(bash "$0" --scan "$FD/yes" 2>&1)
+    [ "$R7" = 0 ] || { echo "❌ 臂7 带空格路径的正向夹具应退 0，实际 $R7"; bad=$((bad+1)); }
+    printf '%s\n' "$L7" | grep -q 'connect=1 hotUpdated=1 fastRefreshInvalidate=1 viteInTrace=yes' \
+      || { echo "❌ 臂7 带空格的路径没把三条 needle 数出来 ⇒ 扫描又是恒 0 的了"; printf '%s\n' "$L7" | sed 's/^/      /'; bad=$((bad+1)); }
+    R7N=$(bash "$0" --scan "$FD/no" >/dev/null 2>&1; echo $?)
+    L7N=$(bash "$0" --scan "$FD/no" 2>&1)
+    [ "$R7N" = 2 ] || { echo "❌ 臂7 负向夹具（zip 里零条 [vite]）应退 2，实际 $R7N"; bad=$((bad+1)); }
+    printf '%s\n' "$L7N" | grep -q 'scan=ok' \
+      || { echo "❌ 臂7 负向腿解不出 .trace ⇒ 它报的 no 是「扫描瞎」不是「没有洪泛」，两腿分不开"; bad=$((bad+1)); }
+    [ "$bad" = 0 ] && echo "   ✅ 臂7：空格路径正向三条 needle 全数到 / 空 zip 负向仍走 scan=ok（两种「0」分得开）"
+  fi
+  # ── 臂 8（正负两腿，钉 10:5x 我新加 `--scan` 时复犯的那起"摘走别人的现场"）：
+  #    负向 = `--scan` 不许动稳定名；正向 = 默认 run 档确实会挂上（没有正向，"不许动"可能只是恒不动）。
+  SL="$ST/stable.lnk"; LT="$ST/live-run.log"; printf 'LIVE-READING\n' > "$LT"; ln -sf "$LT" "$SL"
+  STABLE_LOG="$SL" bash "$0" --scan "$ST/dir with space/yes" >/dev/null 2>&1
+  if [ "$(readlink "$SL")" = "$LT" ]; then
+    echo "   ✅ 臂8 负向：--scan 跑完之后稳定名仍指向 run 那份（新档位摘不走看守的现场）"
+  else
+    echo "❌ 臂8 负向：--scan 把稳定名摘走了（$(readlink "$SL")）⇒ 正在等的那趟现场读不到了"; bad=$((bad+1))
+  fi
+  SL2="$ST/stable2.lnk"; printf 'PLACEHOLDER\n' > "$ST/ph.log"; ln -sf "$ST/ph.log" "$SL2"
+  STABLE_LOG="$SL2" SKIP_GATE=1 RUNS=0 BUDGET=1 PW_CMD=true bash "$0" >/dev/null 2>&1
+  T2=$(readlink "$SL2")
+  if [ -n "$T2" ] && [ "$T2" != "$ST/ph.log" ] && [ -f "$T2" ]; then
+    echo "   ✅ 臂8 正向：默认 run 档仍会新建每跑唯一的日志并挂上稳定名（⇒ 上面那条「不动」不是恒不动）"
+  else
+    echo "❌ 臂8 正向：run 档没有挂稳定名（${T2}）⇒ 装置与真实看守的行为已经不一样，负向那条不算证据"; bad=$((bad+1))
+  fi
   # 留证这一层的两腿就是臂 1 与臂 3：「恒删」坏在臂 3，「恒留」坏在臂 1。
-  [ "$bad" = 0 ] && { echo "✅ selftest 六臂成立（带对的 --output / 判别式数得出来 / 绿删红留 / 摘掉必分得开 / 前缀行不算通道活着 / trace 扫得出来且空 zip 会自报瞎）"; exit 0; }
+  [ "$bad" = 0 ] && { echo "✅ selftest 八臂成立（带对的 --output / 判别式数得出来 / 绿删红留 / 摘掉必分得开 / 前缀行不算通道活着 / trace 扫得出来且空 zip 会自报瞎 / 空格路径与空夹具两种「0」分得开 / 新档位摘不走稳定名而 run 档照挂）"; exit 0; }
   echo "selftest 有 $bad 条不成立 ⇒ 装置坏（exit 4），不是产品坏"; exit 4
 fi
 
@@ -269,9 +423,14 @@ while [ "${SKIP_GATE:-0}" != "1" ]; do
 done
 
 cd e2e || exit 4
+REPO_ROOT=$(cd .. && pwd)
+# 新鲜度体检的**范围**现取（见 ht_dist_report：手抄的包清单会漂）
+HT_DIST_PKGS=$(node -e 'try{var p=require(process.argv[1]),d=Object.assign({},p.dependencies,p.devDependencies);console.log(Object.keys(d).filter(function(x){return x.indexOf("@heyta/")===0}).map(function(x){return x.split("/")[1]}).join(","))}catch(e){}' "$REPO_ROOT/apps/web/package.json" 2>/dev/null)
+HT_DIST_N=$(printf '%s' "${HT_DIST_PKGS:-}" | tr ',' '\n' | grep -c .)
 FLAKY_RUNS=0
 for i in $(seq 1 "$RUNS"); do
   echo "----- 第 $i 趟 $(date '+%T') -----" >> "$LOG"
+  ht_dist_report "$i" >> "$LOG"
   # 🔴 每趟的输出**单独落一份**再并进主日志：原来那行 `grep … "$LOG" | tail -3` 扫的是
   #    **整份主日志**，第 2 趟的 SUMMARY 会把第 1 趟的计数也捞进来（"点位打当逐点打"那一族）。
   # shellcheck disable=SC2086   # PW_CMD 要词分割（默认值就是三个词）；selftest 用桩替它

@@ -23,6 +23,29 @@
 | `calendar-day-away.png` | 点两次页头 `›`（与拖拽共用同一个 `stepCalendarCursor`） | 「10月5日 星期一」，侧栏圈 5；**现在线消失**（它是"现在"，不是"那一天"） |
 | `calendar-day-back-today.png` | 在 10-05 上点「回到今天」 | 标题回今天、侧栏回今天、**现在线回来了**（DOM 计数 = 1） |
 
+🔴 **上面这五张的形状主张要按"拍于哪一刻的工作树"来读，不是"HEAD 的界面"**（11:5x 现量，我把这五张重新打开看了）：
+`git log -1 --format='%h %ad' --date=format:'%m-%d %H:%M' -- calendar-day-full.png` ⇒ **`5e23b7bf` 10-03 23:58**，
+而把主区页头改成"动作整体可换行"的那笔 CSS 是 **`39032107`（10-04 10:11）** 才进的 HEAD
+（同一件事的实测记录在 `../calendar-view-options/README.md`：那两枚年视图的页头从一行折成两行、年板从 4 列掉到 2 列）。
+**人此刻看到的**（`calendar-day-full.png`）：页头**一行排满**（`日历` · `‹ 10月3日 星期六 ›` · `回到今天` · `+` ·
+`视图` `[日 ▾]` · `未同步` · `⟳` · `⚙` · `中文`/`English` · 右上角月亮），**没有折行**；
+全天带里一条 `日视图-947421`，轴从 `0:00` 排到 `7:00`（视口 1280×720 到此为止），底部两句说明都在。
+⇒ 三条要说清的：
+① 图里的"今天"是 **10-03 星期六**（表格里那几处"今天"都指拍摄日，不是读图日）；
+② 这五张**不证明**今天的 HEAD 在日档下也画一行页头 —— 日档通常不开详情列，
+而"折成两行"那个现象的前提是主区被挤窄，所以**这一处既不能说一致也不能说不一致，是没取证**；
+③ 要把 ② 变成读数只有一条路：等 4318/4319 空闲且负载落回个位，重跑
+`cd e2e && npx playwright test tests/calendar-day.spec.ts`，把新图复制回本目录、**人打开看过之后**
+按新字节改上面这张表，并**把提交号一起记进来**（这条纪律就是 `39032107` 那笔教出来的）。
+⚠️ 这五枚**没有常驻 md5**（本目录只有下面 `day-en-empty.png` 一枚有，理由见"锚点规则"那一节）——
+但**这不等于没人管**：12:1x 起它们各有一枚 `UIPIN` 代码锚点（见下面那节），现量
+`bash research/tools/r17-evidence-md5-check.sh --dir apps/web/evidence/calendar-day`
+⇒ `entries=1 mismatch=5 pins=8 md5bad=0 pinbad=5 pinunknown=0`，rc=**1**。
+🔴 **那五枚红是**"形状主张已过期，要重拍"**，不是事故** —— 它把这一节第 ② 条那句"没取证"
+从一段等人读的话变成一条会自己响的读数。敞口的**另一半仍然开着**并且是**故意的**：
+这五张的"字节过期"仍然没有任何东西报红，因为它们每趟必变（`STAMP` + 游标日期），
+报它等于制造常驻红。
+
 ## 🔴 这几张图**不证明**的事
 
 - **不证明现在线画在哪**。它按 `小时 × size.row-min-height` 推导，跑在 10 点档 ⇒
@@ -86,12 +109,42 @@ X/Y/AB/AC 要重写 `packages/ui/dist`，而另一条会话正在读它打移动
 「是同一屏」这件事**在两趟里都成立**（两张并排看：同一标题、说明都在视口内）⇒ 那条降级不是偶然读数。
 语言由 URL 上的 `?lang=en` 决定（解析链第 2 层；第 1 层 `heyta.locale` 这里**故意不写**，
 写了就把英文压回去 —— 理由见 `docs/plans/calendar-year-time-and-mobile-profile.md` §2 R16 那格的更正）。
-**三张人都打开看过**；md5 一并记下（同一检出里别人也在跑 e2e，文件会被覆盖）：
+**三张人都打开看过**；md5 一并记下（同一检出里别人也在跑 e2e，文件会被覆盖）。
+
+🔴 **12:1x：锚点规则改写成两条，因为它们各自被实测打穿过**（01:34 → 06:46 → 11:54 三次覆盖 + 一次逐像素对账）：
+
+1. **常驻 md5 只给"同一笔代码下两趟重跑字节相同"的图。** 本目录三张里只有 `day-en-empty.png` 满足
+   （11:54 那趟重跑之后它的字节与 HEAD **逐字节相同** —— 这是**量出来的**稳定性，不是假设）。
+   另两张带 `STAMP` 的图**本文件上面早就写明「值每趟都换，所以它不能当指纹用」**，
+   却仍然被留在 md5 那一列里 —— 那句话已经把它判过死刑，只是没人去执行它 ⇒ 12:0x 的 `--all` 因此报了两枚红，而**那两枚红不携带任何产品信息**
+   （逐像素实测：`day-en-full` 新旧两批字节差 **468/3686400** 枚像素，**全部落在任务名那一行**，
+   `en-day-589776` → `en-day-083090`；页头、轴、说明句、空态字全部逐字节相同）。
+   一条每跑必红的判据会把人训练成忽略红（§8.3 元规则），所以它们的 md5 **降级为记录值**（留在表里，
+   不再是对账锚点）。
+2. **形状主张改钉"代码锚点"**：`UIPIN <文件> <拍图时那批界面代码的提交> <决定这张图形状的路径…>`，
+   判据是"那些路径里最后一次动它们的提交 ≤ 钉的那笔"。它**不吃重跑的噪声**（臂 6 专门测这件事：
+   图字节一个字没变、源码动了 ⇒ 仍然红），所以它回答的是 md5 回答不了的那半边 —— **主张过期**。
+
+```text
+UIPIN day-en-full.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN day-en-no-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN day-en-empty.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN calendar-day-full.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN calendar-day-drag-next.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN calendar-day-drag-prev.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN calendar-day-away.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN calendar-day-back-today.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+```
+
+⚠️ **后五枚此刻是红的（UISTALE），这是要的结果不是事故**：钉 `5e23b7bf`（10-03 23:58）之后
+`39032107`（10-04 10:11）动过 `main-area.css`（页头可换行）⇒ 上面「② 这五张**不证明**今天的 HEAD 在日档下也画一行页头」那条没取证
+现在有一条**机器读数**替它说话，而不是只有一段话等着被下一个人忽略。
+要让它转绿只有一条路：第 ③ 条写的那趟重拍（等窗口 + 人看图 + 把 pin 换成新字节对应的那笔代码提交）。
 
 | 文件 | md5 | 人看到的 |
 |---|---|---|
-| `day-en-full.png` | `d9916538a42055e92d034ac7913b37b3` | 整屏英文：页头 `Calendar` / `Sun, 10/4` / `Back to today` / `View Day` / `Not synced yet`；「All day」带里一条 `en-day-589776`（随机后缀每次现造 ⇒ 这三张的 md5 **跨趟必不同是设计**）；轴从 `0:00` 起；⚠️ 06:46 那趟重渲染后**这张里没有红色 now 线**（拍于 06:46，线落在 `6:00` 之下、不在取景内。旧文案那句"`1:00` 与 `2:00` 之间有一条红色 now 线"是 01:34 那一趟的事实，**对这张不成立**）；**最长那句说明在轴卡下面整行读得出**：`Nothing on this day has a specific time — they are all in the "All day" band above.`（单行、没换行、没省略号、没出容器） |
-| `day-en-no-timed.png` | `40e71764e83853ba81fad6b50cdb2a4e` | ⚠️ **与上一张是同一屏**（人眼看内容相同，md5 不同 ⇒ 差异不在说明的可读性上）。这张的存在理由是 spec 里那句注释"`day-en-full` 可能已经把说明滚出视口"—— **1280×720 下没发生**，所以它在这个视口下**不构成独立证据**，只是"视口更矮时"的保险。要它成为证据得先有一个把说明挤出视口的窄视口 |
+| `day-en-full.png` | 非锚点（每趟随机）：`d9916538a42055e92d034ac7913b37b3` 是 06:46 那趟的字节；11:54 重跑版 `382ac057fa4ac8a514291d11279c4da8` | 整屏英文：页头 `Calendar` / `Sun, 10/4` / `Back to today` / `View Day` / `Not synced yet`；「All day」带里一条 `en-day-589776`（随机后缀每次现造 ⇒ 这三张的 md5 **跨趟必不同是设计**）；轴从 `0:00` 起；⚠️ 06:46 那趟重渲染后**这张里没有红色 now 线**（拍于 06:46，线落在 `6:00` 之下、不在取景内。旧文案那句"`1:00` 与 `2:00` 之间有一条红色 now 线"是 01:34 那一趟的事实，**对这张不成立**）；**最长那句说明在轴卡下面整行读得出**：`Nothing on this day has a specific time — they are all in the "All day" band above.`（单行、没换行、没省略号、没出容器） |
+| `day-en-no-timed.png` | 非锚点（每趟随机）：`40e71764e83853ba81fad6b50cdb2a4e` 是 06:46 那趟的字节；11:54 重跑版 `a89a9a6c12a336d6884567fc76ebf415` | ⚠️ **与上一张是同一屏**（人眼看内容相同，md5 不同 ⇒ 差异不在说明的可读性上）。这张的存在理由是 spec 里那句注释"`day-en-full` 可能已经把说明滚出视口"—— **1280×720 下没发生**，所以它在这个视口下**不构成独立证据**，只是"视口更矮时"的保险。要它成为证据得先有一个把说明挤出视口的窄视口 |
 | `day-en-empty.png` | `57d2d0085e46dcd469aa00d2a19aa28b` | 空的那天的英文态：「All day」卡里居中 `Nothing is due on this day.`，**没有**上面那句"都在全天里"（那天两条带都空，说了就是谎），底部仍有一句 `Tasks without a due date are not on the calendar; they live in the Inbox on the Tasks tab.`；轴只到 `4:00` 那一档；⚠️ 旧文案的"同样带红色 now 线"对这张同样不成立（now 线在取景外） |
 
 🔴 **05:4x 更正：上面这三枚 md5 是重取的，原来那三枚（`46d2e2fb…` / `51926322…` / `eb50b404…`）已经对不上盘上字节**。
@@ -102,10 +155,44 @@ X/Y/AB/AC 要重写 `packages/ui/dist`，而另一条会话正在读它打移动
 05:4x 三张图**人都重新打开看过**，本表按新字节改写（旧写法里的 `Sat, 10/3` 与 `en-day-054555` 已经不成立：
 日期过午夜、任务名那条是每次运行现造的随机后缀）。
 🟢 常驻对账：`bash research/tools/r17-evidence-md5-check.sh --all`（认两种形状：`md5 -r` 的裸行与本表这种
-`| 文件 | md5 | 说明 |`；现量 `dirs_scanned=12 entries_parsed=9 dirs_with_mismatch=0`，rc=**0**）。
-它的牙由 `--selftest` 四臂钉住（未变异 0 枚 / 裸形状注入恰好 1 枚 / 表格形状解析到 1 条 / 表格形状注入恰好 1 枚）。
+`| 文件 | md5 | 说明 |`；**12:1x 起还认第三种** `UIPIN <文件> <提交> <路径…>` = 代码锚点，
+管"字节没变但主张过期"那一半）。它的牙由 `--selftest` **八臂**钉住（md5 对照腿 0 枚 /
+md5 注入腿恰好 1 枚 / 表格形状解析到 1 条 / 表格形状注入腿恰好 1 枚 / UIPIN 正例 1 命中 /
+**UIPIN 源码动了而图字节一个字没变 ⇒ 恰好 1 枚 UISTALE** / UIPIN 钉不存在的提交 rc=4 /
+UIPIN 路径集为空 rc=4）。
+⚠️ 八臂**全部跑在合成夹具上**：第一版的对照腿复制本目录这份现场 README，12:0x 现场被 11:54
+那趟重跑顶掉一枚字节 ⇒ 对照腿在 exit 4 自杀、**后面六臂一条没跑** —— "牙的检查"不能由它要保护的那份现场卡住。
 
 顺带量到、**判成不是缺陷**的一条：英文那张空态卡里 `Nothing is due on this day.`
 上下留白很大（卡片按"能装下带任务的行"的高度撑开）。这是共享 `EmptyState` 在
 定高容器里的既有形态，中文那一档同样（`calendar-day-full.png` 可比），
 不是英文变长带来的 ⇒ 归到"空态视觉密度"那一类，不在本批改。
+
+## 🔴 13:4x 现量：本目录**五张**的形状锚点真过期了（故意留红，不许改钉糊过去）
+
+`bash research/tools/r17-evidence-md5-check.sh --all` 报 `calendar-day` 五枚 `UISTALE`
+（`calendar-day-full.png` / `-drag-next.png` / `-drag-prev.png` / `-away.png` / `-back-today.png`，
+钉的是 `5e23b7bf`，"源码里决定这张图形状的路径已在 `390321074d` 之后又动过"）。
+
+**先按"探针坏"查过，结论是它没坏**：
+- `stat` 现量：这五张的字节是 **10-03 11:09:12**，而那一笔决定形状的提交是 **10-04 10:11** ⇒ 图比代码旧 23 小时。
+- 那一笔在锚点路径集合里动的正是 `apps/web/src/styles/app/main-area.css`
+  （`.ht-header` 的 `block-size` → `min-block-size`、`padding: 0 var(--ht-space-6)` → `var(--ht-space-2) var(--ht-space-6)`、
+  `.ht-header__actions` 从 `flex: 0 0 auto` 改成可换行）—— **页头条就画在这五张的顶上**。
+
+⇒ **不许把五行 `UIPIN` 直接改成 `39032107`**：那等于用一次改字把"这张图画的是当前交付形状"
+变成一句没有字节支撑的话（§8.3：不能失败的判据比没有更糟，**不能"被改绿"的判据同理**）。
+
+关闭它的一步（要浏览器窗口，与 R17/H 那两张同一个门：4318/4319 空闲 + 负载落回个位）：
+```bash
+cd e2e && npx playwright test tests/calendar-day.spec.ts     # 重拍这五张
+# 然后：人打开这五张（§6.2 规定一），再把五行 UIPIN 重钉到"拍图那一刻"的最后一次决定提交
+git log -1 --format='%h %ad' --date=format:'%m-%d %H:%M' -- \
+  packages/ui/src/calendar apps/web/src/features/calendar \
+  apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+```
+
+⚠️ **同目录里另外三张不在这条账上**：`day-en-full.png` / `day-en-no-timed.png` / `day-en-empty.png`
+（R16 英文取证）字节是 **10-04 12:41**，晚于那一笔 ⇒ 它们的 `UIPIN … 39032107` 现在成立，
+工具打的是 `UIOC`（信息行）而不是红。**五张红、三张不红，是同一目录内的真实差别** ——
+别为了"这个目录干净"把它们一起改口。

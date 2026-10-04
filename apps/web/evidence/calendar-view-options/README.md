@@ -7,13 +7,85 @@
 md5（`md5 -r apps/web/evidence/calendar-view-options/*.png`）：
 
 ```
-d4e80762080fd5bad75f977051fd748f  view-select-closed.png
+记录值（非锚点，理由见下面「12:1x 锚点规则」那一节）：
+  view-select-closed.png  盘上此刻（11:55 那趟） = 52174907f970ff633e673669a7d8d31c
+  view-select-closed.png  HEAD（39032107 带入）  = d4e80762080fd5bad75f977051fd748f
+锚点（同一笔代码下两趟字节相同 ⇒ md5 才配当锚点）：
 ae8ad61d4a136625748ce465dfba46fb  view-tabs-year.png
 ```
 
+🔴 **12:2x 把这张图历史上出现过的字节逐枚枚举出来，因为它推翻了"每趟一个新值"这个说法**
+（复跑：`for c in $(git log --format=%H -- apps/web/evidence/calendar-view-options/view-select-closed.png); do printf '%s %s\n' "${c:0:8}" "$(git show "${c}:apps/web/evidence/calendar-view-options/view-select-closed.png" | md5 -q)"; done`
+—— ⚠️ 这里必须写 `"${c}:apps/…"`：zsh 会把 `$c:apps` 里的 `:a` 当**修饰符**吃掉，
+`git show` 于是输出空，而空输入的 md5 恒等于 `d41d8cd98f00b204e9800998ecf8427e` —— 一个"看起来是读数"的假值）：
+
+| 哪笔提交把它写进 HEAD | 时间 | 那批字节 |
+|---|---|---|
+| `5e23b7bf` | 10-03 23:58 | `bf594d6a…`（23:19 那趟） |
+| `5d0b27b9` | 10-04 01:53 | `d2c5cbfd…`（01:34 那趟） |
+| `39032107` | 10-04 10:11 | `d4e80762…`（10:0x 那趟） |
+| ——（未提交） | 10-04 06:10 与 11:55 | `52174907…`（**同一值出现两次**） |
+
+⇒ 准确的说法是：**这张图在同一笔代码下至少有四个稳定形态，且会复现**（06:10 与 11:55 逐字节相同），
+不是"每跑必变"。所以"不能钉常驻 md5"的结论**不变**（10:11 与 11:55 就是同一笔代码下的两个形态），
+但**根因方向换了**：不是随机种子（这张图里没有 `STAMP`），而是某个**运行态**在两三个值之间切换
+（候选：rail 那条「日历」提示条的显示/淡入帧、`selectOption` 之后焦点落在哪 ⇒ `:focus-visible` 环）。
+⚠️ **未定性，本轮不再往下查**（要往下查得能连跑多趟，而跑 e2e 要窗口）。
+
+```text
+UIPIN view-select-closed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+UIPIN view-tabs-year.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
+```
+
+⚠️ **路径集是判断，不是事实，所以把它的边界写死在这里**：这五条是"本会话认为决定这张图形状的地方"
+（共享日历板 + web 侧日历装配 + 主区页头 CSS + 左侧 rail 的样式 + 词条表）。
+🔴 **刻意不收 `apps/web/src/App.tsx`**：它最后一次动是 `1cf3be7b`（10-04 10:12，挂载 CloseAccountPanel），
+在钉的那笔之后 ⇒ 收进来这两行立刻转红。不收的理由是**它是外壳组合物、一天动好几笔**，
+收进来会让这条锚点变成"每提交必红"的那一种（同一枚 §8.3 的坑，只是换了触发源）。
+⇒ 因此 UIOC 主张的准确范围是：**日历面 + 页头 + rail 样式 + 词条没动过**；
+**外壳组合（谁被挂载、菜单里多一个面板）动了它不会红**。要覆盖那一层得另立一条判据，别改这一条。
+
+## 12:1x 锚点规则：一枚 md5 只有"跨趟字节相同"才配当锚点
+
+12:0x 现量（`bash research/tools/r17-evidence-md5-check.sh --all`）报本目录一枚红：
+`view-select-closed.png` README=`d4e80762…` 盘上=`52174907…`。归因**先做了**再动笔：
+`/tmp/ht-h-flaky.20261004-112757.38951.log` 里**一条 `----- 第 n 趟` 都没有**（看守从 11:27:57 起
+一直在"负载 >12 等 30s"，累计 2070s 从未开窗）⇒ **不是本会话那把看守写的**，是 11:55 别人的一趟 e2e。
+
+然后逐像素量了两批字节（`magick … RGBA:-` + 自己写的按行成带比对）：
+
+| 文件 | 差异像素 | 差异落在哪 | 两批字节肉眼对照 |
+|---|---|---|---|
+| `view-select-closed.png` | 4982 / 3686400 | 只有两条横带：`47x44+8+68`、`99x43+9+121`（都在左侧 rail 的两个图标与那条「日历」提示条上） | 12:1x 我把两批的这一区域裁出来上下并排看过：**看不出差别**；页头、`视图` 下拉、月格、日档详情、侧栏迷你月历**逐字节相同** |
+| `view-tabs-year.png` | 0 | —— 重跑后与工作树**逐字节相同** | 不需要重看：字节就是同一份 |
+
+⇒ 结论分三条，都写死在这里：
+
+1. **`view-select-closed.png` 的 md5 降级为记录值**（值都留在上面那个块里，只是不再是锚点）。
+   理由不是"它坏了"，是**同一笔代码下两趟字节不同**（实测 n=2）—— 一条每跑必红的判据不携带产品信息，
+   而 §8.3 那条元规则说它会把人训练成忽略红。
+2. **`view-tabs-year.png` 保留 md5 锚点**，而且它现在是**被量出来的**稳定，不是被假设的稳定：
+   11:55 那趟重跑没有动它的字节。这是本目录唯一一枚有资格常驻的指纹。
+3. **形状主张改由 `UIPIN` 那两行钉**（判据 = 声明的三条路径里最后一次动它们的提交 ≤ 钉的那笔；
+   现量 `UIOC`，读数在 `r17-evidence-md5-check.sh --dir apps/web/evidence/calendar-view-options`）。
+   🔴 **它同时是对上面 ② 那条"HEAD 又进了 2 笔动 `apps/web` 的提交"的收窄更正**：那两笔
+   （`1cf3be7b` / `5481b3cb`）动的是注销模块，**不在决定这张图形状的那三条路径里** ⇒
+   按窄路径集判是 UIOC，不是"主张已过期"。
+   ⚠️ **但 UIOC 的主张边界必须写清**：它只覆盖**声明的那三条路径**。如果有一天日历面的像素
+   被路径集之外的东西改了（比如共享按钮组件、字体 token），这条锚点**不会红**。
+   它不是"已证明等于当前 HEAD 的界面"，它是"就我所知决定这张图的那几处代码没动"。
+   ③ 那句"重取仍欠着"**没有**被这条锚点取消 —— 它欠的是"人对着当前字节看过一次"，
+   而盘上此刻是 11:55 那批（未归因、且含别人未提交的改动），HEAD 那批才是本文件那张表描述的对象。
+
 🔴 **06:1x：上面这两枚是本会话自己那趟运行（06:10:43–06:10:57，三趟连跑）产的**，
-它替换掉 05:3x 记的那一对（`d2c5cbfd…` / `6fcbf2aa…` —— 那两枚现在还在 HEAD 里，
-`git show HEAD:… | md5 -r` 逐字节相同，所以旧值不是丢了，是**被这一趟顶掉了**）。
+它替换掉 05:3x 记的那一对（`d2c5cbfd…` / `6fcbf2aa…` —— ~~那两枚现在还在 HEAD 里，
+`git show HEAD:… | md5 -r` 逐字节相同，所以旧值不是丢了，是**被这一趟顶掉了**~~）。
+🔴 **10:4x 更正上面那句括号里的"还在 HEAD 里"，它已过期**：那对旧字节只活到 10:11，
+提交 `39032107` 把**本文件这两枚新字节**一起带进了 HEAD。现量（可复跑）：
+`for f in view-select-closed.png view-tabs-year.png; do git show HEAD:apps/web/evidence/calendar-view-options/$f | md5 -r; done`
+⇒ `d4e80762…` / `ae8ad61d…`，与工作树**逐字节相同**（`git status --porcelain -- apps/web/evidence/calendar-view-options` **空**）。
+⚠️ 这条更正本身就是 §7 那一族的新面目：**"HEAD 里是什么"不是文件的属性，是提交历史的瞬时读数** ——
+写它的人当时是对的，而 HEAD 会在没人通知这份 README 的情况下前进。
 ⚠️ **而这一趟拍到的界面不是 HEAD 的界面**：拍的是**当前工作树**，里面含别人未提交的改动 ——
 现量 `git diff -- apps/web/src/styles/app/main-area.css` 有 16 行，注释原文写着
 「详情列与可拖宽侧栏会缩小主区。动作整体可换行」，页头因此从一行折成两行（语言/暗色掉到第二行），
@@ -23,6 +95,20 @@ ae8ad61d4a136625748ce465dfba46fb  view-tabs-year.png
 所以本文件下面那张表按**新字节**改写过（旧写法"4 列月卡阵列 / 1–8 月完整看到"划线留在原处）。
 🔴 **等 A 落笔、别人那批提交进 HEAD 之后，这两枚要重取一次**，否则这份证据记的是
 "某个工作树瞬间的界面"，而不是"这条线交付的界面"。
+🟡 **10:4x：这句的前置**已经**变了，但欠的那一次重取没变 —— 欠的理由换了**（三行现量）：
+① 那 16 行 CSS 已进 HEAD（`git show --stat 39032107 -- apps/web/src/styles/app/main-area.css` ⇒
+`1 file changed, 12 insertions(+), 4 deletions(-)`；`git status --porcelain -- …main-area.css` **空**），
+所以"图里画的是没人提交的东西"这件事**不再成立** ⇒ 上面第 23 行那句"不是 HEAD 的界面"按字面已过期。
+② 但 HEAD 在 10:11 之后又进了 **2 笔动 `apps/web` 的提交**（`1cf3be7b` 10:12 挂载 CloseAccountPanel、
+`5481b3cb` 10:24 注销模块内联样式回基线 / icon 尺寸归 token），
+⇒ 严格能主张的是**"这两枚图 == `39032107` 那笔的界面"**，不是"== 此刻 HEAD 的界面"。
+③ 那 2 笔**会不会改变日历面上画的东西，本文件没有取证**（它们写在注销模块里，但"在别的模块里"
+不等于"日历面像素不变"）。⇒ **重取仍欠着**，它现在挂在窗口看守上：
+`BUDGET=… RUNS=3 STRICT_MAX=9 bash research/tools/h-flaky-window-watcher.sh` 跑的就是同一个 spec，
+拿到窗口的同一趟就会把这两枚按当时的源码重写；复验用 `bash research/tools/r17-evidence-md5-check.sh --all`。
+📌 这一格把"证据过期"这件事拆成了两种：**字节过期**（有人重跑了同名运行）与**主张过期**
+（字节没动，但支撑那句主张的现场动了）。第二种**没有任何东西会报红** —— 只有把"图对应哪一笔提交"
+写进 README 才能防，所以从这一行起本文件把提交号 `39032107` 当作图的一部分来记。
 
 🔴 **这两枚 md5 曾是 2026-10-04 05:3x 现取的，替换掉 2026-10-03 23:19 那一对**
 （旧值 `bf594d6a…` / `def6cc66…` 已经**对不上盘上的字节**）。成因不是有人改图，而是**日期过了午夜**：
@@ -90,5 +176,5 @@ ae8ad61d4a136625748ce465dfba46fb  view-tabs-year.png
 - 🔴 **本文件的 md5 是被自己的对账工具照出来过期的**：
   `bash research/tools/r17-evidence-md5-check.sh --all` 在 06:11 报
   `dirs_scanned=12 entries_parsed=9 dirs_with_mismatch=1`、rc=**1**，唯一那份就是本目录（2 条不一致）。
-  ⇒ 这条常驻对账第一次在**真实写入**上工作（此前只在 `--selftest` 四臂上验过），
+  ⇒ 这条常驻对账第一次在**真实写入**上工作（此前只在 `--selftest` 四臂上验过）—— 那句里的「四臂」是 06:11 当时的臂数，12:1x 起是**八臂**且全跑合成夹具，见本文件「12:1x 锚点规则」那一节，
   而且顶掉指纹的是**我自己那趟运行** —— 也就是说"闭合过的取证交付物会烂"这件事不需要别人参与。

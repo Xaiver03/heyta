@@ -37,7 +37,14 @@ arm() { # $1=桩闸门 $2=BOOT_AVD $3=日志 $4=额外 env 赋值
   #    日志文件都不会建**（互斥守卫在写日志之前就退了），于是七条读数全红，
   #    看起来像"启动逻辑坏了"。互斥那一手有它自己的腿（heal-fire 那套 + 台账里的 rc=6 现量），
   #    不在这里重复测；这里测的只有 maybe_boot_avd。
-  env CARRIER="$CARRIER" BUDGET=0 INTERVAL=1 SELF_GUARD=0 LOG="$lg" GATE="$g" BOOT_AVD="$avd" BOOT_WAIT=5 \
+  # 🔴 CO_PATTERN 同理要**中和**（12:5x 现量补的，同一族的第二枚守卫）：链里还有一道
+  #    "别的重验证看守活着就让它"的读现场守卫，而这一把臂的 GATE 与 BOOT_AVD **都是桩**、
+  #    adb 也是注进去的（下面两型桩），根本不起真设备 ⇒ 守卫要挡的"真动设备"在这里不存在。
+  #    不中和的后果就是 12:5x 那次：H 的看守活着 ⇒ 八条臂全"坏读数"，rc=4 报成装置坏，
+  #    而真相是"让路"。守卫自己的牙在它自己那儿（`r14c-window-retry.sh` 起手那次
+  #    `positive_ok/BROKEN` 正向对照 + window-retry-arms 的臂），不在这把臂上重复。
+  #    ⚠️ 前提是"这两枚都是桩"：以后谁把某条臂换成真 BOOT_AVD，这一行必须一并撤掉。
+  env CARRIER="$CARRIER" BUDGET=0 INTERVAL=1 SELF_GUARD=0 CO_PATTERN=zz-none-bootarm-Q LOG="$lg" GATE="$g" BOOT_AVD="$avd" BOOT_WAIT=5 \
     ${ex:+$ex} bash research/tools/r14c-window-retry.sh >/dev/null 2>&1
 }
 # 桩 adb 两型：off（一台都不在线）/ on（emulator-5554 在线）。
