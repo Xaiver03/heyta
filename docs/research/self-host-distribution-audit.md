@@ -5449,3 +5449,86 @@ prune-family needles: 0                           ← grep 对空文件计数 = 
 2. 每次"0 命中 / 空集"的读数，同一趟里把**取字节那一步自己的 rc** 打出来
    （这一节改成先 `> /tmp/spj.json` 落盘再解析，解析失败会炸在 `JSON.parse`，
    而不是静默把空文件数成 0）。
+
+### 8.90 第七族：main 把**对账器**也改到了同一枚已删除的键上；取本分支侧的理由与注入读数（2026-10-04 15:1x）
+
+#### ① 怎么发现的：不是等窗口开，是先把"窗口开了会不会白费"量一遍
+
+g69 那把等待链的条件是"阻塞集归零 ⇒ 重算载体 ⇒ 扫链"。但"重算这一步在当前两棵树下会不会
+`die(2)`（预置族之外的冲突）"是一个**可以在等待期就确定**的事实 —— 如果会，窗口开了也只是浪费一次窗口。
+所以先干跑（`git merge-tree --write-tree --name-only main b37780fa`，不写树、不动任何工作区）：
+
+```
+MT_RC=1  冲突 5 条：
+  docs/research/self-host-distribution-audit.md      ← 第四族
+  package.json                                        ← 第一族
+  research/tools/check-image-license-coverage.mjs     ← 🔴 新面孔（这一节补成第七族）
+  research/tools/gen-image-npm-tree.mjs               ← 第六族
+  server/image-npm-tree.json                          ← 第五族
+```
+
+⚠️ 干跑**只是预警**，不是结案依据：§8.73 记过一次 `merge-tree` 的预报与实际合并结果不一致。
+判"取哪一侧对不对"的证据只取载体脚本自己列出的冲突集（它跑真 `merge --no-commit --no-ff`）
+加下面 ④ 的注入臂。
+
+#### ② 第七族是什么
+
+| 侧 | 动了什么 | 谁动的 |
+|---|---|---|
+| main | `+4 / −1`：新增 `research/tools/image-deps-fingerprint.mjs`，新鲜度那行改成 `depsFingerprint(…)`，**但仍然去比 `snapshot.inputs.serverPackageJsonSha256`** | `e374b142`（14:54）`refactor(gates): 镜像新鲜度指纹抽成共享模块——生成器与对账器必须同一份实现` |
+| 本批 | `+388 / −35`：遍历器下钻嵌套 `node_modules`、按锁逐条判许可证、双载体互证，新鲜度键换成 `serverInstallInputSha256`（分区指纹，来自 `image-install-shape.mjs`） | `1b7d0921` / `972374f8` / `a70b0ef8` / `89cda0df` |
+
+取本分支侧的**理由**（两条都是结构性的，不是偏好）：
+
+1. **第六族与第七族必须同侧。** 生成器写 `serverInstallInputSha256` 而对账器读
+   `serverPackageJsonSha256` 时，"快照代不代表当下"这一腿比的是一枚**载体上再也不会有人写**的键
+   ⇒ 变成恒红判据；反过来（main 的生成器 × 本批的对账器）同理。载体脚本把这件事打成了
+   一行可复核读数（`与第六族同侧=true`），不靠注释里的信念。
+2. 🔴 **main 那次 refactor 的意图在载体上没有被打折**：它反对的是"两套实现"，
+   载体取完两侧之后，两个消费者共用的是**同一份** `image-install-shape.mjs`
+   （`readServerInstallInput` 分区判断只有一处）。
+   这一句必须写在这里 —— 不写，下一读的人会误读成"合并把他们的重构退回了"。
+
+#### ③ 结构代价：main 那枚新模块在载体上**零引用者**（计数是量出来的，且不删）
+
+main 上 `depsFingerprint` 的引用者集合（`/tmp/heyta-main-check` 干净检出，`grep -rln`）=
+`gen-image-npm-tree.mjs` + `check-image-license-coverage.mjs` + 它自己，**恰好就是第六、第七族那两枚**。
+⇒ 两族都取本分支侧之后，载体上该模块引用者 = **0**（载体脚本把这个计数直接打进那笔读数：
+`⚠️ main 新模块 research/tools/image-deps-fingerprint.mjs 在载体上的引用者=0 枚`）。
+
+**不删。** 删它 = 动一枚本批写集之外的路径 ⇒ 破"集外 0"那条结构不变量，而那条不变量正是
+"这笔合并没吞别人的改动"的唯一证据。这一格交给它的所有者处置；载体不落笔，读数留在提交信息里。
+
+#### ④ 判据有没有牙：注入臂（只把对账器换成 main 那版，在载体上跑）
+
+| 臂 | 三条腿读数 |
+|---|---|
+| 载体原样 | 八道全 `exit 0`（逐条读数打在载体那笔的提交信息里：`check:gate-wiring` / `check:selfhost-entry-command` / `check:script-snapshot` 38 枚 / `check:docs` / `check:md-tables` 9 文件 / image-license 三条腿） |
+| 只把 `check-image-license-coverage.mjs` 取 main 侧 | 第 1 腿仍 `exit 0`，**第 2 腿 `exit 1` 且三层同时红**：① `快照已经不代表当下的声明 / server/package.json 变了（快照里的哈希与当下不一致）`——② 里预测的那一层**命中**；② `镜像装了 3 条许可证门禁从没见过的包`（`@heyta/domain@0.0.0` / `@heyta/shared-schema@1.0.0` / `@heyta/sync-core@1.0.0`）；③ `计数不闭合 covered(126) + 豁免(17) ≠ 快照总数(146)` |
+| 复原 | `git reset --hard e8846352` 后 `git status --porcelain` = **0 行**（注入没在载体上留任何东西） |
+
+🔴 这一臂顺带照出**一件不只是第七族的事**：那三层红里有两层（3 枚本地包从未登记、126+17≠146）
+是 main 那版对账器**读本批快照**时的必然形状 —— 也就是说，"main 那棵树自己的对账器 + 本批那把锁派生的
+快照"这个组合从来没被人验过。这正是 §8.85 那枚新门禁（3b：链里的门指向不在树上的文件）的**姊妹形状**：
+判据之间是配对的，配对的两半分别在不同侧被改，就没人知道合起来红不红。第七族把"必须同侧"钉住，
+就是为了让这个组合不出现。
+
+#### ⑤ 重算后的载体（第七族已生效）
+
+```
+✅ 载体 e8846352 = main(7471d45d) × feat/self-host-distribution(b37780fa)
+   冲突 5 条 · 分族 pkg=1 gi=0 png=0 audit=1 snap=1 gen=1 cov=1 other=0
+   并集 scripts 键 146 · check 链段 main=76 本批=67 base=66 并集=77（摘段 0/0）
+   合并归属：写 38 枚 / 合并相对 main 改 38 枚 / 集外 0 / 写集里未被改到 0 枚
+   门禁 8 道全 exit 0
+```
+
+⚠️ `main` 在这一小时内又挪了两次（`a49c4f19` → `dcbb94ab` → `7471d45d`），`gi`/`png` 两族这次**没有**冲突
+（第一族的 `package.json` 与第四族的审计文档仍在）。所以 §8.88 那张"main 八道全绿"的基线是
+**逐 SHA 的**：真正落地那一刻必须按当时的 `main` 重算载体并重新取一遍基线，不能引用本节这几个 SHA 的读数。
+
+#### ⑥ 等待链的状态（这一节做完时）
+
+g69 已**主动停掉**（不是等满超时）：它的重算步骤用的工具缺第七族，`die(2)` 会让窗口白开。
+补完并实测通过后，等窗口那把重开成 g71，条件不变（阻塞集归零 → 重算 → 逐段扫链 → 出报告），
+它现在拿到的是**带第七族的工具**。阻塞集现量仍是 1 枚（`package.json`，在别人手里）。
