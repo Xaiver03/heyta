@@ -2450,8 +2450,10 @@ W0b ─> 随时可做（台账那半要等文件干净）
 
   两处改法同一条口径（**判据要正向**，AGENTS §7 元规则 2）：
   ① Android step 3 现在**读卡片自己的菜单 a11y 名**作为"有一张点得到的卡"的证据，
-  读不到就按一次返回收浮层再读（最多 3 次），并且每次收完都验「屏还在倒数日屏」——
-  带离现场就 `exit 3` 而不是继续；两条正向出口都不成立时**响亮地** `exit 3`
+  ~~读不到就按一次返回收浮层再读（最多 3 次），并且每次收完都验「屏还在倒数日屏」——
+  带离现场就 `exit 3` 而不是继续~~ —— **这一半在链 L 上被现量否证**（BACK 把应用退到桌面，
+  见 ㉚），归一化改成 step 2 之前 `am force-stop` 冷启动；
+  两条正向出口都不成立时**响亮地** `exit 3`
   （旧版这里是静默走进下一节，才把红拖成看不懂的那条）。step 4 那段"拿空标题再去 XML 里剥"
   的兜底随之删掉（它正是被恒真分支喂空的地方）。
   ② iOS step 2 的就绪判据改成 `label 数 ≥ 2` **且** 三个顶层屏候选（主屏标签 / 同意面板标题 /
@@ -2474,3 +2476,55 @@ W0b ─> 随时可做（台账那半要等文件干净）
   被人打开看过之前，W7-G3 这一格不打勾。链 K 顺带证到的仍然有效：共享 lib 抽取后的
   判据①自检在**两端的载体上都跑绿**（正向 `1080×1440 SHA=221f0d78811c` / 反向 `3×2 BLANK=true`），
   也就是 §8.4 ㉕ 那句"零行为变化的复跑读数还没取"**只欠 step 3 之后的那几节**。
+
+- ㉙ **收尾第 4 项（`pnpm reinstall:all` 四端装上当前产物）里 mac 这一腿，04 08:5x 现量被并行那条线的同一条流程占着 —— 本批不并发、不代它宣布关闭**
+
+  只读 `ps` 取证（08:58）：
+
+  ```
+  81007 05:48:59 sh /tmp/queue-reinstall-all.sh
+  93817 05:45:52 bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817
+  95477 05:45:32 bash apps/desktop-macos/scripts/package-app.sh /tmp/heyta-macos-dist
+  98934 05:44:55 …/usr/bin/notarytool submit /tmp/heyta-macos-dist/Heyta-1.0.0.dmg … --wait
+  ```
+
+  · 归属查过（不是猜的）：那条链的隔离检出 `/tmp/heyta-reinstall` 在 **`main` 的 `d0a81927`
+  （self-host 那条线的载体）**，而 `/tmp/reinstall-all-out.txt` 的最后一行停在
+  `═══ 1. macOS：清旧包 → 打包 → 卸旧 → 装新 ═══` —— 也就是说它从 **03:13** 起就把
+  `/tmp/heyta-macos-dist` 与 `/Applications/Heyta.app` 握在 `notarytool … --wait` 里，
+  到 08:58 已经 **5 小时 45 分**（§8.4 第 ⑰ 条记的"公证无超时"那个形状，正是它）。
+  · 为什么这一腿**不能**由本批并发跑：它写的是同两个目录（`/tmp/heyta-macos-dist` 与
+  `/Applications/Heyta.app`），并且共用同一次公证档 —— 并发就是 §8.9 明令禁止的"抢不得"。
+  · 🔴 **也不可以把他们那趟读数当本批的读数用**：他们打的产物来自 `main`，
+  而本批**按边界没有 merge 进 main** ⇒ 装出来的包里没有 W4b/W7/W8 这三笔。
+  · 唯一已经量到的差别：`/Applications/Heyta.app/Contents/Resources/web-dist/index.html`
+  的时间戳停在 **10-03 23:05:40**（现量 `stat`），比本批任何一笔都旧 ⇒ "mac 装上了当前产物"
+  这一句此刻**为假**，不写进任何打勾里。
+  · 本批这一腿的关闭判据（等窗口开放后原样跑）：在**只含 `feat/countdown-batch2` 的隔离检出**里
+  `bash scripts/reinstall-all.sh --only mac`，读它自己打印的 mac 段判据
+  （安装副本启动自截屏：非空白 **且** 主蓝命中），并配对重跑 `check:shell-surfaces`。
+  windows 那一腿同上（本机 `windows-pc` 可达已由他们那趟的 `WIN_OK` 顺带证到），
+  但它要等同一台打包机空出来。
+
+- ㉚ **链 L（修完 ㉘ 之后复跑）两条仍然 exit 3，但各自往下走了一层，并照出两个新缺陷：BACK 会把应用退到桌面、`--press` 对屏外节点是静默空操作**（04 09:0x，载体 `2987cfdb`）
+
+  | 趟 | 读数 | 走到哪一步 | 现量根因 |
+  |---|---|---|---|
+  | Android `/tmp/device-L-android.txt` | `RC_ANDROID=3` | step 2 ✅（「倒数日屏开到前台」）→ step 3 第 1 次读不到菜单名 → **按 BACK 归一化** → `❌ 按返回之后连倒数日屏都没了` | 两件事叠在一起：① `ensure_app_foreground` **不 force-stop**，`lib/mobile-e2e.sh:653` 那句注释写着"调用方要冷启动时自己先 force-stop（现有脚本都这样做）"—— 本趟没做，于是上一趟留下的卡片菜单跟着**热启动**活了下来；② 我 ㉘ 那条"收浮层"选的手段是 `keyevent 4`，而在这台设备/这个屏上 **BACK 直接把应用退到桌面**（`screen_txt` 打出来的是 `Gmail / Photos / YouTube / Phone / Messages / Chrome / heyta` 这些启动器图标） |
+  | iOS `/tmp/device-L-ios.txt` | `RC_IOS_PROBE=3` | step 0/0b/① ✅、step 2 **✅（label 数 11 + 同意面板收掉 + 离开欢迎页 —— ㉘ 那条就绪判据修对了）**、step 3 找到入口并"按"了 → 屏没开 → step 4 新加的正向门拒跑 | 只读 `describe-all` 量到：应用**仍停在「我的」页**（底栏 `我的` 带 `Selected`），而入口那颗按钮是 `AXFrame {{16, 926}, {370, 44}}` ⇒ 中心 y=**948**，屏高 **874** —— 它在滚动区里、**在屏幕外**。`--press` 对屏外坐标是**静默空操作**（ios-ax-shim.py 文件头第 2 条自己记着这条实测，`type_text` 里那句"先滚进可见区"就是为它写的），而 `--press` 只问 idb 退没退 0，照样回 `result: success` |
+
+  两处修法（都不动共享工具，改在本探针里）：
+  ① Android step 2 之前加 `$ADB shell am force-stop "$PKG"`（**冷启动负责残留状态**），
+  step 3 里那个 BACK 归一化循环**整段撤掉** —— 归一化不能交给一个会把应用退干净的动作；
+  判"有没有卡"仍然只看**菜单 a11y 名**这一个正向证据，读不到就走空态/响亮 exit 3。
+  ② iOS 探针把 `press()` 重写成**先 `--scroll-into-view`、`visible=True` 才点**，
+  并且"滚不进去"是**返回值**（关键导航点收 rc，不成立即 exit 3）；底部标签栏那颗走
+  `press_raw` —— 因为 shim 的"可见"定义是 `中心 y < 屏高-120`（给标签栏让位），
+  而 `我的` 那颗中心 y=808 > 754，按那条定义**永远不可见**、又不在滚动容器里滚不动。
+  📌 一般形状：**"元素在树上"和"元素能被按到"是两个事实**，中间隔着一个视口；
+  而一个把 tap 发出去就算成功的驱动层，会让"按过了"读起来和"按到了"完全一样。
+
+  链 L 仍然有效地产出的读数（不因 exit 3 作废）：判据①的**共享自检在两端载体上都绿**
+  （正向 `1080×1440 SHA=221f0d78811c` / 反向 `3×2 BLANK=true SHA=bf42e074e33c`），
+  所以 §8.4 ㉕ 那句"取值层抽取零行为变化"现在**两端各自复跑过一次**；
+  iOS 的 step 0/0b/①/② 也第一次跑通（`label 数 11` 那行就是 ㉘ 修好的那条判据）。

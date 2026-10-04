@@ -82,7 +82,23 @@ ax() {
 }
 jget() { printf '%s' "$1" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$2',''))" 2>/dev/null; }
 ax_found() { [ "$(jget "$(ax "$1" --list --json)" found)" = "True" ]; }
-press() { ax "$1" --pressable --press --json >/dev/null 2>&1; }
+press_raw() { ax "$1" --pressable --press --json >/dev/null 2>&1; }
+# 🔴 「按过了」不等于「按到了」—— shim 自己的文件头记着这条实测：
+#    **tap 对屏外坐标是静默空操作，不报错**，而 `--press` 只要 idb 退 0 就回
+#    `result: success`。04 08:5x 那一趟就是这样骗掉一步的：`倒数纪念日` 那颗按钮在
+#    「我的」页的滚动区里，`AXFrame` 中心 y=948 而屏高 874 ⇒ 按了、树上"有"它、
+#    页面却没动。所以这里把 press 重写成**先滚进可见区、再点**，并且把
+#    "滚不进去"当成**返回值**交给调用方判（不滚就直接点等于白点）。
+press() {
+  local lbl="$1" vis
+  vis=$(ax "$lbl" --pressable --scroll-into-view --json)
+  [ "$(jget "$vis" visible)" = "True" ] || { echo "   ↳ 「$lbl」滚不进可见区（$(jget "$vis" found)/$(jget "$vis" scrollRc)）"; return 1; }
+  ax "$lbl" --pressable --press --json >/dev/null 2>&1
+}
+# ⚠️ **底部标签栏不适用**上面那个：shim 的"可见"定义是 `中心 y < 屏高-120`（给标签栏让位），
+#    而标签栏自己那颗「我的」中心 y=808 > 874-120=754 ⇒ 按那条定义**永远不可见**、
+#    又因为它不在滚动容器里也滚不动。所以底栏走 `press_raw`，"在不在树上"由
+#    调用方的 `ax_found` 轮询负责（08:5x 现量的两枚 frame）。
 # 「它消失了吗」比「某样东西出现了吗」可靠 —— 欢迎页背后就是底部标签栏，
 # 用"出现了任务"当条件会一次都没按就假绿（verify-mobile-ios.sh:294 那段实测）。
 press_until_gone() {  # <要按的> <应消失的> [尝试次数]
@@ -215,12 +231,15 @@ step "3. 走到倒数日屏（W8 移动半那条注册表）"
 TAB_READY=0
 for _i in 1 2 3 4 5 6; do ax_found "$TAB_LABEL" && { TAB_READY=1; break; }; sleep 3; done
 [ "$TAB_READY" = 1 ] || { echo "   ❌ 浮层归一化之后仍读不到「$TAB_LABEL」标签 —— 探针未到位（本轮无效）"; exit 3; }
-press "$TAB_LABEL"; sleep 3
+press_raw "$TAB_LABEL"; sleep 3
 ENTRY=$(zh mobile.countdown.entry)
 if ! ax_found "$ENTRY"; then
   echo "   ❌ 「$TAB_LABEL」页里没有倒数日入口「$ENTRY」"; exit 3
 fi
-press "$ENTRY"; sleep 3
+# 🔴 rc 必须收下：入口在「我的」页的滚动区里，屏外那一档 `press` 现在是**会返回 1** 的
+#    （旧版静默按空、然后靠下一节的"屏没开到"去反推，红落在哪里全靠运气）。
+press "$ENTRY" || { echo "   ❌ 入口「$ENTRY」滚不进可见区 ⇒ 按不到，本轮无效（不是产品失败）"; exit 3; }
+sleep 3
 # 🔴 判据**不能**用 web.shell.views.countdown：它的 zh 值与入口标签是**同一个串**
 #    （两个都是「倒数纪念日」，实测读数），于是"点了入口没开屏"时树上仍有那个串 ⇒
 #    这条判据永远为真（AGENTS §7 元规则 2：一条永远通过的判据比没有判据更糟）。
