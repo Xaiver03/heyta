@@ -46,6 +46,7 @@ import {
   exportDocumentFromHost,
   materializedState,
   openAppHost,
+  type RestoreDocument,
   restoreIntoEmptyTarget,
   type AppHost,
   type ExportDocument,
@@ -66,6 +67,8 @@ export interface NodeHostOptions {
   serverUrl?: string;
   /** 访问令牌。 */
   token?: string;
+  /** 认证账号 id；提供后宿主启用 Vault key-package / payload codec。 */
+  accountId?: string;
   /** E2EE 口令。缺失时同步会明确失败，**不会降级成明文**。 */
   password?: string;
   /** 覆盖设备 id。默认 persist 在 meta store 里（跨重启不变）。 */
@@ -178,7 +181,11 @@ export interface NodeHost {
    * （含"目标非空就拒绝、且什么都不写"）。**本壳不判断任何产品语义**，
    * 只把 `AppHost` 递进去 —— 它结构上就满足 `ImportTarget`。
    */
-  restoreExport(document: ExportDocument): Promise<RestoreExportResult>;
+  /**
+   * 收 `RestoreDocument`（`entities` 可缺省）而不是 `ExportDocument`：
+   * 运维恢复工具的产物就是"只交 op-log"那一类，缺省的那一格由客户端 reducer 物化。
+   */
+  restoreExport(document: RestoreDocument): Promise<RestoreExportResult>;
 
   /** 关闭 SQLite 连接。之后不可再用。 */
   close(): void;
@@ -192,9 +199,34 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     ...(options.serverUrl !== undefined ? { serverUrl: options.serverUrl } : {}),
     ...(options.token !== undefined ? { token: options.token } : {}),
     ...(options.password !== undefined ? { password: options.password } : {}),
+    ...(options.accountId !== undefined ? { accountId: options.accountId } : {}),
     ...(options.clientId !== undefined ? { clientId: options.clientId } : {}),
     ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
   });
+
+  // A non-UI host has no Vault settings screen to perform the first unlock.
+  // When an account id is supplied, `openAppHost` deliberately selects the
+  // Vault codec and therefore ignores the legacy password cipher. Keep that
+  // unlock lazy: opening a local SQLite file and using list/add/export must
+  // remain possible while the sync service is unavailable. The password stays
+  // in this process only and is consumed immediately before sync.
+  let vaultUnlock: Promise<void> | undefined;
+  const ensureVaultUnlocked = async (): Promise<void> => {
+    if (options.accountId === undefined || options.password === undefined) return;
+    if (vaultUnlock !== undefined) return vaultUnlock;
+    vaultUnlock = (async () => {
+      const vault = await app.getVaultSession();
+      if (vault?.keyPackage !== undefined && vault.state !== 'unlocked') {
+        await vault.unlockWithPassphrase(options.password!);
+      }
+    })();
+    try {
+      await vaultUnlock;
+    } catch (error) {
+      vaultUnlock = undefined;
+      throw error;
+    }
+  };
 
   const actions = createTaskActions(app);
   const projectActions = createProjectActions(app);
@@ -225,7 +257,10 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     listTags: () => projectActions.listTags(),
 
     dispatch: (intent) => app.dispatch(intent),
-    sync: () => app.sync(),
+    sync: async () => {
+      await ensureVaultUnlocked();
+      return app.sync();
+    },
     pendingUploadCount: () => app.pendingUploadCount(),
     exportDocument: () => exportDocumentFromHost(app, { exportedAt: Date.now(), host: 'node' }),
     restoreExport: (document) => restoreIntoEmptyTarget(app, document),
