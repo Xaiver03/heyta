@@ -4685,3 +4685,42 @@ git merge-tree --write-tree --name-only main feat/self-host-distribution
 "scripts 键并集 + `check` 链并集 + 四条断言（含两侧相对顺序不颠倒、相对 base 都不得摘段）"。
 他们提交之后重算载体即可，两侧段都会进并集；**不需要**谁给谁让路。
 真正卡住 #1 的仍然只是"落地那一刻不许把别人未提交的工作树并进载体"这一条。
+
+---
+
+### 8.76 两件"等待期"该做的事：第 2 项的证据**仍然覆盖当前 tip**（零产品字节差），以及两条只属于验证装置的坑（11:0x–11:4x）
+
+#### ① 第 2 项（`verify:selfhost-stack` 全跑）的证据没有因为分支推进而失效 —— 这是量出来的，不是默认假设
+
+那条全跑落在产物 `959fd1e6` 上。之后分支又走了五笔（第五族脚本、台账 §8.71–§8.75、看过的三张截图）。
+"引用的运行落后于实际跑过的运行"是一族会悄悄烂掉的断言，所以逐文件现量：
+
+```
+git diff --name-only 959fd1e6..HEAD
+  docs/research/self-host-distribution-audit.md
+  e2e/selfhost-stack-results/s2-signed-in.png   ← 人看过的那版字节（09:3x 那一趟）
+  e2e/selfhost-stack-results/s3-device-a-synced.png
+  e2e/selfhost-stack-results/s3-device-b-recovered.png
+  research/tools/selfhost-landing-blockers.mjs
+  research/tools/selfhost-merge-carrier.mjs
+git diff --stat 959fd1e6..HEAD -- packages apps server scripts  ⇒ **空**
+```
+
+⇒ **产品面字节自那次全跑以来一个没动**。第 2 项的证据对当前 tip 仍成立，
+而这句话现在有取之即得的复跑命令，不靠印象。
+
+#### ② 验证装置的两条坑（都不是产品结论，但都会让下一轮误判）
+
+· **静默的等待循环等于挂了**。第一版配对链 `/tmp/g62-redpair-signature.sh` 的段前等待上限是 25 分钟，
+  11:18 起跑后 10 分钟日志**一行没多**，看上去与"卡死"完全同形（§7 里"空日志≠卡住"那一族的**反向**用法：
+  装置的输出必须能自证活着）。g63 改成每 60s 打一行 `... 段前等待中 load= tfa= e2e_ports=`，
+  并把 25 分钟/段 收成 7 分钟/段 + 一个 `GLOBAL_CAP` 全局上限，超限的段**记 `NOT_EXECUTED`** 而不是继续等。
+· **逐段当场等闸门，比"起跑前看一眼"贵但值得**：`privacy-consent-e2e` 那种"两侧都 rc=1、
+  一侧其实没跑"的形状，只有在每段起跑前重新量一次 `/tmp/tfa-test.lock` 才不会被当成配对成功。
+
+#### ③ 这一小时的机器现场（说明为什么"等窗口"今天是慢的）
+
+`load=69.9 → 102.8 → 75.2 → 23.2 → 41.8`，11:37 起 `/tmp/tfa-test.lock=yes`（别的会话在跑测试）。
+四条线（倒数纪念日、日历+Profile、回收站、本批）在同一天都要重验证窗口。
+本批**不为此调低阈值**（`负载 >12 属环境无效` 是任务书里的原话），
+等满 CAP 就按"环境无效 ≠ 产品失败"记，不写"没跑成所以没问题"。
