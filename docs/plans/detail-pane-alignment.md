@@ -6576,3 +6576,62 @@ M1 的职责是"往 C1 表加一行既无对照节也不写例外 ⇒ 红且点�
 
 同趟其余读数：选中门禁 RC=0（A–I 九组齐全）；`check-detail-pane-status-table` RC=0（十项；承重(腿9) 表格行 995 枚／含 code span 591 枚／不成对而跳过 0）；
 `check-docs-voice` RC=0；`docs-link-check` 本线死链 **0** 条（RC=1 那条是别人的 `PROGRESS.md:1362`，登记不代改，见 §8.94 第 3 节）。
+
+
+## 8.99 断言 I 落地的**第一件事**就是抓到 main 那条线的一个真空缺：第 12 个 ViewKey `countdown` 没交代过选中（2026-10-04 22:2x 现量，载体续 `3a5844c2`）
+
+`node scripts/verify-detail-pane-merge-preflight.mjs` 在候选树上（本轮 `TREE=f867bc1a`，冲突 18 枚）：
+
+| 档 | 读数 |
+|---|---|
+| 合并造成的红 | **1** 道，逐字是：`🔴 check-selection-single-source.mjs 候选=1 main=0 ✗ 断言 I：视图全集有 12 个 ViewKey，其中 1 个没对"选中"交代过立场：countdown` |
+| 其余 20 道纯 fs 门禁 | 候选=0 main=0（含两道余量为 0 的棘轮与 `check:ui-language`）—— 所以这一枚**不是**载体噪声 |
+| 名册漏跑/探针坏 | 0；静默合流 13 枚零丢行；槽位重复 0 |
+| 产物仍带 marker 的产品文件 | 4 枚 ⇒ 本趟 tally 仍不算"合流验过"（§8.56 那条判据在说话） |
+
+🔴 这一枚的**性质**要说清：它不是"两把门禁打架"，也不是本支落后造成的自愈红 ——
+`main` 侧 `check:selection-single-source` 跑的是它自己那份**没有断言 I** 的脚本（所以 main=0），
+候选树第一次把"main 新增的第 12 路视图"和"本支的名册判据"放进同一棵树，于是**这一格此前没有任何一层守过**。
+这正是 §8.98 立这条腿时给的形式："新加一路由、没人想过选中算不算"永远不会红 —— 现在它会了，而且是**当场**会。
+
+### 1. 现量：`countdown` 今天到底怎么选（读的是 `git show main:apps/web/src/features/countdown/CountdownView.tsx`，302 行）
+
+| 形状 | 命中 |
+|---|---|
+| `useSelected(` / `selection.select(` | **0 处** —— 它完全不碰共享选中态 |
+| 行/卡片的点击入口（`onClick` / `onPress` / `onSelect` / `onOpen`） | **0 处** |
+| 它自己的本地态 | `:199` `exportError` / `:259` 板的 active-all 档 / `:260` `CountdownFilter` —— 三个都不是"在看哪一条" |
+| 卡片上真正有的动作 | `:80` `edit` 与 `:96-97` `exportCard`（成对给 `onExportCard`，`:245`）⇒ **有实体卡，但动作是编辑/导出成品图** |
+
+⇒ 与回收站同一档：`row-actions-only`（本工单 W1 的封闭词表里现成就有这一档，不需要为新视图扩词表）。
+
+### 2. 处置为什么是"合流当时加一行"，不是现在加
+
+本支**没有** `apps/web/src/features/countdown/`（`ls` 现量不存在），而 `ViewKey` 里也还没有 `countdown`。
+现在把那行登记写进本支，断言 I 会**同时**红两处：键名既不在 ViewKey、证据文件也不在 ——
+那是用我自己的分支去红一次别人还没合进来的东西（§8.60 那条"拿落后载体装包＝降级"的同一族错法）。
+所以这一格的正确形态是**一条随时能粘的登记 + 谁合并谁粘**：
+
+```js
+  {
+    view: 'countdown',
+    stance: 'row-actions-only',
+    locus: 'apps/web/src/features/countdown/CountdownView.tsx',
+    needle: 'testID="countdown-view"',
+    because: '有实体卡，但卡上的动作是编辑 / 导出成品图；这一面今天不读也不写共享选中态（2026-10-04 现量 main 那份 302 行文件里 useSelected/selection.select 各 0 处）。',
+  },
+```
+
+⚠️ 粘之前要重新现量一次 needle —— 那句 `testID="countdown-view"` 是从 `main` 此刻那份文件读的（`:250`），
+他们在合流前还可能改；这一行登记的价值不在我抄的那句，而在"**必须有一行、且必须挂在一行真代码上**"。
+
+🔴 另一条要一起说的：如果 `countdown` 将来要进详情列（点一张卡 ⇒ 右栏显示这条纪念日的属性），
+那**不是**在这张表里改一个字就能算完的 —— 它要走 C1 那张表的口径（详情面 = 单个实体的属性面），
+并且 `EVENT` 得先进 `SelectableKind`（断言 D 会要求界面真的有消费者，F 会要求有一面把选中说出来）。
+登记成 `row-actions-only` **不等于**"这件事判过了"，它记的是"今天没接，且今天这样是对的"。
+
+### 3. 任务表
+
+新开 #34（合流当时：给 `countdown` 补那一行登记，并把本工单 §6 的合并步骤里"红了才加"那一格并进来）。
+本批 **#16 那两行 trash `busyId` 豁免**同一形状 —— 都是"合并产物上才会红、红了才加"的登记，
+区别只是 #16 已经预写过改法、这一格现在连 needle 都取好了。
