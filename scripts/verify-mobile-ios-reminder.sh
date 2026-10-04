@@ -40,6 +40,12 @@ BID=${IOS_BID:-com.heyta}
 DERIVED=${HEYTA_IOS_DERIVED:-/tmp/heyta-ios-reminder-release}
 BUILD_LOG=${HEYTA_IOS_BUILD_LOG:-/tmp/heyta-ios-reminder-build.log}
 SCREENSHOT=${HEYTA_IOS_REMINDER_SCREENSHOT:-$ROOT/apps/mobile/evidence/ios-reminder-delivery.png}
+NOTIFICATION_SCREENSHOT=${HEYTA_IOS_NOTIFICATION_SCREENSHOT:-$ROOT/apps/mobile/evidence/ios-reminder-notification-center.png}
+RECONCILE_SCREENSHOT=${HEYTA_IOS_RECONCILE_SCREENSHOT:-$ROOT/apps/mobile/evidence/ios-reminder-after-reconcile.png}
+CANCEL_SCREENSHOT=${HEYTA_IOS_CANCEL_SCREENSHOT:-$ROOT/apps/mobile/evidence/ios-reminder-cancelled.png}
+IOS_DISPLAY=${HEYTA_IOS_DISPLAY:-primary}
+IOS_MODE=${HEYTA_IOS_REMINDER_MODE:-full}
+case "$IOS_MODE" in full|pending-cancel) ;; *) echo "❌ 未知 iOS 提醒模式：$IOS_MODE" >&2; exit 2 ;; esac
 COMPANION_PID=""
 cleanup() {
   if [ -n "$COMPANION_PID" ]; then kill "$COMPANION_PID" >/dev/null 2>&1 || true; fi
@@ -56,7 +62,9 @@ step() { echo; echo "════ $1 ════"; }
 summary() {
   echo
   echo "════════ iOS 提醒投递验收：${PASS} 通过 / ${FAIL} 失败 ════════"
-  echo "截图：$SCREENSHOT"
+  echo "截图：$NOTIFICATION_SCREENSHOT"
+  echo "回应用截图：$RECONCILE_SCREENSHOT"
+  echo "取消正控截图：$CANCEL_SCREENSHOT"
   [ "$FAIL" -eq 0 ]
 }
 
@@ -241,8 +249,26 @@ open_task_composer() {
   return 1
 }
 snapshot() {
-  mkdir -p "$(dirname "$SCREENSHOT")"
-  xcrun simctl io "$UDID" screenshot "$SCREENSHOT" >/dev/null 2>&1 || true
+  local path="${1:-$SCREENSHOT}"
+  mkdir -p "$(dirname "$path")"
+  # A multi-display iOS 27 simulator may default simctl to a secondary LCD
+  # (the file is valid PNG but all black). Prefer idb, then fall back to the
+  # explicitly selected primary display. A non-empty file is not enough:
+  # reject a blank PNG before the caller records a successful evidence step.
+  "$IDB_BIN" --companion-path "$IDB_COMPANION" screenshot --udid "$UDID" "$path" >/dev/null 2>&1 || true
+  if ! png_capture_is_usable "$path"; then
+    xcrun simctl io "$UDID" screenshot --display "$IOS_DISPLAY" "$path" >/dev/null 2>&1 || true
+  fi
+  png_capture_is_usable "$path"
+}
+png_capture_is_usable() {
+  local path="$1"
+  [ -s "$path" ] || return 1
+  HEYTA_PNG_STATS="$ROOT/scripts/screenshots/png-stats.mjs" node --input-type=module - "$path" <<'NODE' >/dev/null 2>&1
+const { inspectPng, looksBlank } = await import(process.env.HEYTA_PNG_STATS);
+const stats = inspectPng(process.argv[2]);
+if (looksBlank(stats)) process.exit(1);
+NODE
 }
 phone_db() {
   echo "$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null)/Library/heyta.sqlite"
@@ -274,9 +300,13 @@ try:
 except FileNotFoundError:
     pass
 PY
+  BUILD_OVERRIDES=()
+  if [ "${HEYTA_IOS_EXCLUDE_CARD_EXPORT:-0}" = "1" ]; then
+    BUILD_OVERRIDES+=(EXCLUDED_SOURCE_FILE_NAMES='HeytaCardExportModule.swift HeytaCardExportModuleBridge.m')
+  fi
   if xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" -scheme Heyta \
       -configuration Release -sdk iphonesimulator -destination "id=$UDID" \
-      -derivedDataPath "$DERIVED" build >"$BUILD_LOG" 2>&1; then
+      -derivedDataPath "$DERIVED" "${BUILD_OVERRIDES[@]}" build >"$BUILD_LOG" 2>&1; then
     ok "当前源码 Release 构建成功（${BUILD_LOG}）"
   else
     bad "Release 构建失败（${BUILD_LOG}）"
@@ -494,6 +524,53 @@ AUTH_JSON=$(xcrun simctl spawn "$UDID" launchctl print system 2>/dev/null | head
 echo "   权限提示处理后保留 UI/SQLite 证据；系统级授权没有可伪造的 shell 旁路。" >&2
 sleep 2
 
+if [ "$IOS_MODE" = pending-cancel ]; then
+  # Positive control: the future occurrence must first be observable in the
+  # native scheduled ledger, then UI deletion must cause reconcile to remove
+  # the OS request and ledger entry without manufacturing firedAt.
+  RECEIPTS="$(phone_db | sed 's#/heyta.sqlite$#/Application Support/heyta-reminder-receipts.json#')"
+  if python3 - "$RECEIPTS" <<'PY'
+import json,sys
+from pathlib import Path
+p=Path(sys.argv[1]); d=json.loads(p.read_text()) if p.exists() else {}
+assert d.get('scheduled'), d
+PY
+  then ok "取消前原生 scheduled ledger 有未来 occurrence"; else bad "取消前没有 scheduled occurrence 正向对照"; fi
+  snapshot "$CANCEL_SCREENSHOT" || bad "取消前截图为空白或不可解析"
+  REMINDER_DELETE_LABEL="删除 ${DUE_MD} ${DUE_HM} 的提醒"
+  if press "$REMINDER_DELETE_LABEL" >/dev/null 2>&1 || press_scroll "$REMINDER_DELETE_LABEL"; then
+    ok "通过提醒面板 UI 删除未来 occurrence"
+    # The button acknowledgement is synchronous at the AX layer, while the
+    # host action writes its op asynchronously. Give the real SQLite writer a
+    # settled window before terminating the process.
+    sleep 4
+    if wait_gone "$REMINDER_DELETE_LABEL" 3; then
+      ok "删除后提醒行从真实 AX 树消失"
+    else
+      bad "AX 点击返回成功但提醒行仍在，不能证明删除回调已执行"
+    fi
+  else
+    bad "未来 occurrence 的提醒删除入口不可达"
+  fi
+  xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
+  xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1 || true
+  sleep 5
+  RECEIPTS="$(phone_db | sed 's#/heyta.sqlite$#/Application Support/heyta-reminder-receipts.json#')"
+  if python3 - "$RECEIPTS" <<'PY'
+import json,sys
+from pathlib import Path
+p=Path(sys.argv[1]); d=json.loads(p.read_text()) if p.exists() else {}
+assert not d.get('scheduled'), d
+PY
+  then ok "删除后 reconcile 清空 OS pending 对应的 scheduled ledger"; else bad "删除后仍有 scheduled occurrence"; fi
+  snapshot "$CANCEL_SCREENSHOT" || bad "取消后截图为空白或不可解析"
+  PHONE_DB="$(phone_db)"
+  FIRED="$(sqlite3 "$PHONE_DB" "SELECT COUNT(*) FROM ops WHERE json_extract(data,'\$.op.entityType')='REMINDER' AND json_extract(data,'\$.op.payload.firedAt') IS NOT NULL;" 2>/dev/null | tr -d ' ')"
+  [ "${FIRED:-0}" = 0 ] && ok "future cancel 未伪造 firedAt" || bad "future cancel 产生了 firedAt"
+  summary
+  exit "$([ "$FAIL" -eq 0 ] && echo 0 || echo 1)"
+fi
+
 echo "   等待系统时刻 ${DUE_ISO} ${DUE_HM} 到达（最多 210 秒）…"
 for _i in $(seq 1 36); do
   sleep 5
@@ -503,15 +580,23 @@ done
 step "3. 终止进程后等待 iOS 系统投递（先截图，再断言）"
 xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
 sleep 5
-# 通知中心的 UI 由系统管理，尝试从屏顶下拉；失败也保留当前设备截图。
+# 通知中心的 UI 由系统管理，尝试从屏顶下拉；先保存独立 OS 证据，不能用任务详情图替代。
 "$IDB_BIN" --companion-path "$IDB_COMPANION" ui swipe 200 5 200 600 --duration 1.0 --udid "$UDID" >/dev/null 2>&1 || true
-snapshot
-ok "已在投递断言前保存截图：$SCREENSHOT"
+if snapshot "$NOTIFICATION_SCREENSHOT"; then
+  ok "已在投递断言前保存通知中心截图：$NOTIFICATION_SCREENSHOT"
+else
+  bad "通知中心截图为空白或不可解析（display=$IOS_DISPLAY）：$NOTIFICATION_SCREENSHOT"
+fi
 
 # 重新启动触发 startup reconcile；不要把进程终止本身当 fired 证据。
 xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
 sleep 8
 dismiss_privacy_gate || true
+if snapshot "$RECONCILE_SCREENSHOT"; then
+  ok "已保存回应用 reconcile 截图：$RECONCILE_SCREENSHOT"
+else
+  bad "回应用 reconcile 截图为空白或不可解析（display=$IOS_DISPLAY）：$RECONCILE_SCREENSHOT"
+fi
 PHONE_DB="$(phone_db)"
 FIRED="$(sqlite3 "$PHONE_DB" "SELECT COUNT(*) FROM ops WHERE json_extract(data,'\$.op.entityType')='REMINDER' AND json_extract(data,'\$.op.payload.firedAt') IS NOT NULL AND json_extract(data,'\$.op.payload.firedForTriggerAt') IS NOT NULL;" 2>/dev/null | tr -d ' ')"
 if [ "${FIRED:-0}" -ge 1 ]; then
@@ -547,15 +632,16 @@ fi
 xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
 xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
 sleep 5
-snapshot
-ok "取消边界回读前保存最新截图"
+if snapshot "$CANCEL_SCREENSHOT"; then
+  ok "取消边界回读前保存截图：$CANCEL_SCREENSHOT"
+else
+  bad "取消边界截图为空白或不可解析（display=$IOS_DISPLAY）：$CANCEL_SCREENSHOT"
+fi
 
 step "5. 人工查看证据"
-echo "   请查看：$SCREENSHOT"
-if [ -s "$SCREENSHOT" ]; then
-  ok "截图文件存在且非空（不得仅凭自动断言宣称系统 banner 可见）"
-else
-  bad "截图为空"
-fi
+for _shot in "$NOTIFICATION_SCREENSHOT" "$RECONCILE_SCREENSHOT" "$CANCEL_SCREENSHOT"; do
+  echo "   请查看：$_shot"
+  if [ -s "$_shot" ]; then ok "截图文件存在且非空：$_shot"; else bad "截图为空：$_shot"; fi
+done
 
 summary

@@ -18,6 +18,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
       UNNotificationCategory(identifier: HeytaReminderReceipts.category, actions: [],
         intentIdentifiers: [], options: [.customDismissAction])
     ])
+#if DEBUG
+    if let stage = ProcessInfo.processInfo.arguments.drop(while: { $0 != "-HEYTA_KEYCHAIN_PROBE" }).dropFirst().first {
+      HeytaVaultSecureStorage.runProbe(stage: stage)
+    }
+#endif
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()

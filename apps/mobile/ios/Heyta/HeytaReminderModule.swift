@@ -48,7 +48,6 @@ final class HeytaReminderModule: NSObject {
   @objc(authorizationStatus:reject:)
   func authorizationStatus(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
     center.getNotificationSettings { settings in
-      NSLog("[reminder] authorizationStatus=%@", settings.authorizationStatus.rawValue.description)
       switch settings.authorizationStatus {
       case .authorized, .provisional, .ephemeral: resolve("granted")
       case .denied: resolve("denied")
@@ -60,9 +59,7 @@ final class HeytaReminderModule: NSObject {
 
   @objc(requestAuthorization:reject:)
   func requestAuthorization(resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-    NSLog("[reminder] requestAuthorization begin")
     center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-      NSLog("[reminder] requestAuthorization completion granted=%@ error=%@", granted ? "true" : "false", error?.localizedDescription ?? "none")
       if let error { reject("E_REMINDER_AUTH", error.localizedDescription, error) }
       else { resolve(granted ? "granted" : "denied") }
     }
@@ -71,7 +68,6 @@ final class HeytaReminderModule: NSObject {
   @objc(schedule:atMs:title:body:resolve:reject:)
   func schedule(_ identifier: String, atMs: Double, title: String, body: String,
     resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
-    NSLog("[reminder] schedule begin id=%@ atMs=%.0f", identifier, atMs)
     guard !identifier.isEmpty, atMs.isFinite, atMs > 0 else {
       reject("E_REMINDER_SCHEDULE", "Invalid reminder request", nil)
       return
@@ -100,7 +96,6 @@ final class HeytaReminderModule: NSObject {
           trigger: UNTimeIntervalNotificationTrigger(
             timeInterval: max(1.0, atMs / 1000 - Date().timeIntervalSince1970), repeats: false))
         self.center.add(request) { error in
-          NSLog("[reminder] schedule completion id=%@ error=%@", identifier, error?.localizedDescription ?? "none")
           if let error { reject("E_REMINDER_SCHEDULE", error.localizedDescription, error); return }
           do {
             try HeytaReminderReceipts.update { state in state.scheduled[identifier] = atMs }
