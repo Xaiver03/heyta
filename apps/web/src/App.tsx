@@ -155,6 +155,7 @@ import { ImportPanel } from './features/settings/ImportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 // 通行密钥自助管理（列 / 删）—— 服务端早就有端点，此前界面没有任何入口。
 import { PasskeyPanel } from './features/settings/PasskeyPanel.js';
+import { CloseAccountPanel } from './features/settings/CloseAccountPanel.js';
 // 个人信息（R10）：昵称与头像的增删改查。入口在头像菜单的「编辑个人信息」，
 // 面板本体开在设置浮层第一段 —— 它需要令牌，而令牌就住在同步设置里。
 import { ProfilePanel } from './features/settings/ProfilePanel.js';
@@ -2406,6 +2407,13 @@ export function App(): React.JSX.Element {
               <PasskeyPanel />
               {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
               <PasswordPanel />
+              {/*
+                账号安全：注销账号（批次 E3）。服务端 `DELETE /api/account` 一直在，
+                缺的是调用点 —— 而 E2 那条"收到注销信号就清本机"的反应也等在这里
+                被主动触发一次，不然它只能靠下一次同步的回声。
+                🔴 未登录时这个面板自己返回 null（没有令牌就没有"哪个账号"可注销）。
+              */}
+              <CloseAccountPanel />
               {/*
                 Windows 小组件的后台刷新（Web Push）。
                 🔴 **能力不可用时这个面板自己不画** —— http:// 上、没配 VAPID 的
