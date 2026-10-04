@@ -9347,3 +9347,75 @@ node research/tools/selfhost-chain-targets.mjs --pkg ../heyta/package.json --tre
 这条**待入 `docs/reference/environment-traps.md`**（多写台账，编号按主检出工作树现量取；
 `#193` 讲的是"字符串比 argv ⇒ 自检空跑"，这一枚是"根本没有守卫 ⇒ import 也跑 CLI"，
 是同一家族的第二种面目，是否并条由后来者按条目原文判）。
+
+### 8.155 main 的链比本批多出来那 18 道，第一次逐道离线跑过并配了对：16 道里 8 绿 / 8 非绿，而 8 道非绿**两侧退出码与首条针句逐字同形**（2026-10-05 01:5x）
+
+#### ① 为什么现在跑
+
+第 1 项的关闭判据要求"在合并载体上跑**完整** `pnpm check`"，而 §8.153 量到 main 的链里
+有 **18 道是本批从没单独跑过的**（`check:shell-surfaces` `check:op-log-semantics`
+`check:selection-single-source` `check:legal-tools` `check:legal-permissions` `check:legal-closure-truth`
+`check:legal-gdpr` `check:doc-citations` `check:md-tables` `check:brand-assets` `check:public-facts`
+`check:card-export` `check:ios-native-bridges` `check:vault-diagnostics` `check:verify-script-copy`
+`check:android-gradle-remote` `check:apk-freshness` `check:shell-erasure-parity`）。
+其中任何一道若因**本批写过的东西**红，落地就会红在一枚没人认领的格子上。
+窗口是稀缺资源，所以这件事在开窗之前用离线树跑。
+
+#### ② 做法（两枚一次性 detached 树，跑完即撤）
+
+```bash
+git worktree add --detach /tmp/ht-selfhost-gatecheck feat/self-host-merge-main   # 载体那枚提交
+git worktree add --detach /tmp/ht-selfhost-gatepair main                          # 配对：干净 main
+# …逐道 node scripts/check-*.mjs，落 rc 与输出…
+git worktree remove --force /tmp/ht-selfhost-gatecheck
+git worktree remove --force /tmp/ht-selfhost-gatepair
+```
+
+不拿哨兵那枚热载体试：同 §8.152 ③ 那条理由（它的 argv+cwd 两腿会把这次试跑读成"载体被别人用"）。
+`check:op-log-semantics`（本体是变异台架）与 `check:apk-freshness`（要 Android 现场）刻意没离线跑 ——
+它们不属于"纯 fs 那几道"，读数只能在窗口里取。
+
+#### ③ 读数（16 道逐道：退出码两侧对比 + 首条失败针句）
+
+| 门禁 | 载体侧 rc | main 侧 rc | 首条失败针句 |
+|---|---|---|---|
+| `legal-tools`（本体 `check-legal-tool-catalog.mjs`） | 0 | 没重跑 | — |
+| `legal-permissions` | 0 | 没重跑 | — |
+| `shell-erasure-parity` | 0 | 没重跑 | — |
+| `selection-single-source` | 0 | 没重跑 | — |
+| `ios-native-bridges`（本体 `check-ios-native-bridge-names.mjs`） | 0 | 没重跑 | — |
+| `vault-diagnostics` | 0 | 没重跑 | — |
+| `android-gradle-remote` | 0 | 没重跑 | — |
+| `md-tables`（本体 `check-md-table-rows.mjs`） | 0 | 没重跑 | — |
+| `legal-closure-truth` | 1 | **1** | `ERR_MODULE_NOT_FOUND`（两侧都是 `packages/legal/dist/index.js` 不在） |
+| `legal-gdpr` | 1 | **1** | 同一枚 `packages/legal/dist/index.js` |
+| `shell-surfaces` | 1 | **1** | `🔴 W5 产物不存在：apps/web/dist ⇒ 先跑 pnpm --filter @heyta/web build` |
+| `verify-script-copy` | 2 | **2** | `🔴 词条产物目录不存在：packages/i18n/dist —— 先 pnpm --filter @heyta/i18n build` |
+| `public-facts` | 1 | **1** | `Cannot find module '<本树根>/packages/shared-schema/dist/index.js'`（只差树根，同一条） |
+| `brand-assets` | 1 | **1** | `缺少设计系统构建产物：packages/design-system/dist/index.js` |
+| `card-export` | 1 | **1** | `❌ @heyta/ui/node 在 node 里加载不了`（那条入口要靠构建产物才解析得到） |
+| `doc-citations` | 1 | **1** | `引用问题 4 条`，四条全在**别人的** `performance-hotpaths-audit.md`，针句全是 `dist/…` |
+
+配对那一趟**只重跑了这 8 道非绿的**（绿的那 8 道在干净 main 上没重跑，所以这一列写"没重跑"而不是
+补一个数 —— 绿在这里只主张"它在载体那枚提交上绿"）。结果：**8 道非绿在两侧退出码完全相同、
+首条失败针句同一句** ⇒ 归因是"这两棵一次性树都没有 `packages/*/dist`"，不是"本批带进来的"。
+
+#### ④ 这一趟真正买到的两件事
+
+1. **这些红里有本批要负责的吗？没有。** 8 道非绿全部同因：一次性树里没跑过 `pnpm build`，
+   而且干净 main 上**同一趟**给出同样的退出码与同一句针。
+   而落地那一刻的完整链第 2 步就是 `pnpm build` ⇒ 那时 `packages/*/dist` 在，这八格不构成新的债。
+2. 🔴 **不要把这类门禁加进载体的落笔前 `GATES`**（`selfhost-merge-carrier.mjs` 那一段跑在
+   `pnpm build` **之前**，也没有 node_modules）。加进去 = 在正常的树上恒红 = 没有判据
+   （AGENTS §8.3 那句，与 §8.153 ② 把"读不出"和"坏了"分两档是同一个理由）。
+   落笔前该挂的是**纯 fs 的**那几道 —— 也就是 §8.153 新加的链悬空判据所属的那一类。
+
+⚠️ 别把"11 绿"读成"这些门禁在载体上一定绿"：没有 node_modules 的树里，绿只证明
+"不依赖构建产物的那部分逻辑成立"。完整链的读数仍然只有窗口里那一趟给得出（第 1 项的关闭判据不变）。
+
+#### ⑤ 这一趟里唯一一条真的、且能点名的落地前风险，是 §8.154 的 G-65
+
+其余 16 道要么离线绿、要么红因是"树没有产物"（另两道 `op-log-semantics` / `apk-freshness`
+没离线跑，理由写在 ② 那一段末尾）。只有 `check:shell-exit-chain`
+那一条是**链条目已经进了别人要提交的那版 `package.json`，而它指向的脚本还没进版本库** ——
+那种红不是环境给的，`pnpm build` 也补不出来。
