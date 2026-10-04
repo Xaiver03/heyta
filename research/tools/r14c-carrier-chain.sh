@@ -273,29 +273,58 @@ run preflight_after_build bash research/tools/r14c-bundle-testid-preflight.sh \
 #    除 load 以外的任何红（含 REDS 行缺失 = 闸门版本不对/装置坏）当场停。
 REGATE_TRIES="${REGATE_TRIES:-3}"
 REGATE_SETTLE="${REGATE_SETTLE:-60}"
-RG=0; REGATE_RC=1; REGATE_REDS=''
-while :; do
-  RG=$((RG + 1))
-  RT="/tmp/ht-r14c-regate.$$.try${RG}.txt"
-  NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target c --repo "$CARRIER" > "$RT" 2>&1
-  REGATE_RC=$?
-  sed 's/^/   [regate] /' "$RT" >> "$LOG"
-  REGATE_REDS=$(grep -m1 '^REDS=' "$RT" 2>/dev/null | cut -d= -f2-)
-  rm -f "$RT"
-  echo "REGATE try=${RG} rc=${REGATE_RC} REDS=${REGATE_REDS:-〈该行不存在〉}" >> "$LOG"
-  [ "$REGATE_RC" = 0 ] && break
-  if [ "$REGATE_RC" = 3 ] && [ "$REGATE_REDS" = load ] && [ "$RG" -lt "$REGATE_TRIES" ]; then
-    echo "REGATE=load-only（第 ${RG} 次，${REGATE_SETTLE}s 后重问；build 刚跑完，1 分钟负载还没落）" >> "$LOG"
-    sleep "$REGATE_SETTLE"
-    continue
-  fi
-  echo "CHAIN_STOPPED_AT=regate（try=${RG} rc=${REGATE_RC} REDS=${REGATE_REDS:-〈该行不存在〉} ⇒ 没动设备）" >> "$LOG"
+# 🔴 收成**一个函数**而不是两段抄件：下面 verify 的"无效重跑"那条路要问的是**同一条**窗口判据，
+#    复制第二段就是本仓那条老规矩的反面（抄件一定会漂，而且漂的那一段没人看）。
+#    返回闸门的码（0 = 窗口还开着），并把 try/rc/REDS 留在 REGATE_* 三个全局里给调用方写日志。
+ask_gate() {  # <这一段是谁在问：pre|retry>
+  REGATE_RG=0; REGATE_RC=1; REGATE_REDS=''
+  local who="${1:-pre}"
+  while :; do
+    REGATE_RG=$((REGATE_RG + 1))
+    RT="/tmp/ht-r14c-regate.$$.${who}.try${REGATE_RG}.txt"
+    NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target c --repo "$CARRIER" > "$RT" 2>&1
+    REGATE_RC=$?
+    sed 's/^/   [regate] /' "$RT" >> "$LOG"
+    REGATE_REDS=$(grep -m1 '^REDS=' "$RT" 2>/dev/null | cut -d= -f2-)
+    rm -f "$RT"
+    echo "REGATE who=${who} try=${REGATE_RG} rc=${REGATE_RC} REDS=${REGATE_REDS:-〈该行不存在〉}" >> "$LOG"
+    [ "$REGATE_RC" = 0 ] && return 0
+    if [ "$REGATE_RC" = 3 ] && [ "$REGATE_REDS" = load ] && [ "$REGATE_RG" -lt "$REGATE_TRIES" ]; then
+      echo "REGATE=load-only（${who} 第 ${REGATE_RG} 次，${REGATE_SETTLE}s 后重问；build 刚跑完，1 分钟负载还没落）" >> "$LOG"
+      sleep "$REGATE_SETTLE"
+      continue
+    fi
+    return "$REGATE_RC"
+  done
+}
+if ! ask_gate pre; then
+  echo "CHAIN_STOPPED_AT=regate（try=${REGATE_RG} rc=${REGATE_RC} REDS=${REGATE_REDS:-〈该行不存在〉} ⇒ 没动设备）" >> "$LOG"
   exit "$REGATE_RC"
-done
-echo "REGATE_OK try=${RG} —— 下面是第一次也是最后一次动设备" >> "$LOG"
+fi
+echo "REGATE_OK try=${REGATE_RG} —— 下面是动设备（rc=3 时允许重问闸门再跑一次，见下）" >> "$LOG"
 
 run verify env PORT="$PORT" bash scripts/verify-mobile-due-time.sh
 rc=$?
+# 🔴 **verify 回 rc=3 的含义是"一条判据都没跑到"**（第 0 步的载体体检、或第 5 步的通道自检判的），
+#    它既不是产品红、也不该把这发窗口烧掉：20:0x 那一趟就是窗口难得、一发用来收 8 条假红。
+#    所以：重问**同一条闸门**（`ask_gate retry`，不自建第二套判据），还开着才再跑一次，
+#    并且**只一次**（`VERIFY_TRIES=2`）—— 追第三趟就是在找 flaky。
+# ⚠️ **rc=1 绝不重试**：那是判据集跑完之后的读数，重试等于把产品红当成不稳定去洗。
+VERIFY_TRIES="${VERIFY_TRIES:-2}"
+VI=1
+while [ "$rc" = 3 ] && [ "$VI" -lt "$VERIFY_TRIES" ]; do
+  VI=$((VI + 1))
+  echo "VERIFY_INVALID（第 ${VI} 次之前：上一趟 rc=3 = 一条判据都没跑到）⇒ 重问闸门" >> "$LOG"
+  if ask_gate retry; then
+    run verify2 env PORT="$PORT" bash scripts/verify-mobile-due-time.sh
+    rc=$?
+  else
+    echo "VERIFY_RETRY=gate-closed（第 ${VI} 次**不跑**：窗口已关（rc=${REGATE_RC} REDS=${REGATE_REDS:-〈无〉}）⇒ 不在窗口外动设备）" >> "$LOG"
+    rc=3
+    break
+  fi
+done
+[ "$VI" -gt 1 ] && echo "VERIFY_ATTEMPTS=${VI} final_rc=${rc}" >> "$LOG"
 # 第 4 层单独再取一次独立读数（它和 verify 里那段同逻辑、同 env 默认值：`heyta_mobile_smoke@127.0.0.1:5432`，
 # 03:5x 现量主检出 `verify-mobile-due-time.sh:626-629` 就是这四个默认值）。
 # 用途是分辨"op 没到服务端"和"读不到服务端"—— 前者是产品红，后者是环境红。
