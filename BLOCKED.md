@@ -4069,3 +4069,38 @@ ps -o command= -p 29093 | tr ' ' '\n' | grep spec
 要往下走得由 hierarchy 那条线自己收掉这枚 worker（它的用例形状像"没有 sleep 的忙等自旋"——
 本仓 10-03 已为同款形状入过一次档：判 5 秒超时的断言写在循环外，循环体每轮只做一次 `readFile`）。
 它停下来之后，本线队列（`~/scratch-heyta/deliver-*` 里活着的那一枚）会自己走进阶段 1 的下一道门。
+
+## B71. 🔴 `pnpm -r test` 在 main 上红一条，根因是**合并把迁移目录改了号、常量没跟上** —— 归属 W4b 那条线，本线只交现量
+
+05:25 那趟集成态链（载体 `1ebcf136`）里被 `head -14` 截掉、因此一直没进我日志的那条非绿，就是这段：
+
+```
+server test:  FAIL  tests/holiday-adjustment-migration.pglite.spec.ts
+server test: Error: ENOENT: … /server/prisma/migrations/20261009000000_add_holiday_adjustments/migration.sql
+server test:  Test Files  1 failed | 120 passed (121)
+```
+
+08:2x 在**当前 main**（`9f631689`）上按 HEAD blob 静态复现，形状没变（跑测试要占测试通道，这趟没跑，判据是文件级的）：
+
+| 项 | 现量 |
+|---|---|
+| spec 硬编码的目录名 | `server/tests/holiday-adjustment-migration.pglite.spec.ts:35` `const MIGRATION_DIR = '20261009000000_add_holiday_adjustments'`（:39 直接 `readFileSync(join(migrationsDir, MIGRATION_DIR, 'migration.sql'))`） |
+| HEAD 里这个目录在不在 | `git ls-tree HEAD server/prisma/migrations/` ⇒ **只有 `20261013000000_add_holiday_adjustments`** |
+| 13 号怎么来的 | `git log -1 -- …\/20261013000000_add_holiday_adjustments/migration.sql` ⇒ `57ff8c55 merge: W4b 服务端半 —— 调休/补班两张表 + 公开读面 + 后台录入`（10-04） |
+| 09 号怎么来的 | `3708d08c` / `a2313c9a`（10-03，同一个 feature 在两条线上各起一次号） |
+| HEAD 里还引用 09 号的地方 | `git grep -l 20261009000000_add_holiday_adjustments HEAD` ⇒ **3 处**：上面那份 spec + `docs/adr/0052-public-facts-are-deployer-supplied.md` + `docs/plans/countdown-batch2-handoff.md` |
+
+⇒ 结论：**目录与常量/文档是两套号**。谁对要 W4b 那条线拍（改目录回 09、还是把常量与那两份文档改成 13），
+本线不代拍、也不吸收别人的债凑绿（AGENTS §8 第 7 条的逐项对账口径：这条记成"② 的唯一 test 红已定源"，不是"② 没过"）。
+
+可复跑（任一时刻、只读、不占测试通道）：
+
+```bash
+git ls-tree HEAD server/prisma/migrations/ | grep -E '202610(09|13)000000_add_holiday'
+git grep -n '20261009000000_add_holiday_adjustments' HEAD
+```
+
+📌 一般规律（本仓已入档过的同族）：**判据/文档里硬编码一个"按日期编号的产物目录名"，就把它和那次编号绑死了** ——
+合并改号时不会有任何一层报错：`check:migrations` 校验的是迁移文件自身的形状（命名规范、CONCURRENTLY、lock-bounded），
+它不知道测试里写着哪个号。改法上更稳的是让那份 spec 从 `readdirSync(migrationsDir)` 里按
+`*add_holiday_adjustments` 现取目录（现取即判据），而不是追着一个具体号码改第二遍。
