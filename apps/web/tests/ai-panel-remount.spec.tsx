@@ -35,8 +35,9 @@ import { I18nProvider } from '@heyta/i18n';
 import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
-import { AssistantEphemeralProvider } from '../src/features/ai/assistant-ephemeral.js';
+import { PanelEphemeralProvider } from '../src/features/ai/panel-ephemeral.js';
 import { AssistantPanel } from '../src/features/ai/AssistantPanel.js';
+import { AiToolRun } from '../src/features/ai/AiToolRun.js';
 
 const ROUTING: AiRoutingConfig = {
   enabled: true,
@@ -132,10 +133,10 @@ function tree(props: { slot: Slot; fetchImpl?: typeof fetch }): React.JSX.Elemen
   );
   return (
     <I18nProvider locale="zh-CN">
-      <AssistantEphemeralProvider>
+      <PanelEphemeralProvider>
         <div data-testid="col-detail">{props.slot === 'detail' ? panel : null}</div>
         <div data-testid="col-main">{props.slot === 'main' ? panel : null}</div>
-      </AssistantEphemeralProvider>
+      </PanelEphemeralProvider>
     </I18nProvider>
   );
 }
@@ -150,6 +151,52 @@ async function mount(props: { slot: Slot; fetchImpl?: typeof fetch }): Promise<H
     root!.render(tree(props));
   });
   return container as HTMLDivElement;
+}
+
+/**
+ * 单步工具面板的同一形状 —— 它和助手面板**共用那份 Provider**，
+ * 而它自己的四样（输入 / 阶段 / 结果 / 提案确认）原来也住在组件里。
+ */
+function toolTree(props: { slot: Slot; fetchImpl?: typeof fetch }): React.JSX.Element {
+  const panel = (
+    <AiToolRun
+      routing={ROUTING}
+      consents={[]}
+      grants={{ list_tasks: true, create_task: true } as never}
+      secrets={secrets}
+      host={fakeHost() as never}
+      {...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl })}
+    />
+  );
+  return (
+    <I18nProvider locale="zh-CN">
+      <PanelEphemeralProvider>
+        <div data-testid="col-detail">{props.slot === 'detail' ? panel : null}</div>
+        <div data-testid="col-main">{props.slot === 'main' ? panel : null}</div>
+      </PanelEphemeralProvider>
+    </I18nProvider>
+  );
+}
+
+async function mountToolRun(props: { slot: Slot; fetchImpl?: typeof fetch }): Promise<HTMLDivElement> {
+  if (root === undefined) {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  }
+  await act(async () => {
+    root!.render(toolTree(props));
+  });
+  return container as HTMLDivElement;
+}
+
+async function typeInto(el: HTMLDivElement, testId: string, text: string): Promise<void> {
+  const input = el.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`);
+  if (input === null) throw new Error(`找不到 ${testId}`);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, text);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 
 /** React 受控输入：必须走原生 setter，否则 onChange 收不到。 */
@@ -274,6 +321,48 @@ describe('账号绑定：换账号不许带一个字', () => {
 
     expect(inputValue(el), 'B 不该看见 A 还没发出去的那句').toBe('');
     expect(disclosureCount(el), 'B 不该继承 A 的未决披露').toBe(0);
+  });
+});
+
+describe('单步工具面板跨挂载点（同一条不变量的另一半）', () => {
+  it('🔴 换挂载点之后披露还在（单步面板的未决披露）', async () => {
+    const el = await mountToolRun({ slot: 'detail' });
+    await typeInto(el, 'ai-tool-input', '帮我看看下周三评审要准备什么');
+    await click(el, 'ai-tool-run-button');
+    expect(
+      el.querySelectorAll('[data-testid="ai-tool-disclosure"]').length,
+      '前置：走模型那条必须先出披露，且此时一个请求都不发',
+    ).toBe(1);
+
+    await mountToolRun({ slot: 'main' });
+
+    expect(
+      el.querySelectorAll('[data-testid="ai-tool-disclosure"]').length,
+      '换挂载点把单步面板的未决披露吃掉了 —— 与助手那条是同一个缺陷的另一半',
+    ).toBe(1);
+  });
+
+  it('换挂载点之后那句输入仍在输入框里（单步面板的草稿）', async () => {
+    const el = await mountToolRun({ slot: 'detail' });
+    await typeInto(el, 'ai-tool-input', '把逾期任务列出来');
+    await mountToolRun({ slot: 'main' });
+    const input = el.querySelector<HTMLInputElement>('[data-testid="ai-tool-input"]');
+    expect(input?.value, '单步面板的草稿被重挂载抹掉了').toBe('把逾期任务列出来');
+  });
+
+  it('🔴 换账号之后一个字节都不许渲染（单步面板的账号绑定）', async () => {
+    setAccount('a@example.com');
+    const el = await mountToolRun({ slot: 'detail' });
+    await typeInto(el, 'ai-tool-input', 'A 的私事');
+    await click(el, 'ai-tool-run-button');
+    expect(el.querySelectorAll('[data-testid="ai-tool-disclosure"]').length).toBe(1);
+
+    setAccount('b@example.com');
+    await mountToolRun({ slot: 'main' });
+
+    const input = el.querySelector<HTMLInputElement>('[data-testid="ai-tool-input"]');
+    expect(input?.value ?? '', 'B 不该看见 A 还没发出去的那句').toBe('');
+    expect(el.querySelectorAll('[data-testid="ai-tool-disclosure"]').length, 'B 不该继承 A 的未决披露').toBe(0);
   });
 });
 
