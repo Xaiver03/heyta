@@ -92,6 +92,29 @@ LAPTOP_DB=/tmp/heyta-notes-laptop.sqlite
 PHONE_DB=/tmp/heyta-notes-phone.sqlite
 TAB_Y=2253
 EVIDENCE="$HEYTA_REPO_ROOT/apps/mobile/evidence"
+
+# 🔴 截图证据的**唯一**落盘口：拍之前先问一次"谁在前台"，把答案按文件名记下来。
+#    为什么判据不是像素统计（现量 2026-10-04，`apps/mobile/evidence` 67 张真图）：
+#    · 主蓝命中有 **14 张是 0**（`android-search-1..6`、`android-reminder-*` 那些人看过的真界面）
+#      ⇒ 把 `reinstall-all.sh` 那侧的 `blue ≥ 20` 抄过来会把这些整片判成红 ——
+#      那条阈值是从 **mac 共享 UI** 推出来的，不是从手机界面推出来的；
+#    · `android-notes-1-editor-open.png` 人眼看是完整编辑屏，`contentRatio` 却只有 **1.8%**，
+#      离 `png-stats` 的 `BLANK_CONTENT_RATIO = 1%` 只剩 **0.8pp** ⇒ looksBlank 在这族图上没有余量。
+#    ⇒ 两个像素读数**照打不判红**（它们是有用的证据，只是不当阈值用）；
+#      判红的那条是"拍的那一刻前台是不是我们" —— 这也是 §7 里
+#      "像素统计挡不住「那是别的 App 的界面」"那条的正解。
+SHOT_FOCUS=""
+shot_evidence() {
+  local rel="$1" focus
+  focus=$($ADB shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r')
+  $ADB exec-out screencap -p > "$EVIDENCE/$rel" 2>/dev/null
+  # 🔴 读不到要落成**一个明确的哨兵**，不能落空串也不能落中文描述：
+  #    空串会让第 12 步的 `case` 走到 `*)`，把"探针没读到"报成"前台是别的 App" ——
+  #    这是夹具照出来的真缺陷（臂 2 当时就是错的归因）。
+  SHOT_FOCUS="${SHOT_FOCUS}${rel}=${focus:-FOCUS-UNKNOWN}
+"
+  printf '   • 截图 %s 那一刻的前台：%s\n' "$rel" "${focus:-FOCUS-UNKNOWN（dumpsys 没读到）}" >&2
+}
 mkdir -p "$EVIDENCE"
 # 🔴 起跑时间戳取在任何破坏性动作之前（第 0 步的 pm clear / install -r 都算）：
 #    第 12 步原来只判 `-s`（非空），而**上一趟留下的旧图同样非空** ——
@@ -302,35 +325,35 @@ require_screen
 open_editor_for "$NOTE_A"
 VAL=$(edit_value "写点什么…" 2>/dev/null)
 if [ "$VAL" != "$NOTE_A" ]; then
-  bad "编辑屏初值不是这条便签的正文（期望「${NOTE_A}」，实际「${VAL}」）"
+  blame_crash "点摘要进编辑屏后核对初值" || bad "编辑屏初值不是这条便签的正文（期望「${NOTE_A}」，实际「${VAL}」）"
 else
   ok "初值精确相等 —— 不是新建屏复用、也不是空草稿"
 fi
-$ADB exec-out screencap -p > "$EVIDENCE/android-notes-1-editor-open.png" 2>/dev/null
+shot_evidence "android-notes-1-editor-open.png"
 
 step "5. 改成正文 B 并保存 → 回列表、摘要变了"
 XY=$(xy_desc "写点什么…")
 if [ -z "$XY" ]; then
-  bad "编辑屏里没有输入框"; screen_txt
+  blame_crash "第 5 步开头找输入框" || bad "编辑屏里没有输入框"; screen_txt
 else
   $ADB shell input tap $XY; sleep 1.2
   clear_and_type "$NOTE_B" "写点什么…"
   dump
   VAL=$(edit_value "写点什么…" 2>/dev/null)
   if [ "$VAL" != "$NOTE_B" ]; then
-    bad "新正文没输进编辑框（期望「${NOTE_B}」，实际「${VAL}」）"; screen_txt
+    blame_crash "改正文并输入" || bad "新正文没输进编辑框（期望「${NOTE_B}」，实际「${VAL}」）"; screen_txt
   else
     ok "新正文已在编辑框里"
     close_editor_with "保存"
     dump
     if [ "$(has_text "$NOTE_B")" != "1" ]; then
-      bad "列表摘要仍是旧正文 —— 保存没生效到界面上"; screen_txt
+      blame_crash "点「保存」回列表" || bad "列表摘要仍是旧正文 —— 保存没生效到界面上"; screen_txt
     else
       ok "列表摘要已变成新正文：$NOTE_B"
     fi
   fi
 fi
-$ADB exec-out screencap -p > "$EVIDENCE/android-notes-2-list-after-edit.png" 2>/dev/null
+shot_evidence "android-notes-2-list-after-edit.png"
 
 step "6. 断言：恰好一条 NOTE/UPD，且载荷只有 content"
 phone_db_pull
@@ -425,7 +448,15 @@ if [ -z "$XY" ]; then
 else
   $ADB shell input tap $XY; sleep 1
   $ADB shell input text "$NOTE_B"; sleep 2
-  dump
+  # 🔴 这里原先是 `dump` 之后直接 `has_text "便签"`，而 run-1（06:2x）现场是
+  #    **上一行刚打印完"uiautomator 连续 10 次抓不到界面 … 那是假红"**，
+  #    下一行就是 `❌ 搜索结果里没有「便签」这一段`。两件事都要，缺一件就回到那条假红：
+  #    · `require_screen` —— 树是空的就把这一趟判成**环境失效（exit 3）**，
+  #      不把它记成产品结论（本库对"需要在真实界面上断言的地方"的既有规定）；
+  #    · `settle_for` —— 抓到 hierarchy **不等于这一屏画完了**，宿主机有内存压力时
+  #      RN 的结果段可能还没渲染。它**不改判据颜色**：轮询到为止，报不出来照样红。
+  require_screen
+  settle_for "便签" 8 2
   if [ "$(has_text "便签")" != "1" ]; then
     bad "搜索结果里没有「便签」这一段（这个词就在这条便签的正文里）"; screen_txt
   else
@@ -439,13 +470,43 @@ else
       dump
       if [ "$(has_text "编辑便签")" = "1" ]; then
         ok "从搜索结果点进了编辑屏（搜索浮层先关，两层 Modal 没有叠）"
-        $ADB exec-out screencap -p > "$EVIDENCE/android-notes-3-from-search.png" 2>/dev/null
+        shot_evidence "android-notes-3-from-search.png"
         close_editor_with "取消"
       else
         bad "点了便签但编辑屏没打开"; screen_txt
       fi
     fi
   fi
+fi
+
+step "8b. setup：先让第二个宿主写一条并同步 —— 否则第 9 步的「下载」没有东西可下"
+# 🔴 这一步不是为了让第 9 步变绿，是补它缺的那个输入：
+#    第 9 步断"手机库里有 ≥1 条 source ≠ local 的 op"，而原来笔记本**第一次出现**
+#    在第 11 步 ⇒ 第 9 步那一刻账号里没有任何别的设备写入的 op，手机**正确地**拉到 0 条。
+#    红的是编排，读起来却像"下载坏了"。
+#    现量（run-1，06:0x 那趟）：同一趟第 10 步服务端 NOTE/UPD=2 ✅、第 11 步笔记本解得开 ✅
+#    ⇒ 上行与下行各自都在工作，缺的只是"对端先写一条"这个前置。
+#    命令形状取自 `apps/node-host/src/cli.ts` 的 `case 'add'`（返回 {ok,command,id,due}）
+#    与 `scripts/lib/mobile-e2e.sh` 的 laptop / laptop_ok 两个 helper —— 不是手搓的调用。
+LAPTOP_MARK="notes-e2e-laptop-$$"
+LT_ADD=$(laptop add "$LAPTOP_MARK")
+LT_ID=$(printf '%s' "$LT_ADD" | python3 -c "
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: print(''); raise SystemExit
+print(d.get('id') or '')
+")
+if [ -z "$LT_ID" ]; then
+  # 探针没跑成 ≠ 对端没写进去。第 9 步从此没有输入，判**环境失效**（3）不判产品失败（1）。
+  bad "setup 没拿到任务 id（返回体「${LT_ADD}」）⇒ 第 9 步的下载判据没有输入，本轮不作数"
+  exit 3
+fi
+ok "第二个宿主写入了一条任务（id=${LT_ID}，标题含标记 ${LAPTOP_MARK}）"
+if laptop_ok sync; then
+  ok "第二个宿主把那条 op 同步上去了"
+else
+  bad "setup 同步失败 ⇒ 同上，本轮不作数"
+  exit 3
 fi
 
 step "9. 手机同步（上传 + 下载）"
@@ -467,6 +528,20 @@ elif [ "$REMOTE_OPS" -ge 1 ]; then
 else
   bad "手机本地库里远端 op 数 = 0 —— 上传可能成了，下载一条都没落地（同步只做了一半）"
   screen_txt
+fi
+# ② 把这条判据**钉到本轮**：只数条数挡不住"数到的是这台设备自己的历史 op、
+#    或上一轮留在服务端账上的别的设备的 op"。第二条要求手机库里正好有
+#    8b 那条 entityId 的 op —— 有输入才有下载，两腿各自可失败。
+LT_ON_PHONE=$(sqlite3 "$PHONE_DB" \
+  "SELECT count(*) FROM ops WHERE json_extract(data,'\$.op.entityId')='${LT_ID}';" 2>/dev/null | tr -d ' ')
+if printf '%s' "$LT_ON_PHONE" | grep -qE '^[0-9]+$'; then
+  if [ "$LT_ON_PHONE" = "1" ]; then
+    ok "手机库里查到本轮第二条宿主写的那条（entityId=${LT_ID}）—— 下载的不是历史数据"
+  else
+    bad "手机库里该 entityId 的 op 条数 = ${LT_ON_PHONE}（本轮只写了一条，应为 1）"
+  fi
+else
+  bad "读不到手机库对该 entityId 的计数（实际「${LT_ON_PHONE}」）—— 探针没跑成，不能当成「没收到」"
 fi
 
 step "10. 直接查 Postgres（服务端数得出那条 UPD 吗）"
@@ -569,6 +644,23 @@ for f in android-notes-1-editor-open.png android-notes-2-list-after-edit.png and
   if [ ! -s "$p" ]; then
     bad "证据缺失或为空：apps/mobile/evidence/$f"; continue
   fi
+  # 🔴 焦点判据：这张图**拍的那一刻**前台必须是本应用。
+  #    读不到焦点时不判红也不判绿 —— 记成"未知"并在下一行按不通过处理，
+  #    因为"探针没读到"和"前台是别的 App"对**这张图能不能当界面证据**是同一个结论，
+  #    但对"本轮是不是环境坏了"不是（所以话要说清是哪种）。
+  F=$(printf '%s' "$SHOT_FOCUS" | sed -n "s|^$f=||p" | head -1)
+  case "$F" in
+    *com.heyta*) ok "  拍 $f 时前台是本应用（${F}）" ;;
+    ""|*FOCUS-UNKNOWN*) bad "  拍 $f 时**没读到**前台焦点（探针读数缺失）—— 这张图不能当界面证据，但这不是产品缺陷" ;;
+    *)           bad "  拍 $f 时前台**不是**本应用（${F}）—— 那是别的界面，不是产品缺陷也不是证据" ;;
+  esac
+  # 像素读数：**只打印**，理由见 shot_evidence 的注释（阈值不从手机界面推导）
+  node - "$p" <<'JS' 2>/dev/null || echo "      （png-stats 读不了这张图，不影响上面的判据）"
+import('./scripts/screenshots/png-stats.mjs').then((m) => {
+  const st = m.inspectPng(process.argv[2]);
+  console.log(`      像素读数 ${st.width}x${st.height} 内容占比 ${(st.contentRatio * 100).toFixed(1)}%（looksBlank=${m.looksBlank(st)}）主蓝命中 ${m.countBrandBlue(process.argv[2])} —— 不当阈值用，见 shot_evidence`);
+}).catch(() => process.exit(1));
+JS
   M=$(stat -f %m "$p")
   if [ "$M" -lt "$RUN_STARTED" ]; then
     bad "证据是旧的：apps/mobile/evidence/$f —— mtime $(stat -f '%Sm' -t '%m-%d %H:%M:%S' "$p") 早于本轮起跑 $(date -r "$RUN_STARTED" '+%m-%d %H:%M:%S')（非空不等于本轮拍的）"
