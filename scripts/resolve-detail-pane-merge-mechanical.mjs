@@ -743,10 +743,13 @@ const applyHunks = (text, hunks, out) => {
 // —— 验真：写完必须回读。"我改了"不是读数，"回读出来 marker 归零、语法过、门禁绿"才是。
 // ⚠️ 只数 `<<<<<<<` / `>>>>>>>` 两串：`=======` 会撞上门禁脚本自己写的那条正则（`/^={7}$/`），
 //    那是一处假报警，而假报警的代价是别人开始忽略这一栏。
+const VERIFY_FILES = [IMPSRC, SPECSRC, GATE, CSSSRC, APPSRC];
 const verify = [];
+const notJudged = [];
 let verifyBad = 0;
+let judged = 0;
 if (apply) {
-  for (const rel of [IMPSRC, SPECSRC, GATE, CSSSRC, APPSRC]) {
+  for (const rel of VERIFY_FILES) {
     const p = join(product, rel);
     if (!existsSync(p)) {
       verifyBad += 1;
@@ -760,8 +763,15 @@ if (apply) {
     // 后者正是 §3c 警告的"叠两套规则 ⇒ 后一条赢，掷硬币"那个形状。
     let cssDup = 0;
     let errs;
-    if (rel.endsWith('.mjs')) errs = [];
+    let ruler;
+    // 🔴 每一档的读数都必须带上**用的是哪把尺子**。这一族原来打的是"语法诊断 0 条"，
+    //    而 `.mjs` 那一支根本没解析、只是 `errs = []` ⇒ 输出把"没看"打印成了"看了、没事"，
+    //    和 CSS/TS 两档的真读数**长得一模一样**（AGENTS §3.2 那条"只打印、不判定"的同一个形状，
+    //    也和本线 §8.120 给预检补"未判"档的理由同一条）。它的定性其实来自下面那行真跑 RC，
+    //    所以措辞改成点名那把尺子，而不是伪造一个 0。
+    if (rel.endsWith('.mjs')) errs = null;
     else if (rel.endsWith('.css')) {
+      ruler = '结构判据（花括号配平 + 块内声明不重复）';
       errs = [];
       if (braceDelta(text) !== 0) cssDup += 1;
       for (const block of text.matchAll(/\{([^{}]*)\}/g)) {
@@ -774,9 +784,26 @@ if (apply) {
         }
       }
       if (cssDup) errs = [`花括号/重复声明 计数 ${cssDup}`];
-    } else errs = parseErrors(text, rel);
-    if (markers || errs.length) verifyBad += 1;
-    verify.push(`${markers || errs.length ? '🔴' : '✅'} ${rel}：marker ${markers} 处 / 语法诊断 ${errs.length} 条`);
+    } else {
+      ruler = 'TS 解析器';
+      errs = parseErrors(text, rel);
+    }
+    const unjudged = errs === null;
+    if (unjudged) notJudged.push(rel);
+    else judged += 1;
+    // ⚠️ "未静态解析"再分两档，与预检/合流窗口那两个装置同口径（工单 §8.120）：
+    //    GATE 有尺子 —— 就是下面那行对它的真跑 RC；别的东西没有尺子 —— 不记过也不记红。
+    const why = rel === GATE ? '由下面那行真跑 RC 定性' : '本档无尺子（不记过、也不记红）';
+    const bad = markers > 0 || (!unjudged && errs.length > 0);
+    if (bad) verifyBad += 1;
+    verify.push(
+      `${bad ? '🔴' : unjudged ? '⚪' : '✅'} ${rel}：marker ${markers} 处 / 语法=${
+        unjudged ? `未静态解析（${why}）` : `${errs.length} 条（${ruler}）`
+      }`,
+    );
+  }
+  if (notJudged.length) {
+    verify.push(`  分母：静态判过=${judged} 枚／**未静态解析=${notJudged.length} 枚**（${notJudged.join(', ')}）`);
   }
   let rc = 0;
   let out = '';
