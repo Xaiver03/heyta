@@ -497,6 +497,12 @@ pnpm check:web-artifact:app
 rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 ```
 
+🔴 **这一节连同落地页那一组，以及"备份在前、站点先发、发完线上验收"的整条顺序，已固化成一条默认不动手的命令**：
+`node research/tools/publish-public-sites.mjs`（不带 `--confirm` 时只打印将要执行的每一条；它拒绝发"不是正好
+`main` 那一笔"的字节，也不发服务端镜像）。这一节仍是**命令本体**的说明与手敲逃生门（脚本自己被守卫挡掉时照这里走）；
+两份抄件的**目的目录**由脚本自己的 `--selftest` P19 臂与这里对账 —— 改了这里不改脚本，那条臂就红。
+`--mutation` 是那 20 条臂各自的变异读数（12 条腿，含未变异对照）。
+
 🔴 **第 2 条不是仪式，它挡的是这一族里最难归因的那一发**：`apps/web/dist` 是**一个目录、两种载体**
 （`/` 给 dev/preview/`pnpm check`，`/app/` 给生产），谁最后构建谁覆盖谁。
 在 build 与 rsync 之间跑一次对账，就把"发出去的字节是不是这个载体"变成了判据 ——
