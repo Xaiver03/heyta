@@ -9949,7 +9949,9 @@ fixture 与真实形状对不上就会在这里现形，而不是等到落地那
 
 **① 现量（03:4x，主检出）**：`main` = `9192445d`（比 03:2x 那趟预检的 `d9da78ea` 多 **7 笔**）。
 重叠 5 枚里 **3 枚已干净**（`docs/README.md`、`packages/i18n/src/locales/zh-CN.ts`、`packages/i18n/src/locales/en.ts`），
-仍脏的是 **`package.json` 与 `scripts/check-script-snapshot.mjs`**。
+仍脏的是 ~~**`package.json` 与 `scripts/check-script-snapshot.mjs`**~~
+🔴 **这半句 8 分钟后被本条自己的判据否证**：`selfhost-landing-blockers.mjs` 报的阻塞集是 **1 枚（只有 `package.json`）**，
+因为 `scripts/check-script-snapshot.mjs` **不在本批写集里**（脏 ≠ 重叠）。现量见 §8.164 ①，标题那句"收窄到 2 枚"按它读。
 复现：`git status --porcelain -- docs/README.md package.json packages/i18n/src/locales/en.ts packages/i18n/src/locales/zh-CN.ts scripts/check-script-snapshot.mjs`。
 🔴 我第一次量这五枚时把两份词条表写成了 `packages/i18n/src/zh-CN.json` / `en-US.json`（**不存在的路径**），
 于是那条命令"什么都没打印"被我读成"已经有人提交了"。**路径要现取**：`git ls-files packages/i18n | grep locales`
@@ -9979,3 +9981,41 @@ fixture 与真实形状对不上就会在这里现形，而不是等到落地那
 
 **⑤ 状态**：哨兵（pid 3361，02:04:32 起跑）仍在等连静 15 分钟；main 每前进一笔，"main 未变"那一格重新起算 ——
 这是设计，不是故障。等窗口期间本轮**不起任何重活**：负载与端口是它要量的两格，我自己跑一条门禁就会把窗口吃掉。
+
+### 8.164 阻塞集现量 = **1 枚**（不是我登记的 2 枚）；把"窗口为什么一直不开"的那一格读准了，顺手按并集代码走了一遍他们那份 diff 的形状（2026-10-05 03:4x–03:47）
+
+**① 判据自己给的读数**（0.15s，纯读）：`node research/tools/selfhost-landing-blockers.mjs` ⇒
+`main = 6fa73ae0 · feat/self-host-distribution = a02bd3f7 · 夹具 5/5 · 写集 73 枚 · 脏条目 29 枚 · **阻塞集 1 枚：package.json**`。
+🔴 这否证了我 03:4x 写进 §8.163 的那句"仍差 2 枚"：`scripts/check-script-snapshot.mjs` 在主检出确实还是 `M`，
+**但它不在本批的写集里**（`git diff --name-only main...feat/self-host-distribution | grep check-script-snapshot` = 空，
+同一命令里 `package.json` 命中 1 枚）⇒ 它不构成"我的落地要等它"。
+它的脏只是**他们那条线的自洽问题**（G-65 / 任务 #42 讲的是同一件事），我把两件事并成了一句"5 枚已收窄到 2 枚"。
+**可迁移的那条**：阻塞集的判据是"**写集 ∩ 脏集**"，所以目标原文里那份"5 枚重叠文件"的清单是**§8.16 时代的写集快照** ——
+写集会随提交变窄（我这批现在 73 枚），引用旧清单就等于引用别人正在消失的前提（[[feedback-attribution-carries-a-precondition]]）。
+
+**② 窗口为什么一直不开（现量，不是猜）**：哨兵 03:17–03:45 那 12 行心跳里，负载 6.19–11.53 **全部 ≤12**、
+端口全空、载体空闲，唯一不成立的是 `阻塞集=1` 与 **"main 变了"** —— main 在那 28 分钟里前进了 **10 笔**
+（423bed1a→741c31c4→73305a73→b4cf434a→d9da78ea→caaf9775→8b690dcf→dba68caf→9192445d→0431d829→6fa73ae0），
+平均 2–3 分钟一笔，而 `QUIET_MIN=15` 要求连 6 个采样点 main 不动。
+⇒ **绑定条件是"别人停止提交"，不是负载**。这一格要说准：等的是**人**，不是机器底噪
+（[[feedback-wait-on-people-not-on-machine-noise]]）。
+⚠️ 顺带把一条我自己的错读挡住：那 10 笔的 `--name-only` 全是三枚文档（§8.163 ④），
+看起来"改文档不该挡我" —— 但"main 未变"这一格是**承重**的，不是保守的装饰：
+`selfhost-land-main.mjs` 是以 ff-only 前进 main，跑链那几十分钟里 main 只要动一笔，
+第 7 道 gate（未被抢先）就必须拒，否则我把载体按旧 main 算出的并集盖到一条已前进的线上。
+不许为了开窗把这一格改窄（同"不许改判据凑绿"）。
+
+**③ 按并集代码把**他们那份未提交的 diff** 走了一遍**（读代码，不是跑载体 —— 跑要窗口）：
+他们的形状是 (a) `check` 链里插一段 `pnpm check:shell-exit-chain`、(b) 新增两个 scripts 键。
+逐条对上 `selfhost-merge-carrier.mjs:425-464`：
+链并集以 main 侧 `oChain` 为基准、只插 `tChain` 里 main 没有的段 ⇒ 他插的那段本来就在 `oChain`，**位置原样保留**；
+新键走"一侧独有 ⇒ 直接收"（`:426-429`），不会碰到 `:433` 那条"两边都改且互不相同"的 die(2)；
+`dropped.main/dropped.src`（`:462-463`）只在**有人摘段**时才响，他们是纯增。
+round-trip 那步也不受影响：`originalOf`（`:482-489`）从两侧原文建映射，他那段是标准 `pnpm ` 前缀。
+⇒ **结论**：他提交之后，载体重算不会因这份 diff 而 die(2)/die(5)。
+🔴 但这一条是**代码走的**，不是实测的：窗口开成真跑一遍之后，要把这句换成现量读数（`package.json 并集 scripts 键 N 个 · check 链段 main=… 本批=… 并集=…`，那行本来就打进提交说明）。
+
+**④ 我这侧今天没有可做的**（写下来挡"闲着也是闲着去动高危文件"）：G-62（任务 #39）剩的两步落在
+`packages/i18n/src/locales/*.ts` 两份词条表 —— §8.137 那条"不去加宽合并面"的理由**今天更成立**：
+那两条表刚被其所有者提交（03:4x 现量干净），而写的那个人正在连排提交（2–3 分钟一笔），
+此刻去改词条 = 直接把阻塞集从 1 枚撑回 3 枚并撞上他的下一笔。指南 runbook 那一半（`/app/` 那句）§8.137 已证**本来就有**。
