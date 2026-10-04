@@ -272,13 +272,59 @@ if (silentRows.length) {
   }
 }
 
+// 🔴 结构判据：两侧各自把"详情列"这一格写成**唯一一个** aside（现量 main=1 / HEAD=1）。
+//    人工解 §3f 那枚冲突时最容易留下的产物形状是"两支都贴上去"—— 那时 marker 清了、
+//    语法过了、两侧新增的行也都在（上面三道全绿），但产物里有两根详情列轨道，
+//    而 `getByTestId('detail-column')` 变成多命中 ⇒ Playwright 严格模式直接抛，
+//    红会落在**别人那一批**的用例上，看起来像"详情列的测试坏了"而不是"合错了"。
+//    ⚠️ 这条不许做成"一个文件里不许有重复 testid"的通用判据：HEAD 现量就有两处合法的
+//    （`App.tsx` 的 `task-list`、`apps/web/src/dev/shell-host.tsx` 的 `shell-host`），
+//    通用形状会天天红，然后被关掉。
+const SLOTS_ONCE = [['apps/web/src/App.tsx', 'detail-column']];
+const slotRows = [];
+for (const [rel, id] of SLOTS_ONCE) {
+  const re = new RegExp(`data-testid=[\x27"]${id}[\x27"]`, 'g');
+  const countOf = (text) => (text.match(re) || []).length;
+  const nA = countOf(git(['show', `${refA}:${rel}`]));
+  const nB = countOf(git(['show', `${refB}:${rel}`]));
+  const pFile = join(product, rel);
+  const pText = existsSync(pFile) ? readFileSync(pFile, 'utf8') : null;
+  const hasMarker = pText !== null && /^<{7}\s/m.test(pText);
+  const nP = pText === null ? null : countOf(pText);
+  const premise = nA === 1 && nB === 1;
+  slotRows.push({
+    rel,
+    id,
+    nA,
+    nB,
+    nP,
+    bad: premise && !hasMarker && (nP === null || nP !== 1),
+    pending: !hasMarker ? false : true,
+  });
+}
+if (slotRows.length) {
+  console.log('\n槽位唯一性（两侧各写一次的那一格，产物里必须还是恰好一个）：');
+  for (const r of slotRows) {
+    console.log(
+      `${r.bad ? '🔴' : '· '} ${r.rel}#${r.id}  ${refA}=${r.nA} ${refB}=${r.nB} 产物=${String(r.nP)}` +
+        (r.pending
+          ? ' · 未判（这个文件还有冲突 marker，先按 §8.47 第 3 节解完再跑）'
+          : r.bad
+            ? ` —— 产物里有 ${String(r.nP)} 个 ⇒ 解冲突时把两支都留下了`
+            : ''),
+    );
+  }
+}
+const slotBad = slotRows.filter((r) => r.bad);
+
 console.log(
   `\nTREE=${tree}  冲突=${conflicted.length} 枚（处置见工单 §8.47 第 3 节）  ` +
     `纯 fs 门禁=${GATES.length} 道：合并造成的红=${bad.length}  两边都红（环境/载体所致，不含合并信息）=${same.length}  ` +
-    `静默合流=${silentRows.length} 枚，其中丢行/删文件/语法不过=${silentBad.length}`,
+    `静默合流=${silentRows.length} 枚，其中丢行/删文件/语法不过=${silentBad.length}  ` +
+    `槽位重复=${slotBad.length}`,
 );
 console.log(`候选树里带 marker 的门禁脚本=${markersIn(product).join('/') || '无'} —— 有就说明 §8.47 第 3 节还没做完`);
-if (bad.length || silentBad.length) {
+if (bad.length || silentBad.length || slotBad.length) {
   console.log('  ⇒ 逐条按 §8.47 第 3–4 节处置后再跑一次；这里绿了才去动真分支。');
 }
 
@@ -288,4 +334,4 @@ if (!keep) {
 } else {
   console.log(`--keep：临时载体留着 —— 产物=${product}  基线=${baseline}（看完请自行删）`);
 }
-process.exit(bad.length + silentBad.length ? 1 : 0);
+process.exit(bad.length + silentBad.length + slotBad.length ? 1 : 0);

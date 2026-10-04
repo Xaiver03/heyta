@@ -3387,6 +3387,28 @@ md5 apps/web/evidence/detail-column-slot/*.png apps/web/evidence/detail-pane-ove
 - 落地必须重跑**两族**判据 + 看图：`e2e/tests/focus-detail-pane.spec.ts`（本单 W7 那六条，含 F5 真产出一条记录）
   与 `e2e/tests/ai-row-layout.spec.ts`（那三条），外加窄档那张图。
   🔴 不许只跑一族就宣布合好了 —— 这枚 hunk 的缺陷形状正是"两侧各自的判据都绿、合起来那一格少了一个东西"。
+- ⚠️ **15:0x 把这枚 hunk 的两族判据逐条读完之后，上面那句"两族"不够，是 5 个 spec**（逐条归属见 §8.54 第 3 节）：
+  `detail-column-slot` / `detail-pane-overlay` / `focus-detail-pane` / `ai-row-layout` / `detail-pane-collapse`。
+  本单 W4 那五条（`detail-pane-collapse.spec.ts` T1/T2/T3a-c/T4）以前没进这张名单，因为 W4 与 AI 面**在 main 上是同一批**、
+  而在本分支上是两批 —— 它们要在合并产物里第一次同时成立。
+- 🔴 **解这一枚时必须把 main 那个 `ref={detailRef}` 一起搬进合并形状**（`:2539`，它是 `detailHasRoom` 唯一的测量点）。
+  留 HEAD 那支裸 `<aside className="ht-app__detail" data-testid="detail-column">` 而忘了 ref ⇒ `detailRef.current` 恒 `null`
+  ⇒ `?? 0` ⇒ 布尔恒 `false` ⇒ AI 面**永远**挂中间列，那一格只剩专注概览。
+  ✅ 这一种错**是有判据的**：`ai-row-layout.spec.ts:84-100` 宽窗那一腿断言 `ai.x >= detail-column.x` 且整块落在右栏内 ⇒ 会红。
+- 🔴 **还有一格两族判据都照不到**（这是静态可证的合并缺陷，不是"可能"）：
+  `detailHasRoom` 只在 mount 与 `resize` 时重算（main `:645-655`：`useEffect(..., [])` + `window.addEventListener('resize', sync)`），
+  而 HEAD 把"这一栏不出现"的四档**全部**实现成 `display: none`（`base.css:200` 用户收起 + `narrow.css:134/156/198` 三档几何不可行）。
+  `display:none` 的盒 `getBoundingClientRect().width` 恒 0（CSS 定义；本单 T2 的承重判据本身就靠这一点），
+  而**改 `data-detail` 属性不触发 `resize`** ⇒ 合并后在宽窗点页头那个"收起详情面"：列 `display:none` 了，布尔还是 `true`，
+  `aiPanels` 仍挂在那根不可见的列里 ⇒ **AI 助手从界面上消失，且不退回中间列** ——
+  正好破掉 main 自己写在 `:637` 的那条判据「功能一个都不少」。
+  镜像那一半同样成立：载入时 localStorage 是 `collapsed` ⇒ 布尔 `false` ⇒ AI 面进中间列；点"展开"后端不重算
+  ⇒ 右栏出现但**是空的**，"无选中态时右栏默认显示 AI"在收起过的设备上没生效。
+  为什么两族都照不到：`detail-pane-collapse.spec.ts` 五条**从不看** `ai-tool-run`，`ai-row-layout.spec.ts` 三条**从不点** `detail-pane-toggle`
+  —— 交叉的那一格没有主人。
+  ⚠️ **它不是"当场就能修"的一条**：正确行为本身要拍 —— 「收起详情面」到底是"那一栏的东西跟着藏"还是"内容退回中间列"，
+  两种答案对应两种改法（前者什么都不用做，后者要把测量从 `resize` 改成跟着 `data-detail` 走）。
+  已挂进 #19（要人的那一格），**不在这里替谁选**。
 
 #### 3g. `docs/plans/detail-pane-alignment.md`（机械可解，但**不是整侧取 HEAD**）
 
@@ -3877,3 +3899,67 @@ node scripts/resolve-detail-pane-merge-mechanical.mjs --product <§8.52 留下�
 
 状态：脚本入库；三条机械处置在候选树上跑出绿（RC=0）；第 2 节那两枚新冲突**已逐枚读回并给出处置**，
 其中工单文档那一枚机械可解（附精确改法）、App.tsx 那一枚**要人**（附可推导的形状 + 必须重跑的两族判据）。
+
+## 8.54 把 §3f 那句"重跑两族判据"逐条读完，得到三件事：名单是 5 个 spec、"忘搬 ref"有牙、交叉那一格没主人（2026-10-04 15:0x）
+
+§3f 写"落地必须重跑两族"的时候，那一句话是我按 spec 名字推的，不是读完的。这一轮把它读完（六份 e2e + main 那半的实现），
+零代码改动，产出一条常驻判据和两处必须写进拍板材料的结论。
+
+### 1. 判据的机制链（每一环都给了出处，不是"我觉得"）
+
+- main 侧那一栏的**内容开关**是一个测量值：`git show main:apps/web/src/App.tsx` → `:643` 声明、`:645-655` 效应，
+  效应依赖 `[]` 且只挂 `window.addEventListener('resize', sync)`，`sync` 读的是
+  `detailRef.current?.getBoundingClientRect().width ?? 0 > 0`；两个挂载点 `:2096`（窄档退回中间列）与 `:2542`（右栏）共用同一个布尔。
+- HEAD 侧把"这一栏不出现"**四档全部**写成 `display: none`：`apps/web/src/styles/app/base.css:200`（`[data-detail='collapsed']`，W4 用户主动收起）
+  + `apps/web/src/styles/app/narrow.css:134 / :156 / :198`（≤768 塌缩 / 769–1023 / ≥1024 且高 <480，W4 ①几何不可行）。
+- 两环接起来：`display:none` ⇒ 宽度 0（CSS 定义，本单 T2 的承重判据"`.ht-main` 右边缘 == 视口右边缘"靠的就是轨道归零 + 这一列不渲染），
+  而**改 `data-detail` 属性不会派发 `resize`** ⇒ 布尔不重算。
+- ⇒ 合并产物上，宽窗点"收起详情面"：列不可见、布尔仍 `true`、`aiPanels` 仍挂在那根不可见的列里 ⇒ **AI 助手消失且不退回**，
+  破掉 main 自己在 `:637` 写的判据「功能一个都不少」。反向那一半同样成立（载入即收起 ⇒ 展开后右栏是空的）。
+  ⚠️ 这一条是**静态可证**的（链条上每一环都在盘上的源码/定义里），不是实测读数 —— 没有浏览器跑过合并产物，
+  因为产物还不存在（§3f 要人）。所以它写在这里的形式是"合完必然成立的机制后果 + 两族判据都照不到"，不是"红了几条"。
+
+### 2. 常驻判据：槽位唯一性（已入库，双臂各跑过一次）
+
+人工解 §3f 时最容易留下的产物形状是**两支都贴上去** —— 那种产物 marker 清了、语法过了、两侧新增的行也都在
+（§8.52/§8.53 那三道全绿），但界面里有两根详情列，`getByTestId('detail-column')` 变多命中，
+红会落在**别人那一批**用例上（Playwright 严格模式），看起来像"详情列的测试坏了"而不是"合错了"。
+
+加进 `scripts/verify-detail-pane-merge-preflight.mjs`：对 `apps/web/src/App.tsx#detail-column`
+先验前提（两侧各自 `=1`，现量 `main=1 / HEAD=1`，merge-base `f419df75` 也 `=1`），再判产物**恰好 1 个**；
+产物里那枚文件还带 marker 时打「未判」，不冒充绿也不假红。
+
+| 臂 | 载体 | 读数 | RC |
+|---|---|---|---|
+| 未变异（对照） | `git archive main` 铺到 `/tmp/dp-slot-arm`，`--a main --b main --product …` | `main=1 main=1 产物=1`，其余 17 道全 0 | 0 |
+| 变异 | 同一载体里把那段 `<aside data-testid="detail-column">` 复制一份 | `产物=2 —— 解冲突时把两支都留下了`，红集**只有这一条** | 1 |
+| 现量合并载体 | `TREE=d79cb67e`（`main × HEAD`） | `main=1 HEAD=1 产物=2 · 未判（还有 marker）`；同趟 冲突=17 / 合并造成的红=1 / 两边都红=0 / 静默合流=**11** 枚全绿 | 1 |
+
+⚠️ 这条**不许泛化成**"一个文件里不许有重复 testid"：HEAD 现量已有两处合法的（`App.tsx` 的 `task-list`、
+`apps/web/src/dev/shell-host.tsx` 的 `shell-host`，217 个 `.ts/.tsx` 里就这 2 个文件有重复）。
+通用形状会天天红，然后被人关掉 —— 那比没有判据更糟。
+
+### 3. 名单从"两族"改成 5 个 spec，逐条写谁守哪一侧
+
+| spec | 守的是哪一侧的行为 | 合并里丢了这个会怎样 |
+|---|---|---|
+| `focus-detail-pane.spec.ts`（F1–F6） | HEAD（本单 W7 专注概览） | 取 main 侧 ⇒ 只有它红 |
+| `ai-row-layout.spec.ts`（3 条 + `assertColumn` 两腿 `:84-100`） | main（拍板"无选中态右栏装 AI 面"） | 取 HEAD 侧、或解冲突时丢了 `ref={detailRef}` ⇒ 宽窗那一腿红 |
+| `detail-column-slot.spec.ts` | HEAD（W2 槽位 + 右边缘承重） | 两根 aside ⇒ 多命中，严格模式抛 |
+| `detail-pane-overlay.spec.ts` | HEAD（W3 浮层覆盖范围） | 轨道变了会红 |
+| `detail-pane-collapse.spec.ts`（T1/T2/T3a-c/T4） | HEAD（W4 看高也看宽 + 可收起 + 三条恢复路径） | T1 的 480/479 边界与 T4 的三档不可行**只在这五份里量得到** |
+
+✅ 读过的四份里，本单那三份**不会**被 AI 面本身弄坏（逐条核过断言对象）：
+`detail-column-slot.spec.ts:172/:176` 与 `focus-detail-pane.spec.ts` 的 F6（`:180`）断的分别是收起态 `toBeHidden()`
+和**按 testid Scoped** 的 `toHaveCount(0)`，不是"那一栏是空的" ⇒ 右栏里多出 AI 面不会把它们变成假绿或假红。
+
+🔴 但**没有一条**判据横跨两侧：`detail-pane-collapse` 五条从不看 `ai-tool-run`，`ai-row-layout` 三条从不点 `detail-pane-toggle`
+—— 第 1 节那一格正因为没有主人才活到现在。合并后需要一条交叉用例（宽窗 → 点收起 ⇒ `ai-tool-run` 仍可见且落在中间列、
+`.ht-main` 右边缘仍等于视口右边缘 → 再点展开 ⇒ 回到右栏）。
+⚠️ **这一条现在不能写**：它的期望值取决于「收起」的语义要拍哪一种（§3f 末尾已把它挂进 #19），
+先写断言就是替产品拍板。写在这里的形状是"缺口 + 两种答案"，不是待办清单上的一项。
+
+边界（别读多）：本轮**没有**跑任何 e2e、没有动任何分支、没有解 §3f；
+新增的只有 pre-flight 里那一段判据 + 本节与 §3f 的四处更正。§8.52/§8.53 的读数没被本节推翻，
+只有"静默合流 10 枚"这一格在本节变成 **11 枚**（`base.css` 在此期间进了这个集合 —— 又是瞬时读数，合流当时要重取）。
+
