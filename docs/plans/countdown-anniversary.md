@@ -1019,6 +1019,19 @@ W0b ─> 随时可做（台账那半要等文件干净）
 
 #### ✅ W6 · `EVENT` 已成为日历的第二个事件源（`e2def90f` @ 本分支，04 02:5x；关闭判据现量归零后才落地）
 
+> 🔴 **Goal 第④条的复核（04 14:3x 现量，两个检出各取一遍）**：当年那条「等六个日历路径的未提交 diff
+> 归零后再落地」的关闭判据，逐条重取 ——
+> ① **判据①（落地没有被 revert）载体必须写清**：在隔离检出（`feat/countdown-batch2` @ `9e98b69a`）
+> `git merge-base --is-ancestor e2def90f HEAD` ⇒ **真**；在主检出（`main` @ `73b6df97`）⇒ **假**。
+> 后者**不是缺陷**，是任务书第 2 条「不 merge 进 main」的直接后果 —— 我第一版把这条写成"主检出的读数"，
+> 现量才发现两处的答案相反，所以这格的载体只能是本批分支。
+> ② **判据②（当年挡路的那六个路径）现在两处都归零**：
+> `git status --porcelain -- packages/ui/src/calendar apps/web/src/features/calendar apps/mobile/src/screens/CalendarScreen.tsx`
+> 在隔离检出与主检出**各 0 行**（含未跟踪）。原句记的是「14 脏 + 4 个未跟踪」，那是 04 02:5x 的瞬时读数 ——
+> 它当时的作用是"别在此刻造三方冲突"，不是"永远不许落地"；现在这条独立复量到 0，说明**落地时机已成立**。
+> ③ 判据本体的读数由链 Y 那趟完整 `pnpm check`（含 `pnpm -r test`）代取 —— 在它取到之前，
+> 这一格只主张「已落地 + 祖先关系在本批分支成立 + 六个路径归零」，**不主张**「当前 HEAD 上测试绿」。
+
 - **事实**：唯一的按日聚合是 `packages/ui/src/calendar/model.ts#groupTasksByDueDate`，它
   `if (task.dueDate === undefined) continue;` —— 🔴 **没有截止时间的任务不上日历**，且注释自己承认这一点
   （所以宿主必须显示 `labels.footnote`）。消费者两处：`apps/web/src/features/calendar/CalendarView.tsx`
@@ -2987,3 +3000,24 @@ W0b ─> 随时可做（台账那半要等文件干净）
   - ✅ **android / windows 两格不受这条影响**：android 是 13:20 在**当前提交**重取的（`RC_ANDROID=0`），
     windows 是 13:20 现场复核「包内 sha == 本地 sha == `517C6BA76D00FB25`」；
     另外同一条"since 10:33 之后有没有进过包的源码提交"现量是 **0 个文件** ⇒ 今天 13:5x 之后的几笔（docs / scripts）不改产物字节。
+
+- ㊻ **Goal 第④条（复核 W6 的关闭判据）：两条读数在两个检出里答案是反的 —— 所以我第一版把载体写错了**（04 14:3x，隔离检出 `9e98b69a` / 主检出 `main` `73b6df97`）
+  - 当年那条判据是"等六个日历路径的未提交 diff 归零后再落地"。今天逐条重取：
+    ① `git merge-base --is-ancestor e2def90f HEAD` ⇒ 隔离检出 **真**、主检出 **假**；
+    ② `git status --porcelain -- packages/ui/src/calendar apps/web/src/features/calendar apps/mobile/src/screens/CalendarScreen.tsx` ⇒ **两个检出各 0 行**（含未跟踪）。
+  - 🔴 **① 的"假"不是缺陷**，是任务书第 2 条「不 merge 进 main」的直接后果。我第一版把这条写成"主检出的读数"，
+    是因为我只在**一个**地方取了就以为它无所谓在哪儿取 —— 现量第二遍才发现两处的答案相反。
+    ⇒ **"祖先关系成立"这类句子必须带在哪个分支上成立**，否则它要么是真话但被读成别的意思，要么是假话但看起来像证据。
+    已把正文（W6 节标题下那条引用块）改成两个检出分别写清。
+  - ② 的"0 行"是**独立复量**，不是复述 04 02:5x 那次（那次记的是「14 脏 + 4 个未跟踪」）。它的意义是：
+    当初那条判据的作用是"别在此刻造三方冲突"而不是"永远不许落地"，现在它自己归零 ⇒ **落地时机成立**，
+    这一格才敢写 ✅。判据本体（`e2def90f` 带的那四份：`packages/domain/tests/event-occurrences-in-range.spec.ts`、
+    `packages/ui/tests/calendar-event-source.spec.ts`、`apps/web/tests/calendar-event-source.spec.tsx`、
+    `apps/mobile/tests/calendar-event-source.spec.ts`，另加 `e2e/tests/countdown-calendar.spec.ts`）的读数由链 Y
+    那趟完整 `pnpm check`（含 `pnpm -r test`）代取，在它取到之前不主张"当前 HEAD 上测试绿"。
+  - 📌 **顺带把链 Y 的读数能否代表当前 HEAD 这件事先证了**（不花 CPU，只读提交元数据）：
+    `git log --name-only 15e777e7..HEAD` 的落点集合 = `docs/plans/countdown-anniversary.md`、
+    `docs/plans/countdown-batch2-handoff.md`、`apps/mobile/evidence/card-export/README.md` ⇒ **全是文档/证据说明，零代码、零生成物**。
+    链 Y 的起点标的是 `15e777e7`（那条 tokenizer 修复），而它跑的时候读的是**工作树**，
+    所以它的 `RC_CHECK` 对当前 HEAD 仍然成立 —— 唯一的例外是 `check:docs` 与 `check:md-table-rows` 这两段会把我随后写的文档一起判，
+    这两段我已单独跑到 rc=0（本条这次提交前又各跑一遍）。
