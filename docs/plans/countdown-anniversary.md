@@ -149,7 +149,7 @@
 
 ### W7 · 纪念卡片导出（成品图）
 
-判据：**导出全程零网络请求**（Playwright 里数 request，按方法+路径比，别只看数量）。移动端渲染通道未取证 ⇒ 本单开工前先验 `react-native-svg` 能否出图，不能就把移动端登记为已知缺口而不是静默降级。
+判据：**导出全程零网络请求**（Playwright 里数 request，按方法+路径比，别只看数量）。~~移动端渲染通道未取证 ⇒ 本单开工前先验~~ ✅ **已验，并在当前提交上取到读数**（04 13:20 链 U：`RC_ANDROID=0`、通过 11 项，成品图 `BYTES=34360 SHA=2ac31233b2ed` 人已看；iOS 那一半在链 X→Z 队列里） `react-native-svg` 能否出图，不能就把移动端登记为已知缺口而不是静默降级。
 
 ### W8 · 三端接线与门禁
 
@@ -920,7 +920,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   - `AccountMenu.tsx` 定位本体 **+11 / −16**（净减 5 行；15 行算术换成 8 行调用）。
 - [x] W0 完成
 
-#### ⏹ W0b · 批次一遗留的三条登记缺口
+#### 🟡 W0b · 批次一遗留的三条登记缺口（①② 已做：16 文件路径/库名旋钮，harness 22 绿 0 红；③ 转投单写者文档、待入 traps）
 
 1. `/tmp/ui.xml` 固定名 ⇒ 并行两轮互相覆盖。闭合代价**每次现量**：
    `grep -rc '/tmp/ui.xml' scripts/lib/mobile-e2e.sh scripts/verify-mobile-*.sh | awk -F: '{s+=$2} END{print s}'`（2026-10-03 曾为 36）。
@@ -953,7 +953,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   默认值没变所以不受影响，但要享受隔离得等它们自己走变量。
   **判据②那一趟真机 run 归入收尾**（用户指令：真机放到最后）。
 
-#### ⏹ W2 · `EVENT` 实体（D1/D2 已拍）
+#### ✅ W2 · `EVENT` 实体已落地（D1/D2 已拍；20/7/17/41/30 passed，存储三套适配与线协议零改动、未 bump schema）
 
 - **省掉一整片工作的事实**：线协议**不枚举实体**（`shared-schema/src/supersync-http-contract.ts:145`
   是 `entityType: z.string().max(255)`）、服务端白名单**自动跟随**（`server/src/sync/services/validation.service.ts:25`
@@ -1011,7 +1011,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   `app-host/tests/event-actions.spec.ts` **17 passed**、`sync-client/tests/sync.spec.ts` **41 passed**、
   `ai/tests/capability-manifest.spec.ts` **30 passed**。
 
-#### ⏹ W6 · `EVENT` 成为日历的第二个事件源
+#### ✅ W6 · `EVENT` 已成为日历的第二个事件源（`e2def90f` @ 本分支，04 02:5x；关闭判据现量归零后才落地）
 
 - **事实**：唯一的按日聚合是 `packages/ui/src/calendar/model.ts#groupTasksByDueDate`，它
   `if (task.dueDate === undefined) continue;` —— 🔴 **没有截止时间的任务不上日历**，且注释自己承认这一点
@@ -1224,7 +1224,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   改挂 **W6 / W8**（日历第二源 + 三端接线）—— 而那两个落点正是并行会话在整片重写的
   `packages/ui/src/calendar/*`，所以它现在**做不了**，不是不想做。
 
-#### ⏹ W7 · 纪念卡片导出为成品图
+#### 🟡 W7 · 纪念卡片导出为成品图（**web 半 + Android 设备出图到最终态；iOS 设备读数在排队**）
 
 - **事实**：`react-native-svg@15.15.5` **已在依赖树**（`apps/mobile/package.json:38`、`packages/ui/package.json:28,37`、
   `apps/mobile/ios/Podfile.lock:2628,3026` 已 pod 已链接、`packages/ui/src/icon/Icon.tsx:47,85` 真在用）
@@ -1373,7 +1373,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
     —— 原文那句"那份住在 `feat/countdown-w7` 上、尚未进 main，所以这里只点名不给链接（给了就是死链）"
     已过期：它**现在是 `origin/main` 的祖先**（`git show origin/main:docs/plans/countdown-w7-device-export.md` 可复跑）。
 
-#### ⏹ W8 · 三端接线与门禁
+#### 🟡 W8 · 三端接线与门禁（**壳级门禁 5 绿 0 红；未取证从 2 栏降到 1 栏**）
 
 - **事实**：web 开关表 `apps/web/src/features/shell/modules.ts:51-58,76-120,141-162`（7 个 key，无 countdown）；
   移动端**没有开关表**，`apps/mobile/src/nav/TabBar.tsx:51-59` 硬编码 5 tab（`:45-49` 记着第 6 个 quadrant tab 已撤销）；
@@ -1443,7 +1443,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
       外加别人那条装包链挂在 `notarytool submit --wait` 上 3h21m 且**它自己不会结束**。
       取证与不并发的理由在 **§8.4 第 ⑬ 条**；等满按任务书第 8 条记 **exit 3 = 环境无效，不是产品失败**。
 
-#### ⏹ W9 · 提醒：本批做"能响的那半截"，原生投递另立一单
+#### 🟡 W9 · 提醒的 web 半已落地（42/28/40 passed，变异 9 臂 9/9 红）；原生投递那一单**不归本批**，由另一条会话持有（ADR-0051）
 
 - **事实（比 §3 写的乐观）**：web 投递已在（8.0 第 1 条）。缺三件：
   ①档位上限是"提前 1 天"（`packages/domain/src/reminders.ts:54-61` = `[0,5m,15m,30m,1h,1d]`），而任意 `offsetMs`
@@ -1533,7 +1533,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   这条线的结论要变，得先有一条新的过门禁候选，不是靠重写措辞。
   🔴 AGENTS §9 里它标成"**未闭合、有依赖裁决**"，不许出现在"本批已完成"的清单里。
 
-#### ⏹ W10 · `EVENT` 进 AI 工具目录与 local-api 契约
+#### ✅ W10 · `EVENT` 已进 AI 工具目录与 local-api 契约（目录 4 条：读 2 写 2，写路径只到提案；MCP 与内置 AI 共用同一份目录）
 
 - **事实**：目录唯一真源 `packages/local-api/src/tools.ts:94 LOCAL_API_TOOLS`（6 条：读 `list_tasks:96/get_task:105/list_projects:114`，
   写 `create_task:121/update_task:131/complete_task:138`，每条带 `egressFields` + `defaultEnabled:false:82`）；
@@ -1597,7 +1597,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   伪装成"你一个倒数日都没有"）；隐私钩子不另立第二个（`isReadable` 参数放宽成 `Task | CountdownEvent`）；
   `kind` 词表用 `Record<CountdownEventKind, true>` 而不是数组抄件（领域层加一档这里就编译不过）。
 
-#### ⏹ W4b · 调休/补班：运营录入 + 客户端拉取（第一条服务端→客户端内容通道）
+#### ✅ W4b · 调休/补班的运营录入与客户端拉取都已落地（判据①真界面三档 3 passed 三图人已看、判据②后台 papers 回显有用例 + 两图；25 臂变异逐臂报红）
 
 - **可照的现成形状**：源 `scripts/vendor/holiday-cn/{2007..2026}.json` + `LICENSE` + 唯一读取入口 `load.mjs`
   （校验点：`days[]` 非空 `:44`、`papers` 非空缺出处即 throw、`DATE_RE :30`、**`isOffDay` 必须 boolean `:63`**、
