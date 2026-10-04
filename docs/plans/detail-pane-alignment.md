@@ -6083,14 +6083,27 @@ git log --oneline -1 -- apps/web/tests/reminders-panel.spec.tsx                #
 - §8.76 那份清单**追加顺序**曾把新条目插在旧条目之前（第 6 条之后先是 `8.` 再是 `7.`），
   即本节第 1 节那 6 处错位的成因 ⇒ 现在 1..14 连续，且由腿 10 守着。
 
-### 6. 提交后的裸树复跑（这一格只在提交之后有效）
+### 6. 提交后的"干净检出复跑"（§1 闸门第 3 道）—— **两种载体不等价**，读数分开记
 
 ```bash
+# 载体 A：裸解包树（git archive）
 T=$(mktemp -d); git archive HEAD | tar -x -C "$T"
-cd "$T" && node scripts/check-detail-pane-status-table.mjs; echo "CLEANTREE_RC=$?"
-node research/tools/mutation-rigs/mutate-detail-pane-status-table.mjs; echo "RIG_RC=$?"
+cd "$T" && node scripts/check-detail-pane-status-table.mjs; echo "CLEAN_GATE_RC=$?"
+node scripts/check-detail-pane-c1-coverage.mjs;           echo "CLEAN_C1_RC=$?"
+node research/tools/mutation-rigs/mutate-detail-pane-status-table.mjs; echo "CLEAN_RIG_RC=$?"
+
+# 载体 B：真 git 检出（一次性 detached worktree，用完删）
+git worktree add --detach /tmp/dp_detached HEAD
+cd /tmp/dp_detached && node research/tools/mutation-rigs/mutate-detail-pane-status-table.mjs
 ```
 
-⚠️ 本节写到这里时**还没提交**，所以这一格的读数只能是"提交前那趟"：提交前裸树 = 上一笔的 HEAD，
-门禁会红在腿 10（那 6 处还在 HEAD 里）—— 那是**预期读数**，不是新红。提交后重跑必须 `CLEANTREE_RC=0`，
-那条读数落在本节末尾的"提交后补记"里（不留空口承诺）。
+| 载体 | 门禁 | 装置 | 为什么 |
+|---|---|---|---|
+| A 裸解包树 | `CLEAN_GATE_RC=0`（十项都成立）、`CLEAN_C1_RC=0` | **`CLEAN_RIG_RC=1`，`status=128`，`fatal: not a git repository`** | 装置第一行要 `repoRoot`（`git rev-parse --show-toplevel`），而 P4 / L4 两条**对照臂按设计必须沿该文件的提交历史认旧版** —— 裸树里根本没有历史 |
+| B detached 检出 | `DET_GATE_RC=0` | `DET_RIG_RC=0`，结论行 `37/37 臂符合预期` | 有 `.git` ⇒ 对照臂取得到旧 blob |
+
+🔴 所以这一族"干净检出复跑"要**分载体写**：门禁类（纯 fs）两种载体都行，装置类只能用真检出。
+本次裸树那个 `RC=1` **不是装置红，是装置没跑起来** —— 与 §8.76 第 10 条同形，而这一趟它和第 4 条
+（"带 `git ls-files` 那半的门禁在裸树里 fatal 空转"）在同一次复跑里各命中一遍。
+⚠️ 诚实记一笔：本节第一版把"门禁与装置都在裸树里跑"当成了承诺写出去，那是**没量过的判据**；
+现量之后改成上面这张表，并把用完的 detached 检出 `git worktree remove` 掉。
