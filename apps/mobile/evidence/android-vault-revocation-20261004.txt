@@ -1,0 +1,19 @@
+Android Release Vault 设备撤销与恢复证据（脱敏）
+============================================
+
+日期：2026-10-04
+载体：当前源码构建的 Android Release 包，emulator-5554
+服务端：真实 HTTP + PostgreSQL，TEST_MODE 生命周期内
+
+1. 已认证的 Android 设置页列出当前账号的设备。
+2. 在设置页撤销当前设备后，服务端记录了被撤销的 client binding，递增该账号的
+   token version；Android UI 显示“设备已撤销，所有设备都必须重新登录”。
+3. 撤销后的 Android 会话重新认证；恢复码解锁成功，随后设置新的 E2EE 口令，
+   生成并确认发布新的恢复码，UI 回到“这台设备上的加密数据已经解锁”。
+4. 服务端 key package 的脱敏状态：旋转前 `keyVersion=1`，旋转后
+   `keyVersion=2`，且 `payloadKeyVersion=2`。root fingerprint 只在进程内用于
+   对账，没有写入本文件。
+
+边界：本文件证明 Android Release 的撤销、重新认证、恢复码解锁与 wrapper/载荷世代
+轮换顺序；不证明离线设备被远程擦除，也不替代 iOS 真包的本地 token/Vault session/
+Keychain 清理与可信设备轮换验收。所有 token、root key、恢复码和口令均未写入证据。
