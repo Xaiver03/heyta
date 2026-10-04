@@ -860,6 +860,33 @@ export const en = {
   'web.passkeys.error.lastPasskey': 'This is the account’s only passkey, and removing it would leave no way to sign in at all, so it cannot be removed. Add a new passkey first - or set a sign-in password on the settings page - then delete this one.',
   'web.passkeys.error.unauthorized': 'Your sign-in has expired — sign in again.',
   'web.passkeys.error.network': 'Could not reach the server. Try again later.',
+  // Account closure (batch E3). Mirror of the zh block above.
+  // 🔴 Every failure sentence states BOTH "the account is still there" and
+  // "nothing on this device was touched": the downstream action is irreversible,
+  // so a user who assumes a 5xx already closed the account will take the next
+  // step (sell the device) while it is still unsafe.
+  'common.accountClosure.title': 'Delete account',
+  'common.accountClosure.lead': 'Deleting this account permanently erases all of its data on the server (sync history and device records). It cannot be undone.',
+  'common.accountClosure.exportHint': 'If you want to keep that data, export a backup first. After deletion the server can no longer read it back.',
+  'common.accountClosure.confirmLocal': 'I understand that data on this device which has not been synced yet, including its local plaintext store, will also be erased.',
+  'common.accountClosure.action': 'Delete this account',
+  'common.accountClosure.busy': 'Deleting…',
+  'common.accountClosure.pending': 'This device still has {count} change(s) that have not been synced. Deleting the account erases them too - the server never had them, and they cannot be recovered afterwards.',
+  'common.accountClosure.cancel': 'Not now',
+  'common.accountClosure.confirmTitle': 'Delete this account?',
+  'common.accountClosure.entryHint': 'Delete the cloud account and erase the data on this device',
+  'common.accountClosure.needLogin': 'This device is not signed in, so there is no account to delete.',
+  'common.accountClosure.done.erased': 'The account has been deleted and the copy on this device has been erased. Backups and your other devices are outside the scope of this action.',
+  'common.accountClosure.done.partial': 'The account has been deleted, but only part of the local data on this device was erased - you will need to handle the rest manually.',
+  'common.accountClosure.done.eraseFailed': 'The account has been deleted, but the local data on this device could not be erased - you will need to handle it manually.',
+  'common.accountClosure.failed.unconfigured': 'No server address is configured, so not a single request was sent - the account is intact and nothing on this device changed.',
+  'common.accountClosure.failed.consentRequired': 'You have not agreed to this device\'s privacy rules yet, so not a single request was sent - the account is intact and nothing on this device changed.',
+  'common.accountClosure.failed.unauthorized': 'Your sign-in session is no longer valid, so nothing was deleted - the account is intact and nothing on this device changed. Sign in again and retry.',
+  'common.accountClosure.failed.rateLimited': 'Too many deletion requests, so this one was refused for now. The account is intact and nothing on this device changed - try again later.',
+  'common.accountClosure.failed.serverError': 'The server did not finish the deletion. The account is intact and nothing on this device changed - try again later.',
+  'common.accountClosure.failed.network': 'The server could not be reached, so nothing was deleted. The account is intact and nothing on this device changed.',
+  'common.accountClosure.failed.malformedResponse': 'The server reply was not something we can recognise, so this is not treated as a deletion. The account may still exist - check, then retry. Nothing on this device changed.',
+  'common.accountClosure.failed.other': 'The deletion did not complete. The account is intact and nothing on this device changed.',
 
   // ── Settings "sign-in password" panel: where the two secrets are separated ──
   //

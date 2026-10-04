@@ -79,6 +79,7 @@ import { Button, Card, Divider, HStack, Screen, SectionHeader, Text, TextField }
 import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
 import { AvatarBadge } from '../ui/avatar';
 import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
+import { AccountClosureScreen } from './AccountClosureScreen';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
@@ -256,6 +257,7 @@ export function ProfileScreen(): React.JSX.Element {
   const [openFeature, setOpenFeature] = useState<MobileFeatureEntryKey | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [closureOpen, setClosureOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
 
@@ -670,6 +672,17 @@ export function ProfileScreen(): React.JSX.Element {
         setExportOpen(true);
       },
     },
+    {
+      kind: 'action',
+      // 🔴 就排在「导出数据」的**下面一格**，不是随手追加在末尾：注销那道屏要求的
+      // 第一步恰恰是"先导出留一份"。两格相邻，那句话才有一个抬眼就够得着的出口。
+      testID: 'profile-entry-close-account',
+      label: t('common.accountClosure.title'),
+      hint: t('common.accountClosure.entryHint'),
+      onPress: () => {
+        setClosureOpen(true);
+      },
+    },
   ];
 
   /**
@@ -722,6 +735,17 @@ export function ProfileScreen(): React.JSX.Element {
         onBack={() => {
           setExportOpen(false);
         }}
+      />
+    );
+  }
+
+  if (closureOpen) {
+    return (
+      <AccountClosureScreen
+        onBack={() => {
+          setClosureOpen(false);
+        }}
+        onClosed={onClearCredentials}
       />
     );
   }

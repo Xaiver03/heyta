@@ -279,6 +279,59 @@ const zh = [
     ],
   },
   {
+    id: 's10',
+    title: '欧盟 GDPR 口径：这一份讲的"出境"在 GDPR 里算哪一档',
+    blocks: [
+      {
+        kind: 'p',
+        text: '本文件的"数据出境"原本是按中国法写的：《个人信息保护法》第三十八条那一类规则问的是**个人信息离开中国境内**。GDPR 第五章问的是**另一件事** —— 个人数据离开欧洲经济区。两个词在中文里长得一样，判据、依据形式和举证责任都不同，所以这里**不把任一侧的结论抄到另一侧**：中国法侧的定性仍然是上面第 8 节那个"待确认"，而下面这一栏只回答 GDPR 侧此刻能拿出什么、拿不出什么。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 44–49 条（向第三国转移）',
+            '个人数据离开欧洲经济区时，有没有一条被承认的传输依据',
+            '今天**一次都不会发生**：托管云端 AI 被 `assertEnableable()` 挡着，逐项出境授权默认关闭，所以没有数据在我们这一侧被送往境外',
+            '我们**没有**标准合同条款、**没有**充分性决定可依赖、**也没有**约束性公司规则。如果用户在自建实例里填入境外端点，那次传输的依据由**用户自己**承担，本文件不代任何人写"已有依据"',
+          ],
+          [
+            '第 9 条（特殊类别数据）',
+            '有没有在处理健康、宗教信仰、性取向一类的敏感数据',
+            '我们不识别内容类别，也不做任何"检测到敏感词就拦下"的过滤',
+            '送出去的上下文来自用户自己写的任务与便签，里面可能就有第 9 条所指的内容；我们没有能力声称"发送前会被识别并拦下"，所以也不写这句',
+          ],
+          [
+            '第 22 条（仅自动化决策）',
+            '有没有对用户产生法律或显著影响的决定是只由机器作出的',
+            '这一条对得上：AI 在类型上就产生不了写入，读操作直接执行、写操作只到提案，确认之后才成为一次 op',
+            '但它成立的前提就是那道人工确认。任何"把建议直接落成写入"的改动都会让这一格立刻变成对不上，所以它不是一项一次性的资质，而是一条需要一直有人守着的判据',
+          ],
+          [
+            '第 25、32 条（默认数据保护与安全性）',
+            '默认设置是否隐私友好，措施是否与风险相称',
+            '默认关闭、本机接口只监听回环、逐工具授权、端到端加密使服务端读不到明文、回退不得跨越隐私边界',
+            '这些主张只有本仓库的代码与测试作为证据，**没有**第三方认证或审计报告；因此本节不写"已通过 GDPR 认证"这一类话',
+          ],
+        ],
+      },
+      {
+        kind: 'ul',
+        items: [
+          '同意在 heyta 里是**逐功能**的（第 6(1)(a) 与第 7 条要的"特定、明确、可撤回"），不是一个总开关；关掉某一项，那一项就一个字节都不出站。',
+          '自建部署时控制者（controller）是运行这个实例的人，GDPR 的对外义务随之在他那一侧；我们提供的是软件。',
+          '逐条的权利行使怎么落地，写在《个人权利行使与请求响应》的 GDPR 对照表里，本文件**不重复那张表** —— 两处各抄一份一定会漂，而漂掉的那一份通常是话说得更满的那一份。',
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '《个人权利行使与请求响应》：GDPR 逐条对照表在那里（含第 13/14、15、16、17、18、20、21/22、32/33 条各自"对不上的部分"）。本文件只讲 AI 与出境这一段，权利行使的具体做法以那份为准。',
+      },
+    ],
+  },
+  {
     id: 's9',
     title: '这份文件什么时候会变',
     blocks: [
@@ -308,6 +361,11 @@ const zh = [
             '1.2',
             '2026-10-04',
             '第六节那张表补齐**剩下的 16 条工具**（习惯 / 打卡 / 专注 / 标签 / 便签 / 清单 / 提醒）：目录已随 AI 覆盖面扩到 9 个实体 26 条，而条款只披露了 10 条。那句"未列出的工具视为未授权"把这张表变成了授权面，所以少一行就是对用户少说一项"打开之后别人读得到什么"。逐格取值按构建产物里的 `egressFields` 写，不写字段名以外的推测；`list_notes` 明确写明便签没有标题、列表出境的只有"什么时候动过"。',
+          ],
+          [
+            '1.3',
+            '2026-10-04',
+            '新增第十节：GDPR 第五章（第 44–49 条）问的是"个人数据离开欧洲经济区"，与本文件的"数据出境离开中国境内"**不是同一个问题**，所以两侧结论不互抄。逐格写明拿得出与拿不出的：没有标准合同条款、没有可依赖的充分性决定、没有约束性公司规则；第 9 条不做内容识别也不过滤；第 22 条只在"确认"这道人工关口存在时成立；第 25/32 条只有本仓库的代码与测试作证据，没有第三方认证。权利行使那张逐条表不在这里复制，只用 docRef 指向《个人权利行使与请求响应》。',
           ],
         ],
       },
@@ -563,6 +621,59 @@ const en = [
     ],
   },
   {
+    id: 's10',
+    title: 'The EU GDPR view: which box the "egress" in this document falls into',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'The "cross-border transfer" wording above was written against Chinese law: the rules around Article 38 of the PIPL ask whether personal information has left **mainland China**. Chapter V of the GDPR asks about **a different thing** - personal data leaving the European Economic Area. The two phrases look identical in translation while the test, the accepted forms of legal basis and the burden of proof all differ, so this document **does not copy a conclusion from one side onto the other**: the characterisation on the Chinese side is still the "pending legal review" in section 8, and the column below answers only what can be produced under the GDPR right now, and what cannot.',
+      },
+      {
+        kind: 'table',
+        head: ['Where in the GDPR', 'What it asks', 'What heyta can produce', 'What does not line up'],
+        rows: [
+          [
+            'Articles 44-49 (transfers to a third country)',
+            'Whether there is a recognised transfer basis once personal data leaves the EEA',
+            'Today it **never happens**: hosted cloud AI is blocked by `assertEnableable()` and per-feature egress consent defaults to off, so no data is sent abroad on our side',
+            'We have **not** filed standard contractual clauses, there is **no** adequacy decision we rely on, and there are **no** binding corporate rules. If a self-hosted instance is pointed at an endpoint abroad, the basis for that transfer is the **operator**\'s to carry; this document will not write "a basis exists" on anyone\'s behalf',
+          ],
+          [
+            'Article 9 (special categories)',
+            'Whether data such as health, religious beliefs or sexual orientation is being processed',
+            'We neither classify content nor run any "detect a sensitive term and block the send" filter',
+            'The context sent comes from the user\'s own tasks and notes, which may well contain Article 9 data; we cannot claim it "will be recognised and stopped before sending", so we do not write that',
+          ],
+          [
+            'Article 22 (solely automated decisions)',
+            'Whether a decision with legal or similarly significant effect on the user is made by machine alone',
+            'This one lines up: the AI cannot produce a write at the type level - reads execute, writes stop at a proposal, and only confirmation becomes an op',
+            'But that holds **only** while the human confirmation exists. Any change that turns a suggestion directly into a write makes this row stop lining up, so it is not a qualification earned once - it is a judgement that has to keep being defended',
+          ],
+          [
+            'Articles 25 and 32 (data protection by default, security)',
+            'Whether default settings are privacy-friendly and measures are appropriate to the risk',
+            'Off by default, the local interface binds to loopback only, per-tool authorisation, end-to-end encryption that leaves the server unable to read plaintext, and no fallback may cross a privacy boundary',
+            'These claims rest on this repository\'s code and tests alone; there is **no** third-party certification or audit report, so this section does not claim "GDPR certified" or anything like it',
+          ],
+        ],
+      },
+      {
+        kind: 'ul',
+        items: [
+          'Consent in heyta is **per feature** (the "specific, informed, withdrawable" that Articles 6(1)(a) and 7 ask for), not one master switch; switch a feature off and that feature sends not a single byte.',
+          'For a self-hosted deployment the controller is the person running the instance, and the GDPR obligations travel with them; what we supply is the software.',
+          'How each right is exercised is in the GDPR comparison table of the Data rights document, and this document **does not duplicate that table** - two copies of one list always drift, and the copy that drifts is usually the one that says more.',
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: 'Data rights document: the article-by-article GDPR table lives there (including what does not line up for Articles 13/14, 15, 16, 17, 18, 20, 21/22 and 32/33). This document covers only the AI and egress part; for exercising a right, that document governs.',
+      },
+    ],
+  },
+  {
     id: 's9',
     title: 'When this document changes',
     blocks: [
@@ -593,6 +704,11 @@ const en = [
             '2026-10-04',
             'The same table now discloses **the remaining 16 tools** (habits / check-ins / focus / tags / notes / projects / reminders): the catalog had grown to 9 entities and 26 tools with the AI coverage work, while this document still listed 10. Because the sentence "a tool not listed is not granted" turns this table into the authorisation surface, a missing row is a missing disclosure of what becomes readable once a tool is enabled. Each cell follows the `egressFields` actually present in the built catalog, with no inference beyond the field names; `list_notes` states explicitly that notes have no titles, so the list projection discloses only "when something was touched".',
           ],
+          [
+            '1.3',
+            '2026-10-04',
+            'Added section ten. Chapter V of the GDPR (Articles 44-49) asks whether personal data leaves the European Economic Area, which is **not the same question** as the cross-border wording elsewhere in this document, so neither side borrows the other conclusion. Each cell states what can be produced and what cannot: no standard contractual clauses, no adequacy decision we rely on, no binding corporate rules; Article 9 content is never classified or filtered; Article 22 holds only while the human confirmation stands in the way; Articles 25 and 32 rest on this repository\'s code and tests, with no third-party certification. The article-by-article rights table is deliberately not copied here - it is pointed at through a document reference instead.',
+          ],
         ],
       },
     ],
@@ -607,7 +723,10 @@ export const aiAndTransfer: LegalDocument = {
   // 这正是条款 s12 那条纪律禁止的事（"否则等于偷偷改"）。
   // 🔴 1.1 → 1.2：同一张表又补了 16 条工具（目录 26 条此前只披露 10 条）。
   // 触发的是同一句纪律，而且这次更直白：条款把这张表当授权面，表少一行 = 同意少一项。
-  version: '1.2',
+  // 🔴 1.2 → 1.3：新增第十节（GDPR 第五章那一档）。加的是**实质承诺的边界**
+  // （没有传输依据、不识别第 9 条内容、第 22 条依赖人工确认），不是措辞打磨，
+  // 所以必须换版本号：同意留痕要能回答"他同意的那一版里有没有这一段"。
+  version: '1.3',
   status: 'draft',
   updatedDate: '2026-10-04',
   title: {

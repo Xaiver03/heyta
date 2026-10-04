@@ -552,6 +552,51 @@ const zh = [
     ],
   },
   {
+    id: 's9',
+    title: '欧盟 GDPR 口径：这份清单能当哪半份用、不能当哪半份用',
+    blocks: [
+      {
+        kind: 'p',
+        text: '这份清单是按《个人信息保护法》的口径写的：它逐类说明收集什么、存在哪儿、服务端能不能读到。GDPR 里最接近它的是第 30 条的处理活动记录（ROPA），但 ROPA 还要求**每一类各自的处理目的、法律依据与留存期** —— 那三列本清单没有，所以这里写清它能顶哪一半、不能顶哪一半，而不是把它改名成 ROPA 交出去。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 30 条（处理活动记录）',
+            '有没有一份按 GDPR 格式写成的处理活动记录',
+            '清单确实逐类写了"存什么、存在哪、谁能读到"，端到端加密那一列还写明服务端只拿到密文',
+            '但它**没有**为每一类标出法律依据与留存期，分类也是按中国法而不是按 GDPR 的分组；补上那两列之前，这份文件不能自称 ROPA'
+          ],
+          [
+            '第 9 条（特殊类别数据）对照"敏感个人信息"',
+            '两套"敏感"定义是不是同一批数据',
+            '清单里的敏感项严格按中国法的列举写，没有擅自加宽也没有收窄',
+            '两个集合**不相等**：GDPR 把生物识别与基因数据明确列入第 9 条，中国法的敏感信息口径与之不同。符合这边的表不自动符合那边，所以本文件不做任何一一对应的换算'
+          ],
+          [
+            '第 15 条（访问权）',
+            '这份清单是不是"你能看到的关于你的一切"',
+            '不是，而且清单自己就这么写：访问权走**导出**，三个端都有，导出含墓碑与完整操作日志',
+            '清单给的是类别，不是你的数据本身；而类别表与实际库不一致时以实际数据为准（本文件第八节写明的那条），这类不一致目前没有逐字段的常驻对账'
+          ],
+          [
+            '第 13(1)(c) 条（留存期限或其确定标准）',
+            '每一类要写明存多久、按什么标准到期',
+            '清单不写期限，期限统一放在《隐私政策》与保留策略里，避免同一件事两处各写一个数字',
+            '留存期今天只能写到"标准"而不能写到"日期"：托管侧的备份是整库快照，代码里**没有**"从既有备份中单独删掉某一条或某一个人"的能力，所以任何按类写死的到期日都会变成一句做不到的话'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: '《隐私政策》：处理目的、法律依据与留存期在那里逐条给出；本清单只回答"有哪些类、存在哪儿、服务端看得见吗"。',
+      },
+    ],
+  },
+  {
     id: 's8',
     title: '这份清单什么时候会变，不一致时以什么为准',
     blocks: [
@@ -1109,6 +1154,51 @@ const en = [
     ],
   },
   {
+    id: 's9',
+    title: 'The EU GDPR view: which half of a record of processing this inventory is, and which half it is not',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'This inventory is written against the PIPL: category by category it says what is collected, where it lives, and whether the server can read it. The closest GDPR instrument is the record of processing activities under Article 30, but a record of processing also requires **the purpose, lawful basis and retention for each category** - three columns this inventory does not have. So the cells below state which half this document can stand in for and which it cannot, rather than renaming it and handing it over.',
+      },
+      {
+        kind: 'table',
+        head: ['Where in the GDPR', 'What it asks', 'What heyta can produce', 'What does not line up'],
+        rows: [
+          [
+            'Article 30 (record of processing activities)',
+            'Is there a record of processing activities in the GDPR\'s shape',
+            'The inventory really does state per category "what is stored, where, and who can read it", and one column records that under end-to-end encryption the server receives ciphertext only',
+            'It carries **no** lawful basis and no retention period per category, and its categories follow Chinese law rather than the GDPR grouping; until those two columns exist this document must not call itself a record of processing'
+          ],
+          [
+            'Article 9 (special categories) against "sensitive personal information"',
+            'Whether the two "sensitive" definitions cover the same data',
+            'The sensitive items listed here follow the Chinese enumeration exactly - neither widened on our own initiative nor narrowed',
+            'The two sets are **not equal**: the GDPR puts biometric and genetic data inside Article 9 while the Chinese definition differs, so a table that satisfies one side does not automatically satisfy the other and no one-to-one mapping is performed here'
+          ],
+          [
+            'Article 15 (access)',
+            'Whether this inventory is "everything we hold about you"',
+            'It is not, and the inventory says so: access is exercised through **export**, available on all three clients, including tombstones and the full operation log',
+            'The inventory gives categories, not your data; and where the category table and the real database disagree, the database governs (section eight of this document) - that kind of disagreement has no field-by-field standing reconciliation today'
+          ],
+          [
+            'Article 13(1)(c) (the retention period, or the criteria used to set it)',
+            'Each category must state how long it is kept, or by what criterion it expires',
+            'The inventory states no periods at all; retention lives in the Privacy policy and the retention rules, so one fact is never written as two different numbers',
+            'Retention can currently be given as a **criterion** but not as a date: hosted backups are whole-database snapshots and the code has **no** ability to remove a single row or a single person from an existing backup, so any hard-coded expiry per category would become a promise we cannot keep'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: 'Privacy policy: purposes, lawful bases and retention periods are given there article by article; this inventory answers only "which categories exist, where they are stored, and whether the server can see them".',
+      },
+    ],
+  },
+  {
     id: 's8',
     title: 'When this inventory changes, and what governs if it disagrees with reality',
     blocks: [
@@ -1144,9 +1234,9 @@ const en = [
 
 export const personalInfoList: LegalDocument = {
   id: 'personal-info-list',
-  version: '1.0',
+  version: '1.1',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': '个人信息收集清单',
     en: 'Personal Information Collection Inventory',

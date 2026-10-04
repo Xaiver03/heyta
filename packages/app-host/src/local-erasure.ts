@@ -24,9 +24,17 @@
  * ⚠️ 这个间接**不放松"必须有人注册"这件事**：没注册时 `eraseLocalData()`
  * 是**抛错**的，而抛错会被 `SyncClient` 响亮地写进状态与 `console.error`。
  * 静默跳过才是这条路径原来的病。
+ *
+ * 🔴 本文件有**一个**例外，读代码时容易看成矛盾：`eraseLocalData()` 除了调用
+ * 注册表，还会自己发一发宿主端口销毁（`./host-storage-erasure.ts`）。
+ * 它不算"宿主知识"，因为那个端口是**所有原生壳共用的同一个 seam**
+ * （`window.__heytaHostStoragePort`），而"壳的 SQLite 里那份明文只有端口够得着"
+ * 是逐端相同的事实 —— 让每个宿主各自记一遍，就是 §3.5 那张漂移表的形状。
  */
 
 import type { DbDestroyReport } from '@heyta/storage';
+
+import { eraseHostStoragePortData } from './host-storage-erasure.js';
 
 /** 一个宿主的销毁动作：清掉它自己知道的那些存储，并逐类交回凭据。 */
 export type LocalEraser = () => Promise<DbDestroyReport[]>;
@@ -82,7 +90,22 @@ export async function eraseLocalData(): Promise<DbDestroyReport[]> {
   // 先清空再跑：销毁器抛错时不能留下**上一次**的凭据 ——
   // 那会让一次失败的销毁被读成"上一轮清过了"。
   lastReports = [];
+
+  /**
+   * 🔴 宿主端口那一档**先于**注册的销毁器跑，两个理由：
+   *
+   * 1. 原生壳里那份明文（`heyta.sqlite`）是本机**唯一带全量明文**的容器，
+   *    先清它，后面那几类清失败也不会留下"最贵的那一份还在"。
+   * 2. 注册的销毁器抛错时（`host` 代码坏了），这一档的凭据必须**已经在账上** ——
+   *    否则一次"库文件真的删了"的销毁会被读成"什么都没清"。
+   *
+   * 没有这个端口的宿主（Web / node-host / 移动端）拿到的是**空数组**，
+   * 所以下面那几条既有断言（返回值、`lastErasureReports()`、逐条下标）一字不变。
+   */
+  const hostReports = await eraseHostStoragePortData();
+  lastReports = hostReports;
+
   const reports = await eraser();
-  lastReports = reports;
-  return reports;
+  lastReports = [...hostReports, ...reports];
+  return lastReports;
 }
