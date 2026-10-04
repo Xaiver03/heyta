@@ -3640,6 +3640,39 @@ W0b ─> 随时可做（台账那半要等文件干净）
     少的正是末段 `pnpm -r test` —— 少一段就少一格读数，所以这条断言是承重的而不是仪式。
     判据**不写死 68**（那是把上游当前状态抄进断言，段数一变两头都错）。
 
+- ㊢ **Android 出图探针以 `exit 3` 收口（18:12:23），而它只等了 900s —— 因为那个 900 是被调方的默认值，不是我的决定**（04 18:1x）
+  - 读数：`RC_REINSTALL_ANDROID=0`（17:57:21）→ 探针门连续拒
+    （`74 → 164 → 201 → 211 → 252 → 284 → 90 → 72 → 82 → 164`，18:12:23 那一行原文
+    `❌ 等满 900s 负载仍是 164 —— 本轮不跑（环境无效，不是产品失败）`）→ `RC_ANDROID=3`。
+    宿主机同一时刻 `uptime` = `141.56 140.92 130.78`，别的会话在跑 `.venv-test/bin/python`、Xcode `clang`/`SWBBuildService`、
+    `chrome-headless-shell`、`npx vitest run tests/security/oppDdlOwnership.test.ts`（18:14 现量 4 枚进程）。
+  - 🔴 **这条是探针的收口，不是产品的收口**：边界第 8 条明确 `exit 3 = 环境无效`。它**不**推翻 13:20 那趟 Android 读数，
+    只让那一格继续挂着"当前提交上未重取"；`RC_REINSTALL_ANDROID=0` 证到的仍是"装上了当前产物"这半。
+  - ⚠️ **我自己的编排脚本在这里犯了一个具体的错**：链 T 第 [1] 步直接 `bash scripts/verify-mobile-card-export.sh`，
+    **没传 `HEYTA_LOAD_GATE_WAIT`** ⇒ 这一腿实际用的是 `scripts/lib/wait-for-quiet-host.sh:31` 的**默认 900s**，
+    而不是我以为的"排到队里就给它足够的时间"。阈值 12 一分没动（那是对的），但**等待上限交给别人的默认值**这件事，
+    症状与"窗口真的开过却还是没等够"完全一样。⇒ 待入 traps（本分支台账止于 #190，编号按主检出取，不在此写死）：
+    **编排脚本调用带旋钮的共享库时，凡"这一腿值等多久"影响结论是否成立的，旋钮必须显式出现在命令行里，
+    不能靠被调方默认值 —— 默认值是被调方给"典型用途"定的，不是给这一腿定的。**
+  - ✅ **换载体而不是续等**：链 T 剩下三条变异臂各自 `wait_free 1800`（阈值 ≤10）⇒ 在最坏情况会把
+    `SENTINEL_T_DONE` 推到 90 min 之后，而链 MAC / 链 FULL / 链 T2 全盯这一句 ⇒ 整串被三条**边界取证**钉住。
+    换到 `/tmp/chain-T3.sh`：**单次共享窗口 + 三条臂连着跑**，等满只记一次 `RC_MUT_*=3`。
+    动手现场：链在 `wait_free` 的 `sleep 30` 里、工作树 `git status --porcelain` 为空、
+    没有 vitest / adb 子进程（18:14:17 现量），**不是在变异中途动的手**。
+  - ⚠️ **T3 的窗口档位是 ≤40，这里要把理由和边界写清楚，因为它看起来像"放宽负载门"**：
+    负载门防的是**探针**不是 CPU —— `wait-for-quiet-host.sh` 的 ≤12 是为 `uiautomator dump` / 截图 / AX 点击定的
+    （traps #168：负载高时探针抓不到界面，会把一次环境失效打印成一堆产品缺陷）。
+    这三条臂只跑 node vitest：**不碰设备、不碰窗口、不碰端口 4318/4319**，且方向是**不对称**的 ——
+    争抢能让一条臂**多红**（超时、别的用例也红），**不能让它少红**；"变异了却仍然全绿"这个失败模式与负载无关。
+    所以臂的读数除了 needle 命中数还打 `Test Files / Tests` 汇总：**红集若宽于我点名的那三条 ⇒ 该臂读数无效重跑**，
+    不许当成"判据有牙"。**设备那两腿（链 T 的 [1]、链 T2）仍用原 ≤12，一点没动。**
+  - ✅ 下游契约没断：`/tmp/relay-T3.sh` 等 T3 收口后把同一句 `SENTINEL_T_DONE` 补进 `chain-T.log`
+    （链 MAC 盯的是精确串，链 FULL / T2 盯的是 `SENTINEL_.*_DONE` 正则），接力行里写清"换过载体"，
+    **不新造读数** —— `RC_ANDROID=3` 留在 18:12:23 原位。
+  - 复现命令：`grep -aE 'RC_REINSTALL_ANDROID=|RC_ANDROID=' /tmp/chain-T.log`、
+    `tail -3 /tmp/chain-T-android-probe.txt`、`sed -n '28,60p' scripts/lib/wait-for-quiet-host.sh`、
+    `cat /tmp/chain-T3.log`、`uptime`。
+
 
 
 
