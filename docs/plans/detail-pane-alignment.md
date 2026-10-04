@@ -4408,3 +4408,28 @@ M3 是**通道档**（证明例外不是永远红的门）；M6 是**反空读�
 四个数也都是当年手抄。16:1x 我只**逐文件复跑**了（57 passed 是四个文件的合计），
 没有做"逐格重新对应到当年那条断言"的账 —— 那要逐格读测试名。谁要清这一格，
 判据形状是"每个数字旁边放一条能打出它的命令"，不是"再抄一次新数字"（抄一次就再漂一次）。
+
+## 8.63 §1 那四道前置闸门，对**本批这 5 笔**复验一遍（16:1x，载体 `2413546c`）
+
+前面几节一直在给别人的读数补判据；这一节把判据指向本批自己 —— 因为"这批只是文档 + 新脚本"
+这句话本身也是一条断言，而 §1 的四道门就是用来回答它的。
+
+| 闸门 | 取数方式 | 读数 |
+|---|---|---|
+| 归属门（永远点名路径提交） | `git diff --name-only 8e5a3ff3..HEAD` | 本批 5 笔**总共只碰 4 个文件**：两份文档 + 两枚新脚本；`packages/` 与 `apps/` 命中数 **0** |
+| 两道余量为 0 的棘轮不许调高基线 | `git diff … -- check-l4-no-style.mjs check-row-single-source.mjs` 行数 + 实跑 | diff **0 行**（基线常量没被碰）；实跑 `check:l4` RC=0（web 基线 104 / mobile 基线 90）、`check:row-single-source` RC=0（基线 28） |
+| packages 改完先 build | 同上第一行 | 本批**没有** `packages/` 改动 ⇒ 这一道对本批是 N/A。写"跑了 build"反而是不实 |
+| 干净检出复跑 | `git worktree add --detach /tmp/dp-clean-verify HEAD` → 在那里逐条跑 → `git worktree remove` | 干净检出里 `git status --porcelain` 条目数 **0**；**7 道**门禁全 RC=0：本批两枚新判据、`check:l4`、`check:row-single-source`、`check:selection-single-source`、`check:layering`、`check:ui-language`；另 `check:migrations` RC=0、`check:docs-voice` RC=0 |
+
+🔴 **这一栏里最值钱的那条是 `docs-link-check` 在干净检出里仍然 RC=1**，而唯一的 offender 是
+`PROGRESS.md:1362 → docs/research/aed-implementation-evidence.md`（输出里 `detail-pane-alignment` 命中 **0**）。
+这正是登记过的那条"不归本单"的债：它**不是**我这台机器的状态造成的，目标文件在任何干净检出上都不存在。
+在带别人未提交改动的工作树里跑，这条红看起来像"本机噪声"；在干净检出里跑，它是**确证的仓库事实**。
+⇒ 处置仍然是不代改（那一行属于别的线），但**证据等级现在变了**，谁接手谁该按仓库事实对待它。
+
+⚠️ 一处我自己的命令写法又踩了本仓记过的坑，记下来免得再犯：
+`node <脚本> | tail -3; echo RC=$?` 取到的是 **`tail` 的退出码**（§7 第 45 条那一族），
+第一趟那两道棘轮的"RC=0"因此是假的读数。改成 `node <脚本> > /tmp/x.txt 2>&1; echo $?` 之后才拿到真码。
+
+**不 push、不 merge**：本批 5 笔提交、其中 merge **0** 笔；远端 `feat/detail-pane` 停在 `c14cfe30`，
+本地 tip `2413546c`，未推送 98 笔 —— 全部留给明确要求的那一轮。
