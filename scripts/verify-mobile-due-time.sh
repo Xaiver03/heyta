@@ -190,6 +190,18 @@ time_value() {
   [ -n "$TIME_EMPTY" ] && [ "$v" = "$TIME_EMPTY" ] && v=""
   printf '%s' "$v"
 }
+# 🔴 归一这把刀**自己也要有一道闸门**，否则它会把上面那个"假红"换成一个更贵的"假绿"：
+#    锚点一旦取晚了（或某设备上这条新任务真带了一个默认时刻），`TIME_EMPTY` 就等于
+#    后面各步要填进去的内容值 ⇒ ② 会报"填不进字"、④b 会报"清空生效"，**两条都绿**，
+#    而它们读的是被自己的锚点吃掉的真空。便宜地排除掉能排除的那一半：
+#    锚点不许与本轮任何一步"要填进去的值"同形。
+calibrate_time_empty() {
+  TIME_EMPTY=$(time_value_raw)
+  case "$TIME_EMPTY" in
+    "1" | "$TIME_HALF" | "$TIME_FULL") return 1 ;;
+  esac
+  return 0
+}
 
 # 清空时刻输入框（全选 + 删除，与 `clear_and_type` 同一手法；不循环 DEL —— 会 ANR）。
 # 🔴 清完必须读回"真的空了"：清空失败时后面那条"填不进字"的负向判据会因为
@@ -429,8 +441,14 @@ step "5. 判据 ①②③ —— 未设日期时的时刻栏"
 #    三条互相打脸，红的原因是占位符被当成了内容，不是 enabled 接线）。
 #    此刻这条任务只有标题、没有时刻 ⇒ 这一读就是"空"在这台设备 + 这份语言下的
 #    字面形状。空框若真回空串，`TIME_EMPTY` 就是空串，归一为无操作 —— 两个方向
-#    都不会引入假绿（见上面 `time_value` 的注释）。
-TIME_EMPTY=$(time_value_raw)
+#    都不会引入假绿（见上面 `time_value` 与 `calibrate_time_empty` 的注释）。
+if ! calibrate_time_empty; then
+  echo "   ❌ 空框锚点取到了'要填进去的内容值'（'${TIME_EMPTY}' 与 '1'/'${TIME_HALF}'/'${TIME_FULL}' 同形）" >&2
+  echo "      这时归一会把**真空**吞成空串 ⇒ ② 与 ④b 会变成两条**假绿**（比原来的假红更贵）。" >&2
+  echo "      本轮读数无效 ⇒ 停。要么是锚点取晚了（脚本侧），要么这条新任务真的自带默认时刻（产品侧）。" >&2
+  screen_txt
+  exit 3
+fi
 echo "   空框锚点 TIME_EMPTY='${TIME_EMPTY}'（长度 ${#TIME_EMPTY}；凡等于它的读数归一成空串）"
 
 RAW_COUNT=$(rid_count task-due-time-input)

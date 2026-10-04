@@ -833,6 +833,33 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   让**修过的判据集**在设备上重跑；判据改了但不重跑 = 这五条修改本身没有牙（本仓 §8.7）。
   现量命令：`grep -n '❌' /tmp/ht-r14c-chain.83401.log`（那 10 条红的原文）、
   `sed -n '1084,1112p' /tmp/ht-r14c-chain.83401.log`（⑧ 之后停在「我的」页那份 dump）。
+- (15) **19:3x–19:4x：归一这把刀自己补了一道闸门 + 一把五臂 rig；看守已重挂；顺带现量到一道**别人手里**的门禁红。**
+  🔴 **为什么修完假红还要再写一段**：`TIME_EMPTY` 归一如果**方向错**（锚点取晚了、或某设备上这条新任务真带默认时刻），
+  它就把**真空**吞成空串 ⇒ ② 与 ④b 从"恒红"变成"**恒绿**"，那比原来的假红贵一个量级。
+  所以补 `calibrate_time_empty()`：锚点不许与本轮任何一步"要填进去的值"（`1` / `16:0` / `16:00`）同形，
+  撞上就 `exit 3`（读数无效，不是产品失败）并当场 `screen_txt`。
+  牙：`bash research/tools/r14c-time-empty-arms.sh` ⇒ rc=**0**、`pass=7 fail=0`
+  （A 归一生效 / **B 反向腿：锚点是占位符时框里真有 `1` 输出仍是 `1`，证明只吃锚点不吃内容** /
+  C 无操作腿 / D 三喂（`1`、`16:0`、`16:00`）全部被闸门拒 rc=1 /
+  **E 变异对照：只在副本上摘掉归一那行（先断言恰好摘 1 行、摘后 0 行）**，A 腿随即读到 `[时:分]`
+  ⇒ A 那条绿是被测那段给的、不是桩自己给的）。
+  ⚠️ **本线自己第四次被 `check:shell-unicode` 抓**：rig 里写了 `（$OUT）` ⇒ 已花括号化。
+  🔴 **更该记的是抓它的那次读数被我自己吃掉了**：`node scripts/…mjs | tail -3; echo RC=$?` 里那个 `$?`
+  是 `tail` 的（§7 #45 原文），于是门禁报红被我读成 rc=0 并打印了一句"修法"当背景噪音 ——
+  改成像现在这样**先重定向、再取退出码**。这条不是新坑，是我在同一个坑里第四次踩。
+  🔴 **现量到一道不归本线的门禁红（登记，不动他们的文件）**：
+  `node scripts/check-script-snapshot.mjs` ⇒ rc=**1**，两处都指向**未跟踪**的
+  `scripts/verify-mobile-account-erasure.sh` / `scripts/verify-mobile-ios-account-erasure.sh`
+  （`git status --porcelain` 现量两枚都是 `??`），而 `scripts/check-script-snapshot.mjs` **自己**也是 ` M`
+  ⇒ 那是账户清除那条线正在成形的东西。`check:script-snapshot` 挂在 `pnpm check` 上（`package.json:66` 现量）
+  ⇒ 它会挡"全量 check 绿"那一句，**但挡的原因是他们在飞，不是本线的洞**；处置＝等他们提交，
+  复跑命令就是上面那条 `node scripts/check-script-snapshot.mjs`。
+  ✅ **看守已按 (14) 那条重挂**（现量：pid **71648**、`BUDGET=7200 INTERVAL=60`、
+  日志 `/tmp/ht-r14c-window.20261004-193742.71648.log`，稳定指针 `/tmp/ht-r14c-window.log` 已指过来）。
+  开窗前后判据仍只有闸门那一个来源；**这轮带去的判据集是修过的**（链的覆盖清单里本来就有
+  `scripts/verify-mobile-due-time.sh`，所以不必等入库也能生效 —— 但已入库才谈得上"载体落后也不是旧判据"）。
+  19:3x 现量窗口闸门：rc=3、`REDS=load,src,dev,apk`（18:2x 那次是 `load,src,apk` ⇒ **`dev` 又红了**，
+  设备面又有人在跑；`apk` 那格由链自己在窗口里补）。
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
 
 
