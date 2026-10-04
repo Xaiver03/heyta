@@ -8926,3 +8926,37 @@ node research/tools/selfhost-land-main.mjs        # 不带 --confirm：只读数
 ①那一枚 `package.json` 被它的所有者提交，②一次负载 ≤12 且五件同时安静的窗口。
 看守（pid 43552，`CAP=14400 STEP=150 QUIET_MIN=15 LOAD_MAX=12 MAX_ATTEMPTS=3 --run-on-open`）在等；
 它拿到窗口时跑的是 `--confirm`，那时才第一次真的跑完整 `pnpm check`（dry-run 明确不跑，见上表"不适用"两行）。
+
+### 8.149 那张许可证登记表到底有没有牙：三条变异臂离线测完，装置放进自己的文件（不撑宽冲突面）（2026-10-05 00:4x，`research/tools/selfhost-license-coverage-arms.mjs`）
+
+**补的是 #29 明写"仍未测"那一格**：G-47 的许可证对账一直只有**通过读数**（"17 条逐条登记过"），
+而登记这张表是人抄的 —— 没测过"摘掉一条会不会红"，就等于没测过它拦不拦得住东西。
+上一轮这条臂**施错了对象**：把"镜像独有"错当成"不在 `lockEntries` 里"，算出 0 条、什么都没摘、
+`rc=0` 是空臂的必然。集合定义后来钉准了：**不在 `license-inventory` 的扫描集里**才是那批条目，
+而这张表就在 `check-image-license-coverage.mjs` 里（`IMAGE_ONLY_PACKAGES`）。
+
+**这一趟不需要 docker**（该门禁的 `snapshot` 载体本来就设计成可离线挂到 `pnpm check` 上），
+所以当场测完了三条：
+
+| 臂 | 施法 | 读数 |
+|---|---|---|
+| 对照 | 未变异 | `rc=0`，输出无 ❌ ⇒ 三条臂都不是无条件红 |
+| A | 从表里**摘掉一枚真登记**（`@node-rs/argon2-linux-x64-gnu@2.2.1`） | `rc=1`，**两层**红：①"有 1 条许可证门禁**从没见过**的包"；②"计数不闭合 covered(126)+豁免(16)+自家(3) ≠ 146" |
+| B | 塞一条**幽灵登记**（不在快照里、也没写 `carrier`） | `rc=1`："__pubcheck-ghost@9.9.9 已经不在快照里了（登记该删，或给它写 carrier）" |
+| C | 把 `carrier` 写成不存在的载体名（拿它当逃避过期检查的后门） | `rc=1`："登记的 carrier=whichever 不是 snapshot / installed-tree 之一 —— 这不是'跳过检查'的开关" |
+
+现量顺带一条：**这张表今天是 17 枚**（`146 = 门禁扫描集 126 + 登记 17 + 本仓库自家 3`），
+不是 §8.101 那批引用的 16/143 —— 引用旧数字会漂，取数请用
+`node research/tools/check-image-license-coverage.mjs` 自己打印那一行。
+
+**为什么装置单独一个文件**（而不是给门禁加 `--mutation`）：
+`research/tools/check-image-license-coverage.mjs` 是本批与 `main` 的**七枚冲突路径之一**（§8.145 那张身份表），
+往里加 60 行装置代码 = 落地那一刻把合并面再撑宽一层，而这几行判据撑不起那个代价。
+所以这里改的是它的**一次性副本**（写完就跑、跑完就 `rmSync`，原件零改动；实测残留 0 枚）。
+表被改名时 `firstKey()` 取不到第一枚登记项会**抛错**而不是"什么都没摘"—— 上一条那种空臂事故的形状，写死了不让它再来一次。
+装置自己踩到的一次：`ROOT` 少剥一层（`research/tools` → 仓库根需要 `'..','..'`），
+`readFileSync` ENOENT 当场炸 —— 报错比"静默空臂"好。
+
+🔴 **仍没测的那一半**：同样的三条臂在 **`--installed-tree`（真树）载体**上还没施过 ——
+那一趟要跑起来的镜像，排在落地后的低负载窗口，与 #28（`docker build` 输出可观测）同一趟。
+所以这一节的主张只到"snapshot 载体这张表有牙"，不到"镜像里实际那棵树有人守"。
