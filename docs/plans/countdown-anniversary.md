@@ -2362,3 +2362,36 @@ W0b ─> 随时可做（台账那半要等文件干净）
   （self-host 那条的 `queue-reinstall-all.sh`，pid 93817）正卡在 macOS 打包段 **4h51m**、
   android/ios 段还没轮到 ⇒ 现在上去就是互相制造假红。负载 14.36 也高于本机门槛 12（ncpu×3/4）。
   设备读数排在窗口之后，取到之前 W7-G3 不打勾。
+
+- ㉖ **W8-GAP-W1 落地：那一栏不是"没取证"，是取证进不来**（04 08:2x，载体 `d5795246`→本次提交，无设备参与）
+  交接 §0.5 的 W8 行上一轮已经把"那两栏只由 `reinstall:all` 关闭"改判成"windows 那栏**结构上**关不掉"，
+  这一轮把那条结构缺陷补掉：`check-shell-surfaces.mjs:778` 给 desktop-windows 写死 `artifactWebDist: null`，
+  而 `:821` 的 `=== null` 短路发生在 `:831` 读 `HEYTA_WINDOWS_WEB_DIST` **之前** ⇒ 本机有什么、env 给什么都判不到。
+  ✅ 而事实文件其实**一直存在**：`package-msix.sh:78` 每次打包都把远端 `install-capture.txt`
+  scp 回 `dist/windows/`（`reinstall-all.sh:265` 也在读它）—— 只是门禁没吃。
+  ⇒ 补的是**消费侧**：windows 走一条自己的 D4（`artifactFacts` + `HEYTA_WINDOWS_FACTS` 覆盖），
+  判三行新事实 + 与本地 dist 的 sha 对账；生产侧 `install-and-capture.ps1` 补发
+  `PAYLOAD_INDEX_SHA` / `PAYLOAD_CHUNK_TOTAL` / `PAYLOAD_CHUNK_PRESENT`（脚本仍**纯 ASCII**，
+  实测两个 ps1 非 ASCII 字节各 0、无 BOM —— §7 #83 那条）。
+  📌 为什么需要 chunk 那两行而不止 sha：`PAYLOAD_WEBDIST=True` 只证明**一个文件在**，
+  而"入口 HTML 进了包、chunk 没进去"的形状恰好是**窗口能开而内容空白**（§7 第 82 条同一族）。
+  vite 把内容哈希后的 chunk 名写进 `index.html` ⇒ HTML 逐字相同才允许把"本地这一面在"
+  **迁移**成"装进包里的字节里有"；迁移的前提是那张资源图真的齐。
+
+  现量（本地那份旧事实文件缺三行 ⇒ 默认判**未取证**、严格模式判红，两档都如实）：
+  `node scripts/check-shell-surfaces.mjs` ⇒ **rc=0，5 绿 / 0 红，未取证 2 栏**（mac + windows）；
+  加 `HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` ⇒ **rc=1**，两栏都折成红。
+  同趟顺带量到本机那份 `/tmp/heyta-macos-dist` 的包 `index.html` sha 是 `5ab36a44…` 而本工作树
+  是 `517c6ba7…` ⇒ **那是别的树打的包**，mac 的 D4 没被骗（这条对账早就有牙，本轮只是第一次看到它拦住）。
+  本地 dist 的读数：`index.html` sha256 `517C6BA76D00…`，引用的 assets **2** 条。
+
+  七臂台架（`/tmp/w8-rig.sh`，全合成取证文件、不碰打包机也不碰设备）：
+  W1 值全对 ⇒ **rc=0** 且打印 `sha256 逐字相同（517C6BA76D00）… chunk 2/2 齐`；
+  W2 `PAYLOAD_WEBDIST=False` ⇒ **rc=1**；W3 `present 1 / total 2` ⇒ **rc=1**（就是那个空白窗口形状）；
+  W4 sha 不符 ⇒ **未取证，不算通过**（rc=0 但列进未取证清单）；W4b 同一份加严格模式 ⇒ **rc=1**；
+  W5 **sha 对得上而那份 dist 里没有 `countdown-view`** ⇒ **rc=1** —— 这一臂是 marker grep 的牙，
+  没有它整条 D4 就退化成"两边一致就行"；W6 事实文件在但缺那三行 ⇒ **未取证** + 指名生产方怎么补。
+  ⚠️ **一条不能多读的边界**：那三行**还没在 Windows 上真跑过**。ps1 只在远端交互式会话里执行，
+  本轮没有跑打包（打包机也归另一条线在用）。所以"这一栏能关了"的准确说法是
+  **消费侧与判据已就位、且离线证明它有牙；生产侧待下一趟真实打包来发那三行**。
+  在那之前 windows 的产物栏仍是未取证 —— 本轮**不**代它宣布关闭。
