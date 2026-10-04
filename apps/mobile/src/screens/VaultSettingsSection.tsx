@@ -78,6 +78,9 @@ export function VaultSettingsSection(): React.JSX.Element {
   const [error, setError] = useState<MessageKey>();
   const [passphrase, setPassphrase] = useState('');
   const [newPassphrase, setNewPassphrase] = useState('');
+  // Legacy password is a migration-only bridge. It is deliberately separate
+  // from the new root passphrase and is never persisted in sync config.
+  const [legacyPassphrase, setLegacyPassphrase] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const [pendingCode, setPendingCode] = useState('');
   const [pending, setPending] = useState<PendingVaultCreation>();
@@ -110,6 +113,7 @@ export function VaultSettingsSection(): React.JSX.Element {
     setPendingAction(undefined);
     setError(undefined);
     setRememberUnlock(false);
+    setLegacyPassphrase('');
     setMigrationProgress(undefined);
     if (scope === undefined || accountId === undefined || accountId.trim() === '' || serverUrl === undefined) {
       return undefined;
@@ -313,23 +317,38 @@ export function VaultSettingsSection(): React.JSX.Element {
                 if (pendingAction === 'rotate') {
                   await activeHost.confirmVaultRootRotation(pending, pendingCode, (progress: VaultMigrationProgress) => {
                     setMigrationProgress({ completed: progress.completed, total: progress.total });
-                  });
+                  }, legacyPayloadMigrationRequired && legacyPassphrase !== ''
+                    ? { legacyPassword: legacyPassphrase }
+                    : undefined);
                 } else {
                   await session!.confirmAndPublish(pending, pendingCode, activeHost.getVaultKeyPackageRemote());
                 }
-                await rememberCurrentRoot(session!);
+                // The server/package commit is the durable boundary. Clear the
+                // one-shot pending UI before the optional secure-store write:
+                // a Keychain/Keystore failure must not make an already-consumed
+                // recovery code look retryable (the next click would be
+                // `pending-invalid`). The error remains visible and the user
+                // can explicitly retry the remember toggle afterwards.
                 setPending(undefined);
                 setPendingAction(undefined);
                 setMigrationProgress(undefined);
                 setPendingCode('');
                 setPassphrase('');
+                setLegacyPassphrase('');
+                await rememberCurrentRoot(session!);
               })}
               tone="primary"
-              disabled={busy || pendingCode.length === 0}
+              disabled={busy || pendingCode.length === 0 ||
+                (pendingAction === 'rotate' && legacyPayloadMigrationRequired && legacyPassphrase.length === 0)}
             />
             <Button
               label={t('mobile.vault.cancel')}
               onPress={() => void run(async () => {
+                // This is migration-only input. Drop it before attempting
+                // remote cancellation so a failed cancel cannot retain an old
+                // password in the component state while the pending operation
+                // remains visible for retry.
+                setLegacyPassphrase('');
                 if (pendingAction === 'rotate') {
                   const activeHost = host ?? await openTaskHost();
                   await activeHost.cancelVaultRootRotation();
@@ -342,6 +361,20 @@ export function VaultSettingsSection(): React.JSX.Element {
             />
             {pendingAction === 'change' ? <Text variant="caption">{t('mobile.vault.changeTitle')}</Text> : null}
             {pendingAction === 'rotate' ? <Text variant="caption">{t('mobile.vault.rootRotationHint')}</Text> : null}
+            {pendingAction === 'rotate' && legacyPayloadMigrationRequired ? (
+              <>
+                <TextField
+                  label={t('web.sync.vault.legacyPassphrase')}
+                  value={legacyPassphrase}
+                  onChangeText={setLegacyPassphrase}
+                  secure
+                  testID="mobile-vault-legacy-passphrase"
+                />
+                <Text variant="caption" tone="subtle">
+                  {t('web.sync.vault.legacyPassphraseHint')}
+                </Text>
+              </>
+            ) : null}
             {migrationProgress !== undefined ? <Text>{t('mobile.vault.rootRotationProgress', migrationProgress)}</Text> : null}
           </Stack>
         </Card>

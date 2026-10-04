@@ -174,6 +174,7 @@ export interface AppHost {
     pending: PendingVaultCreation,
     enteredRecoveryCode: string,
     onProgress?: (progress: VaultMigrationProgress) => void,
+    options?: VaultRootRotationOptions,
   ): Promise<VaultKeyMigrationResponse>;
   /** Release any staged root migration and remove its local encrypted draft. */
   cancelVaultRootRotation(): Promise<void>;
@@ -227,6 +228,15 @@ export interface AppHost {
 
   /** 关闭 SQLite 连接。之后不可再用。 */
   close(): void;
+}
+
+/**
+ * Optional bridge for accounts whose retained payloads still use the legacy
+ * password cipher. The value is supplied by the explicit migration UI and is
+ * never persisted in the sync configuration.
+ */
+export interface VaultRootRotationOptions {
+  legacyPassword?: string;
 }
 
 /**
@@ -559,6 +569,7 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       pending: PendingVaultCreation,
       enteredRecoveryCode: string,
       onProgress?: (progress: VaultMigrationProgress) => void,
+      rotationOptions?: VaultRootRotationOptions,
     ): Promise<VaultKeyMigrationResponse> {
       return withVaultExclusive(async () => {
         const session = await readVaultSession();
@@ -571,6 +582,7 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
         const migrationToken = config.token;
         const currentPayloadKeyVersion = session.payloadKeyVersion ?? null;
         const targetPayloadKeyVersion = (session.payloadKeyVersion ?? 0) + 1;
+        const legacyPassword = rotationOptions?.legacyPassword ?? config.password;
         const remoteOptions = {
           baseUrl: config.serverUrl,
           getToken: async () => migrationToken,
@@ -590,8 +602,8 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
             targetPayloadKeyVersion,
             currentRootKey: input.currentRootKey,
             targetRootKey: input.targetRootKey,
-            ...(currentPayloadKeyVersion === null && config.password !== undefined
-              ? { legacyPassword: config.password }
+            ...(currentPayloadKeyVersion === null && legacyPassword !== undefined
+              ? { legacyPassword }
               : {}),
             journal: vaultMigrationJournal,
             journalScope,
