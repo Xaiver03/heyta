@@ -2861,7 +2861,7 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 - 装置归档：不再只住 `/tmp` —— `~/.heyta-window-rigs/` 现量 **15 枚**（链 v19 本体与它 source 的两份判据库 `heyta-identify-fn.sh`、`heyta-device-occupancy.sh` 都在内，
   之前漏了这两枚 —— 链只有 `set -u`（`:22`），所以缺文件时 `. …` 失败**不会**打死链：`identify_notes_input` 变成 `command not found`（rc=127）走 `|| continue`，
   ③ 于是**每 60 秒静默饿死一次**，而日志看起来像在正常等窗口）；逐枚 sha256-12 打在那目录里，夹具跑的是同一份 shipped 内容而不是抄件。
-- 现场（13:0x 现量）：`ps` 里已无别人的 `verify-mobile` / 打包 / `notarytool` 进程（12:44 那枚挂 9h20m 的 notarytool 不在了），
+- 🔴 **现场那句"13:0x 现量 `ps` 里已无别人的 verify-mobile / 打包 / notarytool"是错的，撤回并留在这里**：成因是命令口径 —— `ps -o pid,etime,command | grep …` 不带 `ax`/`-e` 只看得见与当前终端有关的那几十枚进程，于是"空输出"被我读成"环境干净"；而同一条命令里负载与端口两半是对的，所以它不像"全线 0 行"那样自我暴露。换成 `ps ax -o pid,ppid,etime,command` 现量（13:25:41）**三条全在**：`heyta-wt-batch2/scripts/.verify-mobile-card-export-*.snap`（pid 84803，那时刚起 6 分钟、正在驱动 emulator ⇒ 这就是设备上前台 `com.heyta` 的 pid 从 31628 变成 31765 的原因，不是"残留"）、`/tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817`（pid 93817，已跑 10 小时）、`notarytool submit /tmp/heyta-macos-dist/Heyta-*.dmg`（pid 98934，同一枚挂 10 小时，12:5x 那回它就在那儿 ⇒ §7.31 里"12:44 那枚不在了"也随之作废）。规矩落成动作：**判"没有 X 在跑"只认 `ps ax` 或 `pgrep -f`，并且先拿一枚我确定在跑的 pid（自己的链）做一次阳性对照**；这枚口径同族的是"批门禁在 zsh 下必须 `sh -c`"与"pattern 结构上匹配不到 ⇒ 0 行不代表东西没了"。
   但设备前台仍是别人的 `com.heyta`、`:3000`/`:3100` 仍被占 ⇒ **①③ 继续等窗口**。本轮起跑的设备/Playwright/重装类验收：**0 条**。
 #### 7.31.1 上面那条自己也有两处要先作废（13:1x 现量，载体 `32391847`，主检出 HEAD `ba063aab`）
 
@@ -2875,9 +2875,9 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   用单所有者探针 `lib/mobile-e2e-runner-probe.sh` 数"有别的移动端验收在跑"并 `WHY_DEV=1 + FAIL++`，注释写明 B 会 `simctl uninstall` + `adb uninstall` + 覆盖 `/Applications/Heyta.app`
   这三条都是拆别人正在量的现场，且 04:1x 之前就因"闸门按 target 分岔漏了一半"补过。⇒ **我不给启动器再加 iOS 卸载门**（那会是第二份实现，一定漂）。
   我那条 `mac-dist-guard` 仍站得住，因为它挡的是**闸门看不见的那一类**：正在跑的 `notarytool` / `hdiutil` 句柄（不是 reinstall-all、也不是 verify-mobile-*）。
-- **13:13 现量：那道物体级门此刻确实有用** —— `pgrep -x notarytool` 又有人了，且 `lsof +D /tmp/heyta-macos-dist` = `diskimage/98171` 正握着 `Heyta-1.0.0.dmg`；
-  也就是说 §7.31 末尾那句"ps 里已无别人的 notarytool"只对 13:0x 那一刻成立（这正是瞬时读数必须带时刻的原因）。此刻起跑 ① 会被我的启动器判 `VERDICT=NOT-RUNNING`，
-  而那正是设计意图：`reinstall-all.sh:196,199` 的起跑第一步是 `rm -rf /tmp/heyta-macos-dist`。
+- **13:13 现量：那道物体级门此刻确实有用** —— `pgrep -x notarytool` 有（**注意措辞**：它当时不是"又起来了"，而是一直在，见本节末尾那条撤回 —— 我 12:5x 那趟用的是不带 `ax` 的 `ps` 才读成"没有"），
+  且 `lsof +D /tmp/heyta-macos-dist` = `diskimage/98171` 握着 `Heyta-1.0.0.dmg`；`pgrep` 扫全表所以这一半是对的。
+  ⇒ 此刻起跑 ① 会被我的启动器判 `VERDICT=NOT-RUNNING`，而那正是设计意图：`reinstall-all.sh:196,199` 的起跑第一步是 `rm -rf /tmp/heyta-macos-dist`。
 - **③ 第 10 步的库前置已可读（13:11:25 现量，纯只读）**：`psql` 在 `/opt/homebrew/opt/postgresql@14/bin/psql`，`:5432` 由 `postgres/1334` 监听，
   `heyta_mobile_smoke` 连得上 ⇒ `SELECT count(*) FROM operations` = **90**，同趟阳性对照 `pg_tables` = **93**（两条都出数，说明探针与连接都活着，而不是"0 行"那种空读数）。
   这条只降低"第 10 步因为连不上而红"的概率，**不替代起跑前现量**（库里行数是活的）。
