@@ -1196,3 +1196,45 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   📌 这正是"手搭哨兵不许比规范裁判严"那条的**正面对偶**：粗臂比闸门宽是**安全的**，
   因为最终裁判仍是闸门（`:335` 那次 `--target c`）；把它改严反而会把安卓面上真没人的那些窗口自己关死。
   ⚠️ 别据此去"优化"那条臂 —— 它的用途是给 `com.heyta` 那枚遗留实例一个说法，不是窗口判据。
+
+### 20:0x ① 的取证夹具红了：红的是夹具，但它暴露的隔离失效比那两条 GUARD_FAIL 贵
+
+窗口仍关（20:04 现量：load 58.27–193.72、`:3000` 被 pid 70256 占、设备在主检出那条
+`scripts/.verify-mobile-ios-reminder.sh.snap.27495` 手里），这一段做的是**零 CPU 的装置修复**，
+没起任何设备/Playwright/重装类验收。
+
+- 🔴 **最贵的一条不是那两个 GUARD_FAIL，是夹具违背了自己的文件头**。它的头写着"不跑 pnpm、
+  不碰真 /tmp 那五条共享路径"，而 19:55 那一趟（替换 needle 还停在 v9 的 `pnpm reinstall:all`、
+  且没查 python 退出码）**真的执行了产品命令**：`/tmp/reinstall-inner-1.log` 与 `-2.log`
+  各 802 B、mtime 19:55，里面是
+  `Error: Cannot find module '/tmp/heyta-evid-fixture-Qc08AA/home/.cache/node/corepack/v1/pnpm/12.9.1/bin/pnpm.cjs'`。
+  ⇒ 它没走到设备，**纯粹是因为夹具自己把 `HOME` 换成了临时箱、corepack 解析不到 pnpm** ——
+  这是事故，不是护栏。"声称隔离"的装置一旦靠巧合才没越界，下一次环境变了就会越界。
+- **两个 GUARD_FAIL 的根因都是夹具**（20:00 逐条定位，都用玩具复现过，不是推断）：
+  1. 抽段里的桩路径写的是 `$BOX/inner-1.log`，而 `block.sh` 是**子进程** —— `BOX` 没 `export`
+     ⇒ 子进程里展开成 `/inner-1.log`（不可写）⇒ `tee` 静默落空、`cat` 失败但 `> "$INNER_LOG"`
+     仍把文件建成**空**⇒ E1「inner.log 没抄进证据目录」与 4-stub-red「输出里没有失败面」
+     都是这一个空文件的两张脸（"空测量看着最干净"又出现一次）。
+     ✅ 复现臂 M3：在**夹具副本**上摘掉 `export BOX` ⇒ 精确复现出 E1 那句。
+  2. 抽段调用了 `run_gate`，而这个函数住在启动器的**文件前半**、不在抽段里 ⇒ 子进程报
+     `run_gate: command not found`，紧接着 `[ "$GATE" -ne 0 ]` 拿到空串，在 bash 里
+     报 `integer expression expected` 并返回**假**（玩具实测打印 `BRANCH=RAN-PHASE2`）
+     ⇒ 每一臂都"碰巧"走了「跑第二趟」那一支，**v10 新增的"闸门跳过设备面"这支一次都没被覆盖**，
+     而五臂的 rc 全对。✅ 改法：抽段前面垫 prologue，把 `run_gate`/`IOSN` 变成
+     `HEYTA_FAKE_GATE`/`IOSN_FIXTURE` 两个显式旋钮 —— 依赖不再靠"恰好继承了环境"。
+- **新增三臂 E6/E7/E8**（覆盖"两趟之和"的三种形状）：闸门退 3 ⇒ `PHASE2=SKIPPED-BY-GATE`
+  且第二趟日志必须**空**；只第二趟红 ⇒ `INNER_EXIT=1` + 归因段能从第二趟日志里报出
+  `失败面：@heyta/mobile`；两趟都红 ⇒ `INNER_EXIT=2` 而启动器退出码是 **1**
+  —— 记账时这两个数不是一回事，这条形状以前没有任何东西在守。
+- **有牙证明**（`~/.heyta-window-rigs/heyta-evid-mutation.sh`，20:04 现量 GREEN）：
+  M1 把 `$(( IX1 + IX2 ))` 摘成 `$IX1` ⇒ `GUARD_FAIL=7-phase2-red rc 不符`（也就是说：
+  设备面整条红会被读成 `INNER_EXIT=0` 且启动器退 0 ⇒ ① 会被误记 DONE）；
+  M2 让闸门不再拦第二趟 ⇒ `GUARD_FAIL=6-gate-skip 输出里没有「PHASE2=SKIPPED-BY-GATE」`；
+  M3 见上。夹具本体八臂 GREEN，真启动器 md5 未被任何变异臂碰过：`b3aadde535fba3c0f99a54a160d0d6ed`。
+- 📌 **可迁移的两条**：① **抽段类夹具（把一段代码单抽出来跑）必须自检"这段在真件里依赖的名字是否都在"** ——
+  未定义的 helper 在 bash 里不会让脚本停，它只会让**分支悄悄选边**，于是"rc 全对"可以完全不含新行为的覆盖；
+  ② **装置声称的隔离要落成"非 0 计数即停"的前提检查**（现在加了 `LEAK_N=0`：抽段非注释行里
+  任何 `/tmp/reinstall-inner*` 都不许留），写在注释里的"不碰"不是隔离，只是愿望。
+- ⚠️ 顺带记一处**计时旋钮**，不是产品改动：夹具的 `mkpng` 现在给图打 **+3 秒**的 mtime。
+  原因是被测段自己用 `RUN_START=$(date +%s)` 判"本轮新生"，那一刻发生在子进程起来之后 ——
+  墙钟在 `mkpng` 与它之间跳一秒，这张图就被判陈旧；原五臂能过是运气（没跨秒）。
