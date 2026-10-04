@@ -5164,3 +5164,53 @@ tip 是自己 10 秒前造的那笔 —— `git reset --soft HEAD~1` + `git rest
 >   `11460845` Podfile 里 fmt 绕行那句"可能已升级，请复查"**每次** `pod install` 都会印
 >   （已补过的文件第二次自然匹配不到），把"没事"和"绕行真失效"压成同一句黄字；改成三分支，
 >   最后一档升成红字。
+
+> **B79 补记 #4（10-05 03:3x–04:1x）—— 补记 #3 明确"留给下一位"的那格做掉了；另外把一条押在"动画会结束"上的无界移除路径修在 web 层，于是线上与四端重新对齐到同一枚字节**
+>
+> - 🔴 **发现方式的形状值得单记**：这一发不是产品投诉，是**门禁红查出来的产品缺陷**。
+>   `check:macos-window` 的 WebView 快照 `contentOnModalRatio` 从 0.046 掉到 **0.011**（阈值 0.02），
+>   而同一趟的 M2 探针三条全打 ✅ —— DOM 说应用活着，像素说只有一张品牌帧。
+>   一枚独立写的 WKWebView 探针（同一个 dist、同一个 `?shell=1`）连测 5 拍 / 8 秒一个字段没动：
+>   `bootLeaving:true / anims:1 / playState:running / animTime:"0" / visibility:"hidden"`。
+>   ⇒ `leave()` **跑了**、动画**建出来了**，但页面 `visibilityState === 'hidden'` 时 WebKit **不推进 CSS 动画**，
+>   `currentTime` 永远停在 0，`animationend` 一次都不来。原来的代码只有两条退路
+>   （`animationName === 'none'` 与 animationend），**"没有第三条有界退路"就是这一发的全部**。
+>   对照同一份产物：Chromium 318ms 摘掉、前台 Safari 摘掉、Windows 壳一直是真应用
+>   —— 不是"哪个引擎坏了"，是这条路径没有上界。
+> - **修法两半**（`66ce1545`）：① 页面本来不可见 ⇒ 淡出没人会看见，直接摘；② 可见 ⇒ 继续等
+>   `animationend`，但加一条**由 `getComputedStyle().animationDuration` 推导**的有界兜底
+>   （时长仍只住在 tokens → 生成的 `<style>`，那个文件头"时长不许出现在这里"的立场没被破，
+>   代码里只多一个余量常量 `SPLASH_REMOVAL_SLACK_MS = 120`）。判据：新增
+>   `apps/web/tests/boot-splash-dismiss.spec.ts` 六条，每条问的都是**任何一臂都不许遮罩无限期留在 DOM 里**；
+>   ✅ 两臂变异（摘掉① ⇒ 恰好红 2 条，摘掉② ⇒ 恰好红 1 条，逐字节还原 md5 `3db7b574…`）；
+>   ✅ 真 WKWebView 复跑同一枚探针 ⇒ `getElementById('heyta-boot')` 已是 **null**；
+>   ✅ `check:macos-window` rc=0、比值 **0.011 → 0.046**，那张图**人眼看过**（rail 九个入口 /
+>   页头「收集箱」/ 右栏「AI 工具调用·对话助手」/ 中间首启同意卡，暗色是壳跟随系统外观）。
+> - ⚠️ **这条缺陷把本线此前所有 mac 像素证据的载体否证了**：测量面是**全额受损**的 ——
+>   在此之前 macOS 壳的每一张像素图量的都是品牌帧，而 `reinstall-all.sh` mac 段那句
+>   "主蓝命中 2169 ⇒ 是共享 UI"就是拿品牌帧那块蓝底板过的（§7 第 82 条的形状，
+>   只是这次连"东西"都不是应用）。用户面我只量到"页面以 hidden 起跑"这一档，
+>   ⇒ 既不写成"用户被永久挡住"，也不写成"只是测试环境的事"。
+> - ✅ **补记 #3 那句"没给脚本加重试……这一格留给下一位连同判据一起做"已经填了**（`ad61621a`）：
+>   ios 腿现在跑 `for POD_ATTEMPT in 1 2`，两趟各落一本账（`/tmp/heyta-reinstall-pod.{1,2}.log`）、
+>   每趟打印 rc，**两趟都失败仍整腿判红**，而那句红字改成"两趟都失败 ⇒ 不是那条偶发崩溃"；
+>   沙盒一致性判据（`Manifest.lock == Podfile.lock`）照旧跟在重试**后面**。
+>   三臂台架（`~/scratch-heyta/pod-retry-harness.sh`，抽**真身**那 31 行、抽完断言
+>   `for POD_ATTEMPT` 恰好出现一次）：臂 1 第一趟崩第二趟成 ⇒ `VERDICT=OK`；
+>   臂 2 两趟都崩 ⇒ `VERDICT=FAIL` 且红字说"两趟"；臂 3 第二趟 rc=0 但沙盒仍不一致 ⇒
+>   `VERDICT=FAIL`（重试不许把不一致洗绿）。台架第一趟我自己写错一处：`PODS_SYNC` 初值设成 `INIT`
+>   而真身是**进这段之前就置 `OK`** ⇒ 臂 1 的"通过"被读成"没跑"，初值必须照真身。
+> - 🔴 **这次生产必须重发，与补记 #3 那句"不必重发"是对照关系而不是矛盾**：那一次的判据是
+>   "尖端相对 `afe7ff7a` 的产品面差异只剩 pbxproj"，而 `66ce1545` 动的正是 `apps/web/src/boot-splash.ts`
+>   ⇒ 打进 `index.html` 引用的那枚 entry chunk。发完的等式（载体 `ad61621a`，`HEYTA_WEB_BASE=/app/`）：
+>   `apps/web/dist/index.html` sha256 `5abcb0e889ed40b0…` **==** 线上 `https://heyta.waytofuture.cn/app/`
+>   逐字相同；entry 资产由 `index-BEJaUzcy.js` 换成 `index-DtOAMgSr.js`，把线上那份拉下来对着看，
+>   兜底代码在（`nve=120`、`document.visibilityState==="hidden"` 那一支、`window.setTimeout(a,h+nve)`）。
+>   发布五步各自打印 rc（landing build / `check:entries` / rsync / web build / **`check:web-artifact:app`** / rsync）**全 0**。
+>   线上套件复验：`playwright.live-site.config.ts` **23 passed，rc=0（1.0m）**，打的就是刚发出去的那份字节。
+> - 🟡 **本条还剩两格读数没取到，是"没量到"不是"量过且绿"**：队列 `heyta-deliver-on-window.sh`
+>   pid **70122**（证据目录 `~/scratch-heyta/deliver-040105-70122`）04:01 已过阶段 1 的现场门、
+>   阶段 1.5 对齐（载体 == main == `ad61621a`，未提交项 0），现在在阶段 2 跑链 ⇒
+>   **② 的逐段读数**（分母每次现量，上一趟是 84）与**③ 的四端重装**（含 `FRESH=5/5` +
+>   `PHASE1_EXIT`/`PHASE2_EXIT`/`INNER_EXIT` 三句一起抄）都要等它落账；
+>   落账前，"四端装的是含 `66ce1545` 的树"这句**不成立**（现装的那四端是 `9c3557c1` 的产物）。
