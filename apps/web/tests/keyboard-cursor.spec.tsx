@@ -57,6 +57,19 @@ async function mount(view: ViewKey): Promise<void> {
   });
 }
 
+/**
+ * 拆掉这一趟挂上的钩子与插出来的行。
+ * 写成函数而不是把四行抄进循环：`root` / `container` 是闭包外的 `let`，
+ * TS 在**函数调用后不会重设**它们的收窄，循环里第二次 `root = null` 之后
+ * `root?.unmount()` 就被判成 `never`（编译期红，而跑得是好的）。
+ */
+function unmountHarness(): void {
+  root?.unmount();
+  root = null;
+  container?.remove();
+  container = null;
+}
+
 /** 摆出"界面上渲染出来的那一串行"（文档序就是用户看到的顺序）。 */
 function rows(prefix: string, ids: string[]): void {
   for (const el of Array.from(document.querySelectorAll(`[data-testid^="${prefix}-"]`))) {
@@ -76,10 +89,46 @@ async function press(key: string, target: EventTarget = window): Promise<void> {
   });
 }
 
+// 光标接谁不接，两处真源说了算：视图全集在 `view-tabs.ts`，接了谁在 `keyboard-cursor.ts`。
+// 解析器一旦读空就抛 —— 读空的 0 命中会让下面两条判据无条件成立（§7 元规则二）。
+const VIEW_TABS_SRC = readFileSync(resolve(__dirname, '../src/features/shell/view-tabs.ts'), 'utf8');
+const CURSOR_SRC = readFileSync(resolve(__dirname, '../src/lib/keyboard-cursor.ts'), 'utf8');
+
+function viewKeys(): string[] {
+  const block = /export type ViewKey =([\s\S]*?);/.exec(VIEW_TABS_SRC);
+  const body = block?.[1];
+  if (body === undefined) throw new Error('view-tabs.ts 里没找到 `export type ViewKey` 那块 ⇒ 判据在空转');
+  return [...body.matchAll(/'([a-z][a-z-]*)'/g)].map((m) => m[1] as string);
+}
+
+function cursorTableKeys(): string[] {
+  const start = CURSOR_SRC.indexOf('const CURSOR_VIEWS');
+  if (start < 0) throw new Error('keyboard-cursor.ts 里没有 `const CURSOR_VIEWS` ⇒ 判据在空转');
+  const open = CURSOR_SRC.indexOf('{', start);
+  const close = CURSOR_SRC.indexOf('\n  };', open);
+  if (open < 0 || close < 0) throw new Error('CURSOR_VIEWS 的字面量没框住 ⇒ 判据在空转');
+  return [...CURSOR_SRC.slice(open, close).matchAll(/^\s{4}([a-z][a-z-]*):\s*\{\s*kind:/gm)].map(
+    (m) => m[1] as string,
+  );
+}
+
+/**
+ * 表外的视图 = ViewKey 全集 ∖ 表里的键。
+ * `ACCOUNTED_OUT` 是"这些缺席都被交代过"的名单 —— 理由本体留在 `keyboard-cursor.ts:71`
+ * 那段注释里（那里逐条现量了六条），这里**不重抄**，只登记谁被交代过。
+ */
+const ACCOUNTED_OUT = ['calendar', 'focus', 'growth', 'search', 'settings', 'trash'];
+
+function outOfTableViews(): string[] {
+  const table = cursorTableKeys();
+  return viewKeys()
+    .filter((v) => !table.includes(v))
+    .sort();
+}
+
 beforeEach(() => {
   selection.clear();
 });
-
 afterEach(() => {
   root?.unmount();
   root = null;
@@ -225,20 +274,52 @@ describe('跨视图通用（工单 W1 的那条硬要求）', () => {
     }
   });
 
-  it('🔴 表里没有的视图（日历 / 回收站 / 搜索）不绑光标', async () => {
-    // 回收站的 ↑↓ 是"恢复还是删除"（`TrashView`），搜索面板有它自己那条
-    // （`App.tsx` 的 `moveCursor`）。这里要是"顺手都接上"，那两处就会一次跳两格。
+  it('🔴 表里没有的视图不绑光标 —— 清单**从两处真源推出来**，不是手抄', async () => {
     rows('task-item', ['t1', 't2']);
-    for (const view of ['calendar', 'trash', 'search', 'growth', 'settings'] as ViewKey[]) {
-      selection.clear();
+    // 正向对照：同一趟必须有一次"接上的视图真的动了"，否则下面那个"选中没动"
+    // 可能量的只是夹具坏了（§7 元规则一：先怀疑探针）。
+    await mount('tasks');
+    await press('ArrowDown');
+    expect(selection.get('task'), '夹具自己就不工作 ⇒ 这一条没有资格判绿').not.toBeNull();
+    unmountHarness();
+    selection.clear();
+
+    for (const view of outOfTableViews() as ViewKey[]) {
+      rows('task-item', ['t1', 't2']);
       await mount(view);
       await press('ArrowDown');
       expect(selection.get('task'), `${view} 面上不该有列表光标`).toBeNull();
-      root?.unmount();
-      root = null;
-      container?.remove();
-      container = null;
+      unmountHarness();
     }
+  });
+
+  /**
+   * 🔴 把 `keyboard-cursor.ts:71` 那句原话变成判据 —— 它写的是"这张表的正确性
+   * **取决于'缺席都有理由'**，不取决于'在场都对'"，而注释不能失败。
+   *
+   * 这一条不重抄理由（理由的所有者在源码注释里，抄过来必漂 —— 本篇 §8.33 那一族），
+   * 它只登记**哪一个视图被交代过**：
+   * ① `view-tabs.ts` 的 `ViewKey` 全集 = 表里的 ∪ 已登记的表外视图，两边有重叠或有缺口都红；
+   * ② 新加一个 `ViewKey` 而没进表、也没登记 ⇒ `ACCOUNTED_OUT` 与推出集不等 ⇒ 红；
+   * ③ 表里加了一个视图而名单没动 ⇒ 同样红（方向两侧都有牙，见装置 V2 / V3）。
+   */
+  it('🔴 视图全集必须"每个都选了边站"：新视图不许静默落到表外', () => {
+    const all = viewKeys();
+    const table = cursorTableKeys();
+    const derivedOut = outOfTableViews();
+
+    expect(new Set(all).size, `ViewKey 里有重复：${JSON.stringify(all)}`).toBe(all.length);
+    expect(all.length, 'ViewKey 全集少得不像真的（解析器坏了）').toBeGreaterThanOrEqual(9);
+    expect(table.length, 'CURSOR_VIEWS 解析出 0 项 ⇒ 这条判据在空转').toBeGreaterThan(0);
+    for (const v of table) expect(all, `表里有 ${v}，但 ViewKey 里没有它`).toContain(v);
+    expect(
+      table.length + derivedOut.length,
+      '两边有重叠 ⇒ 名单解释不了全集（表里的键又被登记成了"表外"）',
+    ).toBe(all.length);
+    expect(
+      derivedOut,
+      '表外视图与登记名单不符：新增视图要先在 CURSOR_VIEWS 里接上、或在名单里交代（理由写进 keyboard-cursor.ts 那段注释）',
+    ).toEqual([...ACCOUNTED_OUT].sort());
   });
 });
 
