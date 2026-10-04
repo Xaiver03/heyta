@@ -18,7 +18,7 @@
  * `split('\n')` 段 = `wc -l` 的 213 行（文件以换行结尾）。**手抄的数字连单位都会错**，
  * 所以这里的读数全部由脚本自己拼进提交说明，不由人复述。
  *
- * ## 四条冲突族与它们的解法（§8.22 预置，本文件是唯一执行者）
+ * ## 五条冲突族与它们的解法（§8.22 预置，本文件是唯一执行者）
  *
  *  1. `package.json`：scripts 键并集 + `check` 链并集，带四条断言
  *     （两侧键不缺 / 两侧链段不缺 / 两侧各自相对顺序不颠倒 / 两侧相对 base 都不得摘段）。
@@ -45,13 +45,23 @@
  *     而"别人的内容"在这个文件里的真实形状是**一整节**（标题 + §编号），那一层挡得住。
  *     行级孤儿数量仍然打印并进提交说明，只是不作门禁。
  *
- * 任何不属于这四族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
+ *  5. `server/image-npm-tree.json`（镜像 npm 依赖树快照，派生物）：取**本分支**侧。
+ *     这一族的取舍**不是偏好**：main 那份是 10-03 傍晚由**旧版联网生成器**解出来的，
+ *     `inputs` 里根本没有 `packageLockSha256` 这一项；本批那份是**由提交物锁 `server/package-lock.json`
+ *     派生**的。合并后的树里同时有那把锁和新生成器 ⇒ 取 main 侧一定红在
+ *     `check:image-license` 的第一腿（`gen-image-npm-tree.mjs --check`）。
+ *     🔴 但"取本分支侧就一定对"同样不成立 —— 合并后的锁可能不等于本分支那份的锁（两侧都碰过它
+ *     而不冲突）。所以判据不写在解法里，而是把**生产那一道门禁原样挂进 GATES 在载体树上跑**：
+ *     复制一遍哈希比较就等于制造下一个漂移点，而它只比 `inputs` 里的四枚哈希之一。
  *
- * ## 落笔前的门禁（只跑纯文件系统的那五道）
+ * 任何不属于这五族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
+ *
+ * ## 落笔前的门禁（只跑纯文件系统的那六道）
  *
  * `check:gate-wiring`（并集有没有静默摘掉谁的门禁，这一族的裁判）、
  * `check:selfhost-entry-command`（入口命令抄件对账；顺带证明合并没把站内两份词条抄件并掉）、
- * `check:script-snapshot`、`check:docs`、`check:md-tables`。
+ * `check:script-snapshot`、`check:docs`、`check:md-tables`、
+ * `gen-image-npm-tree.mjs --check`（第五族的裁判：快照还代不代表当下那把锁）。
  * 完整 `pnpm check`（要 node_modules、要起栈、`check:ai-e2e` 会 SIGKILL 别人的 dev server，
  * §7 #87）**不在这里跑** —— 它是落地那一刻的判据，载体绿不绿不由本脚本主张。
  *
@@ -139,21 +149,27 @@ notes.push(`MERGE_HEAD=${mergeHead.slice(0, 8)} 已确认 · 冲突 ${conflicts.
 const stage = (path, n) => git(['-C', WT, 'show', `:${n}:${path}`]);
 const PNG = (p) => p.startsWith('apps/web/evidence/') && p.endsWith('.png');
 const AUDIT = 'docs/research/self-host-distribution-audit.md';
+// 镜像 npm 树快照（派生产物）。它现在是第五族：main 在 10-03 傍晚提交了一份
+// **由旧版联网生成器解出来的**快照（`inputs` 里根本没有 `packageLockSha256` 这一项），
+// 而本批带进去的是**由提交物锁派生**的那一份。合并后的树里同时有锁与新生成器，
+// 所以"取哪一侧"不是偏好 —— 取 main 那份会在 `check:image-license` 的新鲜度那一腿直接判红。
+const SNAPSHOT = 'server/image-npm-tree.json';
 
-const fam = { pkg: [], gi: [], png: [], audit: [], other: [] };
+const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], other: [] };
 for (const p of conflicts) {
   if (p === 'package.json') fam.pkg.push(p);
   else if (p === '.gitignore') fam.gi.push(p);
   else if (PNG(p)) fam.png.push(p);
   else if (p === AUDIT) fam.audit.push(p);
+  else if (p === SNAPSHOT) fam.snap.push(p);
   else fam.other.push(p);
 }
 if (fam.other.length) {
-  die(2, `出现**预置四族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
+  die(2, `出现**预置五族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
     `   先把它加进本文件的分族与解法，再重跑。`);
 }
-notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} other=${fam.other.length}`);
-if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1) {
+notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} other=${fam.other.length}`);
+if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1) {
   die(2, '同一族出现多于一份文件 —— 分族前提（各一处）不成立，交人判');
 }
 
@@ -352,6 +368,24 @@ if (fam.audit.length) {
     `main 独有行 ${r.stats.mainOnly}、本分支独有行 ${r.stats.srcOnly}、产出非空行 ${r.text.split('\n').filter((l) => l.trim() !== '').length}`);
 }
 
+/* ── 镜像 npm 树快照：取本分支侧，但由**生产门禁**来判对错 ────────────────
+ * 两类的取舍不一样：PNG 是"谁主张谁出图"的现场产物，这一份是**派生物** —— 它代不代表
+ * 当下的锁，唯一裁判是 `gen-image-npm-tree.mjs --check`（它就是 `check:image-license`
+ * 的第一腿）。所以这里不自己拼哈希比较（复制一遍判断=下一次漂移的起点，而且它比的是
+ * `inputs` 里**四枚**哈希：server 安装输入 / 安装形状 / 工作区包 package.json / 锁），
+ * 取本分支侧之后**把那道门禁挂进 GATES 在载体树上现跑**。
+ * 为什么是本分支侧：main 那份的 `inputs` 里根本没有 `packageLockSha256`（旧版联网生成器
+ * 的产出），新生成器一定判红；本分支那份才是"由提交物锁派生"的那一份。 */
+let snapReading = '';
+if (fam.snap.length) {
+  git(['-C', WT, 'checkout', '--theirs', '--', ...fam.snap]);
+  git(['-C', WT, 'add', '--', ...fam.snap]);
+  const joined = JSON.parse(readFileSync(join(WT, SNAPSHOT), 'utf8'));
+  snapReading = `${SNAPSHOT} 取本分支侧（locks 派生快照，inputs.packageLockSha256=${(joined.inputs?.packageLockSha256 ?? '缺失').slice(0, 12)}…）；` +
+    '新鲜度由 GATES 里的 gen-image-npm-tree --check 在载体树上现判';
+  notes.push(snapReading);
+}
+
 const still = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
 if (still.length) die(2, `解完之后仍有未解决冲突：${still.join(', ')}`);
 for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'), 'utf8')], ['.gitignore', readFileSync(join(WT, '.gitignore'), 'utf8')]]) {
@@ -377,18 +411,22 @@ for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'
 
 // ── 3. 纯 fs 门禁 ────────────────────────────────────────────────────
 const GATES = [
-  ['check:gate-wiring', 'scripts/check-gate-wiring.mjs'],
-  ['check:selfhost-entry-command', 'scripts/check-selfhost-entry-command.mjs'],
-  ['check:script-snapshot', 'scripts/check-script-snapshot.mjs'],
-  ['check:docs', 'research/tools/docs-link-check.mjs'],
-  ['check:md-tables', 'scripts/check-md-table-rows.mjs'],
+  ['check:gate-wiring', ['scripts/check-gate-wiring.mjs']],
+  ['check:selfhost-entry-command', ['scripts/check-selfhost-entry-command.mjs']],
+  ['check:script-snapshot', ['scripts/check-script-snapshot.mjs']],
+  ['check:docs', ['research/tools/docs-link-check.mjs']],
+  ['check:md-tables', ['scripts/check-md-table-rows.mjs']],
+  // 第五族的裁判：`check:image-license` 的第一腿（纯 fs、不联网、不落盘）。
+  // 🔴 只挂这一腿，不挂整条 —— 后面那腿 `--installed-tree` 要从**真镜像**里取树，
+  //    那是载体上跑不了的（要 docker 构建），挂进来会把"载体 fs 门禁"变成"载体要建镜像"。
+  ['image-npm-tree 新鲜度（check:image-license 第 1 腿）', ['research/tools/gen-image-npm-tree.mjs', '--check']],
 ];
 const gateReadings = [];
-for (const [label, file] of GATES) {
+for (const [label, argv] of GATES) {
   let out = '';
   let rc = 0;
   try {
-    out = execFileSync('node', [file], { cwd: WT, encoding: 'utf8', maxBuffer: 1 << 26 });
+    out = execFileSync('node', argv, { cwd: WT, encoding: 'utf8', maxBuffer: 1 << 26 });
   } catch (err) {
     rc = err.status ?? 1;
     out = `${err.stdout ?? ''}${err.stderr ?? ''}`;
@@ -414,14 +452,14 @@ const msg = `merge(selfhost): 把 ${SOURCE} 合进 ${MAIN}（载体，第一父 
 由 research/tools/selfhost-merge-carrier.mjs 产出，逐路径解法与断言记在该文件头部。
 ${notes.map((n) => `· ${n}`).join('\n')}
 
-解法：${[pkgReading, giReading, auditReading].filter(Boolean).join('；')}
+解法：${[pkgReading, giReading, auditReading, snapReading].filter(Boolean).join('；')}
 ${fam.png.length ? `· evidence PNG ${fam.png.length} 枚取 main 侧` : ''}
 
 载体的纯 fs 门禁读数（全部现量）
 ${gateReadings.map((r) => `· ${r}`).join('\n')}
 
 🔴 完整 pnpm check（要 node_modules、要起栈、check:ai-e2e 会 SIGKILL 别人的 dev server）**不在这一笔的主张里**，
-它是落地那一刻的判据；本笔只把"四条冲突族的解法"固化成一个可复核对象。
+它是落地那一刻的判据；本笔只把"五族冲突的解法"固化成一个可复核对象。
 这一笔**不是** ${MAIN} 的推进。main 每前进一步或本批每多一笔，都要重跑本脚本（只认 ${BRANCH}，不认 SHA）。
 `;
 writeFileSync('/tmp/ht-carrier-msg.txt', msg);
