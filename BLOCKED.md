@@ -4401,16 +4401,33 @@ git grep -n '20261009000000_add_holiday_adjustments' HEAD
   `123614 规范闸门对齐：载体纯快进 bc23fec2 → 5e09205d（无合并、无新提交）` —— 两个 SHA 都是完整 8 位、行内零引号，
   而同一行在旧字节里长成 `"bc23fec → "5e09205`。⇒ 原子 `mv` 换字节的生效点确实是"换代后的实例"。
 
+> **B76 补记 #5（10-04 12:4x）—— 等窗口的回合用来把 ③ 的验收路径核到行号：绿色那一趟一定会读到五条判据，而载体里的旧取证文件不会冒充本轮**
+>
+> - 三处现量（全只读、零负载）：队列 `:822-823` 起的是 `bash scripts/reinstall-all.sh`**不带 `--only`/`--skip`**
+>   ⇒ 四端都在；`reinstall-all.sh:262` 的 `WIN_OUT="$ROOT/dist/windows"` 与队列 `:887` 的
+>   `WIN_FACTS="$CARRIER/dist/windows/install-capture.txt"` 是**同一个路径**（`ROOT` = cwd = 载体）；
+>   Windows 那五条判据的定义只有一份（`scripts/lib/msix-install-facts.sh:20-26`），读者是
+>   `reinstall-all.sh:158`、`package-msix.sh:84` 与队列 `:888-892` —— **用户点名的 `SHORTCUT_OK=True` 三处全在位**，
+>   且 `msix_check_facts()` 是 `tr -d '\r'` + `grep -qxF` **整行**比（子串比会被一句散文满足，那文件头已经写过一次）。
+> - 载体里此刻躺着 10-03 23:12 的旧 `install-capture.txt`（668 B）。它不会变成"本轮装上了"：队列 `:821` 先取
+>   `INST_START`，`decide_win_facts()` 判 `mtime < INST_START ⇒ WIN-STALE-EVIDENCE`（五事实再齐也判红），
+>   而起跑时刻或 mtime 任一侧没量到时单独走 `WIN-NO-BASELINE` —— **不默认"新鲜"**。
+> - 为什么现在核：③ 每轮要等满 5400s 才让位，窗口一旦开就得跑满；**路径或清单错一位的代价是一整轮白等**，
+>   而它是能零成本预先排除的（traps #82 同族：判据读不到的东西不会自己报错）。
+> - `grep -c '\\"' heyta-deliver-on-window.sh` 现量 **0** ⇒ 那次引号缺陷没有第二处潜伏。
+>   ① 的三笔（`dd8f2210` / `f2d7ed40` / `fd34c42a`）在最新 main `faee6abc` 上 `--is-ancestor` 复取仍 **YES**；
+>   ④ 那条 PROGRESS 前置**仍未满足**（`git status` 仍 `M`，`--numstat` = `33 1`，另一条线正在写它）。
+
 **复现本条全部读数的现量命令**（只读，不起负载）：
 
 
 ```bash
 sysctl -n vm.loadavg
-pgrep -f 'heyta-deliver-on-window[.]sh'                      # 我的队列 = 85881
+pgrep -f 'heyta-deliver-on-window[.]sh'                      # 现役实例（10-04 12:4x 现量 = 28485，第 2 轮）
 ps -o pid,ppid,lstart,etime,time,command -p 93772 95477 98934
 lsof -a -d cwd -p 93772 -Fn | grep '^n'                      # 归属：/tmp/heyta-reinstall
 cd heyta && git status --porcelain PROGRESS.md && git diff --numstat PROGRESS.md
-tail -6 ~/scratch-heyta/deliver-105244-85881/run.log
+tail -6 ~/scratch-heyta/deliver-123436-28485/run.log          # 第 2 轮那本账；上一行现取实例号，目录名带 pid
 ```
 
 ## B77. 🟠 ④ 要求的"traps 编号按工作树现量"量出三件事：AGENTS 让下一位用的那条计数命令**数的不是条数**、4 组真重号、号段表落后 2 个号（改号那件事早已登记，本线不代拍）
