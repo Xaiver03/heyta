@@ -1859,3 +1859,27 @@ cwd 在别条线 `heyta-wt-ai-closeout/apps/mobile/ios/Pods`）。
   我的 ① 会被启动器自己的 RIVAL 门挡下（这是对的，不抢别人的四端重装）。
 - ① 的第五条腿有路：`ssh -o BatchMode=yes windows-pc 'echo SSHECHO=OK'` 回 **OK**（打包机可达）；
   载体里 `dist/windows/packaged-first-run.png` 现在**不存在**是正常的 —— 它由 windows 段现场产出。
+
+## 23:07 ② 的分母先在载体上算清（零构建、只读 package.json），并纠正我第一遍算错它用的那把尺
+
+对象：载体 `heyta-wt-reinstall @ 691a4b28`（主检出此刻在 `980c50e9`）。Goal 原文写"62 段"，
+**现量是 82 段** ⇒ 报"可过段数"时分母必须带载体与时刻，不然下一轮只会拿到又一个别的数。
+
+| 数法 | 现量 | 对账 |
+|---|---|---|
+| `scripts.check` 按 `&&` 切 | **82 段** | = 78 段引用 `check:` 名 + 4 段不是（`pnpm build`、`pnpm typecheck`、`pnpm screenshot:verify`、`pnpm -r test`） |
+| `check:` 开头的脚本键 | **79 条** | = 78 条挂在串里 + 1 条没挂（`check:web-artifact:app`） |
+| 串里引用、但没有这个键 | 0 处 | 无悬空引用 |
+| 完全相同的段出现两次 | 0 处 | — |
+
+🔴 **第一遍我算出的是一套自洽但不成立的数**（"76 个不同名 / 3 条没挂"）：匹配器写成 `check:[\w-]+`，
+而 `[\w-]` **不含冒号** ⇒ `check:licenses:stamp` 被截成 `check:licenses`，于是既少算一个名，
+又把两条**本来就挂着**的键错报成"没挂"。换成 `check:[A-Za-z0-9_-]+(?::[A-Za-z0-9_-]+)*` 之后，
+先给这把尺喂**必命中**（`pnpm check:licenses:stamp` → 整名）与**必不命中**（裸 `pnpm check` → 不产出 token）
+各一条，两向都对才拿它算结论。
+⇒ 规则：**枚举带层级分隔符的标识符时，第一个要问的是"我的字符类含不含那个分隔符"**；
+不含分隔符的 pattern 会同时制造"少一项"和"这项没挂"两种假结论，而两个数字看着都像在读数。
+
+- ② 落账时用的口径（就这一句）：**分母 82 段**（载体 691a4b28，23:07 现量），其中 e2e 三段是
+  `check:ai-e2e`（SIGKILL 4318+4319）、`check:privacy-consent-e2e`（4322）、`check:landing-e2e`（4320）。
+  `check:web-artifact:app` 有意不在串里（由产物那条路单独消费），**不许把它算进"可过段数"的分子**。
