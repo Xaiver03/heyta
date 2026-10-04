@@ -215,11 +215,23 @@ to a chosen `serverSeq`, decrypting encrypted payloads with the user's
 passphrase, and writes an importable `AppDataComplete` JSON file. It is
 **read-only** on the database.
 
-> **Status: unverified against real encrypted data.** The script lints, builds,
-> and its module graph loads, but it has not been run end-to-end against an
-> actual encrypted account. Before relying on it in an incident, verify it
-> against a known account (e.g. your own): recover at the latest seq and confirm
-> the entity counts match the live app.
+> **Status: the decrypt + replay segment is now pinned; the end-to-end run is not.**
+> Since 2026-10-04, `tests/recover-replay-roundtrip.spec.ts` drives the script's own
+> helpers with real `encryptBatch` / `decryptBatch` and the real `replayOpsToState`.
+> That is not the same as "has been run against an actual encrypted account", and the
+> caution below still stands: before relying on it in an incident, verify it against a
+> known account (e.g. your own) — recover at the latest seq and confirm the entity
+> counts match the live app.
+>
+> 🔴 Two defects that spec found, both of which a pre-2026-10-04 run would have
+> produced silently: the script carried its **own copy** of the prisma column list and
+> that copy was missing `entityIds` and `repairBaseServerSeq`. Without the first, a
+> batch delete replayed as a single-entity delete, so **entities 2..n came back in the
+> recovered file** (the #8340 bug, second copy — same class as
+> `sync.routes.snapshot-handler.ts` fixed on the snapshot path). Without the second,
+> any account that ever used `REPAIR` failed with `LEGACY_REPAIR_REPLAY_UNSUPPORTED`,
+> i.e. the tool could not recover it at all. Both are fixed by making the script use
+> the snapshot path's exported `REPLAY_OPERATION_SELECT` instead of a hand-copied list.
 
 **1. Inspect** — find the cutoff sequence (no encryption key needed):
 
