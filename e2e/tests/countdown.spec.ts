@@ -95,9 +95,15 @@ test.describe('倒数纪念日：真浏览器契约（W5）', () => {
 
     const days = page.locator('[data-testid^="event-card-"]').first().locator('[data-testid^="event-days-"]');
     // 🔴 期望值从**日历事实**算（独立真值），不是把领域的算术抄一遍：
-    // 下月 1 号距今 28–31 天，且界面必须说出那个数。
-    expect(target.days, '下月 1 号距今应落在 28–31 天').toBeGreaterThanOrEqual(28);
-    expect(target.days).toBeLessThanOrEqual(31);
+    // 界面必须说出"下月 1 号距今 N 天"里的那个 N。
+    //
+    // ⚠️ 这里原来写的是 `28 ≤ N ≤ 31` —— 那不是日历事实，是**"今天恰好是月初"**。
+    //   N 的真实取值范围是 `1..31`（当月最后一天 ⇒ 1 天，当月 1 号 ⇒ 最多 31 天），
+    //   所以那一句让这条用例在**每月 5 号之后每天必红**，而红字写的是"下月 1 号距今
+    //   应落在 28–31 天" —— 读起来像产品的日历算错了。2026-10-05 现量 N=27 命中。
+    //   留下来的界仍然挡得住它本来想挡的：目标日落到过去（N ≤ 0）或挑错了月份（N > 31）。
+    expect(target.days, '下月 1 号必须是**未来**的一天').toBeGreaterThanOrEqual(1);
+    expect(target.days, '下月 1 号不可能比一个月更远').toBeLessThanOrEqual(31);
     await expect(days).toHaveText(`还有 ${String(target.days)} 天`);
     await page.screenshot({ path: 'test-results/countdown-board.png' });
 
