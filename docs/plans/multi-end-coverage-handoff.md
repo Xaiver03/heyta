@@ -2305,3 +2305,25 @@ md5 `8596440d…` / `8679ade2…`，与入库那两枚 `fa8180d2…` / `f6718cb1
 要么在窗口前重起它：`nohup bash ~/.heyta-window-rigs/heyta-carrier-png-janitor.sh >/dev/null 2>&1 & disown`，
 要么在 ③ 跑完立刻手工做同一件事（先 `cp -p` 归档到 `~/.heyta-evidence/`、`cmp -s` 校验、再
 `git -C <载体> checkout -- apps/mobile/evidence/`）。⚠️ 顺序不能反：没校验就还原 = 把本趟证据丢了。
+
+## 00:4x 排队器有一处寿命错配，已按 env 旋钮重起（不改在跑的脚本）
+
+`heyta-queue-checks-after-chain.sh` 等的是**链退出**（`CAP_CHAIN` 默认 180 轮 ≈ 3 小时），
+而链要等窗口开、跑完 ③+① 才退。22:40 起的那台到点即 **01:40 过期**，
+而链此刻还在第 119 轮等负载（42 vs 12）⇒ 窗口若晚开，② 会因为排队器先过期而**永远不跑**，
+且它写的是 `QUEUE=EXPIRED / RC=3`（响亮，但没人接）。
+处置：**不动在跑的那份脚本**（bash 增量读文件，改运行中的脚本会把后续轮次打坏），
+只按它自己的旋钮重起：`CAP_CHAIN=720 nohup bash … & disown` ⇒ 新 pid `50785`，
+证据目录 `~/.heyta-evidence/checks-queued-1005-004044/`，旧日志已留档成
+`…/checks-queued-1005-004042/queue.prev-224030.log`（脚本第 17 行的 `EV=` 是**硬编码**、
+不吃 env，所以我传的 `EV=` 被忽略——这本身是一枚小读数，记下来免得下次又以为传进去了）。
+
+🔴 一条探针边界：macOS 的 `ps eww` **看不见别的进程的环境变量**（SIP），
+所以"读不到 `CAP_CHAIN=`"不构成"没生效"。改测**投放姿势**：
+`CAP_CHAIN=720 nohup bash -c 'echo ${CAP_CHAIN:-180}' > /tmp/heyta-envprobe.txt & disown`
+⇒ 文件里是 `CAP_CHAIN=720`，加上脚本第 26 行就是 `${CAP_CHAIN:-180}` ⇒ 720 在位。
+可迁移的形状：**判"参数没传进去"之前，先确认探针有没有能力读到它**（§7 元规则一）。
+
+traps 台账现量仍是别条线脏着（`+823/−7` 未提交、最大号 270）⇒ 四条候选
+（#271 `find /tmp` 起点是软链、#272 缺桩绊线、引错链日志、验收自毒自己的闸门）
+继续留在本台账，不往多人文件里插行。
