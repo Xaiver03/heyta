@@ -1866,6 +1866,28 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     而那三枚文件在那份检出里根本不存在。
     ⇒ ② 那条"75 段可过"的读数不用改；但**任何"`pnpm check` 全绿"的说法必须带上工作树状态**，
     而未跟踪的并行产物会让它红 —— 这不是产品红，也不由本线代改（AGENTS §8.9）。
+  - ✅ **08:1x ③ 的"第三张截图"补成一条有牙的判据（第二个补丁 `/tmp/heyta-notes-evidence-focus.patch`，
+    43 行新增）**：三处 `screencap` 收进一个 `shot_evidence`，**拍之前**先读一次 `mCurrentFocus`
+    并按文件名记账；第 12 步对每张图各判一条"拍的那一刻前台是本应用"。
+    🔴 **像素统计这次不当判据用，是有现量理由的**（同一目录 67 张人看过的真图）：
+    · `countBrandBlue` 有 **14 张 = 0**（`android-search-1..6`、`android-reminder-*` 全是真界面）
+      ⇒ 把 `reinstall-all.sh` 的 `blue ≥ 20` 抄到手机侧会把这些整片判红 —— 那个阈值是从
+      **mac 共享 UI** 推出来的，不是从手机界面推出来的（§7 第 82 条第二轮那个坑的手机版）；
+    · `android-notes-1-editor-open.png` 人眼看是完整编辑屏（标题「编辑便签」+ 正文 + 蓝色「保存」），
+      而 `contentRatio` 只有 **1.8%**，离 `png-stats` 的 `BLANK_CONTENT_RATIO = 1%` 只剩 **0.8pp**
+      ⇒ `looksBlank` 在这族图上没有余量。两个读数**照打不判红**。
+  - ✅ **这条判据的夹具是 `/tmp/heyta-ev-fixture.sh`：4 臂 11 条断言 + 1 枚变异全绿**
+    （前台是我们 / 读不到 / 是 launcher / 记录串了文件名；变异=删掉"读不到"那一支）。
+    🔴 **它照出一个真缺陷**：`dumpsys window` 读不到时我原来把空串记进账，第 12 步的 `case`
+    会让它落到 `*)`，于是**"探针没读到"被报成"前台是别的 App"** —— 正是我自己注释里说要分开的两种成因。
+    修法是记一个 ASCII 哨兵 `FOCUS-UNKNOWN` 并给 `""|*FOCUS-UNKNOWN*` 单开一支；
+    夹具里那两条"不许塌成对方"的断言（臂 2 不含「不是本应用」、臂 3 不含「没读到」）就是它的牙齿。
+  - ⚠️ **本轮 prepared 产物的持久副本在 `~/.heyta-pending/notes-e2e-20261004/`**（7 枚，逐枚 `cmp` 过）：
+    两个补丁 + 两份夹具 + 两份说明书 + 链 v9 与设备占用库。
+    **不要只住 `/tmp`** —— 一次重启会把它们整个清走，而那时下一位只能重新推导（本条就是那条一般规律的又一次现形）。
+    复跑：`bash ~/.heyta-pending/notes-e2e-20261004/heyta-dump-fixture.sh`、
+    `bash ~/.heyta-pending/notes-e2e-20261004/heyta-ev-fixture.sh`（后者读 `/tmp/heyta-step9/ev.sh`，
+    那份没了就照说明书第 1 步重新 `git show HEAD:… > base.sh` 再 `git apply` 两个补丁）。
 - ✅ **05:3x ⑤ 复核**：`B41/B42/B45` 三行仍在 §7.28 那张「完成条件逐条的现量与差什么」表里（`:1220`/`:1221`，状态 🟡，
     各带自己的现量命令），本夜落笔的六笔只改了 `scripts/verify-mobile-notes.sh` 的第 12 步与
     `apps/desktop-macos/scripts/package-app.sh` 的公证段，加上四份文档，
