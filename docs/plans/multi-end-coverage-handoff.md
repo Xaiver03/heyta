@@ -3092,3 +3092,21 @@ pid 46540）⇒ 按 §8.9 让路，不动它。
 它断言的方向恰好相反：**"逃生门还在不在"**（不见了就报红），
 不是"这一趟有没有被用它跑"。现量全仓只有 `run-gradle.mjs` 与那枚门禁两个引用点，
 装置（在 `~/.heyta-window-rigs/`，不在仓内扫描范围里）没设它 ⇒ 正常跑必放行，只有带旋钮时才拦。
+
+## 03:33 对 ④ 做了一次**对着当前 HEAD 的复量**（不是重做，是防"旧证据覆盖不了新增项"）
+
+④ 早就标了闭合，但这条 Goal 从 09:3x 起 main 已被别线推进三十几笔 ⇒ "当时在 HEAD"不等于"现在还在 HEAD"。
+逐条现量（每条都是可直接重跑的 grep）：
+
+| 承诺 | 现量对象 | 结果 |
+|---|---|---|
+| `ProjectActions.setParent(entityId, parentId?)` | `packages/app-host/src/project-actions.ts:109` 签名带 `?`，实现在 `:280` | ✅ |
+| 一层 / 环 / 自指守卫 | `packages/domain/src/project-hierarchy.ts`：`self`(`:82`)、`cycle`(`:90`)、`parent_not_top_level`(`:97`)、`has_children`(`:100`)、两侧 not-found(`:78`/`:85`) | ✅ 六枚拒绝理由齐，且**动作层不自己算**（`:100` 注释写明分工） |
+| web 选择器 | `apps/web/src/features/projects/ProjectsPanel.tsx`、`features/tasks/SubtaskPicker.tsx`、`store.ts`、`App.tsx` | ✅ 四处引用 |
+| 移动端选择器 | `apps/mobile/src/screens/ListsSection.tsx`、`TaskDetailSheet.tsx` | ✅ |
+| 中英词条 | `common.organizer.folder.{button,title,none,current}` 逐条 `zh=1 en=1` | ✅ 四条各 1/1 |
+
+⚠️ 一处我自己差点读错的：第一次查词条我按"键名里该有 `parent`"去 grep ⇒ `en.ts` 命中 **0**，
+而真键名是 `organizer.folder.*`。**0 命中是探针问错了问题，不是产品缺东西** ——
+这是元规则一（先怀疑探针）今天第三次现形（前两次：Apple 的 `strings` 不支持 `-el`、BSD `grep` 不认 `-P`）。
+⇒ 断"缺 X"之前先把 X 的真名从**生产者那一侧**抄来，别按命名直觉猜。
