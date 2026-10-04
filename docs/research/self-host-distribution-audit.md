@@ -58,7 +58,7 @@
 仍然成立的后半句是「和发不发镜像是两个独立问题」—— 而且它更真了：今天**没有发布镜像**，
 所以这条路对外仍然要靠"自己从源码构建"，而构建出来的东西现在是完整的。
 
-补一条会挡路的已知缺陷：`apps/web/vite.config.ts` 里**没有 `base`**，挂载路径靠命令行 `--base=/app/` 传（`deployment.md:465,471`）；同时 PWA 的 `/sw.js` 与 manifest 里 `start_url/scope/icons` 全是根绝对路径，在 `/app/` 子路径下会落回落地页（`deployment.md` §3.7「还没做的」，登记至今**未修**）。⇒ 要把界面塞进镜像，**必须先把挂载路径变成构建参数**，否则打出来的包在子路径下是坏的。
+补一条会挡路的已知缺陷：`apps/web/vite.config.ts` 里**没有 `base`**，挂载路径靠命令行 `--base=/app/` 传（`deployment.md:465,471`）；同时 PWA 的 `/sw.js` 与 manifest 里 `start_url/scope/icons` 全是根绝对路径，在 `/app/` 子路径下会落回落地页（`deployment.md` §3.7「还没做的」，登记至今**未修**）。~~登记至今未修~~ ⇒ **2026-10-04 现量更正：这一句作为"当前状态"已过期**——`apps/web/src/pwa/register.ts:43` 现在是 `${import.meta.env.BASE_URL}sw.js`，产物 `apps/web/dist/manifest.webmanifest` 的 `start_url`/`scope` 是 `"."`、`icons[].src` 是相对路径（挂载路径已成为构建参数）。⚠️ 这只推翻到**代码与产物层**；"线上 `/app/sw.js` 现在返回的是 JS 而不是落地页 HTML"没有在本趟取证，所以它作为**部署态**判据仍待复验（G-59）。⇒ 要把界面塞进镜像，**必须先把挂载路径变成构建参数**，否则打出来的包在子路径下是坏的。
 
 ⚠️ **这条前置已经做完**（2026-10-03，`257d4b3e` + 本文 §8）：`base` 进了 `vite.config.ts`
 （构建参数 `HEYTA_WEB_BASE`），PWA 的 `SW_URL` 与 manifest 三项改成随 `base` 走。
@@ -6379,10 +6379,12 @@ en  'site.platforms.web.body': The full product, not a demo. It keeps working wh
 
 #### ② 界面级判据：写成一条真浏览器用例，落在**本地 build 产物**
 
-新文件 `e2e/landing/platforms-install-claim.spec.ts`（3 条用例）。它盯的是一句
+新文件 `e2e/landing/platforms-install-claim.spec.ts`（3 条用例；~~3 条~~ ⇒ **18:0x 现量是 4 条**，
+第 4 条是看图撞见的 `.lp-note` flex 缺陷，见 §8.110 ②）。它盯的是一句
 **没有载体的对外承诺**：`site.platforms.web.body` 原来写「可安装、可离线用」，
 而 Web 端到今天也没有可安装的 PWA（`SW_URL='/sw.js'` 在 `/app/` 挂载下返回落地页 HTML，
-§8.57 / deployment.md §3.7）。G-51 的处置是把整条安装承诺摘掉，这条用例负责**不让它回来**。
+§8.57 / deployment.md §3.7）。⚠️ **这句里的机制部分已被 §8.110 ⑦ 的现量推翻**（挂载路径已成构建参数），
+但"因此就可安装"没有证 —— **摘掉整条安装承诺的裁决不变**。G-51 的处置是把整条安装承诺摘掉，这条用例负责**不让它回来**。
 
 两个形状决定，都不是审美：
 
@@ -6655,3 +6657,137 @@ A  apps/mobile/evidence/ios-reminder-ax-companion-20261004.txt
   `g131` 等 rig 结束 **且** 负载 ≤12 **且** 锁空；两条都是等满按环境无效收尾，不调阈值。
 - `g74` 落地预检仍在轮询（上限 18:55 左右到点）。**它到点不等于窗口关**，
   也不等于我可以提前落地；到点后按 §8.16 重跑一轮预检再说。
+
+### 8.110 一张"给人看的证据图"谎报了一个不存在的缺陷，而顺着它查下去撞到两条真的（2026-10-04 17:4x–18:0x）
+
+这一节全部读数来自 `/tmp/g134/arms.txt`、`/tmp/g139/readings.txt`、`/tmp/g141-landing-suite2.log`、
+`/tmp/g145/readings.txt`、`/tmp/g146-suite.log`，提交为 `7ddf36a9`（三条判据）、`8926be56`（`.lp-note` 修复 + 第 4 条）、
+`4e805e53`（等稳定闸门抽成单一所有者）。
+
+#### ① G-51 那条判据做到 4 条，三臂各有牙
+
+| 趟 | 读数 |
+|---|---|
+| 基线（3 条） | `BASELINE rc=0 摘要=[3 passed ]` |
+| ARM1 把中文那句安装承诺塞回去 | `rc=1 摘要=[2 failed 1 passed ]`，红的是「中文 Web 卡」+「整页仍有离线」两条 |
+| ARM2 塞英文那句 | `rc=1 摘要=[1 failed 2 passed ]`，红「英文 Web 卡」 |
+| ARM3 把正向锚点拿掉 | `rc=1 摘要=[1 failed 2 passed ]`，红「中文 Web 卡」 |
+| 复原 | `RESTORED rc=0 摘要=[3 passed ]` + `MD5_SAME=yes`（两份词条表逐字节回到原样） |
+| 加第 4 条之后 | `FIXED rc=0 摘要=[4 passed ]` → 全量 landing 套件 `22 passed`（`SUITE_RC=0 17:51:21`） |
+
+⚠️ 三臂的施法顺序按 §8.109 那条教训改过：施臂 → 跑 → **无条件** restore → 重建，
+且基线 `rc≠0` 就直接 `exit 4` 不落任何臂读数（第一版 rig 把一次 RC=1 的失败起跑当成了绿色基线）。
+
+#### ② 看图撞见的第一个真缺陷：`.lp-note` 是 flex，把一句话排成三栏
+
+`RichText`（`apps/landing/src/site/PageSections.tsx:77`）把一条词条按 `**粗体**` / `` `代码` ``
+切成一串**兄弟节点**，而 `.lp-note` 原来是 `display:flex` + `gap` ⇒ `/platforms` 那条「未签名」
+说明被排成三列，第二列以「，需要右键打开」起头（改前图 `/tmp/g138-before/platforms-page.png`，
+md5 `1c6798b6…`）。⚠️ 图标 `⚠️` 住在**词条文本里**、不是子元素，所以这一条不是"缺图标才要 flex"。
+
+修法 `display:block`（`landing.css:596`），判据第 4 条钉住，三段读数：
+
+```
+FIXED rc=0 摘要=[4 passed ]
+APPLIED flex-back
+ARM-FLEX rc=1 摘要=[1 failed 3 passed ] 红条=[1) …platforms-install-claim.spec.ts:112:1 › 页末说明是一段 flowing ]
+RESTORED rc=0 摘要=[4 passed ]   MD5_SAME=yes
+```
+
+两处 `.lp-note` 规则块（`landing.css:596` 与 `:1689`）**各管不同属性**（后者只有 `max-inline-size`），
+不是重复定义 —— 查过才敢改。`check:design` rc=0。
+
+#### ③ 看图撞见的第二个问题不在产品里，在探针里 —— 而它差点让我去"修"一个不存在的缺陷
+
+改后那张 fullPage 图里，页首「平台状态」H1 **整块不见了**，图顶留一条 180px 空白带。
+先按 §7 第 83 条 ① 怀疑探针自己：把截图前的 `scrollIntoViewIfNeeded` 拿掉重跑
+（`/tmp/g142-noscroll`，md5 从 `a505e3e8…` 变成 `954f91dd…` ⇒ 那一次滚动确实改了字节），
+**空白仍在**。于是量几何（`/tmp/g143-geom.mjs`，自带阳性对照：同时量肉眼确定渲染着的「Web」H2）：
+
+```
+H1  text=平台状态  rect=[88,120,1104,56]  opacity=1  visibility=visible  color=rgb(15,23,42)
+第一个 H2  rect=[64,395,1152,42]  （同一趟，它在图里是看得见的）
+MASK-IMMEDIATE  {"innerTransform":"none","offset":0,"running":1}
+MASK-AFTER-1500MS {"innerTransform":"none","offset":0,"running":0}
+```
+
+⇒ DOM 一切正常，标题**已经**落位；另拍一张视口图（`/tmp/g143-settled.png`）标题、引言、
+主蓝按钮全在。所以缺的不是内容，是**截图取在显现动画中途**：页头走
+`maskedRevealVariants`（`.lp-mask{overflow:hidden}` + 内层 `translateY→0`），
+而 fullPage 把视口撑到整页高度会让 `whileInView` 重放。
+
+🔴 **`screenshot({animations:'disabled'})` 单独不够**（这是我一开始的假设，实测否证）：
+那个参数只完成 CSS 动画/过渡，遮罩那一下是 framer-motion 的 WAAPI transform。
+加上它之后（`/tmp/g144-animdisabled`）lede 与主蓝按钮回来了，**H1 仍是空白**。
+
+#### ④ 这个失效形态仓库里早就知道 —— 于是没有抄第二份，而是抽成单一所有者
+
+`docs-centre.spec.ts:120` 已有一个 `waitHeadRevealed`，**16 处消费者**，注释里写着
+"第一轮六张图里有四张是这样"。所以正确收尾不是在我的 spec 里再写一个等待，
+而是把它抽成 `e2e/landing/head-reveal.ts` 做唯一事实源，两份消费者共用（`4e805e53`）。
+
+零行为变化读数（抽取前后各跑一次整个 landing 套件）：
+
+```
+g141（抽取前）  22 passed  SUITE_RC=0 17:51:21
+g146（抽取后）  22 passed  SUITE_RC=0 18:08:07
+spec:line 标识集合大小  22 = 22
+```
+
+闸门有牙读数（`/tmp/g145/readings.txt`）：把等待的超时压到 1ms ⇒
+`ARM1 rc=1 摘要=[3 passed ] 红条=[1) …:86:1 › 整页仍有「离线」这一档承诺…]`，
+恰好红在带截图的那条；`MD5_SAME=yes`（spec 逐字节复原）。
+最终那张图 `/tmp/g145/platforms-page.png`（md5 `4f36c0f3…`）**人已看过**：标题、引言、
+六个平台区块、说明卡恢复成 flowing 文本、状态图例、页脚全在。
+
+#### ⑤ 同族扫描：`capture.mjs` 用的是固定 600ms，而已入库的截图今天没中招
+
+`scripts/screenshots/capture.mjs:206` 在截图前只 `waitForTimeout(600)`，而它确实截落地页
+（`targets.mjs:138-141`：L02 `/features`、L03 `/platforms`、L04 `/pricing`、L05 `/help`）。
+逐张人眼核对已入库的 `screenshots/landing/L03-平台.png`（1440×900）⇒ **标题在**，
+600ms 那一趟够用。所以今天没有对外伤害，登记为 **G-57**：把那条固定等待换成
+`waitHeadRevealed` 同一条规则（`e2e/landing/head-reveal.ts` 已是单一所有者，`scripts/` 要复用得先解决
+它不在同一棵依赖树里），代价是重截七张图 —— 排在落地之后一起做，不单独起一趟。
+
+#### ⑥ 顺着 L03 那张图撞见第二条：已入库截图里还印着摘掉的承诺和旧域名
+
+同一张 `screenshots/landing/L03-平台.png` 的 Web 卡正文写的是
+「**安装为 PWA 后可离线使用**，数据存在浏览器本地的 SQLite（OPFS）」，
+验证方式一栏写的是 `https://heyta.finlaw.cloud/app/`。
+前者正是 G-51 从词条里摘掉的那句（图是旧构建截的），后者是 2026-09-30 已迁走的域名。
+引用面现量：只有 `docs/research/ui-aesthetic-and-design-system-coverage-audit.md` 与
+`docs/plans/help-center-docs-expansion.md` 两份**内部**文档引用 `screenshots/` ⇒
+这是**潜在**的对外错话，不是现行页面。登记为 **G-58**：落地 + 重发之后重跑
+`pnpm screenshot:capture` 并把七张图一起换掉（换图前逐张看，别只跑 `screenshot:verify` 的空白判据 ——
+它答的是"有没有内容"，不答"内容是不是当前这批"）。
+
+#### ⑦ 我自己那条怀疑只否证了一半 —— 剩下的登记成 G-59，不写成"已清白"
+
+sweep 残留 PWA 承诺时命中 `zh-CN.ts:3602` / `en.ts:3402`
+（「这里没有「检查更新」按钮：应用是 PWA，更新由浏览器在后台决定」），
+我按 §8.57 / `:61` 那条旧读数怀疑它也是错话。**代码与产物层已被否证**：
+`apps/web/src/pwa/register.ts:43` 已是 `${import.meta.env.BASE_URL}sw.js`（注释明写"不能写死 `/sw.js`"），
+产物 `apps/web/dist/manifest.webmanifest` 的 `start_url`/`scope` 是 `"."`、`icons[].src` 是
+`icons/…` 相对路径 ⇒ 挂载路径变成构建参数之后这两处都跟着走了。
+
+🔴 但这**不等于线上注册成功**：原来那个缺陷的形态是"线上 `/sw.js` 返回落地页 HTML"，
+要否证它得量**部署态**（`/app/sw.js` 的 `content-type` 与 SW 注册结果），本趟没有取。
+⇒ 那句 `updateNote` 从"疑似错话"改成"**待线上复验**"，登记为 **G-59**：
+补一条 live-site 判据（`/app/sw.js` 返回 JS 而不是 HTML + 注册不报 `SecurityError`），
+跑在落地之后 —— 与 G-51 剩下的 ④ 同一趟，不要各起一次。
+
+⚠️ 同时把两处**过期状态句**原地更正（不删，划线留原句旁）：`:61` 那句
+"PWA 的 `/sw.js` 与 manifest 里 `start_url/scope/icons` 全是根绝对路径…登记至今**未修**"，
+以及 `:6384`（§8.107）那句"Web 端到今天也没有可安装的 PWA"。
+后者只在**代码/产物层**被推翻，"因此就可安装"没有证，所以 **G-51 摘掉那句的裁决不变**。
+
+#### ⑧ 落地与第 2 项的排队读数（截至 18:07）
+
+- 阻塞集**从 5 枚变 4 枚**（`docs/README.md`、`scripts/check-script-snapshot.mjs` 已被他们提交）：
+  现在是 `.gitignore` / `package.json` / `packages/i18n/src/locales/zh-CN.ts` / `en.ts`，
+  写集 46 枚、脏条目 166 枚、夹具 `5/5 条通过`。
+- 🔴 **载体已过期**：`main = 1cda2053`，而 `/tmp/heyta-merge-carrier` 那笔合并的第一父是 `4235319d`
+  ⇒ 落地时必须重算载体（新鲜度守卫会退 4），不能拿现成的 `ed0a837b` 去 `--ff-only`。
+- `g131`（等负载 ≤12 + 闸门空再跑 `pnpm verify:selfhost-stack`）仍在等，18:02–18:05 三次读到
+  负载 `277.31 / 208.24 / 94.45`（别人的重活在跑）。CAP 5400s 约 19:0x 到点；
+  到点按"环境无效≠产品失败"记，不因此改判据、也不代跑凑绿。
