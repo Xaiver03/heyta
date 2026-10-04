@@ -21,13 +21,16 @@
  *   0 = 体检通过（dry-run）/ 已落地（--confirm）
  *   2 = 探针或用法问题（找不到工作树、--confirm 却不在主检出里跑、脚本没报出可读的数）
  *   1 = 前置不成立（双亲不对 / 阻塞集非空 / main 在算完之后又动了 / --confirm 但 check 没跑）
- *   3 = 环境无效（负载超阈值）—— 环境无效不等于产品失败
+ *   3 = 环境无效（负载超阈值 / 载体的 node_modules 不是当前那把锁装出来的 /
+ *       载体那棵树此刻是别人的现场 —— 载体脚本第 0a 步退 6，这里记成同一档）
+ *       —— 环境无效不等于产品失败
  *   4 = 载体上完整 `pnpm check` 红 ⇒ **不落地**，先逐段归属
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { depsFresh, freshReading } from './selfhost-deps-fresh.mjs';
 
 const MAIN_REF = 'main';
 const BRANCH_REF = process.env.HEYTA_LAND_BRANCH ?? 'feat/self-host-distribution';
@@ -255,6 +258,24 @@ gate(3, '完整 check 不会 SIGKILL 别人的 dev server', () => {
       '那时清场是你做的、日志也在你手上。', 3);
   }
   return `${d.ports.length} 个端口（${d.ports.map((p) => `${p}←${d.owners.get(p)}`).join('、')}）全部无监听；自检：${portsCheck.probeReading}`;
+});
+
+/* ── 3c. 载体的依赖是不是当前那把锁装出来的 ─────────────────────────
+ * 第 1 族那条重算只做 `reset --hard`：**同步提交，不重装依赖**，而 `node_modules` 被 git 忽略、
+ * 原地留着。main 只要动过 `pnpm-lock.yaml` 或 `e2e/pnpm-lock.yaml`，下一趟完整链就跑在
+ * 上一把锁的依赖上 —— 响亮的那种（模块找不到）便宜，安静的那种（旧版本照跑照绿）贵。
+ * 判据本体在 `selfhost-deps-fresh.mjs`（含"0 字节两边相等"与"只判了一棵树"两臂的反证）。 */
+gate(3, '载体的 node_modules 与当前那把锁同源', () => {
+  const d = depsFresh(CARRIER_DIR);
+  if (d.error) blind(`依赖新鲜判不了：${d.error}\n   拿"判不了"当"依赖是新的"就跑完整链，等于让链跑在没装过的树上`);
+  if (d.stale.length) {
+    refuse(`载体重算只同步提交、不重装依赖 ⇒ 完整链会跑在旧锁的依赖上（${d.stale.join('、')} 不同源）：\n` +
+      `     ${freshReading(d)}\n` +
+      `   先在载体里装：cd ${CARRIER_DIR} && pnpm install --frozen-lockfile，再 cd e2e && pnpm install --frozen-lockfile，\n` +
+      '   然后重跑本体检。本工具**不代跑 install** —— 那棵树的 node_modules 与并行那条线的打包共用，' +
+      '重装是有一次性现场后果的动作，得由要看清在场的人做。', 3);
+  }
+  return freshReading(d);
 });
 
 /* ── 4. 载体上跑完整 pnpm check ───────────────────────────────────── */
