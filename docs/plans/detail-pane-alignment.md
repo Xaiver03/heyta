@@ -1710,3 +1710,44 @@ countdown 那一句在 **main** 上已被改写成页内锚点，而**本检出�
 📌 这一节的**取代表动作**本身也值得留一句：判断"两端有没有这个行为"用的是 `grep -n "onScheduleTask"` 数
 消费者 + `sed -n '59,67p'` 读那一处 JSX 的实参清单，**不是**在共享层里找 `Platform` 分支 —— 共享层根本没有分支，
 差别完全落在"宿主传没传"这一维上。
+
+## 8.30 合流面有**两个数**，而真正决定窗口的是那个大的（2026-10-04 09:4x 现量；本节零代码改动）
+
+§8.29 报的 **4 个冲突文件**是 `git merge-tree` 的读数 —— 它**只比提交**。而合流这件事真的发生的时候，
+`git merge` 是在**活的工作树**上跑的，别人**未提交**的改动同样会被它撞：轻则
+`Your local changes to the following files would be overwritten by merge` 直接拒绝，
+重则被整文件 `git add` 抹回去（本仓有过一次反向事故：我 plumbing 提进多人台账的段落被别人的整文件提交冲掉）。
+
+现量两个面（`MERGE_BASE = f419df75`，正好是本批自己那一笔"W5 逐项对账"）：
+
+| 面 | 怎么量 | 数 |
+|---|---|---|
+| 提交级冲突 | `git merge-tree --write-tree --name-only main feat/detail-pane` 的 CONFLICT 行 | **4** |
+| 活树交叠 | `(git diff --name-only <merge-base> HEAD)` ∩ `(主检出 git status --porcelain 的路径)` | 🔴 **13** |
+
+`MY_CHANGED=79 / DIRTY=240 / INTERSECT=13`。13 枚按危害分两堆：
+
+- **8 枚源码/文档**，主检出那边正有人改（未提交行数现量）：`docs/reference/environment-traps.md` **+305/−0**、
+  `packages/i18n/src/locales/zh-CN.ts` +31、`en.ts` +27、`apps/web/src/styles/app/main-area.css` +12/−4、
+  `e2e/tests/helpers.ts` +12、`apps/web/src/App.tsx` +8、`packages/app-host/src/index.ts` +1、`docs/README.md` +1/−1
+- **5 枚是截图证据**（`apps/web/evidence/detail-column-slot/{desktop-with-detail,no-sidebar-view,back-to-desktop}.png`、
+  `apps/web/evidence/detail-pane-overlay/{settings-sheet,search-overlay}.png`）——
+  它们**不需要任何人主动改**：任何一轮 e2e 验收都会原地重写它们。⇒ 这一堆**不能等"它自己变干净"**，
+  只能在**没有验收在跑**的窗口里合，或者接受"合流时被重写的是证据文件而不是代码"。
+
+📌 所以**合流窗口的判据不是"冲突文件少"，是这 13 枚在主检出的未提交改动为 0**（截图那 5 枚额外要求"此刻没有验收在跑"）。
+复跑口径（和上面那两个数同时点跑过，别抄数字）：
+
+```sh
+MB=$(git merge-base main HEAD)
+git diff --name-only "$MB" HEAD | sort -u > /tmp/a.txt
+git -C <主检出> status --porcelain | sed 's/^...//' | sed 's/ -> .*//' | sort -u > /tmp/b.txt
+comm -12 /tmp/a.txt /tmp/b.txt | tee /tmp/intersect.txt | wc -l
+```
+
+顺带一条我自己犯的**相对时间**错：这一节第一版把门禁脚本的 mtime 写成"两小时十四分钟前"，
+那是我从 `02:33` 与"现在"心算出来的。`stat` 的 epoch 与 `Date.now()` 一除，真值是 **434 分钟（7h14m）** ——
+差在机器是 +08 而我按 UTC 心算。**凡是写进记录的"多久以前"，必须由 epoch 现算，不能由两个读数相减再猜。**
+那条编辑至今仍未提交（`main` 与本检出的门禁字节**逐行相同**：两侧都 415 行、`git diff --quiet` 无输出），
+所以断言 F 的阻塞理由从"它在飞"升级为"**它已经 7 小时没动、也 7 小时没提交**" ——
+这两件事对"要不要继续等"的含义相反，留给产品负责人判，本篇不代它决定要不要催。
