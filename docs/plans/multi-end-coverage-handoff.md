@@ -1998,3 +1998,23 @@ platforms android-36 + build-tools 35/36 + NDK 齐，**没有 emulator 本体与
 
 现量哨兵时刻：负载 43.66（1min）/ 46.50（5min）；`:4318` 与 `:4319` **忙**（别人那趟 `playwright test` 正在用套件端口），
 `:4320`/`:4322` 空 —— 这正是我刚重造的那把 `port_busy`（bind ∨ HTTP）该读成 busy 的形状，链的门会因此继续让路。
+
+## 23:34 一条改序的发现：Android 新规现在**落在本 Goal 的关键路径上**
+
+现量（载体的那枚 Release APK）：`mtime=10-04 21:55`、66 996 272 字节，而
+`find apps/mobile packages ( *.ts|*.tsx|*.js ) -newer <APK>` = **52 条**
+⇒ 按 `heyta-prep-apk.sh` 那把 mtime 尺（v2 之后"内容零差异"不再豁免），**③ 与 ① 都需要先重打一次 APK**。
+重打按新规只能走 `ssh windows-pc` ⇒ 在这条分流落进 `scripts/run-gradle.mjs`（并行 Agent 在做）之前，
+我这侧的守卫会一直把 ③/① 挡在 `VERDICT=ANDROID-RULE` / `PHASE2=ANDROID-SKIPPED-BY-RULE`。
+**这是改序，不是完成**：本 Goal 的 ①②③ 从"只等负载窗口"变成"等负载窗口 + 等 Android 构建宿主分流"。
+
+顺带把这条链路读通了（免得下一位再猜）：
+`verify-mobile-notes.sh:237` 只做 `adb install -r "$APK"`，**自己不构建**（全文件 `build:android|gradle` 0 命中）；
+它靠 `heyta_apk_freshness_guard`（位置在第 0 步任何破坏性动作之前）拒绝装旧包。
+所以"旧包 + 不能本机重打"这一档的形状是**响亮地拒跑**，不会产出一条拿旧 bundle 冒充当前产物的读数 ——
+这正是 §7 第 27 条那道防线在换了构建宿主之后仍然成立的原因。
+
+⚠️ 我自己这一轮又踩了第三次同一坑：`bash heyta-prep-apk.sh | tail -4; echo "PREP_RC=$?"` 打出来的
+`PREP_RC=0` 是 **`tail` 的**退出码，而那一趟的真实判决是 `VERDICT=NOT-RUNNING`（负载 28.95 > 12）。
+这条坑在台账里已经记过两次，"下次注意"不成立 ⇒ 从现在起凡要取码一律
+`cmd > /tmp/x.log 2>&1; echo RC=$?`，上面那句已经改成这样跑第二次（`ps`/`uptime` 那条）。
