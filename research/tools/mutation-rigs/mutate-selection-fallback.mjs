@@ -5,8 +5,14 @@
  * 这一族钉的是 Goal 第②条里"同一套**回落规则**"那一半：规则本身在共享层
  * （`packages/app-host/src/selection.ts` 的 `pruneSelection`，那边有 16 条单测），
  * 但共享层证不了**宿主喂进去的是什么** —— 少喂一类、或喂成筛后的一截，
- * 界面都不报错，症状是"另一台设备删了那条，编辑层不自己关"。
+ * 界面都不报错。症状要按"这一类还有没有别人在喂"分两种写法（第一版把两者混成一句，见下面那条 ⚠️）：
+ * 同一屏上别处也没喂 ⇒ "另一台设备删了那条，面板不自己关"；别处兜着 ⇒ 界面上什么都看不见，
+ * 坏的是**依赖关系**（自己界面的正确性寄在别人的挂载策略上）。
  * 本批 §8.43 就是按"谁在读这一类"枚举出**第三个**该喂的屏（任务屏自己挂着便签编辑层）。
+ * ⚠️ 12:5x 更正过一处措辞（§8.43 第 7 节）：那一格**当天并不是空的** —— 任务页无条件挂载的
+ *   `SearchScreen` 也在喂 `note`，它的 effect 在浮层关着时同样跑。所以 R1 钉的不是"修一个
+ *   正在坏的行为"，而是"**任务页不许把自己界面的回落寄在别人的挂载策略上**"：
+ *   把浮层改成条件挂载（一次很自然的重构）就会让它当天变成真缺陷，而没有任何一层会红。
  *
  * 跑法（仓库根；linked worktree 里不要 `pnpm run`，它会先做 deps-status 预检）：
  *   node research/tools/mutation-rigs/mutate-selection-fallback.mjs
@@ -34,7 +40,7 @@ const md5 = (p) => createHash('md5').update(readFileSync(`${ROOT}/${p}`)).digest
 const BASE = Object.fromEntries(Object.entries(files).map(([k, p]) => [k, md5(p)]));
 const orig = Object.fromEntries(Object.entries(files).map(([k, p]) => [k, readFileSync(`${ROOT}/${p}`, 'utf8')]));
 
-const POSITIVE = '便签：三个持有全集的屏都跑了回落，且喂的是 `listNotes()` 的结果';
+const POSITIVE = '便签：两处宿主 + 任务页那个搜索浮层都跑了回落，且喂的是 `listNotes()` 的结果';
 const NEGATIVE = '便签：回落谓词不许来自筛完 / 排过序的那一截（反向）';
 const HABIT = '习惯屏：同一件事，同样来自全集';
 
