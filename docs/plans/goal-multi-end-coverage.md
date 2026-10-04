@@ -1486,6 +1486,13 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     但引用 ② 时必须带"74 段属于 `f08b26e7` 那一趟"，**不能拿它当今天的段数**。
     现量命令（谁都可以重跑，只读 `package.json`）：
     `node -e 'const c=require("./package.json").scripts.check;console.log(c.split("&&").length)'`。
+  - 🔴 **窗口内的执行次序（15:15 现量；写进台账是为了防下一次上下文压缩后有人同时起两件事）**：
+    链 **v22**（pid 48985，`~/.heyta-window-rigs/heyta-window-chain22.sh`）在同一轮里**先 ③ 后 ①**，
+    ① 成交即 `break` 退出；而 ② 的两类读数（三段 e2e + 逐段 `pnpm check`）**不在链里**
+    （现量：`grep -cE 'pnpm check|check:ai-e2e' <链脚本>` = **0**）⇒ **② 只能在链退出之后起** ——
+    `check:ai-e2e` 会按端口 SIGKILL 别人的 vite，而 ① 的 mac 段要起壳并重建 `apps/web/dist`，
+    两者同时跑会把 ② 的红读成产品红。段数现量 **81**（`node -e '…scripts.check.split(" && ").length'`）。
+
 - ③ 便签移动端验收：`NOTES_EXIT=` **待填**（第 6/7 步的 op 判据、第 8 步第三张截图、第 9–11 步跨设备三条腿各写一条读数）—— 现量命令 `bash /tmp/heyta-run-notes.sh`。
   - 🔴 **06:18–06:24 第一趟真读数（载体 `030f0969`、`PORT=3100`、`emulator-5554`、零 mock）：
     通过 27 项 / 失败 5 项 / `NOTES_EXIT=1`**（日志 `/tmp/notes-run1.log`，截图副本 `/tmp/heyta-notes-ev-run1/`）。
