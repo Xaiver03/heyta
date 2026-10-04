@@ -477,29 +477,49 @@ PG_DB="${HEYTA_E2E_DB:-heyta_mobile_smoke}"
 PG_USER="${HEYTA_E2E_DB_USER:-$(whoami)}"
 PG_HOST="${HEYTA_E2E_DB_HOST:-127.0.0.1}"
 PG_PORT="${HEYTA_E2E_DB_PORT:-5432}"
-# 🔴 这条判据原来数的是**整张表**的 NOTE/UPD：实测本趟运行之前库里就已经有历史行
-#    （10-04 14:3x 现量 = 2 条），于是它在任何东西发出去之前就已 ≥1 —— 一条永远通过的判据
-#    证明不了"那次编辑真的出去了"。改成按**本轮那条便签的 entityId**（步骤 3 的 NOTE_ID）数，
-#    并把全表数当分母一起打出来，让"历史残留"与"本轮这一条"在日志里分得开。
-# NOTE_ID 来自手机库的 json_extract，仍然要过形状门才许拼进 SQL（空串/引号/反斜杠都会把这条查询变成别的东西）。
-if ! printf '%s' "${NOTE_ID:-}" | grep -qE '^[A-Za-z0-9_-]+$'; then
-  bad "NOTE_ID 不像合法 entityId（空、或含 [A-Za-z0-9_-] 之外的字符）：[${NOTE_ID:-}] —— 不拼进 SQL"
-else
+# >>> step10-scoped begin（夹具按这两个标记之间抽同一段文本跑，改这里夹具才会跟着变）
+# 🔴 计数必须按**本轮那条 entityId** 收范围。这台库是共享的，实测里面住着两个账号
+#   （user 187 与 user 203，各自一条 NOTE 的 CRT+UPD），而 `server_seq` 还是**按用户各自从 1 起**的。
+#   原来那句 `count(*) ... entity_type='NOTE'` 判 `>= 1` ⇒ 只要有任何一趟留下过一条 NOTE/UPD，
+#   这一趟**一条都没发出去也照样绿** —— 那是一条不能失败的判据（§7 第 50/58 族）。
+#   09:38 现量：全库 NOTE/UPD = 2，而本轮这一趟最多贡献 1 ⇒ 差值就是别人的趟。
+SRV_PROBE_OK=0
+case "$NOTE_ID" in
+  # 拼进 WHERE 前先钉住形状。不合法就判红并**跳过查询**：把空串拼进去得到的"0 条"
+  # 会被下一条读成"没发出去"，那是把探针故障记成产品失败（§7 第 67 条同一个形状）。
+  note-[A-Za-z0-9_-][A-Za-z0-9_-]*) SRV_PROBE_OK=1 ;;
+  *)
+    bad "NOTE_ID 形状不合法（实际「${NOTE_ID}」）—— 不拿它去查服务端，避免把探针故障记成产品失败"
+    ;;
+esac
+if [ "$SRV_PROBE_OK" = 1 ]; then
   SRV_NOTE_UPD=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
     "SELECT count(*) FROM operations WHERE op_type='UPD' AND entity_type='NOTE' AND entity_id='${NOTE_ID}'" 2>&1)
-  SRV_NOTE_UPD_ALL=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
-    "SELECT count(*) FROM operations WHERE op_type='UPD' AND entity_type='NOTE'" 2>&1)
+  # 阳性对照：同一个 entityId 的 CRT 必须也在。它红而 UPD 那条绿 = 连接/表能查但本轮那条编辑没出去；
+  # 两条一起红 = 先怀疑探针（连不上、库名错、别人的实例）。
+  SRV_NOTE_CRT=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
+    "SELECT count(*) FROM operations WHERE op_type='CRT' AND entity_type='NOTE' AND entity_id='${NOTE_ID}'" 2>&1)
   if ! printf '%s' "$SRV_NOTE_UPD" | grep -qE '^[0-9]+$'; then
-    bad "读不到服务端的 NOTE/UPD 计数（库 ${PG_DB} @ ${PG_HOST}:${PG_PORT}，用户 ${PG_USER}，entityId=${NOTE_ID}）—— 原始输出：$(printf '%s' "$SRV_NOTE_UPD" | head -3 | tr '\n' ' ')"
+    bad "读不到服务端的 NOTE/UPD 计数（库 ${PG_DB} @ ${PG_HOST}:${PG_PORT}，用户 ${PG_USER}）—— 原始输出：$(printf '%s' "$SRV_NOTE_UPD" | head -3 | tr '\n' ' ')"
+  elif ! printf '%s' "$SRV_NOTE_CRT" | grep -qE '^[0-9]+$'; then
+    bad "读不到服务端的 NOTE/CRT 计数（同一条连接、同一个 entityId）—— 探针没跑成，不判本轮上传结论"
+  elif [ "$SRV_NOTE_CRT" -lt 1 ]; then
+    bad "服务端查不到这条 NOTE 的 CRT（entityId=${NOTE_ID}）—— 连建的那条都不在，本轮上传整条路没走通（不是「编辑没生效」，是「一条都没出去」）"
+  elif [ "$SRV_NOTE_UPD" -eq 0 ]; then
+    bad "服务端没有这条 NOTE 的 UPD（entityId=${NOTE_ID}，CRT 有 ${SRV_NOTE_CRT} 条）—— 界面说保存好了、也说同步了，服务端一条都没收到"
+  elif [ "$SRV_NOTE_UPD" -gt 1 ]; then
+    bad "服务端这条 NOTE 的 UPD 数 = ${SRV_NOTE_UPD}（本轮只编辑一次，应为 1）—— 同一条被重复上传（第 6 步本地只数出 1 条的话，问题在上传侧）"
   else
-    ok "服务端 entityId=${NOTE_ID} 的 UPD 数 = $SRV_NOTE_UPD；全表 NOTE/UPD（含历史残留）= ${SRV_NOTE_UPD_ALL:-读不到}"
-    if [ "$SRV_NOTE_UPD" -ge 1 ]; then
-      ok "那次编辑真的出去了 —— 服务端 operations 表里数得出**这条 entityId** 的 UPD"
-    else
-      bad "服务端没有 entityId=${NOTE_ID} 的 UPD（全表 NOTE/UPD=${SRV_NOTE_UPD_ALL:-?} 那些只可能是别的便签的历史行）—— 界面说保存好了、也说同步了，服务端一条都没收到"
-    fi
+    ok "那次编辑真的出去了 —— 服务端按 entityId=${NOTE_ID} 数得出恰 1 条 UPD（同一实体 CRT=${SRV_NOTE_CRT} 条）"
   fi
+  # 全库总数**只打印不判定**：它的作用是污染可见（本轮的数与它不等 ⇒ 说明这台库还住着别人），
+  # 而不是判据 —— 判据一律在上面那条按 entityId 收范围的分支里。
+  SRV_ALL_UPD=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
+    "SELECT count(*) FROM operations WHERE op_type='UPD' AND entity_type='NOTE'" 2>&1)
+  printf 'INFO 全库 NOTE/UPD（含别的账号/别的趟，不参与判决）= %s\n' \
+    "$(printf '%s' "$SRV_ALL_UPD" | grep -qE '^[0-9]+$' && printf '%s' "$SRV_ALL_UPD" || echo '读不到')"
 fi
+# >>> step10-scoped end
 
 step "11. 笔记本（node-host 真 SQLite）同步后**解得开**这条 UPD"
 LT_SYNC=$(laptop sync)
