@@ -8001,3 +8001,98 @@ main-CoyMNTqu.js  848654 B    → 可安装=0  完整产品=0  不是演示=0   
 窗口正则的 0 命中默认是**探针的属性**，不是内容的属性。
 （同一族的第三种面目：① needle 不在这一层、② 窗口装不下、③ 真值本来就没有 ——
 三者都打印 0，区别只在**有没有为这个 0 单独取过正证**。）
+
+### 8.132 G-60 就地关掉：线上把清单当 `octet-stream` 给出去，修在生产、判据在 live-site，牙是用旧域名咬出来的（2026-10-04 21:5x）
+
+§8.130/§8.131 那趟顺手量的，本条把它做完。任务 #33（G-60）从"缺判据"进到**已修 + 已有判据 + 已有红臂**。
+
+#### ① 现量与根因（一次 curl 就够，零 CPU 竞争）
+
+```
+/app/manifest.webmanifest   200  application/octet-stream        2361 B   ← 修前
+/app/manifest.webmanifest   200  application/manifest+json       2361 B   ← 修后（同一枚 curl）
+/app/sw.js                  200  application/javascript         16381 B
+/app/icons/icon-192.png     200  image/png                       3267 B
+/app/manifest.json          200  text/html 1361 B  ← 未命中被 try_files 兜底成应用 HTML，**状态码是 200**
+```
+
+根因与 §7 那条 `.wasm` 是**同一个根因的第二次**：这台机器的 `/etc/nginx/mime.types`
+（nginx/1.18.0 Ubuntu）里既没有 `wasm` 也没有 `webmanifest`，缺条目就一律 `octet-stream`。
+`/etc/nginx/sites-available/heyta.waytofuture.cn` 里 `.wasm` 那段（100–113 行）把修法写得很清楚，
+我照它的形状做：**`include /etc/nginx/mime.types;` 之后再补自己的 `types {}`** ——
+因为 **`types` 在嵌套层级是替换继承、不是叠加**，只补一条会把同一段里的 `.js`/`.css`/`.png`
+一起打回默认类型（那段注释自己写着"模块脚本直接不执行"）。
+
+#### ② 凭什么值得动生产：把"挡不挡安装"和"一致性"分开说
+
+浏览器（Chromium 口径）的安装性判据里**没有 content-type 这一条**——我读了 MDN 的原文，
+它列的是 HTTPS + 清单里 `name`/`short_name`、`icons` 含 192 与 512、`start_url`、`display`、
+`prefer_related_applications` 不为 true。⇒ **这条不是"用户装不上"那一类**。
+它真正的价值有两条，都写在配置注释里：
+1. **对外一致性**：自托管那侧的验收用例（`e2e/selfhost-stack/selfhost-web.spec.ts:220`）断言 `application/manifest+json` 且**是绿的**，
+   也就是说外人自建的那套与我们托管的这套在同一个文件上给了两个答案；用户照我们的文档排查时会撞见"我这边和官方那边不一样"。
+2. **它属于"不报错就不管、打开面板才看得见"那一族**（`.wasm` 那次的原话），而那条当时也真被修了。
+
+线上清单的**内容**顺手也核了一遍（同一枚 curl，纯读）：`name=heyta`、`start_url="."`、`display="standalone"`、
+图标 3 枚含 `192x192` 与 `512x512`（另有 maskable 一枚）、无 `prefer_related_applications` ⇒ 安装性的**清单侧四条 criteria 在线上齐**。
+🔴 这句**不等于**"PWA 可安装已被证明"（台账 6785 行那条纪律仍然成立：既有用例判的是资产真身 + SW 注册激活，
+`beforeinstallprompt` 那一发至今没有读数）—— 摘掉那句对外承诺的裁决**不变**，本条不翻案。
+
+#### ③ 变更流程照 §3.7.x 那条纪律走（备份 → 改 → `nginx -t` → reload → 复验）
+
+```
+备份  /etc/nginx/sites-available/heyta.waytofuture.cn.bak-g60-20261004T135239Z
+插入  15 行（diff 实测：只插入、删除 0 行）→ 全落在 location /app/ 内
+闸门  nginx: configuration file /etc/nginx/nginx.conf test is successful ⇒ RELOAD=done
+复验  ①上面那五行全部符合预期；/app/ 的 Cache-Control: no-cache 仍在；
+      落地页 / 与 /en/ 与 /legal/terms/ 三个载体类型未变；/health 200；og-card.png 200 image/png；
+      落地页 HTML 里旧域名命中 0
+回滚  sudo cp …/heyta.waytofuture.cn.bak-g60-20261004T135239Z …/heyta.waytofuture.cn && sudo nginx -t && sudo systemctl reload nginx
+```
+
+⚠️ 一处**我自己写过头、当场改掉**的话：runbook 初稿写"旧域名那份没补这两条、回滚会把两处带回来"。
+实测是 `heyta.finlaw.cloud` 那份**有** `application/wasm`（70–82 行）**只缺** `webmanifest` ⇒ 已改成只主张后者。
+
+#### ④ 判据（`e2e/live-site/live-manifest.spec.ts`，提交 `a0d733ff`）与它的牙
+
+三条用例、`request` fixture（不启浏览器，整趟 **726ms**）：
+- 第一条：类型 + 清单内容四条 criteria 逐项点名（防"清单能解析"被读成"清单够了"）；
+- 第二条是**两腿**：同一段 `servedAsManifest()` 分别喂真清单（必须 true）与 `/app/site.webmanifest`
+  （它被 SPA 兜底成 HTML、**状态码 200**，必须 false）⇒ 挡死的正是"拿状态码当存在性判据"那一族；
+- 第三条的枚举源是**清单自己**（`icons[].src` 逐条去取，相对 `/app/` 解析），不是我抄的一张名字表；
+  并带一条"点名表不许为空"的前置（空表会让遍历静默不执行 = 一条永远不会红的判据）。
+
+```
+线上（修后）            3 passed (726ms)                                    MANIFEST_RC=0
+旧域名 heyta.finlaw.cloud（同一份判据、未改一个字）  2 failed / 1 passed      ARM_RC=1
+   Error: 清单要由服务端以 application/manifest+json 给出（实际 content-type="application/octet-stream"）
+   ✘ 第一条  ✘ 第二条的正向腿   ✓ 第三条（图标与 SW 在两个域名上都正常）
+```
+
+⇒ 这条判据能失败，**不是靠改断言证明的，是靠一台真在生产上、恰好没补这条类型的服务器证明的**；
+而第三条在红臂里仍然通过，说明它抓的是"清单类型"这一处，不是"整站都红"。
+
+#### ⑤ 一条**当场撤回的假设**（留着，因为它差点变成一条错话）
+
+我看到 `location /app/` 用 `alias /var/www/heyta-app/` 时，判断"本批把前端产物搬进了服务端镜像
+（`server/src/web-app.ts` 那一路），线上还从磁盘目录取 ⇒ 这是一处新的对外错话"。
+现量否证：运行手册 §3.3.1 / §3.7.2 自己写的托管路径就是 **`HEYTA_WEB_BASE=/app/` 构建 + `check:web-artifact:app` 对账 +
+rsync 到 `/var/www/heyta-app/`**（第 479–487 行三条命令），磁盘 mtime `2026-10-03 18:13` 与它一致；
+`server/public/` 那一路是**自托管**载体的形状，不是我们这套 nginx 的。⇒ **生产与它自己的文档一致，那句"错话"不成立，已撤回**。
+教训形状：**"我看到配置与代码不一致"要先去读运维事实那份文档，再宣布错话**（否则我自己就是那个制造错话的人）。
+
+#### ⑥ 顺带两条运维事实（下一条会话别重新推导）
+
+- 🔴 `e2e/live-site-results/` 是 **gitignore 的**、且 Playwright 每次运行开始会删建 outputDir。
+  §8.123/§8.130 引的那两张 `platforms-web-card-*.png` 因此**不入库**。跑任何 live-site 用例前先 `cp -a` 走：
+  本次备份在 `/tmp/g180-live-evidence-pre-20261004T135635Z`（md5 `e8506c6f…` 与原文件逐字节相同），跑完拷回。
+- 门禁名不要按印象调文件：我先跑 `node scripts/docs-link-check.mjs` 与 `check-md-tables.mjs` 各得 `rc=1`，
+  那两条是 **`Cannot find module` / `Missing script`**，属"判不了"，不是红。改走 `pnpm run check:docs`
+  （实现是 `research/tools/docs-link-check.mjs`）得 **rc=0 ✅ 无死链**。`md-tables` 那个键名在本仓库不存在，
+  真名待查——**不写成"这道门禁没了"**。
+
+#### ⑦ 对外错话清单的最新读数（本条之后）
+
+发布层剩 **1 处**：「可安装 / Installable」那句（§8.130），加同一条页上三栏排错的「未签名」提示（§8.123 ②，同一根因）。
+两者的关闭动作仍然只有一个：**落地 + 从 landed main 重发落地页**（任务 #19/#20/#21）。
+G-60 这一处已从清单里出去（修在生产、判据已挂 live-site、红臂已取）。
