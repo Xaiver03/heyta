@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 生成物（scripts/gen-app-icons.mjs）：唯一取值是 design-system token color.primary。 -->
+<resources>
+    <color name="ic_launcher_background">#2563eb</color>
+</resources>

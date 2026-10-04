@@ -30,6 +30,15 @@
       而那是最容易被误判成"应用本身有问题"的失败形态。
     -->
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!--
+      exe 自己的图标（写进 PE 资源的那一枚）。
+      🔴 MSIX 贴图（Assets/msix/*.png）管的是"开始菜单/设置里看到什么"，
+      而**未打包**跑 `dotnet publish` 那个 exe 时，资源管理器、任务栏、
+      以及"发送到桌面快捷方式"读的都是这里登记的 PE 图标 ——
+      以前这一条不存在，所以开发机上的 heyta 一直是 Visual Studio 的默认蓝方块。
+      位图是生成物：node scripts/gen-app-icons.mjs（几何与色值都只有一份真源）。
+    -->
+    <ApplicationIcon>..\assets\heyta.ico</ApplicationIcon>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>

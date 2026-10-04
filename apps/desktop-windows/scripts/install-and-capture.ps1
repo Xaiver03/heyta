@@ -115,11 +115,34 @@ try {
   $lnk.TargetPath = 'explorer.exe'
   $lnk.Arguments = 'shell:AppsFolder\' + $aumid
   $lnk.WorkingDirectory = $desktop
-  # The packaged icon is not readable outside the package (ACL), so try the
-  # install location first and fall back to explorer's own glyph. A shortcut
-  # without the right icon is still a working shortcut; one without a target is not.
-  $icon = Join-Path $loc 'Square44x44Logo.targetsize-48_altform-unplated.png'
-  if (Test-Path $icon) { $lnk.IconLocation = $icon }
+  # SHORTCUT ICON. Measured 2026-10-04: two separate bugs made the desktop tile
+  # the generic Explorer glyph, and neither could fail anything --
+  #   a) package-msix.ps1 never generated Square44x44Logo.targetsize-48_altform-unplated.png,
+  #      so the Test-Path below was always false;
+  #   b) even the logos it DID generate are staged under Assets\, while this looked
+  #      at the install-location ROOT.
+  # A silently-missing icon is precisely how "there is no app logo anywhere" survived
+  # every green install criterion, so the choice is now printed and readability is
+  # tested (a packaged path can exist yet not be openable from outside the package).
+  # .ico is tried first because a .lnk's IconLocation only reliably renders
+  # ICO/EXE/DLL; a PNG there shows as blank in Explorer even when it is readable.
+  $candidates = @(
+    (Join-Path $loc 'heyta.ico'),
+    (Join-Path $loc 'Assets\Square44x44Logo.targetsize-48_altform-unplated.png'),
+    (Join-Path $loc 'Square44x44Logo.targetsize-48_altform-unplated.png')
+  )
+  $iconChosen = ''
+  foreach ($c in $candidates) {
+    if (-not (Test-Path $c)) { continue }
+    $readable = $true
+    try { $fs = [System.IO.File]::OpenRead($c); $fs.Close() } catch { $readable = $false }
+    if ($readable) { $iconChosen = $c; break }
+    $lines += ('SHORTCUT_ICON_UNREADABLE=' + $c)
+  }
+  if ($iconChosen -ne '') { $lnk.IconLocation = $iconChosen }
+  # A shortcut without the right icon is still a working shortcut; one without a target is not.
+  $lines += ('SHORTCUT_ICON=' + $(if ($iconChosen -eq '') { 'NONE' } else { $iconChosen }))
+
   $lnk.Description = 'heyta'
   $lnk.Save()
   $lines += ('SHORTCUT_PATH=' + $lnkPath)
