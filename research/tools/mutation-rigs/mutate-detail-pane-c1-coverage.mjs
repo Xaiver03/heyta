@@ -33,7 +33,22 @@
  *   M16 把 M14 那份文档喂「还没有腿 5 的那版判据」→ RC=0（减法现量）。
  *                          🔴 旧版按内容从文件历史认，**不按 HEAD** —— 按 HEAD 取会在腿 5 提交后自己变红
  *   脱牙 ×3 摘掉腿 4 / 腿 5              → 同一份文档不再报出那一句；喂缺日期的文档仍红在腿 3
+ *   —— 腿 6（未核实台账 B6/C2 逐条必须带「补法 / 不可补 / 结案取证」）21:3x 起加：
+ *   M17 摘掉某条台账项的补法行         → **只**红腿 6，点名那一条（其余五腿读数仍为 0）
+ *   M18 标签换成词表外的「以后再看：」  → 点名（认的是封闭词表，不是"这一行有内容"）
+ *   M19 / M19b 换成另外两档            → 都放过（三档逐项有臂，挡"只有补法才算"那种把口径写窄）
+ *   M20 只留「补法」二字、不跟冒号      → 点名（钉住"紧跟冒号"那一半口径）
+ *   M21 摘掉一条**划线条目**的补法行    → 仍然点名 —— 划线不结案（被推翻的原句常带活的尾巴）
+ *   M22 台账小节改名                   → 拒绝报绿并写明"分母为空"
+ *   M23 承重(腿6) 那行自身可解析，且"已结案 + 缺 == 总条数"
+ *   M24 同一份变异喂「还没有腿 6 的那版」→ RC=0（减法现量；旧版按内容认，不按 HEAD）
+ *   脱牙 摘掉腿 6 的命中集合           → M17/M18/M21 三份全部失能
  *   对照 未变异的副本 / 复位后           → 全绿 RC=0
+ *   ⚠️ 同一轮把 M8 的文档来源从 `git archive HEAD` 改成**工作树拷贝**：原版把"我这轮还没提交"
+ *      写成了前提 —— 台账补结案档那一批还没提交时，HEAD 那份缺结案档，这条守 `--root` 的臂
+ *      就自己变红，而红的对象根本不是它守的东西（同一族教训见工单 §8.87 第 3 节）。
+ *   M8b 往树里放一份**缺结案档**的副本  → 红落在树里那一份（仓库那份是干净的）——
+ *      没有这条，M8 在"两边字节相同"的新取材方式下只证明"没崩"，证明不了"读的是那棵树"。
  *
  * 全程只改 /tmp 副本；仓库工作树与别人的产物不动。
  */
@@ -220,20 +235,19 @@ check(
 );
 
 // M8：只给 `--root` 不给文档 → 实参不许被当成文档路径吃掉
+// 🔴 树里的文档取**工作树那一份**，不取 `git archive HEAD` —— 原版取 HEAD 把"我这轮还没提交"
+//   写成了前提：21:3x 给台账补结案档那一批还没提交时，HEAD 那份缺结案档，这条守 `--root` 的臂
+//   就自己变红了，红的对象还不是它在守的东西。（同一族在 §8 表 P4 与工单 §8.87 第 3 节各踩过一次。）
 const treeRoot = join(scratch, 'tree');
-execFileSync('sh', [
-  '-c',
-  `mkdir -p "$0/tree" && git -C "$1" archive HEAD -- "$2" | tar -x -C "$0/tree"`,
-  scratch,
-  repoRoot,
-  DOC,
-]);
+execFileSync('sh', ['-c', `mkdir -p "$0/$(dirname "$2")" && cp "$1" "$0/$2"`, treeRoot, join(repoRoot, DOC), DOC]);
 const m8 = run(['--root', treeRoot]);
 check(
   'M8 产物树模式（只给 --root）→ 绿且读的是树里的文档',
   m8.rc === 0 && counts(m8.out) !== null && m8.out.includes(`取样：${DOC}`),
   `RC=${m8.rc}｜${JSON.stringify(counts(m8.out))}`,
 );
+// M8b 见下面腿 6 那一节（要用到那里的 cutCloser / legCountHas，声明顺序上不来）
+
 
 // M9–M13：腿 4「每个对照节必须有推荐那一档」的臂（目标第 1 条那句"结论**与推荐**写回"的机器消费者）
 const recCount = (out) => {
@@ -446,13 +460,177 @@ writeFileSync(doc, ORIGINAL, 'utf8');
   );
 }
 
+// —— 腿 6（未核实台账逐条必须带「补法 / 不可补 / 结案取证」）21:3x 起加。
+// 这一族与腿 1–5 的对象不同：那五腿判的是 C1b **对照节**，这一腿判的是 B6/C2 **台账**。
+// 🔴 六条臂里有两条方向相反（M18/M19 与 M20），钉的是同一个口径决定：
+//   认的是**词表 + 紧跟冒号**，不是"这一行提到了补法"。少了反方向那条，
+//   下一轮把口径写窄成"必须有 URL 级证据"或放宽成"含『补法』二字即算"都不会有东西失败。
+// 🔴 数红条数的方式与前面几条臂**不同**：这里不抄判据那句完整标题（那是一份会漂的抄件），
+//   而是"以 🔴 开头 + 含这一小段独有心话 + 以「（N 条）：」结尾"三件齐。
+const legCountHas = (out, needle) => {
+  const line = out.split('\n').find((l) => l.startsWith('🔴') && l.includes(needle) && /（\d+ 条）：$/.test(l));
+  const m = line && line.match(/（(\d+) 条）：$/);
+  return m ? Number(m[1]) : 0;
+};
+const LEDGER6 = '未核实台账里这条没写';
+const CLOSER_RE = /(?:^|[\s。；，])\*{0,2}(?:补法|不可补|结案取证)\*{0,2}\s*[：:]/;
+const ledgerItem = (text, tag, n) => {
+  const lines = text.split('\n');
+  const headRe = tag === 'B6' ? /^## B6[.．]/ : /^## C2[.．]/;
+  const s = lines.findIndex((l) => headRe.test(l.trim()));
+  if (s === -1) throw new Error(`装置找不到台账 ${tag} —— 原文形状变了，腿 6 那批臂要跟着改`);
+  let e = s + 1;
+  while (e < lines.length && !/^## /.test(lines[e])) e += 1;
+  const start = lines.findIndex((l, i) => i > s && i < e && new RegExp(`^${n}\\.\\s`).test(l));
+  if (start === -1) throw new Error(`装置找不到 ${tag} #${n}`);
+  let stop = start + 1;
+  while (stop < e && !/^\d+\.\s/.test(lines[stop])) stop += 1;
+  const idx = lines.findIndex((l, i) => i >= start && i < stop && CLOSER_RE.test(l));
+  if (idx === -1) throw new Error(`${tag} #${n} 没有结案档那一行 —— 这台装置没有靶（判据此刻本就报红，臂的期望无从谈起）`);
+  return { lines, idx };
+};
+const editCloser = (t, tag, n, fn) => {
+  const { lines, idx } = ledgerItem(t, tag, n);
+  const before = lines[idx];
+  lines[idx] = fn(before);
+  if (lines[idx] === before) throw new Error(`${tag} #${n} 的结案档行没被改动 —— 替换形状对不上原文`);
+  return lines.join('\n');
+};
+const cutCloser = (t, tag, n) => {
+  const { lines, idx } = ledgerItem(t, tag, n);
+  return [...lines.slice(0, idx), ...lines.slice(idx + 1)].join('\n');
+};
+
+// M17：摘掉某一条的补法行 → **只**红腿 6，且点名那一条（其余五腿读数仍为 0）
+const m17 = withDoc((t) => cutCloser(t, 'B6', 3));
+check(
+  'M17 摘掉台账里一条的「补法」行 → 只红腿 6 并点名那一条（别处零红）',
+  m17.rc === 1 &&
+    legCountHas(m17.out, LEDGER6) === 1 &&
+    m17.out.includes('B6 #3') &&
+    legCount(m17.out, WEAK) === 0 &&
+    legCount(m17.out, NOREC) === 0 &&
+    legCount(m17.out, NOEXT) === 0,
+  `RC=${m17.rc}｜缺结案档 ${legCountHas(m17.out, LEDGER6)}`,
+);
+// M18：标签换成词表外的词（"以后再看："）→ 仍点名。挡的是"有一条续行就算有交代"
+const m18 = withDoc((t) => editCloser(t, 'C2', 13, (l) => l.replace('补法：', '以后再看：')));
+check(
+  'M18 把标签改成词表外的「以后再看：」→ 点名（认的是封闭词表，不是"这一行有内容"）',
+  m18.rc === 1 && legCountHas(m18.out, LEDGER6) === 1 && m18.out.includes('C2 #13'),
+  `RC=${m18.rc}｜点名 C2 #13=${m18.out.includes('C2 #13')}`,
+);
+// M20：留"补法"二字但不跟冒号 → 点名。与 M18 反向，钉"必须紧跟冒号"那一半口径
+const m20 = withDoc((t) => editCloser(t, 'C2', 5, (l) => l.replace('补法：', '补法 以后另定')));
+check(
+  'M20 只留「补法」二字、不跟冒号 → 点名（挡"这条的补法以后再想"那种凑字）',
+  m20.rc === 1 && legCountHas(m20.out, LEDGER6) === 1 && m20.out.includes('C2 #5'),
+  `RC=${m20.rc}｜点名 C2 #5=${m20.out.includes('C2 #5')}`,
+);
+// M19 / M19b：三档词表**都**认 —— 换成「不可补：」「结案取证：」都必须放过。
+// 缺这两条的话，判据会被下一轮读成"只有补法才算"，而"不可补"正是台账里最需要留档的那一档。
+const m19 = withDoc((t) => editCloser(t, 'B6', 5, (l) => l.replace('不可补：', '补法：')));
+const m19b = withDoc((t) => editCloser(t, 'C2', 12, (l) => l.replace('不可补：', '结案取证：')));
+check(
+  'M19/M19b 换成另外两档（补法 / 结案取证）→ 都放过（三档词表逐项有臂）',
+  m19.rc === 0 && m19b.rc === 0,
+  `补法 RC=${m19.rc}｜结案取证 RC=${m19b.rc}`,
+);
+// M21 🔴 划线不算结案：C2 #1 整条带 ~~，摘掉它的补法行必须仍点名。
+// 这一条挡的是最省力的绕过写法 —— 把不想管的敞口划上线，台账"看起来"就全结案了。
+const m21 = withDoc((t) => cutCloser(t, 'C2', 1));
+check(
+  'M21 摘掉一条**划线条目**的补法行 → 仍然点名（划线不结案：被推翻的原句常带活的尾巴）',
+  m21.rc === 1 && legCountHas(m21.out, LEDGER6) === 1 && m21.out.includes('C2 #1'),
+  `RC=${m21.rc}｜点名 C2 #1=${m21.out.includes('C2 #1')}`,
+);
+// M22 分母自检：台账小节被改名 → 判据必须响亮失败，而不是"少一段照样全绿"
+const m22 = withDoc((t) => t.replace(/^## C2[.．]/m, '## C2x. '));
+check(
+  'M22 把台账小节 C2 改名 → 拒绝报绿并写明"分母为空"（空集合上的"全部已交代"是永真）',
+  m22.rc === 1 && /分母为空|拒绝报绿/.test(m22.out),
+  `RC=${m22.rc}`,
+);
+// M23 披露行自身可解析：已结案档 + 缺 == 两条台账的总条数
+const l6 = base.out.match(/承重\(腿6\)：B6 (\d+) 条｜C2 (\d+) 条｜已结案档 (\d+)｜缺 (\d+)/);
+check(
+  'M23 承重(腿6) 那行自身成立：已结案 + 缺 == 台账总条数，且基线缺 0',
+  !!l6 && Number(l6[1]) + Number(l6[2]) === Number(l6[3]) + Number(l6[4]) && Number(l6[4]) === 0,
+  l6 ? `B6 ${l6[1]}｜C2 ${l6[2]}｜已结案 ${l6[3]}｜缺 ${l6[4]}` : '读数行没解析出来',
+);
+
+// M8b 🔴 M8 换取材方式之后**分辨力会掉**：树里那份与仓库那份字节相同 ⇒ "读错了对象"也照样绿。
+//   补一条反向臂：往树里放一份**缺结案档**的副本 ⇒ 必须红、点名那一条，
+//   而仓库里那份是干净的（红只能来自树里那一份）。没有这条，M8 只证明"没崩"。
+const treeDoc2 = join(scratch, 'tree2');
+execFileSync('sh', ['-c', `mkdir -p "$0/$(dirname "$2")" && cp "$1" "$0/$2"`, treeDoc2, join(repoRoot, DOC), DOC]);
+writeFileSync(join(treeDoc2, DOC), cutCloser(readFileSync(join(repoRoot, DOC), 'utf8'), 'B6', 3), 'utf8');
+const m8b = run(['--root', treeDoc2]);
+check(
+  'M8b 树里那份缺一条结案档 → 红落在树里那一份（仓库那份干净，红不可能来自它）—— 补 M8 换取材后掉的分辨力',
+  m8b.rc === 1 && legCountHas(m8b.out, LEDGER6) === 1 && m8b.out.includes('B6 #3') && m8b.out.includes(`取样：${DOC}`),
+  `RC=${m8b.rc}｜缺结案档 ${legCountHas(m8b.out, LEDGER6)}`,
+);
+
+// 脱牙（腿 6）：摘掉命中集合后，M17/M18/M21 三份文档都不再报那一句，而基线仍绿
+const neuter6Decl = 'const openLedger = ledgerItems.filter((it) => !it.body.some((l) => CLOSER_LABEL.test(l)));';
+if (!readFileSync(GATE, 'utf8').includes(neuter6Decl)) {
+  console.log('🔴 装置找不到腿 6 的声明行 —— 脱牙臂会假装成功，拒绝继续。');
+  process.exit(2);
+}
+const neuter6Gate = join(scratch, 'gate-no-leg6.mjs');
+writeFileSync(neuter6Gate, readFileSync(GATE, 'utf8').replace(neuter6Decl, 'const openLedger = [];'), 'utf8');
+const neutered = [cutCloser(ORIGINAL, 'B6', 3), editCloser(ORIGINAL, 'C2', 13, (l) => l.replace('补法：', '以后再看：')), cutCloser(ORIGINAL, 'C2', 1)].map((t) => {
+  writeFileSync(doc, t, 'utf8');
+  const r = spawnSync(process.execPath, [neuter6Gate, doc], { encoding: 'utf8' });
+  return { rc: r.status, out: `${r.stdout}${r.stderr}` };
+});
+check(
+  '脱牙对照 摘掉腿 6 → M17/M18/M21 三份都不再报那一句（三臂全部挂在腿 6 上，且没顺手摘掉整条判据）',
+  neutered.every((r) => r.rc === 0 && !r.out.includes('未核实台账里这条')),
+  neutered.map((r, i) => `臂${i + 1} RC=${r.rc}`).join('｜'),
+);
+
+// 减法现量：把 M17 那份文档喂「还没有腿 6 的那版判据」⇒ 必须 RC=0
+// 🔴 旧版按**内容**从文件历史认，不按 HEAD（腿 6 一提交，按 HEAD 取的下一笔就会自己变红）。
+{
+  const hist = execFileSync('git', ['-C', repoRoot, 'log', '--format=%H', '--', 'scripts/check-detail-pane-c1-coverage.mjs'], {
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .slice(0, 14);
+  let found = '';
+  let oldSrc = '';
+  for (const sha of hist) {
+    const src = execFileSync('git', ['-C', repoRoot, 'show', `${sha}:scripts/check-detail-pane-c1-coverage.mjs`], { encoding: 'utf8' });
+    if (!src.includes('CLOSER_LABEL') && src.includes('const noExt =')) {
+      found = sha;
+      oldSrc = src;
+      break;
+    }
+  }
+  if (!found) throw new Error(`前 ${hist.length} 版里找不到"还没有腿 6"的那版判据 —— 窗口要放宽，但绝不许拿当前版冒充旧版。`);
+  const oldGate = join(scratch, 'gate-before-leg6.mjs');
+  writeFileSync(oldGate, oldSrc, 'utf8');
+  writeFileSync(doc, cutCloser(ORIGINAL, 'B6', 3), 'utf8');
+  const r = spawnSync(process.execPath, [oldGate, doc], { encoding: 'utf8' });
+  check(
+    'M24 同一份变异喂「还没有腿 6 的那版判据」→ RC=0（补的是实测存在的缺口，不是顺手加严）',
+    r.status === 0,
+    `RC=${r.status}｜取的是 ${found.slice(0, 8)}（按内容认）`,
+  );
+}
+writeFileSync(doc, ORIGINAL, 'utf8');
+
 // 对照：恢复干净后全绿
 const control = withDoc(null);
 check('对照 恢复干净后全绿', control.rc === 0, `RC=${control.rc}`);
 
 rmSync(scratch, { recursive: true, force: true });
 
-console.log(`\n读数：判据 ${GATE.split('/').pop()}｜C1 ${bc.rows} 行（有节 ${bc.covered} / 例外 ${bc.excused} / 未覆盖 ${bc.unexcused}）｜C1b ${bc.sections} 节（推荐 ${baseRec?.withRec} / 标题例外 ${baseRec?.excused}）`);
+console.log(`\n读数：判据 ${GATE.split('/').pop()}｜C1 ${bc.rows} 行（有节 ${bc.covered} / 例外 ${bc.excused} / 未覆盖 ${bc.unexcused}）｜C1b ${bc.sections} 节（推荐 ${baseRec?.withRec} / 标题例外 ${baseRec?.excused}）｜台账 ${l6 ? `B6 ${l6[1]} + C2 ${l6[2]}：已结案档 ${l6[3]} / 缺 ${l6[4]}` : '承重(腿6) 读数行没解析出来'}`);
 console.log(`\n${[...notes, ...fail].join('\n')}`);
 if (fail.length) {
   console.log(`\n🔴 ${fail.length}/${notes.length + fail.length} 臂不合格`);
