@@ -1187,3 +1187,12 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   加上 `pnpm -r build` 本身不起 gradle（gradle 只在 `build:android` 里）、① 排在 ③ 之后不同趟 ⇒
   这条门不是永不开的那一类。⚠️ 前提写清楚：判据靠的是 **cwd**（`lsof -a -d cwd`），
   哪天有构建把 daemon 的 cwd 留在载体里，这一格会立刻变成真饿死 —— 归因先查 cwd，别先改判据。
+- ✅ **同一枚 runner 被两把判据读出不同结论，19:53 现场抓到一个活样本**（这条是用来挡住下一次
+  "把我的粗臂改严"的）：占设备的是主检出的 `scripts/.verify-mobile-ios-reminder.sh.snap.27495`（pid 27495，
+  W9 那条 iOS 提醒线）。同一趟里两把判据各读一次：
+  链 `:157` 的**安卓面**归因臂把它筛掉（`grep -vE 'verify-mobile-ios|HEYTA_IOS|simctl'` ⇒ 筛后为空，
+  打印"遗留实例、宿主侧无驱动者 ⇒ 放行"），而规范闸门 `--target c` 同一刻打印
+  `❌ 有移动端验收在跑（pid：27495）` 与 **`REDS=load,dev,apk`** ⇒ 链过不去，③ 不起。
+  📌 这正是"手搭哨兵不许比规范裁判严"那条的**正面对偶**：粗臂比闸门宽是**安全的**，
+  因为最终裁判仍是闸门（`:335` 那次 `--target c`）；把它改严反而会把安卓面上真没人的那些窗口自己关死。
+  ⚠️ 别据此去"优化"那条臂 —— 它的用途是给 `com.heyta` 那枚遗留实例一个说法，不是窗口判据。
