@@ -1,6 +1,6 @@
 {
   "_what": "镜像生产阶段（`server/Dockerfile` 的 FROM … AS production）经 npm 解析出来的依赖树快照。不是清单、不是许可判定 —— 判定在 research/tools/check-image-license-coverage.mjs。",
-  "generatedAt": "2026-10-03T18:35:38Z",
+  "generatedAt": "2026-10-04T06:42:43Z",
   "generator": "research/tools/gen-image-npm-tree.mjs",
   "inputs": {
     "targetPlatform": {
@@ -9,7 +9,7 @@
       "libc": "musl"
     },
     "registry": "https://registry.npmjs.org/",
-    "serverPackageJsonSha256": "272b16d290cfd052e543c7a4ea3bad0a29019062ec33a6983a5b03d087451191",
+    "serverPackageJsonSha256": "b5875f0536e0ab137150083f400b5aa6bd79cc6dd22177079f2c628613a08b84",
     "installShapeSha256": "4b555c29f4aab19827e73338bb4ef15b24ce5fb33443799d7c76504424b89f12",
     "packedWorkspaceDeps": [
       "@heyta/domain",
@@ -17,9 +17,9 @@
       "@heyta/sync-core"
     ],
     "packedPackageJsonSha256": {
-      "packages/domain/package.json": "4850bf55b5c40bb37f183f238fdfbf7cddad19b802fd41c9c211b8b1ac7809e7",
-      "packages/shared-schema/package.json": "a363b0c66f50cb4f5adec37a64797fef4bf76839b7eb152c4ed2401c312c74a6",
-      "packages/sync-core/package.json": "260741f66829865b1517b739682d8df9cea84f535d9c2700586982cfd31ed50c"
+      "packages/domain/package.json": "a4b05a468bd1d1094e7488448158934a04ca4473d859bea460b94cdc888b509a",
+      "packages/shared-schema/package.json": "ff6e0ab64df4f05e787570491c429ad8032fed4bd6e40d8b2cd98041eb7bf40e",
+      "packages/sync-core/package.json": "48079faa9cf92d442b82395812c9d92201cce8a5c4d04b6f3a324aa5649b1514"
     },
     "localTarballs": [
       "./sync-core.tgz",
