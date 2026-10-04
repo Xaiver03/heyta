@@ -54,7 +54,7 @@
  *     而不冲突）。所以判据不写在解法里，而是把**生产那一道门禁原样挂进 GATES 在载体树上跑**：
  *     复制一遍哈希比较就等于制造下一个漂移点，而它只比 `inputs` 里的四枚哈希之一。
  *
- * 任何不属于这六族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
+ * 任何不属于这七族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
  *
  * ## 落笔前的门禁（只跑纯文件系统的那八道）
  *
@@ -166,8 +166,21 @@ const SNAPSHOT = 'server/image-npm-tree.json';
 // `--check` 直接读不到输入。所以这一族取**本分支侧**，并由 GATES 里那三条 `check:image-license`
 // 的腿在载体树上现判（它们判的是"快照 == merged 树算出来的东西"，不是"取了对侧"）。
 const GEN = 'research/tools/gen-image-npm-tree.mjs';
+// 对账器本体（**第七族**，10-04 15:1x 出现）。main 在 `e374b142`（14:54）把新鲜度指纹
+// 抽成新模块 `image-deps-fingerprint.mjs`，并把这里的一行改成
+// `depsFingerprint(…)` **仍然去比 `snapshot.inputs.serverPackageJsonSha256`** ——
+// 而那个键在本分支已由第六族同样的理由删掉（换成 `serverInstallInputSha256`，
+// 分区指纹走 `image-install-shape.mjs` 的 `readServerInstallInput`）。
+// ⇒ 取 main 侧 = 对账器读一枚**载体上再也不会有人写**的键 ⇒ `check:image-license` 必红；
+//   取本分支侧 = 与第六族同一份口径（生成器与对账器共用一个实现这件事**仍然成立**，
+//   只是共用的是 `image-install-shape.mjs` 而不是 `image-deps-fingerprint.mjs`）。
+// ⚠️ 代价要如实打出来：两族都取本分支侧之后，main 那枚新文件 `image-deps-fingerprint.mjs`
+//   在载体上**零引用者**。它是别人的文件、且删它要动本批写集之外的路径（会破"集外 0"），
+//   所以这里**不删**，只把引用者计数打在读数里交给它的所有者。
+const COV = 'research/tools/check-image-license-coverage.mjs';
+const ORPHAN = 'research/tools/image-deps-fingerprint.mjs';
 
-const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], gen: [], other: [] };
+const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], gen: [], cov: [], other: [] };
 for (const p of conflicts) {
   if (p === 'package.json') fam.pkg.push(p);
   else if (p === '.gitignore') fam.gi.push(p);
@@ -175,14 +188,15 @@ for (const p of conflicts) {
   else if (p === AUDIT) fam.audit.push(p);
   else if (p === SNAPSHOT) fam.snap.push(p);
   else if (p === GEN) fam.gen.push(p);
+  else if (p === COV) fam.cov.push(p);
   else fam.other.push(p);
 }
 if (fam.other.length) {
-  die(2, `出现**预置六族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
+  die(2, `出现**预置七族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
     `   先把它加进本文件的分族与解法，再重跑。`);
 }
-notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} other=${fam.other.length}`);
-if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1 || fam.gen.length > 1) {
+notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} cov=${fam.cov.length} other=${fam.other.length}`);
+if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1 || fam.gen.length > 1 || fam.cov.length > 1) {
   die(2, '同一族出现多于一份文件 —— 分族前提（各一处）不成立，交人判');
 }
 
@@ -418,6 +432,38 @@ if (fam.gen.length) {
   notes.push(genReading);
 }
 
+/* ── 对账器本体（第七族）──────────────────────────────────────────────
+ * 与第六族同一条理由，且**必须与第六族取同一侧**：生成器写 `serverInstallInputSha256`
+ * 而对账器读 `serverPackageJsonSha256`（或反过来）时，`check:image-license` 永远读不出
+ * "快照代不代表当下"，那一腿会变成一个恒红的判据。所以这里除了取本分支侧，
+ * 还**现量一条两侧键名**，把它钉成"两侧同族同口径"的可复核读数。
+ * 顺带打 main 那枚新模块在载体上的引用者计数（零引用 ≠ 我来删；它写在别人的路径里）。 */
+let covReading = '';
+if (fam.cov.length) {
+  const mainSide = stage(COV, 2);
+  const branchSide = stage(COV, 3);
+  git(['-C', WT, 'checkout', '--theirs', '--', ...fam.cov]);
+  git(['-C', WT, 'add', '--', ...fam.cov]);
+  const onCarrier = readFileSync(join(WT, COV), 'utf8');
+  let orphanRef = 'NA';
+  if (existsSync(join(WT, ORPHAN))) {
+    try {
+      orphanRef = git(['-C', WT, 'grep', '-l', 'image-deps-fingerprint', '--', '*.mjs'])
+        .split('\n').filter(Boolean).length - 1; // 减掉它自己那一枚
+    } catch {
+      orphanRef = 0; // git grep 零命中 ⇒ 退出码 1 ⇒ 到这里就是"除自己外没人引"
+    }
+  }
+  covReading = `${COV} 取本分支侧（main 侧读 ${/serverPackageJsonSha256/.test(mainSide) ? '旧键 serverPackageJsonSha256' : '（无该键）'}` +
+    `、本分支侧读 ${/serverInstallInputSha256/.test(branchSide) ? 'serverInstallInputSha256 分区指纹' : '（未见）'}` +
+    `；载体上这份含分区键=${/serverInstallInputSha256/.test(onCarrier)}，` +
+    `与第六族同侧=${/serverInstallInputSha256/.test(onCarrier) && /readServerInstallInput/.test(readFileSync(join(WT, GEN), 'utf8'))}，` +
+    `两侧行数 ${mainSide.split('\n').length}/${branchSide.split('\n').length}）；` +
+    `⚠️ main 新模块 ${ORPHAN} 在载体上的引用者=${orphanRef} 枚（零引用**不删**，删它要动本批写集之外的路径）；` +
+    '一致性仍由 GATES 里 check:image-license 三条腿现判';
+  notes.push(covReading);
+}
+
 const still = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
 if (still.length) die(2, `解完之后仍有未解决冲突：${still.join(', ')}`);
 for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'), 'utf8')], ['.gitignore', readFileSync(join(WT, '.gitignore'), 'utf8')]]) {
@@ -491,14 +537,14 @@ const msg = `merge(selfhost): 把 ${SOURCE} 合进 ${MAIN}（载体，第一父 
 由 research/tools/selfhost-merge-carrier.mjs 产出，逐路径解法与断言记在该文件头部。
 ${notes.map((n) => `· ${n}`).join('\n')}
 
-解法：${[pkgReading, giReading, auditReading, snapReading, genReading].filter(Boolean).join('；')}
+解法：${[pkgReading, giReading, auditReading, snapReading, genReading, covReading].filter(Boolean).join('；')}
 ${fam.png.length ? `· evidence PNG ${fam.png.length} 枚取 main 侧` : ''}
 
 载体的纯 fs 门禁读数（全部现量）
 ${gateReadings.map((r) => `· ${r}`).join('\n')}
 
 🔴 完整 pnpm check（要 node_modules、要起栈、check:ai-e2e 会 SIGKILL 别人的 dev server）**不在这一笔的主张里**，
-它是落地那一刻的判据；本笔只把"六族冲突的解法"固化成一个可复核对象。
+它是落地那一刻的判据；本笔只把"七族冲突的解法"固化成一个可复核对象。
 这一笔**不是** ${MAIN} 的推进。main 每前进一步或本批每多一笔，都要重跑本脚本（只认 ${BRANCH}，不认 SHA）。
 `;
 writeFileSync('/tmp/ht-carrier-msg.txt', msg);
