@@ -1,5 +1,8 @@
 # W7 · 纪念卡片**设备出图**证据（Android）
 
+> 本目录的产物文件名：Android 是 `latest-card.png`，iOS 是 `ios-latest-card.png`（探针 `verify-mobile-card-export-ios.sh:360` 落盘）。
+> 盘点「哪些图有人看过」时按这两个**文件名**去对，别按「这张图」这类指代对 —— 那样数出来是 0，而 0 不是证据。
+
 这张图**不是**截图，也不是 web 画的那张 —— 它是**装在模拟器里的应用自己写进沙盒的那串字节**，
 由 `scripts/verify-mobile-card-export.sh` 第 5 步从设备拉回来存在这里。
 产生它的那一趟：2026-10-04 07:41，载体 `7c63411b`，`pnpm verify:mobile-card-export` **rc=0**。
