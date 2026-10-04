@@ -102,6 +102,14 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
 
     await page.screenshot({ path: `${EVIDENCE}/1-disclosure.png`, fullPage: true });
 
+    // 🔴 这张 `fullPage` 截图会改视口高度 ⇒ 右栏那一列量到 0 ⇒ AI 面**换挂载点**。
+    //    2026-10-04 之前换挂载点=重挂载：披露对话框连同草稿一起消失，下面那一发
+    //    click 永远等不到 `[data-testid="ai-assistant-send"]`（60s 超时），
+    //    而症状读起来像"机器太忙"—— 实际是用户把窗口拖过 1023px 就会被
+    //    悄悄取消一次同意请求。现在面板只有一份子树（portal 换 DOM 父节点），
+    //    所以这条断言判的是"跨断点不掉状态"，不是给截图让路。
+    await expect(disclosure).toBeVisible();
+
     // ══ 3. 按「发送」才真的出境，循环跑了第二步 ════════════════════════
     await page.locator('[data-testid="ai-assistant-send"]').click();
     const two = await waitForStubCalls(request, 2);
