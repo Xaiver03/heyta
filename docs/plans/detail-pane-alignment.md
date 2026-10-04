@@ -3409,6 +3409,10 @@ md5 apps/web/evidence/detail-column-slot/*.png apps/web/evidence/detail-pane-ove
   ⚠️ **它不是"当场就能修"的一条**：正确行为本身要拍 —— 「收起详情面」到底是"那一栏的东西跟着藏"还是"内容退回中间列"，
   两种答案对应两种改法（前者什么都不用做，后者要把测量从 `resize` 改成跟着 `data-detail` 走）。
   已挂进 #19（要人的那一格），**不在这里替谁选**。
+  ✅ **15:2x 这一格补了一手对照**：它升格成调研侧的 **C1 #13 / C1b-Q13**
+  （[调研文档](../research/detail-pane-alignment-and-spaced-review.md)），两条官方出处 + 一条明文"Apple HIG 那页没取到正文"，
+  带代价的推荐是**跟着藏**，但那一节自己写明：**选了这支仍要改代码**（现状是布尔没重算的副作用，不是意图），
+  且要补一条交叉判据。⇒ 引用这一格时给 C1b-Q13，别再给"没人查过"。
 
 #### 3g. `docs/plans/detail-pane-alignment.md`（机械可解，但**不是整侧取 HEAD**）
 
