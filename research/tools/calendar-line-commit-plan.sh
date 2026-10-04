@@ -81,6 +81,11 @@ PATHS=(
   research/tools/b-arm3-mutation-arms.sh
   research/tools/b-wedge-mutation-arms.sh
   research/tools/b-batch-reconcile.sh
+  # 🔴 B 那条的"等到窗口就自己开工"看守 + 它的十三臂验证台：
+  #    同批入库的理由和 `stack_down` 那次一样 —— 只提看守不提验证台，HEAD 里就躺着
+  #    一枚"从没证明过自己会在红门下停住"的东西，而它是会**动设备面**的那一条腿。
+  research/tools/b-window-keeper.sh
+  research/tools/b-window-keeper-arms.sh
   research/tools/r14c-carrier-heal.sh
   research/tools/r14c-boot-avd-arms.sh
   research/tools/r14c-heal-fire-arms.sh
