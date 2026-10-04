@@ -54,7 +54,7 @@
  *     而不冲突）。所以判据不写在解法里，而是把**生产那一道门禁原样挂进 GATES 在载体树上跑**：
  *     复制一遍哈希比较就等于制造下一个漂移点，而它只比 `inputs` 里的四枚哈希之一。
  *
- * 任何不属于这五族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
+ * 任何不属于这六族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
  *
  * ## 落笔前的门禁（只跑纯文件系统的那八道）
  *
@@ -157,22 +157,32 @@ const AUDIT = 'docs/research/self-host-distribution-audit.md';
 // 而本批带进去的是**由提交物锁派生**的那一份。合并后的树里同时有锁与新生成器，
 // 所以"取哪一侧"不是偏好 —— 取 main 那份会在 `check:image-license` 的新鲜度那一腿直接判红。
 const SNAPSHOT = 'server/image-npm-tree.json';
+// 生成器本体（**第六族**，10-04 14:5x 才出现的）。main 在 `b60589de` 把新鲜度哈希从
+// "整个 `server/package.json` 的字节"收窄到 7 个依赖字段；而本批那版**把这一档整体换掉了**：
+// 键 `serverPackageJsonSha256` 在本分支已不存在，代之以 `image-install-shape.mjs` 的
+// `readServerInstallInput` —— `TREE_AFFECTING` / `INERT` **显式分区 + 未分类即失败**，
+// 且 `devDependencies` 的惰性是按"生产阶段那条 `npm pkg delete devDependencies` 还在不在"现读的。
+// ⇒ 两侧的改动**不能并排放在一起**：main 那版钉的是本分支已经删掉的键，取 main 侧会让
+// `--check` 直接读不到输入。所以这一族取**本分支侧**，并由 GATES 里那三条 `check:image-license`
+// 的腿在载体树上现判（它们判的是"快照 == merged 树算出来的东西"，不是"取了对侧"）。
+const GEN = 'research/tools/gen-image-npm-tree.mjs';
 
-const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], other: [] };
+const fam = { pkg: [], gi: [], png: [], audit: [], snap: [], gen: [], other: [] };
 for (const p of conflicts) {
   if (p === 'package.json') fam.pkg.push(p);
   else if (p === '.gitignore') fam.gi.push(p);
   else if (PNG(p)) fam.png.push(p);
   else if (p === AUDIT) fam.audit.push(p);
   else if (p === SNAPSHOT) fam.snap.push(p);
+  else if (p === GEN) fam.gen.push(p);
   else fam.other.push(p);
 }
 if (fam.other.length) {
-  die(2, `出现**预置五族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
+  die(2, `出现**预置六族之外**的冲突路径，不许自动决定：\n  - ${fam.other.join('\n  - ')}\n` +
     `   先把它加进本文件的分族与解法，再重跑。`);
 }
-notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} other=${fam.other.length}`);
-if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1) {
+notes.push(`分族：pkg=${fam.pkg.length} gi=${fam.gi.length} png=${fam.png.length} audit=${fam.audit.length} snap=${fam.snap.length} gen=${fam.gen.length} other=${fam.other.length}`);
+if (fam.pkg.length > 1 || fam.gi.length > 1 || fam.audit.length > 1 || fam.snap.length > 1 || fam.gen.length > 1) {
   die(2, '同一族出现多于一份文件 —— 分族前提（各一处）不成立，交人判');
 }
 
@@ -389,6 +399,25 @@ if (fam.snap.length) {
   notes.push(snapReading);
 }
 
+/* ── 生成器本体（第六族）──────────────────────────────────────────────
+ * 取本分支侧的理由见上面 GEN 那段注释。这里额外**现量一句**两侧的差是不是就是那一个键：
+ * main 侧那版还钉着 `serverPackageJsonSha256`，本分支侧那版已经换成 `readServerInstallInput`
+ * 的分区指纹 —— 把这句判断打在载体上，"取本分支侧"才是一行可复核的读数而不是一句信念。 */
+let genReading = '';
+if (fam.gen.length) {
+  const mainSide = stage(GEN, 2);
+  const branchSide = stage(GEN, 3);
+  git(['-C', WT, 'checkout', '--theirs', '--', ...fam.gen]);
+  git(['-C', WT, 'add', '--', ...fam.gen]);
+  const onCarrier = readFileSync(join(WT, GEN), 'utf8');
+  genReading = `${GEN} 取本分支侧（main 侧仍钉 ${/serverPackageJsonSha256/.test(mainSide) ? '旧键 serverPackageJsonSha256' : '（无该键）'}` +
+    `、本分支侧走 ${/readServerInstallInput/.test(branchSide) ? 'readServerInstallInput 分区指纹' : '（未见）'}` +
+    `；载体上取到的这份含分区指纹=${/readServerInstallInput/.test(onCarrier)}，` +
+    `两侧行数 ${mainSide.split('\n').length}/${branchSide.split('\n').length}）；` +
+    '一致性由 GATES 里 check:image-license 三条腿现判';
+  notes.push(genReading);
+}
+
 const still = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
 if (still.length) die(2, `解完之后仍有未解决冲突：${still.join(', ')}`);
 for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'), 'utf8')], ['.gitignore', readFileSync(join(WT, '.gitignore'), 'utf8')]]) {
@@ -462,14 +491,14 @@ const msg = `merge(selfhost): 把 ${SOURCE} 合进 ${MAIN}（载体，第一父 
 由 research/tools/selfhost-merge-carrier.mjs 产出，逐路径解法与断言记在该文件头部。
 ${notes.map((n) => `· ${n}`).join('\n')}
 
-解法：${[pkgReading, giReading, auditReading, snapReading].filter(Boolean).join('；')}
+解法：${[pkgReading, giReading, auditReading, snapReading, genReading].filter(Boolean).join('；')}
 ${fam.png.length ? `· evidence PNG ${fam.png.length} 枚取 main 侧` : ''}
 
 载体的纯 fs 门禁读数（全部现量）
 ${gateReadings.map((r) => `· ${r}`).join('\n')}
 
 🔴 完整 pnpm check（要 node_modules、要起栈、check:ai-e2e 会 SIGKILL 别人的 dev server）**不在这一笔的主张里**，
-它是落地那一刻的判据；本笔只把"五族冲突的解法"固化成一个可复核对象。
+它是落地那一刻的判据；本笔只把"六族冲突的解法"固化成一个可复核对象。
 这一笔**不是** ${MAIN} 的推进。main 每前进一步或本批每多一笔，都要重跑本脚本（只认 ${BRANCH}，不认 SHA）。
 `;
 writeFileSync('/tmp/ht-carrier-msg.txt', msg);
