@@ -2968,3 +2968,24 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   ② python 载荷里嵌套 ASCII 双引号又炸一次（`SyntaxError` —— 第三次栽在同一类上）⇒ 改「」。
 - ⑤ 的越权边界：三条**都没有翻判据** —— 没动 `server/` 与计费、没动 `growth-display.spec.ts` 里那条冻结断言、没动 `EntitlementSection.tsx`。
   B42 即便"比 B41 便宜"也仍需真机确认"点了以后连续天数真的回来"，那要窗口，不属于现在的动作。
+#### 7.31.6 更正一条结论句必须 sweep 全仓 —— 这句在**代码注释**里还有第三住处（13:54 现量）
+
+- 提交 BLOCKED.md 的 B42/B45/B46 更正之后，按仓库那条「同一个结论句落在两份文档 ⇒ 改一处必 sweep 全仓」把
+  两条被推翻的句子在全仓（不限 `*.md`）扫了一遍。命中两处**第二住处**，都已改掉：
+  - `PROGRESS.md:1305`：「（`pnpm -r typecheck` 现在会红在 `packages/legal`，那是别人在飞的 +117 行，见 B46）」
+    ⇒ 改成"曾在…13:42 复量那一格 exit 0，那笔已由属主带修落地"（`f79fbfb0`，plumbing 1/1，
+    提完工作树残留回到 **41/1，全是别人的行**，我那一行相对 HEAD 零差异）。
+  - 🔴 **`apps/mobile/src/screens/GrowthScreen.tsx:89` 的注释**：把"补打卡动作层已现成"钉在
+    `HabitsScreen.tsx:372` —— 与 BLOCKED.md B42 同一枚错行号，**它是代码里的第三住处**。
+    改成 `:401`（`9b9afaf9`，`git commit --only` 点名一枚文件，`git show --stat` 只有 1 文件 1/1，
+    别人暂存的两枚 evidence PNG **没被吸进去**）。纯注释、零行为变化。
+- 同注释里另外两条引用**复量确认仍然命中，所以没动**：`HabitStreakList.tsx:269` =
+  `{onRepair === undefined || labels.repairAction === undefined ? null : (` 那一行（真路径
+  `packages/ui/src/motivation/`，注释里只写裸文件名，不构成错路径）；`growth-display.spec.ts:302` =
+  `expect(labels.streaks.repairAction).toBeUndefined();`。⇒ **sweep 的产出不是"全改"，是逐枚判定"这条对不对"**，
+  否则会顺手改坏本来正确的引用。
+- 可迁移的形状：一句被推翻的结论通常**不止住在原来那份文档里** —— 这次三处分别是
+  台账（BLOCKED.md）、进度页（PROGRESS.md）、**源码注释**。注释这一处最贵，因为 `check:doc-citations` 那类
+  门禁只扫 `docs/`，代码注释里的行号引用**没有任何一层在守**；它坏了也不会红。
+  ⇒ 扫的时候不要带 `--include=*.md`（zsh 还会把没引号的 glob 变成 `no matches found` 直接吃掉整条命令）。
+- 四道文档门禁在改完 BLOCKED.md 之后现量 EXIT=0：`check:doc-citations` / `check:docs` / `check:md-tables` / `check:docs-voice`（13:46 与 13:48 两趟，后者是加了 §7.31.5 之后复跑）。
