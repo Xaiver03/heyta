@@ -32,7 +32,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixelRatio, Platform, Share, View } from 'react-native';
 import { Rect, Svg, Text as SvgText } from 'react-native-svg';
 import { buildCardExportLayout, cardExportFileName, cardExportFileStem, type CardExportLayout, type CardExportRequest } from '@heyta/ui/node';
-import { cardTextLinesFor, rasterRequestFor, rasterScaleFor } from './card-export-units';
+import { cardTextLinesFor, rasterRequestFor, rasterScaleFor, settleRasterize } from './card-export-units';
 import { writeCardPng, type CardExportFailureCode } from './card-export-native';
 
 export type { CardExportFailureCode as MobileCardExportFailure } from './card-export-native';
@@ -127,15 +127,25 @@ export function useCardExporter(): {
       return;
     }
     const options = rasterRequestFor(Platform.OS, current.layout.width, current.layout.height);
-    let settled = false;
-    svg.toDataURL((base64?: string) => {
-      if (settled) return;
-      settled = true;
-      void complete(current.request, base64 ?? '').then((result) => {
+    // 🔴 不直接 `svg.toDataURL(...)`：那条回调**可以永远不来**（见 `settleRasterize` 的注释），
+    //    而"点了没反应"是本文件文件头登记过的高危形状。等不到也要出一句话。
+    void settleRasterize((cb) => {
+      svg.toDataURL(cb, options);
+    }).then((raster) => {
+      if (!raster.fired) {
+        current.resolve({
+          ok: false,
+          error: 'rasterize-empty',
+          detail: `rasterize-${raster.reason}`,
+        });
+        setPending(null);
+        return;
+      }
+      void complete(current.request, raster.base64).then((result) => {
         current.resolve(result);
         setPending(null);
       });
-    }, options);
+    });
   }, [pending]);
 
   const surface =

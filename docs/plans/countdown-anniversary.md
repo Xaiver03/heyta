@@ -1350,6 +1350,15 @@ W0b ─> 随时可做（台账那半要等文件干净）
       ／ [ ] 🔄 **iOS 那一半仍未取设备读数**（编号 **W7-G3**，任务 #21）—— 探针已从"step 2 就拒跑"
       推进到 step 4，链 K/L/M/N 四趟各照出一处探针缺陷（就绪判据、BACK 归一化、屏外 press、
       `--pressable` 过滤把输入框读成"消失"），逐条读数与修法见 §8.4 第 ㉘/㉚/㉜/㉞ 条
+      🔴 **04 10:0x 更正：上面那三行的"五趟都红在探针上"已经过期到链 P 为止。** 链 P（载体 `198603f5`）
+      第一次跑到 `RC_IOS_PROBE=1`（9 通过 / 1 失败），失败的是判据②"点了导出，沙盒里没有新文件"——
+      三层只读取证排掉"没点到"（相邻菜单钮一按就收、系统日志两次 `send gesture actions`）与
+      "原生没编进去"（`nm` 在读到 `+[HeytaCardExportModule(RCTExternModule) moduleName]`）之后，
+      用一次**只换 bundle、不重打 app**的实验把根因钉在**我们自己那条桥交给 JS 的名字**上：
+      `RCT_EXTERN_MODULE` 展开时 JS 名是空的 ⇒ `NativeModules.HeytaCardExport` 为 `undefined`。
+      已改 `RCT_EXTERN_REMAP_MODULE(HeytaCardExport, HeytaCardExportModule, NSObject)`，并把那条
+      标题写"三处逐字相同"、body 却比"`.m` 第一个参数 == ObjC 类名"（坏形状恰好满足）的判据修好，
+      三臂变异各红一次。设备读数等重打 app 后取；全部读数见 §8.4 第 ㊱ 条。
       —— 同一格里还挂着那条更硬的：**iOS 原生模块曾经根本编不过**（§8.4 第 ㉔ 条，`import React` 已修，
       而"修完能不能建"由 07:51 那一次 Release 构建 + 本趟新鲜度门 `bundle 1791071463 > 源码 1791069065` 证到）。
       ⚠️ ~~04 06:3x 现量：这一趟还开不了工~~ —— **09:17 那趟原地作废**：`verify-mobile-window-gate` 之外
@@ -2667,3 +2676,68 @@ W0b ─> 随时可做（台账那半要等文件干净）
   不收会整片按不到）。**四个键名在碰设备之前先过读数器**（`zh` 模式逐条 rc=0）——
   这是同一把尺第三次在开工前抓住探针自己的假设（前两次：㉘ 的三个假键、㉞ 的 pressable 过滤）。
   ⏳ 仍然不打勾，等链 P 的 `RC_IOS_PROBE=0` + 那张图被打开看过。
+
+- ㊱ **链 P：iOS 探针第一次走到产品判据，判红判在真缺陷上 —— 根因是我们自己那条桥的 JS 名字，而那条"三处名字对齐"的判据钉的是错的对象**（04 09:3x，载体 `198603f5`）
+  `RC_IOS_PROBE=1`（通过 9 项 / 失败 1 项）。前五趟都死在 `exit 3`（"本轮无效"），这一趟第一次把
+  判据②跑起来并判红：`点了导出，沙盒 …/tmp/card-export 里没有出现新文件`。
+  🔴 **这一条红不是探针够不着**，三条读数各自排掉一层：
+  ① 不是"没点到"——同一时刻按相邻那颗「收起…」菜单钮，菜单**真的收了**（`编辑` 从树上消失），
+  且系统日志里两次触摸都留着 `send gesture actions`；`导出成品图` 这一格在树上的读数是
+  `{{43, 414}, {96, 44}} | AXButton | enabled:true`，`--press` 回 `success`。
+  ② 不是"原生文件没进 target"——`nm` 在 07:51 那枚**装着的**二进制里读到
+  `+[HeytaCardExportModule(RCTExternModule) moduleName]` 与 `writePngBase64…` 的符号。
+  ③ 分叉只剩"RNSVG 的 `toDataURL` 不回调"与"我们自己的桥从 JS 够不着"两档。
+  ⇒ 用一次**只换 bundle、不重打 app**的实验分开它俩：在 `useCardExporter` 的挂载 effect 里
+  直接调 `writeCardPng('dbg-M-ios.txt', …)`（不经过点击、不经过 react-native-svg），
+  30 秒后沙盒仍是空的；同一趟把界面标题临时改成 `倒数纪念日·DIAG` 当正向对照 ——
+  AX 树里真的读到 `'倒数纪念日·DIAG'` ⇒ **换进去的 bundle 确实在跑**。
+  ⇒ 落不了盘的原因在桥的**名字**上，不在 RNSVG（RNSVG 那一档仍未量到，见下面"下一趟"）。
+  机制是读宏读出来的，不是猜的：`RCT_EXTERN_MODULE(a, b)` 展开成
+  `RCT_EXTERN_REMAP_MODULE(, a, b)` —— **第一个参数（JS 名）是空的**，
+  `RCT_EXPORT_MODULE_NO_LOAD` 里那句 `+moduleName { return @#js_name; }` 因此给不出名字，
+  而 Swift 自己那个 `moduleName()` 被这条分类方法盖掉（ObjC 分类优先）。
+  修法一行：`.m` 改 `RCT_EXTERN_REMAP_MODULE(HeytaCardExport, HeytaCardExportModule, NSObject)`。
+  🔴 **判据侧的同一条更要紧**：`apps/mobile/tests/card-export.spec.ts` 里那条标题写着
+  "模块名三处逐字相同"的断言，body 比的是「`.m` 的第一个参数 == **ObjC 类名**」——
+  而那恰好是**坏形状也能满足**的不变量（它把类名当 JS 名钉）。所以设备上是死的，套件一路绿。
+  现在改成：要求显式 REMAP，且第一个参数逐字等于 `CARD_EXPORT_MODULE_NAME`、第二个等于
+  Swift 的 `@objc(…)` 名。**三臂变异读数**：退回裸 `RCT_EXTERN_MODULE` ⇒ `1 failed | 20 passed`；
+  REMAP 两参互换 ⇒ `1 failed | 20 passed`；把 JS 名改错一位 ⇒ `1 failed | 20 passed`；
+  复原 ⇒ `21 passed`（RC=0）。
+  ⚠️ 同族登记 **W7-G5**（**本批不改，各有所有者**）：`HeytaWidget`（JS 名）/ `HeytaWidgetModule`（类名）、
+  `HeytaReminder` / `HeytaReminderModule` 是同一个形状，四座 iOS 桥里只有
+  `HeytaVaultSecureStorage` 因为"JS 名 == 类名"侥幸对得上 —— 也就是说小组件那格
+  早就记过的"看起来不支持，其实接线错了"，在 iOS 侧的第二种面目就是这一条。
+  ⏳ 待入 `docs/reference/environment-traps.md`（那张台账正被并行会话写，按 §7 的号段规则不在这里插行）。
+  ⚠️ 09:36 现量：宿主负载 **75**（别人那条 `queue-reinstall-all.sh` 从 03:09 起在跑），
+  所以我没有再抢设备窗口 —— 上面三层归因全是只读取证 + 一次只换 bundle 的实验。
+  下一趟（重打 app 之后）要量的两件事：`dbg-M-ios.txt` 该出现（桥通了），
+  以及 `dbg-c<len>` 是否出现（`toDataURL` 到不到得了回调 —— 那一档还没证过）。
+  ✅ **链 Q（10:12–10:14，同一台模拟器，载体 = 上面那笔修复 + `pod install` 同步后的 Pods）**
+  一次跑完就把两档都答了，读数全在沙盒的文件名里（探针把每一步编码成 `dbg-*`）：
+  `dbg-M-ios.txt`（**不经过点击、不经过 RNSVG**，只证明我们自己的桥从 JS 够得着）⇒ 桥修好了；
+  `dbg-X1.txt`（onPress 走到 `exportCard`）、`dbg-a.txt`（effect 跑了）、
+  `dbg-tO1034.txt`（`findNodeHandle` 拿到真 tag 1034，不是 null）、
+  `dbg-m360x480.txt`（`measure` 回的是版面那对数 ⇒ 视图真的布局过）、
+  **`dbg-c88264.txt`（`toDataURL` 回了 88264 个字符的 base64）**，
+  以及 `heyta-w7ios-093005-10月11日 星期日.png` 落在 `tmp/card-export/` 里。
+  ⇒ **RNSVG 那一档是好的**：上面用"界面上既没有图也没有那一句失败"去排除分支，
+  这个前提现在要打折 —— 链 P 那枚 app 用的 Pods 沙盒与 `Podfile.lock` **不一致**
+  （`hermes-engine` 校验和 `d25a17a7…` vs `208b0dcd…`，`cmp` 现量差在第 2952 行，
+  10:12 那次 `pod install` 才同步），所以"链 P 里 `toDataURL` 到底回没回、
+  为什么没渲染那句失败"**未定**，本节不把它写成已证。它不影响结论：
+  让落盘不可能的原因是那条桥的 JS 名，这一点由 `dbg-M-ios.txt` 的有无单独钉住。
+  ⚠️ 同趟顺带修掉一条更普遍的形状：**`toDataURL` 的回调可以永远不来，而界面可以永远不说**
+  —— 新增 `settleRasterize()`（纯函数，node 里可测）把"等不到"折成一个值，
+  界面上出 `rasterize-timeout` 那一句。判据 5 条 + 两臂变异各红一次
+  （删掉超时支路 ⇒ 只有"回调永远不来"那条红；生产路径绕开兜底 ⇒ 只有接线那条红）。
+  ⏳ W7-G3 仍然不打勾：链 Q 是**诊断趟**（带着临时探针），正式的 `RC_IOS_PROBE` 读数
+  要等摘掉探针重打的那一趟（链 R）。
+  ⚠️ **顺带量到一条不属于本批的漂移**（登记，不改）：`pod install` 在本机把
+  `apps/mobile/ios/Podfile.lock` 的 `hermes-engine` 校验和从提交态的 `208b0dcd96fe…`
+  改写成 `d25a17a7bfcc…`（`git diff` 现量只这 1 行），也就是**提交态的 lock 在这台机器上不可复现**；
+  而 `check:native-deps` 只比 pod 名与版本、**不看 `SPEC CHECKSUMS`**，所以没有任何一层会报这件事
+  （traps #150 那句"提交态可复现"的现量口径因此要加一条限定）。
+  本批**没有把这两处 pod-install 产物提交**（`Podfile.lock` 与 `project.pbxproj` 的引用重排
+  都已 `git checkout` 回 HEAD）—— 把本机值钉进提交态只是把漂移挪到另一台机器上。
+  链 R 用的是已经装好的那枚 app，不再需要构建，所以这个不一致不影响它的读数。
