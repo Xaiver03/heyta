@@ -43,8 +43,15 @@ HOST_SERVER="http://127.0.0.1:${PORT}"
 SERVER="$HOST_SERVER"
 export SERVER
 
-PIDFILE="/tmp/heyta-e2e-server.pid"
-LOGFILE="/tmp/heyta-e2e-server.log"
+# 🔴 这两枚**原来写死**，而写死的名字是跨树共享的：主检出与任何 worktree 载体跑的是同一个
+#    `/tmp/heyta-e2e-server.{pid,log}`。17:5x 现量的后果：载体那一趟起栈失败之后，
+#    pidfile 里是一枚**死 pid**（95105 alive=no），而此刻 :3000 上真正的监听者（70256）
+#    **没有被任何地方记下** ⇒ 主人跑 `mobile-e2e-down.sh` 会"成功退出而什么都没停"；
+#    同一枚 logfile 被后起的那一棵覆盖 ⇒ 前一棵的服务端日志（判据读数）没了。
+#    默认值**逐字不变**（现有调用方零改动），要隔离就显式传这两个变量 ——
+#    载体链那么做，并把路径打进自己的日志，留下"这棵起过栈、怎么停"的线索。
+PIDFILE="${HEYTA_E2E_PIDFILE:-/tmp/heyta-e2e-server.pid}"
+LOGFILE="${HEYTA_E2E_LOGFILE:-/tmp/heyta-e2e-server.log}"
 
 # 🔴 **浏览器壳（`apps/web`）与 API 不同源时，同步会被浏览器直接拦下。**
 #

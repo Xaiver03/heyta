@@ -35,6 +35,16 @@ PATHS=(
   research/tools/r14c-install-guard-arms.sh
   research/tools/r14c-drift-teeth.sh
   research/tools/r14c-chain-overlay-arms.sh
+  # 🔴 这一批**成对落地的三枚**（链 + 它依赖的两枚共享起栈脚本）：
+  #    `r14c-carrier-chain.sh` 新加的 `stack_isolation` 后置断言依赖 `scripts/mobile-e2e-up.sh`
+  #    那两枚新旋钮（`HEYTA_E2E_PIDFILE` / `HEYTA_E2E_LOGFILE`），而载体那份取的是**已提交副本**
+  #    ⇒ 只提链不提那两枚，下一次开窗就是"链传了没人接的参数"（17:5x 现场照出来的正是这个形状：
+  #    载体那份 `PIDFILE=` 仍写死在 `:46`）。
+  #    ⚠️ 那两枚**刻意不进 NS_RE**（那张网按"本线自己创建的文件名"反查；共享起栈脚本归设备验收那条线）：
+  #    这里点名它们，是因为**此刻脏的那几行是本线的**，不是因为它们是本线的资产。
+  scripts/mobile-e2e-up.sh
+  scripts/mobile-e2e-down.sh
+  research/tools/r14c-stack-isolation-arms.sh
   research/tools/r14c-gate-b-exclusive-arms.sh
   # 🔴 这枚是闸门**第二次**抓到的（06:1x）：它写在闸门之后，写完没进清单就被 1b 拦下 ——
   #    也就是说这条闸门抓的不是"今天那一次遗漏"，而是"以后每一枚新装置"。
@@ -103,12 +113,44 @@ PATHS=(
   docs/plans/README.md
 )
 
+# 🔴 「刻意不带」登记册（17:5x 加）。加它的原因不是"想放行"，是**原来没有可达的出口**：
+#    §1b 那句"确认不归本线的，就在这里写明为什么不加"对**证据目录里的 png** 做不到 ——
+#    NS_RE 连 png 一起反查（那也是刻意的：README 记的就是图的字节，只提 README 不提图 = 自相矛盾的 HEAD）。
+#    于是只要它们脏着，就只剩两条路，而两条都是错的：
+#      · §1b 判红 ⇒ 把"别人重跑的字节"读成"本线入库被挡住了"（17:4x 现场就是这个读法）；
+#      · `--confirm` 带走 ⇒ 提交一个 README 与图字节不同步的 HEAD（交接 §4.05 (11)(12) 警告过的那种）。
+#    第三条路写进机器：**挂着、逐枚带理由、每次现量它还在不在**。
+# ⚠️ 这不是豁免：在册的枚数照样打印、照样点名，而且下面第 1c 格会**断言每条理由非空**、
+#    并对"已经不脏的在册条目"打「待摘」—— 所以这里不许写"永远不归本线"那种话，
+#    条目只能跟着现量走（它什么时候被别人提交了 / 被重拍覆盖了，就该从这本册子里划掉）。
+# 格式：`<路径>|<为什么不带走 + 处置路>`
+UNCARRIED=(
+  "apps/web/evidence/calendar-view-options/view-select-closed.png|17:25 别人那趟 e2e 重写的字节，本线没看过它（README 第 11 行那句「盘上此刻」随之过期）⇒ 处置＝交接 §5 的第 11 号那一单（重拍 + 人看 + 重钉）"
+  "apps/web/evidence/calendar-day/day-en-empty.png|同一趟 17:25 重写的字节，而 README 把它钉成**常驻 md5**（README=57d2d008… 等于 HEAD，盘上=d64c4994…）⇒ 带走就是提交一个判据自己就会红的 HEAD；处置＝同上那一单"
+  "apps/web/evidence/calendar-day/day-en-full.png|同一趟 17:25 重写；该目录 README 第 146–147 行写着它与 day-en-no-timed **是同一屏**（现在连字节都相同：两枚都是 bac2e331…）⇒ 这张在本视口下不构成独立证据，等重拍时一并定"
+  "apps/web/evidence/calendar-day/day-en-no-timed.png|同上（与 day-en-full 逐字节相同）；处置＝重拍时决定要不要把这张降级成『窄视口才有意义』的那一张"
+)
+
 CONFIRM=0
 # 🔴 测试缝：`--confirm` 那一腿会真提交，绝不能拿本仓库当夹具。
 #    有 PATHS_OVERRIDE（竖线分隔）时，清单从环境取，其余逻辑一字不改 ——
 #    这样"迷你树里跑通 --confirm"证的就是主检出里那一腿的代码。
 if [ -n "${PATHS_OVERRIDE:-}" ]; then
   IFS='|' read -r -a PATHS <<<"$PATHS_OVERRIDE"
+fi
+# 🔴 同一把测试缝的另一半：**在册清单也要能从环境灌**，否则第 1c 格那三条断言（理由非空 /
+#    在册必配 PATHS / 已不脏要打「待摘」）在任何夹具里都跑不到 —— 而"跑不到的那一段"
+#    就是它坏了也没人知道的那一段（本文件 §2 那次事故的同族：一条没跑过的动作腿 = 没有判据）。
+#    条目之间用**换行**分隔 —— 条目内部还有 `路径|理由` 那一层竖线，按 `|` 切会把理由切掉
+#    （第一版就是这么写的，症状是"理由全部消失"而不是报错）。
+# ⚠️ 判"有没有传"用 `${…+set}` 而不是 `-n`：夹具需要的是**传一枚空的册子**
+#    （`UNCARRIED_OVERRIDE=""`），用 `-n` 判空会被当成"没传"⇒ 掉回去用仓库里那 4 枚真路径，
+#    而迷你树里根本没有它们 ⇒ 1b 先 exit 1，17:5x 五臂就是这样整片转红的。
+if [ "${UNCARRIED_OVERRIDE+set}" = set ]; then
+  UNCARRIED=()
+  while IFS= read -r u_line; do
+    [ -n "$u_line" ] && UNCARRIED+=("$u_line")
+  done <<<"$UNCARRIED_OVERRIDE"
 fi
 for a in "$@"; do
   case "$a" in
@@ -123,8 +165,19 @@ if [ "$CONFIRM" = 1 ] && [ -z "${MSG:-}" ]; then
 fi
 
 echo "仓库根：$(pwd)"
+# 在册判定（⚠️ bash 3.2 + `set -u`：空数组的 `"${UNCARRIED[@]}"` 会当场崩 —— 本仓 §7 第 237 条那一族，
+#    所以先取枚数、为 0 就直接返回"不在册"，不展开数组）。
+U_COUNT=${#UNCARRIED[@]}
+is_uncarried() {
+  local u
+  [ "$U_COUNT" = 0 ] && return 1
+  for u in "${UNCARRIED[@]}"; do
+    [ "${u%%|*}" = "$1" ] && return 0
+  done
+  return 1
+}
 echo "== 1. 现量重取清单（别引用文件里的旧枚数）=="
-ST=0; UN=0; NAMES=()
+ST=0; UN=0; NAMES=(); UNC_SEEN=0
 for p in "${PATHS[@]}"; do
   if [ ! -e "$p" ]; then
     # 🔴 点名路径不在磁盘上 = 这份清单自己过期了（改名/删除/写错）。
@@ -136,6 +189,14 @@ for p in "${PATHS[@]}"; do
   if [ -z "$line" ]; then
     printf '   ✅ 已在 HEAD 且工作树与 HEAD 一致：%s\n' "$p"
   else
+    # 🔴 在册的枚数**在这一格就分流**，既不进 NAMES 也不计入"待入库 / 改动"：
+    #    先 case 后判在册的那版会打出 `待入库 7 枚（改动 10 / 新增 1）` —— 总数比分项还小，
+    #    17:5x 现量到的正是这个自相矛盾读数。一枚文件只许有一个口径。
+    #    逐枚理由与状态在下面的第 1c 格，那里也照样看得见它们，不会静默消失。
+    if is_uncarried "$p"; then
+      UNC_SEEN=$((UNC_SEEN + 1))
+      continue
+    fi
     # 🔴 porcelain 前两列是 XY（第 1 列 = 索引 vs HEAD，第 2 列 = 工作树 vs 索引）。
     #    `${line%% *}` 对 ' M …' 会切在第一个空格上得到**空串** —— 我第一版就是这么写的，
     #    结果 'M' 那一条 case **永远不会被命中**（一条走不到的分支 = 没有判据）。
@@ -153,6 +214,7 @@ TOTAL=$(( ${#NAMES[@]} ))
 # 先把第 1 格的读数打完再进 1b —— 否则「待入库 N 枚」会印在 1b 的标题下面，
 # 读日志的人会把第 1 格的量归给第 1b 格（同一份输出里两格的量长得一样）。
 if [ "$TOTAL" != 0 ]; then echo "   ⇒ 待入库 $TOTAL 枚（改动 $ST / 新增 ${UN}）"; fi
+if [ "$UNC_SEEN" != 0 ]; then echo "   ⇒ 另「刻意不带」$UNC_SEEN 枚（不进这一笔，逐枚理由见第 1c 格）"; fi
 
 echo "== 1b. 防「漏登记」：本线命名空间里改了却没点名的文件 =="
 # 🔴 为什么加这一格：PATHS 是我手维护的，而**手维护的清单会漏**——今天实测漏了两枚
@@ -223,8 +285,49 @@ if [ "$LOST" != 0 ]; then
 fi
 echo "   ✅ 命名空间命中 $NS_HIT 枚全部已点名（工作树脏行分母 ${ALL_DIRTY}）"
 
+echo "== 1c. 在册「刻意不带」逐枚现量（这不是豁免：理由写在这本册子里，状态每次重取）=="
+# 🔴 三条断言，缺一条这本册子就会变成"把带走伪装成已登记"：
+#   ① 每条**理由非空**且不是路径本身（忘了写分隔符 `|` 的形状）；
+#   ② 每条**同时也在 PATHS**（只在册不在清单 ⇒ §1 根本不会遍历到它，
+#      它既不会被带走、也不会出现在"待入库"里 ⇒ 这条登记是装饰）；
+#   ③ 每条**现在确实脏**：已经不脏的那枚打「待摘」——
+#      在册条目一旦失效还留着，下一位就会照着它写"这枚还挂着"，而对象已经不存在了。
+if [ "$U_COUNT" = 0 ]; then
+  echo "   （册子空着 ⇒ 这一格无事）"
+else
+  U_BAD=0; U_STALE=0
+  for u in "${UNCARRIED[@]}"; do
+    up=${u%%|*}; ur=${u#*|}
+    if [ "$ur" = "$u" ] || [ -z "$ur" ]; then
+      printf '   ❌ 在册条目没写理由（格式应是 `路径|为什么不带走 + 处置路`）：%s\n' "$up"
+      U_BAD=$((U_BAD + 1)); continue
+    fi
+    named=0
+    for pp in "${PATHS[@]}"; do
+      [ "$pp" = "$up" ] && named=1
+    done
+    if [ "$named" = 0 ]; then
+      printf '   ❌ 在册却不在 PATHS：%s ⇒ §1 遍历不到它，这条登记是装饰（两处要一起写）\n' "$up"
+      U_BAD=$((U_BAD + 1))
+    fi
+    u_st=$(git status --porcelain -- "$up" 2>/dev/null)
+    if [ -z "$u_st" ]; then
+      printf '   🟡 在册但工作树已与 HEAD 一致 ⇒ **待摘**（这条登记的对象已经不存在）：%s\n' "$up"
+      U_STALE=$((U_STALE + 1))
+    else
+      printf '   🚫 在册 [%s]：%s\n' "${u_st:0:2}" "$up"
+      printf '      理由：%s\n' "$ur"
+    fi
+  done
+  echo "   ⇒ 在册 $U_COUNT 枚；断言不过 $U_BAD 枚；登记对象已消失（待摘）$U_STALE 枚"
+  if [ "$U_BAD" != 0 ]; then
+    echo "   ⇒ 先修这本册子（exit 1）。一条没理由 / 没配 PATHS 的在册条目比没有登记更危险：它把「带走」读成「已登记」。"
+    exit 1
+  fi
+fi
+
 if [ "$TOTAL" -eq 0 ]; then
-  echo "   ⇒ 本线点名对象全部已在 HEAD 且工作树一致，且 1b 没有漏件 —— A 此刻**无待办**。"
+  echo "   ⇒ 本线点名对象全部已在 HEAD 且工作树一致，且 1b 没有漏件、1c 的在册断言全过 —— A 此刻**无待办**。"
   exit 0
 fi
 
@@ -309,7 +412,7 @@ if [ "$R2" != 0 ]; then
 fi
 
 if [ "$R1" != 0 ] || [ "$R2" != 0 ]; then
-  # 🔴 18:1x 把这一条的**范围**改对（判据没放宽，改的是它量的那个集合）。
+  # 🔴 17:2x 把这一条的**范围**改对（判据没放宽，改的是它量的那个集合）。
   #    原样是"仓库里这两道有任何红 ⇒ exit 3"，可这一腿提交走的是
   #    `git commit --only -- <NAMES>`，**它的提交集合恰好等于 NAMES** ——
   #    也就是说别人工作树里的红**结构上进不了这一笔**，却被这条前置当成了本线的红。
