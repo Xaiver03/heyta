@@ -2863,3 +2863,25 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
   ③ 于是**每 60 秒静默饿死一次**，而日志看起来像在正常等窗口）；逐枚 sha256-12 打在那目录里，夹具跑的是同一份 shipped 内容而不是抄件。
 - 现场（13:0x 现量）：`ps` 里已无别人的 `verify-mobile` / 打包 / `notarytool` 进程（12:44 那枚挂 9h20m 的 notarytool 不在了），
   但设备前台仍是别人的 `com.heyta`、`:3000`/`:3100` 仍被占 ⇒ **①③ 继续等窗口**。本轮起跑的设备/Playwright/重装类验收：**0 条**。
+#### 7.31.1 上面那条自己也有两处要先作废（13:1x 现量，载体 `32391847`，主检出 HEAD `ba063aab`）
+
+- 🔴 **我 13:13 那条"iOS 模拟器只有 1 台 booted"是假读数**，成因是探针形状而不是环境：我用 `simctl list devices booted | grep -E 'iPhone|iPad'` 去数，
+  而本机四台叫 `heyta-*` 的设备名里**没有** iPhone/iPad 字样 ⇒ 结构上匹配不到。现量（`simctl list devices booted` 不带名字过滤）= **5 台 booted**：
+  `heyta-batch2-closeout`、`heyta-bc-reminders`、**`heyta-iphone-17pro`**、`heyta-ios-isolated`、`iPhone Duo heyta`。
+  ⇒ 后果不是小事：如果我相信那枚"1 台"，就会去判定"① 的 iOS 目标没启动"、然后**去启动一台不该我启动的模拟器**（在共享机上多加一份负载）。
+  链里 ① 要的那台 `heyta-iphone-17pro` 其实一直在 booted 表里，`grep -c '① 不起' /tmp/heyta-chain17.log = 0`（自量：那一支从没触发过）。
+  同族第 N 次：这就是"0 行不代表东西没了"，只不过这次的 pattern 是我为了"顺手筛一下"现编的。
+- **① 会不会拆别人的 iOS 现场 —— 这条不归我补，闸门已经管了**（按实现读，不按分支名读）：`--target b` 分支第 **3b** 段（`:171-199` 现读）
+  用单所有者探针 `lib/mobile-e2e-runner-probe.sh` 数"有别的移动端验收在跑"并 `WHY_DEV=1 + FAIL++`，注释写明 B 会 `simctl uninstall` + `adb uninstall` + 覆盖 `/Applications/Heyta.app`
+  这三条都是拆别人正在量的现场，且 04:1x 之前就因"闸门按 target 分岔漏了一半"补过。⇒ **我不给启动器再加 iOS 卸载门**（那会是第二份实现，一定漂）。
+  我那条 `mac-dist-guard` 仍站得住，因为它挡的是**闸门看不见的那一类**：正在跑的 `notarytool` / `hdiutil` 句柄（不是 reinstall-all、也不是 verify-mobile-*）。
+- **13:13 现量：那道物体级门此刻确实有用** —— `pgrep -x notarytool` 又有人了，且 `lsof +D /tmp/heyta-macos-dist` = `diskimage/98171` 正握着 `Heyta-1.0.0.dmg`；
+  也就是说 §7.31 末尾那句"ps 里已无别人的 notarytool"只对 13:0x 那一刻成立（这正是瞬时读数必须带时刻的原因）。此刻起跑 ① 会被我的启动器判 `VERDICT=NOT-RUNNING`，
+  而那正是设计意图：`reinstall-all.sh:196,199` 的起跑第一步是 `rm -rf /tmp/heyta-macos-dist`。
+- **③ 第 10 步的库前置已可读（13:11:25 现量，纯只读）**：`psql` 在 `/opt/homebrew/opt/postgresql@14/bin/psql`，`:5432` 由 `postgres/1334` 监听，
+  `heyta_mobile_smoke` 连得上 ⇒ `SELECT count(*) FROM operations` = **90**，同趟阳性对照 `pg_tables` = **93**（两条都出数，说明探针与连接都活着，而不是"0 行"那种空读数）。
+  这条只降低"第 10 步因为连不上而红"的概率，**不替代起跑前现量**（库里行数是活的）。
+- 载体的工作树此刻有 **1 枚**未提交：`scripts/verify-mobile-notes.sh`，blob = `df46f473`（= 我的合并态，链在 ③ 之前把 shipped 的 `a7f6579b` 覆盖上去留下的），
+  载体 HEAD `32391847` 落后主检出 `ba063aab` —— 这是**设计**（链在起跑那一轮才对齐），不是故障；
+  同时确认链里 `identify_notes_input` 第 5 参写死的 `a7f6579b` 与 main 当前的这枚**仍逐字相同**（`git show HEAD:scripts/verify-mobile-notes.sh | git hash-object --stdin` 现量），
+  ⇒ 门 B 现在不会拒绝，③ 不会因为我方依据过期而饿死。若它哪天拒绝，正解是 §7.31 那条 `heyta-remerge-notes.sh`，不是改链。
