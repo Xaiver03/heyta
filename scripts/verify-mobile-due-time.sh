@@ -504,12 +504,29 @@ step "5. 判据 ①②③ —— 未设日期时的时刻栏"
 #    一条产品判据都没跑到）。
 assert_channel "第 5 步（判据 ①②③）之前"
 
-# 🔴 **空框读数的自校准锚点，必须在任何敲字之前取**（19:1x 那趟的现场形状：
-#    ④ 报「填进了 1」而 ② 与 ④b 报「框里是 '时:分'」—— 同一个框、同一个通道，
-#    三条互相打脸，红的原因是占位符被当成了内容，不是 enabled 接线）。
-#    此刻这条任务只有标题、没有时刻 ⇒ 这一读就是"空"在这台设备 + 这份语言下的
-#    字面形状。空框若真回空串，`TIME_EMPTY` 就是空串，归一为无操作 —— 两个方向
-#    都不会引入假绿（见上面 `time_value` 与 `calibrate_time_empty` 的注释）。
+RAW_BEFORE=$(rid_count task-due-time-input)
+XY_NO_DATE=$(scroll_to_rid task-due-time-input)
+RAW_COUNT=$(rid_count task-due-time-input)
+# 🔴 ① 原来读的是**上一次没滚动的 dump** 的 `rid_count`，而 ②④ 走 `scroll_to_rid` ——
+#    同一个节点两条通道。19:1x 实测就是这么自相矛盾的：① 报"不在无障碍树里"，
+#    下一行 ② 却拿到了可点坐标。"没滚进可点区"被说成"没画"，与
+#    `verify-mobile-edit` 记过的同一族（ScrollView 折叠线以下的节点在树里但不 sane）。
+#    现在 ① 与 ②④ 同一条腿，**滚前/滚后两枚枚数都打**：
+#      数得出却没滚到 = 探针/布局问题；两枚都是 0 = 共享层真的没画这一行。
+if [ -n "$XY_NO_DATE" ]; then
+  ok "① 时刻输入框画出来了，且已滚进可点区（testID=task-due-time-input，滚前 $RAW_BEFORE 枚 / 滚后 $RAW_COUNT 枚）"
+elif [ "$RAW_COUNT" -ge 1 ]; then
+  bad "① 判不了：树里数得出 $RAW_COUNT 枚时刻输入框，但滚了 6 次都没进可点区 —— 探针/布局问题，不是产品没画"
+else
+  bad "① 时刻输入框不在无障碍树里（滚前 $RAW_BEFORE 枚 / 滚后 0 枚）—— 移动端没把 time prop 传下去，或共享层没画这一行"
+fi
+
+# 🔴 **锚点必须在"节点已经进入这一份 dump"之后取**，且仍在任何敲字之前。
+#    排在滚动之前是 21:1x 那一趟的红因：日志打着 `空框锚点 TIME_EMPTY=''`（长度 0）、
+#    同一条日志的 ① 写着"树里共 0 枚"，而后面的读数却是 `'时:分'` ——
+#    锚点那一刻节点**不在树里**，`rid_attr` 查不到就回空串，于是归一成了**无操作**，
+#    ②/④b 照旧红。这是**"探针取空"被当成"设备答空"**：两种空在输出上长得一模一样，
+#    而枚数是唯一的分辨器 ⇒ 下面把两者并排判。
 if ! calibrate_time_empty; then
   echo "   ❌ 空框锚点取到了'要填进去的内容值'（'${TIME_EMPTY}' 与 '1'/'${TIME_HALF}'/'${TIME_FULL}' 同形）" >&2
   echo "      这时归一会把**真空**吞成空串 ⇒ ② 与 ④b 会变成两条**假绿**（比原来的假红更贵）。" >&2
@@ -517,22 +534,17 @@ if ! calibrate_time_empty; then
   screen_txt
   exit 3
 fi
-echo "   空框锚点 TIME_EMPTY='${TIME_EMPTY}'（长度 ${#TIME_EMPTY}；凡等于它的读数归一成空串）"
-
-RAW_COUNT=$(rid_count task-due-time-input)
-XY_NO_DATE=$(scroll_to_rid task-due-time-input)
-# 🔴 ① 原来读的是**上一次没滚动的 dump** 的 `rid_count`，而 ②④ 走 `scroll_to_rid` ——
-#    同一个节点两条通道。19:1x 实测就是这么自相矛盾的：① 报"不在无障碍树里"，
-#    下一行 ② 却拿到了可点坐标。"没滚进可点区"被说成"没画"，与
-#    `verify-mobile-edit` 记过的同一族（ScrollView 折叠线以下的节点在树里但不 sane）。
-#    现在 ① 与 ②④ 同通道，原始枚数**另打一行**做归因：
-#      数得出却没滚到 = 探针/布局问题；一枚都数不出 = 共享层真的没画这一行。
-if [ -n "$XY_NO_DATE" ]; then
-  ok "① 时刻输入框画出来了，且已滚进可点区（testID=task-due-time-input，树里共 $RAW_COUNT 枚）"
-elif [ "$RAW_COUNT" -ge 1 ]; then
-  bad "① 判不了：树里数得出 $RAW_COUNT 枚时刻输入框，但滚了 6 次都没进可点区 —— 探针/布局问题，不是产品没画"
+if [ -z "$TIME_EMPTY" ]; then
+  if [ "$RAW_COUNT" -ge 1 ]; then
+    echo "   空框锚点 TIME_EMPTY=〈空串〉而树里有 $RAW_COUNT 枚 ⇒ 这台设备的空框**确实回空串**，归一为无操作（预期内）"
+  else
+    bad "②/④b 判不了：锚点是空串而此刻树里 0 枚时刻输入框 ⇒ 这是「探针取空」不是「设备答空」，归一没有可校准的形状"
+    who_else
+    screen_txt
+    exit 3
+  fi
 else
-  bad "① 时刻输入框不在无障碍树里（0 枚）—— 移动端没把 time prop 传下去，或共享层没画这一行"
+  echo "   空框锚点 TIME_EMPTY='${TIME_EMPTY}'（长度 ${#TIME_EMPTY}；凡等于它的读数归一成空串）"
 fi
 if [ -z "$XY_NO_DATE" ]; then
   bad "② 判不了：滚了 6 次都没把时刻输入框送进可点区（读数通道此刻不可用）"
@@ -708,6 +720,12 @@ fi
 
 # ── 判据 ⑪：点「全天」= 清掉时刻，且**日子保留**（清的是精度，不是日期）。
 step "12. 判据 ⑪ —— 「全天」把时刻清掉、日子留住"
+# 🔴 **先导航回「任务」标签**。第 11 步为了同步**自己点了「我的」**（`ensure_phone_sync`
+#    那颗按钮在「我的」页上），而任务行根本不在那一屏 ⇒ 21:1x 的 ⑪「判不了」就是这么来的：
+#    日志里那份 dump 是**我们自己的「我的」页**，不是别人抢占 ——
+#    与 19:1x 那条同名红**成因不同**，别把两条混成一条（这条是脚本自己走掉了没走回来）。
+#    坐标与第 3 步那枚逐字相同（同一台设备的同一个标签）。
+$ADB shell input tap 135 "$TAB_Y"; sleep 3
 if open_sheet "$TITLE"; then
   ALLDAY_XY=$(scroll_to_rid task-due-time-all-day)
   if [ -z "$ALLDAY_XY" ]; then
