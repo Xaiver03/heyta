@@ -5226,3 +5226,75 @@ tip 是自己 10 秒前造的那笔 —— `git reset --soft HEAD~1` + `git rest
 >   **② 的逐段读数**（分母每次现量，上一趟是 84）与**③ 的四端重装**（含 `FRESH=5/5` +
 >   `PHASE1_EXIT`/`PHASE2_EXIT`/`INNER_EXIT` 三句一起抄）都要等它落账；
 >   落账前，"四端装的是含 `66ce1545` 的树"这句**不成立**（现装的那四端是 `9c3557c1` 的产物）。
+>   ✅ **这两格在补记 #5 落成读数了**（04:27 那趟跑完；原句留着不删，因为它记的是"当时没量到"这件事）。
+
+> **B79 补记 #5（10-05 04:0x–04:5x）—— ②③ 两格读数落地；四端确认装的是含 `66ce1545` 的树，代价是查出一枚**我自己的**探针在读错设备**
+>
+> - ✅ **② 链读数**（干净检出 `heyta-wt-ai-closeout` @ `ad61621a`，未提交项 0，链 `rc=0`）：
+>   分母现量 **84 段**，`pass=82 / fail=1 / skip=1 / env-blocked=0`。
+>   唯一红 = 第 42 段 `check:docs`（三条"已提交文档引用了未提交章节"，目标都是 `trash-and-archive.md`
+>   编号 10.87 那一节）⇒ **其中一条是我自己造的**，详见本条下面第 4 点与 `808d584a` 那笔更正；
+>   第 69 段 `check:ai-e2e` 是 `rc=SKIPPED_BY_RULE`（链里不跑它，preflight 会 SIGKILL 4318/4319 上
+>   别人的 vite，§7 #87）⇒ 队列阶段 4 单独补跑，读数 **`AI_E2E rc=0`**（`deliver-040105-70122/ai-e2e.log`）。
+> - ✅ **③ 四端重装**（同一趟，`REINSTALL rc=0`，重装载体 `f8ecbd8f`；`LANDING LANDING-CURRENT reinstall=0 post_drift=0`
+>   ⇒ 落地那一刻 main→载体的**打包输入差集 = 0**）：四端各一条判据 ——
+>   mac `PAX_MAC=MATCH`（`assets/index-C9iddvlQ.js` 已装 sha == 载体 sha `5c83a10f4c0f…`，标记 `list_events` 2/2）；
+>   android `PAX_AND=MATCH`（已装 66,915,556 B == 构建 66,915,556 B，`lastUpdateTime=2026-10-05 04:23:50`）；
+>   windows `PAX_WIN=FACTS-OK facts=5`（五条判据齐，含用户点名的快捷方式两条）+ `WIN-FRESH`（取证文件 mtime 晚于本轮起跑）；
+>   ios 见下一条 —— **那一格当时是红的，而红的是探针不是产品**。
+>   🔴 这一趟**没有**走 `PHASE1_EXIT`/`PHASE2_EXIT` 那个两趟形态（补记 #4 那句预期字段是照旧启动器写的）：
+>   阶段 5 是**一次** `bash scripts/reinstall-all.sh`（四端同趟），所以三句一起抄在这里换成
+>   `REINSTALL rc=0` + 四条 PAX + `LANDING`，缺哪一句都不算收口。
+> - 🔴 **`PAX_IOS=MISMATCH` 是探针读错设备，不是装错产物**（现量）：真目标
+>   `heyta-iphone-17pro`（`FE195661…`）里 `main.jsbundle` sha `7655111d0df1…` **逐字等于构建产物**
+>   （`/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle`，mtime 04:26:59），
+>   而探针取的是 `simctl list devices booted | head -1` ⇒ 本机四台同时 Booted，第一行是
+>   **别人的** `heyta-batch2-closeout`（那枚 bundle 是 10-04 17:04 的 `9194fa3f…`）。
+>   ⚠️ **同一个盲选生产脚本早就改掉了**：`reinstall-all.sh:365` 按 `IOS_DEVICE_NAME` 挑，
+>   `:368-370` 的注释就是 B76 那批为这件事写的（"原来这里退化成随便挑第一台已启动的模拟器，
+>   而这一段的下一个动作就是 `simctl uninstall`"）—— **我在自己的探针里把改掉的那个形状重写了一遍**，
+>   而且写的是只读版，所以没伤人只骗了自己（traps #169 的同族新面目：**盲选目标不只会卸错设备，也会读错设备**）。
+>   ✅ 修：选择式**照抄生产那三条**（不自己改强）+ 走同一个 `IOS_DEVICE_NAME` 旋钮；
+>   ✅ 三臂台架 `~/scratch-heyta/pax-ios-harness.sh`（抽真身第 867–883 行，抽完断言
+>   `IOS_UDID=$(xcrun` 恰好一枚、`NOT-READABLE` 分支在、比对那行在，再 `bash -n`）：
+>   臂 A `heyta-iphone-17pro` ⇒ `MATCH`；臂 B `heyta-batch2-closeout` ⇒ `MISMATCH`
+>   （**有牙**：读到别人那台会说出来，而不是跟着装家的哈希点头）；臂 C 不存在的名字 ⇒ `NOT-READABLE`
+>   （读不到不判绿）。三臂全中 ⇒ **修正后的 ③ 四枚取证齐**，`decide_pax` 的 ios 那格由 `MISMATCH` 翻成 `MATCH`。
+> - 🔴 **② 那条红里有一条是本线造的，而且形状很新**：`docs-link-check.mjs` 的
+>   `SECTION_REF_RE` = `任意路径.md` + 可选反引号 + `§` + 数字，**同行即算一条跨文档引用**，
+>   它不区分"我在引用"与"我在记录别人引用错了"。我在 B79 里写"那两份文件都引用 `trash-and-archive.md §10.87`"
+>   —— **这句话自己就成了第三条失效引用**（`BLOCKED.md:4996`）。我当时数出三条、逐条归因给别的线：
+>   **条数对、归属里混进了自己**，因为我只查了"被引的那节在 HEAD 里有没有"，没查"写这句的是谁"。
+>   ✅ `808d584a` 只改自己那一行（编号写成"编号 10.87"，散文不再被解析成引用），
+>   干净检出现量 **3 → 2**，剩下两条（`calendar-profile-handoff.md:1187`、`multi-end-coverage-handoff.md:2094`）
+>   仍指向只存在于别人未提交工作树的那一节 ⇒ 归属回收站/归档那条线，本线不代改章节号。
+>   📌 **可迁移**：门禁吃的是**文本形状**不是意图；写"记录一条坏引用"的账之前，先问它会不会被当成一条引用。
+> - 🟡 **判决词与它旁边的数字互相打脸**（同一趟 `rc.txt`）：`FINAL DONE-CURRENT-AND-OWN-GREEN own_red=1` ——
+>   `decide_final` 的入参是 Goal 点名的那 **两条 STRICT 门**（`check:ai-coverage` / `check:ai-tools`），
+>   而 `own_red` 数的是**本线全部**非绿门（那 1 条就是按规则不跑的 `check:ai-e2e`，阶段 4 已 `rc=0`）。
+>   ⇒ 判决词改成说真话的名字：`DONE-CURRENT-AND-STRICT-GREEN` / `DONE-BUT-STRICT-RED`；
+>   `decide_final` 抽真身离线喂五形核过（`0 12`⇒STRICT-GREEN、`1 12`⇒STRICT-RED、
+>   空值⇒`FINAL-OWNRED-UNKNOWN`、`LANDING-STALE`⇒原样透传、`0 0`⇒UNKNOWN —— 推不出门数不许判绿）。
+> - ✅ **五枚图逐张人眼看过**（mac 出两枚，分母 5 不是 4）：
+>   mac `.webview.png` = **真应用**（rail 九个入口 / 页头「收集箱」/ 语言切换 / 右栏「AI 工具调用·对话助手」/
+>   首启同意卡，暗色跟随系统外观）⇒ **`66ce1545` 那条兜底在装机产物里成立**（遮罩已摘，不再是品牌帧）；
+>   ios = 同意卡，状态栏 **04:27** 对上本趟；android = 同意卡，状态栏 4:24、`5G`；
+>   windows = 真应用 + 头像菜单开着（第一项「登录 / 注册」、下面「设置」）。
+>   🔴 **mac 的"窗口"那枚是近空的**（只有红绿灯，2164x1432）：后台启动（`HEYTA_NO_FOCUS=1`）的
+>   WKWebView 不进窗口合成 ⇒ 内容判据数的是 `.webview.png` 那枚（脚本正是这么做的，占比 100.0% / 主蓝 1127），
+>   窗口那枚只当尺寸交叉核对。⚠️ 对**别线**的门禁这是一条真风险：任何拿窗口截图当内容载体的判据，
+>   在这台机器上会量到这种空图（traps #170 同族）。
+> - ✅ **交付差额（任务 #49）就此闭合**：修前实测装机字节是旧的
+>   （`/Applications/Heyta.app/Contents/Resources/web-dist/assets/index-B3SuE9mn.js` 里只有
+>   `getComputedStyle(t).animationName==="none"&&i()`，没有上界），修后 mac payload `MATCH` +
+>   线上 `index.html` sha 与载体逐字相同 ⇒ **装机 / 线上 / 源码三者同枚**。
+> - ⚠️ **没为 `808d584a` 重跑整链**，理由给的是路径集合不是印象：
+>   `git diff --name-only ad61621a..HEAD` = 16 笔全落在 `BLOCKED.md` / `PROGRESS.md` / `docs/plans/*`，
+>   去掉这三类后 **0 枚**；受影响的只有 `check:docs` 那一段，已单独在干净检体重跑（`3 → 2`）。
+>   ⇒ ② 的正式读数绑在 `ad61621a`，"整链在 `808d584a` 跑过"这句**不成立**，别往下传。
+> - 🟡 **载体残留两枚，属 iOS 那条线**（诚实记，不代改）：ios 腿跑完 `git status` 脏
+>   `apps/mobile/ios/Heyta.xcodeproj/project.pbxproj`（条目**换位**，无新增重复）与
+>   `Podfile.lock`（`hermes-engine` spec checksum + `PODFILE CHECKSUM` 两行）
+>   ⇒ 提交态那份 lock 与干净树跑出来的**本来就不一致**，每次 `pod install` 都会重写这两行，
+>   脚本自己会打"⚠️ 与 HEAD 差 N 行"。备份到 `~/scratch-heyta/carrier-dirty-0448/` 后
+>   `git checkout --` 回提交态（载体 dirty=0），**没有**把它当成"我的改动"提交。
