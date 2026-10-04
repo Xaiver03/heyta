@@ -620,8 +620,19 @@ else
 fi
 
 step "13. 直接查 Postgres"
-psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
-  "SELECT (SELECT count(*) FROM operations) AS ops, (SELECT count(*) FROM sync_devices) AS devices" 2>/dev/null \
-  | sed 's/^/      ops|devices = /'
+# 🔴 连接参数走 env（与 `verify-mobile-lists.sh:386` / `verify-mobile-notes.sh:460` 同一套约定，仓内理由写在 `lib/mobile-e2e.sh:57-61`）：
+#    原来这里硬印 `-U rocalight -d heyta_mobile_smoke`，换一台机器就连不上，而失败形态被 `2>/dev/null` 吞成"什么都没打印"。
+#    默认值与原来逐字相同（库名同源、用户默认当前登录者），所以现有跑法行为不变。
+PG_DB="${HEYTA_E2E_DB:-heyta_mobile_smoke}"
+PG_USER="${HEYTA_E2E_DB_USER:-$(whoami)}"
+PG_HOST="${HEYTA_E2E_DB_HOST:-127.0.0.1}"
+PG_PORT="${HEYTA_E2E_DB_PORT:-5432}"
+PG_SERVER_STATS=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
+  "SELECT (SELECT count(*) FROM operations) AS ops, (SELECT count(*) FROM sync_devices) AS devices" 2>&1)
+if printf '%s' "$PG_SERVER_STATS" | grep -qE '^[0-9]+\|[0-9]+$'; then
+  ok "服务端现场 ops|devices = ${PG_SERVER_STATS}（库 ${PG_DB} @ ${PG_HOST}:${PG_PORT}，用户 ${PG_USER}）"
+else
+  bad "读不到服务端的 ops/devices 计数（库 ${PG_DB} @ ${PG_HOST}:${PG_PORT}，用户 ${PG_USER}）—— 原始输出：$PG_SERVER_STATS"
+fi
 
 summary "移动端截止时刻输入侧闭环"

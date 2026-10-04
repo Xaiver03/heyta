@@ -82,10 +82,10 @@ while :; do
       echo "WINDOW=open $(date '+%T') —— 开始整条链" >> "$LOG"
       if [ "$CAR_SHA" != "$MAIN_SHA" ]; then
         git -C "$CARRIER" checkout --detach "$MAIN_SHA" >> "$LOG" 2>&1
-        echo "SYNC rc=$?（目标 $MAIN_SHA）" >> "$LOG"
+        echo "SYNC rc=$?（目标 ${MAIN_SHA}）" >> "$LOG"
         git -C "$CARRIER" status --porcelain -- packages apps server scripts | sed 's/^/   仍脏：/' >> "$LOG"
       else
-        echo "SYNC rc=0（载体已在 $MAIN_SHA，无需同步）" >> "$LOG"
+        echo "SYNC rc=0（载体已在 ${MAIN_SHA}，无需同步）" >> "$LOG"
       fi
       CARRIER="$CARRIER" LOG="/tmp/ht-r14c-chain.$$.log" bash "$CHAIN" >> "$LOG" 2>&1
       CHAIN_RC=$?
@@ -93,7 +93,7 @@ while :; do
       echo "ALL_DONE final_rc=$CHAIN_RC" >> "$LOG"
       exit $CHAIN_RC
     elif [ "$GATE_RC" -ne 3 ]; then
-      echo "ALL_DONE final_rc=$GATE_RC（闸门回了非 0 非 3 的码 —— 不洗白，原样交出去）" >> "$LOG"
+      echo "ALL_DONE final_rc=${GATE_RC}（闸门回了非 0 非 3 的码 —— 不洗白，原样交出去）" >> "$LOG"
       exit $GATE_RC
     fi
   fi

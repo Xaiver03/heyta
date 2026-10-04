@@ -542,7 +542,7 @@ for f in android-notes-1-editor-open.png android-notes-2-list-after-edit.png and
   if [ "$M" -lt "$RUN_STARTED" ]; then
     bad "证据是旧的：apps/mobile/evidence/$f —— mtime $(stat -f '%Sm' -t '%m-%d %H:%M:%S' "$p") 早于本轮起跑 $(date -r "$RUN_STARTED" '+%m-%d %H:%M:%S')（非空不等于本轮拍的）"
   else
-    ok "证据在库且本轮新生：apps/mobile/evidence/$f（$(stat -f %z "$p") bytes）"
+    ok "证据在库且本轮新生：apps/mobile/evidence/${f}（$(stat -f %z "$p") bytes）"
   fi
 done
 echo "   📷 三张截图（**人必须打开看**）：编辑屏初值 / 列表摘要已变 / 从搜索结果进来的编辑屏"
