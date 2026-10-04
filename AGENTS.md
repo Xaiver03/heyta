@@ -567,30 +567,30 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
 **从不制造愧疚**。关键裁决见下面 ADR-0022 与
 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
 
-### 2026-10-03：倒数纪念日 批次二（✅ **已完成质量审计与合并**；🔴 `main` 这个 ref 还没指过来）
+### 2026-10-03：倒数纪念日 批次二（✅ **已完成质量审计、合并，并已进 `main`**：`origin/main` = `91a672f6`）
 
 > 逐项状态与全部读数：[`docs/plans/countdown-anniversary.md`](docs/plans/countdown-anniversary.md) §8.2 / §8.4。
 > **本轮质量审计 + 分组提交 + 合并的逐条裁决与合并态读数：同文 §8.5**（2026-10-04）。
 > 分支：`feat/countdown-batch2`（W0/W0b/W2/W5/W10）、`feat/countdown-w9`、
 > `feat/countdown-w4b`、`feat/countdown-w7`、`feat/countdown-w8`（后三条由并行子 Agent 在独立 worktree 里跑）。
 
-🔴 ~~全在本地分支，**未 push、未 merge 进 main**~~ —— ✅ **04 21:3x 现量更正**：
-`feat/countdown-batch2` **已 push 到 origin**（同名远端分支），main **已三次并入本分支**
-（`75114cd3` / `f92491ac` / `5358edf7`；13 处冲突逐处裁决，裁决理由写在 `git show 75114cd3` 的提交信息里，
-后两次都是并行会话在上一笔合并之后又落的文档笔、`git merge-tree` 预检冲突 0 处）。
-**只剩**"把 `main` 这个 ref 指过来"那一格：合并要改写主检出的工作树，而那里 04 21:3x 现量仍有
-**16 枚**未提交路径（含 `AGENTS.md`、`docs/reference/environment-traps.md`、`package.json`）正被并行会话持有
-⇒ 等他们提交之后落地。**落地形态取决于他们提交后 main 是否已推进过本分支的合并基**：
-先现量 `git rev-list --count HEAD..main`（在 batch2 里跑）—— 为 **0** 才是一次快进
-`cd heyta && git merge --ff-only feat/countdown-batch2`；非 **0** 就**先在 batch2 侧 `git merge main`
-再落地**，不要到 main 侧现解冲突。⚠️ 本批改了 `AGENTS.md` §9 与两份计划文档，
-而主检出的 `AGENTS.md`/`environment-traps.md` 正被别人写 ⇒ **下一次并存的这两份大概率冲突**，
-届时照 §8.5 第 4 条的做法：**台账类按行并列取并集，不改写别人的编号与措辞**（不 force、不重写历史）。
-⚠️ **"仍可快进"是瞬时属性**，每次落地前都要现量一次，别按上一轮的读数行动。
-🔴 **本批不代并行会话推他们那 3 笔未推的 main 提交**（`a244d24b`、`894adfac`、`74b3b566`，全是他们自己的
-交接文档笔）：把别人**尚未公开**的提交推上共享 `main`，会让他们的任何一次
-`commit --amend` / rebase 都变成 **force push 才能推**——而"不改写已公开历史"是硬边界。
-现量：`git log --oneline origin/main..main`（在主检出）。
+✅ **04 22:0x：`origin/main` 已收下这批**（`c343b923..91a672f6`，**一次快进、不带 `--force`**）。
+通道不是"改写主检出"，是 `git push origin feat/countdown-batch2:main` ——
+之前记的"落地只能等主检出干净"把**本地 ref** 当成了"合入 main"的实质，已被一次 `--dry-run` 否证
+（全过程与六步读数在 §8.5 第 12 条，那里也写清了它**没有**重跑全量单测的边界）。
+
+🔴 **给并行会话的一条硬提示**：这次快进把他们**原先只在本地的 10 笔**（`4f0b3894`、`83359555`、
+`4023fc5f`、`eaf14080`、`e088c92f` 等）一起公开到了 `origin/main`。
+⇒ **那些笔现在不能再 `commit --amend` / rebase 了**（一改就要 force push，而"不改写已公开历史"是硬边界）；
+要修就新写一笔。他们本地 `main` 是远端的祖先（`merge-base --is-ancestor main origin/main` = YES），
+**一次 `git pull` 就收敛，零冲突**。
+⚠️ 反过来，**下一个只读本地 `main` 的判据**（`git show main:<file>` 形状）在他们 pull 之前会读到旧内容 ——
+跨检出引用请写 `origin/main`。
+
+🔴 ~~全在本地分支，**未 push、未 merge 进 main**~~（04 21:3x 的第一次更正，留形）：
+`feat/countdown-batch2` 已 push；main **六次并入本分支**（`75114cd3` 带 13 处冲突逐处裁决，
+理由在 `git show 75114cd3` 的提交信息里；后五次都是并行会话在上一笔合并之后又落的笔，
+`git merge-tree` 预检冲突 0 处 ⇒ 不需要新裁决）。
 
 **这一批收拢了并行会话的改动**：主检出上 158/167 个未提交路径按逻辑分组成 **13 笔提交**
 （设备撤销共享层 / mobile / web / node-host+op-log / vault e2e / 抹除设备脚本+门禁 / iOS 提醒投递 /
