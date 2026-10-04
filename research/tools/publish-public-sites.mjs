@@ -43,8 +43,11 @@ const DOMAIN = process.env.HEYTA_SITE_DOMAIN || 'heyta.waytofuture.cn';
 const APP_URL = `https://${DOMAIN}/app/`;
 const LANDING_DIST = 'apps/landing/dist';
 const WEB_DIST = 'apps/web/dist';
-/** 参与这两次构建的**输入**目录：它们脏 = 要发的字节不等于 `<REF>` 的提交物。 */
-const INPUT_PATHS = ['apps/landing', 'apps/web', 'packages', 'server/public'];
+/** 参与这两次构建的**输入**：它们脏 = 要发的字节不等于 `<REF>` 的提交物。
+ *  🔴 `pnpm-lock.yaml` 与根 `package.json` 在列不是凑数 —— 它们决定装进来的依赖，
+ *    而依赖变了产物就变了；`e2e` 也在列，因为第 9 步那条**线上验收读数**必须来自同一笔提交，
+ *    否则"验收过了"判的是没进 main 的那份断言。 */
+const INPUT_PATHS = ['apps/landing', 'apps/web', 'packages', 'server/public', 'pnpm-lock.yaml', 'package.json', 'e2e'];
 
 const git = (args, cwd = ROOT) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
@@ -232,10 +235,18 @@ export function publishArms() {
     docDests.join(','), uniq(rsyncSteps.map((s) => (rsyncDest(s) ?? '').replace(/^[^:]*:/, ''))).join(','));
 
   // 守卫：三条各被单独打红过一次，才知道它们不是装饰。
+  // 🔴 桩必须**按 pathspec 过滤**返回。第一版不管 `--` 后面列了什么都把脏字符串原样回给它，
+  //    于是 P20–P22 是在测"桩会不会说脏"，而不是测"清单里有没有这一枚输入"——
+  //    把 'pnpm-lock.yaml' 从清单里摘掉，三条臂一条都不红（M12–M14 就是这么把它照出来的）。
   const fakeGit = (opts) => (args) => {
     if (args[0] === 'rev-parse' && args[1] === 'HEAD') return opts.head;
     if (args[0] === 'rev-parse') return opts.ref;
-    if (args[0] === 'status') return opts.dirty;
+    if (args[0] === 'status') {
+      const paths = args.slice(args.indexOf('--') + 1);
+      return (opts.dirty ?? '').split('\n').filter((l) => l.trim() !== '')
+        .filter((l) => paths.some((p) => l.slice(3).startsWith(p)))
+        .join('\n');
+    }
     throw new Error('unexpected git call');
   };
   push('P11 HEAD == 目标 ref ⇒ 通过', true,
@@ -248,6 +259,14 @@ export function publishArms() {
     /apps\/web\/src\/main\.tsx/.test(guardReadings(fakeGit({ head: 'aaaaaaaa', ref: 'aaaaaaaa', dirty: ' M apps/web/src/main.tsx' }), ROOT).fails.join('')));
   push('P15 判据文件不在树上 ⇒ 拒绝（发一条没有对账的链等于没判据）', false,
     guardReadings(fakeGit({ head: 'aaaaaaaa', ref: 'aaaaaaaa', dirty: '' }), join(ROOT, '..')).ok);
+  /* 🔴 这三条是**行为**臂而不是"清单里有这一项"的静态臂：
+    把某个输入从清单里摘掉，这里就会红。静态清单臂挡不住"摘掉之后顺便也没人测它"。 */
+  push('P20 锁未提交 ⇒ 拒绝（依赖变了，产物就不是 main 那一笔的产物）', false,
+    guardReadings(fakeGit({ head: 'aaaaaaaa', ref: 'aaaaaaaa', dirty: ' M pnpm-lock.yaml' }), ROOT).ok);
+  push('P21 线上验收那套 e2e 有未提交断言 ⇒ 拒绝（"验收过了"不能属于没进 main 的那份断言）', false,
+    guardReadings(fakeGit({ head: 'aaaaaaaa', ref: 'aaaaaaaa', dirty: '?? e2e/live-site/new.spec.ts' }), ROOT).ok);
+  push('P22 根 package.json 未提交 ⇒ 拒绝（workspace 定义与 scripts 键都在这份文件里）', false,
+    guardReadings(fakeGit({ head: 'aaaaaaaa', ref: 'aaaaaaaa', dirty: ' M package.json' }), ROOT).ok);
   return arms;
 }
 
@@ -260,7 +279,7 @@ const SELF = fileURLToPath(import.meta.url);
 /* 🔴 变异只作用在 **planSteps 那一段**上，不作用在整份文件上。
  *    第一版是改整份文件，结果 rig 自己的锚点字符串也在同一个文件里 —— 每条锚点命中 2 次，
  *    命中数断言当场抛错，9 条变异全部读成"红集为空"。这正是"needle 扫到自己"那一族。 */
-const PLAN_START = 'export function planSteps(';
+const PLAN_START = 'const INPUT_PATHS = [';
 const PLAN_END = '/* ── 自检：顺序与守卫都要能被臂打红 ────';
 const planSlice = (src) => {
   const a = src.indexOf(PLAN_START);
@@ -318,6 +337,10 @@ const MUTATIONS = [
   // P19 单独的红读法由 M12 给：只改 runbook 那一侧的话改的是文档，rig 不动文档，所以这里改脚本侧。
   ['M11 脚本发的目的目录与 runbook 不再一致', withPlan((p) =>
     rep(p, '/var/www/heyta-app/', '/var/www/heyta-web/', 1)), ['P7', 'P17', 'P19']],
+  // 把某一枚构建输入从清单里摘掉 ⇒ 只有它那一条行为臂红（证明清单不是装饰，也证明三条各管一枚）。
+  ['M12 输入清单里摘掉锁', withPlan((p) => rep(p, "'pnpm-lock.yaml', ", '', 1)), ['P20']],
+  ['M13 输入清单里摘掉 e2e', withPlan((p) => rep(p, ", 'e2e'];", '];', 1)), ['P21']],
+  ['M14 输入清单里摘掉根 package.json', withPlan((p) => rep(p, "'package.json', ", '', 1)), ['P22']],
 ];
 
 function runMutation() {
@@ -328,21 +351,29 @@ function runMutation() {
     const copy = join(dirname(SELF), `publish-mut-${tag}.tmp.mjs`);
     let red = [];
     let threw = false;
+    let why = '';
     try {
       writeFileSync(copy, apply(base));
       const out = execFileSync(process.execPath, [copy, '--selftest'], { cwd: ROOT, encoding: 'utf8' });
       red = out.split('\n').filter((l) => l.startsWith('RED '))
         .map((l) => l.slice(4).trim().split(/\s+/)[0]).sort();
     } catch (e) {
-      threw = /Error|throw/i.test(`${e.stdout ?? ''}${e.stderr ?? ''}`);
-      red = `${e.stdout ?? ''}`.split('\n').filter((l) => l.startsWith('RED '))
+      const out = `${e.stdout ?? ''}`;
+      red = out.split('\n').filter((l) => l.startsWith('RED '))
         .map((l) => l.slice(4).trim().split(/\s+/)[0]).sort();
+      // 🔴 区分两种失败，它们看起来一模一样（红集为空）：
+      //    ① 子进程**跑了**但一条都没红 = 判据真的没牙；
+      //    ② 变异**根本没施上**（锚点漂了 / 段落定位失败）或子进程自己崩了 = 探针坏。
+      //    第一版只读子进程 stdout ⇒ ②被读成①，我第一次就把它当成"九条判据是装饰"。
+      const ran = /臂数 \d+/.test(out);
+      threw = !ran;
+      why = ran ? '' : `探针坏：${(out + String(e.stderr ?? '') + String(e.message)).trim().split('\n').filter((l) => l.trim()).slice(-1)[0].slice(0, 150)}`;
     } finally {
       rmSync(copy, { force: true });
     }
     const ok = JSON.stringify(red) === JSON.stringify([...expect].sort()) && !threw;
     if (!ok) bad += 1;
-    console.log(`${ok ? '  ok' : 'RED '} ${name} ⇒ 红集 [${red.join(', ')}]（期望 [${[...expect].sort().join(', ')}]）${threw ? ' 且抛错' : ''}`);
+    console.log(`${ok ? '  ok' : 'RED '} ${name} ⇒ 红集 [${red.join(', ')}]（期望 [${[...expect].sort().join(', ')}]）${why ? ' ' + why : ''}`);
   }
   console.log(`变异 rig：${MUTATIONS.length} 条 · 不符 ${bad}`);
   if (bad) {
@@ -363,7 +394,7 @@ function runSelftest() {
   }
   console.log(`发布装置自检：臂数 ${arms.length} · 红 ${bad}`);
   // ⚠️ 地板随臂数**只升不降**：加一条臂就要把这里抬上去。臂被删掉时这个数会拦住"看起来还在自检"。
-  if (arms.length < 20 || bad > 0) {
+  if (arms.length < 23 || bad > 0) {
     console.log('❌ 自检没过 ⇒ 这条链的顺序与守卫不可信，别用它发布');
     process.exit(1);
   }
