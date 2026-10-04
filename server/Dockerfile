@@ -240,14 +240,28 @@ COPY --from=builder --chown=supersync:nodejs /repo/packages/domain/heyta-domain-
 # IMPORTANT: prisma version must match @prisma/client in package.json
 #
 # 这里仍然是 npm（不是 pnpm），**刻意的**：
-# 服务端 package.json 里三个工作区依赖都写成 `"*"`，npm 能用上面三个 tarball 满足它们；
-# 写成 `workspace:*` 的话 npm 会直接报错。这一点很容易踩，别改。
+# 服务端 package.json 里**运行时**那三个工作区依赖（domain / shared-schema / sync-core）
+# 都写成 `"*"`，npm 能用上面三个 tarball 满足它们；写成 `workspace:*` 的话 npm 会直接报错。
+# 这一点很容易踩，别改。⚠️ 但"三个"只数了 `dependencies` —— `devDependencies` 里还有
+# 三枚同名族的 workspace 包，而 npm 会连它们一起解析，所以下面那步剪枝不能省。
 #
 # ⚠️ `domain.tgz` 必须一起装：它自己还依赖 `@heyta/shared-schema`，
 # 而 `pnpm pack` 会把 domain 的 `workspace:*` 改写成真实版本号 ——
 # 所以两个 tarball 要在**同一条** `npm install` 里给，npm 才能就地满足它。
+#
+# 🔴 `devDependencies` 必须在装之前**剪掉**，而不是靠 `--omit=dev`。
+#    npm 即使带 `--omit=dev` 也要先建完整 ideal tree ⇒ 它照样去 registry
+#    **解析** devDeps。而 `@heyta/app-host` / `@heyta/storage` /
+#    `@heyta/sync-client` 这三枚只存在于本 workspace，公共 registry 上回
+#    `E404`，于是整层构建失败（`b3397cda` 把三枚加进 devDeps 之后，镜像
+#    再没建起来过 —— 而 `pnpm -r build` / `pnpm check` 全绿：AGENTS §7 第 75
+#    条那个"本地绿 ≠ 镜像建得出"的形状第二次现形）。
+#    剪掉是安全的：这三枚只有测试与 `scripts/*.ts` 用（`recover-user.ts` 里
+#    那处 `@heyta/app-host` 是**注释**，值用的是字面量，由
+#    `server/tests/recover-artifact-envelope.spec.ts` 钉住），运行时不需要。
 ARG NPM_REGISTRY=https://registry.npmjs.org/
-RUN npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
+RUN node -e 'const fs=require("fs"),f="package.json",p=JSON.parse(fs.readFileSync(f,"utf8"));delete p.devDependencies;fs.writeFileSync(f,JSON.stringify(p,null,2)+"\n")' && \
+    npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npm install --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npm install prisma@5.22.0 --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npx prisma generate && \
