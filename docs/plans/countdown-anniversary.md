@@ -1107,7 +1107,9 @@ W0b ─> 随时可做（台账那半要等文件干净）
     —— 这就是它的 A/B：同一台机器、同一份 spec，05:47 那趟 `✘ 1 … 差 5.3px`，修完这趟两条全过，
     **判据的牙不需要另外证**（它刚刚自己红过一次）；
     jsdom 侧 `apps/web/tests/{calendar-sidebar,due-date-edit}.spec.tsx` **`RC_JSDOM=0` / `Test Files 2 passed`**。
-    两张图**人已打开看过**（`e2e/test-results/calendar-sidebar-mini.png` 与 `…-sidebar.png`）：
+    两张图**人已打开看过**（`e2e/test-results/calendar-sidebar-mini.png` 与 `…-sidebar.png`；
+    🔴 04 14:5x 起这两枚已搬进版本库 `apps/web/evidence/countdown-calendar/`，md5 与"哪一趟"记在同目录
+    `README.md` 末尾那节 —— 原来那个位置是临时目录，任何一趟 e2e 都会重写它）：
     七列在列头下面逐列对齐、没有一列画到侧栏外；`休`（绿）在 1–4 与 5–7、`班`（橙）在 10；
     今天那一格是"一颗蓝点 + 休"**同一行**；主区月历那一侧的标记与周号（40 周…45 周）没被动过。
     ⚠️ 图里侧栏左缘压着一小块灰色"日历 12"提示框 —— 那是 rail 图标的 hover 提示被同一趟截图抓进去的，
@@ -1207,6 +1209,18 @@ W0b ─> 随时可做（台账那半要等文件干净）
   三张图**都打开看了**（§6.2 规定一第 4 条）：`test-results/countdown-empty.png`（空态两块文案）、
   `countdown-board.png`（1280px 两列 + 一张未来一张逾期）、`countdown-archived.png`（归档视图没有输入行、
   二级操作里确实没有"编辑/归档"）。
+
+  🔴 **04 14:5x 补：那三张当时只躺在 `e2e/test-results/`（临时目录，任何一趟 e2e 都会重写）⇒ 已搬进
+  [`apps/web/evidence/countdown-cards/`](../../apps/web/evidence/countdown-cards/README.md)**（带 md5 与"哪一趟"）。
+  搬的时候逐张复核，其中 `countdown-board.png` 人**又打开看了一遍**：两张卡真的并排、
+  左「甲日子 · 还有 28 天 · 11月1日 星期日」右「乙日子 · 已经 32 天 · 9月2日 星期三」——
+  与上面那句"一张未来一张逾期"逐字对得上（跑的那天是 10-04）。
+  ⚠️ 同一趟查出**一条会自己吃掉证据的用例形状，登记为 W5-G1**：`countdown.spec.ts` 的 `:102`
+  （点出一条之后，屏上**一张**卡）与 `:191`（1280px **两列**）**写同一个文件名**
+  `test-results/countdown-board.png` ⇒ 后跑的覆盖先跑的，盘上永远只剩两列那张。
+  也就是说"点出一条之后长什么样"那张**从来没有常驻过**，而台账里"三张图"这句一直把它算在内。
+  本批不改（改判据文件与链 Y 那趟完整 `pnpm check` 抢同一批用例，见 §6.2 与"串行跑重验证"那条纪律），
+  修法方向写在证据 README：**两条用例各写自己的文件名**，不是给路径加时间戳。
 
   🔴 **看图照出一个真缺陷，而 15 条断言全绿**：逾期那张卡**整行日期没画**。根因在共享层 ——
   一次性且已过去的倒数日没有"下一次"（`EventCard.nextDate` 是 `undefined`），卡片原来写的是
