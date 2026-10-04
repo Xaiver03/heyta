@@ -345,6 +345,10 @@ down_stack() {
   [ "$KEEP" = "1" ] && return 0
   log "==> 拆栈"
   compose down -v --remove-orphans >/dev/null 2>&1 || true
+  # 🔴 拆过就把标志位放下：正常结束那条路**显式调**了本函数，之后 EXIT trap 还会再问一次
+  # `STACK_UP`。不清零就是"同一栈拆两遍、日志里两行 `==> 拆栈`"（`compose down` 幂等，
+  # 不会坏，但下一读日志的人会先怀疑是不是起栈失败走了两条分支）。
+  STACK_UP=0
 }
 
 # ── 等健康：迁移要跑完（含 CONCURRENTLY 的带外恢复），最长 240s ────
