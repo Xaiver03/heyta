@@ -9111,9 +9111,19 @@ A–E 五支精确点红自己那一句、对照组不红 ⇒ §8.134 ⑤ 第 4 
 #### ① 现量：冲突面从 7 枚涨到 9 枚，而涨出来的两枚**不在预置九族里**
 
 ```bash
-git merge-tree --write-tree --name-only main feat/self-host-distribution   # 9 条路径 + rc=1
-grep -c -F 'docs/runbooks/deployment.md' research/tools/selfhost-merge-carrier.mjs          # = 0
-grep -c -F 'e2e/live-site/live-domain.spec.ts' research/tools/selfhost-merge-carrier.mjs    # = 0
+# merge-tree 的产出是四段：OID 行 / 冲突路径 / 空行 / "Auto-merging…" 与 "CONFLICT…" 的旁白。
+# 🔴 取路径必须**在空行处停**：整段喂给 grep 会把 "Auto-merging" 当成一枚路径去查族
+#    （本条第一趟就这么错了一次，报出六个假 OTHER）。
+PATHS=$(git merge-tree --write-tree --name-only main feat/self-host-distribution \
+         | awk 'NR>1{if($0=="")exit; print}')
+echo "$PATHS" | wc -l          # = 9（01:2x 现量）
+for p in $PATHS; do
+  grep -q -F -- "$p" research/tools/selfhost-merge-carrier.mjs || echo "OTHER: $p"
+done
+#   ↑ 没有 OTHER 输出 = 预置各族覆盖住了这 9 枚；出现 OTHER 就是"开窗后 --confirm 会退 2"那一发。
+# 单枚的族命中数（本条当时量出来 0 命中、随后被补成族的那两枚）：
+grep -c -F 'docs/runbooks/deployment.md' research/tools/selfhost-merge-carrier.mjs          # 现在 ≥1（第十族）
+grep -c -F 'e2e/live-site/live-domain.spec.ts' research/tools/selfhost-merge-carrier.mjs    # 现在 ≥1（第十一族）
 ```
 
 分族表是**精确匹配**，落不进任何族 ⇒ `fam.other` ⇒ 退 2 并点名。这件事的代价不是"多一条错误信息"：
