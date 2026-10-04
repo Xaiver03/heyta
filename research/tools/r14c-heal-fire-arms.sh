@@ -16,10 +16,25 @@ MARKER=/tmp/arm-healfire.chain-called
 FAIL=0
 say() { printf '%s\n' "$1"; }
 
-# 挑一枚两提交之间变过的非产品文件当夹具
-F=$(git diff --name-only "$OLD" "$NEW" | grep -E '^(scripts|research|docs)/' | head -1)
-[ -n "$F" ] || { say "❌ 装置坏：找不到夹具文件"; exit 4; }
-say "夹具文件=${F}"
+# 挑一枚两提交之间变过的非产品文件当夹具。
+# 🔴 跨度**必须能向后放宽**（12:5x 现量教的）：原写法固定 `HEAD~2`，那一刻 HEAD~2..HEAD 恰好
+#    全是产品文件 ⇒ 本装置打「装置坏：找不到夹具文件」exit 4；一分钟后别人又提交了两笔 docs，
+#    同一条命令就有读数了。也就是说**它红不红取决于别人刚提交了什么** —— 这是一枚随机红的先验，
+#    而随机红的先验比没有先验更贵（它会被人当成"现场不方便，回头再跑"，于是永远没人跑）。
+#    放宽的同时补一条存在性前提：夹具必须在 OLD 与 NEW 两边都在（臂 5 往载体那枚追加、
+#    臂 6 写 NEW 的那一版，两边都要求文件真的存在）。
+F=''; FIX_SPAN=''
+for span in 2 3 4 6 8 12 20; do
+  cand_old=$(git rev-parse "HEAD~$span" 2>/dev/null) || break
+  [ -n "$cand_old" ] || break
+  cand=$(git diff --name-only "$cand_old" "$NEW" 2>/dev/null | grep -E '^(scripts|research|docs)/' | head -1)
+  [ -n "$cand" ] || continue
+  git cat-file -e "$cand_old:$cand" 2>/dev/null || continue
+  git cat-file -e "$NEW:$cand" 2>/dev/null || continue
+  F="$cand"; OLD="$cand_old"; FIX_SPAN="$span"; break
+done
+[ -n "$F" ] || { say "❌ 装置坏：向后放宽到 HEAD~20 都没有一枚两边都在、且内容变过的非产品文件"; exit 4; }
+say "夹具文件=${F}（跨度 HEAD~${FIX_SPAN} → ${NEW:0:8}）"
 
 mk_gates() { # 桩闸门：开窗（rc=0）
   printf '#!/bin/bash\necho "窗口开（桩）"\nexit 0\n' > "$1"; chmod +x "$1";
@@ -37,8 +52,16 @@ mk_chain() { # 桩链：被调用就留标记
 }
 
 run_once() { # $1=桩闸门 $2=桩链 $3=载体 $4=日志
+  # 🔴 CO_PATTERN 必须钉成一枚**必不命中**的，否则本装置读的是活机器而不是夹具
+  #    （13:2x 现量：H 那把 flaky 看守挂着时，臂 6/7/9 全部走到 `CO_RUNNER=alive ⇒ 让路`
+  #     而拿不到开火路径 ⇒ rc=3 / 链调用 0，看起来像"自愈逻辑坏了"）。
+  #     SELF_GUARD=0 只关了"C 让 C"那一半，"C 让 H"那一半是另一道判据，漏了它整条臂就废。
+  #     形状要带 `[$]`：正控那枚假进程的名字由模式**去掉方括号**推出（`…-SELFTEST`），
+  #     所以 `ht-healfire-none[$]` 既能被假进程命中，又不会命中任何真实命令行。
+  #     "让路那一腿到底有没有牙"不在这里测 —— 它由 r14c-window-retry.sh 自己的
+  #     `SELFTEST=positive_ok` 那条正控保证（它必须数得出临时那枚假进程才让开跑）。
   env CARRIER="$3" MAIN="$MAIN" BUDGET=0 INTERVAL=1 LOG="$4" BOOT_WAIT=5 \
-    SELF_GUARD=0 GATE="$1" CHAIN="$2" \
+    SELF_GUARD=0 CO_PATTERN='ht-healfire-none[$]' GATE="$1" CHAIN="$2" \
     bash "$RETRY" >/dev/null 2>&1
   echo $?
 }

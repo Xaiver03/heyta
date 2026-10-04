@@ -57,7 +57,17 @@ PATHS=(
   research/tools/shell-unicode-independent-scan.py
   research/tools/r14c-bundle-testid-preflight.sh
   research/tools/r17-evidence-md5-check.sh
+  # 14:2x 新写：把 --all 报为 UISTALE 的证据目录重拍一遍（默认 dry-run，前置不达标 exit 3）。
+  # 🔴 它同样是**这条防漏格自己抓出来的**：文件刚落盘、还没进清单，1b 就报
+  #    `❌ 本线命名空间有改动却没点名 [??]：research/tools/r17-reshoot-stale.sh` ⇒ 有牙。
+  research/tools/r17-reshoot-stale.sh
+  # 15:4x：上面那条 --only 前置被换成后置对账之后，**这一把就是它的牙**（三臂：正向 / 摘掉 --only /
+  # 我方路径暂存≠工作树）。同样是 1b 自己抓出来的（落盘即报 `[??]`）—— 第四次。
+  research/tools/calendar-line-commit-only-arms.sh
   research/tools/h-flaky-window-watcher.sh
+  # 边界 F 第二条的现量清点器（11:0x 新写）：台账里那句"188 处"是一条断言，
+  # 落成脚本才有可复跑的读数（03:0x 那次就是靠现拼 `$( )` 把探针弄坏的）。
+  research/tools/f-boundary-scope-count.sh
   apps/web/evidence/calendar-view-options/README.md
   # 🔴 这两枚 png 也在清单里，而且**必须由本线一起提交**：06:1x 那趟三连同跑把它们的字节改了
   #    （`52174907…` / `ae8ad61d…`，而 HEAD 里仍是 01:34 那两枚 `d2c5cbfd…` / `6fcbf2aa…`）。
@@ -74,6 +84,17 @@ PATHS=(
   apps/web/evidence/profile-panel/r15b-2-ready.png
   apps/web/evidence/profile-panel/r15b-3-ready-dark.png
   apps/web/evidence/profile-panel/r15b-4-after-reload.png
+  # 🔴 14:1x 补进清单的五枚：它们都是**本线补的证据锚点**（README 里逐张"人看到的" + UIPIN），
+  #    而 13:5x/14:1x 之前**一枚都不在这份清单里** —— 也就是说 A 那格"清单已全"当时是**假绿**：
+  #    它只数了清单里点到的那些。下面 NS_RE 同步扩了两条交替式（旧那条 `calendar-day` 后面
+  #    紧跟 `/`，所以 `calendar-day-time/` **匹配不到**，不是已经覆盖）。
+  #    ⚠️ 只点 `README.md`，**不点这些目录里的 png**：那些字节是别的会话跑 e2e 时写的，
+  #    工作树里它们相对 HEAD 干净 ⇒ 本线没有该提交它们的改动。
+  apps/web/evidence/calendar-year/README.md
+  apps/web/evidence/calendar-day-time/README.md
+  apps/web/evidence/calendar-cells/README.md
+  apps/web/evidence/calendar-week/README.md
+  apps/web/evidence/calendar-capture/README.md
   research/tools/calendar-line-commit-plan.sh
   # 这枚**不是**本线创建的文件，但脏的那一行是本线的（文档中心里 calendar-profile 那一行，
   # 现量 `git diff --numstat` = 1/1 即整份只有这一行改动）。共享文档只点自己那一行的归属。
@@ -143,7 +164,19 @@ echo "== 1b. 防「漏登记」：本线命名空间里改了却没点名的文�
 #   · 它按**名字**判归属，不按 author —— 别人若在同一命名空间里改文件会误报，报了由人来核；
 #   · 它**挡不住**"我改了别人的文件"（`scripts/verify-mobile-notes.sh` 那一枚顺带修就是），
 #     那种只能靠 PATHS 里显式不点名 + 文档写明移交口径。
-NS_RE='^research/tools/(r14c-|r17-|h-flaky-|calendar-line-|b-)|^docs/plans/(calendar-year-time-and-mobile-profile|calendar-profile-handoff)\.md$|^scripts/(verify-mobile-window-gate|verify-mobile-due-time)\.sh$|^scripts/lib/(mobile-e2e-runner-probe|wedged-runner)\.sh$|^apps/web/evidence/(calendar-day|calendar-view-options|profile-panel)/[^/]+\.(md|png)$'
+# 🔴 14:1x 扩证据目录那五条交替式时的两个现量事实，别读成"以前都覆盖了"：
+#   ① 旧那条写的是 `(calendar-day|…)/` —— 正则里 `calendar-day` 后面**紧跟一个 `/`**，
+#      所以 `apps/web/evidence/calendar-day-time/README.md` **从来就不匹配**（不是被漏在清单里，
+#      是命名空间根本没看它）⇒ 1b 那格当时对它是**瞎**的。
+#   ② 新加的五个目录**只把 `README.md` 划进本线命名空间，png 不划**：
+#      那些字节是别人的 e2e 趟写的，工作树相对 HEAD 干净 ⇒ 划进来会让 1b 去点名不属于本线的文件。
+# ⚠️ `docs/reference/environment-traps.md` **刻意不在这里、也不在 PATHS**：那是并行会话共用的台账
+#    （14:1x 现量 ` M`、+318/-7，其中本线只占 #241–#246 六条），点名它 = 把别人几百行未提交内容
+#    一起提交进去。本线条目的可复跑归属口径写在交接 §4.05。
+NS_RE='^research/tools/(r14c-|r17-|h-flaky-|calendar-line-|b-|f-boundary-)|^docs/plans/(calendar-year-time-and-mobile-profile|calendar-profile-handoff)\.md$|^scripts/(verify-mobile-window-gate|verify-mobile-due-time)\.sh$|^scripts/lib/(mobile-e2e-runner-probe|wedged-runner)\.sh$|^apps/web/evidence/(calendar-day|calendar-view-options|profile-panel)/[^/]+\.(md|png)$|^apps/web/evidence/(calendar-year|calendar-day-time|calendar-cells|calendar-week|calendar-capture)/README\.md$'
+# 🔴 11:0x 加 `f-boundary-`（不写裸 `f-`：那个前缀太短，别的线随时会撞上，撞上了就把别人的文件
+#    划进本线的归属）。同一时刻把它加进上面的 PATHS —— **两处一起改**才有效：
+#    只改正则 = 它在 1b 里"可见但不被点名"；只改 PATHS = 下次再写一枚新装置照样会被漏（今天已经第三次）。
 # 🔴 10:1x 把 `b-reinstall-` 放宽成 `b-`，理由是**实测**：那一格当时报"命名空间命中 35 枚全部已点名"，
 #    而本线在同一时刻还脏着三枚 `b-arm3- / b-wedge- / b-batch-` 的装置**在它外面** ——
 #    也就是说这条"防漏登记"的闸门自己就是一条手维护的前缀清单，它会漏的和它要防的是同一件事。
@@ -195,15 +228,45 @@ if [ "$TOTAL" -eq 0 ]; then
   exit 0
 fi
 
-echo "== 2. 索引必须是空的（共享工作树里非空索引 = 一笔吞掉别人的暂存）=="
-IDX=$(git diff --cached --name-only | wc -l | tr -d ' ')
-if [ "$IDX" != 0 ]; then
-  echo "   ❌ 索引里有 $IDX 枚已暂存路径，其中不属于本线的："
-  git diff --cached --name-only | grep -vxF -f <(printf '%s\n' "${NAMES[@]}") | sed 's/^/      /'
-  echo "   ⇒ 先让那些路径的所有者处理自己的暂存；本工具不在别人的索引上动刀（exit 1）。"
-  exit 1
+echo "== 2. 别人的暂存：现量记录，提交后逐字节对账（判据不是「索引必须空」）=="
+# 🔴 这一格**原来的前置是错的**，而且错的形态很典型：它把一次**裸 `git commit`** 的事故
+#    （实测吞掉别人 109 枚暂存）当成了"非空索引就不能提交"的一般规律，可是下面第 5 格走的是
+#    `git commit --only -- <点名路径>` —— 语义是"提交树 = HEAD + 点名路径的工作树内容"，
+#    索引里别人那份条目既进不了这笔、也不会被抹掉。
+#    15:0x 在一次性小副本里实测（别人暂存 b.txt，我只点名 a.txt + 新建 new.txt）：
+#      · `git show --stat HEAD` 只有 a.txt / new.txt 两枚；
+#      · 别人那枚的索引 blob 提交前后**逐字相同**（4722149c…），且仍留在索引里是 `M ` 已暂存态。
+#    ⇒ 拿"索引必须空"当前置，拦的是一条**本工具已经不走的路径**，而代价是真实的：
+#      本机索引长期挂着别人的暂存项，A 那条就被一条不成立的前提**永久挡死**（今天就是 1 枚）。
+#    换成后置对账：挡的是真事故（别人的暂存被带走 / 被抹掉），不是"索引脏"这个表象。
+# 🔴 15:4x 补一次**同形状的复量**（`research/tools/calendar-line-commit-only-arms.sh` 臂 1，
+#    外来暂存枚数 = 1）：`git show --name-only` 里只有点名路径、别人那条 blob 前后逐字相同且仍在索引。
+#    上面那句"旧前置不成立"**已被实测否证两次，别改回去**。
+#    而 §2 里"本线点名路径已被暂存成另一份内容"那条**不是设想出来的**：同一把 rig 的臂 3 把它
+#    造出来了（暂存 ≠ 工作树 ⇒ rc=1 拒绝、没有产生提交、那份暂存原样留着）。
+FOREIGN=""   # 换行分隔的 `<path>\t<blob>`，第 5b 格按这份账逐条核
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  if printf '%s\n' "${NAMES[@]}" | grep -qxF "$f"; then
+    # 本线点名路径被别人暂存成了**另一份内容**：--only 按工作树提交，那份暂存意图会被静默替换掉。
+    # 这才是"非空索引"里真正有危险的那一种，所以它单独判红。
+    WT=$(git hash-object -- "$f" 2>/dev/null || echo NOFILE)
+    IX=$(git ls-files --stage -- "$f" | awk '{print $2}')
+    if [ "$WT" != "$IX" ]; then
+      echo "   ❌ 本线点名路径已被暂存成另一份内容：${f}（索引 ${IX:-无} ≠ 工作树 ${WT}）"
+      echo "      ⇒ --only 会用工作树覆盖那份暂存意图。先与所有者对齐再入库（exit 1）。"
+      exit 1
+    fi
+  else
+    FOREIGN="${FOREIGN}${f}	$(git ls-files --stage -- "$f" | awk '{print $2}')
+"
+  fi
+done < <(git diff --cached --name-only)
+N_FOREIGN=$(printf '%s\n' "$FOREIGN" | grep -c . || true)
+echo "   不属于本线的已暂存路径：$N_FOREIGN 枚（记账待后验，不据此拒绝）"
+if [ "$N_FOREIGN" != 0 ]; then
+  printf '%s' "$FOREIGN" | sed 's/	/  ← 索引 blob /; s/^/      · /'
 fi
-echo "   ✅ 索引为空（$IDX 枚）"
 
 echo "== 3. 静态门禁（入库前红着就别把红一起提交）=="
 # 🔴 每趟唯一路径：固定 /tmp 名会被另一个会话（或上一趟）的读数顶掉，
@@ -270,4 +333,29 @@ if [ "$LEFT" != 0 ]; then
   git status --porcelain -- "${NAMES[@]}" | sed 's/^/      /'
   exit 1
 fi
+
+# 🔴 5b：第 2 格记的那份"别人的暂存"账在这里逐条对上。
+#    这一格是那条前置被换掉之后**唯一的牙** —— 没有它，§2 就退化成"只打印不判定"，
+#    而那正是裸 commit 吞掉 109 枚暂存时缺的东西。
+if [ "$N_FOREIGN" != 0 ]; then
+  BAD=0
+  IN_HEAD=$(git show --name-only --format= HEAD)
+  while IFS=$'\t' read -r f h; do
+    [ -z "$f" ] && continue
+    if printf '%s\n' "$IN_HEAD" | grep -qxF "$f"; then
+      printf '   ❌ 别人的暂存被本笔带走了：%s\n' "$f"; BAD=1
+    fi
+    NOW=$(git ls-files --stage -- "$f" | awk '{print $2}')
+    if [ "$NOW" != "$h" ]; then
+      printf '   ❌ 别人的索引条目被改了：%s（%s → %s）\n' "$f" "$h" "${NOW:-已从索引消失}"; BAD=1
+    fi
+  done <<< "$FOREIGN"
+  if [ "$BAD" != 0 ]; then
+    echo "   ⇒ 上面每条都带着原 blob 哈希，恢复口径：git update-index --cacheinfo 100644,<原哈希>,<路径>"
+    echo "     🔴 先不要 push。**没有回滚别人暂存项的自动化**（那是跨会话的状态，只能人核对后做）。"
+    exit 1
+  fi
+  echo "   ✅ 后置对账：$N_FOREIGN 枚别人的暂存一条不少、索引 blob 逐字不变、且不在本笔的树里"
+fi
+
 echo "   ✅ 点名对象全部进入 HEAD。**没有 push**（推不推是另一个决定，本工具不代做）。"

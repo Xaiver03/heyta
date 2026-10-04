@@ -104,6 +104,9 @@ echo "════ 1. 负载门（规范实现，阈值 = hw.ncpu × 3/4）═�
 # 「那一趟是在推进还是已经楔住」的**纯读数**（不参与下面的红/绿与 REDS= 机器通道）。
 # 抽成 lib 是因为两道门都要它：抄一份到第二道门就是等它漂（AGENTS §7 那一族）。
 . scripts/lib/wedged-runner.sh
+# APK 新鲜度的算法（下面第 4 步与 `verify-mobile-trash.sh` 装包前共用同一份；
+# 那份脚本以前没有这道门，所以"忘了跑闸门"的人会拿旧 bundle 报全绿 —— §7 第 27 条）。
+. scripts/lib/apk-freshness.sh
 # 这里**只读一次现量**，不阻塞等人：窗口的判断是给调用者的，不是替调用者睡觉。
 CORES=$(sysctl -n hw.ncpu)
 LIMIT=$((CORES * 3 / 4))
@@ -268,11 +271,10 @@ case "$TARGET" in
     fi
     APK="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
     if [ -f "$APK" ]; then
-      APK_MT=$(stat -f %m "$APK")
-      NEWEST=$(find apps/mobile/src packages/ui/src packages/i18n/src packages/domain/src \
-        -type f \( -name '*.ts' -o -name '*.tsx' \) -not -path '*/node_modules/*' \
-        -exec stat -f %m {} + 2>/dev/null | sort -rn | head -1)
-      echo "      APK $(date -r "$APK_MT" '+%F %T') / 最新源码 $(date -r "${NEWEST:-0}" '+%F %T')"
+      # 算法住在 `scripts/lib/apk-freshness.sh`（真机验收脚本装包前那一发用的是同一份）。
+      # 这里只保留**呈现**，两行输出的字面形状与抽出去之前逐字相同。
+      read -r APK_MT NEWEST < <(heyta_apk_pair "$APK" "$PWD")
+      echo "      APK $(date -r "${APK_MT:-0}" '+%F %T') / 最新源码 $(date -r "${NEWEST:-0}" '+%F %T')"
       if [ -n "$NEWEST" ] && [ "$NEWEST" -le "$APK_MT" ]; then
         pass "APK 不比源码旧"
       else

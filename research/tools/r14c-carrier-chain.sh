@@ -45,10 +45,17 @@ JUDG_PATHS=(
   #   走这条清单而不是直接 `bash "$MAIN/scripts/…"`：清单带逐枚 md5 对账与跑完还原，
   #   "哪一份判据在跑"是可对账的，不是靠调用路径隐式决定（§6 第 19 条那一族）。
   scripts/verify-mobile-window-gate.sh
-  # 🔴 上面那份闸门现在 source 了这枚 lib（09:0x 加的"楔住 vs 推进"读数）⇒ 依赖必须同列。
-  #    漏它的后果不是崩（闸门只 `set -u`，会打一行 command not found 继续跑），
+  # 🔴 规则（13:2x 现量补齐的）：**闸门 source 的每一枚 lib 都要同列**，不是"漏了才补哪一枚"。
+  #    漏的后果不是崩（闸门只 `set -u`，会打一行 command not found 继续跑），
   #    而是**在最需要那条读数的"动设备那一刻"悄悄没有它** —— 抄件必漂的那条规则在这里成立。
+  #    现量：闸门 :103/:106/:109 三枚 source，12:5x 之前清单里只有 `wedged-runner` 一枚，
+  #    `apk-freshness.sh`（当天新加，载体那份**根本没有**）与 `wait-for-quiet-host.sh` 都不在。
+  #    先验把这一条抓出来的正是 `r14c-chain-overlay-arms.sh` 的依赖对偶不变式。
+  #    `wait-for-quiet-host` 此刻载体那份与主检出**逐字节相同**（按"缺失/才要求"的判定式它还不该红），
+  #    仍然并列：清单要是按"这一趟碰巧的 sha"来写，下次有人在工作树里改它就又漂一次。
   scripts/lib/wedged-runner.sh
+  scripts/lib/apk-freshness.sh
+  scripts/lib/wait-for-quiet-host.sh
 )
 # 🔴 可覆盖只是为了让本步自己的臂（缺文件 / 点名产品代码 / 载体脏）能在隔离克隆里试；
 #    下面那条 `packages/*|apps/*|server/*)` 守卫**不认来源**，覆盖也越不过去。
