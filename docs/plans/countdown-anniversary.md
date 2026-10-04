@@ -3111,3 +3111,56 @@ W0b ─> 随时可做（台账那半要等文件干净）
     （`countdown-board.png` 1280×900，左「甲日子 · 还有 28 天 · 11月1日」右「乙日子 · 已经 32 天 · 9月2日」），
     所以"点出一条之后屏上长什么样"那张**从来没有常驻过**，而"三张图"这句一直把它算在内。
     本批不改 spec：链 Y 正在跑完整 `pnpm check`（含 `check:ai-e2e`），改它抢的是同一批用例。
+
+- ㊾ **链 Y 的完整 `pnpm check` 读数到手：23 段先过、停在 `check:legal-permissions`（7 条红，逐条归因到 W9 那半）；链 Z 的 iOS 重装倒在 `pod install`，而它不是环境坏了**（04 14:54–15:05，载体 `e1b94b67`）
+  - ✅ **Goal ⑤ 第 1 项的读数**（`/tmp/device-closeout-Y.log`，14:54:5x 开跑 → 14:55 收口，`RC_CHECK=1`）：
+    按 `package.json:58` 那条 `check` 串的**段序**数，**前 23 段全过**（第 1 段到第 23 段 =
+    `pnpm build` → `check:entries` → `typecheck` → `claims` → `reachability` →
+    `op-log-semantics` → **`shell-surfaces`** → `migrations` → `token-hashing` → **`layering`** →
+    **`ui-provider`** → `theme` → `row-single-source` → `l4` → `empty-state` → `widgets` → `arkts-widgets` →
+    `adaptive-cards` → `pwa` → `ui-language` → `docs-voice` → `legal-copy` → `legal-tools`），
+    **第 24 段 `check:legal-permissions` rc=1** 把串联停住。
+    ⚠️ 单位钉死：这里的"段"是 `&&` 切出来的**一条命令**，不是日志里 `$ ` 开头的行数（那个现量 27 行，
+    因为嵌套的 `pnpm -r build` 之类自己也打 `$`）—— 两种数法会差 4，别拿其中一个去对另一个。
+    可复跑：`node -e 'const s=require("./package.json").scripts.check.split("&&");const i=s.findIndex(x=>x.includes("check:legal-permissions"));console.log(s.length,i+1,i)'`
+    ⇒ `68 24 23`（总 68 段、停在第 24 段、前面过了 23 段、链 S 要取的是剩下的 **44 段**）。
+    🔴 **本批那三格现在是被串联代取的，不是我单独跑的**：`ui-provider`（㊶ 修的那一行）在完整链里绿，
+    `shell-surfaces` 在完整链里绿，`layering` 也绿 —— 这比"我单独跑一次 rc=0"强一档。
+  - **那 7 条红逐条**（原文在 `/tmp/device-Y-check.txt` 尾部）：6 条是 `permissions.ts` / `third-parties.ts` 里
+    「移动端不申请通知权限 / 不产生任何系统通知」那六句（zh+en 各三条）撞上了**已经声明的**
+    `AndroidManifest:POST_NOTIFICATIONS` + `Info.plist:NSUserNotificationsUsageDescription`；
+    第 7 条是 `SCHEDULE_EXACT_ALARM` 既不在 `PRIVACY_ITEMS` 也不在 `NON_PRIVACY_ANDROID_PERMISSIONS`。
+    🔴 **归因是现量的，不是印象**：`git blame -L '/SCHEDULE_EXACT_ALARM/,+1' apps/mobile/android/app/src/main/AndroidManifest.xml`
+    ⇒ `b0ba4a35`（2026-10-03，W9 原生投递那半）。⇒ 这七句属于 §0.5 的 **L 系列那一行**，
+    裁决早就写过：六句必须**一起翻**并重跑 `check:legal-copy`，本批代改会造一次三方冲突、还会把别人的裁决算成自己的。
+    **所以我不把它改绿**，Goal ⑤-1 的真话是"串联到第 24 段停住 + 它之后每一段各自的读数由链 S 取"
+    （S 的段清单**不手抄**：从 `package.json` 的 `check` 串现解析 `legal-permissions` 之后的全部，别人加一段下一轮自动带上）。
+  - 🔴 **一条我自己的探针形状错，别让它留在读数里**：Y 打印的"停在/过：`check:legal-copy`"是**假的**——
+    那条 `grep -oE 'check:[a-z0-9-]+' | tail -1` 取到的是**报错正文里那句"翻完重跑 `pnpm check:legal-copy`"**，
+    不是段名。真停点是 `check:legal-permissions`（`grep '^\$ node scripts/'` 才看得见段序）。
+    ⇒ 从日志里"取最后一个像名字的东西"当进度指针，会被日志正文里出现的同一个词骗走（§7 第 45 条那一族的新面目）。
+  - ✅ **`RC_WINDOWS_LEG=skip`（同趟 [4] 步）**：Y 的 `pnpm build` 跑完之后 `apps/web/dist/index.html`
+    sha 仍是 `517C6BA76D00FB25`，与 10:39 打进 windows 包的那枚**逐字相同** ⇒ ㊲ 那份 windows 取证对本轮仍然成立，
+    不必重打远端。这条自愈判据第二次真的起作用了（第一次是链 U）。
+  - ✅ **同趟顺手证了 Android 那格也不用重跑**（不花 CPU，只读提交元数据）：
+    `git diff --name-only b995597a..HEAD` = **15 个文件**，其中
+    `grep -cE '^(apps/mobile/(src|android)/|packages/[^/]+/src/)'` = **0** ——
+    13:18 重装、13:20 取到 `RC_ANDROID=0` 的那枚 APK 的 bundle 输入，从那时到现在**一个字节没动**。
+    ⚠️ 它证明到的是"bundle 输入未变"，不证明"`pnpm -r build` 重打后 `packages/*/dist` 逐字节相同"——
+    那一句由 `check:mobile-bundle` / `check:native-deps` 在链 S 里取。
+  - 🔴 **链 Z 的 iOS 那一腿换了个失败姿势**：`RC_REINSTALL_IOS_Z=1`，`✅ 全仓构建完成` 之后
+    **`pod install` 失败** ⇒ `reinstall-all.sh` 自己判定"沙盒未同步 ⇒ 这一轮没有跑 xcodebuild"（这是它该有的行为：
+    不拿旧沙盒继续装）。报错原文 `ArgumentError - path name contains null byte`，
+    栈顶 `cocoapods-1.17.0/lib/cocoapods/project.rb:452 realdirpath`（`add_file_reference` 阶段）。
+    **已排除的三种"环境坏了"**（都是现量，不是猜）：
+    ① 工具链没动 —— `/opt/homebrew/Cellar/{ruby,cocoapods}/*` 目录时间戳都在 **Sep 2026**；
+    ② 机器上 CocoaPods 是好的 —— **主检出**的 `apps/mobile/ios/Pods` mtime = **10-04 13:45:48**（别人那趟 pod 成功过）；
+    ③ 不是非 ASCII 文件名 —— `find apps/mobile/ios -maxdepth 3 -name '*[! -~]*'` **零命中**
+       ⚠️ 顺带一条命令坑：我第一版在同一行加了 `-o -name '*\n*'`，`find` 把它当**转义后的字面 n**，
+       于是 `HeytaWidgetExtension` 这种纯 ASCII 名"命中"了 —— 差点把"有非 ASCII 文件"当成结论写出去。
+    本机 `LANG`/`LC_ALL`/`LC_CTYPE` **全未设置**（这是唯一还站得住的候选，与上游 issue #12798/#12866 那批形状同源），
+    但**尚未证**——要证它得重跑一次 `pod install`，而链 Z 此刻正拿着那枚（旧）已装 app 跑探针，
+    同一时刻动 `ios/` 就是抢它正在读的树。⇒ 排到 Z 收口之后，与链 S 串行。
+  - ⚠️ **Z 现在这趟探针的读数是"装在设备上的那枚 app"的**，不是当前提交的 —— 它自己的新鲜度判据
+    （`verify-mobile-card-export-ios.sh` 开头那条"装的 app 不比源码旧"）会替我说这句话，
+    我不替它宣布结论。**W7-G3 仍然不打勾。**
