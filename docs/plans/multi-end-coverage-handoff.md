@@ -3148,3 +3148,31 @@ pid 46540）⇒ 按 §8.9 让路，不动它。
 只能记"三段 e2e 各 `rc=SKIP-PORTS` + 逐段表"，**不能**记成"84 段里过了 N 段"。
 （同族：`CHECK_EXIT=skip` 那一支特意不打印 `/tmp/pnpm-check.log` 尾部，
 因为那是**上一趟**留下的日志，印出来会被读成本趟的断点。）
+
+## 03:38 ① 的"INNER_EXIT=0"单独抄会撒谎 —— 落账必须**三句一起抄**，外加一条与目标措辞的偏差
+
+读 `heyta-run-reinstall.sh:245-274` 得到的形状（不是我推测，是它自己的赋值）：
+
+- `IX=$(( IX1 + IX2 ))` ⇒ **`INNER_EXIT` 是两趟之和**；
+- 但若第二趟被闸门跳过，走的是 `IX=$IX1` 那一支（`:251`），**且 `inner-2.log` 被清空成空文件**
+  ⇒ `INNER_EXIT` 可以等于第一趟的 **0**，而 android 与 ios **一次都没装**。
+  装置自己在 `:242-244` 就把这件事写下来了：真正拦下"① 没做完"的是 `FRESH/EXPECTED`（图没凑齐 ⇒ 退 3），
+  **不是那个 0**。
+
+⇒ 所以 ① 收口那行**必须同时抄三句**，缺一句就是给下一位留一颗假绿：
+
+| 句 | 它挡的是 |
+|---|---|
+| `PHASE1_EXIT=<n>（mac+windows）` | 桌面两段 |
+| `PHASE2_EXIT=<n>（android+ios）` 或 `PHASE2=SKIPPED-BY-GATE` / `ANDROID-SKIPPED-BY-RULE` | 设备两段**跑没跑**（后两种都算没跑完） |
+| `FRESH=5/5` + `INNER_EXIT=0` | 图凑齐了没 + 两趟之和 |
+
+⚠️ 一条**与目标原话的偏差**，现在写明、不事后倒推：目标要的是"跑 `pnpm reinstall:all` 四端"，
+而装置跑的是 `pnpm reinstall:desktop` + `pnpm reinstall:mobile` 两条。
+等价性的证据（03:38 现读 `package.json` 与 `scripts/reinstall-all.sh:161`）：
+`reinstall:all` = `reinstall-all.sh`（无 `--only`）、`desktop` = `--only mac,windows`、
+`mobile` = `--only android,ios`，而脚本里 `ALL="mac windows android ios"`
+⇒ **两条的并集就是同一条脚本、同一端序、同四个段**。
+拆成两趟的理由也是真的：mac 段有签名+公证（上限 `HEYTA_NOTARY_TIMEOUT` 默认 900s）再叠远端 windows 打包，
+从闸门放行到第一次 `adb uninstall` 之间隔着 **15–25 分钟**，设备那两段前面必须**再过一次闸门**才不动别人的模拟器。
+⇒ 记账时写"四端由 desktop+mobile 两趟覆盖（等价性见上）"，**不要**写成"跑了 `pnpm reinstall:all`"。
