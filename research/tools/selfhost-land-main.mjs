@@ -13,6 +13,7 @@
  *   node research/tools/selfhost-land-main.mjs --carrier <ref> # 用现成的载体，不重算（测双亲闸门用）
  *   node research/tools/selfhost-land-main.mjs --attribute     # check 红时接着跑逐段归属
  *   node research/tools/selfhost-land-main.mjs --selftest      # 只验"端口射程判据"有没有牙（不碰任何工作树）
+ *   node research/tools/selfhost-land-main.mjs --watch-leg 20  # 只取第 4 道看守的三臂读数（合成子进程，不跑链、不碰 ref）
  *
  * 🔴 **落地那一趟必须用本文件的绝对路径**：这批 `selfhost-*.mjs` 只活在分支上，主检出里
  *   一枚都没有（2026-10-04 现量：主检出 `research/tools/` 下 `selfhost-*` = 0 枚），而
@@ -36,9 +37,10 @@ import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { createServer, Socket } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { depsFresh, freshReading } from './selfhost-deps-fresh.mjs';
-import { startWatch } from './selfhost-kill-watchdog.mjs';
+import { foreignListeners, runChildUnderWatch } from './selfhost-kill-watchdog.mjs';
 
 const MAIN_REF = 'main';
 const BRANCH_REF = process.env.HEYTA_LAND_BRANCH ?? 'feat/self-host-distribution';
@@ -145,6 +147,141 @@ if (FLAG('selftest')) {
   process.exit(0);
 }
 
+/* ── --watch-leg N：把第 4 道"边跑边守"的那段代码本体，在无窗口时取一次中止读数 ──────
+ * 为什么要有它：§8.127 末段明写这条守卫"今天还没有它在真实链上的读数"，而那句话原先被当成
+ * 只有几十分钟的窗口才能取 —— 可是**中止**这件事不需要链跑几十分钟，它需要的是
+ * "gate 4 用的那段代码 + 一个真子进程 + 一个真监听者"。所以这里跑的就是 gate 4 现在调的
+ * 同一个 `runChildUnderWatch()`（不是另写一份像它的夹具），只把 `pnpm check` 换成 `sleep`。
+ * 🔴 三臂缺一臂就等于没验：
+ *   W1 对照（那枚端口上无人监听） ⇒ 子进程自己退（code 0）、trip 为 null、reads ≥ 1
+ *   W2 中止（外来监听者，**跑起来之后才出现**）⇒ trip 非空且点名那个 pid、子进程真收到
+ *      SIGTERM（143）、且 reads ≥ 2 —— 那一格才是"边跑边守"；起跑前就摆在那儿的是
+ *      第 3b 道已经量过的事，所以监听者是 0.7s 后注入的，并且起跑前先独立复判端口为空
+ *   W3 反向对照（监听者 cwd 就在载体里）⇒ **必须不触发**，且独立复判要看见它被判成"自己的"
+ *      —— W3 挡的是 §8.127 那枚 `-a` bug 的形状：把自己判成外来 ⇒ 每趟自我中止，
+ *         症状看着像"守卫在起作用"。只测 W2 的装置可以在"永远误杀自己"的状态下全绿。
+ * 三臂都不占派生射程端口（那些是别人 dev server 的端口，占它可能把他们的 vite 挤到下一档）
+ * ⇒ 用一次性端口，并把"派生集合此刻有几枚被别人占着"照实打出来。
+ * 🔴 两种入口共用这一个函数：`--watch-leg N`（单独取证，在任何闸门之前 exit，不重算载体、
+ *    不读别人的工作树、不碰任何 ref）与 `--confirm` **开跑之前**那一次自证（约 3s）。
+ *    后一条是刻意加的：只挂在"人手动跑"那一档的判据，在这批里已经付过两次账（G-48 / G-61）——
+ *    三臂不合格 = 看守本身坏了，那就别开那几十分钟的链。 */
+const watchLeg = async (legSecs, { standalone = false } = {}) => {
+  const sayLeg = (line) => process.stdout.write(`${line}\n`);
+  const die = (code, msg) => { sayLeg(msg); process.exit(code); };
+  if (!existsSync(CARRIER_DIR)) die(2, `🔴 载体目录 ${CARRIER_DIR} 不存在 ⇒ 归属判不了（不拿"判不了"当"没触发"）`);
+  const dl = deriveKillPorts(CARRIER_DIR);
+  if (dl.error) die(2, `🔴 判不了射程：${dl.error}`);
+  const busyNow = busyEntries(dl.ports, dl.owners);
+  const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
+  const freePort = () => new Promise((res) => {
+    const s = createServer();
+    s.once('error', () => res(null));
+    s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); });
+  });
+  const port = await freePort();
+  if (!port) die(2, '🔴 拿不到一个可绑的空端口 ⇒ 三臂一条都开不了（不拿"开不了"当"过了"）');
+  const portStr = String(port);
+  /* 🔴 探针自己坏了不能让"重试 50 次都不行"读成"监听者起不来"：
+   *    `createConnection()` 零参在 Node 22 里是**同步抛** ERR_MISSING_ARGS（本文件第一次跑这
+   *    条腿就是这么死的），而它死在 Promise 执行体里变成一个没人接的 rejection。
+   *    现在换成 `new Socket()` + try/catch，并把最后一次探针的失败原因带进 die 的文案。 */
+  let connectProbeError = null;
+  const connectOk = () => new Promise((res) => {
+    const c = new Socket();
+    c.once('connect', () => { c.destroy(); res(true); });
+    c.once('error', () => { c.destroy(); res(false); });
+    try {
+      c.connect(port, '127.0.0.1');
+    } catch (e) {
+      connectProbeError = String(e?.message ?? e);
+      res(false);
+    }
+  });
+  const started = [];
+  const startListener = async (cwd) => {
+    const p = spawn('node',
+      ['-e', `require('http').createServer((_q,_r)=>_r.end('watch-leg')).listen(${port},'127.0.0.1')`],
+      { cwd, stdio: 'ignore' });
+    started.push(p);
+    for (let i = 0; i < 50; i++) {
+      if (await connectOk()) return p;
+      await sleepMs(100);
+    }
+    die(2, `🔴 监听者（cwd=${cwd}）5s 内没起来 ⇒ 这一臂根本没有监听者可判，不算通过` +
+      (connectProbeError ? `；探针本身报过：${connectProbeError}` : ''));
+  };
+  const stopListener = async (p) => {
+    p.kill('SIGTERM');
+    await new Promise((res) => { p.once('exit', res); setTimeout(res, 3000); });
+  };
+  const watchCfg = (args) => ({
+    command: 'sleep', args, cwd: CARRIER_DIR, ports: [portStr],
+    carrierDir: CARRIER_DIR, intervalMs: 300,
+  });
+  sayLeg(`ℹ️ 射程派生 ${dl.ports.length} 枚（此刻 ${busyNow.busy?.length ?? 0} 枚被别人占着）⇒ 三臂用一次性端口 :${portStr}`);
+
+  const errs = [];
+  const w1 = await runChildUnderWatch(watchCfg(['1']));
+  const w1v = foreignListeners({ ports: [portStr], carrierDir: CARRIER_DIR });
+  sayLeg(`W1 对照（无监听者）：code=${w1.code} trip=${w1.trip ?? 'null'} reads=${w1.reads} 探针自检=${w1.probeReading}`);
+  sayLeg(`   独立复判：error=${w1v.error ?? 'null'} ours=${w1v.ours.length} foreign=${w1v.foreign.length}（要 0/0，否则 W1 量的不是"空端口"）`);
+  if (w1.code !== 0 || w1.trip !== null || w1.reads < 1) errs.push('W1 没有安静地放行');
+  if (w1v.error || w1v.ours.length || w1v.foreign.length) errs.push('W1 那枚端口不是空的/判不了');
+
+  const w2Free = foreignListeners({ ports: [portStr], carrierDir: CARRIER_DIR });
+  /* 🔴 监听者是**跑起来之后**才出现的（700ms 后注入，看守每 300ms 一轮）。
+   *    这一格是 §8.127 的动机本体：3b 那道"起跑前看一眼"能挡住开局撞车，
+   *    挡不住"跑到第 29 分钟别人刚起的 dev server"。要是这里先起监听者再开跑，
+   *    量的就退回成 3b 已经量过的那件事，reads 恒为 1 也无人会怀疑。 */
+  const inject = (async () => { await sleepMs(700); return startListener(tmpdir()); })();
+  const w2 = await runChildUnderWatch(watchCfg([String(legSecs)]));
+  const foreignL = await inject;
+  sayLeg(`W2 中止（**跑起来 0.7s 之后**才出现的监听者 pid=${foreignL.pid} cwd=${tmpdir()}）：` +
+    `code=${w2.code} sig=${w2.sig} reads=${w2.reads} 用时 ${(w2.elapsedMs / 1000).toFixed(1)}s · 起跑前复判 error=${w2Free.error ?? 'null'} ours=${w2Free.ours.length} foreign=${w2Free.foreign.length}`);
+  sayLeg(`   trip=${w2.trip ?? 'null'}`);
+  if (w2Free.error || w2Free.ours.length || w2Free.foreign.length) errs.push('W2 起跑前那枚端口不是空的 ⇒ 量的不是"半路出现"');
+  if (w2.trip === null || w2.code !== 143 || w2.sig !== 'SIGTERM') errs.push('W2 没中止/没真杀子进程');
+  if (w2.reads < 2) errs.push(`W2 只判了 ${w2.reads} 轮就中止 ⇒ 那是"起跑前那一眼"，不是"边跑边守"`);
+  if (!String(w2.trip ?? '').includes(`pid=${foreignL.pid}`)) errs.push('W2 的中止原因没点名那枚外来监听者');
+  await stopListener(foreignL);
+
+  const ownCwd = existsSync(join(CARRIER_DIR, 'scripts')) ? join(CARRIER_DIR, 'scripts') : CARRIER_DIR;
+  const ownL = await startListener(ownCwd);
+  const w3 = await runChildUnderWatch(watchCfg(['1']));
+  const w3v = foreignListeners({ ports: [portStr], carrierDir: CARRIER_DIR });
+  sayLeg(`W3 反向对照（监听者 cwd 在载体里 = ${ownCwd}，pid=${ownL.pid}）：code=${w3.code} trip=${w3.trip ?? 'null'} reads=${w3.reads}`);
+  sayLeg(`   独立复判：ours=${w3v.ours.length} foreign=${w3v.foreign.length}（要 1/0 —— 探针**看见**了它并判成自己的，而不是什么都没看见）`);
+  if (w3.trip !== null || w3.code !== 0) errs.push('W3 把自己的监听者误判成外来（= 每次跑都自我中止那一族）');
+  if (w3.reads < 2 || w3v.ours.length !== 1 || w3v.foreign.length !== 0) errs.push('W3 没有可证的"看见且判成自己的"读数');
+  await stopListener(ownL);
+
+  for (const p of started) { try { p.kill('SIGKILL'); } catch { /* 已退 */ } }
+  if (errs.length) {
+    sayLeg(`🔴 三臂有 ${errs.length} 条不合格：\n - ${errs.join('\n - ')}`);
+    process.exit(1);
+  }
+  sayLeg('✅ 三臂符合预期：第 4 道那段代码本体（runChildUnderWatch）在真子进程上中止过一次，且没有把载体自己的监听者误判成外来。');
+  if (standalone) {
+    sayLeg('   ⚠️ 这一模式**没有**取到的一格：真 `pnpm check` 在看守下的时长读数（那仍然要窗口）⇒ §8.127 那半句不随本轮关闭。');
+  }
+};
+
+if (FLAG('watch-leg')) {
+  if (CONFIRM) {
+    process.stdout.write('🔴 --watch-leg 与 --confirm 互斥：前者只取看守的读数（后者会在开跑前自动跑这三臂）。\n');
+    process.exit(2);
+  }
+  const raw = OPT('watch-leg');
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 60) {
+    process.stdout.write(`🔴 --watch-leg 要一个 1..60 的整数秒（合成子进程最多跑多久），读到 ${JSON.stringify(raw)}\n`);
+    process.exit(2);
+  }
+  await watchLeg(n, { standalone: true });
+  process.exit(0);
+}
+
 /** 自检只在**真要跑链之前**做（dry-run 不跑链 ⇒ 不做，也不谎报）。 */
 const portsCheck = CONFIRM ? await portsSelftest({ carrierDir: CARRIER_DIR }) : null;
 
@@ -178,6 +315,14 @@ if (CONFIRM && here !== mainTree.path) {
   say(`   本脚本**故意不跨工作树**去 merge（那是"动主检出"，而主检出的工作树属于别人）。`);
   say(`   要真的落地：cd ${q(mainTree.path)} && node ${q(SELF)} --confirm`);
   process.exit(2);
+}
+
+/* 🔴 开那几十分钟的链之前，先让看守自证三臂（约 3s，与 `--watch-leg` 同一个函数，不抄第二份）。
+ *    顺序是刻意的：放在"用法错"之后、载体重算之前 —— 探针坏的时候一个字节都不该写。
+ *    这一档不通过就 process.exit（1 或 2），也就是说它是**门槛**而不是一条打印。 */
+if (CONFIRM) {
+  say('跑链之前先自证看守三臂（合成子进程；任一臂不合格 = 探针坏 ⇒ 不开几十分钟的链）');
+  await watchLeg(5);
 }
 
 /* ── 1. 双亲与新鲜度：载体必须正好是 main × 分支 ──────────────────── */
@@ -370,38 +515,26 @@ await gate(4, '载体上完整 pnpm check', async () => {
   checkRan = true;
   /* 🔴 计时不是装饰：§8.126 ⑤ 那条结论要靠"链长 vs main 平均 85s 一笔"两个数才能变成
    *    一次说得出口的协调请求，而"几十分钟"到今天仍然是一条**没有计时读数的断言**。
-   *    红与被中止的那一趟同样要有时长 —— 那才是"窗口要多长"的下界。 */
-  const t0 = Date.now();
+   *    红与被中止的那一趟同样要有时长 —— 那才是"窗口要多长"的下界。
+   *    spawn + 看守 + 退出码归一这段现在住在 `selfhost-kill-watchdog.mjs` 的
+   *    `runChildUnderWatch()` 里（`--watch-leg` 与这里共用同一个函数，不抄第二份）。 */
   say(`   日志 → ${checkLog} · 看守 ${d.ports.length} 枚端口（每 ${WATCH_MS}ms 一轮）`);
-  const chunks = [];
-  const child = spawn('pnpm', ['check'], { cwd: CARRIER_DIR, env: process.env });
-  child.stdout.on('data', (c) => chunks.push(c));
-  child.stderr.on('data', (c) => chunks.push(c));
-  let trip = null;
-  const watch = startWatch({
+  const r = await runChildUnderWatch({
+    command: 'pnpm',
+    args: ['check'],
+    cwd: CARRIER_DIR,
     ports: d.ports,
     carrierDir: CARRIER_DIR,
     intervalMs: WATCH_MS,
-    onTrip: (why) => {
-      trip = why;
-      child.kill('SIGTERM');
-      const hard = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* 已退 */ } }, 5000);
-      hard.unref();
-    },
   });
-  const code = await new Promise((res) => {
-    child.on('exit', (c, sig) => res(typeof c === 'number' ? c : (sig ? 143 : 1)));
-    child.on('error', (e) => { chunks.push(Buffer.from(`\nspawn 失败：${e.message}`)); res(127); });
-  });
-  watch.stop();
-  writeFileSync(checkLog, Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8'));
-  const wd = `看守判了 ${watch.reads} 轮 · 用时 ${Math.round((Date.now() - t0) / 1000)}s`;
-  if (trip) {
-    refuse(`链被本工具**中止**（环境/协作无效，不是产品红）：${trip}\n` +
+  writeFileSync(checkLog, r.output);
+  const wd = `看守判了 ${r.reads} 轮 · 用时 ${Math.round(r.elapsedMs / 1000)}s`;
+  if (r.trip) {
+    refuse(`链被本工具**中止**（环境/协作无效，不是产品红）：${r.trip}\n` +
       `   中止前的输出留在 ${checkLog}。${wd} ⇒ 等那一趟别人的活告一段落再重跑本体检。`, 3);
   }
-  if (code !== 0) {
-    refuse(`rc=${code} ⇒ **不落地**。关闭判据是"每一枚红仍可归属到非本批"，不是"全绿"。\n` +
+  if (r.code !== 0) {
+    refuse(`rc=${r.code} ⇒ **不落地**。关闭判据是"每一枚红仍可归属到非本批"，不是"全绿"。\n` +
       `   逐段归属：node ${TOOL('selfhost-check-segments.mjs')} --tree ${CARRIER_DIR} --as carrier --ref ${MERGE_REF} --out /tmp/attrib.tsv` +
       (FLAG('attribute') ? '' : '（或给本脚本加 --attribute）') + `\n   ${wd}`, 4);
   }
