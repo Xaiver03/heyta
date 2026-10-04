@@ -5291,3 +5291,85 @@ main 从 `d636b010` 走到 `9372a885`。载体每前进一次都要重算（脚�
 ⇒ 这一项的下一步不是"继续等"，是**排在 g69 之后起一条**：`pnpm verify:selfhost-stack`（默认旋钮，
 不带 `--only`/`--skip`），日志落 `/tmp/heyta-selfhost-up.log` 之外再自己写一份带时间戳的读数文件，
 等满负载门就按 exit 3 记"环境无效 ≠ 产品失败"，**不动阈值**。
+
+### 8.88 归属基线的方向反了：干净 main 上那八道 fs 门禁**全绿**，Goal 里"main 红在 check:docs 5 处"这句已被否证（2026-10-04 15:0x）
+
+起因是一件不免费但该做的事：main 从 `a49c4f19` 走到 `dcbb94ab`（这一天里第三次挪），
+而我引用的"main 自己现在红在 `check:docs` 5 处 —— 引用方/报错行只在 main 版本、4 个死链目标
+在主检出是 `??` 未跟踪"这句话是**几天前的读数**。归属判据的基线如果过期，后面每条"这条红不是
+本批的"都是空话，所以去现量。
+
+#### ① 现量（干净 main 检出，逐字执行载体 GATES 里那八道）
+
+载体 `/tmp/heyta-main-check`（`git status --porcelain` = **0 行**，`checkout --detach dcbb94ab` 之后仍是 0 行），
+把 `research/tools/selfhost-merge-carrier.mjs` GATES 用到的六道 `check:*` **按 main 自己 `package.json` 里的
+定义原样执行**（装置：`/tmp/g70-main-baseline.mjs`，它先读 main 的 `pkg.scripts[name]`，
+取不到就记 `ABSENT_IN_MAIN` 而不是拿我这边的定义冒充）：
+
+⚠️ 执行的是 **main 那一份实现**（例如 `check:gate-wiring` 里没有 §8.85 本批新加的第 3b 条），
+所以下面这张表证的是"main 现在自己站不站得住"，不是"我这版门禁在 main 上绿"。
+
+| 门禁 | main 里的定义 | rc | 读到的最后一行 |
+|---|---|---|---|
+| `check:gate-wiring` | `node scripts/check-gate-wiring.mjs` | **0** | ✅ check 链与门禁定义对上了 |
+| `check:selfhost-entry-command` | `node scripts/check-selfhost-entry-command.mjs` | **0** | 审计报告那条"故意排除 1 条"（§8.11 的旧命令） |
+| `check:script-snapshot` | `node scripts/check-script-snapshot.mjs` | **0** | ✅ 自快照 bootstrap 全部在位（**38** 个脚本 + .gitignore） |
+| `check:docs` | `node research/tools/docs-link-check.mjs` | **0** | ✅ 无死链、无"本机有仓库里没有"的链接、无失效章节引用、无失效锚点（278 文件 / 1932 链接 / 522 处跨文档引用） |
+| `check:md-tables` | `node scripts/check-md-table-rows.mjs` | **0** | ✔ 9 个文件的表格行一致 |
+| `check:image-license`（三条腿） | `gen-image-npm-tree --check && check-image-license-coverage --quiet && check-image-install-contract` | **0** | ✅ prisma 三处同源 5.22.0 |
+
+🔴 **要撤的结论（就地撤，不新开会）**：Goal 第 1 项关闭判据里那句"main 自己现在红在 `check:docs`
+5 处（引用方/报错行只在 main 版本、4 个死链目标在主检出是 `??` 未跟踪）"**被这一跑否证**。
+那 4 枚死链目标后来被它们的所有者提交了，main 现在在 `check:docs` 上是 `rc=0`。
+
+⚠️ 诚实划线：**这条否证不是今天第一次拿到**。文档里那处原句旁边已经写过"02:1x 干净检出实测 exit 0"
+的更正（本文 `main 红在 check:docs 5 处` 那一行的下方）。本节的增量只有两点：
+① 把它从 `check:docs` **一枚**扩到**八道全测**（这才谈得上"配对门免费不免费"）；
+② 在**当前** SHA `dcbb94ab` 上重取（main 这 12 小时里挪了三次，02:1x 那次量的不是这一版）。
+
+#### ② 这句话变了判据的**方向**，不是只变一个数字
+
+以前的形状是"载体某道红 ⇒ 去 main 上跑同一道，main 也红就算非本批"（§8.74 / §8.77 用的就是它，
+当时它确实免费）。现在这八道 main 全绿 ⇒
+
+- **配对门不再免费**：载体上这八道里任何一枚红，都不能再往 main 身上一推了之，必须落进本批写集
+  （38 枚）并解释清楚是**哪一笔**造成的，或者说明它由环境造成（例如 `--check` 那条腿读的锁被人改了）。
+- 反过来说这也**收紧了我自己的证据**：载体扫链里这八道只要报 `rc=0`，就直接是"落地不引入 fs 类回归"
+  的正证，不再需要"两侧都红所以不算"这种两段式。
+- 元教训：**"main 也红"是一种会自己失效的豁免**。 引用它时必须带上"在哪个 SHA 上量的"，
+  并且下一次落地前重量 —— 这轮的现量命令就一条（`node /tmp/g70-main-baseline.mjs /tmp/heyta-main-check`），
+  成本比重新推理一遍低得多。
+
+#### ③ 第 2 项那趟 `VERIFY_EXIT=0` 没有被这批 23 笔作废 —— 逐笔取的路径集
+
+`git log --format=%h 959fd1e6..237f69ec` = **23 笔**（959fd1e6 = 拿到 `VERIFY_EXIT=0`/`FRESH=4/4` 那趟的分支载体，
+见 §8.67）。逐笔 `git show --name-only` 后去重，落到的路径只有四类：
+
+| 落到的路径 | 会不会改变"跑起来的栈" |
+|---|---|
+| `docs/research/self-host-distribution-audit.md` | 不会（不进镜像、不进 `apps/web/dist`） |
+| `research/tools/selfhost-merge-carrier.mjs`、`selfhost-landing-blockers.mjs` | 不会（落地装置，不是产品字节） |
+| `scripts/check-gate-wiring.mjs` | 不会（门禁实现；`server/Dockerfile:197` 从 `scripts/` 里**只** COPY `check-web-artifact.mjs` 那一枚，其余零拷贝） |
+| `e2e/selfhost-stack-results/s{2,3}-*.png`（`b9d11ed9`） | 不会（验收证据本身，§8.67 把人看过的那版字节钉进去） |
+
+打进镜像的那几样（`server/`、`packages/*/dist`、`apps/web/dist`、`package.json` 里能改变依赖树的字段、
+`server/image-npm-tree.json`）**一枚都不在这 23 笔里**。所以 §8.87 说的"排在 g69 之后重跑第 2 项"
+是为**合并载体**拿一趟现量（载体才是 main 要前进到的那个字节集），不是因为旧读数坏了。
+
+#### ④ 同一时刻的环境读数（第 2 项没起跑的原因，写清楚免得被读成回避）
+
+```
+vm.loadavg        = { 20.67 25.73 28.26 }   ⇒ 高于 12，负载门会拒
+/tmp/tfa-test.lock = 存在，14:57 起被占（全局验证锁，另一条线的 `node --test` 在跑）
+docker info        = 29.4.0（daemon 在）
+docker ps          = 空（没有残留容器，容器名冲突那一档不适用）
+```
+
+⇒ 现在起 `pnpm verify:selfhost-stack` 会得到一次**环境无效**的 exit 3，不是产品失败。
+按 Goal 的约束**不动阈值、不降级判据**，等窗口；g69（阻塞集→重算→扫链）仍在轮询，
+最近一行 `15:01:41 POLL blockers_rc=0 BLOCK行=1`。
+
+⚠️ 顺手记一枚装置坑（我自己的）：这一跑我先用 `grep -c '^BLOCK '` 数阻塞集，读出 **0**，
+而 g69 用 `grep -c 'BLOCK '` 读出 **1** —— 台账里 `BLOCK` 那几行是**带两格缩进**的，
+锚在行首的计数把非空集合数成了空集。这正是 §7 那条"空测量看着最干净"的形状：
+**判"归零"的计数器必须与生产它的那把尺子逐字同式**（g69 用的模式是对的，我的锚是错的）。
