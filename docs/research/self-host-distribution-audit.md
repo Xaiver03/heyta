@@ -4001,6 +4001,25 @@ git merge-base --is-ancestor "$(git rev-parse feat/self-host-merge-main^1)" main
 git merge --no-ff feat/self-host-merge-main -m "merge: 自托管批次（第 N 次落地）"
 ```
 
+🔴 **上面那张表的"3 枚"从今天起有一条工具化判据，别再手拼 shell**：
+
+```bash
+node research/tools/selfhost-landing-blockers.mjs
+```
+
+它按 `git worktree list` 自己找签出 `main` 的那棵树取脏集合、用 `git status -z` 解析、
+先过 5 条合成夹具才输出读数（解析层坏了就 `exit 2` 且**不打**阻塞集）。
+09:1x 现量：`main=3705e29d · 分支=2a62dd2c · merge-base=b850b1c6 · 写集 36 / 脏 249 / **阻塞 3**`
+—— 与本节 08:0x 那三枚逐字相同（写集从 35 到 36 是我后来加了一枚 `mutate-teardown-trap.sh`，
+不在脏集合里 ⇒ 不挡路）。**为什么要有这条**：手拼 `awk substr($0,3)` 那一版把每条路径切成了
+"带前导空格"，交集于是恒空，屏幕上打的是"阻塞集 0 枚"，读起来像"可以落地了" —— 见 §8.65 ②。
+
+⑤ 的新鲜度 **09:1x 重取**（瞬时读数，引用前还得重取）：载体仍是 `54f66626`，`^1 = a5583840`
+仍在 `main`(`77713be3`) 历史里 = **YES**，但 `^1 ≠ main` ⇒ 载体落后 **22 笔**，
+而本分支又走了 3 笔（`229e4dcd → 2a62dd2c → 03e3df12`：拆栈修法 + 夹具 + 这节）。
+⇒ 08:0x 那句"阻塞一清就不用重算载体"**今天不成立**，落地前必须重算一趟；
+重算命令仍是 `node research/tools/selfhost-merge-carrier.mjs`（在分支 worktree 里跑）。
+
 
 ### 8.62 G-54 的**真构建那一格拿到了**，而 `VERIFY_EXIT=1` 死在载体的 e2e 依赖 —— 以及 ⑧ 那条预测被现量改了两个字（08:1x）
 
