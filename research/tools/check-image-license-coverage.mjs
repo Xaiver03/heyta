@@ -36,8 +36,12 @@
 //    枚举出来的那棵树 —— 那才是发出去的字节。实测两者确有差（平台变体各一枚），
 //    所以"门禁绿"这句话只有第二种载体成立时才是对外承诺。
 //    它由 `scripts/verify-selfhost-stack.sh` 在每次全跑时调用（链外门禁，消费者可验：见 §8.19 那套）。
-//  · 第二种载体多一条判定：**磁盘枚举必须被 npm 自己写的锁记着，反向差集必须全是 optional**
-//    （§8.45 —— 就是这条照出了遍历器漏掉的 4 条嵌套副本）。
+//  · **两种载体各有一条与锁的双向差集**，但它们的含义不同，别读成同一条判定（2026-10-04 补齐）：
+//    - 真树：磁盘枚举 vs 镜像里 npm 自己写的 `/app/package-lock.json` ⇒ 两个**独立**观测互证
+//      （§8.45 —— 就是这条照出了遍历器漏掉的 4 条嵌套副本）；
+//    - 快照：快照 vs 它自己的**输入**锁 ⇒ 不是独立观测，拦的是"生成器漏数"与"有人手改了这个提交物"。
+//      这一条以前**不存在**，所以 §8.101 臂 C（从快照里摘掉一条普通 MIT 包）离线三腿全绿是**真实的存活**，
+//      不是探针没跑到；今天它有了牙，读数见 §8.103。
 //  · 两种载体都有"包自己声明的 license 必须等于登记表里抄的那一条"这条判定：
 //    以前只有真树有（预测快照里根本没有 license 字段），现在锁导出的快照也带 ——
 //    它拦的是"上游把 MIT 改成 GPL 而版本号没变，于是没有任何一层会重新看它"，
@@ -219,7 +223,26 @@ if (snapshot.installedTree && snapshot.packages.filter((p) => typeof p.license =
   process.exit(1);
 }
 
-// ── 载体互相对账：我数出来的磁盘树 vs npm 自己写下的 lock ────────────
+// ── 提交物锁：两种载体共用的第二载体 ────────────────────────────────
+// 🔴 读**一次**、两处用：判定 4 拿它数平台受限条目，下面的对账拿它当"另一侧的载体"。
+// 以前它只在判定 4 里读 ⇒ 快照载体根本没有第二个载体可对，而 §8.101 臂 C
+// （从快照里摘掉一条普通包，离线三腿全绿）正是那一格活下来的原因。
+// 字段读法与 `gen-image-npm-tree.mjs` 共用 `image-lock-platform.mjs`（两处各写一遍=漂移起点）。
+const lockGatePath = join(repoRoot, 'server/package-lock.json');
+if (!existsSync(lockGatePath)) {
+  console.error('❌ 对账没有这把锁：`server/package-lock.json` 不在。');
+  console.error('   它是镜像那棵树的钉子（G-47），也是平台变体这一整类唯一的跨架构清单。');
+  process.exit(1);
+}
+let lockPlatformEntries;
+try {
+  lockPlatformEntries = readImageLock(readFileSync(lockGatePath, 'utf8')).entries;
+} catch (e) {
+  console.error(`❌ 这把锁读不出形状：${e.message}`);
+  process.exit(1);
+}
+
+// ── 载体互相对账：我数出来的树 vs npm 自己写下的 lock ────────────
 // 为什么要有这一条：`dump-installed-tree.js` 是**我手写的一次遍历**，它坏起来的形态是
 // "少几条"，而少几条时剩下的那些照样全绿 —— 这正是 §8.44 之前它漏掉 4 条嵌套副本的形态
 // （那 4 条版本与顶层不同，只数顶层看不见）。镜像里恰好有第二个独立载体：
@@ -258,6 +281,36 @@ if (snapshot.installedTree) {
     process.exit(1);
   }
   treeAgreement = { disk: diskIds.size, lock: lockById.size, platformOnly: lockNotOnDisk.length };
+} else {
+  // 🔴 快照载体的"另一侧"只能是**它的输入锁**，而这两个不是独立观测：
+  // 快照本来就是 `gen-image-npm-tree.mjs` 从那把锁导出的。所以这条拦的是两件事，
+  // 且**只有**这两件事（"镜像里实际少装了东西"仍只有 `--installed-tree` 那趟说得出）：
+  //  · 生成器漏数 —— 同一族缺陷在真树侧漏过 4 条嵌套副本（§8.45），而这条腿当时根本没有；
+  //  · 有人**手改**了 `server/image-npm-tree.json` —— 它是提交物，而抄件一定会漂。
+  const lockById2 = new Map(lockPlatformEntries.map((e) => [e.id, e]));
+  const snapIds = new Set(snapshot.packages.map((p) => `${p.name}@${p.version}`));
+  const snapNotInLock = [...snapIds].filter((id) => !lockById2.has(id));
+  const lockNotInSnap = [...lockById2.keys()].filter((id) => !snapIds.has(id));
+  const snapMissingNonOptional = lockNotInSnap.filter((id) => lockById2.get(id).optional !== true);
+  if (snapNotInLock.length > 0) {
+    console.error(
+      `❌ 快照里有 ${snapNotInLock.length} 条提交物锁没记的包：${snapNotInLock.slice(0, 12).join(', ')}` +
+        (snapNotInLock.length > 12 ? ' …' : '') +
+        '\n   快照是**由那把锁导出的**，多出来只有两种可能：这个文件被手改过，或生成器读的不是这把锁。',
+    );
+    process.exit(1);
+  }
+  if (snapMissingNonOptional.length > 0) {
+    console.error(
+      `❌ 提交物锁认为该装、快照里却没有的非 optional 条目 ${snapMissingNonOptional.length} 条：` +
+        `${snapMissingNonOptional.slice(0, 12).join(', ')}` +
+        (snapMissingNonOptional.length > 12 ? ' …' : '') +
+        '\n   差集**只允许**是 optional（别的平台的原生变体，生成器按 TARGET 滤掉）。' +
+        '出现非 optional 的一条 ⇒ 要么生成器漏数（判定 1 只会跟着数得越来越少），要么锁与快照不同源。',
+    );
+    process.exit(1);
+  }
+  treeAgreement = { snapshot: snapIds.size, lock: lockById2.size, platformOnly: lockNotInSnap.length };
 }
 
 // ── 新鲜度：快照描述的必须是**当下**这套声明（只对预测快照成立）──────
@@ -471,20 +524,7 @@ if (covered.length + exempted.length + firstParty.length !== snapshot.packages.l
 //    在"承诺发哪几个架构"拍板之前，**任何单台机器上的绿都不覆盖承诺面**（G-53 登记的正是这一族）。
 // 输入选**锁**而不是选树：锁是跨架构的（npm 把所有平台的变体都写进去，装哪一枚由平台决定），
 // 所以逐条判它们全部，这条判定就和"我们发哪几枚镜像"脱钩了 —— 不需要先拍那个板。
-// 字段读法与 `gen-image-npm-tree.mjs` 共用 `image-lock-platform.mjs`（两处各写一遍=漂移起点）。
-const lockGatePath = join(repoRoot, 'server/package-lock.json');
-if (!existsSync(lockGatePath)) {
-  console.error('❌ 判定 4 没有输入：`server/package-lock.json` 不在。');
-  console.error('   它是镜像那棵树的钉子（G-47），也是平台变体这一整类唯一的跨架构清单。');
-  process.exit(1);
-}
-let lockPlatformEntries;
-try {
-  lockPlatformEntries = readImageLock(readFileSync(lockGatePath, 'utf8')).entries;
-} catch (e) {
-  console.error(`❌ 判定 4 的输入读不出形状：${e.message}`);
-  process.exit(1);
-}
+// 锁的读法在上面"两种载体共用的第二载体"那一节，**这里不再读第二遍**。
 const gated = lockPlatformEntries.filter((e) => e.gate.restricted);
 // 空集哨兵：生产树里"一个平台受限包都没有"要么说明字段读法坏了，
 // 要么说明原生二进制这一族真的没了 —— 两种都要人来看一眼，不能让它绿过去。
@@ -558,6 +598,13 @@ if (!quiet) {
             : '')
       : `   这棵树的第三方层由提交物锁 \`server/package-lock.json\` 钉住` +
         `（快照 generatedAt=${String(snapshot.generatedAt)}，锁的哈希在 inputs 里）。` +
+        (treeAgreement
+          ? `\n   快照与**它自己的输入锁**对上了：快照 ${treeAgreement.snapshot} 条 ⊆ 锁的非 dev ` +
+            `${treeAgreement.lock} 条，差集 ${treeAgreement.platformOnly} 条且**全是 optional**` +
+            '（别的平台的原生变体，生成器按 TARGET 滤掉）。' +
+            '这条拦的是**生成器漏数**与**有人手改这个提交物**；' +
+            '它拦不住"镜像里实际少装了东西" —— 那一句只有 `--installed-tree` 那趟说得出。'
+          : '') +
         '还剩两件事要说准：\n' +
         '     · 锁与**镜像里实际那棵树**对不对，不在这里判 —— 由本脚本的 `--installed-tree`' +
         '（磁盘枚举 × npm 自己写的锁，双载体）在 `verify:selfhost-stack` 里判；\n' +
