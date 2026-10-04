@@ -83,6 +83,7 @@ ADB="$T/adb"
 export FAKE_FOCUS="$focus"
 dump() { :; }
 screen_txt() { echo "SCREEN_TXT_RAN"; }
+who_else() { echo "WHO_ELSE_STUB"; }
 bad() { printf 'BAD %s\n' "\$1"; }
 ok()  { printf 'OK %s\n' "\$1"; }
 CASE_EOF
@@ -251,6 +252,19 @@ elif [ "$RC" = "1" ]; then
   ok "臂 I 🔴 取不到前台（dumpsys 里没有 mCurrentFocus 行）⇒ 同样 rc=1，不许把「取不到」读成「已经在前台」（问了 $I_CALLS 次，每次都答空）"
 else
   bad "臂 I 不如预期：rc=$RC ⇒ 空读数被判成通过"
+fi
+
+# ---------------------------------------------------------------- 臂 J（通道单所有者：静态不变式）
+# 🔴 这一臂拦的是"半套现场"：同一个脚本里 `dump`/`require_screen` 读 `$UI_XML`，
+#    而 `rid_*` 三枚助手读字面量 `/tmp/ui.xml` —— 换路径时一半判据会去读**别人的界面**，
+#    且**不报错**（lib 自己在 `mobile-e2e.sh:38-48` 写过这句：半套现场比全套更难查）。
+#    只查**代码行**：注释里出现那个路径是历史说明，删掉反而毁掉理由。
+CODE_LITERAL=$(grep -vn '^#' "$S" | grep -c '/tmp/ui\.xml' || true)
+HELPERS_WITH_VAR=$(grep -c 'python3 "\$RID_PY" .*"\$UI_XML"' "$S" || true)
+if [ "$CODE_LITERAL" = "0" ] && [ "$HELPERS_WITH_VAR" = "3" ]; then
+  ok "臂 J：dump 通道**只有一个所有者**（代码里 0 处字面 /tmp/ui.xml，三枚助手都传 \"\$UI_XML\"）"
+else
+  bad "臂 J 不成立：代码里还有 $CODE_LITERAL 处字面 /tmp/ui.xml、助手带变量的只有 $HELPERS_WITH_VAR/3 ⇒ 换路径时这半边会读别人的界面而不报错"
 fi
 
 echo "== 结论：通道自检的停止条件 + settle_foreground 的三条腿 + 变异对照 pass=$PASS fail=$FAIL =="
