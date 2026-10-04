@@ -8605,13 +8605,14 @@ main 的修法是一句内联 `node -e '…delete p.devDependencies…'`，本�
 
 #### 那条红不是解法错，是别人的红 —— 旧逻辑拿它当"解法没修好"，于是永远拒绝落笔
 
-`check:docs` 在载体上退 1，点名一处：`docs/plans/calendar-profile-handoff.md:1187` 指向
-`docs/plans/trash-and-archive.md §10.87`，而那一节**不存在**。三条现量把它钉成非本批：
+`check:docs` 在载体上退 1，点名一处：`docs/plans/calendar-profile-handoff.md:1187` 指向回收站那份计划里
+编号 `10.87` 的那一节，而**提交物里**那一节不存在。三条现量把它钉成非本批：
 
 1. 干净 main 检出（`/tmp/g196-main` @ `2c69c57d`，`git status` 0 行）上 `node research/tools/docs-link-check.mjs`
    ⇒ **rc=1、同样这一条**（分母 `532`，载体上是 `537` —— 多出来的 5 处是本批自己加的引用）；
 2. 那两枚文件**都不在本批写集**：`git diff --name-only b850b1c6 73e594a1 | grep -cE 'calendar-profile-handoff|trash-and-archive'` = **0**；
-3. main 上那份 `trash-and-archive.md` 的 §10.x 最大到 **10.17**（`grep -oE '^#+ 10\\.[0-9]+' | sort -n`）。
+3. main 上那份计划里 `10.` 的编号最大到 **10.17**（现量命令：`git show main:docs/plans/trash-and-archive.md | grep -oE '^#+ 10\.[0-9]+' | sort -t. -k2 -n | tail`）；
+4. 而主检出那枚文件的**未提交版本**里 `10.84`–`10.91` 全都在 ⇒ 这条死链会在它自己的所有者提交后自愈，**不由本批改那两枚文件**。
 
 🔴 而旧逻辑是"任何一道门红 ⇒ 不提交、先修解法"。屏幕上句句真话，**实际没有解法可修**：
 这一档会每轮重算都拒一次，症状长得和"载体坏了"一模一样。Goal 第 1 项本来写的就不是
