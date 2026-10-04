@@ -1,5 +1,7 @@
 #!/bin/bash
-# `b-window-keeper.sh` 的十二臂验证台。
+# `b-window-keeper.sh` 的验证台。
+# 🔴 **臂数不写在这份文件头**（写了就会漂，本仓库登记过"号段声明行是第二本账"）——
+#    收工读数只有最后那行 `pass=… fail=…`，引用时报它现量的数字。
 # ============================================================================
 # 这把 rig 存在的理由：看守是**会在窗口开的那一刻动设备面**的东西（reinstall-all 会
 # 卸装模拟器里的包、覆盖 /Applications/Heyta.app、往 iOS 模拟器装新产物）。
@@ -43,8 +45,14 @@ exit "$RC"
 SH
 cat > "$FIX/reinstall" <<'SH'
 #!/bin/bash
-echo "REINSTALL device=${IOS_DEVICE_NAME:-〈没传〉}" >> "$FIX/calls"
-exit "${REINSTALL_RC:-0}"
+# 🔴 桩必须**收参数**：拆段之后看守会叫两趟（`--only mac,windows` / `--only android,ios`），
+#    唯一的分辨器是这两行的**内容与顺序** —— 只数总次数会把"只跑了设备段"读成"跑完了四端"，
+#    而那正是这次改动要防的那一格（破坏性段在没有新读数的情况下起跑）。
+case "$*" in
+  *mac,windows*) echo "REINSTALL desktop args=$* device=${IOS_DEVICE_NAME:-〈没传〉}" >> "$FIX/calls"; exit "${REINSTALL_DESKTOP_RC:-0}" ;;
+  *android,ios*) echo "REINSTALL device  args=$* device=${IOS_DEVICE_NAME:-〈没传〉}" >> "$FIX/calls"; exit "${REINSTALL_DEVICE_RC:-0}" ;;
+  *) echo "REINSTALL whole   args=$* device=${IOS_DEVICE_NAME:-〈没传〉}" >> "$FIX/calls"; exit "${REINSTALL_RC:-0}" ;;
+esac
 SH
 cat > "$FIX/oplog" <<'SH'
 #!/bin/bash
@@ -87,9 +95,13 @@ run_keeper() {
   printf '%s\n' "${BK_OPLOG_RC:-0}" > "$FIX/oplog_rc"
   printf '%s\n' "${BK_HPID:-}" > "$FIX/hpid"
   printf '%s\n' "$seq" > "$FIX/gseq"
+  # 🔴 这一格踩过的坑（同一族的第三次）：写在函数调用前面的旋钮**不会**进到子进程环境，
+  #    必须在这里列进那次 `env` 前缀里才算数 —— 少写一次，臂打的就是真现场。
   ( FIX="$FIX" GSEQ="$FIX/gseq" GATE="$FIX/gate" REINSTALL="$FIX/reinstall" \
+    REINSTALL_DESKTOP_RC="${BK_R_DESK:-0}" REINSTALL_DEVICE_RC="${BK_R_DEV:-0}" \
     OPLOG="$FIX/oplog" H_PROBE="$FIX/hprobe" \
     LOG="$FIX/log" STABLE="$FIX/stable" BUDGET="${BK_BUDGET:-30}" INTERVAL=0 \
+    GATE2_BUDGET="${BK_GATE2:-0}" \
     DEFER_MAX="${BK_DEFER:-0}" IOS_DEVICE_NAME=rig-iphone RUN="${BK_RUN:-1}" \
     CARRIER="$FIX/heyta-wt-reinstall" \
     bash "$FIX/main/research/tools/b-window-keeper.sh" ) 2>&1
@@ -100,6 +112,9 @@ RCV() { cat "$FIX/rc"; }
 #    数出来是空串，而空串既不是 0 也不是 1 —— 三臂就是被这一点假红的
 #    （本仓 §7 同族：`grep -c . f || echo 0` 在空文件上打出两行）。先判在不在。
 NCALLS() { if [ -f "$FIX/calls" ]; then grep -c 'REINSTALL' "$FIX/calls"; else echo 0; fi; }
+# 拆段之后**总数不再是分辨器**（2 可能是"桌面+设备"，也可能是"设备跑了两次"）⇒ 按段数。
+NDESK() { if [ -f "$FIX/calls" ]; then grep -c 'REINSTALL desktop' "$FIX/calls"; else echo 0; fi; }
+NDEV() { if [ -f "$FIX/calls" ]; then grep -c 'REINSTALL device  ' "$FIX/calls"; else echo 0; fi; }
 NOPLOG() { if [ -f "$FIX/calls" ]; then grep -c 'OPLOG' "$FIX/calls"; else echo 0; fi; }
 NGATE() { if [ -f "$FIX/gate_calls" ]; then grep -c 'gate ' "$FIX/gate_calls"; else echo 0; fi; }
 
@@ -117,17 +132,21 @@ BK_RUN=1
 mk_fixture; BK_BUDGET=60; run_keeper "3:load
 3:load
 0:-" > "$FIX/out"
-if [ "$(RCV)" = 0 ] && [ "$(NCALLS)" = 1 ] && [ "$(NOPLOG)" = 1 ] && [ "$(NGATE)" = 3 ]; then
-  ok "B rc=3,rc=3,rc=0 ⇒ 等两次（闸门被叫 3 次）后起跑：op-log 1 次、重装 1 次"
-else no "B rc=$(RCV) calls=$(NCALLS) oplog=$(NOPLOG) gate=$(NGATE)"; fi
+if [ "$(RCV)" = 0 ] && [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 1 ] && [ "$(NOPLOG)" = 1 ] && [ "$(NGATE)" = 4 ]; then
+  ok "B rc=3,rc=3,rc=0 ⇒ 等两次后起跑：op-log 1 次、桌面段 1 次、设备段 1 次（闸门被叫 4 次 = 等两次 + 开窗 + 设备段前再判一次）"
+else no "B rc=$(RCV) desk=$(NDESK) dev=$(NDEV) oplog=$(NOPLOG) gate=$(NGATE)"; fi
 
-# ── I 结构顺序（不是内容判据）：开窗 < 构建 < 收工 ─────────────────────
+# ── I 结构顺序（不是内容判据）：开窗 < 构建 < 桌面段 < 再判 < 设备段 < 收工 ─
 W=$(grep -n 'WINDOW=OPEN' "$FIX/log" | cut -d: -f1 | head -1)
 O=$(grep -n 'op-log-build' "$FIX/log" | cut -d: -f1 | head -1)
+S1=$(grep -n 'STEP reinstall-desktop' "$FIX/log" | cut -d: -f1 | head -1)
+G2=$(grep -n 'GATE2=OPEN' "$FIX/log" | cut -d: -f1 | head -1)
+S2=$(grep -n 'STEP reinstall-device' "$FIX/log" | cut -d: -f1 | head -1)
 D=$(grep -n 'B_DONE' "$FIX/log" | cut -d: -f1 | head -1)
-if [ -n "$W" ] && [ -n "$O" ] && [ -n "$D" ] && [ "$W" -lt "$O" ] && [ "$O" -lt "$D" ]; then
-  ok "I 顺序成立 WINDOW(${W}) < op-log-build(${O}) < B_DONE(${D})"
-else no "I 顺序读不出来 W=${W} O=${O} D=${D}"; fi
+if [ -n "$W" ] && [ -n "$O" ] && [ -n "$S1" ] && [ -n "$G2" ] && [ -n "$S2" ] && [ -n "$D" ] \
+   && [ "$W" -lt "$O" ] && [ "$O" -lt "$S1" ] && [ "$S1" -lt "$G2" ] && [ "$G2" -lt "$S2" ] && [ "$S2" -lt "$D" ]; then
+  ok "I 顺序成立 WINDOW(${W}) < op-log(${O}) < 桌面段(${S1}) < GATE2(${G2}) < 设备段(${S2}) < B_DONE(${D}) —— 再判**长在两段之间**，不是开头那一次"
+else no "I 顺序读不出来 W=${W} O=${O} S1=${S1} G2=${G2} S2=${S2} D=${D}"; fi
 
 # ── C：预算用尽 ⇒ 门一直红就是不跑，且这是 rc=3（环境无效）不是 rc=1 ───
 mk_fixture; BK_BUDGET=1; run_keeper "3:load" > "$FIX/out"
@@ -159,9 +178,9 @@ if [ "$(RCV)" = 1 ] && grep -q 'STOP=op-log-build' "$FIX/out" && [ "$(NCALLS)" =
   ok "G op-log 构建 rc=1 ⇒ 停在那里（构建被叫 1 次、重装 0 次）"
 else no "G rc=$(RCV) reinstall=$(NCALLS) oplog=$(NOPLOG)"; fi
 BK_OPLOG_RC=""; BK_BUDGET=60; run_keeper "0:-" > "$FIX/out"
-if [ "$(RCV)" = 0 ] && [ "$(NCALLS)" = 1 ]; then
-  ok "G2 只把构建桩改回成功 ⇒ 同一组读数一路放行到重装（G 的红确实来自那一步）"
-else no "G2 rc=$(RCV) calls=$(NCALLS)"; fi
+if [ "$(RCV)" = 0 ] && [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 1 ]; then
+  ok "G2 只把构建桩改回成功 ⇒ 同一组读数一路放行到桌面段与设备段（G 的红确实来自那一步）"
+else no "G2 rc=$(RCV) desk=$(NDESK) dev=$(NDEV)"; fi
 
 # ── H：main 前进 ⇒ 载体必须追平到那一枚，且逐字对得上 ──────────────────
 mk_fixture; advance_main; BK_BUDGET=60; run_keeper "0:-" > "$FIX/out"
@@ -175,20 +194,23 @@ if grep -q 'ALIGN rc=0' "$FIX/out" && ! grep -q 'ALIGN=already' "$FIX/out"; then
 else no "H 没追平：$(grep ALIGN "$FIX/out" | head -2)"; fi
 
 # ── J 变异：摘掉「只有 rc=0 才开窗」⇒ 红门下也起跑 ─────────────────────
+# ── J 变异：摘掉「只有开窗才继续」⇒ 红门下也起跑 ────────────────────────
+# 🔴 针脚跟着 `judge` 那次重构换过一次形状（老针 `if [ "$RC" = 0 ]; then` 命中 **0 处**，
+#    第一趟就是被那句 assert 拦下来的 —— 变异不落地而 rc=0 什么也不证明，这条规矩救过一次）。
 cp "$KEEPER_SRC" "$FIX/keeper_mut"
 python3 - "$FIX/keeper_mut" <<'PY'
 import sys
 p = sys.argv[1]
 s = open(p, encoding='utf-8').read()
-old = 'if [ "$RC" = 0 ]; then'
+old = 'if [ "$G_OPEN" = 1 ]; then'
 assert s.count(old) == 1, "开窗条件形状变了（命中 %d 处）" % s.count(old)
 open(p, 'w', encoding='utf-8').write(s.replace(old, 'if : ; then'))
 PY
 cp "$FIX/keeper_mut" "$FIX/main/research/tools/b-window-keeper.sh"
 BK_BUDGET=1; run_keeper "3:load" > "$FIX/out"
-if [ "$(NCALLS)" = 1 ] && grep -q 'B_DONE' "$FIX/out"; then
-  ok "J 摘掉开窗条件 ⇒ **红门下也真的起跑了重装**（C 臂那条腿确实长在 rc=0 这一行）"
-else no "J 变异后 calls=$(NCALLS) —— C 的红不来自开窗条件：$(tail -2 "$FIX/out")"; fi
+if [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 0 ] && grep -q 'B_DESKTOP_DONE' "$FIX/out" && grep -q 'STOP=device-window-closed' "$FIX/out"; then
+  ok "J 摘掉开窗条件 ⇒ 桌面段真的跑了（动了 /Applications），但**设备段被第二次判挡住**（0 次）⇒ 两道门是两道，不是一道抄两遍"
+else no "J 变异后 desk=$(NDESK) dev=$(NDEV) —— C 的红不来自开窗条件：$(tail -2 "$FIX/out")"; fi
 cp "$FIX/keeper" "$FIX/main/research/tools/b-window-keeper.sh"   # 还原，别把变异体留在夹具里
 BK_BUDGET=1; run_keeper "3:load" > "$FIX/out"
 if [ "$(RCV)" = 3 ] && [ "$(NOPLOG)" = 0 ] && [ "$(NCALLS)" = 0 ]; then
@@ -202,7 +224,7 @@ mk_fixture; BK_BUDGET=60
 echo 0 > "$FIX/cnt"; : > "$FIX/calls"; printf '0\n' > "$FIX/gseq"; printf '0\n' > "$FIX/oplog_rc"; : > "$FIX/hpid"
 printf '%s\n' "0:-" > "$FIX/gseq"
 OUT=$( ( FIX="$FIX" GSEQ="$FIX/gseq" GATE="$FIX/gate" OPLOG="$FIX/oplog" H_PROBE="$FIX/hprobe" \
-    LOG="$FIX/log2" STABLE="$FIX/stable2" BUDGET=60 INTERVAL=0 DEFER_MAX=0 \
+    LOG="$FIX/log2" STABLE="$FIX/stable2" BUDGET=60 INTERVAL=0 DEFER_MAX=0 GATE2_BUDGET=0 \
     IOS_DEVICE_NAME=rig-iphone RUN=1 CARRIER="$FIX/heyta-wt-reinstall" \
     bash "$FIX/main/research/tools/b-window-keeper.sh" ) 2>&1; echo $? > "$FIX/rc" )
 KLINE=$(printf '%s\n' "$OUT" | grep -E 'BROKEN=载体里没有重装脚本|STEP reinstall' | head -1)
@@ -231,16 +253,16 @@ else
     _sp=""
     if [ -n "$1" ]; then ( exec -a "$1" sleep 25 ) & _sp=$!; sleep 1.2; fi
     OUT=$( ( FIX="$FIX" GSEQ="$FIX/gseq" GATE="$FIX/gate" OPLOG="$FIX/oplog" REINSTALL="$FIX/reinstall" \
-        H_PROBE= LOG="$FIX/logL" STABLE="$FIX/stableL" BUDGET=60 INTERVAL=0 DEFER_MAX=0 \
+        H_PROBE= LOG="$FIX/logL" STABLE="$FIX/stableL" BUDGET=60 INTERVAL=0 DEFER_MAX=0 GATE2_BUDGET=0 \
         IOS_DEVICE_NAME=rig-iphone RUN=1 CARRIER="$FIX/heyta-wt-reinstall" \
         bash "$FIX/main/research/tools/b-window-keeper.sh" ) 2>&1; echo $? > "$FIX/rc" )
     [ -n "$_sp" ] && kill "$_sp" 2>/dev/null
     printf '%s' "$OUT"
   }
   L1=$(run_L "bash research/tools/.h-flaky-window-watcher.sh.snap.99998")
-  if [ "$(RCV)" = 0 ] && [ "$(NCALLS)" = 1 ] && printf '%s' "$L1" | grep -q '没有 H 的 e2e 在跑'; then
-    ok "L1 只在**等门**的看守不再锁住 B（照旧开窗起跑，重装 1 次）"
-  else no "L1 rc=$(RCV) 重装=$(NCALLS) 次 ⇒ 一个等待器还在这格上锁着 B"; fi
+  if [ "$(RCV)" = 0 ] && [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 1 ] && printf '%s' "$L1" | grep -q '没有 H 的 e2e 在跑'; then
+    ok "L1 只在**等门**的看守不再锁住 B（照旧开窗起跑，桌面段与设备段各 1 次）"
+  else no "L1 rc=$(RCV) desk=$(NDESK) dev=$(NDEV) ⇒ 一个等待器还在这格上锁着 B"; fi
   L2=$(run_L "node --output=$FIX/ht-h-flaky-trace.999/run1")
   if [ "$(RCV)" = 1 ] && [ "$(NCALLS)" = 0 ] && printf '%s' "$L2" | grep -q '不硬抢'; then
     ok "L2 真在跑的 e2e（argv 带独占 --output）确实挡住了 B（重装 0 次、照实报不硬抢）"
@@ -251,9 +273,9 @@ fi
 #    M = 正向（src 单独红 ⇒ 起跑）；N = 反向（src+load 并存 ⇒ 仍等，挡"见 src 就放行"）；
 #    O = 闸门没打 REDS ⇒ 仍等（缺机器通道按可疑处理，不许当成"红集为空"）。
 mk_fixture; BK_BUDGET=60; run_keeper "3:src" > "$FIX/out"
-if [ "$(RCV)" = 0 ] && [ "$(NCALLS)" = 1 ] && grep -q 'FIRE=src-deferred' "$FIX/out"; then
-  ok "M 红集恰好只有 src ⇒ 载体那一路放行起跑（重装 1 次）"
-else no "M rc=$(RCV) 重装=$(NCALLS) 次 ⇒ src-deferred 没接上，B 还在等一格对本路没有因果的读数"; fi
+if [ "$(RCV)" = 0 ] && [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 1 ] && grep -q 'FIRE=src-deferred' "$FIX/out"; then
+  ok "M 红集恰好只有 src ⇒ 载体那一路放行起跑（桌面段与设备段各 1 次）"
+else no "M rc=$(RCV) desk=$(NDESK) dev=$(NDEV) ⇒ src-deferred 没接上，B 还在等一格对本路没有因果的读数"; fi
 mk_fixture; BK_BUDGET=1; run_keeper "3:src,load" > "$FIX/out"
 if [ "$(RCV)" = 3 ] && [ "$(NCALLS)" = 0 ] && ! grep -q 'FIRE=src-deferred' "$FIX/out"; then
   ok "N src 与 load 并存 ⇒ 继续等（重装 0 次）⇒ 那一格不是「见 src 就放行」"
@@ -263,6 +285,66 @@ if [ "$(RCV)" = 3 ] && [ "$(NCALLS)" = 0 ]; then
   ok "O 闸门没打 REDS ⇒ 仍等（缺机器通道不当成「红集为空」）"
 else no "O rc=$(RCV) 重装=$(NCALLS) 次 ⇒ 没读数被读成没红，这一腿没有牙"; fi
 BK_BUDGET=30
+
+# ── P/Q/Q2/R/R2/S：设备段前那一次**重新判**（10-05 01:1x 补，六臂）────────
+#    为什么要这一组：端序是 `mac windows android ios`（`reinstall-all.sh:161`），设备面在**最后两段**，
+#    而 mac 段会走公证（`HEYTA_NOTARY_TIMEOUT` 默认 900s）、windows 段是远端打包 ⇒ 从闸门放行到第一次
+#    `adb uninstall` 隔着 15–25 分钟。"起跑那一刻没人在用"满足的是我的哨兵，不是 AGENTS §8.9 那句话。
+#    🔴 两腿必须相反（P 放行 / Q 拦住），Q 还要有 R 这条**摘掉再判**的变异腿才算有牙；
+#    Q2 管"门要能开"（先红后开 ⇒ 起跑），否则这一格可能写成一条永不放行的死门（本仓库 614/618 那一族）。
+mk_fixture; BK_BUDGET=60; BK_GATE2=0; run_keeper "0:-" > "$FIX/out"
+P1LINE=$(grep 'REINSTALL desktop' "$FIX/calls" 2>/dev/null | head -1)
+P2LINE=$(grep 'REINSTALL device  ' "$FIX/calls" 2>/dev/null | head -1)
+if [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 1 ] && printf '%s' "$P1LINE" | grep -q -- '--only mac,windows' \
+   && printf '%s' "$P2LINE" | grep -q -- '--only android,ios' && grep -q 'GATE2=OPEN' "$FIX/out"; then
+  ok "P 两段用的是重装脚本**现成的** --only：第一趟只带 mac,windows、第二趟只带 android,ios，中间那次再判留了痕"
+else no "P desk=$(NDESK)[${P1LINE}] dev=$(NDEV)[${P2LINE}] GATE2=$(grep -c 'GATE2=OPEN' "$FIX/out")"; fi
+
+# Q：第二次判红（负载回升 / 别人开始用设备）⇒ 设备段一次都不许起
+mk_fixture; BK_BUDGET=60; BK_GATE2=0; run_keeper "0:-
+3:dev" > "$FIX/out"
+if [ "$(RCV)" = 1 ] && [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 0 ] && grep -q 'STOP=device-window-closed' "$FIX/out"; then
+  ok "Q 桌面段跑完后设备面被占 ⇒ **设备段 0 次**，并大字写出「这轮只装了 mac+windows」（rc=1 不是 0）"
+else no "Q rc=$(RCV) desk=$(NDESK) dev=$(NDEV) ⇒ 破坏性段在没有新读数的情况下起了跑"; fi
+
+# Q2：第二次先红后开 ⇒ 设备段照样起跑（这一格不是死门）
+mk_fixture; BK_BUDGET=60; BK_GATE2=120; run_keeper "0:-
+3:dev
+3:load
+0:-" > "$FIX/out"
+if [ "$(RCV)" = 0 ] && [ "$(NDEV)" = 1 ] && grep -q 'GATE2 try=1 rc=3' "$FIX/out"; then
+  ok "Q2 第二次判先红两次、第三次开 ⇒ 设备段起跑（等得来，不是恒拦）"
+else no "Q2 rc=$(RCV) dev=$(NDEV) ⇒ 再判那一格开不了（恒拦=下一条永不成立的门）"; fi
+
+# R 变异：摘掉 6b 那次 `judge` ⇒ Q 的红必须消失（设备段在红门下照样起跑）
+cp "$KEEPER_SRC" "$FIX/keeper_mut2"
+python3 - "$FIX/keeper_mut2" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding='utf-8').read()
+old = 'judge; G2_RC="$G_RC"; G2_REDS="$G_REDS"'
+assert s.count(old) == 1, "第二次判的形状变了（命中 %d 处）" % s.count(old)
+open(p, 'w', encoding='utf-8').write(s.replace(old, 'G2_RC=0; G2_REDS=""'))
+PY
+cp "$FIX/keeper_mut2" "$FIX/main/research/tools/b-window-keeper.sh"
+BK_BUDGET=60; BK_GATE2=0; run_keeper "0:-
+3:dev" > "$FIX/out"
+if [ "$(NDEV)" = 1 ]; then
+  ok "R 摘掉那一次重新判 ⇒ 设备段**真的起跑了**（Q 拦住的那一趟照样动设备面）⇒ Q 的红长在再判那一行上"
+else no "R 变异后 dev=$(NDEV) —— Q 的红不是来自再判，另有别的东西在拦（这条臂没回答它声称的问题）"; fi
+cp "$FIX/keeper" "$FIX/main/research/tools/b-window-keeper.sh"
+BK_BUDGET=60; BK_GATE2=0; run_keeper "0:-
+3:dev" > "$FIX/out"
+if [ "$(NDEV)" = 0 ] && grep -q 'STOP=device-window-closed' "$FIX/out"; then
+  ok "R2 还原 ⇒ Q 的形状复现（设备段 0 次、大字报「只装了 mac+windows」）"
+else no "R2 还原后 dev=$(NDEV) ⇒ 夹具里留了变异体，或这一格本来就不稳定"; fi
+
+# S：设备段自己红 ⇒ 收口行必须把**两个 rc** 都写出来（只抄 B_DONE 会把桌面段的红读成没发生）
+mk_fixture; BK_BUDGET=60; BK_GATE2=0; BK_R_DEV=1; run_keeper "0:-" > "$FIX/out"; BK_R_DEV=""
+SSEG=$(grep -o 'segments=[^ ]*' "$FIX/out" | head -1)
+if [ "$(RCV)" = 1 ] && [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 1 ] && printf '%s' "$SSEG" | grep -q 'desktop(0)+device(1)'; then
+  ok "S 设备段 rc=1 ⇒ keeper rc=1 且收口行写着 ${SSEG}（两段的码各归各，不合并成一个数）"
+else no "S rc=$(RCV) segments=${SSEG} desk=$(NDESK) dev=$(NDEV) ⇒ 两趟之和被写回成一个 rc，红会被吞"; fi
 
 echo "b-window-keeper 臂：pass=$PASS fail=$FAIL"
 [ "$FAIL" = 0 ] || exit 1

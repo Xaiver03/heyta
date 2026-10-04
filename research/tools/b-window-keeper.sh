@@ -19,17 +19,30 @@
 #   2 载体必须干净（脏了就停：那意味着有人在载体里写）
 #   3 追平到当时的 `main` 尖（**记录追平前后的 sha**：B 的主张是"装的是当前源码"）
 #   4 `pnpm --filter @heyta/op-log build` 必须 exit 0
-#   5 `IOS_DEVICE_NAME=… bash scripts/reinstall-all.sh`，记 rc 与时长
+#   5a 桌面段：`reinstall-all.sh --only mac,windows`（不动设备面），记 rc 与时长
+#   5b **再过一次闸门**（不复用 5a 之前那次读数 —— 中间隔 15~25 分钟，效力早就过期）
+#   5c 设备段：`reinstall-all.sh --only android,ios`（`adb uninstall` / `simctl uninstall` /
+#      覆盖 /Applications 都在这两段里 ⇒ AGENTS §8.9 要的"不动别人正在用的设备"由这一次再判守着）
+#
+#    🔴 为什么拆两段而不是整趟跑：端序是 `mac windows android ios`（`reinstall-all.sh:161`），
+#    设备面在**最后两段**，而 mac 段会走公证（`HEYTA_NOTARY_TIMEOUT` 默认 900s）、windows 段是远端打包
+#    ⇒ 从闸门放行到第一次动设备之间隔着 15–25 分钟。"起跑那一刻没人在用"满足的是我的哨兵，
+#    不是 §8.9 那句话。拆分用的是重装脚本**自己现成的** `--only`（`package.json` 的
+#    `reinstall:desktop` / `reinstall:mobile` 就是这两条），没有自造参数形状。
 #
 # 用法：
 #   RUN=1 bash research/tools/b-window-keeper.sh                 # 起跑（前台；后台由调用方负责）
 #   RUN=1 BUDGET=10800 INTERVAL=60 …                             # 旋钮默认见下
 #   缺 RUN=1 ⇒ 只打印将要做什么然后 exit 1（默认不动现场）
 #
-# 退出码：0 = 跑完（reinstall 的 rc 另记在 B_DONE）
-#         1 = 前置不成立（没给 RUN / 载体脏 / op-log 构建红 / 重装红）
+# 退出码：0 = 四端都跑完（两段的 rc 另记在 B_DESKTOP_DONE / B_DEVICE_DONE）
+#         1 = 前置不成立（没给 RUN / 载体脏 / op-log 构建红 / 某一段重装红 / 设备段窗口没开）
 #         3 = 预算用尽而窗口一直没开（**环境无效，不是产品失败**）
 #         4 = 装置或闸门用法坏（gate 返回 1 之类，必须人来看）
+#    ⚠️ **这两行要一起抄**：`B_DONE rc=` 只等于**设备段**那一趟的 rc，桌面段的 rc 在
+#       `B_DESKTOP_DONE`。只抄 `B_DONE` 会把"mac 段红、android 段绿"读成全绿。
+#       整趟的收口判据是"两段都 exit 0 且汇总里没有跳过端"，不是单一 rc。
+#       （三段行的名字是故意**不**共用 `B_DONE` 前缀的，理由见第 6 段那条评论。）
 #
 # 🔴 可注入的桩（`GATE` / `REINSTALL` / `OPLOG` / `H_PROBE`）是给验证台用的
 #    （`research/tools/b-window-keeper-arms.sh`）—— 真实路径就是默认值。
@@ -67,6 +80,10 @@ IOS_DEVICE_NAME="${IOS_DEVICE_NAME:-heyta-iphone-17pro}"
 BUDGET="${BUDGET:-10800}"               # 3 小时；今晚这种"别人整片重验证"的节奏要得起
 INTERVAL="${INTERVAL:-60}"
 DEFER_MAX="${DEFER_MAX:-900}"           # 让路给 H 看守的累计上限，超了就照实报"两边抢同一道门"
+# 第二段（设备面）前那一次**重新判**的等待预算。给得有界而不是"判一次就走"：
+# 桌面段跑完那一刻设备面可能正被别人临时用一下，几分钟通常就让开了；
+# 但绝不允许"等满就硬起"—— 那等于把这一格降级成装饰（§8.3）。
+GATE2_BUDGET="${GATE2_BUDGET:-900}"
 
 TS=$(date +%Y%m%d-%H%M%S)
 LOG="${LOG:-/tmp/ht-b-window.${TS}.$$.log}"
@@ -90,34 +107,42 @@ say "start 预算=${BUDGET}s 轮询=${INTERVAL}s 载体=${CARRIER} 设备=${IOS_
 [ -d "$CARRIER" ] || { say "BROKEN=载体目录不在：${CARRIER}（取径只认 git worktree list，别猜）"; exit 4; }
 
 # ── 1. 等窗口：只认 rc=0 ───────────────────────────────────────────────
+# 🔴 开窗判据**只写一次**：第 1 步（起跑前）与第 6 步（设备段前）共用这一个 `judge`。
+#    同一个判断抄两遍是本仓库登记过的漂移起点（§3.2 那段"失败判据抄了三遍、三遍都漏"）。
+judge() {
+  G_OUT=$(NO_COLOR=1 bash "$GATE" --target b 2>&1); G_RC=$?
+  G_REDS=$(printf '%s\n' "$G_OUT" | grep -E '^REDS=' | tail -1)
+  G_OPEN=0
+  [ "$G_RC" = 0 ] && G_OPEN=1
+  # ⚠️ 只放行"红集**恰好**是 src 一种"：`load`/`dev`/`apk`/任何别的红（或**没打 REDS**）都不算开。
+  #    负载门与设备门一个字没动（硬约束那句"负载门不达标就登记等待，不降级判据"仍然成立）。
+  if [ "$G_RC" = 3 ] && [ "$G_REDS" = "REDS=src" ]; then G_OPEN=2; fi
+}
 START=$(date +%s)
 N=0
 while :; do
   N=$(( N + 1 ))
-  OUT=$(NO_COLOR=1 bash "$GATE" --target b 2>&1); RC=$?
-  REDS=$(printf '%s\n' "$OUT" | grep -E '^REDS=' | tail -1)
-  if [ "$RC" = 0 ]; then
-    say "WINDOW=OPEN try=${N} ${REDS}"
+  judge
+  if [ "$G_OPEN" = 1 ]; then
+    say "WINDOW=OPEN try=${N} ${G_REDS}"
     break
   fi
-  if [ "$RC" = 3 ]; then
-    # 🔴 载体这一路**不吃 `src` 这一格**（下面是读脚本本体的现量，不是印象）：
+  if [ "$G_OPEN" = 2 ]; then
+    # 载体这一路**不吃 `src` 这一格**（下面是读脚本本体的现量，不是印象）：
     #   · `scripts/reinstall-all.sh:183` 第 0 步就是 `pnpm -r build`，而看守是 `( cd "$CARRIER" && … )` 起它的
     #     ⇒ 构建读的是**载体**那棵树；
     #   · `:214-225` 再把 `.app` 里的 `web-dist` 与"本机 `apps/web/dist` 是同一次构建"逐 chunk 对账；
     #   · 本脚本第 2 步要求载体工作树干净、第 3 步把它追平到 `main` 的**提交**尖并记 from/to sha。
     #   ⇒ 主检出里别人那几枚未提交字节**进不了产物**，而 `src` 这一格防的正是"把别人 WIP 打进产物"
     #     （§7 第 82 条）。所以等它 = 等一个对本路没有因果的读数 —— 与 C 链那条例子 `FIRE=apk-deferred` 同形。
-    #   ⚠️ 只放行"红集**恰好**是 src 一种"：`load`/`dev`/`apk`/任何别的红（或**没打 REDS**）一律继续等。
-    #     负载门与设备门一个字没动（硬约束那句"负载门不达标就登记等待，不降级判据"仍然成立）。
-    if [ "$REDS" = "REDS=src" ]; then
-      say "FIRE=src-deferred try=${N} ${REDS}（载体那一路结构性不吃 src；理由见本段注释与台账 (32)）"
-      break
-    fi
-    say "try=${N} rc=3 ${REDS:-〈闸门没打 REDS，装置可疑〉}"
+    say "FIRE=src-deferred try=${N} ${G_REDS}（载体那一路结构性不吃 src；理由见本段注释与台账 (32)）"
+    break
+  fi
+  if [ "$G_RC" = 3 ]; then
+    say "try=${N} rc=3 ${G_REDS:-〈闸门没打 REDS，装置可疑〉}"
   else
-    say "BROKEN=闸门 rc=${RC}（不是 0/3 ⇒ 用法或装置坏，不继续等）"
-    printf '%s\n' "$OUT" | tail -5 | sed 's/^/      /' >> "$LOG"
+    say "BROKEN=闸门 rc=${G_RC}（不是 0/3 ⇒ 用法或装置坏，不继续等）"
+    printf '%s\n' "$G_OUT" | tail -5 | sed 's/^/      /' >> "$LOG"
     exit 4
   fi
   ELAPSED=$(( $(date +%s) - START ))
@@ -202,13 +227,55 @@ if [ "$RC" != 0 ]; then
   exit 1
 fi
 
-# ── 6. 起 B ────────────────────────────────────────────────────────────
+# ── 6. 起 B：拆成"桌面段 → 再过一次闸门 → 设备段"───────────────────────
 # 🔴 在**载体里**跑，且用它自己那份（追平之后就是 main 尖的已提交副本）：
 #    主检出那棵树上全是别人未提交的源码，从那里起 B 装出来的就不是"当前源码的产物"。
 [ -f "$REINSTALL" ] || { say "BROKEN=载体里没有重装脚本：${REINSTALL}（追平之后应该在）"; exit 4; }
+
+# 6a 桌面段（不动设备面）
+D_START=$(date +%s)
+say "STEP reinstall-desktop script=${REINSTALL} cwd=${CARRIER} only=mac,windows"
+( cd "$CARRIER" && IOS_DEVICE_NAME="$IOS_DEVICE_NAME" bash "$REINSTALL" --only mac,windows ) >> "$LOG" 2>&1; D_RC=$?
+# 🔴 行名写的是 `B_DESKTOP_DONE` 而不是 `B_DONE_DESKTOP`：后者以 `B_DONE` 开头，
+#    于是任何 `grep B_DONE` 的读法（台账、看守交接、下一位的手抄）先撞上的都是**桌面段**那一行，
+#    而收口判据要的那条含 segments 的行在后面。前缀冲突是装置缺陷，不是排版问题（臂 I 当场照出来的）。
+say "B_DESKTOP_DONE rc=${D_RC} secs=$(( $(date +%s) - D_START )) sha=${TIP}"
+if [ "$D_RC" != 0 ]; then
+  say "STOP=desktop-segment（桌面段红 ⇒ 不再动设备面；这一轮的「四端当前产物」不成立，两段 rc 都要抄）"
+  exit 1
+fi
+
+# 6b 设备段前**重新判一次**闸门。不复用 6a 之前那次读数：端序 `mac windows android ios`，
+#    从放行到第一次 `adb uninstall` 隔着 mac 段公证（默认 900s）+ windows 段远端打包 = 15–25 分钟，
+#    那一段时间里别人完全可以把设备用上 —— "起跑那一刻没人在用"满足的是哨兵，不是 §8.9。
+#    开窗判据与第 1 步**同一个 `judge`**（含 `src` 那一格对载体这一路无因果的放行），不抄第二遍。
+G2_START=$(date +%s)
+G2_N=0
+while :; do
+  G2_N=$(( G2_N + 1 ))
+  judge; G2_RC="$G_RC"; G2_REDS="$G_REDS"
+  if [ "$G_OPEN" = 1 ] || [ "$G_OPEN" = 2 ]; then
+    say "GATE2=OPEN try=${G2_N} rc=${G2_RC} ${G2_REDS}（距第一次放行 $(( G2_START - START ))s）"
+    break
+  fi
+  if [ "$G2_RC" != 3 ]; then
+    say "BROKEN=第二次闸门 rc=${G2_RC}（装置或用法坏；桌面段已跑完，设备段没动）"
+    printf '%s\n' "$G_OUT" | tail -5 | sed 's/^/      /' >> "$LOG"
+    exit 4
+  fi
+  say "GATE2 try=${G2_N} rc=3 ${G2_REDS:-〈闸门没打 REDS，装置可疑〉} —— 设备段不起跑"
+  if [ $(( $(date +%s) - G2_START )) -ge "$GATE2_BUDGET" ]; then
+    say "STOP=device-window-closed 等满 ${GATE2_BUDGET}s 设备面仍不让开 ⇒ **这轮只装了 mac+windows**，android/ios 是当前产物这件事**不成立**"
+    exit 1
+  fi
+  sleep "$INTERVAL"
+done
+
+# 6c 设备段（真正会 `adb uninstall` / `simctl uninstall` 的两段）
 R_START=$(date +%s)
-say "STEP reinstall script=${REINSTALL} cwd=${CARRIER}"
-( cd "$CARRIER" && IOS_DEVICE_NAME="$IOS_DEVICE_NAME" bash "$REINSTALL" ) >> "$LOG" 2>&1; RC=$?
-say "B_DONE rc=${RC} secs=$(( $(date +%s) - R_START )) sha=${TIP} device=${IOS_DEVICE_NAME}"
+say "STEP reinstall-device script=${REINSTALL} cwd=${CARRIER} only=android,ios"
+( cd "$CARRIER" && IOS_DEVICE_NAME="$IOS_DEVICE_NAME" bash "$REINSTALL" --only android,ios ) >> "$LOG" 2>&1; RC=$?
+say "B_DEVICE_DONE rc=${RC} secs=$(( $(date +%s) - R_START )) sha=${TIP}"
+say "B_DONE rc=${RC} secs=$(( $(date +%s) - R_START )) sha=${TIP} device=${IOS_DEVICE_NAME} segments=desktop(${D_RC})+device(${RC})"
 [ "$RC" = 0 ] || exit 1
 exit 0

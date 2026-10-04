@@ -82,7 +82,8 @@ PATHS=(
   research/tools/b-arm3-mutation-arms.sh
   research/tools/b-wedge-mutation-arms.sh
   research/tools/b-batch-reconcile.sh
-  # 🔴 B 那条的"等到窗口就自己开工"看守 + 它的十三臂验证台：
+  # 🔴 B 那条的"等到窗口就自己开工"看守 + 它的验证台（臂数不写在这份清单里，会漂；
+  #    现量：`bash research/tools/b-window-keeper-arms.sh | tail -1`）。
   #    同批入库的理由和 `stack_down` 那次一样 —— 只提看守不提验证台，HEAD 里就躺着
   #    一枚"从没证明过自己会在红门下停住"的东西，而它是会**动设备面**的那一条腿。
   research/tools/b-window-keeper.sh
@@ -102,6 +103,12 @@ PATHS=(
   # 🔴 它同样是**这条防漏格自己抓出来的**：文件刚落盘、还没进清单，1b 就报
   #    `❌ 本线命名空间有改动却没点名 [??]：research/tools/r17-reshoot-stale.sh` ⇒ 有牙。
   research/tools/r17-reshoot-stale.sh
+  # 🔴 第 11 号（重拍过期取证）的看守 + 验证台，与上面那枚**同批**：
+  #    `r17-reshoot-stale.sh` 只回答"该重拍哪些"，它需要 4318/4319 空闲 + 负载达标 + 没人正在
+  #    跑 e2e / 重装；那三个"再判"与两条让路臂只能由这把 rig 答（13 臂，含 K 那条摘掉让路的变异）。
+  #    入库理由与 b-window-keeper 同形：会自己起浏览器的那条腿，必须带着它的牙一起进 HEAD。
+  research/tools/r17-reshoot-keeper.sh
+  research/tools/r17-reshoot-arms.sh
   # 15:4x：上面那条 --only 前置被换成后置对账之后，**这一把就是它的牙**（三臂：正向 / 摘掉 --only /
   # 我方路径暂存≠工作树）。同样是 1b 自己抓出来的（落盘即报 `[??]`）—— 第四次。
   research/tools/calendar-line-commit-only-arms.sh
