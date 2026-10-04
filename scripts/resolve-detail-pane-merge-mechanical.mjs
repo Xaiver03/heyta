@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 详情面合流里**两条纯机械处置**的执行器（工单 §8.47 第 3a / 3b / 第 4 步）。
+ * 详情面合流里**四步纯机械处置**的执行器（工单 §8.47 第 3a / 3b / 第 4 步，以及 §8.108 的 #34 那一行）。
  *
  * 为什么要有它：那三步的"规则"已经写在工单里并被 14:0x 那一趟执行验真过（§8.50 / §8.52），
  * 但规则是散文 —— 合流那一刻要靠人重新读散文再手工改文件，而改动本身是可判定的
@@ -400,6 +400,82 @@ const alreadyResolved = (rel) => {
                     (commentWasThere ? '，并把注释里那个计数抄件改成指针' : '（那行计数注释已经不在了，无需改）'),
                 );
                 write(GATE, fixed);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// —— 第 5 步：断言 I 的"新路由没对选中交代立场"那一档。
+// main 侧每多一路由，这一档就会在产物上红一次（本趟是 `countdown`，工单 #34）。
+// 它**看起来**像要人判断，但"这一面走哪一档"是可以从代码量出来的（三条取证见 §8.108），
+// 所以这里放**预审名单**：点名的面若全在名单内就补登记行，出现名单外的名字一律交给人 ——
+// 和 §8.36 那两枚 `busyId` 豁免同一套规矩（"登记的语义"是预审过的，不是脚本临场发明的）。
+// ⚠️ 这一段 `because` 文案是**唯一真源**；工单 §8.108 里那段是当时的抄件，只作记录不作依据。
+const STANCE_ROSTER = {
+  countdown: `  {
+    view: 'countdown',
+    stance: 'row-actions-only',
+    entity: 'event',
+    locus: 'apps/web/src/features/countdown/CountdownView.tsx',
+    needle: '<CountdownBoard',
+    because: '倒数日卡片的每个动作都自带 entityId（onPatch/onArchive/onRemove/onExportCard(entityId, …)），' +
+      '而 web 这一侧的调用点只传视图/筛选/分列，整个文件读不到 useSelected/selection.select ⇒ 点一张卡不产生"在看哪一条"。' +
+      'EVENT 也不在选中词表（task/habit/note）里，接不进共享 store。',
+  },
+`,
+};
+
+{
+  const gatePath = join(product, GATE);
+  if (existsSync(gatePath)) {
+    let out = '';
+    let rc = 0;
+    try {
+      out = execFileSync('node', [GATE], { cwd: product, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      out = `${e.stdout || ''}${e.stderr || ''}`;
+      rc = e.status ?? 1;
+    }
+    if (rc === 0) {
+      notes.push(`第 5 步 ${GATE}：产物上已经**是绿的** ⇒ 不补任何立场登记`);
+    } else {
+      const m = /其中\s+(\d+)\s+个没对"选中"交代过立场：([^\n]+?)。\s*$/m.exec(out);
+      if (!m) {
+        notes.push(`第 5 步 ${GATE}：这一趟的红不是断言 I 那一档（或解析不到点名清单）⇒ 本步不动，交给人`);
+      } else {
+        const stated = Number(m[1]);
+        const named = m[2].split(/[,，、]\s*/).filter(Boolean);
+        // 分母自检：报出的个数与点名的名字必须对得上，对不上就是解析器错了，不是"少一个没关系"。
+        if (named.length !== stated) {
+          failures.push(
+            `${GATE} 第 5 步：门禁说 ${stated} 个，解析到 ${named.length} 个（${named.join('/')}）⇒ 探针错，不写盘`,
+          );
+        } else {
+          const unknown = named.filter((v) => !Object.hasOwn(STANCE_ROSTER, v));
+          if (unknown.length) {
+            failures.push(
+              `${GATE} 第 5 步：点名的面有 ${unknown.length} 个不在预审名单里（${unknown.join(' / ')}）⇒ 那是新的语义判断，不自动登记`,
+            );
+          } else {
+            const g = readFileSync(gatePath, 'utf8');
+            const start = g.indexOf('const VIEW_STANCES = [');
+            const end = start < 0 ? -1 : g.indexOf('\n];', start);
+            if (end < 0) {
+              failures.push(`${GATE} 第 5 步：读不到 VIEW_STANCES 那段数组 ⇒ 不猜形状，交给人`);
+            } else {
+              const fresh = named.filter((v) => !g.includes(`view: '${v}'`));
+              if (!fresh.length) {
+                notes.push(`第 5 步 ${GATE}：点名的 ${named.length} 个面已经在登记表里（红来自别处）⇒ 不重复加`);
+              } else {
+                write(GATE, `${g.slice(0, end + 1)}${fresh.map((v) => STANCE_ROSTER[v]).join('')}${g.slice(end + 1)}`);
+                notes.push(
+                  `第 5 步 ${GATE}：断言 I 点名的 ${named.length} 个面全在预审名单里 ⇒ 补 ${fresh.length} 行立场登记 ` +
+                    `(${fresh.join(' / ')})，插在数组闭合 \`];\` 之前`,
+                );
               }
             }
           }
