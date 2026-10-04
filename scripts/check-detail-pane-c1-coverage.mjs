@@ -15,9 +15,26 @@ import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
-const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+// `--root DIR`：合流预检把候选树解到 /tmp 后在那里跑（那种目录没有 git 索引）。
+// 本判据只看文档结构，索引本来就用不上 —— 加这个旋钮只是为了**不必在 /tmp 里跑 git**。
+const rootIdx = process.argv.indexOf('--root');
+let root;
+if (rootIdx === -1) {
+  // 默认仍是仓库根（从子目录跑也要能找到 `docs/…`）；拿不到就退回 cwd ——
+  // 产物树模式（`--root`）本来就没有索引，所以这里不因为 git 缺失而失败。
+  try {
+    root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+  } catch {
+    root = process.cwd();
+  }
+} else {
+  root = process.argv[rootIdx + 1];
+}
 const DEFAULT_DOC = 'docs/research/detail-pane-alignment-and-spaced-review.md';
-const docArg = process.argv.slice(2).find((a) => !a.startsWith('--'));
+// 🔴 `--root` 的实参不是文档：不排掉它，产物树模式下 `docArg` 会拿到那枚目录，
+// `existsSync` 为真、`readFileSync(dir)` 直接 EISDIR —— 症状是"判据自己崩了"，不是"查到红"。
+const argv = process.argv;
+const docArg = argv.slice(2).find((a, i) => !a.startsWith('--') && i + 2 !== rootIdx + 1);
 // 绝对路径原样收（变异臂的夹具在库外）：`join(root, '/tmp/x.md')` 会拼成 `root/tmp/x.md`，
 // 那种"文件不存在"的红会报在错的对象上。
 const doc = docArg ? (docArg.startsWith('/') ? docArg : join(root, docArg)) : join(root, DEFAULT_DOC);
