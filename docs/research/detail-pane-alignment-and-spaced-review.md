@@ -381,7 +381,7 @@
 | **未选中 = 一行提示字**，"自动放最新一封"是**默认关闭**的选项 | Outlook 阅读窗格 | "Turning on 'always preview messages' … With this feature turned off, … you will see 'Select an item to Read'"（[support.microsoft.com](https://support.microsoft.com/en-us/office/2fd687ed-7fc4-4ae3-8eab-9f9b8c6d53f0)） |
 | 拉宽时给的是 **placeholder** 详情栏，不是概览 | Android 规范布局 | "the list and a placeholder detail pane are shown together"（[developer.android.com](https://developer.android.com/develop/adaptive-apps/guides/canonical-layouts)） |
 | **API 层**把"无选中"当一等状态要求显式给内容（默认 `null`） | MS CommunityToolkit `ListDetailsView` | "Gets or sets the content to display when there is no item selected"（[learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/api/communitytoolkit.winui.ui.controls.listdetailsview.noselectioncontent)）⚠️ 这是**接口形状**，不是内容主张 |
-| **选中才出现**（原地展开 / 浮层），没有常驻第三栏 | Things 4、Notion peek、Linear、Todoist、Gmail（默认 `No split`） | Things："When you open a to-do, it smoothly transforms into a clear white piece of paper"（[culturedcode.com/things/features](https://culturedcode.com/things/features/)）；Todoist："click a task to open the task view"（[help](https://www.todoist.com/help/todoist/features/use-the-task-view-to-manage-tasks-in-todoist-eDeRDO0C)） |
+| **选中才出现**（原地展开 / 浮层），没有常驻第三栏 | Things 3（🔴 本行原写 **Things 4**，2026-10-04 23:1x 按官网命中数改名，依据见 §C1b-Q8 开头第 ① 条）、Notion peek、Linear、Todoist、Gmail（默认 `No split`） | Things："When you open a to-do, it smoothly transforms into a clear white piece of paper"（[culturedcode.com/things/features](https://culturedcode.com/things/features/)，2026-10-04 23:1x 去标签文本逐字命中 1）；Todoist："In Todoist, click a task to open the task view."（[help](https://www.todoist.com/help/todoist/features/use-the-task-view-to-manage-tasks-in-todoist-eDeRDO0C)，同一趟逐字命中 1）⚠️ 同一页的右栏清单同时支撑 §C1b-Q8 的"常驻"那一档 —— 两行问的不是同一件事（这里问**这栏什么时候出现**，Q8 问**栏里空字段在不在**），不互相否证 |
 | **没有任何一方**在常驻栏里放"当前清单的统计概览" | —（缺席结论：核的是上面这 5 家的对应页面） | 概览型内容别处放：Things 的 Progress Pies 在**列表里**，Todoist 的统计在独立的 **Productivity view** |
 
 **压倒性一致的唯一一条**（不管选哪种都要满足）：可隐藏 + **多条恢复入口**（工具栏 / 菜单 / 快捷键）+ 记住状态 —— Apple HIG split views 原文 "Provide multiple ways to reveal hidden panes"；SwiftUI `.inspector` 的列形态"presentation state restored by the framework"。⇒ 这条可以直接写进 W4 的判据，不需要拍板。
@@ -396,8 +396,17 @@
 
 ### C1b-Q8（= C1 #8：详情面里"无数据的区块"是空即隐藏还是常驻）
 
-> 取证日期 **2026-10-03**。🔴 **2026-10-04 09:5x 复扫这一节时照出三行没有 URL 出处**（Things 4 / Todoist / Outlook），
+> 取证日期 **2026-10-03**。🔴 **2026-10-04 09:5x 复扫这一节时照出三行没有 URL 出处**（Things / Todoist / Outlook），
 > 已逐行标成「**未核实 · 未附来源**」—— 本节顶部那句"一手取证"对这三行**不成立**，宁可挂未核实，也不补猜链接。
+> ✅ **2026-10-04 23:1x 三行全部核回厂商自己的页面**（下面每行挂 URL + 整句原文 + 取法与命中数），未核实标记撤掉。
+> 🔴 复核同时照出**两处错误**，都留档不划掉：
+> ① **产品版本号写错** —— 原写「Things 4」。同一趟 `curl` 取 `https://culturedcode.com/things/` 与
+>    `https://culturedcode.com/things/features/`：`Things 4` 命中 **0 / 0**，`Things 3` 命中 **6 / 7**
+>    ⇒ 那句话本身是真的，但它说的是 **Things 3**。活主张已就地改名（本节 + §C1b-Q1 那张表第 4 行）。
+> ② **上一轮"查不到出处"里有一半是探针的锅** —— 我先拿 `grep -F "Click Date"` 打在**原始 HTML 字节**上，得 0 命中；
+>    而那句真在页面上，是行内标记把词切开了（`Click <b>Date</b> to add…` 这类）。**先把标签剥掉再打**才命中 1。
+>    ⇒ 可迁移：对网页判"这句不存在"之前，必须在**去标签文本**上打过一次；原始字节 0 命中**不构成缺席证据**。
+>    与 §7 第 171 条（构建产物里中文是 UTF-16LE，`grep` 恒 0）同族 —— 都是 needle 的字形与载体的字形对不上。
 
 一手取证后**最重要的发现是问题本身问错了**：没有任何一家把这件事写成"空即隐藏 vs 永远都在"，它们写的是**这个区块是不是动作的入口**。
 
@@ -407,18 +416,23 @@
 | Apple SwiftUI `ContentUnavailableView` | 不藏 | "recommended … where a view's content cannot be displayed … a list without items"（[documentation](https://developer.apple.com/documentation/swiftui/contentunavailableview)） |
 | IBM Carbon · Empty states | 不藏，但**空间小就只留文案** | "If space is limited, use just text." + "In situations where there could be multiple empty states showing at once, we recommend using a tertiary button" + 设计必答第一问就是 "What will the pages … and **side panels** look like without content?"（[carbondesignsystem.com](https://carbondesignsystem.com/patterns/empty-states-pattern/)） |
 | Microsoft Power BI | 藏（但藏的是**数据行**，不是功能） | "Power BI doesn't display all possible data by default" + "Turning on the option to show items with no data can negatively affect performance"（[learn.microsoft.com](https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-show-items-no-data)） |
-| Things 4 | 藏 | "those fields are neatly tucked away in the corner until you need them"（**未核实 · 未附来源**） |
-| Todoist 任务详情 | 常驻可操作 | "Click the project name to move… Click Date to add a date, time, and duration … Click Labels to add a label"（**未核实 · 未附来源**：原记"同一 help 页"却没落 URL） |
-| Outlook | 一行字，不给插画 | "you will see 'Select an item to Read'"（**未核实 · 未附来源**：那是客户端界面串，不是文档句子） |
+| Things 3（🔴 原写「Things 4」，版本号错，见上面第 ① 条） | 藏 | "If you like, you can add more details (tags, a checklist, a start date, a deadline), but those fields are neatly tucked away in the corner until you need them."（[culturedcode.com/things/features](https://culturedcode.com/things/features/)，2026-10-04 23:1x `curl` HTTP 200，去标签文本逐字命中 1）⚠️ **射程**：这是**营销页文案，不是界面规格** —— 它说"收在角落"，没说空字段在渲染树里到底存不存在。⇒ 只能用来支撑"藏有先例"，**不能**用来支撑"藏了也不会有人找不到"。未闭合的那半登记在 §C2 第 30 条 |
+| Todoist 任务详情（右栏） | 常驻可操作 | 帮助页「Introduction to tasks」（页面自标更新于 2026-08-28）在 "On the right-hand sidebar, you can:" 这一组下列出三条：「Click the project name to move the task to a different project or section.」「Click Date to add a date, time, and duration to the task.」「Click Labels to add a label to the task.」（[todoist.com help · use-the-task-view](https://www.todoist.com/help/todoist/features/use-the-task-view-to-manage-tasks-in-todoist-eDeRDO0C)，2026-10-04 23:1x `curl` HTTP 200，去标签文本逐字命中各 1）第二枚同立场出处，说得更直白："For example, in case you don't need a reminder or label, attributes are compact but visible."（[todoist.com/inspiration/todoist-new-task-view](https://www.todoist.com/inspiration/todoist-new-task-view)，2026-10-04 23:1x HTTP 200：**整句在原始字节上 0 命中、剥标签后 1 命中**，短句 `compact but visible` 原始字节即 1 命中 —— 同一个句子，两种字形，正是上面第 ② 条那个探针坑的现场）同页还有一句可引用的形状描述："The new sidebar houses all other task attributes like the project, assignee, due date, priority, labels, and reminders."（剥标签 1 命中） |
+| Outlook（经典版阅读窗格） | 一行字，不给插画 | 整句原文："With this feature turned off, the first time navigating to a folder after launching Outlook you will see 'Select an item to Read' in the navigation pane."（[support.microsoft.com](https://support.microsoft.com/en-us/outlook/use-and-configure-the-reading-pane-to-preview-messages-in-outlook)，2026-10-04 23:1x `curl` HTTP 200，原始字节命中 1；§C1b-Q1 第 1 行用的是 ID 形态 URL，实测 **301** 落到本条这个 slug，同一页）🔴 **语境比原先写的窄**：它落在「Always preview messages when switching folders in classic Outlook」那一节，条件是**该选项关闭** + 启动后首次进入文件夹，且厂商原文把出现位置写作 **navigation pane**（不是 reading pane）。⇒ 支撑"未选中时给一行提示字、不给插画"这个形状，**不支撑**"任何未选中态都是一行字"。🔴 原记那句"那是客户端界面串，不是文档句子"**已被否证** —— 它确实写在文档句子里 |
 
 **推荐**：三态契约 **`affordance`（写入口，常驻，空态只占一行按钮级文案）/ `record`（纯记录，可隐藏但区块头留"添加"）/ `hidden`**，而且**这个判断住在共享组件层、四个壳不许各写一份**（AGENTS §3.5 的形状；所有空态文案进 `packages/i18n` 中英成对）。
 - 为什么不选"全部常驻"：详情栏一屏七八个空行，正是 Apple 两条 progressive disclosure 告诫的形态。
 - 🔴 为什么不选"全部空即隐藏"：本仓库已经吃过这个形状的反果 —— `tagIds` 全仓零读写那段记的是"零件都在、产品里没有这个功能"。**界面上隐藏空区块是最容易悄悄把一个功能变成"没有功能"的地方**，而这类失败从来不会报错。
 - Carbon 那句 "use just text" 与本仓库已拍的「不抄空态插画」同向，可直接引用为一致依据。
-- 🔴 **这条推荐不靠上面那三行未附来源的话撑着**（逐条对过）：`affordance 常驻` 的已附来源依据是 Apple 那句
-  "Place controls that people are most likely to use at the top of the disclosure hierarchy so they're always visible"，
-  `record 可隐藏` 的依据是 Apple 第一句 + Power BI 的性能那句，`空态只给一行文案` 的依据是 Carbon。
-  ⇒ 上面 Todoist / Things 4 / Outlook 三行**即使复核后被推翻，本推荐不动** —— 这才敢在只标了"待复核"的情况下继续用。
+- 🔴 **2026-10-04 23:1x 复核前，这一档是"未核时的自保措辞"**（原文：这三行即使被推翻，本推荐不动）。三行都回到一手之后，按实际读数改写：
+  `affordance 常驻` 现在有**两枚一手**而不是单点 —— Apple 那句 "Place controls that people are most likely to use at the top of the disclosure hierarchy so they're always visible"，
+  **加上** Todoist 那句 "in case you don't need a reminder or label, attributes are compact but visible"（后者是**同立场的直接先例**：空字段照样在场）。
+  `record 可隐藏` 的依据仍是 Apple 第一句 + Power BI 性能那句，**新增** Things 3 的 "tucked away in the corner until you need them" 作先例
+  （⚠️ **营销级**，不是规格级 —— 见上面那行的「射程」）。
+  `空态只给一行文案` 的依据是 Carbon + Outlook，但 Outlook 那枚的**射程已收窄**（原文只覆盖"关掉 always preview + 启动后首次进文件夹"那一格），
+  所以这一档的**主要依据回到 Carbon**。
+  ⇒ 结论：**没有一档因这次复核而失去依据**；变化在两处 —— Todoist 由"未附来源"升为同立场一手先例，Outlook 由"通用先例"降为"有条件先例"。
+  ⚠️ 保留这条改写本身：判据从"即使被推翻也不动"变成"复核后承重表变了"，**说明前者当时只是把不确定性挡住了，没有消掉它**。
 
 ### C1b-Q2（= C1 #2：习惯统计三处口径 A 日历月 vs 韧性 / B 自然月 vs 滚动 / C 天 vs 次）
 
@@ -825,6 +839,15 @@ VS Code 敢这么设计是因为每个 view 还能从命令面板/菜单到达�
     现量：本轮同趟逐名查过，`scoreTask.js` / `cron.js` / 那几枚 `.kt` 都不在册 ⇒ **今天零碰撞**，这一档尚未咬到过任何一条真引用。
     补法：出现碰撞时把那条引用改成**带路径的完整形态**（如 `research/upstream/<repo>/src/cron.js:154`）—— `OWN_PATH` 只认 `packages|apps|server|scripts|e2e|docs` 六个顶层前缀，
     带 `research/` 的完整路径必落回"第三方"那一侧，不需要改判据；判据两侧的牙由装置 N1（自家裸名不许冒充外部锚）与 N1b（在册查不到的裸名仍算外部锚）两臂钉住。
+30. 🔴 **§C1b-Q8 那三行核回一手之后仍未关掉的两格**（2026-10-04 23:1x）：
+    ① **Things 3 那句是营销级、不是规格级** —— "those fields are neatly tucked away in the corner until you need them"
+    没有说那些字段在渲染树里到底在不在，所以"空即隐藏在 Things 里是一条界面事实"这句**仍未核**。
+    ② **Todoist 右栏在"什么都没填"时的实际形状**只由厂商两句自述支撑（"attributes are compact but visible" + 那三条 `Click …` 指令），零图证。
+    补法：①②与第 13 条、第 28 条是**同一次实测能一起关掉**的（各家一个可用登录态 + 一张空任务截图，判据形状就是工单 §4 那条），⇒ 要人。
+    在此之前本节那两格只能按"厂商自述其意图"读，不许当界面证据用。
+    结案取证：这一档关掉时把那张图的路径写回 §C1b-Q8 那两行；而"Things 4"这个错名的回潮检查是一条**语义**判据 ——
+    `grep -rn 'Things 4' docs/` 的命中要逐条读，只允许出现在**历史记述或改名说明**里（本条第 ① 项、§C1b-Q1 那行的改名注、工单落地记录），
+    它落进任何活主张（哪家产品叫什么、谁站哪边）即为回潮。不写死命中数，因为那数字随下一批记述变化。
 
 
 ## C3. 与既有冻结调研的分工（唯一事实源规则）
