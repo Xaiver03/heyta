@@ -1,0 +1,139 @@
+#!/usr/bin/env node
+/**
+ * `scripts/check-widgets.mjs` 那一条"黄金夹具"规则的档位装置。
+ *
+ * 为什么要它：这一条规则原来是 `try { pnpm … } catch { 报"夹具不一致" }` ——
+ * "runner 没跑成"与"夹具真的坏了"**同形**，而后者报的是"四端解析器的锁坏了"。
+ * 修法把它分成三档（0 通过 / 1 违规 / 2 没跑成=未判），但**分档本身必须能被证伪**：
+ * 只加一档"未判"而不证明"真违规仍会红"，等于把一个假红换成一条永真的跳过。
+ *
+ * 🔴 臂只改门禁脚本里那一处命令串（换成打假汇总的 shim），跑完按 md5 复原 ——
+ * 不改 `packages/widget-core` 那枚 spec、不碰夹具文件（夹具是四端共享资产）；
+ * A1b 只是把那枚 spec **原样跑一遍**取真值（只读，不写任何产物）。
+ *
+ * 跑法：node research/tools/mutation-rigs/mutate-widgets-unjudged.mjs
+ * 退出码：0 = 全部臂符合预期；1 = 有臂不符合（分档没牙或臂写错，都是这次改动的缺陷）。
+ */
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const ROOT = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+const GATE = 'scripts/check-widgets.mjs';
+const ORIG = readFileSync(`${ROOT}/${GATE}`, 'utf8');
+const BASE = createHash('md5').update(ORIG).digest('hex');
+const scratch = mkdtempSync(join(tmpdir(), 'wdg-'));
+
+/** 打一串"看起来像 vitest 汇总"的输出并按指定码退出 —— 用来伪造 runner 的三种结局。 */
+const shim = (name, body, code) => {
+  const p = join(scratch, name);
+  writeFileSync(p, `#!/bin/sh\ncat <<'EOF'\n${body}\nEOF\nexit ${code}\n`, 'utf8');
+  chmodSync(p, 0o755);
+  return p;
+};
+const sPass = shim('pass.sh', ' RUN  v5.0.1\n Test Files  1 passed (1)\n      Tests  4 passed (4)\n   Duration 200ms', 0);
+const sFail = shim('fail.sh', ' RUN  v5.0.1\n Test Files  1 failed (1)\n      Tests  1 failed | 3 passed (4)\n AssertionError: expected "x" to be "y"', 1);
+const sZero = shim('zero.sh', ' RUN  v5.0.1\n Test Files  0 passed (0)\n      Tests  0 passed (0)', 0);
+const sNoSummary = shim('nosum.sh', 'Scope: all 21 workspace projects\n[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY', 1);
+
+const run = (src) => {
+  writeFileSync(`${ROOT}/${GATE}`, src, 'utf8');
+  const r = spawnSync(process.execPath, [`${ROOT}/${GATE}`], { encoding: 'utf8', cwd: ROOT });
+  return { rc: r.status, out: `${r.stdout}${r.stderr}` };
+};
+const restore = () => writeFileSync(`${ROOT}/${GATE}`, ORIG, 'utf8');
+
+const CALL = "    'pnpm',\n    ['--filter', '@heyta/widget-core', 'exec', 'vitest', 'run', 'tests/fixtures.spec.ts'],";
+const withShim = (src, path) => {
+  if (!src.includes(CALL)) throw new Error('找不到夹具规则里那处 spawn 调用 —— 形状变了，臂没有对象');
+  return src.replace(CALL, `    ${JSON.stringify(path)},\n    [],`);
+};
+
+let pass = 0;
+let bad = 0;
+const rows = [];
+const check = (name, cond, detail) => {
+  rows.push(`${cond ? '  ✅' : '  🔴'} ${name}${detail ? ` —— ${detail}` : ''}`);
+  if (cond) pass += 1;
+  else bad += 1;
+};
+
+// A0 —— 真载体（pnpm 在这个检出里跑不起来）：必须是**未判**，不许报"夹具不一致"
+const a0 = run(ORIG);
+check(
+  'A0 linked worktree 里 pnpm 跑不起来 → 退出码 2（未判），且不再谎报"黄金夹具不一致"',
+  a0.rc === 2 && /没跑成 ⇒ 等于没验过/.test(a0.out) && !/黄金夹具与重建结果\*\*不一致\*\*/.test(a0.out),
+  `RC=${a0.rc}｜原因行 ${(a0.out.match(/ERR_PNPM\S{0,40}/) || ['<没打出 pnpm 码>'])[0]}`,
+);
+
+// A1 —— 历史对照：同一棵树喂 **HEAD 那版**门禁（按 blob 取，不手搓脱牙）
+// 🔴 为什么不用"手工摘掉那一档"当对照臂：摘法是我编的，它坏在哪、坏得和历史上真发生过的一不一样，
+//    都要另外证一次。而 HEAD 那版就是**真出过这次假红**的那份代码 —— 拿它跑同一棵树，
+//    报出来的就是当时那句"黄金夹具与重建结果不一致"，一句话都不用推。
+const headSrc = execFileSync('git', ['-C', ROOT, 'show', `HEAD:${GATE}`], { encoding: 'utf8' });
+const headHasUnjudged = /fixturesUnjudged/.test(headSrc);
+const a1 = run(headSrc);
+check(
+  'A1 同一棵树喂 HEAD 那版（没有未判档）→ RC=1 且谎报"黄金夹具不一致"，而它直接跑那枚 spec 是 4 passed',
+  !headHasUnjudged && a1.rc === 1 && /黄金夹具与重建结果\*\*不一致\*\*/.test(a1.out),
+  `HEAD 那版含未判档=${headHasUnjudged}｜RC=${a1.rc}｜它带出的"代码"首行 ${(a1.out.match(/代码：(\S{0,60})/) || ['', ''])[1]}`,
+);
+// A1b —— 真值对照：同一棵树里**直接**跑那枚 spec，证明 A1 的红是假红
+// ⚠️ 两条都是本仓记过的读数纪律：① vitest 的汇总要 `NO_COLOR=1` 才拿得到纯文本
+//    （带 ANSI 时 needle 恒 0 命中，看起来像"没跑"）；② 判绿只认 summary 行 **和** 退出码，两者都要。
+const direct = spawnSync('./node_modules/.bin/vitest', ['run', 'tests/fixtures.spec.ts'], {
+  cwd: join(ROOT, 'packages/widget-core'),
+  encoding: 'utf8',
+  env: { ...process.env, NO_COLOR: '1' },
+});
+const directOut = `${direct.stdout}${direct.stderr}`.replace(/\u001b\[[0-9;]*m/g, '');
+const a1b = direct.status === 0 && /Tests\s+4 passed/.test(directOut) && /Test Files\s+1 passed/.test(directOut);
+check(
+  'A1b 真值：用该包自己的 vitest 直接跑那枚 spec → 4 passed / RC=0 ⇒ A1 那句"夹具不一致"确证是假红',
+  a1b,
+  `RC=${direct.status}｜${(directOut.match(/Tests\s+\d+ passed[^\n]*/) || ['<剥色后仍没有汇总行>'])[0].trim()}`,
+);
+
+// A2 —— 真违规仍有牙：runner 打出 failed 汇总且退非零
+const a2 = run(withShim(ORIG, sFail));
+check(
+  'A2 runner 报 Tests 1 failed → RC=1 且违规带着 vitest 自己那行汇总（不是只带退出码）',
+  a2.rc === 1 && /黄金夹具与重建结果\*\*不一致\*\*/.test(a2.out) && /Tests\s+1 failed \| 3 passed/.test(a2.out),
+  `RC=${a2.rc}`,
+);
+
+// A3 —— 跑到了但一条都没收集：那也是"没验过"，不许当绿
+const a3 = run(withShim(ORIG, sZero));
+check(
+  'A3 runner 打出 Tests 0 passed → RC=2 未判并写明"spec 没被收集到"（0 条用例上的"通过"是永真）',
+  a3.rc === 2 && /没被收集到/.test(a3.out),
+  `RC=${a3.rc}`,
+);
+
+// A4 —— 正对照：runner 打出 4 passed 且退 0 → 这一条不报违规，整体回到各规则自己的读数
+const a4 = run(withShim(ORIG, sPass));
+check(
+  'A4 对照：runner 真跑出 4 passed → 这一条不产违规（RC 由其余规则决定，不再是 2）',
+  a4.rc !== 2 && !/黄金夹具与重建结果\*\*不一致\*\*/.test(a4.out) && !/没跑成/.test(a4.out),
+  `RC=${a4.rc}｜${(a4.out.split('\n').find((l) => /小组件边界/.test(l)) || '（没打结论行）').slice(0, 70)}`,
+);
+
+// A5 —— 同形对照：shim 打出与 A0 相同的 pnpm 故障文本，也必须走未判档（判的是"有没有汇总"，不是"有没有错误字样"）
+const a5 = run(withShim(ORIG, sNoSummary));
+check(
+  'A5 shim 原样复现 pnpm 故障（无汇总行）→ RC=2 未判，证明分档认的是"跑成没跑成"而不是 grep 错误字样',
+  a5.rc === 2 && /没跑成 ⇒ 等于没验过/.test(a5.out),
+  `RC=${a5.rc}`,
+);
+
+restore();
+const back = createHash('md5').update(readFileSync(`${ROOT}/${GATE}`, 'utf8')).digest('hex') === BASE;
+const after = run(ORIG);
+check('复原后复跑回到同一读数（RC=2），且门禁文件逐字节回到原样', after.rc === 2 && back, `RC=${after.rc}｜BACK_TO_CLEAN=${back}`);
+
+rmSync(scratch, { recursive: true, force: true });
+for (const l of rows) console.log(l);
+console.log(`\n结论：${pass}/${pass + bad} 臂符合预期${bad ? ' 🔴' : ' ✅'}`);
+process.exit(bad ? 1 : 0);

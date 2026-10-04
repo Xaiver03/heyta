@@ -49,7 +49,7 @@
  *   非零退出 = 有违规。
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -239,16 +239,32 @@ for (const rule of RULES) {
 }
 
 // ── 规则：黄金夹具与重建结果一致（委派给既有 spec，不重新实现）──────────────
+// 🔴 这一档把"spec 没跑成"与"夹具真的不一致"**分成两个退出码**：
+//      0 = 跑过且一致 · 1 = 跑过但违规 · 2 = 没跑成，这条等于**没验过**（未判不是绿）。
+//   原由（2026-10-04 现量）：在 linked worktree 里 `pnpm … exec` 的 deps-status 预检会因为
+//   无 TTY 拒绝移除共享 `node_modules`（`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`），
+//   它抛出来的非零码与"vitest 报夹具不同"**逐字同形**。旧写法把前者报成
+//   "黄金夹具与重建结果不一致"，症状是四端解析器的锁看起来坏了 ——
+//   而同一棵树里直接跑那枚 spec（`packages/widget-core/node_modules/.bin/vitest`）是 4 passed。
+//   判"跑成了"只认 vitest 自己打出的 summary 行，不认退出码，也不去 grep 错误字样。
+let fixturesUnjudged = null;
 {
   const specRel = 'packages/widget-core/tests/fixtures.spec.ts';
-  try {
-    execFileSync(
-      'pnpm',
-      ['--filter', '@heyta/widget-core', 'exec', 'vitest', 'run', 'tests/fixtures.spec.ts'],
-      { cwd: ROOT, stdio: 'pipe', encoding: 'utf8' },
-    );
-  } catch (error) {
-    const output = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim();
+  const r = spawnSync(
+    'pnpm',
+    ['--filter', '@heyta/widget-core', 'exec', 'vitest', 'run', 'tests/fixtures.spec.ts'],
+    { cwd: ROOT, encoding: 'utf8' },
+  );
+  const output = `${r.stdout ?? ''}${r.stderr ?? ''}`.trim();
+  // vitest 的汇总行形如 `      Tests  4 passed (4)`；没有这一行就是"根本没跑到"。
+  const summary = output.match(/^\s*Tests\s+(\d+)\s+(passed|failed).*$/m);
+  if (r.error || !summary) {
+    const why = output.split('\n').find((l) => /ERR_PNPM|ENOENT|Command failed|Cannot find/.test(l));
+    fixturesUnjudged =
+      (why ?? output.split('\n')[0] ?? 'runner 没有任何输出').slice(0, 160);
+  } else if (Number(summary[1]) === 0) {
+    fixturesUnjudged = `vitest 跑到了但一条用例都没执行（Tests 0 passed）—— 那枚 spec 没被收集到`;
+  } else if (r.status !== 0 || summary[2] === 'failed') {
     violations.push({
       rel: specRel,
       line: 1,
@@ -270,7 +286,8 @@ for (const rule of RULES) {
           '         （⚠️ 本规则**不重新实现**重建逻辑，而是调既有的那个 spec：' +
           '夹具对不对只能有一个答案，两处实现必然分叉。）',
       },
-      text: output.split('\n').slice(0, 12).join('\n         '),
+      // 带的是 vitest 自己那两行汇总，不是"退出码非零"这件事。
+      text: `${summary ? summary[0].trim() : '（runner 没打汇总行）'}｜exit=${String(r.status)}\n${output.split('\n').slice(0, 10).join('\n         ')}`,
     });
   }
 }
@@ -280,12 +297,27 @@ const scanned =
   RULES.reduce((sum, rule) => sum + rule.scope().length, 0) + 1; // +1 = package.json
 
 if (violations.length === 0) {
+  if (fixturesUnjudged) {
+    console.error(
+      `⚠️ 小组件边界其余规则通过（扫描 ${String(scanned)} 个文件），但**黄金夹具那一条没跑成 ⇒ 等于没验过**：\n` +
+        `      ${fixturesUnjudged}\n` +
+        '      这一档退出码是 2，不是 0 —— "没跑成的检查被读成绿"是本仓库记过最多次的那类错。\n' +
+        '      在 linked worktree 里这是预期的（pnpm 的 deps-status 预检无 TTY 必拒）；' +
+        '要真验这一条，在能跑 pnpm 的检出里跑，或直接调那枚 spec：\n' +
+        '      `cd packages/widget-core && ./node_modules/.bin/vitest run tests/fixtures.spec.ts`',
+    );
+    process.exit(2);
+  }
   console.log(
     `✅ 小组件边界完好（扫描 ${String(scanned)} 个文件 + 4 份黄金夹具，${String(
       RULES.length + 2,
     )} 条规则）。`,
   );
   process.exit(0);
+}
+
+if (fixturesUnjudged) {
+  console.error(`⚠️ 另外：黄金夹具那一条没跑成（退出码被下面的违规占住，不单独报 2）：${fixturesUnjudged}`);
 }
 
 console.error(`🔴 小组件边界有 ${String(violations.length)} 处违规：\n`);
