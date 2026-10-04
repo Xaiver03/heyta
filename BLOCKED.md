@@ -3650,6 +3650,13 @@ Booted 清单排序一变他们的验收就换了一台设备，而且不会有�
 **闭合判据**（谁做谁打勾）：六个位置中英同步翻掉 → `pnpm check:legal-copy` 重生成落地页文案 →
 `SCHEDULE_EXACT_ALARM` 进两张表之一并写理由 → `NO_COLOR=1 node scripts/check-legal-permissions.mjs` rc=0。
 
+> 🔴 **第二次独立复现（10-04 09:57，干净载体 `d544d73c`，非混合工作树）**：`rc=1`，七条 ❌
+> = 未登记的 `SCHEDULE_EXACT_ALARM` 1 条 + 六个承诺位置（`permissions.ts` 的 Android zh/en、iOS zh/en，
+> `third-parties.ts` 的推送 SDK zh/en）仍写着"不申请通知"。读数行与上面那条一字不差：
+> `Android 声明 3 条 [INTERNET, POST_NOTIFICATIONS, SCHEDULE_EXACT_ALARM]、NS…UsageDescription 1 条`。
+> ⇒ 这条红**不是混合工作树的产物**、也不会被谁的落地顺带关掉；它是 ③ 那趟 `OWN_RED n=2` 里的一条
+> （另一条 `check:ai-e2e` = B69），两者都不在本线手里。本线不代改（改的是对外条款的六个位置 + 一次权限归类拍板）。
+
 ## B65. 🔴 落地（① 的最后一步）卡在 **11 个别人未提交的文件**上，而它会把 main 从"63 段"带到"**73 段含 8 红**"（10-04 01:3x 载体 `187057bb` 现量）
 
 **合并本身从来不是障碍**：`git merge-tree --write-tree main 15862311` ⇒ **rc=0、零冲突**。
