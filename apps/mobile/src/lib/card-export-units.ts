@@ -69,6 +69,25 @@ export type RasterizeOutcome =
   | { readonly fired: false; readonly reason: 'timeout' | 'threw' };
 
 /**
+ * 等一帧，再去问原生要图。**不是"拍一个毫秒数"，是等一个事件。**
+ *
+ * 🔴 为什么需要它（2026-10-04 iPhone 模拟器实测）：React 的 effect 跑在 commit 之后，
+ * 但**原生挂载事务刷到主队列之前**。那一刻 `RNSVGSvgViewModule.mm:31` 的
+ * `viewForReactTag:` 返回 nil，日志是
+ * `Invalid svg returned from registry, expecting RNSVGSvgView, got: (null)`，
+ * 而那条分支是 `RCTLogError(...) + return` —— **既不回调也不报错**，
+ * 于是 JS 侧只能等到下面那条 `rasterize-timeout`。
+ * 让出一帧等于把"挂上了没有"这个问题交给调度器回答，而不是我自己猜一个时长。
+ *
+ * `nextFrame` 是**注入**的（不直接摸全局 `requestAnimationFrame`）：
+ * 这个文件要在 node 里被判定（本壳没有 RN 组件测试栈），注入进来才判得动
+ * "同一帧里没调、下一帧才调"这件事。
+ */
+export function afterNextFrame(nextFrame: (run: () => void) => void): Promise<void> {
+  return new Promise<void>((resolve) => nextFrame(() => resolve()));
+}
+
+/**
  * 把"原生可能永远不回调"折成一个**值**。
  *
  * 单独成函数、且不 import `react-native`，是为了让这条判据能在这个壳里真跑

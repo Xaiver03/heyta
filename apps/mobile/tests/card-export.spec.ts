@@ -41,6 +41,7 @@ import { buildCardExportLayout, type CardExportDrawOp, type CardExportRequest } 
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  afterNextFrame,
   cardTextLinesFor,
   rasterRequestFor,
   rasterScaleFor,
@@ -395,5 +396,41 @@ describe('W7 · 「等不到栅格化」必须是一个值，不是一句承诺'
     expect(src.includes('svg.toDataURL(cb'), 'svg.toDataURL 没有把回调交给 settleRasterize 包着').toBe(true);
     // 旧的形状是「把内联函数直接交给 toDataURL」—— 它编译得过、跑得起来，只是永远不回来时没人兜底。
     expect(/toDataURL\(\(base64/u.test(src), '又退回内联回调那一档了（那一档没有超时支路）').toBe(false);
+  });
+});
+
+describe("W7 · 问原生要图之前必须先让出一帧（iOS 实测到的那枚 nil registry）", () => {
+  it("注入的调度器没跑 ⇒ 不结算；跑了一帧 ⇒ 才结算", async () => {
+    const queued: Array<() => void> = [];
+    const p = afterNextFrame((run) => {
+      queued.push(run);
+    });
+    let settled = false;
+    void p.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(queued.length, "afterNextFrame 根本没把活儿交给调度器 —— 那它等于同步放行").toBe(1);
+    expect(settled, "没让帧就结算 ⇒ 这条兜底等于没有").toBe(false);
+    queued.forEach((run) => {
+      run();
+    });
+    await p;
+    expect(settled).toBe(true);
+  });
+
+  it("card-export.tsx 里 toDataURL 的调用点在让帧之后（不是「我记得加了」）", () => {
+    const src = codeOf(MOBILE_LIB("card-export.tsx"));
+    const gate = src.indexOf("afterNextFrame(");
+    const call = src.indexOf(".toDataURL(");
+    expect(gate, "源码里没有让帧这一步 ⇒ iOS 会重演 nil registry 然后超时").toBeGreaterThan(-1);
+    expect(call, "找不到 toDataURL 调用点，这条判据失去对象").toBeGreaterThan(-1);
+    expect(call, "toDataURL 排在让帧之前 —— 那一档原生拿不到 tag 且不回调").toBeGreaterThan(gate);
+    expect(src.match(/afterNextFrame\(/gu)?.length, "让帧被调用了不止一次（每多一次就多等一帧）").toBe(1);
+  });
+
+  it("让帧之后视图可能已经没了 ⇒ 出一句话，不许静默", () => {
+    const src = codeOf(MOBILE_LIB("card-export.tsx"));
+    expect(src.includes("svg-unmounted-in-frame"), "帧间卸载那一支没被 resolve 出去 ——  Promise 会悬着").toBe(true);
   });
 });

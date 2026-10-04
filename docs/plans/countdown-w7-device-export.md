@@ -19,7 +19,7 @@
 | 2 | web 侧真的导出成品图（复用 `avatar-encode.ts` 的 canvas 形状与平台边界） | ✅ 代码 + 单测 + e2e 五条件证跑绿（1080×1440 真落盘、图人看过），六条变异臂全红 | §3 §4.3 §6.3 |
 | 3 | 判据：导出全程**零网络请求**（真浏览器 + 正向对照） | ✅ 5 passed / rc=0：双计数器同时为零 + 页面自发的 `/api/*` 各 +1 + 载体 `SW=NONE` 实测 | §4 |
 | 4 | "零法务变更"的**现量**复核（不是引用那句话） | ✅ 完成：`uses-permission` 声明数**前后都是 1（INTERNET）**、iOS plist/Podfile 零 diff、`NSPhotoLibrary*` 键 0 条，两条既有对账门禁 rc=0 | §5 |
-| 5 | 移动端也真导出（原工单的"成品图"不分端） | 🔄 代码半完成（RN 栅格化 + 双端原生落盘 + 分享），🔴 **真机 IHDR 读数未取**；iOS 折算仍是推的（W7-G2） | §2.4 §7 |
+| 5 | 移动端也真导出（原工单的"成品图"不分端） | ✅ **两端真机 IHDR 读数都取到了**（Android 04 13:20 `RC_ANDROID=0`；iOS 04 17:13:17 `RC_PROBE=0` ⇒ `1080×1440`，W7-G2 那条"折算仍是推的"随之闭合）；🔴 **Android 那趟当场过期**：让帧修复改了 `card-export-units.ts`，要在新树上重取 | §2.4 §7 |
 
 
 ---
@@ -97,11 +97,12 @@ grep -rn "toDataURL\|toBlob\|react-native-view-shot\|captureScreen\|takeSnapshot
 
 | 编号 | 缺口 | 为什么现在不做 | 闭合判据 |
 |---|---|---|---|
-| **W7-G1** | ~~移动端成品图落盘/分享通道不存在~~ ⇒ **代码半已闭合，真机读数未取**：`HeytaCardExport`（Android `CardExportModule.kt` + iOS `HeytaCardExportModule.swift`）接受 base64、写进**自己的缓存目录**、回一个 `content://`（Android）/ `file://`（iOS）URI，`card-export.tsx` 拿它接 `Share.share({url})` | —— 没有新依赖、没有新权限（现量见 §5 [E2]/[E3]/[E5]），所以当初写的"闭合代价"那两条（要过 §3.1/§3.2、要申请照片权限）**都被现量否证了**：自建一个 60 行的原生模块就够了 | 真机（emulator-5554 / iPhone 模拟器）点一次「导出成品图」，把分享面板收到的那张 PNG 拉回宿主机，**数出 IHDR 宽/高 == `EXPORT_CARD_SIZE`** |
-| **W7-G2** | **iOS 那端的尺寸口径仍然没有真机读数**：折算通道已经写进代码（`rasterScaleFor(density) = EXPORT_CARD_SCALE / PixelRatio.get()`，Android 走契约像素、iOS 走 point），但**没有实测过它折算出来的那张图真是 1080×1440** | 折算公式是从 §2.2 读到的 `UIGraphicsImageRenderer` 默认 `scale = screen scale` 推的，不是量出来的。纯 node 判据只能证"折算逻辑按 density 乘回去等于契约值"（`apps/mobile/tests/card-export.spec.ts` 已钉 4 档），证不了 iOS 原生真按这个 scale 出图 | 两端各导一张，**数出来的 IHDR 逐字等于 `EXPORT_CARD_SIZE`**；对不上就把尺寸判据改成"契约 × 该端 scale"并在**契约层**给出那个乘数，而不是在调用侧继续猜 |
+| ~~**W7-G1**~~ | ~~移动端成品图落盘/分享通道不存在~~ ⇒ **闭合**：`HeytaCardExport`（Android `CardExportModule.kt` + iOS `HeytaCardExportModule.swift`）接受 base64、写进**自己的缓存目录**、回一个 `content://`（Android）/ `file://`（iOS）URI，`card-export.tsx` 拿它接 `Share.share({url})`；**两端真机 IHDR 读数都取到了**（Android 04 13:20、iOS 04 17:13:17 ⇒ `1080×1440`） | —— 没有新依赖、没有新权限（现量见 §5 [E2]/[E3]/[E5]），所以当初写的"闭合代价"那两条（要过 §3.1/§3.2、要申请照片权限）**都被现量否证了**：自建一个 60 行的原生模块就够了 | 判据原文"真机点一次「导出成品图」，把那张 PNG 拉回宿主机，数出 IHDR 宽/高 == `EXPORT_CARD_SIZE`"：**两端各自达成**（读数在 `apps/mobile/evidence/card-export/README.md`，图都打开看过并与另一端并排比过） |
+| ~~**W7-G2**~~ | ~~**iOS 那端的尺寸口径仍然没有真机读数**~~ ⇒ **04 17:13:17 闭合**：折算通道不只是"写进了代码"，它**画出来的字节就是契约值**。同一趟探针第 6 格打印 `W=1080 H=1440 BYTES=64619 TRANSPARENT=false BLANK=false SMEARED=false SHA=13e10d6cde3b`，与 `EXPORT_CARD_SIZE` 逐字相同（`rasterScaleFor(density) = EXPORT_CARD_SCALE / PixelRatio.get()` 这条推的公式**被量到了**，不再是推的） | 折算公式是从 §2.2 读到的 `UIGraphicsImageRenderer` 默认 `scale = screen scale` 推的，而**这一趟把它换成了实测**：探针 `scripts/verify-mobile-card-export-ios.sh` 在 iPhone 17 Pro 模拟器（`heyta-batch2-closeout`，`919C5F50-…`）上从设备沙盒拉回那串字节，用与 Android 同一台读数器数 IHDR；同一趟还带了一条**反向对照**（`probe-3x2.png` 读出 `3×2 BLANK=true`）证明读数器会区分，不是恒返回契约值 | 判据原文要求"两端各导一张，数出来的 IHDR 逐字等于 `EXPORT_CARD_SIZE`"：**iOS 这半已达成**；Android 那半 13:20 达成过，但让帧修复改了 `card-export-units.ts` ⇒ 那一趟在新树上过期，见 W7-G6b 的代价栏 |
 | ~~**W7-G3**~~ | ~~本检出没有移动端倒数日界面~~ ⇒ **已不成立**：`apps/mobile/src/screens/CountdownScreen.tsx` 在本检出里存在（W8 移动半的产物），导出动作已挂进它的卡片二级操作 | 原判断的依据是当时 `ls apps/mobile/src/screens \| grep -i countdown` 0 命中；载体现在有了，那条前提原地作废 | 「导出成品图」出现在卡片菜单里（代码级已由 `apps/mobile/tests/card-export.spec.ts` 的 `CountdownScreen` 接线判据钉住）；剩下的仍是 G1 的真机读数 |
 | **W7-G4** | **RN 侧的折行是估算的**：`react-native-svg` 没有同步文本测量 API，`<Text>` 也不接受 `numberOfLines`，所以共享层的 `wrapCardText` 在 RN 那一端拿到的 `measurer` 是 `estimateAdvance(fontSize)`（按"每个码点 ≈ 0.55 em"估） | 真要精确只能异步 `measure`（会把"点导出"变成两段异步），或引 Skia（新过 §3.1/§3.2 两道门）。本单选了"不加依赖 + 估算"，代价是把这条差异**登记出来**而不是藏进注释 | 量一次真机导出图上的标题是否被提前/延后截断（同一段文字与 web 那张逐行对比）；偏了就把 `estimateAdvance` 的系数按端量出来定标，或改成异步 `measure` |
 | **W7-G6** | **`RASTERIZE_SETTLE_MS = 15_000` 这个上限没有实测依据**（`apps/mobile/src/lib/card-export-units.ts:65`）：RNSVG 的 `toDataURL` 回调可以永远不来，那条等待被 `settleRasterize()` 折成一个值，但"等多久算等不到"这个数是拍的 | 拍的方向是**安全的**（超时报错而不是静默出一张空图 ⇒ 只会造成假红，不会造成假绿），所以它不是正确性缺陷；但它也不是一台真设备上量出来的，负载高的模拟器上 15 s 可能不够，那时会看到一条"导出失败"其实栅格化还在跑 | 从设备读数定这个值：`verify-mobile-card-export*` 打出**点击到落盘的实际耗时**（两端各若干次，含高负载那一档），把上限取成观测 P95 的一个倍数并在注释里写清是哪一趟；**⚠️ 本轮不动它**：改 `card-export-units.ts` = 改移动侧打包输入 ⇒ 已取到的 Android 设备读数（§8.4 ㊔ 那一行）当场失效，要连模拟器一起重跑，而模拟器正被另一条会话占着 |
+| 🔴 **W7-G6b** | **W7-G6 的框架在 04 16:4x 被实测改写**：那一格猜的是"15 s 不够 ⇒ 高负载下假红"，今天 iOS 上量到的**不是不够，是回调永远不来** —— 设备日志 `Invalid svg returned from registry, expecting RNSVGSvgView, got: (null)`（`RNSVGSvgViewModule.mm:31` 那条 `RCTLogError + return` 不回调），界面上出的是那句诚实的 `rasterize-timeout` | 超时那条**按设计工作了**，它不是缺陷；缺陷在调用时机（effect 跑在原生挂载事务刷到主队列之前）。修法是"让出一帧再问原生要图"（`afterNextFrame`，调度器注入 + 三条判据），**不是**再拍一个更长的毫秒数 | ✅ **闭合（04 17:13:17 `RC_PROBE=0`，17/0）**：让帧之后同一台设备上那条 `(null)` 没有再出现，沙盒里写下 `heyta-w7ios-170457-10月11日 星期日.png`，IHDR = 契约。两次运行之间**唯一变化的就是那一次 `afterNextFrame`**（同设备、同签名态、同探针）⇒ 这是根因被证实，不是"再试一次碰巧绿"。⚠️ 代价按 W7-G6 自己写的规矩结算：改了 `card-export-units.ts` ⇒ **Android 那一趟读数（§8.4 ㊔）当场过期**，要在新树上重取一次才算两端 |
 | **W7-G8** | **另两座 iOS 桥的 JS 名与类名不同名**：`HeytaWidget`（JS 名）/ `HeytaWidgetModule`（类名）、`HeytaReminder` / `HeytaReminderModule` —— 与 `HeytaCardExport` 那条已修的红是同一个 `RCT_EXTERN_MODULE` 展开形状（原登记时误占 **W7-G5**，与上面那条 tnum 缺口撞号，15:4x 改占 G8；四座桥里只有 `HeytaVaultSecureStorage` 因"JS 名 == 类名"侥幸对得上） | 各有所有者（小组件 / 提醒两条线），本批不跨线改；`check:card-export` 那条"模块名三处逐字相同"的判据只覆盖卡片这一座 | 逐座桥跑一次**只读取名探针**（JS 侧 `NativeModules[名] !== undefined`）；或由那条门禁扩成"扫全部 `RCT_EXTERN_*_MODULE` 并核对三处"，扩了就要按 §8.4 ㊱ 那三臂各量一次 |
 | **W7-G5** | **RN 那一端没有等宽数位（`tabular-nums`）通道**：canvas 侧走 `fontFeatureSettings: '"tnum"'`（web 已实现），而 RNSVG 的 `Text` 不接受 `fontVariant`，也没有 `fontFeatureSettings` | 不是漏写，是**上游没有这个 prop**（读 `react-native-svg/src/elements/Svg.tsx` 与 `apple/RNSVGSvgViewTextAttributes.*` 现量：只有 `fontVariant`-系字重/族/字号，无 OpenType feature）。绕它要走 `textTransform`-式的自研排版 | 两端图上那行数字的位宽对得齐（实测同一串"888"与"111"的字宽差在阈值内），或接受差异并把差异写进契约注释 |
 
@@ -314,11 +315,19 @@ list reporter 的 `✘` 前是**两个**空格而正则要求一个，加上没�
 
 1. ✅ §6.3 那批 e2e 变异臂：六臂全跑（含一条把我自己的预期否证的 M2b），rig 已落
    `research/tools/mutate-w7-e2e-arms.mjs`（不住 `/tmp`，重启带不走）。
-2. 🔄 移动端**真机**出图读数（G1 的闭合判据 / G2 的唯一硬证据）：
-   装置**已经在了** —— `scripts/verify-mobile-card-export.sh`（+ 它的读数器
-   `scripts/verify-mobile-card-export-read.mjs`，`pnpm verify:mobile-card-export`）。
-   起 emulator → 「我的」→ 倒数日 → 卡片菜单 → 点导出 → 从 `cacheDir/card-export/` 拉回那张图数 IHDR。
-   ⚠️ 原文把装置写成 `.mjs`（一个不存在的路径）—— 那是一句**先于实现写下的名字**，
-   现已按真身改指；这一条仍是**唯一**能证伪"iOS 折算猜错"的东西，且**读数尚未取**（脚本没跑过一轮真机）。
+2. ✅ 移动端**真机**出图读数（G1 的闭合判据 / G2 的唯一硬证据）：**两端都取到了**。
+   Android 装置 = `scripts/verify-mobile-card-export.sh`（+ 它的读数器
+   `scripts/verify-mobile-card-export-read.mjs`，`pnpm verify:mobile-card-export`），
+   iOS 装置 = `scripts/verify-mobile-card-export-ios.sh`（W7-G3 那条"只有 Android 有装置"的缺口
+   由它补上，共用同一台读数器）。
+   起 emulator → 「我的」→ 倒数日 → 卡片菜单 → 点导出 → 从沙盒拉回那张图数 IHDR。
+   读数：Android 04 13:20 `RC_ANDROID=0`；**iOS 04 17:13:17 `RC_PROBE=0`（17 项 / 0 失败）
+   ⇒ `W=1080 H=1440`，与 `EXPORT_CARD_SIZE` 逐字相同**。
+   ⚠️ 原文把装置写成 `.mjs`（一个不存在的路径）—— 那是一句**先于实现写下的名字**，现已按真身改指；
+   而"这一条是唯一能证伪'iOS 折算猜错'的东西"那句**已经跑过一轮真机了**：
+   折算没猜错，但它当时**没有证到**的东西在另一处证到了 —— 第一次真机跑红的是**调用时机**（见 W7-G6b）。
+   🔴 **两端现在各欠一趟**：Android 那趟（13:20）验的是让帧修复**之前**的 bundle（`card-export-units.ts` 改了
+   ⇒ 按 W7-G6 自己写的规矩当场过期，要重取）；iOS 那趟装的是 `2a1fa25a` **加未提交的修复**
+   ⇒ 在修复提交之前它不算"提交态绿"的读数。
 3. ⏹ iOS pbxproj 那 8 行的**构建级**验证（`plutil -lint` 只证 XML 合法，不证编译进 target）。
 4. ⏹ 与 `feat/countdown-batch2` 合流（W7 三笔 + W8 那四笔），合流后 `pnpm reinstall:all` 四端重装。

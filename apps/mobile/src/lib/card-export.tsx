@@ -32,7 +32,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixelRatio, Platform, Share, View } from 'react-native';
 import { Rect, Svg, Text as SvgText } from 'react-native-svg';
 import { buildCardExportLayout, cardExportFileName, cardExportFileStem, type CardExportLayout, type CardExportRequest } from '@heyta/ui/node';
-import { cardTextLinesFor, rasterRequestFor, rasterScaleFor, settleRasterize } from './card-export-units';
+import { afterNextFrame, cardTextLinesFor, rasterRequestFor, rasterScaleFor, settleRasterize } from './card-export-units';
 import { writeCardPng, type CardExportFailureCode } from './card-export-native';
 
 export type { CardExportFailureCode as MobileCardExportFailure } from './card-export-native';
@@ -118,8 +118,8 @@ export function useCardExporter(): {
   useEffect(() => {
     const current = pending;
     if (current === null) return;
-    const svg = svgRef.current;
-    if (svg === null) {
+    const mountedAtCommit = svgRef.current;
+    if (mountedAtCommit === null) {
       // React 的 commit 在 effect 之前完成 ⇒ 走到这里就是真的没有视图。
       // **不静默重试**：重试会表现为"卡几秒后突然出图"，那种形状最像成功。
       current.resolve({ ok: false, error: 'rasterize-empty', detail: 'svg-not-mounted' });
@@ -127,23 +127,34 @@ export function useCardExporter(): {
       return;
     }
     const options = rasterRequestFor(Platform.OS, current.layout.width, current.layout.height);
+    // 🔴 先让出一帧再问原生要图（为什么，见 `afterNextFrame` 的注释：不让这一帧，
+    //    iOS 上原生的 tag 查找拿到 nil，而那条分支不回调 ⇒ 只能等到超时）。
     // 🔴 不直接 `svg.toDataURL(...)`：那条回调**可以永远不来**（见 `settleRasterize` 的注释），
     //    而"点了没反应"是本文件文件头登记过的高危形状。等不到也要出一句话。
-    void settleRasterize((cb) => {
-      svg.toDataURL(cb, options);
-    }).then((raster) => {
-      if (!raster.fired) {
-        current.resolve({
-          ok: false,
-          error: 'rasterize-empty',
-          detail: `rasterize-${raster.reason}`,
-        });
+    void afterNextFrame((run) => requestAnimationFrame(run)).then(() => {
+      // 这一帧里界面可能已经被卸载（用户切走了屏）—— 那要出一句话，不许静默。
+      const svg = svgRef.current;
+      if (svg === null) {
+        current.resolve({ ok: false, error: 'rasterize-empty', detail: 'svg-unmounted-in-frame' });
         setPending(null);
         return;
       }
-      void complete(current.request, raster.base64).then((result) => {
-        current.resolve(result);
-        setPending(null);
+      return settleRasterize((cb) => {
+        svg.toDataURL(cb, options);
+      }).then((raster) => {
+        if (!raster.fired) {
+          current.resolve({
+            ok: false,
+            error: 'rasterize-empty',
+            detail: `rasterize-${raster.reason}`,
+          });
+          setPending(null);
+          return;
+        }
+        void complete(current.request, raster.base64).then((result) => {
+          current.resolve(result);
+          setPending(null);
+        });
       });
     });
   }, [pending]);
