@@ -5154,3 +5154,51 @@ overrides / engines / packageManager`，理由是"一杆对无关改动乱响的
 （`check-ai-e2e-preflight.mjs` 只 kill 它自己拿到参数那几个端口）→ 汇总列出
 `SEG_TOTAL / rc=0 / 内存闸门拒绝 / SKIP_SAFETY / NOT_EXECUTED / 红集` 与
 "只在载体红（对 g60 已知红集取差）"，末尾把守卫序列**打出来给人执行**。
+
+### 8.85 那枚阻塞不是一个文件，是一个**共同提交集**；而载体第 1 道门当时看不见它 —— 补了判据，四条读数齐（2026-10-04 14:4x）
+
+§8.84 记下阻塞集涨到 2 枚。把它挖开一层：脏的那枚 `package.json` 的链里**多了 5 道门**，
+而这 5 道的**实现文件不在一起**（`git cat-file -e main:<路径>` + `git ls-files` + `git check-ignore` 逐枚现量）：
+
+| 链里新增的门 | 实现文件 | 在 main 里 | 在索引里 | 在盘上 | 被忽略 |
+|---|---|---|---|---|---|
+| `check:legal-closure-truth` | `scripts/check-legal-closure-truth.mjs` | ✅ 有 | 已暂存 | 在 | 否 |
+| `check:legal-gdpr` | `scripts/check-legal-gdpr.mjs` | ✅ 有 | 已暂存 | 在 | 否 |
+| `check:vault-diagnostics` | `scripts/check-vault-diagnostics.mjs` | 🔴 无 | **未跟踪** | 在 | 否 |
+| `check:apk-freshness` | `scripts/lib/apk-freshness.sh` | 🔴 无 | **未跟踪** | 在 | 否 |
+| `check:shell-erasure-parity` | `scripts/check-shell-erasure-parity.mjs` | 🔴 无 | **未跟踪** | 在 | 否 |
+
+⇒ 那枚阻塞的真身是**一个共同提交集**（`package.json` + 三枚未跟踪实现）。
+如果他只提交 `package.json`，链里就留下**三枚指向不存在文件的门**。
+而这类形状**不在合并冲突里** —— `merge-tree` 看文本、第 1/3 条对齐判据看定义与链，两边都看不见"文件不在树上"。
+
+**注入实测：当时的门禁是瞎的。** 造一份候选 `package.json`（= `git show main:package.json` + 加一道
+`check:does-not-exist-xyz` → `node scripts/definitely-not-here-xyz.mjs`，并把它挂进链），
+拿**主检出那份未改的门禁**跑 `--pkg`：`CTRL_RC=0`（main 原样）与 **`INJ_RC=0`（注入了悬空门）—— 结论句照打、退出码 0**。
+再用他工作树那份真脏 `package.json` 打同一枚旧门禁：`DIRTY_RC=0`，点名 0 枚。**这就是"链绿但一整段根本跑不了"的形状。**
+
+**补的判据**：`scripts/check-gate-wiring.mjs` 加第 **3b** 条 ——
+链里每道门的定义若能认出 `node|bash|sh <仓库内路径>`，那枚文件必须在这棵树上存在；
+带 `cd` 的、`pnpm --filter X <script>` 的、路径落在 `node_modules` 的**不判**，
+并把 **"实现文件判了 N 段、跳过 M 段"打进输出**（一个静默的 0 会把"探针没接上"读成"全都对上了"）。
+
+五条读数（全在 14:4x 现量；第 1/4/5 条是**改后的真门禁**跑的，第 2/3 条是同一逻辑的离线复刻 ——
+复刻只为把「pkg 与树必须同源」这一对比做在别的树上，`--pkg` 改不了脚本自己那枚 `ROOT`）：
+
+| 组合 | 读数 |
+|---|---|
+| 分支树自己（`node scripts/check-gate-wiring.mjs`） | `rc=0`，判 **63** 段、跳 **8** 段 |
+| 载体 `a250e6da` 自带 pkg + 同一棵载体树（复刻） | 判 **73**、跳 8、**缺 0** ⇒ 不会把载体第 1 道门自己搞红 |
+| `git show main:package.json`（取数时 main=`1930f2b5`）vs 干净检出 `/tmp/heyta-main-check`=`a49c4f19`（跟踪文件脏数 0） | 判 **72**、**缺 0** ⇒ **不是天生红的门禁**（AGENTS §8.3） |
+| 合成悬空门那份 pkg | `rc=1`，点名 `check:does-not-exist-xyz → scripts/definitely-not-here-xyz.mjs` |
+| 他那份真脏 pkg vs 缺这些文件的树 | `rc=1`，**恰好点名那三枚**（`vault-diagnostics` / `apk-freshness` / `shell-erasure-parity`） |
+
+对照一条（复刻跑的）：同一份 main 的 pkg 打**分支树**会报 **缺 10** —— 那是跨树比较（分支还没并 main 的新门），
+不是产品红；比较必须 **pkg 与树同源**，这条与 §8.84 那条"走错树拿到 `MODULE_NOT_FOUND`"是同一件事的两面。
+
+**落地那一趟因此换了形状**：`pnpm check` 是 `&&` 串起来的，一枚悬空门不只是"少跑一段"，
+它会让**排在它后面的整串根本不跑**，读数是三枚 `MODULE_NOT_FOUND` + 一屏没跑完；
+现在第 1 道门会在起跑就把三枚门**按名字**报出来 ⇒ §8.61 那条"逐条仍可归属"的关闭判据少三枚要靠签名比对的硬骨头。
+
+**没做的事，写明**：没碰他那三枚文件、没替他把实现 `git add`、没把他的 5 道门挪进我们这条分支、
+没动任何阈值 —— 这条新判据判的是**结构**（定义指向的文件在不在），不是"谁的实现该不该进链"。
