@@ -2018,3 +2018,70 @@ platforms android-36 + build-tools 35/36 + NDK 齐，**没有 emulator 本体与
 `PREP_RC=0` 是 **`tail` 的**退出码，而那一趟的真实判决是 `VERDICT=NOT-RUNNING`（负载 28.95 > 12）。
 这条坑在台账里已经记过两次，"下次注意"不成立 ⇒ 从现在起凡要取码一律
 `cmd > /tmp/x.log 2>&1; echo RC=$?`，上面那句已经改成这样跑第二次（`ps`/`uptime` 那条）。
+
+## 00:0x Android 新规落进仓库（提交 `0858032e`），以及它把我这三条装置各照出一个洞
+
+**落地内容**（全部经 `git show --numstat` 复验：`INS=1344 / DEL=58`，混合文件里别人的未提交行
+一条都没进提交态 —— 判据是"提交态新增行集 ∩ 工作树未提交新增行集 = 0"，AGENTS.md 20/29、
+package.json 2/1 两次都是空交集）：
+
+| 落点 | 是什么 |
+|---|---|
+| `scripts/run-gradle.mjs` | 唯一收口点按平台分流：Windows 逐字不变，macOS/Linux ssh `windows-pc` → 远端 `gradlew` → 产物回传到**消费者原本期望的路径** + 本地 mtime 回写成远端构建完成时刻（让 §7 第 27 条在换宿主后仍然有效）。远端不可达直接红，`HEYTA_ANDROID_LOCAL_GRADLE=1` 是显式例外开关 |
+| `scripts/lib/sync-windows-sources.sh` | 源码同步 + sha256 对账抽成单一实现（`_heyta_windows_sync_push`），新增 `sync_windows_sources_for_android`；MSIX 那条腿（`scripts/reinstall-all.sh`，**没动过**）默认参数逐字等于历史上硬编码的那两个值 |
+| `scripts/check-android-gradle-remote.mjs` | 新门禁 G1–G6，钉的是**形状**（新开 `./gradlew` 入口 / 白名单比现实宽 / 回传路径与 `$APK` 对不上 / 绕开收口点 / 远程支里出现 `runLocal(` / 第二份同步实现）。`--self-test` 七臂，实测 7/7 按预期转红转绿（臂 0 = 阳性对照） |
+| `docs/runbooks/android-build-on-windows.md` | 手册。🔴 判据表里**只有第 1 条（门禁自检）是实测的**，"远程真打出 APK / 装机截图主蓝 / 连续两轮防旧 bundle"三条明确写"未实测"；Mac 释放清单一条都没执行 |
+| `AGENTS.md` §6.1 + `package.json` | 规则本体 + **接线**：`check:android-gradle-remote` 已进 `pnpm check`。`check:gate-wiring` 现量：`门禁定义 80 道 ｜ 链里被引用 83 段 ｜ 链外 1 道（允许表 1 道）` rc 0 |
+
+🔴 **本 Goal 的分母随之变了**：`node -e 'require("./package.json").scripts.check.split(" && ").length'`
+在这笔提交之后是 **83**（此前 23:30 现量 82）。② 落账时**不许抄任何一个数**，要带当次载体 + 现取分母。
+
+### 它照出的第一个洞：我自己的守卫把"落地"量在了错的根上
+
+`heyta-run-reinstall.sh` 第二趟那档守卫原先写 `heyta_android_guard "$MAIN"`（主检出），
+而这段的 cwd 是**载体** `$W` —— 真正决定"gradle 在哪跑"的是这一趟会 exec 的那份 `run-gradle.mjs`。
+载体落后 main 一两笔是常态：主检出落了分流、载体还没 checkout ⇒ 传 `$MAIN` 会**放行一个跑旧收口的本机 build**，
+正好是新规要拦的那件事。已改成 `"$W"`，与 `heyta-prep-apk.sh:94` 传 `$R`（同一枚载体）对齐。
+
+### 它照出的第二个洞：缺桩会把整块打死，而症状长得像"被测体坏了"
+
+`$MAIN` → `$W` 这个新引用一进去，两枚夹具**同时**报红，红的是
+"缺 `PHASE2_EXIT` / 缺 `INNER_EXIT` / `inner.log` 不存在"——看起来像启动器坏了三次。
+真因是 `set -u` 下 eval 的子 shell 在未绑定变量处直接死掉。修法与判据：
+
+1. prologue 里 `W` 与 `MAIN` 定义成**互不相同**的箱内路径 ⇒ "守卫传了哪个根"成为可断言的读数；
+2. split 夹具加 A9/A9b：A9 断言 `GUARD-ARG=$W`，A9b 把实参变异成 `$MAIN` **必须**翻红
+   （两条腿只差那一行）；现在 **13 条臂名各自都对**；
+3. 两枚夹具都加**通用绊线**：输出里出现 `unbound variable` 或 `command not found` 就判
+   "装置坏了，不是被测体红"。这条不是装饰 —— 一次性副本摘掉 guard 桩重跑 evid，
+   8/9 臂立刻各响一次（`MUT` 趟 rc=1）。
+4. 夹具自己也会犯"桩存变量不打 stdout"这种错：A9 第一趟红就是因为 `GUARD_ARG=` 落了变量而 `want` 读的是 OUT。
+
+**收口读数**：`heyta-rig-sweep.sh` 现量 `SWEEPED=28 有不合要求的是 0`；
+`heyta-portgate-fixture.sh --mutate` 现量 `声明臂=9 实到臂=9 PASS=9`、`PORTGATE-MUT=OK`
+（摘掉 lsof 那一支 ⇒ bind-不-应答被读成 free，第 3 臂确有牙）。
+
+### 我在干净 HEAD 上查出一条**不归本线**的红（登记给日历线）
+
+判 HEAD 自洽用的是 `git worktree add --detach /tmp/… HEAD`（不看混合工作树）：
+`docs-link-check` 在干净 HEAD 上 **rc=1** ——
+`docs/plans/calendar-profile-handoff.md:1187 -> trash-and-archive.md §10.87 该章节号不存在`，
+而主工作树里它是**绿的**：那节是回收站线**尚未提交**的正文（现头已经到 §10.92）。
+⇒ AGENTS §7 那条"只在混合工作树成立"的第三种面目：**红的不是产品也不是环境，是"引用了别人还没提交的章节"**。
+处置：不改那两个文件、不代它提交，登记给持有者；本线的 `check:docs` 结论只在**工作树**这一侧成立。
+
+### 对 ①②③ 的净影响（一句话）
+
+分流进了 HEAD ⇒ 守卫那一档现在**只下载体 checkout 到新 HEAD 就会放行**，
+"等 Android 宿主分流"这半个前置已经消掉，剩下的仍是负载窗口（00:0x 现量 `86.26`，阈值 12；
+`:4318/4319/4322` 全空、`:3000/:3100` 忙、链 81245 已跑 1h23m、`/tmp/heyta-chain8.*-done` 仍无）。
+但**远程那条路一次都没真跑过** —— 下一次 ①/③ 的 APK 重打将是它的第一发实弹，
+红了要先分辨"远端环境"与"产品"，不要拿它当产品判据。
+
+### 待入 traps（编号按工作树取，现量最大号 270；`environment-traps.md` 正被别线写着 ⇒ 先落这份单写者文档）
+
+- **#271**（先前那条，仍未入正文）：`find /tmp/…` 的起点若是**软链**会静默扫空。
+- **#272（候选）**：**原样 eval 一段真代码的夹具，块里每出现一个新外部名字（变量或命令），
+  prologue 就必须有一枚对应的桩**；缺桩的通用特征只有 `unbound variable` / `command not found` 两串，
+  所以绊线要挂在**每一臂**的输出上而不是靠人读 rc。理由：这一轮两枚夹具同时报"三条读数全缺"，
+  看起来像被测体坏了三次，真因是同一个未绑定变量。
