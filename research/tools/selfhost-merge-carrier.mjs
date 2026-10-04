@@ -837,7 +837,7 @@ for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'
   notes.push(`合并归属：写 ${own.counts.write} 枚 / 合并相对 ${MAIN} 改 ${own.counts.merged} 枚 / 集外 0 / 写集里未被改到 ${own.unfused.length} 枚`);
 }
 
-// ── 3. 纯 fs 门禁 + "红要逐条归属"的配对层 ────────────────────────────
+// ── 3. 落笔前门禁（多数只读提交物；第 2 腿要已安装的树，见上面那段）+ "红要逐条归属"的配对层 ────────────────────────────
 /* 每条门禁可带第三个元素 = **缺陷行提取式**（那道门禁自己点名缺陷的输出形状）。
  * 载体红时，同一道门在**干净 main 检出**上再跑一次，逐条比"载体点名的缺陷 ⊆ main 点名的缺陷"：
  *   ·  ⊆ 成立 ⇒ 那条红**不是本批造成的**，放行落笔，并把配对读数打进提交说明（别人的债不由本批吸收，
@@ -1040,7 +1040,7 @@ if (reds.length) {
     // 🔴 两种"没有全部通过"要分开说：一条是"这条红是本批的"（要修），一条是"这条红我判不了"
     //    （要先让判据能被逐条点名）。把后者也念成前者，就是让人去修一条并不存在的缺陷。
     const cannotTell = /判不了/.test(badVerdict);
-    die(3, `载体的纯 fs 门禁红了，而**逐条归属没有全部通过**（不提交）：\n  - ${badVerdict}\n` +
+    die(3, `载体的落笔前门禁红了，而**逐条归属没有全部通过**（不提交）：\n  - ${badVerdict}\n` +
       (cannotTell
         ? '   ⇒ 上面带"判不了"的那些**不是**本批的缺陷判定，是这道门没能把缺陷逐条点名（提取式没接上或两侧输出对不上）。' +
           '先把那道门的点名形状补上（并注入验证它能抓到），再谈这条红归谁。\n'
@@ -1069,7 +1069,7 @@ ${notes.map((n) => `· ${n}`).join('\n')}
 解法：${[pkgReading, giReading, auditReading, snapReading, genReading, covReading, dockReading].filter(Boolean).join('；')}
 ${fam.png.length ? `· evidence PNG ${fam.png.length} 枚取 main 侧` : ''}
 
-载体的纯 fs 门禁读数（全部现量）
+落笔前门禁读数（全部现量）
 ${gateReadings.map((r) => `· ${r}`).join('\n')}
 
 🔴 完整 pnpm check（要 node_modules、要起栈、check:ai-e2e 会 SIGKILL 别人的 dev server）**不在这一笔的主张里**，
