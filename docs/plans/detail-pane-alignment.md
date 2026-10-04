@@ -5366,3 +5366,22 @@ node scripts/check-detail-pane-slot.mjs --root /tmp/dp-slotcheck   # 未裁决�
    ⇒ 判"main 红不红"用临时 detached worktree（`git worktree add --detach /tmp/x main`，用完 `worktree remove --force`），
    现量读数：main **RC=0**、本支 **RC=1**、候选合并树里目标文件在场（§8.74 第 3 节那行）。
 
+
+## 8.77 18:5x 合流面整趟复跑读数（**一次性瞬时量**，合流当时必须重取；载体 `78084007` × 实时 `main`）
+
+`node scripts/verify-detail-pane-merge-preflight.mjs` ⇒ `CARRIER_RC=1`（属"处置未做完"，不是新红）：
+
+| 档 | 读数 |
+|---|---|
+| 候选树 / 冲突 | `f4addfec` ／ **18 枚**（18:0x 是 17，多的那一枚是本批 `package.json` 那四个别名 —— 见 §8.73） |
+| 纯 fs 门禁 | **21 道**：合并造成的红 **1**（`check-selection-single-source`，处置是 #16 那两行 trash `busyId` 豁免） |
+| 没有对照组那一档 | **2** = `check-detail-pane-status-table`（⑦/#24 未做）+ `check-detail-pane-slot`（§3f 那一格未裁决） |
+| 产物缺脚本 / 两边都红 / **名册漏跑** | 0 / 0 / **0**（新加的槽位判据同时进别名、链与名册 ⇒ 名册自检这一趟量到它了） |
+| 静默合流 | **11 枚**，其中丢行/删文件/语法不过 **0** |
+| 槽位唯一性 | `main=1 HEAD=1 产物=2 · **未判**`（那枚文件还带 marker ⇒ 它拒绝把"没判成"报成绿） |
+| 台账 | 🔴 2 项（本批 `#215/#216` 与 main 同号不同事 —— #22 的活，只能在合流当时续号） |
+| 仍带 marker 的产品文件 | **4 枚**：`App.tsx`（§3f，**要人**）/ `main-area.css`（§3c，**要人**）/ `habit-actions.ts` + 它的 spec（机械，执行器改法 3 拒绝 0） |
+
+🔴 与 18:0x 那趟唯一的**语义**差别在"没有对照组"那一档的第二枚：同一棵产物树、同一个缺陷，
+以前报的是"闭合标签配对解析不出来"（读起来像合并把结构合坏了），现在报的是
+"槽区域里仍带冲突标记 ⇒ 没能跑（marker 未清）"（点名到 §3f 那一格）。**判据变好没有改变退出码，改变的是下一位去的现场。**
