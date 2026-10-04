@@ -3525,6 +3525,10 @@ sysctl -n vm.loadavg                                      # 1 分钟值要低于
 状态：第 3 节现在 **7 类处置（§3a–§3g）**。§3a/§3b 与第 4 步**已落成执行器并在候选树上跑出绿**（§8.53，
 `node scripts/resolve-detail-pane-merge-mechanical.mjs --apply` ⇒ 回读 marker 0 / 语法 0 诊断 / 门禁复跑 RC=0）；
 §3c 与 §3f 是**要人的那两枚**；§3d/§3e/§3g 有精确改法但要在真合并那一刻做。
+⚠️ **2026-10-04 23:3x 那句"门禁复跑 RC=0"已经不是当前读数**（原句留着，因为它记的是 14:5x 那一棵候选树）：
+断言 I 是 21:5x 之后才进这道门禁的（§8.98），所以**执行器做完三条之后，产物上那道门禁现在退到 RC=1**，
+剩下的那一条正是 #34 的 countdown 登记。⇒ 合流当时的顺序是「执行器 `--apply` → 再手工补 §8.108 那一行 → 复跑」；
+**两条动作一起补完之后产物上 `合并造成的红 = 0`**（这一条已在一次性载体上实测过，见 §8.108 那张表，别当成推断）。
 第 5 步第 2 行往后（typecheck / 全量测试 / `pnpm check` / 重出截图 / 四端重装）**未执行** ——
 它们要的载体是真分支，本节不含任何合并动作。
 
@@ -7083,3 +7087,54 @@ print(t.count("Things 4"), t.count("Things 3"), t.count("until you need"))' /tmp
 #24（丢掉 main 带回的 13 行孤儿表）、#22（traps 从 229 续号 + 16 行 29 处引用 sweep，**要人认领**）、
 #21/#23/#29（marker 清完后重跑 e2e 那五份 spec、把两条新门禁挂进 `pnpm check`、往 main 的 FILES 追加两行）。
 其中**只有 #34 是"合并造成的红"**，其余都是合流当时的动作或要人的账。
+
+## 8.108 把 #16 与 #34 在**同一棵产物树**上一起补上 ⇒ "合并造成的红"第一次退到 **0**（2026-10-04 23:3x 现量，一次性载体，分支一字未动）
+
+这件事此前**没有被量过**，不是没做：§8.52 那趟"补两行后 RC=0"跑在 14:2x 的产品上，而**断言 I 是 21:5x 之后才有的**
+（§8.98）。所以"两行豁免够不够让这道门禁在产物上退绿"这句老结论，对今天的门禁已经**不成立地为旧**。
+载体是 `--keep` 留下来的那棵产物树（`--product` 复跑），跑完即删。
+
+**跑序与读数**：
+
+| 步 | 动作 | 读数 |
+|---|---|---|
+| 0 | 预检 `--keep` 铺产物 | `check-selection-single-source` 候选=1，红两条：断言 G（两枚 trash `busyId`）+ 断言 I（countdown） |
+| 1 | `resolve-detail-pane-merge-mechanical.mjs --product <dir> --apply` | 改法 3 / 拒绝 0；回读 `marker 0 / 语法诊断 0`；但**复跑 RC=1** ⇒ 剩下的那条正是 countdown（这一步把 G 清了，I 本来就不归它管） |
+| 2 | 只往那棵树的门禁副本里加**一行名册登记**（下面那段） | `node --check` 过；`GATE_RC=0`，✅ I 打印 `视图全集 12 个 ViewKey 全部对"选中"交代过立场（selects 6 / 其余 8）… 证据锚点 14 条逐条还在文件里` |
+| 3 | 预检 `--product <dir>` 整趟复跑 | **合并造成的红 = 0**（此前每趟都是 1）｜本分支新增 2｜两边都红 0｜名册漏跑 0｜静默合流 13 枚零丢行｜槽位重复 0｜**带 marker 的产品文件 4 → 2** ｜`TREE=3012a43d…` |
+
+🔴 **这一趟证明到哪一步为止**（别读多）：
+RC 仍 = 1，且那 2 枚 marker 是 `App.tsx` 与 `main-area.css` —— **正是 #19 那两格要人的**。
+所以这句话的准确形式是："**只要那两格有人拍了、marker 清干净，门禁层不会再冒出新红**"，
+而不是"合流验过了"（预检自己在 tally 里明写"本趟不算合流验过"，§8.56 立的规矩）。
+"本分支新增 = 2" 那两道也还没关：`check-detail-pane-status-table` 要 **#24**（丢掉 main 带回的 13 行孤儿表），
+`check-detail-pane-slot` 要 #19 清完 marker 才能回到它的前提。
+
+**这一行就是 #34 当时要写的东西**（从代码判出来的事实，不是替产品拍板；逐字可抄，抄进 `VIEW_STANCES` 末尾）：
+
+```js
+  {
+    view: 'countdown',
+    stance: 'row-actions-only',
+    entity: 'event',
+    locus: 'apps/web/src/features/countdown/CountdownView.tsx',
+    needle: '<CountdownBoard',
+    because: '倒数日卡片的每个动作都自带 entityId（onPatch/onArchive/onRemove/onExportCard(entityId, …)），' +
+      '而 web 这一侧的调用点只传视图/筛选/分列，整个文件读不到 useSelected/selection.select ⇒ 点一张卡不产生"在看哪一条"。' +
+      'EVENT 也不在选中词表（task/habit/note）里，接不进共享 store。',
+  },
+```
+
+取这一档的现量依据（三条，写这行之前逐条量过）：
+① `git show main:packages/ui/src/countdown/EventBoard.tsx` 的 `EventBoardProps` 里所有动作回调一律收 `entityId`，
+**没有** `onSelect`/`activeId`/`selectedId` 这类形状；
+② `git show main:apps/web/src/features/countdown/CountdownView.tsx | grep -cE "useSelected|selection\.select"` = **0**（同一趟在产物树里对
+那枚真实文件再量一次，也是 **0**；这也是 `row-actions-only` 那一档对自己 locus 文件的要求 —— 门禁会反过来查"你登记成非选中，可这个文件现在在读选中吗"）；
+③ 路由处 main 的 `App.tsx:2329` 是 `{contentView === 'countdown' && <CountdownView today={…} />}`，
+**没往这一面递任何选中**。⚠️ 措辞只覆盖 web 这一侧（`ViewKey` 的分母就是 web 的 `view-tabs.ts`），
+触屏端的 `apps/mobile/src/screens/CountdownScreen.tsx` 这一条没有断言过任何东西。
+
+⚠️ **一条只在产物上才看得见的读数，顺带记下来**：G 那一档在处置后打印的是
+`宿主内 …Id 本地态 17 处全部有语义登记（in-flight 8 / inline-rename 4 / confirm-gate 4 / dragging 1）` ——
+**17** 是本分支的 15 + main 带来的那两枚（`§8.36` 的预测），而注释里那句"15 处"早在 §8.52 就改成了
+"以 G 打印的实时命中数为准"，所以这次没有再漂一遍。这是那条改动的**第一次跨载体复验**。
