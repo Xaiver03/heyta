@@ -236,8 +236,11 @@ export function AppWindow({
             </div>
 
             {/*
-              🔴 主导航四项（收集箱 / 今天 / 最近 7 天 / 已完成），从 `SHELL_PRIMARY_NAV` 派生。
+              🔴 主导航三项（今天 / 最近 7 天 / 已完成），从 `SHELL_PRIMARY_NAV` 派生。
               「已完成」原来是漏的（§2 #1）—— 少画一个入口是"不完整"。
+              ⚠️ 2026-10-04：「收集箱」那一行被删（与页头标题重复），所以这一组里
+              **没有会高亮的一项** —— 真应用也一样：停在收集箱时高亮的是 rail 的
+              「任务」，侧栏那三条都是"另有筛选"时才亮。
             */}
             <div className="mk-nav">
               {SHELL_PRIMARY_NAV.map((item) => {
@@ -247,7 +250,7 @@ export function AppWindow({
                     key={item.labelKey}
                     icon={<ItemIcon size={ICON_SIZE.sm} />}
                     label={t(item.labelKey)}
-                    active={item.labelKey === 'web.shell.nav.inbox' && view === 'tasks'}
+                    active={false}
                   />
                 );
               })}

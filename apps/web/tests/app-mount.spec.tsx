@@ -242,17 +242,49 @@ describe('侧栏导航', () => {
     await freshDb();
     await mount();
 
-    // 先离开任务视图。视图在 **rail** 里（不是顶栏 —— 见 IA 那一组断言）。
-    const habitsTab = [...container!.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(
-      (b) => b.textContent?.trim() === '习惯',
-    );
-    expect(habitsTab).toBeDefined();
+    const titleEl = (): string =>
+      container!.querySelector('.ht-header__title')?.textContent?.trim() ?? '';
+    // 视图在 **rail** 里（不是顶栏 —— 见 IA 那一组断言）。
+    const railTab = (name: string): HTMLButtonElement | undefined =>
+      [...container!.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(
+        (b) => b.textContent?.trim() === name,
+      );
+    const habitsTab = railTab('习惯');
+    const tasksTab = railTab('任务');
+    expect(habitsTab, 'rail 上没有「习惯」').toBeDefined();
+    expect(tasksTab, 'rail 上没有「任务」').toBeDefined();
+
+    /*
+     * 🔴 下面这几步钉的是 2026-10-04 删掉侧栏「收集箱」那一行之后的**两半**，
+     * 少任何一半都是半条判据：
+     *
+     * ① 侧栏**不再有**「收集箱」那一行 —— 产品负责人：「已经有一个收集箱的标题了，
+     *    为什么还要个收集箱？在信息架构上面是重复的」（同一屏两个控件指向同一个
+     *    目的地、高亮还各自独立）。
+     * ② 删掉它换来的**唯一**风险是"停在某个清单/标签上就再也回不去收集箱"，
+     *    所以这里必须先把筛选挪走（点「今天」），再验证两条都在：
+     *    **离开再回来 = 位置保留**（R9，2026-10-02 同一位产品负责人：回到任务视图
+     *    应当看到他离开时停着的那一格），**已经在这儿了再点一次 = 回收集箱**。
+     *    ⚠️ 不先挪走筛选，第二条会对着默认的收集箱无条件成立 —— 那就是一条
+     *    永远通过的判据（§7 元规则 2）。
+     */
+    const today = navEntry(container!, '今天');
+    expect(today, '侧栏缺少「今天」入口').toBeDefined();
+    await act(async () => {
+      today!.click();
+    });
+    expect(titleEl(), '点「今天」之后标题应当跟着筛选走').toBe('今天');
+
+    // ① 侧栏里那行重复的「收集箱」必须不在（不是"渲染了但看不见"）。
+    expect(
+      navEntry(container!, '收集箱'),
+      '侧栏不该再有「收集箱」那一行 —— 与页头同名，是同一个目的地的两个入口',
+    ).toBeUndefined();
+
+    // 离开任务视图。
     await act(async () => {
       habitsTab!.click();
     });
-
-    const titleEl = (): string =>
-      container!.querySelector('.ht-header__title')?.textContent?.trim() ?? '';
     expect(titleEl()).toBe('习惯');
 
     // 🔴 习惯视图里**没有**范围列（有的话就是"挂着一列跟它无关的东西"）。
@@ -266,19 +298,21 @@ describe('侧栏导航', () => {
       '收集箱不该出现在习惯视图里',
     ).toBe(false);
 
-    // 回到任务视图 ⇒ 范围列回来，且点它仍然只是"换个筛选"。
-    const tasksTab = [...container!.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(
-      (b) => b.textContent?.trim() === '任务',
-    );
+    // 回到任务视图：位置必须还在（这条是 R9 的原文，不许被 ② 顶掉）。
     await act(async () => {
       tasksTab!.click();
     });
-    const inbox = navEntry(container!, '收集箱');
-    expect(inbox).toBeDefined();
+    expect(titleEl(), '回到任务视图应当看见离开时停着的那一格，不是收集箱').toBe('今天');
+
+    // ② 人已经在任务视图里再点一次「任务」= 回收集箱。
     await act(async () => {
-      inbox!.click();
+      tasksTab!.click();
     });
-    expect(titleEl(), '点收集箱之后标题应当跟着筛选走').toBe('收集箱');
+    expect(titleEl(), '停在「今天」时再点一次 rail 的「任务」应当回到收集箱').toBe('收集箱');
+    expect(
+      useTaskStore.getState().filter.kind,
+      '标题回到收集箱而筛选没跟着回 —— 那是标题在撒谎',
+    ).toBe('all');
   });
 
   /**

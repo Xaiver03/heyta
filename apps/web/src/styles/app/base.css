@@ -80,4 +80,11 @@
   overflow-y: auto;
   border-left: var(--ht-border-width-thin) solid var(--ht-color-border);
   background: var(--ht-color-surface);
+  /* 这一栏从 2026-10-04 起**有内容**（任务视图里是 AI 面），所以左右必须有留白：
+     `.ht-ai-panel` 自己不带 inline padding，挂在零留白的栏里会贴住左边那条
+     分隔线和窗口右边缘。
+     🔴 这条不会改变 `boundingBox().width`——`reset.css` 里是
+     `box-sizing: border-box`，而 `e2e/tests/detail-column-slot.spec.ts` 那条
+     "列宽 == token 值"的等值判据依赖的正是这一点。 */
+  padding-inline: var(--ht-space-4);
 }
