@@ -6,7 +6,7 @@
  * 而它们通常是合并之后才第一次跑 —— 那时候红起来分不清是"合并合错了"还是"本来就红"。
  * 本脚本在**不碰任何分支、不做任何 merge** 的前提下先把它们跑一遍：
  * 用 `git archive` 把 `merge-tree` 造出的候选树铺到临时目录，直接拿真门禁（不复刻逻辑）跑，
- * 再铺一份 **main 单独**作为对照载体 —— 只有"候选树红而 main 绿"的那些才是**合并造成的红**。
+ * 再铺一份 **main 单独**作为对照载体 —— 红要落到哪一档，看下面"读数 ①"那三档（判档用的是类型）。
  *
  * 跑法（仓库根或任一检出都行；无需 node_modules）：
  *   node scripts/verify-detail-pane-merge-preflight.mjs              # 默认 main × HEAD
@@ -14,16 +14,24 @@
  *   node scripts/verify-detail-pane-merge-preflight.mjs --product <上一步留下的目录>   # 手工处置完冲突后复跑
  *
  * 读数分两块：
- *  ① **纯 fs 门禁**：同一批脚本在"候选树"与"main 单独"两个载体上各跑一遍，
- *     只有**候选红而 main 绿**的才算"合并造成的红"（两边都红 = 环境/载体所致，不含合并信息）。
+ *  ① **纯 fs 门禁**：同一批脚本在"候选树"与"main 单独"两个载体上各跑一遍，分三档 ——
+ *     **候选红而 main 绿** = 合并造成的红；**两边都红** = 环境/载体所致，不含合并信息；
+ *     🔴 **候选红而 main 侧没有这个脚本**（`MISS`，本分支新增的门禁）= 没有对照组可减，
+ *     但**不是**"信息为空"：本分支自己检出里它是绿的（读数在工单 §8），所以这一档只能读成
+ *     "合并把对面的旧内容拼回来了"，处置是取本分支那一侧。它同样计入退出码。
+ *     ⚠️ 判档要用**类型**而不是"不等于 0"：`'MISS' !== 0` 为真，早期版本正是这样把这一档
+ *     错并进"不含合并信息"，于是**只在新分支存在的那道门禁在产物里变红时既不被数进退出码、
+ *     也只打 ⚠️**。
  *  ② **静默合流对账**：两侧都改过、而 `merge-tree` 没登记为冲突的文件（零 marker 的那一档）。
  *     逐枚问"两侧各自新增的行，是否**都还在**产物里"，`.mjs` 另跑 `node --check`。
  *     这一档是 §8.42 那个形状（把 main 的函数抄进同一份脚本）唯一的抓手 —— 门禁那一块只能
  *     告诉你"结果红不红"，不能告诉你"哪一侧的改动被无声丢掉了"。
  *
- * 退出码：合并造成的红 + 静默合流丢行/删文件/语法不过 = 0 条 ⇒ 0；有 ⇒ 1；候选树都造不出来 ⇒ 2（响亮失败，不静默放行）。
+ * 退出码：下面这几项之和 = 0 条才 ⇒ 0，有任何一条 ⇒ 1：合并造成的红、候选红而无对照组、
+ *   静默合流丢行/删文件/语法不过、槽位重复、产物仍带 marker 的产品文件、编号台账的号对不上。
+ *   候选树都造不出来 ⇒ 2（响亮失败，不静默放行）。
  *
- * ⚠️ 三条边界，别读多：
+ * ⚠️ 几条边界，别读多（这里不写条数，写过一次"三条"然后就漂了）：
  *  ① 候选树里**未解决的冲突 marker 还留在文本里**（本脚本不替人裁决），所以带 marker 的文件
  *     可能让某些门禁红 —— 那属于 §8.47 第 3 节的处置还没做，不是新问题。脚本会把带 marker 的
  *     文件名打在结论旁边，避免被读成"合并把门禁改坏了"。
@@ -241,10 +249,10 @@ const runOne = (dir, gate) => {
   const args = TREE_ROOT_GATES.includes(gate) ? [gate, '--root', dir] : [gate];
   try {
     const out = execFileSync('node', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    return { rc: 0, line: out.trim().split('\n').pop().slice(0, 58) };
+    return { rc: 0, line: out.trim().split('\n').pop().slice(0, 58), full: out };
   } catch (e) {
     const out = `${e.stdout || ''}${e.stderr || ''}`.trim().split('\n');
-    return { rc: e.status ?? 1, line: (out.find((l) => l.trim()) || '').slice(0, 58) };
+    return { rc: e.status ?? 1, line: (out.find((l) => l.trim()) || '').slice(0, 58), full: out.join('\n') };
   }
 };
 
@@ -252,15 +260,41 @@ const rows = [];
 for (const gate of GATES) {
   const p = runOne(product, gate);
   const b = runOne(baseline, gate);
+  // 🔴 `runOne` 在"这一侧没有这个脚本"时回的是**字符串** `'MISS'`，不是数字。
+  // 原来只按 `b.rc !== 0` 分档，于是 `'MISS' !== 0` 为真 ⇒ **本分支新增的门禁**在产物里变红时，
+  // 会被归进"两边都红（环境/载体所致，不含合并信息）"并用 ⚠️ 打印 —— 而那一条红恰恰**只可能**
+  // 来自合并（两侧各自都不红：一侧没有这道脚本，另一侧我们量过是绿的）。
+  // 更糟的是那一档不进退出码：合并把对面的旧抄件带回来时，这道门禁等于没有自动消费者。
+  // 分成三档：对照绿=合并造成的红 / 对照=两侧都红 / 对照 MISS=**没有对照组**，要拿本分支读数定性。
   const mergeCaused = p.rc !== 0 && b.rc === 0;
-  rows.push({ gate, p, b, mergeCaused });
+  const noControl = p.rc !== 0 && b.rc === 'MISS';
+  rows.push({ gate, p, b, mergeCaused, noControl });
   console.log(
-    `${p.rc === 0 ? '· ' : p.rc !== 0 && b.rc === 0 ? '🔴' : '⚠️'} ${gate.replace(/^scripts\//, '').padEnd(34)} 候选=${p.rc} ${refA}=${b.rc}  ${p.line}`,
+    `${p.rc === 0 ? '· ' : mergeCaused || noControl ? '🔴' : '⚠️'} ${gate.replace(/^scripts\//, '').padEnd(34)} 候选=${p.rc} ${refA}=${b.rc}  ${p.line}`,
   );
+  // 需要人处置的红：把门禁的**全文**打出来。只留最后一行 58 字节的结论，
+  // 读的人还得自己重新铺一份产物树才能知道红在哪一行 —— 而那些红正是"要人裁决"的那一档。
+  if (p.rc !== 0 && (mergeCaused || noControl)) {
+    const lines = String(p.full || '').trimEnd().split('\n');
+    lines.slice(0, 20).forEach((l) => console.log(`      │ ${l}`));
+    if (lines.length > 20) console.log(`      │ …（余 ${lines.length - 20} 行未打，全文去产物树里跑同一道脚本）`);
+  }
 }
 
 const bad = rows.filter((r) => r.mergeCaused);
-const same = rows.filter((r) => r.p.rc !== 0 && r.b.rc !== 0);
+const noControlRows = rows.filter((r) => r.noControl);
+const same = rows.filter((r) => r.p.rc !== 0 && r.b.rc !== 0 && !r.noControl);
+
+if (noControlRows.length) {
+  console.log(
+    `\n🔴 上面这几道在产物里红，而 ${refA} 那一侧还没有这个脚本 ⇒ **没有对照组可减**。` +
+      `这一档不能读成"环境所致"：本分支自己的检出里它们是绿的（读数在工单 §8 对应那条），` +
+      `所以红只可能是**合并把对面的旧内容拼回来**造成的 —— 典型形状是文档类判据：` +
+      `两侧各自都写进了同一篇文档，产物里那一段是两份的叠加，而不是任何一侧单独的样子。\n` +
+      `      ⇒ 处置是去看上面 🔴 打出的门禁全文里**点名的那几行**，按 §8.47 第 3 节裁决时把对应区段取本分支那一侧；` +
+      `这一档计入退出码，不许在没有读数的情况下放行。`,
+  );
+}
 
 // 🔴 门禁**污染探针**（起因与我一度写错的机制，都记在工单 §8.56）。
 // 这一道的**不是**"marker 会把门禁数搞错" —— 那个假设被本趟的 A/B 否证了：
@@ -491,7 +525,9 @@ if (tainted.length) {
 
 console.log(
   `\nTREE=${tree}  冲突=${conflicted.length} 枚（处置见工单 §8.47 第 3 节）  ` +
-    `纯 fs 门禁=${GATES.length} 道：合并造成的红=${bad.length}  两边都红（环境/载体所致，不含合并信息）=${same.length}  ` +
+    `纯 fs 门禁=${GATES.length} 道：合并造成的红=${bad.length}  ` +
+    `候选红但 ${refA} 侧没有这道脚本（本分支新增，只能拿本分支读数定性）=${noControlRows.length}  ` +
+    `两边都红（环境/载体所致，不含合并信息）=${same.length}  ` +
     `静默合流=${silentRows.length} 枚，其中丢行/删文件/语法不过=${silentBad.length}  ` +
     `槽位重复=${slotBad.length}  台账（缺号 / 号在正文被占 / 同号不同事）=${ledgerBad.length ? `🔴 ${ledgerRows.reduce((s, r) => s + r.collide.length + r.lostA.length + r.lostB.length + r.swA.length + r.swB.length, 0)} 项` : '0'}  ` +
       `产物仍带 marker 的产品文件=${tainted.length ? `${tainted.length} 枚 ⇒ 本趟 tally 不算"合流验过"` : '0（这一趟的 tally 量的是一个可运行状态）'}`,
@@ -507,4 +543,6 @@ if (!keep) {
 } else {
   console.log(`--keep：临时载体留着 —— 产物=${product}  基线=${baseline}（看完请自行删）`);
 }
-process.exit(bad.length + silentBad.length + slotBad.length + tainted.length + ledgerBad.length ? 1 : 0);
+process.exit(
+  bad.length + noControlRows.length + silentBad.length + slotBad.length + tainted.length + ledgerBad.length ? 1 : 0,
+);
