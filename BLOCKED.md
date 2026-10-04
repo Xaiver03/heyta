@@ -5117,3 +5117,50 @@ tip 是自己 10 秒前造的那笔 —— `git reset --soft HEAD~1` + `git rest
 > - `c3049c88` 又一发 drive-by：`project.pbxproj` 里两枚模块被登记两次
 >   （每次 iOS 构建一行 `Skipping duplicate build file` 然后照样 succeed ⇒
 >   "日志里有警告"再也不是信号）。`check:native-deps` 规则 3 钉住，两臂变异各 rc=1。
+
+> **B79 补记 #3（10-05 02:3x–03:1x）—— 补记 #2 那两格"还没取到的读数"都取到了；四端改装尖端，另外三发撞见的红/黄各修一处**
+>
+> - ✅ **链第 69 段 `check:ai-e2e` 有读数了**（载体 `heyta-wt-ai-closeout` @ `9c3557c1`，
+>   端口 4318/4319 起跑前现量为 0）：**159 passed / 2 skipped / 0 failed，rc=0（6.1m）**。
+>   补记 #1 那句"这条红**预期**被 `bfbdc5f2` 关掉，但在复跑之前它只是预期"现在翻成读数：
+>   AI 助手那两族（`ai-assistant.spec.ts` / `ai-tool-run.spec.ts`）**全绿**。
+> - ✅ **发布后的线上套件**：`playwright.live-site.config.ts` **23 passed，rc=0（1.1m）**，
+>   打的是刚发出去的那份字节（真 TLS、`--host-resolver-rules` 钉真实 IP、`--no-proxy-server`）。
+>   里面一条 `[console.error] Magic link login error` **不是漏判**：那条用例故意用无效 token
+>   点按钮，判据是"`#error` 浮出来了"且"**没有 `[pageerror]` 未捕获异常**"（`live-domain.spec.ts:398`），
+>   应用把一次已处理的失败写进 console 是它该有的行为。
+> - 🔴 **第一次全尖端跑（02:55）里 ios 腿是红的，而根因不是 pbxproj**：`pod install` 崩在
+>   `ArgumentError - path name contains null byte`（CocoaPods 1.17.0 + Ruby 4.0.7，
+>   `Pod::Project#group_for_path_in_group` → `Pathname#realdirpath`，发生在 "Generating Pods project"
+>   加 source file 引用那一步；上游 issue #12798 / #12866 都还 open）。
+>   **同一棵载体 45 分钟前刚成功跑过 `pod install`** —— 差的是我为了对齐尖端做过一次
+>   `git checkout -- .`，把 `Podfile.lock` 退回提交态而沙盒是新的，脚本于是判定"沙盒不一致"重跑，
+>   撞上这个偶发崩溃。手跑第二次 **rc=0**（84 deps / 83 pods），沙盒 `Manifest.lock == Podfile.lock`。
+>   ⇒ 记两件事：① **这一腿是可重试的**，脚本现在不重试（一次崩溃=整腿红，且红字不指"可重试"）；
+>   ② 我把 38 个文件 `git checkout --` 之前先 `cp` 备份到 `~/scratch-heyta/carrier-dirty-024608/`，
+>   这一步救回了"哪些是构建噪声"的判断依据 —— 没有那份备份就只能猜。
+>   ⚠️ **没给脚本加重试**：一次就红是**诚实**的，加重试要在重试也失败时区分两种失败，
+>   这一格留给下一位连同判据一起做（`reinstall-all.sh` ios 段 404–428 行）。
+> - **四端最终都装在尖端 `9c3557c1`**（mac 02:56 / windows 02:58 / android 03:00 / ios 03:06），
+>   四张图逐张看过：android 与 ios 是同意卡（状态栏 3:00 / 03:06 对上本趟），
+>   windows 是真应用 + 头像菜单开着（第一项「登录 / 注册」、右栏「AI 工具调用」），
+>   mac 的 `.webview.png` 与 02:19 那趟**逐字节相同**（`md5=5187df4a…`，同一张品牌帧）。
+>   Windows 六条取证仍齐（`ADD_APPX=OK` `PAYLOAD_WEBDIST=True` `SHORTCUT_CREATED=True`
+>   `SHORTCUT_RESOLVES=True` `M2D=OK` `RESULT=OK`）。
+> - ✅ **`c3049c88` 那发去重的真构建证据**（这是它缺的那一环）：
+>   `grep -c "Skipping duplicate build file" /tmp/heyta-reinstall-ios-build.log`
+>   改前 **4** → 改后 **0**，而同一份日志里 `BUILD SUCCEEDED` 有 **1** 枚
+>   （阳性对照：构建真跑了，那四类警告有机会出现却没出现）。
+> - **生产不必为这两个提交重发，而且有哈希证据**：尖端 `9c3557c1` 相对 `afe7ff7a`
+>   的**产品面**差异只有 `apps/mobile/ios/Heyta.xcodeproj/project.pbxproj`
+>   （`git diff --name-only afe7ff7a..9c3557c1` 去掉 docs/e2e/scripts 后只剩这一枚）。
+>   在尖端按手册口径重打 `HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build`，
+>   `apps/web/dist/index.html` 的 sha256 = `21f981dd4a3077a4…` = **线上那一份逐字相同**。
+>   ⇒ 线上 = 四端同一棵树的 web 字节；落地页同理（`apps/landing/` 两提交间零改动）。
+> - 撞见的另两处红/黄，各自当场修+验证：
+>   `9c3557c1` W5 那条 e2e 的夹具守卫把"**今天恰好是月初**"写成了日历事实（`28 ≤ N ≤ 31`），
+>   每月 5 号之后每天必红、红字读起来像产品日历算错；界改成事实给出的 `1..31`，
+>   三臂证明守卫仍有牙（过去 −33 红、错月 58 红、全年 365 天越界 0）+ 真身 `base.h` 走"已在位"。
+>   `11460845` Podfile 里 fmt 绕行那句"可能已升级，请复查"**每次** `pod install` 都会印
+>   （已补过的文件第二次自然匹配不到），把"没事"和"绕行真失效"压成同一句黄字；改成三分支，
+>   最后一档升成红字。
