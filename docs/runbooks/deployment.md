@@ -1082,11 +1082,22 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
 ```bash
 # 1) 本机：只打包 Dockerfile 真正 COPY 的路径（整个仓库太大，且有 gitignore 的 research/upstream）
 #    ⚠️ packages/domain 与 tsconfig.base.json **必须在列**，见下面的第 3、4 条
-git archive --format=tar.gz -o /tmp/heyta-server-src.tar.gz HEAD \
-  pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json \
-  packages/sync-core packages/shared-schema packages/domain server
+#
+# 🔴 **清单从 Dockerfile 现推，不要抄。** 这一份原来手抄了 8 个路径，而 2026-10-03
+#    `b855f90f` 往 Dockerfile 里加了 `AS web` 那一段（13 个包 + `apps/web` +
+#    `scripts/check-web-artifact.mjs`）之后，照抄这一段会在 `COPY` 那一步直接失败 ——
+#    手抄的清单落后一次，症状是"构建红在一个看起来像路径写错的地方"。
+#    下面这条 awk 把 `COPY` 的源路径全数出来（跳过 `--from=` 与镜像内路径），
+#    它就是那份清单的唯一写法。实测一趟：36 项 / 3826 个文件 / 52 MB / 包里 `.env` **0** 枚。
+LIST=$(awk '/^COPY /{for(i=2;i<=NF;i++){t=$i; if(t ~ /^--/) continue; if(t ~ /^\// || t ~ /^\.\/|^\.$/) continue; gsub(/\/$/,"",t); print t}}' server/Dockerfile | sort -u | tr '\n' ' ')
+# ⚠️ 在 zsh 里 `$LIST` **不会**按空格分词（整串变成一个 pathspec ⇒ `did not match any files`
+#    而 `git archive` 仍然产出一个空包）⇒ 这一条要放进 `sh -c`，或显式用 `${=LIST}`。
+sh -c 'git archive --format=tar.gz -o /tmp/heyta-server-src.tar.gz HEAD $(awk "/^COPY /{for(i=2;i<=NF;i++){t=\$i; if(t ~ /^--/) continue; if(t ~ /^\//) continue; gsub(/\/$/,\"\",t); if(t ~ /^\\.\\//) continue; print t}}" server/Dockerfile | sort -u | tr "\n" " ")'
+tar tzf /tmp/heyta-server-src.tar.gz | grep -Ec '(^|/)\.env$'   # 必须是 0
 scp /tmp/heyta-server-src.tar.gz ubuntu-jcli:/tmp/
 ssh ubuntu-jcli 'cd ~/heyta && tar xzf /tmp/heyta-server-src.tar.gz'   # .env 不在归档里，会被保留
+# 🔴 解包前后各取一次 .env 的 sha256 前 16 位比对（2026-10-04 实测两边都是 2509959ddebf83eb）。
+#    只写"会被保留"不构成证据 —— 这一族坑（§7 那条 tar 覆盖 .env）的代价是 JWT_SECRET 被换掉。
 
 # 2) 主机：🔴 两个镜像源都不能省（见下）
 ssh ubuntu-jcli 'cd ~/heyta/server && \
@@ -1207,6 +1218,59 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
   ⚠️ **这一轮没有覆盖的东西**：链 5 的 `packages/legal/{privacy,minors,data-rights}.ts` 与它派生的
   `server/src/legal.generated.ts` 不在 HEAD，所以线上九份文本仍是 `privacy@1.0` —— 与镜像里的
   `LEGAL_SET_VERSION` 一致，这是**刻意的**（把别人在飞的改版发上去，落库的指纹就会替他们宣告版本）。
+
+- ✅ **2026-10-04 第五次重建**（自 10-02 起 `server/` 有 **52 笔**提交：账号注销、
+  vault 密钥迁移、recover-user 走同一份重放列集、法务生成物、调休公共事实…）：
+  1. 🔴 **这一轮第一件事不是发布，是"镜像从 10-03 起根本建不出来"**。
+     `b3397cda`（10-03 23:58）第一次往 `server/package.json` 的 **devDependencies** 里放了
+     三枚 workspace 包（`@heyta/app-host` / `storage` / `sync-client`），而 production 阶段是
+     `npm install --omit=dev` —— **`--omit=dev` 照样会去 registry 解析 devDeps**（要先建
+     完整 ideal tree），于是 `E404 @heyta%2fapp-host` 把整层打死。
+     现量：`/tmp/heyta-server-build.log` 963 行里唯一一处 error 就是它。
+     修法（`715b25eb`）：装之前把 `devDependencies` 剪掉 —— 这三枚**运行时确实不需要**
+     （逐条读过：`server/src/**` 里 `@heyta/app-host` 命中 0 处；
+     `dist/scripts/recover-user.js` 里那处是**注释**，值用的是字面量、由
+     `server/tests/recover-artifact-envelope.spec.ts` 钉住）。
+     ⚠️ 这是 AGENTS §7 第 75 条那个形状**第二次**现形："本地 `pnpm -r build` / `pnpm check`
+     全绿"证不了"镜像能构建"，而这二十多个小时里没有任何一层会红 ——
+     会红的那一层是 `pnpm verify:selfhost-stack`（它自己 docker build），**没人跑**。
+  2. 回滚点 `supersync:rollback-20261004-predeploy`（= 当时在跑的 `2b0018b11331`）。
+  3. 先迁移、后换容器：新镜像一次性容器里 `sh scripts/migrate-deploy.sh` ⇒ `MIGRATE_RC=0`，
+     `_prisma_migrations` 从 **45** 条到 **52** 条（7 条待应用全部成功；`count(*) filter
+     (finished_at is not null)` 40→47，另 5 条 `finished_at` 为空的是**建库时就有的**基线行，
+     `rolled_back_at` 全 0）。七条都是普通 DDL（新表 + 可空列），无 CONCURRENTLY、无限时锁。
+  4. `up -d --wait supersync`（**不**跑 `deploy.sh`）⇒ 两个容器 `healthy`，
+     `caddy`/`dozzle`/`uptime-kuma` 一枚都没被造出来。
+  5. §3.8.1 那五条线上判据全绿：`/health` **200**；不存在的账号登录 **401
+     `invalid_credentials`**；一次性账号注册 **201** + 日志 `Verification email sent [zh-CN]`；
+     `magic-login-confirm.js` 里 `sessionToken` **3** 处；启动日志
+     `Password hashing backend verified (Argon2id, 84 ms per hash)`。
+     收尾：那个一次性账号按下面的流程删掉（八张子表逐张数过**全 0**，`DELETE 1`，
+     `users` 回到 **10**）。
+  6. 🔴 **这一轮必须连服务端一起发，不是顺手**：线上那份旧镜像的
+     `ENTITY_TYPES` 是 **15 枚、不含 `EVENT`**（现量：`docker exec … node -e
+     require('@heyta/shared-schema')`），而 `validation.service.ts:25` 的
+     `ALLOWED_ENTITY_TYPES` 就是它的 `Set` ⇒ 只发前端的话，倒数纪念日那条
+     `EVENT` op 会被**硬拒**（`Invalid entityType`），而"一条硬拒把这台设备的同步
+     永久卡死"正是 ADR-0009 / ADR-0016 那一族。新镜像 **16 枚、含 `EVENT`**。
+  7. 静态产物随后发布（顺序：站点 → 应用，见 §3.7）：落地页带
+     `VITE_APP_URL=https://heyta.waytofuture.cn/app/`，应用带 `HEYTA_WEB_BASE=/app/`
+     且 `pnpm check:web-artifact:app` 先过（读数：5 个本地引用 / manifest 15 个文件 /
+     4 个组件数据 URL 落在 `/app/widgets/` / 250 个 `--ht-*` 全部对上）；
+     两侧发布前各留一份 `/var/www/heyta-{landing,app}.bak-20261004T14*Z`。
+     线上真浏览器验收 `--config playwright.live-site.config.ts` **21 passed / 2**，
+     两条红的定性：一条是 needle 只认中文（已修，`b937f545`），
+     一条是**全新浏览器上下文没点同意** ⇒ 应用连 `manifest.webmanifest` 都不发
+     （`PrivacyConsentBlockedError`）—— 这是隐私不变量在线上成立的样子，
+     但 PWA 那三条判据因此**未判**（载体缺 consent 这一步），见 §3.7「还没做的」。
+  8. 🟠 这一轮顺手修掉一条**换域名时不会跟着变、也没有门禁会报**的抄件：
+     `apps/landing/public/robots.txt` 的 `Sitemap:` 行还印着 `heyta.finlaw.cloud`
+     （旧域名那台站点**还活着**，所以爬虫拿到的是整套旧域名 URL，而不是 404 ——
+     症状是"收录的还是上一个域名"）。修法与 `gen-og-card.mjs` 同一条：
+     robots.txt 进 `gen-entries.mjs` 的 `artifacts`，地址取 `DEFAULT_SITE_ORIGIN`，
+     于是 `check:entries` 顺带逐字节对账它 —— 覆盖面读数 **75 → 76 份**（两边都实测过）。
+     ⚠️ 旧的那条坑（§3.7「还没做的」里 PWA 根绝对路径那一条）**没修**，
+     它需要先把挂载路径变成一处构建参数，不是这一轮的范围。
 
 ### 3.8.1 🔴 换完镜像必须重取的五条**线上**判据（2026-10-01 定）
 
