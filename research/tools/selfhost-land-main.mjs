@@ -368,6 +368,10 @@ await gate(4, '载体上完整 pnpm check', async () => {
     blind(`跑链期间无法知道要守哪几枚端口：${d.error} ⇒ 守不住就不能开跑`);
   }
   checkRan = true;
+  /* 🔴 计时不是装饰：§8.126 ⑤ 那条结论要靠"链长 vs main 平均 85s 一笔"两个数才能变成
+   *    一次说得出口的协调请求，而"几十分钟"到今天仍然是一条**没有计时读数的断言**。
+   *    红与被中止的那一趟同样要有时长 —— 那才是"窗口要多长"的下界。 */
+  const t0 = Date.now();
   say(`   日志 → ${checkLog} · 看守 ${d.ports.length} 枚端口（每 ${WATCH_MS}ms 一轮）`);
   const chunks = [];
   const child = spawn('pnpm', ['check'], { cwd: CARRIER_DIR, env: process.env });
@@ -391,7 +395,7 @@ await gate(4, '载体上完整 pnpm check', async () => {
   });
   watch.stop();
   writeFileSync(checkLog, Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8'));
-  const wd = `看守判了 ${watch.reads} 轮`;
+  const wd = `看守判了 ${watch.reads} 轮 · 用时 ${Math.round((Date.now() - t0) / 1000)}s`;
   if (trip) {
     refuse(`链被本工具**中止**（环境/协作无效，不是产品红）：${trip}\n` +
       `   中止前的输出留在 ${checkLog}。${wd} ⇒ 等那一趟别人的活告一段落再重跑本体检。`, 3);
