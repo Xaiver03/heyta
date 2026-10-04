@@ -35,6 +35,7 @@
 import { useState } from 'react';
 
 import { closeAccountAndEraseLocal } from '@heyta/app-host';
+import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import { accountClosureMessageKey } from '@heyta/ui';
 import { AlertTriangle, ShieldX } from 'lucide-react';
@@ -82,7 +83,7 @@ export function CloseAccountPanel(): React.JSX.Element | null {
   return (
     <div className="ht-settings" data-testid="close-account-panel">
       <h2 className="ht-settings__title ht-type-section-title">
-        <ShieldX size={16} aria-hidden="true" /> {t('common.accountClosure.title')}
+        <ShieldX size={ICON_SIZE.sm} aria-hidden="true" /> {t('common.accountClosure.title')}
       </h2>
       <p className="ht-settings__hint">{t('common.accountClosure.lead')}</p>
       <p className="ht-settings__hint">{t('common.accountClosure.exportHint')}</p>
@@ -140,7 +141,7 @@ export function CloseAccountPanel(): React.JSX.Element | null {
           data-testid="close-account-result"
           data-disposition={done.disposition}
         >
-          <AlertTriangle size={16} aria-hidden="true" /> {t(done.sentence)}
+          <AlertTriangle size={ICON_SIZE.sm} aria-hidden="true" /> {t(done.sentence)}
         </p>
       ) : null}
     </div>
