@@ -27,22 +27,26 @@
  *   2 = 探针或用法问题（找不到工作树、--confirm 却不在主检出里跑、脚本没报出可读的数）
  *   1 = 前置不成立（双亲不对 / 阻塞集非空 / main 在算完之后又动了 / --confirm 但 check 没跑）
  *   3 = 环境无效（负载超阈值 / 载体的 node_modules 不是当前那把锁装出来的 /
- *       载体那棵树此刻是别人的现场 —— 载体脚本第 0a 步退 6，这里记成同一档）
+ *       载体那棵树此刻是别人的现场 —— 载体脚本第 0a 步退 6，这里记成同一档；
+ *       跑链期间出现**外来的射程端口监听者**（或守不住）⇒ 链被本工具中止）
  *       —— 环境无效不等于产品失败
  *   4 = 载体上完整 `pnpm check` 红 ⇒ **不落地**，先逐段归属
  */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { depsFresh, freshReading } from './selfhost-deps-fresh.mjs';
+import { startWatch } from './selfhost-kill-watchdog.mjs';
 
 const MAIN_REF = 'main';
 const BRANCH_REF = process.env.HEYTA_LAND_BRANCH ?? 'feat/self-host-distribution';
 const MERGE_REF = 'feat/self-host-merge-main';
 const MAX_LOAD = Number(process.env.HEYTA_LAND_MAX_LOAD ?? 12);
 const LOAD_STEP = Number(process.env.HEYTA_LAND_LOAD_STEP ?? 60);
+/** 跑链期间"守别人的服务端"的轮询间隔（默认 5s；判不了=中止，保守方向见装置文件头）。 */
+const WATCH_MS = Number(process.env.HEYTA_LAND_WATCH_MS ?? 5000);
 
 /**
  * 🔴 打印给**人复制粘贴**的路径一律带引号：仓库路径里有空格（`All in one Data`），
@@ -83,9 +87,9 @@ const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, encoding: 'utf8',
  * 第一件事就 exit 的写法，会让人每修一条才看见下一条 —— 而落地这一步的窗口是分钟级的。
  */
 const fails = [];
-const gate = (severity, name, fn) => {
+const gate = async (severity, name, fn) => {
   try {
-    const note = fn();
+    const note = await fn();
     say(`✅ ${name}${note ? ` —— ${note}` : ''}`);
   } catch (e) {
     if (e?.probe) {
@@ -180,7 +184,7 @@ if (CONFIRM && here !== mainTree.path) {
 const mainSha = git(['rev-parse', MAIN_REF], branchTree.path);
 const branchSha = git(['rev-parse', BRANCH_REF], branchTree.path);
 let carrierSha = OPT('carrier');
-gate(1, '载体双亲对上', () => {
+await gate(1, '载体双亲对上', () => {
   if (!carrierSha) {
     /* 🔴 载体脚本现在在**第一个写动作之前**就会退场（第 0a 步：那棵树是不是别人的现场）。
      *    退 6 不是产品红，是"协作没到位" ⇒ 按 sev 3 记，与负载/端口同一档；
@@ -237,7 +241,7 @@ gate(1, '载体双亲对上', () => {
 });
 
 /* ── 2. 阻塞集必须为空 ────────────────────────────────────────────── */
-gate(1, '阻塞集为空', () => {
+await gate(1, '阻塞集为空', () => {
   const out = run('node', ['research/tools/selfhost-landing-blockers.mjs'], branchTree.path);
   const m = out.match(/阻塞集 (\d+) 枚/);
   if (!m) {
@@ -269,7 +273,7 @@ const loadParseSelfcheck = () => {
   if (Number.isFinite(parseLoadRaw(''))) return '空读数被解析成了数（应当是 NaN ⇒ 按判不了处理）';
   return null;
 };
-gate(3, '负载可用', () => {
+await gate(3, '负载可用', () => {
   const bad = loadParseSelfcheck();
   if (bad) {
     const e = new Error(`${bad} ⇒ 这一档判不了，不拿"判不了"当"负载低"`);
@@ -298,7 +302,7 @@ gate(3, '负载可用', () => {
 });
 
 /* ── 3b. 跑链之前：那几个端口上有没有别人的 dev server ─────────────── */
-gate(3, '完整 check 不会 SIGKILL 别人的 dev server', () => {
+await gate(3, '完整 check 不会 SIGKILL 别人的 dev server', () => {
   if (!CONFIRM) skip('dry-run 不跑链 ⇒ 这条今天不适用（不适用 ≠ 通过）');
   if (portsCheck.problems.length) {
     blind(`射程判据的自检 ${portsCheck.problems.length} 条问题（判据自己坏了，不能拿它的"没端口在用"当放行）：\n     - ${portsCheck.problems.join('\n     - ')}`);
@@ -321,7 +325,7 @@ gate(3, '完整 check 不会 SIGKILL 别人的 dev server', () => {
  * 原地留着。main 只要动过 `pnpm-lock.yaml` 或 `e2e/pnpm-lock.yaml`，下一趟完整链就跑在
  * 上一把锁的依赖上 —— 响亮的那种（模块找不到）便宜，安静的那种（旧版本照跑照绿）贵。
  * 判据本体在 `selfhost-deps-fresh.mjs`（含"0 字节两边相等"与"只判了一棵树"两臂的反证）。 */
-gate(3, '载体的 node_modules 与当前那把锁同源', () => {
+await gate(3, '载体的 node_modules 与当前那把锁同源', () => {
   const d = depsFresh(CARRIER_DIR);
   if (d.error) blind(`依赖新鲜判不了：${d.error}\n   拿"判不了"当"依赖是新的"就跑完整链，等于让链跑在没装过的树上`);
   if (d.stale.length) {
@@ -337,7 +341,7 @@ gate(3, '载体的 node_modules 与当前那把锁同源', () => {
 /* ── 4. 载体上跑完整 pnpm check ───────────────────────────────────── */
 let checkRan = false;
 let checkOk = false;
-gate(4, '载体上完整 pnpm check', () => {
+await gate(4, '载体上完整 pnpm check', async () => {
   /* 🔴 **dry-run 绝不跑链**，这一条原先是假的：3b 那句"dry-run 不跑链 ⇒ 这条今天不适用"
    *    写在纸上，而这里没有对应的守卫，于是"只体检"的一次运行真的起了几十分钟的
    *    `pnpm check`，其中 e2e 前置会按端口 SIGKILL —— 而 3b 那道守卫在 dry-run 里根本没执行。
@@ -354,23 +358,55 @@ gate(4, '载体上完整 pnpm check', () => {
     refuse(`载体目录 ${CARRIER_DIR} 不存在 ⇒ 完整 check 没跑（跳过不等于通过）`);
   }
   const checkLog = join(tmpdir(), 'heyta-land-check.log');
+  /* 🔴 3b 那一眼只在**起跑之前**判；它管不到跑起来之后的几十分钟。链里的 e2e 前置是按端口
+   *    SIGKILL 的，而并行那条线的 vite 在一趟链的时长里会出现不止一波（§8.126 ④ 现量：
+   *    21:04 有人 → 21:07 空 → 21:13 又有人）。所以边跑边守：一旦出现**不在这棵载体树里**的
+   *    监听者就中止整趟链 —— 宁可白跑几十分钟，不拿别人的现场换我的读数。
+   *    守不住（射程派不出来 / lsof 坏 / 归属读不出）一律按"中止"处理，保守方向写死在装置文件头。 */
+  const d = deriveKillPorts(CARRIER_DIR);
+  if (d.error) {
+    blind(`跑链期间无法知道要守哪几枚端口：${d.error} ⇒ 守不住就不能开跑`);
+  }
   checkRan = true;
-  say(`   日志 → ${checkLog}`);
-  try {
-    const out = run('pnpm', ['check'], CARRIER_DIR);
-    writeFileSync(checkLog, out);
-  } catch (e) {
-    writeFileSync(checkLog, `${e.stdout ?? ''}\n---STDERR---\n${e.stderr ?? ''}\n---\n${e.message}`);
-    refuse(`rc=${e.status ?? 1} ⇒ **不落地**。关闭判据是"每一枚红仍可归属到非本批"，不是"全绿"。\n` +
+  say(`   日志 → ${checkLog} · 看守 ${d.ports.length} 枚端口（每 ${WATCH_MS}ms 一轮）`);
+  const chunks = [];
+  const child = spawn('pnpm', ['check'], { cwd: CARRIER_DIR, env: process.env });
+  child.stdout.on('data', (c) => chunks.push(c));
+  child.stderr.on('data', (c) => chunks.push(c));
+  let trip = null;
+  const watch = startWatch({
+    ports: d.ports,
+    carrierDir: CARRIER_DIR,
+    intervalMs: WATCH_MS,
+    onTrip: (why) => {
+      trip = why;
+      child.kill('SIGTERM');
+      const hard = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* 已退 */ } }, 5000);
+      hard.unref();
+    },
+  });
+  const code = await new Promise((res) => {
+    child.on('exit', (c, sig) => res(typeof c === 'number' ? c : (sig ? 143 : 1)));
+    child.on('error', (e) => { chunks.push(Buffer.from(`\nspawn 失败：${e.message}`)); res(127); });
+  });
+  watch.stop();
+  writeFileSync(checkLog, Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8'));
+  const wd = `看守判了 ${watch.reads} 轮`;
+  if (trip) {
+    refuse(`链被本工具**中止**（环境/协作无效，不是产品红）：${trip}\n` +
+      `   中止前的输出留在 ${checkLog}。${wd} ⇒ 等那一趟别人的活告一段落再重跑本体检。`, 3);
+  }
+  if (code !== 0) {
+    refuse(`rc=${code} ⇒ **不落地**。关闭判据是"每一枚红仍可归属到非本批"，不是"全绿"。\n` +
       `   逐段归属：node ${TOOL('selfhost-check-segments.mjs')} --tree ${CARRIER_DIR} --as carrier --ref ${MERGE_REF} --out /tmp/attrib.tsv` +
-      (FLAG('attribute') ? '' : '（或给本脚本加 --attribute）'), 4);
+      (FLAG('attribute') ? '' : '（或给本脚本加 --attribute）') + `\n   ${wd}`, 4);
   }
   checkOk = true;
-  return '全绿';
+  return `全绿 · ${wd}`;
 });
 
 /* ── 5. 落地 ──────────────────────────────────────────────────────── */
-gate(1, 'main 未被别人抢先', () => {
+await gate(1, 'main 未被别人抢先', () => {
   const now = git(['rev-parse', MAIN_REF], branchTree.path);
   if (now !== mainSha) refuse(`main 在体检期间从 ${mainSha.slice(0, 8)} 动到 ${now.slice(0, 8)} ⇒ 重跑本脚本`);
   return `${mainSha.slice(0, 8)} 仍是当前值`;
