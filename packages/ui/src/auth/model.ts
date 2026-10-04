@@ -440,3 +440,85 @@ export function firstAuthErrorField(input: {
  */
 export const SIGN_IN_PASSWORD_LABEL_KEY = 'common.auth.signInPassword.label' as const;
 export const E2EE_PASSPHRASE_LABEL_KEY = 'common.auth.e2eePassphrase.label' as const;
+
+/* ========================================================================
+ * 六、注销账号（批次 E3）：结局 → 词条 key
+ * ====================================================================== */
+
+/**
+ * 注销的结果 → 共用词条 key。
+ *
+ * 🔴 与上面 `authFailureMessageKey` 同一个理由：**这条路由只能在一份里**。
+ * Web 的设置页与移动壳的「我的 → 注销账号」说的必须是同一句"账号还在 / 本机没动"。
+ * 两处各写一张表，结局是漂，而漂掉的那一侧通常正是话说得更满的那一侧 ——
+ * 这条路径的下游是不可逆删除。
+ *
+ * ⚠️ 与 `common.sync.error.accountClosed`（**被动**那一条）不是一句话：那句讲的是
+ * "同步因为账号没了而停下，本地数据完好"；这几句讲的是"我刚刚主动删了它，
+ * 并且清了这台设备"。合并会让"没注销成功"看起来像"注销成功了"。
+ *
+ * ⚠️ 这里按**字符串**收 `disposition` / `failure`，不 import `@heyta/app-host`
+ * （`packages/ui` 今天不依赖它，见文件头）。合法取值由 app-host 那两个封闭集合在
+ * 调用方保证，而"每一条都落到具体的 key、不掉进 `other`"由
+ * `packages/ui/tests/account-closure-model.spec.ts` 那张现取的快照表钉住 ——
+ * 与 `auth-model.spec.ts` 对 `authFailureMessageKey` 做的是同一件事。
+ */
+export type AccountClosureMessageKey =
+  /** 服务端删成 + 本机也清成。 */
+  | 'common.accountClosure.done.erased'
+  /** 服务端删成，本机只清掉一部分（逐类报告里有"容器仍在"的）。 */
+  | 'common.accountClosure.done.partial'
+  /** 服务端删成，本机一点没清。🔴 这一档最容易被写成成功。 */
+  | 'common.accountClosure.done.eraseFailed'
+  | 'common.accountClosure.failed.unconfigured'
+  | 'common.accountClosure.failed.consentRequired'
+  | 'common.accountClosure.failed.unauthorized'
+  | 'common.accountClosure.failed.rateLimited'
+  | 'common.accountClosure.failed.serverError'
+  | 'common.accountClosure.failed.network'
+  /** 2xx 但读不懂 ⇒ 那句是"账号**可能**还在"，与 `serverError` 的"账号还在"不同。 */
+  | 'common.accountClosure.failed.malformedResponse'
+  /** 认不出来的原因与没登记的结局统一落这里：只说"没注销、本机没动"，不猜原因。 */
+  | 'common.accountClosure.failed.other';
+
+const CLOSURE_FAILURE_KEY: Record<string, AccountClosureMessageKey> = {
+  'unconfigured': 'common.accountClosure.failed.unconfigured',
+  'consent-required': 'common.accountClosure.failed.consentRequired',
+  'unauthorized': 'common.accountClosure.failed.unauthorized',
+  'rate-limited': 'common.accountClosure.failed.rateLimited',
+  'server-error': 'common.accountClosure.failed.serverError',
+  'network': 'common.accountClosure.failed.network',
+  'malformed-response': 'common.accountClosure.failed.malformedResponse',
+  // 这三条各有各的 HTTP 形状，而用户在这条路径上能做的动作相同（换令牌/稍后重试/找运营）。
+  // **有意的合并**，不是漏：见 spec 里"注销够得着的那 7 条各说各的话"那条判据。
+  'invalid-input': 'common.accountClosure.failed.other',
+  'not-allowed': 'common.accountClosure.failed.other',
+  'request-rejected': 'common.accountClosure.failed.other',
+};
+
+/**
+ * 注销结果 → 该显示哪一条。
+ *
+ * 🔴 四种 `disposition` 各一条；`not-closed` 再按失败原因分。认不出来的**不编一句**，
+ * 落到 `failed.other` —— 那句只陈述两件一定成立的事：没有删除确认、本机没动。
+ */
+export function accountClosureMessageKey(closure: {
+  disposition: string;
+  failure?: string;
+}): AccountClosureMessageKey {
+  switch (closure.disposition) {
+    case 'closed-and-erased':
+      return 'common.accountClosure.done.erased';
+    case 'closed-erase-partial':
+      return 'common.accountClosure.done.partial';
+    case 'closed-erase-failed':
+      return 'common.accountClosure.done.eraseFailed';
+    case 'not-closed':
+      return CLOSURE_FAILURE_KEY[closure.failure ?? ''] ?? 'common.accountClosure.failed.other';
+    default:
+      // 走到这里 = 上游给 `ClosureDisposition` 加了一档而这里没登记句子。
+      // 宁可说一句保守的真话，也不许它默认显示成"已注销"。兜住"新那一档其实是
+      // 已注销"的，是 spec 里那条"词表必须与 app-host 的封闭集合逐字相同"。
+      return 'common.accountClosure.failed.other';
+  }
+}

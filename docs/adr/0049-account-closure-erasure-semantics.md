@@ -83,7 +83,7 @@
 | # | 动作 | 判据 | 变异读数 |
 |---|---|---|---|
 | 1 | 注销是**可辨识信号**：`TokenFailureCode` 必填（`ACCOUNT_CLOSED` / `ACCOUNT_UNVERIFIED` / `TOKEN_REVOKED` / `TOKEN_INVALID`），随 401 发出 | `server/tests/account-closed-signal.spec.ts` 10 条；server 全量 2110 passed | 摘码 3 红 / 未验证误标成注销 2 红 / middleware 不发码 3 红 / 摘掉注销时的鉴权缓存失效 1 红 |
-| 2 | 政策把注销写成**分层实话**：级联范围回到真源（**16 条外键 / 15 张表**），三处仍存在的副本逐处点名，注销承诺中英两栏都自带"不清除其它设备本地数据"这条边界 | `packages/legal/tests/structure.spec.ts` 新增 4 条；legal 66 passed | 数字抄回旧值 1 红 / 中文漏一类 1 红 / 英文漏边界 1 红 / minors 漏限定 1 红 / 表名推导退回 `split('_')` 3 红 / 类别表塞假表 2 红 |
+| 2 | 政策把注销写成**分层实话**：级联范围回到真源（**16 条外键 / 15 张表** —— ⚠️ 2026-10-04 已被本判据重量为 **19 / 18**，增量是 vault 批次 ADR-0050 长的三张；旧数留在这里不删，因为它本身就是"抄件一定会漂"的现场证据），三处仍存在的副本逐处点名，注销承诺中英两栏都自带"不清除其它设备本地数据"这条边界 | `packages/legal/tests/structure.spec.ts` 新增 4 条；legal 66 passed | 数字抄回旧值 1 红 / 中文漏一类 1 红 / 英文漏边界 1 红 / minors 漏限定 1 红 / 表名推导退回 `split('_')` 3 红 / 类别表塞假表 2 红 |
 | 3 | 日志不落可识别 PII（管理端"解锁/强制登出"两处邮箱明文已摘） | `server/tests/admin-log-pii.spec.ts` 4 条（含 HEAD 历史形状做阳性对照） | 把邮箱插回去 ⇒ 扫描腿 1 红 |
 | 4 | 全量明文产物必须 0600 | `server/tests/recover-artifact-mode.spec.ts` 3 条（权限位现场量） | 摘 `chmodSync` 1 红 / 摘 `mode` 2 红 |
 

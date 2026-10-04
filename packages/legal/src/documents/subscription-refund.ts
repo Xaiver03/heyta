@@ -248,6 +248,51 @@ const zh = [
     ],
   },
   {
+    id: 's10',
+    title: '欧盟 GDPR 口径：付费这一侧留下什么、能删到哪一步',
+    blocks: [
+      {
+        kind: 'p',
+        text: '收费与退款这一侧的 GDPR 问题不是"我们有没有拿到你的同意"，而是**为了收钱而留下的那几行记录，能删到哪里**。下面每一格都按实际表结构写：`payment_events` 与 `checkout_orders` 是真在库里的那两张表，措辞与它们的字段一致，不写这两张表里没有的东西。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 5(1)(c) 条（数据最小化）',
+            '为了收款而保存的东西是否限于必要',
+            '`payment_events` 保存渠道事件号与**报文摘要** `payloadDigest`，不保存支付渠道发来的原始报文；`checkout_orders` 只有订单号、价格、币种、地区、金额与状态，没有卡号那一类支付凭据',
+            '但这些行都通过 `user_id` 绑到你的账号上，摘要本身也能被渠道那边反查；另外开票时你主动发到邮箱的**抬头与税号**落在邮件系统里，不在这两张表的删除范围内'
+          ],
+          [
+            '第 17 条第 17(3)(b) 与 17(3)(e) 款（法定义务、法律主张）',
+            '付费记录能不能说删就删',
+            '合同存续期间必须保留权益判定所需的记录，否则"你到底买到哪一天"就没有可核对的答案',
+            '退款之后那几行**不会当场消失**：会计与税务的留存年限由法定义务决定，而本文件不写具体年限 —— 开票口径本身还没定（见第五节），先写一个数字就是制造一份和实际不一致的对外文本'
+          ],
+          [
+            '第 7(3) 条（撤回同意应与给予同样容易）',
+            '不想再被处理时，撤消这条路是不是同样短',
+            '没有任何自动扣款：到期即止，不存在"先取消订阅才能停止处理"这一步',
+            '但停止托管同步这一侧的处理等于**注销账号**，不是关掉一个开关；所以这里不写"随时可撤、撤回即清除"，那种说法在备份与授权范围内都不成立'
+          ],
+          [
+            '第 22 条（仅自动化决策）',
+            '有没有一个只由机器作出、对你有显著影响的决定',
+            '权益是多个来源取并集的机械判定（付费、邀请奖励、人工授予都算数，后写的奖励不会盖掉已付的时长），没有"机器判断你不配用"这一档',
+            '它确实决定付费功能的可用与不可用，所以判定规则写在本文前几节而不是留成黑箱；如果将来按用户画像调价，这一格会立刻变成对不上，而今天没有这件事，本文件也不为它预留说法'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '《个人权利行使与请求响应》：注销账号之后各类数据各自删到什么程度、备份的边界在哪里，那张 GDPR 逐条对照表在那里；本文件只讲为了收款而留下的记录。',
+      },
+    ],
+  },
+  {
     id: 's9',
     title: '争议、联系与版本记录',
     blocks: [
@@ -266,7 +311,14 @@ const zh = [
       {
         kind: 'table',
         head: ['版本', '日期', '说明'],
-        rows: [['1.0', '2026-10-01', '首次起草，尚未经法务复核']],
+        rows: [
+          ['1.0', '2026-10-01', '首次起草，尚未经法务复核'],
+          [
+            '1.1',
+            '2026-10-04',
+            '新增第十节：GDPR 一侧"为了收款而留下的记录"按 `payment_events` 与 `checkout_orders` 的真实字段写（数据最小化、法定留存、撤回同意这条路有多短、仅自动化决策四格）。同时写明两件做不到的：退款不会让那几行当场消失，你在邮件里发来的抬头与税号不在这两张表的删除范围内。权利行使的逐条对照表只在《个人权利行使与请求响应》那一份里，本节只指向它，不另抄一份。',
+          ],
+        ],
       },
     ],
   },
@@ -489,6 +541,51 @@ const en = [
     ],
   },
   {
+    id: 's10',
+    title: 'The EU GDPR view: what the billing side keeps, and how far it can be deleted',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'The GDPR question on the billing side is not "did we get your consent", it is **how far the rows we keep in order to take your money can be deleted**. Every cell below is written against the actual table structure: `payment_events` and `checkout_orders` are the two tables that really exist, the wording matches their columns, and nothing that is not in those tables is claimed.',
+      },
+      {
+        kind: 'table',
+        head: ['Where in the GDPR', 'What it asks', 'What heyta can produce', 'What does not line up'],
+        rows: [
+          [
+            'Article 5(1)(c) (data minimisation)',
+            'Whether what is stored to take payment is limited to what is necessary',
+            '`payment_events` keeps the provider event id and a **digest** of the payload (`payloadDigest`), not the raw message the provider sent; `checkout_orders` holds only the order number, price, currency, region, amounts and status - no card-style payment credential',
+            'Every row is still tied to your account through `user_id`, and the digest can be traced back by the provider; the invoice **name of payee and tax number** you email us live in the mail system, which is **not** within the deletion scope of these two tables'
+          ],
+          [
+            'Article 17, points 17(3)(b) and 17(3)(e) (legal obligation, legal claims)',
+            'Whether payment records can be deleted on request',
+            'While the contract runs the entitlement records have to stay, otherwise "how far did you actually buy" has no checkable answer',
+            'Those rows do **not** vanish at the moment of a refund: accounting and tax retention is set by legal obligation, and this document deliberately states no number of years - the invoicing practice itself is still undecided (section five), so writing a figure now would create text that disagrees with what we actually do'
+          ],
+          [
+            'Article 7(3) (withdrawal as easy as giving)',
+            'Whether stopping the processing is as short a path as starting it',
+            'There is no automatic charge anywhere: an entitlement simply ends, so there is no "cancel the subscription first" step standing in the way',
+            'Stopping the processing on the hosted-sync side means **closing the account**, not flipping a switch; this document therefore does not say "withdraw any time, and it is erased immediately" - that claim does not hold within the backup and authorisation boundaries'
+          ],
+          [
+            'Article 22 (solely automated decisions)',
+            'Whether a decision with a significant effect on you is made by machine alone',
+            'Entitlement is a mechanical union across sources (paid time, invite rewards, manual grants all count, and a later reward row cannot overwrite paid time), with no "the machine decides you are not entitled" path',
+            'It does decide whether a paid feature is available, which is why the rules are written out earlier in this document instead of left as a black box; pricing driven by user profiling would make this row stop lining up, and since no such thing exists today this document reserves no wording for it'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: 'Data rights document: how far each kind of data actually goes after an account is closed, and where the backup boundary sits, is in that GDPR comparison table; this document covers only the records kept to take payment.',
+      },
+    ],
+  },
+  {
     id: 's9',
     title: 'Disputes, contact, and version history',
     blocks: [
@@ -507,7 +604,14 @@ const en = [
       {
         kind: 'table',
         head: ['Version', 'Date', 'Note'],
-        rows: [['1.0', '2026-10-01', 'First drafted; legal review not yet performed']],
+        rows: [
+          ['1.0', '2026-10-01', 'First drafted; legal review not yet performed'],
+          [
+            '1.1',
+            '2026-10-04',
+            'Added section ten: the GDPR side of "the rows we keep in order to take payment", written against the real columns of `payment_events` and `checkout_orders` (minimisation, legal retention, how short the withdrawal path is, solely automated decisions - four cells). It also states the two things that cannot be promised: a refund does not make those rows vanish on the spot, and the invoice name of payee and tax number you email us are outside the deletion scope of these two tables. The article-by-article rights table stays in the Data rights document only; this section points at it instead of copying it.',
+          ],
+        ],
       },
     ],
   },
@@ -515,9 +619,12 @@ const en = [
 
 export const subscriptionAndRefund: LegalDocument = {
   id: 'subscription-refund',
-  version: '1.0',
+  // 🔴 1.0 → 1.1：新增第十节（GDPR 一侧"为了收款而留下的记录"）。
+  // 加的是**承诺的边界**（退款不即时删、邮件里的抬头与税号不在这两张表的范围内），
+  // 不是措辞打磨，所以必须换版本号：同意留痕要能回答"他同意的那一版里有没有这一段"。
+  version: '1.1',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': '订阅、计费与退款规则',
     en: 'Subscription, Billing and Refund Rules',

@@ -1097,3 +1097,18 @@ export {
   priorityColorToken,
   type PriorityColorToken,
 } from './task-list/priority-color.js';
+
+/**
+ * ── 追加：注销账号（批次 E3）的"结局 → 词条 key"收在这里一份 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 形状与 `authFailureMessageKey` 完全一致：封闭集合在 `@heyta/app-host`
+ * （`ClosureDisposition` / `HostedAuthFailureReason`），句子在 `packages/i18n`，
+ * 而**中间那张路由表只能有一份** —— Web 的设置页与移动壳的「我的」今晚各自要显示
+ * 同一句"账号还在、本机没动"。各写一份的结局是漂，而漂掉的那一侧通常话说得更满。
+ */
+export {
+  accountClosureMessageKey,
+  type AccountClosureMessageKey,
+} from './auth/model.js';

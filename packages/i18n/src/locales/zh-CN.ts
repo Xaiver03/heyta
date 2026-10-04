@@ -922,6 +922,37 @@ export const zhCN = {
   'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，而删掉它就没有任何登录方式了，所以不能删除。先添加一条新的，或者去设置页设一个登录密码，再删这条。',
   'web.passkeys.error.unauthorized': '登录状态已失效，请重新登录。',
   'web.passkeys.error.network': '连不上服务端，请稍后重试。',
+  // ── 注销账号（批次 E3）────────────────────────────────────────
+  // 🔴 失败那几句必须**同时**说"账号还在"和"本机没动"。这条路的下游是不可逆删除：
+  // 用户如果在一次 5xx 之后以为"已经注销了"，他会接着做下一步（比如把设备转卖），
+  // 而那一步此时是不安全的。
+  // 成功那句也划清作用域：这次动作只覆盖服务端 + **这台设备**，
+  // 备份与其它设备有各自的边界（ADR-0048 的分层实话，不写"彻底销毁"）。
+  'common.accountClosure.title': '注销账号',
+  'common.accountClosure.lead': '注销会永久删除这个账号在服务端的全部数据（同步历史与设备记录），而且不可撤销。',
+  'common.accountClosure.exportHint': '如果还想留着这些数据，先去「导出数据」存一份备份再回来。注销之后服务端就再也读不出来了。',
+  'common.accountClosure.confirmLocal': '我确认：这台设备上还没同步出去的数据，连同本机明文存储，也会一起被清除。',
+  'common.accountClosure.action': '注销这个账号',
+  'common.accountClosure.busy': '正在注销…',
+  // 🔴 `{count}` 是**现量**，不是修辞：这一句的存在理由就是把"这台设备上还有多少
+  // 东西没出去"变成一个具体的数，让用户在按下去之前看得见它。写成"可能有未同步数据"
+  // 等于没说。
+  'common.accountClosure.pending': '这台设备上还有 {count} 条改动没同步出去。注销会把它们一起清掉 —— 云端没有它们，之后也拿不回来。',
+  'common.accountClosure.cancel': '先不注销',
+  'common.accountClosure.confirmTitle': '确认注销这个账号？',
+  'common.accountClosure.entryHint': '删除云端账号，并清除这台设备上的数据',
+  'common.accountClosure.needLogin': '这台设备还没有登录，也没有可注销的账号。',
+  'common.accountClosure.done.erased': '账号已注销，这台设备上的本地副本也已清除。备份和你其它设备上的数据不在这次操作的范围里。',
+  'common.accountClosure.done.partial': '账号已注销，但这台设备上的本地数据只清掉了一部分，剩下的需要你手动处理。',
+  'common.accountClosure.done.eraseFailed': '账号已注销，但这台设备上的本地数据没能清干净，需要你手动处理。',
+  'common.accountClosure.failed.unconfigured': '还没有配置服务端地址，所以一个请求都没发 —— 账号还在，本机数据也没动。',
+  'common.accountClosure.failed.consentRequired': '你还没有同意这台设备的隐私规则，所以一个请求都没发 —— 账号还在，本机数据也没动。',
+  'common.accountClosure.failed.unauthorized': '登录状态已经失效，所以没有执行注销 —— 账号还在，本机数据也没动。请重新登录再来一次。',
+  'common.accountClosure.failed.rateLimited': '注销请求太频繁，暂时被拒绝了。账号还在，本机数据也没动，请过一会儿再试。',
+  'common.accountClosure.failed.serverError': '服务端没有完成注销。账号还在，本机数据也没动，请稍后重试。',
+  'common.accountClosure.failed.network': '连不上服务端，所以没有执行注销。账号还在，本机数据也没动。',
+  'common.accountClosure.failed.malformedResponse': '服务端回的内容我们认不出来，所以不算注销成功。账号可能还在 —— 确认之后再重试一次。本机数据也没动。',
+  'common.accountClosure.failed.other': '注销没有完成。账号还在，本机数据也没动。',
 
   // ── 设置页「修改登录密码」：两个秘密的界线在这里划一次 ──────────────
   //

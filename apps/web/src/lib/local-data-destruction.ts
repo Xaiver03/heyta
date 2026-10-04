@@ -104,13 +104,13 @@ function deleteDatabase(name: string): Promise<DbDestroyReport> {
       request.onerror = () =>
         resolve(
           report(name, false, {
-            reason: `deleteDatabase 失败：${String(request.error?.message ?? '未知错误')}`,
+            reason: `indexeddb-delete-failed: ${String(request.error?.message ?? 'unknown-error')}`,
           }),
         );
       // onblocked：与适配器同一取舍 —— 等，不假装成功。
     } catch (error) {
       resolve(
-        report(name, false, { reason: `deleteDatabase 抛错：${(error as Error).message}` }),
+        report(name, false, { reason: `indexeddb-delete-failed: ${(error as Error).message}` }),
       );
     }
   });
@@ -128,7 +128,7 @@ async function removeOpfsDirectory(): Promise<DbDestroyReport> {
   const root = globalThis.navigator?.storage?.getDirectory;
   if (typeof root !== 'function') {
     return report(`opfs:${WEB_OPFS_DIRECTORY}`, false, {
-      reason: '这个浏览器没有 navigator.storage.getDirectory（OPFS 不可用）',
+      reason: 'opfs-unavailable',
     });
   }
   try {
@@ -139,7 +139,7 @@ async function removeOpfsDirectory(): Promise<DbDestroyReport> {
     const notFound = (error as { name?: string } | undefined)?.name === 'NotFoundError';
     if (notFound) return report(`opfs:${WEB_OPFS_DIRECTORY}`, true);
     return report(`opfs:${WEB_OPFS_DIRECTORY}`, false, {
-      reason: `删除 OPFS 目录失败：${(error as Error).message}`,
+      reason: `opfs-delete-failed: ${(error as Error).message}`,
     });
   }
 }
@@ -234,7 +234,7 @@ export async function eraseWebLocalData(): Promise<DbDestroyReport[]> {
     reports.push(await new IndexedDbAdapter(MAIN_DATABASE).destroy());
   } catch (error) {
     reports.push(
-      report(MAIN_DATABASE, false, { reason: `适配器销毁失败：${(error as Error).message}` }),
+      report(MAIN_DATABASE, false, { reason: `adapter-destroy-failed: ${(error as Error).message}` }),
     );
   }
 
@@ -248,20 +248,20 @@ export async function eraseWebLocalData(): Promise<DbDestroyReport[]> {
   const local = wipePrefixedKeys(globalThis.localStorage);
   reports.push(
     local < 0
-      ? report('localStorage', false, { reason: 'localStorage 不可访问（隐私模式？）' })
+      ? report('localStorage', false, { reason: 'local-storage-unavailable' })
       : report(`localStorage(${String(local)})`, local >= 0),
   );
   const session = wipePrefixedKeys(globalThis.sessionStorage);
   reports.push(
     session < 0
-      ? report('sessionStorage', false, { reason: 'sessionStorage 不可访问（隐私模式？）' })
+      ? report('sessionStorage', false, { reason: 'session-storage-unavailable' })
       : report(`sessionStorage(${String(session)})`, session >= 0),
   );
   // 令牌与邮箱那四个键**不带前缀**（写入方是 macOS 壳的注入），前缀扫抓不到。
   const pending = wipeExactKeys(globalThis.sessionStorage, WEB_SESSION_KEYS_UNPREFIXED);
   reports.push(
     pending < 0
-      ? report('sessionStorage:令牌键', false, { reason: 'sessionStorage 不可访问（隐私模式？）' })
+      ? report('sessionStorage:令牌键', false, { reason: 'session-storage-unavailable' })
       : report(`sessionStorage:令牌键(${String(pending)})`, true),
   );
 

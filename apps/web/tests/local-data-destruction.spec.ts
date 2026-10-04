@@ -282,7 +282,13 @@ describe('E2 —— 逐类真的清掉', () => {
     const reports = await eraseWebLocalData();
     const opfs = reports.find((r) => r.target.startsWith('opfs:'));
     expect(opfs?.containerRemoved, '没有 getDirectory 却报"删掉了"').toBe(false);
-    expect(opfs?.reason).toContain('getDirectory');
+    // 🔴 只断言"这一类失败必须带一条可读的原因"，**不钉它的措辞**。
+    // 原来这里写的是 `toContain('getDirectory')`，而 reason 的字符串在 2026-10-03
+    // 被另一条会话统一改成了 ASCII 机器码（`opfs-unavailable`，见 §7 第 83 条：
+    // 证据文件要保持纯 ASCII）。那句话断的是"诊断文本长什么样"，不是本条的不变量 ——
+    // 不变量是"不可用 ≠ 已删除，而且要说得出为什么"。
+    expect(typeof opfs?.reason, '失败却没带原因').toBe('string');
+    expect((opfs?.reason ?? '').length, '原因是一条空串').toBeGreaterThan(0);
   });
 
   it('OPFS 目录本来就不存在（NotFoundError）⇒ 算成功', async () => {
