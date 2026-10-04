@@ -36,7 +36,15 @@
                                 </constraints>
                             </imageView>
                         </subviews>
-                        <color key="backgroundColor" name="HeytaSplashBackground" id="htB-c-001"/>
+                        <!--
+                          这一行的 color 元素不许带 id 属性（实测：带 id 时 ibtool 以
+                          rc=255 退出且零输出，于是 xcodebuild 只报一句
+                          "CompileStoryboard ... failed with a nonzero exit code"，
+                          没有任何指向这一行的线索。同一份 XML 去掉 id 立刻编得过：
+                          A/B 现量 带 id=255 / 去掉=0，加不加 catalog="Images" 都一样。
+                          别的元素（imageView / constraint）带 id 是合法的 —— 崩的只有 color。
+                        -->
+                        <color key="backgroundColor" name="HeytaSplashBackground"/>
                         <constraints>
                             <constraint firstItem="htB-ot-001" firstAttribute="centerX" secondItem="Bcu-3y-fUS" secondAttribute="centerX" id="htB-cx-01"/>
                             <constraint firstItem="htB-ot-001" firstAttribute="centerY" secondItem="Bcu-3y-fUS" secondAttribute="centerY" id="htB-cy-01"/>
