@@ -93,6 +93,26 @@ for (let m = tagRe.exec(appSrc); m; m = tagRe.exec(appSrc)) {
     if (depth === 0) { regionEnd = m.index + m[0].length; break; }
   } else depth += 1;
 }
+// 🔴 分流"结构判据跑不了"的两种成因 —— 它们的处置完全相反，所以**必须在配对结论之前**跑：
+//  ① 槽区域内还留着**冲突标记** ⇒ 这是 §8.47 第 3 节没做完，不是产品缺陷。两侧各自都写了一枚
+//     `<aside data-testid="detail-column">`（main 侧装 AI 面，本批侧装专注面），而真实现场里
+//     **配对失败正是 marker 造成的**（两个开标签 + 一个闭标签）⇒ 把 marker 判据放在配对之后，
+//     产物树里永远只会读到"配对解析不出来"，这条分流形同没写。
+//  ② 真的没有闭合（有人把 `</aside>` 拆走了）⇒ 判据够不着对象，也是红，但要人去看代码而不是去清 marker。
+// ⚠️ 上面这句不是推演：A6 那一臂造的靶是**闭合平衡**的 marker 形状，于是它在判据放错顺序时仍然通过。
+//    真实现场的形状记在装置 A7（工单 §8.75）。
+{
+  const afterOpen = appSrc.slice(regionStart);
+  const closeIdx = afterOpen.indexOf('</aside>');
+  const scannedWindow = afterOpen.slice(0, closeIdx === -1 ? afterOpen.length : closeIdx);
+  if (/^<<<<<<< |^=======|^>>>>>>> /m.test(scannedWindow)) {
+    console.log('🔴 槽区域里仍带冲突标记（`<<<<<<<` / `=======` / `>>>>>>>`）⇒ 详情列这一格**两侧各写了一份内容**，结构判据无法判断。');
+    console.log('      这一档不是"槽里有装饰"，也不是"合并合坏了"：它是 §8.47 第 3 节那一枚 App.tsx 冲突还没裁决。');
+    console.log('      处置：择一/并排裁决之后重跑本判据（工单 §8.75 记的是这一格的产品侧含义）。');
+    console.log('结论：详情列槽位判据没能跑（marker 未清）');
+    process.exit(1);
+  }
+}
 if (regionEnd === -1) {
   console.log('🔴 那枚 <aside> 的闭合标签配对解析不出来（`<aside` 与 `</aside>` 数不上）⇒ 槽区域读不到，按红处理。');
   console.log('结论：详情列槽位判据没能跑');

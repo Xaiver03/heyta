@@ -12,6 +12,14 @@
  * 每臂都断两件事：**红落在我点名的那条腿上**，而且**别的腿是 0**
  * （四条腿一起红等于四条腿都没有 —— 那多半是共享的解析层坏了，§8.39 同族）。
  *
+ * 🔴 A6 断的不是腿，是**第三档分流**：槽区域内留着冲突 marker 时，判据必须说"marker 未清 ⇒ 没能跑"，
+ * 不许说"配对解析不出来"（那是"有人把 `</aside>` 拆走了"，处置是看代码），也不许说"槽里有装饰"
+ * （那是产品缺陷）。三档的处置互不通用，混成一档会把下一位引到错误的现场。
+ * 🔴 **A6 单独不构成牙**：它造的靶里 `<aside>`/`</aside>` 仍然配得上对，所以判据把分流写在配对
+ * 结论之后照样通过 —— 真实现场（工单 §8.75：两侧各写一枚 `<aside data-testid="detail-column">`
+ * 共用同一个 `</aside>`）走的是"配对必然失败"那一路。A7 就是照那个形状造的靶，两臂合起来才钉住
+ * **分流的顺序**（外加第二把脱牙：摘掉 marker 分流后两臂都必须不再报出那句）。
+ *
  * 跑法（linked worktree 里别用 `pnpm run`）：
  *   node research/tools/mutation-rigs/mutate-detail-pane-slot.mjs
  */
@@ -160,6 +168,53 @@ const t7 = layDown('n2');
 const r7 = runGate(t7);
 check('N2 槽里新挂一枚无装饰的生产者 → 放过，且生产者计数=2', r7.rc === 0 && producersOf(r7.out) === 2, `RC=${r7.rc} 生产者=${producersOf(r7.out)} 枚`);
 
+// A6 槽区域内留着**冲突标记**（合流产物里就是这个状态：main 侧装 AI 面、本批侧装专注面）
+// ⇒ 判据必须报"marker 未清"那一句，**不许**报成"配对失败"或"槽里有装饰"。
+// 这三档的处置完全不同：清 marker / 看代码 / 改产品。混成一档就等于把下一位引到错误的现场。
+const t8 = layDown('a6');
+{
+  const p = join(t8, APP_REL);
+  const src = readFileSync(p, 'utf8');
+  const anchor = '      <aside className="ht-app__detail" data-testid="detail-column">';
+  if (!src.includes(anchor)) throw new Error('App.tsx 里那行 <aside> 的字面形状变了，A6 不知道怎么插 marker，拒绝猜。');
+  writeFileSync(p, src.replace(anchor, '      <aside ref={detailRef} className="ht-app__detail" data-testid="detail-column">\n        {detailHasRoom ? aiPanels : null}\n<<<<<<< main\n        {/* 上面这一份是 main 侧 */}\n      </aside>\n' + anchor), 'utf8');
+}
+const r8 = runGate(t8);
+check('A6 槽区域带 marker → 报"仍带冲突标记 / 没能跑（marker 未清）"，不报配对失败也不报装饰',
+  r8.rc === 1 && /仍带冲突标记/.test(r8.out) && !/配对解析不出来/.test(r8.out) && !/腿 [A-D]/.test(r8.out),
+  `RC=${r8.rc}`);
+
+// 🔴 A7 = A6 的另一半，因为 A6 的靶**不是真实现场的形状**：它插的那份 marker 让 `<aside>` 与
+// `</aside>` 仍然配得上对，于是判据把 marker 分流放在配对结论**之后**也照样通过 A6 ——
+// 那一臂守的分支在真产物树上永远走不到。真实现场（`merge-tree main HEAD` 的 App.tsx，工单 §8.75）
+// 是两侧各写一枚 `<aside data-testid="detail-column">` 共用同一个 `</aside>` ⇒ 配对**必然**失败。
+// 这一臂照那个形状造靶，因此它是"分流必须在配对结论之前"这件事的牙。
+const t9 = layDown('a7');
+{
+  const p = join(t9, APP_REL);
+  const src = readFileSync(p, 'utf8');
+  const open = '      <aside className="ht-app__detail" data-testid="detail-column">';
+  const close = '\n      </aside>';
+  const oi = src.indexOf(open);
+  const ci = oi === -1 ? -1 : src.indexOf(close, oi);
+  if (oi === -1 || ci === -1) throw new Error('App.tsx 里那对 <aside>/</aside> 的字面形状变了，A7 不知道怎么照真实现场造冲突，拒绝猜。');
+  const headSide = src.slice(oi, ci);
+  const conflict =
+    '<<<<<<< main\n' +
+    '      <aside\n        ref={detailRef}\n        className="ht-app__detail"\n        data-testid="detail-column"\n      >\n' +
+    '        {detailHasRoom ? aiPanels : null}\n' +
+    '=======\n' +
+    headSide +
+    '>>>>>>> HEAD' +
+    close;
+  writeFileSync(p, src.slice(0, oi) + conflict + src.slice(ci + close.length), 'utf8');
+}
+const r9 = runGate(t9);
+const pairingReported = /配对解析不出来/.test(r9.out);
+check('A7 照真实现场造靶（两侧各一枚 <aside> 共用一个 </aside> ⇒ 配对必然失败）→ 仍须报 marker，不许报配对失败',
+  r9.rc === 1 && /仍带冲突标记/.test(r9.out) && !pairingReported && !/腿 [A-D]/.test(r9.out),
+  `RC=${r9.rc} 报了配对失败=${pairingReported}`);
+
 // —— 脱牙对照：把四条腿的命中集合清空，四臂都要因此失能（有一条仍能红 = 它没挂在那条腿上）
 const neuter = join(scratch, 'gate-neutered.mjs');
 const gateSrc = readFileSync(GATE, 'utf8');
@@ -174,6 +229,25 @@ writeFileSync(neuter, gateSrc.replace(ANCHOR, 'handWritten.length = 0; strayText
   }
   check('脱牙对照 摘掉四条腿的命中集合后，A1/A2/A3/A5 都不得仍然报红（四臂都得失能）',
     survived.length === 0, survived.length ? `摘牙后仍红：${survived.join('/')}` : '四臂全部失能');
+}
+
+// 🔴 第二把脱牙：摘掉 **marker 分流** 那一个 `if`。这一把量的是 A6/A7 有没有挂在分流上 ——
+// 判据里"配对失败"那一档在分流被摘掉后**仍然会红**（A7 的靶配对就是失败的），所以这里的
+// 失能判据不能是 `rc === 0`，只能是"不再报出 marker 那一句"。用错判据会把这把脱牙读成"臂还有牙"。
+const neuterMarker = join(scratch, 'gate-neutered-marker.mjs');
+const MARKER_IF = "if (/^<<<<<<< |^=======|^>>>>>>> /m.test(scannedWindow)) {";
+if (!gateSrc.includes(MARKER_IF)) {
+  throw new Error('判据里 marker 分流那个 `if` 的字面形状变了，第二把脱牙没有插入点，拒绝猜（不改判据凑读数）。');
+}
+writeFileSync(neuterMarker, gateSrc.replace(MARKER_IF, 'if (false) {'), 'utf8');
+{
+  const stillReported = [];
+  for (const [name, tree] of [['A6', t8], ['A7', t9]]) {
+    const n = runGate(tree, neuterMarker);
+    if (/仍带冲突标记/.test(n.out)) stillReported.push(name);
+  }
+  check('脱牙对照 摘掉 marker 分流后，A6/A7 都不得仍然报出"仍带冲突标记"（两臂都得失能）',
+    stillReported.length === 0, stillReported.length ? `摘牙后仍报 marker：${stillReported.join('/')}` : '两臂全部失能');
 }
 
 rmSync(scratch, { recursive: true, force: true });
