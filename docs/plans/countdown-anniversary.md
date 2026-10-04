@@ -3291,3 +3291,20 @@ W0b ─> 随时可做（台账那半要等文件干净）
     ⇒ 沙盒是**在那笔之前**装的，`reinstall-all` 判定"不一致 ⇒ 跑 pod"是对的，不是探针误判。
   - ⏭ 下一步（不等别人）：安静窗口里**重试** `pod install`（非确定性 ⇒ 重试是合法手段，不是碰运气，
     且失败仍会由 `reinstall-all` 的沙盒判据拦住），成了就 `--only ios` 重装 + `verify-mobile-card-export-ios.sh` 取 W7-G3。
+
+- ㊔ **Goal ⑤-4 的四端账：每一格的"装的是当前产物"都按该端的输入集对账到 HEAD**（04 15:4x，纯只读）
+  - 载体一直在动（15:07 之后又落了 4 笔），所以"13:20 装过 android / 10:4x 装过 windows / 15:11 打过 mac"
+    这三句不能只报载体 SHA 就完事 —— 要逐端量**那一端的打包输入**自它的读数以来改没改。现量：
+    | 端 | 读数 | 读数时载体 | 该端输入集自那以后改了几枚 | 结论 |
+    |---|---|---|---|---|
+    | android | 链 U 13:20 `RC_ANDROID=0`（11 项全过） | `b995597a`（13:10） | `apps/mobile packages apps/web/src` = **2 枚，全在 `apps/mobile/evidence/`**（成品图 + README） ⇒ 产品输入 **0** | 读数对 HEAD 仍成立，不必重跑 |
+    | windows | 链 S 10:4x `RC_SYNC=0`+`RC_PACKAGE=0`+七条取证 | `6105ba3b` | `apps/desktop-windows apps/web scripts/windows` = 7 枚，**非取证 0 枚**（逐条都是我这轮入库的 `apps/web/evidence/**`） | 同上 |
+    | macOS（打包/产物栏） | 链 W 15:11 `RC_MAC_PACKAGE=0` | `117386a1` | `apps/desktop-macos apps/web` = **0 枚** | 同上 |
+    | iOS | 未取 | — | — | 链 P 排队中（㊓ 末） |
+  - ⚠️ 这条对账**只**回答"装上的还是不是当前提交的产物"，不回答"装没装"。后一句 mac 仍差
+    "装进 `/Applications`"那一格（#23，常驻实例 pid 772 + 写死路径 + 共享 WebKit 容器，三条硬的），
+    iOS 那格现在差的是 `pod install`（链 P 的有界重试）。
+  - 📌 顺手把 Goal ② 点名的"零法务变更"再量了一次，与 ㉗（Android 侧）/ ㊸（iOS 侧）同向且更省事（不用读 diff）：
+    `apps/mobile/ios/Heyta/Info.plist` 里 `NS*UsageDescription` **只有一枚** = `NSUserNotificationsUsageDescription`（那是 W9 的），
+    `AndroidManifest.xml` 的 `<uses-permission>` 只有 `INTERNET / POST_NOTIFICATIONS / SCHEDULE_EXACT_ALARM` ⇒
+    **卡片导出没给任何一端添权限**，`permissions.ts` 那句"不申请照片"逐字仍为真。
