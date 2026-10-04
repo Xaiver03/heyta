@@ -3014,11 +3014,18 @@ mac 端产出两枚（壳自截屏 + 内嵌 WebView 那张），所以"逐张看
 
 | # | 路径（装置原样，别抄 glob） | 钉到哪一步 | 判据（AGENTS §6.1.1 那列） |
 |---|---|---|---|
-| 1 | `/tmp/heyta-reinstall-mac-installed.png` | mac：安装副本启动后自截屏 | 非空白 **且** 主蓝命中（§7 第 82 条） |
-| 2 | `/tmp/heyta-reinstall-mac-installed.png.webview.png` | mac：壳内 WebView 那一层 | 同上，另证"渲染的是共享 UI 不是原生占位" |
-| 3 | `/tmp/heyta-reinstall-android.png` | android：模拟器全新安装后启动 | 非空白 + 主蓝命中 |
-| 4 | `/tmp/heyta-reinstall-ios.png` | ios：模拟器装完后启动 | 非空白 + 主蓝 + **新鲜度**（已装 main.jsbundle 比源码新） |
-| 5 | `$W/dist/windows/packaged-first-run.png`（绝对路径，`$W`=载体） | windows：远端打包态首屏 | 真应用渲染（不是通道试验页） |
+| 1 | `/tmp/heyta-reinstall-mac-installed.png` | mac：安装副本启动后**窗口**自截屏 | 🔴 **不据它判红**：脚本只在这张上打 ⚠️"WebView 没合成进窗口，本机常态"（`reinstall-all.sh:122-123`） |
+| 2 | `/tmp/heyta-reinstall-mac-installed.png.webview.png` | mac：壳内 WebView 那一层 | ✅ **主蓝命中的就是这张**（`:102` 明写"主蓝必须数第二个参数"），阈值 **≥ 20**；实测同一秒窗口截图主蓝 0 / WebView 79 |
+| 3 | `/tmp/heyta-reinstall-android.png` | android：模拟器全新安装后启动 | ✅ 非空白 + 主蓝 ≥20，**但先要过前台窗口门**：`mCurrentFocus`/`mResumedActivity` 里没有 `$PKG` 就**不打分**（`:315-340`），两枚探针都读不到也判红并打印原文 |
+| 4 | `/tmp/heyta-reinstall-ios.png` | ios：模拟器装完后启动 | ✅ **先过新鲜度**：已装 `main.jsbundle` 的 mtime ≥ 源码最新 mtime；算不出源码 mtime 或读不到已装 bundle 都**直接判红且不打分**（`:449-456`），过了以后才走 `shot_ok_logged`（非空白 + 主蓝）⇒ **新鲜度红的那一趟根本没有这张图**，别把"缺图"读成独立失败 |
+| 5 | `$W/dist/windows/packaged-first-run.png`（绝对路径，`$W`=载体） | windows：远端打包态首屏 | ✅ 真应用渲染（不是通道试验页）；文字判据是 `ADD_APPX=OK` + `RESULT=OK`（`:44` 那张表） |
+
+🔴 **更正我自己 03:25 写的前两行**：当时我把"非空白 + 主蓝命中"同时挂在了第 1、2 张上。
+现读提交态那份脚本（blob `036ce09a`，`git show HEAD:scripts/reinstall-all.sh` 的 `:85-129`）后确认：
+**主蓝数的是第 2 枚（`.webview.png`）**，第 1 枚（窗口截图）在 macOS 上常态就是主蓝 0，
+脚本对它**只打 ⚠️ 不判红**（`looksBlank` 才判红）。
+⇒ 收口时如果拿第 1 张的"主蓝 0"去报缺陷，那是**探针读错了对象**；
+反过来把第 1 张当"渲染了共享 UI"的证据，也是同一枚探针的另一种误用。
 
 ⚠️ 两条装置自己写下的前提，收口时别忘：
 ① 前四条在 **`/tmp` 共享路径** ⇒ 装置会在打印的同一刻 `cp -p` 抄进私有证据目录并**回读校验**
