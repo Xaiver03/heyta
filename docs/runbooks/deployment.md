@@ -228,6 +228,16 @@
   （落地页本身也是 SPA；`/en/` 走同一段）。`/assets/` 单独一段长缓存。
 - ✅ `location /app/` → `alias /var/www/heyta-app/;` + `try_files $uri $uri/index.html /app/index.html`，
   `Cache-Control: no-cache`；`/app/assets/` 单独一段长缓存。
+- 🔴 **`location /app/` 与 `location /app/assets/` 都必须 `include /etc/nginx/mime.types;` 之后再补自己的 `types {}`。**
+  这台机器的 `/etc/nginx/mime.types`（nginx/1.18.0 Ubuntu）里既没有 `wasm` 也没有 `webmanifest`，
+  于是那两类文件一律答 `application/octet-stream`；而 **`types` 在嵌套层级是替换继承、不是叠加**，
+  只补一条会把同一段里的 `.js` / `.css` / `.png` 一起打回默认类型（模块脚本直接不执行）。
+  已按这个形状修过两次：`.wasm`（2026-09-27，`instantiateStreaming` 被拒）与
+  `.webmanifest`（2026-10-04，G-60：`/app/manifest.webmanifest` 曾被答成 octet-stream）。
+  判据在 `e2e/live-site/live-manifest.spec.ts`（两腿：真清单判 true、被 SPA 兜底成 HTML 的路径判 false）。
+  ⚠️ **旧域名 `heyta.finlaw.cloud` 那份只补过 `.wasm`，没补 `.webmanifest`**（现量：那份文件里
+  `application/wasm` 在、`webmanifest` 无）。2026-10-04 把同一份判据指过去得 **2 failed / 1 passed**，
+  所以**回滚到旧域名会把清单类型这一处带回去**（图标与 SW 那侧两域名都正常）。
 - 🔴 `location = /app { return 301 /app/$is_args$args; }` **必须单独写**：`location /app/`
   **不匹配** `/app`，而落地页给出的地址去掉尾斜杠是**故意的**（`apps/landing/src/lib/app-url.ts`）。
   少了它，`/app` 会掉进 `location /` 拿回**落地页 HTML**（HTTP 200、看着正常，点进去却是别的页面）。
