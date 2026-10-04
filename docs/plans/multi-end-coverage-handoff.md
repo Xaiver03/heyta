@@ -1097,3 +1097,18 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   已从**只住 `/tmp`** 复制到 durable（两枚 md5 现量相同 `8ac4f228…`，原件 mtime 04:05）——
   注意它是**手跑那一趟**用的启动器，链跑 ③ 走的是链里那段（不经它），所以这条只是让
   §5 里那句"不带 `--go` 退 3"的演示在 `/tmp` 被清之后仍然可复现。
+- 🔴 **① 的启动器从"一趟四端"改成"两趟各过一次门"（v10，19:4x）**，改的是我这枚启动器，仓里脚本一行没碰。
+  成因是两条时长读数叠出来的窗口内空档：`scripts/reinstall-all.sh:161` 的端序是
+  `mac windows android ios`（**设备面在最后两段**），而 mac 段这轮**真的会走公证** ——
+  `package-app.sh:275` 那条"没有 ASC key 就跳过"的 elif 不进（`~/Desktop` 里那枚 `.p8` 在位），
+  公证上限 `HEYTA_NOTARY_TIMEOUT` 默认 **900s**，再加 windows 段是远端打包
+  ⇒ 从闸门放行到第一次 `adb uninstall` 之间隔着 **15–25 分钟**，那一格够别人把设备用上。
+  AGENTS §8.9 的原文要求是"不动别人正在用的设备"，不是"起跑那一刻没人在用"。
+  做法用仓里现成的两条命令（不自造参数形状）：`pnpm reinstall:desktop` = `--only mac,windows`，
+  `pnpm reinstall:mobile` = `--only android,ios`；两趟之间**再过一次规范闸门**，关上就不动设备面。
+  🔴 **随之改变的读数形状，记账时必须两行一起抄**：`INNER_EXIT` 现在是**两趟之和**，
+  而第二趟被闸门跳过时它可以等于第一趟的 `0` —— 那种情况下真正说明"① 没做完"的是
+  `FRESH/EXPECTED`（图没凑齐 ⇒ 启动器退 3），**不是那个 0**。
+  七臂夹具 `~/.heyta-window-rigs/heyta-reinstall-split-fixture.sh` 现量 GREEN，
+  其中 A2 是"门关了不许跑设备面"、A7 是变异臂（把第二次 `run_gate` 摘掉 ⇒ A2 立刻变红），
+  所以这道门**有牙**；既有两把夹具（relask 八臂、设备占用六臂）复跑仍 GREEN，无回归。
