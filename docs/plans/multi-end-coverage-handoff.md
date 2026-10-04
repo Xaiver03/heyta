@@ -1404,3 +1404,28 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   否则等满之前就被 `timeout` 掐掉，闸门连 `REDS=` 都印不出来 ⇒ 反而把"探针坏了"和"窗口不在"混成一格。
   ⚠️ 若将来真观察到连续 ≥5 轮都是 `REDS=load` 而链日志里每轮都有 `BUILD rc=0`，再来改这一对旋钮，
   并且改动必须**两条一起**（WAIT 与 timeout）—— 记在这里是为了让下一次不必重新推一遍。
+
+#### 20:32 对 Goal 五段做一次完成度自查（全部现量，凭记忆的那条被抓出来了）
+
+- **④ 父子层级选择器：在当前 `HEAD` 逐项复核过，不是凭上一轮的结论**：
+  `git show HEAD:packages/app-host/src/project-actions.ts` 里
+  `setParent(entityId: string, parentId?: string): Promise<void>`（第 109 行，签名正是目标点名的形状）；
+  `packages/domain/src/project-hierarchy.ts` 的拒绝词表含 `self` / `cycle` / `parent_not_top_level`
+  （即"一层深度 + 环 + 自指"三条守卫都在领域层，注释里写明 `self` 为什么**先于**"新父是否存在"判）；
+  `git grep -l setParent HEAD -- apps packages` 命中移动端 `ListsSection.tsx`/`TaskDetailSheet.tsx`
+  与 web 端 `features/projects/store.ts`/`features/tasks/SubtaskPicker.tsx`，另有
+  `apps/mobile/tests/subtask-entry.spec.ts` + `apps/web/tests/subtask-picker.spec.tsx` 两层用例；
+  词条在 `zh-CN.ts` 与 `en.ts` 两边都有（数量不等不是缺陷：`check:ui-language` 钉的是**键集**对等）。
+- **⑤ 三笔登记仍在**：`## B41.`/`## B42.`/`## B45.` 在 **HEAD / 索引 / 工作树** 三份里各命中 1 处
+  （行号 2885/2918/2958），且此刻 `git diff --numstat -- BLOCKED.md` **空** ⇒ 别人收口时没把我的段落抹掉
+  （这是本线记过的"反向事故"形状，所以每次都要量三处，不量一处）。
+- 🔴 **被抓出来的一条过账**：任务清单里 ② 被标成"已完成"。按本 Goal 的口径它**没闭合**，两条理由：
+  ① 它自己那条描述就写着"还差的最后一步：`check:ai-e2e` 那段的干净读数"（02:35 那趟整条断在本机内存锁上）；
+  ② Goal 要的是"**同一窗口内**三段 + 全量 check"，而 ①③ 至今一次没跑 ⇒ ② 必须与它们共用那一趟窗口与同一个载体 sha。
+  ✅ 已把这条任务改回 in_progress 并重写判据口径。
+- ⚠️ 三个旧段数（`62`/`63`/`74`）**都是不同时刻的快照**，20:28 现量只认这一把尺：
+  `require("./package.json").scripts.check.split(" && ").length` = **82**，
+  Goal 点名的三段是第 **68 / 69 / 70** 段。以后报"可过段数"必须带**同一趟**的分母与这三个下标，
+  不许再抄其中任何一个数。
+- **①③ 仍未起跑**（20:31 现量：负载 12→83 反复、`sup-reinstall.sh` 别人那条已 9h52m、
+  booted 模拟器涨到 **5** 台）。设备面与负载任一不成立就不起，这一格没有任何例外。
