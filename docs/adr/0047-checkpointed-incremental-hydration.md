@@ -84,7 +84,9 @@ HTTP + PostgreSQL 测试验证了：服务端可以删除旧前缀，新设备�
 - `scripts/measure-hydration.mjs` 的 Node + 真实 SQLite 测量记录在
   `/tmp/heyta-aed-hydration-final.log`：100,000 条历史全量恢复 9.5672s，使用
   checkpoint 后只重放 100 条尾部约 30.9ms。该数据不能冒充移动端 Hermes
-  性能结论。
+  性能结论。当前工作树在重建 `packages/storage` 与 `packages/op-log` 后于
+  2026-10-04 复跑同一脚本，结果为全量 10,790.9ms、尾部 40.1ms，且
+  `fullScans=0`；原始输出保存在 `/tmp/heyta-aed-hydration-current-20261004.log`。
 
 实现与最终全仓/多端收尾结果见
 [AED 实施证据](../research/aed-implementation-evidence.md)。

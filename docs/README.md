@@ -94,7 +94,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [0008](adr/0008-vector-clock-limit.md) | 向量时钟上限 **20 → 100**：把墙挪远、**不假装拆掉**（真正的修法是因果安全压缩，未做） | ✅ **已接受** |
 | [0046](adr/0046-lossless-vector-clock-frontiers.md) | 取代 0008：向量时钟无损保存/比较/下载；超大时钟显式拒绝；签名因果前沿作为后续压缩边界 | ✅ **已接受** |
 | [0047](adr/0047-checkpointed-incremental-hydration.md) | 可校验 checkpoint 驱动增量水合；损坏时完整回退；归档必须被 checkpoint 覆盖 | ✅ **已接受** |
-| [0050](adr/0050-e2ee-key-lifecycle-and-recovery.md) | E2EE 密钥生命周期与恢复；[威胁模型](research/e2ee-key-lifecycle-threat-model.md)。Web 与移动端恢复码 UI 已嵌入既有同步/设置入口；Web 真实 PostgreSQL 的恢复、旧历史迁移、新设备重建、中断续传与发布后重启恢复 5/5 已验，Android Keystore 已验，移动 UI 互操作与 iOS 运行时续验中 | 🔄 实施中 |
+| [0050](adr/0050-e2ee-key-lifecycle-and-recovery.md) | E2EE 密钥生命周期与恢复；[威胁模型](research/e2ee-key-lifecycle-threat-model.md)。Web 恢复、迁移、撤销后重新认证及 root rotation、AI 字段出境已有真实 HTTP/PostgreSQL 证据；Android/iOS 当前 Release 与 Node/SQLite 的 Vault 双向互读已有独立证据，iOS legacy migration、移动本地撤销收尾与实体设备语义仍待完成。逐项状态、失败恢复与证据以 ADR 当前边界表为准 | 🔄 实施中 |
 | [0051](adr/0051-mobile-reminder-delivery.md) | 原生提醒调度与回执语义；状态与平台证据回填 [多端覆盖计划](plans/goal-multi-end-coverage.md) §4 | 🔄 实施中 |
 | [A/E/D 证据](research/aed-implementation-evidence.md) | 原 A/E/D 范围的实现与验收记录；不能代替后续 B/C 验收 | 已记录 |
 | 🔴 [0048](adr/0048-deletion-four-states-and-the-no-physical-erase-boundary.md) | **删除的四态语义**（2026-10-03，回收站/归档计划的 W0 交付物）：四态定义与 I1–I5 五条不变量；🔴 **I5「隐藏由层负责，不由调用点负责」**（由本轮实测的 D9 搜索漏墓碑 / D11 归档对 AI 全可见共同逼出）；`purgedAt ⇒ deletedAt` 且**不是物理擦除**；**不设自动保留期**的三条论证 + 重新讨论的终点条件；回收站**不收提醒与专注记录**是语义差异而非排期；物理擦除两条候选与四条**明确否决**；壳级窄门面不提供误删恢复是边界不是缺陷；§8 政策那句按实话改写并标**法务口径待最后确认**；§9 逐条列「有没有常驻机器判据」（含两条还没有的） | ✅ **已接受**（§8 措辞待产品负责人逐字确认） |

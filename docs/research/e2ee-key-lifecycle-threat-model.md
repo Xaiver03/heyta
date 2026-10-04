@@ -63,3 +63,5 @@ provider；功能派生密钥只约束相应密文用途，不提升调用者权
 这些边界的运行时判据在 `packages/local-api/tests/`、`packages/ai/tests/` 与
 `packages/app-host/tests/ai-tool-run.spec.ts`。本轮全量测试中 local-api 103 条、AI 222 条通过；
 它们与 Vault 迁移判据分别成立，不能互相替代。
+
+验收自身也属于秘密边界。`pnpm check:vault-diagnostics` 通过真实浏览器失败验证自动 aria 快照、输入调用日志和断言不会把恢复表单内容落盘；负向对照移除保护时必须检出运行时合成秘密。Vault 截图仍显式遮罩恢复码，trace/video 关闭，密钥与存储泄漏断言只输出布尔值；模型请求观察器只保留内存数据。该门禁已进入全仓检查及 `verify:vault-web` 前置，不能仅凭截图已打码就认定诊断产物安全。
