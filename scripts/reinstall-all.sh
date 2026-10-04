@@ -395,7 +395,38 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     #    这一步以前**不在流程里** —— `ios/Pods/` 是 gitignored 的，隔离检出里换一次 HEAD
     #    沙盒就对不上了，而脚本原来只会打印"xcodebuild 失败 + 日志末尾"，
     #    读起来像产品坏了（实际缺的是构建输入）。
-    #    env 那一串与 `scripts/check-native-deps.mjs` 打印的修法同源，**改一处要改两处**。
+    #    env 那一串与 `scripts/check-native-deps.mjs` 打印的修法同源，**改一处要改两处** ——
+    #    自 2026-10-04 起这一句由 `check:native-deps` 的第三条规则钉住（不靠注释）。
+    #
+    #    🔴 那串 env 里**唯一承重的**是"至少有一个 locale 变量"。四臂实测（同一棵树、
+    #    同一分钟内、`/tmp/pod-arms-*.txt`）：
+    #      · `LANG` 与 `LC_ALL` **都不给** ⇒ 崩在 `config.rb:167 installation_root`
+    #        （`Unicode Normalization not appropriate for ASCII-8BIT`，
+    #        `Encoding.default_external=US-ASCII`）。
+    #      · 只给 `LANG`（显式 `-u LC_ALL`）⇒ ✅ `Pod installation complete!` 84 deps/83 pods。
+    #      · 给 `LANG`+`LC_ALL` ⇒ ✅ 同上。
+    #    ⚠️ 所以 `LC_ALL` **不是**必需项，这里不给它；`LANG` 必须给。
+    #
+    #    🔴 而 `ArgumentError - path name contains null byte`（`project.rb:452 realdirpath`）
+    #    与 locale **无关**：给它 `LANG`+`LC_ALL` 的那一趟（D 臂）就崩了，而 5 秒前同样 env
+    #    形状的两趟（A/B）都成功。⇒ 它是**逐趟非确定性**的（上游 CocoaPods #12798 / #12866，
+    #    两条都还 open，后者标题就写着 "sometimes"）。
+    #    这也**否证**了 traps #154 当时的结论"变量是这棵长活的树本身"——同一棵树上三趟两成
+    #    一崩，树不是那个变量。⚠️ 它当时另一条否证（"换一棵新克隆就好了"）依然成立，只是
+    #    解释力更弱：新克隆也一样可能崩，只是没撞上。
+    #
+    #    ⇒ 这里的处置是**有界重试**（每趟 ~10 s，最多 3 趟，逐趟落日志与 RC），
+    #      而不是改 env。判据没放松：仍然要求 `Manifest.lock == Podfile.lock`，
+    #      三趟全崩就照常判红。
+    #
+    #    🔴 而且**不再因为"哈希已经相等"就跳过这一趟**（2026-10-04 实测的理由）：
+    #    上一趟 `pod install` 崩在"Generating Pods project"中段时，`Manifest.lock` 已经写完、
+    #    与 `Podfile.lock` 逐字节相同，但 `Pods/Headers/Public/RCTSwiftUI/` 整层没生成 ——
+    #    于是"沙盒一致"的哈希判据**被一个半写沙盒满足**，xcodebuild 接着报
+    #    `fatal error: module map file '…/RCTSwiftUI.modulemap' not found`（4 个 target 全挂）。
+    #    那一次失败是**响亮**的（装包段判红），所以这不是假绿；但它把"缺构建输入"
+    #    伪装成"产品构建不过"，正是本文件第 396 行自己写过的那个形状。
+    #    ⇒ 现在每次都跑（幂等、~10 s），把"沙盒完整"这件事交给生成器本身，而不是交给一个哈希。
     IOS_IOS_DIR="$ROOT/apps/mobile/ios"
     PODS_SYNC=OK
     LOCK_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | cut -d' ' -f1)"
@@ -403,11 +434,26 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     if [ -z "$LOCK_SHA" ]; then
       echo "  🔴 读不到 apps/mobile/ios/Podfile.lock —— 无法判断沙盒该不该装"
       PODS_SYNC=FAIL
-    elif [ "$LOCK_SHA" != "$MANI_SHA" ]; then
-      echo "  Pods 沙盒与 Podfile.lock 不一致（或缺 Manifest.lock）→ 跑 pod install…"
-      if (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
-          RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) \
-          >/tmp/heyta-reinstall-pod.log 2>&1; then
+    else
+      if [ "$LOCK_SHA" = "$MANI_SHA" ]; then
+        echo "  Pods 哈希本已一致，仍重跑 pod install（半写沙盒不会被哈希相等挡住）…"
+      else
+        echo "  Pods 沙盒与 Podfile.lock 不一致（或缺 Manifest.lock）→ 跑 pod install…"
+      fi
+      POD_OK=0
+      for POD_TRI in 1 2 3; do
+        POD_LOG="/tmp/heyta-reinstall-pod-$POD_TRI.log"
+        if (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
+            RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) \
+            >"$POD_LOG" 2>&1; then
+          POD_OK=1
+          break
+        fi
+        echo "    ⚠️ 第 ${POD_TRI} 趟失败：$(grep -m1 -oE "ArgumentError - [^\"]*|\[!\] [^\"]*" "$POD_LOG" | head -1)（日志 ${POD_LOG}）"
+      done
+      cp -f "$POD_LOG" /tmp/heyta-reinstall-pod.log 2>/dev/null || true
+      if [ "$POD_OK" = 1 ]; then
+        [ "$POD_TRI" -gt 1 ] && echo "    （第 ${POD_TRI} 趟才成功 —— 与上面那条非确定性记录一致）"
         MANI_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Pods/Manifest.lock" 2>/dev/null | cut -d' ' -f1)"
         NEW_LOCK_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | cut -d' ' -f1)"
         if [ "$NEW_LOCK_SHA" != "$LOCK_SHA" ]; then
@@ -415,18 +461,18 @@ if printf '%s' "$WANT" | grep -q "ios"; then
           # 提交态**是**可复现的）。这里只把差异如实打出来，不静默。
           DIFFN=$(diff <(git -C "$ROOT" show HEAD:apps/mobile/ios/Podfile.lock 2>/dev/null) \
                       "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | grep -c '^[<>]')
-          echo "  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 ${DIFFN} 行）—— 见 /tmp/heyta-reinstall-pod.log"
+          echo "  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 ${DIFFN} 行）—— 见 $POD_LOG"
         fi
         if [ -n "$MANI_SHA" ] && [ "$MANI_SHA" = "$NEW_LOCK_SHA" ]; then
           echo "  ✅ 沙盒已同步（Manifest.lock == Podfile.lock）"
         else
           echo "  🔴 pod install 之后 Manifest.lock 仍与 Podfile.lock 不一致"
-          tail -10 /tmp/heyta-reinstall-pod.log | sed 's/^/     /'
+          tail -10 "$POD_LOG" | sed 's/^/     /'
           PODS_SYNC=FAIL
         fi
       else
-        echo "  🔴 pod install 失败（日志末尾：）"
-        tail -10 /tmp/heyta-reinstall-pod.log | sed 's/^/     /'
+        echo "  🔴 pod install 连试 3 趟全失败（最后一趟日志末尾：）"
+        tail -10 "$POD_LOG" | sed 's/^/     /'
         PODS_SYNC=FAIL
       fi
     fi
