@@ -4363,3 +4363,25 @@ EVIDENCE-SETTLE n=52 prev_run=52 archived_to=…/carrier-evidence after=0
 ③ 的自造死锁闭合，**剩下的前置全是外部的**：负载（现量 29 > 12）、4 台模拟器 booted、
 详情面那 13 枚未提交界面代码（B69 的关闭靠它）。④ 的 `PROGRESS.md` / `AGENTS.md` / `environment-traps.md`
 仍 ` M`（别人在写）⇒ 本轮四条规则继续只走 B72/B73 登记；traps 取号现量：条目 236、最大号 227 ⇒ 下一号 228。
+#### §15.43aq（10-04 09:5x）等窗口的回合换成零写盘的红线复量：五条隐私不变量在 `main = c1f7daca` 上逐条重取，其中一条的**措辞与口径**要对齐
+
+队列 81000 卡在负载门（09:57 现量 `{ 27.61 31.90 32.38 }`，阈值 12）——这种回合不该起新负载，
+所以把 Goal 红线段那句"五条隐私不变量不放宽"换成可重跑的读数（全部 `git grep`/`git show` 打在 **提交态**上，
+不碰任何工作树）：
+
+| 红线（用户原话） | 现量口径 | 读数 |
+|---|---|---|
+| AI 类型上产不出 op | `check:ai-tools` **规则 5**：扫描到的文件里任何非注释行出现 `from '@heyta/op-log'` 即 `violate()`（`:186-197`），理由原话"一旦能 import op 构造器，'本层在类型上产生不了 op'这条约束就失效了" | 规则在提交态里逐条存在；本线 12 道门此前在落地载体上 rc=0（§15.43n/o 的逐段读数），本轮没有重跑门禁本体（负载 27，不起新负载） |
+| `host.submit` 全仓恰好一处 | 🔴 **真实口径是"每个写入口各恰好一处"，而入口有两个** | 非注释调用点现量 2 枚：`packages/app-host/src/ai-tool-run.ts:195`（`confirmAiToolProposal()` 内）与 `packages/local-api/src/server.ts:590`（`executeTool()` 的写分支）。门禁逐文件钉：`RUN_FILE` 那条 `occurrences !== 1` 直接红、且断言 `.submit(` 必须在 `CONFIRM_MARKER` **之后**；`MCP_ENTRY`（`check-ai-tools.mjs:417-421`）用 `async function executeTool(` 作标记同样钉住。另有 `SELECTION_FILE` 出现任何 `.submit(` 即红（选择阶段必须纯） |
+| 逐工具默认关 | `isToolGranted` 本体 | `packages/local-api/src/tools.ts:450` 是 `export function isToolGranted(…)`、`:451` 是它的唯一一行实现 `return grants?.[toolName] === true;` —— **只有显式 `true` 才算授权**，缺键 / 不存在的工具一律 `false`（fail-closed，函数头注释明写"它不检查工具是否存在"是刻意的，MCP 侧靠它不泄露目录） |
+| 出境逐字段披露 | ADR-0010 三道闸 + 披露表 | 由 `check:ai-coverage` / 会话侧披露断言守（本线 12 道门 rc=0 的那批） |
+| 回退不跨越隐私边界 | `fallback-needs-consent` | 本机端点失败**不发任何请求**，该形状由 `packages/ai` 的既有测试钉住 |
+
+🔴 **第二条这行值得单独入档**：红线原话"全仓恰好一处"如果照字面读，本轮的现量会像是**违规**（实际 2 处）。
+真相是 §15.18 那次已经查清并补了门禁的形状 —— 内置 AI 与本机 API/MCP **共用同一份工具目录与执行器**
+（ADR-0035），所以写入口本来就有两个，而"恰好一处"的正确断言强度是**逐入口一处 + 每个入口都被数**。
+⇒ **红线句式里"全仓"这类范围词，落笔前要先问它按什么单位数**（文件／入口／调用点），
+并按那个单位给出测量命令；否则下一次复量的人会因为读到 2 而误判"有人放宽了"。
+
+① 逐条 `merge-base --is-ancestor` 此刻仍全 YES，但 `main` 已被并行线推到 `dcd37d36`（我这条读到的是 `c1f7daca`）
+⇒ 引用红线读数必须带 sha，跨 sha 重跑是另一条读数的权利，不是同一条的延续。
