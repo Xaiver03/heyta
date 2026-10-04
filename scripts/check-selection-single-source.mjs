@@ -711,6 +711,111 @@ if (anyTrace.length < FACES.length) {
   );
 }
 
+/**
+ * H：谁**读**某一类的选中，谁就必须把那一类**喂进回落**。
+ *
+ * 这条是 §8.43 那节课的常驻形态。当时是靠人按"谁在读这一类"去数屏幕，
+ * 数出来任务屏是第三个持有便签全集的宿主；但"数"这件事本身会漂 ——
+ * 下一位新加一个读 `useSelected('habit')` 的屏，没有任何一层会提醒他回落要一起接。
+ *
+ * 🔴 触屏端与 Web 端**必须是两套规则**，因为两端的回落**挂载方式**不同（这是现量，不是偏好）：
+ *  - `apps/mobile`：回落按屏跑（每个屏各自 `pruneSelectionAgainst(…)`），所以规则是**同文件**配对。
+ *  - `apps/web`：一份中央回落挂在 store 上（`lib/selection.ts` 的 `pruneSelectionFromEntities`），
+ *    各视图只读不喂 ⇒ 规则改成"中央那份必须覆盖本宿主**读到的每一类**，而且真的被接线调用过"。
+ * 把两端写成同一条"同文件配对"会得到一整片假红；反过来写成"整棵树里有喂就算"会得到假绿 ——
+ * §8.43 第 7 节那次自我否证就是因为"别的文件也在喂"被当成了"这一屏有人负责"。
+ */
+const readKindRe = (kind) => new RegExp(`useSelected\\(['"]${kind}['"]\\)`);
+/** 取 `调用名(` 之后第一个花括号块的原文（大括号配对，不是"往后找 N 个字符"）。 */
+function objectBlocksOf(src, callRe) {
+  const out = [];
+  let m;
+  const re = new RegExp(callRe.source, 'g');
+  while ((m = re.exec(src)) !== null) {
+    const braceAt = src.indexOf('{', m.index + m[0].length - 1);
+    if (braceAt === -1) continue;
+    let depth = 0;
+    for (let i = braceAt; i < src.length; i += 1) {
+      if (src[i] === '{') depth += 1;
+      else if (src[i] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          out.push(src.slice(braceAt + 1, i));
+          re.lastIndex = i;
+          break;
+        }
+      }
+    }
+  }
+  return out;
+}
+const feedKeysOf = (blocks) => {
+  const fed = new Set();
+  for (const block of blocks) {
+    for (const kind of vocab) {
+      if (new RegExp(`(^|[,{\\s])${kind}\\s*:`).test(block)) fed.add(kind);
+    }
+  }
+  return fed;
+};
+
+const readsSeen = [];
+for (const file of files) {
+  const rel = path.relative(ROOT, file);
+  if (/\/lib\/selection\.tsx?$/.test(rel)) continue; // 定义处不算读方
+  const src = stripComments(readFileSync(file, 'utf8'));
+  const read = vocab.filter((kind) => readKindRe(kind).test(src));
+  if (read.length === 0) continue;
+  readsSeen.push([rel, read]);
+  if (rel.startsWith('apps/mobile/')) {
+    const fed = feedKeysOf(objectBlocksOf(src, /pruneSelectionAgainst\(\s*\{/));
+    const missing = read.filter((kind) => !fed.has(kind));
+    if (missing.length > 0) {
+      failures.push(
+        `断言 H：${rel} 读了 ${missing.map((k) => `'${k}'`).join('/')} 的选中，却没把这几类喂进自己那一处\n` +
+          `  \`pruneSelectionAgainst({ … })\`。触屏端的回落**按屏跑**：这一屏不喂，选中的那条被删掉时\n` +
+          `  这一屏的面板就不会自己关 —— 而别的屏在喂**不构成理由**（见工单 §8.43 第 7 节：\n` +
+          `  把自己界面的正确性寄在别人的挂载策略上，一次"把浮层改成条件挂载"的重构就会让它当天变成真缺陷，\n` +
+          `  且没有任何一层会红）。\n` +
+          `  全集从这一屏已经拿得到的动作集里取（` +
+          `\`actions.listTasks()\` / \`listHabits()\` / \`createNoteActions(host).listNotes()\`），不许传筛完的那一截。`,
+      );
+    }
+  }
+}
+// Web：中央回落必须覆盖本宿主读到的每一类，而且真的被调过（挂在 store 变化上，不挂在某个屏的挂载上）。
+const webReads = new Set(readsSeen.filter(([rel]) => rel.startsWith('apps/web/')).flatMap(([, r]) => r));
+const webGlue = 'apps/web/src/lib/selection.ts';
+const webGlueSrc = stripComments(readFileSync(path.join(ROOT, webGlue), 'utf8'));
+const webFed = feedKeysOf(objectBlocksOf(webGlueSrc, /pruneSelection\(\s*selection\s*,\s*\{/));
+for (const kind of webReads) {
+  if (!webFed.has(kind)) {
+    failures.push(
+      `断言 H：${webGlue} 的中央回落没有覆盖 '${kind}'，但 apps/web 里有视图读它。\n` +
+        `  Web 端的规则是"一份中央回落挂在物化状态上"，少一类就是那一类的选中被删掉后面板不自己关。`,
+    );
+  }
+}
+const webGlueCallers = files.filter(
+  (f) =>
+    path.relative(ROOT, f).startsWith('apps/web/') &&
+    !path.relative(ROOT, f).endsWith('lib/selection.ts') &&
+    /\bpruneSelectionFromEntities\(/.test(stripComments(readFileSync(f, 'utf8'))),
+);
+if (webGlueCallers.length === 0) {
+  failures.push(
+    `断言 H：apps/web 里除了 ${webGlue} 自己，没有任何文件调用 \`pruneSelectionFromEntities(\`。\n` +
+      `  中央回落存在但没人调 = 一条永真的登记；Web 端的"数据变了才问选中的还在不在"从来没发生过。`,
+  );
+}
+// 分母自检：一个读方都没扫到 = 扫描层坏了，"全部配对"就是假的绿。
+if (readsSeen.length === 0) {
+  failures.push(
+    `断言 H：整棵树没扫到任何 \`useSelected(…)\` 读方。\n` +
+      `  那要么选中态没人读了（功能没了），要么正则/剥注释坏了 —— 两种都不是"判据通过"。`,
+  );
+}
+
 if (failures.length > 0) {
   console.error('✗ 选中态的所有者不唯一：\n');
   for (const f of failures) console.error(f + '\n');
@@ -728,6 +833,15 @@ console.log(
   `✅ G：宿主内 …Id 本地态 ${rowIdSeen.length} 处全部有语义登记（四类：` +
     ROW_ID_CLASSES.map((c) => `${c} ${ROW_ID_EXEMPT.filter(([, , t]) => t === c).length}`).join(' / ') +
     `），过期豁免 0 条`,
+);
+
+const readCounts = vocab.map(
+  (kind) => `${kind} ${readsSeen.reduce((n, [, r]) => n + (r.includes(kind) ? 1 : 0), 0)}`,
+);
+console.log(
+  `✅ H：${readsSeen.length} 处读选中的宿主文件各自把读到的类别喂进回落（触屏端按屏配对；` +
+    `Web 端中央回落覆盖 ${[...webFed].join('/')} 且被 ${webGlueCallers.length} 处调用），` +
+    `逐类读方数：${readCounts.join(' / ')}`,
 );
 
 const counts = vocab.map((kind) => `${kind} ${consumersByKind.get(kind).length}`).join(' / ');

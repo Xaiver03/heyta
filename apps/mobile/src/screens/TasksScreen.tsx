@@ -562,9 +562,12 @@ export function TasksScreen({
      *
      * 🔴 `note` 这一项是 2026-10-04 补的（工单 §8.43）：**这一屏自己就挂着便签编辑层**
      * （`editingNoteId` 决定 `NoteEditScreen` 开不开），而回落只跑"这一屏递进去的那几类"。
-     * 少递一项的确切症状：从这一屏的搜索里点开一条便签，它在另一台设备上被删了 ——
-     * 编辑层不会自己关，一直显示"这条便签已经不在了"，直到用户手动返回。
-     * 那两条已经接了回落的屏（`NotesSection` / `SearchScreen`）此刻**没挂载**，替不了它。
+     * ⚠️ 补它的理由**不是**"当时面板不会自己关"—— 那句话已被 §8.43 第 7 节否证：
+     *   这一屏**无条件挂载**着 `SearchScreen`（`:1156`），它那个喂 `note` 全集的 effect
+     *   在浮层关着的时候也在跑，所以当时那一格有人兜着，界面上看不见缺陷。
+     *   这一行真正移除的是一条隐式依赖：**自己界面的回落曾经寄在别人的挂载策略上**。
+     *   把浮层改成条件挂载（`{searchOpen ? <SearchScreen …/> : null}`，一次很自然的重构）
+     *   就会让它当天变成真缺陷，而判据、门禁、类型检查三层实测全绿（§8.43 第 7 节的 A/B/C 读数）。
      */
     const aliveNotes = noteActions === null ? undefined : noteActions.listNotes();
     pruneSelectionAgainst({
