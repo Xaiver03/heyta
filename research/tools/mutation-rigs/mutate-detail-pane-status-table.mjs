@@ -55,6 +55,17 @@
  *   P5e 同一形写成转义式                         → 放过（证明 P5 的红不是"码段里不许出现竖线"）
  *   脱牙 摘掉腿 9 的命中集合                     → P1/P3/P5 三臂全部失能
  *
+ * 🔴 20:5x 起多了腿 10（有序列表块的字面编号必须与位置一致），五道 + 一把脱牙：
+ *   L1 块内第三条编号 +1                        → **只有腿 10 红**（前九条全放过：那是列表层，不是表行）
+ *   L2 同一块改成"首项 7 的合法续编"             → 放过（CommonMark 只认块内首项 = start、其余按 start+序号 重排。
+ *                                                  这条臂挡的是"为了绿把调研文档那 20 条 7..26 改成 1..20"的改法）
+ *   L2b 同一块改成"首项 9 的续编"               → 放过（证明 L2 的红不取决于某个特定首项值）
+ *   L3 靶换到**第二份**文档（调研那份）          → 同样点名（钉住"射程 = 传来的每一份"；本线的 `第 N 条` 引用是跨文档的）
+ *                                                  ⚠️ 配套一条基线射程对照：第二份文档在**没注入变异**时块数必须 > 0，
+ *                                                  否则 L3 只是碰巧命中，那份文档以后没有列表块时会静默失去对象
+ *   L4 同一份变异喂 **还没有腿 10 的那版判据**    → 必须 RC=0 且结论仍是九项（减法现量：这一族此前零常驻消费者）
+ *   脱牙 摘掉腿 10 的命中集合                   → L1/L3 两臂全部失能
+ *
  *
  * 🔴 每臂除了退出码，还断言**红落在点名的那条腿**、且别的腿没有跟着红 ——
  * 只看 RC 的臂会把"判据自己崩了"读成"变异成功"。
@@ -68,10 +79,17 @@ const repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { encodin
 const GATE = process.argv[2] ?? join(repoRoot, 'scripts/check-detail-pane-status-table.mjs');
 const DOC = 'docs/plans/detail-pane-alignment.md';
 const ORIGINAL = readFileSync(join(repoRoot, DOC), 'utf8');
+// 腿 10 的对象是"传来的每一份文档"（本线的"第 N 条"引用是跨文档的），所以装置也必须能射第二份。
+const DOC2 = 'docs/research/detail-pane-alignment-and-spaced-review.md';
+const ORIGINAL2 = readFileSync(join(repoRoot, DOC2), 'utf8');
 
 const scratch = mkdtempSync(join(tmpdir(), 'dp-status-'));
 const doc = join(scratch, 'doc.md');
 writeFileSync(doc, ORIGINAL, 'utf8');
+const doc2 = join(scratch, 'doc2.md');
+writeFileSync(doc2, ORIGINAL2, 'utf8');
+/** 所有趟都显式传两份副本：不传第二份就等于让装置去读仓库真身，别人的改动会把对照趟判成红。 */
+const BOTH = [doc, doc2];
 
 const notes = [];
 const fail = [];
@@ -97,15 +115,25 @@ const LEGS = {
   judge: '🔴 已开工的行没写**判据条数**（也没写「无判据面」+理由）',
   arm: '🔴 变异那一档没有"臂条数 + 红集"两个读数（光提一句不算，纯文档单走「无变异面」+理由）',
   pipe: '🔴 表格单元的 code span 里有裸竖线（GFM 会在这里切格，行不裂但格子裂 —— 前八条腿一条都不红）',
+  list: '🔴 有序列表的字面编号与位置不一致（渲染层看不出来，只有按"第 N 条"索引时指错东西）',
 };
 const rowsIn = (out) => Number(out.match(/连续 (\d+) 枚工单行/)?.[1] ?? 0);
 
-const mutate = (fn, args = [doc]) => {
+const mutate = (fn, args = BOTH) => {
   const next = fn(ORIGINAL);
   if (next === ORIGINAL) throw new Error('变异没有改动文档（抽取形状对不上原文）—— 臂是装饰，拒绝继续。');
   writeFileSync(doc, next, 'utf8');
   const res = run(args);
   writeFileSync(doc, ORIGINAL, 'utf8');
+  return res;
+};
+/** 靶在第二份文档上（腿 10 的射程 = 传来的每一份，这一臂钉的就是这件事）。 */
+const mutate2 = (fn, args = BOTH) => {
+  const next = fn(ORIGINAL2);
+  if (next === ORIGINAL2) throw new Error('第二份文档的变异没有生效 —— 臂是装饰，拒绝继续。');
+  writeFileSync(doc2, next, 'utf8');
+  const res = run(args);
+  writeFileSync(doc2, ORIGINAL2, 'utf8');
   return res;
 };
 /** 期望：点名那条腿恰好 +1（或至少 1，对 S5 那种成片的），别的腿为 0，RC=1。 */
@@ -122,7 +150,7 @@ const expectRed = (arm, res, leg, needle, extra = () => true) => {
   return true;
 };
 
-const base = run();
+const base = run(BOTH);
 const baseRows = rowsIn(base.out);
 check('对照 未变异副本全绿', base.rc === 0 && baseRows >= 14, `RC=${base.rc}｜连续 ${baseRows} 枚工单行`);
 
@@ -570,7 +598,159 @@ check(
   );
 }
 
-const control = run();
+// ─────────────────────────────────────────────────────────────────────────────
+// 腿 10：有序列表块的字面编号必须与位置一致（首项 = start，其后每条 +1）。
+// 这一族的**实测缺口**不是推断：2026-10-04 20:4x 给 §8.76 追加一条时，一次性扫描照出该块 6 条
+// 字面编号与位置不一致（写成 6, 8, 7, 8, 9, 10, 11），而当时那九条腿一条都不红 ——
+// 表层的判据管不到列表层。渲染层（CommonMark）只认块内首项的字面值，所以这种坏**渲染后看不出来**，
+// 只在按 `§8.76 第 N 条` 索引时指错东西（与 main 侧 traps 台账同号不同事那一族同形）。
+const ITEM_RE = /^(\d+)\.\s/;
+/** 找第一块"条数 ≥ minLen"的有序列表，返回它每条的行下标与字面值。 */
+const firstBlock = (text, minLen = 3) => {
+  const ls = text.split('\n');
+  let inFence = false;
+  let i = 0;
+  while (i < ls.length) {
+    if (/^```/.test(ls[i])) {
+      inFence = !inFence;
+      i += 1;
+      continue;
+    }
+    if (inFence || !ITEM_RE.test(ls[i])) {
+      i += 1;
+      continue;
+    }
+    const items = [];
+    let j = i;
+    while (j < ls.length) {
+      const m = ls[j].match(ITEM_RE);
+      if (m) {
+        items.push({ idx: j, n: Number(m[1]) });
+        j += 1;
+        continue;
+      }
+      if (ls[j].startsWith('|') || /^#{1,6} /.test(ls[j])) break;
+      if (/^(?:\s+\S|\s*$)/.test(ls[j])) {
+        j += 1;
+        continue;
+      }
+      break;
+    }
+    if (items.length >= minLen) return { items, lines: ls };
+    i = j > i ? j : i + 1;
+  }
+  throw new Error(`找不到条数 ≥ ${String(minLen)} 的有序列表块 —— 臂没有靶，拒绝装作跑过了。`);
+};
+/** 把块内第 k 条（0 基）的字面编号改成 nudge 之和。 */
+const bumpItem = (text, k, delta) => {
+  const { items, lines } = firstBlock(text);
+  const t = items[k];
+  if (t === undefined) throw new Error(`这一块不足 ${String(k + 1)} 条 —— 抽取形状变了。`);
+  lines[t.idx] = lines[t.idx].replace(ITEM_RE, `${String(t.n + delta)}. `);
+  return { text: lines.join('\n'), line: t.idx + 1, n: t.n + delta };
+};
+/** 把整块重新编号成"首项 start、逐条 +1"（合法续编）。 */
+const renumberFrom = (text, start) => {
+  const { items, lines } = firstBlock(text);
+  items.forEach((it, k) => {
+    lines[it.idx] = lines[it.idx].replace(ITEM_RE, `${String(start + k)}. `);
+  });
+  return { text: lines.join('\n'), line: items[items.length - 1].idx + 1 };
+};
+
+const l1 = mutate((t) => bumpItem(t, 2, +1).text);
+const l1Target = bumpItem(ORIGINAL, 2, +1);
+expectRed(
+  'L1 块内第三条的编号 +1（后面全体错位）→ 只有腿 10 红',
+  l1,
+  LEGS.list,
+  `:${String(l1Target.line)}`,
+  (n) => n >= 1,
+);
+const l2 = mutate((t) => renumberFrom(t, 7).text);
+check(
+  'L2 同一块改成"首项 7 的合法续编"→ 放过（钉住 CommonMark 语义，挡"为了绿把调研文档那 20 条 7..26 改成 1..20"）',
+  l2.rc === 0 && legCount(l2.out, LEGS.list) === 0,
+  `RC=${l2.rc} 腿10=${legCount(l2.out, LEGS.list)}`,
+);
+const l2b = mutate((t) => renumberFrom(t, 9).text);
+check('L2b 同一块改成"首项 9 的续编"也放过（L2 的红不是因为某个特定首项值）', l2b.rc === 0, `RC=${l2b.rc}`);
+// 射程对照：第二份文档**没有**被注入变异时也必须真的扫到了它的列表块
+//（否则 L3 那条"靶在第二份"的臂只是碰巧命中，下一轮那份文档没有列表块时会静默失去对象）。
+check(
+  '对照 基线趟里第二份文档的列表块数不为 0（腿 10 对它确有射程）',
+  /doc2\.md：块 [1-9]/.test(base.out),
+  (base.out.match(/承重\(腿10\)：.*/)?.[0] ?? '').slice(0, 150),
+);
+const l3Target = bumpItem(ORIGINAL2, 2, +2);
+const l3 = mutate2((t) => bumpItem(t, 2, +2).text);
+expectRed(
+  'L3 靶换到**第二份**文档（调研那份）→ 同样点名（钉住"射程 = 传来的每一份"，跨文档的"第 N 条"引用不是只守一张表）',
+  l3,
+  LEGS.list,
+  `doc2.md :${String(l3Target.line)}`,
+  (n) => n >= 1,
+);
+
+// L4 减法现量：同一份 L1 变异喂给**还没有腿 10 的那版判据** ⇒ 必须 RC=0。
+// 🔴 按内容沿文件历史取旧版，不按 `HEAD`（第 9 条纪律：新腿一提交，HEAD 版就不再是"旧版"）。
+{
+  const hist = execFileSync('git', ['-C', repoRoot, 'log', '--format=%H', '--', 'scripts/check-detail-pane-status-table.mjs'], {
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .slice(0, 14);
+  const oldGate = join(scratch, 'gate-before-leg10.mjs');
+  let found = '';
+  for (const sha of hist) {
+    const src = execFileSync('git', ['-C', repoRoot, 'show', `${sha}:scripts/check-detail-pane-status-table.mjs`], {
+      encoding: 'utf8',
+    });
+    if (!src.includes(LEGS.list) && src.includes(LEGS.pipe)) {
+      found = sha;
+      writeFileSync(oldGate, src, 'utf8');
+      break;
+    }
+  }
+  if (!found) throw new Error('找不到"还没有腿 10"的那版判据 —— 对照臂没有旧版可喂，拒绝拿当前版冒充。');
+  writeFileSync(doc, bumpItem(ORIGINAL, 2, +1).text, 'utf8');
+  const r = spawnSync(process.execPath, [oldGate, doc], { encoding: 'utf8' });
+  const out = `${r.stdout}${r.stderr}`;
+  writeFileSync(doc, ORIGINAL, 'utf8');
+  check(
+    'L4 同一份变异喂「还没有腿 10 的那版判据」→ RC=0 且结论仍是九项（这一族此前零常驻消费者，不是顺手加严）',
+    r.status === 0 && /九项都成立/.test(out),
+    `RC=${r.status}｜取的是 ${found.slice(0, 8)}（按内容认，不按 HEAD）`,
+  );
+}
+
+// 脱牙对照：摘掉腿 10 的命中集合，L1 / L3 两臂都必须失能。
+{
+  const neuter10 = join(scratch, 'gate-neutered-10.mjs');
+  const src10 = readFileSync(GATE, 'utf8');
+  const ANCHOR10 = 'console.log(`取样：';
+  if (!src10.includes(ANCHOR10)) throw new Error('判据里找不到插入点，脱牙脚本拒绝猜。');
+  writeFileSync(neuter10, src10.replace(ANCHOR10, 'listBad.length = 0;\n' + ANCHOR10), 'utf8');
+  const survived = [];
+  writeFileSync(doc, bumpItem(ORIGINAL, 2, +1).text, 'utf8');
+  writeFileSync(doc2, ORIGINAL2, 'utf8');
+  let r = spawnSync(process.execPath, [neuter10, doc, doc2], { encoding: 'utf8' });
+  if (legCount(`${r.stdout}${r.stderr}`, LEGS.list) > 0) survived.push('L1');
+  writeFileSync(doc, ORIGINAL, 'utf8');
+  writeFileSync(doc2, bumpItem(ORIGINAL2, 2, +2).text, 'utf8');
+  r = spawnSync(process.execPath, [neuter10, doc, doc2], { encoding: 'utf8' });
+  if (legCount(`${r.stdout}${r.stderr}`, LEGS.list) > 0) survived.push('L3');
+  writeFileSync(doc2, ORIGINAL2, 'utf8');
+  check(
+    '脱牙对照 摘掉腿 10 的命中集合后，L1/L3 两臂都不得仍然报出那一档（两臂全部失能）',
+    survived.length === 0,
+    survived.length ? `摘牙后仍红：${survived.join('/')}` : '两臂全部失能',
+  );
+}
+
+const control = run(BOTH);
 check('对照 恢复干净后全绿', control.rc === 0, `RC=${control.rc}`);
 
 rmSync(scratch, { recursive: true, force: true });

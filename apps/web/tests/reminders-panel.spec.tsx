@@ -30,7 +30,7 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { emptyState } from '@heyta/op-log';
 import { I18nProvider, zhCN, type I18nValue } from '@heyta/i18n';
@@ -244,17 +244,29 @@ describe('B. 没有截止时间时只有绝对时刻入口', () => {
     const view = await mountFor(taskId);
 
     // 上限是 5 条（`MAX_REMINDERS_PER_TASK`）；连点 8 次必然撞上限。
-    // ⚠️ 每次点击的触发时刻必须**不同**（`Date.now() + 1h`），否则同一刻的
-    //    提醒会幂等地落到同一条上，永远撞不到上限 —— 所以显式让时钟前进。
-    for (let i = 0; i < 8; i += 1) {
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 3));
-        click(view, 'reminder-add-absolute');
-      });
-    }
+    // 🔴 每次点击的触发时刻必须**逐次不同**：幂等分支（`reminder-actions.ts` 的
+    //    `writeNew`，按 `taskId:triggerAt` 认实体）走在封顶检查**前面**，两次点击落进
+    //    同一毫秒就合成同一条、永远撞不到上限。
+    // ⚠️ 这件事此前靠"两次点击之间真实时钟自己走了 3ms"来保证，而负载高时定时器会合并、
+    //    多次点击落进同一毫秒 ⇒ 该用例偶发假红（单独跑必绿）。把 `Date.now()` 冻住可 100%
+    //    复现那一次红 —— 现在改成按**点击序号**推进时钟，用例前提不再取决于机器负载。
+    const realNow = Date.now.bind(Date);
+    let step = 0;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + step * MINUTE);
+    try {
+      for (let i = 0; i < 8; i += 1) {
+        step += 1;
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 3));
+          click(view, 'reminder-add-absolute');
+        });
+      }
 
-    await waitFor('超上限的错误被记下', () => useReminderStore.getState().error !== undefined);
-    await waitFor('错误渲染出来', () => view.querySelector('[role="alert"]') !== null);
+      await waitFor('超上限的错误被记下', () => useReminderStore.getState().error !== undefined);
+      await waitFor('错误渲染出来', () => view.querySelector('[role="alert"]') !== null);
+    } finally {
+      clock.mockRestore();
+    }
 
     const alert = view.querySelector('[role="alert"]');
     expect(alert?.textContent ?? '').toContain('最多 5 条提醒');
