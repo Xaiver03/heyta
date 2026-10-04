@@ -3859,6 +3859,42 @@ W0b ─> 随时可做（台账那半要等文件干净）
     （不是红，所以它不会被任何链条拦下来 —— 只是那一格又没人取过证）。这条写在
     `docs/runbooks/multi-platform-build.md` 那段旋钮说明的末尾。
 
+- ㊩ **链 FULL2：完整 `pnpm check` 的 68 段逐段读数（04 19:07:31–19:17:07）= 65 绿 / 3 红，三条红逐条归因**
+  - 现量：`SUMMARY 绿=65 红=3 段数=68`；红段清单 `24:check:legal-permissions`、`62:check:shell-unicode`、`68:pnpm -r test`；
+    跑完工作树未提交 **42 枚**（e2e 族按固定文件名重写已跟踪图），链收尾 `git checkout -- .` 后 **0 枚**。
+  - 🔴 **载体要分三段说，这是这一趟最容易被读错的地方**：起跑 19:01:18 时 HEAD 是 `1ad0962c`，
+    跑到第 62 段前后我落了 `3e51b02e` / `a52c7ace`（只动 `docs/` 与 `apps/*/evidence/`，不是任何段的构建输入）
+    与 `c282467b`（动 `scripts/reinstall-all.sh` —— **没有任何一个 check 段读它**，但它正是第 62 段那条红的来源）。
+    ⇒ 65 绿对当前 HEAD 仍然成立，但"62 段当时是红的、随后被我改掉"这件事必须写在读数旁边，不能追认成"当时就绿"。
+  - 🔴 **红 1（第 62 段）是我自己 12 分钟前带进来的，而且踩的正是任务 #30 刚修完的那一型**：
+    `echo "  macOS 输出目录 = $MAC_OUT（覆盖旋钮 …）"` —— `$MAC_OUT` 紧跟全角括号，变量名被吞。
+    修法就是门禁自己给的那一句（`${var}`）；改后 `node scripts/check-shell-unicode-vars.mjs` **rc=0**（"扫了 81 个 .sh"），提交 `c2d572ba`。
+    📌 留这条的理由：我刚写完"共享目录别再写死"的守卫，**同一笔提交里就写了一句会被门禁拦的字符串**。
+    抓住它的不是我记得查，而是链条里那一跑 —— 这就是 §7 那条"能失败的判据才有价值"的又一次结账。
+  - 🔴 **红 2（第 24 段 `check:legal-permissions`）不是本批的**：18:40 已在合并载体上单独重量过，
+    `rc=1 / 7 条红`全部归 W9 那条线的 `b0ba4a35`（英文否表行 vs `POST_NOTIFICATIONS`）⇒ 不吸收别人的债凑绿。
+  - 🔴 **红 3（第 68 段 `pnpm -r test`）这一趟连"全量"都没跑到，按边界第 8 条记环境无效**：
+    `packages/sync-core test: 内存闸门拒绝启动：已有测试在跑（pid=80826，锁 /tmp/tfa-test.lock；它是 npm run verify:routing）`
+    ⇒ 外部那条 `verify:routing` 握着 tfa 内存闸，`pnpm -r` 停在**第 5 个包**（`Scope: 20 of 21 workspace projects`）。
+    ⚠️ 顺带一条**分母漂了**：05:2x 那趟数出来是 **19** 个有 `test` 脚本的包，这一趟 pnpm 自己打的是 **20 of 21**
+    ⇒ 以后引用"全量"必须带 pnpm 那一行 `Scope:`，不能再引用我数的那个数字。
+  - ⚠️ **19:18 我趁锁空复跑（`/tmp/chain-RTEST.log`）：跑到 16 个包、`RC_RTEST=1`，但红的内容不是断言**：
+    `apps/mobile` 打的是 `Test Files 47 passed (47) / Tests 717 passed (717)`，退出码 1 的原因是 vitest 把
+    **5 条 unhandled rejection** 判成致命 —— `RolldownError: Parse failure: Flow is not supported`
+    指向 `node_modules/.pnpm/react-native@0.84.1…/react-native/index.js:1`，五条**全部** `originated in "tests/auth-flow.spec.ts"`。
+    - 隔离复跑两条读数：**单跑那个 spec** ⇒ `RC=0 / 14 passed`，无 unhandled；
+      **单跑整个 mobile 套件** ⇒ `RC=0 / 47 files / 717 passed`，无 unhandled。
+    - 05:30 之后动过 `apps/mobile/src` 的只有 `d4d154b4`（10:21）与 `c313914f`（17:20），
+      两条都只碰 `card-export{,-units}.tsx?` 与它的 spec，**没有一条被 `auth-flow.spec.ts` 引到** ⇒ 机制未定。
+    - ⏳ **判"并发造成"还是"仓库里有一条间歇性红"的复跑在链 RTEST2**（等 `loadavg <= 12` 再跑同一条 `pnpm -r test`，
+      阈值没动、等满记 `RC_RTEST2=3` = 环境无效）。读数没回来之前 ⑤-1 这一格**不打勾**。
+      ⚠️ **也不要拿 05:2x 那趟的"19/19 覆盖"替它**：那一趟的汇总记在下面第 ⑧ 条，而它跑的时候
+      `apps/mobile/src` 还没有 `d4d154b4` / `c313914f` 这两笔 —— 覆盖判定要连代码面一起对，
+      只数包数会把"当时那份树绿"读成"现在这份树绿"。
+      （顺带一条我这次才量准的事实：`pnpm -r test` 这一趟是**停在第一个失败包**的
+      —— `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`，16 个 `Done` 之后不再往下发；
+      所以"跑到了第几个包"必须和"哪个包让它停的"一起报，只报前者会读成"后面那些都验过"。）
+
 
 
 
