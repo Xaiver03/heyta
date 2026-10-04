@@ -115,7 +115,17 @@ if [ "${#TOKEN}" -lt 100 ]; then
   echo "❌ 令牌看起来不对（长度 ${#TOKEN}）—— 先跑建号脚本"; exit 1
 fi
 if [ ! -f "$SERVER_LOG" ]; then
-  echo "⚠️  找不到服务端日志 $SERVER_LOG —— 判据 ① 会被跳过（其余四条仍然有效）"
+  echo "❌ 判据 ① 的证据来源不存在：$SERVER_LOG —— **这一条不许跳过，它不是六条里的一条，它是承重的**："
+  echo "   第 0.5 步那条元判据（脚本自己数自己有没有点同步按钮）挡不住"手点出来的同步"，"
+  echo "   那一档由 ① 兜（见上面第 237 行的注释）。没有 ①，⑤ 就退化成一句字符串自检，"
+  echo "   整个验收的一半意义（"不点按钮也自己出去"）就没人了。"
+  echo "   而且现在退出**还没碰任何破坏性动作**（装包 / pm clear 在下一步），不会清掉别人的现场。"
+  echo ""
+  echo "   修法：把服务端起在 TEST_MODE 并把日志落到那个路径，例如"
+  echo "     <起栈命令> 2>&1 | tee $SERVER_LOG"
+  echo "   或显式指一份现有日志："
+  echo "     HEYTA_SERVER_LOG=/path/to/server.log bash scripts/verify-mobile-trash.sh"
+  exit 1
 fi
 rm -f "$LAPTOP_DB" "$PHONE_DB"
 
@@ -307,27 +317,34 @@ fi
 step "4. 判据 ①：没点按钮，服务端也该收到请求（自动同步真的触发了）"
 # 这一条是**最快**能证伪"自动同步没接线"的判据，所以放在笔记本那几条慢判据之前：
 # 只数真正的同步请求行，不数 wc -l（日志里混着大量 prisma:query）。
-if [ "$LOG_BASE" -gt 0 ]; then
-  SAW_REQUEST=0
-  for i in $(seq 1 24); do
-    sleep 5
-    NEW_REQ=$(sed -n "$((LOG_BASE + 1)),\$p" "$SERVER_LOG" \
-      | grep -cE "\[user:[0-9]+\] (Upload|Download)" | tr -d ' ')
-    if [ "${NEW_REQ:-0}" -gt 0 ]; then
-      SAW_REQUEST=1
-      echo "     第 $i 轮（约 $((i * 5)) 秒）看到 $NEW_REQ 条同步请求行"
-      break
-    fi
-  done
-  sed -n "$((LOG_BASE + 1)),\$p" "$SERVER_LOG" \
-    | grep -E "\[user:[0-9]+\)?\]? (Upload|Download)" | head -5 | sed 's/^/     /'
-  if [ "$SAW_REQUEST" = "1" ]; then
-    ok "服务端在**没有点任何同步按钮**的情况下收到了请求"
-  else
-    bad "删便签后 120 秒内服务端**一条请求都没有** —— 自动同步没有触发"
+#
+# 🔴 原来这里写的是 `if [ "$LOG_BASE" -gt 0 ]`，那是一个**会静默消失的判据**，而且
+#    恰好在最该跑的时候消失：自己新起的栈，日志是刚从 `tee` 出来的空文件，
+#    基线 = 0 ⇒ 整条腿被跳过，而 ⑤ 的那一档正是靠它兜的。
+#    现在基线为 0 是**合法输入**（从头数整个文件），只有"读出来不是数字"才当探针坏了。
+case "$LOG_BASE" in
+  ''|*[!0-9]*)
+    bad "判据 ① 的日志基线不是数字（LOG_BASE=${LOG_BASE}）—— 探针没读到，不许当成"没请求""
+    LOG_BASE=0
+    ;;
+esac
+SAW_REQUEST=0
+for i in $(seq 1 24); do
+  sleep 5
+  NEW_REQ=$(sed -n "$((LOG_BASE + 1)),\$p" "$SERVER_LOG" \
+    | grep -cE "\[user:[0-9]+\] (Upload|Download)" | tr -d ' ')
+  if [ "${NEW_REQ:-0}" -gt 0 ]; then
+    SAW_REQUEST=1
+    echo "     第 $i 轮（约 $((i * 5)) 秒）看到 $NEW_REQ 条同步请求行"
+    break
   fi
+done
+sed -n "$((LOG_BASE + 1)),\$p" "$SERVER_LOG" \
+  | grep -E "\[user:[0-9]+\)?\]? (Upload|Download)" | head -5 | sed 's/^/     /'
+if [ "$SAW_REQUEST" = "1" ]; then
+  ok "服务端在**没有点任何同步按钮**的情况下收到了请求"
 else
-  echo "     ⏭  跳过（没有服务端日志）"
+  bad "删便签后 120 秒内服务端**一条请求都没有** —— 自动同步没有触发"
 fi
 
 step "5. 判据 ②：手机回收站列出它，点「恢复」后那一行消失、便签回到活体列表"

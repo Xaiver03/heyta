@@ -54,7 +54,10 @@ mobile_e2e_runner_lines() {
     $0 !~ /bash -n/ {
       rest = ""
       for (i = 4; i <= NF; i++) rest = rest $i
-      if (rest ~ /verify-mobile-[a-z-]+\.sh/) { print; exit }
+      # 🔴 `verify-mobile-window-gate.sh` 是**只体检、默认不碰设备**的 dry-run 闸门：
+      #    把它算成运行者，两条互相体检的腿会把对方看成"设备被占"而永久互锁
+      #    （2026-10-04 02:37 实测：把一条真实闸门 argv 喂给本函数，命中）。
+      if (rest ~ /verify-mobile-[a-z-]+\.sh/ && rest !~ /verify-mobile-window-gate\.sh/) { print; exit }
     }
   ' "$psfile"
 }
@@ -70,8 +73,9 @@ if [ "${1:-}" = "--self-check" ] && [ "${BASH_SOURCE[0]:-}" = "$0" ]; then
 44444 73231 /bin/zsh -c cd "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta" && bash scripts/verify-mobile-edit.sh
 55555 73231 bash scripts/reinstall-all.sh
 66666 73231 node scripts/some-tool.mjs verify-mobile-calendar.sh
+77777 73231 bash /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/scripts/verify-mobile-window-gate.sh --target c
 FIXTURES
-  # 期望：只有前两条是运行者（3 = 预检、4 = 包装、5 = 非 mobile 脚本、6 = 不是 bash）。
+  # 期望：只有 1、2 两条是运行者（3 = 预检、4 = 包装、5 = 非 mobile 脚本、6 = 不是 bash、7 = dry-run 闸门）。
   # 用 MOBILE_E2E_PROBE_ME 把"自己"钉成 22222，顺带验证按 pid 排除自己这条规则。
   HIT=$(MOBILE_E2E_PROBE_ME=22222 mobile_e2e_runner_lines "$FIX" | awk '{print $1}')
   NPASS=0; NFAIL=0
@@ -80,7 +84,7 @@ FIXTURES
     else echo "   ❌ $1（期望 '$2'，实得 '$3'）"; NFAIL=$((NFAIL + 1)); fi
   }
   # 一次只准命中一行（探针 `exit` 在第一条命中上），所以逐行单独喂。
-  for line in $(seq 1 6); do
+  for line in $(seq 1 7); do
     sed -n "${line}p" "$FIX" > /tmp/_heyta_runner_probe_one.txt
     ONE=$(MOBILE_E2E_PROBE_ME=22222 mobile_e2e_runner_lines /tmp/_heyta_runner_probe_one.txt | awk '{print $1}')
     case $line in
@@ -90,6 +94,7 @@ FIXTURES
       4) want="";    why="zsh -c 包装进程不算运行者" ;;
       5) want="";    why="非 mobile 验收脚本不算" ;;
       6) want="";    why="argv[0] 不是 bash 的不算" ;;
+      7) want="";    why="dry-run 闸门不算设备运行者（否则两条互相体检的腿互锁）" ;;
     esac
     check "$why" "$want" "$ONE"
   done
@@ -100,5 +105,10 @@ FIXTURES
   echo ""
   echo "自检：$NPASS 绿 / $NFAIL 红"
   [ "$NFAIL" -eq 0 ] || exit 1
-  echo "（真实探针当前的读数：'${HIT}' —— 空 = 此刻没有别的移动端验收在跑）"
+  # 🔴 这一行必须读**活 ps**，不能复用上面那个 `$HIT`：`$HIT` 吃的是六行夹具文件，
+#    而夹具第一行就是"有人在跑" ⇒ 照它打印会让人以为设备被占（实测：自检印出 '11111'，
+#    而那一刻 emulator-5554 上没有任何验收在跑 —— 这是一行**恒非空**的读数）。
+REAL=$(mobile_e2e_runner_lines | awk '{print $1}')
+echo "（真实探针当前的读数：'${REAL}' —— 空 = 此刻没有别的移动端验收在跑）"
+echo "（夹具读数是 '${HIT}'，那是上面六行夹具的第一行，不是现场）"
 fi

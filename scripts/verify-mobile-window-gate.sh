@@ -49,6 +49,11 @@ if [ -z "$REPO" ]; then
   REPO="$(cd "$(dirname "$0")/.." && pwd)"
 fi
 cd "$REPO" || { echo "❌ 进不去仓库根：$REPO" >&2; exit 1; }
+# 🔴 cd 成功后立刻把 REPO 换成绝对路径：调用方给的是相对路径时（`--repo ../heyta-wt-r14c`，
+#    实测 07:0x 真撞上过），`cd` 明明成功了，而下面那句比对里 GIT_TOP 永远是 git 给的绝对路径 ⇒
+#    一条**合法**的调用被判成"脚本推导的根与 git 根不一致"并 exit 1 —— 症状与真的根错一模一样，
+#    而报错的口吻把人的注意力引向"这棵树有问题"，不是"我拿相对路径比绝对路径"。
+REPO="$(pwd)"
 # 🔴 打印**两个根**：脚本推导的根与 git 认的根。两者不一致时后面的相对路径全是错的，
 # 而那看起来像"前置没过"而不是"根错了"。
 GIT_TOP="$(git rev-parse --show-toplevel 2>/dev/null)"
@@ -59,8 +64,36 @@ fi
 echo "仓库根：${REPO}（与 git 根一致）"
 
 FAIL=0
+# 🔴 「下一步」必须按**真红的那几条**给。06:0x 实测两处不符：负载已经 ✅（7 ≤ 12）却仍然打印
+#    "等负载落回 7 → ≤12"，而当天真正挡住 B 和 C 的那条「有另一趟 reinstall-all 在跑」
+#    在清单里**一个字都没有** —— 一份和现场不对应的建议清单，比没有建议更费时间。
+WHY_LOAD=0; WHY_SRC=0; WHY_DEV=0; WHY_CRED=0; WHY_APK=0
 pass() { echo "   ✅ $1"; }
 warn() { echo "   ❌ $1"; FAIL=$((FAIL + 1)); }
+# ── 共用：有没有**另一趟 reinstall-all** 在跑（排除自己这一棵树）───────────────
+#    b 侧要它（两趟 B 并行 = 互相卸装）；c 侧更要它（04:2x 现量：另一条会话正以
+#    `bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817` 在跑，而它的 android 段
+#    会对同一台 emulator-5554 做 `adb uninstall` —— C 的链正在往那上面装 APK）。
+#    🔴 设备独占探针 `lib/mobile-e2e-runner-probe.sh` **认不出这一形**：那条正则是
+#    `verify-mobile-[a-z-]+\.sh`，而 reinstall-all 不叫那个名字。它是设备面上的**第三种运行者**，
+#    两边各写一份 pgrep 就会漂 ⇒ 抽成这个函数，b/c 两个分支共用。
+#    `[.]?` 是必需的：`reinstall-all.sh` 会把自己快照成 `scripts/.reinstall-all.sh.snap.$$` 再 exec
+#    （它文件头 14-16 行），带点那一形才是现场运行形态（不带点的那一形由臂 T3 一起钉住）。
+reinstall_other_pids() {
+  local _t=" $$ " _p=$$ _o="" _pid
+  while [ -n "$_p" ] && [ "$_p" != "1" ] && [ "$_p" != "0" ]; do
+    _p=$(ps -o ppid= -p "$_p" 2>/dev/null | tr -d ' ')
+    [ -n "$_p" ] || break
+    _t="${_t}${_p} "
+  done
+  for _pid in $(pgrep -f 'scripts/[.]?reinstall-all[.]sh' 2>/dev/null); do
+    case "$_t" in
+      *" $_pid "*) : ;;
+      *) _o="${_o}${_pid} " ;;
+    esac
+  done
+  printf '%s' "${_o% }"
+}
 
 # ── 通用前置一：负载门。用**仓里那条规范实现**，不在这里重写解析
 #    （`wait-for-quiet-host.sh` 的文件头记着 #168：自己手写 `tr -d '{} '` 会把
@@ -68,6 +101,9 @@ warn() { echo "   ❌ $1"; FAIL=$((FAIL + 1)); }
 echo ""
 echo "════ 1. 负载门（规范实现，阈值 = hw.ncpu × 3/4）════"
 . scripts/lib/wait-for-quiet-host.sh
+# 「那一趟是在推进还是已经楔住」的**纯读数**（不参与下面的红/绿与 REDS= 机器通道）。
+# 抽成 lib 是因为两道门都要它：抄一份到第二道门就是等它漂（AGENTS §7 那一族）。
+. scripts/lib/wedged-runner.sh
 # 这里**只读一次现量**，不阻塞等人：窗口的判断是给调用者的，不是替调用者睡觉。
 CORES=$(sysctl -n hw.ncpu)
 LIMIT=$((CORES * 3 / 4))
@@ -77,6 +113,7 @@ if [ "$LOAD1" -le "$LIMIT" ]; then
   pass "负载达标"
 else
   warn "负载 $LOAD1 > $LIMIT —— 等落回阈值内再开跑（本脚本不替你等）"
+  WHY_LOAD=1
 fi
 
 # ── 通用前置二：工作树里**别人**未提交的源码。
@@ -90,6 +127,7 @@ if [ "$DIRTY_SRC" = "0" ]; then
 else
   echo "   ❌ $DIRTY_SRC 枚未提交的源码改动（这些会被打进产物，而判据看不出来）："
   git status --porcelain -- packages apps server | grep -E '^ ?M' | sed 's/^/      /'
+  WHY_SRC=1
   FAIL=$((FAIL + 1))
 fi
 # `??` 不判：未跟踪文件进不了包（打包走 `git ls-files`），所以它不是"装了别人 WIP"的通道。
@@ -126,6 +164,35 @@ case "$TARGET" in
         echo "   ⚠️ $BOOTED_N 台模拟器同时 booted —— --confirm 默认取列表第一台；要指定另一台就显式传 IOS_DEVICE_NAME"
       fi
     fi
+    echo ""
+    echo "════ 3b. B 专属：设备面独占（AGENTS §8.9 —— 04:1x 补，原来 b 分支没有这道门）════"
+    # 🔴 原来 b 分支只看"reinstall-all.sh 自己干净不干净"，**没看设备面上有没有别人在跑验收**，
+    #    而 B 会 `simctl uninstall` + `adb uninstall` + 覆盖 /Applications/Heyta.app ——
+    #    那三条都是直接拆别人正在量的现场。c 分支早就有这条门，b 分支缺，是"闸门按 target 分岔时漏了一半"。
+    #    与 c 分支同一个单所有者探针（不抄 pgrep 正则；探针文件头写了为什么）。
+    . "$(dirname "$0")/lib/mobile-e2e-runner-probe.sh"
+    B_OTHERS=$(mobile_e2e_runner_lines | awk '{print $1}')
+    if [ -n "$B_OTHERS" ]; then
+      echo "   ❌ 有移动端验收在跑（pid：$(printf '%s ' $B_OTHERS)）—— B 会卸掉它们的安装包，先让路"
+      WHY_DEV=1
+      FAIL=$((FAIL + 1))
+    else
+      pass "没有别的移动端验收在跑"
+    fi
+    # 另一条 B 正在跑（两个 reinstall:all 并行 = 互相卸装），以及**自己这一棵树**要豁免：
+    # 🔴 将来那把"等窗口就起 B"的看守，自己的命令行里就带着 `scripts/reinstall-all.sh` 这个串 ——
+    #    不豁免自己就会造成一条**永远红的门禁**（§8.3：不能失败的检查比没有检查更糟）。
+    RI_OTHERS=$(reinstall_other_pids)
+    if [ -n "$RI_OTHERS" ]; then
+      echo "   ❌ 有另一趟 reinstall-all 在跑（pid：${RI_OTHERS}）—— 两趟并行会互相卸装"
+      # 只加读数，不改这一档的红：楔住也红（它随时可能醒过来动设备面），
+      # 但"等它跑完"和"这一条要人拍板"是两种下一步，不能让人自己去看 ps。
+      for _w in $RI_OTHERS; do ht_wedge_report "$_w" "重装" "   "; done
+      WHY_DEV=1
+      FAIL=$((FAIL + 1))
+    else
+      pass "没有别的 reinstall-all 在跑（已豁免自己与祖先进程）"
+    fi
     CMD="IOS_DEVICE_NAME=\"<上面现取的名字>\" bash scripts/reinstall-all.sh"
     ;;
   c)
@@ -142,9 +209,19 @@ case "$TARGET" in
     OTHERS=$(mobile_e2e_runner_lines | awk '{print $1}')
     if [ -n "$OTHERS" ]; then
       echo "   ❌ 有移动端验收在跑（pid：$(printf '%s ' $OTHERS)）"
+      WHY_DEV=1
       FAIL=$((FAIL + 1))
     else
       pass "粗筛没有别的移动端验收在抢 ${E2E_SERIAL}（权威判据在验收脚本第 0 步）"
+    fi
+    RI_C=$(reinstall_other_pids)
+    if [ -n "$RI_C" ]; then
+      echo "   ❌ 有另一趟 reinstall-all 在跑（pid：${RI_C}）—— 它的 android 段会对同一台设备 adb uninstall"
+      for _w in $RI_C; do ht_wedge_report "$_w" "重装" "   "; done
+      WHY_DEV=1
+      FAIL=$((FAIL + 1))
+    else
+      pass "没有别的 reinstall-all 在抢设备面（探针只认 verify-mobile-*，这一形单独问过）"
     fi
     if adb -s "$E2E_SERIAL" get-state >/dev/null 2>&1; then
       pass "$E2E_SERIAL 在线"
@@ -166,13 +243,28 @@ case "$TARGET" in
       pass "凭据三件套都在"
     else
       warn "缺凭据文件：$MISSING_CRED"
+      WHY_CRED=1
     fi
-    PORT="${PORT:-3000}"
-    HEALTH=$(curl -s --noproxy '*' -m 5 "http://127.0.0.1:${PORT}/health" 2>/dev/null)
-    if printf '%s' "$HEALTH" | grep -q '"status":"ok"'; then
-      pass "服务端就绪（:${PORT}/health）"
+    # 🔴 原来这四行把"服务端就绪"当成一条 pass 前置：`curl :${PORT:-3000}/health` 只看有没有
+    #    `"status":"ok"`。02:2x 现量 :3000 上是**别人的一枚 node 进程**（pid 70256）⇒ 这条 pass 是假的，
+    #    而假 pass 比假 fail 贵：它让我以为环境欠的东西不齐、其实欠的是"别人才有的服务端"。
+    #    本线的服务端由链自己起（`r14c-carrier-chain.sh` 现在会挑一个**真空闲**的端口并把同一个 PORT
+    #    传给起栈与验收），所以"开跑前有没有服务端"根本不是 C 的前置。
+    #    改法：默认只作说明、不计 pass 也不计 warn；显式传 `HEYTA_GATE_SERVER_PORT` 才去探，
+    #    并且**把监听者的 pid 打出来**，让人能一眼否认"那是不是我们的"。
+    GATE_SVC_PORT="${HEYTA_GATE_SERVER_PORT:-}"
+    if [ -n "$GATE_SVC_PORT" ]; then
+      HEALTH=$(curl -s --noproxy '*' -m 5 "http://127.0.0.1:${GATE_SVC_PORT}/health" 2>/dev/null)
+      LISTENER=$(lsof -nP -iTCP:"${GATE_SVC_PORT}" -sTCP:LISTEN -t 2>/dev/null | head -1)
+      if printf '%s' "$HEALTH" | grep -q '"status":"ok"'; then
+        pass "服务端就绪（:${GATE_SVC_PORT}/health，监听者 pid=${LISTENER:-未知}）"
+      else
+        warn "服务端没在 :${GATE_SVC_PORT}（返回：${HEALTH:-空}）"
+      fi
     else
-      warn "服务端没在 :${PORT}（返回：${HEALTH:-空}）"
+      SVC3000=$(lsof -nP -iTCP:3000 -sTCP:LISTEN -t 2>/dev/null | head -1)
+      echo "   ℹ️ 服务端不计入前置：链自己在空闲端口起栈，并把同一个 PORT 同时传给起栈与验收"
+      echo "      现量 :3000 监听者 pid=${SVC3000:-（空）} —— 非空就说明那**不是**本线起的服务端"
     fi
     APK="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
     if [ -f "$APK" ]; then
@@ -185,9 +277,11 @@ case "$TARGET" in
         pass "APK 不比源码旧"
       else
         warn "APK 比源码旧 —— 跑它验的是旧 bundle（§7 第 27 条）"
+        WHY_APK=1
       fi
     else
       warn "APK 不存在：$APK"
+      WHY_APK=1
     fi
     echo ""
     echo "════ 5. C 专属：脚本已进自快照 MANIFEST ════"
@@ -202,14 +296,35 @@ esac
 
 echo ""
 echo "════ 结论 ════"
+# 🔴 机器读的**红灯集合**，与下面那五条建议行是同一批 WHY_* 旗标的投影，不是第二套判据。
+#   为什么要这一行：消费方 research/tools/r14c-window-retry.sh 原来用 `grep -c '❌'` 数红，
+#   而它真正要区分的是"**哪几条**红"（只有 APK 红 = 链自己会打产物，可以开窗；
+#   只有设备离线红 = 才配得起动设备那一手）。把给人看的建议清单当机器输入，
+#   改一个字就静默失效（§6 第 18 条那一族）。
+#   顺序固定 load,src,dev,cred,apk；全绿时打**空值**。消费方必须断"这行存在" ——
+#   缺行 = 闸门版本不对或装置坏（它自己的 exit 4），不是"没有红"。
+#   ⚠️ REDS 的**条数可以小于 FAIL**：FAIL 还数着没有 WHY_ 旗标的提示行
+#   （"服务端没在 :PORT"、"MANIFEST 里没有它"），所以不许写成 FAIL==条数 那种假等式。
+REDS=""
+[ "$WHY_LOAD" = 1 ] && REDS="${REDS}load,"
+[ "$WHY_SRC"  = 1 ] && REDS="${REDS}src,"
+[ "$WHY_DEV"  = 1 ] && REDS="${REDS}dev,"
+[ "$WHY_CRED" = 1 ] && REDS="${REDS}cred,"
+[ "$WHY_APK"  = 1 ] && REDS="${REDS}apk,"
+echo "REDS=${REDS%,}"
 if [ "$FAIL" -gt 0 ]; then
   echo "   窗口**没开**：$FAIL 条前置不成立。这是环境状态，不是产品失败（exit 3）。"
-  echo "   下一步（B/C 都适用的补前置顺序）："
-  echo "     1) 等并行会话把上面列出的文件提交"
-  echo "     2) bash scripts/mobile-e2e-up.sh        # 起服务端 + 建号写凭据"
-  echo "     3) pnpm --filter @heyta/ui build && pnpm build:android"
-  echo "     4) 等负载落回 $LOAD1 → ≤$LIMIT"
-  echo "     5) 重跑本脚本（不带 --confirm）确认全绿"
+  # 🔴 只列**真红的那几条**（06:0x 改）。原来这五行是无条件打印的，实测两处不对应现场：
+  #    负载已经 ✅（7 ≤ 12）却仍输出"等负载落回 7 → ≤12"，
+  #    而当天真正同时挡住 B 和 C 的「有另一趟 reinstall-all 在跑」在这份清单里**一个字都没有**。
+  #    一份和现场不对应的建议清单比没有建议更费时间 —— 它会让人去等一个不需要等的条件。
+  echo "   下一步（只列真红的这几条）："
+  [ "$WHY_DEV" = 1 ] && echo "     · 等那趟抢占设备面的验收/重装跑完：现量 pgrep -f 'scripts/[.]?reinstall-all[.]sh'；c 那一路可挂 bash research/tools/r14c-window-retry.sh"
+  [ "$WHY_SRC" = 1 ] && echo "     · 等并行会话把上面列出的文件提交（本线自有那份走 research/tools/calendar-line-commit-plan.sh）"
+  [ "$WHY_LOAD" = 1 ] && echo "     · 等负载落回 ${LOAD1} → ≤${LIMIT}"
+  [ "$WHY_CRED" = 1 ] && echo "     · bash scripts/mobile-e2e-up.sh        # 起服务端 + 建号写凭据"
+  [ "$WHY_APK" = 1 ] && echo "     · pnpm --filter @heyta/ui build && pnpm build:android   # APK 比源码旧"
+  echo "     · 重跑本脚本（不带 --confirm）确认全绿"
   exit 3
 fi
 
