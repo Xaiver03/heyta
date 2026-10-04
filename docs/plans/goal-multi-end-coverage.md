@@ -3642,3 +3642,47 @@ md5 -q /tmp/heyta-run-reinstall.sh ~/.heyta-window-rigs/heyta-run-reinstall.sh ~
 md5 -q ~/.heyta-window-rigs/heyta-real-runner-pids.sh /tmp/heyta-real-runner-pids.sh | sort -u
 ```
 两行都应只回**一枚**值 —— 那才是"三处/两处副本一致"的判据本身。
+
+#### 7.31.24 ③ 的凭据是**共享且在转的**——起跑那一刻不钉住，跨设备三条腿就是拿 A 账号的写入去数 B 账号的账（17:40–17:47 现量，链到 v25）
+
+**发现的形状**：`scripts/lib/mobile-e2e.sh:132-134` 只在**开头**读一次
+`/tmp/heyta_mobile_{token,email,e2ee}.txt`，而这三枚文件是**每条会话共用**的 ——
+别人每跑一趟验收就重写它们（17:40 现量：token 的 mtime=17:20，是别的会话刚建的号；
+17:38 又有一趟 `.verify-mobile-ios-reminder.sh.snap.56742` 在主检出里起）。
+③ 的第 6/7 步（op 判据）与第 9–11 步（跨设备三条腿）要在跑完之后**再问服务端一次**，
+而问服务端用的还是那三枚共享文件 ⇒ 中途被换号时，**设备侧写的是 A、服务端数的是 B**，
+读数会"对不上"而界面其实没错。这是 §7"空/错读数看着像结论"那一族的又一形：
+探针不是坏了，是**测到两趟不同的东西**。
+
+**修法（不改共享脚本、也不覆写别人在用的文件）**：链在起跑 ③ 之前把三件套复制成
+**这一趟私有的一份**（`/tmp/heyta-notes-creds-<时刻>-<pid>/`），用库里已有的三个旋钮
+（`HEYTA_E2E_TOKEN_FILE` / `_EMAIL_FILE` / `_E2EE_FILE`，正是 `mobile-e2e.sh:126` 那条注释
+"这三个路径以前是写死的"之后留出来的口子）整趟指过去；复制少一枚就**响亮地不起跑**，
+不拿共享文件硬跑。这条脚本本身**不建号**（建号入口 `heyta_e2e_ensure_account` 它没调用），
+所以钉住不会引起"多造一个账号"的副作用。归属打进日志一行：
+`凭据已钉住：账号指纹=<邮箱 md5 前 8 位> token字节=… 共享件mtime=… 私有副本=…`
+—— 只打指纹与长度，邮箱原文与令牌不进日志。
+
+**夹具** `heyta-credpin-fixture.sh`（durable，6 臂 GREEN）：按 marker 从**发货的那段**抽出来跑 ——
+P1 三枚私有副本与原文件**逐字节相同**（证"钉住的是同一个账号"，不是又读一次）；
+P2 少一枚 ⇒ 拒绝且**绝不**走到执行行；P3 执行行把三枚旋钮都指向 `CRED_PIN`
+（钉了不消费等于没钉）；P4 变异：摘掉三枚旋钮 ⇒ P3 转红；P5 打印里不许出现邮箱或令牌本身。
+⚠️ **夹具第一版挂死 2 分钟**（症状是"没输出"，不是"判据红"）：段里带着链的
+`sleep 60; continue`，我把它原样塞进 `while :` 里跑 ⇒ 少一枚那一臂**永远睡下去**。
+改法是替换成 `:`/`break` 并**断言替换真的落上了**（替换没落上就说明发货那段结构又变了，
+这一臂要响亮失败而不是再挂一次）。另两处自坏：变异用 `sed` 时 `[a-z]*` 匹配不到 `e2ee`（含数字），
+把 `${EXEC}` 当第二个 sed 脚本传会报 `No such file or directory` ⇒ 改用 python 精确删三枚固定串。
+
+**复跑**：
+```bash
+bash ~/.heyta-window-rigs/heyta-credpin-fixture.sh     # CREDPIN_FIXTURE=GREEN arms=6
+CHAIN_SH=/tmp/heyta-window-chain25.sh bash ~/.heyta-window-rigs/heyta-notesdone-fixture.sh
+SRC=/tmp/heyta-window-chain25.sh bash ~/.heyta-window-rigs/heyta-chain-rpi-fixture.sh
+```
+**链到 v25**（pid 98440，17:47:45 起跑；`/tmp` 与 durable 两份逐字节相同）：
+v24 由解析器认出（`32924 /tmp/heyta-window-chain24.sh`）、确认没有 ③/① 在飞后停掉，
+换链后日志第一行仍是解析器归因 `指纹=38ba8828036a`。
+
+**窗口现量（17:47:46）**：负载 98（阈值 12）、设备仍不空闲（`com.heyta` pid 6296 在前台，
+另有别人主检出里的 iOS-reminder 走查在跑）、`:3000` 被 node/70256 占 ⇒ ② 的条件也不成立。
+⇒ **①②③ 仍未起**；③ 的读数现在多了一条"账号是谁、什么时候钉的"的自证。
