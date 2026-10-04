@@ -477,16 +477,27 @@ PG_DB="${HEYTA_E2E_DB:-heyta_mobile_smoke}"
 PG_USER="${HEYTA_E2E_DB_USER:-$(whoami)}"
 PG_HOST="${HEYTA_E2E_DB_HOST:-127.0.0.1}"
 PG_PORT="${HEYTA_E2E_DB_PORT:-5432}"
-SRV_NOTE_UPD=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
-  "SELECT count(*) FROM operations WHERE op_type='UPD' AND entity_type='NOTE'" 2>&1)
-if ! printf '%s' "$SRV_NOTE_UPD" | grep -qE '^[0-9]+$'; then
-  bad "读不到服务端的 NOTE/UPD 计数（库 ${PG_DB} @ ${PG_HOST}:${PG_PORT}，用户 ${PG_USER}）—— 原始输出：$(printf '%s' "$SRV_NOTE_UPD" | head -3 | tr '\n' ' ')"
+# 🔴 这条判据原来数的是**整张表**的 NOTE/UPD：实测本趟运行之前库里就已经有历史行
+#    （10-04 14:3x 现量 = 2 条），于是它在任何东西发出去之前就已 ≥1 —— 一条永远通过的判据
+#    证明不了"那次编辑真的出去了"。改成按**本轮那条便签的 entityId**（步骤 3 的 NOTE_ID）数，
+#    并把全表数当分母一起打出来，让"历史残留"与"本轮这一条"在日志里分得开。
+# NOTE_ID 来自手机库的 json_extract，仍然要过形状门才许拼进 SQL（空串/引号/反斜杠都会把这条查询变成别的东西）。
+if ! printf '%s' "${NOTE_ID:-}" | grep -qE '^[A-Za-z0-9_-]+$'; then
+  bad "NOTE_ID 不像合法 entityId（空、或含 [A-Za-z0-9_-] 之外的字符）：[${NOTE_ID:-}] —— 不拼进 SQL"
 else
-  ok "服务端 NOTE/UPD op 数 = $SRV_NOTE_UPD"
-  if [ "$SRV_NOTE_UPD" -ge 1 ]; then
-    ok "那次编辑真的出去了 —— 服务端 operations 表里数得出它的 UPD"
+  SRV_NOTE_UPD=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
+    "SELECT count(*) FROM operations WHERE op_type='UPD' AND entity_type='NOTE' AND entity_id='${NOTE_ID}'" 2>&1)
+  SRV_NOTE_UPD_ALL=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
+    "SELECT count(*) FROM operations WHERE op_type='UPD' AND entity_type='NOTE'" 2>&1)
+  if ! printf '%s' "$SRV_NOTE_UPD" | grep -qE '^[0-9]+$'; then
+    bad "读不到服务端的 NOTE/UPD 计数（库 ${PG_DB} @ ${PG_HOST}:${PG_PORT}，用户 ${PG_USER}，entityId=${NOTE_ID}）—— 原始输出：$(printf '%s' "$SRV_NOTE_UPD" | head -3 | tr '\n' ' ')"
   else
-    bad "服务端 NOTE/UPD = 0 —— 界面说保存好了、也说同步了，服务端一条都没收到"
+    ok "服务端 entityId=${NOTE_ID} 的 UPD 数 = $SRV_NOTE_UPD；全表 NOTE/UPD（含历史残留）= ${SRV_NOTE_UPD_ALL:-读不到}"
+    if [ "$SRV_NOTE_UPD" -ge 1 ]; then
+      ok "那次编辑真的出去了 —— 服务端 operations 表里数得出**这条 entityId** 的 UPD"
+    else
+      bad "服务端没有 entityId=${NOTE_ID} 的 UPD（全表 NOTE/UPD=${SRV_NOTE_UPD_ALL:-?} 那些只可能是别的便签的历史行）—— 界面说保存好了、也说同步了，服务端一条都没收到"
+    fi
   fi
 fi
 
