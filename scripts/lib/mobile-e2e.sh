@@ -441,21 +441,31 @@ wait_synced() {  # <轮数>，每轮 5 秒；默认 60 轮 = 300 秒
   return 1
 }
 
-# 触发一次手机同步：按「立即同步」再等结果。
+# 触发一次手机同步：让它开始，再等结算。
 #
 # 🔴 **这一步一度写在 `verify-mobile-lists.sh` 里**，而标签验收要的是同一件事
-#    （同一个按钮、同一个等待、同一条"按坐标点的是**上一次** dump 的树"的坑）。
-#    放在共用库里的理由是它**不是清单的业务语义** —— 它纯粹是"驱动这台设备"，
-#    与 `wait_synced` / `dump` / `require_screen` 是同一类东西。
-#    各写一份的话，"按钮改了位置"这种改动会只修一处。
+#    （同一个按钮、同一个等待）。放在共用库里的理由是它**不是清单的业务语义** ——
+#    它纯粹是"驱动这台设备"，与 `wait_synced` / `dump` / `require_screen` 是同一类东西。
 #
-# ⚠️ `xy_text` 读的是**上一次 dump 的树**。不重新 dump 就会拿着别的页面的
-#    坐标去点 —— 清单验收的第一版就在这里报过"找不到「立即同步」"。
+# 🔴 **发起那半原本由本函数自己找按钮**：`xy_text "立即同步"`，取不到就
+#    `bad "找不到「立即同步」"`。那是 traps 第 67 条记过的**假红**第三种变体：
+#    自动同步抢跑时按钮处于 `loading`，只渲染菊花，`text` 里没有「立即同步」，
+#    busy 文案也**只在 `content-desc`** —— 于是"同步正在正常进行"被报成"找不到按钮"。
+#    2026-10-04 现量：`verify-mobile-notes.sh` 第 9 步那两条 ❌（「找不到「立即同步」」
+#    「手机同步没成功」）就是这个形状，而**同一份库里 `ensure_phone_sync` 早已把三种
+#    情形分开处理**（空闲=点下去、忙=只等、两者都没有=响亮地红）。
+#    "抽出了一个共享实现不等于重复被消除"在这里现形：新实现有六个脚本在用，
+#    旧实现还留着三个调用点（`verify-mobile-notes.sh`、`verify-mobile-lists.sh`、
+#    `verify-mobile-tags.sh`）。现量命令（别抄这里的数字，它会漂）：
+#      grep -rl ensure_phone_sync scripts/*.sh | grep -v snap        # 用它的人
+#      grep -rnE '^[[:space:]]*(if )?phone_sync\b' scripts/verify-mobile-*.sh   # 还走旧入口的人
+# ⇒ 现在只有一条实现：**发起归 `ensure_phone_sync`（单一所有者），本函数只负责等结算**。
+#
+# ⚠️ `ensure_phone_sync` 自己先 `dump` 再取坐标，所以这里不许在前面补一次"取上一次树"的
+#    读取 —— 清单验收的第一版就是拿着**别的页面**的坐标去点，报的也是"找不到「立即同步」"。
 phone_sync() {
-  dump
-  local ax_xy; ax_xy=$(xy_text "立即同步")
-  if [ -z "$ax_xy" ]; then bad "找不到「立即同步」"; return 1; fi
-  $ADB shell input tap $ax_xy; sleep 5
+  ensure_phone_sync || return 1
+  sleep 5
   wait_synced 180
 }
 
