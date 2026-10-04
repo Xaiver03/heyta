@@ -353,11 +353,31 @@ pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podf
 
 ```bash
 pnpm -r build                   # 🔴 打包前**必须**先跑：APK/.app 里打的是 packages/*/dist
-pnpm build:android              # Android Release APK（Mac 或 Windows 打包机）
+pnpm build:android              # Android Release APK（🔴 从 Mac/Linux 调用时会 ssh windows-pc，见下方新规）
 pnpm build:android:debug        # Android Debug APK
 pnpm build:ios                  # iOS Release（仅 macOS）
 pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
 ```
+
+> 🔴 **2026-10-04 新规（产品负责人拍板）**：Android 任务一律 `ssh windows-pc`，
+> **不要再在这台 Mac 上起新的 Gradle 构建或模拟器**。原因不是整洁，是资源：
+> headless 模拟器 3.6G+ 常驻 / 90% CPU，SDK+AVD+Gradle 缓存吃掉 20G+ 磁盘。
+>
+> - 落地方式是**只在一枚收口点分流**：`scripts/run-gradle.mjs`。所有 android 入口
+>   （根 `package.json` 的 `build:android{,:debug,:bundle}` / `clean:android` → `@heyta/mobile`）
+>   本来就汇成那一枚，所以不需要改各端命令，也不需要在 CI 里加条件。
+>   Windows 上（就是打包机本身）**逐字不变**地跑本机 gradle；macOS/Linux 走远端并把产物
+>   回传到**消费者原本期望的路径**，好让 §7 第 27 条"APK 必须比源码新"继续有效。
+> - **不静默降级**：远端不可达就红。`HEYTA_ANDROID_LOCAL_GRADLE=1` 是**显式例外开关**
+>   （给"远程主机正在重装"这类场景），不是兜底。
+> - 门禁：`pnpm check:android-gradle-remote`（已进 `pnpm check`）。它钉的是**形状**——
+>   新开一条 `./gradlew` 入口、白名单比现实宽、回传路径与 `reinstall-all.sh` 的 `$APK`
+>   对不上、绕开收口点、远程支里出现 `runLocal(`、第二份源码同步实现 —— 各自都会红
+>   （`--self-test` 七臂，臂 0 是阳性对照）。
+> - 操作步骤 / 验收判据 / Mac 释放清单 / 边界（**Windows 侧没有 Android 模拟器**，
+>   所以设备侧验收目前仍在 Mac）见
+>   [`docs/runbooks/android-build-on-windows.md`](docs/runbooks/android-build-on-windows.md)。
+>   ⚠️ 那条"远程真打出 APK"的判据**尚未实测**，别把分流当成已经替换了本机通道。
 
 ### 6.1.1 🔴 固定收尾流程：清旧包 → 重打 → **四端重装**（每轮交付必须）
 
