@@ -58,7 +58,7 @@ export default defineConfig({
   testDir: './tests',
   testMatch: SWEEP
     ? /\.spec\.ts$/
-    : /(detail-(column-slot|pane-overlay|pane-collapse)|focus-detail-pane|keyboard-cursor)\.spec\.ts/,
+    : /(detail-(column-slot|pane-overlay|pane-collapse)|focus-detail-pane|keyboard-cursor|selection-projections)\.spec\.ts/,
   fullyParallel: false,
   // 🔴 0 重试：这一族量的是边界值（480 vs 479）与"轨道归零"，
   // 一次红就是要人看的读数；重试会把"边界写错"洗成"偶发"。
