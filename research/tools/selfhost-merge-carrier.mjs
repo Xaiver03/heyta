@@ -56,12 +56,15 @@
  *
  * 任何不属于这五族的冲突路径 ⇒ 退 2 并点名，**不自动决定**。
  *
- * ## 落笔前的门禁（只跑纯文件系统的那六道）
+ * ## 落笔前的门禁（只跑纯文件系统的那八道）
  *
  * `check:gate-wiring`（并集有没有静默摘掉谁的门禁，这一族的裁判）、
  * `check:selfhost-entry-command`（入口命令抄件对账；顺带证明合并没把站内两份词条抄件并掉）、
  * `check:script-snapshot`、`check:docs`、`check:md-tables`、
- * `gen-image-npm-tree.mjs --check`（第五族的裁判：快照还代不代表当下那把锁）。
+ * `check:image-license` 的**三条腿**（第 1 腿 = 快照还代不代表当下那把锁，第五族的裁判；
+ * 第 2 腿 = 提交物锁里每条依赖都在许可证登记表里有归属；第 3 腿 = 镜像安装合同，
+ * 含"prune devDependencies 必须是第一条 install 之前的一步"与 prisma 三处同源）。
+ * 唯一被排除的是 `--installed-tree` 那一**模式**（要从跑起来的镜像里取树）。
  * 完整 `pnpm check`（要 node_modules、要起栈、`check:ai-e2e` 会 SIGKILL 别人的 dev server，
  * §7 #87）**不在这里跑** —— 它是落地那一刻的判据，载体绿不绿不由本脚本主张。
  *
@@ -416,10 +419,17 @@ const GATES = [
   ['check:script-snapshot', ['scripts/check-script-snapshot.mjs']],
   ['check:docs', ['research/tools/docs-link-check.mjs']],
   ['check:md-tables', ['scripts/check-md-table-rows.mjs']],
-  // 第五族的裁判：`check:image-license` 的第一腿（纯 fs、不联网、不落盘）。
-  // 🔴 只挂这一腿，不挂整条 —— 后面那腿 `--installed-tree` 要从**真镜像**里取树，
-  //    那是载体上跑不了的（要 docker 构建），挂进来会把"载体 fs 门禁"变成"载体要建镜像"。
+  // 第五族的裁判：`check:image-license` 的**三条腿原样**挂进来（不是只挂第 1 腿）。
+  // 🔴 排除的只有 `--installed-tree` 那一**模式**（它要真镜像里 dump 出来的树，消费者是
+  //    `verify:selfhost-stack`），不是第 2/3 腿本身。10-04 13:5x 在载体上实测过：
+  //    `--quiet` 的 coverage 与 install-contract 只读「提交物锁 / Dockerfile / 快照 / server/package.json」，
+  //    里面的 `node_modules/<name>` 是**锁里的键形状**、不是磁盘路径 ⇒ 两条都 exit 0、不联网、不要 node_modules。
+  //    这条为什么值得挂进落笔前：main 正在动 `server/`（一次重算就见到它往 devDependencies 里加了
+  //    `@heyta/app-host` / `@heyta/storage` / `@heyta/sync-client`），而第 3 腿正是
+  //    "prune 必须在第一条 install 之前 + prisma 三处同源"那一族的守门人。
   ['image-npm-tree 新鲜度（check:image-license 第 1 腿）', ['research/tools/gen-image-npm-tree.mjs', '--check']],
+  ['镜像许可证覆盖（check:image-license 第 2 腿）', ['research/tools/check-image-license-coverage.mjs', '--quiet']],
+  ['镜像安装合同（check:image-license 第 3 腿）', ['research/tools/check-image-install-contract.mjs']],
 ];
 const gateReadings = [];
 for (const [label, argv] of GATES) {
