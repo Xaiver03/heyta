@@ -110,7 +110,8 @@ git ls-tree -r --name-only HEAD -- apps/mobile/android/app/src/main/res | grep -
 |---|---|---|
 | 产物 == token 生成物 | `gen-app-icons.mjs --check` | ✅ 31 份（尺寸 + 采样像素 / 文本逐字节） |
 | 同上（首屏） | `gen-boot-splash.mjs --check` | ✅ 5 份，循环 800ms 由四档推导 |
-| **被清单引用 / 被代码消费** | `scripts/check-brand-assets.mjs` | ✅ 22 条（含"退场已接线"、"接线早于任何一次 `root.render`"、"五档前景层在树上"、"iOS 启动帧零文案且不含 `Powered by`"、"刻意不设 brandingImage"） |
+| **被清单引用 / 被代码消费** | `scripts/check-brand-assets.mjs` | ✅ 23 条（含"退场已接线"、"接线早于任何一次 `root.render`"、"五档前景层**在提交物里**"、"iOS 启动帧零文案且不含 `Powered by`"、"刻意不设 brandingImage"） |
+| ⚠️ 更正（2026-10-05，`5b67c944`）：本表原来那行写的是"22 条含**五档前景层在树上**"，而那条判据用的是 `existsSync` —— **标签量的是另一棵树**，它放行的正是 §2 举的那个事故（XML 已提交、PNG 从没提交）。现改走 `git ls-tree -r HEAD`，并加一条"资产目录里不许有未跟踪文件" | 同一个事故状态，两版判据各跑一趟（载体 = 隔离检出） | 旧实现 `RC=0 / 22 条 ✅`（放行了它）；新实现 `RC=1`，恰好两条：`前景层 xxxhdpi …不在 HEAD 里` + `资产：生成物全部已跟踪：1 个未跟踪资产文件` |
 | 首屏那一帧真画得出来 | `e2e/tests/boot-splash.spec.ts` A（探针按住 `/src/main.tsx`） | ✅ 底板 `rgb(37,99,235)`、三道字形齐全、`animation-name: heyta-boot-rise`、`z-index: 900`；截图 `e2e/test-results/boot-splash-frame.png` **人已看** |
 | 遮罩**从 DOM 摘掉**（不是隐藏） | 同 B（零拦截真实启动） | ✅ `#heyta-boot` 计数归 0；截图 `boot-splash-after.png` **人已看** |
 | 变异：摘掉 `armBootSplashDismiss(container)` | 同上 | 🔴 **两条同时红**：门禁报"找不到调用点"、e2e B 在 `toHaveCount(0)` 上 16.5s 超时（遮罩盖住整屏） |
