@@ -4184,6 +4184,13 @@ heyta-selfhost-verify-supersync-migrate-1 heyta-selfhost-verify   Exited (0)
 🔴 三条都要人拍板，且 **A 与本批硬约束直接冲突**。本批做到的部分是：机制已修（G-54，载体上 `镜像 OK` 有读数）、
 判据已挂（第 5/5b 腿 + 10 臂变异）、**这一条缺口已编号并带可复核命令**。
 
+> ⚠️ **本节那格 `116 笔` 是 08:5x 的瞬时读数，15:0x 现量已变成 `97`**（同一把尺
+> `git rev-list --count origin/main..main`；`origin/main` 从 `95ac4662` 走到 `8a254bcd`，
+> 今天 10:13 有人 push 过 —— 那不是本批推的）。口径 A 的**代价会随别人每次 push 自己变小**，
+> 所以引用它时必须现取，不能抄本节。其余三条 needle（devDeps 里那 3 枚 `@heyta/*`、
+> production 阶段 `npm pkg delete` 命中 0、`b3397cda` 是 `origin/main` 的祖先）15:0x 重量**仍成立**，
+> 逐条读数与那枚差点把我骗过去的 zsh 引号坑在 **§8.89**。
+
 ### 8.65 拆栈修法**第一次被真容器消费**，而我自己的落地探针差点把这次合并放行（09:0x–09:1x）
 
 这一节有三笔，前两笔都是**我自己的探针**的事，不是产品的。
@@ -5373,3 +5380,72 @@ docker ps          = 空（没有残留容器，容器名冲突那一档不适�
 而 g69 用 `grep -c 'BLOCK '` 读出 **1** —— 台账里 `BLOCK` 那几行是**带两格缩进**的，
 锚在行首的计数把非空集合数成了空集。这正是 §7 那条"空测量看着最干净"的形状：
 **判"归零"的计数器必须与生产它的那把尺子逐字同式**（g69 用的模式是对的，我的锚是错的）。
+
+### 8.89 G-55 的三条 needle 在**新的公开 SHA** 上重量一遍仍成立；顺带一枚差点骗过我的 zsh 引号坑（2026-10-04 15:0x）
+
+`origin/main` 在今天自己动了（§8.64 量的那版是 `95ac4662`），所以"公开那棵树建不出镜像"这句
+**必须重取**才能继续当对外结论用。这一跑全程只读：git 对象 + GitHub 匿名 API，**不构建、不 push、不发镜像**。
+
+#### ① 远端那一侧现在是什么（先证明我看的不是本地旧 ref）
+
+| 量 | 读数 | 命令 |
+|---|---|---|
+| 本地 `origin/main` | `8a254bcd9074a37006be56ac3adc411604c9c17f` | `git rev-parse origin/main` |
+| 远端 `main` 的头（匿名 API） | `8a254bcd9074a37006be56ac3adc411604c9c17f` —— **逐字相同** | `GET api.github.com/repos/Xaiver03/heyta/commits/main` |
+| 仓库是否公开 | `private=false`、`default_branch=main` | `GET …/repos/Xaiver03/heyta` |
+| `origin/main..main` 落后笔数 | **97**（§8.64 那格是 116；10:13 有人 push 过，不是本批推的） | `git rev-list --count origin/main..main` |
+
+#### ② G-55 的三条承重 needle，逐条重量
+
+| needle | 15:0x 读数 | 说明 |
+|---|---|---|
+| `server/package.json` 的 `devDependencies` 里那 3 枚工作区包 | **仍在**：`@heyta/app-host` / `@heyta/storage` / `@heyta/sync-client` | 用 `git show` 取出 blob 后 **JSON 解析**读字段，不是 grep 字符串 |
+| `AS production` 之后 `npm pkg delete` 的命中数 | **0** | 阶段用 `awk '/AS production/,0'` 切，避免把 builder 阶段的行算进来 |
+| `b3397cda`（ADR-0050，带进那 3 枚 devDep 的那笔）是 `origin/main` 的祖先？ | **真** | `git merge-base --is-ancestor` |
+
+⇒ 生产阶段那三条 install 仍然是 `--omit=dev` 的裸形状（`:250-252`），机制那半截
+（`--omit=dev` **照样解析** devDeps 的每一条 spec）不是这次重量的对象 —— 它已经有真读数了：
+§8.62 那张鉴别表里 **A 臂**（= `b3397cda` 之后的形状，3 枚 `@heyta/*` devDep）
+第一条与第二条 install **各红一次**（`rc=1 code E404 … GET …/@heyta%2fapp-host`），
+**B 臂**（装之前 `npm pkg delete devDependencies`）与**反证臂**（同锁同镜像、摘掉那三枚）都 `rc=0`，
+两臂在 npm 10.9.4（本机）与 11.19.0（`node:24-alpine` 运行时同款）上同形。
+⚠️ 措辞按表原文收窄：那两列是**两条 install**，不是"本地那棵 vs 公开那棵"——
+公开树这一侧的证据是**形状层**的（本节 ② 那三条 needle），不是"公开树被真构建过"。
+行号也分两本账，别抄串了：**公开那棵树**那三条 `--omit=dev` 在 `server/Dockerfile:250-252`；
+**本分支那版**的修法 RUN 在 `:297`（`RUN npm pkg delete devDependencies && npm install ./sync-core.tgz …`）。
+⚠️ 顺带抓出本文自己的一处引用漂移：§8.62 写的 `server/Dockerfile:286` 现在落在**注释行**上
+（`# 🔧 heyta 改动（G-54…）`），RUN 那一行在 `:297` —— 差 11 行是 G-54 那节注释变长造成的。
+两版 Dockerfile 行号整体差 40+ 行，引用时必须写明是**哪一棵树**的行号。
+**所以 G-55 的结论一个字都不改，只是把它的日期从 08:5x 换到 15:0x**，并把口径 A 那格会漂的数字标出来（见原句旁的更正）。
+
+🔴 这一条**仍然不是本批能自己关的**，三种口径一条都没被自动满足：A 直接撞"不推远端"；
+B 会造出"公开树 ≠ 本地 main"的分叉；C 要动那两枚仍在别人手里的 i18n 表 + 一次落地页重发。
+它保持 pending，但现在是**带着现量的 pending**，不是带着印象的 pending。
+
+#### ③ 差点骗过我的一枚坑（值得入档的形状）
+
+第一趟我这样写：
+
+```bash
+for ref in origin/main main; do git show $ref:server/package.json …; done
+```
+
+zsh 会把 `$ref:server/…` 里那个 `:` 当成**修饰符**去解析（同一个家族里还有 `$ref:path` 报 bad substitution），
+于是 git 实际收到的是 `origin/main.json`：
+
+```
+fatal: ambiguous argument 'origin/main.json': unknown revision or path not in the working tree
+SyntaxError: Unexpected end of JSON input        ← 管道下游拿到空串
+prune-family needles: 0                           ← grep 对空文件计数 = 0
+```
+
+危险的不是报错，是**那个 0 与正确答案同号**：我预期的读数就是"`npm pkg delete` 命中 0"，
+所以第一趟的屏幕看起来"完全符合预期"，没有任何一条异常会促使我去看 stderr。
+这一条与 §7「空测量看着最干净」是同一族，但多一种面目：
+**当"没有"本身就是预期结论时，命令失败与结论成立在输出上不可区分。**
+
+修法两条都便宜，都已用在这一节：
+1. ref 与路径**一起**放双引号：`git show "${ref}:server/package.json"`；
+2. 每次"0 命中 / 空集"的读数，同一趟里把**取字节那一步自己的 rc** 打出来
+   （这一节改成先 `> /tmp/spj.json` 落盘再解析，解析失败会炸在 `JSON.parse`，
+   而不是静默把空文件数成 0）。
