@@ -2913,9 +2913,16 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
                                             #   启动器 :356 会 VERDICT=NOT-RUNNING 退 3，而 INNER_EXIT 仍是 0
 PHASE1_EXIT=<n>（mac+windows）
 PHASE2_EXIT=<n>（android+ios）        # 或 PHASE2=SKIPPED-BY-GATE / ANDROID-SKIPPED-BY-RULE ⇒ ① 未完成
-INNER_EXIT=<n>   FRESH=<n>/5
+INNER_EXIT=<n>                       # 🔴 04:08 二次更正：装置**从不打印** `FRESH=` / `EXPECTED=` / `COPY_BAD=`
+                                            #   这三个 token —— 它们只活在中文句子里（:344 与 :362-363）。模板原来写 `FRESH=<n>/5`
+                                            #   是让我抄一行日志里**不存在**的东西 ⇒ 立规矩：**每个字段都必须能在日志里逐字 grep 到**，
+                                            #   grep 不到就改成写那句中文原话。
 本轮新生张数 = <n> / 期望 <n>；证据已抄进 <EVID>    # 启动器 :344 的原话；EVID 目录名带的是**起跑那一版**
-COPY_BAD=<n>                          # 04:03 补：非 0 时启动器退 3。归档失败与"五张都成了"在退出码之外**长得一模一样**
+归档缺张数只有**失败时**才打印（:362-363），形状是两句中文：
+                                            #   VERDICT=NOT-RUNNING（四端图没凑齐：<FRESH>/<EXPECTED>…）
+                                            #   VERDICT=NOT-RUNNING（<n> 张没归档进私有目录，逐张看上面的 ⚠️）
+                                            #   ⇒ 绿的那趟**没有**"归档全部成功"这句话 ⇒ 绿的正证只能由"五枚都在 <EVID> 里、
+                                            #   且与 /tmp 那五枚 cmp 相同"给出（现读装置 :325-341 的结论）。
 图 1 <EVID>/heyta-reinstall-mac-installed.png        size=… mtime=… md5=…  ← 只证「有个真 macOS 窗口」，主蓝不据它判红
 图 2 <EVID>/heyta-reinstall-mac-installed.png.webview.png …  ← 主蓝命中 <n>（阈值 ≥20）
 图 3 <EVID>/heyta-reinstall-android.png              …  ← 前台窗口门：mCurrentFocus=…
