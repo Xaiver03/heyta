@@ -114,6 +114,14 @@
    `PUBLIC_FACT_SHAPES`，往那里加第二种形状（或给公开路径加身份参数）会让它红。
    ⚠️ **该门禁本轮尚未接进 `pnpm check`**（契约文件头已经把它写成 `scripts/check-public-facts.mjs`，
    但那个脚本此刻在 main 里**不存在** —— `ls scripts/check-public-facts.mjs` 现量；登记为 W4b 收尾项，别读成已存在）。
+   ✅ **上面这句已经过期**（2026-10-04 现量）：脚本存在且已接进 `pnpm check`
+   （`package.json` 里 `check:public-facts` 一条 + `check` 串里那一处），
+   实跑 rc=0、分母把 21 条 GET 与 3 条匿名面打印在输出里。留原句是为了让人认出
+   "**引用的运行落后于实际跑过的运行**"这个第三种漂移形状。
+   🔴 同批补上的一处真缺口：契约与路由两边此前都指着
+   `server/tests/holiday-public-route.spec.ts`，而那个文件**不存在** ——
+   匿名读面（ETag 四种写法、304 空 body、500 不退化成空集、per-route 速率）
+   从没有过任何消费者。现在它存在了。
 3. **法务口径经判定不改**。`packages/legal/src/documents/third-parties.ts` 那张"heyta 服务器发出的对外请求"表管的是
    **出网**（server → 第三方），本通道是 server → 用户自己的设备，中间没有任何第三方 ⇒ 四类集合不变。
    这条判定在计划 §8.2 L' 的普查表里，带 82 行候选的读数，不是本文新立的断言。
