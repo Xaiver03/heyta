@@ -51,6 +51,16 @@
  *      `Test-Path` 那枚**目录** ⇒ 远端少两枚已声明的包被伪装成"前置过了"。
  *      与 G7 是同一族（"目录存在"被当成"构建输入齐"），但不是同一件事：G7 拦的是
  *      探错了地方（永不开的门），G9 拦的是探对了地方却只看了目录。
+ *   G10 **步骤 5 的 mtime 读回要跨 PowerShell 版本、且不许把"读不到"读成 1970 年**：
+ *      远端那一行必须给 ISO-8601（`.ToString('yyyy-MM-ddTHH:mm:ssZ')`），本地必须
+ *      `Date.parse` + 一个下界（`MTIME_FLOOR`）。理由是真事故：打包机上是
+ *      Windows PowerShell **5.1**，`[DateTime]` 没有 `ToUnixTimeSeconds()`（那是
+ *      `DateTimeOffset` 的方法），那一行抛错后**什么都不输出**，而 `Number('')` 恰好
+ *      是 `0` —— 于是 `BUILD SUCCESSFUL in 5m 11s` 的那一次真远程构建被报成
+ *      "远端产物比本次构建起点还旧：mtime=1970-01-01"。**归因也是坏的**：它指着
+ *      §7 第 27 条说"拿旧产物报绿"，而产物是新的、探针是坏的。
+ *      与 G9 同族（探针自己坏了），但方向相反：G9 拦"看漏了却报通过"，
+ *      G10 拦"看错了却报失败"—— 两边都要有，否则下一次红会给出一个错误的根因。
  *
  * ## 怎么跑
  *
@@ -473,6 +483,47 @@ function checkRouterInvariants(baseRoot) {
   if (DERIVE.test(router) && SPLIT_MARKERS.test(router) && PROBE_GUARD.test(router)) {
     readings.push('G9 步骤 1 逐包前置（名单由 package.json 推导 ／ 两标记分行 ／ 探针故障守卫在位）');
   }
+
+  /* G10：步骤 5 的 mtime 读回（三条腿，与 G9 一样各自只动一处 ⇒ 每臂恰好 1 条红）。
+   *  1. 远端不许调 [DateTime]::ToUnixTimeSeconds()（PS 5.1 没有 ⇒ 空输出）；
+   *  2. 本地不许 `Number(grab('MTIME'))`（空串读成 0，且 0 是有限数）；
+   *  3. 判定侧必须有下界，否则"读不到"会以"产物是 1970 年的"这个**错误归因**红出去。 */
+  const PS_MTIME_METHOD = /LastWriteTimeUtc\.ToUnixTimeSeconds\(\)/;
+  const ISO_MTIME = /LastWriteTimeUtc\.ToString\('yyyy-MM-ddTHH:mm:ssZ'\)/;
+  const PARSE_ISO = /Date\.parse\(mtimeRaw\)/;
+  const FLOOR_GUARD = /mtime < MTIME_FLOOR/;
+  if (PS_MTIME_METHOD.test(router)) {
+    out.push(
+      'G10 步骤 5 还在用 [DateTime]::ToUnixTimeSeconds() —— 打包机的 PowerShell 5.1 里这个方法不存在，' +
+        '那一行抛错后什么都不输出，而 Number(\'\') 是 0，于是成功的构建被报成"产物是 1970 年的"。',
+    );
+  }
+  if (!ISO_MTIME.test(router)) {
+    out.push(
+      'G10 步骤 5 的远端 mtime 不再输出 ISO-8601 —— 换算要留在本地（Date.parse），' +
+        '让远端给 Unix 秒就得依赖 [DateTimeOffset]，而那正是上一次坏掉的地方。',
+    );
+  }
+  if (!PARSE_ISO.test(router)) {
+    out.push(
+      'G10 步骤 5 不再用 Date.parse(mtimeRaw) 换算时间 —— 换成 Number(...) 时空串会读成 0，' +
+        '而 0 是有限数，于是"探针没读到"会以"产物是 1970 年的"这个错误归因红出去。',
+    );
+  }
+  if (!FLOOR_GUARD.test(router)) {
+    out.push(
+      'G10 判定侧缺 mtime 下界 —— 没有它，"探针没读到"会以"产物比构建起点旧"的形式红出去，' +
+        '把一次成功的构建归因成 §7 第 27 条那个形状。',
+    );
+  }
+  if (
+    !PS_MTIME_METHOD.test(router) &&
+    ISO_MTIME.test(router) &&
+    PARSE_ISO.test(router) &&
+    FLOOR_GUARD.test(router)
+  ) {
+    readings.push('G10 步骤 5 mtime 读回（远端给 ISO ／ 本地 Date.parse ／ 下界守卫在位）');
+  }
   return out;
 }
 
@@ -799,6 +850,53 @@ function selfTest() {
       if (countRed(msgs, 'G9 ') === 1) console.log(`   ✅ 臂 ${arm.name} 转红：G9 抓到（恰好 1 条）`);
       else {
         console.log(`   🔴 臂 ${arm.name} 存活：G9 报了 ${countRed(msgs, 'G9 ')} 条（应当恰好 1）`);
+        fail = 1;
+      }
+    }
+
+    /* 臂 12 / 12b / 12c / 12d：G10 的四条腿。12 就是 2026-10-05 01:4x 那次真远程构建
+     * 当时的形状（BUILD SUCCESSFUL 被报成"产物是 1970 年的"），另外三条是它的三个守卫。 */
+    const g10Arms = [
+      {
+        // 这一个改动**同时**违反两条腿（用了 5.1 没有的方法 + 不再给 ISO-8601），
+        // 所以期望是 2 而不是 1 —— 写在这里是为了让下一位不把"两条红"当成判据过严。
+        name: '12（远端改回 ToUnixTimeSeconds）',
+        from: `.LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')`,
+        to: `.LastWriteTimeUtc.ToUnixTimeSeconds()`,
+        expect: 2,
+      },
+      {
+        name: '12b（远端不再给 ISO-8601）',
+        // ⚠️ 必须是**双引号**字符串：这段 needle 里有 `${i}` / `${p}`，
+        //    放进模板字符串会被当插值求值（ReferenceError: i is not defined —— 第一次跑就死在这）。
+        from: "Write-Output ('A${i}::MTIME=' + (Get-Item '${p}').LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')); ",
+        to: "Write-Output ('A${i}::MTIME=' + (Get-Item '${p}').LastWriteTimeUtc.Day); ",
+      },
+      {
+        name: '12c（本地不再 Date.parse 那一串）',
+        from: 'const mtimeParsed = Date.parse(mtimeRaw);',
+        to: "const mtimeParsed = mtimeRaw === '' ? 0 : Number(mtimeRaw);",
+      },
+      {
+        name: '12d（摘掉 mtime 下界守卫）',
+        from: '      !Number.isFinite(mtime) ||\n      mtime < MTIME_FLOOR',
+        to: '      !Number.isFinite(mtime)',
+      },
+    ];
+    for (const arm of g10Arms) {
+      seed();
+      const mutated = router.split(arm.from).join(arm.to);
+      if (mutated === router) {
+        console.log(`   🔴 臂 ${arm.name} 没施上：run-gradle.mjs 里读不到那一串 —— G10 的这条腿无从求值`);
+        fail = 1;
+        continue;
+      }
+      write('scripts/run-gradle.mjs', mutated);
+      msgs = checkRouterInvariants(dir);
+      const want = arm.expect ?? 1;
+      if (countRed(msgs, 'G10 ') === want) console.log(`   ✅ 臂 ${arm.name} 转红：G10 抓到（恰好 ${want} 条）`);
+      else {
+        console.log(`   🔴 臂 ${arm.name} 存活：G10 报了 ${countRed(msgs, 'G10 ')} 条（应当恰好 ${want}）`);
         fail = 1;
       }
     }
