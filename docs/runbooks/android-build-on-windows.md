@@ -83,7 +83,7 @@ pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
 | 1 | 门禁：`node scripts/check-android-gradle-remote.mjs --self-test` 逐臂按预期转红/转绿 | ✅ 实测 2026-10-05 00:1x `rc=0`；00:4x 复跑加了臂 9（G7：远程前置不许是一条永不开的门）后**仍 rc=0**。
 |    | 逐臂含义：臂 0 = 阳性对照，臂 1–6 各抓一条 G1–G6，臂 7/8 = "门禁文件只描述不执行"那条豁免的正反两腿，臂 9 = G7，臂 10/10b/10c = G8 三条腿，臂 11/11b/11c = G9 三条腿。**臂数别抄进文档 —— 现取 `--self-test` 末行** |
 | 1.5 | 前置：远端**逐个声明依赖**解析得到（不是"node_modules 目录在"），且 dry-run 里这枚探测照跑、照打读数 | ✅ 实测 2026-10-05 01:33 `--dry-run` 现量 `RNDEPS=True ROOTDEPS=True LOCALPROPS=absent DEPCHECK=19 DEPMISS=2`；01:36 远端补装后同一条复量 **`DEPMISS=0`**（同棵树上的正反对账）。🔴 这一格**是被 18 分钟的失败照出来的**，见 §7.1；旧形状在同一条命令里报 ✅ |
-| 2 | 远程真打出 Release APK，`apksigner verify` 通过 | 🔴 **未通过**（01:26 现量：`BUILD FAILED in 18m 18s`，死在 `:app:createBundleReleaseJsAndAssets`）。⚠️ 但**分流本身走通了**：步骤 0–4 全部执行、远端 gradle 真跑到 native 编译与 Metro 打包，成因是远端依赖过期（§7.1），不是路由缺陷。补装依赖后需重跑才算 |
+| 2 | 远程真打出 Release APK，`apksigner verify` 通过 | ✅ **02:14–02:34 通过（带一条签名身份的边界，见 §7.3）**：`BUILD SUCCESSFUL in 41s` → 步骤 5/6/7 全绿 → 回传 `size=66,915,556 B / sha256=ea6fb4421d3df38f…（与远端逐字相同）/ 本地 mtime 回写为远端完成时刻`；`apksigner verify --print-certs` **rc=0**。⚠️ 签名证书是 `CN=Android Debug` —— 这是**设计如此**：`apps/mobile/android/app/build.gradle:182-219` 在四个发布 keystore 键任一缺失时把 release 变体挂到 `signingConfigs.debug`。所以这条判据证到的是"远程打出的产物是一个合法签名的 APK"，**不是**"可以上架的发布签名" |
 | 3 | APK 拉回本机装进模拟器，启动截图**非空白且主蓝命中**（§6.1.1 判据） | 🔴 未实测 |
 | 4 | 连续两轮「改 JS 源码 → 远程重打 → 装机」验产物是当前源码（防 §7 第 27 条旧 bundle） | 🔴 未实测 |
 
@@ -240,7 +240,48 @@ HEAD 含 `5be80374` 的收口点改动）。我只做了两件事：读它的日
 `ssh -o ConnectTimeout=10 windows-pc cd /d C:\src\heyta\apps\mobile\android && gradlew.bat assembleRelease`）；
 "Mac 上不再起新的 Gradle 构建"这条规则在第一次真实调用上是**成立的**，且它的证据形态是
 "本机只有 ssh 子进程 + idle daemon 零 CPU"，不是"本机 java 计数为 0"（后者永远不为 0，拿它当判据会恒红）。
-</think>
+
+### 7.3 2026-10-05 02:14：第一次**打出产物并回传**的远程构建（判据 2 由这一趟换成实量）
+
+🔴 归属先写清，这一段最容易被读成"本批自己跑绿了"：**起跑的不是我起的**。
+是并行那条线在隔离检出 `heyta-wt-ai-closeout`（载体 HEAD `afe7ff7a`，含本批 `5be80374`/`ee87f92c` 的分流与逐包前置）
+里跑 `pnpm reinstall:all` 的 Android 段，走到 `scripts/run-gradle.mjs` ⇒ ssh `windows-pc` ⇒ 远端 `gradlew.bat assembleRelease`。
+本批提供的是**构建路径本身 + 判据 1.5 那条逐包前置 + 下面这条 apksigner 命令**。
+
+| 环节 | 读数（02:34 现取，另一趟 02:14 落盘） |
+|---|---|
+| 远端 gradle | `BUILD SUCCESSFUL in 41s`（上一趟同一位置是 `BUILD FAILED in 18m 18s`，死在 `:app:createBundleReleaseJsAndAssets` ⇒ 这一趟唯一变化的输入是 §7.1 那次补装依赖） |
+| 步骤 5（远端产物身份） | `size=66,915,556 B`、`sha256=ea6fb4421d3df38f…`、`完成时刻(UTC)=2026-10-04T18:14:24.000Z` |
+| 步骤 6（回传落点） | 落进**消费者原本期望的路径** `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`（不是暂存目录） |
+| 步骤 7（本地对账） | 本地 `sha256` 与远端**逐字相同**，本地 mtime 回写为远端完成时刻（02:34 复量：`size=66915556 mtime=2026-10-05 02:14:24` ⇒ 回写没被后续步骤改掉） |
+| 签名核验 | `apksigner verify --print-certs` **rc=0**（`/opt/homebrew/share/android-commandlinetools/build-tools/36.0.0/apksigner`），`Signer #1 certificate DN: CN=Android Debug, OU=Android, O=Unknown…`，证书 SHA-256 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c` |
+
+🔴 **这条判据证到哪一步为止（别读多）**：
+
+1. 签名身份是 **`CN=Android Debug`**，这是**设计如此**不是缺陷 —— `apps/mobile/android/app/build.gradle:182-219`
+   在四个发布 keystore 键（`RELEASE_STORE_FILE` 等）**任一缺失**时把 release 变体挂到 `signingConfigs.debug`。
+   所以判据 2 现在的含义是"远程能打出**一个合法签名的** APK"，**不是**"能打出可上架的发布签名产物"。
+   后者要等发布 keystore 落到那台打包机上、并把 `apksigner verify` 的期望 DN 写成判据才算。
+2. **没有任何仓库脚本执行 `apksigner`**（现量：`grep -rn apksigner scripts/ package.json apps/mobile/package.json`
+   ⇒ 只有 `scripts/check-android-build-host.mjs:46` 的**注释**提到它）。也就是说判据 2 的载体目前是**一条手敲命令**，
+   它不会因为构建变红而红。要么把它接进 `run-gradle.mjs` 的步骤 7 之后（一行，但要连着一次真远程构建才验得动），
+   要么在手册里长期写明"这一步靠人"。**当前选择是后者 + 在这里登记前者为待办**，理由：接进构建路径等于让
+   `pnpm build:android` 依赖一台 Mac 上的 SDK 路径，而那正是 §五 要拆掉的东西。
+3. 产物落在 **gitignore 的构建目录**里（现量：`git check-ignore -v` ⇒ `apps/mobile/.gitignore:17:android/app/build/`），
+   所以上面那组哈希**不是一份可长期复查的证据** —— 下一次构建就地覆盖它。要留证据只能把 sha256 抄进日志或产物名。
+   ⚠️ 同一台机器主检出的同路径下此刻还躺着另一枚**旧的本机** APK（`size=66,995,684 / sha256=3a83a74379e93f0d6b213872…`，
+   10-04 15:02:47，分流之前 Mac 上打的）⇒ **以后引用"那枚远程 APK"必须带载体的绝对路径**，只写相对路径会指到错的树。
+
+仍未读数的两条，判据 2 绿**不覆盖**它们：**判据 3**（拉回本机装进模拟器、启动截图非空白且主蓝命中）与
+**判据 4**（连续两轮"改 JS 源码 → 远程重打 → 装机"验产物是当前源码，防 §7 第 27 条旧 bundle）。
+这两条都是设备面，只在窗口内跑。
+
+⚠️ 判据 4 **不是从零开始**：它已有一枚部分载体 —— `scripts/lib/apk-freshness.sh`（`pnpm check:apk-freshness`，
+"APK 的 mtime 必须不比源码面里最新的那枚 .ts/.tsx 旧"，取不到 mtime 判红），而步骤 7 把本地 mtime
+回写成**远端构建完成时刻**正是它的前提（§二 末与 §7.2 已记：不回写的话 scp 的"传输时间"会让任何一次
+远程产物都自动显得新鲜）。但它只挡"比源码旧"，**挡不住**"远程那台机器的 `C:\src\heyta` 解包解错树"
+那一档（§7 第 82 条的形状），也**只覆盖那四个目录**（清单偏窄已登记在该文件头）。所以判据 4 要的两轮
+端到端行为读数仍然没被这枚门禁抵掉 —— 别拿"有 check:apk-freshness"当"判据 4 已闭合"。
 
 ## 八、第二枚门禁：`check:android-build-host`（规则的另一半）
 
