@@ -19,7 +19,7 @@
 | 2 | web 侧真的导出成品图（复用 `avatar-encode.ts` 的 canvas 形状与平台边界） | ✅ 代码 + 单测 + e2e 五条件证跑绿（1080×1440 真落盘、图人看过），六条变异臂全红 | §3 §4.3 §6.3 |
 | 3 | 判据：导出全程**零网络请求**（真浏览器 + 正向对照） | ✅ 5 passed / rc=0：双计数器同时为零 + 页面自发的 `/api/*` 各 +1 + 载体 `SW=NONE` 实测 | §4 |
 | 4 | "零法务变更"的**现量**复核（不是引用那句话） | ✅ 完成：`uses-permission` 声明数**前后都是 1（INTERNET）**、iOS plist/Podfile 零 diff、`NSPhotoLibrary*` 键 0 条，两条既有对账门禁 rc=0 | §5 |
-| 5 | 移动端也真导出（原工单的"成品图"不分端） | ✅ **两端真机 IHDR 读数都取到了**（Android 04 13:20 `RC_ANDROID=0`；iOS 04 17:13:17 `RC_PROBE=0` ⇒ `1080×1440`，W7-G2 那条"折算仍是推的"随之闭合）；🔴 **Android 那趟当场过期**：让帧修复改了 `card-export-units.ts`，要在新树上重取 | §2.4 §7 |
+| 5 | 移动端也真导出（原工单的"成品图"不分端） | ✅ **两端真机 IHDR 读数都取到了**（Android 04 13:20 `RC_ANDROID=0`；iOS 04 17:13:17 `RC_PROBE=0` ⇒ `1080×1440`，W7-G2 那条"折算仍是推的"随之闭合）；🔴 **Android 那趟当场过期**：让帧修复改了 `card-export-units.ts`，要在新树上重取 —— ⚠️ **04 18:1x 重取已开跑并以环境无效收口**：装包 `RC_REINSTALL_ANDROID=0`（17:57:21）／探针 `RC_ANDROID=3`（18:12:23，等满**默认 900s**、负载 164），补跑在链 T2（显式 3600s + 先重装）。**这一行在补跑取到读数前只能算"iOS 端已到最终态、Android 端装包绿而出图未取到"**，缘由见 `countdown-anniversary.md` §8.4 ㊢ | §2.4 §7 |
 
 
 ---
@@ -329,5 +329,17 @@ list reporter 的 `✘` 前是**两个**空格而正则要求一个，加上没�
    🔴 **两端现在各欠一趟**：Android 那趟（13:20）验的是让帧修复**之前**的 bundle（`card-export-units.ts` 改了
    ⇒ 按 W7-G6 自己写的规矩当场过期，要重取）；iOS 那趟装的是 `2a1fa25a` **加未提交的修复**
    ⇒ 在修复提交之前它不算"提交态绿"的读数。
+   —— 🔴 **04 18:2x 这两句一条被现量升级、一条被量到收口姿势**：
+   ① **iOS 那句作废**，它**是**提交态的读数 —— 不是靠"我记得内容一样"，而是两条可复跑的差异检查：
+   `git diff --stat c313914f HEAD -- apps/mobile/src` ⇒ **空**（JS/TS 输入与修复提交逐字节相同），
+   `git diff --name-only 6d78fa7e HEAD -- apps/mobile` ⇒ 只有 `evidence/card-export/README.md` 与那枚失败截图，
+   按构建输入过滤（`ios/ | src/ | android/ | package.json | .podspec`）命中 **0**。
+   ⇒ **修复提交比探针晚 4 分钟落地、字节是同一份**，这一档的正确说法是"提交在后、输入未变"，
+   而不是"装的不是提交态"。⚠️ 这条更正有保质期：**下一次再动 `apps/mobile/` 的输入，它就得重取**（正是 Android 那一格的教训）。
+   ② **Android 那一趟重取已经开跑并以环境无效收口**：`RC_REINSTALL_ANDROID=0`（17:57:21，装的是当前产物）
+   → 探针 `RC_ANDROID=3`（18:12:23，`❌ 等满 900s 负载仍是 164`；那 900s 是 `wait-for-quiet-host.sh` 的**默认上限**，
+   我的链脚本没传 `HEYTA_LOAD_GATE_WAIT`，阈值 12 没动）。补跑在链 T2：**显式 3600s + 先重装**
+   （臂收尾的 `git checkout --` 会把源码 mtime 推到装进去的 bundle 之前，新鲜度门按规矩就该拒）。
+   缘由与那条可迁移的坑在 `countdown-anniversary.md` §8.4 ㊢。
 3. ⏹ iOS pbxproj 那 8 行的**构建级**验证（`plutil -lint` 只证 XML 合法，不证编译进 target）。
 4. ⏹ 与 `feat/countdown-batch2` 合流（W7 三笔 + W8 那四笔），合流后 `pnpm reinstall:all` 四端重装。
