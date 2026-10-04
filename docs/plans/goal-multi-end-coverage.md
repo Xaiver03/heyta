@@ -3494,3 +3494,68 @@ A1 有判决行 ⇒ 执行了、落旗、旗里带 `NOTES_EXIT=`；A2 旗已在 
 
 **窗口现量（16:26:00，v23 第 1 轮）**：设备仍不空闲（`com.heyta` pid **25009** 自 15:27:40 起未换 ⇒ 那条线在跑长用例），
 1min load **11.54**（16:11:46）／阈值 12。⇒ **①③ 仍未起**；② 按 §7.30 那条新记的次序，只能在链退出之后由人起。
+
+#### 7.31.21 ① 那道 RIVAL 互斥门**在这台机器上从未成立过**（解析器被仓库路径里的空格打断），以及我第一版阴性对照其实是空臂（17:11–17:21 现量）
+
+**怎么发现的**：为了查"③ 为什么一直不开窗"，我拿解析器问"有没有人在跑 `verify-mobile`"，
+得到**空**；同一时刻手查 `ps` 明明有
+`49211 bash /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-batch2/scripts/.verify-mobile-card-export-ios.sh.snap.49211`。
+探针漏读 ⇒ 先怀疑探针（§7 元规则 1），读实现才看到根因。
+
+**根因（一句话）**：旧版用 `ps -Ao pid=,command=` 配 awk 的 `$2/$3` 取"解释器/脚本"两个字段，
+而 `command=` 是**整条命令行** —— 本仓库路径带空格（`All in one Data`）⇒ argv[1] 被打断成
+`/Users/rocalight/Desktop/All`，basename 变成 `All` ⇒ 对**任何带空格路径的运行者恒返回空**。
+这台机器上只有 `/tmp` 里那几枚我自己的脚本不带空格，所以：
+🔴 **① 的"别人的重装在跑就不起跑"这道门，对所有真实宿主侧运行者（含我自己那枚载体
+`…/01_PROJECTS/heyta-wt-reinstall`，路径同样带空格）一直在"什么都没测到"的情况下放行。**
+这是 §7.31.17 那一族（"空测量看着最干净"）的第三种面目：上一节修的是**探针文件不在**，
+这一节修的是**探针在读但读不出**。
+
+**修法**（`heyta-real-runner-pids.sh`，durable 与 `/tmp` 两份 md5 相同 `cfe12315cb7c…`）：
+解释器名从 `comm=` 取（与参数分开，不受空格影响），脚本路径从 `args=` 整串里
+用"以 `.sh`/`.bash`（可带 `.snap.<pid>`）结尾的**最长前缀**"定位，
+`-c` 族守卫**必须保留**（带 `c` 的选项后面是命令串不是路径 —— 摘掉它，
+"只是把某个 `.sh` 的名字写进命令行"的 grep / 快照包装就重新被当成真运行者，
+那正是这份工具存在的那个理由）。
+
+**形状夹具** `heyta-rpi-shape-fixture.sh`（durable，16 臂 GREEN）：不靠现量 `ps`，
+而是把 PATH 最前面放一枚只 `cat` 造好进程表的假 `ps`。六枚阳性形状（带空格路径的自快照 /
+`/tmp` 直路径带 `--go` 参数 / `sh` 本体的排队壳 / 带空格直名 / 相对路径）、
+五枚阴性（`zsh -c` 快照包装、`zsh -c pgrep`、`grep` 本体、`/bin/sh -lc`、`notarytool` 本体）、
+一枚空 pattern 用法臂，加**两枚变异臂**证明两道门有牙：
+摘掉 `-c` 守卫 ⇒ 1005/1006/1010 三枚包装被当成运行者；摘掉解释器门 ⇒ `grep` 那枚被当成运行者。
+
+⚠️ **我第一版夹具自己坏在两处，都是"看起来在测其实没测"**：
+1. **现量做的阴性对照是空臂** —— 我用 `bash -c "sleep 25 # 提到 reinstall-all.sh"` 造"只是提到名字"的进程，
+   但 bash 会把最后一条命令 **exec 掉**，ps 里躺着的其实是 `comm=sleep`；
+   那条臂**根本没走到 `-c` 分支**，却因为"结果为空"被判成通过。
+2. **阴性臂拿"整串为空"当期望** —— 同一张表里本来就有合法运行者会被 pattern 捞到，
+   期望为空把"守卫有效"和"表里没人"混成了一件事，结果四臂假红、一臂假绿。
+   改成**禁止命中集**语义（`run_absent`：只断言那几枚不许出现）后才是它本来想测的东西。
+
+**顺带更正我自己先前写下的两个"仍然"**（读数 17:19–17:21）：
+- **RIVAL 腿现在真的空了**：`pgrep -fl 'queue-reinstall|reinstall-all|sup-reinstall'` 只回
+  `16137 bash sup-reinstall.sh`，而它的 cwd 是 `/Users/rocalight/scratch-heyta`（别那条线的**监督器**，
+  父=launchd，10:39 起，子进程只有 `sleep 600`）—— 它本身不碰共享对象，起跑重装时走的是
+  `reinstall:all` 的字面命令 `bash scripts/reinstall-all.sh`（相对路径，basename 命中）⇒
+  **修好后的这道门能在它真动手的那一刻看见它，而在它只是睡着时不该命中**。这不是放宽判据，是把"命中时刻"说清。
+- **mac-dist 腿仍然挡着 ①**：`diskimage/98171` 还开着 `/private/tmp/heyta-macos-dist/Heyta-1.0.0.dmg`，
+  而 `pgrep -x notarytool` 已经**空**（98934 那趟 `notarytool submit --wait` 早退了）。
+  ⇒ 这正是当初加第二条腿时写的"**别人的公证可能比它的父进程活得久**"的**第二个实测实例**，
+  也说明这条腿按对象（句柄）而不按进程名判是对的形状。不动它（§8.9：只对自己创建的对象动手）。
+
+**窗口现量（17:21:33）**：链 v23 第 74 轮，负载 **37.97** / 阈值 12；android `emulator-5554` 上
+`com.heyta` 正在跑（pid 6296）；主检出里另有 `bash …/.verify-mobile-ios.sh.snap.<pid>` 在跑（17:19 现量 11294）。
+⇒ **①③ 仍未起**；① 的两条腿现在是一条真空、一条被别人的 dmg 句柄挡着，③ 被设备占用挡着。
+
+**复跑**：
+```bash
+bash ~/.heyta-window-rigs/heyta-rpi-shape-fixture.sh          # RPI_SHAPE_FIXTURE=GREEN arms=16
+bash ~/.heyta-window-rigs/heyta-rpi-resolver-fixture.sh       # GREEN=五臂全对
+bash ~/.heyta-window-rigs/heyta-real-runner-pids.sh 'verify-mobile'   # 必须报出带空格路径的运行者
+bash ~/.heyta-window-rigs/heyta-real-runner-pids.sh 'reinstall-all\.sh'  # 不自命中（此刻为空）
+```
+⚠️ **边界**：pattern 不要命名到本工具自己（`heyta-.*\.sh` 这类）—— 贪婪前缀会把 pattern 文本
+并进脚本路径而**自命中**（实测 17:19：`'heyta-real-runner-pids\.sh'` 报出自己那枚）；
+闸门用的 `'reinstall-all\.sh'` 在同一时刻不自命中，所以这道门不会因为自己一次查询就永久退 3。
+已写进文件头。
