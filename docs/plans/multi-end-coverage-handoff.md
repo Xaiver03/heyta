@@ -2562,3 +2562,35 @@ Android 段走到我这批的分流（那棵树 HEAD 含 `5be80374`）。我做�
 而当趟载体实际零枚未提交。⇒ 这句话不能当"那棵树是脏的"的证据；要判脏只能 `git status --porcelain` 现量。
 （同一族的另一面：正因为清单按 `git ls-files` + `--others --exclude-standard` 取，
 **载体脏与不脏会打出同一句话**，所以它是那句措辞的读数无关项。）
+
+## 01:26–01:39 第一次真远程构建**红了**，根因不在我那三条未决里 —— 修法已落地并做了同棵树的正反对账
+
+01:26:48 现量（`/tmp/heyta-reinstall-apk.log`，别线那一趟）：`BUILD FAILED in 18m 18s`，
+`Execution failed for task ':app:createBundleReleaseJsAndAssets'`，往上翻是
+`Unable to resolve module @react-native-documents/picker from …\ProfileScreen.tsx`。
+它那一趟随后 `🔴 ios：失败`、`B_DONE rc=1 secs=1448`（**这是它的读数，不是我 ① 的**）。
+
+分类：**环境**。三条依据（逐条现量，不靠转述）：`apps/mobile/package.json:31` 声明了它；
+本机 `apps/mobile/node_modules/@react-native-documents` 在位；`git log -S` 指到 `6a0e26fa`。
+⇒ 远端那次 install 早于这两笔新增，而 §二 那条同步按设计**不送 node_modules**。
+远端逐包探测（我自己那条只读探针）：`CHECKED=19 APP=17 ROOT=0 MISSING=2`
+⇒ 缺 `@react-native-documents/picker` 与 `@heyta/widget-core`。
+
+**这条红照出的是一条判据缺陷，不是产品的**：步骤 1 当时量的是 `Test-Path apps\mobile\node_modules`
+——目录级判据对"少两枚包"零分辨力，而它和 runbook 里上一条学费（按 `android/node_modules` 判 ⇒
+永不开的门）是**同一族**。已改（`ee87f92c`）：名单从 `apps/mobile/package.json` 推导逐包判、
+两位置择一即算解析到、**先证明探针跑成了**（`DEPCHECK` 读不到或数不对 ⇒ 判探针故障，不放行成"缺 0 个"），
+并且 dry-run 里那枚只读探测**照跑照打**（上一版跟着 DRY 一起跳过，于是"远端不接受这条命令"
+只能等 18 分钟后由 Metro 暴露）。门禁 rc=0、`--self-test` 13 臂 rc=0。
+
+判据强度在同一棵树上做了正反对账：01:33 `--dry-run` ⇒ `DEPCHECK=19 DEPMISS=2`（旧形状此刻报 ✅）；
+远端 `pnpm install --frozen-lockfile`（`Done in 38.7s`、日志哨兵 `INSTALL_RC=0`）后 01:36 复量 ⇒ **`DEPMISS=0`**。
+🔴 **`DEPMISS=0` 不等于"远程构建验证通过"** —— §三 判据 2 仍未通过，要重跑一趟真构建才算。
+
+⚠️ 一个**没有做成自动步骤**的点（待拍，不代拍）：要不要让 `run-gradle.mjs` 在 `DEPMISS>0` 时
+自己去远端 `pnpm install`。本批只做了"检测 + 打出官方修法"，因为自动装意味着构建路径会改
+共享主机的状态；这次那一下 install 是我手动做的，**属于代拍的运维动作**，
+依据/回退/边界写在 runbook §7.1 最后一段。
+
+同刻一条容易读错的量：远端 `pnpm --version` = **10.33.4**，而 install 收尾行 `using pnpm v11.8.0`
+⇒ 那台机器上裸命令与仓库内命令不是同一个 pnpm（`packageManager` 经 corepack 生效）。别把版本号抄成单值。
