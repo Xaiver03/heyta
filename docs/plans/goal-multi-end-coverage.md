@@ -2823,3 +2823,43 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     否则**任何两条线各自跑 ① 都会互相删包**，而两边的判据都只看自己的截图 —— 谁都不会报红。
 - 现场（12:44 现量）：链 v19 第 23 轮仍被 `emulator-5554` 上前台的 `com.heyta`（pid 22880）挡着；负载、端口、
   别人的 iOS 卡片导出验收照旧 ⇒ ①③ 继续等窗口。本轮没有起跑任何设备/Playwright/重装类验收。
+### 7.31 ③ 的输入多了一道「能不能重放」的门，另一枚探针先被自己作废（2026-10-04 12:4x–13:0x，载体 `458249f6`，窗口仍不在）
+
+- 窗口现量（12:56:10）：`vm.loadavg` 1-min **15.78**（阈值 = ncpu 16 × 3/4 = 12）、`:3000` = node/70256、`:3100` = node/26407、4318/4319/4322 空闲、
+  `emulator-5554` 上 `com.heyta` pid 22880 且 `mCurrentFocus=Window{95140e2 … MainActivity}` ⇒ 设备不空闲。
+  ⇒ **本轮没有起跑任何设备 / Playwright / 重装类验收**（照「窗口不在就不要跑」）。链 v19（pid 92734）第 33–38 轮每轮都停在同一枚读数上。
+- 🔴 **③ 的产物取证换了一枚更新的对象，并且顺手作废了我自己的探针**：12:57:28 现量主检出的 release APK `md5=308e828616cf…`、66,991,392 B、
+  mtime 10-04 **12:00** —— 晚于我 06:38 写下的 `heyta-prep-apk.commit`（`04fa70f6`）⇒ 这枚不是我那趟打的；
+  相对那枚标记，`apps/mobile packages pnpm-lock.yaml` 差 **62 文件 / +3494 / −172** ⇒ 我的 prep 在 `SAME_CONTENT=0` 那一档，**不构成豁免**（v2 的设计就是宁可重打）。
+  包内 `assets/index.android.bundle` = **5,969,148 B**、Hermes 魔数 `c61fbc03c103191f`；**UTF-16LE** 口径计数：`打开搜索` **1**、`输入关键词` **1**、`便签` **35**；
+  负向对照 `打开搜索ZZz` **0**、`移动端没有这个串ZZz` **0**；ASCII 口径 `mobile-note-editor` **1**。
+  ⇒ 第 8 步要用的两条界面文案**在当前这枚产物里就在**，那一步若红，原因是行为而不是"bundle 里没这句话"。
+  🔴 而这组数第一次是**假数**：我用 `grep -a -c -F -f` 喂 UTF-16LE 的 needle，`-f` 在第一个 NUL 截断 pattern ⇒ 真串与我现编的假串**都回 75**。
+  改成 node 的 `Buffer.indexOf` 逐字节数才有分辨力（`heyta-u16count.mjs`）。这是「0 命中/同命中先怀疑探针」那族里新的一种面目：**探针不是读不到，而是读到了同一条被截断的短串**。
+- **③ 输入的重放装置（新，夹具 9/9 GREEN）**：动机不是整洁 —— 链里 `identify_notes_input` 的第 5 参写死了 `a7f6579b`（合并态当初推导自哪枚底），
+  main 一旦再推进这枚文件，v13 的门 B 就**响亮拒绝**（这是对的），但"重新推导四个补丁"当时是纯手工动作，而窗口是稀缺资源。
+  现在它是一条命令：`bash ~/.heyta-window-rigs/heyta-remerge-notes.sh <新底> [--write 输出]`，读 `VERDICT=OK/CONFLICT/REJECT` 与"下一步把第 3、5 参换成什么"。
+  三方合并用 `git merge-file`（祖先 = 归档的旧底 `notes-base-a7f6579b.sh`、我方 = 合并态、他方 = 新底），**不用 `patch --fuzz`** —— 那件工具实测过"删掉看起来像的另一块、rc 仍是 0"。
+  四条判据：`bash -n`、五处补丁落点的命中数、他人那枚 `evidence/${f}` 是否活到最后、**相对新底删掉的每一行都必须在那 17 条已知替换白名单里**。
+  夹具九臂（`heyta-remerge-fixture.sh`，逐臂带期望）：C1 新底==旧底 ⇒ OK 且结果**逐字节等于** `df46f473`；A2 他人纯追加两行 ⇒ OK 且两行各 1 次活在结果里；
+  A3 他人改到我替换过的那一行 ⇒ **CONFLICT**（不许静默放行）；A4 他人删掉我落补丁的整段 ⇒ **CONFLICT**；
+  M1 把截图 helper 摘掉 ⇒ **REJECT**；M2 白名单砍空 ⇒ 装置自曝「夹具坏了」而不是判绿；
+  **M3 白名单仍是 17 行但最后一行被换成不相干的串 ⇒ REJECT** —— 这一臂是补的：M2 只证明"行数"那扇门锁得住，M3 才证明**判据 4 读的是内容**，
+  否则"删除 ⊆ 白名单"完全可能是一条只数行数的装饰判据。
+- **闸门 apk 腿的三层局限，本线的增量只剩第 3 层**（第 1、2 层已由别人的装置管着，不据为己有）：
+  (1) mtime 不证 bundle 内容 —— 别人有 `research/tools/r14c-bundle-testid-preflight.sh`；(2) 比较是树内的，载体落后就失明 —— 别人的 `r14c-window-retry.sh` v2 先对齐；
+  (3) **扫面清单偏窄**：12:55 现量 `scripts/lib/apk-freshness.sh:36` 的 `HEYTA_APK_SOURCE_DIRS="apps/mobile/src packages/ui/src packages/i18n/src packages/domain/src"`
+  **不含 `packages/app-host/src`**，而 `grep -rl @heyta/app-host apps/mobile/src` 现量 **54 枚**文件引用它 ⇒ app-host 改了，闸门这条腿可能仍报 apk 新鲜。
+  ⚠️ 那文件 `:33-35` 的注释写着"清单本身偏窄这件事已登记在计划里"，但我按 `偏窄` 与 `HEYTA_APK_SOURCE_DIRS` 两个 needle 扫 `docs/` **各 0 命中**
+  ⇒ **那句"已登记"我没找到落点**（同族规律：注释里对别处状态的断言也是断言）。这条量的出来的东西就是它现在的落点。
+  **不代改**：清单归 `apk-freshness.sh` 的属主，且扩大它会改闸门 `REDS=` 的读数，而那一句是另几把夹具的输入 —— 要动得连夹具一起过。
+  本线为何暂不受它影响：**顺序**。链是 `prep-apk` → 核身门 → `--target c` 才起跑，而我的 prep 扫的是 `find apps/mobile packages`（整个 `packages/`，含 app-host），
+  也就是 **prep 的口径严格不松于闸门** ⇒ app-host 变了会先重打，闸门那条腿随后看到的是新 APK。这条只在"prep 仍在这条链里跑"时成立，写下来是为了让它被拆掉时能被发现。
+- **② 那句"62 段"是任务书的口径，我的读数是另一把尺**（防下一轮误读）：`§7.30` 里我记的是**实际那趟 74 段**（带载体 `940af1c0`），
+  现量 HEAD 的 `package.json` 里 `check` 按 `&&` 切是 **76 段**、`check:*` 脚本 **73** 枚；工作树里还有别人**未提交**的 `check:apk-freshness`
+  （`git show HEAD:package.json | grep -c` = **0**，`M package.json`）⇒ 段数是活数。引用任何"N 段"必须带**哪一趟 + 哪个载体 + 哪个口径**，否则就是两份不可比的数。
+- 装置归档：不再只住 `/tmp` —— `~/.heyta-window-rigs/` 现量 **15 枚**（链 v19 本体与它 source 的两份判据库 `heyta-identify-fn.sh`、`heyta-device-occupancy.sh` 都在内，
+  之前漏了这两枚 —— 链只有 `set -u`（`:22`），所以缺文件时 `. …` 失败**不会**打死链：`identify_notes_input` 变成 `command not found`（rc=127）走 `|| continue`，
+  ③ 于是**每 60 秒静默饿死一次**，而日志看起来像在正常等窗口）；逐枚 sha256-12 打在那目录里，夹具跑的是同一份 shipped 内容而不是抄件。
+- 现场（13:0x 现量）：`ps` 里已无别人的 `verify-mobile` / 打包 / `notarytool` 进程（12:44 那枚挂 9h20m 的 notarytool 不在了），
+  但设备前台仍是别人的 `com.heyta`、`:3000`/`:3100` 仍被占 ⇒ **①③ 继续等窗口**。本轮起跑的设备/Playwright/重装类验收：**0 条**。
