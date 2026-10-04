@@ -3673,6 +3673,26 @@ W0b ─> 随时可做（台账那半要等文件干净）
     `tail -3 /tmp/chain-T-android-probe.txt`、`sed -n '28,60p' scripts/lib/wait-for-quiet-host.sh`、
     `cat /tmp/chain-T3.log`、`uptime`。
 
+- ㊣ **链 MAC 起跑前的现场核对：`reinstall-all` 的 mac 段第一刀就落在别人的证据目录上**（04 18:2x）
+  - 现量：`scripts/reinstall-all.sh:192` 把 `MAC_OUT=/tmp/heyta-macos-dist` **写死**，`:196` 是开局 `rm -rf "$MAC_OUT"`（"清掉旧安装包"）。
+    而 18:20 那一刻该目录里躺的是**另一条会话 03:13 那趟的产物**：`Heyta-1.0.0.dmg`（2 296 476 B）、`Heyta.app`、
+    `entitlements.plist`、`packaged-first-run.png{,.txt,.webview.png}`，并且那枚 dmg **正被 pid 98171（`diskimage` helper）持有一个 FD**
+    （`lsof +D /tmp/heyta-macos-dist` 现量一行 `diskimage 98171 ... 5u REG ... Heyta-1.0.0.dmg`）。
+    ⇒ "清旧包"的原意是清**自己**那一份，写死成共享路径后它清掉的是**此刻放在那里的任何人的产物**。
+  - ✅ **本轮的处置是非破坏性的**：`mv /tmp/heyta-macos-dist /tmp/heyta-macos-dist-0313-held`（改名而不是删除；
+    持有者的 FD 仍指向同一 inode，`lsof -p 98171 | grep -c heyta-macos-dist` 复量 **1** ⇒ 没把别人的挂载搅黄），
+    随后链 MAC 会自建同名目录。**没有**改脚本、**没有**动那条链的命令。
+  - 🔴 结构性修法登记成**任务 #32**（`MAC_OUT` 改带默认值的旋钮 + 段首打印实际目录 + 默认值逐字不变的判据），
+    本批不在此刻改 `scripts/reinstall-all.sh` —— 理由是**这条链正在队列里等窗口**，改它会在读数中途换载体。
+  - 另一枚共享对象：`/Applications/Heyta.app` 上那个常驻实例 **pid 772**（`HeytaMac`，etime 20h47m，
+    18:20 现量 `%cpu 0.0` / `state S`、`lsof +D /Applications/Heyta.app` **零行** ⇒ 没有任何打开的文件，
+    是闲置的 leftovers 而不是"谁正在用它"）。它盘上那份包**不是当前产物**：
+    包内 `web-dist/index.html` 的 sha256 前缀 `217cae2a252d8948` vs 本工作树 `517c6ba76d00fb25`。
+    所以"装进 /Applications"这一格该由链 MAC 关掉；装完之后 772 会变成**跑着已被删掉的二进制**的僵尸
+    （§7 第 81 条第三种：僵尸实例污染窗口清单，后来的窗口门禁会拿它当新实例比），
+    处置顺序 = 先看 `RC_MAC`，绿了再对 772 发**一次** `kill`（TERM，不是 -9），并记下它当时已经无打开文件、
+    其 bundle 已被替换 —— 这三条就是"可以收"的现量依据，不是"我看着像没人用"。
+
 
 
 
