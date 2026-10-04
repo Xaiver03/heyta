@@ -114,13 +114,17 @@
  * 那是给变异复现用的，不是给绕过用的：写错值本身按"判不了"退 2。
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { unionAudit, unionAuditVerdict, ownershipVerdict, pkgFieldVerdict } from './selfhost-audit-union.mjs';
 import { replayCapture, replayVerdict, replayReading, selftestOutputVerdict, CAPTURE_PATH } from './selfhost-capture-replay.mjs';
 import { resolveDockerfileConflict, dockerfileReading, selftestArms as dockSelftestArms, DOCKERFILE_PATH } from './selfhost-dockerfile-merge.mjs';
-import { attributeRed, attributionVerdict, attributionArms } from './selfhost-red-attribution.mjs';
+import {
+  attributeRed, attributionVerdict, attributionArms,
+  ENTRY_COMMAND_DEFECT, entryCommandKey, SCRIPT_SNAPSHOT_DEFECT, scriptSnapshotKey,
+} from './selfhost-red-attribution.mjs';
 import { readImageInstallShape, readImageInstallShapeFromText } from './image-install-shape.mjs';
 import { liveCarrierUsers } from './selfhost-carrier-busy.mjs';
 import { unionMerge, oursMerge, sameCountAs } from './selfhost-text-merge.mjs';
@@ -846,10 +850,19 @@ for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'
  * 那两枚文件都不在本批写集里。少了配对层，载体脚本会把**别人的红**当成"解法没修好"而永远拒绝落笔 ——
  * 症状是"每次都退 3、每次都说要修解法"，而实际没有解法可修。 */
 const DOC_DEFECT = /^   [^\s]+:\d+/; // docs-link-check 四类缺陷都以三空格 + `路径:行号` 开头
+/* 🔴 第 4 个位置是 `defectKey`：**缺陷行里带着会被合并本身挪动的行号/位置数字**的那些门要用。
+ *    并集往 `docs/runbooks/self-host.md` 里插了 11 行，`self-host.md:88 [R1]` 在载体上就成了 `:91`，
+ *    逐字比会把它读成"只在载体 ⇒ 本批带进去的"—— 那是假指控，它挡落地还指错方向。
+ *    键只留承重部分（文件 + 规则词 / 文件 + 理由形状），比较用多重集：多出来的那条仍然算本批的
+ *    （臂 A8/A9/S2，见 `selfhost-red-attribution.mjs --selftest`）。
+ * ⚠️ **第 1/2/3 腿与 `check:gate-wiring` 刻意不给键**：它们的缺陷行里的数字**就是要判的内容**
+ *    （"镜像树里 N 条许可证没有出处"—— 从 16 恶化到 143 是新信息）。折掉数字会把"恶化了"
+ *    读成"和 main 同一条"，那是一条会放过自己缺陷的判据。它们红时仍然交人 —— 现在交人的话
+ *    说的是真话（"判不了"而不是"本批带进来的"）。 */
 const GATES = [
   ['check:gate-wiring', ['scripts/check-gate-wiring.mjs']],
-  ['check:selfhost-entry-command', ['scripts/check-selfhost-entry-command.mjs']],
-  ['check:script-snapshot', ['scripts/check-script-snapshot.mjs']],
+  ['check:selfhost-entry-command', ['scripts/check-selfhost-entry-command.mjs'], ENTRY_COMMAND_DEFECT, entryCommandKey],
+  ['check:script-snapshot', ['scripts/check-script-snapshot.mjs'], SCRIPT_SNAPSHOT_DEFECT, scriptSnapshotKey],
   ['check:docs', ['research/tools/docs-link-check.mjs'], DOC_DEFECT],
   ['check:md-tables', ['scripts/check-md-table-rows.mjs']],
   // 🔴 并集链特有的洞（落笔前判据再加一道）：**链条目来自一侧、脚本文件被另一侧删了**
@@ -899,15 +912,49 @@ const brief = (out, rc) => out.trim().split('\n').filter((l) => l.trim() !== '')
 const hasStore = (dir) => existsSync(join(dir, 'node_modules', '.pnpm'));
 const STORE_BLIND_RE = /找不到任何 pnpm store|请先运行 pnpm install/;
 
+/* `HEYTA_CARRIER_LINK_STORE_FROM=<另一棵检出的根>`：把那一棵的已安装依赖树**软链**进这两棵临时树。
+ * 为什么要有它：配对树每次由 `worktree add` 新建，**永远没有** `node_modules`，而第 2 腿要已安装的树
+ * ⇒ 那道门在配对侧天生答不了（§8.161 ④ 说的那个假归属形状就来自这里）。真落地不需要这个旋钮
+ * （载体那侧有人装过，且 land-main 第 3 道 gate 判过同源），它存在的意义是**让配对这条路能被预检修演** ——
+ * 不然这一层从来没在任何一趟里真跑过，只是"看起来有"。
+ * 🔴 借的前提是**同一把锁**：两侧 `pnpm-lock.yaml` 的 sha256 必须逐字节相同，否则那边装出来的字节
+ *    根本不是这一把锁的，借来只会让"配对"量错东西 ⇒ 退 3 不软链。软链建完还要**回读**一次
+ *    `.pnpm` 真的在（`symlinkSync` 成功不等于链路通）。 */
+const BORROW_SRC = process.env.HEYTA_CARRIER_LINK_STORE_FROM || '';
+const sha256Of = (p) => (existsSync(p) ? createHash('sha256').update(readFileSync(p)).digest('hex') : '读不到');
+const borrowStore = (dir, tag) => {
+  const linked = [];
+  for (const rel of ['', 'e2e/']) {
+    const a = sha256Of(join(BORROW_SRC, rel, 'pnpm-lock.yaml'));
+    const b = sha256Of(join(dir, rel, 'pnpm-lock.yaml'));
+    if (a !== b) {
+      die(3, `${tag} 借 store 的前提不成立：${rel || '（根）'}那侧 ${BORROW_SRC} 的锁=${String(a).slice(0, 16)} ` +
+        `而 ${dir} 的锁=${String(b).slice(0, 16)} ⇒ 那边装出来的字节不是这一把锁的，不软链`);
+    }
+    const srcNm = join(BORROW_SRC, rel, 'node_modules');
+    const dstNm = join(dir, rel, 'node_modules');
+    if (!existsSync(join(srcNm, '.pnpm'))) die(3, `${tag} 借 store 的前提不成立：${srcNm} 里没有 .pnpm 那一层`);
+    if (hasStore(dir) && rel === '') continue; // 这棵树自己就有根 store（上一趟留下的），不覆盖
+    if (existsSync(dstNm) && rel !== '') continue;
+    symlinkSync(srcNm, dstNm, 'dir');
+    if (!existsSync(join(dstNm, '.pnpm'))) die(3, `${tag} 软链建了却读不到 .pnpm（${dstNm} → ${srcNm}）⇒ 链路没通`);
+    linked.push(`${rel || '（根）'}${a.slice(0, 12)}`);
+  }
+  notes.push(`${tag} 的 store 是从「${basename(BORROW_SRC)}」这个检出**软链**来的（env 里给的路径不写进提交说明，` +
+    `理由：载体那笔提交会变成 main 的祖先，而家目录路径是这台机器的形状，不是仓库的事实；` +
+    `锁逐字节相同：${linked.join(' / ') || '本来就有，没新建'}） —— 读数要说这一点：它不是这棵树自己装的`);
+};
+
 const gateReadings = [];
-const reds = []; // {label, argv, re, rc, out}
-for (const [label, argv, re] of GATES) {
+if (BORROW_SRC) borrowStore(WT, '载体树'); // 没有这一句，一次性载体上的第 2 腿永远是"答不了"，配对这条路根本演不了
+const reds = []; // {label, argv, re, key, rc, out}
+for (const [label, argv, re, key] of GATES) {
   const g = runGate(argv, WT);
   if (g.rc === 0) {
     gateReadings.push(`${label} exit 0 —— ${brief(g.out, g.rc)}`);
     continue;
   }
-  reds.push({ label, argv, re, rc: g.rc, out: g.out });
+  reds.push({ label, argv, re, key, rc: g.rc, out: g.out });
 }
 // 🔴 把"这一趟是在什么环境下判的"打进读数，而不是只打结论：第 2 腿要已安装的树，
 //    而载体那侧的 store 由**人**装（10-04 07:03 那次），脚本既不装也不检查 ⇒ 一趟"全绿"
@@ -960,6 +1007,7 @@ const ensurePairTree = () => {
   }
   pairTree = true;
   notes.push(`配对树就绪 ${PAIR_WT} @ ${mainSha.slice(0, 8)}（工作树脏 0 条）`);
+  if (BORROW_SRC) borrowStore(PAIR_WT, '配对树');
 };
 if (reds.length) {
   ensurePairTree();
@@ -985,7 +1033,7 @@ if (reds.length) {
   }
   const results = paired.map(({ g, m2 }) => attributeRed({
     gate: g.label, carrierRc: g.rc, carrierOut: g.out,
-    mainSha, mainRc: m2.rc, mainOut: m2.out, defectRe: g.re,
+    mainSha, mainRc: m2.rc, mainOut: m2.out, defectRe: g.re, defectKey: g.key,
   }));
   const badVerdict = attributionVerdict(results);
   if (badVerdict) {
