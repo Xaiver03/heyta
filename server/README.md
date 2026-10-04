@@ -100,8 +100,32 @@ are published, and the default `image:` value is `${SUPERSYNC_IMAGE:-supersync:l
 the build override compose has neither a build definition nor a local tag, so it tries to
 **pull** and you get `pull access denied for supersync, repository does not exist or may require
 'docker login'`. That hint is the misleading part: there is no registry to log in to. The build
-override is also where `APK_MIRROR` and `NPM_REGISTRY` live, so it is the file that makes this
-path work on a machine that cannot reach Alpine's CDN or npm's registry.
+override is also where `APK_MIRROR`, `NPM_REGISTRY` and `NODE_IMAGE` live, so it is the file that
+makes the **build** work on a machine that cannot reach Alpine's CDN, npm's registry, or Docker Hub.
+
+That was not the whole story, and the paragraph above used to claim it was (audit §8.36): `up -d`
+pulls two more images at **run** time, and a build-time knob cannot reach them. They are knobbed
+too, but they live in `docker-compose.yml`, not in this override:
+
+```bash
+POSTGRES_IMAGE=your-mirror/library/postgres:16-alpine
+CADDY_IMAGE=your-mirror/library/caddy:2.11-alpine
+```
+
+Unset, each renders byte-identical to the tag it replaced (verified with
+`docker compose config`, not by eyeballing the YAML). `check:image-build-args` rule **R6** now walks
+every `server/docker-compose*.yml` and fails on any `image:` that is not `${NAME:-default}`, because
+"the build was covered" is exactly the claim that was sitting here un-checked.
+
+`NODE_IMAGE` fails differently from the other two, which is why it is called out: the Alpine and npm
+knobs affect layers that only run **after** the build has started, while the base image is pulled
+**before** the first instruction executes. On a host that cannot reach `docker.io` the build dies at
+`load metadata for docker.io/library/node:24-alpine` with `failed to fetch anonymous token … i/o
+timeout` — no layer-level clue, because no layer was ever reached. Set it to a base you can actually
+pull (`NODE_IMAGE=your-mirror/library/node:24-alpine`). The default is byte-identical to today's
+behavior, and no regional mirror is hardcoded in this repo for the same reason as `APK_MIRROR`.
+⚠️ `server/Dockerfile` has three stages and `ARG` does not cross `FROM`, so all three declare it;
+they must stay on the same base or the `web` and `production` stages end up built on different images.
 
 The override adds exactly one service and does not touch the default graph. It waits for
 Postgres to be healthy, runs `scripts/migrate-deploy.sh` from the image, and only then lets the
@@ -462,9 +486,10 @@ policy that cannot be enforced is decoration:
 - The server can already see a client's version (`appVersion` on the download request is
   parsed and recorded per device in `server/src/sync/checkpoint-gate.ts` /
   `sync.routes.ts`), but **no heyta client sends it today**: the one place that builds the
-  download query (`packages/sync-client/src/client.ts`) sets `sinceSeq` and `excludeClient`
-  only, and every host goes through it. A version gate would therefore match nothing, and a
-  "supported versions" table would be unreadable by the software it describes.
+  download query (`packages/sync-client/src/client.ts`) sets `sinceSeq`, `limit` and
+  `excludeClient` and nothing else, and every host goes through it. A version gate would
+  therefore match nothing, and a "supported versions" table would be unreadable by the
+  software it describes.
 
 The trigger to revisit this: the first time images are published (see
 `docs/research/self-host-distribution-audit.md` §7 G-40⑤/⑥). Reporting `appVersion` is
@@ -475,20 +500,26 @@ The trigger to revisit this: the first time images are published (see
    heyta versions are `0.x` — so a heyta-space value always compares as "old" and reporting
    it changes nothing except the wording an operator reads.
 2. a client that **creates** a causal full-state boundary. The sweep authorizes deletion from
-   the newest causal full-state op (`storage-quota.service.ts:417`), and no heyta client
-   creates one. To be exact about which half is missing: the **server side is fully
-   implemented** (`sync/sync.routes.snapshot-handler.ts` parses `snapshotOpType` and writes
-   the boundary), while the client side never calls it — `SYNC_IMPORT` / `BACKUP_IMPORT` /
-   `REPAIR` appear in heyta's code only as enum members
-   (`packages/shared-schema/src/supersync-http-contract.ts:20-22`,
-   `packages/sync-core/src/operation.types.ts:18/26/34`); `packages/sync-client` contains no
-   snapshot or checkpoint path at all (4 files, zero case-insensitive matches), and no
-   `apps/*` source constructs one. Practical consequence today: for accounts that only ever
+   the newest causal full-state op (`storage-quota.service.ts:417`). The **server side of this is
+   fully implemented** (`sync/sync.routes.snapshot-handler.ts` parses `snapshotOpType` and writes
+   the boundary). What is missing is not "the code" on the client either — it is
+   **a product path that runs it**. Creating a boundary is an explicit
+   maintenance API in `packages/op-log` (`createSyncCheckpoint()`, see ADR-0046 / ADR-0047:
+   no automatic timer, and it refuses unless history is fully materialized, the upload/apply
+   queues are drained and every entity type is representable), and its only callers are tests.
+   Nothing a user runs reaches it: `packages/sync-client`, `packages/app-host` and every
+   `apps/*/src` contain no full-state construction and no call into that maintenance API —
+   the upload path only ever *recognizes* such an op (batching, payload encryption) when
+   another client sends one. Practical consequence today: for accounts that only ever
    use heyta clients nothing is pruned, so history grows — a storage cost, not a data-loss
    risk. An upstream *Super Productivity* client pointed at this server **does** create
    boundaries, which is precisely why the version check can't be loosened to fit heyta's
    numbers: a `0.x` value would have to be compared against a cut meaningfully expressed in
    `18.x` space.
+   ⚠️ **这半句在 2026-10-04 之前写的是"heyta 代码里这些 op 类型只是枚举成员、客户端根本没有这条路"** ——
+   那是当时的读数，`packages/op-log` 之后落进了显式维护 API，所以缺的一半从"代码不存在"变成了"没人调用"。
+   上面那段现在由 `server/tests/version-coupling.spec.ts` 机器核对（五条腿，每条自带阳性对照与注入臂），
+   而不是靠这段散文自证。
 3. something that **acts** on the gate. Right now its only consumer is the daily
    `Cleanup [checkpoint-gate]` log line (`sync/cleanup.ts`); no automatic cadence exists.
 

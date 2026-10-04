@@ -122,13 +122,22 @@ test('中文落地页 →「立即使用」→ 应用：全程新域名，且无
   expect(html, '页面里仍出现旧域名 heyta.finlaw.cloud').not.toContain('heyta.finlaw.cloud');
 
   /**
-   * 🔴 入口地址**刻意不带尾斜杠**（`apps/landing/src/lib/app-url.ts` 的规范化）：
-   * 写死 `/app/` 会让页面上给出的地址与 nginx 的 `location = /app` 301 规则
-   * 互为冗余。所以这里断言的是设计口径，而不是我一开始以为的 `/app/`。
-   * 它点了之后能落到 `/app/`，由下面的 `waitForURL` 证明。
+   * 入口地址的两条设计口径，逐条都是断言：
+   *
+   * 1. **不带尾斜杠**（`apps/landing/src/lib/app-url.ts` 的规范化）—— 写死 `/app/`
+   *    会让页面上给出的地址与 nginx 的 `location = /app` 301 规则互为冗余。
+   *    它点了之后能落到 `/app/`，由下面的 `waitForURL` 证明。
+   * 2. **带 `?lang=zh-CN`** —— 中文页也是。这条以前断的是"不带"，前提被
+   *    `0aa6cb0e` 撤掉了：应用的首启语言解析链多了系统语言那一层
+   *    （**显式存储 > `?lang=` > 系统语言**），不带参数时这里就是英文界面。
+   *
+   * 🔴 这条用例**故意**不改浏览器语言：`devices['Desktop Chrome']` 的 locale 是 `en-US`，
+   *    所以下面 `waitForAppRender` 等到中文输入框这件事，量的是
+   *    **落地页带来的 `?lang=` 真的压过了系统语言**，而不是"这台机器恰好是中文"。
+   *    少了这个参数，整条用例会红在那句等待上（2026-10-04 实测就是这个形状）。
    */
   const cta = page.locator('a.lp-btn--primary').first();
-  await expect(cta).toHaveAttribute('href', `${ORIGIN}/app`);
+  await expect(cta).toHaveAttribute('href', `${ORIGIN}/app?lang=zh-CN`);
 
   await cta.click();
   // 允许 301：`/app` → `/app/`（nginx `location = /app`）。
@@ -253,7 +262,20 @@ test('管理后台已部署且默认锁着（无令牌 ⇒ 401 JSON）', async (
  * ⚠️ 它**只能**在这一层验：`vite dev` / `vite preview` 都跑在根路径，
  * 那里旧代码也是对的。
  */
-test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功', async ({ page }) => {
+test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功', async ({ browser }) => {
+  /**
+   * 🔴 这条走的是"访客直接用书签 / PWA 图标打开 `/app/`"——**没有落地页可以继承语言**，
+   * 所以应用按解析链第三层（`navigator.language`）走。下面的判据等的是中文外壳，
+   * 这个上下文就必须是 `zh-CN`（项目默认的 `Desktop Chrome` 是 `en-US`，
+   * 拿默认值跑这条会红在那句"等中文输入框"上，而站点没坏）。
+   *
+   * 顺带它成了第三层的一条正例：地址栏里**没有** `?lang=`，界面仍是中文。
+   */
+  const context = await browser.newContext({
+    locale: 'zh-CN',
+    viewport: { width: 1280, height: 900 },
+  });
+  const page = await context.newPage();
   const logs = attachLogs(page);
   await page.goto(`${ORIGIN}/app/`, { waitUntil: 'domcontentloaded' });
 
@@ -375,6 +397,8 @@ test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功',
 
   const hard = hardErrors(logs);
   expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+
+  await context.close();
 });
 
 /**
