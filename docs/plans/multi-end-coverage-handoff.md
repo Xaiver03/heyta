@@ -1429,3 +1429,54 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   不许再抄其中任何一个数。
 - **①③ 仍未起跑**（20:31 现量：负载 12→83 反复、`sup-reinstall.sh` 别人那条已 9h52m、
   booted 模拟器涨到 **5** 台）。设备面与负载任一不成立就不起，这一格没有任何例外。
+
+#### 20:34–20:41 装置普查（24 枚一次跑齐）+ 普查自己的两次不合格
+
+等窗口的回合不换重活，换成"把装置本身过一遍"。做法是 `~/.heyta-window-rigs/heyta-rig-sweep.sh`：
+把一枚"否决目录"前置到 `PATH`（16 枚产品命令 `pnpm/npx/adb/xcrun/simctl/security/codesign/notarytool/
+hdiutil/ssh/scp/tar/rsync/pod/ohpm/hvigorw`，调用即 `VETO-BLOCKED` + 退 97），逐枚跑所有 `*-fixture.sh`，
+按四档分类：真命令泄漏 / rc≠0 / rc=0 但没有收口标记 / ✅。
+
+- **20:37 复跑读数**：`SWEEPED=24 有不合要求的是 0` → `SWEEP=GREEN`，日志留档
+  `~/.heyta-evidence/rig-sweep/sweep-after-rcfix.log`（**不放 /tmp**：这是判据复核的原始输出，
+  重启会把它冲掉，而下一轮就只能重新造一遍）。
+- **修掉的第一处不合格（被检体侧，20:34 抓出）**：`heyta-step10-teeth-fixture.sh` 的
+  `SRC="${SRC:-scripts/verify-mobile-notes.sh}"` 是**相对路径** ⇒ 换一个 cwd 就抽到 0 行，
+  而它报的话是"锚点漂了"。那是把"**文件没读到**"伪装成"**被检体形状变了**"——同一族事故里最省人的一种
+  （读代码的人会去查 `verify-mobile-notes.sh` 的第 10 步改没改，而真正的问题是 cwd）。
+  现在按候选根解析并打印 `被测体=<绝对路径>`，找不到时报**路径类**消息而不是形状类。
+  20:37 从 `~/.heyta-window-rigs` 跑（非仓库 cwd）：`EXTRACTED_LINES=43`、`GREEN=七臂全对（六分支 + 真库列名）`。
+- **修掉的第二处不合格（普查自己）**：GREEN 判据原本只列 `GREEN=|FIXTURE=GREEN|_FIXTURE=GREEN` 三条，
+  而全仓实际有 **11 处** `XXX_FIXTURE=GREEN` 形状，`EVID_FIXTURE2=GREEN` 因为多一个 `2` 就没匹配上
+  ⇒ 一条 rc=0、九臂真跑过的装置被我报成"它到底断言了什么要人看"。
+  🔴 这里的方向和常见的"needle 漂了"**相反**：漂的是**普查的收口 needle**，被报不合格的是**装置**，
+  所以第一反应"去看那个装置断言了什么"会浪费一整轮——先证明探测器读得到标记，再看被检体。
+- **给普查做的阳性对照（20:38）**：造一枚一次性假装置（**放进 `mktemp -d` 的临时箱、用 `RIGS=` 指过去**，
+  不进真装置目录，免得下次普查自己吃到它），里面**自称** `GREEN=` 但真的调用产品命令
+  （只挑只读的 `pnpm --version` / `adb devices` —— 对照物本身不许有破坏性，否则否决器一旦失效就是我自己拆现场）。
+  读数：`🔴 heyta-selftest-fixture.sh rc=0 真命令泄漏=2` + `SWEEP=RED count=1` ⇒ **"零泄漏"这条结论是有对照的**，
+  不是"探测器根本没通电"。
+- 🔴 **这枚对照顺带照出普查脚本自己的 §7 #179**：它原本以 `echo "SWEEP=RED count=$BAD"` 收尾 ⇒
+  **整脚本恒 exit 0**，于是 20:34 那趟 `SWEEP=RED count=2` 在任何按 rc 读的人/脚本眼里都是绿的
+  （判决打印出来了，码却是包装命令的）。改成 `exit "$BAD"` 后双向都带判决：
+  真扫描 `REAL_SWEEP_RC=0 / SWEEP=GREEN`，对照箱 `CONTROL_RC=1 / SWEEP=RED count=1`。
+- **两次探针自伤（都要留在账上，因为它们会误导下一次开窗判断）**：
+  1. 20:39:49 我用一把临时尺子查"对端重活"，pattern 是
+     `reinstall-all|verify-mobile|check:ai-e2e|package-app\.sh|notarytool`，输出 **空** ——
+     而同一时刻 `bash sup-reinstall.sh`（pid 16137，etime **10:00:29**）活着，
+     并且**我自己 7 分钟前刚在本文件 §20:32 那一节写过它**。
+     "空"是这把尺子的形状没覆盖到那枚 argv，不是现场干净。
+     20:40:17 再量它已退出（**没有留存读数说明它有没有真把 `scripts/reinstall-all.sh` 拉起来** ⇒
+     只能记成"**我的**窗口探针漏形状"，**不能**记成"规范闸门漏了它"：闸门那条腿认的正是
+     `scripts/[.]?reinstall-all[.]sh`，而这枚包裹脚本的本体没在几个已知目录里找到
+     （没做全盘搜索：那一刻负载 140，扫盘只会加重现场）。
+  2. 20:40:35 我 grep `/tmp/heyta-chain18.log` 找 `REDS=`，命中 **0** 次，第一反应是"链的闸门那步读数没了"。
+     现量后成立的是另一件事：链 v27（pid 48362，argv 正是它，etime 01:09:00）今晚**一次都没走到那一步** ——
+     日志尾部到 `20:39:58 第 71 轮：负载 174.77 > 12` 为止，每轮都停在负载那一格。
+     ⇒ 🔴 **报"闸门红/绿"之前要先确认它被跑到过**；`REDS=` 出现 0 次不等于"闸门放行了"，
+     也不等于"闸门坏了"，它等于"这一趟还没轮到它说话"。
+- **窗口读数（20:40:24 现量，全部是这一刻的）**：`loadavg { 141.59 83.08 65.63 }` / ncpu 16 ⇒ 负载格红；
+  顶部消费者是 `CC Switch`(85%)、Qoder 自身、WindowServer、qemu emulator、iOS 27 simulator 的
+  `icloudmailagent`，以及 **另一个项目** `litopia12` 的 5 枚 esbuild/vite —— 没有一枚是本线的；
+  `:3000` 有 1 个监听、`:3100` 有 1 个监听（③ 要的就是它，属于前置而非拦项）、4318/4319/4320/4322 全空；
+  booted 模拟器 **5** 台。⇒ **①②③ 继续等**，这一格没有例外。
