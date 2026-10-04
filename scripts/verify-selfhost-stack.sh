@@ -190,6 +190,30 @@ else
   docker image inspect "$IMAGE" >/dev/null 2>&1 || die "--no-build 但本地没有 $IMAGE"
 fi
 
+# 🔴 **被验的那枚镜像必须来自这一棵树**。这是 AGENTS §6.1.1 那条"送到别处构建／运行的流程，
+#    收尾必须有一次内容对账"在本条验收上的落点，也是 §7 第 27／82 条（"测试全绿 ≠ 这是当前产物"）
+#    在这一族的形状：`--no-build` 走的是"复用本地那个 tag"，而 tag 可以是任何一棵树的产物；
+#    没有这条读回，整趟结论都是在给一枚旧二进制打分，而日志看起来跟新鲜运行一模一样。
+#    现量（2026-10-04 15:2x，写这条判据的当时）：本机 `supersync:selfhost-verify` 的
+#    `org.opencontainers.image.revision` = `959fd1e6…`（6 小时前 `VERIFY_EXIT=0` 那一趟的树），
+#    而分支 HEAD 已是 `8bcc53d2…` ⇒ 这一档不是假想敌，它此刻就在这台机器上成立。
+TREE_SHA=$(git rev-parse HEAD)
+IMAGE_REV=$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo '读不到')
+if [ "$IMAGE_REV" != "$TREE_SHA" ]; then
+  die "被验镜像的 OCI revision 与当前树不是同一笔：
+     镜像 label = ${IMAGE_REV}
+     git HEAD   = ${TREE_SHA}
+   这一趟如果继续，报的是**另一棵树**的产物（§7 第 27／82 条那一族）。
+   \`--no-build\` 时这条就是硬闸：要故意验旧镜像，请先把旧那棵树整个检出去再跑，
+   不要为了让这一行过去而改这条判据 —— 改了就等于把\"装上去验的是什么\"这个问题重新交回给人记。"
+fi
+log "    被验镜像的 revision == 当前 HEAD（${TREE_SHA:0:12}…）"
+# 诚实边界：label 只证明"构建时那笔 commit"，**不**证明"构建时工作树是干净的"
+# （构建上下文 = 工作树的字节，不是 commit）。所以把脏不脏打进日志，
+# 让下一读的人能把这趟解释成"这一笔 + N 枚未提交改动"，而不是"这一笔"。
+DIRTY_AT_BUILD=$(git status --porcelain | wc -l | tr -d ' ')
+log "    构建上下文的未提交条目=${DIRTY_AT_BUILD}（>0 ⇒ 这趟量的是「这一笔 + 这些脏行」，不是纯提交物）"
+
 # 🔴 **这一趟验的是哪个架构的产物**必须落在日志里，否则"整套验收过了"会被读成
 #    "要发布的那枚过了"。`docker build` 不带 `--platform` ⇒ 镜像架构 = 构建机架构；
 #    而发布 workflow 钉的是 `linux/amd64`
