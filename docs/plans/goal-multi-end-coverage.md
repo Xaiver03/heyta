@@ -3559,3 +3559,61 @@ bash ~/.heyta-window-rigs/heyta-real-runner-pids.sh 'reinstall-all\.sh'  # 不�
 并进脚本路径而**自命中**（实测 17:19：`'heyta-real-runner-pids\.sh'` 报出自己那枚）；
 闸门用的 `'reinstall-all\.sh'` 在同一时刻不自命中，所以这道门不会因为自己一次查询就永久退 3。
 已写进文件头。
+
+#### 7.31.22 §7.31.21 那次修**只修了一半**，另一半是它自己的夹具形状不对换的（17:30–17:34 现量，链已换到 v24）
+
+§7.31.21 记的是"带空格路径读不出"。修完我以为这道门好了，**17:30 停 v23 起 v24 时让它认一下
+`heyta-window-chain23\.sh`，它报出两枚**：
+```
+99925 /bin/zsh -c { source '…/shell-snapshots/snapshot-zsh-….sh' ; } && … eval 'bash /tmp/heyta-window-chain23.sh'
+99927 bash /tmp/heyta-window-chain23.sh
+```
+99925 是**我起链时的那层包装**，不驱动任何资源 —— 正是这份工具存在的理由要挡掉的东西。
+
+**根因（比上一节更基础）**：macOS 的 `ps -Ao pid=,comm=,args=` 里 **`args=` 是完整 argv、含 argv[0]**，
+所以剥掉 `comm` 之后串首还剩着一份解释器名。我那句"遇到 `-c` 就跳过整行"的守卫是在
+`while (s ~ /^-/)` 里，而 `s` 首字符是 `/`（`/bin/zsh -c …`）⇒ **循环一次都没进，`-c` 守卫从来没生效过**。
+带空格路径那一半是真的修好了（阳性读数一直对），**假阳这一半一直没修**。
+
+**为什么 19 臂夹具没抓到它 —— 夹具的输入是我凭印象造的**：假 `ps` 那张表我把 args 写成了
+"`comm` 之后直接跟参数"（少了一层 argv[0]）。也就是说**A6/A7/A11 那三臂测的是一个真机上不存在的形状**，
+`-c` 守卫在夹具里"有牙"（A15 变异照样转红），在真机上却是死的。
+⇒ 这次加 **A0 臂**：它不测解析器，测的是**那张表有没有资格当证据** ——
+从真机 `ps` 现取一枚 bash 运行者，断言"剥掉 pid+comm 之后串首确实再出现一次解释器"；
+形状不符就把整副夹具判红，而不是让它继续测一个虚构世界。同时补 A17（那枚包装与真运行者同表，
+只有后者该被报出）与 A18（广义 pattern 也不许把包装捞进来）。
+🔴 这是 §7 元规则"先怀疑探针"的加强版：**探针的输入也是断言**，形状不对时它测的是另一个世界。
+
+**同一处还有第二个消费者在漏**：`§7.31.17` 那套"探针不在就不跑"的旋钮只装进了**启动器**，
+链 v23 自己那一行（101 行）一直是 `bash /tmp/heyta-real-runner-pids.sh …` 硬叫 `/tmp` 那枚 ——
+`/tmp` 被清 ⇒ 命令替换得到空 ⇒ `RI` 读空 ⇒ 这道门在链这一侧**假开**，而且它下面还写着
+`if [ -n "$RI" ] && ri_on_device_path "$RI"`，空串直接跳过。
+⇒ v24 把这一段换成带 marker 的 `chain-rpi-resolver` 块（durable→/tmp 两处解析、
+**两处都没有 ⇒ 响亮地"不开窗"，且绝不去跑解析器**、放行时把选中的那枚与它的 md5 打进日志一次），
+新夹具 `heyta-chain-rpi-fixture.sh` 按 marker 抽**发货的那段**跑 7 臂（含一枚变异臂：
+摘掉"拒判"那一行，探针缺失时必须变成放行 —— 证这一臂有牙）。两份同形状代码各有夹具，
+是因为 §7.31.17 教会我的正是"只装一侧就会漂"。
+
+**换链与读数（现量）**：17:30:42 用解析器认出 99927、确认没有 ③/① 在飞
+（`/tmp/heyta-chain8.*` 只有 log 与一枚 `.contaminated`，两个 `-done` 旗标都不存在），
+`kill 99927` ⇒ `V23_STOPPED=OK`；17:34:39 起 v24（pid 32924），日志第一行就是新增的归因：
+`17:34:39 解析器选中的是 ~/.heyta-window-rigs/heyta-real-runner-pids.sh 指纹=38ba8828036a`，
+第 1 轮读数仍是"设备在线但不空闲"（android `com.heyta` pid 6296）。
+⚠️ **§7.31.21 里记的解析器 md5 `cfe12315cb7c` 已被 `38ba8828036a` 取代**（就是这一节的修）；
+两份副本（durable 与 `/tmp`）现在逐字节相同，`sort -u | wc -l = 1` 现量。
+
+**复跑**（四条都该报绿）：
+```bash
+bash ~/.heyta-window-rigs/heyta-rpi-shape-fixture.sh     # RPI_SHAPE_FIXTURE=GREEN arms=19（含 A0 真机形状前提）
+bash ~/.heyta-window-rigs/heyta-chain-rpi-fixture.sh     # CHAIN_RPI_FIXTURE=GREEN arms=7
+bash ~/.heyta-window-rigs/heyta-attr-fixture.sh          # ATTR_FIXTURE=GREEN arms=6
+bash ~/.heyta-window-rigs/heyta-rpi-resolver-fixture.sh  # GREEN=五臂全对
+```
+启动器随之到 **v7**（md5 `84a214fb0401`，三处副本一致；v6 归档已用"摘掉 attribution 块"重建并核对
+`md5 == efda9d97e314…` 逐字节相同 ⇒ 归档名不再说谎）。归因那一行由 `heyta-attr-fixture.sh` 的
+F1/F1b/F1c/F3/F4 五条钉住：值要等于所选解析器的真实 md5、路径要在读数里、解析器坏时该行仍要打印、
+摘掉 echo 必须没读数。
+
+**状态**：① 的两条腿 = RIVAL 真空（两条口径交叉核对）+ mac-dist 仍被 `diskimage/98171` 的 dmg 句柄挡着；
+③ 被设备占用挡着；17:34 负载 38–65 区间。⇒ **①②③ 仍未起**，但互斥面这两节补到了
+"探针输入的形状"与"第二个消费者"这两层。
