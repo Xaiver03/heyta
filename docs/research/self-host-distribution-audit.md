@@ -11596,3 +11596,42 @@ stdout 一个字都没有 —— 也就是说那四条断言每次载体重算�
 （两枚数据卷与 `super-sync-server_internal` 均 Removed）、一次性凭据文件已删、:1900 空。
 ⚠️ 那条 `--keep` 复跑留下的三张新截图（`e2e/selfhost-stack-results/s2/s3-*.png`）**没有被人复核**，
 所以**没有提交**；§8.191 那四张已复核的仍是当前证据。
+
+### 8.202 证书签不出来时三枚容器**全绿**（一枚 hermetic 容器的读数 ⇒ 对外那句补了两条前提）（2026-10-05 13:0x）
+
+起因是上一节自己写下的那句边界（"签证书那一格不在射程内"）。回头核
+`docs/runbooks/self-host.md` §5，它让外人 `curl -fsS https://你的域名/health` 再开
+`https://你的域名/app/` —— 而这两条成立的**前提**（域名已解析到这台机器、宿主机 80/443 对外可达）
+**全文一次都没出现**（**改前**现量：`grep -n "解析\|DNS\|A 记录\|ACME" docs/runbooks/self-host.md`
+只命中第 4 行那句讲 `jq` 的；本节落笔之后再跑同一条会命中**下面那段新加的措辞**，
+所以这条 grep 只在"改前"那棵树上有意义）。这不是错话，是**漏了两条会让外人第一步就撞墙、而撞了又查不出在哪的前提**。
+
+读数（可复现、零对外请求、零端口占用；容器已自清）：
+
+```bash
+docker run -d --name heyta-g68-nocert --network none \
+  -v "$PWD/server/Caddyfile:/etc/caddy/Caddyfile:ro" -e DOMAIN=heyta.example.test \
+  --cap-drop=ALL --cap-add=NET_BIND_SERVICE --memory=256m \
+  --health-cmd "wget -q --spider http://127.0.0.1:2019/config/" \
+  --health-interval 5s --health-retries 3 --health-start-period 5s caddy:2.11-alpine
+```
+
+35 秒后现量：**`running=true  exitcode=0  health=healthy`**。日志只有这三条：
+
+| logger | level | 内容 |
+|---|---|---|
+| `http.acme_client` | warn | `HTTP request failed; retrying`（`acme-v02.api.letsencrypt.org/directory` DNS 都不通） |
+| `tls.obtain` | error | `could not get certificate from issuer` |
+| `tls.obtain` | error | `will retry … retrying_in: 60, max_duration: 2592000` |
+
+🔴 打掉的是这个假设：**"caddy 起不来才会红"**。它签不到证书时**不退出**、
+出货那份 healthcheck（探针打 admin `127.0.0.1:2019`，与证书是两套东西）**照旧 healthy**，
+`docker compose ps` 三枚全绿，而且它会这样安静重试**三十天**。
+⇒ 已落进 §5 的措辞：那一步的判据只能是**浏览器真打开那个 https 地址**（或 `curl -fsSv`），
+不能是容器状态；并写明这一格比"起了但未迁移"更隐蔽 —— 后者至少还在应用日志里刷
+`column ... does not exist`，证书这一格**连 `unhealthy` 都不出现**。
+
+⚠️ 边界（别读多）：这枚容器**不**证"证书能签下来"（那需要一台域名已指过来、80/443 可入的机器），
+它证的是**失败形态**，也就是"为什么不能拿容器状态当那一条的判据"。
+⇒ 一条一般规律：**健康检查打在"进程还活着"上，就打不出"这件事做成了"** ——
+§7 元规则 2（一条永远通过的判据比没有判据更糟）的第五种面目。
