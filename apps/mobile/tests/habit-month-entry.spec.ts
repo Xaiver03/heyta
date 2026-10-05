@@ -47,9 +47,25 @@ describe('移动端月历的接线（源码层）', () => {
   });
 
   it('X3 列头与月份名来自共享层，移动端没再抄一份', () => {
-    expect(display, '没引用共享层那份星期表').toMatch(
-      /import\s*\{[^}]*\bWEEKDAY_MESSAGE_KEYS\b[^}]*\}\s*from\s*'@heyta\/ui'/,
+    /* 🔴 说明符不是写死的正则，是从源码里**抓出来再比对**的：
+       共享层只有两个入口 —— `@heyta/ui`（有 RN 运行时的渲染侧）与
+       `@heyta/ui/node`（node 侧那条 RN-free 的缝，`habits-display.ts` 走这条）。
+       为什么必须两个都认：从 barrel 取值会把 `react-native` 拉进 node 侧 bundle，
+       Rolldown 在那里以 "Flow is not supported" 抛，症状是**整份 spec 加载失败**
+       （`Tests no tests`）而不是某一条红（§7 第 342 条）；那条缝本身由
+       `check:card-export` 的 A1 臂钉着（在 node 里真 import 一次）。
+       牙齿还在的两处：改成本地再抄一份 ⇒ 抓不到 `WEEKDAY_MESSAGE_KEYS` 那条 import（红）；
+       改成第三条路径（深层 `packages/ui/src/...` 或新别名）⇒ 白名单比对（红）。 */
+    const SHARED_ENTRYPOINTS = ['@heyta/ui', '@heyta/ui/node'];
+    const weekImports = [...display.matchAll(/import\s*\{([^}]*)\}\s*from\s*'([^']+)'/g)].filter(
+      (hit) => /\bWEEKDAY_MESSAGE_KEYS\b/.test(hit[1] ?? ''),
     );
+    expect(weekImports, '没引用共享层那份星期表').toHaveLength(1);
+    const specifier = weekImports[0]?.[2];
+    expect(
+      specifier !== undefined && SHARED_ENTRYPOINTS.includes(specifier),
+      `星期表来自 "${String(specifier)}" —— 共享层的入口只有 ${SHARED_ENTRYPOINTS.join(' / ')}`,
+    ).toBe(true);
     expect(display, '月份标题没走共享的格式化').toMatch(/formatMonthTitleText\(date, t\)/);
     expect(display, '格子日期没走共享的格式化').toMatch(/formatDayTitleText\(date, t\)/);
     // 反向：不许在本文件里出现自己拼的月份/星期名。
