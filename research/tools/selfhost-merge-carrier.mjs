@@ -328,6 +328,47 @@ if (busyProbe.users.length) {
 notes.push(`载体空闲（argv+cwd 两腿：ps ${busyProbe.psRows} 行 · cwd ${busyProbe.cwdRows} 行 · ` +
   `豁免自己链 ${busyProbe.exempt.join('←')} · MERGE_HEAD=${mergeHeadBefore ? '有' : '无'}）`);
 
+/* 🔴 第 0b 步：基线必须**已经含**落地目标那条线（10-05 16:4x 现量换来的，不是预防性仪式）。
+ * `6921ac77` 那一发用本地 `main` 当第一父，而本地 main 落后公开侧 595 笔 —— 第 11 族写的正是
+ * "冲突时取 **main** 侧"，于是"取 main 侧"取到**旧版**：本批自己的
+ * `test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功')` 整条用例连同 `?lang=zh-CN`
+ * 那句断言一起被摘（该族的守卫只数两处命中数，"少了一整个 `test(`"不在射程里；账面只打印了
+ * "被丢的独有行 18 条" —— 有名字，没有牙）。
+ * 反方向同样错：只用 `origin/main` 当基线时，本地 main 上并行会话刚落的笔就在新尖的后代之外
+ * ⇒ 推上去会把**别人的提交**从分支上摘掉。
+ * 所以判据是一条可数的性质：**落地目标必须是基线的祖先**（missing=0）。本体在
+ * `selfhost-carrier-base.mjs`（六臂自检），本工具只调它、不另写一份。 */
+const CBASE = join(dirname(fileURLToPath(import.meta.url)), 'selfhost-carrier-base.mjs');
+const LANDING_REF = process.env.HEYTA_LANDING_REF || 'origin/main';
+{
+  let stOut = '';
+  try {
+    stOut = execFileSync('node', [CBASE, '--selftest'], { encoding: 'utf8' });
+  } catch (e) {
+    const reds = String(e.stdout ?? '').split('\n').filter((l) => /^BAD/.test(l)).slice(0, 4).join('\n');
+    die(2, `基线闸门的自检不过 ⇒ 不用它判基线（不能拿一枚没有牙的闸门放行落地）：\n${reds}`);
+  }
+  const armLine = (stOut.split('\n').find((l) => /臂数\s\d+/.test(l)) ?? '').trim();
+  const claimed = armLine.match(/臂数\s(\d+)\s·\s不符\s(\d+)/);
+  if (!claimed || Number(claimed[1]) < 6 || Number(claimed[2]) !== 0) {
+    die(2, `基线闸门的自检读数对不上（臂数行：“${armLine || '（没有这一行）'}”，要求 臂数 ≥6 且 不符 = 0）`);
+  }
+  let baseRc = 0, baseOut = '';
+  try {
+    baseOut = execFileSync('node', [CBASE, `--main=${MAIN}`, `--landing=${LANDING_REF}`], { encoding: 'utf8' });
+  } catch (e) {
+    baseRc = e.status ?? 1;
+    baseOut = `${String(e.stdout ?? '')}${String(e.stderr ?? '')}`;
+  }
+  if (baseRc !== 0) {
+    die(2, `基线不合格（${CBASE} 退 ${baseRc}）：\n${baseOut.trim()}\n` +
+      `   ⇒ 本工具不替你并基线、也不提供绕过开关：先 ` +
+      `git merge-tree --write-tree ${MAIN} ${LANDING_REF}（rc=0 时）→ git commit-tree 两个父 → ` +
+      `拿那支临时 ref 当 HEYTA_MAIN_REF 重跑本脚本。`);
+  }
+  notes.push(`基线闸门：${claimed[1]} 臂 · 不符 0 · ${baseOut.split('\n')[0].trim()}（落地目标=${LANDING_REF}）`);
+}
+
 if (!existsSync(WT)) {
   git(['worktree', 'add', '--detach', WT, mainSha]);
 } else {
