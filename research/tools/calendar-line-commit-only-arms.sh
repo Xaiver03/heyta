@@ -932,6 +932,99 @@ else
   tail -6 "${L}.arm27.out" | sed 's/^/      /'
 fi
 
+# ============================================================================
+# 臂 28–32：`calendar-line-append-trap.mjs`（往环境陷阱册子追加一枚的自闸命令，§4.05 (60)）
+#   同一族规矩：缺参不动手 / 目标脏不动手 / 默认不写盘 / 幂等按正文判 / 未拉下来的远端也占号。
+# ============================================================================
+TRAP=research/tools/calendar-line-append-trap.mjs
+TRAPTXT=research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt
+TRAP_ABS="$PWD/$TRAP"; TXT_ABS="$PWD/$TRAPTXT"
+FT=$(mktemp -d /tmp/clc-trap.XXXXXX)
+mk_traps() { printf '# 环境陷阱\n\n%s\n' "$(for i in $(seq 1 "$1"); do printf '%s. 第 %s 条\n\n' "$i" "$i"; done)" > "$2"; }
+if [ ! -f "$TRAP" ] || [ ! -f "$TRAPTXT" ]; then
+  bad "臂28–32 的夹具没建：$TRAP 或 $TRAPTXT 不在树里"
+else
+  # --- 臂28：缺 --text ⇒ exit 1（不猜正文，也不接受内联）---
+  node "$TRAP_ABS" > "${L}.arm28.out" 2>&1; R28=$?
+  if [ "$R28" = 1 ] && grep -q '缺 --text' "${L}.arm28.out"; then
+    ok "臂28 不带 --text ⇒ rc=1 并说清\"不猜要写什么\" ⇒ 需要人给的值确实是缺参就停，不是拿默认值动手"
+  else
+    bad "臂28 未按预期 ⇒ rc=${R28}"; tail -3 "${L}.arm28.out" | sed 's/^/      /'
+  fi
+
+  # --- 臂29：目标在工作树里脏 ⇒ exit 3，且逐字节不动（BEFORE==AFTER）---
+  mkdir -p "$FT/dirty/docs/reference"
+  (
+    cd "$FT/dirty" || exit 1
+    git init -q .; git config user.email t@t; git config user.name t
+    mk_traps 2 docs/reference/environment-traps.md
+    git add -A >/dev/null 2>&1; git commit -qm base
+    mk_traps 3 docs/reference/environment-traps.md          # 别人未提交的第 4 条
+    echo "DIRTY=$(git status --porcelain -- docs/reference/environment-traps.md)"
+    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/dirty/docs/reference/environment-traps.md" --confirm \
+      > /dev/null 2>&1; echo "RC=$?"
+    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+  ) > "${L}.arm29.out" 2>&1
+  A29=$(cat "${L}.arm29.out")
+  if [ "$(rd "$A29" RC)" = "3" ] && [ -n "$(rd "$A29" DIRTY)" ] && [ "$(rd "$A29" BEFORE)" = "$(rd "$A29" AFTER)" ]; then
+    ok "臂29 册子脏 + --confirm ⇒ rc=3、md5 前后一致 ⇒ 并行会话正在逐段追加时它不替别人带 hunk，也不插号"
+  else
+    bad "臂29 未按预期"; printf '%s\n' "$A29" | tail -4 | sed 's/^/      /'
+  fi
+
+  # --- 臂30：dry-run ⇒ rc=0、现量末号+1 被打印出来、文件逐字节不变 ---
+  mk_traps 5 "$FT/a30.md"; H0=$(md5 -q "$FT/a30.md")
+  O30=$(node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/a30.md" 2>&1); R30=$?
+  H1=$(md5 -q "$FT/a30.md")
+  if [ "$R30" = 0 ] && [ "$H0" = "$H1" ] && printf '%s' "$O30" | grep -q '⇒ 这一枚取 6'; then
+    ok "臂30 末号 5 的目标 dry-run ⇒ rc=0、打印\"取 6\"（编号是现量的，不是抄的）、文件 md5 未变"
+  else
+    bad "臂30 未按预期 ⇒ rc=${R30} 取号句=$(printf '%s' "$O30" | grep -c '这一枚取') 变没变=${H0}/${H1}"
+    printf '%s\n' "$O30" | tail -4 | sed 's/^/      /'
+  fi
+
+  # --- 臂31：--confirm 写一次，第二次必须按**正文**判已在册（号已经变了，按号判永远命中不了）---
+  mk_traps 5 "$FT/a31.md"
+  node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/a31.md" --confirm > "${L}.arm31a.out" 2>&1; R31A=$?
+  NAPP=$(grep -c '^6\. 🔴' "$FT/a31.md" || true)
+  B1=$(md5 -q "$FT/a31.md")
+  node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/a31.md" --confirm > "${L}.arm31b.out" 2>&1; R31B=$?
+  IDP=$(grep -c '已在册（现量号 6）' "${L}.arm31b.out" || true)
+  B2=$(md5 -q "$FT/a31.md")
+  if [ "$R31A" = 0 ] && [ "$NAPP" = 1 ] && [ "$R31B" = 0 ] && [ "$IDP" = 1 ] && [ "$B1" = "$B2" ]; then
+    ok "臂31 写一次得号 6、第二次报\"已在册（现量号 6）\"且 md5 不变 ⇒ 幂等判的是正文；按号判的那版会再追加一份同号不同条目的重复"
+  else
+    bad "臂31 未按预期 ⇒ rc=${R31A}/${R31B} 追加=${NAPP} 已在册句=${IDP} 变没变=${B1}/${B2}"
+    tail -4 "${L}.arm31b.out" | sed 's/^/      /'
+  fi
+
+  # --- 臂32：本检出落后远端 ⇒ origin/main 已占的那个号必须拦下来（"没拉下来的条目"是真的）---
+  mkdir -p "$FT/rem/docs/reference"
+  (
+    cd "$FT/rem" || exit 1
+    git init -q .; git config user.email t@t; git config user.name t
+    mk_traps 1 docs/reference/environment-traps.md
+    git add -A >/dev/null 2>&1; git commit -qm c1
+    mk_traps 2 docs/reference/environment-traps.md
+    git commit -qam c2
+    git update-ref refs/remotes/origin/main HEAD
+    git reset -q --hard HEAD~1                    # 本地回到 1 条，工作树干净，但 origin/main 已经有第 2 条
+    echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
+    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem/docs/reference/environment-traps.md" --confirm \
+      >/dev/null 2>&1; echo "RC=$?"
+    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+  ) > "${L}.arm32.out" 2>&1
+  A32=$(cat "${L}.arm32.out")
+  if [ "$(rd "$A32" RC)" = "3" ] && [ "$(rd "$A32" DIRTY)" = "0" ] && [ "$(rd "$A32" BEFORE)" = "$(rd "$A32" AFTER)" ]; then
+    ok "臂32 目标干净、本地末号 1、但 origin/main 里已有第 2 条 ⇒ rc=3 且文件未动 ⇒ \"ahead/behind\"那种状态下它不会插一个撞号"
+  else
+    bad "臂32 未按预期 ⇒ 远端对照那一格没拦下来"; printf '%s\n' "$A32" | tail -4 | sed 's/^/      /'
+  fi
+fi
+rm -rf "$FT"
+
 rm -rf "$FW" "$FR"
 
 rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8" "$F9" "$F10" "$F11" "$F12" "$F13" "$F14" "$F15" "$F16" "$F17" "$F18" "$F19" "$F20" "$F21"

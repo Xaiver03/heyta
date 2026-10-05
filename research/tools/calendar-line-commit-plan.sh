@@ -114,6 +114,11 @@ PATHS=(
   # 🔴 它的牙在 `calendar-line-commit-only-arms.sh` 的臂 22–27 那一族里，而那把 rig 正是下面 3c 格
   #    每次入库都要跑的三台之一 ⇒ 这枚新工具从落笔起就有常驻消费者，不靠"下次想起来再跑"。
   research/tools/calendar-line-wire-evidence-rigs.mjs
+  # 16:0x 新写（与上面那枚同形）：往 `docs/reference/environment-traps.md` 追加一枚陷阱的自闸命令
+  # + 那条陷阱的正文（(54)⑦ 的可粘贴文本落到随库走的文件里，这样"等文件干净"不再要求下一位记得文本内容）。
+  # 它的牙在臂 28–32（同一把 rig、同一个常驻消费者）。
+  research/tools/calendar-line-append-trap.mjs
+  research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt
   # 15:4x：上面那条 --only 前置被换成后置对账之后，**这一把就是它的牙**（三臂：正向 / 摘掉 --only /
   # 我方路径暂存≠工作树）。同样是 1b 自己抓出来的（落盘即报 `[??]`）—— 第四次。
   research/tools/calendar-line-commit-only-arms.sh
