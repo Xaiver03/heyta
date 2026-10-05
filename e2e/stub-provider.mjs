@@ -49,6 +49,19 @@ const ROUTES = [
 const calls = [];
 
 /**
+ * TCP **连接**计数（还没有任何 HTTP 请求语义）。
+ *
+ * 为什么需要它：设备侧的验收要有一条"设备里够得到假端点"的正向对照，
+ * 否则每一条「计数没动」都有两种解释（没通 / 真的没发）。Android 模拟器镜像里
+ * **没有 curl**，toybox `nc` 的 stdout 经 `adb shell` 又不保证送出，
+ * 所以那条对照不能靠"从设备里读到响应"，只能靠"设备把请求发出去、宿主机侧数到它"。
+ * `probeHits` 数的是**命中 `/__probe` 的请求**（不是任意连接），因此旁边有人用
+ * curl 轮询别的诊断路径时不会把它顶上去 —— 正向对照的每一个 +1 都只可能来自那次发送。
+ */
+let tcpConnections = 0;
+let probeHits = 0;
+
+/**
  * 各功能的确定性响应。
  *
  * ⚠️ 形状必须与 `packages/app-host/src/ai-*.ts` 的解析器严格一致 ——
@@ -187,6 +200,21 @@ const server = createServer((req, res) => {
     return;
   }
 
+  // 设备侧正向对照的读回口（见文件头 tcpConnections/probeHits 的注释）。
+  if (url.startsWith('/__reach')) {
+    res.writeHead(200, { ...cors, 'content-type': 'application/json' });
+    res.end(JSON.stringify({ tcpConnections, probeHits }));
+    return;
+  }
+
+  // 被数的那一下：设备只需把这一行发出去，不需要读到响应。
+  if (url.startsWith('/__probe')) {
+    probeHits += 1;
+    res.writeHead(200, { ...cors, 'content-type': 'application/json' });
+    res.end('{"probe":true}');
+    return;
+  }
+
   // `/__reset` 让每个用例从干净的计数开始。
   if (url.startsWith('/__reset')) {
     calls.length = 0;
@@ -314,6 +342,10 @@ const server = createServer((req, res) => {
       }),
     );
   });
+});
+
+server.on('connection', () => {
+  tcpConnections += 1;
 });
 
 server.listen(PORT, '127.0.0.1', () => {

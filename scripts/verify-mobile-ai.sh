@@ -182,39 +182,143 @@ PY
 }
 # 滚到某个 resource-id 可见并点它。点之前**必须**证明它 enabled ——
 # RN 的 disabled Button 在树里照样存在，点了是静默无操作。
+# 🔴 安全带的上下界**从设备的 inset 现取**，不拿屏幕高度的四分之一拍：
+#    `overrideNonDecorFrame=[0,0][1080,2337]` = 去掉系统导航条后可用区的下沿，
+#    `overrideConfigInsets=[0,63][0,63]` 的第一个 63 = 状态栏高度（可点区要避开它）。
+#    为什么不能用"中间一半"这种比例：实测 `ai-endpoint-label` 中心 y=2112、url y=2335
+#    都**点得动并输入成功**（`tmp/probe-form.xml` 里两格的 text 就是我打进去的值），
+#    而按 [H/4,3H/4]=[600,1800] 会把它们判成"贴着边、先滚进来"，
+#    滚到内容到底之后仍然出不来带 ⇒ 报成"端点表单里滚不出那一格"（rig13 实测）。
+#    真正点不动的那一枚在 y=2373 —— 恰好落在 2337 之外（rig11 实测）。
+DECOR=$($ADB shell dumpsys window displays 2>/dev/null | tr -d '\r' | grep -m1 'ROTATION_0=')
+SAFE_TOP=$(printf '%s' "$DECOR" | grep -oE 'overrideConfigInsets=\[0,[0-9]+\]' | grep -oE '[0-9]+' | head -1)
+SAFE_BOTTOM=$(printf '%s' "$DECOR" | grep -oE 'overrideNonDecorFrame=\[0,0\]\[[0-9]+,[0-9]+\]' | grep -oE '[0-9]+' | tail -1)
+for v in SAFE_TOP SAFE_BOTTOM; do
+  got=${!v}
+  case "$got" in
+    ''|*[!0-9]*)
+      echo "   ❌ 取不到 $v（dumpsys 的 ROTATION_0 那行没给出可点区）—— 安全带没有边界，载体不成立" >&2
+      exit 3;;
+  esac
+done
+
 tap_rid() {  # <testID> [期望 checked]
-  local rid=$1 want=${2:-} i xy
+  local rid=$1 want=${2:-} i ctrl cx cy ck src y lo hi
+  lo=$SAFE_TOP
+  hi=$SAFE_BOTTOM
   for i in 1 2 3 4 5; do
     dump
-    xy=$(rid_center "$rid")
-    [ -n "$xy" ] && break
-    $ADB shell input swipe 540 1900 540 1100 250
+    # 🔴 点的是**带 checked / clickable 的那一枚**（容器不可点时往下找一层），
+    #    见 rid_control 的注释：`ai-gate-enabled` 这一枚连点 5 次都打在标签文字上，
+    #    报出来的却是"总开关点不动"。
+    ctrl=$(rid_control "$rid")
+    if [ -n "$ctrl" ]; then
+      read -r cx cy ck src <<<"$ctrl"
+      y=$cy
+      if [ "$y" -ge "$lo" ] && [ "$y" -le "$hi" ]; then break; fi
+      # 在树里但贴着屏边 —— 这不是"没找到"，是"还没滚到位"，两句话要分开说。
+      echo "   ↻ testID=$rid 的可点节点（${src}）中心 y=$y 在安全带 [$lo,$hi] 外（贴系统栏），先滚进中段（第 ${i} 次）" >&2
+    fi
+    ctrl=""
+    $ADB shell input swipe 540 1900 540 900 300
     sleep 1.5
   done
-  if [ -z "$xy" ]; then
-    echo "   ❌ 找不到 testID=$rid 的节点（滚了 5 次）—— 界面形状或 testID 变了" >&2
+  if [ -z "$ctrl" ]; then
+    echo "   ❌ testID=$rid 滚了 5 次仍没有一枚落在安全带 [$lo,$hi] 里的可点节点 —— 界面形状或 testID 变了" >&2
     return 1
   fi
   if [ "$(rid_attr "$rid" enabled)" = "false" ]; then
     echo "   ❌ testID=$rid 在树里但 disabled —— 点了不会有任何事发生，先补齐它的前置条件" >&2
     return 1
   fi
-  $ADB shell input tap $xy >/dev/null 2>&1
+  echo "   · 点 testID=$rid → 落在 [${src}] @ ${cx},${cy}" >&2
+  $ADB shell input tap "$cx" "$cy" >/dev/null 2>&1
   sleep 1
   if [ -n "$want" ]; then
     dump
-    got=$(rid_attr "$rid" checked)
+    got=$(gate_state "$rid")
     if [ "$got" != "$want" ]; then
-      echo "   ❌ testID=$rid 点完之后 checked=${got}，期望 $want" >&2
+      echo "   ❌ testID=$rid 点完之后 checked=${got:-读不出}，期望 $want（读的是 [${src}] 那一枚，不是容器）" >&2
       return 1
     fi
   fi
   return 0
 }
+# 状态一律从**带 checked 的那一枚**读：容器（ViewGroup）上的 checked 恒 false，
+# 拿它当判据等于写一条永远不可能成立的断言。
+gate_state() {  # <testID> → true / false / 空
+  local ctrl ck
+  ctrl=$(rid_control "$1")
+  [ -z "$ctrl" ] && return 0
+  read -r _ _ ck _ <<<"$ctrl"
+  printf '%s' "$ck"
+}
 has_rid() {  # <testID> → 1/0
   dump
   [ -n "$(rid_center "$1")" ] && echo 1 || echo 0
 }
+# 🔴 在一个块（testID）的矩形里找出**真正能点、能读状态的那一枚节点**。
+# 为什么必须有这一层（2026-10-06 实测，`ai-gate-enabled`）：
+#   `GateRow` 是 `<View testID="ai-gate-enabled">` 包着 `<Checkbox>`（AiSettingsSection.tsx:526），
+#   所以 testID 落在一枚 **clickable=false、checkable=false、没有 checked 语义** 的 ViewGroup 上：
+#     · `tap_rid` 点它的中心 = 点在**标签文字**上 ⇒ 静默无事发生；
+#     · `rid_attr ai-gate-enabled checked` 读的是那枚容器的 checked ⇒ **恒为 false**，
+#       于是"开关没开"是一条**永远不可能成立**的判据，症状却写成"产品坏了"
+#       （§7 元规则二：一条判据能不能失败，只由现量与变异回答）。
+#   同一矩形里真正的那枚是 `android.widget.CheckBox` [87,638][202,754]，
+#   clickable=true、checkable=true、checked 跟着 on 走。
+# 打印四段：`<x> <y> <checked> <来源>`，来源是 `self` 或 `child:<class>:<content-desc>` ——
+# 让读数自己交代"点的是谁"，别把容器的静默无操作冒充成控件的行为。
+rid_control() {  # <testID>
+  HEYTA_RID="$1" python3 - <<'PY'
+import os, re, sys
+try:
+    s = open(os.environ["UI_XML"]).read()
+except OSError:
+    sys.exit(0)
+rid = os.environ["HEYTA_RID"]
+nodes = []
+for m in re.finditer(r"<node\b[^>]*>", s):
+    d = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', m.group(0)))
+    # 🔴 这里搜的是**属性值**（`d['bounds']` 已经是 `[x1,y1][x2,y2]`），所以模式里不许带
+    #    `bounds="` 那层前缀 —— 带上就是永不相等：整棵树被读成 0 枚节点，rid_control 恒空，
+    #    于是 tap_rid 每一枚都报「滚了 5 次仍没有落在安全带里的可点节点」。
+    #    （`rid_center` 那份是在**原始标签文本**上搜，那里带前缀才对 —— 两处不是同一把尺。）
+    b = re.search(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', d.get('bounds', ''))
+    if not b:
+        continue
+    d['_b'] = [int(g) for g in b.groups()]
+    nodes.append(d)
+host = next((n for n in nodes if n.get('resource-id') == rid), None)
+if host is None:
+    sys.exit(0)
+
+
+def emit(n, src):
+    x1, y1, x2, y2 = n['_b']
+    if x2 <= x1 or y2 <= y1:
+        return
+    print((x1 + x2) // 2, (y1 + y2) // 2, n.get('checked', ''), src)
+
+
+if host.get('clickable') == 'true' or host.get('checkable') == 'true':
+    emit(host, 'self')
+    sys.exit(0)
+x1, y1, x2, y2 = host['_b']
+inside = [
+    n for n in nodes
+    if n is not host
+    and (n.get('clickable') == 'true' or n.get('checkable') == 'true')
+    and x1 <= n['_b'][0] and n['_b'][2] <= x2 + 1
+    and y1 <= n['_b'][1] and n['_b'][3] <= y2 + 1
+]
+# checkable 优先：一行里既有整行按钮又有勾选框时，状态只有勾选框有。
+for n in sorted(inside, key=lambda n: n.get('checkable') != 'true'):
+    emit(n, 'child:%s:%s' % (n.get('class', '?').split('.')[-1], n.get('content-desc', '') or n.get('text', '')))
+    break
+PY
+}
+
 # 在某个块（resource-id）的矩形里找 content-desc 完全相等的节点，打印 "<x y> <attr>"。
 # 用来消歧「五个功能块各有一枚同名 chip」那种重复锚点（§7 第 236 条）。
 xy_in_rid() {  # <块 testID> <content-desc> [attribute]
@@ -346,6 +450,20 @@ except Exception:
   printf '%s' "$raw"
 }
 stub_reset() { curl -s --noproxy '*' -m 5 "${STUB_HOST_URL}/__reset" >/dev/null; }
+# 设备侧正向对照的读回口（同 stub_count 的反假绿纪律：读不出不许按 0 处理）。
+stub_probe_hits() {
+  raw=$(curl -s --noproxy '*' -m 5 "${STUB_HOST_URL}/__reach" | python3 -c 'import sys,json
+try:
+  print(int(json.load(sys.stdin)["probeHits"]))
+except Exception:
+  print("BAD")')
+  if ! printf '%s' "$raw" | grep -qE '^[0-9]+$'; then
+    echo "   ❌ /__reach 的 probeHits 读不出（返回：${raw}）—— 正向对照没有输入，本轮不作数" >&2
+    printf 'BAD'
+    return 1
+  fi
+  printf '%s' "$raw"
+}
 feature_lines() {
   curl -s --noproxy '*' -m 5 "${STUB_HOST_URL}/__requests" | python3 -c 'import sys,json
 try:
@@ -364,40 +482,96 @@ $ADB reverse "tcp:${STUB_PORT}" "tcp:${STUB_PORT}" || {
 echo "   ✅ 转发表：$($ADB reverse --list | tr -d '\r')"
 # 正向对照：从**设备里**打一次假端点。这一条证明"通了"，
 # 否则后面每一条「计数没动」都有两种解释（没通 / 真的没发）。
-PROBE_FROM_DEVICE=$($ADB shell "curl -s -m 5 http://127.0.0.1:${STUB_PORT}/__requests" 2>/dev/null | tr -d '\r')
-if ! printf '%s' "$PROBE_FROM_DEVICE" | grep -q '"count"'; then
-  echo "   ❌ 设备里够不到假端点（返回：${PROBE_FROM_DEVICE:-空}）—— 环境不成立，不是产品失败"
+#
+# 🔴 这一条以前用的是 `adb shell curl …/__requests`，而**模拟器镜像里没有 curl**
+#    （实测 `which curl` 空、只有 /system/bin/toybox）：那个变量恒为空串，于是每一轮
+#    都在起跑前判成"设备够不到假端点 ⇒ 环境不成立"并 exit 3 —— 坏的是探针，不是环境。
+#    换成的形状：设备只负责把 `GET /__probe` 这一行**发出去**（toybox nc），
+#    由宿主机读回 `/__reach` 的 probeHits 来证明它到了。不依赖设备能不能把响应打回来。
+#    probeHits 只数命中 /__probe 的请求，旁边的 curl 轮询不会把它顶上去，
+#    所以"没涨"只剩一种解释（发不出去）。
+#
+#    ⚠️ 第二个坑（实测过才写成形状）：`printf … | toybox nc` **连得上但一个字节都不发**。
+#    toybox nc 在 stdin 立刻 EOF 时不冲写缓冲（`-q SECS` 就是为它存在的选项）。
+#    所以发送侧必须把 stdin 按住两秒：`(printf … ; sleep 2) | toybox nc -w 4 …`。
+#    A/B 读数：管道直发 probeHits 0→0；按住 stdin 后 0→1 且响应字节也回来了。
+if ! $ADB shell 'which nc' 2>/dev/null | tr -d '\r' | grep -q nc; then
+  echo "   ❌ 设备镜像里没有 nc —— 正向对照无法建立，载体不成立（不是产品失败）"
+  summary "移动端 AI 助手真机验收" "探针二进制缺失" 3
+fi
+P0=$(stub_probe_hits) || summary "移动端 AI 助手真机验收" "reach 计数读不出" 1
+$ADB shell "(printf 'GET /__probe HTTP/1.0\r\n\r\n'; sleep 2) | toybox nc -w 4 127.0.0.1 ${STUB_PORT} >/dev/null 2>&1; true" >/dev/null 2>&1
+P1=$(stub_probe_hits) || summary "移动端 AI 助手真机验收" "reach 计数读不出" 1
+if [ "$P1" -le "$P0" ]; then
+  echo "   ❌ 设备里发出的 /__probe 没被假端点数到（${P0} → ${P1}）—— 设备够不到假端点，环境不成立，不是产品失败"
   summary "移动端 AI 助手真机验收" "设备够不到假端点" 3
 fi
-echo "   ✅ 设备内回环可达"
+echo "   ✅ 设备内回环可达（/__probe 计数 ${P0} → ${P1}）"
 
 step "0. 全新安装 + 隐私门（先选「只用本机」）"
 $ADB shell pm clear "$PKG" >/dev/null 2>&1 || true
 $ADB shell am force-stop "$PKG" >/dev/null 2>&1 || true
 $ADB install -r -g "$APK" >/dev/null 2>&1 || { echo "   ❌ 装不上 $APK"; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
-dismiss_welcome_if_present
+# 🔴 顺序（2026-10-06 实测出来的形状，别再换回去）：
+#   1) 先 settle_foreground —— 刚 `pm clear` + 装完，进程还没起，此时 dump 到的是 launcher；
+#   2) 再一次性交给 `dismiss_welcome_if_present`：它内部**先**处理隐私面板、**后**点欢迎页。
+#   原先这里写成"先 dismiss_welcome（那时 App 根本没起）→ 再单独处理隐私门"，于是：
+#     · 第一次调用点不到任何东西（树里只有 launcher）；
+#     · 隐私面板是盖住整屏的 RN Modal，它立着的时候**欢迎页节点不在树里**（共享库
+#       `scripts/lib/mobile-e2e.sh` handle_privacy_consent 的注释写明了这一点）；
+#     · 隐私门被第二次的显式调用点掉后，**没有任何人再回去点欢迎页** ⇒
+#       第 1 步起每一条界面锚点都取空，而脚本先打印了一句 `✅ 本轮从「只用本机」起`。
+#   那次读数是"载体停在欢迎页"，不是"产品坏了" —— 界面实测完全正常（欢迎页 →
+#   「先离线使用」→ 任务面 / 「我的」页 / `profile-entry-settings` 全都在树里）。
+#   隐私层（blanket fetch 闸门）关着时**连回环 AI 端点也不该发出去**，第 5 步的规则短路
+#   正好跑在这一档上 ⇒ 起始档仍是「只用本机」，只是改由旋钮交给共享库那一次调用。
 settle_foreground
-# 🔴 故意从「只用本机」起跑：隐私层（blanket fetch 闸门）关着时，
-#   **连回环 AI 端点也不该发出去**。第 5 步的规则短路正好跑在这一档上，
-#   于是那一条「零外发」同时被两层守着；先改「同意并联网」会把两层混成一层。
+CONSENT_GATE_PREFERRED="只用本机"
+dismiss_welcome_if_present || { echo "   ❌ 首启的两层门（隐私面板 / 欢迎页）没处理干净"; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
+CONSENT_GATE_PREFERRED=""
 dump
-if privacy_gate_present; then
-  handle_privacy_consent "只用本机" "以后再说" || { echo "   ❌ 隐私门面点不掉"; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
+if [ "$CONSENT_GATE_SEEN" = "1" ]; then
   PRIVACY_STEP_RAN=1
-  echo "   ✅ 本轮从「只用本机」起"
+  # 🔴 打印的是**实际点掉的标签**，不是脚本"想要"的那个（写死「只用本机」会在收下
+  #    备选按钮时照样报 ✅）。
+  echo "   ✅ 隐私门已选「${CONSENT_GATE_CHOSEN}」"
 else
   PRIVACY_STEP_RAN=0
   echo "   ↷ 这一版没弹隐私门（设备已有态）—— 「只用本机」那一层对照记为**未取证**，不记为通过"
+fi
+# 响亮失败：还停在欢迎页就别让第 1 步去猜。
+if [ "$(has_desc "先离线使用")" = "1" ] || [ "$(has_text "先离线使用")" = "1" ]; then
+  echo "   ❌ 处理完两层门之后界面仍停在欢迎页（「先离线使用」还在树里）—— 后面的锚点全都取空"
+  screen_txt
+  summary "移动端 AI 助手真机验收" "载体停在欢迎页" 1
 fi
 
 step "1. 凭据 + 一条种子任务（后面每条判据的输入）"
 require_screen
 configure_sync_credentials
+# 🔴 这里原本紧跟一句**裸的** `input keyevent 4`（BACK），目的是收起设置浮层。
+#    2026-10-06 实测它的另一种落点：浮层已经自己收起时，BACK 会**直接把应用退到桌面**
+#    ⇒ 后面三次 `tap_tab "我的"` 全在 launcher 上找标签，症状是"进不到任务面"，
+#    读起来像界面坏了，其实是载体自己按出门去了（§7 元规则一：先怀疑探针）。
+#    换成的形状：收键盘 → BACK 一次 → `settle_foreground` **兜住前台**（不在应用里就
+#    重新拉起，凭据已落盘所以重挂不丢状态）→ 再按标签走。
+disable_ime
 $ADB shell input keyevent 4 >/dev/null 2>&1 || true
-tap_tab "我的" "同步" || true
+settle_foreground
 dump
-if ! settle_for "打开任务" 8 2; then echo "   ❌ 进不到任务面"; summary "移动端 AI 助手真机验收" "载体坏了" 1; fi
-tap_tab "任务" "新建任务" || { echo "   ❌ 回不到任务 tab"; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
+if [ -z "$(xy_desc "我的")" ]; then
+  echo "   ❌ 前台里没有「我的」标签 —— 不是标记问题，是界面里根本没有它"
+  screen_txt
+  summary "移动端 AI 助手真机验收" "载体回不到主界面" 1
+fi
+# 🔴 这里原先排的是「切到『我的』」→ `settle_for "打开任务"` → 再切『任务』，两处都对不上：
+#    · `打开任务：{title}`（`mobile.tasks.a11y.open`）是**任务行**的无障碍名前缀，
+#      而这一趟是 `pm clear` 之后的全新装机，此刻**还没有任何任务行**（种子任务要到下面才建）
+#      ⇒ 这条 `settle_for` 在自己设计的顺序里永远不可能满足，报出来的"进不到任务面"
+#        读起来像界面坏了，其实是等一个当时不存在的东西（§7 元规则 2：先问它什么时候该成立）；
+#    · 而且它排在"切到『我的』"之后 —— 就算有任务行，那一屏也不是任务面。
+#    任务面的锚点就是那枚 FAB（content-desc 逐字 `新建任务`，第 470 行本来就在校验它）。
+tap_tab "任务" "新建任务" || { echo "   ❌ 回不到任务 tab"; screen_txt; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
 settle_foreground
 disable_ime
 dump
@@ -414,15 +588,37 @@ EDIT_XY=$(xy_edit_any)
 [ -n "$EDIT_XY" ] || { echo "   ❌ 新建面板里没有输入框"; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
 $ADB shell input tap ${EDIT_XY% *} ${EDIT_XY#* } >/dev/null 2>&1
 clear_and_type "$TASK_TITLE"
+# 🔴 输入之后**先回读标题**，再点提交 —— 这两件事必须分开断言。
+#    `clear_and_type` 不带标签时只保证"发了"，不保证"到了"（它自己的注释写着：
+#    没有标签就没法读回，只能返回 0）。不读这一步，"任务没建出来"就有两种成因
+#    （没输进去 / 没提交成功）而脚本只报后者 —— 那是把探针的故障记成产品故障。
 dump
-$ADB shell input keyevent 4 >/dev/null 2>&1
+if [ "$(has_text "$TASK_TITLE")" != "1" ]; then
+  bad "标题没输进新建面板（「${TASK_TITLE}」不在树里）—— 这是探针/输入通道的问题，不是提交失败"
+  screen_txt
+  restore_ime
+  summary "移动端 AI 助手真机验收" "载体输入通道坏了" 1
+fi
+ok "标题已进面板（${TASK_TITLE}）"
+# 🔴 这里原本排了一句 `input keyevent 4`（BACK），意图是"收起键盘让「添加」露出来"。
+#    实测两重错：① 上面第 454/472 行已经 `disable_ime`（并置
+#    `show_ime_with_hard_keyboard=0`），键盘根本不弹，没什么可收；② 这一句会把**新建面板 itself**
+#    收掉 ⇒ 下一句 `xy_text "添加"` 取空，落进下面那条 ENTER 兜底分支，在一个已经关掉的
+#    面板上按 66 —— 症状是"种子任务没建出来"，读起来像产品写不进去，其实是探针把自己
+#    的面板按走了（2026-10-06 实测；同一款 BACK 在第 448 行那段注释里已经犯过一次）。
+dump
 SAVE_XY=$(xy_text "添加")
 [ -n "$SAVE_XY" ] || SAVE_XY=$(xy_desc "添加")
-if [ -n "$SAVE_XY" ]; then
-  $ADB shell input tap ${SAVE_XY% *} ${SAVE_XY#* } >/dev/null 2>&1
-else
-  $ADB shell input keyevent 66 >/dev/null 2>&1
+if [ -z "$SAVE_XY" ]; then
+  # 🔴 原先这里是"取不到坐标就退回按 ENTER"，于是**锚点坏了**和**没提交成功**
+  #    共用同一句结论，而后者会指向产品。按同形状跑通的 `verify-mobile-autosync.sh`
+  #    走：找不到「添加」就响亮报锚点失效，不猜。
+  bad "新建面板里没有「添加」提交锚点（content-desc/text 都没命中）—— 界面形状变了，锚点要跟着改"
+  screen_txt
+  restore_ime
+  summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 fi
+$ADB shell input tap ${SAVE_XY% *} ${SAVE_XY#* } >/dev/null 2>&1
 sleep 2
 dump
 if [ "$(has_sub "$TASK_TITLE")" = "1" ]; then ok "种子任务在界面上（${TASK_TITLE}）"; else bad "种子任务没建出来 —— 后面每条判据都没有输入"; fi
@@ -471,25 +667,86 @@ for m in re.finditer(r"<node\b[^>]*>", s):
 PY
 }
 
+# 🔴 到「我的」页，并且**证明真的到了那一页**才返回。
+#    为什么必须有"证明"这一半：本脚本有两类反向判据（「AI 助手」那一格**不在**树里），
+#    它们在任何别的屏上都恒成立 —— 2026-10-06 实测第 2 步就是报在 launcher/「分类」屏上
+#    拿到了一句 `✅ 未配置时「AI 助手」入口整行不在 AX 树里`。一句在错屏上取的绿，
+#    比一句红更坏：它后面所有"这一格该出现/该消失"的对照都作废（§7 元规则 2）。
+#    正面锚点用 `profile-entry-settings`（「我的 → 设置」那一格，与 lib 里
+#    `configure_sync_credentials` 用的是同一枚 testID）。
+goto_me_page() {
+  settle_foreground
+  tap_tab "我的" "立即同步" || return 1
+  dump
+  if [ "$(has_rid profile-entry-settings)" != "1" ]; then
+    echo "   ❌ 自称切到了「我的」，但那一页的正面锚点 profile-entry-settings 不在树里 —— 读的是别的屏"
+    screen_txt
+    return 1
+  fi
+  return 0
+}
+
 open_ai_settings() {
-  tap_tab "我的" "同步" || true
-  dump
-  XY=$(xy_desc "设置"); [ -n "$XY" ] || XY=$(scroll_to_desc "设置")
-  [ -n "$XY" ] && $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1
+  goto_me_page || { echo "   ❌ 到不了「我的」页，后面没有屏可点"; return 1; }
+  # 🔴 这一段的锚点原先写的是 `xy_desc "设置"`，2026-10-06 实测**恒取空**：
+  #    那一格的 content-desc 实际是「设置, 同步凭据、桌面小组件与语言」——
+  #    行组件把 label 和 hint 用「, 」拼成 accessibilityLabel（现量：
+  #    `adb shell uiautomator dump` 里那枚节点的 content-desc），
+  #    而 `xy_desc` 是**精确等值**（`/tmp/_xy.py` 的 `desc == want`）⇒ 一次都点不到，
+  #    报出来的却是「设置里没有『AI 设置』区块」—— 那是**根本没进设置页**，
+  #    不是区块没了（同一份 dump 里 testID=ai-settings-section 与 desc「AI 设置」都在）。
+  #    ⇒ 改用 testID 走：desc 锚点不在 `check:mobile-ai-anchors` 的对账面内，
+  #      rid 锚点在（它比的是源码里的 testID 声明）。
+  #    同屏其余各格同理都是「label, hint」形状：
+  #    通知 / 账号与安全 / 我的成长 / 习惯 / 倒数纪念日。
+  tap_rid profile-entry-settings || { echo "   ❌ 点不到「我的 → 设置」那一格（testID=profile-entry-settings）"; screen_txt; return 1; }
   sleep 2
+  # 「AI 设置」区块在设置页**下方**，是内联区块不是可点的入口 ——
+  # 原先这里还去点了一次标题（点了什么也不会发生）。要的是"滚到它进树"。
+  local i
+  for i in 1 2 3 4 5; do
+    dump
+    [ -n "$(rid_center ai-settings-section)" ] && return 0
+    $ADB shell input swipe 540 1900 540 900 300
+    sleep 1.5
+  done
+  echo "   ❌ AI 设置区块没打开（滚了 5 次，testID=ai-settings-section 仍不在树里）"; screen_txt
+  return 1
+}
+
+# 🔴 点一枚 content-desc **恰好等于** <desc> 的节点；取空即响亮失败。
+#    这五处原先写的是 `[ -n "$XY" ] && $ADB shell input tap …`（"取不到就不点"）：
+#    锚点坏了与「这一档本来就没渲染」共用同一条后续读数，于是症状变成"下一步的元素找不到"，
+#    归因被推给产品 —— 而 §7 元规则一要求先把探针的故障认出来。
+#    另一处同类：助手屏的任务格是 `Chip label={task.title}`（AssistantScreen.tsx:484，
+#    `kit.tsx:1048` 把它写成 accessibilityLabel），所以锚点**就是任务标题本身**，
+#    不是任务列表那一行的「打开任务：{title}」（那是 `TasksScreen.tsx:822`，另一个屏）。
+tap_desc() {  # <content-desc>
+  local xy
   dump
-  XY=$(xy_desc "AI 设置"); [ -n "$XY" ] || XY=$(scroll_to_desc "AI 设置")
-  if [ -z "$XY" ]; then
-    echo "   ❌ 设置里没有「AI 设置」区块"; screen_txt
+  xy=$(xy_desc "$1")
+  if [ -z "$xy" ]; then
+    echo "   ❌ 屏上没有 content-desc 恰好等于「$1」的节点 —— 界面形状或锚点变了，不退回「取不到就不点」" >&2
+    screen_txt
     return 1
   fi
-  $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1
-  sleep 2
-  dump
-  if [ -z "$(rid_center ai-settings-section)" ]; then
-    echo "   ❌ AI 设置区块没打开（testID=ai-settings-section 不在树里）"
-    return 1
-  fi
+  echo "   · 点 desc「$1」 @ $xy" >&2
+  $ADB shell input tap ${xy% *} ${xy#* } >/dev/null 2>&1
+  sleep 1
+  return 0
+}
+
+# 从「AI 设置」浮层回到「我的」页。
+# 🔴 三步各司其职，不许收成一句裸 BACK（第 545 行那段实测过它的另一种落点：
+#    浮层已自己收起时 BACK 会把应用退到桌面，随后每一句找标签的都打在 launcher 上）：
+#    ① 收键盘 ② BACK 收浮层（不拦它的失败）③ settle_foreground 兜住前台
+#    —— 最后由 goto_me_page 的正面锚点收尾，取不到就返回 1，不带着「⚠️ 继续」往下走。
+leave_settings() {
+  disable_ime
+  $ADB shell input keyevent 4 >/dev/null 2>&1 || true
+  sleep 1
+  settle_foreground
+  goto_me_page
 }
 
 # 填一枚自定义端点并**提交**（提交就是「添加自定义端点」那一次点击；没有「保存」）。
@@ -498,13 +755,13 @@ add_endpoint() {  # <名称> <地址>
   disable_ime
   for pair in "ai-endpoint-label|$name" "ai-endpoint-url|$url" "ai-endpoint-model|stub-model"; do
     rid=${pair%%|*}; val=${pair#*|}
-    dump
-    XY=$(rid_center "$rid")
-    if [ -z "$XY" ]; then
-      echo "   ❌ 端点表单里没有 testID=$rid 的输入框（界面形状变了，锚点要跟着改）"
-      restore_ime; return 1
-    fi
-    $ADB shell input tap $XY >/dev/null 2>&1
+    # 🔴 原先这里只 `dump` 一次取坐标、取不到就报「界面形状变了，锚点要跟着改」。
+    #    现量（rig12，tmp/probe-form.xml）：label 在 y=[2050,2174]、url 在 y=[2271,2400]（贴屏底），
+    #    model 在**折叠线以下、根本没进那一秒的树** ⇒ 那句红字把"还没滚到位"写成了"锚点坏了"，
+    #    而 `check:mobile-ai-anchors` 刚证明这枚 testID 在源码里存在（AiSettingsSection.tsx:352）。
+    #    改走 `tap_rid`：它负责"滚进安全带再点"，并且已经把
+    #    "不在树里"和"在树里但贴着边"分成两句话（同一枚开关在第 3 步刚用过这条路）。
+    tap_rid "$rid" || { echo "   ❌ 端点表单里滚不出 testID=$rid 那一格"; restore_ime; return 1; }
     clear_and_type "$val"
     sleep 1
   done
@@ -526,6 +783,9 @@ add_endpoint() {  # <名称> <地址>
 }
 
 step "2. 配端点之前：入口整行不在树里（aiEntryVisible 的反向那一半）"
+# 🔴 反向判据必须先站对屏（见 goto_me_page 的注释）：「不在树里」这句话
+#    在别的屏上一样成立，不验正面锚点就是"一句恒绿的判据"。
+goto_me_page || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
 if [ "$(has_rid profile-entry-assistant)" = "1" ]; then
   bad "还没配端点，「AI 助手」那一格就已经在树里 —— 未配置的功能不该进 DOM，那这条反向判据也就守不住任何东西"
 else
@@ -535,16 +795,27 @@ fi
 step "3. 开总开关 + 配一枚回环假端点（仍处「只用本机」）"
 open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 # ① 总开关：按 checked 判定，不按「点过了」判定。
-BEFORE=$(rid_attr ai-gate-enabled checked)
-tap_rid ai-gate-enabled || summary "移动端 AI 助手真机验收" "总开关点不动" 1
-AFTER=$(rid_attr ai-gate-enabled checked)
-if [ "$AFTER" = "true" ] && [ "$BEFORE" != "true" ]; then
-  ok "「启用 AI 功能」开起来了（checked ${BEFORE:-空}→${AFTER}）"
-elif [ "$AFTER" = "true" ]; then
-  ok "「启用 AI 功能」本来就开着（checked 前后都是 true）"
+# 🔴 两处自坏（2026-10-06 实测，读数 `tmp/ai11-rig.log`）：
+#   · 原先读的是 `rid_attr ai-gate-enabled checked` = **容器**的 checked ⇒ 恒 false，
+#     于是"开关没开"是一条永远不可能被否证的判据；同一时刻手工 dump 里那枚
+#     `android.widget.CheckBox` 明明是 `checked=true`（点击真的生效了，红的是探针）。
+#   · 点击之后**没有重新 dump**就读 ⇒ 读的是点击前那份树。
+#   现量：`· 点 testID=ai-gate-enabled → 落在 [child:CheckBox:启用 AI 功能] @ 144,683`
+#   紧接 `❌ …点击后 checked=false` —— 两句不可能同时为真，除非读的是容器/旧树。
+dump; BEFORE=$(gate_state ai-gate-enabled)
+if [ "$BEFORE" = "true" ]; then
+  ok "「启用 AI 功能」本来就开着（点击前 checked=true）—— 这一趟**不去点它**，点了会把它关掉"
+  AFTER=true
 else
-  bad "「启用 AI 功能」点击后 checked=${AFTER:-读不出}（点击前 ${BEFORE:-空}）—— 开关没开，后面每一步都没有输入"
-  summary "移动端 AI 助手真机验收" "总开关没开" 1
+  tap_rid ai-gate-enabled || summary "移动端 AI 助手真机验收" "总开关点不动" 1
+  dump
+  AFTER=$(gate_state ai-gate-enabled)
+  if [ "$AFTER" = "true" ]; then
+    ok "「启用 AI 功能」开起来了（checked ${BEFORE:-空}→${AFTER}；那一枚是哪一层由上面 tap_rid 打的 [ … ] 说）"
+  else
+    bad "「启用 AI 功能」点击后 checked=${AFTER:-读不出}（点击前 ${BEFORE:-空}）—— 开关没开，后面每一步都没有输入"
+    summary "移动端 AI 助手真机验收" "总开关没开" 1
+  fi
 fi
 # ② 允许远程端点：第 7/8 步要用非回环地址，这枚不开就永远走不到出境闸门。
 tap_rid ai-gate-remote || echo "   ↷ 「允许远程端点」没点到（可能本来已开）—— 以第 7 步的实际闸门读数为准"
@@ -579,7 +850,10 @@ else
 fi
 
 step "5. 只用本机时：规则句命中且零外发（Goal-1 的设备级判据）"
-dump
+# 第 3/4 步整段停在「AI 设置」屏上，而「AI 助手」那一格在「我的」页 ——
+# 原先这里直接 dump，等于在设置屏上找「我的」页的格子（恒红），
+# 而第 2 步那句反向判据又在任意错屏上恒绿。两头都要靠 goto_me_page 钉住屏。
+goto_me_page || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
 if [ "$(has_rid profile-entry-assistant)" = "1" ]; then
   ok "配好端点后「AI 助手」这一格进了树（与第 2 步的缺席对照成对）"
 else
@@ -602,19 +876,19 @@ else
 fi
 shot_evidence "android-ai-1-assistant.png"
 # 走多步循环那一档：Goal-1 的短路补在 loop 上，不在单步面板。
-XY=$(xy_desc "AI 工具调用"); [ -n "$XY" ] && $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1
-sleep 1
+tap_desc "AI 工具调用" || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 dump
-XY=$(rid_center tool-input)
-[ -n "$XY" ] || { echo "   ❌ 工具档没有 testID=tool-input 的输入框"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
 disable_ime
-$ADB shell input tap $XY >/dev/null 2>&1
+# 🔴 同一枚"只 dump 一次、取不到就报锚点坏了"的形状（见 add_endpoint 那段现量）：
+#    输入框在面板下方时它**根本没进那一秒的树**，红字却说"界面形状变了"。
+tap_rid tool-input || { echo "   ❌ 工具档里滚不出输入框 testID=tool-input"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
 clear_and_type "list all tasks"
 restore_ime
 stub_reset; RB=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
 dump
 XY=$(rid_center tool-start-assistant)
-[ -n "$XY" ] && $ADB shell input tap $XY >/dev/null 2>&1 || bad "找不到 testID=tool-start-assistant（多步循环那颗发送）"
+[ -n "$XY" ] || { echo "   ❌ 找不到 testID=tool-start-assistant（多步循环那颗发送）"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
+$ADB shell input tap $XY >/dev/null 2>&1
 sleep 4
 dump
 RULE_HIT=$(has_sub "本机规则命中")
@@ -637,8 +911,9 @@ XY=$(xy_desc "重新作出选择"); [ -n "$XY" ] || XY=$(xy_desc "同意并联�
 if [ -n "$XY" ]; then
   $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1
   sleep 2
-  handle_privacy_consent "同意并联网" "只用本机" || echo "   ⚠️ 隐私面板没接住（可能已是联网态）"
-  echo "   ✅ 隐私层已切到「同意并联网」（功能级授权仍逐条手动）"
+  handle_privacy_consent "同意并联网" "只用本机" \
+    && echo "   ✅ 隐私层已切到「同意并联网」（功能级授权仍逐条手动）" \
+    || echo "   ↷ 面板没接住 —— 可能已是联网态。**这句不是 ✅**：到底联网与否由第 7/8 步的计数与披露读数裁决，不由这里自称"
 else
   echo "   ❌ 设置里既没有「重新作出选择」也没有「同意并联网」—— 隐私区块形状变了，锚点要跟着改"
   screen_txt
@@ -648,7 +923,7 @@ fi
 step "7. 非回环 https 端点：授权入口按地址类别出现，未授权时零外发（Goal-7a 的真机对应物）"
 add_endpoint "$EP_REMOTE" "$DEVICE_REMOTE_URL" \
   || { echo "   ❌ 非回环端点没存进去"; screen_txt; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
-open_ai_settings
+open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 # ① 只在「拆解任务」那一块里点 chip（五块同名，块外定位会选错档）。
 tap_in_rid ai-feature-breakdown "$EP_REMOTE" \
   || { echo "   ❌ 拆解任务块里没有 $EP_REMOTE 那枚 chip"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
@@ -685,28 +960,16 @@ case "$CAP_SEL" in
   *) bad "读不出一句话捕获当前选中的目的地 —— 这一支对照没有输入，记为未取证而不是通过" ;;
 esac
 # ③ 不点授权，直接进助手走一次拆解。
-$ADB shell input keyevent 4 >/dev/null 2>&1; sleep 1
-tap_tab "我的" "同步" || true
+leave_settings || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
 tap_rid profile-entry-assistant || summary "移动端 AI 助手真机验收" "入口点不动" 1
-dump
-XY=$(xy_desc "拆解任务"); [ -n "$XY" ] && $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1
-sleep 1
-dump
-XY=$(xy_desc "$TASK_TITLE")
-if [ -n "$XY" ]; then
-  $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1; sleep 1
-else
-  bad "助手屏里选不到那条种子任务（${TASK_TITLE}）—— 拆解的输入没有"
-fi
+tap_desc "拆解任务" || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
+# 🔴 那条种子任务没选中就不往下：`breakdown-start` 在没有输入时是 disabled，
+#    于是「探针选不中那枚 chip」与「产品上的闸门」报出来是同一条 disabled 读数。
+tap_desc "$TASK_TITLE" || summary "移动端 AI 助手真机验收" "拆解没有输入（种子任务没选中）" 1
 stub_reset; G0=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
-dump
-XY=$(rid_center breakdown-start)
-[ -n "$XY" ] || { echo "   ❌ 没有 testID=breakdown-start"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
-if [ "$(rid_attr breakdown-start enabled)" = "false" ]; then
-  bad "🔴 「AI 拆解」在树里但 disabled：路由或任务选择没接上，后面的读数都不算"
-  summary "移动端 AI 助手真机验收" "前置条件没成立" 1
-fi
-$ADB shell input tap $XY >/dev/null 2>&1
+# 🔴 前置条件要在**被测那一侧**读到：disabled 就是"路由或任务选择没接上"，
+#    这一格由 tap_rid 自己那句话说清，这里只负责不让后面的读数替它打分。
+tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
 sleep 3
 dump
 CONSENT_LINE=$(has_sub "需要你批准后内容才会离开本机")
@@ -719,7 +982,9 @@ else
   echo "      命中的功能：$(feature_lines)"; screen_txt
 fi
 # ④ 硬点一次发送：闸门必须在 socket 之前，而不是发出去再判。
-$ADB shell input tap $(rid_center ai-send) >/dev/null 2>&1
+#    🔴 原先这里把坐标直接喂给 `input tap`：rid_center 取空 ⇒ 零参数 ⇒ 一声不响，
+#       而下一句读的是「有没有那句拦截说明」，于是一枚没点到的发送键会报成"闸门放行了"。
+tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
 sleep 5
 dump
 BLOCKED_LINE=$(has_sub "该功能需要你先批准内容离开本机")
@@ -732,17 +997,24 @@ fi
 shot_evidence "android-ai-2-egress-blocked.png"
 
 step "8. 授权之后：披露点名目的地与字段，那条不可达地址的失败必须可见"
-open_ai_settings
-tap_rid ai-consent-breakdown || echo "   ⚠️ 授权按钮点不动（可能已授权）—— 以披露步的实际读数为准"
-$ADB shell input keyevent 4 >/dev/null 2>&1; sleep 1
-tap_tab "我的" "同步" || true
+open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
+# 🔴 「那一格在不在树里」与「点不点得动」是两种状态，原先它们共用一句 ⚠️ 继续往下：
+#    不在 = 此前已授权（合法状态），在却点不动 = 载体坏了（必须停）。分开说。
+if [ "$(has_rid ai-consent-breakdown)" = "1" ]; then
+  tap_rid ai-consent-breakdown || summary "移动端 AI 助手真机验收" "逐功能授权入口点不动" 1
+  echo "   ✅ 逐功能授权已点下（ai-consent-breakdown 曾在树里）"
+else
+  echo "   ↷ 那一档已经没有授权入口（此前已授权过）—— 直接看披露步的读数"
+fi
+leave_settings || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
 tap_rid profile-entry-assistant || summary "移动端 AI 助手真机验收" "入口点不动" 1
-dump
-XY=$(xy_desc "拆解任务"); [ -n "$XY" ] && $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1; sleep 1
-dump
-XY=$(xy_desc "$TASK_TITLE"); [ -n "$XY" ] && $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1; sleep 1
-dump
-$ADB shell input tap $(rid_center breakdown-start) >/dev/null 2>&1
+tap_desc "拆解任务" || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
+tap_desc "$TASK_TITLE" || summary "移动端 AI 助手真机验收" "拆解没有输入（种子任务没选中）" 1
+# 🔴 这两处原先是 `$ADB shell input tap $(rid_center breakdown-start)`：坐标取空时
+#    `input tap` 只收到零个参数 ⇒ 一声不响，随后那句读披露元素的判据就在**没点过的屏**上打分。
+# 同上：这一枚在面板底部，**没滚到位时不在树里**；tap_rid 负责滚进安全带再点，
+# 并且"不在树里 / 贴着边 / disabled"三种成因各说各的话（disabled 它也会响亮拒绝）。
+tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
 sleep 3
 dump
 D_TO=$(has_sub "将发往："); D_FL=$(has_sub "将发送这些字段："); D_RM=$(has_sub "数据会离开设备")
@@ -758,7 +1030,7 @@ else
 fi
 shot_evidence "android-ai-3-disclosure.png"
 stub_reset; U0=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
-$ADB shell input tap $(rid_center ai-send) >/dev/null 2>&1
+tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
 sleep 8
 dump
 if [ "$(has_sub "连不上端点")" = "1" ] || [ "$(has_sub "技术详情")" = "1" ]; then
@@ -775,7 +1047,7 @@ else
 fi
 
 step "9. 换回回环路由：出提案卡，不点确认 ⇒ 手机库恰好 0 条新 op"
-open_ai_settings
+open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 tap_in_rid ai-feature-breakdown "$EP_LOOPBACK" || { echo "   ❌ 换不回回环路由"; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
 dump
 if [ "$(has_rid ai-consent-breakdown)" = "0" ]; then
@@ -783,33 +1055,31 @@ if [ "$(has_rid ai-consent-breakdown)" = "0" ]; then
 else
   bad "回环端点仍然索取授权 —— 地址类别维度没跟着路由变"
 fi
-$ADB shell input keyevent 4 >/dev/null 2>&1; sleep 1
+leave_settings || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
 pull_phone_db
 OPS_BEFORE=$(db_count "$PHONE_DB" "select count(*) from ops")
 case "$OPS_BEFORE" in ''|BAD|NOFILE)
   echo "   ❌ 手机库读不出（${OPS_BEFORE}）—— 第 9/10 步没有基线；这是探针没读到，不记为产品失败"
   summary "移动端 AI 助手真机验收" "读不出手机库" 3;; esac
 echo "   ↷ 提案前基线：手机库 $OPS_BEFORE 条 op"
-tap_tab "我的" "同步" || true
 tap_rid profile-entry-assistant || summary "移动端 AI 助手真机验收" "入口点不动" 1
-dump
-XY=$(xy_desc "拆解任务"); [ -n "$XY" ] && $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1; sleep 1
-dump
-XY=$(xy_desc "$TASK_TITLE"); [ -n "$XY" ] && $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1; sleep 1
+tap_desc "拆解任务" || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
+tap_desc "$TASK_TITLE" || summary "移动端 AI 助手真机验收" "拆解没有输入（种子任务没选中）" 1
 stub_reset; S0=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
-dump
-XY=$(rid_center breakdown-start)
-[ -n "$XY" ] || { echo "   ❌ 没有 testID=breakdown-start"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
-$ADB shell input tap $XY >/dev/null 2>&1
+# 同上：这一枚在面板底部，**没滚到位时不在树里**；tap_rid 负责滚进安全带再点，
+# 并且"不在树里 / 贴着边 / disabled"三种成因各说各的话（disabled 它也会响亮拒绝）。
+tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
 sleep 3
 dump
+# 回环这一档**可以**没有披露步（本机目的地不该问），所以这里保留"在不在"的分支；
+# 但既然进了这一支，坐标就必须取到 —— 原先两句都靠同一个空值，空值时一声不响。
 if [ -n "$(rid_center ai-send)" ]; then
-  $ADB shell input tap $(rid_center ai-send) >/dev/null 2>&1
+  tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
   sleep 6
-  dump
 else
   echo "   ↷ 回环这一趟没有单独披露步（本机目的地不该问）—— 直接看提案"
 fi
+dump
 if [ "$(has_sub "拆解结果")" = "1" ]; then
   ok "提案卡出来（「拆解结果（N 项）」那句在屏上）"
 else
@@ -829,36 +1099,54 @@ echo "   ↷ 这一段假端点计数 ${S0}→${S1}（回环那一次拆解应�
 step "10. 点「写入备注」⇒ 恰好 +1 条 TASK/UPD 且载荷键集合是 note"
 UPD_BEFORE=$(db_count "$PHONE_DB" "select count(*) from ops where json_extract(data,'\$.op.entityType')='TASK' and json_extract(data,'\$.op.opType')='UPD'")
 [ -n "$(rid_center breakdown-apply)" ] || { echo "   ❌ 没有 testID=breakdown-apply（确认那一半没有输入）"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
-tap_rid breakdown-apply || bad "「写入备注」点不动"
+# 🔴 这一点要是没送到，下面"恰好 +1"与"载荷只有 note"两条都在**没写入的库**上打分 ——
+#    它们会一起红，而红字把归因推给产品。守卫要压住后续判据（探针坏了就报"未取证"）。
+if tap_rid breakdown-apply; then
+  APPLIED=1
+else
+  APPLIED=0
+  bad "「写入备注」点不动 —— 第 10 步后面两条判据记为**未取证**，不给它们打分"
+fi
 sleep 4
 pull_phone_db
 UPD_AFTER=$(db_count "$PHONE_DB" "select count(*) from ops where json_extract(data,'\$.op.entityType')='TASK' and json_extract(data,'\$.op.opType')='UPD'")
-if [ "$UPD_AFTER" = "$((UPD_BEFORE+1))" ]; then
+if [ "$APPLIED" = "0" ]; then
+  echo "   ↷ TASK/UPD 计数与载荷键集合这一格未取证（确认那一下没送到）"
+elif [ "$UPD_AFTER" = "$((UPD_BEFORE+1))" ]; then
   ok "确认后恰好 +1 条 TASK/UPD（${UPD_BEFORE}→${UPD_AFTER}）"
 else
   bad "确认后 TASK/UPD 从 $UPD_BEFORE 变成 ${UPD_AFTER}（期望恰好 +1）"
 fi
-PAYLOAD_KEYS=$(sqlite3 "$PHONE_DB" "select json_extract(data,'\$.op.payload') from ops where json_extract(data,'\$.op.entityType')='TASK' and json_extract(data,'\$.op.opType')='UPD' order by json_extract(data,'\$.seq') desc limit 1" 2>/dev/null)
-printf '%s' "$PAYLOAD_KEYS" > /tmp/heyta-ai-upd-payload.json
-KEYSET=$(python3 - "$PAYLOAD_KEYS" <<'PY'
+if [ "$APPLIED" = "1" ]; then
+  PAYLOAD_KEYS=$(sqlite3 "$PHONE_DB" "select json_extract(data,'\$.op.payload') from ops where json_extract(data,'\$.op.entityType')='TASK' and json_extract(data,'\$.op.opType')='UPD' order by json_extract(data,'\$.seq') desc limit 1" 2>/dev/null)
+fi
+printf '%s' "${PAYLOAD_KEYS:-}" > /tmp/heyta-ai-upd-payload.json
+KEYSET=$(python3 - "${PAYLOAD_KEYS:-}" <<'PY'
 import json, sys
 raw = sys.argv[1]
+if not raw:
+    print("NO-PAYLOAD-READ")
+    sys.exit(0)
 try:
     print(sorted(json.loads(raw).keys()))
 except Exception as exc:
     print("PARSE-FAIL:%s" % exc)
 PY
 )
-if [ "$KEYSET" = "['note']" ]; then
+if [ "$APPLIED" = "0" ]; then
+  : # 上面已经打了"未取证"，这两格不给它们打分
+elif [ "$KEYSET" = "['note']" ]; then
   ok "UPD 载荷的键集合就是 note 这一项（多一个键就违反「一个意图一个 op」）"
 else
   bad "UPD 载荷键集合是 ${KEYSET}，不是 note 一项"
 fi
 dump
-if [ "$(has_sub "已写入备注")" = "1" ]; then ok "写完有回执那句"; else bad "写完没有回执（用户看不出这件事发生了）"; fi
+if [ "$APPLIED" = "0" ]; then
+  :
+elif [ "$(has_sub "已写入备注")" = "1" ]; then ok "写完有回执那句"; else bad "写完没有回执（用户看不出这件事发生了）"; fi
 
 step "11. 出得去：手机同步出去（服务端只存密文 ⇒ 只数条数）"
-tap_tab "我的" "同步" || true
+goto_me_page || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
 ensure_phone_sync
 S=$(phone_sync) && ok "手机同步出去（${S}s）" || bad "手机同步没完成 —— 第 12 步的下载判据没有上游"
 
