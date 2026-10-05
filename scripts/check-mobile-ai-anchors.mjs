@@ -461,6 +461,133 @@ function revealDirection(scriptRel) {
   return red;
 }
 
+/**
+ * 判据 ⑬：**"本机规则命中"这句判据只能压在真的被规则表命中的句子上**，
+ * 否则这一趟必须把它登记成"设备侧未覆盖"。
+ *
+ * 起因（2026-10-06 06:44 实测，rig33 现场树）：第 5 步的 RULE_PROMPT 写的是
+ * `list all tasks`，而规则表 12 条的**谓词头全是中文**（列出/看看/查看/有哪些…），
+ * 于是那句 ASCII 从来就不命中任何规则 —— 载体的"规则命中"判据一直在断言一件
+ * 从没发生的事。设备上实际看到的是失败面：
+ *   技术详情无法连接端点「stub-loopback」：privacy-consent-not-granted: 用户尚未同意隐私规则，
+ *   拒绝发起任何请求（http://127.0.0.1:4399/v1/chat/completions）
+ * —— 也就是"发出去了、被本机闸门拦在客户端"，而不是"规则答了"。
+ * 期望值从**规则表真源**算（不写死中文，也不写死条数），所以这张表换了措辞判据跟着动。
+ */
+const TOOL_RULES_SRC = 'packages/app-host/src/ai-tool-selection.ts';
+const RULE_UNCOVERED_MARKER = '设备侧未覆盖';
+
+function toolRulePatterns(text) {
+  const out = [];
+  const re = /pattern:\s*\/((?:[^\\/]|\\.)+)\/([gimsuy]*)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    try {
+      out.push(new RegExp(m[1], m[2]));
+    } catch {
+      /* 跳过解析不了的（例如带命名组的），由调用方的"零条即退 2"兜住 */
+    }
+  }
+  return out;
+}
+
+function typedPrompts(scriptText) {
+  const out = [];
+  scriptText.split('\n').forEach((line, i) => {
+    if (/^\s*#/.test(line)) return;
+    const m = /^(\w*PROMPT)="([^"]*)"\s*$/.exec(line.trim());
+    if (m) out.push({ at: `第 ${String(i + 1)} 行`, name: m[1], value: m[2] });
+  });
+  return out;
+}
+
+function ruleHitHonesty(scriptText, rulesText) {
+  const rules = toolRulePatterns(rulesText);
+  if (rules.length === 0) return { probe: false, red: [] };
+  const prompts = typedPrompts(scriptText);
+  // 🔴 这一支**无条件**先走，放在"这趟还拿不拿规则命中当判据"那道提前返回**之前**：
+  //    名字撒谎与有没有那条判据无关。臂 33 第一次就是这么空的 —— 我把 has_sub 判据摘掉之后
+  //    整条判据 ⑬ 提前返回，"名字叫 RULE 却不命中"从此永远不会红（一条会死的判据被
+  //    另一格的改动顺手救活，等于没有）。
+  //    抓出来的那条：`RULE_PROMPT="list all tasks"` 与一句登记隔了 80 行，
+  //    登记救不了名字 —— 后面的人会照着名字加句子，以为那测的是规则。
+  const lying = prompts.filter((p) => /RULE/.test(p.name) && !rules.some((r) => r.test(p.value)));
+  if (lying.length > 0) {
+    return {
+      probe: true,
+      red: lying.map(
+        (p) =>
+          `${p.at} ${p.name}="${p.value}" —— 名字声称这是"规则句"，但规则表（现算 ${String(rules.length)} 条 pattern）` +
+          `一条都没命中它。要么改命（它只是"走发送链路的第一句"），要么换成真能命中的句子；` +
+          `一张全中文谓词的表是选不出 ASCII 句子的（本仓的 ASCII 输入通道逐条试过，见 traps #334）。`,
+      ),
+    };
+  }
+  // 这一趟不再拿"规则命中"当判据 —— 除了名字撒谎，没什么可判的。
+  const assertsRule = /(?:has_sub|reveal_sub)[^\n]*本机规则命中/.test(scriptText);
+  if (!assertsRule) return { probe: true, red: [] };
+  const hit = prompts.filter((p) => rules.some((r) => r.test(p.value)));
+  if (hit.length > 0) return { probe: true, red: [] };
+  if (scriptText.includes(RULE_UNCOVERED_MARKER)) return { probe: true, red: [] };
+  return {
+    probe: true,
+    red: [
+      `脚本把「本机规则命中」当判据（has_sub / reveal_sub），但打进去的 ${String(prompts.length)} 句里` +
+        `没有一句被规则表（现算 ${String(rules.length)} 条 pattern）命中，也没有一行登记「${RULE_UNCOVERED_MARKER}」。` +
+        `⇒ 这条判据断言的是一件从没发生的事：要么用真能命中的句子，要么显式登记未覆盖（写清是哪条通道够不到）。`,
+    ],
+  };
+}
+
+/**
+ * 判据 ⑭：逐功能授权入口的**期望值**必须由端点字面量推，而"没有"那一支必须带分母。
+ * rig28~34 现量：那一趟配的是回环 stub，而 `ai-consent-<feature>` 罩在 `{needs ? …}` 里
+ * —— 目的地 'none' ⇒ `requiresEgressConsent` false ⇒ 那一行**按设计不渲染**，
+ * 载体却无条件逐档 reveal 那枚按钮 ⇒ 五档全报"滚不出来"，白花五轮滚动还打出五条假红。
+ * 一条恒不成立的判据比没有判据更糟（traps 里 #333 的同族第二种面目）。
+ */
+function consentExpectation(scriptRel) {
+  const bindRaw = helperBody(scriptRel, 'bind_all_routes');
+  const scanRaw = helperBody(scriptRel, 'scan_rids');
+  if (bindRaw === null || scanRaw === null) return null;
+  // 🔴 只读**可执行的那些行**：这三条判据第一版全数失效，因为注释里也写着
+  //    `127.0.0.0/8`、`SCAN-CAP`、`blur_focus` —— 拿"字符串在不在"去判形状，
+  //    注释会把每一条变异都洗成绿（#191 那一族在门禁自己身上的样子）。
+  const codeOf = (b) => b.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  const bind = codeOf(bindRaw);
+  const scan = codeOf(scanRaw);
+  const red = [];
+  // 期望值的定性必须**与那一档的赋值同一行**：分在两处写就等于允许其中一处被换掉而另一处还留着。
+  const qual = bind.split('\n').filter((l) => /NEEDS_CONSENT=0/.test(l));
+  if (!/ep_host=/.test(bind) || !qual.some((l) => /127\./.test(l) && /localhost/.test(l) && /::1/.test(l))) {
+    red.push(
+      'bind_all_routes 里没有"把回环字面量判成免授权"的那一行（ep_host 的推导不在，或者 NEEDS_CONSENT=0 那一行不带 127./localhost/::1 的定性）⇒ ' +
+        '退回"无条件去点同意"那个形状：回环那一档恒不成立、非回环那一档恒成立，两档在输出上长得一模一样。',
+    );
+  }
+  if (!/scan_rids/.test(bind)) {
+    red.push(
+      '回环那一支没走 scan_rids（整页逐帧）⇒ "当前这一帧没看到"会被打印成"界面上没有授权入口"：一条没有分母的否定判据。',
+    );
+  }
+  if (!/SCAN-CAP[^\n]*cap=1/.test(bind.replace(/\s+/g, ' '))) {
+    red.push(
+      'scan_rids 的 SCAN-CAP 哨兵在调用方没人接（没有一行同时写着 SCAN-CAP 与 cap=1）⇒ ' +
+        '载体走不完整页时那一格会被读成"查过了、确实没有"（假绿）。',
+    );
+  }
+  const firstSwipe = scan.indexOf('$ADB shell input swipe');
+  const blurAt = scan.indexOf('blur_focus');
+  const topAt = scan.indexOf('scroll_to_top');
+  if (firstSwipe === -1 || blurAt === -1 || topAt === -1 || blurAt > firstSwipe || topAt > firstSwipe) {
+    red.push(
+      'scan_rids 没在**第一发手势之前**摘焦点、回到顶部 ⇒ 与 reveal_rid 栽过的两档同一形状' +
+        '（长手势被输入框吞 / 起点落在屏幕中段，于是"没查到"其实只是"没走到"）。',
+    );
+  }
+  return red;
+}
+
 function run() {
   const files = walk(join(ROOT, SRC_ROOT));
   if (files.length === 0) {
@@ -616,11 +743,31 @@ function run() {
   for (const line of dirRed) console.log(`滚动方向\t${line}`);
   console.log(`DIRECTION_SUMMARY reveal_rid 有 fallback 调用=${String(dirRed.length === 0 ? 1 : 0)} 红=${String(dirRed.length)}`);
 
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0) {
+  // ── 判据 ⑬：规则命中这句话只能压在真命中的句子上 ──
+  const rulesRel = process.env.HEYTA_TOOL_RULES_SRC ?? TOOL_RULES_SRC;
+  const honesty = ruleHitHonesty(scriptText, readScript(join(ROOT, rulesRel)));
+  if (!honesty.probe) {
+    console.error(`🔴 在 ${rulesRel} 里解析不出任何 pattern: /…/ —— 探针没输入，不报"规则句判据诚实"`);
+    process.exit(2);
+  }
+  for (const line of honesty.red) console.log(`规则句诚实性\t${line}`);
+  console.log(`HONESTY_SUMMARY 规则pattern=${String(toolRulePatterns(readScript(join(ROOT, rulesRel))).length)} 红=${String(honesty.red.length)}`);
+
+  // ── 判据 ⑭：逐功能授权入口的期望值由端点字面量推，否定那一支带分母 ──
+  const consentRed = consentExpectation(scriptRel);
+  if (consentRed === null) {
+    console.error('🔴 取不到 bind_all_routes / scan_rids 的函数体 —— 探针没输入，不报"授权期望值是对的"');
+    process.exit(2);
+  }
+  for (const line of consentRed) console.log(`授权期望值\t${line}`);
+  console.log(`CONSENT_SUMMARY bind/scan 取得到=1 红=${String(consentRed.length)}`);
+
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
       '，双引号文案里的反引号=' + String(backtickRed.length) +
-      '，移动侧能力字段缺口=' + String(capRed.length) + '，装包通道=' + String(installRed.length) + '，滚动方向=' + String(dirRed.length) + '。' +
+      '，移动侧能力字段缺口=' + String(capRed.length) + '，装包通道=' + String(installRed.length) + '，滚动方向=' + String(dirRed.length) + '，规则句诚实性=' + String(honesty.red.length) +
+      '，授权期望值=' + String(consentRed.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
       '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
@@ -904,6 +1051,62 @@ if (process.argv.includes('--self-test')) {
     '臂 31 「没找到」挪回 pass 循环里面 ⇒ 非零退出且点名顺序',
     mutDir31 !== readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8') && m31.code !== 0 && m31.out.includes('永远不会跑'),
   ]);
+
+  // ── 判据 ⑬ 的三臂 ──
+  const hReal = ruleHitHonesty(
+    readScript(join(ROOT, DEFAULT_SCRIPT)),
+    readScript(join(ROOT, TOOL_RULES_SRC)),
+  );
+  arms.push(['臂 32 真脚本：规则句判据要么有真命中要么登记了未覆盖（探针确有输入）', hReal.probe && hReal.red.length === 0]);
+  // 臂 33：摘掉那行登记 ⇒ 必须红，且点名"没有一句被规则表命中"。
+  // 臂 33（本轮真抓到的那条）：往副本里塞一枚"名字叫 RULE_PROMPT 却不命中"的赋值 ⇒ 必须红。
+  //   第一版这里写的是"摘掉登记行"，而**脚本已经不拿 has_sub 当判据了**，于是那一臂
+  //   没有输入、照样报绿 —— 臂 FAIL 才把它照出来（一条永远不红的臂等于没有臂）。
+  const baseFor33 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8');
+  const mutDir33 = `${baseFor33}\nRULE_PROMPT="list all tasks"\n`;
+  arms.push(['臂 33 的假规则句确实进了副本（前置）', mutDir33 !== baseFor33 && mutDir33.includes('RULE_PROMPT=')]);
+  const m33 = runMutantFile(mutDir33, 'lying-rule-name');
+  arms.push(['臂 33 名字叫 RULE 却不命中 ⇒ 非零退出且点名', m33.code !== 0 && m33.out.includes('名字声称这是')]);
+  // 臂 34：把打的句子换成规则表真能命中的中文句 ⇒ 必须放行（证明 OR 的另一支不是装饰）。
+  const baseFor34 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8');
+  const mutDir34 = `${baseFor34}\nRULE_PROMPT="列出所有任务"\n`;
+  arms.push(['臂 34 的真规则句确实进了副本（前置）', mutDir34 !== baseFor34]);
+  const m34 = runMutantFile(mutDir34, 'real-rule-sentence');
+  arms.push(['臂 34 用真命中的句子 ⇒ 整条流水线仍为 0（另一支是活的）', m34.code === 0]);
+
+  // ── 判据 ⑭（授权入口的期望值）的臂 ──
+  const cReal = consentExpectation(DEFAULT_SCRIPT);
+  arms.push(['臂 35 真脚本两个 helper 都取得到、判据 ⑭ 不误红（探针确有输入）', cReal !== null && cReal.length === 0]);
+  const baseFor36 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8');
+  // 臂 36：把回环那一档的定性拿掉（期望值从此不看端点）⇒ 必须红。
+  const mutDir36 = baseFor36.replace('127.[0-9]* | localhost | ::1) NEEDS_CONSENT=0 ;;', 'NOT-A-REAL-PATTERN) NEEDS_CONSENT=0 ;;');
+  arms.push(['臂 36 的变异确实摘掉了端点定性（前置）', mutDir36 !== baseFor36]);
+  const m36 = runMutantFile(mutDir36, 'consent-no-derivation');
+  arms.push(['臂 36 期望值不从端点推 ⇒ 非零退出且点名', m36.code !== 0 && m36.out.includes('回环字面量判成免授权')]);
+  // 臂 37：把整页扫描换成空串（否定那一支从此没有分母）⇒ 必须红。
+  const mutDir37 = baseFor36.replace(
+    '    consent_hit=$(scan_rids "ai-consent-capture ai-consent-breakdown ai-consent-prioritize ai-consent-duration-estimate ai-consent-tool-calling")',
+    '    consent_hit=""',
+  );
+  arms.push(['臂 37 的变异确实摘掉了 scan_rids 调用（前置）', mutDir37 !== baseFor36]);
+  const m37 = runMutantFile(mutDir37, 'consent-no-scan');
+  arms.push(['臂 37 没有整页分母 ⇒ 非零退出且点名', m37.code !== 0 && m37.out.includes('没有分母的否定判据')]);
+  // 臂 38：只摘调用方对 SCAN-CAP 的处理（走不完时没人接哨兵 ⇒ 假绿）⇒ 必须红。
+  const mutDir38 = baseFor36.replace('      *" SCAN-CAP "*) cap=1; consent_hit=$(printf \'%s\' "$consent_hit" | sed \'s/ *SCAN-CAP//\') ;;', '      *) cap=0 ;;');
+  arms.push(['臂 38 的变异确实摘掉了 SCAN-CAP 那一格（前置）', mutDir38 !== baseFor36]);
+  const m38 = runMutantFile(mutDir38, 'consent-no-cap');
+  arms.push(['臂 38 哨兵没人接 ⇒ 非零退出且点名', m38.code !== 0 && m38.out.includes('SCAN-CAP 哨兵')]);
+  // 臂 39：scan_rids 不摘焦点（与 reveal_rid 栽过的同一档）⇒ 必须红。
+  const mutDir39 = baseFor36.replace(
+    '  local pending="$1" hit="" still="" r ref now stuck=0 frames=0\n  blur_focus\n  scroll_to_top',
+    '  local pending="$1" hit="" still="" r ref now stuck=0 frames=0\n  scroll_to_top',
+  );
+  arms.push(['臂 39 的变异确实摘掉了 scan_rids 的 blur_focus（前置）', mutDir39 !== baseFor36]);
+  // 🔴 这三臂同时是"注释不许顶替可执行代码"的臂：真脚本的**注释里**就写着
+  //    `127.0.0.0/8`、`SCAN-CAP`、`blur_focus`，第一版三条判据因此三条全空转
+  //    （变异真的生效、门禁却读成绿）—— 现在每条都只看剔掉注释之后的可执行行。
+  const m39 = runMutantFile(mutDir39, 'consent-no-blur');
+  arms.push(['臂 39 整页扫描不摘焦点 ⇒ 非零退出且点名', m39.code !== 0 && m39.out.includes('没在**第一发手势之前**摘焦点')]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
