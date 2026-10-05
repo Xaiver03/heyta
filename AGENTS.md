@@ -562,6 +562,7 @@ Android Vault 验收还必须把恢复码控件的滚动、输入和业务回读
 22. **iOS 主认证验收必须滚动回读阶段按钮**：AuthScreen 的“保存并启用同步”位于长表单下方，令牌兑换成功后必须用 `--scroll-into-view` 回读该按钮且确认可见，再要求 AX 按压成功；viewport-only `--list` 找不到它时不得退回手工凭据并把中间阶段记成令牌失败。该阶段仍需按现有状态机顺序写入同步配置并启动同步。
 23. **iOS 重启补算必须分开观察 OS 投递与应用回执**：系统 delivered 可能晚于首次启动和首次只读 probe；边界脚本要轮询本轮 occurrence 的 delivered，再重新启动生产 RN 进程执行 reconcile，最后以真 SQLite 的 `firedAt + firedForTriggerAt` 收口。probe 进程不能写业务 op，也不能用 ledger 的 posted/receipts 代替同步事实。
 24. **只读 iOS probe 结束前不能假定生产 App 已重新启动**：probe 为了延迟写快照会暂时保持进程存活；在 delivered 快照后必须先 `simctl terminate` 该 bundle，再显式启动生产 RN，避免 iOS 复用 probe 进程而跳过 startup reconcile。
+25. **iOS AX 按压必须做几何安全检查**：AX 报告 `success` 只代表 HID tap 被设备接受，不代表目标控件收到事件。shim 在发 tap 前必须拒绝屏外坐标和与底部 tab 栏重叠的非 tab 控件，返回 `tap-outside-screen` 或 `tap-blocked-by-tab-bar`；调用方随后必须重新滚动并回读新 bounds。保存、登录、解锁等长表单按钮不得复用滚动前的坐标。`scripts/tools/ios-ax-shim.test.py` 的几何回归必须保持为门禁输入，不能把一次误切 tab 当产品成功。
 
 ### 不要擅自做的事
 
