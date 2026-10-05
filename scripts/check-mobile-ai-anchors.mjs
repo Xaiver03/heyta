@@ -303,6 +303,42 @@ function quoteBackticks(text) {
   return red;
 }
 
+
+// 判据 ⑨：**模型要求用户声明的字段，界面上必须有处可填**（2026-10-06 实测的这类缺口的形状）。
+//   移动壳的端点表单此前压根没有「能力」这一格 ⇒ 手机上建出来的端点永远只拿基线
+//   `structured_output`，`tool-calling`（要 `tool_calling`）与 `breakdown`（要 `long_context`）
+//   在移动侧**结构上不可用**，而界面只表现为"发送按钮恒灰"。web 有、移动没有，这种不对称
+//   typecheck 看不见（字段是可选的）、`check:ai-coverage` 也看不见（它数的是功能接线，不是表单字段）。
+//   判据：`packages/ai` 的 CAPABILITY_ORDER 每一枚，都必须①在移动表单里被渲染（走共享那份顺序表，
+//   不许自己抄一张），②有对应词条键。顺序表一旦被抄成第二份，下一次加能力就只有半个界面跟上。
+const AI_SETTINGS_SRC = 'apps/mobile/src/ai/AiSettingsSection.tsx';
+const AI_ROUTING_SRC = 'packages/ai/src/routing.ts';
+const CAP_TESTID = 'ai-endpoint-cap-';
+
+function capabilityOrder(routingText) {
+  const m = /export const CAPABILITY_ORDER: readonly AiCapability\[\] = \[([^\]]*)\]/.exec(routingText);
+  if (m === null) return null;
+  return (m[1].match(/'[a-z_]+'/g) ?? []).map((x) => x.replaceAll("'", ''));
+}
+
+function capabilityFieldGaps(order, settingsText) {
+  const red = [];
+  if (!settingsText.includes('CAPABILITY_ORDER')) {
+    red.push('移动表单没引用共享的 CAPABILITY_ORDER（自己抄了一张顺序表 ⇒ 下次加能力只有半边跟上）');
+  }
+  if (!settingsText.includes(CAP_TESTID)) {
+    red.push(`移动端点表单没有能力这一格（缺 testID ${CAP_TESTID}<capability>）`);
+    return red;
+  }
+  const keyBlock = /const CAPABILITY_LABEL_KEY[^{]*\{([^}]*)\}/.exec(settingsText);
+  for (const cap of order) {
+    if (!new RegExp(`(^|[,{\\s])${cap}:`, 'm').test(keyBlock?.[1] ?? '')) {
+      red.push(`能力「${cap}」在移动侧没有词条键（CAPABILITY_LABEL_KEY 少这一条 ⇒ 界面渲染的是键名或干脆没有）`);
+    }
+  }
+  return red;
+}
+
 function run() {
   const files = walk(join(ROOT, SRC_ROOT));
   if (files.length === 0) {
@@ -412,12 +448,26 @@ function run() {
   );
   console.log(`模式清单：\n${decl.patterns.map((p) => `  ${p.regex.source}  ← ${p.source}`).join('\n')}`);
 
+  // 判据 ⑨（表单字段覆盖面）：两处源码都能被 env 换掉，变异才敢打在副本上、不动真树。
+  const routingRel = process.env.HEYTA_AI_ROUTING ?? AI_ROUTING_SRC;
+  const settingsRel = process.env.HEYTA_MOBILE_AI_SETTINGS ?? AI_SETTINGS_SRC;
+  const order = capabilityOrder(readScript(join(ROOT, routingRel)));
+  const capRed = order === null
+    ? [`在 ${routingRel} 里解析不出 CAPABILITY_ORDER —— 是探针读不到，不是没缺口（报退 2）`]
+    : capabilityFieldGaps(order, readScript(join(ROOT, settingsRel)));
+  if (order === null) {
+    console.error(`🔴 ${capRed[0]}`);
+    process.exit(2);
+  }
+  for (const line of capRed) console.log(`能力字段缺口\t${line}`);
+
   const backtickRed = quoteBackticks(scriptText);
   for (const line of backtickRed) console.log(`文案反引号\t${line}`);
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0) {
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
-      '，双引号文案里的反引号=' + String(backtickRed.length) + '。' +
+      '，双引号文案里的反引号=' + String(backtickRed.length) +
+      '，移动侧能力字段缺口=' + String(capRed.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
       '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
@@ -540,6 +590,34 @@ if (process.argv.includes('--self-test')) {
   arms.push(['臂 15 红字点名了那一行（不是只退码）', m8.out.includes('文案反引号')]);
   const m9 = runMutant('# 别在文案里写 `反引号`，那是命令替换', 'backtick-comment');
   arms.push(['臂 16 同一个反引号只写在注释里 ⇒ 整条流水线仍为 0', m9.code === 0]);
+
+  // ── 判据 ⑨ 的三臂：证明"必须有处可填"这条会红 ──
+  //   变异打在 tmp 里的副本上（真树不动 —— 动 apps/*/src 会把 mtime 抬起来，
+  //   下一趟设备验收会被新鲜度门顶成 rc=3；那是探针自己把路堵死）。
+  const capMutant = (tag, text) => {
+    const dir = join(ROOT, 'tmp');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `.cap-mutant-${tag}.tsx`);
+    writeFileSync(file, text);
+    try {
+      const kid = spawnSync(process.execPath, [join(ROOT, 'scripts/check-mobile-ai-anchors.mjs')], {
+        encoding: 'utf8',
+        cwd: ROOT,
+        env: { ...process.env, HEYTA_MOBILE_AI_SETTINGS: `tmp/.cap-mutant-${tag}.tsx` },
+      });
+      return { code: kid.status ?? -1, out: `${kid.stdout ?? ''}${kid.stderr ?? ''}` };
+    } finally {
+      rmSync(file, { force: true });
+    }
+  };
+  const aiSettingsText = readFileSync(join(ROOT, AI_SETTINGS_SRC), 'utf8');
+  const m17 = capMutant('no-testid', aiSettingsText.replaceAll(CAP_TESTID, 'zz-no-cap-field'));
+  arms.push(['臂 17 表单里没有能力这一格 ⇒ 整条流水线非零退出', m17.code !== 0]);
+  arms.push(['臂 17 红字点名"能力字段缺口"（不是只退码）', m17.out.includes('能力字段缺口')]);
+  const m18 = capMutant('copied-order', aiSettingsText.replaceAll('CAPABILITY_ORDER', 'LOCAL_CAP_ORDER'));
+  arms.push(['臂 18 顺序表被抄成第二份 ⇒ 非零退出并点名它', m18.code !== 0 && m18.out.includes('共享的 CAPABILITY_ORDER')]);
+  const m19 = capMutant('missing-label', aiSettingsText.replace(/\n *tool_calling: 'web\.ai\.capability\.toolCalling',/, ''));
+  arms.push(['臂 19 少一枚词条键 ⇒ 非零退出且点名那枚能力', m19.code !== 0 && m19.out.includes('tool_calling')]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把

@@ -145,6 +145,21 @@ export type AiCapability =
   | 'tool_calling';
 
 /**
+ * 能力在界面上的呈现顺序。**唯一事实源**：web 壳与移动壳共用这一份，谁都不许再抄一遍。
+ *
+ * 为什么从 `apps/web` 提到这里：移动侧此前**压根没有能力这一格**，于是用户在手机上建出来的
+ * 端点永远只拿基线 `structured_output` ⇒ `tool-calling`（要 `tool_calling`）与 `breakdown`
+ * （要 `long_context`）在手机上结构上不可用，而界面只表现为"发送按钮一直灰着"
+ * （排除原因 `capability-missing` 从不递给人）。顺序表抄两处，下次就是"只有一处补了新能力"。
+ */
+export const CAPABILITY_ORDER: readonly AiCapability[] = [
+  'structured_output',
+  'long_context',
+  'vision',
+  'tool_calling',
+];
+
+/**
  * 每个功能**至少**需要哪些能力。
  *
  * 与 SSOS 的 `requiredCapabilities` 同构：用 `every()` 做单表达式过滤，
