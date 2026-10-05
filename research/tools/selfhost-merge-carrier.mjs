@@ -102,6 +102,9 @@
  * 它们入选的**唯一门槛**是"在一棵没有 node_modules、没有任何 dist 的载体形状树上 exit 0"，
  * 那条量法与两枚反面教材（`check:shell-surfaces` / `check:brand-assets` 在旧 dist 上红得像缺陷）
  * 都记在 `GATES` 数组上面那段注释里。
+ * 🔴 上面这份清单是**门禁**，不是落笔前跑的**全部**判据：另有三处"判据自己的牙"在同一趟跑 ——
+ * 第八族（replay 捕获）、第九族（Dockerfile 解法）、借 store 守卫（`selfhost-store-borrow.mjs`），
+ * 各自 `--selftest` 的臂数由它们自己的输出打印，本文件不抄数字。
  * 完整 `pnpm check`（要 node_modules、要起栈、`check:ai-e2e` 会 SIGKILL 别人的 dev server，
  * §7 #87）**不在这里跑** —— 它是落地那一刻的判据，载体绿不绿不由本脚本主张。
  *
@@ -135,6 +138,7 @@ import {
 } from './selfhost-red-attribution.mjs';
 import { readImageInstallShape, readImageInstallShapeFromText } from './image-install-shape.mjs';
 import { liveCarrierUsers } from './selfhost-carrier-busy.mjs';
+import { borrowStep, selftestArms as borrowSelftestArms, UNREADABLE } from './selfhost-store-borrow.mjs';
 import { unionMerge, oursMerge, sameCountAs } from './selfhost-text-merge.mjs';
 
 const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
@@ -421,6 +425,47 @@ if (!existsSync(join(WT, DMERGE))) {
   }
   dockSelftestReading = `第九族判据自检：${claimed[1]} 条臂（拒绝类 ${claimed[2]}，按理由认领）红 0 · 四道守卫各做过摘除变异、各打红自己那条臂`;
   notes.push(dockSelftestReading);
+}
+
+/* ── 借 store 那条守卫的牙（与第八/九族同一处挂法、同一个理由）───────────
+ * `selfhost-store-borrow.mjs --selftest` 的臂在载体树上现跑。这条性质先前**只有现场读数**
+ * （一次成功配对 + 一次退 3 响亮拒绝），摘掉"两侧锁必须相同"那一行不会有任何东西失败 ——
+ * 台账 §8.161 记的是它坏的方向（假归属），这一格记的是它没有牙。 */
+const SBORROW = 'research/tools/selfhost-store-borrow.mjs';
+let borrowSelftestReading = '';
+{
+  let out = '';
+  let rc = 0;
+  if (!existsSync(join(WT, SBORROW))) {
+    die(2, `借 store 守卫的判据文件不在载体树上（${SBORROW}）⇒ 没有臂就不许用这个旋钮配对`);
+  }
+  try {
+    out = execFileSync('node', [join(WT, SBORROW), '--selftest'], { encoding: 'utf8', maxBuffer: 8 << 20 });
+  } catch (e) {
+    rc = e.status ?? 1;
+    out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+  }
+  const redArms = out.split('\n').filter((l) => /^RED\s/.test(l));
+  const armLine = out.split('\n').find((l) => /臂数\s\d+/.test(l)) ?? '';
+  const claimed = armLine.match(/臂数\s(\d+)（拒绝类\s(\d+)/);
+  if (rc !== 0) die(2, `借 store 守卫的自检退 ${rc} ⇒ 这条性质没有牙，不许拿它配对：\n${redArms.slice(0, 8).join('\n')}`);
+  if (redArms.length) die(2, `借 store 守卫的自检**退出码 0 却带着红臂**：${redArms[0]}`);
+  if (!claimed || Number(claimed[1]) < 13 || Number(claimed[2]) < 7) {
+    die(2, `借 store 守卫的自检读数对不上（臂数行：“${armLine || '（没有这一行）'}”，要求 臂数 ≥13 且拒绝类 ≥7）`);
+  }
+  // 正向对照：判定函数当场能被 import 且拒绝臂全真（输出形状变了而这里没跟上 ⇒ 不拿"rc 0"当通过）。
+  const bArms = borrowSelftestArms();
+  const bRefuse = bArms.filter((a) => a.name.startsWith('A'));
+  if (bRefuse.length < 7 || bRefuse.some((a) => a.got !== true)) {
+    die(2, `借 store 守卫的拒绝臂从**函数**这一侧数出来对不上：拒绝类 ${bRefuse.length} 条、非真 ${bRefuse.filter((a) => a.got !== true).length} 条`);
+  }
+  // 🔴 判定本体与本文件跑的是同一份：这行读的是**正在执行的这份**脚本（SELF），不是载体树里的副本 ——
+  //    臂打在跑的那份上才有意义，否则载体树上那份改了、跑的那份没改，臂判的是别人。
+  if (!/borrowStep\(\{/.test(readFileSync(SELF, 'utf8'))) {
+    die(2, `借 store 的判定不走过 selfhost-store-borrow.mjs 的 borrowStep ⇒ 臂判的是另一份实现，不作数`);
+  }
+  borrowSelftestReading = `借 store 守卫判据自检：${claimed[1]} 条臂（拒绝类 ${claimed[2]}，按理由认领）红 0 · 判定本体=本文件调用的 borrowStep`;
+  notes.push(borrowSelftestReading);
 }
 
 /* ── package.json ─────────────────────────────────────────────────── */
@@ -951,21 +996,30 @@ const STORE_BLIND_RE = /找不到任何 pnpm store|请先运行 pnpm install/;
  *    根本不是这一把锁的，借来只会让"配对"量错东西 ⇒ 退 3 不软链。软链建完还要**回读**一次
  *    `.pnpm` 真的在（`symlinkSync` 成功不等于链路通）。 */
 const BORROW_SRC = process.env.HEYTA_CARRIER_LINK_STORE_FROM || '';
-const sha256Of = (p) => (existsSync(p) ? createHash('sha256').update(readFileSync(p)).digest('hex') : '读不到');
+const sha256Of = (p) => (existsSync(p) ? createHash('sha256').update(readFileSync(p)).digest('hex') : UNREADABLE);
+/* 🔴 判定本体搬进 `selfhost-store-borrow.mjs`（单一所有者，带 `--selftest`，臂数由它自己打印）：
+ *    原先这三档判断（锁必须相同 / 源必须有 .pnpm / skip 排在 refuse 之后）只住在本函数里，
+ *    于是它**只有现场读数、没有臂** —— 摘掉"锁相同"那一行不会有任何东西失败。
+ *    臂打在跑的那份上：本函数调 `borrowStep`，不自己再写一遍（两套裁决标准的自检版）。 */
 const borrowStore = (dir, tag) => {
   const linked = [];
   for (const rel of ['', 'e2e/']) {
     const a = sha256Of(join(BORROW_SRC, rel, 'pnpm-lock.yaml'));
     const b = sha256Of(join(dir, rel, 'pnpm-lock.yaml'));
-    if (a !== b) {
-      die(3, `${tag} 借 store 的前提不成立：${rel || '（根）'}那侧 ${BORROW_SRC} 的锁=${String(a).slice(0, 16)} ` +
-        `而 ${dir} 的锁=${String(b).slice(0, 16)} ⇒ 那边装出来的字节不是这一把锁的，不软链`);
-    }
     const srcNm = join(BORROW_SRC, rel, 'node_modules');
     const dstNm = join(dir, rel, 'node_modules');
-    if (!existsSync(join(srcNm, '.pnpm'))) die(3, `${tag} 借 store 的前提不成立：${srcNm} 里没有 .pnpm 那一层`);
-    if (hasStore(dir) && rel === '') continue; // 这棵树自己就有根 store（上一趟留下的），不覆盖
-    if (existsSync(dstNm) && rel !== '') continue;
+    const step = borrowStep({
+      rel,
+      lockSrc: a,
+      lockDst: b,
+      srcHasPnpm: existsSync(join(srcNm, '.pnpm')),
+      dstHasStore: hasStore(dir),
+      dstNmExists: existsSync(dstNm),
+    });
+    if (step.action === 'refuse') {
+      die(3, `${tag} 借 store 的前提不成立（${step.reason}）：${step.detail}（源 ${srcNm} → 目标 ${dstNm}）⇒ 不软链`);
+    }
+    if (step.action === 'skip') continue;
     symlinkSync(srcNm, dstNm, 'dir');
     if (!existsSync(join(dstNm, '.pnpm'))) die(3, `${tag} 软链建了却读不到 .pnpm（${dstNm} → ${srcNm}）⇒ 链路没通`);
     linked.push(`${rel || '（根）'}${a.slice(0, 12)}`);
