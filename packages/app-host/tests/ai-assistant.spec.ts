@@ -28,9 +28,11 @@ import {
 import { LOCAL_API_TOOLS, type LocalApiHabit, type LocalApiHost, type LocalApiItem, type LocalApiProject } from '@heyta/local-api';
 
 import {
+  LOCAL_ANSWER_MAX_ITEMS,
   assistantEgressFields,
   assistantGrants,
   assistantSystemPrompt,
+  localObservationText,
   observedFieldNames,
   planAssistantEgress,
   requestAssistantTurn,
@@ -358,10 +360,15 @@ describe('🔴 写：一次一个、一次确认', () => {
 
 describe('🔴 出境披露：循环前一次算完，越界就停', () => {
   it('未授权时那句拒绝里**列出了工具结果的字段名**', async () => {
+    // ⚠️ 这句**必须挑一条规则都不命中的**说法。原先用的是「列一下任务」，
+    // 而"规则先跑、命中即零外发"落地之后，那句话在本机就答完了、**根本不会**
+    // 走到出境闸门 —— 用例测的仍然是闸门（没发请求、拒绝里列出字段名），
+    // 只是输入必须落在"闸门可达"的那一侧。换成 `rules: []` 也能过，但那是
+    // 造假一个生产里不存在的配置（见文件尾那条对照用例）。
     const host = fakeHost(TASKS);
     const { impl, calls } = scriptedFetch([{ kind: 'text', text: '不该走到这里' }]);
     const outcome = await requestAssistantTurn(
-      { text: '列一下任务' },
+      { text: '我都有些啥？' },
       { routing: routing(REMOTE), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
     );
     // 一次请求都不发（出境闸门在网路之前）。
@@ -589,7 +596,11 @@ describe('🔴 助手知道"今天"是哪天，而且这件事说过', () => {
     const host = fakeHost(TASKS, PROJECTS);
     const { impl, calls } = scriptedFetch([{ kind: 'text', text: '一条：买牛奶' }]);
     await requestAssistantTurn(
-      { text: '今天有什么任务' },
+      // ⚠️ 用「我都有些啥？」而不是「今天有什么任务」：后者从 2026-10-05 起
+      // **在本机就答完了**（规则短路，零请求），而这条用例要盯的是"真发出去的那段
+      // 请求体里锚点在不在"。句子必须落在会出境的那一侧，否则这条断言会退化成
+      // `calls[0]` 不存在时的一句空话（`?.` 链拿到 undefined，`toBe` 照样比得过）。
+      { text: '我都有些啥？' },
       {
         routing: routing(LOCAL),
         consents: [],
@@ -632,5 +643,246 @@ describe('🔴 助手知道"今天"是哪天，而且这件事说过', () => {
     } finally {
       Date.now = realNow;
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// 🔴 规则先跑：命中即**零外发**（2026-10-05）
+//
+// 这一组的全部价值在**数请求**上：一个"报告说没发、其实发了"的实现，
+// 看返回值看不出来（文件头那条老纪律）。所以每条都把 `calls.length` 钉成 0，
+// 并把 `rules: []` 的对照臂放在旁边 —— 没有对照臂，"0 次请求"可能只是因为
+// 闸门把请求拦下了（那也是 0），而不是因为根本没打算发。
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('规则先跑、命中即零外发', () => {
+  it('「列一下任务」本机就答得出 ⇒ 一次请求都不发，答的是本机读到的内容', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '端点不该被用到' }]);
+
+    const outcome = await requestAssistantTurn(
+      { text: '列一下任务' },
+      {
+        routing: routing(LOCAL),
+        consents: [],
+        tier: 'read-only',
+        host,
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    expect(calls.length, '规则命中了却还是给端点发了请求').toBe(0);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    if (outcome.kind !== 'answer') throw new Error('本机短路期望 answer，实得 ' + outcome.kind);
+    expect(outcome.destination).toBe('none');
+    expect(outcome.steps).toEqual([{ tool: 'list_tasks', kind: 'read', ok: true }]);
+    // 答的是**真读到的东西**，不是"我帮你查了"这种空话。
+    expect(outcome.text).toContain('买牛奶');
+    expect(host.submits).toBe(0);
+  });
+
+  it('🔴 本机查到**空集合**时也要零出境：空是一个真答案', async () => {
+    // 夹具里一台空的宿主：`list_projects` 查到 0 条。这时如果退回模型，
+    // 就是"为一句『你还没有清单』花一次请求"，而模型手里唯一的真信息
+    // 还是我们自己刚查出来的那个 0。
+    const host = fakeHost([], []);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '端点不该被用到' }]);
+    const outcome = await requestAssistantTurn(
+      { text: '列一下清单' },
+      { routing: routing(LOCAL), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+    );
+    expect(calls.length).toBe(0);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.text).toContain('共 0 项');
+  });
+
+  it('🔴 同一句话连**出境授权都没有**时也不再拦用户：本机能答的就不需要批准', async () => {
+    // 这条是产品意义上的差别：以前"未授权 ⇒ 拒绝"，现在"未授权 ⇒ 照样能答，
+    // 因为一个字都没出去"。少这一条，实现可以退回"先要授权再说话"而全绿。
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '不该走到这里' }]);
+    const outcome = await requestAssistantTurn(
+      { text: '列一下任务' },
+      { routing: routing(REMOTE), consents: [], tier: 'read-only', host, routed: { fetchImpl: impl } },
+    );
+    expect(calls.length).toBe(0);
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('对照臂：把规则集清空（`rules: []`）⇒ 同一句话照旧出境', async () => {
+    // 🔴 这条断言的是**上面四条为什么是 0**。没有它，"0 次请求"和"闸门拦住了"
+    // 在测试里长得一模一样 —— 而那正是本仓库反复踩过的"一条永远通过的判据"。
+    // ⚠️ 目的地这一半**必须用远端端点 + 已授权**来比：本机端点的目的地本来就是
+    // `none`（明文没离开设备），拿它当"出境了"的证据会得到一个恒假的比较。
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '端点替我答' }]);
+    const outcome = await requestAssistantTurn(
+      { text: '列一下任务' },
+      {
+        routing: routing(REMOTE),
+        consents: READ_ONLY_CONSENT,
+        tier: 'read-only',
+        host,
+        routed: { fetchImpl: impl },
+        rules: [],
+      },
+    );
+    expect(calls.length).toBe(1);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    if (outcome.kind !== 'answer') throw new Error('对照臂期望 answer，实得 ' + outcome.kind);
+    expect(outcome.destination).toBe('user-endpoint');
+  });
+
+  it('对照臂的另一半：同一句远端出境的话，规则命中时是 0 次、目的地是 none', async () => {
+    // 与上一条**只差 `rules` 一项**，其余逐字相同 —— 这才是"短路"二字的对照，
+    // 而不是"本机 vs 远端"两个变量混在一起。
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '端点替我答' }]);
+    const outcome = await requestAssistantTurn(
+      { text: '列一下任务' },
+      {
+        routing: routing(REMOTE),
+        consents: READ_ONLY_CONSENT,
+        tier: 'read-only',
+        host,
+        routed: { fetchImpl: impl },
+      },
+    );
+    expect(calls.length).toBe(0);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    if (outcome.kind !== 'answer') throw new Error('短路那一半期望 answer，实得 ' + outcome.kind);
+    expect(outcome.destination).toBe('none');
+  });
+
+  it('写意图的规则命中 ⇒ 提案 + 零请求 + 确认前一条 op 都没写', async () => {
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '端点不该被用到' }]);
+    const outcome = await requestAssistantTurn(
+      { text: '新建任务「买咖啡」' },
+      {
+        routing: routing(REMOTE),
+        consents: [],
+        tier: 'read-and-propose',
+        host,
+        routed: { fetchImpl: impl },
+        rules: [
+          {
+            id: 'test.create-task',
+            tool: 'create_task',
+            pattern: /新建任务「(.+)」/,
+            args: (match) => ({ title: match[1] }),
+          },
+        ],
+      },
+    );
+    expect(calls.length).toBe(0);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.kind).toBe('proposal');
+    if (outcome.kind !== 'proposal') return;
+    expect(outcome.destination).toBe('none');
+    expect(outcome.stopsHere).toBe(true);
+    expect(host.submits, '用户还没确认就写了').toBe(0);
+  });
+
+  it('低档（read-only）下写规则**不该**命中：授权范围先于规则', async () => {
+    // 规则命中了 `create_task`，但这个档位没授权它 ⇒ 走模型（它会看到空写工具集）。
+    // 这条钉的是"短路不许绕过第二授权前端"。
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '这个我做不了' }]);
+    const outcome = await requestAssistantTurn(
+      { text: '新建任务「买咖啡」' },
+      {
+        routing: routing(LOCAL),
+        consents: [],
+        tier: 'read-only',
+        host,
+        routed: { fetchImpl: impl },
+        rules: [
+          {
+            id: 'test.create-task',
+            tool: 'create_task',
+            pattern: /新建任务「(.+)」/,
+            args: (match) => ({ title: match[1] }),
+          },
+        ],
+      },
+    );
+    expect(host.submits).toBe(0);
+    expect(outcome.ok).toBe(true);
+    // 请求发出去了（= 没被短路成写提案），而且没有落库。
+    expect(calls.length).toBe(1);
+  });
+
+  it('🔴 观察结果渲染不出人话时**不硬编**，退回模型那一步', async () => {
+    // `get_task` 的观察结果是一个**单对象**（没有数组），`localObservationText`
+    // 按形状拿不到"若干项"，于是必须 fall through —— 而不是编一句"我查到了"。
+    const host = fakeHost(TASKS, PROJECTS);
+    const { impl, calls } = scriptedFetch([{ kind: 'text', text: '那条是买牛奶' }]);
+    const outcome = await requestAssistantTurn(
+      { text: '看那条' },
+      {
+        routing: routing(LOCAL),
+        consents: [],
+        tier: 'read-only',
+        host,
+        routed: { fetchImpl: impl },
+        rules: [
+          {
+            id: 'test.get-one',
+            tool: 'get_task',
+            pattern: /看那条/,
+            args: () => ({ taskId: 't1' }),
+          },
+        ],
+      },
+    );
+    expect(calls.length, '单对象观察结果被硬编成了一句本机回答').toBe(1);
+    expect(outcome.ok).toBe(true);
+  });
+});
+
+describe('本机回答的渲染形状', () => {
+  it('数组直接渲染', () => {
+    const text = localObservationText('list_tasks', [{ title: '买牛奶' }, { title: '写周报' }]);
+    expect(text).toContain('共 2 项');
+    expect(text).toContain('- 买牛奶');
+    expect(text).toContain('- 写周报');
+  });
+
+  it('投影常见的包装形状（`{ tasks: [...] }`）也认', () => {
+    expect(localObservationText('list_tasks', { tasks: [{ title: '买牛奶' }] })).toContain('- 买牛奶');
+  });
+
+  it('再往里一层（`{ task: { title } }` 的每一项）认得出来', () => {
+    expect(localObservationText('list_tasks', [{ task: { title: '买牛奶' } }])).toContain('- 买牛奶');
+  });
+
+  it('空集合答"0 项"；拿不到数组的才返回 undefined（不硬编一句回答）', () => {
+    expect(localObservationText('list_tasks', [])).toContain('共 0 项');
+    expect(localObservationText('list_tasks', { tasks: [] })).toContain('共 0 项');
+    expect(localObservationText('get_task', { task: { title: '买牛奶' } })).toBeUndefined();
+    expect(localObservationText('list_tasks', [{ dueDate: 'x', priority: 'high' }])).toBeUndefined();
+    expect(localObservationText('list_tasks', '一串字')).toBeUndefined();
+    // 🔴 这条是"部分可渲染也不许装作全渲染完了"：缺字的那一项明说没标题，
+    // 而不是被 filter 掉（那样条数就和内容对不上了）。
+    const partial = localObservationText('list_tasks', [{ title: '买牛奶' }, { dueDate: 'x' }]);
+    expect(partial).toContain('共 2 项');
+    expect(partial).toContain('（这一项没有标题）');
+  });
+
+  it('超过上界要**明说**还剩几条没列出', () => {
+    const many = Array.from({ length: LOCAL_ANSWER_MAX_ITEMS + 3 }, (_unused, i) => ({
+      title: `任务 ${String(i + 1)}`,
+    }));
+    const text = localObservationText('list_tasks', many);
+    expect(text).toContain(`共 ${String(many.length)} 项`);
+    expect(text).toContain('还有 3 项没列出');
+    // 列出的行数就是上界那一个数（`split` 的第一段是"共 N 项："那一行）。
+    expect(text?.split('\n- ').length).toBe(LOCAL_ANSWER_MAX_ITEMS + 1);
   });
 });
