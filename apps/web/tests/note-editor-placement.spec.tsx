@@ -203,12 +203,16 @@ describe('P3 宿主接线（App.tsx 源码形状，直接挂组件的用例看�
   const stripComments = (src: string): string =>
     src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
   const app = stripComments(readFileSync(join(process.cwd(), 'src/App.tsx'), 'utf8'));
-  const aside = app.slice(
-    app.indexOf('<aside className="ht-app__detail"'),
-    app.indexOf('</aside>', app.indexOf('<aside className="ht-app__detail"')),
-  );
+  // 切片按**结构**定位，不按"某个属性恰好写在同一行"。合并进 main 之后那一支多挂了一个
+  // `ref={detailRef}`（`detailHasRoom` 由它量出来），JSX 于是被拆成多行 ——
+  // 原来那串 `<aside className="ht-app__detail"` 整串一断，切片就静默变成空串，
+  // 这条判据就从"验装配形状"退化成"验 JSX 排成一行"（本篇 §8 那一族：判据的载体替被测对象说话）。
+  const asideOpen = app.search(/<aside\b[^>]*ht-app__detail[^>]*>/);
+  const aside = asideOpen === -1 ? '' : app.slice(asideOpen, app.indexOf('</aside>', asideOpen));
 
   it('详情列里那一支带的是**几何 + 收起**两个条件，不是恒真', () => {
+    // 先证明切片本身不是空的：空切片会让下面三条一起红，而红字只会说“组件没接上”。
+    expect(aside, 'aside 切片为空 ⇒ 锚点没找到，别把它读成装配缺失').toContain('ht-app__detail');
     expect(aside, '详情列里找不到 NoteEditorCard').toContain('<NoteEditorCard inset');
     expect(aside).toContain('contentView === \'notes\' && detailColumnShown');
     // 槽里不许手写 DOM（`check:detail-pane-slot` 的腿 A 也管这个，两层各挡各的写法）。
