@@ -155,6 +155,9 @@ function fixtureInput(
         'AI_FEEDBACK',
         'PREFERENCE_CORRECTION',
         'TASK_REPEAT_CFG',
+        // 🔴 与下面 `modeledEntityTypes` 里的同一项**成对**出现：生成器会交叉核对
+        // 两端实体清单，只补一边就是"`EntityModelMap` 与 `ENTITY_TYPES` 不一致"的红色形状。
+        'ASSISTANT_TURN',
         'GLOBAL_CONFIG',
         'MIGRATION',
         'RECOVERY',
@@ -162,7 +165,18 @@ function fixtureInput(
       ],
     modeledEntityTypes:
       overrides.modeledEntityTypes ??
-      ['TASK', 'PROJECT', 'REMINDER', 'AI_FEEDBACK', 'PREFERENCE_CORRECTION'],
+      [
+        'TASK',
+        'PROJECT',
+        'REMINDER',
+        'AI_FEEDBACK',
+        'PREFERENCE_CORRECTION',
+        // 🔴 剔除表里每一项都必须**真的在** `EntityModelMap` 里（生成器 :407 那条），
+        // 所以这张小 fixture 跟着剔除表一起长。`ASSISTANT_TURN` 是 ADR-0045 D-4 (ii)
+        // 的跨设备会话实体 —— 漏了它，四条注入用例全部撞在"剔除项已消失"上，
+        // 症状和"口径被重新拍了"一模一样（那就是这条判据存在的意义）。
+        'ASSISTANT_TURN',
+      ],
     tools: overrides.tools ?? [
       { name: 'list_tasks', kind: 'read', description: '列出任务。', schemaRecorded: true, args: [] },
       { name: 'create_task', kind: 'write', description: '新建任务。', schemaRecorded: true, args: [] },

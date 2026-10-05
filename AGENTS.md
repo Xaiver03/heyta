@@ -292,10 +292,18 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2592 个通过 + 12 个跳过：11 浏览器 E2E 默认跳过 + 1 服务端）
+pnpm -r test                    # 全量测试。⚠️ **条数不写在这里**（这里曾写"2592 个通过 + 12 个跳过"，
+                                #    那是会漂的值 —— 与 §7 开头"本文件不写条数"同一个理由）。
+                                #    取现量：逐包的 `Tests  N passed (N)` 汇总行相加；跳过看 `N passed | M skipped`。
+                                # 🔴 收尾必须对一次数：**有 `test` 脚本的包数 == 打了 `Tests` 汇总行的包数**。
+                                #    不相等就说明有一层从来没被跑过，而 `pnpm -r` 的 rc=0 不会告诉你
+                                #    （2026-10-05 实测：19 个包有 test 脚本、19 行汇总，这才敢说没漏层）。
                                 # ⚠️ 沙箱里跑不了 `@heyta/sync-server`（`prisma generate` EPERM），
-                                #    用 `pnpm -r --filter '!@heyta/sync-server' test` 复现这 2592；
-                                #    该包本身只贡献 1 个跳过、0 个通过，所以两者可比
+                                #    用 `pnpm -r --filter '!@heyta/sync-server' test` 复现其余各包。
+                                # 🔴 那条 `--filter` 有两种读数都不指向被测命令：**包名写错**（真名带 `sync-` 前缀）
+                                #    时它打一行 `No projects matched the filters` 然后**退 0**（假绿）；
+                                #    包存在但**没有该 script** 时打 `ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT` **退 1**
+                                #    （假红 —— `@heyta/sync-server` 根本没有 `typecheck` 这一步）。
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -1066,9 +1074,13 @@ WebAuthn RP ID 挡着，**本次没动**。
   默认关（**每个工具单独默认关**）、只监听回环、显式 token、逐工具授权；
   🔴 **加密条目可列举、不可读**；写入只能经 `dispatch()` 形状的端口。
 - **ADR-0013 云端 AI 与 MaaS** ✅（[文档](docs/adr/0013-cloud-ai-and-maas.md)）。
-  **方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS），但**开放条件未满足**：
-  `assertEnableable()` 继续抛 `retention-undecided` 挡住 `managed`。
-  ⚠️ 这**不是没写完的占位符，是有意的失败** —— 不许"先把计费做了，保留策略以后再说"。
+  **方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS）。
+  🔴 **2026-10-05 状态更正（[ADR-0054](docs/adr/0054-managed-ai-retention-and-selling-preconditions.md)）**：
+  原来那句"`assertEnableable()` 继续抛 `retention-undecided` 挡住 `managed`"**已过期** ——
+  保留策略定案、计量与托管代理路由落地、那条 reason 连成员一起删了；
+  本 ADR **没有改**的那一条是"托管 AI 与端到端加密互斥，只能作为明确、可撤销、按功能开启的例外"。
+  ⚠️ 顺序纪律仍然有效（原句"不许先把计费做了、保留策略以后再说"）：ADR-0054 走的是
+  **先补计量、后解禁售**，不是绕过它。而这一档**今天在客户端仍打不开**（0054 §8）。
 - **ADR-0014 记忆偏好层的两个闸门** ✅（[文档](docs/adr/0014-memory-switch-and-corrections.md)）。
   `memoryEnabled` **必填且默认关闭（fail-closed）**；推断结果**不持久化**
   （纯函数，每次从 op-log 重算），只有用户**纠正**进 op-log 跨设备同步；

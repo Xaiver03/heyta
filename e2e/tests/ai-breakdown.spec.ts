@@ -63,7 +63,7 @@ test.describe('AI 拆解：真浏览器端到端旅程', () => {
       '数据不出设备',
     );
     // 还没写备注 → 只送标题这一个字段。
-    await expect(page.locator('[data-testid="ai-field-list"]')).toHaveText('title');
+    await expect(page.locator('[data-testid="ai-field-list"]')).toHaveText('today、title');
     // 🔴 这一步是"披露 = 只算不发"的可失败检查。
     await expectNoStubCall(request);
 
@@ -93,7 +93,7 @@ test.describe('AI 拆解：真浏览器端到端旅程', () => {
     await page.reload();
     await expect(rowFor(page, '把新版本发到生产环境')).toBeVisible();
     await page.locator('[data-testid^="ai-breakdown-"]').click();
-    await expect(page.locator('[data-testid="ai-field-list"]')).toHaveText('title、note');
+    await expect(page.locator('[data-testid="ai-field-list"]')).toHaveText('today、title、note');
 
     // 刷新+重新打开面板**仍然没有发送**（只有按"发送"才发）。
     await expectStubCount(request, 1);

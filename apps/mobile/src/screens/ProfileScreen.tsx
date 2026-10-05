@@ -77,6 +77,8 @@ import {
 
 import { Button, Card, Divider, HStack, Screen, SectionHeader, Text, TextField } from '../ui/kit';
 import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
+import { AssistantScreen } from '../ai/AssistantScreen';
+import { isAiConfiguredOnThisDevice, useAiSettings } from '../ai/settings-store';
 import { AvatarBadge } from '../ui/avatar';
 import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
 import { AccountClosureScreen } from './AccountClosureScreen';
@@ -261,6 +263,15 @@ export function ProfileScreen(): React.JSX.Element {
   const [closureOpen, setClosureOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
+  /**
+   * AI 助手那一屏（五个功能共用一个入口，见 `ai/AssistantScreen.tsx` 的文件头）。
+   *
+   * 🔴 它是**第二层屏**，不是第 6 个标签 —— 与成长 / 回收站 / 导出同一条纪律。
+   * 🔴 入口行**按本机开关决定是否进树**（`aiEntryVisible`）：
+   * 关掉的功能留在树上、点进去五个面板都发不出去，正是本仓反复记过的那类
+   * "界面在说谎"；而设置那一面**不受它影响** —— 闸就住在那里，看不见就无法打开。
+   */
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   /**
    * 「通知」入口行的未读徽标（批二，多端覆盖审计 P0-2）。
@@ -583,6 +594,19 @@ export function ProfileScreen(): React.JSX.Element {
   ];
 
   /**
+   * AI 助手那一格在不在树上。
+   *
+   * 🔴 判据是**本机的四道闸之一**（总开关 + 至少一个端点），纯本机读取、零请求。
+   * 为什么不是"永远显示"：web 那边"配置关着时入口仍然在，点了会说明该去开什么"
+   * 成立，是因为它把 AI 面板挂在**任务详情里**、那句话有地方说；
+   * 本端这一屏是**五个功能的唯一入口**，开着一条空链路等用户点，
+   * 就是本仓反复登记过的那个形状（"设置里能授权、授权了什么都不发生"）。
+   * 而"关掉的功能不进树"是本壳模块开关的既有口径。
+   */
+  const aiSettings = useAiSettings();
+  const aiEntryVisible = isAiConfiguredOnThisDevice(aiSettings);
+
+  /**
    * 功能域那几行**由注册表生成**（`nav/feature-entries.ts`）。
    *
    * 🔴 这里不许再出现一份手写的 `{ key: 'habits', label: t('…') }`：
@@ -607,6 +631,10 @@ export function ProfileScreen(): React.JSX.Element {
    * 唯一"配置类"的动作，也是搬动后凭据表单的新家；后面几项是"关于我"的
    * 回顾与后悔药（功能域那几行由 `nav/feature-entries.ts` 生成），频率都低于它。
    * 骨架来自共享动作行。
+   *
+   * 🔴 **AI 助手那一格按开关进不进树**（`aiEntryVisible`）—— 关掉的功能
+   * 留在树上、点进去五个面板一个都发不出去，就是"界面在说谎"那个形状。
+   * 它排在功能域那几行之后：那是"让机器替我干活"，频率低于回顾与打卡。
    */
   const entryRows: readonly SettingsRowModel[] = [
     {
@@ -655,6 +683,19 @@ export function ProfileScreen(): React.JSX.Element {
       },
     },
     ...featureRows,
+    ...(aiEntryVisible
+      ? [
+          {
+            kind: 'action' as const,
+            testID: 'profile-entry-assistant',
+            label: t('mobile.ai.entry'),
+            hint: t('mobile.ai.entry.hint'),
+            onPress: () => {
+              setAssistantOpen(true);
+            },
+          },
+        ]
+      : []),
     {
       kind: 'action',
       testID: 'profile-entry-trash',
@@ -716,6 +757,16 @@ export function ProfileScreen(): React.JSX.Element {
           void fetchInboxUnread();
         }}
         onUnreadCountChange={setInboxUnread}
+      />
+    );
+  }
+
+  if (assistantOpen) {
+    return (
+      <AssistantScreen
+        onBack={() => {
+          setAssistantOpen(false);
+        }}
       />
     );
   }

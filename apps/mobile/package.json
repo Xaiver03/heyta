@@ -17,10 +17,12 @@
     "clean:android": "node ../../scripts/run-gradle.mjs clean"
   },
   "dependencies": {
+    "@heyta/ai": "workspace:*",
     "@heyta/app-host": "workspace:*",
     "@heyta/design-system": "workspace:*",
     "@heyta/domain": "workspace:*",
     "@heyta/i18n": "workspace:*",
+    "@heyta/local-api": "workspace:*",
     "@heyta/op-log": "workspace:*",
     "@heyta/storage": "workspace:*",
     "@heyta/sync-client": "workspace:*",

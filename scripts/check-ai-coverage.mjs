@@ -35,9 +35,9 @@
  *   3. 该入口**从 `packages/app-host/src/index.ts` 可达**（防止"写了但没导出"）
  *   4. `packages/ai/src/routing.ts` 的 `DEFAULT_FEATURE_CAPABILITIES` 声明了它
  *   5. `packages/domain/src/preference-hints.ts` 的 `RELEVANT_PREFERENCES` 声明了它
- *   6. 界面**真的可达**，分两级查：
- *      a. `apps/web/src/` 里有人调用它的入口（防止"后端通了但界面没有入口"）
- *      b. 调用它的那个界面文件**自己也被别处 import**（防止"组件写好了但没挂载"）
+ *   6. 界面**真的可达**，对 `UI_ENDS` 里的**每一端**分别查两级：
+ *      a. 该端的 `src/` 里有人调用它的入口（防止"后端通了但界面没有入口"）
+ *      b. 调用它的那个界面文件**自己也被别处以 JSX 渲染**（防止"组件写好了但没挂载"）
  *
  *      🔴 第 b 级是**被一个坏门禁逼出来的**：第一版只查 a，于是两个组件
  *      静静地 import 了入口就让门禁变绿 —— 而没有任何地方渲染它们。
@@ -80,12 +80,13 @@
  * 那个形状（就是本文件开头 2026-09-26 那次实测的失效）。
  * **只覆盖一个端的"全覆盖"是一个谎话，不是绿灯。**
  *
- * 所以现在是：`web` 走原来那两级判据（一行没改，它已有的牙齿不缩水），
- * 其余每个端进 `UI_ENDS` 表，`gap` 那栏写"这端此刻刻意没做 + 登记出处"。
+ * 所以现在是：**每个声明要交付 AI 的端都走同一套两级判据**（下面的 `UI_ENDS`）。
  *
- * 🔴 这个登记**不是永久豁免**，它有一条会咬人的规则：一旦该端出现了
- * **任何**一个 AI 入口的 import（= 有人开始接线了），剩余未接的那几条立刻转红。
- * 半接是界面在说谎的那个形状，比全没接更糟 —— 全没接时界面上根本没有那个开关。
+ * 🔴 这里**原来**还有一张 `GAP_ENDS` 表，用来登记"这端此刻刻意没做 + 出处"，
+ * 并配一条会咬人的规则（该端一旦 import 了任何一个入口，剩余几条立刻转红）。
+ * 2026-10-05 把它删了，原因是它自己变成了它要防的那件事：移动端 5 条入口全 import 齐了，
+ * 那条"会咬人"的红确实响了，但**修法是删登记而不是补核对** —— 一张靠人按时销毁的豁免表，
+ * 迟早是一条永久豁免。现在 `UI_ENDS` 里只有**必须全覆盖**的端，没有第三档。
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -100,20 +101,15 @@ const DOMAIN_DIR = join(ROOT, 'packages/domain/src');
 const WEB_DIR = join(ROOT, 'apps/web/src');
 
 /**
- * 除 web 之外要核对的端，以及它此刻**刻意没做**的登记。
+ * 要核对界面可达性的端 —— **列在这里就意味着"必须全覆盖"**。
  *
- * 🔴 `gap` 不是永久豁免：这一端一旦 import 了**任何**一个 AI 入口（= 有人开始接线），
- * 剩余没接的那几条立刻转红。"接了 1 条、另 4 条在界面上还有开关"才是本文件开头
- * 那个 2026-09-26 实测的失效形状，而全没接不是 —— 全没接时界面上根本没有那个开关。
+ * 🔴 没有"这端此刻刻意没做"那一档了（原来叫 `GAP_ENDS`，文件头写了为什么删）。
+ * 新端接入 AI 之前不要往这里加条目：加了就等于承诺 5 条功能在这一端全部可点。
+ * 壳还没建的端（鸿蒙）不在这里 —— 它连 `apps/…/src` 都还没有，没什么可核对的。
  */
-const GAP_ENDS = [
-  {
-    end: 'mobile',
-    dir: join(ROOT, 'apps/mobile/src'),
-    gap:
-      '产品负责人 2026-10-03 拍板"AI 上移动端这轮不做"：出境语义还没裁决' +
-      '（`classifyDestination` 只看端点 URL、网络接口不在模型里），见 BLOCKED B34。',
-  },
+const UI_ENDS = [
+  { end: 'web', dir: WEB_DIR },
+  { end: 'mobile', dir: join(ROOT, 'apps/mobile/src') },
 ];
 
 /**
@@ -309,9 +305,22 @@ for (const feature of aiFeatures) {
   let entry = null;
   if (implFile !== undefined) {
     const src = read(implFile);
-    const names = [...src.matchAll(/export\s+(?:async\s+)?function\s+(request[A-Za-z0-9_]*)/g)].map(
-      (m) => m[1],
-    );
+    /**
+     * 🔴 必须**锚到行首**：不锚，注释里的一句代码草图会被当成导出。
+     *
+     * 实测（2026-10-05，移动端接线时）：`ai-assistant.ts` 的文件头写着
+     * 「实现文件里有没有 `export function request*`」，未锚定时正则从中取出
+     * `request`，于是 `tool-calling` 的"入口名"变成了一枚**根本不存在的导出**，
+     * 真入口 `requestAssistantTurn` 反而排在它后面被忽略。后果分两种，都不是好事：
+     *   · web 第 1 级用 `includes(entry)` —— `'request'` 是哪句的子串，**恒真**，
+     *     那一格从此不会红（假绿）；
+     *   · 端的 import 判据按**精确说明符** —— 谁都没 import 过 `request`，
+     *     于是移动端明明 import 了真入口，仍被判"一条都没接"（假红）。
+     * 一条判据同时会造假绿和假红，就是这条。
+     */
+    const names = [
+      ...src.matchAll(/^export\s+(?:async\s+)?function\s+(request[A-Za-z0-9_]*)/gm),
+    ].map((m) => m[1]);
     if (names.length === 0) {
       fail(
         `功能 \`${feature}\` 的实现文件 ${relative(ROOT, implFile)} 里\n` +
@@ -359,122 +368,84 @@ for (const feature of aiFeatures) {
   }
 }
 
-// ── 6. 界面可达性（两级）──────────────────────────────────────────────────
-const webFiles = walk(WEB_DIR, ['.ts', '.tsx']).filter((f) => !f.includes('/tests/'));
-const webFileSrc = new Map(webFiles.map((f) => [f, read(f)]));
-const webSrc = [...webFileSrc.values()].join('\n');
-void webSrc;
-
-for (const feature of aiFeatures) {
-  if (NO_UI_ENTRY.has(feature)) continue;
-  const entry = entryByFeature.get(feature);
-  if (entry === undefined || entry === null) continue; // 上面已经报过了
-
-  // 第 1 级：有界面文件调用了这个入口。
-  const users = webFiles.filter((f) => webFileSrc.get(f).includes(entry));
-  if (users.length === 0) {
-    fail(
-      `功能 \`${feature}\` 的入口 \`${entry}\` **在 \`apps/web/src/\` 里没有任何调用点**。\n` +
-        `     后端通了、界面没有入口 —— 用户碰不到，等于没做。\n` +
-        `     （如果它确实只给本机 API / MCP 用，请加进本脚本的 \`NO_UI_ENTRY\` 并写明理由。）`,
-    );
-    continue;
-  }
-
-  // 🔴 第 2 级：**引用了 ≠ 用户能用。**
-  //
-  // 这一条是"用一个坏门禁"逼出来的。第一版只查到第 1 级，于是
-  // `AiPrioritize.tsx` / `AiDuration.tsx` 静静地 import 了 entry 就让门禁变绿了 ——
-  // 而**没有任何地方渲染这两个组件**，用户在界面上根本碰不到它们。
-  //
-  // 这正是同一类失效上升了一层：第一层是"能力实现了但没调用点"，
-  // 第二层是"组件写好了但没挂载"。两层都不报错、都不影响测试，
-  // 都只在"有人真的去用"的时候才暴露。
-  //
-  // 所以：调用 entry 的那个界面文件，**自己必须被别处 import**。
-  const mounted = users.filter((f) => {
-    const name = basename(f).replace(/\.(tsx?|jsx?)$/, '');
-    if (name === 'index') return true; // 目录入口，从文件名判断不了，放行
-    const importedElsewhere = webFiles.some(
-      (g) => g !== f && new RegExp(`from\\s+'[^']*/${name}\\.js'`).test(webFileSrc.get(g)),
-    );
-    return importedElsewhere;
-  });
-
-  if (mounted.length === 0) {
-    fail(
-      `功能 \`${feature}\` 的界面文件（${users.map((f) => relative(ROOT, f)).join(', ')}）\n` +
-        `     **没有任何地方挂载它** —— 它 import 了 \`${entry}\`，但自己从不被渲染。\n` +
-        `     用户打开应用时看不到它，所以这个功能**依然碰不到**。\n` +
-        `     挂载点通常在 \`apps/web/src/App.tsx\`（照 \`AiBreakdown\` 的写法）。`,
-    );
-  }
-}
-
-// ── 6b. 登记了缺口的端：**半接即红**，登记不许变成永久豁免 ──────────────────
-const entryNames = new Set(entryByFeature.values());
-
-/**
- * 这一端"接到过 AI 入口"的判据是**从 `@heyta/app-host` import 了那个入口名**。
- *
- * 🔴 不按子串找（web 那条第 1 级是 `includes(entry)`）。实测原因：`tool-calling`
- * 的入口名恰好是 `request`，而 `apps/mobile/src` 里有 3 个文件本来就在写
- * `requestPasswordReset` / 网络重试之类的词 —— 用子串判会得到"移动端已接 1 条"，
- * 一条从未接线的端被探针自己点亮。import 说明符是这一层唯一不会误伤的形状。
- */
-function aiEntriesImportedIn(dir) {
-  const hits = new Map();
-  for (const file of walk(dir, ['.ts', '.tsx'])) {
-    const src = read(file);
-    for (const m of src.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s*['"]@heyta\/app-host['"]/g)) {
-      for (const raw of m[1].split(',')) {
-        const name = raw.trim().split(/\s+as\s+/)[0];
-        if (!entryNames.has(name)) continue;
-        if (!hits.has(name)) hits.set(name, []);
-        hits.get(name).push(file);
-      }
-    }
-  }
-  return hits;
-}
-
+// ── 6. 界面可达性（对 `UI_ENDS` 的每一端查两级）────────────────────────────
 const endCoverage = [];
 
-for (const spec of GAP_ENDS) {
+for (const spec of UI_ENDS) {
   if (!exists(spec.dir)) {
-    // 壳还没建（AGENTS §2 的鸿蒙就是这个状态）—— 不报错，但也不计入"覆盖"。
-    endCoverage.push({ end: spec.end, wired: null, total: entryNames.size, gap: spec.gap });
-    continue;
-  }
-  const hits = aiEntriesImportedIn(spec.dir);
-  const wired = [...hits.keys()];
-  endCoverage.push({ end: spec.end, wired: wired.length, total: entryNames.size, gap: spec.gap });
-
-  if (wired.length === 0) continue;
-
-  const missing = [...entryByFeature.entries()]
-    .filter(([, entry]) => !hits.has(entry))
-    .map(([feature]) => feature);
-
-  if (missing.length === 0) {
     fail(
-      `端 \`${spec.end}\` 已经把**全部** ${wired.length} 条 AI 入口 import 过去了，\n` +
-        `     但它仍在本脚本的 \`GAP_ENDS\` 里挂着"没做"的登记 —— 这句现在是谎话。\n` +
-        `     把它并进上面第 6 条那**两级**核对（有调用点 + 那个界面文件自己也被挂载渲染），\n` +
-        `     然后删掉 \`GAP_ENDS\` 里这一条。只查 import 不够：组件写好了但没挂载\n` +
-        `     是这条门禁第二级专门防的那件事。`,
+      `本脚本声明要核对 \`${spec.end}\` 端（\`UI_ENDS\`），但 ${relative(ROOT, spec.dir)}\n` +
+        `     **不存在**。声明了就要核对：目录没了就让这条门禁响亮地停下，\n` +
+        `     不许它"安静地跳过这一端、然后照样报全覆盖"。`,
     );
     continue;
   }
 
-  fail(
-    `端 \`${spec.end}\` **开始接** AI 了（已 import：${wired.join(', ')}），\n` +
-      `     但功能 ${missing.join(' / ')} 在这一端**一个调用点都没有**。\n` +
-      `     半接比全没接糟：设置/授权那一面是按\`AiFeature\`全量渲染的，于是用户可以\n` +
-      `     给一条空链路配好端点、勾上授权，然后**什么都不会发生，而且没有任何提示**。\n` +
-      `     要么把这 ${missing.length} 条接完并把这一端并进第 6 条那两级核对，\n` +
-      `     要么把已接的那条退回去 —— 不要给它单独加豁免。`,
-  );
+  const files = walk(spec.dir, ['.ts', '.tsx']).filter((f) => !f.includes('/tests/'));
+  const srcOf = new Map(files.map((f) => [f, read(f)]));
+  let reached = 0;
+
+  for (const feature of aiFeatures) {
+    if (NO_UI_ENTRY.has(feature)) continue;
+    const entry = entryByFeature.get(feature);
+    if (entry === undefined || entry === null) continue; // 上面已经报过了
+
+    // 第 1 级：这一端有文件用到了这个入口。
+    // 🔴 带词边界的正则，不是 `includes(entry)`。子串判会被"名字像"点亮：
+    // 实测过一次 `tool-calling` 的入口名被上游的正则截成 `request`，于是移动端
+    // 三个写了 `requestPasswordReset` 的文件把一格**从未接线**的端自己点亮了。
+    // 根因已在第 2 步（锚定 `^export …`）修掉，这里再留一层是挡"将来又出一个
+    // `requestDurationV2` 之类的近名入口"。
+    const uses = new RegExp(`\\b${entry}\\b`);
+    const users = files.filter((f) => uses.test(srcOf.get(f)));
+    if (users.length === 0) {
+      fail(
+        `功能 \`${feature}\` 的入口 \`${entry}\` 在 \`${relative(ROOT, spec.dir)}/\` 里\n` +
+          `     **没有任何调用点**。\n` +
+          `     后端通了、这一端没有入口 —— 用户碰不到，等于这一端没做。\n` +
+          `     （如果它确实只给本机 API / MCP 用，请加进本脚本的 \`NO_UI_ENTRY\` 并写明理由。）`,
+      );
+      continue;
+    }
+
+    // 🔴 第 2 级：**用到了 ≠ 用户能用。**
+    //
+    // 这一条是"用一个坏门禁"逼出来的。第一版只查到第 1 级，于是
+    // `AiPrioritize.tsx` / `AiDuration.tsx` 静静地 import 了 entry 就让门禁变绿了 ——
+    // 而**没有任何地方渲染这两个组件**，用户在界面上根本碰不到它们。
+    //
+    // 这正是同一类失效上升了一层：第一层是"能力实现了但没调用点"，
+    // 第二层是"组件写好了但没挂载"。两层都不报错、都不影响测试，
+    // 都只在"有人真的去用"的时候才暴露。
+    //
+    // ⚠️ 判据写的是**渲染**（别处出现 `<Name`），不是"被 import"。2026-10-05 在
+    // 移动端实测到 import 这一版挡不住的那个形状：`ProfileScreen` import 了
+    // `AssistantScreen`、入口行也在（`setAssistantOpen(true)`），**唯独没读
+    // `assistantOpen` 的那个渲染分支** —— 点进去什么都不发生，而"被 import"是绿的。
+    // 按 import 判还会跟着打包器的后缀习惯漂移：web 写 `from '../x.js'`，
+    // RN 不写后缀，同一条正则一端有效一端失灵。JSX 标签这一层两端同形。
+    const mounted = users.filter((f) => {
+      const name = basename(f).replace(/\.(tsx?|jsx?)$/, '');
+      if (name === 'index') return true; // 目录入口，从文件名判断不了，放行
+      const tag = new RegExp(`<${name}[\\s/>]`);
+      return files.some((g) => g !== f && tag.test(srcOf.get(g)));
+    });
+
+    if (mounted.length === 0) {
+      fail(
+        `功能 \`${feature}\`（端 \`${spec.end}\`）的界面文件（${users
+          .map((f) => relative(ROOT, f))
+          .join(', ')}）\n` +
+          `     **没有任何地方渲染它** —— 它用到了 \`${entry}\`，组件也写好了，\n` +
+          `     但全端找不到一处 \`<Name\` 用法。用户打开应用时看不到它，这个功能**依然碰不到**。`,
+      );
+      continue;
+    }
+
+    reached += 1;
+  }
+
+  endCoverage.push({ end: spec.end, reached, total: aiFeatures.length });
 }
 
 // ── 7. 反向：不许有拼错的 feature 字面量 ──────────────────────────────────
@@ -499,34 +470,162 @@ if (!exists(AI_DIST)) {
 } else {
   const ai = await import(AI_DIST);
 
-  // 8a. 托管云 AI 必须仍然不可启用
-  if (ai.describeRetention('heyta-cloud') !== undefined) {
+  // 🔴 词条表在这里**只加载一次**，供 8a-bis 与 8c 两段共用。
+  // 上一版它只在 8c 里加载，而我把新的一段插在 8a 后面去引用 `catalogs` ——
+  // `const` 的暂时性死区让门禁直接抛 ReferenceError，症状是"门禁坏了"，
+  // 而不是"我的写法错了"。（同一个坑本会话已经踩过一次。）
+  const catalogs = await loadCatalogs();
+  const catalogLocales = Object.keys(catalogs).sort();
+  if (catalogLocales.length === 0) {
     fail(
-      `\`describeRetention('heyta-cloud')\` **不再是 \`undefined\`**。\n` +
-        `     ADR-0013 的结论是：数据保留策略未定案前，托管 AI **不得启用**。\n` +
-        `     这是产品决策，不是编码缺口 —— 改成别的值请先写一份新 ADR。`,
+      '`packages/i18n` 的 `CATALOGS` 是**空的** —— 8a-bis 与 8c 都无从判定。\n' +
+        '     这不是"没有违规"，这是探针够不着。检查 `packages/i18n/dist` 的导出形状是否变了。',
     );
-  } else {
-    notes.push('托管云 AI 仍被挡住（`describeRetention(\'heyta-cloud\') === undefined`）。');
   }
 
-  // 8b. 启用时必须带着 retention-undecided 这个理由失败
-  let threw = null;
-  try {
-    ai.assertEnableable({ mode: 'managed' });
-  } catch (err) {
-    threw = err;
+  // 8a. 托管档的"留多久"必须**说得出数字**（ADR-0054 已定案）
+  //
+  // 🔴 这一条在 2026-10-05 之前钉的是**反方向**的事（"必须还是 undefined，
+  // 因为策略没定"）。裁决落地之后它翻转成：这一档的保留声明**不许为空**，
+  // 而且句子里必须带着那个常量推导出来的天数 —— 界面渲染的是结构化那一份，
+  // 中文句给 CLI 与法务对账用，两边数字漂开时这里先红。
+  const managedRetention = ai.describeRetention('heyta-cloud');
+  const managedKind = ai.retentionDisclosure('heyta-cloud').kind;
+  if (managedKind !== 'metadata-only') {
+    fail(
+      `\`retentionDisclosure('heyta-cloud').kind\` 是 \`${managedKind}\`，不是 \`metadata-only\`。\n` +
+        `     ADR-0054 §2 的裁决是"只留元数据、不留正文"。换成别的分类请**先写一份新 ADR**，\n` +
+        `     而不是改这里 —— 那两个壳的词条表是按这个判别式穷举的。`,
+    );
+  } else if (
+    typeof managedRetention !== 'string' ||
+    managedRetention.length === 0 ||
+    !managedRetention.includes(String(ai.MANAGED_AI_METADATA_RETENTION_DAYS))
+  ) {
+    fail(
+      `托管档的保留声明**没有带出那个天数**（收到：${JSON.stringify(managedRetention)}）。\n` +
+        `     界面上的"留多久"是从 ` +
+        `\`MANAGED_AI_METADATA_RETENTION_DAYS\` 推的，这里查的是中文投影那一路有没有断。`,
+    );
+  } else {
+    notes.push(
+      `托管档保留声明在场（正文不留存 + 计数表 ${String(ai.MANAGED_AI_METADATA_RETENTION_DAYS)} 天）。`,
+    );
   }
-  if (threw === null) {
+
+  // 8a-bis. 保留声明必须点到**两个载体** —— 中文投影 + 每一种语言的词条表
+  //
+  // 🔴 这条是 2026-10-05 现场补的，起因是我自己写的那一句：
+  // 「服务端**只记调用计数**（账号、计费周期、次数、最后使用时间）」。
+  // 那句当时看着保守（少说比多说安全），实际是**假话**：托管代理每次调用还经
+  // `recordManagedAiAttempt` → `Logger.audit` 写一行运维日志，字段是时间、账号、
+  // 功能名、结果状态、请求/响应字节数、耗时（ADR-0054 §4 那份元数据清单说的就是它）。
+  //
+  // 两个方向的错都要拦，而**少说这一侧没有人会发现**：
+  //   · 多说 → 承诺了一个不存在的采集（`ai-metering.pglite.spec.ts` 那条"多一列就红"管它）；
+  //   · 少说 → 披露少了一项真存在的采集，界面、法务、库里全都"看起来更干净"。
+  // 所以这里查的是**存在性**，不是数值：两个载体的名字都得到场。
+  //
+  // ⚠️ 只查"到场"，不查天数归谁。给日志写天数是另一种错（它的上限是容量不是时间），
+  //    那种改法要靠 ADR-0054 §4 那张两载体表 + 人评审，机器在这里帮不上。
+  // ⚠️ 中文兼容句用的那份词表**单独命名**，并由 `CARRIER_RULES['zh-CN']` 引用同一个数组。
+  // 上一版这里写的是 `CARRIER_RULES['zh-CN'].filter(...)`，于是给那张表改一个 key
+  // 就把门禁自己撞成 `TypeError: Cannot read properties of undefined` ——
+  // 变异当场跑出来了：它红是红的，但**红在了错的地方**（崩溃而不是那条 fail-closed 话术），
+  // 而一个会因自己被人编辑而崩的门禁，报出来的理由永远不可信。
+  const ZH_CARRIER_TERMS = ['计数表', '运维日志'];
+  const CARRIER_RULES = {
+    'zh-CN': ZH_CARRIER_TERMS,
+    en: ['counter row', 'operational log'],
+  };
+  const missingInCompat = ZH_CARRIER_TERMS.filter((term) => !managedRetention.includes(term));
+  if (missingInCompat.length > 0) {
     fail(
-      `\`assertEnableable({ mode: 'managed' })\` **没有抛错** —— 托管 AI 被放行了。\n` +
-        `     见 ADR-0013。`,
+      `\`describeRetention('heyta-cloud')\` 少了载体：${missingInCompat.join('、')}。\n` +
+        `     托管路径上有**两个**保留载体 —— 一张计数表（有 45 天这个数字）和\n` +
+        `     每次调用一行的运维日志（上限是日志容量，不是时间）。少说一个就是少披露了一项\n` +
+        `     真实存在的采集。出处：\`server/src/ai/managed-proxy.routes.ts\` 的 \`recordManagedAiAttempt\`。`,
     );
-  } else if (threw.reason !== 'retention-undecided') {
+  }
+  const carriersChecked = [];
+  for (const locale of catalogLocales) {
+    const terms = CARRIER_RULES[locale];
+    if (terms === undefined) {
+      fail(
+        `\`packages/i18n\` 里有 \`${locale}\` 词条表，但 \`CARRIER_RULES\` 没登记它。\n` +
+          `     保留披露"说了哪几个载体"必须**每种语言显式登记一次怎么说**，\n` +
+          `     不能让它悄悄继承另一语言的写法（同 \`E2EE_COPY_RULES\` 的理由）。`,
+      );
+      continue;
+    }
+    const sentence = catalogs[locale]?.['web.ai.disclosure.retentionMetadataOnly'];
+    if (typeof sentence !== 'string') {
+      fail(
+        `\`${locale}\` 词条表里没有 \`web.ai.disclosure.retentionMetadataOnly\` —— ` +
+          `托管档的"留多久"在界面上**根本不出现**。`,
+      );
+      continue;
+    }
+    const missing = terms.filter((term) => !sentence.includes(term));
+    if (missing.length > 0) {
+      fail(
+        `\`${locale}\` 的托管保留句少了载体：${missing.join('、')}。\n` +
+          `     两个载体（计数表 / 每次调用一行的运维日志）都要在场 —— ` +
+          `少写一个不是保守，是**少披露了一项真实存在的采集**。`,
+      );
+    } else {
+      carriersChecked.push(locale);
+    }
+  }
+  if (carriersChecked.length > 0 && catalogLocales.length === carriersChecked.length) {
+    notes.push(
+      `托管保留句在 ${String(carriersChecked.length)} 份词条表（${carriersChecked.join(', ')}）里都点到两个载体。`,
+    );
+  }
+
+  // 8b. 托管档的**两道门**都必须在运行时成立
+  //
+  // | 配置 | 必须发生 | 为什么这条要活在门禁里 |
+  // |---|---|---|
+  // | `managed` 没端点 | 抛 `endpoint-required` | 没有目的地就没有"发给谁"，启用不了 |
+  // | `managed` + 境内白名单 | **不抛** | 开档这件事本身（ADR-0054）—— 悄悄退回去挡住，产品就没这一档 |
+  // | `managed` + 境外端点 | 抛 `managed-endpoint-not-domestic` | 🔴 红线 6c："只能接境内"不许靠形容词，必须有一条运行时真的打它的判据 |
+  const thrownOf = (config) => {
+    try {
+      ai.assertEnableable(config);
+      return null;
+    } catch (err) {
+      return err?.reason;
+    }
+  };
+  const noEndpointReason = thrownOf({ mode: 'managed' });
+  if (noEndpointReason !== 'endpoint-required') {
     fail(
-      `\`assertEnableable({ mode: 'managed' })\` 抛了，但理由是 \`${threw.reason}\`，\n` +
-        `     而不是 \`retention-undecided\`。理由被改掉会让 UI 说出错误的解释。`,
+      `\`assertEnableable({ mode: 'managed' })\`（没端点）的理由是 ${JSON.stringify(noEndpointReason)}，\n` +
+        `     不是 \`endpoint-required\`。那是配置缺口，用户能做的动作是"去填地址" ——\n` +
+        `     换成别的理由就等于告诉用户一个他做不到的修复动作。`,
     );
+  }
+  const domestic = ai.MANAGED_MODEL_HOSTS[0]?.host;
+  if (domestic === undefined) {
+    fail('境内白名单是空的 —— 8b 后两条臂无从判定，这不是"没有违规"，是探针够不着。');
+  } else {
+    const domesticReason = thrownOf({ mode: 'managed', endpoint: `https://${domestic}/v1` });
+    if (domesticReason !== null) {
+      fail(
+        `托管档接**境内白名单**端点（${domestic}）仍然被拒，理由 ${JSON.stringify(domesticReason)}。\n` +
+          `     ADR-0054 已把保留策略定案，这一档**应该能启用** —— 门又被焊回去了。`,
+      );
+    }
+    const foreignReason = thrownOf({ mode: 'managed', endpoint: 'https://api.openai.com/v1' });
+    if (foreignReason !== 'managed-endpoint-not-domestic') {
+      fail(
+        `托管档接**境外**端点（api.openai.com）的理由是 ${JSON.stringify(foreignReason)}，\n` +
+          `     不是 \`managed-endpoint-not-domestic\`。红线是"托管只能接境内的模型供应商"，\n` +
+          `     这条臂就是它的运行时证据 —— 它不响，那条红线就只剩一句注释。`,
+      );
+    }
+    notes.push(`托管档两道门在运行时成立（境内 ${domestic} 可启用；境外以 not-domestic 被拒）。`);
   }
 
   // 8c. 托管 AI 不得被描述成端到端加密（ADR-0006 的基石）
@@ -540,14 +639,7 @@ if (!exists(AI_DIST)) {
   // ⚠️ 也不按中文子串匹配。每个语言在 `E2EE_COPY_RULES` 里登记它**怎么说**
   // 「端到端加密」和**怎么标记否定**，没登记就红 —— 那是故意的：加一门语言
   // 必须为这句话做一次真判断，而不是让它悄悄继承"看起来有否定"。
-  const catalogs = await loadCatalogs();
-  const catalogLocales = Object.keys(catalogs).sort();
-  if (catalogLocales.length === 0) {
-    fail(
-      '`packages/i18n` 的 `CATALOGS` 是**空的** —— 8c 无从判定。\n' +
-        '     这不是"没有违规"，这是探针够不着。检查 `packages/i18n/dist` 的导出形状是否变了。',
-    );
-  }
+  // ⚠️ `catalogs` / `catalogLocales` 在 8a-bis 之前就已加载并做过空表守卫，这里复用。
   const e2eeChecked = [];
   for (const locale of catalogLocales) {
     const rules = E2EE_COPY_RULES[locale];
@@ -591,6 +683,168 @@ if (!exists(AI_DIST)) {
     notes.push(
       `出境披露的否定话术在 ${e2eeChecked.length} 份词条表（${e2eeChecked.join(', ')}）里都在（ADR-0006）。`,
     );
+  }
+
+  // ── 8d. 托管白名单：「境内」必须是**一张表 + 一条对账**，不是形容词 ──────────
+  //
+  // 为什么要**在门禁里**再核一遍，而不是只靠 `packages/ai` 的单测：
+  // 单测跑的是 `src/`，而这个洞的真正形状是**产物**的行为（AGENTS §7 第 27 条那一族：
+  // "改了源码、产物还是旧的"）。同时表的内容是**对外承诺**——托管档卖出去之后，
+  // "接的是哪一家、凭什么说它在境内"是会被追问的，所以每一项都必须带可核对的出处。
+  const hosts = ai.MANAGED_MODEL_HOSTS;
+  if (!Array.isArray(hosts) || hosts.length === 0) {
+    fail(
+      '`MANAGED_MODEL_HOSTS` 不是非空数组 —— 托管档的境内白名单**没有事实源**了。\n' +
+        '     空表不等于"更安全"：那意味着这条规则不再约束任何人，而界面上那句话还在。',
+    );
+  } else {
+    const problems8d = [];
+    const seen = new Set();
+    for (const entry of hosts) {
+      const host = typeof entry?.host === 'string' ? entry.host : '';
+      if (host === '') problems8d.push('有条目的 `host` 不是非空字符串。');
+      if (seen.has(host)) problems8d.push(`\`${host}\` 重复登记（两行指向同一家 = 出处可以互相顶包）。`);
+      seen.add(host);
+      if (host !== host.toLowerCase() || /[:\/[\]]/.test(host)) {
+        problems8d.push(
+          `\`${host}\` 不是规范化主机名（必须小写、不含协议/端口/路径/方括号）。\n` +
+            '     匹配是**逐字相等**，所以一个带端口的行永远匹配不上任何真实端点。',
+        );
+      }
+      if (entry?.jurisdiction !== 'cn') {
+        problems8d.push(
+          `\`${host}\` 的所在地登记为 \`${String(entry?.jurisdiction)}\`，而托管路径只接受境内（ADR-0053 §3.3）。`,
+        );
+      }
+      const evidence = typeof entry?.evidence === 'string' ? entry.evidence : '';
+      if (evidence.length <= 20 || !/ADR-\d{4}|docs\/|https?:\/\//.test(evidence)) {
+        problems8d.push(
+          `\`${host}\` 的「境内」没有**可核对的出处**（要指向一份 ADR、一份仓库文档或一个 URL）。\n` +
+            `     实际写的是：${JSON.stringify(evidence)} —— 形容词不是判据。`,
+        );
+      }
+      if (ai.isDomesticManagedEndpoint(`https://${host}/v1`) !== true) {
+        problems8d.push(
+          `\`${host}\` 在白名单上，但 \`isDomesticManagedEndpoint()\` 认不出它 ——\n` +
+            '     这条目是**装饰**：写了也放不了行，读代码的人会以为托管接了这家。',
+        );
+      }
+    }
+    // 🔴 阳性对照（§7 元规则 2）：**所在地那把尺子必须证明自己会咬人**。
+    // 生产表里全是 'cn'，所以光跑真表证明不了 `jurisdiction !== 'cn'` 那一支还活着。
+    // 表是入参（`managedEndpointVerdictAgainst`），于是这里能拿一张合成表去打它。
+    const syntheticForeign = [
+      {
+        host: 'api.foreign.example',
+        provider: '门禁合成条目，只为证明这条判据活着',
+        jurisdiction: 'foreign',
+        evidence: '本行只存在于这段门禁里，用来证明"在表上"与"在境内"是两把尺子。',
+      },
+    ];
+    if (ai.managedEndpointVerdictAgainst('https://api.foreign.example/v1', syntheticForeign).ok !== false) {
+      fail(
+        '`managedEndpointVerdictAgainst()` 对一张**含境外条目**的表放行了。\n' +
+          '     那条规则是"托管只能接境内"，不是"只能在表上" —— 后者挡不住把境外供应商加进表里那次提交。',
+      );
+    }
+    if (problems8d.length > 0) {
+      fail(`托管白名单（ADR-0053 §3.3）有 ${String(problems8d.length)} 处不成形：\n     ` + problems8d.join('\n     '));
+    } else {
+      notes.push(
+        `托管白名单 ${String(hosts.length)} 行，逐行境内 + 带出处 + 真的匹配得上；含境外条目的合成表被拒（ADR-0053）。`,
+      );
+    }
+  }
+
+  // ── 8e. 托管的目的地**必须从端点推导**（旧形状那个"不看端点"的洞）──────────
+  const heytaCloudFrom = (endpoint) =>
+    ai.classifyDestination(endpoint === undefined ? { mode: 'managed' } : { mode: 'managed', endpoint });
+  const mustNotClaimHeytaCloud = [
+    undefined,
+    '',
+    'https://api.openai.com/v1',
+    'not a url',
+    ...(Array.isArray(hosts) && hosts.length > 0
+      ? [`http://${String(hosts[0]?.host)}/v1`, `https://${String(hosts[0]?.host)}.evil.cn/v1`]
+      : []),
+  ];
+  const lying = mustNotClaimHeytaCloud.filter((e) => heytaCloudFrom(e) === 'heyta-cloud');
+  if (lying.length > 0) {
+    fail(
+      `这些托管配置被推导成了 \`heyta-cloud\`，而它们的端点不合格：${lying.map((e) => JSON.stringify(e)).join('、')}\n` +
+        '     `heyta-cloud` 这个值**本身就是一句陈述**："明文到了 heyta 的服务器上"。\n' +
+        '     旧实现无条件返回它（不看端点），于是"接了一家境外 API 但 mode 写着 managed"\n' +
+        '     在界面上仍然显示"到了我们自己的云" —— ADR-0053 §3.3 堵的就是这个洞。',
+    );
+  } else {
+    // 🔴 反向也要核：合格端点必须**确实**推出 heyta-cloud，否则这条门禁只是"什么都拒"。
+    const ok = Array.isArray(hosts) && hosts.length > 0 ? heytaCloudFrom(`https://${String(hosts[0]?.host)}/v1`) : '（无白名单）';
+    if (ok !== 'heyta-cloud') {
+      fail(
+        '`classifyDestination` 连**合格**的托管端点都推不出 `heyta-cloud` —— 上面那条"不许谎报"就失去了意义。\n' +
+          `     实际值：${String(ok)}。这条判据的两半都要成立。`,
+      );
+    } else {
+      const stillConsent = mustNotClaimHeytaCloud.every(
+        (e) => ai.requiresEgressConsent(heytaCloudFrom(e)) === true,
+      );
+      if (!stillConsent) {
+        fail(
+          '有一种托管配置**既推不出 heyta-cloud、又不需要出境授权** —— 那是把"洞堵上了、门也拆了"。\n' +
+            '     被拒的端点必须落到仍然要授权的那一档。',
+        );
+      } else {
+        notes.push('托管目的地从端点推导：不合格端点拿不到 `heyta-cloud`，且照旧一律要授权（ADR-0053 §3.3）。');
+      }
+    }
+  }
+
+  // ── 8f. 地址类别补进模型，但**免授权面一格都没扩**（ADR-0053 §3.2）──────────
+  const addressCases = [
+    ['http://localhost:11434/v1', true],
+    ['http://127.0.0.1:1234/v1', true],
+    ['http://[::1]:11434/v1', true],
+    ['http://169.254.1.1/v1', false],
+    ['http://[fe80::1]/v1', false],
+    ['http://192.168.1.20:11434/v1', false],
+    ['http://100.64.0.1/v1', false],
+    ['http://[fd00::1]/v1', false],
+    ['http://nas.local/v1', false],
+    ['http://my-nas.lan:11434/v1', false],
+    ['http://a.localhost/v1', false],
+    ['http://[::ffff:127.0.0.1]/v1', false],
+    ['https://api.openai.com/v1', false],
+  ];
+  const misjudged = addressCases.filter(
+    ([endpoint, loopback]) => ai.isLoopbackEndpoint(endpoint) !== loopback,
+  );
+  if (misjudged.length > 0) {
+    fail(
+      `回环判定的结果与 ADR-0053 §3.2 的"只紧不松"对不上：${misjudged.map(([e]) => JSON.stringify(e)).join('、')}\n` +
+        '     免授权的一格只能留在字面量回环里；链路本地、私网、局域网命名形态**照旧要授权**。',
+    );
+  } else {
+    const unknownIsStrict = ['https://api.openai.com/v1', 'http://nas.local/v1', 'not a url'].every(
+      (e) => {
+        const c = ai.classifyEndpointAddress(e);
+        return c.known === false && c.category === 'unknown' && typeof c.reason === 'string';
+      },
+    );
+    if (!unknownIsStrict) {
+      fail(
+        '`classifyEndpointAddress()` 对域名/局域网名字/坏写法不再返回 `known:false + category:"unknown"`。\n' +
+          '     那一批必须落在"未定性 ⇒ 按最严的一档"，这是这一轮承诺的另一半。',
+      );
+    } else {
+      const localOnly = ai.classifyDestination({ mode: 'own', endpoint: 'http://192.168.1.20:11434/v1' });
+      if (localOnly !== 'user-endpoint') {
+        fail(
+          `局域网私网端点的目的地变成了 \`${String(localOnly)}\` —— 私网**不**免出境授权（ADR-0053 §3.2）。`,
+        );
+      } else {
+        notes.push('地址类别已进模型（回环/链路本地/私网/公网/未定性），而免授权面一格都没扩（ADR-0053）。');
+      }
+    }
   }
 }
 
@@ -828,15 +1082,11 @@ console.log(`AI 功能覆盖门禁 —— 由 \`AiFeature\` 联合类型驱动`)
 console.log(`  联合类型成员：${aiFeatures.join(', ')}`);
 console.log(`  界面不可达豁免：${NO_UI_ENTRY.size === 0 ? '（无）' : [...NO_UI_ENTRY].join(', ')}`);
 // 🔴 逐端打印覆盖，不能只报一句"全部可达"：那句在只扫 web 的时候本身就是谎。
-console.log(`  界面端覆盖：web ${aiFeatures.length}/${aiFeatures.length}（两级核对）`);
 for (const cov of endCoverage) {
-  if (cov.wired === null) {
-    console.log(`  界面端覆盖：${cov.end} —— 该端的 src 目录还不存在（壳未建），不计入覆盖`);
-  } else if (cov.wired === 0) {
-    console.log(`  界面端覆盖：${cov.end} ${cov.wired}/${cov.total}（**显式登记的缺口**：${cov.gap}）`);
-  } else {
-    console.log(`  界面端覆盖：${cov.end} ${cov.wired}/${cov.total}`);
-  }
+  console.log(
+    `  界面端覆盖：${cov.end} ${String(cov.reached)}/${String(cov.total)}` +
+      `（两级：调用点 + 那个界面文件自己被渲染）`,
+  );
 }
 console.log('');
 
@@ -857,14 +1107,9 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-const gapSum = endCoverage
-  .filter((c) => c.wired === 0 || c.wired === null)
-  .map((c) => `${c.end} ${c.wired === null ? '（壳未建）' : `${c.wired}/${c.total}`}`)
-  .join('、');
+const coveredEnds = endCoverage.map((c) => `${c.end} ${String(c.reached)}/${String(c.total)}`).join('、');
 console.log(
-  `✅ ${aiFeatures.length} 个 AI 功能在 **web** 端到端可达（实现 → 导出 → 路由声明 → 偏好声明 → 界面` +
-    (gapSum === '' ? '' : `），另有显式登记的缺口端：${gapSum}`) +
-    `。`,
+  `✅ ${String(aiFeatures.length)} 个 AI 功能在**每一端**端到端可达` +
+    `（实现 → 导出 → 路由声明 → 偏好声明 → 界面调用点 → 界面被渲染）：${coveredEnds}。`,
 );
-console.log('   ⚠️ 那句"缺口端"不是已通过 —— 它的意思是"这一端一条都没接，所以没有半接的谎"。');
 process.exit(0);

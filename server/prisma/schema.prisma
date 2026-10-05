@@ -107,6 +107,7 @@ model User {
   notifications               AccountNotification[]
   consents                    UserConsent[]
   avatar                      UserAvatar?
+  aiUsageCounters             AiUsageCounter[]
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
@@ -1257,4 +1258,68 @@ model HolidayAdjustmentDay {
 
   @@index([year])
   @@map("holiday_adjustment_days")
+}
+
+/// 托管 AI 的**用量计数器**：一行 = 一个账号在一个计费周期里用掉了几次。
+///
+/// 依据：[ADR-0054](../../../docs/adr/0054-managed-ai-retention-and-selling-preconditions.md) §2
+///（保留裁决）与 [ADR-0023](../../../docs/adr/0023-managed-ai-quota-not-implemented.md) §5 第 3 条。
+/// 写入与裁决在 `server/src/ai/metering.ts`，库层证据在
+/// `server/tests/ai-metering.pglite.spec.ts`。
+///
+/// ## 🔴 这张表的**列集合本身**就是对外承诺
+///
+/// 只有下面四列。**没有 `prompt`、没有 `completion`、没有 `payload`、
+/// 也没有一个 `Json` 兜底列** —— 这不是"以后再加"，是**故意装不下**：
+/// 一张带 `payload Json` 的表会在某次"顺手存一下便于排障"之后变成事实上的内容仓库，
+/// 而那时《AI 服务条款》§5.3 与隐私政策里"服务端不保留内容"那几句全都成了假话，
+/// 且**没有任何一层会报错**。判据断言列集合**等于**这四个（多一列就红），
+/// 不断言"没有内容列" —— 黑名单永远漏掉下一个想加的名字。
+///
+/// ## 为什么 `periodAnchor` 是计费周期边界，不是自然月
+///
+/// 一次付款买 **30 天**（`packages/domain` 的 `SUBSCRIPTION_PERIOD_DAYS`），起点是支付
+/// 成功那一刻，**不是每月 1 号**。锚点取 `subscriptions.current_period_end`：
+/// 取自然月会让 9 月 20 日付的钱在 10 月 1 日**清零重来**（一次付款拿两轮 300）；
+/// 服务端自己拿墙上时钟 +30 天则与库里已有的权威边界**各说各话**。
+/// 跨边界自然落到**另一行**，新的一轮从 0 开始 —— 这条由 pglite 那条锚点算术钉住。
+///
+/// ## 为什么 `requests` 是普通整数，而不是 `Json`
+///
+/// 裁决要在**一条语句**里读、比、+1（`… WHERE requests < N RETURNING requests`），
+/// 那依赖 `INTEGER` 上的算术与比较；`Json` 给不了原子 +1，也给不了
+/// `CHECK (requests >= 0)`，于是"负数一行就多一次额度"这类残留只能靠人记得。
+/// 一旦开了 `Json`，下一个人塞进来的第一个键就会是 `prompt`。
+model AiUsageCounter {
+  /// 归属账号。**级联删除**是保留承诺的一半（ADR-0054 §2「计数随账号级联删除」）：
+  /// 少了它，删掉的账号会留下一堆指向不存在的 `user_id` 的计数行 —— 任何界面读不到、
+  /// 任何清理任务不知道该删谁，"删账号即删"就只在文档里成立。
+  userId Int  @map("user_id")
+
+  /// 这一行属于**哪一个计费周期** = 该周期结束时刻（epoch 毫秒），
+  /// 出处是 `subscriptions.current_period_end`（唯一权威边界，不做墙上时钟推算）。
+  ///
+  /// 🔴 它与 `userId` 合起来是唯一键，这有两件事一起做成了：
+  /// 1. 「新周期从 0 开始」= 换锚 = 换一行，不需要任何"清零"写入，也没有清零窗口；
+  /// 2. 同一账号同一周期的并发 +1 撞在同一行上 ⇒ 被行锁串行化（裁决的原子性靠它）。
+  /// 第二件事是 `metering.ts` 那条 `WHERE requests < N` **能守住并发**的前提。
+  periodAnchor BigInt @map("period_anchor")
+
+  /// 本周期已用次数。`>= 0` 钉在库里（迁移里的 `ai_usage_counters_requests_non_negative`）：
+  /// 应用路径只做 +1，但这张表还有运维脚本与未来的重置迁移**不是应用路径**的写入口。
+  requests Int @default(0)
+
+  /// 最后一次 +1 的时刻（epoch 毫秒）。它是**元数据**不是内容，
+  /// 用来回答"这一期额度是什么时候用掉的"，不参与任何裁决。
+  ///
+  /// 🔴 别把 ADR-0054 §4 那份"时间 / 功能名 / 结果状态 / 字节数 / 耗时"读成这张表 ——
+  /// 那份清单说的是**每次调用一行的运维审计日志**（`recordManagedAiAttempt`），
+  /// 上限是日志容量而不是天数。这张表只有上面这四列，多一列 `ai-metering.pglite` 就红。
+  /// 两者的区别记在 ADR-0054 §4.1（2026-10-05 落地更正）。
+  updatedAt BigInt @default(0) @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodAnchor])
+  @@map("ai_usage_counters")
 }

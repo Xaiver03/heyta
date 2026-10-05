@@ -274,6 +274,13 @@ const zh = [
             '🔴 **服务器密文**（用它自己的 Argon2id + AES-GCM 口令加密后整块存二进制，我们解不开）。服务器上另存该密文的 SHA-256，只用于跨设备判断"换过没有"；原图不存磁盘、不进对象存储。两条边界：① 它需要**已设置 E2EE 口令**才能上传与读回；② 密文相同即哈希相同，严格说这一点泄露"同一张图重复上传过"',
             '非必要',
           ],
+          [
+            '托管 AI 用量计数（一个计费周期里用了几次）',
+            '额度计量与账单对账：回答「这一期用掉了几次、上限到点没有」。🔴 **只有次数**：这张表按设计只有账号、计费周期锚点、次数、更新时间四列，提示词与模型输出都不落库，连一个能装内容的兜底列都没有 —— 所以「服务端不保留 AI 内容」这句话的证据是它的**列集合**，而有一条判据钉着"多一列就红"。（这张表随 ADR-0054 落进服务端的库结构；托管那一档按 ADR-0054 §6 的顺序被开放之后，它才开始累计。）',
+            '托管那一档被开放之后，由服务端在代理调用的裁决语句里自己 +1；🔴 客户端自报的计数一律不采信',
+            '服务器明文（一个整数）。随账号注销按外键级联删除；周期边界取自订阅的到期时刻，跨期换到新的一行、从 0 起算',
+            '使用该功能时必需 —— 它是「到点即停」唯一能被服务端证明的形式',
+          ],
         ],
       },
       {
@@ -524,9 +531,9 @@ const zh = [
             '随备份保留期自然过期。⚠️ 备份是整库快照，**代码里没有「从既有备份中定点删除某一位用户的数据」的能力**',
           ],
           [
-            '账户、凭据、订阅、订单、邀请与通知记录',
+            '账户、凭据、订阅、订单、邀请、通知与托管 AI 用量计数记录',
             '直到你**注销账号**',
-            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站。🔴 这一行删的是服务端那一份；本机那一层：你点下注销的设备当场清掉本地明文库，其它设备在下次同步拿到“账号已注销”信号时各自清掉自己那一份 —— 从此不再上线的设备我们无法远程擦除',
+            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知、托管 AI 用量计数一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站。🔴 这一行删的是服务端那一份；本机那一层：你点下注销的设备当场清掉本地明文库，其它设备在下次同步拿到“账号已注销”信号时各自清掉自己那一份 —— 从此不再上线的设备我们无法远程擦除',
           ],
           [
             '一次性令牌',
@@ -539,6 +546,11 @@ const zh = [
             '应用内删除是**打标记**（墓碑），彻底删除也只是加一个标记而不清历史——本地明文数据不会在磁盘上被物理擦除。物理清除依赖卸载应用或清除浏览器站点数据',
           ],
           [
+            '托管 AI **那一次调用的内容**，与它的**运维元数据**',
+            '内容：🔴 **不落盘** —— 请求体与返回体只在一次代理调用的内存里存在，调用返回即丢弃，不写日志、不进 trace、不进崩溃上报。元数据：保留期**定为 45 天**，字段是一份封闭清单（时间、用户、功能名、结果状态、请求与响应的字节数、耗时），推导是一个计费周期 30 天加 15 天出账缓冲 —— ⚠️ 不是因为某部法律要求这个数',
+            '内容那一半没有"到期怎么处理"这一步，因为它从来没被写过盘。🔴 元数据那一半要如实补一句：**到期删除的作业本轮没有实现** —— 这些字段走的是下面"服务器运行日志"那一条通道，而那条通道没有轮转与到期删除机制。所以这一格只写期限、**不写**"到期自动删除"；那条作业落地并真的对这些字段生效之后才改口。托管那一档今天仍然打不开，这一格按 ADR-0054 提前把定案写进来，等 §6 的顺序走完它才开始真的累计',
+          ],
+          [
             '服务器运行日志',
             '见下面那段说明',
             '应用侧不记录 HTTP 访问日志；运行日志走标准输出，是否另写磁盘文件由部署配置决定，**代码里没有轮转与到期删除机制**',
@@ -547,7 +559,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '两句要一起写、否则这段会被读成承诺：**45 天是产品当前设定，不是你可以自选的选项**，界面上没有「更短保留期」的开关，改它要发版本。而「你在应用里点了彻底删除」**不会缩短**这个期限——它让这条数据从你的所有设备界面里消失。🔴 还要如实补第三句：按当前版本，服务器上那条加密历史**等不到「保留期届满」**——每日清扫对我们的数据一条都不命中（见上表那一行），它真的不在，目前只有注销账号这一条路。另有一条边界要如实登记：主机与网络层（如前置代理）的访问日志留存由部署环境决定，法定底线是网络日志留存不少于六个月；官方实例当前配置的具体留存期需运营在发布前确认。',
+        text: '三句要一起写、否则这段会被读成承诺：**45 天是产品当前设定，不是你可以自选的选项**，界面上没有「更短保留期」的开关，改它要发版本。而「你在应用里点了彻底删除」**不会缩短**这个期限——它让这条数据从你的所有设备界面里消失。🔴 还要如实补第三句：按当前版本，服务器上那条加密历史**等不到「保留期届满」**——每日清扫对我们的数据一条都不命中（见上表那一行），它真的不在，目前只有注销账号这一条路。⚠️ 第四句别把两个数并成一件事：上表里现在写着**两个 45 天**，一个是同步流水的清理窗口（就是上面这三句说的那一个），另一个是托管 AI 调用元数据的期限；它们同值而不是同一个东西 —— 后者的到期删除连作业都还没有。另有一条边界要如实登记：主机与网络层（如前置代理）的访问日志留存由部署环境决定，法定底线是网络日志留存不少于六个月；官方实例当前配置的具体留存期需运营在发布前确认。',
       },
     ],
   },
@@ -876,6 +888,13 @@ const en = [
             '🔴 **Ciphertext on the server** — encrypted with your own Argon2id + AES-GCM passphrase and stored as one indivisible binary blob we cannot open. The server also stores the SHA-256 of that ciphertext, used only to tell across devices whether it changed. The original file is never written to disk or to object storage. Two boundaries: ① uploading and reading it back require an **E2EE passphrase to be set**; ② identical ciphertext yields an identical hash, so strictly speaking that leaks "the same image was uploaded twice"',
             'Not necessary',
           ],
+          [
+            'Managed-AI usage counters (how many calls in one billing period)',
+            'Allowance metering and bill reconciliation: they answer "how many did I use this period, has the cap been reached". 🔴 **A count only** — the table has exactly four columns by design (account, billing-period anchor, request count, last updated). There is no prompt column, no model-output column and no catch-all column able to hold content, so the evidence for "the server keeps no AI content" is its **column set**, and a check pins it as "add a column and it fails red". (The table landed in the server schema together with ADR-0054; it starts accumulating once the managed tier is enabled in the order that decision sets out.)',
+            'Once the managed tier is enabled, incremented by our own server inside the deciding statement of the proxied call; 🔴 a count reported by a client is never trusted',
+            'Cleartext on the server (a single integer). Deleted by the account foreign-key cascade when you close the account; the period boundary comes from the subscription’s expiry moment, and crossing it moves you onto a new row starting from zero',
+            'Required to use that feature — it is the only form in which "it stops when the cap is reached" can be proven server-side',
+          ],
         ],
       },
       {
@@ -1126,9 +1145,9 @@ const en = [
             'Age out with the backup retention window. ⚠️ Backups are whole-database snapshots, and **there is no capability in the code to delete one user\'s data from an existing backup**',
           ],
           [
-            'Accounts, credentials, subscriptions, orders, referrals and notifications',
+            'Accounts, credentials, subscriptions, orders, referrals, notifications and managed-AI usage counters',
             'Until you **close your account**',
-            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals and notifications all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin. 🔴 What this removes is the server copy; for the local plaintext data, the device you press closure on is wiped on the spot and every other device wipes its own readable copy the next time it syncs and receives the "account closed" signal — a device that never comes back online is one we cannot wipe remotely',
+            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals, notifications and managed-AI usage counters all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin. 🔴 What this removes is the server copy; for the local plaintext data, the device you press closure on is wiped on the spot and every other device wipes its own readable copy the next time it syncs and receives the "account closed" signal — a device that never comes back online is one we cannot wipe remotely',
           ],
           [
             'One-time tokens',
@@ -1141,6 +1160,11 @@ const en = [
             'Deleting inside the app **writes a marker** (a tombstone); "delete forever" adds another marker without erasing history — local cleartext is not physically wiped from disk. Physical removal means uninstalling or clearing site data',
           ],
           [
+            'The content of **one managed-AI call**, and its **operational metadata**',
+            'Content: 🔴 **never persisted** — the request body and the response body exist only in the memory of one proxied call and are dropped when it returns; not written to logs, not put in a trace, not sent to crash reporting. Metadata: the retention period is **set at 45 days** over a closed field list (time, user, feature name, outcome, request and response byte counts, duration), derived as one 30-day billing period plus a 15-day reconciliation buffer — ⚠️ not because any law asks for that number',
+            'The content half has no "what happens at expiry" step, because it was never written to disk. 🔴 The metadata half has to be stated with its gap: **the delete-at-expiry job is not implemented in this round** — those fields travel over the same channel as "Server runtime logs" below, and that channel has neither rotation nor an expiry mechanism. So this cell gives a period and does **not** say "deleted automatically when it ends"; it is rewritten once that job exists and really applies to these fields. The managed tier is still not switchable on today: this row records the ruling from ADR-0054 in advance, and it starts accumulating only once the order in §6 of that decision is completed',
+          ],
+          [
             'Server runtime logs',
             'See the paragraph below',
             'The application records no HTTP access logs; runtime logs go to standard output, and whether they are also written to a disk file depends on deployment configuration. **There is no rotation or expiry mechanism in the code**',
@@ -1149,7 +1173,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'Two sentences that must travel together with that table, or it reads like a promise: **45 days is the product\'s current setting, not an option you can choose**, there is no shorter-retention switch in the interface, and changing it takes a release. And pressing "delete forever" in the app **does not shorten it** — the item disappears from every one of your screens. 🔴 A third sentence has to be added, also honestly: under the current version that encrypted history **never reaches "the retention window expiring"** — the daily sweep does not match our data at all (see that row above), so the one route by which it really stops existing is closing the account. One more boundary, registered honestly: access-log retention at the host and network layer (for example a fronting proxy) is decided by the deployment environment, and the statutory floor is that network logs are kept for no less than six months; the retention actually configured for the official instance needs to be confirmed by operations before this document is published.',
+        text: 'Three sentences that must travel together with that table, or it reads like a promise: **45 days is the product\'s current setting, not an option you can choose**, there is no shorter-retention switch in the interface, and changing it takes a release. And pressing "delete forever" in the app **does not shorten it** — the item disappears from every one of your screens. 🔴 A third sentence has to be added, also honestly: under the current version that encrypted history **never reaches "the retention window expiring"** — the daily sweep does not match our data at all (see that row above), so the one route by which it really stops existing is closing the account. ⚠️ A fourth sentence keeps two numbers from being read as one thing: the table now carries **two 45-day periods**, one being the window for the sync stream (what the three sentences above are about) and the other the period set for managed-AI call metadata — the same value, but not the same knob, and for the second one the delete-at-expiry job is not implemented in this round. One more boundary, registered honestly: access-log retention at the host and network layer (for example a fronting proxy) is decided by the deployment environment, and the statutory floor is that network logs are kept for no less than six months; the retention actually configured for the official instance needs to be confirmed by operations before this document is published.',
       },
     ],
   },
@@ -1234,9 +1258,13 @@ const en = [
 
 export const personalInfoList: LegalDocument = {
   id: 'personal-info-list',
-  version: '1.2',
+  // 🔴 1.3 → 1.4：保留期限那张表新增两格**对外承诺**（托管 AI 一次调用的内容不落盘、
+  // 运维元数据的期限定为 45 天且到期删除尚未实现），并把那段"45 天不是可选项"的说明
+  // 补成"表里有两个同值的 45 天，不是同一个旋钮"。版本号进同意指纹（`legalSetVersion()`），
+  // 改了期限表述而不 bump = 让旧那枚同意覆盖一段它没见过的话。
+  version: '1.4',
   status: 'draft',
-  updatedDate: '2026-10-04',
+  updatedDate: '2026-10-05',
   title: {
     'zh-CN': '个人信息收集清单',
     en: 'Personal Information Collection Inventory',

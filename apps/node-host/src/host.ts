@@ -39,6 +39,7 @@
  */
 
 import {
+  createAssistantSessionActions,
   createHabitActions,
   createNoteActions,
   createProjectActions,
@@ -46,6 +47,7 @@ import {
   exportDocumentFromHost,
   materializedState,
   openAppHost,
+  type NewAssistantTurn,
   type RestoreDocument,
   restoreIntoEmptyTarget,
   type AppHost,
@@ -53,7 +55,7 @@ import {
   type NewTaskFields,
   type RestoreExportResult,
 } from '@heyta/app-host';
-import type { Note, Project, Tag, Task, TrashItem } from '@heyta/domain';
+import type { AssistantTurn, Note, Project, Tag, Task, TrashItem } from '@heyta/domain';
 import { toTrashItems } from '@heyta/domain';
 import type { OpIntent } from '@heyta/op-log';
 import type { EntityType } from '@heyta/shared-schema';
@@ -159,6 +161,7 @@ export interface NodeHost {
   listTags(): Tag[];
 
   /**
+<<<<<<< HEAD
    * 便签的无头写入口（建 / 软删除）。
    *
    * 🔴 存在的理由不是"CLI 想多两个命令"：回收站的判据要**四类各有一条本机新建又删除的行**
@@ -172,6 +175,39 @@ export interface NodeHost {
   removeProject(entityId: string): Promise<void>;
   createHabit(name: string): Promise<string>;
   removeHabit(entityId: string): Promise<void>;
+=======
+   * 助手会话的一条消息（ADR-0045 D-4 (ii)）。
+   *
+   * 🔴 这个壳是它**当前唯一的调用方**，而存在的理由不是"顺手给 CLI 加个命令"：
+   * 会话历史跨设备这件事，判据必须是"**另一台真设备读得到**"，
+   * 单测里的两台 `:memory:` 引擎证明不了真 SQLite 落盘 + 真 HTTP 上行这条链
+   * （AGENTS §8 第 7 条：基础函数、单包测试不能代替功能闭环）。
+   * 而 web 面板此刻正被并行会话重写（`AssistantPanel.tsx` / `aiStore.ts` /
+   * `ai-assistant.ts`），所以生产 UI 的接线是**已登记的另一格**，不是这一格。
+   *
+   * ⚠️ 本壳**不判断任何产品语义**：`appendAssistantTurn` 逐参数透传给
+   * `@heyta/app-host` 的动作层，可确认性/过期/排序全在 `@heyta/domain`
+   * （AGENTS §3.5 那条线）。
+   */
+  newAssistantSessionId(): string;
+  appendAssistantTurn(input: NewAssistantTurn): Promise<string>;
+  /** 这一段会话的消息（未删除、展示顺序）。省略 sessionId = 全部会话。 */
+  listAssistantTurns(sessionId?: string): AssistantTurn[];
+  /** 这一条在**本设备**上算不算过期（跨设备的未确认提案 → `true`）。 */
+  assistantTurnExpiredHere(turn: AssistantTurn): boolean;
+  /**
+   * 记录一条提案的处置（一次点击 = **一条** UPD op）。
+   *
+   * 🔴 这条通道存在的理由是**让"跨设备不可确认"变成一个可观察的失败**：
+   * 只测读侧 `expired=yes` 的话，写侧闸门坏掉（判定被挪进界面）时
+   * 这个壳上没有任何一条命令会报错 —— 于是"另一台设备确认了一条它没参与生成的
+   * 写提案"这件事在真设备上**没人看得见**。有了这条命令，B 上执行它必须非零退出。
+   * 拒绝本体在 `@heyta/app-host` 的 `setDisposition()`，本壳只递参数。
+   */
+  setAssistantDisposition(entityId: string, disposition: 'confirmed' | 'rejected'): Promise<void>;
+  /** 清除一段会话：**一条** DEL op（批量域）。返回被标记的条数。 */
+  clearAssistantSession(sessionId: string): Promise<number>;
+>>>>>>> merge/20261005
 
   /** **唯一写入入口**（AGENTS.md §3.4）。 */
   dispatch(intent: OpIntent): Promise<void>;
@@ -247,6 +283,10 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
   const projectActions = createProjectActions(app);
   const noteActions = createNoteActions(app);
   const habitActions = createHabitActions(app);
+  // 🔴 本设备 id 由 `openAppHost` 持久化决定（跨重启同一个），这里只是把它递给动作层。
+  // 递错了或留空，"跨设备的未确认提案不可确认"那条判据就会整个失效 ——
+  // 所以 `createAssistantSessionActions` 对空值**直接抛**而不是回退。
+  const assistantActions = createAssistantSessionActions(app, { clientId: app.clientId });
 
   return {
     dbPath: app.dbPath,
@@ -271,6 +311,7 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     listProjects: () => projectActions.listProjects(),
     listTags: () => projectActions.listTags(),
 
+<<<<<<< HEAD
     createNote: (content) => noteActions.createNote(content),
     removeNote: (entityId) => noteActions.removeNote(entityId),
     createProject: (name, parentId) =>
@@ -280,6 +321,18 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     removeProject: (entityId) => projectActions.removeProject(entityId),
     createHabit: (name) => habitActions.createHabit(name),
     removeHabit: (entityId) => habitActions.removeHabit(entityId),
+=======
+    newAssistantSessionId: () => assistantActions.newSessionId(),
+    appendAssistantTurn: (input) => assistantActions.appendTurn(input),
+    listAssistantTurns: (sessionId) =>
+      sessionId === undefined
+        ? assistantActions.allTurns()
+        : assistantActions.turnsOf(sessionId),
+    assistantTurnExpiredHere: (turn) => assistantActions.isExpiredHere(turn),
+    setAssistantDisposition: (entityId, disposition) =>
+      assistantActions.setDisposition(entityId, disposition),
+    clearAssistantSession: (sessionId) => assistantActions.clearSession(sessionId),
+>>>>>>> merge/20261005
 
     dispatch: (intent) => app.dispatch(intent),
     sync: async () => {

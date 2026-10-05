@@ -959,11 +959,15 @@ describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种
     return { ...base, routing: { ...base.routing, enabled: true } };
   }
 
-  it('🔴🔴 说清托管 AI **会来**（曾经这里写的是"我们不做"）', () => {
+  it('🔴🔴 说清托管 AI **会来、但这一版界面点不动**（曾经写"我们不做"，后写"仍在开发中"）', () => {
     const el = render({ initial: enabled(), secrets: createSessionSecretStore() });
     const note = el.querySelector('[data-testid="managed-ai-note"]');
     expect(note).toBeTruthy();
-    expect(note?.textContent).toContain('即将提供');
+    expect(note?.textContent).toContain('暂不在这里开放');
+    // 🔴 第二条才是这一版的重点：ADR-0054 之后服务端那一半已经落地，
+    //   "仍在开发中"就从"谨慎"变成了**把做完的事说成没做完**的假话。
+    //   这条断言的存在意义是：下一次有人想图省事把理由写回"还在开发"，这里会红。
+    expect(note?.textContent).not.toContain('仍在开发');
   });
 
   it('🔴🔴 明说托管模式**不是端到端加密**（ADR-0006 的核心结论）', () => {

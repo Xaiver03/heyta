@@ -30,14 +30,15 @@
 export type AiCapabilityEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'TASK_REPEAT_CFG' |
-    'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' | 'ALL';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN' |
+    'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' |
+    'ALL';
 
 /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
 export type AiCapabilityModeledEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'ASSISTANT_TURN';
 
 /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
 export type AiCapabilityToolKind = 'read' | 'write';
@@ -128,6 +129,7 @@ export const AI_CAPABILITY_MANIFEST =
     'PREFERENCE_CORRECTION',
     'REMINDER',
     'EVENT',
+    'ASSISTANT_TURN',
   ],
   'excludedFromDenominator': [
     {
@@ -137,6 +139,10 @@ export const AI_CAPABILITY_MANIFEST =
     {
       'entityType': 'PREFERENCE_CORRECTION',
       'reason': '偏好纠正的落库载体（用户不直接创建它）',
+    },
+    {
+      'entityType': 'ASSISTANT_TURN',
+      'reason': '助手对话的一行记录（ADR-0045 D-4 (ii)）：它是**对话本身**，不是用户可操作的业务实体，而且正文里含 provider 的回复 —— 给 AI 读写它的工具等于让模型改写自己的上下文',
     },
   ],
   'entityTypesWithoutTools': [] as const,
@@ -272,6 +278,14 @@ export const AI_CAPABILITY_MANIFEST =
         'create_event',
         'update_event',
       ],
+    },
+    {
+      'entityType': 'ASSISTANT_TURN',
+      'materialized': true,
+      'countsTowardCoverage': false,
+      'coverage': 'none',
+      'readToolNames': [] as const,
+      'writeToolNames': [] as const,
     },
   ],
   'tools': [
@@ -864,6 +878,7 @@ export const AI_CAPABILITY_TEXT = [
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',
   '- AI_FEEDBACK：AI 建议处置的落库载体（用户不直接创建它）',
   '- PREFERENCE_CORRECTION：偏好纠正的落库载体（用户不直接创建它）',
+  '- ASSISTANT_TURN：助手对话的一行记录（ADR-0045 D-4 (ii)）：它是**对话本身**，不是用户可操作的业务实体，而且正文里含 provider 的回复 —— 给 AI 读写它的工具等于让模型改写自己的上下文',
   '',
   '四、同步协议认识、但没有领域模型的实体类型（算"动作"，不算"已物化实体"）',
   '- TASK_REPEAT_CFG：不要把它写成"有个实体没配工具"。',

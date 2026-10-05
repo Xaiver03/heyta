@@ -601,12 +601,26 @@ function groupDisclosure() {
     ),
   );
 
-  // ② 把"未定案"说成"不适用" —— 于是界面可以理直气壮地编一个保留期。
-  expectRed('disclosure', '把"保留策略未定案"归类成"不适用"', () =>
+  // ② 把托管的"只留计数"说成"根本没保留" —— 于是那句对外承诺变成免费的。
+  expectRed('disclosure', '把托管的"只留计数"归类成"不适用"', () =>
     withMutation(
       AI_SUPPLY,
-      "      return { kind: 'undecided' };\n  }\n}",
-      "      return { kind: 'not-applicable' };\n  }\n}",
+      "        kind: 'metadata-only',",
+      "        kind: 'not-applicable',",
+      aiRun,
+    ),
+  );
+
+  // ②b 兼容中文句里的天数与结构化披露**脱钩**（把插值换成写死的 30）。
+  //     界面渲染的是结构化那一份，CLI 与法务对账读的是这句；两处各写一个数
+  //     就是两条对外口径 —— 这条臂证明"这句必须带出那个常量"真的有牙。
+  //     ⚠️ 变异点选在**插值本身**：改句子尾部（多写一句"（30 天）"）不会让
+  //     `toContain(45)` 红，那种臂是装饰，不是判据。
+  expectRed('disclosure', '让兼容句里的保留天数不再来自常量', () =>
+    withMutation(
+      AI_SUPPLY,
+      '自最后一次使用起保留 ${String(metadataDays)} 天，',
+      '自最后一次使用起保留 30 天，',
       aiRun,
     ),
   );

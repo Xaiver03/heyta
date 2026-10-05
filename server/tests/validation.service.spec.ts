@@ -650,6 +650,11 @@ describe('ValidationService', () => {
       // 而这条"精确数量"断言存在的意义就是让每一次新增都必须在这里认领一次 ——
       // W2 落地时只跑了 packages/* 的套件，服务端这一侧没人跑过，所以欠到今天。
       'EVENT',
+      // 助手会话的一条消息（ADR-0045 D-4 (ii)，2026-10-05 落地）。
+      // 🔴 同一条纪律：**服务端必须先于客户端上线** —— 这张白名单派生自
+      // `ENTITY_TYPES`，如果生产环境的库里没有它，带 `ASSISTANT_TURN` 的 op 会被
+      // 判成 `INVALID_ENTITY_TYPE` 永久拒绝（后果是 §7 第 34/41 条那两个 P0 的形状）。
+      'ASSISTANT_TURN',
     ];
 
     it('should include all heyta entity types', () => {

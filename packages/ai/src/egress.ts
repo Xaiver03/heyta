@@ -88,7 +88,7 @@ export interface EgressDisclosure {
    * `destinationText` 是过渡期的兼容字段，等所有壳切过来就删。
    */
   destinationDisclosure: DestinationDisclosure;
-  /** "留多久"的**结构化**结论。`kind: 'undecided'` = 策略未定案，**不许编数字**。 */
+  /** "留多久"的**结构化**结论。三档都有值 —— 托管那一档的两个天数来自 `supply.ts` 的常量。 */
   retentionDisclosure: RetentionDisclosure;
   /**
    * "发给谁"。⚠️ **过渡期的兼容字段**（中文句子），新代码不要用。
@@ -96,10 +96,10 @@ export interface EgressDisclosure {
    */
   destinationText: string;
   /**
-   * "留多久"。`undefined` = 策略未定案（见 `describeRetention`）。
+   * "留多久"（中文句子）。
    * @deprecated 用 `retentionDisclosure` + 词条表。
    */
-  retentionText: string | undefined;
+  retentionText: string;
   /** 是否需要用户授权才能进行。 */
   requiresConsent: boolean;
 }

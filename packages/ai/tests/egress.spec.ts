@@ -11,7 +11,8 @@
  *      否则会出现"我没同意过这个组合，但它放行了"。
  *   3. 🔴 **本地端点免授权** —— 这是"自备"相对"托管"的实质优势。
  *      如果它也要走一遍提示，用户会被训练成"看到提示就点同意"。
- *   4. 🔴 **托管模式当前必须启用失败** —— 保留策略未定案前不许打开。
+ *   4. 🔴 **托管模式没有端点就启用不了**；有端点也必须落在境内白名单上
+ *      （保留策略已由 ADR-0054 定案，2026-10-05 起这一档可以开，但只有这一扇门）。
  *   5. **provider 只产出建议** —— 类型上就没有能变成 op 的东西。
  */
 
@@ -19,6 +20,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   AiConfigError,
+  MANAGED_AI_METADATA_RETENTION_DAYS,
+  MANAGED_MODEL_HOSTS,
   assertEnableable,
   authorizeEgress,
   buildDisclosure,
@@ -68,8 +71,21 @@ describe('classifyDestination —— 目的地由端点推导，不由模式声�
     expect(classifyDestination({ mode: 'off' })).toBe('none');
   });
 
-  it('托管 → heyta-cloud', () => {
-    expect(classifyDestination({ mode: 'managed' })).toBe('heyta-cloud');
+  it('🔴 托管的目的地也从端点推导（ADR-0053 §3.3 堵掉的洞）', () => {
+    // 旧形状是 `mode === 'managed'` ⇒ 无条件 `heyta-cloud`，**不看端点**。
+    // 那等于"把 mode 写对，界面就说数据到了我们服务器上"—— 而声明可以被写错。
+    // 现在 `heyta-cloud` 只能由**境内白名单上的端点**推导出来（白名单表的逐条核对
+    // 在 `managed-allowlist.spec.ts`，这里是那条规则在目的地这一层的落点）。
+    const host = MANAGED_MODEL_HOSTS[0]?.host ?? '';
+    expect(classifyDestination({ mode: 'managed', endpoint: `https://${host}/v1` })).toBe(
+      'heyta-cloud',
+    );
+    // 拿不到合格端点 ⇒ 推不出 heyta-cloud，但**照旧要授权**（没有放宽）。
+    expect(classifyDestination({ mode: 'managed' })).toBe('user-endpoint');
+    expect(classifyDestination({ mode: 'managed', endpoint: 'https://api.openai.com/v1' })).toBe(
+      'user-endpoint',
+    );
+    expect(requiresEgressConsent(classifyDestination({ mode: 'managed' }))).toBe(true);
   });
 
   it('🔴 自备 + 本地端点 → none（明文没出设备）', () => {
@@ -126,11 +142,14 @@ describe('🔴🔴 隐私文案不许出现"端到端加密"', () => {
   });
 
   it('保留声明同样不含加密承诺', () => {
-    for (const d of ['none', 'user-endpoint'] as const) {
+    // 🔴 三档都要查，**包括托管**：那一档的保留句现在是有内容的实句（以前是
+    // `undefined`，所以这条测不到它）。在"留多久"里顺口加一句"我们加密了"
+    // 是这套产品最不能出现的一句话。
+    for (const d of ['none', 'user-endpoint', 'heyta-cloud'] as const) {
       const text = describeRetention(d);
       expect(text).toBeDefined();
       for (const word of [...JARGON, '端到端加密']) {
-        expect(text!).not.toContain(word);
+        expect(text).not.toContain(word);
       }
     }
   });
@@ -148,14 +167,22 @@ describe('🔴🔴 隐私文案不许出现"端到端加密"', () => {
   });
 });
 
-describe('describeRetention —— 不许编造数字', () => {
+describe('describeRetention —— 每一档都要说得出口，且不许含糊', () => {
   it('none 与 user-endpoint 有诚实文案', () => {
     expect(describeRetention('none')).toContain('未离开设备');
     expect(describeRetention('user-endpoint')).toContain('由你自己的端点决定');
   });
 
-  it('🔴 heyta-cloud 返回 undefined（策略未定案，不许编）', () => {
-    expect(describeRetention('heyta-cloud')).toBeUndefined();
+  it('🔴 heyta-cloud 说得出"留什么、留多久、不含什么"', () => {
+    // 这一档以前返回 `undefined`（策略未定案），界面那一行整行消失。
+    // 定案之后判据反过来：**必须**说清三件事，缺任一件都等于没披露。
+    const text = describeRetention('heyta-cloud');
+    expect(text).toContain('正文不留存');
+    expect(text).toContain(String(MANAGED_AI_METADATA_RETENTION_DAYS));
+    expect(text).toContain('不含正文');
+    // ⚠️ 不许写成"到期自动删除"：删除是按"过期 **且** 周期已结束"两个条件做的
+    //   （少半个条件就会把还在生效的那一期的额度清零），说成"到期即删"是另一句假话。
+    expect(text).not.toContain('到期自动删除');
   });
 });
 
@@ -166,16 +193,18 @@ describe('assertEnableable', () => {
     }).not.toThrow();
   });
 
-  it('🔴 托管模式当前**必须**启用失败（保留策略未定案）', () => {
+  it('🔴 托管模式**没配端点**不能启用，原因是配置缺口而不是"还没定案"', () => {
+    // 2026-10-05 之前这一条断言的是 `retention-undecided`（ADR-0006 §5 未决项）。
+    // 保留策略定案之后那个 reason 整个删了 —— 这一条随之改成钉**当下真实成立**的那件事：
+    // 没有端点就没有目的地，启用不了，而用户能做的动作是"去填地址"。
     expect(() => {
       assertEnableable({ mode: 'managed' });
     }).toThrow(AiConfigError);
-    // 原因要能被程序识别，而不只是给人看的一句话
     try {
       assertEnableable({ mode: 'managed' });
       expect.unreachable('应当抛错');
     } catch (e) {
-      expect((e as AiConfigError).reason).toBe('retention-undecided');
+      expect((e as AiConfigError).reason).toBe('endpoint-required');
     }
   });
 
