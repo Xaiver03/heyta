@@ -403,7 +403,7 @@ describe('HABIT_LOG：打卡落的是记录，同一天不产生第二条', () =
 
     // 同一天**同一个量** ⇒ 幂等成功，一条 op 都不许多写（ADR-0009 那一族）。
     const same = await host.submit({ action: 'record-checkin', habitId, date: '2024-03-01', value: 1 });
-    expect(same.ok).toBe(true);
+    if (!same.ok) throw new Error(`同一天同一个量该幂等成功，却回了两条里的失败分支：${same.message}`);
     expect(same.entityId).toBe(logId);
     expect(await opsOf('HABIT_LOG', logId ?? '')).toHaveLength(1);
 
@@ -414,7 +414,9 @@ describe('HABIT_LOG：打卡落的是记录，同一天不产生第二条', () =
     // 而详情面 W6 之后那个承诺依然成立，op 数从 1 变 2 是改量应有的形状。
     const second = await host.submit({ action: 'record-checkin', habitId, date: '2024-03-01', value: 5 });
     expect(second.ok).toBe(true);
-    if (!second.ok) return;
+    // 🔴 这里原先写的是 `if (!second.ok) return;` —— 一条**静默跳过**的守卫：submit 失败时
+    // 后面四条断言一条都不跑，用例照样绿。改成抛，失败才会被看见。
+    if (!second.ok) throw new Error(`改当日的量该成功：${second.message}`);
     expect(second.entityId).toBe(logId);
     expect(await host.listHabitLogs(habitId, 10)).toHaveLength(1);
     expect((await host.listHabitLogs(habitId, 10))[0]?.value).toBe(5);
