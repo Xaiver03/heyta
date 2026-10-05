@@ -17,6 +17,20 @@
   align-items: start;
 }
 
+/*
+ * 面单搬进详情列那一格时（工单 §8.133），这里**只剩一列**。
+ *
+ * 🔴 为什么要有这一条：`grid-template-columns` 声明的是两根轨道，而轨道不会因为
+ * 第二格里没有子项就自己消失。留着 `minmax(0, 5fr)` 的结果是清单只占 2/7 宽、
+ * 右边 5/7 是一整块空白 —— 症状恰好是这一单要消掉的那个（"中间一坨里再分栏"），
+ * 而它不会报错，只会看起来像布局坏了。
+ * ⚠️ 判据是几何的（清单的右边缘必须铺到内容列右边缘），在
+ * `e2e/tests/detail-pane-habit.spec.ts` 的 H1；jsdom 不做布局，量不到这一条。
+ */
+.ht-habit[data-pane='column'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .ht-habit__side {
   display: flex;
   flex-direction: column;
