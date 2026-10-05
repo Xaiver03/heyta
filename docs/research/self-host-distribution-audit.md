@@ -12913,3 +12913,42 @@ abort 在这里是救场的：软链没被解引用，源树逐字节完好（�
 `scripts/check-script-snapshot.mjs` 已干净（= 已被其所有者提交），`docs/README.md`、`package.json`、
 两份 i18n 词条表**仍是 ` M` 未提交** ⇒ 「等他们提交」这一格还差 4 枚。现量命令：
 `git -C <主检出> status --porcelain -- docs/README.md package.json packages/i18n/src/locales/zh-CN.ts packages/i18n/src/locales/en.ts scripts/check-script-snapshot.mjs`。
+
+### 8.235 载体 v3 的完整链：30 段全绿后死在第 **31** 段，而那一段的 3 是它自己定义的"本轮没有读数"（2026-10-05 17:4x）
+
+**这一趟的形状**（守卫 = 负载门 + 锁等待，都在起跑前：`LOAD_GATE_RC=0`、`LOCK_CLEARED_AFTER=0s`；
+日志 `e2e/selfhost-stack-results/carrier-v3-fullcheck-1708.log`）：
+
+| 读数 | 值 |
+|---|---|
+| 链的段数（从 `package.json` 的 `scripts.check` 现量导出，按 `&&` 切） | **67** |
+| 死掉的那一段 | 第 **31** 段 `pnpm check:journey-coverage` |
+| 它的退出码 | **3** —— 这一段自己的契约写着"退出码 3 = 本轮没有读数"，理由打印在原话里：`内存闸门拒绝启动（有别的测试在跑，锁 /tmp/tfa-test.lock）… 这是环境条件，不构成"旅程不成立"的读数；静态对账仍然成立` |
+| 第 1–30 段 | **全 exit 0**，且整趟里 `✘` / `failed,` 命中 **0 次** |
+| 上一趟（`bea0741d`，同一把尺） | 走到第 **67** 段才停，1–66 全绿（含 `check:ai-e2e`、含 op-log 语义变异那段） |
+
+🔴 **所以"全链绿"目前是分裂在两棵树上的**：v3 覆盖 1–30，`bea0741d` 覆盖 1–66。两棵树的差集只有
+本批的账（`docs/research/*.md`）与 `research/tools/*`，但那两样分别被第 31 段之后的 `check:docs`
+与几枚 `check:*` 消费 ⇒ **不能靠"差不大"合账**，得把 v3 的 31–67 补出来。
+补法写在这里免得下一位重想：从 `scripts.check` 里切出第 31..67 段按序跑（`set -e`、逐段打命令与 rc），
+跑穿即与 1–30 拼成同一棵树的全链 —— 这是**分段拼合**，不是"半条链当全条链"，两段的树必须相同。
+
+**为什么锁总被抢**：`/tmp/tfa-test.lock` 是**机器级**约定，另一个项目（`~/.tfa-shield` 的 playwright）
+也在同一把锁上跑；起跑时锁空（`LOCK_CLEARED_AFTER=0s`）不等于跑到第 31 段时还空。
+⇒ 已登记 #58（把"锁的有界等待"收进 `scripts/lib/`，与负载门同族）与 #57（op-log 语义变异台架把
+环境拒绝报成 `missing assertion report`，与"变异真的存活"共用 rc=1）。两处都不代拍。
+
+**本批自己补的一格（第 2 项的前置）**：`scripts/verify-selfhost-stack.sh` 原先只查 docker 守护进程
+（`command -v` + `docker info`），**没有负载门**，而第 2 项写的是"负载 >12 属环境无效"。
+现在它 source 同一枚共享负载门（阈值由 `hw.ncpu × 3/4` 推导，这台机器 ⇒ 12），位置在任何破坏性动作
+（建 env 文件、`compose build/up`）之前，等满以 **3** 结束而不是 1。
+🔴 牙是**在真满载上**量的，不是合成的：`HEYTA_LOAD_GATE_WAIT=6 HEYTA_LOAD_GATE_INTERVAL=2 bash scripts/verify-selfhost-stack.sh`
+⇒ `GATE_RC=3`，打印 `负载 39 > 12，等 2s（累计 0s/2s/4s）` → `❌ 等满 6s 负载仍是 38 —— 本轮不跑（环境无效，不是产品失败）`，
+且零副作用（没有本批容器出现、没有残留 env 文件）。正向臂（负载达标就放行）由取绿那一趟同时提供 ——
+**这一格现在还是"半条牙"**：只有拒绝臂有读数，通过臂要等真跑那一趟。
+
+改完之后的两枚相关门禁都单独复量过，证明这一改没有把别的判据碰坏：
+`node scripts/check-script-snapshot.mjs` ⇒ rc=**0**（`自快照 bootstrap 全部在位（31 个脚本 + .gitignore）`，它判的是形状不是字节）；
+`node research/tools/../../scripts/check-selfhost-entry-command.mjs` ⇒ rc=**0`（它确实会读这枚脚本的 `COMPOSE_FILES` 抄件，R7 仍成立）。
+另：`scripts.check` 里**没有** `verify-selfhost-stack`（现量：67 段中 selfhost 相关只有 `check:selfhost-entry-command`）
+⇒ 这次编辑不在全链射程内，v3 那 30 段绿不会因为它而失效。

@@ -252,6 +252,19 @@ die() { printf '\n❌ %s\n' "$*" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || die "需要 docker（这条验收的量程就是容器）。"
 docker info >/dev/null 2>&1 || die "docker 守护进程不可用 —— 先起 Docker（或 OrbStack）。"
 
+# 🔴 负载门：这一条的三条判据里有真浏览器，而满载时 Playwright 的超时会被读成
+#    "界面没画出来"（设备验收侧实测过同一件事：load 62 / load 18 时 `uiautomator dump`
+#    抓不到界面，把一次环境失效打印成一堆产品缺陷）。
+#    阈值不写死：由 `hw.ncpu × 3/4` 推导（这台机器 ⇒ 12），与 `wait-for-quiet-host.sh`
+#    共用**同一个所有者** —— 两个验收脚本对"现在能不能跑"给不同答案比没有判据更糟。
+#    🔴 位置：必须在任何破坏性动作（建 env 文件、compose build/up）之前。
+#    🔴 等满以 **3** 结束，不是 1：3 = 环境无效，不是产品失败；折成 1 就等于宣布产品坏了。
+. "$(dirname "$0")/lib/wait-for-quiet-host.sh"
+wait_for_quiet_host || {
+  printf '\n❌ 环境无效：负载没降到阈值以下（等满 %ss）。本轮**不判产品**，也不算产品失败。\n' "${HEYTA_LOAD_GATE_WAIT:-900}" >&2
+  exit 3
+}
+
 # 🔴 compose 文件里 `container_name` 是**写死的**（supersync-server / supersync-postgres），
 # 换 `-p` 也躲不开重名。所以别的栈在跑时必须响亮地失败，
 # 绝不能"复用它"——那等于拿别人的库当自己的夹具（AGENTS §7 第 83 条同一族）。
