@@ -128,6 +128,17 @@ export function needStreak(quietMin, step) {
  */
 export const FAM_OTHER_MARK = '预置十一族之外';
 
+/**
+ * 把 `spawnSync` 的结果折成一个退出码。
+ *
+ * 🔴 `r.error` 必须**先于** `r.status` 判：`spawnSync` 起不来时 `status` 是 `null`，
+ *    老写法 `r.status ?? 1` 会把它折成 **1**，而 1 在这条链上的语义是"main 在算完载体后又动了 ⇒ 可重试"。
+ *    于是"载体脚本压根没被执行"（node 找不到、权限、fork 失败…）会被记成一次正常的抢先，
+ *    三枚尝试全部用满后哨兵安静收工 —— 症状是"窗口明明到了却没落地，日志里每一行都说是别人抢先"。
+ *    归到 2（探针坏 ⇒ 拿同一个坏探针再跑一遍还是坏的）才会**停手并把原因留在日志里**。
+ */
+export const landRcOf = (r) => (r.error ? 2 : (r.status ?? 1));
+
 export function decideAfterLand(rc, attempts, maxAttempts, landOut = '') {
   if (rc === 0) return { action: 'landed', retry: false, exitCode: 0 };
   if (rc === 2) {
@@ -291,6 +302,12 @@ export function sentinelArms() {
     } catch { return '读不到载体'; }
   })();
   push('B11 判针有出处（载体 die() 带着同一个字面量，路径行仍是两格 `- `）⇒ 那边改措辞这里就红', 'ok', carrierReading);
+  // B12/B13：`spawnSync` 起不来的那一档**不许**折成"main 抢先"（那是可重试的，会把三枚尝试全用满）。
+  const brokenSpawn = { error: new Error('ENOENT: node 起不来'), status: null };
+  push('B12 r.error 存在 ⇒ 折成 2（探针坏，停手）而不是 1（抢先，可重试）', 2, landRcOf(brokenSpawn));
+  push('B12b 阳性对照：老写法 `status ?? 1` 对同一枚对象读成 1 ⇒ 这条臂是承重的', 1, brokenSpawn.status ?? 1);
+  push('B13 正常退 4 ⇒ 原样是 4（逐段归属那一档，不重试）', 4, landRcOf({ status: 4 }));
+  push('B13b status=null 且无 error ⇒ 仍按 1 走（保留旧行为，只是不再吞掉 r.error）', 1, landRcOf({ status: null }));
   return arms;
 }
 
@@ -385,11 +402,18 @@ while (elapsed < CAP) {
       //    重定向不带管道 ⇒ 退出码还是被测命令的（环境陷阱 #179/#164 那一族）。
       const landOutPath = `${LOG}.land-${attempts}.log`;
       beat(`    开窗即执行（第 ${attempts}/${MAX_ATTEMPTS} 次尝试）：cd "${mainTree}" && ${body} > '${landOutPath}' 2>&1`);
+      const t0 = Date.now();
       const r = spawnSync('sh', ['-c', `${body} > '${landOutPath}' 2>&1`], { cwd: mainTree });
-      const rc = r.status ?? 1;
+      // 🔴 `r.error` 先于 `r.status`（见 `landRcOf` 的注释：起不来 ≠ "main 抢先"）。
+      const rc = landRcOf(r);
+      if (r.error) beat(`    🔴 落地脚本**没被启动**（不是产品红，也不是抢先）：${r.error.message}`);
+      const elapsedMin = ((Date.now() - t0) / 60000).toFixed(1);
       const { text, size } = tailFile(landOutPath);
       const d = decideAfterLand(rc, attempts, MAX_ATTEMPTS, text);
-      beat(`    LAND_RC=${rc}（0=已落地；1=main 在算完载体后又动了；2=探针坏**或**冲突面有未预置族；3=负载/端口/载体没守住；` +
+      // 这一行是任务 #35 缺的那一格："落地要求 main 连续静默多久"= 连静读数 + 这一段实测。
+      beat(`    LANDER 时长=${elapsedMin}min（第 ${attempts} 次；这就是窗口开之后 main 必须继续不动那么久，` +
+        `落地关闭判据里"完整 check 在载体上跑过"的那一段就花在这里）`);
+      beat(`    LAND_RC=${rc}（0=已落地；1=main 在算完载体后又动了；2=探针坏**或**落地脚本没被启动**或**冲突面有未预置族；3=负载/端口/载体没守住；` +
         `4=载体上完整 pnpm check 红 ⇒ 要人逐段归属。见 selfhost-land-main.mjs 文件头）⇒ ${d.action}` +
         (d.why ? `（${d.why}）` : ''));
       const paths = famOtherPaths(text);
