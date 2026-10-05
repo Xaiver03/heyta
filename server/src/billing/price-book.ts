@@ -96,26 +96,28 @@ export const grantsForSku = (priceId: string): readonly string[] | null =>
   SKU_GRANTS[priceId] ?? null;
 
 /**
- * 🔴 **已定价、已对外承诺，但尚不可交付 —— 因此不得售卖的 SKU。**
+ * 🔴 **已定价、但尚不可交付 —— 因此不得售卖的 SKU。**
  *
  * 这是 [ADR-0023](../../docs/adr/0023-managed-ai-quota-not-implemented.md) §3.1
  * 那条硬约束的**执行点**。只写进 ADR 而没有执行点，就等于没有这条约束 ——
  * 收银台正是它要挡住的那扇门。
  *
- * 为什么是"不得售卖"而不是"不许宣传"：落地页可以继续描述 ¥12（那是**已锁定**的
- * 产品决定），但**收了钱交付不了**是另一回事。带 `ai` 能力的那一档买的是
- * 云端 AI 的 300 次/月，而端点、计量、模型调用**一个都不存在**。
+ * ## 为什么现在是**空的**（2026-10-05）
  *
- * 值里的那句话是给**用户**看的拒绝理由：他点了支付却买不成，必须知道为什么，
- * 而不是看到一个 500。清单清空之日（ADR-0023 §5）就是这里被删掉之日。
+ * 这里原本坐着 `hosted-ai-monthly`，理由是"云端 AI 的端点与用量计量都不存在"。
+ * 那两个不存在现在都成立了：代理路由 `server/src/ai/managed-proxy.routes.ts`、
+ * 原子计量 `server/src/ai/metering.ts`、境内白名单 `packages/ai/src/managed-endpoints.ts`。
+ * ADR-0054 就是那份新的裁决（它**取代** ADR-0023 §5 那张最小清单里的第 1–3 条）。
  *
- * ⚠️ 这个对象是 `scripts/check-ai-quota-consistency.mjs` §3b 的锚点：
- * 那个门会**解析下面这个对象字面量**并检查键。所以别把 SKU id 写进本注释里
- * 当作"已经声明"的证据 —— 门读的是对象体，不是注释。
+ * ⚠️ 摘掉那一条的同时**不许拆掉这个机制**：`checkout.routes.ts` 仍然在报价之前
+ * 问一次 `notSellableReason(...)`，而 `pnpm check:ai-quota` 的 §3 现在钉的就是
+ * "清单可以空，调用点不许消失"。下一档"已定价但暂时交付不了"的服务要靠这里 ——
+ * 删掉机制的症状是"以后再限制时没人记得装回去"，而那正是本门禁要挡的那类错。
+ *
+ * 判据分工：把这一档加回清单 ⇒ `server/tests/billing-checkout.routes.spec.ts`
+ * 那条"¥12 可以下单"红；把调用点删掉 ⇒ `check:ai-quota` 红。两条各挡一边。
  */
-export const NOT_YET_DELIVERABLE_SKUS: Readonly<Record<string, string>> = {
-  'hosted-ai-monthly': '云端 AI 的端点与用量计量尚未上线，这一档暂时无法购买（ADR-0023）',
-};
+export const NOT_YET_DELIVERABLE_SKUS: Readonly<Record<string, string>> = {};
 
 /**
  * 这一档现在能不能卖。`null` = 能卖；否则返回**给用户看的**理由。
