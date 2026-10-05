@@ -536,19 +536,6 @@ export interface SyncClientOptions {
 
   /** 本设备的 clientId。 */
   clientId: string;
-  /**
-   * 本外壳的**裸 semver**（`18.23.1`、`0.4.0`），随下载请求以 `appVersion` 上报。
-   *
-   * 服务端拿它做 checkpoint 闸门（`server/src/sync/checkpoint-gate.ts`，#9962）：
-   * 闸门是**纯结构比较** —— 缺省与"低于 cut"算的是同一档（都判 old），所以
-   * **不上报不会比上报更"安全"**，而上报一个真版本能让运营面不再显示空版本。
-   * 反过来，填一个占位值（各 `package.json` 现在都是 `0.0.0`）就是把谎写进
-   * 设备清单 —— 宁可 `undefined`（=沉默，与今天同形）。
-   *
-   * ⚠️ 这个值必须由**宿主**给（`apps/*` 才知道自己是哪个发行版）；本包不猜、
-   * 不读 `package.json`（浏览器包里没有它）。
-   */
-  appVersion?: string;
   /** E2EE 口令。未配置时必须**拒绝同步**而不是降级成明文。 */
   getPassword: () => Promise<string | undefined>;
 
@@ -1338,11 +1325,6 @@ export class SyncClient {
       url.searchParams.set('limit', String(DOWNLOAD_PAGE_SIZE));
       // 排除自己：我们的 op 已经应用过了，拉回来纯属浪费
       url.searchParams.set('excludeClient', this.options.clientId);
-      // `appVersion` 只搭在下载段这一个参数上：服务端 `touchDevice` 的调用条件是
-      // `excludeClient` 存在（`sync.routes.ts`），所以缺了 clientId 那次连版本都不会记。
-      if (this.options.appVersion) {
-        url.searchParams.set('appVersion', this.options.appVersion);
-      }
 
       const res = await this.fetchImpl(url.toString(), {
         headers: { authorization: `Bearer ${token}` },
