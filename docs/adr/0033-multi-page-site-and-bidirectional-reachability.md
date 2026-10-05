@@ -287,7 +287,7 @@ hreflang / og / JSON-LD 全部在静态 HTML 里），**不是**「首屏不用�
 | 当时那条 | 现在 |
 |---|---|
 | `apps/mobile/src` 里 `Linking.openURL` **0 处** | **不为 0**：移动壳「我的」页的 `RenewSection` 用 `Linking` 打开支付串、用 `Clipboard` 复制它。要现量：`grep -rn "Linking" apps/mobile/src` |
-| `SubscriptionNotice.tsx` 自述「**现在不存在可跳转的续费地址**」 | 那句已被本次续费接线改掉，文件里留着带日期的说明（指向 ADR-0053 同一条时间线） |
+| `SubscriptionNotice.tsx` 自述「**现在不存在可跳转的续费地址**」 | 那句已被本次续费接线改掉，文件里留着带日期的说明（指向 ADR-0056 同一条时间线） |
 
 🔴 **这两条都不影响本 ADR 要回答的问题**：它判的是"落地页与站点各页之间双向可达吗"，
 而应用内多了一个外链出口不是它的论据。留这张表是为了让"当时"和"现在"不混成一套状态。

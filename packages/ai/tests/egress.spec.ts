@@ -71,7 +71,7 @@ describe('classifyDestination —— 目的地由端点推导，不由模式声�
     expect(classifyDestination({ mode: 'off' })).toBe('none');
   });
 
-  it('🔴 托管的目的地也从端点推导（ADR-0053 §3.3 堵掉的洞）', () => {
+  it('🔴 托管的目的地也从端点推导（ADR-0056 §3.3 堵掉的洞）', () => {
     // 旧形状是 `mode === 'managed'` ⇒ 无条件 `heyta-cloud`，**不看端点**。
     // 那等于"把 mode 写对，界面就说数据到了我们服务器上"—— 而声明可以被写错。
     // 现在 `heyta-cloud` 只能由**境内白名单上的端点**推导出来（白名单表的逐条核对

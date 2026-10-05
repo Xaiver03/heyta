@@ -130,6 +130,27 @@ const ALLOWED_OUTSIDE_CHAIN = new Map([
       ],
     },
   ],
+  [
+    'check:adr-numbering',
+    {
+      reason:
+        'ADR 编号唯一 + 正文里裸写的 `ADR-NNNN` 必须只指向一枚文件。' +
+        '它拦的是 2026-10-05 那次**两条并行会话同一天各占 0053**：文件名不同 ⇒ git 不报冲突，' +
+        '每条链接各指各的 ⇒ 死链检查也不报，只有正文里的裸引用从此有两种读法，而挑错那种不会让任何东西红。' +
+        '🔴 **本批刻意不进链的唯一原因是提交面上的**：`package.json` 里 `check` 那一行此刻正被并行会话' +
+        '的未提交改动占着（同一行加 `check:backup-retention`），同一行无法按 hunk 拆开暂存 ⇒ ' +
+        '此刻并进去就等于替别人提交他那半。' +
+        '摘除条件：并行那半进 main 之后，把 `pnpm check:adr-numbering` 并进链（建议紧跟 `check:doc-citations`），' +
+        '并**同时删掉本条登记** —— 登记留着而它已进链，本文件第 2 条判据会红（"留着就是在掩护下一道"）。',
+      consumers: [
+        {
+          file: 'docs/adr/README.md',
+          needle: 'pnpm check:adr-numbering',
+          role: '「规则」第 2 条：定新 ADR 号之前要跑的那一趟（本批唯一的载体）',
+        },
+      ],
+    },
+  ],
 ]);
 
 /** 链必须包含的锚点：掉哪一个都是"整条链不再检查一件事"级别的事故。 */

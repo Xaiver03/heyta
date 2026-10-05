@@ -220,7 +220,7 @@ export interface WebPushConfig {
  *
  * | 如果由客户端给 | 后果 |
  * |---|---|
- * | 上游地址 | 每个请求都在问"请把用户的明文转发到我给的这个 host" —— 那等于把境内白名单交给请求体，而 ADR-0053 §5 的红线正是**只有境内** |
+ * | 上游地址 | 每个请求都在问"请把用户的明文转发到我给的这个 host" —— 那等于把境内白名单交给请求体，而 ADR-0056 §5 的红线正是**只有境内** |
  * | 模型 id | ADR-0021 §1 那句"换模型就是改价，这不是提醒，是等式"：pro 级的月度成本已经越过售价。客户端能选模型 = 客户端能选我们倒贴多少 |
  *
  * ⚠️ 地址的**所在地**不在这里校验，在 `ai/managed-upstream.ts` 的判定里校验 ——
@@ -861,7 +861,7 @@ export const loadConfigFromEnv = (
   // 于是症状是"扣了一次数、拿到一个 502"。启动期报错是唯一不会付出这个代价的位置。
   //
   // ⚠️ 这里**故意不做**境内白名单校验：那是每次转发前的判据（`ai/managed-upstream.ts`），
-  // 而且它必须在**发送点**再算一次（ADR-0053 §5 第 2 条）。配置层判一次就够的错觉，
+  // 而且它必须在**发送点**再算一次（ADR-0056 §5 第 2 条）。配置层判一次就够的错觉，
   // 正是 ADR-0010 从 SSOS 抄来的那句「Enforcement has to sit on the path that actually
   // sends the request, not only on the path that stores it.」所要防的。
   if (process.env.MANAGED_AI_ENABLED === 'true') {

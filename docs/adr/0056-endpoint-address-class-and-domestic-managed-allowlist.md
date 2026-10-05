@@ -1,4 +1,4 @@
-# ADR-0053：目的地判定补上**地址类别**这一维，托管档只接**境内**供应商（白名单是表，不是形容词）
+# ADR-0056：目的地判定补上**地址类别**这一维，托管档只接**境内**供应商（白名单是表，不是形容词）
 
 > 🔴 2026-10-05：本文里"`managed` 整体被保留策略未定案挡着 / `assertEnableable` 抛 `retention-undecided`"
 > 那两处措辞记的是**开工时的现量**，同日已被 [ADR-0054](0054-managed-ai-retention-and-selling-preconditions.md) 撤除

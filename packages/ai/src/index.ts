@@ -8,7 +8,7 @@
  *   1. `supply.ts`  —— 供给模式与出境目的地。**由端点推导目的地，不由模式声明。**
  *      它的两条腿各在自己文件里：`endpoint-address.ts`（地址**类别**，纯字面量、
  *      绝不解析域名）与 `managed-endpoints.ts`（托管档的**境内白名单**）。
- *      🔴 两样都是"唯一一份判断"，消费者不许再写第二遍（ADR-0053）。
+ *      🔴 两样都是"唯一一份判断"，消费者不许再写第二遍（ADR-0056）。
  *   2. `egress.ts`  —— 出境闸门。授权绑定在 `(功能, 目的地)` 上，目的地一变就失效。
  *   3. `provider.ts` —— OpenAI 兼容调用。**只产出建议，类型上无法产出 op。**
  *   4. `routing.ts`  —— 配置路由：多端点、能力→端点映射、回退、熔断。
@@ -31,7 +31,7 @@
  * ## 当前状态
  *
  * 🟢 `managed`（heyta 托管）**可以启用了**，条件是端点落在境内白名单上
- * （`managed-endpoints.ts`，ADR-0053 §3.3）。挡了它很久的"保留策略未定案"
+ * （`managed-endpoints.ts`，ADR-0056 §3.3）。挡了它很久的"保留策略未定案"
  * 已由 [ADR-0054](../../../docs/adr/0054-managed-ai-retention-and-selling-preconditions.md)
  * 定案：正文不保留、元数据 45 天，天数是 `supply.ts` 里的两个常量，
  * 结构化披露与对外文本都从那里出 —— **没有第二份数字**。
@@ -57,7 +57,7 @@ export {
   type RetentionDisclosure,
 } from './supply.js';
 
-// 端点地址的**类别**（ADR-0053 §3.1）。`isLoopbackEndpoint` 是兼容名，
+// 端点地址的**类别**（ADR-0056 §3.1）。`isLoopbackEndpoint` 是兼容名，
 // 它现在只是 `isLoopbackAddress` 的别名 —— 判定只有一份，在 `endpoint-address.ts`。
 export {
   classifyEndpointAddress,
@@ -70,7 +70,7 @@ export {
   type UnknownAddressReason,
 } from './endpoint-address.js';
 
-// 托管路径的**境内白名单**（ADR-0053 §3.3）。表是"境内"的唯一事实源，
+// 托管路径的**境内白名单**（ADR-0056 §3.3）。表是"境内"的唯一事实源，
 // 而它的形状由 `scripts/check-ai-coverage.mjs` 第 8 段在运行时对账。
 export {
   MANAGED_MODEL_HOSTS,

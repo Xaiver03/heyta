@@ -429,7 +429,7 @@ describe('判据 4：词表同源，不是第二份定义', () => {
     // `DestinationDisclosure` 是**类型**，运行时拿不到键；所以从它的构造函数取样本：
     // 三个目的地各推一次，得到的 kind 必须全在 domain 词表里，且**没有第四个**。
     const { destinationDisclosure, classifyDestination, MANAGED_MODEL_HOSTS } = await import('@heyta/ai');
-    // ⚠️ 托管那一档的样本端点**从白名单现取**，不写死主机名：ADR-0053 §3.3 之后，
+    // ⚠️ 托管那一档的样本端点**从白名单现取**，不写死主机名：ADR-0056 §3.3 之后，
     // `mode: 'managed'` 单独不再推出 `heyta-cloud` —— 那个事实必须由端点证明。
     // 写死一个主机名的话，白名单一改这条就红，而红的原因与"词表同源"无关。
     const managedHost = MANAGED_MODEL_HOSTS[0]?.host;
@@ -444,7 +444,7 @@ describe('判据 4：词表同源，不是第二份定义', () => {
     }
     expect([...seen].sort()).toEqual(['heyta-cloud-managed', 'local', 'third-party-endpoint']);
     // 🔴 成对的那一半：**没有**境内端点的 `managed` 不许被说成到了 heyta 手里。
-    // 这一档原先是恒返回 `heyta-cloud`（不看端点），ADR-0053 §3.3 点名的就是那个洞。
+    // 这一档原先是恒返回 `heyta-cloud`（不看端点），ADR-0056 §3.3 点名的就是那个洞。
     expect(classifyDestination({ mode: 'managed' })).toBe('user-endpoint');
     expect(classifyDestination({ mode: 'managed', endpoint: 'https://api.openai.com/v1' })).toBe(
       'user-endpoint',
