@@ -146,7 +146,10 @@ echo "  任务: $TASK_TITLE"
 
 [ "${#TOKEN}" -lt 100 ] && { echo "❌ 令牌看起来不对（长度 ${#TOKEN}）"; exit 1; }
 
-trap 'restore_ime 2>/dev/null; $ADB unroot >/dev/null 2>&1' EXIT
+# 🔴 这条**替换**了 lib 串好的那条 EXIT handler（bash 的 EXIT trap 只有一条，
+#    后装的整条顶掉先装的）—— 所以 `restore_ime` 和第 19 行的快照自删 `"$0"`
+#    都得在这里抄全，少一样就少还一笔（`docs/plans/trash-and-archive.md` §10.87）。
+trap 'rm -f -- "$0"; restore_ime 2>/dev/null; $ADB unroot >/dev/null 2>&1' EXIT
 
 step "0. 装包、清数据、启动"
 $ADB install -r "$APK" 2>&1 | tail -1 | sed 's/^/   /'
