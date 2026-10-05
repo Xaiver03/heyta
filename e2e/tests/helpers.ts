@@ -662,3 +662,17 @@ export async function boxOf(page: Page, locator: Locator, what: string) {
   expect(box, `${what}"可见"却量不到 boundingBox`).not.toBeNull();
   return box as { x: number; y: number; width: number; height: number };
 }
+
+/**
+ * 在习惯清单里**选中**那一条（右侧窗格随之打开）。
+ *
+ * 🔴 这一步不是铺垫而是**前提**：web 的窗格刻意**没有回落选中**
+ *    （`apps/web/tests/habits-list-pane.spec.tsx` 的 G 组钉住"没人点过时零行带
+ *    `aria-current`，窗格说的是「选一条习惯」而不是第一条"）。只 `addHabit` 的话
+ *    窗格里那些编辑器**根本不在 DOM 里**，而报错长这样：`locator.click` 等 90 秒超时 ——
+ *    第一版的图标用例五条全部红在这里，看起来像"选择器坏了"，其实是用例没走到它。
+ */
+export async function selectHabit(page: Page, name: string): Promise<void> {
+  await page.locator('[data-testid^="habit-row-"]').filter({ hasText: name }).first().click();
+  await expect(page.getByTestId('habit-pane')).toHaveAttribute('aria-label', new RegExp(name));
+}
