@@ -40,7 +40,10 @@ export function tasksMarkdownCopy(t: Translate): TasksMarkdownCopy {
 
   return {
     heading: t('web.export.markdown.heading'),
-    generatedAt: t('web.export.markdown.generatedAt'),
+    // `{at}` 由 `@heyta/app-host/export-dump.ts` 的
+    // `copy.generatedAt.replace('{at}', exportedAtIso)` 填；插值点在另一个包里，
+    // 门禁只在本文件看不到（它同时要求全仓真有那一处 replace，否则这条标记判红）。
+    generatedAt: t('web.export.markdown.generatedAt'), // i18n-vars:filled-later
     empty: t('web.export.markdown.empty'),
     open: t('web.export.markdown.open'),
     done: t('web.export.markdown.done'),
