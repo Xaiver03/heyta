@@ -18,7 +18,10 @@
 #     只在**等门**的看守不算挡路 —— 10-05 改，理由见下面第 2 段）
 #   2 载体必须干净（脏了就停：那意味着有人在载体里写）
 #   3 追平到当时的 `main` 尖（**记录追平前后的 sha**：B 的主张是"装的是当前源码"）
-#   4 `pnpm --filter @heyta/op-log build` 必须 exit 0
+#   4 `pnpm --filter '@heyta/op-log...' build` 必须 exit 0，**且** op-log 依赖的那几枚 `@heyta/*`
+#     在载体里都要有 `dist`（缺任何一枚 ⇒ `STOP=oplog-dep-dist-missing`）。
+#     🔴 两条都要：只查构建 rc 会漏掉"构建读了别人的旧 `.d.ts` 也算绿"那一形，
+#     而只带 `...` 又证不了"那条路径真的被读了" —— 理由与实测在下面的第 5 步。
 #   5a 桌面段：`reinstall-all.sh --only mac,windows`（不动设备面），记 rc 与时长
 #   5b **再过一次闸门**（不复用 5a 之前那次读数 —— 中间隔 15~25 分钟，效力早就过期）
 #   5c 设备段：`reinstall-all.sh --only android,ios`（`adb uninstall` / `simctl uninstall` /
@@ -216,15 +219,40 @@ else
 fi
 
 # ── 5. op-log 构建（B 的前置②）────────────────────────────────────────
+# 🔴 选择器必须带 `...` **后缀** = "这个包**和它依赖的那些包**"（实测：`pnpm --filter '@heyta/op-log...'
+#   list --depth -1` 在载体里报 5 枚 = op-log + domain + shared-schema + storage + sync-core；
+#   前缀 `...@heyta/op-log` 是**依赖它的**那些包，方向反的）。
+#   只写 `--filter @heyta/op-log` 在一棵**新载体**上必红：op-log 的 tsup **dts 阶段**要读那四枚的
+#   `.d.ts`，而新 worktree 里它们的 `dist` 不存在 ⇒ 类型全解成 `any` ⇒ 一片 TS7006/TS7005 ⇒
+#   `DTS Build error`、rc=1（10-05 10:59 那一次窗口真的开了，看守走到这里自己停住，没有起 B）。
+#   ⚠️ 主检出**永远量不到这一形**（它 16 份 dist 都在），所以这里钉两条：选择器形状（臂 V）
+#   + 构建之后依赖产物齐不齐（臂 T/U）。后者才是那一红的根因判据 —— 不是"构建步的 rc"。
 if [ -n "$OPLOG" ]; then
   bash "$OPLOG" >> "$LOG" 2>&1; RC=$?
 else
-  ( cd "$CARRIER" && pnpm --filter @heyta/op-log build ) >> "$LOG" 2>&1; RC=$?
+  ( cd "$CARRIER" && pnpm --filter '@heyta/op-log...' build ) >> "$LOG" 2>&1; RC=$?
 fi
 say "STEP op-log-build rc=${RC}"
 if [ "$RC" != 0 ]; then
   say "STOP=op-log-build（没继续起 B —— 装一个构建不过的产物不是当前产物）"
   exit 1
+fi
+
+# ── 5·对账. 依赖产物（上面那一步**绿了也要算**，因为"绿"只证明 op-log 自己编过）──────
+OPMAN="$CARRIER/packages/op-log/package.json"
+if [ ! -f "$OPMAN" ]; then
+  # 夹具里没有 op-log 源码时**响亮地说没判**，不许沉默地跳（一条没执行的前置，输出与执行过的逐字相同）
+  say "DEPDIST=unavailable（载体里没有 ${OPMAN} ⇒ 这一档没判，上面的 rc=0 不等于依赖产物齐）"
+else
+  MISS=""
+  for dep in $(node -e 'const p=require(process.argv[1]);console.log(Object.keys(p.dependencies||{}).filter((n)=>n.startsWith("@heyta/")).map((n)=>n.slice(7)).join(" "))' "$OPMAN"); do
+    [ -d "$CARRIER/packages/${dep}/dist" ] || MISS="${MISS} ${dep}"
+  done
+  if [ -n "$MISS" ]; then
+    say "STOP=oplog-dep-dist-missing（op-log 的类型要读这些包的 .d.ts：缺${MISS} ⇒ 那四枚的产物不是当前源码的）"
+    exit 1
+  fi
+  say "DEPDIST=ok"
 fi
 
 # ── 6. 起 B：拆成"桌面段 → 再过一次闸门 → 设备段"───────────────────────
