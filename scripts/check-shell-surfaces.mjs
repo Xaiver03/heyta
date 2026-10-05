@@ -128,6 +128,13 @@
  *       "确实是本轮打的"那份包                                        → 产物那两栏红
  *       🔴 这一臂是**补出来的**：第一版这个开关只写在"包不存在"那一个分支里，
  *          于是本机存在**别人的**包时严格模式照样 rc=0（实测 rc=0，期望 1）。
+ *   G14 断言 A 的锚点分类（2026-10-05）：`dist/windows/install-capture.txt` 是**未跟踪的
+ *       取证产物**，不是源码锚点 —— 缺席只该由 D4 念"未取证"，不该把整条门禁红成"判据失效"
+ *       （旧形状下每一枚干净检出都必红，而打印出来的修法教人去改锚点）。
+ *       牙没有丢：改成**两侧名字对账**。四臂台架
+ *       `node research/tools/mutation-rigs/mutate-shell-surfaces-anchor.mjs`
+ *       （A0 原样绿 / A1 ps1 改名红 / A2 scp 行改名红 / A3 删真源码锚点仍红 /
+ *        A4a 产物缺席不再红 + A4b 严格模式照样红；臂数以它自己打印的为准）。
  *
  *   （以上 13 臂的**实测读数**逐条记在
  *    `docs/plans/countdown-w8-shell-gate.md` §5 —— 那里是过去式 + 数字，本列表是配方。）
@@ -141,7 +148,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT =
@@ -454,8 +461,24 @@ console.log('\n【断言 A】判据的锚点必须真的扫得到（扫不到 = 
 
 const anchorErrors = [];
 const sources = new Map();
+/**
+ * 🔴 **取证产物不是源码锚点** —— 这一格曾经把整条门禁红成"判据失效"，而它量到的
+ * 只是"这棵树上没打过 Windows 包"：`winFacts` 是 `package-msix.sh` 从打包机 scp 回来的
+ * **未跟踪产物**（`dist/` 整个被 gitignore），任何一枚干净检出上它都不存在
+ * ⇒ `pnpm check` 在 CI / 新克隆上**结构性必红**，而它打印的修法是"把锚点同步回本脚本"，
+ * 那是把人往错的方向推（同一个仓库刚为另一条门禁修过这一族：`fe3e9e7d` 浅克隆 27 枚全红）。
+ * 这个文件"在不在本地"由 **D4 那一栏**判，判得比这里对：缺 ⇒ 响亮未取证、
+ * 在而缺判据行 ⇒ 未取证并点名生产方、行在而值错 ⇒ 红，`HEYTA_REQUIRE_PACKAGED_ARTIFACT=1`
+ * 再把"未取证"折成红（G13 那一臂）。
+ *
+ * 但断言 A 原本想挡的那件事**不能跟着丢**：生产方把文件改名 ⇒ 门禁读一个不存在的旧名，
+ * D4 从此永远念"未取证"而没人发现。所以这里换成**两侧名字对账**（读的是源码，
+ * 在任何树上都成立）：门禁锚点的 basename 必须出现在写它的那两行生产方代码里。
+ */
+const ARTIFACT_ANCHORS = new Set(['winFacts']);
 for (const [name, rel] of Object.entries(FILES)) {
   if (rel.startsWith('/') || !/\.\w+$/.test(rel)) continue; // 产物目录 / 绝对路径不是源文件
+  if (ARTIFACT_ANCHORS.has(name)) continue;
   const code = readSource(rel);
   if (code === null) {
     anchorErrors.push(`   · ${name} 扫不到：${rel}`);
@@ -463,6 +486,25 @@ for (const [name, rel] of Object.entries(FILES)) {
   }
   sources.set(name, code);
 }
+{
+  const factsBase = basename(FILES.winFacts);
+  const producers = [
+    ['apps/desktop-windows/scripts/package-msix.sh', new RegExp(`scp[^\\n]*${factsBase}`)],
+    ['apps/desktop-windows/scripts/install-and-capture.ps1', new RegExp(`\\$factsFile[^\\n]*${factsBase}`)],
+  ];
+  for (const [file, re] of producers) {
+    const raw = readSource(file);
+    if (raw === null) {
+      anchorErrors.push(`   · 取证事实的生产方读不到：${file}（对账做不了，判红不判跳过）`);
+    } else if (!re.test(raw)) {
+      anchorErrors.push(
+        `   · 锚点漂移：门禁读 ${FILES.winFacts}（basename ${factsBase}），` +
+          `而 ${file} 里已经不再写/取这个名字 ⇒ D4 会永远念"未取证"而没人发现`,
+      );
+    }
+  }
+}
+
 
 /** A1：共享词表必须解析得出成员。 */
 const vocabSrc = sources.get('featureModules');
@@ -561,7 +603,12 @@ if (anchorErrors.length > 0) {
   failed = true;
   console.log('\n   🔴 断言 A 不通过（判据失效，不是"没有违规"）：');
   for (const l of anchorErrors) console.log(l);
-  console.log('\n      ⇒ 修法：把锚点同步回本脚本，**不要**把判据放宽成"扫不到就通过"。');
+  console.log(
+    '\n      ⇒ 修法：把锚点同步回本脚本，**不要**把判据放宽成"扫不到就通过"。\n' +
+      '      ⚠️ 这一条红**只**关于"门禁读的源码锚点与生产方对不上"。' +
+      '"这棵树上没打过包"不是这一条 —— 那走 D4 那一栏（响亮未取证，' +
+      '`HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 才折成红），别为了它去改这里的锚点。',
+  );
 } else {
   console.log('\n   ✅ 断言 A 通过：词表 / 两张注册表 / rail 常量 / 台账形状都对得上。');
 }
