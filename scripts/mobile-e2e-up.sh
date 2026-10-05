@@ -208,10 +208,42 @@ else
     psql -h 127.0.0.1 -p 5432 -U "$PG_USER" -d "$PG_DB" -tAc 'select 1' >/dev/null 2>&1 \
       || fail "连不上 Postgres 库 ${PG_DB}（用户 ${PG_USER}）。库要先存在且已迁移。"
 
+    # 🔴 两处启动自检缺了就**拒绝起来**：`JWT_SECRET`（`server/src/auth.ts`）与
+    #    `PASSWORD_PEPPER`（`server/src/password/hash.ts`，`MIN_PEPPER_LENGTH = 32`），
+    #    而它们只写在 `server/.env` 里 —— 那个文件被 gitignore，**干净检出（隔离 worktree /
+    #    新克隆）上没有**（`git worktree add` 不会带过来）。缺了它们，上面那句
+    #    "服务端 60 秒内没有就绪"看起来像产品坏了，实际是**验收载体依赖了一份不进仓库的配置**。
+    #    04:1x 实测：本脚本在 `heyta-wt-trash-e2e` 载体上就是这么红的，日志尾部是
+    #    `Error: JWT_SECRET environment variable is required`，而那次超时是它的下游读数。
+    #    同一件事在 `scripts/lib/auth-journey-server.mjs:233-236` 的 `secretFallback` 早有解，
+    #    这里照它的语义来，不另建第二套规则：**env 与 `server/.env` 两边都没有**才现生成一枚
+    #    一次性值；任一边有就**一个字节都不覆盖**（主检出两边都声明 ⇒ 走原路，行为逐字不变）。
+    #    为什么是现生成而不是把主检出的 `.env` 拷过来：那里面是真凭据，而这个栈不需要复用它们
+    #    （库是本轮的、令牌与口令散列随进程一起死，它们不承担生产密钥的任何义务）。
+    #    ⚠️ 不能写成 `JWT_SECRET="${JWT_SECRET:-}"` 再传进子 shell：dotenv 见"已定义"就不覆盖，
+    #    空串会让带 `.env` 的那棵检出**也**崩在这两句自检上 —— 于是这次修会把主检出的起栈弄坏。
+    #    所以只在真的缺失时才 export。
+    declared_in_server_dotenv() { # $1=变量名
+      [ -f "$ROOT/server/.env" ] && grep -qE "^[[:space:]]*${1}=" "$ROOT/server/.env"
+    }
+    new_one_time_secret() {
+      node -e 'console.log(require("crypto").randomBytes(32).toString("hex"))'
+    }
     # 必须前台跑在子 shell 里再由外层转入后台 —— 直接 `... &` 也要 `nohup` 才不会被 SIGHUP。
     # TEST_MODE 三件套缺一不可：config.ts 在 NODE_ENV=production 时会**抛错拒绝启动**。
     (
       cd "$ROOT/server" || exit 1
+      FALLBACKS=""
+      if [ -z "${JWT_SECRET:-}" ] && ! declared_in_server_dotenv JWT_SECRET; then
+        JWT_SECRET="$(new_one_time_secret)"; export JWT_SECRET; FALLBACKS="JWT_SECRET"
+      fi
+      if [ -z "${PASSWORD_PEPPER:-}" ] && ! declared_in_server_dotenv PASSWORD_PEPPER; then
+        PASSWORD_PEPPER="$(new_one_time_secret)"; export PASSWORD_PEPPER
+        FALLBACKS="${FALLBACKS:+${FALLBACKS} }PASSWORD_PEPPER"
+      fi
+      if [ -n "$FALLBACKS" ]; then
+        echo "   一次性密钥回退：${FALLBACKS}（本检出没有 server/.env ⇒ 现生成，随进程死，不落盘）"
+      fi
       NODE_ENV=development PORT="$PORT" DATABASE_URL="$DATABASE_URL" \
       TEST_MODE=true TEST_MODE_CONFIRM=yes-i-understand-the-risks \
       CORS_ORIGINS="$CORS_ORIGINS" \

@@ -183,6 +183,18 @@ ax() {
 ax_json() { ax "$@"; }
 jget() { printf '%s' "$1" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$2',''))" 2>/dev/null; }
 
+# cpcount：按**码点**数，不按字节。
+#   实测（10-05 08:4x，本 rig 首跑）：secure 框三档回读恒为 60 而期望 20 ⇒ 判据恒红。
+#   根因不在设备上：iOS 安全框的掩码是**每个字符一枚 3 字节圆点**，而这一趟是在
+#   `LANG` 与 `LC_ALL` 都为空的环境里跑的，bash 3.2 的 `${#var}` 那种写法在
+#   非 UTF-8 locale 下数的是**字节** ⇒ 20 位口令读成 60（`printf '\xe2\x97\x8f'` × 20
+#   在同一环境里 `${#}`=60 而 `python3 len()`=20，两边现量）。
+#   ⇒ 掩码这一档唯一稳的读数是码点数；字节数只作为诊断值一起打出来。
+#   🔴 这条与「探针跟着环境说话」同族：同一句判据在带 UTF-8 locale 的终端里是绿的，
+#      在剥了 locale 的后台任务里就恒红 —— 所以计数不能交给 shell 的隐式 locale。
+cpcount() { python3 -c 'import sys;print(len(sys.argv[1]))' "$1"; }
+
+
 # 🔴🔴 **关掉 iOS 的「保存密码？」系统弹窗 —— 它会盖住整个页面。**
 #
 # 实测（2026-09-29，第 36 轮，**截图才看出来**）：在 `secure` 输入框里填过字之后，
@@ -1267,7 +1279,7 @@ set_field() {  # <label> <值> [--secure]
   # ⇒ 现在的纪律：先归一化（收键盘 —— 键盘弹着时下半屏元素会从树上消失），
   #    再 --scroll-into-view（滚进可见区），仍拿不到就 `bad`。
   #    **报告事实，不让容错分支吞掉状态机漂移。**
-  local lbl="$1" val="$2" secure="${3:-}" attempt=1 pre out back rc
+  local lbl="$1" val="$2" secure="${3:-}" attempt=1 pre out back rc vl bl
   while [ "${attempt}" -le 4 ]; do
     # 🔴 归一化放**每一次尝试里**：键盘弹着时被它盖住的元素直接从 AX 树上
     #    消失（第 6 轮实测），上一轮写完留下的键盘会让下一轮定位必败。
@@ -1288,21 +1300,25 @@ set_field() {  # <label> <值> [--secure]
     #    空（症状：同步停在「还没设置端到端加密口令」）。
     #    唯一实测能进 RN 状态的路：**聚焦 + HID 键盘输入**（shim 的 --type-text，
     #    内部先滚进可见区、tap 聚焦、等键盘、再 `ui text`）。
-    #    掩码长度 == 原文长度：多了说明是**追加**（上次残留），也是失败。
+    #    掩码**码点**数 == 原文码点数：多了说明是**追加**（上次残留），也是失败。
+    #    🔴 10-05 08:4x 实测：`LANG` 为空时 `${#back}` 数的是**字节**，而掩码圆点是 3 字节字形
+    #       ⇒ 20 位口令读成 60，这一支在剥了 locale 的后台环境里恒红（注销 rig 首跑撞的就是它）。
+    #       计数改成显式走 cpcount（码点），字节数只当诊断值一起打出来。
     attempt=1
     while [ "${attempt}" -le 3 ]; do
       local tp; tp=$(ax "$lbl" --role AXTextField --type-text "$val")
       back=$(jget "$tp" detail)
-      if [ "$(jget "$tp" typedRc)" = "0" ] && [ "${#back}" -eq "${#val}" ]; then
-        ok "已填写「${lbl}」（secure 框经聚焦+键盘输入，掩码长度 ${#back} = 原文长度）"
+      vl=$(cpcount "$val"); bl=$(cpcount "$back")
+      if [ "$(jget "$tp" typedRc)" = "0" ] && [ "$bl" = "$vl" ]; then
+        ok "已填写「${lbl}」（secure 框经聚焦+键盘输入，掩码码点 ${bl} = 原文码点 ${vl}）"
         return 0
       fi
-      echo "     [set_field] 「${lbl}」secure 框第 ${attempt} 次输入失败：typedRc=$(jget "$tp" typedRc)，掩码 ${#back} ≠ 原文 ${#val}"
+      echo "     [set_field] 「${lbl}」secure 框第 ${attempt} 次输入失败：typedRc=$(jget "$tp" typedRc)，掩码 ${bl} 码点 ≠ 原文 ${vl} 码点（字节 ${#back}）"
       attempt=$((attempt + 1))
       ax --dismiss-keyboard --json >/dev/null 2>&1
       sleep 1
     done
-    bad "填写「${lbl}」失败（secure 框 3 次：typedRc=$(jget "$tp" typedRc)，掩码长度 ${#back} ≠ 原文长度 ${#val}）"
+    bad "填写「${lbl}」失败（secure 框 3 次：typedRc=$(jget "$tp" typedRc)，掩码 ${bl} 码点 ≠ 原文 ${vl} 码点）"
     return 1
   fi
   # 🔴 **idb 的 `set-value` 时好时坏，必须重试**（2026-09-29 实测四次两败）。
@@ -1369,10 +1385,35 @@ grant_network_consent_if_asked() {
 
 CREDS_OK=0
 
+# The auth entry is a bottom-tab child after the preceding reachability probe.
+# A viewport-only press can race the tab transition and report `not-found` even
+# though the same button is visible after the next AX frame.  Normalize to the
+# Profile tab, scroll the exact entry into view, and only then press it.  The
+# postcondition remains the real auth field, so this cannot turn a failed
+# navigation into a pass.
+press_auth_entry_until_email() {
+  local _try _my _entry _press _email
+  for _try in 1 2 3 4 5; do
+    _my=$(ax "我的" --pressable --list --json)
+    if [ "$(jget "$_my" found)" = "True" ]; then
+      ax "我的" --pressable --press --json >/dev/null 2>&1 || true
+    fi
+    sleep 1
+    _entry=$(ax "注册 / 登录" --pressable --scroll-into-view --exact --json)
+    if [ "$(jget "$_entry" found)" = "True" ] && [ "$(jget "$_entry" visible)" = "True" ]; then
+      _press=$(ax "注册 / 登录" --pressable --press --exact --json)
+      sleep 2
+      _email=$(ax "邮箱" --list --json)
+      if [ "$(jget "$_email" found)" = "True" ]; then return 0; fi
+    fi
+  done
+  return 1
+}
+
 # 🔴 **回读"认证页真的出现了吗"**（判据是「邮箱」框，不是 press 的返回值）。
 #    5 次：这台折叠屏上 RN 的按压**时灵时不灵**（第 8 轮实测 3 次全落空，
 #    第 9 轮第一次即中）—— 3 次的预算在它上面不够分辨"夹具抖"和"产品坏了"。
-if press_until "注册 / 登录" "邮箱" 5; then
+if press_auth_entry_until_email; then
   ok "已进入认证页（**回读到「邮箱」才判成功**）"
 else
   bad "「注册 / 登录」按了 5 次都没进认证页 —— 夹具问题，不是产品问题"
@@ -1434,6 +1475,7 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
     # returned session is a separate user action; waiting for Profile's
     # "立即同步" before pressing it makes a successful token exchange look
     # like an auth failure and silently sends the run to the legacy fallback.
+    _save_done=0
     for _i in $(seq 1 20); do
       # The AuthScreen is longer than one iPhone viewport.  After token
       # redemption the session action is rendered below the paste field, so a
@@ -1441,19 +1483,25 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
       # manual fallback.  Scroll and require visibility in the same frame
       # before treating the stage as present.
       _save_stage=$(ax "保存并启用同步" --scroll-into-view --exact --json)
-      _save_button=$(ax "保存并启用同步" --pressable --list --exact --json)
+      _save_button=$(ax "保存并启用同步" --pressable --scroll-into-view --exact --json)
       if [ "$(jget "$_save_stage" found)" = "True" ] && [ "$(jget "$_save_stage" visible)" = "True" ] \
-        && [ "$(jget "$_save_button" found)" = "True" ]; then
+        && [ "$(jget "$_save_button" found)" = "True" ] \
+        && [ "$(jget "$_save_button" visible)" = "True" ]; then
         ok "登录令牌已兑换，回读到「保存并启用同步」阶段"
         _save_press=$(ax "保存并启用同步" --pressable --press --exact --json)
         if [ "$(jget "$_save_press" result)" != "success" ]; then
           bad "「保存并启用同步」按压未确认成功（result=$(jget "$_save_press" result)）"
+        else
+          _save_done=1
         fi
         sleep 3
         break
       fi
       sleep 3
     done
+    if [ "$_save_done" -ne 1 ]; then
+      bad "登录令牌已兑换，但 60 秒内未能把「保存并启用同步」滚入并按下 —— 主路径未完成"
+    fi
     # 首次同步含纯 JS Argon2id 派生，实测约 50 秒 —— 给足时间，并轮询而不是定长 sleep。
     # 🔴 轮询期间**顺路处理两个会悄悄盖住页面的东西**：
     #    · 首启隐私同意门（登录也要联网）；
