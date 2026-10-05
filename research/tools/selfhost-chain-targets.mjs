@@ -25,7 +25,7 @@
  * ## 判据与它的射程边界
  *
  * 逐条链步：`pnpm X` → `scripts[X]`（一层嵌套，带环守卫），再从 body 里取"看起来是仓库内脚本"的
- * token —— 以 `.mjs/.cjs/.js/.ts/.sh` 结尾、不以 `-` 开头、不含 `node_modules/`。
+ * token —— 以 `.mjs/.cjs/.js/.ts/.sh/.py` 结尾、不以 `-` 开头、不含 `node_modules/`。
  * `cd <dir> &&` 前缀会把相对路径挪到那个子目录里去判。
  *
  * 🔴 三条**分类**都要打出来，不许静默跳过（"桩必须能回答不"同一件事）：
@@ -39,6 +39,13 @@
  *    解它要先把包名映射回目录（读 `pnpm-workspace.yaml`）—— 已量：根链 85 步里这类只有 5 步，
  *    运行时按名字打全，不做"读不出就当通过"。
  *
+ * 🔴 `.py` 是 2026-10-05 现量加进来的，不是"顺手补全"：主检出当时那份**未提交**的 `package.json`
+ * 往链里加了 `check:ios-ax-shim` → `python3 scripts/tools/ios-ax-shim.test.py`，而那枚 `.py` 在主检出
+ * 里是未跟踪的 —— 于是 G-65 那一族（"只提交 package.json 就会在落地那一刻红"）**恰好从扩展名集合的
+ * 缝里走进来**，被本尺子归进 `no-target`（打印了名字，但判的是"不在射程"而不是"悬空"）。
+ * 同一把扫描器对**已提交的** main 与载体各自 0 命中，所以这不是"宽起来挡假阳"：`.py` 是唯一
+ * 一条真实存在的形态。`.mts`/`.swift`/`.ps1` 仍然在集合外，敞口按 ① 点名，不当通过。
+ *
  * 退出码：0 = 没有悬空；1 = 有悬空或有 unresolved；2 = 探针自己读不到（`git ls-tree` 失败等）。
  */
 import { execFileSync } from 'node:child_process';
@@ -47,7 +54,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
-const SCRIPT_EXT = /\.(?:mjs|cjs|js|ts|sh)$/;
+const SCRIPT_EXT = /\.(?:mjs|cjs|js|ts|sh|py)$/;
 
 /**
  * 把一条链步解析成 `scripts` 里的命令体，展开一层 `pnpm <name>` 嵌套。
@@ -219,12 +226,25 @@ function runSelftest() {
   const j = auditChain({ pkgText: mkPkg('pnpm -r test', {}), has });
   push('J 纯递归步骤 ⇒ no-target 并带原因，绝不读成 unresolved', 'no-target', j[0].kind);
 
+  // K `.py` 那一格（2026-10-05 现量的真实形态：主检出未提交的 check:ios-ax-shim）
+  //   K1 在位 ⇒ 判 checked，不许掉回 no-target 蒙过去
+  const k1 = summarize(auditChain({
+    pkgText: mkPkg('pnpm pyx', { pyx: 'python3 scripts/ax.py' }),
+    has: (p) => has(p) || p === 'scripts/ax.py',
+  }));
+  push('K1 python3 那步取到目标且在位 ⇒ 1 checked / 0 悬空 / 0 no-target', '1|0|0',
+    `${k1.checked}|${k1.dangling}|${k1.noTarget}`);
+  //   K2 同一形态但实现不在树里 ⇒ **必须**是悬空（这一条就是加 .py 的全部理由）
+  const k2 = summarize(auditChain({ pkgText: mkPkg('pnpm pyx', { pyx: 'python3 scripts/ax.py' }), has }));
+  push('K2 python3 那步的实现不在树里 ⇒ 恰好 1 条 dangling（不是 no-target）', '1|0',
+    `${k2.dangling}|${k2.noTarget}`);
+
   const bad = arms.filter((x) => x.expect !== x.got);
   const fArms = arms.filter((x) => x.name.startsWith('F['));
   console.log(`臂数 ${arms.length} · 不符 ${bad.length} · 其中敞口臂 ${fArms.length} 条（F 臂断言的是当前行为，不是期望行为）`);
   for (const x of arms) console.log(`${x.expect === x.got ? 'ok  ' : 'BAD '} ${x.name}  期望=${x.expect} 实量=${x.got}`);
   for (const x of bad) console.log(`   ^ 这条是自检里真正的不符：${x.name}`);
-  if (arms.length < 11 || bad.length > 0) {
+  if (arms.length < 13 || bad.length > 0) {
     console.error('❌ 自检不过 ⇒ 不许拿这个尺子去判合并载体');
     process.exitCode = 1;
     return;

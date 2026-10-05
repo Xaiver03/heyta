@@ -13,6 +13,7 @@
  *   node research/tools/selfhost-land-main.mjs --carrier <ref> # 用现成的载体，不重算（测双亲闸门用）
  *   node research/tools/selfhost-land-main.mjs --attribute     # check 红时接着跑逐段归属
  *   node research/tools/selfhost-land-main.mjs --selftest      # 只验"端口射程判据"有没有牙（不碰任何工作树）
+ *   node research/tools/selfhost-land-main.mjs --baseline-leg   # 只跑"基线新鲜度"那一格，就地退（不重算载体、不动工作树）
  *   node research/tools/selfhost-land-main.mjs --watch-leg 20  # 只取第 4 道看守的三臂读数（合成子进程，不跑链、不碰 ref）
  *
  * 🔴 **落地那一趟必须用本文件的绝对路径**：这批 `selfhost-*.mjs` 只活在分支上，主检出里
@@ -319,6 +320,71 @@ if (CONFIRM) {
   say('跑链之前先自证看守三臂（合成子进程；任一臂不合格 = 探针坏 ⇒ 不开几十分钟的链）');
   await watchLeg(5);
 }
+
+/* ── 0. 基线新鲜度：本地那笔 main 是不是**当前**那笔公开 main ────────────────
+ * 这一格是 2026-10-05 13:0x 被现量逼出来的：公开 main 前进到 `564ad047`，本地 main 落后
+ * 数百笔而本地独有 0 笔 —— 更要紧的是那些新笔里**已经带着本批的一部分**
+ * （公开树的 `server/Dockerfile` 有那条 `RUN npm pkg delete devDependencies`、
+ * `research/tools/` 下有 20+ 枚 `selfhost-*.mjs`、台账末节到 §8.182）。
+ * ⇒ 本批现在是"部分已公开 + 部分只在本地分支"这个形状。
+ *
+ * 下面"载体双亲对上"那道闸门只比对**本地** main，它看不见"本地 main 自己就是旧的"。
+ * 装在旧基线上的那一笔并不代表"批次 + 当前公开基线"，而它一旦被人推上去，
+ * 就是把别人那几百笔当分叉处理。所以这一档排在**任何写动作之前**（载体重算在 gate 1 里）。
+ *
+ * 读不到远端 ref（没 fetch 过 / 离线）按**判不了**处理：`--confirm` 下拦，纯体检只报不拦。
+ * 口径与 `selfhost-carrier-busy` 同一句话：**"判不了"不等于"没问题"**。 */
+const REMOTE_MAIN = process.env.HEYTA_LAND_REMOTE_MAIN || 'origin/main';
+const baselineGate = () => {
+  let remote = '';
+  try {
+    remote = git(['rev-parse', '--verify', REMOTE_MAIN], branchTree.path).trim();
+  } catch {
+    remote = '';
+  }
+  if (!remote) {
+    let url = '(读不到 origin 的 URL)';
+    try { url = git(['remote', 'get-url', 'origin'], branchTree.path).trim(); } catch { /* 保留上面那句 */ }
+    const msg = `拿不到 ${REMOTE_MAIN} 这个 ref ⇒ 基线新不新鲜**判不了**（判不了 ≠ 没问题）。\n` +
+      `   先只读地取一次现量（不动任何工作树）：git -C ${q(mainTree.path)} fetch ${url} +refs/heads/main:refs/remotes/${REMOTE_MAIN}`;
+    if (CONFIRM) refuse(msg, 1);
+    skip(msg);
+  }
+  const short = (r) => git(['rev-parse', '--short', r], branchTree.path).trim();
+  const behind = Number(git(['rev-list', '--count', `${MAIN_REF}..${REMOTE_MAIN}`], branchTree.path));
+  const ahead = Number(git(['rev-list', '--count', `${REMOTE_MAIN}..${MAIN_REF}`], branchTree.path));
+  const reading = `${MAIN_REF}=${short(MAIN_REF)} · ${REMOTE_MAIN}=${short(REMOTE_MAIN)} · 本地落后 ${behind} 笔（本地独有 ${ahead} 笔）`;
+  if (behind > 0) {
+    if (ahead > 0) {
+      refuse(`${REMOTE_MAIN} 领先本地 ${MAIN_REF} **${behind} 笔**，而本地另有 **${ahead} 笔没进** ${REMOTE_MAIN} ⇒ **这不是快进**，` +
+        `现在落地等于把批次装在一笔两边都不认的基线上。\n` +
+        `   那条"主检出干净时快进"的授权**不覆盖这一格**（它只管快进），本工具也不替所有者合并 / 变基 / 推送：\n` +
+        `   要由 ${MAIN_REF} 那 ${ahead} 笔的所有者把本地提交与公开基线和好（推上去，或先把 ${REMOTE_MAIN} 并进本地）。\n` +
+        `   现量：${reading}`, 1);
+    }
+    refuse(`${REMOTE_MAIN} 领先本地 ${MAIN_REF} **${behind} 笔** ⇒ 现在落地等于把批次装在一笔旧基线上。\n` +
+      `   要先把主检出快进到公开那一笔 —— 那是**主检出所有者**的动作（2026-10-05 已授权由看守在前提成立时代做那一条），` +
+      `本工具不跨工作树动它：\n` +
+      `   node ${q(join(SELF, '..', 'selfhost-main-fastforward.mjs'))} --check   # 只判不动；前提成立时去掉 --check\n` +
+      `   现量：${reading}`, 1);
+  }
+  return reading;
+};
+
+if (FLAG('baseline-leg')) {
+  /* 只跑这一格，就地退：不重算载体、不动任何工作树 —— 给"这条判据能不能红"的 A/B 用。
+   * 两腿都拿真 ref 打，不造假旋钮：`HEYTA_LAND_REMOTE_MAIN=main` ⇒ 落后 0 笔（应绿），
+   * 默认 `origin/main` ⇒ 落后几百笔（应红）。 */
+  try {
+    say(`✅ 基线 —— ${baselineGate()}`);
+    process.exit(0);
+  } catch (e) {
+    say(`🔴 基线 —— ${e.message}`);
+    process.exit(e.skipped ? 2 : 1);
+  }
+}
+
+await gate(1, `基线：${MAIN_REF} 不落后于 ${REMOTE_MAIN}`, baselineGate);
 
 /* ── 1. 双亲与新鲜度：载体必须正好是 main × 分支 ──────────────────── */
 const mainSha = git(['rev-parse', MAIN_REF], branchTree.path);
