@@ -231,7 +231,10 @@ export {
  */
 export {
   ADMIN_API_PREFIX,
+  adminApproveRefund,
+  adminCreateRefundRequest,
   adminForceUserLogout,
+  adminRejectRefund,
   adminSetUserQuota,
   adminUnlockUser,
   adminDeleteHolidayYear,
@@ -241,6 +244,7 @@ export {
   fetchAdminInvites,
   fetchAdminOrders,
   fetchAdminOverview,
+  fetchAdminRefunds,
   fetchAdminSubscriptions,
   fetchAdminUser,
   fetchAdminUsers,
@@ -255,6 +259,7 @@ export {
   type AdminOrderRow,
   type AdminOverview,
   type AdminPage,
+  type AdminRefundRow,
   type AdminResult,
   type AdminSubscriptionRow,
   type AdminUserDetail,

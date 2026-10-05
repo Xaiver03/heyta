@@ -83,7 +83,7 @@ ADR-0026 §1 的查证留了两件事，而它们指向不同的方向：
 | 面 | 落点 | 判据 |
 |---|---|---|
 | 政策口径（窗口 / 全额 / 回收算法） | `server/src/billing/refund-policy.ts`（**纯函数**，唯一数字源） | `tests/billing-refund-policy.spec.ts` |
-| `refunds` 表与三条 CHECK | 迁移 `20261014000000_add_refunds`（普通 DDL，不带 CONCURRENTLY） | PGlite 用例直接读**发布中的迁移文件**建表 |
+| `refunds` 表与三条 CHECK | 迁移 `20261014000000_add_refunds`（普通 DDL，不带 CONCURRENTLY） | PGlite 用例直接读**发布中的迁移文件**建表；真 PostgreSQL 复验见 §4.2 |
 | 状态机 / 冻结 / 唯一回收落点 | `server/src/billing/refund-store.ts` | `tests/billing-refund-store.pglite.spec.ts`（真 SQL：CHECK、条件更新行数、语句顺序、事务边界） |
 | 通道退款调用 | `wechat.adapter.ts#refund`（`/v3/refund/domestic/refunds`）；`noop` 适配器**抛**而不是空操作 | `tests/wechat-adapter.spec.ts` 的 `refund()` 与「退款通知归一化」两组 |
 | 退款通知进业务层 | `webhook.routes.ts`：`event.refundNotice != null` 走回收分支，**没有**任何授予路径 | `tests/billing-webhook-settlement.pglite.spec.ts` 的「webhook 退款分支 —— 通知走回收，不走授予」 |
@@ -94,6 +94,49 @@ ADR-0026 §1 的查证留了两件事，而它们指向不同的方向：
 （ADR-0026 洞 1 的那个 401 因此不再是终态），但归一化出来的事件带
 `oneTimeGrant: null` + `userId: null` —— 🔴 **退款通知在类型上就给不出授予**，
 它只能认领一张已存在的退款行。
+
+## 4.2 真 PostgreSQL 复验（2026-10-05，消掉"这条迁移从没在真库上跑过"那一格）
+
+载体是一次性的 `postgres:16-alpine` 容器（本机、非生产、跑完 `docker rm -f` 删掉），
+**空库**起步 ⇒ 跑的是整条链，不是只跑我这一笔。入口按 §4 的规矩走
+`sh scripts/migrate-deploy.sh`（macOS 需要 `research/tools/macos-sed-shim` 在 PATH 上）。
+
+```
+RC_MIGRATE_1=0     # 空库 → 全链应用完；账本 53 行 / 48 个不同迁移 / 48 条 finished_at 非空
+                   #   （多出的 5 行 rolled_back 是脚本自己的 CONCURRENTLY 带外恢复路径，
+                   #    每一条都有对应的成功行 —— 不是失败）
+RC_MIGRATE_2=0     # 同库再跑一次："No pending migrations to apply." ⇒ 幂等
+```
+
+三条手工 CHECK 在**真目录**里存在（`pg_get_constraintdef` 原样读出，不是文件里写了什么），
+并且逐条能拒 —— 判据是"插入被拒 + 报的是哪一条约束"，不是"看起来建出来了"：
+
+| 探针 | 写入的形状 | 真库反应 |
+|---|---|---|
+| P1 | `amount_minor = 0` | `refunds_amount_positive` |
+| P2 / P3 | `period_days = 0` / `= 400` | `refunds_period_days_range`（两侧都拒） |
+| P4 | `success` + `refunded_at IS NULL` | `refunds_success_needs_refunded_at`（第 1 侧） |
+| P5 / P6 | `failed` / `approved` + `refunded_at` 非空 | 同一条约束（第 2 侧，两个状态各一次） |
+| P7 / P8 | `success` + 非空 / `closed` + `NULL` | **插入成功** —— 正向腿，没有它上面六条可能是恒拒 |
+| P9 | 重复 `out_refund_no` | `duplicate key … refunds_out_refund_no_key` |
+| P10 | `order_id` 指向不存在的单 | `refunds_order_id_fkey` |
+
+🔴 **并发批准也在真库上量了**（这是 §5 第 4 条原来只靠"条件更新行数"的那一格）：
+两个会话跑**同一条** success UPDATE，A 先拿到行锁并 `pg_sleep(4)` 持住，B 在 1.5s 后起跑。
+
+```
+A 的 command tag = UPDATE 1
+B 的 command tag = UPDATE 0        # 等 A 提交后按新行值重算 WHERE，没匹配上
+终态 = status='success' refunded_at=111   # B 写的 222 从未落地
+```
+
+⇒ "两个管理员同时点批准只有一个生效"在真锁下成立，回收落点不会走两遍。
+⚠️ 但**机制是推出来的不是看来的**：中途那枚 `pg_stat_activity` 探针没取到任何行
+（写它的人没让它说话），所以"阻塞"这一环的证据只有上面那**一对** command tag
+加 4 秒持锁窗口。要直接观测得换 `pg_locks` 的取法，留给下一次真碰这条边的人。
+
+容器口令只存在 `$TMPDIR` 的一个 0600 文件里，两份部署日志各 `grep -c` 该口令 = **0**
+（真密钥值不进任何输出或仓库）。
 
 ## 5. 已知边界（不许读成"已解决"）
 
@@ -106,9 +149,11 @@ ADR-0026 §1 的查证留了两件事，而它们指向不同的方向：
    而 `reconcile.ts` 的对账作业**只覆盖支付事件、不覆盖退款**，所以这条边没有兜底对账。
 3. **`already-applied` 这个 outcome 名在两处共用**：真的重投，与"状态机不允许这一跳"
    （例如一条还停在 `requested` 的行收到 success）。审计里分不开这两种。
-4. **行锁没有在本仓库实测过**：PGlite 是单连接的，两个 `BEGIN` 无法并存。
-   "两个管理员同时点批准只有一个生效"的证据是**条件更新的行数**，
-   不是"PostgreSQL 真的会阻塞第二个事务"。后者是文档保证的行为。
+4. **行锁**：PGlite 是单连接的，两个 `BEGIN` 无法并存，所以单元层能给的只有
+   "条件更新的受影响行数"。~~"PostgreSQL 真的会阻塞第二个事务"这一格是文档保证的行为。~~
+   ✅ **2026-10-05 在真 `postgres:16-alpine` 上量过了**：A 拿到行锁并持住 4 秒，B 在 1.5 秒后
+   跑同一条 UPDATE ⇒ `A=UPDATE 1 / B=UPDATE 0`，终态只有 A 写的那一个 `refunded_at`
+   （逐条读数与"机制是推出来的、`pg_stat_activity` 那枚探针没取到"这条限定一起写在 §4.2）。
 5. **没有一笔真实的退款通知**：全部证据在库层与单元层。
    仓库内没有配置任何支付通道（`WECHAT_PAY_ENABLED` 未设 ⇒ 生产 adapter 列表只有 `noop`），
    所以 §4 那四条通道/回调判据是**对着 APIv3 的形状**写的，未与真实载荷逐字段核对
@@ -131,17 +176,34 @@ ADR-0026 §1 的查证留了两件事，而它们指向不同的方向：
    它判的是**这一半够不到任何可达形状**；真正的牙在 schema 那一侧，
    由「三条 CHECK 双向」那组咬住。留着的理由写在代码注释里：钱的路径上，
    一道冗余闸门比一道"以后 CHECK 被放宽了就静默失效"的闸门好。
-10. 🔴 **后台的"审批面"今天是接口，不是界面**：`/api/admin/refunds*` 四条路由通了、判据齐了，
+10. ~~🔴 **后台的"审批面"今天是接口，不是界面**：`/api/admin/refunds*` 四条路由通了、判据齐了，
     但 `apps/web/src/features/admin/` 里**没有** refunds 这个 tab，
     `packages/app-host/src/admin-client.ts` 里**没有**对应的传输函数
     —— 现在能批准一条退款的，只有拿管理员令牌直接敲接口的人。
     补它不是一个改动而是五件：admin-client 传输 + web store 一片 + 面板一个 tab +
     `packages/i18n` 中英两条 + **真浏览器截图且人看过**（`AGENTS.md §6.2` 规定一）。
-    本 ADR 把它记成边界，不记成"后台已可用"。
-11. **`adminRequest` 把非 2xx 只落成 `reason + status`，不带响应体**：
+    本 ADR 把它记成边界，不记成"后台已可用"。~~
+    ✅ **2026-10-05 那五件都做了**：`admin-client` 四条传输函数（列表 / 开单 / 批准 / 驳回）+
+    `apps/web/src/features/admin/store.ts` 一片 + 后台**第八个** tab「退款」+
+    `packages/i18n` 中英各 36 条 + 四张真浏览器图（`apps/web/evidence/admin-*-*.png`，人都看过）。
+    批准是**两步**（第一次点只出确认、一个请求都不发 —— 一次点击不许动钱），
+    驳回一步；只有 `requested` 那一行给按钮；界面**不许**说"已退款"（那一句只由签名有效的回调认领）。
+    🔴 **看图抓到一条只有看图才看得见的缺陷**（也是本节存在的理由）：带按钮的那一行，
+    四段标识被 CSS `text-overflow: ellipsis` 裁掉 **330 px** —— `out_refund_no` 整段不见，
+    展开二次确认时整行标识挤没，而那正是"运营要看清自己在批哪一笔"的一刻。
+    而九条 `toContainText` 对这张截图**全部照样绿**：DOM 里字还在，屏上没有。
+    ⇒ 判据补成真浏览器的一条 `scrollWidth > clientWidth`（**先红 2 条**、改成标识独占一行后转绿）。
+    ⚠️ **仍然成立、不许读成"运营已经能退款"**：这台实例没配真实通道 ⇒ 批准在"发通道"那一步
+    如实失败（`channel-failed` + 原因码上屏），界面不把它伪装成已退款。
+11. ~~**`adminRequest` 把非 2xx 只落成 `reason + status`，不带响应体**：
     于是 409 里的 `reason:'WINDOW_PASSED' / 'ALREADY_REFUNDED'` 到不了界面。
     退款恰恰是"必须告诉运营**为什么**被拒"的那类操作 —— 接界面时这是第一件事，
-    不是可选项（否则会再造一次"错误被折叠成一句'请求无效'"的形状）。
+    不是可选项（否则会再造一次"错误被折叠成一句'请求无效'"的形状）。~~
+    ✅ **2026-10-05 接界面时第一件事就是它**（照本条原话做的）：409 单独成一个 `conflict` 档，
+    `adminRequest` 从失败响应体里读 `reason`（只认字符串、上限 80 字符，读不到就是 `undefined`），
+    界面按码查词表。两条降级路径都不折叠成一句笼统失败：**码不认识** ⇒ 把原码印出来；
+    **没有码** ⇒ 明说"服务端没有给出原因码"。服务端那三条 409 也各自补上了机器码
+    （`NOT_DECIDABLE` ×2、`REFUND_PROVIDER_NOT_REGISTERED`），路由契约用例逐条钉住。
 
 ### 4.1 变异读数（2026-10-05，一次装置跑 14 臂）
 

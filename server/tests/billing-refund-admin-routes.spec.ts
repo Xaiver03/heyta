@@ -351,7 +351,13 @@ describe('POST /api/admin/refunds/:id/approve —— 批准之后才发给通道
       payload: { note: '批准' },
     });
     expect(res.statusCode).toBe(409);
-    expect(res.json()).toMatchObject({ error: 'REFUND_PROVIDER_NOT_REGISTERED', status: 'approved' });
+    // 🔴 409 的体里必须带**机器码**：`error` 是给人读的散文，而后台界面要按码选措辞
+    // （这一条是"钱没发出去"那种必须让运营看见的事实，折成一句笼统冲突就是界面说谎）。
+    expect(res.json()).toMatchObject({
+      reason: 'REFUND_PROVIDER_NOT_REGISTERED',
+      status: 'approved',
+      channel: 'unavailable',
+    });
     expect(calls).toHaveLength(0);
     expect(await refundRow(request.refundId)).toMatchObject({ status: 'approved', refunded_at: null });
     expect(await orderStatus(orderId)).toBe('paid');
@@ -378,6 +384,8 @@ describe('POST /api/admin/refunds/:id/approve —— 批准之后才发给通道
       payload: { note: '再点一次' },
     });
     expect(second.statusCode).toBe(409);
+    // 与上面同一条形：这一档 409 也得带码，否则界面只能说"状态冲突"而说不出"已经决定过了"。
+    expect(second.json()).toMatchObject({ reason: 'NOT_DECIDABLE' });
 
     const { refundId: other } = await requested();
     const noNote = await app!.inject({
@@ -491,6 +499,7 @@ describe('拒绝与列表', () => {
       payload: { note: '改主意' },
     });
     expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ reason: 'NOT_DECIDABLE' });
     // 批准之后已经发给通道，行停在 `processing` —— 拒绝不能把它擦回 `requested`。
     expect(await refundRow(request.refundId)).toMatchObject({ status: 'processing' });
   });

@@ -193,7 +193,7 @@ SKU 与折扣，实现在 `settleOrderPaid`。
 | 哪些单能退 | 只有**收银台一次性单**（`checkout_orders` 里有 `out_trade_no`、金额已核实） | `refund-policy.ts#decideRefundEligibility` |
 | 退多少 | **结算时冻下的实付**（用了券就是实付，不是原价） | 同上；`refunds.amount_minor` 冻结 |
 | 权益怎么回 | 只回收**这一单授予的那一段**；已消费的天数不追回；多来源权益取并集那条纪律不变 | `refund-policy.ts#retractGrantedPeriod` |
-| 例外（超窗） | 只走运营后台的**接口**（`/api/admin/refunds*`），且**必须带理由**，否则 400。🔴 后台**没有**退款 tab —— 今天能点的人是拿令牌敲接口的人（ADR-0053 §5 第 10 条） | `admin.routes.ts` 的 `operatorApproved` + refine |
+| 例外（超窗） | 只走运营后台，且**必须带理由**，否则 400。~~🔴 后台**没有**退款 tab —— 今天能点的人是拿令牌敲接口的人（ADR-0053 §5 第 10 条）~~ ✅ **2026-10-05 后台有了「退款」这一格**：列表 + 开单 + 两步批准 + 驳回，409 的原因码原样上屏（证据与判据见 [`pricing-coupons-handoff.md`](../plans/pricing-coupons-handoff.md) §12.8） | `admin.routes.ts` 的 `operatorApproved` + refine |
 | 通道没配时 | 批准照落库，发通道那步如实失败（`refunds.status='failed'` + 审计），**不报 500** | `refund-store.ts#submitRefundToChannel` |
 
 🔴 **对外说法未改**：这句临时口径目前只在代码与 ADR-0053 里。

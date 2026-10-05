@@ -73,6 +73,40 @@ function defaultFake(): FakeServerState {
   };
 }
 
+/**
+ * `GET /api/admin/refunds` 的两行（投影 = 服务端 `listRefunds` 选的那 9 个键，**逐键对齐**）。
+ *
+ * ⚠️ 取值刻意**互不重叠**：`4012` 分 / `30` 天 / `#1207` / `3304` / `7719` /
+ * `HYRFDEMO0001` —— "投影里每个字段都画出来了"这条存在性判据，
+ * 只有在各值不会互相冒充时才有牙（两个金额都填 400 那种写法判不出来）。
+ */
+function refundRows() {
+  return [
+    {
+      id: 1207,
+      orderId: 3304,
+      userId: 7719,
+      provider: 'wechat',
+      outRefundNo: 'HYRFDEMO0001',
+      amountMinor: 4012,
+      currency: 'CNY',
+      periodDays: 30,
+      status: 'requested',
+    },
+    {
+      id: 1206,
+      orderId: 3301,
+      userId: 7718,
+      provider: 'wechat',
+      outRefundNo: 'HYRFDEMO0002',
+      amountMinor: 1299,
+      currency: 'CNY',
+      periodDays: 30,
+      status: 'success',
+    },
+  ];
+}
+
 const OVERVIEW_BODY = {
   users: { total: 8, verified: 6, admins: 1, locked: 2 },
   subscriptions: {
@@ -204,11 +238,20 @@ async function seed({
   page,
   overviewStatus = 200,
   fake = defaultFake(),
+  refundDenyReason = null,
 }: {
   page: Page;
   /** 403 用来演"非管理员什么都不渲染"。 */
   overviewStatus?: number;
   fake?: FakeServerState;
+  /**
+   * 非 `null` ⇒ `POST /api/admin/refunds` 以 **409 + 这个原因码**回答。
+   *
+   * 🔴 这一格是 ADR-0053 §5 第 11 条那条判据的载体：409 体里的 `reason` 必须**一路走到界面**。
+   * 只断言"有一条错误行"挡不住把 409 折成一句"服务端出错了"的实现 —— 而那正是这一片
+   * 界面存在的理由（运营分不清"这一单过了 7 天"与"这条已经决定过了"就会反复点同一个按钮）。
+   */
+  refundDenyReason?: string | null;
 }): Promise<{ adminCalls: string[] }> {
   // ⚠️ 生产者垫片由 `openApp` 装（同 `inbox.spec.ts`：`page.route` 注册两次会让
   // 后一份把前一份静默遮掉）。
@@ -281,6 +324,12 @@ async function seed({
   // ⚠️ 这一条 glob 写错（少一个斜杠）的**症状不是静默通过**，而是两样都会响：
   // 请求回落到 `stub-provider.mjs` 拿 404 ⇒ `assertNoProblems` 的"不该有非 2xx"红；
   // 而"六个 Tab 各自按需拉数据"那条对 `adminCalls` 的逐字断言也红。
+  // 🔴 退款那两条端点**带状态**：批准之后 `GET /refunds` 必须回一个新状态，
+  // 否则界面只要"把请求里的话再印一遍"就能通过（§7 第 50 条那一族）。
+  const refunds = {
+    rows: refundRows().map((row) => ({ ...row })),
+  };
+
   await page.route(`${ADMIN}/**`, async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.slice(ADMIN_PATH.length); // 例如 '/users/7/unlock'
@@ -465,6 +514,62 @@ async function seed({
       });
       return;
     }
+    // ── 退款四条端点 ───────────────────────────────────────────────
+    if (path === '/refunds' && method === 'GET') {
+      await json({ refunds: refunds.rows });
+      return;
+    }
+    if (path === '/refunds' && method === 'POST') {
+      const body = route.request().postDataJSON() as {
+        orderId: number;
+        note?: string;
+        operatorApproved?: boolean;
+      };
+      if (refundDenyReason !== null) {
+        // 🔴 409 + 体里的**机器码**：这一格要验的就是这个码能不能走到界面。
+        await route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Refund not allowed.', reason: refundDenyReason }),
+        });
+        return;
+      }
+      const id = Math.max(...refunds.rows.map((row) => Number(row.id)), 9000) + 1;
+      refunds.rows.unshift({ ...refundRows()[0], id, orderId: body.orderId });
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          outcome: 'requested',
+          refundId: id,
+          outRefundNo: `HYRFNEW${String(id)}`,
+          amountMinor: 4012,
+        }),
+      });
+      return;
+    }
+    const decided = /^\/refunds\/(\d+)\/(approve|reject)$/.exec(path);
+    if (decided !== null) {
+      const row = refunds.rows.find((entry) => entry.id === Number(decided[1]));
+      if (row === undefined || row.status !== 'requested') {
+        await route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Refund already decided or finished.', reason: 'NOT_DECIDABLE' }),
+        });
+        return;
+      }
+      // 🔴 假服务端**自己变**：界面那一行的新状态只能从下一次 GET 读回来。
+      row.status = decided[2] === 'approve' ? 'processing' : 'rejected';
+      await json(
+        decided[2] === 'approve'
+          ? { ok: true, outcome: 'submitted', status: 'processing', providerRefundId: '5030' }
+          : { ok: true, outcome: 'decided', status: 'rejected' },
+      );
+      return;
+    }
+
     if (/^\/users\/\d+$/.test(path)) {
       await json(detailBody(fake));
       return;
@@ -566,8 +671,8 @@ function assertNoProblems(problems: PageProblems, expectedBad: readonly string[]
   expect(problems.pageErrors, `不该有未捕获异常：${JSON.stringify(problems.pageErrors)}`).toEqual([]);
 }
 
-/** 后台的六个 Tab（词条来自 `packages/i18n` 的 `web.admin.tab.*`）。 */
-type AdminTabLabel = '概览' | '用户' | '订阅' | '订单' | '优惠码' | '邀请';
+/** 后台的标签页（词条来自 `packages/i18n` 的 `web.admin.tab.*`）。 */
+type AdminTabLabel = '概览' | '用户' | '订阅' | '订单' | '优惠码' | '邀请' | '退款';
 
 /**
  * 🔴 必须**限定在面板内**：`role="tab"` 在这个应用里不止一处
@@ -575,6 +680,30 @@ type AdminTabLabel = '概览' | '用户' | '订阅' | '订单' | '优惠码' | '
  */
 function adminTab(page: Page, label: AdminTabLabel) {
   return page.getByTestId('admin-panel').getByRole('tab', { name: label, exact: true });
+}
+
+/**
+ * 🔴 「这一行的标识在**屏幕上**完整看得见」—— 不是「DOM 里有这段文字」。
+ *
+ * `toContainText` 读的是 DOM，而 CSS `text-overflow: ellipsis` 截断时**字还在 DOM 里**，
+ * 于是三条断言全绿的截图上，运营其实看不见自己在批哪一笔。看图实测到的形状：
+ * 带批准按钮的那一行被压成 `用户 #7719…`（`out_refund_no` 整段消失），
+ * 展开二次确认时更糟 —— 整行标识挤到看不见，而那正是最要看清的一刻。
+ *
+ * 判据用 `scrollWidth > clientWidth`（内容比盒子宽 = 被裁），留 1 px 给亚像素舍入。
+ */
+async function expectRowIdentityNotClipped(list: Locator): Promise<void> {
+  const rows = list.locator('li');
+  const count = await rows.count();
+  expect(count, '退款列表一行都没有，这条判据就成了空判').toBeGreaterThan(0);
+  for (let index = 0; index < count; index += 1) {
+    const main = rows.nth(index).locator('.ht-settings__admin-rowMain');
+    const clipped = await main.evaluate((el) => el.scrollWidth - el.clientWidth);
+    const text = await main.innerText();
+    expect(clipped, `第 ${String(index + 1)} 行的标识被裁掉 ${String(clipped)} px：${text}`).toBeLessThanOrEqual(
+      1,
+    );
+  }
 }
 
 test.describe('运营管理后台（真浏览器）', () => {
@@ -777,6 +906,94 @@ test.describe('运营管理后台（真浏览器）', () => {
     // 那条 403 是**本用例自己造的响应**，不是界面坏了 —— 但只放行这一个具体路径，
     // 按状态码放行会把将来真的坏掉的 4xx 一起藏掉。
     assertNoProblems(problems, ['/api/admin/overview']);
+  });
+
+  test('🔴 退款 Tab：投影里每一行都画出来，而只有待批准的那一行给按钮', async ({ page }) => {
+    const problems = captureProblems(page);
+    await seed({ page });
+    await openPanel(page);
+    await adminTab(page, '退款').click();
+
+    const list = page.getByTestId('admin-refunds');
+    // 先截图，再断言（§6.2 规定一第 1 条）。
+    await shoot(page, list, 'admin-tab-refunds.png');
+
+    await expect(list.locator('li')).toHaveCount(2);
+    const first = list.locator('li').first();
+    // 🔴 **逐字段的存在性**：少画任何一列（比如不显示 `out_refund_no`）运营就看不见那条事实，
+    // 而"整块渲染了"看不出来（W5 那条教训：断言只会验界面写了什么，不会验界面少了什么）。
+    for (const value of [
+      '#1207',
+      '3304',
+      '7719',
+      'HYRFDEMO0001',
+      '40.12',
+      'CNY',
+      '30',
+      'wechat',
+      'requested',
+    ]) {
+      await expect(first).toContainText(value);
+    }
+    // DOM 里有 ≠ 屏上看得见：上面那九条在"被 ellipsis 截断"的画面上**全部照样绿**。
+    await expectRowIdentityNotClipped(list);
+    await expect(first.locator('[data-testid="admin-refund-approve-1207"]')).toBeVisible();
+    // 已经走到 `success` 的那一行不再给按钮：状态机不认这一跳，点下去只会拿到一次 409。
+    // ⚠️ 这**不是**安全措施（服务端才是裁决者），是不制造一次注定失败的点击。
+    await expect(list.locator('[data-testid="admin-refund-approve-1206"]')).toHaveCount(0);
+    assertNoProblems(problems);
+  });
+
+  test('🔴 退款：批准是两步 —— 第一次点只出确认、一个请求都不发', async ({ page }) => {
+    const problems = captureProblems(page);
+    const { adminCalls } = await seed({ page });
+    await openPanel(page);
+    await adminTab(page, '退款').click();
+    await page.getByTestId('admin-refund-note-1207').fill('用户坚持，客服同意');
+
+    await page.getByTestId('admin-refund-approve-1207').click();
+    await shoot(page, page.getByTestId('admin-refund-approve-confirm'), 'admin-refund-confirm.png');
+    // 这一条是钱的那道闸：一次点击就动钱、且动出去收不回来的动作不许一步做完。
+    expect(adminCalls.filter((call) => call.includes('/approve')), '第一步不许发请求').toEqual([]);
+    await expect(page.getByTestId('admin-refund-approve-confirm')).toContainText('收不回来');
+    // 🔴 确认这一步**展开在行里**，会把行主内容挤没 —— 而"我在批哪一笔"必须看得见。
+    await expectRowIdentityNotClipped(page.getByTestId('admin-refunds'));
+
+    await page.getByTestId('admin-refund-approve-yes-1207').click();
+    expect(
+      adminCalls.filter((call) => call === 'POST /refunds/1207/approve'),
+      '第二步才发，且只发一次',
+    ).toHaveLength(1);
+    // 界面上那一行来自**重新读回的 GET**：新状态是 processing，而界面不许说"已退款"
+    // （`success` 只由签名有效的回调认领，ADR-0053 §4）。
+    await expect(page.getByTestId('admin-refunds').locator('li').first()).toContainText('processing');
+    await expect(page.getByTestId('admin-refund-notice')).toContainText('已交给支付通道');
+    await expect(page.getByTestId('admin-panel')).not.toContainText('已退款');
+    await shoot(page, page.getByTestId('admin-refunds'), 'admin-refund-approved.png');
+    assertNoProblems(problems);
+  });
+
+  test('🔴 退款：409 的原因码要走到运营眼前（ADR-0053 §5 第 11 条）', async ({ page }) => {
+    const problems = captureProblems(page);
+    const { adminCalls } = await seed({ page, refundDenyReason: 'WINDOW_PASSED' });
+    await openPanel(page);
+    await adminTab(page, '退款').click();
+    await page.getByTestId('admin-refund-order-input').fill('3304');
+    await page.getByTestId('admin-refund-request-note').fill('用户来申请');
+    await page.getByTestId('admin-refund-request').click();
+
+    const notice = page.getByTestId('admin-refund-notice');
+    await shoot(page, notice, 'admin-refund-denied.png');
+
+    expect(adminCalls.filter((call) => call === 'POST /refunds')).toHaveLength(1);
+    // 🔴 这一条判的是"码 → 那句话"整条链路：传输层带不带 `serverReason`、
+    // store 认不认这一档、面板有没有把码映射成词条 —— 三段里断任何一段都会红。
+    await expect(notice).toContainText('超出当前退款政策的时间窗');
+    // 折成 5xx 那句"服务端出错了"就是把"请求没写错、是那一单的状态不允许"这条事实弄丢了。
+    await expect(page.getByTestId('admin-panel')).not.toContainText('服务端出错了');
+    // 被拒的申请没进列表（假服务端也没加行）—— 界面不许显示一条不存在的申请。
+    await expect(page.getByTestId('admin-refunds').locator('li')).toHaveCount(2);
+    assertNoProblems(problems, ['/api/admin/refunds']);
   });
 
   test('🔴 没登录 ⇒ 一个后台请求都不发', async ({ page }) => {

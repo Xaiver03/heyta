@@ -340,13 +340,30 @@ cd apps/landing && npx vitest run              # 期望 71 passed
    锚点、**0 条外链**；`apps/web/src/features/` 下**没有 auth 目录**，无注册/登录界面，
    只有 `SyncBar.tsx` 三个手填框。服务端收银台再通，新用户也到不了应用、建不了账号。
 
-### 11.2 海外：$5 / $12 是"在卖一个买不了的东西"
+### 11.2 海外：$5 / $12 —— 🔴 2026-10-05 决定**整条延后**，本轮不接 USD 通道
 
-`$5/$12` 有价格（`zh-CN.ts:195,205`、`price-book.ts:235`），但**没有任何 USD 通道**：
-全仓只有微信 adapter，且它把币种硬编码成 `currency:'CNY'`（`wechat.adapter.ts:582`）。
-文档自己承认这一点（[pricing-and-entitlements.md](../reference/pricing-and-entitlements.md) §5.2）。
-**更糟**：若把 USD 单喂给现有微信通道，`amountMinor: 500` 会被当成 500 分（¥5）发出去 ——
-金额单位一致，币种不一致，**没有任何一层会报错**。
+本节原来写的是"缺币种断言，USD 单会被微信通道按 CNY 发出去，没有任何一层会报错"。
+**那句是修之前的状态，现在以代码为准**（三处都已落地并有测试钉住）：
+
+| 层 | 现在怎么做 | 证据 |
+|---|---|---|
+| 收银台·词表 | 不认识的币种直接 400 `UNSUPPORTED_CURRENCY`，在建单之前 | `server/src/billing/checkout.routes.ts:146`；`server/tests/billing-checkout.routes.spec.ts:223` |
+| 收银台·能力 | 这台实例没有该币种的通道 → 409 `PROVIDER_CURRENCY_UNSUPPORTED`，**在冻结金额之前**（注释写明为什么必须先于冻结：否则留下一条无用的 failed 订单和一个 502） | `checkout.routes.ts:166-173`；同一测试 `:238`、`:265` |
+| adapter | 下单契约里 `currency` **必填、无默认值**；不在 `WECHAT_SUPPORTED_CURRENCIES`（`['CNY']`）里就抛 `WechatUnsupportedCurrencyError`，不再自己硬填 `'CNY'` | `wechat.adapter.ts:85`、`:617-618`、`:654`；为什么必填见 `types.ts:219-232` |
+
+⇒ 结论：**"按错币种收钱"这条路今天不存在**，USD 请求会在收钱之前被明确拒绝。`$5/$12` 因此是"有价格、无通道"，不是"会被收错钱"。
+
+延后期**仍然敞着的一格是对外呈现**：落地页把 `$5 / $12` 印成档位
+（`apps/landing/src/components/Pricing.tsx:83`，词条 `landing.pricing.hosted.priceUsd` /
+`landing.pricing.hostedAi.priceUsd`），点进去只会得到 409。撤下还是标"暂未开放购买"
+属对外承诺，**等产品负责人定措辞**，本轮只登记不代拍。
+（同一条纪律在 [pricing-and-entitlements.md](../reference/pricing-and-entitlements.md) §5.2：
+落地页上不得出现一个点了没反应的购买按钮。）
+
+**真开 USD 之前的最小清单**：① 一个 `supportedCurrencies` 含 `USD` 的 adapter；
+② 报价 / 冻结 / 回调三处金额与币种同源（`amountMinor` 是最小单位整数、本身不带币种）；
+③ 先把该通道在定价 SSOT 里登记成"已开"，再改对外文案 —— 顺序反了就是先承诺后交付。
+
 
 ### 11.3 后台：能改价，但改价会静默绕过所有门禁
 
@@ -443,8 +460,10 @@ cd apps/landing && npx vitest run              # 期望 71 passed
    [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 14 条。
    在有意引入 admin 路由之前，这条缺口应当保持**显式**，而不是被一个"内网就安全"的假设盖住。
 
-5. **海外通道**（§11.2）—— 通道未定前，落地页的 `$5/$12` 要么标注"仅限中国区"，
-   要么先撤掉；同时给金额加**币种断言**（现在 USD 单会被微信通道按 CNY 发出去）。
+5. **海外通道**（§11.2）—— 🔴 2026-10-05 产品负责人决定：**整条延后**，本轮不做。
+   这里原本挂着两件事，其中**币种断言那一件已经落地**（路由 400/409 + adapter 抛错，三处都有测试），
+   所以延后**不会**留下"收错钱"的敞口。剩下唯一未闭合的一格是对外呈现：
+   落地页的 `$5/$12` 要么标注"暂未开放购买"、要么撤掉 —— 措辞属对外承诺，等产品负责人定。
 
 ## 12. 本轮收尾状态
 
@@ -723,7 +742,7 @@ MUT: 14 臂 → 13 RED（存活那一臂见上面第 3 条）
    所以拿掉它**不会有任何用例会红**。这一臂如实记成"判据够不到"而不是"已覆盖"，
    理由写在 `refund-store.ts` 原地与 ADR-0053 §5 第 9 条。
 
-**仍然没做的**：后台**没有退款 tab**（四条路由是接口，今天能批准的只有拿管理员令牌直接敲 `/api/admin/refunds*` 的人；补齐要哪五件、以及为什么先改 `adminRequest` 才能把 409 的 `reason` 送到界面，见 ADR-0053 §5 第 10、11 条）；
+**仍然没做的**：~~后台**没有退款 tab**（四条路由是接口，今天能批准的只有拿管理员令牌直接敲 `/api/admin/refunds*` 的人；补齐要哪五件、以及为什么先改 `adminRequest` 才能把 409 的 `reason` 送到界面，见 ADR-0053 §5 第 10、11 条）~~ → ✅ **2026-10-05 那五件做完了**，见下面 §12.8（含一条只有看图才看得见的判据缺陷）；
 把 `7×24h 内全额` 写进法务条款 / 界面（对外法律表征，业主决定）；
 `pnpm reinstall:all` 四端当前产物本轮未跑；真实商户号 / 真实通知载荷零条。
 
@@ -775,3 +794,74 @@ RC_E2E_MUT=1         # 变异臂：恰好红在付款块那条
 GATE_web_typecheck=0
 RC_WEB_TEST=0        # apps/web 全量：135 files passed | 2 skipped，1789 tests passed | 13 skipped
 ```
+
+## 12.8 2026-10-05：后台退款 tab —— 把"接口"变成"运营点得动"（含一条**只有看图**才看得见的缺陷）
+
+§12.6 那条"仍然没做的"现在做完了。落地顺序就是 ADR-0053 §5 第 11 条原话说的那件事先做：
+**先让 409 里的 `reason` 到得了界面**，再接 tab —— 反过来做，界面会把"超出时间窗"
+和"服务端挂了"折叠成同一句笼统失败，而那正是这条流程里最不该折叠的一对。
+
+| 层 | 落点 | 一句话 |
+|---|---|---|
+| 传输 | `packages/app-host/src/admin-client.ts` | `conflict` 单独一档 + `serverReason`（只认字符串、上限 80 字符、读不到就 `undefined`）；四条退款函数 |
+| 服务端 | `server/src/admin/admin.routes.ts` | 三条 409 各补机器码（`NOT_DECIDABLE` ×2、`REFUND_PROVIDER_NOT_REGISTERED`），路由契约逐条钉 |
+| 状态 | `apps/web/src/features/admin/store.ts` | `refundNotice` 八档 + `refundCode` + `refundEcho`；**批准/驳回之后一律重新 GET** 再回显（界面不自己改状态） |
+| 界面 | `AdminPanel.tsx` 的 `RefundPanel` | 第八个 tab；批准**两步**、驳回一步；只有 `requested` 给按钮；永不写"已退款" |
+| 词条 | `packages/i18n` | 中英各 36 条（8 个原因码 + 8 个结果提示各一张词表） |
+
+🔴 **两条降级路径是这一节的重点**（它们挡的是"错误被折叠"那一族）：
+原因码**不认识** ⇒ 把原码原样印出来（界面不假装看懂）；409 **没有码** ⇒ 明说"服务端没有给出原因码"。
+两条各有用例，且都证明会红。
+
+**四张图，人都看过**（`apps/web/evidence/`，采自 `cd e2e && npx playwright test tests/admin-console.spec.ts -g "退款"`）：
+
+| 图 | 屏上那一句 | 它回答的问题 |
+|---|---|---|
+| [`admin-tab-refunds.png`](../../apps/web/evidence/admin-tab-refunds.png) | 两行退款，只有 `requested` 那行有按钮 | 列表投影的九段标识**在屏幕上**都在 |
+| [`admin-refund-confirm.png`](../../apps/web/evidence/admin-refund-confirm.png) | 「批准会立刻向支付通道发起这笔退款，钱发出去就收不回来。确认要这样做吗？」 | 一次点击不动钱；不可逆被说成不可逆 |
+| [`admin-refund-approved.png`](../../apps/web/evidence/admin-refund-approved.png) | 「…决定已落库，并已交给支付通道（processing）。是否真的到账以微信回调为准。」 | 界面**不**替回调认领"已退款"，那一行来自重新读回的 GET |
+| [`admin-refund-denied.png`](../../apps/web/evidence/admin-refund-denied.png) | 「这一单已经超出当前退款政策的时间窗，而且没有以例外方式批准。」 | `WINDOW_PASSED` 走到了运营眼前（不是"请求无效"） |
+
+🔴 **看图抓到一条四层门禁全绿、九条断言也全绿的缺陷**：带批准按钮的那一行，四段标识被
+`text-overflow: ellipsis` 裁掉 **330 px** —— `out_refund_no` 整段不见；展开二次确认时
+整行标识挤没，**而那正是运营要看清"我在批哪一笔"的一刻**。
+成因不是新代码写错，是**复用了一个为"只有一个主字段"的行设计的样式**（`.ht-settings__admin-rowMain`
+的 `flex:1 + nowrap + ellipsis` 在别的 tab 里是对的，那一行没有动作）。
+
+为什么没有任何一层拦住它（值得记的形状）：
+
+1. `toContainText` 读 **DOM**，而 CSS 截断时字**还在 DOM 里** —— 九条逐字段存在性断言对这张截图全部照绿；
+2. jsdom **没有排版**，`scrollWidth` 恒为 0，这条判据在单测层结构上写不出来；
+3. `check:design` / `check:text-color` / `check:theme` / `check:row-single-source` 都与运行时布局无关；
+4. 只有把那张图**打开来看**才会看见"少了一截"。
+
+⇒ 新判据写成**可见性的存在性**：`expectRowIdentityNotClipped()` 逐行量
+`scrollWidth - clientWidth <= 1`，挂在"列表首屏"与"确认展开后"两个状态上。
+**先红 2 条**（红话直接印出被裁掉的像素数与那一行的文本），改成"标识独占一行"之后转绿。
+📌 这是 W5 那条"断言只验写了什么、不验少了什么"的**第三种面目**：前两种是漏画一个字段、
+漏画一整行，这一种是**画了但被裁掉**。判据的层级也要跟着换 —— 存在性要问的是"屏上"，不是"DOM 里"。
+
+顺带两条同批修掉的（都是看图时一起看见的）：后台首屏那句「只读为主：用户、订阅、订单、优惠码、邀请」
+在我加完第八个 tab 之后已经**不真**（调休与退款都动数据），改成明说哪三处会动；
+筛选框沿用 `--narrow` 把中英两种 placeholder 都裁掉最后一个词，换成按最长那句定的宽度。
+
+```
+RC_E2E_RED=1         # 新判据（可见性存在性）在修之前：恰好红 2 条，红话印出"被裁掉 330 px"
+RC_E2E_GREEN=0       # 改成"标识独占一行"之后：3 passed，四张图重采
+RC_E2E_FINAL=0       # 词条与筛选框宽度改完后的最后一趟：3 passed（图 = 上面那四张，人已看过）
+RC_WEB_ADMIN_TEST=0  # apps/web admin-panel jsdom 套件（含 6 条退款用例）
+RC_I18N_BUILD=0      # 词条改完必须重打（环境陷阱 #79），否则 `MessageKey` 用的是 dist 里的旧类型
+GATE_design=0 GATE_text-color=0 GATE_theme=0 GATE_row-single-source=0
+GATE_reachability=0 GATE_ui-provider=0 GATE_ui-language=0
+GATE_migrations=0 GATE_payment-entry=0 GATE_server-copy=0 GATE_server-design=0
+GATE_md-tables=0 GATE_docs-voice=0 GATE_claims=0 GATE_doc-citations=0
+GATE_docs=1          # 🔴 唯一那枚红：四枚 png 还没 `git add`，门禁判的是"干净检出上是死链"
+                     #    —— 出路是它自己给的第 ① 条（该入库就 add），不是放宽判据。随本批提交转绿。
+```
+
+七臂变异（本轮跑过，逐臂把生产代码改坏再跑对应用例，**要求红**）：
+拿掉 `serverReason` ⇒ 红；409 归回 `server` 档 ⇒ 红；`MAX_SERVER_REASON_LENGTH` 从 80 改成 3 ⇒ 红；
+批准改成一步 ⇒ 红（那条"第一步不许发请求"就是它的牙）；不画用户列 ⇒ 红；
+不认识的 outcome 也报"已交给通道" ⇒ 红；批准之后不重新 GET ⇒ 红。
+⚠️ 这七臂**没有一条**能抓到上面那个 330 px 截断 —— 它们全是 DOM/状态层的，
+所以那条判据只能长在真浏览器上。两件事都记着，别用其中一组的存在去宣布另一组多余。

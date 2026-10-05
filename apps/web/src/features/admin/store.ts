@@ -29,7 +29,10 @@
 import { create } from 'zustand';
 
 import {
+  adminApproveRefund,
+  adminCreateRefundRequest,
   adminForceUserLogout,
+  adminRejectRefund,
   adminSetUserQuota,
   adminUnlockUser,
   adminDeleteHolidayYear,
@@ -39,6 +42,7 @@ import {
   fetchAdminInvites,
   fetchAdminOrders,
   fetchAdminOverview,
+  fetchAdminRefunds,
   fetchAdminSubscriptions,
   fetchAdminUser,
   fetchAdminUsers,
@@ -50,6 +54,7 @@ import {
   type AdminOrderRow,
   type AdminOverview,
   type AdminPage,
+  type AdminRefundRow,
   type AdminResult,
   type AdminSubscriptionRow,
   type AdminUserDetail,
@@ -68,7 +73,8 @@ export type AdminTab =
   | 'orders'
   | 'coupons'
   | 'invites'
-  | 'holidays';
+  | 'holidays'
+  | 'refunds';
 
 /** 每一页拉多少。服务端上限 200；50 在宽屏表格上够看又不至于一次拉太多。 */
 export const ADMIN_PAGE_SIZE = 50;
@@ -82,6 +88,7 @@ export const ADMIN_REASON_KEY: Record<AdminFailureReason, string> = {
   forbidden: 'web.admin.error.forbidden',
   'not-found': 'web.admin.error.not-found',
   invalid: 'web.admin.error.invalid',
+  conflict: 'web.admin.error.conflict',
   server: 'web.admin.error.server',
 };
 
@@ -113,6 +120,101 @@ export const ADMIN_HOLIDAY_NOTICE_KEY: Record<AdminHolidayNotice, string> = {
   saved: 'web.admin.holiday.notice.saved',
   deleted: 'web.admin.holiday.notice.deleted',
   failed: 'web.admin.holiday.notice.failed',
+};
+
+/**
+ * 退款那一次动作的结果。**穷举**，漏一种编译期就红。
+ *
+ * 🔴 为什么 `submitted` 与 `channel-failed` 是**两句不同的话**：批准这个**决定**已经落库，
+ * 通道那一跳失败只是"下一步还没成"。把它们合成"操作成功"会让运营以为钱已经退出去，
+ * 而 `AGENTS.md §8` 第 10 条要的是"发出去 / 已到账 / 用户已看到"分层说话。
+ * 同理，`denied`（服务端给了机器码）与 `conflict`（没给码）必须分开 ——
+ * 前者能说出"为什么"，后者说不出，界面就不许假装说得出。
+ *
+ * `unknown` 那一档不是防御性装饰：2xx 体的 `outcome` 词表住在服务端，
+ * 客户端这份类型是**手抄的**（`admin-client.ts` 注释里那条"这里不枚举词表"的代价）。
+ * 服务端加一个 outcome 而这一片没跟上时，`unknown` 让界面说"不认识这个码"，
+ * 而不是把它读成成功。
+ */
+export type AdminRefundNotice =
+  | 'requested'
+  | 'submitted'
+  | 'channel-failed'
+  | 'not-submittable'
+  | 'rejected'
+  | 'denied'
+  | 'conflict'
+  | 'unknown';
+
+export const ADMIN_REFUND_NOTICE_KEY: Record<AdminRefundNotice, string> = {
+  requested: 'web.admin.refund.notice.requested',
+  submitted: 'web.admin.refund.notice.submitted',
+  'channel-failed': 'web.admin.refund.notice.channelFailed',
+  'not-submittable': 'web.admin.refund.notice.notSubmittable',
+  rejected: 'web.admin.refund.notice.rejected',
+  denied: 'web.admin.refund.notice.denied',
+  conflict: 'web.admin.refund.notice.conflict',
+  unknown: 'web.admin.refund.notice.unknown',
+};
+
+/**
+ * 服务端 409 / 通道失败里的**机器码** → 专属措辞。
+ *
+ * 🔴 码的唯一来源是服务端（`server/src/billing/refund-policy.ts` 的 `RefundDenialReason`
+ * 与 `admin.routes.ts` 那两个 409）。这里只负责"给已经存在的码配一句人话"，
+ * **不**负责判定它合法 —— 传输层连词表都不枚举（见 `admin-client.ts` 文件头）。
+ *
+ * ⚠️ 这张表**没有**编译期穷举保护：跨的是包边界（`server` 不是 `apps/web` 的依赖），
+ * TS 拿不到那份枚举。兜底是 `denied` 那条通用措辞会把原码打印出来 ——
+ * 也就是说服务端加一个新码时，界面从"运营看得见确切原因"降级成"运营看得见原因码"，
+ * **不会**降级成谎话。补齐这张表属于 ADR-0053 §5 那一条边界。
+ */
+export const ADMIN_REFUND_CODE_KEY: Record<string, string> = {
+  WINDOW_PASSED: 'web.admin.refund.code.windowPassed',
+  ALREADY_REFUNDED: 'web.admin.refund.code.alreadyRefunded',
+  REFUND_ALREADY_OPEN: 'web.admin.refund.code.alreadyOpen',
+  ORDER_NOT_PAYABLE: 'web.admin.refund.code.notPayable',
+  AMOUNT_UNVERIFIED: 'web.admin.refund.code.amountUnverified',
+  NOT_CHECKOUT_ORDER: 'web.admin.refund.code.notCheckoutOrder',
+  NOT_DECIDABLE: 'web.admin.refund.code.notDecidable',
+  REFUND_PROVIDER_NOT_REGISTERED: 'web.admin.refund.code.providerNotRegistered',
+};
+
+/**
+ * 申请退款表单**收集到的原始输入**。
+ *
+ * 🔴 与 `HolidayYearInput` 同一条纪律：这里全是字符串，**一片判定都没有**。
+ * "订单号必须是正整数""理由不能为空""例外必须配理由"全部由服务端那一次
+ * `refundRequestSchema.safeParse` + `decideRefundEligibility` 裁决。
+ * 在这一层加一条 `Number.isInteger` 守卫，就是 §3.5 那条"同一个判断抄两遍"。
+ */
+export interface RefundRequestInput {
+  readonly orderIdText: string;
+  readonly noteText: string;
+  /** 跳过 7×24 时间窗的唯一开关（服务端要求它配一句非空理由）。 */
+  readonly operatorApproved: boolean;
+}
+
+/** 一次动作之后界面要念的那几个数。 */
+export interface AdminRefundEcho {
+  readonly id: number;
+  /** 申请那一步才知道的订单号；批准/驳回时是 `null`（那一行列表里本来就有）。 */
+  readonly orderId: number | null;
+  /** 服务端回的状态或结果码原文（`submitted` / `failed` / 未认识的 outcome…）。 */
+  readonly detail: string | null;
+}
+
+/**
+ * `approve` 的 2xx `outcome` → 界面那一句。
+ *
+ * 🔴 **不认识的 outcome 一律落 `unknown`**，而不是默认成"成功"：这一片的词表住在服务端
+ * （`submitRefundToChannel` 的返回联合），客户端这份类型是手抄的。
+ * 服务端加一臂而这里没跟上的话，"读成成功"就是界面替运营编了一个钱已经发出去的事实。
+ */
+export const ADMIN_REFUND_APPROVE_NOTICE: Record<string, AdminRefundNotice> = {
+  submitted: 'submitted',
+  'channel-failed': 'channel-failed',
+  'not-submittable': 'not-submittable',
 };
 
 /**
@@ -155,6 +257,18 @@ export interface AdminStoreState {
    */
   holidayEcho: { year: number; dayCount: number | null } | null;
 
+  /**
+   * 退款行（`GET /api/admin/refunds` 的投影，**不分页**）。
+   * `null` = 还没拉过（与空列表 `[]` 是两件事：空列表真的意味着"没有申请"）。
+   */
+  refunds: AdminRefundRow[] | null;
+  /** 按用户编号筛选（服务端 `?userId=`）。空串 = 不筛选。 */
+  refundFilter: string;
+  refundNotice: AdminRefundNotice | null;
+  /** 服务端给的那个**机器码**（`denied` / `channel-failed` / `unknown` 时非空）。 */
+  refundCode: string | null;
+  refundEcho: AdminRefundEcho | null;
+
   /** 用户搜索词（服务端按邮箱 `contains`）。 */
   query: string;
   /** 动作完成后的提示（成功/失败），界面显示一次即可。 */
@@ -173,6 +287,14 @@ export interface AdminStoreState {
   /** 撤销某一年 = 那一年**退回随包表**，不是"下发空的一年"。 */
   deleteHolidayYear: (year: number) => Promise<void>;
   clearHolidayNotice: () => void;
+  loadRefunds: (params?: { userId?: string }) => Promise<void>;
+  /** 为一条已付订单开一张申请（`Promise<boolean>`：成功了界面才清输入框）。 */
+  requestRefund: (input: RefundRequestInput) => Promise<boolean>;
+  /** 批准 = 决定落库**并且**把这一跳发给通道。 */
+  approveRefund: (id: number, noteText: string) => Promise<void>;
+  /** 驳回 = 唯一"钱与权益都不动"的出口。 */
+  rejectRefund: (id: number, noteText: string) => Promise<void>;
+  clearRefundNotice: () => void;
   openUser: (id: number) => Promise<void>;
   closeUser: () => void;
   unlockUser: (id: number) => Promise<void>;
@@ -204,6 +326,31 @@ function applyFailure(
     return;
   }
   set({ errorKey, loading: false });
+}
+
+/**
+ * 退款动作的失败：先走 `applyFailure`（那一条对所有后台请求都一样），
+ * 再补退款这一层特有的一句 —— **状态冲突时把服务端给的原因码带进界面**。
+ *
+ * 🔴 这正是 ADR-0053 §5 第 11 条点名的那件事：409 的 `{reason:'WINDOW_PASSED'}`
+ * 如果只落成"服务端错误"，运营会去改参数重试，而改参数永远改不动"这一单已过 7 天"。
+ * 服务端没给码（`serverReason === undefined`）时写成 `conflict`：界面承认"这是一次
+ * 状态冲突，但服务端没说为什么"，**不**替它编一个原因。
+ */
+function applyRefundFailure(
+  result: Extract<AdminResult<unknown>, { ok: false }>,
+  set: (partial: Partial<AdminStoreState>) => void,
+): void {
+  applyFailure(result, set);
+  if (result.reason !== 'conflict') {
+    set({ refundNotice: null, refundCode: null, refundEcho: null });
+    return;
+  }
+  set({
+    refundNotice: result.serverReason === undefined ? 'conflict' : 'denied',
+    refundCode: result.serverReason ?? null,
+    refundEcho: null,
+  });
 }
 
 /**
@@ -241,6 +388,12 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
   holidayYears: null,
   holidayNotice: null,
   holidayEcho: null,
+
+  refunds: null,
+  refundFilter: '',
+  refundNotice: null,
+  refundCode: null,
+  refundEcho: null,
 
   query: '',
   actionNotice: null,
@@ -387,6 +540,92 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
     set({ holidayNotice: null, holidayEcho: null });
   },
 
+  loadRefunds: async (params = {}) => {
+    // 筛选词**必须跟着重载走**（与 `reloadAfterUserAction` 里那句"翻页与搜索词照原样带着"
+    // 同一件事）：动作之后把筛选清掉，运营刚定位到的那一屏会凭空变成全量最新 50 条。
+    const filter = params.userId ?? get().refundFilter;
+    set({ loading: true, refundFilter: filter });
+    const result = await fetchAdminRefunds(clientOptions(), {
+      // ⚠️ 刻意不做 `Number.isFinite` 守卫：`'2a'` → `NaN` → 查询串里是 `userId=NaN`
+      // → 服务端 400 → 界面说"请求参数不合法"。在这里先拦一遍就是两套裁决标准。
+      userId: filter.trim() === '' ? undefined : Number(filter),
+      limit: ADMIN_PAGE_SIZE,
+    });
+    if (!result.ok) return applyFailure(result, set);
+    set({ refunds: result.data.refunds, errorKey: null, loading: false });
+  },
+
+  requestRefund: async (input) => {
+    const note = input.noteText.trim();
+    set({ loading: true, refundNotice: null, refundCode: null, refundEcho: null });
+    const result = await adminCreateRefundRequest(clientOptions(), {
+      orderId: Number(input.orderIdText),
+      ...(note === '' ? {} : { note }),
+      ...(input.operatorApproved === true ? { operatorApproved: true } : {}),
+    });
+    if (!result.ok) {
+      applyRefundFailure(result, set);
+      return false;
+    }
+
+    // 🔴 成功之后**重新读回服务端**，界面那一行念的数是列表里的那一行，
+    // 不是 POST 请求里带上去的那几个字符（与 `saveHolidayYear` 同一判据、同一理由）。
+    await get().loadRefunds();
+    const row = (get().refunds ?? []).find((item) => item.id === result.data.refundId);
+    set({
+      refundNotice: 'requested',
+      refundCode: null,
+      refundEcho: { id: result.data.refundId, orderId: row?.orderId ?? null, detail: row?.status ?? null },
+      loading: false,
+    });
+    return true;
+  },
+
+  approveRefund: async (id, noteText) => {
+    set({ loading: true, refundNotice: null, refundCode: null, refundEcho: null });
+    const result = await adminApproveRefund(clientOptions(), id, noteText.trim());
+    if (!result.ok) {
+      applyRefundFailure(result, set);
+      return;
+    }
+    await get().loadRefunds();
+    const body = result.data;
+    const notice = ADMIN_REFUND_APPROVE_NOTICE[body.outcome] ?? 'unknown';
+    set({
+      refundNotice: notice,
+      // 通道失败那一臂服务端给的是**它的**原因码；`unknown` 那一档把没认识到的 outcome
+      // 原文交出去，界面就说"不认识这个码"，不猜它的意思。
+      refundCode:
+        body.outcome === 'channel-failed' ? body.reason : notice === 'unknown' ? body.outcome : null,
+      refundEcho: {
+        id,
+        orderId: (get().refunds ?? []).find((item) => item.id === id)?.orderId ?? null,
+        detail: 'status' in body ? String(body.status) : null,
+      },
+      loading: false,
+    });
+  },
+
+  rejectRefund: async (id, noteText) => {
+    set({ loading: true, refundNotice: null, refundCode: null, refundEcho: null });
+    const result = await adminRejectRefund(clientOptions(), id, noteText.trim());
+    if (!result.ok) {
+      applyRefundFailure(result, set);
+      return;
+    }
+    await get().loadRefunds();
+    set({
+      refundNotice: 'rejected',
+      refundCode: null,
+      refundEcho: { id, orderId: null, detail: result.data.status },
+      loading: false,
+    });
+  },
+
+  clearRefundNotice: () => {
+    set({ refundNotice: null, refundCode: null, refundEcho: null });
+  },
+
   openUser: async (id) => {
     set({ loading: true, detail: null });
     const result = await fetchAdminUser(clientOptions(), id);
@@ -455,6 +694,11 @@ export function __resetAdminForTests(): void {
     holidayYears: null,
     holidayNotice: null,
     holidayEcho: null,
+    refunds: null,
+    refundFilter: '',
+    refundNotice: null,
+    refundCode: null,
+    refundEcho: null,
     query: '',
     actionNotice: null,
   });

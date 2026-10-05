@@ -111,6 +111,14 @@
   flex: none;
 }
 
+/* 退款那一排的筛选框：默认 `flex: 1` 在这一排里被挤得太窄，
+   中英两种 placeholder 都会被裁掉最后一个词（看图实测「按用户编号筛…」）。
+   固定宽度按英文那句（17 个字符）取。 */
+.ht-settings__admin-input--filter {
+  inline-size: 11rem;
+  flex: none;
+}
+
 .ht-settings__admin-btn {
   display: inline-flex;
   align-items: center;
@@ -196,6 +204,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 🔴 行里带**动作**（理由输入 + 批准 + 驳回）时，一行放不下四段标识 + 那一排按钮，
+   `rowMain` 会被上面的 ellipsis 吃掉一截 —— 实测裁掉 330 px，`out_refund_no` 整段不见，
+   展开二次确认时连"我在批哪一笔"都看不见。DOM 里字还在，所以 `toContainText` 全绿。
+   这一档把标识独占一行，动作排到下一行。只给退款行用（别的行没有动作）。 */
+.ht-settings__admin-staticRow--stack {
+  flex-wrap: wrap;
+}
+
+.ht-settings__admin-staticRow--stack > .ht-settings__admin-rowMain {
+  flex-basis: 100%;
 }
 
 .ht-settings__admin-rowMeta {
