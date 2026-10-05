@@ -20,7 +20,16 @@
  *
  * 用法：node scripts/mutate-egress-wording.mjs —— 非零退出 = 有臂存活。
  * ⚠️ 它会临时改工作树并临时往 `scripts/` 放一份门禁副本，所以**不要并行跑别的门禁**；
- *    每一臂在 `finally` 里还原，结束时再逐路径核对 sha256 —— 变异运行不许留下字节。
+ *    每一臂在 `finally` 里还原，结束时再逐路径核对 sha256 **与 mtime** —— 变异运行不许留下字节，
+ *    也不许留下**新的 mtime**。
+ *    🔴 为什么要单独对账 mtime（2026-10-06 实测）：`writeFileSync(path, original)` 还原了字节，
+ *    却把 mtime 抬到还原那一刻 —— 而 mtime 是**另一道门的输入**：
+ *    `scripts/lib/apk-freshness.sh` 那道"装包之前当场判 APK 比源码新"的门就吃它。
+ *    实测后果：本门禁跑完 ⇒ `packages/i18n/src/locales/zh-CN.ts` 的 mtime 晚于 APK ⇒
+ *    `verify:mobile-ai` 以 rc 3 拒绝起跑，报"验的是旧 bundle"（§7 第 27 条），而那份内容逐字
+ *    等于 HEAD、那一轮根本没有动过 freshness 输入集里的源码 —— 一枚假红把设备级验收整轮挡掉。
+ *    **只比字节挡不住它，因为字节确实是对的。**（与 #287 同族：变异装置的还原动作必须还原
+ *    "被下游消费的那个维度" —— #287 管的是被杀之后的字节，这一条管的是正常跑完的时间戳。）
  *    🔴 `finally` 只挡得住异常，挡不住信号：被 SIGTERM 打断留下的残留由**下一次启动**按归属标记
  *    收掉（见下面 MUTATED_ZH_LINE / PROBE_MARKER 那一段）。这里不挂信号处理器 —— 同步脚本里
  *    `process.on('SIGTERM')` 的回调轮不到执行，注册反而把默认可杀行为取消掉（traps #287）。
@@ -28,7 +37,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync, existsSync, statSync, utimesSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,6 +58,35 @@ function sha(rel) {
     return createHash('sha256').update(readFileSync(join(ROOT, rel))).digest('hex');
   } catch {
     return '<absent>';
+  }
+}
+
+/** 取一对时间戳（atime/mtime，毫秒）。取不到回 null（文件不存在）。 */
+function stamp(rel) {
+  try {
+    const s = statSync(join(ROOT, rel));
+    return { atimeMs: s.atimeMs, mtimeMs: s.mtimeMs };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 把 mtime/atime 按回基线值。
+ * ⚠️ 必须**在写字节之后**调用：还原本身会再次抬起 mtime，顺序反了等于没还原。
+ * 容差 2ms —— APFS 存纳秒，`new Date(mtimeMs)` 只到毫秒，取回时会被截掉小数。
+ */
+function restoreStamp(rel, base) {
+  if (base === null) return;
+  const path = join(ROOT, rel);
+  if (!existsSync(path)) return;
+  utimesSync(path, new Date(base.atimeMs), new Date(base.mtimeMs));
+  const now = stamp(rel);
+  if (now === null || Math.abs(now.mtimeMs - base.mtimeMs) > 2) {
+    throw new Error(
+      `${rel} 的 mtime 还原后仍不等基线（基线 ${String(base.mtimeMs)} / 现量 ${String(now?.mtimeMs)}）——` +
+        ` 这道门不许把 mtime 留在抬起的位置，它是 APK 新鲜度判据的输入。`,
+    );
   }
 }
 
@@ -140,6 +178,9 @@ function sweepProbes(notes) {
 }
 
 const baseline = new Map([GATE, ZH, PROBE_SRC, COPY_GATE].map((rel) => [rel, sha(rel)]));
+// 🔴 mtime 也要基线：只比字节的对账挡不住"字节还原对了、时间戳留在还原那一刻"，
+//    而那个时间戳会被 `scripts/lib/apk-freshness.sh` 当成"源码比 APK 新"来消费。
+const stampBaseline = new Map([GATE, ZH, PROBE_SRC, COPY_GATE].map((rel) => [rel, stamp(rel)]));
 
 
 let failed = false;
@@ -172,6 +213,7 @@ arm('对照（不打补丁）', hits(GATE), (n) => n === 0);
     );
   } finally {
     writeFileSync(path, original);
+    restoreStamp(ZH, stampBaseline.get(ZH));
   }
 }
 
@@ -216,11 +258,34 @@ arm('对照（不打补丁）', hits(GATE), (n) => n === 0);
 // ── 字节对账：变异运行不许留下痕迹 ──────────────────────────
 const residue = [...baseline.entries()].filter(([rel, sum]) => sha(rel) !== sum);
 
+// ── mtime 对账：不许留下"新的时间戳" ────────────────────────
+// 🔴 这一栏单独存在，不是字节对账的重复：`writeFileSync(path, original)` 之后字节相等，
+//    上面那一栏必然干净，而 mtime 已经抬到还原那一刻。基线为 null（开跑时不存在 = 探针文件）
+//    或现在不存在（探针已删）的都跳过 —— 那两种情况由字节对账管。
+const mtimeDrift = [...stampBaseline.entries()].filter(([rel, base]) => {
+  if (base === null) return false;
+  const now = stamp(rel);
+  if (now === null) return false;
+  return Math.abs(now.mtimeMs - base.mtimeMs) > 2;
+});
+
 console.log('「数据出境」措辞红线的变异读数（规则 7 = check:ui-language）');
 for (const line of rows) console.log(line);
 if (residue.length > 0) {
   console.error(`🔴 变异运行留下了字节：${residue.map(([rel]) => rel).join('、')}`);
   process.exit(1);
 }
-console.log(`✅ 工作树已还原（对账 ${String(baseline.size)} 条路径的 sha256）`);
+if (mtimeDrift.length > 0) {
+  console.error(
+    `🔴 变异运行留下了**新的 mtime**：${mtimeDrift.map(([rel]) => rel).join('、')}\n` +
+      `   字节是干净的，所以 sha256 那一栏抓不到它 —— 但 mtime 是 APK 新鲜度判据的输入，\n` +
+      `   留在这里会让下一次真机验收以「APK 比源码旧」拒绝起跑（本次改动就是为了堵住这条路）。`,
+  );
+  process.exit(1);
+}
+console.log(
+  `✅ 工作树已还原（对账 ${String(baseline.size)} 条路径的 sha256 + ${
+    [...stampBaseline.values()].filter((v) => v !== null).length
+  } 条路径的 mtime）`,
+);
 process.exit(failed ? 1 : 0);
