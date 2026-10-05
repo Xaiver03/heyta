@@ -20,6 +20,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  MANAGED_AI_CONTENT_RETENTION_DAYS,
+  MANAGED_AI_METADATA_RETENTION_DAYS,
   buildDisclosure,
   describeDestination,
   describeRetention,
@@ -62,16 +64,24 @@ describe('retentionDisclosure：保留策略 → 性质', () => {
   it('三种目的地各自的 kind', () => {
     expect(retentionDisclosure('none').kind).toBe('not-applicable');
     expect(retentionDisclosure('user-endpoint').kind).toBe('third-party-decides');
-    expect(retentionDisclosure('heyta-cloud').kind).toBe('undecided');
+    expect(retentionDisclosure('heyta-cloud').kind).toBe('metadata-only');
   });
 
-  it('🔴 `undecided` 与兼容层的 `undefined` 必须同时成立', () => {
-    // 这两个是同一个事实的两个投影。只改一边 = 一边说"没定"、另一边编了数字。
-    expect(retentionDisclosure('heyta-cloud').kind).toBe('undecided');
-    expect(describeRetention('heyta-cloud')).toBeUndefined();
+  it('🔴 托管那一档的两个天数**只有一个出处**，且兼容中文句里的数字由它推出', () => {
+    // 这两份投影必须同源：结构化那一份给界面（壳把数字插进词条），
+    // 中文句给 CLI 与门禁。谁在句子另一处写死一个数字，改常量之后界面就会
+    // 报出一个不存在的保留期 —— 所以这里不是"看看文案像不像"，是**逐字符包含**判据。
+    const d = retentionDisclosure('heyta-cloud');
+    if (d.kind !== 'metadata-only') throw new Error('托管档必须是 metadata-only');
+    expect(d.contentDays).toBe(MANAGED_AI_CONTENT_RETENTION_DAYS);
+    expect(d.metadataDays).toBe(MANAGED_AI_METADATA_RETENTION_DAYS);
+    const text = describeRetention('heyta-cloud');
+    expect(text).toContain(String(MANAGED_AI_METADATA_RETENTION_DAYS));
+    // 🔴 正文那一半不许被说成"保留若干天"：0 是**不留**，不是"留 0 天"这种修辞。
+    expect(text).toContain('正文不留存');
   });
 
-  it('`undecided` 只属于托管 —— 别把"没出境"也说成"没定案"', () => {
+  it('`metadata-only` 只属于托管 —— 别把"没出境"也说成"服务端记了计数"', () => {
     expect(retentionDisclosure('none').kind).toBe('not-applicable');
     expect(retentionDisclosure('user-endpoint').kind).toBe('third-party-decides');
   });
@@ -85,13 +95,11 @@ describe('两条路径同源：结构化结论与兼容文本必须互相印证'
       expect(d.retentionText).toBe(describeRetention(destination));
       // 文本非空 —— 空白披露等于没披露。
       expect(d.destinationText.length).toBeGreaterThan(0);
+      // 🔴 三档的保留句**都不许为空**：以前托管那一份是 `undefined`（策略未定案），
+      // 于是那一档的"留多久"在界面上整行消失。定案之后这条必须是实心的句子，
+      // 而且不许含任何加密承诺（那句由 egress.spec 里另一条钉）。
+      expect(d.retentionText.length).toBeGreaterThan(0);
     }
-    // 上面那条 `describeRetention` 对托管返回 undefined，所以托管的文本可以是空，
-    // 但**结构化的 kind 不允许为空**：
-    expect(
-      buildDisclosure({ feature: 'breakdown', destination: 'heyta-cloud', fields: ['title'] })
-        .retentionDisclosure.kind,
-    ).toBe('undecided');
   });
 });
 

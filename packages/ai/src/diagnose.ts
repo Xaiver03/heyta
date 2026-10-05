@@ -50,7 +50,9 @@
  */
 
 import type { AiFailureReason } from './provider.js';
-import { isLoopbackEndpoint } from './supply.js';
+// 回环判定的唯一定义点在 `endpoint-address.ts`（ADR-0053 把地址类别补成了分档判定，
+// 那个函数不再住在 `supply.ts`）。这里**只**用兼容谓词，不起第二份判断。
+import { isLoopbackEndpoint } from './endpoint-address.js';
 
 /** 一次 `network` 失败的两条可能成因。 */
 export type NetworkFailureDiagnosis =

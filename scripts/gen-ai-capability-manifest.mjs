@@ -157,13 +157,23 @@ const MANIFEST_VERSION = 1;
 /**
  * 从**分母**里剔除的已物化实体（ADR-0045 §2.7）。
  *
- * 🔴 这两个不是"还没做工具"，而是**用户根本不直接创建它们**：
+ * 🔴 这些不是"还没做工具"，而是**用户根本不直接创建它们**：
  * 它们是 AI 反馈与偏好纠正的落库载体。把它们算进分母，
  * "AI 覆盖面 = 界面功能面"那条门禁就会永远追一个不存在的需求。
+ *
+ * ⚠️ 加一条的门槛是刻意的：**这里必须能写出"为什么用户不会直接操作它"**，
+ * 写不出就该去补工具。剔除表只增不减的话，门禁会退化成一份没人看的清单
+ * （`check:ai-coverage.mjs` 的 9a 段用算术钉住这张表与 `EntityModelMap` 的一致性）。
  */
 export const DENOMINATOR_EXCLUSIONS = Object.freeze([
   { entityType: 'AI_FEEDBACK', reason: 'AI 建议处置的落库载体（用户不直接创建它）' },
   { entityType: 'PREFERENCE_CORRECTION', reason: '偏好纠正的落库载体（用户不直接创建它）' },
+  {
+    entityType: 'ASSISTANT_TURN',
+    reason:
+      '助手对话的一行记录（ADR-0045 D-4 (ii)）：它是**对话本身**，不是用户可操作的业务实体，' +
+      '而且正文里含 provider 的回复 —— 给 AI 读写它的工具等于让模型改写自己的上下文',
+  },
 ]);
 
 /**
