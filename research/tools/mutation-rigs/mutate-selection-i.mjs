@@ -177,10 +177,19 @@ if (!preSha) {
   throw new Error(`该文件历史里 ${String(histRevs.length)} 版都没有"还没有断言 I"的那版 —— 窗口要放宽，但绝不许拿当前版冒充旧版。`);
 }
 const preRun = run(preSrc);
+/*
+ * 🔴 2026-10-06：这一臂原来还顺带断言 `preRun.rc === 0`。那个"应当绿"**不是本臂要证的事** ——
+ * 它等于假设"门禁的其余每一档永远不会对未来代码红"。第五档 `form-draft` 落进登记表的那一刻，
+ * 历史那版喂当前树就会红在 **G**（它不认识那一档、且 `AssistantScreen` 的草稿态已改名），
+ * 而 I11 要证的自始至终只有一件：**那一版里根本没有断言 I**。
+ * ⇒ 判据改成：不打印 I 那行、不 fired I 档；若它红，红的必须是别的档（逐条点名，不放过"裸红"）。
+ */
+const preFiredI = /断言 I/.test(preRun.out);
+const preOtherRed = /断言 [A-H]：|断言 G：/.test(preRun.out);
 check(
-  'I11 同一份当前代码喂"还没有断言 I 的那版"（按该文件历史取 blob，不按 HEAD）→ RC=0 且它没打印过 I 那行（补的是实测存在的缺口，不是顺手加严）',
-  preRun.rc === 0 && !/✅ I：/.test(preRun.out),
-  `对照版 ${preSha.slice(0, 8)}｜往回第 ${String(histRevs.indexOf(preSha) + 1)} 版｜RC=${preRun.rc}｜它打印过 I 那行=${/✅ I：/.test(preRun.out)}`,
+  'I11 同一份当前代码喂"还没有断言 I 的那版"（按该文件历史取 blob，不按 HEAD）→ 它不打印也不 fired 断言 I；红只许红在别的档上（补的是实测存在的缺口，不是顺手加严）',
+  !/✅ I：/.test(preRun.out) && !preFiredI && (preRun.rc === 0 || preOtherRed),
+  `对照版 ${preSha.slice(0, 8)}｜往回第 ${String(histRevs.indexOf(preSha) + 1)} 版｜RC=${preRun.rc}｜它打印过 I 那行=${/✅ I：/.test(preRun.out)}｜它 fired I 档=${preFiredI}｜红落在别的档=${preOtherRed}`,
 );
 // I11p —— I11 的前置：当前版必须**有**断言 I。没有它，I11 那次红说的是"这一档被人拿掉了"。
 const currentHasI = /断言 I：/.test(ORIG);
