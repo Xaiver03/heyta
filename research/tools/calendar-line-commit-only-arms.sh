@@ -76,6 +76,24 @@
 # 退出码：0 = 每一臂都如预期；1 = 某一臂不按预期（= 装置坏了，不是仓库坏了）
 set -u
 cd "$(dirname "$0")/../.." || exit 1
+# 🔴 递归闸门（§4.05 (54)）：被测脚本 planner 现在有一格「跑本线三把验证台」，
+#    而那三把里就有**本文件** ⇒ 夹具里的每一趟 planner 子进程若不带上这个标记，
+#    就会在迷你树里找 `research/tools/r17-*.sh`（迷你树里没有）⇒ 判红 ⇒ exit 3 ⇒ 每一臂都假红。
+#    这里 export 是**给子进程看的**，臂 18 专门钉"标记生效时那一格打印跳过读数、且不红"。
+export HT_LINE_RIG_NEST=1
+# 🔴 调用者环境必须清（10-05 15:0x 现量：本 rig 第一次被 planner 的 3c 格叫起来跑，
+#    外层那一趟带着 `MSG=… ANCHORS=…` ⇒ 两个旋钮漏进每一臂的夹具子进程，臂 9 读到
+#    "rc=1 但来路是'有孤儿 hunk'而不是'没传 ANCHORS'"、臂 14 的干跑从 rc=0 变 rc=1）。
+#    这不是"调用方式不对"——**臂的语义就依赖"这两个旋钮缺席"**，所以缺席要由本文件保证，
+#    不能靠调用者恰好没设。清完之后立刻自证一次：泄漏没清干净就 exit 4，不带坏读数进臂。
+unset MSG ANCHORS PATHS_OVERRIDE UNCARRIED_OVERRIDE ALLOW_ORPHAN LINE_RIGS CONFIRM
+for _k in MSG ANCHORS PATHS_OVERRIDE UNCARRIED_OVERRIDE ALLOW_ORPHAN LINE_RIGS; do
+  if [ -n "${!_k:-}" ]; then
+    echo "❌ 调用者旋钮没清掉：${_k} ⇒ 本 rig 的臂读数全部不可信（exit 4，不出 pass/fail）" >&2
+    exit 4
+  fi
+done
+echo "CALLER_ENV=cleared（MSG/ANCHORS/PATHS_OVERRIDE/UNCARRIED_OVERRIDE/ALLOW_ORPHAN/LINE_RIGS 与 CONFIRM 由本文件保证缺席）"
 REAL_SCRIPT="research/tools/calendar-line-commit-plan.sh"
 [ -f "$REAL_SCRIPT" ] || { echo "❌ 找不到被测脚本：$REAL_SCRIPT"; exit 1; }
 L=/tmp/clc-$$           # 每跑唯一：固定名会被同一时刻另一趟的读数顶掉
@@ -632,7 +650,181 @@ else
   echo '--- 臂15 复跑日志尾部 ---'; tail -25 "${L}.arm15.rerun.out"
 fi
 
-rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8" "$F9" "$F10" "$F11" "$F12" "$F13" "$F14" "$F15"
+# ------------------------------------------------- 臂 16 3c 那一格红了会不会真挡下提交
+F16=$(mk_fixture) || { echo "❌ 夹具16 建不起来"; exit 1; }
+echo "夹具16：$F16"
+(
+  cd "$F16" || exit 1
+  printf '#!/bin/bash\necho "STUBRED tail-line"\nexit 1\n' > stub-red.sh
+  printf 'MINE16\n' > a.txt
+  MSG='test: 臂16' PATHS_OVERRIDE='a.txt' UNCARRIED_OVERRIDE='' ANCHORS='MINE16' \
+    env -u HT_LINE_RIG_NEST LINE_RIGS='bash stub-red.sh' \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm16.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "STEP3C=$(grep -c '== 3c\.' "${L}.arm16.out" || true)"
+    echo "REDMSG=$(grep -c '有验证台红了' "${L}.arm16.out" || true)"
+    echo "NOCOMMIT=$(grep -c '== 5\. --confirm' "${L}.arm16.out" || true)"
+    echo "COMMITS=$(git rev-list --count HEAD || true)"
+  } > "${L}.arm16.rd"
+  exit $RC
+)
+A16=$(cat "${L}.arm16.rd" 2>/dev/null)
+if [ "$(rd "$A16" RC)" = "3" ] && [ "$(rd "$A16" STEP3C)" != "0" ] \
+   && [ "$(rd "$A16" REDMSG)" != "0" ] && [ "$(rd "$A16" NOCOMMIT)" = "0" ] \
+   && [ "$(rd "$A16" COMMITS)" = "1" ]; then
+  ok "臂16 3c 有台子红 ⇒ exit 3、大字报「有验证台红了」、**根本没走到第 5 步**、HEAD 仍是那一枚 base（commits=1）⇒ 这一格不是打印格：摘掉那句 exit 3 就会多出一枚提交，NOCOMMIT 与 COMMITS 两条同红"
+else
+  bad "臂16 未按预期 ⇒ 3c 红了却没挡住提交、或压根没走到那一格：$(printf '%s\n' "$A16" | tr '\n' ' ')"
+  echo '--- 臂16 日志尾部 ---'; tail -20 "${L}.arm16.out"
+fi
+
+# ------------------------------------------------- 臂 17 台子绿时读数打在成功路径上
+F17=$(mk_fixture) || { echo "❌ 夹具17 建不起来"; exit 1; }
+echo "夹具17：$F17"
+(
+  cd "$F17" || exit 1
+  printf '#!/bin/bash\necho "STUBGREEN tail-line"\nexit 0\n' > stub-green.sh
+  printf 'MINE17\n' > a.txt
+  MSG='test: 臂17' PATHS_OVERRIDE='a.txt' UNCARRIED_OVERRIDE='' ANCHORS='MINE17' \
+    env -u HT_LINE_RIG_NEST LINE_RIGS='bash stub-green.sh' \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm17.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "PERIGN=$(grep -c '台 1 rc=0 :: STUBGREEN tail-line' "${L}.arm17.out" || true)"
+    echo "COUNTLINE=$(grep -c 'LINE_RIGS=1 红=0' "${L}.arm17.out" || true)"
+    echo "ALLGREEN=$(grep -c '上面数出来的台子全绿' "${L}.arm17.out" || true)"
+    echo "REACHED=$(grep -c '== 5\. --confirm' "${L}.arm17.out" || true)"
+  } > "${L}.arm17.rd"
+  exit $RC
+)
+A17=$(cat "${L}.arm17.rd" 2>/dev/null)
+if [ "$(rd "$A17" RC)" = "0" ] && [ "$(rd "$A17" PERIGN)" != "0" ] \
+   && [ "$(rd "$A17" COUNTLINE)" != "0" ] && [ "$(rd "$A17" ALLGREEN)" != "0" ] \
+   && [ "$(rd "$A17" REACHED)" != "0" ]; then
+  ok "臂17（与臂16 配对）台子绿时**逐台的最后一行读数、枚数行、结论行都出现在成功路径上**，且流程继续走到第 5 步真提交 ⇒ 「判据读数要打在绿路上」这条在这里有牙：只把红那一档打印、绿档静默，PERIGN/COUNTLINE/ALLGREEN 三枚同红"
+else
+  bad "臂17 未按预期 ⇒ 绿路上没有读数（等于这格在正常时看不见）、或没走到提交：$(printf '%s\n' "$A17" | tr '\n' ' ')"
+  echo '--- 臂17 日志尾部 ---'; tail -20 "${L}.arm17.out"
+fi
+
+# ------------------------------------------------- 臂 18 递归标记：跳过必须是**读数的跳过**
+F18=$(mk_fixture) || { echo "❌ 夹具18 建不起来"; exit 1; }
+echo "夹具18：$F18"
+(
+  cd "$F18" || exit 1
+  printf 'MINE18\n' > a.txt
+  # 夹具树里**没有**那三把台子 ⇒ 标记要是没生效，默认清单会 127 判红、这一臂必红。
+  #    所以这条断言的"绿"只有两种来路：标记生效（打印跳过）或默认清单真能跑到 —— 后者在夹具里不成立。
+  MSG='test: 臂18' PATHS_OVERRIDE='a.txt' UNCARRIED_OVERRIDE='' ANCHORS='MINE18' \
+    HT_LINE_RIG_NEST=1 \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm18.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "SKIPLINE=$(grep -c '本格跳过（HT_LINE_RIG_NEST=1' "${L}.arm18.out" || true)"
+    echo "NORIGRUN=$(grep -c 'LINE_RIGS=' "${L}.arm18.out" || true)"
+    echo "REACHED=$(grep -c '== 5\. --confirm' "${L}.arm18.out" || true)"
+  } > "${L}.arm18.rd"
+  exit $RC
+)
+A18=$(cat "${L}.arm18.rd" 2>/dev/null)
+if [ "$(rd "$A18" RC)" = "0" ] && [ "$(rd "$A18" SKIPLINE)" != "0" ] \
+   && [ "$(rd "$A18" NORIGRUN)" = "0" ] && [ "$(rd "$A18" REACHED)" != "0" ]; then
+  ok "臂18 带标记时：那一格**打印**跳过（不是静默 continue）、不跑清单（没有枚数行）、流程照常走完 ⇒ 本文件前面 15 臂靠的就是这一手；把标记摘掉或改成静默跳过，这条与臂 16/17 会一起变样"
+else
+  bad "臂18 未按预期 ⇒ 标记没生效（夹具里就会因缺台子判红）或跳过是静默的：$(printf '%s\n' "$A18" | tr '\n' ' ')"
+  echo '--- 臂18 日志尾部 ---'; tail -20 "${L}.arm18.out"
+fi
+
+# ------------------------------------------------- 臂 19 旋钮被拧成空白 ⇒ 判不了要按红
+F19=$(mk_fixture) || { echo "❌ 夹具19 建不起来"; exit 1; }
+echo "夹具19：$F19"
+(
+  cd "$F19" || exit 1
+  printf 'MINE19\n' > a.txt
+  MSG='test: 臂19' PATHS_OVERRIDE='a.txt' UNCARRIED_OVERRIDE='' ANCHORS='MINE19' \
+    env -u HT_LINE_RIG_NEST LINE_RIGS='   ' \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm19.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "ZERO=$(grep -c '一行台子都没跑到' "${L}.arm19.out" || true)"
+    echo "COMMITS=$(git rev-list --count HEAD || true)"
+  } > "${L}.arm19.rd"
+  exit $RC
+)
+A19=$(cat "${L}.arm19.rd" 2>/dev/null)
+if [ "$(rd "$A19" RC)" = "3" ] && [ "$(rd "$A19" ZERO)" != "0" ] \
+   && [ "$(rd "$A19" COMMITS)" = "1" ]; then
+  ok "臂19 清单被拧成纯空白 ⇒ RIG_N=0 走「读不出数按红处理」那一档（exit 3、不产生提交）⇒ 挡掉的是那种「旋钮设空 ⇒ 一格没跑 ⇒ 照样绿」的假通过；把空白行也算成一台、或把 0 台当通过，这条就红"
+else
+  bad "臂19 未按预期 ⇒ 空清单被当成通过，或 exit 3 那句没打：$(printf '%s\n' "$A19" | tr '\n' ' ')"
+  echo '--- 臂19 日志尾部 ---'; tail -20 "${L}.arm19.out"
+fi
+
+# --------------------------------- 臂 20 / 臂 21 干跑"只报不拦"与 --confirm 照旧拦（配对两腿）
+mk_orphan_fixture() {
+  local F; F=$(mk_fixture) || return 1
+  (
+    cd "$F" || exit 1
+    printf 'MINE20\n' > a.txt
+    printf '%s\n' "$F"
+  )
+}
+
+F20=$(mk_orphan_fixture) || { echo "❌ 夹具20 建不起来"; exit 1; }
+echo "夹具20：$F20"
+(
+  cd "$F20" || exit 1
+  # 干跑 + 传一枚**对不上任何 hunk** 的锚点：归属那一格必须报数，但**不许**打破干跑契约
+  MSG='test: 臂20' PATHS_OVERRIDE='a.txt' UNCARRIED_OVERRIDE='' ANCHORS='完全不搭的针' \
+    bash research/tools/calendar-line-commit-plan.sh > "${L}.arm20.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "ORPHAN_REPORTED=$(grep -c '孤儿 1 枚' "${L}.arm20.out" || true)"
+    echo "ONLY_REPORT_LINE=$(grep -c '干跑判到孤儿 hunk ⇒ 只报数' "${L}.arm20.out" || true)"
+    echo "NOT_REACHED=$(grep -c '== 5\. --confirm' "${L}.arm20.out" || true)"
+  } > "${L}.arm20.rd"
+  exit $RC
+)
+A20=$(cat "${L}.arm20.rd" 2>/dev/null)
+if [ "$(rd "$A20" RC)" = "0" ] && [ "$(rd "$A20" ORPHAN_REPORTED)" != "0" ] \
+   && [ "$(rd "$A20" ONLY_REPORT_LINE)" != "0" ] && [ "$(rd "$A20" NOT_REACHED)" = "0" ]; then
+  ok "臂20 干跑 + 传了对不上的锚点 ⇒ **报孤儿但不拦**（rc=0、那句'只报数'在输出里、也没走到第 5 步）⇒ 修掉的是'可选输入 ANCHORS 在测量模式下拿到了拦人的权力'；把它改回 exit 1 这条就红"
+else
+  bad "臂20 未按预期 ⇒ 干跑又被 ANCHORS 挡住了，或孤儿没报出来：$(printf '%s\n' "$A20" | tr '\n' ' ')"
+  echo '--- 臂20 日志尾部 ---'; tail -20 "${L}.arm20.out"
+fi
+
+F21=$(mk_orphan_fixture) || { echo "❌ 夹具21 建不起来"; exit 1; }
+echo "夹具21：$F21"
+(
+  cd "$F21" || exit 1
+  MSG='test: 臂21' PATHS_OVERRIDE='a.txt' UNCARRIED_OVERRIDE='' ANCHORS='完全不搭的针' \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm21.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "REFUSED=$(grep -c '拒绝提交（exit 1）' "${L}.arm21.out" || true)"
+    echo "NOT_REACHED=$(grep -c '== 5\. --confirm' "${L}.arm21.out" || true)"
+    echo "COMMITS=$(git rev-list --count HEAD || true)"
+  } > "${L}.arm21.rd"
+  exit $RC
+)
+A21=$(cat "${L}.arm21.rd" 2>/dev/null)
+if [ "$(rd "$A21" RC)" = "1" ] && [ "$(rd "$A21" REFUSED)" != "0" ] \
+   && [ "$(rd "$A21" NOT_REACHED)" = "0" ] && [ "$(rd "$A21" COMMITS)" = "1" ]; then
+  ok "臂21（与臂20 同夹具、只差 --confirm）⇒ rc=1、大字'拒绝提交'、没走到第 5 步、HEAD 没多提交 ⇒ 臂20 那条放宽**只作用于测量模式**，归属闸门对真提交那一腿一条没松"
+else
+  bad "臂21 未按预期 ⇒ --confirm 那一腿没拦住孤儿 hunk（口子开大了）：$(printf '%s\n' "$A21" | tr '\n' ' ')"
+  echo '--- 臂21 日志尾部 ---'; tail -20 "${L}.arm21.out"
+fi
+
+rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8" "$F9" "$F10" "$F11" "$F12" "$F13" "$F14" "$F15" "$F16" "$F17" "$F18" "$F19" "$F20" "$F21"
 echo "== 合计 pass=$PASS fail=$FAIL =="
 rm -f "${L}".arm*.out "${L}".arm*.rd
 [ "$FAIL" = 0 ] || exit 1
