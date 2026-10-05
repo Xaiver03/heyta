@@ -30,10 +30,15 @@
 import {
   addDays,
   addMonths,
+  aliveEvents,
   DAYS_PER_WEEK,
+  diffDays,
+  eventOccurrencesInRange,
   MONTHS_PER_YEAR,
   startOfMonth,
+  startOfYear,
   toLocalDate,
+  type CountdownEvent,
   type LocalDate,
   type Task,
 } from '@heyta/domain';
@@ -77,14 +82,29 @@ export type CalendarCellBar = {
   readonly title: string;
   readonly done: boolean;
   readonly overdue: boolean;
+  /**
+   * W6：这一条来自**倒数日**而不是任务。
+   *
+   * 🔴 可选且默认 `undefined`，因为改动前每一条都是任务条 —— 判据里
+   *   `bars.filter(b => b.event)` 取到的就是"第二个源"那一堆，
+   *   而"日历只有一个源"这件事因此是**可数的**，不是靠读注释。
+   */
+  readonly event?: boolean | undefined;
 };
 
 /**
- * 把当天的任务折成"可见条 + 被折叠数"。
+ * 把当天的任务（和倒数日）折成"可见条 + 被折叠数"。
  *
- * 排序是**有内容的**：逾期 → 未做 → 已做。
+ * 排序是**有内容的**：逾期 → 未做 → 已做 → 倒数日。
  * 理由是格子只有 3 个位置，把已完成的排进来等于用掉一个"这天还有什么要做"的信号，
  * 而那个信号才是她翻日历时想要的东西。
+ *
+ * 🔴 倒数日排在**最后**是刻意的：它不是"要做的事"，插到未完成任务前面
+ *   就等于让日历替用户判定"这个日子比那件任务急"（§2.7 那条不审判的红线）。
+ *   它与任务条**争同一格容量** ⇒ 满了就一起折进 `+N`，`hidden` 从总数算，
+ *   不需要为第二个源再开一个计数器。
+ *
+ * ⚠️ `events` / `eventLabels` 都不给时，本函数逐字节等于改动前（§9.1）。
  *
  * ⚠️ `hidden` 是**从数据算出来的**（`tasks.length - visible.length`），
  * 不是界面数 DOM 数出来的 —— 后者会让"3 条 + +0"这种废话出现在界面上。
@@ -94,8 +114,10 @@ export function calendarCellBars(
   today: LocalDate,
   date: LocalDate,
   max: number = MAX_CALENDAR_BARS,
+  events?: readonly CalendarDayEvent[] | undefined,
+  eventLabels?: CalendarEventBarLabels | undefined,
 ): { readonly bars: readonly CalendarCellBar[]; readonly hidden: number } {
-  const decorated = tasks.map((task) => {
+  const decorated: CalendarCellBar[] = tasks.map((task) => {
     const done = task.completedAt !== undefined;
     // 逾期 = 截止时间在今天之前**且还没做完**。已完成的不再算逾期 ——
     // 给一件做完的事标红是噪音，而红色在这个应用里只表示"要注意"（见 `calendarDayTone`）。
@@ -106,7 +128,16 @@ export function calendarCellBars(
       overdue: !done && date < today,
     } satisfies CalendarCellBar;
   });
-  const rank = (bar: CalendarCellBar): number => (bar.overdue ? 0 : bar.done ? 2 : 1);
+  for (const event of events ?? []) {
+    decorated.push({
+      id: event.id,
+      title: calendarEventBarTitle(event, eventLabels),
+      done: false,
+      overdue: false,
+      event: true,
+    });
+  }
+  const rank = (bar: CalendarCellBar): number => (bar.event ? 3 : bar.overdue ? 0 : bar.done ? 2 : 1);
   decorated.sort((a, b) => rank(a) - rank(b));
   const bars = decorated.slice(0, Math.max(0, max));
   return { bars, hidden: decorated.length - bars.length };
@@ -596,3 +627,106 @@ export function calendarDayMarkerView(
     spoken: word,
   };
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * ── 批次二 W6：EVENT 是日历的**第二个日期数据源** ──
+ *
+ * 🔴 **本块是追加的**（`model.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 在此之前日历只有一个源：`groupTasksByDueDate` 里那句
+ * `if (task.dueDate === undefined) continue;`，而它的注释自己承认
+ * "没有截止时间的任务不上日历"。倒数日**没有 `dueDate` 这个字段**
+ * （它有的是 `date` 锚点 + 重复规则），所以在这条源上它永远不会出现 ——
+ * 这不是"少接一个入口"，是**数据源本身只有一个**。
+ *
+ * ## 为什么这块算术还是从 domain 要
+ *
+ * "这个日子在这一段区间里出现几次"是**会静默算错**的数学（闰月三档、
+ * 农历新年跨年、锚点越界回退），它已经住在 `@heyta/domain/events.ts`。
+ * 日历自己再写一遍的漂移形状是：面板写"还有 12 天"而日历那格落在后一天
+ * （AGENTS §3.5）。本层只做**摆放**：取哪些天、拼哪句字。
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** 格子里一条倒数日需要的最小事实。🔴 不是 `CountdownEvent`：格子不认闰月、不认规则。 */
+export interface CalendarDayEvent {
+  readonly id: string;
+  readonly title: string;
+  /**
+   * 这一格相对今天的天数：**0 = 就是今天，正 = 还有 N 天，负 = 已经 N 天**。
+   *
+   * 🔴 它由 `diffDays(today, 格子那天)` 得到，**不是** `eventDaysFromToday(event)` ——
+   *   后者永远指向"下一次"，翻到上个月那一格会念出"还有 300 天"。
+   */
+  readonly days: number;
+}
+
+/** 倒数日那一行怎么写（宿主注入；不给就只写标题，见 `calendarEventBarTitle`）。 */
+export interface CalendarEventBarLabels {
+  readonly today: string;
+  readonly until: (days: number) => string;
+  readonly since: (days: number) => string;
+}
+
+/**
+ * 把倒数日摊到 `[rangeFrom, rangeTo]` 这段日历看得见的区间上。
+ *
+ * · 归档与已删除的不进日历（`aliveEvents` 同一个口径 —— 面板不显示的东西
+ *   日历也不许显示，否则"删掉了还在"会读成"没删干净"）。
+ * · 一个事件在同一段区间里**可以有多个格子**（每年重复的纪念日在跨两个月的
+ *   那一格里各出现一次），这与任务条的行为一致。
+ * · 同一格内按 id 升序：两条日子撞在同一天时，两台设备必须画出同一个顺序
+ *   （与 `sortEventsForDisplay` 第三段同一条理由）。
+ */
+export function groupEventsByOccurrence(
+  events: readonly CountdownEvent[],
+  today: LocalDate,
+  rangeFrom: LocalDate,
+  rangeTo: LocalDate,
+): Map<LocalDate, CalendarDayEvent[]> {
+  const map = new Map<LocalDate, CalendarDayEvent[]>();
+  for (const event of aliveEvents(events)) {
+    for (const date of eventOccurrencesInRange(event, rangeFrom, rangeTo)) {
+      const list = map.get(date);
+      const mark: CalendarDayEvent = {
+        id: event.id,
+        title: event.title,
+        days: diffDays(today, date),
+      };
+      if (list === undefined) map.set(date, [mark]);
+      else list.push(mark);
+    }
+  }
+  for (const list of map.values()) list.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return map;
+}
+
+/**
+ * 年档那一屏的可见区间：游标所在年的 **1 月 1 日到 12 月 31 日**。
+ *
+ * 起点用领域层的 `startOfYear`（不在这里重发明"这年第一天"），终点是固定字面量 ——
+ * 12 月永远是 31 天，这里没有需要算的东西。
+ */
+export function yearRangeOf(date: LocalDate): {
+  readonly from: LocalDate;
+  readonly to: LocalDate;
+} {
+  return { from: startOfYear(date), to: `${date.slice(0, 4)}-12-31` };
+}
+
+/**
+ * 倒数日那一行的**字**。
+ *
+ * ⚠️ 词表没给时只剩标题 —— 这不是降级，是这条缝的默认值必须等于"没接之前"
+ *   的形状（§9.1：新 props 一律可选，否则两端同时红）。所以"有没有说出天数"
+ *   是**能被测出来**的一条判据，而不是一句写在注释里的约定。
+ */
+export function calendarEventBarTitle(
+  event: CalendarDayEvent,
+  labels: CalendarEventBarLabels | undefined,
+): string {
+  if (labels === undefined) return event.title;
+  const phrase =
+    event.days === 0 ? labels.today : event.days > 0 ? labels.until(event.days) : labels.since(-event.days);
+  return `${event.title} · ${phrase}`;
+}
+

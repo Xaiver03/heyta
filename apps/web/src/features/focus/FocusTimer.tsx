@@ -211,9 +211,9 @@ export function FocusTimer() {
 
   // 🔴 词条表没有 ICU：1 个专注时英文必须走单数兄弟词条（"1 focus sessions" 是坏句子）。
   const completedText =
-    focus.completedToday === 1
-      ? t('web.focus.completedTodayOne', { count: focus.completedToday })
-      : t('web.focus.completedToday', { count: focus.completedToday });
+    focus.overview.todayCount === 1
+      ? t('web.focus.completedTodayOne', { count: focus.overview.todayCount })
+      : t('web.focus.completedToday', { count: focus.overview.todayCount });
 
   /**
    * 落盘失败要说的句子。

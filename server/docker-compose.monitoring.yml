@@ -19,7 +19,9 @@ services:
   # Real-time log viewer (~40MB RAM)
   # Read-only Docker socket access for viewing container logs
   dozzle:
-    image: amir20/dozzle:latest
+    # Knobbed for the same reason as the default graph's two sidecars (R6): this is a
+    # run-time Docker Hub pull, so no build-time knob can reach it. Unset = unchanged.
+    image: ${DOZZLE_IMAGE:-amir20/dozzle:latest}
     container_name: dozzle
     restart: unless-stopped
     ports:
@@ -35,7 +37,8 @@ services:
   # Uptime monitoring + alerts (~120MB RAM)
   # Provides health check monitoring and notifications
   uptime-kuma:
-    image: louislam/uptime-kuma:1
+    # Knobbed for the same reason as `dozzle` above. Unset = unchanged.
+    image: ${UPTIME_KUMA_IMAGE:-louislam/uptime-kuma:1}
     container_name: uptime-kuma
     restart: unless-stopped
     ports:

@@ -16,6 +16,13 @@
 #   只签名不公证，别人下载后仍会看到"来自身份不明的开发者"。
 #   本脚本**两个都做**，且**分别报告**成功与否 —— 不许把"签了名"说成"能分发"。
 #
+# `HEYTA_SKIP_NOTARIZE=1` 只跳过第 ⑥ 步（默认不跳，行为逐字不变）。
+#   它**不会**把红变成绿：第 ⑥ 步从不在判据里 —— `if xcrun notarytool … | tail -8 | awk`
+#   判的是 `awk` 的退出码（AGENTS §7 第 179 条那个形状），失败分支只打印一句红就继续走完。
+#   它去掉的是**没有上界的等待**：`--wait` 没有超时，2026-10-04 实测同一档被卡住 11h25m
+#   （pid 98934，父链是另一条会话的 `reinstall-all`），而验证载体的排队被这一格占死。
+#   ⇒ 跳过之后这一趟**不许**主张"包已通过公证"；那句只有不带这个变量的一趟能说。
+#
 # ── 为什么需要 entitlements ─────────────────────────────────────────────
 #
 # hardened runtime（公证的硬性前提）默认禁止 JIT 与可写可执行内存，
@@ -241,6 +248,17 @@ if (looksSmeared(cs)) console.error('  ⚠️ 启发式提示疑似渲染坏了 
 const blue = countBrandBlue(brandShot);
 console.log(`  主蓝采样命中 ${blue}（数的是 ${brandShot.split('/').pop()}）`);
 if (blue < 20) { console.error('  🔴 截图里没有 heyta 主蓝 —— 这是错误屏/别的界面，不是共享 UI'); bad = true; }
+// 🔴 2026-10-05：同一枚洞在这条腿上的第二份（第一份修在 `scripts/reinstall-all.sh` 的 `shot_ok`，
+//    两处判据必须一起走，否则"打包自验"与"装机复验"会给出相反的答案）。
+//    首屏**品牌帧**那块底板本身就是主蓝 `#2563EB`，实测命中 **2000**（真界面 1127）——
+//    "主蓝 ≥ 20"不但拦不住它，还给它打更高分数；它此前只靠 `looksBlank` 的 0.01 擦边压住
+//    （品牌帧实测 contentRatio **0.00943**，余量 5.7%，而画幅/DPR/MARK_SIZE/采样步长任一变动即翻）。
+//    ⇒ 下界 **0.05** = 最低真图实测 0.1034 的一半（对品牌帧 5.3 倍、对最低真图 2 倍）。
+if (cs.contentRatio < 0.05) {
+  console.error(`  🔴 内容占比 ${(cs.contentRatio * 100).toFixed(1)}% < 5% —— 主蓝再多也不算数：` +
+    `**首屏品牌帧**就是一块主蓝底板压在近白底上（实测命中 2000、占比 0.9%），那是遮罩还没从 DOM 摘掉的一帧`);
+  bad = true;
+}
 if (bad) process.exit(1);
 console.log('  ✅ 打包后的 .app 能起来、界面有真实内容（且确实是共享 UI）');
 JS
@@ -269,7 +287,10 @@ done
 KEY_ID="T2H876K8MJ"
 ISSUER="627afa93-122d-4739-a780-0ad593aee505"
 
-if [ "$SIGN_KIND" != "developer-id" ]; then
+if [ "${HEYTA_SKIP_NOTARIZE:-}" = "1" ]; then
+  echo "  ⏭ 显式跳过（HEYTA_SKIP_NOTARIZE=1）。这一趟的判据是「装出来的包里有这一屏」（第 ④ 步已经量过），"
+  echo "     公证不是它的组成部分 ⇒ 本趟**不主张**「这个包已通过公证」，那句要等不带这个变量的一趟。"
+elif [ "$SIGN_KIND" != "developer-id" ]; then
   echo "  ⏭ 跳过：不是 Developer ID 签名，公证必然被拒"
 elif [ -z "$KEY_FILE" ]; then
   echo "  ⏭ 跳过：找不到 ASC API key（试过 ~/Library/Private/AppStoreConnect、~/Desktop、~/.appstoreconnect/private_keys）"

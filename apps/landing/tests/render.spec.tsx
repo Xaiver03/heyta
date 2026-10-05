@@ -344,14 +344,34 @@ describe('首页（原有断言，一个都不放松）', () => {
     vi.stubEnv('VITE_APP_URL', 'https://app.example.com/');
 
     const view = renderPage('home');
-    const appLinks = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].filter(
-      (a) => a.getAttribute('href') === 'https://app.example.com',
-    );
+    // 按 **pathname** 认，不按整串相等：入口 href 现在一定带 `?lang=`（默认语言也带，
+    // 理由见 `app-url.ts`），拿整串比会把"真的多出了入口"读成"一条都没有"。
+    const appAnchors = [
+      ...view.querySelectorAll<HTMLAnchorElement>('a[href]')
+    ].flatMap((a) => {
+      try {
+        const url = new URL(a.getAttribute('href') ?? '');
+        return url.origin + url.pathname === 'https://app.example.com/' ? [{ a, url }] : [];
+      } catch {
+        return [];
+      }
+    });
+    // 同一个 pathname 上住着**两个意图**：「立即使用」（新访客）与「登录」
+    // （回访用户，带 `?signin`，且宽屏操作位 + 窄屏菜单各一条 ⇒ 两条）。
+    // 不分开数就会把 4 当成"入口多了一条"—— 那正是这条判据要抓的事。
+    const ctas = appAnchors.filter(({ url }) => !url.searchParams.has('signin'));
+    const signins = appAnchors.filter(({ url }) => url.searchParams.has('signin'));
 
     // 两处：导航一条 + 收尾 CTA 一条。
-    expect(appLinks.length).toBe(2);
-    for (const anchor of appLinks) {
+    expect(ctas.length).toBe(2);
+    expect(signins.length).toBe(2);
+    for (const { a: anchor, url } of appAnchors) {
       expect(anchor.getAttribute('rel')).toBe('noopener noreferrer');
+      // 每一条应用入口（两个意图都算）都要带 `lang=zh-CN` —— 不带的话英文浏览器的访客
+      // 点中文落地页会被静默换成英文界面（`0aa6cb0e` 给应用解析链加了系统语言那一层）。
+      expect(url.searchParams.get('lang')).toBe('zh-CN');
+    }
+    for (const { a: anchor } of ctas) {
       expect(anchor.textContent).toContain('立即使用');
     }
   });
@@ -569,7 +589,7 @@ describe('子页面的正文真的挂上了', () => {
     vi.stubEnv('VITE_APP_URL', 'https://heyta.finlaw.cloud/app/');
     const wired = renderPage('home');
     const wiredLink = wired.querySelector<HTMLAnchorElement>('.lp-nav__signin')!;
-    expect(wiredLink.getAttribute('href')).toBe('https://heyta.finlaw.cloud/app?signin=1');
+    expect(wiredLink.getAttribute('href')).toBe('https://heyta.finlaw.cloud/app?lang=zh-CN&signin=1');
     expect(wiredLink.getAttribute('rel')).toBe('noopener noreferrer');
   });
 });
