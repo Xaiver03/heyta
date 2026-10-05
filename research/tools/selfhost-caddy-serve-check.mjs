@@ -22,9 +22,10 @@
  * ## 判据与变异臂
  * healthy（= compose 那条探针在真 Caddyfile 下不打空）· 经代理取 /app/ 与直连同字节且
  * 数得出 tokens.css 的主蓝 · 经代理取 /health 与直连同形 · 安全头只在代理那侧出现
- * （证 caddy 真在链上）· 带 ?token= 的请求不把明文留在日志。
- * 两条变异臂各打一条：`admin off` ⇒ 那条健康检查命令必须失败；摘掉日志 filter ⇒
- * 令牌必须被这双眼睛抓到。臂数由本脚本自己打印，文档里不许抄。
+ * （证 caddy 真在链上）· 带 ?token= 的请求不把明文留在日志 · 仓库那份在 `caddy fmt` 下是 no-op。
+ * 三条变异臂各打一条：`admin off` ⇒ 那条健康检查命令必须失败；摘掉日志 filter ⇒
+ * 令牌必须被这双眼睛抓到；把注释块与全局块之间的空行塞回去 ⇒ fmt 那条必须判出不一致，
+ * 而同一份副本 validate 照旧通过（否则 F 只是 validate 的影子）。臂数由本脚本自己打印，文档里不许抄。
  *
  * ## G-70（2026-10-05 并入本装置）：实时同步那条 WS 升级**穿过这枚 caddy** 了吗
  *
@@ -204,8 +205,24 @@ const validate = spawnSync('docker', ['run', '--rm', '-v', `${CADDYFILE_HOST}:${
   '-e', `DOMAIN=:${CONTAINER_PORT}`, IMAGE, 'caddy', 'validate', '--config', CADDYFILE_GUEST, '--adapter', 'caddyfile'],
   { encoding: 'utf8' });
 if (validate.status !== 0) die(4, `仓库那份 Caddyfile 连 caddy validate 都过不了：\n${validate.stdout}${validate.stderr}`);
-const fmtWarn = /not formatted[^\n]*/.exec(`${validate.stderr}${validate.stdout}`)?.[0] ?? '';
-readings.push(`地板：caddy validate（仓库原文件，未改一字）→ Valid configuration；${fmtWarn ? `fmt 警告在：${fmtWarn.slice(0, 90)}` : '无 fmt 警告'}`);
+readings.push(`地板：caddy validate（仓库原文件，未改一字）→ Valid configuration`);
+
+// F（G-69）：caddy 自己的格式化器对仓库那份必须是 no-op。
+// 这一条以前只是**打印**：`not formatted; run 'caddy fmt --overwrite'` 在每个 G-68 跑次里
+// 都响过，而打印不构成判据 —— 一条永远不会红的读数，和"已经排过格式"在输出上长得一模一样。
+// ⚠️ validate/fmt 都必须带 `-e DOMAIN=…`：`{$DOMAIN}` 不设值时展开成空串，那份文件**本来**
+//    就报 "server block without any key …"，两版同红 ⇒ 拿它做 A/B 前要先确认探针自己能绿。
+const fmtOf = (hostPath) => {
+  const r = spawnSync('docker', ['run', '--rm', '-v', `${hostPath}:${CADDYFILE_GUEST}:ro`,
+    IMAGE, 'caddy', 'fmt', CADDYFILE_GUEST], { encoding: 'utf8' });
+  // ⚠️ `caddy fmt` 对**未排版**的文件是 rc≠0 + 那句警告（不是 rc=0 打印一份不一样的东西）。
+  //    所以 rc 与"输出==原文件"两半都要量；更不能把非零当成装置故障 die 掉 ——
+  //    非零正是这条判据要抓的那个状态本身（第一版就是这么写的，臂 unformatted 当场把它打回）。
+  return { rc: r.status ?? 1, same: r.stdout === readFileSync(hostPath, 'utf8'), out: r.stdout, file: readFileSync(hostPath, 'utf8') };
+};
+const floor = fmtOf(CADDYFILE_HOST);
+const fmtClean = floor.rc === 0 && floor.same;
+readings.push(`F caddy fmt：rc=${floor.rc}、输出 ${Buffer.byteLength(floor.out)} B vs 文件 ${Buffer.byteLength(floor.file)} B（逐字一致=${floor.same}）⇒ 判据 ${fmtClean}`);
 
 const LIVE = 'heyta-g68-live';
 runCaddy(LIVE, CADDYFILE_HOST);
@@ -352,6 +369,7 @@ claim('D 直连不带压缩（那一条差异只可能来自 caddy）', undefine
 claim('D -Server 生效（代理侧无 Server 头）', undefined, proxyApp.headers['server']);
 claim('E 令牌没被写进日志', false, leaked);
 claim('E ?REDACTED 那行的确在（不然"没泄漏"是探针没看见）', true, sawRedacted);
+claim('F 仓库那份 Caddyfile 在 caddy fmt 下是 no-op', true, fmtClean);
 claim('W1 经代理的 WS 升级建立并收到服务端的 connected', true, lis.s.opened && sawConnected);
 claim('W1 上传之前不许有 new_ops（反例：推送不是无条件发的）', 0, spuriousBefore);
 claim('W2 坏令牌拿不到 connected（那条 101 不是代理自己给的）', false, badConnected);
@@ -404,11 +422,14 @@ await sleep(1500);
 
 // 上一版按"那一行的字面内容"匹配摘它，结果**一条都没摘到**（模式打空、脚本却往下走，
 // 差点把"没泄漏"记成判据绿）。现在按整行摘，并当场数摘了几条、剩下还有没有 REDACTED。
-const FILTER_LINES = [...src.matchAll(/^[ ]*request>uri[^\n]*\n/gm)];
+// ⚠️ 缩进必须写成 `[ \t]*` 而不是 `[ ]*`：`caddy fmt` 会把行首空格改成制表符（G-69 那一笔
+//    就是这么把这条臂打空的 —— 它当场 die(6) 报了"现读 0"，没有假装摘成功）。
+const FILTER_RE = /^[ \t]*request>uri[^\n]*\n/gm;
+const FILTER_LINES = [...src.matchAll(FILTER_RE)];
 if (FILTER_LINES.length !== 2) die(6, `Caddyfile 里的 request>uri filter 不再是 2 条（现读 ${FILTER_LINES.length}）—— 先去看清那两行被改成了什么，再决定这条臂怎么打`);
 const LEAK = 'heyta-g68-leak';
 const LEAK_PATH = join(TMP, 'Caddyfile.nofilter');
-const stripped = src.replace(/^[ ]*request>uri[^\n]*\n/gm, '');
+const stripped = src.replace(FILTER_RE, '');
 if (/REDACTED/.test(stripped)) die(6, '摘完两处 filter 之后 Caddyfile 里仍留着 REDACTED ⇒ 注入没打全，这条臂不构成对 E 的反证');
 writeFileSync(LEAK_PATH, stripped);
 runCaddy(LEAK, LEAK_PATH);
@@ -434,6 +455,23 @@ claim('变异 no-filter：WS 那条路径也必须抓到泄漏（否则 W4 没�
 claim('变异 no-filter：WS 在摘掉 filter 的容器上仍能建立（把归因钉在日志上，不是连接上）', true, wsLeakConnected);
 dockerAllow('rm', '-f', LEAK);
 mine.containers = mine.containers.filter((n) => n !== LEAK);
+
+// 臂 unformatted（G-69）：F 有没有牙，只看一件事 —— 把**那一个空行**塞回注释块与全局块之间
+// （就是这轮之前仓库那份的形状，也是过去每个跑次都打印过的那条警告的来源），同一条判据必须转红。
+// 还要它 validate 照旧通过：否则 F 只是 validate 的影子，量不到任何 validate 量不到的东西。
+if (/\n\n\{\n/.test(src)) die(6, '仓库那份又带回了注释块与全局块之间的空行 ⇒ F 本身已经红了，先修文件再谈这条臂');
+const unfIdx = src.indexOf('\n{\n');
+if (unfIdx < 0) die(6, 'Caddyfile 里找不到裸 `{` 那行 ⇒ unformatted 这条臂没法注入（和 admin-off 同一个前提）');
+const UNFMT_PATH = join(TMP, 'Caddyfile.unfmt');
+writeFileSync(UNFMT_PATH, `${src.slice(0, unfIdx + 1)}\n${src.slice(unfIdx + 1)}`);
+const unf = fmtOf(UNFMT_PATH);
+const unfClean = unf.rc === 0 && unf.same;
+const unfValidate = spawnSync('docker', ['run', '--rm', '-e', `DOMAIN=:${CONTAINER_PORT}`,
+  '-v', `${UNFMT_PATH}:${CADDYFILE_GUEST}:ro`, IMAGE, 'caddy', 'validate', '--config', CADDYFILE_GUEST, '--adapter', 'caddyfile'],
+  { encoding: 'utf8' });
+readings.push(`臂 unformatted：塞回那个空行之后 fmt 判据=${unfClean}（rc=${unf.rc}、逐字一致=${unf.same}，应为 false）；同副本 caddy validate rc=${unfValidate.status}（应为 0，⇒ F 抓的是 validate 抓不到的那一格）`);
+claim('变异 unformatted：同一条 fmt 判据必须判出不一致（否则 F 没牙）', false, unfClean);
+claim('变异 unformatted：它仍然 validate 通过（⇒ F 不是 validate 的影子）', 0, unfValidate.status);
 rmSync(TMP, { recursive: true, force: true });
 
 // ── 收口 ────────────────────────────────────────────────────────────────────
@@ -442,7 +480,7 @@ for (const r of readings) console.log(`   · ${r}`);
 const failed = arms.filter((a) => !a.pass);
 /* 🔴 掉臂检查按**组名**判，不按条数写死：写死数字就是把当时的形状当判据（本仓为这件事红过几次），
  *    而这里真正会发生的失效是"某一整段被人删掉或提前 return"—— 那种情况下"红 0"最危险。 */
-const GROUPS = ['控制腿', 'A ', 'B ', 'C ', 'D ', 'E ', 'W1', 'W2', 'W3', 'W4', 'W5', '变异 admin-off', '变异 no-filter'];
+const GROUPS = ['控制腿', 'A ', 'B ', 'C ', 'D ', 'E ', 'F ', 'W1', 'W2', 'W3', 'W4', 'W5', '变异 admin-off', '变异 no-filter', '变异 unformatted'];
 const missingGroups = GROUPS.filter((g) => !arms.some((a) => a.name.startsWith(g)));
 if (missingGroups.length) die(9, `装置掉臂：这些组一条都不在（${missingGroups.join(' / ')}）—— "红 0"不能读成"全绿"`);
 console.log(`   ── 臂 ${arms.length} 条：红 ${failed.length} 条（组 ${GROUPS.length} 个都在）──`);
@@ -450,5 +488,5 @@ for (const a of arms) console.log(`   ${a.pass ? '✅' : '❌'} ${a.name}｜期�
 console.log(`   与出货形状的四条差异：docker run 而非 compose up｜DOMAIN=:${CONTAINER_PORT} 而非真实 https 域名（⇒ 不覆盖签证书）｜宿主侧发布到 127.0.0.1:${HOST_PORT}（不占主机 :80/:443）｜/data、/config 用一次性卷`);
 console.log(`   G-70 的射程边界：上传方是真 CLI（node-host）经代理建号+上传，但**监听端不是浏览器** —— 浏览器里的实时接线归 verify:selfhost-stack 的界面腿；ws:// 明文（差异 2），TLS 那一条不在这里证`);
 if (failed.length) die(8, `G-68/G-70 判据红 ${failed.length} 条 —— 逐臂见上`);
-console.log(`✅ G-68：仓库原文件 Caddyfile 与 compose 现读出的那枚 caddy 服务，在真栈上跑通了"外人第一步"的三格（healthy／经代理取 /app/ 同字节且数得出主蓝／经代理取 /health 同形），另有两条判据各被变异臂打过一次。签证书那一条不在射程内（差异 2）。`);
+console.log(`✅ G-68：仓库原文件 Caddyfile 与 compose 现读出的那枚 caddy 服务，在真栈上跑通了"外人第一步"的三格（healthy／经代理取 /app/ 同字节且数得出主蓝／经代理取 /health 同形），另有三条判据各被变异臂打过一次（健康检查 / 日志 filter / fmt no-op）。签证书那一条不在射程内（差异 2）。`);
 console.log(`✅ G-70：实时通道那条 WS 升级经这枚 caddy 建立、双向帧都过（connected + 另一台设备上传后的 new_ops），坏令牌被服务端以 4003 拒掉、那一次升级的日志行做了 ?REDACTED，停容器后代理腿连不上而直连腿照旧；no-filter 那枚变异容器上 WS 路径的泄漏确实会被抓到。`);
