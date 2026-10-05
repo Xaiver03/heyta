@@ -52,6 +52,7 @@ const MANIFEST = [
   'scripts/verify-harmony-rnoh.sh',
   'scripts/verify-harmony-toolchain.sh',
   'scripts/verify-ios-lan-http.sh',
+  'scripts/verify-macos-account-erasure.sh',
   'scripts/verify-mobile-account.sh',
   'scripts/verify-mobile-account-erasure.sh',
   'scripts/verify-mobile-aed.sh',

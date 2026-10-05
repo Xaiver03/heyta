@@ -79,11 +79,26 @@ struct ShellStorageHost {
         // 库放 Application Support：这是 macOS 上"应用自己拥有的数据"的既定位置。
         // ⚠️ 与 Windows 的 `%LOCALAPPDATA%\heyta\heyta.sqlite` 是**同一个角色**、
         //    不同平台的位置 —— 两边的真机判据都是"从壳外读这个文件"。
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-        guard let base = support.first else {
-            return .off(reason: "拿不到 Application Support 目录")
+        //
+        // 🔴 `HEYTA_SHELL_DB_DIR=<绝对路径>`：把库目录整体挪走。**它存在的理由不是方便，是安全**：
+        //    界面级的注销判据要**真的删掉这个文件**，而默认路径是用户本机那一份真库
+        //    （计划 §10.70 ① 现量：81,920 B）。没有这个旋钮，那条判据只能拿用户的真数据做实验 ——
+        //    所以这一格的阻塞从来不是"要不要注销"，是"缺一个隔离面"（§10.70 ④）。
+        //    默认分支的表达式**逐字不变**；只接受绝对路径，因为"相对谁的 cwd"在 .app 里
+        //    没有确定参照，静默猜会把验收写进用户目录。
+        let dir: URL
+        if let override = env["HEYTA_SHELL_DB_DIR"], !override.isEmpty {
+            guard override.hasPrefix("/") else {
+                return .off(reason: "HEYTA_SHELL_DB_DIR 必须是绝对路径（实测值：\(override)）—— 不猜参照目录")
+            }
+            dir = URL(fileURLWithPath: override, isDirectory: true)
+        } else {
+            let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            guard let base = support.first else {
+                return .off(reason: "拿不到 Application Support 目录")
+            }
+            dir = base.appendingPathComponent("heyta", isDirectory: true)
         }
-        let dir = base.appendingPathComponent("heyta", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         } catch {

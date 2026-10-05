@@ -64,6 +64,23 @@ const tokenFor = (userId = 1, tokenVersion = 0, expiresIn = '1h'): string =>
 const EXPIRED_TOKEN = tokenFor(1, 0, '-1s');
 const GARBAGE_TOKEN = 'not-a-jwt-at-all';
 
+/**
+ * 🔴 三段的、header 能解、**payload 不是 JSON** 的一枚 —— 与上面那枚不是一回事。
+ *
+ * `not-a-jwt-at-all` 走的是 jsonwebtoken 的 "jwt malformed"（`JsonWebTokenError`），
+ * 而这一枚在它**解码 payload 那一步**抛的是裸 `SyntaxError`：既不是 expired
+ * 也不是 `JsonWebTokenError`，于是落到 `auth.ts` 末尾"数据库错误必须当 500 传播"那一支被 rethrow。
+ *
+ * 实测（2026-10-05 05:2x，同一台 TEST_MODE 服务端，两个请求只差令牌形状）：
+ *   这一枚 → **HTTP 500** `{"statusCode":500,"error":"Internal Server Error"}`
+ *   结构合法、签名错 → **HTTP 401** `{"error":"Invalid token","code":"TOKEN_INVALID"}`
+ * 后果两条：① 客户端按**稳定码**判要不要销毁本机明文（ADR-0049），500 没有码 ⇒
+ * 移动端把"我的令牌是坏的"渲染成 `同步失败：HTTP 500 — Internal Server Error`；
+ * ② 真机验收里"401 不许清库"那条负向对照**测不到它想测的那条路径**（它拿到的是 500）。
+ */
+const MALFORMED_PAYLOAD_TOKEN =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.000000000000000000000000000000.sub-not-real';
+
 /** 真查库那一行的形状（`isVerified` 在库里是 0/1）。 */
 const VERIFIED = { id: 1, tokenVersion: 0, isVerified: 1 };
 const UNVERIFIED = { id: 1, tokenVersion: 0, isVerified: 0 };
@@ -133,6 +150,19 @@ describe('失效原因的可辨识码（真 verifyToken）', () => {
     expect(garbage).toMatchObject({ valid: false, code: 'TOKEN_INVALID' });
 
     for (const r of [expired, garbage]) expect(r).not.toMatchObject({ code: 'ACCOUNT_CLOSED' });
+  });
+
+  it('🔴 payload 解不出 JSON 的令牌 ⇒ 401 TOKEN_INVALID，不是 500、更不是注销', async () => {
+    // 单元层：这一枚**不许抛出去**（抛出去=路由层 500）。
+    const result = await verifyToken(MALFORMED_PAYLOAD_TOKEN);
+    expect(result).toMatchObject({ valid: false, code: 'TOKEN_INVALID' });
+    expect(result).not.toMatchObject({ code: 'ACCOUNT_CLOSED' });
+
+    // 路由层：判的是用户真正看到的那个数 —— 500 会被移动端渲染成"同步失败：HTTP 500"，
+    // 而按稳定码判是否清库的那条链在 500 上**什么都读不到**。
+    const res = await callProtectedRoute(MALFORMED_PAYLOAD_TOKEN);
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({ code: 'TOKEN_INVALID' });
   });
 
   it('数据库故障仍然抛出去，不许伪装成任何一种失效码', async () => {
