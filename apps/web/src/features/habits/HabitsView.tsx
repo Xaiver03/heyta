@@ -122,6 +122,40 @@ export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
     streakCurrent: (count) => currentStreakText(count, t),
     streakLongest: (count) => longestStreakText(count, t),
     streakTotal: (count) => totalCheckInText(count, t),
+    /*
+      数量行（工单 W6）。三个都是**共享层点名要求**的字段，不是可选装饰：
+      `HabitBoardLabels` 把它们写成必填，所以少接一个编译就红 ——
+      可选 prop 会把"宿主没接"伪装成"做完了"，这条在 §8 的 W3 那轮记过。
+      单位为空时补 `web.habits.goal.defaultUnit`（与目标摘要同一个 fallback，
+      共享层不猜：猜出来的"次"对"每天 30 分钟"是错的）。
+    */
+    amount: ({ value, target, unit }) =>
+      t('common.habits.amount.today', {
+        value,
+        target,
+        unit: unit === '' ? t('web.habits.goal.defaultUnit') : unit,
+      }),
+    amountPlusA11y: ({ name }) => t('common.habits.amount.plus', { name }),
+    amountMinusA11y: ({ name }) => t('common.habits.amount.minus', { name }),
+    /*
+      工单 W8 的四格（本月打卡 / 本月完成率 / 本月完成量 / 总完成量）。
+      五个字段在 `HabitBoardLabels` 里都是**必填**：少接一个编译就红 ——
+      与上面三个同一个纪律（可选 prop 会把"宿主没接"伪装成"做完了"）。
+      句子只是 `month` 统计的投影，口径（天/自然月/到期分母）全在 domain 层；
+      完成率的分母为 0 时共享层改点 `monthRatePending`，这里不判断。
+      单位为空时退化成**不带单位**的那条句子（裁决 D：不替用户猜量纲）。
+    */
+    monthDays: (count) => t('web.habits.stats.monthDays', { count }),
+    monthRate: (percent) => t('web.habits.stats.monthRate', { percent }),
+    monthRatePending: t('web.habits.stats.monthRatePending'),
+    monthValue: ({ value, unit }) =>
+      unit === ''
+        ? t('web.habits.stats.monthValue', { value })
+        : t('web.habits.stats.monthValueUnit', { value, unit }),
+    totalValue: ({ value, unit }) =>
+      unit === ''
+        ? t('web.habits.stats.totalValue', { value })
+        : t('web.habits.stats.totalValueUnit', { value, unit }),
     freeze: (count) => t('web.habits.freeze', { count }),
     repair: ({ date, count }) => t('web.habits.repair', { date, count }),
     repairAction: t('web.habits.repairAction'),
@@ -389,8 +423,8 @@ export function HabitsView() {
             // 🔴 配对函数来自 app-host —— 共享层不认识它（见那边的文件头）。
             growth={habitGrowth}
             labels={labels}
-            onCheckIn={(habitId, date?: LocalDate) => {
-              run(habitId, store.checkIn(habitId, date));
+            onCheckIn={(habitId, date?: LocalDate, value?: number) => {
+              run(habitId, store.checkIn(habitId, date, value));
             }}
             onUndoCheckIn={(habitId, date?: LocalDate) => {
               run(habitId, store.undoCheckIn(habitId, date));

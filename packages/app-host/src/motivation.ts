@@ -36,6 +36,7 @@
 import {
   addDays,
   computeActivityTotals,
+  computeHabitPeriodStats,
   computeStreak,
   computeTodayProgress,
   computeWeeklyReview,
@@ -49,6 +50,7 @@ import {
   type FocusSession,
   type Habit,
   type HabitLog,
+  type HabitPeriodStats,
   type HabitResilienceView,
   type IdentityTagProgress,
   type LocalDate,
@@ -170,11 +172,22 @@ export function identityTagsFromState(
  *
  * ⚠️ 这里**不**滤墓碑：`computeStreak` / `describeHabitResilience` 内部各自
  * 按 `deletedAt` 判定"达成"，外面再滤一遍只是重复劳动（撤销就是没发生）。
+ * （唯一的例外是 `computeHabitPeriodStats` 的**求和路径** —— 它不经过那两个
+ * 函数，所以它自己滤；这个分工写死在 domain 侧的参数注释里。）
  */
 export interface HabitGrowthRow {
   habit: Habit;
   streak: StreakResult;
   resilience: HabitResilienceView;
+  /**
+   * 自然月统计 + 历史总量（工单 W8 的四个缺数）。
+   *
+   * 🔴 **必填，不是"宿主可选传的 prop"**：上一批工单记过那条教训 ——
+   * 默认值等于原行为的可选 prop 会把"宿主没接"伪装成"做完了"。
+   * 这里的必填落在**返回类型**上：`habitGrowth` 不算是编译不过，
+   * 而共享层的 `HabitGrowthFn` 同样把它写成必填，测试桩少给一个字段就红。
+   */
+  month: HabitPeriodStats;
 }
 
 export function habitGrowth(habit: Habit, logs: readonly HabitLog[], today: LocalDate): HabitGrowthRow {
@@ -184,6 +197,9 @@ export function habitGrowth(habit: Habit, logs: readonly HabitLog[], today: Loca
     streak: computeStreak(habit, own, today),
     // 韧性与 streak 共用同一份日志、同一个 today，所以两个数字**不可能对不上账**。
     resilience: describeHabitResilience(habit, own, today),
+    // 月统计也吃**同一份** `own` 与同一个 `today` —— 同一个理由：
+    // "本月打卡 N 天"与"连续 N 天"若来自两次不同口径的扫描，界面就会自相矛盾。
+    month: computeHabitPeriodStats(habit, own, today),
   };
 }
 

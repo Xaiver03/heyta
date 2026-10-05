@@ -511,6 +511,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
           const position = row.position;
           const marker = markerMs(position);
           const overdue = isOverdue(position, clock);
+          const rowSelected = activeTaskId === row.taskId;
           const whenColor = overdue
             ? tokens['color.warning']
             : tokens['color.foreground-subtle'];
@@ -519,7 +520,11 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
               key={row.taskId}
               testID={`timeline-row-${row.taskId}`}
               role="listitem"
-              style={activeTaskId === row.taskId ? [styles.row, styles.rowActive] : styles.row}
+              // 🔴 平铺 `aria-pressed`，与共享 `HabitProgressList` 同一选择（RN 的 `AriaProps`
+              //   里没有 `aria-current`，写它不报错也不生效）。底色只给眼睛，这一条给读屏：
+              //   "现在右边显示的就是这一行"这件事，此前只有像素在说。
+              aria-pressed={rowSelected}
+              style={rowSelected ? [styles.row, styles.rowActive] : styles.row}
               onPress={onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId)}
               accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
             >
@@ -683,12 +688,15 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
           >
             {labels.unscheduledLane(unscheduled.length)}
           </Text>
-          {unscheduled.map((row) => (
+          {unscheduled.map((row) => {
+            const rowSelected = activeTaskId === row.taskId;
+            return (
             <Pressable
               key={row.taskId}
               testID={`timeline-lane-item-${row.taskId}`}
+              aria-pressed={rowSelected}
               style={
-                activeTaskId === row.taskId ? [styles.laneItem, styles.rowActive] : styles.laneItem
+                rowSelected ? [styles.laneItem, styles.rowActive] : styles.laneItem
               }
               onPress={onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId)}
               accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
@@ -710,7 +718,8 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                 </Text>
               )}
             </Pressable>
-          ))}
+            );
+          })}
         </View>
       )}
     </View>

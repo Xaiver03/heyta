@@ -595,3 +595,35 @@ export async function parkCursor(page: Page): Promise<void> {
   await page.mouse.move(vp.width - 180, vp.height - 60);
   await page.waitForTimeout(120);
 }
+
+/**
+ * 通过习惯视图自己的表单建一个习惯（真 op-log，不碰内部状态）。
+ *
+ * 定位用的是**界面自己声明的可访问名**（`web.habits.addLabel` = 「新习惯名称」），
+ * 不是 CSS 类 —— `.ht-habit__add` 那类改名不会让判据误红，可访问名改名会是产品事件。
+ * 提交走 `Enter`（那是一个真 `<form onSubmit>`，`HabitsView.tsx:268-273`）。
+ */
+export async function addHabit(page: Page, name: string): Promise<void> {
+  const input = page.getByLabel('新习惯名称');
+  await input.fill(name);
+  await input.press('Enter');
+  await expect(
+    page.locator('[data-testid^="habit-row-"]').filter({ hasText: name }).first(),
+    `建了「${name}」但习惯列表里没有那一行`,
+  ).toBeVisible();
+}
+
+/**
+ * 通过便签板自己的输入框建一条便签（真 op-log）。
+ *
+ * 走共享 `NotesBoard` 的 testID 契约（`notes-input` / `notes-submit`，
+ * `packages/ui/src/notes/NotesBoard.tsx:241-264`）—— 那是界面自己给自动化留的名字。
+ */
+export async function addNote(page: Page, content: string): Promise<void> {
+  await page.getByTestId('notes-input').fill(content);
+  await page.getByTestId('notes-submit').click();
+  await expect(
+    page.locator('[data-testid^="note-row-"]').filter({ hasText: content }).first(),
+    `建了「${content}」但便签板里没有那一张`,
+  ).toBeVisible();
+}
