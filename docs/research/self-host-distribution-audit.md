@@ -12202,3 +12202,41 @@ ahead>0 时它按设计就 refuse（看守每轮如实打 ⏳，没有降级、�
 "脏 33 行 / ahead=1"和"脏 33 行 / ahead=3"，如果不把 ahead 当**趋势**数（而不是当归零条件等），
 就会一直等下去。登记等待时要写清这一格**由谁、在什么动作下**消掉；答不出来就不是等待，是死等。
 （本线 §7 第 82 条讲"非空白不等于对"，这条是它的git版：读数正确不等于读数在回答你的问题。）
+
+### 8.218 "实时同步"这一维**不是**对外错话：逐条核完那条隐私披露的三个断言，顺手照出两条仓库内部的过期"没有 X"句（2026-10-05 14:3x，负载 65 ⇒ 这一格只能是代码读）
+
+G-70 挂的是"WS 升级从未经验 bundled Caddy"。查它之前先问了一句更前置的：**对外有没有已经在说一件还没成立的事**。
+现量（全仓 `实时同步|realtime sync`，排除生成物与 sourcemap）只命中三处，唯一对外那一处是法务条款：
+
+| 位置 | 那句话在断言什么 |
+|---|---|
+| `packages/legal/src/documents/minors.ts:127`（落地页 `/legal/minors/` + 服务端对外页共用这一份真源） | "**在你同意联网、并且开启同步之后**，Web 端才会在你的浏览器里注册 Service Worker 并建立实时同步连接，两者都是持久连接 —— 服务器因此能看到『该账号此刻在线』这一事实。**没有那份同意，这两件事都不会发生**" |
+| `packages/app-host/src/privacy-consent.ts:11` | 不是现状 —— 那是**缺口陈述**（"此前…先于任何同意发生"），第一眼看成矛盾，读完那一整句才否掉 |
+| `packages/sync-client/src/realtime.ts:2` | 模块自述，不对外 |
+
+🔴 注意那条不是功能承诺，是**隐私披露**：它承诺的是"我们不收集"那一侧，所以错话方向是**说过头**（声称有闸门而实际没有），比"承诺有功能而没做"更难被发现 —— 没人会去测一条本来就不该发生的连接。逐条核：
+
+1. "同意之后才建 WS" ⇒ `apps/web/src/features/sync/store.ts:253` `if (!privacyConsent.networkAllowed()) return;`，
+   且注释明写"WS 不经 `window.fetch`，带闸的那层罩不到它 —— **这一处就是它唯一的闸**"，并排在 dispose 之后（撤回同意要真的断连）。
+   移动端同一道闸在 `apps/mobile/src/sync/realtime.ts:175`。
+2. "Web 端会建立实时同步连接" ⇒ `store.ts:294` 真走共享接线 `createHostRealtimeClient()`，不是"零件都在、没人接"那个旧形状。
+3. "Service Worker 也在同意之后" ⇒ `apps/web/src/features/privacy/startup-network.ts:22`（"没同意就不调 `registerServiceWorker`"）。
+4. Caddy 那一侧不构成拦截：`server/Caddyfile:21-30` 是**无路径匹配器**的 catch-all `reverse_proxy`，
+   而 `:48-52` 的日志过滤专门处理 WS 的 `?token=` —— 写这段的人知道 WS 从这里走。
+   ⚠️ 这句是**读代码不是实测**：G-70 那一格（一次真 upgrade 真的穿过 bundled Caddy 落到 supersync）仍然开着，负载 65 现在跑它就是拿环境无效换读数。
+
+⇒ **裁决：这条披露不是错话，不动。** 它也不归本批改（写集外，见下）。
+
+顺光照出的两条**仓库内部**过期句（性质与上面第 2 条相反 —— 是"没有 X"型句子）：
+
+- `apps/web/src/features/sync/store.ts:211`：**"没有任何地方 `createRealtimeClient()`"** —— 现在有两处宿主在接。
+- `apps/web/src/features/sync/store.ts:250`：**"全仓只有这一个 `createHostRealtimeClient()` 调用点（已 grep 确认）"**，
+  而紧接 `:251` 立着一条依赖这个"只有一个"的纪律（"新增第二个构造点时必须同样调它"）。第二处就在
+  `apps/mobile/src/sync/realtime.ts:107`。两份 `realtime-wiring.spec.ts`（web 与 mobile）文件头也还抄着同一段旧话。
+  ⚠️ 这条比上一条例子更值得记：那句"已 grep 确认"带着**取证凭证的样子**，而它已经过期 ——
+  凭证证明的是**当时**，不是**现在**（AGENTS §9 为同一形状写过"'没有入口'这句话的保质期取决于别人什么时候补上它，所以它旁边必须写核对的日期" —— 这里连日期都没有）。
+
+归属（现量，不是印象）：`git diff --name-only $(git merge-base HEAD origin/main)..HEAD` 里
+`apps/web/src/features/sync|apps/mobile/src/sync|packages/legal` 命中 **0** ⇒ 这三处都在本批写集外。
+本批**不改、也不加进写集**：理由与 §8.137 对 `packages/i18n` 那条同一个 —— 落地窗口前不把合并面撑宽一枚文件。
+登记给出：realtime/移动端那条线与法务那条线（后者若要动 `minors.ts` 要走它自己的版本与同意指纹纪律）。
