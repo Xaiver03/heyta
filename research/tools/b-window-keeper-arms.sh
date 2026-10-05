@@ -59,6 +59,16 @@ cat > "$FIX/oplog" <<'SH'
 echo "OPLOG" >> "$FIX/calls"
 exit "$(cat "$FIX/oplog_rc")"
 SH
+# pnpm 桩：只有**不注入 OPLOG** 的那条臂（U/U2）才走得到看守的 else 分支，
+# 那时"选择器有没有带 `...` 后缀"唯一的读法就是这里记的那行参数
+# （K 臂的教训：全臂都注入桩 ⇒ 真路径上的默认值从来没被量过）。
+mkdir -p "$FIX/bin"
+cat > "$FIX/bin/pnpm" <<'SH'
+#!/bin/bash
+echo "PNPM $*" >> "$FIX/pnpm_calls"
+exit "$(cat "$FIX/pnpm_rc" 2>/dev/null || echo 0)"
+SH
+chmod +x "$FIX/bin/pnpm"
 cat > "$FIX/hprobe" <<'SH'
 #!/bin/bash
 cat "$FIX/hpid" 2>/dev/null
@@ -80,8 +90,21 @@ mk_fixture() {
     mkdir -p scripts/lib
     cp "$FIX/ps-scan-lib" scripts/lib/ps-scan.sh || \
       { echo "夹具建不起来：一次性载体里没有 scripts/lib/ps-scan.sh"; exit 1; }
+    # 🔴 载体里要有一枚**真的 op-log 清单**，否则看守第 5·对账 那一步只会打
+    #    `DEPDIST=unavailable`（响亮地不判），臂就永远量不到"依赖产物缺一枚"那一形。
+    #    两个假依赖带 `@heyta/` 前缀（要被对账），另塞一枚不带前缀的 `zod`（不该被对账）——
+    #    基线能走通本身就证明那条前缀过滤真的生效了。
+    mkdir -p packages/op-log
+    cat > packages/op-log/package.json <<'JSON'
+{ "name": "@heyta/op-log", "version": "0.0.0",
+  "dependencies": { "@heyta/dep-a": "workspace:*", "@heyta/dep-b": "workspace:*", "zod": "^3.0.0" } }
+JSON
+    # 依赖产物目录**进忽略表** ⇒ 臂 T 删掉它只让对账红，不会先把载体弄脏、
+    # 让红停在"载体脏"那一格（上一把就踩过：脏检查先跑，臂测不到它声称的东西）。
+    echo 'packages/*/dist/' > .gitignore
     git add -A; git commit -q -m base )
   git -C "$FIX/main" worktree add -q --detach "$FIX/heyta-wt-reinstall" HEAD
+  mkdir -p "$FIX/heyta-wt-reinstall/packages/dep-a/dist" "$FIX/heyta-wt-reinstall/packages/dep-b/dist"
 }
 advance_main() {
   ( cd "$FIX/main"; echo "x$RANDOM" > new.txt; git add -A; git commit -q -m adv )
@@ -89,7 +112,8 @@ advance_main() {
 
 run_keeper() {
   local seq="$1"
-  echo 0 > "$FIX/cnt"; : > "$FIX/calls"; : > "$FIX/gate_calls"
+  echo 0 > "$FIX/cnt"; : > "$FIX/calls"; : > "$FIX/gate_calls"; : > "$FIX/pnpm_calls"
+  echo 0 > "$FIX/pnpm_rc"
   # 桩的默认是"这一步会成功"：基线必须一路走得通，臂才是**加一个失败**才红
   # （第一版默认构建桩 rc=1 ⇒ B/G2/I 三臂假红，红在一个我没测的东西上）。
   printf '%s\n' "${BK_OPLOG_RC:-0}" > "$FIX/oplog_rc"
@@ -97,9 +121,12 @@ run_keeper() {
   printf '%s\n' "$seq" > "$FIX/gseq"
   # 🔴 这一格踩过的坑（同一族的第三次）：写在函数调用前面的旋钮**不会**进到子进程环境，
   #    必须在这里列进那次 `env` 前缀里才算数 —— 少写一次，臂打的就是真现场。
+  # BK_OPLOG_NONE=1 ⇒ 不注入 OPLOG ⇒ 看守走自己那行真的 `pnpm --filter … build`（臂 V/U 用）
+  local oplog="$FIX/oplog"
+  [ -n "${BK_OPLOG_NONE:-}" ] && oplog=""
   ( FIX="$FIX" GSEQ="$FIX/gseq" GATE="$FIX/gate" REINSTALL="$FIX/reinstall" \
     REINSTALL_DESKTOP_RC="${BK_R_DESK:-0}" REINSTALL_DEVICE_RC="${BK_R_DEV:-0}" \
-    OPLOG="$FIX/oplog" H_PROBE="$FIX/hprobe" \
+    OPLOG="$oplog" H_PROBE="$FIX/hprobe" PATH="$FIX/bin:$PATH" \
     LOG="$FIX/log" STABLE="$FIX/stable" BUDGET="${BK_BUDGET:-30}" INTERVAL=0 \
     GATE2_BUDGET="${BK_GATE2:-0}" \
     DEFER_MAX="${BK_DEFER:-0}" IOS_DEVICE_NAME=rig-iphone RUN="${BK_RUN:-1}" \
@@ -345,6 +372,75 @@ SSEG=$(grep -o 'segments=[^ ]*' "$FIX/out" | head -1)
 if [ "$(RCV)" = 1 ] && [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 1 ] && printf '%s' "$SSEG" | grep -q 'desktop(0)+device(1)'; then
   ok "S 设备段 rc=1 ⇒ keeper rc=1 且收口行写着 ${SSEG}（两段的码各归各，不合并成一个数）"
 else no "S rc=$(RCV) segments=${SSEG} desk=$(NDESK) dev=$(NDEV) ⇒ 两趟之和被写回成一个 rc，红会被吞"; fi
+
+# ── T/T2/T2b：op-log **依赖**的那几枚 dist 在不在载体里（10-05 11:0x 补，三臂）────────
+#    为什么要这一组：10-05 10:59 **窗口真的开过一次**，看守走到 op-log 构建就 rc=1 自己停住。
+#    根因不是 op-log 坏了，是**新载体里没有它依赖的那四枚 `@heyta/*/dist`** ⇒ tsup 的 dts 阶段
+#    把类型全解成 `any`（一片 TS7006/TS7005 ⇒ `DTS Build error`）。
+#    🔴 主检出**永远量不到这一形**（它 16 份 dist 都在）—— 只有"在一棵干净载体上真跑"才照得出来。
+mk_fixture; BK_BUDGET=60; run_keeper "0:-" > "$FIX/out"
+if [ "$(RCV)" = 0 ] && grep -q 'DEPDIST=ok' "$FIX/out" && [ "$(NDESK)" = 1 ] && [ "$(NDEV)" = 1 ]; then
+  ok "T 基线：依赖产物齐（清单里还塞了一枚「不该被对账」的 zod）⇒ DEPDIST=ok、桌面段与设备段都起、rc=0"
+else no "T rc=$(RCV) depdist=$(grep -c 'DEPDIST=ok' "$FIX/out") desk=$(NDESK) dev=$(NDEV)"; fi
+
+# T2：缺一枚依赖产物 ⇒ 必须拦在重装之前，并且**点名缺的是哪一枚**
+mk_fixture; rm -rf "$FIX/heyta-wt-reinstall/packages/dep-b/dist"
+BK_BUDGET=60; run_keeper "0:-" > "$FIX/out"
+if [ "$(RCV)" = 1 ] && [ "$(NDESK)" = 0 ] && grep -q 'STOP=oplog-dep-dist-missing' "$FIX/out" \
+   && grep -q 'dep-b' "$FIX/out"; then
+  ok "T2 载体里缺一枚依赖 dist ⇒ rc=1、**重装段 0 次**、大字点名缺的是 dep-b（破坏性段没在一个坏前置上起跑）"
+else no "T2 rc=$(RCV) desk=$(NDESK) dep-b命中=$(grep -c 'dep-b' "$FIX/out") ⇒ 缺的那枚 .d.ts 会让装出来的类型是编的"; fi
+
+# T2b 变异：摘掉存在性判定那一行 ⇒ T2 拦住的那一趟必须**真的跑到重装段**
+cp "$KEEPER_SRC" "$FIX/keeper_mut3"
+python3 - "$FIX/keeper_mut3" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding='utf-8').read()
+old = '    [ -d "$CARRIER/packages/${dep}/dist" ] || MISS="${MISS} ${dep}"'
+assert s.count(old) == 1, "依赖对账那一行的形状变了（命中 %d 处）" % s.count(old)
+open(p, 'w', encoding='utf-8').write(s.replace(old, '    : # 变异：存在性判定被摘掉'))
+PY
+mk_fixture
+cp "$FIX/keeper_mut3" "$FIX/main/research/tools/b-window-keeper.sh"
+rm -rf "$FIX/heyta-wt-reinstall/packages/dep-b/dist"
+BK_BUDGET=60; run_keeper "0:-" > "$FIX/out"
+if [ "$(NDESK)" = 1 ]; then
+  ok "T2b 摘掉「[ -d ]」那一行 ⇒ 同一趟缺依赖产物的现场**真的起了重装**（T2 的红长在存在性判定上，不是长在别的东西上）"
+else no "T2b 变异后 desk=$(NDESK) ⇒ T2 拦住靠的不是那一行，另有东西在拦（这条臂没回答它声称的问题）"; fi
+cp "$FIX/keeper" "$FIX/main/research/tools/b-window-keeper.sh"
+
+# ── U/U2：不注入桩 ⇒ 看守**自己那行** pnpm 选择器被读到（K 臂同族：默认值不注入就不算验过）──
+#    U 要证的正是这次修的那一格：选择器少了 `...` 后缀就只挑 op-log 一枚，依赖四枚不进构建集合。
+mk_fixture; BK_BUDGET=60; BK_OPLOG_NONE=1; run_keeper "0:-" > "$FIX/out"
+# 老坑：`grep -c` 在文件存在但零命中时**打印 0 并退 1**，接一句 `|| echo 0` 就得到两行
+# ⇒ 数出来的值既不是 0 也不是 1。先判在不在，再数。
+NPNPM() { if [ -f "$FIX/pnpm_calls" ]; then grep -c '^PNPM ' "$FIX/pnpm_calls"; else echo 0; fi; }
+PSEL=$(grep '^PNPM ' "$FIX/pnpm_calls" 2>/dev/null | head -1)
+if [ "$(RCV)" = 0 ] && [ "$(NPNPM)" = 1 ] && [ "$(NOPLOG)" = 0 ] && grep -q 'DEPDIST=ok' "$FIX/out" \
+   && printf '%s' "$PSEL" | grep -qF -- "--filter @heyta/op-log... build"; then
+  ok "U 不注入 OPLOG ⇒ 看守真调了一次 pnpm，记录到的选择器带 ... 后缀（= 这个包**和它依赖的那些包**）、依赖对账也真跑了：[${PSEL}]"
+else no "U rc=$(RCV) pnpm=$(NPNPM) oplog桩=$(NOPLOG) 记录=[${PSEL}] ⇒ 真路径没走到，或选择器少了 ..."; fi
+
+# U2 变异：把 `...` 摘掉 ⇒ U 的正例必须转红（证明它读的是真参数，不是臂自己写的串）
+cp "$KEEPER_SRC" "$FIX/keeper_mut4"
+python3 - "$FIX/keeper_mut4" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p, encoding='utf-8').read()
+old = "( cd \"$CARRIER\" && pnpm --filter '@heyta/op-log...' build )"
+assert s.count(old) == 1, "真跑那一行的形状变了（命中 %d 处）" % s.count(old)
+open(p, 'w', encoding='utf-8').write(s.replace(old, "pnpm --filter @heyta/op-log build"))
+PY
+mk_fixture
+cp "$FIX/keeper_mut4" "$FIX/main/research/tools/b-window-keeper.sh"
+BK_BUDGET=60; BK_OPLOG_NONE=1; run_keeper "0:-" > "$FIX/out"
+PSEL2=$(grep '^PNPM ' "$FIX/pnpm_calls" 2>/dev/null | head -1)
+if printf '%s' "$PSEL2" | grep -qF -- '--filter @heyta/op-log build' \
+   && ! printf '%s' "$PSEL2" | grep -qF -- '@heyta/op-log...'; then
+  ok "U2 摘掉 \`...\` ⇒ 记录的选择器只剩 op-log 一枚（U 的正例此刻会红）⇒ U 的牙长在那行真参数上"
+else no "U2 变异后记录=[${PSEL2}] ⇒ 臂读的不是看守那行，或变异没落进去"; fi
+cp "$FIX/keeper" "$FIX/main/research/tools/b-window-keeper.sh"
 
 echo "b-window-keeper 臂：pass=$PASS fail=$FAIL"
 [ "$FAIL" = 0 ] || exit 1
