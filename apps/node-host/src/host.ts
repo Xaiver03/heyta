@@ -161,7 +161,6 @@ export interface NodeHost {
   listTags(): Tag[];
 
   /**
-<<<<<<< HEAD
    * 便签的无头写入口（建 / 软删除）。
    *
    * 🔴 存在的理由不是"CLI 想多两个命令"：回收站的判据要**四类各有一条本机新建又删除的行**
@@ -175,7 +174,8 @@ export interface NodeHost {
   removeProject(entityId: string): Promise<void>;
   createHabit(name: string): Promise<string>;
   removeHabit(entityId: string): Promise<void>;
-=======
+
+  /**
    * 助手会话的一条消息（ADR-0045 D-4 (ii)）。
    *
    * 🔴 这个壳是它**当前唯一的调用方**，而存在的理由不是"顺手给 CLI 加个命令"：
@@ -207,7 +207,6 @@ export interface NodeHost {
   setAssistantDisposition(entityId: string, disposition: 'confirmed' | 'rejected'): Promise<void>;
   /** 清除一段会话：**一条** DEL op（批量域）。返回被标记的条数。 */
   clearAssistantSession(sessionId: string): Promise<number>;
->>>>>>> merge/20261005
 
   /** **唯一写入入口**（AGENTS.md §3.4）。 */
   dispatch(intent: OpIntent): Promise<void>;
@@ -311,7 +310,6 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     listProjects: () => projectActions.listProjects(),
     listTags: () => projectActions.listTags(),
 
-<<<<<<< HEAD
     createNote: (content) => noteActions.createNote(content),
     removeNote: (entityId) => noteActions.removeNote(entityId),
     createProject: (name, parentId) =>
@@ -321,7 +319,7 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     removeProject: (entityId) => projectActions.removeProject(entityId),
     createHabit: (name) => habitActions.createHabit(name),
     removeHabit: (entityId) => habitActions.removeHabit(entityId),
-=======
+
     newAssistantSessionId: () => assistantActions.newSessionId(),
     appendAssistantTurn: (input) => assistantActions.appendTurn(input),
     listAssistantTurns: (sessionId) =>
@@ -332,7 +330,6 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     setAssistantDisposition: (entityId, disposition) =>
       assistantActions.setDisposition(entityId, disposition),
     clearAssistantSession: (sessionId) => assistantActions.clearSession(sessionId),
->>>>>>> merge/20261005
 
     dispatch: (intent) => app.dispatch(intent),
     sync: async () => {
