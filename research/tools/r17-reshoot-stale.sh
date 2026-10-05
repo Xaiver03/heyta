@@ -58,13 +58,21 @@ cd "$MAIN" || exit 1
 
 # 证据目录名 → 产出它的 spec。⚠️ 只登记**本线实测过**的对应关系（14:2x 逐条 grep
 # `page.screenshot({ path:` 对出来的），别的线的目录要加就先把它验证明白再加。
+# 🔴 **一枚目录可以对应多枚 spec**（一行一枚）。这条形状是 11:2x 现量撞出来的：
+#   `calendar-day/` 这**一枚目录里住着两枚 spec 的图** —— 五枚 `calendar-day-*.png` 出自
+#   `calendar-day.spec.ts`，三枚 `day-en-*.png` 出自 `calendar-day-en.spec.ts`（它第 60 行的
+#   `SHOT()` 写的就是 `../apps/web/evidence/calendar-day/`）。旧表一条只给一枚 ⇒
+#   跑完 `calendar-day.spec.ts` 动了 5 张、`settle_dir` 判"这枚目录重拍完成"，
+#   而那 3 张过期主张**一张都没拍** —— 与本脚本 09:5x 修的那格同族，只是粗一档（目录 vs spec）。
+#   现量：`grep -c 'day-en-full' e2e/tests/calendar-day.spec.ts` ⇒ **0**（另一枚 spec 才认得它）。
+#   ⚠️ 表里以前还有一条 `calendar-day-en)` —— 盘上**没有**这枚证据目录（`ls -d apps/web/evidence/…` 现量），
+#   那条永远不会命中；它的真实归属就是上面这条，所以删掉分支而不是留一枚死映射。
 spec_for() {
   case "$1" in
     calendar-cells) echo calendar-cells.spec.ts ;;
     calendar-week) echo calendar-week.spec.ts ;;
     calendar-capture) echo calendar-capture.spec.ts ;;
-    calendar-day) echo calendar-day.spec.ts ;;
-    calendar-day-en) echo calendar-day-en.spec.ts ;;
+    calendar-day) printf '%s\n' calendar-day.spec.ts calendar-day-en.spec.ts ;;
     calendar-view-options) echo calendar-view-options.spec.ts ;;
     calendar-year) echo calendar-year.spec.ts ;;
     # ⚠️ `calendar-day-time/` 那三张**没有同名 spec** —— 它们是 `calendar-day.spec.ts:316/337/403`
@@ -78,6 +86,42 @@ spec_for() {
     profile-panel) echo profile-avatar-e2ee.spec.ts ;;
     *) echo "" ;;
   esac
+}
+
+# spec 源文件所在目录（selftest 把它指到一次性夹具上，才能测下面那条覆盖判据的两腿）
+TESTS_ROOT="${TESTS_ROOT:-$MAIN/e2e/tests}"
+
+# 🔴 映射表的**覆盖判据**：一枚目录里每条 `UIPIN` 钉着的图，必须至少被选中的某枚 spec
+#   点名过（spec 里 `SHOT('<图名>')` 的那个字面串）。没人点名 ⇒ 打印出来。
+#   为什么要有这一层：上面那条多 spec 映射是**手工表**，手工表会漂；而"跑完动了 5 张"这种
+#   部分完成在输出上长得和"全拍完了"一模一样（本脚本 09:5x 那一格的粗档版本）。
+#   这条判据不猜新映射 —— 它只**拒绝把没拍到的读成拍到了**，出路仍然是"往表里补一条实测过的映射"。
+coverage_for_dir() {
+  cd_dir="$1"; shift
+  unc=""
+  # 🔴 解析形状**逐字抄规范裁判** `r17-evidence-md5-check.sh:163`（要 `<名>.png` + 7–40 位十六进制 + 空格）。
+  #    第一版这里写的是裸 `grep '^UIPIN '`，于是 README 里那句讲形状的**散文**
+  #    （"…路径集为空 rc=4…"）被当成一枚锚点，臂 h 报出 `未认领:路径集为空` ——
+  #    一条自己搭的哨兵比规范裁判宽，红在一个不存在的东西上（本仓那一族：哨兵必须等于裁判）。
+  while IFS= read -r pin; do
+    [ -n "$pin" ] || continue
+    img=$(printf '%s' "$pin" | awk '{print $2}')
+    [ -n "$img" ] || continue
+    base="$img"
+    base=${base%.png}; base=${base%.jpg}; base=${base%.jpeg}; base=${base%.webp}
+    hit=0
+    for cs in "$@"; do
+      [ -f "$TESTS_ROOT/$cs" ] || continue
+      grep -qF -- "$base" "$TESTS_ROOT/$cs" && { hit=1; break; }
+    done
+    [ "$hit" = "1" ] || unc="$unc $img"
+  done <<PINS
+$(grep -hE '^UIPIN [^ ]+\.(png|jpg|jpeg|webp) [0-9a-f]{7,40} ' "$cd_dir/README.md" 2>/dev/null || true)
+PINS
+  if [ -n "$unc" ]; then
+    printf '未认领:%s\n' "$(printf '%s\n' $unc | tr '\n' ' ')"
+  fi
+  return 0
 }
 
 # 整棵证据树的 png 指纹（`路径<TAB>md5`，按路径排序）。拍一趟 spec 之前拍一次、之后拍一次，
@@ -228,6 +272,67 @@ if [ "$SELFTEST" = "1" ]; then
   if [ "$RC" != "1" ] || [ "$SIBOK" != "1" ] || [ "$SIBBYTE" = "SIB0" ]; then
     echo "❌ 臂 e 坏了（rc=${RC} 警告行=${SIBOK} 兄弟图真改了=${SIBBYTE}）⇒ calendar-day.spec.ts 顺带改 calendar-day-time/ 那一类没有出处" >&2; bad=$((bad+1))
   fi
+  echo "== selftest 臂 g：映射表的**覆盖判据**（一枚目录住着两枚 spec 的图）=="
+  rm -rf "$V/t2"; mkdir -p "$V/t2/tests" "$V/t2/evidence/twodir"
+  printf "test('one', async () => { SHOT('a') })\n" > "$V/t2/tests/one.spec.ts"
+  printf "test('two', async () => { SHOT('b') })\n" > "$V/t2/tests/two.spec.ts"
+  printf 'OLD' > "$V/t2/evidence/twodir/a.png"; printf 'OLD' > "$V/t2/evidence/twodir/b.png"
+  {
+    printf 'UIPIN a.png deadbeef34 packages/ui\n'
+    printf 'UIPIN b.png deadbeef34 packages/ui\n'
+  } > "$V/t2/evidence/twodir/README.md"
+  OLD_TESTS_ROOT="$TESTS_ROOT"; TESTS_ROOT="$V/t2/tests"
+  NEG=$(coverage_for_dir "$V/t2/evidence/twodir" one.spec.ts)
+  POS=$(coverage_for_dir "$V/t2/evidence/twodir" one.spec.ts two.spec.ts)
+  TESTS_ROOT="$OLD_TESTS_ROOT"
+  if ! printf '%s' "$NEG" | grep -q '未认领' || ! printf '%s' "$NEG" | grep -q 'b.png'; then
+    echo "❌ 臂 g 的负腿坏了（[${NEG}]）⇒ 少映射一枚 spec 时没人报，部分完成会被读成做完" >&2; bad=$((bad+1))
+  fi
+  if [ -n "$POS" ]; then
+    echo "❌ 臂 g 的正腿坏了（[${POS}]）⇒ 两枚都选上还说没覆盖，这条判据会变成常驻红" >&2; bad=$((bad+1))
+  fi
+  echo "== selftest 臂 h：**出厂那张表**自己不漂（逐枚目录跑覆盖判据 + calendar-day 必须是两枚 spec）=="
+  NSPEC=$(spec_for calendar-day | grep -c .); NSPEC=${NSPEC:-0}
+  DRIFT=""
+  while IFS= read -r dn; do
+    [ -n "$dn" ] || continue
+    [ -d "$MAIN/apps/web/evidence/$dn" ] || continue
+    [ -f "$MAIN/apps/web/evidence/$dn/README.md" ] || continue
+    sel=$(spec_for "$dn")
+    [ -n "$sel" ] || continue
+    unc=$(coverage_for_dir "$MAIN/apps/web/evidence/$dn" $sel)
+    [ -n "$unc" ] && DRIFT="$DRIFT $dn:${unc}"
+  done <<TBL_BLOCK
+calendar-cells
+calendar-week
+calendar-capture
+calendar-day
+calendar-view-options
+calendar-year
+calendar-day-time
+profile-panel
+TBL_BLOCK
+  if [ "$NSPEC" != "2" ]; then
+    echo "❌ 臂 h：spec_for calendar-day 现在给 ${NSPEC} 枚 spec（要 2）⇒ day-en 那三张会没人拍" >&2; bad=$((bad+1))
+  fi
+  if [ -n "$DRIFT" ]; then
+    echo "❌ 臂 h：出厂映射表有目录覆盖不全 ⇒${DRIFT}" >&2; bad=$((bad+1))
+  else
+    echo "   ✅ 表里 8 条映射逐枚跑覆盖判据都没有「没人认领的图」"
+  fi
+  echo "== selftest 臂 i：映射检查会把一枚目录摊成**多行 PLAN**（少一行就是漏拍一半）=="
+  NPLAN=0
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    [ -f "$MAIN/e2e/tests/$s" ] && NPLAN=$((NPLAN + 1))
+  done <<SPS
+$(spec_for calendar-day)
+SPS
+  if [ "$NPLAN" != "2" ]; then
+    echo "❌ 臂 i：calendar-day 展开成 ${NPLAN} 行 PLAN（要 2，且两行都得在盘上）⇒ 重拍会只做一半" >&2; bad=$((bad+1))
+  else
+    echo "   ✅ 一枚目录摊成 2 行 PLAN，两枚 spec 都在盘上（第 4 步逐行跑 ⇒ 5 张 + 3 张都会拍到）"
+  fi
   echo "== selftest 臂 f（变异）：摘掉「起跑前清残留」那一行 ⇒ 臂 d 那一步必须不再红 =="
   HITS=$(grep -cE 'rm -f "\$TR_ROOT/\$\(basename "\$f"\)"' "$0"); HITS=${HITS:-0}
   N_LINE=$(grep -nE 'rm -f "\$TR_ROOT/\$\(basename "\$f"\)"' "$0" | head -1 | cut -d: -f1)
@@ -250,7 +355,7 @@ if [ "$SELFTEST" = "1" ]; then
   fi
   rm -rf "$V" "$MUT"
   [ "$bad" = "0" ] || { echo "❌ selftest ${bad} 臂红" >&2; exit 1; }
-  echo "SELFTEST=OK（就地报数 / 拷贝报数 / 字节相同仍印 / 零产出必须红 / 残留被清 / 只改别的目录时点名且不判成完成 / 变异腿证明牙在清残留那一行）"
+  echo "SELFTEST=OK（就地报数 / 拷贝报数 / 字节相同仍印 / 零产出必须红 / 残留被清 / 只改别的目录时点名且不判成完成 / 变异腿证明牙在清残留那一行 / 覆盖判据两腿 / 出厂映射表逐枚自查没有无人认领的图 / 一枚目录摊成多行 PLAN）"
   exit 0
 fi
 
@@ -279,15 +384,32 @@ while IFS= read -r d; do
   [ -n "$d" ] || continue
   name=$(basename "$d")
   [ -n "$ONLY" ] && [ "$name" != "$ONLY" ] && continue
-  s=$(spec_for "$name")
-  if [ -z "$s" ]; then
+  specs=$(spec_for "$name")
+  if [ -z "$specs" ]; then
     echo "   ❌ ${name}：映射表里没有它 —— 不猜。要么把 spec 名补进 spec_for()（先验证），要么手动处理。" >&2
     MISS=$((MISS + 1)); continue
   fi
-  [ -f "$MAIN/e2e/tests/$s" ] || { echo "   ❌ $name → ${s}：spec 文件不在盘上" >&2; MISS=$((MISS + 1)); continue; }
-  echo "   $name → e2e/tests/$s"
-  PLAN="$PLAN$d|$s
+  SEL=""
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    if [ ! -f "$MAIN/e2e/tests/$s" ]; then
+      echo "   ❌ $name → ${s}：spec 文件不在盘上" >&2; MISS=$((MISS + 1)); continue
+    fi
+    echo "   $name → e2e/tests/$s"
+    PLAN="$PLAN$d|$s
 "
+    SEL="$SEL $s"
+  done <<SPEC_BLOCK
+$specs
+SPEC_BLOCK
+  # 🔴 覆盖判据：这张目录里被 UIPIN 钉着的每一张图，都要有**被选中的某枚 spec** 认领
+  UNCOV=$(coverage_for_dir "$d" $SEL)
+  if [ -n "$UNCOV" ]; then
+    echo "   ❌ ${name}：${UNCOV} —— 这几张图没有任何一枚被选中的 spec 认得它们" >&2
+    echo "      ⇒ 不重拍它们却宣布这枚目录做完，读起来会像「三张过期主张已经闭合」，而它们一张都没拍。" >&2
+    echo "         出路只有一条：往 spec_for() 里补一条**实测过的**映射（一行一枚，脚本不猜）。" >&2
+    MISS=$((MISS + 1))
+  fi
 done <<STALE_BLOCK
 $STALE
 STALE_BLOCK
