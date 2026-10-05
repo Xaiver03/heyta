@@ -189,13 +189,14 @@ for (const [name, cwd, cmd] of STEPS) {
     continue;
   }
   const fd = fs.openSync(log, 'w');
-  const rc = spawnSync(cmd, {
+  const spawned = spawnSync(cmd, {
     cwd: path.join(ROOT, cwd),
     shell: true,
     stdio: ['ignore', fd, fd],
     env: { ...process.env, NO_COLOR: '1' },
-  }).status;
+  });
   fs.closeSync(fd);
+  const rc = spawned.status;
   const lines = fs.readFileSync(log, 'utf8').split('\n').filter((l) => l.trim());
   let extra = '';
   // 棘轮那两道光看"绿"不够，要现量打印它此刻是多少。
@@ -221,7 +222,11 @@ for (const [name, cwd, cmd] of STEPS) {
     const sum = lines.filter((l) => /\b\d+ (passed|failed|skipped)\b/.test(l)).at(-1);
     if (sum) extra = ' || ' + sum.trim().slice(0, 110);
   }
-  console.log(`STEP=${name} RC=${rc} ${(lines.at(-1) ?? '').slice(0, 110)}${extra}`);
+  // 🔴 `RC=null` 单独一行是个**读不出死因**的读数（§8.148 那一趟：e2e 跑到第 55/67 条被信号带走，
+  // 而日志末行仍是 `✓ 55 …` 这种**看着像在跑**的进度行 —— 于是"这一族跑完了吗"只能靠去翻日志本体。
+  // 被杀（signal）与起不来（error.code）在 `.status` 上都是 null，所以两样分开打印。
+  const died = rc === null ? ` DEAD=${spawned.signal ?? 'none'}${spawned.error ? ` ERR=${spawned.error.code}` : ''}` : '';
+  console.log(`STEP=${name} RC=${rc}${died} ${(lines.at(-1) ?? '').slice(0, 110)}${extra}`);
   if (rc !== 0) bad.push(name);
 }
 
