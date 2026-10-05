@@ -3732,6 +3732,7 @@ export const zhCN = {
   //    这条对应关系由 `apps/web/src/features/reminders/*` 的宿主测试钉住
   //    （`packages/ui` 只跑纯 `model.ts` 单测，不挂渲染）。
   'reminder.title': '提醒',
+  'task.pane.completed': '已完成',
   'reminder.empty': '还没有提醒',
   'reminder.add': '添加提醒',
   'reminder.offset.0': '截止时',

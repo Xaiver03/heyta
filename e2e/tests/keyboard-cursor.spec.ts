@@ -952,6 +952,15 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
     await expect(page.locator(ROWS).filter({ hasText: '勾选甲' })).toHaveCount(0);
     await expect(page.locator(ROWS).filter({ hasText: '勾选乙' })).toHaveCount(1);
 
+    /*
+      🔴 §8.150：差分证明了"行没了"，而这一格**还画着它** —— 所以那一格必须自己说清这条已完成，
+      否则用户读到的是"选中了一条看不见的任务"（§8.148 边界 ② 看图照出来的形状）。
+      ⚠️ 这里**不**把选中回落掉：回落只认"实体还在不在"，认"当前筛不筛得到"会让用户切一下筛选
+      就把正在编辑的那条判成不存在、面板自己关掉（`packages/app-host/src/selection.ts:127-131`，
+      判据钉在 `packages/app-host/tests/selection.spec.ts:170`）。
+    */
+    await expect(page.getByTestId('task-pane-status'), '栏里那格没写明「已完成」').toHaveText('已完成');
+
     await page.screenshot({ path: SHOT('k14-space-toggles-from-keyboard') });
 
     await page.reload();

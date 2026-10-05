@@ -585,6 +585,27 @@ const ARMS = [
        "勾了标签才长出 chip"在"一直占位"的实现下照样为真（假绿）。 */
     expectE: ['T14'],
   },
+  /* ── §8.150（完成态在栏里那句话）两臂：Z1/Z2 ────────────────────────
+     ⚠️ 臂号用 Z 而不是 S：`S1..S5` 已经被子任务那一族占了（这台臂台的号**不按单分段**，
+     第一版我叫它们 S1/S2，结果 `S1 S2` 一次匹配上**四臂**、读数是混的 —— 号撞了不会被响亮报出来）。
+     ⚠️ 这两臂的**浏览器层消费者是 K14**，而 K14 住在 `tests/keyboard-cursor.spec.ts`，
+     这台臂台只跑 `detail-pane-task.spec.ts` ⇒ 它们在这里只该有 jsdom 的红。 */
+  {
+    name: 'Z1 栏里不写完成态（那条已离开列表的任务看起来和没做的一样）',
+    file: CARD,
+    from: `      {task.completedAt !== undefined ? (`,
+    to: `      {false ? (`,
+    expectJs: ['栏里写明「已完成」', '不是第二颗编辑器', '那句话与区块头'],
+    expectE: [],
+  },
+  {
+    name: 'Z2 那句话借用区块头那一档（读成"一个叫已完成的区块"，不是状态）',
+    file: CARD,
+    from: `        <p data-testid="task-pane-status" style={statusLineStyle}>`,
+    to: `        <p data-testid="task-pane-status" style={blockLabelStyle}>`,
+    expectJs: ['那句话与区块头'],
+    expectE: [],
+  },
 ];
 
 const FILES = [CARD, NOTE, APP, CURSOR, CSS, REPEAT, SUBTASK, REMINDER, ORG];

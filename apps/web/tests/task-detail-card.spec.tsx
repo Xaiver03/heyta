@@ -864,3 +864,59 @@ describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
     ).toBe(false);
   });
 });
+
+describe('完成态在栏里那句话（§8.150）', () => {
+  const paneBox = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
+
+  it('🔴 勾选完成 ⇒ 栏里写明「已完成」（不是只让那一行从列表里消失）', async () => {
+    const id = await addTask('完成态甲');
+    selection.select('task', id);
+    mount();
+    await act(async () => {
+      await useTaskStore.getState().toggleComplete(id);
+    });
+    const box = paneBox();
+    if (box === null) throw new Error('栏里没画面单 ⇒ 这条判据在空转');
+    expect(box.textContent, '完成之后那一格不写状态，读起来像一条还没做的任务').toContain(
+      zhCN['task.pane.completed'],
+    );
+  });
+
+  it('没完成的那条不许出现那句话（这一格不许自己说完成）', async () => {
+    const id = await addTask('未态乙');
+    selection.select('task', id);
+    mount();
+    const box = paneBox();
+    if (box === null) throw new Error('栏里没画面单 ⇒ 这条判据在空转');
+    expect(box.textContent).not.toContain(zhCN['task.pane.completed']);
+  });
+
+  it('🔴 那句话**不是第二颗编辑器**：它不是按钮、也不套在按钮里', async () => {
+    const id = await addTask('编辑器归属丙');
+    selection.select('task', id);
+    mount();
+    await act(async () => {
+      await useTaskStore.getState().toggleComplete(id);
+    });
+    const status = document.querySelector<HTMLElement>('[data-testid="task-pane-status"]');
+    if (status === null) throw new Error('那句话没画出来 ⇒ 这一条在空转');
+    expect(status.tagName, '状态句长成了按钮 ⇒ 完成态有了第二个编辑器').not.toBe('BUTTON');
+    expect(status.closest('button'), '状态句被包进按钮 ⇒ 同一件事两颗编辑器').toBeNull();
+  });
+
+  it('🔴 那句话与区块头**不同档**（同档会被读成"一个叫已完成的区块"，看图照出来的）', async () => {
+    const id = await addTask('档位丁');
+    selection.select('task', id);
+    mount();
+    await act(async () => {
+      await useTaskStore.getState().toggleComplete(id);
+    });
+    const status = document.querySelector<HTMLElement>('[data-testid="task-pane-status"]');
+    const blockHeader = document.querySelector<HTMLElement>('[data-testid="task-pane"] h3');
+    if (status === null || blockHeader === null) {
+      throw new Error('状态句或区块头没画出来 ⇒ 这一条在空转');
+    }
+    expect(status.style.fontSize, '状态句与区块头同字号 ⇒ 层级塌了').not.toBe(blockHeader.style.fontSize);
+    expect(status.style.fontWeight, '状态句与区块头同字重 ⇒ 层级塌了').not.toBe(blockHeader.style.fontWeight);
+  });
+});
