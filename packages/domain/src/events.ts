@@ -256,3 +256,62 @@ export function sortEventsForDisplay(
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 }
+
+/**
+ * `[from, to]` 闭区间里，这个倒数日**发生在哪几天**（升序、去重）。
+ *
+ * ## 为什么在 domain，而不是让日历自己算
+ *
+ * 日历要显示"这一格有个日子"，就得回答"这段区间里它出现几次"。这段数学
+ * （公历规则、农历闰月三档、锚点越界回退）已经在本文件与 `recurrence.ts` /
+ * `lunar.ts` 里，且倒数日面板的"下一次发生日"就是用它算的。日历再写一遍的
+ * 漂移形状是**同一张卡在面板上写"还有 12 天"、在日历上落到后一天**，
+ * 而两边都"看起来是个日期"（AGENTS §3.5 那条同形状的第二次）。
+ *
+ * ## 三种形态各自的口径
+ *
+ * · **一次性**：只有锚点那一天（过去了就永远不在区间里 —— 与
+ *   `nextEventOccurrence` 对一次性过期项返回 `undefined` 同一取舍）。
+ * · **公历重复**：直接交 `occurrencesInRange`，它自己保证升序去重，
+ *   并且**非法规则返回空数组而不是抛**（规则是用户输入）。
+ * · **农历重复**：逐年取 `lunarOccurrencesInYear`（含闰月三档与"该月没有
+ *   那一天就退到月末"的回退），再裁进区间。窗口按**农历年**走，
+ *   所以区间两端各放一年余量 —— 农历新年在 1 月末到 2 月中之间移动，
+ *   只按公历年取会整批漏掉年初那几天。
+ *
+ * ⚠️ 农历那条路径上的 `solarToLunar` / `lunarToSolar` 对**超出历表**的日期会抛
+ *   （`lunar.ts:46,48,209`）。这里把它吞成"这个区间里没有"，与本文件
+ *   `occursOnToday` 对坏规则的取舍同一条：一条坏数据不该把整片日历变成空白块
+ *   —— 那正是判据①要防的失效形状（"不确定"在日历上和"什么都没有"长得一样）。
+ */
+export function eventOccurrencesInRange(
+  event: CountdownEvent,
+  from: LocalDate,
+  to: LocalDate,
+): LocalDate[] {
+  if (to < from) return [];
+
+  if (!isEventRepeating(event)) {
+    return event.date >= from && event.date <= to ? [event.date] : [];
+  }
+
+  if (event.isLunar === true) {
+    try {
+      const anchor = solarToLunar(event.date);
+      const policy = eventLeapMonthPolicy(event);
+      const startYear = lunarYearOf(from);
+      const endYear = lunarYearOf(to) + 1;
+      const out: LocalDate[] = [];
+      for (let year = startYear; year <= endYear; year += 1) {
+        for (const date of lunarOccurrencesInYear(anchor, year, policy)) {
+          if (date >= from && date <= to) out.push(date);
+        }
+      }
+      return [...new Set(out)].sort();
+    } catch {
+      return [];
+    }
+  }
+
+  return occurrencesInRange(event.recurrence as string, event.date, from, to);
+}
