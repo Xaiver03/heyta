@@ -14185,3 +14185,21 @@ VERIFY_RC=0
 ② 第 8 项 `pnpm reinstall:all` 仍未起 —— 它现在被 ① 挡着：从 main 装会装到打不出来的产物，
    从这条分支装则产物不等于 main。
 ③ 落地页那 5 枚 live 红（#20）与 G-44b（#64）不变。
+
+### 8.270 00:2x 交接态读数：main 上 S2/S3 仍红，而**唯一原因是那份测试文件本身**；补好三条腿的分支已在当前 main 上验到 rc=0
+
+- main=`d05b12e0` 现量含我第一版 `ff56bcab`（有 `vault-create-form` 那一档），但**缺三条腿**：
+  `vault-recovery-confirm` 命中 0、`waitFor({ state: 'visible'` 命中 0、`vault-unlock-form` 命中 0。
+  同一把尺在 main 上跑 ⇒ `VERIFY_RC=1`，S1 ✓ 693ms，S2 ✘ 3.0m、S3 ✘ 9.0m，
+  两枚错误行逐字都是 `waiting for getByRole('dialog', { name: '同步设置' }).getByLabel('端到端加密口令')`
+  （证据 `~/.heyta-evidence/verify-at-current-main-1006-000632/`）。
+- 补好三条腿的分支 = **`de761797`（从当前 main 起，只改 `e2e/selfhost-stack/selfhost-web.spec.ts`）**，
+  同一把尺实测 `VERIFY_RC=0`、S1 815ms / **S2 3.3s** / **S3 23.9s**、`3 passed`
+  （证据 `~/.heyta-evidence/verify-at-judge-branch-1006-002424/`）。
+- 🔴 交接要点：`git diff --name-only main de761797` 只有那一枚 **测试文件** ⇒
+  这一格并进 main 之前，四端产物与 main **等价**（没有任何打包输入读 `e2e/selfhost-stack`），
+  所以第 8 项不必等这次合并；但"验收在 main 上是红的"这件事必须记成真话：
+  **main 现在自称可用，而它自己的自托管判据不认** —— 这正是 §7 元规则第 2 条的形状，别读成"只是测试没更新"。
+- 我这一班**没有**动主检出：原本授权的是一次 `ff-only`，而 main 与 fix 分支已分叉
+  （`main 独有=27 / fix 独有=2`），ff 的前提不成立，所以我把它换成"交一条可直接 merge 的分支 + 现量读数"，
+  并把 CalendarView 那处的成因与修法留在 §8.269（它已由合流那条线自己进 main，blob `10d18c28` 逐字同一）。
