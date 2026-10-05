@@ -1760,14 +1760,14 @@ export const en = {
   'web.ai.settings.features.hintStrong': 'List order is try order',
   'web.ai.settings.features.hintTail': ' (earlier ones are tried first).',
   'web.ai.settings.features.empty': 'Add an endpoint first',
-  'web.ai.settings.consentLead': '"{feature}" has a remote endpoint, so your consent to send data out is required.',
+  'web.ai.settings.consentLead': '"{feature}" has an endpoint outside this device, so your approval is needed before anything leaves it.',
   'web.ai.settings.grant': 'Allow',
   // Trailing space: the missing-capability list is spliced in right after.
   'web.ai.settings.gapLead': 'Warning: "{feature}" needs ',
   'web.ai.settings.gapMid': ', but ',
   'web.ai.settings.gapTail': 'does not declare it - the feature will never work.',
   'web.ai.settings.gapFix': 'Add it to "{name}"',
-  'web.ai.settings.granted': 'Data egress allowed',
+  'web.ai.settings.granted': 'Allowed to leave this device',
   'web.ai.settings.revoke': 'Revoke',
   // Conversational assistant (ADR-0045): the second authorization front.
   'web.ai.assistant.title': 'Chat assistant',
