@@ -5455,3 +5455,43 @@ done
     重跑不红，界面代码动了才红。selftest 臂 6 就是这条的证据：**图字节一个字没变、源码动一笔 ⇒ 恰好 1 枚红**。
     📌 可迁移的两问：**这条判据在被约束对象"什么都没改"的那一趟会不会红？**（会 ⇒ 它钉错了对象）
     与 **"我凭什么说它稳定？"**（凭一次重跑后逐字节相同这个读数，不凭"看起来是同一屏"）。
+- (66) **10-05 18:1x：(65) 那两笔决策入库了，外加一条我自己撞上的归属闸门摩擦 —— 孤儿数不等于"带走了别人的字节"。**
+
+  ① 入库两笔（现量：`git log --oneline -2`；**没有 push**）：一笔带 4 枚路径（台账 + `r17-evidence-md5-check.sh` +
+     `calendar-line-append-trap.mjs` + `calendar-line-commit-only-arms.sh`），一笔只带 `BLOCKED.md`（B81 + §5 那七行）。
+     后置对账都在工具输出里：别人那 2 枚已暂存的证据文件**一条不少、索引 blob 逐字不变、且不在本笔的树里**。
+  ② 🔴 **第一版 `--confirm` 被自己的 3b 拒了**：申报 6 枚「本轮标识符」⇒ `hunk 38 枚 / 孤儿 27 枚`，
+     而那 38 枚**全是我几分钟前写的**。这格的设计摩擦在这里露出一个读数陷阱：
+     **孤儿高不等于带走了别人的字节，它同样可能是"申报没铺到"** —— 两种成因的处置完全相反
+     （前者要剔范围，后者要补锚点）。不先分辨就 `ALLOW_ORPHAN=1` 会把别人的字节带进来；
+     不先分辨就重挑范围，会把自己那 27 枚留在树里烂掉。
+     ✅ 用的可复用做法：**锚点从 diff 自己导出** —— 对每枚 hunk 取一段"只在这一侧出现的无空白串"
+     （新增腿 ⇒ 在 `git show HEAD:<file>` 里查不到、在盘上查得到；纯删除腿反过来），
+     于是锚点被锁死在"本轮真的动过的字节"上，而不是我对本轮改动的印象。命令形状：
+     `git diff HEAD -U0 -- <路径>` → 逐 hunk 取 `+`/`-` 行、按空白切片、两侧文本互斥筛 ⇒ 37 枚锚点、`孤儿 0 枚`。
+     ⚠️ 三枚 hunk 取不到"两侧互斥"的串（纯挪动 / 改名后旧串仍在别处）⇒ 那几枚**手工**指认，
+     且指认前逐枚确认过是我的（`DIRTY=`→`DIRTY0=` 那一枚是我改的、`对得上号` 那句是我写的措辞）。
+  ③ 复跑读数（每条都有现量命令，正文不留值）：
+     `bash research/tools/calendar-line-commit-only-arms.sh` ⇒ 末行 `== 合计 pass=36 fail=0 ==`；
+     `bash research/tools/r17-evidence-md5-check.sh --selftest` ⇒ rc=0；
+     主检出 `bash research/tools/r17-evidence-md5-check.sh --all` ⇒ rc=0、`dirs_with_skipped_pin=0`；
+     真浅克隆载体（`git clone --depth 1 file://$PWD <树外目录>` 后把脚本拷进去跑 `--all`）⇒ rc=0、`dirs_with_skipped_pin=8`
+     且收尾那句点名"这一趟**没有**验过它们的代码锚点"。
+  ④ ✅ **新字段没打断现有消费者**（改了输出形状就要问一遍"谁在解析它"）：
+     `grep -rn 'DIRCHECK\|ALLCHECK' --include='*.sh' --include='*.mjs' . | grep -v r17-evidence-md5-check.sh`
+     现量只有 `research/tools/r17-reshoot-stale.sh:505`（`sed` 的锚在 `entries=`/`mismatch=` 上、尾部是 `.*`）与
+     `:558`（`^ALLCHECK ` 整行照抄）⇒ `pinskip=` 与 `dirs_with_skipped_pin=` 落在尾部，两处都不受影响。
+  ⑤ 三格阻塞**每次现量**（此刻全部仍未开，且都不是产品失败）：
+     `NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target c` ⇒ rc=3、`REDS=load,src,apk`（负载远超 12、
+     21 枚未提交源码会被打进产物、APK 比源码旧）；
+     `git diff HEAD --numstat -- docs/reference/environment-traps.md` ⇒ 第 5 项仍被别人那 14 枚未提交条目挡着（现量：
+     `grep -E '^\+[0-9]+\. ' ` 数一下）；
+     `git diff HEAD --numstat -- package.json` ⇒ 第 3 项仍是 2/1（`check:ios-ax-shim` 那一格，所有者会话仍在动 iOS 提醒取证）。
+     ⚠️ **为什么"授权我决策"不改变这三格的处置**：能代拍的是**判断**（分档、跳过口径、编号规则），
+     不能代拍的是**别人的字节** —— 往别人正在写的文件里插一行，对方下一次 `--only` 会把我这行当"它没有的改动"删掉；
+     那条危害是双向的，而我连通知渠道都没有。所以三格仍各留一条自闸收口命令（见 (64) 与记忆条）。
+  ⑥ 记忆层同步：项目记忆里那条「锚点门禁进 CI 的前置 = `fetch-depth: 0`」已就地**划掉并写成否证**
+     （可迁移的那句：把"我的装置在这棵树上判不了"升级成"要先改共享基础设施"之前，先查仓库有没有一条**已经拍下、专门管这一档**的分界）；
+     索引行改成"§7 收号=后落地方顺延，CI 那枚前置自造已消"（≤150 码点）。
+     复跑：`node <记忆工具目录>/check-memory-index.mjs --dir <项目记忆目录>` 与
+     `node <记忆工具目录>/verify-index-no-loss.mjs <该目录>/MEMORY.md <该目录>` ⇒ 均 rc=0。
