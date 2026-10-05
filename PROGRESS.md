@@ -1706,6 +1706,29 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   `AGENTS.md` / `docs/README.md` / `package.json` / `trash-and-archive.md` / `android-build-on-windows.md` 与本批**同文件重叠**，
   `git merge` 在脏树上会拒绝，归各所有者提交后执行（main 在两个小时内自己推进了 6 笔，这是个移动靶）；
   ② 上面那两栏**未取证**，要在落地后的那棵树上跑四端重装才量得到。
+- **② 的桌面半格已就地关掉（同一载体，10-05 12:2x–12:3x）**：`NO_COLOR=1 bash scripts/reinstall-all.sh --only mac,windows`
+  ⇒ **`REINSTALL_RC=0`**，汇总两行都是 ✅（"已清旧包、重打、重装、有当前产物判据"），另外两行大字列出
+  "⏭ android／ios：不在 `--only` 范围 —— 这端**没有**验证当前产物"。读数（日志 `/tmp/heyta-reinstall-desktop.log`）：
+  mac 侧安装对账 **9 个 chunk 与本机 `apps/web/dist` 同一次构建**、窗口 `2164x1432`、
+  `.webview.png` 内容占比 **71.4%**、**主蓝命中 1127**（§7 第 82 条那条判据，不是"非空白"）；
+  windows 侧远端新鲜度对账 **`web-dist/index.html=d224aeea6de8f658…` / `bridge=c4802ee077443329…` / `assets/*.js=7 枚一致`**
+  （§7 第 82 条的"远端字节 == 本地工作树"），远端取证 **"判据齐了：5 条全在位"**。
+  🔴 **两张图都打开看过**（§6.2 规定一第 4 条）：装出来的都是真共享 UI —— 收集箱 + 四象限 + 清单/标签侧栏 +
+  右栏「AI 工具调用 / 对话助手」+ 首启联网同意卡；windows 那张还开着头像菜单，**「登录 / 注册」是第一项、没有「退出登录」**
+  （2026-09-30 那单的身份入口判据在**当前产物**里仍然成立）。
+  ⇒ 跑完后 `node scripts/check-shell-surfaces.mjs` **5 绿 / 0 红、未取证 0 栏**：那两栏从此有产物读数，不再靠"没打过包"解释。
+  🔴 **没把 android/ios 也跑掉是决定，不是遗漏**：这台机器此刻有**两条别的会话的 iOS 设备台架在飞**
+  （`/tmp/heyta-reinstall-ios.png` 11:34、`/tmp/heyta-reinstall-android.png` 11:29 都是**主检出那棵树**的产物，
+  不是这棵合流树），§8.9 不许共享载体上并行覆盖 —— 移动两半要么等台架空出来、要么归落地后那棵树跑一次全量。
+  ⚠️ 顺带把"当前产物"这个词用准：**四端里只有桌面两端装的是合流态**，别把 `REINSTALL_RC=0` 读成四端。
+  **① 的读数换成现量**（12:4x）：追平 `main` 后（`82aeb9ac`，那 2 笔只碰 `calendar-profile-handoff.md` 与
+  `calendar-line-commit-only-arms.sh`，合流态上把那枚 rig 的 `--list` 重跑成 **pass=9 fail=0**），
+  落地阻塞面 = `git diff --name-only main merge/20261005`（**345 文件**）∩ 主检出未提交（**29 文件**）
+  = **恰好 8 枚**：`AGENTS.md` `PROGRESS.md` `docs/README.md` `docs/plans/trash-and-archive.md`
+  `docs/reference/environment-traps.md` `docs/runbooks/android-build-on-windows.md` `package.json`
+  `research/tools/mutation-rigs/README.md` —— 全是在飞会话的**文档与链配置**，不 stash、不代提交，
+  归各所有者落笔后 `git merge --ff-only merge/20261005`（远端 `main` 已经是这条线，所以落地只是把本地那棵跟上，
+  不影响别人从 `origin/main` 并入）。
   另记一条**看图照出来、但不属于本批口径**的产品观察：四象限与时间线那两张图里右栏是空的，
   这是 main 侧既有设计（`App.tsx:1605` 的 `aiPanels` 自己写着 `{contentView === 'tasks' && …}`），
   而产品负责人 2026-10-04 那句"无状态的时候默认显示 AI Chatbot"要不要从任务视图扩到全视图，归详情面那一单判——
