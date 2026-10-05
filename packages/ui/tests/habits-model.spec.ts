@@ -19,6 +19,7 @@ import {
   HABIT_LIST_WEEK_DAYS,
   HEATMAP_WEEK_START,
   frozenDays,
+  habitFrequencySummaryKey,
   habitGoalSummaryKey,
   habitHeatLevel,
   habitHeatmap,
@@ -521,5 +522,33 @@ describe('L 组：热力图月份标签**跨过它标注的那几周**（工单 
     expect(labelRow - gridRow, '标签排溢出网格太多 ⇒ 右边那枚会被窗格裁掉').toBeLessThanOrEqual(
       2 * cell + gap,
     );
+  });
+});
+
+describe('habitFrequencySummaryKey —— 单数那一档住在共享层（工单 H5 的补）', () => {
+  /*
+   * 起因：`pnpm -r test` 在 `@heyta/i18n` 那层报了一条红 ——
+   * `web.habits.freq.summary.interval → Every 1 days`。那条 hazard 规则把每张表的
+   * `{占位符}` 都填成 1 念一遍，而英文里"1 days"是坏句子。
+   * 🔴 修法不是把阈值调宽、也不是改那条规则：是**给 1 一条该走的话**，
+   *    并且分支只写一份（写在两个宿主里就是两份，而两份会漂）。
+   */
+  it('间隔 2 天与 5 天各给复数那一句', () => {
+    expect(habitFrequencySummaryKey({ type: 'interval', everyNDays: 2 }))
+      .toBe('web.habits.freq.summary.interval');
+    expect(habitFrequencySummaryKey({ type: 'interval', everyNDays: 5 }))
+      .toBe('web.habits.freq.summary.interval');
+  });
+
+  it('🔴 间隔恰好 1 天 ⇒ 走 `…intervalOne`（阳性对照：这一档与上面那条必须分得开）', () => {
+    expect(habitFrequencySummaryKey({ type: 'interval', everyNDays: 1 }))
+      .toBe('web.habits.freq.summary.intervalOne');
+  });
+
+  it('`daily` 与 `undefined` 仍给"每天"那一句，`weekly` 仍给星期那一句（新分支不许把它们带偏）', () => {
+    expect(habitFrequencySummaryKey(undefined)).toBe('web.habits.freq.summary.daily');
+    expect(habitFrequencySummaryKey({ type: 'daily' })).toBe('web.habits.freq.summary.daily');
+    expect(habitFrequencySummaryKey({ type: 'weekly', daysOfWeek: [3] }))
+      .toBe('web.habits.freq.summary.weekly');
   });
 });

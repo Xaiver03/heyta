@@ -61,7 +61,8 @@ export function HabitFrequencySlot({
 
   const summaryKey = habitFrequencySummaryKey(frequency);
   const summary =
-    summaryKey === 'web.habits.freq.summary.interval'
+    summaryKey === 'web.habits.freq.summary.interval' ||
+    summaryKey === 'web.habits.freq.summary.intervalOne'
       ? t(summaryKey, { n: String(everyN) })
       : summaryKey === 'web.habits.freq.summary.weekly'
         ? t(summaryKey, {
