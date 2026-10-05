@@ -170,9 +170,12 @@ export interface TaskActions {
    * ═════════════════════════════════════════════════════════════════════
    *
    * 已经彻底删除（`purgedAt` 存在）的条目**拒绝恢复**：那是不可逆的。
-   * 本来就没被删除时**不发 op**（没有用户意图要落库，发空 op 只是噪声）。
+   * 本来就没被删除时**不发 op**（没有用户意图要落库，发空 op 只是噪声），
+   * 并**返回 `false`** —— 与便签/清单/习惯那三类的 `restore*()` 同一个形状。
+   * 🔴 `false` 不是失败，是"没产生 op"：它区分的是"写了新事实"与"已经是那个状态"，
+   * 所以宿主可以照它说不同的话（CLI 就是第一个消费者）。
    */
-  restore(entityId: string): Promise<void>;
+  restore(entityId: string): Promise<boolean>;
   /**
    * 彻底删除（purge）—— 回收站里的**不可逆**动作。
    *
@@ -188,8 +191,10 @@ export interface TaskActions {
    *
    * 只能对**已软删除**的条目用：对一条活着的任务发 purge 会让它在
    * 没有任何墓碑的情况下从视图里消失，而离线端完全不知道发生过什么。
+   *
+   * 已经彻底过就**返回 `false`** 且不重复写 op（同 `restore()` 那一格）。
    */
-  purge(entityId: string): Promise<void>;
+  purge(entityId: string): Promise<boolean>;
   setPriority(entityId: string, priority: Priority): Promise<void>;
   /** 四象限的"重要"维度。 */
   setImportant(entityId: string, important: boolean): Promise<void>;
@@ -506,13 +511,14 @@ export function createTaskActions(
         throw new Error(`任务「${entityId}」已被彻底删除，无法恢复`);
       }
       // 本来就没删除：不产生 op。见 `TaskActions.restore` 的注释。
-      if (task.deletedAt === undefined) return;
+      if (task.deletedAt === undefined) return false;
 
       // 🔴 `null` = 显式清除 `deletedAt`（reducer 的既有约定）。
       // 不要写 `deletedAt: undefined` —— 那会被 JSON 丢掉，
       // 对端既不清除也不报错，"恢复"在另一台设备上静默失效。
       // 原字段（标题/备注/清单/标签/日期/重复规则）本来就在墓碑里，无需重写。
       await update(entityId, { deletedAt: null });
+      return true;
     },
 
     async purge(entityId) {
@@ -522,10 +528,11 @@ export function createTaskActions(
         throw new Error(`任务「${entityId}」不在回收站里，不能彻底删除`);
       }
       // 已彻底删除：幂等，不重复发 op。
-      if (task.purgedAt !== undefined) return;
+      if (task.purgedAt !== undefined) return false;
 
       // 只加标记，**不清 `deletedAt`** —— 墓碑留着，离线端才不会复活它。
       await update(entityId, { purgedAt: now() });
+      return true;
     },
 
     setPriority(entityId, priority) {

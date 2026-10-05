@@ -120,8 +120,11 @@ export interface NoteActions {
    *
    * 只能对**已软删除**的便签用：对一条活着的便签发 purge 会让它在没有墓碑的
    * 情况下从视图里消失，而离线端完全不知道发生过什么 ⇒ **抛错**。
+   *
+   * **已经 purge 过返回 `false`** 且不重复写 op（与 `restoreNote` 的 `false`
+   * 同一句话：这次调用没有改变任何事实，调用方不该把它报成"已彻底删除"）。
    */
-  purgeNote(entityId: string): Promise<void>;
+  purgeNote(entityId: string): Promise<boolean>;
   /** 未删除的便签，**规范顺序**（`sortNotesForDisplay`：钉选 → 更新时间 → id）。 */
   listNotes(): Note[];
   /**
@@ -283,7 +286,7 @@ export function createNoteActions(
         throw new Error(`便签「${entityId}」不在回收站里，不能彻底删除`);
       }
       // 已彻底删除：幂等，不重复发 op。
-      if (raw.purgedAt !== undefined) return;
+      if (raw.purgedAt !== undefined) return false;
       // 只加标记，**不清 `deletedAt`** —— 墓碑留着，离线端才不会复活它。
       await ctx.dispatch({
         entityType: 'NOTE' as EntityType,
@@ -291,6 +294,7 @@ export function createNoteActions(
         opType: OpType.Update,
         payload: { purgedAt: now() },
       });
+      return true;
     },
 
     listNotes() {

@@ -64,8 +64,12 @@ interface NoteState {
    * "永远恢复不了"要分成两句话，界面对后者要说"不可恢复"。
    */
   restoreNote: (entityId: string) => Promise<boolean>;
-  /** 彻底删除（写 `purgedAt` 标记，墓碑保留）。**不可逆**，确认框由界面负责。 */
-  purgeNote: (entityId: string) => Promise<void>;
+  /**
+   * 彻底删除（写 `purgedAt` 标记，墓碑保留）。**不可逆**，确认框由界面负责。
+   *
+   * 返回**有没有真的落成**（`false` = 它早就被彻底删过，这一次没有写 op）。
+   */
+  purgeNote: (entityId: string) => Promise<boolean>;
   /** `pinned` 是**目标值**，不是"切换一下"（与动作层契约一致）。 */
   togglePinned: (entityId: string, pinned: boolean) => Promise<void>;
 }
@@ -122,8 +126,9 @@ export const useNoteStore = create<NoteState>((set) => ({
   },
 
   purgeNote: async (entityId) => {
-    await noteActions.purgeNote(entityId);
+    const purged = await noteActions.purgeNote(entityId);
     refresh();
+    return purged;
   },
 
   togglePinned: async (entityId, pinned) => {

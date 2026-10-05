@@ -1186,6 +1186,12 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
   pnpm 会忽略 `npm_config_registry`，照旧从 `registry.npmjs.org` 取包并超时
   （构建日志里命令打印得完全正确，只有 URL 出卖了它）。`server/Dockerfile` 现在用
   `pnpm config set registry "$NPM_REGISTRY"`。详见 `AGENTS.md` §7 第 74 条。
+- ⚠️ 构建旋钮**不止上面两枚**：还有 `NODE_IMAGE`（base 镜像）与 `PRISMA_ENGINES_MIRROR`
+  （`prisma generate` 下载引擎二进制走的第三家 CDN），以及一条**不需要旋钮**但会让人误判"换源没生效"的
+  corepack 层 —— 全部逐枚说明与实测错误原文在 [`self-host.md`](self-host.md) §3。
+  🔴 **这台生产主机需不需要后两枚，本轮没有读数**：那两枚的实测是在**开发机上的自建栈验收**里做的
+  （`pnpm verify:selfhost-stack`），不要照抄成"部署时也要给"。上面那两条命令保持只给前两个旋钮，
+  是因为它们各自都有**这台机器上的**失败读数。
 - 🔴 **镜像里原来根本没有 `packages/domain`，也没有 `tsconfig.base.json`** ——
   于是 `server` 其实**早就构建不出来了**（`TS2307` / `TS5083`），而本地 `pnpm -r build` 永远绿。
   这是本次重建挖出的最危险的一条：**"本地全绿"证不了"镜像能构建"**。

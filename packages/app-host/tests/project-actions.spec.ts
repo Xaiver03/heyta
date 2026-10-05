@@ -667,10 +667,20 @@ describe('清单进回收站（W4 / P-1）', () => {
     await expect(actions.purgeProject(live)).rejects.toThrow(/不在回收站里/);
 
     await actions.removeProject(live);
-    await actions.purgeProject(live);
+    const opsBefore = (await engine.getOpsForEntity('PROJECT', live)).length;
+    // 🔴 布尔那一格单独钉（G-8）：只数 op 的话 `undefined` 与 `false` 长得一样，
+    //    而 CLI 要靠这个值决定印"已彻底删除"还是"未写入"。
+    expect(
+      await actions.purgeProject(live),
+      '真的打上了标记却返回 false',
+    ).toBe(true);
     const opsAfterFirstPurge = (await engine.getOpsForEntity('PROJECT', live)).length;
+    expect(opsAfterFirstPurge, '第一次 purge 没有发 op').toBe(opsBefore + 1);
     // 幂等：不可逆动作被点两次不该再多产一条 op。
-    await actions.purgeProject(live);
+    expect(
+      await actions.purgeProject(live),
+      '早已彻底删除却返回 true ⇒ 宿主会把什么都没写成的一句报成"已彻底删除"',
+    ).toBe(false);
     expect(await engine.getOpsForEntity('PROJECT', live)).toHaveLength(opsAfterFirstPurge);
   });
 

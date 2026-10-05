@@ -86,9 +86,10 @@ interface TaskState {
    * 从回收站恢复。**走 op-log**（一条 `UPD { deletedAt: null }`），
    * 所以另一台设备回放后也会看到条目回来 —— 不是只改本地 UI 状态。
    */
-  restoreTask: (id: string) => Promise<void>;
-  /** 彻底删除（不可逆）。用户已二次确认。 */
-  purgeTask: (id: string) => Promise<void>;
+  /** 还原（`false` = 它本来就在回收站外面，没写 op）。 */
+  restoreTask: (id: string) => Promise<boolean>;
+  /** 彻底删除（不可逆）。用户已二次确认。`false` = 它已经被彻底删过。 */
+  purgeTask: (id: string) => Promise<boolean>;
   setPriority: (id: string, priority: Priority) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
   /**
@@ -261,13 +262,13 @@ export const useTaskStore = create<TaskState>((set) => ({
   restoreTask: async (id) => {
     // 恢复同样是一次 op（`UPD { deletedAt: null }`）。这里**不碰 entities** ——
     // 绕开 op-log 直接改状态就同步不出去，也会在下次同步时被墓碑覆盖回来。
-    await taskActions.restore(id);
+    return taskActions.restore(id);
   },
 
   purgeTask: async (id) => {
     // 写 `purgedAt` 标记（可加性字段，不 bump schema）。墓碑保留 ——
     // 清掉它会让离线端把这条旧数据又同步回来。
-    await taskActions.purge(id);
+    return taskActions.purge(id);
   },
 
   setPriority: async (id, priority) => {

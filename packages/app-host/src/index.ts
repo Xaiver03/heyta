@@ -74,6 +74,7 @@ export {
 export {
   createHabitActions,
   habitLogId,
+  normalizeHabitFrequency,
   type HabitActions,
   type HabitActionsOptions,
   type NewHabitFields,

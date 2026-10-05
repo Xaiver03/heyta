@@ -381,6 +381,19 @@ model RevokedSyncDevice {
   @@map("revoked_sync_devices")
 }
 
+/// Tombstone for a hard-deleted (closed) account. It deliberately has **no**
+/// `user` relation: a FK with `onDelete: Cascade` would erase the record of the
+/// erasure together with the account it records, and the backup/restore gate
+/// (ADR-0055) would have nothing left to check. `emailHash` is the only identity
+/// residue kept — the plaintext address is gone with the `users` row.
+model AccountTombstone {
+  userId    Int      @id @map("user_id")
+  emailHash String   @map("email_hash")
+  closedAt  DateTime @map("closed_at")
+
+  @@map("account_tombstones")
+}
+
 /// Opaque E2EE key package. The server stores wrappers only; it cannot derive
 /// or decrypt the vault root key. A new keyVersion is published after a
 /// client-side rotation has re-encrypted every local record.

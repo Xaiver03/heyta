@@ -1283,6 +1283,45 @@ export const zhCN = {
   'web.habits.icon.a11y': '为「{name}」选图标',
   'web.habits.icon.a11yDefault': '「{name}」用默认图标',
 
+  // ── Web · 习惯的频次（工单 H5）────────────────────────────
+  // 🔴 判定侧**一直**是按频次数"计划日"的（`isScheduledOn` → `computeStreak`，
+  //    `habit-streak.ts:131/158/227/360`），这一批词条接上的是**写入口**那半米。
+  //    键名沿用 `web.habits.*`：移动端复用同一批（与新建 / 图标 / 目标那几处同一条决定 ——
+  //    端间同词，不各起一套）。
+  // ⚠️ `summary.interval` 里的 `{n}` **只会出现 ≥2**：`interval` 且 `everyNDays === 1`
+  //    在写入侧就被归一成 `daily`（`normalizeHabitFrequency`）。这条不是巧合，
+  //    英文因此不需要复数变形 —— 把归一拿掉，这里就会读出 "Every 1 days"。
+  'web.habits.freq.aria': '「{name}」的频次',
+  'web.habits.freq.toggle': '频次',
+  'web.habits.freq.daily': '每天一次',
+  'web.habits.freq.weekly': '每周挑几天',
+  'web.habits.freq.interval': '每隔几天',
+  'web.habits.freq.summary.daily': '每天',
+  'web.habits.freq.summary.weekly': '每周 {days}',
+  'web.habits.freq.summary.interval': '每 {n} 天',
+  'web.habits.freq.nDays': '每隔几天做一次',
+  'web.habits.freq.invalid': '「每隔几天」的天数要是一个 1 或更大的整数',
+  'web.habits.freq.intervalHint': '按日历固定隔 {n} 天排一次，起点不随建立习惯那天挪。',
+  'web.habits.freq.default': '回到每天',
+
+  // ── 习惯月历 + 补打卡（工单 H4）───────────────────────────
+  // 🔴 六档一句：档位词表是 `@heyta/domain#HabitDayState`，界面只负责把它念出来。
+  //    「不可点」也要有句子 —— 只画灰而不说原因，用户读到的是"应用坏了"。
+  'web.habits.month.grid': '{name} 在 {month} 的打卡月历',
+  'web.habits.month.window': '补打卡可以往回 {n} 天',
+  // 🔴 每句**自带 `{date}`**，不设 `{date}，{state}` 那种拼装模板：
+  //    那条模板除了一个全角逗号没有汉字，会被 `check:ui-language` 判成"拿别的语言占位"
+  //    （它抓的正是"整条只剩标点和占位符"这种假词条 —— 与工单 H5 那条 `separator = 、` 同一道闸）。
+  'web.habits.month.logged': '{date} 已打卡',
+  'web.habits.month.today': '{date}，今天还没打卡',
+  'web.habits.month.backfillable': '{date}，可以补打卡',
+  'web.habits.month.notScheduled': '{date}，这天本来不用打卡',
+  'web.habits.month.future': '{date}，还没到这天',
+  'web.habits.month.tooOld': '{date}，已超过补打卡窗口',
+  // 补白格**必须有自己的一句话**：上一月视图里的"今天"是一格尾随补白，
+  // 只按状态词表它会说「今天还没打卡」却点不动（= "点了没反应"那一族）。
+  'web.habits.month.outOfMonth': '{date}，邻月的日子，不在这个月里',
+
   // ── Web · 习惯的「列表 + 窗格」─────────────────────────────
   'web.habits.list.aria': '习惯清单',
   'web.habits.pane.aria': '「{name}」的打卡记录',
@@ -3357,7 +3396,7 @@ export const zhCN = {
   'site.features.item.task.fields': '标题、备注（Markdown）、优先级、截止时间、所属清单、标签',
   'site.features.item.task.repeat': '重复任务：每天 / 每周 / 工作日 / 每月，四种预设一键选',
   'site.features.item.task.projects': '清单支持一层文件夹嵌套；清单与标签都有独立管理面板',
-  'site.features.item.task.trash': '回收站：删掉的内容先留着，随时恢复，也可以彻底清空',
+  'site.features.item.task.trash': '回收站：删掉的内容先留着，随时恢复，也可以逐条彻底删除',
   'site.features.item.task.export': '一键导出：完整 JSON 备份（连删除过的记录都在，条数可核对）+ 好读的 Markdown',
   'site.features.item.view.quadrant': '四象限：按重要程度与截止时间自动归类，拖动即可调整',
   'site.features.item.view.timeline': '时间线：按预估时长排布，用于个人项目排期',

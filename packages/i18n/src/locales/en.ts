@@ -1177,6 +1177,35 @@ export const en = {
   'web.habits.icon.a11y': 'Choose an icon for "{name}"',
   'web.habits.icon.a11yDefault': '"{name}" uses the derived icon',
 
+  // ── Web · habit frequency (ticket H5) ─────────────────────
+  // 🔴 与中文那一块**逐键对应**（词条表唯一文案事实源，中英必须同步）。
+  // ⚠️ `summary.interval` 的 `{n}` 只会出现 **≥2**：`interval` 且 `everyNDays === 1`
+  //    在写入侧被归一成 `daily`（`normalizeHabitFrequency`），所以这条不需要复数变形。
+  //    本仓库的词条表没有 ICU 复数（见上面 `web.habits.row.aria` 那条注释）。
+  'web.habits.freq.aria': 'Frequency for "{name}"',
+  'web.habits.freq.toggle': 'Frequency',
+  'web.habits.freq.daily': 'Once a day',
+  'web.habits.freq.weekly': 'A few weekdays',
+  'web.habits.freq.interval': 'Every few days',
+  'web.habits.freq.summary.daily': 'Every day',
+  'web.habits.freq.summary.weekly': 'Weekly on {days}',
+  'web.habits.freq.summary.interval': 'Every {n} days',
+  'web.habits.freq.nDays': 'Days between each time',
+  'web.habits.freq.invalid': '“Days between each time” must be a whole number of 1 or more',
+  'web.habits.freq.intervalHint': 'Lands every {n} calendar days on a fixed grid — it does not shift to the day this habit was created.',
+  'web.habits.freq.default': 'Back to every day',
+
+  // ── Habit month calendar + backfill (ticket H4) ────────────
+  'web.habits.month.grid': 'Check-in calendar for {name} — {month}',
+  'web.habits.month.window': 'You can backfill up to {n} day(s)',
+  'web.habits.month.logged': '{date}, checked in',
+  'web.habits.month.today': '{date}, today — not checked in yet',
+  'web.habits.month.backfillable': '{date}, can be backfilled',
+  'web.habits.month.notScheduled': '{date}, not a scheduled day',
+  'web.habits.month.future': '{date}, not reached yet',
+  'web.habits.month.tooOld': '{date}, outside the backfill window',
+  'web.habits.month.outOfMonth': '{date}, a neighbouring month’s day (not in this month)',
+
   // ── Web · habits list + pane ──────────────────────────────
   'web.habits.list.aria': 'Habits list',
   'web.habits.pane.aria': 'Check-in history for "{name}"',
@@ -3125,7 +3154,7 @@ export const en = {
   'site.features.item.task.fields': 'Title, note (Markdown), priority, due date, list, tags',
   'site.features.item.task.repeat': 'Recurring tasks: daily / weekly / weekdays / monthly — four presets, one tap',
   'site.features.item.task.projects': 'Lists support one level of folders; lists and tags each have their own panel',
-  'site.features.item.task.trash': 'Trash: deleted items are kept first — restore them anytime, or clear them for good',
+  'site.features.item.task.trash': 'Trash: deleted items are kept first — restore them anytime, or delete any one of them for good',
   'site.features.item.task.export': 'One-click export: a complete JSON backup (deleted records included, counts you can verify) plus readable Markdown',
   'site.features.item.view.quadrant': 'Four quadrants: sorted automatically by importance and due date — drag to adjust',
   'site.features.item.view.timeline': 'Timeline: laid out by estimated duration, for personal project planning',

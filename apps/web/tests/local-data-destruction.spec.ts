@@ -55,6 +55,11 @@ vi.mock('../src/lib/oplog.js', () => ({
     poolLock.releaseCalls += 1;
     poolLock.held = false;
   },
+  // 这一份要的是 OPFS 那一类的**调用顺序**，所以它不初始化引擎，也就没有活实例可销毁。
+  // 报 `undefined` 就是产品里"没开过存储 ⇒ 回落到新建一个实例去删"那条分支 ——
+  // 下面那些用例判的正是那条回落路径。「销毁的是活的那个实例」住
+  // `local-destroy-live-adapter.spec.ts`（那份**不 mock** oplog，因为它要读真模块态）。
+  destroyLiveStorage: async () => undefined,
 }));
 // `process.cwd()` 在不同调用方式下会是仓库根或 `apps/web`，所以路径一律从
 // `WEB_SRC` 反推，不写死相对层数（写死的那版在这里指向 apps/packages/…）。

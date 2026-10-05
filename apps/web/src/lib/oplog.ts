@@ -16,6 +16,7 @@ import { OpLogEngine, type MaterializedState, type OpIntent } from '@heyta/op-lo
 import {
   createOpLogWirePort,
   createWorkerOpLogSession,
+  type DbDestroyReport,
   IndexedDbAdapter,
   IndexedDbOpLogStore,
   type OpLogStore,
@@ -267,6 +268,34 @@ export async function releaseStorageWorker(): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, 0);
   });
+}
+
+/**
+ * 注销：销毁**这个页面会话真正在用的那个适配器实例**，而不是另开一个实例去删库。
+ *
+ * 🔴 为什么这一格不能省：`DbAdapter.destroy()` 的契约（`@heyta/storage` 的 errors.ts）说的是
+ * "销毁后的那个**实例**拒绝读写，而不是把刚删掉的容器重新建成空壳"。另开一个实例去 `destroy()`
+ * 删掉的是盘上的库，而页面里那个还带着活连接的实例**没有被标记成已销毁** —— 于是它的下一次读写
+ * 会把同名库**空着建回来**，界面看起来"注销成功了"，盘上却多了一个属于这个人的空壳容器，
+ * 而任何还攥着旧 store 的接线（同步客户端在构造时就把 store captures 住了）会安静地写进它。
+ * 政策承诺的是这台设备回到全新空状态，不是"回到一个刚被自己重建的壳"。
+ *
+ * 顺序要紧：先摘掉模块单例（让**后来者**走 `initOpLog()` 建一个全新实例 —— 重新登录是同一条页面
+ * 会话里发生的，不能被这里销毁的实例挡住），再销毁那个实例（让**旧句柄**的下一发读写以
+ * `AdapterDestroyedError` 失败）。两个方向各有各的判据，都钉在
+ * `apps/web/tests/local-data-destruction.spec.ts`。
+ *
+ * @returns 没开过存储（纯测试环境、或注销前一个 op 都没写过）就是 `undefined` ——
+ *          调用方据此回落到"新建一个实例去删"，那一发仍然要把盘上的库删掉。
+ */
+export async function destroyLiveStorage(): Promise<DbDestroyReport | undefined> {
+  const adapter = db;
+  if (adapter === undefined) return undefined;
+  db = undefined;
+  engine = undefined;
+  opLogStore = undefined;
+  initPromise = undefined;
+  return adapter.destroy();
 }
 
 /**

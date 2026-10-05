@@ -167,12 +167,29 @@ async function applySeed(page, site, target) {
   await page.goto(site.baseUrl + langQuery, { waitUntil: 'domcontentloaded' });
   await dismissOverlays(page, target.dismissTexts);
 
-  const settings = page
-    .getByRole('tab', { name: target.seed.settingsLabel, exact: false })
-    .or(page.getByRole('button', { name: target.seed.settingsLabel, exact: false }))
-    .first();
+  // 🔴 「设置」不在 rail 上，它在**头像菜单**里（`apps/web/src/features/shell/AccountMenu.tsx`
+  //    的 `account-menu-settings`）。这里原来写的是
+  //    `getByRole('tab'|'button', { name: settingsLabel, exact: false })` —— `exact: false`
+  //    把「设置」当成了子串，命中的是同步状态栏那颗**「同步设置」**。
+  //    失败形状值得记下来：它不是"点错了一个看得见的东西"，而是**点开了一个永远不会渲染
+  //    `import-panel` 的浮层**，于是这条腿等成一个看不出根因的 20s 超时。
+  const avatar = page.getByTestId('account-menu-avatar');
+  await avatar.waitFor({ state: 'attached', timeout: 20_000 });
+  await avatar.scrollIntoViewIfNeeded().catch(() => {});
+  await avatar.click({ force: true });
+
+  const settings = page.getByTestId('account-menu-settings');
   await settings.waitFor({ state: 'attached', timeout: 20_000 });
-  await settings.scrollIntoViewIfNeeded().catch(() => {});
+  // 抄件要**钉在界面上**，不然它和 `dismissTexts` 一样会悄悄过期：
+  // 菜单项的可及名必须真的含 `settingsLabel`，否则词条改了而这份没改时，
+  // 下面点到的仍是某个"看着像设置"的东西。
+  const settingsName = `${(await settings.getAttribute('aria-label')) ?? ''} ${(await settings.innerText()).trim()}`.trim();
+  if (!settingsName.includes(target.seed.settingsLabel)) {
+    throw new Error(
+      `seed：头像菜单里那一枚的实际文案是 ${JSON.stringify(settingsName)}，` +
+        `与抄件 ${JSON.stringify(target.seed.settingsLabel)} 对不上 ⇒ 改词条要同时改 targets.mjs`,
+    );
+  }
   await settings.click({ force: true });
 
   await page.getByTestId('import-panel').waitFor({ state: 'attached', timeout: 20_000 });
@@ -214,7 +231,10 @@ async function assertSeededTitles(page, target) {
   for (const rows of Object.values(doc.entities ?? {})) {
     for (const row of Array.isArray(rows) ? rows : []) {
       if (row?.deletedAt == null) continue;
-      const label = String(row.title ?? row.content ?? '').trim();
+      // 🔴 每类的标题字段不一样（任务 title / 便签 content / 清单与习惯 name），
+      //    规则的真源是 `@heyta/domain#toTrashItems`，这里那份是它的镜像 ——
+      //    少取一个字段就等于把那一类从判据的分母里悄悄摘掉（§10.226 那条"分母"教训的形状）。
+      const label = String(row.title ?? row.content ?? row.name ?? '').trim();
       if (label !== '') expected.push(label);
     }
   }

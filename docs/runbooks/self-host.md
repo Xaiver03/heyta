@@ -120,7 +120,39 @@ NODE_IMAGE=你自己的源/library/node:24-alpine
 这三处必须同源，否则 `web` 阶段与 `production` 阶段会各自拉不同的 base，
 "我的镜像里到底装了什么"就再也对不上了。
 
-🔴 **上面这三个旋钮只管"构建"，管不到"起栈"**。`docker compose up` 还要在**运行期**再拉两枚镜像，
+还有**第四枚**，它坏的地方前三枚都救不了：`PRISMA_ENGINES_MIRROR`。`prisma generate` 下载引擎二进制
+走的是**第三家 CDN**（`binaries.prisma.sh`），既不经 Alpine 的源、也不经 npm 的源，所以三个旋钮给全了
+仍可能死在这一步。2026-10-06 本机实测原文：
+
+```
+#63 [builder 25/26] RUN pnpm exec prisma generate
+#63 4.424 Error: request to https://binaries.prisma.sh/all_commits/…/linux-musl-arm64-openssl-3.0.x/
+      libquery_engine.so.node.gz.sha256 failed,
+      reason: Client network socket disconnected before secure TLS connection was established
+```
+
+（当时的现量：主机对 `binaries.prisma.sh` 直连取不到东西，而就近镜像可达 ——
+容器内 `wget` 它的 `…/-/binary/prisma/…sha256` 拿到了真值，才敢把源换过去。）
+
+```bash
+PRISMA_ENGINES_MIRROR=https://你的源/-/binary/prisma
+```
+
+默认值逐字等于 `https://binaries.prisma.sh` ⇒ **不带这一行 = 行为一点没变**。
+它在 `server/Dockerfile` 里声明**两处**（`builder` 与 `production` 各跑一次 `prisma generate`）。
+🔴 新加一枚构建旋钮时必须**同时**接进 `docker-compose.build.yml` 的 `args:` ——
+`check:image-build-args` 的 R1/R4 就是判这个，而它这次是真的红过的：我先只改了 Dockerfile，
+compose 没接，红条原文是「这个 ARG 没进 compose 的 `build.args` …… 走 compose 的人改了配置
+没有任何反应，也不报错」。**"设了没反应、也不报错"正是这节最不能留的东西**，所以那枚门禁
+比这段文字更早起作用，改 Dockerfile 的人不必记得来读它。
+
+⚠️ 另有一件事**不需要旋钮**、却会让人误判"换源没生效"：`corepack prepare pnpm@…` 只认环境变量
+`COREPACK_NPM_REGISTRY`，而那步排在 `pnpm install` **之前**，`ARG NPM_REGISTRY` 原来声明在它之后 ⇒
+换了源仍停在 corepack。现在 Dockerfile 把那枚 ARG 提到 corepack 之前并 `ENV` 出上面那个变量，
+**一枚旋钮两个消费者**，不设第二条 ARG（两处默认值就是两处会漂的地方）。判据是那对成对探针：
+同一枚 base 镜像只差这一枚环境变量，带镜像 `COREPACK_MIRROR_OK`（rc=0）、不带 rc=1。
+
+🔴 **上面这些构建期旋钮只管"构建"，管不到"起栈"**。`docker compose up` 还要在**运行期**再拉两枚镜像，
 它们同样出自 Docker Hub，而构建期的任何旋钮对它们无能为力：
 
 ```bash
@@ -155,7 +187,8 @@ or may require 'docker login'
 
 那句 `may require 'docker login'` 是这条路上最容易误导人的一步 —— 它会让人去找
 "该登录哪个仓库"，而真相是**根本没有仓库**。带上 build override 之后，同一条命令
-自己把镜像打出来（`APK_MIRROR` / `NPM_REGISTRY` / `NODE_IMAGE` 三个旋钮在这条路上也生效，
+自己把镜像打出来（`APK_MIRROR` / `NPM_REGISTRY` / `NODE_IMAGE` / `PRISMA_ENGINES_MIRROR`
+这几枚构建期旋钮在这条路上也生效，
 它们就住在这份 override 的 `args` 里 —— ⚠️ 那三个只覆盖**构建**；`up` 在运行期还要拉的
 `postgres` / `caddy` 两枚由 §3 末尾那两个旋钮管，它们住在**默认**那份文件里）。
 
@@ -233,6 +266,12 @@ curl -fsS https://你的域名/health
 - 升级：`git checkout <新 commit>` → `server/scripts/deploy.sh --build`（迁移在换容器**之前**跑）。
 - 备份：`server/scripts/backup.sh`（pg_dump 到 `server/backups/`；`BACKUP_DIR` 可覆写，默认落在 `$SERVER_DIR/backups`）。
   🔴 端到端加密下**备份就是全部** —— 我们这边没有任何一份你的明文可以还原给你。
+- 恢复：`server/scripts/restore.sh <产物>`。它导完那份产物之后会按 `account_tombstones`
+  把**已经注销过的账号**再删一遍，并逐个墓碑断言它读不到账号行。
+  只有 `RESTORE=OK` 那一行是可以照做的；`RESTORE=GATE_FAILED` 说这次恢复把注销过的人带回来了，
+  `RESTORE=NO_TOMBSTONE_TABLE` 说闸没有判据可读、这次导入**未验证**。
+  步骤与退出码在 `server/docs/backup-and-recovery.md`，裁决与"为什么不做逐账号密钥销毁"在
+  [ADR-0055](../adr/0055-account-tombstones-and-restore-gate.md)。
 - 数据是事件溯源（op-log）而不是"当前状态表"：`prisma` 表里的行是可重放的日志，
   不要手改。
 

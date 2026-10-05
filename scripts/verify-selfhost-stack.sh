@@ -307,6 +307,7 @@ if [ "$BUILD" = "1" ]; then
     ${NODE_IMAGE:+--build-arg NODE_IMAGE=$NODE_IMAGE} \
     ${APK_MIRROR:+--build-arg APK_MIRROR=$APK_MIRROR} \
     ${NPM_REGISTRY:+--build-arg NPM_REGISTRY=$NPM_REGISTRY} \
+    ${PRISMA_ENGINES_MIRROR:+--build-arg PRISMA_ENGINES_MIRROR=$PRISMA_ENGINES_MIRROR} \
     -t "$IMAGE" . >/tmp/heyta-selfhost-image.log 2>&1 || {
       tail -30 /tmp/heyta-selfhost-image.log
       die "镜像构建失败（完整日志 /tmp/heyta-selfhost-image.log）"
@@ -663,8 +664,18 @@ log "截图落在 e2e/selfhost-stack-results/ —— 按 §6.2 规定一，**人
 #    当成这次的界面证据。所以判据是「mtime 晚于本次起跑」，不是「有这四张」。
 SHOTS=$(node --input-type=commonjs -e '
 const fs = require("fs"), path = require("path");
-const t0 = Number(process.argv[1]), dir = process.argv[2];
-const want = ["s1-app-loaded.png", "s2-signed-in.png", "s3-device-a-synced.png", "s3-device-b-recovered.png"];
+const t0 = Number(process.argv[1]), dir = process.argv[2], spec = process.argv[3];
+// 🔴 名单**从 spec 现推**，不在这里抄第二份：抄件会漂，而漂了的形状是"新加的那条用例
+//    截图没人对账"——用例红了才知道，用例被整条跳过时这里照样绿。
+const src = fs.readFileSync(spec, "utf8");
+const want = Array.from(new Set(
+  Array.from(src.matchAll(/selfhost-stack-results\/([A-Za-z0-9._-]+\.png)/g), (m) => m[1]),
+));
+if (want.length === 0) {
+  console.log("  WANT=0 —— 从 spec 里一条截图路径都没解析出来");
+  console.log("  这是「装置坏了」，不是「这次没有截图」：正则或 spec 路径任一变了都会走到这里，而它必须红。");
+  process.exit(1);
+}
 let fresh = 0;
 for (const n of want) {
   let st = null;
@@ -675,9 +686,10 @@ for (const n of want) {
   console.log("  " + n + "  mtime=" + (m === null ? "不存在" : new Date(m * 1000).toISOString()) +
     "  bytes=" + (st ? st.size : "-") + "  " + (ok ? "本次的" : "不是本次的"));
 }
+console.log("SHOT_NAMES_FROM_SPEC=" + String(want.length));
 console.log("FRESH=" + fresh + "/" + String(want.length));
 if (fresh !== want.length) process.exit(1);
-' "$BROWSER_T0" "e2e/selfhost-stack-results")
+' "$BROWSER_T0" "e2e/selfhost-stack-results" "e2e/selfhost-stack/selfhost-web.spec.ts")
 SHOT_RC=$?
 printf '%s\n' "$SHOTS"
 # 🔴 先算进变量再插值：bash 3.2 解析不了 `"… $(date -r "$X" '…') …"` 这种**双引号里套
@@ -686,8 +698,9 @@ BROWSER_T0_HUMAN=$(date -r "$BROWSER_T0" '+%Y-%m-%dT%H:%M:%S')
 log "   （起跑时刻 ${BROWSER_T0_HUMAN} —— 只有标「本次的」那几张才算这一趟的证据）"
 
 if [ "$RC" = "0" ] && [ "$SHOT_RC" != "0" ]; then
-  die "Playwright 退出码 0，但四张截图里**没有一张是本次的**（见上面那张 mtime 表）。
-   「退出码 0」+「截图是旧的」这个组合只有一种解释：用例没走到截图那一步就返回了 0 ——
+  die "Playwright 退出码 0，但上面那张 mtime 表里标「本次的」少于 spec 声明的截图总数
+   （名单由 spec 现推，见 SHOT_NAMES_FROM_SPEC）。
+   「退出码 0」+「截图不是本次的」这个组合只有一种解释：用例没走到截图那一步就返回了 0 ——
    也就是**没有证据**。这一趟不算闭合。"
 fi
 

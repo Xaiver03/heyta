@@ -42,6 +42,7 @@ import {
   trashedIn,
   type CategorySlot,
   type Habit,
+  type HabitFrequency,
   type HabitGoalType,
   type HabitIcon,
   type HabitLog,
@@ -71,7 +72,56 @@ export interface NewHabitFields {
    * 不是"没有图标"（理由见 `@heyta/domain#habit-icons`）。
    */
   icon?: HabitIcon;
+  /**
+   * 频次（工单 H5）。省略 = 不改，判定侧按**每天**走。
+   *
+   * 🔴 这一项是"补上写入口"那一米：`isScheduledOn` / `computeStreak` **早就按频次数计划日**
+   *    （`habit-streak.ts:131/158/227/360`），而在此之前**没有任何动作能写它** ——
+   *    于是那套口径对界面是不可达的（§7 第 195 条那个"字段看起来有功能"的形状）。
+   *    写入一律过 `normalizeHabitFrequency`（校验 + 归一，理由见那里）。
+   */
+  frequency?: HabitFrequency;
   backfillDays?: number;
+}
+
+/**
+ * 频次的**校验 + 归一**（工单 H5；`createHabit` 与 `setHabitFrequency` 共用这一份）。
+ *
+ * 为什么校验在动作层而不是界面：`{type:'interval', everyNDays:0}` 会让
+ * `isScheduledOn` 里的取模**除零**（得到 NaN ⇒ 恒 false ⇒ 连续天数永远 0），
+ * 而界面上看不出哪里不对 —— 与 `setHabitGoal` 的数值校验同一条理由。
+ *
+ * 🔴 两条**归一**不是整理癖，是"同一件事只允许一种存法"：
+ *   · `interval` 且 `everyNDays === 1` ⇒ 存成 `daily`
+ *   · `weekly` 且**七天全选** ⇒ 存成 `daily`
+ * 不归一的后果是同一个语义在磁盘上有三种表示，而 `frequency` 是要**长期存在**的字段
+ * （§3.3：已落盘的数据会一直在）—— 之后任何按频次做的判断都得各判一遍。
+ *
+ * ⚠️ `weekly` 的空集合**抛**而不是当"每天"：七天都不选 = "没有计划日"，
+ *    把它当"每天"会让连续天数在用户没打算打卡的日子里判他断链。
+ */
+export function normalizeHabitFrequency(input: HabitFrequency): HabitFrequency {
+  if (input.type === 'daily') return { type: 'daily' };
+
+  if (input.type === 'interval') {
+    const n = input.everyNDays;
+    if (!Number.isInteger(n) || n < 1) {
+      throw new Error(`"每 N 天"的 N 必须是 ≥1 的整数，收到 ${JSON.stringify(n)}`);
+    }
+    return n === 1 ? { type: 'daily' } : { type: 'interval', everyNDays: n };
+  }
+
+  const days = [...new Set(input.daysOfWeek)];
+  if (days.length === 0) {
+    throw new Error('每周几至少要选一天（空集合没有计划日，连续天数会恒为 0）');
+  }
+  for (const day of days) {
+    if (!Number.isInteger(day) || day < 1 || day > 7) {
+      throw new Error(`星期的取值是 1–7（1=周一），收到 ${JSON.stringify(day)}`);
+    }
+  }
+  days.sort((a, b) => a - b);
+  return days.length === 7 ? { type: 'daily' } : { type: 'weekly', daysOfWeek: days };
 }
 
 export interface HabitActionsOptions {
@@ -117,6 +167,25 @@ export interface HabitActions {
    * 习惯永远有图标，所以这个动作改的是"画哪一个"，不是"画不画"。
    */
   setHabitIcon(entityId: string, icon?: HabitIcon): Promise<void>;
+
+  /**
+   * 改一个习惯的**频次**（工单 H5 那一米）。`undefined` = 清除，回到"每天"。
+   *
+   * 🔴 写入口为什么必须在这里，而不是界面自己拼 payload：
+   *    判定侧（`isScheduledOn` → `computeStreak`）**早就按频次数计划日**了，
+   *    而在本动作存在之前，全仓库没有任何一条路径能把 `frequency` 写进去 ——
+   *    那套口径对界面是不可达的（§7 第 195 条"字段看起来有功能"的形状）。
+   *
+   * ⚠️ 与 `setHabitColor` / `setHabitIcon` 同一条约定：**清除写 `null`，不改是不写这个键**。
+   *    把 `undefined` 直接放进 payload 会让 JSON 序列化把它**整个丢掉**，
+   *    于是"我要退回每天"在磁盘上变成"我什么都没改"。
+   *
+   * 值一律过 `normalizeHabitFrequency`（非法值抛，`interval:1` / 七天全选归一成 `daily`）。
+   */
+  setHabitFrequency(
+    entityId: string,
+    frequency?: HabitFrequency,
+  ): Promise<void>;
 
   /**
    * 改一个习惯的**目标**：数值 / 单位 / 达成口径（三者都可单独改）。
@@ -182,8 +251,8 @@ export interface HabitActions {
   listTrashedHabits(): Habit[];
   /** 从回收站还原习惯。幂等：不在回收站返回 `false`；`purgedAt` 之后**抛错**。 */
   restoreHabit(entityId: string): Promise<boolean>;
-  /** 彻底删除一个习惯：追加 `purgedAt` 标记，不动墓碑、不动打卡记录。 */
-  purgeHabit(entityId: string): Promise<void>;
+  /** 彻底删除一个习惯：追加 `purgedAt` 标记，不动墓碑、不动打卡记录。已经 purge 过返回 `false` 且不重复写 op。 */
+  purgeHabit(entityId: string): Promise<boolean>;
 
 }
 
@@ -229,13 +298,21 @@ export function createHabitActions(
       if (trimmed === '') throw new Error('习惯名称不能为空');
 
       const entityId = makeHabitId();
+      // 🔴 建的时候也要过一遍归一/校验：`setHabitFrequency` 有牙而 `createHabit` 没牙，
+      //    得到的结果是"改的时候拦、建的时候放"，非法值照样能落盘（同一判断写两遍必漂一处）。
+      const { frequency, ...rest } = over;
       await ctx.dispatch({
         entityType: 'HABIT' as EntityType,
         entityId,
         opType: OpType.Create,
         // `target` 默认 1：纯打卡型习惯（有的只要"做过"）。
         // 不写 `target: null` —— 这里的 1 是**默认值**，不是"清除"。
-        payload: { name: trimmed, target: 1, ...over },
+        payload: {
+          name: trimmed,
+          target: 1,
+          ...rest,
+          ...(frequency === undefined ? {} : { frequency: normalizeHabitFrequency(frequency) }),
+        },
       });
       return entityId;
     },
@@ -283,6 +360,21 @@ export function createHabitActions(
         // 清除写 `null`（与 `color` 同一条"用 null 穿过 JSON 表达清除"的约定）：
         // 不写这个键 = 不改，写 `null` = 回到派生的那个。
         payload: { icon: clean ?? null },
+      });
+    },
+
+    async setHabitFrequency(entityId, frequency) {
+      if (habitOf(entityId) === undefined) throw new Error(`找不到习惯「${entityId}」`);
+      // 🔴 校验先于 dispatch：非法值落进盘里之后**没有回头路**（§3.3），
+      //    而 `{everyNDays: 0}` 在 `isScheduledOn` 里是取模除零 ⇒ 恒 false ⇒
+      //    连续天数永远 0，界面上完全看不出哪里不对。
+      const normalized = frequency === undefined ? undefined : normalizeHabitFrequency(frequency);
+      await ctx.dispatch({
+        entityType: 'HABIT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        // 与 `icon` / `color` 同一套：`null` = 清除（判定侧 `isScheduledOn(undefined)` = 每天）。
+        payload: { frequency: normalized ?? null },
       });
     },
 
@@ -445,13 +537,14 @@ export function createHabitActions(
       const raw = ctx.getState().habits[entityId];
       if (raw === undefined) throw new Error(`找不到习惯「${entityId}」`);
       if (raw.deletedAt === undefined) throw new Error(`习惯「${entityId}」不在回收站里`);
-      if (raw.purgedAt !== undefined) return;
+      if (raw.purgedAt !== undefined) return false;
       await ctx.dispatch({
         entityType: 'HABIT' as EntityType,
         entityId,
         opType: OpType.Update,
         payload: { purgedAt: now() },
       });
+      return true;
     },
 
     listTrashedHabits() {

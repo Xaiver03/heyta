@@ -1,6 +1,7 @@
 # 备份侧的定点删除（P-12）：监管要求什么、本仓能做到哪一步
 
-状态：**调研 + 建议，未拍板**（拍板点写在 §6）。起因是批次 E 挂着的一条敞口：
+状态：**调研 + 建议 → B/C 两半已按 [ADR-0055](../adr/0055-account-tombstones-and-restore-gate.md) 落码（10-05 23:3x），
+A 与 §6 的三块板仍未拍**。起因是批次 E 挂着的一条敞口：
 注销在活库里有真硬删除，但**备份里没有"把某一个人单独删掉"的能力**，
 法务文档因此只能写成"随保留期自然过期"（`packages/legal/src/documents/privacy.ts:410`、
 `personal-info-list.ts:522-524`、`data-rights.ts:328`）。
@@ -76,6 +77,18 @@ ADR-0049 已经判过一次：crypto-erase 解决 Art.32、**不解决 Art.17**�
    ⇒ **新备份不再含已注销账号**；整库那份做不到，由 A 的窗口 + C 的恢复闸覆盖。
 3. 判据：造一个含"已注销账号"的旧 accounts 档 → 跑导出 → 数得出该 id **0 次**；
    变异 = 摘掉 `NOT IN` 那一支 ⇒ 必须恰好红一条。
+
+> 🔴 **10-05 23:3x 落地时的现量更正（B.2 那一半没有兑现对象，不做了）**：
+> 硬删发生在**活库**上（`DELETE /account` 删 users 行 + schema 级联），而两份产物都读活库
+> （`backup.sh` 的 `run_pg_dump` 是对容器里的库做的 dump）。⇒ **"新备份不再含已注销账号"是硬删
+> 已有的后果**，不需要行级过滤；`NOT IN` 那一支只对"旧产物"有效，而那一半由 A 的留存窗口
+> + C 的恢复闸覆盖。改成 `COPY` 形状会重做整条恢复路径，换来的是一条已经被活库保证的承诺 ⇒
+> **否决**，理由与后果记在 [ADR-0055](../adr/0055-account-tombstones-and-restore-gate.md) §3。
+> B.1 与 C **已按本文落地**（墓碑表 + CHECK + 同事务写入 + `server/scripts/restore.sh` 的拒绝式闸；
+> 判据在 `server/tests/account-tombstone.pglite.spec.ts`、`restore-script.spec.ts`、
+> `account-deletion-paths.spec.ts`）。B 那一半**实际落成的是**：accounts 产物补上
+> `--table=account_tombstones`，让"只恢复账号面"那条路径带上闸的输入。
+> A 仍然做不了 —— 它要 §6 第 1 块板（`RETENTION_DAYS` 到底是 3 还是 14），数字没定就没有唯一数字源可对账。
 
 **C. 补一条恢复闸（今天根本没有恢复脚本，这是最薄的一环）。**
 在服务端脚本目录里新增一枚恢复脚本（今天那里只有 `server/scripts/backup.sh` 一枚 —— 现量 `ls` 过）：

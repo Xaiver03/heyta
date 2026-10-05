@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * 🔴 批次 E / 工单 E1：**注销账号必须是一个可辨识的信号。**
  *
  * 产品要求是「删除账号一定要彻底销毁」。服务端那半今天就是真删
- * （`api.ts` 的 `DELETE /account` → `prisma.user.delete` → 数据库级联），
+ * （`api.ts` 的 `DELETE /account` → `deleteAccountWithTombstone()` → 一个事务里写墓碑 +
+ * `prisma.user.delete` → 数据库级联；墓碑那半见 ADR-0055），
  * 但对用户而言"彻底销毁"还差另一半：**数据在设备上是一份明文本地库**（本地优先的设计），
  * 服务端删完之后，其它设备一行都不会少。
  *
@@ -28,11 +29,26 @@ const mocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
+  findUniqueOrThrow: vi.fn(),
+  tombstoneUpsert: vi.fn(),
   closeForUser: vi.fn(),
 }));
 
+// `DELETE /account` 走 `deleteAccountWithTombstone(tx, …)`（ADR-0055），它拿的是事务客户端，
+// 所以这里必须把 `$transaction` 做成**跑回调的 runner**而不是空 mock：
+// 空 mock 会让事务体根本不执行，而这条用例照样绿 —— 那正是"注销打掉缓存"这一腿最假的过法。
 vi.mock('../src/db', () => ({
-  prisma: { user: mocks },
+  prisma: {
+    user: mocks,
+    $transaction: (cb: (tx: unknown) => Promise<unknown>) =>
+      cb({
+        user: {
+          findUniqueOrThrow: (...a: unknown[]) => mocks.findUniqueOrThrow(...a),
+          delete: (...a: unknown[]) => mocks.delete(...a),
+        },
+        accountTombstone: { upsert: (...a: unknown[]) => mocks.tombstoneUpsert(...a) },
+      }),
+  },
 }));
 
 vi.mock('../src/sync/services/websocket-connection.service', () => ({
@@ -100,6 +116,8 @@ beforeEach(async () => {
   authCache.clear();
   mocks.update.mockResolvedValue({ id: 1 });
   mocks.delete.mockResolvedValue({ id: 1 });
+  mocks.findUniqueOrThrow.mockResolvedValue({ email: 'someone@example.test' });
+  mocks.tombstoneUpsert.mockResolvedValue({ userId: 1 });
   mocks.findUnique.mockResolvedValue(VERIFIED);
 
   app = Fastify();
