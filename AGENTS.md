@@ -353,12 +353,16 @@ pnpm verify:harmony-rnoh-js     # 鸿蒙 JS 侧全链路（零桩）：真 codeg
                                 #   ⚠️ 只到"编得出包"：不验运行（缺模拟器镜像+签名）
                                 #   需要 Node ≥ 20.12（DevEco 自带的 18 会报 styleText，见 §7 第 59 条）
 
-pnpm check                      # 全部门禁 + **全量单元测试**：类型 + 迁移 + 分层 + 界面文案 + 许可证 + 文档 + 设计变量 + iOS 原生依赖 + `pnpm -r test`
+pnpm check                      # 全部门禁 + **全量单元测试**：类型 + 迁移 + 分层 + 界面文案（含占位符对账）+ 许可证 + 文档 + 设计变量 + iOS 原生依赖 + `pnpm -r test`
                                 # 🔴 末尾的 `pnpm -r test` 是后补的：在此之前 `check` **不跑任何单元测试**，
                                 #    于是 `apps/web` 的测试套件红了很久都没有任何东西会失败（原因见下）。
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）
+pnpm check:i18n-vars            # 界面文案的**占位符对账**：t('key') 取了带 {placeholder} 的词条必须填参数
+                                #   它挡的是另一类界面说谎 —— 构建绿、类型绿、check:ui-language 绿，
+                                #   用户看到字面花括号。最重的一档是同意句里被批准的对象不见了。
+                                #   🔴 读的是 packages/i18n/dist：改完词条要 build（§7 第 79 条）
 pnpm check:tokens               # 原生 token 产物（Swift/ArkTS/JSON/RN）是否与 tokens.css 同步
 pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets 产物
 pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podfile.lock，见 §7 第 32 条）
