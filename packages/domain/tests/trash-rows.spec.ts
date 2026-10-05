@@ -241,6 +241,26 @@ describe('W4 四路合并：清单与习惯也是回收站里的一行', () => {
     expect(toTrashItems({ projects: [project('p-1', '没删过')] })).toEqual([]);
     expect(toTrashItems({ habits: [habit('h-1', '没删过')] })).toEqual([]);
   });
+
+  it('🔴 I3 的行级那一半：归档不是删除 —— 只归档的清单没有行，归档又被删的仍有一行', () => {
+    // 计划 §4 的 I3「归档不许借用 `deletedAt`」在这一层有两种坏法，症状都不是报错：
+    //   ① 把 `archived` 也当成"在回收站里" ⇒ 用户只是**收起**一条清单，回收站里
+    //      就凭空多出一行"已删除"，而他从没删过它；
+    //   ② 反过来把归档项从回收站里排除 ⇒ 删掉一条归档过的清单后**回收站里查不到它**，
+    //      而还原与彻底删除的入口只认回收站那一行 —— 那条清单连同里面的任务
+    //      没有任何一处界面能再碰到（`packages/app-host/src/project-actions.ts`
+    //      的 `listArchivedProjects()` 只列活体，也不显示它）。
+    const items = toTrashItems({
+      projects: [
+        project('p-archived-only', '只是收起来', { archived: true }),
+        project('p-archived-deleted', '收起来又删掉', { archived: true, deletedAt: T0 - 7 }),
+      ],
+    });
+
+    expect(items.map((i) => [i.id, i.kind])).toEqual([['p-archived-deleted', 'PROJECT']]);
+    // 正向对照：这一行确实出得来（只断"没有那一行"的话，"整条 projects 路没接上"也能过）。
+    expect(items).toHaveLength(1);
+  });
 });
 
 describe('liveTaskCountOfProject（确认框那句「里面还有 N 条任务」）', () => {
