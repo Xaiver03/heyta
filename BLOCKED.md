@@ -5355,3 +5355,12 @@ tip 是自己 10 秒前造的那笔 —— `git reset --soft HEAD~1` + `git rest
 
 **④ 边界（别读多）**：本线这一轮**没有**写册子、**没有**动 `package.json`、**没有** fetch、**没有**建分支、**没有**跑任何设备/浏览器验收；
 ②③ 全是只读现量 + 一枚随即删除的隔离检出。本条只登记，不替 §5 那格定收号方案。
+
+> ➕ **同轮补一枚读数，它把"等谁"这个问题本身改掉了**：`git branch -a --contains origin/main` ⇒
+> 只有 `remotes/origin/main` 与 `remotes/origin/HEAD` 两行 —— **本地没有任何分支含远端那批提交**，
+> 所以"把远端收进 main、顺手收 279–283 那段号"这件事**此刻不在任何人的进行中**，不是一条已经在跑的合并。
+> 顺带两条对照：`merge/20261005` 的末笔 `564ad047` 只有一个父（名叫 merge 但还不是合并提交）、且它是 `origin/main` 的**祖先**（里面 traps 末号/条数 283/292 与远端逐字同数）；
+> 那台合并载体 `/private/tmp/heyta-merge-carrier` 的 `b673a301` 合的是 `feat/self-host-distribution`，里面末号/条数 **278/288** ⇒ 没带进远端那批。
+> ⇒ 上面 ② 那句"谁执行合并谁定收号规则"要读成：**这是一枚没人认领的仓库级动作**（在主检出带着 49 行别人的未提交去 merge，被 AGENTS §8.9 明文挡着）。
+> 复跑四句：`git branch -a --contains origin/main`；`git log -1 --format='%h %p' merge/20261005`；
+> `git merge-base --is-ancestor merge/20261005 origin/main`；`git show origin/main:docs/reference/environment-traps.md | grep -oE '^[0-9]+\. ' | tr -d '. ' | sort -n | tail -1`。
