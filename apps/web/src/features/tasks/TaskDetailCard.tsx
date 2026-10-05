@@ -16,15 +16,18 @@
  *
  * 🔴 所以本文件遵守的不变量是：**每个字段任何时刻只有一个编辑器所有者**。
  * 已搬进来的是**备注**（`NoteField`，§8.138）、**重复**（`RepeatField`，§8.141）、
- * **子任务**（`SubtaskField`，§8.144）与**提醒**（`ReminderField`，§8.145）：
+ * **子任务**（`SubtaskField`，§8.144）、**提醒**（`ReminderField`，§8.145）与
+ * **截止**（`DueField`，§8.146）：
  * 每一单的同一笔提交里都要把行尾那半撤掉（`App.tsx` 的 `taskPaneInColumn` 反向条件），
  * 所以不存在"同一字段两处可编辑"的那个中间态；列表侧留下的分别是**只读徽标** `NoteBadge`、
  * **只读徽标** `RepeatChip`、**只读徽标** `SubtaskBadge` 与**只读徽标** `ReminderBadge`（"扫一眼要能看出哪条任务写过 /
  * 是重复的 / 挂在谁下面 / 挂了几条提醒"这一档不因为搬进栏里就丢掉）。
- * ⚠️ 这一条是**分阶段**的，不是"这一单顺手做完"：其余字段（清单标签 / 截止 / AI）
+ * ⚠️ 这一条是**分阶段**的，不是"这一单顺手做完"：其余字段（清单标签 / AI）
  * 仍住在行尾，登记成后续单，每一单都要重做"搬进来 + 行里撤掉"这两半，不许只搬一半。
- * 🔴 截止那一栏特别注明：`check:row-single-source` 的断言 A 要求"复选框 + 标题 + 截止"三种信号
- * 同时出现在任务行里，所以截止的**显示**必须留在行上，能搬的只有它的**编辑入口**。
+ * 🔴 截止那一格特别记一笔：`check:row-single-source` 的断言 A 要求"复选框 + 标题 + 截止"三种信号
+ * 同时出现在任务行里，所以截止的**显示**必须留在行上 —— 这一条**不是靠本文件满足的**：
+ * 行上的显示早就在共享元信息条里（`task-meta` → `TaskBadges.due`），而原先行尾那颗触发器
+ * 是它的**第二份**显示，所以这一格搬走时不留徽标（现量与理由在 `DueEditor.tsx` 文件头）。
  *
  * ⚠️ 为什么这里**没有**未选中时的空态句子：沿用便签那一格的先例（§8.130 —— 未选中时那一格
  * 什么都不放）。习惯那一格放一句"选一条习惯…"是因为那块板子必须始终挂载
@@ -41,6 +44,7 @@ import { text } from '../../lib/text.js';
 import { NoteField } from './NoteEditor.js';
 import { RepeatField } from './TaskRepeat.js';
 import { SubtaskField } from './SubtaskPicker.js';
+import { DueField } from './DueEditor.js';
 import { ReminderField } from '../reminders/ReminderPanel.js';
 import { useTaskStore } from './store.js';
 
@@ -148,6 +152,27 @@ export function TaskDetailCard(): React.JSX.Element | null {
         now={store.now}
         onSetRepeat={(rule) => {
           void store.setRepeat(task.id, rule);
+        }}
+      />
+
+      {/*
+        截止（§8.146）。区块头复用行尾那颗触发器已经在说的 `web.due.trigger`（「截止」）——
+        两处问的是同一件事，另起一条词条迟早漂成两种说法。
+        这一格里**没有** `<details>`、也**没有** Portal 与 `.ht-material`：那三件都是
+        "行尾那一支在哪儿画"的细节（与 §8.141 的 R4、§8.144 的 S4、§8.145 的 M4/M5 同一条纪律），
+        栏里要的只是编辑本体。这一格也**不放只读徽标**：截止的显示在共享行的元信息条上
+        （`task-meta`），两档都在，理由见 `DueEditor.tsx` 文件头那张表的第三行。
+        🔴 `key={task.id}`：`DatePicker` 带**本地 state**（"正在看哪个月"），↑↓ 换选中时
+        不换 key 会把上一条浏览到的月份带过来 —— 与 §8.145 那一格（零 useState ⇒ 不挂 key）
+        正好是那条纪律的两面。
+      */}
+      <h3 style={blockLabelStyle}>{t('web.due.trigger')}</h3>
+      <DueField
+        key={`due-${task.id}`}
+        task={task}
+        now={store.now}
+        onSetDueDate={(due) => {
+          void store.setDueDate(task.id, due);
         }}
       />
 

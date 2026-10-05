@@ -598,4 +598,151 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await page.screenshot({ path: SHOT('t11-narrow-reminder-falls-back-to-row') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
+  test('T12 宽档：截止的编辑本体在栏里那一格，行尾整块不画（§8.146）', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTaskAndRelease(page, '截止甲');
+
+    await rowOf(page, '截止甲').click();
+    const pane = paneInColumn(page);
+    await expect(pane, '栏里没画面单').toHaveCount(1);
+
+    // 🔴 整页只有一份月历，且它在栏里。只量"栏里有"会把"两处都能编辑"读成对。
+    // ⚠️ 不用 `toBeContainedIn`：这台套件的**类型**里有那枚匹配器、**跑起来的这份**没有
+    //    （`TypeError: expect(...).toBeContainedIn is not a function`，而 `tsc -p
+    //    tsconfig.detail-pane.json` 整份 RC=0）。两枚计数合起来就是同一条 containment，
+    //    与 T10 数提醒列表那一支同一个形状。
+    const picker = page.getByTestId('date-picker');
+    await expect(picker, '月历不止一份 ⇒ 截止两处可编辑').toHaveCount(1);
+    await expect(pane.locator('[data-testid="date-picker"]'), '栏里没有那份月历').toHaveCount(1);
+    // 这一格**要**宿主给区块头（与提醒那一格相反：`ReminderList` 自带，共享 `DatePicker` 不带）。
+    await expect(pane.getByText('截止', { exact: true }), '「截止」区块头不止一处，或整个没有').toHaveCount(1);
+
+    // 这一格与前四格**不同形**：宽档行尾不留徽标，整块不画。
+    // 截止的显示另有其人（共享行的元信息条 `task-meta`），下面第 ③ 段量的就是它。
+    await expect(
+      page.locator('[data-testid="due-editor-summary"]'),
+      '栏里画着的时候行尾还挂着 `<DueEditor/>` ⇒ 截止两处可编辑',
+    ).toHaveCount(0);
+
+    /* ② 🔴 几何：22rem 的一栏里，7 列 × 44px 的日格**不许伸出月历**。
+       这条不是"排版好看"：日格内层是固定 44px 的圆（`DatePicker` 文件头那条坑 2），
+       外层 `flex: 1` 会被压窄，而**固定尺寸的圆压不窄** —— 一旦栏的可用宽度小于 7×44，
+       最右那一列就画到栏外，被 `.ht-app__detail` 的 `overflow-y: auto` 裁掉，
+       症状是"周六周日那两列根本点不到"。量的是每个日格的右沿，不是月历自己的框
+       （月历的框永远等于容器，看不出溢出）。 */
+    const overflow = await picker.evaluate((el) => {
+      const host = el.getBoundingClientRect();
+      return [...el.querySelectorAll<HTMLElement>('[role="button"]')]
+        .map((b) => ({ name: b.getAttribute('aria-label') ?? '?', right: b.getBoundingClientRect().right }))
+        .filter((c) => c.right > host.right + 1)
+        .map((c) => `${c.name}@right=${String(Math.round(c.right))} > 月历右沿 ${String(Math.round(host.right))}`);
+    });
+    expect(overflow, '这些日子格伸出月历右边界 ⇒ 那一栏放不下整张月历').toEqual([]);
+    const paneBox = await paintedBox(page, pane);
+    const pickBox = await paintedBox(page, picker);
+    expect(
+      pickBox.x + pickBox.width,
+      `月历伸出栏的右边界（月历 ${String(Math.round(pickBox.x + pickBox.width))} vs 栏 ${String(Math.round(paneBox.x + paneBox.width))}）`,
+    ).toBeLessThanOrEqual(paneBox.x + paneBox.width + 1);
+
+    /* ③ 承重：在栏里点一格 ⇒ **行上仍写着那个日期**。
+       这一条是工单 §8.141 第 5 节那条硬约束的现量口径（"截止的显示必须留在行上"）：
+       搬走编辑入口之后，行上的显示由共享元信息条 `task-meta` 承担，而不是由行尾那颗
+       触发器承担（它今天整块不画）。少了这一段，"搬完了"只证明了我没写坏控件，
+       证明不了列表还能扫一眼看出哪天截止。 */
+    const cell = picker.locator('[role="button"][aria-label$="18日"]').first();
+    await expect(cell, '月历里应有某月 18 日这格').toBeVisible();
+    const dayLabel = (await cell.getAttribute('aria-label'))!;
+    const md = /(\d+)月(\d+)日/.exec(dayLabel)!;
+    const compact = `${md[1]!.padStart(2, '0')}-${md[2]!.padStart(2, '0')}`;
+    await cell.click();
+    const meta = rowOf(page, '截止甲').getByTestId('task-meta');
+    await expect(meta, `栏里点了 ${dayLabel} 而行上没写着 ${compact}`).toContainText(compact);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('t12-due-field-in-column') });
+
+    /* 🔴 换选中 ⇒ 栏里那个月历**不许停在上一条浏览到的那个月**。
+       这一段是 `DueField` 那枚 `key` 的牙：共享 `DatePicker` 带本地 state（"正在看哪个月"），
+       不换 key 时甲翻到 11 月、选中换到乙，栏里显示的仍是 11 月 —— 而标题已经换了，
+       界面在说"这是乙"，日历指着的是甲看的那个月。jsdom 那层同一条坏由
+       `apps/web/tests/task-detail-card.spec.tsx` 的"上一条浏览到的那个月"钉，
+       但 jsdom 里没有真布局，**翻月这个动作在界面上到不到**只有浏览器知道。 */
+    await addTaskAndRelease(page, '截止乙·不选日期');
+    await picker.getByRole('button', { name: '下个月' }).click();
+    await expect(
+      picker.locator(`[role="button"][aria-label="${dayLabel}"]`),
+      '翻月没生效：本月 18 日还在格子里',
+    ).toHaveCount(0);
+    await rowOf(page, '截止乙·不选日期').click();
+    await expect(
+      pane.locator(`[role="button"][aria-label="${dayLabel}"]`),
+      '换选中后栏里还停在上一条浏览到的那个月 ⇒ `DueField` 少了 key',
+    ).toHaveCount(1);
+    // 换回甲（它自己定在 `dayLabel` 那个月）⇒ 月历落在它自己那个月，不是上一条看的那个月。
+    await rowOf(page, '截止甲').click();
+    await expect(
+      pane.locator(`[role="button"][aria-label="${dayLabel}"]`),
+      '换回甲之后月历没落在它自己那个月',
+    ).toHaveCount(1);
+
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await expect(
+      rowOf(page, '截止甲').getByTestId('task-meta'),
+      '那次点击没落成 op（刷新后行上读不到日期）',
+    ).toContainText(compact);
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
+
+  test('T13 窄档：那一栏整个不在，截止的编辑入口回到行尾那颗 chip', async ({ page }) => {
+    const errors = watchErrors(page);
+    // 900×600 与 T7/T9 同档（宽 < 1024 ⇒ 栏不画）。这里不需要 T11 那 900 高的理由：
+    // 截止的面板是 Portal + fixed，本来就画在滚动容器之外。
+    await page.setViewportSize({ width: 900, height: 600 });
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTaskAndRelease(page, '窄档截止乙');
+
+    await expect(paneEverywhere(page), '窄档不该画面单').toHaveCount(0);
+    /* 🔴 定位走**行内**那颗 summary（它带 `aria-label` = 「设置任务「…」的截止日期」），
+       与 T9/T11 同一条理由：尾部动作是行体的兄弟节点，而 Portal 出去的面板会把
+       **别的**日子写进 DOM。 */
+    const summary = page.getByLabel('设置任务「窄档截止乙」的截止日期');
+    await expect(summary, '窄档下行尾没有截止入口 ⇒ "改不了截止"').toHaveCount(1);
+    const box = await paintedBox(page, summary.first());
+    expect(box.width, '窄档那颗行尾触发器被挤成 0 宽').toBeGreaterThan(40);
+
+    await summary.first().click();
+    const picker = page.locator('[data-testid="date-picker"]:visible');
+    await expect(picker, '点了行尾那颗触发器而面板没开').toBeVisible();
+    const cell = picker.locator('[role="button"][aria-label$="18日"]').first();
+    await expect(cell, '窄档面板里应有某月 18 日这格').toBeVisible();
+    const dayLabel = (await cell.getAttribute('aria-label'))!;
+    const md = /(\d+)月(\d+)日/.exec(dayLabel)!;
+    const compact = `${md[1]!.padStart(2, '0')}-${md[2]!.padStart(2, '0')}`;
+    await cell.click();
+    await expect(
+      rowOf(page, '窄档截止乙').getByTestId('task-meta'),
+      `窄档点了 ${dayLabel} 而行上没写着 ${compact}`,
+    ).toContainText(compact);
+    /* 🔴 拍之前把那一行**滚进视野中间**：这一趟的行尾面板刚收起，行落在视口下沿，
+       第一张图里那一行只有上半截（读得出「截止 10月18日」，但行体被切了一半）。
+       不用 `scrollIntoViewIfNeeded()` —— 它只在"完全看不见"时才滚，露出半个什么都不做
+       （T11 同一条）。 */
+    await rowOf(page, '窄档截止乙').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await page.screenshot({ path: SHOT('t13-narrow-due-falls-back-to-row') });
+
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await expect(
+      page.getByLabel('设置任务「窄档截止乙」的截止日期'),
+      '窄档那次点击没落成（刷新后行尾触发器上没写日期）',
+    ).toContainText(dayLabel);
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
 });

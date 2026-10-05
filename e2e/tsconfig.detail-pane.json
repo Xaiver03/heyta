@@ -26,7 +26,7 @@
     "noEmit": true,
     "strict": true,
     "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "skipLibCheck": true
@@ -38,6 +38,7 @@
     "tests/detail-pane-collapse.spec.ts",
     "tests/detail-pane-note-editor.spec.ts",
     "tests/detail-pane-habit.spec.ts",
+    "tests/detail-pane-task.spec.ts",
     "tests/focus-detail-pane.spec.ts",
     "tests/keyboard-cursor.spec.ts"
   ]
