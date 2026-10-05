@@ -71,7 +71,7 @@
 import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AppHost, HabitActions } from '@heyta/app-host';
 import { createHabitActions, habitGrowth } from '@heyta/app-host';
-import type { CategorySlot, Habit, HabitGoalType, HabitLog } from '@heyta/domain';
+import type { CategorySlot, Habit, HabitGoalType, HabitIcon, HabitLog } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { HabitBoard, HabitProgressList } from '@heyta/ui';
 
@@ -82,6 +82,7 @@ import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { Button, Card, EmptyState, Screen, Text, TextField } from '../ui/kit';
 import { HabitGoalSlot } from '../ui/habit-goal-slot';
+import { HabitIconSlot } from '../ui/habit-icon-slot';
 import { HabitColorSlot } from '../ui/slot-picker';
 
 export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
@@ -248,6 +249,23 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     [actions, runFor],
   );
 
+  /**
+   * 选图标（工单 H3）。与 `chooseColor` 同一条通路：一次意图 = 一条 op，
+   * 交给 `runFor` 置灰那一条防连点。
+   *
+   * 🔴 `undefined` **不是"清掉图标"**，是"回到按 id 派生的那个"（`HabitIconSlot`
+   *    里「默认」那一格说的就是这个）。动作层把它写成 `null`：
+   *    不写这个键 = 不改，写 `null` = 退回派生 —— 与 `color` 同一条约定。
+   *    闭集之外的值由 `parseHabitIcon` 在动作层**抛**，界面不自己判。
+   */
+  const chooseIcon = useCallback(
+    (habit: Habit, icon: HabitIcon | undefined): void => {
+      if (!actions) return;
+      runFor(habit.id, actions.setHabitIcon(habit.id, icon));
+    },
+    [actions, runFor],
+  );
+
   const setHabitGoal = useCallback(
     (habit: Habit, goal: { target?: number; unit?: string; goalType?: HabitGoalType }) => {
       if (!actions) return Promise.resolve();
@@ -391,6 +409,16 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
             />
           </Card>
         ) : null}
+        {/*
+          图标选择器（工单 H3）住在这里，不是 `HabitBoard` 的又一个插槽：
+          共享层再加一条可选 `renderIconSlot` 会把"宿主没接"伪装成"做完了"
+          （§7 第 195 条那个形状 —— typecheck 与既有门禁全绿），而这一格只有移动端要。
+          放在标题区之下、热力图之上，与 web 的"标题行右边那颗"是同一个读法：
+          它是**这条习惯**的属性，不是这一屏的工具。
+        */}
+        <Card>
+          <HabitIconSlot habit={selected} onChoose={(icon) => chooseIcon(selected, icon)} />
+        </Card>
         <HabitBoard
           habits={[selected]}
           logs={logs}

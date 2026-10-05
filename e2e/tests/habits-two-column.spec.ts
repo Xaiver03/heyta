@@ -34,7 +34,7 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { addHabit, openApp, switchView } from './helpers';
+import { addHabit, boxOf, openApp, switchView } from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 
@@ -70,13 +70,6 @@ async function listTrackCount(page: Page): Promise<number> {
     .locator('.ht-habit__list')
     .evaluate((el) => getComputedStyle(el).gridTemplateColumns);
   return value.split(' ').filter(Boolean).length;
-}
-
-async function boxOf(page: Page, locator: Locator, what: string) {
-  await expect(locator, `界面上找不到${what}`).toBeVisible();
-  const box = await locator.boundingBox();
-  expect(box, `${what}"可见"却量不到 boundingBox`).not.toBeNull();
-  return box as { x: number; y: number; width: number; height: number };
 }
 
 /** 把某个 CSS 变量的**实际像素值**量出来（阈值从被约束的常量推导，不抄字面量）。 */
