@@ -48,7 +48,7 @@ interface Harness {
 
 function makeHarness(
   handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
-  opts: { password?: string | undefined; ops?: Operation<string>[]; appVersion?: string } = {},
+  opts: { password?: string | undefined; ops?: Operation<string>[] } = {},
 ): Harness {
   const uploads: Harness['uploads'] = [];
   const downloads: string[] = [];
@@ -70,7 +70,6 @@ function makeHarness(
   const client = new SyncClient({
     baseUrl: BASE,
     clientId: 'device-a',
-    appVersion: opts.appVersion,
     getToken: async () => 'test-token',
     getPassword: async () => ('password' in opts ? opts.password : PASSWORD),
     getLastServerSeq: async () => cursor.value,
@@ -539,22 +538,6 @@ describe('同步客户端 — 上传与游标', () => {
     expect(h.downloads).toHaveLength(1);
     expect(h.downloads[0]).toContain('excludeClient=device-a');
     expect(h.downloads[0]).toContain('sinceSeq=0');
-  });
-
-  it('下载请求带上宿主给的 appVersion；宿主没给时**一个字都不发**（沉默 ≠ 占位值）', async () => {
-    const withVersion = makeHarness(() => okJson({ ops: [], hasMore: false, latestSeq: 0 }), {
-      appVersion: '0.4.0',
-    });
-    await withVersion.client.sync();
-    expect(withVersion.downloads).toHaveLength(1);
-    expect(withVersion.downloads[0]).toContain('appVersion=0.4.0');
-
-    const without = makeHarness(() => okJson({ ops: [], hasMore: false, latestSeq: 0 }));
-    await without.client.sync();
-    expect(without.downloads[0]).not.toContain('appVersion=');
-    // 缺省不等于"上报了 0.0.0"：服务端把两者算同一档（都判 old），但运营面那份
-    // 设备清单里 `undefined` 是诚实的空，`0.0.0` 是一个假版本。
-    expect(without.downloads[0]).not.toContain('appVersion=undefined');
   });
 });
 

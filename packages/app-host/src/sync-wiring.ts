@@ -58,13 +58,6 @@ import {
 } from '@heyta/sync-client';
 
 export interface SyncWiringOptions {
-  /**
-   * 本外壳的裸 semver，透给 `SyncClient` 让它随下载段上报 `appVersion`。
-   * **由宿主给**（只有 `apps/*` 知道自己属于哪个发行版）；没有真值时传 `undefined`，
-   * 不要传 `0.0.0` 之类的占位 —— 服务端把"缺省"和"低于 cut"算同一档（都判 old），
-   * 所以沉默不改任何行为，而占位值会把假版本写进运营面那份设备清单。
-   */
-  appVersion?: string;
   /** op-log 引擎。待上传队列、重新派发、应用远端都从它派生。 */
   engine: OpLogEngine;
   /**
@@ -101,7 +94,6 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
   return new SyncClient({
     baseUrl: options.baseUrl,
     clientId: engine.getClientId(),
-    appVersion: options.appVersion,
     getToken: options.getToken,
     getPassword: options.getPassword,
     // 游标走 OpLogStore 接口，不碰 adapter：键名与事务语义只由存储层决定。

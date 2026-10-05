@@ -13777,3 +13777,52 @@ terms 仍是 1.1），**它不给答案，只复现前提**。判这类"版本�
 ⇒ **仍缺的两步，都要人**：① 版本号真源在哪（`git tag`／构建参数／正式 bump，是一次发布政策决定，不是顺手改）；
 ② 有真源之后各宿主填进去、并**重跑那两腿拿到运行读数**。登记为 G-44b。
 对外承诺那一侧（#38 那三条版本耦合前置）不受影响：本步没让任何一句对外话变成真的或假的。
+
+### 8.258 我上一轮那笔 appVersion 生产者被**本仓已有的一道对外承诺闸门**当场判红，所以我把它退了 —— 而这正是 G-44 字面项真正缺的东西（2026-10-05 20:5x）
+
+`b467e758` 落地后我去核"有没有对外话在承诺这件还没发生的事"，命中的不是文档而是**门禁**：
+
+`server/tests/version-coupling.spec.ts:210-222`（C3）钉的就是 `server/README.md`
+「Clients and version coupling」那串否定 —— 其中一句是**"没有 heyta 客户端发 `appVersion`"**：
+
+```
+:218  fail('C3', `sync-client 里出现 appVersion：${senders.join(', ')} ⇒ README 那句"没有 heyta 客户端发它"过期了`)
+:381  label: 'C3 客户端开始发 appVersion'          ← 同一趟里的变异臂
+:388  注入的形状是 url.searchParams.set('appVersion', '0.0.0')
+:392  probe: read(CLIENT_REL) toContain("searchParams.set('appVersion'")
+```
+
+⇒ 我的改动**逐字命中了它预先备好的那一款**。这道门不是装饰：它在 `server` 的 `vitest run` 里，
+`pnpm -r test` 每次跑 ⇒ `pnpm check` 会红 ⇒ 会在**落地那一刻**以退 4 挡下来，要人逐段归属。
+那正是"分支带着与自己对外文档相矛盾的代码走到 main"那一发。
+
+退回去（只 `git checkout` 我自己那三枚文件路径，动别人文件的都不是这条路）：
+
+```
+git checkout b467e758~1 -- packages/sync-client/src/client.ts \
+                         packages/sync-client/tests/sync.spec.ts \
+                         packages/app-host/src/sync-wiring.ts
+grep -c appVersion 三枚文件 ⇒ 0 0 0        # 生产者确实不在码里了
+pnpm --filter @heyta/sync-client build ⇒ REBUILD=0   # dist 跟着退，别留旧 d.ts 给 app-host
+```
+
+### 这一退把 §8.257 那句"字面项已补到机制层"改正为：**字面项的做法现在是有规格的，且被门禁钉住**
+
+G-44 要做完，同一次改动里必须**一起**动这四样，缺一即红（这比"写个生产者"准确得多）：
+
+| 动哪样 | 为什么必须同时 |
+|---|---|
+| `server/README.md` 那句"没有 heyta 客户端发它" | 改了码不改它，README 立刻变对外错话 —— 本批主题就是停这种话 |
+| `version-coupling.spec.ts` 的 **C3**（不发 + 查询串只有那三个键） | 它是那句文档的机器对应物 |
+| C3 自己的**变异臂**（:381-392 那一款） | 判据换了事实，牙要跟着换：新的 C3 仍必须"客户端一开始发就红"能被打出来 |
+| 版本号真源（#64） | 没有真源就只能发 `0.0.0`，那是把假版本写进 `admin.routes.ts:340/394` 那张设备清单 |
+
+另外两条**上一轮的判断里要留的**（它们不因回退而失效）：
+① 闸门是纯结构比较，上报真版本**不会**放开任何裁历史的口子 —— §8.17 那半条担心可以卸掉；
+② 但 `checkpoint-gate.ts` 文件头那句 "every release that reports one is newer than the cut"
+在本叉里是**前提**，heyta 一发 `0.x` 就把它否证了 ⇒ 补生产者那一步还得连这段注释一起改。
+
+⚠️ 一条运行读数欠账，我不把它读成通过：C3 的红是我**读源码**判出来的（`server/tests` 归别人在跑的
+vitest，本机内存闸门当时被 `pid=88878` 占着 ⇒ 我没跑 `pnpm -r test`，也没用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕）。
+所以"回退后 C3 恢复绿"目前是**静态成立**（三枚文件里 `appVersion` 计数 0），不是实跑读数；
+它归到 #50 那一趟（落地后同一把尺复跑）里一起取。
