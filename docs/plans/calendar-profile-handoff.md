@@ -1629,12 +1629,50 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   ⑤ **仍未闭合（逐条带归属与可复跑命令）**：
   B —— 还是 §5 那行：远端打包机 `node_modules` 落后，`ssh windows-pc "cd /d C:\src\heyta && pnpm install --frozen-lockfile"`，
   **等远端空闲**（六秒 CPU 差分命令在那行里），看守 `RUN=1 bash research/tools/b-window-keeper.sh` 未重挂；
-  证据门**没有自动消费者** —— 它现在 rc=0，所以可以接进 `pnpm check` 了（下一批第一件，前置条件已满足）；
+  ~~证据门**没有自动消费者** —— 它现在 rc=0，所以可以接进 `pnpm check` 了（下一批第一件，前置条件已满足）~~
+  🔴 **这句在 (37) 里被实测否证**：本机 rc=0 不等于"可以进链"，因为链的另一个消费者是 CI，
+  而 CI 是浅克隆 ⇒ 这道门在那里 27 枚全红。接链的前置改成了"给 `ci.yml` 加 `fetch-depth: 0`"，**要人拍板**。
   锚点覆盖面不齐 —— `calendar-year` / `calendar-view-options` / `calendar-day` 的 R16 那三枚仍钉 `39032107`
   且路径集里**没有 `packages/design-system/src/tokens.css`** ⇒ 主题 token 换值不会让它们红（`calendar-day-time` 这一轮已补宽）。
   现量：`grep -c tokens.css apps/web/evidence/*/README.md`。本轮不补，因为补就要重拍重看那三批图，那是下一批的活。
 
+- (37) **10-05 10:3x：试着把证据门接进 `pnpm check`，被一个实测出来的载体事实挡住 —— CI 是浅克隆，这道门在 CI 里会 27 枚全红。**
+
+  ① (36) ⑤ 说"前置条件已满足，可以接"，**那句是错的**，而且错得值得记：我只验了本机 rc=0 就主张"可以进链"，
+  没有问过**链的另一个消费者是谁**。`pnpm check` 不只由人跑 —— `.github/workflows/ci.yml:101` 就在跑它，
+  而它的 checkout 是 `actions/checkout@v7` **不带 `fetch-depth`**（现量 `grep -n 'fetch-depth' .github/workflows/*.yml`
+  ⇒ 只有 `heyta-server-image.yml:122` 有 `fetch-depth: 0`）⇒ CI 拿到的是 depth=1 的浅克隆。
+
+  ② **这不是推理，是端到端量出来的**（在 `/tmp` 造了一份和 CI 同形状的浅克隆，把当前脚本拷进去跑）：
+  `git rev-parse --is-shallow-repository` ⇒ `true`；三枚被钉的提交 `73ad62a3` / `39032107` / `1e5dd492`
+  全部 `cat-file -e` **ABSENT**；`--all` ⇒ **`PINUNKNOWN` 27 枚、`dirs_with_broken_pin=8`、rc=1**。
+  也就是说接进去之后，**CI 每一次都红，而红的原因跟任何人的改动都无关** —— 那正是本仓库最恨的那类判据
+  （"一条永远红的常驻判据会把人训练成忽略它"）。
+  ⚠️ 更要紧的是这条**一般形状**：`UIPIN` 这类**代码锚点判据天生要求完整历史**，
+  所以"能不能进 CI 链"取决于**载体的 clone 深度**，不取决于本机跑不跑得过。
+  以后任何按提交号判据的门禁要进链，先问这一句。
+
+  ③ **处置**：链里那一段**摘掉了**（不是留着红、也不是把判据降级）。摘的方式是被并行会话逼出来的：
+  我插的两处里，定义那一处用 Edit 撤掉后，`git diff` 显示 `package.json` 里**同时有别人的改动**
+  （`check:ios-ax-shim` 一行 + 链里一段），所以不能整文件回退。
+  ⇒ 链里那段改成**按唯一针脚删**：`python3` 里 `assert s.count('pnpm check:evidence-md5 && ') == 1` 再 replace，
+  命中数不是 1 就拒绝改写。复验现量：`grep -c evidence package.json` = **0**、
+  `git diff --word-diff` 只剩 `check:ios-ax-shim` 两处、链 **86 段可解析**且含他们那一段。
+  🔴 **没有提交 `package.json`** —— 那两处改动是别人的，提交权不在本线。
+
+  ④ 顺手把**诊断**做进装置（不改退出码、不降级）：`cat-file` 失败时若这棵树是浅克隆，
+  `PINUNKNOWN` 那行会多印一句 `⚠️ 这棵树是浅克隆 ⇒ 是**载体判不了**，不是锚点写错：先给 CI 的 checkout 加 fetch-depth: 0。`
+  判据仍然红（浅克隆不是免判通行证）。现量：本机 `--all` **rc=0**、`--selftest` **11 臂 rc=0**；
+  浅克隆里那句话**确实印出来了**（上面 ② 那一趟）。
+
+  ⑤ **下一批要拍的是一句话，不是代码**：给 `ci.yml` 的 checkout 加 `fetch-depth: 0`，代价是 CI 每次多拉完整历史
+  （本机 `.git` 现量 **614M**）。拍完就把这两处接回去（定义 + 链里 `pnpm check:md-tables &&` 之后），
+  接回去的阳性判据已经有了：`node scripts/check-gate-wiring.mjs --pkg <摘掉那一段的候选 package.json>` ⇒ **rc=1**、
+  原文 `🔴 check:evidence-md5: 定义还在，但不在这次的 check 链里`。
+  🔴 归属：**改 CI 配置要用户点头**，本线不擅自动共享流水线。
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
+
 
 
 **G0. 调休标记（休/班）只画在月档，年档那 12 张月格里一颗都没有，而文档里没有"刻意不做"的登记。**
