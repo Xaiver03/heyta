@@ -7,7 +7,11 @@ import { openApp } from './helpers';
  *
  * 覆盖 P1 落地的五个悬浮功能层：
  *   搜索浮层（chrome 档，共享层 tint + 宿主 blur）
- *   账号菜单 / 通知面板 / 任务「整理」下拉 / 任务「重复」下拉（panel 档）
+ *   账号菜单 / 通知面板 / 任务「整理」下拉 / 任务「提醒」下拉（panel 档）
+ *
+ * ⚠️ 第五枚原本是「重复」下拉：§8.141 之后宽档行尾不再渲染它（编辑本体进了栏里那一格，
+ *   行尾只剩只读徽标）。替补的选取口径写在 `SURFACES` 最后一项的注释里 ——
+ *   **要用 ADR-0042 §3 名单上的面**，不是"长得像的另一枚下拉"。
  *
  * 每个面 × 三个状态各截一张（固定路径，人必须看，AGENTS §6.2 规定一）：
  *   light / dark / reduced-transparency（系统"减少透明度"）
@@ -87,13 +91,31 @@ const SURFACES: Surface[] = [
     },
   },
   {
-    name: 'repeat-dropdown',
+    // 🔴 这一腿原本是 `repeat-dropdown`：工单 §8.141 把「重复」的编辑本体搬进栏里那一格之后，
+    //   宽档（本套件的 1440×900，详情列在画）行尾只剩只读徽标、`<summary>` 不再渲染 ⇒ 那一腿
+    //   会点在不存在的选择器上。
+    //
+    // ⚠️ 替补**不是**随手挑的：第一版换成了「截止」那一枚，跑出来 `bgAlpha=1` 直接红 ——
+    //   因为 `DueEditor` 的两副身体都带内联 `backgroundColor: color.surface`（实色），
+    //   而 ADR-0042 §3 的逐面裁决表（审计 §3.4）里那五个玻璃候选是
+    //   账号菜单 / 通知面板 / 清单标签下拉 / 重复规则下拉 / **捕获条下拉**，
+    //   截止下拉**从来不在名单上**。⇒ 拿它替「重复」等于把覆盖面换成一个非玻璃面。
+    //   这里换成提醒那一枚（`.ht-compose--popover` + `.ht-compose-panel ht-material`，
+    //   无内联底色覆盖），它既在名单上、又仍在宽档行尾渲染。
+    name: 'reminder-dropdown',
     open: async (page) => {
-      await page.locator('[data-testid="task-repeat-summary"]').first().click();
-      return page.locator('details:has([data-testid="task-repeat-summary"]) .ht-material').first();
+      await page.locator('details.ht-compose--popover > summary').first().click();
+      const panel = page.locator('details.ht-compose--popover .ht-material').first();
+      // 🔴 把锚点那一行滚到可视区中部再量：这一族的锚点任务落在列表末尾，而
+      //   `position: absolute` 的行尾面板开在**滚动容器**里 ⇒ 朝下开就被容器底裁掉。
+      //   2026-10-05 看图实测：不滚的时候 `toBeVisible()` 与计算样式**全绿**，截图里
+      //   却整块面板都没画（既有的 `organize-dropdown` 腿同一件事）。
+      //   ⇒ 材质判据量的是元素，"用户看得见"要另有一条，见工单 §8.141 边界。
+      await panel.scrollIntoViewIfNeeded();
+      return panel;
     },
     close: async (page) => {
-      await page.locator('[data-testid="task-repeat-summary"]').first().click();
+      await page.locator('details.ht-compose--popover > summary').first().click();
     },
   },
 ];
