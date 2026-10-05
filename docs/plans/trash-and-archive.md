@@ -7964,7 +7964,7 @@ iOS 那把载具第一趟 `SELFTEST=fail: L4`：我断的是"预检排在**第�
 | 现量 | 读数 |
 |---|---|
 | `apps/desktop-macos/Sources/HeytaMac/ShellStorageHost.swift:90` | `HEYTA_SHELL_DB_DIR` 分支已在，且**只接受绝对路径**（:92 那句 `.off(reason:)`），默认分支表达式逐字不变 |
-| rig 是否真的传了它 | `scripts/verify-macos-account-erasure.sh:131` 的 `HEYTA_SHELL_DB_DIR="$DB_DIR" \` |
+| rig 是否真的传了它 | `scripts/verify-macos-account-erasure.sh:230` 的 `HEYTA_SHELL_DB_DIR="$DB_DIR"`（行尾是 shell 续行符，值随那条 exec 一起进壳） |
 | **编译证据（不是"能编"，是"编过了"）** | `apps/desktop-macos/.build/out/Products/Debug/HeytaMac` 里 grep 得到 `HEYTA_SHELL_DB_DIR` 这个串 ⇒ 这个旋钮**已经进过二进制**；产物 mtime 10-04 21:32 = 最后一次源码改动的同一分钟 |
 | 两个 Swift 文件的归属 | 都在我名下未提交（`git diff --stat`：HeytaMacApp.swift +185 / ShellStorageHost.swift +23） |
 

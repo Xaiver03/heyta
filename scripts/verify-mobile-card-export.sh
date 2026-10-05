@@ -73,8 +73,10 @@ STAMP=$(date +%H%M%S)
 NEW_CARD_TITLE="w7e2e-$STAMP"
 
 # 🔴 软键盘：整轮关掉，退出一定恢复（`input text` 只要焦点在就能注入，不需要 IME 可见）。
+#    这里**不许再写裸 `trap … EXIT`**：bash 的 trap 是整条替换，一写就把第 57 行的快照自删摘掉
+#    （症状不是报错，是"该删的没删"）。`restore_ime` 已由 lib 在 source 时用 `heyta_chain_exit`
+#    串在那条自删之前 —— 由 `check:shell-exit-chain` 守。
 disable_ime
-trap 'restore_ime' EXIT
 
 step "0. 现场门：设备在线、没有别的移动端验收、宿主机负载"
 if ! $ADB get-state >/dev/null 2>&1; then
