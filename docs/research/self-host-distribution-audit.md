@@ -13075,3 +13075,74 @@ S3-B 是**另一台全新设备**，同一标题的任务读回来了，行尾�
 **射程边界（别读多）**：这证的是**这台机器上、由本地构建的镜像**一条 compose 起全套且界面可用。
 它**不**证外人能从仓库/镜像仓库拉到这三枚镜像（镜像没发布 = G-55 等拍板，硬约束里也写着"不发布镜像"），
 也**不**证四端装的是当前产物（第 8 项 `reinstall:all` 排在落地之后）。
+
+### 8.240 最终载体 `bd98a4d6` 到手、第 90 段那格闭合，剩下的唯一一格是"main 前进"——它在硬约束下不由我做（2026-10-05 18:4x）
+
+**① §8.238 欠的那枚隔离复跑读数到手了**（同一棵拿到全链分段读数的树 `0ff1055e`）：
+
+```
+起跑负载= 14.13 14.43 30.47  锁=空  HEAD=0ff1055e
+pnpm --filter @heyta/domain test -- tests/lunar.spec.ts ⇒ ISO_RC=0
+Test Files 39 passed (39) · Tests 980 passed (980) · Duration 3.36s
+  ✓ 逐日往返：1901-01-01 → 2100-12-31 (3) … 2764ms
+```
+
+`-- tests/lunar.spec.ts` 实际把整个包跑了（39 文件），比单文件更硬。关键那一行是 **2764ms**：
+§8.238 量到的机制上限读数（73049 天 / 0.38s = 超时上限的 1/13）说的是"这条回路本不该超时"，
+这一枚说的是"**同一条用例在负载 14 上真的用 2764ms 过线，而 5000ms 的闸门就在 2.2ms 之外**"。
+⇒ 第 90 段那枚红 = 满载（145–251）下的调度饥饿，归属成立，两枚读数（机制 + 现场）都在。
+现量命令：`cd /tmp/heyta-merge-carrier-union-v3 && pnpm --filter @heyta/domain test -- tests/lunar.spec.ts`
+
+**② 落地基线又换了一次形**（本地 main 与公开 main 仍是两条线，且两条都在动）：
+`main=0d8de88c`、`origin/main=a40d304a` ⇒ 先 `git merge-tree --write-tree main origin/main`（`rc=0` 且**恰好一行 tree OID** ⇒ 两侧无冲突）
+→ `git commit-tree -p main -p origin/main` → `refs/heads/heyta-main-union-v5 = c1b4c24b`。
+基线闸门按**两个落地目标各量一次**（这一格不能只量一个，落地目标是两条线）：
+
+```
+node research/tools/selfhost-carrier-base.mjs --main=heyta-main-union-v5 --landing=main        ⇒ 未被包含=0 · rc=0（反向 596）
+node research/tools/selfhost-carrier-base.mjs --main=heyta-main-union-v5 --landing=origin/main ⇒ 未被包含=0 · rc=0（反向 13）
+```
+
+**③ 最终载体**：`bd98a4d6 = heyta-main-union-v5(c1b4c24b) × feat/self-host-distribution(72d61139)`，
+分支 `feat/self-host-merge-main-union-v5` 已指过去。载体自己打印的读数（臂数/枚数都以它自己为准，别抄）：
+`冲突 1 条`（`docs/research/self-host-distribution-audit.md`，`audit=1`，其余族全 0、`other=0`）·
+`基线闸门：6 臂 · 不符 0` · `落笔前门禁 17 道` · `红集归属判据自检：21 条臂 红 0` ·
+`合并归属：写 23 枚 / 集外 0 / 写集里未被改到 0 枚`。审计文档并集那族的四条断言（main 零丢行 / 本分支零丢行 /
+无两侧之外的新行 / 无冲突标记）全过，产出非空行的量由它自己打印。
+
+**④ 阻塞集还是 5 枚，但**成员换了**（这就是"脏清单≠阻塞集"的反面用法：阻塞集是本批写集 ∩ 主检出脏集合）**：
+`package.json` + `packages/i18n/src/locales/{en,zh-CN}.ts` + **`server/docker-compose.yml`** + **`server/env.example`**；
+任务书点名的 `docs/README.md` 与 `scripts/check-script-snapshot.mjs` 已经**不在**里面（各自的所有者提交了）。
+🔴 后两枚**不在预置十一族里** ⇒ 落地那一刻若它们仍脏着，载体在 `fam.other` 上 `die(2)` 且没人写过解法。
+别和 ③ 里的 `other=0` 混：那是**提交态**的冲突面（`selfhost-conflict-screen.mjs`，现量 `content=9 mdd=0 blind=0 other=0`），
+阻塞集是**工作树未提交态**——两把尺问两件不同的事，只跑一把就等于没问另一件。
+
+**⑤ v3 的全链分段读数迁到 v5 的射程，是量出来的不是假设的**：
+`git diff --name-only 0ff1055e bd98a4d6` = **8 枚**，非 `docs/` 的只有 5 枚，逐枚点名：
+`BLOCKED.md`（别线的账）、`research/tools/{calendar-line-append-trap.mjs, calendar-line-commit-only-arms.sh, r17-evidence-md5-check.sh}`
+（别线的工具被其所有者提交了）、`scripts/verify-selfhost-stack.sh`（本批 ② 负载门那一笔）。
+链长两侧相同（现量：`node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'` 在两棵载体树上各跑一次）。
+链里**只有两道门**消费被改的那枚脚本（现量：`grep -rln 'verify-selfhost-stack' scripts research/tools`）：
+`check:script-snapshot`（`✅ 自快照 bootstrap 全部在位（41 个脚本 + .gitignore）`）与
+`check:selfhost-entry-command`（它明确打印了 `scripts/verify-selfhost-stack.sh：COMPOSE_FILES 的 -f 集合…（R7）`
+⇒ 负载门那段插进脚本里，没有把 R7/R8/R9 那几条判据撞坏）。两枚在 v5 上直接单跑各 `rc=0`。
+⇒ §8.235/§8.237 那两枚分段读数（1–41、42–89 绿 + 90 归因）对 v5 的**未覆盖部分就是这 8 枚文件**，
+而其中会动到链的只有那枚 `.sh`，它已经按消费方逐道复跑过。
+
+**⑥ 借 store 那棵树上有一枚"看起来像门红"的形状，记下来挡下一次误判**：
+v5 的 `node_modules` 是软链到 v3 那个检出（载体自己打印了这一点，并写明"它不是这棵树自己装的"）。
+在这种树上 `pnpm check:<gate>` **先跑依赖校验** ⇒ `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`、`rc=1`、**stdout 全空**；
+`pnpm -s` 还会把那句错误也吞掉，于是输出只剩"rc=1 什么都没有"。门的真调用形状是直接
+`node scripts/check-<gate>.mjs`（载体工具的 GATES 表本来就是这么调的，所以它那 17 道读的是真门）。
+🔴 这**不是**产品红，也不是门红：它是"这棵树的 store 不是自己的"这一条载体形状。
+要在软链树上跑完整 `pnpm check`，必须先把两条软链 `unlink`（**不能 `rm -rf`**，尾斜杠会删到源树）再原生装 —— 这条在 §8.234 已经记过一次，第二次踩同一个形状说明它值得写进这具工具的输出，而不只写在台账里（登记为待办，见任务 #58 同族）。
+
+**⑦ 第 1 项现在只剩一格，而那格在本会话的硬约束下不由我做**：
+"main 前进到该载体"。约束逐字仍是 **不动主检出、不 `git branch -f main`、不 push**；
+已有的那条常驻授权只覆盖"主检出干净时对 `origin/main` 做一次 `--ff-only`"，**不覆盖**把别人的 main 推到一棵合并载体上
+（那会动到别人已提交的工作，且 `heyta-main-union-v5` 的 596 笔反向差里含别人正在写的文件）。
+⇒ 交还动作 = main 检出的所有者在**主检出干净**时跑一条：`git merge --ff-only feat/self-host-merge-main-union-v5`
+（当前 main 恰是该载体的第二父链上的一点，所以它是纯 fast-forward；`0d8de88c` 之后 main 又动的话要先重算载体，别硬 ff）。
+窗口前置要按**合取**数心跳，不是边际：阻塞集 0 ∧ 负载 ≤ 12 ∧ main 连静 ≥（哨兵阈值 + 那趟链的实测时长）——
+④ 那两枚非预置路径让"阻塞集归零"比昨天更窄，落地前必须把 ②③④ 三段各重跑一次（这三段全是分钟级失效的读数）。
+第 2 项（§8.239）与这一格无关：它已经在新脚本的现场 rc=0 上闭合了。
