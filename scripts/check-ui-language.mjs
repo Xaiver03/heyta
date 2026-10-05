@@ -30,6 +30,10 @@
  *      而 `.ts` 里 `return { reason: '不是安全上下文' }` 这种**对象字面量的值**根本不在视野里。
  *      这正是 P1-4 修掉的那一类泄漏（推送的 17 处 + 专注的校验异常），
  *      所以规则要钉在**形状**上而不是钉在那两个文件上：下一个壳再写一句中文原因，一样会红。
+ *   7. **用户可见文案不许做监管定性。** 词条表的值与 `packages/…/src`、`apps/…/src`
+ *      的字符串字面量里都不许出现「数据出境」这类词 —— 它的定性**至今是"待确认"**，
+ *      界面写出来就是替法务下结论（两个方向都不许）。判据、豁免与变异读数见
+ *      下面 `REGULATORY_TERMS` 那一段；执行入口 `pnpm check:egress-wording`。
  *
  * 这不是"放宽"，是"换了个更值钱的契约"：原来只保证"是中文"，
  * 现在保证"没有硬编码"且"两种语言都真翻了"。
@@ -758,6 +762,129 @@ const catalogResult = checkCatalogs();
 violations.push(...catalogResult.violations);
 
 /**
+ * ── 规则 7：用户可见文案不许做「数据出境」这类监管定性 ──────────────────
+ *
+ * 裁决来源：产品负责人 2026-10-05，落在 [ADR-0054](../docs/adr/0054-managed-ai-retention-and-selling-preconditions.md) §1。
+ * `classifyDestination` 判的是**数据离开这台设备之后去了哪儿**，不是监管意义上的
+ * "数据出境" —— 后者是一个法律结论，而这个结论**至今没有定案**
+ * （《AI 与数据出境说明》把它写成"待确认"）。
+ *
+ * 🔴 所以界面里任何一句带这个词的文案都在**替法务下结论**，而法务明确拒绝下这个结论。
+ *   两个方向都不许：「已授权数据出境」宣称它是出境；「不需要任何出境手续」宣称它不是 ——
+ *   后者更危险，因为它是一句对外法律表征（AGENTS §8 第 18 条那类翻车）。
+ *   文案只许陈述事实：内容会不会离开这台设备、交给谁处理。
+ *
+ * 判据形状（为什么扫两处）：
+ *   · **词条表的值** —— 用户可见文案的唯一事实源（AGENTS §2）；
+ *   · `packages/…/src` 与 `apps/…/src` 的**字符串字面量** —— `packages/ai` 拼给界面的
+ *     失败文案不走 `t()`（§7.10 通道 #5），只查词条表会漏掉这一整类。
+ *
+ * ⚠️ 已知边界（写下来，别让这条读起来比实际更硬）：
+ *   1. 扫的是字符串字面量，**注释里的词不算** —— 注释保留这个词是允许的。
+ *      代价是 `// 曾写成 '该功能需要你先授权数据出境。'` 这种带引号的注释会假红；
+ *      假红比假绿好修（改注释措辞），所以不为此写 JS 解析器。
+ *   2. `server/` 不在扫描根：它的文案由 `check:server-copy` 与词条表对账，
+ *      词条表红了它就红，不是第二个事实源。
+ *   3. 豁免清单**逐条要理由**，并且要能用变异证明它是承重的（把豁免拿掉必须红）。
+ */
+const REGULATORY_TERMS = [
+  '数据出境',
+  '跨境传输',
+  '出境安全评估',
+  '个人信息出境标准合同',
+  'cross-border data',
+];
+
+/** 允许出现这些词的目录 —— 每条都必须带理由，无理由的豁免等于没有豁免。 */
+const REGULATORY_EXEMPT = [
+  {
+    dir: 'packages/legal/src',
+    why: '法务文件正是**讨论**这个定性、并把它写成"待确认"的地方。豁免它不是因为这个词可以进产品，' +
+      '而是因为那一处必须能引用这个词，才谈得上否认它。',
+  },
+];
+
+/** 单引号 / 双引号 / 模板字面量里的内容。够用的形状，不是 JS 解析器。 */
+const STRING_LITERAL = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
+
+/** 规则 7 要扫的源码根：每个 `packages/…/src` 与 `apps/…/src`，扣掉有理由的豁免目录。 */
+function regulatoryRoots() {
+  const roots = [];
+  for (const top of ['packages', 'apps']) {
+    let names;
+    try {
+      names = readdirSync(join(ROOT, top));
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      const rel = `${top}/${name}/src`;
+      const abs = join(ROOT, rel);
+      let st;
+      try {
+        st = statSync(abs);
+      } catch {
+        continue; // 这个包/壳没有 src（纯脚本包、e2e 之类的占位目录）
+      }
+      if (!st.isDirectory()) continue;
+      if (REGULATORY_EXEMPT.some((e) => e.dir === rel)) continue;
+      roots.push(rel);
+    }
+  }
+  return roots;
+}
+
+function regulatoryHit(text) {
+  return REGULATORY_TERMS.find((term) => text.includes(term));
+}
+
+function checkRegulatoryWording(catalogs) {
+  const found = [];
+  for (const [locale, catalog] of catalogs) {
+    for (const [key, value] of catalog) {
+      const term = regulatoryHit(value);
+      if (term === undefined) continue;
+      found.push({
+        where: `${CATALOG_DIR}/${locale}.ts`,
+        text: `'${key}'`,
+        why: `用户可见文案里出现了监管定性「${term}」—— 这个词的定性至今是"待确认"，界面写它就是替法务下结论`,
+        fix: '只陈述事实：内容会不会离开这台设备、交给谁处理（例：「批准后内容才会离开本机」）。理由见 ADR-0054 §1。',
+      });
+    }
+  }
+
+  let files = 0;
+  let literals = 0;
+  for (const rel of regulatoryRoots()) {
+    for (const file of walk(join(ROOT, rel))) {
+      // 词条表的值已经在上面按 key 报过一遍了 —— 这里跳过，避免同一句红两次
+      // （两处各报一半，读数就再也对不上"有几条文案有问题"）。
+      if (relative(ROOT, file).startsWith(`${CATALOG_DIR}/`)) continue;
+      files += 1;
+      const src = readFileSync(file, 'utf8');
+      STRING_LITERAL.lastIndex = 0;
+      let m;
+      while ((m = STRING_LITERAL.exec(src)) !== null) {
+        const text = m[1] ?? m[2] ?? m[3] ?? '';
+        literals += 1;
+        const term = regulatoryHit(text);
+        if (term === undefined) continue;
+        found.push({
+          where: `${relative(ROOT, file)}:${String(src.slice(0, m.index).split('\n').length)}`,
+          text: `'${text.slice(0, 80)}'`,
+          why: `拼给界面的字符串里出现了监管定性「${term}」—— 这条路不走 ` + '`t()`' + `，只查词条表看不见它`,
+          fix: '改成事实陈述（离开本机 / 交给谁处理），或把句子收进词条表再引用。见 ADR-0054 §1。',
+        });
+      }
+    }
+  }
+  return { found, files, literals };
+}
+
+const regulatoryResult = checkRegulatoryWording(catalogResult.counts);
+violations.push(...regulatoryResult.found);
+
+/**
  * ── 价格一致性：词条里的价格必须与**代码价目表**和**法务文本**一致 ──────
  *
  * 为什么挂在这里：它属于同一个契约（「文案说的是真话」），而价格是**唯一一个
@@ -920,6 +1047,7 @@ if (violations.length === 0) {
   console.log(
     `✅ 文案合规（扫描 ${String(scanned)} 个文件、${String(strings)} 处文案、` +
       `${String(diagStrings)} 处诊断字段；` +
+      `监管定性 0 处（源码 ${String(regulatoryResult.files)} 个文件 / ${String(regulatoryResult.literals)} 条字面量）；` +
       `词条表 ${catalogCount}；${mode}）。`,
   );
   process.exit(0);
