@@ -855,8 +855,8 @@ GATE_design=0 GATE_text-color=0 GATE_theme=0 GATE_row-single-source=0
 GATE_reachability=0 GATE_ui-provider=0 GATE_ui-language=0
 GATE_migrations=0 GATE_payment-entry=0 GATE_server-copy=0 GATE_server-design=0
 GATE_md-tables=0 GATE_docs-voice=0 GATE_claims=0 GATE_doc-citations=0
-GATE_docs=1          # 🔴 唯一那枚红：四枚 png 还没 `git add`，门禁判的是"干净检出上是死链"
-                     #    —— 出路是它自己给的第 ① 条（该入库就 add），不是放宽判据。随本批提交转绿。
+GATE_docs=1 → 0    # 提交前那枚红：四枚 png 还没 `git add`，门禁判的是"干净检出上是死链"。
+                   # 出路是它自己给的第 ① 条（该入库就 add），不是放宽判据 —— 随 `ec33731f` 转绿。
 ```
 
 七臂变异（本轮跑过，逐臂把生产代码改坏再跑对应用例，**要求红**）：
