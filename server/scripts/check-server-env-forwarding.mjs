@@ -162,14 +162,12 @@ const srcMentions = (key) =>
 // 与 `research/tools/license-inventory.mjs` 的 `REVIEWED_OTHER` 同一个设计。
 const NOT_FORWARDED = new Map([
   ['ENTITLEMENT_GATE_ENABLED', '官方托管实例专用，默认关；关着的容器与"没有这个功能"逐字相同。由托管实例自己的部署方式给，不该出现在自托管 compose 里。'],
-  ['WECHAT_PAY_ENABLED', '同上（微信支付只跑在官方托管实例上）。'],
-  ['WX_APP_ID', '微信支付凭据，只在官方实例由部署侧注入；写进 compose 模板等于给每个自托管者多一份"这里有秘密"的困惑。'],
-  ['WX_MCH_ID', '同上。'],
-  ['WX_SERIAL_NO', '同上。'],
-  ['WX_API_V3_KEY', '同上。'],
-  ['WX_PRIVATE_KEY', '同上。'],
-  ['WX_PUBLIC_KEY', '同上。'],
-  ['WX_NOTIFY_URL', '同上。'],
+  // 🔴 微信支付那一组**不再在这张表里**（2026-10-05）：`WECHAT_*` 与全部 `WX_*`
+  // 已经进 compose 的 environment（默认 `${WECHAT_PAY_ENABLED:-false}` ⇒ 不设时
+  // 行为逐字不变）。本门禁的规则 1 说的就是这个时刻 —— 豁免项一旦有了通路就必须删，
+  // 留着它就变成"谁都不再读的假豁免"。
+  // 与 `check:payment-entry` 的分工：那条钉"渠道接通 ⟺ 客户端有付款入口"，
+  // 这一条钉"文档化的旋钮真的能进容器"。
   ['MONITOR_STATEMENT_TIMEOUT_MS', '容器内的监控脚本（scripts/monitoring-db.ts）读，不在 supersync 服务的进程环境里；入口是 docker exec / monitoring compose。'],
   ['LOG_LEVEL', '服务端只把 `debug` 当开关用（src/logger.ts），其余取值行为相同；且这是排障旋钮，不在"一条 compose 起全套"的路径上。登记为待办，不顺手扩面。'],
 ]);

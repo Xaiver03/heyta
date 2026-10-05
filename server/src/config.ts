@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from './logger';
 
@@ -127,6 +128,61 @@ export interface WechatPayConfig {
   /** 回调地址，绝对 URL。默认 `PUBLIC_URL + /api/billing/webhooks/wechat`。 */
   readonly notifyUrl: string;
 }
+
+/**
+ * 微信凭证的**取值形态**要能直接复用运维上已有的一份配置：内联 PEM，或指向磁盘上的
+ * PEM 文件（`WX_PRIVATE_KEY_PATH` / `WX_PUBLIC_KEY_PATH`，与内联变量同名的两枚加 `_PATH`）。
+ *
+ * 🔴 **两种形态同时给且内容不同 ⇒ 启动红。** 这不是洁癖：内联与文件谁赢如果靠"代码里
+ * 先读哪个"决定，那么换机器/换部署方式时**签名用的私钥与证书序列号会悄悄不配对**，
+ * 症状是微信把每一笔下单都拒掉，而我们的日志里一切正常。
+ * 🔴 **报错只报键名与路径，绝不带内容。**
+ */
+const readWechatKeyFile = (fileVar: string, rawPath: string): string => {
+  const resolved = path.resolve(rawPath.trim());
+  let contents: string;
+  try {
+    contents = fs.readFileSync(resolved, 'utf8');
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
+    throw new Error(
+      `${fileVar} 指向的文件读不出来（${code}）：${resolved}. ` +
+        '要么把文件放到位，要么改用内联变量；私钥读不出时微信签名会全程失败，不许带着空密钥启动。',
+    );
+  }
+  if (!contents.includes('-----BEGIN')) {
+    throw new Error(
+      `${fileVar} 指向的文件里没有 PEM（${resolved}）—— 期望 -----BEGIN ... KEY----- 开头。`,
+    );
+  }
+  // 内联形态允许 `\\n` 转义与 base64，文件形态不需要：文件本来就是 PEM。
+  // 但**归一化交给 adapter 的 `normalizePemKey`**，这里只做"能不能用"的启动期判断，
+  // 于是同一份内容在内联/文件两条路上得到逐字相同的最终值（否则"哪个赢"又有第二套答案）。
+  return contents;
+};
+
+/** 内联与 `_PATH` 两枚旋钮 → 一份密钥值。见上面 `readWechatKeyFile` 的两条红线。 */
+const resolveWechatKey = (
+  inlineVar: 'WX_PRIVATE_KEY' | 'WX_PUBLIC_KEY',
+  fileVar: string,
+): string => {
+  const inline = process.env[inlineVar]?.trim();
+  const file = process.env[fileVar]?.trim();
+  if (!inline && !file) return '';
+
+  const fromFile = file ? readWechatKeyFile(fileVar, file) : undefined;
+  if (fromFile === undefined) return inline ?? '';
+  if (!inline) return fromFile;
+
+  const same = inline.replace(/\\n/g, '\n').trim() === fromFile.trim();
+  if (!same) {
+    throw new Error(
+      `${inlineVar} 与 ${fileVar} 同时给出且内容不一致（文件：${path.resolve(file as string)}）—— ` +
+        '签名用哪一份不能由读变量的顺序决定。删掉其中一种写法。',
+    );
+  }
+  return inline;
+};
 
 /**
  * Web Push 的配置（RFC 8292 的 VAPID 密钥对）。
@@ -631,8 +687,8 @@ export const loadConfigFromEnv = (
         mchId: process.env.WX_MCH_ID,
         serialNo: process.env.WX_SERIAL_NO,
         apiV3Key: process.env.WX_API_V3_KEY,
-        privateKey: process.env.WX_PRIVATE_KEY,
-        publicKey: process.env.WX_PUBLIC_KEY,
+        privateKey: resolveWechatKey('WX_PRIVATE_KEY', 'WX_PRIVATE_KEY_PATH'),
+        publicKey: resolveWechatKey('WX_PUBLIC_KEY', 'WX_PUBLIC_KEY_PATH'),
       };
       const credentialKeys = Object.keys(credentials) as (keyof typeof credentials)[];
       const missing = credentialKeys.filter((key) => !credentials[key]?.trim());
@@ -640,7 +696,8 @@ export const loadConfigFromEnv = (
         throw new Error(
           'WECHAT_PAY_ENABLED=true but wechat pay credentials are incomplete. Missing: ' +
             `${missing.map((key) => `WX_${key.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`).join(', ')}. ` +
-            'Set all of them, or turn WECHAT_PAY_ENABLED off.',
+            'Set all of them (私钥/平台公钥也可改用 `WX_PRIVATE_KEY_PATH` / `WX_PUBLIC_KEY_PATH` ' +
+            '指向磁盘上的 PEM 文件), or turn WECHAT_PAY_ENABLED off.',
         );
       }
 
@@ -661,6 +718,33 @@ export const loadConfigFromEnv = (
           `WX_NOTIFY_URL must be an absolute https:// URL (got ${notifyUrl}). ` +
             'WeChat Pay refuses non-HTTPS notify URLs.',
         );
+      }
+
+      // 🔴 **回调送到别的 host 时要显式确认。** 复用另一套部署的配置时，
+      // 运维会顺手把对面的 `PAY_NOTIFY_URL` 字面值抄过来 —— 那意味着"钱到账了"
+      // 这条消息进了**另一个实例的库**：那边没有这些订单号，授予不出去，
+      // 而微信看到的是 200、我们这边连一条日志都没有。**收了钱不发货，且两边都不报错。**
+      // 所以 host 不一致默认启动红，只有显式声明"这就是有意的"才放行。
+      if (process.env.WX_NOTIFY_URL?.trim()) {
+        const hostOf = (value: string, label: string): string => {
+          try {
+            return new URL(value).host;
+          } catch {
+            throw new Error(`${label} 不是可解析的绝对 URL：${value}`);
+          }
+        };
+        const notifyHost = hostOf(notifyUrl, 'WX_NOTIFY_URL');
+        const publicHost = hostOf(config.publicUrl, 'PUBLIC_URL');
+        if (notifyHost !== publicHost) {
+          const confirm = process.env.WX_NOTIFY_URL_CONFIRM?.trim();
+          if (confirm !== 'host-mismatch-is-intentional') {
+            throw new Error(
+              `WX_NOTIFY_URL 的 host（${notifyHost}）与 PUBLIC_URL 的 host（${publicHost}）不一致。` +
+                '到账回调会送进另一台实例的库 ⇒ 那边的订单号查不到、这边收了钱不发权益。' +
+                '确实要跨 host 就设 WX_NOTIFY_URL_CONFIRM=host-mismatch-is-intentional。',
+            );
+          }
+        }
       }
 
       config.wechatPay = {
