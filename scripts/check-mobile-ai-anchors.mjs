@@ -31,6 +31,11 @@
  *  ⑤ desc/text 的**字面**锚点也要对得上（判据 ① 只护 rid，这一档以前没人守）：
  *     每一句要么是一条**移动端源码引用过的中文词条**的原文，要么正是某行拼出来的
  *     `「标签, 提示」`；只写了"标签"而那一行其实带 hint ⇒ 红（精确等值恒不命中）。
+ *  ⑥ **块内那一指落在哪一层**（rig20 现量）：RN 的 `Pressable` 把 `content-desc` 挂在
+ *     `clickable=false` 的层上，点它退出码 0 却什么都不发生。`xy_clickable_in_rid`
+ *     取"包含该标签矩形且面积最小的可点祖先"，没有则如实报哨兵。
+ *     这几臂把函数体抽出来喂**合成 AX 树**跑（不占设备），期望值是**写死的坐标** ——
+ *     在臂里重算一遍选择规则等于造第二把尺，两把尺一起错就永远读成绿。
  */
 import {
   existsSync,
@@ -63,6 +68,7 @@ const RID_CALLS = [
   'edit_value_by_rid',
   'tap_in_rid',
   'xy_in_rid',
+  'xy_clickable_in_rid',
 ];
 
 function readScript(file) {
@@ -107,6 +113,24 @@ function walk(dir, acc = []) {
     else if (/\.(tsx|ts)$/.test(name)) acc.push(p);
   }
   return acc;
+}
+
+/**
+ * 从验收脚本里抽出某个 bash 函数的完整定义（`name() { … }`）。
+ *
+ * 为什么要抽而不是"信它在设备上跑过"：`xy_clickable_in_rid` 只在真设备上被调用，
+ * 而设备窗口是全仓最稀缺的资源；它的正确性（落到可点的那一层，而不是标签那一层）
+ * 完全可以在一份合成 AX 树上判。抽不到定义就**如实返回 null**，让调用它的臂自己红 ——
+ * 函数被改名或被删，读数是"臂红"，不是"这几臂不存在"。
+ */
+function helperBody(file, name) {
+  const text = readFileSync(join(ROOT, file), 'utf8');
+  const start = text.indexOf(`${name}() {`);
+  if (start === -1) return null;
+  const end = text.indexOf('\n}', start);
+  if (end === -1) return null;
+  const body = text.slice(start, end + 2);
+  return body.includes('\n') ? body : null;
 }
 
 /**
@@ -463,6 +487,112 @@ if (process.argv.includes('--self-test')) {
   //   没有这条，"跳过注释"就是一条没人验过的豁免（它可以悄悄把真锚点也跳掉而全绿）。
   const m7 = runMutant(`# 别再写 has_desc "${BOGUS_ZH}" 这种锚点`, 'desc-comment');
   arms.push(['臂 7 同一句只写在注释里 ⇒ 整条流水线仍为 0（注释不是调用点）', m7.code === 0]);
+
+  // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
+  //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
+  //   `content-desc` 挂在 **clickable=false** 的那一层上：手指落下去退出码 0、什么都不发生。
+  //   这几臂**不占设备** —— 把函数体抽出来喂合成 AX 树。
+  //   🔴 期望值是**写死的坐标**，不是在臂里重算一遍"包含标签且面积最小"：
+  //   重算等于造出第二把尺，两把尺一起错就永远读成绿（§7 元规则二）。
+  const helper = helperBody(DEFAULT_SCRIPT, 'xy_clickable_in_rid');
+  arms.push(['臂 8 从验收脚本里抽到了 xy_clickable_in_rid 的定义（这几臂有输入）', helper !== null]);
+
+  const runHelper = (body, xml, fn = 'xy_clickable_in_rid', args = 'blk chip') => {
+    const dir = join(ROOT, 'tmp');
+    mkdirSync(dir, { recursive: true });
+    const fnPath = join(dir, '.anchor-helper.sh');
+    const fx = join(dir, '.anchor-helper.xml');
+    writeFileSync(fnPath, `${body}\n`);
+    writeFileSync(fx, xml);
+    try {
+      const kid = spawnSync(
+        'bash',
+        ['-c', `source '${fnPath}'; UI_XML='${fx}' ${fn} ${args}`],
+        { encoding: 'utf8', cwd: ROOT },
+      );
+      return `${kid.stdout ?? ''}`.trim();
+    } finally {
+      rmSync(fnPath, { force: true });
+      rmSync(fx, { force: true });
+    }
+  };
+  // 一块容器 + 一枚标签 + 两枚**套叠**的可点祖先（小那枚中心 150,175；大那枚 150,180）
+  const NESTED =
+    '<hierarchy>' +
+    '<node resource-id="blk" clickable="false" bounds="[0,100][540,400]">' +
+    '<node content-desc="chip" clickable="false" bounds="[100,150][200,200]" />' +
+    '<node clickable="true" bounds="[90,140][210,210]" />' +
+    '<node clickable="true" bounds="[50,120][250,240]" />' +
+    '</node></hierarchy>';
+  // 同一枚标签，但**没有**任何可点祖先 ⇒ 必须如实报哨兵，不许假装点到了
+  const FLAT =
+    '<hierarchy>' +
+    '<node resource-id="blk" clickable="false" bounds="[0,100][540,400]">' +
+    '<node content-desc="chip" clickable="false" bounds="[100,150][200,200]" />' +
+    '</node></hierarchy>';
+  arms.push([
+    `臂 9 套叠的可点祖先必须取**最小**那层（期望逐字 "150 175 clickable-ancestor"）`,
+    helper !== null && runHelper(helper, NESTED) === '150 175 clickable-ancestor',
+  ]);
+  arms.push([
+    `臂 10 没有可点祖先时如实报哨兵（期望逐字 "150 175 label-self-no-clickable-ancestor"）`,
+    helper !== null &&
+      runHelper(helper, FLAT) === '150 175 label-self-no-clickable-ancestor',
+  ]);
+
+  // 臂 11（变异）：把"取最小"换成"取最大" ⇒ 臂 9 那一格必须变红。
+  //   没有这条，臂 9 的坐标可能只是恰好与"任何一种选择"都相容（= 装饰）。
+  const mutated = helper === null ? '' : helper.replace('min(anc,', 'max(anc,');
+  arms.push([
+    '臂 11 变异 min→max 后臂 9 的读数不再等于期望（证明期望坐标锁住了"取哪一层"）',
+    helper !== null &&
+      mutated !== helper &&
+      runHelper(mutated, NESTED) !== '150 175 clickable-ancestor',
+  ]);
+
+  // 臂 12：读侧改了、比较它的 `tap_in_rid` 没跟上 ⇒ 拒绝分支会变成死码。
+  //   🔴 判的是**两处各自的形状**（打印处在那段 python 里、比较处是一条 `[ … = "…" ]`），
+  //   不是"全文数这个词几次" —— 注释里多写一句就能把计数凑够，那是会假绿的数法。
+  const SENTINEL = 'label-self-no-clickable-ancestor';
+  const scriptText = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8');
+  const tapGuard = new RegExp(`\\[\\s*"\\$src"\\s*=\\s*"${SENTINEL}"\\s*\\]`).test(scriptText);
+  arms.push([
+    `臂 12 哨兵两处都在：helper 打印它 + tap_in_rid 用 [ "$src" = … ] 比较它`,
+    helper !== null && helper.includes(SENTINEL) && tapGuard,
+  ]);
+
+  // ── 判据 ⑦：滚动参照锚必须是**会动的**那一枚 ──
+  //   rig23 现量：第一版"取树里第一枚有 resource-id 的节点"挑中的是 `android:id/content`
+  //   （整棵树的根，[0,0][1080,2400] 永远不动），于是每一发 swipe 都读成"画面没动"，
+  //   把四格本来能成的绑定拦死 —— **一条自己坏掉的新判据，比它要护的那条旧判据更危险**。
+  const picker = helperBody(DEFAULT_SCRIPT, 'scroll_anchor_bounds');
+  const PICK_XML =
+    '<hierarchy>' +
+    '<node resource-id="android:id/content" class="android.widget.FrameLayout" bounds="[0,0][1080,2400]">' +
+    '<node resource-id="ai-settings-title" class="android.widget.TextView" text="AI 设置" bounds="[42,300][600,360]" />' +
+    '</node></hierarchy>';
+  arms.push(['判据 ⑦ 抽到了 scroll_anchor_bounds 的定义', picker !== null]);
+  arms.push([
+    '臂 13 参照锚必须挑**会随列表位移的内容节点**（期望逐字 "ai-settings-title 42 300 600 360"，不是那枚根）',
+    picker !== null &&
+      runHelper(picker, PICK_XML, 'scroll_anchor_bounds') === 'ai-settings-title 42 300 600 360',
+  ]);
+  // 臂 14（变异）：摘掉"跳过 android: 系统 id"那道过滤 ⇒ 臂 13 的期望必须不成立。
+  //   🔴 匹配串要**逐字抄被测那一行**：第一版写了 `if (rid.startswith…`（多一层括号），
+  //   `replace` 没命中 ⇒ 变异原样返回 ⇒ 这条臂报 FAIL，响的是臂自己坏了，不是判据没牙。
+  const pickerLoose =
+    picker === null
+      ? ''
+      : picker.replace(
+          "if rid.startswith('android:') or not (d.get('text') or d.get('content-desc')):",
+          'if not rid:',
+        );
+  arms.push([
+    '臂 14 摘掉 android:/无文本那两道过滤后，臂 13 的读数不再等于期望（证明挑的不是根）',
+    picker !== null &&
+      pickerLoose !== picker &&
+      runHelper(pickerLoose, PICK_XML, 'scroll_anchor_bounds') !== 'ai-settings-title 42 300 600 360',
+  ]);
 
   let fail = 0;
   arms.forEach(([name, ok]) => {

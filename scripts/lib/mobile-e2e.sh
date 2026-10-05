@@ -972,6 +972,19 @@ PY
 
 clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循环 DEL（会 ANR）
   local want=$1 label=${2:-} i=0 cur
+
+  # 🔴 **空格必须发成 `%s`**（2026-10-06 现量，同一枚输入框、同一次会话的 A/B）：
+  #   `input text "list all tasks"` ⇒ 框里只剩 `list`，**退出码 0、无任何报错**；
+  #   `input text "list%sall%stasks"` ⇒ 框里是 `list all tasks`。
+  #   空格在 adb→device shell 那一跳被当成语界，后半串根本没进 `input` 的参数。
+  #   这条约定本仓库早就写在 `verify-mobile-capture.sh:129`，却没写进这枚**共用** helper
+  #   —— 同一个判断写两遍、漏了一遍，就是从这种地方开始的（AGENTS §3.5 那条教训的形状）。
+  #   ⚠️ 值里若本身含字面 `%`，`input text` 会把它当转义起点；目前全部调用点的值
+  #   （令牌 / URL / ASCII 标题 / 口令）都不含 `%`，含 `%` 的输入要走别的通道，别照这里加。
+  _adb_text() {  # <字符串> —— 走 `input text` 的唯一出口
+    $ADB shell input text "${1// /%s}"
+  }
+
   $ADB shell input keycombination 113 29; sleep 0.6
   $ADB shell input keyevent 67; sleep 0.8
 
@@ -984,7 +997,7 @@ clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循
   local n=${#want} chunk=40 off=0 piece
   while [ "$off" -lt "$n" ]; do
     piece=$(python3 -c "import sys;print(sys.argv[1][int(sys.argv[2]):int(sys.argv[2])+40])" "$want" "$off")
-    $ADB shell input text "$piece"
+    _adb_text "$piece"
     off=$((off + chunk))
     sleep 0.7
   done
@@ -1008,7 +1021,7 @@ clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循
         # `${#中文}` 在非 UTF-8 locale 下数的是**字节**（8 个汉字报 24），
         # 于是偏移量错位、补上去的是乱码，而且看不出原因。
         piece=$(python3 -c "import sys;print(sys.argv[1][len(sys.argv[2]):])" "$want" "$cur")
-        $ADB shell input text "$piece" >/dev/null 2>&1
+        _adb_text "$piece" >/dev/null 2>&1
         ;;
       *)
         # 不是前缀（中间丢了、或残留了旧值）→ 全选重来，别在脏状态上叠加。
@@ -1030,7 +1043,7 @@ clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循
         fi
         $ADB shell input keycombination 113 29; sleep 0.6
         $ADB shell input keyevent 67; sleep 0.8
-        $ADB shell input text "$want" >/dev/null 2>&1
+        _adb_text "$want" >/dev/null 2>&1
         ;;
     esac
     sleep 1.5
