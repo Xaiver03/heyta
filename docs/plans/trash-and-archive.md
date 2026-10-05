@@ -1,6 +1,8 @@
 # 回收站与归档：落地计划
 
-> 状态：**规划中**（2026-10-03 立项，第四轮读代码后待拍条数从 4 扩到 **9**，见 §7）
+> 状态：**执行到批次 E 的收尾格**（2026-10-03 立项，批次 A / W / E 已在 10-03→10-05 逐项落地）。🔴 **本行原写「规划中」，10-05 14:2x 就地更正** —— 它比实际状态落后两天，而文档第一行就是别人会照着行动的那一句（"规划中"会把一个已经在交付的计划读成"还没开工"）。
+> 现在**未闭合的只有四类**：① E2 的 **#87**（已按口径 B **落码并验完**：销毁即死路 + 契约那条恒绿腿换成"必须抛" + 常驻文件级腿；两臂变异 6 红 / 3 红、探针 REOPENED⇒clean、**恢复后阳性对照 418 passed**（**§10.186/§10.187**）。"注销后还有谁在这个实例上读"已用代码现量答出并**当场修完两条通道**：主动通道 §10.188、被动通道 §10.189（共享层 `onLocalDataErased` 事件 + 移动端用它作废宿主单例；三臂 H1/H2/H3 各红一次）。剩的是设备/壳读数：iOS 判据 D 复量、以及"注销后回到全新空库"那一屏的截图证据（#104）。🔴 原来并列的第三格「Web 同页活连接是否把 `deleteDatabase` 堵在 `blocked`」**不是"等验证"，是查出一枚真缺陷**：适配器与 service worker 两个持有者都不让位，注销那一次删除会永久挂住；两处都已修并各有一正一反的读数（§10.190/§10.191））；② E5 备份侧 **P-12**（要拍板）—— 臂 D 的运行时读数**已到手**（五臂全按预期，§10.158）；③ **#58** 的全量 `pnpm -r test` / `pnpm check`，以及 Windows 那一格的**安装取证**（§10.157 ⑫：三条同步对账全过、缺 `install-capture.txt` ⇒ 归 #65 共享主机，不代改）。⚠️ 10-05 19:16 起这半格换了**载体起跑**形态：`tmp/e2-carrier-check.sh` 在隔离载体（`main` HEAD + 主检出全部未提交改动）上有界排队等窗口，**读数未到手**，起跑前现量是"端口全空 / 无人在跑验收 / 但 1min 负载 82–166 且别线连着跑 vitest"（全部细节与恢复路径见 §10.192 —— 别把这半格读成"已经补跑过"）；④ 台账/门禁侧的登记类工单（#44–#46、#51–#52、#57、#59、#63、#65、#73、#75、#79–#80、#86、#89、#91–#92）。
+> 逐项账在 **§8.4** 与 **§10.x**；末节号与 10.x 节数**一律现量**（`grep -nE '^## 10\.[0-9]+' … | tail -1` / `grep -cE '^## 10\.[0-9]+' …`）—— 这一行原本写死了"末节 §10.157、共 132 节"，六个小时后就漂了，正文里留数字等于留一份会过期的抄件。
 > 事实与证据在 [回收站与归档调研](../research/trash-and-archive-best-practice.md)，本文不重复抄一遍
 > （**抄件一定会漂**）；引用现状时只给该文的节号（§x.y），不重述行号
 > ⚠️ 例外：§2.0、§3.5、§6 G-6/G-9 里的行号是**本轮现量**的（它们不在调研里），
@@ -738,8 +740,8 @@ IndexedDB/OPFS，`MainWindow.xaml.cs:640-643` 与 `:65` 原话），macOS 还有
 |---|---|---|---|---|---|
 | **E1** | 注销必须**可辨识**：`TokenFailureCode` 必填（`ACCOUNT_CLOSED` / `ACCOUNT_UNVERIFIED` / `TOKEN_REVOKED` / `TOKEN_INVALID`），middleware 把稳定码写进 401 响应体 | `server/src/auth.ts:246-`、`server/src/middleware.ts:39-44` | ✅ 已落 | `server/tests/account-closed-signal.spec.ts` **10 passed**；server 全量 **2110 passed / 1 skipped**（还原后复跑红 0） | M1 摘掉"账号行不存在"那一支的码 ⇒ **3 红**；M2 把"未验证"错标成 `ACCOUNT_CLOSED` ⇒ **2 红**；M3 middleware 不发码 ⇒ **3 红**；M4 摘掉 DELETE 里两处 `authCache.invalidate` ⇒ **1 红**（证明那两行是承重的，此前无任何判据钉它） |
 | **E1b** | 状态码 401 → **410 `ACCOUNT_CLOSED`** | 同上 + `packages/sync-client` | ✅ **已落地并已提交**（本轮现量，原表这行停在 ⏸ 是过期的）：`git show HEAD:server/src/middleware.ts \| grep -c '? 410 : 401'` = **1**；`git show HEAD:server/tests/account-closed-signal.spec.ts \| grep -c 'toBe(410)'` = **2**（其中一条专钉"410 是注销独占的，其余三种失效各自仍 401 且码各不相同"） | 判据文件在 HEAD 里；本轮没重跑（闸门），但它不是本轮新增的判据 | 本轮未重跑变异；E1 那批 M1–M4 读数仍在 §10.3 原行 |
-| **E2** | 收到注销信号 ⇒ 本机数据真的销毁：`DbAdapter` 补 `destroy` 契约 + SQLite/op-sqlite 实现 + 每端按 10.2 清单逐类清（Web 4 类 / Windows 2 份 / macOS 2 份）+ 扩 storage 契约测试 | `packages/storage/*`、`packages/sync-client/src/client.ts`、`packages/app-host/src/{native-bridge,host-storage-erasure,local-erasure}.ts`、`apps/desktop-macos`、`apps/desktop-windows`、各宿主 | ✅ **三段缺口全落完，且不需要谁让位（§10.15）**：共享层（契约 + 三套实现 + app-host 注册表 + web 注册）早在 HEAD（§10.6）；本轮补的是**两个原生壳的第二份存储**与**跨 JS realm 的那条缝** —— `SqliteDriver.removeDatabase?()` 经 `native-bridge.ts` 的 `oplog-destroy` 消息回来，页面侧发送器 `host-storage-erasure.ts` 挂在 `eraseLocalData()` 里。🔴 先前记的"被 `oplog-worker-bridge.ts` 的并行会话挡住"已被逐文件现量否证（那条缝不在这个文件里，否证表见 §10.15）。剩的三格都是**窗口型取证**（与 §10.11 那格同口径），09:1x 现量后**只剩两格**：① macOS 界面级"真点注销 ⇒ 文件没了"那一趟（`check:macos-window` 那趟是**壳级截图门禁**，它绿不构成这一格）② ~~Windows"文件被占用"那一半（POSIX 验不了）~~ ✅ **已闭合**（真 Windows 上三条锁腿全报 `raw_code=32 ⇒ file-in-use`、不抛、释放后可删；变异臂恰好 3 红 ⇒ **§10.16**）③ 🔴 **移动端真机**：原先记成"随 W6-c"已过期（17:4x）——它有**自己的装置** `pnpm verify:mobile-account-erasure`（`scripts/verify-mobile-account-erasure.sh`，五条判据含"401 不许清库"那条负向对照，见 §10.66/§10.67），装置+入口+射程+静态自检全齐，**运行时读数仍为零**（要设备窗口） | `native-bridge-destroy.spec.ts` 8 条 + `host-storage-erasure.spec.ts` 9 条 = **17 passed**（真 `NodeSqliteDriver` + 真临时库文件，零 mock）；壳侧 `check:macos-shell` **61 ✅**、`check:windows-shell` **35 ✅**，两边各含 `oplog-destroy` 端到端那一发（真跑到 `containerRemoved:true` + 主文件与旁挂一起消失）；`check:macos-window` `MACWIN_RC=0`（壳级：非空白 + 主蓝命中 + 交叉验证） | `tmp/e2-teeth.mjs` 原地五臂 A–E 各**恰好 1 红**且红在配对断言上（A 摘掉 `removeDatabase` 转发、B 摘掉 `oplog-destroy` 分派、C 摘掉 `destroyOpLogAdapter` 装配、D 摘掉单槽 `onmessage` 的拒绝、E 摘掉"销毁器抛错仍留住凭据"），还原后复跑 **25 passed / 0 failed** |
-| **E3** | 注销入口（Web 设置 + 移动端我的 + CLI），带"会清掉本机包括未同步数据"的二次确认与"先导出"提示 | `packages/app-host/src/hosted-auth.ts`、`features/settings/ProfilePanel.tsx`、`apps/mobile/src/screens/ProfileScreen.tsx` | ⚠️ **读数已过期，看 §10.6**：三端调用点本轮全部落地（Web `CloseAccountPanel` / 移动 `AccountClosureScreen` / CLI `account close`），共享路由表收进 `@heyta/ui`；判据四条 spec 写好、`tsc` 绿，**vitest 被内存闸门挡住没跑**。**顺带闭合 G-08**（苹果 5.1.1(v) 要求应用内可注销）的入口那一半 | 🔄 **原"待闸门"已过期**：Web 那半 04:33:01 真跑 **12 passed**（`apps/web/tests/close-account-panel.spec.tsx` 首次执行，见 §10.9），其余三条 spec（`@heyta/ui` 路由表 / node-host CLI / mobile 入口）仍待闸门 | 那一跑照出的不是产品缺陷而是**用例自己的弱点**（`act` 警告 + 一次多余的手动 render 把"靠订阅消失"糊成"靠再渲染消失"），已改，改后读数待复跑 |
+| **E2** | 收到注销信号 ⇒ 本机数据真的销毁：`DbAdapter` 补 `destroy` 契约 + SQLite/op-sqlite 实现 + 每端按 10.2 清单逐类清（Web 4 类 / Windows 2 份 / macOS 2 份）+ 扩 storage 契约测试 | `packages/storage/*`、`packages/sync-client/src/client.ts`、`packages/app-host/src/{native-bridge,host-storage-erasure,local-erasure}.ts`、`apps/desktop-macos`、`apps/desktop-windows`、各宿主 | ✅ **三段缺口全落完，且不需要谁让位（§10.15）**：共享层（契约 + 三套实现 + app-host 注册表 + web 注册）早在 HEAD（§10.6）；本轮补的是**两个原生壳的第二份存储**与**跨 JS realm 的那条缝** —— `SqliteDriver.removeDatabase?()` 经 `native-bridge.ts` 的 `oplog-destroy` 消息回来，页面侧发送器 `host-storage-erasure.ts` 挂在 `eraseLocalData()` 里。🔴 先前记的"被 `oplog-worker-bridge.ts` 的并行会话挡住"已被逐文件现量否证（那条缝不在这个文件里，否证表见 §10.15）。剩的三格都是**窗口型取证**（与 §10.11 那格同口径），09:1x 现量后**只剩两格**：① macOS 界面级"真点注销 ⇒ 文件没了"那一趟（`check:macos-window` 那趟是**壳级截图门禁**，它绿不构成这一格）② ~~Windows"文件被占用"那一半（POSIX 验不了）~~ ✅ **已闭合**（真 Windows 上三条锁腿全报 `raw_code=32 ⇒ file-in-use`、不抛、释放后可删；变异臂恰好 3 红 ⇒ **§10.16**）③ 🔴 **移动端真机**：原先记成"随 W6-c"已过期（17:4x）——它有**自己的装置** `pnpm verify:mobile-account-erasure`（`scripts/verify-mobile-account-erasure.sh`，五条判据含"401 不许清库"那条负向对照，见 §10.66/§10.67），装置+入口+射程+静态自检全齐，**运行时读数仍为零**（要设备窗口）⚠️ **这半句已过期（10-05 16:4x 就地挂指针，原句保留）**：那台装置后来在真机窗口里跑过了：被动通道那一趟与设备侧 401 前提腿在 **§10.156**，主动通道那一发的变异臂（摘掉它之后界面照样报"已清除"而盘上留着库文件）在 **§10.137**，iOS 侧判据 B 的变异臂在 **§10.155**；本行写"仍为零"的那一刻它确实为零。**这一格现在剩的不是"零读数"，而是两件事**：① 设备级"拿掉产品修复就红"的**变异**臂在注销这一族是有的（M1″/M2′/B 数据腿），而**回收站那一族（W6-c 六条腿）一条都没有**，现状与阻塞见 **§10.174**；② macOS 界面级"真点注销 ⇒ 文件没了"那一趟仍未跑（**#94**，要不可逆动作的同意）。 ⚠️ **这半句已过期（10-05 21:3x 就地挂指针，原句保留）**：#94 已闭合 —— macOS 壳界面级"真点注销 ⇒ 两份存储都没了"那一趟七条判据全绿（含 WKWebView 字节残留那一腿、以及"默认路径那枚真库整趟没被动过"的隔离未漏腿），见 **§10.209**；同一格另一腿"iOS 装上的是当前产物"在 **§10.211**（`IOS_REINSTALL_RC=0`，图人看过是**首启联网同意页**，那条读数**不**证明回收站那屏）。 | `native-bridge-destroy.spec.ts` 8 条 + `host-storage-erasure.spec.ts` 9 条 = **17 passed**（真 `NodeSqliteDriver` + 真临时库文件，零 mock）；壳侧 `check:macos-shell` **61 ✅**、`check:windows-shell` **35 ✅**，两边各含 `oplog-destroy` 端到端那一发（真跑到 `containerRemoved:true` + 主文件与旁挂一起消失）；`check:macos-window` `MACWIN_RC=0`（壳级：非空白 + 主蓝命中 + 交叉验证） | `tmp/e2-teeth.mjs` 原地五臂 A–E 各**恰好 1 红**且红在配对断言上（A 摘掉 `removeDatabase` 转发、B 摘掉 `oplog-destroy` 分派、C 摘掉 `destroyOpLogAdapter` 装配、D 摘掉单槽 `onmessage` 的拒绝、E 摘掉"销毁器抛错仍留住凭据"），还原后复跑 **25 passed / 0 failed** |
+| **E3** | 注销入口（Web 设置 + 移动端我的 + CLI），带"会清掉本机包括未同步数据"的二次确认与"先导出"提示 | `packages/app-host/src/hosted-auth.ts`、`features/settings/ProfilePanel.tsx`、`apps/mobile/src/screens/ProfileScreen.tsx` | ⚠️ **读数已过期，看 §10.6**：三端调用点本轮全部落地（Web `CloseAccountPanel` / 移动 `AccountClosureScreen` / CLI `account close`），共享路由表收进 `@heyta/ui`；判据四条 spec 写好、`tsc` 绿，**vitest 被内存闸门挡住没跑**。**顺带闭合 G-08**（苹果 5.1.1(v) 要求应用内可注销）的入口那一半 | 🔄 **原"待闸门"已过期**：Web 那半 04:33:01 真跑 **12 passed**（`apps/web/tests/close-account-panel.spec.tsx` 首次执行，见 §10.9），其余三条 spec（`@heyta/ui` 路由表 / node-host CLI / mobile 入口）仍待闸门` ⇒ **这句在本表里已经过期两层，挂个指针**：四条 spec 的首次真跑读数在 §10.11 那张 08:04 行（`14 / 10 / 12 / 11 passed`），当前 HEAD 的复量在 **§10.114**（47 passed）。原句留着是因为**这张表是历史台账不是现量看板**，但它已经误导过一次（同一形状见行 783 那条指针） | 那一跑照出的不是产品缺陷而是**用例自己的弱点**（`act` 警告 + 一次多余的手动 render 把"靠订阅消失"糊成"靠再渲染消失"），已改，改后读数待复跑 |
 | **E4** | 政策与 ADR 写成**分层实话** + 数字回到真源 | `packages/legal/src/documents/*`、`packages/legal/tests/structure.spec.ts`、ADR-0048 | ✅ 已落 | legal **66 passed**；新门禁 4 条（推导前提 / 逐类覆盖 / 数字对账 / 边界成对） | M5 数字抄回 19 ⇒ 1 红；M6 中文句里删掉「墓碑」⇒ 1 红；M7 英文句删掉边界 ⇒ 1 红；M8 minors 删「其它设备」⇒ 1 红；M9 表名推导退回 `split('_')[0]` ⇒ **3 红**；M10 类别表塞一条真源没有的表 ⇒ 2 红 |
 | **E5** | 三处结构性敞口的处置（备份无定点删除、日志明文邮箱、`recover-user.ts` 能导全量明文且自陈 UNVERIFIED） | `server/scripts/*` | 🔄 **可当场修的两半已落**（见 §10.6）：产物权限有常驻 spec、政策如实度有常驻门禁；日志明文邮箱那处在 **E7** 里已摘。仍开着的两条：**备份无定点删除**要 P-12 拍（crypto-erase 是运维动作，代码里没有能自己完成的那一半），以及 `recover-user.ts` 文件头那句 `Status: UNVERIFIED against real encrypted data` —— **解密路径至今零测试**（现量：`grep -rln encryptBatch server/tests server/src server/scripts` 命中 0 个文件），所以那句自陈**仍然必须留着**，改它之前要先有一条用真 `encryptBatch` 造数据、再走真 `decryptBatch` + 回放还原的用例。**→ 2026-10-04 这条已闭合，见 §10.10**：那条用例落了地（`server/tests/recover-replay-roundtrip.spec.ts`，8 条全绿 + 三臂变异各红 1），而且把真代码跑起来之后照出两个静默缺陷（批量删除在还原文件里复活 / 用过 REPAIR 的账号恢复不了），自陈那句也已改写成"解密+重放段有常驻判据、端到端对着真实账号仍待演练"。 | 见 §10.6 的 E5 行 | 见 §10.6（门禁 `--self-test` 已量过有牙；spec 那条待闸门） |
 
@@ -780,8 +782,8 @@ IndexedDB/OPFS，`MainWindow.xaml.cs:640-643` 与 `:65` 原话），macOS 还有
 | 工单 | 这一轮落到哪一步 | 判据（能失败的） | 变异读数 |
 |---|---|---|---|
 | **W4b** | ✅ **闭合，且不在本轮** —— §11.9 当年停在门口给的理由（"`OrganizerList.tsx` 正被别人整段重写"）已被现量否证：该文件与 `projects/model.ts` / `ProjectsPanel.tsx` / `TagsSection.tsx` 逐个都是 **CLEAN（已提交）**，共享 `labels.confirmRemove` + `removeImpact` 与取数函数 `liveTaskCountsByTag` 都在 HEAD 里，两端都接了线（不是"默认值=原行为"那种把没接伪装成做完的形状），设备级判据在 `scripts/verify-mobile-trash.sh` 第 6b 步。逐项对账见 §11.13 | — | — |
-| **E3** | 🔄 **三端调用点全部落地**（本轮）：Web 设置面板 `apps/web/src/features/settings/CloseAccountPanel.tsx`（未跟踪）+ 移动端子页 `apps/mobile/src/screens/AccountClosureScreen.tsx`（挂在「我的」→ 导出数据那一行下面，`testID: profile-entry-close-account`）+ CLI `apps/node-host/src/cli-account.ts`（`account close`：预览 → `--confirm` → 本机有未上传 op 就**硬拒且没有逃生门**）。词条从 `web.accountClosure.*` 改名到 `common.accountClosure.*`（两端共用一张表），22 条；"结局 → key"的路由表**只存在一份**，在 `packages/ui/src/auth/model.ts` 的 `accountClosureMessageKey`，Web 面板里那张本地副本已删 | `packages/ui/tests/account-closure-model.spec.ts`（四档结局各自的 key、25 条失败原因的存在性、`other` 那句必须同时说"账号还在"与"本机没动"、上游词表漂移一条）／`apps/node-host/tests/cli-account.spec.ts`（预览不改盘、`--confirm` 才动、pending>0 拒绝且不删文件、成功路径库文件真的没了）／`apps/mobile/tests/account-closure-entry.spec.ts`（入口相邻、`onClosed` 只有一个调用点且被 `!== 'not-closed'` 挡、界面零硬编码文案）／`apps/web/tests/close-account-panel.spec.tsx`（未登录不画、三段点击前零请求、失败时销毁器调用 0 次）。**四条 spec 全部待闸门**（⚠️ 这半句已于 10-04 04:53 作废、今日在当前 HEAD 复量到 47 passed，读数见行 902–906 与 §10.114；原句留在原处是因为**这张表是历史台账，不是现量看板** —— 但它误导过我一次，所以在此就地挂指针，见 §10.113 末）；本轮已过的只有 `tsc`：`@heyta/ui` 与 `@heyta/node-host` typecheck **exit 0** | tsc 抓到并改掉的 4 条自证：① 移动端屏 import 了一个我已删掉的死抽象 `closureErasureIncomplete`（TS2305）；② `variant="body"` 不在 `TEXT_STYLES` 里（全仓唯一一处，其余 93 处用 `caption`）；③ 从 `@heyta/app-host` import `DbDestroyReport` —— 它只在包内被引用、**没导出**，真源在 `@heyta/storage`；④ 用 `string` 索引 `Record<MessageKey,string>`（TS7053）。另有一条**离线对账**先行：22 个 key 在中英两栏的存在性、方向性（中文含汉字 / 英文零汉字）、`{count}` 占位符成对、孤儿词条 0 —— 命中数 0 缺 |
-| **E5** | ✅ **可当场修的两半都落了**。(a) 全量明文导出：`server/scripts/recover-user.ts` 的产物权限（每处 `writeFileSync` 带 `mode: 0o600` + 写完立刻 `chmodSync`，覆盖"文件已存在"那一档）已在库，常驻 spec `server/tests/recover-artifact-mode.spec.ts`。(b) **政策如实度**：把 E2/E3 否证掉的句子改成分层实话 —— 落点 `packages/legal/src/documents/data-rights.ts`（第五节两段 + 第一节/第七节两张表 + 那条"什么时候会变"的触发项 + 版本 `1.1→1.2` 与中英两张变更表各一行）与 `packages/legal/src/documents/minors.ts`（第七节那一行中英各一处 + 版本 `1.1→1.2`）。新常驻门禁 `scripts/check-legal-closure-truth.mjs` | 门禁现量：`文档 9 份 × 中英 = 18 栏 / 拍到 250062 字符 / 变更表内引用 3 条（历史，不算违规）`，**exit 1**，命中 3 条 = `privacy[zh-CN] «今天还不存在»`、`privacy[en] «does not exist in the product today»`、`third-parties[zh-CN] «今天还不存在»`。三条都在**别人未提交的文件**里（现量 `git status --porcelain packages/legal/src/documents/`：那两份都是 `M`，且其 diff 正改着同一份文件的 `version` 行）⇒ 本轮不碰、不代改；**门禁因此尚未接线进 `pnpm check`**（一接线就红在别人的文件上）。两道生成物对账跑绿：`gen-site-copy --check` 与 `gen-server-legal --check` 都 exit 0，指纹含 `data-rights@1.2;minors@1.2` | 门禁自己那条腿：`--self-test` 往中英两栏各注入一条违规，读数 `合成两栏命中 1 + 1，对照 2 / 2` → exit 0。**第一版是坏的，而且坏成假绿**：它按 `doc.sections.zh` 取栏，真键名却是 `'zh-CN'` ⇒ `?? []` 把**整栏中文**换成空数组，`今天还不存在` 那两句在输出上长得和"中文干净"一模一样，第一版因此只报出 1 条（英文那句）。现在逐份、逐栏断言非空 + `texts.length === 18` + "变更表内外命中数相等就判红"（排除那条腿没牙时当场失败） |
+| **E3** | 🔄（**这一行是那一轮当时的快照，不是当前状态** —— 当前：✅ 闭合，四条 spec 在当前 HEAD 复量 10/11/11/15 passed，四臂读数 + 载体守卫见 **§10.114 / §10.115**，逐入口 file:line 挂在批次 E 表的 E3 行）**三端调用点全部落地**（本轮）：Web 设置面板 `apps/web/src/features/settings/CloseAccountPanel.tsx`（未跟踪）+ 移动端子页 `apps/mobile/src/screens/AccountClosureScreen.tsx`（挂在「我的」→ 导出数据那一行下面，`testID: profile-entry-close-account`）+ CLI `apps/node-host/src/cli-account.ts`（`account close`：预览 → `--confirm` → 本机有未上传 op 就**硬拒且没有逃生门**）。词条从 `web.accountClosure.*` 改名到 `common.accountClosure.*`（两端共用一张表），22 条；"结局 → key"的路由表**只存在一份**，在 `packages/ui/src/auth/model.ts` 的 `accountClosureMessageKey`，Web 面板里那张本地副本已删 | `packages/ui/tests/account-closure-model.spec.ts`（四档结局各自的 key、25 条失败原因的存在性、`other` 那句必须同时说"账号还在"与"本机没动"、上游词表漂移一条）／`apps/node-host/tests/cli-account.spec.ts`（预览不改盘、`--confirm` 才动、pending>0 拒绝且不删文件、成功路径库文件真的没了）／`apps/mobile/tests/account-closure-entry.spec.ts`（入口相邻、`onClosed` 只有一个调用点且被 `!== 'not-closed'` 挡、界面零硬编码文案）／`apps/web/tests/close-account-panel.spec.tsx`（未登录不画、三段点击前零请求、失败时销毁器调用 0 次）。**四条 spec 全部待闸门**（⚠️ 这半句已于 10-04 04:53 作废、今日在当前 HEAD 复量到 47 passed，读数见行 902–906 与 §10.114；原句留在原处是因为**这张表是历史台账，不是现量看板** —— 但它误导过我一次，所以在此就地挂指针，见 §10.113 末）；本轮已过的只有 `tsc`：`@heyta/ui` 与 `@heyta/node-host` typecheck **exit 0** | tsc 抓到并改掉的 4 条自证：① 移动端屏 import 了一个我已删掉的死抽象 `closureErasureIncomplete`（TS2305）；② `variant="body"` 不在 `TEXT_STYLES` 里（全仓唯一一处，其余 93 处用 `caption`）；③ 从 `@heyta/app-host` import `DbDestroyReport` —— 它只在包内被引用、**没导出**，真源在 `@heyta/storage`；④ 用 `string` 索引 `Record<MessageKey,string>`（TS7053）。另有一条**离线对账**先行：22 个 key 在中英两栏的存在性、方向性（中文含汉字 / 英文零汉字）、`{count}` 占位符成对、孤儿词条 0 —— 命中数 0 缺 |
+| **E5** | ✅ **可当场修的两半都落了**。(a) 全量明文导出：`server/scripts/recover-user.ts` 的产物权限（每处 `writeFileSync` 带 `mode: 0o600` + 写完立刻 `chmodSync`，覆盖"文件已存在"那一档）已在库，常驻 spec `server/tests/recover-artifact-mode.spec.ts`。(b) **政策如实度**：把 E2/E3 否证掉的句子改成分层实话 —— 落点 `packages/legal/src/documents/data-rights.ts`（第五节两段 + 第一节/第七节两张表 + 那条"什么时候会变"的触发项 + 版本 `1.1→1.2` 与中英两张变更表各一行）与 `packages/legal/src/documents/minors.ts`（第七节那一行中英各一处 + 版本 `1.1→1.2`）。新常驻门禁 `scripts/check-legal-closure-truth.mjs` | 门禁现量：`文档 9 份 × 中英 = 18 栏 / 拍到 250062 字符 / 变更表内引用 3 条（历史，不算违规）`，**exit 1**，命中 3 条 = `privacy[zh-CN] «今天还不存在»`、`privacy[en] «does not exist in the product today»`、`third-parties[zh-CN] «今天还不存在»`。三条都在**别人未提交的文件**里（现量 `git status --porcelain packages/legal/src/documents/`：那两份都是 `M`，且其 diff 正改着同一份文件的 `version` 行）⇒ 本轮不碰、不代改；**门禁因此尚未接线进 `pnpm check`**（一接线就红在别人的文件上）🔴 **这句到 10-05 15:2x 已过期**：`closure-truth` 现量已在链里（`81671871`）且直接跑 `rc=0`，见本表"接线"那一行的更正。两道生成物对账跑绿：`gen-site-copy --check` 与 `gen-server-legal --check` 都 exit 0，指纹含 `data-rights@1.2;minors@1.2` | 门禁自己那条腿：`--self-test` 往中英两栏各注入一条违规，读数 `合成两栏命中 1 + 1，对照 2 / 2` → exit 0。**第一版是坏的，而且坏成假绿**：它按 `doc.sections.zh` 取栏，真键名却是 `'zh-CN'` ⇒ `?? []` 把**整栏中文**换成空数组，`今天还不存在` 那两句在输出上长得和"中文干净"一模一样，第一版因此只报出 1 条（英文那句）。现在逐份、逐栏断言非空 + `texts.length === 18` + "变更表内外命中数相等就判红"（排除那条腿没牙时当场失败） |
 
 🔴 **E2 的剩余量本轮第一次被量化出来**（先前只写"阻塞在别人脏着的文件上"，那是半句话）：
 共享层已提交且现量干净 —— `DbAdapter.destroy` 契约（`packages/storage/src/db.types.ts:265`）、
@@ -814,7 +816,7 @@ macOS/Windows 上**第二份库外明文**还躺在盘上。本轮改完的那�
 | `scripts/check-legal-gdpr.mjs`（新常驻门禁） | 三类判据：条文集合两侧一致且等于登记清单 / 每行"对不上的部分"不许为空且必须含否定词 / 禁止"已完成出境评估、已签署标准合同、已任命 DPO"这类**声称形态**（列举形态不算 —— 本节自己那句"不声称已有任何转移机制"是诚实，命中它就等于门禁咬自己） | **变异读数 4/4 判红 + 未变异对照判绿**（`--fixture` 通道，见下）：M1 清空英文某行那一格 → `en 栏第 6 行的"对不上的部分"是空的`；M2 只删中文一行 → 条文集合与登记清单对不上；M3 塞一句"已完成数据出境安全评估并签署标准合同条款" → 越界声称；M4 改掉小节标题 → 落点不存在 |
 | 落点定位这一条踩了自己的坑，如实写 | 第一版按"文本里含 GDPR 字样"找小节 ⇒ 报 `zh-CN 栏的 GDPR 节数量 = 2`。第二个是**版本变更表 1.2 那一行**，它的职责就是说明"新增了 GDPR 一节"。现在按 `id === 's9'` + 标题含 GDPR 双重定位 | 这是本轮第二条被前提断言抓出来的假绿（第一条是 `check-legal-closure-truth` 第一版按 `sections.zh` 取栏、整栏中文没被扫到） |
 | **没做的部分要说清** | 「九份文档 GDPR 口径」今天做了 **1/9**（权利对照那份是 GDPR 条文映射的天然落点）。其余八份里 `privacy`、`third-parties`、`permissions` **正被并行会话脏着**（现量 `git status --porcelain packages/legal/src/documents/`），按撞车判据不动；`terms`、`personal-info-list`、`ai-and-transfer`、`minors`、`subscription-refund` 干净，但每份要加的那段口径不同（法律基础 / 处理者清单 / 儿童同意 / 出境），不是一句模板能套的 | 门禁当前只覆盖 `data-rights`；扩到更多份时，`--fixture` 与四条臂的形状可以直接复用 |
-| **接线** | `check:legal-gdpr` 与 `check:legal-closure-truth` 都**尚未**进 `package.json`：前者是 `package.json` 现量 `M`（别人正往 `check` 那一行加门禁，那是本仓唯一的合并冲突热点），后者一接线就会红在别人的两份文件上。`check:gate-wiring` 会抓"定义在、链里没有"，所以接线时必须**两处同时加** | 关闭条件：`package.json` 空出 + `privacy`/`third-parties` 那三句改掉 |
+| **接线** | ~~`check:legal-gdpr` 与 `check:legal-closure-truth` 都**尚未**进 `package.json`~~ 🔴 **10-05 15:2x 现量已否证：两道都在链里**（`node -e` 取 `package.json` 的 `check` 串，`grep -c` 各 = **1**；HEAD 与工作树**都是** 1 ⇒ 接线早已入库，落笔提交是 `81671871`）。当时那两个理由也不再成立：`package.json` 现在唯一的未提交增量只有别线那一枚 `check:ios-ax-shim`（§10.161 B 表），而 `closure-truth` 直接跑 **`rc=0`**（它自己打印"九份文档…没有被批次 E 否证的句子"，隐私那两句«今天还不存在»已随 `privacy@1.5` / `third-parties@1.3` 改掉）⇒ **"一接线就红在别人的文件上"这句到 15:2x 是过期声称，不是现状**。原句留着，因为它记的是"为什么当时不动它"。`check:gate-wiring` 会抓"定义在、链里没有"，所以接线时必须**两处同时加** | 关闭条件：`package.json` 空出 + `privacy`/`third-parties` 那三句改掉 ⇒ **两条都已成立**（15:2x），本格闭合 |
 
 E1b 与 E2 客户端那半的归属也顺手量清了，写在这里免得下一轮再翻：`git show HEAD:server/src/middleware.ts | grep -c '? 410 : 401'` = **1**、`git show HEAD:server/tests/account-closed-signal.spec.ts | grep -c 'toBe(410)'` = **2** ⇒ **E1b 已提交**；`git show HEAD:packages/sync-client/src/client.ts | grep -c onAccountClosed` = **3**，而该文件未提交 diff 里注销相关行命中 **0** ⇒ **被动销毁通道已提交**，别人在那File里在飞的是别的东西（`countPendingUpload` 那一族）。客户端 `isAccountClosedFailure` 按设计**只认稳定码、不认状态码**（`middleware.ts:49-53` 写着为什么：只认 410 的判据会在 `TOKEN_REVOKED` 那种"什么都不该删"的场合毁掉数据）。
 
@@ -831,7 +833,7 @@ E1b 与 E2 客户端那半的归属也顺手量清了，写在这里免得下一
 | **E6 GDPR 口径** | 从 **1/9 扩到 6/9**：新增五份各自领域的 GDPR 小节，**中英同形**（同一小节 id、同一列数、同一行数）—— `ai-and-transfer` `s10`（`1.2→1.3`）、`subscription-refund` `s10`（`1.0→1.1`）、`minors` `s9`（`1.2→1.3`）、`terms` `s13`（`1.1→1.2`）、`personal-info-list` `s9`（`1.0→1.1`）。**那张逐条主表只在 `data-rights` 一份里**，其余五份写自己那一档的判据并用 `docRef` 指过去 | 常驻门禁 `scripts/check-legal-gdpr.mjs` 重写成**封闭集合**版：未登记的文档冒出 GDPR 内容 ⇒ 红；`BLOCKED` 里那三份（`privacy`/`third-parties`/`permissions`，逐份写明为什么）真的长出节却还挂在白名单 ⇒ 红（白名单只会过期，不会自己缩短）；`POINTERS` 里任何一份的条文集合**等于**登记清单 ⇒ 红（等于抄了第二份，抄件一定漂）；每行最后一格非空且含否定词；每节拍出 ≥800 字符（遍历层坏了 0 命中不可信）。现量 exit 0：`主表 8 行 × 条文 13/14/15/16/17/18/20/21/22/32/33，逐领域文档 5 份各带自己的对照表与去处，白名单 3 份` | `--self-test`：**变异 7/7 各自判红 + 反向腿 3/3 没咬到缺口陈述 + 未变异对照通过**。🔴 §10.6 那行的"4/4"已被本行取代。**最有价值的一条读数是那个存活过的臂**：注入 `We have appointed an EU representative.` 后第一版门禁**没抓到**，因为词表写的是 `we have (appointed )?a …` —— 英文不定冠词有 `a`/`an` 两种，只认一种等于没认。补成 `an?` 并加一条被动形态 `an? (… representative\|officer\|dpo) (has\|have) been (appointed\|designated\|set up)`，再补一条**独立臂**测被动形态，两条才真的有牙 |
 | **门禁咬到自己写的文本（三条，全是真问题）** | 三条红都落在我本轮写的句子上，逐条按"改文本不改判据"处理：① `subscription-refund` en 第一格原写 `outside the deletion scope`，中文那格是"不在这两张表的删除范围内" —— **en 漂成了肯定句式**，改成 `which is **not** within the deletion scope` 与中文同形；② `terms` en 第四格 `rather than guessed` 对中文"不靠猜" 同理改 `not guessed`；③ `terms` 中文那格我为了否定它而**把被禁的声称原句引了一遍**（`任何"已任命欧盟代表/数据保护专员"的说法都不成立`），needle 命中它 —— 改成陈述缺口本身（"欧盟代表与数据保护专员今天都没有指定过…"），英文同步 | 判据栏没有为了变绿而放宽：`GAP_MARK` 那条**要求中英用同一种否定形状**，这正是它的用途；三条红里两条是被它照出来的真实双语漂移 | 声称层从"整段 `test()`"改成**逐句判定 + 含否定的句子跳过**。这个改动本身也要有牙，所以加了三条**反向腿**（注入合法缺口句、声称层必须报 0 条）：中文"没有指定欧盟代表"、英文 `No EU representative has been appointed…`、列举形态"不声称已有任何转移机制（标准合同条款、充分性决定或转移影响评估）"。**只有正向腿时，"把门禁调宽到什么都不放过"也算通过** —— 反向腿拦的就是这个 |
 | **门禁的绿路径第一次跑到就崩** | 前几轮全是判红，从没走到最后那行打印：`gdprSection()` 返回的是**小节**，取表要再经一层 `tableOf()`，写成 `fullZh.rows` 直接 `TypeError` 退出 1 —— 判绿那一行崩了，症状和"内容不合格"完全一样（exit 1）。已在原地补注释并把绿路径当成被测代码 | 这条是 §7 元规则一（先怀疑探针）的第三种面目：**红路径有日志可看，绿路径没有**，所以从没走过的分支默认是坏的 | 修法读数：`node scripts/check-legal-gdpr.mjs` exit 0 并打印上面那行 |
-| **E5 政策如实度的三条红：本轮判定为"不改，但把为什么不改量清楚"** | 常驻门禁 `scripts/check-legal-closure-truth.mjs`（未跟踪、未接线）现量 exit 1，命中 3 条：`privacy[zh-CN]`、`privacy[en]`、`third-parties[zh-CN]` 的 `«今天还不存在»` —— 被批次 E2 否证（被动销毁通道**已提交**：`packages/sync-client/src/client.ts:929-977` 收到 `ACCOUNT_CLOSED` 就调本机销毁器，判据 `packages/sync-client/tests/account-closed-erasure.spec.ts` 含"401+该码仍算注销"与"其余每一个失效码都不许触发销毁"） | 🔴 **不碰的理由是 hunk 现量，不是印象**：`git diff -U0` 于 04:1x 量到 `privacy.ts` 的未提交 hunk 在 **362 / 591 / 889 / 1118 / 1136**，`third-parties.ts` 在 **235 / 526 / 627 / 629**，而后两组正是那份文件 `version` 行与 `updatedDate` 行的所在（别人把 `privacy` `1.2→1.3`、`third-parties` `1.0→1.1`）。我要改的正文行（489 / 1016 / 290）与它们**行区间不相交**，但**实质修改必须 bump 版本**，而 bump 落点就是他们那一行 ⇒ 要么踩别人的行，要么留下"改了正文不记版本"的更坏形状。选后者不成立，所以整条挂起 | 关闭条件写死在这里：那两份的未提交 diff 落地之后，把三句改成分层实话（① 界面里三个端都有注销入口；② 点下注销的设备当场销毁本机明文，**其它设备要等它下一次同步收到注销信号才清**，离线的这份一直在；③ macOS/Windows 原生壳的第二份存储今天仍没取证），并同时 bump `privacy→1.4`、`third-parties→1.2`、中英变更表各一行 |
+| **E5 政策如实度的三条红：本轮判定为"不改，但把为什么不改量清楚"** | 常驻门禁 `scripts/check-legal-closure-truth.mjs`（未跟踪、未接线）现量 exit 1，命中 3 条：`privacy[zh-CN]`、`privacy[en]`、`third-parties[zh-CN]` 的 `«今天还不存在»` —— 被批次 E2 否证（被动销毁通道**已提交**：`packages/sync-client/src/client.ts:929-977` 收到 `ACCOUNT_CLOSED` 就调本机销毁器，判据 `packages/sync-client/tests/account-closed-erasure.spec.ts` 含"401+该码仍算注销"与"其余每一个失效码都不许触发销毁"） | 🔴 **不碰的理由是 hunk 现量，不是印象**：`git diff -U0` 于 04:1x 量到 `privacy.ts` 的未提交 hunk 在 **362 / 591 / 889 / 1118 / 1136**，`third-parties.ts` 在 **235 / 526 / 627 / 629**，而后两组正是那份文件 `version` 行与 `updatedDate` 行的所在（别人把 `privacy` `1.2→1.3`、`third-parties` `1.0→1.1`）。我要改的正文行（489 / 1016 / 290）与它们**行区间不相交**，但**实质修改必须 bump 版本**，而 bump 落点就是他们那一行 ⇒ 要么踩别人的行，要么留下"改了正文不记版本"的更坏形状。选后者不成立，所以整条挂起 | 关闭条件写死在这里：那两份的未提交 diff 落地之后，把三句改成分层实话（① 界面里三个端都有注销入口；② 点下注销的设备当场销毁本机明文，**其它设备要等它下一次同步收到注销信号才清**，离线的这份一直在；③ macOS/Windows 原生壳的第二份存储今天仍没取证），并同时 bump `privacy→1.4`、`third-parties→1.2`、中英变更表各一行 ⚠️ **这条关闭条件已经满足（10-05 16:4x 现量，原句保留）**：那三句失效声明现在**一个都不在**（`grep -c '今天还不存在'` 于 `privacy.ts` 与 `third-parties.ts` 各回 **0**，英文那句 `does not exist in the product today` 同样各回 **0**），门禁 `node scripts/check-legal-closure-truth.mjs` 直接 **rc=0**，其打印的版本指纹是 **`privacy@1.5` / `third-parties@1.3`**（比这里预测的各多一档，因为中间 E6 那批 GDPR 节又各 bump 了一次）。⇒ **本行不再是"挂起"，是已闭合**；关闭它的那三句改写与版本动作落在 **#32** 那一轮。 |
 | **E3 的四个 spec 本轮第一次真跑** | 之前四个都只到 `tsc` 绿。这一轮闸门空隙里跑过：`apps/node-host/tests/cli-account.spec.ts` **11 passed / 11**、`apps/mobile/tests/account-closure-entry.spec.ts` **11/11**、`apps/web/tests/local-data-destruction.spec.ts` **11/11**、`packages/ui/tests/account-closure-model.spec.ts` **10/10** | 两条红都是**我自己测试的错**，不是产品的：① node-host 那个 `registerLocalEraser` 没在用例后注销，而注册表是**模块级单例**，于是下一个用例拿着上一个的销毁器 —— 修法是 `afterEach` 里 `registerLocalEraser(undefined)`（文档化的拆卸形状），并把断言换成整个信封 `{ok:false,command:'account',action:'close',reason:'pending-uploads',pendingUploads:1}` 而不是只看一个字段；② mobile 那条正则被 prettier 的行尾逗号挡住（**产品代码是对的**，改测试的容忍度而不是改产品） | 🔴 第三条红**不是测试问题，是真缺陷**，而且本轮第一次把它证出来：销毁器注册表拿到的是**早一步注册的兜底实现**，`eraseLocalData()` 会报 `containerRemoved: true` 而那台设备上库还在。修复落点 `packages/app-host/src/host.ts:340-342` 那句 `if (!hasLocalEraser())` 的兜底 —— 该文件本轮现量仍是 `M`（别人在飞的正是 vault / pending 计数那一族），且 `openAppHost()` 不暴露 `adapter`，node-host 侧无法自注册。补丁形状：**注册表按 owner 分层**，兜底注册可以替换另一条兜底，但不许替换宿主自己装的那条（Web 装的是 IndexedDB 版）。取证是两段一次性探针（跑在 gitignore 的 `tmp/` 里，不留在仓里当"证据文件"，读数如下）：探针 A 直接调 `registerLocalEraser` 两次，打印注册表实际拿到的那一个；探针 B 在**库还在**的情况下调 `eraseLocalData()`，返回 `containerRemoved: true` 而 `fs.existsSync(dbFile)` 仍是 `true` —— 这就是那条假成功。复现形状：先注册一个假销毁器模拟早一步的兜底，再开真宿主，然后调 `eraseLocalData()` 比对返回值与磁盘事实。 |
 | **`apps/web/tests/close-account-panel.spec.tsx` 新增的常驻结构判据** | 加了一条"每一种『没注销成功』都同时说清账号与本机两件事"：取 `common.accountClosure.failed.*` 的全部 key（断言 ≥8，防止词条一条都没有时判据空转），逐条要求中文含「账号还在／账号可能还在」且含「本机数据也没动」，英文含对应两短语 | 同批把 `common.accountClosure.failed.malformedResponse` 中英各补齐（原先那句只说了解析失败，没说账号与本机两件事 —— 就是这条新判据把它照出来的） | 🔴 **待闸门**：锁在 pid 64338 手里，这条 spec 本轮没跑成。另记一次自伤：我用 Edit 加这条判据时 `old_string` 吃掉了相邻的 `for` 循环与闭合符（**删掉了正在工作的测试代码**），从工具回显里发现后按行还原 —— 这是记忆里"Edit 别吃掉相邻块的边界行"那次事故的又一次复现，说明我还没学会带上下文边界提交编辑。**→ 04:33:01 这条已经跑成并全绿（`12 passed`），见 §10.9；那句"待闸门"作废。同一次跑成还照出了这个用例自己的一个弱点（`act` 警告 + 多余的手动 render），已改，改后读数仍待复跑** |
 | **接线（两处都还缺，形状量清楚了）** | `check:legal-gdpr` 与 `check:legal-closure-truth` 仍未进 `package.json`。现量：`package.json` 的 `M` diff 只有两处，而**其中一处就是 `check` 那一整行**（别人往里加 `pnpm check:ios-native-bridges`，另加两条脚本定义 `check:ios-native-bridges` / `verify:ios-vault-keychain`）—— 也就是说接线必须落在**他们正在改的那一行**上 | `check:gate-wiring` 抓的正是"定义在、链里没有"，所以接线必须**定义行与链那一行同时加**：`"check:legal-gdpr": "node scripts/check-legal-gdpr.mjs"` 放在 `check:legal-host` 之后，链里在 `pnpm check:legal-host` 之后插 `pnpm check:legal-gdpr` | 🔴 一条本轮才想清楚的**代价**：`scripts/check-legal-gdpr.mjs` 与 `check-legal-closure-truth.mjs` 现在都是 `??`（未跟踪）。如果别人先提交了 `package.json`，一次干净检出的 `pnpm check` 会在那一段 `MODULE_NOT_FOUND` —— 响亮，但确实是我把链改坏的。所以**接线必须与这两个文件同一笔提交**，这条要求写在这里就是为了让人别把它拆开 |
@@ -1218,6 +1220,13 @@ git diff -- packages/app-host/src/import-dump.ts | grep -c "referenceOf"   # 0 �
 | **Windows 原生壳** | ✅ **代码在盘上 + 本机实测**（新 `Heyta.Windows.Core/SqliteContainer.cs` 101 行 + `SqliteBridge.cs` `+39/−0`：`:28-33` 留真路径、`:79-110` `removeDatabase()`） | 桥是 Jint `setFunction` 通路（与 macOS 的 JSExport 不是同一种），失败原因走 Win32 码派生的 ASCII 令牌；`MainWindow.xaml.cs` **刻意未改**（`ScriptHost.cs:37` 把 `__heytaDriverFactory` 直接绑到 CLR 对象 ⇒ 加公开方法就等于暴露，C# 仍不认识任何协议字段） | ✅ **主线程 08:5x 自跑 `pnpm check:windows-shell` ⇒ `WIN_RC=0`，日志 35 条 ✅**（`/tmp/win-shell-verify.log`），里头四条正是这一档要的端到端：`oplog-destroy ⇒ 壳回且只回一条消息`、`那条消息是 oplog-destroyed 回执`、`原生驱动真的把容器删掉了 —— 即 TS 侧确实看得见 removeDatabase`、`report.target 是真的那个文件（…/heyta-smoke-…/oplog.sqlite），不是 'sqlite' 占位串`，外加"主文件与 -wal/-shm 一个都不剩"与"`:memory:` 原样带回"。⚠️ 两份子回报对 `dotnet` 与门禁结论**互相矛盾**（一份："这台 Mac 没有 dotnet、门禁停在 `WINDOWS_BUNDLE_MISSING`"；一份："Core 本机编得过、34/34"）⇒ 现量 `/opt/homebrew/bin/dotnet` 在，结论按主线程自己那一趟记。**仍未证**：文件被占用那一半（POSIX 允许删开着句柄的文件，那条变异存活；机制证据是 `lsof` 的 `FD_OPEN`→`no_fd`），只能在真 Windows 上验 |
 | **Linux 桌面壳** | ❌ **没有**（`check:shell-erasure-parity` 14:1x 现量：`desktop-linux wal=Y remover=N`，WAL 在 `apps/desktop-linux/src/heyta_driver.c:415`，全文件零 `removeDatabase`） | 🔴 本机销毁在那端只走到 **DROP + VACUUM + 重写库文件**，**文件本体留在盘上**；而 `sqlite-adapter.ts:273` 自己写明这个补救**不完备**（空闲页仍可能翻出旧明文）⇒ 注销在那端只能诚实报 `containerRemoved:false` 带原因 | 常驻门禁 `scripts/check-shell-erasure-parity.mjs`（现量 `owners=3 gaps=1 problems=0`，四臂 self-test 全按预期）；政策 `data-rights` 第五节 ② 中英各点名它一次，`check:legal-closure-truth` 的“逐壳点名”与“点名句”两条腿挡的就是“点名点错壳”。**为什么不补**：该壳定位是「同架构但不做专项功能」，而 `check:linux-shell` 在 darwin 响亮跳过 ⇒ 补了拿不到读数。摘除判据 = 装上 `removeDatabase` 且有 Linux 冒烟读数，届时从 `REGISTERED_GAPS` 摘掉它 |
 
+> ⏱️ **这张表的表头日期是 10-04 04:58，移动/桌面两格已被 10-05 的运行时读数超过**（表体不重抄，抄了就会漂）：
+> Android 真机运行时 A/B/C/D 四条全 ✅ ＋ 主动/被动两条通道 ＋ 设备侧 401 前提腿见 **§10.156**；
+> iOS 判据 B 的变异读数（`ARM=OK`，牙齿在数据腿）见 **§10.155**，文件腿"能红但问不到这一枚"的五腿装置见 **§10.157 ④**；
+> macOS 壳级七档 + 四臂见 **§10.98 / §10.129**；Web OPFS 那一类从"删不掉"改成"清得掉"的经过与三臂对照见 **§10.100–§10.102**。
+> 🔴 这张表**仍然有效**的那几格（线协议里没有 `destroy` 那一发、Linux 壳没有 `removeDatabase`）在 06:4x 逐条重跑过，
+>   本批没有新的反证 —— 也就是说 E2 的"逐宿主"这一项今天**取到的是运行时读数**，而"协议层没有销毁那一发"这条结构事实没变。
+
 📌 这张表里最有价值的一格是 macOS/Windows 那两行的**形状**：它们不是"坏了"，是**诚实的半清** ——
 适配器在这种情况下返回 `containerRemoved: false` 带原因，而 `destroy.spec.ts:173` 钉住的正是
 "驱动没有 `removeDatabase` 时必须报'文件仍在'，不许静默成功"。
@@ -1502,6 +1511,9 @@ AGENTS §8 与"不擅自执行不可逆动作"）。
 
 ⚠️ **全部未提交**（产品负责人要求等明示）。下表每一格的读数都带**跑的时间**，
 2026-10-04 04:3x–06:2x 现量；凡是"别人的文件在飞"造成的缺口，写的是 hunk/名字而不是印象。
+ **要看当前状态请读 §10.166 与 §10.171** —— 本节保留原句（含"6/9""浏览器那一趟没跑""`reinstall:all` 未起"
+这三格），因为它们是**那天那个时刻的真读数**，但它们都已经不是今天：E6 后来 9/9（§10.162 复量分母没漂）、
+`reinstall:all` 14:23 三端 ✅ / Windows 🔴（§:12445）、链的门禁段 16:0x 在 overlay 载体上走通（§10.171）。
 
 | 范围项 | 状态 | 证据（都能重跑） | 还缺的那一格 |
 |---|---|---|---|
@@ -1512,7 +1524,7 @@ AGENTS §8 与"不擅自执行不可逆动作"）。
 | E2 `destroy` 契约 + 三套实现 | ✅ | `packages/storage` **417 passed**，其中 `tests/destroy.spec.ts` 单跑 **9 passed**（04:59:41） | — |
 | E2 被动销毁通道 | ✅ 已提交 | `@heyta/sync-client` **132 passed**；`tests/account-closed-erasure.spec.ts` 单跑 **12 passed**（05:01:33，含"401 配该码仍算注销"与"其余每个失效码都不许清"） | — |
 | E2 **逐宿主清到哪一层** | 🟡 **账已列全，缺口只剩一个，而它的真实内容 19:1x 又被现量改写了一次：不是"要不要注销"，是"壳没有隔离数据目录的旋钮"（§10.70 ④）** | §10.11 那张表：Web 四类全清（**11 passed** 04:59:40）、node-host 文件+旁挂都不剩、移动端驱动有 `removeDatabase`、**两个原生壳的明文今天住在壳自己的 `heyta.sqlite`（`resolveStorageBackend()==='shell'`），而触发点在页侧 realm ⇒ 三段缺口（线协议没有 destroy 这一发 / 壳侧只留 close 句柄 / 驱动没有 `removeDatabase`）** | ~~壳侧销毁器要注册在 `host.ts:340-342` 那道门之前~~ 🔴 **这条关闭条件已被否证**（注册表是模块级单例，跨不了 realm；见 §10.11 第二三轮读数）。真正的关闭条件：**等 `packages/storage/src/sqlite/oplog-worker-bridge.ts` 空出**（现量 `M`，别人正改），三段一次落完。 🔴 **这一整格在 08:2x–08:5x 已闭合到"代码链 + 两端壳级门禁实测"，且它当时的关闭条件是错的** —— `destroy` 是**适配器**动作，不进 `OpLogStore` 词表，所以 `oplog-worker-bridge.ts` 从来不是前置（见 §10.15 的三段现量表）。 现在的读数：页侧 `oplog-destroy` 一发（`host-storage-erasure.ts`）+ 壳侧认这一发（`native-bridge.ts`）+ Swift / C# 两份驱动 `removeDatabase`；TS 侧 17 条判据（app-host 全量 **1324 passed**，五臂变异各恰好 1 红）， 壳侧主线程自跑 **`check:macos-shell` `MAC_RC=0` / 61 ✅** 与 **`check:windows-shell` `WIN_RC=0` / 35 ✅**， 两端都真跑到 `oplog-destroyed` + `containerRemoved:true` + 主文件与旁挂一起消失。 剩的三格都是**窗口型**：`check:macos-window` 那一趟界面级证据、Windows 文件被占用那一半（POSIX 验不了）、 移动端真机（**17:5x 更新**：它有自己的装置 `pnpm verify:mobile-account-erasure`，运行时读数仍为零；与 W6-c **共用同一个设备窗口**，所以排队关系没变）⇒ 见 §10.66。 🔴 **09:1x 现量：第二格已闭合**（真 Windows 三条锁腿 `raw_code=32 ⇒ file-in-use`、不抛、释放后可删，变异臂恰好 3 红 —— **§10.16**），这一格现在剩 **macOS 界面级那一趟**、**移动端 Android 运行时**（装置已建，读数待窗口）与 **iOS 运行时**（装置未建，见下一行）三格。 ⚠️ **这一行的三个前提到 19:0x 全部过期**：iOS 装置**已落地**（§10.69，静态有牙 / 运行时零）、macOS 那一格的阻塞换了两次内容（§10.70 ④ → §10.80），"三格"这个计数也不再是现量 —— 要看当前口径就读 **§10.82 ①** 那张逐条对账表，别照这一行动作。 🔴 **10-05 05:4x 现量更新（本行上面那些口径到此作废，读这两句就够）**：**Android 运行时那一格已闭合** —— 第 7 趟 A–E 五条判据全部拿到真机读数，且判据 B 的前提**两侧都证了**（服务端 `curl` 回 401+`TOKEN_INVALID` 一条、界面回读令牌一条），见 §10.127 ① 与 §10.128 ①。顺带从这张表里挖出一个**产品缺陷**（坏形状令牌 ⇒ HTTP 500 而不是 401），已修 + 钉测 + 全量 server 零回归（§10.128 ②）。**iOS 那一格仍未闭合**，且它的阻塞条件现在是一条**实测的合取**：4 台 Booted 全有活占用者，而本 rig 起手 `simctl uninstall` ⇒ 跑上去就是删别人的载体（§10.127 ④ 门 C）。 |
-| E2 **iOS 运行时那一格**（18:0x 现量补出的**漏枚举**） | 🟡 **代码路径已被 Android 那一格覆盖，平台文件系统那一档未取证** | 驱动只有一份、无平台分支：`apps/mobile/src/db/op-sqlite-driver.ts:134` `removeDatabase()` → `:137` `this.db.delete()`（`grep -n "Platform" ` 该文件 **0 命中**，文件干净 166 行）。⇒ "JS 调到了删除"这件事 Android 的判据 D 证得到；**iOS 上还欠的是那三个文件在不在容器里** | 取证机制现成：`scripts/verify-mobile-ios.sh:328` 的 `phone_db()` = `xcrun simctl get_app_container <UDID> <BID> data`/`Library/heyta.sqlite`。关闭判据 = 用 iOS 装置（`idb_*` + AX 点击那套，lib `:1060-1132`）走完 A→B′→C→D→E，**D 那条数的是容器目录里以 `heyta.sqlite`（整串库名）为前缀的残留 = 0 枚**（18:2x 改形状：静态读过 op-sqlite 三个后端的 `opsqlite_remove` 各自只 `remove()` 一条路径，见 §10.68.5 —— 点名三枚会漏 `-journal` 这一档）；装置**已建**（`scripts/verify-mobile-ios-account-erasure.sh`，§10.69）但**未跑** ⇒ 这一格仍不许并入 Android 那一格报绿 |
+| E2 **iOS 运行时那一格**（18:0x 现量补出的**漏枚举**） | 🔴 **已取到真机读数并判红**（不是"未取证"）：A/B/C 绿、D 文件级 1 枚而内容级三腿全过 | 驱动只有一份、无平台分支：`apps/mobile/src/db/op-sqlite-driver.ts:134` `removeDatabase()` → `:137` `this.db.delete()`（`grep -n "Platform" ` 该文件 **0 命中**，文件干净 166 行）。⇒ "JS 调到了删除"这件事 Android 的判据 D 证得到；**iOS 上还欠的是那三个文件在不在容器里** | 取证机制现成：`scripts/verify-mobile-ios.sh:328` 的 `phone_db()` = `xcrun simctl get_app_container <UDID> <BID> data`/`Library/heyta.sqlite`。关闭判据 = 用 iOS 装置（`idb_*` + AX 点击那套，lib `:1060-1132`）走完 A→B′→C→D→E，**D 那条数的是容器目录里以 `heyta.sqlite`（整串库名）为前缀的残留 = 0 枚**（18:2x 改形状：静态读过 op-sqlite 三个后端的 `opsqlite_remove` 各自只 `remove()` 一条路径，见 §10.68.5 —— 点名三枚会漏 `-journal` 这一档）；装置**已建并跑到判据 E**（`scripts/verify-mobile-ios-account-erasure.sh`，10-05 10:16 那趟是**真服务端**， §10.142 ⑤ 有逐行读数）：A、B 两腿、步骤 6 配对、第 7 步 410+`ACCOUNT_CLOSED`、**C 在 iOS 上成立** ⇒ **这一格现在的红不在"读不到"，在产品侧那条销毁后重建路径**（判据 D 文件级 1 枚 + 内容级三腿全过）。 所以它**仍不许并入 Android 那一格报绿**，但欠的东西已经换了：不是"没跑"，是 #81 那条要产品拍板。 |
 | E3 三端注销入口 | ✅ | 五条 spec：ui **10** / node-host **11** / mobile **11** / web **15** / i18n **26**（i18n 本轮没复量）。🔴 web 那条**分母要说清**：`close-account-panel.spec.tsx` 现在是 **13 个 `it` 块 / vitest 报 15 tests**（有 `.each` 展开），10-05 03:0x 实跑 **15 passed**；旧记录的 12 是 `fcff5bbb`（10-04 10:11，注销那批）建这个文件时的条数，之后它又长了 —— **本轮没动这个文件**（工作树脏 0）。挂载点 `App.tsx:2416`、`ProfileScreen.tsx:744`、CLI `account close`；**四条变异臂 A1–A4 全 ARM=OK**（§10.115 + §10.119 ①） | — |
 | E4 政策分层实话 + 级联对账 | ✅ | `@heyta/legal` **66 passed**（04:32:48 第一次全绿；**05:13:25 改了第五节之后复跑仍 66 passed**）；级联数现量 **19 条 / 18 张表**，五处旧读数都带日期更正留在原句旁（§10.8） | — |
 | E4/E5 追加：政策与代码的**方向**对账 | ✅ **本轮新落的一条腿 + 一处正在说反话的政策** | §10.11 末段：`data-rights` 第五节中英各一处改到正确方向（1.2 未发布⇒折进同版，指纹仍 `data-rights@1.2`）；`check-legal-closure-truth.mjs` 新增"读两个代码前提推三态"的方向腿，`--self-test` **13 支按预期**（方向 6 + 前提 7），真跑 0 条不符，**原地变异**（换回改前措辞+重打 dist）报 `❌ 2 条方向对账不符` 逐栏点名、还原 `cmp` 相同 | 教训入档 `environment-traps` **#212**（"扫过期句"与"扫方向"是两类判据；`minors` 因为不抄第二份所以一个字没改） |
@@ -1615,8 +1627,14 @@ cd "<隔离检出>/e2e" && PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN=false \
      而 `AppApi.swift` 里 `removeDatabase` 命中 **0** —— 我按这条去核过，那里本来就不该有）。
      冒烟 **16/16**（`SMOKE_OK 16`，新增两条走的就是 JS 属性通路），
      完整 `pnpm check:macos-shell` 也跑过了：`RESULT=OK / STORAGE=shell / M1-M3 / 截图非空白 + 主蓝 1713`，
-     证据在 `apps/desktop-macos/evidence/macos-removal-20261004.txt`（`REMOVAL_SMOKE=PASS`、
+     证据在 ~~`apps/desktop-macos/evidence/macos-removal-20261004.txt`~~（`REMOVAL_SMOKE=PASS`、
      `FULL_GATE=PASS exit=0`、`STANDALONE_GATE=pnpm check:macos-removal`）。
+     🔴 **更正（08:5x 复核，留原句在此）**：那枚**证据文件从来没有落盘**（10-05 11:1x 现量：
+     该目录最新一枚是 `mac-reinstall-webview-940af1c0.png`（Oct 3 14:13），`macos-removal-20261004.txt` 仍不在；
+     下面那张表里"最新一枚是 09-30"是**当时**的读数，别当现量抄），
+     所以"证据在 <那个路径>"这半句不成立 —— 上面三串读数本身以**主线程自跑**为准，见本节末尾
+     「08:5x 复核更正」那张表。常驻门 `check:doc-citations` 至今仍在报这条路径，
+     因为原句按纪律不删；**别把它读成"还欠一次落盘"**，要补的是判据文件而不是抄一份读数。
      🔴 **顺带查出并修掉一条真缺陷**：`package-app.sh` 打包时**从来没把 `web-dist` 放进 .app**
      （`PAYLOAD_WEBDIST=False`），而 `reinstall-all.sh:303` 的判据读的是**已安装副本**——
      旧的还在就照绿。修了 +41 行；🟡 **修完之后的那次"重装 + 窗口取证"本轮没重跑**，
@@ -1669,7 +1687,12 @@ C 是"两边都支持一下更保险"（而 `onmessage` 是单槽的，覆盖它
 - 🔴 **macOS 壳里那一发 `oplog-destroy` 的端到端**（页侧点注销 → 壳的库文件消失）：
   只有 TS 侧的替身端口证过协议两侧成对（`native-bridge-destroy.spec.ts` 第 ⑧ 条带反向腿），
   真壳里 `window.__heytaHostStoragePort` 是 Swift 注入的那个对象，**没证**。
-- ✅ **移动端真机那一档 Android 已有运行时读数**（op-sqlite 的 `db.delete()` 在设备上真的把库清掉了：§10.128 第 7 趟判据 D「前缀残留 0 枚」，§10.134 ③ 复量同形；**摘掉主动通道那一发的变异臂 §10.137 ⇒ 同一格判据读到残留 1 枚**）；🔴 **iOS 那一格仍未量**，前置见 **§10.133 ⑤**。~~随 W6-c 一起待窗口~~ —— 这句已被实测否证，划线留原句。
+- ✅ **移动端真机那一档 Android 已有运行时读数**（op-sqlite 的 `db.delete()` 在设备上真的把库清掉了：§10.128 第 7 趟判据 D「前缀残留 0 枚」，§10.134 ③ 复量同形；**摘掉主动通道那一发的变异臂 §10.137 ⇒ 同一格判据读到残留 1 枚**）；~~🔴 **iOS 那一格仍未量**，前置见 **§10.133 ⑤**~~。~~随 W6-c 一起待窗口~~ —— 这句已被实测否证，划线留原句。
+  🔴 **10-05 11:34 补：iOS 那一格的读数已到手，且它判红**（看守跑到 E 新载体一趟，32 绿 / 2 红）。
+  红的是"销毁之后有一次重开把**空 schema** 建回来"（内容层三腿仍全 0：行数 0、文件字节里明文 0 命中、freelist 0）
+  —— 也就是**这一格量到的不是"明文没销毁"，是"文件级残留 0 枚"这句承诺不成立**。
+  机制已在无设备载体上复现到字节数相同（73728），全部读数与边界见 **§10.147**。
+  ⇒ 本行原来那句"iOS 那一格仍未量"自此过期；新增的欠账是**修那条重开路径**（§10.147 ③）。
 - ⚠️ `apps/web/src/lib/local-data-destruction.ts`（页侧销毁器本体）本轮 08:2x 现量 `M`，
   别人的 hunk 就在 `eraseWebLocalData` 里（把中文 reason 换成 ASCII 码那一族）。
   所以壳这一档**没有**并进那份销毁器，而是挂在 `eraseLocalData()` 这一层 ——
@@ -2430,7 +2453,7 @@ comm -13 /tmp/h.txt /tmp/w.txt        # 本批新增
 | **W4b 标签删除确认** | `confirmRemove` / `removeImpact` 各命中 **6** 枚，六枚完全同集合：`packages/ui/src/projects/{OrganizerList.tsx,model.ts}` + `apps/web/src/features/projects/ProjectsPanel.tsx` + `apps/mobile/src/screens/TagsSection.tsx` + 两端各自 spec | ✅ 在 HEAD（共享层 + 两端消费者 + 判据三层齐） |
 | **W6-c 手机回收站验收** | `verify.mobile.trash` 命中 **3** 枚：`package.json`、`scripts/verify-mobile-trash.sh`、`scripts/check-script-snapshot.mjs` | ✅ 本体在 HEAD；**未跑**（§10.21/§10.23：`REDS=load,src,dev,apk`） |
 | **E1b 401→410** | `ACCOUNT_CLOSED` 命中 **4** 枚（`server/src/auth.ts`、`middleware.ts` + 两份 spec）；`410` 命中 **6** 枚（含 `server/src/sync/checkpoint-gate.ts`） | ✅ 在 HEAD（与 §10.20 的 3b 一致） |
-| **E2 本机明文库销毁** | storage 层 `destroy` 命中 **5** 枚：`db.types.ts`（契约）+ `indexeddb/`、`sqlite/`（两套驱动链）、`memory/` 三份实现 | ✅ 契约与三套实现在 HEAD；设备面按 §10.11 逐宿主账（**14:1x 现量更正**：那张表原先只有五行，漏了 `desktop-linux` 这一端 —— 分母已改成从树上取，见 §10.42），仍缺 macOS 界面级与移动端真机；🟡 而 Linux 那一端今天是**真缺口不是待取证**（`wal=Y remover=N`，已带理由与摘除判据登记在 `REGISTERED_GAPS`，政策第五节 ② 也点名了它） |
+| **E2 本机明文库销毁** | storage 层 `destroy` 命中 **5** 枚：`db.types.ts`（契约）+ `indexeddb/`、`sqlite/`（两套驱动链）、`memory/` 三份实现 | ✅ 契约与三套实现在 HEAD；设备面按 §10.11 逐宿主账（**14:1x 现量更正**：那张表原先只有五行，漏了 `desktop-linux` 这一端 —— 分母已改成从树上取，见 §10.42），仍缺 macOS 界面级与移动端真机；⚠️ **这半句在 10-05 16:4x 已过期一半（原句保留）**：**移动端真机那一格已经拿到读数**（Android 侧 §10.128 / §10.131 / §10.132 / §10.156，iOS 侧 §10.155；本文件第 5433 行那格早已把它撤了，但这一行没同步 —— 同一个结论句落在两格、改一处必 sweep 全仓，这次就是漏掉的那一处）。**这一行现在真正还缺的只有 macOS 界面级那一趟**（#94，要不可逆动作的同意）；🟡 而 Linux 那一端今天是**真缺口不是待取证**（`wal=Y remover=N`，已带理由与摘除判据登记在 `REGISTERED_GAPS`，政策第五节 ② 也点名了它） |
 | **E3 注销入口** | `closeAccount` / `close-account` 两图案合计命中 **10** 枚，三个宿主全在：`apps/web/.../CloseAccountPanel.tsx`、`apps/mobile/src/screens/AccountClosureScreen.tsx`(+`ProfileScreen.tsx`+spec)、`apps/node-host/src/cli-account.ts`，加上 `packages/app-host/src/{account-closure,hosted-auth}.ts` | ✅ 在 HEAD |
 | **E5 结构性敞口** | `recover-user` 产物权限：`server/scripts/recover-user.ts` 命中；"定点删除/按条目删除"实话命中 **3** 份法务文档（`privacy`、`third-parties`、`personal-info-list`） | ✅ 可当场修的两条在 HEAD |
 | **E6 GDPR 口径** | `GDPR` 命中 **6** 份 `packages/legal/src/documents/*`；两枚门禁**脚本** `scripts/check-legal-{gdpr,closure-truth}.mjs` 在 HEAD | 🟡 见下面第 2 节：**脚本在 HEAD，接线不在** |
@@ -6981,7 +7004,7 @@ C 档=node 写但显式设 ON ⇒ 主文件 0）。我没有把这个不一致�
 | E6 九份法务 GDPR 口径 + 常驻门禁 | ✅ 9/9 | §10.28 + `check-legal-gdpr`；补牙那条（en 栏 16/15 而真值 19/18）是**门禁自己有洞**被照出来后修的（#30） | —— |
 | W07 帮助中心回收站配图 | ✅ 重截过 | §11.7.2：真因是截图流水线缺"导航前清遮挡"，不是假失败；两枚 PNG 重截 + `gen-help-figures` | —— |
 | E5 三处敞口可当场修的部分 | ✅ 两半都落 | `recover-user.ts` 产物权限 + 政策如实度门禁；判定"不改但量清为什么不改"的三条红在批次 E 那张表的 E5 行 | P-12（备份侧加密/密钥托管）**要人拍板**，不在本批；臂 E 那份未跟踪判据要随批入库（#50，等明示提交） |
-| E2 本机明文库真的销毁 | 🟡 **代码链全闭合，运行时读数分宿主还差三格** | 共享层在三套实现 + 注册表（HEAD）；TS 17 条 + 五臂变异各恰好 1 红；壳侧 `check:macos-shell` 61 ✅ / `check:windows-shell` 35 ✅（都真跑到 `containerRemoved:true`） | ① **Web 真浏览器那一趟**（两次被 tfa 内存闸门拒绝，`RUN_RC=1` 是"一条都没跑"，§10.58 那节有可执行关闭三条）② **macOS 界面级**（装置本轮建成、四条探针缺陷已修，还差一趟安静跑，§10.80 ⑤）③ **移动端真机**（Android 装置齐、读数零；iOS 装置**也已落地** `scripts/verify-mobile-ios-account-erasure.sh`，静态有牙 / 运行时零 —— §10.69） |
+| E2 本机明文库真的销毁 | 🟡 **代码链全闭合；运行时读数分宿主：两格未跑、两格已有读数而各欠一条**（10-05 10:4x 现量，之前写"还差三格"是把 Android 那格记成了"读数零"） | 共享层在三套实现 + 注册表（HEAD）；TS 17 条 + 五臂变异各恰好 1 红；壳侧 `check:macos-shell` 61 ✅ / `check:windows-shell` 35 ✅（都真跑到 `containerRemoved:true`） | ① **Web 真浏览器那一趟**（两次被 tfa 内存闸门拒绝，`RUN_RC=1` 是"一条都没跑"，§10.58 那节有可执行关闭三条）② **macOS 界面级**（装置本轮建成、四条探针缺陷已修，还差一趟安静跑，§10.80 ⑤）③ **移动端真机**（Android 运行时读数已到手、三层对照链 §10.130→132→137，但设备级被动通道正向臂 #77 仍未签；iOS **10-05 10:16 真服务端一趟已有运行时读数**：A/B/C 绿、D 内容级三腿全过而文件级 1 枚 ⇒ 这一格的红从"装置没跑"换成了 #81 那条要产品拍板的重建路径，§10.142） |
 | W6 回收站跨设备真机验收 | 🔄 **21:44 起第一次真的在跑** | 见下面 ② | 等这一趟的判据 ①–⑥ 读数 |
 | 让窗后补跑 `check:landing-e2e` / `check:ai-e2e` / 壳类门禁 / `reinstall:all` | ⏸ 等窗口 | —— | 负载与 e2e/Playwright 让位；`reinstall:all` 必须在隔离检出 |
 
@@ -8086,9 +8109,9 @@ grep 全文：`mtime` 只出现在**注释**里（:34 与 :109-110 那两句讨�
 | W4b | 标签删除确认 | ✅ **闭合** | 共享 `packages/ui/src/projects/OrganizerList.tsx:118`（可选 prop）/:365（消费）；**两端都传**：`apps/web/src/features/projects/ProjectsPanel.tsx:425`、`apps/mobile/src/screens/TagsSection.tsx:170`；四个键 `common.organizer.confirm.{ask,impactTags,delete,cancel}` zh 与 en 各 1 条（`grep -c` 现量 4/4）；用例在 `apps/web/tests/projects-panel.spec.tsx` 与 `apps/mobile/tests/projects-sections.spec.ts`；设备那一档在 trash 脚本第 6b 步 |
 | W6 | `verify:mobile-trash` 真机 | ✅ **04:1x 第 13 趟 35 绿 / 0 红：六条验收腿一次拿全（含 W4 的 PROJECT 第四路与 W4b 的标签两步删），四张截图人逐张看过 ⇒ W6 闭合**（读数在 **§10.122**）。历史：🔄 **04:0x 现量：第 11 趟步 0–5 全绿（含零点击上行、恢复的 `NOTE/UPD` 载荷判据），步 6 的红已现量成"装置只会往下滚"（**不是产品**：手工反向滚之后那一行画得好好的、四个按钮 bounds sane，人已看图）⇒ 步 6 加了"先推到页顶"的预滚，第 12 趟在等负载窗口**（逐步读数与那次现量在 **§10.120**，上一轮的三条红归因在 **§10.117**；第 12 趟的 34 绿/1 红与第 13 趟的闭合读数在 **§10.121 / §10.122**） | `scripts/verify-mobile-trash.sh`（就绪门 :144–151，`tmp/trash-health-arm.sh` 四腿 ALL=OK）。01:5x 现量：负载不是拦路的（`load1=7.13` ≤ 阈值 12）、`emulator-5554 device`、链自己把端口从被占的 `:3100` 换到空闲的 `:3101`（`:3100` 的持有者是 `node dist/src/index.js`，cwd=主检出 `server/`，起于 10-04 06:02:44 —— 别人的，本批没碰），**然后被 #49 那道守卫响亮拒绝**：`有另一趟 reinstall-all 在跑（pid 16683）… exit 3`。看守重起为可通知的后台任务（`INTERVAL=90 MAX_TRIES=80`，截止 03:48，日志 `/tmp/w6c-watch-0148.log`）。上一趟 01:29 的远端 APK 失败与它的病因（打包机依赖无人对账）记在 **§10.103 / #59**；**02:0x 第 7 趟的死因不是产品**：远端 `BUILD SUCCESSFUL in 2m33s`，红在 `run-gradle.mjs` 步骤 5 把空读数当成 1970 —— 修它在 02:0x 那一刻只存在于**别人的未提交工作树**（mtime 02:00:26），而载体是 `checkout` 同步的；**02:11 那条已由别人提交为 `afe7ff7a`** ⇒ 下一次开窗第 1 步同步会自然带上，不用我改装置，见 §10.105 ③；**同批必做（02:1x 现量它还没登记）**：拿到跑绿读数那一刻把 `scripts/verify-mobile-trash.sh` 写进 `scripts/check-journey-coverage.mjs` 的移动端 `ENDPOINTS.scripts`（那张是手写清单、不是 glob），并带上那一趟脚本自己打印的 summary 行 + 日期 |
 | E1b | 401 → 410 | ✅ **闭合** | `server/tests/account-closed-signal.spec.ts` 里那条 `it('🔴 账号已注销：**410** 响应体带 code=ACCOUNT_CLOSED（E1b）')` 及其 `expect(res.statusCode).toBe(410)`，其余仍 401；信号码 `ACCOUNT_CLOSED` 住在 `server/src/middleware.ts` 与 `server/src/auth.ts`。⚠️ **别再写 `:154` 这种裸行号**：06:2x 现量它是 HEAD 版的位置（`it` 在 :154、断言在 :159），而该文件此刻带着**别人的未提交 +30 行**，工作树里已被推到 :184/:189 —— 行号是活树的瞬时读数，用例名才是稳的（取证件：`grep -n 'toBe(410)' server/tests/account-closed-signal.spec.ts`） |
-| E2 | 契约 + 三套实现 + 逐宿主 | 🟡 **代码全闭；读数只剩 iOS 一格**（06:3x 行级更新） | 权威分端表在 **§10.11**（本节不重抄）。**已取到读数的端**：macOS 壳级七档全绿 + M3 的 S 红（**§10.98**）、字节留存腿 1⇒0（**§10.99**）、OPFS 双臂自证（**§10.100**）、**Web 真浏览器那一格闭合 —— 常驻判据的变异臂 `ARM=OK`（01:4x，**§10.102**，旧登记的"缺隔离载体"被否证：载体按 blob 筛，不是按目录名猜）**、**Android 真机运行时闭合（第 7 趟，A/B/C/D 四条判据全 ✅ + 前提两侧各一条独立读数；那 5 条红是装置侧的输入框形状读数，非产品，机制与"不在 lib 里修"的理由见 §10.128 ②）**。变异读数一侧：macOS **四臂**（M1/M2a/M2b/M3，含"M2 ⇒ E 红 D 绿"那句预测被实测否证）在 **§10.129**、层内（`packages/sync-client`，摘销毁那一发 ⇒ 恰 6 红 / 放宽成任意 401 ⇒ 9 红含 4 条负向腿）在 **§10.130**、设备级 M2′ 臂两趟在 **§10.131 / §10.132**（第一趟存活⇒照出 B 只量文件没有牙；补数据腿后同一枚变异复跑⇒同一次运行里文件腿 ✅、数据腿 ❌「ops 从 1 行变成 0 行」）；🔴 **设备级 M1′ 两趟已跑、臂存活**（§10.135）—— 它的产出不是「产品没事」，而是**这条 Android 读数只覆盖主动通道**（从界面点注销，`apps/mobile/src/screens/AccountClosureScreen.tsx:138` → `account-closure.ts:65`），而被动通道（`client.ts:937`：别的设备注销、本机之后同步时读到信号）只有层内判据守着（`packages/sync-client/tests/account-closed-erasure.spec.ts:74 / :105 / :214`）。⇒ 设备级换到主动通道的那一臂 **M1″ 已跑并转红**（**§10.137**）。仍未闭合：**iOS 运行时**（合取阻塞见 §10.127 ② —— 4 台 Booted 里 3 台有活进程/idb，而 rig 起手 `simctl uninstall` ⇒ 门 C 拒跑）~~与**设备级 M1′（摘销毁器）**（不许拿层内/macOS 的读数替它签字）~~—— 这一项已由 **§10.137** 的 M1″ 关闭（设备级正向变异读数到手、判据 D 转红）；划线留原句是为了让人看清它错在哪：它把"摘销毁器"这一臂绑在了**被动通道**上，而设备脚本走的是主动通道。iOS 那一格仍然**没有**可替签的读数。~~数据腿在未变异产物上的绿基线~~ —— **已闭合（23:0x）**：未变异产物上 A=1 行、B 两腿都 ✅（数据腿读到"仍是 1 行"），见 **§10.132 ④** 的配对表；⇒ Android 这一格的负向对照现在是"会红、且只在被禁止的行为上红"的闭合形状。旧登记里"macOS 的 M1/M2 两臂 ⇒ 归 #58"这一条**作废**（不重，整条准备链实测 85 秒，且已在 06:1x 跑完） |
+| E2 | 契约 + 三套实现 + 逐宿主 | 🟡 **代码全闭；读数只剩 iOS 一格**（06:3x 行级更新）⚠️ **10-05 10:4x 这句过期**：iOS 运行时已有真服务端读数（§10.142 ⑤，判红在 #81 那条销毁后重建路径，不在"没读数"），这一格欠的是产品裁决 + ~~E 的新载体读数~~ + #76 变异臂 —— ⚠️ **10-05 12:2x 再更新**：E 的换载体第一趟已到手（§10.147，那一格判红的是 #87 那条销毁后重建路径，不是「没读数」）；#76 那一臂的两处装置缺陷也已修（§10.149），~~但它**仍然没有读数**~~ —— **13:0x 读数已到手：`ARM=OK`，判据 B 在 iOS 上有牙，牙齿在数据腿（§10.155）**；**#90 也已闭合**：文件腿**能**红（L2/L3/L4 三条独立红），只是问不到这一枚，恒绿那一格留在 #87（**§10.157** ④） | 权威分端表在 **§10.11**（本节不重抄）。**已取到读数的端**：macOS 壳级七档全绿 + M3 的 S 红（**§10.98**）、字节留存腿 1⇒0（**§10.99**）、OPFS 双臂自证（**§10.100**）、**Web 真浏览器那一格闭合 —— 常驻判据的变异臂 `ARM=OK`（01:4x，**§10.102**，旧登记的"缺隔离载体"被否证：载体按 blob 筛，不是按目录名猜）**、**Android 真机运行时闭合（第 7 趟，A/B/C/D 四条判据全 ✅ + 前提两侧各一条独立读数；那 5 条红是装置侧的输入框形状读数，非产品，机制与"不在 lib 里修"的理由见 §10.128 ②）**。变异读数一侧：macOS **四臂**（M1/M2a/M2b/M3，含"M2 ⇒ E 红 D 绿"那句预测被实测否证）在 **§10.129**、层内（`packages/sync-client`，摘销毁那一发 ⇒ 恰 6 红 / 放宽成任意 401 ⇒ 9 红含 4 条负向腿）在 **§10.130**、设备级 M2′ 臂两趟在 **§10.131 / §10.132**（第一趟存活⇒照出 B 只量文件没有牙；补数据腿后同一枚变异复跑⇒同一次运行里文件腿 ✅、数据腿 ❌「ops 从 1 行变成 0 行」）；🔴 **设备级 M1′ 两趟已跑、臂存活**（§10.135）—— 它的产出不是「产品没事」，而是**这条 Android 读数只覆盖主动通道**（从界面点注销，`apps/mobile/src/screens/AccountClosureScreen.tsx:138` → `account-closure.ts:65`），而被动通道（`client.ts:937`：别的设备注销、本机之后同步时读到信号）只有层内判据守着（`packages/sync-client/tests/account-closed-erasure.spec.ts:74 / :105 / :214`）。⇒ 设备级换到主动通道的那一臂 **M1″ 已跑并转红**（**§10.137**）。仍未闭合：**iOS 运行时**（合取阻塞见 §10.127 ② —— 4 台 Booted 里 3 台有活进程/idb，而 rig 起手 `simctl uninstall` ⇒ 门 C 拒跑）~~与**设备级 M1′（摘销毁器）**（不许拿层内/macOS 的读数替它签字）~~—— 这一项已由 **§10.137** 的 M1″ 关闭（设备级正向变异读数到手、判据 D 转红）；划线留原句是为了让人看清它错在哪：它把"摘销毁器"这一臂绑在了**被动通道**上，而设备脚本走的是主动通道。iOS 那一格仍然**没有**可替签的读数。~~数据腿在未变异产物上的绿基线~~ —— **已闭合（23:0x）**：未变异产物上 A=1 行、B 两腿都 ✅（数据腿读到"仍是 1 行"），见 **§10.132 ④** 的配对表；⇒ Android 这一格的负向对照现在是"会红、且只在被禁止的行为上红"的闭合形状。旧登记里"macOS 的 M1/M2 两臂 ⇒ 归 #58"这一条**作废**（不重，整条准备链实测 85 秒，且已在 06:1x 跑完） |
 | E3 | 三个入口 + 二次确认 + 先导出 | ✅ **闭合**（03:0x 在当前 HEAD 复量四条 spec = `10/11/11/15 passed`，**§10.114**；四臂 A1/A2/A3 恰好红在点名那句、A4 两版针被载具守卫咬过两次后的第三版见 **§10.115** —— 原表"四条 spec 全部待闸门"那半句的作废声明挂在 §10.6 行内 + §10.113 末） | `apps/web/src/features/settings/CloseAccountPanel.tsx`（:89 `exportHint`、:103 `confirmLocal`、:127 `data-testid="close-account-confirm"`）、`apps/mobile/src/screens/AccountClosureScreen.tsx`（含未上传条数那一档 :170）、`apps/node-host/src/cli-account.ts`；文案中英成对，且 `confirmLocal` 那句确实写着"还没同步出去的数据…也会一起被清除" |
-| E5 | 三处结构性敞口 | 🟡 臂 E 闭合，两半不在本批 | 臂 E 见 **§10.95**（载体复量为 HEAD，`1 passed / 6 passed` rc=0）；备份侧 P-12 要人拍板；臂 D 等别人那条跨包改动落地。02:2x 判据层复量：`check:legal-closure-truth` 由 00:3x 的「故意红」变成 **rc=0**（§10.106） |
+| E5 | 三处结构性敞口 | 🟡 臂 E 闭合，两半不在本批 | 臂 E 见 **§10.95**（载体复量为 HEAD，`1 passed / 6 passed` rc=0）；备份侧 P-12 要人拍板；~~臂 D 等别人那条跨包改动落地~~ —— **这句过期**：前置在 §10.144/§10.145 就已成立，14:0x 第一次**带闸门**起跑，被自己的负载门挡下（`现量 loadavg(1m)=20.00 阈值=12` ⇒ `E5=ENV exit3`），而拦它的那趟负载是我自己刚起的四端重装 ⇒ 第三趟 14:2x 现量 `load=8.63` 放行，**读数已到手：五臂全按预期（臂 D：记录 3 / 墓碑 1 / `deleted=1`）⇒ #85 已闭合**（§10.158，含"三趟 exit 3/3/0 才是那道负载门第一次自己兑现"的读法）。02:2x 判据层复量：`check:legal-closure-truth` 由 00:3x 的「故意红」变成 **rc=0**（§10.106） |
 | E6 | 九份法务 + 常驻门禁 | ✅ **闭合** | §10.28 / §10.30（9/9 + 门禁有牙 + legal/landing 读数）；实现各自带 `--self-test` 臂 |
 | E7 | 管理端日志不落邮箱 | ✅ **闭合**（02:1x 现量；一度被我误登记成"没判据"，撤回见 §10.105 ②） | `server/tests/admin-log-pii.spec.ts` 4 条（扫描分母=0 个文件算探针坏、全仓 `server/src` 扫描、**把本轮改掉的两行原文喂回必判红**、改掉后的形状不误判）；取证件 `cd server && NO_COLOR=1 npx vitest run tests/admin-log-pii.spec.ts` ⇒ `4 passed (4)` / rc=0 / 126ms；落点 `server/src/admin/admin.routes.ts:441,513` 的注释点名该 spec，`docs/adr/0049-account-closure-erasure-semantics.md:87` 记了变异形状 |
 | I2/I3 | 归档与删除两态正交 | ✅ **闭合**（02:1x，§10.105 ①） | §4 欠的两条读数补齐：新判据两枚（`project-actions.spec.ts` 的载荷键集 + `trash-rows.spec.ts` 的行层那一半），载具 `tmp/i2-i3-archive-arms.sh` 五臂 A/B/E/C/D 全按点名那句转红、每臂复原后 sha256 与 `cmp -s` 逐字节相同且复跑绿 |
@@ -8384,6 +8407,10 @@ E2 逐宿主清单里 **Web 那一格到此闭合**（真浏览器读数 §10.5x
 与桥接产物 ⇒ 只能进 #58 那批隔离载体补跑）。
 ⚠️ **这一句在 10-05 06:1x 过期了两件事**：① macOS 那两臂**已在隔离载体跑完**（四臂读数 + 一条被否证的
 预测 ⇒ **§10.129**），不需要等 #58 那批；② Android 运行时读数也已经拿到（§10.127 ①/§10.128 ①）。
+🔴 **③ 10-05 10:4x 再过期第三件**：括号里那个"（Android/**iOS**，设备窗口）"里的 **iOS 也不再是"没跑"** ——
+真服务端一趟（10:16）已拿到运行时读数，A/B/C 绿、D 内容级三腿全过而文件级判红 ⇒ **§10.142**。
+这一格现在欠的是 #81 那条重建路径的产品裁决 + 换载体后判据 E 的第一次读数 + #76 那枚变异，（⚠️ 这句从 10-05 11:3x 起过期：E 的第一趟已有读数 §10.147；#76 的装置修了两条腿但仍无读数 §10.149）
+**不是**设备窗口里的"零读数"。
 这一行当时按"臂要重建共享产物 ⇒ 归 #58"推断，而**重建这件事在载体里做实测只要 85 秒**
 （05:56:0x 起链 → 三枚产物 mtime 05:57:17 / 05:57:18 / 05:57:23：token 派生物 + `swift build`（11.47s）
 + 桥 bundle + app-host dist + web dist）。推断把成本写大了，就把一件当场能做的事排成了等待。
@@ -8616,7 +8643,9 @@ macOS 的 **M1/M2 两臂**、W6-c 真机读数、#58 那批重量级补跑（`ch
 > §10.122；§10.97 的 W6 行改了，这段没跟着改）；② **macOS 的 M1/M2 两臂已实测闭合，而且是四臂**
 > （M1 / M2a / M2b / M3，**§10.129**）。原句同时低估了两件事：它并不重（整条准备链实测 **85 秒**，
 > 不是我当时推断的"12 秒"，§10.129 里已就地更正），而"M2 ⇒ E 转红、D 仍绿"那句预测**被实测否证**
-> （真实红集是 B+D+E+F）。这段现在真正只剩：**E2 的 Android 运行时**（第 7 趟七档判据 §10.128 + 变异臂两趟 §10.131/§10.132：第一趟存活照出 B 的文件腿没有牙，补数据腿后同一枚变异转红；数据腿的未变异绿基线已闭合（§10.134 ③：29 绿 / 5 红，那 5 条是装置侧换凭据形状）；**设备级 M1′ 两趟已跑、臂存活**，产出是「这条 Android 读数只覆盖主动通道」这条归属更正（§10.135）⇒ 主动通道那一臂 **M1″ 已跑并按预期转红（§10.137）**，Android 这一格的三层对照链闭合；这一段**没宣布闭合**的只剩 **iOS 运行时**）
+> （真实红集是 B+D+E+F）。这段现在真正只剩：**E2 的 Android 运行时**（第 7 趟七档判据 §10.128 + 变异臂两趟 §10.131/§10.132：第一趟存活照出 B 的文件腿没有牙，补数据腿后同一枚变异转红；数据腿的未变异绿基线已闭合（§10.134 ③：29 绿 / 5 红，那 5 条是装置侧换凭据形状）；**设备级 M1′ 两趟已跑、臂存活**，产出是「这条 Android 读数只覆盖主动通道」这条归属更正（§10.135）⇒ 主动通道那一臂 **M1″ 已跑并按预期转红（§10.137）**，Android 这一格的三层对照链闭合；这一段**没宣布闭合**的只剩 **iOS 运行时**⚠️ **这句在 10-05 10:4x 过期**：
+iOS 运行时已经拿到真服务端读数（§10.142 ⑤），这一段现在没宣布闭合的是 **#81 那条销毁后重建路径的产品裁决**
++ 换载体后判据 E 的第一次读数 + **#76 那枚变异臂**，三者都不是"没有读数"）
 > 与 **iOS 运行时**（§10.127 的合取阻塞）、**#58 那批重量级补跑**、**P-12 / P-8 两枚待拍板**。
 > 原句留在原位不删 —— 它记录的是"剩余清单在 02:2x 那一刻长什么样"。
 阻塞现量（02:2x 当场量的，不引用旧读数）：`vm.loadavg` = `{ 31.66 67.04 47.80 }`（阈值 12）；
@@ -9983,6 +10012,8 @@ M2a `/tmp/heyta-mac-erase-061051`、M2b `/tmp/heyta-mac-erase-061119`。
   占用，而本 rig 起手就 `simctl uninstall` ⇒ 门 C 拒跑~~ 🔴 **这半句 10-05 08:2x 被实测否证**：那几枚 app 进程都在**零 CPU 增量**地挂着
   （模拟器不会因为一轮验收结束就杀进程），门 C 把"装过"读成"在用" ⇒ 4/4 全挡 = 探针问题，**不是环境阻塞**；
   合取里真正没满足的只有 (b) 产物新鲜度那一半 ⇒ 见 **§10.138**）与 #58 那批重量级补跑。
+  🔴 **10-05 10:4x：这一句里的"iOS 运行时"作为'还没跑'已经过期** —— 真服务端读数在 **§10.142 ⑤**，
+  这一格现在欠的是 #81 那条销毁后重建路径的产品裁决、换了载体的判据 E 的第一次读数，以及 #76 那枚变异臂。（⚠️ 10-05 12:2x：中间那项已到手 §10.147；#76 装置已修、仍无读数 §10.149）
 - 装置改动：`scripts/verify-macos-account-erasure.sh` 文件头变异靶那一节整段改写为实测
   （含"必须整链重建 + 按产物量新鲜度"的装置约束）。载体里那份同步到同一 md5（`d3336a96…`）。
   两道够得着的静态门禁复跑：`check:script-snapshot` 0（41 个脚本自快照全在位）、
@@ -10586,7 +10617,11 @@ bash 是**按字节偏移边读边执行**的，脚本文件被换掉之后，�
 - **Android 的被动通道**（`client.ts:932 / :937`：别的设备注销、本机之后同步时读到信号）在**设备层仍只有负向腿**：
   正向那一臂（摘掉被动通道里那一次 `eraseLocalData`）在设备上从没跑过，层内跑过（§10.130）。
   这一档留着不提前签字 —— 它需要再一次重打重装，而下一次应当和 iOS 那一格共用同一个窗口。
-- **iOS**：运行时那一格仍无读数（#67）。
+- **iOS**：运行时那一格**10-05 10:16 已有真服务端读数**（§10.142 ⑤，29 通过 / 5 失败）：
+  A、B 两腿（含三条前提腿）、步骤 6 配对、第 7 步 410+`ACCOUNT_CLOSED`、**C 成立**，
+  D 的内容级三腿全过而**文件级 1 枚** ⇒ 这一格判红的原因从"装置没跑"换成了 #81 那条销毁后重建路径；
+  E 那一档的载体（原为"再点一次立即同步"）已被证明在产品拒同步时不可用，换成冷启动一趟，第一次读数待跑。
+  ⚠️ **仍未签**的是 #76（判据 B 自己能不能红）—— 基线绿不构成这一臂有牙。
 
 ## 10.138 门 C 把四台设备全挡成"有人在用"：一条**永远拒绝**的门与一条永远通过的门是同一个缺陷（10-05 08:2x）
 
@@ -10919,10 +10954,24 @@ db_ops_count()  { sqlite3 "${DATA_CONTAINER}/Library/${DB_NAME}" "SELECT COUNT(*
    ❌ 90 秒内没等到「立即同步」这个标签（它一直 busy？）
 ```
 
-**截图给的形状和这句话不一样**（`apps/mobile/evidence/ios-account-erasure-2-no-composer.png`，人已看）：
-人已经在「我的」页，「立即同步」那颗蓝按钮**就在画面里**，只是被 iCloud 的
-「保存密码？」系统弹窗整个盖住 —— 而弹窗一盖，应用的 AX 树只剩 `AXApplication`，
-"等标签"于是空转到超时。
+**🔴 撤回（10-05 11:0x 逐张回看自己引过的那几张图时照出来的）**：上面那段"截图给的形状是：人已经在
+「我的」页、「立即同步」就在画面里、只是被 iCloud 弹窗整个盖住"**是错的，而且错在我引的那张图正好否证它**。
+现量（`apps/mobile/evidence/ios-account-erasure-2-no-composer.png`，mtime 09:00:54，md5 `18bf5cffbbf770a69e2444663ceeaba4`，人已看）：
+画面是**任务页空态**（「10月5日 星期一」+「今天还没有安排」+ 右下角 FAB），
+**没有**「我的」页、**没有**那颗蓝按钮、**也没有**任何系统弹窗。
+再看同两趟的日志（`/tmp/e2-ios-erasure-085208.log` 与 `-085730.log`，逐字）：
+
+- 08:55 那趟：`❌ 90 秒内没等到「立即同步」这个标签（它一直 busy？）` + `❌ 找不到便签输入框「写点什么…」` —— 这条是**修之前**的形状；
+- 09:00 那趟：`第一轮没等到 ⇒ 先按系统弹窗处置一遍再等第二轮` → `底部两个标签都不在树上 ⇒ 按 iOS 系统弹窗态处理，按坐标点「以后」`
+  → `frame=402x874 ⇒ 点 (124,537)` → `✅ 已按坐标关掉 iOS「保存密码？」系统弹窗（回读：任务=True 我的=True）`
+  → 仍然 `❌ 找不到便签输入框「写点什么…」`。
+
+⇒ 弹窗那一腿**是真的**，但它的证据是**日志那四行**（"底部两个标签都不在树上"就是 `dismiss_ios_save_password`
+判"这是系统弹窗态"的依据），不是那张 PNG。那张 PNG 拍的是**摘掉弹窗之后**的界面，
+而它顺带量到一件我当时没看出来的事：**摘完弹窗，界面停在任务页** ——
+因为 `sync_now` 开头那一下 `ax "我的" --press` 是在弹窗立着的时候发的，**它没落地**。
+所以 09:00 那趟第二轮等的是"任务页上永远不会出现的标签"，最后剩下的那条红是**走错页**，不是弹窗。
+（这一格当时被我读成"弹窗盖住了按钮"，于是修了弹窗腿、没修导航腿。）
 
 我 rig 里那次 `dismiss_ios_save_password` 调用**在填写步内部**（`fill_three_credentials` 里），
 它跑的时候弹窗还没出现；**弹窗是填完 secure 框之后才弹的**。
@@ -10933,8 +10982,9 @@ db_ops_count()  { sqlite3 "${DATA_CONTAINER}/Library/${DB_NAME}" "SELECT COUNT(*
 （我这份写死 `--tap 125 537`，兄弟那份在折叠屏 Duo 上实测点进过页面控件）。
 ⇒ 把兄弟那份的配方搬过来（不新写一套），并在 `sync_now` 里改成
 "第一轮等不到 ⇒ 先摘弹窗 ⇒ 再等一轮，两轮都没等到才判红，且把两轮都打出来"。
+🔴 而"摘完弹窗要**重新按一次「我的」**"这一条是 11:0x 回看图与日志配对时才补上的，落点与读数见 §10.143 ⑦。
 
-09:00 复跑的那段读数（这一段是修好后新拿到的）：
+09:00 复跑的那段读数（这一段是修好弹窗腿之后、修导航腿**之前**拿到的）：
 
 ```
      第一轮没等到 ⇒ 先按系统弹窗处置一遍再等第二轮
@@ -10946,6 +10996,12 @@ db_ops_count()  { sqlite3 "${DATA_CONTAINER}/Library/${DB_NAME}" "SELECT COUNT(*
 📌 一般规律：**"摘掉系统弹窗"不是一个时刻性动作，是一个界面状态**。
 凡是后面还有"等某个标签"的步骤，那个等待点自己就得先看一眼有没有弹窗盖着 ——
 和 §7 里"权限弹窗关闭 ≠ 回到前台"是同一族（状态的**出现时刻**晚于检查时刻）。
+
+📌 第二条（这一轮真正的产出，比第一条贵）：**"摘掉弹窗"之后界面在哪个页上，是一条要重新量的量**。
+弹窗吃掉的不只是那一下 tap，还有"我已经导航到目标页"这个前提；
+而**把截图和它那一趟的日志配对着回看**（而不是只看日志、或只看图）才会同时看见"弹窗是真的"和"页是错的"。
+我此前那句"人已看"只看了图没配日志，于是图真的被我"看"成了另一件事（§6.2 规定一要的是**看图 + 看那一趟的读数**）。
+
 
 ### ⑥ 便签输入框住在「我的」页且要滚动，我这枚 rig 点的是「任务」
 
@@ -11008,3 +11064,4124 @@ y= 681 Button      AXLabel=编辑便签「ｉｏｓ－ｅｒａｓｅ－０９�
 - ⚠️ 一条**不许顺手放宽**的：`idb_has`（lib 那份，精确标签或值）对**任何** ASCII 正文的 needle 在 iOS 上
   都会恒不命中（本节⑦的②）。别的 rig 现在没踩到是因为它们的 needle 是中文。
   要不要把 NFKC 搬进 lib 是**另一个决定**（它会让所有 `idb_has` 变宽松），登记在 #79，不在本节顺手做。
+
+## 10.142 iOS 注销 rig 第一次拿到 A→E 全档读数：那四枚红**分别**是三件事（探针打了不存在的路由 / tap 落在导航栏上 / 销毁之后有一条写路径把壳建回来）（10-05 09:0x–10:1x）
+
+§10.141 修完那七处之后，09:15 / 09:30 / 09:42 三趟把判据本体推到了第 10 步。
+**我上一趟给这四枚红的归因是"共同上游 = 第 7 步那个 404"——这句现在只成立到第 7 步为止**：
+09:30 那趟 404 修好、410 已经读到了，C 仍然连红 40 个采样窗，D 仍然 1 枚残留。
+所以本节按"每一枚红各自的上游"重写，不按"一条根因解释全部"。
+
+### ① 判据 A 与判据 B 第一次在 iOS 上有读数 —— 而 B 的**前提**是今天才发现根本没成立
+
+```
+════ 4. 判据 A ════
+   ✅ 判据 A 成立：heyta.sqlite 在盘上，ops 有 1 行
+════ 5. 判据 B：换成服务端不认的令牌（401 TOKEN_INVALID）════
+   ✅ 判据 B（文件腿）成立：一次 401 之后 heyta.sqlite 仍在盘上
+   ✅ 判据 B（数据腿）成立：401 之后 ops 仍是 1 行（与 A 那一刻逐字相同）
+════ 6. 换回真令牌并同步 ════
+   ✅ 换回有效令牌后库仍在（B 的读数不是「库里本来就没人写过」）
+```
+
+🔴 但把 09:42 那趟的**服务端日志**摊开看（`/tmp/heyta-e2e-erasure-ios-094234.log`）：
+
+```
+01:43:54 [ws:user:302] Connected → Download: 0 ops        ← 步骤 2 存凭据
+01:45:46 [ws:user:302] Connected → Download: 0 ops        ← 步骤 3 那次 sync_now（这一发到了）
+01:46:41 Upload: 1 ops → Download: 0 ops (sinceSeq=1)     ← 便签落库
+01:48:58 DELETE ACCOUNT requested → 410 探针那一发
+（01:46:41 与 01:48:58 之间：步骤 5 换坏令牌 + sync_now、步骤 6 换回真令牌 + sync_now ⇒ 零行）
+```
+
+⇒ **那两腿量到的不是"一次 401 之后库还在"，而是"换了个令牌、库还在"** —— 服务端从来没有
+拒过这枚令牌，因为客户端**一次请求都没发**。B 是这一格唯一的负向对照（"改一次密码会踢掉所有
+设备并毁掉它们的本地数据"那条红话靠它挡），而它的**前提**没有一条读到的证据。
+这不是"结论错了"，是**这条判据当时没在量它说的那件事**。
+
+修法（补两条前提腿，都带失败取证）：
+
+| 落点 | 新腿 | 为什么是这一句 |
+|---|---|---|
+| 步骤 5 `sync_now` 之后 | 界面上必须读得到 `HTTP 401` | 错误详情行是**逐字渲染**的（本节③的假服务端实测：`同步请求失败：HTTP 410 — Account unavailable — …` 原样出现在 AX 树里）⇒ 读得到就是真发生了 |
+| 步骤 6 `sync_now` 之后 | 界面上必须读得到 `已是最新`（`mobile.sync.synced`） | 这一档没真的同步成，D 就没有一条"曾经配好过"的基线可对照 |
+
+⚠️ 仍然**不许**把 A/B 绿读成"判据 B 有牙"：那一臂（把 `isAccountClosedFailure` 放宽成"任何 401 都清库"
+→ 重装 iOS 产物 → 看 B 会不会转红）还是单列在 **#76**，没跑。
+
+📌 顺手量到的**跨端不对称**（不改 Android 那侧，登记在 **#82**）：Android rig 的 B 前提腿有两处
+——`assert_ui_token_is`（界面上的令牌真是本轮那一串）与 `:511-517` 的服务端直探针
+（"这枚坏令牌确实让服务端回 401 + `TOKEN_INVALID`"）。**两条都没证到"这台设备收到过一次 401"**：
+前者证的是界面里换了值，后者证的是服务端会怎么答，中间那一环（设备真的拿新令牌去请求过）
+恰好就是今天 iOS 这趟断掉的地方（步骤 5 的 tap 被导航栏吃掉 ⇒ 设备零请求）。
+iOS 这条新腿（界面上读得到 `HTTP 401`）是**设备侧**的，比那两条各多证一段。
+
+### ② 第 7 步那枚 404：探针 GET 了一个只注册 DELETE 的路由
+
+09:15 那趟：`❌ 注销后再拿这枚令牌请求得到的是 404 而不是 410`。
+**404 是 Fastify 的 route not found** —— 探针那发 `GET /api/account` 在**路由层**就死了，
+410 的生产者（认证中间件）根本没被执行。现量：`server/src/api.ts:713` 对裸 `/account` 只注册了
+`fastify.delete`。🔴 更该记的一笔：**兄弟 rig 早就用对了** ——
+`scripts/verify-mobile-account-erasure.sh:513` 打的是 `$HOST_SERVER/api/sync/status`，
+也就是客户端同步真正会撞的那条。这是今天第三次"没先去读兄弟 rig 已有的那一份"
+（§10.140 填写配方、§10.141 ⑥ 走页、这一条端点）。
+
+修完之后 09:30 的读数：
+
+```
+✅ 探针阳性对照成立：注销**前** http://127.0.0.1:3110/api/sync/status 用同一枚令牌回 200
+   DELETE /api/account → HTTP 200  body: {"success":true}
+   注销后同一发 → HTTP 410  code=ACCOUNT_CLOSED  body: {"error":"Account unavailable","code":"ACCOUNT_CLOSED"}
+✅ 服务端对旧令牌此后回 **410 + code=ACCOUNT_CLOSED**
+```
+
+⇒ **E1b 的形态（注销独占 410 + 稳定码，其余仍 401）在 iOS 这条真机链路上成立**。
+三条改动都留着：注销前同一 URL 必须先回 200（没有这条阳性对照，"不是 410"永远分不清
+"信号没了"与"探针从来不通"）；410 之外还要求 body 里 `code=ACCOUNT_CLOSED`（只比状态码会放过
+"另一个 410"）；失败行把码、`code`、body 前 160 字节一起打出来。
+
+### ③ 判据 C 连红 40 个采样窗的真因：**tap 落在导航栏上**（第八处装置缺陷），而那句**确实会渲染**
+
+09:42 那趟第 8 步：needle 与词条逐字相同、`text_on_screen` 已是 NFKC+子串，仍然 40 次 MISS。
+界面上与同步有关的 8 条文本里没有错误行 —— 我据此写的下一句是"要么客户端没同步、要么移动端
+根本不渲染那句"。**两因分叉没有靠猜**：注销后 2.5 分钟服务端零请求（①里那张表），
+所以先怀疑前者，但前者有两种可能（tap 没落地 / 客户端自己不发），而它们的处置不同。
+
+分叉装置：`tmp/probe-fake-410.py` —— 一枚只记账的假服务端，对任何同步请求回
+**逐字取自真服务端那一发的** 410 + `{"error":"Account unavailable","code":"ACCOUNT_CLOSED"}`
+（真服务端已经证过了，这里要问的只是"客户端发不发、发了界面说什么"）。
+配 `tmp/probe-sync-press2.sh` / `3.sh` 两趟：
+
+| 腿 | 读数 |
+|---|---|
+| 直接 AX 按「立即同步」（`result=success`） | 假服务端**零请求**，界面 12s 内没进 busy ⇒ 这一下没被接住 |
+| 树里的形状 | `AXLabel='立即同步'` frame `y=72..116`，而导航栏标题「我的」在 `y=80..100` —— **按钮整块在导航栏底下**（步骤 3 为了点便签输入框把这一页滚到了底部） |
+| shim 的 press 是什么 | **按坐标 tap**（它文件头写的"键盘遮挡"就是同一族事故：`result=success` 只说 tap 这个系统调用成功了） |
+| 先 `--scroll-into-view "账号"`（页面首行，整块在折叠线上方时 shim 会真的向下拖） | 「立即同步」从 y=72 让到 **y=552** ⇒ 那一发请求就到了：`GET /api/sync/ops?sinceSeq=1&excludeClient=…` |
+| 界面说什么 | ✅ `y=410 '这个账号已经注销，无法再次登录，同步已停止 —— 注销后这台设备上的本地副本会被清除。如果这…'`，下面还有 `y=486 '同步请求失败：HTTP 410 — Account unavailable — 本机数据已按宿主的销毁器清除(备份与其它…'` |
+
+⇒ **判据 C 在 iOS 上是成立的**，那一档红从头到尾是探针打了一个被导航栏盖住的位置。
+🔴 这条的**一般形状**：`result=success` 只证明"手势发出去了"，不证明"那个元素收到了"。
+shim 已经为**键盘**建了这条判据（`tap-blocked-by-keyboard`），但遮挡面不止键盘 ——
+导航栏、悬浮底栏、AutoFill 条都会。而 `scroll_into_view` 的"可见"定义是
+`中心 y < 屏高-120 且 底边 > 0`（`scripts/tools/ios-ax-shim.py:534`），**只有下沿没有上沿**，
+所以它自己不会把这个按钮让出来。
+
+rig 侧修法（不动共享 shim；shim 那条上沿判据登记在 #80）：
+`sync_now` 里先 `ax "账号" --scroll-into-view`，按下之后用**签名变化**当"被接住"的证据 ——
+`sync_signature()` 把树上所有含 同步/正在/失败/注销/离线/最新 的可及名 NFKC 后排序去重成一行，
+按之前取一次、之后 1s×12 采一次，一字未变就 `bad`（并把签名前 160 字打出来）。
+
+⚠️ 为什么不用 busy：实测「正在同步…」在 12 个 1s 采样里**一次都没命中**（同步比采样快），
+拿它当接住证据会得到一枚**恒红**的腿 —— 恒红的腿和没有腿一样糟（§7 元规则二）。
+
+### ④ 判据 D 的读数：内容级三腿全过，而文件的 **birth 就是注销那一秒** —— 这是"复活路径"，不是"没销毁"
+
+`db_forensics()`（新腿，两趟自测各喂一正一负）在设备容器上量：
+
+```
+表与行数：__heyta_seq=0 archive=0 meta=1 ops=0 ops__mt3=0 state=0
+freelist=0 page_count=18
+明文 needle 'ios-erase-094241' 命中：UTF-8=0 UTF-16LE=0（文件 73728 字节）
+birth=10-05 10:04:07 mtime=10-05 10:08:01
+SUMMARY content_rows=0 meta_rows=1 plain=0 tables=6
+```
+
+对照：安装时间戳是 09:42:49（同目录 `heyta-device-prefs.sqlite` 的 birth），
+所以 `heyta.sqlite` 的 **birth=10:04:07 = 注销那一秒** ⇒ 销毁确实把文件删掉了，
+而**同一秒内**有一次重开把空 schema 建了回来。
+
+🔴 **上面那半句"并写进一枚 `meta` = 一枚新 clientId"现在撤回** —— 它是 10:04 那趟**手探**的读数，
+10:16 的 rig 干净一趟两次取证都是 `meta=0`：
+
+```
+9.  表与行数：__heyta_seq=0 archive=0 meta=0 ops=0 ops__mt3=0 state=0
+    freelist=0 page_count=18  明文 needle 'ios-erase-101645' 命中：UTF-8=0 UTF-16LE=0（文件 73728 字节）
+    birth=10-05 10:23:45 mtime=10-05 10:23:45      ← 注销那一发是 10:23:4x
+10. 同一趟第二次读：表与行数全 0（meta 仍 0）  birth=10-05 10:24:00 mtime=10-05 10:24:00
+```
+
+⇒ 重建出来的是**一张空 schema**，`meta` 里有没有那枚自举 clientId **不是恒定的**（手探 1 / rig 0），
+所以它不能进任何结论；这格里唯一稳的是"六张表零行 + 文件字节里明文零命中"。
+
+🔴 **而 15 秒内 birth 前移这一条是本节最重的读数**：D 与 E 之间 rig 只做了"滚动 + 点一次立即同步"，
+而**服务端日志在那段窗口里零条连接**（最后一条 `Connected` 是 10:23:28，注销之后再也没有过）。
+⇒ 把壳建回来的那条路径**不需要网络**，它是宿主自己的本地开库路径
+（`SqliteAdapter.ensureOpen()` 的 `CREATE TABLE IF NOT EXISTS`）。
+⚠️ **它到底是不是"每次开 App 都会"，这一趟没有证** —— 那一趟的 intervening 动作里含滚动与点击，
+不是冷启动。这句留给下面换了载体的判据 E 回答（本节的 rig 改动就是把 E 的载体换成纯 terminate+launch）。
+
+
+⇒ 三种可能的红现在分得开了，rig 也按这个分岔写。**而分岔的钥匙从"有没有 meta 行"换成了
+   `birth − 发出 DELETE 那一刻` 的秒数**（`db_forensics` 多打一行 `birth_epoch=`，
+   步骤 7 在发 DELETE **之前**取 `CLOSE_EPOCH`）：
+
+| 读数 | 判语 |
+|---|---|
+| 残留 0 枚 | ✅ 判据 D 成立 |
+| 残留 ≥1 且 `content_rows=0` 且 `plain=0` 且 `birth > 注销` | 🔴 红，但**不是**「明文仍在」：销毁跑过了，之后有一条重开路径把**空壳**建回来（判据 E 存在的理由就是抓它） |
+| 残留 ≥1 且 `content_rows=0` 且 `plain=0` 且 `birth < 注销` | 🔴 红：**销毁那一发根本没删掉文件**（这是设备级 M1″ 臂的形状，不该出现在未变异的运行里） |
+| `content_rows>0` 或 `plain>0` | 🔴 红：本机明文仍在 |
+
+⚠️ 分岔为什么必须**排除 meta**：这条是自测照出来的 —— 手探那一趟六张表里只有 `meta` 有 1 行，
+按"行数合计"分岔会把"空壳被重建"误报成"内容没清空"。而 `meta` 里那枚是设备自举记录，不是用户内容。
+🔴 **但这一句以前写得比它该有的强**：它把"meta 恰好 1 行"当成了设备现库的**恒定形状**，
+而 rig 干净一趟两次取证都读到 `meta=0` ⇒ 自举 clientId 有没有写是**时序相关**的，
+所以任何判据都不许拿它当分母。（这正是 §7 元规则二那个形状：一条不看量的恒真判语。）
+
+🔴 同上，步骤 9 那句红话原本无条件印「birth 就是注销那一秒」—— **它不管量到什么都会打印**，
+而现在它印的是 `${D1}` 那个实测秒数（含"销毁没删掉"那一支）。登记为 traps 新条目（见 §7 索引）。
+
+🔴 这一格**仍然判红**，没有为变绿改判据：计划 §10.2 的承诺写的是文件级"残留 0 枚"，
+而界面上那句「本机数据已按宿主的销毁器清除」说的也是清除。
+要关它需要的是**产品侧**决定：注销销毁之后，宿主不许再打开这份库（`SqliteAdapter` 的
+`ensureOpen` 在 destroy 之后会 `CREATE TABLE IF NOT EXISTS` 把壳建回来 ——
+`packages/storage/src/sqlite/sqlite-adapter.ts:255-290` + `:300` 起）。
+登记为 **#80/#81**（见下），不在本节顺手放宽。
+
+### ⑤ 这一格现在证到哪一步（E2 的 iOS 腿，10-05 10:16–10:24 那一趟 = 真服务端）
+
+读数全部来自 `/tmp/e2-ios-erasure-101639.log`（载体 `heyta-wt-trash-e2e`，设备 A1D6AD48…，端口 3110，
+**服务端是 rig 自己起的真服务端**，不是上一节那个逐字回放 410 的假端点）。总计 **通过 29 / 失败 5，判据退出码 1**。
+
+- ✅ **判据 C 在真服务端上闭合**（这一条把 ③ 末尾那条"读数来自假服务端"的限定**摘掉**了）：
+  `HIT 1` + 界面上的 `AXLabel` 逐字是「这个账号已经注销，无法再次登录，同步已停止 —— 注销后这台设备上的本地副本会被清除。…」，
+  且第 7 步同一趟读到 `DELETE /api/account → 200`、注销后同一发 `→ 410 code=ACCOUNT_CLOSED`、
+  注销**前**的阳性对照 `→ 200`。
+- ✅ **A / B 两腿 + 步骤 6 配对**：B 的三条前提腿（设备侧读到 `HTTP 401`、服务端侧 curl 回 401+`TOKEN_INVALID` 而不是 500/410、
+  换回真令牌后界面又出现「已是最新」）在这一趟全绿 —— 上一趟那枚 500 是 rig 自己那枚坏形状令牌造成的，
+  改成 Android 那台的令牌形状后服务端不再 500（那条服务端缺陷本身已由 `f9152fbf` 修掉，但载体 HEAD 落后于它，
+  所以 rig 不能依赖修好的服务端，只能依赖**不触发**它）。
+- ✅ **内容级销毁**：ops/state/archive/`__heyta_seq`/两张索引表**六张表全 0 行**，
+  便签原文在整个 73728 字节的文件里 UTF-8 与 UTF-16LE 各 0 命中，`freelist=0`。
+- 🔴 **仍未闭合的两条**：① 文件级"残留 0 枚"被一条销毁后的重建路径挡着，
+  而 ④ 的新读数证明**这条重建不需要网络**（服务端日志那段窗口零连接），
+  它是不是每次冷启动都跑要等换了载体的 E 回答；② 判据 B 有牙与否（#76 变异臂）仍未测。
+- ⚠️ ③ 里那个假服务端趟（`:3110` 上逐字回放 410）仍然算数，但它证的是"客户端发出请求之后整条链的行为"；
+  本节的 C 已经是真服务端读数，**不需要再拿那一趟当替身**。
+
+**判据 E 的载体在本节之后被换掉了**（还没拿到新读数）：原载体是"再点一次立即同步"，
+而判据 C 之后客户端**按设计**进入「同步已停止」—— 再点就是什么都不做。
+上一趟因此连吃两枚假红：`sync_now` 的 ACK 腿把"界面签名一字未变"判成「这一发没被接住」，
+而 E 的分支又无条件写「销毁那条路压根没跑过」，与同一趟 ④ 的 birth 读数直接矛盾。
+新载体是**冷启动一趟**（`simctl terminate` + `launch`，零点击、零请求），判据改成比 birth：
+`E 的 birth > D 的 birth` ⇒ 每次开 App 都重建（更糟）；相等 ⇒ 只有注销那一秒那一次。
+`bash -n` 通过，`check:verify-script-copy` / `check:shell-erasure-parity` / `check:script-snapshot` /
+`check:shell-exit-chain` 四道各 rc=0。**新载体的第一次读数要等负载窗口**（10:35 现量 `vm.loadavg` = 42.24，
+另一条线在跑 ⇒ 起了只会得到环境无效的 exit 3）。
+
+### ⑥ 本批文档门禁的现量（10-05 10:4x，四道绿 + 一道红且那枚红不是本批的）
+
+| 门禁 | rc | 说明 |
+|---|---|---|
+| `check:doc-citations` | 0 | 本节写的 `file:line` 引用全部存在 |
+| `check:md-table-rows` | 0 | **这一道当场照出我自己的一处错**：把 §10.11 那行表格的单元内容换行写了 ⇒ 行被折成三个物理行、列数从 4 掉到 3、表在 GFM 里断成碎片。三道红一次修完（合并成单行，竖线数从 4 修回 5 ⇒ 列数=表头 4） |
+| `check:docs-voice` | 0 | |
+| `pnpm check:docs`（`docs-link-check`） | **1** | 唯一一条死链在 **别人在飞的改动**里：`docs/adr/0050-…:266` 指向 `apps/mobile/evidence/ios-vault-ui-20261005.txt`。现量：那个 ADR 是 `M`（工作树脏、本批没碰过它），证据文件是 `??`（未跟踪），而 **HEAD 里第 266 行根本不存在**（`git show HEAD:… \| sed -n 266p` 空 —— HEAD 那份只有 **256 行**，那 10 行是那一趟新追加的；`git log -S 'ios-vault-ui-20261005'` 零命中）⇒ 干净检出上这一条既没有链接也没有文件，**不是仓库的死链，是那一趟还没落地**。关闭条件在他们手里（把证据文件一起 `git add`，或把链接改成纯文字，或按门禁自己的第三条出路登记 `UNTRACKED_LINK_OK`）；本批**不动那个文件**，也不为了让这一道绿而改判据 |
+
+📌 这一栏的写法是有意的：**"门禁全绿"这种句子必须带现量时刻和分母**，否则它就变成 ④ 里刚被撤掉的那种恒真判语。
+
+## 10.143 判语换成量之后，iOS 那一格剩下的三件事全部变成"窗口型"；#76 那枚变异臂的装置落地，并在落地当场被自己的归属门拦住（10-05 10:4x–10:48）
+
+### ① rig 的两处**恒真红字**改成由变量决定（这是 §10.142 ④ 那两条撤回收进代码的一步）
+
+| 位置 | 原来 | 现在 |
+|---|---|---|
+| `db_forensics()` 的 birth 行 | 只打人类可读时间 | 多打 `birth_epoch=%d`（判据要用它做减法） |
+| 步骤 7 | 无 | 发 DELETE **之前**取 `CLOSE_EPOCH=$(date +%s)` |
+| 步骤 9（判据 D） | 无条件印「birth 就是注销那一秒 ⇒ 销毁之后被重建」 | 印 `birth − CLOSE_EPOCH` 的秒数，并**按正负分两支**：正 ⇒ 销毁之后被重建；负 ⇒ **销毁那一发没删掉文件**（M1″ 的形状） |
+| 步骤 10（判据 E） | 载体 = `sync_now`（点立即同步 + ACK 腿），无条件印「销毁那条路压根没跑过」 | 载体 = `simctl terminate` + `launch`（零点击、零请求），判语按 `EPOCH2 − EPOCH1` 分四支 |
+
+🔴 换载体的理由不是"更好看"，是**旧载体在产品按设计拒同步时不可能成立**：判据 C 之后客户端已进入
+「同步已停止」，再点「立即同步」什么都不做 ⇒ ACK 腿把这一眼读成"这一发没被接住"（一枚假红），
+而服务端日志同期零条连接 ⇒ 那一发**本来就不该**出去。10-05 10:16 那趟的两枚红就是这么来的。
+
+每档都还打 birth 的**人类可读对**（`D=… → E=…`），因为 epoch 差值说明不了"哪一秒被重建"这件事。
+
+### ② `tmp/ios-erase-arm-b76.sh`（#76 的装置；**现已转正到 `research/tools/mutation-rigs/ios-erase-arm-b76.sh`**，见 §10.155）—— 形状沿用 Android 的 M1″ 臂，四条反自己的作弊写在文件头
+
+变异 = 把 `packages/sync-client/src/client.ts:1785` 的
+`return error instanceof SyncHttpError && error.code === ACCOUNT_CLOSED_CODE;`
+放宽成 `return error instanceof SyncHttpError;`（锚点命中数断言 =1，命中数不是 1 就**不动文件**）。
+预期：步骤 5 那发 401 被当成注销信号 ⇒ **判据 B 的文件腿与数据腿各自转红**，而 C 仍然绿。
+
+| 承重检查 | 它挡的是什么 |
+|---|---|
+| 变异前后 `client.ts` md5 必须不同 | 锚点没命中却继续跑（半个文件的变异） |
+| 设备上那份 `main.jsbundle` 的 md5 与臂产物必须不同 | **装了变异源而产物没重打** ⇒ rig 量的是旧字节，会恒定"证明"判据有牙 |
+| `IOS_APP_SRC` 转发（本轮给 `tmp/e2-ios-erasure.sh` 补的） | 臂不传产物 ⇒ rig 起手捞设备上那份旧的 ⇒ 上一条同族 |
+| `trap restore EXIT` + 复原后 `cmp -s` | 构建失败/中断把变异留在载体里 |
+
+退出码三档：`0=ARM=OK`（B 两腿都红且 C 仍绿）／`1=ARM=DEAD 或 HALF`（**这就是本臂要产出的判据**：
+只量文件在不在的 B 没有牙，Android 侧 §10.131 已经照出过一次）／`3=ARM=ENV`（负载、端口、设备归属、构建 ⇒ 环境无效，不读成产品结论）。
+
+### ③ 装置落地的**当场两条读数**（都是它该有的行为，不是缺陷）
+
+```
+A) PREFLIGHT=1（默认负载门）
+   现量 loadavg(1m)=234.67 阈值=12 ncpu=16 → ❌ 负载超阈值 → ARM=ENV load=234.67  rc=3
+B) PREFLIGHT=1 LOAD_MAX=999（越过负载门，只验归属）
+   现役移动验收进程：19645
+   19645 bash …/scripts/.verify-mobile-ios-reminder.sh.snap.19645
+   → ❌ 有别的移动验收在跑 → ARM=ENV busy=verify-mobile  rc=3
+```
+
+⇒ 两趟都**没落到变异那一步**，也就没碰 `client.ts`（预检模式在落变异之前 `exit 0`，一个字节都不改）。
+B 那趟是这臂最有价值的一次自测：它拦住的是**真的**并发 —— 另一条线此刻正在同一台模拟器上跑 iOS 提醒验收。
+按 AGENTS §8.9（共享资源独占验收），这类窗口**先到先得且必须现量归属**，所以 #76、#84（E 的新载体第一次读数）
+和 #77 现在都排在同一个队里，而不是各起一趟互相覆盖。
+
+⚠️ **这一节没有拿到任何新的判据读数** —— 判据 E 换载体之后还没跑过，#76 也还没装过变异产物。
+读这一节时别把它当成"iOS 那一格往前的证据"；往前的是 ①（判语不再会说假话）和 ②（窗口一开就能跑）。
+
+**11:1x 补一条腿 C（同一枚归属门的第三次读数，拦下的是**另一趟**提醒验收）**：
+
+```
+C) LOAD_MAX=999 PREFLIGHT=1
+   现量 loadavg(1m)=35.81 阈值=999 → 越过负载门
+   现役移动验收进程：74921 bash …/scripts/.verify-mobile-ios-reminder.sh.snap.74921
+   → ❌ 有别的移动验收在跑 → ARM=ENV busy=verify-mobile（未落变异、未碰设备）
+```
+
+⇒ B 与 C 不是"同一条读数的第二遍"：pid 不同（19645 / 74921）、时刻不同，而**两次都是同一族并发**
+（另一条线反复在同一台模拟器上跑 iOS 提醒验收）。这条门的用途因此被量了三次都成立。
+
+**顺手把 #76 的变异锚点单独现量了**（归属门把预检挡在锚点之前，所以锚点此前从未被读到）：
+
+```
+grep -c '^  return error instanceof SyncHttpError && error.code === ACCOUNT_CLOSED_CODE;$' \
+  packages/sync-client/src/client.ts            → 1
+git show HEAD:… 同一条                          → 1
+git status --porcelain -- packages/sync-client/src/client.ts → 空（该文件此刻没人动）
+```
+
+⇒ #76 的**源侧前置已确认可用**（锚点唯一、落点干净），它欠的只有"负载 + 设备窗口"两件事；
+窗口一开，`bash research/tools/mutation-rigs/ios-erase-arm-b76.sh` 一条命令就能走到变异与重装。（13:0x 起这枚臂在仓库里；原先的 `tmp/` 那份已删，不留两份抄件）
+🔴 这条读数**不**等于 #76 有进展 —— 变异产物一次都没装过。
+
+### ④ `sync_now` 那条 ACK 腿从 `bad` 降成诊断腿（这是 10:16 那趟**两枚**假的来源，不止步骤 10）
+
+那一趟的 5 枚红按行号摊开是：
+
+| 日志行 | 步骤 | 是什么 | 现在 |
+|---|---|---|---|
+| `:69` | 3 | ACK 腿「签名一字未变」 | **假红**：步骤 3 建完便签后自动同步已经把它推出去了，再手点必然同形（§7 里 `verify-mobile-focus` 那条"传得更快被读成没传"是同一族）⇒ 降为诊断腿 |
+| `:88` | 5 | 前提腿「界面上没有 HTTP 401」 | 真红但**属装置**：旧 `BAD_TOKEN` 载荷不是合法 JSON ⇒ 服务端 500。换成 Android 那台的令牌形状 + 服务端侧 curl 前提腿 ⇒ 这一趟它自己会绿 |
+| `:122` | 9 | 判据 D 文件级 1 枚 | **产品红**（#81），不放宽 |
+| `:131` | 10 | ACK 腿同一枚 | **假红**：注销后客户端按设计「同步已停止」⇒ 载体整条换成冷启动（① 那节） |
+| `:139` | 10 | 「销毁那条路压根没跑过」 | **会说假话的判语**：同一趟 `:122` 的 birth 正好否证它 ⇒ 换成按两次 birth 之差分四支 |
+
+🔴 为什么这不是"为了让它变绿而放宽门"：ACK 腿**不是判据**，它断言的是一条产品从没承诺过的不变量
+（"按下去界面必须有东西变"）。降成诊断腿之后，承重证据全部落在**各步自己的前提腿**上
+（步骤 4 判据 A 数 `ops` 行数、步骤 5 读 `HTTP 401`、步骤 6 读 `已是最新`、步骤 8 读注销那句、步骤 10 比 birth），
+而这些腿**已经各有读数**。同时留了一条真门：签名为空 = 不在同步状态面上 ⇒ 照旧 `bad` + `return 1`，
+因为它和"按了没变化"是两件事。改完之后 D/E 仍按产品理由判红 —— 这轮的净效果是**假红少了三枚，判据数量没动**。
+
+### ⑤ 我这两趟自己的探针错（同族，写下来挡下一次）
+
+1. 先跑 `node scripts/check-md-tables.mjs` ⇒ rc=1 读成"门禁红"。真相：**这个脚本不存在**，真名是 `check-md-table-rows.mjs`
+   （`MODULE_NOT_FOUND` 也退 1）。同一条命令里另一枚 rc=1 是那之前的 python 断言留下的。
+2. 再用 `pnpm run check-shell-unicode` 之类 ⇒ **五道同时 rc=1**。真相：仓库里的门是**冒号形**（`pnpm run check:shell-unicode`），
+   `ERR_PNPM_NO_SCRIPT` 也退 1。用对名字之后五道全 `rc=0`。
+📌 一般规律：**"一条命令退 1"不构成"那件事没成立"** —— 判"红"之前要先看它打印的是**产品/门禁的判语**还是
+**命令自身的用法错误**（`Cannot find module` / `Missing script` / `127`）；而**同一次里五道齐刷刷报错 = 先怀疑探针**（§7 元规则一）。
+
+### ⑥ ① 那批分岔**没跑过设备**，所以先给它做一台不靠设备的自检（10-05 11:0x，装置 `tmp/ios-branch-selftest.sh`）
+
+窗口一直没开（现量：`load1=25.41` / 阈值 12、移动验收进程 0 枚、`:3100` 被 pid 26407 占、五台模拟器 Booted），
+而我把 D/E 从恒真红字改成了按 `birth − CLOSE_EPOCH` 与两次 birth 之差分岔。**一个没人喂过反例的分岔，
+和 §10.142 ④ 那句"birth 就是注销那一秒"是同一类风险** —— 它看起来在判，实际可能四支里只有一支会被走到。
+所以这一步不等设备，先把"分岔可达不可达"变成读数。
+
+做法与读数（`bash tmp/ios-branch-selftest.sh` → `SELFTEST=pass`，`RC=0`，零 CPU 依赖、不碰模拟器）：
+
+| 腿 | 输入 | 读数 |
+|---|---|---|
+| 提取 | 分支体用 awk 锚点从**真身**抽（`if [ "$RESIDUE" = "0" ]; then … fi` / `RESIDUE2` 同形） | D 段 24 行 `ok=1 bad=3`、E 段 16 行 `ok=1 bad=3` |
+| 结构 | 每段必须 **1 支 ok 且 ≥2 支 bad** | 两段都过 —— 这条挡的是"整段恒红"和"整段恒真"两种装饰 |
+| D 四支 | (残留,内容行,明文,Δ) = (0,0,0,9) / (1,0,0,9) / (1,0,0,-12) / (1,3,2,9) | 依次命中「判据 D 成立」/「销毁之后仍有一条写路径」/「销毁那一发没删掉文件」/「本机明文仍在」 |
+| D 语义腿 | Δ<0 那一支 | 打印里带**具体秒数**「早 12 秒」与「一直躺在盘上」⇒ 它和"被重建"那支不是同一句话的两遍 |
+| E 四支 | (残留2,残留,D2) = (0,0,0) / (1,0,0) / (1,1,15) / (1,1,0) | 依次命中「两次读都是 0 枚残留」/「复活路径」/「不需要任何网络活动」/「仍是 D 那一枚」 |
+| E 载体腿 | 冷启动那一支 | 判语里必须同时出现 `terminate`、`launch`、「零点击」⇒ 归因不能超出这一趟真做的事 |
+| 反作弊 A | Δ 读不到（空串） | 仍走 `bad`，**没有变绿**（挡"量不到就放行"） |
+| 反作弊 B | D2 读不到 | 不命中冷启动那支，保守落回「仍是 D 那一枚」⇒ **没有量就没有归因** |
+| 反作弊 C | 内容行/明文读不到（空串） | 不命中「销毁之后仍有一条写路径」那支 ⇒ **不把"没量到"当成"量到 0"** |
+
+🔴 这一台自检自己也踩了两枚装置错，都在**同一趟**被抓住并当场修（这正是自检该有的形状）：
+
+1. **桩必须把换行压掉**。第一版用 `grep -m1 '^OUT|'` 取判语，而真身的 `bad` 串是**多行**的 ——
+   关键词（「销毁之后仍有一条写路径」）落在第二、三行，取首行就恒读不到 ⇒ 三条腿假红。
+   改成 `ok()/bad()` 打印时 `tr '\n' ' '`，判语变单行。
+2. **`eval echo "$BODY"` 会把整段换行压成空格**，于是行计数读成「提取到 D 分岔 **1 行** ｜ ok=0 bad=0」。
+   如果我只做"非空即成立"的锚点检查，这里会**安静地放行**（非空！）—— 是那条结构腿把它拦下来的，
+   而它拦下时输出的是 `SELFTEST=fail=2` 不是 pass。改用间接展开 `BODY=${!REF}` 后两段行数才对。
+3. 我上一轮改判语（把「每一次冷启动」换成「不需要任何网络活动」）之后**没同趟重跑自检**，
+   这次第一条红就是它。⇒ 写进自检的关键词是从真身 grep 出来的，**改判语必须同趟重跑这台**，
+   否则自检会先于设备变成第二套会漂的抄件（§「抄件一定会漂」）。
+
+**这台自检证明到哪一步为止**：它只证「四支各自可达、且不会因量不到而变绿或做出无量的归因」。
+它**不**证 D/E 在真机上的取值，也不证 #81 那条重建路径的成因 —— 那仍是 **#84**（冷启动载体的第一次读数），
+而现在能确说的是：读数一到手，判语会按上面这九档里的**某一档**打印，而不是打印一句固定的话。
+
+### ⑦ 上面那台自检没花设备，而**回看自己引过的截图**当场照出一枚真缺陷（10-05 11:0x）
+
+起因是常驻门 `check:doc-citations --doc 本计划` 报了一条"不存在的路径"
+`apps/mobile/evidence/ios-account-erasure-2-no-composer.png` —— 我引它当证据，而**主检出里没有这个文件**。
+顺着这条查下去，一次"补个文件"变成了三件事：
+
+1. **文件在，只是在载体那侧**：真身在 `heyta-wt-trash-e2e/apps/mobile/evidence/`（rig 的 `EVIDENCE` 是
+   `$HEYTA_REPO_ROOT/apps/mobile/evidence`，而那一趟跑在 linked worktree 里）。
+   ⇒ 按"持久证据进仓"的规则**复制**进主检出（不覆盖：先断言目标不存在；`cp` 后两侧 md5 逐字相同
+   `18bf5cffbbf770a69e2444663ceeaba4`）。这条红从此消失，且**载体被 `git worktree remove` 之后读数还有家**。
+2. **打开那张图看**（§6.2 规定一）⇒ 它画的是**任务页空态**，与我在 §10.141 ⑤ 写的那句"人在「我的」页、
+   蓝按钮在画面里、被 iCloud 弹窗盖住"**逐条不符**。撤回已写在原节原处，这里只记它是怎么被照出来的：
+   **图 + 同一趟的日志配对回看**（`/tmp/e2-ios-erasure-085208.log` / `-085730.log`）。
+3. 配对回看顺带量到真正的缺陷：`sync_now` 的弹窗腿**摘完弹窗不重新导航** ——
+   开头那一下 `ax "我的" --press` 是在弹窗立着时发的、没落地，于是第二轮等的是"任务页上永远不会出现的标签"，
+   必然再空转 90 秒，最后剩一条长得像"同步没被触发"的红（真因：探针停在错的页上）。
+   09:00 那趟的 `❌ 找不到便签输入框「写点什么…」` 就是它的下游。
+
+修法（`scripts/verify-mobile-ios-account-erasure.sh:693-712`，只动我自己那枚 rig）：
+摘弹窗之后**重按一次「我的」+ `sleep 3`**，第二轮等到就打印「第二轮等到 ⇒ 弹窗腿成立（第一轮那一下确实是被系统弹窗吃掉的）」，
+仍没等到才 `bad`，且判语里写明"这一轮之前摘过弹窗**并重按过一次「我的」**"—— 归因句跟着修过的动作走，不留旧文案。
+
+🔴 分母现量：这条缺陷**只在 iOS 那枚 rig 上成立**。
+`grep -n 'dismiss_ios_save_password\|第一轮\|第二轮' scripts/verify-mobile-account-erasure.sh`（Android）与
+`verify-macos-account-erasure.sh` 都**零命中** ⇒ 没有兄弟那份要同步修；`check:shell-erasure-parity` 也从未要求这一腿。
+
+### ⑦.1 这枚修复配了一台**判调用顺序**的离线装置，并拿到配对读数（`research/tools/mutation-rigs/ios-syncnow-order.sh`）
+
+"有没有那一行"不是判据 —— 判的是**顺序**：`导航 → 等第一轮 → 摘弹窗 → 再导航 → 等第二轮`。
+载具把 `sync_now` 的函数体从真身 awk 出来，桩掉 `ax / idb_wait_label / dismiss_ios_save_password / sleep`，
+桩里写死"第一轮超时、第二轮成功"（= 09:00 那一趟的形状），再断言打印出来的序列。
+
+| 一档 | 读数 |
+|---|---|
+| 修后（工作树版，`sync_now` 64 行） | `ORDER=pass` `RC=0`，四条腿全 ✔：两轮之间重按过「我的」／摘弹窗腿被走到／第二轮成功不误判红／等待腿恰好 2 次 |
+| 变异对照（`RIG=<git show HEAD:同一文件>`，18 行那版） | `ORDER=fail=1` `RC=1`，**且只红第一条**（"两轮之间没有重新导航"），另三条照旧 ✔ |
+
+🔴 第二档是这台装置最值钱的地方：HEAD 那版**正是**"摘了弹窗、也等了第二轮"的版本，
+所以"摘弹窗腿被走到""等待腿 2 次"两条都成立 —— 它只在**被禁止的那一格**上红。
+一条会把整台装置打红的判据不叫有牙，叫噪声。
+
+造这台装置时踩到的三枚坑（都是"读数被吃掉"，不是产品问题；已入 **traps #277**）：
+
+1. **macOS 的 `/bin/bash` 是 3.2.57**：命令替换 `$( … )` 里放 `case … )` 直接
+   `syntax error near unexpected token ';;'`。⇒ 载具落成一次性脚本文件再跑。
+2. **`eval "$BODY"` 一个函数定义只是定义了它**：不写 `sync_now` 去调用，序列就只有 `WAIT_CALLS=0`，
+   四条判据三条红 —— **长得像"修复没生效"，其实是装置没走到被测代码**（traps #176 的又一副面目）。
+3. **真身里 `ax … >/dev/null 2>&1` 会把两个流都吞掉**：桩靠 stdout 传读数时，那一下重按明明在代码里，
+   序列里却看不见（⇒ 我又差点判"修复没生效"）。改成桩写**带全局序号的记录文件**，
+   顺序与重定向无关；而 `jget`/`sync_signature` 这类**产出被命令替换捕获**的桩必须走 stdout，
+   所以它们用 `printf` 不用被桩化的 `echo`。
+
+门禁读数（改后同趟）：`bash -n` OK；`check:shell-unicode` / `check:shell-exit-chain` /
+`check:verify-script-copy` / `check:shell-erasure-parity` / `check:script-snapshot` **五道全 rc=0**；
+`check:md-table-rows` rc=0；`check:docs`（真名 `pnpm run check:docs` = `research/tools/docs-link-check.mjs`）rc=0。
+
+⚠️ 我自己这一趟又踩了 §10.143 ⑤ 刚登记的那枚坑**第二次**：先跑 `node scripts/docs-link-check.mjs`
+⇒ `MODULE_NOT_FOUND` 退 1，读成"门红"；真身是 `research/tools/docs-link-check.mjs`。
+⇒ 光写进台账不构成保护，**下次要靠"命令退 1 先读它打印的是判语还是用法错误"这条动作**，而它这次确实救了我（同一趟 `--doc /tmp/…` 报"文档不存在"退 2，我差点当成"差集为空"）。
+
+可迁移的那两层已经入档 **traps #276**（`EVIDENCE` 跟着载体走 ⇒ 载体删了证据就没了；
+"人已看"必须与那一趟的日志**配对**回看；"摘掉弹窗之后还要等标签"的步骤中间必须重新导航，
+否则第二轮的等待条件在当前页上恒假 —— 它给出的红与产品缺陷同形）。
+追加时现量：`grep -oE '^[0-9]+\. ' …` 得 285→286 条、最大号 275→276、`\n276. ` 命中 1。
+门禁读数（同趟）：`check:docs` / `check:md-tables` / `check:docs-voice` **全 rc=0**；
+`check:doc-citations --doc 本计划` 的"不存在的路径"由 87 条降到 **86** 条，且 `ios-account-erasure` 那一条已消失
+（余下 86 条是 #63 的既有边界：设备侧运行时路径、别人的 worktree 快照、gitignored `tmp/` 装置）。
+
+### ⑧ 那枚"引用不存在的证据"不是一桩孤事，所以把整仓的证据引用扫了一遍（10-05 11:2x）
+
+它是一族：**文档里的证据路径可以在"跑过它的那棵树"里存在、在读者所在的那棵树里不存在**。
+现量（全仓 docs 里形如 `apps/…` / `e2e/…` 的图片路径，排除 URL 与 `e2e/test-results/` 那类"跑完才有"的临时产物）：
+**72 条唯一路径 ⇒ 68 存在、0 只在载体、4 两处都无**。
+
+那 4 条**没有一条落在本批计划里**，分属另外三条线（`ai-event-tool-contract`、`goal-multi-end-coverage` + 两份 handoff、
+`calendar-year-time-and-mobile-profile` + handoff），而那四份文档此刻 `git status` **干净** ⇒ 是**已提交的债**
+⇒ 按纪律不代改，登记 **#86**（条目里带可重跑的核验命令，别让下一位重新发明这台 sweep）。
+
+🔴 顺带把自己那枚"最新一枚是 09-30"的旧读数钉住了：`apps/desktop-macos/evidence/` 11:1x 现量最新是
+`mac-reinstall-webview-940af1c0.png`（Oct 3 14:13）。09-30 是 08:5x 那一趟的读数，
+所以更正句里写的是**现量 + 那句旧读数的时刻**，不覆盖原值（§「抄件一定会漂」：值要么留指针，要么带时刻）。
+
+⚠️ 这台 sweep 的**第一版自己就产出了假阳性**：正则把
+`https://heyta.waytofuture.cn/assets/help/first-run/W01-tasks.png` 这种**线上 URL** 里的子串也当成本机路径，
+差点让我去"修"一条根本不存在的断链。⇒ 枚举装置要先看命中行的**原文**（§7 元规则一的第三次踩坑）。
+
+## 10.144 E5 臂 D 的前置**已成立**（这条纠正把"结构性测不了"那句的时间戳钉住），以及主检出 HEAD 正在别人手里往前移（10-05 10:5x 现量）
+
+§10.10 里那句「🔴 D 不是被 E 的顺序挡住，是**结构性测不了**」当时是真的，而它的依据已经随
+`5efa7c67`（10-04 20:45，`feat(app-host): 设备撤销同时守住认证与密钥两个边界（共享层）`）过期：
+
+```
+git show HEAD:packages/app-host/src/import-dump.ts | grep -n 'referenceOf'
+  304:  const reference = referenceOf(document, replayed);
+  371:function referenceOf(document: RestoreDocument, replayed: MaterializedState): ExportDocument
+```
+
+⇒ `restoreIntoEmptyTarget`（现在在 `:284`，**不是**旧句里写的 `:322`）不再无条件展开
+`Object.keys(document.entities)`：`entities` 缺省时核对基准由**客户端 reducer** 物化，
+代码注释自己写明「此时第 2 步退化成恒真，还有牙的是第 4 步」。
+所以臂 D（导进空设备后墓碑 ≥1、导入器回报 `deleted ≥1`、记录 ≥2）**现在可评估**，
+装置仍是 `tmp/e5-drill.sh`（`E5_WT=<隔离检出> PORT=<空闲>`），**等的是负载与库窗口，不是前置**。
+原句留在 §10.10 不删，按本节的日期读。
+
+📌 顺手给 `tmp/e5-drill.sh` 补了它缺的那道**负载门**（原来只有端口门，而且端口被占时 `DIE` 退 **1** ——
+把"环境坏了"和"演练失败"混成同一个码，看守会把 1 当产品红）。现在两枚都是退 **3**，两条腿当场验过：
+
+```
+A) 默认阈值      现量 loadavg(1m)=17.75 阈值=12 ncpu=16 → ❌ 负载超阈值 → E5=ENV exit3   rc=3
+B) LOAD_MAX=999 + PORT=3100（被 pid 26407 那个长命栈占着）
+                 负载门放行 → 端口门拦住 → E5=ENV exit3   rc=3（没建库、没跑迁移）
+```
+
+B 那条是**配对腿**：它证明负载门真的会放行（不是恒红），也证明端口门读的是 `lsof` 的实际占有者而不是布尔。
+
+🔴 同时量到一件影响**所有**"载体复量为 HEAD"这类说法的事：
+
+| 位置 | 现量 |
+|---|---|
+| 主检出 HEAD | `ea913891` |
+| 设备载体 `heyta-wt-trash-e2e` HEAD | `ad61621a`（落后，且不含服务端那枚坏令牌 500 的修复） |
+| 同一页早先一次的 HEAD | `da8688b6`（10:2x 读到的） |
+
+⇒ **本仓的 `main` 正在被并行会话往前推**（一小时里至少两笔）。凡是"载体 = 当前 main"的说法都要带**取数时刻**，
+而 #58 那批重量级补跑与两条 iOS 臂起跑之前，载体要重新对齐到**当时**的 main —— 别拿本节这组 SHA 当基线去 checkout。
+
+
+## 10.145 三条窗口型工单的**源侧前置**被单独现量了（10-05 11:1x–11:2x）—— 它们现在欠的只有窗口，不欠"能不能跑"
+
+等窗口的回合不该只用来重读同一把负载数字。这一轮把 #76 / #84 / #85 三件事里
+**不需要设备就能确证的那一半**逐条量了出来，并起了看守。
+
+| 件 | 源侧前置（现量命令） | 读数 |
+|---|---|---|
+| #76 iOS 判据 B 的变异臂 | `grep -c '^  return error instanceof SyncHttpError && error.code === ACCOUNT_CLOSED_CODE;$' packages/sync-client/src/client.ts`；同一条走 `git show HEAD:`；`git status --porcelain -- <该文件>` | 工作树 **1** ／ HEAD **1** ／ 该文件**干净**（此刻没人动落点） |
+| #85 E5 臂 D | 载体 HEAD `git -C heyta-wt-trash-e2e rev-parse --short HEAD`；`grep -q '^export const REPLAY_OPERATION_SELECT' …/snapshot-generation.service.ts`；`grep -n 'entities 可以缺省' …/import-dump.ts` | 载体仍是 `ad61621a`（与 §10.144 那组 SHA 同一时刻，**没漂**）／锚点 export ✅／`entities` 可缺省那节在 `:64` ✅；两份文件在载体里都干净 |
+| #84 判据 E 的新载体 | `bash -n` + 五道 shell 门（见 §10.143 ⑦.1） | 装置侧全绿；欠的是那一趟真机读数 |
+
+归属门的第三次读数（同一条 `LOAD_MAX=999 PREFLIGHT=1 bash tmp/ios-erase-arm-b76.sh`；那趟它还在 `tmp/`，现已转正到 `research/tools/mutation-rigs/ios-erase-arm-b76.sh`）：
+现役移动验收 = pid **74921** `.verify-mobile-ios-reminder.sh.snap.74921` —— 与 10:4x 那次的 19645 **不是同一趟**，
+即"另一条线在同一台模拟器上反复跑 iOS 提醒验收"是**持续状态**而不是偶发碰撞。
+⇒ 本批不起第二条互相覆盖的臂，改起看守 `tmp/ios-e-window-watcher.sh`：
+它自己**不碰设备、不建库、不改源码**，只在"负载 ≤12 且无现役移动验收"那一刻把起跑权交给 rig 自带的门，
+`rc=3` 就继续等，到顶以 3 自停（不记产品红）。
+
+🔴 这一节**没有**任何一条判据读数 —— 它把"还欠什么"从模糊变成可核对：
+#76 与 #85 欠的是**窗口**，不是**前置**；下一位不必再重新查一遍锚点。
+
+## 10.146 #77 那枚"被动通道没有设备级载体"的洞补上了载体（10-05 11:3x）—— 但这一节给的是**离线**读数，真机第一趟仍欠
+
+先说清它为什么是一枚洞，而不是一项增强：设备级 M1′ 臂（§10.135）摘掉的是
+`packages/sync-client/src/client.ts` 里被动那一发 `ACCOUNT_CLOSED` 处理，而 rig 驱动设备走的是
+**主动**通道（界面上点「注销账号」→ `AccountClosureScreen` → `eraseLocalData()`）。
+⇒ 摘掉被动那一发，UI 那条路照样把界面推到那句结果文案 ⇒ **臂存活**。
+#71 记的"归因为瞄错通道"就是这个意思；这句诊断一直要到有人真去点**注销**那一发**之外**的通道才算闭环。
+载体现在有了。
+
+### ① 落点：`scripts/verify-mobile-account-erasure.sh` step 5 改成两档分支
+
+`git diff --numstat` = **113 插入 / 62 删除**，4 个 hunk 全落在 576–695 行这一个 step 内。
+删除行逐条看过：就是旧 UI 档的本体（重排进 `else`，逐字未改）加旧标题行 —— **没有夹带别人的内容**。
+
+```
+576: step "5. 判据 C：注销之后界面上出现那句结果文案（触发通道由 ERASURE_TRIGGER 选：ui=主动 / external=被动）"
+581: if [ "${ERASURE_TRIGGER:-ui}" = "external" ]; then
+```
+
+**默认档 = `ui`**，即不传变量的行为与改动前逐字相同（旧路径没有"顺手改一点"）。
+这句是断言，取证命令与读数：
+
+```
+sed -n 577,647p <HEAD 版> | sed 's/^[[:space:]]*//' | grep -v '^$' | sort -u   → 64 行
+sed -n 577,698p <工作树> | 同上                                                  → 99 行
+comm -23 老 新   → 空（0 行）
+```
+
+⇒ HEAD step 5 的每一条非空行（去缩进后）**逐字**仍在新 step 5 里。
+⚠️ 这条证到"没丢、没改字面"，**不证到顺序与上下文** —— 顺序由上面那 4 个 hunk 的分布看着确认，
+而"语义完全等价"最终要由真机跑一趟默认档来签（那次读数还没取）。
+取证的路上还栽了两次，都是探针自己的锚点：`awk '/^step "5/{f=1} /^fi$/{exit}'` 会停在**内层**
+零缩进的 `fi`（老档体内就有），削平缩进后再 `awk '/^else$/'` 又会命中嵌套的 `else` ——
+两种错法表现都是"行数对不上"，看着像我把旧档改坏了。
+
+🔴 **10-05 12:3x 复量：上面那句"逐字"要被划掉一半，而取证装置本身先被证是恒真的。**
+从 11:3x 那次到这一趟 HEAD 又前进了（现量载具 `8cb33f55`），而硬行号（`577,647` / `577,698`）正是会随
+HEAD 漂的那种写法 —— 所以复量改成按标题取块（`research/tools/mutation-rigs/rig-step-verbatim-recheck.sh`：
+`step "5` → `step "6`，逐行去缩进、剔空行、`sort -u`）。
+第一版装置**收了 `$2`（输出路径）却从来没用它** —— 结果打在 stdout 上、两个块文件根本没被创建，
+于是 `grep -c '' 不存在的文件` 输出的是**空串而不是 0**，`[ "" = "0" ]` 为假 ⇒ 三道空值守卫一道没触发，
+`comm -23` 比的是两个不存在的文件 ⇒ `MISSING=0` ⇒ 照样打印 `VERBATIM=survives` 并退 **0**。
+入档 [环境陷阱 #284](../reference/environment-traps.md)（同族：#249 的"计数自检在这一面目下恒真"、#272）。
+
+修好的装置读数（HEAD `8cb33f55`，一次成对对照之后）：
+
+| 量 | 值 |
+|---|---|
+| HEAD 块 / 工作树块 | 65 行 / 100 行（比上面旧口径各多 1 行 —— 新口径含 `step "5` 标题那行） |
+| HEAD 有而工作树没有 | **1 行** |
+| 工作树新增 | 36 行 |
+| 阳性对照 | 从工作树块删掉 1 行公共行 ⇒ `MISSING` 从 1 变 2（增量=删掉的行数）⇒ `CONTROL=OK` |
+| 缺的那一行 | `step "5. 判据 C：真 UI 走到注销并看到那句「本地副本也已清除」` |
+| 结论档 | `VERBATIM=title-only`（正文缺 0 行） |
+
+所以那句断言要这样改口径：**step 5 的正文逐字存活（0 行缺失），但标题那行确实被我改写了**。
+
+⚠️ **我先在这儿写过一条原因，然后当场把它否证了，原句留在旁边**：
+~~"那行里的「本地副本也已清除」是旧词条的字面，而词条在 E6 那批里换了名"~~ —— 不对。
+现量：`packages/i18n/src/locales/zh-CN.ts:958` 的 `common.accountClosure.done.erased`
+**HEAD 与工作树逐字相同**，值里就带着"本地副本也已清除"，而新 step 5 正文仍在断言这句
+（复量：`grep -n '账号已注销，这台设备上的本地副本也已清除' scripts/verify-mobile-account-erasure.sh`）——
+这里不写行号，理由就是本节刚记下的那条：硬行号会随 HEAD 漂。
+真正的原因只有一条：**这一步现在读两句不同的文案**（`external` 档读
+`common.sync.error.accountClosed` 那句"…同步已停止"，`ui` 档读 `…done.erased` 那句），
+标题继续只印主动通道那一句就会盖住被动通道那一档。
+📌 教训：**"我为什么改了这一行"也是断言** —— 它和读数一样要现量，而我这次是先写后查。
+
+⚠️ 我先前把"只加了一个分支"写成了"逐字存活"，是因为**装置恒真而我信了它的 rc=0**；
+对照那条我第一版还写成 `MISSING == 删掉的行数`，被装置自己判成 `UNFAIABLE` —— 基线 `MISSING` 本来就是 1，
+期望值应是 `MISSING + REMOVED`。**这一趟是装置比我对它的要求严。**
+
+`external` 档的三枚腿，按断言顺序：
+
+| 腿 | 判据 | 为什么必须在 C 之前 |
+|---|---|---|
+| **P0** | 注销**前** `GET $HOST_SERVER/api/sync/status` 带设备上那枚令牌必须回 **200** | 不回 200 ⇒ 探针自己不通（下面 410/404 之差读不出任何信号），此时打 `bad` 并**当趟收尾**，不把它记成产品红 |
+| **P1** | 宿主侧 `DELETE /api/account` 之后，同一探针必须回 **410** 且响应体含 `ACCOUNT_CLOSED` | 服务端那一发没关掉 ⇒ 界面后面出现的任何东西都与被动通道无关，C 就成了无对应变量的读数 |
+| **C** | 驱动设备去**读**，轮询 45×2s 直到界面出 `这个账号已经注销，无法再次登录，同步已停止` | 这三枚是**前提**，C 才是结论；顺序反过来 P1 就只能靠 C 倒推 |
+
+两个关键取舍写进注释了，理由比实现更容易丢：
+
+- 🔴 **needle 选 `common.sync.error.accountClosed`（`zh-CN.ts:94`）而不是 `common.accountClosure.done.erased`（`:958`）**。
+  后者是**主动通道自己打印的结果句**，被动通道按设计永远不会走到它；
+  前者的生产者只有 `packages/ui/src/sync/model.ts:275` 那条 sync reason 映射 ⇒ **界面出这句就当且仅当被动那一发落地了**。
+  这两句中文里都含"注销"，挑错的那枚会让臂**在错误的通道上复活** —— 这正是 §10.135 那趟的成因。
+- ⚠️ **发起腿只能用 `ensure_phone_sync`，不能用 `phone_sync`**：后者多等一次"结算成功"，
+  而这一趟同步按设计**不会成功**（服务端 410）⇒ 用它会稳定超时后判红。
+  `ensure_phone_sync || echo` 那一行也刻意**不判红**：自动同步可能已经自己跑过，发起与否不是结论。
+
+### ② 离线判据：`research/tools/mutation-rigs/android-passive-branch-selftest.sh` → `PASSIVE=pass` **RC=0**
+
+新分支从没上过设备（窗口被 #76/#84 同一条队列挡着），而**分岔本身没被喂过反例**就是
+§10.143 ⑥ 那批要防的东西。载具 = 从真身按锚点 `sed` 出那 116 行两档分支（不是手抄第二份），
+桩把 `curl` / `has_sub` / `ok` / `bad` / `summary` / `step` / `go_profile` / `ensure_phone_sync` 换成打印，
+喂五条腿：
+
+1. 不传 ⇒ 走 UI 档，且**一发 `DELETE` 都不许出现**；
+2. `external` + 三前提全好 ⇒ P0/P1/C 各 `ok` 一次、**不提前收尾**、走到 `ensure_phone_sync`、**不点任何 UI**；
+3. P0 回 404 ⇒ `bad` + 收尾 rc=1 + **不发** `DELETE`（探针没通就不许去关账号）；
+4. P1 回 401 ⇒ P1 `bad` + rc=1 + **不驱动设备**（服务端状态不成立时点界面毫无意义）；
+5. 前提全成立但界面上始终没那句话 ⇒ C 这一腿会红（**挡恒真**）。
+
+读数五条全中，第 5 条就是这条装置有牙的证据。
+
+**②.1 这批装置已从 `tmp/` 入库到 `research/tools/mutation-rigs/`（11:4x）** ——
+理由不是整洁，是 #86 那一族：文档里点名的证据路径必须在**干净检出**里也在，否则下一位照着文档跑不到东西。
+搬完三处都改了行号引用并复跑（`PASSIVE=pass`、`ORDER=pass`，两条都从 `/tmp` 当 cwd 跑过一次，
+证明 `RIG` 已从装置自身位置推到仓库根、不依赖调用目录）。
+
+🔴 **入库这一步本身是一次免费体检，而且当场照出三处活的 bug**：
+`check:shell-unicode` 扫 `research/tools/` 但**不扫 `tmp/`**，于是这两台装置里
+`$RIG）` ×1 与 `$HARNESS_RC）` ×2 三处"`$var` 紧跟全角字符"（traps #64 那一族）**一直藏在扫不到的目录里**。
+它们不会改退出码，只会让**打印出来的证据是乱码** —— 也就是装置看起来在报读数，报的是丢值后的串。
+修完 `check:shell-unicode` rc=**0**，两臂复验：默认 `ORDER=pass`，
+`RIG=<git show HEAD:同一文件>` ⇒ `ORDER=fail=1`，且**只有"两轮之间没有重新导航"那一格红**，
+其余三条照旧 ✔（§10.143 ⑦.1 那条"变异对照必须只红被禁止的那一格"在新位置上重证了一次）。
+
+⚠️ **一条必须留下的过程账：腿 3 第一次是假通过，而它被照出来的方式值得记。**
+curl 桩在 `while` 里把 `"$@"` 逐个 `shift` 完之后才用 `$*` 认 URL ⇒ 探针那一发永远落不进
+`sync/status` 分支，注入的 `LEG_P0=404` **从未被读到**，桩恒回兜底的 `000`。
+后果的形状很具体：腿 3 的三条断言（P0 判红 / 当场 rc=1 / 没发 `DELETE`）**全部照样 ✔**，
+因为"探针不通 ⇒ 中止"在桩坏的世界里也成立 —— 它是**自我实现**的判据。
+（`DELETE` 那一维没坏：它由循环里解析出的 `method` 判，不依赖 `$*`。）
+
+取证 = 把桩改回坏形状跑一趟一次性副本（`/tmp/pb-mut.sh`，只把两处 `$ALL` 换回 `$*`）：
+⇒ `PASSIVE=fail=7`，7 条红**全部**落在腿 2（5 条）/ 腿 4（1 条）/ 腿 5（1 条），
+而**腿 1 与腿 3 一条都没红**。未变异对照 `bash research/tools/mutation-rigs/android-passive-branch-selftest.sh` ⇒ `PASSIVE=pass` rc=0。
+📌 所以戳穿假通过的不是那条负向腿自己，是同一台装置里的**正向腿**。
+已入 traps #277 第 4 款（含"负向腿不能是唯一那条腿"这条一般规律）。
+
+### ③ 门禁与状态
+
+`bash -n` 通过；`check:shell-unicode` / `check:verify-script-copy` / `check:shell-erasure-parity` /
+`check:script-snapshot` / `check:shell-exit-chain` 五道 **rc=0**。
+
+🔴 **这一节没有任何一条真机读数**。欠的两件按顺序是：
+① `ERASURE_TRIGGER=external` 在模拟器上的第一次读数（负载现量 **17.82**，阈值 12；看守 b7n5qecyj 在跑）；
+② 有了 ① 之后才谈得上那条**配对**：同一载体上摘掉 `client.ts` 被动那一发 ⇒ external 档转红。
+配对腿**尚未跑**，不许拿"载体有了"替它签字（§10.135 那趟就是这么骗过我们的）。
+
+## 10.147 E 新载体的第一趟读数到手（10-05 11:26–11:34，看守真的开到了窗口）——两枚红都是**产品事实**，且机制已在**无设备**载体上复现
+
+看守 `tmp/ios-e-window-watcher.sh`（b7n5qecyj）11:26:09 起跑，11:34:31 收工，
+`WATCHER=DONE rc=1` —— **rc=1 不是 rc=3**，即环境有效、这一趟的读数算数。
+载体 `heyta-wt-trash-e2e`，端口 3110，模拟器 `A1D6AD48-E724-42DB-B46D-B225575B02AE`，
+日志 `/tmp/e2-ios-erasure-112609.log`（服务端 `/tmp/heyta-e2e-erasure-ios-112609.log`）。
+
+**总读数：通过 32 项、失败 2 项。** 失败的是判据 D 与判据 E，而这两枚红合起来是一件事：
+
+| 腿 | 读数 | 它说的是什么 |
+|---|---|---|
+| C | ✅ 界面 `AXLabel=这个账号已经注销，无法再次登录，同步已停止 …` | 被动通道在 iOS 设备级**出到了界面** |
+| D | ❌ 但**不是**"明文仍在"：`content_rows=0`、便签原文在整个文件字节里 UTF-8/UTF-16LE **各 0 命中**、`freelist=0`、文件 73728 字节；`birth` 相对 `DELETE` = **+5 秒** | 文件确实被删掉了，之后有一次重开把**空 schema** 建了回来（`tables=6`，行数全 0） |
+| E | ❌ `birth：D→E 差 0 秒`，`meta_rows 0→1`（mtime 11:34:21） | **冷启动没有再动它** —— 残留就是 D 那一枚；但重启那一趟往这具空壳里**写了一行 meta** |
+
+§10.143 ⑥ 那台分支自检预测的四档，这一趟落进**第四档**（"birth 未变 ⇒ 还是 D 那一枚"），
+第三档（"birth 前移 ⇒ 每次冷启动"）**没被走到** —— 这是那个分岔第一次有真机读数，
+也证明它不是恒真/恒红（那台装置当时的全部理由）。
+
+### ① 机制不在 iOS 桥，在共享层：一条无设备探针把它复现到**字节数逐字相同**
+
+嫌疑点很具体：`packages/storage/src/sqlite/sqlite-adapter.ts:299 ensureOpen()`
+——「打开连接并建 schema。幂等（`CREATE ... IF NOT EXISTS`）」，而 `destroy()` 走完
+`close()` + `removeDatabase()` 之后，**没有任何一层拒绝再经过它**。
+`sync-wiring.ts:147` 把 `onAccountClosed` 默认装成 `eraseLocalData()`，也没有任何一层在销毁后停掉后续的读。
+
+静态路径能把"为什么一定会有下一次读"讲到七、八成：`client.ts:972-991` 那个 `eraseLocalData()`
+在 `await eraser()` 之后**只是返回一条诊断字符串** —— 它既不通知任何人"适配器已经没了"，
+`ensureOpen()` 里也没有"已销毁"这个状态（`:299-315` 只有 `driver` / `opening` 两枚字段）。
+⇒ 只要还有一方持有同一个适配器实例（界面刷新、徽标计数、下一次自动同步 tick），
+它的**任何一次读**都会把 schema 建回来 —— headless 那一臂量到的正是"就一次 `count()`"。
+⚠️ 但**具体是哪一发读**在 iOS 那一趟里没被打出来（rig 不记调用栈），这一格仍写"未定性"，
+留给 #87：要修先钉住调用者，否则容易修成"挡住了一发、还剩三发"。
+
+探针 `research/tools/mutation-rigs/e2-destroy-reopen-probe.mjs`：同一套 `SqliteAdapter`（从 `packages/storage/dist` 导入，
+生产同一份实现）+ 同一个真文件驱动 `NodeSqliteDriver`，不开设备、不起模拟器。读数：
+
+```
+A 写入后      文件=heyta.sqlite 字节=73728 ops 行数=1        明文命中=true
+B destroy()   containerRemoved=true storesCleared=6          文件=（无）
+C 一次普通读  之后文件=heyta.sqlite 字节=73728 ops 行数=0    明文命中=false   schema=6 枚
+D 冷启动一趟  文件=heyta.sqlite 字节=73728 schema=6 枚        明文命中=false
+REOPEN_BY_READ=yes
+```
+
+🔴 **73728 = 73728**：headless 复现出来的空壳，与 iOS 判据 D 量到的那枚残留**字节数相同、表数相同、
+行数全 0、明文 0 命中**。这把"iOS 原生桥没删干净"这个第一归因**否证**了 ——
+共享层确实有一条"销毁之后一次普通读把 schema 建回来"的路径，它与平台桥无关。
+
+⚠️ **但"所以四端都会红"这句不说。** 现成的反证：**Android 同一条判据 D 读到的是残留 0 枚**
+（§10.127 第 7 趟，以及 §10.134 ③ 复量同形），macOS 壳级那 61 条里也记着"销毁后从壳外看库文件与旁挂都不在盘上"。
+把五格读数并排，原先那两个"没分离的变量"**分开了一个**：
+
+| 载体 | 销毁之后有没有再打一次读 | 文件级残留 |
+|---|---|---|
+| headless `PROBE_SKIP_READ=1` 臂 | 明确没有 | **0 枚**（`PROBE=clean`） |
+| headless 默认臂 | 有，就一发 `count()` | **1 枚**（73728 字节 / 6 张表） |
+| iOS 真机 | 销毁之后界面还在跑（判据 C 那句就是界面渲染出来的） | **1 枚** |
+| Android 真机 | **未现量**（那一趟没记录销毁后有没有读） | 0 枚 |
+| macOS 壳级 | **未现量**（只留下"销毁后从壳外看不见文件"这一读数本身） | 0 枚 |
+
+⇒ **"销毁到取证之间有没有再打一次读"这一个变量就足以同时解释全部五格**，
+于是"iOS 的驱动在 `close()` + 删文件之后重开条件不同"这个**平台假设不再是必要的** ——
+注意这句话说的是"最省的解释不需要它"，**不是**"平台差异已被证伪"。
+剩下没分离的是第二格：**Android 那 0 枚是"恰好没读"还是"驱动真的不会重开"**。
+分它的做法是在 Android 上做一次同形对照（销毁 → 故意再打一次读 → 量文件），要设备窗口 ⇒ 已并进 #87 的取证清单。
+
+### ② 这枚红的边界，两条都不能说过
+
+- **不是明文泄漏。** 用户字节三层取证都是 0（内容行 / 文件字节 needle / freelist），
+  `VACUUM` 那一腿也走到了（`sqlite-adapter.ts:274`）。销毁**做了**，且不回头。
+- **但 §10.2 那句"文件级残留 0 枚"是被否证的**，而且被否证的正是"注销后这台设备上的本地副本已清除"
+  这句话的**文件层承诺**。界面上那句话此刻说的是"明文没了"（真），读起来像"这台设备上一张本地库都没有了"
+  （假）—— 一句真话的边界要写清，否则它和 §10.141 ⑤ 那条"截图配错趟"是同一类债。
+- 还有一条副作用值得记：空壳回来之后，冷启动往里写了**新的一枚 clientId**（E 的 `meta_rows 0→1`）
+  ⇒ 注销之后这台设备又"有一份库"了。它不携带任何历史数据，但状态机上是个弯。
+
+### ③ 下一单（新建任务，落点在共享层）
+
+候选修法两条，**先取证再拍**：
+1. `destroy()` 之后把适配器钉成"已销毁"，后续任何调用**响亮失败**（而不是静默重建）；
+   代价：宿主在销毁回调返回后是否还会打一次读，需要现量 —— 如果会，这条会把界面打成异常。
+2. 或在被动通道那一发之后**先停掉所有会打到适配器的循环**（自动同步 / 结算 / 启动路径），再销毁。
+   代价：停哪些循环是一个产品时序判断（§8 规则 12/13 那一族），不是一行代码。
+
+无论哪条，判据都得是**这条 headless 探针的形状**（`destroy → 一次普通读 → 文件必须仍不存在`），
+因为它 3 秒跑完、四端共用，而设备级复跑一次要 8 分钟且要抢窗口。
+
+探针已入库为 **`research/tools/mutation-rigs/e2-destroy-reopen-probe.mjs`**（不在 `tmp/` 留本，
+理由就是 #86 那一族：文档里点名的证据路径必须在干净检出里也在）。两臂读数（11:4x 现量）：
+
+| 臂 | 命令 | 读数 |
+|---|---|---|
+| 默认 | `node research/tools/mutation-rigs/e2-destroy-reopen-probe.mjs` | `PROBE=REOPENED（销毁后一次普通读把 73728 字节 / 6 枚 的空壳建了回来）` rc=**1** |
+| 装置自检 | 同上 + `PROBE_SKIP_READ=1` | `PROBE=clean … 只证明这台装置会报绿` rc=**0** |
+
+🔴 第二臂**不是**产品结论（跳过那一发读等于没问那个问题），它只挡一件事：恒红的装置和真有缺陷的
+装置在第一臂上长得一样，所以"能报绿"必须由装置自己答一次。
+⚠️ 但它**还没挂进 `pnpm check`** —— 挂之前它只是一个能失败、可复跑、可寻址的装置，不是一道门。
+（挂法按 §10.101 那条形状办；挂的时候注意它会以 rc=1 描述当前 HEAD，**不能直接进链**，
+否则 `pnpm check` 从现在起恒红 —— 要先修 #87，或把它作为"已知红的登记表"那一档接进去。）
+
+### ④ 两条修法之间有一条**口径分岔**，它不是代码问题（要产品拍）
+
+把 D 与 E 两档并排放，会跳出一个原先没人问过的形状：
+
+- **D（同一进程内）**：`DELETE` 后 +5 秒文件回来 ⇒ 这是**静默重建**，同一次运行先报了"已清除"又造出一张新库，
+  无论怎么读都是缺陷。上面两条修法都覆盖它。
+- **E（换一个进程）**：重启那一趟往库里写了**新的一枚 clientId**（`meta_rows 0→1`）。
+  但这一条**未必是缺陷** —— 用户注销后重开 App，界面回到"未登录"，此时出现一份**全新的空本地库**
+  与"刚装好的新设备"是同一个形状。若把它也算作"没销毁"，就等于要求
+  **注销过的设备永远不再能使用这个 App**。
+
+⇒ 所以 §10.2 那句"文件级残留 **0 枚**"要先把**测量时机**钉住，否则它同时管着两件不同的事。
+两种可自洽的口径（都能落成 rig 判据，成本差不多）：
+
+| 口径 | 承诺怎么写 | 判据怎么改 | 代码要做什么 |
+|---|---|---|---|
+| **A：同进程不变量** | "注销后这台设备上不再有你曾写下的字节"，且**不重启就不该再有库** | D 要求残留 0；E 明确**豁免**（另立一条"重启后新库必须是空的、且 clientId 与旧的无关"） | 只修同一进程内的静默重开 |
+| **B：跨重启零残留** | "只要账号注销了，这台设备上就没有 heyta 的库" | D 与 E 都要求 0 | 冷启动也要有一条"这份凭据对应的账号已注销 ⇒ 不初始化存储"的判断，代价是给启动路径加一次网络/凭据判定 |
+
+🔴 我倾向 **A**：B 要求"每次冷启动先知道账号是否注销"，在 E2EE + 凭据可能已被清的前提下，
+这条判断要么依赖本地留痕（那本身就是一份残留），要么依赖一次启动期网络请求（把注销语义做进首屏路径）。
+⚠️ 但**这是承诺口径，不是技术选型**，按 §8 规则 7 归产品负责人拍；#87 里两档的落点与代价都已备好，拍了就能走。
+
+🟢 **12:2x 一条现量，把这个选择的可选项砍掉一半**：我去读了**已经对外的**法务文案怎么说这件事
+（现量命令：`grep -rn '注销' packages/legal/src/documents | grep -E '本机|本地|设备|明文|数据库'`；
+命中的承重四行是 `privacy.ts:400 / :489 / :612 / :637`，同族措辞还在 `data-rights.ts:34-36` 与
+`personal-info-list.ts:417`。⚠️ **本轮只读了中文真源**，英文那一侧没有逐字复核 —— 下面的结论只关于**承诺的形状**，
+不关于双语是否一致，那件事由 `check:legal-copy` 一类常驻门看着，不靠这一段）：
+四处的措辞逐字都是 **内容级**：
+
+- 「你点下注销的那台**当场清掉本机明文**，其它设备在下一次同步拿到"账号已注销"这个信号时各自清掉自己那一份」；
+- 副本清单四处里**没有一处**写"这台设备上不再存在 heyta 的数据库文件"；
+- 而 `personal-info-list.ts:417` / `privacy.ts:137` 提到"本机的数据库文件"时，说的是**存放位置**，不是销毁承诺。
+
+⇒ **#87 那枚红没有否证任何对外承诺**（它否证的只是我这一批自己写在 §10.2 那句"文件级残留 0 枚"）。
+⇒ 于是这一拍真正的含义变窄了：**选 A ＝ 对外文案一字不动**，只是把 rig 的判据从文件级换成内容级 + 修同进程静默重开；
+**选 B ＝ 要把政策与三处入口文案一起加严**（"这台设备上不再存在数据库文件"这类话现在没写过），
+外加给冷启动路径加一次账号状态判定。成本不对称的方向和 ① 那段倾向一致，但**理由变了**：
+不是因为 B 技术上难，是因为 **B 会逼着对外承诺跟着改，而那份承诺是草案、还没经过法务复核**（`:637` 自己写着）。
+⚠️ 原句留在上面不删 —— 它当时把两档写成"成本差不多"，这一条现量把它否证了。
+
+## 10.148 #76 的看守换了一版，多出来的那道门是"载体的那个文件干净"（10-05 11:5x）
+
+`tmp/ios-e-window-watcher.sh` 只等两道门（负载、无现役移动验收），那是够 #84 用的 —— 它不改源码。
+**#76 那一臂原地改 `packages/sync-client/src/client.ts` 再复原**，而它的复原判据是
+"与它自己 `cp` 下来的原件逐字节相同"。⇒ 如果载体里那个文件本来就带着别人没提交的改动，
+这臂跑完会**把别人的在飞改动按"还原"的名义抹掉**（§8 规则 9：共享资源不许有第二只手）。
+新看守 `tmp/ios-b76-window-watcher.sh` 因此多加一条：起跑那一刻
+`git -C <载体> status --porcelain -- packages/sync-client/src/client.ts` 必须为空，否则继续等。
+
+起跑前把"载体落后 main 会不会让这臂读的是旧代码"这一问也现量掉了：
+两边那枚文件的 **md5 逐字节相同**（`4a90c8f2…f006`），锚点段 `diff` 为空 ——
+⇒ 载体 HEAD 虽落后（`ad61621a` vs 主检出 `69dccc8a`），**但被摘的那个函数与 main 同一份字节**，
+读数不欠"载体版本"这一笔。⚠️ 这句话只对 `client.ts` 成立；引这臂读数时**不许**把它推广成"整棵载体与 main 同形"。
+
+现场读数（11:5x，只用于说明为什么是等而不是跑）：负载 **39.58**（门槛 12）、
+现役 Playwright headless 多枚在跑（另一条线的 e2e）。Android 那一腿（#77 的 `ERASURE_TRIGGER=external`
+真机第一趟）**不起无人在场的后台运行**，理由两条都是现量的：
+
+1. `verify-mobile-account-erasure.sh` **不自己起栈**（`:151` 那行写的是"起栈：`bash scripts/mobile-e2e-up.sh`"，
+   端口要靠 `PORT=` 显式传；lib 的默认值是 **3000**，`:64-70` 那段注释就是上一版把端口写错之后补的）。
+2. 这一刻 `*:3100` 的监听者是 **pid 26407 `node dist/src/index.js`，10-04 06:02 起、已跑 1 天 5 小时**
+   —— 别人留的长命共享服务。**把那个端口喂给这趟，注销那一发就会真删那上面的账号**（§8 规则 9 +
+   "不擅自执行不可逆动作"）。要么自己起一棵干净栈、要么等人盯着跑 —— 都不是后台无人看守能替它决定的。
+
+🔴 **那条新加的"载体干净"门，上线 90 秒就用上了**：我 11:52 现量 `client.ts` 在主检出与载体两边
+md5 相同且载体那份干净；看守 11:53 第一次试探就读到 ` M packages/sync-client/src/client.ts`
+（**载体里**，不是我改的 —— 臂要三道门全过才会起跑，它没起）⇒ 另一条会话在这 90 秒里动了那枚文件。
+这正是它要挡的那一格：没有这道门，臂会在别人的在飞改动上"变异 → 复原"，
+把别人的改动按"还原到原件"的名义抹掉，而它自己会打印 `RESTORE_SRC=OK`（它比的原件是它自己 `cp` 的那份）。
+读数：`[1] 11:53:15 load=26.9 dirty=[ M …client.ts] ⇒ 继续等`、`[2] 11:56:15 load=466.1 …`。
+⚠️ 顺带一条：**"我量过它干净"的保质期以秒计** —— §10.145 那张"源侧前置已成立"的表，
+对**会被别人写的文件**只在这种"起跑当场再量一次"的形状下才成立，写成一节静态结论就会漂。
+
+## 10.149 #76 的第一趟：窗口真的开过，而臂把「环境拒绝」读成了「判据没牙」（10-05 12:0x）
+
+看守第 5 趟（12:05:16）三道门全过 —— `load=8.5`、无现役移动验收、载体 `client.ts` 干净 ⇒ 起跑；
+12:06:08 臂以 **rc=1** 收工，打印 `ARM=DEAD —— 判据 B 在 iOS 上没有牙`。
+
+🔴 **那句结论是假的，假在它自己下面那一行**：`驱动 rc=3`、
+`B 文件腿 ❌=0 ✅=0  B 数据腿 ❌=0 ✅=0  C ✅=0`。五个数全是 0 ⇒ 这趟**一条判据都没执行**。
+rig 日志 `/tmp/e2-ios-erasure-120604.log` 只有 16 行，死在第 2 步的门 B：
+「设备上装的 bundle（10-05 08:29）比载体源码（10-05 12:05）旧 ⇒ 环境无效（3）」
+（同屏另一条：app 进程 1 枚、采样 3s 内 CPU 零增量 ⇒ 挂起残留，判定不是占用者 ✅ —— 门 C 是放行的）。
+
+**真因是读源码读到的，不是猜的**：臂的第 4 步只**打**变异产物
+（`$WT/apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app`），**从不装**；
+而门 B 跑在起栈之前、比的是**设备上**那份 bundle 的 mtime。
+更讽刺的是：**落变异这个动作本身**就把 `client.ts` 的 mtime 推到"刚刚"
+⇒ 任何"只打不装"的臂**必撞这道门**，而且一撞就是 rc=3。
+rig 里 `IOS_APP_SRC` 那段注释（`:230-233`）写明白了"臂重打的 .app 不在设备上、
+不转发它就会拿未变异的字节量变异代码" —— 但它转发给的是**内层 rig**，那道门在它之前。
+
+三处修（**都不放宽门**）：
+
+1. 新增第 **4b** 步（装）：装前现量归属（`idb_companion --udid` 0 枚、`verify-mobile-*` 0 枚）⇒
+   `simctl install` ⇒ 回读设备上 `main.jsbundle` 的 md5 **必须等于刚打的那枚**
+   （`INSTALLED_JS_MD5=$ARM_JS_MD5`），不等 `ARM=ENV install-identity` 退 3。
+   这一条补的是臂原本那句反作弊②没证到的方向 —— 它只证"产物字节**变了**"，
+   没证"这枚字节**进了设备**"（同 #72 那一族：mtime 与差异都不等于身份）。
+2. 第 7 段结论改成**三档**，且 **NO-RUN 必须排在 DEAD 前面判**：
+   `rc=3` **或** 腿读数合计 0 ⇒ `ARM=NO-RUN` exit 3（看守继续等，不记产品红）；
+   只有"判据确实跑过而 B 两腿全绿"才允许写 `ARM=DEAD`。
+3. 收尾把**产物**也还回去：臂改完设备里留的是变异产物，而旧 `restore()` 只 `cp` 源码 ——
+   下一趟基线会在"源码干净、设备里是变异字节"的世界里跑，那是一条关于产品的假结论。
+   现在第 2 步 `cp -a` 存下变异前那枚 app，收尾装回并打印
+   `RESTORE_APP=OK / PARTIAL / FAIL / SKIPPED`（装不回就响亮说，不许声称还干净）。
+
+判据本体 `research/tools/mutation-rigs/ios-erase-verdict-arms.sh`（抽第 7 段 + 桩喂五档现场，**不碰设备**）：
+`ARMS=pass (5/5)` —— L1 `rc=3`+全 0 ⇒ NO-RUN、L2 `rc=0` 但全 0 ⇒ NO-RUN、
+L3 跑过而 B 全绿 ⇒ DEAD、L4 两腿转红且 C 绿 ⇒ OK、L5 只一腿红 ⇒ HALF。
+变异读数：摘掉 NO-RUN 那一档（9 行）⇒ `ARMS=FAIL（2 腿不符）`，且**只红 L1/L2**，
+L3/L4/L5 逐字不变 ⇒ 这台装置有牙，红在承重的那一格上。
+
+⚠️ 所以 **#76 现在的状态是「第一趟没跑成，设备读数仍为 0」，不是「B 没牙」**。
+Android 侧 §10.131/§10.132 照出的那个形状**目前没有 iOS 对应证据**，不要引成"两端都一样"。
+看守已换成修好的臂重挂（12:1x 现量：`load=8.25` 过、`busy=[72189 80127]` 两枚 `verify-mobile-*` 在跑 ⇒ 继续等）。
+
+**修好的臂第一次跑就交了一次实额**（12:14:11 起跑那一趟，`rc=3`）：
+`SAVED_PRE_APP=OK` ⇒ `MUT hit=1` ⇒ `ARM_JS_MD5=b6e57715…`（≠ `PRE_JS_MD5=e38ca33b…`）⇒
+第 **4b** 步**装前归属现量**照出 `pid=93355` 这枚 `verify-mobile-*` 是看守放行（12:14:11）之后、
+装之前（12:14:52）**才出现的** ⇒ `ARM=ENV busy=rig-preinstall` 拒装。
+🔴 这道腿第一次上场就挡住了一次**在别人正在用的设备上覆盖产物**的动作 ——
+那正是 §8 第 9 条不许做的事，而旧的臂结构上看不见它（旧臂根本不装）。
+收尾三行都是量的：`RESTORE_SRC=OK`、`RESTORE_MD5=4a90c8f2…（= PRE）`、
+`RESTORE_APP=OK（设备上那份 = 变异前那份 md5=e38ca33b…）` ⇒ 载体与设备都还回原状，有 md5 为证。
+教训入台账：traps **#283**。
+
+## 10.150 台账结构自检：B63 那笔债两天内从 4 对重号长到 11 对，而它自带的统计命令两条都查不出（#88 = B63 的复量，不是新缺陷，10-05 12:1x）
+
+先归位：**这条债 `BLOCKED.md` 的 B63 早在 10-03 23:0x 就登记过**（还带 23:3x 的复核补正），
+本节不是"新发现"，是**复量 + 增量 + 一处措辞纠正**。现量命令：
+`node research/tools/traps-ledger-audit.mjs`（本轮新工具，未接门禁）。
+读数：`条目 289 枚（最大号 282）· 嵌套列表项 12 行未计入 · 文档里的 grep -cE '^[0-9]+\. ' 读到 292 行`。
+
+🔴 **增量**：B63 当时现量重号 **4 对**（`#38`、`#93`–`#95`），今天装置现量 **11 对** ——
+多出的是 `#77`–`#82` 六对与 `#269` 一对（每对都是**不同事故**，行号都在输出里，
+例：`#79` 一枚是 `tccli` 无条件写日志、另一枚是 i18n 改完必须 build）。
+`git blame` 现量：那两批 `#77` 都在**同一笔提交 `87f62b396`（10-04）**里并存
+⇒ "编号只增不改"不是只在跨会话撞号时破的，**单笔提交内部**就能塞进一整批已被占用的号。
+所以 B63 那句"要人拍改法"的代价，两天里已经从 4 对涨到 11 对 —— 这是一个**会自己变贵**的缺口。
+
+**对 B63 两处结论的复量**（一处仍成立、一处要改措辞）：
+- `#83/#84/#85`：装置读到这三枚号位**存在** —— `:1780`「别在主工作树里构建要发布的前端产物」、
+  `:1799`、`:1823`，且都**行首带一个空格**。所以它们不是"从没写过"。
+  B63 真正说中的是**内容层错位**：AGENTS.md 索引行"80–83"与它自己那两段 `83.` 指的条目
+  （探针污染状态 / 原生控件跟系统强调色）**不落在这三枚号位上**。
+  ⇒ 措辞应从"缺号"改成"**号位被别的条目占着，而引用指的是第三个东西**"；
+  危害不变 —— ai-event 计划 `:3698` 现量 `#83` 被 **26 处**引用，那一族才是真正会指错的。
+- `#120`：全仓只有 **5 行**把它**列为缺号**（ai-event `:2314`/`:3698` + BLOCKED `:3573`/`:3590`/`:3614`），
+  **没有一处按内容引用它** ⇒ 它不制造悬空引用，优先级低于 `#83` 那一族。
+  B63 那句"逐号问'从没写过'还是'被并进了别的条目'"，这三枚（83/84/85）现在能答：**都不是从没写过**。
+
+**为什么台账自带的统计命令查不出这两件事**：① 它数**行**不数**不同的号** ⇒ 重号只表现为"多一条"；
+② `#77`–`#85` 整批条目行首带一个空格，`^[0-9]+\. ` 连数都数不到它们（**9 枚**）
+⇒ B63 那句"总数现量 189 行"今天的同形读数是 292，而**这 9 枚从来没进过任何一边的计数**。
+这是 B63 命名的"三套编号制并存"之外的**第四种面目**：同一套全局号，写法有两种缩进。
+一条既漏计又无法查重的命令，**写进规则文件也不会让人发现台账坏了**。
+
+装置的两档口径（写在文件头，不藏在实现里）：
+重号与中段插行只在**带标记**（🔴/⚠️/✅/📌/`**`）的条目里找 —— 否则条目正文里那些**零缩进**的
+`1.` 列表项会造出一堆假重号（真树上就有 12 行这种）；
+缺号则在**全部带编号的行**里找 —— 台账开头 `#1`–`#3` 恰好没写标记，只按标记集算会把它们报成丢失。
+🔴 我自己第一版正中招：按标记集算 ⇒ 报出"缺号 1,2,3,120"，**前三枚是装置形状盲区造出来的假号**。
+若照它建三张"补号"工单，就是拿装置的形状替全仓造工作。自检七臂：A/C/D/F/G 是"必须报错"的阳性对照、
+B 是挡恒红的阴性对照、E 管缩进形状、G 专门钉住上面那句口径（`SELFTEST=pass`）。
+另有一处诚实的局限：装置不读 git，判不了"重号是谁在什么时候撞的"，那要 `git blame -L` 另查。
+
+**为什么不接进 `pnpm check`**（这是判断，不是偷懒）：HEAD 上就躺着 11 组重号 + 1 枚空号位，
+接进去等于给全仓造一条恒红门 —— 同 §10.109 那句"刻意不加宽默认射程，否则替全仓台账吸债"。
+**#88 交付的就是这台装置本身**（B63 的关闭判据一个字不改，仍要人拍"局部列表要不要并进全局号"）：
+下一位不必再手工数一遍，`node research/tools/traps-ledger-audit.mjs` 一条命令给出
+重号清单（带行号与两条标题）、空号位、中段插行、以及"自带命令漏了几枚"。
+⚠️ 重编号**不是我这一批能替别人拍的**：`#83` 被 26 处引用（ai-event `:3698` 现量），
+而 AGENTS.md 自己正文里那四段 `80.`–`83.`（RNW 吞 keydown / 窗口取证三坑 / 探针污染 / MSIX 纯 ASCII）
+是**第三套编号** —— `§7` 明明规定"新的条目追加到 traps 文件末尾，不要写回本文件"，
+而台账里 `#81` 那两枚号位没有一条是"窗口取证三坑"（`:3955` 那句"同族：#81（窗口取证三坑）"因此悬空）。
+这一节 B63 已经量过（它记的是 `:961`/`:1048` 都写 `82.`），我复量到的形状与它一致；
+改它要连 `AGENTS.md` 一起动，而它此刻在工作树里是 `M`（别人在飞）⇒ 按 §8 第 9 条不动。
+本批只交工具、复量读数、和上面那处措辞纠正。
+
+## 10.151 我给 #76 加的那几条腿，自己把 #64 那一族又犯了一遍：12 处 `$VAR` 紧跟全角字符（#89，10-05 12:1x）
+
+触发点很日常：§10.149 的修法往臂里加了一批 `echo "… rc=${RIG_RC} …"` 式句子。
+写完顺手用正则在**本批这 6 枚装置**上扫
+`\$(?!\{)[A-Za-z_][A-Za-z0-9_]*(?=[^\x00-\x7F])` ⇒ **12 处命中**
+（`ios-erase-arm-b76.sh` 6、`b76-verdict-arms.sh` 2、两枚看守各 1、`e2-ios-erasure.sh` 1、`ios-branch-selftest.sh` 1）。
+⚠️ 这行是 12:1x 的**当时读数**，其中 `b76-verdict-arms.sh` 后来（12:4x）被提升成
+`research/tools/mutation-rigs/ios-erase-verdict-arms.sh` —— 因为现量发现 **`tmp/` 整目录在 `.gitignore:206` 里**，
+放在 `tmp/` 的装置不会被下一个人拿到（同 §10.153 ③）。当时的**个数**不随改名变，路径以现量为准。
+
+实测复现（判据不是"看起来会错"）：
+
+```bash
+LANG=en_US.UTF-8 /bin/bash -c 'set -u; ARM=x; echo "载具：$ARM）"'
+# /bin/bash: ARM\xef: unbound variable
+```
+
+bash 把全角括号的首字节当成**变量名的一部分**吃进去 ⇒ `$ARM）` 查的是一个不存在的名字；
+`set -u` 下**整行当场死**，不带 `-u` 下**打印空值**。macOS 的 `/bin/bash` 是 **3.2.57**，
+而这批 rig 全部用它跑。
+
+🔴 **为什么常驻门一条都没报**：`scripts/check-shell-unicode-vars.mjs:57-61` **刻意跳过 `tmp/`**
+（注释写明"实测 4 个 `tmp/*.sh` 的红全部来自草稿"）。
+⇒ #277 第 6 款那句"入库是一道免费体检"在这里是**反向成立**的：
+装置留在 `tmp/` 一天，就一天没人给它做这道体检 —— 这次是**我自己带扫描去的**，不是门照出来的。
+
+修法：逐处改成显式 `${VAR}`。改法用带**命中数断言**的 node 脚本
+（每文件期望值写死，全部 staged 完才统一 `writeFileSync` ⇒ 中途 throw 不会留下半改的文件）。
+读数：6 文件 12 处全部命中期望值 ⇒ 一次写盘；复扫这 6 个文件 **0 残留**；
+`bash -n` **6/6 OK**；两台自检在 `LANG=en_US.UTF-8` 下重跑
+`ARMS=pass (5/5)`、`SELFTEST=pass（D 五腿 + E 五腿 + 反作弊三腿）`。
+
+⚠️ **刻意没一起改的**：`tmp/` 其余 19 枚 `.sh` 里同形残留 **67 处**
+（本线被计划点名的对照臂也在内：`w4b-confirm-arms.sh` 8、`i2-i3-archive-arms.sh` 15、
+`nested-wt-exclusion-arms.sh` 2、`ios-gate-c-arms.sh` 1、`opfs-erase-arm.sh` 4 …）。
+它们大多**已经产过读数**，现在动文件等于让"读数所对应的字节"与"盘上的字节"分家
+（§10.89 那条"改装置会使旧读数作废"的纪律），而 `tmp/` 是共享目录、别的线也在里面跑。
+⇒ 登记 **#89**：只交一条可重跑的扫描命令，由"下一次真要跑这枚装置"的人在**起跑前**顺手修
+（跑前修比事后修便宜，且那时改文件不影响任何已存的读数）。
+
+教训本体并进 traps **#277 第 6 款**（不新立一条 —— 那一款讲的就是"装置留在 tmp 就逃掉常驻门"，
+这次只是把"逃掉的代价"量成了 12 处 + 67 处残留）。
+
+## 10.152 一条查过之后**不成立**的风险，也写下来（省掉下一轮重新怀疑；10-05 12:2x）
+
+怀疑的形状：§10.94 给 macOS 那 rig 补了"默认路径没被动过"的判据 S 之后，我顺着同一个问题去看
+**注销那两枚设备 rig** —— 它们的"笔记本对端"是 `apps/node-host/dist/cli.js`（跑在**宿主机**上），
+而被测行为恰恰是 `destroy()`（真删文件）。如果对端用了宿主机默认库路径，
+那么"手机注销 ⇒ 对端下次同步自己清掉"这一发删的就是**用户本机那份真库**，不可逆。
+
+现量三条，结论是这一格**不存在**：
+
+| 查的 | 读数 |
+|---|---|
+| `node-host` 的默认库路径 | `apps/node-host/src/cli.ts:264-267` —— `--db`/`HEYTA_DB` **缺失就 `throw`**，没有兜底默认值。⇒ 结构上不可能"忘了传就写到真库" |
+| rig 实际传了什么 | `scripts/lib/mobile-e2e.sh:91` `LAPTOP_DB=${LAPTOP_DB:-/tmp/heyta-conflict-laptop.sqlite}`，全部对端跑在 `/tmp` 下 |
+| 注销 rig 自己碰的库 | `scripts/verify-mobile-account-erasure.sh:102` `DB_DIR=/data/data/com.heyta/databases`（设备侧），宿主机侧只有 `$ADB pull` 出来的**副本** |
+
+📌 写这条的理由不是"它有趣"，是**它省下一轮**：这类"两个真实特征拼出来的怀疑"（对端在宿主机 + 行为不可逆）
+每轮都会重新长出来一次；把它量成"已排除 + 排除依据"，下一位读到的就不再是"待查"。
+⚠️ 但排除的**保质期取决于代码**：那三条里承重的是 `cli.ts:265` 那句 `throw`。
+哪天有人给 `--db` 加一个默认值（例如"跟 shell 一样放 `~/.heyta/`"），这一格立刻从"不存在"变成"真敞口"，
+而且**没有任何一层会报错** —— 因为它是默认值，不是漏传。
+（`cli-mcp.ts:88` 的 MCP 侧**已经**是 `HEYTA_DB_PATH ?? ~/.heyta/heyta.db` 这个形状；
+ 它不参与设备 rig，所以本轮不构成敞口，但**别拿它当"宿主都没有默认路径"的证据**。）
+
+
+## 10.153 `NO-RUN` 那一档被**活的一趟**走了一次（#76 第 6 趟，负载 13>12）+ 复量装置恒真事故入档 + `tmp/` 原来不进仓库（10-05 12:3x）
+
+**① #76 第 6 趟：修好的三档结论第一次在真窗口前生效。**
+
+```
+[6] 12:31:20 臂退出码 RC=3
+════ 7. 结论（三档：有牙 / 没牙 / 没跑）════
+   ARM=NO-RUN —— 驱动 rc=3、B/C 五条腿的读数合计 0 行 ⇒ 这趟没有任何判据执行过，不许判 B 有没有牙。
+            rig 自己说的：❌ 负载 13 > 12 ⇒ 环境无效（3），等窗口重跑同一条命令
+   RESTORE_SRC=OK（与原件逐字节相同）
+   RESTORE_MD5=4a90c8f2d366e256223a28af99f8f006 期望=4a90c8f2d366e256223a28af99f8f006
+   RESTORE_APP=OK（设备上那份 = 变异前那份 md5=e38ca33b9ece47b815f54330471f8a36）
+```
+
+同一条形状（rc=3 + 五枚腿计数全 0）在 12:06 那趟打印的是 `ARM=DEAD`（§10.149）——
+一句"iOS 判据 B 没有牙"的**产品结论**。这一趟它打的是 `ARM=NO-RUN` 并按 3 退出交给看守继续等。
+**所以 [环境陷阱 #283](../reference/environment-traps.md) 那条修法不是只被离线 5 臂验过，是被一趟真的环境拒绝验过的。**
+另一条只在被拒时才现形的性质：**被拒的那一趟仍然把载体和设备都复原了**（`RESTORE_SRC=OK` + `RESTORE_APP=OK`，
+两个 md5 逐字回读到期望值）—— 复原挂在 `trap … EXIT` 上，而"臂没跑成"恰好是它最容易被漏掉的那条出口。
+
+**② §10.146 那句"逐字存活"复量完了，结论是划掉一半**（读数、装置恒真事故、以及我自己写错的那条原因，
+都写在 §10.146 原地，不另起一处）。要点留三句在这儿，因为它们是跨工单通用的：
+
+- **装置收了 `$2` 却从来没用它** ⇒ 落盘步骤整体消失 ⇒ 下游比的是两个不存在的文件 ⇒
+  `grep -c ''` 在"文件不存在"时给的是**空串而不是 0** ⇒ `[ "" = "0" ]` 为假 ⇒ 三道非空守卫一道没触发 ⇒
+  照样打印结论并退 0。**空串绕过等值守卫**是这条的承重机制（入档 [#284](../reference/environment-traps.md)）。
+- 我给它写的第一版阳性对照把期望值写成"等于删掉的行数"，而基线 `MISSING` 本来就是 1 ⇒
+  **一趟真读数被自己的对照判成 `UNFAIABLE`**。期望值应是 `MISSING + REMOVED`。装置比我对它的要求严。
+- **"我为什么改了这一行"也是断言。** 我先把原因写成"旧词条字面已被换名"，一分钟内现量否证：
+  `common.accountClosure.done.erased` 在 HEAD 与工作树**逐字相同**、正文仍在断言那句
+  （复量：`grep -n '账号已注销，这台设备上的本地副本也已清除' scripts/verify-mobile-account-erasure.sh`）。
+  真实原因只有一条：那一步现在按 `ERASURE_TRIGGER` 读**两句不同**的文案。
+
+**③ 一条会影响"装置该放哪"的现量**：`git check-ignore -v research/tools/mutation-rigs/rig-step-verbatim-recheck.sh` ⇒
+`.gitignore:206:/tmp/` 命中 —— **`tmp/` 整个目录不进仓库**。所以放在 `tmp/` 的验证装置下一个人拿不到、
+也不会进任何提交；要长期留就落 `research/tools/` 或 `scripts/`（本轮 `traps-ledger-audit.mjs` 就是这么放的）。
+🔴 这把 #89 那笔债的**实际代价改口**了：那 67 处 `$VAR`+全角残留全在 gitignored 的一次性装置里，
+代价是"下次现编装置时重踩"，不是"仓库里带病"。本轮真正会跑的那几枚已经扫干净 ——
+用**常驻门同一套判定**（`import { findOffenders } from 'scripts/check-shell-unicode-vars.mjs'`，
+`tmp/scan-runpath-vars.mjs`）而不是我自己再推一遍正则（我推的那版对 7 个文件全报 0，
+先喂一条已知违规串做对照才读到 `CONTROL=1 / TOTAL=0`）。
+
+**④ 提升这两台的过程本身又产出两条可迁移的形状**（都带读数，不是感想）：
+
+- 原来的 `cd "$(dirname "$0")/.."` 隐含"装置躺在仓库根**下一层**"（它们在 `tmp/` 时成立）。搬到
+  `research/tools/mutation-rigs/`（差两层）之后这句就指错地方了 —— 而我**第一版修法**换成
+  `git rev-parse --show-toplevel`，把另一个方向弄断了：从仓库外调起时 `git` 直接报
+  `fatal: not a git repository` ⇒ `VERBATIM=NO-HEAD-COPY`（实测 cwd=`/tmp`）。
+  ✅ 现用的版本是**跟着脚本自己往上找 `.git`**，找不到就响亮 `ROOT=NOT-FOUND` 退 1；
+  复验：两台各从**仓库根**和**`/tmp`** 调起一遍，读数逐字相同
+  （`ARMS=pass (5/5)` rc=0 与 `VERBATIM=title-only` rc=1）。
+  📌 一般规律：**"从脚本位置推根"和"从当前目录推根"是两种不同的坏法**，改一种之前先问
+  另一种会不会断 —— 而只有"两个 cwd 各跑一遍"这种对照能同时排掉两者。
+- 提升之后 `tmp/` 里的原件**删掉**（不留副本），引用它的指针一次改完
+  （计划 3 + traps 1 + 记忆 1，每处带命中数断言、全部成立才落盘）。
+  改完复量 `grep -rn 'b76-verdict-arms\|b76-verbatim-recheck' docs/ research/` 只剩一处，
+  而那一处是 §10.151 的**当时计数**（已就地写明"个数不随改名变，路径以现量为准"）。
+  ⚠️ 落盘前那次断言**先失败过一次**：我凭记忆把表行写成"长期装置要**落**…"，
+  而文件里是"要**搬进**…" ⇒ 整段没写进去（all-or-nothing 生效）。**改自己的句子也要先读回来。**
+
+| 工单 | 这一节的净变化 |
+|---|---|
+| #76 | 结论形状已被活趟验证；**变异读数仍为 0**（窗口还没开：现量 load=12.04 / 阈值 12） |
+| #77 | step 5 的"逐字"改成"正文逐字、标题那行确实改了"，默认档 `ui` 的行为不变这条不受影响 |
+| #89 | 从"67 处待修"改成"跑路径 0 处（带对照）+ 其余在 gitignored 一次性装置里" |
+| 新登记 | `tmp/` 不进仓库 ⇒ 长期装置要搬进 `research/tools/` 或 `scripts/`。**本轮就搬了两台**（见 ④，`ios-erase-verdict-arms.sh` + `rig-step-verbatim-recheck.sh`）；#76 的臂与看守仍留在 `tmp/`，因为看守此刻正引用着臂 —— 结案之后同样该搬 |
+
+
+## 10.154 🔴 #76 这两趟真正的 blocker 不是负载，是**我自己把两道门对撞了**（门 B 要求装包、门 A 禁止刚装）；外加"载体落后 45 笔"这件事的适用面证明（10-05 12:4x）
+
+**① 12:41 那趟 `ARM_RC=3` 的成因，和它为什么永远等不到窗口。**
+
+```
+   ARM_JS_MD5=b6e57715ed0eaa8d8d43d73105f3f700  PRE_JS_MD5=e38ca33b9ece47b815f54330471f8a36
+   INSTALLED_JS_MD5=b6e57715ed0eaa8d8d43d73105f3f700  ARM_JS_MD5=b6e57715ed0eaa8d8d43d73105f3f700
+   设备 bundle mtime=10-05 12:41:41  比它更新的源码=无 ⇒ 门 B 应当放行
+════ 5. 跑判据本体（B 必须转红）════
+❌ 那枚 bundle 是 1s 前装的（< 300s）⇒ 这台设备正在被另一条线使用 ⇒ 环境无效（3）
+```
+
+| 门 | 它要求 | 臂为了满足它 | 于是 |
+|---|---|---|---|
+| B（`e2-ios-erasure.sh:190`，新鲜度） | 设备上那份 bundle 不能比载体源码旧 | 12:1x 给臂加了**装包腿**（落变异会把源码推到"刚刚"，只打不装必撞 B） | bundle 变成"1s 前装的" |
+| A（`:101`，归属） | bundle 不能是刚装的（`< 300s` ⇒ 有人在用这台） | —— | **装 ⇒ A 拦** |
+
+**两道门合起来把这条臂永久挡在判据之外**，而每次的表现都是"环境无效（3），等窗口重跑"。
+🔴 这条的形状值得记住：**我为了修一个假结论（12:06 把"没跑"读成"没牙"）加的腿，和另一道门对撞之后，
+造出一个只会复现同一个假象的僵局** —— 而它的报错文字指向"别人在用这台"，把排查一路引向外部。
+真相在里面：门 A 本来就带**按 UDID 绑名字**的逃生口（`:99-100`：`IOS_SELF_DEVICE=1` **且**这台的名字
+以 `heyta-e2-` 开头；名字是用 python 只取 `udid == IOS_UDID` 那一行得到的，所以这个旗**给别人台子也点不亮**），
+臂从来没转它。
+
+✅ 修法（不是放宽 A）：臂在跑判据前**现量目标这台的名字**，落在本线命名空间里才转旗，
+并把判定打印出来（名字读成空 ⇒ 不转 ⇒ 让 A 照旧拒）。这一腿先单独验过两腿才接上：
+自家 UDID ⇒ `heyta-e2-ios-erasure`／FLAG=1；一枚不存在的 UDID ⇒ 空／FLAG=0。
+🔴 装这条腿时踩到新坑入档 **[#285](../reference/environment-traps.md)**：
+`VAR=x 命令A | 命令B` 的前缀赋值只给管道里**第一条**命令 —— rig 里同样写法能读到，是因为它的
+`IOS_UDID` 是 `IOS_UDID=… bash 脚本` 传进来的、在子 shell 里天然带 export；臂里是局部变量 ⇒ 读成空。
+
+**② 顺带否证我自己刚写下的两条误判**（都是"先推理后现量"的代价，划线留原句旁边）：
+~~"`IOS_APP_SRC` 是全仓没人消费的死旋钮"~~ —— 错。我第一次 grep 命中的是 **Android** 那份
+`verify-mobile-account-erasure.sh`；iOS 那份 `scripts/verify-mobile-ios-account-erasure.sh:481-499`
+**确实读它**（没给而且设备上没装时报"没有产物可装"，给了但目录不存在 ⇒ 环境无效 3）。
+~~"载体落后 main 45 笔，所以这趟的结论只能算载体那一版"~~ —— 这句现在有了**证明而不是猜测**，见下面 ③。
+
+**③ 一趟读数的适用面：靠逐文件字节对比钉，不靠"落后几笔"这种印象。**
+载体 `ad61621a`（落后 main 45 笔）。现量销毁链上**每一个**文件的载体 HEAD 版 vs 主检出工作树：
+
+| 文件 | 对比结果 |
+|---|---|
+| `packages/sync-client/src/client.ts`（变异落点） | 逐字节相同 |
+| `packages/app-host/src/account-closure.ts` | 逐字节相同 |
+| `packages/storage/src/db.types.ts`（契约） | 逐字节相同 |
+| `packages/storage/src/sqlite/{sqlite-driver,node-sqlite-driver,sqlite-wasm-driver,sqlite-adapter}.ts` | 逐字节相同（4/4） |
+| `apps/mobile/src/db/op-sqlite-driver.ts` | 逐字节相同 |
+| `apps/mobile/src/screens/AccountClosureScreen.tsx` | 逐字节相同 |
+| `scripts/verify-mobile-ios-account-erasure.sh` / `scripts/lib/mobile-e2e.sh` | 差 616 / 83 行 —— **这是对的**：rig 第 2b 步会把主检出这三份 overlay 进载体并打印 md5，所以执行的是**当前判据**，不是载体里那版旧判据 |
+
+⇒ **被测字节 == 当前 main，判据字节 == 当前 main**（前者逐文件证、后者由 overlay 步保证并打印）。
+所以这趟的读数**可以**写成"当前 main 上判据 B 有没有牙"，不需要缩成"载体那一版"。
+读取命令（下次自己跑）：`git -C <载体> show HEAD:<路径> \| cmp - <主检出同路径>` 逐个比，
+判据那三份看 rig 日志里 `overlay:` 行的 md5 是否等于主检出的 `md5 -q`。
+
+**④ 这一趟的判据读数**（留空时臂仍在跑；13:0x 用**新尺重读那份旧日志**填上，见 §10.155）：
+驱动 rc=**1**（来历不是手填：日志里的「❌ 有失败项」= `summary()` 的 `FAIL≠0` 分支，它随后 `exit 1`）、
+B 前提 `✅=1`、文件腿 `❌=0 ✅=1`、数据腿 `❌=1 ✅=0`、C 腿 `✅=1`、summary「通过 **31** 项，失败 **3** 项」
+⇒ 结论 **`ARM=OK`：判据 B 在 iOS 上有牙**（牙齿在数据腿）。#76 从这一趟起**不再是 0 读数**。
+⚠️ 12:51 那份 `ARM=DEAD` 是**探针读数**（needle 取了绿行的字面形状），不是产品结论 —— 已就地撤回，见 §10.155。
+
+**⑤ 顺手复验了 W07 那格（不依赖记忆）**：`apps/landing/public/assets/docs/trash/W07-trash.png`
+与 `W07-en-trash.png` 工作树 mtime **10-04 07:57**，且 `dist/` 里那两份与 `public/` **逐字节相同**
+⇒ 构建产物发出去的就是重截后的图。人眼复看中文那张：空态，但两句文案都是四类口径
+（「这里放着已删除的任务、便签、清单和习惯」+「删掉的任务、便签、清单和习惯会先放到这里」）。
+📌 这一格的**覆盖轴是文案不是行**：§11.7.2 当初判定的旧图缺陷就是"空态 + 任务口径文案"，
+所以新图仍是空态并不构成"没覆盖四类"——**别把它重新读成"图里没画四行"**（我这次差点这么判）。
+
+## 10.155 #76 第一次有了真读数：**判据 B 在 iOS 上有牙，牙齿在数据腿**；而 `ARM=DEAD` 那句是我自己读错的（10-05 13:0x）
+
+### ① 读数本体（变异臂 vs 未变异基线，同一判据脚本、同一台设备）
+
+| 档 | 未变异基线 `e2-ios-erasure-112609.log` | 变异臂 `e2-ios-erasure-124444.log` |
+|---|---|---|
+| summary | 通过 **32** 项，失败 **2** 项 | 通过 **31** 项，失败 **3** 项 |
+| B 前提（这台设备真收到过一次 401） | ✅=1 | ✅=1 |
+| B 文件腿（库文件仍在盘上） | ✅=1 | ✅=1 |
+| B 数据腿（ops 行数与 A 那一刻逐字相同） | ✅=1「仍是 1 行」 | ❌=1「401 把 ops 从 **1 行变成了 0 行**」 |
+| 判据 C | ✅=1 | ✅=1 |
+| 判据 D / 重启后 D | ❌ 两条（**变异前就红**，属 #87 那条"销毁之后一次普通读把空壳建回来"，与这枚变异无关） | ❌ 同两条，形状与条数**没变** |
+| 臂的结论 | （基线不产结论） | **`ARM=OK` —— 判据 B 有牙** |
+
+**配对差集（这台装置最值钱的一条腿）**，三个分母都现量在案：
+日志总行 **171 / 165**，带 `✅/❌` 的读数行 **44 / 44**，其中标题含「判据 X」的 **6 / 6** 行 ——
+差集就在那 6 行这一层算：**5 行逐字相同，1 行翻了个面**
+`✅ 判据 B（数据腿）成立：401 之后 ops 仍是 1 行（与 A 那一刻逐字相同…）`
+⇒ `❌ 🔴 判据 B 红（数据腿）：401 把 ops 从 1 行变成了 0 行（…「删库 → 重开空库」正是被文件腿读成绿的那条路）`。
+⇒ 这枚变异**只**搬动了它该搬动的那一条判据，没有连带红。
+算法：`python3` 取两日志里同时含 `✅/❌` 与「判据」的行、归一空白、`Counter` 相减，
+并把"两趟各自 44/44、共有 5 条"一起打印 —— 分母不打印出来的差集没有意义（少一条整行消失都看不出来）。
+⚠️ 第一版我用 `grep -oE '(✅\|❌)[^｜]{0,26}'` **截断**到 26 字符再 `comm`：那样「✅ 判据 B（文件腿）成立」
+与「✅ 判据 B（数据腿）成立」被折成同一个串，差集只报出一个 `✅ 判据 B` 的**计数差**，
+读不出**是哪条腿**翻的 —— 结论方向恰好没错，但它是在**已经被截断的形状**上对的。
+同一个坑（needle 形状不对 ⇒ 读数失真，见 ②）我在这段里犯了第二次，两次都是**先怀疑探针**才抓住的。
+
+### ② 撤回：12:51 那句 `ARM=DEAD —— 判据 B 在 iOS 上没有牙` 是探针产物
+
+判据日志第 99 行当时就印着 `❌ 🔴 判据 B 红（数据腿）：401 把 ops 从 1 行变成了 0 行`，
+而我的五个计数器**全是 0** ⇒ 旧分岔落到"跑过了但 B 一条没红"= `DEAD`。
+原因只有一条：**我拿绿行的字面形状去数红行**。判据脚本两侧的形状不同：
+
+| 腿 | 绿行（`good()`） | 红行（`bad()`） |
+|---|---|---|
+| 文件腿 | `✅ 判据 B（文件腿）成立` | `判据 B 红：一次 401 就把本机库删了…`（**不带**「（文件腿）」） |
+| 数据腿 | `✅ 判据 B（数据腿）成立` | `❌ 🔴 判据 B 红（数据腿）：401 把 ops 从 …` |
+
+修法两条，**第二条才是承重的**：
+1. needle 从被调方 `bad()`/`good()` 的**原文逐字抄**（不凭记忆构造），六条计数各自独立；
+2. 加一条 `ARM=NEEDLE-MISMATCH` 守卫：**summary 报失败 >0 而 B 四条计数全 0** ⇒ 判"我的针没对准"，
+   按 **3**（环境/装置无效）退出，**绝不**落到 `DEAD`。因为"我的计数读不到"与"判据没红"
+   在输出上长得一模一样，而只有前者是我能当场否证的。
+📌 这是 traps **#283 的第二副面目**：上次是 rc=3（连判据都没跑）被折进 `DEAD`，
+这次是判据**真跑了**而我的 needle 形状不对 —— 两次都产出了同一句关于产品的假结论。入档见 **#286**。
+
+### ③ 换一把尺重读旧趟，而不是再烧一趟设备
+
+尺改过之后，12:44 那份日志还在盘上（`/tmp/e2-ios-erasure-124444.log`，12035 B），所以本节的读数
+**来自重读**，不是第三趟真机。为此臂本体加了 `RECOUNT=<日志>` 模式，而它第一次写在了**文件末尾**
+（原先第 6/7 段的位置）⇒ `RECOUNT=… bash 臂` 照样把 0–5 段跑完：建包、装包、驱动设备判据，
+一句话都没重读就超时了。这一趟的代价是**第三趟真机被起来又被停掉**（`TaskStop`），
+而 `trap restore EXIT` 把它兜住了：源 `RESTORE_SRC=OK`（md5 回到 `4a90c8f2…` 原件）、
+设备产物 `RESTORE_APP=OK`（回到变异前那枚 `e38ca33b…`），复现"现场已复原"的现量命令是
+`md5 -q packages/sync-client/src/client.ts`。修法：把结论函数与早退分支一起挪到
+`say()`/`envfail()` 之后、**任何副作用之前**，实测 `RECOUNT` 一趟 **0.038 s** 且零设备调用。入档见 **#287**。
+
+`RECOUNT` 的 rc 也不许多手填：默认从日志自己的收尾句推
+（「❌ 有失败项」⇒ 1 / 「环境无效」⇒ 3 / 「真机全链路通过」⇒ 0），三条都没有 ⇒
+`RECOUNT=RC-UNKNOWN` **拒绝**读（`exit 3`），不替那趟编一个码。
+
+### ④ 顺手修掉一条我自己写下的越界主张
+
+L4 腿（拿未变异基线日志喂 `RECOUNT`）报 `ARM=DEAD`，而旧措辞是
+「变异产物**已装进设备**、判据确实执行过」—— RECOUNT 趟**根本没有**装载证据（它不装包），
+这句话替装置许下了它没有的能力（traps **#281** 同族）。改成结论行带 `${MODE_TAG}`：
+完整臂趟（源与产物两侧 md5 都打印过）才有资格说"关于产品的结论"；RECOUNT 趟同一分支
+只能说到「这份日志里 B 没红」为止。实测两种模式各打印自己的那一版。
+
+### ⑤ 装置台账（两台都已进仓库，`tmp/` 那份已删，不留抄件）
+
+| 装置 | 绿读数 | 变异读数（各摘一处，其余腿须全过） |
+|---|---|---|
+| `research/tools/mutation-rigs/ios-erase-verdict-arms.sh`（结论分岔，七腿） | `ARMS=pass (7/7)` | 摘 `NO-RUN` 那 **6** 行 ⇒ 只红 L1/L2；摘 `NEEDLE-MISMATCH` 那 **7** 行 ⇒ **只红 L5**，且那一腿逐字复现「判据 B 在 iOS 上没有牙」这句假结论 |
+| `research/tools/mutation-rigs/ios-erase-arm-b76.sh`（臂本体，13:0x 从 `tmp/` 转正） | `RECOUNT` 读 12:44 日志 ⇒ `ARM=OK` rc=0；从 `/tmp` 目录调起也成立（根锚走"向上找 `.git`"，两种错法都验过） | 判据驱动 `tmp/e2-ios-erasure.sh` **仍在 gitignored 的 `tmp/`** ⇒ 干净检出上这枚臂 `ARM=ENV rig-driver-missing` 以 **3** 退出（响亮拒绝，不是假绿；这一条**尚未**在干净检出上实测，属"代码即承诺"里我明确标出未量的一格） |
+
+七腿的**注入面**也改过：旧装置注入 `LEG_TOTAL`（替被测代码把求和做完了 ⇒ 新增一条腿它不会知道），
+现在注入**六条计数**，求和在装置眼下跑。载具路径打进输出（`载具：…`），两处都没有时报 `ARMS=NO-CARRIER`。
+
+### ⑥ 这一枚问到了什么、没问到什么（别把它读多）
+
+**问到了**：iOS 侧被动通道那条「401 被当成注销信号就会清本机明文库」的故障，
+判据 B **会红**，且红在数据腿 —— 也就是 §10.131/§10.132 在 Android 上照出的那个形状，
+iOS 这一侧**补了数据腿之后已经被覆盖**。⇒ #76 关闭。
+
+**没问到**：文件腿。这枚变异造成的是「删完立刻被重开成空壳」，文件确实在盘上，
+所以文件腿报绿是**正确行为**，不是"它没牙"。要问文件腿只能换一枚变异：
+**只删不重开**（把销毁器之后的重建路径也摘掉）⇒ 那一趟文件腿若仍不红，才叫没牙。
+已登记成独立工单 **#90**，不许拿这一枚的读数替它结案（这一族的教训原文见 §10.132 与 traps #283）。
+
+**顺带确证**：两条 D 红在变异前后**条数与形状都没变** ⇒ 它们不是这枚变异造成的，
+仍然归 **#87**（销毁之后一次普通读把空壳建回来，共享层，等产品裁决）。
+
+## 10.156 🔴 #77 的被动通道**真机第一趟到手（两趟）**，顺带把 #82 那条欠了很久的腿补上；三处假读数全是我自己的探针（10-05 13:1x–13:4x）
+
+载体（起跑前现量，不是沿用）：负载 `8.09`（门槛 12）、`verify-mobile*` 进程 **0** 枚、
+`:3111` 空 ⇒ 自己起一棵干净栈（`PORT=3111 HEYTA_E2E_DB=heyta_mobile_smoke bash scripts/mobile-e2e-up.sh`，
+pid 99598、全新账号 `mobile-e2e-1791177240@…`）；设备 `emulator-5554` = AVD `heyta-w3-yearly`
+（`adb -s emulator-5554 emu avd name` 现量），当时没有别的 rig 在上面。
+🔴 **没有把注销那一发打在共享的 `:3100` 那棵长命服务端上**（§10.146 立的那条就是为这个）。
+
+### ① 两趟的逐腿读数（`ERASURE_TRIGGER=external`，同一判据脚本）
+
+| 腿 | 第一趟 13:1x（`/tmp/b77-ext.log`） | 第二趟 13:3x（补腿后，`/tmp/b77-ext2.log`） |
+|---|---|---|
+| 前提 P0（注销前设备那枚令牌回 200） | ✅ | ✅ |
+| `DELETE /api/account` | HTTP 200 `{"success":true}` | 同 |
+| 前提 P1（此后同一发） | HTTP **410** + `code=ACCOUNT_CLOSED` | 同 |
+| **判据 B 的前提（设备那一半）** | —— 这一档当时**还不存在** | ✅ 界面读得到「HTTP 401」⇒ 这次同步真被服务端拒过 |
+| 判据 B 文件腿 / 数据腿 | ✅ / ✅（ops 仍是 1 行） | ✅ / ✅ |
+| **判据 C（被动通道）** | ✅ 界面上出现「这个账号已经注销，无法再次登录，同步已停止」，而**注销屏本趟从没打开过** | ✅ 同（且消息里印得出词条名了，见 ③(a)） |
+| 判据 D | ❌ 残留 1 枚 `heyta.sqlite` | ❌ 同，**但补了内容腿**：`ops=0 行、本轮便签原文命中=0 处` ⇒ 空壳 |
+| 判据 E | ❌ 二次读仍 1 枚；❌ 界面没回落到未登录态 | ❌ 同两条（措辞已改，见 ③(b)(c)） |
+| 装置侧红（输入框形状） | 4 枚（重试后恢复） | 5 枚（多一枚"界面上令牌不是本轮那串"，重试后 C 仍 ✅ ⇒ 确实换回来了） |
+| summary | 通过 **28** / 失败 **8** | 通过 **29** / 失败 **8**（多的那一条正是新腿） |
+
+⇒ **#77 关闭**：被动通道（别的设备注销 ⇒ 本机之后同步读到信号）第一次有了**设备级**读数，
+两趟都在，且 C 那句只可能来自 `ACCOUNT_CLOSED` 那条路（主动那一发从没点过）。
+⇒ **#82 关闭**：Android 判据 B 的前提现在两半各有腿（服务端会回 401 + 设备真收到过 401），
+补的是 `dump` + `has_sub 'HTTP 401'`，载体依据是 `client.ts:1734` 把状态码拼进错误句、界面逐字渲染
+（先拿 13:2x 那张截图确认**有量程**，再决定这条腿写得成写不成 —— 不是拿界面当装饰）。
+⇒ **D/E 那三枚红的归属定下来了**：残留是**空壳**（销毁跑过，之后被一次普通读重开）⇒ 归 **#87**，
+不是"本机明文仍在"。这一格从此不许再被读成"E2 移动端没闭合 = 明文没删"。
+
+### ② 为什么这条腿以前量不到，而现在能
+
+Android 这一档的 D 原来**只数文件**（`RESIDUE=$(… grep -c "^heyta.sqlite")`），
+和 §10.131 照出的 B 档是同一个形状：**只量"在不在"的判据回答不了"里面还有没有东西"**。
+补的三条内容腿（`ops` 行数 + 本轮便签原文在文件字节里的命中 + 两档共用）沿用 iOS 那一档已有的形状，
+不是新发明。⚠️ 它只证明"这一趟销毁跑过"，不证明"销毁在每条路径上都跑过"——
+后者仍是 #87 的待裁决项。
+
+### ③ 三处假读数，全部出在我自己的探针上（逐条带成因）
+
+**(a) 判据 C 的消息里那对反引号被命令替换。** 第一趟日志里那行
+`…snap.4703: line 625: common.sync.error.accountClosed: command not found`
+之后紧跟「界面上出现了词条  那句」（中间是空的）。
+🔴 断言本身用的是字面中文串，所以那一腿**是真的过了** —— 坏掉的只是消息。
+两个方向的误读都便宜：见 shell 报错就判腿坏，或者看见空串不当回事。已按 #288 入档并改成直接写词条名。
+
+**(b) 「销毁那条路压根没跑过」这句是我打印出来的，而它没有读数撑着 —— 并且是错的。**
+我先手工量了一遍（`adb root` → 拉 `heyta.sqlite` → `sqlite3 … count(*) from ops` = **0**，
+`grep -ac erase-e2e-note-…` 主文件与 `-wal` 双算都 **0**），再回头改 rig：现在这一档印的是
+D 那两条内容读数，并且把"那句曾经印过什么"留在原句旁边。
+⚠️ 我这次手工量第一版还失败了一回：在 zsh 里写 `ADB="adb -s emulator-5554"` 再 `$ADB root`，
+zsh 不做词拆分 ⇒ `command not found: adb -s emulator-5554` ⇒ 拉下来两枚 **0 字节**文件 ⇒
+"ops 读不到 / 命中 0"看起来像结论，其实是**探针没取到东西**（#45 那一族）。命令写全之后才有数。
+
+**(c) 「这台设备下次同步会把远端又拉回来」方向是错的。** 账号已注销 ⇒ 服务端对这台设备此后
+永远回 `410 + ACCOUNT_CLOSED`（前提腿 P1 量的就是它），拉不回任何东西。
+这一档判的仍是"入口有没有回落到未登录态"这个**形状**问题，红照旧红，理由换成有读数的说法。
+🔴 它是不是产品要求（还是只算 UX 形状）与 **#87 的 A/B 口径**是同一格题，**要人拍**，我不代拍。
+
+### ④ 一个副作用值得记：装置转正之后，门禁够得着它了
+
+`ios-erase-arm-b76.sh` 从 gitignored 的 `tmp/` 搬进 `research/tools/mutation-rigs/` 之后，
+常驻的 `check:shell-unicode-vars` 第一次扫得到它，并当场抓出我**新写**的那行
+`envfail "判据驱动不在：$RIG（它在 …）"` —— 裸 `$RIG` 紧跟全角括号（#64 本尊）。
+📌 也就是说 §10.153 那条"装置别躺在 `tmp/`"的收益不只是"下一个人拿得到"，
+还包括**它开始被已有门禁覆盖**。反向同样成立：留在 `tmp/` 的装置等于自愿退出所有静态门禁。
+
+
+## 10.157 隔离载体上的第一趟重量级补跑：`check:landing-e2e` **18 passed**（载体 SHA 现量）；#90 用一枚**不碰设备**的装置闭合（10-05 13:5x–14:0x）
+
+**① 载体现量**（这条决定读数算谁的）
+
+| 项 | 读数 |
+|---|---|
+| 载体 | `../heyta-wt-b58`（detached）= **`3281ebb2` = 现 main**，工作树 0 脏 |
+| 依赖 | `pnpm install --frozen-lockfile` ⇒ `INSTALL_EXIT=0`，6.1s，15 枚 per-package `node_modules` |
+| 自洽复量 | `apps/web/node_modules/@heyta/ui → heyta-wt-b58/packages/ui` ⇒ 吃的是**这棵树**的源码 |
+| 产物 | `pnpm -r build` ⇒ `BUILD_EXIT=0`（`Scope: 20 of 21 workspace projects`）；必需，因为 `packages/ui` 的 `exports` 指 `./dist/*`，e2e 读不到源码 |
+| 起跑闸门 | 4318 / 4319 / 4320 现量**无人监听**才起；任一被占则 `AIE2E=NOT-STARTED` 直接退 3 —— **不让 preflight 去 SIGKILL 别人的 dev server**（§7 #87 那个事故的自我约束版：那条 preflight 会把别人的 vite 按端口杀掉） |
+
+🔴 第一条载体的"自洽复量"不是仪式：我最初把 `node_modules` 与 `e2e/node_modules` **软链回主检出**，`readlink -f` 现量回
+`…/heyta/packages/shared-schema` ⇒ 那样跑出来的绿灯测的是**别人未提交的源码**，等于没隔离。删掉软链、真装一遍才作数。
+（`e2e/node_modules` 这一枚仍是指向主检出的软链 —— 它里面只有第三方（`@playwright/test` 等），不含本仓库 workspace 包，
+所以隔离判据按上面那条 `@heyta/*` 的解析结果来定，不按目录名猜。）
+
+**①b 载体洁净度要带时刻**：`install` 那一刻现量是 **0 脏**；跑完 landing + ai-e2e 之后同一棵载体复量 **总脏=30 枚**，其中 **证据类 30 枚**（`*/evidence/*.png`，是用例自己重写 tracked 截图）、**非证据类 0 枚**（全部在 evidence 下）。⇒ 「载体 = 当前 main 且干净」这句**只在装依赖前那一刻成立**；写读数要带时刻，别把"现在还有 30 枚脏"读成"载体里混进了别人的源码" —— 判据是那 0 枚里有没有非证据类。
+
+**② landing 读数**：`LANDING_E2E_EXIT=0`，`18 passed (1.0m)`（载体 `3281ebb2`，隔离检出、自己装的依赖、自己 build 的产物）。
+
+**③ `check:ai-e2e` 读数**：`AI_E2E_EXIT=0`，**159 passed（6.7m）/ 2 skipped**，同一棵隔离载体（`3281ebb2`）。
+   ⚠️ 有一句要如实带出来：这份日志里印着 **41 行 `Failed to load resource` 与 8 行 `public facts http 500`**
+   （后者是 `packages/app-host/src/public-facts.ts:208` 的 log 回调）。现量核对：整个 e2e 里**只有**
+   `e2e/tests/legal-reconfirm-gate.spec.ts:147-149` 桩 `status: 500`，那一支的注释写的是"其余 `/api/*`（同步、实时握手…）一律回 500：**不许**因为『没人应答』就把闸门放开"，而 `/api/holiday-adjustments` 正好落在这个"其余"里 ⇒ 这些 500 是**用例自己造的故障档**，
+   产品侧的正确行为就是"记下这次失败、回落到随包表"（同族判据见 `public-facts.spec.ts` 的 A/B 两档：拿不到也是正常状态）。
+   ⇒ 所以这句能写：**全绿 + 日志里的 500 属设计内**；但**不能**把它写成"e2e 里没有任何前端错误"——
+   套件把这些 console error **打出来了却没断言**（§6.2 规定一第 3 条只要求"失败时打印"，这里是打了不判），
+   要判"设计内的 500 必须出现且只出现在那一档"，得另立一条断言。这条敞口登记为新缺口 **#91**。
+
+**④ #90 闭合**：这一格欠的是「iOS 判据 B 的**文件腿**自己能不能红」。§10.155 那枚变异下它绿，而"绿"有两种**处置完全不同**的成因 ——
+探针坏了（恒绿）／尺子问不到这一枚（该修的是 #87 那条销毁后重建路径）。把它们合成一句"文件腿没牙"就是拿一条结论盖两种事实。
+新装置 `research/tools/mutation-rigs/ios-erase-b-fileleg-probe.sh`（**一台设备都不碰**，判据本体与谓词都从真身 `scripts/verify-mobile-ios-account-erasure.sh` awk 抽）：
+
+| 腿 | 造的形状 | 期望 | 正常读数 |
+|---|---|---|---|
+| L1 | `${DATA_CONTAINER}/Library/heyta.sqlite` 在 | 绿 | ✓ |
+| **L2** | 同一枚文件被 `unlink`（目录还在） | 🔴 红 | ✓ 红 —— **承重腿**：它把"坏探针"与"问不到"分开 |
+| L3 | 只剩 `-wal` / `-shm` 旁挂 | 🔴 红 | ✓ 红（挡"把旁挂算成库还在"那一侧的假绿） |
+| L4 | 同目录只有 `heyta-device-prefs.sqlite`（不归 destroy 管的那枚） | 🔴 红 | ✓ 红（证它认**整串库名**，是 §10.68.6 词干假红的反向对照） |
+| L5 | 有内容的库（ops=1） vs 销毁后重开的空壳（ops=0） | **两格都必须绿** | ✓ 两格都绿而内容差一行 ⇒ 当场打印「这一枚问不到，牙齿在数据腿」 |
+
+- 正常读数：**`FILELEG=RIGID`（5/5）**，`RIG_RC=0`，判据行数分母现量 `6/6`（腿全走到）。
+- **变异读数**：把谓词逐字换成"只数目录在不在"（恒真形状）⇒ **`FILELEG=FAIL` rc=1**，
+  且红集**恰好**是 L2/L3/L4 三条（L1/L5 不受影响）⇒ 这台装置有牙，且牙齿对准的就是"恒绿"那一档。
+- ⇒ 结论写法定为：**文件腿不是恒绿装置，但 401 那枚变异它问不到**；恒绿那一格记在 **#87**（要产品拍板），本装置不替它签字。
+
+**⑤ 这台装置被自己的腿抓出的两处自身缺陷**（都属"只跑正常档就会带病出厂"）：
+
+1. 抽块的 awk 退出条件写成 `f&&/^(else)?$/&&NR>0&&/^fi$/` —— 那半截 `(else)?` 是**恒真**，
+   实测抽出 **188 行**（一直到文件尾）⇒ 载具里混进了后续阶段的 `$UDID`，`set -u` 当场崩 ⇒
+   **每条腿的 rc 都变成崩溃码 1**，连本该绿的 L1 也红。修：停"第一个 `fi`" + 两道存在性守卫（块 ≤12 行、绿/红 needles 都在，缺即 `EXTRACT=*` 退 1）。
+2. `ok`/`bad` 的桩我按想象拼成 `printf "✅ %s"`，而真身形状是 `   ✅ %s` / `   ❌ %s`（`scripts/lib/mobile-e2e.sh:149-150`）⇒
+   needles 数的是**桩的形状**。（traps #277：桩的形状必须是被测形状。）
+
+**⑥ 顺带 sweep 掉一种"只在并行时现形"的装置缺陷**：BSD `mktemp` 的 `XXXXXX` 不在模板末尾时**不做替换**，
+`mktemp /tmp/x.XXXXXX.sh` 原样建出一枚**固定名**文件 —— 5 枚 rig 的载具与运行日志共用同一枚，并行两趟就互相覆盖，
+而收尾的 `rm -f "$BODY"` 会删掉对方那份。它退出码 0、文件也真建出来了，所以单跑永远看不出。
+抓到它的唯一原因是**把临时路径打进输出**。12 处 / 5 个文件一次性改成 X 组结尾，复量 `grep -rn 'mktemp [^ "]*XXXXXX\.' research/tools scripts --include='*.sh'` 回 **0**；
+四枚离线 rig 复跑：`FILELEG=RIGID`、`ARMS=pass (7/7)`、`ORDER=pass`、`PASSIVE=pass`。入 traps **#289**。
+   ⚠️ **待办（不在本批改 `AGENTS.md`）**：`AGENTS.md` §7 的号段索引表现在最后一行只覆盖到 **177–209**，而 traps 工作树现量最大号是 **289**（`grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md | sort -n | tail -1`）⇒ 210–289 整段在索引里**没有行**。这次不补，因为 `AGENTS.md` 正被别人未提交改动拿着（`git status` 现量 `M AGENTS.md`），往一张正在被别人改的共享台账插行会造冲突；登记在此，等该文件干净时由收口的人补一行（**索引行写"号段+主题+代表条目"，不写条数**，理由就印在那节开头）。
+
+**⑦ 这一趟仍然没做的**（不写成已闭）：`pnpm reinstall:all`（四端，要设备窗口）、全量 `pnpm -r test`、全量 `pnpm check`、
+E5 臂 D（**#85**）第一次**带闸门的起跑尝试**、**#87** 与备份侧 **P-12**（都要人拍板）。
+
+**⑨ 四端重装（同一棵隔离载体 `3281ebb2`，`IOS_DEVICE_NAME=heyta-e2-ios-erasure` 显式命名，不盲选模拟器）** —— 14:1x 起跑，先落已取到的腿：
+  - **macOS**：`.app` + `.dmg` 打出并装进 `/Applications/Heyta.app`；**安装对账**「.app 里的 `web-dist` 与本机 `apps/web/dist` 是同一次构建（9 个 chunk）」✅；安装副本自截屏 **内容占比 71.4%、主蓝命中 1127**（§7 #82 那条判据：非空白不算证据，主蓝才算"是我们的界面"）；窗口 2164x1432。⚠️ 同一行里那句"窗口截图内容 0.0%"是本机常态（WebView 没合成进窗口截图），脚本自己声明不据此判红。
+  - **Windows**：源码包 51M / 清单 3313 条，**远端收到的包 tar sha256 逐字相同**，且**新鲜度对账**通过（`web-dist/index.html=447e9ac4…`、`bridge=f2dde17a…`、`assets/*.js` 7 枚一致）⇒ #82 那条"装的是旧树而判据全绿"的形状这次被正面挡住了。
+  - Android / iOS 两腿在跑；本节的四端结论以脚本自己的退出码与汇总为准，**不在这里预先宣布**。
+
+**⑩ 壳类门禁改在**同一棵隔离载体**复量（此前那批读数取自主检出，那棵树混着别人的未提交改动）**：
+`pnpm check:macos-shell` ⇒ **RC=0**（尾读 `✅ 跨语言那一层 + 落盘 全部通过`，含"c 目录恢复后同一个实例再删就成功了"那一腿）；`pnpm check:windows-shell` ⇒ **RC=0**（同尾读，`:memory: ⇒ containerRemoved:true 且 target 原样带回`）；`pnpm check:linux-shell` ⇒ **RC=0，但那是响亮跳过**（`⚠️ 当前平台是 darwin —— Linux 原生壳的冒烟已跳过`）。
+🔴 这一格不许写成"Linux 壳已验证"：**exit 0 与"跑过"是两件事**（本机没有 GTK4/`libjavascriptcoregtk-4.1`，跳过是设计行为，脚本自己把话说响了）⇒ Linux 桌面用户的证据这一格**仍然是零读数**，与 AGENTS §1 那张表里"仍然没有 Linux 桌面用户的证据"一致，本节不推翻它。
+
+**⑪ 批次 E 相关的常驻门禁在**主检出**（带着本批未提交的文档/脚本改动）逐条复量，全 13 条 RC=0**：`legal-copy` · `legal-tools`（目录 26 条 == 中文表 == 英文表，含逐行同序）· `legal-permissions`（Android 声明 3 条）· `legal-host` · **`legal-closure-truth`**（九份文档中英两栏，版本变更表除外，没有被批次 E 否证的旧声明）· **`legal-gdpr`**（主表 8 行 × 条文 13/14/15/16/17/18/20/21/22/32/33）· `verify-script-copy` · `journey-coverage` · `ui-language`（331 文件 / 426 处文案）· `layering`（363 文件 / 9 规则）· `migrations` · `design` · `tokens`（210 token）。
+⇒ E5/E6 那两单的"政策如实度 + GDPR 口径中英同步"不是一次性读数：这一批句子现在由这些常驻门盯着，改回来就会红（各自的变异读数挂在 §10.28 / §10.42–§10.44 / §10.106 / §10.115 那些节，本节不重抄）。
+
+**⑬ 全量单元测试在同一棵隔离载体跑通**：`pnpm -r --filter '!@heyta/sync-server' test` ⇒ **`RTEST2_EXIT=0`，19 个包 / 聚合 9126 passed / 13 skipped / `failed` 词频 0**（最大四块：`apps/web` 1773、`packages/app-host` 1346、`apps/landing` 1317、`packages/domain` 948）。`@heyta/sync-server` 按 AGENTS §6 的沙箱例外排除（它在整机里只贡献 1 skipped / 0 passed，两者可比）。
+🔴 **第一趟是红的，而红得有价值**：`packages/sync-core test` 被它自己的**内存闸门**拒绝启动 —— `已有测试在跑（pid=70920，锁 /tmp/tfa-test.lock）`，而现量 `ps -p 70920` **无此进程**、锁文件也已不在 ⇒ **一枚 stale 锁**。后果不是那一包红，而是 `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` **让递归在第一个失败包处中止**，其余十几包**根本没跑到** —— 读日志的人看到 "sync-core Failed" 容易只记下"有一包坏了"，把"整批只覆盖了前缀"漏掉。⇒ 报"全量测试通过"之前必须**数包数**（这趟预期 19，第一趟只数到 3 条 summary）。
+处置：不改闸门、不放宽阈值，等锁自己消失后原样复跑（第二趟就是上面那份读数）；这条入 traps **#291**。
+
+**⑫ 四端重装的最终读数（载体 `3281ebb2`，`REINSTALL_EXIT=1`）** —— 汇总逐端：
+`✅ mac · 🔴 windows · ✅ android · ✅ ios`。**整体退 1 是正确的**（任何一端失败 ⇒ 整体 1，这条不许为变绿改）。
+- **android**：release APK 重打 64M → `emulator-5554` 全新安装 `Success` → `monkey` 之后前台**不是** `com.heyta`，脚本显式 `am start -W` 再验一次 ⇒ `mCurrentFocus=Window{… com.heyta/com.heytamobile.MainActivity}`（§7 #55 那条"启动器说成功不算前台"的正面执行）；截图 1080x2400、内容占比 56.8%、**主蓝命中 4001**。
+- **ios**：`pod install` 第 1 趟 `rc=0` ⇒ 沙盒同步（`Manifest.lock == Podfile.lock`）→ Release 构建成功 → **全新安装进我自己命名的那台** `heyta-e2-ios-erasure`（`A1D6AD48…`）→ 新鲜度判据「已装的包比源码新」✅ → 截图 1206x2622、内容 60.1%、**主蓝命中 4152**。
+- 🔴 **windows 是唯一没取到读数的一格**：三条同步/对账全过（tar sha256 逐字相同、MSIX 包内 `web-dist` 下那枚 `index.html`、`bridge`、`assets/*.js` 7 枚一致），失败在**交互会话里那次装没留下取证** —— `scp: C:/src/heyta-msix/install-capture.txt: No such file or directory`⇒ `RESULT=INSTALL_FAILED (no evidence file from the interactive session)`。同一台主机在主检出里最近一次成功取证是 **10-03 19:06**，所以这不读成"脚本坏了"，读成**共享打包机的交互会话此刻不配合**（**#65** 那句"没有任何步骤独占 windows-pc"的兑现形状）。**处置**：不代改打包脚本、不把 `check:windows-shell RC=0` 拿来替这一格签字（壳的冒烟 ≠ MSIX 装进交互会话）。
+- ⚠️ **一条这次才看见的副作用**：iOS 段在跑完后**改写了载体里的 tracked 文件** —— `apps/mobile/ios/Podfile.lock` +2/−2（脚本自己喊出来了："pod install 改动了 Podfile.lock（与 HEAD 差 4 行）"）与 `Heyta.xcodeproj/project.pbxproj` +? （`git status` 现量脏条目从 30 枚证据图变成 **32**，多出的正是这两枚源码类）。⇒ 含义有两条：**跑完重装的树不再是干净树**（下一句"载体 = 当前 main 且 0 脏"必须重取），以及**这类流程在共享工作树里跑 = 替别人制造脏行**（这次落在隔离载体里跑，正好把这条不变量守住了）。
+- 臂 D 重试第二次：`现量 loadavg(1m)=16.53 阈值=12 ⇒ E5=ENV exit3`。**两趟同一形状**（20.00 / 16.53），且第二次跑时我自己的重装已经结束 ⇒ 负载来自机器上其余在跑的会话，不是本线。阈值不调。
+
+**⑧ 臂 D 的第一次尝试：被自己的负载门挡下（这是可读的阻塞，不是失败）**
+
+`E5_WT=<设备载体> PORT=3121 bash tmp/e5-drill.sh` ⇒ **`E5=ENV exit3`**，读数逐字：`现量 loadavg(1m)=20.00 阈值=12 ncpu=16` → `❌ 负载超阈值：这一趟不起（重负载串行）`。
+两件事同时被量到：
+- 闸门**照字面工作了** —— 而且它拦住的是**我自己刚起的四端重装**（gradle + xcodebuild 在同机），不是别人的栈。这一条要写明，否则"exit 3"很容易被读成"环境问题，与我无关"。
+- 前置那两条当场也复量了：`前提成立：载体里 REPLAY_OPERATION_SELECT 是 export 的 ✅`，并且装置把**本轮未提交的两份文件**换进载体后各打了 md5（`recover-user.ts c4436664…` / `snapshot-generation.service.ts 42435089…`）⇒ 换体是有账的，不是"以为换了"。
+
+🔴 **载体选择的依据是"漂移面"，不是"落后笔数"**：`git diff --name-only ad61621a 3281ebb2 -- server/src/sync/import-dump.ts server/src/sync/snapshot-generation.service.ts packages/app-host/src/import-dump.ts packages/app-host/src/restore.ts` ⇒ **0 个文件**，且这三份在设备载体里 `git status` **干净**。臂 D 量的是"墓碑进得了空设备、导入器报得出 `deleted ≥1`"这条路径，而该路径的四个落点在两个 SHA 之间**逐字相同** ⇒ 用落后 46 笔的那台载体跑，对**这一枚**臂不构成"把已修好的读成没修"（§10.144 警告的那个形状在这里被现量排除）。
+⇒ 重试窗口：等四端重装结束、`loadavg(1m)` 回到阈值以下再跑；**不调阈值挤进去**（同 §7 那条"等满以 exit 3 结束，环境无效 ≠ 产品失败"）。
+
+### ⑭ 全量 `pnpm check` 在隔离载体上的**头两趟**：第一趟**日志里那 92 行命令全过**（单位 = 日志命令行数，载体链本体 85 个 `&&` 环节，见 §10.168），只死在测试段的失效锁上（10-05 14:4x）
+
+载体同 §10.157 开头那枚（detached `3281ebb2` = 当时 main、`pnpm install --frozen-lockfile` + `pnpm -r build` 已绿、
+workspace 链接解析验证过）。起跑前门：`4318/4319` 现量空闲 ⇒ 不让 `check-ai-e2e-preflight` 杀别人的 vite。
+
+| 趟 | 起跑时刻 | 退出码 | 死在哪一格 | 那一格的性质 |
+|---|---|---|---|---|
+| 1 | 14:35–14:44 | `CHECK_EXIT=1` | **最后**一格 `pnpm -r test`：`packages/sync-core` 内存闸门拒绝启动 | 🔴 **环境**：锁点名 pid 23884，而 14:4x 现量该 pid **已不在**、`/tmp/tfa-test.lock` **已消失** ⇒ 失效锁（traps #291 同一族第二次发作） |
+| 2 | 14:45–14:46 | `CHECK2_EXIT=1` | **靠前**一格 `check:op-log-semantics`（它内部要跑一次 vitest） | 🟡 同一道闸门，但这次**有活的持有者**（14:45:18 现量 `vitest=0`，其后并行会话起了测试）⇒ 闸门这次是对的，不许绕 |
+| 3 | 14:47 | `CHECK3_EXIT=1` | 链中后段 `check:vault-diagnostics`（详见下面第 ⑤ 段） | 🔴 **是我的载体形状**（`e2e/node_modules` 软链），非产品、非闸门 |
+| 4 | 14:53–15:06 | `CHECK4_EXIT=1` | **最后一格** `pnpm -r test` 里的 `apps/web`：`1 failed / 1772 passed / 13 skipped (1786)` | 🟡 一枚**间歇红**，属日历/到期那条线的套（下面第 ⑮ 段有复现率） |
+
+### ⑮ 第四趟：链上全部门禁 + 四条 e2e 都过了，唯一那枚红在 6 次复跑里一次都没重现（15:05→15:08）
+
+第四趟的覆盖面比第一趟更硬（同一载体，`e2e/node_modules` 已修成真目录）：
+那 92 行命令覆盖的静态门禁 **以及** `check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e` 与四条壳类门禁**全部走通**，
+一路跑到链上最后一格 `pnpm -r test` 才红，红的是：
+
+```
+FAIL tests/due-date-edit.spec.tsx > 🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate 的 UPD op > 点月历日子格…
+AssertionError: 月历里应有 10月18日 这格（无障碍名 = 完整日期）: expected null not to be null
+  ❯ tests/due-date-edit.spec.tsx:191:54
+```
+
+归属是量出来的不是推的：该文件最近两笔提交是 `5e23b7bf`（日历日/年视图 + 任务时刻贯通）与
+`adb627cc`（到期时间编辑器改造）——**日历/到期那条线的已提交套**，不在本批落点里，
+所以按硬约束**不代改、不调基线**，只把复现率与排查方向留在此处（登记为工单 **#95**）。
+
+复现率（同一载体、同一 detached `3281ebb2`）：
+
+| 复跑 | 范围 | 读数 |
+|---|---|---|
+| 15:08 第一次 | 我本想看单文件，`pnpm --filter @heyta/web test -- tests/…` 的 `--` **没生效**，vitest 实际跑了**整个 web 套** | **`1773 passed / 13 skipped`，0 failed** |
+| 15:08 第二~六次 | 窄命令 `npx vitest run tests/due-date-edit.spec.tsx` 连跑 5 次 | **5/5 全过**（每次 `15 passed`），且起跑负载 **46–49**，**高于** 第四趟的 28.75 |
+
+🔴 三条结论按证据强弱分开写：
+1. **不是断言真红** —— 那一格在整套里也过（1773/1786），单文件 6 次 0 红。
+2. **是一次间歇红**，但"间歇"只成立到 n=1 红 / n=6 绿这个样本量；把 0/6 说成"已排除"是本仓 §7 元规则一的错法，
+   所以这里**只登记未定性**，不宣布无事。
+3. 最可疑的形状（**假设，未证**）：`apps/web` 那趟是 isolate 模式 136 个 worker、每个 ~831ms 启动，
+   在 28.75 的负载下 `:191` 之前那次渲染没被同步刷出来 ⇒ `querySelector` 拿到 `null`；
+   换到 46–49 反而全过说明它与"负载高"不是单调关系，更像**特定交错**。
+   排查方向留给那条线：`:188–:191` 之间是否缺一次 `await waitFor`/flush，
+   以及那条判据能不能从"取到这一格"改成"这一格存在且可点"（两层判据，先免费）。
+
+
+🔴 **退出码的取法**：通知里那个 "exit code 0" 是**包装命令的**（traps #164）；真码从我写在重定向之后的
+`echo "CHECK_EXIT=$?"` 读，两趟分别是 **1** 与 **1**。
+
+**第一趟的覆盖面是这两趟里最大的那一枚，值得单独记账**：它一路跑到最后一个子命令，
+意味着 `pnpm check` 链上**前面那 92 行命令全部为绿**，其中包括本批点名要补跑的
+`check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e` /
+`check:macos-shell` / `check:macos-window` / `check:windows-shell` / `check:linux-shell`（darwin 上响亮跳过）/
+`check:mobile-bundle` / `screenshot:verify` / `check:shell-erasure-parity` / `check:journey-coverage` /
+`check:verify-script-copy`，以及 legal 全家（`closure-truth` / `gdpr` / `tools` / `permissions` / `copy`）。
+测试段此前只完成 `design-system`（496 passed）与 `local-api` 两包 —— 与 traps #291 说的那样，
+**第一个失败包会让整批递归中止**，所以"跑过 19 包"那枚读数只能来自单独那趟 `pnpm -r test`（`RTEST2_EXIT=0`，本文件 ⑬）。
+
+🔴 **顺带否证一句我自己写进本文件的断言**（原句在 §10.11x 附近："`pnpm check` 在 W8 的 Linux 通道落地前不可能全绿"）：
+这趟里 `check:shell-surfaces` **是过的**，而 Linux 通道并没有落地。原因当场查清，不是"债被吸收"：
+
+```bash
+grep -n 'W8-GAP-L1' scripts/check-shell-surfaces.mjs   # :234 那条 gap 仍在台账里
+node scripts/check-shell-surfaces.mjs; echo "SS_RC=$?"  # 14:4x 现量 SS_RC=0
+```
+
+它 rc=0 时打印的原话是「✅ 台账里每一格的声明都和代码里的锚点对得上」+「⚠️ 但有 1 栏**没跑** …
+这份绿说的是"通道在"，**不是**"装出来的包里有这一屏"」。⇒ **那句"不可能全绿"作废**：
+这道门禁的形态是"登记例外 + 响亮警告"，不是"缺通道就红"。划掉留原处，并按本仓纪律补一句：
+**它的绿本来就只承诺"台账与锚点对得上"**，我把"这一格会一直红到 Linux 屏真进包"当成了门禁的形状，那是读错了。
+
+⚠️ 我自己在发射行上还复现了一次 **#168**：第 2 趟打印的是 `现量 load1=`（**空值**）——
+`uptime | awk -F'load average:' …` 在这个 shell 里解析不出来。第 3 趟的发射脚本改成
+`sysctl -n vm.loadavg | awk '{print $1}'`，并把 `WAIT=` 那条读数与 `vitest=` 计数一起打出来，
+这样"等闸门"那一段每一轮都有一条可核对的现量，而不是一个空标签。
+🔴 **而那次"改成"本身还是坏的**：第 3 趟打印的是 `load1={`（`sysctl -n vm.loadavg` 输出
+`{ 9.18 14.01 21.01 }`，第 1 个字段是左花括号）。第 4 趟用
+`sysctl -n vm.loadavg | tr -d '{}' | awk '{print $1}'`，并当场配对跑过三种写法：
+raw=`{ 9.18 14.01 21.01 }` / 正确解析=`9.18` / 我原先那行=`（空）` ⇒ 这条现在是**量过的**，不是又一句"改好了"。
+
+**第 3 趟的红不是产品，也不是闸门，是我的载体形状**（14:47 红在 `check:vault-diagnostics`，
+而它在第 1 趟同一载体上是过的）：那枚门禁 spawn 的是 `pnpm --dir e2e exec playwright test`，
+而载体的 `e2e/node_modules` 是我 13:53 软链到主检出的 —— pnpm 的依赖状态检查判定这份 modules 该清装，
+无 TTY 时直接 `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY]` 退出 ⇒ **Playwright 从未起跑** ⇒ 没有 JSON 报告
+⇒ 门禁吐出它那句被 `catch` 吞掉全部子进程输出后的"check the test lock/browser availability"。
+
+- 我第一错猜是"并行 Playwright 抢共用 `test-results`"，**单独跑仍红 ⇒ 被自己否证**（串行原则下我把并发量了才跑：
+  `playwright=0 vitest=0 lock=无`）。
+- 挖真因的办法是造一枚**未跟踪的临时调试副本**（放在被测门禁自己的那枚目录下，好让它对 `root` 的自身推导不变，
+  文件名 `.vd-` 前缀 + `.mjs` 后缀），把 `catch` 里丢掉的 `result.code` 与 `result.log` 尾部打出来；
+  跑完即删（15:1x 现量：那枚副本**已不在**，主检出与载体的 `scripts/` 下都查不到）。
+- 修载体不修别人的脚本：`rm e2e/node_modules`（只删链接，不带 `-r`/尾斜杠）→ `cd e2e && pnpm install --frozen-lockfile`
+  （`E2E_INSTALL_EXIT=0`）→ 载体侧 `ls -ld` 复量成 `drwxr-xr-x … e2e/node_modules`（真目录）、`.bin` 里 playwright 可解析，
+  且当场复量**主检出那枚条目数摘链前后都是 1**（没伤到别人）。
+- 修完单跑那枚门禁：**`VD2_EXIT=0`**，两条臂都印出来（正向 `preserve assertions without the sensitive page tree`
+  ＋ 负向 `removing the aria guard exposes the canary`）⇒ 红属载体，结案。
+  入档为环境陷阱 **#292**（含"门禁吞子进程日志"那半，另登工单 **#93**，不在本批代改）；
+  ⚠️ 我在那条里一度写成"产物顺着链接落进主检出"，现量是主检出 `e2e` **零残留**
+  （`git status --porcelain -- e2e` 空、`test-results` = `total 0`、无 `.vault-diagnostics-*`），
+  已在原条目里改成如实的那一版：真危险是 pnpm **打算删掉**别人在用的依赖目录，只被无 TTY 那道自锁挡住。
+
+第 4 趟用修好的载体与修好的负载读数重起（`WAIT4` 的等待条件是"锁无 + vitest=0 + playwright=0"三条同时成立，
+起跑前再量 `4318/4319/4320/4322` 四个 e2e 端口）。
+
+
+
+## 10.158 E5 **臂 D 的第一次运行时读数到手**：五臂全按预期（第三趟才拿到窗口，10-05 14:2x）
+
+- 前两趟（§10.157 ⑧⑫）被装置**自己的负载门**挡下：`loadavg(1m)=20.00` / `16.53` > 阈值 12 ⇒ 两趟都 `E5=ENV exit3`。
+  第三趟现量 `load=8.63` 放行 ⇒ **`E5_RC=0`**。
+  🔴 这三趟合起来才是一条判据的形状：**"环境无效"必须是可复现的第三种退出码**，不能和"演练失败"共用 1 ——
+  这正是 §10.144 那次给 `tmp/e5-drill.sh` 补负载门时钉住的东西，今天第一次由**它自己**兑现
+  （前两趟 `3`、第三趟 `0`，而不是三趟都 `1`；看守若只看码 1 会把环境读成产品红）。
+- 载体与换体有账：`E5_WT=heyta-wt-trash-e2e`、`PORT=3121`；装置把本轮未提交的两份文件换进载体并**各打 md5**
+  （`recover-user.ts c4436664…` ／ `snapshot-generation.service.ts 42435089…`），前提腿 `REPLAY_OPERATION_SELECT` 是 `export` ✅。
+  选这棵载体的依据写在 §10.157 ⑧ —— **按漂移面选，不按落后笔数**：臂 D 的四个落点在 `ad61621a..3281ebb2` 之间 **0 个文件漂过**。
+
+| 臂 | 读数 | 这一臂挡住什么 |
+|---|---|---|
+| A | 库里 `is_payload_encrypted` 全真（服务端不自陈） | 若"错口令解不出"只是脚本自陈，A 会红 |
+| B | 错口令 ⇒ 可用明文命中 **0** 且退出码 **1** ✅ | 库里若是明文，任何口令都会"成功" |
+| C | 对口令 ⇒ 产物权限 **600**、活体明文标题命中 **3**（期望 ≥2）、`seq 4 / replayed 4 ops / 4 decrypted`、`TASK ~2` | "全密文但解不出"是功能坏；同时也是 `recover-user.ts` 能不能导全量明文这一格的正面量 |
+| **D** | 导进**空设备** ⇒ 记录 **3** 条、其中**墓碑 1 条**（期望 ≥1）、导入器回报 **`deleted=1`** | 本单真正欠的那条：备份/恢复文档承诺"墓碑跟着走、删掉的不会复活" |
+| E | `parseExportDocument ⇒ ok`，且 **`entities` 这一格确实缺省**（客户端自己物化） | 信封形状变了要当场现形 |
+
+- 每臂之后明文产物都 `rm -P`（不留盘）。⇒ **#85 关闭**。E5 现在只剩两件，而且**都不是"没读数"**：
+  **P-12**（备份侧定点删除，要拍板）与 **#87**（销毁后一次普通读把空壳建回来，要拍口径）。
+- ⚠️ 一句边界，别读多：臂 D 是在**载体 + 一次性 SQLite 文件**上用真客户端 `apps/node-host/dist/cli.js` 取的，
+  证的是"墓碑进得了空设备、导入器报得出 `deleted`"；**不**证"真机界面上还原后回收站显示得对"——
+  那一半挂在 W6-c 的设备读数（§10.13x / §10.156 的台账），两者不互相签字。
+
+## 10.159 #87 的另一半查清了：政策里那句"一个都不留"是**文件级绝对句式**，而它现在只有"销毁那一步"的读数（10-05 14:4x，零负载读证）
+
+等载体那趟 `pnpm check` 的回合做的核查。起因是一条该由本批回答的问题：**#87 会不会让已经发出去的政策文字变成假话**
+（"政策如实度"是 E5 点名的一格，而这句话不需要等产品裁决就能查）。
+
+① 现量三处文字（中英各一份，都在 `packages/legal/src/documents/`）：
+
+| 位置 | 那句话的口径 | 层级 |
+|---|---|---|
+| `data-rights.ts:206`（zh）/ `:529`（en） | 「✅ macOS 与 Windows 的桌面壳…现在本机销毁通道会连那个库文件一起删掉，连它的 WAL 日志与共享内存旁挂**一个都不留**」 | 🔴 **文件级**（容器本体） |
+| `privacy.ts:400` | 「点下注销的那台**当场**清掉本机明文」 | 内容级（明文） |
+| `third-parties.ts:290` / `minors.ts:312` | 同「清掉本机明文」 | 内容级 |
+
+② 各句话**已有**的读数，与各自缺的那一腿：
+
+- 内容级那几句**站得住**：#87 的空壳是 `ops=0 行、便签原文命中=0 处`（§10.156 配对表、§10.147 那行 `content_rows=0 / plain=0`）⇒ 明文确实没了，"清掉本机明文"没有被否证。
+- 文件级那句只证到**销毁那一步**：`containerRemoved:true → 主文件与 -wal/-shm 一起没了`（壳级七档，§10.98/§10.99 那条线）。
+  而"之后盘上还剩不剩东西"正是 #87 问的事 —— 且 `e2-destroy-reopen-probe.mjs` 的载具写明是
+  **`packages/storage/dist` 的 `SqliteAdapter`（与生产同一份实现，不复制适配器逻辑）**，
+  macOS/Windows 两个壳吃的就是这同一个共享层 ⇒ 那枚空壳**不是 iOS 原生桥的事**，是把这句文件级承诺也拖进射程的那一条。
+
+③ 🔴 **仍未测的那一腿，本轮不许用推断替它签字**：macOS/Windows 壳在注销**之后**是否真会发生再一次普通读
+（共享层"被读到就建表"已由探针证到，但"那两个壳上确实有人随后读了一次"没有读数 —— iOS 上那枚残留是设备量出来的，
+壳上没有）。所以本节的结论只到"**这句绝对句式目前只被销毁那一步支持**"为止。
+
+④ 因此**这一轮不改政策文字**，两个理由都写下来：(a) 现在加"容器可能被重新建成空壳"那一小句，
+就是在对外文档里写一条 mac/Win 上未测的断言；(b) 它替 #87 的 A/B 裁决抢跑。改成把裁决的**后果**摆清楚：
+
+| 若拍 **A**（接受空壳：只要没明文就算销毁到位） | 若拍 **B**（销毁后不许有任何普通读把容器建回来） |
+|---|---|
+| `data-rights.ts:206`/`:529` 那句必须补一刀：容器可能被应用下一次普通读**重新建成空壳，里面零明文**；zh+en 成对，另加两版变更记录行 | 那句话原样留着，且在两种读法下都成立 ⇒ **不动文字** |
+| 改后要重跑：`check:legal-closure-truth`、`check:legal-copy`、`check:legal-gdpr`、`check:legal-permissions`、legal 与 landing 两个 vitest 套（§10.30 那批数） | 需要一条**常驻**判据把"销毁后读不回壳"钉住（现成的载具就是那枚 3 秒探针，挂进 `pnpm check` 的 cost 很低） |
+
+⑤ 这条核查自己的可复现取证件（谁要复核直接跑）：
+
+```bash
+grep -n '一个都不留' packages/legal/src/documents/data-rights.ts          # 命中 zh 那一行
+grep -n 'WAL log and shared-memory side files' packages/legal/src/documents/data-rights.ts  # 命中 en 对句
+sed -n '1,12p' research/tools/mutation-rigs/e2-destroy-reopen-probe.mjs   # 载具=共享层那三行自述
+```
+
+## 10.160 一次"差点重复登记"的自查：壳的第二份容器**已被页侧清过**，欠的只是字节残留那一腿（10-05 14:5x，零负载）
+
+等第四趟 `pnpm check` 的回合里，我按 §10.2 那句"Windows 壳是两份独立数据 / macOS 还有 WKWebView 持久 websiteData"
+起了一条新工单的草案，理由是 grep 到 `HeytaMacApp.swift:415-416` 只在 `HEYTA_WEBKIT_EPHEMERAL=1` 时才 `.nonPersistent()`、
+而 `eraseHostStoragePortData()` 读的是 `window.__heytaHostStoragePort`（=壳的 SQLite 线协议端口，不是浏览器存储）
+⇒ 结论差一点写成"两个壳的 WebView 存储没人清"。
+
+**这条草案是错的，被本文件已有的实测否证**（错在只 grep 没读账，正是 §7 第一条元规则"先读被调方本体"）：
+
+- §10.48 已查实：`eraseWebLocalData` 定义在 `apps/web/src/lib/local-data-destruction.ts`，
+  由 **`apps/web/src/main.tsx:53 registerLocalEraser(eraseWebLocalData)`** 注册，
+  而两个桌面壳加载的**就是这份 web 产物** ⇒ 壳里跑的页侧销毁器就是它，
+  清的类包含主库 IndexedDB、其余 `WEB_DATABASE_NAMES`、OPFS 目录、CacheStorage/SW 注销、
+  `heyta*` 前缀的 localStorage/sessionStorage，**外加注释点名的"令牌与邮箱那四个不带前缀的键"**（写入方正是 macOS 壳的注入）。
+- 所以那句"第二份容器没人清"**不成立**，草案**不入库**（写在这里是为了让下一个人别再 grep 一遍就重提）。
+
+🟡 **真正还欠的只有一腿，而且它和已有的那一格是同一次运行**：§10.48 量到的是
+`~/Library/WebKit/cloud.finlaw.heyta.desktop/WebsiteData/Default/<guid>/LocalStorage/localstorage.sqlite3`
+**存在且当天被写过**，以及"本机 IndexedDB 目录为空（**只数文件，未读内容**）"。
+⇒ 注销之后那个 `localstorage.sqlite3` 里**是否还能翻出明文**（空闲页 / WAL 旧帧，与 Linux 那端 §10.42 同一形状）
+没有任何一层读过。这一腿不需要新装置，也不需要新授权面 —— 它必须挂在
+**§10.11 macOS 那行已经写明的"等产品负责人点头就能补"那趟真注销**上：
+同一次运行里加一条"把 `localstorage.sqlite3`（含 `-wal`）喂明文 needle ⇒ 命中必须为 0"，
+并配一条阳性对照（注销前同一枚文件必须命中），否则又是一句"没读到"当"没有"（traps #46/#176 同族）。
+登记为工单 **#94**，与那趟合并，不自开一次不可逆动作。
+
+⚠️ 一条边界：这**不推翻** §10.2 那句"两份独立数据" —— 两份容器确实存在（盘上量过），
+差别只在"清的方式"：第一份走原生 `removeDatabase`（文件本体消失），第二份走页侧 web API（内容被清、容器文件仍在）。
+后者落到字节残留那一腿，正是上面这条欠的读数。
+
+
+
+## 10.161 提交分组表（本批全程未提交，等用户明示）：**23 枚脏文件 + 12 枚未跟踪**（15:3x 复量；下面现量口径同），**归属逐条取自 diff 实际内容**（10-05 14:5x 现量）
+
+归属不是推的。每行右栏那条就是"打开这枚文件的 diff 看到的字面内容"，谁都能用给出的命令重跑。
+现量口径：`git status --porcelain` 15:3x 复量 = **23 枚 ` M` + 12 枚 `??`**（14:5x 那趟是 21 枚。多出的两枚**现量归属过了**：`research/tools/r17-reshoot-stale.sh` 的未提交增量 +112/−8 通篇是 r17 截图重拍装置自己那一档（注释里写「10-05 15:3x 补」，本批关键词 0 命中）⇒ **日历/r17 那条线**。**另一枚我没写成结论**：14:5x 那趟只留了枚数、没留逐枚清单，反推不出具体是哪一张（`apps/mobile/evidence/ios-reminder-*.png` 那四张当时就在 B 表的通配覆盖里）。⇒ 能说出口的是：15:3x 现量 23 枚逐枚对照 A/B 两表后**没有一枚属本批新增**，本批 A 表不因此加行。复核：`git diff --stat -- research/tools/r17-reshoot-stale.sh` 与 `git diff -- research/tools/r17-reshoot-stale.sh | grep -cE "回收站|trash|注销|erasure"`（现量 0））+ `git status --porcelain`（12 枚 `??`）。
+
+### A. 本批（回收站/归档线）——可以直接点名提交
+
+| 文件 | 一句证据（diff 里的实际内容） |
+|---|---|
+| `docs/plans/trash-and-archive.md`（+1598/−16） | 全部是 §10.11x–§10.160 的本批过程账 |
+| `docs/reference/environment-traps.md` ⚠️ **混合，见 C 段** | 我的只有 **#289–#292** 四条（行区间 6723-6746 / 6748-6770 / 6772-6788 / 6790-6835） |
+| `scripts/verify-mobile-account-erasure.sh`（+150/−64） | Android 主动/被动通道两档与 B 的数据腿（§10.128/§10.156） |
+| `scripts/verify-mobile-ios-account-erasure.sh`（+262/−18） | iOS A/B/C/D/E 五判据 + 臂 B 的文件腿/数据腿配对 |
+| `research/tools/mutation-rigs/README.md` | 🔴 **不混合**（原判见下面 C.2 的撤回）：未提交增量 = **13 行 `+`（11 行有内容 + 2 行空）/ 0 行 `-`**，且那 11 行点名的工单全是本批的（`#76 #77 #87 #90` + `§10.146/147/155/68` + 指向本计划），别线落点 **0 处** ⇒ 整文件点名提交即可 |
+| 未跟踪 7 枚 `research/tools/mutation-rigs/*`（`e2-destroy-reopen-probe.mjs`、`ios-erase-arm-b76.sh`、`ios-erase-verdict-arms.sh`、`ios-erase-b-fileleg-probe.sh`、`ios-syncnow-order.sh`、`android-passive-branch-selftest.sh`、`rig-step-verbatim-recheck.sh`） | 文件头各自写明钉的是 #87 / #76 / #90 / #77（§10.146–§10.158） |
+| 未跟踪 `research/tools/traps-ledger-audit.mjs` | 台账结构自检（重号对数那条命令的脚本化，§10.x #88） |
+| 未跟踪 3 枚 `apps/mobile/evidence/{android,ios}-account-erasure-*.png` | 文件名即本批判据（401 不清库 / 注销后本机） |
+
+### B. 别线（**整文件都不要碰**，逐条给出它自己 diff 的字面主题）
+
+| 文件 | 现量它是什么内容 ⇒ 属哪条线 |
+|---|---|
+| `scripts/check-android-gradle-remote.mjs`、`scripts/verify-android-vault-storage.sh`、`docs/runbooks/android-build-on-windows.md` | "Android builds on macOS/Linux must use the single remote router" / `AED` 基线迁移 ⇒ **安卓远程构建路由器**那条线 |
+| `scripts/verify-mobile-ios-reminder.sh`、`scripts/tools/ios-ax-shim.py`、`package.json`、`AGENTS.md`、未跟踪 `scripts/tools/ios-ax-shim.test.py`、`apps/mobile/evidence/ios-reminder-*.png` | `TRIGGER_OFFSET_MINUTES` / AX 按压几何检查 / `"check:ios-ax-shim"` / AGENTS 新增第 25 条 ⇒ **iOS 提醒与 AX**那条线 |
+| `research/tools/calendar-line-commit-only-arms.sh`、`calendar-line-commit-plan.sh`、`docs/plans/calendar-profile-handoff.md` | 日历线装置与交接书 |
+| `docs/adr/0050-e2ee-key-lifecycle-and-recovery.md`、`docs/README.md`（那 1 增 1 删）、`server/src/config.ts`（`+import * as fs from 'fs'`） | ADR-0050 密钥生命周期那条线 |
+| `docs/plans/roadmap.md`、`docs/plans/pricing-coupons-handoff.md`、`PROGRESS.md` | "整条海外线延后（2026-10-05 产品负责人）" / iOS Release Vault 续验 ⇒ **定价/海外**与 **Vault** 两条线 |
+
+🔴 `package.json` 与 `AGENTS.md` 这两枚**不含本批任何一行**。**这句现在是量出来的**（15:1x）：
+`git show HEAD:package.json` 的 `check` 链有 **79** 条门禁，工作树 **80** 条，差集**只有** `check:ios-ax-shim` 一枚（别线）；
+而本批落的那几道（`shell-exit-chain` / `shell-erasure-parity` / `apk-freshness` / `journey-coverage` /
+`verify-script-copy` / `legal-gdpr` / `legal-closure-truth` / `mobile-settings`）**HEAD=1 且 NOW=1**
+⇒ 它们的接线**早已在 HEAD 里**，工作树没有为它们新增任何东西（复核：把两侧 `check` 串各自
+`grep -oE 'check:[a-z0-9-]+' | sort -u` 后 `comm -13`）。`AGENTS.md` 同样量了：未提交增量 = **恰好 1 行 `+` / 0 行 `-`**，那一行是第 25 条"iOS AX 按压必须做几何安全检查"，
+拿本批关键词（`289|290|291|292|trash|回收站|注销|erasure|§10.1`）扫这 1 行 ⇒ **0 命中**。
+所以"顺手一起提交"= 替别人提交 —— 与 §10.55 那次近失同一族，**列在这里就是为了挡住它**。
+
+### C. 混合文件现在只剩**一枚**：只能按行区间搬，**不许整文件 `git add`**
+
+1. `docs/reference/environment-traps.md`：同一文件尾部现在有 **14 条**未提交新条目（`#279–#292`），
+   其中 **#279–#288 是别线的**、**#289–#292 是我的**。取号与行锚点命令（谁复核都跑这两条）：
+
+   ```bash
+   git diff -U0 -- docs/reference/environment-traps.md | grep -E '^\+[0-9]+\. ' | sed -E 's/^\+([0-9]+)\. .*/\1/' | sort -n | tr '\n' ' '
+   awk '/^28[9]\. |^29[0-2]\. /{if(s){print s"-"(NR-2)} s=NR} END{if(s)print s"-"NR}' docs/reference/environment-traps.md
+   ```
+
+   🔴 但**号段不能当归属证据**（"我名下最后四条"这种推断正是 §10.55 那一族）。归属取自条目正文里的自证，
+   15:1x 逐条重新量过：`#289` 被本计划三处引用且 `#290` 正文称它"同族"；`#290` 自己写着"实测（2026-10-05 14:2x，
+   在隔离载体里跑 `bash scripts/reinstall-all.sh`）"并把处置登记成**我的**工单 #92；`#291` 被本计划三处引用；
+   `#292` 点名的 `check:vault-diagnostics` 载体缺陷是我的（工单 #93）。反例也量了：`#287` 只被
+   `multi-end-coverage-handoff.md` 引用、`#288` 只被 `calendar-profile-handoff.md` 引用 ⇒ 别线。复核命令：
+
+   ```bash
+   for n in 287 288 289 290 291 292; do echo "== #$n =="; grep -rn "#$n\b" docs/plans docs/reference BLOCKED.md 2>/dev/null | grep -v environment-traps.md: | sed -E 's#^([^:]+):([0-9]+).*#  \1:\2#' | sort -u; done
+   ```
+
+   行锚点 15:1x 现量**与 14:5x 那张表逐字相同、没有漂**（`#289`=6723 `#290`=6748 `#291`=6772 `#292`=6790，
+   文件共 6835 行，未跟踪新条目仍 14 条 `#279–#292`）。⚠️ 提交前**必须再跑一次上面那两条**：
+   别人随时可能往同一文件尾部追加，行区间就会整体上移。
+
+   安全搬法（不改工作树，plumbing 直进索引）：以 `git show HEAD:` 版为底、**只在尾部追加我那四个行区间**，
+   生成 blob 后 `git update-index --cacheinfo`，再 `git commit --only -- docs/reference/environment-traps.md`；
+   ⚠️ 两条已知雷（都踩过，见 §10.55 与 traps #88）：路径清单里**混进目录**会写成一条坏 `100644 <tree-sha>` 条目；
+   以及我提进去之后**别人随后整文件 `git add` 会把我那四段抹回去** ⇒ 提交后要量三处命中数（HEAD / 他们的暂存 / 工作树）。
+2. ~~`research/tools/mutation-rigs/README.md`：13 行增量里既有我那台 `fileleg` 的表格行，
+   也有**别线写的**那句"⚠️ 下面这几台不属于本表那条线（它们钉的是回收站/批次 E 的工单）"——
+   那句是性能线在**描述我的装置**，所以这枚文件同样要按行搬。~~
+   🔴 **15:1x 撤回（原句留着，挡下一位照它行动）**：这句归属是**推的**，没读 diff。现量：
+   `git diff -- research/tools/mutation-rigs/README.md` = **13 行 `+`（11 行有内容 + 2 行空）/ 0 行 `-`**，
+   而那 11 行里点名的工单**全部**是本批的（`#76 #77 #87 #90`、`§10.146/147/155/68`、指向 `trash-and-archive.md`），
+   别线落点（reminder / calendar / vault / countdown / ai-event / perf）**0 处命中**。
+   那句"⚠️ 下面这几台不属于本表那条线"**是我写的**（它的意思是"这几台不属于 README 原本那条性能线"，
+   装置从 gitignored 的 `tmp/` 转正进这台目录那一趟加的，见 §10.147），
+   我把"描述本表的归属"读反成了"别线在描述我"。
+   ⇒ 这枚文件**整文件点名提交即可**，不在 C 段；C 段只剩 traps 那一枚。
+   📌 这条与本批 §10.55 那次近失同族：**混合与否的判据是 diff 的实际内容，不是"这张表本来是谁的"**。
+   复核命令（0 秒）：
+   `git diff --numstat -- research/tools/mutation-rigs/README.md; git diff -- research/tools/mutation-rigs/README.md | grep '^+[^+]' | grep -cE '(reminder|calendar|vault|countdown|ai-event|perf)'`
+
+### D. 目标要求的"每单三件"逐项落点（防止下一位按印象读）
+
+| 工单 | 改动落点 | 能失败的判据 | 只拿掉修复后的变异读数 |
+|---|---|---|---|
+| W4b | `packages/ui/src/projects/OrganizerList.tsx` + 两端传参 | `projects-panel.spec` / `projects-sections.spec` / trash 脚本 6b | 臂 M（mobile 宿主口径顶替）**转红**，§10.112；设备那一腿在 §10.108 |
+| W6 | `scripts/verify-mobile-trash.sh` + `check-journey-coverage.mjs:118` | 第 13 趟 **35 绿 / 0 红**（§10.122），六条腿 | 步 6 那次红已现量成"装置只会往下滚"的装置缺陷（§10.120），非产品 |
+| E1b | `server/src/middleware.ts:55`（`result.code === 'ACCOUNT_CLOSED' ? 410 : 401`，15:3x 现量在位） | `server/tests/account-closed-signal.spec.ts:189` 与 `:239` 两条 `toBe(410)`（`it` 标题在 `:184`：「🔴 账号已注销：**410** 响应体带 code=ACCOUNT_CLOSED（E1b）」） | 同一枚 spec 里 **4 条 `toBe(401)`**（`:164/:205/:210/…`）与那 2 条 410 配对 ⇒ 摘掉那一发三元组会红在 410 那两条上，而 401 那四条仍绿。⚠️ 本行原判据栏原来写的是"`it(…)` 的 `toBe(410)`"却没给 spec 的路径与行号，读起来像断言在 `middleware.ts` 里 —— 15:3x 用 `grep -n "账号已注销" server/src/middleware.ts` 复核时**命中 0**，就是这么发现的 |
+| E2 | `packages/storage` 三实现 + `sync-client` 两处通道 | 逐宿主 §10.11（Web/macOS/Android/iOS/CLI） | M1″/M2′/臂 B 各转红；#90 文件腿 L2-L4 三条独立红 |
+| E3 | Web `apps/web/src/features/settings/CloseAccountPanel.tsx` / mobile `apps/mobile/src/screens/AccountClosureScreen.tsx` / `apps/node-host/src/cli-account.ts`（15:3x 三枚都在位） | 四条 spec 的真实文件名与读数在**本文件 `:8110`**（03:0x 在当前 HEAD 复量 = `10/11/11/15 passed`）：`packages/app-host/tests/account-closure.spec.ts`、`apps/web/tests/close-account-panel.spec.tsx`、`apps/mobile/tests/account-closure-entry.spec.ts`、`apps/node-host/tests/cli-account.spec.ts` | 四臂 A1–A4（§10.115） |
+| E5 | `recover-user.ts` + 政策如实度门禁族 | 臂 E `1/6 passed` + 臂 D 五臂（§10.158） | `check:legal-closure-truth` 由故意红转 rc=0 |
+| E6 | 九份 legal 文档 + `check:legal-gdpr` 等 | 9/9 + 门禁 `--self-test` 臂 | en 栏 16/15 vs 真值 19/18 那次补牙（§10.30 族） |
+| W07 | `apps/landing/public/assets/docs/trash/W07-trash.png` 与 `W07-en-trash.png`（15:3x 现量两枚都在，原来写成 `W07-{,en-}trash.png` 那种花括号简写不落在文件里，下一位按字面找会找不到） | `gen-help-figures --check` + `check:landing-e2e` 18 passed | 变异臂 H（sectionId 改回旧名）⇒ 恰好 1 红 |
+
+🔴 **本表不主张"全绿"**：`pnpm check` 到本节为止跑了**五趟**（逐趟真实退出码与归因都在 **§10.157 ⑭⑮**，
+第五趟的手况比前四趟严：锁无 + 无 vitest + 无 playwright + `load1 ≤ 16`，等满 45 分钟以 `exit 3` 自停 = 环境无效而非产品失败）。
+第 1 趟死在测试段的失效锁、第 2 趟死在别人的活锁持有者、第 3 趟死在我那枚载体的 `e2e/node_modules` 软链（已修，traps #292）、
+第 4 趟链上那 92 行命令 + 四条 e2e 全过，唯一那枚红在 `apps/web/tests/due-date-edit.spec.tsx:191`（6 次复跑 1 红 5 绿，属日历/到期线，工单 #95，**不代改、不动基线**）。
+
+### §10.161 的 15:5x 复量（同一张表，两个时刻的读数都留着，因为脏清单是瞬时量）
+
+`git status --porcelain` 现量：**23 ` M` + 13 `??` + 2 ` A ` = 38 枚**（15:3x 那次是 23 + 12，多的那枚 `??` 是别线的）。
+按"是不是本批"分：
+
+| 归属 | 枚数 | 构成 |
+|---|---|---|
+| 本批（= §10.164 补的那 16 枚） | **16** | 5 枚 ` M`（计划 / traps 台账 / rigs README / 两份注销脚本）+ 11 枚 `??`（7 枚 rig 装置 + `traps-ledger-audit.mjs` + 3 枚证据 PNG） |
+| 非本批 | **22** | 含 2 枚 ` A `（别线已 `git add` 进共享索引的 iOS 证据 txt）与 2 枚新 `??`（`research/tools/calendar-line-wire-evidence-rigs.mjs`、`scripts/tools/ios-ax-shim.test.py`） |
+
+⇒ 提交时**只点那 16 枚的名**，` A ` 那两枚属别人（`git commit` 提交的是整个索引，裸 commit 会把它们一起带走 —— 见 §10.55 那次近失）。
+📌 这张表每复量一次就多一个时刻戳：15:3x 的"23 + 12"没有被"更正"成 15:5x 的数，
+因为**两个都是当时的真读数**，被改掉的只会是"哪一枚属于谁"这类判断。
+
+## 10.162 E6 那句"9/9"今天重新量过（分母没漂），并且查清了那枚门禁**凭什么**能跟着分母长（10-05 15:0x，零负载）
+
+"9/9"是 10-04 的读数，而 `packages/legal/src/documents/` 是活目录 —— 并行会话完全可能已经加了第十份，
+那"九份"这个分母就会像 §10.2 那句"八个宿主"一样悄悄漂。所以这一格不是复述，是重取：
+
+```bash
+cd packages/legal/src/documents && ls *.ts | grep -v index | wc -l      # 现量 = 9（没漂）
+for f in $(ls *.ts | grep -v index); do
+  printf "%-26s zh=%s en=%s\n" "$f" \
+    "$(grep -c "title: '欧盟 GDPR" "$f")" "$(grep -cE "title: 'The (EU )?GDPR" "$f")"
+done
+```
+
+逐份结果（9 份全部 `zh=1 en=1`，无一份缺侧）：`ai-and-transfer` `data-rights` `minors` `permissions`
+`personal-info-list` `privacy` `subscription-refund` `terms` `third-parties`。
+
+🔴 顺手把这条门禁**为什么不会被第十份绕过**量清楚了，这点以前只有结论没有证据：
+`scripts/check-legal-gdpr.mjs:42` 是 `import { LEGAL_DOCUMENTS } from '../packages/legal/dist/index.js'` ——
+**枚举源是注册表，不是写死的文件名清单**（`grep` 全文无硬编码 9 枚名单），
+所以往 `index.ts` 加一份文档，它就自动进射程；这正是"封闭句式必须有对账门禁"那条纪律该有的形状。
+
+⚠️ 一个要写明的前提，别让"有门禁"被读成"任何时候单跑都算数"：它读的是 **`dist`**。
+链内没问题 —— `pnpm check` 的 chain 开头就是 `check:gate-wiring && pnpm build && … && check:legal-gdpr`
+（`package.json` 里现量该串），注册表在同一条链里先被重建；
+但**单独**跑 `pnpm check:legal-gdpr` 时，若 `packages/legal/dist` 落后于 `src`，它核对的是旧注册表 ⇒
+先 `pnpm --filter @heyta/legal build` 再跑。这一句写在这里是因为 §7 第 27 条那一族
+（"测试绿 ≠ 这是当前产物"）最常见的复发方式就是拿一条读产物的门禁去读旧产物。
+
+
+
+
+## 10.163 全量 `pnpm check` 第一次拿到 **rc=0**，但它的覆盖面必须先量清楚：**基线绿，不是本批绿**（10-05 15:1x–15:2x）
+
+第五趟（载体 `heyta-wt-b58`，detached `3281ebb2`）跑完了。真实退出码从**我自己写在重定向之后的**哨兵行读
+（traps #164：任务通知里那个 `exit code 0` 是包装命令的）：
+
+```
+WAIT5=pending load1=28.59 vitest=0 playwright=0 lock=无（阈值 load1<=16，每 60s 复量，上限 45）
+WAIT5=cleared tries=2 load1=15.88 vitest=0 playwright=0
+CHECK5_EXIT=0
+```
+
+窗口条件是四道同时成立才放行（锁无 + 无 vitest + 无 playwright + `load1 ≤ 16`），第 2 次复量就开了 ⇒
+这一趟**没有**"环境无效"的折扣。日志 8864 行，失败字样（`✗` / `FAIL` / `N failed`）**0 处**，
+`Test Files` 汇总 20 包（含 `948 passed` / `732 passed` / `524 passed` 等），链上那 92 行命令 + `pnpm -r test` 全过。
+
+🔴 **但覆盖面必须先量清楚，否则会读成"本批全绿"**（这是本批第六次撞到"抄件/读数落后于真跑过的那趟"那一族）：
+
+| 量什么 | 现量（15:2x） | 后果 |
+|---|---|---|
+| 载体 SHA vs 当前 main | 载体 `3281ebb2` 是 main 的祖先，main 已到 `03f340cd`，**领先 5 笔** | 这趟不含那 5 笔 |
+| 本批未提交（21 枚 `M`）+ 未跟踪（12 枚 `??`）= **35 枚**是否在这枚载体里 | **`SAME=0 / DIFF=23 / MISS=12`**（逐枚 md5 对，命令见下） | 🔴 **一枚都没有** ⇒ 这趟证的是**基线**，不是本批 |
+
+取这枚分母的命令（谁复核都跑这一条；`SAME` 为 0 才是关键读数，不是"差集很小"）：
+
+```bash
+C=../heyta-wt-b58; { git diff --name-only; git status --porcelain | grep '^??' | sed 's/^?? //'; } | sort -u | \
+while IFS= read -r f; do [ ! -e "$C/$f" ] && echo "MISS $f" || { [ "$(md5 -q "$f")" = "$(md5 -q "$C/$f")" ] || echo "DIFF $f"; }; done
+```
+
+⇒ 所以这句要分开写：**"那 92 行命令 + 全量单测在 main 的一条祖先上绿"** 已成立；
+**"本批的改动跑过全量 `pnpm check`"** 尚未成立，需要一次**载体 = 当前 main + 本批文件 overlay** 的复跑
+（记 **#96**，起手见 §10.164）。overlay 的**枚数是 16 不是 35**：那 35 枚里有 **19 枚属别线**（§10.161 B 表），
+把它们搬进我的载体 = 把别人在飞的改动算进我的读数，正是本批一路在挡的那件事。为什么这一步不能省：链里有**真读我那几枚文件**的门 —— `check:verify-script-copy` /
+`check:journey-coverage`（读 `scripts/verify-mobile-*.sh` 与两份注销 rig）、`check:md-tables` / `check:docs` /
+`check:doc-citations`（读本计划与 traps 台账）、`check:shell-unicode` / `check:shell-exit-chain`（读 rig 脚本本身）。
+载体里 `scripts/verify-mobile-ios-account-erasure.sh` 是 HEAD 那版（`DIFF`）⇒ 本批给那枚 rig 加的
+判据腿**这一趟一条都没被扫过**。
+
+⚠️ 顺带一条否证：上面 ⑭ 那句"第一趟链上那 92 行命令全部为绿"同样只覆盖基线，不覆盖本批；
+它当时的价值在**覆盖面形状**（哪些门会跑到），不在"本批被验过"。两句都在本节改齐。
+📌 已经覆盖到本批文件的那些门，是此前在主检出**逐条**跑的那几趟（10:4x：`check:doc-citations` /
+`check-md-table-rows` / `check-docs-voice` / 四道 shell 门各 `rc=0`），本节不把它们算进这趟 92 行命令的账里。
+
+### ⑰ 写本节时我**第三次**吃掉了相邻节的标题行，而这次的形状是"修脚的脚本自己没守住"（15:2x）
+
+- 事故：用 Edit 在 `## 10.162` 那一行**前面**插 `## 10.163` 整节，`old_string` 取的就是 10.162 的标题行，
+  `new_string` 里没把它带回去 ⇒ **10.162 的标题被替换掉、正文挂在 10.163 名下**。
+  前两次同族事故是 §10.158 与 §10.160/161（都靠"重跑节号 grep"照出来）。
+- 修脚是一枚 gitignored `tmp/` 下的一次性脚本（`fix-10162-order` 那枚 `.mjs`，用完即删，15:2x 现量 `tmp/` 里已无残留），
+  按内容锚点重排、不抄行号。跑完的结构核对：
+  `comm -23 旧 新` 里**非空行 0 条**（零行丢失）、`comm -13` 只有那枚恢复的标题、
+  末四节 `160,161,162,163` 各出现 1 次且升序。
+- 🔴 **这次的新教训不是"又要小心"，是脚本自身的顺序**：那枚修脚把 `writeFileSync` 写在**断言之前**，
+  于是"行数不对"的守卫**没能拦住已经落盘的写入**（它只是让我知道断言预期算错了 +1/+2）。
+  ⇒ 以后写这类"改文件的小脚本"，判据必须是**先全算完、再一次性写**（throw 时文件保持原样），
+  这与我此前记过的"一批替换带命中数断言、内存里改完最后统一写"是同一条纪律的第二次现形。
+
+## 10.164 #96 起手：把载体搬到当前 main 并 overlay 本批那 16 枚，切树当场被一枚**未跟踪**文件挡住（10-05 15:2x）
+
+| 量 | 现量 |
+|---|---|
+| 载体基线 | 从 detached `3281ebb2` 切到 **`03f340cd` = 当时 main**（15:2x 现量 `git rev-parse --short main`） |
+| 切树前清理 | 载体 `28 枚 M + 1 枚 ??` 先整份快照进 `/tmp/carrier-dirty-before-96.tgz`（2 591 133 B）⇒ `git checkout -- .` 可逆 |
+| 挡住 checkout 的那一枚 | `apps/web/evidence/calendar-capture/calendar-capture-input-wins.png` —— 它是载体的**未跟踪**文件，而 main 的新提交把**这个路径变成 tracked**，git 拒绝覆盖 ⇒ 报 `The following untracked working tree files would be overwritten by checkout`、`DETACH_RC=1`、HEAD 原地不动 |
+| 处置 | **搬开不删**：`mv` 到 `/tmp/carrier-moved-96/apps/web/evidence/calendar-capture/`，再 `git checkout --detach 03f340cd` ⇒ `HEAD=03f340cd 脏=0` |
+| overlay | **16 枚**（`cp -p`，逐枚 md5 回读）= 计划 + traps 台账 + 两份注销 rig 脚本 + rigs README + 7 枚未跟踪装置 + `traps-ledger-audit.mjs` + 3 枚本批证据 PNG。**不是 35 枚**：其余 19 枚属别线（§10.161 B 表），搬进来就等于把别人在飞的改动算进我的读数 |
+| 依赖 | `git diff --name-only 3281ebb2..03f340cd` 里 `package.json` 与 `pnpm-lock.yaml` 这两枚命中 **0** ⇒ 不重装；变的是 `research/`(5) / `apps/web/`(3) / `docs/`(1) |
+| 为什么要先重打 | `apps/web` 有 3 处变 ⇒ 载体的 `dist` 落后于源码。直接跑链会让 `check:web-artifact` / e2e 读**旧产物**，那正是 §7 元规则三（"测试绿 ≠ 这是当前产物"）在本批的第三次现形。故 `pnpm -r build` 先行，哨兵 `BUILD7_EXIT` |
+| 窗口门 | 五道同时成立才起跑：锁无 + `vitest=0` + `playwright=0` + `load1 ≤ 16` + `4318/4319/4320/4322` 全空；每 60s 复量、上限 45 次，等满以 `exit 3` 自停（环境无效 ≠ 产品失败） |
+
+📌 可迁移的一条（这条才是本节的产出）：**"载体只是落后几个提交"推不出"可以原地切树"**。
+别人把一枚**产物路径**从 gitignored/未跟踪**转成 tracked**，切树就会被它挡住 —— 而挡住的还是**别人那条线**的文件
+（`calendar-capture*：日历线），不是我的。 ⇒ 切共享检出/载体之前先 `git checkout --dry-run`？git 没这个开关，
+实际做法就是本节这个顺序：**先快照 → 再试切 → 被挡住时按报错点名的路径逐枚搬开（`mv` 不 `rm`）**。
+`set -e` 在这里是承重的：没有它，第一条 `checkout` 失败后脚本会继续把 16 枚 overlay 拷到**旧基线**上，
+那枚读数就会被读成"当前 main + 本批"，而它其实钉在 `3281ebb2`。
+
+
+### 补：那 16 枚的逐枚清单（15:5x 从两棵树反推，因为当时是用内联循环 `cp` 的，没落盘）
+
+反推命令：`git -C <main> status --porcelain` 与 `git -C <carrier> status --porcelain` 取交集，再逐枚比 md5。
+现量：载体脏 46 枚、主检出脏 38 枚、**交集恰好 16 枚**，其中 15 枚逐字节相同、唯一不同的一枚是
+`docs/plans/trash-and-archive.md`（我在同步之后又给它追加了节，所以它必然比载体新 —— 这正是"载体只同步到某一刻"的形状）。
+
+| # | 状态 | 路径 |
+|---|---|---|
+| 1 | ` M` | docs/plans/trash-and-archive.md（比载体新） |
+| 2 | ` M` | docs/reference/environment-traps.md |
+| 3 | ` M` | research/tools/mutation-rigs/README.md |
+| 4 | ` M` | scripts/verify-mobile-account-erasure.sh |
+| 5 | ` M` | scripts/verify-mobile-ios-account-erasure.sh |
+| 6–12 | `??` | research/tools/mutation-rigs/ 的 7 枚装置（android-passive-branch-selftest.sh、e2-destroy-reopen-probe.mjs、ios-erase-arm-b76.sh、ios-erase-b-fileleg-probe.sh、ios-erase-verdict-arms.sh、ios-syncnow-order.sh、rig-step-verbatim-recheck.sh） |
+| 13 | `??` | research/tools/traps-ledger-audit.mjs |
+| 14–16 | `??` | 三枚证据 PNG：apps/mobile/evidence/android-account-erasure-1-401-keeps-db.png、apps/mobile/evidence/android-account-erasure-2-after-closure.png、apps/mobile/evidence/ios-account-erasure-2-no-composer.png |
+
+📌 与 §10.164 起手记的构成对账：计划 1 + traps 台账 1 + 两份注销 rig 脚本 2 + rigs README 1 + 未跟踪装置 7 +
+`traps-ledger-audit.mjs` 1 + 证据 PNG 3 = **16** ⇒ 构成描述与逐枚清单互相咬合，不是各写一次。
+⚠️ 这条补记本身也是一条教训：**overlay 的枚数写在文档里、清单却没落盘**，
+下一轮要复用载体时只能靠"两棵树取交集 + 比字节"反推 —— 反推能成立是因为交集恰好等于 16，
+如果不等，就只能承认"这趟的覆盖面说不清"。以后搬 overlay 一律先 `git -C … diff --name-only` 落成文件。
+
+## 10.165 换账 sweep（15:2x）：本批自己写的两句"尚未接线"被第五趟的日志当场否证（零负载读证）
+
+第五趟日志第 1 行就是那条完整 `check` 链，里面**明晃晃有** `pnpm check:legal-closure-truth` 与 `pnpm check:legal-gdpr`
+⇒ 本文件 `:786` 与 `:819` 那两处"都**尚未**进 `package.json`"的声称已过期。逐枚现量：
+
+| 门 | 工作树链 | HEAD 链 | 直接跑 |
+|---|---|---|---|
+| `check:legal-closure-truth` | 1 | 1 | `rc=0`（它自己打印"九份文档…没有被批次 E 否证的句子"） |
+| `check:legal-gdpr` | 1 | 1 | `rc=0`（主表 8 行 × 条文 11 条，白名单 0 份） |
+
+接线那笔是 `81671871`（"法务封闭句式对账 + GDPR 条款 + verify 脚本抄件对账 + package.json 接线"）。
+🔴 而当时那两条**理由**也一起过期了，不只是结论：`package.json` 现在的未提交增量只有别线那一枚 `check:ios-ax-shim`
+（§10.161 B 表量过），`privacy` / `third-parties` 那两句「今天还不存在」也已随 `privacy@1.5` / `third-parties@1.3` 被改掉 ⇒
+**"一接线就会红在别人的文件上"这句话现在不能再用来解释"为什么不动它"**。两处原句留着、就地加更正与日期。
+
+📌 可迁移：**登记"因为别人的文件会红所以不接线"是一种有保质期的声称**。
+它依赖两个外部状态（别人是否正在改那枚热点文件、那几句违规是否还在），两者都会自己变。
+所以这类"暂缓"必须写成**可重跑的两条命令**（上面那两列 + 直接跑那一枚门），而不是写成一句理由；
+否则下一位会照旧句继续不动，而挡它的那两件事早就没了。复核命令：
+
+```bash
+# 「链内出现次数」——上面表里那一列的量法（单位：链里出现几次，不是文件里）
+node -e 'const p=require("./package.json");console.log((p.scripts.check.match(/check:legal-closure-truth/g)||[]).length)'   # => 1
+git show HEAD:package.json > /tmp/pkg.head.json && node -e 'const p=require("/tmp/pkg.head.json");console.log((p.scripts.check.match(/check:legal-closure-truth/g)||[]).length)'   # => 1
+node scripts/check-legal-closure-truth.mjs; echo $?     # => 0
+```
+
+⚠️ 计数单位要写明：**整枚 `package.json` 里 grep 到的是 2**（一处是 `"check:legal-gdpr": "node scripts/…"` 的定义，一处是链里那一发），
+表里那两列只数**链内**，所以是 1。拿整文件的 2 去比表里的 1 会误判成"账对不上"。
+
+本轮其余同类更正就地落在 §10.161（rigs README 的"混合"原判撤回、`package.json`/`AGENTS.md` 从断言改成量）
+与 §10.157 ⑭⑮、§10.163（第五趟的覆盖面）。更正之后三道 doc 门重跑各 `rc=0`
+（`check-md-table-rows` / `docs-link-check` / `check-docs-voice`）。
+
+## 10.166 完成度对账：把目标里那句"六条腿"和"E2 三套实现"逐条钉到文件行（15:3x 现量，非复述旧账）
+
+这一节是**验收口径的对账表**，不是过程账。每行右栏都是 15:3x 当场跑出来的，不是从上面某节抄的
+（抄件一定会漂 —— 本批已经为这句话付过三次代价）。
+
+### ① W6：目标原文那句六腿 → `scripts/verify-mobile-trash.sh` 的 step
+
+目标原文：「手机删便签 → 服务端有请求 → 手机回收站列出 → 还原后笔记本读到活着 → 手机删清单 → 笔记本回收站也列出，
+全程零点击同步，判据 a/b 两腿形状沿用 `verify:mobile-autosync`」。
+
+| 目标那一腿 | 落在哪一步（现量行号） | 该步的判据形状 |
+|---|---|---|
+| 手机删便签 | `:389` step 3「先证『点了』，再证『生效了』」 | 两层：点击回执 + 界面状态转移 |
+| 服务端有请求 | `:418` step 4 判据 ① | **没点任何按钮**，服务端日志出现请求（= autosync 的判据 a 同形） |
+| 手机回收站列出 | `:451` step 5 判据 ② | 列出该行 → 点「恢复」→ 该行从回收站消失 **且** 回到活体列表 |
+| 还原后笔记本读到活着 | `:691` step 7 对端腿 | 对端读到的便签不在回收站里（正向存在性） |
+| 手机删清单 | `:530` step 6 判据 ④ 手机侧 | 清单行删除后回收站列出它 |
+| 笔记本回收站也列出 | `:691` step 7 同一条腿的对端半 | PROJECT 正向在前当通道对照，负向只在对照成立时判（§10.108 那次假红的修法） |
+| 全程零点击同步 | `:305` step 1 明写「只填表单，**不点同步**」＋ `:747` step 8「待上传」归零 | 队列排空是独立一条，不靠 step 4 代理 |
+
+⚠️ 两条**超出目标承诺**的腿也在脚本里：`:288` step 0.5「这个脚本自己数得出」（元判据，挡"判据读空"）
+与 `:589` step 6b（W4b 标签两步删除）—— 它们不该被读成目标漏项，也不该被算进上面那六条。
+
+### ② E2：目标原文那句"DbAdapter.destroy 契约 + IndexedDB/SQLite/op-sqlite 三套实现" → 文件行
+
+| 目标那一件 | 现量落点 |
+|---|---|
+| 契约 | `packages/storage/src/db.types.ts:249` 起那段（写明"`destroy` 的失败模式更糟：漏掉它的一端不会报错，只会继续留着用户的明文"）；返回类型 `DbDestroyReport` 的语义在 `:96`「**一次销毁的书面凭据，不是成功标志位**」 |
+| IndexedDB | `packages/storage/src/indexeddb/indexeddb-adapter.ts:570` |
+| SQLite（node-host / 桌面壳共用的驱动端口） | `packages/storage/src/sqlite/sqlite-adapter.ts:255`，驱动的 `removeDatabase` 契约在 `sqlite-driver.ts:84`，Node 实现在 `node-sqlite-driver.ts:56` |
+| **op-sqlite（移动端那一套）** | `apps/mobile/src/db/op-sqlite-driver.ts:134` `removeDatabase(): SqliteContainerRemoval` |
+| 内存实现（目标没点名，但契约必填 ⇒ 它也在） | `packages/storage/src/memory/memory-adapter.ts:196` |
+| 两条销毁通道（本批查出来的形状问题，不是目标原文） | 主动：`packages/app-host/src/account-closure.ts:65` 调 `eraseLocalData()`；被动：`packages/sync-client/src/client.ts:937` |
+
+⇒ "三套实现"这句按目标原文数会得到 **IndexedDB / SQLite / op-sqlite** 三条，按仓库类型数会得到 **四** 条
+（内存实现也算 `implements DbAdapter`）。两种数法都对，但**写进文档时必须说清按哪种数** ——
+`grep -n 'async destroy' packages/storage/src/**` 现量三枚，第四枚在 `apps/mobile` 那侧的驱动里，
+拿"三套"去 grep `packages/storage` 会自证成缺一条。
+
+### ③ W4b：共享可选 prop 那一配方（目标原文说落点"正被并行会话整段重写"）
+
+`packages/ui/src/projects/OrganizerList.tsx:118` 是 `confirmRemove?` 的类型位、`:161` 写明
+「只在 `labels.confirmRemove` 存在时被消费；`> 0` 才渲染那句影响面」，`:49` 是那句"删除确认也在共享层"的登记。
+15:3x 现量 `git status --porcelain -- packages/ui/src/projects/OrganizerList.tsx` 回**空**（主检出干净），
+且变异臂 M 早在 §10.112 拿到 `ARM=OK` ⇒ 目标原文那句"当前被并行会话整段重写"**是起跑时的快照，已过期**，
+不要照它把 W4b 重新登记成"被撞车挡住"。
+
+
+## 10.167 第七趟（overlay 载体 = 当前 main + 本批 16 枚）：**链上 92 行命令全过**（单位见 §10.168），只死在最后测试段的**活锁持有者**上（10-05 15:29–15:39）
+
+哨兵逐字（真码取自我写在重定向之后的那行，不是任务通知里的 `exit code 0`）：
+
+```
+BUILD7_EXIT=0
+WAIT7=pending try=1 load1=8.10 vitest=0 playwright=4 lock=无 ports=0
+WAIT7=pending try=2 load1=8.08 vitest=0 playwright=4 lock=无 ports=0
+WAIT7=cleared tries=3 load1=7.13 vitest=0 playwright=0 ports=0
+CHECK7_EXIT=1
+```
+
+日志 2054 行，失败字样 **1 处**，就是最后那一格：
+
+```
+packages/sync-core test: 内存闸门拒绝启动：已有测试在跑（pid=21054，锁 /tmp/tfa-test.lock；
+  它是：/Users/rocalight/.nvm/.../node research/tools/selfhost-verify-window-runner.mjs）
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @heyta/sync-core@1.0.0 test
+```
+
+🔴 **这枚红不归本批，而且是三件事叠在一起，必须分开写**：
+
+1. **覆盖面**：链上 **92 行命令**（单位 = 日志里以 `$ ` 开头的行；载体那棵树的链本体是 85 个 `&&` 环节，见 §10.168；含 `check:docs` / `check:doc-citations` / `check:md-tables` / 四道 shell 门 /
+   `check:verify-script-copy` / `check:journey-coverage`，以及 `check:ai-e2e` / `privacy-consent-e2e` / `landing-e2e`）
+   **全部为绿，而这一次载体里有本批那 16 枚**（`§10.164` 的差集验证：16/16 都在载体脏集合里）。
+   ⇒ 这就是 §10.163 欠的那一格：**本批的改动被全量门禁扫过，且没扫出红**。第五趟只证到基线，这一趟证到本批。
+2. **失败性质**：锁点名 pid 21054 是**活的**持有者（`selfhost-verify-window-runner.mjs`，别那条线），
+   与第五趟第 1 次那枚"失效锁"（pid 已不存在）**不同族** —— 这次闸门是对的，
+   **不许**用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕，也不许调阈值。
+3. **测试段没跑完 ⇒ 这趟不能算"`pnpm check` rc=0"**：本批的判据一直是"整体一条链一个码"，
+   拼起来的两段（链 + 单独补跑的 `pnpm -r test`）只能证明两件事分别成立，不能写成一次全绿。
+   ⇒ 第八趟已起：同一棵 overlay 载体、同一套五道门，重跑整条 `pnpm check`，取**一个** `CHECK8_EXIT`。
+
+📌 顺带把"载体是写者"这条在这一趟又量了一次：跑完之后载体脏集合从 16 枚涨到 **34 枚**（`23 M + 11 ??`），
+涨的全是链里 e2e 腿自己重写的 tracked 截图 —— 与 traps **#290** 同族（那条讲的是 `pod install` 改写 tracked 源码）。
+⇒ 任何"载体 = 当前 main 且只有我那 N 枚"的说法**只在起跑那一刻成立**，跑完必须重取。
+
+## 10.168 第八趟死在第 8/85 环节（锁被别的会话在链中途拿走），顺带把我自己那句"92 条"的量纲钉死（10-05 15:4x）
+
+读数（载体 `03f340cd` + 本批 16 枚 overlay，启动器 `/tmp/b58-check8.sh`，日志 `/tmp/b58-check8.log`）：
+
+- `WAIT8=cleared tries=3 load1=10.23 vitest=0 playwright=0` —— 五道门在**起跑那一秒**全部成立。
+- `CHECK8_EXIT=1`，红在链的第 **8/85** 个 `&&` 环节：`pnpm check:op-log-semantics` →
+  `scripts/mutate-op-log-semantics.mjs:74` 抛 `Error: E: clientId tie-break baseline: missing assertion report`。
+- 抛错原因由闸门自己打印，且**带着持有者**：
+  `内存闸门拒绝启动：已有测试在跑（pid=58812，锁 /tmp/tfa-test.lock；它是：/bin/sh /Users/rocalight/.tfa-shield/bin/npx vitest --run electron）`
+  ⇒ 别的会话那趟 electron vitest 是在**我这条链跑到第 8 环时**才起来的 ⇒ **环境无效，不是产品失败**。
+- 🔴 没有用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕过它。那枚闸门是仓库为整机 OOM 装的安全门，
+  绕过它等于"为了让检查过去而放宽检查"（本批硬约束禁止）。
+
+### 第七趟与第八趟是**同一族**（我之前把它们分成"活锁"和"失效锁"两种，那个分类是错的）
+
+现量 `grep -cE 'pid=[0-9]+.*tfa-test\.lock'`：**两趟各命中 1 行**，形状相同，只是位置不同 ——
+
+| 趟 | 拒启行的位置 | 持有者 | 链跑到 |
+|---|---|---|---|
+| 第七趟 | `packages/sync-core test:` 前缀那行 | `pid=21054` = 并行会话投放的"让窗看守"进程（脚本不在本仓，见 §10.169 那条引用检查） | 第 83/85 环（门禁段全过） |
+| 第八趟 | `check:op-log-semantics` 抛错体里 | `pid=58812` = `npx vitest --run electron` | 第 8/85 环（门禁段几乎没跑） |
+
+⇒ **"起跑前五道门成立"对一条 85 环的长链没有约束力**：门量的是起跑那一秒，链越长被顶的概率越高。
+补救不是调松阈值，而是两条：① 失败读数自带"谁在跑"（闸门自己打了 pid 与命令行 —— 这条已经成立，不用我补）；
+② 把"环境无效 vs 产品失败"的分界写成装置，见下节。
+
+### 第九趟的分类器（`/tmp/b58-check9.sh`）与它的正反对照
+
+规则：非零退出的那一趟，**只有链尾 120 行里出现 `pid=<数字> … tfa-test.lock` 才**判"环境无效"并重跑（≤3 趟）；
+链尾没有那一行 ⇒ 判"产品红"，**立刻停、退出码原样透传**，不重试也不写成环境问题。
+
+- ✅ 正对照：`/tmp/b58-check7.log` 与 `/tmp/b58-check8.log` 的 `refuse_in_tail` 现量都 = **1**（两趟都该判环境无效）。
+- ⚠️ 反对照**没有真样本**：手上没有一趟"产品红"的 `pnpm check` 日志能证明分类器不会误判它。
+  代价是有界的 —— 误判最多让链多重跑 ≤3 趟（浪费的是时间），**不会把红读成绿**：最终结论仍取链自己的退出码。
+
+### 我自己的一处量纲错：那句"链上 92 条门禁"从单位上就是错的
+
+两棵树各自现量 `package.json` 的 `scripts.check.split('&&').length`：
+
+| 树 | `&&` 环节数 | 差集 |
+|---|---|---|
+| 主检出工作树 | **86** | 多的一枚是 `pnpm check:ios-ax-shim`（别线未提交，与 §10.161 B 表记的差集同一条） |
+| 隔离载体 `03f340cd` | **85** | — |
+
+而 **92** 是 `pnpm check` **日志里以 `$ ` 开头的行数**（第七趟现量 92 行，其中 67 行是 `$ node scripts/…`）——
+`pnpm check:x` 这类环节自己还会再打印一层命令，所以"行数"必然多于"环节数"。
+⇒ 我把"日志行数"当成"门禁条数"写了 10 处，已全部改成 **"那 92 行命令"** 并在首次出现处标了单位与载体
+（改法：`node /tmp/b58-fix-units.mjs`，每条替换带命中数断言、两棵树的环节数做前置守卫、全部算完才 `writeFileSync`）。
+📌 这条错在我自己入档的纪律上第四次现形（计数单位要钉死、引用的 N 要带哪一趟），
+而这次错的地方是**我从没怀疑过的**：那个数字我一直以为是"数门禁得出的"，实际是从日志 `grep -c` 出来的。
+
+**待入 traps**（台账现在是 ` M`、正被并行会话写 ⇒ 按项目纪律不往它追加，登记为工单 #97）：
+**起跑闸门对多环节长链没有约束力** ⇒ 长链验收的失败读数必须自带持有者（pid + 命令行），
+且"环境无效"与"产品失败"的分界要落成可重跑的分类器 + 正反对照，而不是靠人事后回忆锁的形状。
+
+## 10.169 把引用检查指到本计划时量到的噪声结构（89 条 flag / 54 个路径），以及载体基线的漂移现量（10-05 15:5x）
+
+`check:doc-citations` 的默认射程只有 1 份文档（工单 #63）。手工指到本计划：
+
+```
+node scripts/check-doc-citations.mjs --doc docs/plans/trash-and-archive.md
+⇒ rc=1，89 条 flag / 54 个不同路径
+```
+
+分桶现量（规则按形状：前缀 `tmp/`、`heyta-wt`、`.qoder/`、`research/probe` 归草稿；含 `node_modules`
+或前缀 `cpp/`、`node/dist`、`metro-file-map` 归依赖内部；`*.spec.ts`、`*.png`、`*.txt`、`*.log` 归证据产物）：
+
+| 桶 | 条数 | 是不是"文档写错了" |
+|---|---|---|
+| 用户机器上的运行时存储（`Library/heyta.sqlite`、`.heyta-web/heyta.sqlite`、`LocalStorage/localstorage.sqlite3`、`Resources/native-bridge.js`） | 18 | 不是 —— 它们本来就不是仓内文件 |
+| vendored 与依赖内部（`cpp/OPBridge.cpp`、`node/dist/database.js`、`metro-file-map/src/worker.js`、`apps/web/node_modules/@heyta/ui`） | 16 | 不是 —— 见下面第 2 点 |
+| 一次性草稿与探针树（`tmp/…`、`heyta-wt-batch2/…`、`.qoder/worktrees/probe-nested-wt/…`、`research/probe-nested-linkcheck/…`） | 15 | **其中一部分是** —— 见第 3 点 |
+| 证据与夹具产物（spec、png、txt、log） | 8 | 未逐条裁 |
+| 变异实验夹具（故意造的 `server/src/b.ts`、`packages/ui/src/c.ts`、`plain/bad.sh`、`nestedwt/bad.sh`） | 7 | 不是 —— 按设计用完就删 |
+| 其余，需逐条裁决 | 25 | 未裁 |
+
+2. 🔴 **结论既不是"门禁坏了"，也不是"文档要修 89 处"**。这一枚门禁的判据是"这个 token 能不能在**仓内文件树**里匹配到"
+   （`scripts/check-doc-citations.mjs:189` 的 `pathHits(candidate) > 0`），而 `node_modules` 根本不在它的遍历范围里 ——
+   所以 `apps/web/node_modules/@heyta/ui` 被判"不存在"时，盘上那条软链其实是**通的**
+   （`readlink` = `../../../../packages/ui`，目标可解析）。
+   ⇒ #63 那句"加宽射程"因此不是体力活：它要先拍一条**形状规则**（哪几类前缀算"非仓内引用"），
+   而"没人拍板就把门禁放宽"正是本批硬约束禁止的那件事。
+   ⚠️ 我同样**没有**去把这 89 处改写成门禁能过的形状 —— 那等于为了让检查过去而重写证据。
+
+3. 这一轮**唯一一条真属于我、且确实是死引用**的：§10.168 那行引了并行会话"让窗看守"进程的脚本路径
+   （`pid=21054` 的命令行）。它跑动时存在，现在两棵树都 `ABSENT`。
+   ⇒ 已就地改成非仓内形状的描述（原 13008 行）。
+   📌 一般形状：**"别人机器上当时在跑的进程命令行"不是仓内证据路径**，写进文档时要按描述写，不能加路径反引号。
+
+4. 载体基线漂移现量（这条决定第八/九趟的读数能写到哪里）：
+
+```
+git rev-parse --short HEAD          # 主检出：e47bf28e → 7a579b85（本会话期间别人提了 2 笔）
+git rev-list --count 03f340cd..HEAD # = 2
+git diff --name-only 03f340cd..HEAD # = 2 个文件，与我这 22 枚 ` M` 的交集 = 0
+git status --porcelain              # 22 ` M` + 12 `??` + 2 ` A `（那两枚 A 是别人 add 进共享索引的）
+```
+
+⇒ 载体的覆盖面判断不变，但**读数只能写成"`03f340cd` + 本批 16 枚 overlay 上绿"，不能写成"当前 main 上绿"**；
+   索引里那 2 枚 `A ` 属别人，我不动索引，提交时仍按 §10.161 点名路径。
+
+5. 🔴 **复量这一节自己带来的东西**（同一命令，写完 §10.168 与本节之后）：**89 ⇒ 101 条**，净 +12，
+   其中包含我把那条死引用改掉带来的 **−1**（`grep -c selfhost-verify` 从 1 变 0，阳性对照）。
+   ⇒ 这一枚门禁**分不清**"把路径当证据引"和"把路径当作缺陷描述的对象写出来"——
+   我为了记录一条死引用，必须把那条路径写出来，于是这句话自己就成了下一条死引用。
+   📌 这条是 #63 的**新证据**：加宽射程之前要先解决的形状问题不是"路径写法"，而是**"引用"与"提及"的区别**；
+   在有人拍板这条形状规则之前，我只记录不改写，也不放宽门禁。
+
+6. 顺手把 §10.166 那三枚锚点用"定位而不是猜路径"的方式复量了一遍（15:5x，只读）：
+
+| 声称 | 复量命令形状 | 读数 |
+|---|---|---|
+| E2 三套实现都有 `destroy` | `grep -rn "async destroy" packages/storage/src` | 三处、返回型都是 `Promise<DbDestroyReport>`：`indexeddb/indexeddb-adapter.ts:570`、`memory/memory-adapter.ts:196`、`sqlite/sqlite-adapter.ts:255`（真路径带子目录，§10.166 里我写的是裸文件名 —— 后缀匹配能命中所以门禁不报，但读文档的人会扑空） |
+| W4b 落点在共享层 | `find packages -name OrganizerList.tsx` | 真路径是 `packages/ui/src/projects/OrganizerList.tsx`（不是 `organizer/`），`confirmRemove` 在 `:118`、`removeImpact` 在 `:163`、消费点 `:365`、注释 `:49` |
+| W4b 没在被重写 | `git status --porcelain -- <上面那枚>` | **0 行** ⇒ objective 那句"当前被并行会话整段重写"在本时刻已过期（与 §10.166 同一结论，这里是再取一次） |
+
+7. W07 那两张图**按 §6.2 规定一打开看了**（15:5x，两枚都看，不是"截了就算"）：
+   `apps/landing/public/assets/docs/trash/W07-trash.png` 与 `W07-en-trash.png`（`dist/assets/` 下同名两枚是构建副本）。
+   读到的是**空态**：中文写"这里放着已删除的任务、便签、清单和习惯。恢复后它会回到原来的位置。"
+   ＋"回收站是空的 / 删掉的任务、便签、清单和习惯会先放到这里"；英文对应 "Deleted tasks, notes, lists and habits land here."
+   ＋"Trash is empty / Tasks, notes, lists and habits you delete show up here first"。
+   ⇒ objective 那条"现图只画任务而文档已写四类"的**矛盾已经消掉**（图里不再出现"只有任务行的列表"），
+   但要说清它消掉的方式：**四类是以空态文案出现的，不是以四行数据出现的**。
+   ⚠️ 残留（登记为工单 #98，不在本批顺手做）：没有一张图**画出**四类的行。
+   要出那张图得在 capture 里先种四条已删除实体再截 —— 而 `scripts/screenshots/capture.mjs:108-139`
+   那段注释记录的正是上一轮踩过的反例：**拿瞬时态/叠加态当"这页长什么样"的配图是在演示用户平时看不到的状态**，
+   所以那条腿要么把"种数据"做成可复现的固定夹具，要么就不做，不能顺手截一张。
+
+8. E5 那句"备份无定点删除的**政策如实度**"再取一次证（15:5x，读的是文案本体不是门禁输出）：
+   中文在 `packages/legal/src/documents/privacy.ts:410`「🔴 …备份是整库快照，代码里没有"从既有备份中单独删掉
+   某一个人"的能力 —— 所以注销之后，你的数据仍…」与 `:613`「**整库备份**是快照，代码层没有…单独摘掉某一个人
+   或某一条」；**英文对应句在同一枚 src 文件的另一半本地化里**：`privacy.ts:984`
+   （"A backup is a whole-database snapshot, and the code has no capability to remove one individual from an existing…"）
+   与 `:1187`；Art. 17 那一格与"备份侧彻底销毁只能靠可销毁密钥"的说明在 `data-rights.ts:635` 与 `:651`。
+   ⚠️ 我先前的取证走了一条**弯路**：第一次 grep 命中的是构建产物 `packages/legal/dist/index.js`，
+   差点把"英文只在产物里"写进台账 —— 指真身要指 src，不指 dist（同 §10.169 第 3 点那条"死引用"是同一族：
+   **指针的保质期取决于它指的是源还是生成物**）。
+   同一文件里 `快照` 与 `backup` 各 **5** 处 ⇒ 两语各有五条，不是只有一边写了。
+   ⚠️ 单位说明：这条"各 5 处"只证**成对存在**，不证逐条语义等价（逐条等价由 `check:legal-*` 那几枚门禁管，
+   它们各自的覆盖面在 §10.161 D 表与 E6 那几节）。
+
+9. E3 那句要求（"带『会清掉本机含未同步数据』的二次确认与先导出提示"）**读的是词条本体**，不是门禁输出：
+   `packages/i18n/src/locales/zh-CN.ts:944-968` 与 `en.ts:868-889` 各 **22 条** `common.accountClosure.*`，
+   两语**键集逐字相同**（`grep -oE "common\\.accountClosure\\.[A-Za-z.]+" | sort` 后 `diff` 无输出）。
+   要的那两条是 `confirmLocal`「我确认：这台设备上还没同步出去的数据，连同本机明文存储，也会一起被清除。」
+   （EN "I understand that data on this device which has not been synced yet, including its local plaintext store,
+   will also be erased."）与 `exportHint`「如果还想留着这些数据，先去『导出数据』存一份备份再回来。」
+   ⚠️ 这里我自己先写错过一次数：第一版记的是"各 11 条"，那是**我的正则只匹配了不带点的键名**、
+   把 `failed.*` 那一族整族漏掉之后的数 —— 与本节第 2 点那个"92 条"是同一族错（**计数单位/正则形状**）。
+   🔴 而且顺序是错的：**我先把 11 写进台账，写完才去 `grep -c` 复核**。这条纪律（复核发生在写之前）我记过几次，
+   这一枚还是没做到 —— 记下来不是为了自罚，是因为"写完再核"在没人再读这一行的时候就等于没核。
+   消费面现量（`grep -oE "common\\.accountClosure\\.[A-Za-z]+" | sort -u`）：
+
+
+   | 宿主 | 用到的 key 数 | 含 `confirmLocal` | 含 `exportHint` | 含带 `{count}` 的 `pending` |
+   |---|---|---|---|---|
+   | Web（`apps/web/src/features/settings/CloseAccountPanel.tsx`） | 6 | 是 | 是 | **否** |
+   | 移动端（`apps/mobile/src`） | 10 | 是 | 是 | 是 |
+
+   ⇒ objective 那条 E3 的**两个必需要素在 Web 与移动端都在**；差的只有"具体条数"那一行，
+   而它正是工单 **#73** 记的那条 parity 缺口 —— 这次复量确认 **#73 没有过期**（不是"其实已经修了"）。
+   📌 顺带一条取证形状：我第一次是用"同一行里同时出现『未同步』和『导出』"去 grep 的，**0 命中** ——
+   而文案是真的存在。0 命中的原因是它长在**两个不同 key** 里，不在同一行。
+   界面文案 needle 0 命中要先去读那个状态自己的组件/词条表，别把"我的正则形状不匹配"写成"没有这句话"。
+
+
+
+
+
+
+
+## 10.170 完成度对账的最后一格：W6-c 六条腿的"变异读数"到底有几条（16:0x 现量，不靠印象）
+
+目标要求每张工单齐三件：**改动落点 / 能失败的判据 / 只拿掉修复后的变异读数**。
+前两件的逐腿映射在 §10.166（`verify-mobile-trash.sh` 的 `:389 :418 :451 :530 :589 :691 :305 :747`）。
+第三件这次**数了一遍**，答案是"分层的"，不是一句"有"或"没有"能盖住的：
+
+| 层 | 这条腿的变异读数 | 现量在哪 |
+|---|---|---|
+| 产品判定层（回收站语义本身） | 有，且是逐臂红集 | I2「restore 里顺手重置 `archived` ⇒ 红」与 I3「归档实现成改 `deletedAt` ⇒ 红」（`:417`/`:418`，两条都在 02:06 拿到读数）、A1 搜索过 `aliveTasks`、E5 那三条"只拿掉修复"的臂（`:967`）与四臂 route-B（`:1148`） |
+| 装置自身（脚本能不能失败） | 有 | 就绪门四腿 `tmp/trash-health-arm.sh` ⇒ `ALL=OK`（`:8107` 那格）；APK 新鲜度守卫臂 4 ⇒ `MUTATED_RC=1`（`:3228`，用 `git show HEAD:` 铺变异副本） |
+| **设备级、逐条腿"拿掉产品修复就红"** | **没有六条，一条都没有** | 六条腿的设备读数只有**未变异的那一趟**（第 13 趟 35 绿 / 0 红，§10.122） |
+
+⇒ 诚实的写法是：**W6-c 的"能失败的判据"这一件齐了（两层都有真读数），
+   "只拿掉修复后的变异读数"这一件只在产品判定层与装置层齐，设备层缺**。
+   补齐设备层要做的是"改一次产品 → 重打 APK → 重装 → 跑一趟 → 还原 → 再跑"，**每条腿一趟**，
+   六趟设备运行的排队成本正好撞上本批现在连一趟干净 `pnpm check` 都拿不到的那件事（§10.168 的三趟被顶）。
+   ⚠️ 所以这一格登记为工单 **#99**，并且**不**把它写成"W6 已按目标三件齐"——
+   设备层那六条在拿到读数之前就是缺的，记在这里比记成 ✅ 有用。
+   一条**不算数**的邻近读数要写明，免得被误当替代：同族机制在 `verify:mobile-autosync` 上确实有一条设备级
+   变异读数（"拿掉写入信号 ⇒ 3 红"），但那是**另一枚脚本**的读数，覆盖不到这六条腿里的任何一条。
+
+📌 顺带一条可迁移的形状：**"这条工单做过变异验证"是一个分层的谓词**，
+   单测层做过不等于设备层做过；我在 §10.166 写"六条腿全拿到"时指的是**绿读数**全拿到，
+   这一节把它与"变异读数"分开，免得下一轮有人（包括我）拿前者当后者。
+
+## 10.171 全量 `pnpm check` 在 overlay 载体上连续四趟的死点表：门禁段每次全过，打断都在测试段（16:0x）
+
+载体：`03f340cd` + 本批 16 枚 overlay（逐枚清单见 §10.164 补记）。链本体 85 个 `&&` 环节，
+日志里打印出 92 行 `$ 命令`（单位见 §10.168 末节）。
+
+| 趟 | 起跑门 | 死在第几环 | 拒启行的持有者 | 那一步在做什么 |
+|---|---|---|---|---|
+| 第七趟 | cleared | 第 85 环（测试段内） | `pid=21054` = 并行会话的让窗看守进程 | `packages/sync-core test` |
+| 第八趟 | cleared（`tries=3 load1=10.23`） | **第 8/85 环** | `pid=58812` = `npx vitest --run electron` | `check:op-log-semantics` |
+| 第九趟 · 第 1 趟 | cleared（`load1=9.72`） | 后段（`check:privacy-consent-e2e`） | `pid=11476` = `npm run test:desktop:card-production` | e2e 腿之一 |
+| 第九趟 · 第 2 趟 | cleared（`load1=15.72`） | 第 85 环（测试段内，且已有三包报数：`local-api 8`、`i18n 3`、`design-system 7` passed） | `pid=89226` = `npm run test:integration:postgres` | `packages/sync-core test` |
+
+三条读数合起来说明的不是"某一趟运气差"，而是：
+
+1. **门禁段（前 84 环，含本批全部新落门禁、`check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e`
+   三条真浏览器腿、四条壳类门禁与截图产物对账）在这棵 overlay 载体上是**走通过的** ——
+   第九趟第 2 趟打印了完整的 92 行命令并进到测试段，测试段自己也已经跑出三个包的读数。
+2. **四趟、四个不同的持有者**（electron vitest / desktop card-production / postgres integration / 让窗看守）
+   ⇒ 拦路的不是某一个还在跑的活，而是这台机器上**持续的并行测试流量**。
+   起跑五道门量的是起跑那一秒（§10.168），链越长越躲不开。
+3. 🔴 **没有做任何一件让这一格"看起来绿"的事**：
+   没用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕过内存闸门；
+   没有把链绿与"单独补跑的 `pnpm -r test`"**拼**成一个 rc=0（§10.167 已把这条规则写死）；
+   没有调 `load1` 阈值，也没有把分类器改成"拒启不算红"（它判的是**环境无效 ⇒ 重跑或如实报阻塞**，
+   最终结论仍取链自己的退出码）。
+4. 因此这一格现在的诚实状态是：**"92 行命令（= 85 环链）的门禁段全绿"已成立；
+   "整条 `pnpm check` 一个连贯 rc=0"仍未成立**，且未成立的原因逐趟带持有者。
+   第九趟第 3 趟在跑，读数到手就补进本表；三趟都被顶则这一格按"实测阻塞"交付，不降级成"已补跑"。
+
+## 10.172 提交前那四段行锚点又核了一次：全部在位，且 6790 之后没有任何新编号条目（16:1x 现量）
+
+§10.161 C.1 为 plumbing 搬 traps 台账记的四个行锚点，逐枚 `sed -n '<n>p'` 回读：
+**6723 = #289、6748 = #290、6772 = #291、6790 = #292** 四枚全部对得上，
+台账总行数 **6835**（= §10.161 记的 #292 末界），`awk 'NR>6790 && /^[0-9]+\. /'` **空输出**
+⇒ 并行会话这段时间没有往我这四枚后面追加新条目，最大号仍是 **292**。
+📌 为什么专门核这个：plumbing 是按**行区间**搬的，区间一旦被别人的插入顶偏，
+搬过去的就是半条别人的段落 + 半条我的 —— 比丢一行贵得多，而且门禁不会报。
+
+## 10.173 第九趟第三趟：整条 `pnpm check` 第一次跑穿到测试段末尾 —— 唯一那一枚红是别线已提交的 `due-date-edit`（#95），本批零红（16:1x–16:2x）
+
+同一棵 overlay 载体（`03f340cd` + 本批 16 枚）、同一套五道门（`GATES=cleared try=1 load1=8.83`）、
+启动器 `/tmp/b58-check9.sh`、日志 `/tmp/b58-check9-try3.log`（869 853 B）。
+
+```
+TRY3 rc=1 bytes=869853 refuse_in_tail=0 refuse_total=0
+CHECK9_EXIT=1 kind=product-red tries=3（链尾无拒启行 ⇒ 不重试、不透传成环境问题）
+```
+
+- 链的 **85 个 `&&` 环节**（日志里 92 行 `$ 命令`）**全部走完**，含最后那一环 `pnpm -r test`。
+- 测试段逐包读数：`storage 8` / `sync-client 9` / `widget-core 6` / `op-log 9` / `ui 31` / `landing 23` /
+  `app-host 68` / `mobile 51` / `node-host 11` / `server 123` 全部 passed；
+  `apps/web` **1772 passed / 1 failed / 13 skipped**（文件层 133 passed / 1 failed / 2 skipped）。
+- 唯一那一枚红：`apps/web/tests/due-date-edit.spec.tsx:191`
+  `AssertionError: 月历里应有 10月18日 这格（无障碍名 = 完整日期）: expected null not to be null`。
+
+### 归属三条现量（不是印象）
+
+| 问的 | 命令 | 读数 |
+|---|---|---|
+| 是不是本批在飞的改动 | `git status --porcelain -- apps/web/tests/due-date-edit.spec.tsx` | **0 行**（既不在我那 16 枚里，也没有别人未提交） |
+| 红是从哪一笔来的 | `git log -1 -- …due-date-edit.spec.tsx` | `5e23b7bf`（日历日/年视图 + 任务时刻贯通，10-03 23:58） |
+| 它跟我的 overlay 有没有关系 | `git merge-base --is-ancestor 5e23b7bf 03f340cd` | **是载体基线的祖先** ⇒ 这枚红在基线上就存在，与我搬进去的 16 枚无关 |
+
+⇒ 这正是工单 **#95** 记的那一枚（历史读数：单跑 6 次 = **1 红 5 绿**，另在第 4 趟全链里红过一次；
+   那一行的位置**不写行号** —— 我这趟写 §10.173 时它还在 `:12759`，十几分钟后已经漂到 `:12762`，
+   要定位用 `grep -n '第 4 趟链上那 92 行命令' docs/plans/trash-and-archive.md`；
+   本趟是它**第二次在全链里**复现）。
+**处置**：不代改（那是日历/到期线的判据）、不动基线、也不为了让链变绿去 `--filter` 掉 `@heyta/web`。
+
+### 顺带把 §10.168 欠的那条反对照补上
+
+§10.168 写过"⚠️ 反对照**没有真样本**：手上没有一趟'产品红'的 check 日志能证明分类器不会误判它"。
+**这一趟就是那枚反对照**：`refuse_total=0` ⇒ 分类器判 `product-red` 并**原样透传 rc=1、不重试**。
+一条只见过正样本的规则不算有牙 —— 这条分类器现在两个方向都有读数了（正：第七/八/九前两趟各命中 1 行；
+反：第三趟 0 行且判对）。
+
+### 目标最后一项现在的状态（分开写，不合并成一句"绿"）
+
+- **"补跑 `pnpm check` 全量"这一件已做完**：一条连贯退出码、跑穿 85 环 + 测试段。
+  目标点名的那几件在同一次运行里的**链上位置**（从载体 `package.json` 现推，不是背出来的）：
+  `check:ai-e2e` = 第 **69** 环、`check:privacy-consent-e2e` = **70**、`check:landing-e2e` = **71**、
+  四条壳类 = 第 **35/36/39/40** 环（`macos-shell` / `macos-window` / `windows-shell` / `linux-shell`）、
+  截图产物对账 `screenshot:verify` = 第 **84** 环。
+  这 9 环在日志里都留下了 `$ …` 执行行（`check-macos-shell` / `check-windows-shell` / `check-linux-shell`
+  各 1 次，`macos-window` 5 次、`ai-e2e` 5 次、`privacy-consent` 16 次、`landing.config` 1 次、`screenshot` 2 次 ——
+  出现多次是因为它们自己的输出里也带这个名字），**而链继续走到了第 85 环的测试段**
+  ⇒ 它们在这趟里都是退出 0 通过的（链是 `&&`，任何一环红就不会有后面的读数）。
+  本批新增的全部静态判据与 spec 也在这同一次运行里（测试段逐包读数见上）。
+- **"整条链 rc=0"这一件没有做到**，而它差的不是本批的任何东西 —— 这一句要留给拍板 #95 归属的人，
+  不能由我把别人的红读成"已补跑完成"，也不能反过来把它算成本批的债。
+⚠️ 一处口径要写明：`linux-shell` 在 darwin 上是**响亮跳过**（AGENTS §1 那格记的设计），
+所以"四条壳类全绿"里那一枚的绿是"按设计跳过且报话"，不是"在 Linux 上跑过"。
+
+### 隔日复核（10-05 16:2x 现量）：载体之后又走了 5 笔，那趟读数作废了吗 —— 没有，且这是量出来的
+
+第 9 趟那次的载体是 `03f340cd`，而写这段时 `HEAD` 已经是 `4b59d9a2`（`git rev-list --count 03f340cd..HEAD` = **5**）。
+按我自己定的隔离语义，"读数属于哪一趟、覆盖到哪"必须随读数量，所以这里不是补一句"应该没影响"，是两条现量：
+
+```bash
+git diff --name-only 03f340cd..HEAD | wc -l                                    # 7
+git diff --name-only 03f340cd..HEAD | grep -Ec 'trash-and-archive|verify-mobile-trash|OrganizerList|packages/storage|packages/sync-client|account-closure|recover-user|packages/legal|W07'   # 0
+git rev-parse 03f340cd:apps/web/tests/due-date-edit.spec.tsx HEAD:apps/web/tests/due-date-edit.spec.tsx   # 两行相同
+```
+
+读法：那 5 笔只动了 `docs/plans/calendar-profile-handoff.md` 与 `research/tools/calendar-line-*`（7 个文件），
+与本批 16 枚文件的**交集为 0** ⇒ 第 9 趟"覆盖本批文件"这个属性没被后来的提交推翻。
+更关键的是第二行：#95 那枚红的**文件字节在载体与 HEAD 上逐字节相同**（同一个 blob `8fac4466…`，最后动它的是 `5e23b7bf` 10-03 23:58）
+⇒ "唯一那一枚红是别线已提交的东西、且本批没碰它"这句在新 HEAD 上仍然成立，不需要为此重跑一趟。
+
+📌 这条自查的形状值得记：**载体漂移本身不是重跑的理由，"漂移是否动了被引用的那两个对象"才是**。
+不先量这两条就重跑，等于默认旧读数作废；不量就宣称仍有效，等于把推断写成读数。
+
+同趟的三道文档门禁读数（各带 rc，写在这段是为了下一批人不必重新猜命令）：
+`node scripts/check-md-table-rows.mjs` rc=**0**、`node scripts/check-docs-voice.mjs` rc=**0**、
+`node research/tools/docs-link-check.mjs` rc=**0**。
+⚠️ 死链那一条我第一次把目录敲错了（放进 `scripts` 下按同名去找，而它不在那儿），
+得到的是 `MODULE_NOT_FOUND` 的 rc=1 —— 症状与"文档有死链"完全同形，是 §7 元规则第 1 条的第 N 次现身：
+先怀疑探针。探针修好后的 rc=0 才是那三道里唯一的死链读数。
+`check:doc-citations --doc` 本趟 101 面旗（§10.169 记过它改一次文档就自己涨），
+其中**落在我这次新增行（>13317）上的有 0 面** —— 现量命令：
+`node scripts/check-doc-citations.mjs --doc docs/plans/trash-and-archive.md | awk '/:1(33[2-9][0-9]) /'`。
+
+## 10.174 #99 的第一次真实尝试：臂死了，但死于两处守卫**正确拒绝**，而不是死于一个假绿（16:30–16:33 现量）
+
+目标要求设备级变异读数。这次真的去取了 —— 挑的那一臂一发打两条腿：把 `packages/app-host/src/note-actions.ts`
+恢复便签时清墓碑的那句 `payload: { deletedAt: null }` 换成 `payload: {}`（op 照发、墓碑不清），
+预期 `:451`「点恢复 → 该行离开回收站且回到活体列表」与 `:691`「笔记本读到那条便签活着」转红，其余腿继续绿
+（同趟自带配对，不靠另跑一趟基线）。臂脚本 `/tmp/b58-w6-arm.sh`，前置守卫齐：动之前先量过
+`git status --porcelain -- packages/app-host/src/note-actions.ts` 回 **0 行**（不是别人在飞的文件才动），
+变异锚点用三行上下文 + `命中数 !== 1 就退出`，`trap` 无条件还原源码。
+
+**读数（`/tmp/b58-arm-w6.log`，逐行都是这趟打出来的）**：
+
+- 变异进了源码、`pnpm --filter @heyta/app-host build` rc=**0**、产物里 `deletedAt: null` 现量 **6** 处；
+- `pnpm build:android` rc=**1**，**1 秒内**死在 `scripts/run-gradle.mjs` 的步骤 1：
+  `ssh: connect to host 10.111.127.237 port 22: Host is down`（退出码 255）。
+  ⇒ 本机 APK 产物通道只有这一条，而它点名的是 Windows 打包机；
+- 我自己那条守卫抓到了这件事：`APK_MD5` 与臂前留存的基线**逐字节相同**
+  （`96e5cfc3…`）⇒ 脚本打印 `APK_CHANGED=NO ⇒ 这一臂无效，产物没变`；
+- `adb install` 被系统拒：`INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.heyta signatures do not match`
+  ⇒ 就算产物打出来了，装它还得先 `adb uninstall`（会清设备上的 app 数据）；
+- `verify-mobile-trash.sh` 走到步骤 0 就自己停下：**「🔴 verify-mobile-trash 拒绝装包：APK 比源码旧 ——
+  跑它验的是旧 bundle（§7 第 27 条）」**（`APK 2026-10-04 15:02:47 / 最新源码 2026-10-05 16:30:59`，
+  扫描面是它自己现推的 11 个 `src` 目录）。
+
+**所以这一臂的诚实结论是两句话，缺一不可**：
+
+1. **#99 没有闭合**，六条腿的设备级变异读数仍是 **0 条**（这一趟一条都没拿到）；
+2. 但这一趟**不是白跑**：它同时给三件东西拿到了正向证明 —— 我的 md5 产物守卫、`run-gradle` 的"远程不可达就响亮失败、
+   绝不静默退回本机"、以及 `verify-mobile-trash` 的 APK 新鲜度守卫，**三者都在这一趟里拒绝了会把无效臂读成读数的路**。
+   一个没守卫的实现会把 `VERIFY_RC=1` 读成"拿掉修复后确实红了"，而那一趟跑的其实是**上一批的旧 APK**，
+   那个红和变异毫无关系。§10.170 那句"设备层一条都没有"因此到现在仍然成立，且**有这趟作证**。
+
+**取证过程中的两个我自己的错（写下来，不是装饰）**：
+
+- 臂脚本里 `grep -c ... | sed 's/^/MUTneedle=/'` 在 BSD sed 上炸 `unescaped newline inside substitute pattern`
+  （我把 GNU 的形状抄了过来）—— 它只影响那一行打印，不影响判据；
+- 探 Windows 打包机可达性时我写的是 `ssh … | head -3; echo "ssh_rc=$?"`，读到的 **0 是 `head` 的退出码**，
+  不是 ssh 的（§7 第 45 / 179 条同族，我自己第二次踩在同一件事上）。真正的证据在 stderr 文本与
+  `ping: 2 packets transmitted, 0 received, 100.0% packet loss` 那两行里。
+
+**零残留（这节写完时现量）**：`note-actions.ts` 对 HEAD 的未提交 diff = **0 行**；
+盘上 APK 的 md5 与臂前**相同**（装到设备上的包没有被这一趟动过）；`/tmp` 里只有本臂的一次性文件。
+
+**本节的两次连带落盘（要算进提交分组，别留给下一轮去猜）**：
+
+1. §10.173 末尾补了「隔日复核」那一小段（载体又走 5 笔之后仍成立的现量）；
+2. **ADR-0048 那一格被就地改了一次归因** —— 它原文把"跨设备那半条未取证"的载体写成 `pnpm verify:mobile-trash`，
+   而该载体 10-05 04:1x 已经有过真机那一趟（35 绿 / 0 红）。**改的不是结论**（那句"本 ADR 不把它写成已成立"原样保留），
+   改的是**缺口的指认**：本格缺的是"注销后对端设备离线再连、界面上真的空了"，不是"回收站跨设备那一趟没跑"。
+   ⇒ **本批待提交文件从 §10.161 记的 16 枚变 17 枚**（新增 `docs/adr/0048-…boundary.md`）；
+   那句"16 枚"留在原处不复述，以本行为准。三道文档门禁在两处写完后的读数：table rc=0、voice rc=0、link rc=0，
+   `check:doc-citations`（默认射程）rc=0。
+3. ⚠️ 修那条 ADR 引用时撞出一个装置事实：我第一版写的跨文件引用是 `… §10.122`，门禁立刻判
+   「失效的章节引用 / 该章节号不存在」，**而那一节真的存在 —— 它是 `###` 三级标题**，
+   门禁的章节集合按 `^## ` 取号，于是 10.119–10.128 整段对它不可见。这次红是**我的引用写法**造成的，
+   但我没去把引用改成行号（行号更容易漂），而是改指同文件里两个真实存在的 H2（§10.170 / §10.174）。
+   反向那一面（仓内多处同文件内的 `§10.122` 式引用不受这层保护）登记为 **#100**，不在本批改门禁。
+
+**下一趟要怎么走（给接手的人，不用重新推）**：前置不是"负载低"，是**两件事**——
+① `windows-pc` 可达（现在：主机不可达；`run-gradle` 文件头把 `HEYTA_ANDROID_LOCAL_GRADLE=1` 写成
+**显式例外**而非兜底，且它会把"这是本机执行"大字印进输出，用它必须把那一行留在读数里），
+② 先 `adb uninstall com.heyta` 再装（签名不与现有包匹配），这一发会清掉模拟器上 app 的数据，
+所以它是一次**有代价的设备动作**，得排在窗口归属现量之后。一趟的成本 = 变异构建 + 干净构建 + 一趟跑到
+第 7 步（`HEYTA_TRASH_LAPTOP_ROUNDS` 默认 180 轮 × 5 秒），**没有 30 分钟以上的独占窗口不要开**。
+
+🔴 **上面那句"现在：主机不可达"是我 15 分钟前写下的、会漂的值，而且它当时就已经部分错了**
+（16:48 现量：`ssh -o ConnectTimeout=8 -o BatchMode=yes windows-pc 'echo HEYTA_PROBE_OK'` 回显 `HEYTA_PROBE_OK` ⇒ **活着**）。
+两件事要分开看：
+① **16:31 那次 `Host is down` 是真的网络层失败**（同刻 `ping` 100% 丢包），臂确实打不出包 —— 那句归因在那一刻成立；
+② 但我后来把"不可达"写成了**状态**，而它只是一个**瞬时读数**。更糟的是我 16:48 之前用过的那把探针本身是坏的：
+`ssh windows-pc true` 在 Windows 上**必然**失败（默认 shell 是 cmd.exe，`true` 不是它的命令，
+stderr 里同时出现 openssh 的后量子告警和 cmd 的乱码报错），**形状与"主机下线"一模一样**。
+⇒ **判一台 Windows 主机可达不许用 `true`，要用 `echo` 回显串比对**（`cmd` 与 PowerShell 都成立）。
+现量命令（每次自己量，别信本节任何一个"现在"）：
+`ssh -o ConnectTimeout=8 -o BatchMode=yes windows-pc 'echo HEYTA_PROBE_OK' | tr -d '\r\n'`。
+**这一格的前置因此从"两件"降到"一件"**：产物通道 16:48 是活的，剩下的是**独占窗口 + `adb uninstall` 的代价 + ≥30 分钟**。臂本身已经落成可重跑的装置（不再是 `/tmp` 里的一次性脚本）：`research/tools/mutation-rigs/w6-note-restore-device-arm.sh`，
+三档退出码（0 拿到预期红 / 1 红集不符 / **3 环境无效**），前置四道：载体自证（`R` 少算一层会让
+`git status --porcelain` 因路径不存在而**空输出=假通过**，第一次跑就撞上）、源码未提交 diff 必须为空、
+设备窗口无别的 `verify-mobile-*`、产物 md5 必须与臂前不同才允许跑验证。
+
+**W07 那一格：目标原文与 #98 的差，这次用眼睛钉了一遍（16:38 人看两张图）**
+目标写的是「现图只画任务，文档已写四类」。现量两张图（10-04 07:57 那批，各 1440×900）画的是**空态**，
+而空态里两处文案都把四类点全：`这里放着已删除的任务、便签、清单和习惯。恢复后它会回到原来的位置。`
+与 `删掉的任务、便签、清单和习惯会先放到这里`（英文那张同义）。
+⇒ **目标原文那句"只画任务"所指的那处图文矛盾，已经不在这两张图里了** —— 这一格按目标口径闭合。
+而 #98 要的是**更强的一档**："画一张装着四类行的图"（现在是一行都不画，靠文字覆盖四类）。
+这一档**不是目标那一格的缺口**，是超出它的改进项，继续留在 #98 ——
+把它写成"目标未完成"会虚报缺口，把 #98 撤掉会丢掉一条真债，两个都不做。
+⚠️ 为什么这一趟不去做它：那两张 png 是 **tracked 资源**，"种四类数据再截一张"要动截图夹具，
+改坏了就是往仓库里落一张更差的图，而它不在目标必需项里 —— 剩余回合不多时不开这种"可能留下退化产物"的活。
+
+## 10.175 目标点名的三格，用"数消费者 / 数分母 / 数链上位置"各复量了一次（16:4x 现量，不复述旧账）
+
+这三格的共同点是：**旧账写的都是结论**（"9/9 已落""两端都接""门禁已接线"），
+而结论句的保质期取决于别人什么时候把它改坏。所以这里量的不是句子，是**能让那句话为假的那个状态**：
+
+| 那一格 | 这次现量了什么 | 读数 |
+|---|---|---|
+| E6「九份法务文档 GDPR 口径」 | 分母**从树上取**，不数文档里 `GDPR` 这个词出现几次 | `grep -rlE 'GDPR' packages/legal/src/documents/*.ts` = **9 份**（`ai-and-transfer` `data-rights` `minors` `permissions` `personal-info-list` `privacy` `subscription-refund` `terms` `third-parties`）⇒ 9/9 成立 |
+| 法务与文案类门禁「接线」那一列 | 读的是 `package.json` 的 `scripts.check` **字符串本身**，不是"脚本存在" | 链现量 **86 环**；`check:legal-gdpr` / `check:legal-closure-truth` / `check:legal-tools` / `check:legal-copy` / `check:doc-citations` 全在链里，真机脚本文案对账那条 `check:verify-script-copy` 在**第 80 环** |
+| W4b「两端都接」 | 数的是**传参形状** `confirmRemove:` 的宿主消费者，不是共享层的声明 | `apps/web/src/features/projects/ProjectsPanel.tsx` **1** 处、`apps/mobile/src/screens/TagsSection.tsx` **2** 处（注释 1 + 真传参 1）、`packages/ui/src/projects/OrganizerList.tsx` 是声明 + 消费 + "不传则 DOM 里没有 `-confirm`"那条负向断言 |
+
+⚠️ 顺手记一次**我自己的探针敲错名**：我第一版拿 `check:mobile-copy` 去 `includes` 那条链，得到"❌ 不在链里"——
+**这个脚本名根本不存在**（真名 `check:verify-script-copy`）。如果我当时就写"某门禁没接线"，
+那会是一条凭空的缺陷，而且形状非常可信（"门禁存在但没人跑"正是本批反复在防的那一类）。
+判"某件东西不在链里"之前，先证明**我用的是它的真名**：`node -e` 把 `scripts` 里所有含关键词的键名打出来再比，
+而不是拿一个记忆里的名字去否定。
+
+**第四格（E2「每端逐宿主取证」）同一趟的现量**：常驻门禁 `check:shell-erasure-parity`（**主检出那条 86 环链的第 83 环**，环数与位置都从 `package.json` 现推）
+直接跑 **rc=0**，它打印的就是分母本身 —— `owners=3 gaps=1 problems=0`，逐行带 `file:line`：
+`desktop-linux` 是 `wal=Y remover=N`（**已登记的例外，带理由与摘除判据**，政策第五节 ② 也点名了它）、
+`desktop-macos` 与 `desktop-windows` 都是 `remover=Y` 并指到各自的 `SqliteBridge`。
+⇒ 这一格的"每端"是**门禁自己数出来并报账的**，不是表里那句话；
+而 §10.11 那张逐宿主表（10-04 14:1x 起分母改成从树上取，见 §10.42）与这枚门禁是**两层不同的东西**：
+这枚管"壳侧驱动有没有把 `removeDatabase` 递给 JS"，那张管"每一端有没有真取过运行时证据"，
+**别拿前者的绿去签后者**（后者今天仍缺 macOS 界面级那一趟 = #94）。
+
+## 10.176 停车账（10-05 16:53，回合将尽）：这一批交到下一轮手上时是什么状态
+
+**落盘三枚，全部未提交**（"不提交，等用户明示"仍然有效）：
+`docs/plans/trash-and-archive.md`、`docs/adr/0048-deletion-four-states-and-the-no-physical-erase-boundary.md`、
+新装置 `research/tools/mutation-rigs/w6-note-restore-device-arm.sh`。⇒ §10.174 记的"17 枚"现在是 **18 枚**，
+提交时按 §10.161 只点名自己的路径，traps 台账（现量仍 ` M`）走行段 plumbing，不整文件 `git add`。
+
+**#99 是唯一一条"能做但这一轮不该做"的**：装置已实测可用 ——
+`bash research/tools/mutation-rigs/w6-note-restore-device-arm.sh --dry-run` 在 16:51 回 **rc=0**，
+六道前置全过（含 `BUILD_HOST=windows-pc 可达`），干跑后源码未提交 diff 仍 0 行、盘上 APK md5 未变。
+**去掉 `--dry-run` 就是取读数的那一趟**，成本与代价写在 §10.174 末段。
+不在最后几个回合开它的理由写死在这里，免得下一轮误读成"忘了开"：
+整臂 ≥30 分钟，而还原挂在 `trap … EXIT` 上，**SIGKILL 不走 trap** ——
+停在半路会把变异后的产品代码留在共享工作树里无人监督，这条线上有过"别人整文件 `git add` 把临时改动一起提交"的先例。
+
+**其余三件都不是我这一轮能推的**：#95 那枚别线已提交的间歇红（要日历/到期线拍归属）、
+#87 的 A/B 口径、P-12 的备份侧定点删除、#65 的打包机独占、#94 的不可逆动作同意 —— 全是要人拍板的事。
+
+## 10.177 P-12 已经调研完，落点换了一份文档（10-05 16:5x，产品负责人授权直接决断之后）
+
+**这份计划不再持有 P-12 的方案正文** —— 它挪到了 `docs/research/backup-side-erasure.md`，
+那一份里带现量的仓内事实（`server/scripts/backup.sh:98` 的账号面单独成档、`:34` 默认 14 天、
+`server/tools/backup-encrypted.sh` 存在但没接线、**根本没有恢复脚本**、服务端没有可解全量的托管密钥）
+与监管口径（ICO：不能拿备份当拒绝理由，但不要求立刻做外科手术，要求 "beyond use" + 按计划性时间表过期 + 一个月内答复）。
+
+一句话结论，免得下一轮重新推：**逐账号 crypto-shredding 在本仓是堵死的**
+（服务端要么得能解密 —— 直接撞 ADR-0050，要么销毁的是全舰队共享的 pepper —— 连别人的备份一起毁）。
+能做到的定点删除在**账号面**（`users`/`passkeys` 那份已经单独成档，可 `NOT IN` 墓碑表过滤），
+密文面走 ICO 那条 "beyond use"；再加一条**恢复闸**（今天最薄的一环：没有 `restore.sh`）。
+⇒ 本计划这边只留三件要拍的板：`RETENTION_DAYS` 定几天（现量冲突：runbook 示例 3 与默认 14 与法务句子 14 三方不一致）、
+备份默认加密的**密钥托管方式**、以及"账号面定点删 / 整库不删"能不能当对外口径（要新写一份 ADR，不动 0049/0050 的结论）。
+
+
+## 10.178 #99 又跑了三趟，三趟都是**环境无效**退出（17:0x–17:37 现量）：读数仍是 0 条，但这三趟各证到一件不同的事
+
+§10.174 记的是第一次（一次性 `/tmp` 臂，死在 `Host is down`）。这一节记后三趟，全部用**已入库的常驻臂**
+`research/tools/mutation-rigs/w6-note-restore-device-arm.sh`（变异锚点 = `packages/app-host/src/note-actions.ts:274`
+的 `payload: { deletedAt: null }` → `payload: {}`，命中数不为 1 就退，`trap` 无条件还原）。
+
+| 趟 | 时间 | 走到第几步 | 死因（原文） | 退出码 | 收尾 |
+|---|---|---|---|---|---|
+| 2 | 16:5x→17:20 | **走穿到第 6 步**（远端构建 ✅、装包 ✅、`verify-mobile-trash` 起跑） | `❌ 等满 900s 负载这格仍未过（现量 load1=18（原始 18.81），阈值 12）—— 本轮不跑（环境无效，不是产品失败）` | 3 | 干净体重建 + 重装 ✅ |
+| 3 | 17:20:37→17:24 | 第 4 步（远端 gradle） | `Read from remote host 10.111.127.237: Operation timed out` / `client_loop: send disconnect: Broken pipe` | 3 | `SRC_RESTORED=clean` |
+| 4 | 17:37 | 只跑前置（`--dry-run`） | 六项全过：`PREFLIGHTS=OK（载体自证 / 源码干净 / 设备窗口独占 / adb 有设备 / :3100 可达 / 构建主机可达）` | 0 | 一字节未改 |
+
+**三件事各自被哪一趟证到**：
+
+1. **第 2 趟证到"臂能走穿"** —— 远端构建、回传、安装三段第一次在常驻臂里连续成立：变异体 APK md5
+   `e851cb6a…`（≠ 基线 `96e5cfc3…`，产物身份守卫放行），装完之后 `verify-mobile-trash` 真的起跑了。
+   所以第 1 趟那个 1 秒死**不是**臂的形状坏了，是主机当时真的不可达。
+2. **第 2 趟同时证到"负载闸门真的会拒绝"** —— 它没有在小模拟器上硬跑一遍拿个假读数，而是等满 900s
+   之后以 `环境无效，不是产品失败` 收尾。这就是 §7 那一族"永远通过的判据"的反面：这条会在不该跑的时候**不跑**。
+3. **第 3 趟证到 #102**（见下）。
+
+🔴 **#102（登记，不在本批改）**：`scripts/run-gradle.mjs:476-478` 把 **ssh 传输层的退出码**和
+**gradle 构建失败的退出码**折成同一句话：
+
+```
+🔴 run-gradle（远程模式）在**步骤 4（远端 gradle 构建）**这一步失败。
+   远端 gradle 退出码 255。…… 构建本身失败 —— 不要改成"换本机再试一次"：同一份源码在两边都该失败。
+```
+
+`255` 是 **ssh 自己**的码（传输断开），不是 gradle 的 —— 而那句"同一份源码在两边都该失败"会把下一轮的人
+推去**改源码**。**它当场就能被否证**：同一个 `note-actions.ts` 在**同一台主机**上，16:58:04→17:02 打出变异体
+`e851cb6a…`、17:17:14→17:20 打出干净体 `b8be28d9…`，**两枚都成功**，而这一趟是 17:20:37 起跑、日志里还留着
+`Broken pipe` ⇒ 失败与"这一份源码"无关。
+不顺手改的理由是现量的：那枚文件 `git status --porcelain` 回 **0 行**（属 Android-on-Windows 那条线，已提交），
+而它的错误分类被 `check:android-gradle-remote` 按**形状**钉住 ⇒ 改文案要连那枚门禁一起动，不是"顺手加个 if"。
+
+**#99 现状（每次现量，别再抄这一行）**：设备级逐腿变异读数 = **0 条**；已尝试 3 趟（1 一次性 + 2 常驻臂），
+其中 1 趟走穿到设备验证步。**阻塞是环境型的，不是许可型的** —— 唯一挡路的是 load 与打包机 ssh 稳定性，
+没有一件需要谁拍板。取读数的命令就一条：
+
+```bash
+bash research/tools/mutation-rigs/w6-note-restore-device-arm.sh        # 需要 ≥30 分钟独占 + load1 ≤ 12
+```
+
+**为什么不发第 5 趟**（17:37 现量，写下这段时 `vm.loadavg` = `29.04 46.11 47.00`）：臂里的负载闸门会在
+900s 后再次拒绝，而第 3 趟已经证明打包机 ssh 在这一轮不稳定 ⇒ 成本可以直接从第 2 趟的时间戳推，不用估：
+构建+装包 `16:58:04→17:02:07`（≈4 分钟）+ 负载等待 900s（=15 分钟）+ 收尾重建重装 `17:17:14→17:20:13`（≈3 分钟）
+= **一趟 22 分钟、0 条读数**。
+更要紧的是收尾代价：**中途停止会留下一枚装在小模拟器上的变异 APK**（`trap` 不接 SIGKILL），
+而这台模拟器同时被别的会话的设备验收用。没有 ≥30 分钟的独占窗口就不起跑，这条写在臂自己的输出里，不是这里的新规则。
+
+## 10.179 第 3 趟的**远端**读数把 #102 钉成了实锤，顺手挖出我自己的一处共享资产残留（17:41–17:43 现量）
+
+§10.178 写下"第 3 趟死在传输层"之后我去打包机上取了三样东西。三样都推翻了我自己刚才的措辞：
+
+| 取的东西 | 命令 | 读数 |
+|---|---|---|
+| 远端 APK 的内容身份 | `ssh windows-pc "certutil -hashfile C:\src\heyta\apps\mobile\android\app\build\outputs\apk\release\app-release.apk MD5"` | `e851cb6af5348d986fedf3a95c847405`，mtime **17:22** |
+| 远端源码是否还原 | 同上 `…packages\app-host\src\note-actions.ts` + `findstr /N /C:"payload: {}"` | md5 `ca70c6e9…`，**274 行是 `payload: {}`** |
+| 与本地 pristine 的逐字节差 | 拉回来 `diff` | **恰好 1 行**，且那一行就是本臂的针脚 |
+
+1. **#102 从"分类错误"升级为"把成功的构建说成源码失败"**。远端 APK 的 mtime `17:22` 落在第 3 趟（17:20:37 起跑）里面，
+   md5 与第 2 趟的变异体**逐字节相同** ⇒ 那一趟远端 gradle **构建成功了**，断掉的只是回程的 ssh 通道。
+   而输出印的是"构建本身失败 —— 不要改成'换本机再试一次'：同一份源码在两边都该失败"。
+   这句现在有**字节级否证**，不需要论证：同一份源码在同一台机器上，17:02 出过 `e851cb6a`，17:19 出过 `b8be28d9`。
+2. 🔴 **我自己在共享打包机上留了残留**：`trap restore_src` 只还原本地，而 `run-gradle` 步骤 2
+   （`scripts/run-gradle.mjs:385-401`，复用 `scripts/lib/sync-windows-sources.sh`）把**当时的工作树**整棵推上
+   `C:\src\heyta` —— 于是本地 0 行脏、远端仍是变异体。它比"变异 APK 留在模拟器上"更危险，因为下一趟别人的构建
+   会把这发打进产物，而那条 sha256 对账比的是**本地 vs 远端**，两边是同一份错的时候就看不出问题
+   （AGENTS §7 第 82 条那个形状，这次是我自己造的）。
+   已当场修复：把本地 pristine 推回去（`push_rc=0`），再从远端拉回来 `diff` = **0 行**、md5 = `1c11da22…` = HEAD；
+   17:43 复量为 `1c11da220aaa2e031f2d89ff5aad0244` ✅。
+3. **装置补了一条腿并自测过**（`restore_src()` 现在在 `MUT_APPLIED=1` 时把 pristine 推回 `$REMOTE_ROOT/$SRCREL` 并**回读逐字节对账**；
+   `REMOTE_ROOT` 与 `run-gradle` 读同一个 `HEYTA_ANDROID_REMOTE_ROOT`，写死路径会让"回读对上了"退化成自己跟自己比）：
+   用 `awk '/^restore_src\(\) \{/,/^\}/'` 把**真函数**eval 出来跑三条腿，不重写逻辑：
+   A 阳性对照（`REMOTE_ROOT` 指到不存在的目录）⇒ `REMOTE_RESIDUE=推不回去（scp 退出非 0…）`；
+   B 默认根 ⇒ `REMOTE_RESTORED=ok C:/src/heyta/… md5=1c11da22…`；
+   C `MUT_APPLIED=0` ⇒ 一个字节的远端写都不发。
+   ⚠️ 自测里那三行 `SRC_RESTORED=FAIL` 是**harness 造成的**（临时目录在仓外，`git diff` 对它报 fatal），不是装置缺陷 ——
+   真装置里 `SRC` 恒在仓内。这句留着是为了别让下一轮把 harness 的产物读成装置的红。
+4. **一条顺带的、能被 #75 用的事实**：两次独立构建（16:58 与 17:20:37 起跑）在同一份输入上产出**同一个 md5**
+   `e851cb6a…` ⇒ 这台打包机上的 release APK 对同一输入是字节确定的，所以"内容身份腿"可以就用 md5，
+   不需要另造哈希方案（#75 的后半原本担心要设计一个身份）。这不等于全链确定 —— 只证了这两发。
+
+**这一节改写了 §10.178 的两处措辞**（原文保留，不删）：那里说第 3 趟"死在打包机 ssh"并给了 `SRC_RESTORED=clean` 作收尾 ——
+`clean` 只是**本地**的 clean，远端当时还是变异体；"死因"也不是"构建失败"，是"构建成功、回程断"。
+
+## 10.180 #87 的 B 分支被**真做过一次**：三行守卫成立，但它撞上一枚把"重开"当承重结构的既有契约（17:51–17:56 现量，已全部回退）
+
+产品负责人 16:5x 的授权把许可型阻塞解开了，所以这一格不再"等拍板"。先做**判据**而不是先讲理由：
+在 `SqliteAdapter.ensureOpen()` 与 `IndexedDbAdapter.open()` 各加一条 `destroyed` 守卫（销毁后任何会打开容器的
+调用抛 `AdapterDestroyedError`），`destroy()` 第二次改成**不再开容器**的幂等返回，新写一份 6 腿 spec
+（`destroy` 后 `init()` 被拒 + 目录条目数保持 0 + 第二次 destroy 幂等 + `close()` 后重开仍合法 + **新实例仍可开库**
+这条**故意让它过**，用来钉住"设备那一半不在这里管"）。
+
+**读数（`pnpm --filter @heyta/storage test`）**：
+
+| 步 | 用例数（=vitest 报的 `Tests`）| rc |
+|---|---|---|
+| 基线（HEAD `0afad3b1`）| 417 passed | 0 |
+| 加守卫 + 新 6 腿 | 419 passed / **4 failed**（423 总）| 1 |
+| 回退后复量 | 417 passed | 0 |
+
+🔴 **那 4 条红不是障碍，是这格的裁决依据**。它们全在**已提交的共享契约**里
+（`packages/storage/tests/contract/adapter.contract.ts:428` 「destroy 之后每个 store 都是空的」，
+按参数化跑 `IndexedDbAdapter` / `SqliteAdapter` / `SqliteWasmDriver` 三份 + `OpLogStore` 那条
+「计数与物化同数、含归档、且计数不读回行」）—— 也就是说**今天的"销毁到位"是靠"销毁之后在同一条实例上再读一次"
+来证明的**：那枚空壳是既有判据的承重件。于是：
+
+- **B 不是三行守卫。** 它的第一步必须先把那枚契约腿换成**新实例**读回（"用新的 `SqliteAdapter` 打开同一路径，逐 store 计数为 0"）
+  —— 这个写法**严格更强**（证的是清除的**持久性**，不是内存态），但它是对 4 份实现共享的契约语义改动，
+  改完还要重出 E2 的逐宿主证据表（§10.2 那张）。第二步才是守卫本身。
+- 我**没有**去改那 4 条断言让它变绿（AGENTS §8.4「不要为了让测试变绿而改测试」；而且 `contract.spec.ts` 是共享层，
+  代别人改契约语义超出本批射程），也**没有**留下半个装到一半的共享层改动 —— 全部回退，`packages/storage`
+  现量 **0** 行未提交、417 passed 复量。
+- **在授权范围内拍的板：走 B。** 理由不是 B 更好做，而是 §10.159 那张表已经把两条分支的**对外代价**量清了：
+  A 要改 `data-rights.ts:206`/`:529` 那句「一个都不留」（zh+en 成对 + 变更记录 + 四枚 legal 门禁重跑），
+  那是**对外法律表征**，不在可代拍的范围里；B **不动任何对外文字**，代价全在工程内。
+  ⇒ #87 从"等 A/B 口径"变成"方向已定 + 第一步已指到 file:line + 已知它要连带重出逐宿主证据表"。
+
+**顺带一格（目标点名的 E1b）**：账里"10 passed"是**旧 HEAD（ef464dfe）**的读数，而今天 main 已推进两枚提交。
+在 `0afad3b1` 上复跑 `server/tests/account-closed-signal.spec.ts`：**11 passed / rc=0**，
+`git show HEAD:server/src/middleware.ts` 第 55 行仍是 `.code(result.code === 'ACCOUNT_CLOSED' ? 410 : 401)`，
+`git show HEAD:server/tests/account-closed-signal.spec.ts | grep -c 'toBe(410)'` = **2**。
+用例数会漂（10→11），所以这行只留现量命令：
+`pnpm --filter @heyta/server test tests/account-closed-signal.spec.ts`（计数单位 = vitest 的 `Tests`，不是文件数）。
+
+## 10.181 #87 的"B 第一步"被自己的变异打回来了：那条"新实例读回"腿**没有牙**，而且天真改写会把一条会红的判据换成恒绿（17:59–18:01 现量）
+
+§10.180 说 B 的第一步是"把契约里那条腿换成**用新实例读回**"。这一轮把那条腿**真写出来并做了变异**，两条都不成立：
+
+**① 天真改写 = 造一条永远通过的判据。** 共享契约的载具只拿到 `{ name, create }`（`adapter.contract.ts:60`），
+而四份实现里有两份的 `create()` **每次返回一套全新的存储** —— `contract.spec.ts:29-40` 的 `memoryDb()` 是新的
+`MemoryDbAdapter`，`freshIndexedDb()` 连 `globalThis.indexedDB` 都换成新的 `IDBFactory`。
+把「destroy 之后每个 store 都是空的」直接改成 `const reopened = await create()` 之后，
+这两份实现**无论如何都会读到空** ⇒ 一条现在会红的判据被换成一条不能失败的（AGENTS §7 元规则 2）。
+
+**② 我按"只在知道容器在哪的实现里单独写 + 自带前提正对照"补了一份 SQLite 文件版（2 条腿，419 passed），
+然后对它做变异 —— 它抓不到东西：**
+
+| 变异 | 前提正对照腿 | "新实例读到空"腿 | 全套 |
+|---|---|---|---|
+| `destroy()` 里**跳过逐表 `DROP TABLE`** 那一循环（`VACUUM` 与删文件照旧） | ✅ 过（写 1 行、新实例读回 1 行）| ✅ **仍过** | `1 failed / 418 passed`，而那**一枚红不是它** —— 是 `destroy.spec.ts` 里「驱动没有 `removeDatabase` 时必须报'文件仍在'」那一档 |
+
+原因很直白：`removeDatabase()` 已经把文件删了，新实例打开同一路径**必然**得到一张按 schema 现建的新空库 ——
+这条腿断言的是"删掉的文件重新打开是空的"，接近恒真。**它不需要 DROP 真的发生就能绿。**
+
+⇒ **修正 §10.180 的第一步**（原文保留）：
+
+- "新实例读回"**不是** B 缺的那条腿，它证的事已经被 `destroy.spec.ts` 覆盖得更好（那边数**目录条目**、
+  还有一档专测"删不掉文件时不许静默成功"）。那份 2 腿 spec 已**删掉**，不在共享树里留一条没牙的判据。
+- B 的真实第一步是：给契约载具补一个**真正指向同一份存储**的重开能力（每份实现各自给，
+  正对照写「**不销毁**时新实例读得到上一实例写的行」—— 这一条不成立就说明载具是假的，判据必须拒绝运行），
+  然后才加守卫。IndexedDB 只要**不重置** `globalThis.indexedDB`、用同名库新建实例就是真重开；
+  `MemoryDbAdapter` 根本没有持久容器，它那一档应当**明确跳过**而不是读一个必然空的新实例。
+- 这套读数的价值是**把一条看起来合理的路线打回**：下一轮不必再写一遍同样的 2 腿 spec。
+
+## 10.182 §10.181 那条"发现"是仓库**已经写明**的事：我把它当成新发现写了一遍，现撤回那个语气（18:04–18:06 现量）
+
+去补 B 的第一步时读到 `packages/storage/tests/destroy.spec.ts:198-201`，那段注释逐字是：
+
+> 🔴 文件还在，所以**内容**必须真的被清掉了 —— 这一句是 `DROP TABLE` 那个循环**唯一的牙**：
+> 其余每条 destroy 判据都跑在"文件被删掉"的驱动上，而那些判据在漏删 DROP 的情况下**全绿**
+> （重开一个新连接本来就什么都没有）。
+
+也就是说 §10.181 花两条腿 + 一次变异"挖出来"的东西，**共享层自己早就写着**，而且写得更准（它连"为什么全绿"都给了：
+重开的是一个全新连接）。我这轮的实际产出只有两格，都不该借"发现"的语气：
+
+1. **一条现量的补强**：四份实现**全部**跑在"每次 `create()` 都换一套新存储"的载具上 ——
+   `:memory:` 两份（`contract.spec.ts:52-61` 的 SQLite、`:81-90` 的 Wasm，注释自己写着"内存库每个用例一份"）、
+   `MemoryDbAdapter` 一份、IndexedDB 那份每次换 `IDBFactory` **还换库名**（`:199-202`，`contract-${++counter}`）。
+   ⇒ 与那句注释合起来看，「destroy 之后每个 store 都是空的」这条契约腿对**四份实现都不可失败**。
+   这不是我测出来的新缺陷，是**已有登记的一个具体分母**（原注释只说"其余每条"，没数到"四份全是"）。
+2. **B 的成本因此被重新估**，方向变了：那 3-4 枚被我守卫打红的契约腿**本来就不承担牙齿**（牙在 `destroy.spec.ts`
+   那一条 + 目录计数那几条）。把它们从"同实例读回读到空"改成"销毁后任何调用必须抛 `AdapterDestroyedError`"
+   是**加强**而不是放宽 —— 它们今天连"什么都没清"都抓不住，改完至少能抓住"销毁后还能被偷偷重开"。
+   ⇒ §10.181 说的"要先给契约载具补一个真指向同一份存储的重开能力（四份各补 + 前提正对照）"
+   **不是 B 的前置**，那是一项独立有用的事（它能把"清除的持久性"从只对文件驱动成立扩展到跨实例可测），
+   但把它写成 B 的第一步是我把两件事串错了顺序。
+3. 🔴 **一枚仍未查清的账（成因已排除一半）**：加守卫时红的 4 条里有一条是 `op-log-store.contract.ts:616`
+   「计数与物化同数、含归档、且计数不读回行（P1-10）」。**它并不依赖"销毁后可重开"** —— 现量：
+   `grep -c 'destroy()' packages/storage/tests/contract/op-log-store.contract.ts` = **0**，
+   而 `withStore` 的收尾只有 `db.close()`（`:59-69`）。所以那枚红要么是 IndexedDB 那份补丁的**连带效应**
+   （同一轮里我只往这个文件加了字段与两处分支），要么这一腿**本来就间歇红**（它是那条要写 505 个 op 再归档的重腿）。
+   两种都不是"契约要求可重开"，因此 B 的成本比 §10.181 估的低一格；但**下一轮动 B 之前先分清是哪一种**：
+   未打守卫复跑那一枚若干次（`pnpm --filter @heyta/storage test op-log-store`）＋ 只打 IndexedDB 那一半守卫再跑，两条腿对照。
+
+**这一段没有留下任何代码改动**：`packages/storage` 现量 0 行未提交，契约与实现都是原样。
+
+## 10.183 §10.182 留的那枚红**不属于 B 的成本**：分腿对照跑出来了（18:07–18:08 现量，全部回退）
+
+§10.182 说"`op-log-store.contract.ts:616` 那枚红要么是我补丁的连带、要么本来就间歇红，必须分清"。分法是把守卫**拆开发**：
+
+| 跑法 | 守卫范围 | `contract.spec.ts` 结果 | 红的腿 |
+|---|---|---|---|
+| 基线 ×3 | 无 | `rc=0 / rc=0 / rc=0` | —— |
+| 对照 A | **只** IndexedDB 那份 | `rc=1`，**1 failed** | 只有「IndexedDbAdapter · destroy 之后每个 store 都是空的」|
+| 对照 B | IndexedDB + SQLite（最小版，故意**不带** `destroyReport` 幂等处理）| `rc=1`，**5 failed** | 3 条「destroy 之后每个 store 都是空的」（IDB / Sqlite / Wasm）+ 2 条「destroy 幂等」（Sqlite / Wasm，报 `promise rejected … instead of resolving`）|
+
+⇒ **那枚 op-log 红在这三次受控跑里都没出现**（包括守卫更全的对照 B）。它要么是上一轮那份补丁的**连带**，
+要么是那条要写 505 个 op 再归档的重腿在 `load1≈40-67` 下的偶发 —— 总之**不是"契约要求可重开"**，
+所以 **B 的成本表里不该有它**。要么它不再复现（那就到此为止），要么下一轮撞上时按
+`pnpm --filter @heyta/storage exec vitest run tests/contract.spec.ts` 单跑并**先记 load**，不要顺手算进 B。
+
+**B 的真实碰撞面因此收敛成一句话**：会红的只有那 3 条 `destroy 之后每个 store 都是空的`
+—— 而 §10.182 已经量明它们**本来就不可失败**（四份实现的载具每次都换一套新存储）。
+把它们改成"销毁后调用必须抛 `AdapterDestroyedError`"是**加强**；「destroy 幂等」那 2 条要靠
+`destroyReport` 缓存来满足（对照 B 故意没写，它们就红了 —— 这正好是那 2 条腿**有牙**的证明：
+幂等不是免费的，忘了就报）。
+
+这一段结束时 `packages/storage` 现量 **0** 行未提交；三次受控跑的产物只有这节表格。
+
+**补一格（B 落地前必须知道的运行时风险面，18:09 现量）**：销毁器唯一的调用点是
+`packages/sync-client/src/client.ts:973-991` —— 它 `try { await eraser() } catch` 把异常**收成一句诊断文字**
+（`本机数据没能清干净：${reason}`），所以守卫在 `eraser()` **内部**抛的东西不会让进程崩，只会变成可读的诊断。
+真正的风险在 eraser **之后**：注册表是模块级单例（`packages/app-host/src/host-storage-erasure.ts:13` 自己写着跨不过 realm），
+`host.ts:341` 注册的闭包捕获的是**那一个** `adapter` 实例，而各宿主在账号注销后是否还会在同一实例上发起
+op-log 读（同步循环重试 / 界面重渲染），四个宿主各不相同、**本轮没有读数**。
+⇒ B 落地时必须逐宿主各答一次"注销后还有谁在用这个实例"，这与 §10.2 那张逐宿主证据表是同一件事，
+不是可以省掉的重复。
+
+## 10.184 #89 的长期装置落到仓里了，顺手把它的分母从"7 个写死的名字"换成"现量枚举"（18:10–18:11 现量）
+
+#89 的口径早就量清（跑路径 `TOTAL=0` 带阳性对照，残留全在 gitignored `tmp/`），一直挂着是因为
+"长期要留的装置落 `research/tools/` 或 `scripts/`" 这一格没做 —— 装置当时住在 `tmp/scan-runpath-vars.mjs`，
+一次重启就没了（记忆里那条"可复现物不要住 /tmp"讲的正是这个）。
+
+已落 `research/tools/scan-runpath-vars.mjs`，两处比那一版**不一样**，都不是装饰：
+
+1. **分母现量枚举**，不写死文件名。旧版点名 7 个文件，其中 5 个住在 `tmp/` —— 目录一清空，
+   那条 `TOTAL=0` 就退化成"5 条读不到 + 2 条干净"，而输出照样长得像扫过了（§7 第 191 条那一族：
+   挂在文件名名单上的门禁，目标没了就安静地**不执行**还照样报通过）。
+   新版默认扫 `scripts/lib/mobile-e2e.sh` + `readdirSync` 现取的 `scripts/verify-mobile-*.sh`，
+   并且打印 `分母=N`；名单点名的文件读不到时**退 2**（不是 0）。
+2. **三档退出码**：0 干净 / 1 扫到违规或探针死 / 2 分母异常。阳性对照仍是第一动作
+   （判定复用常驻门 `scripts/check-shell-unicode-vars.mjs` 导出的同一个 `findOffenders`，不自己推正则）。
+
+**两条腿读数**：
+
+```
+分母=31 个文件  TOTAL=0  CONTROL=1        ⇒ rc=0   （默认那趟：31 个全 0 处）
+分母=1 个文件   TOTAL=1  CONTROL=1        ⇒ rc=1   （往 /tmp 塞一条已知写法，扫得出、行号也对）
+```
+
+旧版和它点名的 5 枚 `tmp/` 草稿都没动（不是我造的对象不动）；新装置是 untracked，随批入库。
+
+**同格顺手量到的一枚红（不属本批，登记）**：这一轮跑 `check:docs` 转红（18:11:32），两处死链都指向
+`docs/adr/0053-refunds-only-for-countable-segments.md` —— 现量：那枚 ADR 是 `??`（未跟踪），
+引用它的是 `0026`/`0038` 各自**新增的未提交行**（`git diff --numstat` = `24 0` 与 `23 0`，
+而 `git show HEAD:` 取那两行取不到 ⇒ HEAD 里没有）。⇒ 红在退款那条线的在飞改动里，与本批 5 个路径零交集；
+按"绝不代别人吸收已提交债/不代改别人的文件"处理：**只登记**（#103），出路是它自己那条线随批把 0053 一起 `git add`。
+
+## 10.185 #97 入了 traps（末号 295，18:13 现量）
+
+登记时说"不追加"的理由是当时 `environment-traps.md` 是 ` M`（并行会话在写）。这一格挂着不做的代价是
+**那条形状只有躺在 §10.168 里才成立** —— 而 §7 的索引才是别人会读的地方。
+取号按 10-05 已裁决的规则（后落地方顺延）：现量最大 294 ⇒ 写 **295**，`grep -cE '^295\. '` = 1（唯一），
+末号复量 `sort -n | tail -2` = `294 / 295`。文件仍是 ` M`（别人的未提交条目没动，我也没整文件 `git add`）。
+正文只带 §10.168 已有的读数（两趟拒启表 + 分类器的正反对照与"误判代价有界"那句），不新造结论。
+
+## 10.186 #87 走 B 落码：销毁即死路（守卫 + 常驻判据 + 两臂变异读数）；对外文字按 §10.159 一字未动（10-05 18:2x–18:3x）
+
+**口径**：B。A 被排除的唯一理由是它要动 `data-rights.ts:206`/`:529` 那句「一个都不留」——
+那是对外法律表征，不在可代拍范围（§10.159 ④）。B 的代价由本批自己吃：加守卫、改判据、不动文字。
+
+### ① 落点（七枚，全在 `packages/storage`；这一片此刻**干净**，撞车现量 = 0 枚别人的未提交 diff）
+
+| 文件 | 那一发修复 |
+|---|---|
+| `src/errors.ts` | 新增 `AdapterDestroyedError extends StorageError`，`kind: 'programming-error'`（宿主接线错了，用户对它无从下手 ⇒ 不占界面文案，中英对账门够不着它也不该够着） |
+| `src/sqlite/sqlite-adapter.ts` | `destroyed` 位 + `destroying` 缓存；守卫挂在 `ensureOpen()` —— **一个进门点覆盖全部读写**（`transaction`/`iterate`/`count` 都从它进） |
+| `src/indexeddb/indexeddb-adapter.ts` | 守卫挂在 `open()`；`destroying` 缓存；🔴 失败时把闸门**撤回去**（被别的标签页堵住 ⇒ 库还在盘上 ⇒ 实例不该假装自己作废，否则"销毁失败"会表现成"这个应用从此不能用"） |
+| `src/memory/memory-adapter.ts` | 守卫挂在 `transaction()` + `init()`；口径从"清空后仍可继续用"改成作废（理由见该文件的 TSDoc：那份"仍可继续用"正是让四份实现无法在契约层区分"销毁"与"清空"的东西） |
+| `src/db.types.ts` | 接口第 5 条从"之后这个实例**不再保证可用**"改成硬承诺"销毁即死路"，并把 §10.146 那枚 73728 字节空壳写进理由里 |
+| `tests/contract/adapter.contract.ts` | 🔴 那条恒绿的 `destroy 之后每个 store 都是空的` **换成** `destroy 之后这个实例是死路`（逐 store 断言拒绝 + 拒绝写 + 拒绝重开）。旧腿为什么恒绿：`create()` 每次都换一份新存储，"读到 0 条"是**新实例**的性质，与被销毁的那个无关 |
+| `tests/destroy.spec.ts` | 新增文件级常驻腿：**抛错 + 目录仍为空**（两半缺一条都不算数：只断言抛 ⇒ 可以"照样重开再把读改成抛"；只断言目录 ⇒ 可以"答应读但返回空"，那正是把泄漏伪装成"库是空的"）；内存那一腿同步改口径 |
+
+### ② 判据读数（都是跑出来的，取证件命令随每条给出）
+
+| 档 | 读数 |
+|---|---|
+| 未变异基线（改后） | `NO_COLOR=1 pnpm --filter @heyta/storage test` ⇒ **8 files / 418 passed**（18:2x） |
+| 回归面（同一份工作树的其他包） | `op-log` 112 / `sync-client` 132 / `app-host` 1360，**全绿、0 红** ⇒ 守卫没有把任何既有宿主接线打成红 |
+| 3 秒探针（`e2-destroy-reopen-probe.mjs`） | HEAD = `PROBE=REOPENED` 退 1 ⇒ 加守卫后 = **`PROBE=clean` 退 0**，且前提腿 A（明文真写进盘）仍为 `true` ⇒ 这个绿不是"探针看不见" |
+| **臂 G**（摘掉三处进门守卫） | 判据 **failed=6**：契约那一腿 ×4 实现 + `destroy.spec` 文件级 + 内存腿；探针同时回到 **REOPENED** ⇒ 常驻判据与探针**双向对得上** |
+| **臂 C**（摘掉三处 `destroying` 缓存） | 判据 **failed=3**：文件级幂等 + 契约 `SqliteAdapter` + 契约 `SqliteWasmDriver`。IDB 与内存**不红**是形状决定的（它们的第二次 destroy 不走重开）—— 这一格不许读成"那两条没牙" |
+| 载体自证 | 两臂跑完 `RESTORED=OK`（三枚源文件 md5 与起手快照逐字节一致），装置落 `research/tools/mutation-rigs/e2-destroyed-guard-arms.sh`（臂名只认 G/C/all；起手守卫会拒绝"针脚不在"的漂装置） |
+
+🔴 **装置自己的一个假绿，当场抓到并修掉**（新记 [环境陷阱 #296](../reference/environment-traps.md)）：
+第一版把变异读数写成 `failed=${failures:-0}`，而另一会话的 `selfhost-verify-window-runner.mjs`（pid 42568）
+正占着 `/tmp/tfa-test.lock` ⇒ 内存闸门拒绝启动 vitest ⇒ 输出里没有 `failed` 也没有 `×` ⇒
+**"根本没跑"被印成"零失败"**，同趟还照常打印了探针读数 —— 看起来像"这枚修复没有牙"。
+现在装置先现量 `Test Files` 在不在，不在就 `ARM=BLOCKED` 退 3。
+⇒ 由此，**"恢复后判据全绿"那一发阳性对照本趟没拿到**（窗口属于别人，不抢、不绕过闸门），归 ④。
+
+### ③ "销毁之后谁还在用这个实例"——逐宿主现量（读调用点，不是推）
+
+生产侧 `adapter.destroy()` 的调用点**恰好四处**（`grep -rn '\.destroy\(\)' apps packages | grep -v tests`）：
+
+| 宿主 | 调用点 | 销毁的是哪一个实例 | 守卫改变了什么 |
+|---|---|---|---|
+| Web | `apps/web/src/lib/local-data-destruction.ts:262` | **另开的新实例**（`new IndexedDbAdapter(MAIN_DATABASE)`） | 页侧销毁器行为不变；⚠️ 反过来也说明**守卫管不到 Web 那个活实例** —— Web 那一头的"销毁后重建"要由真浏览器判据答（§10.102 那批），本条不替它签字 |
+| node-host / 移动端 / 两个桌面壳 | `packages/app-host/src/host.ts:341` | **宿主自己的活实例**（`engine` / `vaultStore` / `vaultMigrationJournal` 都持它） | 🔴 唯一真正改变运行时形状的一格：四个宿主都经这一个 `openAppHost()` 拿 adapter。注销后若同一次运行里再有人读，**现在响亮失败**，不再静默把空壳建回盘上 |
+| 桌面壳的宿主端口那一份 | `packages/app-host/src/native-bridge.ts:387` | 桥侧那个 adapter | 同上（`destroyOpLogAdapter` 只在销毁路径调一次） |
+| Android/iOS 的 op-sqlite | 经 `SqliteAdapter`（`apps/mobile/src/db/op-sqlite-driver.ts:134`） | 同 `host.ts` 那一格 | 守卫在共享层，驱动无平台分支 ⇒ 不新增任何 iOS/Android 侧代码 |
+
+`client.ts:972` 的 `eraseLocalData()` 会把异常**收成诊断文字**（不崩），所以"响亮失败"的落点是诊断与界面状态，
+不是一个未捕获 rejection。
+
+### ④ 仍未闭合（不许读成完成）
+
+1. **四个宿主在真实注销之后是否还会在这个实例上发起读** —— 代码形状已列在 ③，
+   但"确实发生了/确实没发生"要设备与壳各一趟读数；窗口此刻被占。
+2. **恢复后判据全绿 + 探针 clean 的那一发阳性对照**（与 1 同一次运行补）。
+3. **iOS 设备级判据 D 的预测**：加了守卫之后，§10.146/§10.147 那枚"1 个残留"应变 0。
+   ⚠️ 这是**预测**，本批没有读数，不许回填成结果。
+4. 政策文字：**一字未动**（口径 B 的定义就是"那句『一个都不留』在两种读法下都成立"，§10.159 ④ 右栏）。
+   新门禁 `check:*` **没有加** —— 常驻判据走的是 `packages/storage` 的 vitest（`pnpm -r test` 已经覆盖它），
+   而不是往 `pnpm check` 的链上再挂一枚需要 `dist` 的脚本（那会让这道门依赖构建产物；§6.1 那条"门禁绿 ≠ 能打包"的反面教训）。
+
+## 10.187 §10.186 ④ 的两格当场补上：阳性对照到手；"注销后还有谁在这个实例上读"用代码现量答掉了（10-05 18:36–18:39）
+
+### ① 两臂 + 阳性对照，同一趟跑完（`e2-destroyed-guard-arms.sh all`，窗口此刻是空的）
+
+| 档 | 读数 |
+|---|---|
+| 臂 G（摘三处进门守卫） | `failed=6`（契约那腿 ×4 实现 + `destroy.spec` 文件级 + 内存腿）+ 同一趟 `PROBE=REOPENED` |
+| 臂 C（摘三处 `destroying` 缓存） | `failed=3`（文件级幂等 + 契约 `SqliteAdapter` + 契约 `SqliteWasmDriver`） |
+| 载体还原 | `RESTORED=OK`（三枚源文件 md5 与起手快照逐字节一致） |
+| 🔴 **阳性对照**（§10.186 ④.2 欠的那一发） | **`恢复后判据：Tests 418 passed`** ⇒ 上面两臂的红是"摘掉修复"造成的，不是载体坏了、也不是闸门没跑 |
+
+顺带修了装置自己的一处输出缺陷：那行自证文字里写了反引号，bash 把它们当**命令替换**执行，
+于是打印成"上一行已现量  在输出里"（一个空洞）。判据本身没错（`Test Files` 那条腿真在跑），
+但**一条自证的话里带空洞，下一次就没人信它了** —— 现量：`grep -n '这个 0 是跑出来的' research/tools/mutation-rigs/e2-destroyed-guard-arms.sh`。
+
+### ② 四宿主"销毁之后是否还在同一个 adapter 实例上读"——代码现量，不等设备
+
+| 宿主 | 现量 | 结论 |
+|---|---|---|
+| **移动端** | `apps/mobile/src/db/open-host.ts:32-33` 是**模块级单例**（`let pending` / `let resolvedHost`），全部屏（`AccountClosureScreen:111`、`CalendarScreen:121`、`CategoriesScreen:85`、`CountdownScreen:98`…）共用**同一个** `AppHost`，而 `host.ts:341` 的兜底销毁器销毁的正是这**一个** adapter | 🔴 **确实还在用**。守卫把这一格从"静默把空壳建回盘上"换成了"响亮失败"——两者都不是终点：正确处置是**销毁即把单例作废**，下一次 `openTaskHost()` 建新实例。登记为 **#105**（落点 `open-host.ts` + `AccountClosureScreen.tsx` 此刻都干净；`ProfileScreen.tsx` 有别人的未提交 diff ⇒ 不碰） |
+| **node-host** | `apps/node-host/src/cli-account.ts:158-196`：`closeAccountAndEraseLocal` 之后只做打印与 `return`，CLI 一命令一进程 | ✅ 同一次运行里没有后续读 ⇒ 这一格不受守卫影响 |
+| **Web** | `apps/web/src/lib/local-data-destruction.ts:262` 销毁的是 `new IndexedDbAdapter(MAIN_DATABASE)`（**另开的实例**） | ⚠️ 守卫管不到 Web 那个活实例；Web 那一头的"销毁后重建"仍只由真浏览器判据答（§10.102），本条不替它签字。同时留一句待查：同一页里活连接会不会把 `deleteDatabase` 堵成 `blocked`（IDB 语义如此）——**本轮没有读数**，归 #105 的另一半 |
+| **两个桌面壳** | `packages/app-host/src/native-bridge.ts:387` 的 `destroyOpLogAdapter` 只在销毁路径调一次；壳的进程生命周期同 CLI/重启 | 与 node-host 同形（**代码现量**，非设备读数） |
+
+⇒ §10.186 ④.1 那一格**不再是"等读数"**：移动端那一面已经用现量证实"还在用同一个实例"，
+它需要的是一次接线修复（#105），不是又一趟验收。设备侧只剩 ④.3 那枚 iOS 判据 D 的复量（预测 0 枚，仍**没有**读数）。
+
+## 10.188 §10.187 那格的答案落地：移动端注销后把宿主单例作废（主动通道已修，被动通道登记）（10-05 18:43–18:45）
+
+§10.187 ② 用代码现量答出"移动端确实还在同一个实例上读"之后，这一格**不需要等验收**就能修：
+`resetTaskHostCache()` 在 `open-host.ts:145` **已经存在**，但现量它的全部调用点只有测试
+（`grep -rn resetTaskHostCache apps/mobile/src` ⇒ 生产侧 **0 处**，注释自己写着"仅供测试与'重开数据库'这类显式场景"）。
+
+### 改动（两枚文件，起手都干净）
+
+| 文件 | 那一发 |
+|---|---|
+| `apps/mobile/src/screens/AccountClosureScreen.tsx` | 成功分支从 `if (…) onClosed();` 变成 `if (…) { resetTaskHostCache(); onClosed(); }`，并把 `resetTaskHostCache` 从 `../db/open-host` 一起 import（🔴 不在本屏另写一份"清单例"的逻辑 —— 那正是 §3.5 说的漂移开始的地方） |
+| `apps/mobile/tests/account-closure-entry.spec.ts` | 那条腿从"只有账号确认没了才清凭据"扩成**同时**要求"清之前先把已销毁的宿主单例换掉"：带条件的块形状 + `onClosed()` 与 `resetTaskHostCache()` 各**恰好一处** + import 来源必须是 `../db/open-host` |
+
+### 读数（一次 bash 里跑完的三趟，取证件：`cd apps/mobile && npx vitest run tests/account-closure-entry.spec.ts`）
+
+| 趟 | 读数 |
+|---|---|
+| 基线（改后） | `Test Files 1 passed / Tests 11 passed` |
+| **变异**：只把 `resetTaskHostCache();` 那一行删掉 | `Tests 1 failed \| 10 passed` —— 🔴 **恰好那一格红**，其余 10 条不动 ⇒ 这枚修复有牙，且牙在该在的地方 |
+| 恢复 | `Tests 11 passed`（源文件已按备份复原，`git diff --stat` 只剩本批那 11 增 2 删） |
+| 回归面 | `pnpm --filter @heyta/mobile test` ⇒ **52 files / 739 passed**；`pnpm --filter @heyta/mobile typecheck` ⇒ 0 错 |
+
+### 仍然欠的那一半（不许读成"移动端已闭合"）
+
+🔴 **被动通道没有这个作废动作**：别的设备注销 ⇒ 本机某次同步读到 `ACCOUNT_CLOSED` ⇒
+`packages/sync-client/src/client.ts:937` 的 `eraseLocalData()` 销毁同一个 adapter，
+而这条路上**没有那屏**，也就没人调 `resetTaskHostCache()`。守卫之后它的表现是"这台设备下一次读报错"，
+守卫之前是"下一次读把空壳建回来"。⇒ 登记为 **#105**，落点已选好（都不撞车）：
+移动端 `App.tsx`（干净）给 `createSyncClient` 传一个自己的 `onAccountClosed`，
+里面 `await eraseLocalData()` 之后补 `resetTaskHostCache()` —— 共享层 `sync-wiring.ts:147` 那个兜底保持不动
+（它对所有宿主都成立，而"作废宿主单例"是**每个宿主自己的**生命周期知识，AGENTS §3.5 的分界）。
+Web 那一头另有一问（同页活连接会不会把 `deleteDatabase` 堵在 `blocked`，§10.187 ② 那行）也归 #105。
+
+## 10.189 被动通道那一格当场也修完了：共享层开一个"销毁成功"通知，移动端用它作废单例（10-05 18:47–18:50）
+
+§10.188 把主动通道（界面上按注销）修完后留下的那一半，其实**不需要等谁**：
+`resetTaskHostCache()` 早就在，缺的只是一个"销毁成功了"的**事件**。
+
+### 改动（三枚，起手都干净；`packages/app-host/src/index.ts` 有别人的未提交 diff ⇒ 一行没碰）
+
+| 文件 | 那一发 |
+|---|---|
+| `packages/app-host/src/host.ts` | `AppHostOptions` 新增可选 `onLocalDataErased?: () => void`，只在**兜底销毁器**那条路径上、`adapter.destroy()` **成功返回之后**调一次（`AppHostOptions` 类型本来已由 `index.ts:24` 导出，所以加字段不需要动那枚脏文件） |
+| `apps/mobile/src/db/open-host.ts` | `openAppHost({…, onLocalDataErased: resetTaskHostCache })` ⇒ 主动/被动两条通道都走同一个事件 |
+| 判据 | `packages/app-host/tests/local-erasure.spec.ts` 一条双向腿（建宿主时 0 次 / 销毁成功后恰好 1 次 / `removeDatabase` 抛错时恰好 0 次）+ `apps/mobile/tests/account-closure-entry.spec.ts` 一条接线形状腿（要求它真的接在 `openAppHost({...})` 的选项里，不是"两个符号都在文件里"） |
+
+🔴 **为什么钩子在共享层、清缓存在宿主**：`destroy()` 之后把同一个实例再交出去，
+在口径 B 之前是"静默把空壳建回盘上"，之后是"下一次读当场抛"——两种都不是"这台设备回到全新空库"。
+但"哪些东西要跟着作废"是**每个宿主自己的生命周期知识**（AGENTS §3.5），
+所以共享层只报事件，不复制一份宿主的缓存清单。
+
+### 读数（三臂 + 恢复，全部同一趟）
+
+| 档 | 读数 |
+|---|---|
+| 基线 | app-host `local-erasure.spec.ts` **9 passed**；mobile `account-closure-entry.spec.ts` **12 passed** |
+| **臂 H1**（那一发通知改成空操作） | `1 failed \| 8 passed`，红的正是那条双向腿 |
+| **臂 H2**（摘掉移动端那一发接线） | `1 failed \| 11 passed`，红的是那条形状腿 |
+| **臂 H3**（通知挪到 `destroy()` **之前**） | `1 failed \| 8 passed` ⇒ 反向那一腿（销毁失败不许通知）**也有牙**，不是装饰 |
+| 恢复 | `RESTORED_OK`（两枚源文件与备份逐字节相同）+ 两 spec 重新 9 / 12 passed |
+| 回归面 | `@heyta/app-host` **69 files / 1361 passed**（+1 就是这条新腿）、`@heyta/mobile` **52 files / 740 passed**（+1） |
+
+### 🔴 途中一枚真障碍，值得单独记（它差点被读成"我的改动破坏了移动端"）
+
+`pnpm --filter @heyta/mobile typecheck` **第一次是红的**：
+`open-host.ts(132,7): error TS2353: 'onLocalDataErased' does not exist in type 'AppHostOptions'`。
+原因不是类型写错，是**消费者读的是 `packages/app-host/dist` 的 `.d.ts`**，而我只改了 `src`
+—— 与 traps 第 27 条（APK 里是旧 bundle）、第 162 条（dts 阶段才查出来的类型洞）同一族。
+`pnpm --filter @heyta/app-host build` 之后同一命令 0 错。
+⇒ 凡是"给上游包加一个可选字段、下游壳消费它"的改动，**typecheck 之前必须先重打上游**，
+否则第一条读数会把"产物过期"报成"接口不合"。
+
+### 仍欠（不写成完成）
+
+1. iOS 设备级判据 D 在守卫之后的复量（预测"1 枚残留"→ 0 枚，**没有读数**，归 #104）。
+2. Web 那一问：同页那个活连接会不会把 `deleteDatabase` 堵在 `blocked`（§10.187 ② 末行，无读数，归 #104/#105 那格已消，另立待办）。
+3. 真机/真浏览器上"注销之后回到全新空库"这一屏的形状 —— 只有截图算（§6.2 规定一），归 #58/#104 那批窗口读数。
+
+## 10.190 §10.187 ② 那句"待查"查出真洞：Web 的注销删除会被**自己页面的活连接**永久挡住（已修，读数在窗口队列里）（10-05 18:54–18:57）
+
+问的是：同一页里那个活连接会不会把 `deleteDatabase` 堵在 `blocked`。答案是 **会，而且堵的是我们自己的连接**。
+
+### ① 前提链（逐条读源码，不是推）
+
+| 环节 | 现量 |
+|---|---|
+| 谁开主线程连接 | `apps/web/src/lib/oplog.ts:135` `db = new IndexedDbAdapter(dbName)`（`indexeddb` 档）；`apps/web/src/lib/vault-session.ts:69` `new IndexedDbAdapter('heyta-vault')`（`DB_NAME` 于 `:25`，**与主库不同的第二个库**）；`local-data-destruction.ts:262` 又开第三个实例 |
+| 销毁器删哪些库 | `WEB_DATABASE_NAMES = ['heyta','heyta-vault','heyta-widget']`（`local-data-destruction.ts:48`），后两个走**裸 `deleteDatabase`**（`:269-272`） |
+| 浏览器语义 | `deleteDatabase` 先给所有既有连接发 `versionchange`；**没有处理器 ⇒ 删除停在 `blocked`**。本仓库自己的判据就在测这一面：`packages/storage/tests/destroy.spec.ts` 那条"别的连接占着且不让位 ⇒ destroy **不许** resolve"，而它构造"不让位"的方式正是**一个不接 `versionchange` 的裸 `indexedDB.open`** |
+| 我们这个类接了吗 | 🔴 **没接** —— `IndexedDbAdapter.open()` 原来只挂 `onclose`，没有 `onversionchange`（改前现量：`grep -c onversionchange packages/storage/src/indexeddb/indexeddb-adapter.ts` = 0） |
+
+⇒ **改前的形状**：Web 上点注销，销毁器对 `heyta-vault`（以及 `indexeddb` 档下的 `heyta`）的那次删除**永远不会返回**；
+而 `eraseLocalData()` 是在 await 那条链上的，于是界面停在"正在注销"，日志一行都不留。
+OPFS/worker 那一档之所以此前没暴露：销毁器**先** `releaseStorageWorker()`（`:146`）把 worker 句柄撤掉了 —— 那正是 §10.102 真浏览器判据跑绿的那条路，它盖不住主线程这两个库。
+
+### ② 修法（一处，根因层）
+
+`packages/storage/src/indexeddb/indexeddb-adapter.ts` 的 `open()` 里补 `onversionchange`：**让位并清缓存**（`close()` + `db/opening` 归零）。
+选这一层而不是在 `apps/web` 里"注销前先把活连接关掉"，理由是：*任何*用这个类的宿主都可能是那次删除的阻挡者，
+而 IDB 的让位本来就是**连接持有者自己的义务**；在壳侧逐个关连接是第二份实现，也是漂移的开始（AGENTS §3.5）。
+
+判据（同一趟里的配对，两半都钉）：
+- 旧腿：*"不接 `versionchange` 的裸连接 ⇒ 删除必须停在 blocked"*（挡住"把 onblocked 当成功"那类伪造）。
+- 新腿：*"本适配器自己不许挡住那次删除"*（`destroy.spec.ts`，用**同一个类**开应用侧连接，再另开一个实例去销毁；排空固定轮任务队列后**必须已决议**且 `containerRemoved:true`）。
+  ⇒ 两条腿方向相反，缺任何一条都可以被"永远 blocked"或"每次都强制 close 别人的连接"各自蒙过。
+
+### ③ 读数状态：这一节当时（18:57）**还没到手** —— 19:00 的读数与 service worker 那一环见 §10.191
+
+`臂 V`（把 `onversionchange` 那一发停掉）应当**恰好 1 红**（新腿），它同时就是本缺陷的改前读数；
+随后是 storage 全量与 **`apps/web` 回归**（这一发改的是 IDB 连接生命周期，Web 那 900+ 条最可能受影响）。
+18:56 现量：测试窗口被另一会话占着（`/tmp/tfa-test.lock` → `.tfa-shield/bin/npx vitest run`，pid 98067），
+三次尝试都被内存闸门拒绝启动 —— **不抢、不用 `TFA_ALLOW_CONCURRENT_TEST` 绕过**。
+等待+跑批装置落在 `tmp/e2-v-arm-wait-and-run.sh`（有界 25 分钟，超时报 `V=WAIT-TIMEOUT` 退 3；
+它自带"针脚必须为 0"的还原自证）。读数到手前，本格状态记为 **代码已改、判据已写、验证未闭合**。
+
+## 10.191 §10.190 ③ 的读数到手（臂 V 恰好 1 红），顺着它又挖出**第二个**连接持有者 —— service worker（10-05 18:59–19:07）
+
+### ① 臂 V / 恢复后 storage 全量（日志 `/tmp/e2-v-arm-1005.log`，等待装置按预期跑）
+
+- 18:57:08 – 18:59:09 五次轮询都被占（pid 98067），**18:59:39 窗口空出**后自动起跑 —— 没有抢、没用 `TFA_ALLOW_CONCURRENT_TEST` 绕过。
+- **臂 V**（摘掉 `IndexedDbAdapter.open()` 里那一发 `onversionchange`）⇒ **恰好 1 红**，红的正是新腿
+  `🔴 本适配器自己**不许挡住**那次删除：活连接要在 versionchange 时让位`；
+  `Test Files 1 failed (1)` / `Tests 1 failed | 10 passed (11)`。这同时就是本缺陷的**改前读数**。
+- 还原后 storage 全量：`Test Files 8 passed (8)` / `Tests 419 passed (419)`；`残留针脚数 = 0`。
+
+### ② `apps/web` 回归那一枚红：归属用三步定的，不是印象
+
+负载那趟：`1 failed | 1785 passed | 13 skipped (1799)`，红的是 `reminder-wake.spec.tsx`
+「不点任何东西、不产生第二条 op，一条 1.2 秒后的提醒自己响了恰好一次」（13443ms —— 该文件头声明的**真时钟 + 真 `<App />`** 腿）。
+
+1. 该 spec 在当前脏清单里**没有未提交 diff**（撞车判据只认同文件未提交 diff）；
+2. 我这刀只动 IDB 连接生命周期，那条腿等的是墙钟 `setTimeout`，读的是 fake-indexeddb；
+3. **同一套 1799 条**在空窗复跑 ⇒ `135 passed | 2 skipped (137)` / `1786 passed | 13 skipped (1799)`，**0 红**。
+
+⇒ 记为**负载期真时钟腿抖动**，不是本刀的回归。⚠️ 别读成"已证明无关"：证据只有 n=1 红 / n=1 绿，
+与 #95（`due-date-edit` 间歇红）同族，**登记而不结案** —— 这类"用真时钟等 1.2 秒"的腿在这台机器上就是会抖。
+
+### ③ 真正的收获：适配器只是**两个**持有者之一，另一个在 service worker 里
+
+现量枚举产品代码里的 `indexedDB.open(`（排除 `dist/`、`generated/`、`public/`、`*.spec.ts`），**只有两处**：
+
+| 持有者 | 库名 | 让位？ |
+|---|---|---|
+| `packages/storage/src/indexeddb/indexeddb-adapter.ts` | 三个业务库 | ✅ 本节 ① 刚验完 |
+| `apps/web/src/pwa/sw.ts` | `heyta-widget` —— **在** `WEB_DATABASE_NAMES` 里，注销确实要删它 | 🔴 改前**没有** |
+
+为什么它**不是**"用完就还"：`tx()` 只在 `transaction.oncomplete` 里 `db.close()`，
+而请求失败走的是 `onerror` —— **那条路上事务不会 complete**，连接就悬着。
+悬着的连接 + 没有 `versionchange` 处理器 = 那次 `deleteDatabase('heyta-widget')` 停在 `blocked`，
+症状与 #297 逐字相同，而 §10.190 那条**行为**判据压根够不着它（它只cover适配器自己的连接）。
+
+- 修法：`request.onsuccess` 里拿到连接后 `db.onversionchange = () => db.close();`。
+  **没有**顺手改成"每次失败都 close" —— 让位本身就是那条不变量的正解，加一处 close 是替它兜底、会把真正的问题（没让位）盖住。
+  🔴 第一版我写成了 `request.onversionchange = () => request.result.close();` —— **挂错了对象**：
+  `versionchange` 是 `IDBDatabase` 上的事件，`IDBOpenDBRequest` 上根本没有这个属性，
+  运行时那个处理器**永远不会触发**（也就是说修复本身是假的，而两向读数看起来都"对"）。
+  抓到它的是 `pnpm --filter @heyta/web typecheck`（`TS2339`），**不是**我刚写的那条静态腿，也不是 vitest
+  （vitest 只做转译不做类型检查，而 `src/pwa/sw.ts` 根本不被任何用例 import）。
+  ⇒ 这一格里"判据写完 ≠ 修复成立"，编译层是另一条独立的腿；记录见 §10.191 ⑥。
+
+## 10.192 ② 那格补跑的载体起跑：整片未提交态叠到隔离载体，有界排队等窗口（10-05 19:14–19:17，**读数未到手**）
+
+目标最后一句要求"负载与并行 Playwright 让出窗口后补跑 `check:landing-e2e` / `check:ai-e2e` / 壳类门禁与
+`pnpm reinstall:all`（必须在隔离检出）"。本轮生产代码又动了（`packages/storage` × 5、`app-host`、
+`apps/mobile` × 3、`apps/web` × 3），旧的那批读数**再次过期** ⇒ 这一节做的是"起跑与载体定义"，不是结果。
+
+### ① 起跑前现量（四条，全在同一分钟）
+
+| 量 | 读数 | 判 |
+|---|---|---|
+| 三段 e2e 会 SIGKILL 的端口 4318/4319/4320/4322 | **全空**（`lsof -sTCP:LISTEN` 各 0） | 这一面开 |
+| 别线的 `verify-mobile*` / `reinstall-all` / `.sh.snap` | **0 条** | 这一面开 |
+| 1min 负载 | 19:12 量 **82**、19:14 量 **166** | 🔴 拦路（阈值 12 取自 `scripts/lib/wait-for-quiet-host.sh`，不自造） |
+| 内存闸门 `/tmp/tfa-test.lock` | pid 活着，且**每 40 秒换一枚**（76357 → 78264） | 🔴 拦路，且是**别线正在连着跑套件**的形状 |
+| 常驻 booted 模拟器 | 5 台（都不是我起的） | 负载的主要来源；**不动** |
+
+⇒ 这一格的"等"是**等得来**的那种（另一条会话在连着跑测试，它停下来就开），不是底噪 ——
+所以选择排队起跑而不是登记为永久阻塞。
+
+### ② 载体定义（这条是这一节真正要留的判断）
+
+`tmp/e2-carrier-check.sh` 把载体钉成 **`main` HEAD + 主检出的全部未提交改动**
+（`git ls-files -m` ∪ `git ls-files -co --exclude-standard`，显式排除 `node_modules/`，tar 整包搬 +
+随机抽 8 枚比 md5 对账），**而不是"只叠我这批的那十几枚"**。理由写进脚本头：
+只叠自己那几枚会造出一棵**谁都不有的树** —— i18n 词条、移动端界面、`apps/web` 的在飞改动互相引用，
+那种红在任何一格都没法归因。红格的归属留给**读数之后逐文件做**，不在起跑前替别人决定。
+
+### ③ 装置自己的两处坏（都被我自己当场抓到，且都是本仓已有 traps 的同一族）
+
+1. `LOAD=$(sysctl -n vm.loadavg | tr -d '{} ' | cut -d' ' -f1)` 把三个数**粘成一串**，
+   日志印出 `负载 166.30123.3291.63 > 12`。比较侥幸还对（awk 取数字前缀 ⇒ 拿到的正是 1min 值），
+   但印出来的读数是垃圾 —— 这就是 traps **#168**（`vm.loadavg` 解析坏了 15 轮）的第二次命中。
+   改成 `awk '{print $2}'`。
+2. 修它的命令用了 `perl -pi -e "…"`（双引号）⇒ shell 先把替换串执行了一遍，把第 49 行写成
+   `LOAD=20 20 12 61 … sysctl -n vm.loadavg | awk '{print }')`，`bash -n` 当场报语法错。
+   处置顺序也按本仓纪律走：**先停自己那枚**（`ps -o command=` 证明它确实是 `bash tmp/e2-carrier-check.sh` 才 kill，
+   不按名字杀）**再改文件**（bash 增量读脚本，改在跑的那份会错位执行）**再重起**。
+   📌 一般规律：**用双引号 perl/sed 改写脚本，等于让 shell 替你重写一遍那个脚本**（同族 #77 的 C locale、#184 的 `PIPESTATUS`）。
+
+### ④ 起跑状态与恢复路径（哨兵会随上下文压缩消失，只认这一张表）
+
+| 项 | 值 |
+|---|---|
+| 载体 | `/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-tfa-e2`（**不存在则新建，存在则复用**；`worktree add --detach` 到 `bb1c3d6a`，之后每次起跑再现量 `CARRIER_SHA`） |
+| 装置 | 正在跑的那份：`tmp/e2-carrier-check.sh`（⚠️ `tmp/` 是 gitignore 的，一次清理就没了）；持久副本已放 `research/tools/mutation-rigs/e2-isolated-carrier-check.sh`（与 rig 族同处，19:25 复制，复制**不**动在跑的那枚 —— 重命名/复制都不改已打开的 fd）。pid 现量：`pgrep -f e2-carrier-check.sh` |
+| 日志 | `tmp/e2-carrier-check-1005-191605.log` |
+| 证据目录 | `~/.heyta-evidence/tfa-e2-carrier-1005-191605/`（`install.log` / `build.log` / `check.log` / `red-candidates.txt` / `rc.txt` / `overlay.txt`） |
+| 有界性 | `CAP_WAIT=90` 轮 × 40s（60 分钟）；超窗打印 `QUEUE=EXPIRED` 并退 3（**环境无效 ≠ 产品失败**），绝不无限等 |
+| 起跑后依次 | `pnpm install --frozen-lockfile` → 软链方向核（`realpath apps/web/node_modules/@heyta/domain` 必须落在载体里，**不是**数软链条数）→ `pnpm -r build` → **段数现量** `SEGMENTS=` → `pnpm check` → `CHECK_RC=` |
+| 并发礼貌 | 真跑 `pnpm check` 前**占住同一枚** `/tmp/tfa-test.lock`（写自己的 pid，`trap EXIT` 只删自己那枚）—— 载体的 vitest 不走 `.tfa-shield`，不登记就会与别线并发跑，而这台 64G 是被模拟器 + e2e 一起吃干的 |
+
+🔴 这一节**没有读数**。② 那格（三段 Playwright + 全量 check）与 ① 那格（四端重装）都要等这一趟跑完
+再逐项归因；`pnpm reinstall:all` 本轮**没有**起跑（它还要"两枚设备面同时空"这一档更窄的合取事件，
+且现在 5 台模拟器常驻 + 别线在跑测试，起它会拆别人的现场）。
+⚠️ 19:18–19:22 复量：负载从 82 一路涨到 **774**（别线连着跑套件），窗口始终没开。
+🟢 **19:34:57 窗口开了并当场起跑**（日志那行是 `LOCK_HELD_BY_ME=77136` —— 载体那趟按协议占住了同一枚内存闸门锁，
+所以从现在起**主检出的测试类动作会被闸门拒绝**，这是预期的互斥，不是故障）。
+⚠️ 但这条只是**状态**，不是读数：`install → build → SEGMENTS= → CHECK_RC=` 还没打完，
+红格归因要等 `~/.heyta-evidence/tfa-e2-carrier-1005-191605/` 落齐（#107）。
+超窗那一支（`QUEUE=EXPIRED` 退 3、不构成读数）已经不会走了。
+
+## 10.193 #100 闭合，但**登记的病因是错的** —— 真因不是"只认 H2"，是"编号后必须有分隔符"（10-05 19:20–19:22）
+
+### ① 先否证我自己写的那条诊断
+
+#100 那格写的是「该门禁枚举的章节集合**按 `## ` 取号** ⇒ 三级小节整段不可见」。
+打开 `research/tools/docs-link-check.mjs:421` 现量，正则本来就是
+`/^#{2,6}\s+(\d+(?:\.\d+)*)[.、\s]+(.*)$/` —— **`#{2,6}` 从一开始就吃 `###`**。
+照那条错诊断去改（把 `## ` 换成 `^#{2,4} `）会改一件不存在的东西，而且**改完还是红的**，
+因为真正的拦点是那个 `[.、\s]+`。
+
+真因（同一分钟实测出来的）：那十个小节的标题写成 `### 10.119（10-05 03:2x）E3 的四臂闭合…`
+—— **编号后面直接跟全角括号，一个空格都没有** ⇒ `[.、\s]+` 要求至少一个分隔符，匹配失败，
+`10.119–10.128` 整段不进章节集合。现量对照（同一条解析、只换正则）：
+
+| | `10.11x–10.12x` 被认到的枚数 |
+|---|---|
+| 改前 | **10**（10.110…10.118、10.129 —— 全是 `## ` 写法的那些） |
+| 改后 | **20**（补进的恰好是 `### 10.119（…）`–`### 10.128（…）` 那十枚） |
+
+⇒ 漏掉的那十枚与标题层级**无关**，与"有没有分隔符"有关。这也是为什么"按号段缺失"这个现象
+看起来像层级问题：那十枚刚好都是 `###`，但同一篇里 `## 10.116 …` 之所以被认到，
+是因为它写了空格 —— **相关不是因果**，我这次就是把它抄成了因果。
+
+### ② 修法与"为什么不再宽一点"
+
+`(?:[.、\s]+|\s*(?=[(（]))` —— 分隔符可以为空，**但只有紧跟 `(` / `（` 时才允许**。
+不放宽成"编号后面什么都行"的理由写进代码注释，也在判据里钉死了：
+`## 2026-09-30：服务端面向用户的产物全部中文化` 这种**日期开头的标题**在本仓大量存在，
+宽一分就会被登记成章节 `2026`，于是 `§2026` 这类错引用从红变绿 —— 那是**把门禁调松**，不是修误报。
+
+### ③ 判据与变异读数（一对，写在检查器自己的自检节里）
+
+- 正腿：`eq('编号紧跟（也算章节', … '### 10.119（10-05 03:2x）E3 的四臂闭合')` → 必须解析出 `10.119`。
+- 反腿：`eq('日期标题不产章节号', sectionNumbers('## 2026-09-30：…').has('2026'), false)` → 必须不产号。
+
+| 趟 | 读数 |
+|---|---|
+| 改后（本修法） | `rc=1`、**自检失败=False**、`该章节号不存在` 命中 **0** 条、检查 559 处跨文档引用 / 55 处页内锚点 |
+| 变异：只把放宽那截退回 `[.、\s]+` | `rc=1`、🔴 **自检失败=True**（正腿当场红） ⇒ 这条修复是**承重的**，判据能不能红由这一趟回答 |
+| 还原 | `RESTORED=OK`（md5 逐字相同）；装置：`python3` 内联（不双引号 perl —— 上一节刚被那一手把手改坏过一行） |
+
+### ④ 那三枚残留的红不是我欠的，也不代改
+
+改后 `rc=1` 的三行全属**退款线在飞的那格**：`docs/plans/pricing-coupons-handoff.md:756-758`
+指向 `apps/web/evidence/renew-panel-*.png`（本机有、git 没跟踪，干净检出上是死链）。
+该文件此刻在工作树里是 `M`（同一线的 `RenewPanel` 改动也在）⇒ 与 #103 / #83 同一形状：**登记、不代改、不放宽**。
+本批的章节引用这一面是 **0 红**。
+⚠️ **这句已过时（19:34 现量）**：那三枚 PNG 已被该线自己 `git add`（`git status --porcelain apps/web/evidence` 出 `A ` 三行），
+`node research/tools/docs-link-check.mjs` 现在 **RC=0**、打印"无死链、无'本机有仓库里没有'的链接、无失效章节引用、无失效锚点"。
+⇒ 19:22 的 `rc=1` 与 19:34 的 `rc=0` **两条读数都真**，差别只在时刻：**门禁的红/绿是事件不是状态**，
+任何引用它的下游都必须带上取读数的分钟（同课见 [[feedback-wait-on-people-not-on-machine-noise]]：
+"等他们提交"是瞬时事件）。
+
+📌 这一格真正的产出不是那行正则，是**"工单里的病因句要先现量再动"**：
+#100 那句是按现象写的推断（缺的十枚刚好是 `###`），而按它改会改错东西、改完照红。
+入 traps **#299**（19:23 现量：另一会话同一分钟也占过 298，重号集合 [1, 2, 3, 4, 38, 93, 94, 95, 269, 298]；我这条顺延到末号之后，**没有**动别人那条）。
+- 产物：`apps/web/public/sw.js` 是 esbuild 打包物，重跑 `pnpm --filter @heyta/web gen:pwa`（16381 → 16470 字节），
+  `pnpm --filter @heyta/web check:pwa` ✅（7 份文本产物逐字节一致），产物里 `onversionchange` 命中 1。
+- 判据（`local-data-destruction.spec.ts` 新增，**扫全仓产品代码**的静态配对腿）：
+  每个文件的 `indexedDB.open(` 次数必须等于 `.onversionchange =` 次数（**比数量而不是比"文件里出现过这个词"** ——
+  同一文件里第二次 open 忘了接，布尔判据会放行）；
+  外加两条前提腿：总扫描数 >0，且 `apps/` 与 `packages/` **各自**都要扫到（只要求总数时，其中一棵树整个走空也不会红）。
+- 变异读数：把 sw.ts 那一发语句删掉 ⇒ **恰好 1 红**，消息点名 `apps/web/src/pwa/sw.ts：1 处 open，0 处让位`；
+  还原后该腿 ✅，`针脚残留=0`，三枚文件净 **+53 行 / 0 删除**。
+
+### ④ 我自己差点把"没跑"读成"没牙"（#296 的又一面目，值得单独留）
+
+第一趟变异用了 `-t 'versionchange 让位'`。测试标题里 `versionchange` 后面紧跟的是**反引号**再跟空格，
+我的过滤词少了那个反引号 ⇒ **15 条全部 skipped，而命令 exit 0**。
+按"没有红 = 臂存活"读，这条刚写的判据就会被记成"挡不住任何东西"，而实情是**它一行都没执行**。
+
+⇒ 装置纪律两条：`-t` 之后必须回读 `Tests` 行的**总数**（`1 passed | 14 skipped` ≠ `15 passed`）；
+跑变异前先用一次绿运行确认过滤词命中（本次纠法：`-t 'versionchange'`）。
+
+### ⑤ 本格状态与仍然欠的
+
+Web 侧 E2 的"连接持有者"这一格：**代码已改、判据已入库、正反两向读数都到手**（适配器臂 V + sw 静态臂）。
+仍欠的集中在 #104：iOS 判据 D 的复量、"注销后回到全新空库"那一屏的**截图**证据（§6.2 规定一：只有图算），
+以及生产代码又变了（`packages/storage` / `app-host` / `apps/mobile` / `apps/web` 本轮都动过）
+⇒ §10.157 那批补跑读数**再次过期**，须在隔离检出重跑 `pnpm check` 与 `pnpm reinstall:all` 才算"当前产物"。
+
+### ⑥ 挂错对象那一发的闭合对照（19:11，与本节 ③ 的更正配套）
+
+改挂到连接之后重跑了一遍**同一枚变异**，读数和形状都重新对得上：
+
+| 步骤 | 读数 |
+|---|---|
+| `pnpm --filter @heyta/storage build`（tsup 的 dts 阶段） | exit 0 |
+| `pnpm --filter @heyta/web typecheck`（改前） | 🔴 `src/pwa/sw.ts(135,13): TS2339 'onversionchange' does not exist on type 'IDBOpenDBRequest'` |
+| 同上（改成 `db.onversionchange` 之后） | 无 `error TS` |
+| `gen:pwa` / `check:pwa` | 产物 16470 字节、`onversionchange` 命中 1、7 份文本产物逐字节一致 |
+| 静态腿（摘掉最终那发 `db.onversionchange = …`） | **恰好 1 红**：`apps/web/src/pwa/sw.ts：1 处 open，0 处让位`；`1 failed \| 14 skipped (15)` |
+| 还原 | `RESTORED=OK`（md5 逐字相同） |
+
+📌 这一格真正的收获不是那行代码，而是**三层腿各挡各的**：行为腿挡适配器自己、静态枚举腿挡"又一个持有者"、
+**类型检查挡"挂在错误的对象上"**。少了第三层，我会交付一个"处理器写了但永不触发"的假修复，
+而前两层都会放行（vitest 不做类型检查，`src/pwa/sw.ts` 也不被任何用例 import）。
+入 traps #297 末段。
+
+## 10.195 #73 试着做了一格，**没做成并当场撤干净**（10-05 19:27–19:29）
+
+落点与做法都按 #73 那条登记执行过（`CloseAccountPanel` 里加 `pending` 状态 + `hasEngine()/requireEngine().countPendingUpload()`，
+渲染规则三条腿），跑出来是 **1 红 / 17 绿**，而红的原因被我自己加的前提腿照出来了：
+`opStub.reads === 0` ⇒ 面板那段 effect 在用例里压根没走到（`signedIn` 那一档的前置不是我 `setState` 的那两个键名能凑齐的）。
+🔴 更要紧的是：**另外两条腿在这种情况下是假绿** —— "0 条不出现"和"读不到不出现"在"整棵树都没渲染"时同样通过。
+如果我只看 `17 passed` 就会把它当成"两条负向腿已成立"，那正是一条恒绿判据的诞生方式（§7 元规则 2）。
+
+处置：剩下预算不够把它修到可信，**不往树里留红**，用逐串删除的方式撤掉我自己加的东西
+（不做整文件 `git checkout` —— 那两个文件此刻可能同时带着别人的在飞改动，整文件回退会顺手拆掉它），
+撤完 `close-account-panel.spec.tsx` 回到**原 15 条**（`Test Files 1 passed (1)` / `Tests 15 passed (15)`），
+两枚文件对 HEAD 的差集为**空**。
+
+🔴 **而那次撤销自己又失手一回**，形状值得单独留：删除用的切片是
+"`pending` 状态声明 → 下一个 `if (!signedIn) return null;`"，而中间**紧邻着**原有的
+`const signedIn = typeof token === 'string' && token !== '';` —— 切片把它连同一起吞了，
+于是撤销后 spec 从 15 绿变成 5 红。症状看着像"产品坏了"，实际是**我的撤销没撤干净**。
+⇒ 两条纪律：**① 撤销之后先看 `git diff` 对 HEAD 是否为空，再看测试**（只看测试会把我自己造成的红
+归因给产品）；**② 用锚点切片删代码时，锚点必须是被删块的外部边界**，
+不能是"从我要删的东西一路找到下一个关键字"—— 后者会吃掉中间别人（这里是我自己先前写对的）那几行。
+同族：#46（没复现 ≠ 没执行）、#81（探针会改变被测对象的状态）。
+#73 保持 pending，做法栏已验证过一处真前提：
+**用例必须先证明"被测那段确实被执行"（计数/`reads` 这一类前提腿），再谈渲染规则的正负腿。**
+
+## 10.196 #73 第二趟：把这一格的**真阻塞**量出来了（seam 没接上），仍然没做成、当场清干净（10-05 19:31–19:32）
+
+上一轮撤完之后我没有停在"再试一次渲染时机"，而是把两条前提腿（面板挂了 / 面板真去读数）留在用例里再跑 ——
+这一趟它们把成因钉死了：
+
+| 量 | 读数 | 含义 |
+|---|---|---|
+| `find('[data-testid="close-account-panel"]')` | **不是 null**（前提腿过） | 登录态与挂载都成立，不是上一版那个 `signedIn` 前置问题 |
+| `opStub.reads` | **恒 0**（三条腿全红在这一条） | `vi.mock('../src/lib/oplog.js')` **没有拦到**组件那条 `../../lib/oplog.js` 的导入 |
+| 加宏任务 flush（`setTimeout(0)`，React 18 的 passive effect 不吃微任务） | 仍然 0 | 排除了"effect 还没 flush"这一支 |
+
+⇒ 组件里拿到的是**未替换的** `hasEngine()`，jsdom 里返回 false ⇒ 抛错走"读不到"分支 ⇒ stub 一次都没进。
+这条判据的产出因此不是实现，而是**一处 seam 决策**：面板要报"本机还有几条没出去"，
+不该让 UI 直连 `oplog` 模块（那条通道在 Web 上恰好和"引擎可能还没起来"缠在一起，测不到、也骗得过）。
+本文件已经用**两种被验证过的注入**跑通了其余 15 条：`vi.stubGlobal('fetch', …)` 与
+`window.__heytaHostStoragePort` 那一类宿主端口。#73 的正解是二选一：
+① 条数由 `useSyncStore` 提供（与 `baseUrl`/`token` 同一个 store，宿主接线时填，UI 只订阅）；
+② 走那条已验证的宿主端口向引擎要一次计数。两者都不新增第二套算法（真实现仍是 `engine.countPendingUpload()`）。
+
+🔴 收尾按 §10.195 立的纪律走，并且**这次用对了**：撤销后先看
+`git diff --stat <两枚文件>` 为空、`git status` 里只剩我自己的 `local-data-destruction.spec.ts` 与别线的
+`apps/web/tests/renew-panel.spec.tsx`（未动），再跑测试 —— `Tests 15 passed (15)`，回到原样。
+（两枚文件在动手前的 diff 我只看过自己那几枚 hunk，所以这次 `git checkout --` 撤的是自己的改动，
+不是别人的在飞工作；上一版逐串删除吃掉紧邻定义行那一课，换成了"先证差集只含我的东西，再整枚回退"。）
+
+## 10.197 ② 那格先吃到一块真读数：十二枚静态门禁在**当前工作树**上全 rc=0（10-05 19:34）
+
+`check:landing-e2e` / `check:ai-e2e` / 壳类 / 四端重装都要等窗口，但**静态那一批不吃测试窗口、不占端口、不碰设备**，
+而这批改的恰好是它们能照到的东西（`packages/storage` × 5、`app-host` 的新选项、`apps/mobile` 的两处接线、
+`apps/web` 的 `sw.ts` + 产物、两份共享台账、`docs-link-check.mjs` 的解析器）。串行取现量：
+
+```
+check:layering rc=0        check:ui-language rc=0        check:design rc=0
+check:docs rc=0            check:doc-citations rc=0      check:gate-wiring rc=0
+check:journey-coverage rc=0 check:verify-script-copy rc=0 check:shell-erasure-parity rc=0
+check:claims rc=0          check:md-tables rc=0          check:pwa rc=0
+```
+
+（日志 `/tmp/static-gates-1005.log`；`NO_COLOR=1`；逐枚 `out=$(pnpm -s check:$g 2>&1); rc=$?`，红的那枚才打尾部的原文——
+这次没有红，所以日志里只有 rc 行。）
+
+🔴 **这块读数的边界要写清，别读多**：
+
+1. 它属于**当前工作树整体**（别线的在飞改动也在同一棵树里），不属"本批单独"—— 载体那一趟才是隔离读数；
+2. `check:doc-citations` 的默认射程只有 1 份文档（已登记在 **#63**）⇒ 它绿**不等于**我这几节新写的 `§10.19x` 引用全被对账过；
+3. `check:docs` 与我 #100 改的是同一枚脚本（`package.json:58` 现量：`node research/tools/docs-link-check.mjs`），
+   所以修复**有消费者**这一条当场证掉了；顺带把 19:22 那三枚红也结了 —— 见 §10.193 ④ 的 19:34 更正：
+   退款线自己把 PNG `git add` 了，于是**两条 rc 都真，差别只在时刻**。
+
+⇒ ② 那格的未知面因此缩小到：三段 Playwright + 全量 `pnpm -r test` + 壳类 + 四端重装（仍等窗口，`§10.192` 的装置在跑）。
+
+## 10.198 ② 载体那趟的**前半读数**到手：窗口 19:34:26 开、叠 3349 枚未提交改动零失配、`pnpm -r build` 在隔离载体里 rc=0（10-05 19:34–19:35）
+
+```
+19:34:26 窗口开：load=10.23（阈值 12 是仓库 `wait-for-quiet-host` 那道，没自造）
+19:34:26 worktree add --detach → CARRIER_SHA=e372a3f0（主检出 HEAD 已从 bb1c3d6a 前进过，取的是**当时**那枚）
+19:34:27 OVERLAY_FILES=3349（跟踪脏 68 / 未跟踪非忽略 3378）
+19:34:29 OVERLAY_MISMATCH=0        ← 抽 8 枚 md5 逐字对账（§7 第 82 条那条"送到另一棵树的字节要内容对账"）
+19:34:36 INSTALL_RC=0
+19:34:57 BUILD_RC=0                ← `pnpm -r build` 整仓在隔离载体里打得出（AGENTS §6.1 那条前置）
+19:34:57 SEGMENTS=86               ← `pnpm check` 的段数分母现量
+19:34:57 LOCK_HELD_BY_ME=77136     ← 按协议占住同一枚内存闸门锁
+```
+
+🔴 **装置有一行是坏的，而读数仍然可用 —— 两件事都要写。**
+第 111 行 `in-carrier=$(case $LINK in *heyta-wt-tfa-e2*) echo yes;; *) echo no;; esac)`：
+bash 在 `$( … )` 里被模式中的 `*)` **提前闭合**了命令替换 ⇒ 那一格分类根本没执行，
+输出里留的是 `in-carrier= echo yes;; *) echo no;; esac)` 这种半截串。
+但我要的那件事**由同一行打印的 `DOMAIN_LINK` 直接答了**：
+`/Users/…/heyta-wt-tfa-e2/packages/domain` —— 载体里 `apps/web/node_modules/@heyta/domain` 的 realpath
+**落在载体自己那棵树**，所以"软链指向主检出 ⇒ pnpm 会去清别人的树"那一档被排除。
+⇒ 记两条：**① `case` 不要写进 `$( )`**（要分类就写在外面）；
+**② 装置自证失败时，看它打印出的原始值还在不在**——原值在，结论就能由原值给出，不必整趟作废，
+但也**不许**把那一格写成"装置通过"。
+
+⏳ `CHECK_RC=` 尚未落（`check.log` 在长，69 KB 起）。整趟跑完由 #107 收，
+届时还要做"红格逐文件归因"（别线在飞的 68 枚跟踪脏文件也在这棵树里，红不一定属于本批）。
+
+## 10.199 ② 载体那趟**真的抓到一个属于本批的缺陷**：共享契约用了 vitest 独有的匹配子（10-05 19:36–19:40）
+
+上一格留的那句「整趟跑完由 #107 收，届时还要做红格逐文件归因」现在有答案了，
+而且归因结果**指向我自己**：
+
+```
+19:36:03 CHECK_RC=134
+19:36:03 RED_LINES=1
+  ✗ [DbAdapter 契约 —— SqliteAdapter（C# 同步驱动 + Jint）] destroy 之后这个实例是**死路**：普通读写必须抛，不许静默重建容器
+      Property 'toBeInstanceOf' of object is not a function
+```
+
+**机制**：`packages/storage/tests/contract/adapter.contract.ts` 是**一份契约、四个消费者**
+（vitest 的 Memory / IndexedDB / SqliteAdapter，外加 `research/spikes/sqlite-driver-csharp`
+的 C# + Jint 重放器）。后者的 `expect` 替身**只有 `toBe` / `toEqual` / `toThrow`**。
+我在 E2 那一格把"销毁即死路"写成 `expect(...).rejects.toBeInstanceOf(AdapterDestroyedError)` ——
+vitest 是超集，**本地全绿**；跨语言重放器在运行时才说"这个匹配子不存在"。
+
+✅ 修法不是给替身加匹配子（那是把契约往一个消费者身上挪），而是**只用交集**：
+
+```ts
+const rejectionName = async (run: Promise<unknown>): Promise<string> =>
+  await run.then(() => '(没有抛错)', (error: unknown) => (error as Error).name);
+expect(await rejectionName(db.count(store)), `销毁后「${store}」竟然还答应读`).toBe(AdapterDestroyedError.name);
+```
+
+取 `name` 而不是 `instanceof` 在这里**还更准**：Jint 里那个类不是宿主 realm 的同一个类对象，
+`instanceof` 跨 realm 本来就会假负。
+
+**读数（改前 → 改后，都是现量）**：
+
+| 腿 | 改前 | 改后 |
+|---|---|---|
+| `pnpm check:crosslang-contract` | rc≠0，`断言 67 条，通过 66 条，失败 1 条` | `CROSLANG_RC=0` |
+| vitest `pnpm --filter @heyta/storage test` | —— | `Test Files 8 passed (8) / Tests 419 passed (419)`（19:40） |
+
+🔴 **这一格没有被"修好"就写成完成，两件事必须先记账**：
+
+1. **`pnpm check` 是 `&&` 串，第 34/86 段红 ⇒ 后面 52 段一次都没执行**（含末尾的
+   `pnpm -r test`，也含目标点名的 `check:landing-e2e` / `check:ai-e2e` / 三枚壳类门禁）。
+   ⇒ 载体那趟的"② 跑满 pnpm check"**仍然是没读数**，绝不能记成 `33/86` 或"几乎全过"。
+   这不是 §10.197 那条口径的例外，是它的第一次实际应用。
+2. 那 52 段里**已经轮到过谁**我不知道 —— 前 33 段没打印逐段结果，所以"前 33 段绿"也只是
+   `&&` 短路的**间接**结论（第 34 段能起跑就说明前 33 段 exit 0），不是逐段读数。
+
+**可迁移的（入 traps）**：一份被多个消费者重放的契约文件，**它的表达工具也只能取交集**；
+"在最快的消费者那里绿"不构成通过，判据必须包含"每个消费者都跑过这一份"。
+同族：#296（`-t` 没命中也 exit 0）、#195（默认值等于原值的可选 prop 把"宿主没接"伪装成"做完了"）。
+
+## 10.200 ② 补跑换了形状（逐段独立 rc，不再让一处红把 52 段一起挡掉）+ 那枚新红属**别人在飞的目录**（10-05 19:42–19:43）
+
+**装置**：`research/tools/mutation-rigs/e2-remaining-gates.sh`（放 `research/tools/` 而不是 `tmp/`，
+理由见 §10.192 那条"可复现物不许住 tmp"）。它在 §10.198 那只载体里**逐条**跑目标点名的十段
+（`check:macos-shell` / `check:macos-window` / `check:windows-shell` / `check:linux-shell` /
+`check:shell-surfaces` / `check:shell-unicode` / `check:shell-exit-chain` / `check:shell-erasure-parity` /
+`check:landing-e2e` / `check:ai-e2e`），每段独立 `rc=` + `ran=`（日志非空才算它真跑过）落盘。
+**为什么不再整链**：上一趟已经证明了 `&&` 的形状 —— 一处红 = 后面全盲（§10.199 第 1 条）。
+
+🔴 **三门前提现在都有活体证据，不是装饰**：
+`PORT_BUSY=[3000=1]`（`check:ai-e2e` / `landing-e2e` 的前置会 SIGKILL 它 —— 所以这里是**排队**而不是先杀，
+traps #87），`PEERS=1`（另一会话正在跑 `playwright.detail-pane-task.spec.ts`，属三栏详情那条线），
+`load=17.29 > 12`。19:42:08 排队器第一行就是「端口被占：3000=1，继续等」——
+这一行的存在本身就是那门有牙的读数。上限 `CAP_ROUNDS=150`（100 min），过期则 `QUEUE=EXPIRED` 并
+**明确写"这一格没有读数"**，不许折算成 `n/10`。
+
+⚠️ 载体是**增量**搬我的改动（只 `packages/storage/tests/contract/adapter.contract.ts`，md5 对账），
+不重建 19:34 那批叠层 —— 重建会把别的会话**这一小时**的半截改动一起拉进我的读数里。
+代价写在装置输出里：`CARRIER_VS_MAIN_TRACKED_DIRTY_MISMATCH=<n>` 是这一趟读数的**归属边界**。
+
+**新红一格（不是我造成的，也不代别人收拾）**：`pnpm check:docs` 在 19:43 现量 `DOCS_RC=1`，
+47 枚死链 **全部**来自 `tmp-split/`（`grep -E '\-\>' | grep -vc tmp-split` ⇒ **0**）——
+那是退款线 19:36 复制出来的 docs 副本（未跟踪、不属于本批），§10.197 记的 19:34 那次 `check:docs` rc=0
+与这里**不矛盾**，中间隔的正是它落地的那两分钟。**没动那个目录**（不删别人在途文件）。
+本批两枚台账文件（本文件 + traps，含新 #301）在 575 处跨文档章节引用 / 55 处页内锚点里**零命中**。
+
+**顺带一条我自己的探针错**：两次把 rc 读成空（`DOCS_RC=` / `RC=`）—— zsh 下 `${PIPESTATUS[0]}` 是空值，
+不是 bash 的数组下标（traps #184）。同一分钟内第二次踩，说明我"知道这条"不等于"会用这条"；
+改法是 `bash -c '…; echo RC=$?'` 落到文件再读。
+
+## 10.201 ② 壳类那一道**八段第一次读数到手**（7 绿 + 1 红，红是本批的、当场修到绿）；装置自己被抓出两处形状错（10-05 19:42–19:46）
+
+先说结论的分层：**这一道有读数了，另一道还没有**。
+
+```
+LANE_LOAD=OPEN                     ← 负载门 19:44 开（load 11.66 ≤ 12）
+GATE check:macos-shell          rc=0 ran=YES bytes=6298
+GATE check:macos-window         rc=0 ran=YES bytes=2367
+GATE check:windows-shell        rc=0 ran=YES bytes=2796
+GATE check:linux-shell          rc=0 ran=YES bytes=169
+GATE check:shell-surfaces       rc=0 ran=YES bytes=4763
+GATE check:shell-unicode        rc=1 ran=YES bytes=1883   ← 唯一红
+GATE check:shell-exit-chain     rc=0 ran=YES bytes=259
+GATE check:shell-erasure-parity rc=0 ran=YES bytes=706
+LANE_E2E=排队中（19:42 起 `3000=1`；`check:landing-e2e` / `check:ai-e2e` **仍无读数**）
+```
+
+**唯一红是本批的，不是环境的**，而且它指向我自己这一小时写的东西：
+`research/tools/mutation-rigs/{e2-destroyed-guard-arms,e2-isolated-carrier-check,e2-remaining-gates,w6-note-restore-device-arm}.sh`
+里 `pid=$LOCK_PID，继续等`、`$LOAD_MAX，` 这类 **`$var` 紧跟中文** —— 变量名把后面那个非 ASCII 字符
+当成名字的一部分吞掉。归属判据不是我猜的：同一枚门禁**主检出现量也 rc=1**（`MAIN_RC=1`），
+而载体与主检出报的是同一批文件 ⇒ 与"并行会话挡路"无关。
+🔴 **它的危害不是退出码，是证据**：这类行的退出码照常对，打印出来却是乱码或丢值 ——
+§10.198 那趟日志里"负载 166.30123.3291.63 > 12"那一行的第二个成因就是它（第一个是 awk 取错列）。
+修完 `UNI_RC=0`（门禁自己打印"扫了 139 个 .sh"，分母现量）。
+
+⚠️ **一条我必须先写下来的操作事实**：`fix-shell-unicode-vars.py` 的 `--write` **不吃我给它的路径参数**
+（我传了四枚文件名，它照旧全仓扫并改了 **22 个文件 / 86 处**）。
+这次后果可控——dry-run 的分母我看过，22 个全是本条线的 `mutation-rigs/` 与 `tmp/*.sh`（gitignored、
+`$var`→`${var}` 语义等价、`bash -n` 四枚全过）——但**顺序错了**：正确做法是先跑不带 `--write` 的那一趟
+把 22 个分母逐条认成"哪些是我的"，再落刀。把批量工具的路径参数当成"它只听这些路径"是一条会伤到别人的假设。
+
+**装置自己的两处形状错**（都是我第一版写的，都不是产品红）：
+
+1. 🔴 **门拧错了对象**：第一版把**端口门**套在全部十段上。八段壳类根本不碰 5173/3000，
+   却被别人占着的那枚 3000 **白挡了四分钟**（19:42–19:46 那三行"端口被占，继续等"就是现场）。
+   ⇒ 前提要按**道**分：壳类只看负载，两枚 e2e 才看负载+端口+同侪。
+   这是 §7 元规则 2 的一种面目——**过宽的前提门会让"没读数"长期看起来像"还没轮到"**。
+2. 🔴 **`local -n`（nameref）在本机 `/bin/bash 3.2.57` 不支持**（nameref 是 4.3+）。
+   `bash -n` **照样过**，因为 3.2 的 `-n` 只查语法不查该选项是否存在 ⇒ 真跑会当场失败，
+   而那一次失败会被读成"门禁红"。⇒ 改成把段名当位置参数传（3.2 支持）。
+   与 §10.191 那条"恒真 elif / 给装置写它没有的能力"同族，也是 traps #296/#297 那一族：
+   **装置的失败模式必须比它保护的判据更响。**
+
+还有一条我自己的纪律重犯：我在排队器**正在跑**的时候改了它那份文件（bash 增量读文件，§10.195 我
+刚写过"处置是重起而不是改在跑的脚本"）。这次发现得及时（先 `ps -o command=` 证明 50279 是我起的、
+再 `kill`、再改、再重起，只允许一台并存），所以没有产生混合读数的账，但**记录留着**：
+规则不是"知道"，是"动手前那一秒有没有想起"。
+
+📌 目标里那半句"补跑…壳类门禁"到这里**壳类八段第一次有了逐段读数**；
+`check:landing-e2e` / `check:ai-e2e` / `pnpm reinstall:all` 三段仍无读数（前者在排队，
+后者要两台设备面同时空，见 #104）。
+
+## 10.202 unicode 那一枚修的必须是**载体的字节**，不是只修主检出（10-05 19:47）
+
+§10.201 修完只在主检出了 `UNI_RC=0`，但真跑读数是**载体**给出的 ——
+载体里那四枚 `mutation-rigs/*.sh` 还是 19:34 叠层的乱码版，
+"我修了"与"读数的载体里已经修好"是两个事实。增量搬四枚（逐枚 md5 `SYNC … OK`）后在**载体里**复跑：
+
+```
+CARRIER_UNI_RC=0
+   ✅ shell 脚本没有「变量名被非 ASCII 吞掉」的写法（扫了 135 个 .sh）
+```
+
+⚠️ 135 vs 主检出的 139：差的是主检出 `tmp/` 里那四枚 gitignored、且没进 19:34 叠层的探针脚本。
+**这不是失配** —— 扫描面按各自的树算，谁也别拿另一棵树的数当自己的分母（traps #174 同族）。
+
+**这一格现在的真实边界**（不许往上写）：壳类八段第一次逐段读数 ✅（载体内 7 枚 rc=0 + unicode 1→0）；
+`check:landing-e2e` / `check:ai-e2e` ❌ 无读数（19:47:17 现量 `负载 20.57 > 12` 且 `3000=1`，
+装置在排、上限 100 min，过期落 `LANE_E2E=EXPIRED`）；`pnpm reinstall:all` ❌ 未跑（要两台设备面同时空，#104）。
+
+## 10.203 ① 那一格的**现场归属读数**到手（阻塞是负载与"六台模拟器没人认领"，不是主机不可达）；#73 差在哪一格也说清了（10-05 19:49）
+
+目标里 ① 那一格（`pnpm reinstall:all`，必须在隔离检出）现在能不能起跑，判据是**四枚现场读数**，
+19:49 现量：
+
+```
+adb 侧设备数 = 1 台
+已启动模拟器数 = 6 台
+别人在跑的重装/验收（verify-mobile|reinstall-all）= 0 条
+windows-pc 可达（ssh BatchMode + echo）= SSHECHO=OK
+负载 = 25.95 > 12（排队器 19:47:17 起连打 20.57 / 28.07 / 24.19 / 25.95）
+```
+
+🔴 **归因要写对，不能写成"打包机不可达"或"没人让开"**：机器是通的、没有别人在跑验收，
+挡着的是**两件事**：① 负载（六台 qemu 本身就是负载源，而这一格要在同一台上装四端）；
+② **归属**——六台已启动模拟器里没有一台能被指认成"我这条线的、可以被我 `simctl uninstall`"，
+一台 adb 设备同理。AGENTS §8.9 + §6.1.1 的立场是不抢设备、不卸别人正在用的目标，
+所以这里**不是等一会儿就会自己开**的窗口（与"等同一条线提交"那一档不同；
+参见 [[feedback-wait-on-people-not-on-machine-noise]] 的判据：先量这一格红由谁消）。
+⇒ ① 记**实测阻塞**，不记完成；要真跑，得先由人给出"哪台模拟器/哪台 adb 设备归这条线"。
+
+**#73 的准确边界**（这次把"差什么"从印象改成文件级事实）：
+
+- 词条**已经有**：`packages/i18n/src/locales/zh-CN.ts:953` 的 `common.accountClosure.pending`
+  带 `{count}`，注释写明"这一句的存在理由就是把数量变成具体的数"。移动端 `AccountClosureScreen.tsx` 已用它。
+- **Web 面板没有**：`apps/web/src/features/settings/CloseAccountPanel.tsx`（HEAD 态，现量干净、
+  没有别的会话在改）里 `grep pending|hasEngine|unsynced|条数` **零命中** ⇒ 那一格在 web 上是缺实现，
+  不是缺渲染规则。
+- **通道是现成的**：`packages/app-host/src/host.ts:700` 的 `pendingUploadCount()`
+  （注释专门写了"走计数，不走 `getPendingUpload().length`，后者会为显示一个数字把整条队列连密文正文
+  物化进内存"），`apps/node-host/src/cli-account.ts:100` 注销路径已经在用它。
+  ⇒ seam 的**决定**就是"web 面板也走这枚计数端口"，不新造一条。
+- ⚠️ 上一趟我把阻塞写成"seam 决策"，还留了一条**没验证过的假设**：
+  `vi.mock('../src/lib/oplog.js')` 之所以没拦到组件的 `../../lib/oplog.js`，
+  可能是相对导入带 `.js` 时 vitest 与 vite 解析成了两个模块实例（traps #29 那一族）。
+  **这一条到现在没跑过，不许当病因写**。要收 #73 的人第一步应该是拿一枚最小的 mock
+  试两种 specifier（带 `.js` / 不带），把这条假设转成读数，再动组件。
+  改这一格的最小分母：组件 + `apps/web` 侧取数接线 + spec（正反两腿）+ 一次变异 = **四处**。
+
+## 10.204 想先把 #73 那条假设打死，结果**合成探针自己没跑起来**——假设仍是未验证（10-05 19:50–19:51）
+
+19:50 我造了三枚合成文件（`apps/web/src/lib/__probe/{eng.ts,Comp.tsx}` + 两枚 spec，
+一枚 `vi.mock` 用带 `.js` 的 specifier、一枚不带），想一次回答"上一趟的 mock 没拦到是不是
+相对导入带 `.js` 被解析成两个模块实例"。跑法：
+`pnpm --filter @heyta/web exec vitest run tests/__probe-with-js.spec.tsx tests/__probe-no-js.spec.tsx`。
+
+读数：**`Tests  no tests`**（两枚都是 0 条，不是 1 红 1 绿）。
+⇒ **这一格什么都没回答**：既没证明假设成立，也没否证。
+按 §7 元规则 1，"探针没观测到" 不能读成 "被测行为不存在"——这里连测试都没开始执行。
+三枚探针文件当场清掉（我造的，只清我造的），`git status` 复量：`apps/web/tests/` 下只剩
+本批在改的 `local-data-destruction.spec.ts` 一枚 `M`，没有留下残骸。
+
+**留给下一位的诊断线索（是线索、不是结论）**：`apps/web/vite.config.ts:430` 的 `test` 段
+没有为这两枚文件放行。vitest 的位置参数是**文件名过滤器**，相对 `test.root` 解析——
+所以最可能是我传的路径基准与配置里的根不一致（或 `include` 那一段另有约束）。
+**先用 `pnpm --filter @heyta/web test` 的原生跑法确认新文件在不在集合里，再谈 mock。**
+这条也解释了为什么我上一趟"直接改 spec 的 mock 写法"会连测都测不准。
+
+⚠️ 因此 #73 的收口顺序也要改：**别在没跑起来的探针上推 seam**。
+先让新增文件真的被 web 套件收进集合（现量：`Test Files` 数里出现它），再做带/不带 `.js` 的对照，
+最后才动 `CloseAccountPanel.tsx` 的取数接线。
+
+### 10.204 补（同分钟内自我否证一条线索）：`include` 其实是匹配的，我那句"根不一致"当场站不住
+
+刚取到 `apps/web/vite.config.ts` 的 `test.include` 现量：**`['tests/**/*.spec.{ts,tsx}']`**
+（第 446 行附近）⇒ 我上面写的那条"最可能是位置参数与 `test.root` 基准不一致"**被这条读数否证**：
+`tests/__probe-with-js.spec.tsx` 明明落在这个 glob 里。
+真正没排除的候选变成：**收集阶段就报错了**，而我把报错行**过滤掉了** ——
+那条命令只 `grep -E '✓|×|Tests|expected|toBe'`，收集失败的 `Error`/`fail` 行不在模式里，
+于是我只看见 `Tests  no tests` 就往下推。候选：合成 spec 里 `import … from '../src/lib/__probe/Comp.js'`
+（把 `.tsx` 写成 `.js`）在这套配置下解析失败。
+⇒ **这既是 #73 的教训也是我这一趟的教训**：读装置输出先确认"我的 grep 模式覆盖失败形状"，
+否则一次探针故障会被写成一条产品结论（traps #296/#300/#301 同族，**这次是我自己第三、四次犯**）。
+下一位复跑请**不要带 grep**，直接看全量输出前 40 行。
+
+## 10.205 #73 闭合：Web 注销面板接上现量的 N（四腿 + 两刀变异），顺带**否证了我上一轮的假设**，也当场毁掉过自己的修复（10-05 19:52–19:53）
+
+**落点**：`apps/web/src/features/settings/CloseAccountPanel.tsx`（新增 `useEffect` 取数 + 一句渲染）、
+`apps/web/tests/close-account-pending.spec.tsx`（新建，四腿）。词条没动 ——
+`common.accountClosure.pending` 中英**本来就在**（`zh-CN.ts:953` / `en.ts:874`），
+上一轮查过：i18n 成对这一条不需要新代码。
+取数通道 = `apps/web/src/lib/oplog.ts` 的 `hasEngine()` / `requireEngine()` 底下的
+`countPendingUpload()`（= app-host `pendingUploadCount()` 那枚端口的同一实现，也是移动端
+`AccountClosureScreen.tsx:112` 用的那一条），**没有**新造 seam、**没有**用
+`getPendingUpload().length` 去为一个数字物化整条密文队列。
+
+**读数**：
+
+| 腿 | 内容 | 结果 |
+|---|---|---|
+| 基线 | 新 spec + 既有 `close-account-panel.spec.tsx` 同跑 | `Test Files 2 passed / Tests 19 passed`（15 旧 + 4 新，无回归） |
+| 正向 | 读到 3 ⇒ 句子里出现 `3` | ✅ |
+| 负向 | 读到 0 ⇒ 整句不进树 | ✅ |
+| 负向 | 取数抛错 ⇒ 整句不进树、且页面文本里不出现「0 条」 | ✅ |
+| 负向 | 引擎没就绪（`hasEngine()` 假）⇒ 整句不进树 | ✅ |
+| 变异 M1 | 摘掉 `&& pending > 0` 那道闸 | **1 红**（"读到 0 条"那腿） |
+| 变异 M2 | 把整句换成写死的文案（N 不再现量） | **2 红**（"3 条"腿 + "0 条"腿） |
+
+`tsc --noEmit` 在 `apps/web` 上先过了一遍（⇒ `countPendingUpload()` 确实在引擎类型上，不是拼出来的名字）。
+
+🔴 **上一轮那条假设被这一趟否证**：我写过"`vi.mock('../src/lib/oplog.js')` 可能因为相对导入带
+`.js` 被解析成两个模块实例"。**现在同一枚写法直接拦到了** ——
+变异跑出来的错误栈里是 `at Object.countPendingUpload (tests/close-account-pending.spec.tsx:29)`
+被 `CloseAccountPanel.tsx:90` 调用 ⇒ mock 生效。所以 #73 当初卡住的原因**不是** specifier，
+而是我那一版的代码形状（组件当时根本没有取数接线，我先改组件再改判据，两步混在一趟里所以归因漂了）。
+这正是 traps #299 那条的现行实例：**登记过的病因要先现量再动手**。
+
+🔴 **而这一趟我自己毁掉过一次修复，被 md5 抓住**：变异跑完我用
+`git checkout -- <面板文件>` "还原"，但那枚文件在 HEAD 里**没有**我的修复 ⇒
+还原把修复一起退回去了（`NOW_MD5=dd453e30…` vs 变异前的 `BASE_MD5=bcbd2bbb…`，
+两枚 md5 是我在做变异**之前**就取的，所以差别当刻就现形）。
+重放后 `NOW_MD5=bcbd2bbb53c7a713ce5405df3f62a0a5` 与期望**逐字相同**，复跑 19 passed。
+⇒ 纪律：**变异前的"原文件"必须按字节存住**（`cp $P /tmp/$P.bak` 或 `git stash create` 那种自包含对象），
+`git checkout --` 只能回到 HEAD，回不到"我这一格未提交的修复"。
+"未提交"这一条状态在这里是要命的：目标要求本轮不提交，所以 HEAD 不是我的基线。
+
+⚠️ 一条**仍未解释**的：19:50 那两枚合成探针报 `Tests  no tests`，而同一跑法（
+`pnpm --filter @heyta/web exec vitest run tests/<file>.spec.tsx`）刚才收起了真 spec。
+⇒ 说明跑法本身没问题、`include: ['tests/**/*.spec.{ts,tsx}']` 也放行，
+问题在探针文件的**内容**（最可疑是它 import 的 `__probe/Comp.tsx` 与 `eng.ts` 那两枚新建源文件）。
+我没时间去追它，**留着当未解释**，不写成结论，也不拿它当任何判据。
+
+## 10.206 停车格（10-05 19:54）：壳类八段在载体里**八枚全 rc=0**，其余范围逐项留给下一位，含现成命令
+
+**新到的读数**（排队器 pid 67524 重跑那道，19:54:37 现量取回）：
+
+```
+LANE_LOAD=OPEN
+GATE check:macos-shell          rc=0 ran=YES bytes=5929
+GATE check:macos-window         rc=0 ran=YES bytes=2360
+GATE check:windows-shell        rc=0 ran=YES bytes=2796
+GATE check:linux-shell          rc=0 ran=YES bytes=169
+GATE check:shell-surfaces       rc=0 ran=YES bytes=4763
+GATE check:shell-unicode        rc=0 ran=YES bytes=93     ← §10.201 那枚 1→0，在**载体里**复量成功
+GATE check:shell-exit-chain     rc=0 ran=YES bytes=259
+GATE check:shell-erasure-parity rc=0 ran=YES bytes=706
+```
+
+⇒ 目标里"补跑…壳类门禁"这一格**闭合**（八枚逐段独立 rc、每枚带 `ran=YES` 前提腿、载体是隔离检出）。
+`LANE_E2E` 仍在排：19:54:05 现量 `3000=1`（别人占着 :3000，e2e 前置会 SIGKILL 它 —— 所以是排队不是先杀）。
+
+**工作树现状（现量，无半成品）**：
+`M apps/web/src/features/settings/CloseAccountPanel.tsx`（md5 `bcbd2bbb…`，与 §10.205 逐字一致）、
+`M apps/web/src/pwa/sw.ts`、`M packages/storage/tests/contract/adapter.contract.ts`、
+`?? apps/web/tests/close-account-pending.spec.tsx`。**未提交**（等用户明示）。
+
+**留给下一位的清单（按"能不能自己起跑"排）**
+
+| 格 | 状态 | 起跑命令 / 前置 |
+|---|---|---|
+| `check:landing-e2e` `check:ai-e2e` | 无读数（排队中） | 已排队的那台会自己跑；换人跑：`bash research/tools/mutation-rigs/e2-remaining-gates.sh`（前提：`lsof -nP -iTCP:3000 -sTCP:LISTEN` 与 `:5173` 为空、`sysctl -n vm.loadavg \| awk '{print $2}' ≤ 12`、无同侪 `check:*`/`playwright test`） |
+| `pnpm reinstall:all` | **实测阻塞**（§10.203） | 需要人先指认"哪台模拟器 / 哪台 adb 设备归这条线"；本机 6 台已启动模拟器无一可归属 |
+| #99 W6-c 六条设备腿变异读数 | 全缺 | 同样受上面那条归属阻塞 |
+| #98 W07"画出四类行"配图 | 未做 | 要先做种数据夹具（现图只画任务） |
+| P-12 账号面定点删除 | **等人拍板** | 三块板：默认加密／密钥托管／恢复闸 |
+| 未解释：合成探针 `no tests` | 留着，不当结论 | 复跑别带 `grep`，先看全量输出前 40 行（§10.205 末段） |
+
+⚠️ 取负载要用 `awk '{print $2}'`（我这一趟又写成 `$1`，读出 `{`）—— traps #168 那一族的现行复发。
+
+## 10.207 两段 e2e 的真门找到了（是仓库自己的内存闸门，不是 :3000），而装置先犯了两个"把状态印成另一种状态"的错（10-05 20:46–20:50）
+
+**先纠正我自己两轮的排队装置**：它检查的是 `5173` 与 `3000`。真读一眼配置就知道这两枚**都不是**
+这两个套件的端口 —— `scripts/check-ai-e2e-preflight.mjs` 里 `DEFAULT_PORTS = [4318, 4319]`，
+注释还写着"4318/4319 是**为这个套件选的**：Vite 默认 5173、Next 默认 3000"（就是怕撞）；
+`e2e/playwright.landing.config.ts:27` 是 `const PORT = 4320`。
+⇒ 19:46–20:45 那一小时排的是**不相干的端口**，而真门（下面那道锁）压根没检查。
+现量：`4317=0 4318=1 4319=1 4320=0 4321=0`。
+
+**两段各自的真前提**（分开排，别再合到一条串上）：
+
+| 段 | 需要 | 20:50 现量 |
+|---|---|---|
+| `check:landing-e2e` | 内存闸门空 + `4320` 空 + 负载 | 闸门**被占** ⇒ 排队 |
+| `check:ai-e2e` | 内存闸门空 + `4318`/`4319` 空 + 负载 | 端口也非空 ⇒ 排队 |
+
+**持锁者是机器自己点名的**，不是我的推测：
+`/tmp/tfa-test.lock` ⇒ `pid=88878`，命令行 `/bin/sh …/pnpm --dir e2e run test -- --retries=0 tests/ai-assistant.spec.ts tests/ai_brea…`
+—— 是 AI 助手那条线正在跑 e2e。**处置：等，不绕过**（`TFA_ALLOW_CONCURRENT_TEST=1` 那个开关我没用 ——
+它会并发出 1.8–26GB 的进程，整机内存不足弹窗就是这么来的），也不 kill 别人的 pid。
+
+🔴 **这一轮装置自己被抓出两个"状态映射错"，两条读数都作废过**：
+
+1. **`if wait_gate …` 调的函数根本不存在**。我那次"整块替换"的 python 没匹配上，
+   却照样打印 `patched` —— 于是 `bash -n` 过、真跑时 `wait_gate: command not found` 走 `else`，
+   `rc.txt` 里落下两句**看着完全权威**的 `LANE_LANDING=EXPIRED` / `LANE_AI=EXPIRED`。
+   我发现它只因为一件小事：从启动到 DONE **只用了 8 秒**，而一次真等待至少 40 秒。
+   ⇒ 处置：证据目录改名 `VOID-tfa-e2-remaining-194647`，并在装置里加**函数存在性自检**
+   （`typeset -f` 逐个查，缺一个就 `RIG_BROKEN` 退 4，绝不往下印任何"读数"）。
+   同时把 `nohup` 的 stderr 从 `/dev/null` 改成落文件 —— 上一版正是它把 `command not found` 吞掉的。
+2. **`SKIP_LOAD=1` 主动跳过被印成 `LANE_LOAD=EXPIRED`**（"这一道没有读数"），
+   而那道其实**已闭合**（§10.206 八枚 rc=0）。改成显式分支印 `LANE_LOAD=SKIPPED` 并写明理由。
+
+这两条是同一个毛病的两个方向：**"没跑"、"跳过"、"跑不了"、"跑了但红"、"跑了且绿"是五种不同状态，
+任何一种都不许被映射成另一种。** 与 traps #296（`-t` 没命中也 exit 0）、#297（日志不属于一次真实运行）、
+#302（过宽前提门把"没读数"伪装成"还没轮到"）同族 —— 新立一条 #304。
+
+**当前状态**：修好的装置 pid 13366 在排（唯一实例、`SKIP_LOAD=1`、上限 180 轮），
+20:50:13 第一行就是 `landing 等内存闸门：88878（不绕过、不 kill）` ——
+这一行的存在是那两道门**真的在被检查**的读数。
+
+## 10.208 三道车道 + 两条"目标原话"用现量重核（W07 我打开图看了、op-sqlite 那一套的销毁位在哪）（10-05 20:52–20:54）
+
+**排队装置升到三道**（`e2-remaining-gates.sh`，pid 25429，唯一实例）：
+`landing`（内存闸门 + 4320）、`ai-e2e`（内存闸门 + 4318/4319）、
+**`full-check`（整链 `pnpm check`，前提取两者端口并集 + 闸门 + 负载）** ——
+第三道才是 §10.199 欠的那件事（红在第 34/86 段 ⇒ 后 52 段含末尾 `pnpm -r test` 一次没跑），
+具名单段挡不住"跑满整链"这个要求。每道各自 `OPEN/EXPIRED/SKIPPED` 三态分明（§10.207 那两条映射错的续修）。
+20:52:17 现量第一行：`landing 等内存闸门：19387` —— 持锁 pid 从 88878 变成 19387，
+说明 AI 那条线**接着在跑**（不是同一趟遗留），所以这一等可能较久；上限 180 轮 ≈ 2 h。
+
+**目标原话「帮助中心那张 W07 回收站配图重跑（现图只画任务，文档已写四类）」—— 我把图打开看了**（§6.2 规定一）：
+`apps/landing/public/assets/docs/trash/W07-trash.png` 现图是**左侧 rail 的新 IA**、
+回收站那颗是激活主蓝、正文「这里放着已删除的任务、便签、清单和习惯。恢复后它会回到原来的位置。」、
+空态「回收站是空的 / 删掉的任务、便签、清单和习惯会先放到这里」。
+⇒ **目标这一句已满足**（不再是"只画任务"），与 §11.7.2 的 10-04 重截一致。
+🔴 但**我自己另立的一条更严的判据没满足**：图里是**空态**，没有四类**行**同时出现（#98）。
+两者不许混成一句 —— 前者是目标原话、后者是我加的；#98 保持 pending，
+缺口写清楚：`scripts/screenshots/capture.mjs` **没有任何种子机制**（现量：`grep -n "seed" capture.mjs` 零命中、
+`scripts/screenshots/` 目录里也没有），要做的是"建四类各一条 → 各删一条 → 进回收站再截"的夹具，
+而它需要 dev server + Playwright 窗口，与那三道车道抢同一台机器 ⇒ 排在整链之后。
+
+**目标原话「IndexedDB/SQLite/op-sqlite 三套实现」—— 逐枚现量**：
+`packages/storage/src/{indexeddb,sqlite,memory}` 三份各有 `async destroy`（`grep -c` 各 = 1），
+契约四腿跑在 **四套**实现上（`contract.spec.ts:198-208`：Memory / 第二套 / SqliteAdapter / SqliteWasmDriver）；
+**op-sqlite 那一套的销毁位不在 `apps/mobile` 里**（`grep destroy apps/mobile/src/db/*.ts` 零命中），
+它是驱动级的 `removeDatabase()`（`apps/mobile/src/db/op-sqlite-driver.ts:134`），
+由共享 `SqliteAdapter.destroy()` 消费 —— 所以"三套实现"这句**成立**，
+但它的形状是"两套 `destroy` + 一枚驱动级 `removeDatabase`"，
+不是三个各写一遍 `destroy`（这正是 §3.5 想要的：删库语义只有一份）。
+
+## 10.209 🔴 #94 拿到了：macOS 壳**界面级真点注销**那一趟跑通，七条判据全绿（含 WKWebView 字节残留那一腿）（10-05 20:55–20:59）
+
+这一格原先一直记成"要人拍板"（理由是"不能动用户本机那份库"）。装置早就把那个理由换成了**两层隔离**
+（壳库走 `HEYTA_SHELL_DB_DIR`；WebKit 没有改目录的 API ⇒ 把构建产物**改名**再跑，容器名跟可执行文件名走），
+所以它不需要任何人让位。本轮现量确认这条判断成立，并跑出了第一次读数。
+
+**过程**（每一步都是现量，不是照抄上一轮的处方）：
+
+1. 20:55:39 第一趟 `pnpm verify:macos-account-erasure` 以 **rc=3 环境无效**收尾，
+   装置自己点名原因：默认那台 `127.0.0.1:3100` 的服务端**不给 origin `heyta-local://app` 发 ACAO**
+   （`ACAO=空`），WebView 里的 fetch 必被 CORS 拦 —— 症状是"连不上服务端"，**不是**产品登不上。
+   ⇒ 这一行值得留着：它是"环境无效 ≠ 产品失败"的一次正确自我判定（`⏸ 本趟不构成读数`）。
+2. 不碰别人那台栈：自建一台。`createdb heyta_mac_erase_1005`（rc=0）→
+   按 AGENTS §4 用 `server/scripts/migrate-deploy.sh`（**不是** `prisma migrate deploy`，
+   且带 `research/tools/macos-sed-shim` 的 PATH）→ `All migrations have been successfully applied.` rc=0 →
+   `PORT=3177 HEYTA_E2E_DB=heyta_mac_erase_1005 CORS_ORIGINS="http://127.0.0.1:4328,heyta-local://app" bash scripts/mobile-e2e-up.sh`
+   ⇒ `STACK_RC=0`、服务端 pid 45815、全新账号、**ACAO 现量回 `heyta-local://app`**。
+3. `SERVER=http://127.0.0.1:3177 pnpm verify:macos-account-erasure` ⇒ **`ERASE_MAC=PASS` / rc=0**。
+
+**七条判据的读数**（汇总行逐字）：
+
+```
+A(ops)=1   C=ARMED   B(disposition)=closed-and-erased   改前枚数=3 → 改后枚数=0
+E(前缀键 基线⇒注销后)=1⇒0     E字节(命中 改前⇒改后)=1⇒0
+F(复起 ops / 明文命中 / 文件枚数)=0 / 0 / 3              S(默认路径)=SAME
+```
+
+逐条它答的是什么：A=注销前本机确实有 1 条未同步 op（**前提腿**，不然"删干净"是空的）；
+C=销毁器被**装填**过（ARMED）；B=协议结论是 `closed-and-erased`（账号没了 **且** 本机清了，不是二选一）；
+D/枚数=隔离目录里 `heyta.sqlite` 与旁挂三枚文件从 3 枚变 0 枚；
+**E=WKWebView 那份持久存储**（§10.2 清单里 macOS 的第二份）：前缀键 1⇒0、明文命中 1⇒0 ——
+这一腿以前只有壳级截图门禁绿过，**它绿的不构成这一格**（§10.3 E2 行原话）；
+F=同一组目录**再冷启动一次**：建出 3 枚文件但 `ops=0`、便签明文 0 处命中、界面回到"没有可登录的账号"
+⇒ 幂等，且不会下次同步又把它拉回来；
+S=**默认路径那枚真库整趟没被动过**：`存在/字节/mtime/md5/前缀枚数` 五项改前改后逐项相同
+（`81920` / `1790931385` / `cad2df576f00acc465b499f4871b54ca` / 3）—— 这条是"隔离没漏"的判据，
+不是仪式：它挡的正是"我把用户的库删了然后报绿"。
+
+**收尾**：我起的栈 pid 45815 已停（`3177 listeners=0`），**别人那台 3100 全程没动**（仍在监听）；
+我建的 `heyta_mac_erase_1005` **留着不删**（删库是不可逆动作，且它不在本批授权里）。
+证据与隔离目录由装置自己的 trap 清掉，容器名 `HeytaMacErase205805` 印在汇总行备查。
+
+⇒ **E2「每端按 §10.2 清单逐宿主取证」这一格现在按宿主齐了**：Web（含 OPFS 与两处活连接）、
+macOS（本趟，两份存储）、Android（§10.156）、iOS（§10.155/§10.156）、node-host CLI（§10.6）、
+Windows（§10.16 三条锁腿 + `check:windows-shell` 的 `oplog-destroy` 端到端）。
+
+## 10.210 目标那半句「补跑 `check:landing-e2e`」在**隔离载体里闭合**（18 passed / 0 红行），顺带把 iOS 那端的设备归属找回来（10-05 21:01–21:06）
+
+```
+LANE_LANDING=OPEN
+GATE check:landing-e2e rc=0 ran=YES bytes=17621
+  18 passed (1.0m)          ← 载体 `heyta-wt-tfa-e2`，不是主检出
+红行=0
+```
+
+🔴 **这条读数的载体边界要写清**：跑之前发现载体的 `e2e/node_modules` **不存在**
+（`e2e/` 刻意不在根 pnpm 工作区内，19:34 那次叠层只搬跟踪/未跟踪非忽略文件，`node_modules` 是忽略项）。
+补装 `cd <载体>/e2e && pnpm install --frozen-lockfile` ⇒ `INSTALL_RC=0`（`@playwright/test 1.63.0`）之后才有这一趟。
+⇒ 记一条：**隔离载体跑 e2e 类门禁，前置不是"根装过依赖"就够了**，`e2e/` 那份是独立 lockfile。
+
+**上一轮那个"端口门排错了一小时"的续账**（§10.207）：真门是仓库自己的内存闸门锁。
+21:01:23 起 `ai-e2e` 那道改等锁（持锁 pid 从 88878 → 19387 → 64236 一路换人，说明别的会话在**连续**跑），
+而 `landing` 那道 21:01 拿到窗口并跑完 —— **两道分开排是对的**：合成一道的话 landing 也会被 4318/4319 挡死。
+
+**设备归属这一格有了新事实**：`xcrun simctl list devices booted` 现量 6 台，其中
+**`heyta-e2-ios-erasure`（`A1D6AD48-E724-42DB-B46D-B225575B02AE`）是本线自建的**（§10.138 建它的那一行就在台账里）。
+⇒ 目标里 `pnpm reinstall:all` 的 **iOS 端不需要等别人让位**：
+21:04 起在**隔离载体**里跑 `IOS_DEVICE_NAME='heyta-e2-ios-erasure' bash scripts/reinstall-all.sh --only ios`，
+日志现量它自己确认了归属（`模拟器：A1D6AD48-…` 正是那一台），并走进 `pod install` 自愈分支
+（干净载体的 `Pods/` 与 `Podfile.lock` 不一致 —— 与 traps #32「pod 装了 ≠ 链接了」同族，脚本自己处理）。
+⚠️ 另外两端仍**不是**我能让的：`android` 端按 AGENTS §6.1 不许在这台 Mac 起 Gradle/模拟器，
+而它要装的 `emulator-5554` 是共享设备、装的是别线的产物；`mac`/`windows` 端要覆写
+`/Applications/Heyta.app` 与 `windows-pc:C:\src\heyta`（#65 登记的"打包机没人独占"仍开着）。
+⇒ 所以 `reinstall:all` 这一格现在的诚实形状是**"iOS 端有可归属目标、正在取读数；其余三端各有一条归属/授权前置"**，
+不是"整轮没跑"，也不是"四端齐"。
+
+（第一次起跑我输错了一个细节：`cd <载体>` 之后用**相对路径**重定向日志，
+而载体里没有 `tmp/` ⇒ 重定向失败、任务当场没起来，`tail` 报 No such file。改绝对路径 + `mkdir -p` 才起。）
+
+## 10.211 iOS 那端的读数到手（`IOS_REINSTALL_RC=0`），图我按 §6.2 打开看了 —— 那一屏是**首启联网同意页**，不是任务列表（10-05 21:06–21:14）
+
+§10.210 末句写的"正在取读数"现在有结局了。同一台**本线自建**模拟器（日志自己回读了归属：`模拟器：A1D6AD48-E724-42DB-B46D-B225575B02AE`），
+在隔离载体 `heyta-wt-tfa-e2` 里跑 `IOS_DEVICE_NAME='heyta-e2-ios-erasure' bash scripts/reinstall-all.sh --only ios`：
+
+```
+✅ 全仓构建完成（步骤 0 = pnpm -r build）
+pod install 第 1 趟 rc=0；⚠️ 载体内 Podfile.lock 与 HEAD 差 4 行；✅ 沙盒已同步（Manifest.lock == Podfile.lock）
+✅ 构建成功 / ✅ 已安装进模拟器（全新安装）
+✅ 已装的包比源码新 —— 这一轮装的是当前产物       ← freshness 判据，就是 §7 第 27 条那条
+主蓝采样命中 4152；窗口 1206x2622、内容占比 60.1% —— 是共享 UI
+⏭ mac / windows / android：不在 --only 范围 —— 这端**没有**验证当前产物
+IOS_REINSTALL_RC=0
+```
+日志：`tmp/reinstall-ios-210446.log`（主检出），截图 `/tmp/heyta-reinstall-ios.png`。
+
+**pod 那 4 行落在哪棵树，我逐边现量了**（不是"应该只在载体里"）：
+载体 `git diff --stat` = `apps/mobile/ios/Podfile.lock | 4 ++--`，内容两对各一行 ——
+`hermes-engine: 208b0dcd…` → `1e1127e8…`、`PODFILE CHECKSUM: 4b316b80…` → `75d7db42…`；
+主检出 `git status --porcelain -- apps/mobile/ios/Podfile.lock apps/mobile/ios/Pods` **输出为空**。
+⇒ 这一趟没有把别人的 iOS 原生依赖清单弄脏；那 4 行是**干净载体的 Pods 沙盒重建**的产物，
+与 traps #32「pod 装了 ≠ 链接了」同族 —— 脚本自己走自愈分支，我没手动补刀。
+
+🔴 **看图这件事有一个必须写下来的落差**（§6.2 规定一第 4 条要求人真的打开那张图，我打开了）：
+截图那一屏是**首启的联网同意页**（「在使用联网功能之前」+「只用本机」/「同意并联网」两档 +
+服务条款/隐私政策链接 + 品牌蓝主按钮），**不是任务列表，也不是回收站**。
+⇒ 所以这条读数证明的是"当前产物装上了、共享 UI 真渲染了、品牌色在场"，
+**不**证明"回收站那屏在这台 iOS 上画得对" —— 后者属于 #99/W6-c 那一族设备级判据，仍然没有读数。
+判据本身也没撒谎：它问的就是"是不是我们的界面"（traps #82 那条主蓝判据设计的正是这个），
+是**我**差点把它读成"回收站可用"。这两件事的差别必须留在台账里。
+
+⇒ `reinstall:all` 这一格的形状因此更新为：**iOS 端 ✅（载体、可归属设备、rc=0、图人看过）**；
+其余三端各自的前置没变（mac 要覆写 `/Applications/Heyta.app`、windows 要动共享打包机 `#65`、
+android 受 AGENTS §6.1 限制且 `emulator-5554` 是别线在用的设备）。**不是"四端齐"。**
+
+**同窗口的阻塞现量**（`ai-e2e` 那道仍在排队，我不绕过、不 kill 别人的锁）：21:01 起装置依次打印
+`等内存闸门：64236 / 7830 / 15587`（持锁 pid 一路换人 ⇒ 别的会话在**连续**跑）、
+`等同侪（1→3→4 条验收在跑）`、`等负载：69.96 / 89.23 / 115.35 / 62.77 / 36.06 / 21.84 > 12`。
+⇒ 这台机器现在的负载峰值是**我自己这批以外的会话**造成的；这一格的诚实状态是"排队中、有上界（`CAP_ROUNDS=180`）"，
+不是"跑不了"，也不是"跑过了"。
+
+## 10.212 目标点名的 `check:ai-e2e` 读数到手：**rc=1，161 passed / 1 failed / 2 skipped** —— 那一枚红不是本批的，账在 B79 ③（10-05 21:15–21:23）
+
+```
+LANE_AI=OPEN
+GATE check:ai-e2e rc=1 ran=YES bytes=42130
+  1 failed   [chromium] › tests/ai-assistant.spec.ts:65:3 › 对话助手… › 披露前零出境 → 多步读循环 → 第二句不再拦 → 档位刷新后仍在 (18.1s)
+  2 skipped
+  161 passed (7.4m)
+```
+载体 21:15:36 拿到窗口（`窗开：load=10.75`），跑完 21:23:03。排队期间装置如实打印了
+`等内存闸门：64236 / 29827 / 15587 / 7830`、`等同侪（1→4 条验收在跑）`、`等负载：115.35 → 12.25`，
+没有绕过、没有 kill 别人的锁（traps 里那条"等得来的人，等不来的底噪"的形状）。
+
+**归因（三条现量，不靠印象）**：
+1. 断言原文：`expect(locator('[data-testid="ai-assistant-disclosure"]')).toHaveCount(0)` ⇒ Expected 0 / **Received 1**，
+   落在 `e2e/tests/ai-assistant.spec.ts:139`（第二句发送后披露块应消失）；首趟与 retry #1 **两趟都红**（不是 flaky）。
+2. 责任面：`ai-assistant-disclosure` 这个 testid 只住在 4 个文件里
+   （`apps/web/src/features/ai/AssistantPanel.tsx`、`e2e/tests/ai-assistant.spec.ts`、
+   `apps/web/tests/ai-assistant-panel.spec.tsx`、`apps/web/tests/ai-panel-remount.spec.tsx`）—— **本批一枚都不在里面**，
+   本批那 16 枚改动（#96 那张表）没碰 AI 面。
+3. 决定性的一条：`git status --porcelain` 对 `AssistantPanel.tsx` 与 `ai-assistant.spec.ts` **输出为空**
+   ⇒ 它不是"别人正在飞的编辑"造成的，是**已落地**的形状；而 `BLOCKED.md` **B79 ③**（10-05 00:5x）
+   把同一枚红连同成因一起记过：「三条同一个成因 —— `fullPage: true` 截图改视口高度 ⇒ 右栏那一列量到 0
+   ⇒ AI 面换挂载点 = 换子树 ⇒ 未决的披露状态被悄悄取消。这是 `78cdff67`（把 AI 面搬进右栏）带出来的」，
+   并且那节明确写着 A/B 两臂的取舍与**两条已被否证的修法**（portal、模块级 ephemeral）在 B76 补记 #17，属**待拍板**项。
+
+⇒ 结论按硬约束落：**本批不代它吸收这枚已提交债**（"绝不代别人吸收已提交债"），也**不动那条判据**
+（B79 那节自己写的"本线的判据一条都不放宽：不改、不跳过、不加 `force: true`"，我沿用同一口径）。
+目标里"补跑 `check:ai-e2e`"这一格因此**闭合的是"取到读数并按现量归因"**，不是"取到绿" ——
+而 `161 passed / 2 skipped` 这一面说明本批的改动没有把 e2e 套件推倒任何一条（回收站/注销那几条在本套件里是绿的）。
+
+顺带一格（我差点把自己写进那条坑）：上一轮我那个"等到 verdict"的等待器把条件写成
+`^(GATE check:ai-e2e|LANE_AI=)`，于是 `LANE_AI=OPEN` 那一刻它就报了"verdict 到手"——
+**OPEN 是在飞，不是结局**。第二种状态映射错，同族于 §10.207 那两处、traps #304。
+改判据只认 `^GATE check:ai-e2e ` 那一行才作数（本轮第二次等待就是这么做的，round=33 才真到手）。
+
+## 10.213 整链 `pnpm check` 的第一趟读数：**rc=1 但不是产品红** —— 链在半路被仓库自己的内存闸门拒掉，而那一枚段把"闸门拒启动"印成了"变异断言没报告"（10-05 21:23–21:28）
+
+```
+LANE_FULL=OPEN
+FULL_CHECK rc=1 ran=YES segments_denominator=86 red_lines=2 bytes=55313
+日志里打了 9 行 `$ <命令>`，第 9 行就是死掉那一段：
+  $ node scripts/mutate-op-log-semantics.mjs
+  Error: E: clientId tie-break baseline: missing assertion report
+  内存闸门拒绝启动：已有测试在跑（pid=78326，锁 /tmp/tfa-test.lock；
+  它是：/bin/sh … npx vitest run tests/security/revisionsTableNamesContract.test.ts …）
+```
+
+🔴 **这一趟不能记成"86 段里第 9 段红"**。三件事分得开才算读数：
+1. 窗口是**起跑那一刻**合格的（装置 21:23:03 打印 `full-check 窗开：load=8.32`，三门齐过），
+   而链跑到中途时**别人**拿走了内存闸门锁（pid 78326 在跑 `revisionsTableNamesContract.test.ts`，属**另一条线**）；
+2. 被拒之后那一段并没有"跑出了红结论"，它抛的是 `missing assertion report` ——
+   因为它只检查"子进程有没有写出 result.json"，**不区分**"子进程压根没被允许启动"与"变异真红了"。
+   这两档在日志里长得一模一样（`rc=1` + 同一句 Error），正是 traps #304 那一族「五种状态必须印得开」；
+3. 链死在第 9 段 ⇒ 后面 77 段（含末尾 `pnpm -r test`）**仍没有读数**，§10.199 欠的那件事没还。
+
+**我这条线自己欠的那半已经还了**（装置是我的，改它不越界）：
+`research/tools/mutation-rigs/e2-remaining-gates.sh` 的整车道现在
+① 把"日志里出现 `内存闸门拒绝启动`"单独量成 `env_refusal=YES`，
+② 那种趟**不当读数**，回到三门前重新排队再跑（`FULL_ATTEMPTS`，默认 3），
+③ 没有任何一趟干净跑完时印 `LANE_FULL=NO_CLEAN_RUN`（不是 EXPIRED、不是 rc 折算），
+④ 新增 `SKIP_LANDING` / `SKIP_AI` 两枚显式旋钮（已闭合的段不为了重取读数去压负载），
+⑤ 把装置自己列进 `MINE` 自同步表 —— 否则载体里那份旧字节会让 `check:shell-unicode` 在整链里再红一次
+（这一趟就是这么发现的：`$LB（` 那处变量名被全角括号吞掉，主检出的装置自己带着它，
+  载体那份也带着它；现量 `node scripts/check-shell-unicode-vars.mjs` 修前 rc=1 → 修后 rc=0，扫 139 个 .sh）。
+第二趟已于 21:28 起在后台跑（`SKIP_LOAD/LANDING/AI=1`、`CAP_ROUNDS=200`），读数到手前这一格写"排队/在飞"。
+
+📌 **不属于本批、只登记不代改的那一条**（新任务 #108）：`scripts/mutate-op-log-semantics.mjs:74` 把
+"闸门拒启动"与"变异真红"合并成同一句 `missing assertion report`。它是 `f522dcb1`（10-03 23:58，
+无损向量时钟边界那条线）落的装置，此刻在工作树里**干净**（`git status --porcelain` 空）⇒
+不是别人在飞的编辑，是**已落地**的形状；按硬约束"绝不代别人吸收已提交债"与"判据口径永不代改"，
+本批不把自己的状态词表焊进别人的 rig。要改的是那条线自己决定：把拒启动分成第三种退出码/第三种措辞，
+并让 `pnpm check` 那一档在拒启动时**重跑或响亮 BLOCKED**，而不是让整链以一句看起来像产品结论的话短路。
+
+## 10.214 停车格（10-05 21:30）：② 那格里**只剩整链一件事在飞**，其余范围逐项的当前形状与续跑命令
+
+| 目标点名的格 | 现在的形状 | 续跑/取证命令（现量，别抄本表） |
+|---|---|---|
+| 壳类八段 | ✅ 载体八枚 rc=0（§10.206，unicode 那枚红已修并载体复量 §10.202） | `SKIP_LANDING=1 SKIP_AI=1 SKIP_LOAD=1 bash research/tools/mutation-rigs/e2-remaining-gates.sh` 会跳过它 |
+| `check:landing-e2e` | ✅ 载体 18 passed / 红行 0（§10.210） | 前置是 `cd <载体>/e2e && pnpm install --frozen-lockfile`（那份 lockfile 不在根工作区） |
+| `check:ai-e2e` | ✅ **读数到手**：rc=1、161 passed / 1 failed / 2 skipped；那 1 枚红按三条现量归给 **B79 ③**（AI 面搬进右栏 `78cdff67`），本批不代改（§10.212） | `GATE check:ai-e2e` 行在 `~/.heyta-evidence/tfa-e2-remaining-*/rc.txt` |
+| 整链 `pnpm check`（86 段） | 🔄 **在飞**：第 1 趟死在第 9 段且是"闸门中途拒启动"，不当读数（§10.213）；第 2 趟带 `env_refusal` 检测与重排队，21:28:43 起在后台 | `ls -dt ~/.heyta-evidence/tfa-e2-remaining-* \| head -1` → 看 `rc.txt` 的 `FULL_CHECK attempt=… env_refusal=…`；只有 `env_refusal=NO` 那趟才作数 |
+| `pnpm reinstall:all` | iOS 端 ✅（`IOS_REINSTALL_RC=0`、图人看过是首启同意页，§10.211）；mac / windows / android 各有一条归属或授权前置，**不是四端齐** | mac 要覆写 `/Applications/Heyta.app`、windows 要独占 `windows-pc`（#65）、android 受 AGENTS §6.1 且 `emulator-5554` 属别线 |
+
+**本批之外、下一轮要先看的一件事**：#108 那枚"别人把闸门拒启动印成产品结论"——它会继续让
+任何长链在负载高的时段以一句**看起来像红**的话短路。我没代改（判据口径不代改），
+但它对**所有人**的补跑都有影响，登记在 `docs/plans/trash-and-archive.md` 的任务表与 traps 第 304 条第 3 例。
+
+**仍然开着的其余格没被这一轮伪装成闭合**：#98（W07 那张"画出四类行"的配图要先有种数据夹具，
+`capture` 装置现在没有）、#99（W6-c 六条设备腿的"拿掉修复就红"变异读数全缺）、
+#104（宿主运行时那一格 + 阳性对照）、P-12（要产品负责人拍，且是不可逆运维动作）、
+以及 §10.3 那张 19 行登记表里剩下的 pending 项。
+
+## 10.215 整链第 2 趟：链跑到**第 41/86 段**（`pnpm check:docs`）就短路 —— 红是收款线那批未跟踪文件（#103 那格）；我又把"没被闸门拒"错当成"跑完了"（10-05 21:30–21:33）
+
+```
+LANE_FULL=OPEN attempt=1
+FULL_CHECK attempt=1 rc=1 ran=YES env_refusal=NO commands_echoed=45 segments_denominator=86 red_lines=6 bytes=93091
+最后三条 echoed：check:linux-shell → check:native-bare-values → research/tools/docs-link-check.mjs
+```
+
+**这一趟的真结论，分三层说，别混**：
+1. 窗口这次是**全程合格**的（21:30:04 窗开 load=5.82，`env_refusal=NO` ⇒ 上一趟那种"中途被拒"没有重演）；
+2. 链**跑到第 41 段**（`pnpm check:docs` = `research/tools/docs-link-check.mjs`）红并短路。
+   按 `&&` 的语义，**第 0–40 段是"跑了且绿"**（这是链的形状给的推论，不是逐段独立读数 —— 说清这点，
+   免得下一位把这 41 格当成"每段都有过自己的 rc"）；第 42–85 段**没有读数**；
+3. 那一枚红的**内容**我逐条读了：全部是"**本机存在但 git 没跟踪**"的目标 ——
+   `docs/adr/0053-refunds-only-for-countable-segments.md`（被 `pricing-coupons-handoff.md` 三处、
+   `roadmap.md` 两处、`pricing-and-entitlements.md` 一处指着）与
+   `apps/web/evidence/renew-panel-{no-channel,no-consent,order}.png` 三枚。
+   ⇒ 这正是 **#103** 早就登记过的那格：**退款/收款线在飞的 ADR-0053** 与它的凭据图，
+   载体 19:34 叠层把它们当"未跟踪非忽略文件"搬过去了，但它们还没被那一线 `git add`。
+   **本批不代改**（三条出路是那一线自己的选择：入库／改成纯文字／进 `UNTRACKED_OK` 登记理由），
+   我也**不放宽判据**（门禁打印的"别为了让门禁绿而放宽判据"那句，就是我不动它的理由）。
+
+🔴 **又一条我自己的状态映射错**（这一格的第三种状态，同 traps #304）：
+我给整链加的判定是 `env_refusal=NO ⇒ 这一趟作数、跳出重试`，
+而"没有闸门插手"**不等于**"链跑到了底"。真相就在数里：`commands_echoed=45` 对着 `segments_denominator=86`。
+⇒ 装置补了第四道：**尾部段逐段独立取读数**（`TAIL_FROM` 给 0 基下标、段名从 `package.json` 的
+`check` 串**现取**（不手抄清单，抄的那份会漂）、每段自己的 `rc=` 落 `rc.txt`、
+`SKIP_SEG` 只跳已闭合那几段并按 `SKIPPED` 印、收尾印 `TAIL_SUMMARY listed/green/red/skipped`），
+21:33 起在后台跑第 41–85 段。这一道出来的红/绿**都是逐段真读数**，包括末尾那格 `pnpm -r test`。
+
+顺带一枚装置自己的红（不必等整链）：新块里 `say "…（已闭合：$name）"` 那处 `$name` 紧跟全角括号，
+会被吞掉变量名 —— 是我自己那条常驻门禁 `check:shell-unicode` 在起跑**前**抓出来的
+（修前 rc=1 → 修后 rc=0，扫 139 个 `.sh`），与 §10.202「修的必须是载体的字节」配套：
+装置现在把**自己**也列进 `MINE` 自同步表，载体那份不会再留旧字节。
+
+## 10.216 尾部 45 段逐段读数到手（36 绿 / 4 红 / 5 显式跳过）—— 四枚红逐条归因，其中**一枚确实是本批的**，当场修掉并留了红绿对照（10-05 21:33–21:38）
+
+```
+LANE_TAIL=OPEN from=41
+TAIL_SUMMARY from=41 listed=45 green=36 red=4 skipped=5
+红：SEG 01 `check:docs`｜SEG 27 `check:vault-diagnostics`｜SEG 29 `check:privacy-consent-e2e`｜SEG 45 `pnpm -r test`
+```
+
+**加上这一道，86 段现在每一段都有读数**（来源分三道，别再当成"整链跑满了"）：
+第 2 趟整链里 `&&` 语义给出 **0–40 段跑了且绿**（链死在 41 段），
+**41–85 段**由这一道逐段独立给出，其中 5 段（`check:ai-e2e`/`check:landing-e2e`/`check:shell-unicode`/
+`check:shell-exit-chain`/`check:shell-erasure-parity`）按旋钮显式 `SKIPPED` —— 它们各自的读数在 §10.212/§10.210/§10.206，
+不是"没跑"。
+
+### 四枚红的逐条归因（每条都取到原话，不靠印象）
+
+1. **`check:docs` 红 13 处"本机有、仓库里没有"** ⇒ **属收款/退款线，#103 那一格**。
+   命中的目标只有两类：`docs/adr/0053-refunds-only-for-countable-segments.md`（被 `pricing-coupons-handoff.md` 三处、
+   `roadmap.md` 两处、`pricing-and-entitlements.md` 一处、`adr/0026` 一处指着）与
+   `apps/web/evidence/renew-panel-{no-channel,no-consent,order}.png`。
+   ⇒ 载体的 19:34 叠层把这些**未跟踪**文件搬过去了，而那一线还没 `git add`。
+   门禁打印的三条出路（入库／改成纯文字／登记 `UNTRACKED_LINK_OK` + 理由）**是那一线的判断**，本批不代改、不放宽。
+2. **`check:vault-diagnostics` 红，但这条读数问不到东西** —— 它抛
+   `Diagnostic probe did not produce a test report; check the test lock/browser availability`，
+   而子进程的日志**被它自己吞掉**（这正是 #93 登记的那条）。
+   ⇒ "闸门拒启动 / 浏览器不可用 / 真红"三种在这条输出里**长成一个样**，所以这一格记**读数未取到**，
+   不记成产品红、也不记成通过。与 #108 同族（不同脚本、同一个状态合并形状）。
+3. **`check:privacy-consent-e2e` 红 = 环境无效**，日志里明印着
+   `内存闸门拒绝启动：已有测试在跑（pid=33648，锁 /tmp/tfa-test.lock）`，
+   而它自己的前两条腿都过了：`pnpm --filter @heyta/web build` ✓、`check-ai-e2e-preflight 4322` 打印 `✅ 4322 都是空的`。
+   ⇒ 这一格同样是"没被允许跑"，不是"跑了且红"。
+4. 🔴 **`pnpm -r test` 唯一那一枚红是本批的**：`apps/node-host/tests/cli-account.spec.ts` 的
+   「🔴 句子永远不说"彻底销毁"：四种结局里只有一种能声称本机已清」，
+   抛 `AdapterDestroyedError: 这份存储已被销毁（sqlite）…` 栈顶 `SqliteAdapter.ensureOpen`。
+
+### 这一枚为什么不是产品缺陷，以及我改成什么形状
+
+**产品侧顺序现量**：`apps/node-host/src/cli-account.ts:99-101` —— `pendingUploadCount()` 与 `exportDocument()`
+都发生在 `closeAccountAndEraseLocal()` **之前**，命令内部销毁之后不再碰适配器；CLI 一条命令一个进程，
+所以生产路径不存在"复用已销毁实例"。
+**用例侧才是**：那一个 `it` 里连跑两档、**共用同一个 host** —— 第一档注销成功即把那份 SQLite 存储销毁
+（这是 E2 定的"销毁即死路"：销毁后的实例拒绝再用，而不是把刚删掉的容器重建成空壳），
+第二档再去读 ⇒ 抛。**产品行为正确，夹具形状错。**
+
+改法（`apps/node-host/tests/cli-account.spec.ts`）：
+- 拆成两个 `it`，各自吃 `beforeEach` 给的**独立临时目录与独立销毁器注册**（文件头那段注释早就写明注册表是模块级单例、
+  必须逐用例注销 —— 同一个理由也要求每档自己的宿主）；
+- 四条原话逐字保留（`别的设备上的副本与备份不在这次动作里` / `服务端没删成` / `not.toMatch(/彻底(删除|销毁)所有/)` /
+  `existsSync(dbPath)`），**没有删任何断言**；
+- **新增强制一条**：成功那一档之后 `await expect(host.exportDocument()).rejects.toBeInstanceOf(AdapterDestroyedError)` ——
+  把"这次为什么红"钉成判据，谁来把销毁改成静默重建，这条就红。
+
+读数：**修前**整链里 `Test Files 1 failed | 10 passed (11)`、`Tests 1 failed | 185 passed (186)`；
+**修后**主检出单文件 `12 passed / rc=0`（比原来多一枚用例，就是新增那条腿），`tsc --noEmit` rc=0；
+整包（186 枚）复量排在内存闸门后面（21:37:5x 起跑被别人的 pid 83759 拒掉 ⇒ 等窗复跑，等不到就记"没有读数"）。
+
+📌 顺带把 §10.213/§10.215/§10.216 三趟连起来看：**同一句"内存闸门拒绝启动"今天在三种装置里分别被印成
+"missing assertion report"、"没有拒绝就当作数"、"probe did not produce a test report"** ——
+这不是我的批次独有的问题，是补跑长链时**每一道都要自己把"没被允许跑"单独量出来**，
+否则下一次会话会把环境噪声读成产品结论。
+
+### 10.216 补（同分钟内到手）：`apps/node-host` **整包复量绿了** —— 11 files / 187 passed / rc=0（21:39）
+
+刚才那句"整包排在内存闸门后面等窗"有结局了：窗口 21:39:03 打开（等锁循环第一趟就看到锁空，没有 `TFA_ALLOW_CONCURRENT_TEST`，没绕过），
+`NO_COLOR=1 npx vitest run` 在**主检出**跑完整个包：
+
+```
+Test Files  11 passed (11)
+     Tests  187 passed (187)   ← 修前是 1 failed | 185 passed (186)；多出来那一枚就是新增的"销毁后必须拒用"那条腿
+Duration  2.49s
+```
+
+⇒ `pnpm -r test`（尾部 SEG 45）这一格现在**本批那枚红已闭**，且红绿对照齐：
+修前 `1 failed | 10 passed (11)` + `AdapterDestroyedError` 原文 → 修后 `11 passed` / `187 passed`，`tsc --noEmit` rc=0。
+其余三枚红的归属不变（#103 的未跟踪链接、#93/#108 那两枚"问不到东西"的读数）。
+
+## 10.217 目标范围的当前总账（10-05 21:41）：② 那格已闭，剩下的每一格都写着"卡在哪、谁能解"
+
+| 目标点名的范围 | 现在的形状 | 还差什么（以及差的那件事归谁） |
+|---|---|---|
+| W4b 标签删除确认 | ✅ | — |
+| W6 回收站跨设备真机（`verify:mobile-trash` 六条腿） | ✅ 读数到手（§10.174 那批） | **设备级逐腿变异**全缺＝#99；要 Android 设备窗口，而 `emulator-5554` 是别线在用、AGENTS §6.1 又不许在这台 Mac 起 Gradle/模拟器 |
+| E1b 401→410 | ✅ 已在 HEAD 并按代码本体复核（§10.104/§10.212 那张表） | — |
+| E2 三套实现 + 逐宿主取证 | ✅ 按宿主齐（§10.209 是最后一格）；**本批这一格里刚照出的真缺陷已修**（§10.216：node-host 那档"共用已销毁宿主"的夹具形状，新增"销毁后必须拒用"判据腿） | 阳性对照分端现量：macOS 壳运行时 ✅（§10.129 三臂 + §10.98 M3 + §10.221 的 M4）、CLI 宿主 ✅（§10.218）、Web 的删除动作 ✅（§10.100/§10.102）；**仍缺**Web 运行时的"销毁后拒用"（§10.220 那臂在实现层，不在真浏览器）与 Windows 壳（无装置 ⇒ #65） |
+| E3 三端入口 + 二次确认 + 先导出提示 | ✅（§10.205 把现量条数钉上） | — |
+| E5 可当场修的部分 | ✅（含 §10.10 的解密+重放常驻判据） | 备份**定点删除**＝P-12（要产品负责人拍，且是不可逆运维动作） |
+| E6 九份 GDPR 口径 + 常驻门禁 | ✅ 9/9 + 门禁有牙 | — |
+| W07 那张"画出四类行"的配图 | 🟡 现有图只画任务（人已看过） | #98：先给 `capture` 装置做**种数据夹具**，再重截、再看图 |
+| ② 补跑：`check:landing-e2e` / `check:ai-e2e` / 壳类门禁 / `reinstall:all` / 整链 check | ✅ **每段都有读数**（§10.210–§10.216），本批那枚红已修 | `reinstall:all` 的 mac/windows/android 三端各有归属或授权前置（§10.211），不是"没跑" |
+
+一句话现状：**批次 E 与批次 B 的全部工单都落了地并有判据；② 那格的补跑也收完口。**
+开着的四件（#98 / #99 / #104 / P-12）没有一件能靠我自己这一侧完成——
+分别要 Playwright 种数据夹具的工作量、Android 设备窗口、宿主运行时的阳性对照窗口、以及产品负责人对不可逆运维动作的拍板。
+
+## 10.218 #104 的阳性对照到手（CLI 宿主那一格）：摘掉"销毁即死路"那一发 ⇒ **恰好 1 红，红在新那条腿上**；还原逐字节相同 ⇒ 12 passed（10-05 21:42–21:43）
+
+跑在**隔离载体** `heyta-wt-tfa-e2`，不在主检出：主检出的 `packages/storage/src/*` 此刻带着本批自己的未提交改动，
+拿它做变异再还原等于在共享树上玩火（traps #303 那次的教训就是"还原"这步能毁掉别人的在飞改动）。
+起跑前两枚现量：载体与主检出的 `sqlite-adapter.ts` **md5 相同**（`d94dca1f…`）⇒ 载体那份就是要测的那份；
+载体的 `cli-account.spec.ts` 是 19:34 的旧字节 ⇒ 先把主检出那份搬过去并 md5 对账（`SPEC_SYNC … same=YES`）。
+
+```
+MUTATION_APPLIED（只删掉那一句 `if (this.destroyed) return Promise.reject(new AdapterDestroyedError('sqlite'))`，
+                  换成一行注释 ⇒ destroyed 走"透明重开"，正是文件里注释禁掉的那条路）
+BUILD1_RC=0
+ARM_RC=1      Test Files 1 failed (1)   Tests 1 failed | 11 passed (12)
+   × 🔴 句子永远不说"彻底销毁"·放行那一档：…且销毁后的实例真的不能用
+     330|  await expect(host.exportDocument()).rejects.toBeInstanceOf(Adapter…)   ← 红恰好落在这一条新腿
+RESTORE_MD5=d94dca1f41f6f5f1e77f263ec4ec0cc2  same_as_pre=BYTE_EXACT
+BUILD2_RC=0   RESTORED_RC=0   Tests 12 passed (12)
+主检出现量复核：`md5 -q packages/storage/src/sqlite/sqlite-adapter.ts` 仍是 `d94dca1f…`（**没被变异臂碰过**）
+```
+
+⇒ §10.216 那条"把这次红钉成判据"的新腿**有牙**：它不是跟着绿的装饰，摘掉产品修复它单独转红，
+而红的位置就是那条断言本身（配对到 `:330`，不是别处顺带红）。证据目录 `~/.heyta-evidence/mut-104-cli-host-214240/`
+（PRE 原文、两趟构建日志、变异趟与还原趟的 vitest 日志各一份）。
+
+🔴 **这格闭合的范围要说清，别读成"所有宿主的阳性对照都做了"**：
+到手的是 **node-host（CLI 宿主）运行时**那一格。其余宿主的"销毁后拒用"在**运行时**的阳性对照仍需各自窗口：
+Web 那条要真浏览器（`check:web-storage` 与 §10.101 那批 OPFS 臂覆盖的是删除动作本身，不是"再读必须抛"），
+两个原生壳那条要壳级运行窗口（§10.16 / §10.209 覆盖的是"文件真没了"）。所以 **#104 保持 pending**，
+描述改成"CLI 宿主已闭 + 缺哪两格"。
+> **（10-05 22:0x 撤回）** 上面这两句里"两个原生壳那条要壳级运行窗口"**是错判**：macOS 壳的运行时变异读数
+> 在 §10.129（M1/M2a/M2b，05:59–06:1x）就有了，Web 真浏览器的删除动作臂在 §10.102 也有了。
+> 这一节的"仍缺"清单当时就把已有读数的格子重复登记成缺口。
+> 现在 #104 真正缺的是两样，都**不是**"原生壳"：**Web 运行时的"销毁后拒用"**（§10.220 那枚 IndexedDB 臂在实现层测试里，
+> 不在真浏览器上）与 **Windows 壳装置不存在**（要共享打包机 ⇒ #65）。详见 §10.221 开头那段撤回。
+
+## 10.219 #98 的形状终于量清了：截图流水线**根本没有"种数据"那一层**，所以"画出四类行"不是重截一次能做的事（10-05 21:45 现量）
+
+现量四条（不是印象）：
+
+1. `scripts/screenshots/capture.mjs` 全文件只有 **2 处 `evaluate`**
+   （`:143` 是 `page.evaluate(() => document.activeElement?.blur?.())` 清焦点，
+   `:225` 是链式 `.evaluate(([x, y]) => …)` 的坐标点击；按字面 `page.evaluate` 数只有 1 处，
+   所以**数法要说清数的是什么**），两处都**不是种数据**；
+   全文对 `seed` / `demo` / `fixture` 的命中行数是 **0**。
+2. 目标表 `scripts/screenshots/targets.mjs` 里一个 web 目标的全部形状就是
+   `id / name / site / openVia / view / readyText / locale / device / appStore`
+   （原行现量：`{ id: 'W01', name: '任务', site: 'web', openVia: 'tab', view: 'tasks', readyText: '任务', appStore: true },`）—— **没有数据字段**。
+3. ⚠️ 特别别误读：**`appStore` 不是"注入演示数据"**，它是**选集开关**
+   （`capture.mjs:69-80`：带 `--app-store` 时只把打了这个标记的目标换成固定视口的 App Store 产物集）。
+   我一开始差点把它当成那层机制，读源码才否证。
+4. ⇒ 现在这张 `W07-trash.png` 里只有任务那一类，**不是截错了**，而是**没有任何一步把便签/清单/习惯变成"已删除"**。
+   文案与词条真源早就是四类（§10.3 那批对账），**落后的确实只有产物**。
+
+**要做成这件事的最小形状**（写清楚，免得下一位从零想）：
+① 给目标表加一条**声明式的 seed 步骤**（不要把点击序列硬编码进 `capture.mjs`）：
+   四类各"建一条 → 删一条"，走应用自己的写入口（op-log），**不许**直接改 IndexedDB；
+② 判据必须写成**存在性**——每一类都得在图里有自己的行，行名从 i18n 真源取；
+   这正是 W5 那条教训的另一半："断言只会验界面写了什么，不会验界面少了什么"；
+③ 截完接 `node apps/landing/scripts/gen-help-figures.mjs` + `screenshot:verify` + 两道门禁，
+   并且**人再看一眼那张图**（AGENTS §6.2 规定一）；
+④ 🔴 这一趟**只能在工作树那棵 IA 上跑**（§10.3 那行 ③ 早量过：从隔离检出截等于白截，配图与未提交的 IA 绑死）。
+
+**为什么本批这一轮没做**（不是"顺手就能做"，也不是"没试"）：它要一段**连续的 Playwright 窗口**，
+而 21:45 现量这台机器 `load(1m)=22.61`、仓库内存闸门 `HELD`、:5173 上监听 `0` 条、
+同期在跑的验收/门禁命令 `3` 条。按硬约束"重负载串行、窗口先到先得且必须现量归属"，
+我没有插队起浏览器；也**没有**用"改文案让文档迁就旧图"把这格假闭 ——
+文案写四类是对的，错的是图，反向迁就就是把对外承诺降级到产物水平。
+
+⇒ **#98 保持 pending**，缺的那一层与最小做法已落在上面四条里。
+
+## 10.220 E2 那"三套实现"的**变异读数补齐了两套**：IndexedDB 摘掉守卫 ⇒ 恰好 1 红；Memory 摘掉两处 ⇒ 恰好 2 红；两趟还原都逐字节相同 ⇒ 419 passed（10-05 21:46–21:47）
+
+目标对 E2 的要求是"契约 + IndexedDB / SQLite / op-sqlite **三套实现**"，而台账里的变异臂此前只覆盖到
+`op-sqlite/native-bridge` 那一族（A–E 五臂）与 SQLite 的宿主级那一发（§10.218）。
+**`IndexedDbAdapter` 与 `MemoryAdapter` 里那两发 `destroyed` 守卫从来没被摘过** ——
+臂 V（§10.191）摘的是同一个文件里的 `onversionchange`，是**另一条线**，别把两者读成一回事。
+
+| 臂 | 摘掉的是 | 读数 | 还原 |
+|---|---|---|---|
+| IDB | `indexeddb-adapter.ts:224` 的 `if (this.destroyed) return Promise.reject(new AdapterDestroyedError(this.dbName))` | `Test Files 1 failed \| 7 passed (8)`、`Tests 1 failed \| 418 passed (419)`，红的正是契约那条 `destroy 之后这个实例是**死路**：普通读写必须抛，不许静默重建容器`（里面 read/add/init 三腿共用一个 `it`，所以**红数=1 用例而不是 3**） | `BYTE_EXACT`（`c06d212a…`）→ `8 passed / 419 passed` rc=0 |
+| Memory | `memory-adapter.ts:187` 与 `:311` 两处 `throw new AdapterDestroyedError('memory')` | `Test Files 2 failed \| 6 passed (8)`、`Tests 2 failed \| 417 passed (419)`：除了同一枚契约腿，还多红一枚 Memory 自己的 `销毁即死路：报告如实写明"没有持久容器"，而这个实例从此拒绝读写` ⇒ **两套实现的红数不同是有原因的**，报数时别把两边都写成"1 红" | `BYTE_EXACT`（`07b2803f…`）→ `419 passed` rc=0 |
+
+两趟都跑在**隔离载体**，起跑前后各核一次主检出 md5（`c06d212a…` / `07b2803f…` 未变）⇒ 没有把别人的在飞文件当自己的实验台。
+
+🔴 **中间那趟没跑成，形状值得记**：第一趟 Memory 我把匹配句写错了（按 IDB 的 `return Promise.reject(…)` 去匹配 Memory 的
+`throw new …`），python 的 `assert` 当场失败 ⇒ **一个字都没改**。
+而随后两趟 `pnpm --filter @heyta/storage test` 都返回 rc=1 —— 如果照 rc 记账，就会出现"没改代码也摘掉了修复"的假读数。
+日志尾巴是 `内存闸门拒绝启动（pid=73395，是别人在跑的 @heyta/domain test）` ⇒ 判 **ENV_INVALID、不算读数**，
+等锁空再跑才有上面那一行。这正是 #108/#93 那一族在**我自己的装置**上的样子：
+`rc` 不是结论，"这一趟到底跑没跑"才是。
+证据目录：`~/.heyta-evidence/mut-idb-destroyed-214648/`、`~/.heyta-evidence/mut-mem-destroyed2-214740/`（各含 PRE 原文与两趟日志）。
+
+⇒ E2「三套实现」这一格现在的变异覆盖是：**IndexedDB ✅、Memory ✅、SQLite 宿主级 ✅（§10.218）+ 契约级（#87 那批）**；
+仍缺的是**两个原生壳运行时**那一发（§10.218 末段说的那格），别把这张表读成"全部齐了"。
+> **（10-05 21:59 现量更正）** 上面这句在写下四分钟后收窄了：**macOS 壳运行时那一发已到手**（§10.221，摘掉桥上的
+> `removeDatabase` ⇒ B+D 恰好 2 红、还原后复跑 PASS）。这张表现在**仍然不是**"全部齐了"——
+> 缺的是 Web 运行时的"销毁后拒用"与 Windows 壳（无装置，见 §10.221 末段）。
+
+### 10.220 补：分母要说准——"三套实现"里 `destroyed` 守卫只有**三处**，op-sqlite 不是第四处（现量）
+
+`grep -rn AdapterDestroyedError`（排除测试）在生产代码里的**全部**命中是：
+`indexeddb-adapter.ts:224`、`memory-adapter.ts:187` 与 `:311`、`sqlite-adapter.ts`（`ensureOpen` 那一发），
+外加两处注释（`AccountClosureScreen.tsx:147`、`app-host/host.ts:362`）与契约文档句（`db.types.ts:259`）。
+
+⇒ 移动端**没有**第四个守卫：`apps/mobile` 用的就是同一个 `SqliteAdapter`
+（`packages/app-host/src/host.ts:326` `new SqliteAdapter(...)`，`apps/mobile/src/db/op-sqlite-driver.ts:160`
+与 `open-host.ts:89` 都写明"驱动必须是**工厂**而不是实例"）——
+所以摘掉 SQLite 那一发（§10.218）**同时**覆盖 node 宿主与移动宿主共用的这条承诺；
+op-sqlite 与 node sqlite 的差别在**驱动侧的 `removeDatabase`**，那一层由 `tmp/e2-teeth.mjs` 的 A–E 五臂管
+（§10.3 E2 行那批读数）。
+
+这半段存在的理由：我差点把"三套实现"读成"三个守卫点各摘一次、op-sqlite 还要再来一次"，
+那会多报一枚不存在的读数缺口；分母要从代码里数，不是从字面上凑。
+
+## 10.221 macOS 壳的**第四枚**变异落点（桥上的 `removeDatabase`）⇒ B+D 恰好 2 红 —— 并**撤回我自己两条"仍缺原生壳运行时"的错判**（10-05 21:55–22:0x）
+
+先记错判，因为它比读数重要。§10.218（21:42）与 §10.220（21:46）都写了"**仍缺的是两个原生壳运行时**那一发"。
+**这句在当时就是假的**，而且假在同一个文件的同一节台账里：
+
+- **macOS 壳运行时早有变异读数** —— §10.129（10-05 05:59–06:1x）跑了 **M1 / M2a / M2b** 三臂，红集分别是
+  `D+F`、`B+D+E+F`、`E+F`（D 绿），外加 §10.98 的 M3（S 红）。
+- **Web 真浏览器的删除动作臂也有** —— §10.102（01:4x）`ARM=OK`，§10.100 是 OPFS 双臂自证。
+
+⇒ 我在一趟之内两次宣布"这格还缺"，而缺的证据就写在我自己两小时前整理的同一份文件里。
+**这正是 AGENTS §8.8 禁的那个形状**（新证据改变结论时不回头修旧断言，反过来也一样：修的时候不回头查旧读数）。
+可迁移的动作是：**写"仍缺 X"之前先 grep 本台账里 X 的读数**，不是写完再指望别人挑出来。
+
+下面才是这一趟真正新增的东西 —— 一枚**前面四臂都没碰过**的落点。全程在隔离载体
+`heyta-wt-tfa-e2`（`e372a3f0`）里跑，一台自起的栈（`PORT=3177` + `HEYTA_E2E_DB=heyta_mac_erase_1005` +
+`CORS_ORIGINS` 带上 `heyta-local://app`，pid 97706，跑完由本会话自己 kill —— 只 kill 自己 spawn 的那枚），
+**没碰任何人的 :3100，也没碰 §10.129 用过的 :3101**。
+
+**三趟读数**（同一枚装置 `scripts/verify-macos-account-erasure.sh`，`SERVER` 指向 3177）：
+
+| 趟 | 结果 | 判据读数 |
+|---|---|---|
+| ① 基线（载体源码未动） | `ERASE_MAC=PASS` rc=0 | A=1、C=ARMED、B=`closed-and-erased`、D 3⇒0、E 1⇒0、F=0/0/3、S=SAME |
+| ② 臂 M4（摘掉桥上那一发） | `ERASE_MAC=FAIL` **恰好 2 条红** rc=1 | **B 红**=`closed-erase-partial`、**D 红**=还剩 3 枚（`heyta.sqlite` / `-shm` / `-wal`）；A/C/E/F/S 全绿 |
+| ③ 还原后复跑 | `ERASE_MAC=PASS` rc=0 | B=`closed-and-erased`、D 3⇒0（与 ① 同档） |
+
+**变异落点**（一处，纯 JS，不重建 Swift）：`packages/app-host/src/native-bridge.ts` 的 `wrapDriver`
+里那个条件挂载 `typeof native.removeDatabase === 'function'` 改成恒不成立 ⇒ 驱动不带 `removeDatabase`
+⇒ `SqliteAdapter.destroy()` 走进它自己写好的那档诚实报告（"内容已清空，**文件仍在**"，
+`sqlite-adapter.ts:300-306`）。§10.129 的三臂摘的是**上游的擦除动作**（宿主端口档 / web 擦除器注册 / 清键），
+这一臂摘的是**容器删除能力本身** —— 它不在那张表里。为不与 §10.129 的 M1/M2a/M2b 撞名，这臂记作 **M4**。
+
+**这一臂的产出一条，是对 §10.129 结论 4 的收窄而不是重复**：
+
+- §10.129 ③4 量出"**B 对壳库档没有否决权**"（M1 摘掉宿主端口档后界面仍印 `closed-and-erased`，
+  因为空档交回空数组，而 disposition 是 `every(containerRemoved)` —— 空档恒不否决）。
+- 这一臂 **B 却红了**，红成 `closed-erase-partial`，界面上那句随之变成"本地数据只清掉了一部分，剩下的需要你手动处理"。
+- ⇒ 准确说法是：**B 不否决"没跑到"，但否决"跑到了且书面报告 `containerRemoved:false`"**。
+  换句话说 B 的牙取决于**驱动层老不老实**，而这一臂摘掉的正是驱动层的老实话。
+  "壳库删没删"这一格仍由 D 兜住（这一臂 D 也红），但 B 并非全程沉默 —— 这是四臂合起来才读得出的分工。
+- E/F/S 保持绿是归属证明：WebKit 那一档与摘掉的这发无关 ⇒ 红面只在 SQLite 容器这一层。
+
+**还原证据**（不靠 `git checkout --`，traps #303）：源文件 md5 回到 `dd5fc877…`，
+且**与主检出同一枚文件的 md5 逐字相同**（现量两枚一致 ⇒ 载体没把变异漏回主检出）；
+重建后的产物 `bridge-bundle/native-bridge.js` md5 回到基线那枚 `4195b45c…`（变异趟是 `8ecce983…`）。
+
+🟡 **顺带照出一条旧读数的边界**（不属于本轮判据，但它改的是**别人会怎么引用 §10.99**）：
+E 的**字节留存腿**三趟分别读到 `1⇒0`、`1⇒0`、**`1⇒1`** —— 同一份产物、同一台机器、同一套流程。
+装置自己在 `verify-macos-account-erasure.sh:445-454` 写明这一腿"不参与红绿"，理由是把"行没了"与
+"字节还在"分开记。这一趟把那个理由**从推测变成现量**：`removeItem` 之后 SQLite 释放的页能不能归零
+不由我们的代码决定。**所以 §10.99 那句"字节留存腿 1⇒0"是一次读数，不是一条性质** ——
+谁把它读成"安全删除已证"都是读多，连稳定都做不到。
+
+⚠️ **#104 这一格现在的准确形状**（别再拿"缺两枚原生壳"说事）：
+macOS 壳运行时有 **M1/M2a/M2b/M3 + 本趟 M4** 五枚变异读数；CLI 宿主 ✅（§10.218）；
+IndexedDB/Memory 实现臂 ✅（§10.220）；Web 的**删除动作**有真浏览器臂 ✅（§10.100/§10.102）。
+仍缺的只剩两样，且都不是"原生壳"：**① Web 运行时里"适配器销毁后再读必须抛"**（§10.220 那枚 IndexedDB 臂在实现层测试里，
+不在真浏览器的真 IndexedDB 上）；**② Windows 壳根本没有注销销毁装置**（只剩 `check:windows-shell` 的渲染判据），
+要它得先有共享打包机窗口 ⇒ 归 #65，不代拍。
+
+## 10.222 #98 的阻塞比 §10.219 说的还深一层：**没有任何无头宿主能创建便签/清单/习惯**（10-05 22:06 现量）
+
+§10.219 把这一格写成"截图流水线缺 seed 那一层"。这句不差，但它**低估了要建的东西**：
+seed 的纪律是"走应用自己的写入口，不许直接改 IndexedDB"，而**除了界面，今天没有任何入口能建这三类**。四条现量：
+
+1. **仓根脚本解析不到 workspace 包**：`node -e 'import("@heyta/app-host")'` 在仓根 → `Cannot find package '@heyta/app-host'`
+   （`@heyta/storage` 同一条错误）。⇒ 任何生成装置**必须落在某个 workspace 包内**，
+   不能按 §10.219 的设想"在 `scripts/screenshots/` 里直接调 app-host 的动作"。
+2. **`NodeHost` 对外只有任务会写**：接口列的是 `addTask / renameTask / setCompleted / removeTask / purgeTask /
+   listTasks / listTrashed / trashRows / dispatch / exportDocument / restoreExport`（`apps/node-host/src/host.ts:60-190`）。
+   `createNoteActions / createProjectActions / createHabitActions` **在 `host.ts:232-234` 已经实例化，但一条都没挂到对外接口上**。
+3. **CLI 那三个相关子命令是只列不写**：`cli.ts:401 notes` / `:425 projects` / `:448 tags` 各自只调 `list*`；
+   写入只有 `add`（任务）与 `remove`（任务，`:491`）。**habit 在 CLI 里连子命令都没有**。
+4. ⇒ 要造"四类各一条已删除"的种子，缺的不是一层 seed，而是**三类实体的无头写入口（建 + 删）**。
+   这是一条真的功能缺口 —— CLI 被登记成"回收站的第三个宿主"（W6-a/W6-b），却只能删任务。
+
+**为什么本批没有就地把它建起来**（不是"没试"，也不是"顺手就能做"）：22:06 现量 `load(1m)=31.42`，
+且**另一条线的 Playwright 套件正在跑**（`pgrep` 命中 `.worktrees/detail-pane/… playwright test -c playwright.detail-pane.config.ts`
+pid 36158，主检出 `e2e` worker pid 37153 带 4 枚 headless shell）。硬约束是"重负载串行、窗口先到先得且必须现量归属"
+⇒ **没有插队起浏览器**。而给 node-host 补三类实体的写入口是跨 `host.ts + cli.ts` 的功能改动，
+要一起过 `check:journey-coverage`、真机/CLI 文案对账那两道常驻门禁与 `pnpm -r typecheck && pnpm -r test`，
+本批剩余预算不足以做完并留下读数 —— **不留半截**（AGENTS §8.7）。
+
+⇒ **#98 保持 pending**，欠的东西现在量准了：**先给 node-host 补三类实体的无头写入口（建 + 删各一条）**，
+seed 层才有"走应用自己的写入口"那条腿；随后 §10.219 的 ②③④（存在性判据 / `gen-help-figures` + `screenshot:verify` /
+必须在工作树那棵 IA 上截、人要再看一眼）照原样执行。
+⚠️ **别抄的近路**：手写一份"含四类墓碑的 JSON"喂 import —— 那份 JSON 的 op 不是任何宿主写出来的，
+它证明的是"import 能吞任意字节"，**不是**"回收站能列出四类"，而且它会把 W6-a 那条"CLI 是第三个宿主"的登记变成假话。
