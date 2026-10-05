@@ -25,6 +25,33 @@
  * （证 caddy 真在链上）· 带 ?token= 的请求不把明文留在日志。
  * 两条变异臂各打一条：`admin off` ⇒ 那条健康检查命令必须失败；摘掉日志 filter ⇒
  * 令牌必须被这双眼睛抓到。臂数由本脚本自己打印，文档里不许抄。
+ *
+ * ## G-70（2026-10-05 并入本装置）：实时同步那条 WS 升级**穿过这枚 caddy** 了吗
+ *
+ * `verify-realtime-push.mjs` 早就验过"服务端推、监听端收得到"，但它连的是 **`:1900` 直连**；
+ * 而外人照 runbook 起的那套里，界面的实时通道走的是 `wss://域名/api/sync/ws`，
+ * **中间隔着这份 Caddyfile 的 `reverse_proxy` + `encode gzip zstd` + 那条日志 filter**。
+ * 这一段先前零读数 —— 而它坏了的症状不是报错，是"界面全绿、只是永远等不到推送"。
+ *
+ * 为什么不另起一台装置：起 caddy 容器的形状（compose 现读、一次性卷、不占 :80/:443、
+ * 停容器做归因）在本文件里**已经有一份且只有一个所有者**；另写一份就是本仓反复登记过的
+ * "第二套实现一定会漂移"那一族。所以 WS 的腿接在第 2 步之后、复用同一枚 LIVE 容器。
+ *
+ * 六条腿各自的失效方向（逐条有臂，不许用一条的红代抓另一条）：
+ * · 经代理的 WS 能建立，且收到服务端那条 `connected` 握手 ⇒ 帧真的双向过；
+ * · **坏令牌**那条连接必须拿不到 `connected` 且以 4003 关闭 ⇒ 证明回话的是服务端的鉴权，
+ *   不是代理自己 Fabricate 的一个 101（没有这条，"连上了"可能只是探针打错了对象）；
+ * · 上传前那段静默里不许有 `new_ops`（与 verify-realtime-push 同一条反例纪律）；
+ * · 另一台设备**经代理**上传一条真 op ⇒ 监听端收到 `new_ops` 且 `latestSeq > 0`；
+ * · WS 那次请求在 caddy 日志里必须是 `?REDACTED`，且两个真令牌一个都不许出现 ——
+ *   这条比 HTTP 那条更要紧：WS 只能靠 query 带凭据（浏览器不能给升级请求设头），
+ *   而那颗令牌 365 天有效、无轮换（Caddyfile 的注释写的就是它）；
+ * · 停掉这枚 caddy 之后 WS 连不上、直连那侧照旧 ⇒ 把上面五条的归因钉在 caddy 上。
+ * 变异臂也接 G-68 那枚 no-filter 容器：**WS 这条路径**同样必须把泄漏抓出来
+ * （HTTP 那条抓不到不代表 WS 也抓不到 —— 两条是不同的代码形状）。
+ *
+ * ⚠️ 射程边界：上传方用 `apps/node-host` 的真 CLI（真建号、真上传），但**监听端不是浏览器**；
+ *   "浏览器里的实时接线真会连"归 `verify:selfhost-stack` 的浏览器腿与 `store.ts` 的闸，不在这里。
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -32,6 +59,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import WebSocket from 'ws';
+
+/**
+ * 🔴 端点不许在本文件里手拼：引客户端自己的 `buildRealtimeUrl`（与
+ * `scripts/verify-realtime-push.mjs` 同一条纪律，理由也抄过来 —— 手拼的话这里测的是
+ * "我写的那个字符串对不对"，而真实端点曾经是 `/ws` 还是 `/api/sync/ws` 恰好错过一次）。
+ */
+import { buildRealtimeUrl } from '../../packages/sync-client/dist/index.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..', '..');
@@ -45,7 +81,7 @@ const SEC_HEADERS = ['x-content-type-options', 'x-frame-options', 'referrer-poli
 
 const readings = [];
 const arms = [];
-const mine = { containers: [], volumes: [] };
+const mine = { containers: [], volumes: [], dbDir: null };
 const claim = (name, expect, got) => arms.push({ name, expect, got, pass: expect === got });
 const die = (code, msg) => {
   if (readings.length) console.error(`   已量到的读数：\n${readings.map((r) => `     · ${r}`).join('\n')}`);
@@ -56,6 +92,7 @@ const die = (code, msg) => {
 function teardown() {
   for (const name of mine.containers) dockerAllow('rm', '-f', name);
   for (const name of mine.volumes) dockerAllow('volume', 'rm', name);
+  if (mine.dbDir) rmSync(mine.dbDir, { recursive: true, force: true });
 }
 process.on('exit', teardown);
 process.on('uncaughtException', (e) => { console.error(`❌ 未捕获异常（不是任何一道判据的拒绝）：${e?.stack ?? e}`); teardown(); process.exit(7); });
@@ -222,6 +259,86 @@ const leaked = liveLogs.includes(nonce);
 const sawRedacted = /\?REDACTED/.test(liveLogs);
 readings.push(`E 日志：合成令牌出现=${leaked}；带 ?REDACTED 的访问日志行在=${sawRedacted}`);
 
+// ── 第 2.5 步：G-70 —— 实时通道那条 WS 升级**穿过这枚 caddy**了吗 ────────────
+// 建号与上传都走真客户端（`apps/node-host` 的 CLI），不在这里手写协议；
+// 端点用 `buildRealtimeUrl`（文件头写了为什么不许手拼）。口令只从 stdin 进，
+// 令牌只用来连，读数里一个都不出现。
+const NODE_HOST = join(REPO, 'apps', 'node-host', 'dist', 'cli.js');
+if (!existsSync(NODE_HOST)) die(2, `读不到 ${NODE_HOST} ⇒ 上传方就没法用真客户端（先 pnpm --filter @heyta/node-host build），也不许改成手写请求`);
+
+function nodeHost(args, stdin = '') {
+  const r = spawnSync(process.execPath, [NODE_HOST, ...args], { cwd: REPO, encoding: 'utf8', input: stdin, maxBuffer: 32 << 20 });
+  const line = String(r.stdout ?? '').trim().split('\n').filter(Boolean).pop() ?? '';
+  let json = null;
+  try { json = JSON.parse(line); } catch { /* 原样留在 raw 里，判据按 rc 与 json===null 红 */ }
+  return { rc: r.status ?? 1, json, raw: line.slice(0, 160), stderr: String(r.stderr ?? '').slice(0, 200) };
+}
+
+const wait = (pred, budgetMs, every = 150) => new Promise((res) => {
+  const t0 = Date.now();
+  const tick = () => (pred() ? res(true) : Date.now() - t0 > budgetMs ? res(false) : setTimeout(tick, every));
+  tick();
+});
+
+function openProbe(url) {
+  const s = { opened: false, frames: [], closeCode: null, error: null };
+  const sock = new WebSocket(url);
+  sock.on('open', () => { s.opened = true; });
+  sock.on('message', (d) => { try { s.frames.push(JSON.parse(String(d))); } catch { s.frames.push({ type: '<非 JSON>' }); } });
+  sock.on('close', (c) => { s.closeCode = c; });
+  sock.on('error', (e) => { s.error = String(e?.message ?? e).slice(0, 90); });
+  return { s, sock };
+}
+
+const EMAIL = `g70-${randomUUID().slice(0, 8)}@heyta-selfhost.test`;
+const LOGIN_PW = `G70!${randomUUID()}aA9`;
+const E2EE_PW = `g70-e2ee-${randomUUID()}`;
+const DB_DIR = mkdtempSync(join(tmpdir(), 'heyta-g70-db-'));
+mine.dbDir = DB_DIR;
+const DB_UPLOADER = join(DB_DIR, 'uploader.sqlite');
+
+const reg = nodeHost(['auth', 'register', '--server', PROXY, '--email', EMAIL, '--terms', '--json'], LOGIN_PW);
+const loginUploader = nodeHost(['auth', 'login', '--server', PROXY, '--email', EMAIL, '--json'], LOGIN_PW);
+const loginListener = nodeHost(['auth', 'login', '--server', PROXY, '--email', EMAIL, '--json'], LOGIN_PW);
+const TOK_UP = loginUploader.json?.token ?? '';
+const TOK_LIS = loginListener.json?.token ?? '';
+if (!reg.json?.ok || !TOK_UP || !TOK_LIS) {
+  die(6, `经代理建号/登录没成（register rc=${reg.rc} ok=${reg.json?.ok}；登录两条 rc=${loginUploader.rc}/${loginListener.rc}）：${reg.raw || reg.stderr || loginUploader.raw}`);
+}
+readings.push(`W0 经代理建号 + 两次登录：register rc=${reg.rc}、令牌两把都在（长度 ${TOK_UP.length}/${TOK_LIS.length}，值不进读数）`);
+
+const LISTENER_ID = `g70-probe-${randomUUID().slice(0, 8)}`;
+const lis = openProbe(buildRealtimeUrl(PROXY, TOK_LIS, LISTENER_ID));
+const sawConnected = await wait(() => lis.s.frames.some((m) => m.type === 'connected'), 15_000);
+await sleep(3000);
+const spuriousBefore = lis.s.frames.filter((m) => m.type === 'new_ops').length;
+
+const bad = openProbe(buildRealtimeUrl(PROXY, 'eyJhbGciOiJub3QtYS10b2tlbiJ9.0.0', `${LISTENER_ID}-bad`));
+const badConnected = await wait(() => bad.s.frames.some((m) => m.type === 'connected'), 6000);
+await wait(() => bad.s.closeCode !== null, 6000);
+bad.sock.close();
+
+const title = `g70-through-caddy-${Date.now().toString(36)}`;
+// 🔴 上传方**显式**给一条与监听端不同的 clientId：服务端的广播排除上传者自己，
+//    两边同 id 时"没收到"会被读成产品坏了，而真相是探针自己把自己排除了。
+const UPLOADER_ID = `g70-uploader-${randomUUID().slice(0, 8)}`;
+const globalArgs = ['--db', DB_UPLOADER, '--server', PROXY, '--token', TOK_UP, '--password', E2EE_PW, '--client-id', UPLOADER_ID, '--json'];
+const added = nodeHost([...globalArgs, 'add', title]);
+const synced = nodeHost([...globalArgs, 'sync']);
+const gotPush = await wait(() => lis.s.frames.some((m) => m.type === 'new_ops'), 20_000);
+const push = lis.s.frames.find((m) => m.type === 'new_ops');
+readings.push(`W1 监听端经代理：open=${lis.s.opened}、收到 connected=${sawConnected}；上传前 new_ops 条数=${spuriousBefore}（应为 0）`);
+readings.push(`W2 坏令牌：open=${bad.s.opened}、拿到 connected=${badConnected}、关闭码=${String(bad.s.closeCode)}（期望 4003）`);
+readings.push(`W3 上传方经代理 add rc=${added.rc} ok=${String(added.json?.ok)}，sync rc=${synced.rc} ok=${String(synced.json?.ok)}${synced.json?.ok ? '' : `｜原文 ${synced.raw || synced.stderr}`} ⇒ 监听端 new_ops=${gotPush}${push ? `（latestSeq=${String(push.latestSeq)}）` : ''}`);
+
+lis.sock.close();
+await sleep(3000);
+const wsLogs = dockerAllow('logs', '--tail', '200', LIVE).out;
+const wsLogLines = wsLogs.split('\n').filter((l) => l.includes('/api/sync/ws'));
+const wsRedacted = wsLogLines.filter((l) => l.includes('?REDACTED')).length;
+const wsTokenLeak = wsLogLines.some((l) => l.includes(TOK_LIS) || l.includes(TOK_UP));
+readings.push(`W4 caddy 访问日志里 /api/sync/ws 行 ${wsLogLines.length} 条，其中带 ?REDACTED 的 ${wsRedacted} 条；两把令牌出现在这些行里=${wsTokenLeak}`);
+
 claim('控制腿：按 compose 现读形状起容器', 'healthy', healthy);
 claim('A 出货那条健康检查命令 rc=0', 0, probe.rc);
 claim('B /app/ 经代理与直连同字节', true, sameBytes);
@@ -235,6 +352,16 @@ claim('D 直连不带压缩（那一条差异只可能来自 caddy）', undefine
 claim('D -Server 生效（代理侧无 Server 头）', undefined, proxyApp.headers['server']);
 claim('E 令牌没被写进日志', false, leaked);
 claim('E ?REDACTED 那行的确在（不然"没泄漏"是探针没看见）', true, sawRedacted);
+claim('W1 经代理的 WS 升级建立并收到服务端的 connected', true, lis.s.opened && sawConnected);
+claim('W1 上传之前不许有 new_ops（反例：推送不是无条件发的）', 0, spuriousBefore);
+claim('W2 坏令牌拿不到 connected（那条 101 不是代理自己给的）', false, badConnected);
+claim('W2 坏令牌被服务端以 4003 关掉（鉴权真在链上）', 4003, bad.s.closeCode);
+claim('W3 上传方经代理 add 成功', true, added.json?.ok === true);
+claim('W3 上传方经代理 sync 成功', true, synced.json?.ok === true);
+claim('W3 监听端经代理收到 new_ops', true, gotPush);
+claim('W3 那条 new_ops 带真实 latestSeq', true, typeof push?.latestSeq === 'number' && push.latestSeq > 0);
+claim('W4 WS 那一次的日志行都做了 ?REDACTED', true, wsLogLines.length > 0 && wsRedacted === wsLogLines.length);
+claim('W4 两把真令牌都不在 WS 日志行里', false, wsTokenLeak);
 
 dockerAllow('stop', LIVE);
 const afterStopProxy = await get(`${PROXY}/app/`);
@@ -242,6 +369,15 @@ const afterStopDirect = await get(`${DIRECT}/app/`);
 readings.push(`D 停掉这枚 caddy 之后：代理腿=${afterStopProxy.status}（${afterStopProxy.error ?? '无异常'}），直连腿=${afterStopDirect.status} ⇒ 代理腿的回话者是它，而不是 18080 上恰好坐着的别的东西`);
 claim('D 停容器后代理腿连不上', true, afterStopProxy.status !== 200);
 claim('D 停容器后直连腿照旧（把归因钉在 caddy 上）', 200, afterStopDirect.status);
+const afterStopWs = openProbe(buildRealtimeUrl(PROXY, TOK_LIS, `${LISTENER_ID}-after`));
+const afterStopConnected = await wait(() => afterStopWs.s.frames.some((m) => m.type === 'connected'), 8000);
+afterStopWs.sock.close();
+const directWs = openProbe(buildRealtimeUrl(DIRECT, TOK_LIS, `${LISTENER_ID}-direct`));
+const directConnected = await wait(() => directWs.s.frames.some((m) => m.type === 'connected'), 10000);
+directWs.sock.close();
+readings.push(`W5 停掉 caddy 后：经代理 WS connected=${afterStopConnected}（应 false）、直连 WS connected=${directConnected}（应 true）⇒ W1–W4 那四条确实过的是这枚代理`);
+claim('W5 停容器后经代理的 WS 连不上', false, afterStopConnected);
+claim('W5 停容器后直连的 WS 照旧（归因钉在 caddy 上）', true, directConnected);
 dockerAllow('rm', '-f', LIVE);
 mine.containers = mine.containers.filter((n) => n !== LIVE);
 await sleep(1500);
@@ -284,6 +420,18 @@ const leakLogs = dockerAllow('logs', '--tail', '30', LEAK).out;
 const leakCaught = leakLogs.includes(nonce2);
 readings.push(`臂 no-filter：摘掉 filter 后令牌出现在日志=${leakCaught}（应为 true，否则 E 那句"没泄漏"本来就抓不到东西）`);
 claim('变异 no-filter：必须抓到泄漏（否则 E 没牙）', true, leakCaught);
+
+// 同一枚容器上再打一次 **WS 那条路径**：HTTP 那条抓不到泄漏不代表 WS 也抓不到 ——
+// 升级请求的 query 是它唯一的凭据通道（浏览器不能给升级请求设头），代码形状与那条 GET 不同。
+const wsLeakProbe = openProbe(buildRealtimeUrl(PROXY, TOK_LIS, `${LISTENER_ID}-nofilter`));
+const wsLeakConnected = await wait(() => wsLeakProbe.s.frames.some((m) => m.type === 'connected'), 12_000);
+wsLeakProbe.sock.close();
+await sleep(3000);
+const leakWsLogs = dockerAllow('logs', '--tail', '200', LEAK).out.split('\n').filter((l) => l.includes('/api/sync/ws'));
+const leakWsCaught = leakWsLogs.some((l) => l.includes(TOK_LIS));
+readings.push(`臂 no-filter 的 WS 腿：连接建立=${wsLeakConnected}；/api/sync/ws 日志行 ${leakWsLogs.length} 条，其中明文令牌出现=${leakWsCaught}（应为 true，否则 W4 那句"WS 也没泄漏"本来就抓不到东西）`);
+claim('变异 no-filter：WS 那条路径也必须抓到泄漏（否则 W4 没牙）', true, leakWsCaught);
+claim('变异 no-filter：WS 在摘掉 filter 的容器上仍能建立（把归因钉在日志上，不是连接上）', true, wsLeakConnected);
 dockerAllow('rm', '-f', LEAK);
 mine.containers = mine.containers.filter((n) => n !== LEAK);
 rmSync(TMP, { recursive: true, force: true });
@@ -292,8 +440,15 @@ rmSync(TMP, { recursive: true, force: true });
 console.log('   ── 这一趟量到的读数 ──');
 for (const r of readings) console.log(`   · ${r}`);
 const failed = arms.filter((a) => !a.pass);
-console.log(`   ── 臂 ${arms.length} 条：红 ${failed.length} 条 ──`);
+/* 🔴 掉臂检查按**组名**判，不按条数写死：写死数字就是把当时的形状当判据（本仓为这件事红过几次），
+ *    而这里真正会发生的失效是"某一整段被人删掉或提前 return"—— 那种情况下"红 0"最危险。 */
+const GROUPS = ['控制腿', 'A ', 'B ', 'C ', 'D ', 'E ', 'W1', 'W2', 'W3', 'W4', 'W5', '变异 admin-off', '变异 no-filter'];
+const missingGroups = GROUPS.filter((g) => !arms.some((a) => a.name.startsWith(g)));
+if (missingGroups.length) die(9, `装置掉臂：这些组一条都不在（${missingGroups.join(' / ')}）—— "红 0"不能读成"全绿"`);
+console.log(`   ── 臂 ${arms.length} 条：红 ${failed.length} 条（组 ${GROUPS.length} 个都在）──`);
 for (const a of arms) console.log(`   ${a.pass ? '✅' : '❌'} ${a.name}｜期望 ${JSON.stringify(a.expect)}｜实得 ${JSON.stringify(a.got)}`);
 console.log(`   与出货形状的四条差异：docker run 而非 compose up｜DOMAIN=:${CONTAINER_PORT} 而非真实 https 域名（⇒ 不覆盖签证书）｜宿主侧发布到 127.0.0.1:${HOST_PORT}（不占主机 :80/:443）｜/data、/config 用一次性卷`);
-if (failed.length) die(8, `G-68 判据红 ${failed.length} 条 —— 逐臂见上`);
+console.log(`   G-70 的射程边界：上传方是真 CLI（node-host）经代理建号+上传，但**监听端不是浏览器** —— 浏览器里的实时接线归 verify:selfhost-stack 的界面腿；ws:// 明文（差异 2），TLS 那一条不在这里证`);
+if (failed.length) die(8, `G-68/G-70 判据红 ${failed.length} 条 —— 逐臂见上`);
 console.log(`✅ G-68：仓库原文件 Caddyfile 与 compose 现读出的那枚 caddy 服务，在真栈上跑通了"外人第一步"的三格（healthy／经代理取 /app/ 同字节且数得出主蓝／经代理取 /health 同形），另有两条判据各被变异臂打过一次。签证书那一条不在射程内（差异 2）。`);
+console.log(`✅ G-70：实时通道那条 WS 升级经这枚 caddy 建立、双向帧都过（connected + 另一台设备上传后的 new_ops），坏令牌被服务端以 4003 拒掉、那一次升级的日志行做了 ?REDACTED，停容器后代理腿连不上而直连腿照旧；no-filter 那枚变异容器上 WS 路径的泄漏确实会被抓到。`);
