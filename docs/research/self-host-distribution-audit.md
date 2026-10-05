@@ -14154,3 +14154,41 @@ stat -f '%z 字节' /tmp/heyta-reinstall/apps/desktop-macos/scripts/package-app.
 **"判某个进程是否持有某文件"时，路径必须按对方那棵树的绝对路径解析（逐 pid 取 `cwd` 再拼），
 从自己这棵树解析同名相对路径会命中另一枚 inode，探针于是把"活着"报成"没了"。**
 镜像面已经在本节上面（不带 `-a` 的 `lsof -p PID -i` 是并集）。
+### 8.268 22:5x 现量：**本批已被别线合进 main**，而 main 现在打不出镜像 —— 断在 apps/web 的一处合流残留（不是本批造成的，且它挡着第 2 与第 8 项）
+
+先说落地那一格：**它由别人达成了，不是我那一发 ff-only。**
+- `git merge-base --is-ancestor feat/self-host-distribution main` ⇒ **是祖先**；
+  `git rev-list --left-right --count main...feat/self-host-distribution` = **main 独有 1321 / 本批独有 0**。
+  通道是 `9651a4ac merge: 合并载体 consolidate/20261005 进 main`（+ 顶上 `acce5fd3 fix(合流)`）。
+- **内容级对账**（不是"分支名对上"就算）：本批写集 92 枚 = **逐字相同 78 / 内容不同 14 / 真缺 0**。
+  🔴 那"真缺 7 枚"是**我的探针错**：`git diff --name-only` 会把非 ASCII 路径**加引号再转义**，
+  我把带引号的串当路径喂给 `git rev-parse main:"…"` ⇒ 必然查不到。改 `-c core.quotePath=false` + `-z` 重判即归零。
+- 14 枚"内容不同"里最要紧的两格都活着：**门禁** `check:selfhost-entry-command` / `check:image-license` /
+  `check:gate-wiring` / `check:web-artifact:app` / `check:android-gradle-remote` 在 main 的 `package.json` 各命中 1；
+  **对外错话词条**（本批在 zh 表改过的 2 枚键）在 main 上**逐字等于本批版**，en 表两侧都在。
+  ⚠️ `server/docker-compose.migrate-once.yml` 我先前报"main 无"也是路径错（真实路径带 `server/` 前缀），现量 main 有。
+
+**然后是新的硬阻塞（本会话取到，归属已判）**：22:54 在载体树上前进到 `acce5fd3`、
+`pnpm install --frozen-lockfile` rc=0（锁 `d340e576`）、起跑时 1 分钟负载 8.44，跑 `pnpm verify:selfhost-stack` ⇒
+**rc=1，死在镜像构建的 apps/web 那一步**（Dockerfile:206 `RUN HEYTA_WEB_BASE=/app/ pnpm --filter "@heyta/web..." run build`）：
+
+- `src/features/calendar/CalendarView.tsx(83,9) 和 (145,9)` ⇒ **TS2451 Cannot redeclare block-scoped variable 'events'**
+  （提交态 `main` 那一版里 83 与 145 两行**都**写着 `const events = useCountdownStore((s) => s.events);`，全文 275 行）
+- `(268,11)` ⇒ **TS17001 JSX elements cannot have multiple attributes with the same name**
+
+**形状就是合流时两段都留下了**，不是平台/依赖/缓存问题：同一次运行里 `packages/app-host build: Done`、
+`apps/web build: Failed` 紧跟着三个 TS 码。归属：本批写集里 **apps/web 下 0 枚**（`git diff --name-only <基线> e8a6eb4e -- apps/web` 计数 0），
+这枚文件的改动来自日历那条线；主检出此刻对它还有一个未提交状态（索引标志 `M `，索引版重复声明计数 `1`）——
+**那是别人正在写的东西，我不动、不代提交、也不替他们判口径**。
+
+⇒ 对目标的影响要说白：**第 1 项"main 前进到该载体"实质已达成，但第 2 项与第 8 项现在被这处合流残留挡着** ——
+main 打不出前端产物，`verify:selfhost-stack` 走不到真镜像那一段，`reinstall:all` 四端装的也会是打不出来的产物。
+这条不是我能在"不动主检出、不替别人提交"的边界内清掉的：它要么由日历那条线把自己那份裁掉，
+要么由负责人授权我在**独立副本**上做一次"删掉重复那一段 + 回读 83/145 只剩一处 + 构建转绿"的修复再走合流通道。
+证据目录 ``（`summary.txt` 带 PREV/AT/INSTALL_RC/VERIFY_RC，`verify.log` 有原文三个 TS 码），
+载体已按 trap 还原回 `6921ac77`（`RESTORE_RC` 见 summary）。
+
+⇒ **这一格的阻塞已被合流会话关掉（10-05 23:5x 现量，归属：日历那条线自己那份重复声明随"取载体那一代"消掉）**：
+`grep -c "const events = useCountdownStore" apps/web/src/features/calendar/CalendarView.tsx` = **1**（原报的是 83/145 两处），
+冲突标记计数 **0**，`pnpm -r build` **rc=0**（`apps/web` 在内）。上面那句"main 打不出前端产物"是 22:54 的真读数，
+保留原文是为了让下一位认出"合流时两段都留下"这个形状；第 2 与第 8 项现在**不再被它挡着**。
