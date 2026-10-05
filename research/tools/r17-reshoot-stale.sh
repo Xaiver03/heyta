@@ -21,6 +21,9 @@
 #   LOAD_MAX=8 bash research/tools/r17-reshoot-stale.sh   # 收紧负载门（默认按 核数×3/4 现算）
 #   HEYTA_MEM_GATE_MIN_PCT=20 bash research/tools/r17-reshoot-stale.sh   # 收紧内存门（默认可回收/空闲 ≥ 物理内存的 10%）
 #   bash research/tools/r17-reshoot-stale.sh --only calendar-day   # 只重拍一枚目录
+#   FORCE_SHOOT=calendar-capture bash research/tools/r17-reshoot-stale.sh --only calendar-capture
+#       ↑ 点名一枚目录**不论过期与否**都拍（要拍的是一张从没钉过 UIPIN 的新图时用）；
+#         必须与 --only 同用且同枚，其余判据（映射 / 覆盖 / 前置门）一条不放宽。
 set -u
 
 MAIN=$(cd "$(dirname "$0")/../.." && pwd)
@@ -336,7 +339,7 @@ SPS
   echo "== selftest 臂 f（变异）：摘掉「起跑前清残留」那一行 ⇒ 臂 d 那一步必须不再红 =="
   HITS=$(grep -cE 'rm -f "\$TR_ROOT/\$\(basename "\$f"\)"' "$0"); HITS=${HITS:-0}
   N_LINE=$(grep -nE 'rm -f "\$TR_ROOT/\$\(basename "\$f"\)"' "$0" | head -1 | cut -d: -f1)
-  MUT=$(mktemp /tmp/ht-reshoot-mut.XXXXXX.sh)
+  MUT=$(mktemp /tmp/ht-reshoot-mut.sh.XXXXXX)
   if [ "$HITS" != "1" ] || [ -z "$N_LINE" ]; then
     # 针脚没落地（那行改了形）⇒ 直接判红，不许把"变异没落地"读成"这条臂本来就该绿"
     echo "❌ 臂 f 的针脚命中 ${HITS} 行（要恰好 1）⇒ 清残留那一行的形状变了，臂 d 的牙此刻无法证明" >&2; bad=$((bad+1))
@@ -365,8 +368,58 @@ ALL_OUT=$(bash "$R17" --all 2>&1)
 ALL_RC=$?
 printf '   r17 --all rc=%s\n' "$ALL_RC"
 STALE=$(printf '%s\n' "$ALL_OUT" | sed -n 's/^DIRCHECK \(.*\) entries=.* mismatch=\([1-9][0-9]*\) .*/\1/p' | sort -u)
+# 🔴 FORCE_SHOOT：**点名一枚目录就拍它，不论它过期没过期**。10-05 13:5x 加，因为它要解的是一件
+#    这条路径**结构上办不到**的事：`ONLY=calendar-capture` 想拍的是一张**从没钉过 UIPIN 的新图**
+#    （`calendar-capture-input-wins.png`），而"过期与否"这个判据是从 UIPIN 推出来的 ——
+#    没钉过的图永远推不出"过期"，于是重拍集合里不可能有它，看守就只能报"无事可做"。
+#    这不是判据太严，是**判据的适用范围不含这一档**。所以给一个**只管一枚**的点名旋钮，
+#    而不是把过期判据放宽（放宽后任何人跑默认档都会无视 r17 的读数）。
+#    三条前置缺一不可：必须与 --only 同用、两枚名字必须相同、那枚目录必须在盘上 ——
+#    少任何一条，这个旋钮就会变成"点名一枚、实拍一片"。
+if [ -n "${FORCE_SHOOT:-}" ]; then
+  if [ -z "$ONLY" ]; then
+    echo "   ❌ FORCE_SHOOT=$FORCE_SHOOT 必须与 --only 同用 —— 不给 --only 就等于「无视过期判据重拍全树」，那不是这个旋钮的范围。" >&2
+    exit 1
+  fi
+  if [ "$FORCE_SHOOT" != "$ONLY" ]; then
+    echo "   ❌ FORCE_SHOOT=$FORCE_SHOOT 与 --only=$ONLY 不是同一枚目录 ⇒ 拒绝（一档只管一枚，不做批量）。" >&2
+    exit 1
+  fi
+  _fsd="$MAIN/apps/web/evidence/$ONLY"
+  if [ ! -d "$_fsd" ]; then
+    echo "   ❌ FORCE_SHOOT 点名的证据目录不在盘上：$_fsd" >&2
+    exit 1
+  fi
+  if printf '%s\n' "$STALE" | grep -qx "$_fsd"; then
+    echo "   FORCED=0（$ONLY 本来就在待重拍集合里，这个旋钮不改变任何东西）"
+  else
+    STALE=$(printf '%s\n%s\n' "$STALE" "$_fsd" | grep .)
+    echo "   FORCED=1（$ONLY 不在待重拍集合里，按 FORCE_SHOOT 点名加入）"
+    echo "     为什么这一档必须存在：过期判据由 UIPIN 推导，而这一枚要的是一张**从没钉过锚点的新图**；"
+    echo "     映射与覆盖判据（§2）和全部前置门（§3）照旧执行 —— 这个旋钮只改「拍谁」，不改「怎么拍、能不能拍」。"
+  fi
+fi
 if [ -z "$STALE" ]; then
+  # 🔴 10-05 13:5x 现量照出来的**形状错误**：`--only <目录>` 在"零枚过期"的那棵树上，
+  #    原来会走到这里打 `✅ 没有过期目录 ⇒ 无事可做` 并退 **0**，而 §2 那条
+  #    `--only 一枚都没匹配上 ⇒ 参数写错了` 的检查在它**后面**，永远走不到。
+  #    后果不是"少了句话"：看守把 `rc=0` 当成"窗口开了"（那是它自己文件头写的开窗条件），
+  #    于是打出 `WINDOW=OPEN GATES=〈空〉` —— 而**这一趟第 3 节的前置门一枚都没跑**
+  #    （端口/负载/内存/dist 全没判）。读数实测：13:48:03 `WINDOW=OPEN try=1 GATES=〈空〉`，
+  #    同一分钟我手工 `host_load_gate` 的量是 `load1=13` 对阈值 12 ⇒ **红的**。
+  #    也就是说这把看守在"没有活"的时候报"门开了"，而它报的那声"门开了"没有任何闸门背书。
+  if [ -n "$ONLY" ]; then
+    echo "   ❌ ONLY_MISMATCH=$ONLY —— 点名的这枚**不在待重拍集合里**：r17 --all 现量没把它报成过期。" >&2
+    echo "      这**不是**「无事可做」（那是「不给 --only」才有的形状）。要拍一枚**从没钉过 UIPIN 的新图**，" >&2
+    echo "      这条路径结构上做不到（过期与否是从 UIPIN 推的，没钉过就没有「过期」可言）⇒ 直跑那条 spec，" >&2
+    echo "      判据与理由见 docs/plans/calendar-profile-handoff.md §4.05 (50)。退 1 = 载体/用法不成立（不是环境无效，不降级）。" >&2
+    exit 1
+  fi
   echo "   ✅ 没有过期目录 ⇒ 无事可做。"
+  # 🔴 这枚标记是给**消费者**看的：这一条早退**没有跑第 3 节的前置门**，
+  #    所以 `rc=0` 在这里的含义是"没活"，绝不是"闸门全绿、可以起跑"。
+  #    没有它，任何拿 `rc=0` 当开窗判据的上层都会把"没跑闸门"读成"跑过且绿了"。
+  echo "   NOTHING_TO_SHOOT=1（本条早退**未执行第 3 节前置门** ⇒ 不许被读成 WINDOW=OPEN）"
   printf '%s\n' "$ALL_OUT" | grep '^ALLCHECK ' | sed 's/^/      /'
   exit 0
 fi

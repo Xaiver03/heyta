@@ -172,6 +172,12 @@ PATHS=(
   apps/web/evidence/calendar-cells/README.md
   apps/web/evidence/calendar-week/README.md
   apps/web/evidence/calendar-capture/README.md
+  # 🔴 13:5x 这两枚由 §1b 的**推导格**点名要进来（不是我记得）：那趟 `FORCE_SHOOT` 重拍改了
+  #    `calendar-capture.png` 的字节，而 `calendar-capture-input-wins.png` 是**这条主张第一次有图**。
+  #    README 里两枚 `UIPIN` 都指向它们 ⇒ 只提 README 不提图 = 又一个自相矛盾的 HEAD。
+  #    （旧的那句"这些目录里的 png 相对 HEAD 干净所以不点"在 12:5x 已被现量推翻，见上面那段。）
+  apps/web/evidence/calendar-capture/calendar-capture.png
+  apps/web/evidence/calendar-capture/calendar-capture-input-wins.png
   research/tools/calendar-line-commit-plan.sh
   # 🔴 12:5x 补点名的三枚 e2e：这一批的**判据源码**就在这里，不带它们 = 提交一批"锚点已重钉、
   #    可重钉所依据的那条定帧等待与那条存在性前置从没进过库"的 HEAD —— 下一个人 clone 完
@@ -267,7 +273,7 @@ is_uncarried() {
   return 1
 }
 echo "== 1. 现量重取清单（别引用文件里的旧枚数）=="
-ST=0; UN=0; DEL=0; NAMES=(); UNC_SEEN=0
+ST=0; UN=0; DEL=0; LANDED=0; NAMES=(); UNC_SEEN=0
 for p in "${PATHS[@]}"; do
   if [ ! -e "$p" ]; then
     # 🔴 「本线删掉一枚已跟踪的产物」是一种**真实交付形状**（按判据处置掉一枚取证图就是这一种），
@@ -282,8 +288,22 @@ for p in "${PATHS[@]}"; do
       NAMES+=("$p"); DEL=$((DEL + 1))
       continue
     fi
+    # 🔴 第三种**真实存在**的形状：那笔删除**已经落库了**（HEAD 里没有它、索引里没有它、
+    #    而历史里能找到它的一条 `D`）。12:5x 之前这一格没有认得它，于是**本工具自己要求的收尾复跑**
+    #    （"再跑一次看枚数归零"）在删除落库之后**必然变红** —— 也就是 14 臂刚验完的那条腿
+    #    只验了"当轮"，没验"下一轮"。这跟上一笔提交信息点名的形状是同一件事：
+    #    **加闸门的人没同步测这条闸门的下一轮**。
+    #    判据要窄：三条同时成立才算"已落库"，其中第三条把"清单写错路径 / 别人暂存的删除"挡在外面
+    #    （那两枚从来没有一条 D 落进过历史 ⇒ 仍然 exit 1，臂 11/12 的口径一字不动）。
+    if [ -z "$(git ls-files -- "$p")" ] && ! git cat-file -e "HEAD:$p" 2>/dev/null \
+       && [ -n "$(git log --diff-filter=D -1 --format=%h -- "$p")" ]; then
+      printf '   🗑 本线删除**已落库**（HEAD 无此枚、索引无此枚、历史里有它的一条 D=%s）：%s ⇒ 不计数、下一轮复跑不判红\n' \
+        "$(git log --diff-filter=D -1 --format=%h -- "$p")" "$p"
+      LANDED=$((LANDED + 1))
+      continue
+    fi
     # 不能把它当"已入库"跳过 —— 那正是"漏点名会静默留在工作树"的反面：静默少一枚。
-    echo "   ❌ 点名路径在磁盘上不存在，且不满足「本线删除」那三条件：$p —— 清单过期，先修清单（exit 1）。" >&2
+    echo "   ❌ 点名路径在磁盘上不存在，且不满足「本线删除」那三条件、也不满足「删除已落库」那三条件：$p —— 清单过期，先修清单（exit 1）。" >&2
     exit 1
   fi
   line=$(git status --porcelain -- "$p")
@@ -322,6 +342,9 @@ if [ "$((ST + UN + DEL))" != "$TOTAL" ]; then
   exit 1
 fi
 if [ "$UNC_SEEN" != 0 ]; then echo "   ⇒ 另「刻意不带」$UNC_SEEN 枚（不进这一笔，逐枚理由见第 1c 格）"; fi
+# 🔴 已落库的那几枚**单列一行**，不并进"待入库"也不并进分项之和：它们已经不是待办，
+#    而这一行的存在是为了让"条目该摘了"这件事**在输出里看得见**，不是靠人记得。
+if [ "$LANDED" != 0 ]; then echo "   ⇒ 另「删除已落库」$LANDED 枚（下一轮复跑不判红；要从点名清单里摘掉）"; fi
 
 echo "== 1b. 防「漏登记」：本线命名空间里改了却没点名的文件 =="
 # 🔴 为什么加这一格：PATHS 是我手维护的，而**手维护的清单会漏**——今天实测漏了两枚
@@ -613,7 +636,7 @@ if [ -z "${ANCHORS:-}" ]; then
     echo "      传法：ANCHORS='本轮新增或改动的标识符、函数名、独有串' MSG='…' bash $0 --confirm"
     exit 1
   fi
-  echo "   · 干跑未传 ANCHORS ⇒ 跳过（提交那一腿强制，且牙由 14 臂验证台守着）"
+  echo "   · 干跑未传 ANCHORS ⇒ 跳过（提交那一腿强制，且牙由 calendar-line-commit-only-arms.sh 那把验证台守着 —— 臂数以它最后一行为准，别抄在这里）"
 else
   ANCHORS="$ANCHORS" bash research/tools/calendar-line-hunk-ownership.sh "${NAMES[@]}"
   HO_RC=$?

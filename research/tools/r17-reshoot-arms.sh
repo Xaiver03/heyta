@@ -1,6 +1,8 @@
 #!/bin/bash
-# `r17-reshoot-keeper.sh` 的十三臂验证台（A–E 顺序与停止、F/G/H2 让路三向、I 失败停住、
-# J/J2 默认值与默认图案对照、K 变异）。
+# `r17-reshoot-keeper.sh` 的验证台（A–E 顺序与停止、F/G/H2 让路三向、I 失败停住、
+# J/J2 默认值与默认图案对照、K 变异、L1/L2/L3 `rc=0` 的三种形状分辨）。
+# ⚠️ **臂数不写在正文里**（这里原来写着"十三臂"，加到 L3 那天就漂了）——
+#    现量取最后一行 `r17-reshoot-keeper 臂：pass=… fail=…`。
 # ============================================================================
 # 这把 rig 存在的理由：看守是**会在窗口开的那一刻起真浏览器、覆盖取证 png** 的东西。
 # "它会不会在红门下起跑"不能靠读代码确认 ⇒ 接到一次性夹具上，逐臂喂一组被守脚本的读数，
@@ -26,11 +28,17 @@ no() { FAIL=$(( FAIL + 1 )); echo "  ❌ $1"; }
 
 cat > "$FIX/reshoot" <<'SH'
 #!/bin/bash
-# 真谓词桩：按 CK_SEQ 逐行退码（`rc:GATES`），行用尽就重复最后一行。
+# 真谓词桩：按 CK_SEQ 逐行退码（`rc:GATES[:SHAPE]`），行用尽就重复最后一行。
 # `--confirm` 那一次单独记进 calls，并可被 CK_CONFIRM_RC 打成失败。
+# 🔴 SHAPE 是 10-05 13:5x 加的第三段：被守的那条脚本在 `rc=0` 时**有三种真实输出形状**，
+#    而看守以前对它们一视同仁地宣布 WINDOW=OPEN —— 桩不印出这三种，那一条臂就测不到这件事。
+#      gates（默认，旧行不带第三段时就是它）= 打了 `== 3. 前置门` 那一节 ⇒ 闸门真跑过且全绿
+#      nothing = 打 `NOTHING_TO_SHOOT=1` ⇒ §1 就早退了，第 3 节一个字都没打
+#      bare    = 什么都不打 ⇒ 旧桩的形状（也就是"rc=0 但说不出自己干了什么"）
 N=$(( $(cat "$FIX/cnt") + 1 )); echo "$N" > "$FIX/cnt"
 LINE=$(sed -n "${N}p" "$CK_SEQ"); [ -z "$LINE" ] && LINE=$(tail -1 "$CK_SEQ")
-RC=${LINE%%:*}; GS=${LINE#*:}
+RC=${LINE%%:*}; REST=${LINE#*:}; GS=${REST%%:*}; SHAPE=${REST#*:}
+[ "$SHAPE" = "$GS" ] && SHAPE=gates
 for a in "$@"; do [ "$a" = "--confirm" ] && echo "CONFIRM range=${ONLY:-all}" >> "$FIX/calls"; done
 if [ "$RC" != 0 ]; then
   echo "   ⇒ 前置不达标：GATES=${GS} —— 这是**环境无效**，不是产品失败（exit 3，不降级、不硬跑）。" >&2
@@ -39,6 +47,11 @@ fi
 if [ "${CK_CONFIRM_RC:-0}" != 0 ] && printf '%s' "$*" | grep -q -- '--confirm'; then
   echo "RESHOOT-FAKE-FAIL" >&2; exit "${CK_CONFIRM_RC}"
 fi
+case "$SHAPE" in
+  gates)   echo "== 3. 前置门（端口 / 负载 / 内存 / dist / 依赖 / 载体 —— 以实际打印的 GATES= 为准）==" ;;
+  nothing) echo "   NOTHING_TO_SHOOT=1（本条早退未执行第 3 节前置门）" ;;
+  bare)    : ;;
+esac
 exit "$RC"
 SH
 chmod +x "$FIX/reshoot"
@@ -189,6 +202,29 @@ kill "$P_K" 2>/dev/null
 if [ "$(NCONF)" = 1 ]; then
   ok "K 摘掉让路判定 ⇒ 重装真在跑也照样 confirm（F 那条腿确实长在 [ -z ... ] 那一行）"
 else no "K 摘掉让路判定之后仍然挡 ⇒ F 的红不来自那一行，臂在测别的东西"; fi
+
+# ── L1/L2/L3：`rc=0` 的三种形状必须被看守**分得开**（10-05 13:5x 加，与被守脚本同趟）
+#    起因是一条实测读数：`ONLY=calendar-capture` 在一棵"零枚过期"的树上，
+#    被守的脚本在 §1 就早退（第 3 节前置门**一个都没跑**）并退 0，看守于是打
+#    `WINDOW=OPEN try=1 GATES=〈空〉` —— 而同一分钟 `host_load_gate` 现量是红的（load1=13 / 阈值 12）。
+#    一声没有闸门背书的"门开了"比没有这声更糟：下一个人会以为它绿过。
+mk_fixture; RK_BUDGET=60 RK_DEFER=0 RK_BRE="$TOK_NONE" RK_HRE="$TOK_NONE" run_keeper "0:none:bare"
+L1_RC=$(RCV); L1_N=$(NCONF)
+if [ "$L1_RC" = "4" ] && [ "$L1_N" = "0" ] && grep -q 'PROBE=SUSPECT' "$FIX/out"; then
+  ok "L1 形状分辨：被守的脚本退 0 却**既没打前置门、也没打 NOTHING_TO_SHOOT** ⇒ 看守判装置可疑 exit 4、一次 --confirm 都没起（旧行为是宣布 WINDOW=OPEN 并起跑）"
+else no "L1 未按预期 ⇒ 看守仍会把'闸门没跑'的 rc=0 读成窗口开了：rc=${L1_RC} confirm枚数=${L1_N}"; tail -8 "$FIX/out"; fi
+
+mk_fixture; RK_BUDGET=60 RK_DEFER=0 RK_BRE="$TOK_NONE" RK_HRE="$TOK_NONE" run_keeper "0:none:nothing"
+L2_RC=$(RCV); L2_N=$(NCONF)
+if [ "$L2_RC" = "0" ] && [ "$L2_N" = "0" ] && grep -q 'NOTHING_TO_SHOOT=1' "$FIX/out"; then
+  ok "L2 无事可做那一支：rc=0 但看守**不起 --confirm**、收工话里点名「没跑第 3 节前置门」 ⇒ 不会为一枚没活可拍的目录起真浏览器"
+else no "L2 未按预期 ⇒ 早退形状被读错：rc=${L2_RC} confirm枚数=${L2_N}"; tail -8 "$FIX/out"; fi
+
+mk_fixture; RK_BUDGET=60 RK_DEFER=0 RK_BRE="$TOK_NONE" RK_HRE="$TOK_NONE" run_keeper "0:none:gates"
+L3_RC=$(RCV); L3_N=$(NCONF)
+if [ "$L3_RC" = "0" ] && [ "$L3_N" = "1" ] && grep -q '第 3 节的前置门' "$FIX/out"; then
+  ok "L3 配对正向腿：同样的 rc=0、但输出里真有 `== 3. 前置门` ⇒ 照常起跑一次 --confirm，rc=0"
+else no "L3 未按预期 ⇒ 新判读把「闸门真绿」那一支也挡了（那就是把一条好闸门改成红闸门）：rc=${L3_RC} confirm枚数=${L3_N}"; tail -8 "$FIX/out"; fi
 
 echo "r17-reshoot-keeper 臂：pass=$PASS fail=$FAIL"
 [ "$FAIL" = 0 ] || exit 1

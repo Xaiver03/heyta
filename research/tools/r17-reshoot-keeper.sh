@@ -91,8 +91,27 @@ while :; do
   OUT=$(call_reshoot); RC=$?
   GATES=$(printf '%s\n' "$OUT" | grep -E '前置不达标：GATES=' | tail -1 | sed 's/.*GATES=//; s/ .*//')
   if [ "$RC" = 0 ]; then
-    say "WINDOW=OPEN try=${N} GATES=〈空〉"
-    break
+    # 🔴 10-05 13:5x 加的判读格。原来这里只看 `RC=0` 就宣布 `WINDOW=OPEN GATES=〈空〉`，
+    #    而"退 0"至少有三种来源，其中两种**根本没跑闸门**：
+    #      ① 闸门全绿、有活要拍 —— 输出里有 `== 3. 前置门` 那一节（真跑过）；
+    #      ② 现量没有过期目录 —— 被守的脚本在 §1 就早退了，第 3 节一个字都没打；
+    #      ③ 用法/载体不成立 —— 那是 rc≠0，走下面另一支。
+    #    把 ② 读成"门开了"的实际后果（13:48 实测）：它宣布 WINDOW=OPEN 的那一刻
+    #    `host_load_gate` 现量是 **红的**（load1=13 对阈值 12）。一声没有闸门背书的"门开了"
+    #    比没有这声更糟 —— 下一个人会以为绿过（本仓 §7 第 50 条那一族）。
+    if printf '%s\n' "$OUT" | grep -q 'NOTHING_TO_SHOOT=1'; then
+      say "NOTHING_TO_SHOOT=1（被守的脚本现量没有过期目录，且**没跑第 3 节前置门**）⇒ 不起 --confirm，收工"
+      printf '%s\n' "$OUT" | tail -4 | sed 's/^/      /' >> "$LOG"
+      exit 0
+    fi
+    if printf '%s\n' "$OUT" | grep -q '== 3\. 前置门'; then
+      say "WINDOW=OPEN try=${N} GATES=〈空〉（这一趟第 3 节的前置门**跑过且全绿** —— 不是「没跑」）"
+      break
+    fi
+    say "PROBE=SUSPECT：被守的脚本退 0，可输出里既没有「== 3. 前置门」那一节、也没有「NOTHING_TO_SHOOT=1」那枚标记"
+    say "  ⇒ 这个 rc=0 分不清「闸门全绿」与「闸门根本没跑」，按装置坏了处理（exit 4），绝不据它起跑"
+    printf '%s\n' "$OUT" | tail -8 | sed 's/^/      /' >> "$LOG"
+    exit 4
   fi
   if [ "$RC" = 3 ]; then
     say "try=${N} rc=3 GATES=${GATES:-〈被守的脚本没打 GATES，装置可疑〉}"

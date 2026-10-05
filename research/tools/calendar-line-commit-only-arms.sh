@@ -34,6 +34,9 @@
 #              （`NS_NAMED=0`）—— 这一臂证的不是"又报了一次红"，是"这一格能报到那一格报不到的地方"
 #   臂 14 臂 13 的**配对下界**：同一夹具把图点名 ⇒ 期望 rc=0 且"未点名 0 枚"
 #              （缺它就无法区分"推导格抓到了漏"与"这棵夹具树本来就跑不通"）
+#   臂 15 「删除」那条腿的**下一轮**：先把删除真的 --confirm 落库，再拿**同一份点名清单原样干跑复跑**
+#              ⇒ 期望 rc=0 且打「已落库」，而不是 §4 自己要求的那个收尾动作在下一轮变红
+#              （12:5x 主检出实测红在这一步 —— 当时 14 臂全绿，因为它们都只验当轮；账在 §4.05 (50)）
 #
 # 🔴 **臂 1/2/5/6 必须传 ANCHORS，而这件事曾经没人传（10-05 11:5x 现量查出）**：
 #    `cbd18178` 给被测脚本加了"3b 在 --confirm 下缺 ANCHORS 就 exit 1"，**却没同步这套 rig**
@@ -594,7 +597,42 @@ else
   echo '--- 臂14 日志尾部 ---'; tail -25 "${L}.arm14.out"
 fi
 
-rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8" "$F9" "$F10" "$F11" "$F12" "$F13" "$F14"
+F15=$(mk_del_fixture) || { echo "❌ 夹具15 建不起来"; exit 1; }
+(
+  cd "$F15" || exit 1
+  # 第一腿：先把删除**真的落库**（与臂10 同一条 --confirm 路径，同一份点名清单）。
+  rm -f a.txt
+  MSG='test: 臂15 落库' PATHS_OVERRIDE='a.txt|docs/plans/mine.md' UNCARRIED_OVERRIDE='' \
+    ANCHORS='正文（改过） base' \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm15.commit.out" 2>&1
+  RC_COMMIT=$?
+  # 第二腿（这一臂真正测的东西）：**同一份清单原样复跑一次干跑** —— 也就是本工具在 §4
+  # 里自己要求的那个收尾动作。没有下面这几行，"删除"这条腿只验了当轮、没验下一轮，
+  # 而 12:5x 主检出就是靠这格红给我看的（账在 §4.05 (50)）。
+  PATHS_OVERRIDE='a.txt|docs/plans/mine.md' UNCARRIED_OVERRIDE='' \
+    bash research/tools/calendar-line-commit-plan.sh > "${L}.arm15.rerun.out" 2>&1
+  RC=$?
+  {
+    echo "RC_COMMIT=$RC_COMMIT"
+    echo "RC=$RC"
+    echo "LANDED=$(grep -c '删除\*\*已落库\*\*（HEAD 无此枚' "${L}.arm15.rerun.out" || true)"
+    echo "SUMMARY=$(grep -c '另「删除已落库」1 枚' "${L}.arm15.rerun.out" || true)"
+    echo "NO_TODO=$(grep -c '无待办' "${L}.arm15.rerun.out" || true)"
+    echo "STALE_MSG=$(grep -c '清单过期' "${L}.arm15.rerun.out" || true)"
+  } > "${L}.arm15.rd"
+  exit $RC
+)
+A15=$(cat "${L}.arm15.rd" 2>/dev/null)
+if [ "$(rd "$A15" RC_COMMIT)" = "0" ] && [ "$(rd "$A15" RC)" = "0" ] \
+   && [ "$(rd "$A15" LANDED)" != "0" ] && [ "$(rd "$A15" SUMMARY)" != "0" ] \
+   && [ "$(rd "$A15" NO_TODO)" != "0" ] && [ "$(rd "$A15" STALE_MSG)" = "0" ]; then
+  ok "臂15 下一轮腿：删除落库后**同一份清单原样复跑** rc=0、打「已落库」并进汇总行、'清单过期'那句不再出现 ⇒ §4 自己要求的收尾动作不会在下一轮变红（配对：臂11 证明'从来没有过的路径'仍然 exit 1，这条口子没开成'没有也放行'）"
+else
+  bad "臂15 未按预期 ⇒ 下一轮复跑仍红、或已落库那格没被走到、或口子开过头把过期清单放行了：$(printf '%s\n' "$A15" | tr '\n' ' ')"
+  echo '--- 臂15 复跑日志尾部 ---'; tail -25 "${L}.arm15.rerun.out"
+fi
+
+rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8" "$F9" "$F10" "$F11" "$F12" "$F13" "$F14" "$F15"
 echo "== 合计 pass=$PASS fail=$FAIL =="
 rm -f "${L}".arm*.out "${L}".arm*.rd
 [ "$FAIL" = 0 ] || exit 1
