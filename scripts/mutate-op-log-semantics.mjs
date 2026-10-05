@@ -62,6 +62,14 @@ const scenarios = [
     to: 'if (false) {',
   },
 ];
+/**
+ * 载体被宿主内存护栏挡在外面时，它只打印拒绝、不产出任何报告文件。
+ * 沿用 `scripts/mutate-calendar-event-source.mjs` 里同一枚 `BAILED` 与同一个理由：
+ * **那是环境，不是判据**。退 2 与退 1 对 `pnpm check` 都是红，所以这条不放松任何东西，
+ * 它只是不再把"没跑成"印成 `missing assertion report` —— 后者读起来像夹具坏了。
+ */
+const BAILED = /内存闸门拒绝启动/;
+
 function run(scenario, label) {
   const report = join(temporary, 'result.json');
   rmSync(report, { force: true });
@@ -71,7 +79,15 @@ function run(scenario, label) {
   if (result.error || result.signal) throw result.error ?? new Error(`${label}: ${result.signal}`);
   let parsed;
   try { parsed = JSON.parse(readFileSync(report, 'utf8')); }
-  catch { throw new Error(`${label}: missing assertion report\n${result.stdout}\n${result.stderr}`); }
+  catch {
+    const out = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+    if (BAILED.test(out)) {
+      console.error(`⏸ ${label}: 载体被内存护栏挡在外面 —— 这一轮**没跑成**，不是判据没牙。`);
+      console.error(out.split('\n').filter((l) => l.includes('内存闸门拒绝启动')).join('\n'));
+      process.exit(2);
+    }
+    throw new Error(`${label}: missing assertion report\n${result.stdout}\n${result.stderr}`);
+  }
   return { status: result.status, failed: parsed.numFailedTests, passed: parsed.numPassedTests };
 }
 try {
