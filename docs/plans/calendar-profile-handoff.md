@@ -1769,6 +1769,44 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   改完立刻对该文档的编号集合做一次命中数清点（比"看起来没事"便宜，且这次三次都真的有事）。
   已把这条搬进跨会话记忆（`feedback-edit-boundary-hygiene`）。
 
+- (41) **10-05 10:5x：把"删掉 `day-en-no-timed` 那次重复截图"从一句判断改写成一条**可测前置**。**
+  本趟不动 spec —— 它要 e2e 窗口，而门现在（10:57 现量 `tail -1 /tmp/ht-b-window.log`）是 `rc=3 REDS=load,src`。
+
+  ① **旧措辞为什么不算判据**：`apps/web/evidence/calendar-day/README.md` 那一行写的是"下一趟有窗口时把
+  `calendar-day-en.spec.ts:290` 去掉"，依据是**某一趟的读数**（10-05 02:1x 两张逐字节相同），
+  而不是一条会在相反状态下失败的检查。哪一天那句说明真的在 `day-en-full` 那一帧出了视口，
+  按旧措辞删掉的正好是**唯一的证据** —— 这是本仓库那条"一条永远通过的判据比没有判据更糟"的镜像形状：
+  **一次性读数当判据，删的是证据而不是冗余。** ⇒ 前置必须写成断言，且量在**与 `day-en-full` 同一帧**上。
+
+  ② **同一帧这件事读了源码**（不是记得）：视口在 `calendar-day-en.spec.ts:175` 钉成 `1280×720`；
+  `grep -n 'scroll' e2e/tests/calendar-day-en.spec.ts` 现量命中 **5 行** ——
+  `104/105/261` 是 `evaluate` 里的 `scrollWidth/scrollHeight`（**只读测量，不动滚动**）、
+  `297` 是下一条用例自己的 `setViewportSize`、只有 `289` 是那次 `scrollIntoViewIfNeeded()`。
+  ⇒ 从 `201`（截 `day-en-full`）到 `289` 之间没有第二次视口改变，所以插在第 289 行**之前**量到的矩形
+  就是那张图里的矩形；插在之后量到的是**滚过之后**的状态，那会证明另一件事。
+
+  ③ 下一趟要加的检查（插在 `289` 之前，两条腿）：
+
+  ```ts
+  // 这条断言决定 day-en-no-timed 是不是独立证据；量在 day-en-full 那一帧（201→289 之间无滚动、视口 175 行钉死）。
+  const vp = page.viewportSize()!;
+  const box = await page.locator(NO_TIMED).boundingBox();
+  expect(box, '说明元素量不到矩形 ⇒ 探针没落到元素上，不许据此删图').not.toBeNull();
+  expect(box!.y + box!.height, `说明底边 vs 视口高 ${String(vp.height)}`).toBeLessThanOrEqual(vp.height);
+  ```
+
+  - 断言**成立** ⇒ 它确实不构成独立证据：删 `290` 那次 `screenshot()`（spec 里留一行为什么删），并**同批**删
+    README 里它的表格行与那枚锚点（现量 `apps/web/evidence/calendar-day/README.md:130` = `UIPIN day-en-no-timed.png 39032107 …`）；
+  - 断言**不成立** ⇒ 是 `scrollIntoViewIfNeeded()` 没把说明带回视口（或那一帧真的动过），**那是另一条缺陷**，这张图留着。
+
+  ④ 📌 顺手核到一条**单向**的守卫，写下来免得下一趟以为有网兜着：
+  删图不删锚点**会红** —— `r17-evidence-md5-check.sh:224` 对"README 钉了但盘上没有"回
+  `UISTALE … 盘上没有这个文件` 并计入 `pbad`（该档**没有基线**，恒响）；
+  反过来**删锚点留图不红**（那枚 png 只是不再被钉，目录级 `UNPINNED` 棘轮数的是"整个目录一条锚点都没有"）。
+  ⇒ 两处必须同批改。改完的现量命令：
+  `bash research/tools/r17-evidence-md5-check.sh --dir apps/web/evidence/calendar-day`（改前现量 **rc=0**、
+  `entries=1 mismatch=0 pins=8 md5bad=0 pinbad=0 pinunknown=0`；删掉那枚后 `pins` 应为 **7** 且仍 rc=0）。
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
 
 
@@ -1796,6 +1834,13 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
 ⇒ 是 vault/回收站那条线**正在写**的一对（ADR 引用 + 它的脱敏取证），处置在他们手里：把那枚 `.txt` 一起提交。
 **本线不动**：既不改他们的 ADR，也不替他们 `git add` 一枚还没看过内容的脱敏文件。
 复跑：`node research/tools/docs-link-check.mjs`（它自己会说不该为门禁绿放宽判据，三条出路写在它的输出里）。
+🔴 **10:5x 复跑读数：两枚都归零了，但归零的原因不是"提交落地了"。** `docs-link-check` rc=**0**、`check:md-tables` rc=**0**（9 文件）。
+现量：`git status --porcelain -- apps/mobile/evidence/ios-vault-ui-20261005.txt` ⇒ **`A `**（进了**索引**），
+而 `git log -1 -- <那枚 .txt>` **空输出** ⇒ **还没有任何一笔提交带它**。
+门禁为什么就绿了：它判"仓库里有没有"用的是 `git ls-files -z`（`docs-link-check.mjs:130`），
+那个集合**包含已 `add` 未提交**的文件。
+⇒ **"干净检出上是死链"这一半主张此刻仍未闭合** —— 检出侧要的是那笔提交，不是那个索引位。
+本行不替他提交，只把这条差注册在这里（复跑：`git log -1 --format=%h -- apps/mobile/evidence/ios-vault-ui-20261005.txt`，非空即闭合）。
 
 🟡 **同一分钟还有第二枚，形状更值得记**：`check:md-tables` 在我提交 `79ebb485` 那一刻报 **rc=1**，
 三处错位全在 `docs/plans/trash-and-archive.md:1515/1516/1519`（表头 4 列该行 3 列 / 表格行被折成两个物理行 /
