@@ -12462,3 +12462,42 @@ W5 停掉 caddy 后：经代理 WS connected=false、直连 WS connected=true
 
 **收尾**：`--keep` 留下的那套栈按脚本打出的那条命令 `down -v` 拆掉，一次性凭据文件 `rm` 掉，
 现量残留 0 枚容器 / 0 枚网络。装置与台账之外，本轮没有动任何别的落点。
+
+### 8.224 对外错话普查的**第二个面**：外人是在产品里读到那篇指南的，不是只在 GitHub 上 —— 站内文章逐条对到本体，八条成立、查出一句没有门禁的**全称承诺**（G-71）（2026-10-05 15:3x）
+
+§8.220 普查的是 `docs/runbooks/self-host.md`（GitHub 上那一页）。但"外人一条 compose 起全套、打开浏览器就能用"
+这句话里，**外人先打开的是浏览器** —— 他先读到的是站内文档中心那篇 `site.docs.selfhost.*`（58 条词条），
+而那一页是**给非技术的人决定"要不要自建"之前**看的。所以它同样是一个对外事实面，同样要对着本体核。
+
+| 站内那句 | 核对的本体（不是文档自己的注释） | 判 |
+|---|---|---|
+| s1i4 `JWT_SECRET` / `PASSWORD_PEPPER` 短于 32 字符服务**拒绝启动** | `server/src/auth.ts:17` `MIN_JWT_SECRET_LENGTH = 32`；`server/src/password/hash.ts:37` `MIN_PEPPER_LENGTH = 32`、`:50` 缺了抛、`:54-56` 短了抛 | ✅ 两条各自成立（先前只核过 JWT 那半） |
+| s2i1 "不配 SMTP 也建得了号…而**界面会明说这件事**" | 四层链都在：`server/src/auth.ts:626-632`（发不出去时 `emailDelivered: false`，message 与状态码**不变**，防邮箱存在性预言机）→ `packages/app-host/src/hosted-auth.ts:471-498`（**只认字面量 `false`** 的严格读取）→ `apps/web/src/features/auth/store.ts:396-397` → `packages/i18n/src/locales/zh-CN.ts:721`（那句"只在服务端亲口说时才出现"的词条） | ✅ 成立，而且是**跨四层的成立**（任何一层断掉这句话就变谎话） |
+| s2i4 白名单关上后提示是「这个服务端不允许用该邮箱注册」 | `packages/i18n/src/locales/zh-CN.ts:730` `common.auth.error.notAllowed` 逐字 = 那句 | ✅ 引号里的字逐字对得上 |
+| s6i1 "多个来源逗号分开；**生产环境下**『全都放行』会被直接拒绝启动" | `server/src/config.ts:452-463`：`origins.includes('*')` 且 `NODE_ENV === 'production'` ⇒ `throw`；非生产 ⇒ 只 `Logger.warn` 并保留 `*`（`server/src/server.ts:429-432` 把 `*` 变成 `origin: true`） | ✅ **这句比"看着像"更准**：它把禁令限定在生产那一档，而代码的禁令确实只在那一档。compose `:40` 默认 `NODE_ENV=production` ⇒ 自建者默认就在被拒的那一档 |
+| s8i3 "默认连本栈的 PostgreSQL 16" | `server/docker-compose.yml:49` 的 `DATABASE_URL` 默认指向 `postgres:5432`、`:173` `image: ${POSTGRES_IMAGE:-postgres:16-alpine}` | ✅ |
+| s7p2 "部署脚本会核对镜像的源码版本标签，防止拿旧镜像跑新迁移" | `scripts/verify-selfhost-stack.sh` 的 revision 闸 | ✅ **本轮刚被它拒过一次**（§8.223 开头那笔 rc=1：镜像 label `673e6a43` ≠ HEAD `6039f158`）—— 这句承诺不是写在文档里的意图，是一枚会拒跑的门 |
+| s1i1 / s7p1 没有现成镜像、要钉版本就传提交号 | §8.220 已核（`git tag -l 'v*.*.*'` = 0、workflow 无 `workflow_dispatch`、`VCS_REF` 传的是 `git rev-parse HEAD`） | ✅ 沿用，未重复取数 |
+| s7p2 后半句"确信要跳过这份核对也有显式开关" | 同一处脚本的显式开关分支 | ✅ |
+
+⇒ **这一面也没有对外错话，所以一个字都没改词条**（不改的判据是"查过且对得上"，不是"没查"）。
+
+🔴 **查出来的缺口是一句没有门禁的全称承诺**：`s3p1` 写着
+"（仓库那两份手册）跟这一页讲的**每句都对得上**"。
+这是一个**全称量词**，而它今天为真 —— 靠的是我这一轮和 §8.220 那一轮两次人工普查。
+没有任何一层守着它：`check:selfhost-entry-command` 只对**入口命令**那一句逐字（R1–R9），
+`check:docs` 只管死链，`check:legal-copy` 只比生成物与真源。
+⇒ 两边任何一侧改一句话，这句"每句都对得上"就变谎话，而**不会有任何东西红**。
+这正是 §8.220 末尾那条一般规律的第二个实例（"文档里凡能被子系统否证的句子，都要有一条指向那个子系统的对账"）。
+
+**G-71 的关闭判据（二选一，不三选一）**：
+① 把 `s3p1` 那句改成它**现在真能保证**的范围（"这一页讲的入口命令与那三份手册逐字同一套，由 `check:selfhost-entry-command` 钉住"），中英同步 + 重跑生成与 `check:entries`；
+② 或加一条对账，把"每句"落成一个**封闭的可核子集**（三个必填项的默认值/长度、那条入口命令、CORS 那一档的措辞、PostgreSQL 那个大版本），逐条"文档里的字面 ⇒ 去本体取一次 ⇒ 逐字比"。
+⚠️ ②要挂进链就得动根 `package.json`，与 #55 同一批排在落地后；①不需要。
+**不许**为了省事把这句删掉了事 —— 它是那一页唯一的"两边同源"承诺，删了读者就不知道哪份为准。
+
+顺带一条**分类上的**收获，写下来是为了让下一个人不去"修"它：站内那篇**没有**讲
+`NODE_IMAGE` / `APK_MIRROR` / `NPM_REGISTRY` 与 `POSTGRES_IMAGE` / `CADDY_IMAGE` 这五个旋钮（runbook §3 讲了）。
+这不是错话，是**缺信息** —— 那一页的职责它自己写明了（"让你在决定要不要自建**之前**先知道它长什么样"），
+而把五个镜像源旋钮塞进决策页会让它变成另一份手册。
+区别要说清：**缺信息可以选择不补，错话不行**。
