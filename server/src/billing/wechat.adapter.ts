@@ -43,8 +43,12 @@ import type {
   BillingAdapter,
   CheckoutResult,
   CreateCheckoutInput,
+  CreateRefundInput,
   NormalizedPaymentEvent,
   OneTimeGrant,
+  ProviderRefundStatus,
+  RefundNotice,
+  RefundResult,
   RevokeEntitlementInput,
   SubscriptionStatus,
   WebhookHeaders,
@@ -86,6 +90,58 @@ export const WECHAT_SUPPORTED_CURRENCIES: readonly Currency[] = ['CNY'];
 
 /** Native 下单的 APIv3 路径（**相对路径**，签名串里用的就是它）。 */
 export const WECHAT_NATIVE_PATH = '/v3/pay/transactions/native';
+
+/**
+ * 退款的 APIv3 路径。签名串用的同样是**相对路径**（与下单同一个理由：
+ * 微信的 `signature` 里写的是 URL 而不是 host，两处不一致会得到一个 401）。
+ */
+export const WECHAT_REFUND_PATH = '/v3/refund/domestic/refunds';
+
+/**
+ * 微信退款通知的三种 `event_type` → 我方归一化状态。
+ *
+ * 🔴 这张表**住在这里**（adapter 的私有细节），不进 `types.ts`：
+ * 微信的 `REFUND.SUCCESS` 与别家的 `refund.succeeded` 不是同一个字面量，
+ * 把映射抽成共享表正是选型文档 §4 说要避免的那件事。
+ *
+ * 没有 `PROCESSING` 对应的通知：通道只在**终态**发通知，
+ * 所以这里的三个值就是回调侧可能出现的全部状态。
+ */
+export const WECHAT_REFUND_EVENT_STATUS: Readonly<Record<string, ProviderRefundStatus>> = {
+  'REFUND.SUCCESS': 'success',
+  'REFUND.ABNORMAL': 'abnormal',
+  'REFUND.CLOSED': 'closed',
+};
+
+/**
+ * 退款**同步响应**里的 `status` → 我方归一化状态。
+ *
+ * ⚠️ 这是**第二张表**，不是第一张的副本，两处的输入不同域：
+ * 上面那张的键是通知的 `event_type`（`REFUND.SUCCESS`），这里的键是退款单的状态字面量
+ * （`SUCCESS` / `PROCESSING` / `CLOSED` / `ABNORMAL`）。把它们合成一张表的做法
+ * 在选型文档 §4 里被点名为"最容易用错的地方"—— 两个域的字面量将来会各自漂移，
+ * 而共享表会让其中一侧悄悄接不上。
+ *
+ * 这里**必须**含 `PROCESSING`：它是受理后的常态（异步退款要几秒到几天）。
+ * 少了它，一次正常的受理会走进 `UNKNOWN_REFUND_STATUS` 那条抛错路径。
+ */
+export const WECHAT_REFUND_STATUS_MAP: Readonly<Record<string, ProviderRefundStatus>> = {
+  SUCCESS: 'success',
+  PROCESSING: 'processing',
+  CLOSED: 'closed',
+  ABNORMAL: 'abnormal',
+};
+
+/**
+ * 退款事件幂等键的**唯一**拼装点。
+ *
+ * 🔴 键里必须带上状态：同一笔退款的 `ABNORMAL` 之后可能转成 `SUCCESS`
+ * （微信文档明说会补发）。若键只写 `out_refund_no`，后到的那条**更正**
+ * 会被前一条挡掉 —— 于是"钱已经退了"这件事永远进不了库，
+ * 用户的权益永远回不来（回收只由 `success` 触发）。
+ */
+export const buildWechatRefundEventId = (outRefundNo: string, status: ProviderRefundStatus): string =>
+  `refund_${status}:${outRefundNo}`;
 
 /**
  * APIv3 入口。刻意是常量而不是配置项：微信支付只有一个生产入口，
@@ -528,6 +584,16 @@ export class WechatInvalidAmountError extends Error {
  * 🔴 它护的是「冻结的订单号 == 发给通道的订单号」这条不变量：
  * 回调按订单号认单，两者不一致时**一笔真实到账的钱授予不出去**（`unknown-order`）。
  */
+/** 退款单号不可用（空 / 非字符串）。与订单号那条分开：两者的排查方向不同。 */
+export class WechatInvalidRefundNoError extends Error {
+  readonly code = 'WECHAT_INVALID_REFUND_NO';
+
+  constructor(outRefundNo: unknown) {
+    super(`微信退款单号不可用：${JSON.stringify(outRefundNo)}，拒绝发起`);
+    this.name = 'WechatInvalidRefundNoError';
+  }
+}
+
 export class WechatInvalidOutTradeNoError extends Error {
   readonly code = 'WECHAT_INVALID_OUT_TRADE_NO';
 
@@ -580,6 +646,29 @@ export class WechatUnsupportedCurrencyError extends Error {
         `拒绝下单（金额数值在币种之间不可比，静默按 CNY 发出会收错钱）`,
     );
     this.name = 'WechatUnsupportedCurrencyError';
+  }
+}
+
+/**
+ * 🔴 退的钱**多于**那一单实付的钱。
+ *
+ * 这是通道一定会拒的一种请求，所以必须在这里、发出去之前拒 —— 更根本的理由是：
+ * 一旦允许 `refund > total` 通过，`refunds` 那一行就会带着一个"比实付还大的金额"
+ * 进入权益回收流程，而回收只看天数不看金额。症状是**用户多拿了钱、权益照样扣**，
+ * 而这笔差额在库里没有任何一行会承认它发生过。
+ */
+export class WechatRefundExceedsPaymentError extends Error {
+  readonly code = 'WECHAT_REFUND_EXCEEDS_PAYMENT';
+
+  constructor(
+    readonly refundAmountMinor: number,
+    readonly totalAmountMinor: number,
+  ) {
+    super(
+      `退款金额 ${refundAmountMinor} 大于该单实付 ${totalAmountMinor} —— ` +
+        `拒绝发起（通道也会拒；先把一个算不平的数写进 refunds 行是更坏的结果）`,
+    );
+    this.name = 'WechatRefundExceedsPaymentError';
   }
 }
 
@@ -700,6 +789,116 @@ export const createWechatBillingAdapter = (
       return { qrCode: parsed.code_url };
     },
 
+    /**
+     * 发起退款：`POST /v3/refund/domestic/refunds`。
+     *
+     * 🔴 这个方法**只把请求发给通道**，不写库、不动权益。
+     * 权益回收的唯一落点在 `refund-store.ts#applyRefundResult`，且只由
+     * `success` 触发。这里若顺手回收，就会出现"通道还没受理、权益已经砍掉"。
+     *
+     * ⚠️ 微信的退款受理是**异步**的：小额可能当场回 `SUCCESS`，多数先回 `PROCESSING`。
+     * 所以 `PROCESSING` 在这里是**正常结果**，不是失败 —— 它对应的库状态是
+     * `processing`，终态要等 `REFUND.*` 通知（或查询对账）。
+     */
+    async refund(input: CreateRefundInput): Promise<RefundResult> {
+      // 币种先于一切，理由与 `createCheckout` 完全同一条：数不带币种就不可比。
+      if (!WECHAT_SUPPORTED_CURRENCIES.includes(input.currency)) {
+        throw new WechatUnsupportedCurrencyError(input.currency, WECHAT_SUPPORTED_CURRENCIES);
+      }
+      if (!isMinorAmount(input.refundAmountMinor) || input.refundAmountMinor <= 0) {
+        throw new WechatInvalidAmountError(input.refundAmountMinor);
+      }
+      if (!isMinorAmount(input.totalAmountMinor) || input.totalAmountMinor <= 0) {
+        throw new WechatInvalidAmountError(input.totalAmountMinor);
+      }
+      if (input.refundAmountMinor > input.totalAmountMinor) {
+        throw new WechatRefundExceedsPaymentError(input.refundAmountMinor, input.totalAmountMinor);
+      }
+      if (input.outTradeNo === '') {
+        throw new WechatInvalidOutTradeNoError(input.outTradeNo, '空订单号');
+      }
+      if (input.outRefundNo === '') {
+        throw new WechatInvalidRefundNoError(input.outRefundNo);
+      }
+
+      const payload: Record<string, unknown> = {
+        out_trade_no: input.outTradeNo,
+        out_refund_no: input.outRefundNo,
+        // 🔴 `amount` 里的 `total` 是**那一单的实付**，不是原价：
+        // 用原价做分母时，一张用了券的单会被通道判成"退款额超过可退额"而拒掉，
+        // 而我们这边的失败原因会写成品通道的报错 —— 排查的人看不出是金额口径错了。
+        amount: {
+          refund: input.refundAmountMinor,
+          total: input.totalAmountMinor,
+          currency: input.currency,
+        },
+      };
+      // `reason` 会出现在用户的微信账单上，所以**由调用方给**（后台那句理由）。
+      // 不传就整个字段省略：这里刻意不给一个"默认理由"，
+      // 因为给用户看的句子必须是有人对它负责的内容。
+      if (input.reason !== undefined && input.reason.trim() !== '') {
+        payload.reason = input.reason.trim();
+      }
+
+      const body = JSON.stringify(payload);
+      const timestamp = Math.floor(now() / 1000);
+      const nonce = randomBytes(16).toString('hex');
+      const signature = signWechatRequest(
+        { method: 'POST', url: WECHAT_REFUND_PATH, timestamp, nonce, body },
+        privateKey,
+      );
+
+      const response = await fetchImpl(`${WECHAT_API_BASE_URL}${WECHAT_REFUND_PATH}`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'heyta-sync-server/wechat-native',
+          Authorization: buildWechatAuthorizationHeader({
+            mchId: options.mchId,
+            serialNo: options.serialNo,
+            nonce,
+            timestamp,
+            signature,
+          }),
+        },
+        body,
+      });
+
+      const parsed = (await response.json().catch(() => ({}))) as {
+        refund_id?: unknown;
+        status?: unknown;
+        code?: unknown;
+        message?: unknown;
+      };
+
+      if (!response.ok) {
+        throw new WechatApiError(
+          response.status,
+          typeof parsed.code === 'string' ? parsed.code : undefined,
+          typeof parsed.message === 'string' ? parsed.message : undefined,
+        );
+      }
+
+      const statusRaw = typeof parsed.status === 'string' ? parsed.status : '';
+      const mapped = WECHAT_REFUND_STATUS_MAP[statusRaw];
+      if (mapped === undefined) {
+        // 🔴 陌生状态**不猜**。把它归成 `processing` 会让一行"通道其实没受理"的退款
+        // 被我们等成"迟早会成功"；归成 `success` 更糟 —— 那会直接砍掉用户权益。
+        throw new WechatApiError(
+          response.status,
+          'UNKNOWN_REFUND_STATUS',
+          `退款响应里的状态 ${JSON.stringify(parsed.status)} 不在已知词表里`,
+        );
+      }
+
+      return {
+        providerRefundId:
+          typeof parsed.refund_id === 'string' && parsed.refund_id !== '' ? parsed.refund_id : null,
+        status: mapped,
+      };
+    },
+
     async verifyWebhook(
       rawBody: Buffer,
       headers: WebhookHeaders,
@@ -740,10 +939,18 @@ export const createWechatBillingAdapter = (
         return { ok: false, reason: 'malformed-payload' };
       }
 
-      // 本轮只接"支付成功"。其余事件（退款 / 撤销）**明确拒绝**而不是静默忽略：
-      // 静默忽略会落一条 PaymentEvent 却没有对应语义，比 401 更难排查。
-      // 退款回收仍是已知缺口（见文件头与 `onRevoke` 注释）。
-      if (envelope.event_type !== 'TRANSACTION.SUCCESS') {
+      // 🔴 接受两类事件：**支付成功**与**退款终态**（SUCCESS / ABNORMAL / CLOSED）。
+      // 其余事件仍然**明确拒绝**而不是静默忽略：静默忽略会落一条 PaymentEvent
+      // 却没有对应语义，比 401 更难排查。
+      //
+      // 退款通知为什么必须在这里接：它到达时**只有通道知道**钱退没退成。
+      // 拒掉它的后果不是"少一条日志"，而是 `refunds` 那一行永远停在 `processing`
+      // —— 而权益回收只由 `success` 触发，于是"钱退了、权益却不回来"。
+      const refundStatus =
+        typeof envelope.event_type === 'string'
+          ? WECHAT_REFUND_EVENT_STATUS[envelope.event_type]
+          : undefined;
+      if (envelope.event_type !== 'TRANSACTION.SUCCESS' && refundStatus === undefined) {
         return { ok: false, reason: 'unsupported-event-type' };
       }
 
@@ -779,11 +986,58 @@ export const createWechatBillingAdapter = (
         success_time?: unknown;
         attach?: unknown;
         amount?: { total?: unknown } | undefined;
+        // 退款通知带的三列（支付通知没有）。放在同一个类型上是为了**一次** JSON.parse，
+        // 而不是按事件类型走两条解密路径 —— 两条解密路径迟早会漂移成两套。
+        out_refund_no?: unknown;
+        refund_id?: unknown;
+        refund_status?: unknown;
       };
       try {
         payload = JSON.parse(plaintext.toString('utf8')) as typeof payload;
       } catch {
         return { ok: false, reason: 'malformed-resource' };
+      }
+
+      // 🔴 退款通知在这一支**先**出去，且**绝不**带着 `oneTimeGrant` 出去：
+      // 它不是"一笔钱进来了"，把它落到支付那条路径上会**再发一次 30 天权益**。
+      if (refundStatus !== undefined) {
+        if (typeof payload.out_refund_no !== 'string' || payload.out_refund_no === '') {
+          return { ok: false, reason: 'missing-out-refund-no' };
+        }
+        // 通道给的 `refund_status` 必须与 `event_type` 说的一致。
+        // 不一致时**不猜**：这两种值各自的下游动作相反（一个是回收权益、一个不是）。
+        const reported =
+          typeof payload.refund_status === 'string' ? payload.refund_status.toLowerCase() : null;
+        if (reported !== null && reported !== refundStatus) {
+          return { ok: false, reason: 'refund-status-conflict' };
+        }
+        return {
+          ok: true,
+          event: {
+            provider: WECHAT_PROVIDER,
+            providerEventId: buildWechatRefundEventId(payload.out_refund_no, refundStatus),
+            eventType: typeof envelope.event_type === 'string' ? envelope.event_type : 'REFUND',
+            // `success_time` 只在 SUCCESS 里有。缺它时用到达时间：退款通知**不参与**
+            // 订阅行那套乱序闸门（它只推进 `refunds` 那一行），所以这里不需要"事件内时间"
+            // 那种强度；编一个更早的时间反而会把它自己判成过期。
+            occurredAt: parseWechatTime(payload.success_time) ?? now(),
+            externalSubscriptionId: null,
+            status: null,
+            currentPeriodEnd: null,
+            // 退款通知的用户归属**不从事件推**：它由 `refunds` 那一行带着（申请时
+            // 就从订单上冻结了）。这里如实写 `null`，而不是拿 out_refund_no 反解一个。
+            userId: null,
+            oneTimeGrant: null,
+            refundNotice: {
+              outRefundNo: payload.out_refund_no,
+              providerRefundId:
+                typeof payload.refund_id === 'string' && payload.refund_id !== ''
+                  ? payload.refund_id
+                  : null,
+              status: refundStatus,
+            } satisfies RefundNotice,
+          } satisfies NormalizedPaymentEvent,
+        };
       }
 
       if (payload.trade_state !== 'SUCCESS') {

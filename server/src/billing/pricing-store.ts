@@ -306,6 +306,23 @@ export const AUDIT_ACTIONS = [
    * 等于"有人付了不对的钱"这件事只存在于当时那条日志里。
    */
   'order_amount_mismatch',
+  /**
+   * 退款这一族（ADR-0053）。**每一条都要落审计**，理由与 `order_amount_mismatch`
+   * 同一条：钱上的决定不能只活在当时那个 HTTP 响应里。
+   *
+   * · `refund_requested` / `refund_denied`：政策判"能退/不能退"的那一次判断本身。
+   *   被拒也要留痕 —— 用户七天内申请过而被挡，是一个要能举证的事实。
+   * · `refund_decided`：运营批准或拒绝（`operator_note` 是"谁批的、为什么批"的载体）。
+   * · `refund_channel_failed`：通道拒了。**权益一格未动**，所以更需要可查。
+   * · `refund_retracted` / `refund_retraction_skipped`：回收了多少天，
+   *   或者"钱退了却没有可回收的订阅行"这一件如实但不该静默的事。
+   */
+  'refund_requested',
+  'refund_denied',
+  'refund_decided',
+  'refund_channel_failed',
+  'refund_retracted',
+  'refund_retraction_skipped',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -1114,29 +1131,45 @@ export const expireStaleOrders = async (
  * 那个 `reserved` 分支因此不可达，留着只会**掩盖**一个坏了的不变量 ——
  * 万一真出现 `paid` + `reserved`，我们要的是它炸出来，不是悄悄记一笔核销。
  *
- * ⚠️ 本轮**不做资金侧退款**：这一步只改我们自己的账。真正的退款要调支付商的
- * 退款接口，而通道尚未接线（见 `pricing-and-entitlements.md` §5）。
- * 也就是说这个函数现在是"退款被**确认之后**的状态同步"，不是退款本身。
+ * ⚠️ 2026-10-05 更正（ADR-0053）：这里原写"本轮不做资金侧退款，这一步只改我们自己的账"。
+ * 那句话当时成立，现在不成立 —— 资金侧已经接进 `refund-store.ts#submitRefundToChannel`，
+ * 而本函数的**第一个生产调用方**是 `applyRefundResult`（只在通道确认 `success` 之后）。
+ * 它仍然是"退款被**确认之后**的状态同步"，但那个确认不再是一句空话：
+ * 没退成钱的一条都到不了这里（`refunded_at IS NULL` 那道条件更新）。
+ */
+export const reverseOrderOnRefundInTransaction = async (
+  tx: SqlRunner,
+  input: { readonly orderId: number; readonly now: number },
+): Promise<{ readonly orders: number; readonly redemptions: number }> => {
+  const orders = await tx.execute(
+    `UPDATE checkout_orders
+        SET status = 'refunded', settled_at = $1, updated_at = $1
+      WHERE id = $2 AND status = 'paid'`,
+    [input.now, input.orderId],
+  );
+  const redemptions = await tx.execute(
+    `UPDATE coupon_redemptions
+        SET state = 'reversed', settled_at = $1
+      WHERE order_id = $2 AND state = 'applied'`,
+    [input.now, input.orderId],
+  );
+  return { orders, redemptions };
+};
+
+/**
+ * 事务**外**的入口：自己开一层事务跑上面那个主体。
+ *
+ * 与 `settleOrderPaid` / `settleOrderPaidInTransaction` 同一对形状，理由也一样：
+ * 退款回收必须"订单 + 券 + 权益"同生共死，而调用方（`refund-store.ts`）**已经**
+ * 开着一层事务并持有那一行的 `FOR UPDATE`。Prisma 的事务 client 上没有
+ * `$transaction`（`ITXClientDenyList`），所以正确形状不是硬套一层，
+ * 而是把主体抽成收 `SqlRunner` 的那一个。
  */
 export const reverseOrderOnRefund = async (
   sql: SqlExecutor,
   input: { readonly orderId: number; readonly now: number },
 ): Promise<{ readonly orders: number; readonly redemptions: number }> =>
-  sql.transaction(async (tx) => {
-    const orders = await tx.execute(
-      `UPDATE checkout_orders
-          SET status = 'refunded', settled_at = $1, updated_at = $1
-        WHERE id = $2 AND status = 'paid'`,
-      [input.now, input.orderId],
-    );
-    const redemptions = await tx.execute(
-      `UPDATE coupon_redemptions
-          SET state = 'reversed', settled_at = $1
-        WHERE order_id = $2 AND state = 'applied'`,
-      [input.now, input.orderId],
-    );
-    return { orders, redemptions };
-  });
+  sql.transaction((tx) => reverseOrderOnRefundInTransaction(tx, input));
 
 /** 把被拒的候选券序列化出来（订单上冗余存一份，用于回答"我的码为什么不能用"）。 */
 export const serializeRejections = (rejected: readonly RejectedCoupon[]): string =>

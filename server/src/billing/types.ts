@@ -4,8 +4,10 @@
  * 设计依据：`docs/plans/subscription-provider-selection.md` §4
  * 「抽象层设计：能抽象什么、抽象不掉什么」。那份结论说得很清楚：
  *
- * - 接口**只暴露四个方法**（`createCheckout` / `verifyWebhook` /
- *   `mapSubscriptionState` / `revokeEntitlement`）；
+ * - 接口**只暴露五个方法**（`createCheckout` / `verifyWebhook` /
+ *   `mapSubscriptionState` / `revokeEntitlement` / `refund`）——
+ *   最后一个是 2026-10-05 补的（ADR-0053），因为它**必填**才有意义：
+ *   没有通道的 adapter 也要能"照收请求然后拒"，见 `noop.adapter.ts`；
  * - 「状态映射表」与「金额单位换算」是每个 adapter 的**私有细节** ——
  *   这两处是最容易用错的地方，绝不能泄漏成共享的常量表；
  * - 🔴 **幂等不是 adapter 的职责**：七家支付商的幂等机制互不相同
@@ -164,6 +166,38 @@ export interface NormalizedPaymentEvent {
    * （没有金额就没有权威校验可以过）。
    */
   readonly paidAmountMinor?: number | null;
+  /**
+   * 🔴 **退款通知的显式声明**（ADR-0053）。与 `oneTimeGrant` 完全并列、互斥。
+   *
+   * 为什么必须是一个**声明字段**，而不是让通用层从"`eventType` 里有 REFUND"推断：
+   * `apply-event.ts` 的既有立场是"授予必须是事件上的显式声明，不能从
+   * '没有订阅引用'推断"—— 反过来的推断同样坏：任何一条我们没打算动的
+   * 通知（撤销、对账、将来的争议）都会被误认成一次退款回收。
+   *
+   * 有这一项 ⇒ webhook 路由**只**更新退款行与权益，**绝不**授予任何权益；
+   * 没有这一项 ⇒ 这条路径不做任何退款处理。
+   *
+   * ⚠️ 它是**通道给的事实**，不是"我们已经退完钱"：只有
+   * `status === 'success'` 才允许回收（见 `refund-store.ts`）。
+   */
+  readonly refundNotice?: RefundNotice | null;
+}
+
+/**
+ * 归一化后的退款通知。
+ *
+ * 🔴 幂等键仍然走 `providerEventId`（`(provider, providerEventId)` 那道唯一的闸）。
+ * adapter 必须保证**同一笔退款的同一状态**重投时给出同一个 `providerEventId`，
+ * 而不同状态（`ABNORMAL` 后转 `SUCCESS`）给出**不同**的键 —— 否则后一个状态
+ * 会被前一个挡掉，那笔钱永远结不了。
+ */
+export interface RefundNotice {
+  /** 我方退款单号：回调侧唯一能把通知认回 `refunds` 那一行的依据。 */
+  readonly outRefundNo: string;
+  /** 通道侧退款 id。`null` = 通知里没带（微信的退款通知带，但对账路径不该依赖它）。 */
+  readonly providerRefundId: string | null;
+  /** 通道说这笔退款现在是什么状态。 */
+  readonly status: ProviderRefundStatus;
 }
 
 /**
@@ -279,6 +313,51 @@ export interface RevokeEntitlementInput {
 }
 
 /**
+ * `refund` 的入参。**金额是两个数，不是一个。**
+ *
+ * 🔴 为什么必须同时给"原单实付"与"本次退多少"：微信（以及支付宝 / Stripe 的
+ * 部分退款）都要求 `refund ≤ total`，而这个 `total` 是**那一单的实付**。
+ * 只传退款金额时，adapter 要么去查价目表（多一个价格事实源，正是 ADR-0018 §3.1
+ * 要消灭的形状），要么把原价当 total（用了券的单会算错，见 `refund-policy.ts`
+ * 里 `AMOUNT_UNVERIFIED` 那一条）。两个数都由调用方从**订单行**上取。
+ */
+export interface CreateRefundInput {
+  /** 要退的那一单的商户订单号（`checkout_orders.out_trade_no`）。 */
+  readonly outTradeNo: string;
+  /**
+   * 我方退款单号 —— **通道的幂等键**，由调用方生成、adapter 原样使用。
+   *
+   * 与下单侧同一个理由：回调（`REFUND.*`）只带这个号回锚，adapter 若另生成一个，
+   * 库里冻的是 A、通道记的是 B ⇒ 到账通知永远对不上任何一行。
+   */
+  readonly outRefundNo: string;
+  /** 本次退出的金额（最小单位整数）。只能等于订单的实付 —— 本仓不做部分退。 */
+  readonly refundAmountMinor: number;
+  /** 那一单的**实付**总额（最小单位整数）。 */
+  readonly totalAmountMinor: number;
+  /** 🔴 必填、无默认，理由同 `CreateCheckoutInput.currency`：数不带币种就不可比。 */
+  readonly currency: Currency;
+  /** 给通道 / 账单侧的理由文本。不参与任何判定。 */
+  readonly reason?: string;
+}
+
+/**
+ * 通道给出的退款终态。
+ *
+ * 🔴 这个词表**不是**我方的状态机（那在 `refund-store.ts` 的 `REFUND_STATUSES`）：
+ * 这里只有通道会答复的四种。`SUCCESS` 与 `PROCESSING` 分开是必须的 ——
+ * 只有 `SUCCESS` 才允许动权益，把 `PROCESSING` 当成成功会造成
+ * "通道还没退钱、用户已经掉权益"，那与 ADR-0026 禁的是同一类半真状态。
+ */
+export type ProviderRefundStatus = 'processing' | 'success' | 'abnormal' | 'closed';
+
+/** `refund` 的返回。`providerRefundId` 可空：某些通道在受理时不给号。 */
+export interface RefundResult {
+  readonly providerRefundId: string | null;
+  readonly status: ProviderRefundStatus;
+}
+
+/**
  * 支付商 adapter。
  *
  * 🔴 只有这四个方法，且**没有任何"幂等"语义**。去重在 webhook 路由里由
@@ -347,4 +426,20 @@ export interface BillingAdapter {
    * `webhook.routes.ts` 里的同一处注释）。
    */
   revokeEntitlement(input: RevokeEntitlementInput): Promise<void>;
+
+  /**
+   * 向通道发起退款。
+   *
+   * 🔴 **必填，不是可选方法。** 做成 `refund?()` 的话，调用方就必须写
+   * `typeof adapter.refund === 'function'` 这类绕路，而那是 AGENTS §10 明确不许的
+   * 形状（"测试桩缺接口时补桩，不在生产路径用可选调用绕过"）。
+   * 一个**没有通道**的 adapter 的正确实现是：照收这个方法，然后
+   * 抛 `BillingProviderNotConfiguredError` —— 见 `noop.adapter.ts`。
+   *
+   * 🔴 **不许在这一层动权益。** 这个方法只把请求发给通道；权益回收只发生在
+   * 通道确认 `success` 之后（同步响应里的 `SUCCESS`，或 `REFUND.SUCCESS` 通知），
+   * 且只有一个落点 `refund-store.ts#applyRefundResult`。
+   * 把回收写进 adapter 会造出两个事实源：一个在通道答复里，一个在我们库里。
+   */
+  refund(input: CreateRefundInput): Promise<RefundResult>;
 }

@@ -711,6 +711,9 @@ model CheckoutOrder {
   /// 它同时强制了"一单只能用一张券"这条产品策略。
   redemption CouponRedemption?
 
+  /// 这一单的退款行（0 或 1 条有效退款；见 `Refund` 的注释里"为什么允许多行"）。
+  refunds Refund[]
+
   @@index([userId, status])
   @@index([status, expiresAt])
   @@map("checkout_orders")
@@ -777,6 +780,103 @@ model CouponRedemption {
   /// sweep 的扫描面：`state = 'reserved' AND reserved_until < now`。
   @@index([state, reservedUntil])
   @@map("coupon_redemptions")
+}
+
+// ---------------------------------------------------------------------------
+// 退款（临时方案：7×24 小时内全额，超期默认不退，例外只走运营后台）
+// ---------------------------------------------------------------------------
+
+/// 一次**退款申请**及其终态。ADR-0053。
+///
+/// ## 为什么这张表是"钱侧唯一的一行"，而 `checkout_orders.status='refunded'` 不算
+///
+/// 订单状态只说"结果"，说不出**是谁在什么时候按什么口径退的**。退款是可争议
+/// 的（用户会说"我七天内申请过"），所以那一次判断必须原样留在库里：
+/// `reason` 存被拒时的口径码、`operator_note` 存批例外时的理由、
+/// `amount_minor` 存**冻结下来的实付**（不是原价、不是报价）。
+///
+/// ## 一个订单为什么可以有多行
+///
+/// 退款**失败**（通道拒、余额不足）后运营者要能重试，而微信要求重试换一个
+/// `out_refund_no`。所以这里 `(order_id)` 上只是索引，不是唯一约束。
+/// 🔴 但"同一笔钱退两次"仍然不可能 —— 它挡在两处，缺一不可：
+/// - 库里：`checkout_orders.status` 一旦推进到 `refunded` 就再也进不来
+///   （`decideRefundEligibility` 对 `refunded` 直接判 `ALREADY_REFUNDED`，
+///   而 `reverseOrderOnRefund` 的 `WHERE status = 'paid'` 是第二道）；
+/// - 通道：`(provider, out_refund_no)` 唯一，重投的同一通知被幂等键挡住。
+///
+/// ## 每一列都是可选或带默认值以外的**必填**？
+///
+/// 这是**新表**，没有存量行，所以这里允许 `NOT NULL` 且无默认的列
+/// （`amount_minor`、`currency`、`period_days`、`out_refund_no`）。
+/// AGENTS §3.3 那条"新字段必须可选"管的是**已落盘的数据**，不是新对象。
+/// 反过来，把金额写成可空会让"退一个算不清的数"变成可能 —— 那正是 §3.3 要防的形状。
+model Refund {
+  id Int @id @default(autoincrement())
+
+  orderId Int          @map("order_id")
+  order   CheckoutOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// 退款属于哪个账号。**冗余自订单**，为的是"按用户查退款"不用 join 订单表，
+  /// 也让权益回收那一步能直接用它定位订阅行（`subscription-boundary.md` §6.2 一行一用户）。
+  userId Int @map("user_id")
+
+  /// 支付通道名。与 `checkout_orders.provider` 同值 —— 退款必须回到**同一个**通道，
+  /// 不存在"从另一条通道退"这种操作。
+  provider String
+
+  /// 🔴 我方退款单号，发给通道的幂等键。**由本仓库生成、原样使用**，
+  /// 与 `checkout_orders.out_trade_no` 的关系同源于下单那一条纪律。
+  /// 微信的"退款查询 / 退款通知"也都以它回锚，所以它同时是回调侧唯一的认单依据。
+  outRefundNo String @unique @map("out_refund_no")
+
+  /// 通道侧的退款 id（微信 `refund_id`）。`null` = 还没拿到通道受理，或压根没通道。
+  providerRefundId String? @map("provider_refund_id")
+
+  /// 退多少钱（最小单位整数）。**冻结在申请成功的那一刻**，之后改价目表/券都影响不到它。
+  amountMinor Int @map("amount_minor")
+
+  /// 币种。必填、无默认：金额是"最小单位的整数"，不带币种就不可比
+  /// （同 `CreateCheckoutInput.currency`，两处是同一个理由）。
+  currency String
+
+  /// 🔴 这一单当初授予了**多少天**。权益回收扣的就是这一段。
+  ///
+  /// 为什么把天数存下来而不是回收时再算：退款发生在授予之后，中间可能有
+  /// 第二次购买、可能有别的通道的事件先到。把"这一段有多长"冻在退款行上，
+  /// 回收才是一个**可重放**的减法，而不是对当前状态的猜测。
+  /// 写入侧的唯一来源是 `SUBSCRIPTION_PERIOD_DAYS`（见 `refund-policy.ts`）。
+  periodDays Int @map("period_days")
+
+  /// `requested` | `approved` | `rejected` | `processing` | `success` | `abnormal` | `closed` | `failed`
+  /// （词表在 `refund-store.ts` 的 `REFUND_STATUSES`，与下单侧同一套做法：库不设 CHECK，
+  /// 由写入函数在**词表外**直接抛。）
+  status String @default("requested")
+
+  /// 被拒 / 失败时的**口径码**（`WINDOW_PASSED`、`REFUND_CHANNEL_UNAVAILABLE`…）。
+  /// 存码不存句子：句子会变（中文/英文/文案改写），码才是可对账的事实。
+  reason String?
+
+  /// 运营者批例外时写的理由。`operatorApproved` 是**唯一**能跳过时间窗的开关，
+  /// 所以它必须留下"谁批的、为什么批"（`requested_by` / `decided_by` 是那两个"谁"）。
+  operatorNote String? @map("operator_note")
+
+  requestedBy Int? @map("requested_by")
+  decidedBy   Int? @map("decided_by")
+
+  requestedAt BigInt  @default(0) @map("requested_at")
+  decidedAt   BigInt? @map("decided_at")
+  /// 通道确认退款成功的时刻。**只有这一列非空才允许动权益。**
+  refundedAt  BigInt? @map("refunded_at")
+
+  createdAt BigInt @default(0) @map("created_at")
+  updatedAt BigInt @default(0) @map("updated_at")
+
+  /// 后台列表：按账号翻退款。
+  @@index([userId, status])
+  /// 权益回收与"这一单退过没有"的查找回路。
+  @@index([orderId, status])
+  @@map("refunds")
 }
 
 // ---------------------------------------------------------------------------
