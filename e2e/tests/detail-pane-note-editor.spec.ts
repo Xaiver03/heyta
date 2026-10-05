@@ -411,4 +411,55 @@ test.describe('便签面单落进详情列', () => {
     await page.screenshot({ path: SHOT('n6-whole-row-is-the-hit-area') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
+
+  /*
+    N7 = §8.151 边界 ② 落地（待办 #65，工单 §8.153）：入口撑满整行之后，**尾部动作那一列没被盖住**。
+    两件事各挡一种坏：
+      ① 几何：入口盒子与每一颗动作按钮的盒子**不相交** —— 相交时那一点归谁由 z-order 说了算，
+         而"看起来点的是删除、实际打开的是编辑器"正是撑大命中面积最容易造出来的新坏；
+      ② 行为：钉选只钉那一条、删除只删那一条（各真点一次，另一条必须原样还在）。
+    ⚠️ 只测 ① 会放过"没相交但事件被外层吃掉"；只测 ② 会放过"今天恰好不重叠、换一档视口宽度就重叠"。
+  */
+  test('N7 尾部动作那一列仍然各自可点，且没被撑大的入口盖住（§8.153）', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '便签');
+    await addNote(page, '动作甲');
+    await addNote(page, '动作乙');
+
+    const rowA = page.locator('[data-testid^="note-row-"]').filter({ hasText: '动作甲' });
+    const rowB = page.locator('[data-testid^="note-row-"]').filter({ hasText: '动作乙' });
+    await expect(rowA, '两条便签没都画出来').toHaveCount(1);
+    await expect(rowB, '两条便签没都画出来').toHaveCount(1);
+
+    const entry = await rowA.locator('[data-testid^="note-edit-"]').boundingBox();
+    const pin = await rowA.locator('[data-testid^="note-pin-"]').boundingBox();
+    const remove = await rowA.locator('[data-testid^="note-remove-"]').boundingBox();
+    if (entry === null || pin === null || remove === null) {
+      throw new Error(`入口/钉选/删除三者之一没画出来：entry=${JSON.stringify(entry)} pin=${JSON.stringify(pin)} remove=${JSON.stringify(remove)}`);
+    }
+    // 相交判据：任一轴上完全分开即可（留 1px 容差，RNW 的亚像素取整不算重叠）。
+    const separate = (a: { x: number; width: number }, b: { x: number; width: number }) =>
+      a.x + a.width <= b.x + 1 || b.x + b.width <= a.x + 1;
+    expect(separate(entry, pin), '入口与钉选那颗的盒子相交 ⇒ 那一点归谁由 z-order 说了算').toBe(true);
+    expect(separate(entry, remove), '入口与删除那颗的盒子相交 ⇒ 那一点归谁由 z-order 说了算').toBe(true);
+
+    await rowA.locator('[data-testid^="note-pin-"]').click();
+    await expect(rowA.locator('[data-testid^="note-today-"]'), '钉选那一下没落到那一条上').toHaveCount(1);
+    await expect(rowB.locator('[data-testid^="note-today-"]'), '另一条也长了徽标 ⇒ 那一下不止作用于一行').toHaveCount(0);
+    // 钉选不许顺手把编辑层打开（它是第二个动作，不是入口的一部分）。
+    await expect(editorEverywhere(page), '点钉选那颗顺带打开了编辑层').toHaveCount(0);
+
+    await rowB.locator('[data-testid^="note-remove-"]').click();
+    await expect(
+      page.locator('[data-testid^="note-row-"]').filter({ hasText: '动作乙' }),
+      '删除那一下没把那条删掉'
+    ).toHaveCount(0);
+    await expect(rowA, '删除那一下顺手把另一条也删了').toHaveCount(1);
+    await expect(rowA.locator('[data-testid^="note-today-"]'), '删邻居把这一条的钉选也带走了').toHaveCount(1);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('n7-action-buttons-stay-separate') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
 });
