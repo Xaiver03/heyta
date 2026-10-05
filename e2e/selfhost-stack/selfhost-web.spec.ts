@@ -169,7 +169,24 @@ async function setE2eePassword(page: Page): Promise<void> {
   await page.getByRole('button', { name: '同步设置' }).click();
   const dialog = page.getByRole('dialog', { name: '同步设置' });
   await expect(dialog).toBeVisible();
-  await dialog.getByLabel('端到端加密口令').fill(E2EE_PASSWORD);
+  // 🔴 全新实例上这张面板是**另一档**：先「创建加密数据钥匙」，再把钥匙包发布出去。
+  // 上一版只认「已有钥匙」那一档的 label（`web.sync.password.label`），所以在自己
+  // 造的干净栈上必然等不到 —— 外人照着指南走的第一条路，验收从没驱动过它。
+  const create = dialog.getByTestId('vault-create-form');
+  if (await create.isVisible()) {
+    await create.getByTestId('vault-create-passphrase').fill(E2EE_PASSWORD);
+    await create.getByTestId('vault-create').click();
+    const pending = dialog.getByTestId('vault-pending');
+    await expect(pending, '创建之后必须进入待发布，并且给出恢复码').toBeVisible();
+    await expect(dialog.getByTestId('vault-recovery-display')).not.toHaveText('');
+    await pending.getByTestId('vault-publish').click();
+    await expect(
+      dialog.getByTestId('vault-ready'),
+      '发布后界面必须说出钥匙就绪（否则同步只会在后台失败）',
+    ).toBeVisible({ timeout: 30_000 });
+  } else {
+    await dialog.getByLabel('端到端加密口令').fill(E2EE_PASSWORD);
+  }
   await dialog.getByRole('button', { name: '保存并同步' }).click();
   await expect(dialog).toBeHidden();
 }
