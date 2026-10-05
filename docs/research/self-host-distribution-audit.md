@@ -11446,3 +11446,33 @@ A/B 两趟都跑真脚本、真载体：
 早就写过这条理由；**同一个理由第二次漏在新加的那一段上**，说明它是"写在注释里的规则"而不是"结构上挡住的规则" ——
 真要挡住得让成功路径统一 dump `notes`，那是一次单独的改动（会挪动 8 处已有打印的排版），
 本批不在此刻做，登记在这里。
+
+### 8.198 载体那三份 compose 解析出来与分支那份**只差两个绝对路径**；而"验哪棵树"这件事脚本早就回答了（2026-10-05 12:2x）
+
+落地前不想再花一次窗口才发现"合并把 compose 的 YAML 解坏了"，所以做了一次**不吃负载**的静态解析
+（`docker compose -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml config`，
+两棵树各一次，都退 0）：
+
+- 服务清单逐字相同：`supersync · supersync-migrate · postgres · caddy`（+ 卷/网络名 `caddy-data`、
+  `postgres-data`、`supersync-data`、`internal`、`networks`、`options`）。
+- 解析后全文 `diff` **只有 4 行**，两两成对，且都是同一件事：`source: <树>/server/Caddyfile` 与
+  `context: <树>` —— 绝对路径本来就该随树变。⇒ 挂载、build 上下文、健康检查、端口这些**承重形状零差异**。
+
+🔴 **这条读数的射程到此为止**：`config` 只证"解析得出、形状一致"，不证"起得来、界面可用"。
+后者由 `scripts/verify-selfhost-stack.sh` 判（第 2 项那趟已经判过一次，`服务图对账：默认 3 个 · 带 override 4 个`）。
+
+💡 **顺手纠正我自己一个差点白造装置的决定**：本来要给"载体 vs 分支的 compose 形状"写一枚新判据
+（带臂、带注入）。读完 verify 脚本头部才看清两件事 ——
+① 它已经在判服务图（`默认 3 / 带 override 4` 那句就是它打的），再造一枚是**第二把量同一件事的尺**，
+正是本批一直在拦的"同形状第二次"；
+② 它的被测树是 `REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"`（:88）**由脚本自身路径推出**，
+不是参数也不是当前目录 ⇒ 直接跑 `/tmp/heyta-merge-carrier/scripts/verify-selfhost-stack.sh`
+量就是**落地后那笔字节**，而且 :234 那条 `被验镜像的 revision == 当前 HEAD` 会自己把"验的是哪一棵"钉住
+（镜像 tag 取自载体 HEAD，对不上就响亮拒绝）。
+⇒ 结论：**不加新装置**，改成把同一把尺挪到载体那棵树上跑一次，排在落地那一刻（任务 #50）。
+它比第 2 项现在这趟强的地方很具体：第 2 项量的是**分支 worktree**，而合并解出来的
+`server/Dockerfile`（第九族）与 compose 三件套**只在载体上以那个形状存在过**。
+
+⚠️ 过程里又踩了同一条：第一次跑我把 `… | head -8` 之后的 `$?` 当成了 compose 的退出码
+（两行 `RC=0` 其实是 `head` 的）—— AGENTS §7 #184 那张账上这是第 N 次，判据要重跑一遍才算：
+去掉管道之后真实读数才是上面那两条"都退 0"。
