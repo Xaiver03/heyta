@@ -805,6 +805,28 @@ rid 锚点逐条对回源码的 `testID`（字面或模板模式）、`desc/text
 | rig23 | 五档"滚不出来"、四格拦死 | **我自己新写的那条"画面没动"判据坏了**：参照锚是 `android:id/content`（永远不动，traps #328-①）⇒ 参照锚换成会位移的内容节点，并补臂 13/14 |
 | rig24 | **通过 13 / 失败 2**：第 0–3 步全绿（含五档全部绑到那枚回环端点）、第 5 步走到"入口进树 → 五档 chips 全在 → 常驻脚注在屏 → 选中 tool-calling → 输入 → 发送" | 两条开项，各自定源，**不包装成完成**：<br>① 第 4 步 `ai-endpoint-label` 在安全带内取不到可点节点 —— 端点表单一共有四格，第二枚端点的表单此刻的滚动形状没取到，需要按 §第 3 步同样的"动作回读 + 摘焦点"重做那一格；<br>② 第 5 步发送按钮仍 `disabled` —— **两种成因没分辨**：五档路由真没写进 `routes[feature]`（AX 读不到选中态，见上），还是这一档的**逐功能同意**没给（`resolveRoute` 的候选集还要过同意）。决定性的一测量是**从设备库里读回 `routes` 与 `consents`**，而不是再猜界面 |
 
+#### rig25 之后：库回读把那条"两种成因"关成了一个（同一次运行的设备状态，独立复算过）
+
+取法现量：root + `adb pull /data/data/com.heyta/databases/heyta-device-prefs.sqlite`
+（**这张表不在 op-log 那枚库里** —— `device_pref` 住在 `heyta-device-prefs.sqlite`，
+`heyta.sqlite` 里查它会得到 `BAD:DatabaseError`；而 `run-as` 在不可调试的 Release 装机上只回
+一行 42 字节的报错文本，`exec-out … > 文件` 的退出码属于重定向，所以那句报错会被当成"库"读进来）：
+
+```
+enabled=True  allowRemote=True  endpoints=1  consents=0
+capture=1 breakdown=1 prioritize=1 duration-estimate=1 tool-calling=1
+```
+
+⇒ **第 3 步的点击真的写进去了**（五档各绑 1 枚），rig24 那句"路由没绑上"被设备自己否证；
+⇒ 第 5 步 `tool-start-assistant` 仍 disabled 的成因落在**这一档的逐功能同意没给**（`consents=0`），
+而第 6 步的载体设计恰恰是"同意联网但逐功能授权一律不给"—— 顺序在同意之前就要发送。
+
+🔴 由此现出一条**产品侧**问题，不是载体的：`disabled = 文本为空 || route.target 未定义`。
+按 Goal-1 的不变量，**规则命中本来就该零外发**，可这句判断发生在规则短路**之前** ——
+也就是"一条根本不需要端点的本地回答"被按钮层要求先配好端点并给出这一档的同意。
+两种收口方式（要拍板，别由载体替产品决定）：① 按钮的 disabled 表达式先过规则命中；
+② 载体在第 5 步之前发一次这一档的同意。①是语义修正，②是把产品缺陷固化进验收脚本 —— **选①之前需要产品确认**。
+
 ⚠️ 边界：本表只覆盖 Android 模拟器这一腿。iOS 侧助手面零设备读数；`windows-pc` 本轮不可达，
 所以任何需要**重打 APK** 的读数（例如把新的产品改动装进设备）本轮取不到，如实登记为未闭合。
 
