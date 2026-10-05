@@ -68,7 +68,7 @@ import { selection } from './selection.js';
  * 两边都响应同一个键会一次跳两格，所以这里刻意不登记，而不是"忘了加"。
  * `trash` 也不在：它的 ↑↓ 是"选恢复还是删除"，语义完全不同（`TrashView`）。
  *
- * 🔴 表外一共 **六** 个 `ViewKey`，上面只写了两条理由，剩下四条今天补上 ——
+ * 🔴 表外一共 **七** 个 `ViewKey`（第六、第七分别是日历那趟与合并倒数日线补的），上面只写了两条理由，
  * 否则下一个读这张表的人会以为"日历/专注是漏加的"，而这张表的正确性
  * 取决于"缺席都有理由"，不取决于"在场都对"。逐条现量（2026-10-04）：
  *
@@ -81,6 +81,12 @@ import { selection } from './selection.js';
  * · `focus`：没有"哪一项" —— `features/focus/store.ts:66` 是计时状态机，关联任务只由
  *   `start(taskId?)`（`:101`）带进来。工单 §6 明文"不许把番茄页塞进列表模型"。
  * · `growth` / `settings`：面本身不是列表（成长是图与卡，设置是浮层/面板），没有行可走。
+· `countdown`：倒数纪念日那一面（W5 的卡片网格，`apps/web/src/features/countdown/CountdownView.tsx`）
+   今天**没有选中态也没有键盘语义** —— 现量（2026-10-05 合并倒数日线时）：那一份文件里
+   `onKeyDown` / `ArrowUp` / `ArrowDown` / `tabIndex` / `role="grid"` / `selection.` **各 0 命中**，
+   `store.ts` 里也没有 `selected` 那一维。它的卡是**点进去编辑**的，不是"走一行"的，
+   所以这里登记成"交代过"而不是"漏加"。要做成可走的前置是卡片网格有可聚焦的选中单元
+   （`check:rn-aria` / 键盘可达那一族），不是在这张表里加一行前缀。
  */
 const CURSOR_VIEWS: Partial<Record<ViewKey, { readonly kind: SelectableKind; readonly prefix: string }>> =
   {

@@ -117,7 +117,7 @@ function cursorTableKeys(): string[] {
  * `ACCOUNTED_OUT` 是"这些缺席都被交代过"的名单 —— 理由本体留在 `keyboard-cursor.ts:71`
  * 那段注释里（那里逐条现量了六条），这里**不重抄**，只登记谁被交代过。
  */
-const ACCOUNTED_OUT = ['calendar', 'focus', 'growth', 'search', 'settings', 'trash'];
+const ACCOUNTED_OUT = ['calendar', 'countdown', 'focus', 'growth', 'search', 'settings', 'trash'];
 
 function outOfTableViews(): string[] {
   const table = cursorTableKeys();
