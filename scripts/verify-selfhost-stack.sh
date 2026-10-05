@@ -26,6 +26,9 @@ trap 'rm -f -- "$0"' EXIT
 #   pnpm verify:selfhost-stack --keep          # 跑完不拆栈，留给人打开浏览器看
 #                                              # 🔴 此时**也保留**那份一次性凭据文件
 #                                              # （下面打印的拆栈命令要用它的 --env-file）
+#   bash scripts/verify-selfhost-stack.sh --selftest-teardown
+#     不碰 docker、不起栈：只量"打印出去的拆栈那一行按 shell 词法 eval 回来，
+#     还是不是 compose() 用的那串 argv"（G-72：那一行以前是让人照抄的，照抄就跑不通）
 #
 # ## 判据分了两处，是有意为之
 #
@@ -98,6 +101,7 @@ PORT="${HEYTA_SELFHOST_PORT:-1900}"
 BASE="http://127.0.0.1:${PORT}/app/"
 BUILD=1
 KEEP=0
+SELFTEST=0
 # 🔴 栈起没起来必须由**脚本自己**记着（2026-10-04 现量：08:0x 那趟在浏览器那一腿之前
 # 因缺 e2e 依赖而 die，三个容器在机器上活了 23 分钟，占着 :1900 与内存，而输出里只有一个 rc=1）。
 # `cleanup()` 从来不拆栈 —— 拆栈是各个失败分支**各自**调 `down_stack`，所以任何一条没调到的
@@ -120,13 +124,101 @@ compose() {
   docker compose -p "$PROJECT" --env-file "$ENV_FILE" "${COMPOSE_FILES[@]}" "$@"
 }
 
+# 🔴 打印给人粘贴的那一行，必须**按 shell 词法拆回来还是同一串 argv**。
+# 以前这里是 `${COMPOSE_FILES[*]}` 直接拼：工作树路径带空格时（本仓的开发机就是这样），
+# 那句"整条可以直接粘贴执行"照抄就跑不通 —— 现量 `unknown docker command: "compose in"`。
+# 判据不靠人眼看输出：把打印出去的那一行 eval 回参数表，个数与逐个取值都要和 compose() 用的 argv 相同。
+TEARDOWN_ARGV=()
+
+# $1 = 要替换进去的根（自检时故意给一棵带空格的假树）；传空串 = 用真 REPO_ROOT。
+# compose 文件那一段从 COMPOSE_FILES **推导**，不在这里重抄一遍（手写枚举是本仓反复红过的那一族）。
+build_teardown_argv() {
+  local root="$1" a
+  TEARDOWN_ARGV=(docker compose -p "$PROJECT" --env-file "$ENV_FILE")
+  for a in "${COMPOSE_FILES[@]}"; do
+    if [ -n "$root" ] && [ "${a#"$REPO_ROOT"/}" != "$a" ]; then
+      TEARDOWN_ARGV+=("${root}/${a#"$REPO_ROOT"/}")
+    else
+      TEARDOWN_ARGV+=("$a")
+    fi
+  done
+  TEARDOWN_ARGV+=(down -v)
+}
+
+# 每个参数单独过 printf %q ⇒ 带空格/带 $() 的值都能原样拆回来（bash 3.2 没有 ${arr[@]@Q}）
+teardown_print_argv() {
+  local a line=""
+  for a in "$@"; do line="${line}$(printf '%q ' "$a")"; done
+  printf '%s' "${line% }"
+}
+
+selftest_teardown_hint() {
+  local fake='/tmp/heyta 假树 with space' line want got i parsed expect
+  build_teardown_argv "$fake"
+  want="${#TEARDOWN_ARGV[@]}"
+  line="$(teardown_print_argv "${TEARDOWN_ARGV[@]}")"
+  eval "set -- $line"            # 只解析这一行，不执行它
+  got="$#"
+  if [ "$got" != "$want" ]; then
+    echo "❌ 拆栈提示不可粘贴：带空格的路径下 eval 拆回 ${got} 个参数，期望 ${want} ⇒ 打印时没把每个参数引起来" >&2
+    echo "   打印的那一行：${line}" >&2
+    return 1
+  fi
+  i=1
+  while [ "$i" -le "$want" ]; do
+    eval "parsed=\${$i}"
+    expect="${TEARDOWN_ARGV[$((i - 1))]}"
+    if [ "$parsed" != "$expect" ]; then
+      echo "❌ 拆栈提示第 ${i} 个参数拆回来不是原值：[${parsed}] vs [${expect}]" >&2
+      return 1
+    fi
+    i=$((i + 1))
+  done
+
+  # 🔴 第二格判据，量的是**另一件事**：打印出去的 argv 必须等于 `compose()` 真正执行的那串。
+  # 上面那一圈**没有这个能力** —— 期望值与打印值同源于 build_teardown_argv，实测把
+  # `"$root/${a#…}"` 改成只剩 `"$root"`（参数个数不变、值全错）它照样报绿。
+  # 所以这里必须**独立重述**一遍 compose() 的 argv（这是"对账"，不是"第二份实现"：
+  # 第二条陈述本身就是判据，就像 check:legal-tools 拿目录对账文档那张表）。
+  local -a compose_argv=(docker compose -p "$PROJECT" --env-file "$ENV_FILE" "${COMPOSE_FILES[@]}" down -v)
+  build_teardown_argv ""
+  line="$(teardown_print_argv "${TEARDOWN_ARGV[@]}")"
+  eval "set -- $line"
+  if [ "$#" != "${#compose_argv[@]}" ]; then
+    echo "❌ 拆栈提示与 compose() 实际执行的 argv 个数不同：提示 $# 个 vs compose() ${#compose_argv[@]} 个" >&2
+    echo "   打印的那一行：${line}" >&2
+    return 1
+  fi
+  i=1
+  while [ "$i" -le "${#compose_argv[@]}" ]; do
+    eval "parsed=\${$i}"
+    expect="${compose_argv[$((i - 1))]}"
+    if [ "$parsed" != "$expect" ]; then
+      echo "❌ 拆栈提示第 ${i} 个参数与 compose() 用的不是同一个值：[${parsed}] vs [${expect}] ⇒ 照着拆的那套不是起的那套" >&2
+      return 1
+    fi
+    i=$((i + 1))
+  done
+  echo "✅ 拆栈提示可粘贴，且与 compose() 实际执行的 argv 逐个相同（带空格路径下 eval 拆回 ${got}/${want} 个参数）"
+  echo "   ${line}"
+  return 0
+}
+
 for arg in "$@"; do
   case "$arg" in
     --no-build) BUILD=0 ;;
     --keep) KEEP=1 ;;
-    *) echo "未知参数：${arg}（支持 --no-build / --keep）" >&2; exit 2 ;;
+    --selftest-teardown) SELFTEST=1 ;;
+    *) echo "未知参数：${arg}（支持 --no-build / --keep / --selftest-teardown）" >&2; exit 2 ;;
   esac
 done
+
+if [ "$SELFTEST" = "1" ]; then
+  # 不碰 docker、不碰栈：只量"打印出去的那一行拆回来还是不是同一串 argv"。
+  rm -f "$ENV_FILE"
+  selftest_teardown_hint
+  exit $?
+fi
 
 cleanup() {
   # 快照副本（bootstrap 那行 trap 会被下面 `trap 'cleanup; …' EXIT` 整个替换掉 ——
@@ -159,6 +251,19 @@ die() { printf '\n❌ %s\n' "$*" >&2; exit 1; }
 
 command -v docker >/dev/null 2>&1 || die "需要 docker（这条验收的量程就是容器）。"
 docker info >/dev/null 2>&1 || die "docker 守护进程不可用 —— 先起 Docker（或 OrbStack）。"
+
+# 🔴 负载门：这一条的三条判据里有真浏览器，而满载时 Playwright 的超时会被读成
+#    "界面没画出来"（设备验收侧实测过同一件事：load 62 / load 18 时 `uiautomator dump`
+#    抓不到界面，把一次环境失效打印成一堆产品缺陷）。
+#    阈值不写死：由 `hw.ncpu × 3/4` 推导（这台机器 ⇒ 12），与 `wait-for-quiet-host.sh`
+#    共用**同一个所有者** —— 两个验收脚本对"现在能不能跑"给不同答案比没有判据更糟。
+#    🔴 位置：必须在任何破坏性动作（建 env 文件、compose build/up）之前。
+#    🔴 等满以 **3** 结束，不是 1：3 = 环境无效，不是产品失败；折成 1 就等于宣布产品坏了。
+. "$(dirname "$0")/lib/wait-for-quiet-host.sh"
+wait_for_quiet_host || {
+  printf '\n❌ 环境无效：负载没降到阈值以下（等满 %ss）。本轮**不判产品**，也不算产品失败。\n' "${HEYTA_LOAD_GATE_WAIT:-900}" >&2
+  exit 3
+}
 
 # 🔴 compose 文件里 `container_name` 是**写死的**（supersync-server / supersync-postgres），
 # 换 `-p` 也躲不开重名。所以别的栈在跑时必须响亮地失败，
@@ -593,7 +698,14 @@ if [ "$KEEP" = "1" ]; then
   # 于是 --keep 打印出来的是一条**照着执行拆不掉**的假提示（`down` 读不到那份 env，
   # 栈就留在机器上了）。现在 cleanup 在 --keep 时保留它并把路径打出来。
   log "   拆掉（整条可以直接粘贴执行）："
-  log "   docker compose -p ${PROJECT} --env-file ${ENV_FILE} ${COMPOSE_FILES[*]} down -v"
+  # 这条提示本身要有一条判据，不能只是"看起来像一条命令"：下面那行自检量的是
+  # "打印出去的字节 eval 回来还是不是 compose() 用的那串 argv"（带空格的路径才算，
+  # 因为这个 bug 恰恰只在路径带空格的机器上现形）。自检红 ⇒ 不打印假提示。
+  if ! selftest_teardown_hint >/dev/null; then
+    die "拆栈提示自检不过（打印出去的那一行 eval 回不来同一串 argv）—— 不打印一条照着执行拆不掉栈的假提示"
+  fi
+  build_teardown_argv ""
+  log "   $(teardown_print_argv "${TEARDOWN_ARGV[@]}")"
   log "   拆完顺手 rm 掉上面那份一次性凭据文件（随机凭据，别留在 /tmp）"
 else
   down_stack
