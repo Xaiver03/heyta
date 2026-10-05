@@ -13826,3 +13826,28 @@ G-44 要做完，同一次改动里必须**一起**动这四样，缺一即红�
 vitest，本机内存闸门当时被 `pid=88878` 占着 ⇒ 我没跑 `pnpm -r test`，也没用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕）。
 所以"回退后 C3 恢复绿"目前是**静态成立**（三枚文件里 `appVersion` 计数 0），不是实跑读数；
 它归到 #50 那一趟（落地后同一把尺复跑）里一起取。
+
+### 8.259 §8.258 那条"C3 恢复绿只是静态成立"的欠账补上了：实跑 12 条全过，读数里 `appVersion` 确实不在查询串上（2026-10-05 20:5x）
+
+占着内存闸门的那一趟退了（`pid=88878` 不在），我没绕闸、只是等它空出来，然后单独跑那一支：
+
+```
+cd server && npx vitest run tests/version-coupling.spec.ts
+C3_RUN_RC=0 · Test Files 1 passed · Tests 12 passed (12)
+[version-coupling] readings {…"downloadQueryKeys":["sinceSeq","limit","excludeClient"],
+  "syncClientFiles":[… "packages/sync-client/src/client.ts" …],
+  "workspaceVersions":["0.0.0","1.0.0"],"workspaceCount":20,
+  "fullStateShapeControls":{"构造命中":true,"比较不误伤":false,"枚举成员不误伤":false,"调用命中":true,"定义不误伤":false},
+  "checkpointRefsOutsideModule":{"accountSafeRefs":[],"constantRefs":["server/src/sync/cleanup.ts"]}}
+```
+
+三格因此从"推断"变成"读数"：
+
+| 先前说的 | 现在证的 |
+|---|---|
+| 回退后 `grep -c appVersion` 三枚文件各 0（静态） | `downloadQueryKeys` 由用例自己枚举，**只有那三个键** ⇒ 下载段确实一发 `appVersion` 都不带 |
+| "C3 会把我那笔打红"（读源码判的） | 同一趟里 `fullStateShapeControls` 五对布尔各按其形状给值（该命中的两条 `true`、该不误伤的三条 `false`），`accountSafeRefs` 那条 0 命中也照样带着非空的对照腿（`constantRefs` 命中 `cleanup.ts`）⇒ 这道门的"0 命中"不是探针坏了读出来的 0 |
+| "heyta 没有版本真源"（看 package.json 猜的） | `workspaceVersions` 实得 `["0.0.0","1.0.0"]`、`workspaceCount=20` —— 而 `18.21.2` 那枚阈值对这两个值都判 old（C2 的阳性对照 `isCheckpointSafeAppVersion(阈值)===true` 在同趟成立） |
+
+⚠️ 仍然没做的两件，别把这一趟读成它们做过了：① **全量** `pnpm -r test` 没跑（这台机器负载 15，全量会把 1 分钟负载压过 12 ⇒ 等于把自己那一格落地窗口往后推；全链读数归 #50 与落地那一刻）；
+② `b467e758` 里那两腿 `appVersion` 用例随代码一起退掉了，**树里没有残留**（`grep -c` 已证），要它就得按 §8.258 那张四件套表连同 README/C3/变异臂一起进来。
