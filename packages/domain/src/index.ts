@@ -33,6 +33,8 @@ export * from './search.js';
 export * from './habit-streak.js';
 export * from './habit-resilience.js';
 export * from './habit-icons.js';
+export * from './habit-backfill.js';
+export * from './habit-year.js';
 export * from './milestones.js';
 export * from './today-progress.js';
 export * from './weekly-review.js';

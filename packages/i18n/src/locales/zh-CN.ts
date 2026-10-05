@@ -1283,6 +1283,57 @@ export const zhCN = {
   'web.habits.icon.a11y': '为「{name}」选图标',
   'web.habits.icon.a11yDefault': '「{name}」用默认图标',
 
+  // ── Web · 习惯的频次（工单 H5）────────────────────────────
+  // 🔴 判定侧**一直**是按频次数"计划日"的（`isScheduledOn` → `computeStreak`，
+  //    `habit-streak.ts:131/158/227/360`），这一批词条接上的是**写入口**那半米。
+  //    键名沿用 `web.habits.*`：移动端复用同一批（与新建 / 图标 / 目标那几处同一条决定 ——
+  //    端间同词，不各起一套）。
+  // ⚠️ `summary.interval` 里的 `{n}` **只会出现 ≥2**：`interval` 且 `everyNDays === 1`
+  //    在写入侧就被归一成 `daily`（`normalizeHabitFrequency`）。这条不是巧合，
+  //    英文因此不需要复数变形 —— 把归一拿掉，这里就会读出 "Every 1 days"。
+  'web.habits.freq.aria': '「{name}」的频次',
+  'web.habits.freq.toggle': '频次',
+  'web.habits.freq.daily': '每天一次',
+  'web.habits.freq.weekly': '每周挑几天',
+  'web.habits.freq.interval': '每隔几天',
+  'web.habits.freq.summary.daily': '每天',
+  'web.habits.freq.summary.weekly': '每周 {days}',
+  'web.habits.freq.summary.interval': '每 {n} 天',
+  'web.habits.freq.nDays': '每隔几天做一次',
+  'web.habits.freq.invalid': '「每隔几天」的天数要是一个 1 或更大的整数',
+  'web.habits.freq.intervalHint': '按日历固定隔 {n} 天排一次，起点不随建立习惯那天挪。',
+  'web.habits.freq.default': '回到每天',
+
+  // ── 习惯月历 + 补打卡（工单 H4）───────────────────────────
+  // 🔴 六档一句：档位词表是 `@heyta/domain#HabitDayState`，界面只负责把它念出来。
+  //    「不可点」也要有句子 —— 只画灰而不说原因，用户读到的是"应用坏了"。
+  'web.habits.month.grid': '{name} 在 {month} 的打卡月历',
+  'web.habits.month.window': '补打卡可以往回 {n} 天',
+  // 🔴 每句**自带 `{date}`**，不设 `{date}，{state}` 那种拼装模板：
+  //    那条模板除了一个全角逗号没有汉字，会被 `check:ui-language` 判成"拿别的语言占位"
+  //    （它抓的正是"整条只剩标点和占位符"这种假词条 —— 与工单 H5 那条 `separator = 、` 同一道闸）。
+  'web.habits.month.logged': '{date} 已打卡',
+  'web.habits.month.today': '{date}，今天还没打卡',
+  'web.habits.month.backfillable': '{date}，可以补打卡',
+  'web.habits.month.notScheduled': '{date}，这天本来不用打卡',
+  'web.habits.month.future': '{date}，还没到这天',
+  'web.habits.month.tooOld': '{date}，已超过补打卡窗口',
+  // 补白格**必须有自己的一句话**：上一月视图里的"今天"是一格尾随补白，
+  // 只按状态词表它会说「今天还没打卡」却点不动（= "点了没反应"那一族）。
+  'web.habits.month.outOfMonth': '{date}，邻月的日子，不在这个月里',
+
+  // ── 习惯年视图（工单 H7）─────────────────────────────────
+  // 年那一档只说"这一月过成什么样"，数全部来自领域层（逐月调用那一份月度裁决）。
+  // 🔴 「还没到这个月」与「这个月还没有可算的日」是**两句话**：前者分母为零因为未来，
+  //    后者因为这天都不归这条习惯管。合成一句就会把"没做"说成"还没到"。
+  'web.habits.year.grid': '{name} 在 {year} 年的打卡年视图',
+  'web.habits.year.achieved': '达成 {n} 天',
+  'web.habits.year.rate': '完成率 {n}%',
+  'web.habits.year.none': '这个月还没有可算的日',
+  'web.habits.year.future': '还没到这个月',
+  'web.habits.year.card': '{month}：{state}，达成 {achieved} 天',
+  'web.habits.year.summary': '全年达成 {achieved} 天，{state}',
+
   // ── Web · 习惯的「列表 + 窗格」─────────────────────────────
   'web.habits.list.aria': '习惯清单',
   'web.habits.pane.aria': '「{name}」的打卡记录',

@@ -1177,6 +1177,47 @@ export const en = {
   'web.habits.icon.a11y': 'Choose an icon for "{name}"',
   'web.habits.icon.a11yDefault': '"{name}" uses the derived icon',
 
+  // ── Web · habit frequency (ticket H5) ─────────────────────
+  // 🔴 与中文那一块**逐键对应**（词条表唯一文案事实源，中英必须同步）。
+  // ⚠️ `summary.interval` 的 `{n}` 只会出现 **≥2**：`interval` 且 `everyNDays === 1`
+  //    在写入侧被归一成 `daily`（`normalizeHabitFrequency`），所以这条不需要复数变形。
+  //    本仓库的词条表没有 ICU 复数（见上面 `web.habits.row.aria` 那条注释）。
+  'web.habits.freq.aria': 'Frequency for "{name}"',
+  'web.habits.freq.toggle': 'Frequency',
+  'web.habits.freq.daily': 'Once a day',
+  'web.habits.freq.weekly': 'A few weekdays',
+  'web.habits.freq.interval': 'Every few days',
+  'web.habits.freq.summary.daily': 'Every day',
+  'web.habits.freq.summary.weekly': 'Weekly on {days}',
+  'web.habits.freq.summary.interval': 'Every {n} days',
+  'web.habits.freq.nDays': 'Days between each time',
+  'web.habits.freq.invalid': '“Days between each time” must be a whole number of 1 or more',
+  'web.habits.freq.intervalHint': 'Lands every {n} calendar days on a fixed grid — it does not shift to the day this habit was created.',
+  'web.habits.freq.default': 'Back to every day',
+
+  // ── Habit month calendar + backfill (ticket H4) ────────────
+  'web.habits.month.grid': 'Check-in calendar for {name} — {month}',
+  'web.habits.month.window': 'You can backfill up to {n} day(s)',
+  'web.habits.month.logged': '{date}, checked in',
+  'web.habits.month.today': '{date}, today — not checked in yet',
+  'web.habits.month.backfillable': '{date}, can be backfilled',
+  'web.habits.month.notScheduled': '{date}, not a scheduled day',
+  'web.habits.month.future': '{date}, not reached yet',
+  'web.habits.month.tooOld': '{date}, outside the backfill window',
+  'web.habits.month.outOfMonth': '{date}, a neighbouring month’s day (not in this month)',
+
+  // ── Habit year view (ticket H7) ────────────────────────────
+  // 🔴 "not reached" and "nothing to count" are two different sentences: the first has a
+  //    zero denominator because the month is in the future, the second because none of its
+  //    days belong to this habit. Merging them would let the UI call "not done" "not yet".
+  'web.habits.year.grid': 'Year view of {name} — {year}',
+  'web.habits.year.achieved': '{n} day(s) done',
+  'web.habits.year.rate': '{n}% complete',
+  'web.habits.year.none': 'Nothing to count this month yet',
+  'web.habits.year.future': 'Month not reached yet',
+  'web.habits.year.card': '{month}: {state}, {achieved} day(s) done',
+  'web.habits.year.summary': 'This year: {achieved} day(s) done, {state}',
+
   // ── Web · habits list + pane ──────────────────────────────
   'web.habits.list.aria': 'Habits list',
   'web.habits.pane.aria': 'Check-in history for "{name}"',

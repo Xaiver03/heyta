@@ -42,9 +42,6 @@
  *    值导入会让整个 spec 文件转译失败）—— S2/S3 因此读源码文本，这也是它们唯一能读的方式。
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import type { Habit } from '@heyta/domain';
 import { habitIconOf, HABIT_ICONS } from '@heyta/domain';
@@ -55,33 +52,12 @@ import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 import { OpType } from '@heyta/sync-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '../../..');
+import { mobileSources, read, stripComments } from './source-reading';
+
 const SCREEN = 'apps/mobile/src/screens/HabitsScreen.tsx';
 const SLOT = 'apps/mobile/src/ui/habit-icon-slot.tsx';
 const UI_GLYPHS = 'packages/ui/src/habits/HabitProgressList.tsx';
 const WEB_GLYPHS = 'apps/web/src/features/habits/habit-glyphs.ts';
-
-const read = (rel: string): string => readFileSync(join(REPO, rel), 'utf8');
-const stripComments = (src: string): string =>
-  src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^[ \t]*\/\/.*$/gm, '');
-
-/** `apps/mobile/src` 下所有源文件（与 `habit-create-entry.spec.ts` 同一份走法）。 */
-function mobileSources(): string[] {
-  const root = join(REPO, 'apps/mobile/src');
-  const acc: string[] = [];
-  const walk = (dir: string): void => {
-    for (const name of readdirSync(dir)) {
-      if (name === 'node_modules') continue;
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) walk(full);
-      else if (/\.tsx?$/.test(name)) acc.push(relative(REPO, full));
-    }
-  };
-  walk(root);
-  return acc.sort();
-}
 
 // ── 行为层夹具 ─────────────────────────────────────────────────────────
 let adapter: SqliteAdapter;

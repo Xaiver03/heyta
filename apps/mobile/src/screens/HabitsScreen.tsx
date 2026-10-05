@@ -71,17 +71,31 @@
 import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AppHost, HabitActions } from '@heyta/app-host';
 import { createHabitActions, habitGrowth } from '@heyta/app-host';
-import type { CategorySlot, Habit, HabitGoalType, HabitIcon, HabitLog } from '@heyta/domain';
+import type {
+  CategorySlot,
+  Habit,
+  HabitFrequency,
+  HabitGoalType,
+  HabitIcon,
+  HabitLog,
+} from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { HabitBoard, HabitProgressList } from '@heyta/ui';
+import { HabitBoard, HabitProgressList, HabitTrendBoard } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
-import { habitBoardLabels, habitListLabels } from '../lib/habits-display';
+import {
+  habitBoardLabels,
+  habitListLabels,
+  habitMonthLabels,
+  habitTrendTabs,
+  habitYearLabels,
+} from '../lib/habits-display';
 import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { Button, Card, EmptyState, Screen, Text, TextField } from '../ui/kit';
 import { HabitGoalSlot } from '../ui/habit-goal-slot';
+import { HabitFrequencySlot } from '../ui/habit-frequency-slot';
 import { HabitIconSlot } from '../ui/habit-icon-slot';
 import { HabitColorSlot } from '../ui/slot-picker';
 
@@ -89,7 +103,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const { t } = useI18n();
   // 🔴 "现在"由 `useToday` 提供：回到前台与跨过本地零点时会刷新。
   // 拿一个冻结的 `Date.now()` 会让"今天打过没打"在午夜之后一直停在昨天。
-  const { now } = useToday();
+  const { now, today } = useToday();
   /**
    * 🔴 `dataRevision` 是**同步完成**的信号。少了它，这一屏在整个应用生命周期里
    * 都不会重读：冷启动落在本屏（空的）→ 去「我的」同步 → 切回来仍是空的，
@@ -198,6 +212,12 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
 
   const labels = useMemo(() => habitBoardLabels(t), [t]);
   const listLabels = useMemo(() => habitListLabels(t), [t]);
+  const monthLabels = useMemo(() => habitMonthLabels(t), [t]);
+  // 「月 ⇄ 年」那一排切换器的文案 + 年那一档的文案（工单 H7）。
+  const trendLabels = useMemo(
+    () => ({ tabs: habitTrendTabs(t), month: monthLabels, year: habitYearLabels(t) }),
+    [t, monthLabels],
+  );
 
   /**
    * 详情层展开的那一条。
@@ -264,6 +284,21 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
       runFor(habit.id, actions.setHabitIcon(habit.id, icon));
     },
     [actions, runFor],
+  );
+
+  /**
+   * 改频次（工单 H5）。返回 promise 而**不是** `void`：`HabitFrequencySlot` 必须
+   * 自己接住 reject 并显示原因 —— 交给 `runFor` 只会置灰，用户看到的是"点了没反应"。
+   *
+   * 🔴 `undefined` = 清除（回到"每天"），与图标那一格"回到派生"同一条约定；
+   *    校验与归一（`interval:1`→每天、七天全选→每天、空日子集合抛）全在动作层。
+   */
+  const chooseFrequency = useCallback(
+    (habit: Habit, frequency: HabitFrequency | undefined): Promise<void> => {
+      if (!actions) return Promise.resolve();
+      return actions.setHabitFrequency(habit.id, frequency);
+    },
+    [actions],
   );
 
   const setHabitGoal = useCallback(
@@ -418,6 +453,35 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         */}
         <Card>
           <HabitIconSlot habit={selected} onChoose={(icon) => chooseIcon(selected, icon)} />
+          {/* 频次（工单 H5）与图标同一格：都是**这条习惯**的规则，不是这一屏的工具。 */}
+          <HabitFrequencySlot
+            habit={selected}
+            today={today}
+            onSet={(frequency) => chooseFrequency(selected, frequency)}
+          />
+        </Card>
+        {/*
+          「月 ⇄ 年」那一格（工单 H4 起，H7 加了年那一档）。为什么是**宿主直接挂**而不是给
+          `HabitBoard` 再加一条可选插槽：§7 第 195 条那个形状 —— "默认值等于原值的可选 prop"
+          会把"宿主没接"伪装成"做完了"，typecheck 与既有门禁全绿。
+          热力图回答"打过没有"，月历回答"哪天还能补"，年卡回答"这一月过成什么样"，
+          三件事不该挤在同一块板里，所以是三个组件而不是一个带开关的组件。
+        */}
+        <Card>
+          <HabitTrendBoard
+            habit={selected}
+            logs={logs}
+            today={today}
+            labels={trendLabels}
+            onCheckIn={(habitId, date) => {
+              runFor(habitId, actions.checkIn(habitId, date));
+            }}
+            onUndoCheckIn={(habitId, date) => {
+              runFor(habitId, actions.undoCheckIn(habitId, date));
+            }}
+            busy={busyId === selected.id}
+            testID="habit-trend"
+          />
         </Card>
         <HabitBoard
           habits={[selected]}

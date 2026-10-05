@@ -22,15 +22,11 @@ import type { AiRouteTarget } from '@heyta/app-host';
 import { useI18n } from '@heyta/i18n';
 
 import { AI_DISCLOSURE_KEYS, retentionMessage } from './copy';
+import { LIST_SEPARATOR } from '../lib/recurrence-display';
 
-/**
- * 中英列表分隔符不同（`、` vs `, `）。
- * ⚠️ 与 web 的 `locale-punctuation.ts` 同一条判断；那张表在这里只覆盖本壳的两种语言。
- */
-const LIST_SEPARATOR: Record<'zh-CN' | 'en', string> = {
-  'zh-CN': '、',
-  en: ', ',
-};
+/* 🔴 分隔符表**不在这里**：本壳唯一那位所有者是 `lib/recurrence-display.ts`。
+   这里原来手抄过一张（键与值逐字相同 ⇒ 谁也不会报错），而 AGENTS §3.5 那条教训
+   说的就是这种"两份一样的东西会漂移"。工单 H5 的源码判据 M3 现在钉住全壳只有一处定义。 */
 
 export interface AiDisclosureBlockProps {
   /** 自动化取证的 testid 前缀（与 web 各面板同一批名字，便于跨端对账）。 */

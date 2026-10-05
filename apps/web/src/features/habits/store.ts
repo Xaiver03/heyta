@@ -39,6 +39,7 @@ import {
 import type {
   CategorySlot,
   Habit,
+  HabitFrequency,
   HabitGoalType,
   HabitIcon,
   HabitLog,
@@ -67,8 +68,12 @@ interface HabitState {
    * 已被彻底删除的那条由动作层**抛错**，界面必须接住并说出来（不许 `void` 掉）。
    */
   restoreHabit: (habitId: string) => Promise<boolean>;
-  /** 彻底删除一条习惯：只追加 `purgedAt` 标记，打卡记录一条都不动。 */
-  purgeHabit: (habitId: string) => Promise<void>;
+  /**
+   * 彻底删除一条习惯：只追加 `purgedAt` 标记，打卡记录一条都不动。
+   *
+   * 返回 `false` = 它早就被彻底删过（这一句没有写 op）。
+   */
+  purgeHabit: (habitId: string) => Promise<boolean>;
   /**
    * 改名。**不许**用"删了重建"代替它 —— 打卡记录按 `(习惯 id, 日期)` 寻址，
    * 重建会换 id，于是那条习惯的历史整个清零（`app-host` 侧同一条理由）。
@@ -81,6 +86,17 @@ interface HabitState {
    * **不是**"没有图标"。非法 key 由动作层 `throw`。
    */
   setHabitIcon: (habitId: string, icon?: HabitIcon) => Promise<void>;
+  /**
+   * 改**频次**（工单 H5）。`undefined` = 清除，回到"每天"。
+   *
+   * 🔴 这一米存在的全部理由：判定侧（`isScheduledOn` → `computeStreak`）**早就按计划日
+   * 数连续天数**了，而在本转发出现之前，全仓库没有任何一条路径能把 `frequency` 写进去 ——
+   * 那套口径对界面是不可达的（§7 第 195 条"字段看起来有功能"那个形状）。
+   *
+   * ⚠️ 校验与归一**不在这里**：非法值 `throw`、`interval:1` 与"七天全选"归一成 `daily`，
+   * 全在 `app-host` 的 `normalizeHabitFrequency`（界面里一个判断都不写）。
+   */
+  setHabitFrequency: (habitId: string, frequency?: HabitFrequency) => Promise<void>;
   /**
    * 改习惯的**目标**（数值 / 单位 / 达成口径）。
    *
@@ -147,8 +163,9 @@ export const useHabitStore = create<HabitState>(() => ({
 
   purgeHabit: async (habitId) => {
     // 不 catch：不可逆动作被拒绝（例如它已被别处恢复）必须让界面说给用户。
-    await habitActions.purgeHabit(habitId);
+    const purged = await habitActions.purgeHabit(habitId);
     refresh();
+    return purged;
   },
 
   setHabitGoal: async (habitId, goal) => {
@@ -160,6 +177,13 @@ export const useHabitStore = create<HabitState>(() => ({
     // 闭集校验在动作层：这里不许出现"不认识就当默认"的兜底（那会把用户的
     // 一次点击悄悄吞掉，症状是"点了没反应"）。
     await habitActions.setHabitIcon(habitId, icon);
+    refresh();
+  },
+
+  setHabitFrequency: async (habitId, frequency) => {
+    // 不 catch：非法频次（`每 0 天` / 空的日子集合）必须让界面说给用户，
+    // 而不是变成一条"点了没反应"。归一（`interval:1`→每天、七天全选→每天）在动作层。
+    await habitActions.setHabitFrequency(habitId, frequency);
     refresh();
   },
 

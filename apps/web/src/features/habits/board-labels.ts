@@ -16,8 +16,19 @@
  * ✅ 三个连续数字的措辞在 `./copy.ts`：左列的 chip `title` 要的是同一句话，
  * 写两份就会漂移（一边"连续 N 天"、一边"连 N 天"没人会红）。
  */
-import type { I18nValue } from '@heyta/i18n';
-import { HEATMAP_MONTH_KEYS, type HabitBoardLabels } from '@heyta/ui';
+import type { I18nValue, MessageKey } from '@heyta/i18n';
+import type { HabitDayState, LocalDate } from '@heyta/domain';
+import {
+  HEATMAP_MONTH_KEYS,
+  WEEKDAY_MESSAGE_KEYS,
+  formatDayTitleText,
+  formatMonthTitleText,
+  CALENDAR_VIEW_LABEL_KEYS,
+  type CalendarViewTabsLabels,
+  type HabitBoardLabels,
+  type HabitMonthLabels,
+  type HabitYearLabels,
+} from '@heyta/ui';
 
 import { checkInLabel, currentStreakText, longestStreakText, totalCheckInText } from './copy.js';
 
@@ -105,4 +116,81 @@ export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
  */
 export function paneEmptyText(t: I18nValue['t'], hasHabits: boolean): string {
   return hasHabits ? t('web.habits.pane.pickOne') : t('web.habits.empty');
+}
+
+/**
+ * 六档词表 → 词条 key（工单 H4）。
+ *
+ * 🔴 `satisfies Record<HabitDayState, …>`：**加一档就编译不过**。
+ * 如果写成普通的 `Record<string, string>`，新状态会在这里静默落到兜底，
+ * 界面对一个它并不理解的日子说一句不相干的话 —— 与 `HABIT_ICON_LABEL_KEYS`
+ * 同一个理由（穷尽性由类型给，不由测试给）。
+ */
+const MONTH_STATE_KEYS = {
+  logged: 'web.habits.month.logged',
+  today: 'web.habits.month.today',
+  backfillable: 'web.habits.month.backfillable',
+  'not-scheduled': 'web.habits.month.notScheduled',
+  future: 'web.habits.month.future',
+  'too-old': 'web.habits.month.tooOld',
+} as const satisfies Record<HabitDayState, MessageKey>;
+
+export function habitMonthLabels(t: I18nValue['t']): HabitMonthLabels {
+  // 每档的句子**自带 `{date}`**（词条表里就是这么写的）：宿主只负责把日期
+  // 用共享的 `formatDayTitleText` 说出来，不负责拼装 —— 拼一次就是第二套措辞规则。
+  const day = ({ date, state }: { date: LocalDate; state: HabitDayState }): string =>
+    t(MONTH_STATE_KEYS[state], { date: formatDayTitleText(date, t) });
+  return {
+    grid: ({ name, month }) => t('web.habits.month.grid', { name, month }),
+    // 列头表在共享层（`WEEKDAY_MESSAGE_KEYS`，周一起头）；这里只负责念出来。
+    weekdays: WEEKDAY_MESSAGE_KEYS.map((key) => t(key)),
+    monthTitle: (date) => formatMonthTitleText(date, t),
+    prevMonth: t('web.calendar.prevMonth'),
+    nextMonth: t('web.calendar.nextMonth'),
+    windowHint: (days) => t('web.habits.month.window', { n: days }),
+    day,
+    // 补白格另有一句（上一月视图里的"今天"若按状态说，会念"今天还没打卡"却点不动）。
+    outOfMonth: ({ date }) =>
+      t('web.habits.month.outOfMonth', { date: formatDayTitleText(date, t) }),
+    // web 才有悬停提示（移动端没有鼠标，不传这个字段）。
+    cellTitle: ({ text }) => text,
+  };
+}
+
+/**
+ * 年那一档的文案（工单 H7）。
+ *
+ * 🔴 月份名**不另起一张表**：`monthKey` 拼成该月 1 号后交给共享的
+ * `formatMonthTitleText`，与月历那一档的标题同一个构造器。写一张
+ * `['1月','2月',…]` 就是第二份"月份叫什么"，而中英两边都会各自漂。
+ */
+export function habitYearLabels(t: I18nValue['t']): HabitYearLabels {
+  return {
+    grid: ({ name, year }) => t('web.habits.year.grid', { name, year }),
+    yearTitle: (year) => t('common.date.yearTitle', { year }),
+    monthName: (monthKey) => formatMonthTitleText(`${monthKey}-01` as LocalDate, t),
+    achieved: (days) => t('web.habits.year.achieved', { n: days }),
+    rate: (percent) => t('web.habits.year.rate', { n: percent }),
+    noDenominator: t('web.habits.year.none'),
+    future: t('web.habits.year.future'),
+    card: ({ monthName, achievedDays, rateText }) =>
+      t('web.habits.year.card', { month: monthName, state: rateText, achieved: achievedDays }),
+    prevYear: t('common.calendar.prevYear'),
+    nextYear: t('common.calendar.nextYear'),
+    summary: ({ achievedDays, rateText }) =>
+      t('web.habits.year.summary', { achieved: achievedDays, state: rateText }),
+  };
+}
+
+/**
+ * 「月 ⇄ 年」那排切换器的文案。
+ *
+ * 🔴 档位名走共享层那一张 `CALENDAR_VIEW_LABEL_KEYS`（日历那一族也是它），
+ * 所以这里**没有新增任何档位词条** —— 中英同时的可能性因此是结构性的，不是靠人记着改两处。
+ */
+export function habitTrendTabs(t: I18nValue['t']): CalendarViewTabsLabels {
+  return {
+    group: t('common.calendar.view.aria'),
+    name: (kind) => t(CALENDAR_VIEW_LABEL_KEYS[kind]),
+  };
 }

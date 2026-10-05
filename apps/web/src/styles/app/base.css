@@ -148,6 +148,20 @@
  */
 .ht-app__detail-habit {
   padding: var(--ht-space-4);
+  /* 🔴 一屏封顶 + 内部滚动，和上面 `.ht-app__detail` 那条**同一条理由、不同的格子**：
+     栏是滚动容器，而**焦点环挂在面单那一格上**（`habits.css` 的
+     `.ht-habit__pane:focus-visible`）。面单比栏高时，浏览器把焦点滚进视野只会
+     **对齐顶边**（这一格上边贴着栏顶，本来就在 0），于是环的**底边**掉出视口 ——
+     现量（H4 那块 42 格月历 + H7 那排档位进来之后，`keyboard-cursor.spec.ts` K9）：
+     `top=2 / bottom=996 / vh=720`，也就是说键盘用户按下 Enter 之后，
+     屏幕上**没有任何一处**说明焦点进了这一栏。
+     ⇒ 焦点环必须挂在**不高于视口的那只盒子**上，而不是把判据改松。
+     落点选 `.ht-app__detail-habit`（= 面单在详情栏里的那枚元素）而不是 `.ht-habit__pane`：
+     后者同时是中栏那一版的类名（`habits.css` 的 `[data-pane='column']`），
+     中栏那一格本来就要按内容长高，不许被这条封顶。
+     栏自己的 `overflow-y` 留着：任务/便签/AI 那三面仍按内容长。 */
+  max-block-size: 100%;
+  overflow-y: auto;
 }
 
 /*
