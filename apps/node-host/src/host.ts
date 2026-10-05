@@ -158,6 +158,21 @@ export interface NodeHost {
    */
   listTags(): Tag[];
 
+  /**
+   * 便签的无头写入口（建 / 软删除）。
+   *
+   * 🔴 存在的理由不是"CLI 想多两个命令"：回收站的判据要**四类各有一条本机新建又删除的行**
+   * 才能在非浏览器宿主上断言（`trash` 早就能列四类），而此前这个宿主**只能建任务** ——
+   * 于是"另一台设备的回收站里有没有这条便签/清单/习惯"在这里根本没法证。
+   * 语义全在 `@heyta/app-host` 的动作里，**本壳不判断任何产品语义**，只递参数。
+   */
+  createNote(content: string): Promise<string>;
+  removeNote(entityId: string): Promise<void>;
+  createProject(name: string, parentId?: string): Promise<string>;
+  removeProject(entityId: string): Promise<void>;
+  createHabit(name: string): Promise<string>;
+  removeHabit(entityId: string): Promise<void>;
+
   /** **唯一写入入口**（AGENTS.md §3.4）。 */
   dispatch(intent: OpIntent): Promise<void>;
 
@@ -255,6 +270,16 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     listNotes: () => noteActions.listNotes(),
     listProjects: () => projectActions.listProjects(),
     listTags: () => projectActions.listTags(),
+
+    createNote: (content) => noteActions.createNote(content),
+    removeNote: (entityId) => noteActions.removeNote(entityId),
+    createProject: (name, parentId) =>
+      parentId === undefined
+        ? projectActions.createProject(name)
+        : projectActions.createProject(name, parentId),
+    removeProject: (entityId) => projectActions.removeProject(entityId),
+    createHabit: (name) => habitActions.createHabit(name),
+    removeHabit: (entityId) => habitActions.removeHabit(entityId),
 
     dispatch: (intent) => app.dispatch(intent),
     sync: async () => {

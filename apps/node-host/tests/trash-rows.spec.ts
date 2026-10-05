@@ -11,10 +11,12 @@
  *      这正是 §7 那一族"探针够不着"的形状。
  *   2. `host.listNotes()` 能读出"还原之后这条便签活着"（判据 ③ 的那一侧）。
  *
- * ⚠️ 测试里用 `createXxxActions(ctx)` 造数据，`ctx` 是 `NodeHost` 的
- * `dispatch` + `engine.getState()` 拼的 `ActionContext`。那**不是**产品代码里的
- * 胶水 —— 宿主侧的写通道刻意没扩（本机验收只读，写入都在手机上），
- * 造数据只需要满足 `ActionContext` 这个结构。
+ * ⚠️ 旧的 `it` 用 `createXxxActions(ctx)` 造数据，`ctx` 是 `NodeHost` 的
+ * `dispatch` + `engine.getState()` 拼的 `ActionContext`。那**不是**产品代码里的胶水 ——
+ * 当时宿主侧的写通道**确实没扩**（本机验收只读，写入都在手机上），造数据只能自己拼。
+ * （10-05 22:13 更正：§10.222 量出截图流水线的 seed 层需要"走应用自己的写入口"，
+ * 而这条通道正是它缺的那一层 ⇒ `NodeHost` 现已挂上便签/清单/习惯的建与删，
+ * 新增那条 `it` 走的就是公开通道，不再拼 `ActionContext`。原来那句"宿主侧的写通道刻意没扩"过期。）
  */
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -49,6 +51,36 @@ function ctxOf(host: NodeHost): ActionContext {
 afterEach(() => {
   for (const host of opened.splice(0)) host.close();
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+describe('宿主写通道：便签 / 清单 / 习惯 各能在本机「新建 → 软删 → 回收站列出」（§10.222 的 seed 前提）', () => {
+  it('四类各有一条自己新建又删掉的行；只新建没删的那条不许出现在回收站', async () => {
+    const host = await openNodeHost({ dbPath: tempDbPath() });
+    opened.push(host);
+
+    const noteId = await host.createNote('写通道便签');
+    const projectId = await host.createProject('写通道清单');
+    const habitId = await host.createHabit('写通道习惯');
+    const taskId = await host.addTask('写通道任务');
+    // 🔴 这条是**负向腿**：它进了回收站的话，上面四条存在性判据就同时恒真（等于没有判据）。
+    const keptNoteId = await host.createNote('只新建不删除');
+
+    await host.removeNote(noteId);
+    await host.removeProject(projectId);
+    await host.removeHabit(habitId);
+    await host.removeTask(taskId);
+
+    const ids = host.trashRows().map((row) => row.id);
+    for (const [label, id] of [
+      ['便签', noteId],
+      ['清单', projectId],
+      ['习惯', habitId],
+      ['任务', taskId],
+    ] as const) {
+      expect(ids, `${label}那一路没列出本机刚删的那条`).toContain(id);
+    }
+    expect(ids, '没删的东西出现在回收站里 ⇒ 上面四条存在性判据全部失真').not.toContain(keptNoteId);
+  });
 });
 
 describe('trashRows：四路在真实库上都出得来', () => {

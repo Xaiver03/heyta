@@ -212,6 +212,12 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   sync                      与真实服务端同步一次
   pending                   打印待上传队列长度
   projects                  列出清单
+  projects add <名称>       新建清单
+  projects remove <id>      软删除清单（进回收站）
+  notes add <正文>          新建便签
+  notes remove <id>         软删除便签（进回收站）
+  habits add <名称>         新建习惯
+  habits remove <id>        软删除习惯（进回收站）
   tags                      列出标签
   export --out <路径>       导出全部数据到 JSON 文件（含已删除记录与完整操作日志）
   import --in <路径>        从导出的 JSON 还原 —— **只支持还原到空库**；
@@ -399,6 +405,20 @@ async function main(): Promise<number> {
       }
 
       case 'notes': {
+        const verb = positionals[0];
+        if (verb === 'add' || verb === 'remove') {
+          const arg = positionals[1];
+          if (arg === undefined) {
+            throw new Error(`notes ${verb} 需要 <${verb === 'add' ? '正文' : 'id'}>`);
+          }
+          // 语义全在 `@heyta/app-host` 的 `createNote / removeNote`（remove 发 DEL op）。
+          const created = verb === 'add' ? await host.createNote(arg) : undefined;
+          if (verb === 'remove') await host.removeNote(arg);
+          const id = created ?? arg;
+          if (json) out(JSON.stringify({ ok: true, command: 'notes', verb, id }));
+          else out(`${verb === 'add' ? '已新建' : '已软删除（进回收站）'} ${id}`);
+          return 0;
+        }
         const notes = host.listNotes();
         if (json) {
           out(
@@ -423,6 +443,19 @@ async function main(): Promise<number> {
       }
 
       case 'projects': {
+        const verb = positionals[0];
+        if (verb === 'add' || verb === 'remove') {
+          const arg = positionals[1];
+          if (arg === undefined) {
+            throw new Error(`projects ${verb} 需要 <${verb === 'add' ? '名称' : 'id'}>`);
+          }
+          const created = verb === 'add' ? await host.createProject(arg) : undefined;
+          if (verb === 'remove') await host.removeProject(arg);
+          const id = created ?? arg;
+          if (json) out(JSON.stringify({ ok: true, command: 'projects', verb, id }));
+          else out(`${verb === 'add' ? '已新建' : '已软删除（进回收站）'} ${id}`);
+          return 0;
+        }
         const projects = host.listProjects();
         if (json) {
           out(
@@ -442,6 +475,24 @@ async function main(): Promise<number> {
         } else {
           for (const project of projects) out(`${project.name}  (${project.id})`);
         }
+        return 0;
+      }
+
+      case 'habits': {
+        const verb = positionals[0];
+        if (verb !== 'add' && verb !== 'remove') {
+          throw new Error('habits 需要 add <名称> 或 remove <id>');
+        }
+        const arg = positionals[1];
+        if (arg === undefined) {
+          throw new Error(`habits ${verb} 需要 <${verb === 'add' ? '名称' : 'id'}>`);
+        }
+        // 打卡记录不跟着删那条规则在 `@heyta/app-host#removeHabit`，本壳不判断。
+        const created = verb === 'add' ? await host.createHabit(arg) : undefined;
+        if (verb === 'remove') await host.removeHabit(arg);
+        const id = created ?? arg;
+        if (json) out(JSON.stringify({ ok: true, command: 'habits', verb, id }));
+        else out(`${verb === 'add' ? '已新建' : '已软删除（进回收站）'} ${id}`);
         return 0;
       }
 
