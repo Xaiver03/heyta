@@ -6707,3 +6707,49 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     凡出现"未列出的即视为不适用"的封闭句式，那个集合就必须有一条对账门禁
     （与 `check:legal-tools` 那条同形 —— 那条是文档表 ↔ 代码目录，这条是脚本参数 ↔ 目录内容）。
     取号现量：本条并入时载体最大号 285 ⇒ 取 **286**。
+
+287. 🔴 **`finally` 与 `process.on('SIGTERM')` 都挡不住"被杀"：会临时改工作树的门禁必须让
+    下一次启动能把上一轮的尸收掉，而"收"的资格只能来自读盘可判的归属证据。**
+
+    起因是现量的事故，不是设想：整链 `pnpm check` 跑到 `check:op-log-semantics` 第 1 个场景时
+    被 SIGTERM，`packages/op-log/src/state.ts` 留在 `if (aClientId !== bClientId)` → `if (false)`
+    ——**LWW 的 clientId 决胜被摘掉**，而工作树看起来只是"有点脏"。下一轮跑这道门的红会是
+    `baseline is not green`：它响的是**自己上一轮的尸**，不是被测语义。
+
+    🔴 **同一条的第一层失效：同步脚本里的信号处理器根本轮不到执行。**
+    第一版修法给两个台架都挂了 `process.on('SIGINT'|'SIGTERM'|'SIGHUP')` 做还原。臂实测
+    （载体 `tmp/arm2-kill-semantics.sh`）：变异窗口里发 SIGTERM ⇒ **进程没停、9 条场景全跑完、RC=0**。
+    这两个台架从头到尾是同步代码（`spawnSync` 阻塞事件循环），回调要等整趟跑完才有机会执行，
+    而**注册本身就取消了默认的"可被杀"行为** —— 想 Ctrl-C 停住一道门的人从此停不住。
+    ⇒ 撤掉处理器，机制换成"**下一次启动先收尸**"：变异前把 `{file, original, mutated}` 逐字节
+    落到 `tmp/op-log-semantics-journal.json`；启动时 journal 在 ⇒ 还在变异态就按 journal 还原、
+    已还原就删 journal、**两边都不像就拒绝动手**（那不是残留，是别人在改这棵树）。
+
+    现量（`tmp/arms-mutation-harness.sh`，同一次运行内）：
+    S1 变异窗口里 `kill -9` ⇒ `S1_KILL_RC=137`、journal 在、`state.ts` 脏一行；
+    S2 带残留重跑 ⇒ 打印"按 journal 还原"、`S2_DIRTY_LINES=0`、journal 消失；
+    S3 残留但**没有** journal（无归属证据）⇒ 锚点检查先炸并给出 `git checkout -- <file>`，
+    且 `S3_BYTES_UNTOUCHED=yes`（拒绝开跑不是"顺手修好"）。
+    ⚠️ S2 那一轮随后 RC=1，红在**另一件事**上：S1 的 SIGKILL 把 `spawnSync` 的孩子留成孤儿，
+    它握着 `/tmp/tfa-test.lock`，于是 S2 一个用例都没跑。这种红不能读成"变异没被抓到"，
+    已给 `run()` 单列 `ENV_UNAVAILABLE` 分支（三出口：没跑到 / 跑到且红 / 跑到且绿）。
+
+    🔴 **同一条的第二层失效，是我这次自己带出来的：给门禁副本加"归属标记"时把 shebang 顶到了
+    第 2 行 ⇒ 副本 `SyntaxError` ⇒ 读起来像"命中 0 处 ⇒ 判据没牙"。**
+    `check:egress-wording` 的 M3 臂要跑一份 `check-ui-language.mjs` 的补丁副本；副本必须在第一行
+    是 `#!`，而我把标记注释拼在了最前面。修前读数：`M3 … 命中 0 处 ❌ 存活`（RC=1，整链会红）；
+    把标记改到 shebang **之后**：`M3 拿掉 packages/legal/src 的豁免 ⇒ 命中 8 处
+    （packages/legal/src/documents/ai-and-transfer.ts:273）✅ 判红`，RC=0。
+    真正要补的不是那一行顺序，而是 `hits()` 把"崩了"和"零违规"读成同一个数 ——
+    已加一条**结论行**判据（输出里没有 `文案合规` / `处不合规` ⇒ 抛"没跑到结论行"）；
+    反向注入坏形状（把标记放回 shebang 前，跑一份副本）实测：
+    `Error: … 没跑到结论行（退出码 1）… SyntaxError`、RC=1 —— 这条新出口自己也能红。
+
+    📌 可迁移的三条：**①"临时改工作树的门禁"要按"被杀之后"设计**，不是按"抛异常之后"设计 ——
+    `finally`、信号处理器、`trap EXIT` 都有各自够不着的死法，落一份 journal + 启动收尸是唯一
+    对 SIGKILL 也成立的那条。**② 收尸要先有归属证据**：独有字面量、文件头那一行、journal 三选一，
+    且必须**读盘可判**；没有证据就拒绝，别"顺手 git checkout"（那会毁掉别人未提交的改动）。
+    **③ 往别的脚本前面拼任何一行**（注释、banner、license 头）之前，先确认被拼的对象有没有
+    "必须在第 1 行"的东西 —— shebang、`'use strict'`、frontmatter、`@file` 指令都是。
+    取号现量：`grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md | tr -d '. ' | sort -n | tail -1`
+    在本条并入时是 286 ⇒ 取 **287**。
