@@ -121,8 +121,13 @@
  * "这棵树此刻是不是别人的现场"：argv 腿（命令行里点了这个目录）+ cwd 腿（进程坐在里面）
  * + `MERGE_HEAD` 三条，任何一条命中 ⇒ **退 6 且一个字节都不写**；两条腿读不到 ⇒ **退 2**
  * （"判不了"不等于"没人用"）。判据本体在 `selfhost-carrier-busy.mjs`（九臂自检）。
- * `HEYTA_CARRIER_BUSY_FORCE` 只能把它**逼红**（`busy`/`blind`），没有让它放行的取值 ——
+ * `HEYTA_CARRIER_BUSY_FORCE` 只能把它**逼红**（`busy`/`blind`/`state`），没有让它放行的取值 ——
  * 那是给变异复现用的，不是给绕过用的：写错值本身按"判不了"退 2。
+ * 🔴 **`MERGE_HEAD` 那一格和另外两格不能共用一句建议**（10-05 实测出来的）：前两格是**进程**，
+ * "等那一趟跑完再重跑"成立；`MERGE_HEAD` 是**状态**，没有会跑完的那一趟，而第 0 步那次
+ * `merge --abort` 排在闸门后面走不到 ⇒ 直接重跑会永远退 6。所以这一格的话术改成
+ * "先证明这场合并是谁起的（`rev-parse MERGE_HEAD` 对分支尖 + `MERGE_MSG` 的 mtime 对窗口），
+ * 再由那个所有者 `merge --abort`"。触发形状：本脚本崩在合并与落笔之间（本次是一个未定义标识符）。
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
@@ -235,23 +240,42 @@ if (existsSync(WT)) {
   } catch { /* 没有进行中的合并 */ }
 }
 const FORCE_BUSY = process.env.HEYTA_CARRIER_BUSY_FORCE;
-if (FORCE_BUSY && FORCE_BUSY !== 'busy' && FORCE_BUSY !== 'blind') {
+if (FORCE_BUSY && !['busy', 'blind', 'state'].includes(FORCE_BUSY)) {
   die(2, `不认识 HEYTA_CARRIER_BUSY_FORCE=${FORCE_BUSY} ⇒ 这道闸门没有"绕过"取值，打错就当判不了`);
 }
 const busyProbe = FORCE_BUSY === 'blind'
   ? { error: `变异注入：强制判不了（HEYTA_CARRIER_BUSY_FORCE=blind）` }
   : FORCE_BUSY === 'busy'
     ? { users: [{ pid: 999999, via: 'argv', what: `变异注入：强制有人在用（HEYTA_CARRIER_BUSY_FORCE=busy）` }], psRows: 0, cwdRows: 0, exempt: [process.pid] }
-    : liveCarrierUsers({ dir: WT, mergeHead: mergeHeadBefore });
+    : FORCE_BUSY === 'state'
+      // 第三档注入的是**形状**而不是进程：闸门自己那两档读数（argv/cwd）都为空，只有
+      // "上一趟崩在合并与落笔之间"留下的 MERGE_HEAD。用它来验退 6 话术里那条恢复分支，
+      // 不必去共用载体那棵树上真造一场合并。
+      ? { users: [{ pid: -1, via: 'MERGE_HEAD', what: `变异注入：强制只有"没收拾干净的在飞合并"这一格状态` }], psRows: 0, cwdRows: 0, exempt: [process.pid] }
+      : liveCarrierUsers({ dir: WT, mergeHead: mergeHeadBefore });
 if (busyProbe.error) {
   die(2, `载体在用者**判不了**：${busyProbe.error}\n` +
     `   不拿"读不到"当"没人用" —— 那正是 §8.122 端口探针那个假 0 的形状，代价是硬重置别人的现场。`);
 }
 if (busyProbe.users.length) {
+  // 🔴 两种占用形状要分开说话，因为**只有一种能等**。10-05 实测：借 store 那段判据里一个
+  //    未定义标识符让本脚本崩在合并之后、落笔之前，于是载体里留下一场 MERGE_HEAD；
+  //    下一趟退 6 却被告知"等那一趟跑完再重跑" —— 那一趟根本不存在（pid=-1 是状态不是进程），
+  //    而第 0 步那次 `merge --abort` 排在闸门**后面**，闸门不通就永远走不到它。
+  //    话术错一格 = 落地路径上一格没有出口的循环。判拒不变（照样退 6、不自动收拾）。
+  const onlyState = busyProbe.users.every((u) => u.via === 'MERGE_HEAD');
   die(6, `载体 ${WT} 此刻有 ${busyProbe.users.length} 个**别人的**进程在用：\n` +
     busyProbe.users.map((u) => `     pid=${u.pid} [${u.via}] ${u.what}`).join('\n') +
-    `\n   ⇒ 不重算、不硬重置、不动这棵树（本工具**不提供绕过开关**）。` +
-    `   等那一趟跑完再重跑本脚本；要现在就落地，得由那个现场的所有者自己挪开，不是由我替他决定。`);
+    (onlyState
+      ? `\n   ⇒ 这一格是**状态**，不是进程：没有"哪一趟"会跑完，直接重跑本脚本会永远退 6` +
+        `（第 0 步的 merge --abort 排在这道闸门后面，走不到）。` +
+        `\n     先证明这场合并是谁起的，再动这棵树：` +
+        `\n       git -C ${WT} rev-parse MERGE_HEAD        # 等于哪条分支的尖，它就是那条分支的所有者起的` +
+        `\n       ls -l "$(git -C ${WT} rev-parse --git-dir)/MERGE_MSG"   # mtime 落在哪一趟的窗口里` +
+        `\n     确认后由那个所有者自己收拾：git -C ${WT} merge --abort && git -C ${WT} status --porcelain（应当 0 行）` +
+        `\n     本工具不替他决定 —— 也不提供绕过开关。`
+      : `\n   ⇒ 不重算、不硬重置、不动这棵树（本工具**不提供绕过开关**）。` +
+        `   等那一趟跑完再重跑本脚本；要现在就落地，得由那个现场的所有者自己挪开，不是由我替他决定。`));
 }
 notes.push(`载体空闲（argv+cwd 两腿：ps ${busyProbe.psRows} 行 · cwd ${busyProbe.cwdRows} 行 · ` +
   `豁免自己链 ${busyProbe.exempt.join('←')} · MERGE_HEAD=${mergeHeadBefore ? '有' : '无'}）`);
@@ -461,6 +485,7 @@ let borrowSelftestReading = '';
   }
   // 🔴 判定本体与本文件跑的是同一份：这行读的是**正在执行的这份**脚本（SELF），不是载体树里的副本 ——
   //    臂打在跑的那份上才有意义，否则载体树上那份改了、跑的那份没改，臂判的是别人。
+  const SELF = fileURLToPath(import.meta.url);
   if (!/borrowStep\(\{/.test(readFileSync(SELF, 'utf8'))) {
     die(2, `借 store 的判定不走过 selfhost-store-borrow.mjs 的 borrowStep ⇒ 臂判的是另一份实现，不作数`);
   }
