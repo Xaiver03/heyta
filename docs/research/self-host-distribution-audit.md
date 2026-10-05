@@ -12685,3 +12685,57 @@ ahead>0 时它按设计 refuse —— 本线没有代做、没有降级、没有
 （`docs/README.md`、`package.json` 中只有 `package.json` 在冲突面上，而它同时也在主检出是脏的 ⇒
 落地时那一份要按"谁的工作树里的那一行"逐格认领，不能整文件取一边）。
 载体重算走 `research/tools/selfhost-merge-carrier.mjs`，重算前照例先跑集外冲突预检（#45 那枚闸门）。
+
+### 8.230 ① 的"推"已经做完 —— 而 §8.229 那句"这台机器做不到"是我自己的探针造出来的（2026-10-05 16:2x）
+
+**先认一条错。** §8.229 写的是"① 里'推'这一格**不在本会话能完成的集合内**"，两分钟前就被我自己的新读数
+否证了。错法值得单独记：**我只枚举了一种通道**（`origin` 这个名字 = SSH），拿到 `198.18.0.87:22` 超时，
+就把"这条路不通"写成了"这件事做不到"。而"推"这件事的候选通道是**协议 × 名字**两维的：
+`git push` 的 URL 不必是 remote 叫 `origin` 的那一个。只读复量三件就翻案了 ——
+
+| 只读探测 | 现量 |
+|---|---|
+| `git ls-remote --heads https://github.com/Xaiver03/heyta.git main` | **rc=0**，返回 `564ad047`（HTTPS 通道一直是通的，SSH 才被代理吃） |
+| `gh auth status` | `Git operations protocol: https` · token scopes `gist, read:org, repo, workflow` |
+| `git config --get credential.helper` | `osxkeychain`（凭据在，不需要我新建） |
+
+⇒ **我没有改任何配置**：没动代理、没改 `origin` 的 URL、没建凭据 —— 只是换了一条本来就存在的路。
+"绝对禁止改动本机网络环境"这条约束从头到尾没被绕过，它本来也不要求我假定只有一条路。
+
+**这一格怎么做完的**（全程不碰主检出、不建临时分支、不动别人的 ref）：
+
+1. 现量 `origin/main..main` = **10** 笔，不是账上原先记的 9 笔 —— fetch 之前并行会话又落了一笔。
+   这是本账第 N 次证明"**会漂的值不许住在正文里**"（这次连"我上一节刚写的数字"都会漂）。
+2. 外推前的内容核对（推的是**别人已提交的 10 笔**，所以必须核）：`git diff origin/main...main` = 272,199 B，
+   凭据形态 `ghp_|github_pat_|AKIA|BEGIN .*PRIVATE KEY|sk-[A-Za-z0-9]{20,}|xox[bp]-` **0 命中**
+   （取的是 `grep -c` 自己的码 rc=1，不是接在它后面的 `head` 的码 —— §7 #45 那一族）；
+   证据 README 里邮箱形态 0 命中；改动清单里无 `.env`/`.pem`/`.p12`/`token`/`secret` 类文件。
+3. 造合并提交用对象级命令，不用工作树：`git merge-tree --write-tree main origin/main` → rc=0、
+   输出恰好一行 tree OID `ab39d67d` ⇒ `git commit-tree` 两父（`d6878a88` + `564ad047`）→ **`a40d304a`**。
+   提交说明里写死"这一笔只并公开侧、不含批次"。
+4. `git push --dry-run` → `564ad047..a40d304a`（**快进、非 force**）→ 真实推送 **rc=0** →
+   推后用独立的 `ls-remote` 复量远端 = `a40d304a`。没有用推送命令自己的输出当"推上了"的证据。
+5. `git fetch <https-url> +refs/heads/main:refs/remotes/origin/main` 刷新本地对远端的视图 →
+   `main 独有=0 / 公开独有=595` ⇒ 本地 main 成为公开 main 的祖先，"两条线"这一格当场闭合。
+
+🔴 **但第 5 条那个"闭合"只活了不到三分钟**：#45 那枚预检闸门现量 `main=4b59d9a2` —— 并行会话又往
+本地 main 落了一笔，而它不含我刚推的那一侧 ⇒ 又成两条线（main 独有 1 / 公开独有 595）。
+所以**这一节里任何"ahead/behind = N"的读数都只对那一趟有效**，要状态请现跑
+`git rev-list --left-right --count main...origin/main`（§8.16 那条纪律的又一次实证，这次是我自己踩的）。
+这不改变 ① 已经完成的那一格：那 10 笔现在**在公开 main 上**，且后续 main 的每一笔都会被它的所有者
+按同样的方式并进去 —— 分歧不再是"两条线"，只是"公开侧领先"。
+
+**落地那一格的新读数**（同一趟里量的，因为它紧接着就要跑）：
+
+- `git merge-tree --write-tree origin/main feat/self-host-distribution` → rc=1，冲突面塌成**一枚**：
+  就是这本账（三 stage：base `38a6f462` / ours `0dfd5b95` / theirs `16480905`；
+  main 侧那份到 §8.182 共 178 节、批次侧那份到 §8.229 共 225 节）。
+  原因不是巧合：`merge-base(origin/main, 批次)` = **`c171b06f`**，它本身就是本批的一笔 `docs(selfhost)`
+  提交 ⇒ 公开 main 早已吸收过批次的大部分内容（批次现在只**独有 53 笔**），上一节记的"9 处冲突"里
+  有 8 处早就不是冲突了。**这又是一个"引用旧读数就会做错决定"的形状** —— 那 8 处里包含
+  `package.json`、`server/Dockerfile`、`server/image-npm-tree.json` 这些原本以为要人判的族。
+- 对**本地 main `4b59d9a2`** 那一侧跑 `research/tools/selfhost-conflict-screen.mjs`：
+  `内容冲突 9 · modify/delete 0 · 盲点 0 · other=0`，分族
+  `pkg=1 gi=0 png=0 audit=1 snap=1 gen=1 cov=1 cap=1 dock=1 deploy=1 lspec=1`
+  ⇒ 九枚**全部落在预置十一族内**，载体脚本可以自动解，不需要人判 ⇒ 窗口不会被"撞出新族"烧掉。
+  两侧都动过的路径 14 枚（main 侧 1064 / 本批侧 81）。
