@@ -491,6 +491,7 @@ const ROW_ID_EXEMPT = [
   ['apps/web/src/features/quadrant/QuadrantBoard.tsx', 'activeId', 'dragging'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'editingRowId', 'inline-rename'],
+  ['apps/web/src/features/trash/TrashView.tsx', 'busyId', 'in-flight'],
   ['apps/web/src/features/trash/TrashView.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/mobile/src/screens/CalendarScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/HabitsScreen.tsx', 'busyId', 'in-flight'],
@@ -499,6 +500,7 @@ const ROW_ID_EXEMPT = [
   ['apps/mobile/src/screens/SecurityScreen.tsx', 'renamingId', 'inline-rename'],
   ['apps/mobile/src/screens/SecurityScreen.tsx', 'confirmDeleteId', 'confirm-gate'],
   ['apps/mobile/src/screens/TasksScreen.tsx', 'busyId', 'in-flight'],
+  ['apps/mobile/src/screens/TrashScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/TrashScreen.tsx', 'confirmingId', 'confirm-gate'],
 ];
 
@@ -1037,6 +1039,18 @@ const VIEW_STANCES = [
     locus: 'apps/web/src/features/trash/TrashView.tsx',
     needle: 'const [confirmingId, setConfirmingId] = useState<string | undefined>(undefined);',
     because: '有实体行，但行上的动作是恢复/彻底删除；confirmingId 是"哪条在二次确认"，不是"在看哪一条"（它登记在断言 G 的行 id 类别里）。',
+  },
+  {
+    view: 'countdown',
+    stance: 'row-actions-only',
+    locus: 'packages/ui/src/countdown/EventBoard.tsx',
+    needle: 'const [editingFor, setEditingFor] = useState<string | undefined>(undefined);',
+    because:
+      '卡片行上是置顶/归档/删除与**就地改**，没有"走哪一条"：整张卡的字段就在网格上，就地编辑器改的就是它自己，' +
+      '所以那个 owner 是共享板的 `editingFor`（不是宿主本地态，也不在词表里 —— `event` 作为投机项已在 W1 摘掉，' +
+      '依据是"没有任何一处界面会选中一条 EVENT"）。🔴 与便签那一格的区别要说清，别把两条读成同一条：' +
+      'NotesView 的列表只显示标题，"在编辑哪条"**就是**"在看哪条"，所以它登记 selects；卡片网格不是。' +
+      '把它升成"选中一条 EVENT ⇒ 右栏出该实体面单"属于 C1 #1 那一单（已拍，未实现），不是这条门禁的口径。',
   },
   {
     view: 'settings',
