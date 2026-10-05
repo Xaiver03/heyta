@@ -73,11 +73,30 @@ Android 的 `force-stop` 是系统明确的用户阻断操作，会取消/阻止
 
 已验证：Android Kotlin 与 iOS workspace Debug 编译通过；共享层回执失败不 ack、权限未决定
 不排程、可见/待排程容量区分与 dirty rerun 均有行为测试；乱序收敛在 op-log 语义测试中覆盖。
+`apps/mobile/tests/native-reminder-plan.spec.ts` 还固定了 iOS 容量算法的 65→64 边界：
+传入 65 个按时间排序的 occurrence 时，只保留最早 64 个，窗口外 occurrence 不会挤掉更早的
+提醒。该测试只证明共享规划器的截断规则，不替代 iOS 系统通知中心的真实 65 条排程验收。
 `node scripts/mutate-reminder-delivery.mjs` 已实跑四条臂：删除离线写入唤醒、删除授权完成唤醒、落库失败仍 ack、
 按提醒 id 而非完整 occurrence 显示不确定说明，均由对应行为断言抓到；测试初始化失败不算 caught。
 该脚本临时改源码，必须与构建独占，逐条 finally 对字节还原，不能与原生打包并发。
-**尚未完成**：iOS OS 级投递、iOS 权限拒绝/设备重启后的实测、四端重装、
-全仓最终门禁、不确定回执说明的真实界面截图验收。旧失败轮截图不作为成功证据。
+**尚未完成**：iOS 权限拒绝/设备重启后的实测、实体设备投递复验、四端重装、全仓最终门禁、
+不确定回执说明的真实界面截图验收，以及跨设备 fired 去重和新 occurrence 的原生系统投递复验、
+iOS 最早 64 条排程窗口。两台独立 SQLite 宿主经真实 HTTP/PostgreSQL 的回执传播与新 occurrence 调度决策已通过下述集成测试；通知 port 为受控观察器，不能替代 OS 证据。iOS 模拟器已经证明授权、排程、到期前终止进程、启动 reconcile 和
+`firedAt` 回执闭环，通知中心对应任务标题也已人工核看；未来提醒取消续验 21/21，目标实体 `DEL` 与 ledger 清理成立，删除后同一详情页截图已人工检查。旧取消失败已定位为验收脚本日期标签不匹配，详见下方续验记录。上述结果不能替代剩余边界；旧失败轮截图不作为成功证据。
+
+当前 C 阶段的边界台账如下；每一项都必须由对应平台/设备的真实证据关闭，不能由 Android 单机结果外推：
+
+| 边界 | 当前状态 | 关闭判据 |
+|---|---|---|
+| Android 主链、权限恢复、启动补算、未来 pending 取消 | ✅ 已验 | 当前 Release 真 UI、SQLite occurrence 回执与系统 pending/通知证据一致 |
+| iOS 模拟器授权、排程、启动 reconcile、未来提醒取消 | ✅ 已验 | 当前 Release 模拟器真实 UI；目标 occurrence 的 `DEL`、AX 行消失、ledger 清理和未伪造 `firedAt` 均成立 |
+| 跨设备 fired 去重 | HTTP/PG 与独立 SQLite 已验；原生 OS 待验 | 设备 A 写入某 occurrence 的 fired receipt 后，设备 B 真实下载该 op，并证明不会再次排程/投递同一 occurrence |
+| 重复提醒与新 occurrence | 改期、贪睡、每日重复的 HTTP/PG 已验；原生 OS 待验 | 改期、snooze 或下一次重复触发产生新的 occurrence ID；旧 occurrence 的 fired receipt 不阻止新 occurrence 投递 |
+| iOS 权限拒绝/重启补算 | 待验证 | 拒绝权限跨过 trigger 不写 fired；重新授权并启动后补发；普通终止/重启后的 iOS 证据分别保留 |
+| iOS 系统通知中心与“用户已看到”边界 | 标题截图已验；不确定回执界面待验 | 截图中人工辨认本轮提醒标题；通知被清除或系统证据丢失时只显示不确定说明，不伪造 fired |
+| iOS 64 条排程窗口 | 待验证 | 创建至少 65 个 occurrence，证明只排最早 64 条，窗口滚动后下一条进入且不丢失 |
+
+2026-10-04 13:01，`server/tests/integration/reminder-delivery-http.integration.spec.ts` 在真实 PostgreSQL 上 **2/2 通过、零跳过**（1.90 秒）。每例独立账号、两台独立 SQLite 宿主与真实加密 HTTP 同步：先证明 B 确实排程，再由 A 写入 occurrence 回执，B 下载、解密并取消 pending；重开 SQLite 仍不重排。改期、贪睡和每日重复完成经同一真实链路传播，旧回执不会挡住新 occurrence，重复 reconcile 不追加 op。通知 port 是受控观察器，以上证明同步与调度决策，不证明 Android/iOS 系统实际投递。测试已登记在 `server/package.json` 的 PostgreSQL 集成入口中。 `DATABASE_URL=… node scripts/mutate-reminder-delivery.mjs --http` 在隔离副本完成三条反向臂：忽略 fired 重排、取消 pending 接线移除、snooze occurrence 错用原 trigger；三者都命中具名行为断言（AssertionError），不是构建/初始化失败。每臂 finally 逐字还原源码并重建 dist。初轮共用账号使上一例未上传的新回执污染下一例，已改为逐例创建/删除账号；不能靠过滤额外提醒放宽断言。
 
 Android 真链路以设备时钟和时区创建三分钟内到期的提醒，等待 OS 定时投递。创建规则拒绝
 早于过去一分钟的触发时刻，因此“给昨天任务点截止时”不会产生提醒 op，不能用来冒充补发验收。
@@ -185,18 +204,179 @@ HOME 后用 SIGKILL 终止普通进程，系统 alarm 保留，22:55 仍交付�
 `firedAt` 与 `firedForTriggerAt` 的 REMINDER op。隐私覆盖层也先由真实 AX 点击关闭并复核消失。
 这轮证明的是模拟器 OS 投递与回收闭环；实体设备通知权限仍需独立验收，Keychain 也不由这条证据代替。
 `apps/mobile/evidence/ios-reminder-delivery-success.png` 只记录回到应用后的任务详情和业务回执，
-是辅助证据，不是系统通知中心截图。当前 `ios-reminder-notification-center.png` 与
-`ios-reminder-after-reconcile.png` 仍未取得可观察的通知中心画面（一次是多显示器模拟器默认的全黑副屏，
+是辅助证据，不是系统通知中心截图。当时的 `ios-reminder-notification-center.png` 与
+`ios-reminder-after-reconcile.png` 未取得可观察的通知中心画面（一次是多显示器模拟器默认的全黑副屏，
 一次是锁屏壁纸），因此不能挂作成功证据；脚本现显式选择 `primary` display 并用 `png-stats`
 拒绝全黑 PNG，但这只修复取证装置，不能把现有失败截图升级为成功证据；
-下一轮必须在人工看见包含对应提醒标题的系统通知中心后，才能把 OS 级截图判据改为已验证。
+后续 11:42 的同设备续验已人工看到对应标题，当前截图和裁决见下方 full 模式记录；此前截图不作为成功证据。
 
-2026-10-04 03:56–04:09 的 `pending-cancel` 续验进一步暴露了一个未闭合路径：真实 Release
-包通过 UI 创建未来 occurrence，原生 scheduled ledger 有记录；随后 AX 点击“删除提醒”返回成功，
-但等待 4 秒后真 SQLite 仍只有 REMINDER `CRT`、没有对应 `DEL`，重启 reconcile 后 scheduled
-ledger 仍保留该 occurrence。`firedAt` 没有被伪造。该结果不能记作取消通过；它说明当前验收装置已经
-走到真实删除按钮，但业务写入没有落地，必须先修复或取得可重复的根因证据，再补 OS pending 清空判据。
+2026-10-04 03:56–10:23 的 `pending-cancel` 续验先暴露并修复了验收脚本自身的标签格式错误：宿主
+输入使用 `10/4`，而 RN 的实际无障碍标签使用零填充 `10-04`。旧脚本用输入格式寻找删除按钮，
+导致 AX 目标缺失；一次 plain press 的 success 不能作为业务写入证据。脚本改为从 ISO 日期生成实际
+`MM-DD` 标签，并在点击后回读 AX、SQLite 与原生 ledger。当前 Release 真 UI 续验 **21/21 通过**：
+SQLite 先回读目标 occurrence 的 `entityId` 与 `triggerAt`；删除前 scheduled ledger 有 future occurrence；
+通过提醒面板 UI 删除后行从 AX 消失，SQLite 对同一 `entityId` 有 `REMINDER DEL` op，且有删除后、
+重启前的同一详情页截图（[删除前](../../apps/mobile/evidence/ios-reminder-pending-before.png)、
+[删除后](../../apps/mobile/evidence/ios-reminder-pending-after-delete.png)）；重启 reconcile 清空
+OS pending 对应 ledger，且没有伪造 `firedAt`。重启后的回应用截图另存为
+[pending-after](../../apps/mobile/evidence/ios-reminder-pending-after.png)。
+
+2026-10-04 的 full 模式续验又把 killed-process 边界跑到了真实 SQLite 回执：本轮任务
+`task-mut84l15-2-5un25bqh` 的 occurrence 为
+`task-mut84l15-2-5un25bqh:1791082380000`；从 SQLite 回读的 `triggerAt=1791082380000`，
+App 在 `terminateAt=1791082360426` 被终止，console 会话退出，随后等待到
+`1791082380328` 才继续取证；启动 reconcile 后只接受同一 occurrence 且
+`firedForTriggerAt=1791082380000` 的 fired op，真实回读通过。该轮的提醒专项 Release 构建日志在
+`/tmp/heyta-ios-reminder-build.log`；它是提醒 probe 包，不代表四端重装或全仓 Release 交付。
+该轮首次通知中心截图落在 SpringBoard 主屏，不作为成功证据；11:42 的同设备续验修正了
+直接 HID/截图命令的 TCP companion 参数，并在系统通知中心人工读到
+`heyta / ios-reminder-delivery-105035`。只读 SQLite 对账确认该标题属于上面的
+`task-mut84l15-2-5un25bqh`，且回执 `firedAt=1791082383051`、
+`firedForTriggerAt=1791082380000`。当前[通知中心截图](../../apps/mobile/evidence/ios-reminder-notification-center.png)
+证明该 occurrence 的系统可见性；截图是在 reconcile 后补取，不冒称到期瞬间截图或真实用户已读。
+脚本统一了 AX 与直接 idb 调用的 TCP 参数，手势失败判红，截图先清除同名旧文件，避免取证失败仍复用旧图。
+系统 AX Button 必须包含本轮标题，详情字段和非空主屏均不能满足这条判据；本轮标题还必须带
+进程级唯一后缀，不能只精确到秒，否则快速重跑可能命中通知中心残留的同名旧通知。直接调用脚本中的
+helper，在同一系统画面以真实标题正控通过、错误标题负控拒绝。该补强不替代截图人工复核。
 
 为避免同类故障重新出现，`pnpm check:ios-native-bridges` 现在逐项核对 Swift 的 `moduleName()`、
 Objective-C bridge 的 `RCT_EXTERN(_REMAP)_MODULE` 导出名，以及 JS `NativeModules` 查找名；构建成功
 本身不再被视为原生模块接线正确的证据。
+
+帮助中心的同一轮对账删除了“后台只能靠自建推送”的旧承诺，中英同步说明移动系统本地通知、Android 强停后的补算、iOS 排程窗口和离线多端可能各自提醒。原[提醒文章截图](../../apps/landing/evidence/reminder-capabilities-zh.png)已人工查看；此图证明用户说明已更新，不是 OS 投递证据。 首启隐私面板也须区分服务器推送与本地通知：选择“只用本机”不启动联网能力，但系统授权后的移动端本地提醒仍可用；中英 `common.privacy.consent.localOnlyGuarantee` 已同步移除“任何通知都不投递”的旧暗示。
+
+2026-10-04 专用 iOS 模拟器续验又修正了两类**验收装置**问题，但没有改变产品边界台账：任务详情同时有两张
+`DatePicker`，重复的「今天」必须由 AX occurrence 明确选第 0 个（截止日期），并在滚动、重新定位、点击全程保持同一序号；
+普通时刻 `TextInput` 改用 `set-value` 后重新拉 AX 值确认，不能把 HID `type-text` 的成功返回当作领域状态已提交。
+当前续验受 iOS 27 companion 间歇性 AX 长调用卡住影响，未取得新的 full 通过记录；历史上已通过的
+killed-process/通知中心记录仍有效，未完成的权限拒绝、重启补发、不确定回执和 64 条窗口也仍保持待验证。
+
+### 2026-10-04：只读 iOS OS snapshot 探针与 64 条窗口夹具（进行中）
+
+为使后续边界验收能够观察 `UNUserNotificationCenter` 的真实状态，原生层新增了一个专用的
+Release 编译条件 `HEYTA_REMINDER_PROBE`。它不是普通 `DEBUG` 路径：探针包仍使用 Release
+Hermes bundle，只在专用 xcodebuild 调用中加入
+`SWIFT_ACTIVE_COMPILATION_CONDITIONS='RELEASE HEYTA_REMINDER_PROBE'`，并由启动参数
+`-HEYTA_REMINDER_PROBE [delayMs]` 触发。探针延迟后只读
+`getNotificationSettings`、`getPendingNotificationRequests`、`getDeliveredNotifications`，
+以及 `heyta-reminder-receipts.json` 的只读副本，输出授权状态、occurrence ID、trigger 日期和
+receipt 摘要；它不调用 `UNUserNotificationCenter.add/remove`，不 ack receipt，不写 op 或 SQLite。
+因此它可以在生产 JS reconcile 完成后提供 OS 级观察证据，也不会制造被测事件。
+
+当前已实测：专用 Release 探针包在 iPhone 17 Pro 模拟器
+`9DC7F824-00C5-4757-B5E9-2177FAE8CC9A` 编译成功并启动快照，输出
+`authorization=granted`、`pending=2`、`delivered=[]`，两个 pending occurrence 的
+`triggerDate` 均为 ISO-8601，且与本机 receipt ledger 的两个 `scheduled` occurrence 一致。
+这是 OS 观察入口已成立的装置证据，不是 65→64 边界通过证据。
+
+2026-10-04 的 `permission-recovery` 首次真实运行已取得一轮**失败证据**：设备
+`9DC7F824-00C5-4757-B5E9-2177FAE8CC9A` 的 Release probe 包真实 UI 创建了
+`task-mutn6q7x-2-vhrxw1q7:1791107700000`，首次通知权限弹窗实际点击“不允许”；跨过
+trigger 后 probe 快照确认 `authorization=denied`、`pending=[]`、`delivered=[]`，固定的恢复前
+截图已保存（画面近黑，仅作失败取证，不能作为 UI 成功证据），
+SQLite 没有 fired receipt。该轮最终失败在恢复阶段：脚本的 `App-Prefs` 深链没有把当前
+模拟器带到 heyta 的通知设置页，AX 树仍是 Settings 根页，因此无法通过真实 Settings UI
+恢复授权；不能把这条失败改写为“恢复成功”。同轮还暴露了 probe 输出的时序问题（启动后
+快照文件存在但脚本轮询可能先超时），后续必须用进程/文件双重确认并保留失败截图。
+
+该轮也修复了验收装置的两个真实问题：iOS 27 companion 可读 AX 树且 HID swipe 成功，
+但从屏幕折叠线附近开始的 60–90px 短拖不会让 RN ScrollView 滚动；`ios-ax-shim.py`
+现在为底部向上滚动保留至少 180px 手势距离。另一个问题是原先按脚本名全局阻塞并发，
+会把另一台模拟器的验收误判为当前设备冲突；现在并发门禁按目标 UDID 匹配。
+
+同日 `restart-recovery` 也完成了真实的关机顺序验证：目标 occurrence
+`task-mutne7c2-2-amahunx8:1791108000000` 在模拟器关机前已写入 SQLite，设备在 trigger 前
+shutdown，跨过 trigger 后再 boot；但该轮 probe 未产出快照，启动后也没有回执，因此仍是失败。
+初步假设是 probe 早退后没有维持进程 RunLoop，设备重启后的 `simctl launch` 进程可能立即退出；
+该假设尚未被重跑证实。已在 `AppDelegate` 为只读 probe 增加有限时长 RunLoop，必须重新编译并
+重跑才能改变台账。该轮固定的
+`restart-recovery-before/after` 截图只有载体画面，不能作为成功 UI 证据。
+
+随后使用 `/tmp/heyta-ios-reminder-probe-check4` 重编译并重跑 `restart-recovery`：真实 occurrence
+`task-muto7yz3-2-ezsapvj:1791109440000` 在关机状态跨过 trigger 后 boot，顺序判据通过；脚本
+仍在 probe 文件写入前结束等待，故没有 recovery receipt，边界继续保持待验证。统一日志随后
+确认 probe 最终写出 `authorization=granted`、`pending=[]`、`delivered=[]` 和 scheduled ledger，
+说明至少存在 iOS 27 冷启动时序问题；脚本轮询已从 45 秒提高到 120 秒。权限恢复也已从不可靠
+`App-Prefs` 深链改为 Settings AX 路径 `App → heyta → 通知、横幅、声音、标记 → 允许通知`。
+
+窗口夹具的 Node 端已使用真实 `@heyta/app-host`、真实 SQLite、真实 HTTP/PostgreSQL、账号
+`205` 和 authenticated Vault 参数分两批创建并同步 63 个任务与 63 个提醒；两批 sync 均为
+`synced`，上传队列为 0。此前一次单批 126 ops 被服务端 100 ops 上限以 HTTP 413 拒绝，随后按
+批次重跑成功。这一结果只证明共享 host 和服务端能供给窗口夹具，不能替代 iOS 下载、生产 JS
+reconcile 和 OS pending 列表的 64 条证据。当前 iOS 专用包尚未完成该账号的 UI 登录/同步，故
+`iOS 64 条排程窗口`、权限拒绝恢复、重启补算和不确定 receipt 仍保持待验证；不得把本节的
+`pending=2` 或共享层 65→64 单测登记为窗口通过。
+
+验收脚本现在把四条边界固定成显式模式：
+
+```bash
+HEYTA_IOS_REMINDER_MODE=permission-recovery scripts/verify-mobile-ios-reminder.sh
+HEYTA_IOS_REMINDER_MODE=restart-recovery   scripts/verify-mobile-ios-reminder.sh
+HEYTA_IOS_REMINDER_MODE=uncertain          scripts/verify-mobile-ios-reminder.sh
+HEYTA_IOS_REMINDER_MODE=window \
+  HEYTA_IOS_WINDOW_PRESERVE_DATA=1 \
+  scripts/verify-mobile-ios-reminder.sh
+```
+
+这些边界模式不会把普通 Release 的 JS 启动结果当成系统证据：脚本会为边界模式构建带
+`HEYTA_REMINDER_PROBE` 的 Release 包，并通过 `-HEYTA_REMINDER_PROBE` 启动一个不挂载
+React Native 的只读进程。这样探针不会在“恢复前”偷偷触发 startup reconcile；它只读
+`UNUserNotificationCenter` 的授权、pending、delivered 列表和本地 receipt ledger。权限恢复
+必须经过真实系统权限弹窗与 Settings 页面，重启模式必须经过真实 simulator shutdown/boot，
+不确定模式必须在通知中心清除本轮通知后仍没有 fired op；任一系统按钮或快照不可见时判红。
+`window` 模式要求至少 65 条提醒先经真实同步进入设备 SQLite，并对照 OS pending 集合是按
+`triggerAt` 排序的最早 64 条；没有同步夹具时脚本直接失败，不能靠直写 SQLite 凑数。
+
+这些模式已经成为验收入口，但截至本记录时间尚未取得四条新的 iOS OS 级通过证据；运行
+模式本身、探针 `pending=2` 和共享层 65→64 测试都不改变上面的边界台账。取得通过证据后，
+必须在本节补设备 UDID、Release 产物、截图人工复核结果和 SQLite occurrence 对账，才能把
+对应行从“待验证”改为“已验”。
+
+2026-10-04 的 `restart-recovery` 还校准了探针等待边界：真实模拟器完成关机、启动并跨过
+`triggerAt` 后，旧的 120 秒 `run_probe` 上限先报“无法读取 OS 快照”，但统一日志随后显示
+同一个只读进程写出了本轮 JSON。这个迟到文件不能回填为原轮成功，也不能被解释成通知系统
+已失败。脚本现以 `HEYTA_IOS_PROBE_WAIT_SECONDS` 控制等待，默认 240 秒；每次先删除旧文件、
+重新启动带 `-HEYTA_REMINDER_PROBE` 的进程，并只接受该次新进程写出的文件，超过上限仍判红。
+在拿到新的 OS 级通过证据前，本节四条边界继续保持“待验证”。
+
+同轮第二次对账发现探针写入的真实路径是
+`<Data container>/Library/Application Support/heyta-reminder-probe.json`；旧脚本遗漏了
+`Library`，因此日志中的成功写入仍无法被 shell 轮询读到。`probe_path()` 已修正为从
+`simctl get_app_container ... data` 的 Data 根拼接该路径。以后新增原生探针必须同时核对
+Data 根、生产 SQLite 的 `Library` 位置和当前进程写入的文件，并保留旧文件清理；统一日志
+只能诊断迟到/路径问题，不能代替本轮 JSON 文件证据。
+
+重启补算还要求把两个异步阶段分开：首次启动可能已经将错过 occurrence 重新排成“立即投递”，
+但系统 delivered 仍晚于第一张 probe 快照。脚本现轮询本轮 occurrence 的 delivered，出现后
+重新启动生产 RN 进程执行正常 reconcile，最后等待真 SQLite 中对应的
+`firedAt + firedForTriggerAt`。probe 的 pending/delivered 和原生 ledger 的 posted/receipts
+都不能单独升级为同步事实；这四层必须绑定同一个 occurrence ID。
+
+只读 probe 为了让延迟回调有时间写文件会暂时保持同一 bundle 进程存活。因此 delivered 快照
+之后必须先终止 probe，再显式启动生产 RN；否则 iOS 可能复用 probe 进程，表面上启动成功但
+没有挂载 JS，也就不会执行 startup reconcile。该终止/启动顺序已经固化在 `restart-recovery`
+脚本，SQLite 回执仍是最后判据。
+
+2026-10-04 16:50–16:58 的专用模拟器续验再次固定了一条验收边界：当前源码 Release 包在
+`9DC7F824-00C5-4757-B5E9-2177FAE8CC9A` 上安装成功，bundle hash 新鲜度、首启选择、RN
+Composer 建任务和真实 SQLite `TASK CRT` 均通过；随后在任务详情用 AX `scroll_into_view("今天")`
+时，`idb swipe` 长调用分别在 TCP companion `10988` 和强制 Unix companion 上未返回。两轮都在
+取得通知授权/创建 REMINDER 前中止，没有产生新的 OS 投递证据，旧截图也没有被提升为成功证据。
+今后的规则是：AX swipe/companion 超时只能记为验收载体失败，必须保留本轮 Release、设备、
+传输方式和失败日志；不能把 `schedule()` 返回、任务 SQLite 写入或旧截图当作通知中心证据。
+本轮脱敏取证见 [AX companion 载体失败记录](../../apps/mobile/evidence/ios-reminder-ax-companion-20261004.txt)。
+
+同轮还修正了脚本自愈路径中的一个真实载体缺陷：TCP 模式把 `IDB_COMPANION` 替换为
+`HOST:PORT` 后，AX 空树分支原先仍调用只支持 Unix socket 的 `ensure_idb_companion`，
+重启后会把地址当作二进制路径，导致 companion 根本没有恢复。脚本现在单独保存
+`IDB_COMPANION_BIN`，在 shutdown/boot 后按同一端口重新启动 companion，并用
+`idb --companion HOST:PORT` 复核连接；Unix 模式仍走原有 `--companion-path`。这条修复已由
+`bash -n scripts/verify-mobile-ios.sh` 和一次真实 TCP companion 日志对账确认；它只修正验收
+载体，不改变 C 的 OS 级边界台账。后续若重启后的 TCP 连接或 AX 树仍失败，必须记录为载体失败，
+不能把它写成提醒投递或 Vault 产品失败。
+
+随后对照发现，单修 shim 仍不足以证明整条验收通道：共享 `scripts/lib/mobile-e2e.sh` 的
+`idb_ui` 与 AX 计数 helper 也曾固定使用 `--companion-path`，会把已经恢复的 TCP 地址再次
+读成空树。现已让共享入口与 shim 使用同一 `HOST:PORT`/Unix 判别；同一目标 UDID 的 TCP
+`11005` 只读对照得到 `AX_LABELS=11` 与合法 JSON。今后 transport 变更必须同时覆盖 shim、
+共享 helper、重启分支和只读 AX 对照，不能只验证一个调用点。
