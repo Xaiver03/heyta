@@ -5450,4 +5450,8 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 预算 14400s、每 60s 问一次 `verify-mobile-window-gate.sh --target c`（dry-run，绝不动设备）。
 它会在开窗那趟自己 checkout 到主检出当前提交、重打产物、再跑 `scripts/verify-mobile-due-time.sh` 那 37 条腿。
 ⚠️ 日志与 pidfile 都在 `/tmp`（一次重启就没）——**别把它当持久证据**；要重新主张这一格就再挂一次，别同时挂两枚（同一张设备面，AGENTS §8.9）。
-**这一格仍未闭合**：37 条腿没在开窗后真跑过，读数就只有"装置在等"这一种。
+🔴 **19:47 修正（本节第一版这句是错的）**：~~这一格仍未闭合：37 条腿没在开窗后真跑过~~ —— 那把 84091 于 19:34:30 真开了一次窗，
+链跑完了那 37 条腿：**`通过 37 项，失败 0 项` / `CHAIN rc=0` / `ALL_DONE final_rc=0`**，载体随后还原（`dirty=0`），看守按设计自己退出（跑完即退，不是被杀）。
+🔴 **20:0x 再修正（这条读数会自己翻面）**：它闭合的是 **`e372a3f0` 那批字节**；`git diff --name-only e372a3f0 HEAD -- packages apps` 现量 **15 枚**
+（含 `ProfileScreen.tsx`）⇒ 对当前 HEAD 又回到未闭合。20:02:41 已按同一装置重挂（pid 现量 `cat /tmp/ht-r14c-keeper.pid`，第一趟 `REDS=load,dev`，
+`dev` 是那条重装线占的、不是本线的东西），全过程账在本线台账 §4.05 (69)(71)。
