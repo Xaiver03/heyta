@@ -117,6 +117,37 @@ export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
     streakCurrent: (count) => currentStreakText(count, t),
     streakLongest: (count) => longestStreakText(count, t),
     streakTotal: (count) => totalCheckInText(count, t),
+    /*
+      数量行（工单 W6）—— 与 web 那份 `habitBoardLabels` **同一批 key**
+      （`common.habits.amount.*`），一条新键都没加：同一条习惯在两端说出
+      两个样子的"今天记了几格"，是这个数最容易被打折的地方。
+      单位为空的 fallback 也复用同一条 `web.habits.goal.defaultUnit`。
+    */
+    amount: ({ value, target, unit }) =>
+      t('common.habits.amount.today', {
+        value,
+        target,
+        unit: unit === '' ? t('web.habits.goal.defaultUnit') : unit,
+      }),
+    amountPlusA11y: ({ name }) => t('common.habits.amount.plus', { name }),
+    amountMinusA11y: ({ name }) => t('common.habits.amount.minus', { name }),
+    /*
+      工单 W8 的四格 —— 与 web 那份 `habitBoardLabels` **同一批 key**
+      （`web.habits.stats.*`），一条新键都没加：同一个月的同一组数字在两端
+      说出两句话，是这批格子最容易被打折的地方。字段必填，少接编译就红。
+      单位为空时退化成不带单位的句子（与 web 逐字同形状）。
+    */
+    monthDays: (count) => t('web.habits.stats.monthDays', { count }),
+    monthRate: (percent) => t('web.habits.stats.monthRate', { percent }),
+    monthRatePending: t('web.habits.stats.monthRatePending'),
+    monthValue: ({ value, unit }) =>
+      unit === ''
+        ? t('web.habits.stats.monthValue', { value })
+        : t('web.habits.stats.monthValueUnit', { value, unit }),
+    totalValue: ({ value, unit }) =>
+      unit === ''
+        ? t('web.habits.stats.totalValue', { value })
+        : t('web.habits.stats.totalValueUnit', { value, unit }),
     freeze: (count) => t('web.habits.freeze', { count }),
     repair: ({ date, count }) => t('web.habits.repair', { date, count }),
     repairAction: t('web.habits.repairAction'),

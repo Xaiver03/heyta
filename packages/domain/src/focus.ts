@@ -405,13 +405,15 @@ export function focusStatsForDay(
   return stats;
 }
 
-/** `focusMs` 的人类可读形式：不足 1 小时给「25 分钟」，否则「1 小时 20 分钟」。 */
-export function formatFocusDuration(ms: number): string {
-  const totalMinutes = Math.round(Math.max(0, ms) / 60000);
-  if (totalMinutes < 60) return `${String(totalMinutes)} 分钟`;
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return m === 0
-    ? `${String(h)} 小时`
-    : `${String(h)} 小时 ${String(m)} 分钟`;
-}
+/*
+ * 这里**没有**时长的人类可读格式化函数 —— 那是 `activity-categories.ts#durationParts`
+ * 的活（先四舍五入到分钟、再分三档，`packages/domain/tests/activity-categories.spec.ts:391`
+ * 起有判据）。原来这一层确实有一个 `formatFocusDuration`，返回写死的中文
+ * 「1 小时 20 分钟」，而 `apps/web/src/features/categories/copy.ts` 与
+ * `apps/web/src/lib/due-display.ts` 两处注释都在提醒"别用它"。
+ *
+ * 🔴 工单 W7 让 web 与 mobile 第一次**同时**要显示"今日专注时长"，
+ * 那就是留一个中文写死版本会开始骗人的时刻 —— 收尾动作是删掉它，
+ * 不是再写一个更好的字符串版本（AGENTS §3.5 那条教训）。
+ */
+
