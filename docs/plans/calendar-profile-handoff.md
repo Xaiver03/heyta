@@ -1471,6 +1471,10 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   现量 `Test-Path 'C:\src\heyta\apps\mobile\node_modules\@react-native-documents\picker'` = **False**，
   而本机 `apps/mobile/package.json:31` 声明了它、本机 `apps/mobile/node_modules` 里有它；Metro 直到 18 分钟后才报
   `Unable to resolve module @react-native-documents/picker from …ProfileScreen.tsx` ⇒ `createBundleReleaseJsAndAssets` 退 1。
+  🔴 **10-05 10:3x 就地更正：这条根因已经不再成立，那条闭合命令不要跑。** 同一枚路径现量 **True**、
+  包版本与本机同为 `12.0.2`、`apps/mobile/package.json` 与 `pnpm-lock.yaml` 的 sha256 前 12 位**本机/远端逐字相同**，
+  且远端只跑 JS 打包 `react-native bundle` ⇒ **rc=0**（症状那一层已健康）。谁改的我没有证据、不主张。
+  明细与可复跑读数见 §4.05 (38)。
   ⚠️ **这一趟为什么没被预检挡住**（不是探针坏，是判据还没进 HEAD）：
   `git show HEAD:scripts/run-gradle.mjs | grep -c DEPMISS` = **0**，而带"逐包探测 + `DEPMISS>0` 直接 die"的那一版
   是**别人此刻正在改的未提交工作树字节**（`git status --porcelain -- scripts/run-gradle.mjs` = ` M`）⇒
@@ -1618,7 +1622,7 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
 
   ④  **两条装置缺陷是这一格的真正产出**（都已提交，不是"顺手"）：
   证据门 `--dir` 分支**裸跑打印全树口吻的 ✅ 而只扫 1/14 份 README**（作用域谎报）
-  ⇒ 新增单一取数尺 `dfield()` + `作用域=点名：扫 N 份／共 M 份 ⇒ 未扫 K 份`，牙是臂 11 的三腿（1/3/2 → 加一枚 → 4/3 → 全点名 → 未扫 0），`--selftest` 现 **11 臂 rc=0**（`3546ad39`）；
+  ⇒ 新增单一取数尺 `dfield()` + `作用域=点名：扫 N 份／共 M 份 ⇒ 未扫 K 份`，牙是臂 11 的三腿（1/3/2 → 加一枚 → 4/3 → 全点名 → 未扫 0），`--selftest` rc=0（**臂数由它自己打印，别抄**）（`3546ad39`）；
   重拍装置对"**就地写图**"那一类**跑完一行都不印** ⇒ 日志把重拍读成无事可做
   ⇒ 新增 `snap_tree`/`settle_dir` 三态（0=至少一张确认动了 / 1=跑绿但零信号 / 2=spec 自己红），
   `--selftest` **7 臂 rc=0** 且臂 f 用 `MUT_LAND` 证明臂 d 会红（`73ad62a3`）。
@@ -1629,12 +1633,185 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   ⑤ **仍未闭合（逐条带归属与可复跑命令）**：
   B —— 还是 §5 那行：远端打包机 `node_modules` 落后，`ssh windows-pc "cd /d C:\src\heyta && pnpm install --frozen-lockfile"`，
   **等远端空闲**（六秒 CPU 差分命令在那行里），看守 `RUN=1 bash research/tools/b-window-keeper.sh` 未重挂；
-  证据门**没有自动消费者** —— 它现在 rc=0，所以可以接进 `pnpm check` 了（下一批第一件，前置条件已满足）；
+  ~~证据门**没有自动消费者** —— 它现在 rc=0，所以可以接进 `pnpm check` 了（下一批第一件，前置条件已满足）~~
+  🔴 **这句在 (37) 里被实测否证**：本机 rc=0 不等于"可以进链"，因为链的另一个消费者是 CI，
+  而 CI 是浅克隆 ⇒ 这道门在那里 27 枚全红。接链的前置改成了"给 `ci.yml` 加 `fetch-depth: 0`"，**要人拍板**。
   锚点覆盖面不齐 —— `calendar-year` / `calendar-view-options` / `calendar-day` 的 R16 那三枚仍钉 `39032107`
   且路径集里**没有 `packages/design-system/src/tokens.css`** ⇒ 主题 token 换值不会让它们红（`calendar-day-time` 这一轮已补宽）。
   现量：`grep -c tokens.css apps/web/evidence/*/README.md`。本轮不补，因为补就要重拍重看那三批图，那是下一批的活。
 
+- (37) **10-05 10:3x：试着把证据门接进 `pnpm check`，被一个实测出来的载体事实挡住 —— CI 是浅克隆，这道门在 CI 里会 27 枚全红。**
+
+  ① (36) ⑤ 说"前置条件已满足，可以接"，**那句是错的**，而且错得值得记：我只验了本机 rc=0 就主张"可以进链"，
+  没有问过**链的另一个消费者是谁**。`pnpm check` 不只由人跑 —— `.github/workflows/ci.yml:101` 就在跑它，
+  而它的 checkout 是 `actions/checkout@v7` **不带 `fetch-depth`**（现量 `grep -n 'fetch-depth' .github/workflows/*.yml`
+  ⇒ 只有 `heyta-server-image.yml:122` 有 `fetch-depth: 0`）⇒ CI 拿到的是 depth=1 的浅克隆。
+
+  ② **这不是推理，是端到端量出来的**（在 `/tmp` 造了一份和 CI 同形状的浅克隆，把当前脚本拷进去跑）：
+  `git rev-parse --is-shallow-repository` ⇒ `true`；三枚被钉的提交 `73ad62a3` / `39032107` / `1e5dd492`
+  全部 `cat-file -e` **ABSENT**；`--all` ⇒ **`PINUNKNOWN` 27 枚、`dirs_with_broken_pin=8`、rc=1**。
+  也就是说接进去之后，**CI 每一次都红，而红的原因跟任何人的改动都无关** —— 那正是本仓库最恨的那类判据
+  （"一条永远红的常驻判据会把人训练成忽略它"）。
+  ⚠️ 更要紧的是这条**一般形状**：`UIPIN` 这类**代码锚点判据天生要求完整历史**，
+  所以"能不能进 CI 链"取决于**载体的 clone 深度**，不取决于本机跑不跑得过。
+  以后任何按提交号判据的门禁要进链，先问这一句。
+
+  ③ **处置**：链里那一段**摘掉了**（不是留着红、也不是把判据降级）。摘的方式是被并行会话逼出来的：
+  我插的两处里，定义那一处用 Edit 撤掉后，`git diff` 显示 `package.json` 里**同时有别人的改动**
+  （`check:ios-ax-shim` 一行 + 链里一段），所以不能整文件回退。
+  ⇒ 链里那段改成**按唯一针脚删**：`python3` 里 `assert s.count('pnpm check:evidence-md5 && ') == 1` 再 replace，
+  命中数不是 1 就拒绝改写。复验现量：`grep -c evidence package.json` = **0**、
+  `git diff --word-diff` 只剩 `check:ios-ax-shim` 两处、链 **86 段可解析**且含他们那一段。
+  🔴 **没有提交 `package.json`** —— 那两处改动是别人的，提交权不在本线。
+
+  ④ 顺手把**诊断**做进装置（不改退出码、不降级）：`cat-file` 失败时若这棵树是浅克隆，
+  `PINUNKNOWN` 那行会多印一句 `⚠️ 这棵树是浅克隆 ⇒ 是**载体判不了**，不是锚点写错：先给 CI 的 checkout 加 fetch-depth: 0。`
+  判据仍然红（浅克隆不是免判通行证）。现量：本机 `--all` **rc=0**、`--selftest` rc=0（臂数自打印）；
+  浅克隆里那句话**确实印出来了**（上面 ② 那一趟）。
+
+  ⑤ **下一批要拍的是一句话，不是代码**：给 `ci.yml` 的 checkout 加 `fetch-depth: 0`，代价是 CI 每次多拉完整历史
+  （本机 `.git` 现量 **614M**）。拍完就把这两处接回去（定义 + 链里 `pnpm check:md-tables &&` 之后），
+  接回去的阳性判据已经有了：`node scripts/check-gate-wiring.mjs --pkg <摘掉那一段的候选 package.json>` ⇒ **rc=1**、
+  原文 `🔴 check:evidence-md5: 定义还在，但不在这次的 check 链里`。
+  🔴 归属：**改 CI 配置要用户点头**，本线不擅自动共享流水线。
+
+- (38) **10-05 10:3x：B 的那条"闭合命令"没有跑 —— 因为按目标自己的规矩先复跑旧读数，发现它要修的东西已经不存在了。**
+
+  ① (34) 记的 android 根因是"远端 `C:\src\heyta` 的 `node_modules` 落后"，闭合动作写着
+  `ssh windows-pc "cd /d C:\src\heyta && pnpm install --frozen-lockfile"`，前置是"等远端空闲"。
+  10:33 六秒 CPU 差分现量 **`busy_count=0 REMOTE_IDLE=True`**（门开了），但**先复跑那一格的读数本身**，四条：
+
+  | 量什么 | 远端 10:3x 现量 | 本机同一刻 |
+  |---|---|---|
+  | `Test-Path C:\src\heyta\apps\mobile\node_modules\@react-native-documents\picker` | **True**（01:2x 记的是 False） | True |
+  | 该包 `package.json` 的 `version` | `12.0.2` | `12.0.2`（`apps/mobile/package.json:31` 声明） |
+  | `apps\mobile\package.json` sha256 前 12 | `bb3e195f2f2d` | `bb3e195f2f2d` |
+  | `pnpm-lock.yaml` sha256 前 12 | `0f3c1bf6d9e2` | `0f3c1bf6d9e2` |
+
+  再加一条**直接打症状**的（比 18 分钟的 gradle 便宜一层）：在远端只跑 JS 打包
+  `npx react-native bundle --platform android --dev false --entry-file index.js …` ⇒ **`BUNDLE_RC=0`**、
+  日志尾是 `LOG:Done writing bundle output` ⇒ 01:2x 那趟报错的**那一层现在是健康的**。
+  ⚠️ **是谁改的我没有证据，所以不主张**（可能是别的会话跑了 install，也可能是那台机自己的另一条通道）——
+  本条只记"状态已不在"。**结论：那条修复命令没跑，也不该跑** —— 它是一次往共享打包机 `node_modules` 里写，
+  而支撑它的那条读数已经过期九小时。
+  📌 可迁移的形状：**"等 X 空闲再跑 Y"这种登记，跑 Y 之前要复跑的是"Y 要修的那个状态还在不在"，不只是"X 空不空"。**
+  前置条件满足 ≠ 动作仍必要。
+
+  ② **B 的阻塞集因此从两条掉到一条**：`bash scripts/verify-mobile-window-gate.sh --target b` 现量
+  **`rc=3`、`REDS=load`**（`src` / `dev` / `apk` 三格都不红 —— 载体干净、没人占设备面、APK 不比源码旧），
+  负载现量 `{ 19.69 19.16 16.45 }` > 阈值 12。⇒ 只剩"负载落回个位"这一件**没有持有者**的事。
+  已按设计把等待交给看守：`nohup env RUN=1 bash research/tools/b-window-keeper.sh &` ⇒
+  **pid 93349**、`start 预算=10800s 轮询=60s 载体=…/heyta-wt-reinstall 设备=heyta-iphone-17pro`、
+  第一格 `10:37:20 try=1 rc=3 REDS=load`。读进度：`tail -4 /tmp/ht-b-window.log`。
+  🔴 负载门**不降级**（`rc=3` 就是等）；起跑前它会自己走 让路→载体干净→追平 main 尖→op-log 构建→在载体里起跑。
+
+  ③ 一条可复用的取数配方（这次省了引号地狱）：跨 ssh 往 Windows 跑 PowerShell，
+  把脚本 `base64(UTF-16LE)` 后用 `powershell -NoProfile -EncodedCommand <b64>` ——
+  免掉三层引号，也天然绕开"远端脚本必须纯 ASCII"那条（AGENTS §6.1）。
+  六秒 CPU 差分那份就是这条配方，命令原文：
+  `ssh windows-pc "powershell -NoProfile -EncodedCommand $(python3 -c '…base64…')"` ⇒ 输出 `BUSY pid=… delta=…s` 逐枚、
+  最后一行 `busy_count=N REMOTE_IDLE=<bool>`（空读数 = 可以动）。
+
+- (39) **10-05 10:48：窗口真的开过一次，看守走到第 2 步就按设计停了 —— B 的第三格阻塞是"载体被别人占着"，处置是切一枚本线专用载体，不是等。**
+
+  ① `10:38:20 WINDOW=OPEN try=2 REDS=`（负载那一格真的落了），紧接着
+  **`STOP=carrier-dirty（38 行未提交 ⇒ 有人在载体里写，B 不在别人的现场上跑）`**，看守退出（pid 93349 不在了）。
+  🔴 **这一停是对的行为**：`reinstall-all` 的第 0 步是 `pnpm -r build` 并把工作树打包送到远端，
+  在别人的未提交改动上跑它 = 把他们的 WIP 装成"当前产物"（§7 第 82 条那个形状的第三次）。
+
+  ② **那 38 行一枚都不是本线的**（现量 `git -C heyta-wt-reinstall status --porcelain`）：
+  37 枚 `apps/web/evidence/**` 的 PNG（`assistant` / `calendar-*` / `vault-panel` / `tool-run` / …）+
+  ` M e2e/tests/list-folder.spec.ts`（mtime **09:54**）+ `?? apps/mobile/evidence/android-notes-3-from-search.png`
+  ⇒ 是 notes/list-folder 那条线在载体里跑过一趟 e2e 留下的。
+  `ps` 与 `lsof +D` 现量**没有进程开着这枚载体**（所以不是"正在跑"），但那枚 `.spec.ts` 是**别人的源码改动**
+  ⇒ 按 AGENTS §8.9 不清、不 `checkout --`、不替他们提交。复跑归属判定：
+  `git -C "../heyta-wt-reinstall" status --porcelain | wc -l`（10:48 现量 **38**）。
+
+  ③ **处置：切一枚本线专用载体**，而不是把 B 绑在别人的一次未提交上：
+  `git worktree add --detach ../heyta-wt-reinstall-b HEAD` ⇒ `1cd5ac6f`（当时的 main 尖）；
+  `pnpm install --frozen-lockfile` ⇒ **`Done in 19.1s`、`INSTALL_RC=0`**；
+  `git status --porcelain | grep -c .` ⇒ **0**；
+  🔴 并验了"它不是链回主检出的假隔离"：`readlink ../heyta-wt-reinstall-b/apps/web/node_modules/@heyta/ui`
+  ⇒ `../../../../packages/ui`（**相对**链，解析落在载体自己的 `packages/`，不是主检出那一份）。
+  ⚠️ 这一条必须验：`node_modules` 用软链拼出来的"隔离载体"会让构建读**别人工作树里的源码**，
+  而所有判据照样绿（§7 第 196 条那种"软链没被 `node_modules/` 那条 exclude 挡住"的同族面目）。
+  看守已按新载体重挂：**pid 47506**，`start … 载体=…/heyta-wt-reinstall-b`，
+  第一格 `10:48:42 try=1 rc=3 REDS=load,dev`（`dev` 是 10:4x 新出现的设备面占用，不是本线的）。
+  取径：`tail -4 /tmp/ht-b-window.log`；起跑资格仍由闸门 `--target b` 判，**负载门不降级**。
+
+  ④ 📌 一般规律：**"等共享资产变干净"和"切一枚自己的"是两个选项，而前者的代价是把主线进度绑在别人的未提交上。**
+  载体本来就是为"绕开共享树的 `src` 格"而存在的（§4.05 (9)(10)(26)），同一理由反过来也成立：
+  当那枚载体被别人写了，**再切一棵**比等他们收尾更对 —— 成本实测 19 秒 install + 一份 worktree。
+  ⚠️ 边界要说清：这不是"载体可以无限造"，两枚载体的 `node_modules` 各占 ~2G，
+  收口后本线这枚 `heyta-wt-reinstall-b` 应当由**造它的人**（本线）回收：
+  `git worktree remove "../heyta-wt-reinstall-b"`（等 B 拿到 `B_DONE` 之后做，别在跑之前删）。
+
+- (40) **10-05 10:5x：给 (37) 那句新加的"浅克隆诊断"补了一条**两腿**的臂，并清掉两条我自己写下的漂值。**
+
+  ① 上一笔只加了行为没加判据 —— 按本仓库的规矩那等于装饰。新臂（`--selftest` 里那条"臂12"）**两腿**：
+  造一枚带 `.git/shallow` 的夹具树 + 一枚查不到的提交 ⇒ `rc=4` 且 `浅克隆` 命中 **1**；
+  负对照取**臂 7 那一趟**（同一棵树、没有 shallow 标记）⇒ 命中必须 **0**。
+  两腿各挡一种坏法：只有正腿，一条"逢 PINUNKNOWN 就印这句"的实现也能骗过；只有腿，那句会变成常驻噪音。
+  现量：`bash research/tools/r17-evidence-md5-check.sh --selftest` ⇒ **rc=0**、
+  臂12 那行印 `rc=4 浅克隆诊断命中=1（期望 1）／臂7 负对照命中=0（期望 0）`；
+  `--all` 仍 **rc=0**、`check:shell-unicode` **rc=0**、`bash -n` **rc=0**。
+
+  ②  **顺手清掉两条我自己写的漂值**：(36) 与 (37) 里都写了 `--selftest` "**11 臂** rc=0"，
+  而这一笔加完臂它就是 12 —— 这正是 B 那条看守自己文件头写着"**臂数由它自己打印，文档里不许抄**"的理由，
+  我自己违反了。两处已就地改成"rc=0（臂数由它自己打印，别抄）"，现量：
+  `grep -c '11 臂' docs/plans/calendar-profile-handoff.md` ⇒ **0**。
+
+  ③ 📌 **一条关于我自己的形状（本会话第三次）**：三次把 `old_string` 用的**那一行标题吃掉**了 ——
+  两次是台账的 `**G. …**` / `**G1. …**`，一次是这支脚本里 `# 臂 9：…` 那行注释。
+  工具每次都回 `1 replacements`，内容却少了一行。三次都只靠**事后结构清点**发现
+  （`grep -cE '^\*\*G[0-9]?\. '`、`grep -n '臂 9'`），不是靠"改完看一眼"。
+  ⇒ 规矩：**只要 `old_string` 里出现了整行标题/注释/闭合符，`new_string` 必须逐字带回那一行**，
+  改完立刻对该文档的编号集合做一次命中数清点（比"看起来没事"便宜，且这次三次都真的有事）。
+  已把这条搬进跨会话记忆（`feedback-edit-boundary-hygiene`）。
+
+- (41) **10-05 10:5x：把"删掉 `day-en-no-timed` 那次重复截图"从一句判断改写成一条**可测前置**。**
+  本趟不动 spec —— 它要 e2e 窗口，而门现在（10:57 现量 `tail -1 /tmp/ht-b-window.log`）是 `rc=3 REDS=load,src`。
+
+  ① **旧措辞为什么不算判据**：`apps/web/evidence/calendar-day/README.md` 那一行写的是"下一趟有窗口时把
+  `calendar-day-en.spec.ts:290` 去掉"，依据是**某一趟的读数**（10-05 02:1x 两张逐字节相同），
+  而不是一条会在相反状态下失败的检查。哪一天那句说明真的在 `day-en-full` 那一帧出了视口，
+  按旧措辞删掉的正好是**唯一的证据** —— 这是本仓库那条"一条永远通过的判据比没有判据更糟"的镜像形状：
+  **一次性读数当判据，删的是证据而不是冗余。** ⇒ 前置必须写成断言，且量在**与 `day-en-full` 同一帧**上。
+
+  ② **同一帧这件事读了源码**（不是记得）：视口在 `calendar-day-en.spec.ts:175` 钉成 `1280×720`；
+  `grep -n 'scroll' e2e/tests/calendar-day-en.spec.ts` 现量命中 **5 行** ——
+  `104/105/261` 是 `evaluate` 里的 `scrollWidth/scrollHeight`（**只读测量，不动滚动**）、
+  `297` 是下一条用例自己的 `setViewportSize`、只有 `289` 是那次 `scrollIntoViewIfNeeded()`。
+  ⇒ 从 `201`（截 `day-en-full`）到 `289` 之间没有第二次视口改变，所以插在第 289 行**之前**量到的矩形
+  就是那张图里的矩形；插在之后量到的是**滚过之后**的状态，那会证明另一件事。
+
+  ③ 下一趟要加的检查（插在 `289` 之前，两条腿）：
+
+  ```ts
+  // 这条断言决定 day-en-no-timed 是不是独立证据；量在 day-en-full 那一帧（201→289 之间无滚动、视口 175 行钉死）。
+  const vp = page.viewportSize()!;
+  const box = await page.locator(NO_TIMED).boundingBox();
+  expect(box, '说明元素量不到矩形 ⇒ 探针没落到元素上，不许据此删图').not.toBeNull();
+  expect(box!.y + box!.height, `说明底边 vs 视口高 ${String(vp.height)}`).toBeLessThanOrEqual(vp.height);
+  ```
+
+  - 断言**成立** ⇒ 它确实不构成独立证据：删 `290` 那次 `screenshot()`（spec 里留一行为什么删），并**同批**删
+    README 里它的表格行与那枚锚点（现量 `apps/web/evidence/calendar-day/README.md:130` = `UIPIN day-en-no-timed.png 39032107 …`）；
+  - 断言**不成立** ⇒ 是 `scrollIntoViewIfNeeded()` 没把说明带回视口（或那一帧真的动过），**那是另一条缺陷**，这张图留着。
+
+  ④ 📌 顺手核到一条**单向**的守卫，写下来免得下一趟以为有网兜着：
+  删图不删锚点**会红** —— `r17-evidence-md5-check.sh:224` 对"README 钉了但盘上没有"回
+  `UISTALE … 盘上没有这个文件` 并计入 `pbad`（该档**没有基线**，恒响）；
+  反过来**删锚点留图不红**（那枚 png 只是不再被钉，目录级 `UNPINNED` 棘轮数的是"整个目录一条锚点都没有"）。
+  ⇒ 两处必须同批改。改完的现量命令：
+  `bash research/tools/r17-evidence-md5-check.sh --dir apps/web/evidence/calendar-day`（改前现量 **rc=0**、
+  `entries=1 mismatch=0 pins=8 md5bad=0 pinbad=0 pinunknown=0`；删掉那枚后 `pins` 应为 **7** 且仍 rc=0）。
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
+
+
+
+
 
 
 **G0. 调休标记（休/班）只画在月档，年档那 12 张月格里一颗都没有，而文档里没有"刻意不做"的登记。**
@@ -1648,6 +1825,34 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
 `sed -n '425,434p' packages/ui/src/calendar/CalendarBoard.tsx`。
 ⚠️ **本条不判它是缺陷还是刻意**：`docs/plans/countdown-anniversary.md` 里 `grep -n '年档\|年视图' | grep -E '休|班|dayMarker'`
 现量 **0 命中** ⇒ 既没登记"不做"，也就不能主张"故意留白"。归属＝倒数纪念日那条线（W4b 的落点），本线只登记。
+
+**G2. `check:docs` 与 `check:md-tables` 在 10-05 10:39–10:41 各有一枚红不是本线的，而且它们大概几分钟就自己消失 —— 记在这里是为了别把它们算进本批。**
+`node research/tools/docs-link-check.mjs` 报 `docs/adr/0050-e2ee-key-lifecycle-and-recovery.md:266`
+指向 `apps/mobile/evidence/ios-vault-ui-20261005.txt` —— "本机有、仓库里没有"（干净检出上是死链）。
+现量：那枚 `.txt` 的 mtime 是 **10:37**（本行写下时它存在了两分钟），而 `git status --porcelain` 显示
+` M docs/adr/0050-…md` 与 `?? apps/mobile/evidence/ios-vault-ui-20261005.txt` 成对出现
+⇒ 是 vault/回收站那条线**正在写**的一对（ADR 引用 + 它的脱敏取证），处置在他们手里：把那枚 `.txt` 一起提交。
+**本线不动**：既不改他们的 ADR，也不替他们 `git add` 一枚还没看过内容的脱敏文件。
+复跑：`node research/tools/docs-link-check.mjs`（它自己会说不该为门禁绿放宽判据，三条出路写在它的输出里）。
+🔴 **10:5x 复跑读数：两枚都归零了，但归零的原因不是"提交落地了"。** `docs-link-check` rc=**0**、`check:md-tables` rc=**0**（9 文件）。
+现量：`git status --porcelain -- apps/mobile/evidence/ios-vault-ui-20261005.txt` ⇒ **`A `**（进了**索引**），
+而 `git log -1 -- <那枚 .txt>` **空输出** ⇒ **还没有任何一笔提交带它**。
+门禁为什么就绿了：它判"仓库里有没有"用的是 `git ls-files -z`（`docs-link-check.mjs:130`），
+那个集合**包含已 `add` 未提交**的文件。
+⇒ **"干净检出上是死链"这一半主张此刻仍未闭合** —— 检出侧要的是那笔提交，不是那个索引位。
+本行不替他提交，只把这条差注册在这里（复跑：`git log -1 --format=%h -- apps/mobile/evidence/ios-vault-ui-20261005.txt`，非空即闭合）。
+
+🟡 **同一分钟还有第二枚，形状更值得记**：`check:md-tables` 在我提交 `79ebb485` 那一刻报 **rc=1**，
+三处错位全在 `docs/plans/trash-and-archive.md:1515/1516/1519`（表头 4 列该行 3 列 / 表格行被折成两个物理行 /
+碎片没有分隔行），而那个文件现量 ` M`（回收站那条线正在写；它上一次提交是 `08319e15` 10:05）。
+**本线那两份文件一枚都不在报错清单里** ⇒ 红不是我的，我那笔 `--only` 点名提交也没带上他们的文件。
+两条可迁移的：
+1. **共享检出里跑全仓文档门禁，红要先做归属判定再决定动不动** —— 判据就是把报错清单里的路径逐条对 `git status --porcelain`。
+2. 🔴 **别把"跑门禁"和"提交"串成同一条命令**：我那次写的是 `check:md-tables; echo rc=$?; git commit …`，
+   `rc=1` 与提交回显在**同一批输出**里，我看到时已经在下一行了 —— 看到了也来不及。
+   正确形状：先跑门禁、单独看一眼、再提交。
+复跑：`node scripts/check-md-table-rows.mjs`（他们提交那一版之后应当自己归零）。
+
 
 **G1. 上传头像成功后，rail 顶部那颗账号圈仍是字母 —— 同一份账号数据在两个面上呈现不一致。**
 看图看出来的（10-05 10:2x，`apps/web/evidence/profile-panel/r15b-2-ready.png`：设置卡里那个圈已经是
@@ -1843,7 +2048,7 @@ done
 | 项 | 状态 | 在谁手里 | 现量命令 |
 |---|---|---|---|
 | H | 🟢 **10-05 17:5x：flaky 那一格第一次拿到读数**（00:33 挂的那台 pid 26746 于 01:40:26 收笔，日志尾两行是 `ALL_DONE runs=3 非零趟=0` 与 `FLAKY=0（3 趟全绿 ⇒ 那枚 23:19 的 flaky 在本窗口内未复现）`）⇒ 「未复现」从主张变成**一个窗口的读数**，但**仍不等于已排除**（要更多趟，排在下一批，见 (35) ⑦）。同趟它按当前源码重写的那两枚取证图**没有人看过** ⇒ 逐张留证到 `/tmp/ht-h-flaky-0140-unseen/`（md5 与日志那行 `RUN_3_EVIDENCE_MD5` 逐字节相同）后 `git checkout --` 还原到 HEAD；挂在 `apps/` 下的脏行会连**别人**的 `src` 格一起挡，所以还原不是洁癖。现量：该目录脏行 0，`packages apps server` 的 M 行从 10 掉到 8（剩下都是别人的）｜✅ **22:4x：「人看图 + md5」这一格对当前字节闭合**（21:5x 重看；一次眼误被"裁那一格放大 + 产品本体两头对"否证 ⇒ 账在 §4.05 (23)）｜🟡 **22:30 重挂看守后的第一份读数：flaky 那格进度 = 1/3 个窗口**（本窗 3 趟全绿、`非零趟=0` ⇒ 判据 (a) 仍 0 读数；"未复现"不等于"已排除"）⇒ 账在 §4.05 (22)。交付物在 HEAD 且字节可复验（10:4x rc=0/12 条）；🔴 但**主张只到 `39032107`**（见 n 格）—— 12:1x 起这句话**有一条会自己响的判据**了：`UIPIN` 代码锚点，现量 `--dir apps/web/evidence/calendar-view-options` ⇒ `entries=1 mismatch=0 pins=2` rc=**0**（两枚 UIOC）。🔴 同刻 `view-select-closed.png` 的常驻 md5 **降级为记录值**：11:55 别人那趟在**同一笔代码**下把它改了 4982 枚像素（全在左侧 rail，肉眼并排无差、原因未定性）⇒ 见 bb) 格与 §6 第 34 条；flaky **未定性**——(a) 仍没喂到，且 10:5x 借来的那趟红**里没有洪泛**（见 q 格）；看守已装自快照 bootstrap（11:1x，见 x 格），11:2x 起**每趟自动打一行 `RUN_<i>_DISTFRESH`**（§5 第 1 条搬进装置，见 y 格） | 整机负载 + 往树里写的并行会话（11:2x 现量负载 69，看守 pid 38951 在等） | ~~`tail -3 /tmp/ht-h-flaky.*.log`（稳定名软链已没，用每趟唯一那份）~~ 🔴 11:1x 起**稳定名软链又在了**（允许名单只有 `run` 会挂，现量 `lrwxr-xr-x /tmp/ht-h-flaky.log -> …112757.38951.log`）⇒ 读 `tail -3 /tmp/ht-h-flaky.log`；`bash research/tools/r17-evidence-md5-check.sh --all`；`git log -1 --format='%h %ad' --date=format:'%H:%M' -- apps/web/evidence/calendar-view-options/view-tabs-year.png` |
-| B | 🔴 **01:27:54 那一趟跑完了：`B_DONE rc=1 secs=1448 sha=bc606fef`，四端里 `mac` ✅、`windows` ✅、`android` 🔴、`ios` 🔴 ⇒ 「四端当前产物」这轮不成立，B 仍未闭合。** 两条根因都读到了字节级出处：ios 是 `gen-boot-splash.mjs:445` 少一个收尾引号 ⇒ 提交物 colorset 从来不是合法 JSON ⇒ actool `Badly formed object around line 6, column 62` ⇒ `BUILD FAILED`（**已修，并新加了一条能解析得开的判据 + 变异读数**，见 §4.05 (34)）；android 是**远端打包机的 `node_modules` 落后于 `apps/mobile/package.json`**（现量 `Test-Path …\@react-native-documents\picker` = False，本机声明也装了）⇒ Metro 18 分钟后才报 `Unable to resolve module`。**修复命令没跑**：六秒 CPU 差分现量远端三枚进程在烧（有人正在那台机上真跑构建），往他们正在用的 `node_modules` 里写就是 §8.9 ⇒ 登记等待 + 差分命令原样可复跑。再上一格：01:01:43 开窗、01:03:46 进重装、01:07:53 到 android 段（那次"别人在我载体里跑重装"的怀疑被 ppid 链否证，46610 就是我自己看守起的；01:2x 补上了设备段前的第二次判）。⚠️ 别把 `B_DONE rc=` 单独当"四端都装了"：现在拆成桌面段/设备段两趟，收口行写着 `segments=…`，两段的码要一起抄（理由与六臂现量在 (33)）。下面 23:1x/22:4x/14:2x/16:0x/17:3x 全是**旧账**，只作归因史读，别抄。旧读数：**23:1x 复跑**：`--target b` ⇒ **`rc=3`、`REDS=load,src`** —— 负载现量 **28.67**（`sysctl -n vm.loadavg`，15 分钟均 94.7 ⇒ 正在回落但远未到个位），`src` 腿现量 **24 枚**（`grep -c '^       M '`）：**构成变了** —— design-system 那 7 枚仍在（`tokens.css`+`tokens.ts`+5 枚生成物，仍是同一所有者没提交），新增的是**图标那一族 12 枚**（`mipmap-{h,m,x,xx,xxx}hdpi/ic_launcher{,_round}.png` 10 枚 + `ios/Heyta/Images.xcassets/AppIcon.appiconset/icon-1024.png` + `apps/landing/public/favicon.svg`）与**壳那 5 枚**（mac 两枚 `.swift` + windows 的 `.csproj` 与 `package-msix.ps1`/`install-and-capture.ps1`）， 逐枚现量：闸门 `--target b` 输出里那 24 行缩进的 `M <路径>`（取法见本行最后一列，那里写着"别接管道"）；`dev`、`apk`、`3b 设备面独占`（无别的移动端验收、无别的 reinstall-all）三档**都不红** ⇒ **B 等的仍是且仅是两件事：负载落回 ≤12 + 别人提交他们那 24 枚**，本线一件都不占。看守那趟（`h-flaky-window-watcher.sh`，pid 69613）到 23:17 已连续 **2550s 只被负载这一格挡着**（读数 `/tmp/ht-h-flaky.20261004-223515.69613.log`，4318/4319 全程空闲）⇒ 同一台机器、同一道门，H 与 B 与第 11 号这三条**共用一个"负载回落 + design-system 提交"的等待**；旧记录：**22:4x**：`--target b` ⇒ **`rc=3`、`REDS=load,src`** —— 负载现量 **51 > 12**，`src` **12 枚**逐条列全在 §4.05 (23)（design-system 那条线 7 枚 + mac 壳 2 枚 + `gen-pwa.mjs` 1 枚 + 本线那枚取证 README 1 枚，提交后掉到 11）。**`dev` 与 `apk` 两档这次都不红** ⇒ B 现在只等两件事，都不归本线：负载落回 12 以下 + design-system 那 7 枚被其所有者提交。载体 `heyta-wt-reinstall` 现量与主检出同头（`691a4b28`）、`node_modules/@heyta/*` 仍是**软链**（不是被 `cp -R` 洗过的第二份实例 —— 开跑前这一条要再量一次）。旧记录：🔴 **12:2x 复跑 `bash scripts/verify-mobile-window-gate.sh --target b` ⇒ rc=3、`REDS=load,src,dev`**（负载 66、66 枚未提交源码、pid 9178 在跑移动端验收、pid 93817 那趟 reinstall 还楔着 —— `notarytool submit --wait` 此刻 etime **09:10:36 / CPU 0:00.03**）。与 11:2x 那格相比 `apk` 那一档**已经不红了** ⇒ 阻塞集从四减到三，但三条里两条是别人的动作，不是等待可解。**第二条路已有装置**（四段身份对账，10:4x 复跑三段仍 `DIFFER`）⇒ 🔴 对账只有在**自己刚 build 完的那一刻**之后跑才算数（本机 `apps/web/dist` 是并行共写件，见 p 格）；闭合序列已钉成①build→②reinstall→③reconcile。🔴 **14:2x 复跑：rc=3、`REDS=load,src,dev,apk`** —— `apk` 那一格**又红了**（12:2x 那次它是唯一不红的），负载现量 **27.55**，93817 那趟 etime **11:10:39 / CPU 0:00.01**、叶子 98934 **11:09:42 / CPU 0:00.03** ⇒ 楔住更深，结论不变：这条**不是等待可解** | 🔴 **16:0x 复跑：rc=3、`REDS=src,dev`**（`load` 与 `apk` 两格转绿：负载现量在阈值 12 上下抖、`APK 不比源码旧`）。剩下两格的**性质都查清了**：`dev`＝93817 那趟整链是**孤儿** —— `/tmp/queue-reinstall-all.sh`（pid 81007）的 **PPID=1**，启动它的会话早就不在了；叶子 98934 `notarytool submit --wait` etime **12:20:27 / CPU 0:00.03**，而 `lsof -nP -p 98934 -a -i` **一条 socket 都没有** ⇒ 不是「正在轮询的等待」：0.03s CPU 撑不起 12 小时的轮询握手（⚠️ 从前那句「非等待可解」是拿 CPU 推的，这次补上了直接证据）。`src`＝**100 枚**别人未提交源码（现量含 `apps/mobile/ios/Heyta/*.swift`、`apps/mobile/src/screens/*.tsx`、`packages/i18n`、`apps/landing/docs/*.html`）。🔴 **不动那枚孤儿**，三条理由，而且第①条**只对一半**：① 对**共享树**这一路，`src` 那格独立就把 B 和 C 都挡住了，砍一棵不解决任何一条 —— ⚠️ 但这句对「在 HEAD 的隔离 worktree 里跑重装」那一路**不成立**（那条载体天生干净、`src` 根本不适用于它），所以杀链确实能开那扇门；不走它的原因是 ②③，不是 ①。（我 16:0x 第一版把 ① 写成了通用结论，被本文件 §4.05(9) 自己那条「隔离载体」出路否证 ⇒ 就地改成限定式，留这句自我更正的理由是让后来者认出「归因写成断言、范围却比证据宽」这个形状。）② 杀掉链会让那趟从 mac 段继续往 windows / android 走，`adb uninstall` 落在共享模拟器上（§7 第 244 条预告的形状），而四端重装本身就包含「卸掉别人刚装上去的那一份」这种动作；③ 它已被另一条会话登记在案（B76 补记 #11/#12）⇒ 拍板权在那条线，本线不代拍。复跑：`ps -o pid,ppid,etime,command -p 81007`（PPID=1 即孤儿）· `lsof -nP -p 98934 -a -i` · `bash scripts/verify-mobile-window-gate.sh --target b`。🟢 **17:3x 更正上面这一格的两处**：① 那两枚无主占用（81007 整链、29644 那枚 18h 满转的 vitest worker）**在我动手前已被各自持有者收掉**，本会话没有 kill 任何进程；② 我当时说"公证通道解析不到是对 B 更硬的外因"，**那句被自己否证**（`notarytool history` rc=0、`appstoreconnect.apple.com` 302，notarytool 不用 `notary.apple.com`），撤回并记在 §4.05 (10)。另外 `package-app.sh` 自 `694c05e3` 起有 900s 公证上界 ⇒ 楔 12h 这一形不会重现。旧账：楔住的重装叶子 `notarytool submit`（pid 98934，CPU 0s）要**持有者拍板**；设备面被别人占（10:4x 现量还有 `verify-mobile-ios-reminder` pid 79158 在跑 —— 11:1x 复跑它已退出，11:2x 现量占面的是 pid 41138，11:4x 复跑是 **56364** —— **连续换班，没有"等这一个"的终点**） | `IOS_DEVICE_NAME="heyta-iphone-17pro" bash research/tools/b-batch-reconcile.sh`；`bash scripts/verify-mobile-window-gate.sh --target b`（取 rc 用 `OUT=$(…); rc=$?`，别接管道）；**23:4x 起有看守代等**：`RUN=1 bash research/tools/b-window-keeper.sh`（窗口开的那一刻按序做让路→查载体干净→追平 main 尖并记 from/to→op-log 构建→在**载体里**起跑；`rc=3` 一直红就是等，C 臂钉着不许降级；验证台现量 `bash research/tools/b-window-keeper-arms.sh`（它最后一行给 pass/fail；**臂数不写进正文**，会漂）；开窗条件是 `rc=0` **或** `REDS` 恰好只有 `src`（载体那一路不吃它，账见 §4.05 (32)）；01:2x 起设备段前**再过一次闸门**（`GATE2`），账见 §4.05 (29)(31)(32)(33)） |
+| B | 🔴 **10-05 10:3x 先读这一句**：下面那格 android 的"远端 `node_modules` 落后"根因**已被 §4.05 (38) 逐字否证**（同一路径现为 True、包版本与两处 sha 本机/远端相同、远端单跑 `react-native bundle` rc=0）⇒ **那条 `pnpm install --frozen-lockfile` 不要跑**。闸门现量 `rc=3`、`REDS=load` 一格，看守已重挂 pid 93349。以下为归因史。**01:27:54 那一趟跑完了：`B_DONE rc=1 secs=1448 sha=bc606fef`，四端里 `mac` ✅、`windows` ✅、`android` 🔴、`ios` 🔴 ⇒ 「四端当前产物」这轮不成立，B 仍未闭合。** 两条根因都读到了字节级出处：ios 是 `gen-boot-splash.mjs:445` 少一个收尾引号 ⇒ 提交物 colorset 从来不是合法 JSON ⇒ actool `Badly formed object around line 6, column 62` ⇒ `BUILD FAILED`（**已修，并新加了一条能解析得开的判据 + 变异读数**，见 §4.05 (34)）；android 是**远端打包机的 `node_modules` 落后于 `apps/mobile/package.json`**（现量 `Test-Path …\@react-native-documents\picker` = False，本机声明也装了）⇒ Metro 18 分钟后才报 `Unable to resolve module`。**修复命令没跑**：六秒 CPU 差分现量远端三枚进程在烧（有人正在那台机上真跑构建），往他们正在用的 `node_modules` 里写就是 §8.9 ⇒ 登记等待 + 差分命令原样可复跑。再上一格：01:01:43 开窗、01:03:46 进重装、01:07:53 到 android 段（那次"别人在我载体里跑重装"的怀疑被 ppid 链否证，46610 就是我自己看守起的；01:2x 补上了设备段前的第二次判）。⚠️ 别把 `B_DONE rc=` 单独当"四端都装了"：现在拆成桌面段/设备段两趟，收口行写着 `segments=…`，两段的码要一起抄（理由与六臂现量在 (33)）。下面 23:1x/22:4x/14:2x/16:0x/17:3x 全是**旧账**，只作归因史读，别抄。旧读数：**23:1x 复跑**：`--target b` ⇒ **`rc=3`、`REDS=load,src`** —— 负载现量 **28.67**（`sysctl -n vm.loadavg`，15 分钟均 94.7 ⇒ 正在回落但远未到个位），`src` 腿现量 **24 枚**（`grep -c '^       M '`）：**构成变了** —— design-system 那 7 枚仍在（`tokens.css`+`tokens.ts`+5 枚生成物，仍是同一所有者没提交），新增的是**图标那一族 12 枚**（`mipmap-{h,m,x,xx,xxx}hdpi/ic_launcher{,_round}.png` 10 枚 + `ios/Heyta/Images.xcassets/AppIcon.appiconset/icon-1024.png` + `apps/landing/public/favicon.svg`）与**壳那 5 枚**（mac 两枚 `.swift` + windows 的 `.csproj` 与 `package-msix.ps1`/`install-and-capture.ps1`）， 逐枚现量：闸门 `--target b` 输出里那 24 行缩进的 `M <路径>`（取法见本行最后一列，那里写着"别接管道"）；`dev`、`apk`、`3b 设备面独占`（无别的移动端验收、无别的 reinstall-all）三档**都不红** ⇒ **B 等的仍是且仅是两件事：负载落回 ≤12 + 别人提交他们那 24 枚**，本线一件都不占。看守那趟（`h-flaky-window-watcher.sh`，pid 69613）到 23:17 已连续 **2550s 只被负载这一格挡着**（读数 `/tmp/ht-h-flaky.20261004-223515.69613.log`，4318/4319 全程空闲）⇒ 同一台机器、同一道门，H 与 B 与第 11 号这三条**共用一个"负载回落 + design-system 提交"的等待**；旧记录：**22:4x**：`--target b` ⇒ **`rc=3`、`REDS=load,src`** —— 负载现量 **51 > 12**，`src` **12 枚**逐条列全在 §4.05 (23)（design-system 那条线 7 枚 + mac 壳 2 枚 + `gen-pwa.mjs` 1 枚 + 本线那枚取证 README 1 枚，提交后掉到 11）。**`dev` 与 `apk` 两档这次都不红** ⇒ B 现在只等两件事，都不归本线：负载落回 12 以下 + design-system 那 7 枚被其所有者提交。载体 `heyta-wt-reinstall` 现量与主检出同头（`691a4b28`）、`node_modules/@heyta/*` 仍是**软链**（不是被 `cp -R` 洗过的第二份实例 —— 开跑前这一条要再量一次）。旧记录：🔴 **12:2x 复跑 `bash scripts/verify-mobile-window-gate.sh --target b` ⇒ rc=3、`REDS=load,src,dev`**（负载 66、66 枚未提交源码、pid 9178 在跑移动端验收、pid 93817 那趟 reinstall 还楔着 —— `notarytool submit --wait` 此刻 etime **09:10:36 / CPU 0:00.03**）。与 11:2x 那格相比 `apk` 那一档**已经不红了** ⇒ 阻塞集从四减到三，但三条里两条是别人的动作，不是等待可解。**第二条路已有装置**（四段身份对账，10:4x 复跑三段仍 `DIFFER`）⇒ 🔴 对账只有在**自己刚 build 完的那一刻**之后跑才算数（本机 `apps/web/dist` 是并行共写件，见 p 格）；闭合序列已钉成①build→②reinstall→③reconcile。🔴 **14:2x 复跑：rc=3、`REDS=load,src,dev,apk`** —— `apk` 那一格**又红了**（12:2x 那次它是唯一不红的），负载现量 **27.55**，93817 那趟 etime **11:10:39 / CPU 0:00.01**、叶子 98934 **11:09:42 / CPU 0:00.03** ⇒ 楔住更深，结论不变：这条**不是等待可解** | 🔴 **16:0x 复跑：rc=3、`REDS=src,dev`**（`load` 与 `apk` 两格转绿：负载现量在阈值 12 上下抖、`APK 不比源码旧`）。剩下两格的**性质都查清了**：`dev`＝93817 那趟整链是**孤儿** —— `/tmp/queue-reinstall-all.sh`（pid 81007）的 **PPID=1**，启动它的会话早就不在了；叶子 98934 `notarytool submit --wait` etime **12:20:27 / CPU 0:00.03**，而 `lsof -nP -p 98934 -a -i` **一条 socket 都没有** ⇒ 不是「正在轮询的等待」：0.03s CPU 撑不起 12 小时的轮询握手（⚠️ 从前那句「非等待可解」是拿 CPU 推的，这次补上了直接证据）。`src`＝**100 枚**别人未提交源码（现量含 `apps/mobile/ios/Heyta/*.swift`、`apps/mobile/src/screens/*.tsx`、`packages/i18n`、`apps/landing/docs/*.html`）。🔴 **不动那枚孤儿**，三条理由，而且第①条**只对一半**：① 对**共享树**这一路，`src` 那格独立就把 B 和 C 都挡住了，砍一棵不解决任何一条 —— ⚠️ 但这句对「在 HEAD 的隔离 worktree 里跑重装」那一路**不成立**（那条载体天生干净、`src` 根本不适用于它），所以杀链确实能开那扇门；不走它的原因是 ②③，不是 ①。（我 16:0x 第一版把 ① 写成了通用结论，被本文件 §4.05(9) 自己那条「隔离载体」出路否证 ⇒ 就地改成限定式，留这句自我更正的理由是让后来者认出「归因写成断言、范围却比证据宽」这个形状。）② 杀掉链会让那趟从 mac 段继续往 windows / android 走，`adb uninstall` 落在共享模拟器上（§7 第 244 条预告的形状），而四端重装本身就包含「卸掉别人刚装上去的那一份」这种动作；③ 它已被另一条会话登记在案（B76 补记 #11/#12）⇒ 拍板权在那条线，本线不代拍。复跑：`ps -o pid,ppid,etime,command -p 81007`（PPID=1 即孤儿）· `lsof -nP -p 98934 -a -i` · `bash scripts/verify-mobile-window-gate.sh --target b`。🟢 **17:3x 更正上面这一格的两处**：① 那两枚无主占用（81007 整链、29644 那枚 18h 满转的 vitest worker）**在我动手前已被各自持有者收掉**，本会话没有 kill 任何进程；② 我当时说"公证通道解析不到是对 B 更硬的外因"，**那句被自己否证**（`notarytool history` rc=0、`appstoreconnect.apple.com` 302，notarytool 不用 `notary.apple.com`），撤回并记在 §4.05 (10)。另外 `package-app.sh` 自 `694c05e3` 起有 900s 公证上界 ⇒ 楔 12h 这一形不会重现。旧账：楔住的重装叶子 `notarytool submit`（pid 98934，CPU 0s）要**持有者拍板**；设备面被别人占（10:4x 现量还有 `verify-mobile-ios-reminder` pid 79158 在跑 —— 11:1x 复跑它已退出，11:2x 现量占面的是 pid 41138，11:4x 复跑是 **56364** —— **连续换班，没有"等这一个"的终点**） | `IOS_DEVICE_NAME="heyta-iphone-17pro" bash research/tools/b-batch-reconcile.sh`；`bash scripts/verify-mobile-window-gate.sh --target b`（取 rc 用 `OUT=$(…); rc=$?`，别接管道）；**23:4x 起有看守代等**：`RUN=1 bash research/tools/b-window-keeper.sh`（窗口开的那一刻按序做让路→查载体干净→追平 main 尖并记 from/to→op-log 构建→在**载体里**起跑；`rc=3` 一直红就是等，C 臂钉着不许降级；验证台现量 `bash research/tools/b-window-keeper-arms.sh`（它最后一行给 pass/fail；**臂数不写进正文**，会漂）；开窗条件是 `rc=0` **或** `REDS` 恰好只有 `src`（载体那一路不吃它，账见 §4.05 (32)）；01:2x 起设备段前**再过一次闸门**（`GATE2`），账见 §4.05 (29)(31)(32)(33)） |
 | C | ✅ **10-04 22:12 闭合**（下面这段是它一路的账，保留原状是为了让下一位看见"闭合"值多少条读数）；10:4x 复跑 ⇒ **rc=3、`REDS=load,src,dev,apk`**（5 条 ❌，两条共用 `WHY_DEV`，这是第 307 行注释预告过的形状、不是新缺陷）；载体链与四层判据都在，等同一张设备面。🔴 **11:2x 复跑同一条命令：rc=3、`REDS` 逐字相同，但三格内容变了** —— 凭据三件套现量**都在**、模拟器**在线**（旧账那两行"全无/要起栈"过期），设备面运行者**连续换班**（10:4x 79158 → 11:2x 41138 → 11:4x **56364**，前两个都已退出 ⇒ 没有"等这一个就好"的终点）；`src` 那格量化过，**且量的是会翻的比例**（逐树 M 行 ≠ 逐消费者源码：11:2x 是 21 枚里 evidence 2 枚，11:3x 复算成 38 枚里 evidence **21** 枚 ⇒ 那格的红有多少"只是别人的取证图"取决于谁刚跑了一趟 e2e，别抄本表）；不改判据的两条理由与"按 target 分范围"这条下一批边界在第 4 条末。🔴 **14:2x 复跑：rc=3、`REDS=load,src,dev,apk`**（与 10:4x 逐字相同），`src` 那格现量含 `packages/i18n`、`packages/legal`、`packages/shared-schema`、`server/src/legal.generated.ts` 等**多条并行线正在写**；同一分钟 `lsof` 现量 4318/4319 由 node **93264 / 93252** 占着 ⇒ H 与 C 共用的是**同一张窗口**，不是两张。🔴 **17:3x 再复跑：rc=3、`REDS=load,src,dev,apk`**（四格全红回去：负载 15–19、`src` 101 枚、dev=pid 49211 正在跑 `verify-mobile-card-export-ios.sh`、APK 15:02 比源码 15:36 旧）。🔴 **17:46:22 那个看守真的开火了一次**（`FIRE=apk-deferred`），链跑到 `stack_up rc=1` 停住 —— 根因与修法、四臂牙、变异读数全在 §4.05 (13)：**载体没有未跟踪的 `server/.env`，而 `mobile-e2e-up.sh` 的启动 env 块里没有 `JWT_SECRET`**（主检出靠 dotenv 读那个文件，链依赖的东西必须与 dependent 同列）。现量 18:2x：`REDS=load,src,apk`（`dev` 又绿，17:4x 报的 pid 90200 已退）⇒ **C 离闭合只差一次重挂看守 + 负载落位**。**上一把看守**：pid 84884、`CARRIER=…heyta-wt-r14c BUDGET=7200`、日志 `/tmp/ht-r14c-window.20261004-171301.84884.log`；而同一趟 `--repo 载体` 那一路现量 `REDS=load,dev,apk` —— **`src` 在隔离载体里是绿的**（见 §4.05 (10) 最后一条）。上一次 16:0x 的读数：rc=3、`REDS=src,dev`，设备面前置**四条同时绿**（本线第一次见到这个组合）：粗筛没有别的移动端验收在抢 emulator-5554、emulator-5554 在线、凭据三件套都在、APK 不比源码旧，负载与 apk 两格都不再红。挡住它的还是那两格，且都不归本线：`src`＝100 枚别人未提交源码（含 `packages/i18n`、`apps/mobile/src/screens/ProfileScreen.tsx`），`dev`＝上面那趟孤儿重装（性质与「不动它」的两条理由见 B 格）。⚠️ **本批刻意不给 C 挂 `r14c-window-retry.sh`**（开窗即打 APK 会把 H 的负载门顶回去，而 C 的 blocker 是"要人拍板"不是"没排队"） | 18:0x 现量：楔住那趟重装（`reinstall-all` / `notarytool` / `queue-reinstall`）**整条已消失** ⇒ `dev` 那格自解，本线没有要等的外部拍板了；剩下的是负载 + 别人未提交源码（`src`）+ apk 那格由链自己补。🟢 **21:13 那一发把"判据集第一次在真设备上跑完"这件账合上了**：`通过 32 / 失败 5`，五条红**逐条归因完、没有一条是产品缺陷**（②④b＝锚点排在节点进 dump 之前 ⇒"探针取空"被当"设备答空"；⑪＝第 11 步自己点了「我的」而第 12 步没走回来；后两条是⑪的下游），而 **⑧⑨a⑩ 三条第一次绿** ⇒ R14c 的产品主张在真设备上有下游读数了。两处修完 + 三套夹具 `7/9/6 fail=0` ⇒ 明细 §4.05 (19)；看守 74502 随那一发退出，**下一发的判据就是这三处修完后 ②/④b/⑪ 是否一起转绿**。🟢 **22:03 那一发闭合**：`通过 37 / 失败 0`、`verify_rc=0`、`readability_rc=0`，三条红逐条转绿并各带读数（`滚前 0 枚 / 滚后 1 枚`、`空框锚点 TIME_EMPTY='时:分'`、`⑪c … == 2026-10-05 00:00`）；🔴 **同一枚 APK sha256（`66ce55f7…`）下 32/5 → 37/0**，中间只动了判据 ⇒ (19) 那句"五条红都在探针侧"由叙述变成一次天然 A/B；分母三趟一致（37）不是"少跑了所以绿"。明细 §4.05 (21)。**C 本格关闭，看守不再为它重挂** | `bash scripts/verify-mobile-window-gate.sh --target c`；`bash research/tools/r14c-bundle-testid-preflight.sh`；`src` 差集（表格里不放管道符，那要转义且复制下来不能跑）：`git status --porcelain -- packages apps server >/tmp/ht-dirty.txt; grep -cE '^ ?M' /tmp/ht-dirty.txt; grep -c '/evidence/' /tmp/ht-dirty.txt` |
 | A | ✅ **10-04 16:0x 闭合**（用户当场授予提交权 —— 这同时是本线**第一次真跑** `--confirm` 那一腿）：`b4033742`，32 枚点名路径 / +2706 −88，`git show --name-only` 逐条都在本线 PATHS 里、别人的路径 0 枚被带走，**没有 push**；复跑 `bash research/tools/calendar-line-commit-plan.sh` ⇒ 「A 此刻**无待办**」、命名空间 0 枚未点名、md-tables / shell-unicode / docs-link 三声 rc=0。🔴 入库当场把那条**自锁的前置**换掉了：旧 §2「索引必须是空的」来自一次**裸 `git commit`** 的事故（实测吞掉别人 109 枚暂存），而本工具走 `git commit --only -- <点名路径>` —— 15:0x 手工一趟 + 15:4x rig 臂 1 一趟（两次外来暂存枚数都是 1）实测：别人那枚的索引 blob 提交前后**逐字相同**、且不在本笔的树里 ⇒ 前置换成**提交后逐字节对账**（§5b），牙落在新 rig `research/tools/calendar-line-commit-only-arms.sh`（当时三臂，**现五臂** —— 新增那一对量 §3 收窄的两个方向，见 §4.05 (12)：正向 / 把 `--only` 摘成裸 commit ⇒ §5b 点名 foreign.txt 且 rc=1 / 把**我方点名路径**暂存成别的内容 ⇒ §2 拒绝、零提交、那份暂存原样留着）。已入 §7 第 **247** 条。⚠️ 本线那枚 `r17-evidence-md5-check.sh` 的十臂版**没等到自己那笔**：15:2x 被并行会话的 `8590ae02`（「r17 证据校验脚本的 $var+中文 写法收敛」）连工作树整文件提交掉 ⇒ 内容在 HEAD、署名在别处（同族事故已在项目 memory 里）。下面那句是当时的账，留着是因为它记的是一条**性质**（这条闸门的颜色与别人的动作同源，不是本线的属性），不是当前读数：🔴 **此刻没有提交权**；11:0x 复跑 ⇒ **rc=1**：别人的三枚 `apps/landing/evidence/*.png` 进了索引，闸门拒绝在它上面动刀（v 格）。本线待入库 **8 枚**（改动 7 + 新增 1 枚 `f-boundary-scope-count.sh`，先 add 才进得了 `--only`）。🟢 **11:39 复跑 ⇒ rc=0、`✅ 索引为空（0 枚）`、三门禁 rc=0、待入库点名 8 枚、工作树脏行分母 78** —— ⚠️ 这格的红是**别人把自己那三枚提交掉**才消的，与 o 格那句"绿此刻挂在别人的暂存区上"是同一件事的两个方向：**这条闸门的颜色与别人的动作同源，不是本线的属性**；🟢 **17:4x 复跑：A 仍然闭合，但"闭合"的含义要说清** —— 待入库 **4 枚**且**全是图**（`view-select-closed.png` + `calendar-day/day-en-{empty,full,no-timed}.png`，mtime 17:25 = 别人那一趟 e2e 的产物），本线这一笔只带 3 枚文档/装置（账在 §4.05 (12)），**这四枚刻意不带走**：盘上字节与其 README 记的不是同一份（`r17 --dir …calendar-day` ⇒ `md5bad=1`）。带走 = 造出一个自相矛盾的 HEAD，也正是 (11) 那句警告点名的形状。同刻 `shell-unicode` 由 rc=1 翻成 **rc=0**（持有者修掉了自己那枚），所以 17:5x 之后任何"这道门禁红"的引用都要重跑才算 | 索引那三枚＝落地页/凭据线的会话（**已提交，本格关闭**）；🔴 11:4x 起**全局 `check:docs` 又红**（3 处指向一枚未跟踪的 vault 取证件，来源 `PROGRESS.md` ×1 + `ADR-0050` ×2）＝端到端加密密钥生命周期那条线，本线不代改（z 格）；本线＝若有授权的一轮 | `bash research/tools/calendar-line-commit-plan.sh`（默认 dry-run，`MSG=… --confirm` 才动）；~~关到关的判据是回到 `✅ 索引为空`~~ 🔴 **那句随 §2 前置一起作废**（它量的是本工具不走的那条路）：现在的关闭判据 = 「待入库 0 枚」+ §5b 那句「别人的暂存一条不少、索引 blob 逐字不变」，见 §4.05 (12) 与 §7 第 247 条 |
 | E | ✅ 闭合，且闭合形状是**属性**不是段数 | — | `git show HEAD:package.json` 解析链里 `check:md-tables` 恰 1 段；`node scripts/check-md-table-rows.mjs` rc=0 |
