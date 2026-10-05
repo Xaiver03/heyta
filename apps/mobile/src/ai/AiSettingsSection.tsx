@@ -49,7 +49,7 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 
 import { Button, Card, Checkbox, Chip, SectionHeader, Stack, Text, TextField } from '../ui/kit';
 import { useTokens } from '../theme';
-import { AI_FEATURE_LABEL_KEY, healthCopy } from './copy';
+import { AI_FEATURE_LABEL_KEY, AI_PRESET_COPY_KEY, healthCopy } from './copy';
 import { aiSecrets, saveAiSettings, useAiSettings } from './settings-store';
 import { readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 
@@ -87,6 +87,15 @@ export function AiSettingsSection(): React.JSX.Element {
 
   const routing = settings.routing;
 
+  /**
+   * 没填名字时端点叫什么 —— 落库的 `label` 和密钥输入框那行标签**必须同源**。
+   * 各写一遍的话，用户看到的字段名和列表里的名字会分叉（`{n}` 的取值迟早漂移）。
+   */
+  const draftEndpointName =
+    draftLabel.trim() === ''
+      ? t('web.ai.settings.customLabel', { n: routing.endpoints.length + 1 })
+      : draftLabel.trim();
+
   function commit(nextRouting: typeof routing): void {
     const consents = recomputeConsents(settings.consents, nextRouting);
     const wrote = saveAiSettings({ ...settings, routing: nextRouting, consents });
@@ -103,7 +112,7 @@ export function AiSettingsSection(): React.JSX.Element {
     const id = `custom-${String(Date.now())}`;
     const endpoint: AiEndpointConfig = {
       id,
-      label: draftLabel.trim() === '' ? t('web.ai.settings.customLabel') : draftLabel.trim(),
+      label: draftEndpointName,
       endpoint: draftUrl.trim(),
       model: draftModel.trim(),
     };
@@ -279,7 +288,7 @@ export function AiSettingsSection(): React.JSX.Element {
                   ))}
                 </HStackish>
                 <Button
-                  label={t('web.ai.settings.deleteAria')}
+                  label={t('web.ai.settings.deleteAria', { name: endpoint.label })}
                   tone="danger"
                   onPress={() => {
                     removeEndpoint(endpoint.id);
@@ -291,21 +300,32 @@ export function AiSettingsSection(): React.JSX.Element {
         )}
 
         <HStackish>
-          {AI_ENDPOINT_PRESETS.map((preset) => (
-            <Chip
-              key={preset.id}
-              label={t('web.ai.settings.presetAdd')}
-              onPress={() => {
-                addPreset(preset.id);
-              }}
-            />
-          ))}
+          {AI_ENDPOINT_PRESETS.map((preset) => {
+            // 🔴 不许渲染 `preset.label` —— 那是 packages/ai 里的中文字面量，
+            // 英文模式下会整句露出中文（理由与回落取 id 的规则写在 `./copy`）。
+            const copy = AI_PRESET_COPY_KEY[preset.id];
+            const name = copy === undefined ? preset.id : t(copy.label);
+            return (
+              <Chip
+                key={preset.id}
+                label={t('web.ai.settings.presetAdd', { name })}
+                onPress={() => {
+                  addPreset(preset.id);
+                }}
+              />
+            );
+          })}
         </HStackish>
-        {AI_ENDPOINT_PRESETS.map((preset) => (
-          <Text key={preset.id} variant="caption" tone="subtle">
-            {preset.label}：{preset.prerequisite === undefined ? '' : String(preset.prerequisite)}
-          </Text>
-        ))}
+        {AI_ENDPOINT_PRESETS.map((preset) => {
+          const copy = AI_PRESET_COPY_KEY[preset.id];
+          return (
+            <Text key={preset.id} variant="caption" tone="subtle">
+              {copy === undefined
+                ? preset.id
+                : `${t(copy.label)}：${t(copy.prerequisite)}`}
+            </Text>
+          );
+        })}
 
         <TextField
           label={t('web.ai.settings.field.name')}
@@ -332,7 +352,7 @@ export function AiSettingsSection(): React.JSX.Element {
           testID="ai-endpoint-model"
         />
         <TextField
-          label={t('web.ai.settings.keyAria')}
+          label={t('web.ai.settings.keyAria', { name: draftEndpointName })}
           value={draftKey}
           onChangeText={setDraftKey}
           secure
@@ -437,7 +457,7 @@ export function AiSettingsSection(): React.JSX.Element {
         </Text>
         <GateRow
           label={t('web.ai.settings.localApi.enabled.label')}
-          note={t('web.ai.settings.localApi.enabled.note')}
+          note={t('web.ai.settings.localApi.enabled.note', { address: settings.localApi.bindAddress })}
           on={settings.localApi.enabled}
           testID="ai-gate-local-api"
           onToggle={() => {

@@ -54,7 +54,10 @@ import {
 } from '@heyta/ai';
 import {
   MAX_CAPTURE_INPUT_LENGTH,
+  MAX_DURATION_MINUTES,
+  MAX_PRIORITIZE_TASKS,
   MAX_TOOL_CALL_TEXT_LENGTH,
+  MIN_DURATION_MINUTES,
   buildBreakdownInvocation,
   buildCaptureInvocation,
   buildDurationInvocation,
@@ -412,7 +415,7 @@ function DisclosureStep({
       */}
       {!decision.allowed ? (
         <Text variant="row-meta" tone="warning">
-          {t('web.ai.settings.consentLead')}
+          {t('web.ai.settings.consentLead', { feature: t(AI_FEATURE_LABEL_KEY[feature]) })}
         </Text>
       ) : null}
       <HStack gap="tight">
@@ -783,7 +786,7 @@ function BreakdownPanel(props: SharedPanelProps): React.JSX.Element {
       ) : null}
       {phase === 'proposal' && proposal !== undefined ? (
         <Card gap="loose">
-          <Text variant="row-title">{t('web.ai.breakdown.proposalHead')}</Text>
+          <Text variant="row-title">{t('web.ai.breakdown.proposalHead', { count: proposal.items.length })}</Text>
           {proposal.items.map((item, index) => (
             <Text key={`${item}-${String(index)}`} variant="row-meta">
               {item}
@@ -791,7 +794,7 @@ function BreakdownPanel(props: SharedPanelProps): React.JSX.Element {
           ))}
           {proposal.truncated ? (
             <Text variant="caption" tone="warning">
-              {t('web.ai.breakdown.truncated')}
+              {t('web.ai.breakdown.truncated', { count: proposal.items.length })}
             </Text>
           ) : null}
           <HStack gap="tight">
@@ -956,7 +959,7 @@ function PrioritizePanel(props: SharedPanelProps): React.JSX.Element {
       ) : null}
       {phase === 'proposal' && proposal !== undefined ? (
         <Card gap="loose">
-          <Text variant="row-title">{t('web.ai.prioritize.proposalHead')}</Text>
+          <Text variant="row-title">{t('web.ai.prioritize.proposalHead', { count: proposal.suggestions.length })}</Text>
           {proposal.suggestions.map((suggestion) => {
             const title = frozen.tasks.find((task) => task.id === suggestion.id)?.title ?? suggestion.id;
             return (
@@ -982,7 +985,7 @@ function PrioritizePanel(props: SharedPanelProps): React.JSX.Element {
           })}
           {proposal.truncated ? (
             <Text variant="caption" tone="warning">
-              {t('web.ai.prioritize.truncated')}
+              {t('web.ai.prioritize.truncated', { max: MAX_PRIORITIZE_TASKS })}
             </Text>
           ) : null}
           <HStack gap="tight">
@@ -1134,7 +1137,11 @@ function DurationPanel(props: SharedPanelProps): React.JSX.Element {
           <Text variant="numeric-body">{t('web.ai.duration.minutes', { minutes: String(proposal.minutes) })}</Text>
           {proposal.clamped ? (
             <Text variant="caption" tone="warning">
-              {t('web.ai.duration.clamped')}
+              {t('web.ai.duration.clamped', {
+                min: MIN_DURATION_MINUTES,
+                max: MAX_DURATION_MINUTES,
+                minutes: proposal.minutes,
+              })}
             </Text>
           ) : null}
           <HStack gap="tight">
@@ -1268,7 +1275,9 @@ function ToolPanel(
     // 🔴 唯一能把提案变成写入的那一步，而它调的是 app-host 的
     // `confirmAiToolProposal()` —— `host.submit(` 在本壳里仍然一个都没有。
     const result = await confirmAiToolProposal(props.toolHost, proposal);
-    setConfirmed(result.ok ? t('web.ai.tools.confirmedOk') : t('web.ai.tools.confirmedFail'));
+    setConfirmed(
+      result.ok ? t('web.ai.tools.confirmedOk') : t('web.ai.tools.confirmedFail', { message: result.message }),
+    );
     setPhase('input');
     setToolOutcome(undefined);
     setAssistantOutcome(undefined);
@@ -1299,7 +1308,7 @@ function ToolPanel(
       >
         {assistantTurn ? (
           <Text variant="caption" tone="subtle">
-            {t('web.ai.assistant.maxRequests', { count: String(assistantPlan.maxRequests) })}
+            {t('web.ai.assistant.maxRequests', { n: assistantPlan.maxRequests })}
           </Text>
         ) : null}
       </DisclosureStep>
@@ -1416,7 +1425,7 @@ function ToolResultCard({
         </Text>
         {assistant.steps.length > 0 ? (
           <Text variant="caption" tone="subtle">
-            {t('web.ai.chat.trace')}
+            {t('web.ai.chat.trace', { n: assistant.steps.length })}
             {assistant.steps.map((step) => `${step.tool}${step.ok ? '' : '✗'}`).join(' → ')}
           </Text>
         ) : null}
