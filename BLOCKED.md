@@ -5478,6 +5478,12 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 - ⚠️ **没排掉的第三种**：它可能是那 17 笔里 `packages/*` 带进来的 —— 那样**当前 main 也会红**，就该归 mobile/日历那条线，不是环境噪声。
   判它需要**在干净树上跑 main**：主检出此刻正被另一条线占着（`apps/mobile/src/db/open-host.ts`、`AccountClosureScreen.tsx` 等 8 枚 `M`/`A`），
   在那儿跑出来的读数**不属于任何一枚提交**，所以本线没去跑，也不去动那棵树。
+- 🔴 **20:43 自我更正（这一条把上面那个"第三种"削掉一半，别照着它去追那 17 笔）**：
+  载体跑的就是 `7911ad02` **那批字节**（工作树 == 载体 HEAD，见 goal §7.30e 的 1a 门读数），而它在 20:36 **当场就红**
+  ⇒ **"红是后面那 17 笔带进来的"在结构上不成立**，最迟可追到 `b3397cda`（10-03 23:58，vault/E2EE 那批）之后 ——
+  那批是 `tests/auth-flow.spec.ts` 最后一次被改的时刻（现量 `git log -1 --format=%h%ad -- apps/mobile/tests/auth-flow.spec.ts`）。
+  还剩的只有"所有检出都红（真·提交态缺陷）"vs"只有这台机器/这棵树红（装置态）"两种分法，
+  而这两者的判据仍是同一条命令（另建干净载体 checkout main 单跑 mobile test）。
 - **下一步谁能消、怎么消**（一条命令，约 6-10 分钟，含重建）：另建一枚载体 `git worktree add <父目录>/heyta-wt-seg85 main`
   → `pnpm install --frozen-lockfile` → `pnpm -r build` → `NO_COLOR=1 pnpm --filter @heyta/mobile test`。
   绿 ⇒ 成因在 `7911ad02` 那批的依赖/产物形状（回到本线）；红 ⇒ 报给 mobile 线，本线这条登记随之关闭并注明"不是本线的东西"。

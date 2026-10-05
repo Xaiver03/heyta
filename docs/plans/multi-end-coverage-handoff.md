@@ -3728,8 +3728,11 @@ git grep -ohE 'AGENTS\.md §[0-9]+(\.[0-9]+)*' main -- docs | sort | uniq -c
    20:36 锁空时重跑（补跑器 `heyta-seg85-clean-rerun.sh`，**没有**用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕）⇒ **仍然 rc=1**，
    红的是 `apps/mobile` 的 vitest：**5 枚未处理拒绝** `RolldownError: Parse failure … Flow is not supported`（`react-native/index.js:1:0`，
    vitest 标的来源是 `tests/auth-flow.spec.ts`）。载体年龄这一解释**已被现量否证**（17 笔里 `apps/mobile`/`package.json`/`pnpm-lock.yaml`
-   零命中，两棵树装出来的 vite 目录逐字相同）。⇒ 段 85 登记为**待归属**：要么是那 17 笔里 `packages/*` 带进来的（那样 main 也红），
-   要么还有别的成因；判它得在**干净树上跑 main**，而主检出正被另一条线的 8 枚未提交改动占着 ⇒ 不去那儿跑。逐条细节在 goal §7.30e。
+   零命中，两棵树装出来的 vite 目录逐字相同）。⇒ 段 85 登记为**待归属**。
+   🔴 **20:43 又削掉一种**：载体跑的就是 `7911ad02` 那批字节，所以"红是那 17 笔带进来的"**结构上不成立** ——
+   最迟可追到 `b3397cda`（10-03 23:58，`tests/auth-flow.spec.ts` 最后一次被改）。
+   ⇒ 只剩"所有检出都红（真·提交态缺陷）"vs"只有这棵树红（装置态）"，判据同一条：在**干净树上跑 main**
+   （主检出正被另一条线的 8 枚未提交改动占着 ⇒ 不去那儿跑，那儿的读数不属于任何一枚提交）。逐条细节在 goal §7.30e 与 BLOCKED B83。
 3. 🔴 **同族缺陷第二次出现**：逐段表与 85 枚单段日志原先只住 `/tmp`（归档只有聚合那句）。
    已 `cp -p` 收进 `~/.heyta-evidence/checks-queued-1005-201130/`。
 
