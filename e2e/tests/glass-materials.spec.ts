@@ -81,8 +81,16 @@ const SURFACES: Surface[] = [
     },
   },
   {
+    // 🔴 §8.147 起这一腿必须**先把视口收到窄档**，理由与本文件 `reminder-dropdown` 那条
+    //   （§8.145 同一件事）逐字同形：工单 §8.147 把「清单 + 标签」的编辑本体搬进栏里那一格之后，
+    //   宽档（本套件的 1440×900，详情列在画）行尾只剩只读 `TagChips`、`<summary>` 不再渲染
+    //   ⇒ 原先这一腿在 1440 档**超时等不到** `task-organize-summary`（light 与 dark 两条一起红）。
+    //   覆盖面一个字没换：「清单标签下拉」是 ADR-0042 §3 那五个玻璃候选之一，
+    //   窄档（详情列不画）时那块面板原样回到行尾 —— 换的只是"在哪一档量它"，**删掉这一腿才是把覆盖丢掉**。
+    //   ⚠️ `close` 里把视口还回 1440×900：本套件其余四面按宽档拍，继承窄档 = 截图互相污染。
     name: 'organize-dropdown',
     open: async (page) => {
+      await page.setViewportSize({ width: 900, height: 600 });
       await page.locator('[data-testid="task-organize-summary"]').first().click();
       return page
         .locator('details:has([data-testid="task-organize-summary"]) .ht-material')
@@ -90,6 +98,7 @@ const SURFACES: Surface[] = [
     },
     close: async (page) => {
       await page.locator('[data-testid="task-organize-summary"]').first().click();
+      await page.setViewportSize({ width: 1440, height: 900 });
     },
   },
   {
