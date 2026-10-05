@@ -14,6 +14,8 @@ import { useShallow } from 'zustand/react/shallow';
 import {
   CircleHelp,
   Moon,
+  PanelRightClose,
+  PanelRightOpen,
   Sun,
   Trash2,
   X,
@@ -82,12 +84,17 @@ import { type DueDisplayMode } from './lib/due-display.js';
 import { TaskRowMeta } from './features/tasks/row-meta.js';
 import { loadDueDisplay, saveDueDisplay } from './features/tasks/due-display-pref.js';
 import { loadTaskSort, saveTaskSort } from './features/tasks/sort-pref.js';
-import { TaskOrganizer } from './features/tasks/TaskOrganizer.js';
+import {
+  loadDetailPane,
+  saveDetailPane,
+  type DetailPanePref,
+} from './features/shell/detail-pane-pref.js';
+import { TagChips, TaskOrganizer } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
-import { TaskRepeat } from './features/tasks/TaskRepeat.js';
+import { RepeatChip, TaskRepeat } from './features/tasks/TaskRepeat.js';
 import { DueEditor } from './features/tasks/DueEditor.js';
-import { NoteEditor } from './features/tasks/NoteEditor.js';
-import { SubtaskPicker } from './features/tasks/SubtaskPicker.js';
+import { NoteBadge, NoteEditor } from './features/tasks/NoteEditor.js';
+import { SubtaskBadge, SubtaskPicker } from './features/tasks/SubtaskPicker.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
@@ -135,11 +142,15 @@ import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.j
 import { RenewPanel } from './features/subscription/RenewPanel.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
+import { HabitDetailCard } from './features/habits/HabitDetailCard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
 import { GrowthView } from './features/motivation/GrowthView.js';
 import { CountdownView } from './features/countdown/CountdownView.js';
 import { NotesView } from './features/notes/NotesView.js';
-import { ReminderPanel } from './features/reminders/ReminderPanel.js';
+import { NoteEditorCard } from './features/notes/NoteEditorCard.js';
+import { TaskDetailCard } from './features/tasks/TaskDetailCard.js';
+import { useDetailColumnShown } from './features/shell/detail-pane-visible.js';
+import { ReminderBadge, ReminderPanel } from './features/reminders/ReminderPanel.js';
 import { TimelinePanel } from './features/timeline/TimelinePanel.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
@@ -177,10 +188,12 @@ import {
   saveAiSettings,
   toHealthSnapshot,
 } from './features/settings/aiStore.js';
+import { FocusDetailPane } from './features/focus/FocusDetailPane.js';
 import { FocusTimer } from './features/focus/FocusTimer.js';
 import { TrashView } from './features/trash/TrashView.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
 import { onEngineChange, readRecentOps } from './lib/oplog.js';
+import { useSelectionKeyboardCursor } from './lib/keyboard-cursor.js';
 import { pruneSelectionFromEntities, selection, useSelected } from './lib/selection.js';
 import { applyTheme, rememberThemeChoice, resolveInitialTheme, type Theme } from './lib/theme.js';
 
@@ -540,6 +553,12 @@ export function App(): React.JSX.Element {
    * （浮层之下"下层可见"，§11.5）。
    */
   const contentView = view === 'settings' || view === 'search' ? settingsBaseView : view;
+  /**
+   * 🔴 键盘光标绑的是**这一行的值**，不是 `view`：设置与搜索都是浮层/面板，
+   * 底下那一栏还挂着（`settingsBaseView` 存在的理由）。绑 `view` 的话，
+   * 打开设置面板会把光标从「任务」切走 —— 而用户看到的还是那一栏列表。
+   */
+  useSelectionKeyboardCursor(contentView);
 
   /**
    * 第二列（侧栏）在哪些视图出现。
@@ -691,6 +710,71 @@ export function App(): React.JSX.Element {
     setDueDisplayState(mode);
     saveDueDisplay(mode);
   }, []);
+
+  /**
+   * 详情列（右侧那一栏）的收起状态（工单 W4 ②③）。
+   *
+   * 🔴 它是**用户的选择**，与"这一栏今天画不画得出来"是两件事：后者由视口几何决定，
+   * 断点在 `styles/app/narrow.css`（≤768 / 769–1023 / ≥1024 但高 < 480 三种都不出现）。
+   * 两处不许合成一个布尔 —— 合成就等于把"这台屏幕放不下"说成"用户关掉了它"，
+   * 于是窗口拉宽之后界面自己改了主意，而设置里那一项显示的是"收起"。
+   *
+   * 三条恢复路径各自独立成立：页头的开关、设置里这一项、⌘/Ctrl + Shift + \\。
+   * 判据逐条各走一次（`e2e/tests/detail-pane-collapse.spec.ts`），
+   * 因为"三条路径"最容易写成"其实只有同一个 onClick 调了三遍"。
+   */
+  const [detailPane, setDetailPaneState] = useState<DetailPanePref>(loadDetailPane);
+  const setDetailPane = useCallback((value: DetailPanePref) => {
+    setDetailPaneState(value);
+    saveDetailPane(value);
+  }, []);
+  const toggleDetailPane = useCallback(() => {
+    setDetailPane(detailPane === 'collapsed' ? 'open' : 'collapsed');
+  }, [detailPane, setDetailPane]);
+
+  /**
+   * 详情列**此刻看得见吗** —— 几何（宽/高够不够）与"用户主动收起"两个输入一起算，
+   * 规则与 `narrow.css` 那两条媒体规则同源（`features/shell/detail-pane-visible.ts`）。
+   *
+   * 🔴 面单往哪一栏放是**渲染时**的决定，不能只交给 CSS：CSS 在放不下时是 `display:none`，
+   * 真按它放，窄屏/收起态下用户点一条便签会得到一枚藏在 `display:none` 里的编辑器 ——
+   * 界面什么都不说，数据却已经进模型。所以看不见时编辑卡回到便签板上方。
+   */
+  const detailColumnShown = useDetailColumnShown(detailPane === 'collapsed');
+
+  /**
+   * 任务面单**此刻画在详情列里**的那个条件 —— 栏在画（几何 + 没被收起）且当前是任务那一族
+   * 的视图（列表 / 四象限 / 时间线：同一批任务行、同一个 `'task'` 选中态）。
+   *
+   * 🔴 行尾那颗备注 chip 用的是**这同一个布尔的反向**，不是再算一遍条件：两处共用一枚变量，
+   * "chip 没了而栏里也没有输入框"（= 任何档下都写不了备注）这一档就结构上不可能出现。
+   * 工单 §8.138。
+   */
+  const taskPaneInColumn =
+    detailColumnShown &&
+    (contentView === 'tasks' || contentView === 'quadrant' || contentView === 'timeline');
+
+  /**
+   * ⌘/Ctrl + Shift + \\ 开合详情列 —— 三条恢复路径里的"快捷键"那一条。
+   *
+   * 值得为它加一个界面上没画出来的入口：键盘用户收起它的那一下就是想要"临时让列表变宽"，
+   * 而把它叫回来要跑三次鼠标（页头 → 按钮 → 点）比收起它还麻烦 —— 那条不对称会让人
+   * 干脆不去收。开关本身在页头与设置里都有名字，所以这不是"藏一个入口"。
+   * ⚠️ 选 \\ 而不是字母：`Ctrl+Shift+D`（Chrome 书签管理器）、`Ctrl+Shift+K`
+   * （Firefox 控制台）都被浏览器占着，字母组合在这两个浏览器里**根本到不了页面**。
+   * 🔴 监听挂**捕获阶段**，理由与搜索浮层那条同（§7 #80：RNW 的输入框在 keydown 里
+   *    无条件 `stopPropagation()`，焦点在输入框时冒泡阶段的监听永远收不到）。
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.altKey || !(event.metaKey || event.ctrlKey) || !event.shiftKey) return;
+      if (event.key !== '\\') return;
+      event.preventDefault();
+      toggleDetailPane();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [toggleDetailPane]);
 
   /**
    * 记忆落差的 op 窗口（最近 `MEMORY_OP_WINDOW` 条 op）。
@@ -914,65 +998,138 @@ export function App(): React.JSX.Element {
         >
           {/* 备注。🔴 在它之前 Web 上**没有备注输入框** ——
               `Task.note` 与 `setNote` 都在，但唯一调用点是 AI 拆解与 AI 估时，
-              于是"我自己能不能在任务上写点东西"的答案是"不能"。 */}
-          <NoteEditor
-            task={task}
-            onSetNote={(note) => {
-              void store.setNote(task.id, note);
-            }}
-          />
+              于是"我自己能不能在任务上写点东西"的答案是"不能"。
+
+              ⚠️ 工单 §8.138 之后它**只在详情列没在画时挂在这里**：栏里画着的时候正文输入框
+              住在 `TaskDetailCard` 那一格，这里换成一枚**只读徽标**（`NoteBadge`）。
+              理由是那道二选一的裁决要的不变量 —— 同一字段任何时刻只有一个编辑器所有者，
+              两处都能改就会漂移成两套写入语义；而"扫一眼列表要能看出哪些任务写了东西"
+              这一档不能因为搬进栏里就丢掉（第一趟看图照出来的正是这个）。
+              窄档（栏不出现）时它退回这一格，所以"写不了备注"在任何档都不会发生。 */}
+          {taskPaneInColumn ? (
+            <NoteBadge task={task} />
+          ) : (
+            <NoteEditor
+              task={task}
+              onSetNote={(note) => {
+                void store.setNote(task.id, note);
+              }}
+            />
+          )}
 
           {/* 子任务。🔴 在它之前：`packages/domain/src/subtasks.ts`（616 行，
               建树 + 环防护 + 深度/子数上限）与 `app-host` 的 `setParent`
               **都已经写好**，但 Web 上一次调用点都没有 —— 于是
               "模型支持、树能建、用户没有任何办法造出一个子任务"，
-              且**不报错**，只是这个功能不存在（方案 §5.5 的"看起来有其实没有"）。 */}
-          <SubtaskPicker
-            task={task}
-            onSetParent={(parentId) => store.setParent(task.id, parentId)}
-          />
+              且**不报错**，只是这个功能不存在（方案 §5.5 的"看起来有其实没有"）。
+
+              ⚠️ 工单 §8.144 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
+              （候选 + 原生 `<select>` + 拒绝提示）住在 `TaskDetailCard` 那一格，这里只剩一枚
+              **只读徽标** `SubtaskBadge` —— 同一枚不变量（每个字段只有一个编辑器所有者），
+              而"扫一眼要能看出哪条挂在谁下面"这一档不因搬进栏里就丢掉。
+              🔴 这一格顺带改掉一条**写在别处的取数前提**：`e2e/tests/selection-projections.spec.ts`
+              文件头那句"按标题找行不能用 `task-item-*`，因为行里常驻的 `subtask-select-*` 会把别的任务
+              标题写进 `textContent`" —— 宽档下那只 `<select>` 不在行里了，窄档下仍在。
+              那边的解法（用 `task-title-*`）两种档都对，所以不动它，只把这条变化记下来。 */}
+          {taskPaneInColumn ? (
+            <SubtaskBadge task={task} />
+          ) : (
+            <SubtaskPicker
+              task={task}
+              onSetParent={(parentId) => store.setParent(task.id, parentId)}
+            />
+          )}
 
           {/* 清单归属 + 标签。Web 端此前**根本没有入口** ——
               `moveToProject` 没有任何调用点、`tagIds` 全仓库零读写，
-              于是侧栏里建出来的清单和标签一个也用不上。 */}
-          <TaskOrganizer
-            task={task}
-            onMoveToProject={(projectId) => {
-              void store.moveToProject(task.id, projectId);
-            }}
-            onSetTags={(tagIds) => {
-              void store.setTags(task.id, tagIds);
-            }}
-          />
+              于是侧栏里建出来的清单和标签一个也用不上。
+
+              ⚠️ 工单 §8.147 起它**只在详情列没在画时整块挂在这里**：栏里画着的时候编辑本体
+              （清单下拉 + 标签复选框）住在 `TaskDetailCard` 那一格。
+              🔴 这一格留的是**只读 chip**（`TagChips`），不是截止那种"整块不画"：
+              截止的显示另有其人（共享 `task-meta` 那一槽），而**标签在共享层没有对应槽**，
+              行上这两枚 chip 就是它唯一的显示位 —— 撤掉会让列表里"看不出哪条挂了标签"，
+              那是 §8.138 那条不变量明确不许的。归属的显示本来就在 `task-meta`，所以这里
+              不重复画清单名（同一行说两遍）。窄档（栏不出现）时整块退回这一格，
+              所以"归不了类"在任何一档都不会发生。 */}
+          {taskPaneInColumn ? (
+            <TagChips task={task} />
+          ) : (
+            <TaskOrganizer
+              task={task}
+              onMoveToProject={(projectId) => {
+                void store.moveToProject(task.id, projectId);
+              }}
+              onSetTags={(tagIds) => {
+                void store.setTags(task.id, tagIds);
+              }}
+            />
+          )}
 
           {/* 重复。🔴 Web 此前**没有入口** —— 移动端早就能设，
               两端不一致；这一处补的正是 B2-3 的「Web 入口」那一半，
-              并额外给了移动端也还没有的**自定义 RRULE**。 */}
-          <TaskRepeat
-            task={task}
-            now={store.now}
-            onSetRepeat={(rule) => {
-              void store.setRepeat(task.id, rule);
-            }}
-          />
+              并额外给了移动端也还没有的**自定义 RRULE**。
+
+              ⚠️ 工单 §8.141 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
+              （预设单选 + 自定义 RRULE）住在 `TaskDetailCard` 那一格，这里只剩一枚
+              **只读徽标** `RepeatChip`。理由与备注同一枚不变量 —— 同一字段任何时刻
+              只有一个编辑器所有者；而"扫一眼列表要能看出哪些任务是重复的"不能因为
+              搬进栏里就丢掉。窄档（栏不出现）时它整块退回这一格，所以"设不了重复"在任何档都不会发生。 */}
+          {taskPaneInColumn ? (
+            <RepeatChip task={task} now={store.now} />
+          ) : (
+            <TaskRepeat
+              task={task}
+              now={store.now}
+              onSetRepeat={(rule) => {
+                void store.setRepeat(task.id, rule);
+              }}
+            />
+          )}
 
           {/* 截止。🔴 多端覆盖审计 P0-3：`setDueDate` 的语义早就完整，
               但 Web 上**没有任何调用点** —— 想给任务定"周五截止"没有直接入口
               （唯一沾边的是 AI 捕获，那是建任务时）。移动端早就能改；
-              这里补上后两端共用同一只共享 `DatePicker`。 */}
-          <DueEditor
-            task={task}
-            now={store.now}
-            onSetDueDate={(due) => {
-              void store.setDueDate(task.id, due);
-            }}
-          />
+              这里补上后两端共用同一只共享 `DatePicker`。
+
+              ⚠️ 工单 §8.146 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
+              （共享 `DatePicker`：四个快捷项 + 月历 + 清除）住在 `TaskDetailCard` 那一格。
+              🔴 这一格与前四格（备注 / 重复 / 子任务 / 提醒）**不同形**：这里**不补只读徽标**，
+              宽档整块不画。理由不是省事 —— 截止的显示一直在共享行的元信息条上
+              （`task-meta` → `TaskBadges.due`，`date` 档 `10-05` / `countdown` 档「明天」），
+              而原先那颗 `<summary>` 也在写当前值（「截止 10月5日」），也就是同一行把同一件事实
+              说了两遍。工单 §8.141 第 5 节那条硬约束（截止的**显示**必须留在行上）由 `task-meta`
+              满足，撤掉第二份显示不会让它失效；真浏览器 T12 把这条钉成判据（设了截止 ⇒
+              行上仍写着日期）。窄档（栏不出现）时 `DueEditor` 整块退回这一格，
+              所以"改不了截止"在任何一档都不会发生。 */}
+          {taskPaneInColumn ? null : (
+            <DueEditor
+              task={task}
+              now={store.now}
+              onSetDueDate={(due) => {
+                void store.setDueDate(task.id, due);
+              }}
+            />
+          )}
 
           {/* 提醒。🔴 在这一刀之前 `REMINDER` 有写路径、op 能同步，
               但 Web 上**没有任何入口能建它** —— 提醒面板补的就是这最后一米。
               状态与动作全在 `features/reminders/store.ts`（唯一一处
-              `createReminderActions`），这里只把它挂在行的尾部插槽上。 */}
-          <ReminderPanel task={task} />
+              `createReminderActions`），这里只把它挂在行的尾部插槽上。
+
+              ⚠️ 工单 §8.145 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
+              （共享 `ReminderList` + 六个动作 + 错误提示）住在 `TaskDetailCard` 那一格，
+              这里只剩一枚**只读徽标** `ReminderBadge`。同一枚不变量（每个字段只有一个编辑器所有者）。
+              🔴 徽标与 `NoteBadge`/`RepeatChip` 有一处**刻意的不同**：零条提醒时它**不渲染**，
+              而原来那颗 chip 在零条时显示「提醒」二字 = 入口。入口如今住在栏里那一格的区块头，
+              把它留在行上就成了一份"两处都能开始编辑"（拍板 #8 的 `record` 档：徽标可隐藏）。
+              窄档（栏不出现）时 `ReminderPanel` 整块退回这一格，那颗带文字的入口 chip 也一起回来，
+              所以"建不了提醒"在任何一档都不会发生。 */}
+          {taskPaneInColumn ? (
+            <ReminderBadge task={task} />
+          ) : (
+            <ReminderPanel task={task} />
+          )}
 
           {/* AI 拆解。配置关着时它仍然在 —— 点了会说明该去开什么，
               而不是消失（"找不到入口"和"入口说为什么不可用"是两件事）。 */}
@@ -1050,7 +1207,7 @@ export function App(): React.JSX.Element {
         </div>
       );
     },
-    [aiSecrets, aiSettings, memory.preferenceSet, store, t],
+    [aiSecrets, aiSettings, memory.preferenceSet, store, t, taskPaneInColumn],
   );
 
   /** 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。 */
@@ -1227,6 +1384,12 @@ export function App(): React.JSX.Element {
         label: project.name,
         group: 'project' as const,
         hint: t('web.search.hint.project'),
+        // ⚠️ 这里的 `onSelect` 是**搜索面板自己的字段**（拾取这一条候选），和清单/标签那一格的
+        // "选中"不是一回事：实参走 `goToFilter` ⇒ 容器从来不进选中宇宙（工单 §8.122 / C1 #14 A）。
+        // rail 上那两行同动作的名字已改成 `onFilterWith`，这里没改是因为它属于 `QuickAction` 契约、
+        // 视图项与回收站项也共用同一个字段名。**按 `onSelect` 形状扫选中消费方会把这两行读成已接**
+        // （工单 §8.96 那条 grep 配方就是这类探针）—— 名册（`check-selection-single-source` 断言 I/D）
+        // 认的是 `useSelected('…')` / `selection.select('…')`，所以它不会读错；人读的时候带这句。
         onSelect: () => goToFilter({ kind: 'project', projectId: project.id }),
       })),
       ...projects.tags.map((tag) => ({
@@ -1599,7 +1762,12 @@ export function App(): React.JSX.Element {
       */}
       <PanelEphemeralProvider>
       <AiSettingsNavigationContext.Provider value={openAiSettings}>
-      <div className={`ht-app${withSidebar ? ' ht-app--with-sidebar' : ''}`}>
+      <div
+        className={`ht-app${withSidebar ? ' ht-app--with-sidebar' : ''}`}
+        // 🔴 详情列的**用户选择**（不是几何判断）落在这里，CSS 按它把轨道归零 +
+        // 不渲染那一列（`styles/app/base.css`）。两条各管一件事，见上面那段注释。
+        data-detail={detailPane}
+      >
       {/*
         ═══════════════════════════════════════════════════════════════════════
         🔴 外壳分三层（2026-09-29，落实 `dida-view-unification.md` §1.3 / §4.1 / §4.4）
@@ -1859,7 +2027,7 @@ export function App(): React.JSX.Element {
               />
             ))}
           </div>
-          <ProjectsPanel onSelect={goToFilter} />
+          <ProjectsPanel onFilterWith={goToFilter} />
           {/* 右边缘的拖拽手柄（绝对定位在这一列上，不占布局）。 */}
           <SidebarResizer />
         </nav>
@@ -1980,6 +2148,33 @@ export function App(): React.JSX.Element {
             {/* 语言切换。外壳顶栏的全局控件区，与主题切换并列 ——
                 这是**真实用户唯一能把界面切到英文的入口**（见该文件的注释）。 */}
             <LanguageSwitcher />
+            {/*
+              详情列的开关（工单 W4 ②的第一条路径）。
+              与主题按钮同一档位：**纯图标 + 自带可访问名**，名字说的是"点下去会怎样"
+              （`web.shell.detailPane.{collapse,expand}`），所以文案随状态翻转而不是恒一个"详情"。
+              🔴 它在几何不可行的三档视口里由 CSS 一起藏掉（`narrow.css`）：
+              那一栏没地方画，还留一个按钮就是界面在说谎。
+              `aria-pressed` 报的是"这一栏现在在不在"，与名字互为对照 ——
+              读屏用户不需要看见图标就能知道自己刚按下会收还是会展。
+            */}
+            <button
+              type="button"
+              className="ht-btn ht-btn--ghost ht-app__detail-toggle"
+              data-testid="detail-pane-toggle"
+              aria-label={
+                detailPane === 'collapsed'
+                  ? t('web.shell.detailPane.expand')
+                  : t('web.shell.detailPane.collapse')
+              }
+              aria-pressed={detailPane === 'open'}
+              onClick={toggleDetailPane}
+            >
+              {detailPane === 'collapsed' ? (
+                <PanelRightOpen size={ICON_SIZE.md} aria-hidden="true" />
+              ) : (
+                <PanelRightClose size={ICON_SIZE.md} aria-hidden="true" />
+              )}
+            </button>
             <button
               type="button"
               className="ht-btn ht-btn--ghost"
@@ -2299,7 +2494,7 @@ export function App(): React.JSX.Element {
           {contentView === 'quadrant' && (
             <QuadrantBoard onOpenTask={openTask} activeTaskId={selectedTaskId} />
           )}
-          {contentView === 'habits' && <HabitsView />}
+          {contentView === 'habits' && <HabitsView paneInColumn={detailColumnShown} />}
           {/**
            * 番茄钟。**计时核心来自 `@heyta/ui` 的共享 `FocusPanel`**
            * （与 mobile 同一份实现）。
@@ -2348,7 +2543,7 @@ export function App(): React.JSX.Element {
           {contentView === 'growth' && <GrowthView />}
           {/* 便签。🔴 `NotesView` 里自带一层 `HeytaUiProvider` ——
               上面 tasks 那棵树的 Provider 不覆盖兄弟节点（见该文件头）。 */}
-          {contentView === 'notes' && <NotesView />}
+          {contentView === 'notes' && <NotesView editorInColumn={detailColumnShown} />}
           {/* 倒数纪念日（W5）。与便签同一类：`CountdownView` 自带 `HeytaUiProvider`。 */}
           {contentView === 'countdown' && <CountdownView today={toLocalDate(store.now)} />}
           {contentView === 'trash' && <TrashView />}
@@ -2412,6 +2607,43 @@ export function App(): React.JSX.Element {
                       name="due-display"
                       checked={dueDisplay === d.key}
                       onChange={() => setDueDisplay(d.key)}
+                    />
+                    <span>{t(d.labelKey)}</span>
+                  </label>
+                ))}
+              </div>
+              {/*
+                详情列的常驻/收起（工单 W4 ②的第二条路径）。
+                🔴 与上面那组**同一个 section、同一条说明纪律**（2026-09-30 那条教训：
+                页头上光秃秃的「日期 | 倒计时」没人知道是什么）。这里必须带一句
+                说明，而且那句话要把"**什么时候这一项不起作用**"写进去 ——
+                窗口太窄或太矮时这一栏由几何直接不出现，此时选"常驻"也画不出来；
+                不写清这句，用户会把它当成一个坏掉的开关。
+                ⚠️ 用 `radio` 而不是 `checkbox`：两个档是**互斥的词表**（`open`/`collapsed`），
+                与设备本地存储里那两个值一一对应，不是一个布尔的两面。
+              */}
+              <p className="ht-settings__hint">{t('web.settings.display.detailNote')}</p>
+              <div
+                role="radiogroup"
+                aria-label={t('web.settings.display.detail.title')}
+                className="ht-settings__options"
+                data-testid="detail-pane-pref"
+              >
+                {(
+                  [
+                    { key: 'open' as DetailPanePref, labelKey: 'web.settings.display.detail.modeOpen' },
+                    {
+                      key: 'collapsed' as DetailPanePref,
+                      labelKey: 'web.settings.display.detail.modeCollapsed',
+                    },
+                  ] as const
+                ).map((d) => (
+                  <label key={d.key} className="ht-settings__option">
+                    <input
+                      type="radio"
+                      name="detail-pane-pref"
+                      checked={detailPane === d.key}
+                      onChange={() => setDetailPane(d.key)}
                     />
                     <span>{t(d.labelKey)}</span>
                   </label>
@@ -2553,25 +2785,58 @@ export function App(): React.JSX.Element {
        * "中间一坨里再分两栏"。这条是 W2 的承重判据（`boundingBox` 右边缘相等），
        * 变异臂就是把这一列搬回 `.ht-content` 里面 —— 搬回去它必须转红。
        *
+       * 这一栏按**视图**分派，一格一个所有者（自上而下）：
+       *   · 专注 = **常驻**的"概览 + 记录"（工单 W7，与选中了哪条无关）
+       *   · 便签 = 选中一条便签 ⇒ 同一格出编辑面（工单 §8.130）
+       *   · 习惯 = 选中一条习惯 ⇒ 同一格出板子（§8.133；板子始终一枚是 `motivation.spec`
+       *     白屏检测的前提，未选中时它说的是"选一条习惯…"，见 `HabitDetailCard` 文件头）
+       *   · 任务 / 四象限 / 时间线 = 选中一条任务 ⇒ 同一格出面单（§8.138 起字段逐格搬进来）
+       *   · 其余（含上述各面的未选中态）= AI 面 `aiPanels`
+       *
        * ⚠️ 它**曾经**是空的，而且那是设计不是半成品：产品负责人当时的原话是
-       * "即使没东西也空在那里，一旦选中任何东西右边就出详细的面单"，
-       * 被主计划 §5.4 否决的是"没有选中态时往槽里塞装饰"。
-       * 🔴 **2026-10-04 这条被同一个人推翻**：「右边那一栏……无状态的时候就可以
-       * 默认显示 AI Chatbot」⇒ 任务视图里这一栏装的就是 AI 面（`aiPanels`）。
-       * "选中某条 ⇒ 右边出详情面"那一半**没有**被推翻，它仍属于"详情面本体"那单
-       *（阻塞在拍板 #1/#8）；那一单接进来时替换的是**这一块位置**，不另开第三处。
-       * ⚠️ 这一栏仍然**没有无障碍名**：里面两个面板各自带标题，而这一栏的名字要
-       * 等详情面那单一起定（定名字就要新词条，中英必须成对，不为一半的答案先抄一个）。
+       * "即使没东西也空在那里，一旦选中任何东西右边就出详细的面单"，被主计划 §5.4
+       * 否决的是"没有选中态时往槽里塞装饰"。🔴 2026-10-04 那句被同一个人推翻
+       * （「右边那一栏……无状态的时候就可以默认显示 AI Chatbot」），2026-10-05 起
+       * 便签/习惯/任务三面按的是**正条**：选中才换面单，不另开第三处。
        *
        * ⚠️ 窄屏（≤1023px）这一列不出现，规则与算过的账在 `styles/app/narrow.css`。
-       * AI 面在那一档**退回中间列**，不跟着这一栏一起消失（判据见 `detailHasRoom`）。
+       * AI 面在那一档**退回中间列**（`{detailHasRoom ? null : aiPanels}`，见上面任务列末尾），
+       * 不跟着这一栏一起消失；`detailHasRoom` 由挂在 `detailRef` 上的探针量出来，
+       * ⇒ **那个 ref 是承重的**，不要因为它"只是个 aside"就摘掉。
+       * 其余四面走 `detailColumnShown`（收起态/无位置时生产者自己不出）。
+       *
+       * ⚠️ 这一栏仍然**没有无障碍名**。"因为里面没内容"那句理由已经不成立（五面都在住），
+       * 留着的是另一条：定名字就要新词条、中英必须成对，不在合流这一笔里顺手定。
        */}
       <aside
         ref={detailRef}
         className="ht-app__detail"
         data-testid="detail-column"
       >
-        {detailHasRoom ? aiPanels : null}
+        {contentView === 'focus' ? (
+          <FocusDetailPane />
+        ) : contentView === 'notes' && detailColumnShown ? (
+          /* 那一栏本身没有内边距（`.ht-app__detail` 只有 `border-left`）：每一面自己给 inset。
+             🔴 inset 是**递给生产者的必填参数**，不是在这里包一层 `<div>` ——
+             `check:detail-pane-slot` 的腿 A 不许装配处手写 DOM 标记（它红过一次，实测）。 */
+          <NoteEditorCard inset />
+        ) : contentView === 'habits' && detailColumnShown ? (
+          /* 习惯面单（工单 §8.133）：选中哪一条，这一格就是那一条的板子。
+             没选中时它仍然挂载，说的是"选一条习惯…"（`paneEmptyText`）——
+             板子始终一枚是 `motivation.spec` 白屏检测的前提，与落点无关。 */
+          <HabitDetailCard inset />
+        ) : taskPaneInColumn ? (
+          /* 任务面单（工单 §8.138）：选中哪一条，这一格就是那一条的面单；没选中就不画
+             （沿用便签那一支的先例，见 `TaskDetailCard` 文件头那一段"为什么没有空态"）。
+             四象限与时间线走同一批任务行、同一个 `'task'` 选中态 ⇒ 三面共用这一支。
+             🔴 备注编辑器的落点在**这一格**，所以行尾那颗备注 chip 在这一支成立时不渲染
+             （`renderTaskTrailing` 里的 `noteInColumn`）—— 同一字段任何时刻只有一个所有者。 */
+          <TaskDetailCard />
+        ) : detailHasRoom ? (
+          /* 兜底那一格是 AI 面（2026-10-04 拍板：无选中时默认显示 Chatbot）。
+             🔴 它排在**最后**：上面四面任一成立时这一栏已被占，AI 面不叠第二处。 */
+          aiPanels
+        ) : null}
       </aside>
       </div>
       </AiSettingsNavigationContext.Provider>

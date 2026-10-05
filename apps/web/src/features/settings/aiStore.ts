@@ -45,7 +45,11 @@ import {
   type SecretStore,
 } from '@heyta/ai';
 import { DEFAULT_LOCAL_API_CONFIG, type LocalApiConfig } from '@heyta/local-api';
-import type { AssistantTier } from '@heyta/app-host';
+import {
+  DEFAULT_ASSISTANT_TIER,
+  normalizeAssistantTier,
+  type AssistantTier,
+} from '@heyta/app-host';
 
 export const AI_SETTINGS_STORAGE_KEY = 'heyta.ai.settings';
 
@@ -75,7 +79,7 @@ export interface PersistedAiSettings {
    */
   memoryEnabled: boolean;
   /**
-   * 🔴 **对话式助手的能力档位**（ADR-0045 §2.2）。默认 `read-only`。
+   * 🔴 **对话式助手的能力档位**（ADR-0045 §2.2）。默认由 `@heyta/app-host` 给。
    *
    * 它是**第二个授权前端**，与下面 `localApi.grants` 是两件事，缺一不可：
    *
@@ -88,9 +92,12 @@ export interface PersistedAiSettings {
    * 变的是"谁来勾"。把助手挂在 MCP 那逐工具默认关上，等于让用户为了用助手
    * 去开一个他其实不想给外部程序的能力。
    *
-   * ⚠️ 这一条**读回来时不做"看起来像真"**：只有字符串逐字等于
-   * `'read-and-propose'` 才算开写。别的值、缺字段、旧版本存的 `undefined`
-   * 一律落回 `read-only` —— 与 `memoryEnabled` 同一条 fail-closed 纪律。
+   * ⚠️ **档位的字面量、出厂默认、读回时的 fail-closed 归一都不在这里** ——
+   * 它们在 `@heyta/app-host` 的 `assistant-tier-settings.ts`。这里只负责
+   * **把它存进 Web 的通道**（`localStorage` 的这一块 JSON）。
+   * 理由是 AGENTS.md §3.5：默认值与归一方向决定"模型这一次能不能改用户的数据"，
+   * 那是产品语义；每个壳各写一遍，同一个用户在三个壳上就有三种权限，
+   * 而且**没有任何一层会报错**。
    */
   assistantTier: AssistantTier;
 }
@@ -117,7 +124,8 @@ export function defaultAiSettings(): PersistedAiSettings {
     // 🔴 第四道闸，同样默认关。与 ADR-0014 的 fail-closed 要求一致。
     memoryEnabled: false,
     // 🔴 助手默认**只能读**。要它能提改动，得用户在这里明确切一档。
-    assistantTier: 'read-only',
+    // 默认值本身来自 `@heyta/app-host`（所有壳同一个），不在这里声明。
+    assistantTier: DEFAULT_ASSISTANT_TIER,
   };
 }
 
@@ -146,10 +154,11 @@ export function loadAiSettings(): PersistedAiSettings {
       // 隐私闸门不接受"看起来像真"的值（与 `sanitizeRouting` 对
       // `enabled` 的处理同一条规则）。
       memoryEnabled: candidate.memoryEnabled === true,
-      // 🔴 只有逐字等于"开写"那一档才算开。`true` / `"read_and_propose"` /
-      // 缺字段 / 旧版本存的 `undefined` 一律落回 `read-only` ——
-      // 隐私与写入能力的闸门不接受"看起来像真"的值。
-      assistantTier: candidate.assistantTier === 'read-and-propose' ? 'read-and-propose' : 'read-only',
+      // 🔴 只有**逐字等于**开写那一档才算开；`true`、下划线写法、大小写、
+      // 缺字段、旧版本存的 `undefined` 一律落回只读 —— 与上面 `memoryEnabled`
+      // 同一条 fail-closed 纪律。归一本身不在这里写三元：它在
+      // `@heyta/app-host` 的 `normalizeAssistantTier()`，所有壳共用一份。
+      assistantTier: normalizeAssistantTier(candidate.assistantTier),
       health: {
         version: HEALTH_SNAPSHOT_VERSION,
         entries: toHealthSnapshot(

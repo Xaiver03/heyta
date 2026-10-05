@@ -1,0 +1,261 @@
+{
+  "app": {
+    "host": "node",
+    "name": "heyta"
+  },
+  "counts": {
+    "entities": {
+      "AI_FEEDBACK": {
+        "deleted": 0,
+        "total": 0
+      },
+      "EVENT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "FOCUS_SESSION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "HABIT": {
+        "deleted": 1,
+        "total": 1
+      },
+      "HABIT_LOG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "NOTE": {
+        "deleted": 1,
+        "total": 1
+      },
+      "PREFERENCE_CORRECTION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "PROJECT": {
+        "deleted": 1,
+        "total": 1
+      },
+      "REMINDER": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TAG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TASK": {
+        "deleted": 1,
+        "total": 1
+      }
+    },
+    "opsByEntityType": {
+      "HABIT": 2,
+      "NOTE": 2,
+      "PROJECT": 2,
+      "TASK": 2
+    },
+    "totalDeleted": 4,
+    "totalEntities": 4,
+    "totalOps": 8
+  },
+  "entities": {
+    "AI_FEEDBACK": [],
+    "EVENT": [],
+    "FOCUS_SESSION": [],
+    "HABIT": [
+      {
+        "_lastClientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+        "_lastClock": {
+          "83e5472e-2efc-4fe5-867d-a0af38f611a2": 8
+        },
+        "_lastOpId": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383970-1",
+        "createdAt": 1791210383898,
+        "deletedAt": 1791210383970,
+        "id": "habit-49dcb673-aa8f-4961-abb8-0de42850ec21",
+        "name": "每天阅读 20 分钟",
+        "target": 1,
+        "updatedAt": 1791210383970
+      }
+    ],
+    "HABIT_LOG": [],
+    "NOTE": [
+      {
+        "_lastClientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+        "_lastClock": {
+          "83e5472e-2efc-4fe5-867d-a0af38f611a2": 4
+        },
+        "_lastOpId": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383682-1",
+        "content": "门口便利店要换招牌",
+        "createdAt": 1791210383608,
+        "deletedAt": 1791210383682,
+        "id": "note-5f842a20-848a-40d0-af97-286ad1c5ab34",
+        "isPinnedToToday": false,
+        "updatedAt": 1791210383682
+      }
+    ],
+    "PREFERENCE_CORRECTION": [],
+    "PROJECT": [
+      {
+        "_lastClientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+        "_lastClock": {
+          "83e5472e-2efc-4fe5-867d-a0af38f611a2": 6
+        },
+        "_lastOpId": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383826-1",
+        "createdAt": 1791210383753,
+        "deletedAt": 1791210383826,
+        "id": "project-262dc57c-bad1-4eaa-9c5e-92779602a75c",
+        "name": "年度体检",
+        "updatedAt": 1791210383826
+      }
+    ],
+    "REMINDER": [],
+    "TAG": [],
+    "TASK": [
+      {
+        "_lastClientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+        "_lastClock": {
+          "83e5472e-2efc-4fe5-867d-a0af38f611a2": 2
+        },
+        "_lastOpId": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383535-1",
+        "createdAt": 1791210383464,
+        "deletedAt": 1791210383535,
+        "id": "task-44ada420-9022-4ad2-9c29-2e306d6daca3",
+        "priority": 0,
+        "title": "写周报",
+        "updatedAt": 1791210383535
+      }
+    ]
+  },
+  "exportedAt": "2026-10-05T14:26:24.042Z",
+  "formatVersion": 1,
+  "opLog": [
+    {
+      "actionType": "CRT_TASK",
+      "clientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+      "entityId": "task-44ada420-9022-4ad2-9c29-2e306d6daca3",
+      "entityType": "TASK",
+      "id": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383464-1",
+      "opType": "CRT",
+      "payload": {
+        "priority": 0,
+        "title": "写周报"
+      },
+      "schemaVersion": 1,
+      "timestamp": 1791210383464,
+      "vectorClock": {
+        "83e5472e-2efc-4fe5-867d-a0af38f611a2": 1
+      }
+    },
+    {
+      "actionType": "DEL_TASK",
+      "clientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+      "entityId": "task-44ada420-9022-4ad2-9c29-2e306d6daca3",
+      "entityType": "TASK",
+      "id": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383535-1",
+      "opType": "DEL",
+      "payload": {},
+      "schemaVersion": 1,
+      "timestamp": 1791210383535,
+      "vectorClock": {
+        "83e5472e-2efc-4fe5-867d-a0af38f611a2": 2
+      }
+    },
+    {
+      "actionType": "CRT_NOTE",
+      "clientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+      "entityId": "note-5f842a20-848a-40d0-af97-286ad1c5ab34",
+      "entityType": "NOTE",
+      "id": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383608-1",
+      "opType": "CRT",
+      "payload": {
+        "content": "门口便利店要换招牌",
+        "isPinnedToToday": false,
+        "projectId": null
+      },
+      "schemaVersion": 1,
+      "timestamp": 1791210383608,
+      "vectorClock": {
+        "83e5472e-2efc-4fe5-867d-a0af38f611a2": 3
+      }
+    },
+    {
+      "actionType": "DEL_NOTE",
+      "clientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+      "entityId": "note-5f842a20-848a-40d0-af97-286ad1c5ab34",
+      "entityType": "NOTE",
+      "id": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383682-1",
+      "opType": "DEL",
+      "payload": {},
+      "schemaVersion": 1,
+      "timestamp": 1791210383682,
+      "vectorClock": {
+        "83e5472e-2efc-4fe5-867d-a0af38f611a2": 4
+      }
+    },
+    {
+      "actionType": "CRT_PROJECT",
+      "clientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+      "entityId": "project-262dc57c-bad1-4eaa-9c5e-92779602a75c",
+      "entityType": "PROJECT",
+      "id": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383753-1",
+      "opType": "CRT",
+      "payload": {
+        "name": "年度体检",
+        "parentId": null
+      },
+      "schemaVersion": 1,
+      "timestamp": 1791210383753,
+      "vectorClock": {
+        "83e5472e-2efc-4fe5-867d-a0af38f611a2": 5
+      }
+    },
+    {
+      "actionType": "DEL_PROJECT",
+      "clientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+      "entityId": "project-262dc57c-bad1-4eaa-9c5e-92779602a75c",
+      "entityType": "PROJECT",
+      "id": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383826-1",
+      "opType": "DEL",
+      "payload": {},
+      "schemaVersion": 1,
+      "timestamp": 1791210383826,
+      "vectorClock": {
+        "83e5472e-2efc-4fe5-867d-a0af38f611a2": 6
+      }
+    },
+    {
+      "actionType": "CRT_HABIT",
+      "clientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+      "entityId": "habit-49dcb673-aa8f-4961-abb8-0de42850ec21",
+      "entityType": "HABIT",
+      "id": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383898-1",
+      "opType": "CRT",
+      "payload": {
+        "name": "每天阅读 20 分钟",
+        "target": 1
+      },
+      "schemaVersion": 1,
+      "timestamp": 1791210383898,
+      "vectorClock": {
+        "83e5472e-2efc-4fe5-867d-a0af38f611a2": 7
+      }
+    },
+    {
+      "actionType": "DEL_HABIT",
+      "clientId": "83e5472e-2efc-4fe5-867d-a0af38f611a2",
+      "entityId": "habit-49dcb673-aa8f-4961-abb8-0de42850ec21",
+      "entityType": "HABIT",
+      "id": "83e5472e-2efc-4fe5-867d-a0af38f611a2-1791210383970-1",
+      "opType": "DEL",
+      "payload": {},
+      "schemaVersion": 1,
+      "timestamp": 1791210383970,
+      "vectorClock": {
+        "83e5472e-2efc-4fe5-867d-a0af38f611a2": 8
+      }
+    }
+  ],
+  "schemaVersion": 1
+}

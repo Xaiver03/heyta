@@ -2,6 +2,7 @@
   "name": "@heyta/sync-core",
   "version": "1.0.0",
   "description": "Framework-agnostic core types and utilities for heyta sync (vendored from Super Productivity)",
+  "license": "MIT",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",

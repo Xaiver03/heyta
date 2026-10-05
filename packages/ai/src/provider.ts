@@ -286,7 +286,7 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
           ok: false,
           reason: 'egress-not-authorized',
           message:
-            `该功能需要你先授权数据出境。\n` +
+            `该功能需要你先批准内容离开本机。\n` +
             `发送内容：${d.fields.join('、') || '（无）'}\n` +
             `${d.destinationText}\n保留：${retention}`,
         };

@@ -230,13 +230,60 @@
   gap: var(--ht-space-1);
 }
 
+/**
+ * 🔴 只有"出处"这一种徽标需要让位，所以修在修饰符上，不动共用那条。
+ *
+ * 成因是看图看出来的（第一趟截图里年份显示成「2026…」，而全套文本断言是绿的 ——
+ * DOM 里文字完整，裁切只发生在渲染上）。一条 gov.cn 的 URL 有 60+ 字符，
+ * 徽标容器的 **flex-basis 默认是它的 max-content**（两条 URL 排一行 ≈ 1140px），
+ * 而 `rowMain` 是 `flex: 1`（= `1 1 0%`：只长不占）。整行没有多余空间可分时，
+ * **先占得多的一方赢** ⇒ 年份只剩 48px。
+ *
+ * ⚠️ 第一版只加了 `min-inline-size: 0` + `flex-wrap: wrap`，实测 `clientWidth` **仍是 48**：
+ * 那两条让它**肯收缩**，却没改变它**先占多少**。是判据自己那条正向对照
+ * （`clientWidth > 100`）把这次无效修复照出来的 —— 没有它，"没被裁切"会读成通过。
+ * 正解是给这一格一个 0 basis 并让它参与生长，URL 则在徽标内部折行。
+ *
+ * ⚠️ 不给共用的 `.ht-settings__admin-badges` 加 `flex: 1 1 0` 的理由：用户列表那排徽标
+ * 共用它，而那里 `rowMain` 装的是**邮箱** —— 分一半宽度给徽标是回归，不是修复。
+ */
+.ht-settings__admin-badges--papers {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  flex-wrap: wrap;
+}
+
+/**
+ * 🔴 年度那一格**整条不许裁切**（`white-space: nowrap` + 省略号是共用的
+ * `.ht-settings__admin-rowMain` 的行为，对邮箱那排是对的，对这一排是缺陷）。
+ *
+ * 上一条 `--papers` 让徽标那排肯收缩了，但**没解决这一格自己有多长**：
+ * "2026 · 2 天安排 · 国务院办公厅通知" 是一条 nowrap 的整串，
+ * 行内没有多余空间时它仍然被裁掉 13px ⇒ 年份看不见（实测读数，非推断）。
+ * 年度、条数、备注三条都是运营要核对的内容，**没有一条是可以被省略号替掉的**，
+ * 所以这里按"内容必须全部可见"改，而不是把 URL 拍短。
+ *
+ * 不动共用那条的理由与 `--papers` 同：邮箱排里 ellipsis 是**有意的**。
+ */
+.ht-settings__admin-rowMain--wrap {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
 .ht-settings__admin-badge {
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-border-subtle);
   color: var(--ht-color-foreground-muted);
   font-size: var(--ht-font-size-2xs);
   padding: 0 var(--ht-space-2);
-  white-space: nowrap;
+  /**
+   * 出处 URL 不许截断显示：运营要核对的就是那串地址本身。
+   * `overflow-wrap: anywhere` 同时影响内在宽度（不像 `word-break: break-word` 那样不影响），
+   * 所以它是"这一格能收缩到一行以内"的前提 —— 少了它，徽标的 min-content 就是一整条 URL。
+   */
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
 }
 
 .ht-settings__admin-badge--admin {

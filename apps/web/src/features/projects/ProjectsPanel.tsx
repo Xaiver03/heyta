@@ -10,10 +10,10 @@ import { ICON_SIZE } from '@heyta/design-system';
  *   1. 文案（`web.projects.*` / `web.tags.*`）；
  *   2. 数据从哪来（`useProjectStore` / `useTaskStore`）；
  *   3. 平台特有物：DOM `<form><input>` + `<ColorSlotPicker>`；
- *   4. 点一行之后要做什么 —— **必须经由 `onSelect`，不能直接 `tasks.setFilter`**。
+ *   4. 点一行之后要做什么 —— **必须经由 `onFilterWith`，不能直接 `tasks.setFilter`**。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴 点清单必须经由 `onSelect`，不能直接 `tasks.setFilter`
+ * 🔴 点清单必须经由 `onFilterWith`，不能直接 `tasks.setFilter`
  *
  * 侧栏在**所有视图**下都渲染（任务 / 四象限 / 习惯 / 番茄 / 时间线 / 成长 / 设置），
  * 而清单筛选只对**任务视图**有意义。直接 `setFilter` 会让"人在习惯页、点某个清单"
@@ -71,10 +71,10 @@ import { useTaskStore, type TaskFilter } from '../tasks/store.js';
 import { useProjectStore } from './store.js';
 
 export function ProjectsPanel({
-  onSelect,
+  onFilterWith,
 }: {
   /** 用户选了某个清单 / 标签。宿主负责切视图并落筛选（见文件头）。 */
-  onSelect: (filter: TaskFilter) => void;
+  onFilterWith: (filter: TaskFilter) => void;
 }) {
   const { t } = useI18n();
   const projects = useProjectStore();
@@ -283,8 +283,8 @@ export function ProjectsPanel({
               empty: t('common.organizer.lists.empty'),
               emptyHint: t('common.organizer.lists.empty.hint'),
             }}
-            onSelect={(item) => {
-              onSelect({ kind: 'project', projectId: item.id });
+            onFilterWith={(item) => {
+              onFilterWith({ kind: 'project', projectId: item.id });
             }}
             onRename={(item, name) => {
               void projects.renameProject(item.id, name);
@@ -403,7 +403,7 @@ export function ProjectsPanel({
             🔴 标签名此前是一个**不可点的 `<span>`** —— 于是 `TaskFilter` 的
             `{ kind: 'tag' }` 分支虽然存在于共享层（`packages/domain/src/task-filter.ts`）
             并有单测，**却没有任何界面能把筛选切过去**。现在它与清单走同一份
-            `OrganizerList`，`onSelect` 必须传下去 —— 否则这个空洞会静默回来。
+            `OrganizerList`，`onFilterWith` 必须传下去 —— 否则这个空洞会静默回来。
           */}
           <OrganizerList
             kind="tag"
@@ -431,8 +431,8 @@ export function ProjectsPanel({
               empty: t('common.organizer.tags.empty'),
               emptyHint: t('common.organizer.tags.empty.hint'),
             }}
-            onSelect={(item) => {
-              onSelect({ kind: 'tag', tagId: item.id });
+            onFilterWith={(item) => {
+              onFilterWith({ kind: 'tag', tagId: item.id });
             }}
             onRename={(item, name) => {
               void projects.renameTag(item.id, name);

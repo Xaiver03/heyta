@@ -1,5 +1,5 @@
 /**
- * 任务行上的「整理」控件：清单归属 + 标签
+ * 任务行上的「整理」：清单归属 + 标签
  * ==========================================
  *
  * 🔴 **这个文件补的是 Web 端的一个真实空洞。**
@@ -10,6 +10,24 @@
  * 于是 Web 上的标签只能"建出来放在侧栏里看着"，一个都用不上。
  *
  * （移动端在上一轮补的正是同一件事。两端都缺，只是移动端先修的。）
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ## 这一格里今天有三个导出，不是一个
+ *
+ * 工单 §8.147 把"整理"搬进详情列那一格，走的是这条线已经用了五次的形状
+ * （备注 §8.138 / 重复 §8.141 / 子任务 §8.144 / 提醒 §8.145 / 截止 §8.146）：
+ * **一份实现、两个落点**，宿主读同一枚 `taskPaneInColumn`。于是必须拆开——
+ *
+ * | 导出 | 是什么 | 画在哪 |
+ * |---|---|---|
+ * | `OrganizerField` | 编辑本体（清单下拉 + 标签复选框），**不带**展开机关与浮层外壳 | `TaskDetailCard`（栏里）**和** `TaskOrganizer`（行尾那支内） |
+ * | `TagChips` | 只读显示（挂了哪几个标签） | `App.tsx` 行尾：宽档只剩它，窄档在 `TaskOrganizer` 里 |
+ * | `TaskOrganizer` | `TagChips` + `<summary>` 触发器 + `<details>` + `.ht-material` 外壳，内嵌 `OrganizerField` | `App.tsx` 行尾，只在窄档 |
+ *
+ * 🔴 为什么**显示**留在行上、不像截止那样整块撤掉：截止那一格的显示今天另有其人
+ * （共享 `TaskBadges` 的 `task-meta` 槽），而**标签在共享层没有对应槽**（见下面第 1 条决定），
+ * 这一处 chip 就是它的唯一显示位 —— 撤掉就等于"列表里看不出哪条挂了标签"，
+ * 那是 §8.138 那条不变量明确不许的（搬进栏里不能丢掉"扫一眼看得出"）。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 三个刻意的决定
@@ -47,7 +65,53 @@ import { selectChildProjects, selectTopLevelProjects, useProjectStore } from '..
 const CHIP_ICON_SIZE = 12;
 const TRIGGER_ICON_SIZE = 14;
 
-export function TaskOrganizer({
+const chipStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: cssVar('space.1'),
+  padding: `${cssVar('space.1')} ${cssVar('space.2')}`,
+  borderRadius: cssVar('radius.full'),
+  fontSize: cssVar('font-size.xs'),
+  color: cssVar('color.foreground-muted'),
+  whiteSpace: 'nowrap',
+};
+
+/**
+ * 只读显示：这条任务挂了哪几个标签。**两档都要画**（宽档行上只剩它）。
+ *
+ * ⚠️ `tagIds` 里可能有**查不到的 id**（标签在另一台设备上被删了，而这条 op
+ * 还没同步过来）。`filter` 掉它们，而不是渲染一个名字为空的 chip ——
+ * 后者看起来像界面坏了。数据仍然在 `tagIds` 里，等同步回来就会重新出现。
+ */
+export function TagChips({ task }: { task: Task }): React.JSX.Element | null {
+  const projectState = useProjectStore();
+  const assignedTags = projectState.tags.filter((tag) => task.tagIds?.includes(tag.id) ?? false);
+  if (assignedTags.length === 0) return null;
+
+  return (
+    <>
+      {assignedTags.map((tag) => (
+        <span key={tag.id} style={chipStyle} data-testid="task-chip-tag">
+          <TagIcon size={CHIP_ICON_SIZE} aria-hidden="true" />
+          {tag.name}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * 编辑本体：清单归属下拉 + 标签复选框。**不带 `<details>`，也不带 `.ht-material`** ——
+ * 那两件是"这一格在哪儿画"的细节，属于行尾那一支。
+ *
+ * 🔴 它**自带两个区块头**（`<label>` 里那句「清单」与 `<fieldset>` 的 `<legend>`「标签」），
+ * 所以宿主不许再叠 `<h3>`：两处同一个词说两遍，读到的是"有两个区块"
+ * （§8.141 的 R4 与 §8.145 的 M2 钉的就是这一档）。
+ * 🔴 它**全程零 `useState`**（两个控件都是受控于 store），所以搬进栏里**不需要** `key` ——
+ * §8.145 那条纪律（"有本地 state 才要 key"）在这一格落在"不挂"那一侧，
+ * 与截止那一格（`DatePicker` 带 `useState(month)` ⇒ **必须**挂）正好相反。
+ */
+export function OrganizerField({
   task,
   onMoveToProject,
   onSetTags,
@@ -62,14 +126,6 @@ export function TaskOrganizer({
   const projectState = useProjectStore();
 
   const tops = selectTopLevelProjects(projectState);
-  /**
-   * 已挂上的标签。
-   *
-   * ⚠️ `tagIds` 里可能有**查不到的 id**（标签在另一台设备上被删了，而这条 op
-   * 还没同步过来）。`filter` 掉它们，而不是渲染一个名字为空的 chip ——
-   * 后者看起来像界面坏了。数据仍然在 `tagIds` 里，等同步回来就会重新出现。
-   */
-  const assignedTags = projectState.tags.filter((tag) => task.tagIds?.includes(tag.id) ?? false);
 
   /** 清单下拉的选项：顶层 + 其子清单（领域层只支持一层）。 */
   const projectOptions = tops.flatMap((top) => [
@@ -82,16 +138,108 @@ export function TaskOrganizer({
     })),
   ]);
 
-  const chipStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: cssVar('space.1'),
-    padding: `${cssVar('space.1')} ${cssVar('space.2')}`,
-    borderRadius: cssVar('radius.full'),
-    fontSize: cssVar('font-size.xs'),
-    color: cssVar('color.foreground-muted'),
-    whiteSpace: 'nowrap',
-  };
+  return (
+    <>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.1') }}>
+        <span style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}>
+          {t('web.organize.projectLabel')}
+        </span>
+        <select
+          // 与视觉标签**同名会撞**（读屏与验收都靠这个定位），
+          // 所以 aria-label 带上任务标题做区分。
+          aria-label={t('web.organize.projectSelect', { title: task.title })}
+          data-testid="organize-project-select"
+          value={task.projectId ?? ''}
+          onChange={(event) => {
+            const next = event.target.value;
+            // 空字符串 = 「收集箱」。传 `undefined` 而不是 `''` ——
+            // app-host 会把它写成 `null`（清除该字段）。
+            onMoveToProject(next === '' ? undefined : next);
+          }}
+        >
+          <option value="">{t('web.organize.inbox')}</option>
+          {projectOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {projectState.tags.length === 0 ? (
+        // 一个标签都没有时**说明去哪建**。留一片空白会让人以为这功能坏了。
+        <p style={{ margin: 0, fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-subtle') }}>
+          {t('web.organize.noTags')}
+        </p>
+      ) : (
+        <fieldset
+          style={{
+            margin: 0,
+            padding: 0,
+            border: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: cssVar('space.1'),
+          }}
+        >
+          <legend
+            style={{
+              padding: 0,
+              fontSize: cssVar('font-size.xs'),
+              color: cssVar('color.foreground-muted'),
+            }}
+          >
+            {t('web.organize.tagsLegend')}
+          </legend>
+          {projectState.tags.map((tag) => {
+            const checked = task.tagIds?.includes(tag.id) ?? false;
+            return (
+              <label
+                key={tag.id}
+                style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2') }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  aria-label={t('web.organize.tagToggle', { name: tag.name, title: task.title })}
+                  onChange={() => {
+                    const current = task.tagIds ?? [];
+                    // 去重与"空数组写 null"由 `app-host` 的 `setTags` 决定。
+                    onSetTags(
+                      checked
+                        ? current.filter((id) => id !== tag.id)
+                        : [...current, tag.id],
+                    );
+                  }}
+                />
+                {tag.name}
+              </label>
+            );
+          })}
+        </fieldset>
+      )}
+    </>
+  );
+}
+
+/**
+ * 行尾那一整块：只读 chip + 展开机关 + 玻璃浮层，浮层里装的是 `OrganizerField`。
+ *
+ * ⚠️ 工单 §8.147 起宿主**只在窄档**挂它（`taskPaneInColumn` 为假）——
+ * 宽档行上只剩 `TagChips`，编辑本体住在详情列那一格。
+ */
+export function TaskOrganizer({
+  task,
+  onMoveToProject,
+  onSetTags,
+}: {
+  task: Task;
+  /** 传 `undefined` 表示移出清单（收集箱）。 */
+  onMoveToProject: (projectId: string | undefined) => void;
+  /** 传**整组**。算"用户想要哪一组"是本组件的责任。 */
+  onSetTags: (tagIds: string[]) => void;
+}): React.JSX.Element {
+  const { t } = useI18n();
 
   return (
     <span
@@ -108,12 +256,7 @@ export function TaskOrganizer({
         **同一行里出现两遍清单名**。抽取的收尾动作是删掉旧的那份（AGENTS §3.5）。
         标签 chip 留下：共享层没有标签徽章，这里就是它的唯一显示位。
       */}
-      {assignedTags.map((tag) => (
-        <span key={tag.id} style={chipStyle} data-testid="task-chip-tag">
-          <TagIcon size={CHIP_ICON_SIZE} aria-hidden="true" />
-          {tag.name}
-        </span>
-      ))}
+      <TagChips task={task} />
 
       <details>
         {/*
@@ -154,83 +297,11 @@ export function TaskOrganizer({
             boxShadow: cssVar('shadow.lg'),
           }}
         >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.1') }}>
-            <span style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}>
-              {t('web.organize.projectLabel')}
-            </span>
-            <select
-              // 与视觉标签**同名会撞**（读屏与验收都靠这个定位），
-              // 所以 aria-label 带上任务标题做区分。
-              aria-label={t('web.organize.projectSelect', { title: task.title })}
-              value={task.projectId ?? ''}
-              onChange={(event) => {
-                const next = event.target.value;
-                // 空字符串 = 「收集箱」。传 `undefined` 而不是 `''` ——
-                // app-host 会把它写成 `null`（清除该字段）。
-                onMoveToProject(next === '' ? undefined : next);
-              }}
-            >
-              <option value="">{t('web.organize.inbox')}</option>
-              {projectOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {projectState.tags.length === 0 ? (
-            // 一个标签都没有时**说明去哪建**。留一片空白会让人以为这功能坏了。
-            <p style={{ margin: 0, fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-subtle') }}>
-              {t('web.organize.noTags')}
-            </p>
-          ) : (
-            <fieldset
-              style={{
-                margin: 0,
-                padding: 0,
-                border: 'none',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: cssVar('space.1'),
-              }}
-            >
-              <legend
-                style={{
-                  padding: 0,
-                  fontSize: cssVar('font-size.xs'),
-                  color: cssVar('color.foreground-muted'),
-                }}
-              >
-                {t('web.organize.tagsLegend')}
-              </legend>
-              {projectState.tags.map((tag) => {
-                const checked = task.tagIds?.includes(tag.id) ?? false;
-                return (
-                  <label
-                    key={tag.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: cssVar('space.2') }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      aria-label={t('web.organize.tagToggle', { name: tag.name, title: task.title })}
-                      onChange={() => {
-                        const current = task.tagIds ?? [];
-                        // 去重与"空数组写 null"由 `app-host` 的 `setTags` 决定。
-                        onSetTags(
-                          checked
-                            ? current.filter((id) => id !== tag.id)
-                            : [...current, tag.id],
-                        );
-                      }}
-                    />
-                    {tag.name}
-                  </label>
-                );
-              })}
-            </fieldset>
-          )}
+          <OrganizerField
+            task={task}
+            onMoveToProject={onMoveToProject}
+            onSetTags={onSetTags}
+          />
         </div>
       </details>
     </span>

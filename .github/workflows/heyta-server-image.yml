@@ -186,7 +186,11 @@ jobs:
           build-args: |
             VCS_REF=${{ steps.sha.outputs.revision }}
           provenance: false
-          # 平台：与 `server/Dockerfile` 现有实测范围一致（本机 amd64/arm64 单架构）。
-          # 🔴 加 platforms 之前要先确认 web stage 与 npm 安装在目标架构上真跑过，
-          # 否则 multi-arch 会打出"只有一层是好的"镜像。见 docs/reference/build-matrix.md。
+          # 平台：只发 linux/amd64。⚠️ 这**不是**"两个架构都实测过"——本仓库的自托管整套验收
+          # （`pnpm verify:selfhost-stack`）跑的是 `docker build` 不带 `--platform` 的那枚，
+          # 也就是**构建机的架构**；2026-10-04 现量是 linux/arm64（`docker image inspect`）。
+          # 所以截至目前 amd64 这枚发布物**没有任何一次运行证据**，而两枚镜像里按平台切分的
+          # 二进制包不是同一批（§8.38 / G-53）。要加 platforms 得先确认 web stage 与 npm
+          # 安装在目标架构上真跑过，否则 multi-arch 会打出"只有一层是好的"镜像。
+          # 见 docs/reference/build-matrix.md。
           platforms: linux/amd64

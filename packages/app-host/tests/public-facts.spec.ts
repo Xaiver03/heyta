@@ -17,7 +17,13 @@ import { describe, expect, it } from 'vitest';
 
 import { META_KEYS } from '@heyta/storage';
 import { HOLIDAY_ADJUSTMENT_PATHS, PUBLIC_FACT_SHAPES } from '@heyta/shared-schema';
-import { adjustmentOn, holidayPapersFor } from '@heyta/domain';
+import {
+  adjustmentOn,
+  clearHolidayAdjustmentOverrides,
+  holidayAdjustmentSource,
+  holidayCoverage,
+  holidayPapersFor,
+} from '@heyta/domain';
 
 import {
   installPublicFactsFromCache,
@@ -249,5 +255,67 @@ describe('公共事实的下行（客户端半）', () => {
     const cache = fakeCache();
 
     await expect(installPublicFactsFromCache(cache)).resolves.toBeUndefined();
+  });
+
+  /**
+   * 🔴 撤回必须落地：批次里**少一年** ⇒ 那一年退回随包表。
+   *
+   * 这条用例的存在理由：`installHolidayAdjustmentOverrides` 只做 `set`，
+   * 覆盖表从来不清空，所以运营 DELETE 掉某一年之后，客户端**永远继续**替部署方
+   * 说那句已被收回的话（`adjustmentOn()` 仍答那一年）。ADR-0052 §2.2 承诺的是
+   * "下一次拉取退回随包表"，而修之前这条承诺没有任何一层在守。
+   *
+   * 断言写成**相对量**（与装覆盖之前那次现读的随包答案对账），不写死某一天是休是班 ——
+   * 随包表每加一年就会漂，写死数值会让这条判据在 vendor 数据更新后悄悄变成恒真或恒红。
+   */
+  it('🔴 批次少一年 ⇒ 那一年退回随包表，而批次里剩下的那一年不许被牵连', async () => {
+    const { to } = holidayCoverage();
+    const probeDay = `${String(to)}-05-05`;
+    clearHolidayAdjustmentOverrides();
+    const bundledAnswer = adjustmentOn(probeDay);
+
+    const cache = fakeCache();
+    const bodyWithBoth = {
+      version: '1730000000000.2.3',
+      years: [
+        {
+          year: YEAR,
+          papers: ['https://www.gov.cn/gongshu/example-2027'],
+          days: [
+            { day: '2027-01-02', isOffDay: true },
+            { day: '2027-02-20', isOffDay: false },
+          ],
+        },
+        {
+          year: to,
+          papers: [`https://www.gov.cn/gongshu/example-${String(to)}`],
+          days: [
+            { day: probeDay, isOffDay: false },
+            { day: `${String(to)}-05-06`, isOffDay: true },
+          ],
+        },
+      ],
+    };
+
+    const first = await refreshPublicFacts(
+      configured(cache, fetchJson(bodyWithBoth).impl),
+    );
+    expect(first.kind).toBe('ok');
+    expect(adjustmentOn(probeDay), '覆盖里说的"这天上班"必须改答').toBe('work');
+    expect(holidayAdjustmentSource(probeDay)).toBe('override');
+
+    // 运营把 `to` 那一年整年撤回：批次里只剩 2027。
+    const second = await refreshPublicFacts(
+      configured(cache, fetchJson({ version: '1730000000001.1.2', years: [bodyWithBoth.years[0]!] }).impl),
+    );
+    expect(second.kind).toBe('ok');
+
+    expect(adjustmentOn(probeDay), '已撤回的那一年不许继续替部署方说话').toBe(bundledAnswer);
+    expect(holidayAdjustmentSource(probeDay)).toBe('bundled');
+    // 另一半：整批替换不是"全清"—— 批次里还在的那一年必须仍然用下发的那一份。
+    expect(adjustmentOn('2027-01-02')).toBe('off');
+    expect(holidayAdjustmentSource('2027-01-02')).toBe('override');
+
+    clearHolidayAdjustmentOverrides();
   });
 });

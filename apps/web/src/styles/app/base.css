@@ -88,3 +88,165 @@
      "列宽 == token 值"的等值判据依赖的正是这一点。 */
   padding-inline: var(--ht-space-4);
 }
+
+/*
+ * 用户**主动收起**（工单 W4）。状态由 `App.tsx` 写在 `.ht-app` 的 `data-detail` 上，
+ * 设备本地持久化（`features/shell/detail-pane-pref.ts`）。
+ *
+ * 🔴 收起必须**同时**做两件事：轨道归零 + 这一列不渲染。只做后者会让 grid 里
+ * 留着一条 `clamp()` 算出来的空轨道 —— 症状是"右边凭空多出一道空白、中间那一列被挤窄"，
+ * 而 `display: none` 的那个子项本身已经看不见了，所以**截图和断言都容易读成"收好了"**。
+ * 承重判据因此不是"这一列不见了"，而是"`.ht-main` 的右边缘 == 视口右边缘"（没有死轨道）。
+ * 走 `--ht-detail-track` 而不是重抄两条 `grid-template-columns`，与 W2 同一条理由。
+ *
+ * ⚠️ 这一条只管"用户收没收"。视口够不够是另一件事，断点在 `narrow.css`
+ * —— 两处的理由不同（一个是选择、一个是几何可行性），不许合成一个布尔。
+ */
+.ht-app[data-detail='collapsed'] {
+  --ht-detail-track: 0;
+}
+
+/* ── 详情列的内容：专注概览（工单 W7）───────────────────────
+ *
+ * ⚠️ 命名全部挂在既有的 `.ht-app` 族下（`.ht-app__detail-*`），
+ * 不新起 `.ht-focus` 一族 —— `check:row-single-source` 数的是顶层 `ht-*` 家族名，
+ * 而它余量为 0（28 = 基线 28）。同一先例见上面 `.ht-app__detail` 那段注释。
+ */
+.ht-app__detail-focus {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-4);
+}
+
+/*
+ * 便签面单（工单 §8.130）—— 同一档内边距，理由与上面那条不同。
+ *
+ * 🔴 共享 `NoteEditor` 原来只出现在中间那一列（宽度有余量），换进这根 22rem 的栏里
+ * 会**贴住窗口右边缘**：实测面单里输入框与保存按钮的右边缘 = 1280 = 列的右边缘，
+ * 于是按钮的圆角被窗口边切掉，看起来像"界面被裁了一半"。
+ * 栏本身没有 padding（`.ht-app__detail` 只有 `border-left`），所以**每一面自己给 inset** ——
+ * 与 `.ht-app__detail-focus` 同一个模式，不是重复：两面的区块结构不同，
+ * 合成一个"通用详情面"类会让专注概览那套 gap 规则套到便签上。
+ *
+ * 承重判据在 `e2e/tests/detail-pane-note-editor.spec.ts` 的 N1：
+ * 面单里每一格控件的右边缘必须留出栏内间距，间距**从 `--ht-space-4` 推导**，不抄字面量。
+ */
+.ht-app__detail-note {
+  padding: var(--ht-space-4);
+}
+
+/*
+ * 习惯面单（工单 §8.133）—— 与上面两档同一内边距，但它是**同一枚元素上的第二个类**，
+ * 不是又一层壳：面单那块 DOM 在两个落点里是同一枚（`.ht-habit__pane`），
+ * 只有落点在换。多套一层 `<div>` 会让"全页只有一块板"那类判据之外再多一处
+ * 与布局无关的盒子，也会让窄屏塌缩那条 `padding-top + border-top` 算错参照。
+ *
+ * ⚠️ 这一栏宽 22rem（`--ht-layout-detail-width`），而板子里最宽的是 90 天热力图。
+ * 它会不会撑破这一栏，只有浏览器知道 ⇒ 判据在 `e2e/tests/detail-pane-habit.spec.ts`
+ * 的 H5（逐控件 containment + 不许出现横向溢出），不是这里的一行注释。
+ */
+.ht-app__detail-habit {
+  padding: var(--ht-space-4);
+}
+
+/*
+ * 任务面单（工单 §8.138）—— 同一档内边距，同一个理由。
+ *
+ * ⚠️ `overflow-wrap` 挂在这一格而不是标题上：它是**可继承**属性，而这一栏里
+ * 用户自己写的字有两处（标题与备注正文），两处都要挡住"一个长词撑破 22rem 的栏"。
+ * 承重判据在 `e2e/tests/detail-pane-task.spec.ts`（逐控件 containment）。
+ */
+.ht-app__detail-task {
+  overflow-wrap: anywhere;
+  padding: var(--ht-space-4);
+}
+
+.ht-app__detail-heading {
+  /* 区块标题档：lg + semibold（AGENTS §5 的文字层级表）。
+     刻意**不是** xl —— 一屏一个页标题，页标题在 `.ht-header__title`。 */
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  color: var(--ht-color-foreground);
+}
+
+.ht-app__detail-cards {
+  display: grid;
+  /* 两列等宽；`minmax(0, 1fr)` 让长数字（"12 小时 30 分钟"）不会把列撑破。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-3);
+}
+
+.ht-app__detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-app__detail-card-label {
+  /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-app__detail-card-value {
+  /* 🔴 `.tabular-nums` 不是装饰：番茄钟与统计数字不加它，
+     每次"25 → 24"这种变化都会让整列宽度抖一下（AGENTS §5 明列的常见错）。 */
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground);
+}
+
+.ht-app__detail-records {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ht-app__detail-record {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ht-space-1) var(--ht-space-2);
+  align-items: baseline;
+  padding-block: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 排版四件套来自语义档位类 `ht-type-row-meta`（JSX 与本类成对出现）。 */
+}
+
+.ht-app__detail-record-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-app__detail-record-duration {
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground);
+}
+
+.ht-app__detail-record-task {
+  /* 任务名是最长的一段，给它整行的省略权而不是把列撑破。 */
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-app__detail-record-aborted {
+  /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-app[data-detail='collapsed'] .ht-app__detail {
+  display: none;
+}

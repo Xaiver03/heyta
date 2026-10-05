@@ -883,12 +883,37 @@ bash apps/desktop-windows/scripts/package-msix.sh
 前置：macOS 需要 `swift`；Linux 走 SSH 到 `sanjiaozhou`（Ubuntu 24.04，有 gtk4/jsc/dpkg-deb）；
 Windows 走 SSH 到 `windows-pc`（Win11，Windows SDK x64 + dotnet 10 + 管理员）。
 
-🔴 **macOS 那条的公证一步有上限**：`HEYTA_NOTARY_TIMEOUT`（默认 900 秒，`0` = 显式要旧行为"不设限"）。
-`notarytool submit --wait` 在 Apple 侧不回话时会**永久挂住** —— 2026-10-04 实测一条 `reinstall:all`
-卡在那一行 1h57m，累计 CPU 0:00.03 且**零条 TCP 连接**（连重试都没在重试）。**超时不判通过**：
-它走"没通过公证"那一支，不装订票据，并把 rc=124 与 Apple 真实拒绝（rc≠0）分开报。
-裸 macOS 不带 `timeout`（那是 GNU coreutils），所以还有一条纯 bash 看门狗兜底 —— 否则"没装 homebrew
-的打包机"这个默认情况会退化成没有上限。
+🔴 **mac 第 ⑥ 步（公证）现在有两个旋钮，各管一件事，别混着读。**
+
+· `HEYTA_NOTARY_TIMEOUT`（**上限**，默认 900 秒，`0` = 显式要旧行为"不设限"）。
+  `notarytool submit --wait` 在 Apple 侧不回话时会**永久挂住** —— 2026-10-04 实测一条 `reinstall:all`
+  卡在那一行 1h57m，累计 CPU 0:00.03 且**零条 TCP 连接**（连重试都没在重试）。**超时不判通过**：
+  它走"没通过公证"那一支，不装订票据，并把 rc=124 与 Apple 真实拒绝（rc≠0）分开报。
+  裸 macOS 不带 `timeout`（那是 GNU coreutils），所以还有一条纯 bash 看门狗兜底 ——
+  否则"没装 homebrew 的打包机"这个默认情况会退化成没有上限。
+· `HEYTA_SKIP_NOTARIZE=1`（**跳过整步**，默认不跳、行为逐字不变）。用它之前先认清它**不**改变任何判据：
+  第 ⑥ 步从不在退出码里（`if xcrun notarytool … | tail -8 | awk` 判的是 `awk` 的码，公证失败分支只打印
+  一句红就继续走完 —— §7 第 179 条那个形状），所以它**不可能**把红跳成绿。反过来，跳过之后那一趟
+  **不许**主张"包已通过公证"；那句只有不带这个变量、且没走到 rc=124 的一趟能写。
+  分支三臂实测：不设 ⇒ 走提交、`=0` ⇒ 走提交、`=1` ⇒ 跳过（默认行为逐字不变）。
+
+⚠️ **合并时的裁决记录**：这一版文档此前写的是"公证是唯一没有上界的一步"，那是**假的** ——
+另一条线把 `HEYTA_NOTARY_TIMEOUT` 落进了 `package-app.sh:293`（默认 900）。留这句是为了让后来人认出
+"**文档里那句关于代码的事实，保质期取决于别人什么时候把它改掉**"：两个旋钮都是这同一份脚本里的，
+现量一行 `grep -n HEYTA_NOTARY_TIMEOUT apps/desktop-macos/scripts/package-app.sh` 就能判文档对不对。
+
+🔴 **`reinstall-all.sh` 的 mac 段会 `rm -rf` 它的输出目录，而那个目录以前是写死的** ——
+`HEYTA_MACOS_DIST_DIR`（默认 `/tmp/heyta-macos-dist`，不带变量时行为逐字不变）把它变成可以指到自己那一份的旋钮。
+起因是 2026-10-04 03:13 那一趟：另一条会话的证据正好落在同一个路径上，本脚本一跑就会把**别人的现场**整个删掉，
+当时靠起跑前手动改名保住 —— 而"我记得先改名"不是判据（AGENTS §8 第 9 条：共享资源先定所有者与运行窗口）。
+同一趟起，脚本在 `rm -rf` **之前**把"删的是哪个目录、里面有几项、前八项叫什么"打进日志：
+这一句原来的失败模式是**安静**，出事后日志里连"原来那里有东西"都读不出来。
+两臂实测（离线复刻 mac 段那 18 行，不碰 `/Applications`、不碰真实默认目录）：
+带 `HEYTA_MACOS_DIST_DIR=<临时目录>` ⇒ 清的是临时目录、真实默认目录里的 `Heyta.app` 前后都在；
+拿改动前那 4 行做变异 ⇒ 同一个 env 被无视、写死的那个目录被删（**旋钮确有牙**）。
+⚠️ 配对关系要说清：`check:shell-surfaces` 的 macOS"产物"栏默认读的也是那个写死路径，
+它的覆盖旋钮是另一个名字（`HEYTA_MACOS_WEB_DIST`）⇒ **用私有目录跑重装时，门禁那侧必须同时指过去**，
+否则产物栏会去空目录里取证（裸路径上的表现是"未取证 1 栏"，不是红）。
 
 ### 6.1 🔴 Windows：`Add-AppxPackage` 必须在**非提权**的交互式会话里跑
 

@@ -193,7 +193,10 @@ services:
     logging: *app-logging
 
   postgres:
-    image: postgres:16-alpine
+    # Knob, not a hardcoded source: `check:image-build-args` (R6) requires every `image:` in
+    # this directory to be `${VAR:-default}`, because the build-time knobs can do nothing about
+    # the images compose pulls at **run** time. Unset = `postgres:16-alpine`, unchanged.
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: supersync-postgres
     restart: unless-stopped
     environment:
@@ -296,7 +299,8 @@ services:
     logging: *default-logging
 
   caddy:
-    image: caddy:2.11-alpine
+    # Same rule as `postgres` above (R6): unset = `caddy:2.11-alpine`, unchanged.
+    image: ${CADDY_IMAGE:-caddy:2.11-alpine}
     container_name: supersync-caddy
     restart: unless-stopped
     ports:

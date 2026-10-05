@@ -523,6 +523,13 @@ export const en = {
 
   'web.settings.display.title': 'Display',
   'web.settings.display.dueNote': 'Show due dates on task rows as a date, or as a countdown to the deadline.',
+  // Ticket W4: the details pane (right column) — when it shows up and how to get it back.
+  'web.shell.detailPane.collapse': 'Hide details pane',
+  'web.shell.detailPane.expand': 'Show details pane',
+  'web.settings.display.detail.title': 'Details pane',
+  'web.settings.display.detail.modeOpen': 'Always shown',
+  'web.settings.display.detail.modeCollapsed': 'Hidden',
+  'web.settings.display.detailNote': 'The right column shows the details pane for the current selection. When the window is too narrow or too short it hides itself and this setting does nothing. Once you hide it on this device, the header button, this setting, or ⌘/Ctrl + Shift + \\ brings it back.',
   'web.shell.dueMode.countdown': 'Countdown',
   // Icon-only buttons on a task row: the name must carry the task title, or a
   // screen reader reads out a run of indistinguishable "button"s.
@@ -1074,6 +1081,18 @@ export const en = {
   'web.focus.config.locked': 'Durations cannot change while the timer runs — stop this round, edit, then start again.',
   'web.focus.config.a11y.minutes': '{label} duration in minutes',
   'web.focus.config.a11y.sessions': '{label} in sessions',
+  // Ticket W7: the focus details pane (four overview cards + the record list).
+  // ⚠️ Card labels carry **no count** — the number is its own field, so English does not
+  // need a sibling pair like `web.focus.completedTodayOne` for these.
+  'web.focus.detail.title': 'Focus overview',
+  'web.focus.detail.todayCount': 'Sessions today',
+  'web.focus.detail.todayDuration': 'Focus time today',
+  'web.focus.detail.totalCount': 'Total sessions',
+  'web.focus.detail.totalDuration': 'Total focus time',
+  'web.focus.detail.records': 'Focus records',
+  'web.focus.detail.recordsEmpty': 'No focus records yet. Finish a session and it will show up here.',
+  'web.focus.detail.unlinked': 'No linked task',
+  'web.focus.detail.aborted': 'Ended early',
 
   // ── Web · habits ──────────────────────────────────────────
   'web.habits.addPlaceholder': 'New habit, for example "Drink water"',
@@ -1112,6 +1131,23 @@ export const en = {
   // The third metric: the one that only ever grows (never reset by a break).
   'web.habits.streak.total': 'Total {count} days',
   'web.habits.streak.totalOne': 'Total {count} day',
+  // ── W8: habit period stats (this-month chips) ──
+  // Semantics live in `@heyta/domain#computeHabitPeriodStats`; these lines
+  // are its projection only. "check-in" counts DAYS, the rate denominator
+  // counts DUE scheduled days (a zero denominator renders the pending line,
+  // never "0%"). English uses noun-first shapes so each sentence holds for
+  // both 1 and N — no `…One` siblings needed (catalog HAZARD rule).
+  'web.habits.stats.monthDays': 'Check-in days this month: {count}',
+  // The rate cell says "by days" on purpose: a count-type habit can show
+  // "0%" next to "3 cups" on the same screen (target 8, today 3 => today does
+  // not count as achieved). Both numbers are right; the label carries the unit
+  // so the pair does not read as a contradiction (work order §8.121 / #39).
+  'web.habits.stats.monthRate': 'Completion rate this month (by days): {percent}%',
+  'web.habits.stats.monthRatePending': 'Completion rate (by days): no scheduled days yet',
+  'web.habits.stats.monthValue': 'Done this month: {value}',
+  'web.habits.stats.monthValueUnit': 'Done this month: {value} {unit}',
+  'web.habits.stats.totalValue': 'Done in total: {value}',
+  'web.habits.stats.totalValueUnit': 'Done in total: {value} {unit}',
   // Heatmap copy is passed *by us* to react-activity-calendar; its defaults are English-only.
   // `{{count}}` is the library's own placeholder and must survive verbatim.
   // ── M3 knife 7 (habits): copy for the self-drawn heatmap ──
@@ -1144,6 +1180,7 @@ export const en = {
   // ── Web · habits list + pane ──────────────────────────────
   'web.habits.list.aria': 'Habits list',
   'web.habits.pane.aria': 'Check-in history for "{name}"',
+  'web.habits.pane.pickOne': 'Select a habit to see its check-ins and stats here.',
   'web.habits.week.aria': 'Last 7 days',
   'web.habits.week.done': '{date} checked in',
   'web.habits.week.missed': '{date} no check-in',
@@ -1723,14 +1760,14 @@ export const en = {
   'web.ai.settings.features.hintStrong': 'List order is try order',
   'web.ai.settings.features.hintTail': ' (earlier ones are tried first).',
   'web.ai.settings.features.empty': 'Add an endpoint first',
-  'web.ai.settings.consentLead': '"{feature}" has a remote endpoint, so your consent to send data out is required.',
+  'web.ai.settings.consentLead': '"{feature}" has an endpoint outside this device, so your approval is needed before anything leaves it.',
   'web.ai.settings.grant': 'Allow',
   // Trailing space: the missing-capability list is spliced in right after.
   'web.ai.settings.gapLead': 'Warning: "{feature}" needs ',
   'web.ai.settings.gapMid': ', but ',
   'web.ai.settings.gapTail': 'does not declare it - the feature will never work.',
   'web.ai.settings.gapFix': 'Add it to "{name}"',
-  'web.ai.settings.granted': 'Data egress allowed',
+  'web.ai.settings.granted': 'Allowed to leave this device',
   'web.ai.settings.revoke': 'Revoke',
   // Conversational assistant (ADR-0045): the second authorization front.
   'web.ai.assistant.title': 'Chat assistant',
@@ -2547,6 +2584,10 @@ export const en = {
   'common.habits.rename.button': 'Rename habit "{name}"',
   'common.habits.rename.label': 'Habit name',
   'common.habits.delete.button': 'Delete habit "{name}"',
+  // 工单 W6：与 zh 同三条（键集对等由类型系统钉住，少一条就编译不过）。
+  'common.habits.amount.today': 'Today {value}/{target} {unit}',
+  'common.habits.amount.plus': 'Increase {name} by 1',
+  'common.habits.amount.minus': 'Decrease {name} by 1',
   'mobile.profile.section.tags': 'Tags',
   'common.organizer.tags.empty': 'No tags yet',
   'common.organizer.tags.empty.hint': 'Tags group tasks across lists — for example "Urgent" or "Waiting".',
@@ -3110,7 +3151,7 @@ export const en = {
   'site.platforms.legend.partial': 'It runs, but something required for release is missing',
   'site.platforms.legend.blocked': 'There is a specific external dependency we have not cleared',
   'site.platforms.web.name': 'Web',
-  'site.platforms.web.body': 'The full product, not a demo. Installable, works offline, and your data lives in your own browser.',
+  'site.platforms.web.body': 'The full product, not a demo. It keeps working when you are offline and syncs when the connection returns — your data lives in your own browser.',
   'site.platforms.android.name': 'Android',
   'site.platforms.android.body': 'Works on a real device: creating tasks, rescheduling, priorities, lists, tags, recurrence, focus, conflict resolution and trash all work. Widgets and a release signature are on the way.',
   'site.platforms.ios.name': 'iOS',
@@ -3356,7 +3397,7 @@ export const en = {
   'site.docs.selfhost.s2i3': 'Passkeys: need a real hostname. Browsers reject IP literals, so when you reach the server by IP, only the emailed link remains.',
   'site.docs.selfhost.s2i4': 'Who may register: an address allow-list can close registration. Once closed, other people see "this server does not allow registering with that address".',
   'site.docs.selfhost.s3': 'Where the full steps live',
-  'site.docs.selfhost.s3p1': 'The repository carries a deployment guide and a local-start guide written for whoever will operate the server — the repository icon in the nav bar is that door — and they agree with every sentence on this page. This page exists so you know what you are taking on **before** deciding whether to self-host.',
+  'site.docs.selfhost.s3p1': 'The repository carries a deployment guide and a local-start guide written for whoever will operate the server — the repository icon in the nav bar is that door. The start-the-stack command on this page is **byte-for-byte the same one** those guides carry: a repository gate watches every copy of it, so changing one side without the others turns that gate red. This page exists so you know what you are taking on **before** deciding whether to self-host.',
   'site.docs.selfhost.s3w1': 'Once you self-host, you are the party that "can see the metadata" — the encryption boundary described above is exactly the same one.',
   'site.docs.selfhost.s4': 'What your days look like afterwards',
   'site.docs.selfhost.s4p1': 'Upgrading. You decide when new code goes out, and you back the database up first — changes to table structure ship "forward only": a migration that has already run is never edited, a fix goes out as another one. So when an upgrade goes wrong, your way out is the backup, not rewriting history.',
@@ -3716,6 +3757,12 @@ export const en = {
   'common.conflict.reason.fallback': 'Both sides made different changes to the same thing',
   'common.calendar.dayMarker.off': 'Off',
   'common.calendar.dayMarker.work': 'Work',
+  // The countdown line inside a calendar cell (W6, the calendar's second source).
+  // Lives under `common.*` because the shared board is one implementation for both
+  // shells; worded exactly like the countdown panel's own line.
+  'common.calendar.event.today': 'Today',
+  'common.calendar.event.until': '{days} days to go',
+  'common.calendar.event.since': '{days} days so far',
 
   // 🔴 This group lives under `common.*`, not `web.*`: **both shells read it**
   //    (a view tier is added per batch, so the count is deliberately not written

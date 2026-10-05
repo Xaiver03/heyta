@@ -311,13 +311,87 @@ describe('computeActivityTotals', () => {
     expect(totals.activeDays).toBe(3);
   });
 
+  /*
+   * 🔴 工单 W7 判据 ① 的地基：`focusCount` 与 `focusMs` 是**两个问题**，
+   * 而且段数**不能**由时长推出来（变异臂 W7-M2 就是把 `focusCount` 写成
+   * `focusMs/60000`，那一句必须红）。
+   */
+  it('focusCount 只数自然完成的工作段：休息不算、放弃的也不算', () => {
+    const totals = computeActivityTotals({
+      logs: [],
+      tasks: [],
+      focusSessions: [
+        focus({ id: 'a', completed: true }),
+        focus({ id: 'b', completed: false, actualMs: 8 * 60000 }),
+        focus({ id: 'c', completed: true }),
+        focus({ id: 'd', kind: 'shortBreak', completed: true }),
+        focus({ id: 'e', completed: true, deletedAt: 1 }),
+      ],
+    });
+    expect(totals.focusCount).toBe(2);
+    // 时长含放弃的那一段（那是真实坐下来的时间），所以两个数**故意**不同口径。
+    expect(totals.focusMs).toBe(25 * 60000 + 8 * 60000 + 25 * 60000);
+  });
+
+  it('🔴 段数不能由时长推出：两段 12.5 分钟与一段 25 分钟的 focusMs 相同，段数不同', () => {
+    const one = computeActivityTotals({
+      logs: [],
+      tasks: [],
+      focusSessions: [focus({ id: 'one', completed: true, actualMs: 25 * 60000 })],
+    });
+    const two = computeActivityTotals({
+      logs: [],
+      tasks: [],
+      focusSessions: [
+        focus({ id: 'two-a', completed: true, actualMs: 12.5 * 60000 }),
+        focus({ id: 'two-b', completed: true, actualMs: 12.5 * 60000 }),
+      ],
+    });
+    expect(one.focusMs).toBe(two.focusMs);
+    expect([one.focusCount, two.focusCount]).toEqual([1, 2]);
+  });
+
+  /*
+   * 🔴 变异臂 W7-M8 的落点：把 `completed === true` 写成 `completed !== false`
+   * 时这一条必须红。它钉的不是"我们自己的写入方会不会漏这个字段"
+   * （`focus-actions.ts:151` 落盘时写了 `?? false`，不会），而是 AGENTS §3.3
+   * 那条**磁盘事实**：`completed?: boolean` 是可选字段，已经落盘与服务端里的
+   * payload 可以整个没有它。
+   *
+   * ⚠️ 方向要说清：**"没标完成"不等于"标了放弃"**，但也不等于"算一个番茄"。
+   * 段数取保守的一侧（少算），与 `focusStatsForDay` 的
+   * `if (completed === true) …` 同一句判据 —— 两处口径必须一样，
+   * 否则会出现"今日番茄 2 个 / 总番茄 3 个"这种自相矛盾的读数。
+   */
+  it('🔴 `completed` 整个缺失的老 payload 不算一个番茄（时长照算）', () => {
+    const totals = computeActivityTotals({
+      logs: [],
+      tasks: [],
+      focusSessions: [
+        // 夹具默认**不带** `completed` 字段（见文件头 `focus()`），这就是磁盘上
+        // 一个可选字段缺失的形状。
+        focus({ id: 'no-flag', actualMs: 4 * 60000 }),
+        focus({ id: 'done', completed: true }),
+      ],
+    });
+    expect(totals.focusCount).toBe(1);
+    // 坐下来过的那 4 分钟是发生过的事实 —— 缺的只是"它算不算一个番茄"。
+    expect(totals.focusMs).toBe(4 * 60000 + 25 * 60000);
+  });
+
   it('已删除的记录一律不计入', () => {
     const totals = computeActivityTotals({
       logs: [{ ...log('2026-09-01'), deletedAt: 1 }],
       tasks: [task({ id: 't1', completedAt: local(2026, 9, 1, 10), deletedAt: 1 })],
       focusSessions: [],
     });
-    expect(totals).toEqual({ checkIns: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0 });
+    expect(totals).toEqual({
+      checkIns: 0,
+      focusCount: 0,
+      focusMs: 0,
+      tasksCompleted: 0,
+      activeDays: 0,
+    });
   });
 });
 
@@ -325,6 +399,7 @@ describe('deriveMilestones', () => {
   it('未达标时给"到这一档"的进度，已达标时给"到下一档"的进度', () => {
     const milestones = deriveMilestones({
       checkIns: 25,
+      focusCount: 0,
       focusMs: 0,
       tasksCompleted: 0,
       activeDays: 0,
@@ -344,6 +419,7 @@ describe('deriveMilestones', () => {
   it('最高档达成后进度封顶，不再造出假目标', () => {
     const milestones = deriveMilestones({
       checkIns: 99999,
+      focusCount: 0,
       focusMs: 0,
       tasksCompleted: 0,
       activeDays: 0,
@@ -356,6 +432,7 @@ describe('deriveMilestones', () => {
   it('专注小时数向下取整（没满一小时不能说成满）', () => {
     const milestones = deriveMilestones({
       checkIns: 0,
+      focusCount: 0,
       focusMs: 9.9 * 60 * 60 * 1000,
       tasksCompleted: 0,
       activeDays: 0,
@@ -369,6 +446,7 @@ describe('deriveMilestones', () => {
   it('每个维度的每一档都在结果里（界面需要"下一档还差多少"）', () => {
     const milestones = deriveMilestones({
       checkIns: 0,
+      focusCount: 0,
       focusMs: 0,
       tasksCompleted: 0,
       activeDays: 0,
@@ -462,7 +540,7 @@ describe('computeWeeklyReview', () => {
 describe('deriveIdentityTags', () => {
   it('按累计量给身份，未达标时给进度', () => {
     const tags = deriveIdentityTags({
-      totals: { checkIns: 100, focusMs: 60 * 60 * 1000, tasksCompleted: 0, activeDays: 30 },
+      totals: { checkIns: 100, focusCount: 0, focusMs: 60 * 60 * 1000, tasksCompleted: 0, activeDays: 30 },
       bestCurrentStreak: 5,
     });
 
@@ -478,7 +556,7 @@ describe('deriveIdentityTags', () => {
 
   it('当前连续天数可以单独支撑一个身份标签', () => {
     const ids = reachedIdentityTagIds({
-      totals: { checkIns: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0 },
+      totals: { checkIns: 0, focusCount: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0 },
       bestCurrentStreak: 30,
     });
     expect(ids).toEqual(['streak-thirty']);
@@ -486,7 +564,7 @@ describe('deriveIdentityTags', () => {
 
   it('什么都没有时一个身份都不给', () => {
     const ids = reachedIdentityTagIds({
-      totals: { checkIns: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0 },
+      totals: { checkIns: 0, focusCount: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0 },
       bestCurrentStreak: 0,
     });
     expect(ids).toEqual([]);

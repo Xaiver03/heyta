@@ -73,8 +73,15 @@ export interface HabitsListRow {
 
 interface HabitsListProps {
   rows: readonly HabitsListRow[];
-  /** 当前在右窗格里展开的那个习惯；`undefined` = 一个都没有。 */
-  selectedId: string | undefined;
+  /**
+   * 当前在右窗格里展开的那个习惯；**`null` = 一个都没有**。
+   *
+   * 🔴 类型取 `string | null` 而不是 `string | undefined`：它接的是共享选中态
+   * （`useSelected('habit')`）的原值，而那一侧的"没选中"就是 `null`。
+   * 用 `undefined` 表示同一个意思会逼装配处写一次 `?? undefined` ——
+   * 那种转换正是"两种空"能互相冒充的地方（本单撤掉 `?? rows[0]` 的同族）。
+   */
+  selectedId: string | null;
   onSelect: (habitId: string) => void;
 }
 

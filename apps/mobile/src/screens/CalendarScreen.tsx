@@ -25,6 +25,13 @@
  *（`lib/date.ts` 里那三个已删掉 —— 该文件头自己就写着"不要在本文件里转发一层，
  * 转发会让下一个人以为这里还是定义处"）。`DatePicker` 也改从那一边引。
  *
+ * 🔴 **两个日期数据源**（W6）：任务按 `dueDate` 摆，倒数日按它自己的发生日摆。
+ * 后者原先**只有面板（「我的 → 倒数纪念日」）有，日历一格都不画** ——
+ * 共享板 2026-10-04 起有了可选的 `events` / `eventLabels` 两个 prop，而
+ * "组件支持了"与"宿主真的接上了"是两件事（AGENTS §7 记过第五种同一面目）。
+ * 哪一天真的发生（闰月三档、农历跨年、重复规则展开）**全在 `@heyta/domain`**，
+ * 摆进哪一格、超出 3 条怎么折成 `+N` 全在 `@heyta/ui`，这一层只负责交数据。
+ *
  * 🔴 写入只有一处：勾选完成，走 `createTaskActions`。
  * 这一层**不做**任何自己的 op 构造（AGENTS.md §3.5）。
  *
@@ -43,6 +50,7 @@ import {
   createEventActions,
   createTaskActions,
   type AppHost,
+  type EventActions,
   type TaskActions,
 } from '@heyta/app-host';
 import {
@@ -59,6 +67,7 @@ import {
   formatMonthTitleText,
   formatYearTitleText,
   WEEKDAY_MESSAGE_KEYS,
+  type CalendarEventBarLabels,
   type CalendarViewKind,
 } from '@heyta/ui';
 import { useToday } from '../lib/use-today';
@@ -83,7 +92,14 @@ export function CalendarScreen(): React.JSX.Element {
   const { t } = useI18n();
   const [host, setHost] = useState<AppHost | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  /** 第二个事件源（W6）：未删除、未归档的那批倒数日，由动作层给。 */
+  /**
+   * 倒数日（W6）：日历的**第二个日期数据源**。
+   *
+   * 🔴 这里存的是**全量活的事件**，刻意不按可见月筛：哪几天落在这一屏由共享板的
+   * `groupEventsByOccurrence` 算（它取的是 42 格里首末格那段区间，含补白格）。
+   * 宿主先筛一遍月就是第二份数学，症状是"5 月 3 日那条纪念日在 10 月屏的补白列里
+   * 不出现"，而没有任何一层会报错。
+   */
   const [events, setEvents] = useState<CountdownEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   /** 正在写入的任务 id —— 防止连点产生两次 toggle。 */
@@ -141,19 +157,25 @@ export function CalendarScreen(): React.JSX.Element {
     () => (host ? createTaskActions(host) : null),
     [host],
   );
-  /*
-   * 日历的**第二个事件源**（W6）。动作集同样从宿主派生（与 `CountdownScreen`
-   * 同一条规则，AGENTS §3.5：界面里不新造 op、不自己筛"哪些算已删除"）。
-   */
-  const eventActions = useMemo(() => (host ? createEventActions(host) : null), [host]);
+  // 与 `CountdownScreen` 同一个动作集来源：宿主派生，界面里不新造（AGENTS §3.5）。
+  const eventActions = useMemo<EventActions | null>(
+    () => (host ? createEventActions(host) : null),
+    [host],
+  );
 
   const refresh = useCallback(() => {
     if (!actions || !eventActions) return;
-    // ⚠️ `listTasks()` 是**同步**的（读已物化的内存状态），不是 Promise。
+    // ⚠️ 两个 list 都是**同步**的（读已物化的内存状态），不是 Promise。
     setTasks(actions.listTasks());
-    // 🔴 倒数日也一并读：`listEvents(today)` 给的是"未删除、未归档"那一批，
-    //   剥掉的是删除与归档，**不是**"有没有截止时间"—— 倒数日没有 `dueDate`，
-    //   而它照样要上日历（W6 那条核心判据的可观测证据就在这一步）。
+    /**
+     * 🔴 `listEvents(today)` 只给**未归档、未删除**的那些（`aliveEvents` 同一个口径）。
+     * 归档的留在「我的 → 倒数纪念日」那个视图里，不进日历 ——
+     * 传错了列表的症状是"删掉的日子还在日历上"，读作"没删干净"。
+     *
+     * ⚠️ Web 那边要额外 `syncToday(today)` 播种，因为它的 countdown store 在拿到
+     * "今天"之前**不猜**；移动端没有那份 store —— `today` 就在这一次调用里给到
+     * 动作层，所以这一侧不需要播种（也**不许**为"对齐 web"新写一份 store）。
+     */
     setEvents(eventActions.listEvents(today));
   }, [actions, eventActions, today]);
 
@@ -300,6 +322,26 @@ export function CalendarScreen(): React.JSX.Element {
   );
 
   /**
+   * 倒数日那一行**怎么写**（W6，与 Web 同三条词条）。
+   *
+   * 🔴 共享层不许 `import '@heyta/i18n'`，所以"还有 N 天 / 就是今天 / 已经 N 天"
+   * 这句话只能由宿主注入。不给的话那一行**只剩标题** —— 类型合法、格子看着不空，
+   * 而"看不出这是好日子还是已经过去的日子"没人会报 bug。所以两条都要传，
+   * 判据在 `apps/mobile/tests/calendar-event-source.spec.ts`。
+   *
+   * ⚠️ 天数（`days`）由共享层从 `diffDays(today, 格子那天)` 算好后传进来，
+   *   这里只负责把它说成一句话；本文件一次都不做日期算术。
+   */
+  const eventLabels = useMemo<CalendarEventBarLabels>(
+    () => ({
+      today: t('common.calendar.event.today'),
+      until: (days: number) => t('common.calendar.event.until', { days }),
+      since: (days: number) => t('common.calendar.event.since', { days }),
+    }),
+    [t],
+  );
+
+  /**
    * 档位切换器要的词。
    *
    * ⚠️ 共享层不许 `import '@heyta/i18n'`（会拖进第二份 React），所以**翻译动作**仍然在这里；
@@ -345,11 +387,6 @@ export function CalendarScreen(): React.JSX.Element {
 
       <CalendarBoard
         tasks={tasks}
-        // 🔴 第二个事件源（W6）。共享板把这个 prop 定成**必填**：漏接不是"日历上
-        //   少几条生日"，而是**编译不过** —— 那条"默认值等于原值的可选 prop"会把
-        //   "宿主没接"伪装成"这天没有倒数日"，而 typecheck 与既有门禁两边都不响
-        //   （AGENTS §7 第 195 条，web 那边同一条）。
-        events={events}
         today={today}
         cursor={cursor}
         selected={selected}
@@ -364,6 +401,12 @@ export function CalendarScreen(): React.JSX.Element {
         labels={labels}
         view={view}
         now={now}
+        /* 🔴 倒数日那两个 prop 是**一对**（与 web 的 `dayMarker` / `dayMarkerLabels` 同理）：
+           只给 `events` 不给词表，那一行只剩标题；只给词表不给 `events`，
+           共享板连投影都不做一次（默认 `undefined` = 一条都不画，正是"接之前"的形状）。
+           少接任何一个的症状都不是报错，是日历上**安静地一个倒数日都没有**。 */
+        events={events}
+        eventLabels={eventLabels}
         testID="calendar-board"
       />
     </Screen>

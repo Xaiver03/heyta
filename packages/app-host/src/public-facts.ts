@@ -32,6 +32,7 @@
  */
 import { HOLIDAY_ADJUSTMENT_PATHS, PUBLIC_FACT_SHAPES, holidayAdjustmentsResponseSchema } from '@heyta/shared-schema';
 import {
+  clearHolidayAdjustmentOverrides,
   installHolidayAdjustmentOverrides,
   type HolidayAdjustmentOverride,
   type HolidayOverrideInstallResult,
@@ -159,6 +160,25 @@ function toOverrides(body: { years: readonly { year: number; papers?: readonly s
 }
 
 /**
+ * 覆盖表是**整批替换**，不是"把批次里有的年份逐年合并进去"。
+ *
+ * 🔴 为什么必须先清：运营 DELETE 掉某一年的调休之后，那一年就不在批次里了。
+ * 只 set 批次里有的年份 ⇒ 已撤回的那一年**永远留在覆盖表里**，`adjustmentOn()`
+ * 继续替部署方说那句已经被收回的话，而 ADR-0052 §2.2 承诺的正是
+ * "DELETE 后下一次拉取退回随包表"。这不是降级路径的边角，是**界面在说谎**那一族。
+ *
+ * 先清不会丢 papers：`papers` 在公开那份 schema 里是必填且 `min(1)`
+ * （`holiday-adjustment-contract.ts` 的 `yearFields`），批次每一年都自带出处。
+ * 清与装两步都是同步的、中间没有 `await` ⇒ 不会出现"覆盖表已空但界面读到了"的窗口。
+ */
+function installWholeBatch(
+  years: readonly HolidayAdjustmentOverride[],
+): readonly HolidayOverrideInstallResult[] {
+  clearHolidayAdjustmentOverrides();
+  return installHolidayAdjustmentOverrides(years);
+}
+
+/**
  * 把缓存装进 domain 的覆盖表。启动时调用（纯本地、不发网络、不抛）。
  *
  * 返回 `undefined` = 本机从来没有过这份数据 ⇒ `adjustmentOn()` 读随包表（判据①的
@@ -169,7 +189,7 @@ export async function installPublicFactsFromCache(
 ): Promise<readonly HolidayOverrideInstallResult[] | undefined> {
   const snapshot = await readPublicFactsCache(cache);
   if (snapshot === undefined) return undefined;
-  return installHolidayAdjustmentOverrides(snapshot.years);
+  return installWholeBatch(snapshot.years);
 }
 
 /**
@@ -200,7 +220,7 @@ export async function refreshPublicFacts(
   }
 
   if (response.status === 304 && cached !== undefined) {
-    installHolidayAdjustmentOverrides(cached.years);
+    installWholeBatch(cached.years);
     return { kind: 'not-modified', version: cached.version };
   }
 
@@ -231,7 +251,7 @@ export async function refreshPublicFacts(
   await options.cache.setMetaValue(META_KEYS.PUBLIC_FACTS_ETAG, checked.data.version);
   await options.cache.setMetaValue(META_KEYS.PUBLIC_FACTS_FETCHED_AT, fetchedAt);
 
-  const installed = installHolidayAdjustmentOverrides(years);
+  const installed = installWholeBatch(years);
   const snapshot: PublicFactsSnapshot = { version: checked.data.version, years, fetchedAt };
   return { kind: 'ok', installed, snapshot };
 }

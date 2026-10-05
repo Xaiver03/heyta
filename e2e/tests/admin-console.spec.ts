@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openApp, openSettingsView, stubEmptyHolidayAdjustments, stubLegalRecheck } from './helpers';
+import { openApp, openSettingsView, stubLegalRecheck, stubPublicFacts } from './helpers';
 
 /**
  * 运营管理后台：真浏览器契约（截图为判据）。
@@ -53,6 +53,15 @@ const REALTIME_WS_GLOB = 'ws://127.0.0.1:4319/api/sync/ws*';
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 20, 4, 0, 0);
+
+/**
+ * 判据②那两条出处。🔴 假服务端的响应与下面的断言**共用这一个常量** ——
+ * 抄两份的漂移形状是"改了夹具没改期望"，那条判据就悄悄变成只对自己成立。
+ */
+const HOLIDAY_PAPERS = [
+  'https://www.gov.cn/zhengce/content/2025-11/holiday-2026.pdf',
+  'https://www.gov.cn/zhengce/content/2025-11/make-up-2026.pdf',
+] as const;
 
 /** 详情页那台"假服务端"的可变状态。界面的新值只能从这里读回来。 */
 interface FakeServerState {
@@ -264,6 +273,11 @@ async function seed({
 
   // 🔴 补签那道读侧闸：塞了凭据应用一启动就会问一次，与后台这个主题无关。
   await stubLegalRecheck(page, SERVER);
+  // 🔴 同一条理由的第二例，而且是**本批自己带来的**：W4b 的公共事实通道挂在
+  // `apps/web/src/main.tsx:152 startPublicFacts()` ⇒ 一开机就发 `GET /api/holiday-adjustments`。
+  // 2026-10-04 03:0x 实测：不补它 ⇒ 本套件**一次红五条**，五条报错逐字相同
+  // （`除已登记缺失外不该有非 2xx：["/api/holiday-adjustments"]`），其中四条与后台无关。
+  await stubPublicFacts(page, SERVER);
 
   // 实时同步的 WS 与权益探测：塞了凭据应用就会真发，对端得补上，
   // 否则无关的 404 会淹掉真正的失败（同 `inbox.spec.ts` 的理由）。
@@ -317,7 +331,6 @@ async function seed({
     });
   });
 
-  await stubEmptyHolidayAdjustments(page, SERVER);
 
   const adminCalls: string[] = [];
 
@@ -594,6 +607,29 @@ async function seed({
       return;
     }
 
+    if (path === '/holiday-adjustments') {
+      // 判据②的那份数据：一年、两条出处、两天逐日表。
+      // `dayCount` 是服务端算的，界面拿它核对"存进去的 == 显示出来的"。
+      await json({
+        version: '1759000000000.1.2',
+        years: [
+          {
+            year: 2026,
+            papers: HOLIDAY_PAPERS,
+            days: [
+              { day: '2026-10-10', isOffDay: true },
+              { day: '2026-10-11', isOffDay: false },
+            ],
+            dayCount: 2,
+            updatedAt: 1_759_000_000_000,
+            updatedBy: 'ops@example.test',
+            note: '国务院办公厅通知',
+          },
+        ],
+      });
+      return;
+    }
+
     await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });
 
@@ -625,14 +661,24 @@ function stat(page: Page, label: string) {
  * 页头，那张图**证明不了面板长什么样**，而 §6.2 规定一要的恰好就是这张图。
  * （Playwright 的 `click` 会自动滚动，`screenshot` 不会 —— 这个差别很容易踩。）
  */
-async function shoot(page: Page, target: Locator, name: string): Promise<void> {
+async function shoot(
+  page: Page,
+  target: Locator,
+  name: string,
+  /**
+   * 落在哪。默认仍是 `test-results/`（既有那些用例一张都没改）。
+   * 🔴 但**新落的判据要留证**就给受版本控制的那份：`e2e/test-results/` 每趟被清，
+   *   一张"截图为证"的图如果只活在那里，下一趟跑完就没有人能再打开它看。
+   */
+  dir = 'test-results',
+): Promise<void> {
   await target
     // 🔴 必须给它一个**短超时**：默认会等到整条用例超时（60s），那时页面已被关掉，
     // `screenshot` 直接报 "Target page, context or browser has been closed" ——
     // 于是"失败时也要有图"（§6.2 规定一第 1 条）在最需要它的时候失效。
     .scrollIntoViewIfNeeded({ timeout: 3_000 })
     .catch(() => null); // 目标不在时不在这儿报错，交给后面的断言。
-  await page.screenshot({ path: `test-results/${name}` });
+  await page.screenshot({ path: `${dir}/${name}` });
 }
 
 interface PageProblems {
@@ -672,7 +718,7 @@ function assertNoProblems(problems: PageProblems, expectedBad: readonly string[]
 }
 
 /** 后台的标签页（词条来自 `packages/i18n` 的 `web.admin.tab.*`）。 */
-type AdminTabLabel = '概览' | '用户' | '订阅' | '订单' | '优惠码' | '邀请' | '退款';
+type AdminTabLabel = '概览' | '用户' | '订阅' | '订单' | '优惠码' | '邀请' | '调休/补班' | '退款';
 
 /**
  * 🔴 必须**限定在面板内**：`role="tab"` 在这个应用里不止一处
@@ -1018,6 +1064,69 @@ test.describe('运营管理后台（真浏览器）', () => {
     expect(adminCalls, `未登录时不该有任何后台请求：${JSON.stringify(adminCalls)}`).toEqual([]);
     // 同 403 那条：锚到后台该在的那一片再拍（`fullPage` 拍不进设置浮层这个滚动容器）。
     await shoot(page, page.getByTestId('import-panel'), 'admin-not-configured.png');
+
+    assertNoProblems(problems);
+  });
+
+  /*
+    🔴 **W4b 判据②的界面那一半**：出处（papers）在后台回显成可点的链接。
+    jsdom 那一份（`apps/web/tests/admin-panel.spec.tsx`）钉的是"渲染成 `<a href>`"，
+    这一条要的是真浏览器里的四件事：真的打了一次 `/api/admin/holiday-adjustments`、
+    链接的 `href` 就是那条 URL、**链接的文字也是那条 URL**（写成"查看出处"就把
+    取证链接藏进了标签里，运营者无法核对原文），以及那张图里看得见它。
+    图落在受版本控制的 `apps/web/evidence/admin-holiday/`（`test-results/` 每趟被清）。
+  */
+  test('🔴 调休/补班那一页把出处回显成可点链接（判据②，截图为证）', async ({ page }) => {
+    const problems = captureProblems(page);
+    const { adminCalls } = await seed({ page });
+    await openPanel(page);
+    await expect(page.getByTestId('admin-panel')).toBeVisible();
+
+    await adminTab(page, '调休/补班').click();
+    const years = page.getByTestId('admin-holiday-years');
+    await expect(years, '调休/补班那一页没渲染出年度列表').toBeVisible();
+    await shoot(page, years, 'admin-holiday-papers.png', '../apps/web/evidence/admin-holiday');
+
+    await expect(years.locator('li')).toHaveCount(1);
+    // 按需拉取：这个端点恰好一次（与其余六个 Tab 同一条纪律）。
+    expect(
+      adminCalls.filter(
+        (call) => call === 'GET /holiday-adjustments' || call.startsWith('GET /holiday-adjustments?'),
+      ),
+      '出处那一页要么没拉、要么重拉了',
+    ).toHaveLength(1);
+
+    const links = years.locator('[data-testid="admin-holiday-papers"] a');
+    await expect(links).toHaveCount(HOLIDAY_PAPERS.length);
+    for (const paper of HOLIDAY_PAPERS) {
+      const link = links.filter({ hasText: paper });
+      await expect(link, `界面上找不到那条出处：${paper}`).toHaveCount(1);
+      // `href` 逐字等于那条 URL（不是被包了一层跳转页）。
+      await expect(link).toHaveAttribute('href', paper);
+      // 防线：新窗口打开时不许把后台这一页的 window 交出去。
+      await expect(link).toHaveAttribute('rel', 'noreferrer noopener');
+    }
+    // 界面显示的条数 == 服务端算出的 `dayCount`（"存进去的 == 显示出来的"）。
+    await expect(years).toContainText('国务院办公厅通知');
+
+    // 🔴 这一条是**看图**加进来的，不是从需求推出来的。第一趟截图里年份显示成「2026…」：
+    // 两条 gov.cn 长 URL 的出处徽标把同一行的主体挤到被省略号裁切。
+    // **文本断言抓不到它** —— DOM 里文字是完整的，裁切只发生在渲染上（与 §8.4 里 W5 那条
+    // "断言只验写了什么、不验少了什么"是同一族，这次是"少了看得见的部分"）。
+    // 所以判据必须是几何的：这一格的滚动宽度不超过它自己的宽度 = 没有任何内容被藏起来。
+    const rowMain = years.locator('li').first().locator('.ht-settings__admin-rowMain');
+    await expect(rowMain, '年度那一格连年份都没有').toContainText('2026');
+    const box = await rowMain.evaluate((el) => ({
+      hidden: el.scrollWidth - el.clientWidth,
+      width: el.clientWidth,
+      text: el.textContent ?? '',
+    }));
+    // 🔴 正向对照：一条"元素没参与布局"的读数（`0 - 0 = 0`）会让上面那条判据**永远通过**。
+    // 先证明这一格真的被排版了（宽度 > 100px：整条后台面板有 1000px 可用），
+    // 才有资格说"没被裁切"。（AGENTS §7 元规则 2；这条对照是被自己的假绿逼出来的。）
+    expect(box.width, `这一格根本没参与布局（clientWidth=${box.width}），"没被裁切"是空测`).toBeGreaterThan(100);
+    // `1` 是亚像素舍入的容差，不是"裁掉一点没关系"：实测被挤掉时这个数是几十。
+    expect(box.hidden, `年度那一格被裁掉 ${box.hidden}px ⇒ 年份在界面上看不见（文本="${box.text}"）`).toBeLessThanOrEqual(1);
 
     assertNoProblems(problems);
   });
