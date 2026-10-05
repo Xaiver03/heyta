@@ -175,19 +175,33 @@ function runSelftest() {
   const arms = [];
   const push = (id, expect, got) => arms.push({ id, expect, got });
 
-  // 第十族：真实 deployment.md
+  // 🔴 原先 U1/U3/O1/O3 把**当下 blob 里的具体字面量**当前提（`'7b9089b2'`、
+  //    `o.dropped.length > 0`、"真 spec 一定存在本批独有行"）。10-05 16:4x 现量：
+  //    `HEYTA_MAIN_REF=origin/main`（公开侧早已吸收过这两枚文件的本批内容）一换上去，
+  //    U3/O1/O3 三条同时 BAD ⇒ 整发载体退 2，而那一趟这两族**根本没有冲突要解**
+  //    （唯一冲突是审计台账）。判据的前提长在别人的历史里 = 一枚定时炸弹，不是牙。
+  //    现在：真 blob 只承担"跑得通 / 产出无损"这类**无前提**断言，取证针从块里现取；
+  //    "检查有没有响"全部由合成样本证明（与 U2/U4 同一口径），并配一条不偷的阳性对照，
+  //    免得把实现改坏成"恒响"也能过。
   const dep = blobs(MAIN, SRC, 'docs/runbooks/deployment.md');
   const u = unionMerge(dep.ours, dep.base, dep.theirs);
+  const depBlocks = conflictBlocks(dep.ours, dep.base, dep.theirs).blocks;
+  const needleO = depBlocks.flatMap((b) => b.o)[0];
+  const needleT = depBlocks.flatMap((b) => b.t)[0];
   push('U0 真实 deployment.md 走 union ⇒ 成功', true, u.ok === true);
-  push('U1 产出同时含两侧各自那段独有的句子', true,
-    u.ok && u.text.includes('7b9089b2') && u.text.includes('publish-public-sites.mjs'));
+  push('U1 产出含两侧块内各自第一行（无冲突块时这一族本趟无东西可解，U1 仍验产出=两侧之并）', true,
+    depBlocks.length === 0
+      ? u.ok === true && u.parsed === 0
+      : u.ok === true && u.text.includes(needleO) && u.text.includes(needleT));
   push('U2 base 段非空时 union 必须拒绝（不许降级成 ours）', false,
     unionMerge('a\nX\nb\n', 'a\nQ\nb\n', 'a\nY\nb\n').ok);
-  push('U3 从 union 产出里偷摘 main 块内的一行 ⇒ 块级无损检查必须响', true,
-    blockLossChecks(
-      u.text.split('\n').filter((l) => !l.includes('7b9089b2')),
-      conflictBlocks(dep.ours, dep.base, dep.theirs).blocks,
-    ).length > 0);
+  const sO = 'a\nM1\nb\n', sB = 'a\nb\n', sT = 'a\nT1\nb\n';
+  const sU = unionMerge(sO, sB, sT);
+  const sBlocks = conflictBlocks(sO, sB, sT).blocks;
+  push('U3 合成：从 union 产出里偷摘 main 块内的一行 ⇒ 块级无损检查必须响', true,
+    sU.ok === true && blockLossChecks(sU.text.split('\n').filter((l) => l !== 'M1'), sBlocks).length > 0);
+  push('U3c 合成阳性对照：不偷 ⇒ 同一条检查必须不响（挡"恒响"的实现）', false,
+    sU.ok === true && blockLossChecks(sU.text.split('\n'), sBlocks).length > 0);
   // U4 挡的是"把判据写宽成文件级"那一类假红：同一处两侧各追加（真冲突块），
   //    而 main 在**块外**删掉了一行 —— 块级判据必须仍然通过（那一行本来就该没）。
   push('U4 一侧的块外删除不造成假红（块级判据，不是文件级）', true,
@@ -205,14 +219,16 @@ function runSelftest() {
   ].filter(Boolean);
   const o = oursMerge(spec.ours, spec.base, spec.theirs, shape);
   push('O0 真实 live-domain.spec.ts 走 ours ⇒ 成功', true, o.ok === true);
-  push('O1 被丢掉的本批独有行有账可查（不是静默丢）', true, o.ok && o.dropped.length > 0);
+  // 牙由合成样本证明：两侧在同一处各追加一行 ⇒ ours 取 main 侧 ⇒ 本批那行必须**逐行在账上**。
+  const oSyn = oursMerge('a\nb\nO1\n', 'a\nb\n', 'a\nb\nT1\n');
+  push('O1 合成：被丢掉的本批独有行必须逐行有账（不依赖当下 blob）', true,
+    oSyn.ok === true && oSyn.dropped.length === 1 && oSyn.dropped[0] === 'T1');
   push('O2 结构断言有牙：手动把 probe 声明复制成两枚 ⇒ 必须报不成立', true,
     shape([...spec.ours.split('\n'), '  const probe = await page.evaluate(async () => {});']).length > 0);
-  push('O3 这种形状上不许走 union（要么拒、要么被结构断言抓住）', true,
+  push('O3 同一处两侧都改过（base 段非空）⇒ union 必须因"base 段非空"拒，而不是因解析器不一致', true,
     (() => {
-      const bad = unionMerge(spec.ours, spec.base, spec.theirs);
-      if (!bad.ok) return bad.refuse.includes('base 段非空');
-      return shape(bad.text.split('\n')).length > 0;
+      const bad = unionMerge('a\nO\nb\n', 'a\nQ\nb\n', 'a\nT\nb\n');
+      return bad.ok === false && bad.refuse.includes('base 段非空');
     })());
 
   let bad = 0;
