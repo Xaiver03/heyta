@@ -666,6 +666,31 @@ pull_prefs_db() {
   $ADB unroot >/dev/null 2>&1 || true
 }
 
+# 🔴 存进去没有，只能由**被写那一侧**回答（同 routes_reading 的理由）。
+#   旧写法用 `endpoint_rows()`（数屏上 `ai-endpoint-*` 的行）做前后对比 —— 那是**滚动位置的函数**：
+#   rig26 现量第 4 步 "行数 0→1" 就是这么来的（add_endpoint 头上新加的 scroll_to_top 把已存的那一
+#   行从折叠区外滚进了安全带），读起来像"明文端点落库了"那种隐私缺陷，实际是探针自己移动了尺。
+endpoint_store_count() {  # → 端点条数（整数）；读不到库打印 NOFILE / BAD:* 并以 1 退出
+  pull_prefs_db
+  if [ ! -s "$PREFS_DB" ] || [ "$(wc -c < "$PREFS_DB")" -lt 512 ]; then printf 'NOFILE'; return 1; fi
+  head -c 16 "$PREFS_DB" | grep -q 'SQLite format 3' || { printf 'BAD:not-a-db'; return 1; }
+  HEYTA_DB="$PREFS_DB" python3 - <<'PYE'
+import json, os, sqlite3, sys
+try:
+    row = sqlite3.connect(f"file:{os.environ['HEYTA_DB']}?mode=ro", uri=True).execute(
+        "SELECT value FROM device_pref WHERE key='heyta.ai.settings'").fetchone()
+except sqlite3.Error as e:
+    print(f"BAD:{type(e).__name__}"); sys.exit(0)
+if not row:
+    print("BAD:no-row"); sys.exit(0)
+try:
+    v = json.loads(row[0])
+except json.JSONDecodeError:
+    print("BAD:json"); sys.exit(0)
+print(len((v.get('routing') or {}).get('endpoints') or []))
+PYE
+}
+
 routes_reading() {  # → 每档一行 "feature=<绑定端点数>/<同意数>"；读不到库打 NOFILE、解析不了打 BAD
   pull_prefs_db
   if [ ! -s "$PREFS_DB" ] || [ "$(wc -c < "$PREFS_DB")" -lt 512 ]; then printf 'NOFILE'; return 1; fi
@@ -1004,16 +1029,6 @@ db_count() {  # <sqlite 文件> <SQL>
 # 端点**行数**：已存的每枚端点渲染成一行 `ai-endpoint-<id>`。
 # 🔴 必须把表单自己的五枚 testID 剔掉（label/url/model/key/add 也以 ai-endpoint- 开头），
 #    否则这个数永远 ≥5、增加一枚根本读不出来 —— 第 4 链的"行数没增加"就是假判据。
-endpoint_rows() {
-  dump
-  HEYTA_UI="$UI_XML" python3 - <<'PY'
-import os, re
-s = open(os.environ["HEYTA_UI"]).read()
-FORM = {"label", "url", "model", "key", "add"}
-ids = {m.split("ai-endpoint-")[1].rstrip('"') for m in re.findall(r'resource-id="(ai-endpoint-[^"]+)"', s)}
-print(len(ids - FORM))
-PY
-}
 edit_value_by_rid() {  # <testID> → 该输入框当前文本（读不到打印空串）
   HEYTA_RID="$1" python3 - <<'PY'
 import os, re, sys
@@ -1199,10 +1214,10 @@ fi
 # ② 允许远程端点：第 7/8 步要用非回环地址，这枚不开就永远走不到出境闸门。
 tap_rid ai-gate-remote || echo "   ↷ 「允许远程端点」没点到（可能本来已开）—— 以第 7 步的实际闸门读数为准"
 # ③ 端点：名称/地址/模型 + 一次提交。
-ROWS_BEFORE=$(endpoint_rows)
+ROWS_BEFORE=$(endpoint_store_count)
 add_endpoint "$EP_LOOPBACK" "$DEVICE_LOOPBACK_URL" \
   || { echo "   ❌ 回环假端点没存进去"; screen_txt; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
-ROWS_AFTER=$(endpoint_rows)
+ROWS_AFTER=$(endpoint_store_count)
 # 🔴 两件事不许并成一句（rig22 现量：`行 0→1` 已经写进去了，而单帧 `has_desc` 命中 0）：
 #   ① **存没存进去** —— 数的是配置里的端点行（这一格当时就成立了）；
 #   ② **界面读不读得到那枚 chip** —— chip 挂在 `content-desc` 上，可能在裁切窗口以外，
@@ -1229,12 +1244,20 @@ bind_all_routes "$EP_LOOPBACK" \
   || { echo "   ❌ 回环端点没能绑进五档路由 —— 助手面的按钮会一直 disabled，那不是产品闸门" >&2; screen_txt; summary "移动端 AI 助手真机验收" "载体没把路由绑上" 1; }
 
 step "4. 明文 + 非回环端点**存不进去**（validateEndpointUrl 的 plaintext-remote）"
-ROWS_BEFORE2=$(endpoint_rows)
+ROWS_BEFORE2=$(endpoint_store_count)
 add_endpoint "$EP_PLAINTEXT" "$DEVICE_PLAINTEXT_REMOTE_URL"
 sleep 1
 dump
 ERR_SHOWN=$(has_sub "远端端点必须是 https")
-ROWS_AFTER2=$(endpoint_rows)
+ROWS_AFTER2=$(endpoint_store_count)
+# 🔴 两次读数里任何一次不是整数 = **载体没读到库**，这不是产品判据，不许拿它推出"存进去了"。
+case "$ROWS_BEFORE2$ROWS_AFTER2" in
+  *[!0-9]*)
+    bad "端点条数读不出来（前=${ROWS_BEFORE2} 后=${ROWS_AFTER2}）⇒ 本步判据**没有读数**，是载体读库失败，不是明文端点落库；先修 pull_prefs_db"
+    screen_txt
+    summary "移动端 AI 助手真机验收" "载体读库失败" 1
+    ;;
+esac
 if [ "$ERR_SHOWN" = "1" ] && [ "$ROWS_AFTER2" = "$ROWS_BEFORE2" ]; then
   ok "明文非回环被当面拒绝：那句校验话在屏上，且端点行数没增加（${ROWS_BEFORE2}→${ROWS_AFTER2}）"
 elif [ "$ERR_SHOWN" != "1" ]; then
