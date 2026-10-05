@@ -1236,6 +1236,10 @@ console.log(`   ${giReading}`);
 //    在成功时是静默的，而"静默的通过"会被下一轮读成"没跑"或"跑了但没人看"。
 console.log(`   ${capSelftestReading}`);
 console.log(`   ${dockSelftestReading}`);
+// 同一句理由，同一趟里第二次撞上：借 store 那段自检**每次载体重算都跑**（它是无条件的裸块），
+// 但只 push 进 notes ⇒ 只有 die 路径 dump 时才看得见。10-05 那趟带旋钮的重算退了 3，
+// 读数就"出现过"；紧接着两趟 rc=0 的里面它一个字都没印 —— 于是"跑过"和"看得见跑过"被混成一件事。
+console.log(`   ${borrowSelftestReading}`);
 if (attribution.length) console.log(`   🔴 载体红 ${attribution.length} 道，已逐条归属到非本批（那条红仍在 main 上，不由本批修）：\n     ${attribution.join('\n     ')}`);
 // 🔴 这句是**推导**出来的，不是写死的"全 exit 0"：归属过的红仍然是红（缺陷还躺在 main 上），
 //    把它印成"8 道全 exit 0"就是本批一直在拦的那类对外错话，只不过读者是下一轮的我（§8.143 实测撞到的）。
