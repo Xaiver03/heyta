@@ -3113,6 +3113,35 @@ done
     `git status --porcelain -- e2e/package.json scripts/reinstall-all.sh`、`grep -n 'dir e2e run test' package.json`、
     `sed -n '86p' ~/scratch-heyta/heyta-chain.sh`。⚠️ 最后一枚在**仓库外**（是那条会话的临时载体），不在库史里，别把它当成产品资产找。
 
+- (64) **10-05 16:4x：同一条规矩用到第 5 项的第二枚前置上 —— 量出来的不是"我等谁"，是"这一步全机器上还没人开始"。**
+
+  ① (61)④ 把第 5 项的第二枚前置写成"远端那批条目被收进本检出 ⇒ 不归本线"。这句也是**没枚举过分母的**，
+    而它的分母此刻是能量的。现量（都不联网、不动树）：
+    · `git branch -a --contains origin/main` ⇒ 只有 `remotes/origin/main` 与 `remotes/origin/HEAD` 两行 ——
+      **本地没有任何分支含 origin/main** ⇒ "把 594 枚收进 main"这件事**此刻不在任何人的进行中**（不是我在等一条已经在跑的合并）。
+    · `merge/20261005` 的末笔 `564ad047`（12:59）只有一个父 `61a9dfb3` ⇒ 那枚分支名叫 merge 但**还不是合并提交**；
+      而 `git merge-base --is-ancestor merge/20261005 origin/main` ⇒ **是远端的祖先** ⇒ 那条线已经落到远端了，它里面 traps 的末号/条数 = **283 / 292**（与 `origin/main` 逐字同数）。
+    · 那台合并载体 `/private/tmp/heyta-merge-carrier` 的 `b673a301`（12:35，两父 `8cb33f55`+`4023af1c`）合的是
+      `feat/self-host-distribution`，它里面 traps 末号/条数 = **278 / 288** ⇒ 与本检出 HEAD 同数 —— **它没有带进远端那批**。
+  ② 通道分母（"收号"这件事有哪几种做法，各自现量与取舍）：
+    · **A. 在主检出 `git merge origin/main`** ⇒ 拒：这棵树此刻 `git status --porcelain | wc -l` = **49** 行未提交（本线只占我正在写的这一格，其余都是别的会话的，含 traps 尾部 14 条与 `package.json`），
+      带着它们合并 = 要么冲突面盖住别人现场、要么把未提交内容卷进一次合并提交。AGENTS §8.9（共享资源独占验收）明文挡这条路。
+    · **B. 在隔离载体里先合出来（`git worktree` + merge）** ⇒ 能产出"候选合并"，但**落地**仍然要把结果写进本地 `main`，
+      那还是 A；而且重号那 5 枚（279–283 两边不同文）要有人**逐条裁决留下哪个**，那是产品级判断，不是机械合并。
+    · **C. 等那条已经在做合并的会话** ⇒ 现量否证：① 里 `--contains` 那条说明**没有这样一条会话在跑**。
+      ⇒ 所以 (61)④ 那句"不归本线"要改成**更硬也更有用的说法**：这一步没人排队，它是一枚**待拍板的仓库级动作**，
+      而"能不能由本线顺手做"的答案是 A/B 各被上面那条理由挡住，不是"我不方便"。
+  ③ ⇒ 第 5 项的最终形状（不降级）：条目正文、编号算法、脏/撞号/重号三种拒绝，全部在库里有臂；
+    收口仍是 `node research/tools/calendar-line-append-trap.mjs --text research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt --confirm`，
+    但它今天会被**两道**挡住（目标脏 + `origin/main` 已占 279），第二道背后是 ② 那枚**没人认领**的仓库级裁决。
+  ④ 🔴 这一格对本线以外的价值（也是它该进台账的原因）：`§7 #279` 在两台机器上已经是两条不同的坑，
+    而把远端收进本地这一步**还没人开始** ⇒ 越晚做，重号的那段越长（本地未提交已经从 279 排到 292）。
+    这条不进 §5 那一格就等于没人排队。复跑四句：`git branch -a --contains origin/main`；
+    `git log -1 --format='%h %p' merge/20261005`；`git merge-base --is-ancestor merge/20261005 origin/main`；
+    `git show origin/main:docs/reference/environment-traps.md | grep -oE '^[0-9]+\. ' | tr -d '. ' | sort -n | tail -1`。
+  ⑤ 边界（别读多）：本轮**没有** merge、**没有** pull/fetch、**没有**动本地 `main` 的指针、**没有**碰别人的载体；
+    ①② 全是只读现量。`/private/tmp/heyta-merge-carrier` 是别人的载体，我只读了它的 `git show`。
+
 
 
 
