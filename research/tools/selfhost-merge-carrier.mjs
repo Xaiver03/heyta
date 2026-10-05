@@ -1235,6 +1235,14 @@ if (reds.length) {
     mainSha, mainRc: m2.rc, mainOut: m2.out, defectRe: g.re, defectKey: g.key,
   }));
   const badVerdict = attributionVerdict(results);
+  /* 🔴 红门禁的**原始输出**先前只在内存里、从不打印：`brief()` 只留末尾 8 行，而 `check:docs`
+   *    那类检查器把"是哪一条死链、在哪个文件的哪一行"印在前面 —— 于是归属报"这条红是本批带进来的"
+   *    时，操作者拿不到任何可以照着修的东西（10-05 16:2x 现量：日志 33 行里没有一枚死链）。
+   *    归属判据本身不动，这里只把已有的 `g.out` / `m2.out` 交出来。*/
+  const rawDump = paired.filter(({ g }) => g.rc !== 0)
+    .map(({ g, m2 }) => `\n──── ${g.label} 载体原始输出（退 ${g.rc}）────\n${g.out}` +
+      `\n──── ${g.label} 配对树(main ${mainSha.slice(0, 8)}) 原始输出（退 ${m2.rc}）────\n${m2.out}`)
+    .join('\n').slice(-24000);
   if (badVerdict) {
     // 🔴 两种"没有全部通过"要分开说：一条是"这条红是本批的"（要修），一条是"这条红我判不了"
     //    （要先让判据能被逐条点名）。把后者也念成前者，就是让人去修一条并不存在的缺陷。
@@ -1244,7 +1252,7 @@ if (reds.length) {
         ? '   ⇒ 上面带"判不了"的那些**不是**本批的缺陷判定，是这道门没能把缺陷逐条点名（提取式没接上或两侧输出对不上）。' +
           '先把那道门的点名形状补上（并注入验证它能抓到），再谈这条红归谁。\n'
         : '') +
-      `   ⇒ 归属不成立的那些必须先在解法侧修掉；本工具不拿"看起来差不多"当放行。`);
+      `   ⇒ 归属不成立的那些必须先在解法侧修掉；本工具不拿"看起来差不多"当放行。` + rawDump);
   }
   for (const r of results) {
     attribution.push(r.why);
