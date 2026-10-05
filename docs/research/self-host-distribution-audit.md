@@ -11501,3 +11501,42 @@ stdout 一个字都没有 —— 也就是说那四条断言每次载体重算�
 
 📌 一般形状：**新守卫第一次运行的"位置"要和它的"依赖"一致**。只读源码/配置的判据必须排在任何写动作之前 ——
 它越早红，红的时候需要收拾的现场就越少。本轮把它放在落笔之后，第一次响就留下一笔"已经落但被自己判死"的载体。
+
+### 8.200 对外那句"别人通过 bundled Caddy 访问 `/app/`"从来没有人真跑过（登记 G-68；顺手拿到一枚便宜的地板）（2026-10-05 12:3x）
+
+第 2 项那趟绿了之后，回头核对外两份文件的每条可验声称（`docs/runbooks/self-host.md` 与 `server/README.md`）：
+端口 `127.0.0.1:1900`、`WEB_APP_PATH=/app/` + `WEB_APP_DIR=/app/web-dist` 两个旋钮、
+`[web-app] 共享 UI 挂在 /app/（来自 …）` 那句日志、一次性 migrator `exited(0)` 而应用侧
+`RUN_MIGRATIONS_ON_STARTUP=false`、"heyta 不发镜像所以 prefer-the-pull 在这里不可用"——
+**逐条与今天 12:08 那趟的读数一致**（这是"没找到错话"的负结果，不是"验过了"）。
+
+🔴 但顺着第 142-143 行那句 "for other people it is `https://<your-domain>/app/` through the
+**bundled Caddy service**" 查下去，撞出一格**覆盖缺口**：
+
+- `scripts/verify-selfhost-stack.sh:50` 明写"只起 postgres 与 supersync 两个服务：**不起 caddy**"
+  （这台机器 :80 归宿主 nginx，`deploy.sh` 曾因它以"启动失败"收尾），并把 Caddy 那一段推给
+  `e2e/live-site/`；
+- 而 `e2e/live-site/` 打的是**线上那个域名**，线上走的是**宿主 nginx**（`deployment.md` §3.12 那套），
+  不是 compose 里这枚容器；
+- 全仓 `grep -li caddy scripts/ research/tools/ e2e/` 只命中两枚：上面那枚脚本（**排除**它）与
+  `check-image-build-args.mjs`（管 `CADDY_IMAGE` 那个镜像前缀旋钮）。
+  而 `docker-compose.yml:275` 的默认服务图里 caddy 是**常驻第三枚**（`ports 80:80 / 443:443`，
+  健康检查探针打 admin `127.0.0.1:2019`）。
+
+⇒ **外人照指南做的第一步，恰好落在唯一一次都没被任何判据跑过的那枚容器上。**
+今天这趟绿**不**覆盖它 —— 它量的是"绕开 caddy 直接打 1900 时界面可用"。登记为 **G-68**，
+关闭判据写成一条能跑的动作：在一台 :80/:443 可占的机器（或把 caddy 的 `address` 临时改成
+高端口 + `tls internal` 的一次性网络）起一次真栈，判 ① 容器 healthy（admin 探针那条注释说改 admin
+绑定就会 restart-loop —— 那正是这一跑要证的）② 经 caddy 拿到 `/app/` 200 且 HTML 里数得出主蓝资源
+③ 经 caddy 的 `/api/health` 与直连 1900 同形。**不以 `caddy validate` 顶替这三条。**
+
+✅ 拿到一枚便宜的地板（不是判据，是"至少配置本身不坏"）：
+`docker run --rm -e DOMAIN=heyta.example.test -v $PWD/server/Caddyfile:/etc/caddy/Caddyfile:ro --network none caddy:2.11-alpine caddy validate --config … --adapter caddyfile`
+→ **`Valid configuration`**，并自动加上 TLS 策略与 HTTP→HTTPS 跳转（`https_port 443`）。零端口绑定、
+零负载、秒级。⚠️ 它**不**证容器起得来、不证反代通、不证证书拿得到。
+
+⚠️ 同一趟带出一条**决定不做**的：validate 顺带报 `Caddyfile input is not formatted`（:6）。
+实测删掉那个空行只把警告推到 :7，`caddy fmt` 要的是**整份文件空格→制表符**（剩 102 行 churn），
+而这份文件里住着**日志脱敏那一段**（`request>uri regexp "?REDACTED"`、`Referer delete`）。
+⇒ 不在落地前为一枚排版警告造 100 行 diff；登记为 **G-69**，判据：真要 fmt 就单独一笔、
+零逻辑改动，且重跑一次"上游不可用时 `docker logs` 里读不到 token"那条脱敏断言。
