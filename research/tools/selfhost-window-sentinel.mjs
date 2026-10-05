@@ -14,16 +14,20 @@
  *   ③ v4 里那段 `node -e '…'` 把判据字符串塞进 shell 单引号 —— 引号一漂就是静默空读数。
  *      v5 直接在进程内 import `selfhost-kill-ports.mjs`。
  *
- * 六件事**同时且持续**成立才算开窗（缺一就继续等，不调阈值、不硬跑）：
+ * 开窗要成立的六件事，**按它们各挡什么分成两档**（2026-10-05 改，理由见 `sampleVerdict` 里那段）：
+ *   时机档（缺一就把连静清零）：
  *   1) 阻塞集归零（别人未提交的工作树压在我也改过的文件上）
- *   2) 1 分钟负载 ≤ LOAD_MAX（默认 12）
  *   3) 链里那几枚会被 SIGKILL 的端口现在没人监听
  *   4) 载体那棵树此刻不是别人的现场
  *   5) main 这一样和上一样同一个值
- *   6) 上面五件同时成立要连续保持 QUIET_MIN 分钟
+ *   6) 上面四件**连续**保持 QUIET_MIN 分钟
  *      ⚠️ 仍然只是**代理指标**：过去 15 分钟没动 ≠ 链那几十分钟里不动。它挡得住"每 85 秒一笔"，
  *      挡不住"链跑到第 29 分钟来一笔" —— 后者由 `--confirm` 的闸门判，判到了就是退 1，
  *      那一趟的全链读数仍留在日志里（不是白跑，它顺手就是逐段归属要的那份读数）。
+ *   环境档（只挡开窗那一下，**不抹连静**）：
+ *   2) 1 分钟负载 ≤ LOAD_MAX（默认 12）—— 落地脚本真跑之前自己还要连续三样再判一次，
+ *      所以这里挡不住不等于它会硬跑；而一次负载尖峰把已观察到的时机清零，等于用一台机器的
+ *      呼吸去否决一段已经成立的协作时机（实测被它挡掉过一整格：见 §8.254）。
  *
  * 用法：
  *   node research/tools/selfhost-window-sentinel.mjs                     # 只等只报（打印那条命令）
@@ -91,15 +95,34 @@ export function sampleVerdict(s, prevMain, loadMax = LOAD_MAX) {
   const firstSample = !prevMain;
   if (s.blockerProbeBad) reasons.push(`阻塞集探针判不了：${s.blockerProbeBad}`);
   else if (s.blockers !== 0) reasons.push(`阻塞集=${s.blockers}`);
-  if (s.load === null) reasons.push('负载读不出形状');
-  else if (s.load > loadMax) reasons.push(`负载=${s.load}>${loadMax}`);
+  // 🔴 负载**不进** reasons：它抹不掉连静，只挡开窗那一刻（`canOpen`）。
+  //    理由不是"想早点开窗"，是这两件判的不是同一件事 —— 连静判的是"main 现在不会被人抢先、
+  //    别人没在编辑我也改的文件"（时机），负载判的是"这一趟几十分钟的链跑不跑得动"（环境）。
+  //    实测代价（2026-10-05 的日志）：10:05–10:28 阻塞集=0 连续 9 样、main 在 fd8cd780 上停了
+  //    15 分钟，而 10:15 与 10:22 两样打印 `不成立=无`（连静=1/6）—— 中间 10:17 负载 37.86、
+  //    10:20 负载 12.2 各把连静抹回 0。那一个窗口不是被别人挡掉的，是被**一台机器上的摆**挡掉的。
+  //    摘掉这层双保险不降低安全性：`selfhost-land-main.mjs` 的 `gate(3,'负载可用')` 在真跑之前
+  //    自己还要连续三样（每样隔 LOAD_STEP 秒）都 ≤ LOAD_MAX，不到就退 3 = 环境无效。
+  let loadReason = null;
+  if (s.load === null) loadReason = '负载读不出形状';
+  else if (s.load > loadMax) loadReason = `负载=${s.load}>${loadMax}`;
   if (!s.portsFree) reasons.push(s.portsReason);
   if (!s.carrierFree) reasons.push('载体那棵树正被别人用');
   if (!s.main) reasons.push('main 读不到');
   const mainChanged = !firstSample && !!s.main && !!prevMain && s.main !== prevMain;
   if (firstSample) reasons.push('首样：没有"上一样的 main"可比');
   else if (mainChanged) reasons.push(`main 变了（${prevMain}→${s.main}）`);
-  return { ok: reasons.length === 0, reasons, mainChanged, firstSample };
+  return { ok: reasons.length === 0, reasons, loadReason, mainChanged, firstSample, canOpen: reasons.length === 0 && !loadReason };
+}
+
+/**
+ * 连静怎么往下算 —— **唯一所有者**。
+ * 循环里那一行和自检臂必须都走这里：自检若自己另写一遍 `v.ok ? +1 : 0`，
+ * 那它证的只是夹具，不是那条真的在跑的链（同一处判断写两遍就是漂移的起点）。
+ * 只认时机档（`v.ok`）；负载在开窗那一刻由 `canOpen` 挡，不参与清零。
+ */
+export function nextStreak(streak, v) {
+  return v.ok ? streak + 1 : 0;
 }
 
 /** 连续成立需要几样：向上取整，别用整除把 15 分钟截成 14.5。 */
@@ -251,9 +274,40 @@ export function sentinelArms() {
   const v6 = sampleVerdict({ blockers: 0, blockerProbeBad: null, load: 3.2, portsFree: true, portsReason: '端口空', carrierFree: true, main: 'bbbbbbb' }, 'aaaaaaa');
   const okSample = { blockers: 0, blockerProbeBad: null, load: 3.2, portsFree: true, portsReason: '端口空', carrierFree: true, main: 'aaaaaaa' };
 
-  push('control 五件同刻成立 ⇒ ok', true, sampleVerdict(okSample, 'aaaaaaa').ok);
+  push('control 六件同刻成立 ⇒ ok 且 canOpen', '[true,true]',
+    JSON.stringify([sampleVerdict(okSample, 'aaaaaaa').ok, sampleVerdict(okSample, 'aaaaaaa').canOpen]));
   push('A1 阻塞集 1 枚 ⇒ 不开窗', false, sampleVerdict({ ...okSample, blockers: 1 }, 'aaaaaaa').ok);
-  push('A2 负载 13.5 ⇒ 不开窗', false, sampleVerdict({ ...okSample, load: 13.5 }, 'aaaaaaa').ok);
+  push('A2 负载 13.5 ⇒ 不开窗，但**不抹连静**（时机档仍成立）', '[false,true]',
+    JSON.stringify([sampleVerdict({ ...okSample, load: 13.5 }, 'aaaaaaa').canOpen,
+      sampleVerdict({ ...okSample, load: 13.5 }, 'aaaaaaa').ok]));
+  push('A2b 负载读不出形状 ⇒ 同样只挡开窗、不清零', '[false,true]',
+    JSON.stringify([sampleVerdict({ ...okSample, load: null }, 'aaaaaaa').canOpen,
+      sampleVerdict({ ...okSample, load: null }, 'aaaaaaa').ok]));
+  // A2c：今天那一段的**逐样真实读数**（10:12/10:15/10:17/10:20/10:22，main 全程停在 fd8cd780、
+  //        阻塞集=0、端口空、载体空闲，负载依次 27.76 / 9.38 / 37.86 / 12.2 / 7.49）。
+  //        老写法把负载混进时机档 ⇒ 尖峰把已经攒下的连静一次一次抹回 0。
+  const today = [27.76, 9.38, 37.86, 12.2, 7.49];
+  const streakRule = (useLoadAsTiming) => {
+    let st = 0;
+    for (const ld of today) {
+      const v = sampleVerdict({ ...okSample, main: 'fd8cd780', load: ld }, 'fd8cd780');
+      // 老写法 = 把负载当成时机档的一员（今天真实日志上那 5 样就是这么算的）
+      st = useLoadAsTiming ? (v.ok && !v.loadReason ? st + 1 : 0) : nextStreak(st, v);
+    }
+    return st;
+  };
+  push('A2c 阳性对照：老写法在今天真实那 5 样上连静=1 ⇒ 那一格是负载摆动的账挡掉的', 1, streakRule(true));
+  push('A2d 新写法在同一段读数上连静=5（每一样都算数，但 canOpen 仍要当场看负载）', 5, streakRule(false));
+  push('A2e 两样负载都低 ⇒ 照样连着算（新写法不是"永远不算"）', 2, (() => {
+    let st = 0;
+    for (const ld of [9.38, 7.49]) st = nextStreak(st, sampleVerdict({ ...okSample, load: ld }, 'aaaaaaa'));
+    return st;
+  })());
+  push('A2f 时机档里 main 变了仍然清零（这次改动**没有**放宽真正要防的那件事）', 0, (() => {
+    const a = sampleVerdict(okSample, 'aaaaaaa');
+    const b = sampleVerdict({ ...okSample, main: 'zzzzzzz' }, 'aaaaaaa');
+    return a.ok && !b.ok ? 0 : -1;
+  })());
   push('A3 端口被占 ⇒ 不开窗', false, sampleVerdict({ ...okSample, portsFree: false, portsReason: '端口被占：4318/123' }, 'aaaaaaa').ok);
   push('A4 载体被别人用 ⇒ 不开窗', false, sampleVerdict({ ...okSample, carrierFree: false }, 'aaaaaaa').ok);
   push('A5 首样没有上一样的 main ⇒ 不开窗（也不许算"变了"）', false, sampleVerdict(okSample, '').ok);
@@ -321,7 +375,7 @@ function runSelftest() {
   }
   console.log(`哨兵自检：臂数 ${arms.length} · 红 ${bad} · 判定臂 ${arms.filter((a) => /^[AB]\d+ /.test(a.name)).length} 条`);
   if (arms.length < 12 || bad > 0) { console.log('❌ 自检没过 ⇒ 不许拿这条哨兵去等窗口'); process.exit(1); }
-  console.log('✅ 五件判据各被单独打红过一次，负载解析证明取的是 1 分钟位，BLOCK 行按 trimStart 认。');
+  console.log('✅ 时机档各被单独打红过一次；负载单独证明：挡得了开窗、抹不掉连静；负载解析取的是 1 分钟位，BLOCK 行按 trimStart 认。');
   process.exit(0);
 }
 
@@ -385,14 +439,24 @@ while (elapsed < CAP) {
   const s = takeSample();
   const v = sampleVerdict(s, prevMain);
   if (v.mainChanged) mainChanges += 1;
-  streak = v.ok ? streak + 1 : 0;
+  streak = nextStreak(streak, v);
   writeFileSync(PIDF, `pid=${process.pid} epoch=${Math.round(Date.now() / 1000)} step=${STEP} cap=${CAP} quiet_min=${QUIET_MIN} run_on_open=${runOnOpen} last=${JSON.stringify(v.reasons)}\n`);
-  beat(`阻塞集=${s.blockerProbeBad ? `判不了(${s.blockerProbeBad})` : s.blockers} 负载=${s.load ?? '读不到'} ${s.portsReason} 载体(rc${s.carrierFree ? 0 : 1})=${s.carrierReading} main=${s.main || '读不到'}(上一=${prevMain || '首样'}) 连静=${streak}/${NEED} 不成立=${v.reasons.join('；') || '无'}`);
+  beat(`阻塞集=${s.blockerProbeBad ? `判不了(${s.blockerProbeBad})` : s.blockers} 负载=${s.load ?? '读不到'} ${s.portsReason} 载体(rc${s.carrierFree ? 0 : 1})=${s.carrierReading} main=${s.main || '读不到'}(上一=${prevMain || '首样'}) 连静=${streak}/${NEED} 不成立=${[...v.reasons, v.loadReason].filter(Boolean).join('；') || '无'}${streak >= NEED && v.loadReason ? '（连静已满，负载挡的是开窗那一下，不抹连静）' : ''}`);
   if (process.env.FORCE_OPEN === '1') streak = NEED;
   if (streak >= NEED) {
+    // 负载只在这里挡门：连静已经凑满时不抹计数（否则一次尖峰把 15 分钟的时机观察清零），
+    // 但也绝不开窗 —— 真跑那一趟之前 `selfhost-land-main.mjs` 还要自己连续三样再判一次。
+    if (v.loadReason && process.env.FORCE_OPEN !== '1') {
+      prevMain = s.main || prevMain;
+      beat(`    连静已满但 ${v.loadReason} ⇒ 不开窗、不清零，下一样接着算`);
+      const tLoad = Date.now();
+      execFileSync('sleep', [String(STEP)]);
+      elapsed += Math.max(STEP, Math.round((Date.now() - tLoad) / 1000));
+      continue;
+    }
     // 🔴 演练出来的 WINDOW_OPEN 必须带着"这是演练"的标记，否则日志里"负载=88 也算开窗"这一行
     //    会被下一轮读成真读数（v4 就是这么留了一条会骗人的行的）。
-    beat(`WINDOW_OPEN${process.env.FORCE_OPEN === '1' ? '【FORCE_OPEN=1 演练，不是真窗口】' : ''} 五件同时成立已连续 ${streak * STEP}s ≥ ${QUIET_MIN} 分钟（负载=${s.load} main=${s.main} 观察期内 main 变过 ${mainChanges} 次）`);
+    beat(`WINDOW_OPEN${process.env.FORCE_OPEN === '1' ? '【FORCE_OPEN=1 演练，不是真窗口】' : ''} 时机四件连续成立 ${streak * STEP}s ≥ ${QUIET_MIN} 分钟，且开窗这一刻负载=${s.load} 也过（观察期内 main 变过 ${mainChanges} 次）`);
     beat(`    手工等价命令：cd "${mainTree}" && node "${LANDER}" --confirm`);
     if (runOnOpen) {
       attempts += 1;
