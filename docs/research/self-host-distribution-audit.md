@@ -14218,3 +14218,22 @@ VERIFY_RC=0
    所以"这一格没并进 main 时四端产物仍与 main 等价"成立，而"没人读它"不成立。
 
 结论不变的那半：第 8 项 `reinstall:all` 不被这次合并挡着（它装的是产物，不是判据）。
+
+### 8.272 00:4x 第 8 项 `pnpm reinstall:all` 真跑：四端里 **2 端拿到当前产物判据、2 端各被一个具体成因挡住**（不包装成完成，也不记成产品失败）
+
+起跑树 `/tmp/heyta-merge-carrier` @ `de761797`（= 当前 main 的产品源码；差集只有那枚测试文件，见 §8.271）。
+
+| 端 | 结果 | 判据读数 |
+|---|---|---|
+| **mac** | ✅ | `.app + .dmg` 重打并装进 `/Applications/Heyta.app`；**安装对账**：包内 `web-dist` 与本机 `apps/web/dist` 是同一次构建（9 个 chunk）；安装副本自截屏 2164x1432、内容占比 100.0%、**主蓝命中 1127** ⇒ 是共享 UI（不是 §7 第 82 条那种错误屏） |
+| **windows** | ✅ | 源码包 61M / 清单 3633 条 → 远端 tar sha256 `ce195bbe0069f2a7…` **逐字相同** → 远端新鲜度对账（`web-dist/index.html=cef8573b…`、`bridge=ab129bee…`、`assets/*.js` 7 枚一致）→ 远端打包+安装+启动截图完成 → 取证"判据齐了：5 条全在位" |
+| **android** | 🔴 环境/主机态 | 远端打包机的 `node_modules` 落后于锁。脚本自己印的修法：`ssh windows-pc "cd /d C:\src\heyta && pnpm install --frozen-lockfile"`。**我没有执行它** —— 那是共享打包机、别线可能正在那里构建，属"影响别人系统的单动作"，要一次点名授权。脚本也明确**不自动退回本机**（§6.1 新规），所以这一格没有降级读数 |
+| **ios** | 🔴 网络面 | `pod install` **三趟**都在同一步失败：`Installing hermes-engine (250829098.0.9)` ⇒ `git clone https://github.com/facebook/hermes.git` ⇒ `fatal: unable to access …: LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to github.com:443`。⇒ 前置的 `pnpm -r build` ✅、但**沙盒未同步 ⇒ 这一轮没有跑 xcodebuild**，所以 iOS 端**没有**当前产物判据。设备面我自己那台 `heyta-selfhost-reinstall` 已 boot（脚本原本要 `iPhone 17 Pro`，本机没有该名字的设备，我用自建那台并显式传 `IOS_DEVICE_NAME`，没动别人建的两台） |
+
+🔴 **一条顺带被证实的旧疑点**：§8.264 里我登记过"`git fetch --quiet` 带回空、本地 `origin/main` 与 main 两条血缘（595/57）未判成因"。
+今晚这发把同一台机器对 `github.com:443` 的 TLS 连接失败**直接照出来了** ⇒ 那次 fetch 静默无进展与它同源。
+仍然**不动本机网络环境**（硬规则），所以 `不推远端` 这一条今晚在物理上也不是我能选的。
+
+**第 8 项的诚实口径**：四端里两端有"装上的是当前产物且起得来"的判据（mac / windows），
+两端各被一个**具体、可复现、非产品**的成因挡着（远端依赖落后 / GitHub TLS）。
+汇总行按脚本自己的设计大字列出了没装的端 —— 这不是"跑过了就算"。
