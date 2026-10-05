@@ -520,7 +520,8 @@ export function habitGoalSummaryKey(goalType: string | undefined): HabitGoalSumm
 export type HabitFrequencySummaryKey =
   | 'web.habits.freq.summary.daily'
   | 'web.habits.freq.summary.weekly'
-  | 'web.habits.freq.summary.interval';
+  | 'web.habits.freq.summary.interval'
+  | 'web.habits.freq.summary.intervalOne';
 
 /**
  * 频次 → 摘要词条 key。
@@ -528,6 +529,12 @@ export type HabitFrequencySummaryKey =
  * ⚠️ `undefined` 与 `daily` **都给"每天"那一条**：判定侧 `isScheduledOn(undefined)` = 每天，
  *    界面读出来必须与判定一致 —— 否则"没设过频次的习惯"在界面上没有频次，
  *    而连续天数却按每天算（§7 第 195 条那个"看起来没功能其实有"的断面）。
+ *
+ * 🔴 单数那一档也住在这里，不住在宿主里：`everyNDays === 1` 给 `…intervalOne`。
+ *    写入口会把 1 归一成 `daily`（`app-host#habit-actions:111`），所以这条**通常走不到**，
+ *    但"通常走不到"不是判据 —— `packages/i18n` 的 hazard 规则把每条 `web.habits.*` 的
+ *    占位符都用 1 渲染一遍，"Every 1 days" 就是它拦的东西，而两个宿主各写一份的话，
+ *    漂移的那一份不会报错（§3.5 同一条理由）。
  */
 export function habitFrequencySummaryKey(
   frequency: HabitFrequency | undefined,
@@ -536,7 +543,9 @@ export function habitFrequencySummaryKey(
     return 'web.habits.freq.summary.daily';
   }
   if (frequency.type === 'weekly') return 'web.habits.freq.summary.weekly';
-  return 'web.habits.freq.summary.interval';
+  return frequency.everyNDays === 1
+    ? 'web.habits.freq.summary.intervalOne'
+    : 'web.habits.freq.summary.interval';
 }
 
 /**

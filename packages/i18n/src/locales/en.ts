@@ -1190,6 +1190,9 @@ export const en = {
   'web.habits.freq.summary.daily': 'Every day',
   'web.habits.freq.summary.weekly': 'Weekly on {days}',
   'web.habits.freq.summary.interval': 'Every {n} days',
+  // Singular sibling: the catalog's hazard rule renders every `web.habits.*` placeholder
+  // with 1, and "Every 1 days" is exactly what it is there to catch.
+  'web.habits.freq.summary.intervalOne': 'Every {n} day',
   'web.habits.freq.nDays': 'Days between each time',
   'web.habits.freq.invalid': '“Days between each time” must be a whole number of 1 or more',
   'web.habits.freq.intervalHint': 'Lands every {n} calendar days on a fixed grid — it does not shift to the day this habit was created.',
@@ -3166,7 +3169,7 @@ export const en = {
   'site.features.item.task.fields': 'Title, note (Markdown), priority, due date, list, tags',
   'site.features.item.task.repeat': 'Recurring tasks: daily / weekly / weekdays / monthly — four presets, one tap',
   'site.features.item.task.projects': 'Lists support one level of folders; lists and tags each have their own panel',
-  'site.features.item.task.trash': 'Trash: deleted items are kept first — restore them anytime, or clear them for good',
+  'site.features.item.task.trash': 'Trash: deleted items are kept first — restore them anytime, or delete any one of them for good',
   'site.features.item.task.export': 'One-click export: a complete JSON backup (deleted records included, counts you can verify) plus readable Markdown',
   'site.features.item.view.quadrant': 'Four quadrants: sorted automatically by importance and due date — drag to adjust',
   'site.features.item.view.timeline': 'Timeline: laid out by estimated duration, for personal project planning',

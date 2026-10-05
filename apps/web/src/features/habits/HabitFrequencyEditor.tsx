@@ -78,7 +78,8 @@ export function HabitFrequencyEditor({
 
   const summaryKey: HabitFrequencySummaryKey = habitFrequencySummaryKey(frequency);
   const summary =
-    summaryKey === 'web.habits.freq.summary.interval'
+    summaryKey === 'web.habits.freq.summary.interval' ||
+    summaryKey === 'web.habits.freq.summary.intervalOne'
       ? t(summaryKey as never, { n: String(everyN) })
       : summaryKey === 'web.habits.freq.summary.weekly'
         ? t(summaryKey as never, {

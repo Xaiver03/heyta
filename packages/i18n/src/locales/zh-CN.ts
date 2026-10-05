@@ -1299,6 +1299,9 @@ export const zhCN = {
   'web.habits.freq.summary.daily': '每天',
   'web.habits.freq.summary.weekly': '每周 {days}',
   'web.habits.freq.summary.interval': '每 {n} 天',
+  // 中文没有单复数变化，这一条与上面逐字相同；它存在的理由是**词表形状**：
+  // 英文侧要靠 `…One` 兄弟条躲开 "Every 1 days"，调用方按 key 分支，两侧必须同键集。
+  'web.habits.freq.summary.intervalOne': '每 {n} 天',
   'web.habits.freq.nDays': '每隔几天做一次',
   'web.habits.freq.invalid': '「每隔几天」的天数要是一个 1 或更大的整数',
   'web.habits.freq.intervalHint': '按日历固定隔 {n} 天排一次，起点不随建立习惯那天挪。',
@@ -3408,7 +3411,7 @@ export const zhCN = {
   'site.features.item.task.fields': '标题、备注（Markdown）、优先级、截止时间、所属清单、标签',
   'site.features.item.task.repeat': '重复任务：每天 / 每周 / 工作日 / 每月，四种预设一键选',
   'site.features.item.task.projects': '清单支持一层文件夹嵌套；清单与标签都有独立管理面板',
-  'site.features.item.task.trash': '回收站：删掉的内容先留着，随时恢复，也可以彻底清空',
+  'site.features.item.task.trash': '回收站：删掉的内容先留着，随时恢复，也可以逐条彻底删除',
   'site.features.item.task.export': '一键导出：完整 JSON 备份（连删除过的记录都在，条数可核对）+ 好读的 Markdown',
   'site.features.item.view.quadrant': '四象限：按重要程度与截止时间自动归类，拖动即可调整',
   'site.features.item.view.timeline': '时间线：按预估时长排布，用于个人项目排期',

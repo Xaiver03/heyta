@@ -202,6 +202,11 @@ describe('英文习惯文案在 count=1 时必须仍然成立', () => {
       'web.habits.streak.current',
       'web.habits.streak.longest',
       'web.habits.streak.total',
+      // 工单 H5 的摘要条（2026-10-06 补）：`everyNDays === 1` 由**共享层**分给 `…intervalOne`
+      // （`packages/ui/src/habits/model.ts#habitFrequencySummaryKey`）。写入口本来会把 1 归一成
+      // `daily`，所以这一档平时走不到 —— 但这条判据管的是**词表**，不是可达性：
+      // 上一轮它就是因为"Every {n} days" 裸着被填成 1 而红，红的是文案，不是路径。
+      'web.habits.freq.summary.interval',
     ]);
     for (const key of branched) {
       expect(HAZARD.test(withOne(en[`${key}One` as MessageKey]))).toBe(false);
