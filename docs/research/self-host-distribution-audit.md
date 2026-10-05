@@ -11540,3 +11540,59 @@ stdout 一个字都没有 —— 也就是说那四条断言每次载体重算�
 而这份文件里住着**日志脱敏那一段**（`request>uri regexp "?REDACTED"`、`Referer delete`）。
 ⇒ 不在落地前为一枚排版警告造 100 行 diff；登记为 **G-69**，判据：真要 fmt 就单独一笔、
 零逻辑改动，且重跑一次"上游不可用时 `docker logs` 里读不到 token"那条脱敏断言。
+
+### 8.201 G-68 闭合：bundled Caddy 第一次在真栈上被真跑，18 臂 0 红，两条判据各被变异臂打过（2026-10-05 12:5x）
+
+装置新入库：`research/tools/selfhost-caddy-serve-check.mjs`（分支）。它**不抄形状** ——
+`caddy:2.11-alpine`、`ports` 的容器侧端口、healthcheck 的 `test`/`interval`/`timeout`/`retries`/`start_period`、
+`cap_drop`/`cap_add`、`mem_limit`、Caddyfile 的挂载点，全部现读 `server/docker-compose.yml` 的 caddy 块，
+**任一项读不到就退 2**（"推导不出来"必须与"跑绿了"分开）。主判据腿仍走窗口起跑器的 `CMD` 旋钮，
+所以锁与负载纪律沿用既有那把尺，没有第二把。退出码分档：判据红 8、注入形状不对 6、
+栈没起（环境无效≠产品失败）3、没到 healthy 5 —— 绿不绿只认整条 exit。
+
+上面那条"关闭判据"逐条对上：
+
+| 原判据 | 现量 |
+|---|---|
+| ① 容器 healthy（证 admin 绑定没坏） | ✅ 状态 `healthy`；compose 那条探针 `[wget -q --spider http://127.0.0.1:2019/config/]` 现跑 **rc=0** |
+| ② 经 caddy 拿 `/app/` 200 且数得出主蓝资源 | ✅ 代理 200 且与直连**同字节**（sha256[:12] `5573bdad5f06` == `5573bdad5f06`）；HTML 引到 5 个同源资源经代理**全 200**；**4** 个产物含从 `tokens.css` 解出的 `#2563eb`（色值是现读的，不是写死的） |
+| ③ 经 caddy 的 `/api/health` 与直连 1900 同形 | ✅ 但**路径按现量更正为 `/health`** —— 服务端只有这一个健康路由（`verify-selfhost-stack.sh:446` 等的就是它；`/api/health` 只在 `verify-mobile-ios.sh:541` 作为 `||` 兜底出现，不是路由）。同形判据本身没改 |
+
+顺带钉住"外人第一步"另三格，它们全是**取值差异**而不是"有没有"：
+`X-Frame-Options` 经代理=**DENY**、直连=**SAMEORIGIN**（⇒ caddy 的 `header` 块在覆盖，也证代理腿真经过它）；
+`encode gzip zstd` 生效（代理带 `content-encoding: gzip`，直连**不带压缩**）；
+`-Server` 两侧都无 —— Node 本来就不发 `Server` 头 ⇒ **这一行在当前部署里是空操作**，登记不当缺陷。
+
+🔴 这里有一处**我自己写错的判据被现量抓出来**：原打算用"直连侧没有安全头"当"请求真经过 caddy"的证据，
+实测**直连侧三条全有**（发出者是 `@fastify/helmet`，注册在 `server/src/server.ts:416`）。照原写法跑会以红收尾、且把归因指错地方。改成"取值不同形"，
+并补一条更硬的：`docker stop` 之后代理腿 `fetch failed`（status=0）而**直连腿仍 200**
+⇒ 回话者就是这枚容器，不是 `127.0.0.1:18080` 上恰好坐着的东西。
+
+两条变异臂（都留原读数）：
+- `{ admin off }` 注进全局块 ⇒ 那条健康检查命令 **rc=1**，而容器仍活着、代理仍 200
+  ⇒ 红的确实只有 admin 那一格 ⇒ **①/A 有牙**（这正是 Caddyfile 头三行注释那句"改 admin 绑定就会 restart-loop"的第一次实证）。
+- 摘掉两处 `request>uri` 日志 filter ⇒ 合成令牌**出现在** `docker logs` ⇒ **E（脱敏那条）有牙**。
+  令牌是 `synthetic-<uuid>`，不是任何真凭据，且不落进任何输出与证据文件。
+
+两处**探针自身**的缺陷当场被抓、当场改掉（都属"臂写反 / 模式打空"那一族，值得后来者照镜子）：
+1. 那条 admin-off 臂我写成 `claim(..., 1, rc === 0 ? 1 : 0)` —— 把读数预先取反了一次，
+   于是**变异真的成功时这条臂反而报红**（第二趟 18 臂里那 1 条红就是它，不是产品红）。
+   ⇒ 规矩：**臂的 `got` 必须是原读数**；"期望非零"要写成布尔，不要靠三元翻转去凑。
+2. 按字面内容匹配那行 filter 的正则**一条都没摘到**，脚本却照常往下走 ⇒ 若不加
+   "正好摘掉 2 条、且摘完后 `REDACTED` 不再出现"这两条断言，就会把"探针没打中"记成"E 判过了"。
+   （§7 第 46 条的又一次实锤：**没复现的臂什么也不证明**。）
+
+🔴 **射程边界（不许读多）**：这跑**不覆盖** `docker compose up` 那条真服务图（我用 `docker run` 起单容器，
+只是字段从 compose 读）· **不覆盖签证书**（`DOMAIN=:80` 没有域名 ⇒ ACME/443 那一格仍未取证）·
+**不覆盖** WebSocket 升级经代理（`?token=` 只打到 HTTP GET 层）· **不覆盖**主机 :80/:443 的真占用
+（刻意发布到 `127.0.0.1:18080`，也不动宿主 nginx）。
+⇒ 对外那句 "through the bundled Caddy service" 现在有四格读数（容器起得来 / 反代通 / 产物原样到达浏览器 /
+日志脱敏在位），**没有**"证书能签下来"那一格。
+
+顺手一枚 G-69 新读数：`caddy validate` 在这条路径上照样报 `not formatted`（file=`/etc/caddy/Caddyfile`），
+脚本把它作为 reading 打印出来 —— 警告是真的、且不修。
+
+收尾对账：脚本自己创建的对象（3 枚容器 + 6 枚一次性卷）**0 残留**；我自己那组 `--keep` 栈已 `down -v`
+（两枚数据卷与 `super-sync-server_internal` 均 Removed）、一次性凭据文件已删、:1900 空。
+⚠️ 那条 `--keep` 复跑留下的三张新截图（`e2e/selfhost-stack-results/s2/s3-*.png`）**没有被人复核**，
+所以**没有提交**；§8.191 那四张已复核的仍是当前证据。
