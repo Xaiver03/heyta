@@ -2995,7 +2995,7 @@ VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VER
 
   | 段 | 命令 | 归因（每条都有现量出处） |
   |---|---|---|
-  | 8 | `check:op-log-semantics` | 变异脚本自身抛错 `mutate-op-log-semantics.mjs:79`（Node 22.22）⇒ **未归因**，登记待查 |
+  | 8 | `check:op-log-semantics` | 🔴 **19:31 定案：与第 84 段同族，是内存闸门拒绝**。日志原文写着「内存闸门拒绝启动：已有测试在跑（pid=40338，锁 `/tmp/tfa-test.lock`；它是 `.tfa-shield/bin/npx vitest run tests/security/revisionsL…`）」⇒ `run()` 拿到 `result.error` 就在 `:73` 抛、`:79` 是调用点。**不是产品红，是别人持锁时按设计不起跑**（那条旋钮 `TFA_ALLOW_CONCURRENT_TEST=1` 用户明令不用） |
   | 42 | `check:docs` | 🔴 **载体年龄**，不是死链：引用的 `trash-and-archive.md §10.87` 在**主检出行 7330 存在**、在**载体那棵老树里 0 命中**（`grep -cE '^#+ *(§)?10\.87'` 主=1 / 载体=0） |
   | 69 | `check:ai-e2e` | 🔴 **本批自己的**：`tests/list-folder.spec.ts:72:1`（④ 那条取证）第 115 行 `scrollIntoViewIfNeeded` 报 `Element is not attached to the DOM`，**retry #1 同样红** ⇒ 不是纯抖动；产品/测试两侧未裁定，见下面边界条 |
   | 70/71 | `check:privacy-consent-e2e`、`check:landing-e2e` | 同一趟里**两种读数**：第 3 步单跑 rc=0，第 5 步逐段 rc=1 ⇒ 归到竞争/负载（当时 15 分钟均值 47.65），不算产品证据 |
