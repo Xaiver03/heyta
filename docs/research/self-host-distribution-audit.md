@@ -14136,3 +14136,52 @@ main 打不出前端产物，`verify:selfhost-stack` 走不到真镜像那一段
 要么由负责人授权我在**独立副本**上做一次"删掉重复那一段 + 回读 83/145 只剩一处 + 构建转绿"的修复再走合流通道。
 证据目录 ``（`summary.txt` 带 PREV/AT/INSTALL_RC/VERIFY_RC，`verify.log` 有原文三个 TS 码），
 载体已按 trap 还原回 `6921ac77`（`RESTORE_RC` 见 summary）。
+
+### 8.269 23:4x 真跑通：**自托管整套三条判据全过 rc=0**，但代价是先挖出并修掉两处 —— 一处是 main 的合流残留，一处是**判据自己没驱动外人必经的那条路**
+
+先给结论读数（载体树 `fix/selfhost-e2ee-first-run-key` @ `9535f8b8`，证据 `~/.heyta-evidence/selfhost-stack-clean-1005-234719/`）：
+
+```
+VERIFY_RC=0
+✓ S1 `/app/` 打开就是应用，且 service worker 在 /app/ scope 下注册上 (835ms)
+✓ S2 在这台实例上注册并登录，凭据落在本机自己那台服务器 (4.3s)
+✓ S3 建一条任务同步出去，全新设备只能从服务端读到它 (23.8s)
+3 passed (29.6s)   ✅ 自托管整套：三条判据全过
+```
+镜像内依赖对账 145=126+16+3、入口命令九条 R 判据、产物自洽（`/app/` + 256 个 `--ht-*`）在同趟**各自复现**。
+四张截图都是本趟的（23:48/23:49），**人打开看过**：`s2-signed-in.png` 顶栏「已同步」+ 账号菜单里是本次邮箱
+`selfhost-5336084-1@example.test`；`s3-device-b-recovered.png` 里全新设备读到了 `selfhost-task-5336084-2`
+（序号与本次账号一致，不是上一轮剩的）。
+
+**修掉的两处，缺一不可：**
+
+1. 🔴 **main 打不出产物**（`acce5fd3` 提交态）：`apps/web/src/features/calendar/CalendarView.tsx` 里
+   `const events` 在 83 与 145 行**各写了一遍**、268 行那个 JSX 带重名属性 ⇒ `tsc -b` 三个 TS 码 ⇒
+   Dockerfile:206 那步 `pnpm --filter "@heyta/web..." run build` 失败 ⇒ 镜像建不出来，验收连 docker 段都没走到。
+   修法：取日历那条线**已经在它自己索引里**的那份成品入库（`ff56bcab`，删 17 行），
+   **没有动他们的工作树**、没有替他们提交他们的其它文件。归属：本批写集里 apps/web 0 枚（§8.265 同一把尺）。
+2. 🔴 **判据没驱动外人第一次自建必经的那条路**（这才是本批真正的缺口）：`setE2eePassword` 只认
+   「已有钥匙」那一档的 label `端到端加密口令`，而干净实例上同步设置里给的是
+   **`vault-create-form`（创建钥匙）→ `vault-pending`（含恢复码）→ 把恢复码逐字抄进 `vault-recovery-confirm`
+   → `vault-publish`（确认并发布）**。`vault-publish` 的禁用条件是
+   `disabled={busy || pendingCode.length === 0 || remote === undefined}` —— **不抄恢复码就永远点不动**，
+   Playwright 那句 `waiting for element to be visible, enabled and stable` 就是这个意思。
+   还有一层：那张卡是**异步**的（先 `vault-loading`），用瞬时 `isVisible()` 判档位会静默走错分支。
+   改完（`9535f8b8`）S2 从 **3.0 分钟超时**变 **4.3 秒过**、S3 从 **9.0 分钟**变 **23.8 秒**。
+   ⚠️ 这条要读准：**产品没有坏，是验收从来没走过外人要走的那条路**。上一版"三条判据全过"的历史读数
+   （§8.252）是在**旧界面档位**下取的，合流之后那一档变了，判据没跟上 —— 这正是 §7 元规则第 2 条的形状。
+
+**过程中我自己造的三枚错，都记下来挡后来者：**
+
+- 在**正在跑的**验证中途改了它读的 spec ⇒ 那一趟的 S2/S3 属**混修订**，读数作废重跑（同族：改在跑的 bash 脚本要换副本重启）。
+- 第二发 `--filter @heyta/web`（少写 `...`）拿旧 dist 判新源码，凭空报出 4 枚"缺导出/缺词条"TS 码；
+  换成生产那行的形状 `--filter "@heyta/web..."` 同一条命令 rc=0（已固化进记忆）。
+- 起第二发时撞上自己的**内存闸门**（`/tmp/tfa-test.lock` 被我上一发 Playwright 占着）⇒ 那一趟 e2e **整段没跑**、
+  只留下 rc=1。没有用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕它。
+
+**仍然没闭合的（不包装成完成）**：
+① 这两处修复现在只在 `fix/selfhost-e2ee-first-run-key`（`acce5fd3` 的后代 ⇒ 对 main 是**快进**），
+   main 本身还打不出产物；把它并进 main 要动主检出（硬约束禁止），所以**这一格要负责人点头**。
+② 第 8 项 `pnpm reinstall:all` 仍未起 —— 它现在被 ① 挡着：从 main 装会装到打不出来的产物，
+   从这条分支装则产物不等于 main。
+③ 落地页那 5 枚 live 红（#20）与 G-44b（#64）不变。
