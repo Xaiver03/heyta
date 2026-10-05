@@ -42,7 +42,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-import { decidePrivacyConsent, enableAllModules } from './helpers';
+import { decidePrivacyConsent, enableAllModules, waitForBootSplashGone } from './helpers';
 import { installMissingProducerShims } from './shims';
 
 const APP_EN = '/?lang=en';
@@ -135,6 +135,9 @@ async function openAppEnglish(page: Page): Promise<void> {
   await decidePrivacyConsent(page);
   // 🔴 英文确实生效：`<html lang>` 是应用按解析结果自己写的。
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  // 定帧：等首屏品牌帧摘掉再返回（10-05 12:1x 那两张 AE≈93% 的图就是拍到过渡帧的，
+  // 理由与判据见 `helpers.ts` 的 `waitForBootSplashGone`）。
+  await waitForBootSplashGone(page);
 }
 
 /** 从任务页进**日档**。日历 tab 的名字来自表 —— 界面不是英文就点不到。 */
@@ -285,9 +288,22 @@ test('🔴 英文日档：那条最长的说明**整句读得出**，没有溢�
   });
   expect(cjk, `英文日档里残留了中文：${cjk.join(' | ')}`).toEqual([]);
 
-  // 单独把那句说明拍进证据（`day-en-full` 可能已经把它滚出视口）。
-  await page.locator(NO_TIMED).scrollIntoViewIfNeeded();
-  await page.screenshot({ path: SHOT('day-en-no-timed'), fullPage: false });
+  /*
+   * 🔴 这里**不再补拍第二张**（原来是 `scrollIntoViewIfNeeded()` + 一次 `screenshot('day-en-no-timed')`）。
+   *    删的依据不是"某一趟看着一样"，是下面这条**常驻前提断言**：那条说明在 `day-en-full`
+   *    那一帧就整条落在视口里 ⇒ 再拍一张只是把同一个证据拍两遍（现量：入库的那两张
+   *    `md5` 逐字相同 `bac2e33145d264ab07f777d0654e40ff`、`cmp -l` 差异 0 字节 ⇒ 那次滚动是空操作）。
+   *    量在 full 那一帧：201→此处逐行核过没有交互（视口在 174 行钉死 1280×720），
+   *    探针有没有落到元素上由 212 行 `probe.height > 0` 钉住。
+   * ⚠️ **反向读这条断言才是那张补拍的存在理由**：哪一天它红了（说明被挤出视口），
+   *    要做的是把补拍加回来 + 在取证 README 补一行一枚锚点，**不是**把它改松。
+   */
+  const viewport = page.viewportSize()!;
+  expect(
+    sentence.bottom,
+    `说明底沿 ${String(sentence.bottom)} 越出视口底沿 ${String(viewport.height)} ⇒ 它不在 day-en-full 那一帧里，` +
+      '此时必须补拍独立的一张（见 docs/plans/calendar-profile-handoff.md §4.05(41)）',
+  ).toBeLessThanOrEqual(viewport.height);
 
   expect(errors, `控制台报错：${errors.join(' | ')}`).toEqual([]);
 });

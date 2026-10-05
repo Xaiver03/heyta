@@ -80,9 +80,9 @@ cd e2e && npx playwright test tests/calendar-day.spec.ts
 同一状态重跑必然不同字节 ⇒ md5 是"每跑必红"的判据，§8.3 说它会把人训练成忽略红。
 
 ```
-UIPIN day-hour-labels.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
-UIPIN day-timed.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
-UIPIN day-timed-hour16.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN day-hour-labels.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN day-timed.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN day-timed-hour16.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
 ```
 
 钉 `73ad62a3` 的理由（10-05 重钉，见下面那节）：这五条路径里最后一次动它们的提交是
@@ -129,3 +129,9 @@ UIPIN day-timed-hour16.png 73ad62a3 packages/ui/src/calendar apps/web/src/featur
 3. `day-timed-hour16.png` 里那条任务名是 `挂在十六点-113718`（上一批是 `-867223`）
    ⇒ 再次直接看到"每跑必红"的那条随机源，钉 md5 不可行的理由不是推理出来的，是这两串数字。
 
+
+## 10-05 12:2x 重拍批次（指针）
+
+本目录这 3 枚锚点已重钉 `8cb33f55`，图逐张看过。
+**批次记录（含"第一次重拍拍到首屏遮罩过渡帧"那条 A/B 与修法）只写一份**：
+`../calendar-day/README.md` 的「10-05 12:2x 重拍批次」那一节。

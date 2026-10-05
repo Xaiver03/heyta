@@ -3,8 +3,19 @@
 判据在 `e2e/tests/calendar-capture.spec.ts`（2 条），DOM 那一层在
 `apps/web/tests/calendar-capture.spec.tsx`。拍法：
 `cd e2e && npx playwright test tests/calendar-capture.spec.ts`，
-产物落 `e2e/test-results/calendar-capture.png` 后复制到本目录
-（`test-results/` 会被下一趟 Playwright 清空）。
+🔴 产物由 spec **就地写进本目录**（`SHOT()` 返回 `../apps/web/evidence/calendar-capture/<名>.png`）——
+10-05 12:0x 之前它落 `e2e/test-results/` 再由人复制，而**新增**的那张永远复制不到：
+重拍装置只把"目标目录里已存在同名文件"的产物拷回去（`r17-reshoot-stale.sh` 的拷贝循环）。
+
+## 待补的第二张：`calendar-capture-input-wins.png`
+
+`calendar-capture.spec.ts` 的**第 2 条**（"输入里写『后天』时以输入为准"）10-05 12:0x 起会拍这张，
+但**盘上还没有它** —— 要等一次 e2e 窗口（负载门 + 4318/4319 空闲）。
+所以这里**刻意还没有它的 `UIPIN`/`md5`**：给一枚盘上没有的图钉锚点，
+`r17-evidence-md5-check.sh` 会报 `盘上没有这个文件` 并计入红（那是"主张先于证据"的形状）。
+窗口跑完后要做的是：打开那张图逐张看过 → 在本节下面补「人看到的」→ 补一枚 `UIPIN`
+（这张图里有每趟随机的 `覆盖-NNNNNN` ⇒ **只能钉代码锚点，不能钉 md5**，理由见下面那节）。
+复跑命令：`cd e2e && npx playwright test tests/calendar-capture.spec.ts --reporter=list`。
 
 ## `calendar-capture.png` —— 人看到的（2026-10-04 14:1x 逐张打开看过）
 

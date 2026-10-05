@@ -20,6 +20,14 @@ import { openApp } from './helpers';
 const APP_ZH = '/?lang=zh-CN';
 const BOARD = '[data-testid="calendar-board"]';
 const MONTH_CARD = '[data-testid="calendar-board-month-card"]';
+/**
+ * 证据落在**受版本控制**的目录里（`e2e/test-results/` 每趟会被清掉）。
+ * 🔴 两条用例同一个口径：原来只有第 1 条拍、且拍进 `test-results/` 再由人复制，
+ *    于是"这条主张只有 DOM 断言撑着"（§4.05 记的那枚缺口）。走 `test-results` 那形状还有个硬约束：
+ *    重拍装置只把**目标目录里已存在同名文件**的产物拷回去，一枚**新增**的图永远拷不进去 ——
+ *    就地写才是这里能用的形状（`calendar-day` / `profile-panel` 那几枚 spec 早就这么写）。
+ */
+const SHOT = (name: string): string => `../apps/web/evidence/calendar-capture/${name}.png`;
 
 async function gotoCalendar(page: Page): Promise<void> {
   await page.getByRole('tab', { name: '日历' }).click();
@@ -72,7 +80,7 @@ test('🔴 点 `+` → 输入一句话 → 任务条出现在**刚指着的那�
   //    任何"未选中格子数为 0"的写法都恒真（§7 元规则 2）。
   //    "没跑偏到今天"由第二条用例从反面钉：锚点是明天、输入是后天 ⇒ 落在后天。
 
-  await page.screenshot({ path: 'test-results/calendar-capture.png', fullPage: false });
+  await page.screenshot({ path: SHOT('calendar-capture'), fullPage: false });
   expect(errors, `控制台报错：${errors.join(' | ')}`).toEqual([]);
 });
 
@@ -107,4 +115,8 @@ test('🔴 输入里写了「明天」时以**输入**为准：在 3 号那一�
   await expect(
     page.locator(`[data-testid="calendar-cell-${dayAfter}"] [data-testid$="-bar-title"]`),
   ).toHaveCount(0);
+  // 🔴 这张是**这一条主张唯一的界面证据**：上面两个断言只说明"数据落对了格子"，
+  //    而"用户看得见它落在 5 号那一格、3 号那一格是空的"必须有一张图（§6.2 规定一）。
+  //    原来整个 spec 只有第 1 条拍 ⇒ 这条一直只有 DOM 撑着（§4.05 登记的那枚缺口）。
+  await page.screenshot({ path: SHOT('calendar-capture-input-wins'), fullPage: false });
 });

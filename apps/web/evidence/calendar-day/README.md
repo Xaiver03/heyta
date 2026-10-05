@@ -126,14 +126,13 @@ X/Y/AB/AC 要重写 `packages/ui/dist`，而另一条会话正在读它打移动
    图字节一个字没变、源码动了 ⇒ 仍然红），所以它回答的是 md5 回答不了的那半边 —— **主张过期**。
 
 ```text
-UIPIN day-en-full.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN day-en-no-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN day-en-empty.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-full.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
-UIPIN calendar-day-drag-next.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
-UIPIN calendar-day-drag-prev.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
-UIPIN calendar-day-away.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
-UIPIN calendar-day-back-today.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN day-en-full.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN day-en-empty.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN calendar-day-full.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN calendar-day-drag-next.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN calendar-day-drag-prev.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN calendar-day-away.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN calendar-day-back-today.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
 ```
 
 ⚠️ **后五枚曾经红过（UISTALE），10-05 10:2x 那趟重拍 + 逐张看过之后才转绿并改钉 `73ad62a3`**
@@ -155,9 +154,8 @@ UIPIN calendar-day-back-today.png 73ad62a3 packages/ui/src/calendar apps/web/src
 
 | 文件 | md5 | 人看到的 |
 |---|---|---|
-| `day-en-full.png` | 非锚点（每趟随机）：`d9916538a42055e92d034ac7913b37b3` 是 06:46 那趟的字节；11:54 重跑版 `382ac057fa4ac8a514291d11279c4da8` | 整屏英文：页头 `Calendar` / `Sun, 10/4` / `Back to today` / `View Day` / `Not synced yet`；「All day」带里一条 `en-day-589776`（随机后缀每次现造 ⇒ 这三张的 md5 **跨趟必不同是设计**）；轴从 `0:00` 起；⚠️ 06:46 那趟重渲染后**这张里没有红色 now 线**（拍于 06:46，线落在 `6:00` 之下、不在取景内。旧文案那句"`1:00` 与 `2:00` 之间有一条红色 now 线"是 01:34 那一趟的事实，**对这张不成立**）；**最长那句说明在轴卡下面整行读得出**：`Nothing on this day has a specific time — they are all in the "All day" band above.`（单行、没换行、没省略号、没出容器） |
-| `day-en-no-timed.png` | 非锚点（每趟随机）：10-05 02:1x 现量 `bac2e33145d264ab07f777d0654e40ff` —— 🔴 **与上一张逐字节相同**（旧文案写的是"人眼看内容相同，md5 不同"，现在连 md5 都相同了：`spec` 第 290 行那次补拍落在同一帧上） | ⚠️ **与上一张是同一屏**，而且**这一趟是同一份字节**。这张的存在理由是 spec 里那句注释"`day-en-full` 可能已经把说明滚出视口"—— **1280×720 下没发生**（那句话在 full 那张里本来就整行读得出），所以它在这个视口下**不构成独立证据**，只是"视口更矮时"的保险。要它成为证据得先有一个把说明挤出视口的窄视口。 处置：下一趟有窗口时**把 `calendar-day-en.spec.ts:290` 那次重复截图去掉**（留一行说明为什么去掉），而不是留着让"两张图"读起来像两个证据 —— 本行只登记读数，不在这一趟改 spec（改完必须重拍同一族三张，而那是另一趟窗口的事） |
-| `day-en-empty.png` | `d64c4994508cd993b4fb9775f2dd65f3`（10-05 02:1x 重取；上一枚 `57d2d0085e…` 落后于 10-04 21:3x 那批提交带进来的字节 —— 这枚 md5 是**常驻锚点**，所以那次覆盖被 `--all` 报成 MISMATCH，不是靠人记住） | 空的那天的英文态：「All day」卡里居中 `Nothing is due on this day.`，**没有**上面那句"都在全天里"（那天两条带都空，说了就是谎），底部仍有一句 `Tasks without a due date are not on the calendar, they live in the Inbox on the Tasks tab.`；轴只到 `4:00` 那一档；⚠️ 旧文案的"同样带红色 now 线"对这张同样不成立（now 线在取景外）。🔴 **新字节里页头是两行**（第一行 `‹ Sun, 10/4 › Back to today + View[Day ▾]`，第二行 `Not synced yet ⟳ ⚙ Language 中文/English ✓ 🌙`）—— 与旧文案第 30 行那句"页头一行排满"是同一件事的反面，见下面 10-05 那一节 |
+| `day-en-full.png` | 非锚点（每趟随机）：`d9916538a42055e92d034ac7913b37b3` 是 06:46 那趟的字节；11:54 重跑版 `382ac057fa4ac8a514291d11279c4da8` | 整屏英文：页头 `Calendar` / `Sun, 10/4` / `Back to today` / `View Day` / `Not synced yet`；「All day」带里一条 `en-day-589776`（随机后缀每次现造 ⇒ 这三张的 md5 **跨趟必不同是设计**）；轴从 `0:00` 起；⚠️ 06:46 那趟重渲染后**这张里没有红色 now 线**（拍于 06:46，线落在 `6:00` 之下、不在取景内。旧文案那句"`1:00` 与 `2:00` 之间有一条红色 now 线"是 01:34 那一趟的事实，**对这张不成立**）；**最长那句说明在轴卡下面整行读得出**：`Nothing on this day has a specific time — they are all in the "All day" band above.`（单行、没换行、没省略号、没出容器）；🔴 **原来这张下面还有一行 `day-en-no-timed.png`，10-05 12:0x 按 §4.05(41) 删掉了**：它与本行**逐字节相同**（`md5 bac2e33145d264ab07f777d0654e40ff`、`cmp -l` 差异 **0** 字节）⇒ spec 里那次 `scrollIntoViewIfNeeded()` 是空操作、那张不构成独立证据；现在 spec 改断言"说明底沿 ≤ 视口高"，**它红了才说明需要一张独立补拍**（那时要连本表这行与一枚锚点一起补回来，不是把断言改松） |
+| `day-en-empty.png` | `db9226d940c933fa0f7594a65e23a811`（10-05 12:2x 重拍后重取；上一枚 `d64c499450…` 是 02:1x 那批 —— 这枚 md5 是**常驻锚点**，所以那次覆盖被 `--all` 报成 MISMATCH，不是靠人记住） | 空的那天的英文态：「All day」卡里居中 `Nothing is due on this day.`，**没有**上面那句"都在全天里"（那天两条带都空，说了就是谎），底部仍有一句 `Tasks without a due date are not on the calendar, they live in the Inbox on the Tasks tab.`；轴只到 `4:00` 那一档；⚠️ 旧文案的"同样带红色 now 线"对这张同样不成立（now 线在取景外）。🔴 **新字节里页头是两行**（第一行 `‹ Sun, 10/4 › Back to today + View[Day ▾]`，第二行 `Not synced yet ⟳ ⚙ Language 中文/English ✓ 🌙`）—— 与旧文案第 30 行那句"页头一行排满"是同一件事的反面，见下面 10-05 那一节 |
 
 🔴 **05:4x 更正：上面这三枚 md5 是重取的，原来那三枚（`46d2e2fb…` / `51926322…` / `eb50b404…`）已经对不上盘上字节**。
 成因与 `calendar-view-options/README.md` 那一条**是同一件事**：2026-10-04 01:34 另一条会话跑 e2e 时把同名 png 覆盖，
@@ -204,10 +202,13 @@ git log -1 --format='%h %ad' --date=format:'%m-%d %H:%M' -- \
   apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/i18n
 ```
 
-⚠️ **同目录里另外三张不在这条账上**：`day-en-full.png` / `day-en-no-timed.png` / `day-en-empty.png`
-（R16 英文取证）字节是 **10-04 12:41**，晚于那一笔 ⇒ 它们的 `UIPIN … 39032107` 现在成立，
-工具打的是 `UIOC`（信息行）而不是红。**五张红、三张不红，是同一目录内的真实差别** ——
-别为了"这个目录干净"把它们一起改口。
+⚠️ **同目录里另外两张不在这条账上**：`day-en-full.png` / `day-en-empty.png`
+（R16 英文取证）字节是 **10-04 12:41**，晚于 `39032107` 那一笔 ⇒ 当时它们的锚点成立、工具打的是 `UIOC`（信息行）而不是红。
+🔴 **10-05 12:0x 给这两枚的路径集补宽了 `packages/design-system/src/tokens.css`，它们因此转成 UISTALE**：
+`1e5dd492`（10-05 00:06，首屏动画落到 web/Android/iOS）动过 tokens.css，而这两张拍于 10-04 12:41
+⇒ **这一枚红是对的红**（决定形状的源码确实在图之后动过），闭合动作是"重拍 → 逐张看过 → 重钉"，
+**不是**把钉改到当前提交（那等于用一次改字把一条真过期主张洗成绿的）。
+（第三张 `day-en-no-timed.png` 已按 §4.05(41) 删掉 —— 它与 `day-en-full.png` 逐字节相同，不构成独立证据。）
 
 ## 🔴 2026-10-05 09:52 重拍 + 10:1x 逐张看过：上面第 ② 条那句"没取证"**现在有读数了，而且它推翻了一句旧文案**
 
@@ -243,3 +244,28 @@ git log -1 --format='%h %ad' --date=format:'%m-%d %H:%M' -- \
 
 ⇒ 复跑对账：`bash research/tools/r17-evidence-md5-check.sh --dir apps/web/evidence/calendar-day`。
 
+
+## 10-05 12:2x 重拍批次（这一族的**真源记录在这里**，另三份 README 只留指针）
+
+- **触发**：本目录 7 枚里有 2 枚（`day-en-*`）的路径集补宽了 `packages/design-system/src/tokens.css`
+  ⇒ 当场转 UISTALE（`1e5dd492` 10-05 00:06 动过 tokens.css，而那两张拍于 10-04 12:41）。
+  重拍把整目录 7 张一起刷新，同趟带上 `calendar-day-time/`（它的图由同一枚 `calendar-day.spec.ts` 产出）。
+- 🔴 **第一次重拍（12:1x）有两张是废的**，而 `--all` 全绿看不出来：`day-en-empty.png` 与
+  `calendar-day-time/day-hour-labels.png` 对 HEAD 的像素差 **AE = 855096 / 855948（≈93%）**。
+  逐张打开看见的是**一枚半透明的 `h` 品牌 mark 压在内容上** —— `1e5dd492` 那批首屏退场动画的**过渡帧**。
+  ⚠️ **产品没有错**（遮罩按 `animationend` + 有界兜底自己摘，见 `apps/web/src/boot-splash.ts`），
+  **错在取证载体没等它摘掉**：一张正在淡出的遮罩既不是首屏也不是目标界面，
+  而它同时骗过像素判据和"非空白"判据（§7 第 82 条那一族换了个触发源）。
+  修在 `e2e/tests/helpers.ts` 新增的 `waitForBootSplashGone`，挂在 `openApp` 与本 spec 的
+  `openAppEnglish` 末尾；`boot-splash.spec.ts` 是**故意**拍品牌帧的，它不走 `openApp` ⇒ 不受影响。
+- **A/B（同一对文件、同一个装置，只换载体）**：12:1x `AE=855096/855948` ⇒ 12:2x `AE=3884/4982`
+  （0.42% / 0.54%）。差异区实测在页头日期与左下迷你日历的今日格（`magick compare` + `-trim`：
+  `83x26+25+129`、`100x96+8+68` 一类）⇒ 来源是**日期翻到 10/5** 与每趟随机的任务名，不是形状。
+- **逐张看过**（14 枚改过字节的图全看了）：本目录 `calendar-day-{full,drag-prev,away,back-today}` +
+  `day-en-{full,empty}`，以及 `calendar-day-time/{day-hour-labels,day-timed-hour16}`、
+  `calendar-year/{year,year-next,year-drilled,year-bottom}`、`calendar-view-options/{view-select-closed,view-tabs-year}`。
+  形状与各自行「人看到的」一致；`calendar-day-drag-next.png` 与 `day-timed.png` 重拍后**与 HEAD 逐字节相同**
+  （⇒ 不需要重看，但这次按目录批量重钉时它们的锚点也一并挪到 `8cb33f55`，如实记这一句）。
+- **锚点**：本目录 7 枚 + `calendar-year` 4 + `calendar-view-options` 2 + `calendar-day-time` 3 = 16 枚
+  全部重钉 `8cb33f55`；现量 `bash research/tools/r17-evidence-md5-check.sh --all` ⇒
+  `pins_parsed=26 mismatch=0 UISTALE=0 rc=0`。

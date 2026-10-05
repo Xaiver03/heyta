@@ -11,7 +11,7 @@ md5（`md5 -r apps/web/evidence/calendar-view-options/*.png`）：
   view-select-closed.png  盘上此刻（11:55 那趟） = 52174907f970ff633e673669a7d8d31c
   view-select-closed.png  HEAD（39032107 带入）  = d4e80762080fd5bad75f977051fd748f
 锚点（同一笔代码下两趟字节相同 ⇒ md5 才配当锚点）：
-ae8ad61d4a136625748ce465dfba46fb  view-tabs-year.png
+57d2dfeba3bb4cd94579c142f236758c  view-tabs-year.png
 ```
 
 🔴 **12:2x 把这张图历史上出现过的字节逐枚枚举出来，因为它推翻了"每趟一个新值"这个说法**
@@ -39,8 +39,8 @@ ae8ad61d4a136625748ce465dfba46fb  view-tabs-year.png
 旧句留原处：**未定性，本轮不再往下查**（要往下查得能连跑多趟，而跑 e2e 要窗口）。
 
 ```text
-UIPIN view-select-closed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN view-tabs-year.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN view-select-closed.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN view-tabs-year.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
 ```
 
 ⚠️ **路径集是判断，不是事实，所以把它的边界写死在这里**：这五条是"本会话认为决定这张图形状的地方"
@@ -204,3 +204,9 @@ UIPIN view-tabs-year.png 39032107 packages/ui/src/calendar apps/web/src/features
   `dirs_scanned=12 entries_parsed=9 dirs_with_mismatch=1`、rc=**1**，唯一那份就是本目录（2 条不一致）。
   ⇒ 这条常驻对账第一次在**真实写入**上工作（此前只在 `--selftest` 四臂上验过）—— 那句里的「四臂」是 06:11 当时的臂数，12:1x 起是**八臂**且全跑合成夹具，见本文件「12:1x 锚点规则」那一节，
   而且顶掉指纹的是**我自己那趟运行** —— 也就是说"闭合过的取证交付物会烂"这件事不需要别人参与。
+
+## 10-05 12:2x 重拍批次（指针）
+
+本目录这 2 枚锚点已重钉 `8cb33f55`，图逐张看过。
+**批次记录（含"第一次重拍拍到首屏遮罩过渡帧"那条 A/B 与修法）只写一份**：
+`../calendar-day/README.md` 的「10-05 12:2x 重拍批次」那一节。

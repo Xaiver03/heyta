@@ -14,10 +14,10 @@
 **重跑不红，决定形状的界面代码动了才红**。
 
 ```
-UIPIN year.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN year-next.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN year-drilled.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN year-bottom.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN year.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN year-next.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN year-drilled.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN year-bottom.png 8cb33f55 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
 ```
 
 钉 `39032107` 不是"随手取 HEAD"：上面五条路径里**最后一次**动过的提交就是它
@@ -40,3 +40,9 @@ UIPIN year-bottom.png 39032107 packages/ui/src/calendar apps/web/src/features/ca
 动作区可换行之后的**新形状**。而 `../calendar-day/` 那五张 10-03 11:09 的字节里页头还是**一行**。
 ⇒ 那五枚 `UISTALE` 不是探针坏，是**图比代码旧**（同一处 CSS 改动在两个目录里给出了一红一绿两种读数，
 互相印证）。那五张的账与关闭命令写在 `../calendar-day/README.md` 末尾那一节。
+
+## 10-05 12:2x 重拍批次（指针）
+
+本目录这 4 枚锚点已重钉 `8cb33f55`，图逐张看过。
+**批次记录（含"第一次重拍拍到首屏遮罩过渡帧"那条 A/B 与修法）只写一份**：
+`../calendar-day/README.md` 的「10-05 12:2x 重拍批次」那一节。

@@ -295,6 +295,25 @@ export async function stubEmptyHolidayAdjustments(page: Page, origin: string = S
  * 反过来写会让这里等的那个元素被遮罩挡住（判据本身不受影响，
  * 但后面的点击会红成"元素点不动"而不是"面板没关"）。
  */
+/**
+ * 等首屏品牌帧（`#heyta-boot`）**真的从 DOM 上摘掉**。
+ *
+ * 🔴 由来不是设想，是 10-05 12:1x 那次重拍取证：`--all` 报的 8 枚 UISTALE 里两张
+ * 逐张打开后**整片变了**（`magick compare -metric AE` = 855096/921600 ≈ 93%），
+ * 画面上是一枚半透明的 `h` 品牌 mark 压在日档内容上 —— `1e5dd492` 那批首屏退场动画
+ * 还在跑，而 `page.screenshot` 发生在它之前。
+ * ⚠️ **产品行为没有错**（遮罩按 `animationend` + 有界兜底自己摘，见 `apps/web/src/boot-splash.ts`），
+ *    错在**取证拍到了过渡帧**：§6.2 规定一要的是"用户看见的那一屏"，
+ *    而一张正在淡出的遮罩既不是首屏也不是目标界面 —— 它同时污染像素判据和人的复核。
+ *
+ * 放在 `openApp` 末尾 ⇒ 所有走它的 spec 一起定帧。
+ * `e2e/tests/boot-splash.spec.ts` 是**故意**拍品牌帧的那一枚，它不走 `openApp`，因此不受影响。
+ * 品牌帧若真的摘不掉，这条等待 5s 后抛错 ⇒ 响亮失败，而不是继续拍一张被盖住的图。
+ */
+export async function waitForBootSplashGone(page: Page): Promise<void> {
+  await page.locator('#heyta-boot').waitFor({ state: 'detached', timeout: 5000 });
+}
+
 export async function openApp(
   page: Page,
   path = '/',
@@ -306,6 +325,7 @@ export async function openApp(
   await page.goto(path);
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
   await decidePrivacyConsent(page, consent);
+  await waitForBootSplashGone(page);
 }
 
 /** 切换顶部视图 tab。 */

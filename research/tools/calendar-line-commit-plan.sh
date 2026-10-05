@@ -138,6 +138,15 @@ PATHS=(
   apps/web/evidence/calendar-day/day-en-empty.png
   apps/web/evidence/calendar-day/day-en-full.png
   apps/web/evidence/calendar-day/day-en-no-timed.png
+  # 🔴 10-05 12:3x 由 1b 那格**当场照出来的漏件**：这五枚是 R13 日档交互的本线取证图，
+  #    可 PATHS 里过去只列了 `day-en-*` 那三枚 —— 于是"重拍动了它们"这件事在清单上是隐形的，
+  #    而隐形正是这条闸门要防的形状（漏点名 = 静默少一枚）。补宽锚点那趟第一次把它们冲出来，
+  #    是因为重拍会写整目录，不只是写那三枚。
+  apps/web/evidence/calendar-day/calendar-day-full.png
+  apps/web/evidence/calendar-day/calendar-day-drag-next.png
+  apps/web/evidence/calendar-day/calendar-day-drag-prev.png
+  apps/web/evidence/calendar-day/calendar-day-away.png
+  apps/web/evidence/calendar-day/calendar-day-back-today.png
   apps/web/evidence/profile-panel/README.md
   apps/web/evidence/profile-panel/r15b-1-need-password.png
   apps/web/evidence/profile-panel/r15b-2-ready.png
@@ -147,14 +156,31 @@ PATHS=(
   #    而 13:5x/14:1x 之前**一枚都不在这份清单里** —— 也就是说 A 那格"清单已全"当时是**假绿**：
   #    它只数了清单里点到的那些。下面 NS_RE 同步扩了两条交替式（旧那条 `calendar-day` 后面
   #    紧跟 `/`，所以 `calendar-day-time/` **匹配不到**，不是已经覆盖）。
-  #    ⚠️ 只点 `README.md`，**不点这些目录里的 png**：那些字节是别的会话跑 e2e 时写的，
-  #    工作树里它们相对 HEAD 干净 ⇒ 本线没有该提交它们的改动。
+  #    14:1x 那趟写的是"只点 README.md，不点这些目录里的 png"，理由也一并记在这里 ——
+  #    ⚠️ **那句理由已被 12:3x 那趟重拍当场推翻**（不是注释写错了，是前提变了）：
+  #    重拍会写**整目录**，`calendar-year` 4 枚 + `calendar-day-time` 2 枚的字节被本线改掉了，
+  #    而这两目录的 README 锚点又是我这一批重钉到 `8cb33f55` 的 ⇒ 只提 README 不提图，
+  #    HEAD 里就是"锚点声称对着某 commit 的图，盘上/库里却是另一对字节"。下面六枚是**补上的**。
+  apps/web/evidence/calendar-year/year.png
+  apps/web/evidence/calendar-year/year-next.png
+  apps/web/evidence/calendar-year/year-bottom.png
+  apps/web/evidence/calendar-year/year-drilled.png
+  apps/web/evidence/calendar-day-time/day-hour-labels.png
+  apps/web/evidence/calendar-day-time/day-timed-hour16.png
   apps/web/evidence/calendar-year/README.md
   apps/web/evidence/calendar-day-time/README.md
   apps/web/evidence/calendar-cells/README.md
   apps/web/evidence/calendar-week/README.md
   apps/web/evidence/calendar-capture/README.md
   research/tools/calendar-line-commit-plan.sh
+  # 🔴 12:5x 补点名的三枚 e2e：这一批的**判据源码**就在这里，不带它们 = 提交一批"锚点已重钉、
+  #    可重钉所依据的那条定帧等待与那条存在性前置从没进过库"的 HEAD —— 下一个人 clone 完
+  #    跑 `r17-reshoot-stale.sh` 会**重拍出旧的过渡帧**，而 README 记的是新字节 ⇒ 又一对自相矛盾。
+  #    hunk 归属现量：`git diff --numstat` = 13/1 + 20/4 + 20/0，逐条读过**全部是本线写的**
+  #    （helpers 里那枚新导出 + openApp 末尾那一行调用；两份 spec 里的 SHOT/补拍/前置断言）。
+  e2e/tests/helpers.ts
+  e2e/tests/calendar-day-en.spec.ts
+  e2e/tests/calendar-capture.spec.ts
   # 这枚**不是**本线创建的文件，但脏的那一行是本线的（文档中心里 calendar-profile 那一行，
   # 现量 `git diff --numstat` = 1/1 即整份只有这一行改动）。共享文档只点自己那一行的归属。
   # 🔴 反例（刻意**不**加）：`scripts/verify-mobile-notes.sh` 那一枚顺带修属 notes 那条线，
@@ -241,12 +267,23 @@ is_uncarried() {
   return 1
 }
 echo "== 1. 现量重取清单（别引用文件里的旧枚数）=="
-ST=0; UN=0; NAMES=(); UNC_SEEN=0
+ST=0; UN=0; DEL=0; NAMES=(); UNC_SEEN=0
 for p in "${PATHS[@]}"; do
   if [ ! -e "$p" ]; then
-    # 🔴 点名路径不在磁盘上 = 这份清单自己过期了（改名/删除/写错）。
-    #    不能把它当"已入库"跳过 —— 那正是"漏点名会静默留在工作树"的反面：静默少一枚。
-    echo "   ❌ 点名路径在磁盘上不存在：$p —— 清单过期，先修清单（exit 1）。" >&2
+    # 🔴 「本线删掉一枚已跟踪的产物」是一种**真实交付形状**（按判据处置掉一枚取证图就是这一种），
+    #    所以这里不能一律 exit 1。但放行的口子必须窄到只放这一种：**索引里还有它，且工作树状态恰好是 " D"**。
+    #    少任何一条都会把别的形状读成"本线删了它"：
+    #      · 清单写错路径 / 文件被改名 ⇒ 索引里也没有它 ⇒ `ls-files --error-unmatch` 非零 ⇒ 仍然 exit 1；
+    #      · 别人**已经把删除暂存了** ⇒ 索引里也没有它 ⇒ 同上（那枚不归本线带走）；
+    #      · 状态是 `D `（已暂存）或 `MD`/`AD` ⇒ `cut -c1-2` 对不上 " D" ⇒ 仍然 exit 1。
+    if git ls-files --error-unmatch -- "$p" >/dev/null 2>&1 \
+       && [ "$(git status --porcelain -- "$p" | cut -c1-2)" = " D" ]; then
+      printf '   🗑 本线删除（索引里有它、工作树状态恰好是 " D"）：%s\n' "$p"
+      NAMES+=("$p"); DEL=$((DEL + 1))
+      continue
+    fi
+    # 不能把它当"已入库"跳过 —— 那正是"漏点名会静默留在工作树"的反面：静默少一枚。
+    echo "   ❌ 点名路径在磁盘上不存在，且不满足「本线删除」那三条件：$p —— 清单过期，先修清单（exit 1）。" >&2
     exit 1
   fi
   line=$(git status --porcelain -- "$p")
@@ -277,7 +314,13 @@ done
 TOTAL=$(( ${#NAMES[@]} ))
 # 先把第 1 格的读数打完再进 1b —— 否则「待入库 N 枚」会印在 1b 的标题下面，
 # 读日志的人会把第 1 格的量归给第 1b 格（同一份输出里两格的量长得一样）。
-if [ "$TOTAL" != 0 ]; then echo "   ⇒ 待入库 $TOTAL 枚（改动 $ST / 新增 ${UN}）"; fi
+if [ "$TOTAL" != 0 ]; then echo "   ⇒ 待入库 $TOTAL 枚（改动 $ST / 新增 $UN / 删除 ${DEL}）"; fi
+# 🔴 分项之和必须等于总数 —— 17:5x 现量到的那个自相矛盾读数（`待入库 7 枚（改动 10 / 新增 1）`）
+#    从此会**当场判红**，而不是靠下一个人看出来。新增一格（比如上面的"删除"）忘了并进打印，就是这条抓住。
+if [ "$((ST + UN + DEL))" != "$TOTAL" ]; then
+  echo "   ❌ 口径自相矛盾：待入库 $TOTAL 枚，分项却是 改动 $ST + 新增 $UN + 删除 $DEL = $((ST + UN + DEL))" >&2
+  exit 1
+fi
 if [ "$UNC_SEEN" != 0 ]; then echo "   ⇒ 另「刻意不带」$UNC_SEEN 枚（不进这一笔，逐枚理由见第 1c 格）"; fi
 
 echo "== 1b. 防「漏登记」：本线命名空间里改了却没点名的文件 =="
@@ -299,7 +342,24 @@ echo "== 1b. 防「漏登记」：本线命名空间里改了却没点名的文�
 # ⚠️ `docs/reference/environment-traps.md` **刻意不在这里、也不在 PATHS**：那是并行会话共用的台账
 #    （14:1x 现量 ` M`、+318/-7；**本线占哪几条不抄在这里** —— 号段会漂而且不连续，唯一现量口径在交接 §4.05 那条 `for n in …grep -cE` 命令），点名它 = 把别人几百行未提交内容
 #    一起提交进去。本线条目的可复跑归属口径写在交接 §4.05。
-NS_RE='^research/tools/(r14c-|r17-|h-flaky-|calendar-line-|b-|f-boundary-)|^docs/plans/(calendar-year-time-and-mobile-profile|calendar-profile-handoff)\.md$|^scripts/(verify-mobile-window-gate|verify-mobile-due-time)\.sh$|^scripts/lib/(mobile-e2e-runner-probe|wedged-runner|ps-scan)\.sh$|^apps/web/evidence/(calendar-day|calendar-view-options|profile-panel)/[^/]+\.(md|png)$|^apps/web/evidence/(calendar-year|calendar-day-time|calendar-cells|calendar-week|calendar-capture)/README\.md$'
+NS_RE='^research/tools/(r14c-|r17-|h-flaky-|calendar-line-|b-|f-boundary-)|^docs/plans/(calendar-year-time-and-mobile-profile|calendar-profile-handoff)\.md$|^scripts/(verify-mobile-window-gate|verify-mobile-due-time)\.sh$|^scripts/lib/(mobile-e2e-runner-probe|wedged-runner|ps-scan)\.sh$|^apps/web/evidence/(calendar-day|calendar-view-options|profile-panel)/[^/]+\.(md|png)$|^apps/web/evidence/(calendar-year|calendar-day-time|calendar-cells|calendar-week|calendar-capture)/[^/]+\.(md|png)$|^e2e/tests/(calendar-day-en|calendar-capture)\.spec\.ts$|^e2e/tests/helpers\.ts$'
+# 🔴 **12:3x 把证据那一支从"只认 README"改成"README 与 png 都认"，是现量照出来的洞，不是整理**：
+#    旧正则对 `calendar-year` / `calendar-day-time` 两枚目录**只匹配 README.md**，而那两目录的 png
+#    又不在 PATHS 里 ⇒ 重拍动了 6 枚图，1b 报"全部已点名"、待入库清单里也没有它们，
+#    于是这笔会**提交锚点却把图留在工作树** —— 正是 06:2x 那段注释点名要防的"自相矛盾的 HEAD"，
+#    只是漏的方式是"枚举少了一支"，而枚举少的这支恰好是**唯一没被 png 反查覆盖**的那两支。
+#    ⇒ 这条闸门自己犯的错与它要防的是同一件事（上面 10:1x 那段讲的正是这个）。
+# 🔴 同一趟把 `e2e/tests/` 纳进来（旧正则**零支**覆盖 e2e，而本线的判据源码有三枚住在那儿）：
+#    枚举是手维护的，这一点与文件头对前缀清单的批评一致 —— 差别在于 e2e 那一支**只有三枚**，
+#    且下一位新增 spec 时必须同时改这里与 PATHS（两处一起改，见上面 11:0x 那段）。
+# 🔴 **12:5x 现量：上面那句"纳进来"当时只对三枚中的一枚成立**。我写的是
+#    `(calendar-day-en|calendar-capture|helpers)\.ts$` —— 交替项后面紧跟 `\.ts$`，
+#    而前两枚的真名是 `calendar-day-en.spec.ts` / `calendar-capture.spec.ts`，
+#    中间多出的 `.spec` 让整支对它们**永不匹配**（逐枚现量：helpers=MATCH，另两枚 NO_MATCH）。
+#    症状是这条"防漏登记"的闸门报了 `helpers.ts`、**静默放行另外两枚** ——
+#    也就是说它连"我自己刚写的那一支"都没验过。⇒ 这已是本文件第五次栽在手写枚举上，
+#    所以 1b 下面新加的那一格**不再枚举目录**，改由 `UIPIN` 从仓库事实推导。
+#    ⚠️ 剩下的两支（e2e 的 spec 文件名）仍然只能靠人维护 —— 推导不成立的地方要写清它推导不了。
 # 🔴 11:0x 加 `f-boundary-`（不写裸 `f-`：那个前缀太短，别的线随时会撞上，撞上了就把别人的文件
 #    划进本线的归属）。同一时刻把它加进上面的 PATHS —— **两处一起改**才有效：
 #    只改正则 = 它在 1b 里"可见但不被点名"；只改 PATHS = 下次再写一枚新装置照样会被漏（今天已经第三次）。
@@ -328,6 +388,38 @@ while IFS= read -r st; do
     LOST=$((LOST + 1))
   fi
 done < <(git status --porcelain)
+# 🔴 12:5x 加的**推导格** —— 这是本文件第五次回答"手维护的枚举会漏"，但这次**换了形状**：
+#    上面那格反查的是 NS_RE，一份我手写的正则。实测漏过三次：10:1x 三枚 `b-*` 装置、
+#    11:0x 一枚 `scripts/lib/wedged-runner.sh`、12:3x 六枚证据 png。
+#    **枚举少一支，红就永远不来** —— 前面三次修法的共同点都是"再往正则里添一支 + 叮嘱下次改两处"，
+#    也就是继续靠人记得住；这一格不猜命名空间，它从仓库自己的事实推出"哪些目录的图字节与锚点是绑死的"：
+#      判据（可现量、可复跑）：grep -l '^UIPIN ' apps/web/evidence/*/README.md
+#      ⇒ 该目录下**任何脏 png** 必须在 PATHS 或「刻意不带」册子里，否则判红。
+#    收益是形状：以后新增一枚钉了锚点的证据目录，**不用改这里**也自动进反查范围。
+#    代价与 NS_RE 那一支同源，同样不摘：别人一趟 e2e 重写同名图也会让它红，而那种红是**真问题**
+#    （要么连图一起提，要么按新字节重看再改 README）—— 见上面 06:2x 那段的同一判断。
+DERIV_MISS=0; DERIV_N=0
+while IFS= read -r rrm; do
+  [ -n "$rrm" ] || continue
+  d=${rrm%/README.md}
+  while IFS= read -r st; do
+    [ -n "$st" ] || continue
+    code=${st:0:2}; f=${st:3}
+    case "$f" in *' -> '*) f=${f%%' -> '*} ;; esac
+    case "$f" in *.png) ;; *) continue ;; esac
+    DERIV_N=$((DERIV_N + 1))
+    listed=0
+    for p in "${PATHS[@]}"; do
+      [ "$p" = "$f" ] && listed=1
+    done
+    if is_uncarried "$f"; then listed=1; fi
+    if [ "$listed" = 0 ]; then
+      printf '   ❌ 推导格：%s 的 README 钉了 UIPIN，可里面的图 [%s] 脏了却没点名：%s\n' "$d" "$code" "$f"
+      DERIV_MISS=$((DERIV_MISS + 1))
+    fi
+  done < <(git status --porcelain -- "$d")
+done < <(grep -l '^UIPIN ' apps/web/evidence/*/README.md 2>/dev/null)
+echo "   DERIV 反查（由 UIPIN 推导，非手写枚举）：钉锚点目录内脏 png $DERIV_N 枚，未点名 $DERIV_MISS 枚"
 # 🔴 10:1x 加的**读数格**（不参与红绿）：上面那条命名空间**本身也是手维护的正则**，
 #    它会漏的和它要防的是同一件事 —— 本轮实测漏了三枚 `b-*` 装置（见 NS_RE 那段），
 #    而收窄成"未跟踪的新文件"之后**当场又照出一枚真的**：`scripts/lib/wedged-runner.sh`
@@ -343,11 +435,11 @@ echo "   OUTSIDE_NS=${OUTSIDE_NS_N}（命名空间**没看过**的新文件；�
 if [ "$OUTSIDE_NS_N" != 0 ]; then
   printf '%s\n' "$OUTSIDE_NS" | sed 's/^/      · /'
 fi
-if [ "$LOST" != 0 ]; then
+if [ "$LOST" != 0 ] || [ "$DERIV_MISS" != 0 ]; then
   echo "   ⇒ 加进 PATHS；确认不归本线的，就在这里写明为什么不加（不能默默留着）。exit 1。"
   exit 1
 fi
-echo "   ✅ 命名空间命中 $NS_HIT 枚全部已点名（工作树脏行分母 ${ALL_DIRTY}）"
+echo "   ✅ 命名空间命中 $NS_HIT 枚全部已点名，推导格 $DERIV_N 枚也全部已点名（工作树脏行分母 ${ALL_DIRTY}）"
 
 echo "== 1c. 在册「刻意不带」逐枚现量（这不是豁免：理由写在这本册子里，状态每次重取）=="
 # 🔴 三条断言，缺一条这本册子就会变成"把带走伪装成已登记"：
