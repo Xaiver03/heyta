@@ -12101,3 +12101,22 @@ rc=1  CONFLICT (content): Merge conflict in docs/research/self-host-distribution
 ⚠️ 口径写清楚，别让下一位误读：**这里做集合差是预检，不是判据的第二份实现** ——
 "能不能自动解"这件事的判据本体仍然只在 `selfhost-merge-carrier.mjs` 第 4 族里；
 本节那条 `comm -23` 只是在窗口之前先回答"要不要为这一格留人"。
+
+### 8.214 不需要窗口的归属预检：本批那 14 枚差集文件能过的门禁，现在全绿（2026-10-05 14:0x）
+
+第 1 项的关闭判据是"任何红都要逐条归属到非本批"。窗口之前能做的不是等，是把**本批自己可能造成的红**先排掉。
+差集是 2 份文档 + 3 张截图 + 9 枚 `research/tools/*.mjs`（§8.212），所以只跑**射程真覆盖这些路径**的五道：
+
+| 门禁 | 为什么它可能咬本批 | 现量 |
+|---|---|---|
+| `check:docs` | 今天新写十来节，带路径/节号/锚点引用 | rc=0（无死链、无"本机有仓库里没有"、无失效章节引用与锚点） |
+| `check:gate-wiring` | 新增 `selfhost-main-fastforward.mjs` 这类工具，链与门禁定义要对得上 | rc=0 |
+| `check:claims` | 对外/平台状态句 | rc=0（6 个平台都在 roadmap 找得到条目） |
+| `check:docs-voice` | 台账与 runbook 的措辞表 | rc=0（扫 `site.*` 1018 条，豁免自托管 120 条） |
+| `check:script-snapshot` | 新脚本入 `research/tools` | rc=0（31 个脚本自快照在位；它只管 `scripts/`，所以这一格是"确认不覆盖"而不是"覆盖到且绿"） |
+| `check:selfhost-entry-command` | 本批改过 runbook 的入口段 | rc=0（R1–R9 全过） |
+
+🔴 这张表**只回答"本批有没有自己带进红"**，不回答"载体上完整 check 会不会绿" ——
+后者要跑在合并树上，且公开侧那 23 段（§8.213）第一次进本批的树，红了按 #26 的两树 A/B 归属。
+`check:script-snapshot` 那一格尤其要说白：它扫的是 `scripts/`，**射程不含 `research/tools`**，
+所以它的绿对本批新工具没有任何证明力 —— 写进表里是为了不让下一位把"五道全绿"读成"新工具被门禁看过"。
