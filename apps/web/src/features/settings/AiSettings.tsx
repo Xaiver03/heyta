@@ -92,7 +92,13 @@ function featuresNeeding(capability: AiCapability, t: I18nValue['t'], locale: Lo
   return hit.join(LIST_SEPARATOR[locale]);
 }
 import { LOCAL_API_TOOLS, validateLocalApiConfig } from '@heyta/local-api';
-import { planAssistantEgress, type AssistantTier } from '@heyta/app-host';
+import {
+  ASSISTANT_TIER_ORDER,
+  ASSISTANT_TIER_READ_AND_PROPOSE,
+  ASSISTANT_TIER_READ_ONLY,
+  planAssistantEgress,
+  type AssistantTier,
+} from '@heyta/app-host';
 import { AlertTriangle, Check, Lock, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 
 import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
@@ -162,25 +168,25 @@ const FEATURE_ORDER: readonly AiFeature[] = [
 ];
 
 /**
- * 助手能力档位，**按权限从低到高**排。
+ * 助手能力档位，**按权限从低到高**排（`ASSISTANT_TIER_ORDER`，来自 `@heyta/app-host`）。
  *
- * ⚠️ 顺序是承重的：界面用 `.map()` 渲染，默认档（`read-only`，见 `aiStore.ts`）
- * 必须排在第一格，否则"出厂状态"在界面上看起来像第二格那个更高的权限。
+ * ⚠️ 顺序是承重的：界面用 `.map()` 渲染，默认档必须排在第一格，
+ * 否则"出厂状态"在界面上看起来像第二格那个更高的权限。
+ * 这份顺序**不在这里声明** —— 声明了就有两份，而两份的顺序可以不一样。
  */
-const ASSISTANT_TIER_ORDER: readonly AssistantTier[] = ['read-only', 'read-and-propose'];
 
 /** 档位的中文名与说明（`Record` 是穷尽的：加一档忘词条 = 编译错误）。 */
 function tierLabels(t: I18nValue['t']): Readonly<Record<AssistantTier, string>> {
   return {
-    'read-only': t('web.ai.assistant.tier.readOnly.label'),
-    'read-and-propose': t('web.ai.assistant.tier.readAndPropose.label'),
+    [ASSISTANT_TIER_READ_ONLY]: t('web.ai.assistant.tier.readOnly.label'),
+    [ASSISTANT_TIER_READ_AND_PROPOSE]: t('web.ai.assistant.tier.readAndPropose.label'),
   };
 }
 
 function tierNotes(t: I18nValue['t']): Readonly<Record<AssistantTier, string>> {
   return {
-    'read-only': t('web.ai.assistant.tier.readOnly.note'),
-    'read-and-propose': t('web.ai.assistant.tier.readAndPropose.note'),
+    [ASSISTANT_TIER_READ_ONLY]: t('web.ai.assistant.tier.readOnly.note'),
+    [ASSISTANT_TIER_READ_AND_PROPOSE]: t('web.ai.assistant.tier.readAndPropose.note'),
   };
 }
 

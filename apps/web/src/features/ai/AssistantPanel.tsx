@@ -63,6 +63,7 @@ import {
   type SecretStore,
 } from '@heyta/ai';
 import {
+  ASSISTANT_TIER_READ_ONLY,
   assistantEgressFields,
   confirmAiToolProposal,
   planAssistantEgress,
@@ -333,8 +334,10 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         title={t('web.ai.chat.title')}
         lead={<Sparkles size={ICON_SIZE.xs} aria-hidden="true" />}
       />
+      {/* 这一行是**这一档此刻到底是什么**的陈述，判据（哪一档算只读）来自
+          `@heyta/app-host`，不在外壳里重写字面量 —— 见 `assistant-tier-settings.ts`。 */}
       <p className="ht-ai__note" data-testid="ai-assistant-tier">
-        {props.tier === 'read-only'
+        {props.tier === ASSISTANT_TIER_READ_ONLY
           ? t('web.ai.chat.tier.readOnly')
           : t('web.ai.chat.tier.readAndPropose')}
       </p>
