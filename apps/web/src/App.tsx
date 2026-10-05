@@ -141,6 +141,8 @@ import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
 import { GrowthView } from './features/motivation/GrowthView.js';
 import { NotesView } from './features/notes/NotesView.js';
+import { NoteEditorCard } from './features/notes/NoteEditorCard.js';
+import { useDetailColumnShown } from './features/shell/detail-pane-visible.js';
 import { ReminderPanel } from './features/reminders/ReminderPanel.js';
 import { TimelinePanel } from './features/timeline/TimelinePanel.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
@@ -646,6 +648,16 @@ export function App(): React.JSX.Element {
   const toggleDetailPane = useCallback(() => {
     setDetailPane(detailPane === 'collapsed' ? 'open' : 'collapsed');
   }, [detailPane, setDetailPane]);
+
+  /**
+   * 详情列**此刻看得见吗** —— 几何（宽/高够不够）与"用户主动收起"两个输入一起算，
+   * 规则与 `narrow.css` 那两条媒体规则同源（`features/shell/detail-pane-visible.ts`）。
+   *
+   * 🔴 面单往哪一栏放是**渲染时**的决定，不能只交给 CSS：CSS 在放不下时是 `display:none`，
+   * 真按它放，窄屏/收起态下用户点一条便签会得到一枚藏在 `display:none` 里的编辑器 ——
+   * 界面什么都不说，数据却已经进模型。所以看不见时编辑卡回到便签板上方。
+   */
+  const detailColumnShown = useDetailColumnShown(detailPane === 'collapsed');
 
   /**
    * ⌘/Ctrl + Shift + \\ 开合详情列 —— 三条恢复路径里的"快捷键"那一条。
@@ -2297,7 +2309,7 @@ export function App(): React.JSX.Element {
           {contentView === 'growth' && <GrowthView />}
           {/* 便签。🔴 `NotesView` 里自带一层 `HeytaUiProvider` ——
               上面 tasks 那棵树的 Provider 不覆盖兄弟节点（见该文件头）。 */}
-          {contentView === 'notes' && <NotesView />}
+          {contentView === 'notes' && <NotesView editorInColumn={detailColumnShown} />}
           {contentView === 'trash' && <TrashView />}
           {/*
             🔴 **设置是浮层（sheet），不是一路由** —— 见 `settingsBaseView` 的说明与
@@ -2522,10 +2534,14 @@ export function App(): React.JSX.Element {
        * "中间一坨里再分两栏"。这条是 W2 的承重判据（`boundingBox` 右边缘相等），
        * 变异臂就是把这一列搬回 `.ht-content` 里面 —— 搬回去它必须转红。
        *
-       * ⚠️ 今天它是**空的**，这是设计不是半成品：产品负责人对这一栏的原话是
+       * ⚠️ ~~今天它是**空的**，这是设计不是半成品~~ ⇒ 🔴 **2026-10-05 起这句过期**：
+       * 专注面（W7）与**便签编辑卡**（选中一条便签 ⇒ 同一格里出编辑面，工单 §8.130）都已经住进来。
+       * 产品负责人对这一栏的原话是
        * "即使没东西也空在那里，一旦选中任何东西右边就出详细的面单"。
        * 被主计划 §5.4 否决的是"没有选中态时往槽里塞装饰"，而 W1 的选中态已经就绪。
-       * 往里放什么属于"详情面本体"那一单（阻塞在拍板 #1/#8），
+       * 🔴 拍板 #1/#8 已于 2026-10-05 02:5x 由本线给完（工单 §8.125），所以"往里放什么"**不再是阻塞项** ——
+       * 任务那一格仍等下一单，理由是"行的字段编辑搬进那一栏"要先决定同一批字段留不留两处，
+       * 那是实现顺序问题，不是等谁拍。
        * 所以这里也**不给它起无障碍名** —— 一个还没有内容的区域，名字会比内容更响。
        *
        * ⚠️ 窄屏（≤1023px）这一列不出现，规则与算过的账在 `styles/app/narrow.css`。
@@ -2535,7 +2551,14 @@ export function App(): React.JSX.Element {
        * （#1 问的是"任务那一栏放什么"）。其余视图仍然空着，那仍是设计。
        */}
       <aside className="ht-app__detail" data-testid="detail-column">
-        {contentView === 'focus' ? <FocusDetailPane /> : null}
+        {contentView === 'focus' ? (
+          <FocusDetailPane />
+        ) : contentView === 'notes' && detailColumnShown ? (
+          /* 那一栏本身没有内边距（`.ht-app__detail` 只有 `border-left`）：每一面自己给 inset。
+             🔴 inset 是**递给生产者的必填参数**，不是在这里包一层 `<div>` ——
+             `check:detail-pane-slot` 的腿 A 不许装配处手写 DOM 标记（它红过一次，实测）。 */
+          <NoteEditorCard inset />
+        ) : null}
       </aside>
       </div>
       </AiSettingsNavigationContext.Provider>

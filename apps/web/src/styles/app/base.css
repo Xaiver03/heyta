@@ -112,6 +112,23 @@
   padding: var(--ht-space-4);
 }
 
+/*
+ * 便签面单（工单 §8.130）—— 同一档内边距，理由与上面那条不同。
+ *
+ * 🔴 共享 `NoteEditor` 原来只出现在中间那一列（宽度有余量），换进这根 22rem 的栏里
+ * 会**贴住窗口右边缘**：实测面单里输入框与保存按钮的右边缘 = 1280 = 列的右边缘，
+ * 于是按钮的圆角被窗口边切掉，看起来像"界面被裁了一半"。
+ * 栏本身没有 padding（`.ht-app__detail` 只有 `border-left`），所以**每一面自己给 inset** ——
+ * 与 `.ht-app__detail-focus` 同一个模式，不是重复：两面的区块结构不同，
+ * 合成一个"通用详情面"类会让专注概览那套 gap 规则套到便签上。
+ *
+ * 承重判据在 `e2e/tests/detail-pane-note-editor.spec.ts` 的 N1：
+ * 面单里每一格控件的右边缘必须留出栏内间距，间距**从 `--ht-space-4` 推导**，不抄字面量。
+ */
+.ht-app__detail-note {
+  padding: var(--ht-space-4);
+}
+
 .ht-app__detail-heading {
   /* 区块标题档：lg + semibold（AGENTS §5 的文字层级表）。
      刻意**不是** xl —— 一屏一个页标题，页标题在 `.ht-header__title`。 */
