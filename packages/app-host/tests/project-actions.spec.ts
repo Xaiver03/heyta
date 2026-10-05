@@ -378,6 +378,40 @@ describe('归档的 list 分裂（W9 / P-9 / I5）', () => {
       actions.listProjects().length + actions.listArchivedProjects().length,
     );
   });
+
+  it('🔴 I3：归档那条 op 的载荷只有 `archived` 一个键 —— 不许借道 `deletedAt`', async () => {
+    // 计划 §4 的 I3「归档不许借用 `deletedAt`」在**动作层的字节形状**上才有牙：
+    // 界面上归档一条清单，如果那次写入顺手带上 `deletedAt`，两态就塌成一态 ——
+    // 清单立刻出现在回收站里（用户从没删过它），而"取消归档"和"还原"变成同一个动作。
+    // ⚠️ 这句**不是**重复上面那几条 `list*` 判据 —— 两档变异都实测过（§10.105）：
+    //   写"有值的 `deletedAt`"（臂 B）一把红了 8 条，说明那几路读数确实也在守这一档；
+    //   而写 `{ archived, deletedAt: null }`（臂 E）时清单**仍然活着**，可见/归档/回收站
+    //   三条读数一条都不变，整套 40 条里**只有这一条红**（1 failed | 39 passed）。
+    //   所以钉载荷键集买到的是那一整档隐形形状，不是重复劳动。
+    const id = await actions.createProject('只归档');
+    await actions.archiveProject(id);
+
+    const archivePayload = payloadOf(await opWithField('PROJECT', id, 'archived'));
+    expect(Object.keys(archivePayload).sort()).toEqual(['archived']);
+    expect(archivePayload.archived).toBe(true);
+
+    // 行为那一半：收起来不等于删掉。
+    expect(actions.listTrashedProjects()).toEqual([]);
+    expect(actions.listArchivedProjects().map((p) => p.id)).toEqual([id]);
+
+    // 取消归档同样只写这一个键：写成 `{ archived: false, deletedAt: null }` 那种
+    // "顺手复原"会让一条**从没被删过**的清单产出一发清墓碑的 op，
+    // 对端回放时它的删除状态被一个无关动作改掉（顺序敏感的覆写，事件溯源里没法事后补救）。
+    await actions.archiveProject(id, false);
+    const unarchivePayload = payloadOf(await opWithField('PROJECT', id, 'archived'));
+    expect(Object.keys(unarchivePayload).sort()).toEqual(['archived']);
+    expect(unarchivePayload.archived).toBe(false);
+
+    // 正向对照：`deletedAt` 那条通道本身是通的 —— 真删一次它就进回收站。
+    // 少了这一句，"回收站里为空"可能只是因为根本没有回收站这一路。
+    await actions.removeProject(id);
+    expect(actions.listTrashedProjects().map((p) => p.id)).toEqual([id]);
+  });
 });
 
 describe('🔴 归档只藏**容器**，不藏里面的任务（W3 / P-9 的边界）', () => {
