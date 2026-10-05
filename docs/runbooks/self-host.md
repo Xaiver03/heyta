@@ -188,6 +188,18 @@ curl -fsS https://你的域名/health
 注册一个账号，看它能不能建任务、刷新之后还在不在。**只看容器状态不构成"可用"**：
 上面第 4 节那种"起了但未迁移"的现场，`docker compose ps` 是全绿的。
 
+🔴 上面那两条 `https://…` 还差**两条 compose 管不到的前提**：域名的 A/AAAA 记录已经指到这台机器，
+且宿主机 80/443 对外可达 —— Caddy 只有这两条都成立时才拿得到证书。
+
+而**证书拿不到时没有任何一层会报红**（实测：一枚 `--network none` 的 caddy 容器 +
+`DOMAIN=` 一个真实形态的域名 ⇒ 必然签不出来）：容器**不退出**，出货那份 healthcheck
+（`wget -q --spider http://127.0.0.1:2019/config/`）**照旧 `healthy`**，`docker compose ps` 三枚全绿；
+日志里只有 `tls.obtain: could not get certificate from issuer` 和
+`will retry … retrying_in: 60, max_duration: 2592000` —— 它会这样安静重试三十天。
+⇒ 这一步的判据只能是**浏览器真的打开那个 https 地址**（或 `curl -fsSv https://你的域名/health`），
+不能是容器状态。这一格比"起了但未迁移"更隐蔽：后者至少还会在应用日志里刷
+`column ... does not exist`，证书这格连 `unhealthy` 都不出现。
+
 ## 6. 反向代理（以及一个默认值会咬人的地方）
 
 `docker-compose.yml` 默认自带一个 Caddy 服务，它会绑宿主机的 **80/443**，
