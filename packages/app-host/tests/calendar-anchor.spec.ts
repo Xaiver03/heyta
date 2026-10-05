@@ -29,10 +29,16 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   CALENDAR_ANCHOR_RULES,
+  assistantEgressFields,
   assistantSystemPrompt,
+  buildBreakdownInvocation,
+  buildCaptureInvocation,
+  buildDurationInvocation,
+  buildPrioritizeInvocation,
   calendarAnchor,
   calendarAnchorLine,
   utcOffsetLabel,
+  type PrioritizeTaskInput,
 } from '../src/index.js';
 
 /** 两个被测瞬间（epoch ms）。 */
@@ -143,5 +149,68 @@ describe('助手的系统提示带着锚点，且锚点是**每次现算**的', 
   it('省略 `now` 时用真实时钟（壳不注入也不能崩）', () => {
     process.env['TZ'] = 'UTC';
     expect(assistantSystemPrompt()).toContain('今天是：');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// 🔴 W4：锚点必须住在**每一条**出境链路上，而且只有一个生产者
+// ─────────────────────────────────────────────────────────────────────────
+//
+// 这三条判据各挡一种不同的坏：
+//
+//   1. **"某条链路没带锚点"** —— 那正是 W4 的原始缺陷（只有 capture 有）。
+//      逐个点名，不数全仓命中数：全仓命中 3 次可能全在同一份文件里。
+//   2. **"某条链路带了锚点但没披露 `today`"** —— 披露里没有、请求里有。
+//      这是本仓库最不能接受的形状（AGENTS §7 那一整族"界面在说谎"）。
+//   3. **"有人抄了第二份日期格式化逻辑"** —— 措辞与 `calendarAnchorLine`
+//      逐字不同就红。抄件一定会漂，而"哪条链路里的今天是哪天"这种漂移
+//      没有任何一层会失败。
+describe('🔴🔴 四条出站链路都带锚点，且都披露 today', () => {
+  /** 本地中午：任何时区下本地日历日都是 2026-09-25（周五）。 */
+  const N = Date.parse('2026-09-25T12:00:00');
+  const TASKS: readonly PrioritizeTaskInput[] = [{ id: 't1', title: '做发布' }];
+  const canonical = calendarAnchorLine(calendarAnchor(N));
+
+  const chains = [
+    {
+      name: 'capture',
+      prompt: () => buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: N }).user,
+      fields: () => buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: N }).fields,
+    },
+    {
+      name: 'breakdown',
+      prompt: () => buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', now: N }).user,
+      fields: () => buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', now: N }).fields,
+    },
+    {
+      name: 'prioritize',
+      prompt: () => buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS, now: N }).user,
+      fields: () => buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS, now: N }).fields,
+    },
+    {
+      name: 'duration-estimate',
+      prompt: () => buildDurationInvocation({ locale: 'zh-CN', title: '写周报', now: N }).user,
+      fields: () => buildDurationInvocation({ locale: 'zh-CN', title: '写周报', now: N }).fields,
+    },
+  ];
+
+  for (const chain of chains) {
+    it(`🔴 ${chain.name}：user 第一行就是那**一个**生产者产出的锚点`, () => {
+      expect(chain.prompt().startsWith(`${canonical}\n`), `${chain.name} 的锚点不是 canonical 那一行`).toBe(true);
+    });
+
+    it(`🔴 ${chain.name}：带了锚点就必须披露 today（披露里没有、请求里有 = 说谎）`, () => {
+      expect(chain.fields(), `${chain.name} 没披露 today`).toContain('today');
+    });
+  }
+
+  it('🔴 工具调用链路：系统提示带锚点 + 硬规则，且 today 在出境字段里', () => {
+    expect(assistantSystemPrompt(N)).toContain(`${canonical}\n\n${CALENDAR_ANCHOR_RULES}`);
+    expect(assistantEgressFields('read-only')).toContain('today');
+  });
+
+  it('🔴 阳性对照：上面那四条链路确实各有 4 条，分母不许悄悄缩水', () => {
+    // 少一条链路 = 这条判据的作用面自己变小而没人红（§7 元规则二）。
+    expect(chains.map((c) => c.name)).toEqual(['capture', 'breakdown', 'prioritize', 'duration-estimate']);
   });
 });

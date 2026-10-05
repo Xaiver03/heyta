@@ -57,7 +57,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     await expect(page.locator('[data-testid="duration-destination"]')).toContainText(
       STUB_ENDPOINT,
     );
-    await expect(page.locator('[data-testid="duration-field-list"]')).toHaveText('title');
+    await expect(page.locator('[data-testid="duration-field-list"]')).toHaveText('today、title');
     // 🔴 没有历史/偏好时必须**如实说**，不许假装懂。
     await expect(page.locator('[data-testid="duration-basis-none"]')).toContainText(
       '没有可用的历史数据',
@@ -84,7 +84,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     await page.reload();
     await expect(rowFor(page, '重构同步引擎的冲突解决')).toBeVisible();
     await page.locator('[data-testid^="duration-run-"]').click();
-    await expect(page.locator('[data-testid="duration-field-list"]')).toHaveText('title、note');
+    await expect(page.locator('[data-testid="duration-field-list"]')).toHaveText('today、title、note');
     // 重新打开面板不算发送。
     await expectStubCount(request, 1);
   });
@@ -121,7 +121,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     await page.reload();
     await expect(rowFor(page, '整理季度预算表')).toBeVisible();
     await page.locator('[data-testid^="duration-run-"]').click();
-    await expect(page.locator('[data-testid="duration-field-list"]')).toHaveText('title、note');
+    await expect(page.locator('[data-testid="duration-field-list"]')).toHaveText('today、title、note');
     await expectNoStubCall(request);
   });
 });

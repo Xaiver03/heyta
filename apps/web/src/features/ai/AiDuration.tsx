@@ -220,6 +220,10 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
     title: task.title,
     // 🔴 界面语言：它进的是提示词的「输出语言」指令，不是用户数据字段（不进 `fields`）。
     locale,
+    // 🔴 时间锚点的时间源：**这一次渲染取一次**，写进 `source`。同一个 `source` 既进
+    // `buildDurationInvocation`（决定界面披露里的 `today`），也进 `requestDuration`
+    // （决定真正发出去的那行「今天是」）—— 跨过午夜时两边不可能给出两个不同的"今天"。
+    now: Date.now(),
     ...(task.note === undefined ? {} : { note: task.note }),
     ...(history === undefined ? {} : { history }),
   };

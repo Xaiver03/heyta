@@ -31,220 +31,78 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
+import { EMPTY_SECRET_STORE, type SecretStore } from '@heyta/ai';
 import {
-  HEALTH_SNAPSHOT_VERSION,
-  fromHealthSnapshot,
-  toHealthSnapshot,
-  type AiHealthSnapshot,
-  DEFAULT_FEATURE_CAPABILITIES,
-  EMPTY_SECRET_STORE,
-  type AiEndpointConfig,
-  type AiFeature,
-  type AiRoutingConfig,
-  type EgressConsent,
-  type SecretStore,
-} from '@heyta/ai';
-import { DEFAULT_LOCAL_API_CONFIG, type LocalApiConfig } from '@heyta/local-api';
-import {
-  DEFAULT_ASSISTANT_TIER,
-  normalizeAssistantTier,
-  type AssistantTier,
+  createAiSettingsStore,
+  defaultAiSettingsState,
+  type AiSettingsState,
+  type AiSettingsStorePort,
 } from '@heyta/app-host';
 
 export const AI_SETTINGS_STORAGE_KEY = 'heyta.ai.settings';
 
-/** 存进 `localStorage` 的形状。**注意这里没有密钥字段。** */
-export interface PersistedAiSettings {
-  routing: AiRoutingConfig;
-  localApi: LocalApiConfig;
-  consents: readonly EgressConsent[];
-  /**
-   * 熔断状态（端点的连续失败与跳闸）。
-   *
-   * ⚠️ 它是**本机状态，不是用户数据** —— 所以不进 op-log、不参与同步。
-   * 换台设备该重新探一次端点，而不是继承另一台机器的失败历史。
-   *
-   * 形状用 `AiHealthSnapshot` 而不是裸的 `HealthMap`：落盘的东西需要一个
-   * 版本号，否则将来改结构时没法安全迁移（见 `packages/ai/src/health-store.ts`）。
-   */
-  health: AiHealthSnapshot;
-  /**
-   * 🔴 **记忆总开关**（见 ADR-0014）。
-   *
-   * 默认 **false**。关闭时偏好层**零推断、零偏好进 prompt**。
-   *
-   * ⚠️ 与 `routing`/`localApi` 不同，它**不是**"AI 能不能用"的开关 ——
-   * AI 可以照常工作，只是不记得你。两个概念分开，用户才想得清楚：
-   * 「不用 AI」和「用 AI 但别记我」是两件事。
-   */
-  memoryEnabled: boolean;
-  /**
-   * 🔴 **对话式助手的能力档位**（ADR-0045 §2.2）。默认由 `@heyta/app-host` 给。
-   *
-   * 它是**第二个授权前端**，与下面 `localApi.grants` 是两件事，缺一不可：
-   *
-   * | | 管的是什么 | 谁消费 |
-   * |---|---|---|
-   * | `localApi.grants` | **外部程序**（MCP / 本机 HTTP）能不能调某个工具，逐工具、默认关 | `authorizeToolCall()` |
-   * | `assistantTier` | **内置助手**这一次允许看见哪些工具、要不要产出写入提案 | `assistantGrants(tier)` |
-   *
-   * 两者最后都汇到同一个判据 `isToolGranted()` —— 授权**只有一份**（ADR-0035 的立场没变），
-   * 变的是"谁来勾"。把助手挂在 MCP 那逐工具默认关上，等于让用户为了用助手
-   * 去开一个他其实不想给外部程序的能力。
-   *
-   * ⚠️ **档位的字面量、出厂默认、读回时的 fail-closed 归一都不在这里** ——
-   * 它们在 `@heyta/app-host` 的 `assistant-tier-settings.ts`。这里只负责
-   * **把它存进 Web 的通道**（`localStorage` 的这一块 JSON）。
-   * 理由是 AGENTS.md §3.5：默认值与归一方向决定"模型这一次能不能改用户的数据"，
-   * 那是产品语义；每个壳各写一遍，同一个用户在三个壳上就有三种权限，
-   * 而且**没有任何一层会报错**。
-   */
-  assistantTier: AssistantTier;
-}
+/**
+ * 存进 `localStorage` 的形状。**注意这里没有密钥字段。**
+ *
+ * 🔴 它就是 `@heyta/app-host` 的那一份，**不再在本文件里重复声明**：
+ * 字段与默认值是判断（"这台设备上那道闸关没关"），不是存储细节 ——
+ * 移动壳接 AI 时必然要读同一个形状，两份类型各写一遍就是漂移的开始
+ * （理由见 `packages/app-host/src/ai-settings-store.ts` 文件头）。
+ */
+export type PersistedAiSettings = AiSettingsState;
+
+/** 再导出，保持既有调用点的名字不变。 */
+export { defaultAiSettingsState as defaultAiSettings };
 
 /**
- * 出厂默认值。
+ * Web 的通道：`localStorage` 上那块 JSON。
  *
- * 🔴 **三道闸全是关的**：总开关关、不允许远程、本机 API 关。
- * 用户不主动打开就什么都不发生 —— 与 ADR-0010 §3.1 / ADR-0011 §3.1 一致。
+ * 🔴 这里**只实现 `read` / `write`**。清洗（`enabled` 只认逐字 `true`、
+ * 坏端点丢掉、`bindAddress` 永不从磁盘读、解析失败回到全关）在
+ * `@heyta/app-host` 的 `createAiSettingsStore()` 里，**所有壳同一份**。
+ *
+ * ⚠️ 原先这四条住在下面这个文件里（`sanitizeRouting` / `sanitizeLocalApi` /
+ * 一段手写三元）。它们被删掉了，不是被复制走的 —— 复制走就还是两份。
  */
-export function defaultAiSettings(): PersistedAiSettings {
+function webStoragePort(): AiSettingsStorePort {
   return {
-    routing: {
-      enabled: false,
-      allowRemote: false,
-      endpoints: [],
-      // 🔴 空路由：**不预置任何功能**。
-      // 预置会让"我打开了总开关"变成"好几个功能悄悄开始跑"。
-      routes: {},
-    },
-    localApi: { ...DEFAULT_LOCAL_API_CONFIG },
-    consents: [],
-    health: { version: HEALTH_SNAPSHOT_VERSION, entries: [] },
-    // 🔴 第四道闸，同样默认关。与 ADR-0014 的 fail-closed 要求一致。
-    memoryEnabled: false,
-    // 🔴 助手默认**只能读**。要它能提改动，得用户在这里明确切一档。
-    // 默认值本身来自 `@heyta/app-host`（所有壳同一个），不在这里声明。
-    assistantTier: DEFAULT_ASSISTANT_TIER,
-  };
-}
-
-/**
- * 读取设置。
- *
- * ⚠️ 容错策略：**解析失败就回到默认值（全关），而不是抛错**。
- * 因为"配置坏了"的最安全结果是"什么都不做"，不是"崩掉"，
- * 也**绝不是**"用一份猜出来的配置继续跑"。
- */
-export function loadAiSettings(): PersistedAiSettings {
-  try {
-    const raw = localStorage.getItem(AI_SETTINGS_STORAGE_KEY);
-    if (raw === null) return defaultAiSettings();
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return defaultAiSettings();
-    const candidate = parsed as Partial<PersistedAiSettings>;
-    const fallback = defaultAiSettings();
-
-    return {
-      routing: sanitizeRouting(candidate.routing, fallback.routing),
-      localApi: sanitizeLocalApi(candidate.localApi, fallback.localApi),
-      consents: Array.isArray(candidate.consents) ? candidate.consents : [],
-      // 🔴 只在**真的是布尔 true** 时才打开。
-      // 存成字符串 "true"、数字 1、或字段缺失 —— 一律按关闭处理。
-      // 隐私闸门不接受"看起来像真"的值（与 `sanitizeRouting` 对
-      // `enabled` 的处理同一条规则）。
-      memoryEnabled: candidate.memoryEnabled === true,
-      // 🔴 只有**逐字等于**开写那一档才算开；`true`、下划线写法、大小写、
-      // 缺字段、旧版本存的 `undefined` 一律落回只读 —— 与上面 `memoryEnabled`
-      // 同一条 fail-closed 纪律。归一本身不在这里写三元：它在
-      // `@heyta/app-host` 的 `normalizeAssistantTier()`，所有壳共用一份。
-      assistantTier: normalizeAssistantTier(candidate.assistantTier),
-      health: {
-        version: HEALTH_SNAPSHOT_VERSION,
-        entries: toHealthSnapshot(
-          fromHealthSnapshot(candidate.health, Date.now()),
-          Date.now(),
-        ).entries,
-      },
-    };
-  } catch {
-    // 隐私模式下 localStorage 可能抛错；坏 JSON 也一样。
-    return defaultAiSettings();
-  }
-}
-
-/** 保存设置。失败不影响本次会话生效（与 `theme.ts` 同样的降级策略）。 */
-export function saveAiSettings(settings: PersistedAiSettings): void {
-  try {
-    localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-    // 存不上就只在本会话生效
-  }
-}
-
-/**
- * 清洗路由配置。
- *
- * 🔴 它**强制**两件事，不信任存储里的值：
- * - `enabled` 与 `allowRemote` 必须是真正的布尔（`"true"` 字符串不算）
- * - 每个端点必须通过 URL 校验；**不合法的端点直接被丢掉**
- *
- * 为什么不合法就丢：一个坏的端点留在配置里，用户会在"AI 时好时坏"
- * 里排查很久。丢掉 + 下面 `describeDroppedEndpoints` 告诉用户更好。
- */
-function sanitizeRouting(input: unknown, fallback: AiRoutingConfig): AiRoutingConfig {
-  if (typeof input !== 'object' || input === null) return fallback;
-  const c = input as Partial<AiRoutingConfig>;
-
-  const endpoints = Array.isArray(c.endpoints)
-    ? c.endpoints.filter(
-        (e): e is AiEndpointConfig =>
-          typeof e === 'object' &&
-          e !== null &&
-          typeof (e as AiEndpointConfig).id === 'string' &&
-          typeof (e as AiEndpointConfig).label === 'string' &&
-          typeof (e as AiEndpointConfig).endpoint === 'string' &&
-          typeof (e as AiEndpointConfig).model === 'string',
-      )
-    : [];
-
-  const routes: AiRoutingConfig['routes'] = {};
-  if (typeof c.routes === 'object' && c.routes !== null) {
-    for (const feature of Object.keys(DEFAULT_FEATURE_CAPABILITIES) as AiFeature[]) {
-      const targets = (c.routes as Record<string, unknown>)[feature];
-      if (Array.isArray(targets)) {
-        const cleaned = targets.filter(
-          (t): t is { endpointId: string } =>
-            typeof t === 'object' && t !== null && typeof (t as { endpointId: string }).endpointId === 'string',
-        );
-        if (cleaned.length > 0) routes[feature] = cleaned;
+    read: () => {
+      try {
+        return localStorage.getItem(AI_SETTINGS_STORAGE_KEY) ?? undefined;
+      } catch {
+        // 隐私模式下 localStorage 会抛。契约是"取不到返回 undefined，不许抛"，
+        // 而"取不到"的最安全结果是全关的默认值，不是崩掉。
+        return undefined;
       }
-    }
-  }
-
-  return {
-    enabled: c.enabled === true,
-    allowRemote: c.allowRemote === true,
-    endpoints,
-    routes,
+    },
+    write: (value) => {
+      try {
+        localStorage.setItem(AI_SETTINGS_STORAGE_KEY, value);
+        return true;
+      } catch {
+        // 存不上就只在本会话生效（与 `theme.ts` 同一条降级策略）。
+        return false;
+      }
+    },
   };
 }
 
-function sanitizeLocalApi(input: unknown, fallback: LocalApiConfig): LocalApiConfig {
-  if (typeof input !== 'object' || input === null) return fallback;
-  const c = input as Partial<LocalApiConfig>;
-  return {
-    enabled: c.enabled === true,
-    // 🔴 绑定地址**不从存储里读** —— 永远用默认的回环地址。
-    // 这一条是刻意的：如果哪天存储被改成了 0.0.0.0，读回来就等于
-    // 悄悄把服务暴露到局域网。绑定地址不该是可持久化的偏好。
-    bindAddress: fallback.bindAddress,
-    port: typeof c.port === 'number' && Number.isInteger(c.port) ? c.port : fallback.port,
-    ...(typeof c.token === 'string' && c.token !== '' ? { token: c.token } : {}),
-    ...(typeof c.grants === 'object' && c.grants !== null
-      ? { grants: c.grants as Record<string, boolean> }
-      : {}),
-  };
+const webAiSettingsStore = createAiSettingsStore(webStoragePort());
+
+/** 读取设置（清洗过的那份）。 */
+export function loadAiSettings(): PersistedAiSettings {
+  return webAiSettingsStore.load();
+}
+
+/**
+ * 保存设置。
+ *
+ * ⚠️ 返回**是否真的落盘**。原先这里吞掉了写入失败（"不影响本次会话生效"），
+ * 于是"改了设置但下次打开还是旧值"没有一处能说出口。调用方可以忽略返回值，
+ * 但**界面要说的那句话现在有条件可判**了。
+ */
+export function saveAiSettings(settings: PersistedAiSettings): boolean {
+  return webAiSettingsStore.save(settings);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
