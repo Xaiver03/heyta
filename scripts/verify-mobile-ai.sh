@@ -204,11 +204,20 @@ for v in SAFE_TOP SAFE_BOTTOM; do
 done
 
 tap_rid() {  # <testID> [期望 checked]
-  local rid=$1 want=${2:-} i ctrl cx cy ck src y lo hi
+  local rid=$1 want=${2:-} i pass ctrl cx cy ck src y lo hi
   lo=$SAFE_TOP
   hi=$SAFE_BOTTOM
-  for i in 1 2 3 4 5; do
-    dump
+  # 🔴 两趟（rig31/32 现量的方向局限）：第 1 趟按原方向滚到底；第 2 趟摘焦点、回到顶部，
+  #   让"控件在视口上方"那一档也有一次机会。第 2 趟开始前先 blur_focus —— 带着焦点的
+  #   反向手势会被输入框当文本拖拽吞掉（rig21 的受控 A/B）。
+  for pass in 1 2; do
+    if [ "$pass" = 2 ]; then
+      echo "   ↻ 第 1 趟没把 testID=$rid 滚进安全带 ⇒ 摘焦点回到顶部，换方向再走一趟" >&2
+      blur_focus
+      scroll_to_top
+    fi
+    for i in 1 2 3 4 5; do
+      dump
     # 🔴 点的是**带 checked / clickable 的那一枚**（容器不可点时往下找一层），
     #    见 rid_control 的注释：`ai-gate-enabled` 这一枚连点 5 次都打在标签文字上，
     #    报出来的却是"总开关点不动"。
@@ -216,16 +225,34 @@ tap_rid() {  # <testID> [期望 checked]
     if [ -n "$ctrl" ]; then
       read -r cx cy ck src <<<"$ctrl"
       y=$cy
-      if [ "$y" -ge "$lo" ] && [ "$y" -le "$hi" ]; then break; fi
+      if [ "$y" -ge "$lo" ] && [ "$y" -le "$hi" ]; then break 2; fi
       # 在树里但贴着屏边 —— 这不是"没找到"，是"还没滚到位"，两句话要分开说。
       echo "   ↻ testID=$rid 的可点节点（${src}）中心 y=$y 在安全带 [$lo,$hi] 外（贴系统栏），先滚进中段（第 ${i} 次）" >&2
+      # 🔴 手势方向由**读数**决定，不由习惯决定（rig32 现量）：这一枚在安全带**上方**时，
+      #   `swipe 1900→900`（往下滚）只会让它更靠上，五发滚满永远进不了带子，
+      #   而打印出来的那句是「界面形状或 testID 变了」—— 那是假归因。
+      #   第 5 步第二发的 `tool-input` 就是这么红的：结果卡渲染在下面，输入框在上面。
+      if [ "$y" -lt "$lo" ]; then
+        $ADB shell input swipe 540 900 540 1900 300
+      else
+        $ADB shell input swipe 540 1900 540 900 300
+      fi
+    else
+      # 压根不在树里：先按原方向找（它多半在下方），两趟都试过才说"没有"。
+      $ADB shell input swipe 540 1900 540 900 300
     fi
-    ctrl=""
-    $ADB shell input swipe 540 1900 540 900 300
-    sleep 1.5
+      ctrl=""
+      sleep 1.5
+    done
+    # 🔴 这一格必须排在**两趟都走完**之后：写在 pass 循环里面时，第 1 趟没找到就
+    #   `return 1` 退出了函数，换方向那一趟永远不会执行 —— 读数看着像"两种方向都试过"。
   done
   if [ -z "$ctrl" ]; then
-    echo "   ❌ testID=$rid 滚了 5 次仍没有一枚落在安全带 [$lo,$hi] 里的可点节点 —— 界面形状或 testID 变了" >&2
+    # 两种方向都滚遍了（第 2 趟先摘焦点回到顶部）还是没拿到可点节点。
+    #   这里不写"界面形状或 testID 变了"：那句会把"这一档没渲染"与"载体不在那一屏"
+    #   冒充成同一件事（traps #330b 的同一形状，而 #331 是它的第三种面目）。
+    echo "   ❌ testID=$rid 往下滚满、再摘焦点回到顶部往上滚满，两趟都没有一枚落在安全带 [$lo,$hi] 里的可点节点" >&2
+    echo "      ⇒ 要么这一档按设计没渲染（条件渲染的控件），要么载体根本不在那一屏 —— 两种都不记成产品缺陷" >&2
     return 1
   fi
   if [ "$(rid_attr "$rid" enabled)" = "false" ]; then
