@@ -11309,10 +11309,14 @@ G-55（公开 `origin/main` 建不出镜像，等一次拍板）；② 装完之
 ⇒ **只有根那一对漂了，e2e 那一对两侧相同** —— 这正是臂 A2 钉的那条性质（"第二侧不是免检区"）
 第一次拿到现场读数：只判根的实现会在这里放行一棵锁不同的树。漂的原因也现量了：
 main 在 `2f735392` 动过根锁，而分支 worktree 的 `node_modules` 是那之前装的。
-🔴 **落地那一刻这一格还会再红一次**，恢复动作 `selfhost-land-main.mjs` 里第 3 道守卫早就写好了：
-`cd 载体 && pnpm install --frozen-lockfile`，再 `cd e2e && pnpm install --frozen-lockfile`，然后重跑体检。
-它**拒绝代跑 install** —— 那棵树的 `node_modules` 与并行那条线的打包共用，这不是保守，是归属。
-（任务 #43 那一格因此从"要重取读数"具体化成"要真装一次，且要先跟并行那条线协调窗口"。）
+
+⚠️ **这条漂不构成交付前置，我一开始把它读成了前置 —— 现量否证了**（同一趟里第 3 道守卫给的）：
+漂的是**借来方**（分支 worktree）那侧的锁，而载体**自己**的 `node_modules` 与载体那把锁是**同源的**
+（根 `0f3c1bf6d9e2` 361300B / installed 同值；e2e `021a9df4add8` 993B / installed 同值 ⇒ 两道 ✅）。
+理由不神秘：本批没动 `pnpm-lock.yaml`，所以载体的锁 = main 的锁，而载体那套 install 早就是按 main 那把锁装的。
+⇒ **落地不需要"先在载体里 install 一趟"**，`selfhost-land-main.mjs` 第 3 道守卫现在是绿的（它仍是每次落地前重取的瞬时读数）。
+旋钮那条路（借别人的 store）因此**只在"载体没装过"的世界里才需要** —— 这一次它把自己拦在门外，
+恰好证明它判的是前提而不是便利。
 
 **④ 顺带查出闸门话术里一格没有出口的循环**（已改，`80dba899`）：
 ①崩在合并之后 ⇒ 载体里留下 `MERGE_HEAD`；下一趟退 6，话术是"等那一趟跑完再重跑本脚本"。
@@ -11322,3 +11326,39 @@ main 在 `2f735392` 动过根锁，而分支 worktree 的 `node_modules` 是那�
 `HEYTA_CARRIER_BUSY_FORCE=state` 专门演这一格。三档实测：`state`→6（新的恢复话术，
 点名"先对分支尖 + 对 mtime 证明是谁起的，再由那个所有者 abort"）、`busy`→6（原"等"话术）、
 `ture`（打错）→2。
+
+### 8.193 落地只剩一格：体检七道里 5 绿 · 2 "不适用" · 唯一那枚红是别人的未提交 `package.json`（2026-10-05 12:1x）
+
+```
+node research/tools/selfhost-land-main.mjs --carrier     # 只读取数，不落地
+✅ 载体 c7c4e0ad = main(8cb33f55) × feat/self-host-distribution(cab59fc6)
+   并集 scripts 键 159 · check 链段 main=85 本批=67 base=66 并集=86（摘段 0/0）· 非 scripts 顶层字段 9 个（丢 0）
+   门禁 17 道：17 道 exit 0
+✅ 载体双亲对上 · ✅ 负载可用 7.33 ≤ 12 · ✅ node_modules 与当前那把锁同源 · ✅ main 未被抢先
+🔴 阻塞集 1 枚：package.json
+⏭️ 完整 check 不会 SIGKILL 别人的 dev server（dry-run 不跑链）· ⏭️ 载体上完整 pnpm check（同上）
+```
+
+🔴 **两格"不适用"不是通过**（AGENTS §9 第 7 条那一档）：它们要的是**窗口内**那趟真链，
+而**现在还不能跑它** —— 链里 e2e 前置会按端口 SIGKILL，那正是第 4 道守卫在 dry-run 里不执行的原因。
+⇒ 第 1 项剩下的**不是**"再准备一点"，而是两件事：**别人提交 `package.json`** + **一个能跑完整链的协调窗口**。
+哨兵（`--run-on-open`，`QUIET_MIN=15 LOAD_MAX=12`）等的是前者，窗口开了自己就会走后面那趟。
+
+顺带把 G-48 那句"零自动消费者"的**当前**状态现量了一遍（它已经不等式反了，别按旧措辞读）：
+`--mount /app/` 那一腿现在有三处消费者 —— `server/Dockerfile:211`（镜像构建内跑
+`check-web-artifact --dist apps/web/dist --mount /app/`）、`scripts/verify-selfhost-stack.sh:182`
+（**从 Dockerfile 里反解**出唯一那个 `--mount` 值，取不到唯一值就 die，然后在**跑起来的镜像里**
+按同一个值复判一次 :270）、`scripts/check-gate-wiring.mjs:102`（把 `pnpm check:web-artifact:app` 当
+needle 钉住）。三档调用实测：裸跑（不给 `--mount`）⇒ **退 1**「缺少 --mount …默认值就是那条永远绿的空判据」；
+`--mount /` ⇒ 0（本 worktree 当前产物是按 `/` 打的）；`--mount /app/` ⇒ 1「产物声明 / 而你要放在 /app/」
+—— 后两条**同时正确**，因为判的是"这一份产物声明的路径 == 你要挂的路径"，不是"产物好不好"。
+⚠️ 我上一趟把裸跑那个 1 当成"G-48 可能没闭合"的信号 —— 那是**我的调用形状错了**，
+不是判据坏了。形状：这条判据**必须**带 `--mount`，而链里带的是 `/`。
+
+🔴 **那一枚红的形状要报准，否则"在等提交"会被读成"快好了"**（12:1x 现量，主检出只读）：
+`package.json` 的未提交 diff 是 **2 增 1 删**，而它的 mtime 是 **10:31:18** —— 也就是这一格已经
+挂了 **1 小时 47 分**没被碰过；同一棵主检出此刻还有 **27 条**脏条目（`AGENTS.md`、`PROGRESS.md`、
+一批 iOS 证据 PNG/txt）在动。⇒ 这不是"他马上就提"，是**那个人正忙别的事**，
+哨兵按 `quiet_min=15` 等下去可能等很久。能清这一格的只有它的所有者（或产品负责人让那条会话先把它提了），
+**不是**我这侧再准备什么 —— 本批写集与它相交的只有这一枚，其余四枚（`docs/README.md` 等）按 §8.190
+那条交集判据早就不算阻塞。
