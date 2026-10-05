@@ -840,6 +840,32 @@ capture=1 breakdown=1 prioritize=1 duration-estimate=1 tool-calling=1
 | rig28 | 未跑完就中止（10 通过 / 0 失败后被顶死） | 从库里 `consents=0` 反推出「载体漏点逐功能同意」并加了硬判据；而 `ai-consent-<feature>` 是罩在 `{needs ? …}` 里的**条件渲染 Button**（`apps/mobile/src/ai/AiSettingsSection.tsx:407`），不需要同意时压根不渲染 ⇒ 新判据把整趟拦死（traps #330b） |
 | rig29 | **14 通过 / 1 失败**（与 rig27 同形） | 那一格改成只登记（ⓘ 一行，不判红不中止）；仍开的只有第 5 步 `tool-start-assistant` 的 `enabled` |
 
+#### rig30→35 逐趟现量（2026-10-06 05:3x–07:1x，`emulator-5554` + 真服务端 + 本机假端点，零 mock）
+
+载体前置变了：`windows-pc` 现量不可达（`ssh` 报 `Operation timed out`），Android 产物走
+文档化的显式例外 `HEYTA_ANDROID_LOCAL_GRADLE=1` 在**这台 Mac** 打（脚本大字印「这是本机执行」，
+不是静默降级）。副作用是**换了打包机 = 换了 debug keystore** ⇒ `adb install -r` 报
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE`，载体补了"卸载后全新安装"那一档出口。
+
+| 趟 | 读数 | 这一趟改掉/证伪了什么 |
+|---|---|---|
+| rig30 | 未跑完就中止（0 通过 / 0 失败） | `装不上 app-release.apk` 后面什么都没带 —— 归因成本全压给人工复现。补：捕获 adb 原文 + 换键走 uninstall 重装；同时钉判据 ⑪（装包命令不许 `>/dev/null`、必须认 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`） |
+| rig31 | 16 通过 / 1 失败 | 换键恢复生效（装上的是本机这一台打的产物）。唯一红：`tool-input` "滚了 5 次仍在安全带外 —— 界面形状或 testID 变了"，而真相是 `reveal_rid` **只有往下滚那一种手势**（traps #331） |
+| rig32 | 16 通过 / 中止 | 只修了 `reveal_rid` 没修 `tap_rid` —— 同一个缺陷在两枚 helper 上，只修一枚等于没修。判据 ⑫ 扩到 `tap_rid`（方向由 y 与带子的符号选 + 第二趟摘焦点回顶） |
+| rig33 | 16 通过 / 中止 | `tap_rid` 的"没找到"那一格误留在 pass 循环**里面** ⇒ 第 1 趟就 `return 1`，换方向永不执行。写成会红的**顺序**判据（臂 31）。这一趟同时拿到 `tool-start-assistant enabled=true`（rig16 以来第一次） |
+| rig34 | 20 通过 / 1 失败 | 第 5 步旧判据「假端点计数上涨」在「只用本机」档**恒不成立**（blanket fetch 闸门在任何 fetch 之前就返回 `privacy-consent-not-granted`）⇒ 换成四条真判据；「规则命中⇒零外发」按三条中文输入通道的现量登记成**设备侧未覆盖**（traps #333/#334）。唯一红移到第 6 步「隐私开关锚点失效」 |
+| rig35 | **21 通过 / 1 失败**（`RIG35_RC=1`） | 第 3 步不再无条件逐档去点 `ai-consent-*`：回环端点下 `destination='none'` ⇒ 那一行按设计不渲染。期望值改由端点字面量推，两档各有判据，否定那一支自带整页分母（新 `scan_rids` + `SCAN-CAP`）；判据 ⑭ + 臂 35–39。第 6 步那红的真身也现了：**区块的两枚按钮互斥**，`consentRecord !== null`（含"已选只用本机"）那一支只有「撤回同意」，而载体找的是「重新作出选择」/「同意并联网」⇒ 恒空（判据 ⑩ 的 desc/text 对账把新锚点对回了词条） |
+
+**第 5 步的当前诚实状态（rig35 现量，取代上面那段 21:3x 的候选清单）**：
+`enabled=true`、拒绝原文含 `privacy-consent-not-granted`、那句拒绝点名了它本来要去的
+`127.0.0.1` URL、假端点计数 `0→0` 一次没动、失败面给出「重试」—— 五条各有 ✅；
+仍**未覆盖**的只有一格：「本机规则命中 ⇒ 零外发」（全中文谓词的规则表在这台没有中文
+输入法的 Android Release 载体上无法被键盘命中，三条注入通道逐个试过）。
+上面那段"候选还剩 resolveAiRoute 的能力声明 / assistantTier"已由现量收掉：
+能力声明那一半在 rig33 前就修完（`ai-endpoint-cap-*` 三枚 chip 可勾 + 库里回读），
+`assistantTier` 不是拦它的那一道（同档 `enabled=true`）。
+**本轮设备级读数收在这里：21/22，一条按设计不可达、一条（第 6 步锚点）修法已落但未取到读数 —— 不降级判据，也不拿载体跑通当产品完成。**
+
 **第 5 步当前的诚实状态**：三条候选里「逐功能同意没给」从定源**降级为待验证**（设备侧分不开
 「控件没渲染」与「控件没滚到」）。剩下两条不需要设备、只靠读代码就能判：
 `resolveAiRoute` 是否要求这一档的端点**声明工具能力**（假端点 `stub-model` 零能力声明，
