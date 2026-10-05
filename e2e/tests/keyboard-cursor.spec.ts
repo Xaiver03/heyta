@@ -563,4 +563,291 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
     await parkCursor(page);
     await page.screenshot({ path: SHOT('k8-notes-selection-visible') });
   });
+  /*
+   * K9 / K10 / K11 = 工单 W1b 的**第 3 条腿**（§8.137）：在带痕迹那一行上按 Enter ⇒ 焦点交给这一格，
+   * 而在**没**带痕迹那一行上按 Enter ⇒ 光标让开、那一行自己的按钮接到这一下。
+   *
+   * 🔴 为什么这三条必须在真浏览器里跑（jsdom 那 5 条不够）：
+   *   ① 落点是**选择器**（`[data-testid="habit-pane"]` / `[data-testid="notes-editor-input"]`），
+   *      jsdom 那套是自己插一枚假元素测的，它永远看不见"真渲染里根本没有这个 testid"；
+   *   ② 焦点环是 CSS（`:focus-visible`），程序化 `focus()` 到底画不画得出来只有浏览器知道 ——
+   *      没有环的 Enter 是**静默跳焦点**：界面什么都没说的，而 Tab 序列已经不在列表上了；
+   *   ③ 🔴 落点要的是**可聚焦**那只，而"带 testid 的那只"和"可聚焦的那只"**可以不是同一只**。
+   *      这一条不是设计出来的，是 K10 第一版踩出来的：便签行外层 `note-row-<id>` 是 `View`
+   *      （不可聚焦、没有 onPress），入口在里面那一只 `note-edit-<id>` 上 —— 点外层那只
+   *      什么都不发生，于是"Enter 没把焦点送进去"读起来像机制坏了。臂台里 A4 就是这一档的靶子
+   *      （摘掉 `tabIndex={-1}`：jsdom 全绿、e2e 红）。
+   */
+  test('K9 习惯：Enter 把焦点交给那一栏里的面单，且**看得见**焦点进来了', async ({ page }) => {
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '习惯');
+    await addHabit(page, '回车甲');
+    await addHabit(page, '回车乙');
+
+    const rows = page.locator('[data-testid^="habit-row-"]');
+    const first = rows.first();
+    await first.click();
+    const markedBefore = await page
+      .locator('[data-testid^="habit-row-"][aria-current="true"]')
+      .getAttribute('data-testid');
+    // 行上的三个数字 = "有没有被写了一笔"的读数（Enter 只许挪焦点，不许发 op）。
+    const numbersBefore = await first.textContent();
+
+    await first.press('Enter');
+
+    const ring = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (el === null) return null;
+      const cs = getComputedStyle(el);
+      /* 🔴 尺子必须是"**同一份 token 在这台浏览器里算出来的值**"，不是写死的像素/色号：
+         造一枚隐形探针，把它的 `color` 与 `border-top-width` 设成那两个 token，再读计算值。
+         同环境比对是必需的 —— CSS 变量原始值可能是 `oklch(...)`，而 `outline-color` 计算出来
+         是 `rgb(...)`，直接比字符串永远不相等（本文件 K1 那一族读底色时同一个坑）。 */
+      const probe = document.createElement('div');
+      probe.style.cssText =
+        'position:absolute;visibility:hidden;color:var(--ht-color-ring);border-top:var(--ht-focus-ring-width) solid #000;';
+      document.body.appendChild(probe);
+      const pcs = getComputedStyle(probe);
+      const out = {
+        testid: el.getAttribute('data-testid'),
+        outlineStyle: cs.outlineStyle,
+        outlineWidth: cs.outlineWidth,
+        outlineColor: cs.outlineColor,
+        wantWidth: pcs.borderTopWidth,
+        wantColor: pcs.color,
+      };
+      probe.remove();
+      return out;
+    });
+    expect(ring?.testid, 'Enter 之后焦点没进这一格').toBe('habit-pane');
+    /* 🔴 焦点环要**是我们那一条**，不是"随便有个环"。这一条被 A5 那一臂照出来过：
+       把 `.ht-habit__pane:focus-visible` 换成一枚界面上不存在的类（= 那条规则彻底没生效），
+       e2e **全绿** —— 因为判据当时写的是"style 不是 none 且宽度 > 0"，而 Chromium 对
+       `:focus-visible` 的 **UA 默认环**（`outline-style: auto`）恰好满足它。
+       §7 第 83 条同族：**"默认值恰好像我们的品牌色"不构成判据**。
+       现在量三件：样式 = `solid`（UA 那条是 `auto`）、颜色与宽度**逐字等于**同一份 token
+       在这台浏览器里算出来的值。 */
+    expect(
+      ring?.outlineStyle,
+      `焦点进来了但画的是浏览器的默认环（读到 ${JSON.stringify(ring)}）⇒ 那条 :focus-visible 没生效`,
+    ).toBe('solid');
+    expect(
+      ring?.outlineColor,
+      `焦点环的颜色不是 --ht-color-ring（${String(ring?.outlineColor)} ≠ ${String(ring?.wantColor)}）`,
+    ).toBe(ring?.wantColor);
+    expect(
+      ring?.outlineWidth,
+      `焦点环的宽度不是 --ht-focus-ring-width（${String(ring?.outlineWidth)} ≠ ${String(ring?.wantWidth)}）`,
+    ).toBe(ring?.wantWidth);
+
+    /* 🔴 计算值有环 ≠ 画面上看得见环。这一条是**看图**照出来的（§6.2 规定一第 4 条）：
+       K9 那张图里右边那一格只有**底下一条蓝线**，用户读到的是"栏里多了一条线"，
+       而不是"焦点进来了"。现量（临时探针，量完即删）：那一格的盒子
+       `top=0`、`right=1280`（视口宽 1280），而全局那条 `:focus-visible` 给的是
+       `outline-offset: 2px` —— 环画在盒子**外面**，于是**上边与右边各有一条被视口裁掉**。
+       判据因此不写"有没有环"，写"**四条边都落在视口里**"：环带 = 盒子外扩 `offset + width`
+       （`offset` 为负就是内缩），四边都必须还在可视区内。
+       修法是这一格把环**往里画**（`habits.css` 里那条负 `outline-offset`，理由写在那里）。 */
+    const ringBox = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement;
+      const cs = getComputedStyle(el);
+      const b = el.getBoundingClientRect();
+      const pad = parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth);
+      return {
+        top: Math.round(b.top - pad),
+        left: Math.round(b.left - pad),
+        right: Math.round(b.right + pad),
+        bottom: Math.round(b.bottom + pad),
+        vw: window.innerWidth,
+        vh: window.innerHeight,
+        pad: Math.round(pad),
+      };
+    });
+    const clipped = [
+      ringBox.top < 0 ? `上边 ${String(ringBox.top)}` : '',
+      ringBox.left < 0 ? `左边 ${String(ringBox.left)}` : '',
+      ringBox.right > ringBox.vw ? `右边 ${String(ringBox.right)} > 视口 ${String(ringBox.vw)}` : '',
+      ringBox.bottom > ringBox.vh ? `下边 ${String(ringBox.bottom)}` : '',
+    ].filter((s) => s !== '');
+    expect(
+      clipped,
+      `焦点环有 ${String(clipped.length)} 条边画在视口外（${JSON.stringify(ringBox)}）⇒ 图上只看得见一条线，"焦点进来了"读不出来`,
+    ).toEqual([]);
+
+    expect(
+      await page.locator('[data-testid^="habit-row-"][aria-current="true"]').getAttribute('data-testid'),
+      'Enter 顺手换了选中',
+    ).toBe(markedBefore);
+    expect(await first.textContent(), 'Enter 写进去了东西（行上的数字变了）').toBe(numbersBefore);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('k9-enter-focuses-pane') });
+  });
+
+  test('K10 便签：Enter 把焦点交给正文输入框（"打开便签"的自然落点）', async ({ page }) => {
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '便签');
+    await addNote(page, '便签回车甲');
+    await addNote(page, '便签回车乙');
+    await releaseFocus(page);
+
+    /* 🔴 必须点行**里面**那颗 `note-edit-<id>`，不能点 `note-row-<id>`。
+       共享板把 testid 放在外层 `View`（`NotesBoard.tsx:319`），而 `accessibilityRole="button"`
+       + `onPress` 挂的是里面那一只摘要按钮（`:326`）—— 点外层那只**什么都不发生**：
+       选中不换、编辑器不开。症状长得像"Enter 没把焦点送进去"（机制红），
+       真实原因是探针从没点到入口。现量：点外层 ⇒ `notes-editor-input` 计数 0，
+       点内层 ⇒ 1。本文件 K8 早就是按 `note-edit-${id}` 寻址的，这一条第一版没跟着做。 */
+    const rows = page.locator('[data-testid^="note-row-"]');
+    const target = rows.nth(1);
+    const id = (await target.getAttribute('data-testid'))?.replace(/^note-row-/, '');
+    const entry = target.locator(`[data-testid="note-edit-${id}"]`);
+    await entry.click();
+
+    /* 前提先钉住：那一格里真的有待聚焦的东西、痕迹确实在这一行上、而且**焦点在这一行里**。
+       少了第三步，下面那一下 Enter 打的是 `<body>`，红的会是探针而不是机制。 */
+    await expect(
+      page.getByTestId('notes-editor-input'),
+      '点到那一行之后，详情列那一格里没有正文输入框（落点选择器在真 DOM 里没有生产者）',
+    ).toHaveCount(1);
+    expect(
+      await target.getAttribute('aria-current'),
+      '点完行之后这一行没带痕迹 ⇒ "焦点行 == 选中行"那道闸门根本走不到 Enter 分支',
+    ).toBe('true');
+    expect(
+      await page.evaluate(
+        () =>
+          (document.activeElement as HTMLElement | null)?.closest('[data-testid^="note-row-"]') !==
+          null,
+      ),
+      '点完摘要按钮后焦点不在那一行里 ⇒ 后面按的 Enter 不是用户那一下',
+    ).toBe(true);
+
+    await entry.press('Enter');
+    const focusedTestid = await page.evaluate(
+      () => (document.activeElement as HTMLElement | null)?.getAttribute('data-testid') ?? null,
+    );
+    expect(
+      focusedTestid,
+      '便签那一格的落点不是正文输入框（Enter 后焦点仍在原处）',
+    ).toBe('notes-editor-input');
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('k10-enter-focuses-note-input') });
+  });
+
+  /**
+   * K11 = 这一条**反过来**的那一档：焦点在**没带痕迹**的那一行上按 Enter。
+   *
+   * 判据写成"按钮真的收到了这一下"而不是只写"光标没抢"：那一行本来就是 `<button>`，
+   * Enter 的**应有行为**是"按下它"= 换成选中这一行。所以"光标让开"在界面上必须留下
+   * 两个读数：焦点仍在行上（没被抢进右边那一格）**且**痕迹换到了这一行（按钮自己接了）。
+   * 只断言前一半的话，"谁都没接"那种坏也会绿。
+   */
+  test('K11 焦点在**没选中**的那一行上按 Enter ⇒ 光标让开、按钮自己接（痕迹换过来）', async ({ page }) => {
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '习惯');
+    await addHabit(page, '回车甲');
+    await addHabit(page, '回车乙');
+    await releaseFocus(page);
+
+    const rows = page.locator('[data-testid^="habit-row-"]');
+    const unmarked = rows.first();
+    const marked = rows.nth(1);
+    await marked.click();
+    await expect(marked).toHaveAttribute('aria-current', 'true');
+    // 前提：这一格里真的有面单（否则"焦点没跳"会因为落点不存在而恒成立 = 一条永远通过的判据）。
+    await expect(page.getByTestId('habit-pane')).toHaveCount(1);
+
+    // Tab 进那一行而不是点它：点它就换了选中，那条路测的是 K9。
+    const unmarkedId = await unmarked.getAttribute('data-testid');
+    await unmarked.focus();
+    expect(
+      await page.evaluate(() => document.activeElement?.getAttribute('data-testid')),
+      '焦点没落在那一行上 ⇒ 下面按的 Enter 不是用户那一下'
+    ).toBe(unmarkedId);
+
+    await page.keyboard.press('Enter');
+
+    expect(
+      await page.evaluate(() => document.activeElement?.getAttribute('data-testid')),
+      '焦点被抢进右边那一格了，而用户那一下按的是列表里的行'
+    ).toBe(unmarkedId);
+    expect(
+      await unmarked.getAttribute('aria-current'),
+      '按钮没接到这一下 Enter（痕迹没换过来）⇒ "光标让开"被读成了"谁都没接"'
+    ).toBe('true');
+    expect(
+      await marked.getAttribute('aria-current'),
+      '原来那一条还带着痕迹 ⇒ 界面同时给了两个"当前"'
+    ).toBeNull();
+
+    // 这张图画的就是"Enter 之后焦点仍在那一行、痕迹换到了那一行"这两件读数（§6.2 规定一）。
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('k11-unmarked-row-keeps-enter') });
+  });
+
+  /**
+   * K12 = 工单 §8.143：把 §8.138 边界 ③ 那条"最短路径今天不成立"变成成立的读数。
+   *
+   * 🔴 与 K9/K10/K11 的区别**不是多测一面，是一次都不点**：那三条都用
+   * `locator.press('Enter')`，而 Playwright 的 `press` 会先把焦点打到那个 locator 上 ——
+   * 也就是说"焦点已经在行上"这件事是**探针给的**，不是机制挣来的。这一条只往 `body`
+   * 上发键（`press()` + `releaseFocus()`），所以它量的是真用户那条路：
+   * **↓ 走一行 → Enter**，中间没有任何一次点击。
+   *
+   * ⚠️ 为什么 jsdom 那两条不算数：jsdom 里行是插出来的 `<div>`，"行里到底有没有可聚焦的
+   * 东西"是夹具说的；真实渲染里 `task-item-*` 外层是裸 `View`（`TaskRow.tsx:300`），
+   * 可聚焦的是行里那颗 `role="checkbox"`。**只有浏览器知道那颗东西真的存在** ——
+   * 摘掉 `focusRow` 之后这一条会红在"焦点还在 body"上（臂台 F1 就是这一档），
+   * 而"焦点恒落在第一行"那一类坏红在后面那两句"焦点行 == 痕迹行"上（臂台 F2）。
+   */
+  test('K12 🔴 一次点击都不给：↓ 走两行再 Enter ⇒ 焦点已经在栏里那只正文框', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTask(page, '焦点跟走甲');
+    await addTask(page, '焦点跟走乙');
+    // 建完两条任务，焦点还停在捕获框里（= 正在打字，闸门会挡下 ↓）。交回 body。
+    await releaseFocus(page);
+
+    await press(page, 'ArrowDown');
+    const afterArrow = await page.evaluate(
+      () => (document.activeElement as HTMLElement | null)?.getAttribute('data-testid') ?? null,
+    );
+    expect(
+      afterArrow,
+      '↓ 之后 DOM 焦点还停在 body ⇒ Enter 的接管条件（焦点行 == 痕迹行）永远不成立',
+    ).not.toBeNull();
+
+    // 🔴 再走一行。第一下不能单独当判据：**没选中时第一次 ↓ 走到的就是第一行**，
+    // 于是"焦点永远落在第一行"那一类坏在它身上比不出来（臂 F2 就是那一类），
+    // 痕迹与焦点要到**第二行**才分得开。
+    await press(page, 'ArrowDown');
+
+    // 焦点所在那一行必须**就是**带痕迹那一行 —— 比 id，不比文本（K4 同一口径）。
+    const marked = await page
+      .locator(`${ROWS}[aria-current="true"]`)
+      .getAttribute('data-testid');
+    const focusedRow = await page.evaluate(
+      () =>
+        document
+          .activeElement?.closest('[data-testid^="task-item-"]')
+          ?.getAttribute('data-testid') ?? null,
+    );
+    expect(focusedRow, `焦点落在的行（${String(focusedRow)}）与带痕迹那一行（${String(marked)}）不是同一条`).toBe(
+      marked,
+    );
+
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByTestId('task-note-input'),
+      '↓ 再 Enter 没把焦点送进栏里的正文框',
+    ).toBeFocused();
+
+    // Enter 只许挪焦点，不许发 op：两条任务还在，且都没被勾成完成。
+    await expect(page.locator(ROWS)).toHaveCount(2);
+    await expect(page.locator('[data-testid^="task-item-"][aria-checked="true"]')).toHaveCount(0);
+
+    await page.screenshot({ path: SHOT('k12-arrows-then-enter-focuses-pane') });
+  });
 });

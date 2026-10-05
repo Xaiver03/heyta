@@ -324,8 +324,13 @@ describe('接线：入口在两端都真的连着', () => {
     expect(webSrc('features/projects/store.ts')).toContain('projectActions.renameTag(id, name)');
     expect(webSrc('features/projects/ProjectsPanel.tsx')).toContain('projects.renameTag(item.id, name)');
     expect(webSrc('features/habits/store.ts')).toContain('habitActions.renameHabit(habitId, name)');
-    expect(webSrc('features/habits/HabitsView.tsx')).toContain('store.renameHabit(id, next)');
-    expect(webSrc('features/habits/HabitsView.tsx')).toContain('store.deleteHabit(');
+    /* 🔴 这两条从 `HabitsView.tsx` 改指 `HabitDetailCard.tsx`（工单 §8.133 的**搬家**，不是新债务）：
+       习惯面单从内容列的窗格搬进详情列之后，改名与删除的**调用点**跟着面单走，
+       视图只剩清单。登记的道理与 `check:selection-single-source` 的 `ROW_ID_EXEMPT` 一样 ——
+       **判据按"文件 + 那一句"索引的时候，搬家必须同时改指向**，否则下一轮会把"文件换名"
+       读成"入口消失了"，而真正会漏的是相反的那一种：把旧文件里剩下的注释当成调用点。 */
+    expect(webSrc('features/habits/HabitDetailCard.tsx')).toContain('store.renameHabit(id, next)');
+    expect(webSrc('features/habits/HabitDetailCard.tsx')).toContain('store.deleteHabit(');
   });
 
   it('共享层只让位、不藏第二份行骨架：`OrganizerList` 的 rename/archive prop 默认不渲染', () => {

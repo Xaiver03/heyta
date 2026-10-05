@@ -285,7 +285,20 @@ describe('数量行文案（W6）', () => {
     // 本文件（移动端那份构造器）。⚠️ 期望值也要 `sort()`：`keysIn` 排过序，
     // 不排就把"顺序不同"读成"key 不同"。
     const mobile = keysIn(read('../src/lib/habits-display.ts'));
-    const web = keysIn(read('../../../apps/web/src/features/habits/HabitsView.tsx'));
+    /* 🔴 web 那一侧要读**三份文件**（工单 §8.133 的搬家）：数量行那三条 key 原来写在
+       `HabitsView.tsx` 的 labels 构造器里，面单搬进详情列之后构造器单独成文件
+       （`board-labels.ts`，理由是循环依赖不是整洁），而面单的宿主是 `HabitDetailCard.tsx`。
+       只读视图会得到 `[]` —— 症状长得像"web 把这三条 key 删了"，其实是这条对账**跟着搬家没改指向**。
+       对账的**语义**没动：两端仍然必须用同一批 key。 */
+    const web = keysIn(
+      [
+        '../../../apps/web/src/features/habits/board-labels.ts',
+        '../../../apps/web/src/features/habits/HabitDetailCard.tsx',
+        '../../../apps/web/src/features/habits/HabitsView.tsx',
+      ]
+        .map((rel) => read(rel))
+        .join('\n'),
+    );
     const expected = [...AMOUNT_KEYS].sort();
     expect(mobile, '移动端没接全这三条').toEqual(expected);
     expect(web, 'web 没接全这三条').toEqual(expected);

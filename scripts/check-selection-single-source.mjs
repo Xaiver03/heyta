@@ -486,8 +486,11 @@ const ROW_ID_CLASSES = ['in-flight', 'inline-rename', 'confirm-gate', 'dragging'
 /** §8.28 那一趟逐处归类后的结果（条数以断言 G 打印的为准，别在这里抄数）。改名／删掉某处时必须同时改这里，否则 G 报过期豁免。 */
 const ROW_ID_EXEMPT = [
   ['apps/web/src/features/calendar/CalendarView.tsx', 'busyId', 'in-flight'],
-  ['apps/web/src/features/habits/HabitsView.tsx', 'busyId', 'in-flight'],
-  ['apps/web/src/features/habits/HabitsView.tsx', 'renamingId', 'inline-rename'],
+  // 🔴 §8.133：这两处随面单一起从 `HabitsView.tsx` 搬进 `HabitDetailCard.tsx`
+  // （面单落进详情列那一格，视图只剩列表）。语义类别没变，变的是宿主文件 ——
+  // 表按「文件 + 变量名」索引，所以搬家必须两行一起改，否则 G 报过期豁免。
+  ['apps/web/src/features/habits/HabitDetailCard.tsx', 'busyId', 'in-flight'],
+  ['apps/web/src/features/habits/HabitDetailCard.tsx', 'renamingId', 'inline-rename'],
   ['apps/web/src/features/quadrant/QuadrantBoard.tsx', 'activeId', 'dragging'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'editingRowId', 'inline-rename'],

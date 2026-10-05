@@ -67,6 +67,16 @@ const STEPS = [
   ['gate design', '.', 'node design-system/heyta/check-hardcoded.mjs'],
   ['gate ui-language', '.', 'node scripts/check-ui-language.mjs'],
   ['gate migrations', '.', 'node scripts/check-migrations.mjs'],
+  /* 🔴 本线自己那四枚门禁**以前不在这台电池里**（也没进 `pnpm check` —— 待办 #23 说 package.json
+     在主检出里脏着，挂不进去）。后果是实测的：§8.134 补跑第 3 道闸门时发现
+     `check-detail-pane-status-table` **在本分支恒红**，而那是我自己上一笔（`24098799`）把一枚
+     表格行写成 8 个物理行造成的 —— 电池跑了 12 趟都没人拦，因为**这枚门禁没有消费者**。
+     "有脚本、没消费者"那一档工单 §8.72 数过，这次数到的是我自己。四枚都是纯 fs 读源码/文档，
+     零依赖、秒级，没有理由不进电池。 */
+  ['gate dp-slot', '.', 'node scripts/check-detail-pane-slot.mjs'],
+  ['gate dp-status-table', '.', 'node scripts/check-detail-pane-status-table.mjs'],
+  ['gate dp-c1-coverage', '.', 'node scripts/check-detail-pane-c1-coverage.mjs'],
+  ['gate dp-evidence-refs', '.', 'node scripts/check-detail-pane-evidence-refs.mjs'],
   ['build token-gen', 'packages/design-system', './node_modules/.bin/tsup --config tsup.generate.config.ts'],
   ['gate tokens', 'packages/design-system', 'node dist/generate-cli.js --check'],
   // 🔴 这四步补的是一个洞：`build web vite` 打进产物的是 **`packages/*/dist`**，不是 `src`。
