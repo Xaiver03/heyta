@@ -651,7 +651,11 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
 ① `RTEST-UNHANDLED-01` —— `pnpm -r test` 在共享载体上会以 rc=1 结束（5 条 Rolldown Flow 解析的
 unhandled rejection，单跑不现），归因未定，**不记产品失败也不记"抖动"**；
 ② `check:ai-e2e` **整族**没在合并态载体上跑过（本轮只跑了那 4 份手工裁决的用例，见上面 `E2E-MERGE-01`）；
-③ 主检出的本地 `main` 指针在他们手里，**不代 pull、不代推他们那 4 笔未公开的笔**。
+③ 主检出的本地 `main` 指针在他们手里，**不代 pull、不代推他们那 4 笔未公开的笔**；
+④ `FULLCHECK-01` —— **`pnpm check` 整条 76 步链没在最终载体上重跑**（第⑤步只单独取了 17 道门禁 +
+build/typecheck + 每包一份单测）；当刻 1 分钟负载 **261**（阈值 12），
+且那三段 e2e 会按专用端口 SIGKILL、末尾 `-r test` 受 `RTEST-UNHANDLED-01` 挡着
+⇒ **记环境无效、不记产品失败、也不记"已验证"**；闭合的四个前置条件写在 §8.5 第 16 条。
 
 🔴 ~~全在本地分支，**未 push、未 merge 进 main**~~（04 21:3x 的第一次更正，留形）：
 `feat/countdown-batch2` 已 push；main **六次并入本分支**（`75114cd3` 带 13 处冲突逐处裁决，
