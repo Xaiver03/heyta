@@ -33,6 +33,11 @@
 - 新增 `docs/research/ai-feature-completeness-audit.md`。
 - 结论：**本地自带端点（BYO-key）模式完整**；**托管/云 AI 是刻意受阻**，且受阻点
   （`retention-undecided` 运行时门禁、"300 次/月"配额未实现 + 禁售）全部仍在代码里。
+  - 🔴 **上面这句是审计当时的读数，现已作废**（2026-10-05）：`retention-undecided` 这个 reason
+    与 `NOT_YET_DELIVERABLE_SKUS` 里那一条都已随 [ADR-0054](docs/adr/0054-managed-ai-retention-and-selling-preconditions.md)
+    撤除（保留策略定案 + 计量已实现，禁售按 0023 自己写的顺序解除）；
+    ⚠️ 但这一档**在客户端仍然打不开**（0054 §8），所以"托管 AI 对用户可用"并不因此成立。
+    该审计另外三个真缺口的状态见 [ai-assistant-closure.md](docs/plans/ai-assistant-closure.md)。
 - 真正的缺口 3 个：受保护条目 `readable:false` 没有产品机制（最严重，压在入站 AI
   的隐私承诺上）、"发特征不发原文"从未实现（文档债）、工具调用 P3/P4 未开始。
 

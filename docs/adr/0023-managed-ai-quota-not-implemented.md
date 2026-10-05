@@ -2,10 +2,15 @@
 
 > 状态：**已接受**
 > 日期：2026-09-29
-> 取代：无。本 ADR **不**改动 [ADR-0020](0020-ai-subscription-two-tiers.md) /
+> 取代：**本 ADR 的结论已被 [ADR-0054](0054-managed-ai-retention-and-selling-preconditions.md) 取代** ——
+> 0054 不是推翻这条约束，而是**照它自己的顺序把它走完**：先把"计量存在"补出来，
+> **然后**才按顺序解除禁售（0054 §6 逐字如此）。下面那句原文照旧成立：
+> 本 ADR **不**改动 [ADR-0020](0020-ai-subscription-two-tiers.md) /
 > [ADR-0021](0021-managed-ai-model-deepseek-flash.md) 的任何价格、额度或模型结论 ——
 > 它判定的是**这些结论的落地顺序**：额度先记在文档里，计量与端点后做。
 > 相关：[ADR-0013](0013-cloud-ai-and-maas.md) §2（会提供统一云端 AI 并按此收费）。
+> 已被 [ADR-0054](0054-managed-ai-retention-and-selling-preconditions.md) 取代其结论（2026-10-05）；
+> 本文正文一字未改，留作历史 —— 它当时拦的是"收了钱交付不了"。
 
 ## 1. 背景与约束
 

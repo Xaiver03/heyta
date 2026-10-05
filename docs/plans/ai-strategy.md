@@ -165,8 +165,11 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 > 🔴 **铁律（ADR-0006）**：托管 AI **可以提供**，但**绝不能**被描述成端到端加密。
 > 它是一个**明确、可撤销、按功能开启的例外**，不是默认。
 
-**当前代码状态**：`assertEnableable()` 对 `managed` **主动抛错**（`retention-undecided`）。
-这是**故意的** —— 数据保留策略没定案之前不许打开。见 §7。
+**当前代码状态**（🔴 2026-10-05 更新）：`assertEnableable()` 对 `managed` **不再抛**
+`retention-undecided` —— 保留策略已由 [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md)
+定案，那条 reason 连同它的成员一起删除（没有构造点的成员不留）。
+它现在只拒两件事：**境外供应商**（`managed-endpoint-not-domestic`）与**没填端点**（`endpoint-required`）。
+⚠️ 而"库层放开了"≠"用户能用"：任何客户端都还没有那个开关，边界逐条见 ADR-0054 §8。见 §7。
 
 > 档位与价格已由 [ADR-0020](../adr/0020-ai-subscription-two-tiers.md) /
 > [ADR-0021](../adr/0021-managed-ai-model-deepseek-flash.md) 锁定
@@ -234,10 +237,15 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 | **AI-4** 复盘 | 受限分支，未开工 |
 | 密钥库的其他平台 | 只有 macOS 实现了；Windows / Linux / 移动端未实现（发布时再做） |
 
-> **2026-10-03 逐条复核（载体 `4107e234`）**：上面四条"未落地"**目前仍然成立** ——
+> **2026-10-03 逐条复核（载体 `4107e234`）**：上面四条"未落地"**在复核当时仍然成立** ——
 > 托管 AI 仍被 `assertEnableable()` 抛 `retention-undecided` 挡着（`packages/ai/src/supply.ts`）、
 > AI-3 / AI-4 无实现、密钥库仍只有 macOS。本节 §7.1 新增的四行是**这一天的落地项**，
 > 不是对上面任何一条的改判。
+> 🔴 **2026-10-05 更正（只更正托管那一条）**：`retention-undecided` 已随
+> [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 删除，
+> 保留策略定案、计量与代理路由落地、`hosted-ai-monthly` 可下单；
+> 这一条从"闸门挡着"改判成"服务端已落地、客户端还没有那个开关"（ADR-0054 §8）。
+> AI-3 / AI-4 与密钥库那几条**本笔不代它们主张状态**。
 >
 > ⚠️ 一条同时暴露出来的文档缺口：本线的headline（覆盖面跑满 —— 落地时 8/8、10-04 现量 9/9 + 覆盖面门禁进链）
 > 在 `AGENTS.md §9` 与 `roadmap.md §1.1`（AI-0…AI-5 那张表）**都没有落点** ——

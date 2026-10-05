@@ -711,7 +711,7 @@ W3（归档出口）**必须先于 EVENT 批次二**；W4（清单/习惯）量�
 
 | 层 | 今天真的发生什么 | 证据（复跑：读那一行） |
 |---|---|---|
-| **服务端主路径** | `prisma.user.delete` 一句，靠数据库级联删干净：**引用 `users` 且 `ON DELETE CASCADE` 的外键 16 条、覆盖 15 张表**（⚠️ 2026-10-04 重量为 **19 条 / 18 张表**，增量是 vault 批次 ADR-0050 长的三张；这一行今天仍是 16/15 是因为它是 10-03 的现场读数 —— 抄它已经让 `data-rights` 判红一次，见 §10.8） | `server/src/api.ts:713-757`；推导见 `packages/legal/tests/structure.spec.ts` |
+| **服务端主路径** | `prisma.user.delete` 一句，靠数据库级联删干净：**引用 `users` 且 `ON DELETE CASCADE` 的外键 16 条、覆盖 15 张表**（⚠️ 2026-10-04 重量为 **19 条 / 18 张表**，增量是 vault 批次 ADR-0050 长的三张；这一行今天仍是 16/15 是因为它是 10-03 的现场读数 —— 抄它已经让 `data-rights` 判红一次，见 §10.8；⚠️ **2026-10-05 同一行第二次漂**：现量 **20 条 / 19 张表**（增量是 ADR-0054 §2 的 `ai_usage_counters`，带 `user_id → users` 的 `ON DELETE CASCADE`），而 `privacy` 与 `data-rights` 的中英四栏又照抄了 19/18、被同一条判据再次当场报红 —— 同一个教训被证明**需要每次重新现量**：要这个数字就跑 `structure.spec.ts`，别从本节抄） | `server/src/api.ts:713-757`；推导见 `packages/legal/tests/structure.spec.ts` |
 | **级联之外** | `payment_events` 没有 `userId`，注销后**行仍在**，只是订阅指针 `SetNull`（金额+时间留存，断链） | `server/prisma/schema.prisma:305-345`（:336 原话「删订阅不删事件审计」） |
 | **备份** | 每日 `pg_dump` 两份：整库 + **accounts（邮箱明文/口令散列/passkey）**，保留期默认 14 天；代码里**没有**"从既有备份中定点删掉某一个人"的能力 | `server/scripts/backup.sh:98,107,135`；`server/docs/backup-and-recovery.md:45`（示例 cron 写 3 天，与默认值不一致 → 待核） |
 | **日志** | `admin.routes.ts:423/:493` 把**邮箱明文**打进日志；注销自身留 `userId` 审计行；无轮转与到期删除 | 现量 grep `Logger.audit` |

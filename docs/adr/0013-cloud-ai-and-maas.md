@@ -1,5 +1,10 @@
 # ADR-0013：云端 AI 与 MaaS —— 方向已定，但**开放条件仍然未满足**
 
+> 🔴 2026-10-05：本文下面那些"故意挡住"的说法已被 [ADR-0054](0054-managed-ai-retention-and-selling-preconditions.md) 撤除 ——
+> 保留策略已定案、计量已实现、`retention-undecided` 这个 reason 已从代码里删除。
+> 下面这些句子是**当时的记录**，读它们时以 0054 为准；
+> 本文**没有**改变的那一条是 §3：托管 AI 与端到端加密互斥，必须标注成例外。
+
 - **状态**：已接受（2026-09-26）
 - **相关**：[ADR-0006](0006-supply-modes.md)（供给模式）、[ADR-0010](0010-ai-config-routing.md)（配置路由）、[ADR-0011](0011-local-api-mcp.md)（本机 API / MCP）
 - **取代**：[`docs/plans/ai-open-decisions.md`](../plans/ai-open-decisions.md) 决策 2 的**结论**（原为"暂不提供托管 AI"）

@@ -1513,9 +1513,19 @@ export const en = {
   // check-ai-coverage); the web shell simply has no production consumer left.
   'web.ai.disclosure.retentionNotApplicable': 'Data does not leave this device, so there is no server-side retention.',
   'web.ai.disclosure.retentionThirdParty': 'Retention is decided by your own endpoint; heyta has no way to know.',
-  // Panel-side fallback for when an endpoint reports no retention policy. The
-  // real disclosure chain in `packages/ai` is handled separately (plan §9).
-  'web.ai.disclosure.retentionUndecided': 'Undecided - this endpoint stays disabled until heyta explains it clearly.',
+  // Managed tier (ADR-0054). 🔴 `{metadataDays}` must come from the disclosure
+  // object (`MANAGED_AI_METADATA_RETENTION_DAYS` in `packages/ai`) — never a
+  // literal here, otherwise changing the constant leaves the UI promising a
+  // retention period that no longer exists.
+  // 🔴 This sentence names BOTH carriers (the counter row *and* the per-call
+  // operational log). Dropping one is not conservatism - it under-states data
+  // that really exists, and nothing but the `check:ai-coverage` arm would notice.
+  // ⚠️ The day count belongs to the counter row only. The log's bound is
+  // *volume*, not time, so it must never be given a number (that would promise
+  // a scheduled deletion that does not exist).
+  // ⚠️ One physical line: `check:ui-language` parses this table line by line, and
+  // a key/value split across two lines is silently dropped as unparsed.
+  'web.ai.disclosure.retentionMetadataOnly': 'Your content is not retained - it exists only in the memory of a single call. heyta keeps two kinds of metadata, neither containing your content: a usage counter row (account, billing period, number of requests, last used), held for {metadataDays} days after the last request and deleted once that billing period has closed; and one operational log line per call (time, feature, outcome, byte counts, duration), which is bounded by log volume rather than by a timer.',
   'web.ai.health.ok': 'OK',
   'web.ai.health.failing': 'Recent failures: {failures}',
   'web.ai.health.circuitOpen': 'Temporarily stopped (recent failures: {failures}; retrying in {retryInSeconds}s)',
@@ -1720,8 +1730,12 @@ export const en = {
   'web.ai.settings.remote.tail': ', and it is a different channel from task sync. Each feature needs separate consent.',
   'web.ai.settings.endpoints.title': 'Endpoints',
   // The leading `heyta` comes from `common.brand`, so this starts at the verb.
-  'web.ai.settings.managed.offer': 'will soon offer',
-  'web.ai.settings.managed.rest': 'a cloud AI service (still in development, not yet available). Until then you need to connect an endpoint yourself (on-device or remote). The hosted mode is different in kind: with it, your task content reaches the heyta servers ',
+  // 🔴 2026-10-05 (ADR-0054): the *reason* changed, the *conclusion* did not. The server
+  // half is done (metering, domestic allowlist, retention decision, sales ban lifted);
+  // what is missing is a switch in this build of the app. Saying "still in development"
+  // now understates work that shipped.
+  'web.ai.settings.managed.offer': 'is not on offer here yet',
+  'web.ai.settings.managed.rest': 'a cloud AI service (the server half is done - quota metering, the domestic provider allowlist, the retention decision, the sales ban lifted; see ADR-0054 - but this build of the app does not carry the switch yet, so there is nothing to turn on here). Until then you need to connect an endpoint yourself (on-device or remote). The hosted mode is different in kind: with it, your task content reaches the heyta servers ',
   'web.ai.settings.managed.strongPlain': 'in plaintext',
   'web.ai.settings.managed.mid': ', so it is ',
   'web.ai.settings.managed.strongNot': 'not',
@@ -3239,7 +3253,7 @@ export const en = {
   'site.help.q.selfhost': 'How do I run my own server?',
   'site.help.a.selfhost': 'You can, but this is "operate a service yourself": **no prebuilt image is published** (you build it), and **upgrading is not one command** — the one-shot migration service exits after it runs and compose does not restart an exited service, so after a table-structure change you re-run the command that names `supersync-migrate`. Registration and sign-in run on **email + password**; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with `REQUIRE_EMAIL_VERIFICATION=false`. See "Running your own sync server".',
   'site.help.q.privacy': 'Where does my data actually live?',
-  'site.help.a.privacy': 'On your own device first; once sync is on, the cloud holds ciphertext only — the server rejects plaintext outright. **Metadata is not encrypted**, though — sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise "we can see nothing".',
+  'site.help.a.privacy': 'On your own device first. **This answer is about the sync channel** - once sync is on, that channel holds ciphertext only in the cloud, and a sync endpoint that receives plaintext rejects it outright. ⚠️ AI is a different path and is not covered by that sentence: a language model has to read your text in order to suggest anything, so the field-by-field, feature-by-feature disclosure lives in the "AI & Data Flow" document, linked in the footer. One more thing: sync **metadata is not encrypted** - sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise "we can see nothing".',
 
   // ── Documentation centre (the article layer under /help) ────
   // Group headings deliberately reuse the five `site.help.module.*` keys above:
@@ -3298,7 +3312,7 @@ export const en = {
   'site.docs.how.s2i2': 'Mobile: a write goes out about two seconds later; returning to the foreground adds another pass; failures back off instead of hammering the server.',
   'site.docs.how.s2i3': 'Every end: **what other devices wrote arrives on its own**. The server pushes a signal when there is something new, and the side that receives it pulls.',
   'site.docs.how.s3': 'What the server actually cannot see',
-  'site.docs.how.s3p1': 'Uploaded payloads are **encrypted end to end**: encryption and decryption both happen on your devices, and the server receives — and can only ever receive — ciphertext. A client that tries to upload plaintext is rejected outright and nothing is written.',
+  'site.docs.how.s3p1': '**This section is about the sync channel**: payloads uploaded over it are encrypted end to end — encryption and decryption both happen on your devices, and the sync server receives (and can only ever receive) ciphertext. A client that tries to upload plaintext over it is rejected outright and nothing is written. 🔴 That sentence does **not** cover the AI path: a model has to read plaintext to be useful, so what goes there is the original text you authorised feature by feature — the field-by-field table is in the "AI & Data Flow" document, linked in the footer.',
   'site.docs.how.s3p2': 'But the **surrounding metadata is not encrypted**: sync times, which devices you use, which kinds of things were touched and in what order are all visible to it. What is protected is the content itself — task titles, notes — not "which heyta features you use". We do not advertise "we can see nothing".',
 
   // Accounts, tokens, and how you sign in
@@ -3709,6 +3723,7 @@ export const en = {
   'common.entity.FOCUS_SESSION': 'Focus session',
   'common.entity.AI_FEEDBACK': 'AI usage record',
   'common.entity.PREFERENCE_CORRECTION': 'Preference correction',
+  'common.entity.ASSISTANT_TURN': 'Assistant message',
   'common.entity.GLOBAL_CONFIG': 'Global settings',
   'common.entity.MIGRATION': 'Data migration',
   'common.entity.RECOVERY': 'Disaster recovery',
@@ -4021,9 +4036,9 @@ export const en = {
   "site.legal.minors.seo.title": "Protection of Minors — heyta",
   "site.legal.minors.seo.description": "How an adult-oriented productivity app handles minors: we do not verify age and rely on declarations; the dedicated processing rules for children under fourteen, article-by-article applicability under the Minors Protection Regulations, and the channels open to guardians.",
   "site.legal.subscription-refund.title": "Subscription, Billing and Refund Rules",
-  "site.legal.subscription-refund.lede": "How two **independent** paid services — hosted sync and cloud AI — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.",
+  "site.legal.subscription-refund.lede": "How two paid services with **their own separate terms** — hosted sync and cloud AI, where the tier that grants cloud AI today also includes hosted sync — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.",
   "site.legal.subscription-refund.seo.title": "Subscription, Billing and Refund Rules — heyta",
-  "site.legal.subscription-refund.seo.description": "How two independent paid services — hosted sync and cloud AI — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.",
+  "site.legal.subscription-refund.seo.description": "How two paid services with their own separate terms — hosted sync and cloud AI, where the tier that grants cloud AI today also includes hosted sync — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.",
   "site.legal.data-rights.title": "Exercising Your Rights: Requests and Responses",
   "site.legal.data-rights.lede": "Access, copy, correction, deletion, account closure and withdrawal of consent — what is self-service in heyta, what is email-only, the 15-working-day response window, and what \"deletion\" actually means in this architecture.",
   "site.legal.data-rights.seo.title": "Exercising Your Rights: Requests and Responses — heyta",
@@ -4104,4 +4119,29 @@ export const en = {
   'mobile.countdown.export.rasterize': 'The system could not draw the card into an image. Nothing was lost and nothing left this device.',
   'mobile.countdown.export.write': 'The image was rendered, but it could not be written to storage on this device.',
   'mobile.countdown.export.share': 'The share sheet rejected this image.',
+
+  // ── AI assistant (one mobile screen shared by all five features) ──────
+  'mobile.ai.entry': 'AI assistant',
+  'mobile.ai.entry.hint': 'Break tasks down, prioritise, estimate, capture a line, ask your own data',
+  'mobile.ai.title': 'AI assistant',
+  'mobile.ai.back': 'Back',
+  'mobile.ai.section.mode': 'What to do',
+  'mobile.ai.hostFailed.title': 'Could not read the data on this device',
+  'mobile.ai.hostFailed.hint': 'Nothing was sent anywhere. Go back and open this again; if it still fails, restart heyta.',
+  'mobile.ai.notConfigured.title': 'AI is not set up yet',
+  'mobile.ai.notConfigured': 'Turn it on and add an endpoint of your own under Settings → AI — until then there is no working path here.',
+  'mobile.ai.goSettings': 'Pick an endpoint for this feature under Settings → AI.',
+  'mobile.ai.proposalNeverAuto': 'AI only suggests: nothing is written until you confirm it.',
+  'mobile.ai.task.label': 'Pick a task',
+  'mobile.ai.task.none': 'No tasks on this device yet.',
+  'mobile.ai.task.more': '{count} more not shown.',
+  'mobile.ai.input.capture': 'The line to capture',
+  'mobile.ai.input.capture.placeholder': 'e.g. Dentist at 3pm tomorrow, buy cat food on the way back',
+  'mobile.ai.input.limit': 'Up to {max} characters per line.',
+  'mobile.ai.input.tool': 'What should it do',
+  'mobile.ai.tools.grantsHint': 'Up to {max} characters per call, and only the tools you ticked can be used.',
+  'mobile.ai.prioritize.scope': 'Ranking only compares your own tasks — nobody else, no leaderboard.',
+  'mobile.ai.keyNotice': 'The key stays on this device: never backed up, never synced, cleared when you log out.',
+  'mobile.ai.saveFailed': 'This device could not store the change (local storage refused the write).',
+  'mobile.ai.tier.defaultNote': 'A new endpoint starts at “{tier}”; you can change it any time.',
 } satisfies Record<MessageKey, string>;
