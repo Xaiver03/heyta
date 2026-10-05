@@ -5720,3 +5720,41 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 `heyta-wt-*` 九枚、`.worktrees/detail-pane` 等）。删除需要**证明某个载体是本会话创建的**，
 而这份上下文里没有那份 pid/path 登记 —— 按"只对自己创建的对象动手"，我不按名字清。
 真要清，先用上面那条 `git cherry` 计数确认内容已在 main，再逐枚 `git worktree remove`（不 `prune --force` 一把梭）。
+
+## B89（2026-10-06 00:2x，合流会话续）：三条红逐条解到哪儿了，以及"我这一推把别人的三笔一起公开了"
+
+产品负责人追加一句"**这些红色全部由你解决**"，于是 B87/B88 那三条登记不代改的红，本轮全部由我动手。
+**解到 2/3 闭合，第三条只剩一次提交**，逐条如下（每条都带现量读数，别读成"都好了"）：
+
+| 红 | 本轮做到哪 | 读数 / 复跑 |
+|---|---|---|
+| `check:materialized-reads` | ✅ **已闭合**（上一笔 `bde3cb15`）：规则三随 `93a1c378` 那一代退役，规则二留下并在**载体那一代**上重验有牙 | `node scripts/check-materialized-reads.mjs` ⇒ **RC=0**，✅ 行打印"30 个屏…2 个渲染共享日历板的宿主都读了并喂进了倒数日" |
+| `check:selection-single-source` 两格 | ✅ **已闭合**（`d05b12e0`）。两条形状不同所以修法不同：AdminPanel 那格**只登记**（类别按那处代码自己的注释 = `confirm-gate`）；AssistantScreen 那格承认它是**第五档 `form-draft`**（表单草稿），改名 `targetTaskId` + 登记 + 新判据钉住"AI 面板不许接共享选中态"。🔴 **不接进 `'task'` 槽的理由是现量的**：`TasksScreen.tsx` 把 `detailTaskId = useSelected('task')` 直接喂 `visible={detailTaskId !== null}` 的详情 Modal ⇒ 在 AI 面板里点任务会把详情弹出来 | 门禁 **RC=0**，✅ G 打印"20 处全部有语义登记（5 类：in-flight 8 / inline-rename 4 / confirm-gate 5 / dragging 1 / form-draft 1），过期豁免 0 条"；新判据五臂 **5/5 具名命中**（对照基线 spec=0/gate=0，每臂按 sha256 写回复验）；既有台架回归 `mutate-selection-f` **15/15**、`-h` **7/7**、`-i` **19/19**、`-g` **7/7**，四台 `FINAL_SAME=true`；`pnpm --filter @heyta/mobile test` **54 文件 / 772 passed**（原 766 + 新增 6） |
+| `check:md-tables` 那一字符 | 🟡 **工作树已绿、HEAD 还差一次提交**：`docs/plans/trash-and-archive.md:744` 第 5 格那枚落单反引号我在树里删掉了（`node scripts/check-md-table-rows.mjs` ⇒ **RC=0**），但同一枚文件正被回收线改着（`git status` = ` M`，末尾已追加 146 行），带 pathspec 提交会把他们整片带走 ⇒ **不动**。<br>🔴 `git show HEAD:…:744 \| grep -c '仍待闸门\`'` 现量 **1** ⇒ **干净检出上这一道仍会红**，直到他们那笔落下（我那枚字符已在工作树里，他们 `git add` 时会自动带上） | 空窗复跑：`git diff --cached --name-only \| wc -l` 回 0 且 `git status --porcelain -- docs/plans/trash-and-archive.md` 回空 ⇒ 我再补那一笔；此刻两条都不成立（回收线索引里躺着 `A docs/adr/0055-account-tombstones-and-restore-gate.md`） |
+
+**顺手修掉两条与我无关的既有失效**（都在 `origin/main` 上就坏了）：
+① `mutate-selection-g.mjs` 的 **G5 阴性对照从 §8.133 起一直 `MUTATE-NO-OP`** —— 锚点写在 `HabitsView.tsx`，
+而那两处 `busyId`/`renamingId` 当年随面单搬进 `HabitDetailCard.tsx`（登记表那一行的注释自己记着这次搬家）。
+现量 `git show a40d304a:apps/web/src/features/habits/HabitsView.tsx | grep -c 'const \[busyId'` = **0**
+⇒ "复数不在射程"这条阴性对照**从来没有真跑过**，整台子一直 exit 1。按落点改锚，判据一字未动 ⇒ 现在 **7/7**。
+② `mutate-selection-i.mjs` 的 I11 顺带断言"历史那版喂当前树必须绿"—— 那不是本臂要证的事
+（等于假设其余每一档永远对未来代码绿）；第五档一登记，旧版必然红在 G。判据改成它真正证的：
+**那一版不打印、也不 fired 断言 I；若红，红的必须是别的档**。
+
+📌 可迁移的一条：**"这条判据现在绿"和"这条判据的阴性对照现在跑"是两件事**。
+G5 挂了 20 多天没人发现，正是因为红的是**别的臂**，而那台子整体 exit 1 又被读成"在等窗口"。
+
+**日历线那三把取证台第一次进 `pnpm check`（`4fa7a05a`），我在合流树上逐把跑过**：
+`calendar-line-commit-only-arms.sh` **`== 合计 pass=36 fail=0 ==`**、
+`r17-reshoot-arms.sh` **`pass=16 fail=0`**、`r17-reshoot-stale.sh --selftest` **RC=0**。
+⇒ `check:calendar-evidence-rigs` 这道新常驻门禁**在合流产物上是绿的**，不必再等窗口。
+
+🔴 **一条要公开的代价（不是我的选择，是共享检出的必然）**：`HEAD:main` 里除了我这两笔，
+还夹着日历线在我推送前落的三笔（`4fa7a05a` 门禁接线、`a953d09a` traps #320、`7a2fde72` W6 台账 ④）。
+我按用户"全部 push"的指令推上去 ⇒ **那三笔现在已在 `origin/main`，不能再 `commit --amend` / rebase**
+（一改就要 force push，而"不改写已公开历史"是硬边界）；要修就新写一笔。
+推送后现量：`origin/main` = **`7a2fde72`**，`ahead/behind` = **0/0**。
+
+⚠️ **本轮没做**（别把上面那三行绿读成整链绿）：`pnpm -r typecheck` 此刻 **RC=2**，
+报错**全部**在回收线在飞未提交的 `apps/node-host/src/host.ts`（5 条 TS2322，非 node-host 报错现量 **0**）；
+`pnpm -r test` 全量、`check:ai-e2e` 一族、`pnpm reinstall:all` 四端当前产物 —— **都还没跑**。
