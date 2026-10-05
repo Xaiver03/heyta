@@ -269,8 +269,30 @@ export async function stubLegalRecheck(page: Page, origin: string = STUB_ORIGIN)
   });
 }
 
-/** 与本测试主题无关的公开调休日历：只响应合法空年度，未知请求仍由各夹具判红。 */
-export async function stubEmptyHolidayAdjustments(page: Page, origin: string = STUB_ORIGIN): Promise<void> {
+/**
+ * 给"公共事实"那条通道一个**中性**的应答（`GET /api/holiday-adjustments`）。
+ *
+ * 🔴 与 {@link stubLegalRecheck} 完全同形，且是**同一个成因**：应用一启动就会拉一次
+ * 公共事实（`apps/web/src/main.tsx:152 startPublicFacts()`，W4b 客户端那半），
+ * 而假服务端只实现 `/v1/chat/completions`，其余一律 404 ⇒ 那声 404 落进每条用例都挂的
+ * 「除已登记缺失外不该有非 2xx」，把真正的失败淹掉。
+ * 2026-10-04 03:0x 实测：`admin-console.spec.ts` **一次红五条**，五条的报错原文
+ * 逐字相同（`["/api/holiday-adjustments"]`），而其中四条与该套件的主题毫无关系。
+ *
+ * ⚠️ "中性"是有定义的：`years: []` 表示**部署方没下发任何一年**，
+ * 按 `holidayAdjustmentYearSchema` 的粒度（一整年逐日表**整体替换**，见契约 `:266` 那张表），
+ * 空数组 = 一年都不替换 ⇒ 随包节假日表照旧，日历上不该有任何肉眼可见的变化。
+ * `version` 那个串不是随手编的：`server/src/holidays/holiday-adjustment-store.ts:113`
+ * `holidayVersionToken()` 对空数据算出来就是 `0.0.0`（`maxUpdatedAt.yearCount.dayCount`）。
+ *
+ * ⚠️ 它**只答读侧、且刻意答"没有数据"**。要验"下发了数据日历会变"的是
+ * `public-facts.spec.ts`，它自己装了带具体数据与 404 的路由（后注册的会遮蔽这里）。
+ *
+ * 🔴 "只答读侧"是**代码层的**，不是注释里的：非 GET 一律 `fallback()` 交回夹具的
+ * catch-all，让"某个套件不该发的写请求"仍然按未登记计入红集 —— 把写侧也一并 fulfill
+ * 掉，就等于用一条中性夹具替产品开了后门。
+ */
+export async function stubPublicFacts(page: Page, origin: string = STUB_ORIGIN): Promise<void> {
   await page.route(`${origin}/api/holiday-adjustments**`, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
     await route.fulfill({

@@ -16,6 +16,13 @@
 #   只签名不公证，别人下载后仍会看到"来自身份不明的开发者"。
 #   本脚本**两个都做**，且**分别报告**成功与否 —— 不许把"签了名"说成"能分发"。
 #
+# `HEYTA_SKIP_NOTARIZE=1` 只跳过第 ⑥ 步（默认不跳，行为逐字不变）。
+#   它**不会**把红变成绿：第 ⑥ 步从不在判据里 —— `if xcrun notarytool … | tail -8 | awk`
+#   判的是 `awk` 的退出码（AGENTS §7 第 179 条那个形状），失败分支只打印一句红就继续走完。
+#   它去掉的是**没有上界的等待**：`--wait` 没有超时，2026-10-04 实测同一档被卡住 11h25m
+#   （pid 98934，父链是另一条会话的 `reinstall-all`），而验证载体的排队被这一格占死。
+#   ⇒ 跳过之后这一趟**不许**主张"包已通过公证"；那句只有不带这个变量的一趟能说。
+#
 # ── 为什么需要 entitlements ─────────────────────────────────────────────
 #
 # hardened runtime（公证的硬性前提）默认禁止 JIT 与可写可执行内存，
@@ -269,7 +276,10 @@ done
 KEY_ID="T2H876K8MJ"
 ISSUER="627afa93-122d-4739-a780-0ad593aee505"
 
-if [ "$SIGN_KIND" != "developer-id" ]; then
+if [ "${HEYTA_SKIP_NOTARIZE:-}" = "1" ]; then
+  echo "  ⏭ 显式跳过（HEYTA_SKIP_NOTARIZE=1）。这一趟的判据是「装出来的包里有这一屏」（第 ④ 步已经量过），"
+  echo "     公证不是它的组成部分 ⇒ 本趟**不主张**「这个包已通过公证」，那句要等不带这个变量的一趟。"
+elif [ "$SIGN_KIND" != "developer-id" ]; then
   echo "  ⏭ 跳过：不是 Developer ID 签名，公证必然被拒"
 elif [ -z "$KEY_FILE" ]; then
   echo "  ⏭ 跳过：找不到 ASC API key（试过 ~/Library/Private/AppStoreConnect、~/Desktop、~/.appstoreconnect/private_keys）"
