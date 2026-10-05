@@ -248,6 +248,17 @@ if (looksSmeared(cs)) console.error('  ⚠️ 启发式提示疑似渲染坏了 
 const blue = countBrandBlue(brandShot);
 console.log(`  主蓝采样命中 ${blue}（数的是 ${brandShot.split('/').pop()}）`);
 if (blue < 20) { console.error('  🔴 截图里没有 heyta 主蓝 —— 这是错误屏/别的界面，不是共享 UI'); bad = true; }
+// 🔴 2026-10-05：同一枚洞在这条腿上的第二份（第一份修在 `scripts/reinstall-all.sh` 的 `shot_ok`，
+//    两处判据必须一起走，否则"打包自验"与"装机复验"会给出相反的答案）。
+//    首屏**品牌帧**那块底板本身就是主蓝 `#2563EB`，实测命中 **2000**（真界面 1127）——
+//    "主蓝 ≥ 20"不但拦不住它，还给它打更高分数；它此前只靠 `looksBlank` 的 0.01 擦边压住
+//    （品牌帧实测 contentRatio **0.00943**，余量 5.7%，而画幅/DPR/MARK_SIZE/采样步长任一变动即翻）。
+//    ⇒ 下界 **0.05** = 最低真图实测 0.1034 的一半（对品牌帧 5.3 倍、对最低真图 2 倍）。
+if (cs.contentRatio < 0.05) {
+  console.error(`  🔴 内容占比 ${(cs.contentRatio * 100).toFixed(1)}% < 5% —— 主蓝再多也不算数：` +
+    `**首屏品牌帧**就是一块主蓝底板压在近白底上（实测命中 2000、占比 0.9%），那是遮罩还没从 DOM 摘掉的一帧`);
+  bad = true;
+}
 if (bad) process.exit(1);
 console.log('  ✅ 打包后的 .app 能起来、界面有真实内容（且确实是共享 UI）');
 JS

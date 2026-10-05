@@ -1790,3 +1790,10 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   而主检出的 `package.json` 这一小时里确实被别人改过链那一行（加 `check:ios-ax-shim`）。
   ⇒ 两个候选落点交给下一个数分母的人定：**并进链**（改 `check` 那一行），或
   **挂在已有的 `screenshot:verify` 定义里**（只改那一枚脚本的定义行，不动分母）。
+  📌 **同一枚洞的落点是现量数出来的，不是猜的**：全仓把主蓝当**阈值**用的只有两枚
+  （`grep -n 'countBrandBlue('` 去掉定义/测试/打印语句 ⇒ `scripts/reinstall-all.sh:140` 与
+  `apps/desktop-macos/scripts/package-app.sh:248`），两处都补了同一条 0.05 下界并各自 A/B 过：
+  前者五臂（品牌帧红 / mac·android·ios·最空真图绿），后者**四臂**（品牌帧两种传法都红、
+  真装机与最空真图绿，读数 0.9% / 71.4% / 10.3%）。`verify-mobile-notes.sh:711` 那处印主蓝但
+  明写"不当阈值用"，不动。⚠️ 后者的判据代码是 `package-app.sh` 里的一段 heredoc，
+  验法是把**那段真实代码**从文件里抽出来跑（不是照抄一遍），跑前把相对 import 改成绝对路径。
