@@ -11654,9 +11654,27 @@ docker run -d --name heyta-g68-nocert --network none \
 ⇒ 登记 **G-70**，关闭判据写成一条能跑的动作（**落在 §8.201 那枚装置里加一条臂，不另建装置**）：
 ① 经 caddy 用真 JWT 完成一次 WS 升级（断言拿到 `101` 且**这一腿只有经过 caddy 才会是 101** ——
 控制腿：不带 upgrade 头同 URL 必须不是 101）；② 设备 A 经代理写一条任务，设备 B 只挂着这条 WS、
-**不轮询不点同步**，在 N 秒内收到该 op（N 由 `realtime.ts` 里那个既有常量推导，不写死）；
+**不轮询不点同步**收到该 op，且**从建连到收到这一条不许发生重连**（重连计数为 0）——
+这一条比"多少秒内"硬：它排掉了"其实是退避重连把那一条带回来的"。
+阈值不许写死，只能从 `packages/sync-client/src/realtime.ts:220-222` 现量导出
+（`DEFAULT_INITIAL_BACKOFF_MS = 1_000` / `DEFAULT_MAX_BACKOFF_MS = 30_000` / `factor = 2`）；
+close 码那三个常量（`4001/4003/4009`）是同一条路径上的既有词表，臂要认它们而不是认字符串。
 ③ 变异臂一条：把 Caddyfile 的 `reverse_proxy` 换成 `handle_path /` 之类的错误形状 ⇒ ② 必须转红
 （证 ② 真压在代理那一条上）；④ 顺手取 `docker logs` 里那条 `?REDACTED` **出现在这腿的 upgrade 请求上**
 （现在只证过 HTTP GET 腿）。
 边界：这一跑仍**不覆盖**签证书（§8.202）与真实域名下的 TLS 终结。
 ⚠️ 它需要窗口（要起栈），排在落地之后；现在登记是为了**别让这条边界只活在那张表里**。
+
+### 8.204 判据的锚点必须带**现量路径**：我在 §8.203 里写的那个文件路径是脑补的（2026-10-05 13:1x）
+
+上一节最初把阈值锚在「`realtime.ts` 里那个既有常量」—— 因为 `AGENTS.md` 的 P2 那一行写着
+"实时同步在 web 的接线（`realtime.ts` 450 行 + 自带测试齐全）"，我按惯性把它当成 `apps/web/src/realtime.ts`。
+现量：那个路径**不存在**（`ls apps/web/src/realtime.ts` → No such file）。真身在
+**`packages/sync-client/src/realtime.ts`**（469 行，与 AGENTS 那句"450 行"对得上，但**不 web**），
+web 侧只有 `apps/web/tests/realtime-wiring.spec.ts` 那枚接线测试；`apps/mobile/src/sync/realtime.ts` 是另一份宿主侧。
+⇒ 已把 §8.203 的 ② 改写成"重连计数为 0 + 阈值从 `packages/sync-client/src/realtime.ts:220-222` 现量导出"。
+
+📌 这条值得单独留着：**"文档里提到过某个文件名"不等于"它在某个路径下"**。
+把判据锚在一个不带路径的名字上，下一个执行者要么在错的文件里找不到常量、
+要么随手挑一个数字当阈值 —— 两种都把这条判据变成装饰。锚点写法只有两种合格的：
+**带行号的现量路径**，或**从被约束的常量导出的表达式**（§7 元规则 2）。
