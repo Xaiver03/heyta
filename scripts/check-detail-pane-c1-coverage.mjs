@@ -221,6 +221,31 @@ const perLedger = Object.entries(
   }, {}),
 );
 
+// 腿 7：Markdown 的表格行**必须是一个物理行**。
+// 为什么 C1 表要单独有一条：上面那些腿是用正则从 `| N |` 起手的行里**取前几格**的，
+// 一行被写成两个物理行时，第一行照样匹配、照样被计数，于是"这一行有对照节/有推荐"全部成立，
+// 而它在渲染里根本不是表格 —— 状态等于没人记。§8.135 在工单表上实测过一次（那枚红活了
+// 12 趟门禁没人看见），2026-10-05 本线在 C1 表的 #14 行上**又**踩了一次，所以这一档从
+// "靠人眼"改成"有腿"。形状判据：起头是竖线而不以竖线收尾，或不以竖线起头却以竖线收尾
+// （后者是断行的尾巴），两种都算断。围栏代码块跳过；引用块里的表格行（`> | …`）先剥前缀再判。
+const brokenRows = [];
+{
+  let fence = false;
+  for (let i = 0; i < lines.length; i += 1) {
+    const raw = lines[i];
+    if (/^```/.test(raw.trim())) {
+      fence = !fence;
+      continue;
+    }
+    if (fence) continue;
+    const t = raw.replace(/^>\s?/, '').trimEnd();
+    if (!t.includes('|')) continue;
+    const starts = t.startsWith('|');
+    const ends = t.endsWith('|');
+    if (starts !== ends) brokenRows.push({ line: i + 1, kind: starts ? '起而不收' : '收而不起', text: t.slice(0, 64) });
+  }
+}
+
 console.log(`取样：${doc.startsWith(root + '/') ? doc.slice(root.length + 1) : doc}（C1 表 ${lines.slice(start, end).length} 行区间）`);
 console.log(
   `C1 行 ${rows.length} 行 ⇒ 有对照节 ${rows.length - uncov.length} / 例外 ${excused.length} / 未覆盖 ${unexcused.length}；C1b 节 ${sections.length} 个（有推荐 ${sections.filter(hasRec).length} / 标题写明不需要拍 ${excusedSections.length} / 缺推荐 ${noRec.length}）（有外部锚 ${sections.filter(hasExternal).length} / 缺外部锚 ${noExt.length} / 标题豁免 ${excusedExt.length}）`,
@@ -269,8 +294,11 @@ dump(
   (it) => `  :${it.line} ${it.head === '^## B6[.．]' ? 'B6' : 'C2'} #${it.n} ${it.body[0].replace(/^\d+\.\s*/, '').slice(0, 58)}…`,
 );
 
+dump('🔴 这一行不是完整的表格行（Markdown 里表格行必须是一个物理行 ⇒ 它在渲染中不是表格，状态等于没人记）', brokenRows, (r) => `  :${r.line} ${r.kind} —— ${r.text}…`);
+
 // 逐节读数（含覆盖到的行号），让覆盖面可数而不是一个总数
 console.log(`\n承重(腿6)：${perLedger.map(([h, n]) => `${h === '^## B6[.．]' ? 'B6' : 'C2'} ${n} 条`).join('｜')}｜已结案档 ${closedLedger.length}｜缺 ${openLedger.length}（三档词表：补法/不可补/结案取证；划线不结案）`);
+console.log(`承重(腿7)：非围栏区里以竖线起头或收尾的行 ${lines.filter((l) => { const t = l.replace(/^>\s?/, '').trim(); return t.startsWith('|') || t.endsWith('|'); }).length} 行参与形状判 ⇒ 断成多个物理行的 ${brokenRows.length} 处（一条表格行 = 一个物理行；否则它在渲染里根本不是表格，那一格的状态等于没人记）`);
 console.log('\n逐节读数：');
 for (const s of sections) {
   const urls = (s.body.match(/https?:\/\/\S+/g) || []).length;
@@ -284,12 +312,12 @@ for (const s of sections) {
   );
 }
 
-const bad = unexcused.length + orphanSections.length + weak.length + noRec.length + noExt.length + openLedger.length;
+const bad = unexcused.length + orphanSections.length + weak.length + noRec.length + noExt.length + openLedger.length + brokenRows.length;
 console.log(
   `\n结论：${
     bad === 0
-      ? 'C1 每一行要么有对照节、要么写明例外类别；每个对照节都有日期、出处、**外部锚**（URL 或第三方源码行号）与推荐那一档（或标题写明不需要拍）；未核实台账逐条带「补法 / 不可补 / 结案取证」✅'
-      : `🔴 ${bad} 处不成立`
+      ? 'C1 每一行要么有对照节、要么写明例外类别；每个对照节都有日期、出处、**外部锚**（URL 或第三方源码行号）与推荐那一档（或标题写明不需要拍）；未核实台账逐条带「补法 / 不可补 / 结案取证」；正文里每条表格行都是一个完整的物理行 ✅'
+      : `🔴 ${bad} 处不成立（含腿 7 的断行 ${brokenRows.length} 处）`
   }`,
 );
 process.exit(bad === 0 ? 0 : 1);
