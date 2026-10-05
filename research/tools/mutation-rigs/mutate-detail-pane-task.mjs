@@ -59,6 +59,14 @@
  *   M5 展开机关跟着本体搬进栏里          → jsdom 1 红 + e2e T10 红（同 S4：`<details>` 收起时
  *       里面**不画**，`toBeVisible()` 挡不住）
  *
+ * ── §8.146（第五个字段：截止）五臂 ─────────────────────────────────
+ *   D1 宽档行尾还挂 `<DueEditor/>`（两处可编辑）→ jsdom 1 红（源码形状）+ e2e T12 红
+ *   D2 栏里那一支少挂 key                → jsdom 1 红 + e2e T12 红（这一格带本地 state）
+ *   D3 展开机关跟着本体搬进栏里           → jsdom 1 红 + e2e T12 红（同 S4/M5）
+ *   D4 玻璃浮层跟着本体搬进栏里           → jsdom 1 红 + e2e **T10** 红（见臂内：pane 级判据
+ *       在 e2e 层只有一个消费者，塞哪一格都红那一格）
+ *   D5 栏里那一格没有区块头               → jsdom 1 红 + e2e T12 红（宿主给的标题，与提醒相反）
+ *
  * ⚠️ 载体是 `vite preview` + `apps/web/dist`（`e2e/playwright.detail-pane.config.ts`，端口 4371），
  *    所以**每一臂都必须重打 `apps/web`**（§7 第 27 条那一族：改了源码没重建 ⇒ 被测的那一份
  *    里根本没有变异 ⇒ 判据会被读成"没有牙"）。jsdom 那层由 vitest 直接读源码，不需要构建。
@@ -365,6 +373,95 @@ const ARMS = [
     /* 同 S4：`<details>` 收起时里面**不画**，T10 那句 `toBeVisible()` 直接红。 */
     expectE: ['T10'],
   },
+
+  /* ── §8.146（第五个字段：截止）五臂 ────────────────────────────────
+     这一格与前四格**不同形**（宽档行尾不留徽标），所以臂的形状也不同：
+     D1 打的不是"徽标 vs 编辑器"，而是"宿主那一支到底读不读同一枚布尔"。   */
+  {
+    name: 'D1 宽档行尾还挂着 `<DueEditor/>`（截止长出第二个编辑器）',
+    file: APP,
+    from: `          {taskPaneInColumn ? null : (
+            <DueEditor`,
+    to: `          {(taskPaneInColumn && false) ? null : (
+            <DueEditor`,
+    expectJs: ['截止两处可编辑'],
+    /* 两条都撞 T12：整页那份 `date-picker` 数到 2，而行尾那颗 `due-editor-summary` 又在。 */
+    expectE: ['T12'],
+  },
+  {
+    name: 'D2 栏里那一支少挂 key（上一条**浏览到的那个月**跟着人走）',
+    file: CARD,
+    from: `      <DueField
+        key={\`due-\${task.id}\`}
+        task={task}`,
+    to: `      <DueField
+        task={task}`,
+    expectJs: ['栏里还停在上一条浏览到的那个月'],
+    /* 🔴 与 A2（备注那一格的同一档）不同：A2 头一趟**存活**过，因为探针自己 `mount()` 了
+       一次新 root 把坏抹掉了。这一臂两层的靶子都是"同一枚 root 里换选中"，
+       jsdom 那三条与 T12 最后那一段都照这个形状写。 */
+    expectE: ['T12'],
+  },
+  {
+    name: 'D3 行尾的展开机关跟着编辑本体搬进栏里（栏里那一格自己收起来了）',
+    file: CARD,
+    from: `      <DueField
+        key={\`due-\${task.id}\`}
+        task={task}
+        now={store.now}
+        onSetDueDate={(due) => {
+          void store.setDueDate(task.id, due);
+        }}
+      />`,
+    to: `      <details>
+        <DueField
+          key={\`due-\${task.id}\`}
+          task={task}
+          now={store.now}
+          onSetDueDate={(due) => {
+            void store.setDueDate(task.id, due);
+          }}
+        />
+      </details>`,
+    expectJs: ['不许有行尾的两层外壳'],
+    expectE: ['T12'],
+  },
+  {
+    name: 'D4 玻璃浮层跟着编辑本体搬进栏里（栏里漂着一块板子）',
+    file: CARD,
+    from: `      <DueField
+        key={\`due-\${task.id}\`}
+        task={task}
+        now={store.now}
+        onSetDueDate={(due) => {
+          void store.setDueDate(task.id, due);
+        }}
+      />`,
+    to: `      <div className="ht-compose-panel ht-material">
+        <DueField
+          key={\`due-\${task.id}\`}
+          task={task}
+          now={store.now}
+          onSetDueDate={(due) => {
+            void store.setDueDate(task.id, due);
+          }}
+        />
+      </div>`,
+    expectJs: ['不许有行尾的两层外壳'],
+    /* ⚠️ 红集里出现 T10 不是笔误：pane 级那条"栏里不许有 `.ht-material`"在 e2e 层的**唯一
+       消费者就是 T10**（一条不变量一个所有者），所以往**任何一格**里塞这块壳都红 T10。
+       这一臂顺手把那条纪律的射程量出来了：它是**整栏**的，不是提醒那一格的。 */
+    expectE: ['T10'],
+  },
+  {
+    name: 'D5 栏里那一格没有区块头（共享 DatePicker 不自带，宿主漏给）',
+    file: CARD,
+    from: `      <h3 style={blockLabelStyle}>{t('web.due.trigger')}</h3>
+      <DueField`,
+    to: `      <DueField`,
+    expectJs: ['「截止」区块头在栏里不是恰好一处'],
+    expectE: ['T12'],
+  },
 ];
 
 const FILES = [CARD, NOTE, APP, CURSOR, CSS, REPEAT, SUBTASK, REMINDER];
@@ -508,14 +605,14 @@ const b = build();
 if (b.rc !== 0) fail(`干净态打不出包：\n${b.out.slice(-1500)}`);
 const cleanDigest = distDigest();
 const bj = jsdom();
-if (bj.rc !== 0 || bj.passed < 59) fail(`干净态 jsdom 层不干净（要 >=59 passed）：${bj.line}`);
+if (bj.rc !== 0 || bj.passed < 63) fail(`干净态 jsdom 层不干净（要 >=63 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 11 || be.failed > 0) {
+if (be.rc !== 0 || be.passed < 13 || be.failed > 0) {
   fail(
-    `干净态 e2e 层不干净（要 >=11 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
+    `干净态 e2e 层不干净（要 >=13 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
   );
 }
-console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T11）｜dist=${cleanDigest}`);
+console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T13）｜dist=${cleanDigest}`);
 
 /* 只跑点名的臂：`node … A3 B1`。存在的理由是**改完一条主张之后不必把八臂全部重跑** ——
    否则"改臂"这个动作的成本会把人推回去改判据（那才是真正要避免的）。

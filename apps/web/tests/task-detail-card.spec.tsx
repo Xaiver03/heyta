@@ -23,7 +23,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { dueDateToEpoch, toLocalDate } from '@heyta/domain';
 import { I18nProvider, zhCN } from '@heyta/i18n';
+import { HeytaUiProvider } from '@heyta/ui';
 
 import { __resetOpLogForTests, initOpLog, useTaskStore } from '../src/features/tasks/store.js';
 import { useReminderStore } from '../src/features/reminders/store.js';
@@ -51,8 +53,15 @@ function mount(): void {
   root = createRoot(container);
   act(() => {
     root?.render(
+      // 🔴 `HeytaUiProvider` 从 §8.146 起是**必需**的，不是照着 App 抄的装饰：
+      // 栏里那一格现在画着共享 `DatePicker`，它经 `useHeytaUiTheme()` 取 token，
+      // 没有 Provider 就当场抛（"必须在 <HeytaUiProvider> 内使用"）—— 整栏渲染不出来，
+      // 于是这个文件里 14 条用例一起红。前四格（备注 / 子任务 / 重复 / 提醒）都只吃
+      // `useI18n()`，所以这层包裹今天才第一次被需要。
       <I18nProvider locale="zh-CN">
-        <TaskDetailCard />
+        <HeytaUiProvider>
+          <TaskDetailCard />
+        </HeytaUiProvider>
       </I18nProvider>,
     );
   });
@@ -241,7 +250,7 @@ describe('宿主的落点接线（读 App.tsx 的源码形状）', () => {
   });
 });
 
-describe('栏里那一格的外壳形状（pane 级不变量，四格共用一条）', () => {
+describe('栏里那一格的外壳形状（pane 级不变量，五格共用一条）', () => {
   /**
    * 🔴 这条**从三格各自的用例里搬出来合成一条**，理由是臂台自己照出来的：
    *   §8.145 给提醒补了"栏里没有 `<details>` / 没有 `.ht-material`"两句之后，
@@ -557,5 +566,98 @@ describe('提醒这一字段此刻归谁（§8.145）', () => {
       src,
       '栏里画着的时候行尾还在挂 `<ReminderPanel/>` ⇒ 提醒两处可编辑',
     ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<ReminderBadge\s+task=\{task\}\s*\/>\s*\)\s*:\s*\(\s*<ReminderPanel/);
+  });
+});
+
+describe('截止这一字段此刻归谁（§8.146）', () => {
+  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  /** 月历里那一格的可访问名 = `{month}月{day}日`（词条 `web.due.dayLabel`）。 */
+  const dayCell = (label: string): string => `[role="button"][aria-label="${label}"]`;
+  /* 🔴 月份从 store 那个冻结的"现在"推，不写死 10 月：写死的月份在跨月那天会变成
+     一条"看起来在测、实际在空转"的判据（`due-date-edit.spec.tsx` 用的是它自己冻的时刻，
+     这一格吃的是宿主 store 的时刻，两者不是一回事）。 */
+  const thisMonthDate = () => toLocalDate(useTaskStore.getState().now);
+  const monthNum = (d: string): number => Number(d.slice(5, 7));
+  const dayLabel = (d: string): string => `${String(monthNum(d))}月18日`;
+
+  it('🔴 栏里画的是截止的编辑本体（共享月历），整页只有一份', async () => {
+    const id = await addTask('截止甲');
+    selection.select('task', id);
+    mount();
+    const pickers = document.querySelectorAll('[data-testid="date-picker"]');
+    expect(pickers.length, `整页应有且只有一份月历，实到 ${String(pickers.length)}`).toBe(1);
+    expect(pane()?.contains(pickers[0]!), '那一份月历不在栏里 ⇒ 编辑本体没搬进来').toBe(true);
+    // "是编辑器不是痕迹"的证据：快捷项与清除都在场（只读徽标长不出按钮）。
+    expect(pane()?.textContent ?? '', '栏里那一格没有快捷项 ⇒ 画的不是编辑器').toContain('今天');
+    // 这一格**要**宿主给区块头（共享 `DatePicker` 自己不带，与 `ReminderList` 相反）。
+    const dueHeads = [...(pane()?.querySelectorAll('h3') ?? [])].filter(
+      (h) => h.textContent === '截止',
+    );
+    expect(dueHeads.length, '「截止」区块头在栏里不是恰好一处').toBe(1);
+  });
+
+  it('🔴 在栏里点日子 ⇒ 真的写进物化状态（不是只改内存里那一条）', async () => {
+    const id = await addTask('截止乙');
+    selection.select('task', id);
+    mount();
+    const today = thisMonthDate();
+    const cell = pane()?.querySelector<HTMLDivElement>(dayCell(dayLabel(today)));
+    if (cell == null) throw new Error(`栏里那个月历里没有 ${dayLabel(today)} 这格 ⇒ 判据在空转`);
+    await act(async () => {
+      cell.click();
+    });
+    await flush();
+    expect(
+      useTaskStore.getState().entities.tasks[id]?.dueDate,
+      '栏里那次点击没落到 dueDate 上',
+    ).toBe(dueDateToEpoch(`${today.slice(0, 7)}-18`));
+  });
+
+  it('🔴 换选中 ⇒ 上一条**浏览到的那个月**不跟着人走（这一格的 key 那一档）', async () => {
+    const a = await addTask('截止丙');
+    const b = await addTask('截止丁');
+    selection.select('task', a);
+    mount();
+    const here = dayCell(dayLabel(thisMonthDate()));
+    expect(pane()?.querySelector(here), '初始月里应有 18 日').not.toBeNull();
+
+    const nextButton = pane()?.querySelector<HTMLDivElement>(
+      '[role="button"][aria-label="下个月"]',
+    );
+    if (nextButton == null) throw new Error('栏里没有「下个月」那枚按钮 ⇒ 判据在空转');
+    await act(async () => {
+      nextButton.click();
+    });
+    const nextMonth = (monthNum(thisMonthDate()) % 12) + 1;
+    expect(pane()?.querySelector(here), '翻月没生效：本月 18 日还在').toBeNull();
+    expect(
+      pane()?.querySelector(dayCell(`${String(nextMonth)}月18日`)),
+      '翻月没生效：下月 18 日没出现',
+    ).not.toBeNull();
+
+    // 🔴 同一枚 root 里换选中（`mount()` 会新建 root，那会把"没换 key"这份坏抹掉 ——
+    // 与 §8.138 的 A2 同一族，那条事故就记在上面那个 describe 里）。
+    act(() => {
+      selection.select('task', b);
+    });
+    expect(container?.querySelector('h2')?.textContent, '标题换了').toBe('截止丁');
+    expect(
+      pane()?.querySelector(here),
+      '换选中后栏里还停在上一条浏览到的那个月 ⇒ `DueField` 少了 key（它有本地 state）',
+    ).not.toBeNull();
+  });
+
+  it('🔴 宿主那一支读同一枚布尔，且宽档**不补徽标**（这一格与前四格不同形）', () => {
+    const src = stripComments(APP_SRC);
+    expect(
+      src,
+      '栏里画着的时候行尾还在挂 `<DueEditor/>` ⇒ 截止两处可编辑',
+    ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*null\s*:\s*\(\s*<DueEditor/);
+    /* 这一格宽档留的是 `null` 而不是徽标 —— 断言把它钉住，否则"顺手补一枚 DueBadge"
+       会把同一件事实变成行上的第二份显示（截止的显示在共享元信息条 `task-meta` 上）。 */
+    expect(
+      /taskPaneInColumn\s*\?\s*<DueBadge/.test(src),
+      '宽档行尾长出了截止徽标 ⇒ 行上把截止的显示说了两遍',
+    ).toBe(false);
   });
 });

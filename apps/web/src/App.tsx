@@ -976,14 +976,27 @@ export function App(): React.JSX.Element {
           {/* 截止。🔴 多端覆盖审计 P0-3：`setDueDate` 的语义早就完整，
               但 Web 上**没有任何调用点** —— 想给任务定"周五截止"没有直接入口
               （唯一沾边的是 AI 捕获，那是建任务时）。移动端早就能改；
-              这里补上后两端共用同一只共享 `DatePicker`。 */}
-          <DueEditor
-            task={task}
-            now={store.now}
-            onSetDueDate={(due) => {
-              void store.setDueDate(task.id, due);
-            }}
-          />
+              这里补上后两端共用同一只共享 `DatePicker`。
+
+              ⚠️ 工单 §8.146 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
+              （共享 `DatePicker`：四个快捷项 + 月历 + 清除）住在 `TaskDetailCard` 那一格。
+              🔴 这一格与前四格（备注 / 重复 / 子任务 / 提醒）**不同形**：这里**不补只读徽标**，
+              宽档整块不画。理由不是省事 —— 截止的显示一直在共享行的元信息条上
+              （`task-meta` → `TaskBadges.due`，`date` 档 `10-05` / `countdown` 档「明天」），
+              而原先那颗 `<summary>` 也在写当前值（「截止 10月5日」），也就是同一行把同一件事实
+              说了两遍。工单 §8.141 第 5 节那条硬约束（截止的**显示**必须留在行上）由 `task-meta`
+              满足，撤掉第二份显示不会让它失效；真浏览器 T12 把这条钉成判据（设了截止 ⇒
+              行上仍写着日期）。窄档（栏不出现）时 `DueEditor` 整块退回这一格，
+              所以"改不了截止"在任何一档都不会发生。 */}
+          {taskPaneInColumn ? null : (
+            <DueEditor
+              task={task}
+              now={store.now}
+              onSetDueDate={(due) => {
+                void store.setDueDate(task.id, due);
+              }}
+            />
+          )}
 
           {/* 提醒。🔴 在这一刀之前 `REMINDER` 有写路径、op 能同步，
               但 Web 上**没有任何入口能建它** —— 提醒面板补的就是这最后一米。
