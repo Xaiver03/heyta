@@ -12921,17 +12921,22 @@ abort 在这里是救场的：软链没被解引用，源树逐字节完好（�
 
 | 读数 | 值 |
 |---|---|
-| 链的段数（从 `package.json` 的 `scripts.check` 现量导出，按 `&&` 切） | **67** |
-| 死掉的那一段 | 第 **31** 段 `pnpm check:journey-coverage` |
+| 链的段数（从**载体那棵树**的 `package.json` 现量导出，按 `&&` 切） | **90**（本批检出是 67 —— 见本节末的更正）|
+| 死掉的那一段 | 第 **42** 段 `pnpm check:journey-coverage`（载体树 90 段里的 42；67 段的检出里才是 31） |
 | 它的退出码 | **3** —— 这一段自己的契约写着"退出码 3 = 本轮没有读数"，理由打印在原话里：`内存闸门拒绝启动（有别的测试在跑，锁 /tmp/tfa-test.lock）… 这是环境条件，不构成"旅程不成立"的读数；静态对账仍然成立` |
-| 第 1–30 段 | **全 exit 0**，且整趟里 `✘` / `failed,` 命中 **0 次** |
-| 上一趟（`bea0741d`，同一把尺） | 走到第 **67** 段才停，1–66 全绿（含 `check:ai-e2e`、含 op-log 语义变异那段） |
+| 第 1–41 段 | **全 exit 0**，且整趟里 `✘` / `failed,` 命中 **0 次** |
+| 上一趟（`bea0741d`，同一棵树的 90 段） | 走到第 **75** 段才停，1–74 全绿（含 op-log 语义变异那段与第 74 段 `check:ai-e2e`） |
 
-🔴 **所以"全链绿"目前是分裂在两棵树上的**：v3 覆盖 1–30，`bea0741d` 覆盖 1–66。两棵树的差集只有
+🔴 **所以"全链绿"目前是分裂在两棵树上的**：v3 覆盖 1–41，`bea0741d` 覆盖 1–74（同一枚 90 段的尺；两棵树共用同一份合并后的 `package.json`）。两棵树的差集只有
 本批的账（`docs/research/*.md`）与 `research/tools/*`，但那两样分别被第 31 段之后的 `check:docs`
 与几枚 `check:*` 消费 ⇒ **不能靠"差不大"合账**，得把 v3 的 31–67 补出来。
-补法写在这里免得下一位重想：从 `scripts.check` 里切出第 31..67 段按序跑（`set -e`、逐段打命令与 rc），
-跑穿即与 1–30 拼成同一棵树的全链 —— 这是**分段拼合**，不是"半条链当全条链"，两段的树必须相同。
+补法写在这里免得下一位重想：从 `scripts.check` 里切出第 42..90 段按序跑（`set -e`、逐段打段号与 rc），
+跑穿即与 1–41 拼成同一棵树（v3）的全链 —— 这是**分段拼合**，不是"半条链当全条链"，两段的树必须相同。
+
+> **17:5x 更正（同一节内的自我否证）**：这一节初稿把段数写成 67、死点写成"第 31 段"、上一趟写成"走到 67"。
+> 那三个数是**本批检出**的链（`package.json` 67 段），而载体那棵树的链是 **90 段**（main 侧带进来 23 段）；
+> 死点真身第 **42** 段，上一趟真身第 **75** 段。**错的是单位对象不是数**：两棵树的链都叫 `scripts.check`，读起来像同一把尺。
+> 现量命令（别再抄数）：`node -e "const s=require(\"<那棵树>/package.json\").scripts.check.split(\"&&\");console.log(s.length)"`。
 
 **为什么锁总被抢**：`/tmp/tfa-test.lock` 是**机器级**约定，另一个项目（`~/.tfa-shield` 的 playwright）
 也在同一把锁上跑；起跑时锁空（`LOCK_CLEARED_AFTER=0s`）不等于跑到第 31 段时还空。
@@ -12950,5 +12955,5 @@ abort 在这里是救场的：软链没被解引用，源树逐字节完好（�
 改完之后的两枚相关门禁都单独复量过，证明这一改没有把别的判据碰坏：
 `node scripts/check-script-snapshot.mjs` ⇒ rc=**0**（`自快照 bootstrap 全部在位（31 个脚本 + .gitignore）`，它判的是形状不是字节）；
 `node research/tools/../../scripts/check-selfhost-entry-command.mjs` ⇒ rc=**0`（它确实会读这枚脚本的 `COMPOSE_FILES` 抄件，R7 仍成立）。
-另：`scripts.check` 里**没有** `verify-selfhost-stack`（现量：67 段中 selfhost 相关只有 `check:selfhost-entry-command`）
+另：`scripts.check` 里**没有** `verify-selfhost-stack`（现量：90 段中 selfhost 相关只有 `check:selfhost-entry-command`）
 ⇒ 这次编辑不在全链射程内，v3 那 30 段绿不会因为它而失效。
