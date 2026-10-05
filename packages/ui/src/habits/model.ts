@@ -394,6 +394,56 @@ export function toHeatmapWeeks(
 }
 
 /**
+ * 每个月份标签**该跨过几列**：返回与 `weeks` 同长的数组，`0` = 这一列不是标签起点。
+ *
+ * 🔴 为什么住在模型层而不是组件里：标签的宽度必须由"这一列真的属于那个月"推出来。
+ * 组件里再算一次月长就是第二套判断（AGENTS §3.5），而它一旦与 `toHeatmapWeeks`
+ * 的切列方式不一致，症状是"标签与它标注的那一列错开"—— 正是 `HabitBoard` 文件头
+ * 那句承诺作废的样子。
+ *
+ * 🔴 一列宽（`icon.xs` = 16px）装不下「10月」这种 2–3 枚字形 ⇒ 每一枚都折成两行
+ * （工单 H8 照出来的缺陷）。跨列之后**整行与网格同宽**：
+ * `Σ(span×格宽 + (span−1)×空隙) + (标签数−1)×空隙 == 网格总宽`，
+ * 因为相邻两个标签块之间恰好隔着网格自己那一列的空隙。
+ */
+export function heatMonthSpans(weeks: readonly HeatmapWeek[]): number[] {
+  return weeks.map((week, index) => {
+    if (week.month === undefined) return 0;
+    let span = 1;
+    for (let next = index + 1; next < weeks.length; next += 1) {
+      if (weeks[next]?.month !== undefined) break;
+      span += 1;
+    }
+    return span;
+  });
+}
+
+/**
+ * 每一枚月份标签的**像素宽度**（`0` = 这一列不是标签起点）。
+ *
+ * 🔴 宽度住在模型层而不是组件里：`cell` 与 `gap` 由调用方（拿着设计 token 的那一侧）传进来，
+ * 而"跨几列"由 `heatMonthSpans` 从同一份列数据数出来 —— 组件里就只剩一次乘法，
+ * 没有第二套"这个月占几周"的判断。
+ *
+ * 🔴 下界是**两列**（`2 × 格宽 + 一枚空隙`），不是拍出来的：窗口末尾那一列通常只有
+ * 零星几天 ⇒ 它的 `span == 1`，而「10月」这种三枚字形在 16px 里**必然折成两行**
+ * （工单 H8 看图照出来的就是这件事）。取"两列"而不是"三列"的理由是可验证的：
+ * 两列 = 36px，比最宽的那句月份标签（`caption` 字号下三枚字形 ≈ 26px）宽，
+ * 又只比网格右边界多出 20px —— 窗格那一侧的余量比这个大。
+ * **这条"比最宽标签宽"不是注释说了算，是 `e2e/tests/habit-heatmap-labels.spec.ts` 的 HL1 量的。**
+ */
+export function heatMonthLabelWidths(
+  weeks: readonly HeatmapWeek[],
+  cell: number,
+  gap: number,
+): number[] {
+  const floor = 2 * cell + gap;
+  return heatMonthSpans(weeks).map((span) =>
+    span === 0 ? 0 : Math.max(floor, span * cell + (span - 1) * gap),
+  );
+}
+
+/**
  * 有没有"可以补回来的那一天"。判据在领域层（`describeHabitResilience` 只在
  * `streakIfRepaired ≥ 2` 时给出 `repair`），这里只做取反。
  */

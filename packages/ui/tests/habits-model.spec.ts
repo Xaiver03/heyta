@@ -23,6 +23,8 @@ import {
   habitHeatLevel,
   habitHeatmap,
   hasCountableGoal,
+  heatMonthLabelWidths,
+  heatMonthSpans,
   heatmapLevelToken,
   heatmapTotal,
   monthOfDate,
@@ -440,5 +442,84 @@ describe('todayValue / hasCountableGoal（W6）', () => {
     expect(hasCountableGoal(habit({ target: 0, goalType: 'atMost' }))).toBe(true);
     expect(hasCountableGoal(habit({ target: 1, goalType: 'atMost' }))).toBe(true);
     expect(hasCountableGoal(habit({ target: 1, goalType: 'exactly' }))).toBe(true);
+  });
+});
+
+describe('L 组：热力图月份标签**跨过它标注的那几周**（工单 H8）', () => {
+  /* `habitHeatmap` 的第三个参数是**毫秒时刻**（它自己 `toLocalDate(now)`），不是 `LocalDate`。
+     本地正午：跨时区也不会把那一天推到昨天/明天。 */
+  const at = (year: number, month: number, day: number) =>
+    new Date(year, month - 1, day, 12, 0, 0).getTime();
+  /** 一段窗口切成周列（`toHeatmapWeeks` 会补齐首尾，标签只打在月份变那一列）。 */
+  const weeksOf = (days: number, now: number) =>
+    toHeatmapWeeks(habitHeatmap([], 'h-1', now, days));
+
+  it('L1 与 `weeks` **同长**，且每一列恰好归一个标签块（Σspan == 列数）', () => {
+    for (const [days, now] of [
+      [90, at(2026, 10, 5)],
+      [30, at(2026, 1, 31)],
+      [371, at(2026, 12, 31)],
+    ] as const) {
+      const weeks = weeksOf(days, now);
+      const spans = heatMonthSpans(weeks);
+      expect(spans.length, `${String(days)} 天窗口的数组长度不等于列数`).toBe(weeks.length);
+      // 每一列要么是一个标签块的起点（span ≥ 1），要么被前一个块跨过去（记 0）。
+      // Σ == 列数 挡的是两种坏：漏列（标签比网格短 ⇒ 右边空一块）与重列（跨过了下一个标签）。
+      expect(spans.reduce((a, b) => a + b, 0), `${String(days)} 天窗口：列没有恰好分完`).toBe(
+        weeks.length,
+      );
+    }
+  });
+
+  it('L2 🔴 标签起点**恰好**是月份变的那几列（不重复打、不漏打）', () => {
+    const weeks = weeksOf(371, at(2025, 12, 31));
+    const spans = heatMonthSpans(weeks);
+    const starts = spans.map((s, i) => (s > 0 ? i : -1)).filter((i) => i >= 0);
+    const labelled = weeks.map((w, i) => (w.month === undefined ? -1 : i)).filter((i) => i >= 0);
+    expect(starts, '标签起点与 `toHeatmapWeeks` 打标签的那些列不是同一批').toEqual(labelled);
+    // 阳性对照：一年多的窗口**确实**有多枚标签（否则上面那条会因为"两边都空"而假绿）。
+    expect(starts.length, '371 天窗口里一枚月份标签都没有 ⇒ 时间轴整条没了').toBeGreaterThan(10);
+    // 每一枚跨的列数都 ≥1，且没有任何一枚靠"下一枚标签"来收尾。
+    expect(Math.min(...spans.filter((s) => s > 0)), '有标签只跨 0 列').toBeGreaterThanOrEqual(1);
+  });
+
+  it('L3 🔴 每一枚标签都**至少两列宽**（末列只有一两天时也不许退回一列）', () => {
+    /* 窗口末尾那一列通常只有零星几天 ⇒ 它的 `span == 1`。若宽度就等于 `span × 格宽`，
+       「10月」这种三枚字形在 16px 里必然折成两行 —— 那正是工单 H8 看图照出来的形状。
+       🔴 下界取"两列"这件事**不靠注释自证**：字面能不能装下由 `e2e` 的 HL1 在真浏览器里量。 */
+    for (const [cell, gap] of [
+      [16, 4],
+      [1, 1],
+    ] as const) {
+      for (const [days, now] of [
+        [90, at(2026, 10, 6)],
+        [30, at(2026, 1, 31)],
+        [371, at(2026, 12, 31)],
+      ] as const) {
+        const weeks = weeksOf(days, now);
+        const widths = heatMonthLabelWidths(weeks, cell, gap).filter((w) => w > 0);
+        expect(widths.length, `${String(days)} 天窗口里没有月份标签`).toBeGreaterThan(0);
+        const tooNarrow = widths.filter((w) => w < 2 * cell + gap);
+        expect(tooNarrow, `cell=${String(cell)} 时有标签窄于一枚字形都放不下的宽度`).toEqual([]);
+      }
+    }
+  });
+
+  it('L4 标签排的总宽**有界**：不短于网格，也不多出超过一枚最小标签', () => {
+    /* 左边对齐是 HL2 量的，这里量的是"整排"的两端：
+       · 短于网格 ⇒ 标签会整体往左挤，与它标注的那一列错开；
+       · 长过"网格 + 一枚最小标签" ⇒ 溢出窗格右边界（那才是真会被裁的那种坏）。 */
+    const cell = 16;
+    const gap = 4;
+    const weeks = weeksOf(90, at(2026, 10, 6));
+    const widths = heatMonthLabelWidths(weeks, cell, gap).filter((w) => w > 0);
+    const labelRow = widths.reduce((a, w) => a + w, 0) + (widths.length - 1) * gap;
+    const gridRow = weeks.length * cell + (weeks.length - 1) * gap;
+    expect(labelRow, `标签排比网格短了 ${String(gridRow - labelRow)}px ⇒ 会错列`).toBeGreaterThanOrEqual(
+      gridRow,
+    );
+    expect(labelRow - gridRow, '标签排溢出网格太多 ⇒ 右边那枚会被窗格裁掉').toBeLessThanOrEqual(
+      2 * cell + gap,
+    );
   });
 });

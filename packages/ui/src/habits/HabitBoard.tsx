@@ -105,6 +105,7 @@ import {
   HABIT_HEATMAP_DAYS,
   habitHeatmap,
   hasCountableGoal,
+  heatMonthLabelWidths,
   heatmapLevelToken,
   heatmapTotal,
   shouldOfferFreshStart,
@@ -420,8 +421,16 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'row',
       gap: tokens['space.1'],
     },
+    /**
+     * 月份标签那一格**不在这里写宽度**：宽度 = 它标注的那几周（下界两列），
+     * 由 `heatMonthLabelWidths` 按调用方传进来的 `cell`/`gap` 算出来。
+     * 原先这里是 `width: icon.xs`(16px)，而标签是「7月」「10月」这种 2–3 枚字形
+     * ⇒ **每一枚都折成两行**（工单 H8，看图照出来的）。
+     */
     heatMonthCell: {
-      width: tokens['icon.xs'],
+      /* `flexShrink: 0`：那一排的总宽可以比容器宽（末列那种"两列下界"的标签会溢出），
+         但**绝不被压回去** —— 压回去就是又折行，H8 那一族的原病。 */
+      flexShrink: 0,
     },
     heatGrid: {
       flexDirection: 'row',
@@ -510,6 +519,8 @@ export function HabitBoard({
         const busy = busyHabitId === row.habit.id;
         const heatmap = habitHeatmap(logs, row.habit.id, now, heatmapDays);
         const weeks = toHeatmapWeeks(heatmap);
+        // 标签宽度 = 它跨过的那几列（下界两列），算法在 `heatMonthLabelWidths`（工单 H8）。
+        const labelWidths = heatMonthLabelWidths(weeks, tokens['icon.xs'], tokens['space.1']);
         const total = heatmapTotal(heatmap);
         const { less, more } = labels.heatmap;
 
@@ -871,10 +882,14 @@ export function HabitBoard({
               </View>
             ) : null}
 
-            <View style={styles.heat}>
-              {/* 月份标签与格子**同一套列宽**，否则标签会与它标注的那一列错开。 */}
+            <View style={styles.heat} testID={`${testID}-heat`}>
+              {/* 月份标签与格子**同一套列宽**，否则标签会与它标注的那一列错开。
+                  兑现这句话的方式不是把标签压成一列宽（那会折成两行，工单 H8），
+                  而是**让标签跨过它标注的那几周**：宽度 = `span × 格宽 + (span−1) × 空隙`，
+                  `span` 由 `heatMonthSpans(weeks)` 从同一份列数据数出来。 */}
               <View
                 style={styles.heatMonths}
+                testID={`${testID}-heat-months`}
                 accessible
                 accessibilityLabel={labels.heatmap.grid({
                   name: row.habit.name,
@@ -882,20 +897,31 @@ export function HabitBoard({
                   days: heatmapDays,
                 })}
               >
-                {weeks.map((week, index) => (
-                  <View key={`m-${String(index)}`} style={styles.heatMonthCell}>
-                    {week.month === undefined ? null : (
+                {weeks.flatMap((week, index) => {
+                  const width = labelWidths[index] ?? 0;
+                  const month = week.month;
+                  if (width === 0 || month === undefined) return [];
+                  return [
+                    <View
+                      key={`m-${String(index)}`}
+                      testID={`${testID}-heat-month-${String(index)}`}
+                      style={[styles.heatMonthCell, { width }]}
+                    >
                       <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
-                        {labels.heatmap.month(week.month)}
+                        {labels.heatmap.month(month)}
                       </Text>
-                    )}
-                  </View>
-                ))}
+                    </View>,
+                  ];
+                })}
               </View>
 
-              <View style={styles.heatGrid}>
+              <View style={styles.heatGrid} testID={`${testID}-heat-grid`}>
                 {weeks.map((week, weekIndex) => (
-                  <View key={`w-${String(weekIndex)}`} style={styles.heatWeek}>
+                  <View
+                    key={`w-${String(weekIndex)}`}
+                    testID={`${testID}-heat-week-${String(weekIndex)}`}
+                    style={styles.heatWeek}
+                  >
                     {week.days.map((day, dayIndex) =>
                       day === null ? (
                         <View key={`e-${String(dayIndex)}`} style={styles.heatCell} />
