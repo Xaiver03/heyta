@@ -316,13 +316,13 @@ cd apps/landing && npx vitest run              # 期望 71 passed
 | ② | 点 CTA | ❌ | `Pricing.tsx:96-99` 是 `<p>` + 沙漏**不是按钮**；词条 =「即将开放」 |
 | ③ | 注册 / 登录 | ⚠️ 服务端有、客户端无 | `server/src/api.ts:271,546` 有 passkey / magic-link；`apps/web` **没有 auth 目录**，只有 `SyncBar.tsx:218-248` 三个手填框。落地页 `Footer.tsx:33-43` **全是 `#` 锚点、0 条外链** |
 | ④ | 选档下单 | ✅ **服务端已通** | `POST /api/billing/checkout`（`server/src/billing/checkout.routes.ts`）把 `quoteOrder` → 冻结 → `createCheckout` 接成一条（提交 `81df2e9`） |
-| ⑤ | 唤起支付 | ⚠️ 通到通道口，但没配通道 | 路由确实调了 `adapter.createCheckout`；但只有 `noop` 时回 `503`，且**客户端没有付款按钮** |
+| ⑤ | 唤起支付 | ⚠️ 通到通道口，但没配通道 | 路由确实调了 `adapter.createCheckout`；只有 `noop` 时回 `503`。~~**客户端没有付款按钮**~~ ✅ **2026-10-05 有按钮了**：web 设置页 `RenewPanel` 与移动壳「我的」页 `RenewSection`，两端共用 `packages/app-host` 那一份下单接线；`check:payment-entry` 钉的是"按钮存在 ⇔ 开关状态"这一对，所以它拿到的是**如实的 503**，不是静默无反应 |
 | ⑥ | 支付回调 | ✅ 代码层 | `webhook.routes.ts:107`；`server.ts:500-504` |
-| ⑦ | 授予权益 | ⚠️ 有实现、**仍不可达** | `apply-event.ts` 写 `status=active` + `+30 天`；`schema.prisma` **已有 `price_id` / `grants` 列**（`9684d2a`），但 webhook 路径**仍未**把待结算的支付交给 `settleOrderPaid`（[pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 9 条） |
+| ⑦ | 授予权益 | ✅ **代码层已通** | 那格"webhook 路径仍未把待结算的支付交给 `settleOrderPaid`" **已过期**：结算在同一个事务里走 `settleOrderPaid`，档位取**订单冻结的 `price_id`** 而不是 adapter 的金额启发式（判据：`tests/billing-webhook-settlement.pglite.spec.ts`，含"¥5 实付 + adapter 猜成 `hosted-monthly`"那条反证）。**仍不可达的原因只剩通道资质** |
 | ⑧ | 看「买了什么 / 剩多少 AI」 | ❌ | web 只有降级提示 `SubscriptionNotice.tsx`；i18n 里的额度词条**只有落地页的** `landing.pricing.hostedAi.feature2`（「每月 300 次」），**没有**「本周期已用 X / 300 次」的界面 |
-| ⑨ | 续费 | ❌ | `SubscriptionNotice.tsx:12-18` 自述「现在不存在可跳转的续费地址」 |
+| ⑨ | 续费 | ✅ **临时方案已落地（2026-10-05）** | ~~`SubscriptionNotice.tsx` 自述「现在不存在可跳转的续费地址」~~ 那句话已随本次接线改掉（文件里留着日期）。临时口径 = **再次下单顺延**：一次性 30 天叠加在当前到期日之后，不自动扣款；到期后数据不动 |
 | ⑩ | 到期降级 | ⚠️ 通但默认关 | `entitlement.ts:114-146`（半开区间，`now===end` 即过期）；`config.ts:203-205` 默认 `enabled:false`；测试只覆盖**同步** |
-| ⑪ | 退款 / 取消 | ❌ | `pricing-store.ts` 「退款接口，通道尚未接线」；`wechat.adapter.ts:436-443` 空操作；退款政策未定（`subscription-boundary.md:136`） |
+| ⑪ | 退款 / 取消 | ✅ **临时方案已落地（2026-10-05）**，🔴 **对外承诺未改** | ~~`pricing-store.ts`「退款接口，通道尚未接线」；`wechat.adapter.ts` 空操作；退款政策未定~~ 三句都过期：`refund-policy.ts`（单一政策常量）+ `refund-store.ts`（状态机与唯一回收落点）+ `wechat.adapter.ts#refund` + 后台四条路由 + 回调按 `out_refund_no + 状态` 幂等。域如何收窄见 [ADR-0053](../adr/0053-refunds-only-for-countable-segments.md)。**未做**：把「7×24h 内全额」写进法务条款／界面（属业主决定） |
 
 **三个最致命的断点**（每条都标了审计之后的变化）：
 
@@ -632,8 +632,8 @@ cd apps/landing && npx vitest run              # 期望 71 passed
 | §12.3 | 事项 | 代码 | 验证 | 非代码阻塞 |
 |---|---|---|---|---|
 | 1 | 等桌面壳提交后重跑门禁 | — 不属本任务书代码 | ✅ 已跑：16 道绿，仅 `check:ai-e2e` 红（对方的文件） | 桌面壳那批文件**仍**未提交 |
-| 2 | 客户端「付款」按钮 | ⛔ **不做** | — | 🔴 **外部资质**：无支付商资质 = 必然 `503` 死按钮；且 `apps/web/**`、`apps/mobile/**` 属他人占用（§6 白名单外） |
-| 3 | 退款/拒付侧接线 | ⛔ **不做**（业主选 B，[ADR-0026](../adr/0026-refund-side-entitlement-revocation-not-implemented.md)） | — | 🔴 权益模型**无法表达"退哪一笔"**（写代码必然过度回收）+ 退款政策未定 |
+| 2 | 客户端「付款」按钮 | ⛔ **当时不做** → ✅ **2026-10-05 已做**（web `RenewPanel` + 移动 `RenewSection`，共用 app-host 那份下单接线） | ✅ 见 §12.6 | 🔴 外部资质那条**仍然成立**：没配通道时点下去就是 `503`，而 `check:payment-entry` 钉的正是"按钮 ⇔ 开关"这一对，所以它不是死按钮 |
+| 3 | 退款/拒付侧接线 | ⛔ **当时不做**（业主选 B，[ADR-0026](../adr/0026-refund-side-entitlement-revocation-not-implemented.md)）→ ✅ **2026-10-05 由 [ADR-0053](../adr/0053-refunds-only-for-countable-segments.md) 收窄后落地** | ✅ 见 §12.6 | 🔴 "权益模型无法表达退哪一笔"**没有被推翻**，是被**绕开**的：本方案把可退的域限到"这一单授予的那一段"（一次性 30 天 + 单一授予时长），表达不了的形状**照旧拒发**。政策也定了临时口径（7×24h 全额，例外走后台） |
 | 4 | 存量订单回填 | — **不适用**（0 行数据，§7 第 20 条） | — | 真通道上线**且**在回填前产生过订单时才需要 |
 | 5 | 海外通道与**币种断言** | ✅ **已做**（币种断言三层） | ✅ 单测 + 两次注入 | ⚠️ 落地页 `$5/$12` 文案 = 业主/市场决定，且词条在 `packages/i18n`（占用） |
 
@@ -668,3 +668,110 @@ cd apps/landing && npx vitest run              # 期望 71 passed
   `recurrence` 等其余 9 组故障注入探针**没跑**；
   桌面壳提交后的整链绿**仍未证实**。
 
+
+## 12.6 2026-10-05：退款侧落地（§12.3 第 2、3 行的后续）
+
+上面那张表里"⛔ 不做"的两行，本轮都变成"做了，且带判据"。
+**决策与不变量不在这里重述** —— 域为什么收窄、三条硬规则、被否掉的六个选项都在
+[ADR-0053](../adr/0053-refunds-only-for-countable-segments.md)；本节只留**读数**与**只有写判据时才暴露出来的东西**。
+
+| 面 | 落点 | 判据 |
+|---|---|---|
+| 政策（纯函数、唯一数字源） | `server/src/billing/refund-policy.ts` | `tests/billing-refund-policy.spec.ts` |
+| 状态机 / 冻结 / **唯一回收落点** | `server/src/billing/refund-store.ts` | `tests/billing-refund-store.pglite.spec.ts`（真 SQL：CHECK 双向、条件更新行数、语句顺序、`BEGIN` 只一次） |
+| 表与三条 CHECK | 迁移 `20261014000000_add_refunds` | 同上，DDL 由 `tests/pricing-ddl.helper.ts` 从**发布中的迁移文件**读，不抄第二份 |
+| 通道退款 + 退款通知归一化 | `wechat.adapter.ts#refund`、两张词表、`buildWechatRefundEventId` | `tests/wechat-adapter.spec.ts`（stub `fetchImpl`，零真网络） |
+| 回调走回收不走授予 | `webhook.routes.ts` 的 `refundNotice` 分支 | `tests/billing-webhook-settlement.pglite.spec.ts` |
+| 运营审批面 | `admin.routes.ts` 四条（列表 / 申请 / approve / reject） | `tests/billing-refund-admin-routes.spec.ts`（PGlite 撑的 `PrismaLikeClient`，真约束真事务） |
+
+**读数**（2026-10-05，`NO_COLOR=1`，退出码从 `RC_*` 行取，不从后台任务的通知取）：
+
+```
+GATE_server_tsc=0              # server `tsc --noEmit -p tsconfig.json`
+GATE_check:migrations=0        # 新迁移 `20261014000000_add_refunds` 的形状（单语句、无 CONCURRENTLY）
+GATE_check:payment-entry=0     # 双向：compose 转发的旋钮 ⇄ 代码读的旋钮
+GATE_check:server-env=0
+GATE_check:pricing=0
+GATE_check:docs=0              # 死链 / 章节号 / 页内锚点
+GATE_check:ui-language=0       # 先 `pnpm --filter @heyta/i18n build`（环境陷阱 #79）
+GATE_check:layering=0  GATE_check:design=0  GATE_r_typecheck=0
+RC_SELECTED=0                  # 六份退款 spec 单跑：Test Files 6 passed / Tests 159 passed
+RC_FULL=0                      # server 全量：Test Files 126 passed / Tests 2318 passed | 1 skipped
+RC_R_TEST=1 attempt=1          # `pnpm -r test` 全量：只有 apps/mobile 两红
+                               #   `tests/legal-recheck-mobile.spec.ts` 那两条**单独复跑 29/29 绿**
+                               #   （同一次全量里 `packages/ui` 那条 `priorityColorToken` 红也复跑绿了）
+                               #   ⇒ 归因：共享工作树上的并发/负载，**不是本线的缺陷**，也不属本轮改动碰过的文件
+MUT: 14 臂 → 13 RED（存活那一臂见上面第 3 条）
+```
+
+⚠️ 读数的口径：`RC_*` / `GATE_*` 是**命令自己的退出码**，从日志里取，
+不取后台任务通知里那个 `exit code 0`（那是包装命令的，环境陷阱 #164）。
+
+🔴 **三条只有写判据时才现形的东西**（这才是本节存在的理由，读数本身不说明质量）：
+
+1. **两条会漏钱的形状是判据逼出来的，不是设计时想到的**：
+   ① 同一单**可以有两条都在途的退款**（申请那一步只判了"这单退过没有"，
+   没判"这条申请还开着"）—— 两次批准 = 两次发给通道；
+   ② 一条 `failed` 的行**永远回不来**（success 通知的条件更新集合里没有 `failed`，
+   而"发通道时抛错"恰恰包含"请求到了、响应丢了"）—— 钱退了而权益永远不回收。
+   两条都在生产代码里修掉，并各配一条能红的用例。
+2. **一条标题在断言、正文没断言到的用例**：`amount.total` 那条两个金额都填 400，
+   于是"把 `total` 写成 `refundAmountMinor`"这个变异**存活**
+   —— 改成 `refund 200 / total 400` 之后同一臂转红。对称的参数值等于没测（§7 第 33 条那一族）。
+3. **一条活不到的冗余闸门**：success 条件更新里的 `refunded_at IS NULL` 与状态集合
+   在库层被那条双向 CHECK 压成同一件事，没有任何可达行能让两半给出不同答案，
+   所以拿掉它**不会有任何用例会红**。这一臂如实记成"判据够不到"而不是"已覆盖"，
+   理由写在 `refund-store.ts` 原地与 ADR-0053 §5 第 9 条。
+
+**仍然没做的**：后台**没有退款 tab**（四条路由是接口，今天能批准的只有拿管理员令牌直接敲 `/api/admin/refunds*` 的人；补齐要哪五件、以及为什么先改 `adminRequest` 才能把 409 的 `reason` 送到界面，见 ADR-0053 §5 第 10、11 条）；
+把 `7×24h 内全额` 写进法务条款 / 界面（对外法律表征，业主决定）；
+`pnpm reinstall:all` 四端当前产物本轮未跑；真实商户号 / 真实通知载荷零条。
+
+### 12.7 2026-10-05：续费入口的三张图（以及**看图**才抓到的那条日期排版缺陷）
+
+§11.1 第 ⑤ 行和上面第 2 行都写着"按钮已经有了"，但**没有一处链接到证据**。
+补上，因为这三张图里的一张抓出了一个四层门禁全绿的东西。
+
+| 图 | 屏上写的那一句 | 它回答的问题 |
+|---|---|---|
+| [`apps/web/evidence/renew-panel-no-channel.png`](../../apps/web/evidence/renew-panel-no-channel.png) | 「这台实例没有配置收款通道，现在买不了。」 | 503 落到一句人话上，且**没有**半截付款面板 |
+| [`apps/web/evidence/renew-panel-no-consent.png`](../../apps/web/evidence/renew-panel-no-consent.png) | 「刚才那一步需要与服务器通信，而还没有同意隐私规则，所以 heyta 一个请求都没有发。」 | 我们自己拒发的那一步**不被伪装成**"连不上服务端" |
+| [`apps/web/evidence/renew-panel-order.png`](../../apps/web/evidence/renew-panel-order.png) | 「应付金额 4.00 CNY」+「这一单在 …… 之前有效」+ 一栏只读的 `weixin://wxpay/bizpayurl…` | 金额与支付串是**服务端那一单**的，界面没有假装到账 |
+
+采集：`cd e2e && npx playwright test tests/renew-panel.spec.ts`（3 passed），图由
+`test-results/` 拷进 `apps/web/evidence/`。**三张都人眼看过。**
+
+🔴 **看图抓到的缺陷（不是"渲染错了"，是"渲染成了另一种语言的规则"）**：
+`order` 那张图里失效时刻印的是 `10/5/2026, 5:47:10 PM` —— 中文界面里一个英文习惯的
+日期。成因是 `RenewPanel` 用了裸 `new Date(...).toLocaleString()`，它跟的是
+**运行时/浏览器**的 locale（Playwright 的 `Desktop Chrome` 是 en-US），不是界面的。
+仓库里 `TrashView` / `ConflictDialog` / `ReminderPanel` 三处早就写成
+`toLocaleString(locale, {...})` 并各留了一句理由，这一处是**漏抄了那条约定**。
+
+四层为什么全都没拦住（这才是值得记的部分）：
+
+1. `check:ui-language` 比的是**词条表**，这一串是运行时生成的 —— 结构上够不到；
+2. 同文件里那条「两种语言」用例，zh-CN 那一支只断言"文本里**有**中文"，
+   日期是英文它照样绿 —— **断言只验写了什么，不验按什么规则写的**；
+3. typecheck 与 `check:design` 与运行时字符串无关；
+4. 只有把那张图**打开来看**才会看见。
+
+修 + 三条新判据（不是改完就算，每条都单独证明会红）：
+
+| 判据 | 载体 | 变异（把 `RenewPanel` 改回裸 `toLocaleString()`） |
+|---|---|---|
+| 每次 `toLocaleString` 必须**显式收到**界面语言 | `apps/web/tests/renew-panel.spec.tsx` | × 该条红 |
+| 同一时刻在 zh-CN / en 下排出**不同**的串，且中文侧无 `AM/PM` | 同上 | × 该条红（两边都跟系统 ⇒ 恒等） |
+| 真浏览器里付款块**不含** `/AM\|PM/` | `e2e/tests/renew-panel.spec.ts` | × `RC_E2E_MUT=1`，报的就是这一条 |
+
+⚠️ 第二条为什么不能写成"渲染出的串等于 `toLocaleString('zh-CN', …)`"：那样
+**把系统语言设成中文的机器上有 bug 的实现照样满足它**。判据要钉的是
+"语言被传进去了"这个动作，不是某个具体排法 —— 否则门禁跟着机器漂。
+
+```
+RC_RENEW_JSDOM=0     # 修复后单跑该 spec：15 passed（原 13 + 新 2）
+RC_E2E=0             # 3 passed，含新的 AM/PM 反向断言；三张图重采并重看
+RC_E2E_MUT=1         # 变异臂：恰好红在付款块那条
+GATE_web_typecheck=0
+RC_WEB_TEST=0        # apps/web 全量：135 files passed | 2 skipped，1789 tests passed | 13 skipped
+```
