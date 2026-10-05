@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# calendar-line-commit-plan.sh 的 `--confirm` 那一腿的装置验证（八臂）。
+# calendar-line-commit-plan.sh 的 `--confirm` 那一腿的装置验证。
+#    ⚠️ **臂数不写在这份说明里**（写过一次"八臂"，加第 九 臂那天就漂了）—— 现量取最后一行 `== 合计 pass=… fail=… ==`。
 #
 # 🔴 为什么单独一把 rig：`--confirm` 腿从前**在任何树上都没有跑过** ——
 #    它的旧前置"索引必须空"在共享工作树里几乎永远不成立（今天现场就是 1 枚别人的暂存项），
@@ -7,7 +8,7 @@
 #    这次把前置换成"提交后逐字节对账别人的暂存"（§5b），**必须**当场证明 §5b 会红，
 #    否则等于把一条会拦事故的闸门换成了一句打印。
 #
-# 八臂（都在 /tmp 下的一次性 git 小副本里跑，绝不碰主检出）：
+# 各臂（都在 /tmp 下的一次性 git 小副本里跑，绝不碰主检出）：
 #   臂 1  正向：索引里有**别人的**暂存项 ⇒ --only 提交成功，且别人那条 blob 哈希不变、仍在索引、
 #              不在本笔的树里 ⇒ 期望 exit 0 且 §5b 打出对账行
 #   臂 2  变异（§5b 的牙）：把脚本副本里的 `git commit --only` 改成裸 `git commit`
@@ -22,6 +23,16 @@
 #              而它仍脏在工作树里（只测打印的话，把分流那一段整块删掉另两臂照样全绿）
 #   臂 7  在册断言①：条目漏了 `|理由` ⇒ 期望 exit 1 并点名（空理由的册子会把"带走"读成"已登记"）
 #   臂 8  在册断言②：条目**不在 PATHS** ⇒ 期望 exit 1 并点名（§1 按 PATHS 遍历 ⇒ 只在册不在清单的那条永远走不到）
+#   臂 9  3b 的**进门那一腿**：`--confirm` 而**不给 ANCHORS** ⇒ 期望 exit 1、点名"没传 ANCHORS"、且不产生提交
+#
+# 🔴 **臂 1/2/5/6 必须传 ANCHORS，而这件事曾经没人传（10-05 11:5x 现量查出）**：
+#    `cbd18178` 给被测脚本加了"3b 在 --confirm 下缺 ANCHORS 就 exit 1"，**却没同步这套 rig**
+#    ⇒ 四臂从那天起整片红，而且红的不是它声称测的那一段（第 5 步根本没到，`REACHED=0`）。
+#    现量：那条改动落在 `cbd18178`（10-04 23:32），本 rig 距它约 **12 小时**没被执行过
+#    —— `grep -rn calendar-line-commit-only-arms package.json scripts/ .github/workflows/` 现量**为空**
+#    ⇒ 它没有任何常驻消费者，"红"不会自己开口；它只在有人**主动跑它**的那一刻才有声音。
+#    配套：臂 1 除了 `REACHED` 还断言日志里出现 `== 3b. hunk 归属` 与 `孤儿 0 枚`
+#    ——只断 rc=0 的话，"ANCHORS 传了但 3b 整段被摘掉"也能给我一个绿（改输入集合 ≠ 那条被走过）。
 #
 # 为什么要有 4/5 这一对（17:2x 现量，不是设想）：§3 原来是"仓库里这两道有任何红 ⇒ exit 3"。
 # 现场那一趟的红在 `scripts/verify-mobile-ios-reminder.sh`（别人正在编辑、本清单点名 0 处），
@@ -29,9 +40,9 @@
 # 收窄只改"量哪个集合"，判据本身没放宽。**方向性**是这一对的全部意义：
 # 只测臂 4 会把闸门做得比原来更严也不被发现；只测臂 5 会把它悄悄摘成一句打印也不被发现。
 #
-# 🔴 臂 1–5 都显式传 `UNCARRIED_OVERRIDE=''`（**set 但为空**）。不传会掉回脚本里那 4 枚真路径，
-#    而迷你树里根本没有它们 ⇒ §1b 先 exit 1 ⇒ 17:5x 那一趟是**五臂整片转红**，
-#    红的还不是被测的那一段。判"有没有传"因此用 `${…+set}`，不是 `-n`。
+# 🔴 臂 1–5 都显式传 `UNCARRIED_OVERRIDE=''`（**set 但为空**）。不传会掉回脚本里那本**在册册子**
+#    （它跟着现量涨删，枚数不写在这里），而迷你树里根本没有那些真路径 ⇒ §1b 先 exit 1
+#    ⇒ 17:5x 那一趟是**五臂整片转红**，红的还不是被测的那一段。判"有没有传"因此用 `${…+set}`，不是 `-n`。
 #
 # ⚠️ 夹具里三道门禁**两道是桩、一道是真的**（15:3x 现量，别读成"图省事"）：
 #    `scripts/check-md-table-rows.mjs` 按**文件名**读 `docs/plans/calendar-year-time-and-mobile-profile.md`
@@ -49,7 +60,7 @@
 #    §3 在主检出里同样真跑：本次入库前现场量到 md-tables=0 / shell-unicode=1（红在别人的文件上）/ docs-link=0。
 #
 # 用法：bash research/tools/calendar-line-commit-only-arms.sh
-# 退出码：0 = 八臂如预期；1 = 某一臂不按预期（= 装置坏了，不是仓库坏了）
+# 退出码：0 = 每一臂都如预期；1 = 某一臂不按预期（= 装置坏了，不是仓库坏了）
 set -u
 cd "$(dirname "$0")/../.." || exit 1
 REAL_SCRIPT="research/tools/calendar-line-commit-plan.sh"
@@ -68,6 +79,9 @@ mk_fixture() {
   local F; F=$(mktemp -d /tmp/clc-only.XXXXXX)
   mkdir -p "$F/research/tools" "$F/scripts" "$F/docs/plans"
   cp "$REAL_SCRIPT" "$F/research/tools/"
+  # 🔴 3b 会被 --confirm 那腿调用，所以**被依赖的那枚必须与调用者同列进夹具**
+  #    （§7 那一族：lib 缺席时调用方报 "No such file or directory"，读数会退化成"有孤儿 hunk"这种假归因）。
+  cp research/tools/calendar-line-hunk-ownership.sh "$F/research/tools/"
   # 🔴 shell-unicode 用**真门禁**（臂 4/5 测的就是它的归类，桩测不了）。
   #    它的 ROOT = 自己所在目录的上一级 ⇒ 放进 <夹具>/scripts/ 就自然扫那棵小树。
   cp scripts/check-shell-unicode-vars.mjs "$F/scripts/" || return 1
@@ -104,12 +118,16 @@ echo "夹具1：$F"
   printf '# 计划\n\n正文（改过）\n' > docs/plans/mine.md
   printf 'NEW\n' > new.txt
   MSG='test: 臂1' PATHS_OVERRIDE='a.txt|docs/plans/mine.md|new.txt' UNCARRIED_OVERRIDE='' \
+    ANCHORS='MINE NEW 正文（改过）' \
     bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm1.out" 2>&1
   RC=$?
   {
     echo "RC=$RC"
     echo "REACHED=$(grep -c '== 5. --confirm' "${L}.arm1.out" || true)"
     echo "GATE3=$(grep -c 'md-tables rc=0 / shell-unicode rc=0 / docs-link rc=0' "${L}.arm1.out" || true)"
+    # 🔴 这两行是**路由自证**：只断 rc=0 的话，"把 3b 整段摘掉"也能给我一个绿。
+    echo "ANCHOR_RUN=$(grep -c '== 3b. hunk 归属' "${L}.arm1.out" || true)"
+    echo "ORPHAN0=$(grep -c '孤儿 0 枚' "${L}.arm1.out" || true)"
     echo "BEFORE=$FH"
     echo "AFTER=$(git ls-files --stage -- foreign.txt | awk '{print $2}')"
     echo "IN_HEAD=$(git show --name-only --format= HEAD | grep -cxF foreign.txt || true)"
@@ -123,8 +141,9 @@ A1=$(cat "${L}.arm1.rd" 2>/dev/null)
 if [ "$(rd "$A1" RC)" = "0" ] && [ "$(rd "$A1" REACHED)" != "0" ] && [ "$(rd "$A1" GATE3)" != "0" ] \
    && [ -n "$(rd "$A1" BEFORE)" ] && [ "$(rd "$A1" BEFORE)" = "$(rd "$A1" AFTER)" ] \
    && [ "$(rd "$A1" IN_HEAD)" = "0" ] && [ "$(rd "$A1" STILL_INDEXED)" != "0" ] \
-   && [ "$(rd "$A1" HAS_OK)" != "0" ] && [ "$(rd "$A1" MINE_IN_HEAD)" = "2" ]; then
-  ok "臂1 正向：别人的暂存 blob 逐字不变($(rd "$A1" AFTER))、仍在索引、不在本笔；我的两枚进了 HEAD；§5b 打出对账行"
+   && [ "$(rd "$A1" HAS_OK)" != "0" ] && [ "$(rd "$A1" MINE_IN_HEAD)" = "2" ] \
+   && [ "$(rd "$A1" ANCHOR_RUN)" != "0" ] && [ "$(rd "$A1" ORPHAN0)" != "0" ]; then
+  ok "臂1 正向：别人的暂存 blob 逐字不变($(rd "$A1" AFTER))、仍在索引、不在本笔；我的两枚进了 HEAD；§5b 打出对账行；3b 那一格真被走到且孤儿 0"
 else
   bad "臂1 不如预期：$(printf '%s\n' "$A1" | tr '\n' ' ')"
   echo '--- 臂1 日志尾部 ---'; tail -25 "${L}.arm1.out"
@@ -149,6 +168,7 @@ F2=$(mk_fixture) || { echo "❌ 夹具2 建不起来"; exit 1; }
   # 被 perl 改过的副本**本身**落在本线命名空间里 ⇒ 必须一起点名，否则 §1b 先 exit 1，
   # 这一臂测的就不是 §5b 了（15:3x 实测到一次：红读的是"命名空间有改动却没点名"）。
   MSG='test: 臂2' PATHS_OVERRIDE='a.txt|docs/plans/mine.md|research/tools/calendar-line-commit-plan.sh' UNCARRIED_OVERRIDE='' \
+    ANCHORS='MINE 正文（改过） commit' \
     bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm2.out" 2>&1
   RC=$?
   {
@@ -243,6 +263,7 @@ F5=$(mk_fixture) || { echo "❌ 夹具5 建不起来"; exit 1; }
   printf 'MINE\n' > a.txt
   printf '# 计划\n\n正文（改过）\n' > docs/plans/mine.md
   MSG='test: 臂5' PATHS_OVERRIDE='a.txt|docs/plans/mine.md' UNCARRIED_OVERRIDE='' \
+    ANCHORS='MINE 正文（改过）' \
     bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm5.out" 2>&1
   RC=$?
   {
@@ -282,6 +303,7 @@ F6=$(mk_fixture) || { echo "❌ 夹具6 建不起来"; exit 1; }
   printf 'MINE\n' > a.txt
   MSG='test: 臂6' PATHS_OVERRIDE='a.txt|pic.png' \
     UNCARRIED_OVERRIDE='pic.png|测试理由：这一枚的字节不是我拍的' \
+    ANCHORS='MINE' \
     bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm6.out" 2>&1
   RC=$?
   {
@@ -356,7 +378,36 @@ else
   echo '--- 臂8 日志尾部 ---'; tail -25 "${L}.arm8.out"
 fi
 
-rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8"
+# ---------------- 臂 9 3b 的进门那一腿：--confirm 却不给 ANCHORS ⇒ 拒绝且不产生提交
+# 🔴 这一臂是这次补的**原因本身**：`cbd18178` 加了那条强制却没同步本 rig，四臂从此整片红，
+#    而"缺 ANCHORS 就拒"这条新判据在 rig 里**一条断言都没有** —— 也就是说它当时是一条
+#    只在被测脚本里存在、没有任何装置证明它会红的闸门（正是本仓反复犯的那一形）。
+F9=$(mk_fixture) || { echo "❌ 夹具9 建不起来"; exit 1; }
+(
+  cd "$F9" || exit 1
+  printf 'MINE\n' > a.txt
+  HEAD_BEFORE=$(git rev-parse HEAD)
+  MSG='test: 臂9' PATHS_OVERRIDE='a.txt' UNCARRIED_OVERRIDE='' \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm9.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "NAMED=$(grep -c '却没传 ANCHORS' "${L}.arm9.out" || true)"
+    echo "NOT_REACHED=$(grep -c '== 5. --confirm' "${L}.arm9.out" || true)"
+    echo "HEAD_SAME=$([ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] && echo yes || echo no)"
+  } > "${L}.arm9.rd"
+  exit $RC
+)
+A9=$(cat "${L}.arm9.rd" 2>/dev/null)
+if [ "$(rd "$A9" RC)" != "0" ] && [ "$(rd "$A9" NAMED)" != "0" ] \
+   && [ "$(rd "$A9" NOT_REACHED)" = "0" ] && [ "$(rd "$A9" HEAD_SAME)" = "yes" ]; then
+  ok "臂9 进门腿：--confirm 缺 ANCHORS ⇒ rc=$(rd "$A9" RC) 并点名那句理由、没走到第 5 步、HEAD 一枚提交都没多"
+else
+  bad "臂9 未按预期 ⇒ 3b 那条强制没牙或它挡住了本该继续的流程：$(printf '%s\n' "$A9" | tr '\n' ' ')"
+  echo '--- 臂9 日志尾部 ---'; tail -25 "${L}.arm9.out"
+fi
+
+rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8" "$F9"
 echo "== 合计 pass=$PASS fail=$FAIL =="
 rm -f "${L}".arm*.out "${L}".arm*.rd
 [ "$FAIL" = 0 ] || exit 1
