@@ -1684,9 +1684,14 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   `pnpm -r test` **RC=0 / 20 个包 / 11607 passed**（上一趟那条 `calendar-sidebar` 的 5s 超时单独复跑 **13 passed** ⇒ 记为并行负载超时不是产品失败）；
   静态门禁分母**从 `package.json` 的 `check` 链现量**（90 段里 85 枚 `check:*`，排除 5 段会抢共享载体的：
   `check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e` / `check:macos-window` / `check:apk-freshness`）
-  ⇒ **80 段跑完，79 绿 / 1 红**，唯一红是 `check:shell-surfaces` 的两栏**未取证**（`desktop-macos / countdown · 产物`、
-  `desktop-windows / countdown · 产物`）——它要的是装机证据不是代码修法，按它自己那份"不许修绿"清单留着，
-  归落地后的 `pnpm reinstall:desktop`；`check:vault-diagnostics` 那一红查出来是**载体缺件**
+  ⇒ **80 段跑完，79 绿 / 1 红**。
+  🔴 **那一红当时的解释是错的，留原文是为了让人看清"红字自己说的原因"也要复核**：它打印的是
+  "断言 A：winFacts 扫不到 ⇒ 判据失效"，我第一版把它读成"两栏未取证，归落地后的四端重装"——
+  两句都不对：未取证那一栏走的是响亮跳过（`HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 才折成红），
+  真正判红的是断言 A 把 `dist/windows/install-capture.txt` 这枚**未跟踪的取证产物**当成源码锚点扫
+  ⇒ 每一枚干净检出上 `pnpm check` 结构性必红。已修成"两侧名字对账"并补四臂台架（`56e08da8`，
+  `AS_EXPECTED=10/10`），入册为环境陷阱 **#283** 的同批；两栏未取证**仍然**归落地后的 `pnpm reinstall:desktop`，
+  只是它不再是这条红的原因。`check:vault-diagnostics` 那一红查出来是**载体缺件**
   （`e2e/` 是独立 workspace，这棵 worktree 从没装过它 ⇒ 探针读不到报告），`cd e2e && pnpm install` 后两腿 PASS。
   详情面那一族按它自己 §3e 留的处置补完：合流时 `--ours` 取的 10 枚证据 PNG **重跑三个 spec 重出并逐张看过**
   （`8 passed / 11.8s`，`0a1475a2` 的提交信息里逐枚写读数）。
