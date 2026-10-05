@@ -1905,6 +1905,47 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
 
 
 
+- (44) **10-05 11:2x：重拍装置里那枚"一枚目录住两枚 spec"的洞 —— 它会用 5 张的完成盖住 3 张的没拍。**
+  这是给 (42) 那条"9 枚要重拍"配方**预检**时撞出来的，不是等窗口开了才发现的（窗口只有一次，本线这一晚已经
+  被一次坏前置吃掉一回，见 (43)）。
+
+  ① **洞的形状**：`r17-reshoot-stale.sh` 的 `spec_for()` 一条目录只给**一枚** spec，而
+  `apps/web/evidence/calendar-day/` 这**一枚目录里住着两枚 spec 的图** ——
+  五枚 `calendar-day-*.png` 出自 `calendar-day.spec.ts`，三枚 `day-en-*.png` 出自
+  `calendar-day-en.spec.ts`（现量：它第 60 行 `SHOT()` 写的就是 `../apps/web/evidence/calendar-day/`，
+  而 `ls -d apps/web/evidence/calendar-day-en` ⇒ **不存在这枚目录**，表里那条 `calendar-day-en)` 是永不命中的死映射）。
+  `grep -c 'day-en-full' e2e/tests/calendar-day.spec.ts` ⇒ **0** ⇒ 跑完 `calendar-day.spec.ts` 动 5 张、
+  `settle_dir` 数到"就地 5 枚"就判这枚目录做完，**那 3 张过期主张一张没拍**。
+  与本脚本 09:5x 修的那格同族，只是**粗一档：目录级 vs spec 级**（那一格修的是"零产出要响亮"，
+  它没管"产出一半算不算全部"）。
+
+  ② **补的是一条例程性的覆盖判据，不是补那一行映射**：`coverage_for_dir()` 把该目录里**每条 UIPIN 钉着的图**
+  拿去问"有没有被选中的某枚 spec 点名过"（认 spec 里 `SHOT('<图名>')` 那个字面串），
+  没人点名 ⇒ `❌ … 未认领: <图名>` 并 **exit 1**（映射表仍是人工 allowlist，脚本不猜新映射 ——
+  这条判据只拒绝"把没拍到的读成拍到了"）。同时把 `calendar-day` 的映射改成**两行**（一行一枚）。
+  现量：`bash research/tools/r17-reshoot-stale.sh --selftest` ⇒ rc=**0**，
+  `bash research/tools/r17-reshoot-arms.sh` ⇒ **pass=13 fail=0**（那把守的是让路/图案逐字对账，没被这次改动碰坏）。
+
+  ③ **三臂**（臂数由 `--selftest` 自己打印，别抄）：**g** 一次性夹具里一枚目录两枚 spec 的图 ——
+  只选一枚 ⇒ 必须打 `未认领 … b.png`（负腿），两枚都选 ⇒ 必须空（正腿，挡"常驻红"）；
+  **h** **出厂那张表自己不漂**：表里 8 条映射逐枚对**真 spec** 跑覆盖判据，任何一张没人认领就红，
+  外加 `spec_for calendar-day` 必须是 **2** 枚；
+  **i** 一枚目录摊成 **2 行 PLAN** 且两行都在盘上（第 4 步是逐行跑，少一行就是漏拍一半）。
+
+  ④ 🔴 **一条我自己刚撞的、关于"自搭哨兵"的规矩**：`coverage_for_dir` 第一版解析 UIPIN 用的是裸
+  `grep '^UIPIN '`，于是 `calendar-day/README.md` 里**讲形状的那句散文**（"…路径集为空 rc=4…"）被当成一枚锚点，
+  臂 h 报出 `未认领:路径集为空` —— 红在一个**不存在的东西**上。规范裁判的解析形状在
+  `r17-evidence-md5-check.sh:163`（要求 `<名>.png` + 7–40 位十六进制 + 空格），
+  改成**逐字抄那一条**之后 rc=0。⇒ 凡是复核另一套判据的装置，**解析谓词必须等于被复核那套的原文**，
+  宽一档就会自己造红（这正是记忆里"手搭的哨兵必须等于规范裁判"那一族的又一次命中，本仓已第三次）。
+
+  ⑤ **下一趟窗口的配方因此变长了，但不会半路骗人**：补宽那 9 枚的 `tokens.css` ⇒ 它们转 UISTALE ⇒
+  `RUN=1 BUDGET=5400 INTERVAL=180 bash research/tools/r17-reshoot-keeper.sh`（缺 `RUN=1` 只打印要做的事并 exit 1）
+  ⇒ 装置现在会**逐枚目录把两枚 spec 都跑**（`calendar-day` 那一枚），跑完人逐张看图、改「人看到的」、重钉。
+  现量对照：`bash research/tools/r17-reshoot-stale.sh`（不带 `--confirm`）⇒ 前置门不达标时 exit 3 并打印 `GATES=`，
+  今日没有过期目录时它在第 1 步就 exit 0 报"无事可做"。
+
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
 **G0. 调休标记（休/班）只画在月档，年档那 12 张月格里一颗都没有，而文档里没有"刻意不做"的登记。**
 看图看出来的（22:0x，`calendar-view-options/view-select-closed.png` 月档里 10-01…10-07 与 10-09 带绿色「休」、
