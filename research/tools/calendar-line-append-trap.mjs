@@ -7,11 +7,12 @@
  * 所以这里把三个判断固化成退出码（默认 dry-run，`--confirm` 才动盘；缺 `--text` 直接 exit 1）：
  *
  *   ① 目标在工作树里脏 ⇒ `exit 3`。那本册子是并行会话的取证账本，别人正在写的 hunk 不替他们带。
- *   ② 远端跟踪分支（`origin/main`，以**上次 fetch 到的那份**为准）与本检出的**编号集合对不上号** ⇒ `exit 3`。
- *      两种形状各自会红：算出来的 N 已被远端占用；以及 N 不撞、但远端有本检出没有的号 / 同号写着两条不同的坑
- *      （§4.05 (61)③ 在真字节上量到的是后者：`origin/main` 末号 283、本检出 HEAD 278，`#279`–`#283` 同号不同文）。
- *      这一条不是仪式：本检出此刻 `ahead 8 / behind 594`，"没拉下来的条目"是真实存在的一批编号。
- *      没有该 ref 时**如实打印** `REMOTE=absent`，不假装验过；对得上时打印"对得上号"（阳性对照，臂 35）。
+ *   ② 与上次 fetch 到的 `origin/main` 相比，分两种形状两种处置（裁决见 §4.05 (65)）：
+ *      · **同号不同文** ⇒ `exit 3`。同一枚号下有两种主张，留哪条是**内容判断**，工具不代拍。
+ *      · **远端领先本检出** ⇒ **不拒绝**，按「号只增不改、两边各追加时后落地的一方顺延」把号抬到
+ *        两边最大号之后（臂32/34 是这两腿）。旧版在这里直接拒绝，于是凭空多出一枚前置
+ *        ——「等远端被收进本检出」根本不必等，中间那段空号在远端有定义，是诚实的；重号才是假的。
+ *      没有该 ref 时**如实打印** `REMOTE=absent`，不假装验过；两边对得上时打印"对得上号"（臂35 阳性对照）。
  *   ③ 正文首行已在册 ⇒ 报"已在册（现量号 X）"并 `exit 0`（幂等**按正文判**，见下面那腿）。
  *
  * 编号**只在写的那一刻现量**（`grep -oE '^[0-9]+\. ' | sort -n | tail -1`），
@@ -68,12 +69,13 @@ if (ROOT) {
 
 const src = fs.readFileSync(TARGET, 'utf8');
 const maxOf = (s) => (s.match(/^\d+\. /gm) || []).map((x) => parseInt(x, 10)).sort((a, b) => a - b).pop() ?? 0;
-const N = maxOf(src) + 1;
+const N0 = maxOf(src) + 1;
+let N = N0;
 let headMax = 'nogit';
 if (ROOT) {
   try { headMax = maxOf(execFileSync('git', ['-C', ROOT, 'show', `HEAD:${rel}`], { encoding: 'utf8' })); } catch { headMax = 'nohead'; }
 }
-console.log(`   现量末号：工作树 ${maxOf(src)}（HEAD ${headMax}）⇒ 这一枚取 ${N}`);
+console.log(`   现量末号：工作树 ${maxOf(src)}（HEAD ${headMax}）⇒ 初算 ${N}（远端对照那一格可能把它顺延）`);
 // 🔴 原本这里还有一档"N 是否已被占用"，它是**永远不会红的判据**：N 就是同一份文本里的最大号 +1，
 //    按定义 `^N\. ` 在那份文本里不可能存在。一条不能失败的检查比没有检查更糟（AGENTS §7 元规则 2），
 //    所以这里删掉它，把"撞号"这件事交给下面那一格**真的会红**的远端对照。
@@ -95,14 +97,6 @@ if (ROOT) {
     try { out = execFileSync('git', ['-C', ROOT, 'show', `origin/main:${rel}`], { encoding: 'utf8' }); }
     catch (e) { die(3, `❌ 读不到 origin/main 里那份册子（${String(e.message || e).split('\n')[0]}）⇒ 保守拒绝，不把"读不到"当成"没占用"`); }
     remote = 'checked';
-    if (new RegExp(`^${N}\\. `, 'm').test(out)) {
-      die(3, `❌ 上次 fetch 到的 \`origin/main\` 里号 ${N} 已被占用 ⇒ 本检出落后远端时"没拉下来的条目"是真实存在的一批编号；先让同步那一头收号，本工具不猜下一个空号`);
-    }
-    // 🔴 上面那一格只挡"N 恰好撞远端已用的号"，而 §4.05 (61)③ 在**真数据**上量到的形状比它宽：
-    //    `origin/main` 末号 283、本检出 HEAD 278，`#277`/`#278` 两边同文而 `#279`–`#283` **同号写着两条不同的坑**。
-    //    那种状态下等本地未提交那 14 条一落地，N 会算成 293 —— 不与远端撞，于是这一枚被追加进一本
-    //    **已经重号**的册子，把歧义从 5 枚加到 6 枚，而输出看着完全正常。
-    //    ⇒ 这一格判的是"这本册子当前与远端对得上号吗"，跟 N 撞不撞无关。
     const numMap = (s) => {
       const m = new Map();
       for (const line of s.split('\n')) {
@@ -113,16 +107,43 @@ if (ROOT) {
     };
     const LMAP = numMap(src);
     const RMAP = numMap(out);
-    const missing = [...RMAP.keys()].filter((k) => !LMAP.has(k));
+    const show = (xs) => xs.slice(0, 6).join(', ') + (xs.length > 6 ? ` …（共 ${xs.length} 枚）` : '');
     const clash = [...RMAP.keys()].filter((k) => LMAP.has(k) && LMAP.get(k) !== RMAP.get(k));
-    if (missing.length || clash.length) {
-      const show = (xs) => xs.slice(0, 6).join(', ') + (xs.length > 6 ? ` …（共 ${xs.length} 枚）` : '');
-      die(3, `❌ 这本册子与上次 fetch 到的 \`origin/main\` **已经对不上号**：`
-        + (missing.length ? ` 远端有 ${missing.length} 枚号在本检出里不存在（${show(missing)}）；` : '')
-        + (clash.length ? ` 同号不同文 ${clash.length} 枚（${show(clash)}）；` : '')
-        + `⇒ 先让同步那一头把两边收进同一份，本工具不往一本重号的册子尾部再加一枚`);
+    const missing = [...RMAP.keys()].filter((k) => !LMAP.has(k));
+    // 🔴 同号不同文要**再分一档**才知道需不需要人：
+    //    · 位移 = 这一枚号下两边写的不一样，但**各自那句话在对方那边另有其号** ⇒ 没有"两种主张"，
+    //      只是号被对方占去了；这是机械事实，pull 之后自然对齐，工具不必拦（真数据就是这一形：
+    //      HEAD `#269` 那句话在 `origin/main` 里落在 **282**）。
+    //    · 真分叉 = 某一侧的那句话在对方**任何号下都不存在** ⇒ 同一枚号下有两种主张，留哪条是内容判断，
+    //      工具不许猜 ⇒ `exit 3`。
+    //    ⚠️ 形状以现量为准（§4.05 (65)）：(61)③ 曾把「origin 独有 279–283」与「同号不同文」混写成一句。
+    const RV = new Set(RMAP.values());
+    const LV = new Set(LMAP.values());
+    const shifted = clash.filter((k) => RV.has(LMAP.get(k)) || LV.has(RMAP.get(k)));
+    const realClash = clash.filter((k) => !RV.has(LMAP.get(k)) && !LV.has(RMAP.get(k)));
+    if (realClash.length) {
+      die(3, `❌ 与上次 fetch 到的 \`origin/main\` **同号不同文且互不相容 ${realClash.length} 枚**（${show(realClash)}）`
+        + `⇒ 同一枚号下有两种主张、各自在对方任何号下都不存在，留哪条是内容判断；本工具不代拍`);
     }
-    console.log('   · 远端对照：本检出的编号集合与 origin/main **对得上号**（号同、首行文本同）');
+    // 而"远端领先本检出"这一形**不是拒绝的理由**：按 10-05 拍下的收号裁决——
+    // **号只增不改，两边各追加时后落地的一方顺延**——把号抬到两边最大号之后再写，
+    // 中间那段空号是诚实的（它在远端有定义），而重复号不是。
+    // 旧版在这里直接拒绝，于是第 5 项凭空多出一枚前置（"等远端被收进本检出"），而它根本不必等。
+    if (shifted.length) {
+      console.log(`   · 同号不同文 ${shifted.length} 枚（${show(shifted)}）经对账是**位移**（各自那句话在对方另有其号）⇒ 不是两种主张，不需要人裁决`);
+    }
+    if (missing.length || shifted.length) {
+      const RMAX = Math.max(...RMAP.keys());
+      if (RMAX + 1 > N) {
+        console.log(`   · 本检出落后远端（远端多 ${missing.length} 枚号${missing.length ? '：' + show(missing.sort((a, b) => a - b)) : ''}）`
+          + `⇒ 按「后落地的一方顺延」把号从 ${N} 抬到 ${RMAX + 1}（中间空号在远端有定义，不回收、不复用）`);
+        N = RMAX + 1;
+      } else {
+        console.log('   · 本检出落后远端，但取号已在两边最大号之后 ⇒ 不必抬高');
+      }
+    } else {
+      console.log('   · 远端对照：本检出的编号集合与 origin/main **对得上号**（号同、首行文本同）');
+    }
   }
 }
 console.log(`   远端那一格：REMOTE=${remote}${remote === 'absent' ? '（这个仓库没有可读的 origin/main ref ⇒ 那一格真的没验，不是验过说没问题）' : ''}`);
@@ -137,6 +158,7 @@ if (already >= 0) {
   process.exit(0);
 }
 
+console.log(`   ⇒ 这一枚取 ${N}${N !== N0 ? `（由初算 ${N0} 顺延而来）` : ''}`);
 console.log(`   会追加的一行（首行，其余 ${body.split('\n').length - 1} 行随后）：`);
 console.log(`     ${N}. ${body.split('\n')[0].slice(0, 72)}`);
 if (!CONFIRM) {

@@ -144,7 +144,7 @@ check_one_dir() {
   readme="$rd/README.md"
   if [ ! -f "$readme" ]; then
     echo "SKIP ${rd}（没有 README.md）"
-    echo "DIRCHECK ${rd} entries=0 mismatch=0 pins=0 md5bad=0 pinbad=0 pinunknown=0"
+    echo "DIRCHECK ${rd} entries=0 mismatch=0 pins=0 md5bad=0 pinbad=0 pinunknown=0 pinskip=0"
     return 4
   fi
   entries=$(grep -E -e '^([0-9a-f]{32}  [^ ]+\.(png|jpg|jpeg|webp))$' \
@@ -168,7 +168,7 @@ check_one_dir() {
     #    而 --all 的 UNPINNED 计数是从 DIRCHECK 的 entries=/pins= 两个字段读的 ⇒
     #    字段不存在 ⇒ 这一档**永远数到 0**，判据看着装了牙其实一条都没接住）。
     #    约定：check_one_dir **只要跑到底就打 DIRCHECK**，判决走返回值、账目走这一行。
-    echo "DIRCHECK ${rd} entries=0 mismatch=0 pins=0 md5bad=0 pinbad=0 pinunknown=0"
+    echo "DIRCHECK ${rd} entries=0 mismatch=0 pins=0 md5bad=0 pinbad=0 pinunknown=0 pinskip=0"
     return 4
   fi
   bad=0
@@ -206,7 +206,7 @@ check_one_dir() {
   done <<EOF3
 $entries
 EOF3
-  pbad=0; punk=0
+  pbad=0; punk=0; pnskip=0
   # UIPIN 的路径是**仓库根相对**的，所以 git 必须在仓库根上跑；$rd 是子目录时
   # `git -C "$rd" log -- packages/ui/...` 会把 pathspec 解成 `$rd/packages/ui/...` ⇒ 恒空。
   root=$(git -C "$rd" rev-parse --show-toplevel 2>/dev/null)
@@ -228,16 +228,18 @@ EOF3
       echo "PINUNKNOWN ${name}：$rd 不在任何 git 树里 ⇒ 代码锚点判不了（不算绿）"
       punk=$((punk + 1)); continue
     fi
-    # 浅克隆是**载体**判不了，不是锚点写错。这一档仍然红（判不了就不许报绿），
-    # 但要把话说清：CI 的 actions/checkout 默认 fetch-depth=1，接进链之前要先给那一步 full history，
-    # 否则这道门会在 CI 里**每枚锚点都红**，而红的原因跟任何人的改动都无关。
-    if [ ! -e "$root/.git/shallow" ]; then
-      SHALLOW_HINT=""
-    else
-      SHALLOW_HINT="⚠️ 这棵树是浅克隆 ⇒ 是**载体判不了**，不是锚点写错：先给 CI 的 checkout 加 fetch-depth: 0。"
+    # 🔴 浅克隆是**载体不具备 git 历史**，不是锚点写错。按 2026-10-01 拍板的那条分界
+    #   （平台/工具链不存在 ⇒ 合法跳过 + 响亮一行；工具都在而取证失败 ⇒ 判红），
+    #   依赖历史的那半在这里**既不判绿也不判错**，跳过的枚数打进 `pinskip=` 并在 --all 汇总里数出来。
+    #   ⚠️ 跳过是**被范围限定的**：上面那圈 md5 对账（README 记的字节 vs 盘上字节）与"图缺失"
+    #   都不依赖历史，在浅克隆里照样判红 —— 臂13 就是这一句的配对腿（同一棵浅树、改一枚字节 ⇒ 必须 rc=1）。
+    #   CI 要真验锚点，就给那一步 checkout 加 `fetch-depth: 0`；在此之前这行是响亮跳过，不是静默绿。
+    if [ -e "$root/.git/shallow" ]; then
+      echo "PINSKIP ${name}：这棵树是浅克隆 ⇒ 钉的 ${want:0:10} 与那组路径的历史**载体取不到**（判不了，也不算错；要验它请给 CI 的 checkout 加 fetch-depth: 0）"
+      pnskip=$((pnskip + 1)); continue
     fi
     if ! git -C "$root" cat-file -e "${want}^{commit}" 2>/dev/null; then
-      echo "PINUNKNOWN ${name}：钉的 ${want} 在这棵树里不是一笔提交（写错了 / 被 rebase 掉了）${SHALLOW_HINT}⇒ 判不了，不算绿"
+      echo "PINUNKNOWN ${name}：钉的 ${want} 在这棵树里不是一笔提交（写错了 / 被 rebase 掉了）⇒ 判不了，不算绿"
       punk=$((punk + 1)); continue
     fi
     if ! git -C "$root" merge-base --is-ancestor "$want" HEAD 2>/dev/null; then
@@ -258,7 +260,7 @@ EOF3
   done <<EOF4
 $pins
 EOF4
-  echo "DIRCHECK ${rd} entries=${n} mismatch=$((bad + pbad)) pins=${pn} md5bad=${bad} pinbad=${pbad} pinunknown=${punk}"
+  echo "DIRCHECK ${rd} entries=${n} mismatch=$((bad + pbad)) pins=${pn} md5bad=${bad} pinbad=${pbad} pinunknown=${punk} pinskip=${pnskip}"
   if [ "$((bad + pbad))" != "0" ]; then return 1; fi
   [ "$punk" = "0" ] && return 0 || return 4
 }
@@ -393,20 +395,38 @@ if [ "$SELFTEST" = "1" ]; then
     echo "❌ 臂8 坏了（rc=${P4}，期望 4；命中=${UK8}，期望 1）⇒ 一条**空的**锚点会被读成绿" >&2
     rm -rf "$P"; exit 1
   fi
-  # 臂 12：**同一枚查不到的提交**，但这棵树带 `.git/shallow` ⇒ 必须多说一句"是载体判不了"。
-  #   负对照就是臂 7 那份输出（同一棵夹具树、没有 shallow 标记）⇒ 它**不许**带那句话，
-  #   否则这条诊断会在正常树上把"锚点写错了"误导成"环境的锅"。
+  # 臂 12：**同一枚查不到的提交**，但这棵树带 `.git/shallow` ⇒ 依赖历史的那半是**载体判不了**，
+  #   按 2026-10-01 那条分界走"响亮跳过"（rc=0 + 一行 PINSKIP），而不是把 CI 变成每枚锚点都红的门。
+  #   负对照 = 臂 7 那趟（同一棵夹具树、没有 shallow 标记）⇒ 它**不许**跳过，必须照样 rc=4 点名 PINUNKNOWN；
+  #   两趟对照才证明"跳过"是**浅克隆这一档**触发的，不是这道门松了。
   printf 'UIPIN x.png %s ui/a.css\n' "0000000000000000000000000000000000000000" > "$P/README.md"
   : > "$P/.git/shallow"
-  echo "== selftest 臂12 浅克隆载体的诊断（负对照=臂7 那趟不带这句）=="
+  echo "== selftest 臂12 浅克隆载体：锚点那半响亮跳过（负对照=臂7 那趟必须照旧红）=="
   check_one_dir "$P" >"$P/p5.out" 2>&1
   P5=$?
-  HINT12=$(grep -c '浅克隆' "$P/p5.out")
+  SK12=$(grep -c '^PINSKIP ' "$P/p5.out")
+  UK12=$(grep -c '^PINUNKNOWN ' "$P/p5.out")
   NEG12=$(grep -c '浅克隆' "$P/p3.out")
-  echo "   臂12 rc=${P5} 浅克隆诊断命中=${HINT12}（期望 1）／臂7 负对照命中=${NEG12}（期望 0）"
-  if [ "$P5" != "4" ] || [ "$HINT12" != "1" ] || [ "$NEG12" != "0" ]; then
-    echo "❌ 臂12 坏了（rc=${P5} 期望 4；命中=${HINT12} 期望 1；负对照=${NEG12} 期望 0）⇒ CI 那种 depth=1 的载体把「锚点判不了」报成「锚点写错」，接链的人会白查一轮" >&2
-    rm -rf "$P"; exit 1
+  echo "   臂12 rc=${P5} PINSKIP=${SK12}（期望 1）PINUNKNOWN=${UK12}（期望 0）／臂7 负对照带浅克隆字样的行=${NEG12}（期望 0）"
+  if [ "$P5" != "0" ] || [ "$SK12" != "1" ] || [ "$UK12" != "0" ] || [ "$NEG12" != "0" ]; then
+    echo "❌ 臂12 坏了（rc=${P5} 期望 0；PINSKIP=${SK12} 期望 1；PINUNKNOWN=${UK12} 期望 0；负对照=${NEG12} 期望 0）⇒ 要么 CI 那种 depth=1 的载体把「锚点写错」和「载体没历史」混成同一个读数，要么跳过根本没被数出来" >&2
+    rm -f "$P/.git/shallow"; rm -rf "$P"; exit 1
+  fi
+  # 臂 13（**这一臂才是"没降级"的证据**）：同一棵浅树里，把**不依赖历史**的那半弄坏 ——
+  #   README 记的 md5 与盘上字节不一致 ⇒ 必须照样 rc=1。
+  #   🔴 为什么必须有它：12 那趟只证明"浅克隆会跳过锚点"；没有 13，一条"浅克隆 ⇒ 整道门 return 0"的
+  #   写法同样能骗过 12，而那正是把判据换成装饰。跳过是被**范围**限定的，不是把门关掉。
+  printf '%s  %s\n' "00000000000000000000000000000000" "x.png" > "$P/README.md"
+  printf 'UIPIN x.png %s ui/a.css\n' "0000000000000000000000000000000000000000" >> "$P/README.md"
+  echo "== selftest 臂13 浅克隆里 md5 那半坏了 ⇒ 仍必须红（证明跳过只限依赖历史的那半）=="
+  check_one_dir "$P" >"$P/p6.out" 2>&1
+  P6=$?
+  MM13=$(grep -c '^MISMATCH ' "$P/p6.out")
+  SK13=$(grep -c '^PINSKIP ' "$P/p6.out")
+  echo "   臂13 rc=${P6}（要非 0）MISMATCH=${MM13}（期望 1）PINSKIP=${SK13}（期望 1，两半各说各的）"
+  if [ "$P6" = "0" ] || [ "$MM13" != "1" ] || [ "$SK13" != "1" ]; then
+    echo "❌ 臂13 坏了（rc=${P6} 期望非 0；MISMATCH=${MM13} 期望 1；PINSKIP=${SK13} 期望 1）⇒「浅克隆跳过」会把不依赖历史的证据过期一起吞掉" >&2
+    rm -f "$P/.git/shallow"; rm -rf "$P"; exit 1
   fi
   rm -f "$P/.git/shallow"
   rm -rf "$P"
@@ -465,7 +485,7 @@ if [ "$SELFTEST" = "1" ]; then
   sed 's/^/      /' "$U/a10.out"
   # 🔴 逐字段比，不写"包含关键字"式的断言：整行相等才能同时钉住"多算了"和"少算了"
   #    （只 grep dirs_unpinned=1 的话，unpinned 数到 3 也照样过 —— 而 3 说明它把有锚点的也算进去了）
-  WANT="ALLCHECK dirs_scanned=3 entries_parsed=1 pins_parsed=0 dirs_with_mismatch=0 dirs_without_readme=1 noreadme_baseline=1 dirs_unpinned=1 unpinned_baseline=1 dirs_with_broken_pin=0"
+  WANT="ALLCHECK dirs_scanned=3 entries_parsed=1 pins_parsed=0 dirs_with_mismatch=0 dirs_without_readme=1 noreadme_baseline=1 dirs_unpinned=1 unpinned_baseline=1 dirs_with_broken_pin=0 dirs_with_skipped_pin=0"
   if [ "$A10_RC" != "0" ] || [ "$A10" != "$WANT" ]; then
     echo "❌ 臂10 对照腿坏了（rc=${A10_RC}）" >&2
     echo "   期望：${WANT}" >&2
@@ -574,7 +594,29 @@ if [ "$SELFTEST" = "1" ]; then
     rm -rf "$W"; exit 1
   fi
   rm -rf "$W"
-  echo "SELFTEST=OK（对照 0 枚 / 变异恰好 1 枚 / 表格形状解析到 1 条 / 表格形状注入腿恰好 1 枚 / UIPIN 正例 1 命中 / 源码动了恰好 1 枚 UISTALE / 假提交号 rc=4 / 空路径集 rc=4 / 浅克隆载体多说出"是载体判不了"且正常树不带那句 / 有图无 README 点名 1·负对照 0·全集 1 且补好后归零 / --all 层：ALLCHECK 逐字段相等 + 文本目录不点名 + 两档棘轮各自能红 + PINBROKEN 能红 + 空树 rc=4 / 点名层：扫了几·共几·未扫几 三个数字随树变且全点名归零）"
+  # ── 臂 14：浅克隆载体里**收尾那一句**不许把跳过的锚点说成验过的。
+  #   这臂不是补数，是真踩过：depth=1 的克隆里现量 `pins_parsed=27 dirs_with_skipped_pin=8`，
+  #   而旧那句照旧打印「27 条 UIPIN 的代码锚点未被『决定形状的源码』越过」⇒ 一行读起来像全绿的假绿。
+  #   两腿方向相反：浅腿要 rc=0 + 点名跳过 + **不许**出现那句；非浅腿（同一份夹具、钉的是坏号）要照样红。
+  V=$(mktemp -d /tmp/ht-r17-shallow-all.XXXXXX)
+  mkdir -p "$V/apps/web/evidence/pinned"
+  printf 'P1' > "$V/apps/web/evidence/pinned/p.png"
+  printf 'UIPIN p.png %s apps/web/evidence/pinned/p.png\n' "0000000000000000000000000000000000000000" > "$V/apps/web/evidence/pinned/README.md"
+  GITV="git -C $V -c commit.gpgsign=false -c core.hooksPath=$V/nohooks -c user.name=t -c user.email=t@t"
+  $GITV init -q 2>/dev/null; $GITV commit -q --allow-empty -m seed 2>/dev/null
+  bash "$SELF_PATH" --all --root "$V" >"$V/n0.out" 2>&1; N0=$?
+  : > "$V/.git/shallow"
+  bash "$SELF_PATH" --all --root "$V" >"$V/n1.out" 2>&1; N1=$?
+  SKIPWORD=$(grep -c '被响亮跳过' "$V/n1.out")
+  FALSEGREEN=$(grep -c '未被「决定形状的源码」越过' "$V/n1.out")
+  SKFLD=$(sed -n 's/^ALLCHECK .* dirs_with_skipped_pin=\([0-9]*\).*/\1/p' "$V/n1.out")
+  echo "   臂14 浅腿 rc=${N1}（要 0）点名跳过=${SKIPWORD}（要 1）假绿句=${FALSEGREEN}（要 0）skipped_pin 字段=${SKFLD}（要 1）／非浅腿 rc=${N0}（要非 0）"
+  if [ "$N1" != "0" ] || [ "$SKIPWORD" != "1" ] || [ "$FALSEGREEN" != "0" ] || [ "$SKFLD" != "1" ] || [ "$N0" = "0" ]; then
+    echo "❌ 臂14 坏了（浅腿 rc=${N1} 点名=${SKIPWORD} 假绿=${FALSEGREEN} 字段=${SKFLD}；非浅腿 rc=${N0}）⇒ 浅克隆里那句收尾会把没验的报成验过的" >&2
+    rm -f "$V/.git/shallow"; rm -rf "$V"; exit 1
+  fi
+  rm -f "$V/.git/shallow"; rm -rf "$V"
+  echo "SELFTEST=OK（对照 0 枚 / 变异恰好 1 枚 / 表格形状解析到 1 条 / 表格形状注入腿恰好 1 枚 / UIPIN 正例 1 命中 / 源码动了恰好 1 枚 UISTALE / 假提交号 rc=4 / 空路径集 rc=4 / 浅克隆载体锚点那半响亮跳过（rc=0 且 PINSKIP=1）而正常树照旧 rc=4 / 同一棵浅树里 md5 那半坏了仍必须 rc=1（证明跳过只限依赖历史的那半，不是把门关掉） / 浅克隆收尾那句：点名跳过 1 枚且**不许**出现「未被越过」那句假绿，同一夹具不浅时照旧红 / 有图无 README 点名 1·负对照 0·全集 1 且补好后归零 / --all 层：ALLCHECK 逐字段相等 + 文本目录不点名 + 两档棘轮各自能红 + PINBROKEN 能红 + 空树 rc=4 / 点名层：扫了几·共几·未扫几 三个数字随树变且全点名归零）"
   exit 0
 fi
 
@@ -591,6 +633,7 @@ if [ "$ALL" = "1" ]; then
   [ -n "$README_LIST" ] || { echo "❌ 前提不成立：${ALL_ROOT}/apps 下按 ${ALL_GLOB} 的深度一份 README 都没找到 ⇒ 探针没接上" >&2; exit 4; }
   TOTAL_UNPINNED=0
   TOTAL_UNKNOWN=0
+  TOTAL_SKIP=0
   while IFS= read -r r; do
     [ -n "$r" ] || continue
     d=$(dirname "$r")
@@ -620,6 +663,14 @@ if [ "$ALL" = "1" ]; then
       printf 'PINBROKEN %s（%s 条锚点判不了 ⇒ 不能算数）\n' "${d#"$ALL_ROOT"/}" "$UK"
       TOTAL_UNKNOWN=$((TOTAL_UNKNOWN + 1))
     fi
+    # 浅克隆载体里被**响亮跳过**的那半（依赖 git 历史的锚点）。这一档不给棘轮、也不判红：
+    # 它既不是"锚点写错"也不是"证据过期"，是载体不具备历史 —— 但它必须数得出来，
+    # 否则"CI 里全绿"会被读成"锚点在 CI 里也被验过"，那是这道门最容易被误读的一格。
+    PS=$(printf '%s\n' "$OUT" | sed -n 's/^DIRCHECK .* pinskip=\([0-9]*\).*/\1/p')
+    if [ -n "$PS" ] && [ "$PS" != "0" ]; then
+      printf 'PINSKIP %s（%s 条锚点在浅克隆里判不了 ⇒ 不判绿也不判错；CI 要验它请给 checkout 加 fetch-depth: 0）\n' "${d#"$ALL_ROOT"/}" "$PS"
+      TOTAL_SKIP=$((TOTAL_SKIP + 1))
+    fi
   done <<RL_BLOCK
 $README_LIST
 RL_BLOCK
@@ -635,7 +686,7 @@ RL_BLOCK
   done <<NR_BLOCK
 $(noreadme_dirs "$ALL_ROOT")
 NR_BLOCK
-  echo "ALLCHECK dirs_scanned=${TOTAL_DIRS} entries_parsed=${TOTAL_ENTRIES} pins_parsed=${TOTAL_PINS} dirs_with_mismatch=${TOTAL_BAD} dirs_without_readme=${TOTAL_NOREADME} noreadme_baseline=${NOREADME_MAX} dirs_unpinned=${TOTAL_UNPINNED} unpinned_baseline=${UNPINNED_MAX} dirs_with_broken_pin=${TOTAL_UNKNOWN}"
+  echo "ALLCHECK dirs_scanned=${TOTAL_DIRS} entries_parsed=${TOTAL_ENTRIES} pins_parsed=${TOTAL_PINS} dirs_with_mismatch=${TOTAL_BAD} dirs_without_readme=${TOTAL_NOREADME} noreadme_baseline=${NOREADME_MAX} dirs_unpinned=${TOTAL_UNPINNED} unpinned_baseline=${UNPINNED_MAX} dirs_with_broken_pin=${TOTAL_UNKNOWN} dirs_with_skipped_pin=${TOTAL_SKIP}"
   if [ "$((TOTAL_ENTRIES + TOTAL_PINS))" = "0" ]; then
     echo "❌ 前提不成立：${TOTAL_DIRS} 份 README 里解析到 0 条锚点（md5=0 且 UIPIN=0）⇒ 探针没接上，不能据此判绿" >&2
     exit 4
@@ -659,7 +710,15 @@ NR_BLOCK
     echo "   🔴 这一档没有基线，因为现量本来就是 0：一条查不到的锚点比没有锚点更糟 —— 它会被读成"已有判据"。" >&2
     exit 1
   fi
-  [ "$TOTAL_BAD" = "0" ] && { echo "✅ ${TOTAL_ENTRIES} 条 md5 与盘上字节逐条相同，${TOTAL_PINS} 条 UIPIN 的代码锚点未被「决定形状的源码」越过（${TOTAL_DIRS} 份 README）"; exit 0; }
+  [ "$TOTAL_BAD" = "0" ] && {
+    # 🔴 收尾那句**不许把跳过的枚数说成验过的**：浅克隆载体里 `pins_parsed` 照样数到 27，
+    #   而它们的锚点一条都没验 —— 沿用上面那句就会产出一行读起来像"锚点全绿"的假绿。
+    if [ "$TOTAL_SKIP" != "0" ]; then
+      echo "⚠️ ${TOTAL_ENTRIES} 条 md5 与盘上字节逐条相同；UIPIN 共解析到 ${TOTAL_PINS} 条，其中 ${TOTAL_SKIP} 份 README 的锚点**在这棵浅克隆树里被响亮跳过**（既不判绿也不判错）⇒ 这一趟**没有**验过它们的代码锚点，要验请给 CI 的 checkout 加 fetch-depth: 0"
+    else
+      echo "✅ ${TOTAL_ENTRIES} 条 md5 与盘上字节逐条相同，${TOTAL_PINS} 条 UIPIN 的代码锚点未被「决定形状的源码」越过（${TOTAL_DIRS} 份 README）"
+    fi
+    exit 0; }
   echo "❌ ${TOTAL_BAD} 份 README 有锚点不一致（md5 要重取，代码锚点要重看并重钉）" >&2
   exit 1
 fi
