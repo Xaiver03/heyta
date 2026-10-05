@@ -1635,17 +1635,27 @@ fi
 
 step "6. 同意联网，但逐功能授权一律不给"
 open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
-# 隐私同意在设置**第一段**（合规位置，理由写在 SettingsScreen 的注释里）：
-# 决定过 ⇒ 只有「重新作出选择」或「撤回同意」两枚，前者把同一张面板再开一次。
-# 🔴 rig34 现量：上一行 open_ai_settings 是**往下**滚到 AI 区块才 return 的，于是这一格
-#   在 AI 区块那一屏找第一段里的「重新作出选择」⇒ 恒取空 ⇒ 报「隐私开关锚点失效」，
-#   读起来像合规区块被摘掉了。这是 traps #331 的同族第二种面目：
-#   探针只认"当前这一帧"，而"在上面"和"不存在"在输出上是同一句空。
-#   ⇒ 先看顶部（摘焦点 + 回顶），失败分支照旧带 screen_txt 把"顶上那一屏到底有什么"打出来。
+# 隐私同意在设置**第一段**（合规位置，理由写在 SettingsScreen 的注释里）。
+# 🔴 那一格的两枚按钮是**互斥**的，由产品的状态机决定（SettingsScreen.tsx:330 那个三元）：
+#   `consentRecord === null`（没决定过 / 刚撤回）⇒ 只有「重新作出选择」
+#   `consentRecord !== null`（已同意 **或** 已明确选只用本机）⇒ 只有「撤回同意」
+#   rig34/rig35 现量：第 0 步把这一档选成「只用本机」⇒ 走到这里时界面上只有「撤回同意」，
+#   而载体找的是「重新作出选择」/「同意并联网」⇒ 两次都取空，报「隐私开关锚点失效」，
+#   读起来像合规区块被摘掉了。这是 traps #335 的同一条：**期望值要由产品自己的状态机推**。
+#   ⇒ 先到未决定态（点撤回），再走「重新作出选择」把同一张面板开起来；两态各有读数。
 blur_focus
 scroll_to_top
 dump
-XY=$(xy_desc "重新作出选择"); [ -n "$XY" ] || XY=$(xy_desc "同意并联网")
+if [ "$(has_sub 撤回同意)" = "1" ]; then
+  echo "   · 现量：区块在「已决定」态（只有「撤回同意」）⇒ 先撤回，回到未决定态才有「重新作出选择」" >&2
+  tap_in_rid privacy-consent-section 撤回同意 || tap_desc 撤回同意 \
+    || { screen_txt; bad "「撤回同意」在树里却点不动（两锚：块内 clickable 祖先 / content-desc）"; }
+  sleep 1.5
+  blur_focus; scroll_to_top; dump
+fi
+XY=$(xy_clickable_in_rid privacy-consent-section 重新作出选择)
+[ -n "$XY" ] || XY=$(xy_desc "重新作出选择")
+[ -n "$XY" ] || XY=$(xy_desc "同意并联网")
 if [ -n "$XY" ]; then
   $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1
   sleep 2
@@ -1653,12 +1663,23 @@ if [ -n "$XY" ]; then
     && echo "   ✅ 隐私层已切到「同意并联网」（功能级授权仍逐条手动）" \
     || echo "   ↷ 面板没接住 —— 可能已是联网态。**这句不是 ✅**：到底联网与否由第 7/8 步的计数与披露读数裁决，不由这里自称"
 else
-  echo "   ❌ 设置里既没有「重新作出选择」也没有「同意并联网」—— 隐私区块形状变了，锚点要跟着改"
+  echo "   ❌ 走过「撤回同意」之后，设置里仍然既没有「重新作出选择」也没有「同意并联网」"
+  echo "      两枚锚点分别是 consentRecord 的 null / 非 null 两支（SettingsScreen.tsx:330），"
+  echo "      两支都取空 ⇒ 要么那一格换了措辞（词条对账会先红），要么区块本身没了"
   screen_txt
   bad "隐私开关锚点失效"
 fi
 
 step "7. 非回环 https 端点：授权入口按地址类别出现，未授权时零外发（Goal-7a 的真机对应物）"
+# 🔴 必须**先回设置面**再存端点。rig36 现量：这一格原先 add_endpoint 排在
+#   open_ai_settings 之前，而第 6 步刚把设置面**收掉**了 ——
+#   「重新作出选择」在 `SettingsScreen.tsx:197` 是 `onClose()` 再开同意面板
+#   （RN 的 Modal 各开一个原生窗口，"不叠两层"是产品写死的裁决，不是巧合），
+#   于是 add_endpoint 落在「我的」页上：表单四格一枚都不在树里，
+#   报出来的却是「非回环端点没存进去」+ 一句"旧 APK 没有这一格？"。
+#   探针留下的状态就是后续判据的输入（#83.1），而"产品主动收了面"这一档
+#   要写在这里，否则下一个人会以为是自己没滚到。
+open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 add_endpoint "$EP_REMOTE" "$DEVICE_REMOTE_URL" \
   || { echo "   ❌ 非回环端点没存进去"; screen_txt; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
 open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
