@@ -132,6 +132,11 @@ noreadme_dirs() {
   done
 }
 
+# 从一行 `DIRCHECK …` 里取一个数字字段。两个分支（--all 与点名）共用这一把尺 ——
+# 🔴 原来 --all 里那两条 sed 是一把手抄了两遍的形状，而点名分支根本没有取数，
+#    于是它的绿行只能写"逐条相同"这种**没有分母**的口吻（臂 11 的由来）。
+dfield() { printf '%s\n' "$1" | sed -n "s/^DIRCHECK .* ${2}=\\([0-9]*\\) .*/\\1/p"; }
+
 # 对一份 README 逐条对账；stdout 打印 `OK <名>（<md5>）` 或 `MISMATCH <名>：…`
 # 返回：0 全对 / 1 有不一致 / 4 这份里解析到 0 条
 check_one_dir() {
@@ -494,7 +499,58 @@ if [ "$SELFTEST" = "1" ]; then
     echo "❌ 臂10 前提腿坏了（rc=${R4}，期望 4）⇒ 扫描没接上时会判绿" >&2
     exit 1
   fi
-  echo "SELFTEST=OK（对照 0 枚 / 变异恰好 1 枚 / 表格形状解析到 1 条 / 表格形状注入腿恰好 1 枚 / UIPIN 正例 1 命中 / 源码动了恰好 1 枚 UISTALE / 假提交号 rc=4 / 空路径集 rc=4 / 有图无 README 点名 1·负对照 0·全集 1 且补好后归零 / --all 层：ALLCHECK 逐字段相等 + 文本目录不点名 + 两档棘轮各自能红 + PINBROKEN 能红 + 空树 rc=4）"
+  # ── 臂 11：**点名分支的作用域自述**。它救的是"绿行没有分母"这一格 ——
+  #   02:1x 现场：裸跑（默认只扫 DEFAULT_DIRS 一枚）打印 `✅ 证据 README 的 md5 与盘上字节逐条相同`，
+  #   而同一分钟 `--dir apps/web/evidence/calendar-day` 报 mismatch=6 / pinbad=5。
+  #   那句 ✅ 说的其实是"我扫的这一枚没问题"，但输出上**和"全树都干净"长得一模一样**（同族：
+  #   「空测量看着最干净」、作用域打空的命令照样 rc=0）。所以这一臂不测对账逻辑，
+  #   只测**这句话有没有把范围说出来**，并且让那个数字跟着树变（跟着变才证明它是现量的、不是抄的）。
+  W=$(mktemp -d /tmp/ht-r17-scope.XXXXXX)
+  for n in d1 d2 d3; do
+    mkdir -p "$W/apps/web/evidence/$n"
+    printf 'IMG-%s' "$n" > "$W/apps/web/evidence/$n/p.png"
+    printf '%s  p.png\n' "$(md5 -q "$W/apps/web/evidence/$n/p.png")" > "$W/apps/web/evidence/$n/README.md"
+  done
+  echo "== selftest 臂11 点名分支的作用域自述 =="
+  bash "$SELF_PATH" --root "$W" --dir "$W/apps/web/evidence/d1" >"$W/o1" 2>&1
+  S1=$?
+  L1=$(sed -n '/^✅/p' "$W/o1")
+  echo "   腿1（只扫 1／树里 3）rc=${S1} 行：${L1}"
+  # 三条都要命中：扫了几份、树里共几份、未扫几份 —— 少任何一条这句话仍能读成全树口吻
+  M1=0
+  printf '%s' "$L1" | grep -q '扫 1 份' && M1=$((M1+1))
+  printf '%s' "$L1" | grep -q '共 3 份' && M1=$((M1+1))
+  printf '%s' "$L1" | grep -q '未扫 2 份' && M1=$((M1+1))
+  if [ "$S1" != "0" ] || [ "$M1" != "3" ]; then
+    echo "❌ 臂11 腿1 坏了（rc=${S1} 三个数字命中=${M1}，要 0/3）⇒ 点名范围的绿行仍会被读成全树干净" >&2
+    rm -rf "$W"; exit 1
+  fi
+  # 腿2（变异）：往树里**加一份**证据 README ⇒ 「共/未扫」必须各加一。
+  #   这一腿证明那两个数是现量数出来的：写成常量的实现过不了这里。
+  mkdir -p "$W/apps/web/evidence/d4"
+  printf 'IMG-d4' > "$W/apps/web/evidence/d4/p.png"
+  printf '%s  p.png\n' "$(md5 -q "$W/apps/web/evidence/d4/p.png")" > "$W/apps/web/evidence/d4/README.md"
+  bash "$SELF_PATH" --root "$W" --dir "$W/apps/web/evidence/d1" >"$W/o2" 2>&1
+  S2=$?
+  L2=$(sed -n '/^✅/p' "$W/o2")
+  echo "   腿2（树里加了 d4 ⇒ 应读成 共 4／未扫 3）rc=${S2} 行：${L2}"
+  if [ "$S2" != "0" ] || ! printf '%s' "$L2" | grep -q '共 4 份' || ! printf '%s' "$L2" | grep -q '未扫 3 份'; then
+    echo "❌ 臂11 腿2 坏了（rc=${S2}）⇒ 分母没跟着树走，是抄下来的数字" >&2
+    rm -rf "$W"; exit 1
+  fi
+  # 腿3（负对照）：把四份**全点名** ⇒ 未扫必须归零；不归零说明"扫过的"没被从分母里扣掉，
+  #   下一位会看见"未扫 4"而以为全树还欠着账。
+  bash "$SELF_PATH" --root "$W" --dir "$W/apps/web/evidence/d1" --dir "$W/apps/web/evidence/d2" \
+    --dir "$W/apps/web/evidence/d3" --dir "$W/apps/web/evidence/d4" >"$W/o3" 2>&1
+  S3=$?
+  L3=$(sed -n '/^✅/p' "$W/o3")
+  echo "   腿3（全点名）rc=${S3} 行：${L3}"
+  if [ "$S3" != "0" ] || ! printf '%s' "$L3" | grep -q '未扫 0 份'; then
+    echo "❌ 臂11 腿3 坏了（rc=${S3}）⇒ 已扫的没有从分母里扣掉，绿行会长期谎称还欠账" >&2
+    rm -rf "$W"; exit 1
+  fi
+  rm -rf "$W"
+  echo "SELFTEST=OK（对照 0 枚 / 变异恰好 1 枚 / 表格形状解析到 1 条 / 表格形状注入腿恰好 1 枚 / UIPIN 正例 1 命中 / 源码动了恰好 1 枚 UISTALE / 假提交号 rc=4 / 空路径集 rc=4 / 有图无 README 点名 1·负对照 0·全集 1 且补好后归零 / --all 层：ALLCHECK 逐字段相等 + 文本目录不点名 + 两档棘轮各自能红 + PINBROKEN 能红 + 空树 rc=4 / 点名层：扫了几·共几·未扫几 三个数字随树变且全点名归零）"
   exit 0
 fi
 
@@ -517,9 +573,9 @@ if [ "$ALL" = "1" ]; then
     TOTAL_DIRS=$((TOTAL_DIRS + 1))
     OUT=$(check_one_dir "$d"); RC=$?
     printf '%s\n' "$OUT"
-    E=$(printf '%s\n' "$OUT" | sed -n 's/^DIRCHECK .* entries=\([0-9]*\) .*/\1/p')
+    E=$(dfield "$OUT" entries)
     [ -n "$E" ] && TOTAL_ENTRIES=$((TOTAL_ENTRIES + E))
-    Q=$(printf '%s\n' "$OUT" | sed -n 's/^DIRCHECK .* pins=\([0-9]*\) .*/\1/p')
+    Q=$(dfield "$OUT" pins)
     [ -n "$Q" ] && TOTAL_PINS=$((TOTAL_PINS + Q))
     if [ "$RC" = "1" ]; then TOTAL_BAD=$((TOTAL_BAD + 1)); fi
     # 🔴 第二档债：README 里 md5=0 且 UIPIN=0（check_one_dir 返回 4 / EMPTY），**而目录里有图**。
@@ -585,12 +641,31 @@ NR_BLOCK
 fi
 
 if [ -z "$DIRS" ]; then DIRS="$DEFAULT_DIRS"; fi
+SCANNED=0
 for d in $DIRS; do
-  check_one_dir "$d" || TOTAL_BAD=$((TOTAL_BAD + 1))
+  OUT=$(check_one_dir "$d"); RC=$?
+  printf '%s\n' "$OUT"
+  E=$(dfield "$OUT" entries); [ -n "$E" ] && TOTAL_ENTRIES=$((TOTAL_ENTRIES + E))
+  Q=$(dfield "$OUT" pins);    [ -n "$Q" ] && TOTAL_PINS=$((TOTAL_PINS + Q))
+  [ "$RC" != "0" ] && TOTAL_BAD=$((TOTAL_BAD + 1))
+  SCANNED=$((SCANNED + 1))
 done
+# 🔴 **作用域自述**（臂 11）。这一条分支原来打印的是 `✅ 证据 README 的 md5 与盘上字节逐条相同`
+#    —— 全树口吻，而它只扫 DEFAULT_DIRS **一枚**目录。2026-10-05 02:1x 现场：同一分钟
+#    `--dir apps/web/evidence/calendar-day` 报 `entries=1 mismatch=6 pins=8 pinbad=5`，
+#    裸跑却打印那句 ✅。两件事都不是"有人写错了一句 echo"那么简单：
+#      · 默认作用域是**硬编码的一枚目录**，而树里有十几份证据 README ⇒ 新增目录永远落在scope 外；
+#      · 绿行**没有分母**，所以"扫了 1 份"和"扫了全部"在输出上长得一模一样。
+#    这里不改成全树扫（--all 才是那一层，文档里十几处引用的是它），改的是**让绿行说不出假话**：
+#    报扫了几份、root 里共几份、没扫几份，并把 --all 指给下一位。
+TREE_READMES=$(find "$ALL_ROOT/apps" -type f -path '*/evidence/*/README.md' 2>/dev/null | grep -c . || true)
+TREE_READMES=${TREE_READMES:-0}
+UNSCANNED=0
+[ "$TREE_READMES" -gt "$SCANNED" ] && UNSCANNED=$((TREE_READMES - SCANNED))
+SCOPE="作用域=点名：扫 ${SCANNED} 份／root 内共 ${TREE_READMES} 份证据 README ⇒ 未扫 ${UNSCANNED} 份（全树对账：--all）"
 if [ "$TOTAL_BAD" != "0" ]; then
-  echo "❌ ${TOTAL_BAD} 个证据目录有锚点不一致（README 要重取指纹/重钉代码锚点，且「人看过的那张图」要重看）" >&2
+  echo "❌ ${TOTAL_BAD} 个证据目录有锚点不一致（README 要重取指纹/重钉代码锚点，且「人看过的那张图」要重看）—— ${SCOPE}" >&2
   exit 1
 fi
-echo "✅ 证据 README 的 md5 与盘上字节逐条相同，UIPIN 的代码锚点都还没被源码越过"
+echo "✅ 本次扫的 ${SCANNED} 份点名目录里 ${TOTAL_ENTRIES} 条 md5 与盘上字节逐条相同，${TOTAL_PINS} 条 UIPIN 的代码锚点都还没被源码越过 —— ${SCOPE}"
 exit 0
