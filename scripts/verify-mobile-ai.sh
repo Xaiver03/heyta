@@ -312,6 +312,47 @@ reveal_rid_top_fallback() {  # <testID> → 0=在视口上方，回到顶部后�
   return 1
 }
 
+# 把整页从顶走到底，逐帧查一组 testID，返回**命中**的那些。
+# 🔴 为什么要有它：一条"没有 X"的判据必须能出示它把多少帧、哪些档查过了，
+#    否则"没观测到"和"没观测"在输出上长得一模一样（AGENTS §7 元规则 1）。
+#    reveal_rid 是"找到为止"，够不到时报的是载体失败；这里要的是"走遍全书"。
+scan_rids() {  # <testID...> → stdout: 命中的 testID（空格分隔）；没走遍全书时追加哨兵 SCAN-CAP
+  local pending="$1" hit="" still="" r ref now stuck=0 frames=0
+  blur_focus
+  scroll_to_top
+  while :; do
+    frames=$((frames + 1))
+    dump
+    still=""
+    for r in $pending; do
+      if [ -n "$(rid_center "$r")" ]; then hit="$hit $r"; else still="$still $r"; fi
+    done
+    pending="$still"
+    if [ -z "$(printf '%s' "$pending" | tr -d ' ')" ]; then break; fi
+    if [ "$frames" -ge 12 ]; then
+      echo "   ⓘ 走满 12 帧上限，还没查到：$pending —— 这一格按「载体走不完」记，不记成「界面上没有」" >&2
+      hit="$hit SCAN-CAP"
+      break
+    fi
+    ref=$(scroll_anchor_bounds)
+    $ADB shell input swipe 540 1900 540 900 300 >/dev/null 2>&1
+    sleep 1.2
+    dump
+    now=$(scroll_anchor_bounds)
+    if [ -n "$ref" ] && [ "$ref" = "$now" ]; then
+      stuck=$((stuck + 1))
+      # 第一次不动先摘焦点（焦点挂在输入框上时长 swipe 会被它吞掉，见 reveal_rid 那段现量），
+      # 摘过还是不动才认"到底了"。
+      if [ "$stuck" = 2 ]; then blur_focus; continue; fi
+      if [ "$stuck" -ge 3 ]; then break; fi
+    else
+      stuck=0
+    fi
+  done
+  echo "   · 整页走了 ${frames} 帧、逐帧查过五档；未命中：${pending:-（无）}" >&2
+  printf '%s\n' "$hit"
+}
+
 reveal_rid() {  # <testID> [最多滚几次=6] → 0=滚出来了 / 1=滚不出来
   local rid=$1 max=${2:-6} i ref now stuck=0 blurred=0
   for i in 1 2 3 4 5 6 7 8; do
@@ -829,35 +870,71 @@ bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要�
     return 1
   fi
   echo "   · 五档在库里各有 ≥1 枚端点（这条判据读的是被写那一侧，不是手指）" >&2
-  # 🔴 端点绑上 ≠ 同意给了。`resolveAiRoute` 要**逐功能同意**才产出 target：
-  #   rig26/27 现量五档 routes 各 1 枚而 consents 全 0 ⇒ 助手面按钮恒 disabled，第 5 步那条
-  #   "规则命中且零外发"的设备级判据**根本没有输入**。这一格此前载体整段少走，
-  #   于是"产品闸门按设计拦住"和"载体没给同意"在同一条读数里混成了一件事。
-  #   逐档点开关（开关自己的 testID 是 `ai-consent-<feature>`），再回读库里那一半。
-  local cf MISSC=""
-  for cf in capture breakdown prioritize duration-estimate tool-calling; do
-    reveal_rid "ai-consent-$cf" || { MISSC="$MISSC $cf(滚不出来)"; continue; }
-    tap_rid "ai-consent-$cf" || MISSC="$MISSC $cf(点不动)"
-  done
-  # 🔴 点不到**不判红、不中止**（rig28 现量：五档全报"滚不出来"而整趟被我的判定顶死，
-  #   10 项通过改成"未跑完就中止"——那是我加出来的新故障，不是产品的）。
-  #   代码形状：`ai-consent-<feature>` 是**一枚 Button**（授权/撤销），且外面罩着 `{needs ? …}`
-  #   （apps/mobile/src/ai/AiSettingsSection.tsx:407）——这一档不需要逐功能同意时它**根本不渲染**，
-  #   所以"屏上没有这枚"和"载体没滚到"是两句话，而设备侧分不开。
-  #   ⇒ 只登记读数，等第 5 步自己的 enabled 判定来说话；成因候选因此仍留着，不许在这一格替它编结论。
-  if [ -n "$MISSC" ]; then
-    echo "   ⓘ 这些档没找到可点的同意控件:$MISSC" >&2
-    echo "     （ai-consent-* 罩在 needs 条件下，本模式可能压根不渲染；也可能是载体没滚到 —— 设备侧分不开）" >&2
-    echo "     不判红、不中止：第 5 步的 enabled 才是真判据，它红会自己说清差哪一档" >&2
+  # 🔴 端点绑上 ≠ 同意给了 —— 但"这一档到底要不要同意"是**产品判的**，期望值必须从它推。
+  #   `requiresEgressConsent(classifyDestination({mode:'own', endpoint}))`（packages/ai/src/supply.ts）
+  #   对**字面量已定性的回环**返回 destination='none'（127.0.0.0/8 = endpoint-address.ts:227、
+  #   localhost = :280、::1 = :257），而 `ai-consent-<feature>` 罩在 `{needs ? …}` 里
+  #   （apps/mobile/src/ai/AiSettingsSection.tsx:441）⇒ **这一档按设计不渲染授权入口**。
+  #   rig28~34 现量：这一趟配的是回环 stub，载体却无条件逐档 reveal 那枚按钮，五档全报
+  #   "滚不出来" —— 白花五轮滚动，还打出五条读起来像"载体坏了"的 ❌。
+  #   一条恒不成立的判据比没有判据更糟（traps #333 的同族第二种面目）。
+  #   ⇒ 期望值由这一趟**真的配了哪个端点**推，两档各有判据（只留一支就是恒绿的那一半）：
+  #     回环   ⇒ 走完整页，五档都不许出现同意行；出现即红（在"没出境"的档位上索取授权）
+  #     非回环 ⇒ 五档都必须出现且点得动；不出现即红（授权入口消失了）
+  #   正向对照不另造：后面把路由换到**非回环**那一段（`ai-consent-breakdown 在树里`）就是
+  #   "会出现"那一支的现量读数 —— 同一枚 build、同一个页面，只有目的地不同。
+  local cf NEEDS_CONSENT ep_host consent_hit MISSC="" cap=0
+  if [ -z "${2:-}" ]; then
+    echo "   ❌ 调用方没把端点 URL 交给 bind_all_routes ⇒ 推不出这一档该不该有授权入口" >&2
+    echo "      期望值不许猜（猜成「该有」就退回 rig28~34 那条恒不成立的判据）" >&2
+    return 1
   fi
+  ep_host=$(printf '%s' "$2" | sed -E 's#^[A-Za-z][A-Za-z0-9+.-]*://##; s#/.*$##; s#:[0-9]+$##; s#^\[##; s#\]$##')
+  case "$ep_host" in
+    127.[0-9]* | localhost | ::1) NEEDS_CONSENT=0 ;;
+    *) NEEDS_CONSENT=1 ;;
+  esac
+  echo "   · 目的地期望：endpoint 字面量 host=$ep_host ⇒ requiresEgressConsent=$( [ "$NEEDS_CONSENT" = 1 ] && echo true || echo false )" >&2
+  if [ "$NEEDS_CONSENT" = 0 ]; then
+    consent_hit=$(scan_rids "ai-consent-capture ai-consent-breakdown ai-consent-prioritize ai-consent-duration-estimate ai-consent-tool-calling")
+    cap=0
+    case " $consent_hit " in
+      *" SCAN-CAP "*) cap=1; consent_hit=$(printf '%s' "$consent_hit" | sed 's/ *SCAN-CAP//') ;;
+    esac
+    if [ -n "$(printf '%s' "$consent_hit" | tr -d ' \n')" ]; then
+      echo "   ❌ 目的地是 'none'（回环字面量 $2）却渲染了逐功能授权入口：$consent_hit" >&2
+      echo "      红的是「明文没离开本机也向用户索取授权」：classifyDestination 放宽了，或 needs 那层条件没了" >&2
+      return 1
+    fi
+    if [ "$cap" = 1 ]; then
+      echo "   ⓘ 未取证：载体没走完整页（SCAN-CAP）⇒ 只能说「扫过的帧里没有」，不能说「界面上没有」" >&2
+    else
+      ok "回环端点下界面不索取逐功能授权（走完整页、五档逐帧查过）—— 与 destination='none' 同一口径"
+    fi
+  else
+    for cf in capture breakdown prioritize duration-estimate tool-calling; do
+      reveal_rid "ai-consent-$cf" || { MISSC="$MISSC $cf(滚不出来)"; continue; }
+      tap_rid "ai-consent-$cf" || MISSC="$MISSC $cf(点不动)"
+    done
+    if [ -n "$MISSC" ]; then
+      echo "   ❌ 非回环端点下这些档没有可点的授权入口：$MISSC" >&2
+      echo "      目的地需要授权而界面上没有入口 ⇒ 这一档永远无法被点亮，那是产品的洞" >&2
+      return 1
+    fi
+    ok "非回环端点下五档都出现了逐功能授权入口并已点下"
+  fi
+  # 库里那一半：回环档**预期全 0**（没有授权可给），非回环档预期各 ≥1。
   local readc linec cc missc2=""
   readc=$(routes_reading)
   for linec in $readc; do
     cc=${linec#*/}
     case "$cc" in (''|*[!0-9]) missc2="$missc2 $linec(读不出)" ;; *) [ "$cc" -ge 1 ] || missc2="$missc2 $linec" ;; esac
   done
-  if [ -n "$missc2" ]; then
-    echo "   ⓘ 库里这些档的同意仍是 0：$missc2（与上面那行合并着读：控件没渲染时这条是预期的）" >&2
+  if [ "$NEEDS_CONSENT" = 0 ]; then
+    echo "   · 库里五档同意数与界面一致（回环那一档没有授权可给）：$readc" >&2
+  elif [ -n "$missc2" ]; then
+    echo "   ❌ 点了授权而库里仍是 0：$missc2（$readc）⇒ 写路径没落地，不是「点过了」就算过" >&2
+    return 1
   else
     echo "   · 五档逐功能同意在库里各有 ≥1 条（回读：$readc）" >&2
   fi
@@ -1380,7 +1457,7 @@ else
 fi
 # ④ 🔴 端点存进去 ≠ 路由绑上了（见 bind_route 头上那段现量）：不绑，助手面六枚按钮全 disabled，
 #    第 5 步往后每一条判据都没有输入。
-bind_all_routes "$EP_LOOPBACK" \
+bind_all_routes "$EP_LOOPBACK" "$DEVICE_LOOPBACK_URL" \
   || { echo "   ❌ 回环端点没能绑进五档路由 —— 助手面的按钮会一直 disabled，那不是产品闸门" >&2; screen_txt; summary "移动端 AI 助手真机验收" "载体没把路由绑上" 1; }
 
 step "4. 明文 + 非回环端点**存不进去**（validateEndpointUrl 的 plaintext-remote）"
@@ -1454,10 +1531,12 @@ tap_rid tool-input || { echo "   🔴 工具档里滚不出输入框 testID=tool
 #    **读回并补齐**。rig18 现量：不带标签发 "list all tasks"，框里只剩 `list`
 #    —— 空格在 adb→device shell 那一跳被当成语界，`input text` 退 0、一声不响
 #    （`%s` 才对，见 lib 里 `_adb_text` 那段 A/B）。
-RULE_PROMPT="list all tasks"
-NO_MATCH_PROMPT="write a haiku about rain"
-clear_and_type "$RULE_PROMPT" "想让它怎么帮你" \
-  || { echo "   🔴 助手输入框读不回「$RULE_PROMPT」（发进去的内容与期望不符）—— 这是输入通道坏了，不是产品没答" >&2; screen_txt; restore_ime; summary "移动端 AI 助手真机验收" "载体输入通道坏了" 1; }
+# 🔴 这一句**不叫 RULE_PROMPT**：规则表 12 条的谓词头全是中文，任何纯 ASCII 句子都命中不了
+#   （现量与三条注入通道的分母见下面 5d 那段）。它是"第一发用来走发送链路的句子"。
+#   名字要是还留着 RULE_，门禁判据 ⑬ 会当场红 —— 那是刻意的：名字也是一种承诺。
+SEND_PROMPT="list all tasks"
+clear_and_type "$SEND_PROMPT" "想让它怎么帮你" \
+  || { echo "   🔴 助手输入框读不回「$SEND_PROMPT」（发进去的内容与期望不符）—— 这是输入通道坏了，不是产品没答" >&2; screen_txt; restore_ime; summary "移动端 AI 助手真机验收" "载体输入通道坏了" 1; }
 restore_ime
 stub_reset; RB=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
 # 🔴 原先这里写的是裸 `$ADB shell input tap $XY`（取 rid_center 的中心）—— 那是 #324-4
@@ -1487,62 +1566,84 @@ ok "点「发送（多轮）」后进的是披露步（ai-tool-send 在树里）
 tap_rid ai-tool-send || summary "移动端 AI 助手真机验收" "披露步的发送点不动" 1
 sleep 4
 dump
-# 结果卡在面板下方 ⇒ 先滚进来再读（同 reveal_rid 那条裁切现量）。
-reveal_sub "本机规则命中"
-RULE_HIT=$(has_sub "本机规则命中")
-RC1=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
 
-# ── 5a 反向对照：规则表**选不到**的那一句必须真的走出去 ─────────────────
-# 为什么这条必须先跑：没有它，"计数一次没动"就分不清是"零外发成立"还是"根本没发"
-# （rig16 那次就是后者，而输出长得和成功一模一样 —— §7 元规则二）。
-# 这句不是拍的：真表逐条 `.test()` 过（现量，2026-10-06 19:42）：
-#   node -e 'const R=require("./packages/app-host/dist/index.js").DEFAULT_TOOL_SELECTION_RULES;
-#     console.log(R.length, ["list all tasks","write a haiku about rain","列出所有任务"]
-#       .map(p=>p+"⇒"+(R.filter(r=>new RegExp(r.pattern.source,r.pattern.flags).test(p)).map(r=>r.id).join(",")||"零命中")))'
-#   → 表 12 条；两句 ASCII 全零命中，「列出所有任务」命中 list.tasks。
-tap_rid tool-input || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
-clear_and_type "$NO_MATCH_PROMPT" "想让它怎么帮你" \
-  || { echo "   🔴 第二发没进框（读回不符）" >&2; restore_ime; summary "移动端 AI 助手真机验收" "载体输入通道坏了" 1; }
-restore_ime
-RB2=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
-tap_rid tool-start-assistant || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
-dump
-[ -n "$(rid_center ai-tool-send)" ] || summary "移动端 AI 助手真机验收" "披露步没出现" 1
-tap_rid ai-tool-send || summary "移动端 AI 助手真机验收" "披露步的发送点不动" 1
-sleep 5
-RC2=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
-if [ "$RC2" -gt "$RB2" ]; then
-  ok "反向对照成立：「$NO_MATCH_PROMPT」规则表选不到 ⇒ 假端点计数 ${RB2}→${RC2}（确实会外发，所以下面那条「计数没动」才有意义）"
+# ── 5c 只用本机档：一次发送都到不了端点，而界面把原因与去处都说清楚了 ──────
+# 🔴 这一段是重写过的，原来那两条判据在**当前档位下恒不成立**（一条永远不可能通过的判据
+#   比没有判据更糟 —— §7 元规则二）：
+#   · 旧 5a「规则表选不到的一句必须真的走出去（计数要涨）」：第 0 步选的隐私档是「只用本机」，
+#     而这一档下 `packages/app-host/src/privacy-consent.ts` 的 blanket 闸门在任何 fetch 之前就
+#     返回 `PRIVACY_CONSENT_BLOCKED_MARKER`（= 屏上那句 privacy-consent-not-granted），
+#     所以计数**永远不会**涨。rig33 现量：`通过 16 项 / 失败 0 项` 之后整趟在第二发
+#     `tap_rid tool-input` 上中止 —— 因为发送失败后进的是 FailureStep，那一屏压根没有输入框
+#     （`AssistantScreen.tsx` 的 `if (phase === 'failed') return <FailureStep/>` 是整屏 return），
+#     而载体以为"发完就能接着打第二句"。
+#   · 旧 5b 的 `else bad "这一腿没有读数…"`：ASCII 句子命中不了规则表（谓词头全中文），
+#     所以那个 else 分支同样是恒红。
+# 现在这一腿判三件**在这一档真的可观察**的事，第四件如实登记成未覆盖。
+reveal_sub "privacy-consent-not-granted"
+BLOCKED=$(has_sub "privacy-consent-not-granted")
+NAMED=$(has_sub "127.0.0.1")
+RC1=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
+if [ "$BLOCKED" = "1" ]; then
+  ok "只用本机档：发送在本机闸门处被拦下，界面给出拒绝原文（privacy-consent-not-granted）—— 不是静默失败"
 else
-  bad "🔴 反向对照不成立：规则表选不到的一句也没有走出去（${RB2}→${RC2}）—— 要么发送链路断了，要么这一档根本没接外发；"
-  echo "      此时上面任何「零外发」读数都不能当作 Goal-1 的证据。"
+  bad "🔴 点完披露步的发送之后，屏上没有本机闸门的拒绝原文 —— 要么闸门换了措辞（判据要跟着改），要么这一档根本没拦"
+  screen_txt
+fi
+if [ "$NAMED" = "1" ]; then
+  ok "那句拒绝点名了它本来要去哪个端点（含 127.0.0.1 的 URL）⇒ 下面那条「计数没动」不是「压根没走传输边界」"
+else
+  bad "拒绝话里没点名端点地址 ⇒ 「请求被拦在客户端」这一半无从判定"
+  screen_txt
+fi
+if [ "$RC1" = "$RB" ]; then
+  ok "假端点计数 ${RB}→${RC1} 一次没动（只用本机档：任何一次 AI 发送都不会打到端点）"
+else
+  bad "🔴 只用本机档下端点却收到了请求（${RB}→${RC1}）—— 隐私闸门被绕过，这是安全级失败"
   echo "      端点收到过的功能：$(feature_lines)"
-  summary "移动端 AI 助手真机验收" "反向对照不成立" 1
+fi
+if [ -n "$(xy_desc "重试")" ]; then
+  ok "失败面给出「重试」—— 不确定态可重试，不是把用户钉死在一屏"
+else
+  bad "失败面没有「重试」那一步：投递失败后用户没有可执行动作"
+  screen_txt
 fi
 
-# ── 5b 规则命中那一腿：装的是旧产物时**明确记未闭合** ────────────────────
-# 🔴 为什么这里可能拿不到读数（三条通道现量，2026-10-06）：
-#   · 本机规则表的 12 条 `pattern`（`packages/app-host/src/ai-tool-selection.ts` 的
-#     `DEFAULT_TOOL_SELECTION_RULES`；条数现量：见 5a 上面那条 node -e）
-#     **谓词头全是中文**（列出/列一下/看看/看一下/查看/有哪些…），ASCII 句子永远选不中；
-#   · 而这台模拟器发不出中文：`input text "列出所有任务"` 与 `input keyboard text …`
-#     都抛 `java.lang.NullPointerException`（#43 复测），`cmd clipboard` 回
-#     「No shell command implementation」—— 三条注入通道逐个试完，不是只试一条。
-#   ⇒ 这一腿要闭合，得先给规则表补 ASCII 别名（并配正反样本）**再重打 Android 产物**，
-#     或走 iOS 那条能输中文的通道。载体现量：`ssh windows-pc` 现不可达（Host is down），
-#     而 `pnpm build:android` 按 §6.1 一律走那台打包机 ⇒ 本机不擅自降级。
-if [ "$RULE_HIT" = "1" ] && [ "$RC1" = "$RB" ]; then
-  ok "「$RULE_PROMPT」走本机规则（那句「本机规则命中 —— 没有联网」在屏上），假端点计数 ${RB}→${RC1} 一次没动"
-elif [ "$RC1" != "$RB" ] && [ "$RULE_HIT" = "1" ]; then
-  bad "🔴 规则命中却仍然外发了：计数 ${RB}→${RC1}"
-else
-  bad "这一腿没有读数：界面没有「本机规则命中」那行，而计数 ${RB}→${RC1} 说明请求确实发出去了 —— 与 5a 同因（ASCII 句子命中不了全中文谓词的规则表）。上面 5a 已把这条通道证到能用，所以这里记的是**规则表缺 ASCII 别名**，不是载体坏了、也不是零外发成立。"
+# ── 5d 规则命中那一格：**设备侧未覆盖**（登记，不判红、不判绿）──────────────
+# 🔴 为什么这一格在这台载体上拿不到读数，三条注入通道逐个试过（不是只试一条就写"做不到"）：
+#   ① `input text "列出所有任务"` 与 `input keyboard text …` 都抛
+#      `java.lang.NullPointerException: Attempt to get length of null array`（#43 复测）；
+#   ② 这台模拟器**没有中文输入法**：`ime list -s -a` 现量只有
+#      `com.google.android.inputmethod.latin/.LatinIME` 与 google tts 的 voice IME；
+#   ③ `cmd clipboard` 不可用（现量回「No shell function」一类的空实现）。
+#   而规则表 `DEFAULT_TOOL_SELECTION_RULES` 每一条的**谓词头全是中文**
+#   （列出/列一下/看看/看一下/查看/有哪些…），只有尾部留着 todo / anniversary / countdown
+#   这类 ASCII —— 也就是说**不存在任何一句纯 ASCII 的话能被这张表选中**。
+#   ⇒ 于是旧稿那句被叫做 RULE_PROMPT 的 "list all tasks" 从来就不是"规则句"，
+#     它只是一句 ASCII 普通句子；拿它断言「本机规则命中」是载体自己写错的对象，
+#     不是产品没做这条短路（这条短路在 app-host 的 loop 里，ai-e2e 那侧有变异读数）。
+# 闭合这一格需要什么，写在这里而不是留给下一个人猜：
+#   · 给规则表补 ASCII 别名（并配正反样本）后重打 Android 产物；或
+#   · 走 iOS 那条能输中文的通道（现量：iOS 侧助手零设备读数，同样待验证）。
+echo "   ⓘ 设备侧未覆盖：「本机规则命中 ⇒ 零外发」这一格在本载体上不可达（ASCII 句子命中不了全中文谓词的规则表）" >&2
+echo "     已证的是 5c：只用本机档下任何一次发送都到不了端点；**不许**把 5c 的计数没动读成规则短路的证据。" >&2
+
+# 发完停在失败面 ⇒ 先退出助手屏再走第 6 步（探针留下的状态就是后续判据的输入，#83.1）
+if [ -n "$(rid_center assistant-back)" ]; then
+  tap_rid assistant-back || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 fi
 
 step "6. 同意联网，但逐功能授权一律不给"
 open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 # 隐私同意在设置**第一段**（合规位置，理由写在 SettingsScreen 的注释里）：
 # 决定过 ⇒ 只有「重新作出选择」或「撤回同意」两枚，前者把同一张面板再开一次。
+# 🔴 rig34 现量：上一行 open_ai_settings 是**往下**滚到 AI 区块才 return 的，于是这一格
+#   在 AI 区块那一屏找第一段里的「重新作出选择」⇒ 恒取空 ⇒ 报「隐私开关锚点失效」，
+#   读起来像合规区块被摘掉了。这是 traps #331 的同族第二种面目：
+#   探针只认"当前这一帧"，而"在上面"和"不存在"在输出上是同一句空。
+#   ⇒ 先看顶部（摘焦点 + 回顶），失败分支照旧带 screen_txt 把"顶上那一屏到底有什么"打出来。
+blur_focus
+scroll_to_top
 dump
 XY=$(xy_desc "重新作出选择"); [ -n "$XY" ] || XY=$(xy_desc "同意并联网")
 if [ -n "$XY" ]; then
