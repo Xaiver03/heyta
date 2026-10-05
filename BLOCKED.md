@@ -5499,13 +5499,16 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 - ⚠️ **起跑资格这轮又掉了一格，而且换了一条腿**：20:47 现量 `verify-mobile-window-gate.sh --target b` ⇒ `REDS=src`
   （`packages/ apps/ server/` 里有并行会话的未提交改动 ⇒ 窗口**没开**，exit 3，不是产品失败）。
   所以本线**没有**起任何设备/重装类运行，包括 Android 判据 4。
-- 🔴 **windows-pc 此刻不可达**（三条独立通道各自现量，分母齐）：`ssh … "echo REMOTE_OK"` ⇒ **rc=255** +
-  `connect to host 10.111.127.237 port 22: Operation timed out`；`nc -z -G 5 … 22` ⇒ **rc=1**；
-  `ping -c 2` ⇒ **0 packets received, 100.0% loss**。
-  而它 20:00 还打得进（① 的 Windows 段就是从那儿装出来并回传了 1.68 MB 截图与 `install-capture.txt`）
-  ⇒ 成因在 20:00–20:47 之间（睡眠/网络变更/被搬走），**本线不去猜也不远程唤醒**。
-  ⇒ ① 的图 5 那一格现在有**两层**人都要动的前置：**主机可达** + **控制台解锁**（20:26 现量 `LogonUI` 在跑 ⇒ `LOCKED=yes`）。
-  下一位若跑 `pnpm reinstall:all --only windows`，预期红在"主机不可达"那一格，脚本会如实报因，别把它读成产品缺陷。
+- 🔴 **windows-pc 一度不可达，4 分钟后自己翻面**（这条是"否定读数的保质期"的现场样本，别照第一版去登记"等开机"）：
+  20:47 现量三条通道各自取码：`ssh … "echo REMOTE_OK"` ⇒ **rc=255** + `Operation timed out`；`nc -z -G 5 … 22` ⇒ **rc=1**；
+  `ping -c 2` ⇒ **0 packets received, 100.0% loss**。而 **20:51 同一条 ssh 命令 ⇒ rc=0 + `REMOTE_OK`**。
+  它 20:00 还打得进（① 的 Windows 段就是从那儿装出来并回传 1.68 MB 截图与 `install-capture.txt`）
+  ⇒ 中间那一段的成因（睡眠 / 网络变更 / 被人搬走）**未查明，本线不去猜也不远程唤醒**。
+- ✅ **图 5 那一格的前置因此回到只剩一层**：20:51 再探远端 `Get-Process LogonUI` ⇒ **`LOCKED=yes`**（控制台仍锁着）。
+  本机 `package-msix|reinstall-all|verify-mobile` 进程现量 **0 枚**。
+  ⇒ 消红动作就是**有人在 windows-pc 前解锁会话**，然后 `pnpm reinstall:all --only windows`（判据仍是"那张图人打开看过"）。
+  ⚠️ 但**窗口本身仍没开**：20:51 现量 `verify-mobile-window-gate.sh --target b` ⇒ `REDS=src`（gate_rc=3），
+  所以本线即便主机可达也没起那一趟 —— 现在起会把别人的未提交改动打进包里（AGENTS §6.1.1 的新鲜度判据正是拦这个）。
 - 📌 顺带一枚自己抓到的探针形状（同族已入册，这里是第二次现量命中）：我第一版探测写成
   `ssh … | grep -E 'LOCKED='`，输出 `No matches found` 而 `echo $?` 报 **0** —— 那是 `grep`/管道尾部的码，不是 ssh 的。
   改成"先落盘再单独取 `$?`"才拿到真 255。**判"读不到"之前必须分通道各取一次码**，否则会把"探测坏了"读成"对方状态变了"。
