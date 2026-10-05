@@ -11362,3 +11362,27 @@ needle 钉住）。三档调用实测：裸跑（不给 `--mount`）⇒ **退 1*
 哨兵按 `quiet_min=15` 等下去可能等很久。能清这一格的只有它的所有者（或产品负责人让那条会话先把它提了），
 **不是**我这侧再准备什么 —— 本批写集与它相交的只有这一枚，其余四枚（`docs/README.md` 等）按 §8.190
 那条交集判据早就不算阻塞。
+
+### 8.194 G-47 那条"真树不是当前产物"的边界，今天顺手升了一格（2026-10-05 12:2x）
+
+第 2 项那趟 `verify:selfhost-stack` 把镜像重建了（`supersync:selfhost-verify` id `3739fa94b690`，
+`created=12 minutes ago`）⇒ §8.149 留的那句"真树来自 6 小时前那次 verify 的镜像，不是当前产物"
+当场过期。一条秒级一次性容器把树导出来，再拿它跑一遍许可证臂：
+
+```
+docker run --rm -i --entrypoint node supersync:selfhost-verify --input-type=commonjs - \
+  < research/tools/dump-installed-tree.js > /tmp/tree-today.json      # 23388 B · scannedEntries 145
+node research/tools/selfhost-license-coverage-arms.mjs --installed-tree /tmp/tree-today.json
+  ok A 摘掉一枚真登记（@node-rs/argon2-linux-arm64-musl@2.2.1）⇒ rc=1，命中「许可证门禁**从没见过**」
+  ok B 塞一条幽灵登记 ⇒ rc=1，命中「已经不在」
+  ok C 把 carrier 写成后门值 ⇒ rc=1，命中「不是 snapshot / installed-tree 之一」
+  许可证登记表变异臂：载体=installed-tree · 4 条 · 不符 0（对照组未变异不红）
+```
+
+🔴 **这一格能升，靠的是"登记成债前先实测贵不贵"那一条**（§8.149 的自我否证）：
+先前把它排在"落地后与 #28 同一趟"，理由是"要占一次完整构建窗口" —— 那句是错的，
+一次性容器秒级就够。⇒ 现在**主张**的是：真树那侧的三条臂在**本批字节构建出的镜像**上各红一次。
+仍然**不**主张的：这台机器上"发出去的字节有人守" —— 镜像没发布（G-55 那一档等拍板），
+而 12:08 之后我又落了三笔（`80dba899` 只动 `research/tools/selfhost-merge-carrier.mjs`、
+`cab59fc6`/`1e35790a` 只动本台账），**都不在 `server/Dockerfile` 的 COPY 集合里**，
+所以这棵树对"许可证扫的那棵树"仍然代表当前产物 —— 这一句是有条件的，条件就是刚才那三条 `--stat`。
