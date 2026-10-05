@@ -9628,6 +9628,25 @@ mobile **608**；`build web` 两步（`tsc -b` + `vite build`）RC=0；`typechec
 `document.activeElement`，而 ↑↓ 只改选中、**不挪 DOM 焦点**（第一趟 T3 就是这么红的 ——
 红的是探针不是产品）。Tab 能走到行（行是按钮），所以不是坏，但它意味着"↓ 到底再按 Enter"
 这条最短路径今天不成立。登记成待办，不在本单顺手改（改它要动 W1b 那三条闸门的语义）。
+
+🔴 **2026-10-05 15:1x 就地补现量（把"下一轮该怎么落"从猜测变成读数）** —— 五个视图里
+"这一行的可聚焦元素"**不是同一个东西，且有两面的行本体根本不可聚焦**：
+
+| 面 | 行本体 | 该行上可聚焦/可点的那一个 |
+|---|---|---|
+| tasks / quadrant / timeline | `task-item-<id>`（`packages/ui/src/task-list/TaskRow.tsx:308`，**不带 onPress 的 View**） | `task-row-<id>`（同文件 `:343` 与 `:355`，标题那一层） |
+| habits | `habit-row-<id>`（`packages/ui/src/habits/HabitProgressList.tsx:249`，`Pressable` + `accessibilityRole="button"`）⇒ **本体可聚焦**（K11 在真浏览器里 `.focus()` 之后 `activeElement` 就是它，这是已证事实） | 同上 |
+| notes | `note-row-<id>`（`packages/ui/src/notes/NotesBoard.tsx:319`，不可聚焦的 View） | `note-edit-<id>`（同文件 `:332`；那一行"只有摘要那一段可点"已登记成待办 #51） |
+
+**推论（写下来是为了让下一轮不必重新推）**：这一格**不许**写成一句通用的 `row.focus()` ——
+`focus()` 打在不可聚焦的元素上什么都不做，于是任务与便签两面会**静默 no-op**，
+而那两条判据看起来"跑过了"（§7 元规则 2："一条永远通过的判据比没有判据更糟"）。
+形状必须是**表里再加一枚与 `enterTarget` 同构的 `focusTarget`**（"这一行的可聚焦元素是谁"
+由登记它的那一面回答，不由宿主猜），并且**每面各一条判据**，一条通用判据挡不住两面 no-op。
+另两条前置：① `[data-testid^="task-row-"]` 这个名字**已经被选择器占用**（`TaskRow.tsx:271`
+自己写明"标题锚不许叫 `task-row-title`，因为那个前缀会匹配到行体"）⇒ 拿它当焦点落点要先处理这层重名；
+② 焦点一挪，**"正在打字"那道闸门判的对象就变了**（K2/K5 两条反向臂量的正是"什么键不该被抢"），
+所以这一格要连那两条臂一起复跑才算闭合。
 ④ 接线只在 web：触屏端没有键盘光标这回事（同 W1b 边界 ②）。
 ⑤ 四端重装未做（真实前置是合流，待办 #13）⇒ 本单与 W1/W1b 一样不许读成"已完成"。
 
