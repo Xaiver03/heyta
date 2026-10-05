@@ -7,8 +7,11 @@
  * 两臂各对应一种坏，且都是**只有真浏览器看得见**的坏 —— jsdom 那十条落点判据
  * （`apps/web/tests/note-editor-placement.spec.tsx`）一条都不会红，因为它不跑布局。
  *
- *   H1 去掉 `alignSelf:'stretch'` ⇒ 入口缩回摘要那一段的高度 ⇒ 上下那一圈空白点不到
- *   H2 把徽标挪回入口**外面** ⇒ 徽标那一段落在可点区域之外（点它 = 点空白）
+ *   H1 去掉 `alignSelf:'stretch'` ⇒ 入口缩回摘要那一段的高度 ⇒ 上下那一圈空白点不到（N6）
+ *   H2 把徽标挪回入口**外面** ⇒ 徽标那一段落在可点区域之外（点它 = 点空白）（N6）
+ *   H3 动作列 `marginLeft:-120` ⇒ 它与撑大的入口盒子相交（N7，§8.153）
+ *   H4 钉选那颗顺带 `onEdit?.()` ⇒ 点它是"打开编辑层"而不是"钉这一条"（N7）
+ *   H5 删除那颗的 `onPress` 清空 ⇒ 它画在那儿但什么都不做（N7）
  *
  * 🔴 **这一台必须先重打 `packages/ui` 的 dist 再打 `apps/web`**。
  *   载体是 `vite preview` + `apps/web/dist`，而 vite 打进去的是 **`packages/ui/dist`**，
@@ -17,7 +20,7 @@
  *   判据的载体决定变异必须落在哪一层 —— 这一台的 `build()` 里有两道，缺一道就是假读数。
  *
  * 跑法（仓库根）：
- *   node research/tools/mutation-rigs/mutate-detail-pane-note-hit-area.mjs          # 两臂
+ *   node research/tools/mutation-rigs/mutate-detail-pane-note-hit-area.mjs          # 全部臂（臂数由它自己打印）
  *   node research/tools/mutation-rigs/mutate-detail-pane-note-hit-area.mjs H1       # 点名一臂
  * ⚠️ 占 4371 端口、起 Chromium、**原地改工作树里的 NotesBoard.tsx**（收尾复原并核对 md5）。
  * ⚠️ 臂 id 只在本台内唯一（本台 = H1/H2）。id 撞了不会报错，只会把两臂的预期红集混成一团。
@@ -43,12 +46,14 @@ const ARMS = [
   {
     name: 'H1',
     label: '去掉撑满行高',
+    title: 'N6',
     edits: [["      alignSelf: 'stretch',\n      justifyContent: 'center',", "      justifyContent: 'center',"]],
     expectE2e: ['入口没撑满行高'],
   },
   {
     name: 'H2',
     label: '徽标挪回入口外面',
+    title: 'N6',
     edits: [
       [
         "                    testID={`note-edit-${row.id}`}\n                  >\n                    {excerptText}\n                    {badgeNode}\n                  </Pressable>",
@@ -60,6 +65,37 @@ const ARMS = [
       ],
     ],
     expectE2e: ['「今天」徽标不在入口里面'],
+  },
+  {
+    name: 'H3',
+    label: '动作列整体压进入口的盒子里',
+    title: 'N7',
+    edits: [["    actions: {\n      flexDirection: 'row',", "    actions: {\n      marginLeft: -120,\n      flexDirection: 'row',"]],
+    expectE2e: ['入口与钉选那颗的盒子相交'],
+  },
+  {
+    name: 'H4',
+    label: '钉选那颗顺带打开编辑层',
+    title: 'N7',
+    edits: [
+      [
+        "onPress={() => {\n                      onTogglePinned(row.id, !row.isPinned);",
+        "onPress={() => {\n                      onEdit?.(row.id);\n                      onTogglePinned(row.id, !row.isPinned);",
+      ],
+    ],
+    expectE2e: ['点钉选那颗顺带打开了编辑层'],
+  },
+  {
+    name: 'H5',
+    label: '删除那颗不做事',
+    title: 'N7',
+    edits: [
+      [
+        "onPress={() => {\n                      onRemove(row.id);\n                    }}",
+        "onPress={() => {\n                      /* 变异：这一颗什么都不做 */\n                    }}",
+      ],
+    ],
+    expectE2e: ['删除那一下没把那条删掉'],
   },
 ];
 
@@ -170,7 +206,7 @@ if (b.rc !== 0) fail(`干净态打不出包：\n${b.out.slice(-1200)}`);
 const bj = jsdom();
 if (bj.rc !== 0 || bj.passed < 10) fail(`干净态 jsdom 层不干净（要 >=10 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 6 || be.failed > 0) fail(`干净态 e2e 层不干净（要 >=6 passed / 0 failed）：${be.line}`);
+if (be.rc !== 0 || be.passed < 7 || be.failed > 0) fail(`干净态 e2e 层不干净（要 >=7 passed / 0 failed）：${be.line}`);
 console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}`);
 
 let ok = 0;
@@ -188,7 +224,7 @@ for (const arm of arms) {
     ...new Set([...me.out.matchAll(/✘[^\n]*?›\s*(N\d[^\n]*?)\s*$/gm)].map((m) => (m[1] ?? '').trim().slice(0, 46))),
   ];
   const hit = arm.expectE2e.every((frag) => me.out.includes(frag));
-  const teeth = me.rc !== 0 && me.failed >= 1 && redTitles.some((t) => t.startsWith('N6')) && hit;
+  const teeth = me.rc !== 0 && me.failed >= 1 && redTitles.some((t) => t.startsWith(arm.title)) && hit;
   console.log(
     `${arm.name} ${arm.label}：jsdom=${mj.line}（盲区腿=${blind ? '成立' : '不成立'}）｜e2e=${me.line} 红集=${redTitles.join(' ｜ ') || '(解析不出标题)'}｜有牙腿=${teeth ? '成立' : '不成立'}`
   );
