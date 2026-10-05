@@ -353,6 +353,84 @@ function requiredCapsNotDeclarable(routingText) {
   return [...req].filter((c) => !order.includes(c));
 }
 
+/**
+ * 判据 ⑪：**装包那一步必须自带原因**，而"换了打包机"那一档失败要有出口。
+ *
+ * 起因（2026-10-06 05:50 实测，rig30）：第 0 步写着
+ *   `$ADB install -r -g "$APK" >/dev/null 2>&1 || echo "❌ 装不上 $APK"`
+ * 然后 abort。屏幕上只有「装不上」三个字，adb 的原因被丢进 /dev/null。手动复现才拿到：
+ *   `INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.heyta signatures do not
+ *   match newer version; ignoring!`
+ * 机制不是设备坏了：**release 变体在没有发布键时挂的是打包机自己的 debug keystore**
+ * （`build.gradle` 那条回退，AGENTS §6.1 那格写明"那趟的证书 CN=Android Debug"）。
+ * 所以「远程打 → 本机打」（或反过来）= 换签名键，而同包名跨键**不能 `-r` 覆盖安装**。
+ * 这条失败在换机后的**第一次**验收必然出现，而载体当时只会说「装不上」。
+ *
+ * 于是钉两件事：① 装包命令不许把输出丢掉（判据坏掉的那一步要能自证原因）；
+ * ② 这一种失败在脚本里必须有一档出口（卸载重装），否则换机这件事永远靠人现场猜。
+ *
+ * ⚠️ 只看非注释行 —— 判据自己的说明注释里必然提到那枚错误码和那行旧代码，
+ *    把它们当调用点会让这条检查永远红（一条乱红的检查比没有检查更危险，臂 22 之外还有臂 25 守着）。
+ */
+const INSTALL_CALL = /\$ADB\b.*\binstall\b/;
+function installChannel(text) {
+  const calls = [];
+  text.split('\n').forEach((line, i) => {
+    if (/^\s*#/.test(line)) return;
+    if (INSTALL_CALL.test(line)) calls.push([i + 1, line]);
+  });
+  if (calls.length === 0) return null; // 探针没有输入 ⇒ 由调用方退 2，不报"装包通道没问题"
+  const red = [];
+  for (const [n, line] of calls) {
+    if (line.includes('/dev/null')) {
+      red.push(
+        `第 ${String(n)} 行的装包命令把输出丢进 /dev/null ⇒ 装不上时判据只剩「装不上」三个字，` +
+          `真原因（签名键不同 / 磁盘满 / 设备只读）要人重新手动复现才知道。载体坏掉的那一步必须自带原因：${line.trim()}`,
+      );
+    }
+  }
+  if (!/INSTALL_FAILED_UPDATE_INCOMPATIBLE/.test(text)) {
+    red.push(
+      '整个脚本没有一处认得 INSTALL_FAILED_UPDATE_INCOMPATIBLE —— release 变体在没有发布键时挂的是' +
+        '**打包机自己的 debug keystore**，换打包机 = 换签名键，同包名不能 -r 覆盖安装。' +
+        '这一档失败没有出口，验收会在换机后第一次红得没有原因。',
+    );
+  }
+  return red;
+}
+
+/**
+ * 判据 ⑫：**reveal 类 helper 的失败出口必须先排除"只会往一个方向滚"**。
+ *
+ * 起因（2026-10-06 06:03 实测，rig31）：端点表单里加了能力 chip 那一行之后，表单整体变高，
+ * 滚动停靠点落到 chip 以下，而「名称」那一格（`ai-endpoint-label`）在**上面**。
+ * `reveal_rid` 的手势只有一种方向（1900→900 = 往下滚），于是它滚满 5 发之后打印
+ *   `❌ testID=ai-endpoint-label 滚了 5 次仍没有一枚落在安全带里的可点节点 —— 界面形状或 testID 变了`
+ * 那句话是**错的**：界面形状没变，testID 也没变，变的是载体够不到的那一侧。
+ * 同一趟里第 5 步第二发的 `tool-input` 也是这样红的（结果卡在下面，输入框在上面）。
+ *
+ * 这条不变量的形状：`reveal_rid` 的两个失败出口都得走"摘焦点 + 回到顶部再找一次"那一档，
+ * 而那档必须真的调用反向手势（`scroll_to_top`），不是只换一句更温和的红字。
+ */
+function revealDirection(scriptRel) {
+  const reveal = helperBody(scriptRel, 'reveal_rid');
+  const fallback = helperBody(scriptRel, 'reveal_rid_top_fallback');
+  if (reveal === null || fallback === null) return null;
+  const red = [];
+  if (!/reveal_rid_top_fallback/.test(reveal)) {
+    red.push(
+      'reveal_rid 的失败出口里没有"回到顶部再找一次"那一档 ⇒ 只会往下滚的 helper 会把' +
+        '"控件在视口上方"读成"界面形状或 testID 变了"（rig31 的 ai-endpoint-label 与 tool-input 都是这一句冒充的）。',
+    );
+  }
+  if (!/scroll_to_top/.test(fallback)) {
+    red.push(
+      'reveal_rid_top_fallback 没有调用 scroll_to_top ⇒ 那一档只是换一句更温和的红字，方向局限一点没排除。',
+    );
+  }
+  return red;
+}
+
 function run() {
   const files = walk(join(ROOT, SRC_ROOT));
   if (files.length === 0) {
@@ -487,11 +565,32 @@ function run() {
 
   const backtickRed = quoteBackticks(scriptText);
   for (const line of backtickRed) console.log(`文案反引号\t${line}`);
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0) {
+
+  // ── 判据 ⑪：装包通道（见函数上方那段实测）──
+  const installRed = installChannel(scriptText);
+  if (installRed === null) {
+    console.error('🔴 脚本里一条 $ADB install 调用都没取到 —— 是探针没输入，不报"装包通道没问题"');
+    process.exit(2);
+  }
+  for (const line of installRed) console.log(`装包通道\t${line}`);
+  console.log(`INSTALL_SUMMARY 装包调用=${String(
+    scriptText.split('\n').filter((l) => !/^\s*#/.test(l) && INSTALL_CALL.test(l)).length,
+  )} 红=${String(installRed.length)}`);
+
+  // ── 判据 ⑫：reveal 的失败出口要排除"方向局限"，才许说"不存在" ──
+  const dirRed = revealDirection(scriptRel);
+  if (dirRed === null) {
+    console.error('🔴 取不到 reveal_rid / reveal_rid_top_fallback 的函数体 —— 探针没输入，不报"滚动方向没问题"');
+    process.exit(2);
+  }
+  for (const line of dirRed) console.log(`滚动方向\t${line}`);
+  console.log(`DIRECTION_SUMMARY reveal_rid 有 fallback 调用=${String(dirRed.length === 0 ? 1 : 0)} 红=${String(dirRed.length)}`);
+
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
       '，双引号文案里的反引号=' + String(backtickRed.length) +
-      '，移动侧能力字段缺口=' + String(capRed.length) + '。' +
+      '，移动侧能力字段缺口=' + String(capRed.length) + '，装包通道=' + String(installRed.length) + '，滚动方向=' + String(dirRed.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
       '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
@@ -507,6 +606,28 @@ if (process.argv.includes('--self-test')) {
   // "有缺失时退非零"那一半 —— 那条病在仓里出现过不止一次（§7）。
   const lit = declarations(walk(join(ROOT, SRC_ROOT)));
   const arms = [];
+  // 整份副本变异用的助手：runMutant 只会**追加**一行，而"摘掉某一档"必须改既有内容。
+  //   仍然打在 tmp 副本上、经 env 重定向进整条流水线（真树 mtime 不动）。
+  const runMutantFile = (text, tag) => {
+    const dir = join(ROOT, 'tmp');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `.mut-${tag}.sh`);
+    writeFileSync(file, text);
+    let code = -1;
+    let out = '';
+    try {
+      const kid = spawnSync(process.execPath, [join(ROOT, 'scripts/check-mobile-ai-anchors.mjs')], {
+        encoding: 'utf8',
+        cwd: ROOT,
+        env: { ...process.env, HEYTA_ANCHOR_SCRIPT: `tmp/.mut-${tag}.sh` },
+      });
+      code = kid.status ?? -1;
+      out = `${kid.stdout ?? ''}${kid.stderr ?? ''}`;
+    } finally {
+      rmSync(file, { force: true });
+    }
+    return { code, out };
+  };
 
   // 臂 0（阳性对照）：真脚本现在必须整体过 —— 它不过就不是"能失败"，是"已经在红"。
   const base = spawnSync(process.execPath, [join(ROOT, 'scripts/check-mobile-ai-anchors.mjs')], {
@@ -671,6 +792,63 @@ if (process.argv.includes('--self-test')) {
     routingText.replace("  'tool-calling': ['tool_calling'],", "  'tool-calling': ['tool_calling', 'audio'],")
   );
   arms.push(['臂 21 功能要求一枚表外能力 ⇒ 非零退出且点名它', m21.code !== 0 && m21.out.includes('audio')]);
+
+  // ── 判据 ⑪（装包通道）的四臂 ──
+  //   病是 rig30 那次「❌ 装不上」连原因都没有：adb 的 stderr 被 `>/dev/null 2>&1` 吞掉，
+  //   真原因（换打包机 = 换 debug keystore ⇒ INSTALL_FAILED_UPDATE_INCOMPATIBLE）
+  //   只有人手忙脚乱复现一次才看得见。臂 22 证明探针确有输入，23/24 证明两种漏法都会红，
+  //   臂 25 证明"注释行不算调用点"这条豁免本身有牙齿（否则判据可以把真调用也跳掉而全绿）。
+  const realInstallRed = installChannel(readScript(join(ROOT, DEFAULT_SCRIPT)));
+  arms.push([
+    '臂 22 真脚本里装包调用取得到、判据 ⑪ 不误红（探针确有输入）',
+    realInstallRed !== null && realInstallRed.length === 0,
+  ]);
+  const m23 = runMutant('$ADB install -r -g "$APK" >/dev/null 2>&1 || true', 'install-swallow');
+  arms.push(['臂 23 装包命令把输出丢进 /dev/null ⇒ 非零退出', m23.code !== 0]);
+  arms.push(['臂 23 红字点名"装包通道"（不是只退码）', m23.out.includes('装包通道')]);
+  const m25 = runMutant('# 旧写法 $ADB install -r -g "$APK" >/dev/null 2>&1 已经废掉了', 'install-comment');
+  arms.push(['臂 25 同一行只写在注释里 ⇒ 整条流水线仍为 0', m25.code === 0]);
+
+  // 臂 24：把那一档失败的处理摘掉（改标识符，保持 bash 语法完整）⇒ 必须红且点名。
+  const mutDir24 = join(ROOT, 'tmp');
+  mkdirSync(mutDir24, { recursive: true });
+  const mut24 = join(mutDir24, '.install-nodecl.sh');
+  const base24 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8');
+  writeFileSync(mut24, base24.split('INSTALL_FAILED_UPDATE_INCOMPATIBLE').join('ZZ_REMOVED_BRANCH'));
+  let code24 = -1;
+  let out24 = '';
+  try {
+    const k24 = spawnSync(process.execPath, [join(ROOT, 'scripts/check-mobile-ai-anchors.mjs')], {
+      encoding: 'utf8',
+      cwd: ROOT,
+      env: { ...process.env, HEYTA_ANCHOR_SCRIPT: 'tmp/.install-nodecl.sh' },
+    });
+    code24 = k24.status ?? -1;
+    out24 = `${k24.stdout ?? ''}${k24.stderr ?? ''}`;
+  } finally {
+    rmSync(mut24, { force: true });
+  }
+  arms.push(['臂 24 摘掉换签名键那一档 ⇒ 非零退出', code24 !== 0]);
+  arms.push(['臂 24 红字说明为什么这一档必须有出口', out24.includes('debug keystore')]);
+
+  // ── 判据 ⑫（滚动方向）的三臂 ──
+  //   臂 26 阳性对照（探针确有输入且不误红），27 摘掉 reveal_rid 里那一档 ⇒ 红，
+  //   臂 28 把 fallback 里的反向手势摘掉（留个同名空壳）⇒ 红。
+  const dirReal = revealDirection(DEFAULT_SCRIPT);
+  arms.push(['臂 26 真脚本两个 helper 都取得到、判据 ⑫ 不误红', dirReal !== null && dirReal.length === 0]);
+  // 🔴 必须**全部**摘掉：reveal_rid 现在有两处调用（滚不动那一档 + 滚满那一档），
+  //    只 replace 第一处会让第二处留着 ⇒ 臂自己失效（读数看着像门禁不红）。
+  const mutDir27 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8')
+    .split('reveal_rid_top_fallback "$rid" && return 0')
+    .join('true && return 0');
+  const m27 = runMutantFile(mutDir27, 'reveal-no-fallback');
+  arms.push(['臂 27 reveal_rid 不回到顶部再找 ⇒ 非零退出且点名', m27.code !== 0 && m27.out.includes('滚动方向')]);
+  const mutDir28 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8').replace(
+    'reveal_rid_top_fallback() {  # <testID> → 0=在视口上方，回到顶部后取到 / 1=回到顶部也没有\n  local rid=$1\n  blur_focus\n  scroll_to_top',
+    'reveal_rid_top_fallback() {  # <testID>\n  local rid=$1\n  blur_focus',
+  );
+  const m28 = runMutantFile(mutDir28, 'reveal-no-scroll');
+  arms.push(['臂 28 那一档只是空壳（没反向手势）⇒ 非零退出且点名', m28.code !== 0 && m28.out.includes('scroll_to_top')]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
