@@ -5440,6 +5440,8 @@ git diff HEAD --numstat -- docs/reference/environment-traps.md      # 要 0/0（
 node research/tools/calendar-line-append-trap.mjs --text research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt            # 干跑
 node research/tools/calendar-line-append-trap.mjs --text research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt --confirm  # 干净才写；号由它现量给并按 10-05 的收号裁决自动顺延
 bash research/tools/r17-evidence-md5-check.sh --all                 # 落完复跑，rc 仍要 0
+ANCHORS='这一枚的独有串' bash research/tools/calendar-line-hunk-ownership.sh docs/reference/environment-traps.md
+git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 同 ①：那枚路径也不在本线 PATHS 里，收尾要显式点名
 ```
 裁决与分档见 B81；**编号这件事已经不需要等人了**，只差册子干净。
 
