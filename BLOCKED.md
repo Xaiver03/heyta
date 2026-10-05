@@ -5512,3 +5512,37 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 - 📌 顺带一枚自己抓到的探针形状（同族已入册，这里是第二次现量命中）：我第一版探测写成
   `ssh … | grep -E 'LOCKED='`，输出 `No matches found` 而 `echo $?` 报 **0** —— 那是 `grep`/管道尾部的码，不是 ssh 的。
   改成"先落盘再单独取 `$?`"才拿到真 255。**判"读不到"之前必须分通道各取一次码**，否则会把"探测坏了"读成"对方状态变了"。
+
+### B83.2 复现定形 + 🔴 我自己两处装置错（20:54–21:02 现量，一条已当场修复）
+
+**先说错的**（这两条比读数更重要，因为它们会让下一个人在假读数上排队）：
+
+1. 🔴 **20:54 那趟"干净树判别"答的是另一个问题**：它跑的是 `pnpm --filter @heyta/mobile test`（**单包**），
+   而段 85 那一格在 `pnpm check` 里是 `pnpm -r test`（**全仓递归**）。命令形状不同 ⇒ 那趟的 `MOBILE_TEST_RC=0`
+   **不判 B83**，它只证明"单跑这一包能绿"。我把一条装置的读数当成了另一个问题的答案（§7 元规则 1 的同族）。
+2. 🔴 **21:01 我用不带引号的 heredoc 往共享台账追加，正文里的反引号被当成命令替换执行了**：
+   `cat >> BLOCKED.md <<EOF` 里那些行内代码全部被 shell 求值。后果逐条如实列（都当场核实过）：
+   ① 其中一段 `git checkout --detach $(…rev-parse main)` **真的在主检出里跑了**，落在 `main` 自己的 tip（`ec33731f`）上 ⇒
+      **工作树字节零变化**（目标就是分支当前提交），我在约 40 秒内 `git checkout main` 把分支指针恢复，
+      另一条线的未提交改动与那本账都没被动（`git status` 复核后现量一致）；
+   ② 另一段 `pnpm --filter @heyta/mobile test` 也被执行，但**被内存闸门拒绝**（`已有测试在跑…`）⇒ 没有跑测试、没有占锁；
+   ③ 其余反引号串报 `command not found`（无害）；④ 追加进去的正文被打坏 ⇒ `git checkout -- BLOCKED.md` 丢弃
+      （那段是我自己的未提交内容，没别人的行）。
+   📌 **一般规律（新形状，值得入 traps）**：把给人看的中文正文写进 shell heredoc 时，**反引号一律是命令替换**，
+   而且它照样"成功追加"（rc=0）——同族条目讲的是打印字符串里的反引号，这一条是**落盘正文**里的反引号，
+   代价从"丢词"升级成"在共享检出里跑掉一条真命令"。**用 Edit/Write 这类不经过 shell 的工具写正文**，
+   非用 heredoc 时写 `<<'EOF'` 并保证正文不含需要保留的反引号。
+
+**读数本身（装置 `heyta-seg85-rtest-replica.sh`，载体 `7911ad02`、工作树 == HEAD、锁空时起跑，
+证据 `~/.heyta-evidence/seg85-rtest-1005-205739/`）**：
+
+- `SEG85B_RC=1` ⇒ **段 85 的红第二次复现，且这次旁边没有任何别人的测试**
+  （`CONCURRENT_VITEST_AT_START=0` / `AT_END=0`）⇒ 上一条"并发导致"的假设**被现量否证**。
+- 红的形状定案：`apps/mobile test: Test Files 52 passed (52)` / `Tests 739 passed (739)` **之后**才
+  `apps/mobile test: Failed` + `[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL]` ——
+  **没有一条用例红**（`Unhandled 命中=6`、`Parse failure 命中=5`，与 20:36 那趟同一形状）
+  ⇒ 这是 vitest"未处理拒绝也算失败"那一档，不是断言失败。
+- ⏭ **还差的唯一一步**（一条命令，锁空时 1-2 分钟）：把**同一条** `pnpm -r test` 跑在当前 main 上
+  （载体 `git checkout --detach $(git -C <主检出> rev-parse main)`，两枚提交的 lockfile 已现量相同、node_modules 沿用）。
+  绿 ⇒ 这档红属于 `7911ad02` 那批的提交态；红 ⇒ 它跟着 main 走，报给 mobile/vault 那条线（`b3397cda` 那批是最近的改动方）。
+- 📌 ② 的"可过段数 **83/85**"**不因本条改动**：段 85 只是归因更准了，红没有消失。
