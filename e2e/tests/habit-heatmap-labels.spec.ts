@@ -155,7 +155,9 @@ test.describe('热力图月份标签（H8，web 端）', () => {
       `${String(overlap.length)} 枚标签压到了下一枚上 ⇒ 时间轴读不出哪句属于哪一段`,
     ).toBe(0);
 
-    await heat(page).screenshot({ path: SHOT('labels-aligned') });
+    /* 这一张只拍**标签那一排**：HL2 说的是"哪句属于哪一段"，格子本身不参与判断，
+       拍进图里只会让下一位以为格子也在判据内（§6.2 规定一：图要说的是那条断言的话）。 */
+    await monthRow(page).screenshot({ path: SHOT('labels-aligned') });
   });
 
   test('HL3 🔴 没有一枚标签溢出窗格右边界（探出网格可以，探出窗格不行）', async ({ page }) => {
@@ -176,6 +178,35 @@ test.describe('热力图月份标签（H8，web 端）', () => {
     }
     expect(outside, `${String(outside.length)} 枚月份标签被窗格裁掉（${outside.join(' ; ')}）`).toEqual([]);
 
-    await heat(page).screenshot({ path: SHOT('labels-in-pane') });
+    /* 🔴 这张图要拍的是**热力区那一横条 + 窗格的右边界**，不是热力区自己：
+       HL3 判的是"探出窗格才算被裁"，而一张只有热力区的元素图里根本没有窗格那条边，
+       看图的人会以为图在替 HL1 说话。元素截图到视口边就断、不拼接（§7 第 170 条那一族），
+       所以先把视口拉高，再证明"要拍的那一块整块在视口内"——否则这张图说的不是判据说的话。
+       三张图的取景各不相同，也是在挡 §7 第 337 条那种"一批不同状态的图 md5 逐字相同"。 */
+    const size = page.viewportSize() ?? { width: 1280, height: 720 };
+    await page.setViewportSize({ width: size.width, height: 1600 });
+    const shot = await heat(page).evaluate((el) => {
+      el.scrollIntoView({ block: 'center' });
+      const heat = el.getBoundingClientRect();
+      const pane = document.querySelector('[data-testid="habit-pane"]')?.getBoundingClientRect();
+      return {
+        heatTop: heat.top,
+        heatBottom: heat.bottom,
+        paneLeft: pane?.left ?? heat.left,
+        paneRight: pane?.right ?? heat.right,
+        vh: window.innerHeight,
+      };
+    });
+    expect(shot.heatTop, '热力区上边掉出视口 ⇒ clip 会裁在标签那一排中间').toBeGreaterThanOrEqual(0);
+    expect(shot.heatBottom, '热力区下边掉出视口 ⇒ clip 会裁在半截格子上').toBeLessThanOrEqual(shot.vh);
+    await page.screenshot({
+      path: SHOT('labels-in-pane'),
+      clip: {
+        x: Math.max(0, shot.paneLeft),
+        y: Math.max(0, shot.heatTop - 8),
+        width: shot.paneRight - shot.paneLeft,
+        height: shot.heatBottom - shot.heatTop + 16,
+      },
+    });
   });
 });
