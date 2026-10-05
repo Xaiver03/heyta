@@ -16,6 +16,8 @@
  *     snapshot 时就脏 → 一律不动，并逐枚列出；
  *     snapshot 时干净、之后字节变了 → 才是这一趟写的，逐枚**点名**还原。
  *   新增的未跟踪文件同样不动（那是新证据，不是被覆盖的证据）。
+ *   🔴 但"跑前就存在的未跟踪文件被这一趟换了字节"**必须点名报**（`EVIDENCE_UNTRACKED_REWRITTEN`
+ *   那一档）—— 守卫对它没有还原能力，不报就等于让"人看的那版"与"盘上那版"悄悄分家（§8.151 第 6 节）。
  *
  * 跑法：
  *   node scripts/verify-detail-pane-evidence-guard.mjs --snapshot /tmp/x.json
@@ -81,11 +83,14 @@ if (mode === 'snapshot') {
   const dirty = dirtyNow();
   const snap = { at: new Date().toISOString(), tracked: {}, untrackedAtSnapshot: [] };
   for (const rel of tracked()) snap.tracked[rel] = { md5: md5(rel), dirtyBefore: dirty.has(rel) };
-  for (const rel of onDisk()) if (!snap.tracked[rel]) snap.untrackedAtSnapshot.push(rel);
+  for (const rel of onDisk()) {
+    if (snap.tracked[rel]) continue;
+    snap.untrackedAtSnapshot.push({ rel, md5: md5(rel) });
+  }
   writeFileSync(file, JSON.stringify(snap, null, 1));
   console.log(
     `SNAPSHOT 登记=${Object.keys(snap.tracked).length} 枚（其中跑前就脏的 ${Object.values(snap.tracked).filter((v) => v.dirtyBefore).length} 枚）` +
-      `｜当时未跟踪 ${snap.untrackedAtSnapshot.length} 枚`,
+      `｜当时未跟踪 ${snap.untrackedAtSnapshot.length} 枚（逐枚记了 md5 —— 守卫还原不了它们，但必须能报"被这一趟换过字节"）`,
   );
   process.exit(0);
 }
@@ -114,13 +119,29 @@ for (const [rel, info] of Object.entries(snap.tracked || {})) {
   }
   rewritten.push(rel);
 }
-const added = onDisk().filter((rel) => !trackedNow.has(rel) && !(snap.untrackedAtSnapshot || []).includes(rel));
+const added = onDisk().filter((rel) => !trackedNow.has(rel) && !(snap.untrackedAtSnapshot || []).some((e) => e.rel === rel));
+/**
+ * 🔴 跑前就存在的**未跟踪**文件被这一趟换了字节 —— 守卫**还原不了**它（`git restore` 对未跟踪无意义），
+ * 但绝不能因此不报：那条路的名字叫"人看的那张图与提交的那张图不是同一份字节"（§8.151 第 6 节现量：
+ * 新图 38328 → 38327 字节，而守卫只说"当时未跟踪 1 枚"）。
+ * 判红不行：一单**第一次**出图时必然有未跟踪的新图，判红等于禁止新增证据 ⇒ 响亮报名、退出码仍 0，
+ * 处置两条写在那一行里（先 `git add` 再跑，或提交前重新打开那张图）。
+ */
+const untrackedRewritten = [];
+for (const e of snap.untrackedAtSnapshot || []) {
+  if (trackedNow.has(e.rel)) continue; // 中途 add 过 ⇒ 它已是提交态，由上面 tracked 那一圈管
+  const after = md5(e.rel);
+  if (after !== null && after !== e.md5) untrackedRewritten.push(e.rel);
+}
 
 console.log(
-  `EVIDENCE 本趟重写=${rewritten.length} 枚｜跑前就脏（不动）=${untouchedPreexisting.length} 枚｜新增未跟踪（不动）=${added.length} 枚`,
+  `EVIDENCE 本趟重写=${rewritten.length} 枚｜跑前就脏（不动）=${untouchedPreexisting.length} 枚｜新增未跟踪（不动）=${added.length} 枚｜EVIDENCE_UNTRACKED_REWRITTEN=${untrackedRewritten.length}`,
 );
 for (const l of untouchedPreexisting) console.log(`  · 不动（跑前就是脏的，可能是别人的在途证据）：${l}`);
 for (const l of added) console.log(`  · 新增未跟踪：${l}`);
+for (const l of untrackedRewritten) {
+  console.log(`  · 🔴 未跟踪且被这一趟换了字节：${l} —— 看过的不等于盘上的；先 git add 再跑，或提交前重新打开它`);
+}
 
 if (keep) {
   console.log(`EVIDENCE_GUARD=KEEP（--keep：这一趟的字节留在盘上，未还原 ${rewritten.length} 枚）`);
