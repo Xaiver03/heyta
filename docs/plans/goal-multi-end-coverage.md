@@ -2983,7 +2983,6 @@ VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VER
 ```
 
 ### 7.30c ② 第一次有真读数（2026-10-05 09:53–约 12:0x，载体 `3546ad39`，窗口内起跑；**整条 `pnpm check` 是红的**）
-
 - 起跑资格现量（09:53，全部由装置自己打印）：4318/4319/4320/4322 = free、tfa 锁不存在、负载 9.5 < 12、
   无别线 `verify-mobile`/打包进程 ⇒ `VERDICT=PREFLIGHT-OK`，加 `--go` 起跑。证据 `~/.heyta-evidence/checks-manual-1005-095331/checks.log`。
 - 🔴 **`FULL_CHECK_SKIPPED` 没有打印**（那道护栏只在端口 busy 时才落 1）⇒ 这一趟"跑满"是**真有读数的红**，不是"没跑"。
@@ -2999,8 +2998,9 @@ VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VER
   |---|---|---|
   | 8 | `check:op-log-semantics` | 🔴 **19:31 定案：与第 84 段同族，是内存闸门拒绝**。日志原文写着「内存闸门拒绝启动：已有测试在跑（pid=40338，锁 `/tmp/tfa-test.lock`；它是 `.tfa-shield/bin/npx vitest run tests/security/revisionsL…`）」⇒ `run()` 拿到 `result.error` 就在 `:73` 抛、`:79` 是调用点。**不是产品红，是别人持锁时按设计不起跑**（那条旋钮 `TFA_ALLOW_CONCURRENT_TEST=1` 用户明令不用） |
   | 42 | `check:docs` | 🔴 **载体年龄**，不是死链：引用的 `trash-and-archive.md §10.87` 在**主检出行 7330 存在**、在**载体那棵老树里 0 命中**（`grep -cE '^#+ *(§)?10\.87'` 主=1 / 载体=0） |
-  | 69 | `check:ai-e2e` | 🔴 **19:46 定案（原来的"未裁定"作废）**：既不是产品也不是负载 —— **载体工作树被我自己上一段的取证装置换过**。`heyta-run-folderspec.sh:64-72` 把 `/tmp/list-folder.spec.ts`（mtime 10-04 03:42、md5 `d73db784d41243ef46c25781f4feffaf`、**没有** HEAD 里 10-04 加的 detach 重试壳 `scrollFreshAndShoot`）覆盖进 `e2e/tests/list-folder.spec.ts`（09:54）且**不还原**；10:0x 的全量 check 继承它，于是红在 `:115 Element is not attached to the DOM`、retry #1 同样红。链条字节级闭合：载体的脏 blob `43b0884b` == 草稿的 `git hash-object`，归档的还原前副本 md5 == 草稿 md5。判据/装置修复与双臂现量见交接账 19:4x 那节（traps 候选 #290/#291）。
-    ⚠️ 已证的是**成因**（覆盖链条字节级闭合）；还差一次**干净载体上的单 spec 复跑**做最后确认，预测是不再出现 `:115 not attached`（HEAD 那份带 detach 重试壳）。窗口到了就补，不拿"应该好了"当读数。 |
+  | 69 | `check:ai-e2e` | 🔴 **19:46 定案（原来的"未裁定"作废）**：既不是产品也不是负载 —— **载体工作树被我自己上一段的取证装置换过**。`heyta-run-folderspec.sh:64-72` 把 `/tmp/list-folder.spec.ts`（mtime 10-04 03:42、md5 `d73db784d41243ef46c25781f4feffaf`、**没有** HEAD 里 10-04 加的 detach 重试壳 `scrollFreshAndShoot`）覆盖进 `e2e/tests/list-folder.spec.ts`（09:54）且**不还原**；10:0x 的全量 check 继承它，于是红在 `:115 Element is not attached to the DOM`、retry #1 同样红。链条字节级闭合：载体的脏 blob `43b0884b` == 草稿的 `git hash-object`，归档的还原前副本 md5 == 草稿 md5。判据/装置修复与双臂现量见交接账 19:4x 那节第 5 条的两枚候选（**本地序号** #290/#291 —— 不是 traps 文件的号，原因见交接账 19:5x 第 4 条）。
+    ✅ **20:18 已确认**：干净载体（`7911ad02`、`CARRIER_DIRTY_TRACKED=0`）上整段 `SEG ai-e2e rc=0 / 162 passed`，
+    `list-folder.spec.ts:102:1` 那条 `✓ … (3.4s)` ⇒ 预测成立、那个形状不再出现。读数在 **§7.30e**。 |
   | 70/71 | `check:privacy-consent-e2e`、`check:landing-e2e` | 同一趟里**两种读数**：第 3 步单跑 rc=0，第 5 步逐段 rc=1 ⇒ 归到竞争/负载（当时 15 分钟均值 47.65），不算产品证据 |
   | 84 | `pnpm -r test` | 🔴 **内存闸门按设计拒绝**：`packages/sync-core test` 打印"并发测试会把进程推到 1.8–26GB…等它跑完"，唯一放行旋钮是 `TFA_ALLOW_CONCURRENT_TEST=1`（**用户明令不用**）⇒ 环境拒绝，不是产品红 |
 - `CARRIER_SHA=3546ad39a52ac487d7264965c4659c509e7b9cf2` 与 `CARRIER_SHA_AT_END=` **逐字相同** ⇒ 载体身份那条门自己过了。
@@ -3133,6 +3133,26 @@ COPY_BAD：装置**没有打印过这一行**（`grep -c COPY_BAD` = 0）⇒ 不
 照搬 mac 那条只会得到一段**永远红**的 Windows 判据。
 ⇒ 改后的建议（按可靠度）：① 内容判据继续压在壳自己写的 `M2D=`（本轮真在位）上，截图只管"有没有真窗口"；
 ② 采集换 `PrintWindow`/窗口 DC；③ 字节量级只当**报警绊线**，不当判据。全部细节与表在交接账 20:0x 那节第 4 条。
+
+### 7.30e ② 第二趟：载体干净之后重跑（2026-10-05 20:11:31 起，载体 `7911ad02`，同一窗口跟在 ① 后面）
+
+**先说这趟存在的理由**：§7.30c 那一趟的可过段数是在**被我自己上一段装置污染过的载体**上取的（第 69 段那条红，见本节末尾的定案）。
+这一趟的三个前置都换了：① 载体工作树 == 载体 HEAD（新 1a 门 `CARRIER_DIRTY_TRACKED=0`，未跟踪只有 ③ 那张合法证据图）；
+② ① 的 iOS 腿留下的 `Podfile.lock` / `project.pbxproj` 在闸门**之前**就被还原（排队器 v3）；③ 载体已对齐到 `7911ad02`（落后 main 7 笔，旗标在场 ⇒ 放行，读数钉这一枚）。
+
+装置打印（`~/.heyta-evidence/checks-queued-1005-201130/checks.log`，20:18:58 现量）：
+
+```
+SEG ai-e2e rc=0  tests=162 passed  failed=
+SEG privacy-consent-e2e rc=0  tests=7 passed  failed=
+（landing-e2e 20:18:48 起跑；第 4 步 CHECK_EXIT / CHECK_SEGMENTS_TOTAL 尚未打印 ⇒ 本条不主张"跑满"）
+```
+
+🔴 **§7.30c 留给"下一次安静窗口"的那条待确认，就在这趟里闭合了**：`tests/list-folder.spec.ts:102:1` 那条
+`✓ … 清单移入文件夹：入口常驻、跨刷新还在、非法目标不给点 (3.4s)`，且整段 `SEG ai-e2e rc=0 / 162 passed / failed 为空`。
+⇒ 上一趟 `:115 Element is not attached to the DOM` 的**预测成立**（干净载体 ⇒ 那个形状不再出现），
+归因从"成因已证、最后确认待跑"升级为**已确认**；而且确认它的不是单 spec 复跑，是整段 162 条全绿。
+同趟还新生了那五张取证图（`/tmp/list-folder-evidence/list-folder-{1..5}-*.png`，84–97 KB，mtime 20:11:37–38）。
 
 ### 7.31 ③ 的输入多了一道「能不能重放」的门，另一枚探针先被自己作废（2026-10-04 12:4x–13:0x，载体 `458249f6`，窗口仍不在）
 
