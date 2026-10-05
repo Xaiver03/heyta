@@ -2540,6 +2540,62 @@ done
     装置的出口就是为此而设：`ALLOW_ORPHAN=1` 会在输出里大字列出被放行的 hunk，提交信息里写明理由，
     而这一条是它的**台账落点**。持有者要找自己那一行：`git log -L 342,342:research/tools/r17-reshoot-stale.sh`。
 
+- (52) **10-05 14:1x：这一轮 Goal 的收尾对账 —— 两项闭合、三项被挡，而"被挡"这次每一格都查到了具体那几行在谁手里。**
+  本轮两笔提交（都**没有 push**）：`3281ebb2`（(49)：入库装置换判据的来源 + 六枚漏点名的图 + 三枚 e2e 源码），
+  `adfc7ec5`（(50) 的"下一轮"腿 + (51) 的重拍装置三形状与 `FORCE_SHOOT` + 第二张取证图与其 README 锚点）。
+  收尾读数：`bash research/tools/calendar-line-commit-plan.sh` ⇒ **rc=0**、
+  `⇒ 本线点名对象全部已在 HEAD 且工作树一致…A 此刻**无待办**`、`命名空间命中 0 枚`、`推导格 0 枚`、
+  `🗑 本线删除已落库…D=3281ebb2`（(50) 那条分支在主检出的第一次真复跑）。
+
+  **闭合的两项**（各带能因注入转红的判据）：
+  · **第 1 项（9 枚锚点补宽 + 重拍 + 人看图）** —— 账在 (48)，闭合读数在 §5 的 H 行；
+    常驻判据是 `r17-evidence-md5-check.sh --all`（现量 `rc=0 / pins_parsed=27 / dirs_with_mismatch=0 / 14 份 README`），
+    它的牙是它自己那把十臂台 + `r17-reshoot-arms.sh`（现量 `pass=16 fail=0`）。
+  · **第 2 项（(41) 的重复截图处置 + 第二张采集）** —— 前半见 (48) ③（那条前置断言已经跑绿过一次），
+    后半见 (51) ⑥（图拍出来了、人看了、还纠回一次看错的方向）。
+    这一格**关掉的现量判据**是两条计数：
+    `grep -c 'page.screenshot' e2e/tests/calendar-capture.spec.ts` = **2** 而 `grep -cE '^test\('` = **2**
+    （改之前是 1 / 2 —— 那正是这条缺口唯一的形状）。
+
+  **仍然被挡的三项（每一格都写"在谁手里 + 可复跑命令"，不降级、不硬闯）**：
+  · **第 3 项（把 `calendar-line-commit-only-arms.sh` 接进常驻消费者）**。
+    🔴 这次不是"印象里在等 package.json"，是**读被调本体读出来的**：
+    `scripts/check-gate-wiring.mjs` 审的是 **package.json 里的 npm 脚本名**（`ALLOWED_OUTSIDE_CHAIN` 那张表 +
+    "链外必须有可验消费方"），`research/tools/*.sh` 它**根本不扫**（现量：`grep -n 'research/tools' scripts/check-gate-wiring.mjs` 零命中）；
+    而全仓没有任何汇总器或 CI 跑这三把 rig（现量：`grep -rln 'mutation-rigs' scripts package.json .github/workflows`
+    只命中 `scripts/mutation-rigs` 那枚**目录名**，`ls scripts | grep -iE 'rig|arms|mutation'` 也只有那个目录）
+    ⇒ **唯一的常驻消费者入口就是 `package.json` 的 `check` 链**。
+    而 `package.json` 现量 ` M`、`git diff --numstat` = **2/1**，两处都是**别人**的 `check:ios-ax-shim`
+    （定义那一行 + 链里插在 `check:script-snapshot` 与 `check:verify-script-copy` 之间）
+    ⇒ 在谁手里：**给 iOS AX shim 接门禁那条会话**。
+    可机械套用的补丁（**等它落库之后**再做；而且**不要照抄我这份链行** —— 它改的就是同一行，必须先重读当前那一行再插）：
+    ① 定义：`"check:calendar-evidence-rigs": "bash research/tools/calendar-line-commit-only-arms.sh && bash research/tools/r17-reshoot-arms.sh && bash research/tools/r17-reshoot-stale.sh --selftest"`；
+    ② 链：把 `pnpm check:calendar-evidence-rigs` 插在 `pnpm check:md-tables` 之后（与本线那枚证据门禁同族，放一起）。
+    为什么这一档可以进链而不拖慢 `check`：三把都是**零浏览器、零网络**的夹具台
+    （`r17-reshoot-arms.sh` 的被守脚本是桩、`--selftest` 里 `SPEC_CMD='true'`、commit rig 用 `mktemp -d` 迷你树），
+    今天逐把跑过：`pass=15 fail=0` / `pass=16 fail=0` / `SELFTEST=OK`。
+    复跑（判"能不能接"）：`bash research/tools/calendar-line-commit-only-arms.sh && bash research/tools/r17-reshoot-arms.sh && bash research/tools/r17-reshoot-stale.sh --selftest`。
+  · **第 4 项（`--target c` 开时重跑 R14c 的 37 条设备腿）**：负载门现量 `load1=13` 对阈值 12（`host_load_gate`），
+    且 `src` 那一格是别人未提交源码 ⇒ 在谁手里：**负载 + 那几片并行工作树的所有者**，本线一件都不占。
+    可复跑：`bash scripts/verify-mobile-window-gate.sh --target c`（取 rc 用 `OUT=$(…); rc=$?`，别接管道），
+    开窗后先 `pnpm --filter @heyta/ui build && pnpm build:android` 再按 §5 的 C 行那串跑。
+    ⚠️ 这一格**本轮没有被推进**，别读成"快了"：它上一次闭合是 10-04 22:03 的 `37/0`，
+    本轮只重取了门的读数，没有新产物、没有新腿。
+  · **第 5 项（环境陷阱「差分形状 ≠ 差分语义」）**：`docs/reference/environment-traps.md` 现量 ` M`、
+    `git diff --numstat` = **269/1**（三枚 hunk，最后一枚在文件末尾**追加 237 行**），
+    最大号现量已从 287 涨到 **289**（`289. 🔴 BSD mktemp 只替换模板末尾的 XXXXXX…` —— 就是 (51) ⑪ 那场的 sweep）
+    ⇒ 本线条目的号**只能现量取**（写在这里的"290"到那天也会漂），且**不带别人 hunk**：
+    在谁手里：**正在往台账尾部追加那 237 行的会话**。
+    可复跑：`grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md | tr -d '. ' | sort -n | tail -1`；
+    要写的判据草稿在 (51) ⑥（"缩略图上看着像压在 6/7 之间，裁 300% 才看清在 7 号列"）与 (48) ③（AE≈93% 的过渡帧）：
+    **看缩略图得出的位置结论不算证据 —— chip 与列对齐必须在同一帧里同时看得见才算。**
+  📌 这一轮值得直接用的两条：
+    ① **"被挡"要先读被调本体再登记** —— 第 3 项的入口是 `check-gate-wiring` 审什么决定的，
+      不是"感觉要改 package.json"；读了本体才知道只有那一个入口，也才知道该留一份可机械套用的补丁。
+    ② 三处"我以为我知道"的现量本轮都改了口径：锚点枚数（26→27）、traps 最大号（287→289）、
+      并发锁（12:47 没有 / 12:50 就有）⇒ **正文里只留命令、不留读数**这条规矩被验证了三次。
+
+
   ⑦ 同一趟重取的三件被挡项现量（**别抄，跑之前重取**）：
   · `docs/reference/environment-traps.md` 仍 ` M`（别人正在写），且最大号已从 287 涨到 **288**
   （`grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md | tr -d '. ' | sort -n | tail -1`）
