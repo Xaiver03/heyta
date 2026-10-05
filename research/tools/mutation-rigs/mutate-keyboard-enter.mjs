@@ -6,7 +6,14 @@
  * "e2e 是不是 jsdom 的重复"，这一台问的是**这一条腿上的每一档承诺各由哪一层守着**。
  * 两层各有对方看不见的坏，所以臂台必须**双向**都造：
  *
- *   A1 落点没登记（habit 那一行）      → jsdom 1 红 + e2e K9 红
+ *   A1 落点没登记（habit 那一行）      → jsdom 2 红 + e2e K9 红
+ *      🔴 **2026-10-05 现量更正（§8.143 这一趟全跑才照出来）**：这台臂台上一次全跑是 §8.137，
+ *      而 §8.138 往同一份 spec 里又加了两条用例（"表里五面每一面都登记了落点"、
+ *      "任务那一族的落点是栏里那只正文框"）。于是 A1/A3/A6/A7 四臂的**期望红集全部漂了**：
+ *      A1 1→2 红、A3 1→2 红且 e2e 红集 K9/K10→K9/K10/**K12**（本单新那条也共用 `openPane`）、
+ *      A6 0→1 红（它原本记的"jsdom 盲区"已不成立 —— 五面登记那条现在也抓得到便签落点）、
+ *      A7 1→2 红。**判据一条没动，动的是这台装置自己那份"谁守着哪一档"的主张** ——
+ *      臂台不重跑，它打印出来的就是假话。
  *   A2 撤掉"焦点行 == 选中行"那道闸门   → jsdom 1 红 + e2e K11 红
  *   A3 `openPane` 只吞键不聚焦          → jsdom 1 红 + e2e **K9 与 K10 两条**红
  *      （🔴 第一版只点名 K9，实测多红一条 K10 ⇒ **改的是这一条主张，不是判据**：
@@ -20,6 +27,16 @@
  *      所有者，已删；三步现量在臂的注释里
  *   A6 落点没登记（便签）                → **jsdom 全绿** + e2e K10 红
  *   A7 撤掉 Enter 那支的 `preventDefault` → jsdom 1 红 + **e2e 全绿**（反向盲区）
+ *
+ * ── §8.143「焦点跟着痕迹走」三臂 ───────────────────────────────────────
+ *   F1 摘掉 `focusRow` 调用           → jsdom 2 红 + e2e K12 红
+ *   F2 焦点总是落在第一行             → jsdom 1 红 + e2e K12 红
+ *      （**只红第一条**：端点那条与 K12 的第一次按键都是"`ids[0]` 恰好就是走到的那一行"，
+ *       分不开两种坏 —— K12 因此走**两行**，这一档是 F2 逼出来的。）
+ *   F3 可聚焦口径缩成只认 `<button>`   → **两层全绿**（预判错了，见臂内注释：行里真有 `<button>`）
+ *      🔴 这一臂是"夹具镜像了什么"的现量：jsdom 那两行的行内控件真是 `<button>`，
+ *       而真实生产者（`TaskRow.tsx:300` 外层裸 `View` + 行内那颗 `role="checkbox"`）
+ *       不是。⇒ "行里到底有没有可聚焦的东西"这一档**只有浏览器知道**，与 A4 同一族。
  *   A8 环改回往外画（改前的形状）        → **jsdom 全绿**（它没有视口）+ e2e K9 红
  *
  * 🔴 A7 那条盲区要照实登记，不许当成"判据没牙"混过去：吞掉 Enter 在**今天的界面上
@@ -60,6 +77,17 @@ const BIN = (rel) => path.join(ROOT, 'apps/web', 'node_modules', '.bin', rel);
 /** 两条 jsdom 用例的名字片段（不带 markdown 星号，避免与用例名里的 `**` 对不上）。 */
 const JS_MARKED = '吞掉按键，且选中一个字都没动';
 const JS_UNMARKED = '那一下，不是';
+/** §8.143 那两条（焦点跟着痕迹走）。 */
+const JS_FOLLOW = '焦点没跟着痕迹走';
+const JS_ENDPOINT = '也要把焦点';
+/**
+ * 🔴 另两条**不是新用例**，是 §8.138 加进同一份 spec 的两条 —— 它们让 A1/A3/A6/A7 的
+ * 期望红集从 1 条变成 2 条（或 0 变 1）。这台臂台上次全跑是 §8.137，**§8.138 之后没人重跑过**，
+ * 所以"应红 1 条"这句话已经漂了三轮。本单把它按现量改回来，并记下形状：
+ * **臂台不重跑，它自己那份"谁守着哪一档"的主张就会变成假话** —— 判据没动，动的是主张。
+ */
+const JS_ALLFIVE = '每一面都登记了落点';
+const JS_TASKPANE = '栏里那只正文框';
 
 const ARMS = [
   {
@@ -67,7 +95,7 @@ const ARMS = [
     file: CURSOR,
     from: `    habits: { kind: 'habit', prefix: 'habit-row', enterTarget: '[data-testid="habit-pane"]' },`,
     to: `    habits: { kind: 'habit', prefix: 'habit-row' },`,
-    expectJs: [JS_MARKED],
+    expectJs: [JS_MARKED, JS_ALLFIVE],
     expectE: ['K9'],
   },
   {
@@ -86,9 +114,9 @@ const ARMS = [
   return true;`,
     to: `  if (pane === null) return false;
   return true;`,
-    expectJs: [JS_MARKED],
-    // 两面共用同一只 openPane ⇒ 两条都该红（第一版只点名 K9，见文件头）。
-    expectE: ['K9', 'K10'],
+    expectJs: [JS_MARKED, JS_TASKPANE],
+    // 三面共用同一只 openPane（习惯 / 便签 / 任务栏里）⇒ 三条都该红（第一版只点名 K9，见文件头）。
+    expectE: ['K9', 'K10', 'K12'],
   },
   {
     name: 'A4 面单根没有 tabIndex（真渲染里 focus() 是空操作，jsdom 看不见）',
@@ -134,7 +162,7 @@ const ARMS = [
     file: CURSOR,
     from: `    notes: { kind: 'note', prefix: 'note-row', enterTarget: '[data-testid="notes-editor-input"]' },`,
     to: `    notes: { kind: 'note', prefix: 'note-row' },`,
-    expectJs: [],
+    expectJs: [JS_ALLFIVE],
     expectE: ['K10'],
   },
   /* A8 = §8.137 第 5.5 节那一处（看图照出来的"环有四条边被视口裁掉"）。
@@ -161,7 +189,43 @@ const ARMS = [
     file: CURSOR,
     from: `        if (openPane(target)) event.preventDefault();`,
     to: `        openPane(target);`,
-    expectJs: [JS_MARKED],
+    expectJs: [JS_MARKED, JS_TASKPANE],
+    expectE: [],
+  },
+  /* ── §8.143「焦点跟着痕迹走」三臂 ───────────────────────────────────
+     这三臂合起来回答一个问题：**这一档承诺到底由哪一层守着**。F1/F2 两层都看得见；
+     F3 两层**都看不见**（预判错了，见臂内注释）—— 它量出的是"这份口径宽度今天不承重"。 */
+  {
+    name: 'F1 摘掉 focusRow 调用（↑↓ 只改选中、不挪 DOM 焦点 = §8.138 边界③原状）',
+    file: CURSOR,
+    from: `      focusRow(target.prefix, next);`,
+    to: `      // F1：不挪 DOM 焦点`,
+    expectJs: [JS_FOLLOW, JS_ENDPOINT],
+    expectE: ['K12'],
+  },
+  {
+    name: 'F2 焦点总是落在**第一行**（而不是走到的那一行）',
+    file: CURSOR,
+    from: `      focusRow(target.prefix, next);`,
+    to: `      focusRow(target.prefix, ids[0] as string);`,
+    /* 🔴 只红第一条：第二条是"单行列表上端点再按"，那里 `ids[0]` 恰好**就是**走到的那一行，
+       比不出来。这一档 K12 也一样 —— 所以 K12 走的是**两行**（第一次 ↓ 落的就是第一行，
+       一次按键分不开两种坏）。 */
+    expectJs: [JS_FOLLOW],
+    expectE: ['K12'],
+  },
+  {
+    name: 'F3 可聚焦的口径缩成只认 `<button>`（两层都盲 ⇒ 这份宽度今天不承重）',
+    file: CURSOR,
+    from: `const FOCUSABLE =
+  '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea, [role="checkbox"], [role="button"], [role="link"]';`,
+    to: `const FOCUSABLE = 'button';`,
+    /* 🔴 读数与我的预判**相反**。预判写的是"真渲染里那颗是 `div[role=checkbox]`，只认 `button`
+       就会只红浏览器层"；实测**两层全绿** —— 真实那一行里确实还有一颗 `<button>`（行尾那颗删除），
+       所以 `querySelector('button')` 照样能找到可聚焦的东西。
+       ⇒ `FOCUSABLE` 那份宽度今天**没有消费者**，它是保险不是被观察到的行为；这一臂的用处
+       就是把这句话钉成读数。而"预判写反了"本身与 §8.141 边界① 是同一条教训：**先跑再写**。 */
+    expectJs: [],
     expectE: [],
   },
 ];
@@ -283,9 +347,9 @@ const b = build();
 if (b.rc !== 0) fail(`干净态打不出包：\n${b.out.slice(-1500)}`);
 const cleanDigest = distDigest();
 const bj = jsdom();
-if (bj.rc !== 0 || bj.passed < 30) fail(`干净态 jsdom 层不干净（要 >=30 passed）：${bj.line}`);
+if (bj.rc !== 0 || bj.passed < 34) fail(`干净态 jsdom 层不干净（要 >=34 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 11 || be.failed > 0) {
+if (be.rc !== 0 || be.passed < 12 || be.failed > 0) {
   fail(`干净态 e2e 层不干净（要 >=11 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'K').join(' ｜ ')}`);
 }
 console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（K1..K11）｜dist=${cleanDigest}`);

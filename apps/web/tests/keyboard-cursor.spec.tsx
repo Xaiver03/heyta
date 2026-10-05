@@ -467,6 +467,59 @@ describe('接线的三个细节', () => {
     expect(spy.mock.calls[0]?.[0]).toEqual({ block: 'nearest' });
   });
 
+  /**
+   * 摆出**镜像真实生产者**的一串行：行本体是裸 `<div>`（不可聚焦），行里有一颗可聚焦的控件。
+   *
+   * 🔴 为什么夹具必须长成这样：`packages/ui/src/task-list/TaskRow.tsx:300` 的外层行是
+   * 裸 `<View>` 且**不带 `tabIndex`**，可聚焦的是行里那颗 `accessibilityRole="checkbox"`。
+   * 而 `rows()` 那种空 `<div>` 夹具会让"聚焦行"静默变成空操作 —— 那条判据就只在骗自己
+   * （§8.137 B13 那一族：插出来的 DOM 抓不住生产者的形状）。
+   *
+   * ⚠️ 行内那颗的名字**刻意不以行前缀开头**（`row-box-*` 而不是 `task-item-*-box`）：
+   * `renderedIds` 按 `[data-testid^="task-item-"]` 扫行，取 `task-item-f1-box` 这种名字
+   * 会让行内的控件被当成**第二行**（本单第一版就这么撞的：↓ 走到的是"f1-box"这一"行"，
+   * 焦点看着没动）。真实生产者没有这种名字（行内是 `task-title-*` / `task-chip-*`），
+   * 所以这是夹具的形状错、不是产品的洞 —— 但它是一条**潜在雷**，登记在 §8.143 边界。
+   */
+  function rowsWithControl(prefix: string, ids: string[]): void {
+    for (const el of Array.from(document.querySelectorAll(`[data-testid^="${prefix}-"]`))) {
+      el.remove();
+    }
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      ids
+        .map(
+          (id) =>
+            `<div data-testid="${prefix}-${id}"><button data-testid="row-box-${id}" type="button"></button></div>`,
+        )
+        .join(''),
+    );
+  }
+
+  it('🔴 ↓ 走一行 ⇒ DOM 焦点跟着落到**那一行里那颗可聚焦控件**（§8.143）', async () => {
+    rowsWithControl('task-item', ['f1', 'f2']);
+    const box = document.querySelector('[data-testid="row-box-f1"]') as HTMLElement;
+    if (box === null) throw new Error('夹具里没有可聚焦控件 ⇒ 这一条在空转');
+    box.focus();
+    selection.select('task', 'f1');
+    await mount('tasks');
+    await press('ArrowDown');
+    expect(
+      document.activeElement?.getAttribute('data-testid'),
+      '焦点没跟着痕迹走 ⇒ Enter 的接管条件永远不成立',
+    ).toBe('row-box-f2');
+  });
+
+  it('🔴 端点上再按（选中不动）也要把焦点**带进那一行**（从 body 起步）', async () => {
+    rowsWithControl('task-item', ['only']);
+    selection.select('task', 'only');
+    await mount('tasks');
+    // 焦点此刻在 body（用户还没 Tab 到行上）—— 端点那一下 `next === current`，
+    // 但按键是被吞掉的（既有裁决），所以焦点必须照样落到这一行的控件上。
+    await press('ArrowDown');
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('row-box-only');
+  });
+
   it('列表是空的 ⇒ 什么都不做，也不吞键', async () => {
     await mount('tasks');
     let defaultPrevented: boolean | null = null;
