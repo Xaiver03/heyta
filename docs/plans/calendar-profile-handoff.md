@@ -1712,7 +1712,42 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   `ssh windows-pc "powershell -NoProfile -EncodedCommand $(python3 -c '…base64…')"` ⇒ 输出 `BUSY pid=… delta=…s` 逐枚、
   最后一行 `busy_count=N REMOTE_IDLE=<bool>`（空读数 = 可以动）。
 
+- (39) **10-05 10:48：窗口真的开过一次，看守走到第 2 步就按设计停了 —— B 的第三格阻塞是"载体被别人占着"，处置是切一枚本线专用载体，不是等。**
+
+  ① `10:38:20 WINDOW=OPEN try=2 REDS=`（负载那一格真的落了），紧接着
+  **`STOP=carrier-dirty（38 行未提交 ⇒ 有人在载体里写，B 不在别人的现场上跑）`**，看守退出（pid 93349 不在了）。
+  🔴 **这一停是对的行为**：`reinstall-all` 的第 0 步是 `pnpm -r build` 并把工作树打包送到远端，
+  在别人的未提交改动上跑它 = 把他们的 WIP 装成"当前产物"（§7 第 82 条那个形状的第三次）。
+
+  ② **那 38 行一枚都不是本线的**（现量 `git -C heyta-wt-reinstall status --porcelain`）：
+  37 枚 `apps/web/evidence/**` 的 PNG（`assistant` / `calendar-*` / `vault-panel` / `tool-run` / …）+
+  ` M e2e/tests/list-folder.spec.ts`（mtime **09:54**）+ `?? apps/mobile/evidence/android-notes-3-from-search.png`
+  ⇒ 是 notes/list-folder 那条线在载体里跑过一趟 e2e 留下的。
+  `ps` 与 `lsof +D` 现量**没有进程开着这枚载体**（所以不是"正在跑"），但那枚 `.spec.ts` 是**别人的源码改动**
+  ⇒ 按 AGENTS §8.9 不清、不 `checkout --`、不替他们提交。复跑归属判定：
+  `git -C "../heyta-wt-reinstall" status --porcelain | wc -l`（10:48 现量 **38**）。
+
+  ③ **处置：切一枚本线专用载体**，而不是把 B 绑在别人的一次未提交上：
+  `git worktree add --detach ../heyta-wt-reinstall-b HEAD` ⇒ `1cd5ac6f`（当时的 main 尖）；
+  `pnpm install --frozen-lockfile` ⇒ **`Done in 19.1s`、`INSTALL_RC=0`**；
+  `git status --porcelain | grep -c .` ⇒ **0**；
+  🔴 并验了"它不是链回主检出的假隔离"：`readlink ../heyta-wt-reinstall-b/apps/web/node_modules/@heyta/ui`
+  ⇒ `../../../../packages/ui`（**相对**链，解析落在载体自己的 `packages/`，不是主检出那一份）。
+  ⚠️ 这一条必须验：`node_modules` 用软链拼出来的"隔离载体"会让构建读**别人工作树里的源码**，
+  而所有判据照样绿（§7 第 196 条那种"软链没被 `node_modules/` 那条 exclude 挡住"的同族面目）。
+  看守已按新载体重挂：**pid 47506**，`start … 载体=…/heyta-wt-reinstall-b`，
+  第一格 `10:48:42 try=1 rc=3 REDS=load,dev`（`dev` 是 10:4x 新出现的设备面占用，不是本线的）。
+  取径：`tail -4 /tmp/ht-b-window.log`；起跑资格仍由闸门 `--target b` 判，**负载门不降级**。
+
+  ④ 📌 一般规律：**"等共享资产变干净"和"切一枚自己的"是两个选项，而前者的代价是把主线进度绑在别人的未提交上。**
+  载体本来就是为"绕开共享树的 `src` 格"而存在的（§4.05 (9)(10)(26)），同一理由反过来也成立：
+  当那枚载体被别人写了，**再切一棵**比等他们收尾更对 —— 成本实测 19 秒 install + 一份 worktree。
+  ⚠️ 边界要说清：这不是"载体可以无限造"，两枚载体的 `node_modules` 各占 ~2G，
+  收口后本线这枚 `heyta-wt-reinstall-b` 应当由**造它的人**（本线）回收：
+  `git worktree remove "../heyta-wt-reinstall-b"`（等 B 拿到 `B_DONE` 之后做，别在跑之前删）。
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
+
 
 
 
