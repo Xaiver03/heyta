@@ -13592,6 +13592,38 @@ AI 工具调用与对话助手两块都在，档位写着"只读"）；
 截图反而是唯一进库的产物。⇒ 凡是"某项的现量"，账本必须**逐字抄住终态那几行**（本节就是补这一格），
 否则下一次翻目录时，更新的那趟会因为没进库而悄悄过期，而我会继续引用更旧的那把尺。
 
+### 8.253 第 8 项 iOS 端"要自带设备"这一格今天备好了：建了一枚**本线自己创建**的模拟器，没有 boot 它（2026-10-05 20:2x）
+
+先量为什么它以前跑不了（`scripts/reinstall-all.sh:342-365` 现读，不是印象）：
+iOS 段取设备的方式是 `IOS_DEVICE_NAME`（默认 `iPhone 17 Pro`）在 **Booted** 列表里做 `grep -F` 名字匹配；
+匹配不到时，**只有一台**已启动才盲用那一台，**多于一台就拒绝**（"不猜"，因为这一段会 `simctl uninstall`）。
+20:2x 现量：Booted 有 **6 台**（`heyta-batch2-closeout` / `heyta-bc-reminders` / `heyta-e2-ios-erasure` /
+`heyta-iphone-17pro` / `heyta-multiend-reinstall` / `heyta-ios-isolated`），**没有一台**的名字含 `iPhone 17 Pro`
+（真名是连字符小写）⇒ 默认旋钮下这一端**必然拒绝**，而把 `IOS_DEVICE_NAME` 填成上面任何一个名字
+= 拿别人的设备去 `simctl uninstall`。所以这一格从来不是"慢一点就好"，是**缺一枚属于本线的对象**。
+
+**做了什么**：`xcrun simctl create "heyta-selfhost-reinstall" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro com.apple.CoreSimulator.SimRuntime.iOS-27-0`
+⇒ `ED4589E9-B756-4918-A66B-B234C353AD8D`，状态 `Shutdown`（判据是 `simctl list` 里读得到这枚 UDID，不是命令的退出码）。
+落地之后跑 iOS 端只要两条：
+
+```bash
+xcrun simctl boot heyta-selfhost-reinstall
+IOS_DEVICE_NAME="heyta-selfhost-reinstall" bash scripts/reinstall-all.sh --only ios
+```
+
+🔴 **刻意没有 boot 它**：这台机器已经有 6 台 Booted（内存压力那条是长期事实），
+而这一端要等落地之后才跑；建好但不启动 = 把"缺对象"变成"缺一条命令"，且不给别人添内存账。
+收尾时若落地始终没发生，这枚设备由本线自己 `xcrun simctl delete` 掉（我创建的，只有我能删）。
+
+**两条探针形状（都是已入档陷阱的再次命中，不是新知识，但值得记"我又踩了一次"）**：
+① 第一次建的时候配 `iPhone 17 Pro × iOS 27.1` 报 **`Incompatible device`** ——
+`simctl list runtimes` 列出 27.1 存在，**并不**意味着每种机型都支持它；机型×运行时这一对要单独试。
+② 那条命令我最初写成 `xcrun simctl create … | tail -2; echo "CREATE_RC=$?"` ⇒ 打印 **`CREATE_RC=0`**，
+而它其实是**失败**的那次（`tail` 的退出码）。正是 §7 里"管道后 `$?` 是 `tail` 的"那一条。
+第二次改成 `out=$(…); rc=$?` 直接取码，才看见真正的 `Incompatible device`。
+**判"建成功了"的依据必须是 `simctl list` 里读得到那枚 UDID，而不是管道尾部的 0。**
+
+
 
 
 
