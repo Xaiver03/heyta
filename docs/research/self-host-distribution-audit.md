@@ -13685,3 +13685,41 @@ IOS_DEVICE_NAME="heyta-selfhost-reinstall" bash scripts/reinstall-all.sh --only 
 - 任务 #25（公开树整条 build 能否跑通）**这轮不跑**，理由是量出来的不是感觉：一趟全量 build
   会把 1 分钟负载压过 12，而负载正是我自己那道开窗闸 —— 跑它就等于把自己那一格往后推。
   等落地后再跑（那时它和 #50、#55 是同一批）。
+
+### 8.255 整套 live-site 在线上全跑一遍：24 绿 6 红，六枚红**没有一枚是产品缺陷**，且每一枚都认得出主人（2026-10-05 20:4x）
+
+这是"外人一条 compose 起全套、打开浏览器就能用"里**线上**那一维的第一次整跑（不是单条）。命令：
+
+```
+cd e2e && npx playwright test --config playwright.live-site.config.ts     # 逐字 RUN_RC=1
+24 passed / 6 failed (1.6m)
+```
+
+六枚红逐条归属（每条都取到报错原文，不靠印象）：
+
+| # | 用例 | 报错原文（关键那一行） | 归属 |
+|---|---|---|---|
+| 1–4 | `live-install-claim.spec.ts:94` ×4（Web 卡 / 自建指南段 × 中英） | 新句不在场、旧句在场 | **改了没发布**（#20/#61 那两句，早就登记过） |
+| 5 | `live-domain.spec.ts:96` 中文落地页 →「立即使用」 | `Expected: "…/app?lang=zh-CN"` `Received: "…/app"`（`64 × locator resolved to <a … href="…/app">`） | **同样是改了没发布** —— 出处不是推测：`apps/landing/src/lib/app-url.ts:70-78` 自己写着"两种语言都带 `?lang=`"，并把旧理由的死因钉在 `0aa6cb0e`（10-01 15:33 首启语言解析链收进 i18n 与两个壳），还点名了这条用例曾经红在"应用是英文的" |
+| 6 | `live-legal.spec.ts:268` terms 英文侧 = 本地真源 | `线上 terms 是 1.2，@heyta/legal 的 dist 里是 1.1` | **未定**，而它打印的那句处置我照做了：`pnpm --filter @heyta/legal build` ⇒ `BUILD_RC=0`（`DTS ⚡️ Build success in 562ms`）。复跑被**内存闸门**挡下：`已有测试在跑（pid=88878 … tests/ai-assistant.spec.ts）` ⇒ `RETRY_RC=1` 是环境拒绝，不是产品红。我没有用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕过去 —— 那一族并发把整机推到过 26GB |
+
+### 顺带取到的三格"当前产物"读数（都是之前只登记、没量过的）
+
+- 线上 `/app/sw.js` ⇒ `200 application/javascript 16381 B`；`/app/manifest.webmanifest` ⇒ `200 application/manifest+json 2361 B`，
+  清单字段是 `id/start_url/scope` **全相对**（`'.'`）+ 相对 icons —— 也就是挂载路径那一项（任务 #1）的产物形状**在线上已经是新的**。
+  而 #33（G-60）那条判据本来就带两腿（真清单 true / SPA 兜底路径 false），这一趟两腿各给对的一个，`3 passed`。
+  ⚠️ **`live-domain.spec.ts:96` 的红不是这道门的红**：那道门量的是资产类型，这一条量的是 CTA 的 `href`。别把"清单已经对了"读成"入口已经对了"。
+- `/tmp/live-sw.js` 的 md5 `d0252fcbdefedaec4edb6cf6222cd65e` **等于**本树 `apps/web/dist/sw.js`（同 16381 B）——
+  这条只能证**形状是当前的那一版**，不能证"线上那发就是我这棵树打的"（`dist/` 是 gitignore 的构建产物，
+  同源码同配置两次构建本就同 hash）。要证来源得看部署记录，不看 hash。
+- 我一度怀疑那发 `sw.js` 是别的项目的：它第一行注释是 `// ../../packages/widget-core/dist/…`。
+  **这条怀疑是我读错了**，否证来自本树自己 —— `packages/widget-core` 是本仓的包，被
+  `apps/web/src/pwa/publish.ts:52,58` 引用，那句是打包器留下的模块横幅。📌 可迁移的那条：
+  **先在本地树里 grep 那个"不属于我们的名字"，再决定要不要报缺陷**；`ls` 一下 dist 目录之外的同名词就够。
+
+### 这一趟给 #61 的那句话补了个数
+
+发布节奏那个待拍板项以前只挂着"两句错话"。现在能说的是：**一次重发（落地后的那一发）会把 5 枚红一起转绿**
+（4 枚 install-claim + 1 枚 CTA 的 `?lang=`），第 6 枚（terms 版本）不在这一发里判 —— 它要先在
+没有别人占着测试锁的时候复跑一次。⚠️ 这是"5 枚同因"的算术，不是"落地了就会绿"的承诺：
+那 5 枚要的是 `main` 前进之后重发，两件事都还没发生。
