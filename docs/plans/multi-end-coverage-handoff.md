@@ -3413,3 +3413,27 @@ preflight 不碰它们 ⇒ 我们不会杀别人，但别人在那几枚上时�
 
 📌 记这一条是为了让下一位不要把 04:10 那枚 `REDS=` 空读成"② 的窗口开了"。
 要判 ② 的窗口，**四枚端口 + 别线 runner 都要单独量**（现量命令就在下面这条），闸门只覆盖其中一部分。
+
+
+## 19:17 ① 的 iOS 靶换成了**我自己新建的一台模拟器**（用户 19:1x 明确全权授权，不再逐项回问）
+
+原来的拦因不是"我的装置坏了"，是**别人的现场**：目标机 `heyta-iphone-17pro` 上 `com.heyta` 有 1 个实例在跑，
+另有两枚 `idb_companion` 正驱动 `heyta-batch2-closeout` / `heyta-e2-ios-erasure`。
+reinstall 的 ios 段会 `simctl uninstall` 目标机 ⇒ 换到**别人命名得像夹具的那三台**上等于拆他们的现场，
+即便被授权也不该那么做。所以走的是第三条路：**自己建一台，只动自己创建的对象。**
+
+| 项 | 现量 |
+|---|---|
+| 建 | `xcrun simctl create heyta-multiend-reinstall "iPhone 17 Pro" com.apple.CoreSimulator.SimRuntime.iOS-27-0` ⇒ udid `EAAD1B66-80A3-4A51-957C-298DAF22F057`（runtime 与旧靶同版，从 `simctl list devices -j` 现读，不是抄的） |
+| 起 | `xcrun simctl boot` ⇒ 列表里 `(Booted)` |
+| 占用表认它空闲吗 | 链用的那把探针 `ios_occupancy_table` ⇒ `running=0  name=heyta-multiend-reinstall`（**同一条探针**，不是另搭判据） |
+| 链怎么拿到它 | `IOS_TARGET_NAME=heyta-multiend-reinstall` 环境变量；链里那一行本来就是这个形状：`IOS_TARGET_NAME="${IOS_TARGET_NAME:-heyta-iphone-17pro}"` |
+| 一条命令回退 | 去掉这个环境变量重起链即可回到 `heyta-iphone-17pro`；我建的这台用 `xcrun simctl delete EAAD1B66-…` 单独拆，不影响任何人 |
+
+重起的三件装置（19:17 现量）：链 **82394**（日志 `/tmp/heyta-chain19.log`，`HEYTA_CHAIN_CAP=1400`）、
+排队器 **82522**（`CAP_CHAIN=1500 GATE_CAP=90`，证据目录 `~/.heyta-evidence/checks-queued-1005-191730`）、
+哨兵（`heyta-watch-12.sh`，日志 `/tmp/heyta-watch19.log`）。三件父进程都不是本会话，回合/暂停不影响它们。
+
+⚠️ 一条顺带纠正：**第 69 段那条红不是载体年龄**（那 48 笔对三个相关文件 `git log`/`diff --numstat` 皆空，见 goal §7.30c）；
+而 19:14 现量整机 **load 248/128/92 且 `/tmp/tfa-test.lock` 存在（别人持锁）** ⇒ 下一趟 ② 会在**安静窗口**里重跑，
+那条 spec 的 A/B 就在那一趟里定案（`check:ai-e2e` 是 `pnpm check` 的第 69 段，不需要另起一次运行）。
