@@ -7,12 +7,14 @@
  * 习惯这一面本来就是「列表 + 窗格」两列（产品负责人 2026-10-01 定的），
  * 所以这一单动的是"窗格落在哪一栏"，不是"新增一块面单"。
  *
- * 🔴 为什么这一层不能省（`habits-detail-card.spec.tsx` 已经把落点规则量过了）：
- * jsdom 那 11 条量的是"开关对不对 + 组件画不画得出来"，量不到三件事：
+ * 🔴 为什么这一层不能省（`apps/web/tests/habits-detail-card.spec.tsx` 已经把落点规则量过了）：
+ * jsdom 那 13 条量的是"开关对不对 + 组件画不画得出来 + 头行的**结构**对不对"，量不到四件事：
  *   ① 那一栏被 CSS 藏掉时面单**回不回得来**（`display:none` 里的板子 = 界面不说、模型已变）；
  *   ② 面单搬走之后，`.ht-habit` 那根 5fr 轨道有没有**留成一整块空白**（布局只在浏览器里成立）；
- *   ③ 90 天热力图压在 22rem 的栏里**会不会溢出**（板子原来在宽度有余的中间列）。
- * 所以 H4/H1/H5 各挡一件，且每台配了臂（见 `mutate-detail-pane-habit-e2e.mjs`）。
+ *   ③ 90 天热力图压在 22rem 的栏里**会不会溢出**（板子原来在宽度有余的中间列）；
+ *   ④ 三颗工具与它所属的那条习惯**名字**在不在同一行、离卡片近不近（§8.134 看图那一处，
+ *      jsdom 只能看结构、看不到高度）。
+ * 所以 H4/H1/H5/H6/H7 各挡一件，且每台配了臂（见 `mutate-detail-pane-habit-e2e.mjs`）。
  *
  * ⚠️ 载体是 `vite preview` + `apps/web/dist`（见 `playwright.detail-pane.config.ts` 文件头），
  *    改完 `apps/web/src/**` **必须先重打**，否则量的是旧产物（§7 第 27 条那一族）。
@@ -357,6 +359,79 @@ test.describe('习惯面单落进详情列', () => {
 
     await parkCursor(page);
     await page.screenshot({ path: SHOT('h5-heatmap-fits') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
+
+  /*
+    H6/H7 是工单 §8.134 那一处看图的读数。§8.133 记下的是**观感**（"三颗浮在栏顶、与页头
+    同高，读起来像页头的工具条"），观感不能直接当判据 —— 把它翻译成两件量得到的事：
+      · H6 **这一行有名字**：工具与"所选那条的名字"在同一行（竖向重叠）、在名字右侧。
+        一条没名字的浮排控件才会被读成页头的；名字一在，归属就在。
+      · H7 **这一行不离它说的卡片**：工具不许跑出头行盒子，且它与卡片之间的空白不许超过
+        这一栏的栏内间距（阈值从 `--ht-space-4` 推导，不抄像素 —— §7 元规则 2）。
+    两件事合起来才是那条观感，而它们各自能被不同的臂打红（E4 只红 H6，E3 两条都红）。
+  */
+  test('H6 三颗工具与所选那条的名字在同一行（不再是一排没名字的浮控件）', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '习惯');
+    await addHabitAndRelease(page, '头行甲');
+    await addHabitAndRelease(page, '头行乙');
+    await page.locator('[data-testid^="habit-row-"]').first().click();
+
+    const marked = await nameOfMarkedRow(page);
+    expect(marked, '点完行没有一行带痕迹').not.toBe('');
+    const title = paneInColumn(page).locator('.ht-habit__pane-title');
+    await expect(title, '栏里那一格没有标题').toBeVisible();
+    expect(
+      (await title.textContent())?.trim(),
+      '标题写的不是带痕迹那一条 ⇒ 工具没有归属，又回到"没名字的一排浮控件"',
+    ).toBe(marked);
+
+    const titleBox = await paintedBox(page, title);
+    const tools = await paintedBox(page, paneInColumn(page).locator('.ht-habit__pane-tools'));
+    expect(
+      tools.y < titleBox.y + titleBox.height && tools.y + tools.height > titleBox.y,
+      `工具不在同一行：标题 ${String(titleBox.y)}–${String(titleBox.y + titleBox.height)}，` +
+        `工具 ${String(tools.y)}–${String(tools.y + tools.height)}`,
+    ).toBe(true);
+    expect(
+      tools.x,
+      `工具压在标题文字上（工具左缘 ${String(tools.x)} < 标题右缘 ${String(titleBox.x + titleBox.width)}）`,
+    ).toBeGreaterThanOrEqual(titleBox.x + titleBox.width - 1);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('h6-head-row') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
+
+  test('H7 工具不许跑出头行，也不许与它说的卡片之间隔出一整段空白', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '习惯');
+    await addHabitAndRelease(page, '归属甲');
+    await page.locator('[data-testid^="habit-row-"]').first().click();
+
+    const pane = paneInColumn(page);
+    const head = await paintedBox(page, pane.locator('.ht-habit__pane-head'));
+    const tools = await paintedBox(page, pane.locator('.ht-habit__pane-tools'));
+    expect(
+      tools.y >= head.y - 1 && tools.y + tools.height <= head.y + head.height + 1,
+      `工具跑出头行盒子（头行 ${String(head.y)}–${String(head.y + head.height)}，` +
+        `工具 ${String(tools.y)}–${String(tools.y + tools.height)}）`,
+    ).toBe(true);
+
+    const card = await paintedBox(page, pane.locator('[data-testid^="habit-card-"]').first());
+    const inset = await pxOfCssVar(page, '--ht-space-4');
+    expect(inset, '栏内间距 token 量为 0 ⇒ 下面那条阈值会退化成"间隙必须为 0"').toBeGreaterThan(0);
+    expect(
+      card.y - (tools.y + tools.height),
+      `工具与卡片之间隔了 ${String(card.y - (tools.y + tools.height))}px，` +
+        `超过栏内间距 ${String(inset)}px 的两倍 ⇒ 这一排控件与它说的东西脱开了（§8.133 看图那处）`,
+    ).toBeLessThanOrEqual(inset * 2);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('h7-tools-with-their-card') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 });

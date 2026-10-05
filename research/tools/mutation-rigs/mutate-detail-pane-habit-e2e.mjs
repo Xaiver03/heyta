@@ -2,10 +2,10 @@
 /**
  * 习惯面单落点（工单 §8.133）的**真浏览器层**变异臂。
  *
- * 这一台要回答的问题只有一个：`e2e/tests/detail-pane-habit.spec.ts` 那 5 条
- * 是不是 `apps/web/tests/habits-detail-card.spec.tsx` 那 11 条的**重复**？
+ * 这一台要回答的问题只有一个：`e2e/tests/detail-pane-habit.spec.ts` 那 7 条
+ * 是不是 `apps/web/tests/habits-detail-card.spec.tsx` 那 13 条的**重复**？
  * 答案是"不是"，证明方式与便签那一台（`mutate-detail-pane-note-editor-e2e.mjs`）同形：
- * 造两份**只有浏览器能看见**的坏，看 jsdom 那一层红不红。
+ * 造**只有浏览器能看见**的坏，看 jsdom 那一层红不红。E1/E2 来自 §8.133，E3/E4 来自 §8.134。
  *
  *   E1 往栏里那条 CSS 里把板子 `display:none` 藏掉 ——
  *      用户在宽屏点习惯会看到"右边那一栏什么都没有"，而选中态已经进了模型。
@@ -24,7 +24,8 @@
  *
  * 两腿都要成立才算数：
  *   腿 A（盲区）：变异态下 jsdom 那 11 条**一条都不红** —— 证明它看不见这一份坏；
- *   腿 B（有牙）：变异态下 e2e 至少一条红，且红的必须含 H1（落点与真实几何那一条）。
+ *   腿 B（有牙）：变异态下 e2e 的红集**逐条等于**该臂点名的那几条（`expectTitles`）——
+ *      多一条少一条都判臂台不干净。E1/E2 各点名 5 条与 2 条，E3/E4 点名 2 条与 1 条。
  *
  * ⚠️ 刻意**没有**第三条臂："面单走了、`.ht-habit` 留一根 5fr 空轨道"这一份坏
  *    两层都抓得到（jsdom 的 R4 读 CSS 源码形状，浏览器的 H1 读 CSSOM 计算值），
@@ -65,6 +66,11 @@ const ARMS = [
   display: none;
 }
 `,
+    /* 🔴 这一臂的红集**本来就是 5 条**，不是 §8.134 加出来的：藏掉栏里那块板，凡是
+       "栏里那块板要画得出来"的判据都得红（H1 落点、H3 跟随、H4 两支都真会走、H5 热力图、
+       H7 头行与卡片的间隙量不到卡片）。旧版只要求 `some(H1)`，把这件事藏在了读数里；
+       现在"红集逐条等于点名那几条"，多一条少一条都算臂台不干净。 */
+    expectTitles: ['H1', 'H3', 'H4', 'H5', 'H7'],
   },
   {
     name: 'E2 栏里的板子被撑到比那一栏宽（板子出栏、右边被窗口切）',
@@ -77,6 +83,50 @@ const ARMS = [
   min-width: 40rem;
 }
 `,
+    // 两条：H1 量的是"板子里的控件不许贴住窗口边"，H5 量的是"每一枚热力图格子不许出栏"。
+    expectTitles: ['H1', 'H5'],
+  },
+  /* ── E3/E4：头行（工单 §8.134）───────────────────────────────────
+     两臂都打在**栏里那一支**（选择器带 `.ht-app__detail-habit`），回落那一支一行字节不动。
+     🔴 选择器必须比 `habits.css` 里那条**更具体**：本台上一次事故（E2 第一版）就是
+     注入被后导入的等特异性规则吃掉，臂打空却"看起来绿"。
+
+     E3 = §8.133 看图那一处的**原形状**：工具浮出头行、跑到栏顶外面（那里正是页头的高度）。
+     E4 = 只把工具挪到标题**下面一行**：它仍在头行盒子里、仍贴着卡片，
+          所以只有"与名字同一行"那一条该红 —— 两臂红集不同，才证明 H6/H7 是两条判据而不是一条。 */
+  {
+    name: 'E3 工具浮出头行、跑到栏顶之外（读起来像页头的工具条）',
+    marker: '--dp-arm-e3',
+    css: `
+/* MUTATION-ARM E3（临时，本脚本收尾会删）：让工具脱离头行、浮到栏顶之上。 */
+.ht-app__detail-habit .ht-habit__pane-head {
+  position: relative;
+}
+.ht-app__detail-habit .ht-habit__pane-tools {
+  --dp-arm-e3: 1;
+  position: absolute;
+  top: -3rem;
+  right: 0;
+}
+`,
+    expectTitles: ['H6', 'H7'],
+    expectMessage: /工具不在同一行|工具跑出头行盒子/,
+  },
+  {
+    name: 'E4 工具掉到标题下面单独一行（有名字，但那一排又和名字脱开）',
+    marker: '--dp-arm-e4',
+    css: `
+/* MUTATION-ARM E4（临时，本脚本收尾会删）：头行换行，工具自成一行。 */
+.ht-app__detail-habit .ht-habit__pane-head {
+  flex-wrap: wrap;
+}
+.ht-app__detail-habit .ht-habit__pane-tools {
+  --dp-arm-e4: 1;
+  width: 100%;
+}
+`,
+    expectTitles: ['H6'],
+    expectMessage: /工具不在同一行/,
   },
 ];
 
@@ -184,10 +234,10 @@ const b = build();
 if (b.rc !== 0) fail(`干净态打不出包：\n${b.out.slice(-1200)}`);
 const cleanDigest = distDigest();
 const bj = jsdom();
-if (bj.rc !== 0 || bj.passed < 11) fail(`干净态 jsdom 层不干净（要 >=11 passed）：${bj.line}`);
+if (bj.rc !== 0 || bj.passed < 13) fail(`干净态 jsdom 层不干净（要 >=13 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 5 || be.failed > 0) {
-  fail(`干净态 e2e 层不干净（要 5 passed / 0 failed）：${be.line}`);
+if (be.rc !== 0 || be.passed < 7 || be.failed > 0) {
+  fail(`干净态 e2e 层不干净（要 >=7 passed / 0 failed）：${be.line}`);
 }
 console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}｜dist=${cleanDigest}`);
 
@@ -217,12 +267,18 @@ for (const arm of ARMS) {
   const titles = redTitles(me.out);
   // Playwright/vitest 全绿时**不打** failed 那一行 ⇒ 读数是 -1，不是 0。按"没有失败"判：
   const blind = mj.failed <= 0 && mj.passed === bj.passed;
+  /* 🔴 红集要**恰好**等于点名那几条：少了 = 判据没牙，多了 = 这一臂的坏同时打到了别的判据，
+     那一条的"这条臂证的是哪一档"就说不清了。E3/E4 就是按这个标准分开的 ——
+     两臂红集不同（H6+H7 / 只有 H6），才说明 H6 与 H7 是两条判据而不是一条的两句话。 */
+  const expected = arm.expectTitles;
   const teeth =
     me.rc !== 0 &&
-    me.failed >= 1 &&
-    titles.some((t) => t.startsWith('H1')) &&
+    me.failed === expected.length &&
+    expected.every((p) => titles.some((t) => t.startsWith(p))) &&
+    titles.every((t) => expected.some((p) => t.startsWith(p))) &&
     // 红的必须是"落点/真实几何"这一族，而不是别的东西（比如载体没起来）。
-    /expected: visible|toBeVisible|界面上找不到这个元素|面单不在|溢出|画不出来/i.test(me.out);
+    (arm.expectMessage ?? /expected: visible|toBeVisible|界面上找不到这个元素|面单不在|溢出|画不出来/i)
+      .test(me.out);
   console.log(`── ${arm.name}`);
   console.log(`   腿 A 盲区（jsdom）：${mj.line} rc=${mj.rc} → ${blind ? '看不见（成立）' : '也抓到了（这一份坏不区分两层）'}`);
   console.log(
@@ -247,5 +303,5 @@ if (bad.length || rj.rc !== 0 || re.rc !== 0) {
   process.exit(1);
 }
 console.log(
-  `RIG_RESULT=${ok}/${ARMS.length}（两臂都是：jsdom 对这一份坏是盲的，e2e 层为它变红 ⇒ e2e 那一层不是重复）`,
+  `RIG_RESULT=${ok}/${ARMS.length}（每臂都是：jsdom 对这一份坏是盲的，e2e 层为它变红 ⇒ e2e 那一层不是重复）`,
 );

@@ -190,10 +190,45 @@
   min-width: 0;
 }
 
+/*
+  标题行 = 这一栏的**第一行**：所选那条的名字在左，图标/改名/删除三颗在右。
+
+  🔴 这一行是 §8.133 看图照出来的缺陷的修法（工单 §8.134）：那三颗原来单独浮在栏顶、
+  与页头那排图标同高，读起来像**页头的工具条**而不是"这条习惯的工具"。
+  判据不写在注释里 —— `e2e/tests/detail-pane-habit.spec.ts` H6 量的是几何
+  （工具的上边缘必须在页头**之下**、且与标题行**竖向重叠**），变异臂 E3 证明它会红。
+
+  `baseline` 而不是 `center`：名字与那颗「图标：浇水」的按钮是两种字高的东西，
+  居中对齐会让标题看起来飘在按钮上方半个身位。
+*/
 .ht-habit__pane-head {
   display: flex;
-  justify-content: flex-end;
+  align-items: baseline;
+  justify-content: space-between;
   gap: var(--ht-space-2);
+  min-width: 0;
+}
+
+/* 整条消费 `section-title`（lg + semibold + tight + tracking.title，AGENTS §5 文字层级）。
+   超长名字必须省略号而不是把三颗工具挤出栏外 —— 习惯名是用户写的，长度不可知。 */
+.ht-habit__pane-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-title);
+}
+
+/* `flex: none`：工具那一坨不许被标题挤扁（图标选择器展开时是一整排字形）。 */
+.ht-habit__pane-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  flex: none;
 }
 
 /* 图标选择器：与 `.ht-slot-picker` 同一形状（展开式，不是浮层）。

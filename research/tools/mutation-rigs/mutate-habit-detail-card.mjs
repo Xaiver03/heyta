@@ -7,14 +7,19 @@
  * 各自有一层 inset 壳、各自的空态。所以臂也各打各的落点文件，谁也不替谁作证。
  *
  * 🔴 每一臂都改**判据的输入**（源码形状或组件行为），红集必须**恰好**落在点名那几条上。
- * 只有一条臂（B7）期望 3 红：把"猜第一条"那档回落放回来，会同时违反"面单跟着选中"
- * "未选中说选一条习惯""未选中不许有无障碍名" —— 三条都在守同一件事，这是**加强**不是含糊。
+ * 只有一条臂（B7）期望 4 红：把"猜第一条"那档回落放回来，会同时违反"面单跟着选中"
+ * "未选中说选一条习惯""未选中不许有无障碍名""未选中不许有头行" —— 四条都在守同一件事，
+ * 这是**加强**不是含糊。
  *
  * ⚠️ 这一台只覆盖 jsdom 够得着的部分。"那一栏被 CSS 藏掉时面单回不回得来""轨道留没留空白"
  *    "热力图压在 22rem 里溢不溢出"这三件是**只有浏览器能看见**的坏，臂在
  *    `mutate-detail-pane-habit-e2e.mjs`（它同时回答"e2e 那 5 条是不是这 11 条的重复"）。
  *    查询串与 `narrow.css` 同源那一档也不在这里重复 —— 那一支的臂是 note-editor 那台的 A5，
  *    打的是同一个共享文件 `detail-pane-visible.ts`。
+ *
+ * 🔴 B11–B13 是 §8.134（头行）补的三臂。它们打的是**结构**（工具挂在哪一行、未选中时
+ *    这一行存不存在）；"工具与标题在不在同一行""工具与卡片隔没隔出一整段空白"是几何，
+ *    jsdom 量不到，那两档的臂是同一台 e2e 上的 E3/E4。
  *
  * 跑法（仓库根）：node research/tools/mutation-rigs/mutate-habit-detail-card.mjs
  */
@@ -45,6 +50,25 @@ const sub = (rel, from, to, expectHits) => {
     throw new Error(`${rel} 里 ${JSON.stringify(from).slice(0, 46)} 命中 ${hits} 次（要 ${expectHits} 次）`);
   }
   writeFileSync(path.join(ROOT, rel), orig[rel].replaceAll(from, to));
+};
+
+/**
+ * 一次注入、多处改动（B12 用）。
+ *
+ * 🔴 逐处 `sub` 不行：它每次都从 `orig` 重写整个文件，第二处会把第一处的注入覆盖掉，
+ *    于是"两处的臂"实际只注入了一处 —— 而**这种臂打空不会自己说**（它照样能红，
+ *    只是红在另一条上）。所以这里把配对改动当成**一次**写入，并逐处校验命中数。
+ */
+const subAll = (rel, pairs) => {
+  let text = orig[rel];
+  for (const [from, to, expectHits] of pairs) {
+    const hits = text.split(from).length - 1;
+    if (hits !== expectHits) {
+      throw new Error(`${rel} 里 ${JSON.stringify(from).slice(0, 46)} 命中 ${hits} 次（要 ${expectHits} 次）`);
+    }
+    text = text.replaceAll(from, to);
+  }
+  writeFileSync(path.join(ROOT, rel), text);
 };
 
 const restore = () => {
@@ -123,9 +147,17 @@ const ARMS = [
         'const selected = store.habits.find((habit) => habit.id === selectedId) ?? store.habits[0];',
         1,
       ),
-    // 🔴 三条一起红是有意的：面单内容、空态措辞、无障碍名**都得**跟着选中，缺一档就还有说谎的余地。
-    failed: 3,
-    needles: ['跟着共享选中态换人', '说的是「选一条习惯」', '无障碍名跟着选中'],
+    // 🔴 四条一起红是有意的：面单内容、空态措辞、无障碍名**都得**跟着选中，缺一档就还有说谎的余地。
+    // 第 4 条（头行）是 §8.134 加进来的，**不是臂漂了**：把"猜第一条"放回来之后，
+    // 未选中时那一行会写着列表第一条的名字，而痕迹那栏一条都没标 —— 正是这一臂要抓的形状。
+    // （原来这里写 3，B7 复跑报 4 红 ⇒ 改的是**臂的主张**并写下理由，没去动任何一条判据。）
+    failed: 4,
+    needles: [
+      '跟着共享选中态换人',
+      '说的是「选一条习惯」',
+      '无障碍名跟着选中',
+      '未选中时这一行整个不存在',
+    ],
   },
   {
     name: 'B8 生产者不再包那一层内边距壳（栏里的板子贴住窗口边被切）',
@@ -150,6 +182,53 @@ const ARMS = [
     apply: () => sub(F.card, '      empty: paneEmptyText(t, store.habits.length > 0),\n', '', 1),
     failed: 1,
     needles: ['说的是「选一条习惯」'],
+  },
+  /* ── B11–B13：头行（工单 §8.134）────────────────────────────────
+     这三臂各打 S 组里**一条不同的断言**，所以 needles 里除了用例名还点名了
+     断言自己的那句话 —— 两条都红在同一个用例上时，看的是**哪一句**先红。 */
+  {
+    name: 'B11 头行的标题不跟选中（写死一个字，三颗工具又变成"没归属的一排"）',
+    apply: () =>
+      sub(
+        F.card,
+        '<h2 className="ht-habit__pane-title">{selected.name}</h2>',
+        '<h2 className="ht-habit__pane-title">{"习惯"}</h2>',
+        1,
+      ),
+    failed: 1,
+    needles: ['标题行 = 所选那条的名字', '头行的标题不是所选那条'],
+  },
+  {
+    name: 'B12 三颗工具挪出头行（回到"单独浮在栏顶"那一档，§8.133 看图照出来的形状）',
+    apply: () =>
+      subAll(F.card, [
+        [
+          '            <h2 className="ht-habit__pane-title">{selected.name}</h2>\n            <div className="ht-habit__pane-tools">',
+          '            <h2 className="ht-habit__pane-title">{selected.name}</h2>\n          </div>\n            <div className="ht-habit__pane-tools">',
+          1,
+        ],
+        [
+          '            </div>\n          </div>\n\n          {renamingId === selected.id ? (',
+          '            </div>\n\n          {renamingId === selected.id ? (',
+          1,
+        ],
+      ]),
+    failed: 1,
+    needles: ['标题行 = 所选那条的名字', '三颗工具不在头行里'],
+  },
+  {
+    name: 'B13 未选中时也画头行，且指着列表第一条（"界面在说没选中、这一行却说某一条"）',
+    apply: () =>
+      sub(
+        F.card,
+        '      {selected === undefined ? null : (',
+        '      {selected === undefined ? (\n        <div className="ht-habit__pane-head">\n          <h2 className="ht-habit__pane-title">{store.habits[0]?.name}</h2>\n        </div>\n      ) : (',
+        1,
+      ),
+    // 两条一起红是有意的：一行"指着某条习惯的头行"同时违反**结构**（未选中不该有这一行）
+    // 与**文本**（未选中时界面不许出现某一条的名字）—— 两档各挡一种坏，缺一条就还有说谎的余地。
+    failed: 2,
+    needles: ['未选中时这一行整个不存在', '未选中时板子照常挂载'],
   },
 ];
 
