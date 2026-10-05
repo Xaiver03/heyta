@@ -123,6 +123,13 @@ export function openTaskHost(): Promise<AppHost> {
        * **以后新加的调用点忘了传 `fetchImpl`**。两半各拦一类失效，都要在。
        */
       fetchImpl: consentFetch,
+      /**
+       * 🔴 本机明文被销毁（主动注销或别的设备注销后同步读到信号）之后，
+       * **把这个单例作废**：`pending`/`resolvedHost` 里那个 `AppHost` 已经持着一个
+       * 按口径 B 拒绝读写的 adapter，留着它，下一屏拿到的还是同一个死实例。
+       * 作废之后下一次 `openTaskHost()` 会重开一份全新空库 —— 那才是政策承诺的形状。
+       */
+      onLocalDataErased: resetTaskHostCache,
     }).then(withWriteSignal).then((host) => {
       resolvedHost = host;
       return host;

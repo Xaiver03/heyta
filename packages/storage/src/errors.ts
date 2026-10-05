@@ -110,3 +110,31 @@ export function asStorageError(
   if (cause instanceof StorageError) return cause;
   return storageError(cause, fallbackMessage, failure);
 }
+
+/**
+ * 在**已经 `destroy()` 过的适配器实例**上继续读写。
+ *
+ * 🔴 为什么要有这个类型，而不是让它静默成功：
+ * `destroy()` 会把连接关掉。此前的实现里，之后任何一次普通读都会走
+ * `open()`/`ensureOpen()` 那条重开路径，于是**刚删掉的容器被重新建成空壳**
+ * （SQLite 侧实测 73728 字节 / 6 张空表，见计划 §10.146）。表现是：
+ * 调用方拿到"销毁成功"的报告，盘上却重新出现了库 —— 而内容读出来是空的，
+ * 所以**没有任何一层会说谎**。这是"永远通过的判据"那一族的存储层版本。
+ *
+ * 现在销毁即死路：第二次 `destroy()` 返回同一份报告（幂等仍然成立），
+ * 其余任何操作一律抛这个错。要重新用就换一个新实例 ——
+ * 每个真实宿主在注销之后都是这么做的（重新登录 / 重启进程 / 重新加载页面）。
+ *
+ * `kind` 是 `programming-error`：用户对它无从下手，能做的只有把接线改对
+ * （销毁器之后不该再有人拿着同一个实例发起读）。
+ */
+export class AdapterDestroyedError extends StorageError {
+  constructor(target: string) {
+    super(
+      `这份存储已被销毁（${target}）。销毁后的实例不可再用 —— 它会拒绝读写，` +
+        '而不是把刚删掉的容器重新建成空壳。请改用一个新的适配器实例。',
+      { kind: 'programming-error' },
+    );
+    this.name = 'AdapterDestroyedError';
+  }
+}

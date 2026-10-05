@@ -21,6 +21,7 @@ import { join } from 'node:path';
 
 import type { ExportDocument } from '@heyta/app-host';
 import { registerLocalEraser } from '@heyta/app-host';
+import { AdapterDestroyedError } from '@heyta/storage';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runAccountCommand, type AccountCommandTarget } from '../src/cli-account.js';
 import { openNodeHost, type NodeHost } from '../src/host.js';
@@ -311,20 +312,35 @@ describe('account close：放行之后', () => {
     expect(existsSync(dbPath)).toBe(true);
   });
 
-  it('🔴 句子永远不说"彻底销毁"：四种结局里只有一种能声称本机已清', async () => {
+  // 🔴 这两档**各自一个宿主**（`beforeEach` 给各自一个临时目录）：
+  //    成功那一档会把这台宿主的存储**销毁**，而"销毁即死路"是 E2 定的产品语义 ——
+  //    销毁后的实例拒绝再用，而不是把刚删掉的容器重建成空壳（`AdapterDestroyedError`）。
+  //    两档共用一个宿主时，第二档读到的是**已销毁的实例**，当场抛错（本轮实测，计划 §10.216）。
+  it('🔴 句子永远不说"彻底销毁"·放行那一档：说清作用域边界，且销毁后的实例真的不能用', async () => {
     host = await hostWithData();
-    const texts = {
-      closed: (await runAccountCommand({ action: 'close', confirm: true, json: false },
-        targetFor(host, { pendingUploads: 0 }), { fetchImpl: async () => okResponse() })).stdout,
-      notClosed: (await runAccountCommand({ action: 'close', confirm: true, json: false },
-        targetFor(host, { pendingUploads: 0 }), { fetchImpl: async () => new Response('{}', { status: 500 }) })).stdout,
-    };
-    // 成功那一档说清了作用域边界（别的设备与备份不在里面）。
-    expect(texts.closed).toContain('别的设备上的副本与备份不在这次动作里');
-    expect(texts.notClosed).toContain('服务端没删成');
-    for (const text of Object.values(texts)) {
-      expect(text).not.toMatch(/彻底(删除|销毁)所有/);
-    }
+    const closed = (await runAccountCommand(
+      { action: 'close', confirm: true, json: false },
+      targetFor(host, { pendingUploads: 0 }),
+      { fetchImpl: async () => okResponse() },
+    )).stdout;
+
+    expect(closed).toContain('别的设备上的副本与备份不在这次动作里');
+    expect(closed).not.toMatch(/彻底(删除|销毁)所有/);
+    // 钉住"这一档为什么必须换个宿主"：产品在这里的行为是**拒绝再用**，不是静默重建。
+    await expect(host.exportDocument()).rejects.toBeInstanceOf(AdapterDestroyedError);
+  });
+
+  it('🔴 句子永远不说"彻底销毁"·服务端没删成那一档：不许声称本机已清', async () => {
+    host = await hostWithData();
+    const notClosed = (await runAccountCommand(
+      { action: 'close', confirm: true, json: false },
+      targetFor(host, { pendingUploads: 0 }),
+      { fetchImpl: async () => new Response('{}', { status: 500 }) },
+    )).stdout;
+
+    expect(notClosed).toContain('服务端没删成');
+    expect(notClosed).not.toMatch(/彻底(删除|销毁)所有/);
+    expect(existsSync(dbPath)).toBe(true);
   });
 });
 

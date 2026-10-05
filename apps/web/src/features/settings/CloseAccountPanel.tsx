@@ -32,7 +32,7 @@
  * 这里给用户的是明确的一句结果，不靠那个回声。
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { closeAccountAndEraseLocal } from '@heyta/app-host';
 import { ICON_SIZE } from '@heyta/design-system';
@@ -40,6 +40,7 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 import { accountClosureMessageKey } from '@heyta/ui';
 import { AlertTriangle, ShieldX } from 'lucide-react';
 
+import { hasEngine, requireEngine } from '../../lib/oplog.js';
 import { useAuthStore } from '../auth/store.js';
 import { useSyncStore } from '../sync/store.js';
 
@@ -64,6 +65,41 @@ export function CloseAccountPanel(): React.JSX.Element | null {
   const [done, setDone] = useState<{ sentence: MessageKey; disposition: string } | null>(null);
 
   const signedIn = typeof token === 'string' && token !== '';
+
+  /**
+   * 🔴 那句「还有 N 条没同步出去」里的 **N 是现量**，不是修辞。
+   *
+   * 走的是 app-host 已有的计数端口（`pendingUploadCount()` 底下那枚
+   * `engine.countPendingUpload()`，与移动端 `AccountClosureScreen` 同一条通道），
+   * **不是** `getPendingUpload().length` —— 后者为了显示一个数字会把整条队列
+   * 连密文正文一起物化进内存（`packages/app-host/src/host.ts` 的注释钉着这件事）。
+   *
+   * 三种"读不到"（引擎没就绪 / 取数抛错 / 还没回来）一律写成 `undefined` = **整句不进树**：
+   * 显示 0 会让人敢按下（那句的相反承诺），显示"未知"会被读成"那就是没有"。
+   */
+  const [pending, setPending] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (!signedIn) return;
+    let alive = true;
+    const read = async (): Promise<void> => {
+      try {
+        if (!hasEngine()) {
+          if (alive) setPending(undefined);
+          return;
+        }
+        const count = await requireEngine().countPendingUpload();
+        if (alive) setPending(count);
+      } catch (error: unknown) {
+        console.warn('[account-closure] 读未上传条数失败', error);
+        if (alive) setPending(undefined);
+      }
+    };
+    void read();
+    return () => {
+      alive = false;
+    };
+  }, [signedIn]);
+
   if (!signedIn) return null;
 
   const submit = async (): Promise<void> => {
@@ -87,6 +123,12 @@ export function CloseAccountPanel(): React.JSX.Element | null {
       </h2>
       <p className="ht-settings__hint">{t('common.accountClosure.lead')}</p>
       <p className="ht-settings__hint">{t('common.accountClosure.exportHint')}</p>
+
+      {pending !== undefined && pending > 0 ? (
+        <p className="ht-settings__hint" data-testid="close-account-pending">
+          {t('common.accountClosure.pending', { count: pending })}
+        </p>
+      ) : null}
 
       <label className="ht-settings__item-label" htmlFor="close-account-ack">
         <span className="ht-settings__row">

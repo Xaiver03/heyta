@@ -153,6 +153,21 @@ export interface AppHostOptions {
    * 差异全在时间戳里，看起来像行为漂移，其实是时钟没被控制。
    */
   now?: () => number;
+  /**
+   * 本机明文**销毁成功之后**的宿主回调（批次 E2 口径 B）。
+   *
+   * 🔴 为什么要有这个钩子，而不是让共享层自己去清：
+   * 宿主常常把 adapter 缓存成**单例**（移动端的 `open-host.ts` 用 `pending`/`resolvedHost`，
+   * 全部屏共用一个 `AppHost`）。`destroy()` 之后再把同一个实例交出去，
+   * 在口径 B 之前是"静默把刚删掉的空壳建回盘上"（§10.146 那枚 73728 字节），
+   * 加了守卫之后是"下一次读当场抛" —— 两者都不是"这台设备回到全新空库"。
+   * 而"要作废哪些缓存"是**宿主自己的生命周期知识**（AGENTS §3.5 的分界），
+   * 所以这里开一个钩子，不在共享层复制一份。
+   *
+   * 语义：只在**这条兜底销毁器**（没人自己注册时）真的把 `adapter.destroy()` 跑成之后调一次；
+   * 销毁抛错时不调（那份库还在，宿主不该假装清过）。
+   */
+  onLocalDataErased?: () => void;
 }
 
 export interface AppHost {
@@ -338,7 +353,18 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
    * 反过来如果这里无条件注册，症状是"Web 注销后 OPFS 里那份库还在"。
    */
   if (!hasLocalEraser()) {
-    registerLocalEraser(async () => [await adapter.destroy()]);
+    registerLocalEraser(async () => {
+      const report = await adapter.destroy();
+      // 🔴 顺序：**销毁成功之后**才通知，且抛错时一句都不通知。
+      // 理由是这一格真正防的那件事：宿主把 adapter  caches 在单例里
+      // （移动端 `open-host.ts` 的 `pending`/`resolvedHost` 就是全部屏共用的那一个）。
+      // 销毁之后继续把同一个实例交出去，在口径 B 之前是"静默把空壳建回盘上"，
+      // 之后是"下一次读当场抛 `AdapterDestroyedError`" —— 两种都不是注销完该有的样子，
+      // 政策承诺的是这台设备回到**全新空库**（计划 §10.188）。
+      // 共享层**不自己清单例**：哪些东西要作废是宿主的生命周期知识（AGENTS §3.5）。
+      options.onLocalDataErased?.();
+      return [report];
+    });
   }
 
   const engine = new OpLogEngine({
