@@ -5546,3 +5546,19 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
   （载体 `git checkout --detach $(git -C <主检出> rev-parse main)`，两枚提交的 lockfile 已现量相同、node_modules 沿用）。
   绿 ⇒ 这档红属于 `7911ad02` 那批的提交态；红 ⇒ 它跟着 main 走，报给 mobile/vault 那条线（`b3397cda` 那批是最近的改动方）。
 - 📌 ② 的"可过段数 **83/85**"**不因本条改动**：段 85 只是归因更准了，红没有消失。
+
+### B83.3 同一条 `pnpm -r test` 跑在当前 main 上的读数（21:04:42 现量，装置 `heyta-seg85-at-main.sh`）
+
+载体前进到 main=`8f870ea3`（lockfile 与 `7911ad02` 现量相同、node_modules 沿用、工作树 == HEAD、起跑时别人的 vitest `CONC0=0`、load 11.28），
+跑完自动还原回 `7911ad02`（`RESTORE_RC=0`）。证据 `~/.heyta-evidence/seg85-at-main-1005-210357/`。
+
+- 🔴 **main 上这同一条命令也是红的，而且红在别的包**：`server test: 2318 passed | 1 skipped`，紧接着
+  `apps/web test: ⎯ Failed Tests 24 ⎯` / `Test Files 1 failed | 134 passed | 2 skipped (137)` /
+  `Tests 24 failed | 1773 passed | 13 skipped (1810)` → `apps/web test: Failed` →
+  `[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @heyta/web@0.0.0 test`（`pnpm -r` 在第一枚失败处停 ⇒ **没走到 apps/mobile**）。
+- ⇒ 两条结论分开：**①** 我 ② 的段 85 那枚红**不等于** main 绿——main 现在也红，只是红在 `apps/web` 的 **24 条真用例**上；
+  **②** `apps/mobile` 的"用例全过 + 未处理拒绝算 Failed"那一档，在 main 上**本轮没取到读数**（被前面的失败挡在门外），
+  它仍是一个独立问题，别把这两件事并成一条。
+- ⚠️ 这条读数的归属边界要说清：`8f870ea3` 是**提交态**（不是我或别人工作树里的未提交改动——载体是干净检出），
+  所以"main 上 24 条 apps/web 用例红"是一个**可以被任何人复跑**的事实；
+  它属于哪条线、要不要立刻修，由那本账的作者判，本线只负责把它量出来并留在公共台账里。
