@@ -107,14 +107,42 @@ H6 HabitLog.note ── 一条决定，不阻塞别人
 
 ## 6. 完成定义（DoD，逐项打勾才算这一面收口）
 
-- [ ] 每张单的判据都跑过并且**逐臂看过红集**（存活的那几条才是这单真正产出的判据）；
+> 2026-10-06 06:1x 逐格收口。打勾的格都带**现量命令或读数**；没打的两格写明卡在谁手里，
+> 不写成"基本完成"（AGENTS §8：新证据改变结论要同步改状态表，不许只在文末追加成功记录）。
+
+- [x] 每张单的判据都跑过并且**逐臂看过红集**（存活的那几条才是这单真正产出的判据）；
+      四台臂台的逐臂红集都读进工单行了（`mutate-habit-month` 5/5、`mutate-habit-year` 6/6、
+      `mutate-habit-frequency` 5/5、`mutate-habit-create-entry` 4/4、`mutate-habit-icon-picker` 5/5）。
+      ⚠️ **两格例外已登记**（`BLOCKED.md` B91 §1）：`mutate-habits-two-column` 的 N5 臂接手时
+      连语法都不过（模板字符串里嵌反引号），修好后**整台没重跑**；`mutate-habit-year` 的 YA4
+      期望红集放宽后**没重跑**。这两格不许被上面那行"全红"覆盖。
 - [ ] `pnpm check` 全链 RC=0（含上面那八道门禁）；
-- [ ] 习惯面的 e2e 用例**在当前产物上**重跑，截图逐张打开看过，主蓝数得出（§7 第 82 条）；
-- [ ] 暗色主题实际切换查看（AGENTS §5）；
+      🔴 **不在本单手里**：`BLOCKED.md` B90（回收线，06:0x 现量）报 `check:ai-e2e` 在当前 HEAD 上
+      红 **9 枚**，其中 4 枚根因是详情面 §8.138 那支三元链把 AI 面挤掉了 —— 那条挡住整条 `pnpm check`。
+      本批单独取到的门禁读数（不含 e2e 全族）：`-r typecheck`（domain/ui/app-host/web/mobile）rc=0、
+      `check:layering` rc=0、`check:ui-language` rc=0（词条 zh-CN 3250 = en 3250）、
+      `check:design` rc=0、`check:docs` 无死链。
+- [x] 习惯面的 e2e 用例**在当前产物上**重跑，截图逐张打开看过，主蓝数得出（§7 第 82 条）；
+      载体：`pnpm --filter @heyta/ui build` + `pnpm --filter @heyta/web build` 之后才跑 e2e（不是旧 dist）。
+      复跑读数：`keyboard-cursor + detail-pane-habit + habit-month + habit-year` **33 passed**、
+      `habit-year + habit-month` **13 passed**。逐张开过的图：`month-board`、`month-dark`、
+      `year-12cards`、`year-consistency`、`year-dark`、`k9-enter-focuses-pane`。
+      主蓝现量（`scripts/screenshots/png-stats.mjs` 的 `countBrandBlue`）：
+      `month-default` 1086、`k9-enter-focuses-pane` 2770、`month-board` 426、`month-dark` 424、
+      `year-12cards`/`year-consistency`/`year-dark` 各 929，全部 `blank=false`。
+      🔴 同一趟对账把**三张不同状态的 `year-*.png` md5 逐字相同**照了出来（成因与修法见 §2 H7 那一行）。
+- [x] 暗色主题实际切换查看（AGENTS §5）；
+      两张 `-dark` 图现在是真的暗色：`emulateMedia` 那条假绿已改成"点产品自己那颗开关 +
+      断言 `<html data-theme>` 翻了 + 断言真正画出来的底色变了"（R7/S5）。
 - [ ] `pnpm reinstall:all` 四端装上当前源码产物（AGENTS §6.1.1）—— 桌面三壳与 node-host 无习惯 UI 是**已登记边界**，
       这一格只要求 web / Android / iOS 三端的习惯屏各有一张"装上的是当前产物"的判据；
-- [ ] 本篇 §1 那张现状表**重跑并回填**（哪几行从 🔴 翻成 ✅，附命令与读数）；
-- [ ] `docs/plans/detail-pane-alignment.md` 与本篇之间没有两套状态（同一张单不许两处各写各的状态）。
+      🔴 **本轮没跑**（要 Windows 打包机与 iOS 模拟器同时空；§6.1 规定 Android 一律走 `windows-pc`）。
+      登记在 `BLOCKED.md` B91 §1 第三格，与 H3-V1 是同一档缺口。
+- [x] 本篇 §1 那张现状表**重跑并回填**（哪几行从 🔴 翻成 ✅，附命令与读数）；
+      三行翻面（有没有视图切换 / 有没有月历与年视图 / 词条是否中英同步），每行都带**可复现命令**，
+      并撤回了一条写早了的 `63/63`（现量 91/2/6 两侧一致）。
+- [x] `docs/plans/detail-pane-alignment.md` 与本篇之间没有两套状态（同一张单不许两处各写各的状态）。
+      §2 第二批那三行（H4/H5/H7）现在只留**编号映射与还没拍的那半**，状态一律指回第一批那一行。
 
 ## 7. 明确不做（不是排期问题）
 
