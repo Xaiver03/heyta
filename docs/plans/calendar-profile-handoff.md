@@ -3004,6 +3004,47 @@ done
   `--pkg-file` 指向非 git 树里的目标时，脏检查与远端对照两格**如实跳过并打印**（夹具要的就是这个）；
   这一格**没有**替第 5 项主张"已入册" —— 入册的判据是那条命令退 0 且现量数得出那一枚。
 
+- (61) **10-05 16:2x：三格复跑。其中一格把 (60)⑦ 那句"只剩一条命令"否证了一半 —— 第 5 项的前置是两枚，第二枚不在本线手里。**
+
+  ① 两枚自闸命令的复跑读数（默认 dry-run，各自 **rc=3**）：
+  · `node research/tools/calendar-line-wire-evidence-rigs.mjs` ⇒ 目标脏；`git diff --numstat -- package.json` = **2/1**，
+    hunk 头仍是 `@@ -41,0 +42 @@` 与 `@@ -66 +67 @@` —— 与 (59) 登记的**逐字相同**，两小时没动。
+    🔴 但"没动"不等于"没人做"：② 那格列出的 4 枚 `apps/mobile/evidence/ios-reminder-*.png` **正在被改**，
+    也就是说 `check:ios-ax-shim` 那条会话还活着 ⇒ 这一格是**等得来的人**（§7 那条"等得来的人，等不来的底噪"），等是对的。
+  · `node research/tools/calendar-line-append-trap.mjs --text research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt`
+    ⇒ `M docs/reference/environment-traps.md`。
+
+  ② 第 4 项的门（`NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target c`，非管道）⇒ **rc=3、`REDS=load,src,apk`**。
+    与 11:2x 那趟的 `load,src,dev,apk` 相比 **`dev` 那一格转绿**（粗筛无抢占 + `emulator-5554` 在线），剩三格各自是：
+    负载 31 > 阈值 12（16 核 ×3/4）；`src` = 5 枚未提交源码，逐枚点名 `apps/mobile/evidence/ios-reminder-{after-reconcile,cancelled,notification-center,permission-recovery-before}.png` + `server/src/config.ts`（**都不归本线**）；
+    `apk` = APK `2026-10-04 15:02:47` 比最新源码 `2026-10-05 05:44:49` 旧。
+    ⇒ 窗口仍没开、**不降级**；开跑序没变：等那 5 枚落地 → 负载落回 ≤12 → `pnpm --filter @heyta/ui build && pnpm build:android` → 复跑本门（不带 `--confirm`）确认全绿。
+
+  ③ 🔴 这轮真正的产出，是一枚**已经存在的事实**而不是风险：`docs/reference/environment-traps.md` 的同一枚号在两边指着两条不同的条目。
+    现量（读现有 ref，不联网）：`git show origin/main:docs/reference/environment-traps.md` 末号 **283** / 条目数 **292**；
+    `git show HEAD:` 同一份末号 **278** / 条目数 **288**；工作树末号 **292**。
+    `git merge-base HEAD origin/main` = **`8cb33f55`** —— 本线上一笔（"它已经红了 12 小时"那笔）**已经在远端里**，
+    `#277`/`#278` 两边**逐字同文**，而 `#279`–`#283` **同号不同文**（例：本地未提交的 279 是「设备级取证量到的红，先花 3 秒找一条无设备的复现…」，
+    `origin/main` 的 279 是「变异/验证脚本读的是产物时，"存活"这个读数要先过一道…」。
+    ⇒ AGENTS §7 开头那句「正文里引用写『§7 #N』」意味着这枚号是**对外承重标识**，而它此刻**已经在两台机器上解析成两个东西**。
+    ⚠️ 处置它需要一次跨会话的收号裁决（谁 pull 谁重排、还是给册子加"号=提交序"的规则），**不在本线授权里** ⇒ 这里只登记读数与复跑命令。
+
+  ④ 我把 ③ 从"读了被调本体推出来的"升级成"**真字节上跑出来的**"，且没碰主检出的脏、没动 ref：
+    `git worktree add --detach .worktrees/trap-number-probe HEAD`，然后在该检出里
+    `node "$WT/research/tools/calendar-line-append-trap.mjs" --text "$WT/research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt" --pkg-file "$WT/docs/reference/environment-traps.md"`
+    ⇒ `现量末号：工作树 278（HEAD 278）⇒ 这一枚取 279` 紧跟 `❌ 上次 fetch 到的 origin/main 里号 279 已被占用 ⇒ …本工具不猜下一个空号` ⇒ **rc=3**；
+    收摊 `git worktree remove .worktrees/trap-number-probe`（`git worktree list` 现量只剩原有那些）。
+    ⇒ 那格远端对照**在真实数据上也会拦**（此前只有臂 32 的夹具证明 ⇒ 按"判据要能红"的口径，夹具腿 + 真数据腿现在都有）。
+    ⇒ **(60)⑦ 那句"收口只剩一条命令"当场改口**：第 5 项的前置是**两枚** —— 册子腾开 **且** 远端那批条目被收进本检出。
+    第二枚不是"手快就能做"：`push` 未授权，而把远端那批提交拉进这棵正被并行会话写的树，更不是本线能替产品负责人拍的。
+
+  ⑤ 顺带否证一枚**任务文本里的数**：本轮 objective 写的是"环境陷阱 #279"。这个号**不能预定** —— 它只能由写入那一刻的现量给出。
+    现量 `grep -nE '(^|[^0-9])2[7-9][0-9]' research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt` 只命中 `+380+290`（一枚像素偏移，不是号），
+    而工具里"正文自带编号 ⇒ exit 1"那道闸挡的正是**自带号 + 现量号 = 双号**。⇒ 引用这枚号时只能写"那一枚待追加的条目"，不能写 #279。
+
+  ⑥ 边界（别读多）：本轮**没有**写册子、**没有**动 `package.json`、**没有** fetch、**没有**建分支、**没有**跑任何设备/浏览器验收；
+    ③/④ 那两格是只读现量 + 一枚随即删掉的隔离检出；`src` 那 5 枚与 `package.json` 那 2/1 都**不是**本线的字节，按 §8 的纪律不替他们带、也不代改判据口径。
+
 
 
 
