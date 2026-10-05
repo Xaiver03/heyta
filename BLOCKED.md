@@ -5309,3 +5309,49 @@ tip 是自己 10 秒前造的那笔 —— `git reset --soft HEAD~1` + `git rest
 >   ⇒ 提交态那份 lock 与干净树跑出来的**本来就不一致**，每次 `pod install` 都会重写这两行，
 >   脚本自己会打"⚠️ 与 HEAD 差 N 行"。备份到 `~/scratch-heyta/carrier-dirty-0448/` 后
 >   `git checkout --` 回提交态（载体 dirty=0），**没有**把它当成"我的改动"提交。
+
+---
+
+## B80. 🟠 日历+Profile 线：两格收口卡在别人的字节上（各自一条自闸命令 + 现量 rc=3），顺带给在册 §5 那格编号病量出**新的一面** —— 同一枚 `#279` 在 `HEAD` 与 `origin/main` 上指着两条不同的条目（10-05 16:2x）
+
+**为什么写在这里而不是只写在计划里**：本线那两格等待的账在 `docs/plans/calendar-profile-handoff.md` §4.05 (59)(60)(61)。
+但下面 ② 是**跨线的** —— 谁执行那次合并谁要处理它，而它只躺在一份五千多行的计划里，下一个引用「§7 #N」的人不会翻到。
+
+**① 三格等待：在谁手里 + 可复跑命令**
+
+- 第 3 项（把本线三把验证台接进 `pnpm check`）：`package.json` 现量 ` M`、`git diff --numstat` = **2/1**，
+  hunk 头 `@@ -41,0 +42 @@` 与 `@@ -66 +67 @@`，两处都是别人的 `check:ios-ax-shim` ⇒ 在**接 iOS AX shim 门禁那条会话**手里。
+  复跑：`node research/tools/calendar-line-wire-evidence-rigs.mjs` ⇒ 现量 **rc=3**（它自己判脏就拒绝，不替别人带字节、也不往同一行上插）。
+  腾开后收口是同一串加 `--confirm`，然后走本线入库工具（提交不 push）。
+- 第 5 项（把「差分形状 ≠ 差分语义」那枚条目入册）：`docs/reference/environment-traps.md` 现量 ` M`（尾部 14 条未提交、号 279–292，都不是本线写的）
+  ⇒ 在**正往册子尾部写的那两条会话**手里。复跑：
+  `node research/tools/calendar-line-append-trap.mjs --text research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt` ⇒ 现量 **rc=3**。
+  🔴 这一格的前置**不止一枚**（见 ②）：册子腾开**且**远端那批条目被收进本检出，否则工具算出来的号会撞上远端已用的号、自己拒绝。
+- 第 4 项（`--target c` 的 37 条设备腿按当前字节重跑）：`NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target c` ⇒ 现量 **rc=3、`REDS=load,src,apk`**（`dev` 这一格本轮转绿：粗筛无抢占 + `emulator-5554` 在线）。
+  `src` = 5 枚未提交源码，逐枚点名 `apps/mobile/evidence/ios-reminder-{after-reconcile,cancelled,notification-center,permission-recovery-before}.png` 与 `server/src/config.ts` ⇒ 在 **iOS 提醒那条线**手里；
+  `load` = 1 分钟负载 31 > 阈值 12；`apk` = 产物 `2026-10-04 15:02:47` 比最新源码 `2026-10-05 05:44:49` 旧，跑之前必须先 `pnpm --filter @heyta/ui build && pnpm build:android`。
+  ⇒ **不降级、不硬闯**，等这三格各自的所有者。
+
+**② 新面（并进在册 §5 那一格，不另立问题）**
+
+现量（读现有 ref，不联网）：`git show origin/main:docs/reference/environment-traps.md` 末号 **283** / `grep -cE '^[0-9]+\. '` = **292**；
+`git show HEAD:` 同一份末号 **278** / **288**；工作树末号 **292**。`git merge-base HEAD origin/main` = **`8cb33f55`**
+⇒ 两边从 278 之后**各自追加**；`#277`/`#278` 两边逐字同文，而 `#279`–`#283` **同号不同文**
+（本地未提交的 279 是「设备级取证量到的红，先花 3 秒找一条无设备的复现…」，`origin/main` 的 279 是「变异/验证脚本读的是产物时，"存活"这个读数要先过一道…」）。
+
+⇒ 在册 §5 原先写的是「同一份**工作树**里 `§7 第 82 条` 指四件不同的事」。这一趟量出来的是**跨 ref 的同号歧义**：
+同一句「§7 #279」在两台机器上解析成两条不同的坑，而 AGENTS §7 开头明文写着「正文里引用写『§7 #N』」——
+那枚号是对外承重标识。修它仍然要动 `AGENTS.md` 的号段表 ⇒ **仍然等一次拍板，本线不代拍**（谁执行合并谁定收号规则）。
+
+⚠️ 读数口径先自证两件事：末号必须 `sort -n`（这份册子物理顺序与编号不同序，AGENTS §7 那条警告就是为它写的）；
+条数与最大号**不是同一个量**（B77 已写明 `grep -cE '^[0-9]+\. '` 数的是行数形状、不是条数），这里只报这些命令给出的数、不改它们的口径。
+
+**③ ② 那格是跑出来的，不是推出来的**（只读探针，随即删掉，不碰主检出的脏）
+
+`git worktree add --detach .worktrees/trap-number-probe HEAD`，在该检出里把同一枚工具的 `--pkg-file` 指过去，
+读数：`现量末号：工作树 278（HEAD 278）⇒ 这一枚取 279` 紧跟 `❌ 上次 fetch 到的 origin/main 里号 279 已被占用 ⇒ 本检出落后远端时"没拉下来的条目"是真实存在的一批编号；先让同步那一头收号，本工具不猜下一个空号` ⇒ **rc=3**；
+收摊 `git worktree remove .worktrees/trap-number-probe`，`git worktree list` 复验只剩原有那些。
+⇒ 那格远端对照此前**只有夹具腿**（`calendar-line-commit-only-arms.sh` 臂 32），现在多了一条真数据腿。
+
+**④ 边界（别读多）**：本线这一轮**没有**写册子、**没有**动 `package.json`、**没有** fetch、**没有**建分支、**没有**跑任何设备/浏览器验收；
+②③ 全是只读现量 + 一枚随即删除的隔离检出。本条只登记，不替 §5 那格定收号方案。
