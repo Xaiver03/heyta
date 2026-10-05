@@ -138,6 +138,7 @@ import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
+import { HabitDetailCard } from './features/habits/HabitDetailCard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
 import { GrowthView } from './features/motivation/GrowthView.js';
 import { NotesView } from './features/notes/NotesView.js';
@@ -2260,7 +2261,7 @@ export function App(): React.JSX.Element {
           {contentView === 'quadrant' && (
             <QuadrantBoard onOpenTask={openTask} activeTaskId={selectedTaskId} />
           )}
-          {contentView === 'habits' && <HabitsView />}
+          {contentView === 'habits' && <HabitsView paneInColumn={detailColumnShown} />}
           {/**
            * 番茄钟。**计时核心来自 `@heyta/ui` 的共享 `FocusPanel`**
            * （与 mobile 同一份实现）。
@@ -2535,7 +2536,8 @@ export function App(): React.JSX.Element {
        * 变异臂就是把这一列搬回 `.ht-content` 里面 —— 搬回去它必须转红。
        *
        * ⚠️ ~~今天它是**空的**，这是设计不是半成品~~ ⇒ 🔴 **2026-10-05 起这句过期**：
-       * 专注面（W7）与**便签编辑卡**（选中一条便签 ⇒ 同一格里出编辑面，工单 §8.130）都已经住进来。
+       * 专注面（W7）、**便签编辑卡**（选中一条便签 ⇒ 同一格里出编辑面，工单 §8.130）与
+       * **习惯面单**（选中一条习惯 ⇒ 同一格里出板子，工单 §8.133）都已经住进来。
        * 产品负责人对这一栏的原话是
        * "即使没东西也空在那里，一旦选中任何东西右边就出详细的面单"。
        * 被主计划 §5.4 否决的是"没有选中态时往槽里塞装饰"，而 W1 的选中态已经就绪。
@@ -2548,7 +2550,9 @@ export function App(): React.JSX.Element {
        *
        * 🔴 **今天它有一格内容是例外的**：专注面（工单 W7）。滴答那一栏在番茄钟视图里
        * 是**常驻**的"概览 + 记录"，与选中了哪条任务无关 —— 所以它不需要等拍板 #1
-       * （#1 问的是"任务那一栏放什么"）。其余视图仍然空着，那仍是设计。
+       * （#1 问的是"任务那一栏放什么"）。~~其余视图仍然空着，那仍是设计~~ ⇒ 便签（§8.130）
+       * 与习惯（§8.133）按的是**正条**：选中才换面单；未选中时便签那一格什么都不放，
+       * 习惯那一格放的是板子自己的"选一条习惯…"那句（板子必须始终挂载，见 `HabitDetailCard` 文件头）。
        */}
       <aside className="ht-app__detail" data-testid="detail-column">
         {contentView === 'focus' ? (
@@ -2558,6 +2562,11 @@ export function App(): React.JSX.Element {
              🔴 inset 是**递给生产者的必填参数**，不是在这里包一层 `<div>` ——
              `check:detail-pane-slot` 的腿 A 不许装配处手写 DOM 标记（它红过一次，实测）。 */
           <NoteEditorCard inset />
+        ) : contentView === 'habits' && detailColumnShown ? (
+          /* 习惯面单（工单 §8.133）：选中哪一条，这一格就是那一条的板子。
+             没选中时它仍然挂载，说的是"选一条习惯…"（`paneEmptyText`）——
+             板子始终一枚是 `motivation.spec` 白屏检测的前提，与落点无关。 */
+          <HabitDetailCard inset />
         ) : null}
       </aside>
       </div>

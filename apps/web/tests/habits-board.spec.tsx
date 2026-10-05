@@ -373,8 +373,20 @@ describe('D. 空态由共享层渲染', () => {
 });
 
 describe('E. web 视图不再有第二份实现（源码级判据）', () => {
+  /**
+   * 🔴 工单 §8.133 之后，web 侧"渲染共享板子的那份文件"是 `HabitDetailCard.tsx`
+   * （面单搬进了详情列那一格，`HabitsView.tsx` 只剩列表）。
+   * 这里**两枚都读**而不是换成只读卡片：判据问的是"web 这一侧不许有第二份实现"，
+   * 而"第二份"可能长在视图里、也可能长在卡片里 —— 只盯一个新文件名，
+   * 就是给旧的那个开了豁免。
+   */
   const hostSource = (): string =>
-    readFileSync(resolve(WEB_SRC, 'features/habits/HabitsView.tsx'), 'utf8');
+    [
+      resolve(WEB_SRC, 'features/habits/HabitsView.tsx'),
+      resolve(WEB_SRC, 'features/habits/HabitDetailCard.tsx'),
+    ]
+      .map((p) => readFileSync(p, 'utf8'))
+      .join('\n');
   const boardSource = (): string =>
     readFileSync(resolve(UI_SRC, 'habits/HabitBoard.tsx'), 'utf8');
 
@@ -581,7 +593,9 @@ describe('F. 数量行：读数与步进', () => {
      *    正是"共享组件默认值=原行为"那类假绿的镜像）。
      */
     for (const [where, rel] of [
-      ['web', 'features/habits/HabitsView.tsx'],
+      // 🔴 §8.133：web 那份构造器从 `HabitsView.tsx` 搬进了 `board-labels.ts`
+      // （面单拆成独立组件，构造器留在被用的那一侧，两边互相 import 会成环）。
+      ['web', 'features/habits/board-labels.ts'],
       ['mobile', '../../../apps/mobile/src/lib/habits-display.ts'],
     ] as const) {
       const src = readFileSync(resolve(WEB_SRC, rel), 'utf8');
@@ -600,7 +614,8 @@ describe('F. 数量行：读数与步进', () => {
 
     let passed = 0;
     for (const rel of [
-      'features/habits/HabitsView.tsx',
+      // 🔴 §8.133：web 那侧调用打卡的是**面单**（`HabitDetailCard.tsx`），不再是视图。
+      'features/habits/HabitDetailCard.tsx',
       '../../../apps/mobile/src/screens/HabitsScreen.tsx',
     ] as const) {
       if (/checkIn\(\s*habitId,\s*date,\s*value\s*\)/u.test(readFileSync(resolve(WEB_SRC, rel), 'utf8'))) {
@@ -711,7 +726,7 @@ describe('G. W8 四格：存在性、分母为 0 走占位句、求和走 monthV
     // 接了，但两端各建一条同义键 —— 同义键不会让任何单元测试变红，
     // 只会让同一个数在两端长成两句话。
     for (const [where, rel] of [
-      ['web', 'features/habits/HabitsView.tsx'],
+      ['web', 'features/habits/board-labels.ts'],
       ['mobile', '../../../apps/mobile/src/lib/habits-display.ts'],
     ] as const) {
       const src = readFileSync(resolve(WEB_SRC, rel), 'utf8');

@@ -179,7 +179,13 @@ beforeEach(async () => {
     root = createRoot(container!);
     root.render(
       <I18nProvider locale="zh-CN">
-        <HabitsView />
+        {/*
+          🔴 `paneInColumn={false}`：这一套量的是**列表 + 面单同屏**那一档（jsdom 里
+          没有 matchMedia ⇒ 宿主算出"那一栏放不下"，与真实窄屏同一支）。
+          落点本身（栏里 / 列表右边）由 `habits-detail-card.spec.tsx` 那一套量，
+          两层各管各的 —— 直接挂组件的用例看不见 `App.tsx` 漏接线。
+        */}
+        <HabitsView paneInColumn={false} />
       </I18nProvider>,
     );
   });
@@ -269,19 +275,26 @@ describe('C. 右窗格：全页只有一块共享板，且只显示选中那一�
     expect(qa('[data-testid="habit-board"]')).toHaveLength(1);
   });
 
-  it('点一行之后：窗格与 aria-current 说的是同一条', () => {
-    selectRow('喝水');
-    expect(markedRows()).toHaveLength(1);
-    expect(selectedName()).toBe('喝水');
-    expect(pane()?.getAttribute('aria-label')).toBe('「喝水」的打卡记录');
-    /* 🔴  equality 比"窗格里有这个名字"硬：卡片自己的 testID 带着习惯 id，
-       把它和带痕迹那一行的 id 对上，才挡得住"痕迹指 A、窗格画 B"那种分叉
-       （A5 那一臂实测就是这个形状：只断文字会漏，因为两条习惯的名字都在 DOM 里）。 */
-    const markedId = markedRows()[0]?.getAttribute('data-testid')?.replace('habit-row-', '');
-    const cardIds = qa<HTMLElement>('[data-testid^="habit-card-"]', pane() ?? document)
-      .map((el) => (el.getAttribute('data-testid') ?? '').replace('habit-card-', ''));
-    expect(cardIds, '窗格里的卡片数不是恰好一枚').toHaveLength(1);
-    expect(cardIds[0], `痕迹在 ${markedId} 而窗格画的是 ${cardIds[0]}`).toBe(markedId);
+  it('点一行之后：窗格与 aria-current 说的是同一条（两行都点，不按位置）', () => {
+    /* 🔴 这一条原来**只点「喝水」**，而「喝水」恰好是夹具的第一行 —— 臂台实测暴露了这一点：
+       注入"痕迹永远挂第 0 行"那一份坏时，红的是下一条（点另一行那条），这一条是绿的。
+       一条只偶然在某个顺序上成立的判据，钉不住它自称钉住的东西，所以这里两行都点一遍。
+       （同一族纪律记在 `mutate-habits-selection-fallback.mjs` 的 A5 注释里：
+       预期红集必须只由判据决定，不许由夹具的偶然顺序决定。） */
+    for (const name of ['喝水', '阅读']) {
+      selectRow(name);
+      expect(markedRows(), `${name}：带痕迹的行不止一行`).toHaveLength(1);
+      expect(selectedName()).toBe(name);
+      expect(pane()?.getAttribute('aria-label')).toBe(`「${name}」的打卡记录`);
+      /* equality 比"窗格里有这个名字"硬：卡片自己的 testID 带着习惯 id，
+         把它和带痕迹那一行的 id 对上，才挡得住"痕迹指 A、窗格画 B"那种分叉
+         （A5 那一臂实测就是这个形状：只断文字会漏，因为两条习惯的名字都在 DOM 里）。 */
+      const markedId = markedRows()[0]?.getAttribute('data-testid')?.replace('habit-row-', '');
+      const cardIds = qa<HTMLElement>('[data-testid^="habit-card-"]', pane() ?? document)
+        .map((el) => (el.getAttribute('data-testid') ?? '').replace('habit-card-', ''));
+      expect(cardIds, `窗格里的卡片数不是恰好一枚（${name}）`).toHaveLength(1);
+      expect(cardIds[0], `痕迹在 ${markedId} 而窗格画的是 ${cardIds[0]}`).toBe(markedId);
+    }
   });
 
   it('🔴 点另一行后窗格换人：新名字出现、旧名字不再出现', () => {
@@ -503,10 +516,22 @@ describe('G. 回落规则的形状（源码级，剥注释后再读）', () => {
   const here = dirname(fileURLToPath(import.meta.url));
 
   const viewSource = (): string =>
-    stripComments(readFileSync(resolve(here, '../src/features/habits/HabitsView.tsx'), 'utf8'));
+    [
+      resolve(here, '../src/features/habits/HabitsView.tsx'),
+      // 🔴 §8.133 之后"猜第一条"那枚回落**可能长在的两份文件**都要读。
+      // 只读视图等于给新落地的那份开豁免，而面单刚刚就是从视图里搬出去的。
+      resolve(here, '../src/features/habits/HabitDetailCard.tsx'),
+    ]
+      .map((p) => stripComments(readFileSync(p, 'utf8')))
+      .join('\n');
 
   it('🔴 习惯面不许再有"猜第一条"的回落', () => {
-    expect(viewSource()).not.toMatch(/rows\[0\]/);
+    /* ⚠️ 判据从 `not.toMatch(/rows\[0\]/)` 放宽成"**任何下标 0**"（§8.133 搬家的直接后果）：
+       面单搬出视图之后，那份回落长在 `HabitDetailCard` 里而且是 `store.habits[0]` 的形状 ——
+       只盯字面量 `rows[0]` 等于给新落点开了一张豁免，而这一条要挡的是"按位置猜"这个**动作**。
+       今天这两个文件（剥注释后）一处下标都没有，所以这条判据现在是空的；
+       将来若真需要 `[0]`（比如取第一天），红的时候**就地登记它为什么不是猜**。 */
+    expect(viewSource()).not.toMatch(/\[\s*0\s*\]/);
   });
 
   it('左列的痕迹接的是共享选中态本身，不是那个派生值', () => {

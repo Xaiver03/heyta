@@ -129,6 +129,20 @@
   padding: var(--ht-space-4);
 }
 
+/*
+ * 习惯面单（工单 §8.133）—— 与上面两档同一内边距，但它是**同一枚元素上的第二个类**，
+ * 不是又一层壳：面单那块 DOM 在两个落点里是同一枚（`.ht-habit__pane`），
+ * 只有落点在换。多套一层 `<div>` 会让"全页只有一块板"那类判据之外再多一处
+ * 与布局无关的盒子，也会让窄屏塌缩那条 `padding-top + border-top` 算错参照。
+ *
+ * ⚠️ 这一栏宽 22rem（`--ht-layout-detail-width`），而板子里最宽的是 90 天热力图。
+ * 它会不会撑破这一栏，只有浏览器知道 ⇒ 判据在 `e2e/tests/detail-pane-habit.spec.ts`
+ * 的 H5（逐控件 containment + 不许出现横向溢出），不是这里的一行注释。
+ */
+.ht-app__detail-habit {
+  padding: var(--ht-space-4);
+}
+
 .ht-app__detail-heading {
   /* 区块标题档：lg + semibold（AGENTS §5 的文字层级表）。
      刻意**不是** xl —— 一屏一个页标题，页标题在 `.ht-header__title`。 */

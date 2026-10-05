@@ -49,7 +49,7 @@
  *   |---|---|---|---|
  *   | `features/trash/TrashView.tsx` | 87-90 | 手抄 `ht-empty` 三件套 + `Trash2` 图标 | `web.trash.empty.{title,hint}` |
  *   | `features/auth/AuthPanel.tsx` | 225-229 | `<strong>+<span>` 自成一格 | `web.auth.empty.{title,body}` |
- *   | `features/habits/HabitsView.tsx` | 127-128 | 单句 `<p>` | `web.habits.empty` |
+ *   | `features/habits/HabitsView.tsx` | 127-128 | 单句 `<p>` | `web.habits.empty`（🔴 §8.133 起构造器在 `features/habits/board-labels.ts`，本表其余行号同样是当时读数） |
  *   | `features/categories/CategoryBreakdown.tsx` | 67-68 | `ht-categories__empty` | `web.categories.empty` |
  *   | `features/motivation/GrowthView.tsx` | 78-79 | `ht-growth__empty` | `web.growth.week.empty` |
  *   | `features/motivation/IdentityTagList.tsx` | 71-72 / 111 | `ht-tags__empty` ×2 | `web.growth.tags.empty` |
@@ -367,7 +367,14 @@ const EMPTY_SITES = {
      * 它留在账上的理由只剩"谁来做"，不再有"做不到"。
      */
     'apps/web/src/features/categories/copy.ts',
-    'apps/web/src/features/habits/HabitsView.tsx',
+    /**
+     * 🔴 工单 §8.133：这一处**是搬家，不是新增债务**（账上仍然只有站点一枚）。
+     * 习惯面单拆成独立生产者（`HabitDetailCard.tsx`）之后，板子的文案构造器落在
+     * `features/habits/board-labels.ts` —— 视图与卡片互相 import 会成环，所以构造器
+     * 住在被用的那一侧。**渲染仍在共享层**（`HabitBoard` 用 `labels.empty`），
+     * 这里只是文案站点换了文件名，与上面 `categories/copy.ts` 同一形状。
+     */
+    'apps/web/src/features/habits/board-labels.ts',
     // ⚠️ 它只从「空槽位类」消失了（那个槽位被收编），**文案站点仍在账上**。
     'apps/web/src/features/motivation/GrowthView.tsx',
     'apps/web/src/features/settings/AiSettings.tsx',

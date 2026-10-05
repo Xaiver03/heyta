@@ -2,14 +2,16 @@
  * 习惯「列表 + 窗格」的真浏览器验收
  * ==================================
  *
- * jsdom 那套（`apps/web/tests/habits-list-pane.spec.tsx`，17 条）已经把**结构**
+ * jsdom 那两套（`apps/web/tests/habits-list-pane.spec.tsx` 与
+ * `apps/web/tests/habits-detail-card.spec.tsx`，条数请现量：
+ * `grep -c "it('" apps/web/tests/habits-*.spec.tsx`）已经把**结构**
  * 钉死了：哪些节点存在、选中态挂在哪个属性上、点第二行窗格换人。
  * 这一份只验 **jsdom 根本够不着的四件事**：
  *
- * 1. **真的两列**。`grid-template-columns` 是 CSS，jsdom 不做布局 ——
- *    它可以在 DOM 里"有两列"而屏幕上是一列。这里比的是 `boundingBox()`。
- * 2. **窄屏塌缩的方向**。768px 断点必须把整列换到窗格**上方**，
- *    而不是砍掉三个数字（ADR-0022 那条红线落在布局上）。
+ * 1. **真的两列**。清单列与详情栏的 `boundingBox()` 关系是 CSS 布局，jsdom 不做布局 ——
+ *    它可以在 DOM 里"有两列"而屏幕上是一列。
+ * 2. **窄屏塌缩的方向，以及面单在窄屏**归属哪一列**（这一单起它有两个落点）。
+ *    768px 断点必须把整列换到面单**上方**，而不是砍掉三个数字（ADR-0022 那条红线落在布局上）。
  * 3. **打卡标记的颜色真的分得开**。`heatmapLevelToken` 只是 token 名，
  *    能不能"一眼看出哪几天打了"取决于解析后的 `background-color` ——
  *    只有浏览器知道 `--ht-color-heat-4` 实际是什么。
@@ -138,23 +140,55 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
 
     const side = page.locator('.ht-habit__side');
     const pane = page.locator('.ht-habit__pane');
+    const column = page.locator('.ht-app__detail');
+    // 🔴 先等渲染完再量盒子：面单从这一单起**会随视口搬家**（宽屏在详情栏里、窄屏回
+    // 清单那一列），搬家靠 `matchMedia` ⇒ 视口变化之后还有一帧重渲染。`boundingBox()`
+    // 不等，实测在窄屏那条读到 `null` 而 a11y 快照里面单最终就在 `<main>` 末尾 ——
+    // 界面没错，是探针抢跑（§7 元规则一）。
     await expect(side).toBeVisible();
+    await expect(column).toBeVisible();
     await expect(pane).toBeVisible();
 
     const sideBox = await side.boundingBox();
     const paneBox = await pane.boundingBox();
+    const columnBox = await column.boundingBox();
     await shot(page, 'habits-list-pane-light');
 
-    // 🔴 判据从布局推出来，不是从常量推出来：窗格必须在清单**右边**，
-    // 且两列同高区间重叠（不是被 flex-wrap 甩到下面去了）。
+    /* 🔴 判据从布局推出来，不是从常量推出来：面单必须在清单**右边**，并且**落在那一栏里**。
+
+       ⚠️ ~~`expect(sideBox.width).toBeLessThan(paneBox.width)`~~ 与 ~~两列竖向区间重叠~~
+       这对代理（2026-10-05 工单 §8.133 撤掉）量的是"同一个视图里的主从两栏"，比例 2fr/5fr。
+       自 §8.133 起面单落在**详情列**（`.ht-app__detail`，宽 22rem），清单铺满中间那一列 ⇒
+       "清单比窗格窄"不再是契约，而是恰好被这次改动否证的形状；竖向重叠那条代理也没了依据：
+       面单的高度由**内容**决定（没选中时只有一行空态文案），而清单列有一整页行 ——
+       两个盒子可以完全不相交而布局是对的。替代判据是下面三条，都与高度无关：
+       面单被栏的矩形**包住** + 栏贴视口右边缘 + 清单只占一根轨道（不留空轨道）。 */
     expect(sideBox, '清单列没有渲染盒子').not.toBeNull();
     expect(paneBox, '窗格没有渲染盒子').not.toBeNull();
+    expect(columnBox, '详情列没有渲染盒子').not.toBeNull();
     expect(paneBox!.x).toBeGreaterThan(sideBox!.x + sideBox!.width - 1);
-    expect(sideBox!.y).toBeLessThan(paneBox!.y + paneBox!.height);
-    expect(sideBox!.y + sideBox!.height).toBeGreaterThan(paneBox!.y);
+    expect(paneBox!.x, '面单左边缘在详情列左边之外').toBeGreaterThanOrEqual(columnBox!.x - 1);
+    expect(paneBox!.y, '面单上边缘在详情列上边之外').toBeGreaterThanOrEqual(columnBox!.y - 1);
+    expect(paneBox!.x + paneBox!.width, '面单右边缘溢出详情列').toBeLessThanOrEqual(
+      columnBox!.x + columnBox!.width + 1,
+    );
+    expect(paneBox!.y + paneBox!.height, '面单下边缘溢出详情列').toBeLessThanOrEqual(
+      columnBox!.y + columnBox!.height + 1,
+    );
 
-    // 清单列确实比窗格窄（2fr/5fr），否则"两列"只是两个 640px 的巧合。
-    expect(sideBox!.width).toBeLessThan(paneBox!.width);
+    // 那一栏贴窗口右边缘（W2 的承重几何，面单落地不该弄坏它）。
+    // ⚠️ 量的是**列盒子**而不是 pane：pane 在列里还有一圈 inset，贴边的是列。
+    const viewportWidth = page.viewportSize()!.width;
+    expect(
+      columnBox!.x + columnBox!.width,
+      `详情列右边缘 ${String(columnBox!.x + columnBox!.width)} 没贴到视口右边缘 ${String(viewportWidth)}`,
+    ).toBeGreaterThanOrEqual(viewportWidth - 1);
+    // 清单那一侧只有一根轨道（面单走了之后不许留一整块空白）。
+    const tracks = await side.evaluate((el) => {
+      const grid = el.closest('.ht-habit');
+      return grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length : -1;
+    });
+    expect(tracks, '`.ht-habit` 不是单列 ⇒ 面单搬走后留了一根没人住的轨道').toBe(1);
 
     // 全页只有一块板（motivation.spec 的白屏检测靠它，两边必须同一条判据）。
     await expect(page.getByTestId('habit-board')).toHaveCount(1);
@@ -165,7 +199,7 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
     for (let i = 0; i < 3; i += 1) await expect(nums.nth(i)).toHaveText('0');
 
     // 🔴 点哪一行，窗格就换人。这条**不依赖默认选中的是谁** ——
-    // `selected` 的兜底是 `rows[0]`，而 rows 的顺序由取数层决定，不是这里的契约。
+    // §8.131 起根本没有"默认"：没选中时窗格说的是"选一条习惯"，谁都不画。
     // 所以两边各点一次、各验一次，顺序怎么变判据都成立。
     await page.locator(`[data-testid="habit-row-${second}"]`).click();
     await expect(pane).toHaveAttribute('aria-label', /「阅读」/);
@@ -225,7 +259,7 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
     expect(errors, `控制台报错：${errors.join(' | ')}`).toEqual([]);
   });
 
-  test('窄屏（≤768px）整列换到窗格上方，三个数字一个都不砍', async ({ page }) => {
+  test('窄屏（≤768px）面单回到清单那一列、换到其下方，三个数字一个都不砍', async ({ page }) => {
     await openApp(page, APP_ZH);
     await switchView(page, '习惯');
     const id = await createHabit(page, '喝水');
@@ -233,14 +267,24 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
 
     const side = page.locator('.ht-habit__side');
     const pane = page.locator('.ht-habit__pane');
+    // 🔴 等面单**搬完家**再量（同上面那条理由）：视口 700px ⇒ `DETAIL_FITS_QUERY` 转假，
+    // 面单要从 `.ht-app__detail` 搬回 `.ht-habit` 末尾，这一步是 matchMedia 之后的一帧重渲染。
+    await expect(side).toBeVisible();
+    await expect(pane).toBeVisible();
     const sideBox = await side.boundingBox();
     const paneBox = await pane.boundingBox();
     await shot(page, 'habits-list-pane-narrow');
 
     expect(sideBox).not.toBeNull();
     expect(paneBox).not.toBeNull();
-    // 🔴 塌缩方向只有一个正确答案：清单在**上**、窗格在**下**。
-    // 反过来（窗格在上）等于把"扫一眼"的那一列挤到要滚动才看见的地方。
+    // 🔴 面单在窄屏必须**离开详情列**。这条是这一单新增的：以前它恒在 `.ht-habit` 里，
+    // "窄屏要不要收"根本不构成判据；现在它有两个落点，只看"塌到下面"挡不住
+    // "落点在栏里、靠 CSS `display:none` 藏起来"这一种假通过 —— 那正是拍板 #1
+    // 反对的形状（界面不说、模型已变）。承重的是这里：**DOM 里它归属哪一列**。
+    const inDetailColumn = await pane.evaluate((el) => el.closest('.ht-app__detail') !== null);
+    expect(inDetailColumn, '窄屏下面单仍挂在详情列里 ⇒ 落点没跟着视口走').toBe(false);
+    // 🔴 塌缩方向只有一个正确答案：清单在**上**、面单在**下**。
+    // 反过来（面单在上）等于把"扫一眼"的那一列挤到要滚动才看见的地方。
     expect(sideBox!.y + sideBox!.height).toBeLessThanOrEqual(paneBox!.y + 1);
     expect(paneBox!.y).toBeGreaterThan(sideBox!.y);
 
