@@ -10671,3 +10671,100 @@ pane 级"不许有行尾的两层外壳"在 e2e 层只有 T10 一个消费者（
 `git ls-tree -r feat/detail-pane -- scripts/verify-mobile-window-gate.sh` ⇒ 0 行；`main` 与 `origin/main` 各 1 行），
 所以只能按 §8.60 写的那样在主检出跑；③ 按 §8.60 那条裁决，本单**不拿一枚落后 main 的载体先把包装上**
 （那等于把已装产物降级，§8.10 那批量过的正是这个形状），#13 的真实前置是合流落地，本线不代 merge。
+
+## 8.148 键盘光标那两处"没有判据"：一处是判据盲区，另一处是**界面上真的做不到**（2026-10-06 00:3x–00:5x，状态：**进行中**）
+
+§8.143 收口时留了三件"没做"，其中两件不需要拍板、落点全在本线自己的文件里，本节把它们补完。
+🔴 **两件不是同一件东西**：① 是**判据的射程**问题（机制在、没人量）；② 一测之下是**产品缺陷**
+（机制根本不存在）。把②登记成"这条新可达面没有判据"，读起来像"大概是通的，只是没人量" ——
+**"没有判据"和"没有行为"在台账上长得一模一样**，这是本节真正要记的那一条。
+
+### 1. 现量：三张面的行里，`FOCUSABLE` 命中的第一颗**各不相同**
+
+一趟真浏览器取回（一次性探针，跑完即删；durable 的那一份现在是 K13）：
+
+| 面 | 行 testid | 行内 FOCUSABLE 命中（文档序） | `focusRow` 实际挑中 |
+|---|---|---|---|
+| 任务 | `task-item-<id>` | **5 颗**：`task-toggle-<id>`（`div[role=checkbox][tabindex=0]`）→ `task-row-<id>`（`button[role=button]`）→ `ai-breakdown-*` → `duration-run-*` → 无名 `button` | `task-toggle-<id>` |
+| 习惯 | `habit-row-<id>` | **0 颗**（行自己就是可聚焦的那一颗） | 行本身 |
+| 便签 | `note-row-<id>` | 3 颗：`note-edit-*` → `note-pin-*` → `note-remove-*`（都是 `button[role=button]`） | `note-edit-<id>` |
+
+⇒ 三面身份不同，所以判据**逐面点名**，不写成"行里第一颗"这种把现量推回读者的话。
+🔴 也⇒ 臂 F3（`FOCUSABLE` 缩成只认 `button`）为什么两层全盲：任务行里第二颗就是 `<button>`，
+**同属一行** ⇒ 一切"焦点在哪一行"的读数都分不出两种坏；而 jsdom 夹具 `rowsWithControl`
+行里唯一那颗恰好是 `<button>` —— **夹具长成了答案的形状**。
+
+### 2. 现量：焦点已经在复选框上按 Space ⇒ **什么都没发生**
+
+同一趟探针（改之前）：`focused = task-toggle-<id>`，按 Space 之后两条任务的 `aria-checked`
+读数仍是 `false`、`activeElement` 没动。机制原因：`react-native-web` 把
+`accessibilityRole="checkbox"` 落成 `<div role="checkbox" tabindex="0">`，而 Chromium
+**不会**把 Space 合成成这种节点的激活（原生 `<button>` / `<input>` 才会）。
+⇒ 纯键盘用户当时**勾选不了任何一条任务**：Enter 被 §8.137 那条腿占去"打开这一格"，
+Space 又什么都不做，两把键里没有一把能完成一条任务。
+
+修法落在**已经在管这把键的那枚文件**里（`apps/web/src/lib/keyboard-cursor.ts`，不是 `packages/ui`）：
+只补"焦点在 `[role=checkbox]`、且它不是原生可激活节点、且它属于本视图的某一行"这一种情况，
+`preventDefault()`（不拦的话 Chromium 拿这一下去滚页面）+ `el.click()`。
+⚠️ 三道条件各挡一种坏：不限 `role` ⇒ 替别人按键；不排原生 `<button>`/`<input>` ⇒ **双份 op**
+（浏览器自己那一下 + 合成这一下）；不限在本视图的行里 ⇒ 浮层里任何一颗复选框被抢。
+三条闸门（打字 / 浮层 / 焦点归控件）与 ↑↓、Enter **共用同一套**，不另写一份。
+
+### 3. 判据（三层，全在本线自己的文件里）
+
+| 层 | 新增 | 钉的是什么 |
+|---|---|---|
+| jsdom `apps/web/tests/keyboard-cursor.spec.tsx` | 3 条（34 → **37 passed**） | ①焦点落的是那颗**复选框**而不是同一行里的第二颗（夹具按真生产者顺序摆两颗）；②Space 落在 `div[role=checkbox]` ⇒ 合成一次 click 且吞键；③Space 落在**行里的** `<button role=checkbox>` ⇒ 一次都不许多按、不吞 |
+| 真浏览器 `e2e/tests/keyboard-cursor.spec.ts` **K13** | 三面各一句 | ↓ 之后 `activeElement` 的 `data-testid` 逐面等于上面那张表（任务 `task-toggle-*` / 习惯 行本身 / 便签 `note-edit-*`） |
+| 真浏览器 **K14** | 一条 | Space ⇒ 那条任务**离开收集箱**而没被碰的那条还在 → 刷新后仍如此（差分 + 那一下真走了一条 op） |
+
+⚠️ K14 **不读 `aria-checked`**：两趟现量给的是"当场裸 `evaluate` 还看得见那一行、几秒后 locator 就找不到"
+⇒ 完成的那一条会从这一列里整行消失（`aria-checked` 不是个稳定读数）。
+🔴 第一版 K14 红在**探针自己的尺子**上：`getByText('勾选乙')` 整页命中**两处**（行 + 栏里那张面单的标题），
+报的是 "Expected 1, Received 2"，看着像"勾选没生效"，实际量到了隔壁那一格 ⇒ 两句差分都圈进 `ROWS`。
+
+### 4. 臂台（`research/tools/mutation-rigs/mutate-keyboard-enter.mjs`，11 → **13 臂**）
+
+⚠️ 这台臂台的点名是**位置参数**，没有 `--arms` 这个开关：第一趟我按 §8.147 那台的写法敲了
+`--arms F3,F4,F5`，它把整串当成一个点名去匹配 ⇒ `VERDICT=PROBE_BROKEN … 一枚都没匹配上`。
+🔴 而**包装命令的退出码是 0**（§7 #164/#179 同族）—— "后台任务完成 (exit code 0)" 那条通知
+**不是**臂台的读数，读日志才算。
+
+| 臂 | 注入 | 预期红集 |
+|---|---|---|
+| F3（**预期改了**） | `FOCUSABLE` 缩成只认 `button` | jsdom 身份那条 + e2e **K13/K14**（§8.143 那趟记的"两层全盲"被本单变成有牙） |
+| F4 | 摘掉 Space 那一支（`const space = false`） | jsdom 正向那条 + e2e **K14** |
+| F5 | 不区分原生与否 | **只**红 jsdom 那条负向腿（真渲染里今天没有 `button[role=checkbox]` 这种生产者 ⇒ e2e 层不可观察，它是**契约**的牙不是**观感**的牙） |
+
+读数（载体 = 本单那三枚源文件，`node research/tools/mutation-rigs/mutate-keyboard-enter.mjs F3 F4 F5`）：
+基线 `jsdom=Tests 37 passed (37)｜e2e=passed=14｜dist=8cdb4bffa529816c` ⇒
+F3 `jsdom 1 failed（焦点落的是那颗）+ e2e 红集=K13｜K14`、F4 `jsdom 1 failed（替它按一次并吞键）+ e2e K14`、
+F5 `jsdom 1 failed（一次都不许多按）+ e2e 盲区（成立）` ⇒ **`RIG_RESULT=3/3`**、
+`复原：BACK_TO_CLEAN=true`、复跑 `jsdom=37 passed｜e2e=14 passed`。
+⚠️ 这一趟**只跑了三臂**，其余 10 臂本轮没有读数（臂台自己打了那行警告）—— 不许把 `3/3` 读成"这台臂台全绿"。
+
+### 5. 四道前置闸门 + 图证
+
+| 闸门 | 读数 |
+|---|---|
+| ① 归属门 | 起跑前主检出里本单五枚路径（`keyboard-cursor.ts` / 两份 spec / 臂台 / 本工单）逐个 `git status` **干净**；机器负载现量 `{10.80 13.10 13.35}`（短窗 < 长窗 ⇒ 不是我自己压上去的） |
+| ② 两道余量为 0 的棘轮 | `check:l4` ⇒ `✅ L4 不写样式：三道断言都通过`（本单没加一枚内联样式）；`check:row-single-source` ⇒ `✅ 任务行单一来源 + ht-* 族基线：两道断言都通过`（没新起 `ht-*` 族）；**两道的基线一个字都没动**。另 `check:selection-single-source` 全绿（词表 3 类全有消费者 task 11 / habit 8 / note 14、宿主内本地选中态 0 处、11 个 ViewKey 全部交代过立场） |
+| ③ 干净检出复跑 | **本单未跑** —— 登记在边界 ①，不写成过了 |
+| ④ packages 改完先 build | 本单**零 `packages/` 改动**，但改了 `apps/web/src` ⇒ 载体是 `vite preview` + `apps/web/dist`，所以**先重打**（`tsc -b` RC=0、`vite build` RC=0）再跑判据；干净态基线摘要 `dist=8cdb4bffa529816c` |
+
+图证（AGENTS §6.2 规定一，两张都打开看过）：
+`apps/web/evidence/keyboard-cursor/k13-focus-identity-three-faces.png` —— 便签面：第一行「身份便签乙」
+带着**焦点环 + 浅蓝底**两种线索，右栏编辑器写的正是「身份便签乙」；
+`apps/web/evidence/keyboard-cursor/k14-space-toggles-from-keyboard.png` —— 收集箱里只剩「勾选乙」一行、侧栏「已完成」计数是 **1**、
+右栏画的是刚被 Space 掉的那条「勾选甲」。⚠️ 看图照出一件**本节没修**的事：那一行已经不在列表里了，
+而栏里那格还画着它（共享选中态没被剪 —— 实体还在，只是不在这条过滤视图里），读起来像"选中了一条
+看不见的任务"。登记成边界 ②，不在本单动：要拍的是"面单跟不跟着列表的**可见集**走"，那是 W1 的
+回落规则，不是一把键盘的事。
+
+### 6. 边界（别读多）
+
+① 闸门 ③（干净检出复跑）本单**没跑**；补法与 §8.147 那一格同形（`git worktree add --detach` 到本单那笔之后重跑门禁）。
+② 上面图证末段那一格（完成的那条仍占着栏里那一格）未修、未拍。
+③ 触屏端仍无键盘光标（§8.143 边界③ 未变，本单没动移动端）。
+④ 四端重装未做（同一格，待办 #13，读数见 §8.147 边界⑨）。
+⑤ F5 那一臂在 e2e 层**不可观察**，不许把它读成"Space 的双份 op 有浏览器层的牙"。
