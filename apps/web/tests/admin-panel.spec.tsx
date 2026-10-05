@@ -175,15 +175,16 @@ describe('是管理员：渲染面板与概览', () => {
     expect(overview!.textContent).toContain('123.00 CNY');
   });
 
-  it('面板上有七个标签页，默认停在概览', async () => {
+  it('面板上有八个标签页，默认停在概览', async () => {
     stubFetch(200);
     const el = await renderPanel();
 
     const tabs = [...el.querySelectorAll('[role="tab"]')];
-    // 第六个是 W4b 的「调休/补班」（`TABS` 与 `AdminTab` 同批加的），
-    // 第七个之前是「邀请」。⚠️ 这条判据的价值在"标签页数 = TABS 的长度"：
+    // 第六个是 W4b 的「调休/补班」，第七个之前是「邀请」，第八个是本批的「退款」
+    // （三处都是 `TABS` 与 `AdminTab` 同批加的）。
+    // ⚠️ 这条判据的价值在"标签页数 = TABS 的长度"：
     // 只改数字不改 TABS（或反过来）都会让它红。
-    expect(tabs).toHaveLength(7);
+    expect(tabs).toHaveLength(8);
     expect(tabs[0]!.getAttribute('aria-selected')).toBe('true');
   });
 
@@ -774,5 +775,284 @@ describe('🔴 调休：撤销是两步，而且说的是"退回随包数据"', 
       '2026 年的录入已撤销',
     );
     expect(el.querySelectorAll('[data-testid="admin-holiday-papers"] a')).toHaveLength(0);
+  });
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * 退款 tab（ADR-0053 落地面的最后一块：把那四条接口变成运营点得动的界面）。
+ *
+ * 这一组钉的全是**这一片界面自己能做错**的事：
+ *   ① 列表按 `listRefunds` 的投影逐字段渲染（少画一个字段 = 运营看不见那条事实）；
+ *   ② 🔴 **批准是两步**：点一次只出确认，第二次才发请求 —— 这一步会把钱交给通道，
+ *      发出去收不回来。驳回一步就够（它是什么都不发生的出口）；
+ *   ③ 动作之后**重新读回服务端**，界面说的状态来自 GET，不来自请求；
+ *   ④ 🔴 409 的**原因码要渲染成人话**（§5 第 11 条）：折成一句"服务端出错了"
+ *      就是让运营对一条"已经过了 7 天"的申请反复点同一个按钮；
+ *   ⑤ 不认识的码 ⇒ 把**原码**打出来（降级成"看得见码"，不降级成"编一个原因"）；
+ *   ⑥ 只有 `requested` 那一行给按钮（不是安全措施，是不制造一次注定失败的点击）。
+ *
+ * 假服务端**带状态**（批准真的把行改成 `processing`），理由与调休那一组相同：
+ * 一个自己不变的替身，能让"只改本地副本"的实现也通过（§7 第 50 条）。
+ * ──────────────────────────────────────────────────────────────────────── */
+const REFUND_DEMO_ROW = {
+  id: 1207,
+  orderId: 3304,
+  userId: 7719,
+  provider: 'wechat',
+  outRefundNo: 'HYRFDEMO0001',
+  amountMinor: 4012,
+  currency: 'CNY',
+  periodDays: 30,
+  status: 'requested',
+};
+
+interface FakeRefundServer {
+  listFetches: number;
+  approveBodies: unknown[];
+  rejectBodies: unknown[];
+  requestBodies: unknown[];
+}
+
+/**
+ * @param requestStatus `POST /refunds` 的返回码：409 用来演"政策拒绝这次申请"，
+ *                      而**被拒的那一单永远不该出现在列表里**。
+ * @param denyReason    409 体里的原因码（`undefined` = 服务端没给码）。
+ */
+function stubRefundServer(
+  initial: Record<string, unknown>[] = [REFUND_DEMO_ROW],
+  requestStatus = 201,
+  denyReason?: string,
+): FakeRefundServer {
+  // 🔴 逐行**浅拷贝一份**：假服务端会改 `row.status`，而 `initial` 的默认值是模块级常量 ——
+  // 只摊开数组会让上一条用例把同一枚对象改脏，下一条用例于是报「找不到输入框」（本次实测撞到过）。
+  const rows: Record<string, unknown>[] = initial.map((row) => ({ ...row }));
+  let nextId = 9001;
+  const state: FakeRefundServer = {
+    listFetches: 0,
+    approveBodies: [],
+    rejectBodies: [],
+    requestBodies: [],
+  };
+  const fail = (status: number, body: unknown) =>
+    Promise.resolve({ status, ok: false, json: () => Promise.resolve(body) } as unknown as Response);
+
+  fetchMock = vi.fn((url: string, init?: { method?: string; body?: string }) => {
+    const path = url.replace(/^.*\/api\/admin/, '').split('?')[0];
+    const method = init?.method ?? 'GET';
+    if (path === '/overview') return Promise.resolve(json(OVERVIEW));
+
+    if (path === '/refunds' && method === 'GET') {
+      state.listFetches += 1;
+      return Promise.resolve(json({ refunds: rows }));
+    }
+    if (path === '/refunds' && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      state.requestBodies.push(body);
+      if (requestStatus !== 201) {
+        return fail(requestStatus, {
+          error: 'Refund not allowed.',
+          ...(denyReason === undefined ? {} : { reason: denyReason }),
+        });
+      }
+      rows.unshift({
+        ...REFUND_DEMO_ROW,
+        id: nextId,
+        orderId: body.orderId,
+        outRefundNo: `HYRFNEW${String(nextId)}`,
+        status: 'requested',
+      });
+      nextId += 1;
+      return Promise.resolve(
+        json({ ok: true, outcome: 'requested', refundId: nextId - 1, outRefundNo: 'x', amountMinor: 4012 }),
+      );
+    }
+    const decided = /^\/refunds\/(\d+)\/(approve|reject)$/.exec(path);
+    if (decided !== null) {
+      const id = Number(decided[1]);
+      const body = JSON.parse(String(init?.body)) as { note: string };
+      const row = rows.find((entry) => entry.id === id);
+      if (row === undefined || row.status !== 'requested') {
+        return fail(409, { error: 'Refund already decided or finished.', reason: 'NOT_DECIDABLE' });
+      }
+      // 🔴 真的改 state：批准之后 GET 回来的那一行必须是**新状态**，
+      // 否则"界面说的是请求里带的字"这种实现也能通过。
+      row.status = decided[2] === 'approve' ? 'processing' : 'rejected';
+      (decided[2] === 'approve' ? state.approveBodies : state.rejectBodies).push(body);
+      return Promise.resolve(
+        json(
+          decided[2] === 'approve'
+            ? { ok: true, outcome: 'submitted', status: 'processing', providerRefundId: '5030' }
+            : { ok: true, outcome: 'decided', status: 'rejected' },
+        ),
+      );
+    }
+    return Promise.resolve(json({ items: [], total: 0, limit: 50, offset: 0 }));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return state;
+}
+
+async function openRefundTab(el: HTMLElement): Promise<void> {
+  await clickTab(el, '退款');
+}
+
+function refundNoticeText(el: HTMLElement): string {
+  return el.querySelector('[data-testid="admin-refund-notice"]')?.textContent ?? '';
+}
+
+describe('🔴 退款：列表把投影里的每个字段都画出来', () => {
+  it('9 个投影键逐键可见，且没有 undefined 漏进界面', async () => {
+    stubRefundServer();
+    const el = await renderPanel();
+    await openRefundTab(el);
+
+    const row = el.querySelector('[data-testid="admin-refunds"] li')!.textContent ?? '';
+    // 存在性判据（W5 那条教训：**断言只会验界面写了什么，不会验界面少了什么**）：
+    // 少画任何一列 ⇒ 这一条红，而"整块渲染了"是看不出来的。
+    for (const value of [
+      '#1207',
+      '3304',
+      '7719',
+      'HYRFDEMO0001',
+      '40.12',
+      'CNY',
+      '30',
+      'wechat',
+      'requested',
+    ]) {
+      expect(row).toContain(value);
+    }
+    expect(row).not.toContain('undefined');
+  });
+
+  it('一条申请都没有时说的是"还没有过任何一条"，不是"出错了"', async () => {
+    stubRefundServer([]);
+    const el = await renderPanel();
+    await openRefundTab(el);
+
+    expect(el.textContent).toContain('还没有过任何一条退款申请');
+    expect(el.querySelector('[data-testid="admin-error"]')).toBeNull();
+  });
+});
+
+describe('🔴 退款：批准要两步，驳回一步', () => {
+  it('点「批准」只出确认，**不发请求**；确认之后才发给通道', async () => {
+    const state = stubRefundServer();
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-note-1207', '用户坚持，客服同意');
+
+    await pressTestId(el, 'admin-refund-approve-1207');
+    // 🔴 这一条是钱的那道闸：一次点击就动钱的界面，靠"再确认"挡住手滑。
+    expect(state.approveBodies).toHaveLength(0);
+    expect(el.querySelector('[data-testid="admin-refund-approve-confirm"]')).not.toBeNull();
+
+    await pressTestId(el, 'admin-refund-approve-yes-1207');
+    expect(state.approveBodies).toEqual([{ note: '用户坚持，客服同意' }]);
+    // 动作之后**再读一次**（进页面 1 次 + 动作后 1 次）。
+    expect(state.listFetches).toBe(2);
+    // 界面说的是重新读回来的那一行：processing，而且**没有**"已退款"。
+    const row = el.querySelector('[data-testid="admin-refunds"] li')!.textContent ?? '';
+    expect(row).toContain('processing');
+    expect(refundNoticeText(el)).toContain('已交给支付通道');
+    expect(el.textContent).not.toContain('已退款');
+    // 已经不在 `requested` 的那一行不再给按钮（⑥）。
+    expect(el.querySelector('[data-testid="admin-refund-approve-1207"]')).toBeNull();
+  });
+
+  it('「驳回」一步就发，且说的是"钱和权益都不动"', async () => {
+    const state = stubRefundServer();
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-note-1207', '不在政策内');
+
+    await pressTestId(el, 'admin-refund-reject-1207');
+
+    expect(state.rejectBodies).toEqual([{ note: '不在政策内' }]);
+    expect(refundNoticeText(el)).toContain('已驳回');
+    expect(refundNoticeText(el)).toContain('钱和权益都不动');
+  });
+});
+
+describe('🔴 退款：409 的原因码必须到得了运营眼前（ADR-0053 §5 第 11 条）', () => {
+  it('超窗被拒 ⇒ 界面说的是"时间窗"这句话，而不是一句笼统的服务端错误', async () => {
+    const state = stubRefundServer([], 409, 'WINDOW_PASSED');
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-order-input', '3304');
+    await typeInto(el, 'admin-refund-request-note', '用户来申请');
+
+    await pressTestId(el, 'admin-refund-request');
+
+    expect(state.requestBodies).toEqual([{ orderId: 3304, note: '用户来申请' }]);
+    // 🔴 变异点：把 `readServerReason` 拿掉 ⇒ 这里只剩通用措辞，这一条转红。
+    expect(refundNoticeText(el)).toContain('超出当前退款政策的时间窗');
+    // 折成 5xx 那句"服务端出错了"就是把"你的参数没问题、是那一单的状态不允许"这条事实弄丢了。
+    expect(el.textContent).not.toContain('服务端出错了');
+    // 被拒的申请**不该**出现在列表里（假服务端也没真的加行）。
+    expect(el.querySelector('[data-testid="admin-refunds"] li')).toBeNull();
+  });
+
+  it('服务端给了一个这台界面**不认识**的码 ⇒ 原码打出来，界面不猜', async () => {
+    stubRefundServer([], 409, 'SOMETHING_NEW');
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-order-input', '3304');
+    await pressTestId(el, 'admin-refund-request');
+
+    expect(refundNoticeText(el)).toContain('SOMETHING_NEW');
+  });
+
+  it('409 但体里**没有**原因码 ⇒ 界面承认"没有码"，不编一个原因', async () => {
+    stubRefundServer([], 409);
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-order-input', '3304');
+    await pressTestId(el, 'admin-refund-request');
+
+    // 说的是"没给码"这一句（而不是某个具体原因，也不是"服务端坏了"）。
+    expect(refundNoticeText(el)).toContain('而服务端没有给出原因码');
+    expect(refundNoticeText(el)).not.toContain('原因码：');
+    expect(el.textContent).not.toContain('服务端出错了');
+  });
+
+  it('服务端回了一个这台界面**不认识**的 outcome ⇒ 说"不认识"，不说成功', async () => {
+    // 客户端那份 outcome 联合是手抄的（词表住在服务端）。这一条钉的是抄漏之后会静默
+    // "读成成功"那一格：界面宁可承认自己看不懂，也不许替运营编一个"钱已经发出去了"。
+    fetchMock = vi.fn((url: string, init?: { method?: string }) => {
+      const path = url.replace(/^.*\/api\/admin/, '').split('?')[0];
+      if (path === '/overview') return Promise.resolve(json(OVERVIEW));
+      if (path === '/refunds' && (init?.method ?? 'GET') === 'GET') {
+        return Promise.resolve(json({ refunds: [{ ...REFUND_DEMO_ROW }] }));
+      }
+      return Promise.resolve(
+        json({ ok: true, outcome: 'refunded_out_of_band', status: 'success' }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await pressTestId(el, 'admin-refund-approve-1207');
+    await pressTestId(el, 'admin-refund-approve-yes-1207');
+
+    expect(refundNoticeText(el)).toContain('不认识的结果码');
+    expect(refundNoticeText(el)).toContain('refunded_out_of_band');
+    expect(refundNoticeText(el)).not.toContain('已交给支付通道');
+  });
+
+  it('勾了"例外"才会带上 operatorApproved（不勾就是不带这个键，由服务端按默认处理）', async () => {
+    const state = stubRefundServer();
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-order-input', '3304');
+    await typeInto(el, 'admin-refund-request-note', '超窗但客服同意');
+    await pressTestId(el, 'admin-refund-exception');
+
+    await pressTestId(el, 'admin-refund-request');
+
+    expect(state.requestBodies).toEqual([
+      { orderId: 3304, note: '超窗但客服同意', operatorApproved: true },
+    ]);
   });
 });

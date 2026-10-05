@@ -49,6 +49,12 @@ export interface AdminClientOptions {
  * `forbidden` 与 `unauthorized` **分开**：前者是"这个账号没有后台权限"（重试无意义），
  * 后者是"令牌过期了"（重新登录就好）。合并成一个 `auth-error` 会让界面
  * 给用户一句"请重新登录"，而他其实登录着、只是永远不会有权限。
+ *
+ * 🔴 `conflict`（409）也必须**独立于 `server`（5xx）**：409 说的是"请求本身没写错，
+ * 是被操作那一行的当前状态拒绝了"，它的下一步是**换一个动作或换一单**，
+ * 而 5xx 的下一步是重试。把它折进 `server`，运营会对着一条"已过 7 天的退款申请"
+ * 反复点同一个按钮 —— 这正是 `admin.routes.ts` 里"409 而不是 400"那条注释要防的事，
+ * 只是它防在了服务端，而界面这一半此前没人接。
  */
 export type AdminFailureReason =
   | 'unconfigured'
@@ -58,6 +64,7 @@ export type AdminFailureReason =
   | 'forbidden'
   | 'not-found'
   | 'invalid'
+  | 'conflict'
   | 'server';
 
 export type AdminResult<T> =
@@ -67,6 +74,19 @@ export type AdminResult<T> =
       readonly reason: AdminFailureReason;
       /** HTTP 状态码（`network` / `unconfigured` / `no-token` 时没有）。 */
       readonly status?: number;
+      /**
+       * 服务端在 4xx 响应体里带回来的**业务码**（`reason` 字段，原样交出去）。
+       *
+       * 🔴 传输层**不翻译、不裁决、不白名单** —— 它只做"把服务端给的那个码搬到返回值里"。
+       * 哪些码存在、每个码对界面意味着什么，只有后台那一片知道
+       * （`apps/web/src/features/admin/store.ts` 的 `ADMIN_REFUND_CODE_KEY`）。
+       * 在这里写一份枚举就是 §3.5 那条"同一个判断抄两遍"。
+       *
+       * ⚠️ 之所以要有这一格：`{ok:false, reason, status}` 这三元组里，`reason` 是
+       * **HTTP 的**原因（409 ⇒ conflict），它答不了"为什么这一单被拒"。
+       * 退款恰恰是必须告诉运营**为什么**的这类操作（ADR-0053 §5 第 11 条）。
+       */
+      readonly serverReason?: string;
     };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -233,7 +253,35 @@ function reasonFromStatus(status: number): AdminFailureReason {
   if (status === 403) return 'forbidden';
   if (status === 404) return 'not-found';
   if (status === 400) return 'invalid';
+  if (status === 409) return 'conflict';
   return 'server';
+}
+
+/**
+ * 这一格为什么要带**上界**：`serverReason` 要进 DOM。
+ *
+ * 我们自己的服务端给的是短业务码（`WINDOW_PASSED` 这类）。但这一层读的是
+ * **任意**非 2xx 响应体 —— 换过版本的服务端、挡在前面的反代、以及
+ * 未来任何一条忘了带码的 4xx 都从这里过。长度上界是这条边界上唯一的形状约束，
+ * 它不裁决"这个码合不合法"（那是后台那一片的事）。
+ */
+const MAX_SERVER_REASON_LENGTH = 80;
+
+/** 从非 2xx 的响应体里取 `reason`。取不到就 `undefined` —— **不抛**。 */
+async function readServerReason(response: Response): Promise<string | undefined> {
+  if (typeof response.json !== 'function') return undefined;
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    // 反代给的 HTML / 空体：这一次失败仍然按状态码说话。
+    return undefined;
+  }
+  if (body === null || typeof body !== 'object') return undefined;
+  const value = (body as { readonly reason?: unknown }).reason;
+  if (typeof value !== 'string') return undefined;
+  const code = value.trim();
+  return code === '' || code.length > MAX_SERVER_REASON_LENGTH ? undefined : code;
 }
 
 /**
@@ -294,7 +342,12 @@ async function adminRequest<T>(
   }
 
   if (!response.ok) {
-    return { ok: false, reason: reasonFromStatus(response.status), status: response.status };
+    return {
+      ok: false,
+      reason: reasonFromStatus(response.status),
+      status: response.status,
+      serverReason: await readServerReason(response),
+    };
   }
 
   try {
@@ -479,3 +532,120 @@ export const fetchAdminInvites = (
     options,
     `${ADMIN_API_PREFIX}/invites${query({ limit: params.limit, offset: params.offset })}`,
   );
+
+// ─────────────────────────────────────────────────────────────────────
+// 退款（申请 / 批准 / 驳回）—— 与 `server/src/admin/admin.routes.ts` 那四条端点一一对应。
+//
+// 决策依据在 [`docs/adr/0053-refunds-only-for-countable-segments.md`]
+// （../../../docs/adr/0053-refunds-only-for-countable-segments.md）。本文件只做传输：
+//
+// 🔴 **能退不该退、退多少，一个都不在这里判。** 三条 CHECK、7×24 窗口、
+// "金额只能等于结算冻下的实付"、"同一单不许有第二条开着的退款"全部住在服务端
+// （`server/src/billing/refund-policy.ts` + `refund-store.ts`）。界面这一侧多判一次
+// 就是两套标准，而漂移表现为"界面放行了、服务端 409"或反过来。
+//
+// 🔴 **这里也不枚举 `status`**。词表在 `REFUND_STATUSES`（服务端）。抄一份进客户端
+// 就有了第二份词表；订单与订阅那两列同样是原样显示服务端码，退款这一列跟着做。
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * 列表行：与服务端 `listRefunds` 的投影**逐键对齐**（判据钉在
+ * `apps/web/tests/admin-panel.spec.tsx` 的「列表投影键集合」那一条）。
+ *
+ * ⚠️ 投影里**没有** `note`、`reason`、`refundedAt`、`providerRefundId` ——
+ * 库里都有，但 `listRefunds` 没选。所以这一片界面**说不出**"谁写的理由"和
+ * "通道那头的单号"，只能列出这 9 个键。要显示就得先扩服务端投影（独立的一步）。
+ */
+export interface AdminRefundRow {
+  readonly id: number;
+  readonly orderId: number;
+  readonly userId: number;
+  readonly provider: string;
+  readonly outRefundNo: string;
+  readonly amountMinor: number;
+  readonly currency: string;
+  readonly periodDays: number;
+  readonly status: string;
+}
+
+/** `GET /api/admin/refunds` 的响应（**不分页**：只有 `limit`，没有 `offset`）。 */
+export interface AdminRefundList {
+  readonly refunds: AdminRefundRow[];
+}
+
+/** `POST /api/admin/refunds` 成功（201）回的就是这三件事。被拒走 409，不落在这里。 */
+export interface AdminRefundRequestResult {
+  readonly ok: true;
+  readonly outcome: 'requested';
+  readonly refundId: number;
+  readonly outRefundNo: string;
+  readonly amountMinor: number;
+}
+
+/**
+ * `POST /refunds/:id/approve` 的 2xx 响应体。
+ *
+ * 🔴 四个臂都可能是 **200**：批准这个**决定**已经成立，通道那一步是**下一步**的事实，
+ * 所以通道失败不报 5xx（服务端注释写明了理由）。界面因此**不许**把这一条读成
+ * "退款已经完成" —— 完成只由签名有效的回调认领。
+ */
+export type AdminRefundApproveBody =
+  | { readonly ok: true; readonly outcome: 'submitted'; readonly status: string; readonly providerRefundId: string | null }
+  | { readonly ok: true; readonly outcome: 'channel-failed'; readonly reason: string }
+  | { readonly ok: true; readonly outcome: 'not-submittable'; readonly status: string }
+  | { readonly ok: true; readonly outcome: 'not-found' };
+
+/** `POST /refunds/:id/reject` 的 2xx 响应体（拒绝**不碰钱也不碰权益**）。 */
+export interface AdminRefundRejectBody {
+  readonly ok: true;
+  readonly outcome: 'decided';
+  readonly status: string;
+}
+
+/** `GET /api/admin/refunds` —— 最新的若干条退款行。 */
+export const fetchAdminRefunds = (
+  options: AdminClientOptions,
+  params: { userId?: number; limit?: number } = {},
+): Promise<AdminResult<AdminRefundList>> =>
+  adminRequest<AdminRefundList>(
+    options,
+    `${ADMIN_API_PREFIX}/refunds${query({ userId: params.userId, limit: params.limit })}`,
+  );
+
+/**
+ * `POST /api/admin/refunds` —— 为某一条**已付订单**开一张退款申请。
+ *
+ * ⚠️ `note` 在服务端是可选的，但 `operatorApproved: true` 时**必须**非空
+ * （一次没有理由的例外批准，事后与"运营手滑"无法区分）。界面把这一条交给服务端，
+ * 不在这里预先禁用按钮。
+ */
+export const adminCreateRefundRequest = (
+  options: AdminClientOptions,
+  input: { readonly orderId: number; readonly note?: string; readonly operatorApproved?: boolean },
+): Promise<AdminResult<AdminRefundRequestResult>> =>
+  adminRequest<AdminRefundRequestResult>(options, `${ADMIN_API_PREFIX}/refunds`, {
+    method: 'POST',
+    body: input,
+  });
+
+/** `POST /api/admin/refunds/:id/approve` —— 批准并**这一步就把退款发给通道**。 */
+export const adminApproveRefund = (
+  options: AdminClientOptions,
+  id: number,
+  note: string,
+): Promise<AdminResult<AdminRefundApproveBody>> =>
+  adminRequest<AdminRefundApproveBody>(options, `${ADMIN_API_PREFIX}/refunds/${String(id)}/approve`, {
+    method: 'POST',
+    body: { note },
+  });
+
+/** `POST /api/admin/refunds/:id/reject` —— 驳回。钱与权益都不动。 */
+export const adminRejectRefund = (
+  options: AdminClientOptions,
+  id: number,
+  note: string,
+): Promise<AdminResult<AdminRefundRejectBody>> =>
+  adminRequest<AdminRefundRejectBody>(options, `${ADMIN_API_PREFIX}/refunds/${String(id)}/reject`, {
+    method: 'POST',
+    body: { note },
+  });

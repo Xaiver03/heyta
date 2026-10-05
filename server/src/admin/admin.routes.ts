@@ -988,7 +988,13 @@ export const adminRoutes = async (
     });
     if (decided.outcome === 'not-found') return reply.status(404).send({ error: 'Refund not found.' });
     if (decided.outcome === 'not-decidable') {
-      return reply.status(409).send({ error: 'Refund already decided or finished.' });
+      // 🔴 409 一律带 `reason` 这个**机器码**：`error` 是给人读的散文，而界面要按码选措辞。
+      // 后台那一片拿不到码就只能说"状态冲突"，运营分不清"这条已经决定过了"与"这一单过期了"
+      // （ADR-0053 §5 第 11 条）。
+      return reply.status(409).send({
+        error: 'Refund already decided or finished.',
+        reason: 'NOT_DECIDABLE',
+      });
     }
 
     const channel = await refundChannelOf(sql, id.data);
@@ -1001,7 +1007,8 @@ export const adminRoutes = async (
         ok: true,
         status: 'approved',
         channel: 'unavailable',
-        error: 'REFUND_PROVIDER_NOT_REGISTERED',
+        error: 'Refund provider is not registered on this instance.',
+        reason: 'REFUND_PROVIDER_NOT_REGISTERED',
       });
     }
 
@@ -1032,7 +1039,11 @@ export const adminRoutes = async (
     });
     if (decided.outcome === 'not-found') return reply.status(404).send({ error: 'Refund not found.' });
     if (decided.outcome === 'not-decidable') {
-      return reply.status(409).send({ error: 'Refund already decided or finished.' });
+      // 与 approve 那条同一码、同一理由：界面要能区分"这条已经决定过了"与别的状态冲突。
+      return reply.status(409).send({
+        error: 'Refund already decided or finished.',
+        reason: 'NOT_DECIDABLE',
+      });
     }
     // 拒绝**不碰钱也不碰权益** —— 它是这条流程里唯一"什么都不发生"的出口，
     // 所以响应里如实只带状态，不带任何金额或到期日字段。
