@@ -254,3 +254,33 @@ Profile 的“立即同步”，210 秒后报主路径失败；同轮旧凭据�
 验收器漏动作，不是可用的产品成功证据。脚本现逐段回读并按下“保存并启用同步”，再检查 Profile
 同步状态。今后认证 UI 任何阶段变化都必须先对照 AuthScreen 状态机与 `saveAuthSession` 接线，
 不能用后续手工凭据成功覆盖中间阶段。
+
+### iOS Release 设备撤销续验（2026-10-05）
+
+在同一 iOS Release 安装产物上，设置页列出当前设备；通过真实确认框执行撤销后，
+UI 回读“设备已撤销，所有设备都必须重新登录”，并显示可信设备轮换提示。撤销前的
+旧认证绑定随后对 key-package、ops 和 status 三个端点均收到 `401`，因此这条旅程
+补齐了 iOS 安装产物的撤销与 tokenVersion fence 腿。脱敏取证见
+[`ios-vault-revocation-20261005.txt`](../../apps/mobile/evidence/ios-vault-revocation-20261005.txt)。
+
+本轮没有把 iOS root rotation 写成完成：同一现有 Release 产物在重新认证并准备好
+服务端 package 后，Vault 设置只报告通用的本地 Vault 加载失败，未进入可确认的
+口令/恢复码轮换状态。因此 iOS 的 native root 清理、可信设备 root rotation、
+legacy payload migration 与独立 `fingerprintChanged` 仍是待验；Android 的现有证据
+也明确没有独立指纹布尔判据，不能由 `keyVersion` 推断 root 已更换。该缺口必须由
+当前源码对应的正常 Release 产物补做，不能以 Web、Node 或 fixture 结果替代。
+
+### iOS Release Vault 首次发布续验（2026-10-05）
+
+在同一正常 Release 包上补齐了认证阶段之后的 Vault 状态机：一次性登录令牌兑换后，
+真实 UI 先按下“保存并启用同步”，再进入设置里的“创建加密数据钥匙”。创建不是一次
+点击即完成：先生成一次性恢复码，再在“输入恢复码以确认”中回填并按“确认并发布”。
+服务端对该隔离账号回读到 `key_version=1`、`active_payload_key_version=1`，设置页
+随后显示“这台设备上的加密数据已经解锁”。解锁后，iOS 本地已有任务真实上传，
+PostgreSQL 回读到 5 条该账号 operation；过程没有把恢复码、口令或密钥写入证据，
+脱敏记录见 [`ios-vault-ui-20261005.txt`](../../apps/mobile/evidence/ios-vault-ui-20261005.txt)。
+
+这次续验只关闭 iOS Release 的“认证 → 创建/确认 Vault → 解锁 → 加密上传”腿；
+设备撤销后的本地清理、可信设备 root rotation、iOS legacy payload migration 和实体
+设备锁屏语义仍按矩阵保持待验。需要操作的控件若位于底部 tab 栏上方，AX shim 会拒绝
+过时坐标并要求重新滚动回读，不能把 `result=success` 当成产品状态已改变。
