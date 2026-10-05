@@ -355,9 +355,17 @@ const baselineGate = () => {
   const ahead = Number(git(['rev-list', '--count', `${REMOTE_MAIN}..${MAIN_REF}`], branchTree.path));
   const reading = `${MAIN_REF}=${short(MAIN_REF)} · ${REMOTE_MAIN}=${short(REMOTE_MAIN)} · 本地落后 ${behind} 笔（本地独有 ${ahead} 笔）`;
   if (behind > 0) {
+    if (ahead > 0) {
+      refuse(`${REMOTE_MAIN} 领先本地 ${MAIN_REF} **${behind} 笔**，而本地另有 **${ahead} 笔没进** ${REMOTE_MAIN} ⇒ **这不是快进**，` +
+        `现在落地等于把批次装在一笔两边都不认的基线上。\n` +
+        `   那条"主检出干净时快进"的授权**不覆盖这一格**（它只管快进），本工具也不替所有者合并 / 变基 / 推送：\n` +
+        `   要由 ${MAIN_REF} 那 ${ahead} 笔的所有者把本地提交与公开基线和好（推上去，或先把 ${REMOTE_MAIN} 并进本地）。\n` +
+        `   现量：${reading}`, 1);
+    }
     refuse(`${REMOTE_MAIN} 领先本地 ${MAIN_REF} **${behind} 笔** ⇒ 现在落地等于把批次装在一笔旧基线上。\n` +
-      `   要先把主检出快进到公开那一笔 —— 那是**主检出所有者**的动作，本工具不代做（也不碰主检出）：\n` +
-      `   cd ${q(mainTree.path)} && git merge --ff-only ${REMOTE_MAIN}\n` +
+      `   要先把主检出快进到公开那一笔 —— 那是**主检出所有者**的动作（2026-10-05 已授权由看守在前提成立时代做那一条），` +
+      `本工具不跨工作树动它：\n` +
+      `   node ${q(join(SELF, '..', 'selfhost-main-fastforward.mjs'))} --check   # 只判不动；前提成立时去掉 --check\n` +
       `   现量：${reading}`, 1);
   }
   return reading;
