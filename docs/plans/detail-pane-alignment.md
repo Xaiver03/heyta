@@ -10771,3 +10771,20 @@ F5 `jsdom 1 failed（一次都不许多按）+ e2e 盲区（成立）` ⇒ **`RI
 ③ 触屏端仍无键盘光标（§8.143 边界③ 未变，本单没动移动端）。
 ④ 四端重装未做（同一格，待办 #13，读数见 §8.147 边界⑨）。
 ⑤ F5 那一臂在 e2e 层**不可观察**，不许把它读成"Space 的双份 op 有浏览器层的牙"。
+
+### 7. 整族复跑（把"没动到别的族"那句话的射程从 15 条扩到 67 条）
+
+读数：`cd e2e && ./node_modules/.bin/playwright test -c playwright.detail-pane.config.ts`
+（**不带** `DP_SWEEP` ⇒ 走配置里那份 `testMatch`：10 枚 spec）⇒ **`67 passed (2.4m)`、零失败**，
+载体 = 本单源码 + 重打后的 `apps/web/dist`。
+
+为什么单独记这一趟：§8.147 边界 ⑤ 与 §8.148 边界 ① 那句"没动到别的族"，射程原本只到
+"本族 15 条 + 玻璃 + web 单测"。而 Space 那一支是**新挂进全局 keydown 的分支**，
+它最容易碰的恰好是别的单那些"按 Enter / 按 Esc / 点行"的用例（`focus-detail-pane` 6 条、
+`detail-pane-collapse` 7 条、`selection-projections` 3 条、`habit-month-stats` 等）—— 这一趟全绿。
+⚠️ 仍然**不是**整份 e2e 套件：`tests/` 共 52 枚 spec，其余要主配置那台 dev 载体与假端点
+（本配置刻意不起 4319，理由见它文件头），那一档仍属合流当时（待办 #21）。
+🔴 这一趟**绕过**了 §8.123 那枚证据图守卫（它包在电池的 e2e 那一步两侧），于是重写了
+**49 枚** `apps/web/evidence/**` 同名 png —— 已 `git restore` 全部还原，复跑
+`git status --porcelain -- apps/web/evidence` ⇒ 0 行。形状：**手动跑族 = 手动负责还原**，
+守卫只在那条电池路上生效，这一格它管不到。
