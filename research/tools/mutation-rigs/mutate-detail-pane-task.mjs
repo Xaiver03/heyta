@@ -3,9 +3,9 @@
  * 任务面单落进那一栏（工单 §8.138）的变异臂。
  *
  * 这台问的是 §8.138 那一句不变量的**每一档各由哪一层守着**："每个字段任何时刻只有一个
- * 编辑器所有者"，以及"那一格画的是选中的那一条"。十二臂里 6 档两层都看得见、
- * 5 档只有 jsdom 看得见（e2e 盲区）、1 档只有真浏览器看得见（jsdom 没有布局）——
- * 两层不是重复，是互补。
+ * 编辑器所有者"，以及"那一格画的是选中的那一条"。臂数由 `--list` 现量（`node 本文件 --list`），
+ * 这里**不抄分档计数** —— 上一版写着"十二臂里 6 档两层都看得见"，加一臂就得重数一遍，
+ * 而没人会在加的时候重数（漂移就是这么来的）。每臂的盲区/有牙都写在各臂自己的注释里。
  *
  *   A1 面单"没选中就猜第一条"        → jsdom 1 红 + e2e T1 红
  *   A2 栏里的正文框不跟着换 key       → jsdom 1 红 + e2e T2 红
@@ -37,17 +37,25 @@
  *   R4 浮层外壳跟着本体搬进栏里        → jsdom 1 红 + **e2e 盲区**（T6 数输入框与 summary，
  *       一块多套的 `.ht-material` 壳两条都不看 —— 这一档只有 DOM 树知道）
  *
+ * ── §8.144（第三个字段：子任务）五臂 ─────────────────────────────────
+ *   S1 宽档行尾还挂 `<SubtaskPicker/>` → jsdom 1 红（源码形状）+ e2e T8 红
+ *   S2 栏里那只 select 的 testid 改名   → jsdom 3 红 + e2e T8 红（**阳性对照**，见臂内注释）
+ *   S3 徽标不判"有没有父"               → jsdom 1 红 + e2e T8 红（与 A5/R3 **不同档**，原因写在臂内）
+ *   S4 展开机关跟着本体搬进栏里         → jsdom 1 红 + e2e T8 红（与 R4 **不同档**，原因写在臂内）
+ *   S5 预过滤退化成"只排除自己"         → jsdom 1 红 + e2e T8 红（T8 里"反向那一段"就是为它加的）
+ *
  * ⚠️ 载体是 `vite preview` + `apps/web/dist`（`e2e/playwright.detail-pane.config.ts`，端口 4371），
  *    所以**每一臂都必须重打 `apps/web`**（§7 第 27 条那一族：改了源码没重建 ⇒ 被测的那一份
  *    里根本没有变异 ⇒ 判据会被读成"没有牙"）。jsdom 那层由 vitest 直接读源码，不需要构建。
  *
  * 跑法（仓库根）：
- *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs            # 全部十二臂
- *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs A3 B1      # 只点名那两臂
- * ⚠️ 它会占 4371 端口、起 Chromium，且**原地改这六枚源文件**（收尾逐文件复原并核对 md5）：
- *    `apps/web/src/features/tasks/TaskDetailCard.tsx`、`.../NoteEditor.tsx`、`.../TaskRepeat.tsx`、
+ *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs --list   # 臂名册 + 每臂点名的红集
+ *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs          # 全部臂
+ *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs A3 B1    # 只点名那两臂
+ * ⚠️ 它会占 4371 端口、起 Chromium，且**原地改这七枚源文件**（收尾逐文件复原并核对 md5）：
+ *    `apps/web/src/features/tasks/{TaskDetailCard,NoteEditor,TaskRepeat,SubtaskPicker}.tsx`、
  *    `apps/web/src/App.tsx`、`apps/web/src/lib/keyboard-cursor.ts`、`apps/web/src/styles/app/base.css`。
- *    跑之前确认这六枚没有别人的在飞改动。
+ *    跑之前确认这七枚没有别人的在飞改动。
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -62,6 +70,7 @@ const APP = 'apps/web/src/App.tsx';
 const CURSOR = 'apps/web/src/lib/keyboard-cursor.ts';
 const CSS = 'apps/web/src/styles/app/base.css';
 const REPEAT = 'apps/web/src/features/tasks/TaskRepeat.tsx';
+const SUBTASK = 'apps/web/src/features/tasks/SubtaskPicker.tsx';
 const JSDOM_SPECS = ['tests/task-detail-card.spec.tsx', 'tests/keyboard-cursor.spec.tsx'];
 const E2E_SPEC = 'tests/detail-pane-task.spec.ts';
 const BIN = (rel) => path.join(ROOT, 'apps/web', 'node_modules', '.bin', rel);
@@ -200,12 +209,99 @@ const ARMS = [
     /* e2e 盲区：T6 数的是栏里那只输入框与行尾那颗 summary，一块多套的壳两条都不看。 */
     expectE: [],
   },
+
+  /* ── §8.144（第三个字段：子任务）五臂 ──────────────────────────────── */
+  {
+    name: 'S1 宽档行尾还挂 `<SubtaskPicker/>`（同一字段两处可编辑）',
+    file: APP,
+    from: `<SubtaskBadge task={task} />`,
+    to: `<SubtaskPicker task={task} onSetParent={(parentId) => store.setParent(task.id, parentId)} />`,
+    expectJs: ['子任务两处可编辑'],
+    expectE: ['T8'],
+  },
+  {
+    name: 'S2 栏里那只 select 的 testid 改名（两层不再吃同一枚钩子）',
+    file: SUBTASK,
+    from: 'data-testid={`subtask-select-${task.id}`}',
+    to: 'data-testid={`subtask-parent-${task.id}`}',
+    expectJs: ['整栏只有一只', '候选的预过滤在栏里', '真的写进 op-log'],
+    /* 🔴 这一臂是 §8.144 这一族的**阳性对照**（与 R2 同一档）：它不测产品语义，测的是
+       两层吃的是不是同一枚钩子。答案是**同时失去对象**（jsdom 3 红 + e2e T8 红）。
+       ⚠️ T9 不在红集里，而且**不是盲区**：它走的是 `aria-label`（界面自己声明的可访问名），
+       换 testid 动不到它 —— 同一格里两种定位通道各自独立，这正是要记下来的差别。 */
+    expectE: ['T8'],
+  },
+  {
+    name: 'S3 徽标不判"有没有父"（record 档变成常驻）',
+    file: SUBTASK,
+    from: `  if (parent === undefined) return null;`,
+    to: `  if (parent === undefined) return <span className="ht-chip" data-testid={\`task-subtask-badge-\${task.id}\`} />;`,
+    expectJs: ['顶级任务却占了位'],
+    /* 🔴 与 A5/R3 **不是同一档**：那两臂 e2e 盲区，这一臂 T8 会红 ——
+       因为 T8 的徽标判据是**整机数** `[data-testid^="task-subtask-badge-"]` 等于 1，
+       而这一趟另一条顶级任务多长出一枚 ⇒ 数到 2。
+       ⇒ 一般规律：**"盲区"取决于判据怎么写，不取决于这一档是不是徽标**。
+       A5/R3 那两臂写的是"某一条任务上的徽标在不在"，所以看不见；这里写的是"整页几枚"，就看见了。 */
+    expectE: ['T8'],
+  },
+  {
+    name: 'S4 行尾的展开机关跟着编辑本体搬进栏里（栏里那一格自己收起来了）',
+    file: CARD,
+    from: `      <SubtaskField
+        key={\`subtask-\${task.id}\`}
+        task={task}
+        onSetParent={(parentId) => store.setParent(task.id, parentId)}
+      />`,
+    to: `      <details>
+        <SubtaskField
+          key={\`subtask-\${task.id}\`}
+          task={task}
+          onSetParent={(parentId) => store.setParent(task.id, parentId)}
+        />
+      </details>`,
+    expectJs: ['拿到了行尾的展开机关'],
+    /* ⚠️ 与 R4 **不是同一档**：R4 套的是一块 `<div>` 壳（DOM 多一层，两条判据都不看），
+       这里套的是 `<details>` —— 收起时里面**不画**，于是 T8 那句 `toBeVisible()` 直接红。
+       记下来是因为它给了一条一般规律：**"多套一层壳"是否可观察，取决于那层壳会不会藏东西**。 */
+    expectE: ['T8'],
+  },
+  {
+    name: 'S5 候选的预过滤退化成"排除自己"（后代进了候选 ⇒ 界面上能造出环）',
+    file: SUBTASK,
+    from: `        .filter((t2) => canSetParent(allTasks, task.id, t2.id))`,
+    to: `        .filter((t2) => t2.id !== task.id || canSetParent(allTasks, task.id, t2.id))`,
+    /* `||` 那一支不是笔误：它让"自己"仍被 `canSetParent` 挡掉（同一条 ⇒ false），
+       而"后代"被前一支放进来 ⇒ 正好是"用土办法预过滤"的行为，且不引入未使用导入。 */
+    expectJs: ['候选的预过滤在栏里'],
+    /* 🔴 T8 有牙靠的是**反向那一段**（换选 甲 之后要求 乙 不在候选里）：
+       只量"自己不在候选里"的话，这一臂在 e2e 层是盲区 —— 而 `id !== task.id` 那种土办法
+       恰好过得了正向那一半。这就是 T8 里多那一段的全部理由。 */
+    expectE: ['T8'],
+  },
 ];
 
-const FILES = [CARD, NOTE, APP, CURSOR, CSS, REPEAT];
+const FILES = [CARD, NOTE, APP, CURSOR, CSS, REPEAT, SUBTASK];
 const orig = new Map(FILES.map((f) => [f, readFileSync(path.join(ROOT, f), 'utf8')]));
 const md5 = (s) => createHash('md5').update(s).digest('hex');
 const origMd5 = new Map([...orig].map(([f, s]) => [f, md5(s)]));
+
+/**
+ * `--list`：把臂名册打出来就退出。
+ *
+ * 存在的理由和电池那枚 `--list` 同一个：**臂数是会漂的值**。文件头以前写着
+ * "十二臂里 6 档两层都看得见"，加一臂就得回头重数一次 —— 而加臂的人不会重数，
+ * 于是那句话在下一笔提交里就变成一条假主张。现在它是一条现量命令。
+ * 顺带把每臂点名的红集打出来，"哪些臂是盲区"不必读源码。
+ */
+if (process.argv.includes('--list')) {
+  for (const a of ARMS) {
+    console.log(
+      `${a.name.split(' ')[0]}\t${a.file}\tjsdom 点名 ${String(a.expectJs.length)} 条\te2e ${a.expectE.length === 0 ? '盲区（成立）' : `点名 ${a.expectE.join('/')}`}`,
+    );
+  }
+  console.log(`ARMS=${String(ARMS.length)}`);
+  process.exit(0);
+}
 
 const run = (cmd, args, cwd) => {
   const r = spawnSync(cmd, args, {
@@ -325,14 +421,14 @@ const b = build();
 if (b.rc !== 0) fail(`干净态打不出包：\n${b.out.slice(-1500)}`);
 const cleanDigest = distDigest();
 const bj = jsdom();
-if (bj.rc !== 0 || bj.passed < 41) fail(`干净态 jsdom 层不干净（要 >=41 passed）：${bj.line}`);
+if (bj.rc !== 0 || bj.passed < 53) fail(`干净态 jsdom 层不干净（要 >=53 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 7 || be.failed > 0) {
+if (be.rc !== 0 || be.passed < 9 || be.failed > 0) {
   fail(
-    `干净态 e2e 层不干净（要 >=7 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
+    `干净态 e2e 层不干净（要 >=9 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
   );
 }
-console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T7）｜dist=${cleanDigest}`);
+console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T9）｜dist=${cleanDigest}`);
 
 /* 只跑点名的臂：`node … A3 B1`。存在的理由是**改完一条主张之后不必把八臂全部重跑** ——
    否则"改臂"这个动作的成本会把人推回去改判据（那才是真正要避免的）。

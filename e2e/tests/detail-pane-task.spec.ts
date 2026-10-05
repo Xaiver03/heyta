@@ -7,7 +7,7 @@
  * 于是那条裁决在它最该成立的地方不成立。§8.130 记下的那道二选一（"行内展开编辑 vs
  * 栏里编辑"）在本单裁成**栏里编辑**，理由与推翻代价写在工单那一节。
  *
- * 🔴 这一层量的是 jsdom 那 7 条**量不到**的四件事：
+ * 🔴 这一层量的是 jsdom 那一族**量不到**的四件事：
  *   ① 那一栏被 CSS 藏掉时，备注输入框**回不回得来**（`display:none` 里藏一只编辑器 =
  *      界面不说、模型已变，§8.130 那条同一个形状）—— T4；
  *   ② 用户打进去的备注**真落成了一条 op**（jsdom 只看到 `onBlur` 被调用过）—— T1 的后半；
@@ -359,6 +359,119 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     //   一张看不见被量对象的图不构成证据（本轮第一版 t7 就是这样，读数绿、图没用）。
     await page.getByTestId('task-chip-repeat').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: SHOT('t7-narrow-repeat-falls-back-to-row') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
+
+  /** 行体那一棵（标题 + 元信息；尾部动作是它的兄弟节点，见 `TaskRow.tsx` 的注释）。 */
+  const rowOf = (page: Page, title: string): Locator =>
+    page.locator('[data-testid^="task-row-"]').filter({ hasText: title }).first();
+
+  test('T8 宽档：子任务的编辑本体在栏里那一格，行尾只剩只读徽标（§8.144）', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTask(page, '子任务父甲');
+    await addTaskAndRelease(page, '子任务子乙');
+
+    await rowOf(page, '子任务子乙').click();
+    const pane = paneInColumn(page);
+    await expect(pane, '栏里没画面单').toHaveCount(1);
+
+    // 🔴 整页只有一只 `<select>`，且它在栏里。只量"栏里有"会把"两处都能编辑"读成对。
+    const selectEverywhere = page.locator('[data-testid^="subtask-select-"]');
+    await expect(selectEverywhere, '子任务的 select 不止一只 ⇒ 两处可编辑（两套写入语义迟早漂）').toHaveCount(1);
+    const select = pane.locator('[data-testid^="subtask-select-"]').first();
+    await expect(select, '栏里没有那只 select').toBeVisible();
+    await expect(
+      page.locator('[data-testid^="subtask-trigger-"]'),
+      '栏里画着的时候行尾还留着那颗 `<summary>` ⇒ 子任务两处可编辑',
+    ).toHaveCount(0);
+
+    // 候选的预过滤在**真渲染**里同样成立：自己的标题不许出现在候选里（选得到就能造环）。
+    const optionTexts = await select.locator('option').allTextContents();
+    expect(optionTexts, '自己出现在候选里').not.toContain('子任务子乙');
+    expect(optionTexts, '合法父没进候选 ⇒ 这一格根本改不了').toContain('子任务父甲');
+    expect(optionTexts).toContain('（顶级任务）');
+
+    await select.selectOption({ label: '子任务父甲' });
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await rowOf(page, '子任务子乙').click();
+
+    const badge = page.locator('[data-testid^="task-subtask-badge-"]');
+    await expect(badge, '改过父而列表上没有痕迹 ⇒ 搬进栏里把这件事弄丢了').toHaveCount(1);
+    await expect(badge).toContainText('子任务父甲');
+    await expect(
+      badge.locator('select, details, input, textarea, button'),
+      '徽标里长出可编辑控件（那是第二个编辑器）',
+    ).toHaveCount(0);
+    await expect(selectEverywhere, '刷新后 select 又不是整页一份').toHaveCount(1);
+
+    /*
+      🔴 再换一条选中，量**反向**那一档：乙 现在是 甲 的子，所以 甲 的候选里**不许**再有 乙。
+      上面那段只挡得住"自己出现在候选里"（`id !== task.id` 那种土办法恰好能过），
+      而"后代"这一类才是环的入口 —— 臂台 S5 就是打在预过滤上的，
+      没有这一段，S5 在真浏览器层是盲区（jsdom 有它的用例，浏览器这一层今天也得有）。
+    */
+    await rowOf(page, '子任务父甲').click();
+    const parentOptions = await pane
+      .locator('[data-testid^="subtask-select-"]')
+      .first()
+      .locator('option')
+      .allTextContents();
+    expect(parentOptions, '自己的标题出现在候选里').not.toContain('子任务父甲');
+    expect(parentOptions, '后代出现在候选里 ⇒ 在界面上就能造出环（环 = 树无限递归）').not.toContain(
+      '子任务子乙',
+    );
+    expect(parentOptions).toContain('（顶级任务）');
+
+    await badge.scrollIntoViewIfNeeded();
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('t8-subtask-field-in-column') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
+
+  test('T9 窄档：那一栏整个不在，子任务的编辑入口回到行尾那颗 chip', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.setViewportSize({ width: 900, height: 600 });
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTask(page, '窄档子任务父');
+    await addTaskAndRelease(page, '窄档子任务子');
+
+    await expect(paneEverywhere(page), '窄档不该画面单').toHaveCount(0);
+    /**
+     * 🔴 定位走**可访问名**，不走"行容器里找"。两个理由各挡一种假绿/假红：
+     *   ① 尾部动作是行体（`task-row-*`）的**兄弟节点**，不在它里面（`TaskRow.tsx` 的注释），
+     *       所以 `rowOf(...).locator('[data-testid^="subtask-trigger-"]')` 恒为 0；
+     *   ② 也不能退到 `task-item-*` + `hasText`：窄档那颗 chip 的 `<select>` 把**别的任务标题**
+     *       写进了 `option`，于是"含『窄档子任务父』的行"两行都命中
+     *       （`selection-projections.spec.ts` 文件头第 1 条记的就是这个）。
+     * `aria-label` 是界面自己声明的名字（`web.subtask.trigger.aria` / `…pick.aria`），
+     * 只有那一行会带着它。
+     */
+    const trigger = page.getByLabel('把「窄档子任务子」移到别的任务下面');
+    await expect(trigger, '窄档下行尾没有子任务入口 ⇒ "挂不到谁下面"').toHaveCount(1);
+    await trigger.click();
+
+    // ⚠️ 与 T7 同一条：`<details>` 收起时那只 select 在 DOM 里但**不画**，
+    // 所以必须量真实渲染，`toHaveCount(1)` 不构成"写得进去"。
+    const select = page.getByLabel('选一个父任务：窄档子任务子');
+    const box = await paintedBox(page, select);
+    expect(box.width, '窄档那只在行尾的 select 被挤成 0 宽').toBeGreaterThan(40);
+    await select.selectOption({ label: '窄档子任务父' });
+
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await expect(
+      page.getByLabel('把「窄档子任务子」移到别的任务下面'),
+      '窄档那次改父没落成（刷新后行上的 chip 没写挂在谁下面）',
+    ).toContainText('窄档子任务父');
+
+    await page.getByLabel('把「窄档子任务子」移到别的任务下面').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: SHOT('t9-narrow-subtask-falls-back-to-row') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 });

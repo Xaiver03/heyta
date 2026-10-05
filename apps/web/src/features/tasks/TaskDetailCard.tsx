@@ -15,11 +15,13 @@
  *      `renderTaskTrailing` 那段注释与台账 G9）—— 把字段往栏里搬，行的宽度问题才真的解决。
  *
  * 🔴 所以本文件遵守的不变量是：**每个字段任何时刻只有一个编辑器所有者**。
- * 已搬进来的是**备注**（`NoteField`，§8.138）与**重复**（`RepeatField`，§8.141）：
+ * 已搬进来的是**备注**（`NoteField`，§8.138）、**重复**（`RepeatField`，§8.141）与
+ * **子任务**（`SubtaskField`，§8.144）：
  * 每一单的同一笔提交里都要把行尾那半撤掉（`App.tsx` 的 `taskPaneInColumn` 反向条件），
- * 所以不存在"同一字段两处可编辑"的那个中间态；列表侧留下的分别是**只读徽标** `NoteBadge`
- * 与**只读徽标** `RepeatChip`（"扫一眼要能看出哪条任务写过 / 是重复的"这一档不因为搬进栏里就丢掉）。
- * ⚠️ 这一条是**分阶段**的，不是"这一单顺手做完"：其余字段（子任务 / 清单标签 / 截止 / 提醒 / AI）
+ * 所以不存在"同一字段两处可编辑"的那个中间态；列表侧留下的分别是**只读徽标** `NoteBadge`、
+ * **只读徽标** `RepeatChip` 与**只读徽标** `SubtaskBadge`（"扫一眼要能看出哪条任务写过 /
+ * 是重复的 / 挂在谁下面"这一档不因为搬进栏里就丢掉）。
+ * ⚠️ 这一条是**分阶段**的，不是"这一单顺手做完"：其余字段（清单标签 / 截止 / 提醒 / AI）
  * 仍住在行尾，登记成后续单，每一单都要重做"搬进来 + 行里撤掉"这两半，不许只搬一半。
  * 🔴 截止那一栏特别注明：`check:row-single-source` 的断言 A 要求"复选框 + 标题 + 截止"三种信号
  * 同时出现在任务行里，所以截止的**显示**必须留在行上，能搬的只有它的**编辑入口**。
@@ -38,6 +40,7 @@ import { useSelected } from '../../lib/selection.js';
 import { text } from '../../lib/text.js';
 import { NoteField } from './NoteEditor.js';
 import { RepeatField } from './TaskRepeat.js';
+import { SubtaskField } from './SubtaskPicker.js';
 import { useTaskStore } from './store.js';
 
 /*
@@ -114,6 +117,20 @@ export function TaskDetailCard(): React.JSX.Element | null {
         onSetNote={(note) => {
           void store.setNote(task.id, note);
         }}
+      />
+
+      {/*
+        子任务（§8.144）。区块头复用词条表里已有的那一句「子任务」（`web.subtask.none`）——
+        它在行尾那颗 chip 上说的就是同一件事，另起一条词条迟早漂成两种说法。
+        🔴 编辑本体里**没有** `<details>`：那是行尾那一支的展开机关，栏里要的只是控件本身
+        （与重复那一格同一条理由）。
+        `key={task.id}`：拒绝提示是本地 state，↑↓ 换选中时不换 key 会把上一条的提示带过来。
+      */}
+      <h3 style={blockLabelStyle}>{t('web.subtask.none')}</h3>
+      <SubtaskField
+        key={`subtask-${task.id}`}
+        task={task}
+        onSetParent={(parentId) => store.setParent(task.id, parentId)}
       />
 
       {/*

@@ -91,7 +91,7 @@ import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
 import { RepeatChip, TaskRepeat } from './features/tasks/TaskRepeat.js';
 import { DueEditor } from './features/tasks/DueEditor.js';
 import { NoteBadge, NoteEditor } from './features/tasks/NoteEditor.js';
-import { SubtaskPicker } from './features/tasks/SubtaskPicker.js';
+import { SubtaskBadge, SubtaskPicker } from './features/tasks/SubtaskPicker.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
@@ -920,11 +920,24 @@ export function App(): React.JSX.Element {
               建树 + 环防护 + 深度/子数上限）与 `app-host` 的 `setParent`
               **都已经写好**，但 Web 上一次调用点都没有 —— 于是
               "模型支持、树能建、用户没有任何办法造出一个子任务"，
-              且**不报错**，只是这个功能不存在（方案 §5.5 的"看起来有其实没有"）。 */}
-          <SubtaskPicker
-            task={task}
-            onSetParent={(parentId) => store.setParent(task.id, parentId)}
-          />
+              且**不报错**，只是这个功能不存在（方案 §5.5 的"看起来有其实没有"）。
+
+              ⚠️ 工单 §8.144 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
+              （候选 + 原生 `<select>` + 拒绝提示）住在 `TaskDetailCard` 那一格，这里只剩一枚
+              **只读徽标** `SubtaskBadge` —— 同一枚不变量（每个字段只有一个编辑器所有者），
+              而"扫一眼要能看出哪条挂在谁下面"这一档不因搬进栏里就丢掉。
+              🔴 这一格顺带改掉一条**写在别处的取数前提**：`e2e/tests/selection-projections.spec.ts`
+              文件头那句"按标题找行不能用 `task-item-*`，因为行里常驻的 `subtask-select-*` 会把别的任务
+              标题写进 `textContent`" —— 宽档下那只 `<select>` 不在行里了，窄档下仍在。
+              那边的解法（用 `task-title-*`）两种档都对，所以不动它，只把这条变化记下来。 */}
+          {taskPaneInColumn ? (
+            <SubtaskBadge task={task} />
+          ) : (
+            <SubtaskPicker
+              task={task}
+              onSetParent={(parentId) => store.setParent(task.id, parentId)}
+            />
+          )}
 
           {/* 清单归属 + 标签。Web 端此前**根本没有入口** ——
               `moveToProject` 没有任何调用点、`tagIds` 全仓库零读写，

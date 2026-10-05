@@ -31,6 +31,7 @@ import { selection } from '../src/lib/selection.js';
 const { TaskDetailCard } = await import('../src/features/tasks/TaskDetailCard.js');
 const { NoteBadge } = await import('../src/features/tasks/NoteEditor.js');
 const { RepeatChip } = await import('../src/features/tasks/TaskRepeat.js');
+const { SubtaskBadge } = await import('../src/features/tasks/SubtaskPicker.js');
 
 const APP_SRC = readFileSync(join(process.cwd(), 'src', 'App.tsx'), 'utf8');
 
@@ -320,5 +321,110 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
       src,
       '栏里画着的时候行尾还在挂 `<TaskRepeat/>` ⇒ 重复两处可编辑',
     ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<RepeatChip\s+task=\{task\}\s+now=\{store\.now\}\s*\/>\s*\)\s*:\s*\(\s*<TaskRepeat/);
+  });
+});
+
+describe('子任务这一字段此刻归谁（§8.144）', () => {
+  /** 建 A → B → C 那条链（与 `subtask-picker.spec.tsx` 同一形状：B 是 A 的子、C 是 B 的子）。 */
+  async function makeChain(): Promise<{ a: string; b: string; c: string }> {
+    await addTask('A');
+    await addTask('B');
+    await addTask('C');
+    const ids = Object.values(useTaskStore.getState().entities.tasks)
+      .sort((x, y) => x.createdAt - y.createdAt)
+      .map((t) => t.id);
+    const [a, b, c] = ids as [string, string, string];
+    await act(async () => {
+      await useTaskStore.getState().setParent(b, a);
+      await useTaskStore.getState().setParent(c, b);
+    });
+    await flush();
+    return { a, b, c };
+  }
+
+  const pane = () => document.querySelector('[data-testid="task-pane"]');
+
+  it('🔴 栏里画的是子任务的**编辑本体**，且整栏只有一只 `<select>`、没有 `<details>`', async () => {
+    const { a } = await makeChain();
+    selection.select('task', a);
+    mount();
+    const box = pane();
+    if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
+    expect(box.querySelectorAll('[data-testid^="subtask-select-"]').length).toBe(1);
+    // 展开机关属于行尾那一支：栏里那一格再套一层 `<details>`，用户读到的是"还有一层没打开"。
+    expect(box.querySelector('details'), '栏里那一格拿到了行尾的展开机关').toBeNull();
+  });
+
+  it('🔴 候选的预过滤在栏里**同样成立**（选得到自己的后代 = 界面上能造出环）', async () => {
+    const { a, b, c } = await makeChain();
+    selection.select('task', a);
+    mount();
+    const select = pane()?.querySelector(`[data-testid="subtask-select-${a}"]`);
+    if (select == null) throw new Error('栏里没有那只 select ⇒ 判据在空转');
+    const values = Array.from(select.querySelectorAll('option')).map((o) => o.getAttribute('value') ?? '');
+    expect(values, '自己出现在候选里').not.toContain(a);
+    expect(values, '子任务出现在候选里').not.toContain(b);
+    expect(values, '孙任务出现在候选里（选它就是造环）').not.toContain(c);
+    expect(values).toContain('');
+  });
+
+  it('🔴 在栏里改父 ⇒ 真的写进 op-log（不是只改内存里那一条）', async () => {
+    const { a, c } = await makeChain();
+    selection.select('task', c);
+    mount();
+    const select = pane()?.querySelector<HTMLSelectElement>(`[data-testid="subtask-select-${c}"]`);
+    if (select == null) throw new Error('栏里没有那只 select ⇒ 判据在空转');
+    await act(async () => {
+      select.value = a;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await flush();
+    expect(useTaskStore.getState().entities.tasks[c]?.parentId, '栏里那次改父没落库').toBe(a);
+  });
+
+  it('SubtaskBadge 是只读的：有父才出现，里面没有 select / details / 输入控件', async () => {
+    const { a, b } = await makeChain();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    act(() => {
+      r.render(
+        <I18nProvider locale="zh-CN">
+          <SubtaskBadge task={useTaskStore.getState().entities.tasks[b]!} />
+        </I18nProvider>,
+      );
+    });
+    const chip = host.querySelector(`[data-testid="task-subtask-badge-${b}"]`);
+    expect(chip, 'B 明明挂在 A 下面，徽标却没出现 ⇒ 列表看不出这一条是子任务').not.toBeNull();
+    expect(chip?.textContent ?? '', '徽标没说清挂在谁下面').toContain('A');
+    expect(chip?.querySelector('select'), '徽标里长出 select ⇒ 子任务两处可编辑').toBeNull();
+    expect(chip?.querySelector('details'), '徽标里长出展开机关 ⇒ 那是编辑器不是痕迹').toBeNull();
+
+    // 顶级任务是默认态 ⇒ 不占位（拍板 #8 的 `record` 那一档）。
+    const host2 = document.createElement('div');
+    document.body.appendChild(host2);
+    const r2 = createRoot(host2);
+    act(() => {
+      r2.render(
+        <I18nProvider locale="zh-CN">
+          <SubtaskBadge task={useTaskStore.getState().entities.tasks[a]!} />
+        </I18nProvider>,
+      );
+    });
+    expect(host2.innerHTML, '顶级任务却占了位 ⇒ 每行都挂一枚空壳').toBe('');
+    act(() => {
+      r.unmount();
+      r2.unmount();
+    });
+    host.remove();
+    host2.remove();
+  });
+
+  it('🔴 宿主那一支也读同一枚布尔：栏里画着时行尾只剩只读徽标', () => {
+    const src = stripComments(APP_SRC);
+    expect(
+      src,
+      '栏里画着的时候行尾还在挂 `<SubtaskPicker/>` ⇒ 子任务两处可编辑',
+    ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<SubtaskBadge\s+task=\{task\}\s*\/>\s*\)\s*:\s*\(\s*<SubtaskPicker/);
   });
 });
