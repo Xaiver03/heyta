@@ -68,11 +68,11 @@
   那就是上面"看图才现形的两件事"第 2 条讲的中间态，图拍在修好**之前**，
   所以它是那条已修缺陷的**证据**，不是新缺陷。别拿这张图去报 bug。
 
-UIPIN calendar-cells.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
-UIPIN calendar-cells-dark.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
-UIPIN calendar-cells-empty.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
-UIPIN calendar-tall-viewport.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
-UIPIN calendar-toolbar.png 5340c126 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-cells.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-cells-dark.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-cells-empty.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-tall-viewport.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-toolbar.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
 
 钉的是**拍这五张图那一刻**最后一次动过上面那组路径的提交（`5340c126`，10-03 02:10，
 字节 mtime 02:58）。🔴 **补完锚点之后 `--all` 当场报这五枚 UISTALE**，而且报得对：
@@ -83,3 +83,44 @@ UIPIN calendar-toolbar.png 5340c126 packages/ui/src/calendar apps/web/src/featur
 它和 §5 的 H 共用同一个窗口前置（4318/4319 空闲 + 负载落回个位，
 `check:ai-e2e` 会按端口 SIGKILL 别人的 dev server ⇒ 不许在窗口没开时硬跑）。
 登记在 `docs/plans/calendar-profile-handoff.md` §4.1。
+
+## 2026-10-05 09:52 重拍 + 10:0x 逐张看过（五张都看了）—— 上面那两条"看图才现形"的主张有一条**过期了**
+
+重拍：`bash research/tools/r17-reshoot-stale.sh --confirm`（前置门现量：4318/4319 空闲、
+load1=7 ≤ 12、内存 free 45%、dist 新鲜、判据路径无未提交改动）。
+五张字节全换（`md5 -r` 现量见下面那五行锚点的同一目录）。锚点从 `5340c126` 换到 `73ad62a3`。
+
+**逐张看见的**（只写图里真有的东西）：
+
+1. `calendar-cells.png` —— 页头现在是**两行**：第一行 `‹ 2026年10月 › 回到今天 + 视图[月▾]`，
+   第二行 `未同步 ⟳ ⚙ 语言[中文✓ English] 🌙`。今天 10/5 选中（蓝底），格内三行标题
+   （`日历格…` 被省略号截断）+ `+2`，整月 40–45 周 6 行全在可视范围内。
+   **新出现**：日期下方有绿色的「休」与橙色的「班」（1–4 休、10 班）—— 上面那张 10-02 的表里
+   一个字都没提，因为那时还没有休/班通道。
+2. `calendar-toolbar.png` —— 点过一次 `›`：主区与**侧栏迷你月历同时是 2026年11月**（同一 cursor
+   那条主张仍然成立，两处没有分叉）。11 月整月无任务。下方清单区写的是
+   **「10月5日 星期一 · 0」+「这一天没有到期的任务。」** —— 也就是清单那一块**锚在"今天"**，
+   不跟着月格翻到 11 月。这是图里读出来的形状，旧 README 没有登记过；
+   是不是想要的行为要产品负责人判（**不当缺陷写**）。
+3. `calendar-cells-empty.png` —— 空日历仍铺满内容区（"只占一半"那格的判据照旧有效），
+   清单区是带 heyta logo 插画 + 底部一句「未设截止时间的任务不在日历上，它们在「任务」页的收集箱里。」
+4. `calendar-tall-viewport.png` —— 🔴 视口拉到 1200 之后，**多出来的高度全部给了 41 周那一行**
+   （当天格被拉高，星期行仍是一档高度），清单区 5 条 `日历格-0-105209 … -4-105209` 逐条列出、
+   不截断。这条是这张图存在的理由，重拍后**仍然成立**。
+5. `calendar-cells-dark.png` —— 暗色下外框**和月历卡片一起**变深（不是黑底白卡）✓。
+
+🔴 **过期的一条**：上面「看图才现形的两件事」第 2 条说这张暗色图里"页头那颗语言 chip 是一块
+没有字的白底"，并说它是那条已修缺陷的**证据**。**重拍之后这张图里 chip 是正常的**
+（深色底 + 可读的「中文 ✓ / English」）。⇒ 那张图**不再**是缺陷证据，别照着旧文字去找那块白底；
+缺陷本身（`.ht-chip` 只给 background 上过渡、color 瞬切，中间态 1.01:1）仍按 §7 #143 记着，
+只是**这张字节不再承载它**。
+
+🟡 **看图现形的一条新候选**（登记，不在本线代修）：暗色那张里，选中格（今天）是**主蓝底**，
+压在上面的「休」是绿色系 —— 肉眼在 720 高的截图上几乎读不出来。亮色那张没有这个问题
+（白底 + 绿字）。⇒ 需要一条"标记色 × 选中格底色"的对比度判据；权威在
+`packages/design-system` 那套 WCAG 计算里，不在这里。
+
+⚠️ 顺带一条**装置教训**（正文在交接 §4.05 (36)）：这一趟 `r17-reshoot-stale.sh` 对
+profile-panel 那段**一行都没印**，而它其实重拍了 4 张 —— 因为那枚 spec 是**就地**写进证据目录的，
+脚本只认 `test-results/` 那一种形状。"跑完了"这句话当时没有内容。已重写那一层并补七臂。
+
