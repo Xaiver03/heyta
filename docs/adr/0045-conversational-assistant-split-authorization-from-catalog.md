@@ -327,6 +327,25 @@ ADR-0005 给的否决理由有三条（隐私面 / 工程面 / **失败模式**�
   分母：该目录 86 个 `.ts`/`.tsx` 全搜），
   所以这不是"漏接一条本机通道"，是"还没有那个界面"。
   "新会话"按钮与"刷新丢了"长得一模一样那个代价，随 (i) 一起消掉了。
+- 🔴 **2026-10-05 更正与续况（不改上面任何结论，只把状态更新到当前）**：
+  **(ii) 已经拍板并落到了引擎层**（`10b53a81`）：新实体 `ASSISTANT_TURN` 走**纯可加性**
+  （`shared-schema/src/entity-types.ts` + `domain/src/assistant-turn.ts` 三处登记，
+  **没有 bump `CURRENT_SCHEMA_VERSION`**），新字段一律可选带运行时默认值，
+  乱序 / 重复 / 先于 `CREATE` 到达的收敛由 `op-log/tests/assistant-turn-convergence.spec.ts` 钉住，
+  跨设备取证用真服务端 + **两台独立宿主**双向读写（`scripts/verify-assistant-turn-sync.mjs`）。
+  ⚠️ **但"落到引擎"不等于"用户拿得到"**：现量只有一枚宿主真的在写它 ——
+  `apps/node-host/src/host.ts:273` 调 `createAssistantSessionActions`；
+  `apps/web` 的助手对话**仍然只落本机 `localStorage`**（上面那条 (i) 的路径没被替换），
+  `apps/mobile` 不写会话实体。所以"手机上的一段对话出现在电脑上"这件事
+  **在两个 UI 壳上都还没成立**。这一条不是我去查出来的，是 `check:reachability`
+  的判据 C 当场报红的（"ASSISTANT_TURN 有写路径，但 ACTION_FAMILIES 里没有它的宿主
+  action 家族 —— 无法判定"），把家族登记进表之后它仍只回答"有没有宿主接了"（≥1），
+  不回答"每一枚 UI 壳都接了"⇒ **剩下的那半记在未闭合清单**：
+  [`docs/plans/ai-assistant-closure.md`](../plans/ai-assistant-closure.md) §9 的 W15/W13。
+- 🔴 **本 ADR 上面第 5 条那句"移动端根本没有助手入口"已经过期**（`a9f0867a`，2026-10-05）：
+  `apps/mobile/src/ai/` 有助手界面与五项功能接线，覆盖面门禁对 mobile 从 `0/5` 转正。
+  ⚠️ 但它的**设备级验收还没有载体脚本**（`pnpm` 里 `verify:mobile-*` 现有清单没有一条覆盖助手），
+  所以"移动端 AI 可用"目前只证到代码与静态门禁这一层。
 - 🔴 **本 ADR 没预见到的一条出境项：日历锚点。** 助手必须知道"今天是哪天"
   才能把"今天有什么任务"翻译成日期参数，于是**今天这个日期本身成了出境数据**，
   它现在写在 `ASSISTANT_BASE_EGRESS_FIELDS` 里（`today`），因此出现在一次性披露里。
