@@ -10519,3 +10519,61 @@ node research/tools/selfhost-chain-targets.mjs --pkg ../heyta/package.json --tre
 ⇒ 读起来像"实例没了"，而 `pgrep -f selfhost-window-sentinel` 给出的是**在位**。
 📌 一般形状：**pid 文件是键值对载体，不是一个 pid**；"只吃数字"的参数拿到整行会**静默返回空**，
 而空在这一族判据里恰好等于"死了" —— 与"判存活用 `ps` 清单不用裸 `kill -0`"同族，是它的新面目。
+
+### 8.174 开窗前把"落地那一刻才现形的失败"挪到便宜的地方：四格 node-only 预检（2026-10-05 10:2x，不起栈、不跑测试）
+
+#### ① 载体那棵树的链是完整的（本批自己新增的那一段不是又一次"半笔"）
+
+```
+cd /tmp/heyta-merge-carrier && node research/tools/selfhost-chain-targets.mjs
+→ 裁判对象 = 工作树 /private/tmp/heyta-merge-carrier
+  链步 86 · 取到脚本目标 83 枚 · checked 79 · no-target 7 · unresolved 0 · **悬空 0**
+```
+
+本批那一段 `check:image-build-args` 的实现确实在载体里（`research/tools/check-image-build-args.mjs` 18548 B）。
+🔴 这条读数判的方向和 §8.173 ② 相反：那次判的是"**别人**的链条目指向别人的缺失脚本"，这次判的是
+"**我的**链条目不能指向我这侧没提交的脚本" —— 同一个洞的两半，只量一半等于没量。
+
+#### ② 链条目按 ref 逐段对账：main 一夜新增 19 段，上一趟 40 分钟全链**没跑到过它们**
+
+`base(b850b1c6)=66 · main(fd8cd780)=85 · 本批(389771be)=67 · 并集=86`。main 新增的 19 段（逐字点名）：
+
+```
+check:shell-surfaces · check:op-log-semantics · check:selection-single-source · check:legal-tools ·
+check:legal-permissions · check:legal-closure-truth · check:legal-gdpr · check:doc-citations ·
+check:md-tables · check:brand-assets · check:public-facts · check:card-export ·
+check:ios-native-bridges · check:vault-diagnostics · check:shell-exit-chain · check:verify-script-copy ·
+check:android-gradle-remote · check:apk-freshness · check:shell-erasure-parity
+```
+
+本批新增 1 段：`check:image-build-args`。
+**为什么要专门记这一格**：§8.169 记的"链段 main=84"到 §8.173 是 85，而"载体上完整 `pnpm check` 跑过一遍"
+那次读数属于**旧的 66/84 段**。链条会变长，"上次全链绿"这张凭据的**射程会随 main 的新增段缩**——
+把它当成"载体链已经验证过"就是拿旧地图走新路。
+
+#### ③ 其中"可能被我的合并解法影响"的那几段，在载体上单跑全绿
+
+| 段 | 载体单跑 | 一行读数 |
+|---|---|---|
+| `check:doc-citations` | rc=0 | `引用检查：路径存在性 + git-show-HEAD 锚 —— 无问题` |
+| `check:shell-exit-chain`（main 今天 10:04 才加的） | rc=0 | `30 枚自快照 rig 的生效 EXIT handler 全部带 "$0…"` |
+| `check:image-build-args`（本批那一段） | rc=0 | `镜像构建参数：3 段全部 FROM ${NODE_IMAGE} AS …（R5）` |
+| `check:md-tables` | rc=0 | `9 个文件，列数、断行与"是不是表"都一致` |
+
+加载体重算自带的 **9 道 GATES 全 exit 0** ⇒ 落笔前那一段是 13 道读数。
+⚠️ `doc-citations` 这条要和 §8.171 一起读，否则像自相矛盾：那 6 条假阳性是我用 `--doc docs/runbooks/deployment.md`
+**手点那篇**才现形的；链里那一步扫的是默认文档集，它**不含** `deployment.md` ⇒ 链绿并不推翻 §8.171 的结论，
+两条讲的是射程不同。
+
+#### ④ 载体锁同源（只为确认"开窗时不会因为它 `die(3)`"）
+
+`根工作区 ✅同源 lock=0f3c1bf6d9e2(361300B) installed=0f3c1bf6d9e2(361300B) · e2e 套件 ✅同源 lock=021a9df4add8(993B)`。
+🔴 这条**不替代**任务 #43：它只在落地那一刻成立（main 再动一次锁就作废），现在量它是把"开窗即 `die(3)`"这一种
+浪费挪出来，不是提前取得那格凭据。
+
+#### ⑤ 🔴 剩下 15 段我没在载体上单跑，这是**故意的**，预检证明到哪一步也写在这一步
+
+它们要么要 `packages/*/dist`（链第一步就是 `pnpm build`），要么要 APK / 远端 Windows / 真机 / Playwright
+（后者会去抢 `/tmp/tfa-test.lock` 那把内存闸门，并在我等的窗口上再加一层负载）。本批的落点**不在**那些面上 ⇒
+若红，同一把尺在干净 main 上也红，归属层按"逐字 / 形状+条数"两条对法判（`selfhost-red-attribution.mjs` 文件头那三条放行条件）。
+所以这四格证明的是"**到这一步为止**没有本批造成的红"，它**不等于**"开窗那趟全链会绿" —— 后者只能由那 40 分钟本身给。
