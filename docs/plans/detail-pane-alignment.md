@@ -8677,7 +8677,7 @@ typecheck 也拦不住（必填参数写漏会在编译期红，**写错成 `ins
 |---|---|
 | 归属门 | 开工前 `VERDICT=CLEAN … 点名 6 条｜本地不在场 0 条｜被占 0 条`；**提交前重取（09:5x 现量）**：`主检出未提交 51 枚｜点名 22 条｜本地不在场 0 条｜被占 0 条 ⇒ VERDICT=CLEAN`（枚数从 6 涨到 22 是本批真的多出装配处、门禁、两台臂台与 7 枚图，不是口径变了） |
 | 两道余量为 0 的棘轮 | `check:l4` ⇒ mobile **90 = 基线**（RC=0，没动基线）；`check:row-single-source` ⇒ **28 = 基线**（新类名挂在既有 `.ht-app` 族下，不是新顶层族 —— 与 `.ht-app__detail-focus` 同一先例） |
-| 干净检出复跑 | ⚠️ **本单没做**：改动全在 `apps/web` 与 `e2e`，判据跑在工作树；合流当时（待办 #21 那一组）随整族一起跑 |
+| 干净检出复跑 | 🔴 **2026-10-05 10:3x 已补，见 §8.132**：纯 fs/git 那九道在 `024b5e63` 这一批的提交态树上同判（`docs-link` 仍是别线那枚）；jsdom / 浏览器两层**仍不在射程**（混合载体那条否证见 §8.126），随待办 #21 在真检出整族跑 |
 | packages 改完先 build | 本单**没改 `packages/*`**；`apps/web` 自己重打了两次（`tsc -b` RC=0 + `vite build`），e2e 载体是 `dist` ⇒ 量的确实是当前源码 |
 
 静态门禁逐条 RC：`check:l4` 0 / `check:row-single-source` 0 / `check:ui-language` 0 /
@@ -8826,7 +8826,7 @@ const selected = rows.find((r) => r.progress.habit.id === selectedId) ?? rows[0]
 |---|---|
 | 归属门 | 开工前 `VERDICT=CLEAN`；提交前重取（点名 8 条，见第 9 节） |
 | 两道余量为 0 的棘轮 | `check:l4` RC=0（没动基线）；`check:row-single-source` RC=0（本单**零新类名**，只改了一个 prop 的类型） |
-| 干净检出复跑 | ⚠️ 本单没做（改动在 `apps/web` + `packages/i18n` 词条 + `e2e`）；随合流当时那批一起跑（待办 #21） |
+| 干净检出复跑 | 🔴 **已补，见 §8.132**：九道纯 fs/git 判据在 `120bcbd9` 的提交态树上同判；jsdom / 浏览器两层不在射程（§8.126 的混合载体否证） |
 | packages 改完先 build | 🔴 改了 `packages/i18n` ⇒ 先跑它自己的 `tsup`（`I18N_BUILD_EXIT=0`，含 dts）再跑判据；`apps/web` 重打（`tsc -b` RC=0 + `vite build`）后 e2e 才跑 |
 
 静态门禁逐条 RC：`design` 0 / `l4` 0 / `row-single-source` 0 / `ui-language` 0（zh=en 键集）/
@@ -8858,3 +8858,39 @@ const selected = rows.find((r) => r.progress.habit.id === selectedId) ?? rows[0]
   "已完成"说的是"习惯面不再猜第一条"这件事有两层证据 + 五臂红集，不是详情面本体做完了。
 - 我的 e2e 趟又重写了别族 16 枚 evidence png，已逐枚 `git restore`（只留本单那两枚 k6）——
   与 §8.130 第 8 节同一格代价，守卫只在电池里包着 e2e 两侧。
+
+## 8.132 第 3 道闸门在这三笔上的补跑：干净检出里 9 道同判，外加**我自己的读数装置读错了 10 个退出码**（2026-10-05 10:3x，状态：**已完成**）
+
+§8.130 与 §8.131 的第 3 道闸门都写着"本单没做"。这一节把它补上，载体沿用 §8.126 那套
+（`git worktree add --detach /tmp/dp_clean_8131 120bcbd9` ⇒ 树里只有提交态内容，跑完摘掉）。
+覆盖的提交：`024b5e63`（便签面单进栏）、`be278f6e`（更正那句假事实）、`120bcbd9`（习惯面撤掉回落）。
+
+| 判据（纯 fs / git 读源码与文档那一档） | 干净检出 EXIT |
+|---|---|
+| `check-detail-pane-slot` / `-status-table` / `-c1-coverage` / `-evidence-refs` | 0 / 0 / 0 / 0 |
+| `check-docs-voice` / `check-claims` / `check-reachability` | 0 / 0 / 0 |
+| `check-selection-single-source` / `check-layering` | 0 / 0 |
+| `research/tools/docs-link-check.mjs` | **1** —— 唯一那枚仍是别线的 `PROGRESS.md:1362`（现量：目标文件只在**主检出**里以未跟踪状态存在，两棵提交态树里都没有 ⇒ 干净检出里它必然死链，与 §8.126 同一读数） |
+
+🔴 **射程与不做的事**：vitest 族与 e2e 族**没有**在这棵树里跑。理由不是省事，是 §8.126 量出来的
+那条"裸检出 + 部分 `node_modules` 软链 = 混合载体"：根软链会把 `@heyta/*` 解析到**主检出**的包，
+于是量的是"我的源码 + 别人的包"，那种读数**红绿都不作数**。所以本单的第 3 道闸门仍然只覆盖
+纯 fs/git 判据，jsdom/浏览器两层要等合流当时在真检出里整族跑（待办 #21）。
+
+### 1. 💥 这一趟我自己造的一次假读数（比读数本身值得记）
+
+第一遍的打印长这样：
+
+```bash
+node "$f" > "$log" 2>&1
+echo "CLEAN $(basename "$f") EXIT=$?"
+```
+
+十道**全部报 0**，包括 `docs-link-check` —— 而它的日志里明明白白印着"🔴 发现 1 个死链"。
+成因：`$?` 是在 `echo` 的参数展开阶段取的，而**同一行里先执行的 `$(basename …)` 把 `$?` 覆盖成了自己的 0**。
+改成先 `rc=$?` 存进变量再打印，同一段循环立刻报出真实的 `1`。
+
+📌 这是 §7 那一族（`echo` 接在管道/替换后面读到别人的码、后台通知的 0 不是被测命令的 0）的**又一种面目**：
+不需要管道、不需要后台，**一行里的命令替换就够把退出码换掉**。
+可迁移的写法：`node "$f" >"$log" 2>&1; rc=$?` —— 取码与格式化之间不许再执行任何东西。
+自检办法（本次用的）：拿一枚**已知会红**的输入对照（`docs-link` 的日志里有 🔴 而退出码报 0 ⇒ 装置坏了）。
