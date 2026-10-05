@@ -5455,3 +5455,7 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 🔴 **20:0x 再修正（这条读数会自己翻面）**：它闭合的是 **`e372a3f0` 那批字节**；`git diff --name-only e372a3f0 HEAD -- packages apps` 现量 **15 枚**
 （含 `ProfileScreen.tsx`）⇒ 对当前 HEAD 又回到未闭合。20:02:41 已按同一装置重挂（pid 现量 `cat /tmp/ht-r14c-keeper.pid`，第一趟 `REDS=load,dev`，
 `dev` 是那条重装线占的、不是本线的东西），全过程账在本线台账 §4.05 (69)(71)。
+🟢 **20:1x 那一把重挂真的又开窗并跑完了**（20:09:59，前 6 趟 `rc=3` 等的是负载 + 那趟重装占的设备面）：
+`SYNC rc=0（目标 a4ca347c）` → 全链 rc=0 → **`通过 37 项，失败 0 项`** → `ALL_DONE final_rc=0`，`RESTORE_DONE 10 枚`、载体 `dirty=0`，整趟约 6 分钟。
+⚠️ 引用这条读数前先跑翻面判据 `git diff --name-only a4ca347c HEAD -- packages apps`（现量 0；一旦非 0 就退回"没在当前产物上验过"）——
+它不是永久绿，而**6 分钟就能重取一次**，所以下一个人应该重跑而不是转述。
