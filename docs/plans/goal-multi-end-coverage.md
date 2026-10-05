@@ -3005,6 +3005,20 @@ VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VER
   78/84 那个数来自另一台仪表（逐段单跑），两者语义不同，谁都不能替谁（本档 03:37 那节的原话，这里照它执行）。
 - ⚠️ 本条**不主张** ① 的任何读数：`/tmp/heyta-reinstall-{mac-installed,android,ios}.png` 三枚 18:32 现量**已不存在**
   （`/tmp` 被清理），四端重装**从未跑出 `INNER_EXIT=`**；04:15 那张 md5 基线因此成为唯一的"曾经在场"记录。
+- 🔴 **19:14 对第 69 段那条红做了静态归因，排除掉两条、剩下一条待验**（**没有**为了让它绿而改测试）：
+  1. **不是载体年龄**：那 48 笔（`3546ad39..HEAD`）里 `git log` 与 `git diff --numstat` 对
+     `packages/ui/src/projects/OrganizerList.tsx`、`apps/web/src/features/projects/ProjectsPanel.tsx`、
+     `e2e/tests/list-folder.spec.ts` **三个文件都是空** ⇒ 两棵树在这三处逐字相同，红不能推给"载体旧"。
+     （同一条手段对第 42 段是**成立的** —— 那边差的是被引用的 `trash-and-archive.md` 自己，别把两种情形混起来。）
+  2. **不是"子行不渲染"**：共享层 `OrganizerList.tsx:688-695` 是 `node.children.length === 0 ? null : …map(… context={{isChild:true}})`，
+     而整个文件里**没有** expanded/collapse 那类门（grep `expanded|collapse|isOpen` 无命中）⇒ 移入之后子行仍在那个位置，
+     `web-list-folder-<childId>-trigger` 应当在场。
+  3. **剩下最像的一条（未定案）**：装置的调用日志是 `element is not stable` → 重试 → `not attached`，
+     且 **retry #1 同样红**；那一趟整机负载是 1 分钟 47 那一档 ⇒ 饱和机器上稳定性判定（bounding box 不再移动）
+     与 rAF 都可能饿死。定案需要一次**低负载下的单 spec 复跑**（`cd e2e && npx playwright test tests/list-folder.spec.ts`），
+     绿则归环境、仍红则按产品缺陷查 `ProjectsPanel` 那次重挂。**19:14 现量：load 248/128/92，且 `/tmp/tfa-test.lock` 存在（别人的测试持锁）
+     ⇒ 此刻不许跑任何测试类**（这条锁就是为这种时刻设的）。
+
 - 另记一条编排教训（当场抓到、零损失）：我为了挡 ① 而起的手工锁 `echo $$ > /tmp/tfa-test.lock`
   **反过来把 ② 挡死** —— 装置读到"锁存在且持有者活着（pid=91905）"就判 `NOT-RUNNING（别人正持锁）`，
   它分不清持锁的正是我自己。**共享互斥锁不能由要被保护的那一方自己持有。**
