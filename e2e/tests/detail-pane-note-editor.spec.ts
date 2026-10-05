@@ -366,4 +366,49 @@ test.describe('便签面单落进详情列', () => {
     await page.screenshot({ path: SHOT('n5-reexpanded-in-column') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
+
+  /*
+    N6 = 待办 #51（工单 §8.151）：可点区域**曾经是摘要那一段文字**，点在名字旁边、徽标旁边、
+    行尾空白上什么都不发生 —— 那是 §8.137 那趟 K10 撞出来的形状，不是理论猜测。
+    这一条量两件事：① 入口那一枚节点的盒子**撑满整行**（几何），② 在文字**之外**的那一点
+    真按一次，栏里的编辑层照样开（行为）。
+    ⚠️ 只测①会放过"撑满了却没接 onPress"；只测②会放过"文字那段可点、其余不可点"——
+    而后者正是修之前的实现（它在②上也是绿的，只要探针恰好点在文字上），所以两点都要有。
+  */
+  test('N6 🔴 整行都可点：文字之外那一点按下去，栏里的编辑层照样开（§8.151）', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '便签');
+    await addNote(page, '命中面积甲');
+    await addNote(page, '命中面积乙');
+
+    const row = page.locator('[data-testid^="note-row-"]').first();
+    const edit = page.locator('[data-testid^="note-edit-"]').first();
+    // ⚠️ 不写死「甲」：板子是**新的在前**，`first()` 那一行是哪一条不由我定 ——
+    //    第一版就是这么红的（`getByText('命中面积甲')` 在 `first()` 那一行里 0 命中）。
+    // 先钉选：让那一行真的长出徽标，下面两句才量得到"徽标在入口里面"这件事。
+    await page.locator('[data-testid^="note-pin-"]').first().click();
+    await expect(
+      page.locator('[data-testid^="note-edit-"]').first().locator('[data-testid^="note-today-"]'),
+      '「今天」徽标不在入口里面 ⇒ 它落在可点区域之外，点它就变成点空白'
+    ).toHaveCount(1);
+
+    const textBox = await row.getByText(/命中面积/).boundingBox();
+    const rowBox = await row.boundingBox();
+    const editBox = await edit.boundingBox();
+    if (rowBox === null || editBox === null || textBox === null) {
+      throw new Error(`行/入口/文字三者之一没画出来：row=${JSON.stringify(rowBox)} edit=${JSON.stringify(editBox)} text=${JSON.stringify(textBox)}`);
+    }
+    expect(editBox.height, '入口没撑满行高 ⇒ 上下那一圈空白仍然点不到').toBeGreaterThanOrEqual(rowBox.height - 1);
+    expect(editBox.width, '入口没撑满剩余宽度 ⇒ 文字右边那一段仍然点不到').toBeGreaterThan(textBox.width);
+
+    // 按在**文字之外**：入口盒子右端内侧 4px（那一段今天落在徽标/空白上）
+    await page.mouse.click(editBox.x + editBox.width - 4, editBox.y + editBox.height / 2);
+    await expect(editorInColumn(page), '点在文字之外 ⇒ 栏里没开编辑层').toHaveCount(1);
+    await expect(editorInput(page)).toHaveValue(/命中面积/);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('n6-whole-row-is-the-hit-area') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
 });

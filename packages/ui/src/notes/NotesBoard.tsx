@@ -190,6 +190,16 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexWrap: 'wrap',
       gap: tokens['space.2'],
     },
+    /**
+     * 🔴 只有**可点**那一支加这个：`row` 是 `alignItems:'center'`，子节点不跟着拉伸，
+     * 于是"整行都能点"在几何上根本不成立（行高 `touch-target.min`，而入口只有摘要那一段高）。
+     * 这一枚把入口撑满行高，配合 `flex:1` 撑满剩余宽度 ⇒ 点名字旁边、徽标旁边、行尾空白
+     * 都是同一件事（§8.137 那趟 K10 撞出来的缺口，登记成待办 #51）。
+     */
+    mainFill: {
+      alignSelf: 'stretch',
+      justifyContent: 'center',
+    },
     excerpt: {
       flexShrink: 1,
     },
@@ -311,6 +321,16 @@ export function NotesBoard({
               </Text>
             );
 
+            /*
+              「今天」徽标只在钉选时出现。判据是模型给的 `isPinned`
+              （它来自 `isNoteHighlighted`），组件不读 `note.isPinnedToToday`。
+            */
+            const badgeNode = row.isPinned ? (
+              <View style={styles.badge} testID={`note-today-${row.id}`}>
+                <Text style={[text.badge, styles.badgeText]}>{labels.badgeToday}</Text>
+              </View>
+            ) : null;
+
             return (
               <View
                 key={row.id}
@@ -318,32 +338,34 @@ export function NotesBoard({
                 aria-current={active ? 'true' : undefined}
                 testID={`note-row-${row.id}`}
               >
-                <View style={styles.main}>
-                  {onEdit === undefined ? (
-                    excerptText
-                  ) : (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={labels.a11yEdit(row.excerpt)}
-                      onPress={() => {
-                        onEdit(row.id);
-                      }}
-                      style={styles.excerpt}
-                      testID={`note-edit-${row.id}`}
-                    >
-                      {excerptText}
-                    </Pressable>
-                  )}
-                  {/*
-                    「今天」徽标只在钉选时出现。判据是模型给的 `isPinned`
-                    （它来自 `isNoteHighlighted`），组件不读 `note.isPinnedToToday`。
-                  */}
-                  {row.isPinned ? (
-                    <View style={styles.badge} testID={`note-today-${row.id}`}>
-                      <Text style={[text.badge, styles.badgeText]}>{labels.badgeToday}</Text>
-                    </View>
-                  ) : null}
-                </View>
+                {/*
+                  🔴 可点区域 = **整行里除尾部动作那一列**（§8.151 / 待办 #51）。
+                  原来这只 `Pressable` 只包住摘要那一段，于是"点行的名字旁边、徽标旁边、
+                  行尾空白"什么都不发生 —— 那是 §8.137 那趟 K10 撞出来的形状，不是理论猜测。
+                  徽标一起包进来：它是这条便签的一部分，不是第二个动作。
+                  ⚠️ `testID` 仍留在这一枚节点上（`note-edit-*`），所以键盘光标"焦点落的是哪一颗"
+                  逐字不变（K13 三面点名那一条读的还是同一个 testid）—— 本单改的是**命中面积**，
+                  不是焦点身份。宿主没接 `onEdit` 时仍然是纯文本，那一支没有可点区域可言。
+                */}
+                {onEdit === undefined ? (
+                  <View style={styles.main}>
+                    {excerptText}
+                    {badgeNode}
+                  </View>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={labels.a11yEdit(row.excerpt)}
+                    onPress={() => {
+                      onEdit(row.id);
+                    }}
+                    style={[styles.main, styles.mainFill]}
+                    testID={`note-edit-${row.id}`}
+                  >
+                    {excerptText}
+                    {badgeNode}
+                  </Pressable>
+                )}
 
                 <View style={styles.actions}>
                   {/*
