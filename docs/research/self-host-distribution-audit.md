@@ -14056,3 +14056,33 @@ docs 那半已绿（§8.264）；替换成"main 红在 `apps/web/tests/admin-pan
 `packages/*`（含 i18n 词条）与 `server/`，而 `apps/web` 打包吃的是 `packages/*/dist`
 （AGENTS §6.1 那条"打包前必须先 `pnpm -r build`"，以及 §7 第 27 条"APK 里是旧 JS bundle"同族）——
 所以装完仍会因**未落地**而过期，只是过期路径经过的是 `packages/*/dist`，不是 apps/web 源码。
+
+### 8.266 换班指针（2026-10-05 21:1x，本 Goal 预算用尽处）——现场已停靠，下一班**不要重取**这些读数
+
+**这一批真正剩下的只有一格**：第 1 项的"main 前进到该载体"，以及被它挡着的第 8 项。
+本轮 Goal 没有落地，也**没有**假装落地：`git merge-base --is-ancestor feat/self-host-distribution main`
+在 21:1x 现量仍是"非祖先"，`docs/runbooks/self-host.md` 与 `scripts/check-selfhost-entry-command.mjs`
+在 main 上的 blob 与本批**不同值**，main **没有** `docker-compose.migrate-once.yml` 与 `server/package-lock.json`
+⇒ 载体重算确实还必要，不是形式主义。
+
+起跑条件此刻**不成立**（三条都是现量，不是推测）：
+① 第 1 项点名的 5 枚重叠文件还剩 **2 枚**未由其所有者提交（`docs/README.md`、`package.json`）；
+② 主检出脏 **68** 枚、main 在 21:0x 仍每两三分钟挪一笔；
+③ 载体的完整 `pnpm check` 一起跑就把 1 分钟负载顶过 12，而 §8.263 现量负载单独挡掉 98% 的样 ——
+**在预算内起这发，只会留下一半红一半没跑的载体**，所以没起。
+
+已在飞、且**有意留着**的一样东西：落地看守 `pgrep -fl selfhost-window-sentinel`（pid 见 `tail -1 /tmp/selfhost-window-sentinel.log`）。
+它唯一的对外动作是窗口开成那一刻对**本地** main 做一次 `git merge --ff-only <carrier>`，
+不 push、不 `branch -f`、不动主检出工作树（这是既有授权的那一条）。要停：只 kill 这个 pid，别按名字乱杀。
+
+下一班的三步，顺序不能换：
+1. `node research/tools/selfhost-merge-carrier.mjs`（重算载体）→ 在载体上跑**完整** `pnpm check`；
+   红就逐条归属——main 那 24 条 `apps/web/tests/admin-panel.spec.tsx` 已判归非本批（§8.265），
+   `check:docs` 已绿（§8.264），**这两格别再重取**。
+2. 落地后：`pnpm verify:selfhost-stack` 用同一把尺在载体树上复跑（#50），再 `pnpm reinstall:all`（第 8 项）。
+3. 清理归属：本线自建的模拟器设备 `heyta-selfhost-reinstall`（现量 Shutdown）是我的，落地做完由我删；
+   `/tmp/heyta-merge-carrier*` 与 `feat/self-host-merge-main*` 里只有**我起跑的那批**归我清。
+
+仍要人拍板的三句，没拍我就不能替它决定：**#61** 对外两句错话的发布节奏（我倾向等落地一次发）、
+**#62** 那段"四件同时 ≥15 分钟"的窗口（要机器上别人的 e2e/模拟器/构建让路）、
+**#64** 版本号真源（G-44b 四件套同趟才有牙）。
