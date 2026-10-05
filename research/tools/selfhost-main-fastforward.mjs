@@ -12,9 +12,11 @@
  *
  * 出口码（与 selfhost-land-main.mjs 的严重度口径对齐）：
  *   0 = 快进做完了，或本来就不落后
- *   1 = 不该继续等的失败：非快进（本地有独有提交）/ ff 命令本身失败 / 现场读不到
+ *   1 = 停下来的那种失败：那条命令**真跑过**却失败 / 远端 ref 读不到（判不了）/ 现场解析不到
  *   2 = 前提不成立（--once / --check 下一次就退；watch 模式把它当"还没到"继续等）
  *   3 = 窗口等满（CAP 轮之后前提仍未成立 ⇒ 环境无效，不是产品失败）
+ * ⚠️ "非快进（本地有未推送提交）"和"fetch 失败"**不是** 1：那两格要等的是别人的动作，
+ *    看守会每轮大字报出来继续等，由 CAP 封顶。把它们当失败退出等于让自动化正好在最需要它的时候死掉。
  *
  * 用法：
  *   node research/tools/selfhost-main-fastforward.mjs --check        # 只判不动（现在就能跑）
@@ -196,11 +198,21 @@ for (let i = 1; i <= CAP; i++) {
   }
   if (r.kind === 'current') { say(`✅ 本来就不落后（${REMOTE_MAIN}=${r.before}）⇒ 无事可做`); process.exit(0); }
   if (r.kind === 'dirty' || r.kind === 'would-ff') { await new Promise((s) => setTimeout(s, STEP * 1000)); continue; }
+  /**
+   * `divergent` / `fetch-fail` 是**等得到**的：前者要等那笔本地提交的所有者把它与公开基线和好，
+   * 后者多半是网络那一格。它们不是"命令跑了却失败"，所以继续等（由 CAP 封顶），但每一轮都大字报出来。
+   * 真正该停的是 `ff-fail`（那条授权命令真跑过且失败）与 `no-remote-ref`（探针读不到 ⇒ 判不了）。
+   */
+  if (r.kind === 'divergent' || r.kind === 'fetch-fail') {
+    say(`   ⏳ ${r.kind} —— 不在授权范围，继续等：${r.msg ?? `本地独有 ${r.ahead} 笔（main=${r.before}，落后 ${r.behind}）`}`);
+    await new Promise((s) => setTimeout(s, STEP * 1000));
+    continue;
+  }
   if (r.kind === 'no-remote-ref') {
     say(`🔴 拿不到 ${REMOTE_MAIN} ⇒ 基线新不新鲜**判不了**（判了 ≠ 没问题）。先只读取一次现量再重跑看守。`);
     process.exit(1);
   }
-  say(`🔴 ${r.kind} —— 原样报，不重试、不解释成环境：\n${r.msg ?? `本地独有 ${r.ahead} 笔 ⇒ 这不是快进，那条授权不覆盖它（main=${r.before}）`}`);
+  say(`🔴 ${r.kind} —— 原样报，不重试、不解释成环境：\n${r.msg}`);
   process.exit(1);
 }
 say(`🔴 窗口等满 ${CAP} 轮（前提从未成立）⇒ 环境无效，不是产品失败`);
