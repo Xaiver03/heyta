@@ -418,6 +418,19 @@ export interface HabitLog extends EntityBase {
   date: string;
   /** 实际完成值。默认等于 Habit.target。 */
   value?: number;
+  /**
+   * 🔴 **预留位：界面不碰，也没有读取者**（工单 H6 拍板，见
+   * [`docs/plans/habits-alignment.md`](../../../docs/plans/habits-alignment.md) §2 与 §5 的 P-3）。
+   *
+   * 为什么留着而不删：它已经在磁盘与服务端库里（删它就是 §3.3 那条"改已落盘数据"的代价），
+   * 而留着一条**明说的**预留位不撒谎。为什么界面不做：打卡记录的语义是"达成判定"，
+   * 叙述性文本在 heyta 已经有正式去处（`NOTE` 实体，两端都有界面、有搜索、有导出），
+   * 再开一处自由文本只会多出一份没有入口、没有搜索、没有留存承诺的密文存量。
+   *
+   * ⚠️ 什么时候要重新判：真要在这条打卡上挂一句时，必须连带补三侧
+   * （web 面单 / mobile 面单 / `local-api` 的 `habit-log` 工具）与留存说明，
+   * **不许只让某一层偷偷写它** —— 那正是"字段看起来有功能"的那个读数。
+   */
   note?: string;
 }
 
