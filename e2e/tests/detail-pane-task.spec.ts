@@ -285,4 +285,80 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await page.screenshot({ path: SHOT('t5-long-title-wraps') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
+  test('T6 宽档：重复的编辑本体在栏里那一格，行尾只剩只读徽标（§8.141）', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTaskAndRelease(page, '重复归栏甲');
+
+    await page.locator('[data-testid^="task-row-"]').first().click();
+    const pane = paneInColumn(page);
+    await expect(pane, '栏里没画面单').toHaveCount(1);
+
+    // 🔴 编辑本体**整页只有一份**，而且它在栏里：行尾那颗 `<summary>` 必须整个不渲染。
+    // "行尾只剩徽标"如果只量"徽标在"，就把"两处都能编辑"读成了对 —— 所以两半都要量。
+    await expect(page.getByTestId('task-repeat-custom-input')).toHaveCount(1);
+    await expect(pane.getByTestId('task-repeat-custom-input')).toHaveCount(1);
+    await expect(
+      page.getByTestId('task-repeat-summary'),
+      '栏里画着的时候行尾还留着重复浮层的触发器 ⇒ 同一字段两处可编辑',
+    ).toHaveCount(0);
+
+    // 打进去的串要真落成一条 op（jsdom 只看得到 onChange/onClick 被调过）。
+    await page.getByTestId('task-repeat-custom-input').fill('FREQ=WEEKLY;INTERVAL=2;BYDAY=TU');
+    await page.getByTestId('task-repeat-custom-input').press('Enter');
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await page.locator('[data-testid^="task-row-"]').first().click();
+
+    const badge = page.getByTestId('task-chip-repeat');
+    await expect(badge, '写过重复规则而列表上没有痕迹 ⇒ 搬进栏里把这件事弄丢了').toHaveCount(1);
+    await expect(badge).toContainText('FREQ=WEEKLY;INTERVAL=2;BYDAY=TU');
+    await expect(
+      badge.locator('input, textarea, button'),
+      '徽标里长出可编辑控件（那是第二个编辑器）',
+    ).toHaveCount(0);
+    await expect(page.getByTestId('task-repeat-custom-input')).toHaveCount(1);
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('t6-repeat-field-in-column') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
+
+  test('T7 窄档：那一栏整个不在，重复的编辑入口回到行尾那颗浮层', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.setViewportSize({ width: 900, height: 600 });
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTaskAndRelease(page, '窄档重复甲');
+
+    await expect(paneEverywhere(page), '窄档不该画面单').toHaveCount(0);
+    const trigger = page.getByTestId('task-repeat-summary');
+    await expect(trigger, '窄档下行尾没有重复入口 ⇒ "设不了重复"').toHaveCount(1);
+    await trigger.first().click();
+
+    // ⚠️ `<details>` 收起时面板在 DOM 里但不画得出来（§8.138 T4 同一件事）：
+    // 判"写不写得进去"必须量真实渲染，不能只看 `toHaveCount`。
+    const field = page.getByTestId('task-repeat-custom-input');
+    const box = await paintedBox(page, field.first());
+    expect(box.width, '窄档那只在行尾的框被挤成 0 宽').toBeGreaterThan(40);
+    await field.first().fill('FREQ=MONTHLY;BYMONTHDAY=15');
+    await field.first().press('Enter');
+
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await expect(
+      page.getByTestId('task-chip-repeat').first(),
+      '窄档设的重复规则没落成（刷新后行上没有痕迹）',
+    ).toContainText('FREQ=MONTHLY;BYMONTHDAY=15');
+
+    // 🔴 截图前把被量的那一行滚进视口：900×600 下 AI 那几块把列表推到首屏之外，
+    //   不滚的话这张图里**没有判据量的那一格** —— 而 §6.2 规定一要的是"人看图"，
+    //   一张看不见被量对象的图不构成证据（本轮第一版 t7 就是这样，读数绿、图没用）。
+    await page.getByTestId('task-chip-repeat').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: SHOT('t7-narrow-repeat-falls-back-to-row') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
 });

@@ -3,8 +3,9 @@
  * 任务面单落进那一栏（工单 §8.138）的变异臂。
  *
  * 这台问的是 §8.138 那一句不变量的**每一档各由哪一层守着**："每个字段任何时刻只有一个
- * 编辑器所有者"，以及"那一格画的是选中的那一条"。八臂里三档只有真浏览器看得见、
- * 三档只有 jsdom 看得见 —— 两层不是重复，是互补。
+ * 编辑器所有者"，以及"那一格画的是选中的那一条"。十二臂里 6 档两层都看得见、
+ * 5 档只有 jsdom 看得见（e2e 盲区）、1 档只有真浏览器看得见（jsdom 没有布局）——
+ * 两层不是重复，是互补。
  *
  *   A1 面单"没选中就猜第一条"        → jsdom 1 红 + e2e T1 红
  *   A2 栏里的正文框不跟着换 key       → jsdom 1 红 + e2e T2 红
@@ -26,17 +27,27 @@
  *       根本没有这个 testid —— 与 §8.137 的 A4 同一族）
  *   B2 栏内边距拿掉                   → **jsdom 全绿**（它没有布局）+ e2e T1 红
  *
+ * ── §8.141（第二个字段：重复）四臂 ─────────────────────────────────────
+ *   R1 宽档行尾还挂 `<TaskRepeat/>`    → jsdom 1 红（源码形状）+ e2e T6 红
+ *   R2 自定义框 testid 改名            → jsdom 2 红 + e2e T6/T7 红
+ *      （这一臂是"两层吃同一枚钩子"的**阳性对照**：它不测产品语义，测的是
+ *       如果那枚钩子换了名，两层是否**同时**失去对象。答案是同时。）
+ *   R3 徽标不判"有没有规则"            → jsdom 1 红 + **e2e 盲区**（同 A5：T6/T7 量的
+ *       那两条任务都有规则，界面上不存在"没设重复"那一格的反例）
+ *   R4 浮层外壳跟着本体搬进栏里        → jsdom 1 红 + **e2e 盲区**（T6 数输入框与 summary，
+ *       一块多套的 `.ht-material` 壳两条都不看 —— 这一档只有 DOM 树知道）
+ *
  * ⚠️ 载体是 `vite preview` + `apps/web/dist`（`e2e/playwright.detail-pane.config.ts`，端口 4371），
  *    所以**每一臂都必须重打 `apps/web`**（§7 第 27 条那一族：改了源码没重建 ⇒ 被测的那一份
  *    里根本没有变异 ⇒ 判据会被读成"没有牙"）。jsdom 那层由 vitest 直接读源码，不需要构建。
  *
  * 跑法（仓库根）：
- *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs            # 全部八臂
+ *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs            # 全部十二臂
  *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs A3 B1      # 只点名那两臂
- * ⚠️ 它会占 4371 端口、起 Chromium，且**原地改这五枚源文件**（收尾逐文件复原并核对 md5）：
- *    `apps/web/src/features/tasks/TaskDetailCard.tsx`、`.../NoteEditor.tsx`、`apps/web/src/App.tsx`、
- *    `apps/web/src/lib/keyboard-cursor.ts`、`apps/web/src/styles/app/base.css`。
- *    跑之前确认这五枚没有别人的在飞改动。
+ * ⚠️ 它会占 4371 端口、起 Chromium，且**原地改这六枚源文件**（收尾逐文件复原并核对 md5）：
+ *    `apps/web/src/features/tasks/TaskDetailCard.tsx`、`.../NoteEditor.tsx`、`.../TaskRepeat.tsx`、
+ *    `apps/web/src/App.tsx`、`apps/web/src/lib/keyboard-cursor.ts`、`apps/web/src/styles/app/base.css`。
+ *    跑之前确认这六枚没有别人的在飞改动。
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -50,6 +61,7 @@ const NOTE = 'apps/web/src/features/tasks/NoteEditor.tsx';
 const APP = 'apps/web/src/App.tsx';
 const CURSOR = 'apps/web/src/lib/keyboard-cursor.ts';
 const CSS = 'apps/web/src/styles/app/base.css';
+const REPEAT = 'apps/web/src/features/tasks/TaskRepeat.tsx';
 const JSDOM_SPECS = ['tests/task-detail-card.spec.tsx', 'tests/keyboard-cursor.spec.tsx'];
 const E2E_SPEC = 'tests/detail-pane-task.spec.ts';
 const BIN = (rel) => path.join(ROOT, 'apps/web', 'node_modules', '.bin', rel);
@@ -132,9 +144,65 @@ const ARMS = [
     expectE: ['T1'],
     cssMarker: '--dp-arm-b2:1',
   },
+  /* ── §8.141「重复」这一字段的两臂 + 两档盲区 ─────────────────────────
+     这一单搬的是**第二个**字段，所以它守的东西和 §8.138 不是同一件：
+     §8.138 立的是不变量，§8.141 要证的是"同一套纪律第二次也没漏"。     */
+  {
+    name: 'R1 宽档行尾那支还挂 `<TaskRepeat/>`（重复长出第二个编辑器）',
+    file: APP,
+    from: `<RepeatChip task={task} now={store.now} />`,
+    to: `<TaskRepeat task={task} now={store.now} onSetRepeat={() => undefined} />`,
+    expectJs: ['重复两处可编辑'],
+    /* T6 两条都撞：`task-repeat-summary` 在宽档必须 count 0，而整页那只自定义输入框
+       必须**在栏里**（行尾再长一只就变成两只）。 */
+    expectE: ['T6'],
+  },
+  {
+    name: 'R2 自定义框的 testid 改名（两层不再吃同一枚钩子）',
+    file: REPEAT,
+    from: `data-testid="task-repeat-custom-input"`,
+    to: `data-testid="task-repeat-rule-input"`,
+    expectJs: ['整栏只有一份', '自定义 RRULE 输入框没画出来'],
+    expectE: ['T6', 'T7'],
+  },
+  {
+    name: 'R3 徽标不判"有没有重复规则"（record 档变成常驻）',
+    file: REPEAT,
+    from: `  if (chipText === undefined) return null;`,
+    to: `  if (chipText === undefined) return <span style={chipStyle} data-testid="task-chip-repeat" />;`,
+    expectJs: ['没设重复却占了位'],
+    /* 🔴 e2e **盲区**（与 A5 同一档）：T6/T7 量的那两条任务都**有**规则，界面上
+       没有"没设重复"那一格可看 ⇒ 反例不存在。这一档现在是**契约**不是**观感**。 */
+    expectE: [],
+  },
+  {
+    name: 'R4 浮层外壳跟着编辑本体搬进栏里（栏里漂着一块板子）',
+    file: CARD,
+    from: `      <RepeatField
+        key={\`repeat-\${task.id}\`}
+        task={task}
+        now={store.now}
+        onSetRepeat={(rule) => {
+          void store.setRepeat(task.id, rule);
+        }}
+      />`,
+    to: `      <div className="ht-material" style={{ position: 'absolute' }}>
+        <RepeatField
+          key={\`repeat-\${task.id}\`}
+          task={task}
+          now={store.now}
+          onSetRepeat={(rule) => {
+            void store.setRepeat(task.id, rule);
+          }}
+        />
+      </div>`,
+    expectJs: ['拿到了行尾的浮层外壳'],
+    /* e2e 盲区：T6 数的是栏里那只输入框与行尾那颗 summary，一块多套的壳两条都不看。 */
+    expectE: [],
+  },
 ];
 
-const FILES = [CARD, NOTE, APP, CURSOR, CSS];
+const FILES = [CARD, NOTE, APP, CURSOR, CSS, REPEAT];
 const orig = new Map(FILES.map((f) => [f, readFileSync(path.join(ROOT, f), 'utf8')]));
 const md5 = (s) => createHash('md5').update(s).digest('hex');
 const origMd5 = new Map([...orig].map(([f, s]) => [f, md5(s)]));
@@ -259,12 +327,12 @@ const cleanDigest = distDigest();
 const bj = jsdom();
 if (bj.rc !== 0 || bj.passed < 41) fail(`干净态 jsdom 层不干净（要 >=41 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 5 || be.failed > 0) {
+if (be.rc !== 0 || be.passed < 7 || be.failed > 0) {
   fail(
-    `干净态 e2e 层不干净（要 >=5 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
+    `干净态 e2e 层不干净（要 >=7 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
   );
 }
-console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T5）｜dist=${cleanDigest}`);
+console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T7）｜dist=${cleanDigest}`);
 
 /* 只跑点名的臂：`node … A3 B1`。存在的理由是**改完一条主张之后不必把八臂全部重跑** ——
    否则"改臂"这个动作的成本会把人推回去改判据（那才是真正要避免的）。
@@ -364,5 +432,5 @@ if (bad.length || rj.rc !== 0 || re.rc !== 0) {
   process.exit(1);
 }
 console.log(
-  `RIG_RESULT=${ok}/${SELECTED.length}（每臂的红集**逐条等于**点名那几条；A4/A5/A6 只 jsdom 红=e2e 盲区，B2 只 e2e 红=jsdom 盲区）`,
+  `RIG_RESULT=${ok}/${SELECTED.length}（每臂的红集**逐条等于**点名那几条；A4/A5/A6/R3/R4 只 jsdom 红=e2e 盲区，B2 只 e2e 红=jsdom 盲区）`,
 );
