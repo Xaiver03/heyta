@@ -1768,3 +1768,25 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
      📌 待入 traps（**不抢号**：`git diff --numstat` 现量 `183 1`，未提交部分里已有 **#284/#285** 在飞）：
      「`looksBlank` 收的是 stats 对象不是路径，传路径恒 `false`」+「装机判据的主蓝命中数会把品牌帧打得比真界面更高，
      占比下界必须从最低真图推」。
+  🔴 **同一轮照出的第二枚真缺陷（探针自己的入参形状）**：`scripts/screenshots/png-stats.mjs` 里
+  `looks*` 一族收 **stats 对象**、`count*` 一族收 **路径**，两族相邻、名字都像谓词 —— 把路径喂给
+  `looksBlank()` 时 `stats.contentRatio` 是 `undefined`，而 `undefined < 0.01` 恒 `false`
+  ⇒ 那条"判空白"的判据**不是变红，是被无声摘掉**（§7 元规则 2 点名的形状，且这枚判据有
+  **20 个调用点**、四端打包/门禁/移动验收都在用）。修法三层：① `requireStats()` 在两个 `looks*`
+  入口**响亮抛** `TypeError`（点名函数 + 打出被误传的路径 + 给修法）；② 用例从 13 条补到 **16 条**
+  （第一条是**阳性对照**：把错误用法那个式子原样写进断言，证明它确实恒 `false`；第二条才断言"现在会抛"）；
+  ③ README 那句"分两层"跟着改成**三层**（不留两套状态）。
+  **牙齿现量**：摘掉两处 `requireStats()` ⇒ `14 pass / 2 fail`（`not ok 15`、`not ok 16`）；
+  全部 7 处 `st/stats` 赋值点逐条核过都来自 `inspectPng(...)` ⇒ 没有把任何一条现有判据改红；
+  `screenshot:verify` 复跑 **23 个目标 rc=0**。
+  ⚠️ 顺带**否证掉自己上一条假设**：我一度以为 `verify-artifacts.mjs:83` 的 `looksBlank(file)` 是同一个 bug
+  的活体（它旁边 `countBrandBlue(file)` 收的就是路径），读到手发现那枚 `file` 是
+  `inspectPng()` 的返回值（`:44`）—— **同名变量不等于同一种形状，判之前要读到赋值那一行**。
+  📌 **登记一条缺口，不在本轮代改**：`pnpm screenshot:test`（跑这 16 条）在 `package.json` 里**只有定义、
+  没有任何自动载体**（现量：`node -e` 扫全部 scripts，除自身外零引用；`check` 链里零命中；
+  `check:gate-wiring` 只扫 `check:*` 名字，`screenshot:test` 从它的分母里漏出去）。
+  为什么不并进链：`check:gate-wiring` 的允许表里此刻正写着一条同族裁决 ——
+  「链段分母被并行会话计数，此时并进去会把别人的读数改成谁都对不上」（`check:android-build-host` 那条），
+  而主检出的 `package.json` 这一小时里确实被别人改过链那一行（加 `check:ios-ax-shim`）。
+  ⇒ 两个候选落点交给下一个数分母的人定：**并进链**（改 `check` 那一行），或
+  **挂在已有的 `screenshot:verify` 定义里**（只改那一枚脚本的定义行，不动分母）。
