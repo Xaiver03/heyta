@@ -31,13 +31,19 @@ PORTS="${PORTS:-4318 4319}"
 DIST_PKGS="${DIST_PKGS:-ui,i18n,design-system,app-host}"
 CONFIRM=0
 ONLY=""
+SELFTEST=0
+# 🔴 三个旋钮只为**让"放回 + 报数"那一层可以被测**（见 --selftest）。
+#    默认值就是现场路径，不传任何一个时行为逐字不变。
+EVID_ROOT="${EVID_ROOT:-$MAIN/apps/web/evidence}"
+TR_ROOT="${TR_ROOT:-$MAIN/e2e/test-results}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --confirm) CONFIRM=1; shift ;;
+    --selftest) SELFTEST=1; shift ;;
     --only) ONLY="${2:-}"; [ -n "$ONLY" ] || { echo "❌ --only 后面要给证据目录名" >&2; exit 1; }; shift 2 ;;
     --help|-h) sed -n '1,26p' "$0"; exit 0 ;;
-    *) echo "❌ 未知参数：$1（只认 --confirm / --only <目录名> / --help）" >&2; exit 1 ;;
+    *) echo "❌ 未知参数：$1（只认 --confirm / --selftest / --only <目录名> / --help）" >&2; exit 1 ;;
   esac
 done
 
@@ -73,6 +79,181 @@ spec_for() {
     *) echo "" ;;
   esac
 }
+
+# 整棵证据树的 png 指纹（`路径<TAB>md5`，按路径排序）。拍一趟 spec 之前拍一次、之后拍一次，
+# 差集就是"这一趟真正动过的图"。
+snap_tree() {
+  find "$EVID_ROOT" -type f -name '*.png' 2>/dev/null | LC_ALL=C sort | while IFS= read -r p; do
+    printf '%s\t%s\n' "$p" "$(md5 -q "$p")"
+  done
+}
+
+# 🔴 「跑完一趟 spec，然后把变化**报告**出来」这一层（09:5x 重写的理由见下面两段注释）。
+#    返回 0 = 至少有一张图被确认动了 / 1 = spec 绿了但**零信号** / 2 = spec 自己红了。
+settle_dir() {
+  d="$1"; s="$2"
+  ST_DIR="${ST:-}"
+  [ -n "$ST_DIR" ] || ST_DIR=$(mktemp -d /tmp/ht-reshoot-run.XXXXXX)
+  mkdir -p "$ST_DIR" || return 2
+  snap_tree > "$ST_DIR/before"
+  # 🔴 起跑前**先清掉 test-results 里同名的残留**。不清的后果不是脏文件，是**假绿**：
+  #    上一趟（甚至别人那趟）留在 test-results/ 里的同名图会被拷进证据目录，
+  #    字节恰好相同时打印成「（字节相同）」—— 于是"spec 什么都没产出"与
+  #    "spec 产出了一模一样的字节"在输出上长得一模一样（探针命中自家残留，§7 那一族）。
+  for f in "$d"/*.png; do [ -f "$f" ] || continue; rm -f "$TR_ROOT/$(basename "$f")"; done
+  if [ -n "${SPEC_CMD:-}" ]; then
+    # 这两个根目录**必须显式传给桩**：它们是 shell 变量、不在环境里，
+    # 不传的话桩里的 `$EVID_ROOT/cal/a.png` 会展开成 `/cal/a.png`（写不进任何东西），
+    # 症状是"spec 非零退出"—— 看起来像夹具坏了，其实是装置没把作用域交出去。
+    OUT=$(EVID_ROOT="$EVID_ROOT" TR_ROOT="$TR_ROOT" SPEC_NAME="$s" bash -c "$SPEC_CMD" 2>&1); RC=$?
+  else
+    OUT=$(cd "$MAIN/e2e" && npx playwright test "tests/$s" --reporter=list 2>&1); RC=$?
+  fi
+  if [ "$RC" != "0" ]; then
+    echo "      ❌ spec 非零退出（rc=${RC}）⇒ **不复制任何字节**：失败的趟里哪些图是完整的没有记录，" >&2
+    echo "         拿它们覆盖取证目录 = 用一次不确定的运行替换掉已知的那一份。" >&2
+    printf '%s\n' "$OUT" | tail -6 | sed 's/^/         /'
+    return 2
+  fi
+  # 先做差（**在拷贝之前**）：这一步抓到的是 spec **就地**写进证据目录的那些
+  # （`SHOT()` 直接返回 `../apps/web/evidence/<目录>/<名字>.png` 的那种形状 ——
+  #  calendar-day / calendar-day-en / profile-panel / calendar-view-options / calendar-year 都是）。
+  snap_tree > "$ST_DIR/after"
+  CHG=$(awk -F'\t' 'NR==FNR{a[$1]=$2; next} ($1 in a) && a[$1] != $2 {print $1}' "$ST_DIR/before" "$ST_DIR/after")
+  INPLACE=0
+  SIB=""
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    case "$p" in
+      "$d"/*) INPLACE=$((INPLACE + 1)); printf '      就地 %s  %s\n' "$(basename "$p")" "$(md5 -q "$p" | cut -c1-8)" ;;
+      *) SIB="$SIB $(basename "$(dirname "$p")")" ;;
+    esac
+  done <<CHG_BLOCK
+$CHG
+CHG_BLOCK
+  NCP=0
+  for f in "$TR_ROOT"/*.png; do
+    [ -f "$f" ] || continue
+    b=$(basename "$f")
+    [ -f "$d/$b" ] || continue
+    old=$(md5 -q "$d/$b"); new=$(md5 -q "$f")
+    cp "$f" "$d/$b"
+    NCP=$((NCP + 1))
+    printf '      拷回 %s  %s → %s%s\n' "$b" "${old:0:8}" "${new:0:8}" "$([ "$old" = "$new" ] && echo '（字节相同）')"
+  done
+  # 🔴 零信号必须**响亮**：第一版这里什么都没有，因为脚本只认 test-results 那一种形状。
+  #    10-05 09:5x 现场：五枚目录跑完，profile-panel 那一段**一行没印**（它的 spec 是就地写的，
+  #    test-results 里没有它的图），日志读起来像"这一枚无事可做"，而它其实重拍了 4 张、
+  #    其中 r15b-3-ready-dark 换了字节。同一趟 calendar-day.spec.ts 还顺带改了
+  #    **不在计划里的** calendar-day-time/ 三张 —— 也是从 git 的 M 里发现的，不是从日志里。
+  # 先点名"改到别处去了"，**再**判零信号：这两件事必须同时看得见 ——
+  # 这一枚没动而兄弟目录动了，正是零信号那格的解释（不然下一位只会看到"没拍到"）。
+  if [ -n "$SIB" ]; then
+    printf '      ⚠️ 这一趟还改了目标目录**之外**的取证目录：%s\n' "$(printf '%s\n' $SIB | sort -u | tr '\n' ' ')"
+    echo "         ⇒ 它们的「人看过」主张同样过期了；人看与重钉要把这几枚一起算进来（本脚本不代改 README）。"
+  fi
+  if [ "$INPLACE" = "0" ] && [ "$NCP" = "0" ]; then
+    echo "      ❌ ${s} 跑绿了，但这一枚目录**一张图都没有动**（既没有就地写入，也没有 test-results 产物）" >&2
+    echo "         ⇒ 不把它读成「重拍完成」。要么这条映射的 spec 不产出本目录的图（去改 spec_for），" >&2
+    echo "           要么它写去了别处（看上面有没有点名别的目录），要么它根本没跑。" >&2
+    return 1
+  fi
+  return 0
+}
+
+if [ "$SELFTEST" = "1" ]; then
+  # 🔴 这五臂测的是**报告层**，不是对账层（对账在 r17-evidence-md5-check.sh）。
+  #    由来是 10-05 09:5x 那一趟：脚本只认 test-results 那一种形状，就地写图的 spec 跑完
+  #    **一行都不印**，日志把"重拍了 4 张、其中一枚换了字节"读成"无事可做"。
+  #    那种形态的洞不会红也不会响 —— 它只是让"跑完了"这句话失去内容。
+  bad=0
+  V=$(mktemp -d /tmp/ht-reshoot-st.XXXXXX)
+  EVID_ROOT="$V/evidence"; TR_ROOT="$V/tr"; ST="$V/st"
+  reset_tree() {
+    rm -rf "$EVID_ROOT" "$TR_ROOT"; mkdir -p "$EVID_ROOT/cal" "$EVID_ROOT/sibling" "$TR_ROOT"
+    printf 'OLD1' > "$EVID_ROOT/cal/a.png"; printf 'OLD2' > "$EVID_ROOT/cal/b.png"
+    printf 'SIB0' > "$EVID_ROOT/sibling/s.png"
+  }
+  echo "== selftest 臂 a：就地形状（spec 直接写证据目录）=="
+  reset_tree
+  SPEC_CMD='printf NEW > "$EVID_ROOT/cal/a.png"'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-inplace.spec.ts" 2>&1); RC=$?
+  printf '%s\n' "$OUT" | sed 's/^/      /'
+  if [ "$RC" != "0" ] || ! printf '%s' "$OUT" | grep -q '就地 a.png'; then
+    echo "❌ 臂 a 坏了（rc=${RC}）⇒ 就地写图的那一类仍然报不出字节" >&2; bad=$((bad+1))
+  fi
+  echo "== selftest 臂 b：test-results 形状（要拷回证据目录）=="
+  reset_tree
+  SPEC_CMD='printf NEWCP > "$TR_ROOT/b.png"'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-copy.spec.ts" 2>&1); RC=$?
+  printf '%s\n' "$OUT" | sed 's/^/      /'
+  if [ "$RC" != "0" ] || ! printf '%s' "$OUT" | grep -q '拷回 b.png'; then
+    echo "❌ 臂 b 坏了（rc=${RC}）⇒ 拷贝那一类回归到旧行为，等于没测" >&2; bad=$((bad+1))
+  fi
+  # 臂 b2：字节**真的相同**时也要照样打印，否则"拷了一张一模一样的图"与"什么都没拷"不可区分
+  echo "== selftest 臂 b2：拷回的字节与现场相同 ⇒ 仍要印出那一行（不许静默）=="
+  reset_tree
+  SPEC_CMD='cp "$EVID_ROOT/cal/a.png" "$TR_ROOT/a.png"'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-same.spec.ts" 2>&1); RC=$?
+  if [ "$RC" != "0" ] || ! printf '%s' "$OUT" | grep -q '字节相同'; then
+    echo "❌ 臂 b2 坏了（rc=${RC}）⇒「一模一样的重拍」被读成「没拍」" >&2; bad=$((bad+1))
+  fi
+  echo "== selftest 臂 c：spec 跑绿但零产出 ⇒ 必须 rc=1 并响亮说清 =="
+  reset_tree
+  SPEC_CMD='true'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-nothing.spec.ts" 2>&1); RC=$?
+  printf '%s\n' "$OUT" | sed 's/^/      /'
+  if [ "$RC" != "1" ] || ! printf '%s' "$OUT" | grep -q '一张图都没有动'; then
+    echo "❌ 臂 c 坏了（rc=${RC}，要 1）⇒「跑绿但没拍到」会被写成「重拍完成」（就是 09:5x 那一格）" >&2; bad=$((bad+1))
+  fi
+  echo "== selftest 臂 d：test-results 里有**残留**（内容还不一样）⇒ 起跑前必须清掉，不许拷成产物 =="
+  reset_tree
+  printf 'STALE-LEFTOVER' > "$TR_ROOT/a.png"
+  SPEC_CMD='true'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-leftover.spec.ts" 2>&1); RC=$?
+  LEFT=$( [ -f "$TR_ROOT/a.png" ] && echo yes || echo no )
+  if [ "$RC" != "1" ] || [ "$LEFT" != "no" ] || printf '%s' "$OUT" | grep -q '拷回'; then
+    echo "❌ 臂 d 坏了（rc=${RC} 残留还在=${LEFT}）⇒ 上一趟留下的图会被读成本趟拍的（探针命中自家残留）" >&2; bad=$((bad+1))
+  fi
+  echo "== selftest 臂 e：只有**别的**证据目录被改 ⇒ rc=1 且必须点名那枚目录 =="
+  reset_tree
+  SPEC_CMD='printf X > "$EVID_ROOT/sibling/s.png"'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-sibling.spec.ts" 2>&1); RC=$?
+  printf '%s\n' "$OUT" | sed 's/^/      /'
+  # ⚠️ 断言的是**警告行本身**（`之外的取证目录`），不是 spec 文件名 ——
+  #    第一版这里 grep 的是 `sibling`，而 `fake-sibling.spec.ts` 里就带着这个词，
+  #    于是那条臂在警告**根本没打印**的时候也照样过（假绿臂，靠下面这条 SIB_DONE 才照出来）。
+  SIBOK=$(printf '%s' "$OUT" | grep -cF '取证目录：'); SIBOK=${SIBOK:-0}
+  SIBBYTE=$(md5 -q "$EVID_ROOT/sibling/s.png")
+  if [ "$RC" != "1" ] || [ "$SIBOK" != "1" ] || [ "$SIBBYTE" = "SIB0" ]; then
+    echo "❌ 臂 e 坏了（rc=${RC} 警告行=${SIBOK} 兄弟图真改了=${SIBBYTE}）⇒ calendar-day.spec.ts 顺带改 calendar-day-time/ 那一类没有出处" >&2; bad=$((bad+1))
+  fi
+  echo "== selftest 臂 f（变异）：摘掉「起跑前清残留」那一行 ⇒ 臂 d 那一步必须不再红 =="
+  HITS=$(grep -cE 'rm -f "\$TR_ROOT/\$\(basename "\$f"\)"' "$0"); HITS=${HITS:-0}
+  N_LINE=$(grep -nE 'rm -f "\$TR_ROOT/\$\(basename "\$f"\)"' "$0" | head -1 | cut -d: -f1)
+  MUT=$(mktemp /tmp/ht-reshoot-mut.XXXXXX.sh)
+  if [ "$HITS" != "1" ] || [ -z "$N_LINE" ]; then
+    # 针脚没落地（那行改了形）⇒ 直接判红，不许把"变异没落地"读成"这条臂本来就该绿"
+    echo "❌ 臂 f 的针脚命中 ${HITS} 行（要恰好 1）⇒ 清残留那一行的形状变了，臂 d 的牙此刻无法证明" >&2; bad=$((bad+1))
+  else
+    { sed -n "1,$((N_LINE - 1))p" "$0"; sed -n "$((N_LINE + 1)),\$p" "$0"; } > "$MUT"
+    reset_tree; printf 'STALE-LEFTOVER' > "$TR_ROOT/a.png"
+    SPEC_CMD='true'
+    eval "$(sed -n '/^settle_dir()/,/^}/p' "$MUT")"
+    OUT=$(settle_dir "$EVID_ROOT/cal" "x.spec.ts" 2>&1); RC=$?
+    if [ "$RC" = "1" ]; then
+      echo "❌ 臂 f 的变异腿仍然红（rc=1）⇒ 臂 d 的红不是长在「起跑前清残留」那一行，那条牙是虚的" >&2; bad=$((bad+1))
+    else
+      printf '   MUT_LAND=1：摘掉那一行之后残留被当成本趟产物拷了（rc=%s，臂 d 原来是 1）⇒ 牙在那一行\n' "$RC"
+    fi
+    eval "$(sed -n '/^settle_dir()/,/^}/p' "$0")"
+  fi
+  rm -rf "$V" "$MUT"
+  [ "$bad" = "0" ] || { echo "❌ selftest ${bad} 臂红" >&2; exit 1; }
+  echo "SELFTEST=OK（就地报数 / 拷贝报数 / 字节相同仍印 / 零产出必须红 / 残留被清 / 只改别的目录时点名且不判成完成 / 变异腿证明牙在清残留那一行）"
+  exit 0
+fi
+
 
 echo "== 1. 现量取「形状主张已过期」的目录（不引用旧读数）=="
 ALL_OUT=$(bash "$R17" --all 2>&1)
@@ -241,21 +422,7 @@ while IFS= read -r item; do
   d=${item%|*}; s=${item#*|}
   name=$(basename "$d")
   echo "   ── ${name}（${s}）"
-  OUT=$(cd "$MAIN/e2e" && npx playwright test "tests/$s" --reporter=list 2>&1); RC=$?
-  if [ "$RC" != "0" ]; then
-    echo "      ❌ spec 非零退出（rc=${RC}）⇒ **不复制任何字节**：失败的趟里哪些图是完整的没有记录，" >&2
-    echo "         拿它们覆盖取证目录 = 用一次不确定的运行替换掉已知的那一份。" >&2
-    printf '%s\n' "$OUT" | tail -6 | sed 's/^/         /'
-    FAIL=$((FAIL + 1)); continue
-  fi
-  for f in "$MAIN/e2e/test-results/"*.png; do
-    [ -f "$f" ] || continue
-    b=$(basename "$f")
-    [ -f "$d/$b" ] || continue
-    old=$(md5 -q "$d/$b"); new=$(md5 -q "$f")
-    cp "$f" "$d/$b"
-    printf '      %s  %s → %s%s\n' "$b" "${old:0:8}" "${new:0:8}" "$([ "$old" = "$new" ] && echo '（字节相同）')"
-  done
+  settle_dir "$d" "$s" || FAIL=$((FAIL + 1))
 done <<PLAN_BLOCK
 $PLAN
 PLAN_BLOCK
