@@ -145,7 +145,7 @@ import { NotesView } from './features/notes/NotesView.js';
 import { NoteEditorCard } from './features/notes/NoteEditorCard.js';
 import { TaskDetailCard } from './features/tasks/TaskDetailCard.js';
 import { useDetailColumnShown } from './features/shell/detail-pane-visible.js';
-import { ReminderPanel } from './features/reminders/ReminderPanel.js';
+import { ReminderBadge, ReminderPanel } from './features/reminders/ReminderPanel.js';
 import { TimelinePanel } from './features/timeline/TimelinePanel.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
@@ -988,8 +988,21 @@ export function App(): React.JSX.Element {
           {/* 提醒。🔴 在这一刀之前 `REMINDER` 有写路径、op 能同步，
               但 Web 上**没有任何入口能建它** —— 提醒面板补的就是这最后一米。
               状态与动作全在 `features/reminders/store.ts`（唯一一处
-              `createReminderActions`），这里只把它挂在行的尾部插槽上。 */}
-          <ReminderPanel task={task} />
+              `createReminderActions`），这里只把它挂在行的尾部插槽上。
+
+              ⚠️ 工单 §8.145 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
+              （共享 `ReminderList` + 六个动作 + 错误提示）住在 `TaskDetailCard` 那一格，
+              这里只剩一枚**只读徽标** `ReminderBadge`。同一枚不变量（每个字段只有一个编辑器所有者）。
+              🔴 徽标与 `NoteBadge`/`RepeatChip` 有一处**刻意的不同**：零条提醒时它**不渲染**，
+              而原来那颗 chip 在零条时显示「提醒」二字 = 入口。入口如今住在栏里那一格的区块头，
+              把它留在行上就成了一份"两处都能开始编辑"（拍板 #8 的 `record` 档：徽标可隐藏）。
+              窄档（栏不出现）时 `ReminderPanel` 整块退回这一格，那颗带文字的入口 chip 也一起回来，
+              所以"建不了提醒"在任何一档都不会发生。 */}
+          {taskPaneInColumn ? (
+            <ReminderBadge task={task} />
+          ) : (
+            <ReminderPanel task={task} />
+          )}
 
           {/* AI 拆解。配置关着时它仍然在 —— 点了会说明该去开什么，
               而不是消失（"找不到入口"和"入口说为什么不可用"是两件事）。 */}

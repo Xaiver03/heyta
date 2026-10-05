@@ -34,15 +34,30 @@
  *       如果那枚钩子换了名，两层是否**同时**失去对象。答案是同时。）
  *   R3 徽标不判"有没有规则"            → jsdom 1 红 + **e2e 盲区**（同 A5：T6/T7 量的
  *       那两条任务都有规则，界面上不存在"没设重复"那一格的反例）
- *   R4 浮层外壳跟着本体搬进栏里        → jsdom 1 红 + **e2e 盲区**（T6 数输入框与 summary，
- *       一块多套的 `.ht-material` 壳两条都不看 —— 这一档只有 DOM 树知道）
+ *   R4 浮层外壳跟着本体搬进栏里        → jsdom 1 红（pane 级那一条）+ **e2e T10 红**
+ *      🔴 本档原记"e2e 盲区"，§8.145 那一趟把它照成**有牙**：T10 数的是
+ *      `pane.locator('.ht-material')` 等于 0，而注入落在同一个 pane 里 ⇒ 与在哪一格无关。
+ *      同趟还把"栏里不许有 `<details>` / `.ht-material`"从三格各自的用例**合成一条 pane 级
+ *      判据** —— 抄三遍时一次注入红三条，红集会被读成"判据变多了"（AGENTS §3.2 同族形状）。
  *
  * ── §8.144（第三个字段：子任务）五臂 ─────────────────────────────────
  *   S1 宽档行尾还挂 `<SubtaskPicker/>` → jsdom 1 红（源码形状）+ e2e T8 红
  *   S2 栏里那只 select 的 testid 改名   → jsdom 3 红 + e2e T8 红（**阳性对照**，见臂内注释）
  *   S3 徽标不判"有没有父"               → jsdom 1 红 + e2e T8 红（与 A5/R3 **不同档**，原因写在臂内）
- *   S4 展开机关跟着本体搬进栏里         → jsdom 1 红 + e2e T8 红（与 R4 **不同档**，原因写在臂内）
+ *   S4 展开机关跟着本体搬进栏里         → jsdom 1 红 + e2e T8 红（与 R4 **不同档**：壳藏东西才看得见）
  *   S5 预过滤退化成"只排除自己"         → jsdom 1 红 + e2e T8 红（T8 里"反向那一段"就是为它加的）
+ *
+ * ── §8.145（第四个字段：提醒）五臂 ───────────────────────────────────
+ *   M1 宽档行尾还挂 `<ReminderPanel/>`  → jsdom 1 红（源码形状）+ e2e T10 红
+ *   M2 宿主再叠一枚「提醒」区块头        → jsdom 1 红 + e2e T10 红（共享列表**自带**区块头）
+ *   M3 徽标不判"有没有提醒"             → jsdom 1 红 + e2e T10 红
+ *      （🔴 与 A5/R3 **不是同一档**：T10 里刻意多建了一条**没挂提醒**的任务，
+ *       整机判据"徽标等于 1"才有对象可数。A5/R3 那一趟没有这一条，所以它们是盲区。
+ *       规律写在 S3 那里：**"盲区"取决于判据怎么写，不取决于这一档是什么**。）
+ *   M4 玻璃浮层跟着本体搬进栏里          → jsdom 1 红 + e2e T10 红（与 R4 **同一档**：
+ *       两条判据都是 pane 级的，注入在哪一格都红）
+ *   M5 展开机关跟着本体搬进栏里          → jsdom 1 红 + e2e T10 红（同 S4：`<details>` 收起时
+ *       里面**不画**，`toBeVisible()` 挡不住）
  *
  * ⚠️ 载体是 `vite preview` + `apps/web/dist`（`e2e/playwright.detail-pane.config.ts`，端口 4371），
  *    所以**每一臂都必须重打 `apps/web`**（§7 第 27 条那一族：改了源码没重建 ⇒ 被测的那一份
@@ -52,10 +67,12 @@
  *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs --list   # 臂名册 + 每臂点名的红集
  *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs          # 全部臂
  *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs A3 B1    # 只点名那两臂
- * ⚠️ 它会占 4371 端口、起 Chromium，且**原地改这七枚源文件**（收尾逐文件复原并核对 md5）：
+ * ⚠️ 它会占 4371 端口、起 Chromium，且**原地改下面这些源文件**（收尾逐文件复原并核对 md5；
+ *    清单由 `FILES` 现量，别在这里抄枚数）：
  *    `apps/web/src/features/tasks/{TaskDetailCard,NoteEditor,TaskRepeat,SubtaskPicker}.tsx`、
+ *    `apps/web/src/features/reminders/ReminderPanel.tsx`、
  *    `apps/web/src/App.tsx`、`apps/web/src/lib/keyboard-cursor.ts`、`apps/web/src/styles/app/base.css`。
- *    跑之前确认这七枚没有别人的在飞改动。
+ *    跑之前确认这些文件没有别人的在飞改动。
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -71,6 +88,7 @@ const CURSOR = 'apps/web/src/lib/keyboard-cursor.ts';
 const CSS = 'apps/web/src/styles/app/base.css';
 const REPEAT = 'apps/web/src/features/tasks/TaskRepeat.tsx';
 const SUBTASK = 'apps/web/src/features/tasks/SubtaskPicker.tsx';
+const REMINDER = 'apps/web/src/features/reminders/ReminderPanel.tsx';
 const JSDOM_SPECS = ['tests/task-detail-card.spec.tsx', 'tests/keyboard-cursor.spec.tsx'];
 const E2E_SPEC = 'tests/detail-pane-task.spec.ts';
 const BIN = (rel) => path.join(ROOT, 'apps/web', 'node_modules', '.bin', rel);
@@ -205,9 +223,14 @@ const ARMS = [
           }}
         />
       </div>`,
-    expectJs: ['拿到了行尾的浮层外壳'],
-    /* e2e 盲区：T6 数的是栏里那只输入框与行尾那颗 summary，一块多套的壳两条都不看。 */
-    expectE: [],
+    /* 🔴 两条期望都被 §8.145 这一趟**改写了**，改的是主张不是判据：
+       ① jsdom 从"1 条（§8.141 那一格）"变成"1 条（pane 级那一条）"—— 因为"栏里不许有
+          浮层外壳"量的对象是整个 pane，四格各抄一遍时**任何一格**被注入都会同时红四条；
+          合成一条之后一次注入红一条（这条合成就是本臂头一趟 NOT_AS_EXPECTED 照出来的）。
+       ② e2e 从**盲区**变成 T10 有牙：T10 新加了 `pane.locator('.ht-material')` 等于 0，
+          而注入落点在同一个 pane 里 ⇒ 与注入在哪一格无关。 ⇒ 又一例"盲区取决于判据怎么写"。 */
+    expectJs: ['不许有行尾的两层外壳'],
+    expectE: ['T10'],
   },
 
   /* ── §8.144（第三个字段：子任务）五臂 ──────────────────────────────── */
@@ -259,10 +282,13 @@ const ARMS = [
           onSetParent={(parentId) => store.setParent(task.id, parentId)}
         />
       </details>`,
-    expectJs: ['拿到了行尾的展开机关'],
-    /* ⚠️ 与 R4 **不是同一档**：R4 套的是一块 `<div>` 壳（DOM 多一层，两条判据都不看），
+    expectJs: ['不许有行尾的两层外壳'],
+    /* ⚠️ 与 R4 **不是同一档**：R4 套的是一块 `<div>` 壳（DOM 多一层，只有数类名那条判据看得见），
        这里套的是 `<details>` —— 收起时里面**不画**，于是 T8 那句 `toBeVisible()` 直接红。
-       记下来是因为它给了一条一般规律：**"多套一层壳"是否可观察，取决于那层壳会不会藏东西**。 */
+       记下来是因为它给了一条一般规律：**"多套一层壳"是否可观察，取决于那层壳会不会藏东西**。
+       🔴 T10 **不红**（本趟读数）：注入的 `<details>` 不带 `ht-compose--popover` 类，
+       而 T10 那两句分别数的是 `.ht-material` 与 `details.ht-compose--popover` ⇒ 都躲得过。
+       ⇒ 同一格里"壳"有两种可观察性，别把一条臂的红集外推给另一条。 */
     expectE: ['T8'],
   },
   {
@@ -278,9 +304,70 @@ const ARMS = [
        恰好过得了正向那一半。这就是 T8 里多那一段的全部理由。 */
     expectE: ['T8'],
   },
+
+  /* ── §8.145（第四个字段：提醒）五臂 ─────────────────────────────────
+     这一族的落点在**三处**：`App.tsx` 的装配、`TaskDetailCard` 的栏内、
+     `ReminderPanel` 自己的 record 判定。所以臂也按这三处分。          */
+  {
+    name: 'M1 宽档行尾还挂 `<ReminderPanel/>`（提醒长出第二个编辑器）',
+    file: APP,
+    from: `<ReminderBadge task={task} />`,
+    to: `<ReminderPanel task={task} />`,
+    expectJs: ['提醒两处可编辑'],
+    /* T10 两条都撞：整页那份 `reminder-list-*` 必须只有一份（行尾再长一份就是两份），
+       而 `details.ht-compose--popover` 必须 count 0。 */
+    expectE: ['T10'],
+  },
+  {
+    name: 'M2 宿主再叠一枚「提醒」区块头（共享列表自带，于是同一格说了两遍）',
+    file: CARD,
+    from: `      <ReminderField task={task} />`,
+    to: `      <h3 style={blockLabelStyle}>{t('reminder.title')}</h3>
+      <ReminderField task={task} />`,
+    expectJs: ['「提醒」区块头不止一处'],
+    /* 🔴 这一臂钉的是本单**唯一一处"少写 vs 多写"**的坏：其余各臂都是"撤掉某道判断"，
+       这一臂是"多加一枚标题"。判据必须写成**存在性计数**（"说这个词的地方只许有一处"），
+       写成"标题在不在"就永远抓不到多写。 */
+    expectE: ['T10'],
+  },
+  {
+    name: 'M3 徽标不判"有没有提醒"（record 档变成常驻）',
+    file: REMINDER,
+    from: `  if (count === 0) return null;`,
+    to: `  if (count === 0) return <span className="ht-chip" data-testid={\`task-reminder-badge-\${task.id}\`} />;`,
+    expectJs: ['零条提醒却占了位'],
+    /* 🔴 与 A5/R3 **不是同一档**（那两臂 e2e 盲区）：T10 里多建了一条**没挂提醒**的任务，
+       整机判据"徽标 count 等于 1"于是有了可数的反例 ⇒ 这一臂会红。
+       一般规律仍与 S3 同一条：**盲区取决于判据怎么写，不取决于这一档是什么**。
+       而"要不要为一条臂多建一条夹具任务"这件事，答案是建 —— A5/R3 那两臂的盲区本来是可以不存在的。 */
+    expectE: ['T10'],
+  },
+  {
+    name: 'M4 玻璃浮层跟着编辑本体搬进栏里（栏里漂着一块板子）',
+    file: CARD,
+    from: `      <ReminderField task={task} />`,
+    to: `      <div className="ht-compose-panel ht-material">
+        <ReminderField task={task} />
+      </div>`,
+    expectJs: ['不许有行尾的两层外壳'],
+    /* 与 R4 同一档（同一块 pane 级判据、同一个 T10 牙）：注入带 `ht-material`，
+       而 T10 数的是 `pane.locator('.ht-material')` 等于 0 ⇒ 与注入落在哪一格无关。 */
+    expectE: ['T10'],
+  },
+  {
+    name: 'M5 行尾的展开机关跟着编辑本体搬进栏里（栏里那一格自己收起来了）',
+    file: CARD,
+    from: `      <ReminderField task={task} />`,
+    to: `      <details>
+        <ReminderField task={task} />
+      </details>`,
+    expectJs: ['不许有行尾的两层外壳'],
+    /* 同 S4：`<details>` 收起时里面**不画**，T10 那句 `toBeVisible()` 直接红。 */
+    expectE: ['T10'],
+  },
 ];
 
-const FILES = [CARD, NOTE, APP, CURSOR, CSS, REPEAT, SUBTASK];
+const FILES = [CARD, NOTE, APP, CURSOR, CSS, REPEAT, SUBTASK, REMINDER];
 const orig = new Map(FILES.map((f) => [f, readFileSync(path.join(ROOT, f), 'utf8')]));
 const md5 = (s) => createHash('md5').update(s).digest('hex');
 const origMd5 = new Map([...orig].map(([f, s]) => [f, md5(s)]));
@@ -421,14 +508,14 @@ const b = build();
 if (b.rc !== 0) fail(`干净态打不出包：\n${b.out.slice(-1500)}`);
 const cleanDigest = distDigest();
 const bj = jsdom();
-if (bj.rc !== 0 || bj.passed < 53) fail(`干净态 jsdom 层不干净（要 >=53 passed）：${bj.line}`);
+if (bj.rc !== 0 || bj.passed < 59) fail(`干净态 jsdom 层不干净（要 >=59 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 9 || be.failed > 0) {
+if (be.rc !== 0 || be.passed < 11 || be.failed > 0) {
   fail(
-    `干净态 e2e 层不干净（要 >=9 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
+    `干净态 e2e 层不干净（要 >=11 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
   );
 }
-console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T9）｜dist=${cleanDigest}`);
+console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T11）｜dist=${cleanDigest}`);
 
 /* 只跑点名的臂：`node … A3 B1`。存在的理由是**改完一条主张之后不必把八臂全部重跑** ——
    否则"改臂"这个动作的成本会把人推回去改判据（那才是真正要避免的）。
@@ -527,6 +614,11 @@ if (bad.length || rj.rc !== 0 || re.rc !== 0) {
   );
   process.exit(1);
 }
+/* 盲区清单**由臂名册算出来**，不手写：上一版写着"A4/A5/A6/R3/R4 只 jsdom 红"，
+   加一臂就得回头重数 —— 而 §8.145 这一批恰恰改了归属（M3 从"盲区"变成"有牙"）。
+   算出来的那一行永远不会漂。 */
+const jsOnly = ARMS.filter((a) => a.expectE.length === 0).map((a) => a.name.split(' ')[0]);
+const eOnly = ARMS.filter((a) => a.expectJs.length === 0).map((a) => a.name.split(' ')[0]);
 console.log(
-  `RIG_RESULT=${ok}/${SELECTED.length}（每臂的红集**逐条等于**点名那几条；A4/A5/A6/R3/R4 只 jsdom 红=e2e 盲区，B2 只 e2e 红=jsdom 盲区）`,
+  `RIG_RESULT=${ok}/${SELECTED.length}（每臂的红集**逐条等于**点名那几条；e2e 盲区=${jsOnly.join('/') || '无'}｜jsdom 盲区=${eOnly.join('/') || '无'}）`,
 );

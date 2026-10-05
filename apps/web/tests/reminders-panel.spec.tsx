@@ -34,7 +34,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { emptyState } from '@heyta/op-log';
 import { I18nProvider, zhCN, type I18nValue } from '@heyta/i18n';
-import { REMINDER_OFFSET_PRESETS_MS } from '@heyta/domain';
+import { MAX_REMINDERS_PER_TASK, REMINDER_OFFSET_PRESETS_MS } from '@heyta/domain';
 import { HeytaUiProvider } from '@heyta/ui';
 
 import {
@@ -243,23 +243,34 @@ describe('B. 没有截止时间时只有绝对时刻入口', () => {
     const taskId = await addTask('没有截止时间');
     const view = await mountFor(taskId);
 
-    // 上限是 5 条（`MAX_REMINDERS_PER_TASK`）；连点 8 次必然撞上限。
-    // 🔴 每次点击的触发时刻必须**逐次不同**：幂等分支（`reminder-actions.ts` 的
-    //    `writeNew`，按 `taskId:triggerAt` 认实体）走在封顶检查**前面**，两次点击落进
-    //    同一毫秒就合成同一条、永远撞不到上限。
-    // ⚠️ 这件事此前靠"两次点击之间真实时钟自己走了 3ms"来保证，而负载高时定时器会合并、
-    //    多次点击落进同一毫秒 ⇒ 该用例偶发假红（单独跑必绿）。把 `Date.now()` 冻住可 100%
-    //    复现那一次红 —— 现在改成按**点击序号**推进时钟，用例前提不再取决于机器负载。
+    /* 上限是 `MAX_REMINDERS_PER_TASK`（现量：`packages/domain/src/reminders.ts`），
+       这里**不抄那个数** —— 抄了之后改常量会让本用例的前提静默变形。
+       🔴 每次点击的触发时刻必须**逐次不同**：幂等分支（`reminder-actions.ts` 的
+       `writeNew`，按 `taskId:triggerAt` 认实体）走在封顶检查**前面**，两次点击落进
+       同一毫秒就合成同一条、永远撞不到上限。这一档靠"按点击序号推进 `Date.now()`"钉住。
+
+       🔴 而**每一次点击都必须等它落定再点下一次**。上一版靠 `setTimeout(3)` 隔开，
+       那是把"异步落库"当成"3 毫秒"来赌：单独跑必绿，全量并行时（实测 2026-10-05，
+       §8.145 那一趟）**八次点击只落进封顶检查五条 ⇒ 界面画出 6 条提醒而不报错**，
+       等待错误的 `waitFor` 超时。⇒ 与文件头那条纪律同一个形状：**等条件，不等固定 tick**。
+       ⚠️ 这只修了**判据的确定性**。产品侧"用户连点可以把存活提醒点到超过上限"那道竞态
+       **仍然存在、本单没修**（登记在待办 #47）。 */
     const realNow = Date.now.bind(Date);
     let step = 0;
     const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + step * MINUTE);
     try {
-      for (let i = 0; i < 8; i += 1) {
+      for (let i = 0; i < MAX_REMINDERS_PER_TASK + 3; i += 1) {
         step += 1;
         await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 3));
           click(view, 'reminder-add-absolute');
         });
+        const target = Math.min(i + 1, MAX_REMINDERS_PER_TASK);
+        await waitFor(
+          `第 ${String(i + 1)} 次点击落定（要么建出来，要么被拒）`,
+          () =>
+            (useReminderStore.getState().byTask[taskId]?.length ?? 0) >= target ||
+            useReminderStore.getState().error !== undefined,
+        );
       }
 
       await waitFor('超上限的错误被记下', () => useReminderStore.getState().error !== undefined);
@@ -269,7 +280,13 @@ describe('B. 没有截止时间时只有绝对时刻入口', () => {
     }
 
     const alert = view.querySelector('[role="alert"]');
-    expect(alert?.textContent ?? '').toContain('最多 5 条提醒');
+    expect(alert?.textContent ?? '').toContain(
+      `最多 ${String(MAX_REMINDERS_PER_TASK)} 条提醒`,
+    );
+    // 🔴 存活数**停在封顶值**：这一句挡的是"上限根本没生效"，而上面那句只挡"错误看得见"。
+    expect((useReminderStore.getState().byTask[taskId] ?? []).length).toBe(
+      MAX_REMINDERS_PER_TASK,
+    );
   });
 });
 

@@ -12,6 +12,8 @@ import { openApp } from './helpers';
  * ⚠️ 第五枚原本是「重复」下拉：§8.141 之后宽档行尾不再渲染它（编辑本体进了栏里那一格，
  *   行尾只剩只读徽标）。替补的选取口径写在 `SURFACES` 最后一项的注释里 ——
  *   **要用 ADR-0042 §3 名单上的面**，不是"长得像的另一枚下拉"。
+ *   🔴 §8.145 之后连替补那一枚也不在宽档了 ⇒ 那一腿**自己把视口收到窄档**再量（覆盖面不变）。
+ *   ⚠️ 所以本文件不再"五面同在 1440×900 下拍"：判据仍是计算样式，截图的**窗口宽度**逐腿而定。
  *
  * 每个面 × 三个状态各截一张（固定路径，人必须看，AGENTS §6.2 规定一）：
  *   light / dark / reduced-transparency（系统"减少透明度"）
@@ -102,8 +104,16 @@ const SURFACES: Surface[] = [
     //   截止下拉**从来不在名单上**。⇒ 拿它替「重复」等于把覆盖面换成一个非玻璃面。
     //   这里换成提醒那一枚（`.ht-compose--popover` + `.ht-compose-panel ht-material`，
     //   无内联底色覆盖），它既在名单上、又仍在宽档行尾渲染。
+    //
+    // 🔴 §8.145 之后**宽档也没有它了**（提醒的编辑本体进了栏里那一格，行尾只剩 `ReminderBadge`）。
+    //   这一腿不删、改成**先把视口收到窄档**：`details.ht-compose--popover` 整块是条件挂载，
+    //   窄档（详情列不画）时它原样回到行尾 ⇒ 覆盖面（名单上的那一面）一个字没换，
+    //   换的只是"在哪一档量它"。删掉这一腿才是把覆盖丢掉。
+    //   ⚠️ `close` 里必须把视口还回 1440×900：本套件其余四面都按宽档拍，
+    //   让下一腿继承窄档 = 截图互相污染（同一循环里已经有一条"关干净再拍下一个"的判据）。
     name: 'reminder-dropdown',
     open: async (page) => {
+      await page.setViewportSize({ width: 900, height: 600 });
       await page.locator('details.ht-compose--popover > summary').first().click();
       const panel = page.locator('details.ht-compose--popover .ht-material').first();
       // 🔴 把锚点那一行滚到可视区中部再量：这一族的锚点任务落在列表末尾，而
@@ -116,6 +126,7 @@ const SURFACES: Surface[] = [
     },
     close: async (page) => {
       await page.locator('details.ht-compose--popover > summary').first().click();
+      await page.setViewportSize({ width: 1440, height: 900 });
     },
   },
 ];
