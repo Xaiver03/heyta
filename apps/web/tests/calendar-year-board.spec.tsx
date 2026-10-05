@@ -36,6 +36,7 @@ import {
   daysInMonth,
   monthsOfYear,
   parseLocalDate,
+  type CountdownEvent,
   type LocalDate,
   type Task,
 } from '@heyta/domain';
@@ -63,8 +64,22 @@ function task(id: string, title: string, dueDate: number): Task {
   return { id, title, dueDate } as Task;
 }
 
+/**
+ * 一条倒数日。🔴 它**没有** `dueDate` 这个键（这个类型里根本没有）——
+ * 年档要认出它，靠的只能是 `groupEventsByOccurrence` 那份区间枚举，不是任务那条 `if`。
+ */
+function event(id: string, title: string, date: LocalDate): CountdownEvent {
+  return { id, title, date, createdAt: 0, updatedAt: 0 } as CountdownEvent;
+}
+
 function YearBoardProbe(props: {
   tasks: readonly Task[];
+  /**
+   * 🔴 W6 的第二个事件源。它是**必填**的：`CalendarBoard` 上这条 prop 一旦改成可选，
+   *   "宿主根本没接倒数日"就会被渲染成"这四个月里谁都没事"—— 两种情况在界面上长得一模一样
+   *   （§7 第 195 条）。这里跟着一起写成必填，是为了让"忘了接"在编译期就红。
+   */
+  events: readonly CountdownEvent[];
   today: LocalDate;
   cursor: LocalDate;
   onPickMonth: ((monthFirstDay: LocalDate) => void) | undefined;
@@ -75,6 +90,7 @@ function YearBoardProbe(props: {
       <CalendarBoard
         view="year"
         tasks={props.tasks}
+        events={props.events}
         today={props.today}
         cursor={props.cursor}
         selected={props.today}
@@ -91,6 +107,7 @@ function YearBoardProbe(props: {
 
 function render(props: {
   tasks?: readonly Task[];
+  events?: readonly CountdownEvent[];
   year?: LocalDate;
   today?: LocalDate;
   onPickMonth?: (monthFirstDay: LocalDate) => void;
@@ -104,6 +121,7 @@ function render(props: {
       <LocaleHost>
         <YearBoardProbe
           tasks={props.tasks ?? []}
+          events={props.events ?? []}
           today={today}
           cursor={props.year ?? today}
           onPickMonth={props.onPickMonth}
@@ -241,6 +259,38 @@ describe('年视图的 12 张月卡', () => {
     ).toBeNull();
     // 全年的点数恰好等于有任务的天数（不是任务数：同一天两条只画一个点）。
     expect(container!.querySelectorAll('[data-testid$="-dot"]')).toHaveLength(1);
+  });
+
+  /*
+    🔴 W6：年档那 365 个格子以前只认任务。一条倒数日在这里**没有**任何可写的地方 ——
+    它没有 `dueDate`，任务那条聚合的第一句就是"没截止时间就跳过"。
+    这两条把"第二个源进了年档"钉在**渲染结果**上：模型层的同名判据（`calendar-cell-bars.spec.ts`）
+    证明不了这块板真的把 `events` 传到了 `MiniDay`。
+  */
+  it('🔴 只有倒数日的那一天也画点（没有任务、也没有 dueDate，格子照样要有它）', () => {
+    render({ events: [event('e1', '外婆生日', '2026-07-15')] });
+    expect(
+      container!.querySelector('[data-testid="calendar-board-year-day-2026-07-15-dot"]'),
+      '倒数日没进年档 —— 第二个源只到了月档',
+    ).not.toBeNull();
+    // 反面：没有倒数日的那一格照样不许画点。
+    expect(
+      container!.querySelector('[data-testid="calendar-board-year-day-2026-07-16-dot"]'),
+      '没事那天也画了点',
+    ).toBeNull();
+  });
+
+  it('🔴 年档的读屏名把任务与倒数日**一起**数（两块面两套数就是界面在说谎）', () => {
+    render({
+      tasks: [task('t1', 'A', atMidnight('2026-07-15'))],
+      events: [event('e1', 'B', '2026-07-15')],
+    });
+    const dayTitle = formatDayTitleText('2026-07-15', t);
+    expect(dayAt('2026-07-15')?.getAttribute('aria-label')).toBe(
+      t('web.calendar.a11y.dayWithTasks', { date: dayTitle, count: 2 }),
+    );
+    // 而点数仍然只有一个：同一天两件事 = 一颗点（与上面那条任务的判据同一条口径）。
+    expect(container!.querySelectorAll('[data-testid="calendar-board-year-day-2026-07-15-dot"]')).toHaveLength(1);
   });
 
   it('同一天两条任务只有**一个**点，但读屏名里数得出两件', () => {

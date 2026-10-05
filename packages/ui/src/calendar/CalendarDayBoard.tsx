@@ -49,16 +49,24 @@ import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import type { HeytaNativeTokens } from '@heyta/design-system';
-import { toLocalDate, type LocalDate, type Task } from '@heyta/domain';
+import { toLocalDate, type CountdownEvent, type LocalDate, type Task } from '@heyta/domain';
 
 import { EmptyState } from '../empty-state/EmptyState.js';
 import { TaskList } from '../task-list/TaskList.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { calendarDayBuckets, type CalendarBoardLabels } from './model.js';
+import { CalendarEventRowList } from './CalendarEventRow.js';
+import { calendarDayBuckets, groupEventsByOccurrence, type CalendarBoardLabels } from './model.js';
 
 export interface CalendarDayBoardProps {
   /** 全部候选任务（已按范围筛过）。分桶只看 `dueDate` 落在 `day` 的那些。 */
   readonly tasks: readonly Task[];
+  /**
+   * 第二个事件源（W6）。**必填**，理由见 `CalendarBoardProps.events`。
+   *
+   * 🔴 倒数日天生就落在**"全天带"**这一格：它说的就是"这一天"，没有时刻。
+   *   把它排到 24 小时轴的某个小时上，等于替用户发明一个他没写过的时间。
+   */
+  readonly events: readonly CountdownEvent[];
   /** 正在看的那一天。 */
   readonly day: LocalDate;
   /**
@@ -79,6 +87,7 @@ export interface CalendarDayBoardProps {
 
 export function CalendarDayBoard({
   tasks,
+  events,
   day,
   now,
   onToggleTask,
@@ -92,6 +101,16 @@ export function CalendarDayBoard({
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
   const buckets = useMemo(() => calendarDayBuckets(tasks, day), [tasks, day]);
+  /*
+   * 这一天落得的倒数日。走的是与月档**同一个**归属函数
+   * （`groupEventsByOccurrence` → `@heyta/domain#eventOccurrencesInRange`）——
+   * 日档另数一遍"这天有没有它"就是第二套口径，而两套口径的症状是
+   * "月档格子里有这条生日，切到日档它没了"。
+   */
+  const dayEvents = useMemo(
+    () => groupEventsByOccurrence(events, day, day).get(day) ?? [],
+    [events, day],
+  );
   const rowHeight = tokens['size.row-min-height'];
   /**
    * 现在线：只在"看的就是今天"且宿主给了时钟时画。
@@ -125,7 +144,7 @@ export function CalendarDayBoard({
             {labels.dayAllDay}
           </Text>
         ) : null}
-        {buckets.allDay.length === 0 ? (
+        {buckets.allDay.length === 0 && dayEvents.length === 0 ? (
           // 🔴 空态走共享实现（`check:empty-state` 判据 3：不许在视图里手写空态）。
           <EmptyState
             /*
@@ -139,7 +158,16 @@ export function CalendarDayBoard({
             testID={`${testID}-all-day-empty`}
           />
         ) : (
-          <TaskList tasks={buckets.allDay} {...taskListProps} testID={`${testID}-all-day-list`} />
+          <>
+            {buckets.allDay.length === 0 ? null : (
+              <TaskList tasks={buckets.allDay} {...taskListProps} testID={`${testID}-all-day-list`} />
+            )}
+            {/* 倒数日排在同一条"全天带"里，但走**另一种行**（不可勾、无截止槽）：
+                理由与月档那块同一份，实现也是同一份（`CalendarEventRow.tsx`）。 */}
+            {dayEvents.length === 0 ? null : (
+              <CalendarEventRowList events={dayEvents} testID={`${testID}-all-day-events`} />
+            )}
+          </>
         )}
       </View>
 

@@ -197,6 +197,67 @@ export function nextEventOccurrence(
 }
 
 /**
+ * `[from, to]`（含两端）这段时间里这个倒数日的**全部**发生日，升序去重。
+ *
+ * 🔴 为什么不"循环调 `nextEventOccurrence` 直到出界"：那条路回答的是"下一次是哪天"，
+ * 而日历要问的是"这一段里有哪几天"。农历 `both` 档在同一年里就有**两个**正日子
+ * （ADR-0044），用"下一次"去凑"这一段"只会剩第一个 —— 那不是少画一个点，
+ * 是把一档真实行为从界面上抹掉，而且两边看起来都"合理"。
+ *
+ * @param from 窗口下沿（含）。日历格子的第一天。
+ * @param to   窗口上沿（含）。
+ *
+ * ⚠️ 非法规则与求值抛错一律按**不命中**处理，与 `occursOnToday` 同一取舍：
+ * 重复规则是用户输入，一条打错的规则不该让整张日历崩掉。
+ */
+export function eventOccurrencesInRange(
+  event: CountdownEvent,
+  from: LocalDate,
+  to: LocalDate,
+): LocalDate[] {
+  if (to < from) return [];
+  if (!isEventRepeating(event)) {
+    return event.date >= from && event.date <= to ? [event.date] : [];
+  }
+
+  if (event.isLunar === true) {
+    const anchor = solarToLunar(event.date);
+    const policy = eventLeapMonthPolicy(event);
+    const out: LocalDate[] = [];
+    /*
+      从 `from` 所在的**上一个**农历年起算：农历新年落在公历 1–2 月，
+      所以公历 1 月上旬那几天属于上一个农历年。少退一年就会把整月的
+      农历生日在 1 月那一格里画漏 —— 而 12 月那一格是对的，症状看起来像"偶尔错"。
+      上沿同理多走一年：`to` 是窗口最后一天，它所在农历年的下一次 occurrence 可能仍在窗口内。
+    */
+    const lastYear = lunarYearOf(to);
+    for (let year = lunarYearOf(from) - 1; year <= lastYear + 1; year += 1) {
+      for (const date of lunarOccurrencesInYear(anchor, year, policy)) {
+        if (date > to) break;
+        if (date >= from) out.push(date);
+      }
+    }
+    return out.sort();
+  }
+
+  /*
+    🔴 迭代上限要**按窗口算**，不能吃 `recurrence.ts` 那个 1000 的默认值。
+    那条路是这么坏的：一条锚在三年前的"每天"倒数日，ical 的迭代器要空转 1000 次
+    才走到窗口，于是**窗口里的每一天都不画** —— 而它不抛错、不报警，
+    界面上就是"这条倒数日凭空不存在"。给它一个由锚点到 `to` 的真实天数 + 余量，
+    这条静默少画的路就被这条判据挡住了（`eventOccurrencesInRange` 的"锚在三年前的 DAILY"用例）。
+  */
+  const iterations = Math.max(1, diffDays(event.date, to) + 2);
+  try {
+    return occurrencesInRange(event.recurrence as string, event.date, from, to, {
+      maxIterations: iterations,
+    });
+  } catch {
+    return [];
+  }
+}
+
+/**
  * "已经 N 天"那个数：分母是**锚点**，不是上一次发生日。
  *
  * 🔴 结婚纪念日的卡片要说"在一起 3 650 天"，不是"距上一个 5 月 1 日多少天"
