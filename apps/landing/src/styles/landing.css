@@ -594,8 +594,11 @@
 }
 
 .lp-note {
-  display: flex;
-  gap: var(--ht-space-3);
+  /* 🔴 不是 flex。`RichText`（`site/PageSections.tsx:77`）把一条词条切成
+     `<strong>` / `<code>` / `<span>` **兄弟节点**，flex 会把它们各排一栏 ——
+     实测 `/platforms` 那条「未签名」说明被排成三列，第二列以「，需要右键打开」起头。
+     这个元素从来只摆一段文字：⚠️ 那个图标在**词条文本里**，不是子元素。 */
+  display: block;
   padding: var(--ht-space-4);
   border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);

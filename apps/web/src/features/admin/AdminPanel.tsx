@@ -28,6 +28,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useI18n, type MessageKey } from '@heyta/i18n/provider';
+import { isHttpPaperUrl } from '@heyta/shared-schema';
 import { EmptyState, HeytaUiProvider } from '@heyta/ui';
 import { ChevronLeft, ChevronRight, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 
@@ -693,7 +694,7 @@ function HolidayPanel(props: { store: AdminStoreState }): React.JSX.Element {
             <ul className="ht-settings__admin-list" data-testid="admin-holiday-years">
               {years.years.map((year) => (
                 <li key={year.year} className="ht-settings__admin-staticRow">
-                  <span className="ht-settings__admin-rowMain">
+                  <span className="ht-settings__admin-rowMain ht-settings__admin-rowMain--wrap">
                     {year.year} ·{' '}
                     {t('web.admin.holiday.dayCount').replace('{count}', String(year.dayCount))}
                     {year.note === null ? '' : ` · ${year.note}`}
@@ -706,18 +707,35 @@ function HolidayPanel(props: { store: AdminStoreState }): React.JSX.Element {
                       `isHttpPaperUrl` 的注释：`z.string().url()` 放行 `javascript:`）。
                       所以这三条同时是判据与防线：链接本身、它的文字、以及
                       `rel` 防止被打开的站点反向拿到后台这一页的 window。 */}
-                  <span className="ht-settings__admin-badges" data-testid="admin-holiday-papers">
-                    {year.papers.map((paper) => (
-                      <a
-                        key={paper}
-                        className="ht-settings__admin-badge"
-                        href={paper}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                      >
-                        {paper}
-                      </a>
-                    ))}
+                  <span
+                    className="ht-settings__admin-badges ht-settings__admin-badges--papers"
+                    data-testid="admin-holiday-papers"
+                  >
+                    {year.papers.map((paper) =>
+                      /*
+                       * 🔴 渲染层这一道是**第二道**，不是装饰。
+                       * 迁移 SQL 的「手工补充 2/3」写的就是"http/https 由契约层 + 渲染层两处钉"，
+                       * 而只钉契约层的说法不成立：绕过 PUT 进来的行（运维直接跑 SQL、
+                       * 将来的导入通道、库里已存在的旧值）都不会再过 zod，于是后台的
+                       * `href` 里就是一条 `javascript:`。同一串还经公开 GET 原样下发，
+                       * 所以这里按**取到值的样子**判，不按"入库时应当合法"判。
+                       */
+                      isHttpPaperUrl(paper) ? (
+                        <a
+                          key={paper}
+                          className="ht-settings__admin-badge"
+                          href={paper}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                        >
+                          {paper}
+                        </a>
+                      ) : (
+                        <span key={paper} className="ht-settings__admin-badge" data-testid="admin-holiday-paper-rejected">
+                          {paper}
+                        </span>
+                      ),
+                    )}
                   </span>
                   <div className="ht-settings__admin-actions">
                     <button

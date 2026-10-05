@@ -30,6 +30,13 @@
  * | 再点同一字形不退回派生 | 「再点同一个字形 = 退回派生」 |
  * | 去掉空列表时的窗格头部守卫 | 「列表零行说的是共享层那句空态」 |
  *
+ * 🔴 **2026-10-05（工单 §8.131）表里 `?? rows[0]` 那一行被就地反转**：那 7 条当时把
+ * "宿主猜第一条"钉成了契约，而那正是 W1"各处同一套回落规则"在 web 上最后一处例外 ——
+ * 界面说第一条选中、共享选中态说没选中，而详情列按后者维持 AI。
+ * 现在**注入 `?? rows[0]` 会红**（红集与臂台读数记在工单 §8.131）。
+ * 旧行留着不删，是为了让下一轮看得见：同一枚注入，判据的方向可以整体反过来 ——
+ * 能反证的判据才是判据，方向是由规则定的，不是由当时哪版代码定的。
+ *
  * 图标的**词表 / 解析 / 派生**与 `setHabitIcon` 的**写路径**判据不在这里 ——
  * 它们各自住在 owning 层：`packages/domain/tests/habit-icons.spec.ts`（14 条）
  * 与 `packages/app-host/tests/habit-actions.spec.ts` 的「习惯图标」组（5 条），
@@ -242,47 +249,85 @@ describe('C. 右窗格：全页只有一块共享板，且只显示选中那一�
     expect(qa('[data-testid="habit-board"]')).toHaveLength(1);
   });
 
-  it('默认就恰好一条被选中，窗格说的就是它的名字', () => {
-    const marked = qa<HTMLElement>('.ht-habit__row').filter(
-      (r) => r.getAttribute('aria-current') === 'true',
-    );
-    expect(marked).toHaveLength(1);
-    expect(pane()?.getAttribute('aria-label')).toBe(`「${selectedName()}」的打卡记录`);
+  /** 带 `aria-current` 的行（选中痕迹的第一种说法）。 */
+  const markedRows = (): HTMLElement[] =>
+    qa<HTMLElement>('.ht-habit__row').filter((r) => r.getAttribute('aria-current') === 'true');
+
+  it('🔴 没人点过时**零行**带 aria-current，窗格说的是「选一条习惯」而不是第一条', () => {
+    /* 这一条原本钉的是**相反**的行为（"默认就恰好一条被选中"）。撤它的理由不是审美：
+       那枚"默认"是 `?? rows[0]` 猜的，于是同一屏上界面说"第一条是选中的"，而共享选中态
+       说"什么都没选中"（详情列按后者维持 AI）。W1 要的是"各处同一套状态与回落规则"，
+       便签面（K8）与任务面都是零行。旧判据把缺陷钉成了契约。 */
+    expect(markedRows()).toHaveLength(0);
+    const text = pane()?.textContent ?? '';
+    expect(text).toContain('选一条习惯');
+    expect(text).not.toContain('喝水');
+    expect(text).not.toContain('阅读');
+    // 🔴 两条空态不许互相冒充：有习惯时窗格不许说"还没有习惯"。
+    expect(text).not.toContain('还没有习惯');
+    // 板子仍挂载（白屏检测那条依赖这一点），只是里面一条习惯都没有。
+    expect(qa('[data-testid="habit-board"]')).toHaveLength(1);
+  });
+
+  it('点一行之后：窗格与 aria-current 说的是同一条', () => {
+    selectRow('喝水');
+    expect(markedRows()).toHaveLength(1);
+    expect(selectedName()).toBe('喝水');
+    expect(pane()?.getAttribute('aria-label')).toBe('「喝水」的打卡记录');
+    /* 🔴  equality 比"窗格里有这个名字"硬：卡片自己的 testID 带着习惯 id，
+       把它和带痕迹那一行的 id 对上，才挡得住"痕迹指 A、窗格画 B"那种分叉
+       （A5 那一臂实测就是这个形状：只断文字会漏，因为两条习惯的名字都在 DOM 里）。 */
+    const markedId = markedRows()[0]?.getAttribute('data-testid')?.replace('habit-row-', '');
+    const cardIds = qa<HTMLElement>('[data-testid^="habit-card-"]', pane() ?? document)
+      .map((el) => (el.getAttribute('data-testid') ?? '').replace('habit-card-', ''));
+    expect(cardIds, '窗格里的卡片数不是恰好一枚').toHaveLength(1);
+    expect(cardIds[0], `痕迹在 ${markedId} 而窗格画的是 ${cardIds[0]}`).toBe(markedId);
   });
 
   it('🔴 点另一行后窗格换人：新名字出现、旧名字不再出现', () => {
-    const was = selectedName();
-    const other = was === '喝水' ? '阅读' : '喝水';
-    selectRow(other);
+    selectRow('喝水');
+    selectRow('阅读');
     const text = pane()?.textContent ?? '';
-    expect(text).toContain(other);
-    expect(text).not.toContain(was);
-    expect(selectedName()).toBe(other);
+    expect(text).toContain('阅读');
+    expect(text).not.toContain('喝水');
+    expect(selectedName()).toBe('阅读');
   });
 
   it('窗格只给选中那一条渲染打卡按钮（两块板 / 两个按钮都会在这里现形）', () => {
+    selectRow('喝水');
     const name = selectedName();
     expect(qa(`[data-testid="habit-checkin-${habitIdOf(name)}"]`, pane() ?? document)).toHaveLength(1);
     expect(qa('[data-testid^="habit-checkin-"]', pane() ?? document)).toHaveLength(1);
   });
 
-  it('选中项被删掉时退回剩下那条，不出现空窗格（派生 fallback，不是 useEffect）', async () => {
+  it('🔴 选中项被删掉时回到**未选中**，不是猜下一条（与便签面同一回落）', async () => {
+    /* 旧判据写的是"退回剩下那条"。删掉当前习惯之后**自动选下一条**同样是宿主猜位置：
+       用户刚删掉一条，界面却把另一条摊开在他面前，而共享态是 prune 出来的、不是他选的。
+       现在走 `pruneSelectionFromEntities` ⇒ 共享态变 null ⇒ 窗格回到"选一条习惯"那一格。
+       原句里"不出现空窗格"要的东西仍然成立：板子始终挂载、窗格有话说，只是说的是措辞而不是数据。 */
+    selectRow('喝水');
     const gone = selectedName();
     const keep = gone === '喝水' ? '阅读' : '喝水';
     await act(async () => {
       await useHabitStore.getState().deleteHabit(habitIdOf(gone));
     });
-    await until(`「${keep}」成为选中项`, () => selectedName() === keep);
-    expect(qa('.ht-habit__item')).toHaveLength(1);
-    expect(pane()?.getAttribute('aria-label')).toBe(`「${keep}」的打卡记录`);
+    await until(`「${keep}」还在列表里`, () => qa('.ht-habit__item').length === 1);
+    expect(markedRows()).toHaveLength(0);
+    expect(pane()?.textContent ?? '').toContain('选一条习惯');
     expect(qa('[data-testid="habit-board"]')).toHaveLength(1);
   });
 });
 
 describe('D. 图标选择器：存闭集 key，不存字形名', () => {
+  /**
+   * 图标选择器长在**窗格头部**，而窗格头部只在"有选中"时存在。
+   * 🔴 所以 D 组每条都得先 `selectRow` —— 这一单之前不必，因为 `?? rows[0]`
+   * 让头部永远在。那枚回落撤掉之后"没选中就没有头部"是**新形状**，
+   * 由 C 组第一条钉住；这里补的是它的另一面：选择器不是消失了，是要先选中才出现。
+   */
   function openPicker(): void {
     const toggle = qa<HTMLElement>('.ht-habit__icon-toggle', pane() ?? document)[0];
-    expect(toggle).toBeDefined();
+    expect(toggle, '窗格头部里没有图标开关（有没有先 selectRow？）').toBeDefined();
     click(toggle);
   }
 
@@ -302,6 +347,7 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
   };
 
   it('八个字形 + 一个「默认」，一个都不许多（词表是红线）', () => {
+    selectRow('喝水');
     openPicker();
     const options = qa('.ht-habit__icon-option', pane() ?? document);
     expect(options).toHaveLength(HABIT_ICONS.length + 1);
@@ -309,6 +355,7 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
   });
 
   it('🔴 选一个字形 → **落库的是 key**，且行首圆盘跟着变', async () => {
+    selectRow('喝水');
     const name = selectedName();
     // 🔴 挑的字形必须**一定不同于**这条习惯当前画着的那个（BLOCKED.md B9）：
     // 派生字形由 id 哈希决定，而 id 每次运行都是新随机 UUID ⇒ 约 1/8 的运行
@@ -325,6 +372,7 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
   });
 
   it('再点同一个字形 = 退回派生（存的是 `undefined`，不是"没有图标"）', async () => {
+    selectRow('喝水');
     const name = selectedName();
     openPicker();
     click(optionAt('book'));
@@ -441,5 +489,37 @@ describe('F. 字形表：web 清单与共享 RN 清单不许各画各的', () =>
     const shared = glyphTable(readSharedListSource(), '共享层');
     const web = glyphTable(readFileSync(resolve(here, '../src/features/habits/habit-glyphs.ts'), 'utf8'), 'web');
     expect(shared).toEqual(web);
+  });
+});
+
+describe('G. 回落规则的形状（源码级，剥注释后再读）', () => {
+  /* 🔴 先剥注释。这一族判据读的是**代码形状**，而注释里会引用被禁的那个写法本身
+     （这里就写着 `?? rows[0]`）。不剥注释的话，一条会被散文改变的判据量的不是代码 ——
+     工单 §8.130 第 7 节为此连撞两处（jsdom 用例 + 常驻门禁）。行注释只认行首的。 */
+  const stripComments = (src: string): string =>
+    src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+
+  // F 组那个同名 `here` 长在它自己的 describe 作用域里，这里要自己算一份。
+  const here = dirname(fileURLToPath(import.meta.url));
+
+  const viewSource = (): string =>
+    stripComments(readFileSync(resolve(here, '../src/features/habits/HabitsView.tsx'), 'utf8'));
+
+  it('🔴 习惯面不许再有"猜第一条"的回落', () => {
+    expect(viewSource()).not.toMatch(/rows\[0\]/);
+  });
+
+  it('左列的痕迹接的是共享选中态本身，不是那个派生值', () => {
+    // 派生值在撤掉回落之前恒等于"第一条"，于是 aria-current 说的是宿主猜的位置。
+    expect(viewSource()).toMatch(/<HabitsList[\s\S]{0,400}?selectedId=\{selectedId\}/);
+  });
+
+  it('`selectedId` 的空值是 `null` —— 与共享选中态同一个"没有"，不逼装配处写转换', () => {
+    const src = stripComments(
+      readFileSync(resolve(here, '../src/features/habits/HabitsList.tsx'), 'utf8'),
+    );
+    expect(src).toMatch(/selectedId: string \| null;/);
+    expect(src).not.toMatch(/selectedId: string \| undefined;/);
+    expect(viewSource()).not.toMatch(/selectedId=\{selectedId \?\? undefined\}/);
   });
 });

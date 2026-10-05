@@ -1576,7 +1576,14 @@ describe('§2.1 服务端词表落后于客户端', () => {
     expect(status.reason).toBe('upload-rejected');
     expect(status.retryable).toBe(false);
     expect(status.message).toContain('不认识它的实体类型');
-    expect(status.message).toContain('请先升级服务端');
+    expect(status.message).toContain('这台服务器的版本落后于客户端');
+    expect(status.message).toContain('这些数据仍完整保存在本机');
+    // 🔴 这句是本轮审计加进来的**反向腿**：以前这里断言 `'请先升级服务端'`，
+    // 而那句话承诺的"然后再同步一次"没有任何代码兑现（`rejected` 不在上传队列里，
+    // 全仓没有 `rejected→pending` 的再入队路径）⇒ 判据钉在了一句谎话上。
+    // 现在钉的是"说得出成因 + 不许诺不存在的自愈"。
+    expect(status.message).toContain('不会自动补传');
+    expect(status.message).not.toMatch(/然后再同步一次|升级服务端（自托管部署尤其注意这一点），然后/);
     expect(status.message).toContain('仍完整保存在本机');
     // 数据没上云 ⇒ 不许标成已上传，必须走 markRejected
     expect(h.marked).toHaveLength(0);

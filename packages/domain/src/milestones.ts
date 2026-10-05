@@ -27,7 +27,20 @@ import { focusSessionDay, shouldPersistSession } from './focus.js';
 export interface ActivityTotals {
   /** 累计打卡次数（达成与否不在此层区分 —— 那是 streak 的口径）。 */
   checkIns: number;
-  /** 累计专注时长（ms）。只含工作段（`shouldPersistSession`）。 */
+  /**
+   * 累计**自然完成**的工作段数（不含休息、不含中途放弃）。
+   *
+   * 🔴 这个数**不能由 `focusMs` 推出来**：25 分钟一段与两段 12.5 分钟共享同一个
+   * `focusMs`，而番茄数一个是 1、一个是 2。
+   *
+   * ⚠️ 它与下面的 `focusMs` **口径不同，而且必须不同**：时长含放弃段
+   * （"真实坐下来的时间"，见 `focus.ts` 的 `FocusDayStats.focusMs`），
+   * 而段数只数完成的那些（一段没做完就不是一个番茄）。
+   * 这不是不一致 —— 是"多少个番茄"与"坐了多久"本来就是两个问题。
+   * 判据要钉住的是**今日与累计两处用同一套口径**（工单 W7 ①）。
+   */
+  focusCount: number;
+  /** 累计专注时长（ms）。只含工作段（`shouldPersistSession`），含中途放弃的部分。 */
   focusMs: number;
   /** 累计完成的任务数。 */
   tasksCompleted: number;
@@ -59,11 +72,14 @@ export function computeActivityTotals(input: ActivityTotalsInput): ActivityTotal
   }
 
   let focusMs = 0;
+  let focusCount = 0;
   for (const session of input.focusSessions) {
     if (session.deletedAt !== undefined) continue;
     // 休息不是专注成果 —— 口径与 `focusStatsForDay` 一致，不另立一套。
     if (!shouldPersistSession(session)) continue;
     focusMs += session.actualMs ?? session.plannedMs;
+    // 段数只数**自然完成**的（与 `FocusDayStats.completedWorkCount` 同一条判据）。
+    if (session.completed === true) focusCount += 1;
     days.add(toLocalDate(focusSessionDay(session)));
   }
 
@@ -75,7 +91,7 @@ export function computeActivityTotals(input: ActivityTotalsInput): ActivityTotal
     days.add(toLocalDate(task.completedAt));
   }
 
-  return { checkIns, focusMs, tasksCompleted, activeDays: days.size };
+  return { checkIns, focusCount, focusMs, tasksCompleted, activeDays: days.size };
 }
 
 /** 里程碑的四个维度。 */

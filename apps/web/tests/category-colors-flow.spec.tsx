@@ -124,6 +124,10 @@ describe('从界面选一个色槽，最后真的出现在成长视图里', () =
     // 先切到习惯视图（默认落在任务视图）。
     click(byText('习惯'));
     await flush();
+    // 🔴 2026-10-05（工单 §8.131）：窗格不再默认展示第一条（那枚 `?? rows[0]` 与共享选中态
+    // 互相矛盾），取色器长在窗格头部 ⇒ 必须先点一行把那条习惯选中。
+    click(document.querySelector('[data-testid^="habit-row-"]'));
+    await flush();
 
     const toggle = container?.querySelector('.ht-slot-picker__toggle');
     expect(toggle, '习惯卡片上应该有取色器入口').not.toBeNull();
@@ -154,6 +158,10 @@ describe('从界面选一个色槽，最后真的出现在成长视图里', () =
 
   it('再点一次同一个槽位 = 清除，并且界面上真的回到「无」', async () => {
     click(byText('习惯'));
+    await flush();
+    // 🔴 2026-10-05（工单 §8.131）：窗格不再默认展示第一条（那枚 `?? rows[0]` 与共享选中态
+    // 互相矛盾），取色器长在窗格头部 ⇒ 必须先点一行把那条习惯选中。
+    click(document.querySelector('[data-testid^="habit-row-"]'));
     await flush();
 
     await clickAndSettle(container?.querySelector('.ht-slot-picker__toggle'));

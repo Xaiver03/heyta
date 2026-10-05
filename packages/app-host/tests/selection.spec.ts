@@ -25,6 +25,7 @@ import {
   SELECTABLE_KINDS,
   createSelectionStore,
   pruneMissingSelection,
+  moveSelectionInList,
   pruneSelection,
 } from '../src/selection.js';
 
@@ -187,5 +188,77 @@ describe('回落规则：只认实体存在性', () => {
     pruneSelection(store, { task: () => true, habit: () => true });
     expect(listener).not.toHaveBeenCalled();
     expect(store.snapshot()).toEqual({ task: 't1', habit: 'h1' });
+  });
+});
+
+describe('moveSelectionInList（工单 W1b 的键盘光标规则）', () => {
+  /**
+   * 为什么这些规则在 app-host 而不是各视图里：↑↓ "往哪走"是**产品语义**
+   * （AGENTS §3.5），而 web 今天有四个任务投影（列表 / 四象限 / 时间线 / 搜索面板）
+   * 加习惯、便签共六个入口。各写一遍的结果必然是"在列表里 ↓ 走一行，
+   * 切到四象限再 ↓ 走了两行"。
+   */
+  const ids = ['a', 'b', 'c'];
+
+  it('空列表：两个方向都是 null（不是 undefined、不是抛错）', () => {
+    expect(moveSelectionInList({ orderedIds: [], current: null, delta: 1 })).toBeNull();
+    expect(moveSelectionInList({ orderedIds: [], current: 'x', delta: -1 })).toBeNull();
+  });
+
+  it('没选中时按方向进列表：↓ 到第一项、↑ 到最后一项', () => {
+    expect(moveSelectionInList({ orderedIds: ids, current: null, delta: 1 })).toBe('a');
+    expect(moveSelectionInList({ orderedIds: ids, current: null, delta: -1 })).toBe('c');
+  });
+
+  it('中间位置：↓ 下一项、↑ 上一项', () => {
+    expect(moveSelectionInList({ orderedIds: ids, current: 'b', delta: 1 })).toBe('c');
+    expect(moveSelectionInList({ orderedIds: ids, current: 'b', delta: -1 })).toBe('a');
+  });
+
+  it('🔴 端点夹住，不环绕：顶 ↑ 仍是顶、底 ↓ 仍是底', () => {
+    // 环绕的症状是"连按 ↓ 突然跳回顶部"，在长列表里那是最容易迷失的一刻；
+    // 而"已经到底了"本身是有用的信息。
+    expect(moveSelectionInList({ orderedIds: ids, current: 'a', delta: -1 })).toBe('a');
+    expect(moveSelectionInList({ orderedIds: ids, current: 'c', delta: 1 })).toBe('c');
+  });
+
+  it('只有一项时两个方向都是它自己', () => {
+    expect(moveSelectionInList({ orderedIds: ['only'], current: null, delta: 1 })).toBe('only');
+    expect(moveSelectionInList({ orderedIds: ['only'], current: 'only', delta: -1 })).toBe('only');
+  });
+
+  it('🔴 选中的那条不在当前列表里（切了筛选）：按方向进列表，不猜它"本来该在哪"', () => {
+    expect(moveSelectionInList({ orderedIds: ids, current: 'zzz', delta: 1 })).toBe('a');
+    expect(moveSelectionInList({ orderedIds: ids, current: 'zzz', delta: -1 })).toBe('c');
+  });
+
+  it('🔴 只按**传进来的顺序**走，不自己排序（排了就成第二个所有者）', () => {
+    // 故意给一串"字典序倒过来"的 id：如果这里再 sort 一遍，↓ 会走到 'y'。
+    const reversed = ['z', 'y', 'x'];
+    expect(moveSelectionInList({ orderedIds: reversed, current: 'z', delta: 1 })).toBe('y');
+    expect(moveSelectionInList({ orderedIds: reversed, current: null, delta: 1 })).toBe('z');
+  });
+
+  it('连按五次的轨迹：逐项走到底后**停住**，不跳回顶部', () => {
+    const seen: string[] = [];
+    let cur: string | null = null;
+    for (let i = 0; i < 5; i += 1) {
+      cur = moveSelectionInList({ orderedIds: ids, current: cur, delta: 1 });
+      seen.push(String(cur));
+    }
+    expect(seen).toEqual(['a', 'b', 'c', 'c', 'c']);
+  });
+
+  it('纯函数：不碰 store —— 同一串输入连调两次结果相同、也不发通知', () => {
+    const store = createSelectionStore();
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const first = moveSelectionInList({ orderedIds: ids, current: null, delta: 1 });
+    const again = moveSelectionInList({ orderedIds: ids, current: null, delta: 1 });
+    expect([first, again]).toEqual(['a', 'a']);
+    expect(listener).not.toHaveBeenCalled();
+    // 真的走一遍才通知：宿主的动作仍然是 `select()`，这里只回答"该选谁"。
+    store.select('task', 'a');
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });
