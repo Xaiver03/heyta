@@ -60,7 +60,17 @@ function preview(note: string): string {
   return body.length > PREVIEW_CHARS ? `${body.slice(0, PREVIEW_CHARS)}…` : body;
 }
 
-export function NoteEditor({
+/**
+ * 备注的**正文输入框**（不含展开机关）。
+ *
+ * 🔴 为什么把它单独导出来：备注这一栏有两个落点（工单 §8.138 拍完"行内展开 vs 栏里编辑"
+ * 那道二选一之后才有的形状）—— 详情列放得下时它住在栏里（`TaskDetailCard`），
+ * 放不下时退回行尾那颗 chip 的 `<details>` 里。两处要的是**同一份写入语义**
+ * （失焦才提交、空串写 `undefined`、没变不发 op、非受控 + `key`），
+ * 抄两遍就是 AGENTS §3.5 那两条"抽出实现却没删旧的"事故形状。
+ * 这里只管正文与提交；`<details>` 那一层留在 `NoteEditor` 里。
+ */
+export function NoteField({
   task,
   onSetNote,
 }: {
@@ -69,32 +79,14 @@ export function NoteEditor({
   onSetNote: (note: string | undefined) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
-  const hasNote = task.note !== undefined && task.note.trim() !== '';
 
   return (
-    <details className="ht-note">
-      <summary
-        // 有备注时 chip 是实心的：它承担"这一行写过东西"的提示职责，
-        // 没有备注时只是一个低调的入口。
-        //
-        // 🔴 用既有的 `.ht-chip` / `.ht-chip--on`（与设置页的能力开关同一个 chip 族），
-        // 而不是在这里现写一套：chip 的边距、圆角、字号、光标都已在 app.css 里。
-        // 只留 `listStyle: 'none'` —— `.ht-chip` 不负责隐藏 `<summary>` 的展开三角。
-        className={hasNote ? 'ht-chip ht-chip--on' : 'ht-chip'}
-        style={{ listStyle: 'none' }}
-      >
-        <NotebookPen size={ICON_SIZE.xs} aria-hidden="true" />
-        {/*
-          chip 上显示的是**用户自己的字**（备注预览），原样呈现、不翻译。
-          没有备注时才用词条表里那句「备注」。
-          `preview()` 已把长度截到 24 字，所以这里不再需要 ellipsis 约束。
-        */}
-        <span>{hasNote ? preview(task.note!) : t('web.note.toggle')}</span>
-      </summary>
-
-      {/* `.ht-compose` 是「输入行」：它给这个只有一行控件的容器 flex + 间距。 */}
+    <>
       <div className="ht-compose">
         <textarea
+          // `data-testid` 是键盘光标那一族的落点锚（工单 W1b 第 3 条腿：在选中那一行上按
+          // Enter，焦点进这只正文框，见 `lib/keyboard-cursor.ts` 的 `enterTarget`）。
+          data-testid="task-note-input"
           // 🔴 非受控 + key：外部改动能刷进来，用户打字时不会被重置（见文件头第 4 条）。
           key={task.note ?? ''}
           defaultValue={task.note ?? ''}
@@ -122,6 +114,73 @@ export function NoteEditor({
         />
       </div>
       <p className="ht-settings__hint">{t('web.note.hint')}</p>
+    </>
+  );
+}
+
+/**
+ * 行尾那枚**只读徽标** —— 备注的编辑器搬进栏里之后，列表还要能看出"这一行写过东西"。
+ *
+ * 🔴 它刻意不是第二份编辑器：没有 `<details>`、没有输入框、没有 `onPress`。
+ * 一次点击 = 选中那一行（行的那颗按钮接这一下），而正文只在栏里改 ——
+ * 这是 §8.138 那条不变量（每个字段只有一个编辑器所有者）的另一半。
+ * 第一趟看图就是照出"少了它"：那一行明明写着两段备注，列表里却一点痕迹都没有
+ * （`NoteEditor.tsx` 文件头第 1 条那个"扫一眼要能看出哪些任务写了东西"的职责被削掉了）。
+ *
+ * ⚠️ 没备注时它**不占位**：这是拍板 #8 三态契约里的 `record` 那一档
+ * （有记录才出现），与栏里那个常驻的区块头（`affordance`）不冲突。
+ */
+export function NoteBadge({ task }: { task: Task }): React.JSX.Element | null {
+  const hasNote = task.note !== undefined && task.note.trim() !== '';
+  if (!hasNote) return null;
+  return (
+    <span className="ht-chip ht-chip--on" data-testid={`task-note-badge-${task.id}`}>
+      <NotebookPen size={ICON_SIZE.xs} aria-hidden="true" />
+      <span>{preview(task.note!)}</span>
+    </span>
+  );
+}
+
+/**
+ * 行尾那一颗**备注 chip**：详情列没在画的时候，正文输入框就住在这它的 `<details>` 里。
+ *
+ * ⚠️ 它现在是被**条件挂载**的（`App.tsx` 的 `noteInColumn` 反向）：栏里画着的时候这里
+ * 整个不渲染，于是同一时刻 DOM 里只有一只备注输入框。两个落点各拿一个必填布尔决定，
+ * 刻意的不是"默认值等于原行为"（§8.130 那条理由：那种写法会把"宿主没接"伪装成"做完了"）。
+ */
+export function NoteEditor({
+  task,
+  onSetNote,
+}: {
+  task: Task;
+  onSetNote: (note: string | undefined) => void;
+}): React.JSX.Element {
+  const { t } = useI18n();
+  const hasNote = task.note !== undefined && task.note.trim() !== '';
+
+  return (
+    <details className="ht-note">
+      <summary
+        // 有备注时 chip 是实心的：它承担"这一行写过东西"的提示职责，
+        // 没有备注时只是一个低调的入口。
+        //
+        // 🔴 用既有的 `.ht-chip` / `.ht-chip--on`（与设置页的能力开关同一个 chip 族），
+        // 而不是在这里现写一套：chip 的边距、圆角、字号、光标都已在 app.css 里。
+        // 只留 `listStyle: 'none'` —— `.ht-chip` 不负责隐藏 `<summary>` 的展开三角。
+        className={hasNote ? 'ht-chip ht-chip--on' : 'ht-chip'}
+        style={{ listStyle: 'none' }}
+      >
+        <NotebookPen size={ICON_SIZE.xs} aria-hidden="true" />
+        {/*
+          chip 上显示的是**用户自己的字**（备注预览），原样呈现、不翻译。
+          没有备注时才用词条表里那句「备注」。
+          `preview()` 已把长度截到 24 字，所以这里不再需要 ellipsis 约束。
+        */}
+        <span>{hasNote ? preview(task.note!) : t('web.note.toggle')}</span>
+      </summary>
+
+      {/* 正文与提示那一行原样搬进 `NoteField`：展开后的 DOM 与搬之前逐字节相同。 */}
+      <NoteField task={task} onSetNote={onSetNote} />
     </details>
   );
 }

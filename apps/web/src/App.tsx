@@ -90,7 +90,7 @@ import { TaskOrganizer } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
 import { TaskRepeat } from './features/tasks/TaskRepeat.js';
 import { DueEditor } from './features/tasks/DueEditor.js';
-import { NoteEditor } from './features/tasks/NoteEditor.js';
+import { NoteBadge, NoteEditor } from './features/tasks/NoteEditor.js';
 import { SubtaskPicker } from './features/tasks/SubtaskPicker.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
@@ -143,6 +143,7 @@ import { HabitsView } from './features/habits/HabitsView.js';
 import { GrowthView } from './features/motivation/GrowthView.js';
 import { NotesView } from './features/notes/NotesView.js';
 import { NoteEditorCard } from './features/notes/NoteEditorCard.js';
+import { TaskDetailCard } from './features/tasks/TaskDetailCard.js';
 import { useDetailColumnShown } from './features/shell/detail-pane-visible.js';
 import { ReminderPanel } from './features/reminders/ReminderPanel.js';
 import { TimelinePanel } from './features/timeline/TimelinePanel.js';
@@ -661,6 +662,18 @@ export function App(): React.JSX.Element {
   const detailColumnShown = useDetailColumnShown(detailPane === 'collapsed');
 
   /**
+   * 任务面单**此刻画在详情列里**的那个条件 —— 栏在画（几何 + 没被收起）且当前是任务那一族
+   * 的视图（列表 / 四象限 / 时间线：同一批任务行、同一个 `'task'` 选中态）。
+   *
+   * 🔴 行尾那颗备注 chip 用的是**这同一个布尔的反向**，不是再算一遍条件：两处共用一枚变量，
+   * "chip 没了而栏里也没有输入框"（= 任何档下都写不了备注）这一档就结构上不可能出现。
+   * 工单 §8.138。
+   */
+  const taskPaneInColumn =
+    detailColumnShown &&
+    (contentView === 'tasks' || contentView === 'quadrant' || contentView === 'timeline');
+
+  /**
    * ⌘/Ctrl + Shift + \\ 开合详情列 —— 三条恢复路径里的"快捷键"那一条。
    *
    * 值得为它加一个界面上没画出来的入口：键盘用户收起它的那一下就是想要"临时让列表变宽"，
@@ -884,13 +897,24 @@ export function App(): React.JSX.Element {
         >
           {/* 备注。🔴 在它之前 Web 上**没有备注输入框** ——
               `Task.note` 与 `setNote` 都在，但唯一调用点是 AI 拆解与 AI 估时，
-              于是"我自己能不能在任务上写点东西"的答案是"不能"。 */}
-          <NoteEditor
-            task={task}
-            onSetNote={(note) => {
-              void store.setNote(task.id, note);
-            }}
-          />
+              于是"我自己能不能在任务上写点东西"的答案是"不能"。
+
+              ⚠️ 工单 §8.138 之后它**只在详情列没在画时挂在这里**：栏里画着的时候正文输入框
+              住在 `TaskDetailCard` 那一格，这里换成一枚**只读徽标**（`NoteBadge`）。
+              理由是那道二选一的裁决要的不变量 —— 同一字段任何时刻只有一个编辑器所有者，
+              两处都能改就会漂移成两套写入语义；而"扫一眼列表要能看出哪些任务写了东西"
+              这一档不能因为搬进栏里就丢掉（第一趟看图照出来的正是这个）。
+              窄档（栏不出现）时它退回这一格，所以"写不了备注"在任何档都不会发生。 */}
+          {taskPaneInColumn ? (
+            <NoteBadge task={task} />
+          ) : (
+            <NoteEditor
+              task={task}
+              onSetNote={(note) => {
+                void store.setNote(task.id, note);
+              }}
+            />
+          )}
 
           {/* 子任务。🔴 在它之前：`packages/domain/src/subtasks.ts`（616 行，
               建树 + 环防护 + 深度/子数上限）与 `app-host` 的 `setParent`
@@ -1020,7 +1044,7 @@ export function App(): React.JSX.Element {
         </div>
       );
     },
-    [aiSecrets, aiSettings, memory.preferenceSet, store, t],
+    [aiSecrets, aiSettings, memory.preferenceSet, store, t, taskPaneInColumn],
   );
 
   /** 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。 */
@@ -2567,6 +2591,13 @@ export function App(): React.JSX.Element {
              没选中时它仍然挂载，说的是"选一条习惯…"（`paneEmptyText`）——
              板子始终一枚是 `motivation.spec` 白屏检测的前提，与落点无关。 */
           <HabitDetailCard inset />
+        ) : taskPaneInColumn ? (
+          /* 任务面单（工单 §8.138）：选中哪一条，这一格就是那一条的面单；没选中就不画
+             （沿用便签那一支的先例，见 `TaskDetailCard` 文件头那一段"为什么没有空态"）。
+             四象限与时间线走同一批任务行、同一个 `'task'` 选中态 ⇒ 三面共用这一支。
+             🔴 备注编辑器的落点在**这一格**，所以行尾那颗备注 chip 在这一支成立时不渲染
+             （`renderTaskTrailing` 里的 `noteInColumn`）—— 同一字段任何时刻只有一个所有者。 */
+          <TaskDetailCard />
         ) : null}
       </aside>
       </div>
