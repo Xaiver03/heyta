@@ -13986,3 +13986,40 @@ npx vitest run（服务端全量）                                             
 
 ⚠️ 因此第 1 项"main 前进到该载体"这一格**仍未闭合**，且闭合条件按上表重新表述；
 本会话没有预跑落地链、没有 `git branch -f main`、没有动主检出、没有 push（硬约束逐字遵守）。
+
+### 8.264 目标里"main 红在 check:docs 5 处"这半句**已过期**；main 的红挪到了 `pnpm -r test`，归属对象也换了（2026-10-05 21:0x）
+
+落地前必须重取的读数，这次取了。判据本体 `node research/tools/docs-link-check.mjs`（= `check:docs`），
+在**两把尺**上各跑一次，两处都是绿的：
+
+| 载体 | 树 | 读数 |
+|---|---|---|
+| 主检出（含 68 枚未提交文件） | `8f870ea3` + 工作树 | ✅ 无死链、无失效章节引用、无失效锚点 |
+| **干净**隔离树 `git worktree add --detach /tmp/heyta-main-tip-recheck 8f870ea3` | 逐字 main tip | ✅ 同上，`283 文件 / 1997 相对链接 / 556 处跨文档章节引用 / 55 处页内锚点`，rc=0 |
+
+🔴 原来那 5 处红里有 4 处的"目标在主检出是 `??` 未跟踪"这一半，现量已不成立：
+那四枚（`docs/runbooks/icp-app-filing.md`、`docs/plans/goal-multi-end-coverage.md`、
+`docs/reference/build-matrix.md`、`docs/runbooks/multi-platform-build.md`）**全部已在 main 上**
+（`git cat-file -e main:<路径>` 逐条命中）。消掉它的是别线的提交，不是本批：
+`2cff1d55 fix(docs): …` 与 `8f870ea3 docs(§12.8 读数): 那枚 GATE_docs 的红在提交前是真的…` ——
+后者自己就把这件事写在了标题里。本批对 `check:docs` **一个字没改**。
+
+⇒ **第 1 项的关闭判据要按新形状走**："main 自己红在 check:docs 5 处、须逐条归属到非本批"这一句
+作为前置**已消失**（不是被本批满足，是前提不再成立）。但同一时间别线取到了 main 的**新红**：
+`7d1f2d27` 的标题逐字是"同一条 `pnpm -r test` 跑在干净检出的 main(8f870ea3) 上也是红的 ——
+红在 apps/web 的 24 条真用例，没走到 apps/mobile"。因为 `pnpm check` 链尾就是 `pnpm -r test`，
+这 24 条会原样落到**载体的** `pnpm check` 上 —— 而它属"非本批"，正是要逐条归属的那种红。
+⚠️ 本会话**没有**自己复跑这条（要跑全量单测 + 会顶高负载、直接挡掉 §8.263 那把等待窗），
+读数是引用别线那笔提交的原文；落地那一刻必须用同一把尺在载体树上现量一次，不能拿这条当现量。
+
+🔴 另一条要在落地前**先判清**的（本会话只量出形状、未判定成因）：
+`git rev-list --left-right --count origin/main...main` 现量 = **origin 独有 595 / 本地 main 独有 57**，
+即本地的 `origin/main` 指针（`a40d304a`）与本地 main 是**两条血缘**，而 `a40d304a` 恰好是
+ `/private/tmp/heyta-merge-carrier-public` 那个载体 worktree 的 tip。两种解释都还没排掉：
+①这台机对远端的可见性受本机代理/凭据限制，那次 `git fetch` 实际没带回东西（本会话的 fetch 是
+`--quiet` 且没查 rc，这是**我的取证缺陷**）；②`origin/main` 这个 ref 曾被某轮载体实验写过。
+落地动作是 `git merge --ff-only <carrier>`（本地、不 push），所以这一格**不挡落地**，
+但它挡"落地之后 main 与远端的关系怎么说"这句话 —— 硬约束不许 push，故只登记不处置。
+
+⚠️ 本节没改变任何状态声明：第 1 项仍差"main 前进到该载体"一格（§8.263 的联合窗口），
+第 8 项仍排在落地之后。
