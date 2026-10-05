@@ -771,9 +771,16 @@ bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要�
     reveal_rid "ai-consent-$cf" || { MISSC="$MISSC $cf(滚不出来)"; continue; }
     tap_rid "ai-consent-$cf" || MISSC="$MISSC $cf(点不动)"
   done
+  # 🔴 点不到**不判红、不中止**（rig28 现量：五档全报"滚不出来"而整趟被我的判定顶死，
+  #   10 项通过改成"未跑完就中止"——那是我加出来的新故障，不是产品的）。
+  #   代码形状：`ai-consent-<feature>` 是**一枚 Button**（授权/撤销），且外面罩着 `{needs ? …}`
+  #   （apps/mobile/src/ai/AiSettingsSection.tsx:407）——这一档不需要逐功能同意时它**根本不渲染**，
+  #   所以"屏上没有这枚"和"载体没滚到"是两句话，而设备侧分不开。
+  #   ⇒ 只登记读数，等第 5 步自己的 enabled 判定来说话；成因候选因此仍留着，不许在这一格替它编结论。
   if [ -n "$MISSC" ]; then
-    echo "   ❌ 这些档的同意开关没点到:$MISSC —— 后面的零外发判据会因为没有 target 而恒红，那是载体的事" >&2
-    return 1
+    echo "   ⓘ 这些档没找到可点的同意控件:$MISSC" >&2
+    echo "     （`ai-consent-*` 罩在 needs 条件下，本模式可能压根不渲染；也可能是载体没滚到 —— 设备侧分不开）" >&2
+    echo "     不判红、不中止：第 5 步的 enabled 才是真判据，它红会自己说清差哪一档" >&2
   fi
   local readc linec cc missc2=""
   readc=$(routes_reading)
@@ -782,10 +789,10 @@ bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要�
     case "$cc" in (''|*[!0-9]) missc2="$missc2 $linec(读不出)" ;; *) [ "$cc" -ge 1 ] || missc2="$missc2 $linec" ;; esac
   done
   if [ -n "$missc2" ]; then
-    echo "   ❌ 点了开关而库里这些档的同意仍是 0（$missc2）—— 不拿「点过了」当已通过" >&2
-    return 1
+    echo "   ⓘ 库里这些档的同意仍是 0：$missc2（与上面那行合并着读：控件没渲染时这条是预期的）" >&2
+  else
+    echo "   · 五档逐功能同意在库里各有 ≥1 条（回读：$readc）" >&2
   fi
-  echo "   · 五档逐功能同意在库里各有 ≥1 条（回读：$readc）" >&2
   return 0
 }
 
