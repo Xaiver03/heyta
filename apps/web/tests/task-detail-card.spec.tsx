@@ -295,7 +295,7 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
     await flush();
   }
 
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
 
   it('🔴 栏里那一格画着重复的**编辑本体**，且整栏只有一份', async () => {
     const a = await addTask('重复甲');
@@ -381,7 +381,7 @@ describe('子任务这一字段此刻归谁（§8.144）', () => {
     return { a, b, c };
   }
 
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
 
   it('🔴 栏里画的是子任务的**编辑本体**，且整栏只有一只 `<select>`', async () => {
     const { a } = await makeChain();
@@ -475,7 +475,7 @@ describe('提醒这一字段此刻归谁（§8.145）', () => {
     ).length;
   }
 
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
 
   it('🔴 栏里画的是提醒的**编辑本体**（共享 `ReminderList`），整栏只有一份', async () => {
     const id = await addTask('提醒甲');
@@ -572,7 +572,7 @@ describe('提醒这一字段此刻归谁（§8.145）', () => {
 });
 
 describe('截止这一字段此刻归谁（§8.146）', () => {
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
   /** 月历里那一格的可访问名 = `{month}月{day}日`（词条 `web.due.dayLabel`）。 */
   const dayCell = (label: string): string => `[role="button"][aria-label="${label}"]`;
   /* 🔴 月份从 store 那个冻结的"现在"推，不写死 10 月：写死的月份在跨月那天会变成
@@ -679,7 +679,7 @@ describe('截止这一字段此刻归谁（§8.146）', () => {
  *    所以下面那条判据量的是**换选中后值跟着换人** —— 一旦有人把它改成非受控草稿，那条就红。
  */
 describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
   const selectIn = (root: Element | null | undefined): HTMLSelectElement | null =>
     root?.querySelector<HTMLSelectElement>('[data-testid="organize-project-select"]') ?? null;
   /** 数某一档区块头：只数**叶子文本节点所在的那个元素**，不数 aria-label。 */
