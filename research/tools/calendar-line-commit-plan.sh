@@ -641,10 +641,60 @@ else
   ANCHORS="$ANCHORS" bash research/tools/calendar-line-hunk-ownership.sh "${NAMES[@]}"
   HO_RC=$?
   if [ "$HO_RC" != 0 ]; then
-    echo "   ❌ 有孤儿 hunk ⇒ 这一笔会带走不是我写的字节，拒绝提交（exit 1）。"
-    echo "      要么补锚点，要么与所有者分开提交；ALLOW_ORPHAN=1 是**承认放行**不是静默绕过（会大字留痕）。"
-    exit 1
+    if [ "$CONFIRM" = 1 ]; then
+      echo "   ❌ 有孤儿 hunk ⇒ 这一笔会带走不是我写的字节，拒绝提交（exit 1）。"
+      echo "      要么补锚点，要么与所有者分开提交；ALLOW_ORPHAN=1 是**承认放行**不是静默绕过（会大字留痕）。"
+      exit 1
+    fi
+    # 🔴 干跑**只报不拦**（§4.05 (56)）。原形状是"只要传了 ANCHORS，干跑也会 exit 1"，
+    #    于是本文件第 8 行那句"干跑只测量与打印"的契约被一个**可选输入**打破了：
+    #    同一份清单，干跑带针 = 红，干跑不带针 = 跳过。实测它伤到了臂 14 那条配对腿
+    #    （以及任何"顺手把 ANCHORS 一起传进来先看归属"的用法）。
+    #    拦的那一手仍然只在 --confirm 那一条路上（臂 21 钉着），这条改动由臂 20 钉着。
+    echo "   ⚠️ 干跑判到孤儿 hunk ⇒ 只报数、不拦这一趟（本工具还没碰索引）。同一份清单走 --confirm 会被拒。"
   fi
+fi
+
+echo "== 3c. 本线三把验证台（行级常驻消费者 —— §4.05 (54)）=="
+# 🔴 为什么接在这里，而不是等 package.json：
+#    (52)(53) 读过被调本体 —— `scripts/check-gate-wiring.mjs` 审的是 **npm 脚本名**，
+#    `research/tools/*.sh` 它根本不扫，所以仓库级那个入口只有 `check` 链一枚，而 `package.json`
+#    正被别人一枚 `check:ios-ax-shim` 占着。这一格先把**行级**的消费者做出来：
+#    "凡走本工具入库，三把台子必须当场全绿"。它不是共享流水线改动，改的是本线自己那枚文件。
+# 🔴 为什么这三把有资格当前置而 `r17-evidence-md5-check.sh --all` 没有：
+#    三把全是**夹具级自检**（桩打在前置、SPEC_CMD='true'、迷你树 mktemp），它们只在
+#    "装置自己坏了"时红；而 `--all` 那把读的是真实取证状态，别人一笔提交就能让它红，
+#    接进来等于把本线的入库扣在别人的读数上（§「判据别把上游当前状态写死」）。
+# 🔴 递归这一手必须挡，而且挡法要**看得见**：`calendar-line-commit-only-arms.sh` 的被测对象
+#    就是本文件，它在迷你树里跑 planner ⇒ planner 再跑 rig ⇒ 无界嵌套。
+#    那把台子在自己的进程里 `export HT_LINE_RIG_NEST=1`，本格见到标记就**打印一行跳过读数**再继续。
+#    ⚠️ 不要把它改成静默 `continue`：跳过这件事本身必须是输出里的一行，否则下一位读不出"到底判过没有"。
+if [ "${HT_LINE_RIG_NEST:-0}" = 1 ]; then
+  echo "   ⏭ 本格跳过（HT_LINE_RIG_NEST=1 ⇒ 这一趟本身就是那把 rig 的子进程；这条读数由 (54) 的守卫腿钉住）"
+else
+  RIG_N=0; RIG_RED=0
+  while IFS= read -r rig_cmd; do
+    [ -n "${rig_cmd//[[:space:]]/}" ] || continue   # 纯空白的一行不算"跑到一台"（臂 19 钉这一格）
+    RIG_N=$((RIG_N + 1))
+    RIG_OUT="/tmp/$TAG-rig$RIG_N.out"
+    eval "$rig_cmd" >"$RIG_OUT" 2>&1; RIG_RC=$?
+    printf '   台 %s rc=%s :: %s\n' "$RIG_N" "$RIG_RC" "$(tail -1 "$RIG_OUT")"
+    if [ "$RIG_RC" != 0 ]; then RIG_RED=$((RIG_RED + 1)); fi
+  done <<EOS
+${LINE_RIGS:-bash research/tools/calendar-line-commit-only-arms.sh
+bash research/tools/r17-reshoot-arms.sh
+bash research/tools/r17-reshoot-stale.sh --selftest}
+EOS
+  echo "   LINE_RIGS=$RIG_N 红=$RIG_RED"
+  if [ "$RIG_N" = 0 ]; then
+    echo "   ❌ 一行台子都没跑到（LINE_RIGS 被覆盖成空？）⇒ 判不了，按红处理（exit 3）"
+    exit 3
+  fi
+  if [ "$RIG_RED" != 0 ]; then
+    echo "   ❌ 有验证台红了 ⇒ 本线不入库（exit 3）。红读在 ${TAG}-rig*.out；先修装置再谈提交。"
+    exit 3
+  fi
+  echo "   ✅ 上面数出来的台子全绿（枚数见上一行；这一格是本线 rig 唯一的常驻消费者，直到 package.json 那一格腾开）"
 fi
 
 echo "== 4. 点名动作（复制即可，本工具不代执行）=="
