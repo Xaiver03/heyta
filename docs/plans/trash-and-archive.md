@@ -15539,3 +15539,26 @@ SUITE_RC=0
 `main` 已经自己往前走到了 `3dd8ab05`，其中 `c790a489` 把本批 #109 的三枚文件**替我提交了**，
 `e95d8621` 把这一本台账快照了进去 —— 所以"本批未提交"这句话现在只适用于
 `cli-trash-write.spec.ts` 与 §10.226 那两枚 seed 产物。
+
+## 10.234 🔴 22:45 现量：**挡 web 的那件事没了**（`UU` 10→**0**、`CalendarSidebar.tsx` 的标记 4→**0**，HEAD 已到 `9651a4ac`）—— §10.228/§10.230/§10.233 里"跑了也不构成读数"那句的前提已解除，续跑要按本节重算
+
+停车格写完后 43 秒复量，机器状态翻了一面：
+
+| 现量（22:45） | 读数 | 对照（22:35 / 22:40） |
+|---|---|---|
+| `git rev-parse --short HEAD` | **`9651a4ac`** | `3dd8ab05`（那条线把合并收尾了） |
+| `git status --porcelain \| grep -c '^UU'` | **0** | 10 |
+| `grep -c '<<<<<<<' apps/web/src/features/calendar/CalendarSidebar.tsx` | **0** | 4 |
+| `pgrep -fl "playwright test"` | 零行 | 零行 |
+| `check-ai-e2e-preflight.mjs` / `… 4320` | **rc=0 / rc=0** | rc=0 / rc=0 |
+| `sysctl -n vm.loadavg` | `{ 8.41 8.02 10.70 }`（5m 与 1m 同量级 ⇒ 稳态底噪，不是有人在跑） | 7.49 |
+
+⇒ **三件事同时变了**：① 从源码重打 `apps/web` 的跑法**恢复了取读数的资格**
+（`check:ai-e2e`、`check:landing-e2e`、`pnpm reinstall:all` 都不再有"编译期就被别人的标记挡住"这条否证）；
+② §10.230 给 #104 指名的那条真浏览器腿，其障碍现在**只剩**起跑器 `verify-selfhost-stack.sh`
+是不是还在别人手里（这条要现量，别再引用 22:37 那次）；
+③ #98 的让位条件要重取 —— 本节没测 `capture.mjs` 现在的状态，**不许把 §10.229 那句"仍是 `M`"读成现状**。
+
+⚠️ 本会话没有据此起跑：轮次将尽，而这三条里的任何一条都比"半途起一趟、无人看守"更要求先看住窗口。
+**续跑的第一条命令就是重取本表这六行现量**（`UU` / 标记数 / 两条 preflight / `pgrep` / `capture.mjs` 与
+`verify-selfhost-stack.sh` 的 `git status` 位），而不是照抄这里的数。
