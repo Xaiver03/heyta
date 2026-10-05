@@ -5419,8 +5419,17 @@ git diff HEAD --numstat -- package.json                     # 要 0/0（19:2x �
 node research/tools/calendar-line-wire-evidence-rigs.mjs            # 干跑：脏 ⇒ rc=3 且一个字节不写（已被臂22–27 逐档证明能红）
 node research/tools/calendar-line-wire-evidence-rigs.mjs --confirm  # 干净才跑；锚点数≠1 ⇒ rc=4「不猜插入点」
 node scripts/check-gate-wiring.mjs --pkg package.json               # 插完自己过仓库那把对账
-ANCHORS='check:calendar-evidence-rigs' MSG='…' bash research/tools/calendar-line-commit-plan.sh --confirm
+node scripts/check-md-table-rows.mjs && node scripts/check-shell-unicode-vars.mjs   # 静态门（本笔只动 JSON 一行）
+git diff HEAD -U0 -- package.json | grep -c '^@@'                                   # 要 1（只有我插的那两处算同一枚 hunk 时才对得上）
+ANCHORS='check:calendar-evidence-rigs' bash research/tools/calendar-line-hunk-ownership.sh package.json   # 孤儿要 0
+git commit --only -m '…' -- package.json                                            # 🔴 收尾是这一条，**不是**本线入库工具
 ```
+🔴 **为什么最后一步不是 `calendar-line-commit-plan.sh`**（19:4x 读代码量出来的，B82 第一版这句写错了）：
+那把工具的 `NAMES` 只遍历它自己的 `PATHS` 清单，而 `package.json` **不在**清单里（10-05 10:5x 那次收口把它留在外面是有理由的：
+它一进去，任何一笔 `--confirm` 都会尝试带走别人在里面的未提交行）；更糟的是 1b 的命名空间正则 `NS_RE` 只覆盖
+`research/tools/…` 与 `docs/plans/…`，也**看不见** `package.json` ⇒ 拿它跑完会打印"点名对象全部进入 HEAD"，
+而我插的那一行**安静地留在工作树里没提交**。所以正确形状是上面那四条：静态门 + 归属闸门 + 显式 `--only package.json`。
+（`--only` 之前必须先确认 `git diff HEAD --numstat -- package.json` 只有我这一处改动 —— 这就是第 1 条现量存在的理由。）
 🔴 **不要**在它脏的时候用 `--only package.json` 之类的手法"把自己的行夹带进去"：
 `git commit --only` 提交的是**该路径工作树内容的全部**，那 2 行未提交字节会被算成本线提交的（归属闸门 3b 会红，但人在红面前容易顺手 `ALLOW_ORPHAN=1`）。
 
