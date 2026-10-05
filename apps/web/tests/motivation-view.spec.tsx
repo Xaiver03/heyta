@@ -339,9 +339,14 @@ describe('习惯卡片（L2）真的显示出三个数', () => {
   it('连续 / 最长 / 累计三个指标同时可见', async () => {
     click(byText('习惯'));
     await flush();
+    // 🔴 2026-10-05（工单 §8.131）：窗格不再"默认展示第一条"—— 那枚 `?? rows[0]` 是宿主猜的位置，
+    // 与共享选中态互相矛盾（界面说第一条选中、模型说没选中，而详情列按模型维持 AI）。
+    // 所以这里必须**真点一行**，卡片才会出现。
+    click(document.querySelector('[data-testid^="habit-row-"]'));
+    await flush();
 
     await waitFor('习惯卡片出现', () =>
-      (container?.textContent ?? '').includes('喝水'),
+      document.querySelector('[data-testid="habit-board"]') !== null,
     );
 
     const text = container?.textContent ?? '';
@@ -357,7 +362,11 @@ describe('习惯卡片（L2）真的显示出三个数', () => {
     // 差一天，前提断言就会莫名其妙地红。
     click(byText('习惯'));
     await flush();
-    await waitFor('习惯卡片出现', () => (container?.textContent ?? '').includes('喝水'));
+    click(document.querySelector('[data-testid^="habit-row-"]'));
+    await flush();
+    await waitFor('习惯卡片出现', () =>
+      document.querySelector('[data-testid="habit-board"]') !== null,
+    );
 
     const now = Number(sessionStorage.getItem('now') ?? Date.now());
     const today = toLocalDate(now);

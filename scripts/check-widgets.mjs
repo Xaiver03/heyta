@@ -49,7 +49,7 @@
  *   非零退出 = 有违规。
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -239,77 +239,91 @@ for (const rule of RULES) {
 }
 
 // ── 规则：黄金夹具与重建结果一致（委派给既有 spec，不重新实现）──────────────
+// 🔴 这一档把"spec 没跑成"与"夹具真的不一致"**分成两个退出码**：
+//      0 = 跑过且一致 · 1 = 跑过但违规 · 2 = 没跑成，这条等于**没验过**（未判不是绿）。
+//   原由（2026-10-04 现量）：在 linked worktree 里 `pnpm … exec` 的 deps-status 预检会因为
+//   无 TTY 拒绝移除共享 `node_modules`（`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`），
+//   它抛出来的非零码与"vitest 报夹具不同"**逐字同形**。旧写法把前者报成
+//   "黄金夹具与重建结果不一致"，症状是四端解析器的锁看起来坏了 ——
+//   而同一棵树里直接跑那枚 spec（`packages/widget-core/node_modules/.bin/vitest`）是 4 passed。
+//   判"跑成了"只认 vitest 自己打出的 summary 行，不认退出码，也不去 grep 错误字样。
+// 🔴 第二半（同一天现量）：那条 `pnpm … exec` 自己带上 `--config.verify-deps-before-run=false`。
+//   两个理由，第二个比第一个硬：
+//   ① 带上前一枚门禁**在每个载体里都能真判**（本检出实测 `Tests 4 passed (4)`、RC=0，
+//      不再只有"未判"这一档）；
+//   ② 一道纯 fs 门禁**不该带着"能删掉共享 node_modules"的副作用** —— 那个预检的动作就是移除
+//      modules 目录，它今天只是被"无 TTY"挡住的；在有 TTY 的地方跑这道门禁，它就会真去删重装。
+//   ⚠️ 这个 flag 只是**关掉那道预检**（不装、不删、不改任何文件），不是 `CI=true`，
+//      也不改变被测内容：vitest 那枚 spec 还是原样跑。
+let fixturesUnjudged = null;
 {
   const specRel = 'packages/widget-core/tests/fixtures.spec.ts';
-  try {
-    execFileSync(
-      'pnpm',
-      ['--filter', '@heyta/widget-core', 'exec', 'vitest', 'run', 'tests/fixtures.spec.ts'],
-      { cwd: ROOT, stdio: 'pipe', encoding: 'utf8' },
-    );
-  } catch (error) {
-    const output = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim();
-    // 🔴 **"那个 spec 退出码非零"不等于"夹具与重建结果不一致"**。
-    //   原来这里把所有非零一律报成夹具坏了，并附一句"重建命令：UPDATE_FIXTURES=1 …"。
-    //   实测它会在**探针根本没跑成**时说出这句话并给出那句危险建议：
-    //   2026-10-05 03:1x 那次 `pnpm check`，宿主内存闸门（`~/.tfa-shield`）拒绝启动 vitest
-    //   （别的会话持着 `/tmp/tfa-test.lock`），于是"重建结果"这一栏的内容是
-    //   **闸门那段拒绝文案**，而门禁报的是"黄金夹具与重建结果不一致"。
-    //   照它做的人会把 `UPDATE_FIXTURES=1` 跑一遍 —— 那正是它最坏的一种失败：
-    //   **用一段拒绝文案覆盖掉四端解析器的锁**，而四端测试从此对着假夹具全绿。
-    //   所以：探针没跑到断言，就报"探针没跑成"，并且明写**不许**重建夹具。
-    const probeNeverRan =
-      /内存闸门拒绝启动|TFA_ALLOW_CONCURRENT_TEST|ENOENT|Cannot find (?:package|module)|command not found/i.test(
-        output,
-      ) || !/\bTest Files\b/.test(output);
-    if (probeNeverRan) {
-      violations.push({
-        rel: specRel,
-        line: 1,
-        rule: {
-          what:
-            '夹具对账**没有执行**（探针没跑成，不是夹具坏了）：' +
-            '那条 spec 退出非零，而输出里**没有 vitest 的用例汇总**，' +
-            '也就是说它一条断言都没跑到',
-          why:
-            '把"没跑成"报成"不一致"是**反向**的失败：它引导读者去重建夹具，' +
-            '而这四份夹具是 iOS / Android / 鸿蒙原生解析器共同的锁 —— ' +
-            '用一段启动期文案覆盖它们，四个平台会一起照着假夹具实现对且各自全绿。' +
-            '常见成因是并发测试的内存闸门持锁、依赖缺失、spec 文件本身改名或语法坏。',
-          fix:
-            '先让探针跑起来，再谈夹具：等 `/tmp/tfa-test.lock` 空闲后重跑 ' +
-            '`pnpm check:widgets`（或 `pnpm --filter @heyta/widget-core test tests/fixtures.spec.ts` 单独看）。' +
-            '🔴 **这一步绝对不要加 `UPDATE_FIXTURES=1`** —— 只有当这条门禁报的是' +
-            '"不一致"（即探针确实跑到了断言）时，重建才是正确动作。',
-        },
-        text: output.split('\n').slice(0, 12).join('\n         '),
-      });
-    } else {
-      violations.push({
-        rel: specRel,
-        line: 1,
-        rule: {
-          what: '黄金夹具与重建结果**不一致**（夹具被人手改了，或契约改了但没重建夹具）',
-          why:
-            '这四份夹具是**四端解析器的锁**：iOS / Android / 鸿蒙的原生解析器' +
-            '都对着它写、对着它测。它一旦与真源不一致，' +
-            '**四个平台会一起照着错的东西实现对**，而且各自的测试全绿 —— ' +
-            '因为它们的"正确"就是这份夹具。这是整个 W0 里唯一一个' +
-            '"错了会让四端同时错"的点。' +
-            '⚠️ 另外：`pnpm check` 的链路是 `build → typecheck → check:*`，' +
-            '**它平时不跑测试**，所以这个断言此前在 `pnpm check` 里完全没有保护 ——' +
-            '本规则把它接进来。',
-          fix:
-            '夹具必须由真实选择器产出，不是手写的。重建命令：\n' +
-            '         `UPDATE_FIXTURES=1 pnpm --filter @heyta/widget-core test tests/fixtures.spec.ts`\n' +
-            '         重建后**必须看一眼 diff** —— 如果变化不是你有意造成的，那是 bug 不是夹具过期。' +
-            '         （⚠️ 本规则**不重新实现**重建逻辑，而是调既有的那个 spec：' +
-            '夹具对不对只能有一个答案，两处实现必然分叉。）',
-        },
-        text: output.split('\n').slice(0, 12).join('\n         '),
-      });
+  const r = spawnSync(
+    'pnpm',
+    [
+      '--config.verify-deps-before-run=false',
+      '--filter',
+      '@heyta/widget-core',
+      'exec',
+      'vitest',
+      'run',
+      'tests/fixtures.spec.ts',
+    ],
+    {
+      cwd: ROOT,
+      encoding: 'utf8',
+      // 🔴 `NO_COLOR=1` 是**承重的**，不是排版偏好：pnpm exec 把 vitest 的 stdout 判成 TTY，
+      // 于是汇总行长这样 `^[[2m      Tests ^[[22m …4 passed`（现量：把这条命令原样打到文件里也是彩色的）。
+      // 带色时下面那条 needle **恒 0 命中** ⇒ 这道门禁会在**每个载体**里都判成"未判"，
+      // 也就是把一个能跑的判据永久变成哑的。再加一层剥色做双保险（被调方不认 NO_COLOR 时仍成立）。
+      env: { ...process.env, NO_COLOR: '1' },
+    },
+  );
+  const output = `${r.stdout ?? ''}${r.stderr ?? ''}`
+    .replace(/\u001b\[[0-9;]*m/g, '')
+    .trim();
+  // vitest 的汇总行形如 `      Tests  4 passed (4)`；没有这一行就是"根本没跑到"。
+  const summary = output.match(/^\s*Tests\s+(\d+)\s+(passed|failed).*$/m);
+  if (r.error || !summary) {
+    const why = output.split('\n').find((l) => /ERR_PNPM|ENOENT|Command failed|Cannot find/.test(l));
+    fixturesUnjudged =
+      (why ?? output.split('\n')[0] ?? 'runner 没有任何输出').slice(0, 160);
+    if (/内存闸门拒绝启动|TFA_ALLOW_CONCURRENT_TEST|tfa-test\.lock/.test(output)) {
+      // 🔴 主线 2026-10-05 03:1x 现量的那一次：宿主内存闸门拒绝启动 vitest（别的会话持着
+      // `/tmp/tfa-test.lock`），"重建结果"这一栏的内容是**闸门那段拒绝文案**。
+      // 报成"不一致"会引导读者跑 `UPDATE_FIXTURES=1` —— 那正是最坏的失败：
+      // **用一段拒绝文案覆盖掉四端解析器共同的锁**，四端从此对着假夹具全绿。
+      fixturesUnjudged +=
+        ' —— 这是并发测试的内存闸门拒绝启动 vitest，**不是夹具坏了**：' +
+        '🔴 这一步绝对不要加 `UPDATE_FIXTURES=1`。等 `/tmp/tfa-test.lock` 空闲后重跑 `pnpm check:widgets`。';
     }
-  }
+  } else if (Number(summary[1]) === 0) {
+    fixturesUnjudged = `vitest 跑到了但一条用例都没执行（Tests 0 passed）—— 那枚 spec 没被收集到`;
+  } else if (r.status !== 0 || summary[2] === 'failed') {
+    violations.push({
+      rel: specRel,
+      line: 1,
+      rule: {
+        what: '黄金夹具与重建结果**不一致**（夹具被人手改了，或契约改了但没重建夹具）',
+        why:
+          '这四份夹具是**四端解析器的锁**：iOS / Android / 鸿蒙的原生解析器' +
+          '都对着它写、对着它测。它一旦与真源不一致，' +
+          '**四个平台会一起照着错的东西实现对**，而且各自的测试全绿 —— ' +
+          '因为它们的"正确"就是这份夹具。这是整个 W0 里唯一一个' +
+          '"错了会让四端同时错"的点。' +
+          '⚠️ 另外：`pnpm check` 的链路是 `build → typecheck → check:*`，' +
+          '**它平时不跑测试**，所以这个断言此前在 `pnpm check` 里完全没有保护 ——' +
+          '本规则把它接进来。',
+        fix:
+          '夹具必须由真实选择器产出，不是手写的。重建命令：\n' +
+          '         `UPDATE_FIXTURES=1 pnpm --filter @heyta/widget-core test tests/fixtures.spec.ts`\n' +
+          '         重建后**必须看一眼 diff** —— 如果变化不是你有意造成的，那是 bug 不是夹具过期。' +
+          '         （⚠️ 本规则**不重新实现**重建逻辑，而是调既有的那个 spec：' +
+          '夹具对不对只能有一个答案，两处实现必然分叉。）',
+      },
+      // 带的是 vitest 自己那两行汇总，不是"退出码非零"这件事。
+      text: `${summary ? summary[0].trim() : '（runner 没打汇总行）'}｜exit=${String(r.status)}\n${output.split('\n').slice(0, 10).join('\n         ')}`,
+    });  }
 }
 
 // ── 报告 ───────────────────────────────────────────────────────────────────
@@ -317,12 +331,28 @@ const scanned =
   RULES.reduce((sum, rule) => sum + rule.scope().length, 0) + 1; // +1 = package.json
 
 if (violations.length === 0) {
+  if (fixturesUnjudged) {
+    console.error(
+      `⚠️ 小组件边界其余规则通过（扫描 ${String(scanned)} 个文件），但**黄金夹具那一条没跑成 ⇒ 等于没验过**：\n` +
+        `      ${fixturesUnjudged}\n` +
+        '      这一档退出码是 2，不是 0 —— "没跑成的检查被读成绿"是本仓库记过最多次的那类错。\n' +
+        '      这道命令自己已经带了 `--config.verify-deps-before-run=false`，所以还剩这一档' +
+        '说明**这个检出连 vitest 都没有**（没装依赖的裸检出实测报 `Command "vitest" not found`），' +
+        '门禁不会替它装东西。\n' +
+        '      要绕开门禁自己真验这一条：`cd packages/widget-core && ./node_modules/.bin/vitest run tests/fixtures.spec.ts`',
+    );
+    process.exit(2);
+  }
   console.log(
     `✅ 小组件边界完好（扫描 ${String(scanned)} 个文件 + 4 份黄金夹具，${String(
       RULES.length + 2,
     )} 条规则）。`,
   );
   process.exit(0);
+}
+
+if (fixturesUnjudged) {
+  console.error(`⚠️ 另外：黄金夹具那一条没跑成（退出码被下面的违规占住，不单独报 2）：${fixturesUnjudged}`);
 }
 
 console.error(`🔴 小组件边界有 ${String(violations.length)} 处违规：\n`);

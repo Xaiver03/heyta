@@ -78,6 +78,15 @@ import {
 export interface CalendarYearBoardProps {
   /** 全部候选任务（已按范围筛过）。归属只看 `dueDate` 落在哪一天。 */
   readonly tasks: readonly Task[];
+  /**
+   * 这一年里**有倒数日的那些天**（W6）。🔴 由调用方投影好传进来 ——
+   * 本层不许出现"哪天发生"的算术（那是 `@heyta/domain` 的 `eventOccurrencesInRange`）。
+   *
+   * ⚠️ 传的是**集合而不是事件**：年档一格只画一个点，不需要标题、也不需要天数，
+   *   把 `CalendarDayEvent[]` 传进来只会诱使这里去拼一句它没有词表的话。
+   * 默认 `undefined` ⇒ 一个点都不多画，与接之前逐格一样（§9.1）。
+   */
+  readonly eventDates?: ReadonlySet<LocalDate> | undefined;
   readonly today: LocalDate;
   /** **这一年里的任意一天**（游标约定，见 `monthsOfYear`）。 */
   readonly year: LocalDate;
@@ -115,6 +124,7 @@ const monthSuffix = (monthFirstDay: LocalDate): string => monthFirstDay.slice(0,
 function MiniDay({
   date,
   dayTasks,
+  hasEvent,
   today,
   isToday,
   labels,
@@ -125,6 +135,8 @@ function MiniDay({
 }: {
   date: LocalDate;
   dayTasks: readonly Task[];
+  /** 这一天有没有倒数日（W6）。 */
+  hasEvent: boolean;
   today: LocalDate;
   isToday: boolean;
   labels: CalendarBoardLabels;
@@ -141,7 +153,11 @@ function MiniDay({
         ? tokens['color.primary']
         : tone === 'subtle'
           ? tokens['color.foreground-muted']
-          : 'transparent';
+          : // 没任务但**有倒数日**：点照画。年档一格只有一个点，它说的是"这天值得记"，
+            // 不是"这天有几条待办"—— 后者是月档那 42 格才有的信息量。
+            hasEvent
+            ? tokens['color.primary']
+            : 'transparent';
 
   return (
     <View
@@ -161,8 +177,10 @@ function MiniDay({
         日期由宿主的 `dayTitle` 说成当前语言，数量是**真的那一条**（不是 1 个占位）。
       */
       accessibilityLabel={
-        dayTasks.length > 0
-          ? labels.dayWithTasks({ date: labels.dayTitle(date), count: dayTasks.length })
+        // 数的是**这一格里有几个条目**（任务 + 倒数日），与月档格子同一口径
+        // （那里的 `barCount = bars.length + hidden` 已把倒数日那条算进去了）。
+        dayTasks.length + (hasEvent ? 1 : 0) > 0
+          ? labels.dayWithTasks({ date: labels.dayTitle(date), count: dayTasks.length + (hasEvent ? 1 : 0) })
           : labels.dayNoTasks({ date: labels.dayTitle(date) })
       }
     >
@@ -182,12 +200,14 @@ function MiniDay({
         {Number(date.slice(8, 10))}
       </Text>
       {/*
-        `plain` 那一档**什么都不画**（点色 `transparent` 也不画 —— 省掉一个透明节点）。
+        `plain` 那一档**没有任务就不画**（点色 `transparent` 也不画 —— 省掉一个透明节点）。
         于是"有事的格子"数字下面多一个记号，而"没事的格子"只有数字；
         数字本身两行都钉在同一基线上（`justifyContent: flex-start` + 定高），
         所以不会画成"有事的那几天字往上跳了一格"。
+        ⚠️ 例外是有倒数日（W6）：那一格**有东西要记**，不画点就成了"年视图里
+        纪念日一个都不存在"，而那正是这一档最该被看见的一天。
       */}
-      {tone === 'plain' ? null : (
+      {tone === 'plain' && !hasEvent ? null : (
         <View
           style={[styles.dot, { backgroundColor: dotColor }]}
           testID={`${testIDBase}-day-${date}-dot`}
@@ -199,6 +219,7 @@ function MiniDay({
 
 export function CalendarYearBoard({
   tasks,
+  eventDates,
   today,
   year,
   onPickMonth,
@@ -294,6 +315,7 @@ export function CalendarYearBoard({
                               key={cell.date}
                               date={cell.date}
                               dayTasks={byDate.get(cell.date) ?? []}
+                              hasEvent={eventDates?.has(cell.date) === true}
                               today={today}
                               isToday={cell.date === today}
                               labels={labels}

@@ -267,3 +267,31 @@ Error: P3018 ... DROP INDEX CONCURRENTLY cannot run inside a transaction block
 要托管到别处就显式设 `SUPERSYNC_IMAGE`；`env.example` 里保留了一行被注释的上游示例
 （`server/env.example:264`）。`deploy.sh` 本地构建走 `--build`
 （`server/scripts/deploy.sh:203`，产出 `supersync:local`），不带该参数时才 `pull supersync`。
+## 改了这些文件，就必须跑一次全栈验收（登记 `G-61` 的①档，2026-10-05 定）
+
+`pnpm check` 里那几十道**全是纯文件对账**：它们能证明入口命令的几份抄件仍然一致、镜像那棵依赖树仍然逐条
+有出处，但**没有任何一层会把镜像真的 build 出来、把栈真的起起来、用真浏览器打开 `/app/` 点一遍**。
+那三件事只有下面这一趟做得到，而它**不在 `pnpm check` 链里** —— 这是裁决不是遗漏：它要真构建、要起 Docker、
+自带负载门，挂在必过的链上就会有人去调低阈值，那比没人跑更贵（读数与理由在
+`docs/research/self-host-distribution-audit.md` §8.118 与 §8.134）。
+
+所以义务写在文档里，而"这行字还在不在、还点没点名触发条件"由 `check:selfhost-entry-command` 的 **R9**
+钉成会红的判据（G-48 用的就是这个机制：把"没人跑它"从一句注释变成一次失败）：
+
+```
+pnpm verify:selfhost-stack
+```
+
+### 跑它的时机
+
+改了下面**任何一件**，在落地/发布之前必须跑一次，并把 `STACK_RC` 与那四张截图留在日志里：
+
+- `server/Dockerfile`、`server/docker-compose*.yml` —— 含一次性迁移那份 override（`docker-compose.migrate-once.yml`）
+  与 build / test 两份 override。
+- `scripts/verify-selfhost-stack.sh` 与 `e2e/selfhost-stack/*`：**改验收自己也要复跑** —— 否则判据坏了不会有人知道
+  （本批已经为这件事付过一次账：`verify-selfhost-stack.sh` 少一份 override 而照抄文档的人拿到 `pull access denied`，
+  见同一份台账的 §8.28）。
+- `apps/web` 产物的挂载旋钮：`WEB_APP_PATH` 与 `WEB_APP_DIR` **必须一起改**，只改一个是**静默无效**。
+
+⚠️ **等窗口，别调阈值**：这一趟自带的负载门等满会以 **exit 3** 结束 —— 那是"环境无效"，
+不是产品失败。红在这里不等于东西坏了，把阈值改低反而会把"没验"伪装成"验过"。

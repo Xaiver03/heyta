@@ -163,3 +163,46 @@ export function pruneSelection(
     if (kept === null && store.get(kind) !== null) store.select(kind, null);
   }
 }
+
+/** 键盘光标的移动方向：`-1` 上、`+1` 下。封闭成两值，不许传任意整数。 */
+export type CursorDelta = -1 | 1;
+
+/**
+ * 在**当前视图渲染出来的那一串 id** 里移动选中，返回该选中的 id（列表为空返回 `null`）。
+ *
+ * 🔴 它只吃一串已经排好序的 id，**不自己排**。理由与 {@link pruneSelection} 同源：
+ * "列表按什么顺序显示"的唯一所有者是那个视图（任务侧是日期分组 + 组内排序，
+ * 习惯侧是面板顺序，便签侧是列表顺序）。这里再排一遍就是第二个所有者，
+ * 症状是"界面上 ↓ 走到第 3 行，选中却跳到了第 5 行" —— 而且两边都不报错。
+ * 所以宿主必须把**渲染顺序**传进来，不许传"数据顺序"。
+ *
+ * 四条规则，每条都有理由（也都有一条判据）：
+ *
+ * 1. **没选中时按方向进列表**：`+1` → 第一项，`-1` → 最后一项。
+ *    光标从"用户按的那一下的方向"进来，而不是落到中间或什么都不做 ——
+ *    按 ↓ 的人预期看到顶部，按 ↑ 的人预期看到底部。
+ * 2. **到端点就夹住，不环绕**。环绕会让连按 ↓ 突然跳回顶部，
+ *    而这正是长列表里最容易迷失的一刻；"已经到底了"本身是有用的信息。
+ * 3. **选中的那条不在当前列表里**（切了筛选、或列表刚变）：同样按方向进列表
+ *    （规则 1），**不去猜它"本来该在哪"** —— 猜的结果是跳到一个用户没指向的地方。
+ * 4. **返回值可能等于当前值**。这不是浪费：调用方走 `select()`，而它对
+ *    "同一类里重复选同一条"是**不通知**的（见上面那条注释），
+ *    所以端点上连按不会让详情面白重渲染一次。
+ *
+ * ⚠️ 纯函数：不读 store、不写 store、不碰 DOM。"哪个视图、哪一类、
+ * 焦点在不在输入框里"这些是宿主的判断，不是产品语义。
+ */
+export function moveSelectionInList(opts: {
+  orderedIds: readonly string[];
+  current: string | null;
+  delta: CursorDelta;
+}): string | null {
+  const { orderedIds, current, delta } = opts;
+  if (orderedIds.length === 0) return null;
+
+  const at = current === null ? -1 : orderedIds.indexOf(current);
+  if (at === -1) return delta > 0 ? (orderedIds[0] as string) : (orderedIds.at(-1) as string);
+
+  const next = Math.min(orderedIds.length - 1, Math.max(0, at + delta));
+  return orderedIds[next] as string;
+}

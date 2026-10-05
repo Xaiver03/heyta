@@ -62,9 +62,10 @@ import {
  * 再宽就只是在给"拿这个接口当下载器"留空间。
  *
  * ⚠️ 生效前提：`@fastify/rate-limit` 必须在**根实例**上注册过
- *（`server.ts` 里它在 `!testMode.enabled` 分支内）。测试模式注册的是**自己一份**
- *（见 `holiday-anonymous-gate.spec.ts`），否则这条配置在测试里是装饰 ——
- * 那正是 §7 元规则 2 说的"一条永远通过的判据"。
+ *（`server.ts` 里它在 `!testMode.enabled` 分支内）。判据在
+ * `server/tests/holiday-public-route.spec.ts` 的最后一条：那个测试**自己注册一份插件**，
+ * 然后打满 `max+1` 次并要求第 61 次是 429 —— 去掉那次 `register` 它立刻转红。
+ * 否则这条配置在测试里是装饰，那正是 §7 元规则 2 说的"一条永远通过的判据"。
  */
 export const HOLIDAY_PUBLIC_RATE_LIMIT = {
   max: 60,

@@ -97,6 +97,43 @@ APK_MIRROR=你的-alpine-镜像源
 NPM_REGISTRY=https://你的-npm-镜像
 ```
 
+还有**第三行**，它坏的形态和上面两行不一样，所以单独说：`NODE_IMAGE`。前两个旋钮作用在
+Dockerfile **已经跑起来之后**的层，而 base 镜像是在任何一条指令执行**之前**就要拉下来的 ——
+连不上 `docker.io` 的主机得到的是一条**响亮但无线索**的失败：
+
+```
+#2 [internal] load metadata for docker.io/library/node:24-alpine
+#2 ERROR: failed to authorize: DeadlineExceeded: failed to fetch anonymous token:
+#2   Get "https://auth.docker.io/token?scope=repository%3Alibrary%2Fnode%3Apull…": i/o timeout
+```
+
+（2026-10-04 在本机实测到的原文；当时的现量是本地一枚 `node:*` 缓存都没有，
+`registry-1.docker.io` 直连拿到 000，而就近的公开加速源能拉到 `alpine`。）
+
+```bash
+NODE_IMAGE=你自己的源/library/node:24-alpine
+```
+
+默认值逐字等于 `node:24-alpine`，所以**不带这一行 = 今天的行为一点没变**。
+仓库里不写死任何地域性源，理由与 `APK_MIRROR` 同一条：那会让别处的自建者拿到慢源。
+⚠️ `server/Dockerfile` 有**三个阶段**，而 `ARG` 不跨 `FROM` 继承，所以那里声明了三次 ——
+这三处必须同源，否则 `web` 阶段与 `production` 阶段会各自拉不同的 base，
+"我的镜像里到底装了什么"就再也对不上了。
+
+🔴 **上面这三个旋钮只管"构建"，管不到"起栈"**。`docker compose up` 还要在**运行期**再拉两枚镜像，
+它们同样出自 Docker Hub，而构建期的任何旋钮对它们无能为力：
+
+```bash
+POSTGRES_IMAGE=你自己的源/library/postgres:16-alpine
+CADDY_IMAGE=你自己的源/library/caddy:2.11-alpine
+```
+
+它们住在 `docker-compose.yml`（不是 `docker-compose.build.yml`），变量没设时渲染出来逐字节等于
+`postgres:16-alpine` / `caddy:2.11-alpine`（判据 `docker compose config` 现量，见
+`docs/research/self-host-distribution-audit.md` §8.36）。
+`check:image-build-args` 的 **R6** 现在会走一遍 `server/docker-compose*.yml`，
+任何一枚 `image:` 不是 `${名字:-默认}` 形状就报红 —— 这一条存在的理由就是本节曾经只说了三个旋钮。
+
 镜像仓库同理：**我们不提供任何第三方公共镜像**，需要就近拉取就把它推到
 **你自己的** registry，`SUPERSYNC_IMAGE` 指向那里。
 
@@ -118,15 +155,16 @@ or may require 'docker login'
 
 那句 `may require 'docker login'` 是这条路上最容易误导人的一步 —— 它会让人去找
 "该登录哪个仓库"，而真相是**根本没有仓库**。带上 build override 之后，同一条命令
-自己把镜像打出来（`APK_MIRROR` / `NPM_REGISTRY` 两个旋钮在这条路上也生效，
-它们就住在这份 override 的 `args` 里）。
+自己把镜像打出来（`APK_MIRROR` / `NPM_REGISTRY` / `NODE_IMAGE` 三个旋钮在这条路上也生效，
+它们就住在这份 override 的 `args` 里 —— ⚠️ 那三个只覆盖**构建**；`up` 在运行期还要拉的
+`postgres` / `caddy` 两枚由 §3 末尾那两个旋钮管，它们住在**默认**那份文件里）。
 
 `docker-compose.migrate-once.yml` 是一个**一次性迁移服务**的 override：默认服务图里
 没有它（那里恰好是 `caddy / postgres / supersync` 三个），加进来之后迁移跑完就退出，
 应用容器要等它成功才启动。
 
 ⚠️ **它只在第一次开机迁移。** compose 不会重跑一个已经退出的 `restart: "no"` 服务，
-所以升级时要么用第 3 节的 `./scripts/deploy.sh`，要么显式补一刀：
+所以升级时要么用第 3 节那个部署脚本（`server/scripts/deploy.sh`，第 3 节先 `cd server`），要么显式补一刀：
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.build.yml \
@@ -180,8 +218,8 @@ curl -fsS https://你的域名/health
 
 ## 7. 升级与备份
 
-- 升级：`git checkout <新 commit>` → `./scripts/deploy.sh --build`（迁移在换容器**之前**跑）。
-- 备份：`./scripts/backup.sh`（pg_dump 到 `server/backups/`）。
+- 升级：`git checkout <新 commit>` → `server/scripts/deploy.sh --build`（迁移在换容器**之前**跑）。
+- 备份：`server/scripts/backup.sh`（pg_dump 到 `server/backups/`；`BACKUP_DIR` 可覆写，默认落在 `$SERVER_DIR/backups`）。
   🔴 端到端加密下**备份就是全部** —— 我们这边没有任何一份你的明文可以还原给你。
 - 数据是事件溯源（op-log）而不是"当前状态表"：`prisma` 表里的行是可重放的日志，
   不要手改。
@@ -192,5 +230,5 @@ curl -fsS https://你的域名/health
 |---|---|
 | 没有发布镜像，因此也**没有可钉的版本号** | "升级到哪个版本"目前唯一的官方答案是**源码提交号**；tag 三件套（`vX.Y.Z` + 滚动 `X.Y` + `latest`）与发布流水线已经写成文件但**没有启用**，启用与否是一个还没拍板的产品决定 |
 | 没有客户端/服务端兼容矩阵 | 政策写在 `server/README.md` 的 "Clients and version coupling"，而且它**刻意不承诺跨版本兼容**：镜像里那份界面与服务端同一次构建（结构上不会错配）；**其他任何客户端**（移动壳、桌面壳、你另起的界面）唯一被支持的组合是**与服务端同一份源码修订**。注意这里没有"同 major 即可"或"N-1 可用"的承诺 —— 那种话要等真做出兼容矩阵才说得出 |
-| 服务端镜像的 npm 依赖树没被钉住 | 同一份源码两次构建可能装到不同的传递依赖版本；许可证与漏洞扫描因此只能覆盖"某一次解析"（`pnpm check:image-license` 就是那条会红的对账） |
+| ~~服务端镜像的 npm 依赖树没被钉住~~ 🔴 **这句已过期**（2026-10-04 落）：第三方依赖层现在由**提交物** `server/package-lock.json` 钉住，它是 `server/Dockerfile` 生产阶段的一条 `COPY` 输入 ⇒ 同一份源码两次构建装到的是锁里那个版本（实测 `npm install` 认锁、只在声明范围内取版本，不会升级到范围内最新） | **这一格现在真正没做到的三件**：① 自家三个 workspace 包装的是**当前源码字节** —— 这是要的（本地包跟着源码走），不是可复现性缺陷；② 锁钉的是 registry 层，上游若**重传同一版本号**的字节，锁不会替你发现；③ **发哪几个架构**还没拍板，所以现在只有本机那个架构（这台是 `linux/arm64`）有运行证据，`amd64` 的发布物**零运行证据**。许可证扫描已覆盖锁里的平台变体（`pnpm check:image-license` 的判定 4 按 `os`/`cpu`/`libc` 逐条判），但那回答的是"许可可不可接受"，**不回答"跑起来对不对"** —— 后者只有 `pnpm verify:selfhost-stack` 那一趟 |
 | 没有自动更新、没有多副本编排 | 一台机器一套 compose；要横向扩展请先读 `server/docker-compose.yml` 里关于 `RUN_MIGRATIONS_ON_STARTUP` 的那段注释 |

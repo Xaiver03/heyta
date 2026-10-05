@@ -126,8 +126,8 @@ export function eventBoardLabels(t: Translate): EventBoardLabels {
  * "这台设备的包里没带导出组件"与"分享面板拒了"说成同一件事 ——
  * 而前者该重装、后者该换个去处，让用户去做错的那件事比不提示更糟。
  *
- * `detail` 是原生**原样**回来的字符串：按本屏的分工不翻译（翻译之后既没法搜索、
- * 也没法对照日志，与"打开宿主失败"那条同一理由）。
+ * `detail` 是原生**原样**回来的字符串，它**只进日志、不进界面**（理由见函数体里那段：
+ * 里面有沙盒绝对路径、平台英文串与跟随系统语言的 `localizedDescription`）。
  */
 export function exportFailureText(
   t: Translate,
@@ -142,7 +142,19 @@ export function exportFailureText(
         : error === 'write-failed'
           ? t('mobile.countdown.export.write')
           : t('mobile.countdown.export.share');
-  return detail === undefined || detail === '' ? sentence : `${sentence}（${detail}）`;
+  /**
+   * 🔴 `detail` **不上屏**，只进日志。
+   *
+   * 它的来源全是非 i18n 串：`CardExportModule.kt` 的 `MKDIR_FAILED` 带**沙盒绝对路径**、
+   * Java 的 `e.message`、iOS 的 `error.localizedDescription`（跟着系统语言走，中英不定）、
+   * RN `Share` 的平台英文串。把它们拼进界面同时违反两条立场：§5「界面里不许出现硬编码文案」，
+   * 以及"验证失败页不许回显服务端原始错误"那一族（本仓 09-30 刚在服务端修掉同一个形状）。
+   * 但失败**也不许静默吞掉**，所以它走日志通道：可搜索、可对照，只是不进界面。
+   */
+  if (detail !== undefined && detail !== '') {
+    console.warn(`[card-export] ${error}: ${detail}`);
+  }
+  return sentence;
 }
 
 /** 筛选档位 → 词条键（`全部` 与四种类型；穷尽 switch，加一档不映射就编译红）。 */

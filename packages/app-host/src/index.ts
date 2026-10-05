@@ -49,6 +49,16 @@ export {
 } from './focus-actions.js';
 
 /**
+ * 专注概览（工单 W7）。**"两端今日专注时长来自同一个出口"这条判据的载体就是这一行** ——
+ * web 与 mobile 各自 `import { focusOverview }`，谁都不许自己 reduce。
+ */
+export {
+  focusOverview,
+  type FocusOverview,
+  type FocusRecord,
+} from './focus-overview.js';
+
+/**
  * 清单 / 标签 / 习惯动作。同一理由：**op 的构造只有一份**（AGENTS.md §3.5）。
  *
  * 🔴 `apps/*` 里**不得出现 `entityType: 'PROJECT' | 'TAG' | 'HABIT' | 'HABIT_LOG'`
@@ -783,8 +793,10 @@ export {
 export {
   SELECTABLE_KINDS,
   createSelectionStore,
+  moveSelectionInList,
   pruneMissingSelection,
   pruneSelection,
+  type CursorDelta,
   type SelectableKind,
   type SelectionSnapshot,
   type SelectionStore,

@@ -13,7 +13,7 @@ import { fillVaultSecret } from '../vault/privacy';
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { decidePrivacyConsent, enableAllModules, stubEmptyHolidayAdjustments, stubLegalRecheck } from './helpers';
+import { decidePrivacyConsent, enableAllModules, stubLegalRecheck, stubPublicFacts } from './helpers';
 import { installMissingProducerShims } from './shims';
 
 const SERVER = 'http://sync.vault.e2e.test';
@@ -103,7 +103,9 @@ async function installHttpFixture(page: Page): Promise<{
   await page.route(`${SERVER}/api/admin/overview`, (route) =>
     route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'Forbidden' }) }));
   await stubLegalRecheck(page, SERVER);
-  await stubEmptyHolidayAdjustments(page, SERVER);
+  // 🔴 W4b 的开机拉取不在这个主题里，但它确实会发：不登记就被 catch-all 计入
+  // `unexpected`，而这条判据红起来读起来像"密钥面坏了"。
+  await stubPublicFacts(page, SERVER);
   await page.routeWebSocket('ws://sync.vault.e2e.test/**', () => undefined);
 
   // The fixture is deliberately strict. A new endpoint must be added here

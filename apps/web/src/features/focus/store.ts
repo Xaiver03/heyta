@@ -39,7 +39,6 @@ import {
   DEFAULT_FOCUS_CONFIG,
   abort as abortFn,
   advance,
-  focusStatsForDay,
   initialFocusState,
   isFinished,
   pause as pauseFn,
@@ -53,8 +52,10 @@ import {
 import {
   createFocusActions,
   focusLogFailureCode,
+  focusOverview,
   type ActionContext,
   type FocusLogFailureCode,
+  type FocusOverview,
 } from '@heyta/app-host';
 
 import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
@@ -64,16 +65,23 @@ interface FocusStoreState {
   config: FocusConfig;
   state: FocusState;
   /**
-   * 今天完成了几个专注。
+   * 概览四数 + 专注记录（工单 W7）。
    *
-   * 🔴 **由 op-log 派生，不是自增计数器。**
+   * 🔴 **由 `@heyta/app-host#focusOverview` 现算，这里一个数都不自己 reduce。**
    *
-   * 它原先是一个 `set({ completedToday: get().completedToday + 1 })` —— 那意味着
-   * **刷新页面就归零**，而且与另外两台设备看到的数字不同。专注记录已经落在
-   * op-log 里了，界面上的数字就该从那里算出来（`focusStatsForDay`），
-   * 顺带自动获得"与同步一致"这个性质。
+   * 它的前身是一个叫 `completedToday` 的字段，值来自本文件里直接调
+   * `focusStatsForDay` —— 那是"同一个口径写两遍"的形状：移动端要显示同一组数时
+   * 就是第二次，而两端口径不同的症状是"手机说今天 4 个番茄、网页说 3 个"
+   * （AGENTS §3.5）。W7 的判据 ③ 要求两端**同一个出口**，所以收尾动作是
+   * **把本文件那处推导删掉**，不是再写一个更好的版本。
+   *
+   * ⚠️ 与 `completedToday` 一样：它**不是自增计数器**，刷新页面不会归零，
+   * 别的设备同步下来的记录也会算进来（见文件末尾那条 `onEngineChange` 订阅）。
+   * ⚠️ 派生时机是"引擎变了"，不是"墙上时钟走了"：跨过零点而没有任何写入时，
+   * 这一组数会停在昨天 —— 那条边界原样继承自 `completedToday`，
+   * 要修就一起修，别在这里另开一套。
    */
-  completedToday: number;
+  overview: FocusOverview;
   /** 重绘节拍。值本身无意义，只用于让组件重新计算 remainingMs。 */
   tick: number;
   /**
@@ -125,10 +133,22 @@ async function persist(session: FocusSession): Promise<void> {
   await focusActions.log(session);
 }
 
-/** 从 op-log 里算出今天完成了几个专注。 */
-function deriveCompletedToday(): number {
-  const sessions = Object.values(currentState().focusSessions);
-  return focusStatsForDay(sessions, Date.now()).completedWorkCount;
+/**
+ * 空概览。只用于"引擎还没就绪时的那一份初值" —— 四个 0 与一个空列表，
+ * 不含任何口径（口径全在 `@heyta/app-host#focusOverview`）。
+ */
+const EMPTY_OVERVIEW: FocusOverview = {
+  todayCount: 0,
+  todayFocusMs: 0,
+  todayAbortedCount: 0,
+  totalCount: 0,
+  totalFocusMs: 0,
+  records: [],
+};
+
+/** 从 op-log 现算概览四数与记录列表（本文件不做任何 reduce）。 */
+function deriveOverview(): FocusOverview {
+  return focusOverview(actionContext, Date.now());
 }
 
 export const useFocusStore = create<FocusStoreState>((set, get) => ({
@@ -141,7 +161,7 @@ export const useFocusStore = create<FocusStoreState>((set, get) => ({
    */
   config: loadFocusConfig(),
   state: initialFocusState(),
-  completedToday: 0,
+  overview: EMPTY_OVERVIEW,
   tick: 0,
 
   start: (taskId) => {
@@ -243,7 +263,7 @@ async function runPersist(
 ): Promise<void> {
   try {
     await persist(finished);
-    set({ completedToday: deriveCompletedToday(), error: undefined });
+    set({ overview: deriveOverview(), error: undefined });
   } catch (error: unknown) {
     stopTicking();
     set({
@@ -262,7 +282,7 @@ async function runPersist(
  * 自增计数器做不到这一点。
  */
 onEngineChange(() => {
-  useFocusStore.setState({ completedToday: deriveCompletedToday() });
+  useFocusStore.setState({ overview: deriveOverview() });
 });
 
 function ensureTicking(
@@ -287,7 +307,7 @@ export function __resetFocusForTests(): void {
   useFocusStore.setState({
     config: DEFAULT_FOCUS_CONFIG,
     state: initialFocusState(),
-    completedToday: 0,
+    overview: EMPTY_OVERVIEW,
     tick: 0,
     error: undefined,
   });

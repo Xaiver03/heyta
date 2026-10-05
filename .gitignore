@@ -1,4 +1,9 @@
-node_modules/
+# 🔴 **不带尾斜杠是有意的**：`node_modules/` 只匹配目录，挡不住**软链**（traps #196 那一族）。
+# linked worktree 里 `e2e/node_modules` 常常是指向主检出的软链（为了不重复装第二份 playwright），
+# 带斜杠那版下它以未跟踪态出现在 `git status` 里，于是两个方向都出错：
+#   · 任何"脏树就不许跑"的守卫（`research/tools/selfhost-check-segments.mjs` 的脏前置）被它**永久**挡死；
+#   · `git ls-files -co --exclude-standard` 形状的打包集合会把它当未跟踪文件送出去（#196 的原事故）。
+node_modules
 dist/
 dist-types/
 # 桌面端渲染进程的构建产物（`apps/desktop/vite.config.ts` 的 outDir）。

@@ -208,7 +208,7 @@ export function ListsSection(): React.JSX.Element {
           一旦画了，移动端与 web 的清单行就会开始漂移，而那件事不会有任何
           测试变红（判据见 `apps/web/tests/projects-panel.spec.tsx`）。
 
-          ⚠️ 不传 `onSelect`：移动端没有"侧栏筛选"这个概念（筛的是
+          ⚠️ 不传 `onFilterWith`：移动端没有"侧栏筛选"这个概念（筛的是
           `TasksScreen` 自己的分节），点一行没有去处就不做成可点 ——
           一个点了没反应的按钮比不可点更坏。也不传 `counts`：
           移动端此前不显示未完成任务数，本批不顺手加。

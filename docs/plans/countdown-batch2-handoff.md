@@ -10,11 +10,69 @@
 > 🔴 **23:0x 增量**：W4b **客户端拉取那半已落地**（3 笔：storage 的 META 通用读写 / app-host 的
 > `public-facts.ts` / web 接线 + i18n 中英），**判据①第一次有了真界面载体**（e2e 三档、3 passed、
 > 三张图人已看）；25 臂变异逐臂报红。⇒ W4b 只剩一条：**papers 的后台界面回显**目前只到 API 层。
-> 🔴 **仍未做**：
-> W7 设备出图那半、W8 原生壳那半与壳级门禁、W9 原生投递（另一条会话）；W6 停放（23:0x 复量仍 14 脏，
-> 且撞车面**新增 4 个未跟踪文件** —— 日/年视图与拖拽，见 §5）；
-> **收尾四项（§8.3）除第 1 条的两半之外没启动**。
-> 🔴 **所有成果都在本地分支，没有 push、没有 merge 进 `main`**。
+> 🔴 ~~**仍未做**：W7 设备出图那半、W8 原生壳那半与壳级门禁、W9 原生投递（另一条会话）；W6 停放（23:0x 复量仍 14 脏，且撞车面**新增 4 个未跟踪文件** —— 日/年视图与拖拽，见 §5）；**收尾四项（§8.3）除第 1 条的两半之外没启动**。~~
+> —— 🔴 **04 14:0x 原地更正（这段是 10-03 23:0x 的读数，与本文 §0.5 与 §0.5 收尾行已经不同步；留原文是因为它会复现）**：
+> W6 **已闭合**（`e2def90f`）；W7 设备出图 = **Android 那一半在当前提交上取到读数**（13:18 重装 → 13:20 `RC_ANDROID=0` 11 项全过、成品图人已看）、
+> ~~**iOS 那一半仍未取到**（~~链 X 卡在负载门，累计 960s+，cap 3600s~~ ⇒ 14:4x 现量累计 **3420s / cap 3600s**，两分钟内以 `exit 3` 收口 = 环境无效不是产品失败；接力的是**链 Z**，cap 7200s）~~
+> —— 🔴 **04 17:1x 再更正：iOS 那一半取到了**（链 S `RC_PROBE=0`，17:13:17，通过 17 项 / 失败 0 项，IHDR `1080×1440` = 契约，图入库且人打开看过）。
+> 而它当时判红的那两趟**不是负载问题**：链 Z 之后 16:44 那次拿到窗口、跑到产品判据，红在 `rasterize-timeout`，
+> 真根因是**我们自己的调用时机**（effect 跑在 Fabric 把挂载事务刷到主队列之前 ⇒ `viewForReactTag:` 拿到 nil，而那条分支不回调）。
+> 修 = 让出一帧再要图（`afterNextFrame` + 三条 node 判据），已提交 `c313914f`。⇒ **W7-G1/G2/G3 同批闭合**；
+> ⚠️ 代价：`card-export-units.ts` 改了 ⇒ 13:20 那趟 Android 读数当场过期，重取排在链 T 第 [4] 步。
+> W8 壳级门禁 = **windows 那栏已有真实读数**（链 S 四臂）、~~mac 那栏仍未取证（两条硬理由见 §0.5 第 W8 行）~~
+> **mac 那栏 14:4x 起改成"排队自取"**：`check-shell-surfaces.mjs:944` 有 `HEYTA_MACOS_WEB_DIST` 覆盖 ⇒ 本批自己打一份到私有 OUT_DIR 就能读（链 W，pid 62956，带 `HEYTA_SKIP_NOTARIZE=1`）；
+> 关不掉的只剩"装进 /Applications"那一格，**三条**硬理由逐条带 pid/行号在计划 §8.4 ㊳ 的"macOS 那一腿的关闭条件"段（新增那条没有绕法：`reinstall-all.sh:198` 要 `rm -rf` 的正是 **pid 772 跑着的那枚包**）
+> —— 🔴 **04 18:2x 这三条"硬理由"里那条 pid 772 的已被现量否证，原地改掉**：18:20 现量 `lsof +D /Applications/Heyta.app` **零行**、
+> `ps -p 772` 给出 `%cpu 0.0 / state S / etime 20h47m` ⇒ 它是**闲置的 leftovers 而不是"谁正在用它"**；
+> 它盘上那份包内 `web-dist/index.html` 是 `217cae2a252d8948`，**不等于**当前 `517c6ba76d00fb25` ⇒ **"装进 /Applications"这一格该由本批关掉**，
+> 不再挂在共享位置的持有者手里（链 MAC 就是这一腿）。⚠️ 动手前查了并行台账 `BLOCKED.md:3419`，
+> 那里**早已把"21:33 那个旧实例挡着"判过否证** ⇒ 我不杀它、也不代它做归属裁决，只把这一腿的读数取回来。
+> 🔴 **同一条台账还证了一件事**：`BLOCKED.md:4375` 把他们的阻塞写成"与我抢同一处固定路径 `/tmp/heyta-macos-dist`"，
+> 那是**他们的链活着时**的读数；18:20 现量 `pgrep -fl 'notarytool|reinstall-all|package-app'` **零命中** ⇒ 对手没了，
+> 但**物证还在原地**（那枚 dmg 被 pid 98171 持有）。所以 mac 段开局那句 `rm -rf "$MAC_OUT"`（`:192/:196`，路径写死）
+> 现在删的不再是"对手的在产物"而是**别人已经交付的证据** ⇒ 本轮处置 = **改名保住**（`/tmp/heyta-macos-dist-0313-held`，非破坏、可逆，
+> 对方 FD 仍指向同一 inode），结构性修法（`HEYTA_MACOS_DIST_DIR` 旋钮、默认值逐字不变）登记任务 #32。
+> —— ✅ **04 19:3x 这两件事都做完了，原地收口**：mac 那一腿 `RC_MAC=0`（18:45:48，9 chunk 集合对账 +
+> 包内 `index.html` sha 与本机逐字相同 + 装进 `/Applications` 那一枚自截屏我打开看过），
+> 而 19:15 链 FULL2 重打 `apps/web/dist` 之后那个 sha **仍是 `517c6ba76d00fb25`** ⇒ windows 那格第四次复核成立；
+> 旋钮已落地（`reinstall-all.sh:197`，默认值逐字不变，两臂离线实测：带 env 清临时目录且真实默认目录里的
+> `Heyta.app` 前后都在 / 拿改动前那 4 行做变异则 env 被无视）。🔴 顺带一条自己踩的坑：
+> 那笔旋钮提交自己带了 `$MAC_OUT（` 这种会被门禁拦的写法（第 62 段 `check:shell-unicode` 报红），
+> `c2d572ba` 修掉 —— 抓住它的不是我记得查，是链条里那一跑。
+> 全部现量与缘由在计划 §8.4 ㊣。；
+> W9 原生投递**不归本批**（另一条会话持有）；
+> 收尾四项现在是：①完整 `pnpm check` —— 13:26 那次停在 `check:ui-provider`，14:0x 已修好该判据（四臂变异）并**排在链 X 之后重取**（链 Y）；
+> ②`docs-link-check` **rc=0**（14:04 现量）；③界面结论截图**人已看**（本批的：android 成品图 13:2x、windows 打包图 10:4x、web 三张 23:0x）；
+> ④四端装上当前产物 —— **android 13:20 ✅ / windows 10:39 ✅（13:20 复核 sha 仍逐字相同）/ ios 等链 X / mac 受阻**。
+> 复现命令：`git rev-parse --short HEAD`、`grep -aE 'RC_ANDROID=|RC_REINSTALL_ANDROID=|RC_WINDOWS_LEG=' /tmp/device-closeout-U.log`、
+> `grep -aE 'RC_REINSTALL_IOS=|RC_IOS_PROBE=' /tmp/device-closeout-X.log`、`grep -a 'RC_CHECK=' /tmp/device-closeout-Y.log`。
+> 🔴 ~~**所有成果都在本地分支，没有 push、没有 merge 进 `main`**。~~
+> ✅ **04 21:2x 现量更正**：这条已经不成立。`feat/countdown-batch2` 已 push 到 origin
+> （`c36b1d89 → c9f4e2aa → cfdac113 → f92491ac`），`main` 也已 push（`9070e18d → c343b923`，
+> 那 13 笔是把并行会话留在主检出的稳定改动按逻辑簇收拢的），
+> 而 **main 已经整条并进 batch2**（`75114cd3`，13 处冲突逐处裁决，理由在提交信息里）。
+> 还没走完的只剩最后那一格：**main 这个 ref 还没指过来** ——
+> 主检出此刻仍有别人在写的 `AGENTS.md` / `environment-traps.md` / `package.json`，
+> 快进会把它们的工作树改掉，所以按"共享资源先定所有者"等他们提交之后：
+> `cd heyta && git merge --ff-only feat/countdown-batch2`。
+> ⚠️ 这条更正本身就是 §7 里那句"**我没 push"≠"分支不在远端"** 的第二次命中：
+> 原句写的时候是真的，它的保质期取决于别人什么时候动同一件事，所以它旁边必须写核对日期。
+> 🔴 **同一条保质期在十分钟内又命中第三次**：`5358edf7`（第三次并入 main）之后 main 立刻再落 4 笔
+> ⇒ "仍可快进"作废。**决定：停止追 main**，落地那一步交回主检出持有者，
+> 明细与现量在 [`countdown-anniversary.md`](countdown-anniversary.md) **§8.5 第 12 条**。
+> ✅ **原先那格"未闭合的验证 `E2E-MERGE-01`"已闭合**（04 21:4x）：4 份手工裁决的 Playwright 用例真跑完
+> ⇒ `1 failed / 10 passed`，红的那条抓到一个**只有 e2e 层能抓到的真缺陷**（后台年度那一格被裁 13px，
+> 而同趟 10 条文本断言全绿）。已按不变量修完（新增 `--wrap` 修饰符，**没抬阈值**），
+> 变异 `RC_MUT_WRAP=1` 复现同一个 13px，两张图人都看过。明细在 §8.5 第 11 条。
+> ✅ **04 22:0x：`origin/main` 已收下这批**（`c343b923..91a672f6`，一次快进、不带 force。
+> ⚠️ 那个 SHA 是**那一趟的瞬时 tip**；当前 tip 按计划 §8.5 第 14 条的命令现量读，不要抄这里）。
+> 通道是 `git push origin feat/countdown-batch2:main`，**不是**改写主检出 ——
+> 先前那条"落地只剩 main 这个 ref"把**本地 ref** 当成了"合入 main"的实质，已被一次 `--dry-run` 否证
+> （全过程与边界在 §8.5 第 12 条；那笔**没有**重跑全量单测，读数边界写在那里）。
+> 🔴 **如果另一个会话正在读本地 `main`**：它现在落后 `origin/main`，请 `git pull` 一次收敛；
+> 那 10 笔已被公开，**不能再 amend/rebase**（要修就新写一笔）。
+> 至此本批**没有剩余未闭合项**，除两条已登记的边界：`check:ai-e2e` 整族（只跑了那 4 份）、
+> 以及 `G-AUDIT-1..8` 那八条按"改不动的登记编号不硬压"处理的缺口。
 > 交接日期：**2026-10-03**（CST）
 > 给**全新会话**用：不从聊天记录继承任何前提。每条断言都带可复现命令或实测读数。
 >
@@ -37,9 +95,36 @@
 
 ## 0. 一句话现状
 
-批次二的**代码半基本落地**，卡点不在代码而在**合流**：三条并行线（W7/W8/W4b）的成果还躺在各自
-worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 笔**（`main` 是多人协作的活树，
-不是我的基线）。**下一段最贵的工作是把三条线收进 batch2 并兑现 §3 那两条义务，不是再写新功能。**
+> 🔴 **本节 2026-10-04 03:1x 重写。下面那段"卡点在合流"已经被现量否证，原句留在引用块里划掉，
+> 因为它记录的是一种会复现的形状：**"别人什么时候把它合掉的"不在我的读数里，所以"还没合流"这句话的保质期不由我决定。**
+
+> ~~批次二的**代码半基本落地**，卡点不在代码而在**合流**：三条并行线（W7/W8/W4b）的成果还躺在各自
+> worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 笔**。~~
+
+**现在的状态**：合流**已经发生**，而且不是我做的。现量（每次引用本条都要重跑，别信这段文字）：
+
+```bash
+git log --oneline origin/main..HEAD          # 2026-10-04 03:1x 读数：只剩 e2def90f（W6 那一笔）
+git rev-list --count HEAD..origin/main       # 同刻读数：228 —— main 在吸收批次二之后又前进了 228 笔
+```
+
+⇒ 三条线（W7 `43e94b32`、W8 `f2d09974`、W4b 那六笔）**都已经是 `origin/main` 的祖先**，
+`heyta-wt-w7` / `heyta-wt-w8` 那些 worktree 里的"未提交成果"这个描述整体过期了。
+本批剩下的不是"合流"，而是**把 W6 那一笔之外的收尾做完**：判据②的真浏览器读数、W7 的变异臂、
+完整 `pnpm check`、四端重装。
+
+🔴 **这条变化改变一件事的判断口径**：凡"本批带来的后果"现在**同时是 main 的后果**，
+所以"等合流之后再管"这个念头不再成立。两个当场撞见的例子，**归属不一样**（第二个不是我们的债）：
+① `apps/web/src/main.tsx:152 startPublicFacts()` 让**每个** e2e 套件一开机都发一次
+  `GET /api/holiday-adjustments`，而假服务端只实现 `/v1/chat/completions` ⇒ 带
+  「除已登记缺失外不该有非 2xx」守卫的套件被无关地拖红（`admin-console.spec.ts` 实测一次红五条，
+  修法见 `e2e/tests/helpers.ts` 新增的 `stubPublicFacts`，与 `stubLegalRecheck` 同形同因）；
+② W9 那半在 main 上声明了 `POST_NOTIFICATIONS` + `SCHEDULE_EXACT_ALARM`，而 `permissions.ts` /
+  `third-parties.ts` 那六句"移动端不申请通知权限"没跟着翻、那条闹钟权限也没登记
+  ⇒ **`node scripts/check-legal-permissions.mjs` 在干净 main 上就 rc=1，且是 7 条红而不是 2 条**。
+  04 03:5x 用门禁自己的 `HEYTA_CHECK_ROOT` 旋钮把七份输入换成**只含 `origin/main` 已提交内容**的一份，
+  ⇒ **rc=1 / 7 条红**，与喂 `HEAD` 那次末行逐字相同 —— 所以这句"干净 main 上就红"从推断升级成了实测
+  （命令与探针踩坑见 `countdown-anniversary.md` §8.2 L' 第 1b 条；本批不代它翻那六句）。
 
 本轮新增了一条**常驻门禁**：`pnpm check:legal-permissions`（`1d71e75f` + 加固 `017adc3e`，在 batch2 分支），
 它把"移动端不申请任何权限"这类**对外承诺**与 manifest / Info.plist / entitlements 的**真实声明面**对账。
@@ -66,15 +151,15 @@ worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 
 | W0 | 批次一遗留的登记缺口收掉（`/tmp/ui.xml` 固定名 36 处、`verify-mobile-repeat.sh:243` 硬印库名、**待入台账的两条正文搬运**） | 🟡 **①② done**（`6598703b`，harness 22 绿 0 红） | ③ **台账搬运没做**：`environment-traps.md` 正脏 ⇒ 正文停在计划 §3.5（`:675` 起），任务 #14 |
 | W2 | 新实体 `EVENT` 落 `shared-schema` + `domain` + `op-log` reducer + 存储三套适配 + 线协议契约；🔴 部署顺序硬约束"服务端先于客户端"；ADR-0044 已定"闰月生日逢闰过正" | ✅ 已闭合（`bb6c1203` + `05794dc5`），**且服务端那一腿本轮补上了**（`30340fa2`：`EVENT` 认领进 `validation.service.spec.ts` 的手写实体清单） | 无。**但"服务端先于客户端"是部署期义务，`reinstall:all` 那一步要按它排序** |
 | W5 | 倒数日卡片网格 + 二级操作（界面） | ✅ 已闭合（`a9529a59` + `94760c82` + `c07df677`），e2e 6 passed、三张图人已看 | 无 |
-| W6 | 第二个日期数据源 | ⏹ **停放**（撞车面非空，关闭判据见 §5） | 等六个日历路径 `git status --porcelain` 归零后落地，复用 §4 第 3 条的 `dayMarker` 缝 |
-| W7 | 纪念卡片导出为**成品图**（设备渲染导出，**零通道、零法务变更**；区别于素材图） | 🟡 **已提交 `581bdb99` 并合进 batch2 `caf9a48c`**：只有线协议契约（99 行）+ ui 侧字段（+42）。🔴 合进来的东西**本轮第一次跑过**：`shared-schema` 117 passed、`pnpm -r build` rc=0（⚠️ 但它是靠 build 才第一次进 dist —— 起手 `grep -c EXPORT_CARD_EDGE_PX dist/index.js` = **0**） | 🔴 **设备出图那半没有**：RN/原生渲染导出、`check:*` 门禁、判据（含"零法务变更"的现量复核）全未做 |
-| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | 🟡 **已提交 `b8f39cae` 并合进 batch2 `db430cc9`**：移动半（`CountdownScreen` 267 行 + `feature-entries` 109 + `countdown-display` 133）+ 领域层 `feature-modules.ts` 77 + 测试 244 行；web 半已随 W5 落地。✅ **那 244 行本轮真跑了**：`@heyta/mobile` 547 passed、`@heyta/domain` 859 passed（起手 4+15 枚红全部是读旧 dist，见 §2.2 第 1 条） | 🔴 "三端"里**原生壳那半 + 壳级门禁**没有产物 |
+| W6 | 第二个日期数据源 | ✅ **已闭合**（`e2def90f` @ `feat/countdown-batch2`，2026-10-04 02:5x） | 无。⚠️ 原句"等六个日历路径归零后落地"的载体已经不存在了 —— 那六个路径的未提交 diff 随 main 的推进被各自所有者提交掉，`608fa5b1` 把合并基搬到 batch2 上，落地前重跑了一次关闭判据（`git status --porcelain -- packages/ui/src/calendar apps/web/src/features/calendar apps/mobile/src/screens/CalendarScreen.tsx` 输出为空）。**留了一条编号缺口 W6-G1**：接进「今天」/收集箱要先给共享 `TaskList` 一条"不可交互行"的契约变更（把 EVENT 塞进任务行要么伪造 `completedAt`、违反 §3.4 一个意图一个 op，要么凭空造第三种行形），不属于这一批。**04 06:1x 另关一条本批自己照出来的红（R-1）**：W6 那颗「休/班」把侧栏格子撑高，而格子带 `aspect-ratio: 1` ⇒ **高度绕到宽度**、`repeat(7, 1fr)` 的自动最小允许轨道被撑开 ⇒ 行网格 `37.5px×7=263px` 而容器 189px，**整张迷你月历溢出侧栏一列**、七列与列头逐列错位（实测 −5.25…−68.25px，`e2e/tests/calendar-sidebar.spec.ts:111` 在安静窗口确定性红）。修法三处（`minmax(0, 1fr)` / 删 `aspect-ratio` / 那颗点与状态点**同行**并给槽位 `min-block-size`），修后同一判据 **`RC_E2E_SIDEBAR=0`、`2 passed`**，两张图人已看。取证与"我那条算术否证否错了对象"写在计划 §W6 节 R-1 段 |
+| W7 | 纪念卡片导出为**成品图**（设备渲染导出，**零通道、零法务变更**；区别于素材图） | ✅ **web 半 + Android 设备出图都到最终态**（04 07:41 `RC=0`，成品图入库且人看过），**iOS 那一半未取设备读数、且本轮量出它的原生模块从未编过译**（~~移动端"代码 + 判据在、真机那一趟没跑"~~）（~~✅ 三端都到最终态~~ —— 04 04:3x 改判：那句把"原生模块已写好"读成了"设备上画出来了"，而 Goal 的范畴②要的正是后者）。共享版面 `packages/ui/src/countdown/card-export-layout.ts` + web `<canvas>` 出图 + 移动原生落盘（Android `cacheDir` + `FileProvider`、iOS 写沙盒，两端**都不走相册**）+ 门禁 `check:card-export`。**04 03:1x 现量**：`apps/mobile/tests/card-export.spec.ts` **21 passed**（`MOBILE_RC=0`）、`e2e/tests/countdown-export.spec.ts` **5 passed**（`EXPORT_E2E_RC=0`）、成品图与四张界面图**人已看**且**已进版本库**（`apps/web/evidence/countdown-export/`，含每张"看见了什么"+ 两件事：竖条是 `surface-sunken` 不是主蓝＝夹具没选模板，这是设计；「还有 28 天」与「11月1日」互相自洽＝只有看图才会做的交叉验证） | 🔴 **两臂变异 04 04:2x–04:3x 跑完**（`RC_A1=1` 红 `:268`+`:312`＝同一把尺子的两处使用；`RC_A3=1` 红 `:360`；还原后 `RC_RESTORE_EXPORT=0` / 5 passed），装置已从 `/tmp` 落进版本库 `research/tools/mutate-w7-card-export-arms.mjs`。**剩下的一条**：真机出图读数 —— 装置 `pnpm verify:mobile-card-export`（含探针自检两腿：现成图必须等于契约、3×2 对照必须不等）已落库，排在收尾第 4 项那一趟里。⚠️ 另记一条**因 A1 而失效的旧读数**：`check:card-export` 的 `rc=0` 是 03:1x 量的，而那一臂把 `packages/ui` 的 dist 打过又还原重打过 ⇒ 收尾那趟必须重取。**04 05:1x 已重取：`RC_CARD_EXPORT=0`**（同一趟里 66 段 sweep 也是 0）。🔴 **再登记一条编号缺口 W7-G3**：那台装置是 **adb-only**（`grep -icE "ios\|simctl\|swift"` 在 305 行里命中 **0**）⇒ "设备出图"目前只有 **Android 那一半会有读数**，iOS 那一半停在代码 + node 单测。正文（含"iOS 的读数通道其实更便宜：`simctl get_app_container data`/`tmp/card-export/` 是宿主机直接可读的目录，不需要 `adb root`，缺的只是 UI 驱动"）在 `countdown-anniversary.md` 的 W7 节。<br>🔴 **04 07:2x–07:4x 两条现量改判**：① **W7-G3 的"闭合代价"那句被我自己的现量否证**（登记成债之前先量贵不量贵）—— `ax()` 只是 `verify-mobile-ios.sh:172` 的 3 行包装、真身是仓内文件 `scripts/tools/ios-ax-shim.py`（959 行、CLI 现成），`resolve_idb()` **就在共享 lib** `scripts/lib/mobile-e2e.sh:970`，本地只剩 `press_until`(48 行)/`dismiss_overlays`(32 行) 两个小助手；读数通道三台模拟器 `get_app_container` 全 rc=0 且宿主机可直接 `ls` ⇒ 已转任务 #21。② 🔴 **iOS 原生模块从来没编过译**：第一次真跑 `reinstall-all --only ios` ⇒ `BUILD FAILED`，22 条 error 全在 `HeytaCardExportModule.swift`（`cannot find type 'RCTPromiseResolveBlock'`，缺 `import React`；兄弟模块都有那行）。已修 `7c63411b`，**但"修完能不能建"仍未验**。⇒ 台账里"W7 iOS 侧代码链闭合"这句当时就不成立，正确说法是"代码写完、注册进 target 了、**没编过**"：`check:card-export` 数的是 pbxproj 里有没有那两个文件，TS 单测量的是 JS 折算，**没有一层跑过 Swift 编译器**（§6.1.1"门禁绿 ≠ 能打包"第四次现形）。<br>✅ **Android 那一半的设备读数已到手**（04 07:41，载体 `7c63411b`，`pnpm verify:mobile-card-export` **`RC=0`**）：判据①两腿（正向 `1080×1440` / 反向 `3×2 BLANK=true` ⇒ 读数器会区分）、判据②（点前缓存空 ⇒ 点后出现 `heyta-w7e2e-073853-10月11日 星期日.png`）、判据③（**设备那串字节 `W=1080 H=1440 BYTES=36493 TRANSPARENT=false BLANK=false SMEARED=false`，逐字等于 `shared-schema` 产物里的契约那两个数** ⇒ 关闭 **W7-G1/G2**）、第 6 步零授权弹窗（前台仍是 `com.heyta`，与"不申请照片"那句条款同向）。成品图**已入库** `apps/mobile/evidence/card-export/latest-card.png` + 同目录 `README.md`（**人打开看过**：竖条是 `surface-sunken` 不是主蓝＝没选模板，这是设计；「还有 7 天」与「10月11日 星期日」与当天 10-04 三者互相自洽）。中途卡了两趟都红在**探针**：新鲜度门读不出 dumpsys 的日期形状（`644130c7`，并量了负向臂），底栏目标被 `*-sane` 的 `cy<2100` 守卫结构性地滤空（`80f7be46`，同一份 dump 三种取法同时量）。 🔴 **04 10:0x 现量（链 P，载体 `198603f5`）：iOS 探针第一次走到产品判据并判红，根因既不是探针也不是 react-native-svg，而是我们自己那条桥交给 JS 的名字** —— `RCT_EXTERN_MODULE(a, b)` 展开成 `RCT_EXTERN_REMAP_MODULE(, a, b)`，JS 名那格是**空的**，于是 `NativeModules.HeytaCardExport` 为 `undefined`（Swift 自己那个 `moduleName()` 被分类方法盖掉）。三层只读取证 + 一次**只换 bundle、不重打 app**的实验把它与"RNSVG 不回调"分开：在 hook 挂载处直接调 `writeCardPng` 也不落盘，而同趟界面标题的临时对照真的出现在 AX 树上。已改 `RCT_EXTERN_REMAP_MODULE(HeytaCardExport, HeytaCardExportModule, NSObject)`；同时修掉那条**标题写"模块名三处逐字相同"、body 却比 `.m` 第一个参数 == ObjC 类名**（坏形状恰好满足）的判据 —— 三臂变异各红一次（退回裸宏 / REMAP 两参互换 / JS 名错一位），复原 21 绿。同族两座桥（`HeytaWidget` / `HeytaReminder`）登记为 **W7-G5**，本批不改（各有所有者）。iOS 设备读数等重打 app 后取；逐条读数在计划 §8.4 第 ㊱ 条。<br>✅ **04 17:13:17 iOS 那一半的设备读数到手 ⇒ W7-G3 关闭**（链 S `RC_PROBE=0`，通过 17 项 / 失败 0 项）：判据①两腿（正向 1080×1440 / 反向 3×2 `BLANK=true`）、判据②（点前沙盒无此文件名 ⇒ 点后出现 `heyta-w7ios-170457-10月11日 星期日.png`）、判据③（`W=1080 H=1440 BYTES=64619 TRANSPARENT=false` 逐字等于契约 ⇒ **W7-G1/G2 的 iOS 腿同时闭合**）、第 7 格零权限弹窗。<br>🔴 **而它第一次真跑（16:44）红在 `rasterize-timeout`，根因不是超时不够、也不是 react-native-svg 坏，是我们自己的调用时机**：`RNSVGSvgViewModule.mm:31` 那条 `viewForReactTag:` 拿到 nil 时只 `RCTLogError + return`（回调永远不来），而 JS 侧 effect 跑在 commit 之后、原生挂载事务刷到主队列之前（Android 同码出得来图 ⇒ 两端不对称）。修法 = **让出一帧再要图**（`afterNextFrame`，调度器注入 + 三条 node 判据），**不是**把 15 s 拍得更长。已提交 `c313914f`。<br>⚠️ **代价按 W7-G6 自己写的规矩结算**：`card-export-units.ts` 改了 ⇒ 13:20 那趟 `RC_ANDROID=0` 验的是改动前的 bundle，**当场过期**，重取排在链 T 第 [4] 步（先 `reinstall-all --only android` 再探针）。三条让帧判据的**变异臂**（A 不等帧 / B 摘掉调用点 / C 换 detail 串）在同一趟的 [1..3] 步，每条带"复原后 `git status` 该路径为空"的自证。 —— 🔴 **04 18:1x 原地更正这两处排队，并记一条探针收口**：① 排队顺序 17:5x 就翻过来了（**设备读数第 [1]、三条臂在其后**），因为让 Goal 被挡的那一腿排在边界取证后面是我自己排的错；② 臂 18:15 换到 `/tmp/chain-T3.sh`（单次共享窗口 + 三臂连跑，等满只记一次 `RC_MUT_*=3`），理由不是它们坏了，是三条各等 1800s 会把 `SENTINEL_T_DONE` 推后 90 min，而链 MAC / FULL / T2 全盯这一句 —— 接力脚本 `/tmp/relay-T3.sh` 把同一句哨兵补回 `chain-T.log`，下游契约不断，**不新造读数**。③ ✅ **重装那半已取到**：`RC_REINSTALL_ANDROID=0`（17:57:21，载体含让帧修复）。🔴 **出图那半以环境无效收口**：`RC_ANDROID=3`（18:12:23，探针原文 `❌ 等满 900s 负载仍是 164`；同一时刻 `uptime` 141/204/169，别的会话在跑 pytest + Xcode clang + chrome-headless-shell）。⚠️ **这一腿只等了 900s，因为链脚本没传 `HEYTA_LOAD_GATE_WAIT` ⇒ 用的是 `wait-for-quiet-host.sh` 的默认值**：阈值 12 一分没动（对的），但"这一腿值等多久"交给了被调方的默认旋钮，症状与"窗口开过却没等够"一模一样 —— 补跑（链 T2，排在队列最末）**显式带 `HEYTA_LOAD_GATE_WAIT=3600`**，且带一次重装（臂收尾的 `git checkout` 会把源码 mtime 推到装进去的 bundle 之前，新鲜度门按规矩就该拒）。13:20 那趟 `RC_ANDROID=0` 仍算过期，本行不代它宣布关闭。逐条读数在计划 §8.4 ㊢。<br>✅ **04 18:32:34 边界第 7 条这一半闭合**（三条让帧判据的变异臂各 `rc=1`，每条读数都是 `Test Files 1 failed (1)` + `Tests 1 failed \| 28 passed (29)` —— 红集恰好只有点名那一条，且各带一行"已复原（`git status` 该路径为空）"）。⚠️ **第一次起跑（18:31:01）三条臂一起 `PATCH_FAIL`**：我传的相对路径少了 `apps/mobile/` 一层，而**同一个错原样躺在被换掉的链 T 脚本里**，只因那三条臂从未走到 apply 那一步（全被负载门挡住）才没暴露 ⇒ **没跑过的取证代码本身也是未验证代码**；它是响亮失败且不动文件的，没污染任何读数。⇒ **② 现在只剩 Android 出图那一格**（补跑在链 T2；**18:41 起重排在 `MAC → T2b → FULL2`**，文中"链 T2 / 链 FULL"指的就是 `/tmp/chain-T2b.sh` 与 `/tmp/chain-FULL2.sh`，改名不改语义，`diff` 现量只差哨兵清单与 `LOG` 路径）。逐臂表在 `countdown-w7-device-export.md` §6.4，教训全文在计划 §8.4 ㊤。 🔴 **04 19:0x：② 的最后一格补到了** —— 链 T2b `RC_REINSTALL_T2=0`（18:46:47，先重装再探针）→ `RC_ANDROID_T2=0`（19:00:50，`通过 11 项 / 失败 0 项`、IHDR `1080×1440` 逐字等于契约、`BYTES=35286 SHA=2821b4820f8f`、`TRANSPARENT=false`、全程零授权页、成品图我打开看过：白卡 + 左侧竖条 + 居中「还有 7 天」+ 底部「10月11日 星期日」，与 iOS 17:13 那张**四处同构**）。⇒ **这一行转 ✅：两端读数都在当前提交上**，逐条账在计划 §8.4 ㊧。⚠️ 顺带一条载体形状：链 FULL2 收尾那条 `git checkout -- .` 会连**刚拉回来的设备证据**一起回滚，所以顺序必须是「证据先提交、链后收尾」—— 它按名字复原时分不清「e2e 重写的」和「设备拉回来的」。 |
+| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | ✅ **三端代码 + 壳级门禁都在 main 上了**（`f2d09974`）。🔴 这条门禁 04 03:2x 现量曾 rc=1、5 格 4 绿 / 1 红，红的格是 `[web] W5 产物比源码旧`（`dist 18:53 < src 19:40`）—— **是自家提交（`e2def90f` W6 + 后台面板）把这条判据甩下的，不是新缺陷**；同一条命令 03:0x 那次确实 rc=0 / 5 绿，两次都真。**04 04:5x 第三次现量：`pnpm --filter @heyta/web build`（`RC_WEB_BUILD=0`）后重跑 ⇒ `RC_SURFACES=0` / 5 绿 0 红**，回到与 03:0x 一致的读数。未取证 2 栏不变（`desktop-{macos,windows} / countdown · 产物`，macOS 那栏包里 `index.html` sha256 与本工作树 `apps/web/dist` 不符）。门禁自己那句话是判据本体："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" —— 🔴 **04 18:4x 起这句要连着新读数一起读**：链 MAC 把当前产物装进 `/Applications` 之后，**裸路径**跑 `node scripts/check-shell-surfaces.mjs` 现量 `rc=0 / 5 绿 0 红 / 未取证 **0 栏**`（上面那句"未取证 2 栏"是 04:5x 的读数，已被 18:48 与 20:1x 两趟取代），三处 `index.html` 的 sha256 前缀 `517c6ba76d00fb25` 逐字相同（本机 dist / 包内副本 / 远端 windows 取证）。⇒ 那一栏从"通道在"升到了"装出来的包里确有这一屏的字节"，但**它仍然不证倒数日那一屏在屏上**（那一格由设备出图那两趟给）。账在计划 §8.4 ㊦/㊧/㊬。 | 那两栏~~只由 Goal 第 ⑤ 条的 `pnpm reinstall:all` 关闭（它顺带把 `apps/web/dist` 打进两端安装包）~~ —— 🔴 **04 07:2x 现量否证了一半，原地改掉**：`reinstall:all --only windows` 这一腿本轮**真跑绿了**（`RC_WINDOWS=0`，远端对账打印 `web-dist/index.html=517c6ba76d00fb25` 与本工作树 dist 逐字相同），可门禁那一栏**照旧报未取证** —— `check-shell-surfaces.mjs:778` 给 desktop-windows 写死 `artifactWebDist: null`，而 `:821` 在 `:831` 读 env 覆盖**之前**就短路 ⇒ windows 这一栏在本机**结构上不可能**转绿，缺的不是取证是把取证搬回本机的通道（登记 **W8-GAP-W1** / 任务 #20，含三臂变异配方）。<br>  ✅ **04 08:2x 通道已就位**：windows 那栏改走**远端取回的事实文件**（`artifactFacts` + `HEYTA_WINDOWS_FACTS`），生产侧 `install-and-capture.ps1` 补发 `PAYLOAD_INDEX_SHA` / `PAYLOAD_CHUNK_TOTAL` / `PAYLOAD_CHUNK_PRESENT` 三行；七臂台架逐臂读数（含「sha 对上而字节里没这一面」那一腿）记在 `countdown-anniversary.md` §8.4 ㉖。<br>~~⚠️ 但那三行还没在 Windows 上真跑过 ⇒ 这一栏现在仍报未取证，本轮不代它宣布关闭~~ —— 🔴 **04 10:4x 原地更正：这一栏已经有真实读数**（链 S，载体 `6105ba3b`，无设备参与）：`RC_SYNC=0` + `RC_PACKAGE=0` + 七条取证齐（`PAYLOAD_INDEX_SHA=517C6BA76D00…`、`PAYLOAD_CHUNK_PRESENT/TOTAL=2/2`）⇒ `check:shell-surfaces` **`RC_SURFACES=0`、5 绿 0 红、未取证从 2 栏降到 1 栏**，D4 那一行打印的是「装进包的字节与本工作树 dist **sha256 逐字相同**，且那份里有 `countdown-view`」。**四臂各量一次**（拿真取证文件改一个值，经 `HEYTA_WINDOWS_FACTS` 注入）：`PAYLOAD_WEBDIST=False`⇒红、`PAYLOAD_CHUNK_PRESENT=1`⇒红、sha 首位 `517C→0000`⇒**转回未取证**（不许拿别人的字节给自己这一轮作证）、删掉那三行⇒**未取证**（生产方没测这些事实）。跑的是 `reinstall-all.sh` 的 **windows 那一腿的两条命令**（`sync_windows_sources` + `package-msix.sh`），**不是整条 `reinstall:all`** —— mac 那一腿的 `/tmp/heyta-macos-dist` 与 `/Applications/Heyta.app` 正被那条 hung 链握着（`notarytool submit --wait` 到 10:36 已 7h22m，`lsof` 现量 27 个 fd 里**零个网络 fd**）。📌 **关闭 W8-GAP-W1 / 任务 #20**。⚠️ 一条限制：取证文件落在 `dist/windows/`（**被 gitignore**）⇒ 它是本机这一趟的读数，不是仓库里的常驻证据，干净检出上这一栏仍会报未取证。👁 打包图 `packaged-first-run.png`（1152×587）**人已看**：头像菜单第一项是高亮的「登录 / 注册」、下面「设置」、**没有**「退出登录」，主区「收集箱」+「未同步」chip，弹层是首装那张「在使用联网功能之前」授权卡，中文零豆腐块。⚠️ 与 Android 那一格同一条边界：这张图证的是「装上的是当前源码的界面」，而「倒数日这一屏在装出来的包里」是由上面那条 sha 逐字相同证的。<br>~~**macOS 那一栏这句仍然成立**（包落在本机 `/tmp/heyta-macos-dist`，D4 会读它），而它本轮**没装**：`notarytool submit` 已占这一档 4 小时 03 分（07:15:33 现量）。在此之前本行不打勾~~ —— 🔴 **04 15:1x 原地更正：mac 那一栏的"未取证"是本批自己取掉的，不是等别人让位**。链 W（`RC_CHAINW=0`，载体 `117386a1`）：`HEYTA_SKIP_NOTARIZE=1` 把包打进**自己的** OUT_DIR `/tmp/heyta-macos-dist-b2`（`package-app.sh:28` 的第一位置参数，公证旋钮的三臂实测在 `3178a097`）→ `RC_MAC_PACKAGE=0` → 包内 `web-dist/index.html` sha 与本机 dist **逐字相同**（`517c6ba76d00`）→ assets 集合对账 **9/9、差异行 0** → `HEYTA_MACOS_WEB_DIST=<包内那份> node scripts/check-shell-surfaces.mjs` 打出「判定 5 格：**5 绿 / 0 红；未取证 0 栏**」（`HEYTA_MACOS_WEB_DIST` 这个覆盖 `:944` 一直就有，缺的只是把包打进那个位置参数目录 —— 上一版把"没有覆盖通道"写成事实，是 ㊼ 那条否证的一部分）。👁 内容载体 `packaged-first-run.png.webview.png`（155 KB）**人已打开看过**：收集箱 + 首启「在使用联网功能之前」同意卡 + 主蓝实心钮；同名的窗口图（13 KB）是空的，而 `package-app.sh:232-242` 早把内容判据压在 WebView 快照上并显式声明窗口图为空"不据此判红"（2026-10-03 实测）⇒ **本行主张的是"包里有这一屏"，不主张"屏幕上那个窗口有内容"**，后者仍属 #23 那一格（`/Applications/Heyta.app` 与共享 WebKit 容器由常驻实例握着，pid 772 现量）。逐条读数在计划 §8.4 ㊒。<br>📌 ~~本行曾写"收尾那趟 check 之前必须先 `pnpm --filter @heyta/web build`，否则这一格必红"~~ —— **04 04:5x 现量作废**：`package.json:58` 的 `check` 串**第一段就是 `pnpm build`**，所以完整收尾那趟结构上不可能在这一格响；那句前置只在**单独跑 `check:shell-surfaces`** 时成立。教训的形状和 §8.4 那条一样：**把"单跑门禁"的条件写成"跑 check"的条件**，就是一个会误导下一个人的前瞻。⚠️ **04 18:2x 给这句再补一条同族**：那一格"未取证 **0** 栏"是**带 `HEYTA_MACOS_WEB_DIST` 覆盖**量到的；裸跑（`pnpm check` 里那一格就是裸跑）读的是硬编码默认路径 `/tmp/heyta-macos-dist/...`，18:22 现量 `rc=0` / 5 绿 0 红 / **未取证 1 栏**（原文"这台机器上没打过 macOS 包"）。⇒ 引用"0 栏"必须带用了哪个覆盖，而裸路径回到 0 栏**与 Goal ⑤-4 的 mac 装包是同一步**（链 MAC 会把当前产物打进那个默认路径）。读数与改名缘由在计划 §8.4 ㊣。 |
 | W9 | 提醒（含投递路径 —— 现状是全仓零 `new Notification(`） | 🟡 **web 半 + DST ✅**（`a8f5a9a6`，变异 9/9 红）；**原生投递那半没动** | 投递路径 = Goal 明文要求的**没做完**那半（ADR-0051 另立一单）；合流时连带兑现 §3.1 |
 | W10 | `EVENT` 必须**同时**进 AI 工具目录与 local-api 工具契约（实体与 AI 工具一起做；不改 `ENTITY_TYPES` 驱动的排期决定） | ✅ 已闭合（`8a595493` + `e2aeedc4`），目录 4 条 EVENT 工具，MCP 与内置 AI 共用同一份 | 无。⚠️ 副作用已被 L' 抓住并修（`ai-and-transfer.ts` 那张表 = 授权面） |
-| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | ✅ **代码链已闭合**（23:0x）：服务端半那 4 笔（`a39f7fa6`/`a2259e5d`/`3708d08c`/`2877dd37`）+ ADR 定性与 0038 回写（`c28e5f1a` @ `main`）+ §3.2 ADR 指针（`1dbe6df6`）+ 门禁 `check:public-facts`（`3f327dc2`，八臂 8 红 0 存活）+ `dayMarker` 缝（`509a06cd`）+ **客户端拉取三笔**（`6735cc39` storage META 通用读写 / `b05fbc50` app-host 模块 / `67fef701` web 接线 + i18n + 真界面判据）。判据①**已在真界面跑过**（三档截图人已看，读数见 §4） | 🔴 **只剩一条**：判据②"papers 在**后台界面**回显"目前只到 API 层（`admin.routes.ts` 的 GET 带 papers，但 `apps/web/src/features/admin/` 没有调休面板、`admin-client.ts` 也没有对应方法）⇒ 面板正在补（见 §4 末），补完并跑过判据才打勾 |
-| L 系列 | 法务联动 —— 改 `packages/legal` 那六处现成位置、每处中英双份、落地页文案走生成物不许手改（`check:legal-copy` 已在 `pnpm check`） | 🟡 **判定表已出、唯一真命中已修**（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`） | 🔴 六处**没有被"全改一遍"是判定结果**（§4 时序条款：纯文字版不触发 L1/L2/L4/L5），但 **§3.1 那六个字面位置随 W9 那半必须翻转** |
-| 收尾 | Goal 第 7 条 + 计划 §5/§8.3 | 🟡 **§6 第 1 条的两半已做**（`pnpm -r build` rc=0、`pnpm -r typecheck` rc=0、八个包 + 服务端全套的读数见 §2.2） | `check:docs`（33 处是别人未跟踪文档的函数）、界面截图人看、`pnpm reinstall:all` 四端 —— 全未做 |
-| 同步 | 每完成一项 → 计划文档打勾 + **同步 AGENTS §9** | 🟡 计划文档已同步（`cd839ec5`）；**AGENTS §9 欠着** | `AGENTS.md` 脏 ⇒ 不能 `--only` 提交（§7 第二条），等干净后补 |
+| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | ✅ **代码链闭合，判据②的面板也落了**：服务端半 4 笔 + ADR 定性与 0038 回写（`c28e5f1a`）+ 门禁 `check:public-facts`（八臂 8 红 0 存活）+ `dayMarker` 缝 + 客户端拉取三笔（`6735cc39`/`b05fbc50`/`67fef701`）。**判据①**真界面三档截图已看；**判据②**的后台面板在 `apps/web/src/features/admin/AdminPanel.tsx`（`HolidayPanel`，把 `papers` 渲染成 `<a href>` + `rel="noreferrer noopener"`），e2e 那条用例（`admin-console.spec.ts`「调休/补班那一页把出处回显成可点链接」）**04 03:0x 第一趟跑出来是红的**：五条同因红，报错逐字相同 `除已登记缺失外不该有非 2xx：["/api/holiday-adjustments"]` —— 根因不是面板，是**本批自己的**开机拉取没人登记（见 §0 第 ① 条例外），补了 `e2e/tests/helpers.ts:stubPublicFacts` 之后重跑 | 三条欠账**04 04:1x–04:3x 全部量完**（逐项读数在 `countdown-anniversary.md` W4b 节那条表格）：正常腿 `RC_W4B_OK=0` / **6 passed**、还原后复绿 `RC_RESTORE_ADMIN=0`；两张图**人打开看过**（改前把年份挤成「2026…」，改后 `2026 · 2 天安排 · 国务院办公厅通知` + 两条链接折行），看图还照出我文档里那句"年份被挤没"说轻了、原地改成"整格被挤成 2026…"；三臂变异 `RC_B1=1`/`RC_B2=1`/`RC_B3=1` 各红自己那条（`:887` / `:889` / `:909` 正向对照）。修复两笔已入库 `87109e9e`（提交在变异全部还原**之后**，sha 与基线逐字节相同）。⇒ **只剩 `inbox.spec.ts` 那条先红后绿**（同一批开机拉取的敞口，链条第 [8] 步在量） |
+| L 系列 | 法务联动 —— 改 `packages/legal` 那六处现成位置、每处中英双份、落地页文案走生成物不许手改（`check:legal-copy` 已在 `pnpm check`） | 🟡 **判定表已出、唯一真命中已修**（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`）。🔴 现量读数**只在 §0 第 ② 条与 `countdown-anniversary.md` §8.2 L' 第 1b 条各写一次**（同一对抄件会漂：这两处曾分别写"2 条红"与"6 条红"，04 03:5x 实测都是 **7 条**，且红的是 main 的**已提交状态**——把七份输入换成只含 `origin/main` 内容的探针根复现相同）| ⇒ **归属不在本批**：六句必须一起翻并重跑 `check:legal-copy`，本批代改会造出三方冲突。**关闭判据**：`node scripts/check-legal-permissions.mjs` rc=0（每次引用本条重跑，并写明在哪个载体跑的） |
+| 收尾 | Goal 第 7 条 + 计划 §5/§8.3 | ✅ ~~🟡~~ **第 1 条已**三趟**量完：第三趟一趟跑完 68 段 = **66 绿 / 2 红**（04 06:17:07–06:27:21 @ 载体 `c4332f86`，含 `check:ai-e2e` **352s `rc=0`** —— 本批第一次整条 e2e 零红；两条红逐条对账在计划 §8.4 第 ⑩ 条、整趟读数在第 ⑪ 条），前两趟是逐段量的（66/68 段两趟 + `-r test` 全量 + ~~ai-e2e 一趟但并发~~ **04 06:1x：ai-e2e 已补一趟安静的，`3 failed / 1 passed` 三条红全部复现并全部归因完毕**——两条是本批 W4b 的开机拉取撞上夹具的封闭登记（已按 `inbox`/`admin-console` 同一条纪律登记进去），一条是 W6 的侧栏几何红 R-1（已修，修后 `RC_E2E_SIDEBAR=0`））**、第 2 条 04 06:2x 在本树重取 **`rc=0`**（计划 §8.4 第 ⑫ 条，含那条差点被 `\| tail` 骗过的取码方式）、第 3 条三批图都人已看；只剩第 4 条设备那一趟在排队。**04 02:5x 现量更正**：`node research/tools/docs-link-check.mjs` 在 `heyta-wt-batch2` 隔离检出 ⇒ **rc=0，死链 0 处** —— 上面那句"33 处"是**主检出**（有别人未跟踪文档）的读数，死链数是"仓库 + 本机未跟踪文件"的属性，不是仓库属性。**04 05:3x 补**：~~W4b 判据②待看~~ 已看（`apps/web/evidence/admin-holiday/`，看图照出"整格被挤成 2026…"并把判据改成几何）；`pnpm -r test` 全量现量 **10760 passed / 1 failed / 14 skipped，19/19 个包**，而那一条红在安静窗口两趟 `15 passed / rc=0` ⇒ ~~并发单发不稳，已关闭~~ 🔴 **04 06:1x 这句归因作废并原地改掉**：不是"并发"，是**探针赌时长** —— `DueEditor` 的面板有两副身体， jsdom 27 会在一个宏任务里派发 `toggle`、`rAF` 在 17ms 回调，而用例从 `container` 里找格子； 机器空时等不到 17ms 就绿、负载 31 时等到了就红。修法 = 三处定位改从 `document` 取（同文件 R14 那几条早就是这么写的）， 并把 `DueEditor.tsx` 注释里那句"jsdom 不触发 `toggle`"改成实测结论。修后 `RC_JSDOM=0 / Test Files 2 passed`。🔴 顺带一条**不属于本批但要留的现量**：`AGENTS.md:295` 写着"当前 2592 个通过"，实测差 4 倍多 —— **没有代改**，因为主检出的 `AGENTS.md` 此刻正被另一条会话改着（`git -C <主检出> status --porcelain -- AGENTS.md` = ` M`），改它 = 制造一次没人能干净解的冲突 | 第 4 条 `pnpm reinstall:all` 四端 + `verify:mobile-card-export`：链条已排（`/tmp/batch2-closeout2.sh` 的 B 段：等另一条会话的重装链退出 → 负载门 → 工作树干净 → 装四端 → 设备出图 → 重取两扇门禁）。⚠️ 它此刻等的是**外部**一件事，04 06:3x 现量更新：对方那趟 `reinstall:all` 卡在 macOS 公证的 `notarytool submit --wait` 上**已 3 小时 21 分**（pid 98934；`/tmp/heyta-reinstall-mac.log` 自 03:13 起**零字节增量**、末行停在 `=== ⑥ 公证 ===`），而**那次提交没有超时** ⇒ 它不会自己结束；等满按任务书第 8 条记 **exit 3 = 环境无效而非产品失败**。🔴 并且"对方已经装过一遍"**不算本批的账**：其载体 `d0a81927` **不含**本批 HEAD（`git merge-base --is-ancestor 895ad07c d0a81927` ⇒ rc=1）。✅ 等待口径换掉两处：**① 现场判据改用仓里现成的闸门** `bash scripts/verify-mobile-window-gate.sh --target b`（04 06:3x 首跑 **`RC_WINGATE_B=3`**：工作树 / `reinstall-all.sh` / iOS 三台已启动模拟器三条 ✅，唯一 ❌ 是**负载 18 > 阈值 12**；同趟 `adb devices` **0 台** ⇒ Android 那一端此刻连"可达"都不成立），不再手搓负载探针；**② 上一版那条"别人在跑"的 `pgrep` 探针被现量否证为自匹配**（创建脚本的后台包装 shell 的 argv 带着整份 heredoc 正文，正文里就有那些字符串 ⇒ 永远命中自己；main 上 `dc63cbff` 记的是同一形状的另一种面目），已改成豁免自己这一棵 + 空跑自检（`/tmp/window-wait-E.sh`）。取证与打包脚本那两条形状（公证无超时；`if … \| tail -8 \| awk` 判的是 `awk` 的退出码 ⇒ `🔴 公证失败` 分支不可达）在计划 **§8.4 第 ⑬/⑭ 条**与**待入 #218**。✅ **04 06:5x 再补两件事**：执行链（窗口复量→干净树→装前基线→headless 起 `heyta-*` AVD 并现取序列号→`reinstall:all`→装后配对判据→`verify:mobile-card-export`→重取两扇门禁→还原 evidence）已写好**并证了它第一道判据真的会拦**（现在就跑 ⇒ `RC_F_GUARD=3`）；W7 那条设备判据里**不需要设备的两腿**已经先量了（读数器分得出 1080×1440 与 3×2、`BLANK` 一真一假 ⇒ 那条判据不是恒真断言）—— 全部读数在计划 **§8.4 第 ⑬/⑭/⑰/⑱/⑲ 条** 🔴 **04 08:5x 现量：收尾第 4 项的 mac/windows 两腿被并行那条线自己的 `pnpm reinstall:all` 占着**（`queue-reinstall-all.sh` 03:13 起跑，`notarytool … --wait` 到 08:58 已 5h45m 无超时 ⇒ 同握 `/tmp/heyta-macos-dist` 与 `/Applications/Heyta.app`）；本批**不并发、不代它宣布关闭**，而且他们那趟打的是 `main` 侧载体 `d0a81927` 的产物 —— ⚠️ 本行原先写"里面没有本批三笔"，**09:2x 逐笔 `git merge-base --is-ancestor` 现量后否证**：W4b 的 `c28e5f1a`/`6735cc39`/`b05fbc50`/`67fef701` 四笔**在**他们载体里，`a0d342df`/`87109e9e`/`8e4b5097`/`58cff57f` 四笔不在；⇒ 结论不变但理由换成"装上的必须是当前提交"：那一趟仍然不能替本批关闭任何一格。`/Applications/Heyta.app/…/web-dist/index.html` 现量停在 10-03 23:05 ⇒ "mac 装上当前产物"此刻为假。逐条取证与窗口开放后的关闭判据在原计划 **§8.4 ㉙**。<br>🔴 **04 11:2x 现量把这一格换成"三条链排队 + 一条硬阻塞"**（前面那些 06:3x/08:5x 的等待口径仍然成立，只是读数换了）：**① windows 那一腿已经真跑绿并关上 W8-GAP-W1**（链 S：`RC_SYNC=0` + `RC_PACKAGE=0` + 七条取证齐 ⇒ `check:shell-surfaces` 的未取证从 2 栏降到 **1 栏**，四臂变异各红/各响亮跳过一次，读数在 §8.4 ㊲）；**② iOS 的正式设备读数没取到**（链 R 10:50 负载门开了一格、探针自己的现场门同一秒因主检出有人起 `verify-mobile-ios-reminder.sh` 而拒跑 `RC_IOS_PROBE=3`；链 R2 第 4 次 runner 门开了、卡在负载门等满 900s，11:18 现量 `loadavg 47.72 27.88 22.48`）—— **W7-G3 因此仍不打勾**，逐条在 §8.4 ㊳；**③ Android 那一腿必须重跑**：09:18 那趟之后 `apps/mobile/src/lib/card-export.tsx` 改了（`settleRasterize`）⇒ 模拟器里那枚 APK 的 bundle 已不代表当前提交，这正是 §6.1.1 与 §7 第 27/82 条要防的"绿了但装的是旧产物"；**④ macOS 那一腿不能由本批自己动**（两条硬理由，不是"再等等"）：`package-app.sh:36` 会 `rm -rf "$OUT_DIR"` 而默认 OUT_DIR 正是那条 hung 链**正在公证**的 `/tmp/heyta-macos-dist`；而门禁 mac 那一栏读的是**写死的**这个路径、**没有 env 覆盖**（`check-shell-surfaces.mjs:263` + 它 957 行那段注释就是上一轮"把别人的包读成自己的"之后加的）⇒ 任务 #23 登记了关闭条件。排队的三条链各带自己的前置，互不并发：**链 R2**（重试 iOS 现场门，直到 `RC_IOS_PROBE != 3`）→ **链 U**（`reinstall:all --only android` + `verify:mobile-card-export` 在当前产物上复跑 + 两扇门禁重取，4b 那步会在 `apps/web/dist` 的 sha 被 `pnpm -r build` 改动时**当场重打 windows 那一腿**）→ **链 V**（完整 `pnpm check` + `docs-link-check`，跑前先量 4318/4319 空着，否则不跑）。✅ 同批重取：`docs-link-check` 在当前 HEAD **rc=0**（死链 0），`check-md-table-rows` **rc=0**，`check:card-export` **rc=0**（载体 `ce4bf082`，无设备参与）。 🔴 **04 13:2x–14:0x 原地更新（链 U / V / X）**：第 4 项的 **android 那一腿已在当前提交上重取**（链 U 13:18 `RC_REINSTALL_ANDROID=0` → 13:20 `RC_ANDROID=0`，通过 11 项 / 失败 0 项；成品图换成 13:20 那枚 `BYTES=34360 SHA=2ac31233b2ed`，人已看，字节差是卡片标题不是行为）；**windows 腿不必重跑**（13:20 现量「本地 dist sha == 包内 sha = `517C6BA76D00FB25`」⇒ 上面那份取证对本轮仍成立，链 U 第 4b 步就是这条自愈判据）。第 1 项：**完整 `pnpm check` 在 13:26 停在 `check:ui-provider`**（4 处"消费者在子树之外"），14:0x 现量**否证了我先前"别名误判"的判读**、查出真根因是探针把 `return <X />` 当成 TS 泛型吃（我自己那笔 `b8f39cae` 照出来的盲区，`git show b8f39cae^` 里该形态命中 0）；改一行"紧邻前置字符"判据后 **`check:ui-provider` rc=0**，可达集 mobile 32→36 / web 65→66、**零新增红**，四条变异臂（CONTROL 0/0、tokenizer 退回旧写法⇒恰好那 4 条红、摘掉 mobile 的 Provider⇒响亮报"没挂"、冻结可达性 BFS⇒93 条红）记在计划 §8.4 ㊶ —— 完整 `pnpm check` 的读数因此解锁，排在链 X 之后取（它第一步 `pnpm -r build` 会抢 Metro 的 CPU）。第 4 项的 **iOS 那一腿仍未取到**：链 X 13:46 起在负载门里被连续拒绝（20→39，累计 960s 还没开），按任务书第 8 条那是**环境无效不是产品失败**，等满即 `exit 3`，不为此调低阈值；mac 那一腿的两条硬理由（`package-app.sh` 会 `rm -rf` 别人在飞的 `/tmp/heyta-macos-dist`；但「`check-shell-surfaces.mjs:263` 写死且无 env 覆盖」那半句 14:19 被现量否证 —— `:944` 一直有 `HEYTA_MACOS_WEB_DIST` 这个覆盖，缺的只是把包打进 `package-app.sh:28` 那个**位置参数**目录，链 W（pid 87699，🔴 14:42 因加了 `HEYTA_SKIP_NOTARIZE` 旋钮而重起为 **pid 62956**，见 ㊼）排在 X/Y/Z 收口之后去做，三条通道对照臂读数见计划 §8.4 ㊹）。 🔴 **04 15:0x：第 1 项的读数到手，第 4 项的 iOS 那一腿换了失败姿势**（链 Y / 链 Z，载体 `e1b94b67`，逐条在计划 §8.4 ㊾）：**① 完整 `pnpm check` `RC_CHECK=1`** —— 按 `package.json:58` 的段序，**前 23 段全过**（含本批修过的 `ui-provider`、`shell-surfaces`、`layering`），**第 24 段 `check:legal-permissions` 停住**，7 条红全部是「移动端不申请通知权限」那六句 + `SCHEDULE_EXACT_ALARM` 未登记，`git blame` 现量归到 `b0ba4a35`（W9 那半）⇒ **不代改、不改绿**，剩下的 44 段由链 S 逐段取读数（段清单从 `check` 串现解析，不手抄）；**② `RC_WINDOWS_LEG=skip`**（Y 的 `pnpm build` 之后 `apps/web/dist/index.html` 仍是 `517C6BA76D00FB25`，与包内那枚逐字相同）；**③ Android 那格也不必重跑**（`git diff --name-only b995597a..HEAD` = 15 个文件，其中移动/共享源码 **0** 个 ⇒ 13:20 那枚 APK 的 bundle 输入没动）；**④ iOS 那一腿 `RC_REINSTALL_IOS_Z=1`**：`pod install` 报 `ArgumentError - path name contains null byte`（`cocoapods-1.17.0/project.rb:452 realdirpath`），`reinstall-all` 自己判定"沙盒未同步 ⇒ 不跑 xcodebuild"。三种"环境坏了"已现量排除（ruby/cocoapods 都是 Sep 装的、**主检出 13:45 的 pod 是成功的**、`ios/` 下无非 ASCII 文件名）；唯一还站得住的候选是本机 `LANG`/`LC_ALL` 全未设置，**尚未证**，要证得重跑 pod install，而那要等 Z 的探针收口（同一时刻动 `ios/` 就是抢它正在读的树）。⇒ **W7-G3 仍然不打勾**。 🔴 **04 15:2x（链 S / 链 W，逐条在计划 §8.4 ㊒）**：**第 1 项剩下那 44 段的读数到手** = `RC_SEGMENTS=绿38/红6`，而 6 格里**没有一格是本批的产品红**（`shell-unicode` 是本批自己的红 → 已修并提交 `344d2812`，门禁 35→0；其余 5 格是并发拒跑：`tfa-test.lock` 被 pid 21302 占、4318/4319 上有别人的 vite，`journey-coverage` 单跑 rc=0）⇒ 这 5 格由**链 V** 复跑（起笔现量负载 31.18 ≥ 12，正在等窗口，上限 5h，等满 `RC_LOAD=3` = 环境无效）。**第 4 项的 mac 那一格从"等别人"换成"本批自取"**：`RC_MAC_PACKAGE=0` + 包内 `index.html` sha 与本机**逐字相同** + assets 集合对账 **9/9/差异 0** + `check-shell-surfaces` 经 `HEYTA_MACOS_WEB_DIST` 读**包内**那份打出「5 格：**5 绿 / 0 红；未取证 0 栏**」；**第 3 项的"人看过"这一格已勾**（155 KB 那张 WebView 快照 = 收集箱 + 首启同意弹窗 + 主蓝实心钮，人打开看过；13 KB 那张窗口图是空的，而 `package-app.sh:242` 早写明"不据此判红"，所以主张的是前者，"屏幕上那个窗口真有内容"这一件**没有**被证到 —— 那属于 #23 那一格）。🔴 **04 15:4x 再补两格 + 一条原地否证**（逐条读数在计划 §8.4 ㊕，本行不抄）：`check:journey-coverage` 与 `check:shell-unicode` 各自**复跑 rc=0**；而 `pnpm -r test` 那格的 `rc=1` **不是产品红** —— 明细里唯一红的一格是 `packages/sync-core test: 内存闸门拒绝启动（pid=97013，锁 /tmp/tfa-test.lock）`，挡它的是一个与本仓毫无关系的 scratch 测试，同趟其余包全绿 ⇒ 上一版那句"内存闸门会自己排队"作废，它**拒绝启动并退 1**，重试链必须先等锁空（已落成**链 Q**：等链 V2 收口 → 等锁 → `-r test` → `pod install` 有界重试 4 趟 → `--only ios` 重装 → iOS 出图探针）。**04 16:2x 第 1 条收口**：68 段现在**每段都有读数** —— `pnpm -r test` 由链 Q 在锁空后取到 **rc=0 / 10778 passed / 518 个文件 / 20 包汇总行**，`check:ai-e2e` 由链 V3 取到 **rc=0 / 145 passed (5.9m) / 闸门拒跑行=0 / 起跑负载 11.53**（前 23 段一趟全过、第 24 段那 7 条红逐条归 W9 那一半、其余各段复跑绿，读数在计划 §8.4 ㊒/㊗/㊙）；⚠️ 链 V3 那一趟把 **37 枚已入库的别人证据图按固定文件名重写**了，当场 `git checkout --` 复原 —— 跑 e2e 族门禁前先 `git ls-files` 数它的输出目录里有多少枚已入库。🔴 **第 4 条的 iOS 那一格**：挡它的"缺 `LC_ALL`"诊断已被四臂**否证**（见 ㊙），真因是逐趟非确定性的 `null byte` + 一趟崩在半程的 `pod install` 留下的**半写沙盒**（哈希一致但 `Headers/Public` 缺层）⇒ 已改成"哈希相等也照跑 + 有界重试"（`0d9d74c3`，门禁三臂变异全红）。<br>🔴 **04 17:1x–17:2x 第 4 条的四端读数（链 S / 链 T / 链 MAC）**：**iOS 两格都绿了** —— `RC_REINSTALL=0`（17:04:57，新鲜度门 `bundle 1791104679 ≥ 源码 1791104211`）+ `RC_PROBE=0`（17:13:17，设备出图 1080×1440，图入库且人已打开看过，见 W7 行）；**Android 那一腿在重取**（让帧修复改了 `card-export-units.ts` ⇒ 13:20 那枚 APK 的 bundle 输入动了，与 15:0x 那次"15 个文件里移动/共享源码 0 个"的判定**不是同一种情形**），链 T 第 [4] 步先 `reinstall-all --only android` 再探针，前面三步是三条让帧判据的变异臂；**windows 不必重跑**（13:20 现量「本地 dist sha == 包内 sha = `517C6BA76D00FB25`」仍然成立，链 U 第 4b 步就是这条自愈判据）；**mac 那一腿的前置本轮变了**：17:23 现量 `pgrep -fl 'notarytool\|reinstall-all\|package-app'` **零命中**（那条 7h22m 无超时的公证链已经不在了），`/tmp/heyta-macos-dist` 无人握 ⇒ 原先"两条硬理由"里的第一条消失，剩下的只是"`/Applications/Heyta.app` 是共享位置"（pid 772 是 10-03 21:33 起的常驻实例，此刻没有任何 mac 门禁/探针在读它，`reinstall-all` 不杀进程、只 `rm -rf`  bundle 再拷新的）。因此链 MAC 起跑，并**显式跳过公证**（`HEYTA_SKIP_NOTARIZE=1`，链 W 已实测这条旋钮可用）：本判据问的是"装上的是不是当前产物 + 安装副本起不起来 + 自截屏非空白且主蓝命中"，公证与这三件事无关，**这条边界写在读数旁边而不是藏在命令里**。 🔴 **04 19:0x：第 4 条四格全到齐** —— android `RC_ANDROID_T2=0`（19:00:50，11 项全过、IHDR = 契约、图人已看）、ios 链 S `RC_PROBE=0`（17:13，17 项 / 0 失败）、windows（10:39 装包 + 13:20 与 18:1x 两次 `index.html` sha256 前缀 `517c6ba76d00fb25` 逐字相同）、mac `RC_MAC=0`（18:45:48，9 chunk 集合对账 + 装进 `/Applications` 那一枚自截屏人已看）。第 1 条（68 段逐段完整 `pnpm check`）的新读数此刻在链 FULL2 里跑（19:01:18 起跑，载体是当前 HEAD）。 🔴 **04 19:3x 第 1 条的账重画**：链 FULL2 一趟跑完 68 段 = **65 绿 / 3 红**（19:07:31–19:17:07），三条红逐条归因 —— 第 62 段 `check:shell-unicode` 是**我自己 12 分钟前那笔旋钮提交**带的（`$MAC_OUT（` 被吞，`c2d572ba` 已修、该段复跑 rc=0）、第 24 段归 W9 的 `b0ba4a35`、第 68 段是外部 `verify:routing` 握着 tfa 内存闸（停在第 5 个包 = 环境无效）。`pnpm -r test` 的全量读数随后在安静窗口取到：**`RC_RTEST3=0`、`Done=21`、`unhandled=0`**，而中间两趟红（mobile 5 条 unhandled、web 13 条 ×）由**两条隔离复跑**判成负载签名而不是断言失败。⚠️ 分母漂了：05:2x 数的是 19 个包，现在 pnpm 自己打 `Scope: 20 of 21` ⇒ 引用"全量"要带那一行。⑤-1 只剩"修完之后重跑一趟 68 段"（链 FULL3，等安静窗口，等满记 `RC_FULL3=3`）。逐条账在计划 §8.4 ㊩/㊪。 🔴 **04 20:1x 第 1 条的最终读数到手**：链 FULL3 一趟跑完 68 段 = **67 绿 / 1 红**（20:01:55–20:12:25，起跑负载 10.06，载体 `4f3a6536`），唯一红段是第 24 段 `check:legal-permissions`，7 条逐条读过全归 W9 的 `b0ba4a35`（`SCHEDULE_EXACT_ALARM` 未登记 + `permissions.ts` 中英 4 + `third-parties.ts` 中英 2）；第 68 段 `pnpm -r test` 在这一趟里 rc=0（`apps/web 1639 passed`、`apps/desktop 12 passed`）。⇒ **收尾四项全部有读数**，这一行转 ✅。逐条账在计划 §8.4 ㊩/㊪/㊫/㊬。 |
+| 同步 | 每完成一项 → 计划文档打勾 + **同步 AGENTS §9** | 🟡 计划文档已同步（`cd839ec5`）；**AGENTS §9 欠着** | `AGENTS.md` 脏 ⇒ 不能 `--only` 提交（§7 第二条），等干净后补 📌 **04 09:1x 现量（合流义务的三处载体全在别人手里，本批一律不代改）**：主检出 `git status --porcelain \| wc -l` = **240**，其中 `AGENTS.md`、`package.json`、`e2e/tests/helpers.ts`、`e2e/tests/admin-console.spec.ts`、`scripts/lib/mobile-e2e-runner-probe.sh` **逐个都是 ` M`** ⇒ ①AGENTS §9 那句"补上"仍然做不到（`--only` 提交会把别人的未提交内容一起吸进 HEAD），②#18 那两份同义开机拉取夹具的收敛（两条都住在 `helpers.ts` / `admin-console.spec.ts` 里）**同样被挡**，③window-gate 自匹配那条修复也在他们手上。三条都只在他们提交之后才有一步可做，本批不代改、也不把"欠着"写成"已排期"。 |
 
 **硬边界与纪律（任务书原文 7 条，逐条仍在生效）**：
 
@@ -331,12 +416,21 @@ cd "…/heyta" && git merge-tree --write-tree --name-only feat/countdown-batch2 
 
 ---
 
-## 5. W6 保持停放（关闭判据是**可判的**，不是"等日历线忙完"这种印象）
+## 5. W6 的关闭判据：判过两次红、一次归零，归零那次已落地
+
+> ✅ **04 02:5x 收口**：本节标题原来叫"W6 保持停放"。W6 已落地成 `e2def90f` ——
+> 判据本体（"一条**没有截止日**的倒数日能上日历"）+ 四个档位 + 侧栏那颗点各有真 DOM 判据，
+> 三层 14/8/13 passed + e2e 3 passed 五张图人看过 + 变异 5 臂逐臂只红自己那条。
+> 原文留着，是因为**"停放"这个判定当时是对的**，而它对的方式就是下面这条命令。
 
 ```bash
 cd "…/heyta" && git status --porcelain -- packages/ui/src/calendar apps/web/src/features/calendar \
-  apps/mobile/src/screens/CalendarScreen.tsx | wc -l      # 现在 = 非 0 ⇒ 继续停
+  apps/mobile/src/screens/CalendarScreen.tsx | wc -l      # 归零才动；每次引用本条都要重跑这一行
 ```
+
+🔴 **这条判据给的是活树瞬时读数，不是提交属性** —— 下面两段是当时的逐次现量，原样保留：
+20:2x 非 0 ⇒ 停；23:0x 复量仍是 14 且**变宽**；04 02:3x 在 `608fa5b1` 把 main 搬进 batch2 之后**归零** ⇒ 落地。
+**同一行命令六小时里给出三种答案**，所以"已归零/仍撞车"这类断言离开日期与载体就没有意义。
 
 20:2x 现量的撞车代价：`calendar/model.ts` **+264/−7**（261→518 行，含一处 166 行整块插入）、
 `CalendarBoard.tsx` +107、`CalendarScreen.tsx` +153。HEAD 与他们的版本里 `grep -c 'EVENT'` **都是 0**
@@ -347,13 +441,50 @@ cd "…/heyta" && git status --porcelain -- packages/ui/src/calendar apps/web/sr
 `apps/web/src/features/calendar/{drag-day,useDragDayNav}.*` ⇒ 日历线正在做**日视图 / 年视图 / 拖拽**，
 不是收尾中的余波。停放的判定继续成立。
 
-⚠️ **给合流的人的一条硬提醒（新）**：我方 `509a06cd` 与 `67fef701` 改的
+⚠️ **给合流的人的一条硬提醒（原文保留，下面那段是它的结案）**：我方 `509a06cd` 与 `67fef701` 改的
 `packages/ui/src/calendar/{model.ts,CalendarBoard.tsx}` 和 `apps/web/src/features/calendar/{CalendarView.tsx,store.ts}`
 **逐个都在上面那 14 个里** ⇒ batch2 合回 main 时这四个文件必冲突。冲突解法不是二选一：
 `model.ts` 里我方新增的是 `CalendarDayMarker` / `CalendarDayMarkerView` / `calendarDayMarkerView`，
 `CalendarBoard.tsx` 里是 `dayMarker?` / `dayMarkerLabels?` 两个**可选** prop 与 DayCell 那一处渲染，
 `store.ts` 里是 `publicFactsEpoch` + `bumpPublicFactsEpoch` —— **全部保住**，他们的新板子（日/年视图）
 一旦也要标"休/班"，用的就是同一条缝（这正是 §4 第 3 条当初把它做成默认值等于原值的可选 prop 的理由）。
+
+✅ **04 02:5x 结案：合流已经发生，四条锚点在 `origin/main` 上全部保住**。
+载体是 `origin/main`（我的分支缺它身上 228 笔：`git rev-list --count HEAD..origin/main`；
+它缺我这边的 5 笔：`git rev-list --count origin/main..HEAD`），命令现量：
+
+```bash
+cd "…/heyta-wt-batch2" && for spec in \
+  "packages/ui/src/calendar/model.ts:calendarDayMarkerView" \
+  "packages/ui/src/calendar/CalendarBoard.tsx:dayMarker" \
+  "apps/web/src/features/calendar/store.ts:publicFactsEpoch" \
+  "apps/web/src/features/calendar/CalendarView.tsx:publicFactsEpoch"; do
+  f=${spec%%:*}; n=${spec##*:}; echo "origin/main $f 含 $n: $(git show origin/main:$f | grep -c "$n")"; done
+```
+
+读数 **1 / 14 / 4 / 2**。
+
+🔴 **我在这条结案上先写错过一次，错在我的取证命令本身**：上面第一段我曾判成
+"它是以**内容**而非**提交**的形式进去的，因为 `git log --oneline HEAD..origin/main | grep -E '509a06cd|67fef701'` 现量 0 行"。
+那句 0 行是真的，**结论是假的** —— `HEAD..origin/main` 是**差集**，按定义不打印 HEAD 自己的祖先，
+而那两笔本来就是 batch2 分支上的提交、合流后同时是 HEAD 与 `origin/main` 的祖先 ⇒
+**这个命令结构上不可能打印出它们**，"合流已完成"这个最强的情形恰好给出 0 行。
+换成逐笔判祖先现量：
+
+```bash
+for c in 509a06cd 67fef701 6735cc39 b05fbc50 e2def90f; do
+  git merge-base --is-ancestor $c origin/main && echo "$c in origin/main=yes" || echo "$c in origin/main=no"; done
+```
+
+读数：**`509a06cd` / `67fef701` / `6735cc39` / `b05fbc50` 四笔全 yes**（W4b 服务端那两笔 + `dayMarker` 那条缝 + epoch，
+**是以提交的形式进的 main**），只有 **`e2def90f`（今天 02:3x 落的 W6）no** —— 它还在上面那 5 笔里。
+⇒ 结案改成：**缝四条全在、提交形式进的 main；缺的不是缝，是缝的那个消费者**
+（"一条没有截止日的倒数日能上日历"这条行为还没进 main）。
+
+📌 **可迁移的判据**：判"某笔提交在不在 X 里"只能用 `git merge-base --is-ancestor <c> X`，
+不能用 `git log <A>..<B>` 的清单去 grep —— 后者是差集，对"两边共有"的提交恒不打印，
+于是"已经合流"会被读成"从没存在过"。这是 §7"0 命中先查 needle 住在哪"的同族：
+这里 needle 住的那个集合**根本不在扫的集合里**。
 
 ---
 

@@ -115,8 +115,14 @@ export function DueEditor({
    * 当年被 rail 裁掉是同一族 bug。修法沿用那个先例：**fixed + 实测锚点
    * + 滚动/改窗即关**（关掉比弹在错位置诚实）。
    *
-   * jsdom 不触发 `toggle` 事件 ⇒ `anchor` 保持 null ⇒ 面板回落**在流**布局
-   * （组件级 op 判据照常工作）；"真浏览器里弹出位置对"由 e2e 钉。
+   * ⚠️ 2026-10-04 更正：这句原来写的是"jsdom 不触发 `toggle` ⇒ `anchor` 保持 null
+   * ⇒ 面板回落**在流**布局（组件级 op 判据照常工作）"—— **它在 jsdom 27 上不成立**。
+   * 探针实测：`details.open = true` 之后**一个宏任务**里 `toggle` 就到了
+   * （jsdom 用 `setTimeout(…, 0)` 派发），`requestAnimationFrame` 在第 17ms 回调，
+   * 所以组件级用例里 `anchor` 同样会变成非 null、面板同样换到 Portal 那副身体。
+   * ⇒ "在流"这一副只在**第一个宏任务之前**存在。用例要面板里的东西一律从
+   * `document` 取，不许假定它在哪棵子树里（`due-date-edit.spec.tsx` 就是这么修的）；
+   * "真浏览器里弹出位置对"仍由 e2e 钉。
    */
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
@@ -262,7 +268,7 @@ export function DueEditor({
           fixed 卡片 —— 行容器带 transform（`r-transform-*`），transform 祖先
           会成为 fixed 的包含块，所以不逃出DOM 子树就必然被滚动容器裁掉
           （实测白边，见文件头）。
-        - `anchor === null`（jsdom 不触发 toggle / 兜底）：details 内的**在流**
+        - `anchor === null`（还没收到 `toggle` 的那一帧 / 无 JS 环境）：details 内的**在流**
           卡片，op 判据与无 JS 环境都走它；details 关闭时浏览器原生隐藏它。
       */}
       {anchor !== null ? (

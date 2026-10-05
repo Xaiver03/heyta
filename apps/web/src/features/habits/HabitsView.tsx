@@ -122,6 +122,40 @@ export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
     streakCurrent: (count) => currentStreakText(count, t),
     streakLongest: (count) => longestStreakText(count, t),
     streakTotal: (count) => totalCheckInText(count, t),
+    /*
+      数量行（工单 W6）。三个都是**共享层点名要求**的字段，不是可选装饰：
+      `HabitBoardLabels` 把它们写成必填，所以少接一个编译就红 ——
+      可选 prop 会把"宿主没接"伪装成"做完了"，这条在 §8 的 W3 那轮记过。
+      单位为空时补 `web.habits.goal.defaultUnit`（与目标摘要同一个 fallback，
+      共享层不猜：猜出来的"次"对"每天 30 分钟"是错的）。
+    */
+    amount: ({ value, target, unit }) =>
+      t('common.habits.amount.today', {
+        value,
+        target,
+        unit: unit === '' ? t('web.habits.goal.defaultUnit') : unit,
+      }),
+    amountPlusA11y: ({ name }) => t('common.habits.amount.plus', { name }),
+    amountMinusA11y: ({ name }) => t('common.habits.amount.minus', { name }),
+    /*
+      工单 W8 的四格（本月打卡 / 本月完成率 / 本月完成量 / 总完成量）。
+      五个字段在 `HabitBoardLabels` 里都是**必填**：少接一个编译就红 ——
+      与上面三个同一个纪律（可选 prop 会把"宿主没接"伪装成"做完了"）。
+      句子只是 `month` 统计的投影，口径（天/自然月/到期分母）全在 domain 层；
+      完成率的分母为 0 时共享层改点 `monthRatePending`，这里不判断。
+      单位为空时退化成**不带单位**的那条句子（裁决 D：不替用户猜量纲）。
+    */
+    monthDays: (count) => t('web.habits.stats.monthDays', { count }),
+    monthRate: (percent) => t('web.habits.stats.monthRate', { percent }),
+    monthRatePending: t('web.habits.stats.monthRatePending'),
+    monthValue: ({ value, unit }) =>
+      unit === ''
+        ? t('web.habits.stats.monthValue', { value })
+        : t('web.habits.stats.monthValueUnit', { value, unit }),
+    totalValue: ({ value, unit }) =>
+      unit === ''
+        ? t('web.habits.stats.totalValue', { value })
+        : t('web.habits.stats.totalValueUnit', { value, unit }),
     freeze: (count) => t('web.habits.freeze', { count }),
     repair: ({ date, count }) => t('web.habits.repair', { date, count }),
     repairAction: t('web.habits.repairAction'),
@@ -175,8 +209,6 @@ export function HabitsView() {
   // 固定"现在"，避免同一次渲染里跨午夜导致不一致
   const now = Number(sessionStorage.getItem(NOW_STATE_KEY) ?? Date.now());
 
-  const labels = useMemo(() => habitBoardLabels(t), [t]);
-
   /**
    * 左列的数据：进度行 + 它自己的 7 天窗口。
    *
@@ -194,11 +226,47 @@ export function HabitsView() {
   );
 
   /**
-   * 选中项。`selectedId` 指向的习惯被删掉时退回第一条 ——
-   * 用**派生**而不是 `useEffect` 补一次 setState：效果会在提交后再渲染一轮，
-   * 那一轮窗格是空的（症状：删掉当前习惯时右半边闪一下）。
+   * 窗格里那句空态**取决于"为什么空"**：
+   *   · 列表本来就是空的 ⇒ 共享层自己的措辞（`web.habits.empty`"还没有习惯"）；
+   *   · 有习惯但没选中 ⇒ "选一条习惯…"。
+   *
+   * 🔴 两条不许互相冒充。原先只有一条，靠 `?? rows[0]` 让第二格永远不出现；
+   * 那枚回落撤掉之后如果继续用 `web.habits.empty`，界面对着一堆习惯说"还没有习惯" ——
+   * 那是**文字上的同一种错**，而 `check:empty-state` 拦不住（它管的是空态不许缺席）。
+   *
+   * ⚠️ `HabitBoard` 仍然**始终挂载**（未选中时 `habits={[]}`），因为
+   * `e2e/tests/motivation.spec.ts` 的白屏检测按 `[data-testid="habit-board"]` 数恰好 1 枚 ——
+   * 这一单改的是"哪一条是选中项"，不是"窗格里有没有那块板"。
    */
-  const selected = rows.find((r) => r.progress.habit.id === selectedId) ?? rows[0];
+  const labels = useMemo<HabitBoardLabels>(
+    () => ({
+      ...habitBoardLabels(t),
+      empty: rows.length === 0 ? t('web.habits.empty') : t('web.habits.pane.pickOne'),
+    }),
+    [t, rows],
+  );
+
+  /**
+   * 选中项。**没有本地回落**。
+   *
+   * 🔴 这一行原本是 `rows.find(…) ?? rows[0]`：没选中时右窗格也永远有内容，而
+   * `aria-current` 挂的就是那枚回落行（`HabitsList` 收的 `selectedId` 来自这里）。
+   * 于是同一屏上会出现两句互相矛盾的话 —— 界面说"第一条是选中的"，共享选中态说
+   * "什么都没选中"（而详情列按后者维持 AI）。便签面早就没有这一档（K8 钉着"没按键时
+   * 不许有任何一行带 aria-current"），任务面也没有。**这是 W1 那句"各处同一套状态与
+   * 回落规则"在 web 上最后一处例外**，也是一整条 `?? rows[0]` 的考古：
+   * `grep -n 'rows\[0\]' apps/web/src` 现在只有注释里这一处命中。
+   *
+   * 为什么不留回落而不是"挂载时把第一条写进共享选中态"：后者是**宿主替用户猜位置**，
+   * 而猜出来的那条和 ↑↓ 那条规则（`moveSelectionInList` 第四条"不猜位置"）当场打架；
+   * 前者只是"未选中"这一格还没被任何一侧说出它的措辞 —— 措辞在上面那格 `labels.empty`。
+   *
+   * ⚠️ 刻意**不是** `useEffect` 补一次 setState：效果会在提交后再渲染一轮，
+   * 那一轮窗格是空的（症状：删掉当前习惯时右半边闪一下）。删掉当前习惯之后走的是
+   * `pruneSelectionFromEntities`（`App.tsx`）⇒ 共享态自己变 null ⇒ 窗格回到未选中那一格，
+   * 与便签/任务同一个结局，而不是"猜下一条"。
+   */
+  const selected = rows.find((r) => r.progress.habit.id === selectedId);
 
   async function add(): Promise<void> {
     await store.addHabit(draft);
@@ -282,7 +350,10 @@ export function HabitsView() {
 
         <HabitsList
           rows={rows}
-          selectedId={selected?.progress.habit.id}
+          // 🔴 痕迹的输入**只能是共享选中态本身**，不是 `selected`（那枚派生值在撤掉
+          // 回落之前一直等于"第一条"，于是 `aria-current` 说的是宿主猜的位置）。
+          // 现在两者对未选中都是 null ⇒ 列表里零行带痕迹，与便签面（K8）同一口径。
+          selectedId={selectedId}
           onSelect={(habitId) => {
             selection.select('habit', habitId);
           }}
@@ -389,8 +460,8 @@ export function HabitsView() {
             // 🔴 配对函数来自 app-host —— 共享层不认识它（见那边的文件头）。
             growth={habitGrowth}
             labels={labels}
-            onCheckIn={(habitId, date?: LocalDate) => {
-              run(habitId, store.checkIn(habitId, date));
+            onCheckIn={(habitId, date?: LocalDate, value?: number) => {
+              run(habitId, store.checkIn(habitId, date, value));
             }}
             onUndoCheckIn={(habitId, date?: LocalDate) => {
               run(habitId, store.undoCheckIn(habitId, date));
