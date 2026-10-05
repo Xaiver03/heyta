@@ -1093,6 +1093,7 @@ export const en = {
   // ── Web · habits list + pane ──────────────────────────────
   'web.habits.list.aria': 'Habits list',
   'web.habits.pane.aria': 'Check-in history for "{name}"',
+  'web.habits.pane.pickOne': 'Select a habit to see its check-ins and stats here.',
   'web.habits.week.aria': 'Last 7 days',
   'web.habits.week.done': '{date} checked in',
   'web.habits.week.missed': '{date} no check-in',
