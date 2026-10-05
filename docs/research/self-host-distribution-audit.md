@@ -14086,3 +14086,19 @@ docs 那半已绿（§8.264）；替换成"main 红在 `apps/web/tests/admin-pan
 仍要人拍板的三句，没拍我就不能替它决定：**#61** 对外两句错话的发布节奏（我倾向等落地一次发）、
 **#62** 那段"四件同时 ≥15 分钟"的窗口（要机器上别人的 e2e/模拟器/构建让路）、
 **#64** 版本号真源（G-44b 四件套同趟才有牙）。
+
+### 8.267 停靠前的最后一核：看守在窗口开成那一刻落的是**当前 tip**，不是它早前算好的旧载体（2026-10-05 21:1x）
+
+本会话在 §8.266 之后又提交了 4 笔（`43eac009`、`74852c20`、`6b3a53ca`、`9d017715`，全是账本自身）。
+若看守手里握着的是**早前算好的载体 sha**，这些就会被落下 —— 那是停靠隐患，核过才敢留它跑。
+
+`research/tools/selfhost-land-main.mjs` 现量三条（`grep -nE 'rev-parse|carrier|merge-carrier'`）：
+
+- `:48` `BRANCH_REF = process.env.HEYTA_LAND_BRANCH ?? 'feat/self-host-distribution'`（ref，不是 sha）
+- `:391` `branchSha = git rev-parse BRANCH_REF`（**每次起跑现取**）
+- `:394-400` 无 `--carrier` 参数时**先重算**：`run('node', ['research/tools/selfhost-merge-carrier.mjs'])`
+- `:444` 若算完载体后分支又动了 ⇒ `refuse(第二父 ≠ 当前分支 sha)` —— 失败方向是**拒绝落地**，不是落旧内容
+
+⇒ 留它跑是安全的：开窗那一刻重算的载体必然含当前 tip，否则响亮拒绝。
+另一层双保险在 `:104` 的注释里写明：裁判不是看守，而是 lander 自己那七道闸门（含 `gate(3,'负载可用')`），
+所以即便看守的判断被什么顶掉，真跑之前还有一道负载闸。停止方式仍然只有一条：kill 那个 pid，不按名字乱杀。
