@@ -89,7 +89,7 @@ currentPeriodEnd = max(now, 已有的 currentPeriodEnd ?? now) + 30 天
 
 ## 4. 🔴 凭证
 
-真实凭证在 `/Users/rocalight/Desktop/All in one Data/01_PROJECTS/litopia12/.env.local`：
+真实凭证在 `~/Desktop/All in one Data/01_PROJECTS/litopia12/.env.local`：
 `WX_APP_ID` / `WX_MCH_ID` / `WX_SERIAL_NO` / `WX_API_V3_KEY` /
 `WX_PRIVATE_KEY` / `WX_PUBLIC_KEY`。
 
