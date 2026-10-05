@@ -339,6 +339,20 @@ function capabilityFieldGaps(order, settingsText) {
   return red;
 }
 
+// 判据 ⑩：**每个功能要求的能力，必须在界面上有处可声明**。
+//   这条与 ⑨ 合起来才是完整的一条：⑨ 说"移动表单渲染了 CAPABILITY_ORDER 的每一枚"，
+//   ⑩ 说"顺序表罩得住所有功能的要求"。缺任意一半，症状都一样 —— 某档功能在手机上永远进不了候选，
+//   而界面只表现为"发送按钮恒灰"（2026-10-06 实测的那条 `tool-calling` 缺口就是这个形状）。
+//   判据写在源码文本上（不是构建产物），因为这里要防的是"有人给功能加了一枚新能力、没同步界面词表"。
+function requiredCapsNotDeclarable(routingText) {
+  const order = capabilityOrder(routingText);
+  if (order === null) return null;
+  const block = /DEFAULT_FEATURE_CAPABILITIES[^=]*=\s*\{([\s\S]*?)\n\};/.exec(routingText);
+  if (block === null) return null;
+  const req = new Set((block[1].match(/'([a-z_]+)'/g) ?? []).map((x) => x.replaceAll("'", '')));
+  return [...req].filter((c) => !order.includes(c));
+}
+
 function run() {
   const files = walk(join(ROOT, SRC_ROOT));
   if (files.length === 0) {
@@ -461,9 +475,19 @@ function run() {
   }
   for (const line of capRed) console.log(`能力字段缺口\t${line}`);
 
+  const notDeclarable = requiredCapsNotDeclarable(readScript(join(ROOT, routingRel)));
+  if (notDeclarable === null) {
+    console.error(`🔴 在 ${routingRel} 里解析不出 DEFAULT_FEATURE_CAPABILITIES 的形状 —— 探针没输入，不报"都能声明"`);
+    process.exit(2);
+  }
+  const capOrderRed = notDeclarable.map(
+    (c) => `功能要求里的能力「${c}」不在 CAPABILITY_ORDER 里 ⇒ 任何界面都渲染不出它、用户无从声明（加能力要同时加那张表）`,
+  );
+  for (const line of capOrderRed) console.log(`能力不可声明\t${line}`);
+
   const backtickRed = quoteBackticks(scriptText);
   for (const line of backtickRed) console.log(`文案反引号\t${line}`);
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0) {
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
       '，双引号文案里的反引号=' + String(backtickRed.length) +
@@ -618,6 +642,35 @@ if (process.argv.includes('--self-test')) {
   arms.push(['臂 18 顺序表被抄成第二份 ⇒ 非零退出并点名它', m18.code !== 0 && m18.out.includes('共享的 CAPABILITY_ORDER')]);
   const m19 = capMutant('missing-label', aiSettingsText.replace(/\n *tool_calling: 'web\.ai\.capability\.toolCalling',/, ''));
   arms.push(['臂 19 少一枚词条键 ⇒ 非零退出且点名那枚能力', m19.code !== 0 && m19.out.includes('tool_calling')]);
+
+  // ── 判据 ⑩ 的两臂 ──
+  const routingText = readFileSync(join(ROOT, AI_ROUTING_SRC), 'utf8');
+  const runRoutingMutant = (tag, text) => {
+    const dir = join(ROOT, 'tmp');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `.routing-mutant-${tag}.ts`);
+    writeFileSync(file, text);
+    try {
+      const kid = spawnSync(process.execPath, [join(ROOT, 'scripts/check-mobile-ai-anchors.mjs')], {
+        encoding: 'utf8',
+        cwd: ROOT,
+        env: { ...process.env, HEYTA_AI_ROUTING: `tmp/.routing-mutant-${tag}.ts` },
+      });
+      return { code: kid.status ?? -1, out: `${kid.stdout ?? ''}${kid.stderr ?? ''}` };
+    } finally {
+      rmSync(file, { force: true });
+    }
+  };
+  // 臂 20（阳性对照）：今天两处都能解析、且每一条要求能力都在表里 ⇒ 整条流水线仍为 0。
+  const m20 = runRoutingMutant('asis', routingText);
+  arms.push(['臂 20 原样副本 ⇒ 判据 ⑩ 不产生误红（探针确有输入）', m20.code === 0]);
+  // 臂 21（变异）：给某个功能加一枚不在顺序表里的能力 ⇒ 必须红且点名它。
+  //   这正是本批那条缺口的下一步形态（有人加 `audio` 而没人改界面词表），所以这条臂不是装饰。
+  const m21 = runRoutingMutant(
+    'undeclarable',
+    routingText.replace("  'tool-calling': ['tool_calling'],", "  'tool-calling': ['tool_calling', 'audio'],")
+  );
+  arms.push(['臂 21 功能要求一枚表外能力 ⇒ 非零退出且点名它', m21.code !== 0 && m21.out.includes('audio')]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
