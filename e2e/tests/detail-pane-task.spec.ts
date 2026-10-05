@@ -366,6 +366,19 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
   const rowOf = (page: Page, title: string): Locator =>
     page.locator('[data-testid^="task-row-"]').filter({ hasText: title }).first();
 
+  /**
+   * 🔴 **整行**那一棵（行体 + 尾部动作），T14/T15 用它而不是 `rowOf`。
+   *
+   * 理由不是便利，是 `packages/ui/src/task-list/TaskRow.tsx:292` 那段注释记着的实测代价：
+   * `renderTrailing` 是行体的**兄弟节点**，按 `task-row-*` 定位行尾控件会**全部落空**
+   *（那枚触发器、那几枚 chip、`<details>` 里的下拉与复选框都在尾部）。外层 `task-item-*`
+   * 就是为这一档补的可寻址名字（同一形状当初砸在 `e2e/tests/task-organize.spec.ts` 上）。
+   *
+   * ⚠️ **点行选中仍然走 `rowOf`**：外层那棵 `View` 没有 `onPress`，点它不会选中。
+   */
+  const rowItemOf = (page: Page, title: string): Locator =>
+    page.locator('[data-testid^="task-item-"]').filter({ hasText: title }).first();
+
   test('T8 宽档：子任务的编辑本体在栏里那一格，行尾只剩只读徽标（§8.144）', async ({ page }) => {
     const errors = watchErrors(page);
     await openApp(page, '/?lang=zh-CN');
@@ -743,6 +756,177 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
       page.getByLabel('设置任务「窄档截止乙」的截止日期'),
       '窄档那次点击没落成（刷新后行尾触发器上没写日期）',
     ).toContainText(dayLabel);
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
+
+  /*
+    T14 / T15 —— 清单 + 标签（工单 §8.147，第六格）。
+    这一格的判据形状与前五格同一条，但**留下的那半不一样**：
+    截止那一格宽档整块不画（显示另有 `task-meta`），而**标签在共享层没有对应槽**，
+    所以行上必须留着 `TagChips` 那两枚 chip —— 于是 T14 同时钉两件事：
+    "编辑本体整页只有一份"与"显示仍在行上"。少任何一件，界面都在说谎。
+  */
+  const SIDEBAR = 'aside[aria-label="清单与标签"]';
+
+  /**
+   * 从侧栏建一条清单与一枚标签（走真 UI ⇒ 真 op-log，不塞内存）。
+   *
+   * ⚠️ 这里的前提检查用**存在性**（`toHaveCount`）而不是 `toBeVisible`：实测这一档
+   * `sidebar.getByText(名字, {exact:true})` 解析到行里那只文字 div，它的框量出来是
+   * **0×24**（同一行 183×44、行内那只按钮 **0×44**、整个 aside 207×229@80,450）。
+   * **成因未定位** —— 本单没动 `apps/web/src/features/projects/ProjectsPanel.tsx`，
+   * 也没动 `apps/web/src/styles/app/sidebar.css`，且已用 A/B 否证了"本单弄红的"：
+   * 把 `App.tsx` / `TaskOrganizer.tsx` / `TaskDetailCard.tsx` 三个文件换回 HEAD 的产物、
+   * 重打 `apps/web/dist`、同一条 `e2e/tests/task-organize.spec.ts:72` **仍然红在同一行**
+   * （读数记在工单 §8.147 的闸门①）。
+   *
+   * 为什么这里只要求"建出来了"：本族量的是**任务行 / 详情栏**，判据（元信息槽写着那条清单、
+   * 行上画着那枚 chip）全在行上，不该被侧栏的排版绑住。0 宽那一档单独登记给侧栏那一族。
+   */
+  async function seedListAndTag(page: Page, list: string, tag: string): Promise<void> {
+    const sidebar = page.locator(SIDEBAR);
+    await expect(sidebar, '侧栏没开 ⇒ 建不了清单/标签，后面的判据会空转').toBeVisible();
+    await sidebar.getByLabel('新建清单').click();
+    await sidebar.getByLabel('新清单名称').fill(list);
+    await sidebar.getByLabel('添加清单').click();
+    await expect(sidebar.locator(`[data-testid^="project-"][data-testid$="-row"]`), `侧栏里没有那条清单「${list}」`).toHaveCount(1);
+    await sidebar.getByLabel('新建标签').click();
+    await sidebar.getByLabel('新标签名称').fill(tag);
+    await sidebar.getByLabel('添加标签').click();
+    await expect(sidebar.locator(`[data-testid^="tag-"][data-testid$="-row"]`), `侧栏里没有那枚标签「${tag}」`).toHaveCount(1);
+  }
+
+  test('T14 宽档：整理的编辑本体在栏里那一格，行尾只剩只读 chip（§8.147）', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTaskAndRelease(page, '整理甲');
+    await seedListAndTag(page, '整理清单一', '整理标签一');
+
+    await rowOf(page, '整理甲').click();
+    const pane = paneInColumn(page);
+    await expect(pane, '栏里没画面单').toHaveCount(1);
+
+    // 🔴 整页只有一份编辑本体，且它在栏里（只量"栏里有"会把"两处都能编辑"读成对）。
+    const select = page.getByTestId('organize-project-select');
+    await expect(select, '清单下拉不止一份 ⇒ 整理两处可编辑').toHaveCount(1);
+    await expect(pane.getByTestId('organize-project-select'), '栏里没有那份清单下拉').toHaveCount(1);
+    // 🔴 这一格**自带两个区块头** ⇒ 宿主不许再叠：数的是"那个词出现几次"，
+    //    写成"标题在不在"永远抓不到多写（§8.145 的 M2 同一把尺）。
+    await expect(pane.getByText('清单', { exact: true }), '「清单」区块头不止一处，或整个没有').toHaveCount(1);
+    await expect(pane.getByText('标签', { exact: true }), '「标签」区块头不止一处，或整个没有').toHaveCount(1);
+    // 行尾那支整块不画（宽档）：触发器一只都不许有。
+    await expect(
+      page.getByTestId('task-organize-summary'),
+      '栏里画着的时候行尾还挂着 `<TaskOrganizer/>` ⇒ 整理长出第二个编辑器',
+    ).toHaveCount(0);
+
+    // ── 承重 ①：在栏里选清单 ⇒ **行的元信息槽**写着那条清单 ──────────────
+    await expect(rowOf(page, '整理甲').getByTestId('task-meta'), '起始态就带着清单名 ⇒ 后面的断言永真').not.toContainText(
+      '整理清单一',
+    );
+    await select.selectOption({ label: '整理清单一' });
+    await expect(
+      rowOf(page, '整理甲').getByTestId('task-meta'),
+      '栏里选了清单，行上的元信息槽却没写',
+    ).toContainText('整理清单一');
+
+    // ── 承重 ②：在栏里勾标签 ⇒ **行上长出那枚只读 chip** ────────────────
+    // 🔴 假绿前提：勾**之前**行上不该有 chip。少了这一条，"长出了那枚 chip"永真 ——
+    //    §8.146 学到的那把尺反过来用：判据要能抓住"多画"，也得先证"起始为空"。
+    await expect(
+      rowItemOf(page, '整理甲').getByTestId('task-chip-tag'),
+      '起始态行上就有标签 chip ⇒ 后面那条"长出了"读不出因果',
+    ).toHaveCount(0);
+    /* 🔴 用 `click()`，不用 `check()` —— 这条坑不是本单新踩的，
+       `e2e/tests/task-organize.spec.ts` 早就把它写成了注释：复选框是**受控**的，
+       `dispatchIntent` 又是 async（`await engine.dispatch()` 之后才 `notify()`），
+       点击那一刻 React 手上仍是旧 `tagIds`，重渲染把 DOM 勾选态按回去 ⇒
+       Playwright 报 `Clicking the checkbox did not change its state`（**假红**：op 已派发）。
+       判据要看的是**结果**（行上真长出了 chip），不是控件此刻的勾选态。 */
+    await pane
+      .getByRole('checkbox', { name: '给任务「整理甲」加上或去掉标签「整理标签一」' })
+      .click();
+    const chips = rowItemOf(page, '整理甲').getByTestId('task-chip-tag');
+    await expect(chips, '栏里勾了标签，行上却没画出 chip ⇒ 显示被搬走了').toHaveCount(1);
+    await expect(chips, 'chip 上没写标签名').toContainText('整理标签一');
+    // 🔴 chip 是显示不是第二个编辑器：chip 那一块里不许长出下拉/复选框/展开机关。
+    await expect(chips.locator('select, input, details'), '行上那枚 chip 里长出了控件').toHaveCount(0);
+
+    await select.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: SHOT('t14-organizer-field-in-column') });
+
+    // ── 刷新后仍在（证明那两次交互真走了一条 op）────────────────────────
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    // ⚠️ 选中态**不跨刷新**：不重新点那一行，栏里什么都没有，"没有第二处"会被读成"没有重复"。
+    await rowOf(page, '整理甲').click();
+    await expect(
+      rowOf(page, '整理甲').getByTestId('task-meta'),
+      '刷新后归属没了 ⇒ 栏里那次选择没落成 op',
+    ).toContainText('整理清单一');
+    await expect(
+      rowItemOf(page, '整理甲').getByTestId('task-chip-tag'),
+      '刷新后标签 chip 没了 ⇒ 栏里那次勾选没落成 op',
+    ).toHaveCount(1);
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
+
+  test('T15 窄档：那一栏整个不在，整理的编辑入口回到行尾那颗触发器', async ({ page }) => {
+    const errors = watchErrors(page);
+    // 🔴 900 宽恒窄档（`DETAIL_FITS_QUERY` 要 ≥1024）：这一档量的是回落，不是栏。
+    await page.setViewportSize({ width: 900, height: 600 });
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTaskAndRelease(page, '整理窄档乙');
+    await seedListAndTag(page, '整理清单乙', '整理标签乙');
+
+    await expect(paneInColumn(page), '窄档却画出了详情栏').toHaveCount(0);
+    // 🔴 窄档要量的东西**全在行尾**（触发器、`<details>` 里的下拉与复选框、chip），
+    //    所以这一档从头到尾用整行 `task-item-*`（见上面 `rowItemOf` 的注释）。
+    const row = rowItemOf(page, '整理窄档乙');
+    const summary = row.getByTestId('task-organize-summary');
+    await expect(summary, '窄档行尾没有整理入口 ⇒ 回落丢了，这一档根本归不了类').toHaveCount(1);
+    /* 🔴 阈值从**触发器自己画的那枚图标**推导，不是我挑的字面量。
+       `TaskOrganizer` 的 summary 里只有 `<SlidersHorizontal size={TRIGGER_ICON_SIZE}/>`。
+       这一档实测触发器的框是 **16.9375px**（行尾并排六格把它挤窄，是既有形状）。
+       原来这里写的是 `> 20` —— 那是**我猜的**，于是把"当前形状"读成了"回落坏了"，
+       一条猜出来的阈值比没有阈值更容易骗人（它看起来像在量东西）。
+       "不许裁掉自己的图标"这条同时有牙：挤到 0 宽时触发器先过不了 `paintedBox`，
+       比图标窄时这一行直接红。图标的框由同一个探针当场量，不写死。 */
+    const iconBox = await paintedBox(page, summary.locator('svg'));
+    const box = await paintedBox(page, summary);
+    expect(box.width, '行尾触发器比它自己的图标还窄 ⇒ 图标被裁掉了').toBeGreaterThanOrEqual(
+      iconBox.width,
+    );
+
+    await summary.click();
+    // 🔴 窄档整页也只许一份编辑本体（这一档它是从 `<details>` 里出来的，不是栏里那一份）。
+    await expect(
+      page.getByTestId('organize-project-select'),
+      '窄档出现了两份清单下拉（行尾 + 栏里）',
+    ).toHaveCount(1);
+    await row.getByLabel('任务「整理窄档乙」所属清单').selectOption({ label: '整理清单乙' });
+    await expect(
+      row.getByTestId('task-meta'),
+      '窄档选了清单而行上没写',
+    ).toContainText('整理清单乙');
+    await row
+      .getByRole('checkbox', { name: '给任务「整理窄档乙」加上或去掉标签「整理标签乙」' })
+      .click();
+    await expect(row.getByTestId('task-chip-tag'), '窄档勾了标签而 chip 没画出来').toHaveCount(1);
+
+    await row.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await page.screenshot({ path: SHOT('t15-narrow-organizer-falls-back-to-row') });
+
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await expect(
+      rowOf(page, '整理窄档乙').getByTestId('task-meta'),
+      '窄档那次选择没落成（刷新后行上读不到归属）',
+    ).toContainText('整理清单乙');
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
 });

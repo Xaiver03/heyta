@@ -16,13 +16,15 @@
  *
  * 🔴 所以本文件遵守的不变量是：**每个字段任何时刻只有一个编辑器所有者**。
  * 已搬进来的是**备注**（`NoteField`，§8.138）、**重复**（`RepeatField`，§8.141）、
- * **子任务**（`SubtaskField`，§8.144）、**提醒**（`ReminderField`，§8.145）与
- * **截止**（`DueField`，§8.146）：
+ * **子任务**（`SubtaskField`，§8.144）、**提醒**（`ReminderField`，§8.145）、
+ * **截止**（`DueField`，§8.146）与**清单 + 标签**（`OrganizerField`，§8.147）：
  * 每一单的同一笔提交里都要把行尾那半撤掉（`App.tsx` 的 `taskPaneInColumn` 反向条件），
  * 所以不存在"同一字段两处可编辑"的那个中间态；列表侧留下的分别是**只读徽标** `NoteBadge`、
  * **只读徽标** `RepeatChip`、**只读徽标** `SubtaskBadge` 与**只读徽标** `ReminderBadge`（"扫一眼要能看出哪条任务写过 /
- * 是重复的 / 挂在谁下面 / 挂了几条提醒"这一档不因为搬进栏里就丢掉）。
- * ⚠️ 这一条是**分阶段**的，不是"这一单顺手做完"：其余字段（清单标签 / AI）
+ * 是重复的 / 挂在谁下面 / 挂了几条提醒"这一档不因为搬进栏里就丢掉），
+ * 以及**只读 chip** `TagChips` —— 标签那一档留的是 chip 而不是"整块不画"，因为
+ * **标签在共享层没有对应槽**（截止有 `task-meta`，标签没有），撤掉就等于列表里看不出哪条挂了标签。
+ * ⚠️ 这一条是**分阶段**的，不是"这一单顺手做完"：其余字段（AI）
  * 仍住在行尾，登记成后续单，每一单都要重做"搬进来 + 行里撤掉"这两半，不许只搬一半。
  * 🔴 截止那一格特别记一笔：`check:row-single-source` 的断言 A 要求"复选框 + 标题 + 截止"三种信号
  * 同时出现在任务行里，所以截止的**显示**必须留在行上 —— 这一条**不是靠本文件满足的**：
@@ -45,6 +47,7 @@ import { NoteField } from './NoteEditor.js';
 import { RepeatField } from './TaskRepeat.js';
 import { SubtaskField } from './SubtaskPicker.js';
 import { DueField } from './DueEditor.js';
+import { OrganizerField } from './TaskOrganizer.js';
 import { ReminderField } from '../reminders/ReminderPanel.js';
 import { useTaskStore } from './store.js';
 
@@ -136,6 +139,27 @@ export function TaskDetailCard(): React.JSX.Element | null {
         key={`subtask-${task.id}`}
         task={task}
         onSetParent={(parentId) => store.setParent(task.id, parentId)}
+      />
+
+      {/*
+        清单 + 标签（§8.147）。🔴 与重复/提醒那两格同一条理由，这里**不叠 `h3`**：
+        `OrganizerField` 自带两个区块头（`<label>` 里那句「清单」与 `<fieldset>` 的
+        `<legend>`「标签」），两处同一个词说两遍，读到的是"有两个区块"。
+        行尾那一支的 `<details>` 与 `.ht-material` 也**不跟着本体进栏**（§8.141 的 R4、
+        §8.145 的 M4/M5、§8.146 的 D3/D4 钉的都是这一档，pane 级那一条判据在 e2e 层只有
+        T10 一个消费者 —— 任何一格套上外壳都红在它身上）。
+        ⚠️ 这里**没有** `key`，而且不是漏掉：两个控件全部受控于 store、整块零 `useState`，
+        所以 §8.145 那条"有本地 state 才要 key"落在**不挂**那一侧 ——
+        与紧邻的截止那一格正好相反（`DatePicker` 带 `useState(month)` ⇒ 必须挂）。
+      */}
+      <OrganizerField
+        task={task}
+        onMoveToProject={(projectId) => {
+          void store.moveToProject(task.id, projectId);
+        }}
+        onSetTags={(tagIds) => {
+          void store.setTags(task.id, tagIds);
+        }}
       />
 
       {/*
