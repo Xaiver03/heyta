@@ -3031,18 +3031,26 @@ VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VER
   **反过来把 ② 挡死** —— 装置读到"锁存在且持有者活着（pid=91905）"就判 `NOT-RUNNING（别人正持锁）`，
   它分不清持锁的正是我自己。**共享互斥锁不能由要被保护的那一方自己持有。**
 
-### 7.30d ① 这一轮**真跑起来了**（2026-10-05 19:56:53 起，载体 `7911ad02`，链 27 第 25 轮；**截至 20:01 只有前两段的打印**）
+### 7.30d ① **跑完了**（2026-10-05 19:56:53–20:07:15，载体 `7911ad02`，链 27 第 25 轮）：`INNER_EXIT=0`、五枚图新生 **5/5**、载体身份首尾一致；🔴 但"人看过"只记 **4/5**（图 5 是锁屏）
 
-⚠️ **本条不构成 ① 完成**：`INNER_EXIT=` 与 `本轮新生张数=` 还没打印（android 段 20:00:57 才起跑，ios 段在后）。
-下面每一行都是**装置自己打印的**（出处：`/tmp/heyta-reinstall-launch.round25.log` 与它引用的 `/tmp/heyta-reinstall-win.log`），不凭记忆、不补词：
+下面每一行都是**装置自己打印的**（出处：`/tmp/heyta-reinstall-launch.round25.log`、它引用的 `/tmp/heyta-reinstall-win.log`、
+以及归档目录 `/Users/rocalight/.heyta-evidence/reinstall-7911ad02-1005-195657/`），不凭记忆、不补词：
 
 ```
 载体 = heyta-wt-reinstall @ 7911ad02c80d3741ee7117f20c09ab93e684595a
      scripts/reinstall-all.sh blob = c30a587ceb4d4ec8138b7bc975317247e9669f48   ← 现读 `git -C <载体> rev-parse HEAD:scripts/reinstall-all.sh`
      （⚠️ 我 03:35 那节写的 036ce09a 已被别线落地反过来否证，见交接账 20:00 那条就地更正）
 载体身份（起跑）=7911ad02c80d3741ee7117f20c09ab93e684595a
-$ bash scripts/reinstall-all.sh --only mac,windows        ← 第一段先跑桌面两端；android+ios 是随后一段
-PHASE1_EXIT=<未打印>   PHASE2_EXIT=<未打印>   INNER_EXIT=<未打印>   FRESH=<未打印>/5
+载体身份（收尾）=7911ad02c80d3741ee7117f20c09ab93e684595a ⇒ 与起跑一致，本轮读数可整体钉给这一个 sha
+PHASE1_EXIT=0（mac+windows）
+PHASE2_EXIT=0（android+ios）
+INNER_EXIT=0
+本轮新生张数 = 5 / 期望 5；证据已抄进 /Users/rocalight/.heyta-evidence/reinstall-7911ad02-1005-195657
+COPY_BAD：装置**没有打印过这一行**（`grep -c COPY_BAD` = 0）⇒ 不是"0"，是"没这个字段"，如实记
+主蓝采样命中 1127（数的是 heyta-reinstall-mac-installed.png.webview.png）
+主蓝采样命中 4001（数的是 heyta-reinstall-android.png）
+主蓝采样命中 4152（数的是 heyta-reinstall-ios.png）
+```
 
 段 1 macOS（✅ 打印齐）
   ✅ 打包完成（.app + .dmg，含打包即启动的自截屏验证；日志 /tmp/heyta-reinstall-mac.log）
@@ -3061,9 +3069,23 @@ PHASE1_EXIT=<未打印>   PHASE2_EXIT=<未打印>   INNER_EXIT=<未打印>   FRE
   ✅ mac：已清旧包、重打、重装、有当前产物判据
   ✅ windows：已清旧包、重打、重装、有当前产物判据
 
-段 3 Android（20:00:57 起跑，读数待打印）
-段 4 iOS（未起）
+段 3 Android（✅ 打印齐）
+  ✅ release APK 已重打（ 64M；日志 /tmp/heyta-reinstall-apk.log）
+  ✅ 模拟器 emulator-5554 全新安装成功
+  主蓝采样命中 4001（数的是 heyta-reinstall-android.png）
+  ✅ 窗口 1080x2400、heyta-reinstall-android.png 内容占比 56.7%、主蓝命中 4001 —— 是共享 UI
+  截图证据：/tmp/heyta-reinstall-android.png
+段 4 iOS（✅ 打印齐）
+  模拟器：EAAD1B66-80A3-4A51-957C-298DAF22F057（= 我自己新建的那台 heyta-multiend-reinstall，不是别线的现场）
+  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 4 行）—— 见 /tmp/heyta-reinstall-pod.1.log   ← traps #290 那一枚，正是排队器 v2 要还原的东西
+  ✅ 沙盒已同步（Manifest.lock == Podfile.lock）
+  主蓝采样命中 4152（数的是 heyta-reinstall-ios.png）
+  /tmp/heyta-reinstall-ios.png 562430 bytes mtime=10-05 20:07:15 md5=b95a8330f89d  [本轮新生]
 ```
+
+**"看的是哪一枚图"这件事有对账**：我在 20:03 先把四枚 `cp -p` 成私有快照再看（`/tmp` 会被下一趟覆盖，traps #275），
+20:07 与归档目录逐枚比 md5 ⇒ 四枚**逐字相同**
+（`c4641723a659…` / `1f0ab4fb1a2c…` / `042fbb9f8947…` / `666e3e588e44…`），所以下面那段肉眼描述就是对**归档证据**说的，不是对一张已经变质的临时文件。
 
 三条**顺手取到**的旁证（不是判据本体，但都关系到别面）：
 - 远端 `web-dist files = 26` 与本地 `find apps/web/dist -type f` 现量 **26** 相符 ⇒ traps #175 那个"覆盖式解包只增不减（26 vs 7）"这一轮**没有复发**（不是靠印象，是两边各数一次）。
@@ -3087,6 +3109,7 @@ PHASE1_EXIT=<未打印>   PHASE2_EXIT=<未打印>   INNER_EXIT=<未打印>   FRE
 | 1 mac 窗口截图 | 只有暗底 + 三个交通灯，**没有界面内容** | ⚠️ 与 `reinstall-all.sh:97` 记的那枚"48 KB / 主蓝 0"同一枚形状；**主蓝不据它判**（模板早写了"只作参考"）。它的 md5 与 04:15 基线 `c4641723a6` **逐字相同** ⇒ 这张图跨轮不变，本来就没有分辨力 |
 | 2 mac WebView 快照 | 深色主题的**真 heyta**：左 rail（收集箱图标高亮成主蓝）、`收集箱` 页标题、今天/最近 7 天/已完成、四象限四条、清单/标签空态文案、右侧「AI 工具调用 / 对话助手 当前档位：只读 / 例如：列出所有任务」、语言 pill `中文 ✓ | English`，以及首启的「在使用联网功能之前」卡（`同意并联网` 主蓝实心 + `只用本机` 描边 + 服务条款/隐私政策链接） | ✅ 是共享 UI，且**首启同意卡在场**正是"全新安装"的界面级证据（与 `--only` 前"清壳的 WebKit 存储"一致）。装置打印的主蓝命中 **1127** 与肉眼所见一致 |
 | 3 android 装机截图 | 浅色主题、状态栏 8:02/5G，整屏是同一张「在使用联网功能之前」卡：盾牌图标、两段 bullet、`服务条款 隐私政策` 蓝色链接、`同意并联网` 实心主蓝按钮 + `只用本机` 描边按钮；卡外是被遮罩压成灰底的应用背景 | ✅ 是我们的界面。⚠️ 顺带解释了装置那句"内容占比 56.7%"：模态卡把四周压成纯色，**占比低不是空白屏**，判据靠的是主蓝命中 4001 而不是占比 |
+| 4 ios 装机截图 | 浅色、状态栏 `20:07` + wifi/电量，整屏是同一张「在使用联网功能之前」卡（盾牌 + 两段 bullet + `服务条款 隐私政策` 蓝链 + `同意并联网` 实心主蓝 + `只用本机` 描边），卡外灰底遮罩 | ✅ 是我们的界面，且同样是"全新安装才有的首启卡"。装置打印主蓝命中 **4152**；新鲜度判据（已装 `main.jsbundle` 比源码新）在装置侧已过，否则这张图根本不会存在 |
 | 5 windows 装机截图 | 🔴 **是 Windows 锁屏**：海湾小镇壁纸 + 大字时钟 `19:59` + `10月5日, 星期一` + 两处搜索磁贴。**没有 heyta 窗口** | ❌ **这一格不能算"人看过"** —— 见下面那条缺陷 |
 
 🔴 **图 5 的缺陷（当场定性，不是"环境问题"那么轻）**：`dist/windows/install-capture.txt` 里文本判据**全在位**
@@ -3102,6 +3125,11 @@ PHASE1_EXIT=<未打印>   PHASE2_EXIT=<未打印>   INNER_EXIT=<未打印>   FRE
 ① 换成 `PrintWindow`/窗口 DC 采集，锁屏也能拍到窗口内容；
 ② 给 windows 段补一条与 mac 同族的像素判据（注意：这枚锁屏是海景照片，**天真地数主蓝可能照样过**，所以特征要取"界面结构标记"而不是单色命中）。
 ⇒ **① 这一轮的"五枚图人看过"只能记 4/5**，图 5 待打包机解锁后单段重采（`--only windows` 或只跑 capture 那一步）。
+
+📌 这条缺陷有一条**现成而没人用的判据**：提交态那几枚真·Windows 装机图是 `34,435` / `79,896` / `74,523` B
+（`apps/desktop-windows/evidence/*.png`，1152x587 的窗口内容），而这一枚是 **1,683,391 B** —— 锁屏是照片，PNG 下大 20–50 倍。
+⇒ 修法 ③：**Windows 段先加一条字节量级/尺寸带判据**（比"数主蓝"可靠，锁屏海景照里可能真有接近 #2563EB 的色），
+再谈 `PrintWindow`。登记给打包线（脚本 `scripts/windows/install-and-capture.ps1`，本轮不改：① 在跑、且那是别线的资产）。
 
 ### 7.31 ③ 的输入多了一道「能不能重放」的门，另一枚探针先被自己作废（2026-10-04 12:4x–13:0x，载体 `458249f6`，窗口仍不在）
 
