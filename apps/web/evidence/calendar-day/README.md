@@ -129,17 +129,29 @@ X/Y/AB/AC 要重写 `packages/ui/dist`，而另一条会话正在读它打移动
 UIPIN day-en-full.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
 UIPIN day-en-no-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
 UIPIN day-en-empty.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-full.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-drag-next.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-drag-prev.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-away.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-back-today.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-full.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN calendar-day-drag-next.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN calendar-day-drag-prev.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN calendar-day-away.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN calendar-day-back-today.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
 ```
 
-⚠️ **后五枚此刻是红的（UISTALE），这是要的结果不是事故**：钉 `5e23b7bf`（10-03 23:58）之后
-`39032107`（10-04 10:11）动过 `main-area.css`（页头可换行）⇒ 上面「② 这五张**不证明**今天的 HEAD 在日档下也画一行页头」那条没取证
-现在有一条**机器读数**替它说话，而不是只有一段话等着被下一个人忽略。
-要让它转绿只有一条路：第 ③ 条写的那趟重拍（等窗口 + 人看图 + 把 pin 换成新字节对应的那笔代码提交）。
+⚠️ **后五枚曾经红过（UISTALE），10-05 10:2x 那趟重拍 + 逐张看过之后才转绿并改钉 `73ad62a3`**
+（现量：`calendar-day-full.png` 盘上字节 `6e17d015…` == `git show HEAD:` 同一枚，随 `da8688b6` 入库）。
+当初为什么它必须红：钉 `5e23b7bf`（10-03 23:58）之后 `39032107`（10-04 10:11）动过 `main-area.css`（页头可换行）
+⇒ 上面「② 这五张**不证明**今天的 HEAD 在日档下也画一行页头」那条没取证 —— 是这条**机器读数**替它说话的，
+而不是只有一段话等着被下一个人忽略。要让它转绿只有一条路：第 ③ 条写的那趟重拍（等窗口 + 人看图 + 把 pin 换成新字节对应的那笔代码提交）—— 10:2x 走的就是这条路。
+
+🟢 **10-05 11:0x 这五枚的路径集补宽了一枚 `packages/design-system/src/tokens.css`，而且补宽是免费的**：
+`git merge-base --is-ancestor 1e5dd492 73ad62a3` ⇒ rc=**0**（`1e5dd492` 10-05 00:06 是唯一一枚在 `39032107` 之后动过 tokens.css 的提交，
+而它已经在这五枚的钉**之下**）。现量 `--dir apps/web/evidence/calendar-day` ⇒ rc=**0**、`pins=8 pinbad=0`，
+且每行 `UIOC` 的针脚变成了 `（决定形状的源码最后一次动它是 1e5dd4926d ≤ 钉的 73ad62a3）`
+—— **针脚变了才是补宽真的生效**，原样复读说明那条路径没进路径集。
+
+🔴 **上面那三枚 `day-en-*.png` 刻意没跟着补宽**：它们的钉是 `39032107`，**早于** `1e5dd492` ⇒ 补宽会立刻转 UISTALE。
+那枚红是**对的红**（tokens.css 确实在那三张之后动过），处置只有一条：重拍 + 逐张看图 + 重钉（连同 `calendar-year` 4 枚、
+`calendar-view-options` 2 枚，一共 **9 张**要占一次 e2e 窗口；逐枚模拟读数与代价表在 `docs/plans/calendar-profile-handoff.md` §4.05 (42) ②）。
+**不能靠"把钉改成 `73ad62a3` 再补宽"绕过** —— 那是用一次改字把一条真过期的主张洗成绿的。
 
 | 文件 | md5 | 人看到的 |
 |---|---|---|
