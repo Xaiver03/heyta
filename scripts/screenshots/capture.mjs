@@ -19,7 +19,7 @@
  *    默认只允许 localhost / 127.0.0.1 —— 免得手一抖把真实用户数据截进仓库。
  */
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import process from 'node:process';
 
@@ -145,6 +145,103 @@ async function clearHoverAndFocus(page) {
   await page.waitForTimeout(150);
 }
 
+/**
+ * 把声明式 `seed` 走**产品自己的「从备份还原」通道**喂进这个 context。
+ *
+ * 为什么走界面而不是直接写 IndexedDB：这张图的主张是"回收站里四类都有"，
+ * 而那句话的真伪取决于**产品能不能把一份四类都删过的备份还原进来**。
+ * 绕过界面种数据，截出来的图证明的是夹具会写库，不是产品能用。
+ *
+ * 🔴 还原之后不重新加载也不算数 —— 主循环紧接着有一次真 `goto`，
+ *    所以种进去的东西必须在**重启后仍在界面上**，这才是"落库"的证据。
+ */
+async function applySeed(page, site, target) {
+  const absPath = join(root, target.seed.fixture);
+  if (!existsSync(absPath)) {
+    throw new Error(
+      `seed 夹具不存在：${target.seed.fixture}\n` +
+        `   ⇒ 先生成它：node scripts/screenshots/seed-trash-fixture.mjs（别手写墓碑 JSON，也别放宽这条）`,
+    );
+  }
+  const langQuery = target.locale === 'zh-CN' ? '' : `?lang=${target.locale}`;
+  await page.goto(site.baseUrl + langQuery, { waitUntil: 'domcontentloaded' });
+  await dismissOverlays(page, target.dismissTexts);
+
+  const settings = page
+    .getByRole('tab', { name: target.seed.settingsLabel, exact: false })
+    .or(page.getByRole('button', { name: target.seed.settingsLabel, exact: false }))
+    .first();
+  await settings.waitFor({ state: 'attached', timeout: 20_000 });
+  await settings.scrollIntoViewIfNeeded().catch(() => {});
+  await settings.click({ force: true });
+
+  await page.getByTestId('import-panel').waitFor({ state: 'attached', timeout: 20_000 });
+  await page.getByTestId('import-file').setInputFiles(absPath);
+  const runButton = page.getByTestId('import-run');
+  await runButton.waitFor({ state: 'attached', timeout: 10_000 });
+  // 🔴 按钮仍 disabled = 文件根本没进界面状态（不是"慢"）。这时点下去什么都不会发生，
+  //    而后续的 success 判据会等成一个看不懂的超时。
+  if (await runButton.isDisabled()) {
+    throw new Error('seed：选了夹具但「还原」按钮仍是 disabled ⇒ 文件没进入界面状态，还原从未发生');
+  }
+  await runButton.click();
+
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    if (await page.getByTestId('import-success').count()) return;
+    const refused = page.getByTestId('import-refused');
+    if (await refused.count()) {
+      throw new Error(`seed：产品拒绝还原这份夹具 —— ${await refused.first().innerText()}`);
+    }
+    if (await page.getByTestId('import-failed').count()) {
+      throw new Error(`seed：还原抛错（import-failed），夹具=${target.seed.fixture}`);
+    }
+    await page.waitForTimeout(200);
+  }
+  throw new Error(`seed：等了 20s 没出现 import-success（夹具=${target.seed.fixture}）`);
+}
+
+/**
+ * 存在性判据：**夹具里每一条被删的行，回收站界面必须有一行**。
+ *
+ * 🔴 刻意逐条数夹具里的标题，而不是"看起来有四类"：§10.226 的量是
+ *    "断言只会验界面写了什么，不会验界面少了什么" —— 而这张图的全部主张就是四类都进得来。
+ *    标题是用户自己的字（TrashBoard 原样显示、不翻译），所以中英文两张图共用同一组期望值。
+ */
+async function assertSeededTitles(page, target) {
+  const doc = JSON.parse(readFileSync(join(root, target.seed.fixture), 'utf8'));
+  const expected = [];
+  for (const rows of Object.values(doc.entities ?? {})) {
+    for (const row of Array.isArray(rows) ? rows : []) {
+      if (row?.deletedAt == null) continue;
+      const label = String(row.title ?? row.content ?? '').trim();
+      if (label !== '') expected.push(label);
+    }
+  }
+  if (expected.length === 0) {
+    throw new Error(
+      `seed 夹具里一条"被删且有标题"的行都没有（${target.seed.fixture}）⇒ 这条判据没有分母，重新生成夹具`,
+    );
+  }
+  const missing = [];
+  for (const label of expected) {
+    const hits = await page
+      .getByText(label, { exact: false })
+      .locator('visible=true')
+      .first()
+      .count()
+      .catch(() => 0);
+    if (!hits) missing.push(label);
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `回收站界面少了 ${missing.length}/${expected.length} 行：${missing.join('、')}\n` +
+        `   ⇒ 这张图会被命名为「回收站」却演示不出四类，那是假证据。不要放宽这条判据 —— 先查还原有没有真的落库`,
+    );
+  }
+  console.log(`  🌱 seed 到位：回收站列出 ${expected.length} 行（夹具里每一条被删的行都命中）`);
+}
+
 for (const job of jobs) {
   const { target, device, folder } = job;
   const site = SITES[target.site];
@@ -168,6 +265,11 @@ for (const job of jobs) {
   const page = await context.newPage();
 
   try {
+    // 种数据排在导航**之前**：还原发生在设置视图里，而主流程紧接着还有一次 goto ——
+    // 那一次重新加载顺带证明了"还原的东西落库了"，不是只活在内存里的一趟。
+    if (target.seed) {
+      await applySeed(page, site, target);
+    }
     if (target.openVia === 'tab') {
       // 🔴 视图是 React state：必须先落到应用，再点导航标签。
       //
@@ -276,6 +378,12 @@ for (const job of jobs) {
     //    "界面有问题"的证据去查，查的是一个不存在的问题）。
     //    没有 `.lp-h1` 的应用视图仍走那 600ms：那些页面没有可等的揭示，
     //    把它们接进新判据只会让每张图都等一个永远不成立的条件。
+    // 🔴 有 seed 的目标：**先验"该出现的行都出现了"，再截图**。
+    //    顺序很重要 —— 判据在截图之后的话，图已经落盘了才发现少一类，
+    //    而那张半成品图会被下一次的门禁当成"已有产物"放过。
+    if (target.seed) {
+      await assertSeededTitles(page, target);
+    }
     const settled = await settleForShot(page);
     await page.screenshot({ path: outPath, fullPage: target.fullPage });
 

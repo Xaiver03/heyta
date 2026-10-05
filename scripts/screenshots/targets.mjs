@@ -161,7 +161,21 @@ export const TARGETS = [
   { id: 'W04', name: '番茄钟', site: 'web', openVia: 'tab', view: 'focus', readyText: '番茄钟', appStore: true },
   { id: 'W05', name: '时间线', site: 'web', openVia: 'tab', view: 'timeline', readyText: '时间线', appStore: true },
   { id: 'W06', name: '成长', site: 'web', openVia: 'tab', view: 'growth', readyText: '成长', appStore: true },
-  { id: 'W07', name: '回收站', site: 'web', openVia: 'tab', view: 'trash', readyText: '回收站' },
+  // 🔴 `seed`：这张图主张的是"回收站里四类都有"，而截图流水线原来**没有任何种数据的层**
+  //   （计划 §10.219 现量），所以它只能截出一个空回收站或只有任务的回收站。
+  //   `capture.mjs` 会把 `fixture` 走**产品自己的「从备份还原」通道**喂进去，
+  //   再按夹具里"每一条被删的行"逐条做存在性判据 —— 不是直接写 IndexedDB。
+  //   `settingsLabel` 与 `dismissTexts` 同规：`scripts/` 不在 pnpm 工作区里，这是一份**抄件**，
+  //   由 `verify-artifacts.mjs` 的词条对账钉住（改词条不改这里 ⇒ 门禁红）。
+  {
+    id: 'W07',
+    name: '回收站',
+    site: 'web',
+    openVia: 'tab',
+    view: 'trash',
+    readyText: '回收站',
+    seed: { fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json', settingsLabel: '设置' },
+  },
   { id: 'W08', name: '设置', site: 'web', openVia: 'tab', view: 'settings', readyText: '设置' },
 
   // ── 移动端（标签式的移动视口）────────────────────────────────────
@@ -178,7 +192,17 @@ export const TARGETS = [
   { id: 'W02-en', name: 'Quadrants', site: 'web', openVia: 'tab', view: 'quadrant', locale: 'en', readyText: 'Quadrants' },
   { id: 'W03-en', name: 'Habits', site: 'web', openVia: 'tab', view: 'habits', locale: 'en', readyText: 'Habits' },
   { id: 'W05-en', name: 'Timeline', site: 'web', openVia: 'tab', view: 'timeline', locale: 'en', readyText: 'Timeline' },
-  { id: 'W07-en', name: 'Trash', site: 'web', openVia: 'tab', view: 'trash', locale: 'en', readyText: 'Trash' },
+  {
+    id: 'W07-en',
+    name: 'Trash',
+    site: 'web',
+    openVia: 'tab',
+    view: 'trash',
+    locale: 'en',
+    readyText: 'Trash',
+    // 夹具里的标题是**用户自己的字**，TrashBoard 原样显示、不翻译 ⇒ 中英两张图共用同一组期望值。
+    seed: { fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json', settingsLabel: 'Settings' },
+  },
 ].map((target) => {
   const merged = {
     device: 'desktop',
@@ -186,6 +210,8 @@ export const TARGETS = [
     authRequired: false,
     appStore: false,
     locale: 'zh-CN',
+    // 默认不种数据：只有需要演示"有内容"的图才声明 seed（见 W07 的注释）。
+    seed: null,
     ...target,
   };
   return {
