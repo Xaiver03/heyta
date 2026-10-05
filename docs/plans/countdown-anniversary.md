@@ -4410,3 +4410,27 @@ W0b ─> 随时可做（台账那半要等文件干净）
     "撞车判据 = 同一文件的未提交 diff"是同一条，只是反过来：它也会**反向**漏报"看着不冲突的那份其实脏着"）。
     ⚠️ **不代推他们那 4 笔**：把别人尚未公开的提交推上共享 `main`，会让他们的任何一次
     `amend`/rebase 变成只能 force push —— 那是硬边界（同 §8.5 早先那段的理由，未被推翻）。
+
+16. 🔴 **`FULLCHECK-01`：`pnpm check` 整条 76 步链没有在最终载体上重跑，这一格是空的**。
+    第 14 条覆盖的是**我能单独取、且不与他人抢资源的那些格**：17 道门禁逐条 rc=0
+    （含第⑤步点名的死链 `check:docs`、表格 `check:md-tables`，与本批新增的
+    `check:public-facts` / `check:ios-native-bridges` / `check:script-snapshot` / `check:verify-script-copy` /
+    `check:legal-copy` / `check:row-single-source` / `check:migrations`），加 `-r build`、`-r typecheck`、
+    每个包各一份单测读数。
+    ⚠️ **这不等于"整链绿"**：`node -e "console.log(require('./package.json').scripts.check)"` 现量是
+    **76 个步骤**，其中 `check:ai-e2e` / `privacy-consent-e2e` / `landing-e2e` 三段会起 vite 并按端口 SIGKILL
+    （4318/4319、4322、4320 —— **三段各自不同**，抄成两个数字就会杀到别人的服务），
+    末尾还有 `pnpm -r test`（受 `RTEST-UNHANDLED-01` 挡着）。
+    🔴 **这一格当刻为什么没跑（04 22:4x 现量，不是推测）**：`uptime` ⇒ **load 261.56 / 183.90 / 112.56**，
+    而本仓自己的等待阈值是核数 × 3/4 = **12**（`sysctl -n hw.ncpu` = 16）；
+    `ps -Arco pid,pcpu,comm` ⇒ 前几名 `ApplicationsStorageExtension` 167%、`du` 60%、
+    `qemu-system-aarch64-headless` 30%、`mds` / `mdworker_shared`（Spotlight 在扫盘），
+    而 `pgrep -fl "heyta-wt-batch2"` ⇒ **0** ⇒ 这台机器上的重活没有一件在我这一棵树上。
+    📌 261 这种量级配上 `%CPU` 总和不到 200 的组合，读法是**大量进程卡在不可中断 I/O**，不是算力被吃满。
+    在这种窗口跑 76 步，得到的可能是假红（超时类断言），也可能是把别人那台 qemu / `du` 挤成超时
+    ⇒ **记环境无效，不记产品失败，也不记"已验证"**。
+    ✅ **闭合它的四个前置条件（写给下一个做这件事的人，每条带现量命令）**：
+    ① `uptime` 的 1 分钟负载 < 12；② `pgrep -fl "playwright|vite|verify-mobile"` 为空；
+    ③ 同窗若还有别人在跑整链，那三段 e2e 会同抢专用端口 ⇒ 串行或等（traps #87）；
+    ④ 跑之前先读 `RTEST-UNHANDLED-01` —— 它会让末尾那步 rc=1，
+    **那一次 rc=1 不构成新缺陷**，别把它读成"整链终于查出问题了"。
