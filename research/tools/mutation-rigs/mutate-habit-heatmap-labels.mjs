@@ -111,10 +111,16 @@ function run(cmd, args, cwd) {
 
 const tallyVitest = (out) => {
   const line = (out.match(/^[ \t]*Tests[ \t].*$/m) || [''])[0];
+  const passed = Number(/(\d+) passed/.exec(line)?.[1] ?? -1);
+  const failedHit = /(\d+) failed/.exec(line);
   return {
     line: line.trim(),
-    passed: Number(/(\d+) passed/.exec(line)?.[1] ?? -1),
-    failed: Number(/(\d+) failed/.exec(line)?.[1] ?? -1),
+    passed,
+    /* 🔴 汇总行里**没有** `failed` 有两种情况，必须分开：
+       ① 数到了 `passed` 却没有 `failed` —— vitest 全过时就是不印那一截，这是**真的 0**；
+       ② 连 `passed` 都没有 —— 汇总行没解析到，那是**探针读不到**，不许当成 0
+          （读不到会被下游误播成"零失败"，这条教训就写在本仓 i18n 那张表的注释里）。 */
+    failed: failedHit ? Number(failedHit[1]) : passed >= 0 ? 0 : -1,
   };
 };
 
@@ -125,12 +131,28 @@ const tallyPlaywright = (out) => {
     return hits.length === 0 ? -1 : Number(hits[hits.length - 1][1]);
   };
   const passed = grab('passed');
-  const failed = grab('failed');
+  const failedHit = grab('failed');
+  /* 与上面 vitest 那条同一分工：数到 passed 而没有 failed 段 = 全过 = 0；
+     两个都数不到 = 探针读不到，保持 -1 让它响亮地失败。 */
+  const failed = failedHit >= 0 ? failedHit : passed >= 0 ? 0 : -1;
   return { passed, failed, line: `passed=${String(passed)} failed=${String(failed)}` };
 };
 
 /** 红集：`HL1 …` / `L1 …` 这样的标题前缀（两条腿共用一张前缀表）。 */
-const titles = (out) => [...new Set([...out.matchAll(/^[ \t]*[×✕]\s+(?:\S*\.spec\(\w+:\d+\)\s+)?((?:HL|L)\d+)/gm)].map((x) => x[1]))];
+const titles = (out) =>
+  [...new Set(
+    out
+      .split('\n')
+      .filter((line) => /^[ \t]*[×✕]/.test(line))
+      .map((line) => /(?:^|[\s>›])(HL\d+|L\d+)(?![\w-])/.exec(line)?.[1])
+      .filter(Boolean),
+  )];
+/* 🔴 第三枚探针 bug（前两枚见 `waitPortFree` 与两个 tally）：原来那条正则要求
+   `[×✕]` 后面**紧跟**"文件名(行:列)"，而 Playwright 真实打出来的是
+   `  ✘  1 [chromium] › tests/x.spec.ts:90:3 › … › HL1 …` —— 中间那截 `[chromium] › 路径` 它不认，
+   于是 e2e 腿的红集**永远为空**，臂台把"HL1 真的红了"读成"部分存活：少了 HL1"。
+   这是最坏的一种假信号：它指控的是"判据没牙"，而判据其实正在生效。
+   现在改成"在失败行里找第一个 `HL?\d+` 词元"，两条腿共用一套，不再猜前缀的形状。 */
 
 function rebuild() {
   for (const pkg of ['ui', 'web']) {
@@ -148,7 +170,10 @@ function waitPortFree(port = 4371, budgetMs = 60_000) {
   for (;;) {
     const r = spawnSync('lsof', ['-nP', `-iTCP:${String(port)}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8' });
     const pids = (r.stdout ?? '').trim().split('\n').filter(Boolean);
-    if (pids.length === 0) return;
+    /* 🔴 `return;`（undefined）会被调用方那句 `if (!waitPortFree()) return null` 读成"端口没释放"，
+       于是**干净态永远跑不成**，臂台每一臂都停在 `BASELINE_BROKEN` —— 探针坏得恰好伪装成"环境不配合"。
+       §7 元规则 1（先怀疑探针）在这一臂上是指我自己写的这台装置。 */
+    if (pids.length === 0) return true;
     if (Date.now() > deadline) {
       const who = spawnSync('ps', ['-o', 'command=', '-p', pids[0] ?? '0'], { encoding: 'utf8' }).stdout.trim();
       console.log(
