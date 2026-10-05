@@ -305,10 +305,20 @@
   outline-offset: var(--ht-space-1);
 }
 
+/*
+ * 🔴 `minmax(0, 1fr)`，不是 `1fr`。2026-10-04 探针实测（一次性载体
+ * `e2e/tests/r1-grid-probe.spec.ts`，跑完已删）：`1fr` 的轨道最小值是 `auto`
+ * = **内容最小宽**，而 W6 给格子加的「休 / 班」那一行把格子撑到 37.5px 高，
+ * `.ht-sidebar__day` 的 `aspect-ratio: 1` 又让**宽度跟高度走** ⇒
+ * 行网格算出 `37.5px × 7 = 263px`，容器只有 189px（`scrollWidth 263 > clientWidth 189`）
+ * ⇒ 整张迷你月历横向溢出侧栏、七列与列头逐列错位（实测位移 −5.25 … −68.25px）。
+ * 把最小值钉成 0，两副 grid 就只由容器宽度决定，**与格子内容无关** ——
+ * 这才是"列头与格子必须对齐"这条判据想要的形状。
+ */
 .ht-sidebar__month-weekdays,
 .ht-sidebar__month-row {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .ht-sidebar__month-weekdays {
@@ -328,7 +338,12 @@
   align-items: center;
   justify-content: center;
   gap: var(--ht-space-0);
-  aspect-ratio: 1;
+  /*
+   * 🔴 这里原来有 `aspect-ratio: 1`，**已删**：它让格子的**宽度跟着高度走**，
+   * 而 W6 之后格子会因「休 / 班」变高 ⇒ 轨道被撑到 37.5px、整张月历溢出侧栏
+   * （取证见上面 `.ht-sidebar__month-row` 那条）。迷你月历这一列本来就是
+   * "等宽七列 + 高度随内容"，方形不是它的约束。
+   */
   border: 1px solid transparent;
   border-radius: var(--ht-radius-sm);
   background: transparent;
@@ -365,13 +380,40 @@
   align-items: center;
   justify-content: center;
   gap: var(--ht-space-1);
-  block-size: var(--ht-size-badge-dot);
+  /*
+   * 🔴 `min-block-size` 而不是 `block-size`：这一槽现在住的**不止那颗点** ——
+   * W6 的「休 / 班」与它同一行（一颗点在 27px 宽的一格里再单独占一行，
+   * 会把格子撑出 `aspect-ratio` 那条老路，见上面 `.ht-sidebar__day` 的记录）。
+   * 固定 8px 会把 13.75px 高的字切成一半，所以给它**下限**而不是定值。
+   */
+  min-block-size: var(--ht-size-badge-dot);
 }
 
 .ht-sidebar__day-dots > i {
   inline-size: var(--ht-size-badge-dot);
   block-size: var(--ht-size-badge-dot);
   border-radius: var(--ht-radius-full);
+}
+
+/*
+ * 迷你月历里的「休 / 班」（W4b 的公共事实，W6 补齐侧栏这一半 ——
+ * 原先只有主区月历画，侧栏那颗点说"这天有没有事"，却不说"这天是不是班"）。
+ *
+ * 🔴 用哪一个颜色**不在这里判**：class 尾巴就是共享层 `calendarDayMarkerView`
+ *    返回的那个 token 名（`color.success-strong` → `--success-strong`）。
+ *    这里再判一次"休该是绿的"，就是同一格两份裁决。
+ */
+.ht-sidebar__day-marker {
+  font-size: var(--ht-font-size-2xs);
+  line-height: var(--ht-line-height-tight);
+}
+
+.ht-sidebar__day-marker--success-strong {
+  color: var(--ht-color-success-strong);
+}
+
+.ht-sidebar__day-marker--warning-strong {
+  color: var(--ht-color-warning-strong);
 }
 
 /* 今天：列头与数字同色（主蓝），圈出一层边 —— 与主区月历同一条表达。 */

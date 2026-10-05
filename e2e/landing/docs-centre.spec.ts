@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { waitHeadRevealed } from './head-reveal';
+
 /**
  * 文档中心 —— 真浏览器验收（帮助中心的两层深度）
  * =================================================
@@ -106,32 +108,8 @@ function expectCleanConsole(hits: Hit[]): void {
   ).toEqual([]);
 }
 
-/**
- * 🔴 等页头那一次"遮罩揭示"**真的落位**，再截图。
- *
- * 页头的标题走 `.lp-mask { overflow: hidden }` + 内层 `translateY(112%) → 0%`，
- * 引言再错峰淡入。动画没跑完时，**页头在截图里就是一条空白带** ——
- * 第一轮六张图里有四张是这样（暗色那张甚至拍到标题被横切一半）。
- *
- * 那不是产品缺陷，但它是**不能用的证据**：§6.2 规定一要的是"访客看到的画面"，
- * 而对着这张图去查就会去修一个不存在的问题。
- * 这仍是 §7 第 83 条那一族 —— 探针观测的时刻本身就是判据的一部分。
- */
-async function waitHeadRevealed(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
-    const h1 = document.querySelector<HTMLElement>('.lp-h1');
-    const inner = h1?.querySelector<HTMLElement>('.lp-mask__inner') ?? null;
-    const lede = document.querySelector<HTMLElement>('.lp-lede');
-    if (h1 === null || inner === null || lede === null) return false;
-    const box = h1.getBoundingClientRect();
-    const innerBox = inner.getBoundingClientRect();
-    return (
-      box.height > 0 &&
-      Math.abs(innerBox.top - box.top) < 2 &&
-      getComputedStyle(lede).opacity === '1'
-    );
-  });
-}
+// `waitHeadRevealed` 已抽到 `./head-reveal.ts` 做**唯一事实源**（`/platforms` 那条
+// 判据撞上了同一个失效形态，不该再抄第二份）。
 
 /** 去掉前导 `/`、结尾 `/` 与语言前缀，取最后一段 —— 也就是文章 id。 */
 function articleIdOf(href: string): string {

@@ -18,6 +18,11 @@ services:
       dockerfile: server/Dockerfile
       args:
         VCS_REF: ${SUPERSYNC_BUILD_SHA:-local}
+        # 基础镜像。默认与不带这个参数时逐字一致（`node:24-alpine`）；在连不上
+        # docker.io 的主机上用 NODE_IMAGE 覆盖成自己拉得到的源，否则构建会死在
+        # `load metadata`（一条 Dockerfile 指令都还没跑，所以也没有"哪层错了"的线索）。
+        # Dockerfile 文件头有实测错误原文。
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-alpine}
         # Alpine 仓库源。默认官方 CDN（与不带这个参数的行为一致）；
         # 在连不上 dl-cdn.alpinelinux.org 的主机上用 APK_MIRROR 覆盖，
         # 否则 `apk add` 会**无声挂住**（Dockerfile 里有说明）。

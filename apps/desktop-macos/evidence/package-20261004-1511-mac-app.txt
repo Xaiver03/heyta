@@ -1,0 +1,37 @@
+package-20261004-1511-mac-app.png / .webview.png 的自述
+====================================================
+
+它是什么
+  倒数纪念日批次二 Goal 第③条（W8 原生壳那半）与第⑤条第 3 项（界面结论截图且人看过）的证据：
+  **从当前提交打出来的 macOS .app，自己启动、自己截的那一屏**。
+
+怎么来的（可复跑）
+  HEYTA_SKIP_NOTARIZE=1 bash apps/desktop-macos/scripts/package-app.sh /tmp/heyta-macos-dist-b2
+  载体 = 分支 feat/countdown-batch2 @ 117386a1（链 W，日志 /tmp/device-closeout-W.log，RC_MAC_PACKAGE=0）
+  图由 package-app.sh 第 ④ 步产生：HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE=<OUT_DIR>/packaged-first-run.png
+  本目录这两枚是 15:50 从那个 OUT_DIR 复制进来的（/tmp 是临时目录，不复制就会像 W5-G1 那样把"人已看过"留在会消失的地方）。
+
+两张图的分工（这条是关键，别只留一张）
+  .png          13013 B  md5 ae28c2f6295debb5d8f8444ed1e2f5cb  —— **窗口级截图，画面是空的**（只有三颗交通灯）。
+                        package-app.sh:232-242 把内容判据压在 WebView 快照上，并在 :242 显式打出
+                        "窗口截图本身是空的 —— 本机常态：WebView 内容没合成进窗口，不据此判红"。
+                        留它是为了让下一个人看见"窗口图为空"与"WebView 有内容"在同一次运行里同时成立。
+  .webview.png 155563 B  md5 d674c88722d81b56f684c57d451ede24  —— **内容判据的载体**：
+                        窗口 1092x723、内容占比按脚本打的读数、主蓝采样命中 **1269**（阈值 20）。
+
+人看见了什么（不是脚本打的，是 15:2x 逐张打开看过之后写的）
+  · 左 rail 九项：头像 / 任务 / 收件箱(激活，主蓝) / 日历 / 习惯 / 四象限 / 统计 / 搜索 / 回收站，底部铃铛与帮助；
+  · 主区标题「收集箱」，顶栏「未同步」chip + 刷新 + 设置 + 中文·English 两颗 + 深色切换；
+  · 中间浮着**首启那张同意卡**「在使用联网功能之前」：正文三点、
+    「服务条款 / 隐私政策」两个链接、**同意并联网**（主蓝实心）与「只用本机」（文字钮）；
+  · 弹窗背后可见「AI 工具调用」卡、「四象限」四行各带一颗色点、「清单」「标签」两处空态；中文零豆腐块。
+
+这一对图**证明到哪一步为止**
+  ✅ 装进 .app 的 `Contents/Resources/web-dist` 是这一批的产物（同趟对账：包内 index.html sha 与本机
+     apps/web/dist 逐字相同 517c6ba76d00；assets 集合 包内 9 / 本机 9 / 差异行 0）；
+  ✅ 那个包里的共享 UI 在 macOS 壳里渲染出来了，且第一屏就是同意卡；
+  ❌ **不**证明"屏幕上那个窗口真有内容"（窗口图为空，见上）；
+  ❌ **不**证明"这个包已通过公证"（这一趟带 HEYTA_SKIP_NOTARIZE=1）；
+  ❌ **不**证明"倒数日那一屏在装出来的包里"——那一件由上面那条 sha 逐字相同 +
+     `node scripts/check-shell-surfaces.mjs`（经 HEYTA_MACOS_WEB_DIST 指到包内那份）打出的
+     「判定 5 格：5 绿 / 0 红；未取证 0 栏」共同证明。

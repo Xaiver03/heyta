@@ -2,6 +2,7 @@
   "name": "@heyta/shared-schema",
   "version": "1.0.0",
   "description": "heyta 实体清单、schema 版本策略与 SuperSync HTTP 契约（基于 Super Productivity 的 shared-schema 改造）",
+  "license": "MIT",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",

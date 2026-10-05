@@ -33,15 +33,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import {
-  focusStatsForDay,
-  type FocusSession,
-  type FocusSessionKind,
-  type Task,
-} from '@heyta/domain';
+import { type FocusSessionKind, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
-import { createFocusActions, createTaskActions, type AppHost } from '@heyta/app-host';
+import { createTaskActions, focusOverview, type AppHost } from '@heyta/app-host';
 
 import { useText, useTokens } from '../theme';
 import { Button, Card, Chip, Screen, SectionHeader, Text } from '../ui/kit';
@@ -166,7 +161,6 @@ export function FocusScreen(): React.JSX.Element {
   const { state } = timer;
 
   const [host, setHost] = useState<AppHost | null>(null);
-  const [sessions, setSessions] = useState<FocusSession[]>([]);
   /** 全部未删除任务 —— 用来**显示**已关联任务的名字。 */
   const [tasks, setTasks] = useState<Task[]>([]);
   /** 未完成任务 —— 只用它填选择列表。 */
@@ -193,7 +187,6 @@ export function FocusScreen(): React.JSX.Element {
     if (host === null) return;
     // 三个都是**同步**读物化状态（不是 Promise）。
     const taskActions = createTaskActions(host);
-    setSessions(createFocusActions(host).listSessions());
     setTasks(taskActions.listTasks());
     setPendingTasks(taskActions.listPendingTasks());
   }, [host]);
@@ -206,9 +199,23 @@ export function FocusScreen(): React.JSX.Element {
     // 本屏同样需要看见（与任务屏/日历屏同一种毛病，见 `sync/store.ts`）。
   }, [refresh, timer.savedAt, dataRevision]);
 
-  const stats = useMemo(
-    () => focusStatsForDay(sessions, timer.now),
-    [sessions, timer.now],
+  /*
+   * 🔴 工单 W7 判据 ③：这一屏的"今日专注时长 / 今日番茄"与 web 那一栏
+   * **必须来自同一个出口** —— 所以这里调 `focusOverview`，不再自己
+   * `focusStatsForDay(本地快照, now)`。
+   *
+   * 原来那一份是"同一个口径写两遍"的形状：本屏自己 `listSessions()` 存一份
+   * state、再自己汇总，而 web 的 store 里还有另一份同样的推导。两端口径一旦
+   * 分叉，症状是"手机说今天 4 个番茄、网页说 3 个"，且没有任何一层报错
+   * （AGENTS §3.5）。现在两端都只剩一次转调。
+   *
+   * ⚠️ 依赖里 `dataRevision` 与 `timer.savedAt` 都在：前者让"别的设备同步下来的
+   * 记录"进得来，后者让"刚落盘的那一轮"立刻可见 —— 少了任何一个，
+   * 数字会停在旧值上，看起来像记录没保存。
+   */
+  const overview = useMemo(
+    () => (host === null ? null : focusOverview(host, timer.now)),
+    [host, timer.now, timer.savedAt, dataRevision],
   );
 
   /**
@@ -333,23 +340,25 @@ export function FocusScreen(): React.JSX.Element {
       </Card>
 
       <SectionHeader icon="focus.stats" title={t('mobile.common.today')} />
-      <Card>
-        <StatRow
-          label={t('mobile.focus.stats.completed')}
-          value={t('mobile.focus.stats.completedValue', { count: stats.completedWorkCount })}
-        />
-        <StatRow
-          label={t('mobile.focus.stats.focusDuration')}
-          value={formatFocusDurationText(stats.focusMs, t)}
-        />
-        {/* 放弃次数只在真的发生过时才显示 —— 一行常年的「0 次」不传达任何信息。 */}
-        {stats.abortedWorkCount > 0 ? (
+      {overview === null ? null : (
+        <Card>
           <StatRow
-            label={t('mobile.focus.stats.aborted')}
-            value={t('mobile.focus.stats.abortedValue', { count: stats.abortedWorkCount })}
+            label={t('mobile.focus.stats.completed')}
+            value={t('mobile.focus.stats.completedValue', { count: overview.todayCount })}
           />
-        ) : null}
-      </Card>
+          <StatRow
+            label={t('mobile.focus.stats.focusDuration')}
+            value={formatFocusDurationText(overview.todayFocusMs, t)}
+          />
+          {/* 放弃次数只在真的发生过时才显示 —— 一行常年的「0 次」不传达任何信息。 */}
+          {overview.todayAbortedCount > 0 ? (
+            <StatRow
+              label={t('mobile.focus.stats.aborted')}
+              value={t('mobile.focus.stats.abortedValue', { count: overview.todayAbortedCount })}
+            />
+          ) : null}
+        </Card>
+      )}
     </Screen>
   );
 }

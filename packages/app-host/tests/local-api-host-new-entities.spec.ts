@@ -393,7 +393,7 @@ describe('HABIT_LOG：打卡落的是记录，同一天不产生第二条', () =
     expect(logs).toEqual([{ habitId, date: day, value: 8 }]);
   });
 
-  it('🔴 同一天再打一次：仍是 `ok: true`，而 op **仍然只有一条**（幂等成功，不是失败）', async () => {
+  it('🔴 同一天再打一次：仍是 `ok: true` 且**记录只有一条**，幂等挡的是"没有变化"', async () => {
     const host = makeHost();
     const habitId = await newHabit('冥想');
 
@@ -401,15 +401,26 @@ describe('HABIT_LOG：打卡落的是记录，同一天不产生第二条', () =
     if (!first.ok) throw new Error(`第一次打卡该成功：${first.message}`);
     const logId = first.entityId;
 
+    // 同一天**同一个量** ⇒ 幂等成功，一条 op 都不许多写（ADR-0009 那一族）。
+    const same = await host.submit({ action: 'record-checkin', habitId, date: '2024-03-01', value: 1 });
+    if (!same.ok) throw new Error(`同一天同一个量该幂等成功，却回了两条里的失败分支：${same.message}`);
+    expect(same.entityId).toBe(logId);
+    expect(await opsOf('HABIT_LOG', logId ?? '')).toHaveLength(1);
+
+    // 同一天**另一个量** ⇒ 改当日那条的量，仍然不多出一条记录。
+    // ⚠️ 这一句是合并时改写的：原来这里断的是"第二次的 value 没落进去"，
+    // 因为当时 `checkIn` 遇到已有记录一律 return false —— 那是**能力缺失**（界面上改不了当日的量），
+    // 不是这条用例要守的承诺。它守的是"标识 = (习惯, 日期)、重复调用不会多出第二条"，
+    // 而详情面 W6 之后那个承诺依然成立，op 数从 1 变 2 是改量应有的形状。
     const second = await host.submit({ action: 'record-checkin', habitId, date: '2024-03-01', value: 5 });
     expect(second.ok).toBe(true);
-    if (!second.ok) return;
-    // 同一个实体 id：打卡的标识是 (习惯, 日期)，重复调用不会多出一条记录。
+    // 🔴 这里原先写的是 `if (!second.ok) return;` —— 一条**静默跳过**的守卫：submit 失败时
+    // 后面四条断言一条都不跑，用例照样绿。改成抛，失败才会被看见。
+    if (!second.ok) throw new Error(`改当日的量该成功：${second.message}`);
     expect(second.entityId).toBe(logId);
-    expect(await opsOf('HABIT_LOG', logId ?? '')).toHaveLength(1);
-    // 第二次那个 value 也没落进去（`checkIn` 早就 return false 了）。
     expect(await host.listHabitLogs(habitId, 10)).toHaveLength(1);
-    expect((await host.listHabitLogs(habitId, 10))[0]?.value).toBe(1);
+    expect((await host.listHabitLogs(habitId, 10))[0]?.value).toBe(5);
+    expect(await opsOf('HABIT_LOG', logId ?? '')).toHaveLength(2);
   });
 
   it('不同日期各一条（幂等只挡同一天，不许把整个习惯锁住）', async () => {

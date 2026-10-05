@@ -35,7 +35,18 @@
  3. 两个 target 都开 App Group 能力，bundle id 改成 `com.heyta.mobile[.WidgetExtension]`。
  */
 
-@interface RCT_EXTERN_MODULE(HeytaWidgetModule, NSObject)
+/*
+ * 🔴 必须是 `REMAP`，不能是 `RCT_EXTERN_MODULE`。
+ *
+ * `RCT_EXTERN_MODULE(HeytaWidgetModule, …)` 把 **JS 侧的名字**也定成了
+ * `HeytaWidgetModule`，而 `widget-bridge.ts` 取的是 `NativeModules.HeytaWidget` ——
+ * 于是那个属性恒为 `undefined`，而 JS 把"模块不存在"降级成"这台设备没有小组件支持"，
+ * 症状是**静默失效**（仅一条 warn）。Swift 的 `moduleName()` 也救不了：
+ * `RCT_EXTERN_MODULE` 生成的 `+moduleName` 分类会盖掉 Swift 那一版。
+ * `REMAP(js_name, objc_class, parent)` 才是"类名与 JS 名分开"的那条通道
+ * （与 `HeytaReminderModuleBridge.m` 同一个修法，见计划 W7-G8）。
+ */
+@interface RCT_EXTERN_REMAP_MODULE(HeytaWidget, HeytaWidgetModule, NSObject)
 
 RCT_EXTERN_METHOD(setWidgetSnapshot:(NSString *)envelopeJson
                   resolve:(RCTPromiseResolveBlock)resolve

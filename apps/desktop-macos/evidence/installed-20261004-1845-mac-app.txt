@@ -1,0 +1,54 @@
+installed-20261004-1845-mac-app.png / .webview.png 的自述
+========================================================
+
+它是什么
+  倒数纪念日批次二 Goal 第⑤条第 4 项（`pnpm reinstall:all` 四端装上当前产物）里 **macOS 那一格**的证据，
+  同时也是第⑤条第 3 项（界面结论截图且人看过）在 mac 端的补上：**装进 `/Applications/Heyta.app` 的那一枚，
+  自己启动、自己截的那一屏**。与同目录 `package-20261004-1511-mac-app.*` 的分工是：
+  那一对证的是"**打出来的包里有这一屏**"（链 W，产物落在私有 OUT_DIR），
+  这一对证的是"**装到共享位置的那一枚也是这一屏**"（链 MAC，`/Applications`）。
+
+怎么来的（可复跑）
+  HEYTA_SKIP_NOTARIZE=1 bash scripts/reinstall-all.sh --only mac
+  载体 = 分支 feat/countdown-batch2 @ de93cd2a（链 MAC，日志 /tmp/chain-MAC.log + /tmp/chain-MAC-run.txt +
+        /tmp/heyta-reinstall-mac.log，**RC_MAC=0**，起跑 18:44:44 负载 10.60，收口 18:45:48）
+  图由安装副本自截屏产生：HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE=/tmp/heyta-reinstall-mac-installed.png
+  这两枚是 18:50 从 /tmp 复制进本目录的 —— /tmp 会漂，"人已看过"不能留在会消失的地方（W5-G1 那次的教训）。
+
+两张图的分工（这条是关键，别只留一张）
+  .png          13913 B  md5 29ebfeb690c0ee87e569d65d005fd846  —— **窗口级截图**，
+                        本机常态下 WebView 内容没合成进窗口，所以它**不是**内容判据的载体。
+                        `package-app.sh:232-242` 把内容判据压在 WebView 快照上，并显式声明窗口图为空"不据此判红"。
+  .webview.png 151075 B  md5 e22b2c6a44ebed441c4a99abbd36340d  —— **内容判据的载体**，
+                        脚本同一趟打的读数：窗口 1092x723、内容占比 100.0%、**主蓝采样命中 1266**（阈值 20）。
+                        复跑（这条是 18:53 现跑验证过的形状；png-stats 是**模块不是 CLI**，
+                        直接 `node png-stats.mjs <file>` 会**静默无输出** —— 我第一版就把这条写错了）：
+                          node --input-type=module -e "import('./scripts/screenshots/png-stats.mjs').then(m=>{const p='apps/desktop-macos/evidence/installed-20261004-1845-mac-app.webview.png';const st=m.inspectPng(p);console.log(st.width+'x'+st.height, m.countBrandBlue(p), m.looksBlank(st));})"
+                          → 1092x723 1266 false
+                        🔴 **那 1266 全部来自暗色板**：同一枚图 `countColor(p, HEYTA_BLUE)`（亮色主蓝 #2563EB）= **0**，
+                        `countColor(p, HEYTA_BLUE_DARK)`（#60A5FA）= **1266**。判据用的是 `countBrandBlue`
+                        （= 两档相加，`png-stats.mjs:399-401`），所以它在暗色外观下仍然成立；
+                        但**谁要单拿亮色那一档去复现，一定会得到 0 并误判"这张图是假的"** —— 这台机器的系统外观是暗色。
+
+人看见了什么（不是脚本打的，是 18:4x 打开 `.webview.png` 逐处看过之后写的）
+  · **暗色外观**下的一屏 —— 这台机器的系统外观是暗色，壳跟着系统走。
+    ⚠️ 这句要说清以免被读成"暗色已验收"：**这是被动满足的，不是我们主动切的**（§5 那条要求的是主动切换查看）。
+  · 左 rail：头像 / 收集箱（激活，主蓝）/ 今天 / 最近 7 天 / 已完成 / 四象限四条各带一颗色点 / 清单 / 标签，底部铃铛与帮助；
+  · 主区页标题「收集箱」，顶栏「未同步」chip + 刷新 + 设置 + 中文·English 两颗（中文那颗是主蓝实心）+ 深色切换；
+  · 中央浮层是**首启那张同意卡**「在使用联网功能之前」：正文三点（含"只发端到端加密之后的密文与同步游标 —— 服务器看不到你的明文"）、
+    「服务条款 / 隐私政策」两个链接、**「同意并联网」（主蓝实心钮）**与「只用本机」（次级钮）；
+  · 弹窗背后可见「AI 工具调用」一节与输入框、右上「添加」钮；**中文零豆腐块**。
+  · **没有**看到倒数日那一屏 —— 见下面"证明到哪一步为止"。
+
+这一对图**证明到哪一步为止**
+  ✅ 装进 `/Applications/Heyta.app` 的那一枚，其 `Contents/Resources/web-dist` 与本机 `apps/web/dist` 是**同一次构建**
+     （同一趟对账：包内 `index.html` sha256 前缀 `517c6ba76d00fb25` == 本机 dist == `/tmp/heyta-macos-dist` 那份，
+      assets 集合 **9 个 chunk** 逐字相同）；
+  ✅ 那个包里的共享 UI 在 macOS 壳里**渲染出来了**，第一屏是同意卡，且带设计系统主蓝；
+  ✅ 顺带把 Goal 第③条那格的读数升级了：**裸跑** `node scripts/check-shell-surfaces.mjs` 现在打
+     「判定 5 格：5 绿 / 0 红；**未取证 0 栏**」（18:48 现量，`rc=0`）——
+     之前那一格要靠 `HEYTA_MACOS_WEB_DIST` 覆盖才成立（原因与量法在 `docs/plans/countdown-anniversary.md` §8.4 的 ㊣ 与 ㊦）；
+  ❌ **不**证明"屏幕上那个窗口真有内容"（窗口图为空，见上）；
+  ❌ **不**证明"这个包已通过公证"（这一趟带 `HEYTA_SKIP_NOTARIZE=1`，去掉的是没有上界的等待，不是判据）；
+  ❌ **不**证明"倒数日那一屏在装出来的包里"——那一件由上面那条 sha 逐字相同 + 裸跑那 0 栏共同证明，
+     不由这张图证明（与 Android / windows 那两格同一条边界，不混着说）。
