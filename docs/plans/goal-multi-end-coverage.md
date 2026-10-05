@@ -3163,7 +3163,57 @@ CHECK_SEGMENTS_TOTAL=85      ← 现量（01:15 那趟是 84；分母是活的�
 `check:docs` 恰好是最容易被"别人对文档措辞的修订"改变的一段。⇒ 要么 ② 之前再对齐一次载体并重跑构建（贵），
 要么**如实把"可过段数"钉在载体 sha 上并附这条年龄说明**（本条选后者，因为读数钉的是 `7911ad02`，不是当前 main）。
 
-第 5 步（逐段单跑，给"可过段数"）此刻仍在跑，`可过段数 = n/85` 未打印 ⇒ **本条不主张跑满**。
+**第 5 步（逐段单跑）20:33 跑完了，装置打印（同一枚 `checks.log`）**：
+
+```
+逐段实测：通过 83 / 失败 2 / 跳过 0 / 计数合计 85（总数应为 85）
+CARRIER_SHA_AT_END=7911ad02c80d3741ee7117f20c09ab93e684595a
+```
+
+⇒ ② 的"可过段数"这句话现在是**两条**，一条都不能替另一条：
+
+| 那一问 | 由哪一步回答 | 读数 |
+|---|---|---|
+| 整条 `pnpm check` 链 exit 0 吗 | 第 4 步（`&&` 串，有短路） | ❌ `CHECK_EXIT=1`（断在段 42） |
+| 每一段在自己的读数下过不过 | 第 5 步（逐段单跑，无短路） | ✅ **83/85 过**，分母 `85` 与 `计数合计 85` 对得上（跳过 0 枚，`FULL_CHECK_SKIPPED` 未置 ⇒ 第 4 步真跑了） |
+
+**两枚红的性质不同，必须分开写**：
+
+- **段 42 `check:docs`** —— 载体年龄（上面那条归因）。20:27 又补了一次**带分母的否证**：
+  `git grep -ohE 'AGENTS\.md §[0-9]+…' main -- docs` 现量 main 上这类引用共 **15 种取值**，全部落在 AGENTS.md
+  真实存在的章节集合内，**没有那一枚** ⇒ "断点在 main 上已经不存在"不再是"我看了一行"。
+- **段 85 `pnpm -r test`** —— 这一枚在**锁空的时候重跑过，仍然红**，而且红的是 `apps/mobile` 的 vitest：
+  20:31 那一趟是 `packages/sync-core` 的内存闸门拒绝启动（`已有测试在跑（pid=51036，锁 /tmp/tfa-test.lock；
+  它是：bash tmp-rf-e2e-wait.sh）`，那枚锁属于**另一条线**的有界等待器，它 20:34 已 `3 passed / RC_E2E_REFUNDS=0`）；
+  `pnpm -r` 默认在**第一枚失败**处停，所以那一趟根本没走到 apps/mobile。
+  20:35 补跑器 `~/.heyta-window-rigs/heyta-seg85-clean-rerun.sh`（有界 60 轮 × 20 秒，等锁 + 负载 >12 不抢，
+  **没有**用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕）在 20:36:27 量到锁空、load=11.65 起跑，24 秒后
+  `SEG85_RC=1`，失败面是 `apps/mobile test: Failed` / `[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @heyta/mobile@0.0.0 test: vitest run`，
+  读数量出来是 **5 枚未处理拒绝**：`RolldownError: Parse failure … Flow is not supported`，
+  文件是 `react-native/index.js:1:0`，而 vitest 标注的来源是 `tests/auth-flow.spec.ts`
+  （另有 `[prefs] 设备本地偏好库不可用 … Cannot find module '…/op-sqlite/node/dist/database'`，
+  那是**被 catch 的告警路径**，同一条 `node/dist/database.js` 在两棵树里都现量存在 ⇒ 不是那一枚失败）。
+  🔴 **已排掉的两种解释**（都是现量，不是推断）：
+  ① **不是 ① 造成的** —— ① 只重装安装包，不改源码；
+  ② **不是"载体落后 17 笔"能解释的** —— `git diff --name-only 7911ad02..main -- pnpm-lock.yaml package.json apps/mobile`
+  输出**为空**，而两棵树 `.pnpm` 里装出来的 `vite@7.3.6_* / vite@8.3.1_*` 目录名**逐字相同** ⇒ 依赖形状一致。
+  ⚠️ **还剩一种没排掉**：它可能是那 17 笔里 `packages/*` 带进来的（那样当前 main 也会红）。
+  判它要在**干净树上跑 main**，而主检出此刻正被另一条线占着（`apps/mobile/src/db/open-host.ts`、
+  `AccountClosureScreen.tsx` 等 8 枚 `M`/`A`）—— 在那儿跑出来的读数**不属于任何一枚提交**，所以不去跑。
+  ⇒ 段 85 这一格登记为**待归属**（不写成产品缺陷、也不写成环境缺陷），证据 `~/.heyta-evidence/seg85-clean-1005-203507/`。
+
+**归档补收（同一族缺陷的第二处，见台账 20:3x 第 1 节）**：第 5 步那张逐段表与 85 枚单段日志原先**只住 /tmp**。
+20:35 已 `cp -p` 收进 `~/.heyta-evidence/checks-queued-1005-201130/`（`check-seg-by-seg.log`、`check-segments.txt`、
+`seg-logs/`）。⚠️ 收的过程中现量到一条新坑：**第一遍 `cp` 没带 `-p`，把归档里 98 枚的 mtime 全刷成当下**，
+于是"按 mtime 筛出属于这一趟的那些"当场得到 `98/98 全命中` 这种假读数 ——
+`/tmp` 里本来混着上一趟（12:01）的 `seg-check_*.log`/`seg-entries.log` 与 00:54 的 `seg-84-fail.log`。
+重拷带 `-p` 之后按 20:11:00 那把刀分：**留 88 / 丢 10**，而 `88 = 85 枚编号 + 3 枚第 3 步具名`（分母自己加得回来）。
+⇒ 取证归档必须 `cp -p`，否则丢掉的不是"整齐"，是**这批文件属于哪一趟**这个唯一可判别属性。
+
+⚠️ **③ 与 ① 的读数年龄关系（不写明就会被读成"当前产物仍然绿"）**：③ 那趟 37 项全绿钉的是载体 `423bed1a`
+（03:20 的读数，见 `~/.heyta-evidence/notes-evidence-423bed1a-1005-032056-j/`），而 ① 在 **20:07 用 `7911ad02` 重装了四端**
+⇒ ③ 绿的是"那时候装在设备上的那份产物"。③ 的**验收范围**（第 6/7 步 op 判据、第 8 步第三张截图、第 9–11 步跨设备三条腿）
+在那趟已逐项补齐 —— 这不是没做完，是读数年龄；要把"① 之后设备上的当前产物仍然绿"这句话说出口，只有一条路：在 ① 之后重跑 ③。
 
 🔴 **§7.30c 留给"下一次安静窗口"的那条待确认，就在这趟里闭合了**：`tests/list-folder.spec.ts:102:1` 那条
 `✓ … 清单移入文件夹：入口常驻、跨刷新还在、非法目标不给点 (3.4s)`，且整段 `SEG ai-e2e rc=0 / 162 passed / failed 为空`。
