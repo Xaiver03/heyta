@@ -21,11 +21,14 @@
  * 用法：node scripts/mutate-egress-wording.mjs —— 非零退出 = 有臂存活。
  * ⚠️ 它会临时改工作树并临时往 `scripts/` 放一份门禁副本，所以**不要并行跑别的门禁**；
  *    每一臂在 `finally` 里还原，结束时再逐路径核对 sha256 —— 变异运行不许留下字节。
+ *    🔴 `finally` 只挡得住异常，挡不住信号：被 SIGTERM 打断留下的残留由**下一次启动**按归属标记
+ *    收掉（见下面 MUTATED_ZH_LINE / PROBE_MARKER 那一段）。这里不挂信号处理器 —— 同步脚本里
+ *    `process.on('SIGTERM')` 的回调轮不到执行，注册反而把默认可杀行为取消掉（traps #287）。
  */
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,6 +37,9 @@ const GATE = 'scripts/check-ui-language.mjs';
 const ZH = 'packages/i18n/src/locales/zh-CN.ts';
 const PROBE_SRC = 'packages/app-host/src/__mutate_egress_probe.ts';
 const COPY_GATE = 'scripts/__mutate_egress_probe.gate.mjs';
+
+/** 归属标记：探针文件的第一行就声明自己是谁造的，收尸时只认带这行的字节。 */
+const PROBE_MARKER = '本文件由 scripts/mutate-egress-wording.mjs 创建并删除';
 
 /** 只认规则 7 自己那行；别人的红（硬编码、漏翻译）不参与判定。 */
 const MARK = '监管定性「数据出境」';
@@ -63,7 +69,17 @@ function sha(rel) {
  */
 function hits(script) {
   const r = spawnSync(process.execPath, [join(ROOT, script)], { encoding: 'utf8', cwd: ROOT });
-  const lines = `${String(r.stdout ?? '')}${String(r.stderr ?? '')}`.split('\n');
+  const out = `${String(r.stdout ?? '')}${String(r.stderr ?? '')}`;
+  const lines = out.split('\n');
+  // 🔴 三个出口，不许合成两个：没跑到 / 跑到且红 / 跑到且绿。
+  // "门禁崩了"和"一条违规都没有"在 `found.length === 0` 上逐字同形 ——
+  // 实测：往副本前面插一行注释把 shebang 顶到第 2 行，`node` 报 SyntaxError，
+  // M3 于是读出"命中 0 处 ⇒ 存活"，响的是臂自己坏了，不是判据没牙。
+  if (!/文案合规|处不合规/.test(out)) {
+    throw new Error(
+      `${script} 没跑到结论行（退出码 ${String(r.status)}）—— 这不算"0 处违规"：\n${out.slice(0, 1500)}`,
+    );
+  }
   const found = [];
   let where = '<unknown>';
   for (const line of lines) {
@@ -76,7 +92,55 @@ function hits(script) {
   return found;
 }
 
+/**
+ * 🔴 与 `mutate-op-log-semantics.mjs` 同一族：`finally` 挡不住信号，而 `process.on('SIGTERM')`
+ * 在**全程同步**的脚本里同样挡不住 —— 它从不回到事件循环，回调要等整趟跑完才有机会执行，
+ * 而注册本身把默认的"可被杀"取消了（实测 2026-10-05：变异窗口里发 SIGTERM ⇒ 进程没停、
+ * 9 条场景全跑完、RC=0；见 traps #287）。所以这里**不设信号处理器**，只保证一件事：
+ * **下一次启动能把上一轮的尸收掉**。
+ *
+ * 被信号打断会留下三样之一：zh-CN.ts 的被补丁字节、
+ * `packages/app-host/src/__mutate_egress_probe.ts`、`scripts/__mutate_egress_probe.gate.mjs`。
+ * 归属怎么证：探针文件的第一行写着"由本脚本创建并删除"，zh 的补丁态是 M1 那串独有的字面量 ——
+ * 带着这些标记才动手，不带就是别人的文件，拒绝。
+ *
+ * ⚠️ 收尸必须排在取基线**之前**：文末那条 sha256 对账比的是"开跑时的字节"，
+ * 基线若在残留态上取，清掉残留反而会被报成"留下了字节"。
+ */
+const MUTATED_ZH_LINE = "'web.ai.settings.granted': '已授权数据出境',";
+
+function sweepProbes(notes) {
+  for (const rel of [PROBE_SRC, COPY_GATE]) {
+    const path = join(ROOT, rel);
+    if (!existsSync(path)) continue;
+    // 这两条路径 M2/M3 要往里写，所以"存在但不是本脚本造的"必须**拒绝开跑**，
+    // 不能只"没删它"然后下一步把别人的文件覆盖掉。
+    if (!readFileSync(path, 'utf8').includes(PROBE_MARKER)) {
+      throw new Error(
+        `${rel} 已存在但不含归属标记 —— 那不是残留，是别人的文件，而本脚本要往这个路径写。拒绝开跑。`,
+      );
+    }
+    rmSync(path, { force: true });
+    notes.push(`已清掉 ${rel}`);
+  }
+}
+
+{
+  const notes = [];
+  sweepProbes(notes);
+  if (readFileSync(join(ROOT, ZH), 'utf8').includes(MUTATED_ZH_LINE)) {
+    throw new Error(
+      `${ZH} 停在上一轮 M1 的补丁态（那串字面量只有本脚本会写）—— 本轮拒绝开跑。\n` +
+        `  现量：git diff -- ${ZH}\n` +
+        `  还原：git checkout -- ${ZH}\n` +
+        `  （探针残留已顺手收掉：${notes.join('；') || '无'}）`,
+    );
+  }
+  if (notes.length > 0) console.log(`⚠️  ${notes.join('；')}`);
+}
+
 const baseline = new Map([GATE, ZH, PROBE_SRC, COPY_GATE].map((rel) => [rel, sha(rel)]));
+
 
 let failed = false;
 function arm(name, found, verdict) {
@@ -100,7 +164,7 @@ arm('对照（不打补丁）', hits(GATE), (n) => n === 0);
   const from = "'web.ai.settings.granted': '已批准内容离开本机',";
   if (!original.includes(from)) throw new Error('M1 的落点那行不在了 —— 词条变了，这条臂要跟着改');
   try {
-    writeFileSync(path, original.replace(from, "'web.ai.settings.granted': '已授权数据出境',"));
+    writeFileSync(path, original.replace(from, MUTATED_ZH_LINE));
     arm(
       'M1 中文词条的值写成「数据出境」',
       hits(GATE),
@@ -117,7 +181,7 @@ arm('对照（不打补丁）', hits(GATE), (n) => n === 0);
   try {
     writeFileSync(
       path,
-      '// 变异探针（本文件由 scripts/mutate-egress-wording.mjs 创建并删除）\n' +
+      `// 变异探针（${PROBE_MARKER}）\n` +
         "export const PROBE = '该功能需要你先授权数据出境。';\n",
     );
     arm(
@@ -136,7 +200,13 @@ arm('对照（不打补丁）', hits(GATE), (n) => n === 0);
   const patched = src.replace('const REGULATORY_EXEMPT = [', 'const REGULATORY_EXEMPT = []; const _EXEMPT_ORIGINAL = [');
   if (patched === src) throw new Error('M3 没能定位到豁免清单 —— 规则 7 的形状变了，这条臂要跟着改');
   try {
-    writeFileSync(join(ROOT, COPY_GATE), patched);
+    // 归属标记必须排在 shebang **之后**：shebang 只在第 1 行才合法，
+    // 把它顶到第 2 行 = 副本 SyntaxError = 这条臂读起来像"命中 0 处"（实测踩过，见 hits() 注释）。
+    const firstBreak = patched.indexOf('\n');
+    const body = patched.startsWith('#!')
+      ? `${patched.slice(0, firstBreak + 1)}// 变异探针副本（${PROBE_MARKER}）\n${patched.slice(firstBreak + 1)}`
+      : `// 变异探针副本（${PROBE_MARKER}）\n${patched}`;
+    writeFileSync(join(ROOT, COPY_GATE), body);
     arm('M3 拿掉 packages/legal/src 的豁免', hits(COPY_GATE), (n) => n > 0);
   } finally {
     rmSync(join(ROOT, COPY_GATE), { force: true });
