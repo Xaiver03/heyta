@@ -11540,6 +11540,8 @@ stdout 一个字都没有 —— 也就是说那四条断言每次载体重算�
 而这份文件里住着**日志脱敏那一段**（`request>uri regexp "?REDACTED"`、`Referer delete`）。
 ⇒ 不在落地前为一枚排版警告造 100 行 diff；登记为 **G-69**，判据：真要 fmt 就单独一笔、
 零逻辑改动，且重跑一次"上游不可用时 `docker logs` 里读不到 token"那条脱敏断言。
+🟢 **该"决定不做"已被后续裁决取代**：落地那三格仍要人（§8.217），但 G-69 按它自己写的判据
+单独做掉了，读数与三条装置自红见 **§8.225**。
 
 ### 8.201 G-68 闭合：bundled Caddy 第一次在真栈上被真跑，18 臂 0 红，两条判据各被变异臂打过（2026-10-05 12:5x）
 
@@ -12501,3 +12503,66 @@ W5 停掉 caddy 后：经代理 WS connected=false、直连 WS connected=true
 这不是错话，是**缺信息** —— 那一页的职责它自己写明了（"让你在决定要不要自建**之前**先知道它长什么样"），
 而把五个镜像源旋钮塞进决策页会让它变成另一份手册。
 区别要说清：**缺信息可以选择不补，错话不行**。
+
+### 8.225 G-69 闭合：那枚"永远只打印、不判定"的 fmt 警告变成了一条有牙的判据 —— 而它第一次转红是**被自己造出来的**（2026-10-05 15:4x，负载窗口 9.16）
+
+按 §8.200 给 G-69 写下的判据做单独一笔：`caddy fmt --overwrite` 打给 `server/Caddyfile`，零逻辑改动，
+并重跑"上游不可用时 `docker logs` 里读不到 token"那条脱敏断言。
+
+现量（改动本身）：`65` 行 → `64` 行，sha `cbba19e4…` → `3c651cec…`，`--numstat` 51 增 / 52 删。
+`git diff -w` 里**只剩一处**非缩进变化：注释块与全局块 `{` 之间那枚空行被删掉了 ——
+那正是过去每个 G-68 跑次打印 `not formatted` 的来源。
+
+🔴 **"零逻辑改动"这句不是断言，是一条判据**：`caddy adapt` 编译出的 JSON **前后逐字相同**
+（改前/改后都是 `1208` B、sha `6b33fe033ac2ae0f…`）。而那份 JSON 里数得出
+`reverse_proxy` ×1、`encode` ×3、两条 `?REDACTED` 的 `request>uri` filter、两处 `Referer delete` ——
+也就是说"相同"不是两枚空文件相同。复现：
+`docker run --rm -e DOMAIN=heyta.example.test -v <文件>:/etc/caddy/Caddyfile:ro --network none caddy:2.11-alpine caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile`
+
+平台验收（当前产物）：真栈在 `fd3668c6` 上**真构建**起来（`verify-selfhost-stack.sh --keep` rc=0，
+含 3 条真浏览器判据），排过格式的那份 Caddyfile 由 compose 从宿主**只读挂载**（`docker-compose.yml:284`）
+⇒ 容器读的就是这次改的字节，不需要为重打镜像而绕新鲜度闸。装置跑完 **35 臂 0 红、15 个组都在**：`F 仓库那份 Caddyfile 在 caddy fmt 下是 no-op`（rc=0、2258 B vs 2258 B 逐字一致），
+`变异 unformatted：同一条 fmt 判据必须判出不一致` → **false**（rc=1 且逐字不一致），
+`变异 unformatted：它仍然 validate 通过` → **0** ⇒ **F 量的是 validate 量不到的那一格**，不是它的影子；
+E 与 W4 那两条脱敏臂（HTTP 腿 + WS 腿）在排过格式的文件上照旧各抓到一次泄漏反证。
+🔴 那趟 `--keep` 的三张界面图**人打开看过**（`e2e/selfhost-stack-results/s2-signed-in.png` 已同步 + 头像菜单四条；
+`s3-device-a-synced.png` 设备 A 里 `selfhost-task-6067648-2` 与三处计数 1/1/1；
+`s3-device-b-recovered.png` 全新 context 的设备 B 读到**同一条**任务、同样三处计数）——  nonce `6067648` 把这三位绑在本轮。
+
+三条**装置自红**都发生在这一笔里，每一条都是我的改动打到装置自己的缝上（不是产品的红）：
+
+1. `no-filter` 那条臂的行首正则写的是 `^[ ]*`（只认空格），`caddy fmt` 把行首空格改成制表符 ⇒
+   它当场 `die(6)`："request>uri filter 不再是 2 条（现读 0）"。**这就是它该有的样子** ——
+   上一版按字面内容匹配、一条都没摘到还继续往下走（§8.201 记的那次）。修法是 `[ \t]*`，
+   并把 `matchAll` 与 `replace` 收成同一个 `FILTER_RE`：同一个判断写两遍就是漂移的入口。
+2. 我第一版把 `caddy fmt` 非零退出当成装置故障 `die(4)`。实测：**未排版文件就是 rc≠0 + 那句警告**，
+   非零正是这条判据要抓的状态本身 ⇒ 判据必须写成"rc 与逐字一致"两半（`rc === 0 && out === file`）。
+   臂 unformatted 第一次跑就把这个设计错误打回了原形。
+3. 读数把单位混了：`out.length` 是**字符**、`Buffer.byteLength` 是**字节**，而这份文件里有 2 个
+   非 ASCII 字节 ⇒ 打印成"2256 B vs 2258 B，逐字一致=true"，看着自相矛盾。两边同单位。
+
+一条**探针假红**（差点把改动读成"我把配置弄坏了"）：不带 `-e DOMAIN=` 跑 `caddy validate`，
+`{$DOMAIN}` 展开成空串，报 `server block without any key … it must be first`，**改前改后同红**。
+我第一次手做的 A/B 就是这个形状，两枚 `VALIDATE_RC=1` 摆在一起时才看出来是探针没设变量。
+⇒ 拿任何判据做 A/B 之前，先证明它在"我以为没变"的那一侧能绿。（装置自己一直带 `-e DOMAIN=`，
+所以它的地板是绿的 —— 这次红的是我临时起的那两条命令。）
+
+🆕 **G-72（新登记，有运行时现量）**：`--keep` 末尾那条写着"整条可以直接粘贴执行"的拆栈命令，
+在**路径带空格的工作树**上照抄就跑不通 —— 原样 eval 的读数：`unknown docker command: "compose in"`。
+根因是打印时 `REPO_ROOT` 没加引号（`-f /Users/…/All in one Data/…`）。本趟拆栈是我手工加引号跑的
+`down -v`，容器/卷/网络残留 **0**，一次性凭据文件已 `rm`（另清掉一枚 0 字节的 `heyta-selfhost-env.*` 空文件，
+无秘密，是某次早死留下的）。关闭判据：那条提示必须打印成**可被 bash 原样执行**的一行（对含空格的
+路径加引号），并用一条臂把"打印出来的那行 eval 得动"钉住 —— 这条不改脚本，因为验证它要再跑一趟完整
+`--keep`，而本批只剩"等裁决"的那三格值得占用窗口；编号在这里，不与 §8.217 那三格混。
+
+落地那格的现量顺手重取（**这里更正一处我自己写错的文件名**）：主检出 HEAD `0061e86e`（比 §8.217 时又前进 3 笔）、
+`origin/main 564ad047` 仍是两条线。五枚重叠文件里 `packages/i18n/src/locales/en-US.ts` **这个路径在本仓不存在**
+（英文表是 `en.ts`，`git status` 对不存在的路径返回空、不报错 ⇒ 我那一列"5 枚"里一直坐着一条幽灵，
+真实重叠面是 **4 枚**）。现量：`docs/README.md` 与 `package.json` **仍脏**（最后提交分别 `2ea0e3c0` 10-05 00:08、
+`9856a4a7` 10-05 10:04）；`scripts/check-script-snapshot.mjs` 干净且**确实**由 `f9152fbf` 10-05 10:04 提交；
+两份词条表 `zh-CN.ts` / `en.ts` 干净，但它俩的最后一次提交都还是 **10-04 20:45 的 `baf125e5`**
+⇒ **不能写成"已由所有者提交"** —— 要么那阵子的未提交改动被撤销了，要么 §8.217 当时读到的是别的状态。
+这一格对落地的影响只有一个：真实冲突面从"5"变成"2 枚脏 + 1 枚存疑"，**要的还是那个人裁决，不是窗口。**
+
+边界（不包装）：F 那条判据住在 `research/tools/selfhost-caddy-serve-check.mjs`，而这台装置**不在 `pnpm check` 链里**
+（已登记为 #55 那一族）⇒ "F 会红"目前只在有人跑它时成立；线上 nginx 那侧不在这次改动射程内。
