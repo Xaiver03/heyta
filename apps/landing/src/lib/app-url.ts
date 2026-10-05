@@ -29,7 +29,7 @@
  * 所以非 `http(s)` 一律当作"没配置"。
  */
 
-import { DEFAULT_LOCALE, type Locale, type MessageKey } from '@heyta/i18n/provider';
+import type { Locale, MessageKey } from '@heyta/i18n/provider';
 
 /**
  * 读到并校验构建期的 `VITE_APP_URL`。
@@ -59,20 +59,31 @@ export function appUrl(): string | null {
 }
 
 /**
- * 把落地页的语言**带进应用**。
+ * 把落地页的语言**带进应用** —— 两种语言都带，包括默认语言。
  *
  * 🔴 不这样做会留下一个真实的尴尬：访客在**英文**落地页上读完、点「Use it now」，
  * 落到的却是**中文**界面。原因是两边判断语言的依据不同 ——
  * 落地页由 URL 决定（要 SEO），应用由自己的偏好存储决定（`apps/web/src/lib/locale.ts`）。
  * 这是 `docs/plans/roadmap.md` §5.1 留下的两条保留之一。
  *
- * 默认语言**不带参数**：应用在没有任何偏好时本来就是默认语言，
- * 带上只会给每个链接加一段噪音，也让 `lang=` 失去"这条链接特意指定了语言"的含义。
+ * ## 为什么"默认语言不带参数"这条捷径在 2026-10-03 被撤掉
+ *
+ * 它原来的理由是"应用在没有任何偏好时本来就是默认语言，带了只是噪音"。
+ * 那个前提死于 `0aa6cb0e`（10-01 15:33，P1-1 把首启语言解析链收进 i18n 与两个壳）：
+ * 应用的解析链现在是 **显式存储 > `?lang=` > 系统语言**，第三层是新加的。
+ * 于是"没有偏好"不再等于"默认语言"，而是等于"访客的浏览器语言" ——
+ * 一个用英文浏览器读**中文**落地页的人点「立即使用」，会被静默换成英文界面。
+ * 这正是这条函数要避免的那件事，只是换了方向，而方向换了没人报警：
+ * 线上 `live-site/live-domain.spec.ts:96`（标题就叫"中文落地页 → 应用"）
+ * 红在等中文输入框超时，而截图里应用是**英文**的（`live-app-after-cta.png`）。
+ *
+ * ⚠️ 带参数**不会**盖掉用户已经选过的语言：解析链里显式存储排在 `?lang=` 前面，
+ * 而首启经系统语言推断出来的那个值**不算**显式存储（见 `locale.ts` 里那条注释）。
+ * 所以这条改动只影响"第一次从落地页进来"这一件事，不影响回头客。
  */
 const LANG_PARAM = 'lang';
 
 function withLocale(url: string, locale: Locale): string {
-  if (locale === DEFAULT_LOCALE) return url;
   // 用 `URL` 拼而不是字符串相加：`VITE_APP_URL` 自己可能带查询串
   // （例如带一个灰度参数），手拼 `?`/`&` 会在那种情况下生成坏地址。
   const parsed = new URL(url);

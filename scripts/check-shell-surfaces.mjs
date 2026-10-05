@@ -128,6 +128,13 @@
  *       "确实是本轮打的"那份包                                        → 产物那两栏红
  *       🔴 这一臂是**补出来的**：第一版这个开关只写在"包不存在"那一个分支里，
  *          于是本机存在**别人的**包时严格模式照样 rc=0（实测 rc=0，期望 1）。
+ *   G14 断言 A 的锚点分类（2026-10-05）：`dist/windows/install-capture.txt` 是**未跟踪的
+ *       取证产物**，不是源码锚点 —— 缺席只该由 D4 念"未取证"，不该把整条门禁红成"判据失效"
+ *       （旧形状下每一枚干净检出都必红，而打印出来的修法教人去改锚点）。
+ *       牙没有丢：改成**两侧名字对账**。四臂台架
+ *       `node research/tools/mutation-rigs/mutate-shell-surfaces-anchor.mjs`
+ *       （A0 原样绿 / A1 ps1 改名红 / A2 scp 行改名红 / A3 删真源码锚点仍红 /
+ *        A4a 产物缺席不再红 + A4b 严格模式照样红；臂数以它自己打印的为准）。
  *
  *   （以上 13 臂的**实测读数**逐条记在
  *    `docs/plans/countdown-w8-shell-gate.md` §5 —— 那里是过去式 + 数字，本列表是配方。）
@@ -141,7 +148,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT =
@@ -261,6 +268,14 @@ const FILES = {
   linuxDir: 'apps/desktop-linux',
   /** 本机打包产物（`package-app.sh` 的默认 OUT_DIR；没有就是"没打过包"）。 */
   macAppDist: '/tmp/heyta-macos-dist/Heyta.app/Contents/Resources/web-dist',
+  /**
+   * Windows 那一端的**取证文件**（W8-GAP-W1，04 08:2x）。包在打包机上，本机拿不到
+   * 那份字节 —— 但 `package-msix.sh:78` 一直会把远端 `install-capture.txt` scp 回
+   * `$OUT_DIR`（`dist/windows/`）。原先这一格写死 `artifactWebDist: null`，于是在
+   * `:821` **读 env 覆盖之前**就短路成"未取证"，那条通道结构性关不掉。
+   * 现在判的是那份事实文件里的机读行。
+   */
+  winFacts: 'dist/windows/install-capture.txt',
 };
 
 /* ========================================================================
@@ -446,8 +461,24 @@ console.log('\n【断言 A】判据的锚点必须真的扫得到（扫不到 = 
 
 const anchorErrors = [];
 const sources = new Map();
+/**
+ * 🔴 **取证产物不是源码锚点** —— 这一格曾经把整条门禁红成"判据失效"，而它量到的
+ * 只是"这棵树上没打过 Windows 包"：`winFacts` 是 `package-msix.sh` 从打包机 scp 回来的
+ * **未跟踪产物**（`dist/` 整个被 gitignore），任何一枚干净检出上它都不存在
+ * ⇒ `pnpm check` 在 CI / 新克隆上**结构性必红**，而它打印的修法是"把锚点同步回本脚本"，
+ * 那是把人往错的方向推（同一个仓库刚为另一条门禁修过这一族：`fe3e9e7d` 浅克隆 27 枚全红）。
+ * 这个文件"在不在本地"由 **D4 那一栏**判，判得比这里对：缺 ⇒ 响亮未取证、
+ * 在而缺判据行 ⇒ 未取证并点名生产方、行在而值错 ⇒ 红，`HEYTA_REQUIRE_PACKAGED_ARTIFACT=1`
+ * 再把"未取证"折成红（G13 那一臂）。
+ *
+ * 但断言 A 原本想挡的那件事**不能跟着丢**：生产方把文件改名 ⇒ 门禁读一个不存在的旧名，
+ * D4 从此永远念"未取证"而没人发现。所以这里换成**两侧名字对账**（读的是源码，
+ * 在任何树上都成立）：门禁锚点的 basename 必须出现在写它的那两行生产方代码里。
+ */
+const ARTIFACT_ANCHORS = new Set(['winFacts']);
 for (const [name, rel] of Object.entries(FILES)) {
   if (rel.startsWith('/') || !/\.\w+$/.test(rel)) continue; // 产物目录 / 绝对路径不是源文件
+  if (ARTIFACT_ANCHORS.has(name)) continue;
   const code = readSource(rel);
   if (code === null) {
     anchorErrors.push(`   · ${name} 扫不到：${rel}`);
@@ -455,6 +486,25 @@ for (const [name, rel] of Object.entries(FILES)) {
   }
   sources.set(name, code);
 }
+{
+  const factsBase = basename(FILES.winFacts);
+  const producers = [
+    ['apps/desktop-windows/scripts/package-msix.sh', new RegExp(`scp[^\\n]*${factsBase}`)],
+    ['apps/desktop-windows/scripts/install-and-capture.ps1', new RegExp(`\\$factsFile[^\\n]*${factsBase}`)],
+  ];
+  for (const [file, re] of producers) {
+    const raw = readSource(file);
+    if (raw === null) {
+      anchorErrors.push(`   · 取证事实的生产方读不到：${file}（对账做不了，判红不判跳过）`);
+    } else if (!re.test(raw)) {
+      anchorErrors.push(
+        `   · 锚点漂移：门禁读 ${FILES.winFacts}（basename ${factsBase}），` +
+          `而 ${file} 里已经不再写/取这个名字 ⇒ D4 会永远念"未取证"而没人发现`,
+      );
+    }
+  }
+}
+
 
 /** A1：共享词表必须解析得出成员。 */
 const vocabSrc = sources.get('featureModules');
@@ -553,7 +603,12 @@ if (anchorErrors.length > 0) {
   failed = true;
   console.log('\n   🔴 断言 A 不通过（判据失效，不是"没有违规"）：');
   for (const l of anchorErrors) console.log(l);
-  console.log('\n      ⇒ 修法：把锚点同步回本脚本，**不要**把判据放宽成"扫不到就通过"。');
+  console.log(
+    '\n      ⇒ 修法：把锚点同步回本脚本，**不要**把判据放宽成"扫不到就通过"。\n' +
+      '      ⚠️ 这一条红**只**关于"门禁读的源码锚点与生产方对不上"。' +
+      '"这棵树上没打过包"不是这一条 —— 那走 D4 那一栏（响亮未取证，' +
+      '`HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 才折成红），别为了它去改这里的锚点。',
+  );
 } else {
   console.log('\n   ✅ 断言 A 通过：词表 / 两张注册表 / rail 常量 / 台账形状都对得上。');
 }
@@ -775,11 +830,31 @@ const DESKTOP_CHANNELS = {
       label: '打包脚本对 web-dist 有失败断言（WEB_DIST_MISSING）',
       re: /RESULT=WEB_DIST_MISSING/,
     },
-    artifactWebDist: null, // 产物在 windows-pc 上，本机拿不到 ⇒ 见下面的响亮跳过
+    artifactWebDist: null, // Windows 没有本机可见的包字节 ⇒ 走下面那份**事实文件**通道
+    artifactFacts: FILES.winFacts,
     hostLabel: 'Windows',
     produceCmd: 'pnpm reinstall:desktop（走 windows-pc）／ pnpm verify:windows-auth',
   },
 };
+
+/** 读远端取回的事实文件：只认 `KEY=VALUE` 行，注释与空行跳过。 */
+function parseFactLines(raw) {
+  const out = {};
+  for (const line of raw.split(/\r?\n/)) {
+    const t = line.trim();
+    if (t === '' || t.startsWith('#')) continue;
+    const m = /^([A-Z][A-Z0-9_]*)=(.*)$/.exec(t);
+    if (m) out[m[1]] = m[2].trim();
+  }
+  return out;
+}
+
+const WIN_FACT_KEYS = [
+  'PAYLOAD_WEBDIST',
+  'PAYLOAD_INDEX_SHA',
+  'PAYLOAD_CHUNK_TOTAL',
+  'PAYLOAD_CHUNK_PRESENT',
+];
 
 console.log('\n【桌面三端】判的是 **web-dist 通道**，不是"原生有没有手写这一屏"\n');
 console.log(
@@ -818,7 +893,92 @@ for (const end of ['desktop-macos', 'desktop-windows']) {
     }
 
     // D4：包里那份 web-dist 的字节里到底有没有这一面（只有本机打过包才跑得到）
-    if (channel.artifactWebDist === null) {
+    //
+    // 🔴 Windows 走的是**另一条 D4**（W8-GAP-W1）：包在打包机上，本机拿不到那份字节，
+    //    但 `package-msix.sh:78` 一直会把远端的 `install-capture.txt` scp 回来。
+    //    判据因此建在"远端测出来的事实 + 与本地构建的 sha 对账"上，而不是"本机存在某目录"。
+    //    原先这一格写死 `artifactWebDist: null`，于是它在**读 env 覆盖之前**就短路了
+    //    （`:821` 在 `:831` 之前），那条通道结构性关不掉 —— 不是没取证，是取证进不来。
+    if (channel.artifactFacts) {
+      const envKey = `HEYTA_${channel.hostLabel.toUpperCase()}_FACTS`;
+      const factsPath = process.env[envKey] ?? join(ROOT, channel.artifactFacts);
+      if (!existsSync(factsPath)) {
+        skipped(end, `${face.key} · 产物`, [
+          `⚠️ 产物判据未跑：读不到远端取证文件 ${factsPath}（这台机器上没打过 ${channel.hostLabel} 包），`,
+          `      要取证：${channel.produceCmd}`,
+        ]);
+      } else {
+        const facts = parseFactLines(readFileSync(factsPath, 'utf8'));
+        const missing = WIN_FACT_KEYS.filter((k) => !(k in facts));
+        if (missing.length > 0) {
+          // 🔴 "生产方没测这些事实" = **未取证**，不是产品红 —— 本门禁的既有规矩是
+          //    未取证响亮跳过、`HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 才折成红（G13 那一臂）。
+          //    理由不是客气：`dist/windows/install-capture.txt` 是**上一趟打包**留下的，
+          //    那时 ps1 还不发这几行 ⇒ 判红就是把"我的判据比现场新"当成产品缺陷
+          //    （§7 第 50 条那一族：状态对，但那条承诺没生效在被打测的那一趟上）。
+          //    牙齿不丢：行**在而值错**（下面三条）仍然是红，严格模式下"行不在"也是红。
+          skipped(end, `${face.key} · 产物`, [
+            `⚠️ 取证文件在 ${factsPath}，但缺判据行 ${missing.join(' / ')}`,
+            '      ⇒ 那一趟打包用的还是**没测这些事实的旧生产方**，本栏不计为通过。',
+            `      补上生产方：apps/desktop-windows/scripts/install-and-capture.ps1，再跑 ${channel.produceCmd}`,
+          ]);
+        } else if (facts.PAYLOAD_WEBDIST !== 'True') {
+          ok = false;
+          detail.push(
+            `🔴 D4：装出来的包里**没有** web-dist/index.html（PAYLOAD_WEBDIST=${facts.PAYLOAD_WEBDIST}）` +
+              ` ⇒ 壳会退回 spike 页，屏幕上不是共享 UI（§7 第 82 条那一族）`,
+          );
+        } else if (
+          !/^\d+$/.test(facts.PAYLOAD_CHUNK_TOTAL) ||
+          Number(facts.PAYLOAD_CHUNK_TOTAL) < 1 ||
+          facts.PAYLOAD_CHUNK_PRESENT !== facts.PAYLOAD_CHUNK_TOTAL
+        ) {
+          ok = false;
+          detail.push(
+            `🔴 D4：index.html 引用的资源文件没全部落在包里（present ${facts.PAYLOAD_CHUNK_PRESENT} / total ${facts.PAYLOAD_CHUNK_TOTAL}）` +
+              ` ⇒ 窗口能开而内容是空白，正是"入口 HTML 进去了、chunk 没进去"那个形状`,
+          );
+        } else {
+          // 对账：远端那份 index.html 的 sha 必须等于**本工作树刚构建出来的**那份。
+          // vite 把内容哈希后的 chunk 名写进 index.html ⇒ HTML 逐字相同 = 整张资源图相同，
+          // 于是"本地这份 dist 里有这一面"才能**迁移**到"装进包里的字节里有这一面"。
+          // 对不上就明说未取证 —— 拿别人的字节给自己这一轮作证是 §7 第 82 条。
+          const localDist =
+            process.env.HEYTA_WEB_DIST_DIR ?? join(ROOT, FILES.webDist);
+          const localIndex = join(localDist, 'index.html');
+          const mine = existsSync(localIndex) ? sha256File(localIndex).toUpperCase() : null;
+          if (mine === null) {
+            skipped(end, `${face.key} · 产物`, [
+              `⚠️ 产物判据未跑：本地 ${localDist}/index.html 不存在（没构建 ⇒ 没有可对照的那份字节）`,
+            ]);
+          } else if (mine !== facts.PAYLOAD_INDEX_SHA) {
+            skipped(end, `${face.key} · 产物`, [
+              `⚠️ 包在打包机上，但它那份 index.html 与本工作树的 dist **sha256 不符**：`,
+              `      包里 ${facts.PAYLOAD_INDEX_SHA.slice(0, 12)} / 本地 ${mine.slice(0, 12)}`,
+              `      ⇒ 那是**别的检出／别的会话打的包，或旧产物**，不能当本轮的取证。要取证：${channel.produceCmd}`,
+            ]);
+          } else {
+            let found = false;
+            for (const f of walkAll(localDist)) {
+              if (!/\.(js|html)$/.test(f)) continue;
+              if (readFileSync(f, 'utf8').includes(face.webTestID)) { found = true; break; }
+            }
+            if (!found) {
+              ok = false;
+              detail.push(
+                `🔴 D4 装进包的那份 dist（sha256 已逐字对上 ${mine.slice(0, 12)}）里搜不到 "${face.webTestID}"` +
+                  ` ⇒ 通道在、**字节里没有这一面**`,
+              );
+            } else {
+              detail.push(
+                `D4 装进包的字节与本工作树 dist **sha256 逐字相同**（${mine.slice(0, 12)}），` +
+                  `且那份里有 "${face.webTestID}"（chunk ${facts.PAYLOAD_CHUNK_PRESENT}/${facts.PAYLOAD_CHUNK_TOTAL} 齐）`,
+              );
+            }
+          }
+        }
+      }
+    } else if (channel.artifactWebDist === null) {
       skipped(
         end,
         `${face.key} · 产物`,

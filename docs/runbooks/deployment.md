@@ -228,6 +228,16 @@
   （落地页本身也是 SPA；`/en/` 走同一段）。`/assets/` 单独一段长缓存。
 - ✅ `location /app/` → `alias /var/www/heyta-app/;` + `try_files $uri $uri/index.html /app/index.html`，
   `Cache-Control: no-cache`；`/app/assets/` 单独一段长缓存。
+- 🔴 **`location /app/` 与 `location /app/assets/` 都必须 `include /etc/nginx/mime.types;` 之后再补自己的 `types {}`。**
+  这台机器的 `/etc/nginx/mime.types`（nginx/1.18.0 Ubuntu）里既没有 `wasm` 也没有 `webmanifest`，
+  于是那两类文件一律答 `application/octet-stream`；而 **`types` 在嵌套层级是替换继承、不是叠加**，
+  只补一条会把同一段里的 `.js` / `.css` / `.png` 一起打回默认类型（模块脚本直接不执行）。
+  已按这个形状修过两次：`.wasm`（2026-09-27，`instantiateStreaming` 被拒）与
+  `.webmanifest`（2026-10-04，G-60：`/app/manifest.webmanifest` 曾被答成 octet-stream）。
+  判据在 `e2e/live-site/live-manifest.spec.ts`（两腿：真清单判 true、被 SPA 兜底成 HTML 的路径判 false）。
+  ⚠️ **旧域名 `heyta.finlaw.cloud` 那份只补过 `.wasm`，没补 `.webmanifest`**（现量：那份文件里
+  `application/wasm` 在、`webmanifest` 无）。2026-10-04 把同一份判据指过去得 **2 failed / 1 passed**，
+  所以**回滚到旧域名会把清单类型这一处带回去**（图标与 SW 那侧两域名都正常）。
 - 🔴 `location = /app { return 301 /app/$is_args$args; }` **必须单独写**：`location /app/`
   **不匹配** `/app`，而落地页给出的地址去掉尾斜杠是**故意的**（`apps/landing/src/lib/app-url.ts`）。
   少了它，`/app` 会掉进 `location /` 拿回**落地页 HTML**（HTTP 200、看着正常，点进去却是别的页面）。
@@ -495,6 +505,12 @@ cd e2e && npx playwright test --config playwright.live-site.config.ts   # 判据
 （用例在 `page.evaluate` 里 `fetch`，被应用自己的隐私同意闸门挡下；以及 SW 注册按 G-12
 排在同意之后，而用例没答那份披露就等 `serviceWorker.ready`）。两条的逐条读数与修法见
 `7b9089b2`。**不发一次不会知道，发一次不跑也不会知道。**
+
+🔴 **这一节连同落地页那一组，以及"备份在前、站点先发、发完线上验收"的整条顺序，已固化成一条默认不动手的命令**：
+`node research/tools/publish-public-sites.mjs`（不带 `--confirm` 时只打印将要执行的每一条；它拒绝发"不是正好
+`main` 那一笔"的字节，也不发服务端镜像）。这一节仍是**命令本体**的说明与手敲逃生门（脚本自己被守卫挡掉时照这里走）；
+两份抄件的**目的目录**由脚本自己的 `--selftest` P19 臂与这里对账 —— 改了这里不改脚本，那条臂就红。
+`--mutation` 是那批臂各自的变异读数（臂数与腿数以命令自己打印的那一行为准，这里不抄数字：抄一次就漂一次）。
 
 🔴 **第 2 条不是仪式，它挡的是这一族里最难归因的那一发**：`apps/web/dist` 是**一个目录、两种载体**
 （`/` 给 dev/preview/`pnpm check`，`/app/` 给生产），谁最后构建谁覆盖谁。
@@ -1118,6 +1134,12 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
   APK_MIRROR=mirrors.aliyun.com NPM_REGISTRY=https://registry.npmmirror.com \
   sudo -E ./scripts/deploy.sh --build'
 ```
+
+⚠️ **这两个旋钮不是"构建镜像需要的全部旋钮"**，只是**这台生产机**当时需要的那两个：
+它拉 `docker.io` 是通的，所以 base 镜像从来没成为问题。有一台**连不上 docker.io** 的机器要照这一段
+重打镜像时，还要第三个 `NODE_IMAGE` —— 它坏得更早在**第一条 Dockerfile 指令之前**，
+所以得到的是一条响亮但没有层线索的 `load metadata … failed to fetch anonymous token`。
+见 [`self-host.md`](self-host.md) §3（含实测错误原文）与 `check:image-build-args` 那条门禁。
 
 > 第 3 步要**带上和第 2 步一样的两个变量**：`deploy.sh --build` 会再跑一次
 > `docker compose build`，变量不一致就是不同的 ARG ⇒ **缓存全废、重头再建一遍**。

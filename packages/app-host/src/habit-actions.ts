@@ -17,10 +17,15 @@
  *    "今天已经打过卡了，再点一次什么都不做" —— reducer 做不到这件事，
  *    因为"第二次打卡"和"改了打卡数值"在 op 上长得一模一样
  *    （都是对同一实体的 `UPD`/`CRT`）。必须在**发起写入之前**查一次。
+ *    ⚠️ 这条纪律在 W6 加了"改今天的量"之后**没有被削弱**，而是写成了三分支：
+ *    已打卡时**没给 `value`**、或给的正好是当前值 ⇒ 仍然 `return false`、零 op。
  *
- * 3. **打卡值缺省落在 `habit.target` 上，再缺省才是 1。**
+ * 3. **打卡值缺省落在 `habit.target` 上；那个缺省不是正数时才是 1。**
  *    一个"每天 8 杯水"的习惯，跳过 value 打卡应当记 8 而不是 1 ——
  *    记 1 会让完成率永远是 12%，而界面上什么都没报错。
+ *    ⚠️ 但 `atMost` + `target: 0`（"一次都不碰"）时缺省是 0，而 0 **没有合法意思**
+ *    （见下面 `checkIn` 的那段）：写 0 会让这条打卡既"打过卡"又按 `value <= target`
+ *    **算达成** —— "做了一次"被记成"守住了戒"。所以这里落 1：做了 1 次 ⇒ 未达成。
  *
  * ⚠️ `undoCheckIn` 是软删除（`DEL` op），不是物理删。物理删除会让另一端
  * 把打卡**同步回来** —— 用户会看到自己撤销的打卡自己复活。
@@ -29,6 +34,7 @@
 
 import {
   byCreatedAtOrder,
+  habitLogValue,
   isLive,
   parseCategorySlot,
   parseHabitIcon,
@@ -117,9 +123,11 @@ export interface HabitActions {
    *
    * 🔴 这是「习惯计数型 / 时长型」在**写路径**上缺的那一米：
    * `Habit` 有 `target` / `unit` / `goalType`，`isAchieved` 把三种口径都实现了，
-   * `checkIn` 也收 `value` —— 但**没有任何动作能改一个已建习惯的目标**
+   * `checkIn` 也收 `value` —— 但**在这个动作补上之前，没有任何动作能改一个已建习惯的目标**
    *（`createHabit` 只能设初始值，而 `NewHabitFields` 连 `goalType` 都没有）。
    * ⇒ 界面上只能建"每天做一次"的习惯，**计数型与时长型到不了用户手里**。
+   * ⚠️ 上面那句"到不了用户手里"的保质期到本动作为止；再往下的那一米是
+   * **今天记了几格**（`checkIn` 的 `value` 通道，见下面那条与工单 W6）。
    *
    * `unit` 传空串（或全是空白）表示**清除单位**，写成 `null`
    *（与 `setHabitColor` / `setDueDate` 同一条"用 null 穿过 JSON 表达清除"的约定）。
@@ -132,10 +140,29 @@ export interface HabitActions {
   ): Promise<void>;
 
   /**
-   * 打卡。省略 `date` 表示**今天**。
+   * 打卡。省略 `date` 表示**今天**。`value` 是"今天记了几格"（工单 W6 那一米）。
    *
-   * 已打卡时是**幂等空操作**（见文件头第 2 条），返回 `false`；
-   * 真的写入了返回 `true` —— 调用方据此决定要不要提示"今天已经打过卡了"。
+   * 三种情形，只有后两种写 op：
+   *   · 没打过、**不给** `value` ⇒ 记缺省量（文件头第 3 条，**逐字旧行为**）
+   *   · 没打过、给了 `value`     ⇒ 就记它（"目标 8 页、今天读 5 页"）
+   *   · 已经打过                 ⇒ 给了**与当前量不同**的 `value` 才改（一条 `UPD`）；
+   *                                没给、或给的就是当前量 ⇒ 幂等空操作，返回 `false`
+   *
+   * 返回"这次到底写没写" —— 调用方据此决定要不要提示"今天已经打过卡了"。
+   *
+   * 🔴 `value` 必须是**不小于 0 的有限数**（合并 main 时的裁决，理由写在这里）：
+   * 详情面那条线原本把它收紧成"大于 0"，让"今天没做"走 `undoCheckIn`；
+   * 而本机 API / MCP 的 `record-checkin` 契约（`local-api-host.ts` 在写入前就按
+   * `intent.value < 0` 判 invalid）与 `atMost` 型习惯都需要一个显式的 0 ——
+   * "今天刷手机 0 次"是一条**读数**，不是一次缺席。
+   * ⚠️ 那一收紧担心的"这一格同时读起来像打过卡又像没做"是真问题，但它住在**显示层**：
+   * 存在性（打过卡）与达成（`isAchieved` 走 `habitLogValue`，0 对 atMost 达成、
+   * 对 atLeast 不达成）本来就是两件事，把其中一件做没了会让另一件变成唯一答案。
+   * 所以这一层的字段不许用写入侧的抛错去替显示层做决定。
+   *
+   * ⚠️ 刻意**不要求整数**：`setHabitGoal` 允许 `target: 0` 与任意有限正数
+   *（"每天 0.5 小时"是合法目标），所以"记 1.5 格"可能是这个习惯唯一的步进形状。
+   * 卡整数会把合法数据判成非法输入 —— 那是比宽松更贵的错法。
    */
   checkIn(habitId: string, date?: LocalDate, value?: number): Promise<boolean>;
   /**
@@ -304,10 +331,49 @@ export function createHabitActions(
     async checkIn(habitId, date, value) {
       const habit = habitOf(habitId);
       if (habit === undefined) throw new Error(`找不到习惯「${habitId}」`);
+      // 校验在写入侧（与 `setHabitGoal` / `setHabitColor` 同一条纪律）：
+      // 不认识的值直接抛，不悄悄落成一个"看起来对"的数。
+      // ⚠️ 下限是 **0 不是 1**：见上面接口注释里那条合并裁决
+      //（本机 API/MCP 契约与 `atMost` 都需要显式的 0）。
+      if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+        throw new Error(
+          `打卡量必须是不小于 0 的有限数（收到 ${String(value)}）；负数、NaN、Infinity 都不是一个读数`,
+        );
+      }
 
       const day = date ?? toLocalDate(now());
-      // 幂等：这天已经打过卡就什么都不做 —— 见文件头第 2 条。
-      if (logOf(habitId, day) !== undefined) return false;
+      const target = habit.target ?? 1;
+      const existing = logOf(habitId, day);
+      /**
+       * 这条习惯"打了卡但没写量"时界面上读出来的那个数（`@heyta/domain#habitLogValue`
+       * —— 与 `isAchieved`、共享行的 `todayValue` **同一个算法**）。
+       * 拿它而不是 `existing.value` 来比"有没有变化"，见下面那段注释。
+       */
+      const existingValue = habitLogValue(habit, existing);
+      if (existing !== undefined) {
+        /**
+         * 🔴 文件头第 2 条那条幂等纪律**没有因为"能改量"而被削弱**：
+         * 没给 `value`（旧调用方逐字不变）、或给的正好是当前值 ⇒ 零 op。
+         * 少这一句判断，界面上"再点一次"就会白写一条 `UPD`，
+         * 而 reducer 收敛成同一条实体 ⇒ **测试全绿、op-log 在长胖**。
+         *
+         * ⚠️ 比的是**有效值**而不是 `existing.value` 这个键：一条没写量的旧记录，
+         * 它的量按 `habit.target` 读（文件头第 3 条）。按键比会让"记满"这个动作
+         * 在上面再发一条 op，而那条 op 改变的只有 `undefined` → `8` 这个键本身 ——
+         * 与 `setHabitGoal` 那里"一个字段都没传就不写"是同一条纪律。
+         */
+        if (value === undefined || value === existingValue) return false;
+        await ctx.dispatch({
+          entityType: 'HABIT_LOG' as EntityType,
+          entityId: habitLogId(habitId, day),
+          opType: OpType.Update,
+          // 只带 `value`。`habitId` / `date` 是这个实体的**身份**
+          //（id 由 (习惯, 日期) 决定，见文件头第 1 条），重发一遍只是给
+          // 乱序回放多留一份可以互相覆盖的副本。
+          payload: { value },
+        });
+        return true;
+      }
 
       await ctx.dispatch({
         entityType: 'HABIT_LOG' as EntityType,
@@ -316,8 +382,13 @@ export function createHabitActions(
         payload: {
           habitId,
           date: day,
-          // 见文件头第 3 条：value → habit.target → 1。
-          value: value ?? habit.target ?? 1,
+          // 见文件头第 3 条：缺省落 `habit.target`，而那个缺省**不是正数时落 1**。
+          // ⚠️ 这里刻意不复用 `@heyta/domain#habitLogValue`：那个回答的是
+          // "**已有记录**没写量时读成几"，这里回答的是"**新写一条**记几"。
+          // `target: 0`（"一次都不碰"）的两条会分叉（读 0 / 写 1），而分叉是有意的：
+          // 写 0 会造出一条"打过卡但量为 0"的记录 —— 界面无法表达、
+          // 又会让 `atMost` 把"做了"判成"守住了"（见文件头第 3 条 ⚠️）。
+          value: value ?? (target > 0 ? target : 1),
           // 🔴 `deletedAt: null` 是**必须**的，不是防御性写法。
           //
           // 打卡记录的 id 由 (习惯, 日期) 决定（见文件头第 1 条），所以

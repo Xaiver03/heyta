@@ -29,7 +29,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { tokensForTheme, resolveTextStyle } from '@heyta/design-system';
+import { resolveTextStyle, tokensForTheme } from '@heyta/design-system';
 import {
   EXPORT_CARD_FILE_STEM_MAX_CODE_POINTS,
   EXPORT_CARD_SCALE,
@@ -87,6 +87,8 @@ function wordsOf(card: EventCard): EventCardTexts {
 }
 
 function layoutOf(card: EventCard, words: EventCardTexts, dark = false, rasterScale = EXPORT_CARD_SCALE) {
+  // 取表走 `tokensForTheme()`：L0 原始表（`lightTokens`/`darkTokens`）只允许
+  // design-system 内部与 `packages/ui` 的建表点引用（`check:theme` 的 R3）。
   const tokens = tokensForTheme(dark ? 'dark' : 'light');
   return buildCardExportLayout({
     texts: words,

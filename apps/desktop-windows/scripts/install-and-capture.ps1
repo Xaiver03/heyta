@@ -79,6 +79,34 @@ $lines += ('PAYLOAD_XBF=' + (@(Get-ChildItem $loc -Filter '*.xbf' -File -ErrorAc
 $webDist = Join-Path $loc 'web-dist'
 $lines += ('PAYLOAD_WEBDIST=' + (Test-Path (Join-Path $webDist 'index.html')))
 
+# W8-GAP-W1: `PAYLOAD_WEBDIST=True` only proves ONE file is there. The gate that
+# reads this file has to answer "are the bytes the shell actually serves the ones
+# this worktree built?", and a boolean cannot carry that. Three machine-readable
+# facts instead, all MEASURED from the installed payload:
+#   PAYLOAD_INDEX_SHA    - sha256 of the installed index.html. Vite writes
+#                          content-hashed chunk names into it, so a matching hash
+#                          means the same asset graph, not just the same file.
+#   PAYLOAD_CHUNK_TOTAL  - how many /assets/... entries that index.html references
+#   PAYLOAD_CHUNK_PRESENT- how many of those actually exist next to the exe
+# The last two are the leg that catches "index.html shipped, chunks did not" -
+# which renders a blank window while every existing criterion stays green.
+$indexFile = Join-Path $webDist 'index.html'
+$indexSha = 'NONE'
+$chunkTotal = 0
+$chunkPresent = 0
+if (Test-Path $indexFile) {
+  $indexSha = (Get-FileHash -Algorithm SHA256 -Path $indexFile).Hash
+  $html = Get-Content -Raw -Path $indexFile
+  foreach ($m in [regex]::Matches($html, '(?:src|href)="(/?assets/[^"]+)"')) {
+    $chunkTotal += 1
+    $rel = $m.Groups[1].Value -replace '^/', ''
+    if (Test-Path (Join-Path $webDist ($rel -replace '/', '\'))) { $chunkPresent += 1 }
+  }
+}
+$lines += ('PAYLOAD_INDEX_SHA=' + $indexSha)
+$lines += ('PAYLOAD_CHUNK_TOTAL=' + $chunkTotal)
+$lines += ('PAYLOAD_CHUNK_PRESENT=' + $chunkPresent)
+
 # ---- desktop shortcut --------------------------------------------------------
 # WHY THIS IS A SEPARATE CRITERION. An MSIX gets a Start Menu entry by itself
 # (measured on the packaging machine: Get-StartApps lists

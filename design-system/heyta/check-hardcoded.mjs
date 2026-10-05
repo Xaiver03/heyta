@@ -109,6 +109,15 @@ const MATCH_ALLOW = [
 /** 需要对**整行**取上下文才能判断的。 */
 const LINE_ALLOW = [
   { re: /@media[^;]*(min|max)-width/, why: '断点是固定设备宽度，不是设计尺度' },
+  {
+    // JS 侧的 `matchMedia` 查询串（`apps/web/src/features/shell/detail-pane-visible.ts`）。
+    // 上面那条只认 `@media`，而媒体查询的**特征值不接受 var()** —— 断点写进 JS 只能是字面量，
+    // 没有"改成 token"这条路（`var(--ht-*)` 在 `min-width:` 位置是无效声明，整条查询会被丢弃）。
+    // 🔴 这不是"放行一份抄件"：那一串与 `narrow.css` 三条隐藏规则的同源关系有常驻判据
+    //    （`apps/web/tests/note-editor-placement.spec.tsx` 的 P1 第一条，变异臂 A5 改一个数就红）。
+    re: /\((?:min|max)-(?:width|height):/,
+    why: 'matchMedia 查询串里的断点：媒体特征值不能用 var()，同源由判据钉住',
+  },
   { re: /(viewBox|points|transform)=/, why: 'SVG 图形数据不是样式' },
   { re: /--ht-/, why: 'token 定义/引用' },
   { re: /^\s*(\/\/|\*|\/\*)/, why: '纯注释行' },
