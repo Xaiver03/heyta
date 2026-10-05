@@ -14023,3 +14023,36 @@ npx vitest run（服务端全量）                                             
 
 ⚠️ 本节没改变任何状态声明：第 1 项仍差"main 前进到该载体"一格（§8.263 的联合窗口），
 第 8 项仍排在落地之后。
+
+### 8.265 main 那 24 条 apps/web 红的归属**已证成**（不需要我复跑），顺带否证了第 8 项理由里的"本批改了 apps/web"（2026-10-05 21:1x）
+
+上一轮我把这条标成"引用别线提交标题、本会话未自跑"。现在不用复跑也能判 —— 读**它自己的证据产物**就够：
+`~/.heyta-evidence/seg85-at-main-1005-210357/rtest.log`（577 KB，别线 21:04 现量，载体前进到 `8f870ea3` 后自动还原）。
+
+三条独立读数：
+
+1. **24 条全在一个文件里**：逐条 `FAIL` 行的用例名全部落在 `tests/admin-panel.spec.tsx`
+   （用例名原文含"面板上有八个标签页，默认停在概览""邀请页必须把响应的两面都渲染出来""解锁后…「已锁定」徽标必须消失""同意留痕那一行"）。
+   同一次运行里 `server` 是 `2318 passed | 1 skipped`。
+2. **该文件与它的被测对象都归 main 自己**：`git show --stat ec33731f`（`feat(后台退款)`，20:xx 落在 main）
+   同时改了 `apps/web/src/features/admin/AdminPanel.tsx`(+265)、`store.ts`(+246)、
+   **`apps/web/tests/admin-panel.spec.tsx`(+288)**，并新增第 9 个 tab `{ key: 'refunds', labelKey: 'web.admin.tab.refunds' }`。
+3. **本批与 admin 无交集**：`git diff --name-only $(git merge-base main feat/self-host-distribution) feat/self-host-distribution`
+   共 92 枚，其中 `apps/web` 下 **0 枚**，`grep -i admin` **0 枚**。
+
+🔴 **判归属的那一步是逻辑而不是相关性**：这 24 条红复现在 `8f870ea3` 这个**不含本批任何一笔提交**的树上
+（`git merge-base --is-ancestor feat/self-host-distribution main` ⇒ 非祖先，本批确未进 main）。
+"纯 main 就红"直接排除"本批代码造成"，所以**不必**为归属去跑全量单测（跑了还会顶高负载、挡掉 §8.263 的窗）。
+⚠️ 边界别读多：这不等于"载体上不会新增红" —— 合并后可能另有红，那一格只能在落地那一刻用载体的
+`pnpm check` 现量。也不等于我读到了断言 diff：我 grep 断言原文那一发**返回空**（日志格式不匹配我的模式），
+所以上面第 1 条的证据是**用例名与文件归属**，不是 expected/actual 字节。
+
+⇒ **第 1 项的关闭判据按新形状重述**：原句"main 现在红在 `check:docs` 5 处，须逐条归属到非本批"——
+docs 那半已绿（§8.264）；替换成"main 红在 `apps/web/tests/admin-panel.spec.tsx` 24 条"，
+**归属这半已按上面三条判完，非本批**。
+
+⚠️ **顺带否证目标自己的一句前提**：第 8 项写"落地之后才起 `reinstall:all`，因为**本批改了 apps/web**"。
+现量本批对 `apps/web` 零改动。排序**仍然成立**，但真实理由换了一条：本批改的是
+`packages/*`（含 i18n 词条）与 `server/`，而 `apps/web` 打包吃的是 `packages/*/dist`
+（AGENTS §6.1 那条"打包前必须先 `pnpm -r build`"，以及 §7 第 27 条"APK 里是旧 JS bundle"同族）——
+所以装完仍会因**未落地**而过期，只是过期路径经过的是 `packages/*/dist`，不是 apps/web 源码。
