@@ -3077,6 +3077,42 @@ done
   ⑦ 边界（别读多）：工具仍然**不提交**、不动 AGENTS §7 索引表、`--pkg-file` 指非 git 树时脏与远端两腿照旧如实跳过；
     新腿只比对"号 + 首行文本"，正文其余部分不参与（那足以认出 (61)③ 那种分叉，再多就是另一枚判据）。
 
+- (63) **10-05 16:4x：第 3 项那句"唯一的常驻消费者入口就是 `package.json`"——结论留着，但它是**没枚举过分母的否定结论**，而且里面两处细节是错的。**
+
+  ① 触发是一句别人写的规矩（user memory「否定结论也要枚举分母」）：写下"只有 X 能做"之前要把候选通道逐条量过；
+    只量一条就报全称否定，等于拿探针的射程冒充事实的射程，而**假阻塞的代价是整条线排在错误的等待上**。
+    ⇒ 这一趟把 (59) 那句话的分母补齐，顺带抓到 (59) 自己两处错。
+  ② 🔴 否证一：`scripts/mutation-rigs` **这枚目录不存在**（现量 `ls scripts/mutation-rigs` ⇒ `No such file or directory`；
+    `grep -rln 'mutation-rigs' scripts package.json .github/workflows` 现量**输出为空**）。
+    (59) 写着"只命中 `scripts/mutation-rigs` 那枚**目录名**"——那是我把 `research/tools/mutation-rigs` 记成了 `scripts/` 底下。
+    后果不只在措辞：那句话被读成"scripts 里有个 rig 汇总器"的话，下一位会去**接错门**。
+  ③ 🔴 否证二：`check-gate-wiring.mjs` 那句仍然成立（`grep -n 'research/tools'` 零命中，它审的是 package.json 里的脚本名），
+    但"唯一入口"当时只量了通道 ① 一条。下面是七条通道的现量与取舍：
+    · **① 根 `package.json` 的 `scripts.check`** —— 消费方三层：`pnpm check`、CI（`.github/workflows/ci.yml:101` 就是 `run: pnpm check`）、
+      以及那把 84 段载体 `~/scratch-heyta/heyta-chain.sh:86`（它是 `require("./package.json").scripts.check.split("&&")` **现取段名**，不抄第二份）。
+      ⇒ 它是**段源**，不是"其中一条通道"。现量仍 ` M`、2/1（别人的 `check:ios-ax-shim`）⇒ **第 3 项的仓库级那一半继续等**。
+    · **② `.github/workflows/ci.yml` 直接加一步** —— 消费方存在，但只在 push 时跑（`push` 未授权），且改 CI 是共享管线、要产品负责人点头；
+      更实在的问题是它会把"段清单"变成**第二处**（① 已经是真源）⇒ 拒。
+    · **③ `packages/*` 与 `apps/*` 的 `test`** —— 现量 21 份 `"test"`（含 `server` 与 `e2e`），逐份只含 `vitest`（或 e2e 的 `playwright test`），
+      **没有一处 sh 出 `research/tools`**（先例为 0；唯一多一段的是 `sync-core` 的 `test:typecheck && vitest run`）；
+      消费方是链尾的 `pnpm -r test`。⇒ 拒：bash 变异臂塞进"包单元测试"是类错误，而且 §7 第 291 条就是它——`pnpm -r test` 第一个失败包**递归中止**，
+      一枚环境类红会把整批读数吃掉（那把 rig 自己就曾被 `/tmp/tfa-test.lock` 的 stale 锁挡过一次）。
+    · **④ `e2e/package.json` 的 `test`**（现量 `"playwright test"`，而且这枚文件**是干净的**）—— 消费方是 `package.json:124` 的 `check:ai-e2e`。
+      ⇒ 拒：那条门禁的前置 preflight 会对 4318/4319 上 LISTEN 的进程 SIGKILL（硬约束明文禁止本线跑它），
+      把 rig 挂在一个"本线永远不能亲手跑、跑了就拆别人现场"的入口上，比 ① 更糟；这是"为了有人跑而塞进不合适的缝"。
+    · **⑤ `scripts/reinstall-all.sh`**（固定收尾，现量干净）—— 拒：它是打包/重装编排，不是门禁；同一条链路的段源改动会顺带影响四端交付。
+    · **⑥ 本线 `calendar-line-commit-plan.sh` 的 3c** —— **这就是今天真正在跑的那枚常驻消费者**（(54) 落的，本轮三笔提交各跑一次、现量 `LINE_RIGS=3 红=0`）。
+      ⇒ 第 3 项"接进常驻消费者"在**行级已经成立**，等的只是仓库级那一层。
+    · **⑦ `scripts/check-gate-wiring.mjs`** —— 它不能当消费者（不扫 `research/tools`），它是**看守 ① 不被后来整文件提交挤掉**的那道闸（(59) 已验三腿）。
+  ④ 结论的**正确说法**：不是"只有 `package.json` 能做"，而是——**七条里只有 ① 同时满足「段源」与「本线能安全跑」**；
+    ②④⑤ 各有消费方但各自被"未授权 / 会拆别人现场 / 类错误"排除，③ 被自己的历史事故排除，⑥ 已成立、⑦ 不是消费者。
+    ⇒ 第 3 项的等待**没有被否证**（它仍是 blocked），但从"我以为只有一条路"变成"这条路是枚举过其余六条之后选的"。
+  ⑤ 复跑（谁要重开这一格，先把这七条的量法跑一遍，别只跑 ①）：
+    `ls scripts/mutation-rigs`、`grep -rln 'mutation-rigs' scripts package.json .github/workflows`、
+    `grep -n 'research/tools' scripts/check-gate-wiring.mjs`、`grep -rn '"test"' packages/*/package.json apps/*/package.json | head`、
+    `git status --porcelain -- e2e/package.json scripts/reinstall-all.sh`、`grep -n 'dir e2e run test' package.json`、
+    `sed -n '86p' ~/scratch-heyta/heyta-chain.sh`。⚠️ 最后一枚在**仓库外**（是那条会话的临时载体），不在库史里，别把它当成产品资产找。
+
 
 
 
