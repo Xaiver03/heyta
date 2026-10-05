@@ -22,6 +22,7 @@
 
 import type {
   AiFeedback,
+  AssistantTurn,
   CountdownEvent,
   FocusSession,
   PreferenceCorrection,
@@ -69,6 +70,19 @@ export interface MaterializedState {
    * ⚠️ 它**不是**"没有截止日的任务"：见 `CountdownEvent` 文件头三条理由。
    */
   events: Record<string, CountdownEvent>;
+  /**
+   * 助手会话的消息（ADR-0045 D-4 (ii)，产品负责人 2026-10-05 拍"做"）。
+   *
+   * ⚠️ **一条消息一个实体**，不是一段会话一个实体 —— LWW 在数组上是覆盖语义，
+   * 会话级实体会让两台设备并发追加时互相吞消息且零层报错。理由逐条写在
+   * `entity-types.ts` 与本桶对应模型 `AssistantTurn` 上。
+   *
+   * 🔴 它是**用户内容**（与 `aiFeedback` 那条"只有数字与枚举、没有文本"的注释
+   * 正好相反），所以它受 ADR-0005/0006 的出境纪律约束：端到端加密在上传那一步，
+   * 服务端只见密文；而"这句是哪个端点答的"必须由 `destinationKind` 逐条带着走，
+   * 否则合并后的历史里分不出本机答案与云端答案。
+   */
+  assistantTurns: Record<string, AssistantTurn>;
 }
 
 export function emptyState(): MaterializedState {
@@ -84,6 +98,7 @@ export function emptyState(): MaterializedState {
     preferenceCorrections: {},
     reminders: {},
     events: {},
+    assistantTurns: {},
   };
 }
 
@@ -100,6 +115,7 @@ const BUCKET_BY_ENTITY = {
   PREFERENCE_CORRECTION: 'preferenceCorrections',
   REMINDER: 'reminders',
   EVENT: 'events',
+  ASSISTANT_TURN: 'assistantTurns',
 } as const;
 
 type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;

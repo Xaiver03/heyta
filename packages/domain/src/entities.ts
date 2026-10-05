@@ -650,6 +650,116 @@ export interface CountdownEvent extends EntityBase {
   notes?: string;
 }
 
+// ─────────────────────────────────────────────────────────────
+// 助手会话的一条消息
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 一条会话消息的角色。**四档与界面 transcript 逐字同名**
+ * （`apps/web/src/features/ai/assistant-transcript.ts` 的 `ChatItem`）。
+ *
+ * ⚠️ 这里**不 import** 那个类型：domain 不依赖任何壳（文件头的包边界声明），
+ * 而这条同名是持久化取值，必须能独立于界面演进。对账由
+ * `packages/app-host/tests/assistant-session-actions.spec.ts` 的"词表同源"那条判据钉住
+ * —— 壳侧加一档而这里没有，测试会红。
+ */
+export type AssistantTurnRole = 'user' | 'assistant' | 'proposal' | 'error';
+
+/**
+ * 这条消息**由哪一类目的地产出**。
+ *
+ * 🔴 取值就是 `packages/ai` 的 `DestinationDisclosure['kind']` 那三档 + `'unknown'`，
+ * **没有第四档"局域网"** —— 这不是漏了，是沿用既有裁决：`supply.ts` 的
+ * `isLoopbackEndpoint()` **只认字面回环**，局域网主机名按 Joplin 先例判成远端
+ * （`.local` 证明不了"这是你这台机器"）。所以局域网端点的答案落在
+ * `'third-party-endpoint'`。另开一档等于造第二套目的地词表，而词表会漂（§7 #4）。
+ *
+ * ⚠️ domain **不 import `@heyta/ai`**（与 `AiFeedback.feature` 用 `string` 而不用
+ * `AiFeature` 同一个理由：持久化取值要独立演进）。两边的一致性由
+ * `assistantTurnDestinationRejection()` 的封闭词表 + app-host 那条对账测试钉住。
+ */
+export type AssistantTurnDestinationKind =
+  | 'local'
+  | 'third-party-endpoint'
+  | 'heyta-cloud'
+  | 'unknown';
+
+/**
+ * 一条**改动提案**的处置。
+ *
+ * 🔴 只有 `'confirmed'` 才是"落过库"。`'pending'` 是**未确认**，而它在另一台设备上
+ * 一律按 `expired` 展示 —— 判据见 `assistantTurnIsConfirmableHere()`。
+ * 没有 `'expired'` 这一档是刻意的：过期**不是数据**，是"本机能不能确认"的派生结论，
+ * 写进磁盘就等于让一台设备的判断变成全局事实（ADR-0022"状态留在派生侧"同一条）。
+ */
+export type AssistantTurnDisposition = 'pending' | 'confirmed' | 'rejected';
+
+/**
+ * 助手会话的一条消息（ADR-0045 D-4 (ii)，产品负责人 2026-10-05 拍"做"）。
+ *
+ * 🔴 **一条消息 = 一个实体**（不是"一段会话一个实体"）。理由与它**不**做成
+ * `GLOBAL_CONFIG` 里一个会话对象的依据是同一条：数组在 LWW 下是覆盖语义，
+ * 两台设备并发追加会互相吞消息，而且**没有任何一层会报错**
+ * （`entity-types.ts` 里那条注释就是这个决定的落点）。
+ *
+ * 🔴 **全部字段可选**（AGENTS §3.3），这里比 `CountdownEvent` 更严一档，理由要说清：
+ * `CountdownEvent.title` 必填，是因为**那个实体存在就有标题**（标题是它的身份）；
+ * 而一条会话消息的**任何**一格都可能是某个旧宿主没写的 —— 这个实体类型以前根本不存在，
+ * 上线后第一批落库的载荷形状取决于写它的那个构建版本。把 `role` 做成必填，
+ * 症状是"某条老消息在 hydration 时炸掉整个助手面板"，而 **typecheck 与构建都会绿**
+ * （TS 只保护新数据）。所以每一格都给运行时默认值，读侧永远不许 `!`。
+ *
+ * ⚠️ **不落库的东西**（这条边界比落库的字段更容易漂，所以写在模型旁边而不是别处）：
+ * 工具调用的**中间步骤**、失败的 `cause` 枚举、提案的结构化 `intent` 载荷。
+ * 前两个是"这台设备上这一次运行"的细节，同步过去既读不懂也用不上；
+ * 🔴 第三个是**故意不同步**的：那个载荷要改的是本机的某个实体，
+ * 而对端按规则根本不能确认它（见 `assistantTurnIsConfirmableHere`），
+ * 于是它在对端是一段永远不可执行的载荷 —— 落库只会让人以为"另一台设备也能点确认"。
+ * 本机那份仍在本机的 `localStorage` 里（D-4 (i)）。
+ */
+export interface AssistantTurn extends EntityBase {
+  /**
+   * 同一段会话的分组键（由**产生它的那台设备**生成，不是服务端 id）。
+   *
+   * ⚠️ 缺席 = 老数据没写。读侧按"未分组"处理（`assistantTurnsOfSession` 会把它排除），
+   * **不是**按"空会话"处理 —— 后者会让一个真有一段话的设备看起来什么都没说过。
+   */
+  sessionId?: string;
+  /** 角色；缺席按 `'assistant'` 展示（详见 `assistantTurnRoleOf` 的取舍理由）。 */
+  role?: AssistantTurnRole;
+  /** 那条消息的文本。🔴 它就是同步的内容 —— 端到端加密在上传那一步，服务端只见密文。 */
+  text?: string;
+  /**
+   * 这条消息在**会话内**的时刻（本机墙上时钟，epoch ms）。
+   *
+   * ⚠️ 它与 `createdAt` 不是一回事：`createdAt` 由 reducer 从 **op 时间戳**派生，
+   * 是"这条 op 什么时候被写入"，两设备并发时它跟着到达顺序走。`at` 是用户在
+   * 自己界面上看到的那个时刻，也是**展示顺序的键**（排序三段见 `assistant-turn.ts`，
+   * 第三段是 id 兜底 —— 少了它，同一毫秒的两条在两端会换位置，先例见 §2.4）。
+   */
+  at?: number;
+  /** 这一条是哪一类目的地答的；缺席按 `'unknown'`（**不许**猜成 `'local'`）。 */
+  destinationKind?: AssistantTurnDestinationKind;
+  /** 提案那一档：是哪个工具产出的（如 `create_task`）。缺席 = 老数据没写。 */
+  toolName?: string;
+  /** 提案的处置；缺席按 `'pending'`（= 未确认 ⇒ 在对端按过期展示）。 */
+  disposition?: AssistantTurnDisposition;
+  /**
+   * 🔴 **写这条消息的那台设备的 clientId** —— 提案可确认性的唯一判据。
+   *
+   * 为什么不直接读归约器的 `_lastClientId`（它确实记着同一件事）：那个键是
+   * **reducer 的内部元数据**（下划线前缀、随投影走、不承诺形状），把一条安全语义
+   * 挂在它上面，将来某次归约器重构就会无声摘掉"跨设备不许确认"这条规则。
+   * 显式写一格，代价是载荷里多一个字符串，换来的是这条判据有一个**读得到的落点**
+   * 和一条能打红的测试。
+   *
+   * ⚠️ 它是**自报**：同账号下的设备自己写自己的 id，不是不可伪造的证明。
+   * 这里要拦的不是攻击者，而是"另一台设备误以为自己可以确认"这个真实会发生的误用；
+   * 威胁模型写清楚，不要把它读成访问控制。
+   */
+  originClientId?: string;
+}
+
 /**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
@@ -666,6 +776,7 @@ export interface EntityModelMap {
   PREFERENCE_CORRECTION: PreferenceCorrection;
   REMINDER: Reminder;
   EVENT: CountdownEvent;
+  ASSISTANT_TURN: AssistantTurn;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -694,6 +805,7 @@ export const MODELED_ENTITY_TYPES = [
   'PREFERENCE_CORRECTION',
   'REMINDER',
   'EVENT',
+  'ASSISTANT_TURN',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */

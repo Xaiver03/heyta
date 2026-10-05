@@ -56,3 +56,6 @@ export * from './ticktick-import.js';
 export * from './quick-due-picks.js';
 export * from './lunar.js';
 export * from './holidays.js';
+// ADR-0045 D-4 (ii)：助手会话消息的**判定**（一条消息=一个实体；
+// 提案的可确认性只在产生它的那台设备上，跨设备一律按过期呈现。理由在文件头）。
+export * from './assistant-turn.js';
