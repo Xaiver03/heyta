@@ -292,10 +292,18 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2592 个通过 + 12 个跳过：11 浏览器 E2E 默认跳过 + 1 服务端）
+pnpm -r test                    # 全量测试。⚠️ **条数不写在这里**（这里曾写"2592 个通过 + 12 个跳过"，
+                                #    那是会漂的值 —— 与 §7 开头"本文件不写条数"同一个理由）。
+                                #    取现量：逐包的 `Tests  N passed (N)` 汇总行相加；跳过看 `N passed | M skipped`。
+                                # 🔴 收尾必须对一次数：**有 `test` 脚本的包数 == 打了 `Tests` 汇总行的包数**。
+                                #    不相等就说明有一层从来没被跑过，而 `pnpm -r` 的 rc=0 不会告诉你
+                                #    （2026-10-05 实测：19 个包有 test 脚本、19 行汇总，这才敢说没漏层）。
                                 # ⚠️ 沙箱里跑不了 `@heyta/sync-server`（`prisma generate` EPERM），
-                                #    用 `pnpm -r --filter '!@heyta/sync-server' test` 复现这 2592；
-                                #    该包本身只贡献 1 个跳过、0 个通过，所以两者可比
+                                #    用 `pnpm -r --filter '!@heyta/sync-server' test` 复现其余各包。
+                                # 🔴 那条 `--filter` 有两种读数都不指向被测命令：**包名写错**（真名带 `sync-` 前缀）
+                                #    时它打一行 `No projects matched the filters` 然后**退 0**（假绿）；
+                                #    包存在但**没有该 script** 时打 `ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT` **退 1**
+                                #    （假红 —— `@heyta/sync-server` 根本没有 `typecheck` 这一步）。
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
