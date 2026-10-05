@@ -491,6 +491,10 @@ struct SharedWebView: NSViewRepresentable {
         private var ranWebauthnProbe = false
         /// C 的鉴权旅程探针只跑一次。
         private var ranAuthJourney = false
+        /// 🔴 E2 界面级注销旅程只跑一次 —— 它会**真的把账号注销掉**，
+        /// 跑第二遍时面板已经不存在，读数会变成 `NO_CLOSE_ACCOUNT_PANEL`，
+        /// 而那看起来像"入口没了"（其实是被第一趟做掉了）。
+        private var ranEraseJourney = false
 
         /// 🔴 **这两个口子必须"只跑一次"。**
         /// 它们都会**重新加载**页面，而重新加载之后首屏探针会**再次成功** ⇒
@@ -964,6 +968,34 @@ struct SharedWebView: NSViewRepresentable {
                                             "M2-macOS ✅ **已登录**（退出登录 \(menuSignout) 个、" +
                                             "登录入口 \(menuSignin) 个；设置项 \(menuSettings) 个）"
                                         )
+                                        /**
+                                         🔴 **注销旅程只从"已登录"这一支起跑**（`HEYTA_ERASE_JOURNEY=<档位>`）。
+                                         起跑点选这里而不是选鉴权旅程的回调，三条理由：
+                                           · 未登录时 `CloseAccountPanel` 自己返回 null（没有令牌就没有
+                                             "哪个账号"），那一趟读到的 `NO_CLOSE_ACCOUNT_PANEL`
+                                             会被误判成"入口没了"；
+                                           · 这一支**已经点过头像、菜单正开着** ⇒ 探针不用再点头像，
+                                             而两条链同时点头像会把菜单开一下又关掉
+                                             （`NO_SIGNIN_ENTRY`，2026-09-30 实测）；
+                                           · 判据由"链自己判定已登录"给出，不靠 sleep 猜时序。
+                                         */
+                                        if let erase = ProcessInfo.processInfo.environment["HEYTA_ERASE_JOURNEY"],
+                                           !erase.isEmpty, !self.ranEraseJourney {
+                                            self.ranEraseJourney = true
+                                            webView.callAsyncJavaScript(
+                                                Self.eraseJourneyProbe(mode: erase),
+                                                arguments: [:], in: nil, in: .page
+                                            ) { res in
+                                                switch res {
+                                                case let .success(value):
+                                                    self.onStorageFact("ERASE_JOURNEY=\(String(describing: value))")
+                                                case let .failure(error):
+                                                    self.onStorageFact(
+                                                        "ERASE_JOURNEY=调用失败：\(error.localizedDescription)"
+                                                    )
+                                                }
+                                            }
+                                        }
                                         return
                                     }
 
@@ -1182,6 +1214,20 @@ struct SharedWebView: NSViewRepresentable {
                   return cands.some((c) => t.includes(c));
                 });
 
+              // 🔴 **首启的隐私同意面板先答掉**（2026-10-04 实测：不答的话粘贴令牌那条
+              //    会以 `PASTED panelClosed=true panel=…还没有同意隐私规则，这次操作没有发出任何数据`
+              //    收尾 —— 看着像"登上了"，其实一个请求都没发）。
+              //    这一段是幂等的：面板不在（已答过）就整体跳过，不影响第二次起跑。
+              if (byTest('privacy-consent-dialog')) {
+                const acc = byTest('privacy-consent-accept');
+                if (!acc) return 'NO_CONSENT_ACCEPT';
+                acc.click();
+                for (let i = 0; i < 30 && byTest('privacy-consent-dialog'); i += 1) {
+                  await sleep(150);
+                }
+                if (byTest('privacy-consent-dialog')) return 'CONSENT_STILL_OPEN';
+              }
+
               const avatar = byTest('account-menu-avatar');
               if (!avatar) return 'NO_AVATAR';
               // 菜单可能已经开着（别把切换点成"关"）。
@@ -1199,10 +1245,32 @@ struct SharedWebView: NSViewRepresentable {
               entry.click();
               await sleep(700);
 
-              const urlInput = document.querySelector('input[type="url"]');
-              if (!urlInput) return 'NO_SERVER_INPUT';
-              setValue(urlInput, \(jsStringLiteral(server)));
-              const emailInput = document.querySelector('input[type="email"]');
+              /**
+               🔴 **这一整块在 2026-10-04 之前是坏的**（实测：隔离出来的干净存储下
+               `AUTH_JOURNEY=NO_SERVER_INPUT`，而界面确实开到了登录面板）。
+               两重原因叠在一起：
+                 · 2026-10-02 那次折叠改动把「自托管地址 / 粘贴令牌」两栏**从默认 DOM 里拿掉了**
+                   （`AuthForm`：给了 toggle 就默认收起；e2e 侧同一条已在 §33 修过，
+                   壳里这条探针没人再跑过 —— 因为历次门禁用的都是**已登录的旧存储**，
+                   `AUTH_STATE=signed-in` 来自残留状态而不是这条链，于是它坏了也没人看得见）；
+                 · 即便展开，RN-web 也不给地址框加 `type="url"` —— 稳定的钩子是 `data-testid`。
+               ⇒ 现在**先点展开、再按 testID 取**，与 e2e 那条用同一组钩子。
+               */
+              const revealSelfHost = async () => {
+                if (byTest('auth-form-server-url')) return true;
+                const tg = byTest('auth-form-self-host-toggle');
+                if (!tg) return false;
+                tg.click();
+                for (let i = 0; i < 20 && !byTest('auth-form-server-url'); i += 1) {
+                  await sleep(150);
+                }
+                return !!byTest('auth-form-server-url');
+              };
+              if (!(await revealSelfHost())) return 'NO_SELF_HOST_TOGGLE';
+              const serverInput = byTest('auth-form-server-url');
+              if (!serverInput) return 'NO_SERVER_INPUT';
+              setValue(serverInput, \(jsStringLiteral(server)));
+              const emailInput = byTest('auth-form-email');
               if (!emailInput) return 'NO_EMAIL_INPUT';
               setValue(emailInput, \(jsStringLiteral(email)));
 
@@ -1222,15 +1290,33 @@ struct SharedWebView: NSViewRepresentable {
                 return 'CLICKED(' + act + '): ' + (panel.textContent || '').slice(0, 160);
               }
 
-              const paste = [...document.querySelectorAll('input')].find(
-                (i) => { const p = i.placeholder || ''; return p.includes('粘贴') || p.includes('Paste'); }
-              );
-              if (!paste) return 'NO_PASTE_INPUT';
-              setValue(paste, \(jsStringLiteral(token)));
+              // 粘贴框在**另一枚**折叠入口后面（`auth-form-have-token-toggle`，
+              // 与地址栏那枚是两条独立的 `useState`）—— 实测 21:26：只展开地址栏
+              // 会走到这里并以 `NO_PASTE_INPUT` 收尾。
+              const revealPaste = async () => {
+                if (byTest('auth-form-paste')) return true;
+                const tg = byTest('auth-form-have-token-toggle');
+                if (!tg) return false;
+                tg.click();
+                for (let i = 0; i < 20 && !byTest('auth-form-paste'); i += 1) {
+                  await sleep(150);
+                }
+                return !!byTest('auth-form-paste');
+              };
+              let pasteEl = byTest('auth-form-paste');
+              if (!pasteEl) {
+                await revealPaste();
+                pasteEl = byTest('auth-form-paste') ||
+                  [...document.querySelectorAll('input')].find(
+                    (i) => { const p = i.placeholder || ''; return p.includes('粘贴') || p.includes('Paste'); }
+                  );
+              }
+              if (!pasteEl) return 'NO_PASTE_INPUT';
+              setValue(pasteEl, \(jsStringLiteral(token)));
               await sleep(200);
               // ⚠️ 候选必须**精确**：早先放了 '登录' 当兜底，而「发送登录链接」也含这两个字 ⇒
                 //    点错按钮、面板关掉、探针误判成登录成功（实测 2026-09-30）。
-                const confirm = byText(['完成登录', 'Finish signing in']);
+                const confirm = byTest('auth-form-verify') || byText(['完成登录', 'Finish signing in']);
               if (!confirm) return 'NO_CONFIRM_BUTTON';
               confirm.click();
               await sleep(2500);
@@ -1249,6 +1335,85 @@ struct SharedWebView: NSViewRepresentable {
               'PASTED panelClosed=' + !byTest('sync-signin-entry') + ' panel=' +
               (panel.textContent || '').split(/\\s+/).join(' ').slice(0, 140)
             );
+            """
+        }
+
+        /**
+         🔴 **界面级注销旅程**（`HEYTA_ERASE_JOURNEY=<档位>`，默认关）—— E2 的 macOS 那一格。
+
+         这一格要证的**不是**"销毁函数会删文件"（那一层已有 17 条 TS 判据 + 两端壳级
+         `oplog-destroyed` 实测），而是**用户在界面上点注销，本机真的清了**。macOS 壳没有
+         CDP（实测），所以只能像 Windows 那条一样由壳自己把真 UI 走一遍。
+
+         两档，各自只跑一次：
+           · `arm`   —— 只走到"勾了确认、`close-account-open` 出现"就**停住**，不提交。
+                        它是前提证明：没有这一档，`close` 那档"文件没了"可能只是
+                        根本没点到按钮（＝"没观测到"被读成"没发生"）。
+           · `close` —— 一路提交，把结果面板那句连同 `data-disposition` 读回来。
+
+         ⚠️ 只按 `data-testid` / `id` 找控件，**不按界面文案**：壳里语言跟随系统，
+            按中文找会在英文界面下全落空（`authJourneyProbe` 那条实测的同族）。
+         ⚠️ 结果面板可能在读之前就随 `useAuthStore.reset()` 卸载 ⇒ 用 MutationObserver
+            在节点出现的那一刻取值，而不是只靠轮询（轮询 200ms 会漏掉一闪而过的读数）。
+         */
+        static func eraseJourneyProbe(mode: String) -> String {
+            """
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+            const byTest = (id) => document.querySelector('[data-testid="' + id + '"]');
+            const act = \(jsStringLiteral(mode));
+
+            let seen = null;
+            const note = (el) => {
+              if (!el || seen) return;
+              seen = 'disposition=' + (el.getAttribute('data-disposition') || '') +
+                     ' text=' + (el.textContent || '').slice(0, 160);
+            };
+            const obs = new MutationObserver(() => note(byTest('close-account-result')));
+            obs.observe(document.body, { childList: true, subtree: true, attributes: true });
+
+            const avatar = byTest('account-menu-avatar');
+            if (!avatar) { obs.disconnect(); return 'NO_AVATAR'; }
+            let panel = byTest('close-account-panel');
+            for (let attempt = 0; attempt < 3 && !panel; attempt += 1) {
+              if (!byTest('account-menu-settings')) avatar.click();
+              let item = null;
+              for (let i = 0; i < 20 && !item; i += 1) {
+                await sleep(150);
+                item = byTest('account-menu-settings');
+              }
+              if (!item) { obs.disconnect(); return 'NO_SETTINGS_ITEM'; }
+              item.click();
+              for (let i = 0; i < 40 && !panel; i += 1) {
+                await sleep(150);
+                panel = byTest('close-account-panel');
+              }
+            }
+            if (!panel) { obs.disconnect(); return 'NO_CLOSE_ACCOUNT_PANEL'; }
+
+            const ack = document.getElementById('close-account-ack');
+            if (!ack) { obs.disconnect(); return 'NO_ACK_CHECKBOX'; }
+            if (!ack.checked) { ack.click(); await sleep(250); }
+            if (!ack.checked) { obs.disconnect(); return 'ACK_NOT_CHECKABLE'; }
+            let open = byTest('close-account-open');
+            for (let i = 0; i < 20 && !open; i += 1) {
+              await sleep(150);
+              open = byTest('close-account-open');
+            }
+            if (!open) { obs.disconnect(); return 'NO_OPEN_BUTTON'; }
+            if (act === 'arm') { obs.disconnect(); return 'ARMED ack=1 open=1'; }
+            open.click();
+            let confirm = byTest('close-account-confirm');
+            for (let i = 0; i < 20 && !confirm; i += 1) {
+              await sleep(150);
+              confirm = byTest('close-account-confirm');
+            }
+            if (!confirm) { obs.disconnect(); return 'NO_CONFIRM_BUTTON'; }
+            note(byTest('close-account-result'));
+            confirm.click();
+            for (let i = 0; i < 160 && !seen; i += 1) { await sleep(200); }
+            obs.disconnect();
+            if (!seen) return 'SUBMITTED_NO_RESULT_PANEL';
+            return 'RESULT ' + seen;
             """
         }
 
