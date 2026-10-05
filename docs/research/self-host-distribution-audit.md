@@ -12656,3 +12656,32 @@ BLOCKED.md（主检出） = 最后修改 10-05 04:41，最新条目 B79 是别�
 三选一（①推那 9 笔 / ②本地 main 重置到公开那笔、9 笔另找落点 / ③承认两条线并重写 §8.16 的落地口径）
 **每条都会动到别人已提交的工作**，授权原文只覆盖"主检出干净时那一条 `git merge --ff-only origin/main`"，
 ahead>0 时它按设计 refuse —— 本线没有代做、没有降级、没有把 ahead 当成归零条件等。
+
+### 8.229 裁决到了：走 ①。先把 ① 的两件事实量出来 —— 一件比想象中便宜，另一件我做不了（2026-10-05 16:1x）
+
+产品负责人选了 **①「先推那 9 笔，再落地」**。动手前只读地把两件事核了一遍，两件事都改变了下一步的形状：
+
+**其一，并进公开侧是零冲突的。** `git merge-tree --write-tree main origin/main` → **rc=0**，
+输出恰好一行 tree OID ⇒ 本地那 9 笔与公开独有的 594 笔在树级别**不撞**。
+（§8.16 明写"零冲突只对落笔那一趟成立，用它之前必须先跑一次 merge-tree，不许引用" ⇒ 这条读数就是那次现跑，
+它只对 16:1x 这一趟有效。）所以 ① 的 git 部分是：`fetch` → `merge origin/main`（无冲突）→ `push`，
+**不需要**先解本批那 9 处冲突 —— 那是"落地"那一格的事，两件事被这条读数分开了。
+
+**其二，push 在这台机器上做不到，而且不是慢。** 远端是 `git@github.com:Xaiver03/heyta.git`；
+两次只读探测（`git ls-remote --heads origin main`）的现量：
+`RC=128 / Connection timed out during banner exchange / Connection to 198.18.0.87 port 22 timed out`
+（第一次 45s 直接 124）。`198.18.x.x` 是本机代理的 fake-ip 段 —— **SSH 到 GitHub 被代理吃掉了**，
+而"绝对禁止改动本机网络环境（不起停代理客户端）"是本线与用户之间长期有效的约束。
+⇒ ① 里"推"这一格**不在本会话能完成的集合内**：要么由负责人自己开一条直连通道后跑那三条命令，
+要么由负责人自己推。我没有代做网络侧的改动，也没有为了让它通而改判据。
+
+**顺带一条对落地的新读数**（同一次只读探测里量的，因为 ① 之后紧接着就是落地）：
+`git merge-tree --write-tree --name-only main feat/self-host-distribution` → **rc=1，9 处冲突**：
+`docs/research/self-host-distribution-audit.md`、`docs/runbooks/deployment.md`、
+`e2e/live-site/live-domain.spec.ts`、`package.json`、`research/tools/check-image-license-coverage.mjs`、
+`research/tools/gen-image-npm-tree.mjs`、`scripts/screenshots/capture.mjs`、`server/Dockerfile`、
+`server/image-npm-tree.json`。
+比 §8.22/§8.29 那两趟的"6 条"多了 3 条，且**九条里没有任何一条是主检出里那两枚别人未提交的文件**
+（`docs/README.md`、`package.json` 中只有 `package.json` 在冲突面上，而它同时也在主检出是脏的 ⇒
+落地时那一份要按"谁的工作树里的那一行"逐格认领，不能整文件取一边）。
+载体重算走 `research/tools/selfhost-merge-carrier.mjs`，重算前照例先跑集外冲突预检（#45 那枚闸门）。
