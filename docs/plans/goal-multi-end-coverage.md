@@ -3037,7 +3037,8 @@ VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VER
 以及归档目录 `/Users/rocalight/.heyta-evidence/reinstall-7911ad02-1005-195657/`），不凭记忆、不补词：
 
 ```
-载体 = heyta-wt-reinstall @ 7911ad02c80d3741ee7117f20c09ab93e684595a
+载体当前=3696abb8  main 现在=7911ad02c80d3741ee7117f20c09ab93e684595a   ← 启动器 :41 的**打印名**（模板要求的形状）
+     载体对齐由启动器自己完成 ⇒ 本轮读数钉的是下面那枚 7911ad02（不是 3696abb8）
      scripts/reinstall-all.sh blob = c30a587ceb4d4ec8138b7bc975317247e9669f48   ← 现读 `git -C <载体> rev-parse HEAD:scripts/reinstall-all.sh`
      （⚠️ 我 03:35 那节写的 036ce09a 已被别线落地反过来否证，见交接账 20:00 那条就地更正）
 载体身份（起跑）=7911ad02c80d3741ee7117f20c09ab93e684595a
