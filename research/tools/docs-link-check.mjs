@@ -156,6 +156,16 @@ function collect(dir, acc = []) {
     if (SKIP_PATHS.some((p) => rel === p || rel.startsWith(p + '/'))) continue;
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
+      // 🔴 **嵌套检出**（linked worktree / 另一次 clone）不属于本检出，判据不能建在目录名上。
+      //    上面那张 SKIP_DIRS 已经为这件事补过两次名字（`.worktrees`、`tmp`），各自的注释
+      //    都写了同一条实测："别人半成品的工作副本能把主检出的 check:docs 卡红"。
+      //    2026-10-04 22:2x 第三次现形：本 CLI 给子 Agent 开的 `.qoder/worktrees/<id>/`
+      //    不在名单里，它自带一份 `docs/runbooks/deployment.md` 与 `desktop.md`，
+      //    于是"唯一 basename 简写""唯一路径后缀"两枚**自检夹具**同时解析不出来 ——
+      //    检查器报的是"我自己坏了"，而根因是扫描面把另一份工作副本算进来了。
+      //    目录里有没有 `.git` 才是这件事的定义（worktree 放的是 .git **文件**，
+      //    clone 放的是目录），名字只是巧合。
+      if (existsSync(join(full, '.git'))) continue;
       collect(full, acc);
     } else if (entry.name.endsWith('.md')) {
       acc.push(full);

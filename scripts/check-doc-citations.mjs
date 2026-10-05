@@ -106,6 +106,15 @@ function looksLikePath(token) {
   // `node_modules/...`：索引里**没有**这些（遍历跳过它们），而本文用它讲的是
   // 装出来的依赖树 —— 不在"仓库里有没有这个名字"这个问题的范围内。
   if (token.startsWith('node_modules/') || token === 'node_modules') return false;
+  // 🔴 两类**长得像路径但其实不是**的形状，现量于 10-05 02:4x 把本门指向
+  //    `docs/plans/trash-and-archive.md` 的那一趟（它此前只被指向审计档跑过，所以没人撞见）：
+  //    · `@heyta/server` —— npm 包名。`@scope/name` 里的 `/` 不是目录分隔符，
+  //      而它尾段 `server` 恰好落进下面那条"常见源码目录"的正则 ⇒ 被当路径报成"不存在"。
+  //    · `§10.66/§10.67` —— 同一篇文档里的**节引用**。它含 `/`、不含被排除的标点，
+  //      于是也进了路径维。
+  // 两类的共同点：它们问的都不是"仓库里有没有这个名字"，所以不在本门的射程内。
+  if (token.startsWith('@')) return false;
+  if (token.includes('§')) return false;
   if (/[*<>{}[\]()$|"'`…]/.test(token)) return false;
   if (token.includes('..') || token.includes('…') || token.includes('=')) return false;
   if (token.endsWith('/') || /\s/.test(token)) return false;
@@ -141,6 +150,14 @@ function collect(dir, prefix, sink) {
   for (const entry of entries) {
     if (entry.name === '.git' || entry.name === 'node_modules') continue;
     const rel = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
+    // 🔴 **嵌套检出**（linked worktree / 另一次 clone）不属于本检出，判据不能建在目录名上。
+    //    现量：本仓根下同时躺着 `.worktrees/detail-pane`（`.git` 是**文件**）和
+    //    `.qoder/worktrees/agent-general-purpose-*`（`.git` 是**目录**）—— 名单漏一个就吃进一整棵树。
+    //    ⚠️ 这一条门的**失效方向和别处相反**：`check:shell-unicode` 那类是"多扫了别人的文件 ⇒ 报假红"，
+    //    这里索引是**接受集**（`pathHits > 0` 就放行），别人的检出里有**还没进 main 的新文件**
+    //    ⇒ 引用那些路径的文档在**本机判绿、在干净检出判红**。同一族里的第三种面目：
+    //    "门禁绿 ≠ 干净检出绿"（§7 那张表里 #191 的近亲）。
+    if (entry.isDirectory() && existsSync(join(dir, entry.name, '.git'))) continue;
     // 🔴 目录也进索引：本文有一批引用是**目录**形状（`apps/web`、`packages/ui/src`），
     //   只收文件会把它们全报成不存在 —— 那是一条会为一百个真东西报假的红。
     sink.push(rel);
@@ -256,18 +273,25 @@ function selfTest() {
     '见 `packages/definitely-not-here/fake-file.ts:1` 的那一行。',
     '现量取自 git show HEAD:server/src/x.ts，读数 = 0，这一句没写 SHA。',
     '带锚的那句：git show HEAD:server/src/x.ts 于 deadbeef，行数 12。',
+    '包名 `@heyta/server` 与节引用 `§10.66/§10.67` 都不是仓库里的路径。',
   ].join('\n');
 
-  const pathCaught = findPathProblems('__probe__', probe).some((p) =>
-    p.includes('packages/definitely-not-here/fake-file.ts'),
-  );
+  const pathProblems = findPathProblems('__probe__', probe);
+  const pathCaught = pathProblems.some((p) => p.includes('packages/definitely-not-here/fake-file.ts'));
+  // 🔴 负向对照：这两枚**必须不被报**。没有这两条，"把 `@scope/name` 当路径"这种
+  //    误判可以自己过完整套阳性对照 —— 而它每加宽一次射程就多杀一批正常句子。
+  const pkgNotFlagged = !pathProblems.some((p) => p.includes('@heyta/server'));
+  const sectionNotFlagged = !pathProblems.some((p) => p.includes('§10.66'));
   const shaProblems = findShaProblems('__probe__', probe);
   const noAnchorCaught = shaProblems.some((p) => p.includes('没写锚定的 SHA'));
   const bogusCaught = shaProblems.some((p) => p.includes('不是本仓的提交对象'));
 
   return {
-    ok: pathCaught && noAnchorCaught && bogusCaught,
-    detail: `路径维=${pathCaught ? '抓到' : '漏'} · 无锚维=${noAnchorCaught ? '抓到' : '漏'} · 假 SHA 维=${bogusCaught ? '抓到' : '漏'}`,
+    ok: pathCaught && noAnchorCaught && bogusCaught && pkgNotFlagged && sectionNotFlagged,
+    detail:
+      `路径维=${pathCaught ? '抓到' : '漏'} · 无锚维=${noAnchorCaught ? '抓到' : '漏'} · ` +
+      `假 SHA 维=${bogusCaught ? '抓到' : '漏'} · ` +
+      `包名不误杀=${pkgNotFlagged ? '是' : '否'} · 节引用不误杀=${sectionNotFlagged ? '是' : '否'}`,
   };
 }
 
