@@ -1684,6 +1684,11 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   `pnpm -r test` **RC=0 / 20 个包 / 11607 passed**（上一趟那条 `calendar-sidebar` 的 5s 超时单独复跑 **13 passed** ⇒ 记为并行负载超时不是产品失败）；
   静态门禁分母**从 `package.json` 的 `check` 链现量**（90 段里 85 枚 `check:*`，排除 5 段会抢共享载体的：
   `check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e` / `check:macos-window` / `check:apk-freshness`）
+  ⚠️ 那 5 段里的 4 段**随后在锁让路之后补跑完**（`56e08da8`）：`check:ai-e2e` **196 passed / 7.6m**、
+  `check:landing-e2e` **22 passed**、`check:privacy-consent-e2e` **7 passed**、`check:apk-freshness`（它是 `--self-test`）rc=0，
+  外加链上非 `check:*` 的两段 `check:entries`（76 份 rc=0）与 `screenshot:verify`（23 个目标 rc=0）；
+  **只剩 `check:macos-window` 没跑**——本机此刻躺着一枚 `/Applications/Heyta.app`（pid 772）在用户手里，
+  那条门禁会 pkill 同名旧实例，跑它等于把用户的窗口拿走（§8.9 只对自己创建的对象动手）。
   ⇒ **80 段跑完，79 绿 / 1 红**。
   🔴 **那一红当时的解释是错的，留原文是为了让人看清"红字自己说的原因"也要复核**：它打印的是
   "断言 A：winFacts 扫不到 ⇒ 判据失效"，我第一版把它读成"两栏未取证，归落地后的四端重装"——
