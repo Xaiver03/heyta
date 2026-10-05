@@ -1129,3 +1129,28 @@ export {
   type CalendarDayEvent,
   type CalendarEventBarLabels,
 } from './calendar/model.js';
+
+/**
+ * ── 工单 H3：习惯图标的**两张共享表** ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 转出的动机不是"方便"，是**移动端要画同一批字形**：`HabitsScreen` 详情层的图标
+ * 选择器（工单 H3）如果自己在 `apps/mobile` 里再抄一张 `key → 字形`，那就是
+ * **第三份事实源** —— 而它坏的时候两端都不报错，症状只是"手机上水滴、web 上月亮"。
+ * 现有判据（`apps/web/tests/habits-list-pane.spec.tsx` F 组）比的是**清单**那两张
+ * （web 的组件表 vs 共享层的数据表），管不到宿主里新长出来的第三张。
+ *
+ * ⚠️ 两张表的性质不同，别读成"重复被消除了"：
+ *   · `HABIT_GLYPHS`（key → `lucide` **图标数据**，经 `HeytaIcon` 在 RN 上画）
+ *     与 web 那张 `key → lucide-react **组件**`**结构上必须分开**（画的不是同一种东西），
+ *     一致性由 F 组逐对比钉住 —— 这一份导出只是让移动端**不必**再抄；
+ *   · `HABIT_ICON_LABEL_KEYS`（key → 词条名）是**真的只有一份**：web 已改为从这里取
+ *     （`apps/web/src/features/habits/habit-glyphs.ts` 里那 10 行删掉了），
+ *     抽取的收尾动作是删掉旧的那份，不是再写一份更好的。
+ */
+export {
+  HABIT_GLYPHS,
+  HABIT_ICON_LABEL_KEYS,
+  type HabitIconLabelKey,
+} from './habits/HabitProgressList.js';

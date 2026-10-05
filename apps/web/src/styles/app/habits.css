@@ -304,7 +304,6 @@
   gap: var(--ht-space-1);
   flex: none;
 }
-
 .ht-habit__icon-toggle {
   display: inline-flex;
   align-items: center;
@@ -324,10 +323,28 @@
   font-size: var(--ht-font-size-xs);
 }
 
+/*
+ * 展开的那一排：🔴 **必须是定宽网格，不能按内容撑开**。
+ *
+ * 看图照出来的缺陷（工单 H3，2026-10-06 01:5x）：原来它是 `display:flex` + `flex-wrap:wrap`
+ * 而没有宽度上界，于是整排按内容撑到 8×44px 并把 `.ht-habit__pane-tools`（`flex: none`，
+ * 刻意不让标题挤扁工具）顶出窗格 —— 结果**第 8 个字形被视口右边缘裁掉、「默认」那一格
+ * 完全看不见**。而 `toBeVisible()` 五条判据全绿：它只验"有非空 bounding box"，
+ * 不验"在视口里"。看不见「默认」= 用户挑过就退不回去，正是那一格存在的唯一理由。
+ *
+ * 定成 4 列网格：宽度 = 4 × `touch-target.min` + 3 × `space.1`，
+ * 从被约束的常量推导，不写像素字面量；「默认」那一格独占一行（`grid-column: 1 / -1`）。
+ */
 .ht-habit__icon-options {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, var(--ht-touch-target-min));
   gap: var(--ht-space-1);
+  justify-content: end;
+}
+
+/* 「默认」那一格铺满整行：它不是第 9 个字形，挤在同一排会让人以为它是候选之一。 */
+.ht-habit__icon-option--default {
+  grid-column: 1 / -1;
 }
 
 .ht-habit__icon-option {

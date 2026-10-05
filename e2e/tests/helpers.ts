@@ -29,7 +29,7 @@
  * 出现了才点。这也意味着**远端授权链路在本套件里验不到**，见测试报告。
  */
 
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { installMissingProducerShims } from './shims';
 
 /** 假端点的来源（与 `playwright.config.ts` 的 webServer 端口一致）。 */
@@ -646,4 +646,19 @@ export async function addNote(page: Page, content: string): Promise<void> {
     page.locator('[data-testid^="note-row-"]').filter({ hasText: content }).first(),
     `建了「${content}」但便签板里没有那一张`,
   ).toBeVisible();
+}
+
+/**
+ * 量一个元素的**盒子**，并把"可见却量不到"当成失败响亮报出来。
+ *
+ * 🔴 为什么要单独一个 helper：`toBeVisible()` 回答的是"在 DOM 里、有尺寸、没被
+ *    `display:none`"，**它不回答"在不在视口内"**。第一版图标选择器五条断言全绿，
+ *    而展开的那一排被排到了视口右边外面 —— 只有盒子坐标能抓这种"存在但看不见"。
+ *    所以任何几何判据都必须先过这一道：拿不到 box 就红，不许按 `0` 继续算。
+ */
+export async function boxOf(page: Page, locator: Locator, what: string) {
+  await expect(locator, `界面上找不到${what}`).toBeVisible();
+  const box = await locator.boundingBox();
+  expect(box, `${what}"可见"却量不到 boundingBox`).not.toBeNull();
+  return box as { x: number; y: number; width: number; height: number };
 }
