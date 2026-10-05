@@ -3081,7 +3081,6 @@ COPY_BAD：装置**没有打印过这一行**（`grep -c COPY_BAD` = 0）⇒ 不
   ✅ 沙盒已同步（Manifest.lock == Podfile.lock）
   主蓝采样命中 4152（数的是 heyta-reinstall-ios.png）
   /tmp/heyta-reinstall-ios.png 562430 bytes mtime=10-05 20:07:15 md5=b95a8330f89d  [本轮新生]
-```
 
 **"看的是哪一枚图"这件事有对账**：我在 20:03 先把四枚 `cp -p` 成私有快照再看（`/tmp` 会被下一趟覆盖，traps #275），
 20:07 与归档目录逐枚比 md5 ⇒ 四枚**逐字相同**
