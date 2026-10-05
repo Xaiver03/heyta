@@ -266,6 +266,25 @@ has_rid() {  # <testID> → 1/0
 #   同时完整出现。⇒ `has_rid` 的那个 0 有两种读法："这一行没渲染"与"这一行在裁切线以外"，
 #   而第 5 步要的恰恰是前者。rig15 就是拿后者当成了产品缺陷（`❌ 配好端点后「我的」里仍没有…`）。
 # 用法：`reveal_rid <testID>` 先把它滚进窗口（退化成"看得见"），返回 1 才说明真没有。
+# 🔴 rig31 现量的新形状（第 4 步的 ai-endpoint-label、第 5 步第二发的 tool-input 都栽在这）：
+#   reveal_rid 的手势只有一种方向（1900→900 = **往下**滚），于是"控件在视口上方"和
+#   "控件根本不存在"两种事实被读成同一句「滚不出来 / 界面形状或 testID 变了」。
+#   这次是端点表单里加了能力 chip 那一行，内容整体变高：滚动停靠点落到了 chip 以下，
+#   而「名称」那一格在**上面** —— 往下滚满 5 发永远够不到它。
+#   ⇒ 失败出口必须先排除"方向局限"这一档，再说"没有"。这一档也顺带把 scroll_to_top
+#   那五发反向手势复用掉，不在两处再抄第二套手势（同一个判断写两遍就是漂移的起点）。
+reveal_rid_top_fallback() {  # <testID> → 0=在视口上方，回到顶部后取到 / 1=回到顶部也没有
+  local rid=$1
+  blur_focus
+  scroll_to_top
+  dump
+  if [ -n "$(rid_center "$rid")" ]; then
+    echo "   · testID=$rid 在**视口上方**（往下滚永远够不到）⇒ 摘焦点回到顶部后取到" >&2
+    return 0
+  fi
+  return 1
+}
+
 reveal_rid() {  # <testID> [最多滚几次=6] → 0=滚出来了 / 1=滚不出来
   local rid=$1 max=${2:-6} i ref now stuck=0 blurred=0
   for i in 1 2 3 4 5 6 7 8; do
@@ -292,7 +311,9 @@ reveal_rid() {  # <testID> [最多滚几次=6] → 0=滚出来了 / 1=滚不出�
         echo "   ↻ 连 ${stuck} 发 swipe 参照锚没动（$ref）—— 焦点多半挂在输入框上，先摘焦点" >&2
         blur_focus; blurred=1; stuck=1
       elif [ "$stuck" -ge 3 ]; then
-        echo "   ❌ 摘过焦点之后仍连续 ${stuck} 发 swipe 画面一格没动 ⇒ 载体够不到这一屏（不把「滚不出来」记成产品缺陷）" >&2
+        # 画面不动有两种：滚到列表底了（目标在上方 ⇒ 换方向才有救）/ 这一屏真的滚不动。
+        reveal_rid_top_fallback "$rid" && return 0
+        echo "   ❌ 摘过焦点、往下滚满又回到顶部再找一次，testID=$rid 还是不在树里 ⇒ 载体够不到（不把这一句记成产品缺陷）" >&2
         return 1
       fi
     else
@@ -300,7 +321,11 @@ reveal_rid() {  # <testID> [最多滚几次=6] → 0=滚出来了 / 1=滚不出�
     fi
   done
   dump
-  [ -n "$(rid_center "$rid")" ]
+  [ -n "$(rid_center "$rid")" ] && return 0
+  # 往下滚满了还没见到 ⇒ 换方向再判一次，别让"在上方"冒充"不存在"。
+  reveal_rid_top_fallback "$rid" && return 0
+  echo "   ❌ testID=$rid 往下滚满又回到顶部再找一次仍不在树里 ⇒ 界面形状或 testID 变了" >&2
+  return 1
 }
 # 判断"这一发手势到底让画面动了没有"的参照锚。
 # 🔴 rig23 现量：第一版取"树里第一枚有 resource-id 的节点"，那是 `android:id/content`
@@ -948,7 +973,37 @@ echo "   ✅ 设备内回环可达（/__probe 计数 ${P0} → ${P1}）"
 step "0. 全新安装 + 隐私门（先选「只用本机」）"
 $ADB shell pm clear "$PKG" >/dev/null 2>&1 || true
 $ADB shell am force-stop "$PKG" >/dev/null 2>&1 || true
-$ADB install -r -g "$APK" >/dev/null 2>&1 || { echo "   ❌ 装不上 $APK"; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
+# 🔴 adb 的输出必须留在判据里（2026-10-06 05:50 实测）：这一行原来写成
+#   `$ADB install -r -g … >/dev/null 2>&1 || echo 装不上`，于是换打包机带来的那次失败
+#   只剩「装不上」三个字。真原因是
+#   `INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.heyta signatures do not
+#   match newer version; ignoring!` —— Android 的 release 变体在没有发布键时挂的是
+#   **打包机自己的 debug keystore**（`build.gradle` 那条回退），本机打出来的 APK 与
+#   windows-pc 打出来的那颗键不同 ⇒ 同包名跨键**不能 `-r` 覆盖安装**。
+#   载体坏掉的那一步要自带原因，否则下一轮还得重新手动复现一次才知道它为什么坏。
+#   修法分两层：① 先把输出接进变量；② 认出这一种失败就卸掉重装（这一步本来就写着
+#   「全新安装」，`pm clear` 已经把数据清了，卸载不多丢任何状态），重装仍失败才判红。
+INSTALL_OUT=$($ADB install -r -g "$APK" 2>&1)
+if [ $? -ne 0 ]; then
+  case "$INSTALL_OUT" in
+    *INSTALL_FAILED_UPDATE_INCOMPATIBLE*)
+      echo "   ⓘ 已装的那枚与本轮产物不是同一颗签名键（换了打包机 = 换了 debug keystore）⇒ 卸载后重装"
+      UN_OUT=$($ADB uninstall "$PKG" 2>&1); echo "      uninstall：${UN_OUT}"
+      INSTALL_OUT=$($ADB install -g "$APK" 2>&1)
+      if [ $? -ne 0 ]; then
+        echo "   ❌ 卸载后仍装不上 $APK"
+        echo "      adb 原文：${INSTALL_OUT}"
+        summary "移动端 AI 助手真机验收" "载体坏了" 1
+      fi
+      ok "换键后全新安装成功（本轮产物是这一台打出来的）"
+      ;;
+    *)
+      echo "   ❌ 装不上 $APK"
+      echo "      adb 原文：${INSTALL_OUT}"
+      summary "移动端 AI 助手真机验收" "载体坏了" 1
+      ;;
+  esac
+fi
 # 🔴 顺序（2026-10-06 实测出来的形状，别再换回去）：
 #   1) 先 settle_foreground —— 刚 `pm clear` + 装完，进程还没起，此时 dump 到的是 launcher；
 #   2) 再一次性交给 `dismiss_welcome_if_present`：它内部**先**处理隐私面板、**后**点欢迎页。
