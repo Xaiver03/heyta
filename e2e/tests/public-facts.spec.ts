@@ -33,6 +33,9 @@ const MARKERS = '[data-testid^="calendar-day-marker-"]';
 const CELLS_PER_MONTH_GRID = 42;
 
 const markerOf = (date: string): string => `[data-testid="calendar-day-marker-${date}"]`;
+/** 左侧那份**迷你月历**的标记（W6 之前它不跟着画 —— 同一屏两份说法）。 */
+const miniMarkerOf = (date: string): string =>
+  `[data-testid="calendar-mini-marker-${date}"]`;
 
 /** 往凭据里塞服务端地址 = "这台设备连的是那个部署方"。 */
 async function pointAtDeployer(page: Page): Promise<void> {
@@ -61,6 +64,11 @@ test('A：没配服务端 ⇒ 日历完整，标记来自随包表（判据①�
   // 随包表覆盖 2026-10，所以一颗点都不该有 —— 这条判的是"退回随包表"真退回了。
   await expect(page.locator(markerOf('2026-10-01'))).toHaveText('休');
   await expect(page.locator(markerOf('2026-10-10'))).toHaveText('班');
+  // 🔴 W6 补齐的那半：左侧迷你月历原先**不跟着画**，于是同一屏两份说法
+  //   （主区说"10-01 休"、侧栏只给一颗点）。读的是同一个 `adjustmentOn`，
+  //   画不画是宿主的事 —— 这条就是钉"宿主画了"。
+  await expect(page.locator(miniMarkerOf('2026-10-01'))).toHaveText('休');
+  await expect(page.locator(miniMarkerOf('2026-10-10'))).toHaveText('班');
   expect(errors, `界面上不该出现任何东西，但控制台有：\n${errors.join('\n')}`).toEqual([]);
 });
 
@@ -119,6 +127,9 @@ test('C：部署方只下发 10-17 一天 ⇒ 10-17 出现「班」，随包表 
   // 🔴 再等"随包表那一天不在了"—— 整年替换的另一半，缺了它这条判据等于只验了新值。
   await expect(page.locator(markerOf('2026-10-01'))).toHaveCount(0);
   await expect(page.locator(markerOf('2026-10-10'))).toHaveCount(0);
+  // 侧栏那份跟着换（覆盖表是模块级状态，React 看不见 —— 这一条钉的是那次重算真的敲到了侧栏）。
+  await expect(page.locator(miniMarkerOf('2026-10-17'))).toHaveText('班');
+  await expect(page.locator(miniMarkerOf('2026-10-01'))).toHaveCount(0);
 
   await page.screenshot({ path: 'test-results/public-facts-deployer-supplied.png', fullPage: false });
 

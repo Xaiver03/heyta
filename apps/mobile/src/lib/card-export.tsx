@@ -32,7 +32,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixelRatio, Platform, Share, View } from 'react-native';
 import { Rect, Svg, Text as SvgText } from 'react-native-svg';
 import { buildCardExportLayout, cardExportFileName, cardExportFileStem, type CardExportLayout, type CardExportRequest } from '@heyta/ui/node';
-import { cardTextLinesFor, rasterRequestFor, rasterScaleFor } from './card-export-units';
+import { afterNextFrameWithin, cardTextLinesFor, rasterRequestFor, rasterScaleFor, settleRasterize } from './card-export-units';
 import { writeCardPng, type CardExportFailureCode } from './card-export-native';
 
 export type { CardExportFailureCode as MobileCardExportFailure } from './card-export-native';
@@ -118,24 +118,80 @@ export function useCardExporter(): {
   useEffect(() => {
     const current = pending;
     if (current === null) return;
-    const svg = svgRef.current;
-    if (svg === null) {
+
+    /**
+     * 🔴 一次运行只能有一个"结结论"的人。
+     *
+     * `settled` 之前，这个闭包里的每条分支都可能是结论点；`cleanup` 之后，
+     * 结论点换成 cleanup。**不允许**两条都 resolve —— 双 resolve 会让一次点击
+     * 排起两个分享面板（实测形状：连点两次出两张图，而图与文件名是错配的）。
+     */
+    let settled = false;
+    const finish = (result: MobileCardExportResult) => {
+      if (settled) return;
+      settled = true;
+      current.resolve(result);
+      setPending(null);
+    };
+
+    const mountedAtCommit = svgRef.current;
+    if (mountedAtCommit === null) {
       // React 的 commit 在 effect 之前完成 ⇒ 走到这里就是真的没有视图。
       // **不静默重试**：重试会表现为"卡几秒后突然出图"，那种形状最像成功。
-      current.resolve({ ok: false, error: 'rasterize-empty', detail: 'svg-not-mounted' });
-      setPending(null);
+      finish({ ok: false, error: 'rasterize-empty', detail: 'svg-not-mounted' });
       return;
     }
     const options = rasterRequestFor(Platform.OS, current.layout.width, current.layout.height);
-    let settled = false;
-    svg.toDataURL((base64?: string) => {
+    // 🔴 先让出一帧再问原生要图（为什么，见 `afterNextFrame` 的注释：不让这一帧，
+    //    iOS 上原生的 tag 查找拿到 nil，而那条分支不回调 ⇒ 只能等到超时）。
+    // 🔴 不直接 `svg.toDataURL(...)`：那条回调**可以永远不来**（见 `settleRasterize` 的注释），
+    //    而"点了没反应"是本文件文件头登记过的高危形状。等不到也要出一句话。
+    // 🔴 让帧本身也要有预算：`requestAnimationFrame` 在**后台不触发**，
+    //    不设上限时这段等待落在 `RASTERIZE_SETTLE_MS` 那 15 s 预算**管不到的地方** ——
+    //    于是"挂死"与"回前台后延迟弹一次分享面板"两种形状都会出现（W7-G6 那句
+    //    "只会假红不会假绿"正是靠这一条才成立）。
+    void afterNextFrameWithin((run) => requestAnimationFrame(run)).then((framed) => {
+      if (settled) return;
+      if (!framed) {
+        finish({ ok: false, error: 'rasterize-empty', detail: 'frame-timeout' });
+        return;
+      }
+      // 这一帧里界面可能已经被卸载（用户切走了屏）—— 那要出一句话，不许静默。
+      const svg = svgRef.current;
+      if (svg === null) {
+        finish({ ok: false, error: 'rasterize-empty', detail: 'svg-unmounted-in-frame' });
+        return;
+      }
+      return settleRasterize((cb) => {
+        svg.toDataURL(cb, options);
+      }).then((raster) => {
+        if (settled) return;
+        if (!raster.fired) {
+          finish({
+            ok: false,
+            error: 'rasterize-empty',
+            detail: `rasterize-${raster.reason}`,
+          });
+          return;
+        }
+        void complete(current.request, raster.base64).then((result) => {
+          finish(result);
+        });
+      });
+    });
+
+    /**
+     * 作废：屏被卸载（用户切走）或 `pending` 被第二次点击顶掉。
+     *
+     * 🔴 这里必须**给个结论**再走，不能只把 `settled` 置上 —— 悬着的 Promise 会让
+     * 调用方的按钮永远停在"进行中"。回 `cancelled` 而不是失败文案：
+     * 用户没有做错任何事，界面也不该为他切屏这件事报错。
+     */
+    return () => {
       if (settled) return;
       settled = true;
-      void complete(current.request, base64 ?? '').then((result) => {
-        current.resolve(result);
-        setPending(null);
-      });
-    }, options);
+      current.resolve({ ok: false, cancelled: true });
+    };
   }, [pending]);
 
   const surface =

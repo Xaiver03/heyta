@@ -78,7 +78,7 @@ function progress(over: Partial<TodayProgress> = {}): TodayProgress {
 }
 
 function totals(over: Partial<ActivityTotals> = {}): ActivityTotals {
-  return { checkIns: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0, ...over };
+  return { checkIns: 0, focusCount: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0, ...over };
 }
 
 /** 本周复盘的最小底：用例只声明它关心的字段。 */
@@ -154,7 +154,7 @@ describe('milestoneGroups：每维度一块，顺序不按达成数重排', () =
     const few = milestoneGroups(deriveMilestones(totals({ checkIns: 12 })));
     // 反过来：让最后一个维度（activeDays）达成最多。
     const many = milestoneGroups(
-      deriveMilestones(totals({ checkIns: 0, focusMs: 0, tasksCompleted: 0, activeDays: 400 })),
+      deriveMilestones(totals({ checkIns: 0, focusCount: 0, focusMs: 0, tasksCompleted: 0, activeDays: 400 })),
     );
     expect(many.map((g) => g.kind)).toEqual(few.map((g) => g.kind));
     expect(many[3]!.maxed).toBe(true);
@@ -165,6 +165,7 @@ describe('milestoneGroups：每维度一块，顺序不按达成数重排', () =
       deriveMilestones(
         totals({
           checkIns: 5000,
+          focusCount: 0,
           focusMs: 2000 * 3_600_000,
           tasksCompleted: 9000,
           activeDays: 400,

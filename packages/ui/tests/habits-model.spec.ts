@@ -11,7 +11,7 @@
  */
 
 import { HEAT_TOKENS } from '@heyta/design-system';
-import type { Habit, HabitLog, HabitResilienceView, LocalDate, StreakResult } from '@heyta/domain';
+import type { Habit, HabitLog, HabitPeriodStats, HabitResilienceView, LocalDate, StreakResult } from '@heyta/domain';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -22,6 +22,7 @@ import {
   habitGoalSummaryKey,
   habitHeatLevel,
   habitHeatmap,
+  hasCountableGoal,
   heatmapLevelToken,
   heatmapTotal,
   monthOfDate,
@@ -55,19 +56,35 @@ function log(date: LocalDate, over: Partial<HabitLog> = {}): HabitLog {
 function stubGrowth(result?: {
   streak: StreakResult;
   resilience: HabitResilienceView;
+  month?: HabitPeriodStats;
 }): { fn: HabitGrowthFn; calls: Array<{ habitId: string; logCount: number; today: LocalDate }> } {
   const calls: Array<{ habitId: string; logCount: number; today: LocalDate }> = [];
   const fn: HabitGrowthFn = (h, logs, today) => {
     calls.push({ habitId: h.id, logCount: logs.length, today });
     return (
-      result ?? {
-        streak: { current: 3, longest: 9 },
-        resilience: { resilience: { current: 3, longest: 9, total: 12, freezesHeld: 1, frozenDays: 2, frozenInCurrentRun: 0 } },
+      // W8：`month` 与 streak/resilience 一样**原样透传**，桩默认给一份
+      // 与 streak 数字处处不同的值，免得巧合相等时断言指错地方。
+      {
+        ...(result ?? {
+          streak: { current: 3, longest: 9 },
+          resilience: { resilience: { current: 3, longest: 9, total: 12, freezesHeld: 1, frozenDays: 2, frozenInCurrentRun: 0 } },
+        }),
+        month: result?.month ?? MONTH_STUB,
       }
     );
   };
   return { fn, calls };
 }
+
+const MONTH_STUB: HabitPeriodStats = {
+  monthKey: '2026-09',
+  achievedDays: 6,
+  scheduledDays: 9,
+  rate: 6 / 9,
+  monthValue: 14,
+  totalValue: 77,
+  totalAchievedDays: 33,
+};
 
 describe('热度分档只有两档，且与迁移前的 web 口径逐字一致', () => {
   it('0 次 = 0 档，≥1 次 = 4 档（不发明中间档）', () => {
@@ -223,10 +240,12 @@ describe('进度投影：连续/韧性由注入的配对函数给，model 不自
       },
       repair: { date: '2026-09-27', streakIfRepaired: 5 },
     };
-    const { fn } = stubGrowth({ streak, resilience });
+    const { fn } = stubGrowth({ streak, resilience, month: MONTH_STUB });
     const rows = toHabitProgressRows([habit()], [], NOW, fn);
     expect(rows[0]?.streak).toBe(streak);
     expect(rows[0]?.resilience).toBe(resilience);
+    // W8：月统计同一条纪律 —— 由注入函数给，共享层不重算。
+    expect(rows[0]?.month).toBe(MONTH_STUB);
   });
 });
 
@@ -365,5 +384,61 @@ describe('habitGoalSummaryKey —— 口径 → 摘要词条', () => {
 
   it('认不出来的值也落 `atLeast`，不编一句新话', () => {
     expect(habitGoalSummaryKey('some-future-goal')).toBe('web.habits.goal.summaryAtLeast');
+  });
+});
+
+/**
+ * 工单 W6：`todayValue`（今天记了几格）与"该不该出现数量行"的判据。
+ *
+ * 这两件事都必须**在判断层**：组件里不许有分支（本文件文件头的约定），
+ * 而"几格"的缺省算法在领域层（`@heyta/domain#habitLogValue`）——
+ * 这里验的是**共享行带上了它**，以及**什么时候该显示**。
+ */
+describe('todayValue / hasCountableGoal（W6）', () => {
+  const rowsOf = (h: Habit, logs: HabitLog[]) => toHabitProgressRows([h], logs, NOW, stubGrowth().fn);
+
+  it('🔴 目标 8、今天记 5 ⇒ 行上是 5（不是 1、不是 0.625）', () => {
+    const rows = rowsOf(habit({ target: 8 }), [log('2026-09-28', { value: 5 })]);
+    expect(rows[0]?.todayValue).toBe(5);
+    // 同一个数在比例那一腿上是 0.625 —— 两个字段说的是同一格，必须互相自洽。
+    expect(rows[0]?.todayRatio).toBeCloseTo(0.625, 5);
+  });
+
+  it('今天没有记录 ⇒ 0（不是 undefined，界面上不许出现"今天 /8"）', () => {
+    expect(rowsOf(habit({ target: 8 }), [])[0]?.todayValue).toBe(0);
+  });
+
+  it('打过卡但那条没写量 ⇒ 落 target，与 `isAchieved` 同一个读法', () => {
+    const rows = rowsOf(habit({ target: 8 }), [log('2026-09-28')]);
+    expect(rows[0]?.todayValue).toBe(8);
+    expect(rows[0]?.todayRatio).toBe(1);
+  });
+
+  it('🔴 超目标时 `todayValue` 不等于比例反算值（记 10 / 目标 8 要显示 10，不是 8）', () => {
+    const rows = rowsOf(habit({ target: 8 }), [log('2026-09-28', { value: 10 })]);
+    expect(rows[0]?.todayValue).toBe(10);
+    // 比例被 `Math.min(1, …)` 截断过 —— 这条同时证明两个字段**不能互换**。
+    expect(rows[0]?.todayRatio).toBe(1);
+  });
+
+  it('hasCountableGoal：只有"做过一次"这一档的习惯**不**出现数量行', () => {
+    // `createHabit` 给每条习惯都写 `target: 1`，所以判据不能是"填过目标没有" ——
+    // 那会让每条纯打卡型习惯多一行「1/1」。
+    expect(hasCountableGoal(habit())).toBe(false);
+    expect(hasCountableGoal(habit({ target: 1 }))).toBe(false);
+    expect(hasCountableGoal(habit({ target: 1, unit: '分钟' }))).toBe(false);
+  });
+
+  it('🔴 计数 / 时长 / **小数目标** / 目标 0 / `atMost`+1 五种都要出现', () => {
+    expect(hasCountableGoal(habit({ target: 8, unit: '杯' }))).toBe(true);
+    expect(hasCountableGoal(habit({ target: 30, unit: '分钟' }))).toBe(true);
+    // 判据第一版写的是 `target > 1`，被一条界面用例照出来：0.5 小时的目标
+    // 也是多格的（能记 0.25 / 0.5 / 1），却会整行不显示。合法域由 `setHabitGoal`
+    // 决定 —— 它只拦负数与非有限数，所以 `!== 1` 才是那个判据。
+    expect(hasCountableGoal(habit({ target: 0.5, unit: '小时' }))).toBe(true);
+    // "一次都不碰"与"最多 1 杯"要的正是能记下**破戒**那个数。
+    expect(hasCountableGoal(habit({ target: 0, goalType: 'atMost' }))).toBe(true);
+    expect(hasCountableGoal(habit({ target: 1, goalType: 'atMost' }))).toBe(true);
+    expect(hasCountableGoal(habit({ target: 1, goalType: 'exactly' }))).toBe(true);
   });
 });

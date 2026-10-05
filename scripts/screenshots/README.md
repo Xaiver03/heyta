@@ -47,10 +47,17 @@ SSOS 用 `pngjs`。本仓库对新增依赖有两道门（`AGENTS.md` §3.1–3.
 
 ### 校验器本身怎么被验证的
 
-`png-stats.test.mjs` 分两层，**不接受"自己测自己"**：
+`png-stats.test.mjs` 分三层，**不接受"自己测自己"**：
 
 1. 用 `magick` 造**已知像素**的合成图 → 断言精确值（纯白 → `contentRatio=0, colorSpan=0`）；
-2. 用 **`magick identify` 的尺寸** + **PNG IHDR 第 25 字节的 colorType** 交叉验证真实文件。
+2. 用 **`magick identify` 的尺寸** + **PNG IHDR 第 25 字节的 colorType** 交叉验证真实文件；
+3. **入参形状**（不需要 `magick`，所以任何机器都会跑到）：`looksBlank()` / `looksSmeared()` 收的是
+   `inspectPng()` 的**结果对象**，而 `countColor()` / `countBrandBlue()` 收的是**路径** —— 两族相邻、
+   名字都像谓词，喂错的那一瞬间判据不是变红，是**被无声摘掉**（字符串上取不到那两个字段 ⇒
+   `undefined < 0.01` 恒 `false` ⇒ "永远不判空白"）。2026-10-05 实测踩过一次，所以现在
+   `requireStats()` 会点名函数、打出那枚被误传的路径、并给出修法；那三条用例里第一条是
+   **阳性对照**（直接写错误用法的那个式子，断言它确实恒 `false`），第二条才断言"现在会抛"。
+   ⚠️ 摘掉 `requireStats()` 的两处调用 ⇒ 恰好红 2 条（实测 `14 pass / 2 fail`）。
 
 真实样本里**包含 SSOS 仓库的产品截图**（异库样本），用来证明解析器不是只对本仓库的文件成立。
 两条外部基准都对得上才认。
