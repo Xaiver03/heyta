@@ -1,0 +1,28 @@
+iOS Release Vault revoke probe — 2026-10-05
+================================================
+
+Device: dedicated iOS 27.1 simulator (UDID omitted from committed evidence).
+Build: existing Heyta Release artifact at /tmp/heyta-b-ios-main-release-xcode27.
+Server: TEST_MODE Fastify + PostgreSQL, http://127.0.0.1:3287.
+
+1. The authenticated iOS settings UI listed the connected device. The real
+   confirmation alert was pressed through the AX companion, followed by the
+   settings readback “设备已撤销，所有设备都必须重新登录”。The UI also removed
+   the connected-device row and showed the local recovery guidance.
+2. Before any re-authentication, the old authenticated binding was tested
+   against GET key-package, GET ops and GET status. All three returned HTTP
+   401; no response body, token, email, recovery code or root key is retained
+   here.
+3. This run did not claim iOS root rotation. The installed artifact could
+   authenticate again, but the Vault settings could not complete the
+   passphrase/recovery unlock continuation for the newly provisioned package;
+   the panel reported the generic local Vault load failure and never exposed a
+   valid rotation confirmation state. No fingerprint or payload-generation
+   transition is recorded for iOS, and no secret was written to evidence.
+
+Conclusion: this file closes the iOS Release revoke + old-token fence leg only.
+The required iOS local secure-store cleanup, recovery unlock, trusted-device
+root rotation, and legacy payload migration remain open until a current
+Release artifact can complete the full state machine. The existing Android
+fingerprint evidence likewise remains explicitly incomplete until it records
+an independent fingerprintChanged boolean.
