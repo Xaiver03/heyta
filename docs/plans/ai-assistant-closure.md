@@ -340,7 +340,7 @@
 | **W10** 扩工具目录 | D-2 | 把习惯 / 便签 / 标签 / 提醒 / 专注 / 重复 / 搜索配上工具（动作层零件**全都已存在**，是"没接线"不是"没零件"） | 一条**新门禁**：`EntityModelMap` 每个已物化实体必须有工具，否则红 —— 让"AI 覆盖面 = 界面功能面"从主张变成机器可查 |
 | **W11** 批量写入 | D-1a | 参考滴答"限制批量大小"的解法（`batch_*` ≤20） | ⚠️ **要先论证**它和 AGENTS §3.4"一个用户意图 = 一个 op""多实体变更要在一次操作里完成，不要 fan-out"的关系。**这两条可能是同一条**，也可能是冲突的 —— 论证不成立就不做 |
 | **W12** chat 外壳 | D-1 | 持久化会话、结果卡片、过程轨迹"已调用 N 个工具"、AI 免责声明 | 🔴 **排在 W8 之后**。外壳先做 = 做出一个能聊天但改不动任何数据的助手（那正是审计 §3.4 今天的状态） |
-| **W13** 移动端入口 | — | 目前 `apps/mobile/src` 零 `@heyta/ai` 导入，Electron 壳零 AI | 至少一条真模拟器 E2E，零 mock，照 `verify:mobile-*` 那批的形状 |
+| **W13** 移动端入口 | — | 🔴 **本行原来的"现状"（`apps/mobile/src` 零 `@heyta/ai` 导入）已被 `a9f0867a` 那批否证**，2026-10-06 现量：`grep -rlE "from '@heyta/ai'" apps/mobile/src` 命中数由该命令给出（真 import，不含注释）；Electron 壳那一半仍成立（`apps/desktop/src` 同一条 grep 为空）。设备级读数见 §9 W13 | 至少一条真模拟器 E2E，零 mock，照 `verify:mobile-*` 那批的形状 |
 | **W14** 语音线 AI | — | 滴答有 AI 语音添加（一段话拆多条、不确定给两版左右滑）与录音转写总结（30+ 语言、失败回退普通模式）；heyta **整条线为零**，且**不在任何现有 AI 计划里** | 🔴 **先过 AGENTS §3.1 可维护性 + §3.2 许可证两道门并完成登记**，再谈立项。语音模型接入不走现有 `packages/ai` 那条文本路径 |
 
 **W14'（已消化进 `AI-COV`，编号不再复用 W 号）**：D-3 拍成"同批"之后，这条不再是"要么登记延后、
@@ -749,17 +749,63 @@ for i in $(seq 1 12); do printf "%s cpu=%s etime=%s netfd=%s\n" "$(date '+%H:%M:
    读侧改吃 op-log 的物化投影，**并且**把 `localStorage` 那条**删掉**而不是并存 ——
    两份历史 = 两个事实源，那是本仓库反复踩过的那类"抽出了新的、没删旧的"。
 
-### W13 的设备半：入口与接线有了，**验收载体还没有**
+### W13 的设备半：验收载体**已建成**，第一趟读数在下面（2026-10-06 00:0x 起）
 
 `a9f0867a` 落了移动端助手入口 + 五项接线，`check:ai-coverage` 对 mobile 从 `0/5` 转正。
 但那条工单原本要求的判据是"**至少一条真模拟器 E2E，零 mock**"（§3 那张表里 W13 那一格）。
-现量核对（2026-10-05 22:5x，条数不写死在这里 —— 取现量用
-`node -e "const p=require('./package.json');console.log(Object.keys(p.scripts).filter(x=>/^verify:mobile/.test(x)).length, Object.keys(p.scripts).filter(x=>/^verify:mobile/.test(x)&&/ai|assistant/i.test(x)).length)"`）：
-`verify:mobile-*` 若干条里**覆盖助手的恰好 0 条**，`ls scripts | grep -i mobile-ai` 命中 0 ⇒
-移动端 AI 的"设备级验收"不是**在排队等模拟器**，而是**判据载体尚未存在**。
-这一步要连载体带读数一起做，载体形状照 `verify:mobile-edit` 那批：
-真模拟器 + 真服务端 + 真另一台设备回读，并且要能失败（摘掉一项接线 ⇒ 恰好对应那格转红）。
+**这一格在 2026-10-05 22:5x 写下的"载体尚未存在"已被自己否证** —— 那是一句瞬时读数，
+当晚 `scripts/verify-mobile-ai.sh` 与根 `verify:mobile-ai` 就落了地。
+现量（取现量用 `node -e "const p=require('./package.json');const k=Object.keys(p.scripts).filter(x=>/^verify:mobile/.test(x));console.log(k.length, k.filter(x=>/ai|assistant/i.test(x)).length)"`）：
+`verify:mobile-*` 若干条里覆盖助手的**恰好 1 条**，就是 `verify:mobile-ai`。
 
-⚠️ 本批 22:5x 现量（写这条时的设备面）：iOS **0 台 booted**（`simctl list devices booted` 两段标题下均空），
-Android `emulator-5554` 在线但归属未知，`idb_companion` 3 枚在跑，1 分钟负载 55.71 ⇒
-即便载体写好了，这一轮也拿不到有效读数；**不降级判据、不把"环境被占"当已交付**。
+载体的形状照 `verify:mobile-edit` 那批：真模拟器 + 真服务端 + 只绑回环的**可数**假端点，
+并且每一步都带**反向对照**：
+
+| 步 | 判据 | 反向对照（没有它，"没观测到"分不清是没发生还是探针坏） |
+|---|---|---|
+| 2 | 未配端点时「AI 助手」入口整行不在 AX 树里 | **邻锚同帧**：`profile-entry-habits` 与 `profile-entry-trash` 必须同帧都在 ⇒ "它们之间那一格的缺席"才是没渲染，而不是裁切线以外 |
+| 5 | 规则能答的意图**零外发**（假端点计数不动） | `NO_MATCH_PROMPT`（"write a haiku about rain"）同屏再发一次 ⇒ 计数**必须 +1** |
+| 5 | 绑定真的生效 | 判据放在**被绑那一侧**：`tool-start-assistant` 的 `enabled` 必须为 `true`（不拿 `selected` 当判据，理由见下） |
+
+配套的常驻门禁 `check:mobile-ai-anchors`（不占设备）把锚点这一类缺陷拦在设备窗口之外：
+rid 锚点逐条对回源码的 `testID`（字面或模板模式）、`desc/text` 字面锚点逐条对回词条、
+块内那一指必须落在**可点的那一层**。臂数由 `--self-test` 自己打印（本文件不抄）。
+
+#### 建载体当场照出来的两条**产品侧**缺口（不是脚本问题，登记后没硬压）
+
+1. 🔴 **Android 无障碍树读不到选中态**。`apps/mobile/src/ui/kit.tsx` 的 `Chip` 写了
+   `accessibilityState={{ selected }}`，而 rig20 现量：整棵 `uiautomator dump` 里
+   `selected="true"` 命中 **0** 枚。后果超出验收 —— 用 TalkBack 的人**听不出哪一档端点被选中**。
+   闭合路径：RN 侧把选中态同时表达成 `accessibilityState={{selected, checked}}` 或直接换
+   `role="radio"`/`accessibilityRole="checkbox"`（Android 对 `checked` 有映射），
+   判据 = dump 里数得出非零，且 `verify:mobile-ai` 第 3 步能把 `↷ 读数` 从"恒空"变成有值。
+   ⚠️ 载体不能替它编读数，所以第 3 步现在只打印、不判定，生效与否由第 5 步的 `enabled` 兜住。
+2. 🔴 **规则前门是中文-only，英文界面 100% 走不到它**。`packages/app-host/src/ai-tool-selection.ts`
+   十二条 `pattern`（现量 `grep -c 'pattern:' 该文件`）除一条带 `todo` 外全是中文词头。
+   这**直接削弱 Goal-1 那条不变量**：界面切到英文后，"列出所有任务"这类本可本机答掉的意图
+   一条都不命中规则 ⇒ 每次都发出请求。与"零外发"红线是同一条不变量的另一半。
+   闭合路径：每条规则补英文别名（`list|show|what are` + `tasks|todos|lists|habits|tags|notes|reminders`），
+   并把**两种语言各一条**钉进 `ai-tool-selection` 的用例；⚠️ 本轮未做 —— 它是行为变更，
+   要连着"规则命中即零外发"的循环侧一起验，不与本批的载体收口混成一笔。
+
+#### rig17 → rig21：三趟红都是**载体自己的**，逐条定源后修完（判据一条没放宽）
+
+| 趟 | 症状 | 定源 | 修法 |
+|---|---|---|---|
+| rig17 | 起跑即 `rc=3`（APK 比源码旧） | 变异门禁 `writeFileSync` 还原了**字节**却没还原 **mtime**，`scripts/lib/apk-freshness.sh` 拿 `packages/*/src` 的最大 mtime 比 ⇒ 假红（traps **#326**） | 门禁 `finally` 里 `utimesSync` 还原 + 文末第二栏 mtime 对账（>2ms 判红）；残留收尸脚本带**三条前提**（树干净 / APK 之后无提交 / 锚点=该文件最后提交时刻）才 `touch -t` |
+| rig18 | 第 5 步输入框有字，`tool-start-assistant` 仍 `disabled` | 两件事叠在一起：① `adb shell input text` 把**空格当语界** ⇒ 只落前半句、退出码 0（traps #43 追加子条）；② 端点建好了但**从没绑进 `routes[feature]`**（traps **#327**） | `scripts/lib/mobile-e2e.sh` 新增 `_adb_text`（空格发 `%s`）；验收脚本新增 `bind_all_routes` 五档逐条绑 + 第 3 步失败即点名是哪一档 |
+| rig20 | 五档绑定**全红** | 块内那一指落在 `clickable="false"` 的**标签层**（`Pressable` 把 `content-desc` 挂在这层），点下去退出码 0、什么都不发生 | 新增 `xy_clickable_in_rid`：取"包含标签矩形且面积最小的可点祖先"；找不到可点祖先 ⇒ 打哨兵并由 `tap_in_rid` **响亮拒绝**（不再静默点空） |
+
+设备读数（rig21→rig24 逐趟，载体在 `heyta-wt-merge`，设备 `emulator-5554`）：
+
+| 趟 | 读数 | 这一格证明了什么 / 还欠什么 |
+|---|---|---|
+| rig21 | 通过 10 / 失败 0 后**中止**在第 3 步：五档里前三档绑上、后两档"滚不出来" | `xy_clickable_in_rid` 在真设备上落对了层（日志打 `[clickable-ancestor] @ 235,2057`）；后两档是被**焦点吞掉的手势**（traps #328-②） |
+| rig22 | 中止在第 3 步更早处：`行 0→1` 与 `chip 命中=0` 并存 | 端点**存进去了**，是探针用 `text=` 去找挂在 `content-desc` 上的 chip（traps #328-③）⇒ 新增 `reveal_desc` |
+| rig23 | 五档"滚不出来"、四格拦死 | **我自己新写的那条"画面没动"判据坏了**：参照锚是 `android:id/content`（永远不动，traps #328-①）⇒ 参照锚换成会位移的内容节点，并补臂 13/14 |
+| rig24 | **通过 13 / 失败 2**：第 0–3 步全绿（含五档全部绑到那枚回环端点）、第 5 步走到"入口进树 → 五档 chips 全在 → 常驻脚注在屏 → 选中 tool-calling → 输入 → 发送" | 两条开项，各自定源，**不包装成完成**：<br>① 第 4 步 `ai-endpoint-label` 在安全带内取不到可点节点 —— 端点表单一共有四格，第二枚端点的表单此刻的滚动形状没取到，需要按 §第 3 步同样的"动作回读 + 摘焦点"重做那一格；<br>② 第 5 步发送按钮仍 `disabled` —— **两种成因没分辨**：五档路由真没写进 `routes[feature]`（AX 读不到选中态，见上），还是这一档的**逐功能同意**没给（`resolveRoute` 的候选集还要过同意）。决定性的一测量是**从设备库里读回 `routes` 与 `consents`**，而不是再猜界面 |
+
+⚠️ 边界：本表只覆盖 Android 模拟器这一腿。iOS 侧助手面零设备读数；`windows-pc` 本轮不可达，
+所以任何需要**重打 APK** 的读数（例如把新的产品改动装进设备）本轮取不到，如实登记为未闭合。
+
+
