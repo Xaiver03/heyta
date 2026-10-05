@@ -36,15 +36,10 @@
 
 import { useMemo } from 'react';
 import { useI18n, type I18nValue } from '@heyta/i18n';
-import {
-  HeytaUiProvider,
-  NoteEditor,
-  NotesBoard,
-  type NoteEditorLabels,
-  type NotesBoardLabels,
-} from '@heyta/ui';
+import { HeytaUiProvider, NotesBoard, type NotesBoardLabels } from '@heyta/ui';
 
 import { selection, useSelected } from '../../lib/selection.js';
+import { NoteEditorCard } from './NoteEditorCard.js';
 import { useNoteStore } from './store.js';
 
 /** 构造共享 `NotesBoard` 的全部文案。字段名与 `NotesBoardLabels` 逐项对应，漏了编译不过。 */
@@ -66,25 +61,18 @@ export function notesBoardLabels(t: I18nValue['t']): NotesBoardLabels {
   };
 }
 
-/** 构造共享 `NoteEditor` 的全部文案。与上面同一纪律：字段对不上编译不过。 */
-export function noteEditorLabels(t: I18nValue['t']): NoteEditorLabels {
-  return {
-    // 占位符**复用 composer 那一句**：两处问的是同一件事（"写点什么"），
-    // 各起一条词条迟早会漂成两种说法。
-    placeholder: t('notes.composer.placeholder'),
-    save: t('notes.save'),
-    cancel: t('notes.cancel'),
-  };
-}
-
-export function NotesView(): React.JSX.Element {
+/**
+ * 🔴 `editorInColumn` 是**必填**的，不是"默认值等于原行为"的可选开关：
+ * 那种形状会把"宿主根本没接"伪装成"做完了"（本线记过不止一次）。
+ * 它回答的是"这一屏详情列看得见吗"，由 `App.tsx` 用 `useDetailColumnShown` 算，
+ * 而编辑卡本身在 {@link NoteEditorCard} —— 两支落点共用一份实现。
+ */
+export function NotesView({ editorInColumn }: { editorInColumn: boolean }): React.JSX.Element {
   const { t } = useI18n();
   const notes = useNoteStore((s) => s.notes);
   const addNote = useNoteStore((s) => s.addNote);
-  const updateNote = useNoteStore((s) => s.updateNote);
   const removeNote = useNoteStore((s) => s.removeNote);
   const togglePinned = useNoteStore((s) => s.togglePinned);
-  const editError = useNoteStore((s) => s.editError);
 
   /**
    * 正在编辑的那条便签 = **选中的那一条**（`null` = 面板没开）。
@@ -98,41 +86,19 @@ export function NotesView(): React.JSX.Element {
   const editingId = useSelected('note');
 
   const labels = useMemo(() => notesBoardLabels(t), [t]);
-  const editorLabels = useMemo(() => noteEditorLabels(t), [t]);
   const editing = editingId === null ? undefined : notes.find((note) => note.id === editingId);
-  // 便签在别处被删掉了（另一台设备同步过来的墓碑）→ 面板自然消失，
-  // 而不是留着一个指向不存在的 id 的输入框。
-  const activeEditing = editing !== undefined ? editing : null;
 
   /**
    * 🔴 选中痕迹（工单 W1c）：递给共享板的是**当前打开的那一条**，不是又一个本地状态。
    * 用 `editing?.id` 而不是 `editingId`：id 在 `notes` 里找不到时（别的设备删了它）
-   * 面板本来就不渲染（上一条已经把 `activeEditing` 判成 `null`），高亮也必须跟着没有 ——
+   * 编辑卡本来就不渲染（`editing` 是 `undefined`），高亮也必须跟着没有 ——
    * 留着会出现"列表里亮着一条、右边什么都没有"，两种线索互相矛盾。
    */
   const activeNoteId = editing?.id;
 
   return (
     <HeytaUiProvider>
-      {activeEditing === null ? null : (
-        <NoteEditor
-          key={activeEditing.id}
-          initialContent={activeEditing.content}
-          labels={editorLabels}
-          error={editError ?? null}
-          onSave={(content) => {
-            void updateNote(activeEditing.id, content).then((ok) => {
-              // 只有真落成了才收面板：失败时错误要留在屏幕上，
-              // 否则用户看到的是"点了保存，面板自己关了，什么也没改"。
-              if (ok) selection.select('note', null);
-            });
-          }}
-          onCancel={() => {
-            selection.select('note', null);
-          }}
-          testID="notes-editor"
-        />
-      )}
+      {editorInColumn ? null : <NoteEditorCard inset={false} />}
       <NotesBoard
         notes={notes}
         onAdd={(content) => {

@@ -139,7 +139,7 @@ W1–W7 与 W0 从来不等任何一拍。
 |---|---|---|
 | W0 | ✅ 已完成（① 2026-10-03；② 补落地 2026-10-04 09:2x，见 §8.25 第一档；🔴 ② 那一行 09:4x 又按现量修了一次 —— "五档全部落地"把 web 独占的拖拽读成了两端都接，见 §8.29） | 两处过期都改在**文档本体**：① `docs/reference/architecture.md` 的实体清单里 `FocusSession` 原写 `mode(pomo/stopwatch), duration` —— 三个字段**都不存在**，真实形状是 `kind(work/shortBreak/longBreak) + plannedMs + actualMs? + completed? + startedAt? + endedAt?`（逐字段核对 `packages/domain/src/entities.ts` 的 `FocusSessionKind` 与 `interface FocusSession`）；② `docs/README.md` 对 ADR-0043 那句「⚠️ 代码未开工」改成已落地并留了更正痕迹（指向调研 A0.8 的取证）。**判据**：`docs-link-check` 无死链 + 两份文档不再与代码冲突（人工核对，无自动判据 —— 按 §2 那一行写明的"允许只做人工核对并在此登记"，这条**没有**变异臂，别把它当成有牙的）。⚠️ 归属：`docs/README.md` 同一文件里另有别人 7 行未提交的改动，所以我**没有**单独提交那一行，改动作废在工作树里，由下一次整文件提交带进去。🔴 **那句"由下一次整文件提交带进去"落空了**（2026-10-04 09:1x 现量：本分支 HEAD 与 `main` 两份 `docs/README.md` 里 `代码未开工` 那句**都还在**，工作树也没有那笔改动 ⇒ ② **从来没有落地**，而本行此前写着"✅ 已完成" —— 这是一次过度主张，不是措辞不严）。当场按**五条逐项现量**改掉（每条给了 `file:line`，见 §8.25 第一档），并复跑 `check:docs-voice` / `check:claims` / `check:reachability` 各 **RC=0**、`docs-link-check` 对本文件 **0 命中**、README 那张表 **139 行列数零不一致**。🔴 **判据条数与变异红集这两样此前这格里没有**（18:5x 由新的腿 7/8 照出来，按现量补）：判据 **0 条** —— 这一单改的是文档与代码注释里的句子，验收是三条常驻门禁各 RC=0 加逐字段人工核对（§8.25 第一档）；`无变异面：没有自动判据可供变异` —— 这一格原先那句"这条**没有**变异臂，别把它当成有牙的"就是它的真实读数，不许为了让两条腿闭嘴而补一条假判据 |
 | W1 | 🔄 **进行中**（接线、判据、**真浏览器截图 + 人看图**都已闭合；容器那一格（C1 #14 的"点一行清单/标签算什么"）的代码半边也落地了（§8.122）；只剩 AGENTS §6.1.1 的**四端重装**，所以还不算已完成） | **已落地**：单一所有者收拢 —— `packages/app-host/src/selection.ts`（封闭词表 + `createSelectionStore` + 纯函数 `pruneMissingSelection`/`pruneSelection`），四份本地 `useState` 全删，两端各只留一份宿主胶水 `apps/{web,mobile}/src/lib/selection.ts`。🔴 **词表从 6 类改成 3 类**（`task\|habit\|note`）：`project`/`tag`/`event` 是**投机项** —— 两侧的 prune 谓词照着写了 project/tag，而**没有任何一处界面会选中一条清单或标签**（它们在两端都是筛选/导航），"支持六类"读起来像已完成、实际只有三类活着。这条被升级成常驻门禁的**断言 D**（逐类扫宿主有没有 `select/useSelected`，零消费者即红；词表从数组字面量现读，解析出 0 项也算红）。💥 **本轮现场抓出的两个真缺陷**：① `apps/web/src/features/quadrant/QuadrantBoard.tsx` 把 `onOpenTask`/`activeTaskId` **声明了、解构了、没往共享板子传** ⇒ "三种投影接同一个选中"实际只有两种接上，而两个 prop 都是可选的 ⇒ **typecheck 全绿、当时四条门禁全绿**，症状只是"四象限不跟随选中"（→ §7 #179）；② `openNoteFromSearch` **签名里不收 id** ⇒ 搜索结果点便签只换视图、什么都不打开。③ 顺手补掉一条既有的端间不一致：web 时间线的行体此前**根本不可点**，而触屏端早能。**判据**：共享层 16 条（`packages/app-host/tests/selection.spec.ts`）+ web 选中 16 条（`task-selection.spec.tsx`）+ mobile 13 条（`selection-single-owner.spec.ts`；🔴 **13 是 `0815c4d5` 那趟的读数，现量 14** —— 第 14 条由 `806fce49`（§8.43「任务屏也持有便签全集」）加进来，本行当时没跟着改；现量命令 `cd apps/mobile && ./node_modules/.bin/vitest run tests/selection-single-owner.spec.ts` ⇒ 14 passed，16:1x 复跑过）+ 三种投影各自的行为判据（`quadrant-row-parity.spec.tsx` 新增 2 条、`timeline-board.spec.tsx` 新增 3 条、`notes-view.spec.tsx` 新增 3 条）+ 门禁 `check:selection-single-source` **八道断言 A–H**（A–G 见下，H 见 §8.46：谁读某一类的选中，谁就得把那一类喂进回落 —— §8.43 那次"人工数屏幕"从此变成常驻判据）（E 是同文件内比"声明"与"使用"；F 见 §8.37：四处渲染面各按端把选中说出来（**§8.42 起是五处**：共享时间线那一面原本"自己算、自己上色"却登记在递送层里，合法躲过了通道要求）；G 见 §8.36：宿主内每一处行 id 本地态都要带语义类别逐处登记）。**视图全集那一侧**见 §8.41：`ViewKey` 里每个视图都必须交代过自己站哪边（在 `CURSOR_VIEWS` 表里、或在 `ACCOUNTED_OUT` 登记表里），缺口／重叠／解析读空都红，装置 5 臂按预期 5/5。**面与回落那两侧**见 §8.42 / §8.43：前者把"每张面必须把选中说出来"钉成三条按类别给的规则（并修掉一处"有底色、没声音"的共享时间线面），后者把"该给哪几类喂回落"从**按功能位置数**改成**按谁在读数**（现量出任务屏是第三个持有便签全集的屏，4 臂按用例名点名；🔴 但它第一版那句"编辑层不自己关"的症状已被**§8.43 第 7 节**否证并划线留档，这一格的真实理由是"移除一条挂在别人挂载策略上的隐式依赖"，反事实读数 A/B/C 三层全绿在那节里）。🔴 **载体发现（写进 §7 #178）**：RNW 在 jsdom 里把样式编译成 class（`r-backgroundColor-*`），`el.style.backgroundColor` **恒为 `''`** —— 用它当判据第一次就得到"三种投影全都没底色"这种**看起来像三个真缺陷**的空读数；底色一律走 `getComputedStyle`（未选中是 `rgba(0, 0, 0, 0)`，不是空串）。**变异臂（两趟 rig 共 18 臂，每臂跑完复原并复跑回到绿；终态 Z2 = web/mobile/门禁三处 RC=0）**：14 条正臂按设计转红（门禁 A/B/B2/B3/C/A2/D/E/E2/E3-分母自检 + TaskList 底色 + TimelineBoard 两处底色 + 两处 `onPress` + NotesView 退回本地态 + 搜索丢 id + web 四处投影断一处 + mobile 回落摘一处 + mobile 三处投影全摘）；🔴 **一条第一次跑活了**：把 web 便签换回**裸名** `const [editingId] = useState(null)` 时门禁**全绿** —— 而文档块里当时写着"仍未覆盖：不带实体名的 editingId"，即这条缺口我**登记过但没验证**。补上裸名分支（`detailId\|selectedId\|editingId`，刻意不含 `active`/`open`：四象限的 `activeId` 是 dnd-kit 正在拖哪一颗）后重跑**转红**；为此把 `PasskeyPanel` 那份行内改名编辑器的状态改名 `editingRowId`（第一次我改成 `renamingId`，撞上 store 里已有的"请求在途那条"——两个概念不能并成一个名字，断言把它挡在写盘前）。两条负向对照绿：字样只写进注释、以及树上活着的 `activeId`/`editingRowId` 不被误伤。**读数**：门禁绿（`词表 3 类全有消费者（task 10 / habit 7 / note 13）、接线声明 17 处全部用起来`）；本轮直接跑的 `task-selection + timeline-board + quadrant-row-parity + notes-view` = **55 passed / 0 failed**；web/mobile/app-host/ui 四包 typecheck RC=0；`check:docs` 归因见 §8.1（三处死链指向**别人未提交**的在途文档，已把链接改成带状态的指针）。**真浏览器取证已闭合（2026-10-03 22:4x，载体 `feat/detail-pane` = `d5b835b5`）**：新增 `e2e/tests/selection-projections.spec.ts` **3 条**，跑法与读数：生产构建载体（`vite build` + `vite preview`，端口 4358）上 **3 passed / 0 failed**；截图五张落在 `apps/web/evidence/selection-projections/{01-list,02-quadrant,03-timeline,04-switch,05-search}.png`，**五张都逐张打开看过**：列表与搜索那两张里选中那条带浅蓝底、另一条白底；四象限那张选中那条落在"先不做"格里且带同一种蓝；时间线那张"未排期（2）"里只有第一条带蓝；换选中那张是**第二条**带蓝、第一条回到白底。看图还照出一件断言看不见的事：`switchView` 用鼠标点 rail，**rail 的 tooltip 会留在下一张图上**，第一版 `03-timeline.png` 里那句"四象限"正好压在选中那条的标题上 ⇒ 截图前 `parkCursor`（把鼠标挪开），这不是美化，§6.2 要的是"人能看懂的那张图"。🔴 **23:5x 两处更正（载体 `0de58095` + `0c159f7f`）**：① 那五张图已随 W2 的第四列整体重跑并**逐张重看**（选中态在四种投影里读数不变）；② 更要紧的是读底色的探针里有一条**会假绿**的机制被照出来了 —— Chromium 对**已从文档分离**的节点 `getComputedStyle` 返回空串，而判据写的是"选中那条 ≠ 同屏没选中的那条"，空串永远不等于任何真实底色 ⇒ **"根本没读到值"会被判成"画上选中色了"**。症状先以一次假红出现（两遍连跑全绿、第三遍红），所以这类"偶发红"要按**探针故障**查，不要按产品抖动放过。现在探针先等到算得出来为止，自检臂（把读数改成恒返回空串）实测 3 条全红。 |
-| W1b 键盘光标 | 🔄 **进行中**（三层判据、22 条变异臂全红、七张图逐张看过、九道门禁 RC=0；但**原判据三条腿只落了第一条** —— 那两条此前记为"阻塞在拍板 #1／#8"，🔴 **拍板已于 2026-10-05 02:5x 由本线给完（§8.125），阻塞项从"等拍板"换成"等详情面本体的实现"**；四端重装也未做 ⇒ 不算已完成） | 原 W1 判据 ③「↑↓ 移动选中」**拆到这一行**，理由不是省事：`TaskList` 的 `activeTaskId` 是**展示槽**，而"往哪走"要有目的地才有意义 —— 详情列（W2）没开之前，回车没有可去的地方。判据是"↑↓ 改选中 + 详情面跟着换 + Enter 打开焦点"。<br>载体 `feat/detail-pane` = `6c3c1ecd`。<br>**分层与裁决**：规则在 `packages/app-host/src/selection.ts` 的 `moveSelectionInList`（四条：方向进列表 / 夹住不环绕 / 不猜位置 / 可返回同值），宿主只回答"当前哪个视图、那一串 id 现在在 DOM 里的顺序、什么时候不该响应、要不要滚进视野"。🔴 **顺序从渲染出来的那一串行取，不再算一遍**：列表顺序今天有四个所有者（`groupTasksByDate` + `collapsedGroups` / `QuadrantBoard` 的格子序 / `TimelinePanel` / 习惯与便签各一份），宿主自己算就是**第五个**，症状是"眼睛在第 3 行、选中跳到第 5 行"而两边都不报错。`search` 与 `trash` **刻意不进表**（前者自己有一条走结果数组的光标，两边都响应同一个键 = 一次跳两格；后者的 ↑↓ 是"选恢复还是删除"，语义完全不同）。<br>**三道"不响应"，第三道是看图看出来的缺陷**：① 正在打字；② 有浮层（今天**三个真浮层分两种形状**：设置 `.ht-sheet`、搜索 `role="dialog"`+`aria-modal="false"`、法务二次确认 `role="dialog"` 且**不带**裸 `.ht-sheet` ⇒ 选择器只认一种就会漏）；③ 🔴 焦点落在 `[role="menu"]` / `[aria-haspopup="menu"]` 上。第三条的来路：K3 那张图的第一版里**账号菜单是开着的** —— Esc 关设置浮层时焦点按既有设计回到头像（`App.tsx:473-479`），而头像那颗按钮自己把 ↓ 用作"打开菜单"（`AccountMenu.tsx:299`），于是同一次按键**既弹菜单又把底下那栏的选中挪走**；菜单展开时同理，它的面板既不是 `.ht-sheet` 也不是 `role="dialog"`，第 ② 道挡不住。裁决是**焦点归谁、键就归谁**（反过来让列表光标赢会弄坏 `AccountMenu` 那条既有、且有用例的键盘入口）。<br>**判据 41 条分三层**（11:3x 起：宿主层 24→25，多的是视图全集那条分区判据，见 §8.41）：规则层 +9（空列表 / 没选中时两个方向各进列表 / 中间 / 两端夹住 / 单条 / 当前不在列表 / "只按传入顺序不自己排序"用故意倒序夹具钉 / 连按五次轨迹 / 纯函数不通知），该文件现 25 passed；宿主层 `apps/web/tests/keyboard-cursor.spec.tsx` **25 条**；真浏览器 `e2e/tests/keyboard-cursor.spec.ts` **K1–K7**（生产构建载体 `vite build` + `vite preview` 端口 4371）。<br>💥 **变异 22 臂全红**：jsdom 层 15 臂（B1–B15）红集**逐条点名** —— B1 环绕 2 红 / B2 进列表 2 红 / B3 自己排序 1 红 / B4 摘打字闸门 2 红 / B5 摘浮层闸门 2 红 / **B11 把浮层选择器缩到只剩 `.ht-sheet` ⇒ 恰好 1 红**（新加的 dialog 腿单独红，证明它不是把 B5 又量了一遍）/ **B12 摘"焦点归控件"闸门 2 红** / B6 去重 1 红 / B7 端点吞键 1 红 / B8 滚进视野 1 红 / B9 绑 `view` 1 红 / B10 摘掉 habits 那一行 1 红 / **B13 把真生产者（`packages/ui/src/notes/NotesBoard.tsx:294` 的 `testID`）改名 ⇒ 恰好 1 红，只红“前缀 ↔ 生产者”那一条** / **B14 把表里的 `note-row` 写成 `note-card` ⇒ 2 红**（那条 + notes 那一圈循环 —— 这一臂顺手把新判据存在的理由钉住了：**插出来的 DOM 抓不住表错**，它注入的是测试自己那份 `cases` 字面量） / **B15 把表里五处 `prefix: '…'` 的单引号换成双引号（运行时逐字等价）⇒ 恰好 1 红，且红在“解析出 0 项也算红”那句守卫上**（没有那句，前缀表一改写法这条判据就静默变成永真）。浏览器层 7 臂（C1 摘浮层 ⇒ K3 红 / C4 摘焦点闸门 ⇒ K5 红 / C5 摘打字闸门 ⇒ K2 红 / C2 端点环绕 ⇒ K1 红，C2 那条证明 e2e 这层走的确实是 app-host 的规则而不是宿主又算了一遍 / **C6 表里 `habit-row` 写成 `habit-card` ⇒ K6 红** / **C7 把 `notes` 那一行整个摘掉 ⇒ K7 红** / **C8 把便签编辑器当成浮层（往第②道闸门的选择器里加 `[data-testid^="notes-editor"]`）⇒ K7 红** —— C8 才是 K7 那句关键前提（“编辑器不算浮层，所以闸门不挡它”）的靶子：没有它，K7 只是在描述一个巧合）。每臂复原后 sha256 逐字节比对、`dist/` 目录摘要回到干净态（`BACK_TO_CLEAN=True`，干净摘要 `e0c768102d639a5e`），每臂都先打 `REACHED_ARTIFACT=True` 才有资格判红；并各跑一次"不复位也全绿"的阴性对照（jsdom 24 passed / e2e 7 passed）。<br>🔴 **两条"存活"要分开记，一条是判据缺口、一条本来就不该有牙**：① C5 头两趟存活 = 判据缺口，全过程与改法在 **§8.9 第 2 条**；② **C3（把绑定从 `contentView` 换成 `view`）预期存活且确实存活** —— 绑 `view` 时开着设置面板根本没人绑，K3 的负向腿白过，两道机制在浏览器上**不可区分**。所以"`contentView` 那条绑定"只有 B9 一处消费者（源码级断言），**不许声称浏览器层有它的牙**。它是真冗余还是真必要，取决于第②道闸门哪天被简化掉 —— 那之前这一行就是它的现状。<br>**门禁 9 道 RC=0**：`check:layering`（332 文件 9 规则）/ `check:selection-single-source`（词表 3 类全有消费者 task 10 / habit 7 / note 13，宿主内本地选中态 0 处）/ `check:l4`（web 98≤104、mobile **90 = 基线 90**，没动基线）/ `check:row-single-source`（**28 = 基线 28**，本单没新增顶层 `ht-*` 族）/ `check:design` / `check:ui-language`（zh 2864 = en 2864）/ `check:migrations` / token 生成物两步（tsup → `--check`，8 文件 204 token）。typecheck：电池里那六条**改成从各包自己的 `package.json` 取 `typecheck` 脚本**（五个包是 `tsconfig.spec.json`、`apps/mobile` 是 `tsconfig.json`），六条 RC=0、各日志里 `error TS` 计数 0；spec 版曾抓到一条真错误（见 §8.9 第 3 条）。🔴 上一轮记的“六包 `tsconfig.json` 与 spec 各 RC=0”里，**电池那六条其实是恒绿的虚检查**（命令字面量抄成了 `-p tsconfig.json`），本轮修的是电池本身，不是读数。另加两步 `apps/web` 重打（`tsc -b` + `vite build`）再跑 e2e 那一族 —— 该配置的 `webServer` 只有 `vite preview`、**不建**，不重打就是在验上一轮的产物（§7 第 212 条那一族）。电池因此从 24 步变 25 步（多一条 `typecheck e2e family`），整条电池 25 步 RC=0、`BATTERY_RESULT=ALL_GREEN`。全量单测 domain 834 / app-host 1020 / i18n 26 / ui 459 / web **1585 passed \| 12 skipped** / mobile 607；e2e 详情面整族 **25 passed**。<br>🔴 **`check:docs`（`docs-link-check`）RC=1，而那一条死链不在本单**：`PROGRESS.md:1362` → `docs/research/aed-implementation-evidence.md`。现量三件：那一行是 `96f3293d`（别的线）已提交的、目标文件**此刻只存在于主检出且未被跟踪**（`ls` 有 / `git show HEAD:` 无）⇒ 在任何干净检出里它必然是死链。处置是**登记不代改**（两种改法分别是"替别人提交他的在途文档"和"动他那一行"，都不归本单）。本单自己的文档改动零死链，复跑：`node research/tools/docs-link-check.mjs 2>&1 \| grep -c detail-pane-alignment` ⇒ `0`。<br>**截图 7 张，逐张打开看过**（`apps/web/evidence/keyboard-cursor/{k1-first-row-highlighted,k2-typing-row-unchanged,k3-cursor-back-after-closing-sheet,k4-quadrant-same-selection,k5-avatar-owns-arrow,k6-habits-cursor-aria-current,k7-notes-editor-follows-cursor}.png`）：k1 只有第一行带浅蓝底；k2 输入框里是"正在打字"且带焦点环、高亮停在**中间**那一行；k3 关掉浮层后**菜单没弹**、第二行带蓝（= 光标回来了）；k4 切到四象限还是同一条；k5 是那条缺陷的**修复后**读数 —— 菜单开着、头像带焦点环，而底下第一行仍带着高亮（= 一次按键只发生一件事）；k6 里三行习惯只有第一行「光标甲」带**蓝框 + 浅蓝底**、右窗格开的正是它（两种线索同一行，且那是夹住后的第 0 行）；k7 里编辑器开在板子**上方**（不是浮层），内容是「便签光标乙」，而下面两张便签卡**没有任何选中痕迹**。看图另照出一件**拍不出来**的事：`.ht-sheet` 的底色是 `color-mix(in srgb, var(--ht-color-background) 95%, transparent)`（`sheets.css:27`，那里自己写明"下层可见"的判据是 DOM 里标记仍在），95% 浓度下"浮层底下那一行没动"在像素上量不出来 ⇒ K3 的前半由断言证，图证只给它配套的那一半（关掉之后还在）。<br>**边界（别读多）**：① 三条腿只落了第一条，另两条等拍板 #1 / #8（`App.tsx:2532` 今天只有 `contentView === 'focus'` 一支，任务/习惯/便签那一栏里**没有可换的东西**）；② **接线只落了 web** —— 规则在 app-host，触屏端仍走"点一行"，移动端目前没有键盘光标这回事，别把这一行读成三端都接了；③ 🔴 **本轮闭合**（载体 `4b17213a`）：新增 `e2e/tsconfig.detail-pane.json`，编译器**借 `../apps/web/node_modules/.bin/tsc`** —— 不在 e2e 里装 typescript（那要过 AGENTS §3.1/§3.2 两道门，还会写进主检出那份**共享的** `e2e/node_modules`）。它第一趟就抓到本单自己的一处类型谎：`onlyHighlighted` 声明返回 `{at, title}` 而 `return` 里塞着 `id`，调用方靠 `as` 硬掰 —— 而跨投影那条判据（K4）比的正是 `id`。`include` 只圈本单六个文件：同一趟对 `tests/*.ts` 全量跑现量 **13 条错误分布在另外 6 个文件**（`calendar-cells` 5 / `calendar-week` 3 / `quadrant-fill` 2 / `task-row-touch-target` 1 / `search-overlay` 1 / `due-date-edit` 1），那是别的线在飞的活，**不吸收进来凑绿**（收进来只会得到“这道检查天生是红的”）。能不能失败也量了：真代码 RC=0 / 0 条错误，注入一句 `press(page, 'ArrowRight')` ⇒ RC=2 且精确报在那一行；④ 未做四端重装；⑤ ⚠️ 本 worktree 的 `node_modules` 与 `e2e/node_modules` 是指向主检出的**软链**，而 `.gitignore` 写的是 `node_modules/`（带斜杠只匹配目录）⇒ 它们在 `git status` 里是 `??`，**在这个检出里永远不要 `git add -A`**；⑥ 🔴 **上一轮这条边界写错了，撤回**：它写的是“web 上没有建习惯、建便签的入口，本轮做不到”，现量两处都在 —— `HabitsView.tsx:275` 的新建 `<input>`（`<form>` 在 268）与共享 `NotesBoard` 的 `notes-input` / `notes-submit`（`packages/ui/src/notes/NotesBoard.tsx:241-264`）。**错法值得记**：那句是按“模块开关默认关掉便签”的印象写的，没去读那两个视图的组件本体 —— 与 §8.9 第 4 条同族，新的是它的方向：**“没有某个入口”也是一条断言**，写它要过和写 `file:line` 同样的门槛。补上的是 K6 / K7 两条真浏览器判据（载体 `1dd23d25`，三臂 C6/C7/C8 各红在指定那一条），所以这一栏现在写的是**已证**而不是边界；⑦ e2e 那一族重跑会**改写别的单的三张 evidence png**（本轮：`detail-column-slot/no-sidebar-view.png`、`focus-detail-pane/f1-four-cards.png`、`focus-detail-pane/f5-aborted-record.png`，各差几字节），已 `cmp` 后 `git restore` 还原 —— 记下来是让下一轮别把它们当成自己的改动提交；🔴 **2026-10-05 03:1x 更新：这件事现在不用人记了**，§8.123 那枚证据图守卫（`scripts/verify-detail-pane-evidence-guard.mjs`，提交 `6785742f`）包在电池里 e2e 那一步的两侧，跑前快照、跑后逐枚还原。最近一趟读数：`SNAPSHOT 登记=139 枚（跑前就脏 0）` → `EVIDENCE_GUARD=RESTORED 14 枚` → `EVIDENCE_DIRTY=0`。**枚数从 3 变 14 不是漂移**：那一轮手记的是"本轮恰好被改写的三张"，守卫量的是 `apps/web/evidence` 全目录里被这一趟重写的所有枚。原句保留，因为它记的是**这格曾经靠人**；⑧ 🔴 **K4 有一次只在并行时红过**（“切到四象限后高亮行数 = 2”），单独跑 3 次、整份文件再跑 4 次都没复现 —— **未定性**，不写成因也不改松判据；处置是把每行的 `{bg, near}` 读数打进断言消息（`test-results` 每次重跑会被清掉，快照不是可留存的证据 —— 这一次想回查时已经被我自己的复跑删掉了）。下一轮再红就直接读消息里的容器；⑨ 🔴 **这句已过期，2026-10-05 03:1x 就地撤回**（原文：**便签面上的选中没有可见痕迹**（K7 看图照出来的，不是推断）：`NotesBoard` 的行不带 `aria-current`、也没有换底色，光标每按一次的唯一可见后果是**上方编辑器换内容**。这条**不在本单动手** …… 改法已量过：给共享 `NotesBoard` 加一个默认值等于原行为的可选 prop（`selectedId?`），代价是零消费者改动。）—— 撤回留在原处而不是删掉，因为它**当时是真读数**，K7 那张图确实照出来的就是这个；过期是**因为 W1c 把它做掉了**，不是因为发现探针坏了。现量四处：prop 名是 `activeNoteId` 而不是预测的 `selectedId`（`packages/ui/src/notes/NotesBoard.tsx:121` 声明、`:181` 的 `styles.rowActive` 用 `color.primary-subtle`、`:317` 应用），宿主从**共享选中态**取它而非又一个本地 id（`apps/web/src/features/notes/NotesView.tsx:113` 定义、`:150` 递出），载体 `6ee85fda`（2026-10-04 08:5x）。判据两层：`apps/web/tests/notes-selection-trace.spec.tsx` 9 条 + 真浏览器 `K8`。**图这次真的打开看了**（`apps/web/evidence/keyboard-cursor/k8-notes-selection-visible.png`，工作树与 HEAD 逐字节相同）：三行里中间那行「便签痕迹乙」带浅蓝底，上方编辑器的正文也正是「便签痕迹乙」。⚠️ 两条**不许读多**的边界：① 本批**没有重跑浏览器**（当时机器 1 分钟负载 13.8，见 §8.127），所以这一栏的图证读的是 `6ee85fda` 提交里那张，**不是一次新的读数**；② "便签只有一种视觉线索、习惯面有两种（蓝框 + 浅底）"这一档**不是本行新照出来的漏做**，W1c 已把它写进 §8.22 的更正。 |
+| W1b 键盘光标 | 🔄 **进行中**（三层判据、22 条变异臂全红、七张图逐张看过、九道门禁 RC=0；但**原判据三条腿只落了第一条** —— 那两条此前记为"阻塞在拍板 #1／#8"，🔴 **拍板已于 2026-10-05 02:5x 由本线给完（§8.125），阻塞项从"等拍板"换成"等详情面本体的实现"**；四端重装也未做 ⇒ 不算已完成） | 原 W1 判据 ③「↑↓ 移动选中」**拆到这一行**，理由不是省事：`TaskList` 的 `activeTaskId` 是**展示槽**，而"往哪走"要有目的地才有意义 —— 详情列（W2）没开之前，回车没有可去的地方。判据是"↑↓ 改选中 + 详情面跟着换 + Enter 打开焦点"。<br>载体 `feat/detail-pane` = `6c3c1ecd`。<br>**分层与裁决**：规则在 `packages/app-host/src/selection.ts` 的 `moveSelectionInList`（四条：方向进列表 / 夹住不环绕 / 不猜位置 / 可返回同值），宿主只回答"当前哪个视图、那一串 id 现在在 DOM 里的顺序、什么时候不该响应、要不要滚进视野"。🔴 **顺序从渲染出来的那一串行取，不再算一遍**：列表顺序今天有四个所有者（`groupTasksByDate` + `collapsedGroups` / `QuadrantBoard` 的格子序 / `TimelinePanel` / 习惯与便签各一份），宿主自己算就是**第五个**，症状是"眼睛在第 3 行、选中跳到第 5 行"而两边都不报错。`search` 与 `trash` **刻意不进表**（前者自己有一条走结果数组的光标，两边都响应同一个键 = 一次跳两格；后者的 ↑↓ 是"选恢复还是删除"，语义完全不同）。<br>**三道"不响应"，第三道是看图看出来的缺陷**：① 正在打字；② 有浮层（今天**三个真浮层分两种形状**：设置 `.ht-sheet`、搜索 `role="dialog"`+`aria-modal="false"`、法务二次确认 `role="dialog"` 且**不带**裸 `.ht-sheet` ⇒ 选择器只认一种就会漏）；③ 🔴 焦点落在 `[role="menu"]` / `[aria-haspopup="menu"]` 上。第三条的来路：K3 那张图的第一版里**账号菜单是开着的** —— Esc 关设置浮层时焦点按既有设计回到头像（`App.tsx:473-479`），而头像那颗按钮自己把 ↓ 用作"打开菜单"（`AccountMenu.tsx:299`），于是同一次按键**既弹菜单又把底下那栏的选中挪走**；菜单展开时同理，它的面板既不是 `.ht-sheet` 也不是 `role="dialog"`，第 ② 道挡不住。裁决是**焦点归谁、键就归谁**（反过来让列表光标赢会弄坏 `AccountMenu` 那条既有、且有用例的键盘入口）。<br>**判据 41 条分三层**（11:3x 起：宿主层 24→25，多的是视图全集那条分区判据，见 §8.41）：规则层 +9（空列表 / 没选中时两个方向各进列表 / 中间 / 两端夹住 / 单条 / 当前不在列表 / "只按传入顺序不自己排序"用故意倒序夹具钉 / 连按五次轨迹 / 纯函数不通知），该文件现 25 passed；宿主层 `apps/web/tests/keyboard-cursor.spec.tsx` **25 条**；真浏览器 `e2e/tests/keyboard-cursor.spec.ts` **K1–K7**（生产构建载体 `vite build` + `vite preview` 端口 4371）。<br>💥 **变异 22 臂全红**：jsdom 层 15 臂（B1–B15）红集**逐条点名** —— B1 环绕 2 红 / B2 进列表 2 红 / B3 自己排序 1 红 / B4 摘打字闸门 2 红 / B5 摘浮层闸门 2 红 / **B11 把浮层选择器缩到只剩 `.ht-sheet` ⇒ 恰好 1 红**（新加的 dialog 腿单独红，证明它不是把 B5 又量了一遍）/ **B12 摘"焦点归控件"闸门 2 红** / B6 去重 1 红 / B7 端点吞键 1 红 / B8 滚进视野 1 红 / B9 绑 `view` 1 红 / B10 摘掉 habits 那一行 1 红 / **B13 把真生产者（`packages/ui/src/notes/NotesBoard.tsx:294` 的 `testID`）改名 ⇒ 恰好 1 红，只红“前缀 ↔ 生产者”那一条** / **B14 把表里的 `note-row` 写成 `note-card` ⇒ 2 红**（那条 + notes 那一圈循环 —— 这一臂顺手把新判据存在的理由钉住了：**插出来的 DOM 抓不住表错**，它注入的是测试自己那份 `cases` 字面量） / **B15 把表里五处 `prefix: '…'` 的单引号换成双引号（运行时逐字等价）⇒ 恰好 1 红，且红在“解析出 0 项也算红”那句守卫上**（没有那句，前缀表一改写法这条判据就静默变成永真）。浏览器层 7 臂（C1 摘浮层 ⇒ K3 红 / C4 摘焦点闸门 ⇒ K5 红 / C5 摘打字闸门 ⇒ K2 红 / C2 端点环绕 ⇒ K1 红，C2 那条证明 e2e 这层走的确实是 app-host 的规则而不是宿主又算了一遍 / **C6 表里 `habit-row` 写成 `habit-card` ⇒ K6 红** / **C7 把 `notes` 那一行整个摘掉 ⇒ K7 红** / **C8 把便签编辑器当成浮层（往第②道闸门的选择器里加 `[data-testid^="notes-editor"]`）⇒ K7 红** —— C8 才是 K7 那句关键前提（“编辑器不算浮层，所以闸门不挡它”）的靶子：没有它，K7 只是在描述一个巧合）。每臂复原后 sha256 逐字节比对、`dist/` 目录摘要回到干净态（`BACK_TO_CLEAN=True`，干净摘要 `e0c768102d639a5e`），每臂都先打 `REACHED_ARTIFACT=True` 才有资格判红；并各跑一次"不复位也全绿"的阴性对照（jsdom 24 passed / e2e 7 passed）。<br>🔴 **两条"存活"要分开记，一条是判据缺口、一条本来就不该有牙**：① C5 头两趟存活 = 判据缺口，全过程与改法在 **§8.9 第 2 条**；② **C3（把绑定从 `contentView` 换成 `view`）预期存活且确实存活** —— 绑 `view` 时开着设置面板根本没人绑，K3 的负向腿白过，两道机制在浏览器上**不可区分**。所以"`contentView` 那条绑定"只有 B9 一处消费者（源码级断言），**不许声称浏览器层有它的牙**。它是真冗余还是真必要，取决于第②道闸门哪天被简化掉 —— 那之前这一行就是它的现状。<br>**门禁 9 道 RC=0**：`check:layering`（332 文件 9 规则）/ `check:selection-single-source`（词表 3 类全有消费者 task 10 / habit 7 / note 13，宿主内本地选中态 0 处）/ `check:l4`（web 98≤104、mobile **90 = 基线 90**，没动基线）/ `check:row-single-source`（**28 = 基线 28**，本单没新增顶层 `ht-*` 族）/ `check:design` / `check:ui-language`（zh 2864 = en 2864）/ `check:migrations` / token 生成物两步（tsup → `--check`，8 文件 204 token）。typecheck：电池里那六条**改成从各包自己的 `package.json` 取 `typecheck` 脚本**（五个包是 `tsconfig.spec.json`、`apps/mobile` 是 `tsconfig.json`），六条 RC=0、各日志里 `error TS` 计数 0；spec 版曾抓到一条真错误（见 §8.9 第 3 条）。🔴 上一轮记的“六包 `tsconfig.json` 与 spec 各 RC=0”里，**电池那六条其实是恒绿的虚检查**（命令字面量抄成了 `-p tsconfig.json`），本轮修的是电池本身，不是读数。另加两步 `apps/web` 重打（`tsc -b` + `vite build`）再跑 e2e 那一族 —— 该配置的 `webServer` 只有 `vite preview`、**不建**，不重打就是在验上一轮的产物（§7 第 212 条那一族）。电池因此从 24 步变 25 步（多一条 `typecheck e2e family`），整条电池 25 步 RC=0、`BATTERY_RESULT=ALL_GREEN`。全量单测 domain 834 / app-host 1020 / i18n 26 / ui 459 / web **1585 passed \| 12 skipped** / mobile 607；e2e 详情面整族 **25 passed**。<br>🔴 **`check:docs`（`docs-link-check`）RC=1，而那一条死链不在本单**：`PROGRESS.md:1362` → `docs/research/aed-implementation-evidence.md`。现量三件：那一行是 `96f3293d`（别的线）已提交的、目标文件**此刻只存在于主检出且未被跟踪**（`ls` 有 / `git show HEAD:` 无）⇒ 在任何干净检出里它必然是死链。处置是**登记不代改**（两种改法分别是"替别人提交他的在途文档"和"动他那一行"，都不归本单）。本单自己的文档改动零死链，复跑：`node research/tools/docs-link-check.mjs 2>&1 \| grep -c detail-pane-alignment` ⇒ `0`。<br>**截图 7 张，逐张打开看过**（`apps/web/evidence/keyboard-cursor/{k1-first-row-highlighted,k2-typing-row-unchanged,k3-cursor-back-after-closing-sheet,k4-quadrant-same-selection,k5-avatar-owns-arrow,k6-habits-cursor-aria-current,k7-notes-editor-follows-cursor}.png`）：k1 只有第一行带浅蓝底；k2 输入框里是"正在打字"且带焦点环、高亮停在**中间**那一行；k3 关掉浮层后**菜单没弹**、第二行带蓝（= 光标回来了）；k4 切到四象限还是同一条；k5 是那条缺陷的**修复后**读数 —— 菜单开着、头像带焦点环，而底下第一行仍带着高亮（= 一次按键只发生一件事）；k6 里三行习惯只有第一行「光标甲」带**蓝框 + 浅蓝底**、右窗格开的正是它（两种线索同一行，且那是夹住后的第 0 行）；k7 里编辑器开在板子**上方**（不是浮层），内容是「便签光标乙」，而下面两张便签卡**没有任何选中痕迹**。看图另照出一件**拍不出来**的事：`.ht-sheet` 的底色是 `color-mix(in srgb, var(--ht-color-background) 95%, transparent)`（`sheets.css:27`，那里自己写明"下层可见"的判据是 DOM 里标记仍在），95% 浓度下"浮层底下那一行没动"在像素上量不出来 ⇒ K3 的前半由断言证，图证只给它配套的那一半（关掉之后还在）。<br>**边界（别读多）**：① ~~三条腿只落了第一条，另两条等拍板 #1 / #8（`App.tsx:2532` 今天只有 `contentView === 'focus'` 一支，任务/习惯/便签那一栏里**没有可换的东西**）~~ 🔴 **2026-10-05 04:1x 就地更新（§8.130）**：**便签那一格的第 2 条腿已经落了** —— 详情列里现在装的是 `NoteEditorCard`，↑↓ 换选中时那一格跟着换（`e2e/tests/detail-pane-note-editor.spec.ts` 的 N3，真浏览器 + 图证）。**任务与习惯那一栏里仍然没有可换的东西**，所以第 2 条腿在两面仍未闭合、第 3 条腿（Enter 打开焦点）一面都没落。原句里的 `App.tsx:2532` 也已过期（同一个文件本批净增 25 行 ⇒ 那段 JSX 现在在 2553），这一处**改成指符号锚**：`<aside className="ht-app__detail" data-testid="detail-column">` 那一段；② **接线只落了 web** —— 规则在 app-host，触屏端仍走"点一行"，移动端目前没有键盘光标这回事，别把这一行读成三端都接了；③ 🔴 **本轮闭合**（载体 `4b17213a`）：新增 `e2e/tsconfig.detail-pane.json`，编译器**借 `../apps/web/node_modules/.bin/tsc`** —— 不在 e2e 里装 typescript（那要过 AGENTS §3.1/§3.2 两道门，还会写进主检出那份**共享的** `e2e/node_modules`）。它第一趟就抓到本单自己的一处类型谎：`onlyHighlighted` 声明返回 `{at, title}` 而 `return` 里塞着 `id`，调用方靠 `as` 硬掰 —— 而跨投影那条判据（K4）比的正是 `id`。`include` 只圈本单六个文件：同一趟对 `tests/*.ts` 全量跑现量 **13 条错误分布在另外 6 个文件**（`calendar-cells` 5 / `calendar-week` 3 / `quadrant-fill` 2 / `task-row-touch-target` 1 / `search-overlay` 1 / `due-date-edit` 1），那是别的线在飞的活，**不吸收进来凑绿**（收进来只会得到“这道检查天生是红的”）。能不能失败也量了：真代码 RC=0 / 0 条错误，注入一句 `press(page, 'ArrowRight')` ⇒ RC=2 且精确报在那一行；④ 未做四端重装；⑤ ⚠️ 本 worktree 的 `node_modules` 与 `e2e/node_modules` 是指向主检出的**软链**，而 `.gitignore` 写的是 `node_modules/`（带斜杠只匹配目录）⇒ 它们在 `git status` 里是 `??`，**在这个检出里永远不要 `git add -A`**；⑥ 🔴 **上一轮这条边界写错了，撤回**：它写的是“web 上没有建习惯、建便签的入口，本轮做不到”，现量两处都在 —— `HabitsView.tsx:275` 的新建 `<input>`（`<form>` 在 268）与共享 `NotesBoard` 的 `notes-input` / `notes-submit`（`packages/ui/src/notes/NotesBoard.tsx:241-264`）。**错法值得记**：那句是按“模块开关默认关掉便签”的印象写的，没去读那两个视图的组件本体 —— 与 §8.9 第 4 条同族，新的是它的方向：**“没有某个入口”也是一条断言**，写它要过和写 `file:line` 同样的门槛。补上的是 K6 / K7 两条真浏览器判据（载体 `1dd23d25`，三臂 C6/C7/C8 各红在指定那一条），所以这一栏现在写的是**已证**而不是边界；⑦ e2e 那一族重跑会**改写别的单的三张 evidence png**（本轮：`detail-column-slot/no-sidebar-view.png`、`focus-detail-pane/f1-four-cards.png`、`focus-detail-pane/f5-aborted-record.png`，各差几字节），已 `cmp` 后 `git restore` 还原 —— 记下来是让下一轮别把它们当成自己的改动提交；🔴 **2026-10-05 03:1x 更新：这件事现在不用人记了**，§8.123 那枚证据图守卫（`scripts/verify-detail-pane-evidence-guard.mjs`，提交 `6785742f`）包在电池里 e2e 那一步的两侧，跑前快照、跑后逐枚还原。最近一趟读数：`SNAPSHOT 登记=139 枚（跑前就脏 0）` → `EVIDENCE_GUARD=RESTORED 14 枚` → `EVIDENCE_DIRTY=0`。**枚数从 3 变 14 不是漂移**：那一轮手记的是"本轮恰好被改写的三张"，守卫量的是 `apps/web/evidence` 全目录里被这一趟重写的所有枚。原句保留，因为它记的是**这格曾经靠人**；⑧ 🔴 **K4 有一次只在并行时红过**（“切到四象限后高亮行数 = 2”），单独跑 3 次、整份文件再跑 4 次都没复现 —— **未定性**，不写成因也不改松判据；处置是把每行的 `{bg, near}` 读数打进断言消息（`test-results` 每次重跑会被清掉，快照不是可留存的证据 —— 这一次想回查时已经被我自己的复跑删掉了）。下一轮再红就直接读消息里的容器；⑨ 🔴 **这句已过期，2026-10-05 03:1x 就地撤回**（原文：**便签面上的选中没有可见痕迹**（K7 看图照出来的，不是推断）：`NotesBoard` 的行不带 `aria-current`、也没有换底色，光标每按一次的唯一可见后果是**上方编辑器换内容**。这条**不在本单动手** …… 改法已量过：给共享 `NotesBoard` 加一个默认值等于原行为的可选 prop（`selectedId?`），代价是零消费者改动。）—— 撤回留在原处而不是删掉，因为它**当时是真读数**，K7 那张图确实照出来的就是这个；过期是**因为 W1c 把它做掉了**，不是因为发现探针坏了。现量四处：prop 名是 `activeNoteId` 而不是预测的 `selectedId`（`packages/ui/src/notes/NotesBoard.tsx:121` 声明、`:181` 的 `styles.rowActive` 用 `color.primary-subtle`、`:317` 应用），宿主从**共享选中态**取它而非又一个本地 id（`apps/web/src/features/notes/NotesView.tsx:113` 定义、`:150` 递出），载体 `6ee85fda`（2026-10-04 08:5x）。判据两层：`apps/web/tests/notes-selection-trace.spec.tsx` 9 条 + 真浏览器 `K8`。**图这次真的打开看了**（`apps/web/evidence/keyboard-cursor/k8-notes-selection-visible.png`，工作树与 HEAD 逐字节相同）：三行里中间那行「便签痕迹乙」带浅蓝底，上方编辑器的正文也正是「便签痕迹乙」。⚠️ 两条**不许读多**的边界：① 本批**没有重跑浏览器**（当时机器 1 分钟负载 13.8，见 §8.127），所以这一栏的图证读的是 `6ee85fda` 提交里那张，**不是一次新的读数**；② "便签只有一种视觉线索、习惯面有两种（蓝框 + 浅底）"这一档**不是本行新照出来的漏做**，W1c 已把它写进 §8.22 的更正。 |
 | W1c 选中痕迹统一（本轮新增的子单） | ✅ 已完成（2026-10-04 08:4x；四端重装仍随 W1/W1b 那批一起挂着，见 §8.14，**第七次读数与合流面见 §8.24**） | 见下面 **§8.22** —— 它是从拍板 #1 里拆出来的**缺陷**，不是选择题（同 W8a 那一刀的拆法）。覆盖面逐处现量、两种无障碍通道与那处该豁免的面在 **§8.26**；🔴 那一趟留下的"目前只有一次性判据在顶"这句**已过期**：常驻化落在门禁的**断言 F**，四处面 + 九臂见 **§8.37**（2026-10-04 10:5x）。🔴 **判据条数与变异红集此前这格里没有**（18:5x 由新的腿 7/8 照出来并现量补上）：判据 **10 条** —— 新增 `apps/web/tests/notes-selection-trace.spec.tsx` 9 条 + e2e `K8` 1 条（条数按定义处现取：`grep -cE 'it\\(\|test\\(' 该文件`）。变异**九臂**（`research/tools/mutation-rigs/mutate-selection-f.mjs`）的红集里最要紧的一条不是"九臂全红"，而是 **H4 第一趟存活**：把谓词换成常量 `true` 时门禁当时全绿 ⇒ 补上裸名分支（`detailId\|selectedId\|editingId`）后同一臂**转红**，逐臂预期与实测在 §8.37 那张表里 |
 | W2 | 🔄 **进行中**（槽位、判据、五臂变异、八张图逐张看过、十道门禁都闭合；只剩 AGENTS §6.1.1 的**四端重装**，所以还不算已完成） | 载体 `feat/detail-pane` = `0c159f7f`（前置那笔 `0de58095` 是探针修复）。**落点与裁决**：详情列是 `.ht-app` 的**第四个轨道**、与 `<main>` 平级，不是 `.ht-content` 里的第二栏 —— `.ht-content` 自带 `max-inline-size` + `margin-inline: auto`，挂进去的列永远贴不到窗口右边缘，观感就不是"三栏 + 右详情"。轨道 `--ht-detail-track` **只在 `.ht-app` 上算一次**，两轨/四轨两条 `grid-template-columns` 各自拼它（抄两遍就会漂），塌缩态覆盖这个变量而不是重抄声明。**今天这一列是空的**，这是设计不是半成品（原话："即使没东西也空在那里"），往里放什么阻塞在拍板 #1/#8。token 三枚新增（`--ht-layout-detail-{width,min-width,max-width}` = 22/18/30rem）+ `--ht-layout-content-max` 的**语义**改成"中间列上限"（值没动），5 份生成产物同步。⚠️ 上下限今天**只是 `clamp()` 的两端，没有拖拽手柄** —— 别以为已经能拖。<br>**判据 3 条**（`e2e/tests/detail-column-slot.spec.ts`，生产构建载体 `vite build` + `vite preview` 端口 4358）：① 右边缘 == 视口右边缘（±1px）**且**中间列不贴边（只断言前者挡不住"两边一起缩进去"）；② 它是 `.ht-app` 的直接子项（几何成立的那条机制）；③ 宽度**等于** token 给的像素值 —— 阈值由 `pxOfCssVar` 从页面现读，不抄 rem→px，且先断言区间非退化。🔴 第一版这里写的是"落在 [min,max] 区间内"，那是**恒真判据**：轨道就是 `clamp(min,width,max)` 算出来的，任何越界值都被夹回区间。换成等值判据才有牙。<br>💥 **变异 5 臂，每臂复原后逐字节比对并复跑回 3 passed**：M1 把列搬回 `.ht-content` ⇒ **2 红**（两条视图各红在右边缘，读数 `904 没贴到 1280`）；M2 两轨那条不走 token 写 `24rem` ⇒ **1 红**（`384 ≠ 352`）；M5 共用的 `--ht-detail-track` 整体不走 token ⇒ **2 红**而窄档那条**仍绿**；M3 摘 769–1023 收起 ⇒ 红在 900 那一句；M4 摘 ≤768 收起 ⇒ 红在 700 那一句、900 仍绿。🔴 **M2 的第一版是存活的（2 passed）**：那时两条用例都停在带侧栏那一面，生效的是四轨声明，**两轨那行零判据** —— "两条都绿"读起来像"宽度判据有牙"，其实是同一行声明量了两遍。第三条用例就是这条存活臂换来的（§8.3 第 4 条）。<br>**门禁 10 道 RC=0**：`check:design` / `check:row-single-source`（`ht-*` 前缀族 **28 = 基线 28，未新增** ⇒ 命名走 `.ht-app__detail` 而不是新起一族，先例 `.ht-content__calendar-host`）/ `check:l4`（web 98≤104、mobile 90=90，**没调基线**）/ `check:layering` / `check:ui-language` / `check:selection-single-source` / token 产物 `--check`（8 文件 204 token）/ design-system 489 tests / `check:server-design`（41 个，布局 token 不上服务端）/ `check:arkts`（真编译器过）。<br>**截图**：新增 3 张（`desktop-with-detail` / `no-sidebar-view` / `back-to-desktop`）+ W1 那 5 张因布局多了 352px 而整体重跑，**八张逐张打开看过**：详情列在两张视图里都是窗口右边那条带发丝分隔边的空白列；选中那条在列表/四象限/时间线/搜索里仍是唯一带浅蓝底的一行。看图另照出一件断言看不见的事：`parkCursor` 第一版落点 `(640,40)` **恰好压在顶栏「同步」按钮上**，那张证据图里那个按钮带着 hover 环 ⇒ 改成按视口算右下角并移进 `helpers.ts`（`0de58095`）。<br>**边界（别读多）**：窄档今天只有**宽度**条件，"看高也看宽 + 收起按钮 + 三条恢复路径 + 持久化"是 W4；这一列里放什么是"详情面本体"那一单（拍板 #1/#8）。⚠️ 未做四端重装，窗口判据同 W1 那行。⚠️ 本 worktree 的 `node_modules` 与 `e2e/node_modules` 是指向主检出的**软链**，而 `.gitignore` 写的是 `node_modules/`（带斜杠只匹配目录）⇒ 它们在 `git status` 里是 `??`，**在这个检出里永远不要 `git add -A`**。**截图产物（入库的只有这三枚）**：`apps/web/evidence/detail-column-slot/{desktop-with-detail,no-sidebar-view,back-to-desktop}.png`；本格上面那句「八张图逐张看过」是 09:5x 那一趟的**看图数**，其余几张没有入库产物可对应（**未核实它们在哪儿**，所以本行只登记入库的三枚，不拿"八张"当证据） |
 | W3 | 🔄 **进行中**（决定已钉死、三臂各红在指定那一条、两张图人看过；只剩 §6.1.1 四端重装） | **零 CSS 改动** —— 这不是没做，是量出来的结果就是工单取的默认值："设置浮层不盖第四列"（几何上根本不相交），"搜索浮层盖满视口但透出下层"。决定本身分**三种机制**达成，所以判据也必须写成三种：<br>① `.ht-sheet` = `absolute; inset:0` 挂在 `.ht-content` 里 ⇒ 与详情列**盒子不相交**（第四列是 `.ht-app` 的直接子项，在它外面）；② `.ht-search-overlay` = `fixed; inset:0`（2026-10-01 为"一开搜索列表跳回顶部"那个缺陷改的）⇒ **相交**，靠 `--ht-material-scrim` = `rgb(15 23 42 / .32)` 半透明透出；③ 模态层 `.ht-sheet__reconfirm` / `.ht-trash__overlay` 也是 `fixed; inset:0` ⇒ 盖一切，**这是对的，不判**（登记在下面那条枚举里）。<br>🔴 **判据一律写成盒子相交，不写 `toBeVisible()`**：被浮层整个盖住的元素照样 visible（Playwright 的 visible = 有盒子且非 `visibility:hidden`），那条会绿在"详情列已被盖死"的界面上。<br>**判据 2 条**（`e2e/tests/detail-pane-overlay.spec.ts`）：每条都配**正向对照**（设置那条先断"浮层确实盖住了 `.ht-main`"，否则"不盖详情列"在浮层压根没渲染时也成立 = 恒真）；搜索那条同时钉"它盖到详情列"（决定变更要回来改判据并说明理由）与"scrim 的 alpha **在 0 与 1 之间**"（下界不是凑数：alpha=0 等于没有 scrim，"透出"就成了空话），外加列宽仍等于 token、右边缘仍贴视口。<br>**变异三臂**（每臂重新 `vite build` 再跑、复原后逐字节比对、复跑回 2 passed）：N1 `.ht-sheet` 改 `fixed; inset:0` ⇒ 1 红，读数 `sheet 右边缘 1280 vs 详情列左边缘 928`；N2 scrim 的 alpha 改 1 ⇒ 1 红 `alpha=1 不小于 1`；🔴 **N3 打的是防作弊机制自己** —— 把浮层缩成左上角 4rem 小块 ⇒ 红在**正向对照**那句（`连中间列都没盖住…这条就成了空判据`）。三臂里未触碰的那条用例每臂都仍绿。<br>**既有判据继续绿**：`apps/web/tests/settings-sheet-ia.spec.tsx` + `search-overlay-ia.spec.tsx` = **8 passed / 0 failed**（W2 改布局之后重跑的）。<br>**整屏/浮起层的完整枚举**（`grep position: fixed apps/web/src/styles/`，6 处，别再重新推一遍）：整屏非模态 1（`.ht-search-overlay`）、内容区内 1（`.ht-sheet`，是 `absolute`）、模态 2（reconfirm / trash overlay，`fixed; inset:0` + `--ht-z-modal`，**盖一切是对的**）、锚定小面板 3（`.ht-inbox__panel` / `.ht-accountmenu__panel` / `.ht-rail__label`，不参与"盖不盖列"这个问题）。<br>**截图 2 张**（`apps/web/evidence/detail-pane-overlay/{settings-sheet,search-overlay}.png`）**都打开看过**：前者设置面盖住中间列、下层"收集箱"字样淡淡透出、**右侧详情列完全不被染色**（发丝分隔边清楚）；后者整屏被 scrim 压暗，rail / 侧栏 / 详情列一起变灰但仍读得出来，卡片贴顶居中。⚠️ 未做四端重装。 |
@@ -8543,3 +8543,179 @@ C 缺快照必须 rc=2 / D `--keep` 真的把字节留下 / 收尾工作树零�
 外链存活是**时刻性**读数，不是提交属性。⇒ 合流当时（待办 #21 那一组）再跑一趟
 `node research/tools/detail-pane-citation-liveness.mjs`，并把 `DEAD` 与 `BLOCKED` 逐条读完；
 `DEAD` 若不为 0，改的是**调研文档本体**（撤回或换出处），不是放宽装置。
+
+## 8.130 详情面本体的第一格内容：便签面单落进那一栏（2026-10-05 03:4x–04:1x 落地、09:5x 收口复跑，状态：**已完成**）
+
+> 这一单做的是 §8.125 第 3 节钉下的那道 DoD 的第一格。它**不是** W2（那单交付的是槽位）
+> 也**不是** W4（那单交付的是槽位什么时候不出现）—— 它交付的是"选中某条 ⇒ 那一格换成该实体面单"
+> 这句话第一次真的成立。
+
+### 1. 为什么第一格挑便签，不挑任务
+
+拍板 #1 说的是"同一格换成面单"，而**任务**那一格要搬的是行的字段编辑（标题/截止/优先级/清单/标签）。
+现量过一处代价：那些字段的编辑器今天住在 `TaskDetail` 浮层里，搬进栏里 = **同一批字段在两处可编辑**，
+要先决定留不留两处（那是产品裁决，不是实现细节）。便签相反：编辑卡本来就只有一份实现，
+搬进栏里是**少一处**（板子上方那一枚不再常驻）。所以本单先落便签，
+把"槽位里放什么"这条缝的形状钉出来，任务那一格等它自己的裁决。
+
+### 2. 落地的形状
+
+| 件 | 落在哪 | 一条理由 |
+|---|---|---|
+| 一份实现、两个落点 | `apps/web/src/features/notes/NoteEditorCard.tsx`（新） | 在 `NotesView` 里渲染两遍就是 AGENTS §3.5 那个事故形状（"抽出了实现却没删旧的"）；接线（保存只在真落成时才收面板、取消、`editError`、`key={id}` 防过期快照）抄两遍迟早漂 |
+| 落点由**必填**布尔决定 | `NotesView({ editorInColumn }: { editorInColumn: boolean })` | 🔴 刻意不是"默认值等于原行为"的可选 prop —— 那种写法会把"宿主没接"伪装成"做完了"（§8.115 那一族，typecheck 与既有门禁全绿）。P3 里有一条专门挡它变回 `editorInColumn?:` |
+| "放不放得下"只有一个算法 | `apps/web/src/features/shell/detail-pane-visible.ts`（新）：`DETAIL_FITS_QUERY` + `useDetailColumnShown(collapsed)` | 🔴 **不能只交给 CSS**：那一栏在窄档/收起态是 `display:none`，若只靠它藏，用户点便签会得到一枚**藏在看不见的地方的编辑器** —— 选中态真的进了模型，界面上什么都没有。这就是"界面不说、数据已进模型"那一档 |
+| 栏内间距 | 同一份 `inset: boolean`（必填）递给生产者，壳 `.ht-app__detail-note` 由 `NoteEditorCard` 自己包 | 🔴 第一版是**装配处包一层 `<div>`**，被常驻门禁 `check:detail-pane-slot` 的腿 A 判红（RC=1，实测）—— 那条门禁要的就是"槽里只放内容生产者"。搬进生产者之后回落那一支**不套壳**（DOM 与这一单之前逐字节相同），而"哪一支带 inset"由 A7/A8 两臂各钉一边 |
+
+### 3. 判据（条数）
+
+- **jsdom 层 11 条**：`apps/web/tests/note-editor-placement.spec.tsx` = P1 算法与同源 3 条 /
+  P2 落点唯一性 + inset 5 条 / P3 宿主接线（读 `App.tsx` 源码形状）3 条。读数
+  `Tests 11 passed (11)`；连同 `notes-view`（6）与 `notes-selection-trace`（9）= **26 passed / 0 failed**。
+- **真浏览器层 5 条**：`e2e/tests/detail-pane-note-editor.spec.ts` N1–N5。读数
+  `5 passed`，挂进 `playwright.detail-pane.config.ts` 的 `testMatch` 后整族 **38 passed / 0 failed**
+  （含 keyboard-cursor 的 K7/K8 与 selection-projections —— 它们**没被这一单弄坏**，
+  那两条只按 testID 全局找编辑器，不关心它住在哪一栏）。
+- P1 第一条钉的是**同源**：遍历 `narrow.css` 里三条真实媒体块、逐块断言它确实藏了 `.ht-app__detail`，
+  再断查询串 = 那三条并集的补（宽 ≥1024 且高 ≥480）。刻意不是"文件里有没有这三个串"——
+  那是抄件式判据，别人加一条不藏详情列的同款查询它照样绿。
+- ⚠️ P3 那三条读的是 `App.tsx` 的**源码形状**，所以它们必须先剥注释再匹配（`stripComments`）。
+  第一版没剥 —— 结果**我自己写在那一段注释里的三个字面 `<div>`** 把"装配处不许手写 DOM"那枚断言弄红了。
+  一条会被散文改变的判据量的不是代码；口径与常驻门禁 `check:detail-pane-slot` 一致（它的输出里就写着
+  "剥注释后共 N 行"）。这一条的成因与两腿验证记在第 7 节第 3 项。
+
+### 4. 变异臂（红集逐条点名）
+
+**jsdom 臂台** `research/tools/mutation-rigs/mutate-note-editor-placement.mjs` ⇒
+`ARMS=8 AS_EXPECTED=8 FAIL=0` / `RIG_RESULT=8/8`，每臂断言的是"恰好 1 红 + 其余 10 条仍绿 + 红在那条指定用例上"：
+
+| 臂 | 改的是 | 红集 |
+|---|---|---|
+| A1 | 摘掉 `&& detailColumnShown`（恒按宽屏放） | P3 第一条 |
+| A2 | `editorInColumn={detailColumnShown}` 写成裸 `editorInColumn`（恒真） | P3 第二条 |
+| A3 | `NotesView` 不看开关（两支同时渲染） | P2 第一条 |
+| A4 | 写死编辑器的 `key` | P2 第三条 |
+| A5 | 查询串 `1024px` → `900px` | P1 第一条 |
+| A6 | `editorInColumn: boolean` → `?:` | P3 第三条 |
+| A7 | 生产者不再包那一层内边距壳（`inset` 两支都不套） | P2 第五条「inset 只有栏里那一支拿到」 |
+| A8 | 装配处漏递 `inset`（宿主没接 ⇒ 栏里那一支拿到 `false`） | P3 第一条（与 A1 同一条用例的另一枚断言：`<NoteEditorCard inset` 找不到） |
+
+🔴 **A4 第一版设计错了，改过一次**：原本写的是"把 `useSelected('note')` 换成常量 id"，
+那会**同时**打红"没选中 ⇒ 一枚都没有"（常量永远有值）⇒ 红集 2 条，`failed===1` 的判据把它读成"臂没牙"。
+换成写死 `key` 之后红集恰好一条，钉的正是"跟着换"而不是"有没有"。
+这条改动的理由写在臂台文件里，不只写在本文档 —— 下一个改臂的人要先看见它，才不会又"修回"成常量 id。
+
+⚠️ **A7/A8 是 inset 改版之后补的两臂，各钉一半成因**：A7 拆的是**生产者**那半边（壳不包了），
+A8 拆的是**宿主**那半边（递了 `editorInColumn` 却忘了递 `inset`）。
+只留 A7 会漏掉"壳还在但宿主没接"这一支 —— 而那一支在 DOM 上和"没接"长得一模一样，
+typecheck 也拦不住（必填参数写漏会在编译期红，**写错成 `inset={false}` 不会**）。
+
+**浏览器臂台** `research/tools/mutation-rigs/mutate-detail-pane-note-editor-e2e.mjs` ⇒ `RIG_RESULT=1/1`，
+它回答的问题与上面八个不同：**e2e 那 5 条是不是 jsdom 那 11 条的重复？**
+造一份只有浏览器看得见的坏（往 `base.css` 追加一条把栏里的编辑器 `display:none`），两腿必须同时成立：
+
+```
+基线：jsdom=Tests  11 passed (11)｜e2e=passed=5 failed=-1
+腿 A 盲区（jsdom）：Tests  11 passed (11) rc=0        ← jsdom 对这一份坏是盲的
+腿 B 有牙（e2e）：passed=3 failed=2 rc=1
+腿 B 红集：N1 宽屏：面单在那一栏里、画得出来，且整机只有这一枚 ｜ N2 用的还是 W2 那根列，不是新铸一个槽位
+复原：BACK_TO_CLEAN=true 复跑 jsdom=Tests  11 passed (11)｜e2e=passed=5 failed=-1
+```
+
+（上面这份读数是在 inset 改版**之后**重跑的 —— 前一版记录写的是 `10 passed`，那是加第 11 条判据之前的数，
+留在正文里会变成两套状态，所以就地换成现量。）
+
+⚠️ 这一臂台自己也修过两处**会假绿**的地方：① 汇总行解析原先 vitest/Playwright 共用一个正则，
+而 Playwright 打的不是 `Tests …` 那一行 ⇒ e2e 侧永远读成 `failed=0`，**基线检查恒不成立**；
+② 全绿时 Playwright **不打** `failed` 那一行 ⇒ 读数 `-1` 而不是 `0`，判据要按"没有失败"写。
+红集原先只断"输出里有没有 `N1 宽屏` 这个串"，现在解析 `✘` 行的标题并**点名**，
+解析不出标题时单独打一行（不然 reporter 改了标记会被读成"臂没牙"）。
+
+### 5. 截图 7 张，逐张打开看过
+
+`apps/web/evidence/detail-pane-note-editor/{n1-wide-in-column,n2-same-slot,n3-follows-cursor,n4-narrow-above-board,n4-back-to-column,n5-collapsed-above-board,n5-reexpanded-in-column}.png`
+
+看图照出两件**断言全绿而界面不对**的事，两件都当场修了：
+
+1. 🔴 **保存按钮的右半边被窗口边缘切掉**。`n1` 那张里按钮是方的、贴着 x=1280。
+   先怀疑眼睛，再量：把判据从"外层容器在栏内"改成"面单里**每一格控件**（输入框/保存/取消）
+   离列右边缘要留出一个 `--ht-space-4`"，并把阈值**从 token 现量**（`pxOfCssVar`，
+   沿 `detail-column-slot.spec.ts` 的做法）而不是抄一个 `8`。
+   改前实测：输入框右边缘 = 1280 = 列右边缘（间距 0）；改后 `.ht-app__detail-note` 给出 inset，
+   判据转绿，图里按钮圆角完整。
+   📌 这是 §8.125 那条"断言只验界面写了什么、不验少了什么"的**第三种面目**：
+   它连"少了什么"都不是 —— 是"多贴了一格"，外层容器判据对此完全无感。
+2. 🔴 **`n5-collapsed-above-board.png` 里装的不是收起态**。截图点留在用例末尾（"再展开"之后），
+   于是文件名说的是收起、画的是栏还在。我第一遍看图时被它误导，据此怀疑"回落跑到了板子右边"，
+   量出来才发现回落本身是对的（面单 y=80–308、板子 y=308 起，祖先链 `div < div.ht-content < main.ht-main`）。
+   修的是**取证时机**：截图移到收起那一帧，另加一张 `n5-reexpanded-in-column` 给正向对照。
+   ⚠️ 但这一趟顺手补了一条**当时确实缺的判据**：回落那一支原先只断"在 `.ht-main` 里"，
+   答不出"在板子的哪一边"。现在 N4/N5 各有一条断"面单的**下边缘 ≤ 板子的上边缘**"（`stackDiagnostics`，
+   失败消息带两个矩形与祖先链）。
+3. **N3 红了两次，两次都是探针自己的错**（界面没错、判据要钉的东西也没错 —— 记下来是因为两个成因都很常见）：
+   ① 第一版的期望值写的是"板子上第 i 张 = 第 i 个建的"，而便签板按自己的规则排序（不是添加顺序）——
+   实测第 0 张里是**后建**的那条「跟随乙」。改成**读被点那张卡自己的摘要文本**当期望值（`excerptAt`），
+   判据就不再依赖排序方向；排序哪天变，它照样有效。
+   ② `first.startsWith(excerptAt(0))` —— 传进去的是**未 await 的 Promise**，被隐式 coerce 成
+   `"[object Promise]"` ⇒ 恒 false；而我在错误消息里把同一个值 `await` 了再打印，
+   读起来像"两边明明一样"。改成先 `await` 成 `ex0`/`ex1` 再比较，并补一条**非退化前提**
+   （两张卡的摘要必须都非空且互不相同，否则一个常量夹具能让这条用例在任何面单上都"通过"）。
+   📌 元规则第 1 条（先怀疑探针）在这一单里连中三次：上面 ①②，加上第 2 项那张拍错时机的图。
+
+### 6. 四道前置闸门的读数
+
+| 闸门 | 读数 |
+|---|---|
+| 归属门 | 开工前 `VERDICT=CLEAN … 点名 6 条｜本地不在场 0 条｜被占 0 条`；**提交前重取（09:5x 现量）**：`主检出未提交 51 枚｜点名 22 条｜本地不在场 0 条｜被占 0 条 ⇒ VERDICT=CLEAN`（枚数从 6 涨到 22 是本批真的多出装配处、门禁、两台臂台与 7 枚图，不是口径变了） |
+| 两道余量为 0 的棘轮 | `check:l4` ⇒ mobile **90 = 基线**（RC=0，没动基线）；`check:row-single-source` ⇒ **28 = 基线**（新类名挂在既有 `.ht-app` 族下，不是新顶层族 —— 与 `.ht-app__detail-focus` 同一先例） |
+| 干净检出复跑 | ⚠️ **本单没做**：改动全在 `apps/web` 与 `e2e`，判据跑在工作树；合流当时（待办 #21 那一组）随整族一起跑 |
+| packages 改完先 build | 本单**没改 `packages/*`**；`apps/web` 自己重打了两次（`tsc -b` RC=0 + `vite build`），e2e 载体是 `dist` ⇒ 量的确实是当前源码 |
+
+静态门禁逐条 RC：`check:l4` 0 / `check:row-single-source` 0 / `check:ui-language` 0 /
+`check:ui-provider` 0 / `check:empty-state` 0 / `check:design` **先 1 后 0**（见第 7 节第 1 项）/
+`check:detail-pane-slot` **先 1 后 0**（见第 7 节第 3 项）/ `check:layering` 0 /
+`check:selection-single-source` 0 / `check:dp-status-table` 0 / `check:dp-c1-coverage` 0 /
+`check:docs-voice` 0 / `check:claims` 0 / `check:reachability` 0 / `tsc -b` 0 /
+`docs-link-check` 1（唯一那枚仍是别线的 `PROGRESS.md:1362`，处置与 §8.128 相同：**登记不代改**）/
+`check:detail-pane-evidence-refs` **先 1 后 0**（本批 7 枚新图是未跟踪文件，`git add` 之后转绿）。
+
+### 7. 顺带修掉的三处（都不是本单的产品面，但都是这一趟照出来的）
+
+1. **`check:design` 报了本单自己造的一处"硬编码"**：`detail-pane-visible.ts` 里 `1024px` / `480px`。
+   这不是能改掉的 —— 媒体查询的**特征值不接受 `var()`**（写了整条查询失效），JS 侧只能是字面量。
+   按门禁自己写的逃生门（"确属合理例外 ⇒ 进 `ALLOW` 并写 why"）加了一条 `LINE_ALLOW`，
+   正则窄到只认 `\((min|max)-(width|height):`，并配**两腿验证**：
+   干净态 `LEG1_EXIT=0`（断点不再报）／同一文件注入一枚真裸值 `padding: 12px` ⇒ `LEG2_EXIT=1` 且精确命中 1 处
+   （`ALLOW_VERDICT=OK`，注入文件是本批**未跟踪新文件**，所以复原走备份副本而不是 `git checkout --`）。
+2. **C1 表 #1 那格里的三枚 `App.tsx:NNNN` 锚**：见调研文档同一格的更正 —— 逐枚现量后是三件事，
+   不是一件：一枚随本批净增 25 行漂了（`:2542`→2553）、一枚**恰好还在原位**（`:2528`，巧合不是正确）、
+   一枚**在本批改之前的 HEAD 上就已经指错**（`:2094-2096` 那三行是"空态包在 `task-list` 锚点里"的注释，
+   与"窄档退回中间列"无关）。⇒ 三枚都换成符号锚。
+   📌 这条与 §8.127 同族而**不是同一件事**：那次是"句子过期"，这次是**行号锚连当下对不对都不能靠记**。
+3. 🔴 **常驻门禁 `check:detail-pane-slot` 的腿 A 读的是未剥注释的原文 —— 我的注释把它的判据翻红了。**
+   顺序是这样的：先按它报的红做了一件**对的**事（把装配处那层 `<div>` 搬回生产者、改成必填 `inset`），
+   搬完之后装配处只剩一句解释性注释，里面写着"这里不许手写 `<div>`" —— 腿 A 于是**仍然** RC=1，
+   而它红的原因已经不是代码。查出来是它 `slice` 出那段文本后**直接**匹配，没有剥注释。
+   ✅ 修法：腿 A 改成对 `stripComments(inner)` 匹配（与上面 P3 那三条同一口径），
+   并配**两腿验证**：腿 1 干净态 `EXIT=0`（注释里有 `<div>` 字样也不再报）、
+   腿 2 往装配处注入一枚**真** `<div>` ⇒ `EXIT=1` 且精确命中 1 处
+   （`SLOT_FIX_VERDICT=OK`：腿1 0/0 命中、腿2 1/1 命中、`RESTORED=yes`、复原后复跑 0）。
+   📌 **一般规律**：判"代码形状"的判据（门禁、单测、棘轮）只要读的是原文，
+   **散文就能改它的读数** —— 而这类判据的价值恰恰在于"改注释不会让它变"。
+   同一趟里撞了两次（本单的门禁 + 本单的 P3 用例），所以两处都改成剥注释后再读。
+
+### 8. 边界（别读多）
+
+- 只落了 **web**。触屏端便签编辑仍是"点一行开板子上方那枚"，没有详情列这回事（移动端没有这一栏的形态）。
+- **任务与习惯那一栏仍然空着** —— 第 1 节说的那道裁决没做，本单不给它编一个占位面单。
+- W1b 的第 3 条腿（Enter 打开焦点）一面都没落；第 2 条腿只落了便签（见本节第 3、4 节）。
+- 本单**没跑**全量单测、没跑 §8.113 那台电池、没做四端重装（#13）。
+  所以这一格"已完成"说的是**便签面单落进那一栏这件事**做完了并有两层证据，
+  不是"详情面本体这一单全部做完"。
+- ⚠️ 我的 e2e 趟会重写别族的 evidence png（本轮 13 枚），已 `git restore` 还原 ——
+  §8.123 那枚守卫只在**电池里**包着 e2e 那一步两侧，直接跑 `playwright` 不经过它。
+  本轮 13 枚里 `k7` / `k8` 两张的**内容**确实因本单变了（编辑器从板子上方搬进了栏里），
+  还原到 HEAD 意味着那两张图停在旧形状；本单的新形状由上面那 7 张承载，不靠它们。
+  🔴 这一条是**已知代价**，不是遗漏：合流当时（待办 #21）整族重跑并逐张看图时，
+  那两张会自然更新成当前形状。
+

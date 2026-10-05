@@ -157,9 +157,14 @@ const bodies = sources.map((s) => ({ label: s.label, text: stripComments(s.raw) 
 const scannedLines = bodies.reduce((sum, b) => sum + b.text.split('\n').length, 0);
 
 // 腿 A：槽里面不许手写 DOM 标记 / 裸文本
-const tagsInRegion = [...inner.matchAll(/<([A-Za-z][A-Za-z0-9.]*)/g)].map((m) => m[1]);
+// 🔴 用**剥注释后**的那一份：上面 `stripComments` 的注释写着"剥注释后判"，而腿 B/C/D 用的是
+// `bodies`（已剥），腿 A 原来直接读 `inner`（未剥）—— 于是**注释里写一个 `<div>` 字样就能把
+// 这条门禁判红**（实测：§8.130 给槽加内边距时，注释里那句"不是在这里包一层 `<div>`"让它 RC=1，
+// 而代码里根本没有那个元素）。一条会被散文改变的判据量的不是代码；这里补齐口径。
+const innerCode = stripComments(inner);
+const tagsInRegion = [...innerCode.matchAll(/<([A-Za-z][A-Za-z0-9.]*)/g)].map((m) => m[1]);
 const handWritten = tagsInRegion.filter((t) => /^[a-z]/.test(t));
-const outsideTags = inner
+const outsideTags = innerCode
   .replace(/<[^>]*>/g, '')
   .replace(/\{[^{}]*\}/g, '')
   .replace(/[{}()?:;=<>]/g, '')
