@@ -13019,3 +13019,29 @@ abort 在这里是救场的：软链没被解引用，源树逐字节完好（�
 📌 这一段要留的形状（比读数更耐放）：**一条 90 段的链，它的"绿"在共享机器上不是一个布尔值，
 是一段区间**。所以归属的写法必须是"哪几段在哪一趟、什么负载、被谁挡在哪一行"，
 写成 `check 全量绿/不绿` 就把"第 90 段根本没执行"和"第 90 段真红"压成同一个字 —— 那正是 §7 #46/#50 那一族。
+
+### 8.238 第 90 段补跑出来的那条红是一条**超时**，而这条回路的实测耗时只有超时上限的 1/13 —— 归因要用机制读数，不是"看着像负载"（2026-10-05 18:1x）
+
+补跑（锁空后 20s 起跑，起跑负载 97.42）的读数：`packages/domain test: tests/lunar.spec.ts (44 tests | 1 failed)`，
+失败原因**不是断言不匹配**而是 `Error: Test timed out in 5000ms`，红点 `tests/lunar.spec.ts:174:3`
+那条"逐日往返 1901-01-01 → 2100-12-31"。其余 38 个文件 / 979 条通过。
+
+🔴 **判它是不是产品缺陷的机制读数**（这一步不跑 vitest，因此**不受那把锁影响**）：
+在同一棵载体树上直接对 `dist/index.js` 的 `solarToLunar` 单线程跑同一条回路 ——
+`73049 天，耗时 0.38s`，对 5000ms 的上限有 **13 倍余量**。
+同一次 `pnpm -r test` 是 **20 个包并发**、整机 1 分钟负载 90–97（另一个项目同时在跑 `pnpm test`/`npx vitest`）。
+⇒ 这一条**归因到调度饥饿**：回路本身比上限快一个数量级，被饿到超过 5s 只能是 CPU 没轮到它。
+
+两条边界，别把这段读成"已经证明绿"：
+1. **还缺一条隔离复跑读数**（单跑那个文件）。这次想跑时被同一把锁第**五**次挡在门外
+   （`pid=37368，锁 /tmp/tfa-test.lock；它是：/bin/sh ~/.tfa-shield/bin/npx vitest run tests/hooks/useAutoSaveDraft.test.tsx`），
+   而我没有用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕过。拿到窗口的现量命令写在这里：
+   `cd <那棵树>/packages/domain && NO_COLOR=1 npx vitest run tests/lunar.spec.ts`。
+2. 这条用例**不在本批射程内**（两处现量，别抄数）：`git diff --name-only origin/main…feat/self-host-distribution -- packages/domain` 的枚数，
+   以及 `git diff --stat main feat/self-host-distribution -- packages/domain/tests/lunar.spec.ts` 的空输出。
+   它的主人是倒数纪念日/农历那条线 ⇒ 即便它哪天变成一条**真**红（比如 5s 上限本身定得太紧），
+   改判据口径的也不是本批（AGENTS §9.7 + 记忆里"判据口径永不代改"）。
+
+📌 要留的形状：**"负载引起的红"是一个需要机制读数的断言，不是一句托辞**。
+托辞的写法是"当时负载 90 所以不算"；机制写法是把被测回路单独量一次，
+证明它比上限快一个数量级 —— 前者不可复核，后者任何人都能重跑那一条命令。
