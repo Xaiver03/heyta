@@ -40,8 +40,8 @@ const getCaddyLogBlocks = (): { runtime: string; access: string } => {
   const activeCaddyfile = caddyfile.replace(/#.*$/gm, '');
 
   return {
-    runtime: extractCaddyBlock(activeCaddyfile, /^ {4}log default\s*\{/m),
-    access: extractCaddyBlock(activeCaddyfile, /^ {4}log\s*\{/m),
+    runtime: extractCaddyBlock(activeCaddyfile, /^[ \t]+log default\s*\{/m),
+    access: extractCaddyBlock(activeCaddyfile, /^[ \t]+log\s*\{/m),
   };
 };
 
