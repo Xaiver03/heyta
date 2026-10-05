@@ -1120,6 +1120,11 @@ leave_settings() {
 # 填一枚自定义端点并**提交**（提交就是「添加自定义端点」那一次点击；没有「保存」）。
 add_endpoint() {  # <名称> <地址>
   local name=$1 url=$2 pair rid val got
+  # 🔴 第二枚端点是在**逐功能列表已经滚到底**之后加的（rig24：`ai-endpoint-label` 滚 5 次取不到）。
+  #   `reveal_rid` 只往下滚，而这一格此刻在**上方** —— "目标在上面够不到"与"没渲染"是两句话。
+  #   先摘焦点再回到顶部（同一个理由见 bind_all_routes 头上那段）。
+  blur_focus
+  scroll_to_top
   disable_ime
   for pair in "ai-endpoint-label|$name" "ai-endpoint-url|$url" "ai-endpoint-model|stub-model"; do
     rid=${pair%%|*}; val=${pair#*|}
@@ -1303,7 +1308,7 @@ stub_reset; RB=$(stub_count) || summary "移动端 AI 助手真机验收" "假�
 #   —— 框里已有文字（上面逐字读回过），所以 enabled=true 只可能来自"路由真的绑上了"。
 dump
 if [ "$(rid_attr tool-start-assistant enabled)" != "true" ]; then
-  bad "输入框里有文字、按钮却还是 disabled ⇒ 这一档的候选集是空的；两种成因用库回读分辨——\n      现量 routes/同意：$(routes_reading)\n      （routes 那一格为 0 ⇒ 第 3 步的点击没写进去；为 ≥1 而同意为 0 ⇒ 这一档的逐功能同意没给。都不许读成"产品闸门拦住了"，那条闸门另有判据）"
+  bad "输入框里有文字、按钮却还是 disabled ⇒ 这一档的候选集是空的；两种成因用库回读分辨——\n      现量 routes/同意：$(routes_reading)\n      （rig25 库回读已把「点击没写进去」这一条**排除**：五档 routes 各 1 枚、enabled/allowRemote 都 True。剩下三个候选：这一档的逐功能同意没给（consents=0）／这一枚端点没声明**工具能力**（stub-model 零能力声明，而能力按 ADR-0010 是显式声明、不做推断）／助手档位 assistantTier 把这一档挡在外面。载体不替产品选一个，也不许读成「产品闸门正常工作」——那条闸门另有判据）"
   screen_txt
   summary "移动端 AI 助手真机验收" "路由没绑上" 1
 fi
