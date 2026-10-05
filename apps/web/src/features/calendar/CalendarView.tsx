@@ -69,22 +69,6 @@ export function CalendarView(): React.JSX.Element {
   const view = useCalendarViewStore();
 
   const today = toLocalDate(store.now);
-
-  /*
-   * 日历的**第二个事件源**（W6）：倒数日读的是倒数日那一屏同一个 store
-   *（`features/countdown/store.ts` —— web 端唯一一处 `createEventActions(...)`，
-   * 并且它自己订阅了引擎变化，远程 op 落地后重读）。这里**不另建一份列表**。
-   *
-   * 🔴 `syncToday(today)` 那一笔不是多余的：那份 store 拿不到宿主冻结的"今天"时
-   *   **不猜**（它宁可不读，也不让两次刷新落在不同的天上）。日历是它的第二个消费者，
-   *   不能假设用户先去过倒数日那一屏 —— 不接这一笔，症状是"日历上什么都没有，
-   *   去倒数日页绕一圈回来才有点"，而那种"看过就有、没看过就没有"最难归因。
-   */
-  const events = useCountdownStore((s) => s.events);
-  const syncEventToday = useCountdownStore((s) => s.syncToday);
-  useEffect(() => {
-    syncEventToday(today);
-  }, [today, syncEventToday]);
   /** 正在写入的任务 id —— 防止连点产生两次 toggle。 */
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -235,7 +219,6 @@ export function CalendarView(): React.JSX.Element {
         ) : null}
         <SharedCalendarBoard
           tasks={tasks}
-          events={events}
           today={today}
           cursor={view.cursor}
           selected={view.selected}
