@@ -78,7 +78,7 @@ import {
 } from '@heyta/local-api';
 
 import { MAX_TOOL_CALL_TEXT_LENGTH, parseToolArguments, toToolDescriptors } from './ai-tool-call.js';
-import { resolveToolSelection, type ToolSelectionRule } from './ai-tool-selection.js';
+import { resolveToolSelection, type ToolSelection, type ToolSelectionRule } from './ai-tool-selection.js';
 import { runSelectedTool, type AiToolProposal } from './ai-tool-run.js';
 import {
   CALENDAR_ANCHOR_RULES,
@@ -468,6 +468,52 @@ export function localObservationText(tool: string, data: unknown): string | unde
   return `这条我在这台设备上查到了，没有发出任何请求（${tool}）。\n共 ${String(rows.length)} 项：\n${lines}${tail}`;
 }
 
+/**
+ * 这一句**本机规则**选中的工具（`kind === 'tool'` = 短路可用）。
+ *
+ * 🔴 导出它是因为有两个消费者必须给出同一个答案：
+ *   · {@link requestAssistantTurn}（循环本身：命中就直接跑，一个请求都不发）；
+ *   · 对话面板（在**弹出境披露之前**先问这一句要不要出境）。
+ * 两处各写一份规则判定，就是 §3.5 抽掉之后又长回来的那种重复 —— 症状是同一句话在
+ * 单步面板零出境、在对话里却把数据发出去，而两边都"正常工作"。
+ */
+export function assistantLocalSelection(
+  text: string,
+  opts: {
+    readonly tier: AssistantTier;
+    readonly rules?: readonly ToolSelectionRule[];
+    readonly now?: number;
+  },
+): ToolSelection {
+  return resolveToolSelection(text, {
+    grants: assistantGrants(opts.tier),
+    ...(opts.rules === undefined ? {} : { rules: opts.rules }),
+    now: () => opts.now ?? Date.now(),
+  });
+}
+
+/**
+ * 这一句需不需要**出境披露**。
+ *
+ * 🔴 面板原先无条件弹披露，于是"今天有什么任务"这种本机就答得出的句子会先承诺
+ * "这些话要离开本机"、用户点发送、然后一个字都没出去。那句承诺是假的，而代价不是
+ * 一次白点 —— 是下一次真需要出境时，用户已经不信这条提示了。
+ *
+ * ⚠️ 判据只到 `kind === 'tool'`，**不含"结果渲染不渲染得出人话"**：短路命中但渲染失败时
+ * 循环会退回模型路径，而那一步仍被出境闸门挡着（没有同意就 `egressNotAuthorized`、
+ * 零请求）。所以这里"少弹一次披露"在结构上不可能变成"多发一次请求"。
+ */
+export function assistantNeedsEgressDisclosure(
+  text: string,
+  opts: {
+    readonly tier: AssistantTier;
+    readonly rules?: readonly ToolSelectionRule[];
+    readonly now?: number;
+  },
+): boolean {
+  return assistantLocalSelection(text, opts).kind !== 'tool';
+}
+
 export async function requestAssistantTurn(
   source: { text: string },
   deps: AssistantTurnDeps,
@@ -514,10 +560,10 @@ export async function requestAssistantTurn(
   //
   // ⚠️ 规则命中但**渲染不出人话**时不硬编一句回答，退回模型那一步
   // （见 `localObservationText`）。退回是有测试钉着的，不是"反正能跑"。
-  const local = resolveToolSelection(text, {
-    grants,
+  const local = assistantLocalSelection(text, {
+    tier: deps.tier,
     ...(deps.rules === undefined ? {} : { rules: deps.rules }),
-    now: () => anchorNow,
+    now: anchorNow,
   });
 
   if (local.kind === 'tool') {
