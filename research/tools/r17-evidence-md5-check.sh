@@ -228,8 +228,16 @@ EOF3
       echo "PINUNKNOWN ${name}：$rd 不在任何 git 树里 ⇒ 代码锚点判不了（不算绿）"
       punk=$((punk + 1)); continue
     fi
+    # 浅克隆是**载体**判不了，不是锚点写错。这一档仍然红（判不了就不许报绿），
+    # 但要把话说清：CI 的 actions/checkout 默认 fetch-depth=1，接进链之前要先给那一步 full history，
+    # 否则这道门会在 CI 里**每枚锚点都红**，而红的原因跟任何人的改动都无关。
+    if [ ! -e "$root/.git/shallow" ]; then
+      SHALLOW_HINT=""
+    else
+      SHALLOW_HINT="⚠️ 这棵树是浅克隆 ⇒ 是**载体判不了**，不是锚点写错：先给 CI 的 checkout 加 fetch-depth: 0。"
+    fi
     if ! git -C "$root" cat-file -e "${want}^{commit}" 2>/dev/null; then
-      echo "PINUNKNOWN ${name}：钉的 ${want} 在这棵树里不是一笔提交（写错了 / 被 rebase 掉了 ⇒ 判不了，不算绿）"
+      echo "PINUNKNOWN ${name}：钉的 ${want} 在这棵树里不是一笔提交（写错了 / 被 rebase 掉了）${SHALLOW_HINT}⇒ 判不了，不算绿"
       punk=$((punk + 1)); continue
     fi
     if ! git -C "$root" merge-base --is-ancestor "$want" HEAD 2>/dev/null; then
