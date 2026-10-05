@@ -999,7 +999,9 @@ else
     tail -4 "${L}.arm31b.out" | sed 's/^/      /'
   fi
 
-  # --- 臂32：本检出落后远端 ⇒ origin/main 已占的那个号必须拦下来（"没拉下来的条目"是真的）---
+  # --- 臂32：本检出落后远端 ⇒ 按「后落地的一方顺延」把号抬高后**照写**，而不是拒绝（裁决 (65)）---
+  #   旧版这一臂的预期是 rc=3（"等远端被收进本检出"）。那枚前置是**凭空多出来的**：
+  #   本地 {1}、远端 {1,2} 时把这一枚写成 3，远端那两条一位都不动、中间也不留重号，本来就是安全的。
   mkdir -p "$FT/rem/docs/reference"
   (
     cd "$FT/rem" || exit 1
@@ -1010,17 +1012,20 @@ else
     git commit -qam c2
     git update-ref refs/remotes/origin/main HEAD
     git reset -q --hard HEAD~1                    # 本地回到 1 条，工作树干净，但 origin/main 已经有第 2 条
-    echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
     echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    echo "LINES=$(node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem/docs/reference/environment-traps.md" 2>&1 | grep -cE '顺延|这一枚取 3')"
     node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem/docs/reference/environment-traps.md" --confirm \
       >/dev/null 2>&1; echo "RC=$?"
-    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+    echo "NO1=$(grep -c '^1\. 第 1 条' docs/reference/environment-traps.md)"
+    echo "GOT3=$(grep -c '^3\. ' docs/reference/environment-traps.md)"
+    echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
   ) > "${L}.arm32.out" 2>&1
   A32=$(cat "${L}.arm32.out")
-  if [ "$(rd "$A32" RC)" = "3" ] && [ "$(rd "$A32" DIRTY)" = "0" ] && [ "$(rd "$A32" BEFORE)" = "$(rd "$A32" AFTER)" ]; then
-    ok "臂32 目标干净、本地末号 1、但 origin/main 里已有第 2 条 ⇒ rc=3 且文件未动 ⇒ \"ahead/behind\"那种状态下它不会插一个撞号"
+  if [ "$(rd "$A32" RC)" = "0" ] && [ "$(rd "$A32" NO1)" = "1" ] && [ "$(rd "$A32" GOT3)" = "1" ] \
+     && [ "$(rd "$A32" DIRTY)" = "1" ] && [ "$(rd "$A32" LINES)" != "0" ]; then
+    ok "臂32 本地 {1}／远端 {1,2} ⇒ 初算 2 被顺延成 3 后写入：本地既有的 #1 一位没动、这一枚落在 3（不与远端任何号重叠）、工作树只剩这一处改动 ⇒ 「落后远端」从此不是前置"
   else
-    bad "臂32 未按预期 ⇒ 远端对照那一格没拦下来"; printf '%s\n' "$A32" | tail -4 | sed 's/^/      /'
+    bad "臂32 未按预期 ⇒ rc=$(rd "$A32" RC) 本地#1=$(rd "$A32" NO1) 落在3=$(rd "$A32" GOT3) 脏=$(rd "$A32" DIRTY) 顺延句=$(rd "$A32" LINES)"; printf '%s\n' "$A32" | tail -4 | sed 's/^/      /'
   fi
 
   # --- 臂33：N 不撞、但**同号写着两条不同的坑** ⇒ 「对得上号」那一格必须拦 ---
@@ -1049,7 +1054,7 @@ else
     bad "臂33 未按预期 ⇒ rc=$(rd "$A33" RC) 脏=$(rd "$A33" DIRTY) 变没变=$(rd "$A33" BEFORE)/$(rd "$A33" AFTER) 点名=$(printf '%s' "$A33" | grep -c '同号不同文')"; printf '%s\n' "$A33" | tail -4 | sed 's/^/      /'
   fi
 
-  # --- 臂34：远端有本检出没有的号、而 N 也不撞 ⇒ 同一格另一种形状（missing 分支）---
+  # --- 臂34：远端领先、但初算的号已经在两边最大号之后 ⇒ 走"不必抬高"那一腿，照样放行 ---
   #     🔴 夹具的**前提**自己也要断言：这一臂第一版就是栽在这里 —— `git commit -m c1` 的 c1 是**提交信息**、
   #     不是 ref，`git checkout c1 -- 文件` 直接 `fatal: invalid reference`，而那一步之后没有 `set -e`，
   #     于是工作树停留在"远端那版"⇒ 本地=远端 ⇒ missing=0 ⇒ 工具**真的写盘了**，读数 rc=0。
@@ -1069,25 +1074,27 @@ else
     git update-ref refs/remotes/origin/main HEAD                         # origin/main = 带 #4 的那版
     git checkout -q "$S_LOCAL" -- docs/reference/environment-traps.md
     git commit -qam local-again                                          # 本检出回到不带 #4 的那版，工作树干净
-    echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
+    echo "DIRTY0=$(git status --porcelain | wc -l | tr -d ' ')"
     echo "LNUMS=$(grep -oE '^[0-9]+\.' docs/reference/environment-traps.md | tr -d '.' | tr '\n' ',')"
     echo "RNUMS=$(git show origin/main:docs/reference/environment-traps.md | grep -oE '^[0-9]+\.' | tr -d '.' | tr '\n' ',')"
-    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
-    node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem34/docs/reference/environment-traps.md" --confirm; echo "RC=$?"
-    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+    echo "PRE=$(node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem34/docs/reference/environment-traps.md" 2>&1 | grep -c '不必抬高')"
+    node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem34/docs/reference/environment-traps.md" --confirm >/dev/null 2>&1; echo "RC=$?"
+    echo "GOT11=$(grep -c '^11\. ' docs/reference/environment-traps.md)"
+    echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
   ) > "${L}.arm34.out" 2>&1
   A34=$(cat "${L}.arm34.out")
   if [ "$(rd "$A34" LNUMS)" = "1,2,3,10," ] && [ "$(rd "$A34" RNUMS)" = "1,2,3,4,10," ] \
-     && [ "$(rd "$A34" RC)" = "3" ] && [ "$(rd "$A34" DIRTY)" = "0" ] && [ "$(rd "$A34" BEFORE)" = "$(rd "$A34" AFTER)" ] \
-     && printf '%s' "$A34" | grep -q '枚号在本检出里不存在'; then
-    ok "臂34 夹具形状已自证（本地 1,2,3,10 / 远端 1,2,3,4,10，N=11 不撞任何号）⇒ rc=3、文件未动、红句点名『本检出里不存在』⇒ missing 分支独立于臂33 的 clash 分支"
+     && [ "$(rd "$A34" DIRTY0)" = "0" ] && [ "$(rd "$A34" RC)" = "0" ] && [ "$(rd "$A34" PRE)" = "1" ] \
+     && [ "$(rd "$A34" GOT11)" = "1" ] && [ "$(rd "$A34" DIRTY)" = "1" ]; then
+    ok "臂34 形状自证（本地 1,2,3,10／远端 1,2,3,4,10）⇒ 打印『不必抬高』、rc=0、落在 11、工作树只剩这一处改动 ⇒ 顺延是**有条件的**，不是照抄远端最大号"
   else
-    bad "臂34 未按预期 ⇒ 形状=$(rd "$A34" LNUMS)/$(rd "$A34" RNUMS) rc=$(rd "$A34" RC) 脏=$(rd "$A34" DIRTY) 点名=$(printf '%s' "$A34" | grep -c '枚号在本检出里不存在') 变没变=$(rd "$A34" BEFORE)/$(rd "$A34" AFTER)"; printf '%s\n' "$A34" | tail -4 | sed 's/^/      /'
+    bad "臂34 未按预期 ⇒ 形状=$(rd "$A34" LNUMS)/$(rd "$A34" RNUMS) 起跑脏=$(rd "$A34" DIRTY0) rc=$(rd "$A34" RC) 不必抬高=$(rd "$A34" PRE) 落在11=$(rd "$A34" GOT11) 收尾脏=$(rd "$A34" DIRTY)"; printf '%s\n' "$A34" | tail -4 | sed 's/^/      /'
   fi
 
   # --- 臂35：阳性对照 —— 编号集合对得上时那一格**必须放行** ---
-  #     §7 第 282 条那一族：永远拒绝的门和永远通过的门同族。删掉臂33/34 的红是坏的，
-  #     把这四臂合起来看才回答"这一格判的是对不对得上号"。
+  #     §7 第 282 条那一族：永远拒绝的门和永远通过的门同族。32/34 两腿证明"落后远端会顺延/放行"，
+  #     33 证明"同号不同文仍会拦"，而这一臂证明**两边一致时它不吭声也不拦** —— 缺任何一条，
+  #     这四臂合起来都回答不了"这一格判的到底是什么"。
   mkdir -p "$FT/rem35/docs/reference"
   (
     cd "$FT/rem35" || exit 1
@@ -1106,6 +1113,38 @@ else
     ok "臂35 远端与本检出编号集合逐项同号同文 ⇒ dry-run rc=0、打印『对得上号』+『这一枚取 4』、文件未动 ⇒ 新那一格不是永远拒绝的门"
   else
     bad "臂35 未按预期 ⇒ rc=$(rd "$A35" RC) 脏=$(rd "$A35" DIRTY) 放行句=$(printf '%s' "$A35" | grep -c '对得上号') 取号句=$(printf '%s' "$A35" | grep -c '这一枚取 4') 变没变=$(rd "$A35" BEFORE)/$(rd "$A35" AFTER)"; printf '%s\n' "$A35" | tail -5 | sed 's/^/      /'
+  fi
+
+  # --- 臂36：同号不同文里再分一档 —— **位移**不拦，只有互不相容才拦 ---
+  #   形状来自真数据（(65)）：HEAD `#269` 那句话在 origin/main 里落在 **282**，两边各自的号下都在写别的东西。
+  #   臂33 那种"两种主张"必须拦（留哪条是内容判断）；位移不该拦，否则第 5 项就被一枚**不需要人拍**的东西挡住。
+  mkdir -p "$FT/rem36/docs/reference"
+  (
+    cd "$FT/rem36" || exit 1
+    git init -q .; git config user.email t@t; git config user.name t
+    printf '# 环境陷阱\n\n1. 第 1 条\n\n2. 甲话\n\n' > docs/reference/environment-traps.md
+    git add -A >/dev/null 2>&1; git commit -qm local
+    printf '# 环境陷阱\n\n1. 第 1 条\n\n2. 乙话\n\n3. 甲话\n\n' > docs/reference/environment-traps.md
+    git commit -qam remote 2>/dev/null || { git add -A >/dev/null 2>&1; git commit -qm remote; }
+    git update-ref refs/remotes/origin/main HEAD
+    git checkout -q "$(git rev-parse HEAD~1)" -- docs/reference/environment-traps.md
+    git commit -qam back-to-local
+    echo "DIRTY0=$(git status --porcelain | wc -l | tr -d ' ')"
+    echo "LNUMS=$(grep -oE '^[0-9]+\.' docs/reference/environment-traps.md | tr -d '.' | tr '\n' ',')"
+    echo "RNUMS=$(git show origin/main:docs/reference/environment-traps.md | grep -oE '^[0-9]+\.' | tr -d '.' | tr '\n' ',')"
+    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    O36=$(node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem36/docs/reference/environment-traps.md" 2>&1); echo "RC=$?"
+    printf '%s\n' "$O36" | sed 's/^/OUT| /'
+    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+  ) > "${L}.arm36.out" 2>&1
+  A36=$(cat "${L}.arm36.out")
+  if [ "$(rd "$A36" LNUMS)" = "1,2," ] && [ "$(rd "$A36" RNUMS)" = "1,2,3," ] && [ "$(rd "$A36" DIRTY0)" = "0" ] \
+     && [ "$(rd "$A36" RC)" = "0" ] && [ "$(rd "$A36" BEFORE)" = "$(rd "$A36" AFTER)" ] \
+     && printf '%s' "$A36" | grep -q 'OUT| .*位移' \
+     && printf '%s' "$A36" | grep -q '这一枚取 4' && ! printf '%s' "$A36" | grep -q '互不相容'; then
+    ok "臂36 号 2 两边不同文、但本地那句在远端落在 3（=位移）⇒ 不拦：dry-run rc=0、点名『位移』、号顺延到 4、文件未动；且**不许**报成互不相容"
+  else
+    bad "臂36 未按预期 ⇒ 形状=$(rd "$A36" LNUMS)/$(rd "$A36" RNUMS) 起跑脏=$(rd "$A36" DIRTY0) rc=$(rd "$A36" RC) 位移句=$(printf '%s' "$A36" | grep -c '位移') 取4=$(printf '%s' "$A36" | grep -c '这一枚取 4') 变没变=$(rd "$A36" BEFORE)/$(rd "$A36" AFTER)"; printf '%s\n' "$A36" | tail -6 | sed 's/^/      /'
   fi
 fi
 rm -rf "$FT"
