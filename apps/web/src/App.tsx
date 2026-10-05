@@ -88,7 +88,7 @@ import {
 } from './features/shell/detail-pane-pref.js';
 import { TaskOrganizer } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
-import { TaskRepeat } from './features/tasks/TaskRepeat.js';
+import { RepeatChip, TaskRepeat } from './features/tasks/TaskRepeat.js';
 import { DueEditor } from './features/tasks/DueEditor.js';
 import { NoteBadge, NoteEditor } from './features/tasks/NoteEditor.js';
 import { SubtaskPicker } from './features/tasks/SubtaskPicker.js';
@@ -941,14 +941,24 @@ export function App(): React.JSX.Element {
 
           {/* 重复。🔴 Web 此前**没有入口** —— 移动端早就能设，
               两端不一致；这一处补的正是 B2-3 的「Web 入口」那一半，
-              并额外给了移动端也还没有的**自定义 RRULE**。 */}
-          <TaskRepeat
-            task={task}
-            now={store.now}
-            onSetRepeat={(rule) => {
-              void store.setRepeat(task.id, rule);
-            }}
-          />
+              并额外给了移动端也还没有的**自定义 RRULE**。
+
+              ⚠️ 工单 §8.141 起它**只在详情列没在画时挂在这里**：栏里画着的时候编辑本体
+              （预设单选 + 自定义 RRULE）住在 `TaskDetailCard` 那一格，这里只剩一枚
+              **只读徽标** `RepeatChip`。理由与备注同一枚不变量 —— 同一字段任何时刻
+              只有一个编辑器所有者；而"扫一眼列表要能看出哪些任务是重复的"不能因为
+              搬进栏里就丢掉。窄档（栏不出现）时它整块退回这一格，所以"设不了重复"在任何档都不会发生。 */}
+          {taskPaneInColumn ? (
+            <RepeatChip task={task} now={store.now} />
+          ) : (
+            <TaskRepeat
+              task={task}
+              now={store.now}
+              onSetRepeat={(rule) => {
+                void store.setRepeat(task.id, rule);
+              }}
+            />
+          )}
 
           {/* 截止。🔴 多端覆盖审计 P0-3：`setDueDate` 的语义早就完整，
               但 Web 上**没有任何调用点** —— 想给任务定"周五截止"没有直接入口

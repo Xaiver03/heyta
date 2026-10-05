@@ -30,6 +30,7 @@ import { selection } from '../src/lib/selection.js';
 
 const { TaskDetailCard } = await import('../src/features/tasks/TaskDetailCard.js');
 const { NoteBadge } = await import('../src/features/tasks/NoteEditor.js');
+const { RepeatChip } = await import('../src/features/tasks/TaskRepeat.js');
 
 const APP_SRC = readFileSync(join(process.cwd(), 'src', 'App.tsx'), 'utf8');
 
@@ -230,5 +231,94 @@ describe('宿主的落点接线（读 App.tsx 的源码形状）', () => {
     for (const view of ['tasks', 'quadrant', 'timeline']) {
       expect(block, `任务那一族少了 ${view}：那一面按了 Enter 会落空`).toContain(`'${view}'`);
     }
+  });
+});
+
+describe('重复这一字段此刻归谁（§8.141）', () => {
+  /** 单独挂一枚只读徽标（它用的是同一个词条表，得在 Provider 里）。 */
+  function mountNode(node: React.ReactNode): HTMLElement {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    act(() => {
+      r.render(<I18nProvider locale="zh-CN">{node}</I18nProvider>);
+    });
+    return host;
+  }
+
+  async function setRepeatOf(id: string, rule: string | undefined): Promise<void> {
+    await act(async () => {
+      await useTaskStore.getState().setRepeat(id, rule);
+    });
+    await flush();
+  }
+
+  const pane = () => document.querySelector('[data-testid="task-pane"]');
+
+  it('🔴 栏里那一格画着重复的**编辑本体**，且整栏只有一份（不是第二份浮层）', async () => {
+    const a = await addTask('重复甲');
+    selection.select('task', a);
+    mount();
+    const box = pane();
+    if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
+    expect(box.querySelectorAll('[data-testid="task-repeat-custom-input"]').length).toBe(1);
+    expect(box.querySelectorAll('input[type="radio"]').length, '预设单选没画出来').toBeGreaterThan(2);
+    // 🔴 浮层外壳不许跟着编辑本体搬进栏里：一栏里出现 `position:absolute` 的玻璃面板，
+    // 用户看到的是"这一格里漂着一块不属于这一块的板子"。
+    const style = box.querySelector('.ht-material');
+    expect(style, '栏里那一格拿到了行尾的浮层外壳').toBeNull();
+  });
+
+  it('🔴 换选中 ⇒ 上一条**没提交的 RRULE 草稿**不跟着人走', async () => {
+    const a = await addTask('草稿甲');
+    const b = await addTask('草稿乙');
+    selection.select('task', a);
+    mount();
+    const input = document.querySelector<HTMLInputElement>('[data-testid="task-repeat-custom-input"]');
+    if (input === null) throw new Error('自定义 RRULE 输入框没画出来 ⇒ 判据在空转');
+    await act(async () => {
+      input.value = 'FREQ=WEEKLY;BYDAY=MO';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    // ⚠️ 不再 mount()：重挂一棵新树会**自己**造出一只空框，那条坏就再也观察不到（§8.138 第 4 节 A2 同族）。
+    await act(async () => {
+      selection.select('task', b);
+    });
+    const after = document.querySelector<HTMLInputElement>('[data-testid="task-repeat-custom-input"]');
+    expect(after?.value, '上一条没提交的规则串跟着换到了这一条名下').toBe('');
+  });
+
+  it('徽标与栏里读的是**同一份判定**：非预设规则在两边都显示原串', async () => {
+    const a = await addTask('自定义规则甲');
+    await setRepeatOf(a, 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU');
+    selection.select('task', a);
+    mount();
+    const box = pane();
+    expect(box?.textContent ?? '', '栏里没显示这条规则').toContain('FREQ=WEEKLY;INTERVAL=2;BYDAY=TU');
+    const host = mountNode(<RepeatChip task={useTaskStore.getState().entities.tasks[a]!} now={useTaskStore.getState().now} />);
+    expect(host.textContent ?? '', '徽标把非预设规则显示成了"没有重复"').toContain('FREQ=WEEKLY;INTERVAL=2;BYDAY=TU');
+  });
+
+  it('RepeatChip 是只读的：里面没有 radio、没有输入框；没设重复时整枚不出现（record 档）', async () => {
+    const a = await addTask('没重复那条');
+    const task = useTaskStore.getState().entities.tasks[a];
+    if (task === undefined) throw new Error('读不到刚建的那条 ⇒ 判据在空转');
+    const empty = mountNode(<RepeatChip task={task} now={useTaskStore.getState().now} />);
+    expect(empty.querySelector('[data-testid="task-chip-repeat"]'), '没设重复却占了位').toBeNull();
+
+    await setRepeatOf(a, 'FREQ=DAILY');
+    const task2 = useTaskStore.getState().entities.tasks[a];
+    const host = mountNode(<RepeatChip task={task2!} now={useTaskStore.getState().now} />);
+    const chip = host.querySelector('[data-testid="task-chip-repeat"]');
+    expect(chip, '设了重复而徽标没出现 ⇒ 列表看不出这条是重复的').not.toBeNull();
+    expect(chip?.querySelectorAll('input').length ?? 0, '徽标里长出可编辑控件（那是第二个编辑器）').toBe(0);
+  });
+
+  it('🔴 宿主那一支也读同一枚布尔：栏里画着时行尾只剩只读徽标', () => {
+    const src = stripComments(APP_SRC);
+    expect(
+      src,
+      '栏里画着的时候行尾还在挂 `<TaskRepeat/>` ⇒ 重复两处可编辑',
+    ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<RepeatChip\s+task=\{task\}\s+now=\{store\.now\}\s*\/>\s*\)\s*:\s*\(\s*<TaskRepeat/);
   });
 });
