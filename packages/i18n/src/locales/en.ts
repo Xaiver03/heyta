@@ -3078,7 +3078,7 @@ export const en = {
   'site.platforms.legend.partial': 'It runs, but something required for release is missing',
   'site.platforms.legend.blocked': 'There is a specific external dependency we have not cleared',
   'site.platforms.web.name': 'Web',
-  'site.platforms.web.body': 'The full product, not a demo. Installable, works offline, and your data lives in your own browser.',
+  'site.platforms.web.body': 'The full product, not a demo. It keeps working when you are offline and syncs when the connection returns — your data lives in your own browser.',
   'site.platforms.android.name': 'Android',
   'site.platforms.android.body': 'Works on a real device: creating tasks, rescheduling, priorities, lists, tags, recurrence, focus, conflict resolution and trash all work. Widgets and a release signature are on the way.',
   'site.platforms.ios.name': 'iOS',
