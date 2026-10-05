@@ -13750,3 +13750,30 @@ terms 仍是 1.1），**它不给答案，只复现前提**。判这类"版本�
 📌 同族还有一条我今天早先自己踩的：第一次 grep `packages/legal/src` 找 `version` 返回"什么都没有"，
 原因是我把过滤器写成 `grep -vE "package|…"` —— 所有路径都以 `packages/` 开头，**过滤器把证据全滤掉了**，
 差点让我得出"这仓的条款没有版本字段"。报"没有 X"之前先问我的筛子是不是也在筛掉路径本身。
+
+### 8.257 第 6 项（G-44）的字面半不再"未做"：生产侧接口补完了，缺的是**版本号真源**——而那不是一行代码（2026-10-05 20:4x）
+
+§8.17 当年判"补生产者会造假信号"，这次先把闸门本体读完再决定，结论要修正一半：
+
+`server/src/sync/checkpoint-gate.ts` 是**纯结构比较** —— `isCheckpointSafeAppVersion(null)` 与
+`isCheckpointSafeAppVersion('0.4.0')` 都是 `false`（都算 old，cadence 都关）。
+**所以上报真版本不会放开任何裁历史的口子**，那部分担心不成立；成立的是另外两件事：
+
+1. 文件头那句 "every release that reports one is newer than the cut, so silence can only mean a
+   pre-reporting client" 是**上游版本空间的前提**，heyta 一开始上报就把它否证了（heyta 是 `0.x`）。
+   ⇒ 注释/口径要跟着改，不能留一句在本叉里已经不成立的推理。
+2. 真前提是**没有版本号的事实源**：`packages/app-host`、`apps/web` 的 `package.json` 都是 `0.0.0` 占位。
+   填 `0.0.0` 就是把假版本写进运营面那份设备清单（`admin.routes.ts:340/394`、`admin-client.ts:156` 都在读它）。
+
+落地的东西（只到"机制完整、不编造值"那一条线）：
+
+| 面 | 交付 | 读数 |
+|---|---|---|
+| 生产接线 | `SyncClientOptions.appVersion?: string`（宿主给；缺省**一个字都不发**）+ `download()` 里搭在 `excludeClient` 那一个参数上 | `pnpm --filter @heyta/sync-client build` ⇒ `BUILD=0`；`sync-client` / `app-host` typecheck 各 `0`（app-host 第一次红是 `TS2353` —— 它读的是 dist 的 `.d.ts`，改完 `packages/` 不重 build 就会这样，§7 那一族又中一次） |
+| 判据 | `sync.spec.ts` 两腿：给 `0.4.0` ⇒ URL 含 `appVersion=0.4.0`；不给 ⇒ **不含** `appVersion=` 且不含 `appVersion=undefined` | ⚠️ **编译过、没跑过**：`pnpm --filter @heyta/sync-client test` 被内存闸门拒绝（`已有测试在跑 pid=88878`，锁还在）。我没用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕 ⇒ 这一格的运行读数**未取**，不能算闭合 |
+| 设计/口径 | 选项的文档注释写清"沉默 ≠ 占位值"的理由与"必须由宿主给"的边界 | 在码里 |
+| 失败与恢复 | 不 bump schema、不动线协议（`appVersion` 早就是契约里的 optional 字段，`supersync-http-contract.ts:191`）、不动那道闸的阈值 | 三处未碰 |
+
+⇒ **仍缺的两步，都要人**：① 版本号真源在哪（`git tag`／构建参数／正式 bump，是一次发布政策决定，不是顺手改）；
+② 有真源之后各宿主填进去、并**重跑那两腿拿到运行读数**。登记为 G-44b。
+对外承诺那一侧（#38 那三条版本耦合前置）不受影响：本步没让任何一句对外话变成真的或假的。
