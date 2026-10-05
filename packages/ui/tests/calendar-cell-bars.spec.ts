@@ -13,35 +13,14 @@
  * 🔴 为什么"没有一条被裁一半"不在这里测：jsdom 里所有 rect 都是 0，
  * 那种几何判据**只能在真浏览器里量**（见 `e2e/tests/calendar-cells.spec.ts`）。
  * 在这一层写"高度足够"会得到一条永远通过的判据 —— 比没有判据更糟。
- *
- * W6（2026-10-05）在这一层加了**第二个源**：倒数日 / 纪念日。判据只有一条是新的、
- * 也是这一整单的立论 —— **`CountdownEvent` 这个类型里根本没有 `dueDate` 这个键**，
- * 所以"一条没有截止日的倒数日也能上日历"不是配置出来的行为，是**类型层就不可能
- * 走 Task 那条 `if (dueDate === undefined) continue` 的分支**。下面每一条例子都
- * 刻意让任务那一侧留空，这样"日历上出现了它"只有一个可能来源。
  */
 
 import { describe, expect, it } from 'vitest';
-import { Recurrence, type CountdownEvent, type LocalDate, type Task } from '@heyta/domain';
+import type { Task } from '@heyta/domain';
 
-import {
-  calendarCellBars,
-  calendarDayTone,
-  groupEventsByOccurrence,
-  MAX_CALENDAR_BARS,
-  MAX_WEEK_CALENDAR_BARS,
-} from '../src/calendar/model.js';
+import { calendarCellBars, MAX_CALENDAR_BARS, MAX_WEEK_CALENDAR_BARS } from '../src/calendar/model.js';
 
 function task(over: Partial<Task> & { id: string }): Task {
-  return { title: over.id, createdAt: 0, updatedAt: 0, ...over };
-}
-
-/**
- * 一条倒数日。`date` 是它唯一的时间字段（公历 `YYYY-MM-DD`，不是时间戳）。
- * 🔴 这里**不给** `dueDate`：`CountdownEvent` 上没这个键，写上去 typecheck 就红 ——
- * 那正是这一单要的"它是另一个源"的证据形状。
- */
-function event(over: Partial<CountdownEvent> & { id: string; date: LocalDate }): CountdownEvent {
   return { title: over.id, createdAt: 0, updatedAt: 0, ...over };
 }
 
@@ -56,7 +35,7 @@ describe('月格任务条：封顶与折叠', () => {
     const tasks = Array.from({ length: MAX_CALENDAR_BARS }, (_, i) =>
       task({ id: `t${String(i)}` }),
     );
-    const { bars, hidden } = calendarCellBars(tasks, [], TODAY, FUTURE);
+    const { bars, hidden } = calendarCellBars(tasks, TODAY, FUTURE);
     expect(bars).toHaveLength(MAX_CALENDAR_BARS);
     expect(hidden).toBe(0);
   });
@@ -64,29 +43,29 @@ describe('月格任务条：封顶与折叠', () => {
   it('🔴 超出上限：可见条封顶，hidden = 总数 − 可见数（那个差是从数据算的）', () => {
     const total = MAX_CALENDAR_BARS + 2;
     const tasks = Array.from({ length: total }, (_, i) => task({ id: `t${String(i)}` }));
-    const { bars, hidden } = calendarCellBars(tasks, [], TODAY, FUTURE);
+    const { bars, hidden } = calendarCellBars(tasks, TODAY, FUTURE);
     expect(bars).toHaveLength(MAX_CALENDAR_BARS);
     expect(hidden).toBe(total - MAX_CALENDAR_BARS);
     // 一条都不许凭空消失：可见 + 折叠 == 总数。
     expect(bars.length + hidden).toBe(total);
   });
 
-  it('这一天既没任务也没倒数日：空数组、hidden 0 —— 格子照样要在（月历的价值是整月同时在场）', () => {
-    const { bars, hidden } = calendarCellBars([], [], TODAY, FUTURE);
+  it('这一天没有任务：空数组、hidden 0 —— 格子照样要在（月历的价值是整月同时在场）', () => {
+    const { bars, hidden } = calendarCellBars([], TODAY, FUTURE);
     expect(bars).toEqual([]);
     expect(hidden).toBe(0);
   });
 
   it('上限可以由宿主改小（窄屏要更少行），折叠量跟着重算', () => {
     const tasks = [task({ id: 'a' }), task({ id: 'b' }), task({ id: 'c' })];
-    const { bars, hidden } = calendarCellBars(tasks, [], TODAY, FUTURE, 1);
+    const { bars, hidden } = calendarCellBars(tasks, TODAY, FUTURE, 1);
     expect(bars).toHaveLength(1);
     expect(hidden).toBe(2);
   });
 
   it('上限给 0 或负数不会崩：只是全折起来（hidden 等于总数）', () => {
     const tasks = [task({ id: 'a' }), task({ id: 'b' })];
-    const { bars, hidden } = calendarCellBars(tasks, [], TODAY, FUTURE, 0);
+    const { bars, hidden } = calendarCellBars(tasks, TODAY, FUTURE, 0);
     expect(bars).toEqual([]);
     expect(hidden).toBe(2);
   });
@@ -101,7 +80,6 @@ describe('月格任务条：哪条看得见（顺序是产品语义）', () => {
   it('格子只放得下 1 条时，留下的必须是还没做的', () => {
     const { bars } = calendarCellBars(
       [task({ id: 'done', completedAt: COMPLETED_AT }), task({ id: 'todo' })],
-      [],
       TODAY,
       PAST,
       1,
@@ -112,7 +90,6 @@ describe('月格任务条：哪条看得见（顺序是产品语义）', () => {
   it('🔴 已完成排在最后（但不消失）：格子装得下时它照样在场', () => {
     const { bars } = calendarCellBars(
       [task({ id: 'done', completedAt: COMPLETED_AT }), task({ id: 'todo' })],
-      [],
       TODAY,
       FUTURE,
     );
@@ -121,7 +98,7 @@ describe('月格任务条：哪条看得见（顺序是产品语义）', () => {
 
   it('同等级的多条不因排序而丢：输入顺序原样保留', () => {
     const tasks = [task({ id: 'x' }), task({ id: 'y' }), task({ id: 'z' })];
-    expect(calendarCellBars(tasks, [], TODAY, FUTURE).bars.map((b) => b.id)).toEqual(['x', 'y', 'z']);
+    expect(calendarCellBars(tasks, TODAY, FUTURE).bars.map((b) => b.id)).toEqual(['x', 'y', 'z']);
   });
 
   it('折叠掉的是**尾部**（等级最低的那几条），不是头部', () => {
@@ -132,7 +109,6 @@ describe('月格任务条：哪条看得见（顺序是产品语义）', () => {
         task({ id: 'done-1', completedAt: COMPLETED_AT }),
         task({ id: 'done-2', completedAt: COMPLETED_AT }),
       ],
-      [],
       TODAY,
       FUTURE,
       2,
@@ -144,13 +120,13 @@ describe('月格任务条：哪条看得见（顺序是产品语义）', () => {
 
 describe('月格任务条：条上的两个状态', () => {
   it('🔴 每条都带标题 —— 这次改造的立论就是"格子里必须有一个字可读"', () => {
-    const { bars } = calendarCellBars([task({ id: 'rev', title: '评审登录页' })], [], TODAY, FUTURE);
+    const { bars } = calendarCellBars([task({ id: 'rev', title: '评审登录页' })], TODAY, FUTURE);
     expect(bars[0]?.title).toBe('评审登录页');
     expect(bars.every((b) => b.title.trim() !== '')).toBe(true);
   });
 
   it('过去那天的每条**未做完**的任务都标逾期', () => {
-    const { bars } = calendarCellBars([task({ id: 'a' }), task({ id: 'b' })], [], TODAY, PAST);
+    const { bars } = calendarCellBars([task({ id: 'a' }), task({ id: 'b' })], TODAY, PAST);
     expect(bars.every((b) => b.overdue)).toBe(true);
     expect(bars.every((b) => !b.done)).toBe(true);
   });
@@ -158,7 +134,6 @@ describe('月格任务条：条上的两个状态', () => {
   it('已完成的逾期任务**不标红**：红色在这个界面里只表示"要注意"', () => {
     const { bars } = calendarCellBars(
       [task({ id: 'a', dueDate: new Date(2026, 8, 20).getTime(), completedAt: COMPLETED_AT })],
-      [],
       TODAY,
       PAST,
     );
@@ -167,8 +142,8 @@ describe('月格任务条：条上的两个状态', () => {
   });
 
   it('今天与未来的日子都不算逾期', () => {
-    expect(calendarCellBars([task({ id: 'a' })], [], TODAY, TODAY).bars[0]?.overdue).toBe(false);
-    expect(calendarCellBars([task({ id: 'a' })], [], TODAY, FUTURE).bars[0]?.overdue).toBe(false);
+    expect(calendarCellBars([task({ id: 'a' })], TODAY, TODAY).bars[0]?.overdue).toBe(false);
+    expect(calendarCellBars([task({ id: 'a' })], TODAY, FUTURE).bars[0]?.overdue).toBe(false);
   });
 });
 
@@ -179,146 +154,5 @@ describe('两个档位的上限之间的关系（R11 批三）', () => {
     // e2e 里 `drawn === 周档上限` 两边都从同一份源码读，把上限改回 3 它照样绿
     // （变异臂 H 实测存活过一次）。真正有牙齿的是"两档不相等且周档更大"。
     expect(MAX_WEEK_CALENDAR_BARS).toBeGreaterThan(MAX_CALENDAR_BARS);
-  });
-});
-
-
-/**
- * W6：EVENT 成为日历的**第二个事件源**（2026-10-05）。
- *
- * 🔴 这一整块的立论只有一条，且它是**类型层**的：`CountdownEvent` 上根本没有
- * `dueDate` 这个键，而任务那一条聚合走的是 `if (task.dueDate === undefined) continue`。
- * 所以"一条没有截止日的倒数日也能上日历"不是配出来的行为 —— 它**接不进** Task 那条规则。
- * 下面每一例都把任务侧留空，这样"格子里出现了东西"只剩一个可能来源。
- *
- * ⚠️ 这一层只到"模型认得第二个源"。界面上真的画出来、以及宿主真的把数据递进来，
- *   不在这里（`packages/ui` 的测试跑在 node、不 render 组件）：
- *   Web 看 `apps/web/tests/calendar-event-source.spec.tsx`（挂真 `<App/>`），
- *   移动端看 `check:materialized-reads` 那把常驻门（`CalendarScreen` 里必须数得出 `listEvents(`）。
- */
-describe('倒数日作为第二个事件源（W6）', () => {
-  it('🔴 只有倒数日、一条任务都没有的一天：格子照样有条', () => {
-    const { bars, hidden } = calendarCellBars(
-      [],
-      [event({ id: 'e1', title: '妈妈生日', date: FUTURE })],
-      TODAY,
-      FUTURE,
-    );
-    expect(bars.map((b) => b.id)).toEqual(['e1']);
-    expect(bars[0]?.title).toBe('妈妈生日');
-    expect(hidden).toBe(0);
-  });
-
-  it('🔴 那条东西确实没有 `dueDate`：有截止时间才上日历的那条规则接不住它', () => {
-    const e = event({ id: 'e1', title: '结婚纪念日', date: PAST });
-    expect('dueDate' in e).toBe(false);
-    expect(calendarCellBars([], [e], TODAY, PAST).bars).toHaveLength(1);
-  });
-
-  it('倒数日永不标逾期：过去那天的倒数日不是"拖着没做完的事"', () => {
-    const { bars } = calendarCellBars(
-      [],
-      [event({ id: 'e1', title: '上一个节气', date: PAST })],
-      TODAY,
-      PAST,
-    );
-    expect(bars[0]?.overdue).toBe(false);
-    expect(bars[0]?.done).toBe(false);
-  });
-
-  it('两个源同时在场时未做完的任务排在前面（逾期 > 待办与倒数日 > 已完成）', () => {
-    const { bars } = calendarCellBars(
-      [task({ id: 't1' })],
-      [event({ id: 'e1', title: '上线倒数', date: PAST })],
-      TODAY,
-      PAST,
-    );
-    expect(bars.map((b) => b.id)).toEqual(['t1', 'e1']);
-  });
-
-  it('🔴 封顶把两个源一起算：hidden 里含倒数日，一条都不许凭空消失', () => {
-    const tasks = Array.from({ length: MAX_CALENDAR_BARS }, (_, i) =>
-      task({ id: `t${String(i)}` }),
-    );
-    const events = [
-      event({ id: 'e1', title: '生日', date: FUTURE }),
-      event({ id: 'e2', title: '结婚纪念日', date: FUTURE }),
-    ];
-    const { bars, hidden } = calendarCellBars(tasks, events, TODAY, FUTURE);
-    expect(bars).toHaveLength(MAX_CALENDAR_BARS);
-    expect(hidden).toBe(events.length);
-    expect(bars.length + hidden).toBe(tasks.length + events.length);
-  });
-
-  it('宿主把上限改小时，只由倒数日占的那几格同样会折起来', () => {
-    const events = Array.from({ length: 4 }, (_, i) =>
-      event({ id: `e${String(i)}`, title: '倒数', date: FUTURE }),
-    );
-    const { bars, hidden } = calendarCellBars([], events, TODAY, FUTURE, 1);
-    expect(bars).toHaveLength(1);
-    expect(hidden).toBe(3);
-  });
-});
-
-describe('格子状态色也要认第二个源（否则条画了、点不画 —— 同一屏两套口径）', () => {
-  it('🔴 这天只有倒数日：给 primary 而不是 plain —— plain 的意思本来是"这天没安排"', () => {
-    expect(
-      calendarDayTone([], [event({ id: 'e1', title: '生日', date: TODAY })], TODAY, TODAY),
-    ).toBe('primary');
-  });
-
-  it('只有倒数日的**过去**那天不给 danger：倒数日不是拖了没做的事', () => {
-    expect(
-      calendarDayTone([], [event({ id: 'e1', title: '生日', date: PAST })], TODAY, PAST),
-    ).toBe('primary');
-  });
-
-  it('任务全做完了但这天有倒数日：不许沉成 subtle（"清空了"说的是没倒数日之外的东西）', () => {
-    expect(
-      calendarDayTone(
-        [task({ id: 't1', completedAt: COMPLETED_AT })],
-        [event({ id: 'e1', title: '生日', date: TODAY })],
-        TODAY,
-        TODAY,
-      ),
-    ).toBe('primary');
-  });
-
-  it('原来那三档各归各位：全做完且无倒数日 = subtle；两天都空 = plain；未做且在过去 = danger', () => {
-    expect(calendarDayTone([task({ id: 't1', completedAt: COMPLETED_AT })], [], TODAY, TODAY)).toBe(
-      'subtle',
-    );
-    expect(calendarDayTone([], [], TODAY, TODAY)).toBe('plain');
-    expect(calendarDayTone([task({ id: 't1' })], [], TODAY, PAST)).toBe('danger');
-  });
-});
-
-describe('按发生日分桶（区间那一段交给领域层，这里只钉"落哪一格"）', () => {
-  it('一次性倒数日落在锚点那一格；窗口外的根本不进 map（不许为它凭空造一天）', () => {
-    const map = groupEventsByOccurrence(
-      [
-        event({ id: 'e1', title: '发布倒数', date: FUTURE }),
-        event({ id: 'e2', title: '还远', date: '2026-12-31' }),
-      ],
-      TODAY,
-      FUTURE,
-    );
-    expect([...map.keys()]).toEqual([FUTURE]);
-    expect(map.get(FUTURE)?.map((e) => e.id)).toEqual(['e1']);
-  });
-
-  it('🔴 每年公历重复、锚点在 25 年前：今年这一格照样有它（任务那条聚合做不到这件事）', () => {
-    const map = groupEventsByOccurrence(
-      [event({ id: 'e1', title: '生日', date: '2001-10-08', recurrence: Recurrence.yearly(10, 8) })],
-      TODAY,
-      FUTURE,
-    );
-    expect(map.get(FUTURE)?.map((e) => e.id)).toEqual(['e1']);
-  });
-
-  it('窗口反了 ⇒ 空 map：不许倒着算出一个日期来', () => {
-    expect(
-      groupEventsByOccurrence([event({ id: 'e1', title: 'x', date: TODAY })], FUTURE, TODAY).size,
-    ).toBe(0);
   });
 });
