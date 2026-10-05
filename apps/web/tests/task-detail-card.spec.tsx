@@ -475,7 +475,9 @@ describe('提醒这一字段此刻归谁（§8.145）', () => {
     ).length;
   }
 
-  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  // 🔴 泛型参数不是装饰：`headerLeaves` 收的是 `HTMLElement`，而裸 `querySelector`
+  //    回来的是 `Element` —— 合流之后这两半第一次被并到同一个 describe 里。
+  const pane = () => document.querySelector<HTMLElement>('[data-testid="task-pane"]');
 
   it('🔴 栏里画的是提醒的**编辑本体**（共享 `ReminderList`），整栏只有一份', async () => {
     const id = await addTask('提醒甲');

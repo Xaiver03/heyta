@@ -292,7 +292,12 @@ describe('R. 宿主接线与布局开关（直接挂组件的用例看不见这�
   const read = (rel: string): string => stripComments(readFileSync(resolve(here, rel), 'utf8'));
 
   const app = read('../src/App.tsx');
-  const asideStart = app.indexOf('<aside className="ht-app__detail"');
+  /* 🔴 锚点钉的是"这一栏的哪一个稳定钩子"，不是"`<aside` 后面紧跟哪个属性"。
+     合流之后那一行以 `ref={detailRef}` 开头（AI 面那一档要量几何），
+     按属性顺序锚会把整段切成空串 —— 三条断言于是全部空转。
+     它红过一次，红的正是"找不到 HabitDetailCard"这一条。 */
+  const asideTag = /<aside\b[^>]*data-testid="detail-column"[^>]*>/.exec(app);
+  const asideStart = asideTag?.index ?? -1;
   const aside = app.slice(asideStart, app.indexOf('</aside>', asideStart));
 
   it('详情列那一支带的是**视图 + 几何/收起**两个条件，且槽里没有手写标记', () => {
