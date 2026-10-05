@@ -111,6 +111,9 @@ export {
   calendarMonthDrill,
   stepCalendarCursor,
   groupTasksByDueDate,
+  // 🔴 W6 那个"第二个事件源"在宿主侧的唯一入口：区间怎么推都在里面，
+  //   宿主（Web 侧栏的迷你月历）不许自己再写一遍"这一段是哪几天"。
+  groupEventsForGrid,
   MAX_CALENDAR_BARS,
   MAX_WEEK_CALENDAR_BARS,
   HOURS_IN_DAY,

@@ -37,9 +37,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { startOfMonth, toLocalDate, type LocalDate, type Task } from '@heyta/domain';
+import { startOfMonth, toLocalDate, type CountdownEvent, type LocalDate, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { createTaskActions, type AppHost, type TaskActions } from '@heyta/app-host';
+import {
+  createEventActions,
+  createTaskActions,
+  type AppHost,
+  type TaskActions,
+} from '@heyta/app-host';
 import {
   CalendarBoard,
   CalendarViewTabs,
@@ -78,6 +83,8 @@ export function CalendarScreen(): React.JSX.Element {
   const { t } = useI18n();
   const [host, setHost] = useState<AppHost | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  /** 第二个事件源（W6）：未删除、未归档的那批倒数日，由动作层给。 */
+  const [events, setEvents] = useState<CountdownEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   /** 正在写入的任务 id —— 防止连点产生两次 toggle。 */
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -134,12 +141,21 @@ export function CalendarScreen(): React.JSX.Element {
     () => (host ? createTaskActions(host) : null),
     [host],
   );
+  /*
+   * 日历的**第二个事件源**（W6）。动作集同样从宿主派生（与 `CountdownScreen`
+   * 同一条规则，AGENTS §3.5：界面里不新造 op、不自己筛"哪些算已删除"）。
+   */
+  const eventActions = useMemo(() => (host ? createEventActions(host) : null), [host]);
 
   const refresh = useCallback(() => {
-    if (!actions) return;
+    if (!actions || !eventActions) return;
     // ⚠️ `listTasks()` 是**同步**的（读已物化的内存状态），不是 Promise。
     setTasks(actions.listTasks());
-  }, [actions]);
+    // 🔴 倒数日也一并读：`listEvents(today)` 给的是"未删除、未归档"那一批，
+    //   剥掉的是删除与归档，**不是**"有没有截止时间"—— 倒数日没有 `dueDate`，
+    //   而它照样要上日历（W6 那条核心判据的可观测证据就在这一步）。
+    setEvents(eventActions.listEvents(today));
+  }, [actions, eventActions, today]);
 
   useEffect(() => {
     if (!host) return;
@@ -329,6 +345,11 @@ export function CalendarScreen(): React.JSX.Element {
 
       <CalendarBoard
         tasks={tasks}
+        // 🔴 第二个事件源（W6）。共享板把这个 prop 定成**必填**：漏接不是"日历上
+        //   少几条生日"，而是**编译不过** —— 那条"默认值等于原值的可选 prop"会把
+        //   "宿主没接"伪装成"这天没有倒数日"，而 typecheck 与既有门禁两边都不响
+        //   （AGENTS §7 第 195 条，web 那边同一条）。
+        events={events}
         today={today}
         cursor={cursor}
         selected={selected}

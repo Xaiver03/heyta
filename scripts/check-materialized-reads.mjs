@@ -19,8 +19,13 @@
  *
  * ## 这条门禁查什么
  *
- * 任何屏只要调用了读物化状态的 API，就必须在同一个文件里引用 `dataRevision`
+ * **规则一**：任何屏只要调用了读物化状态的 API，就必须在同一个文件里引用 `dataRevision`
  * （由 `sync/store.ts` 的 `useMobileSync()` 提供，每完成一次同步 +1）。
+ *
+ * **规则二（W6，2026-10-05）**：渲染共享日历板 `<CalendarBoard` 的宿主必须
+ * ① 真的**读**过倒数日、② 真的把它**喂**进板子，且不许喂字面空数组。
+ * 这条存在的原因是必填 prop 只挡得住"没传"，挡不住"传了一个永远为空的数组" ——
+ * 而后者在界面上与"这台设备没有倒数日"逐像素相同（§7 第 195 条）。
  *
  * 它是**静态**检查，不是运行时检查 —— 因为运行时那种 bug 需要
  * "屏挂着 + 恰好此时同步" 的时序，单元测试很难稳定复现。
@@ -33,7 +38,7 @@
  * 放宽规则会让这条门禁悄悄失效，那比没有门禁更糟。
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -144,6 +149,75 @@ function stripComments(src) {
 const problems = [];
 let scanned = 0;
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * 🔴 第二条规则（W6，2026-10-05）：**渲染共享日历板的宿主必须真的把倒数日喂进去**。
+ *
+ * 为什么第一条挡不住这件事：第一条问的是"读了物化状态有没有订阅同步完成信号"。
+ * 移动端完全可以把 `listEvents()` 那一句删掉、留下 `const [events] = useState([])`，
+ * 于是 `events={events}` 照样传、typecheck 照样绿（必填 prop 只挡"根本没传"，
+ * **挡不住"传了一个永远为空的数组"**），而界面上"这台设备没有倒数日"与
+ * "宿主没接"长得一模一样 —— §7 第 195 条记的就是这个形状。
+ *
+ * 所以这一条把**宿主侧那一端**钉成一对：
+ *   · 渲染 `<CalendarBoard` 的文件必须**读**过倒数日（`listEvents(` 或 store 的 `.events`）；
+ *   · 并且必须把它**喂**进去（`events={…}`，且不许是字面空数组 `events={[]}` ——
+ *     那正是"用假数据把接线糊过去"的那种写法）。
+ *
+ * ⚠️ 匹配同样作用在**剥掉注释之后**的源码上（理由见 `stripComments` 的说明：
+ *    第一版那条门禁的反证就是被注释里的字命中的）。
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** 只扫宿主自己的源码：测试夹具里的 `<CalendarBoard events={[]} />` 是**该允许**的。 */
+const HOST_SRC_DIRS = ['apps/web/src', 'apps/mobile/src', 'apps/desktop/src', 'apps/node-host/src'];
+/**
+ * 🔴 这一条**必须容忍别名**。Web 端写的是 `import { CalendarBoard as SharedCalendarBoard }`
+ *   再 `<SharedCalendarBoard …>`（`CalendarView.tsx:40`）。第一版把模式写成
+ *   `/<CalendarBoard[\s>]/`，于是它**只数到移动端那 1 个宿主**、对 Web 整片失明 ——
+ *   而且报的是 ✅。一条因为正则太窄而漏掉目标的门禁，比没有门禁更危险：
+ *   它会让人以为那一格已经被守住了。
+ */
+const BOARD_JSX = /<[A-Za-z]*CalendarBoard[\s>]/;
+const EVENT_READ = [/\.listEvents\s*\(/, /\.events\b/];
+const EVENT_FEED = /events=\{[A-Za-z_$]/;
+/** `events={[]}` / `events={[ ]}`：字面空数组 = 没接。 */
+const EVENT_FEED_EMPTY = /events=\{\s*\[\s*\]\s*\}/;
+
+function* walk(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) yield* walk(path);
+    else if (entry.isFile() && entry.name.endsWith('.tsx')) yield path;
+  }
+}
+
+const feedProblems = [];
+let boardHosts = 0;
+
+for (const rel of HOST_SRC_DIRS) {
+  const dir = join(ROOT, rel);
+  // 宿主目录可以整片不存在（`apps/desktop` 是待退役壳）—— 那种情况**没什么可扫的**，
+  // 但不能因此让整把门因为一个 ENOENT 崩掉：崩掉的门禁与放宽规则同样危险。
+  if (!existsSync(dir)) continue;
+  for (const path of walk(dir)) {
+    const source = stripComments(readFileSync(path, 'utf8'));
+    if (!BOARD_JSX.test(source)) continue;
+    boardHosts += 1;
+    const missing = EVENT_READ.filter((re) => !re.test(source)).length === EVENT_READ.length;
+    const empty = EVENT_FEED_EMPTY.test(source);
+    const fed = EVENT_FEED.test(source);
+    if (missing || !fed || empty) {
+      feedProblems.push({
+        file: relative(ROOT, path),
+        why: missing
+          ? '渲染了共享日历板，却没有读任何倒数日（既没有 `.listEvents(` 也没有 store 的 `.events`）'
+          : empty
+            ? '喂给日历板的是**字面空数组** `events={[]}` —— 那与"宿主没接"在界面上完全一样'
+            : '读了倒数日却没有把它作为 `events={...}` 传给日历板',
+      });
+    }
+  }
+}
+
 for (const file of readdirSync(SCREENS_DIR)) {
   if (!file.endsWith('.tsx')) continue;
   const path = join(SCREENS_DIR, file);
@@ -182,4 +256,19 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`✅ ${scanned} 个屏：读物化状态的那些都订阅了 dataRevision。`);
+if (feedProblems.length > 0) {
+  console.error('❌ 渲染共享日历板的宿主没有把倒数日接进去（W6 第二条规则）：\n');
+  for (const p of feedProblems) console.error(`   ${p.file}\n      ${p.why}`);
+  console.error(
+    '\n   为什么这一条要常驻：`events` 是**必填** prop，它挡得住"根本没传"，' +
+      '\n   挡不住"传了一个永远为空的数组"。后者的界面与"这台设备没有倒数日"' +
+      '\n   逐像素相同（§7 第 195 条）。修法是从宿主读它：移动端 `actions.listEvents(today)`，' +
+      '\n   Web 端 `useCountdownStore((s) => s.events)`。\n',
+  );
+  process.exit(1);
+}
+
+console.log(
+  `✅ ${scanned} 个屏：读物化状态的那些都订阅了 dataRevision；` +
+    `${boardHosts} 个渲染共享日历板的宿主都读了并喂进了倒数日。`,
+);

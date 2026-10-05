@@ -25,6 +25,7 @@ import {
   eventAgeInDays,
   eventKindOf,
   eventLeapMonthPolicy,
+  eventOccurrencesInRange,
   eventRejection,
   eventTitleRejection,
   isEventPinned,
@@ -249,5 +250,79 @@ describe('写入侧的合法性判定', () => {
     expect(eventRejection('ok', '2026-03-05')).toBeUndefined();
     expect(eventRejection('ok', '2024-02-29')).toBeUndefined();
     expect(eventRejection('   ', '2026-03-05')).toBe('empty-title');
+  });
+});
+
+/*
+  W6「EVENT 成为日历的第二个事件源」的那条源。
+  🔴 这一组用例的共同前提：**它没有 `dueDate`**。TASK 上日历走的是 `dueDate`，
+  所以"一条没有截止时间的倒数日能出现在指定区间里"就是它与 TASK 的可观测分界；
+  把区间枚举换成"照 dueDate 过滤"，下面每一条都会红。
+*/
+describe('区间枚举 eventOccurrencesInRange（日历格子里那一段）', () => {
+  it('一次性倒数日：窗口含它就有、不含就没有', () => {
+    const e = ev({ date: '2026-10-20' });
+    expect(eventOccurrencesInRange(e, '2026-10-01', '2026-10-31')).toEqual(['2026-10-20']);
+    expect(eventOccurrencesInRange(e, '2026-11-01', '2026-11-30')).toEqual([]);
+  });
+
+  it('每年公历：锚点在很多年之前，本月那一次仍要出来', () => {
+    const e = ev({ date: '2001-05-01', recurrence: Recurrence.yearly(5, 1) });
+    expect(eventOccurrencesInRange(e, '2026-05-01', '2026-05-31')).toEqual(['2026-05-01']);
+  });
+
+  it('🔴 锚在三年前的"每天"：不许被迭代上限静默清空', () => {
+    // 吃 `recurrence.ts` 那个 1000 的默认值时这条会数出 0 天，而它**不抛错** ——
+    // 界面上就是"这条倒数日凭空不存在"。断言写成"整月都在"，少一天都红。
+    const e = ev({ date: '2023-01-01', recurrence: Recurrence.daily() });
+    const days = eventOccurrencesInRange(e, '2026-10-01', '2026-10-31');
+    expect(days.length).toBe(31);
+    expect(days[0]).toBe('2026-10-01');
+    expect(days[30]).toBe('2026-10-31');
+  });
+
+  it('农历 both 档：同一农历年里的两个正日子都要出现', () => {
+    const month = leapMonthOf(2025);
+    expect(month).toBeGreaterThan(0); // 前提：没有闰月，这组档位无从区别
+    const anchor = lunarToSolar({ year: 2025, month, day: 12, leap: false });
+    const parts = solarToLunar(anchor);
+    const e = ev({
+      date: anchor,
+      isLunar: true,
+      leapMonthPolicy: 'both',
+      recurrence: Recurrence.yearly(parts.month, parts.day),
+    });
+    const days = eventOccurrencesInRange(e, '2025-01-01', '2025-12-31');
+    expect(days.length).toBe(2);
+    expect(solarToLunar(days[0] as string).leap).toBe(false);
+    expect(solarToLunar(days[1] as string).leap).toBe(true);
+    const firstOnly = ev({ ...e, leapMonthPolicy: 'first' });
+    expect(eventOccurrencesInRange(firstOnly, '2025-01-01', '2025-12-31').length).toBe(1);
+  });
+
+  it('🔴 公历 1 月上旬属于上一个农历年：那一格不能画漏', () => {
+    // 农历 2025 年的**冬月十五** = 公历 2026-01-03：日期已经在 2026 年，
+    // 农历年却还挂在 2025（农历 2026 的新年是 2026-02-17）。
+    // 窗口只按"from 所在的农历年"起算就会把这格算成 2026 年的冬月十五（落在 2026-12 月），
+    // 于是 1 月这一格**画漏**，而 12 月那一格是对的 —— 症状看起来像"偶尔错"。
+    const anchor = lunarToSolar({ year: 2025, month: 11, day: 15, leap: false });
+    expect(anchor).toBe('2026-01-03'); // 前提：它真的落在公历 1 月上旬
+    const parts = solarToLunar(anchor);
+    const e = ev({
+      date: anchor,
+      isLunar: true,
+      recurrence: Recurrence.yearly(parts.month, parts.day),
+    });
+    expect(eventOccurrencesInRange(e, '2026-01-01', '2026-01-31')).toContain(anchor);
+  });
+
+  it('非法规则按不命中处理（一条坏数据不该掀掉整张日历）', () => {
+    const e = ev({ date: '2020-01-01', recurrence: '这不是规则' });
+    expect(eventOccurrencesInRange(e, '2026-10-01', '2026-10-31')).toEqual([]);
+  });
+
+  it('窗口反了（to < from）⇒ 空，不许倒着算出一个日期来', () => {
+    const e = ev({ date: '2026-10-20' });
+    expect(eventOccurrencesInRange(e, '2026-10-31', '2026-10-01')).toEqual([]);
   });
 });

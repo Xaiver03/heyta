@@ -11,7 +11,8 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 🔴 数学与色调**一行都不在这里**
  *
  * * 格子怎么排（周一开头、补白格归哪个月）→ `@heyta/domain` 的 `monthGrid`；
- * * 点是什么颜色 → `@heyta/ui` 的 `calendarDayTone`（与主区同一条）；
+ * * 点是什么颜色 → `@heyta/ui` 的 `calendarDayTone`（与主区同一条，**两个来源**：
+ *   任务 + 倒数日，W6）；分组走同一个 `groupEventsForGrid`；
  *   **颗数在这里固定为一颗** —— 侧栏可拖到 12rem，那时一格只有二十来像素，
  *   主区那 1–3 颗会糊成一条线，"3 件事"和"1 件事"看起来一样；
  * * 哪些任务在范围内 → `@heyta/domain` 的 `scopeTasks`；
@@ -50,6 +51,7 @@ import {
   calendarDayTone,
   formatDayTitleText,
   formatMonthTitleText,
+  groupEventsForGrid,
   groupTasksByDueDate,
   toOrganizerTree,
   toTagItems,
@@ -59,6 +61,7 @@ import {
 import { Check, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
 
 import { SidebarResizer } from '../shell/SidebarResizer.js';
+import { useCountdownStore } from '../countdown/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useWheelMonthNav } from './useWheelMonthNav.js';
@@ -219,6 +222,16 @@ export function CalendarSidebar(): React.JSX.Element {
   );
   const byDate = useMemo(() => groupTasksByDueDate(scoped), [scoped]);
   const weeks = useMemo(() => monthGrid(view.cursor), [view.cursor]);
+  /*
+   * 倒数日（日历的第二个事件源，W6）。数据与主区月历读**同一个 store**，
+   * 分组走**同一个** `groupEventsForGrid`（传进这屏的 `weeks` 与选中的那天）。
+   * 🔴 这两处任何一处"自己再算一遍"，症状都是侧栏与主区对同一天说不一样的话。
+   */
+  const events = useCountdownStore((s) => s.events);
+  const eventsByDate = useMemo(
+    () => groupEventsForGrid(events, weeks, view.selected),
+    [events, weeks, view.selected],
+  );
 
   /** 一层嵌套摊平成带 `depth` 的行（与任务侧栏同一条层级语义：子清单缩进）。 */
   const projectRows = useMemo<ScopeRow[]>(
@@ -237,16 +250,20 @@ export function CalendarSidebar(): React.JSX.Element {
   /**
    * 格子的读屏名：完整日期 + 这天有没有事、有几件。
    *
+   * 🔴 那个 `count` 是**任务 + 倒数日**两个来源之和（调用处算），与主区格子的
+   *   `bars.length + hidden` 同一条口径。少算一边不会报错，只会让两列对同一天
+   *   说出两个数 —— 而这一列存在的理由正是"与主区同色同点同措辞"。
+   *
    * 🔴 单复数是**两条词条**，且每条都写成一次 `t('字面量', …)`。
    * 把 key 塞进三元表达式（`t(cond ? 'a' : 'b', …)`）会被 `check:ui-language`
    * 判成"用户可见的硬编码字面量" —— 它认的是 `t()` 的**第一个实参是不是字面量**，
    * 不是这一行有没有走词条表。
    */
-  const dayLabel = (date: LocalDate, list: readonly Task[]): string => {
+  const dayLabel = (date: LocalDate, count: number): string => {
     const title = formatDayTitleText(date, t);
-    if (list.length === 0) return t('web.calendar.a11y.dayNoTasks', { date: title });
-    if (list.length === 1) return t('web.calendar.a11y.dayWithTasksOne', { date: title, count: 1 });
-    return t('web.calendar.a11y.dayWithTasks', { date: title, count: list.length });
+    if (count === 0) return t('web.calendar.a11y.dayNoTasks', { date: title });
+    if (count === 1) return t('web.calendar.a11y.dayWithTasksOne', { date: title, count: 1 });
+    return t('web.calendar.a11y.dayWithTasks', { date: title, count });
   };
 
   /**
@@ -327,6 +344,7 @@ export function CalendarSidebar(): React.JSX.Element {
               <div className="ht-sidebar__month-row" key={week[0]!.date}>
                 {week.map((cell) => {
                   const cellTasks = byDate.get(cell.date) ?? [];
+                  const cellEvents = eventsByDate.get(cell.date) ?? [];
                   return (
                     <MiniDay
                       key={cell.date}
@@ -334,8 +352,8 @@ export function CalendarSidebar(): React.JSX.Element {
                       inMonth={cell.inMonth}
                       isToday={cell.date === today}
                       isSelected={cell.date === view.selected}
-                      tone={calendarDayTone(cellTasks, today, cell.date)}
-                      label={dayLabel(cell.date, cellTasks)}
+                      tone={calendarDayTone(cellTasks, cellEvents, today, cell.date)}
+                      label={dayLabel(cell.date, cellTasks.length + cellEvents.length)}
                       onPress={view.selectDay}
                     />
                   );

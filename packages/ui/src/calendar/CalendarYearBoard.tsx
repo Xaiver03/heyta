@@ -64,12 +64,22 @@ import {
 } from 'react-native';
 
 import type { HeytaNativeTokens } from '@heyta/design-system';
-import { monthGrid, monthsOfYear, type LocalDate, type Task } from '@heyta/domain';
+import {
+  addDays,
+  addMonths,
+  monthGrid,
+  monthsOfYear,
+  startOfYear,
+  type CountdownEvent,
+  type LocalDate,
+  type Task,
+} from '@heyta/domain';
 
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import {
   calendarDayTone,
   calendarYearColumns,
+  groupEventsByOccurrence,
   groupTasksByDueDate,
   type CalendarBoardLabels,
   type CalendarDayTone,
@@ -78,6 +88,12 @@ import {
 export interface CalendarYearBoardProps {
   /** 全部候选任务（已按范围筛过）。归属只看 `dueDate` 落在哪一天。 */
   readonly tasks: readonly Task[];
+  /**
+   * 第二个事件源（W6）。**必填**，理由见 `CalendarBoardProps.events`。
+   * 年档按**这一年**（1 月 1 日 → 12 月 31 日，也就是这里真的画出来的那些格子）枚举，
+   * 不复用月档那份按 42 格切的区间 —— 拿过去只会让另外 11 个月看不到倒数日。
+   */
+  readonly events: readonly CountdownEvent[];
   readonly today: LocalDate;
   /** **这一年里的任意一天**（游标约定，见 `monthsOfYear`）。 */
   readonly year: LocalDate;
@@ -115,6 +131,7 @@ const monthSuffix = (monthFirstDay: LocalDate): string => monthFirstDay.slice(0,
 function MiniDay({
   date,
   dayTasks,
+  dayEvents,
   today,
   isToday,
   labels,
@@ -125,6 +142,8 @@ function MiniDay({
 }: {
   date: LocalDate;
   dayTasks: readonly Task[];
+  /** 这一天落得的倒数日（第二个事件源，W6）。 */
+  dayEvents: readonly CountdownEvent[];
   today: LocalDate;
   isToday: boolean;
   labels: CalendarBoardLabels;
@@ -133,7 +152,7 @@ function MiniDay({
   text: ReturnType<typeof useHeytaText>;
   testIDBase: string;
 }): React.JSX.Element {
-  const tone: CalendarDayTone = calendarDayTone(dayTasks, today, date);
+  const tone: CalendarDayTone = calendarDayTone(dayTasks, dayEvents, today, date);
   const dotColor =
     tone === 'danger'
       ? tokens['color.danger']
@@ -159,10 +178,16 @@ function MiniDay({
         读屏名**照月档那两条**（`dayWithTasks` / `dayNoTasks`）：一屏三百多个数字
         对读屏用户没有任何意义，而"这天有没有事"正是这一档唯一的增量信息。
         日期由宿主的 `dayTitle` 说成当前语言，数量是**真的那一条**（不是 1 个占位）。
+        🔴 那个数是**两个来源加起来**的，与月档格子（`bars.length + hidden`）、
+        当天那块 header 同一条口径 —— 年档漏掉倒数日的话，"这天 3 件事"点进去
+        只剩 2 件，而三个界面各自都"看起来对"。
       */
       accessibilityLabel={
-        dayTasks.length > 0
-          ? labels.dayWithTasks({ date: labels.dayTitle(date), count: dayTasks.length })
+        dayTasks.length + dayEvents.length > 0
+          ? labels.dayWithTasks({
+              date: labels.dayTitle(date),
+              count: dayTasks.length + dayEvents.length,
+            })
           : labels.dayNoTasks({ date: labels.dayTitle(date) })
       }
     >
@@ -199,6 +224,7 @@ function MiniDay({
 
 export function CalendarYearBoard({
   tasks,
+  events,
   today,
   year,
   onPickMonth,
@@ -213,6 +239,18 @@ export function CalendarYearBoard({
   // 🔴 与月档同一份归属函数：年档要的是"这天有没有 / 逾不逾期"，
   //   而那两个判断的输入就是这一份按天分好的任务。另数一遍计数 = 第二套口径。
   const byDate = useMemo(() => groupTasksByDueDate(tasks), [tasks]);
+  /*
+   * 倒数日按**这一年**分组（`[1 月 1 日, 12 月 31 日]`）。
+   *
+   * ⚠️ 区间的两端都从 `startOfYear` 推，不写 `'…-12-31'` 这种字符串：
+   *   `addMonths(1 月 1 日, 12)` 再退一天 = 这一年的最后一天，闰年与月份天数
+   *   都由 `@heyta/domain` 那一份说了算（在这里自己拼 31 就是第二套日历数学）。
+   * 🔴 归属判断本身在 `groupEventsByOccurrence`（月/周/日/年四档共用），这里不重判。
+   */
+  const eventsByDate = useMemo(() => {
+    const from = startOfYear(year);
+    return groupEventsByOccurrence(events, from, addDays(addMonths(from, 12), -1));
+  }, [events, year]);
   const months = useMemo(() => monthsOfYear(year), [year]);
 
   /**
@@ -294,6 +332,7 @@ export function CalendarYearBoard({
                               key={cell.date}
                               date={cell.date}
                               dayTasks={byDate.get(cell.date) ?? []}
+                              dayEvents={eventsByDate.get(cell.date) ?? []}
                               today={today}
                               isToday={cell.date === today}
                               labels={labels}
