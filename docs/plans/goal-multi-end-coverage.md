@@ -3031,6 +3031,49 @@ VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VER
   **反过来把 ② 挡死** —— 装置读到"锁存在且持有者活着（pid=91905）"就判 `NOT-RUNNING（别人正持锁）`，
   它分不清持锁的正是我自己。**共享互斥锁不能由要被保护的那一方自己持有。**
 
+### 7.30d ① 这一轮**真跑起来了**（2026-10-05 19:56:53 起，载体 `7911ad02`，链 27 第 25 轮；**截至 20:01 只有前两段的打印**）
+
+⚠️ **本条不构成 ① 完成**：`INNER_EXIT=` 与 `本轮新生张数=` 还没打印（android 段 20:00:57 才起跑，ios 段在后）。
+下面每一行都是**装置自己打印的**（出处：`/tmp/heyta-reinstall-launch.round25.log` 与它引用的 `/tmp/heyta-reinstall-win.log`），不凭记忆、不补词：
+
+```
+载体 = heyta-wt-reinstall @ 7911ad02c80d3741ee7117f20c09ab93e684595a
+     scripts/reinstall-all.sh blob = c30a587ceb4d4ec8138b7bc975317247e9669f48   ← 现读 `git -C <载体> rev-parse HEAD:scripts/reinstall-all.sh`
+     （⚠️ 我 03:35 那节写的 036ce09a 已被别线落地反过来否证，见交接账 20:00 那条就地更正）
+载体身份（起跑）=7911ad02c80d3741ee7117f20c09ab93e684595a
+$ bash scripts/reinstall-all.sh --only mac,windows        ← 第一段先跑桌面两端；android+ios 是随后一段
+PHASE1_EXIT=<未打印>   PHASE2_EXIT=<未打印>   INNER_EXIT=<未打印>   FRESH=<未打印>/5
+
+段 1 macOS（✅ 打印齐）
+  ✅ 打包完成（.app + .dmg，含打包即启动的自截屏验证；日志 /tmp/heyta-reinstall-mac.log）
+  ✅ 已安装到 /Applications/Heyta.app
+  ✅ 安装对账：.app 里的 web-dist 与本机 apps/web/dist 是**同一次构建**（9 个 chunk）
+  主蓝采样命中 1127（数的是 heyta-reinstall-mac-installed.png.webview.png）      ← 阈值 ≥20，命中 1127
+  ✅ 窗口 2164x1432、heyta-reinstall-mac-installed.png.webview.png 内容占比 100.0%、主蓝命中 1127 —— 是共享 UI
+
+段 2 Windows（✅ 打印齐，判据五条全在位）
+  ✅ 源码包  51M（清单 3333 条，含工作树未提交改动 + 构建输入）
+  ✅ 远端收到的是这一包（tar sha256=327d7f7ebe73369c… 逐字相同）
+  ✅ 远端新鲜度对账通过（web-dist/index.html=56574b5f4ad805a1… bridge=f2dde17ac2bc419e… assets/*.js=7 枚一致）
+  ✅ 远端打包 + 安装 + 启动截图完成（日志 /tmp/heyta-reinstall-win.log）
+  ✅ 远端取证：判据齐了：5 条全在位
+     /tmp/heyta-reinstall-win.log 里逐字：ADD_APPX=OK  PAYLOAD_WEBDIST=True  M2D=OK  RESULT=OK  web-dist files = 26
+  ✅ mac：已清旧包、重打、重装、有当前产物判据
+  ✅ windows：已清旧包、重打、重装、有当前产物判据
+
+段 3 Android（20:00:57 起跑，读数待打印）
+段 4 iOS（未起）
+```
+
+三条**顺手取到**的旁证（不是判据本体，但都关系到别面）：
+- 远端 `web-dist files = 26` 与本地 `find apps/web/dist -type f` 现量 **26** 相符 ⇒ traps #175 那个"覆盖式解包只增不减（26 vs 7）"这一轮**没有复发**（不是靠印象，是两边各数一次）。
+- 远端 APK 是**先前**由 `run-gradle.mjs` 走 windows-pc 打出来的（66,925,624 B / sha256 `314eda50205d6192…` / 远端完成 `11:56:22Z`），
+  所以 ① 的 android 段不必重打；这条把 AGENTS §6.1「远端真打出 APK 尚未实测」变成有读数。
+- 图 5 `载体/dist/windows/packaged-first-run.png` 现量 **1,683,391 B、mtime 20:00**（新鲜），但**人还没看** —— 看的是 `$EVID` 里归档那枚，等收尾。
+
+五枚图的"人看过"那一栏**故意留空**：现在只有 mac 那两枚在 `/tmp` 与远端各自存在，而 §6.2 规定一要的是"打开那张图"，
+`/tmp` 那路径会被下一趟覆盖（traps #275），所以我等 `$EVID` 归档完成后从**归档副本**逐张开、逐张写看到了什么。
+
 ### 7.31 ③ 的输入多了一道「能不能重放」的门，另一枚探针先被自己作废（2026-10-04 12:4x–13:0x，载体 `458249f6`，窗口仍不在）
 
 - 窗口现量（12:56:10）：`vm.loadavg` 1-min **15.78**（阈值 = ncpu 16 × 3/4 = 12）、`:3000` = node/70256、`:3100` = node/26407、4318/4319/4322 空闲、
