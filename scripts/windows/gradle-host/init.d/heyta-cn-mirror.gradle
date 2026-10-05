@@ -1,0 +1,72 @@
+/*
+ * heyta 打包机（windows-pc）专用：把境外 Maven 仓库的 URL 就地改到境内镜像。
+ *
+ * 为什么要有这枚文件（2026-10-06 实测，写进 docs/runbooks/android-build-on-windows.md）：
+ *   这台机器到 repo.maven.apache.org / central.sonatype.com / dl.google.com 的两条路都不稳：
+ *     · 直连 HTTP/1.1 会超时（Gradle 的传输层正是 HTTP/1.1）；
+ *     · 经本机配置的代理（10.111.127.246:7890）TLS 握手被断；
+ *     · 同一枚 URL 用 java.net.http（默认协商 h2）连取三次都是 200 —— 所以不是"到不了"，是"Gradle 那条走不通"。
+ *   后果是**任何一次新依赖的解析**都会随机撞墙（第一次远程构建就死在
+ *   kotlinx-coroutines-android:1.7.1 上，连打两趟同一枚）。
+ *   maven.aliyun.com 直连首次即 200，且它就是这些仓库的镜像。
+ *
+ * 做了什么：**只改 URL**（setUrl），不删仓库、不改顺序、不加仓库 ——
+ *   所以项目的 repositories 声明面一个字没动，构建脚本里看不见这回事。
+ *   没覆盖的（jitpack 等）保持原样。
+ *
+ * 供给链交代：镜像只是同一批字节的其他出口，不引入新坐标。
+ *   核对方法（每次换产物源后至少抽一枚）：
+ *     远端 sha256  ==  Mac 上同版本产物 sha256
+ *   对不上就是不同的字节，立刻摘掉这枚文件并回来查。
+ *
+ * 回退：删掉这个文件（以及 gradle.properties 里 nonProxyHosts 上的 maven.aliyun.com）。
+ */
+def heytaMirrorUrl = { String u ->
+  if (u.startsWith('https://repo.maven.apache.org/maven2')
+      || u.startsWith('http://repo.maven.apache.org/maven2')
+      || u.startsWith('https://repo1.maven.org/maven2')
+      || u.startsWith('https://central.sonatype.com')) {
+    return 'https://maven.aliyun.com/repository/public'
+  }
+  if (u.startsWith('https://dl.google.com/dl/android/maven2')) {
+    return 'https://maven.aliyun.com/repository/google'
+  }
+  if (u.startsWith('https://plugins.gradle.org/m2')) {
+    return 'https://maven.aliyun.com/repository/gradle-plugin'
+  }
+  return null
+}
+
+def heytaRemap = { repos ->
+  if (repos == null) return
+  def hits = []
+  repos.each { r ->
+    if (r instanceof org.gradle.api.artifacts.repositories.MavenArtifactRepository) {
+      def target = heytaMirrorUrl(r.url.toString())
+      if (target != null && r.url.toString() != target) hits << [r, target]
+    }
+  }
+  hits.each { pair ->
+    def r = pair.get(0)
+    r.setUrl(pair.get(1))
+    println "[heyta-mirror] ${r.name} -> ${pair.get(1)}"
+  }
+}
+
+beforeSettings { settings ->
+  heytaRemap(settings.pluginManagement.repositories)
+}
+
+settingsEvaluated { settings ->
+  heytaRemap(settings.pluginManagement.repositories)
+  heytaRemap(settings.dependencyResolutionManagement.repositories)
+}
+
+// 老式"在各 project 的 build.gradle 里声明 repositories"的路径，RN 模板不走这条，
+// 但打包机以后可能构建别的工程 —— 兜住它，判据时机放在 projectsEvaluated（脚本已执行完）。
+projectsEvaluated { g ->
+  g.rootProject.allprojects { p ->
+    heytaRemap(p.repositories)
+    heytaRemap(p.buildscript.repositories)
+  }
+}

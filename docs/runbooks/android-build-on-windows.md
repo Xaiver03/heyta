@@ -323,6 +323,61 @@ Hermes `.hbc` 里**纯 ASCII 的串按单字节存、含中文的整条按 UTF-1
 而一次远程构建是 41 s 量级 ⇒ 余量约 40 倍，这一趟不构成风险。
 **这不是永久属性**：换打包主机、或那台机器休眠/时区改动后都要重量一次（一行命令，写在上面）。
 
+### 7.4 2026-10-06 01:0x：远程构建**第一次真打出 APK**，红的是打包机到 Maven Central 那条路
+
+判据 4 那一档先被这一次照出来的不是构建，是**依赖供给**。同一份源码，两趟都在
+`步骤 4（远端 gradle 构建）` 红在同一枚坐标上：
+
+```
+Could not resolve org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1
+> The server may not support the client's requested TLS protocol versions …
+> Remote host terminated the handshake
+```
+
+诊断按"**先分离协议、再分离路径**"走，四条读数各有反证：
+
+| 试的东西 | 结果 | 定性 |
+|---|---|---|
+| 打包机 **直连** `repo.maven.apache.org`，HTTP/1.1 | 超时 | 那条路不稳 |
+| 打包机**经本机代理**（`C:\Users\41478\.gradle\gradle.properties` 把三个仓库全押在 `10.111.127.246:7890`，而 `10.111.127.246` **就是这台 Mac 的 LAN IP**） | TLS 握手被断 | 代理活着，出境那一跳不行 |
+| 同一枚 URL，用远端 **JDK 21 的 `java.net.http`**（默认 h2）连取 3 次 | **3 次全 200** | ⇒ 不是"网络到不了"，是 **Gradle 那条 h1.1 走不通** |
+| `maven.aliyun.com` **直连** h1.1 | 200 | 唯一能用的形状 |
+
+`--ssl-no-revoke` 也 200 —— 那是另一条独立干扰（schannel 吊销检查 `CRYPT_E_REVOCATION_OFFLINE`），
+**不要**把它当成本次根因。探针留在 `tmp/JTlsProbe.java`（远端 `%USERPROFILE%` 同名），因为它把
+"能不能到"与"Gradle 那条协议能不能到"分开这一件事，比任何解释都便宜。
+
+修法只在**主机侧**，且**只改 URL、不增删仓库**：`scripts/windows/gradle-host/init.d/heyta-cn-mirror.gradle`
+用 `MavenArtifactRepository.setUrl()` 就地重写，三个时机各跑一次
+（`beforeSettings` / `settingsEvaluated`（RN 的 `dependencyResolutionManagement`）/ `projectsEvaluated`（老式 per-project repos）），
+另把 `maven.aliyun.com` 加进 `gradle.properties` 的 `nonProxyHosts`。
+回退点：`gradle.properties.pre-cn-mirror`（逐字重建的改前内容，远端同名在位）。
+**没有**用 `HEYTA_ANDROID_LOCAL_GRADLE=1` 退回本机、**没有**拿旧 APK 出绿 ——
+那两条正是 §6.1 新规要挡的形状。
+
+🔴 **供给链交代：只对账了一半，另一半要说清没拿到。**
+抽 `kotlinx-coroutines-android-1.7.1.jar` 做三方比：
+
+| 比的是 | 读数 |
+|---|---|
+| 远端 Gradle 缓存里那枚 vs Mac 从镜像直下那一枚 | sha256 **逐字相同** `107313760c…118e9a`，size 20637 相同 |
+| 该 sha1 vs Gradle 缓存目录名（Gradle 自己记下的那枚） | `c2d86b56…97d77a7` **相同** |
+| 实际 sha512 vs 镜像**发布**的 `.sha512` | **相同** `6a369ae9…a3403ac8` |
+
+⚠️ 这三条共同证明的是"**构建吃的字节 == 镜像发的字节 == 镜像自己公布的摘要**"，
+**不等于**"镜像 == Maven Central 公布的摘要" —— 最后这一环 2026-10-06 17:2x 在这台 Mac 上**拿不到**
+（`curl --http1.1 --noproxy '*'` 与 `-x http://127.0.0.1:7890` 两条都是 `SSL_ERROR_SYSCALL`，
+正是让远程构建红的那条路）。补法一行，等有 Central 通路时跑，跑完才把上面这句删掉：
+
+```bash
+curl -sS -o - https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-android/1.7.1/kotlinx-coroutines-android-1.7.1.jar.sha512
+```
+
+**别把"镜像换源"当成已解决的构建配置**：它改的是打包机 `~\.gradle`，仓库里的两份只是**它的来源**；
+门禁 `check:android-gradle-remote` 钉的是分流形状，不钉那两份是否真挂上去了。
+现量方式：`ssh windows-pc "dir /b C:\Users\41478\.gradle\init.d"` 要看到 `heyta-cn-mirror.gradle`，
+`dir /b C:\Users\41478\.gradle` 要同时看到 `gradle.properties` 与 `gradle.properties.pre-cn-mirror`。
+
 ## 八、第二枚门禁：`check:android-build-host`（规则的另一半）
 
 规则原话里有**两个**被禁的东西："不要再在 Mac 起新的 Gradle 构建**或模拟器**"。
