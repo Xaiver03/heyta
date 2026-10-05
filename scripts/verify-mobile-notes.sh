@@ -98,10 +98,13 @@ if [ -n "$BUSY" ]; then
 fi
 step "负载门"
 wait_for_quiet_host || exit 3
-# >>> apk-freshness guard begin（自检：heyta-apk-guard-fixture.sh 按这两个标记之间抽同一段跑）
+# >>> apk-freshness guard begin（自检：`pnpm check:apk-freshness` 的臂 4b 钉的就是下面这两行调用点在不在）
 # 🔴 §7 第 27 条（"packages/ 改了、APK 里是旧 JS bundle，验收对旧代码报绿"）的算法抽在
-#    `scripts/lib/apk-freshness.sh` 这个单一所有者里，但**会装包的 26 枚脚本只有 1 枚接过线**
-#    （18:40 现量：`install -r "$APK"` 命中 26 枚，`heyta_apk_freshness_guard` 命中 1 枚 = trash）。
+#    `scripts/lib/apk-freshness.sh` 这个单一所有者里，但**会装包的 26 枚脚本只有 2 枚接过线**
+#    （10-05 现量：`install -r "$APK"` 命中 26 枚，`heyta_apk_freshness_guard` 命中 2 枚 = trash 与本文件）。
+#    ⚠️ 这段标记原来的第一行写着"自检：heyta-apk-guard-fixture.sh 按这两个标记之间抽同一段跑"——
+#    那枚夹具**全仓不存在**（`find . -name "*apk-guard*"` 0 命中），所以那句是注释里的声称而不是事实；
+#    现在把它换成真的那一臂（臂 4b），要验接线就摘掉下面那行调用，臂 4b 会红。
 #    本条验的是手机里的便签，装的就是那枚 APK ⇒ 不接这道门，读数可能属于几小时前的源码
 #    （18:39 现量：载体 APK mtime 05:36:40，同树最新源码 14:49:16，落后 33,156 秒）。
 #    位置在负载门之后、第 0 步任何破坏性动作（pm clear / install -r）之前 —— 拒绝就要拒在没弄脏设备之前。
