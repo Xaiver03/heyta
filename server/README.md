@@ -95,6 +95,14 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml \
   -f docker-compose.migrate-once.yml up -d --build
 ```
 
+The override adds exactly one service and does not touch the default graph. It waits for
+Postgres to be healthy, runs `scripts/migrate-deploy.sh` from the image, and only then lets the
+app start (`service_completed_successfully`). ⚠️ It migrates on **first** boot: a one-shot
+container whose config hash did not change is not re-run by a later `up -d`, so upgrades still
+need `deploy.sh` (or `--force-recreate supersync-migrate`). A migration entry that quietly only
+works once, documented as if it worked always, would be worse than none — it would make the
+operator believe the schema is current.
+
 🔴 **Do not drop `docker-compose.build.yml` unless you already have the image.** No heyta images
 are published, and the default `image:` value is `${SUPERSYNC_IMAGE:-supersync:local}` — without
 the build override compose has neither a build definition nor a local tag, so it tries to
@@ -126,14 +134,6 @@ pull (`NODE_IMAGE=your-mirror/library/node:24-alpine`). The default is byte-iden
 behavior, and no regional mirror is hardcoded in this repo for the same reason as `APK_MIRROR`.
 ⚠️ `server/Dockerfile` has three stages and `ARG` does not cross `FROM`, so all three declare it;
 they must stay on the same base or the `web` and `production` stages end up built on different images.
-
-The override adds exactly one service and does not touch the default graph. It waits for
-Postgres to be healthy, runs `scripts/migrate-deploy.sh` from the image, and only then lets the
-app start (`service_completed_successfully`). ⚠️ It migrates on **first** boot: a one-shot
-container whose config hash did not change is not re-run by a later `up -d`, so upgrades still
-need `deploy.sh` (or `--force-recreate supersync-migrate`). A migration entry that quietly only
-works once, documented as if it worked always, would be worse than none — it would make the
-operator believe the schema is current.
 
 **That is the whole setup — there is no separate frontend to build or host.** The image
 contains the web client, built from the same commit as the server it ships with, and the
