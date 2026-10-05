@@ -12268,7 +12268,7 @@ G-70 挂的是"WS 升级从未经验 bundled Caddy"。查它之前先问了一�
    并且把"摘掉 consent 同意 ⇒ WS 不建"（`store.ts:253` 那道闸）也算作一条臂，
    这样它同时回答 §8.218 那条隐私披露的行为面（现在只证到代码面）。
 
-### 8.220 外人那一页的**事实面**普查：八条可核断言逐条对到代码/文件本体，零错话；查出的是"没有一条门禁守着这些散文"这一族缺口（2026-10-05 14:4x，负载 65 只能做这一类活）
+### 8.220 外人那一页的**事实面**普查：九条可核断言逐条对到代码/文件本体，零错话；查出的是"没有一条门禁守着这些散文"这一族缺口（2026-10-05 14:4x，负载 65 只能做这一类活）
 
 第 2 项的现量已到手（§8.211），落地卡在人的裁决上（§8.217），这一轮能推进目标的只剩目标后半句：
 **"停掉对外错话"**。做法不是再读一遍措辞，是把 `docs/runbooks/self-host.md` 里**每一条能被代码否证**的断言
@@ -12284,7 +12284,7 @@ G-70 挂的是"WS 升级从未经验 bundled Caddy"。查它之前先问了一�
 | "公网 host 的 `PUBLIC_URL` 必须 https（会抛）；局域网/回环的 http **放行**"（§2） | `config.ts:326-332`（`ADR-0012 §4.2`：禁令只对公网，与 iOS ATS 口径一致）+ `:428` 起那段 | ✅ 两句都对 |
 | "`CORS_ORIGINS` 默认是上游演示站，而且 `env.example` 里**未注释**，`cp` 完就生效"（§2 表） | `server/env.example:199` = `CORS_ORIGINS=https://app.super-productivity.com`，行首无 `#` | ✅ |
 | "应用自己只绑 `127.0.0.1:1900`，直接 `http://IP:1900` 从局域网连不通（不是防火墙，是它只听回环）"（§6） | `server/docker-compose.yml:114` `'127.0.0.1:${SUPERSYNC_HOST_PORT:-1900}:1900'` | ✅ |
-| "备份脚本在 `server/scripts/backup.sh`，`BACKUP_DIR` 默认落 `$SERVER_DIR/backups`"（§7） | 文件存在（`ls server/scripts/`） | ✅ 存在性；默认值那半句本轮没打开文件看 |
+| "备份脚本在 `server/scripts/backup.sh`，`BACKUP_DIR` 默认落 `$SERVER_DIR/backups`"（§7） | `backup.sh:32-33` `SERVER_DIR="$(dirname "$SCRIPT_DIR")"` / `BACKUP_DIR="${BACKUP_DIR:-$SERVER_DIR/backups}"`，`:51` 确实用 `pg_dump` | ✅ 整句成立 |
 
 ⇒ **本轮没有发现新的对外错话，所以一个字都没改这份 runbook。** 这是"查过且是干净的"，不是"没查"。
 
