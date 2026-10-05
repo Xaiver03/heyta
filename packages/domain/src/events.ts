@@ -209,6 +209,32 @@ export function nextEventOccurrence(
  *
  * ⚠️ 非法规则与求值抛错一律按**不命中**处理，与 `occursOnToday` 同一取舍：
  * 重复规则是用户输入，一条打错的规则不该让整张日历崩掉。
+ *
+ * `[from, to]` 闭区间里，这个倒数日**发生在哪几天**（升序、去重）。
+ *
+ * ## 为什么在 domain，而不是让日历自己算
+ *
+ * 日历要显示"这一格有个日子"，就得回答"这段区间里它出现几次"。这段数学
+ * （公历规则、农历闰月三档、锚点越界回退）已经在本文件与 `recurrence.ts` /
+ * `lunar.ts` 里，且倒数日面板的"下一次发生日"就是用它算的。日历再写一遍的
+ * 漂移形状是**同一张卡在面板上写"还有 12 天"、在日历上落到后一天**，
+ * 而两边都"看起来是个日期"（AGENTS §3.5 那条同形状的第二次）。
+ *
+ * ## 三种形态各自的口径
+ *
+ * · **一次性**：只有锚点那一天（过去了就永远不在区间里 —— 与
+ *   `nextEventOccurrence` 对一次性过期项返回 `undefined` 同一取舍）。
+ * · **公历重复**：直接交 `occurrencesInRange`，它自己保证升序去重，
+ *   并且**非法规则返回空数组而不是抛**（规则是用户输入）。
+ * · **农历重复**：逐年取 `lunarOccurrencesInYear`（含闰月三档与"该月没有
+ *   那一天就退到月末"的回退），再裁进区间。窗口按**农历年**走，
+ *   所以区间两端各放一年余量 —— 农历新年在 1 月末到 2 月中之间移动，
+ *   只按公历年取会整批漏掉年初那几天。
+ *
+ * ⚠️ 农历那条路径上的 `solarToLunar` / `lunarToSolar` 对**超出历表**的日期会抛
+ *   （`lunar.ts:46,48,209`）。这里把它吞成"这个区间里没有"，与本文件
+ *   `occursOnToday` 对坏规则的取舍同一条：一条坏数据不该把整片日历变成空白块
+ *   —— 那正是判据①要防的失效形状（"不确定"在日历上和"什么都没有"长得一样）。
  */
 export function eventOccurrencesInRange(
   event: CountdownEvent,
@@ -221,23 +247,28 @@ export function eventOccurrencesInRange(
   }
 
   if (event.isLunar === true) {
-    const anchor = solarToLunar(event.date);
-    const policy = eventLeapMonthPolicy(event);
-    const out: LocalDate[] = [];
-    /*
-      从 `from` 所在的**上一个**农历年起算：农历新年落在公历 1–2 月，
-      所以公历 1 月上旬那几天属于上一个农历年。少退一年就会把整月的
-      农历生日在 1 月那一格里画漏 —— 而 12 月那一格是对的，症状看起来像"偶尔错"。
-      上沿同理多走一年：`to` 是窗口最后一天，它所在农历年的下一次 occurrence 可能仍在窗口内。
-    */
-    const lastYear = lunarYearOf(to);
-    for (let year = lunarYearOf(from) - 1; year <= lastYear + 1; year += 1) {
-      for (const date of lunarOccurrencesInYear(anchor, year, policy)) {
-        if (date > to) break;
-        if (date >= from) out.push(date);
+    try {
+      const anchor = solarToLunar(event.date);
+      const policy = eventLeapMonthPolicy(event);
+      const out: LocalDate[] = [];
+      /*
+        从 `from` 所在的**上一个**农历年起算：农历新年落在公历 1–2 月，
+        所以公历 1 月上旬那几天属于上一个农历年。少退一年就会把整月的
+        农历生日在 1 月那一格里画漏 —— 而 12 月那一格是对的，症状看起来像"偶尔错"。
+        上沿同理多走一年：`to` 是窗口最后一天，它所在农历年的下一次 occurrence 可能仍在窗口内。
+      */
+      const lastYear = lunarYearOf(to);
+      for (let year = lunarYearOf(from) - 1; year <= lastYear + 1; year += 1) {
+        for (const date of lunarOccurrencesInYear(anchor, year, policy)) {
+          if (date > to) break;
+          if (date >= from) out.push(date);
+        }
       }
+      // 去重：`both` 档在同一年里给两个正日子，闰月策略换档时两个来源可能撞同一天。
+      return [...new Set(out)].sort();
+    } catch {
+      return [];
     }
-    return out.sort();
   }
 
   /*

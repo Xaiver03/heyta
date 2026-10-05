@@ -219,7 +219,7 @@ describe('E2 —— 清单与真源逐字对账（抄件一定会漂）', () => 
 
   it('🔴 每一处 `indexedDB.open` 都必须接 `versionchange` 让位（销毁才不会被自己的活连接挡住）', () => {
     // 行为那一腿在 `packages/storage/tests/destroy.spec.ts`（活连接挡住 deleteDatabase
-    // ⇒ 那次销毁永远停在 blocked，陷阱 #297）。**那一腿只-cover 它自己那个适配器**：
+    // ⇒ 那次销毁永远停在 blocked，陷阱 #302）。**那一腿只-cover 它自己那个适配器**：
     // 一个不在 `IndexedDbAdapter` 里的连接持有者（如 service worker）挡住删除时，
     // 那条行为判据照样全绿。所以这里要一条**扫全部产品代码**的配对判据。
     // 比的是**数量**而不是"文件里出现过这个词"：同一个文件里第二次 open 忘了接，

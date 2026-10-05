@@ -133,7 +133,7 @@ function openDb(): Promise<IDBDatabase> {
       //    没人让位 = 删除永远停在 `blocked`（不报错、不超时）。
       //    而这里的连接**不是**用完就还：`tx()` 只在 `oncomplete` 里 `close()`，
       //    请求失败走 `onerror`，那条路上连接是悬着的。
-      //    同一个形状在 `IndexedDbAdapter.open()` 里已经抓出过一次（陷阱 #297）。
+      //    同一个形状在 `IndexedDbAdapter.open()` 里已经抓出过一次（陷阱 #302）。
       db.onversionchange = () => db.close();
       resolve(db);
     };

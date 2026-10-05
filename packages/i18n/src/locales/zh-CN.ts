@@ -589,6 +589,16 @@ export const zhCN = {
 
   'web.settings.display.title': '显示',
   'web.settings.display.dueNote': '任务行上的截止时间显示为日期，还是距离截止时间的倒计时。',
+  // 工单 W4：详情列（右侧那一栏）的出现与收起。
+  // 🔴 说明句里必须把"它自己不出来的两种情况"和"收起来之后怎么叫回来"都说完 ——
+  // 一个只写「常驻 / 收起」的开关，用户收起后在窗口变窄时看到它没了，
+  // 会以为自己按坏了。
+  'web.shell.detailPane.collapse': '收起详情面',
+  'web.shell.detailPane.expand': '展开详情面',
+  'web.settings.display.detail.title': '详情面',
+  'web.settings.display.detail.modeOpen': '常驻',
+  'web.settings.display.detail.modeCollapsed': '收起',
+  'web.settings.display.detailNote': '右侧那一栏显示当前选中项的面单。窗口太窄或太矮时它自己不出现，这时这一项设置不起作用。在这一台设备上收起之后，页头的按钮、这里的开关，或快捷键 ⌘/Ctrl + Shift + \\ 都能把它叫回来。',
   'web.shell.dueMode.countdown': '倒计时',
   // 任务行上那几个**纯图标**按钮：名字里必须带上任务标题，
   // 否则屏幕阅读器听到的是一串没有区别的"按钮"。
@@ -1175,6 +1185,18 @@ export const zhCN = {
   'web.focus.config.locked': '计时进行中不能改时长 —— 先中止本轮，改完再开始。',
   'web.focus.config.a11y.minutes': '{label}时长，单位分钟',
   'web.focus.config.a11y.sessions': '{label}，单位个数',
+  // 工单 W7：专注详情面（四张概览卡 + 专注记录列表）。
+  // ⚠️ 卡上的标签**不带数量**，数字单独一格 —— 那样英文不需要为「1 session / 3 sessions」
+  // 再开一对兄弟词条，而 `web.focus.completedTodayOne` 那种成对词条的存在理由在这里不成立。
+  'web.focus.detail.title': '专注概览',
+  'web.focus.detail.todayCount': '今日番茄',
+  'web.focus.detail.todayDuration': '今日专注时长',
+  'web.focus.detail.totalCount': '总番茄',
+  'web.focus.detail.totalDuration': '总专注时长',
+  'web.focus.detail.records': '专注记录',
+  'web.focus.detail.recordsEmpty': '还没有专注记录。完成一轮就会出现在这里。',
+  'web.focus.detail.unlinked': '未关联任务',
+  'web.focus.detail.aborted': '中途放弃',
 
   // ── Web · 习惯 ────────────────────────────────────────────
   'web.habits.addPlaceholder': '新习惯，例如「喝水」',
@@ -1216,6 +1238,23 @@ export const zhCN = {
   // 中文无单复数，两句刻意逐字相同（en 侧才会不同）。
   'web.habits.streak.total': '累计 {count} 天',
   'web.habits.streak.totalOne': '累计 {count} 天',
+  // ── 工单 W8：习惯统计的读侧（本月四格）。口径全在
+  //   `@heyta/domain#computeHabitPeriodStats`，这些句子只是它的投影：
+  //   「打卡」量的是**天**（不是次），完成率的分母是**已到期计划日**
+  //   （分母为 0 时没有率可言 ⇒ 界面上是占位句，不是 0%）。
+  //   ⚠️ 英文侧刻意用"名词在前、数字在后"的形状（`Check-in days…: {count}`），
+  //   与 `catalog.spec.ts` 的 `1 <复数名词>` HAZARD 同族 —— 词条表没有 ICU，
+  //   这些句子必须对 1 和 N 都成立，不配 `…One` 兄弟键。
+  'web.habits.stats.monthDays': '本月打卡 {count} 天',
+  // 🔴 率那一格必须自己说清"按天"：计数型习惯同屏会出现「完成率 0%」与「完成量 3 杯」
+  //   （目标 8 杯、今天 3 杯 ⇒ 今天不算达成），两个数都对、读起来自相矛盾（工单 §8.121 看图照出，
+  //   #39 的拍板：在率格里点明口径，而不是改算式或藏掉其中一个）。
+  'web.habits.stats.monthRate': '本月完成率（按天） {percent}%',
+  'web.habits.stats.monthRatePending': '本月完成率（按天） —',
+  'web.habits.stats.monthValue': '本月完成量 {value}',
+  'web.habits.stats.monthValueUnit': '本月完成量 {value} {unit}',
+  'web.habits.stats.totalValue': '总完成量 {value}',
+  'web.habits.stats.totalValueUnit': '总完成量 {value} {unit}',
   // 热力图文案由**我们**传给 react-activity-calendar —— 它的默认文案是英文，
   // 而 `{{count}}` 是**库自己的**占位符，必须原样留着（不是我们的 `{name}` 形状）。
   // ── M3 第七刀（habits）：共享热力图的两条文案 ──────────────
@@ -1247,6 +1286,7 @@ export const zhCN = {
   // ── Web · 习惯的「列表 + 窗格」─────────────────────────────
   'web.habits.list.aria': '习惯清单',
   'web.habits.pane.aria': '「{name}」的打卡记录',
+  'web.habits.pane.pickOne': '选一条习惯，这里看它的打卡与统计。',
   // 行首的 7 个点：日期本身已经在 `aria-label` 里，这里只说"打没打"。
   'web.habits.week.aria': '最近 7 天',
   'web.habits.week.done': '{date} 已打卡',
@@ -1847,13 +1887,13 @@ export const zhCN = {
   'web.ai.settings.features.hintStrong': '列表顺序就是尝试顺序',
   'web.ai.settings.features.hintTail': '（靠前的先试）。',
   'web.ai.settings.features.empty': '先添加端点',
-  'web.ai.settings.consentLead': '「{feature}」有远端端点，需要你授权数据出境。',
+  'web.ai.settings.consentLead': '「{feature}」的端点不在这台设备上，需要你批准后内容才会离开本机。',
   'web.ai.settings.grant': '授权',
   'web.ai.settings.gapLead': '⚠️ 「{feature}」需要',
   'web.ai.settings.gapMid': '，但',
   'web.ai.settings.gapTail': '没有声明它 —— 这个功能会一直不工作。',
   'web.ai.settings.gapFix': '给「{name}」补上',
-  'web.ai.settings.granted': '已授权数据出境',
+  'web.ai.settings.granted': '已批准内容离开本机',
   'web.ai.settings.revoke': '撤销',
   // ── 对话助手（ADR-0045）：第二个授权前端 ──────────────────────────
   // 🔴 这一块的存在理由：`localApi.grants` 管的是"**外部程序**能不能调这个工具"
@@ -2070,7 +2110,7 @@ export const zhCN = {
   // ⚠️ 别在这里重新概括：同一句用户可见文案有两个来源就一定会漂移（见 §7.10 通道 #5）。
   // ⚠️ 引号照抄 `packages/ai`（ASCII 双引号）—— 有测试逐字比对，别改成「」。
   'web.ai.failure.cause.notConfigured': 'AI 未启用。在设置里选择"使用自己的 AI 端点"即可开启。',
-  'web.ai.failure.cause.egressNotAuthorized': '该功能需要你先授权数据出境。',
+  'web.ai.failure.cause.egressNotAuthorized': '该功能需要你先批准内容离开本机。',
   'web.ai.failure.cause.noRoute': '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。',
   'web.ai.failure.cause.fallbackNeedsConsent': '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。',
   'web.ai.failure.cause.network': '连不上端点。检查网络，以及端点地址是否可达。',
@@ -2749,6 +2789,11 @@ export const zhCN = {
   'common.habits.rename.button': '重命名习惯「{name}」',
   'common.habits.rename.label': '习惯名称',
   'common.habits.delete.button': '删除习惯「{name}」',
+  // 工单 W6：计数型习惯"今天记了几格"。句子写成 `{value}/{target}{unit}` 而不是
+  // 三个占位符裸串 —— 纯占位符的 zh 词条在 `check:ui-language` 眼里与"忘了翻译"同一件事。
+  'common.habits.amount.today': '今天 {value}/{target} {unit}',
+  'common.habits.amount.plus': '给「{name}」加 1',
+  'common.habits.amount.minus': '给「{name}」减 1',
 
   // ── 标签 ───────────────────────────────────────────────────
   // 清单和标签在数据上是两个实体，在产品上是同一件事的两个面（组织任务）：
@@ -3339,7 +3384,7 @@ export const zhCN = {
   'site.platforms.legend.partial': '能跑起来，但还缺发布所必需的东西',
   'site.platforms.legend.blocked': '有明确的外部依赖没解决',
   'site.platforms.web.name': 'Web',
-  'site.platforms.web.body': '完整产品，不是演示。可安装、可离线用，数据就存在你的浏览器里。',
+  'site.platforms.web.body': '完整产品，不是演示。断网也能照常记，恢复后自动补传；数据就存在你自己的浏览器里。',
   'site.platforms.android.name': 'Android',
   'site.platforms.android.body': '真机可用：建任务、改期、优先级、清单、标签、重复、专注、冲突解决、回收站都能用。桌面小组件与发布签名还在路上。',
   'site.platforms.ios.name': 'iOS',
@@ -3581,7 +3626,7 @@ export const zhCN = {
   'site.docs.selfhost.s2i3': '通行密钥：需要真实域名。纯 IP 地址会被浏览器拒掉，所以用 IP 访问时只剩邮箱链接这一条路。',
   'site.docs.selfhost.s2i4': '谁能注册：可以用邮箱白名单把注册关上。关上之后别人看到的提示是「这个服务端不允许用该邮箱注册」。',
   'site.docs.selfhost.s3': '完整步骤在哪',
-  'site.docs.selfhost.s3p1': '仓库里有给运维看的部署手册和本地起服务手册（导航栏那个图标就是仓库入口），那是给要动手的人写的，跟这一页讲的每句都对得上。这一页的职责是让你在决定要不要自建**之前**，先知道它长什么样。',
+  'site.docs.selfhost.s3p1': '仓库里有给运维看的部署手册和本地起服务手册（导航栏那个图标就是仓库入口），那是给要动手的人写的；这一页那条起服务的命令与它们**逐字是同一条**，仓库里有一枚门禁盯着这条命令的每一份抄件，改任何一边都会让它红。这一页的职责是让你在决定要不要自建**之前**，先知道它长什么样。',
   'site.docs.selfhost.s3w1': '自建之后，你就是那个"能看到元数据的人" —— 加密边界与前面那篇讲的是同一套。',
   'site.docs.selfhost.s4': '起来之后，你的日常是这三件事',
   'site.docs.selfhost.s4p1': '升版本。你得自己决定什么时候上新代码，而上之前先备份数据库 —— 表结构的变更按"只向前"的方式发：已经上过的那一份不会被改动，要修就再发一次新的。所以升级出了问题，退路是回到备份，不是去改历史。',
@@ -3966,6 +4011,11 @@ export const zhCN = {
   // `calendarDayMarkerView` 里 `spoken` 直接取它，所以英文侧必须是能念出来的词，不能是符号。
   'common.calendar.dayMarker.off': '休',
   'common.calendar.dayMarker.work': '班',
+  // 日历格子里倒数日那一行（W6 第二个数据源）。住 `common.*` 因为共享板两端同一份；
+  // 措辞与倒数日面板那条逐字相同 —— 同一个数在两处两种说法是漂移的开始。
+  'common.calendar.event.today': '就是今天',
+  'common.calendar.event.until': '还有 {days} 天',
+  'common.calendar.event.since': '已经 {days} 天',
 
   // 🔴 这一组住在 `common.*` 而不是 `web.*`：**两端都要用**（档位每批会加一档，
   //    所以这里刻意**不写条数** —— 写过数字的注释一定会漂）。

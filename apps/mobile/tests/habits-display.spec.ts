@@ -233,3 +233,75 @@ describe('月份 key 的副本与共享层一致（本文件是那条漂移的�
     expect(shared).toEqual([...MOBILE_HEATMAP_MONTH_KEYS]);
   });
 });
+
+/**
+ * 工单 W6：数量行那三条文案（`labels.amount` / `amountPlusA11y` / `amountMinusA11y`）
+ *
+ * 🔴 这一组防的是两种**都不会报错**的坏法：
+ *  · 共享层的三个字段是必填的，所以"没接"会被 TS 拦住 —— 但"接成另一批 key"不会。
+ *    两端各建一条同义键（`mobile.habits.amount` vs `common.habits.amount.today`），
+ *    症状是同一条习惯在两端说出两句话，而词条表里多一条键不会让任何东西变红。
+ *  · 单位为空时那句兜底必须走**已有的** `web.habits.goal.defaultUnit`，
+ *    不能在共享层猜"次"（对"每天 30 分钟"是错的），也不该再建一条。
+ */
+describe('数量行文案（W6）', () => {
+  const AMOUNT_KEYS = [
+    'common.habits.amount.today',
+    'common.habits.amount.plus',
+    'common.habits.amount.minus',
+  ] as const;
+
+  it('🔴 句子带得上三个数，单位为空时补「次」/「times」（走既有的那条 fallback）', () => {
+    const zhLabels = habitBoardLabels(zh);
+    const enLabels = habitBoardLabels(en);
+    const withUnit = zhLabels.amount({ value: 5, target: 8, unit: '杯' });
+    expect(withUnit).toContain('5');
+    expect(withUnit).toContain('8');
+    expect(withUnit).toContain('杯');
+    // 空单位 ⇒ 必须有兜底量纲，否则渲染成「今天 5/8 」，像少了个字。
+    const noUnit = zhLabels.amount({ value: 5, target: 8, unit: '' });
+    expect(noUnit).toContain(zh('web.habits.goal.defaultUnit'));
+    expect(enLabels.amount({ value: 5, target: 8, unit: '' })).toContain(
+      en('web.habits.goal.defaultUnit'),
+    );
+    // 中英两条都得是**有内容**的句子（zh 侧纯占位符会被 `check:ui-language` 当漏翻）。
+    expect(noUnit).not.toBe(withUnit);
+    expect(enLabels.amount({ value: 0, target: 8, unit: 'cups' })).toContain('0');
+  });
+
+  it('🔴 两个步进按钮的无障碍名带习惯名（多个习惯同时在场时"加 1"指不出是谁的）', () => {
+    const labels = habitBoardLabels(zh);
+    expect(labels.amountPlusA11y({ name: '喝水' })).toContain('喝水');
+    expect(labels.amountMinusA11y({ name: '喝水' })).toContain('喝水');
+    // 两句必须**不同**：同一个名会让读屏用户分不清按下的是哪个。
+    expect(labels.amountPlusA11y({ name: '喝水' })).not.toBe(labels.amountMinusA11y({ name: '喝水' }));
+  });
+
+  it('🔴 与 web 用的是**同一批** key —— 移动端不许另建一套同义词', () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const read = (rel: string): string => readFileSync(resolve(here, rel), 'utf8');
+    const keysIn = (src: string): string[] =>
+      [...src.matchAll(/'(common\.habits\.amount\.[a-z]+)'/g)].map((m) => m[1]!).sort();
+    // 本文件（移动端那份构造器）。⚠️ 期望值也要 `sort()`：`keysIn` 排过序，
+    // 不排就把"顺序不同"读成"key 不同"。
+    const mobile = keysIn(read('../src/lib/habits-display.ts'));
+    /* 🔴 web 那一侧要读**三份文件**（工单 §8.133 的搬家）：数量行那三条 key 原来写在
+       `HabitsView.tsx` 的 labels 构造器里，面单搬进详情列之后构造器单独成文件
+       （`board-labels.ts`，理由是循环依赖不是整洁），而面单的宿主是 `HabitDetailCard.tsx`。
+       只读视图会得到 `[]` —— 症状长得像"web 把这三条 key 删了"，其实是这条对账**跟着搬家没改指向**。
+       对账的**语义**没动：两端仍然必须用同一批 key。 */
+    const web = keysIn(
+      [
+        '../../../apps/web/src/features/habits/board-labels.ts',
+        '../../../apps/web/src/features/habits/HabitDetailCard.tsx',
+        '../../../apps/web/src/features/habits/HabitsView.tsx',
+      ]
+        .map((rel) => read(rel))
+        .join('\n'),
+    );
+    const expected = [...AMOUNT_KEYS].sort();
+    expect(mobile, '移动端没接全这三条').toEqual(expected);
+    expect(web, 'web 没接全这三条').toEqual(expected);
+    expect(mobile, '两端用的是不同的那批 key —— 同一条习惯会说两句话').toEqual(web);
+  });
+});

@@ -79,7 +79,7 @@ count_and_verdict() {
     grep -E '环境无效|❌' "$RUNLOG" | head -6 | sed 's/^/            rig 自己说的：/'
     exit 3
   fi
-  # 🔴 计数与 summary 对不上 = **探针坏**，不是"没牙"（#283/#286 同一族）。
+  # 🔴 计数与 summary 对不上 = **探针坏**，不是"没牙"（#288/#291 同一族）。
   if [ "$FAILED" != "NA" ] && [ "$FAILED" -gt 0 ] && [ $(( FILE_RED + DATA_RED )) = "0" ] \
      && [ "$FILE_OK" = "0" ] && [ "$DATA_OK" = "0" ]; then
     echo "   ARM=NEEDLE-MISMATCH —— summary 报失败 $FAILED 项，而 B 两腿四条计数全是 0"
@@ -165,7 +165,7 @@ PRE_JS_MD5=$(md5 -q "$APP_ON_DEVICE/main.jsbundle" 2>/dev/null)
 echo "   PRE_JS_MD5=${PRE_JS_MD5:-（设备上读不到 main.jsbundle）}"
 # 🔴 把设备上那一枚**存一份**，收尾装回去。臂会把变异产物装上设备，
 #    只复原源码不等于复原产物 —— 下一趟基线会在"源码干净、设备里是变异字节"的世界里跑，
-#    那是一条关于产品的假结论（同一族的教训见 traps #281：装置不许许下它没有的能力）。
+#    那是一条关于产品的假结论（同一族的教训见 traps #286：装置不许许下它没有的能力）。
 PRE_APP_DIR=/tmp/heyta-b76-app-pre
 rm -rf "$PRE_APP_DIR"; mkdir -p "$PRE_APP_DIR"
 if [ -n "$APP_ON_DEVICE" ] && cp -a "$APP_ON_DEVICE" "$PRE_APP_DIR/Heyta.app" 2>/dev/null; then

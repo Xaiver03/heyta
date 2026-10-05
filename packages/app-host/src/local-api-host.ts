@@ -942,10 +942,12 @@ async function submitIntent(
           message: `打卡数值必须是不小于 0 的有限数，收到「${String(intent.value)}」。`,
         };
       }
-      // 🔴 那一天已经打过卡时，`checkIn` 回 `false` 并且**不落第二条 op** ——
-      // 那是幂等成功（同 ADR-0009 对精确重复的 op 的裁决），不是失败：
+      // 🔴 那一天已经打过卡时，本工具**报的仍是成功**（同 ADR-0009 对精确重复 op 的裁决）：
       // 打卡记录的标识是 `习惯:日期` 组合，重复调用不会多出第二条。
       // 报 `ok: false` 会让用户以为没打上，而再点一次也不会变成"打上"。
+      // ⚠️ 详情面 W6 之后 `checkIn` 多了一米：**给了与当日当前量不同的 value 就改那条的量**
+      //（一条 `UPD`，实体 id 不变）。所以这里的承诺是"不多出一条记录"，
+      // 不是"重复调用一条 op 都不写" —— 后者只在值没变时成立。
       await habitActions.checkIn(intent.habitId, day, intent.value);
       const logId = habitLogId(intent.habitId, day);
       return { ok: true, taskId: logId, entityId: logId, entityType: 'HABIT_LOG' };

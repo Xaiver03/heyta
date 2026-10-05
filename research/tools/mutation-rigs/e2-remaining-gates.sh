@@ -127,7 +127,7 @@ done
 if [ "${SKIP_LOAD:-0}" = 1 ]; then
   # 🔴 主动跳过要印成 SKIPPED，**不许**落到 else 里印成 EXPIRED（"没有读数"）：
   #    上一版 `SKIP_LOAD=1` 走的就是 else，于是那道明明已闭合（§10.206 八枚 rc=0）的读数
-  #    被记成 EXPIRED —— 一个状态被映射成另一个状态，正是 traps #296/#302 那一族。
+  #    被记成 EXPIRED —— 一个状态被映射成另一个状态，正是 traps #301/#307 那一族。
   say "LANE_LOAD=SKIPPED（这道已闭合，SKIP_LOAD=1 是为了不把负载压到正在跑 e2e 的那条线）"
   printf 'LANE_LOAD=SKIPPED\n' >> "$EV/rc.txt"
 elif wait_load; then
@@ -178,7 +178,7 @@ else
   # 于是链里那一枚会自己起 vitest 的段（`mutate-op-log-semantics.mjs`）被拒掉。
   # 那枚拒掉的退出码在日志里长得和"语义变异真红了"**一模一样**（都是 rc=1 + "missing assertion report"），
   # 所以这里把"被闸门拒启动"单独量出来标成 env_refusal=YES，并**重排队再跑一趟**，
-  # 而不是把这一趟当成产品结论（traps #304 那一族：五种状态必须分得开）。
+  # 而不是把这一趟当成产品结论（traps #309 那一族：五种状态必须分得开）。
   FULL_DONE=0
   attempt=1
   while [ "$attempt" -le "${FULL_ATTEMPTS:-3}" ]; do

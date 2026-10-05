@@ -131,6 +131,33 @@ export function CalendarView(): React.JSX.Element {
   );
 
   /**
+   * 倒数日：日历的**第二个日期数据源**（W6）。
+   *
+   * 🔴 宿主在这里只做两件事：把 store 里那份活的事件交给板子，并把三个说法注入。
+   * "哪一天真的发生"是 `@heyta/domain` 的 `eventOccurrencesInRange`，
+   * "折成几条 +N"是共享层的 `calendarCellBars` —— 这里再算一遍就是第二份数学。
+   *
+   * ⚠️ `syncToday` 这一句不是客套：那份 store 的"今天"原先**只由倒数日页播种**，
+   *   没进过倒数日页就直接开日历时它是 `undefined`，而 `refresh()` 在拿到
+   *   "今天"之前**不猜**（故意的）。后果不是报错，是日历上安静地一个倒数日都没有 ——
+   *   "共享组件支持了"与"宿主真的接上了"是两件事，这条就是那条坑的第五种面目。
+   */
+  const events = useCountdownStore((s) => s.events);
+  const syncCountdownToday = useCountdownStore((s) => s.syncToday);
+  useEffect(() => {
+    syncCountdownToday(today);
+  }, [syncCountdownToday, today]);
+
+  const eventLabels = useMemo(
+    () => ({
+      today: t('common.calendar.event.today'),
+      until: (days: number) => t('common.calendar.event.until', { days }),
+      since: (days: number) => t('common.calendar.event.since', { days }),
+    }),
+    [t],
+  );
+
+  /**
    * 滚轮翻月 / 翻周（产品负责人 2026-10-01：「上下滑动自由无限切换日历」）。
    *
    * 🔴 走的是**和页头那两个箭头同一个** `stepCalendarCursor` ——
@@ -238,6 +265,8 @@ export function CalendarView(): React.JSX.Element {
           labels={labels}
           dayMarker={dayMarker}
           dayMarkerLabels={dayMarkerLabels}
+          events={events}
+          eventLabels={eventLabels}
           testID={BOARD_TEST_ID}
         />
       </div>

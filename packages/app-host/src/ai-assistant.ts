@@ -78,6 +78,7 @@ import {
 } from '@heyta/local-api';
 
 import { MAX_TOOL_CALL_TEXT_LENGTH, parseToolArguments, toToolDescriptors } from './ai-tool-call.js';
+import { resolveToolSelection, type ToolSelection, type ToolSelectionRule } from './ai-tool-selection.js';
 import { runSelectedTool, type AiToolProposal } from './ai-tool-run.js';
 import {
   CALENDAR_ANCHOR_RULES,
@@ -267,6 +268,14 @@ export interface AssistantTurnDeps {
    * 用真实时钟写出来的测试会过几天变红。省略 = `Date.now()`。
    */
   readonly now?: number;
+  /**
+   * 规则短路用的规则集。省略 = `DEFAULT_TOOL_SELECTION_RULES`（与单步面板同一份）。
+   *
+   * 🔴 **不另写一份规则**：单步面板 `requestToolCall` 与助手循环必须按**同一套**
+   * 规则判定"这句话本机就能答"。两份规则 = 两个答案，症状是同一句话在
+   * 单步面板零出境、在对话里却把数据发出去了，而且两边都"正常工作"。
+   */
+  readonly rules?: readonly ToolSelectionRule[];
 }
 
 const ASSISTANT_SYSTEM_PROMPT = [
@@ -389,6 +398,122 @@ function budgetModelName(routing: AiRoutingConfig, override: string | undefined)
  * （它一开始就照红了本文件：那时这里叫 `runAssistantTurn`，界面确实调得到，
  * 但整个包的入口命名一致性也确实是**约定**，改名字比放宽判据便宜。）
  */
+/**
+ * 本机短路一次性最多列出几条。
+ *
+ * 这个数字**不是审美**：超过它就不是一条聊天回答了（那是列表界面该做的事），
+ * 而"把一整段清单塞进一句回答"会让用户以为助手在复述它读到的全部内容 ——
+ * 实际只复述了前 N 条。所以下界必须**明说**还剩多少条没列出。
+ */
+export const LOCAL_ANSWER_MAX_ITEMS = 8;
+
+/**
+ * 把一条**本机读到的**观察结果渲染成回答。渲染不出来就返回 `undefined`。
+ *
+ * 🔴 为什么允许"渲染不出来"：本函数的职责是**在零出境的前提下给用户一个真答案**，
+ * 而不是给任意 JSON 编一句人话。编不出来还硬编，得到的是一句**看起来像回答的谎话**
+ * （比"没答"更糟 —— 用户会照着它做决定）。这种情况下调用方退回模型那一步，
+ * 而退回这件事本身有测试钉着（见 `ai-assistant.spec.ts` 的"不硬编"那条）。
+ *
+ * ⚠️ 只认两种形状：数组本身，或对象里**第一个**数组值（投影层就是这么包的，
+ * 例如 `{ tasks: [...] }`）。每一项必须有一个能给人看的字：`title` / `name` /
+ * `label` / `text`，或者再往里一层（`{ task: { title } }`）。
+ * 更深的内容不在这里展开 —— 那是卡片渲染的事，不是回答文案的事。
+ */
+export function localObservationText(tool: string, data: unknown): string | undefined {
+  const rows = Array.isArray(data)
+    ? data
+    : data !== null && typeof data === 'object'
+      ? Object.values(data as Record<string, unknown>).find((value) => Array.isArray(value))
+      : undefined;
+  if (rows === undefined) return undefined;
+  if (rows.length === 0) {
+    // 🔴 **空集合是一个真答案**，不是"没答案"。带日期参数的规则（`list.today` 传 `dueOn`）
+    // 查回空数组时，退回模型意味着：为一句话发一次请求，而请求里唯一的真信息就是
+    // "本机一条都没有" —— 模型拿到它也只能说"今天没有任务"，还可能顺手编一条。
+    // 所以这里直接答"0 项"，零出境。
+    return `这条我在这台设备上查过了（${tool}），没有发出任何请求。结果是空的：共 0 项。`;
+  }
+
+  const labelOf = (row: unknown): string | undefined => {
+    const source =
+      row !== null && typeof row === 'object' && !Array.isArray(row)
+        ? (row as Record<string, unknown>)
+        : undefined;
+    if (source === undefined) return undefined;
+    for (const key of ['title', 'name', 'label', 'text'] as const) {
+      const value = source[key];
+      if (typeof value === 'string' && value.trim() !== '') return value.trim();
+    }
+    // 投影常见的包装形状：`{ task: { title } }` / `{ project: { name } }`。
+    for (const inner of Object.values(source)) {
+      if (inner !== null && typeof inner === 'object' && !Array.isArray(inner)) {
+        const nested = labelOf(inner);
+        if (nested !== undefined) return nested;
+      }
+    }
+    return undefined;
+  };
+
+  const labels = rows.map(labelOf);
+  // 🔴 一项都没字 ⇒ 渲染不出来（返回 undefined 而不是"某某：无"）。
+  // 只要有一项有字就继续：缺字的那一项列成"（这一项没有标题）"，
+  // 因为**丢掉它**会让条数与内容对不上，而"共 5 项，只列 3 项"是另一种谎话。
+  if (labels.every((label) => label === undefined)) return undefined;
+
+  const shown = labels.slice(0, LOCAL_ANSWER_MAX_ITEMS).map((label) => label ?? '（这一项没有标题）');
+  const lines = shown.map((label) => `- ${label}`).join('\n');
+  const rest = rows.length - shown.length;
+  const tail = rest > 0 ? `\n（还有 ${String(rest)} 项没列出）` : '';
+  return `这条我在这台设备上查到了，没有发出任何请求（${tool}）。\n共 ${String(rows.length)} 项：\n${lines}${tail}`;
+}
+
+/**
+ * 这一句**本机规则**选中的工具（`kind === 'tool'` = 短路可用）。
+ *
+ * 🔴 导出它是因为有两个消费者必须给出同一个答案：
+ *   · {@link requestAssistantTurn}（循环本身：命中就直接跑，一个请求都不发）；
+ *   · 对话面板（在**弹出境披露之前**先问这一句要不要出境）。
+ * 两处各写一份规则判定，就是 §3.5 抽掉之后又长回来的那种重复 —— 症状是同一句话在
+ * 单步面板零出境、在对话里却把数据发出去，而两边都"正常工作"。
+ */
+export function assistantLocalSelection(
+  text: string,
+  opts: {
+    readonly tier: AssistantTier;
+    readonly rules?: readonly ToolSelectionRule[];
+    readonly now?: number;
+  },
+): ToolSelection {
+  return resolveToolSelection(text, {
+    grants: assistantGrants(opts.tier),
+    ...(opts.rules === undefined ? {} : { rules: opts.rules }),
+    now: () => opts.now ?? Date.now(),
+  });
+}
+
+/**
+ * 这一句需不需要**出境披露**。
+ *
+ * 🔴 面板原先无条件弹披露，于是"今天有什么任务"这种本机就答得出的句子会先承诺
+ * "这些话要离开本机"、用户点发送、然后一个字都没出去。那句承诺是假的，而代价不是
+ * 一次白点 —— 是下一次真需要出境时，用户已经不信这条提示了。
+ *
+ * ⚠️ 判据只到 `kind === 'tool'`，**不含"结果渲染不渲染得出人话"**：短路命中但渲染失败时
+ * 循环会退回模型路径，而那一步仍被出境闸门挡着（没有同意就 `egressNotAuthorized`、
+ * 零请求）。所以这里"少弹一次披露"在结构上不可能变成"多发一次请求"。
+ */
+export function assistantNeedsEgressDisclosure(
+  text: string,
+  opts: {
+    readonly tier: AssistantTier;
+    readonly rules?: readonly ToolSelectionRule[];
+    readonly now?: number;
+  },
+): boolean {
+  return assistantLocalSelection(text, opts).kind !== 'tool';
+}
+
 export async function requestAssistantTurn(
   source: { text: string },
   deps: AssistantTurnDeps,
@@ -423,11 +548,69 @@ export async function requestAssistantTurn(
   const disclosed = new Set(assistantEgressFields(deps.tier));
   const disclosedPlain = [...disclosed].map((field) => field.split('.')[1] ?? field);
   const runnerDeps = { host: deps.host, grants };
+  const anchorNow = deps.now ?? Date.now();
 
-  // 🔴 锚点**一轮算一次**：逐步重算会让跨零点的那一轮里"第 1 步按今天查、
-  // 第 3 步按明天查"，而同一条消息数组里并存两种"今天" —— 模型看到的是一个
-  // 自相矛盾的上下文，且没有任何一层会报。
-  const system = assistantSystemPrompt(deps.now ?? Date.now());
+  // ── 规则先跑：这一句本机就能答 ⇒ **一个请求都不发** ─────────────────────
+  //
+  // 🔴 顺序是这条判据的全部意义：**先看规则，再决定要不要出境**，而不是"先把
+  // 整句发给模型、模型再挑工具"。后者即使结果一样，也已经把用户那句话（连同
+  // `today`、工具目录）送出去了。单步面板 `requestToolCall` 一直是这个顺序，
+  // 助手循环原先没有 —— 于是同一句"列出所有任务"在两个界面里有两种隐私表现，
+  // 而对话界面恰好是用户更不容易想到要看披露的那一个。
+  //
+  // ⚠️ 规则命中但**渲染不出人话**时不硬编一句回答，退回模型那一步
+  // （见 `localObservationText`）。退回是有测试钉着的，不是"反正能跑"。
+  const local = assistantLocalSelection(text, {
+    tier: deps.tier,
+    ...(deps.rules === undefined ? {} : { rules: deps.rules }),
+    now: anchorNow,
+  });
+
+  if (local.kind === 'tool') {
+    const run = await runSelectedTool(local, runnerDeps);
+
+    if (run.kind === 'proposal') {
+      // 写：与模型路径同一个收场 —— 提案 + `stopsHere`，确认才落库。
+      // 差别只有一个：**这一步零出境**（`destination: 'none'`，端点从未被碰过）。
+      return {
+        ok: true,
+        kind: 'proposal',
+        text: '我已经准备好这个改动了，等你确认。',
+        proposal: run.proposal,
+        steps: [{ tool: run.proposal.tool, kind: 'write', ok: true }],
+        appended: [
+          { role: 'user', text },
+          { role: 'assistant', text: '我已经准备好这个改动了，等你确认。' },
+        ],
+        health: {},
+        destination: 'none',
+        stopsHere: true,
+      };
+    }
+
+    if (run.kind === 'observation') {
+      const answer = localObservationText(run.tool, run.data);
+      if (answer !== undefined) {
+        return {
+          ok: true,
+          kind: 'answer',
+          text: answer,
+          steps: [{ tool: run.tool, kind: 'read', ok: true }],
+          appended: [
+            { role: 'user', text },
+            { role: 'assistant', text: answer },
+          ],
+          health: {},
+          destination: 'none',
+        };
+      }
+    }
+  }
+
+  // 🔴 锚点**一轮算一次**（`anchorNow`，规则短路也用它）：逐步重算会让跨零点的那一轮里
+  // "第 1 步按今天查、第 3 步按明天查"，而同一条消息数组里并存两种"今天" —— 模型看到的是
+  // 一个自相矛盾的上下文，且没有任何一层会报。
+  const system = assistantSystemPrompt(anchorNow);
 
   const steps: AssistantStep[] = [];
   const toolTranscript: ChatMessage[] = [];

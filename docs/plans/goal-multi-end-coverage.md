@@ -844,9 +844,14 @@ pnpm reinstall:mobile                      # 只欠 android + ios 两段
 
 1. 它证明的是**提交态 `1ac5913a` 在干净检出上全绿**。`1ac5913a` 之后 main 又推进了两笔
    （`be8bebfb`、`661cff78`，都是文档笔），所以"当前 main 全绿"这句要下一轮重量才成立。
-2. `check:macos-window` 的四条**跳过分支仍返回 exit 0**（非 darwin / 无 swift / 取证脚本 exit 4 /
-   非 Aqua 会话）—— 那是登记在案、**尚未拍**的一条（"全绿而这条从未执行"的可能性还在）。
-   本轮的"真跑了"是靠 `STORAGE=shell` 那一行**单独证明**的，不是靠 exit 0。
+2. ~~`check:macos-window` 的四条**跳过分支仍返回 exit 0**（非 darwin / 无 swift / 取证脚本 exit 4 /
+   非 Aqua 会话）—— 那是登记在案、**尚未拍**的一条（"全绿而这条从未执行"的可能性还在）。~~
+   🔴 **这句在写下时就已经是过期的**：裁决 `1030a560`（10-01 12:03"平台门禁跳过分支裁决落地"）
+   比本笔（10-03 13:53）**早两天**，我抄的是 `help-center-docs-expansion.md` §10 那条 10-01 03:38 的旧账，
+   没有读被抄的那枚门禁本身。现量：只剩**平台不符**与**没有 `swift`**两条返回 `exit 0`，
+   `exit 4`（无屏幕录制权限）与"有 Aqua 会话却取不到图"**都判红**，分界写在该门禁文件头
+   （`scripts/check-macos-window.mjs:40-54`）。本轮"真跑了"仍要靠 `STORAGE=shell` 那一行单独证明 ——
+   这条立场不变，10-05 12:4x 在合流态复量到的是 `contentOnModalRatio 0.327` + M2 三条 ✅ + 交叉验证 ✅。
 3. 这一趟 `check:web-storage` 过的**前提是 :4321 空着**（它自己 spawn `vite --port 4321 --strictPort`）。
    这条段的历史红就是被别人占着端口造成的，所以它的绿**依赖现场**，不是无条件属性。
 
@@ -948,7 +953,9 @@ Chrome 图标、信息气泡、Google 搜索栏本来就是蓝的。也就是说
    #154 的解法与本轮对它的否证各是一个时间窗的读数，两句都不该往下传"。
    写回原文件的动作照旧挂在 `environment-traps.md` 干净的时候做
    （现量：`git diff --numstat docs/reference/environment-traps.md`；14:2x 实测仍是 `48 0`）。
-4. **`check:macos-window` 四条跳过分支仍返回 exit 0** —— 登记在案、**尚未拍**的老缺口，本轮没动它。
+4. ~~**`check:macos-window` 四条跳过分支仍返回 exit 0** —— 登记在案、**尚未拍**的老缺口，本轮没动它。~~
+   与 §9c 边界 2 **同一条、同一个错**（抄的是落地前的旧账）：裁决在 `1030a560`，
+   现在只剩"平台不符 / 没有 swift"两条绿色跳过，`exit 4` 与"有 Aqua 却取不到图"判红。
 5. **M3 的 41 处内联样式** —— 现在住在基线 90 里，B18 **没有解除**，只是不再表现为红。
 
 ### 7.21 🔴 B31 当场解除：`pod install` 在**同一棵树、同一 commit** 上现在 exit 0 —— 于是 #154 的 remedy 与本轮对它的否证**都不成立**（14:0x–14:1x，载体 `940af1c0`）
@@ -2998,7 +3005,7 @@ VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VER
   |---|---|---|
   | 8 | `check:op-log-semantics` | 🔴 **19:31 定案：与第 84 段同族，是内存闸门拒绝**。日志原文写着「内存闸门拒绝启动：已有测试在跑（pid=40338，锁 `/tmp/tfa-test.lock`；它是 `.tfa-shield/bin/npx vitest run tests/security/revisionsL…`）」⇒ `run()` 拿到 `result.error` 就在 `:73` 抛、`:79` 是调用点。**不是产品红，是别人持锁时按设计不起跑**（那条旋钮 `TFA_ALLOW_CONCURRENT_TEST=1` 用户明令不用） |
   | 42 | `check:docs` | 🔴 **载体年龄**，不是死链：引用的 `trash-and-archive.md §10.87` 在**主检出行 7330 存在**、在**载体那棵老树里 0 命中**（`grep -cE '^#+ *(§)?10\.87'` 主=1 / 载体=0） |
-  | 69 | `check:ai-e2e` | 🔴 **19:46 定案（原来的"未裁定"作废）**：既不是产品也不是负载 —— **载体工作树被我自己上一段的取证装置换过**。`heyta-run-folderspec.sh:64-72` 把 `/tmp/list-folder.spec.ts`（mtime 10-04 03:42、md5 `d73db784d41243ef46c25781f4feffaf`、**没有** HEAD 里 10-04 加的 detach 重试壳 `scrollFreshAndShoot`）覆盖进 `e2e/tests/list-folder.spec.ts`（09:54）且**不还原**；10:0x 的全量 check 继承它，于是红在 `:115 Element is not attached to the DOM`、retry #1 同样红。链条字节级闭合：载体的脏 blob `43b0884b` == 草稿的 `git hash-object`，归档的还原前副本 md5 == 草稿 md5。判据/装置修复与双臂现量见交接账 19:4x 那节第 5 条的两枚候选（**本地序号** #290/#291 —— 不是 traps 文件的号，原因见交接账 19:5x 第 4 条）。
+  | 69 | `check:ai-e2e` | 🔴 **19:46 定案（原来的"未裁定"作废）**：既不是产品也不是负载 —— **载体工作树被我自己上一段的取证装置换过**。`heyta-run-folderspec.sh:64-72` 把 `/tmp/list-folder.spec.ts`（mtime 10-04 03:42、md5 `d73db784d41243ef46c25781f4feffaf`、**没有** HEAD 里 10-04 加的 detach 重试壳 `scrollFreshAndShoot`）覆盖进 `e2e/tests/list-folder.spec.ts`（09:54）且**不还原**；10:0x 的全量 check 继承它，于是红在 `:115 Element is not attached to the DOM`、retry #1 同样红。链条字节级闭合：载体的脏 blob `43b0884b` == 草稿的 `git hash-object`，归档的还原前副本 md5 == 草稿 md5。判据/装置修复与双臂现量见交接账 19:4x 那节第 5 条的两枚候选（**本地序号** #295/#296 —— 不是 traps 文件的号，原因见交接账 19:5x 第 4 条）。
     ✅ **20:18 已确认**：干净载体（`7911ad02`、`CARRIER_DIRTY_TRACKED=0`）上整段 `SEG ai-e2e rc=0 / 162 passed`，
     `list-folder.spec.ts:102:1` 那条 `✓ … (3.4s)` ⇒ 预测成立、那个形状不再出现。读数在 **§7.30e**。 |
   | 70/71 | `check:privacy-consent-e2e`、`check:landing-e2e` | 同一趟里**两种读数**：第 3 步单跑 rc=0，第 5 步逐段 rc=1 ⇒ 归到竞争/负载（当时 15 分钟均值 47.65），不算产品证据 |
@@ -3078,7 +3085,7 @@ COPY_BAD：装置**没有打印过这一行**（`grep -c COPY_BAD` = 0）⇒ 不
   截图证据：/tmp/heyta-reinstall-android.png
 段 4 iOS（✅ 打印齐）
   模拟器：EAAD1B66-80A3-4A51-957C-298DAF22F057（= 我自己新建的那台 heyta-multiend-reinstall，不是别线的现场）
-  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 4 行）—— 见 /tmp/heyta-reinstall-pod.1.log   ← traps #290 那一枚，正是排队器 v2 要还原的东西
+  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 4 行）—— 见 /tmp/heyta-reinstall-pod.1.log   ← traps #295 那一枚，正是排队器 v2 要还原的东西
   ✅ 沙盒已同步（Manifest.lock == Podfile.lock）
   主蓝采样命中 4152（数的是 heyta-reinstall-ios.png）
   /tmp/heyta-reinstall-ios.png 562430 bytes mtime=10-05 20:07:15 md5=b95a8330f89d  [本轮新生]
@@ -3265,7 +3272,7 @@ CARRIER_SHA_AT_END=7911ad02c80d3741ee7117f20c09ab93e684595a
 归因从"成因已证、最后确认待跑"升级为**已确认**；而且确认它的不是单 spec 复跑，是整段 162 条全绿。
 同趟还新生了那五张取证图（`/tmp/list-folder-evidence/list-folder-{1..5}-*.png`，84–97 KB，mtime 20:11:37–38）。
 
-### 7.30f 判据 4（Android「远程重打跟着源码变」）三趟跑到底了：两条主腿正读数，第三条腿**被我自己装置的变量传递 bug 打成假红**（2026-10-05 21:42–21:52，载体 `7911ad02`）
+### 7.30f 判据 4（Android「远程重打跟着源码变」）：四条腿都有读数，其中两条**各自被我自己装置的 bug 打成过一次假红**（2026-10-05 21:42–22:16，载体 `7911ad02`）
 
 产品负责人 21:14 解锁 windows-pc 并明确"不用等窗口，直接跑"。我在**干净载体**里跑
 `~/.heyta-window-rigs/heyta-judge4-two-rounds.sh --carrier … --go`（它第一步就是规范窗口闸门，**跑在载体那棵树**，
@@ -3325,9 +3332,57 @@ MARKER_BUNDLE=latin1=1 utf16le=1     INSTALL=Success     MARKER_AX=0     RESULT=
 
 ⇒ 装置的 launch 腿已按现量改成 **resolve-activity 取组件 → `am start -n` → 轮询 `mCurrentFocus` 到 `com.heyta` 才 dump**，
 并加了"解析不到组件就 `RESULT=FAIL` 并印出拿到的是什么"的响亮失败（不能让"起不来"再长得像"界面没渲染"）。
-修完整条重跑在飞（22:2x 起跑，`/tmp/j4-rerun-2220.log`）。
-**在它出读数之前，判据 4 只能主张到"确定性腿 + 变更传播腿 + 标记进字节码腿 + 装机腿有读数、界面腿靠手动走通"**：
-`MARKER_AX` 必须由修好的装置自己打印出 ≥ 1 才算四条腿全闭合。
+
+**修好的这条腿已经单独走过一次并出读数**（22:16:32，`~/.heyta-evidence/judge4-launchleg-221632/`，
+新装置 `heyta-judge4-launch-leg.sh` —— 它只重放这一腿，不重打，因为设备上装着的正是那一趟的 R3 标记包）：
+
+```
+LAUNCH_CMP=com.heyta/com.heytamobile.MainActivity
+FOCUS=  mCurrentFocus=Window{79e85d4 u0 com.heyta/com.heytamobile.MainActivity}
+MARKER_AX=1   UI_XML_BYTES=12579   RESULT=OK
+```
+
+截图 `launchleg.png` **人打开看过**：同意卡标题两行印着「在使用联网功能之前 MK=J4MARK」，
+正文是本地优先那段说明，两个按钮「同意并联网」（主蓝实心）/「只用本机」（描边），
+`服务条款`/`隐私政策` 两条链接在 —— 也就是**改动确实走到了装出来的界面**，不只是在字节码里。
+
+🔴 **顺带自曝一个假旋钮**：装置里那行 `HEYTA_LOAD_GATE_WAIT=0 timeout 200 bash scripts/verify-mobile-window-gate.sh`
+看着像"不等待、超时 200 秒"的配置，但 `grep -c WAIT scripts/verify-mobile-window-gate.sh` 现量 **0** ——
+**闸门根本不读这个变量**，它一直是"一次判定、不等待"。所以那个 `=0` 是装饰，`timeout 200` 才是唯一真起作用的。
+（同族规律：注释和变量名对别处行为的断言也是断言，一样要现量。）
+
+⏭ **整条装置端到端重跑：22:33:57 起跑、22:40:08 出 `RESULT=OK`**（`~/.heyta-evidence/judge4-1005-223356/`，载体仍 `7911ad02`）。
+这一趟把上面那一格消掉了，读数逐字如下：
+
+```
+R1=49d0c5f248ae7dfa…   R2=49d0c5f248ae7dfa…   R3=6db897a49800b201…
+APK sha R1=314eda50205d6192  R2=314eda50205d6192  R3=8dbae397615b1f16
+MARKER_BUNDLE=latin1=1 utf16le=1     MARKER_AX=1
+LAUNCH_CMP=com.heyta/com.heytamobile.MainActivity
+FOCUS=  mCurrentFocus=Window{142fd55 u0 com.heyta/com.heytamobile.MainActivity}
+INSTALL=Success   RESTORE=OK   RESULT=OK
+```
+
+📌 **顺带多出来的一枚读数**：这一趟的 R1/R2/R3 三枚 sha 与 21:58 那趟**逐字相同**（`49d0c5f2…`/`49d0c5f2…`/`6db897a4…`，APK 也同为
+`314eda…`/`8dbae3…`）。也就是说"零改动重打相等"不只是一趟里的巧合，而是**跨两趟独立运行仍然相等** ——
+远程通道的字节确定性比判据要求的还强一档。`packaged-judge4.png`（10:39 那张）**人打开看过**：
+同意卡标题两行「在使用联网功能之前 / MK=J4MARK」、正文本地优先那段、`服务条款`/`隐私政策` 两条链接、
+「同意并联网」主蓝实心 +「只用本机」描边 —— 与 22:16 手动那两张是同一形态。
+
+🔴 **起跑前修掉的两处装置缺陷（不是产品）**：
+① 闸门 `--target` 原来抄的是 `b`（四端重装那一档），它额外要求**有 booted 的 iOS 模拟器**与 `reinstall-all.sh` 干净 ——
+本装置既不装 iOS 也不跑重装，22:3x 现量就是被那格 iOS 腿判红的（21:58 那趟有 6 台 booted 才过，之后别人关了）⇒ 改 `--target c`；
+② `apk` 那一格**按理由显式豁免并打印**（判据 4 的装置自己就是打 APK 的一方，装机腿装的是刚打的那枚，
+"拿旧 APK 验旧 bundle"在这条链上结构上不可能发生），而且它会**被上一趟成功收尾自己推红**
+（现量：22:05 的还原步把源码 mtime 推到 22:04 那枚 APK 之后 ⇒ 下一趟的 apk 腿必红）。
+豁免逻辑第一次写成了 `[ "$G" != 0 ]` —— 闸门**只要有一格红就退 3**，所以那行让豁免永远不生效
+（22:32:49 那趟 `REDS=apk`、其余腿全绿却照样 exit 3）。改成"只拦 `rc=1`（用法错）与 apk 之外仍有红腿"。
+⇒ 新增 traps 候选 **#297**：**收尾会还原源码的装置，会让"产物比源码新"那一类前置在下一趟永久红** ——
+这类豁免必须打印出来，不能静默。
+
+⇒ **判据 4 现在可以主张闭合**：四条腿（确定性 / 变更传播 / 标记进字节码 / 装机后界面读到标记）**全部由修好的装置自己一次跑完打印**，
+`RESULT=OK`。它同时留下两条判据教训：#295（`monkey` 拉起 ≠ 目标 App 在前台）、#296（`HEYTA_LOAD_GATE_WAIT` 是闸门从不读的假旋钮）。
+
 
 ### 7.31 ③ 的输入多了一道「能不能重放」的门，另一枚探针先被自己作废（2026-10-04 12:4x–13:0x，载体 `458249f6`，窗口仍不在）
 

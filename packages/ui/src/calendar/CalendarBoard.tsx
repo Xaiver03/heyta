@@ -22,20 +22,6 @@
  * ## 本目录不许 `import '@heyta/i18n'`
  *
  * 文案全部由宿主的 `labels` 注入（理由见 `model.ts` 文件头）。
- *
- * ## 🔴 这一屏有**两个事件源**（W6，2026-10-05）
- *
- * 任务是第一个，倒数日（纪念日 / 倒数日 / 生日 / 节日）是第二个。两者**归日的依据不同**：
- * 任务看它自己的 `dueDate`，倒数日看"这条锚点/规则在这段时间的哪几天落地"。
- *
- * ⚠️ 所以倒数日**不是**"一种没有 `dueDate` 的任务"，也不许被改成那样：
- * 核心判据就是「一条**没有截止日**的倒数日也能上日历」，而它唯一可观测的证据是
- * 标题出现在格子里 + 当天那块的那两个数把它算进去。
- * 一旦为了复用 `TaskList` 给它发明 `dueDate`，这条判据测的就不再是这件事了。
- *
- * 🔴 **不含法定节假日**：休 / 班走的是 `dayMarker` 那条公共事实通道（W4b），
- * 与这里的"用户自己记的日子"是两件事 —— 合成一个源就会让"国家放的假"
- * 和用户定的"结婚纪念日"共用一套排序与配色，而那两套语义都没有被设计过。
  */
 
 import React, { useCallback, useMemo } from 'react';
@@ -59,7 +45,7 @@ import { HeytaIcon } from '../icon/Icon.js';
 import { TaskList } from '../task-list/TaskList.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { CalendarDayBoard } from './CalendarDayBoard.js';
-import { CalendarEventRowList } from './CalendarEventRow.js';
+import { CalendarEventRow } from './CalendarEventRow.js';
 import { CalendarYearBoard } from './CalendarYearBoard.js';
 import { CalendarToolbar } from './CalendarToolbar.js';
 import {
@@ -68,10 +54,12 @@ import {
   calendarDayTone,
   MAX_CALENDAR_BARS,
   MAX_WEEK_CALENDAR_BARS,
-  groupEventsForGrid,
   groupTasksByDueDate,
+  groupEventsByOccurrence,
+  yearRangeOf,
   calendarDayMarkerView,
   type CalendarDayMarker,
+  type CalendarEventBarLabels,
   type CalendarBoardLabels,
   type CalendarCellBar,
   type CalendarViewKind,
@@ -81,18 +69,6 @@ import {
 export interface CalendarBoardProps {
   /** 全部候选任务。**没设截止时间的不会出现在日历上** —— 见 `labels.footnote`。 */
   readonly tasks: readonly Task[];
-  /**
-   * 日历的**第二个事件源**（W6）：当天落得的倒数日 / 纪念日 / 生日 / 节日。
-   *
-   * 🔴 **必填**，不是可选 —— 理由写在 `model.ts#calendarCellBars` 的 `events` 那一段：
-   * 一条"默认值等于空数组"的可选 prop 会把"宿主根本没接"伪装成"这天没有倒数日"，
-   * 而 typecheck 与既有门禁两边都不响（AGENTS §7 第 195 条）。宿主没有数据时给 `[]`。
-   *
-   * ⚠️ 传**未过滤的全量还是筛过的**由宿主决定，但只该筛一次：
-   * `@heyta/app-host` 的 `listEvents(today)` 已经剥掉删除与归档，
-   * 板子里再判一遍 `deletedAt` 就是两套口径。
-   */
-  readonly events: readonly CountdownEvent[];
   /** 今天的本地日历日。 */
   readonly today: LocalDate;
   /** 正在显示的月份（用该月里任意一天表示）。 */
@@ -182,6 +158,27 @@ export interface CalendarBoardProps {
    *    `apps/web/tests/calendar-view.spec.tsx` 同族的 ui 侧判据）。
    */
   readonly dayMarkerLabels?: Readonly<{ off: string; work: string }> | undefined;
+  /**
+   * 日历的**第二个日期数据源**（批次二 W6）：倒数日 / 纪念日。
+   *
+   * 🔴 **默认 `undefined` ⇒ 一条都不画**。这块板子原本只有一个源
+   * （`groupTasksByDueDate` 里那句 `if (task.dueDate === undefined) continue;`），
+   * 而倒数日**没有 `dueDate` 这个字段** —— 宿主不传它，倒数日在日历上就是零存在，
+   * 传了才有。判据不是"共享组件支持了"，是**宿主真的传了**（见
+   * `apps/web/tests/calendar-event-source.spec.tsx` 与 `e2e/tests/countdown-calendar.spec.ts`）。
+   *
+   * ⚠️ 传**全量活的事件**（未归档、未删除），不要预先按可见月筛：
+   *   哪几天落在这一屏由 `groupEventsByOccurrence` 算，宿主筛一遍就是第二份数学。
+   */
+  readonly events?: readonly CountdownEvent[] | undefined;
+  /**
+   * 上面那些条**怎么写**（"还有 N 天 / 就是今天 / 已经 N 天"那一档字，宿主的词条表给）。
+   *
+   * ⚠️ 不给时倒数日那一行只剩标题 —— 与 `dayMarkerLabels` 同一条理由：
+   *   共享层不 import i18n（会拖进第二份 React），而"看不出这是个好日子"
+   *   是能被测出来的，不是靠约定。
+   */
+  readonly eventLabels?: CalendarEventBarLabels | undefined;
 }
 
 /**
@@ -308,7 +305,11 @@ function DayCell({
       {bars.map((bar) => (
         <View
           key={bar.id}
-          testID={`${testIDOf(date)}-bar`}
+          /* 🔴 倒数日那条**换名字**（`-event` 而不是 `-bar`）：判据要能单独问
+             "这格里有没有那个日子"。共用一个名字的话，"宿主没接第二个源"
+             会被"任务条画出来了"读成通过 —— 那条"默认值等于原行为的可选 prop
+             会把没接伪装成做完了"的教训（§9.1）就是这么个形状。 */
+          testID={`${testIDOf(date)}-${bar.event === true ? 'event' : 'bar'}`}
           style={[styles.bar, { gap: tokens['space.1'] }]}
         >
           <View
@@ -332,7 +333,7 @@ function DayCell({
             /* 🔴 标题**自己带一个 testID**：RN-web 里 `Text` 和 `View` 都渲染成 `<div>`，
                判据要是靠"条里第一个 div"会正好抓到那根**没有字的色条**，
                量到的颜色跟"字读不读得出"毫无关系（这条真错过一次）。 */
-            testID={`${testIDOf(date)}-bar-title`}
+            testID={`${testIDOf(date)}-${bar.event === true ? 'event' : 'bar'}-title`}
             style={[
               text['row-meta'],
               styles.barTitle,
@@ -371,7 +372,6 @@ const testIDOf = (date: LocalDate): string => `calendar-cell-${date}`;
 
 export function CalendarBoard({
   tasks,
-  events,
   today,
   cursor,
   selected,
@@ -390,6 +390,8 @@ export function CalendarBoard({
   toolbarTrailing,
   dayMarker,
   dayMarkerLabels,
+  events,
+  eventLabels,
 }: CalendarBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -404,20 +406,58 @@ export function CalendarBoard({
   );
   /** 周次列只在月视图有意义：那一列就是"第几周"，而周视图整屏只有**一个**周。 */
   const showWeekNumber = view === 'month' && labels.weekNumber !== undefined;
-  const dayTasks = byDate.get(selected) ?? [];
 
-  /*
-   * 第二个事件源（W6）：把倒数日分到**屏幕上这一段格子**里。
+  /**
+   * 倒数日摊到**这一屏看得见的区间**上（W6）。
    *
-   * 🔴 区间怎么推、要不要含住选中那天，全在 `groupEventsForGrid`（Web 侧栏那张
-   *   迷你月历用的是同一个）—— 板子里再写一遍"这段是哪几天"就是第二套口径，
-   *   而它的症状是"主区格子有那条生日，侧栏那颗点没有"。
+   * 🔴 区间取自 `weeks` 的首格与末格，不是"游标那个月的 1 号到月末"：
+   *   月历是 6 行 42 格，含上月与下月的补白格，而那些格子**照样可点、照样该显示**。
+   *   按整月算的话，"5 月 3 日"那条纪念日在 10 月那屏的补白列里不会出现 ——
+   *   少画的是**看得见的格子**，这种缺陷只有对着屏幕才看得出来。
+   *
+   * ⚠️ `events` 没给 ⇒ 整块是 `undefined`，一次投影都不做（不是"投影成空"）。
    */
-  const eventsByDate = useMemo(
-    () => groupEventsForGrid(events, weeks, selected),
-    [events, weeks, selected],
-  );
-  const dayEvents = eventsByDate.get(selected) ?? [];
+  const eventsByDate = useMemo(() => {
+    if (events === undefined) return undefined;
+    const first = weeks[0]?.[0]?.date;
+    const lastWeek = weeks[weeks.length - 1];
+    const last = lastWeek?.[lastWeek.length - 1]?.date;
+    if (first === undefined || last === undefined) return undefined;
+    return groupEventsByOccurrence(events, today, first, last);
+  }, [events, today, weeks]);
+  const dayTasks = byDate.get(selected) ?? [];
+  /**
+   * 选中那天的倒数日（W6）。
+   *
+   * 🔴 **必须与格子同源**：格子里画了一条「妈妈生日 · 还有 3 天」，点进那一天却
+   * 得到「0 件 · 这天没有安排」，读起来就是"点错了"或"数据没了"。而这块的
+   * 数据**已经在 `eventsByDate` 里**（`selected` 一定落在可见网格里，
+   * `pickDay` 会把游标跟过去），所以这里只是**同一次投影的第二个消费者**，
+   * 不是第二份数学 —— 再走一遍 `eventOccurrencesInRange` 才会真的漂。
+   */
+  const dayEvents = eventsByDate?.get(selected) ?? [];
+  /**
+   * 日档那一屏的倒数日（W6）。
+   *
+   * 🔴 取的是**游标**那天，不是 `selected`：日档渲染的全是游标（`day={cursor}`，
+   * 理由见下面那一处），跟着 selected 走就会在宿主没同步两者时画出
+   * "标题写 3 号、带里是 5 号的日子"。
+   * ⚠️ 游标那天一定在 `eventsByDate` 的区间里（`monthGrid(cursor)` 覆盖整月），
+   *   所以这里仍是**同一次投影的第三个消费者**，没有第二份日期算术。
+   */
+  const dayBoardEvents = eventsByDate?.get(cursor) ?? [];
+  /**
+   * 年档 12 张月卡里**有倒数日的那些天**（W6）。
+   *
+   * 🔴 只在 `view === 'year'` 时算：年档的区间是**整年**，把每条重复规则展开 365 天
+   *   是一份真实的开销，挂在月档/周档每次渲染上都算"为了没画的东西付账"。
+   * 传出去的是**日期集合**而不是事件 —— 年档一格只有一个点，没有标题也没有天数可写。
+   */
+  const yearEventDates = useMemo<ReadonlySet<LocalDate> | undefined>(() => {
+    if (events === undefined || view !== 'year') return undefined;
+    const { from, to } = yearRangeOf(cursor);
+    return new Set(groupEventsByOccurrence(events, today, from, to).keys());
+  }, [events, today, cursor, view]);
 
   /**
    * 点某一天。
@@ -468,10 +508,8 @@ export function CalendarBoard({
           {view === 'year' ? (
             <CalendarYearBoard
               tasks={tasks}
-              // 🔴 年档**自己**按它那一段（整年 12 张月卡的并集）枚举倒数日：
-              //   这里传的是全量 `events`，不是上面那份按月网格切出来的 map ——
-              //   把月档的区间塞给年档，症状是"只有 10 月那两格有生日，2 月没有"。
-              events={events}
+              /* 年档也要认得这一天：否则切到年视图，整年那些纪念日一个点都不画。 */
+              eventDates={yearEventDates}
               today={today}
               // 🔴 与日档同一条理由：年档渲染的也是**游标**（`‹ ›` / 滚轮写的都是它）。
               year={cursor}
@@ -482,9 +520,9 @@ export function CalendarBoard({
           ) : (
             <CalendarDayBoard
               tasks={tasks}
-              // 🔴 日档那一天的倒数日由**日档自己**取（`day={cursor}` 才是它渲染的那天），
-              //   不读月档那份按网格切的 map。
-              events={events}
+              /* 倒数日（W6）：日档也要有，否则"切到日视图，那条纪念日就凭空消失"。 */
+              events={dayBoardEvents}
+              eventLabels={eventLabels}
               // 🔴 日档渲染的是**游标**：`‹ ›`、滚轮、横向拖拽写的都是游标，
               //   渲染 selected 的话宿主一旦没同步，箭头就"点了没反应"。
               //   宿主侧那条"游标与选中同一天"由 `cursorFor` / `setCursor` 保证
@@ -566,11 +604,12 @@ export function CalendarBoard({
               const cellTasks = byDate.get(cell.date) ?? [];
               const { bars, hidden } = calendarCellBars(
                 cellTasks,
-                eventsByDate.get(cell.date) ?? [],
                 today,
                 cell.date,
                 // 档位决定"这一格画得下几条"（理由见常量本身）。
                 view === 'week' ? MAX_WEEK_CALENDAR_BARS : MAX_CALENDAR_BARS,
+                eventsByDate?.get(cell.date),
+                eventLabels,
               );
               return (
                 <DayCell
@@ -580,10 +619,7 @@ export function CalendarBoard({
                   inMonth={cell.inMonth}
                   isToday={cell.date === today}
                   isSelected={cell.date === selected}
-                  /* 档位色由**两个来源**一起说（规则本体在 `calendarDayTone`，
-                     这里不再判一遍）：倒数日能把"空着的一天"说成"有安排的一天"，
-                     但永远不说成"逾期"。 */
-                  tone={calendarDayTone(cellTasks, eventsByDate.get(cell.date) ?? [], today, cell.date)}
+                  tone={calendarDayTone(cellTasks, today, cell.date)}
                   bars={bars}
                   hidden={hidden}
                   labels={labels}
@@ -603,13 +639,9 @@ export function CalendarBoard({
         <Text style={[text['section-title'], styles.dayTitle]} testID={`${testID}-day-title`}>
           {labels.dayTitle(selected)}
         </Text>
-        {/*
-          🔴 这个数是**两个来源合起来**的：`dayTasks.length + dayEvents.length`。
-          格子里那条读屏标签（`barCount`）数的也是这两样 —— 一边数任务、一边数
-          "任务+倒数日"，就是同一屏两套口径，而它的症状是"格子上写着 3 件事，
-          点开这块写着 2"。倒数日能上日历这件事，界面上唯一说得出来的地方就是这两个数。
-        */}
         <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
+          {/* 这一天**有几条**，两个源都算：只数任务的话，格子里那条倒数日
+              在这个数字上就凭空消失了（而下面已经给它留了行）。 */}
           {dayTasks.length + dayEvents.length}
         </Text>
       </View>
@@ -639,17 +671,20 @@ export function CalendarBoard({
               />
             )}
             {/*
-              倒数日走**另一行**，不是塞进上面那份 `TaskList`（理由见
-              `CalendarEventRow.tsx` 文件头：那里有复选框、有截止槽、有"完成"这个动作，
-              而一条生日三样都没有）。
-              ⚠️ 它**不可点**：共享板没有"打开某条倒数日"的端口，
-              挂一个什么都不做的 `Pressable` 就是 §9.3 禁的那种控件。
+              倒数日行（W6）。排在任务**下面**是刻意的：任务是"今天要做的"，
+              倒数日是"这一天为什么值得记"，把后者排在前面会让人以为它是待办。
+              🔴 JSX 只有一份（`CalendarEventRow`）—— 日档那条「全天」带要的是同一行，
+              各写一份就是"同一行在不同容器里不同高度"，正是本目录文件头那条
+              「不是三份 JSX」要拦的事。日期算术与措辞也都不在这一层（`model.ts`）。
             */}
-            {dayEvents.length === 0 ? null : (
-              // 行锚点是 `${testID}-<event.id>`（容器与行共用这一串前缀，
-              // 取行用后缀匹配、取容器用精确匹配 —— 与格子里 `-bar` / `-bar-title` 同一套命名）。
-              <CalendarEventRowList events={dayEvents} testID={`${testID}-day-events`} />
-            )}
+            {dayEvents.map((event) => (
+              <CalendarEventRow
+                key={event.id}
+                event={event}
+                labels={eventLabels}
+                testID={`${testID}-day-event-${event.id}`}
+              />
+            ))}
           </>
         )}
       </View>

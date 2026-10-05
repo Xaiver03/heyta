@@ -1,38 +1,30 @@
 /**
- * W6：倒数日（`EVENT`）是日历的**第二个事件源**
- * ==============================================
+ * 日历的第二个数据源在 **Web 这一端真的接上了吗**（批次二 W6）
+ * ==========================================================
  *
- * 这个文件只钉一件事，而它是整单的立论：
+ * ## 这个文件防的是什么
  *
- * > 🔴 **一条没有截止日的倒数日也能上日历。**
+ * `CalendarBoard` 这轮拿到的是**两个默认值等于原行为的可选 prop**
+ * （`events?` / `eventLabels?`）。这种形状有一种非常具体的假绿：
  *
- * 为什么这一句需要**宿主级**的证据（而不只是 `packages/ui/tests/calendar-cell-bars.spec.ts`
- * 那批模型判据）：模型层能证明"给它一个事件数组它会出条"，但它证明不了
- * **宿主真的把事件数组递过来了**。所以这里挂真 `<App/>`、走真 op-log、
- * 用产品自己的写入口 `useCountdownStore.addEvent(...)` 建那条倒数日，然后断言
- * **一件任务都不存在**（`useTaskStore` 里 0 条）时格子里已经画出了它 ——
- * 于是"画出来"只剩一个可能来源。
+ * > 共享层测试全绿（`packages/ui/tests/calendar-event-source.spec.ts` 11 条），
+ * > 因为共享层**支持**了；而宿主一行没接 ⇒ 界面上一个倒数日都没有，
+ * > 而没有任何一层会失败。
  *
- * ## 为什么这里不需要"给它补一个 dueDate"
+ * 所以这里的判据全部是**挂载真 `App`、写真 op、看渲染出来的 DOM**，
+ * 字符串在源码里出现过不算。另附一条同族的：侧栏那份迷你月历原先
+ * **不跟着画「休 / 班」**（W4b 当场发现、当场登记给 W6），这里一并钉住。
  *
- * `CountdownEvent` 这个类型**没有** `dueDate` 这个键。任务那条聚合
- * （`model.ts#groupTasksByDueDate`）的第一句就是 `if (task.dueDate === undefined) continue`，
- * 倒数日**接不进**那条 `if` —— 它走的是 `groupEventsForGrid` 那份区间枚举。
- * 所以这条判据不是"配了个开关让它显示"，是"两个源各有其路"。
- * 变异臂正是拿这句话去问代码：把事件源改成"有截止时间才显示"，本文件第一条必须红。
+ * 🔴 **四个档位逐个有一条**（月格 / 选中那天的清单 / 日档全天带 / 年档那个点）：
+ * 共享板现在有四块屏吃同一个 `events`，只测月档的话，"切到日视图那条日子就没了"
+ * 这一类缺陷不会有任何一层失败 —— 而它和"宿主根本没接"在界面上是同一张图。
  *
- * ## 顺带钉住的四条宿主契约
+ * ## 断言口径
  *
- * 1. **`events` 是必填 prop**：`CalendarBoard` 少传它，`pnpm -r typecheck` 当场红
- *    （§7 第 195 条 —— "默认值等于原值的可选 prop"会把"宿主根本没接"伪装成
- *    "这天没有倒数日"，而界面上这两种情况长得一模一样）。
- * 2. **两块面共用一份分桶**：主网格与侧栏那张迷你月历，同一天必须同时有东西。
- * 3. **当天那个数字是 tasks + events**：只数任务的那个数字现在是**错的**，
- *    而它错得难看 —— 格子里明明有一条，标题旁边写着 0。
- * 4. **日档里它落在"全天带"**：倒数日没有"几点"，落进小时轴等于替用户发明一个时刻。
- *
- * ⚠️ 颜色与几何（那颗点是不是主蓝、条有没有被裁一半）**不在这里**：jsdom 里所有
- *   rect 都是 0（§7 元规则 2）。那两条由真浏览器套件与 §6.2 规定一的截图复核负责。
+ * · **存在性先于取值**：先问"那一格有没有倒数日行"，再问它写了什么；
+ * · 那一天**一条任务都没有**（夹具里没有 dueDate），所以那一行的出现
+ *   本身就是"第二个源"的证据，而不是任务条的副产物；
+ * · 词表由宿主注入 ⇒ 行里必须出现"还有 N 天"，只出现标题就是宿主没接上。
  */
 
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
@@ -40,15 +32,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { FULL_SCOPE, addDays, toLocalDate, type LocalDate } from '@heyta/domain';
-import { formatDayTitleText } from '@heyta/ui';
-/**
- * 🔴 期望串一律从**词条表**取，不在这里抄任何一句界面文字
- *   （与 `calendar-day-view.spec.tsx` 同一条纪律：抄进测试的第二份从改名那天起就开始漂）。
- */
-import { translate, zhCN, type I18nValue, type Locale } from '@heyta/i18n';
-
-import { enableModules } from './enable-all-modules.js';
+import './enable-all-modules.js';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
@@ -56,18 +40,17 @@ import { enableModules } from './enable-all-modules.js';
 const { App } = await import('../src/App.js');
 const { LocaleHost } = await import('../src/lib/locale-host.js');
 const { __resetOpLogForTests, initOpLog } = await import('../src/lib/oplog.js');
-const { applyLocale } = await import('../src/lib/locale.js');
 const { useTaskStore } = await import('../src/features/tasks/store.js');
-const { useCalendarViewStore } = await import('../src/features/calendar/store.js');
 const { useCountdownStore } = await import('../src/features/countdown/store.js');
-
-const t: I18nValue['t'] = (key, vars) => translate('zh-CN', key, vars);
+const { useCalendarViewStore } = await import('../src/features/calendar/store.js');
+const { addDays, startOfMonth, toLocalDate, adjustmentOn, installHolidayAdjustmentOverrides } =
+  await import('@heyta/domain');
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
-/** 每个用例一个独立库名：共用库会让上一例写的倒数日活在这一例的格子里。 */
 let dbName: string;
-let today: LocalDate;
+/** 每个用例一个独立库名：上一个用例建的倒数日会漏进下一个（症状是"多出一行"）。 */
+let caseSeq = 0;
 
 async function flush(): Promise<void> {
   await act(async () => {
@@ -76,28 +59,7 @@ async function flush(): Promise<void> {
   });
 }
 
-function need<T extends HTMLElement = HTMLElement>(testId: string): T {
-  const el = container!.querySelector<T>(`[data-testid="${testId}"]`);
-  expect(el, `找不到 [data-testid="${testId}"]`).not.toBeNull();
-  return el!;
-}
-
-/** 轮询"这条倒数日真的落库并进 store 了"（固定两次 tick 在负载下会读到上一轮，§7 第 149 条）。 */
-async function waitEvent(title: string): Promise<string> {
-  const deadline = Date.now() + 5000;
-  for (;;) {
-    await flush();
-    const found = useCountdownStore.getState().events.find((e) => e.title === title);
-    if (found !== undefined) return found.id;
-    if (Date.now() > deadline) throw new Error(`等不到倒数日「${title}」落库`);
-    await new Promise((r) => setTimeout(r, 20));
-  }
-}
-
-async function mount(locale: Locale = 'zh-CN'): Promise<void> {
-  // 🔴 语言的**来源**要写清楚：jsdom 的 `navigator.language` 恰好是 `en-US`，
-  //   用它来证明"界面是中文"测的是环境不是产品。走产品自己的写入口 `applyLocale`。
-  applyLocale(locale);
+async function mount(): Promise<void> {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -112,59 +74,38 @@ async function mount(locale: Locale = 'zh-CN'): Promise<void> {
 }
 
 async function openCalendar(): Promise<void> {
-  const label = zhCN['web.shell.modules.calendar.label'];
   const tab = [...(container?.querySelectorAll<HTMLButtonElement>('button[role="tab"]') ?? [])].find(
-    (b) => b.textContent?.trim() === label,
+    (b) => b.textContent?.trim() === '日历',
   );
-  expect(tab, `rail 上找不到「${label}」`).toBeDefined();
+  expect(tab, 'rail 上找不到「日历」—— 这一页就不存在').toBeDefined();
   await act(async () => {
     tab!.click();
   });
   await flush();
 }
 
-/** 用页头那个档位下拉切档（**不**直接 setState —— 要验的就是入口真的接通）。 */
-async function selectView(view: 'day' | 'year'): Promise<void> {
-  const select = need<HTMLSelectElement>('calendar-view-select');
-  await act(async () => {
-    select.value = view;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await flush();
+/** 事件 id 由 op-log 生成，用例里不猜：按标题从 store 读回来。 */
+function eventIdOf(title: string): string {
+  const found = useCountdownStore
+    .getState()
+    .events.find((event) => event.title === title);
+  expect(found, `夹具里没找到「${title}」`).toBeDefined();
+  return found!.id;
 }
-
-/** 走产品入口建一条倒数日并等它进 store。 */
-async function addEvent(title: string, date: LocalDate): Promise<string> {
-  await act(async () => {
-    await useCountdownStore.getState().addEvent(title, date);
-  });
-  return waitEvent(title);
-}
-
-const miniCell = (date: LocalDate): HTMLElement => need(`calendar-mini-day-${date}`);
-const miniDotCount = (date: LocalDate): number =>
-  miniCell(date).querySelectorAll('.ht-sidebar__day-dots > i').length;
 
 beforeEach(async () => {
   __resetOpLogForTests();
   localStorage.clear();
-  // 🔴 关掉的模块根本不进 DOM，"找不到日历"会报成 `expect(null).not.toBeNull()`
-  //    （`enable-all-modules.ts` 文件头记的就是这个）。
-  enableModules(['calendar']);
-  dbName = `calendar-event-source-${Math.random().toString(36).slice(2)}`;
+  caseSeq += 1;
+  dbName = `calendar-events-${String(caseSeq)}-${Math.random().toString(36).slice(2)}`;
   await initOpLog(dbName);
-  today = toLocalDate(Date.now());
+  const today = toLocalDate(Date.now());
   useTaskStore.setState({ now: Date.now() });
   useCalendarViewStore.setState({
-    cursor: today,
+    cursor: startOfMonth(today),
     selected: today,
-    scope: FULL_SCOPE,
     view: 'month',
-    captureOpen: false,
   });
-  // 🔴 每个用例从"没有任何倒数日"起算：store 是模块级的，上一例写的那条会活在这一例里，
-  //   而"格子里只有一条"这种断言就会变成对着两条数据打分。
-  useCountdownStore.setState({ events: [], archivedEvents: [] });
 });
 
 afterEach(() => {
@@ -172,126 +113,218 @@ afterEach(() => {
     root?.unmount();
   });
   container?.remove();
-  container = undefined;
   root = undefined;
+  container = undefined;
 });
 
-describe('🔴 核心判据：没有截止日的倒数日也能上日历', () => {
-  it('一条倒数日、零条任务：今天的格子里已经有了它', async () => {
+describe('倒数日进日历（Web 宿主接线）', () => {
+  it('🔴 一条没有截止日的倒数日出现在它那一格（那一天没有任何任务）', async () => {
     await mount();
     await openCalendar();
-    await addEvent('妈妈生日', today);
 
-    // 排他证据：这个库里**一条任务都没有**。于是"格子里出现了字"不可能是任务那条路。
-    expect(Object.keys(useTaskStore.getState().entities.tasks)).toHaveLength(0);
-    expect(need(`calendar-cell-${today}-bar-title`).textContent).toBe('妈妈生日');
-  });
-
-  it('同一条倒数日在**当天那块**也有自己的一行（不是只出现在格子里）', async () => {
-    await mount();
-    await openCalendar();
-    const id = await addEvent('结婚纪念日', today);
-
-    expect(need(`calendar-board-day-events-${id}-title`).textContent).toBe('结婚纪念日');
-    // 只画一遍：同一条不许在当天那块出现两次。
-    expect(
-      container!.querySelectorAll('[data-testid^="calendar-board-day-events-"]').length,
-    ).toBe(2); // 行 + 行里的标题各一个锚点
-    expect(
-      container!.querySelectorAll('[data-testid="calendar-board-day-events-' + id + '"]'),
-    ).toHaveLength(1);
-  });
-
-  it('🔴 当天标题旁边那个数字数的是**任务 + 倒数日**（只数任务的那个数字在说谎）', async () => {
-    await mount();
-    await openCalendar();
-    await addEvent('发布倒数', today);
+    const today = toLocalDate(Date.now());
+    const day = addDays(today, 5);
+    let ok = false;
     await act(async () => {
-      await useTaskStore.getState().addTask('顺手一条任务', { dueDate: Date.now() });
+      ok = await useCountdownStore.getState().addEvent('结婚纪念日', day);
     });
+    expect(ok, '倒数日没落库 —— 后面的断言都不用看').toBe(true);
+    await flush();
 
-    const count = need('calendar-board-day-title').parentElement?.lastElementChild;
-    expect(count?.textContent, '当天那个数字没把倒数日算进去').toBe('2');
-  });
-
-  it('反面（阳性对照）：既没任务也没倒数日的那一格一条都不画', async () => {
-    await mount();
-    await openCalendar();
-    const far = addDays(today, 20);
-    expect(container!.querySelector(`[data-testid="calendar-cell-${far}-bar"]`)).toBeNull();
-  });
-});
-
-describe('两块面共用同一份分桶（各自推一遍区间，迟早有一处漏）', () => {
-  it('🔴 主网格画了它的那天，侧栏那张迷你月历**同一天**也要有那颗点', async () => {
-    await mount();
-    await openCalendar();
-    await addEvent('外婆生日', today);
-
-    expect(need(`calendar-cell-${today}-bar-title`).textContent).toBe('外婆生日');
+    // 那一天**没有任何任务**：这一行只可能来自第二个源。
     expect(
-      miniDotCount(today),
-      '主网格有那条倒数日、侧栏那颗点却没有 —— 两处各自数了一遍',
-    ).toBeGreaterThan(0);
+      container!.querySelector(`[data-testid="calendar-cell-${day}-bar"]`),
+      '夹具前提不成立：那天出现了任务条，这一行就证明不了第二个源',
+    ).toBeNull();
+
+    const row = container!.querySelector(`[data-testid="calendar-cell-${day}-event"]`);
+    expect(row, `那一格里没有倒数日行（${day}）`).not.toBeNull();
+    const title = container!.querySelector(`[data-testid="calendar-cell-${day}-event-title"]`);
+    expect(title?.textContent, '行里必须有一个字可读').toContain('结婚纪念日');
   });
 
-  it('侧栏那个读屏名也把它数进去了（有倒数日时不许说"这天没有安排"）', async () => {
+  it('🔴 那一行说的是"还有 N 天"—— 宿主注入的词表真的接上了', async () => {
     await mount();
     await openCalendar();
-    await addEvent('搬家倒数', today);
 
-    expect(miniCell(today).getAttribute('aria-label')).toBe(
-      t('web.calendar.a11y.dayWithTasksOne', { date: formatDayTitleText(today, t), count: 1 }),
-    );
-    // 阳性对照：同一张迷你月历里**没有**东西的那一天还是那句"没有安排"。
-    // 少了这一句，上面那条会因为侧栏把每天都写成"有 1 件"而照样绿。
-    const empty = [...container!.querySelectorAll<HTMLElement>('[data-testid^="calendar-mini-day-"]')]
-      .map((el) => el.dataset.testid!.replace('calendar-mini-day-', ''))
-      .find((date) => date !== today);
-    expect(empty).toBeDefined();
-    expect(miniCell(empty as LocalDate).getAttribute('aria-label')).toBe(
-      t('web.calendar.a11y.dayNoTasks', { date: formatDayTitleText(empty as LocalDate, t) }),
-    );
-  });
-});
-
-describe('日档、年档与"每年重复"：倒数日落在它该在的形状里', () => {
-  it('🔴 日档里它在**全天带**（倒数日没有"几点"，落进小时轴等于发明一个时刻）', async () => {
-    await mount();
-    await openCalendar();
-    const id = await addEvent('体检倒数', today);
-    await selectView('day');
-
-    expect(need(`calendar-board-day-all-day-events-${id}-title`).textContent).toBe('体检倒数');
-    // 而且它**只**在全天带：24 行小时轴里不许出现这条标题。
-    expect(need('calendar-board-day-axis').textContent ?? '').not.toContain('体检倒数');
-  });
-
-  it('🔴 锚在 25 年前、每年重复：今年这一格照样有它（任务那条聚合做不到这件事）', async () => {
-    await mount();
-    await openCalendar();
-    const id = await addEvent('每年生日', today);
-    // 走产品自己的写入口把它变成"锚在 2001 年 + 每年"（`yearly` 的 RRULE 由宿主构造，
-    // 测试里不手拼规则串 —— 词表是业务语义，展示层给不出也不该给出一条规则串）。
-    const anchor = `2001-${today.slice(5)}` as LocalDate;
+    const day = addDays(toLocalDate(Date.now()), 5);
     await act(async () => {
-      await useCountdownStore.getState().patchEvent(id, { date: anchor, yearly: true });
+      await useCountdownStore.getState().addEvent('搬家', day);
     });
     await flush();
 
-    expect(useCountdownStore.getState().events[0]?.recurrence).toBeDefined();
-    expect(need(`calendar-cell-${today}-bar-title`).textContent).toBe('每年生日');
+    const title = container!.querySelector(`[data-testid="calendar-cell-${day}-event-title"]`);
+    // 只出现标题 = 共享层画了而宿主没给词表（`calendarEventBarTitle` 的默认分支）。
+    expect(title?.textContent, '宿主没注入 eventLabels').toContain('还有 5 天');
   });
 
-  it('年档那块板也认第二个源：12 张缩略卡里的点不是另一套数', async () => {
+  it('归档的倒数日不进日历（面板不显示的东西，日历也不许显示）', async () => {
     await mount();
     await openCalendar();
-    await addEvent('结婚周年', today);
-    await selectView('year');
+
+    const day = addDays(toLocalDate(Date.now()), 6);
+    await useCountdownStore.getState().addEvent('要归档的日子', day);
+    await flush();
+    expect(
+      container!.querySelector(`[data-testid="calendar-cell-${day}-event"]`),
+      '前置条件：未归档时那一格就该有它',
+    ).not.toBeNull();
+
+    const entityId = useCountdownStore
+      .getState()
+      .events.find((event) => event.title === '要归档的日子')!.id;
+    await act(async () => {
+      await useCountdownStore.getState().archive(entityId);
+    });
+    await flush();
 
     expect(
-      container!.querySelector(`[data-testid="calendar-board-year-day-${today}-dot"]`),
-      '年档没把这条倒数日画进点里',
+      container!.querySelector(`[data-testid="calendar-cell-${day}-event"]`),
+      '归档之后日历上还挂着它',
+    ).toBeNull();
+  });
+
+  it('🔴 侧栏那份迷你月历也画「休 / 班」（W4b 欠 W6 的那半）', async () => {
+    const today = toLocalDate(Date.now());
+    const offDay = addDays(today, 2);
+    const year = Number(offDay.slice(0, 4));
+    installHolidayAdjustmentOverrides([{ year, offDays: [offDay], workDays: [] }]);
+    expect(adjustmentOn(offDay), '夹具前提：覆盖表没装上，这条判据就成了空转').toBe('off');
+
+    await mount();
+    await openCalendar();
+
+    const marker = container!.querySelector(`[data-testid="calendar-mini-marker-${offDay}"]`);
+    expect(marker, '主区画了而侧栏没画 —— 同一屏两份说法').not.toBeNull();
+    expect(marker?.textContent).toBe('休');
+  });
+
+  /*
+    🔴 下面三条是同一件事的三个面：**四个档位都得认得第二个源**。
+    只接月档那种"看得见就算做完"的形状本仓记过很多次 ——
+    切到日视图/年视图，那条纪念日凭空消失，而共享层的测试仍然是全绿的
+    （它测的是那块板**支持**，不是这一屏**画了**）。
+  */
+
+  it('🔴 点进那一天，下面的清单里也有这一行（不是"这天没有安排"）', async () => {
+    await mount();
+    await openCalendar();
+
+    const day = addDays(toLocalDate(Date.now()), 5);
+    await act(async () => {
+      await useCountdownStore.getState().addEvent('结婚纪念日', day);
+    });
+    await flush();
+    const id = eventIdOf('结婚纪念日');
+
+    // 走真路径点那一格（`pickDay` 会同时把选中与游标跟过去）。
+    const cell = container!.querySelector<HTMLElement>(`[data-testid="calendar-cell-${day}"]`);
+    expect(cell, `那一格没找到（${day}）`).not.toBeNull();
+    await act(async () => {
+      cell!.click();
+    });
+    await flush();
+
+    // 前提：那天没有任何任务 ⇒ 清单里出现的只可能是倒数日。
+    expect(
+      container!.querySelector('[data-testid="calendar-board-day-list"]'),
+      '前提不成立：清单里出现了任务',
+    ).toBeNull();
+    expect(
+      container!.querySelector('[data-testid="calendar-board-day-empty"]'),
+      '格子里有那条日子，点进去却说"这天没有安排"',
+    ).toBeNull();
+
+    const row = container!.querySelector(`[data-testid="calendar-board-day-event-${id}-title"]`);
+    expect(row, '选中那天的清单里没有倒数日行').not.toBeNull();
+    expect(row?.textContent).toContain('结婚纪念日');
+    expect(row?.textContent, '行里没把天数说出来（宿主词表没接到这一屏）').toContain('还有 5 天');
+  });
+
+  it('🔴 日档：那一天摊开成全天带时，倒数日也在那一带', async () => {
+    await mount();
+    await openCalendar();
+
+    const day = addDays(toLocalDate(Date.now()), 5);
+    await act(async () => {
+      await useCountdownStore.getState().addEvent('搬家', day);
+    });
+    await flush();
+    const id = eventIdOf('搬家');
+
+    // 日档渲染的是**游标**，所以这里写游标（宿主那条同步由 store 保证）。
+    await act(async () => {
+      useCalendarViewStore.setState({ view: 'day', cursor: day, selected: day });
+    });
+    await flush();
+
+    const band = container!.querySelector('[data-testid="calendar-board-day-all-day"]');
+    expect(band, '没有「全天」那条带 —— 这一档根本没渲染').not.toBeNull();
+
+    const row = container!.querySelector(
+      `[data-testid="calendar-board-day-all-day-event-${id}-title"]`,
+    );
+    expect(row, '切到日视图，那条纪念日就凭空消失了').not.toBeNull();
+    expect(row?.textContent).toContain('搬家');
+    expect(row?.textContent).toContain('还有 5 天');
+
+    /*
+      ⚠️ 那条"这天没有到期的任务"的空态**照旧要在**：它说的是任务，
+      把倒数日算进它的分母就是让一句话去数它没提到的东西。
+      这条断言防的是反过来那次错 —— 有人为了让空态消失把事件并进了 `buckets.allDay`。
+    */
+    expect(
+      container!.querySelector('[data-testid="calendar-board-day-all-day-empty"]'),
+      '全天带的空态被倒数日顶掉了（那句说的是任务）',
     ).not.toBeNull();
+  });
+
+  it('🔴 年档：12 张月卡里那一天有一个点', async () => {
+    await mount();
+    await openCalendar();
+
+    const day = addDays(toLocalDate(Date.now()), 5);
+    await act(async () => {
+      await useCountdownStore.getState().addEvent('外婆生日', day);
+    });
+    await flush();
+
+    // 游标放到**那一天所在的月**，于是这 12 张卡覆盖的一定含它（不依赖今天是几号）。
+    await act(async () => {
+      useCalendarViewStore.setState({ view: 'year', cursor: startOfMonth(day) });
+    });
+    await flush();
+
+    const dot = container!.querySelector(`[data-testid="calendar-board-year-day-${day}-dot"]`);
+    expect(dot, '切到年视图，整年的纪念日一个点都不画').not.toBeNull();
+  });
+
+  it('🔴 侧栏那颗迷你月历也标出这一天（正反两腿：隔壁那天不许有）', async () => {
+    await mount();
+    await openCalendar();
+
+    const today = toLocalDate(Date.now());
+    const day = addDays(today, 5);
+    const neighbour = addDays(today, 6);
+    await act(async () => {
+      await useCountdownStore.getState().addEvent('侧栏也要认得', day);
+    });
+    await flush();
+
+    // 前提：这两天都没有任务 ⇒ 侧栏出现的任何一颗点都只可能来自倒数日。
+    expect(
+      container!.querySelector(`[data-testid="calendar-cell-${day}-bar"]`),
+      '前提不成立：那天有任务',
+    ).toBeNull();
+
+    expect(
+      container!.querySelector(`[data-testid="calendar-mini-dot-${day}"]`),
+      '主区有那条日子，侧栏那一格却说"这天没事"',
+    ).not.toBeNull();
+    // 反向腿：只画正的那一条挡不住"每天都画"（那等于没有信息）。
+    expect(
+      container!.querySelector(`[data-testid="calendar-mini-dot-${neighbour}"]`),
+      '隔壁那天也被标了 ⇒ 这颗点回答的不是"这天有没有"',
+    ).toBeNull();
   });
 });

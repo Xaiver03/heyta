@@ -39,7 +39,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
@@ -268,7 +268,61 @@ if (feedProblems.length > 0) {
   process.exit(1);
 }
 
+/*
+ * **规则三（W6，2026-10-05 22:3x）**：共享日历板那三枚组件的 `events` prop **不许退回可选**。
+ *
+ * 为什么单独立一条：规则二查的是"宿主喂没喂"，它的前提是**那道缝是必填的**。
+ * 一旦有人把它改回 `events?:`（合流时两边各有一份实现，这是最可能被选中的那一份），
+ * 于是：宿主全都还在传 `events` ⇒ **typecheck 一个字都不报**、规则二**照样全绿**
+ * （它查的是 JSX 上有没有 `events={…}`），而"某个新宿主忘了接"从此静默通过。
+ * 一条只在"有人犯错时"才响的判据，等那个错误发生就已经太晚了 —— 所以查**形状本身**。
+ *
+ * 判据按符号锚定（`events?:` 这个成员声明），不按行号、不抄整段文本 ——
+ * 后者会让它成为第二份格式规范，改缩进就红。
+ *
+ * `--seam-dir` 是**取证旋钮**，不是逃生门：默认查真实路径，
+ * 只用来在别处（例如另一条线那份实现的 blob 副本）证明这条判据真的会红。
+ */
+const SEAM_DIR_ARG = process.argv.indexOf('--seam-dir');
+const SEAM_DIR =
+  SEAM_DIR_ARG >= 0 && process.argv[SEAM_DIR_ARG + 1]
+    ? resolve(process.argv[SEAM_DIR_ARG + 1])
+    : join(ROOT, 'packages/ui/src/calendar');
+const SEAM_FILES = ['CalendarBoard.tsx', 'CalendarDayBoard.tsx', 'CalendarYearBoard.tsx'];
+/** 可选成员声明：`events?:` （带不带 `readonly` 都算）。 */
+const OPTIONAL_EVENTS_PROP = /^\s*(?:readonly\s+)?events\?\s*:/m;
+
+const seamProblems = [];
+for (const file of SEAM_FILES) {
+  const path = join(SEAM_DIR, file);
+  if (!existsSync(path)) {
+    // 🔴 文件不在 = 红，不是跳过（§7 第 191 条：挂在文件枚举上的门禁，
+    //    目标被删时会安静地不执行还照样打印通过）。
+    seamProblems.push({ file: relative(ROOT, path), why: '文件不在了 —— 这条判据不能因为改名/删除而静默失效' });
+    continue;
+  }
+  const source = stripComments(readFileSync(path, 'utf8'));
+  if (OPTIONAL_EVENTS_PROP.test(source)) {
+    seamProblems.push({
+      file: relative(ROOT, path),
+      why: '`events` 被声明成了**可选** prop（`events?:`）—— 见本文件规则三那段',
+    });
+  }
+}
+
+if (seamProblems.length > 0) {
+  console.error('❌ 共享日历板的倒数日缝不再是必填 prop（W6 第三条规则）：\n');
+  for (const p of seamProblems) console.error(`   ${p.file}\n      ${p.why}`);
+  console.error(
+    '\n   后果：宿主忘接倒数日时 typecheck 与规则二**都不响**，"这台设备没有倒数日"' +
+      '\n   会被静默画成正常界面。改回 `readonly events: readonly CountdownEvent[];`，' +
+      '\n   没有倒数日就传 `[]`。\n',
+  );
+  process.exit(1);
+}
+
 console.log(
   `✅ ${scanned} 个屏：读物化状态的那些都订阅了 dataRevision；` +
-    `${boardHosts} 个渲染共享日历板的宿主都读了并喂进了倒数日。`,
+    `${boardHosts} 个渲染共享日历板的宿主都读了并喂进了倒数日；` +
+    `${SEAM_FILES.length} 枚共享板组件的 \`events\` 仍是必填。`,
 );

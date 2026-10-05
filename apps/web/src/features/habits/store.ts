@@ -207,3 +207,21 @@ export function selectHeatmap(
 ): ReturnType<typeof habitHeatmap> {
   return habitHeatmap(state.logs, habitId, now, days);
 }
+
+/**
+ * 界面里"现在"的取值缝。
+ *
+ * 🔴 为什么在这里：左列（`HabitsView` 的 7 个点）与面单（`HabitDetailCard` 的 90 天热力图）
+ * 必须用**同一个时刻**，否则同一次渲染里跨午夜会让"列表说打过、窗格说没打"。
+ * 这一单把面单拆成独立组件之后，那句话不再是"显然成立"—— 两边各写一遍
+ * `Number(sessionStorage.getItem('now') ?? Date.now())` 就变成两处可以各自漂移的实现。
+ * 留在数据模块而不是新建一个文件，理由是它和这个 store 一样属于"界面读数据时的口径"，
+ * 而它**不判断任何业务**（与上面那句"转发里一个判断都不能写"同一条纪律）。
+ *
+ * ⚠️ 测试经 `sessionStorage['now']` 钉住同一天（`habits-list-pane.spec.tsx` 的 `NOW`）。
+ */
+export const NOW_STATE_KEY = 'now';
+
+export function readNow(): number {
+  return Number(sessionStorage.getItem(NOW_STATE_KEY) ?? Date.now());
+}

@@ -78,7 +78,8 @@ describe('startCta()：全页唯一的「开始使用」意图', () => {
   it('配置了应用时，指向应用并换成「立即使用」', () => {
     vi.stubEnv('VITE_APP_URL', 'https://example.com/app/');
     const cta = startCta('zh-CN');
-    expect(cta.href).toBe('https://example.com/app');
+    // 尾斜杠被规范化 + 语言随链接带过去（默认语言也带，理由见 app-url.ts 那段）。
+    expect(cta.href).toBe('https://example.com/app?lang=zh-CN');
     expect(cta.labelKey).toBe('landing.cta.useApp');
     // `external` 是渲染处加 `rel="noopener noreferrer"` 的开关，
     // 也是导航是否多一条的开关 —— 它必须为真，否则外链没有 rel。
@@ -105,9 +106,17 @@ describe('startCta()：把落地页的语言带进应用', () => {
     expect(startCta('en').href).toBe('https://example.com/app?lang=en');
   });
 
-  it('默认语言（中文）**不带**参数 —— 不让每条链接都多一段噪音', () => {
+  it('🔴 默认语言（中文）**也**带参数 —— 这条以前是"不带"，前提被 0aa6cb0e 撤掉了', () => {
+    /**
+     * 以前"不带"的理由是"应用没有偏好时本来就是默认语言"。P1-1 给应用的解析链
+     * 加了第三层（`显式存储 > ?lang= > 系统语言`）之后，"没有偏好"不再等于默认语言，
+     * 而是等于访客的浏览器语言 ⇒ 英文浏览器 + 中文落地页 = 点进去变英文。
+     * 线上症状：`live-site/live-domain.spec.ts:96`（"中文落地页 → 应用"）
+     * 等中文输入框超时，截图里应用是英文的。
+     * 带参数不会盖掉回头客自己选过的语言 —— 显式存储排在这个参数前面。
+     */
     vi.stubEnv('VITE_APP_URL', 'https://example.com/app');
-    expect(startCta('zh-CN').href).toBe('https://example.com/app');
+    expect(startCta('zh-CN').href).toBe('https://example.com/app?lang=zh-CN');
   });
 
   it('应用地址自己带查询串时，参数是追加而不是覆盖', () => {
@@ -183,8 +192,8 @@ describe('signInHref()：「登录」直接进应用并打开认证面板', () =
     vi.stubEnv('VITE_APP_URL', 'https://example.com/app/');
     const href = signInHref('en');
     expect(href).toBe('https://example.com/app?lang=en&signin=1');
-    // 默认语言不带 lang，但**必须**带 signin —— 否则英文那条能跳、中文那条不能，
-    // 是最难复现的一种"只在一种语言下坏"。
-    expect(signInHref('zh-CN')).toBe('https://example.com/app?signin=1');
+    // 两种语言**都**带 lang（默认语言那条以前不带，理由见上面那条 it），
+    // 而 signin 必须一直在 —— 否则英文那条能跳、中文那条不能，是最难复现的一种"只在一种语言下坏"。
+    expect(signInHref('zh-CN')).toBe('https://example.com/app?lang=zh-CN&signin=1');
   });
 });
