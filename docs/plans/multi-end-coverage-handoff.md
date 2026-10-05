@@ -3756,8 +3756,8 @@ git grep -ohE 'AGENTS\.md §[0-9]+(\.[0-9]+)*' main -- docs | sort | uniq -c
 
 | 格 | 由谁消 | 命令与判据 |
 |---|---|---|
-| ① 的图 5（Windows 第一屏） | **人**：在 windows-pc 前解锁控制台（20:26 现量 `LogonUI` 在跑 ⇒ `LOCKED=yes`） | 解锁后 `pnpm reinstall:all --only windows`，判据仍是"那张图**人打开看过**"（AGENTS §6.2 规定一），文本侧继续认 `M2D=OK` 五条 |
-| ② 段 85 归属 | 窗口（20:45 现量锁被 pid 88878 活着持有） | BLOCKED **B83** 那条命令（干净载体 checkout main → install → build → 单跑 `@heyta/mobile test`）；绿=装置态、红=提交态报 mobile 线 |
+| ① 的图 5（Windows 第一屏） | **人，两层**：① windows-pc **此刻不可达**（20:47 现量三条通道：ssh rc=255 / `nc -z` rc=1 / ping 100% 丢包；它 20:00 还打得进）② 控制台**还锁着**（20:26 现量 `LogonUI` 在跑 ⇒ `LOCKED=yes`） | 恢复可达 + 解锁后 `pnpm reinstall:all --only windows`，判据仍是"那张图**人打开看过**"（AGENTS §6.2 规定一），文本侧继续认 `M2D=OK` 五条。⚠️ 现在跑会红在"主机不可达"那一格，别读成产品缺陷 |
+| ② 段 85 归属 | 窗口（20:47 现量 `--target b` ⇒ `REDS=src`；锁也被 pid 88878 活着持有过） | BLOCKED **B83/B83.1** 那条命令（干净载体 checkout main → install → build → 单跑 `@heyta/mobile test`）。20:47 已削掉"装置态"一半：两棵树 `apps/mobile/node_modules/vitest` 软链**指向同一枚 `.pnpm` 目录** ⇒ 变换管线不是差异 |
 | Android 判据 4（连续两轮重打） | 窗口 | `~/.heyta-window-rigs/heyta-judge4-two-rounds.sh --go`（判据 3 已在 ① 里取到读数，别重取） |
 | traps 候选 #273–**#292** | 等 `docs/reference/environment-traps.md` 腾开（20:45 现量仍 `M`，正文最大号 303） | 落地时**按写入当时的现量最大号顺延**，别抄 303；#292 = `cp` 不带 `-p` 会毁掉归档里"属于哪一趟"这个唯一可判别属性 |
 

@@ -5489,3 +5489,23 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
   绿 ⇒ 成因在 `7911ad02` 那批的依赖/产物形状（回到本线）；红 ⇒ 报给 mobile 线，本线这条登记随之关闭并注明"不是本线的东西"。
 - 📌 **别把这条读成"② 没跑完"**：② 的两问已分别回答（整条 `&&` 链 exit 0 ❌ / 每段各自读数 ✅ 83/85），
   登记本条只是为了让下一位不把段 85 那枚红随手归给"环境"或"沙箱"。
+
+### B83.1 追加两枚现量（20:43–20:47）：**倾向"所有检出都红"**，而窗口/主机这两格各自又断了
+
+- 🔴 **"只有这棵树红（装置态）"这一种被削掉一半**：两棵树的 `apps/mobile/node_modules/vitest` 软链
+  **指向同一枚 `.pnpm` 目录**（`vitest@5.0.1_@types+node@24.19.0_jsdom@27.4.0_@noble+hashes@2.4.0__vite@8.3.1_@types+no_caae`），
+  而 `vite` / `rolldown` 在两处**都是 MISSING**（同一形状）。⇒ 那 5 枚未处理拒绝所走的**变换管线不是差异**。
+  还剩的判据仍是 B83 那条（干净树 checkout main 单跑 `@heyta/mobile test`）。
+- ⚠️ **起跑资格这轮又掉了一格，而且换了一条腿**：20:47 现量 `verify-mobile-window-gate.sh --target b` ⇒ `REDS=src`
+  （`packages/ apps/ server/` 里有并行会话的未提交改动 ⇒ 窗口**没开**，exit 3，不是产品失败）。
+  所以本线**没有**起任何设备/重装类运行，包括 Android 判据 4。
+- 🔴 **windows-pc 此刻不可达**（三条独立通道各自现量，分母齐）：`ssh … "echo REMOTE_OK"` ⇒ **rc=255** +
+  `connect to host 10.111.127.237 port 22: Operation timed out`；`nc -z -G 5 … 22` ⇒ **rc=1**；
+  `ping -c 2` ⇒ **0 packets received, 100.0% loss**。
+  而它 20:00 还打得进（① 的 Windows 段就是从那儿装出来并回传了 1.68 MB 截图与 `install-capture.txt`）
+  ⇒ 成因在 20:00–20:47 之间（睡眠/网络变更/被搬走），**本线不去猜也不远程唤醒**。
+  ⇒ ① 的图 5 那一格现在有**两层**人都要动的前置：**主机可达** + **控制台解锁**（20:26 现量 `LogonUI` 在跑 ⇒ `LOCKED=yes`）。
+  下一位若跑 `pnpm reinstall:all --only windows`，预期红在"主机不可达"那一格，脚本会如实报因，别把它读成产品缺陷。
+- 📌 顺带一枚自己抓到的探针形状（同族已入册，这里是第二次现量命中）：我第一版探测写成
+  `ssh … | grep -E 'LOCKED='`，输出 `No matches found` 而 `echo $?` 报 **0** —— 那是 `grep`/管道尾部的码，不是 ssh 的。
+  改成"先落盘再单独取 `$?`"才拿到真 255。**判"读不到"之前必须分通道各取一次码**，否则会把"探测坏了"读成"对方状态变了"。
