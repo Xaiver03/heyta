@@ -1022,6 +1022,91 @@ else
   else
     bad "臂32 未按预期 ⇒ 远端对照那一格没拦下来"; printf '%s\n' "$A32" | tail -4 | sed 's/^/      /'
   fi
+
+  # --- 臂33：N 不撞、但**同号写着两条不同的坑** ⇒ 「对得上号」那一格必须拦 ---
+  #     形状来自 §4.05 (61)③ 的真数据：origin/main 末号 283 / 本检出 278，#279–#283 同号不同文。
+  #     臂32 那一格只覆盖"N 恰好撞上"，而那种状态下若本地未提交那批一落地，N 就不撞了 ——
+  #     工具会把这一枚追加进一本**已经重号**的册子，输出看着完全正常。
+  mkdir -p "$FT/rem33/docs/reference"
+  (
+    cd "$FT/rem33" || exit 1
+    git init -q .; git config user.email t@t; git config user.name t
+    mk_traps 3 docs/reference/environment-traps.md
+    git add -A >/dev/null 2>&1; git commit -qm c1
+    git update-ref refs/remotes/origin/main HEAD            # 远端 = 原文 1/2/3
+    T33=$(mktemp); sed 's/^2\. .*/2. 本地那一版/' docs/reference/environment-traps.md > "$T33" && mv "$T33" docs/reference/environment-traps.md
+    git commit -qam c2                                       # 本检出 = #2 改写过；号集合与远端一致 ⇒ N=4 不撞
+    echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
+    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem33/docs/reference/environment-traps.md" --confirm; echo "RC=$?"
+    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+  ) > "${L}.arm33.out" 2>&1
+  A33=$(cat "${L}.arm33.out")
+  if [ "$(rd "$A33" RC)" = "3" ] && [ "$(rd "$A33" DIRTY)" = "0" ] && [ "$(rd "$A33" BEFORE)" = "$(rd "$A33" AFTER)" ] \
+     && printf '%s' "$A33" | grep -q '同号不同文'; then
+    ok "臂33 本地与远端号集合相同、只有 #2 文本分叉（N=4 不与远端撞）⇒ rc=3 且文件未动、红句点名『同号不同文』 ⇒ 重号的册子里它不会再加一枚"
+  else
+    bad "臂33 未按预期 ⇒ rc=$(rd "$A33" RC) 脏=$(rd "$A33" DIRTY) 变没变=$(rd "$A33" BEFORE)/$(rd "$A33" AFTER) 点名=$(printf '%s' "$A33" | grep -c '同号不同文')"; printf '%s\n' "$A33" | tail -4 | sed 's/^/      /'
+  fi
+
+  # --- 臂34：远端有本检出没有的号、而 N 也不撞 ⇒ 同一格另一种形状（missing 分支）---
+  #     🔴 夹具的**前提**自己也要断言：这一臂第一版就是栽在这里 —— `git commit -m c1` 的 c1 是**提交信息**、
+  #     不是 ref，`git checkout c1 -- 文件` 直接 `fatal: invalid reference`，而那一步之后没有 `set -e`，
+  #     于是工作树停留在"远端那版"⇒ 本地=远端 ⇒ missing=0 ⇒ 工具**真的写盘了**，读数 rc=0。
+  #     红的是我的夹具，不是那一格 —— 所以现在把两边的号集合打出来，先证明形状成立再判结果。
+  mkdir -p "$FT/rem34/docs/reference"
+  (
+    cd "$FT/rem34" || exit 1
+    git init -q .; git config user.email t@t; git config user.name t
+    mk_traps 3 docs/reference/environment-traps.md
+    printf '10. 第 10 条\n\n' >> docs/reference/environment-traps.md    # 本检出的号集合 {1,2,3,10} ⇒ N=11
+    git add -A >/dev/null 2>&1; git commit -qm local
+    S_LOCAL=$(git rev-parse HEAD)
+    git update-ref refs/remotes/origin/main HEAD
+    mk_traps 4 docs/reference/environment-traps.md                       # 远端 {1,2,3,4} 再补 10 ⇒ 多一枚 #4
+    printf '10. 第 10 条\n\n' >> docs/reference/environment-traps.md
+    git commit -qam remote
+    git update-ref refs/remotes/origin/main HEAD                         # origin/main = 带 #4 的那版
+    git checkout -q "$S_LOCAL" -- docs/reference/environment-traps.md
+    git commit -qam local-again                                          # 本检出回到不带 #4 的那版，工作树干净
+    echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
+    echo "LNUMS=$(grep -oE '^[0-9]+\.' docs/reference/environment-traps.md | tr -d '.' | tr '\n' ',')"
+    echo "RNUMS=$(git show origin/main:docs/reference/environment-traps.md | grep -oE '^[0-9]+\.' | tr -d '.' | tr '\n' ',')"
+    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem34/docs/reference/environment-traps.md" --confirm; echo "RC=$?"
+    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+  ) > "${L}.arm34.out" 2>&1
+  A34=$(cat "${L}.arm34.out")
+  if [ "$(rd "$A34" LNUMS)" = "1,2,3,10," ] && [ "$(rd "$A34" RNUMS)" = "1,2,3,4,10," ] \
+     && [ "$(rd "$A34" RC)" = "3" ] && [ "$(rd "$A34" DIRTY)" = "0" ] && [ "$(rd "$A34" BEFORE)" = "$(rd "$A34" AFTER)" ] \
+     && printf '%s' "$A34" | grep -q '枚号在本检出里不存在'; then
+    ok "臂34 夹具形状已自证（本地 1,2,3,10 / 远端 1,2,3,4,10，N=11 不撞任何号）⇒ rc=3、文件未动、红句点名『本检出里不存在』⇒ missing 分支独立于臂33 的 clash 分支"
+  else
+    bad "臂34 未按预期 ⇒ 形状=$(rd "$A34" LNUMS)/$(rd "$A34" RNUMS) rc=$(rd "$A34" RC) 脏=$(rd "$A34" DIRTY) 点名=$(printf '%s' "$A34" | grep -c '枚号在本检出里不存在') 变没变=$(rd "$A34" BEFORE)/$(rd "$A34" AFTER)"; printf '%s\n' "$A34" | tail -4 | sed 's/^/      /'
+  fi
+
+  # --- 臂35：阳性对照 —— 编号集合对得上时那一格**必须放行** ---
+  #     §7 第 282 条那一族：永远拒绝的门和永远通过的门同族。删掉臂33/34 的红是坏的，
+  #     把这四臂合起来看才回答"这一格判的是对不对得上号"。
+  mkdir -p "$FT/rem35/docs/reference"
+  (
+    cd "$FT/rem35" || exit 1
+    git init -q .; git config user.email t@t; git config user.name t
+    mk_traps 3 docs/reference/environment-traps.md
+    git add -A >/dev/null 2>&1; git commit -qm c1
+    git update-ref refs/remotes/origin/main HEAD                          # 远端 == 本检出
+    echo "DIRTY=$(git status --porcelain | wc -l | tr -d ' ')"
+    echo "BEFORE=$(md5 -q docs/reference/environment-traps.md)"
+    node "$TRAP_ABS" --text "$TXT_ABS" --pkg-file "$FT/rem35/docs/reference/environment-traps.md"; echo "RC=$?"
+    echo "AFTER=$(md5 -q docs/reference/environment-traps.md)"
+  ) > "${L}.arm35.out" 2>&1
+  A35=$(cat "${L}.arm35.out")
+  if [ "$(rd "$A35" RC)" = "0" ] && [ "$(rd "$A35" DIRTY)" = "0" ] && [ "$(rd "$A35" BEFORE)" = "$(rd "$A35" AFTER)" ] \
+     && printf '%s' "$A35" | grep -q '对得上号' && printf '%s' "$A35" | grep -q '这一枚取 4'; then
+    ok "臂35 远端与本检出编号集合逐项同号同文 ⇒ dry-run rc=0、打印『对得上号』+『这一枚取 4』、文件未动 ⇒ 新那一格不是永远拒绝的门"
+  else
+    bad "臂35 未按预期 ⇒ rc=$(rd "$A35" RC) 脏=$(rd "$A35" DIRTY) 放行句=$(printf '%s' "$A35" | grep -c '对得上号') 取号句=$(printf '%s' "$A35" | grep -c '这一枚取 4') 变没变=$(rd "$A35" BEFORE)/$(rd "$A35" AFTER)"; printf '%s\n' "$A35" | tail -5 | sed 's/^/      /'
+  fi
 fi
 rm -rf "$FT"
 
