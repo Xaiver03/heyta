@@ -269,3 +269,37 @@ test('容差从被约束的常量推导：差 HEYTA_BLUE_TOLERANCE 算命中，�
   assert.ok(countColor(inside, HEYTA_BLUE) > 0, '正好落在容差上的像素要算命中');
   assert.equal(countColor(outside, HEYTA_BLUE), 0, '超出容差 1 就必须不算 —— 阈值是有边的');
 });
+
+// ── 入参形状（不需要 magick：这三条测的是"探针自己会不会被用错"）───────────────
+//
+// 🔴 2026-10-05 实测：本文件的 `looks*` 收 stats 对象、`count*` 收路径，两族相邻且名字都像
+// 谓词。有人（本轮就是我）把路径喂给 `looksBlank()`，于是 `stats.contentRatio` 是
+// `undefined`，而 `undefined < 0.01` 恒为 `false` —— **一条被无声摘掉的判据**：
+// 不报错、不变红，只是再也不判空白。下面第一条就是那个"摘掉"动作的阳性对照。
+
+test('阳性对照：把路径直接喂给旧的判据式子，它恒为 false（这就是无声摘掉判据的形状）', () => {
+  const statsFromAPath = 'apps/web/evidence/detail-pane-overlay/settings-sheet.png';
+  assert.equal(
+    statsFromAPath.contentRatio < 0.01 || statsFromAPath.colorSpan < 16,
+    false,
+    '这条断言的是"错误用法为什么不报错"：字符串上取不到那两个字段 ⇒ undefined 比较恒 false',
+  );
+});
+
+test('looksBlank / looksSmeared 收到路径字符串要**响亮地抛**，不是返回 false', () => {
+  assert.throws(() => looksBlank('some/shot.png'), (e) => {
+    assert.ok(e instanceof TypeError, `要的是 TypeError，拿到 ${e.constructor.name}`);
+    assert.match(e.message, /looksBlank\(\)/, '报错要点名是哪个函数');
+    assert.match(e.message, /inspectPng/, '并且要给出可用的修法');
+    assert.ok(e.message.includes('some/shot.png'), '要把那枚被误传的路径打出来，否则查不到调用点');
+    return true;
+  });
+  assert.throws(() => looksSmeared('some/shot.png'), TypeError);
+});
+
+test('looksBlank 收 null / 缺字段的对象也抛；收完整 stats 才返回布尔', () => {
+  assert.throws(() => looksBlank(null), TypeError);
+  assert.throws(() => looksBlank({ contentRatio: 0.9 }), TypeError, '缺 colorSpan 的半截对象同样要抛');
+  assert.equal(looksBlank({ contentRatio: 0, colorSpan: 255 }), true, '整幅同色 ⇒ 空白');
+  assert.equal(looksBlank({ contentRatio: 0.5, colorSpan: 200 }), false);
+});
