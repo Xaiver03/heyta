@@ -98,25 +98,28 @@ interface CursorView {
   /**
    * Enter 的落点（工单 W1b 第 3 条腿）：**这一格里第一个该被聚焦的东西**的选择器。
    *
-   * 🔴 缺席 = 这一面的 Enter **不接管**，而不是"忘了配"。今天缺席的三个是任务那一族
-   * （`tasks` / `quadrant` / `timeline`）：那一面**既没有可聚焦的落点，也没有 Enter 绑定**
-   * （现量 `grep -rn "key === 'Enter'" apps/web/src`：除本机制文件之外没有一处在任务行上），
-   * 而"任务那一格是行内展开还是栏里编辑"是 §8.130 记下的那道**二选一**，
-   * 没裁决之前在这里加一行就是把答案猜了。习惯与便签两面已经各有一个明确落点。
+   * 🔴 缺席 = 这一面的 Enter **不接管**，而不是"忘了配"。五面都登记之后今天**没有缺席的面**：
+   * 任务那一族（`tasks` / `quadrant` / `timeline`）的落点在 §8.138 拍完"行内展开编辑 vs
+   * 栏里编辑"那道二选一（裁成**栏里编辑**）之后才存在 —— 那一格的备注正文是页面里唯一
+   * 一份该字段的编辑器（栏在画时行尾那颗 chip 不渲染，两处共用 `App.tsx` 的
+   * `taskPaneInColumn` 同一枚布尔）。
    *
-   * ⚠️ 两个落点**不是一种东西**，这是刻意的：习惯那一格是"读 + 打卡"的一块区域，
+   * ⚠️ 三类落点**不是一种东西**，这是刻意的：习惯那一格是"读 + 打卡"的一块区域，
    * 所以焦点给**区域本体**（`tabIndex={-1}` 的 `.ht-habit__pane`，屏幕阅读器会念出
-   * 它那句 `aria-label`）；便签那一格是编辑器，焦点给**正文输入框**（"打开便签"的
-   * 自然落点就是光标进正文）。共同点只有一条：都在那一格里，都不是列表。
+   * 它那句 `aria-label`）；便签与任务那一格是编辑器，焦点给**正文输入框**（"打开便签 /
+   * 打开任务"的自然落点就是光标进正文）。共同点只有一条：都在那一格里，都不是列表。
+   *
+   * ⚠️ 落点**不在 DOM 时不接管**（`openPane` 找不到就返回 `false`，键原样交给浏览器）：
+   * 任务那一面"没选中就不画面单"，所以光标停在哪一行都可能是栏里还没有那只框。
    */
   readonly enterTarget?: string;
 }
 
 const CURSOR_VIEWS: Partial<Record<ViewKey, CursorView>> =
   {
-    tasks: { kind: 'task', prefix: 'task-item' },
-    quadrant: { kind: 'task', prefix: 'task-item' },
-    timeline: { kind: 'task', prefix: 'task-item' },
+    tasks: { kind: 'task', prefix: 'task-item', enterTarget: '[data-testid="task-note-input"]' },
+    quadrant: { kind: 'task', prefix: 'task-item', enterTarget: '[data-testid="task-note-input"]' },
+    timeline: { kind: 'task', prefix: 'task-item', enterTarget: '[data-testid="task-note-input"]' },
     habits: { kind: 'habit', prefix: 'habit-row', enterTarget: '[data-testid="habit-pane"]' },
     notes: { kind: 'note', prefix: 'note-row', enterTarget: '[data-testid="notes-editor-input"]' },
   };

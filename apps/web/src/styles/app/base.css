@@ -143,6 +143,18 @@
   padding: var(--ht-space-4);
 }
 
+/*
+ * 任务面单（工单 §8.138）—— 同一档内边距，同一个理由。
+ *
+ * ⚠️ `overflow-wrap` 挂在这一格而不是标题上：它是**可继承**属性，而这一栏里
+ * 用户自己写的字有两处（标题与备注正文），两处都要挡住"一个长词撑破 22rem 的栏"。
+ * 承重判据在 `e2e/tests/detail-pane-task.spec.ts`（逐控件 containment）。
+ */
+.ht-app__detail-task {
+  overflow-wrap: anywhere;
+  padding: var(--ht-space-4);
+}
+
 .ht-app__detail-heading {
   /* 区块标题档：lg + semibold（AGENTS §5 的文字层级表）。
      刻意**不是** xl —— 一屏一个页标题，页标题在 `.ht-header__title`。 */

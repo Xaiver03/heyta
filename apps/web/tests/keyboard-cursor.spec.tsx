@@ -563,14 +563,48 @@ describe('Enter 把焦点交给这一格（W1b 第 3 条腿）', () => {
     expect(selection.get('habit')).toBe('h1');
   });
 
-  it('表里**没登记落点**的视图（任务那一族）⇒ Enter 不接管，等那道二选一', async () => {
+  it('🔴 任务那一族的落点是**栏里那只正文框**（§8.138 拍完"行内展开 vs 栏里编辑"之后才存在）', async () => {
     rows('task-item', ['t1', 't2']);
-    const p = pane('task-pane-that-does-not-exist');
+    const input = document.createElement('textarea');
+    input.setAttribute('data-testid', 'task-note-input');
+    document.body.appendChild(input);
     selection.select('task', 't1');
     await mount('tasks');
+    expect(await enterOn('t1', 'task-item')).toBe(true);
+    expect(document.activeElement, '按了 Enter，焦点没进栏里的正文框').toBe(input);
+    expect(selection.get('task'), 'Enter 顺手改了选中').toBe('t1');
+    input.remove();
+  });
+
+  it('🔴 窄档（栏没在画 ⇒ 正文框住在行尾那颗 chip 里，DOM 里没有登记的落点）⇒ 不接管、**不吞键**', async () => {
+    rows('task-item', ['t1', 't2']);
+    selection.select('task', 't1');
+    await mount('tasks');
+    // 这一条与上面那条是**同一个落点的两侧**：表里登记了 `enterTarget` 不代表画得出来。
+    // 吞掉一次落空的 Enter，用户读到的是"回车坏了"，而界面没有任何东西说明为什么。
     expect(await enterOn('t1', 'task-item')).toBe(false);
-    expect(document.activeElement, '任务那一面今天没有落点，焦点却跳了').not.toBe(p);
     expect(selection.get('task')).toBe('t1');
+  });
+
+  it('🔴 表里五面**每一面都登记了落点**，且任务那一族三面同串（一处改、三面跟着换）', () => {
+    const start = CURSOR_SRC.indexOf('const CURSOR_VIEWS');
+    const open = CURSOR_SRC.indexOf('{', start);
+    const close = CURSOR_SRC.indexOf('\n  };', open);
+    if (open < 0 || close < 0) throw new Error('CURSOR_VIEWS 的字面量没框住 ⇒ 判据在空转');
+    const lines = [...CURSOR_SRC.slice(open, close).matchAll(/^\s{4}([a-z][a-z-]*):.*$/gm)];
+    const parsed = lines.map((m) => ({
+      view: m[1] as string,
+      enterTarget: /enterTarget:\s*'([^']+)'/.exec(m[0])?.[1],
+    }));
+    expect(parsed.map((p) => p.view).sort()).toEqual(['habits', 'notes', 'quadrant', 'tasks', 'timeline']);
+    const missing = parsed.filter((p) => p.enterTarget === undefined).map((p) => p.view);
+    expect(missing, `这些面没有 Enter 的落点：${missing.join(' / ')}`).toEqual([]);
+    const taskViews = parsed.filter((p) => ['tasks', 'quadrant', 'timeline'].includes(p.view));
+    expect(
+      new Set(taskViews.map((p) => p.enterTarget)).size,
+      '三面走的是同一批任务行、同一个 `task` 选中态，落点却登记成了不同的串',
+    ).toBe(1);
+    expect(taskViews[0]?.enterTarget).toBe('[data-testid="task-note-input"]');
   });
 
   it('Enter 走的是**同一套闸门**：正在打字 / 浮层开着 / 焦点在菜单里，都不接管', async () => {
