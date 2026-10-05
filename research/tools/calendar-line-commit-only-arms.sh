@@ -24,6 +24,16 @@
 #   臂 7  在册断言①：条目漏了 `|理由` ⇒ 期望 exit 1 并点名（空理由的册子会把"带走"读成"已登记"）
 #   臂 8  在册断言②：条目**不在 PATHS** ⇒ 期望 exit 1 并点名（§1 按 PATHS 遍历 ⇒ 只在册不在清单的那条永远走不到）
 #   臂 9  3b 的**进门那一腿**：`--confirm` 而**不给 ANCHORS** ⇒ 期望 exit 1、点名"没传 ANCHORS"、且不产生提交
+#   臂 10 「**本线删除**」那一格的**动作腿**：点名一枚"索引里有、工作树恰好是 ' D'"的路径
+#              ⇒ 期望 rc 0、分项打印含 `删除 1` 且与总数自洽、那枚以 `D` 出现在提交里、3b 真的量到它的 hunk
+#   臂 11 同一格的**下界①**：点名一枚**索引里也没有**的路径（清单写错/改名后的形状）⇒ 期望 exit 1 且不产生提交
+#   臂 12 同一格的**下界②**：那枚删除是**别人已经暂存**的（状态 `D `，索引里已没有它）⇒ 同样期望 exit 1
+#              （10/11/12 是一组**方向性**三腿：只做 10 会把口子开成"磁盘上没有的也能带走"也不被发现）
+#   臂 13 1b 的**推导格**：夹具里造一枚 NS_RE **结构上匹配不到**的脏证据图（新目录名不在任何交替式里），
+#              但它的 README 有 UIPIN ⇒ 期望 rc≠0、由推导格点名，并**同时断言手写枚举那一格没吭声**
+#              （`NS_NAMED=0`）—— 这一臂证的不是"又报了一次红"，是"这一格能报到那一格报不到的地方"
+#   臂 14 臂 13 的**配对下界**：同一夹具把图点名 ⇒ 期望 rc=0 且"未点名 0 枚"
+#              （缺它就无法区分"推导格抓到了漏"与"这棵夹具树本来就跑不通"）
 #
 # 🔴 **臂 1/2/5/6 必须传 ANCHORS，而这件事曾经没人传（10-05 11:5x 现量查出）**：
 #    `cbd18178` 给被测脚本加了"3b 在 --confirm 下缺 ANCHORS 就 exit 1"，**却没同步这套 rig**
@@ -407,7 +417,184 @@ else
   echo '--- 臂9 日志尾部 ---'; tail -25 "${L}.arm9.out"
 fi
 
-rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8" "$F9"
+# --------- 臂 10/11/12 「本线删除」那一格：动作腿 + 两条下界
+# 🔴 这一组是 10-05 12:0x 加**那条分支的同一趟**补的：入库装置原来把"点名路径不在磁盘上"一律判
+#    "清单过期 exit 1"，于是"按判据处置掉一枚取证图"这种**真实交付形状**走不了本线的提交装置。
+#    放宽一个前置而不同时补臂，就是上一笔刚犯过的错（加闸门的人没同步测闸门的人）。
+mk_del_fixture() {
+  local F; F=$(mk_fixture) || return 1
+  ( cd "$F" || exit 1
+    printf '# 计划\n\n正文（改过）\n' > docs/plans/mine.md )
+  printf '%s\n' "$F"
+}
+
+F10=$(mk_del_fixture) || { echo "❌ 夹具10 建不起来"; exit 1; }
+(
+  cd "$F10" || exit 1
+  rm -f a.txt                                   # 工作树删除、索引未动 ⇒ 状态恰好 " D"
+  HEAD_BEFORE=$(git rev-parse HEAD)
+  MSG='test: 臂10' PATHS_OVERRIDE='a.txt|docs/plans/mine.md' UNCARRIED_OVERRIDE='' \
+    ANCHORS='正文（改过） base' \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm10.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "STATUS_BEFORE=$(git show --name-status --format= HEAD | tr -d ' \t' | grep -c '^Da\.txt$' || true)"
+    echo "SUM=$(grep -c '待入库 2 枚（改动 1 / 新增 0 / 删除 1）' "${L}.arm10.out" || true)"
+    echo "BRANCH=$(grep -c '🗑 本线删除' "${L}.arm10.out" || true)"
+    echo "HUNKED=$(grep -c 'a\.txt：hunk' "${L}.arm10.out" || true)"
+    echo "ORPHAN0=$(grep -c '孤儿 0 枚' "${L}.arm10.out" || true)"
+    echo "GONE=$([ ! -e a.txt ] && echo yes || echo no)"
+    echo "HEAD_MOVED=$([ "$(git rev-parse HEAD)" != "$HEAD_BEFORE" ] && echo yes || echo no)"
+  } > "${L}.arm10.rd"
+  exit $RC
+)
+A10=$(cat "${L}.arm10.rd" 2>/dev/null)
+if [ "$(rd "$A10" RC)" = "0" ] && [ "$(rd "$A10" STATUS_BEFORE)" = "1" ] \
+   && [ "$(rd "$A10" SUM)" != "0" ] && [ "$(rd "$A10" BRANCH)" != "0" ] \
+   && [ "$(rd "$A10" HUNKED)" != "0" ] && [ "$(rd "$A10" ORPHAN0)" != "0" ] \
+   && [ "$(rd "$A10" GONE)" = "yes" ] && [ "$(rd "$A10" HEAD_MOVED)" = "yes" ]; then
+  ok "臂10 动作腿：' D' 那枚被带走并在提交里记成 D、分项与总数自洽（删除 1 进了打印）、3b 真量到它的 hunk 且孤儿 0"
+else
+  bad "臂10 未按预期 ⇒ 「本线删除」那一格坏了或没被走到：$(printf '%s\n' "$A10" | tr '\n' ' ')"
+  echo '--- 臂10 日志尾部 ---'; tail -25 "${L}.arm10.out"
+fi
+
+F11=$(mk_del_fixture) || { echo "❌ 夹具11 建不起来"; exit 1; }
+(
+  cd "$F11" || exit 1
+  HEAD_BEFORE=$(git rev-parse HEAD)
+  MSG='test: 臂11' PATHS_OVERRIDE='ghost.png|docs/plans/mine.md' UNCARRIED_OVERRIDE='' \
+    ANCHORS='正文（改过）' \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm11.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "NAMED=$(grep -c '不满足「本线删除」那三条件' "${L}.arm11.out" || true)"
+    echo "NOT_REACHED=$(grep -c '== 5. --confirm' "${L}.arm11.out" || true)"
+    echo "HEAD_SAME=$([ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] && echo yes || echo no)"
+  } > "${L}.arm11.rd"
+  exit $RC
+)
+A11=$(cat "${L}.arm11.rd" 2>/dev/null)
+if [ "$(rd "$A11" RC)" != "0" ] && [ "$(rd "$A11" NAMED)" != "0" ] \
+   && [ "$(rd "$A11" NOT_REACHED)" = "0" ] && [ "$(rd "$A11" HEAD_SAME)" = "yes" ]; then
+  ok "臂11 下界①：清单里一枚索引也没有的路径 ⇒ rc=$(rd "$A11" RC) 点名拒绝、没走到第 5 步、HEAD 没多提交（放宽没放宽成'磁盘上没有也带走'）"
+else
+  bad "臂11 未按预期 ⇒ 那条口子开过头了：$(printf '%s\n' "$A11" | tr '\n' ' ')"
+  echo '--- 臂11 日志尾部 ---'; tail -25 "${L}.arm11.out"
+fi
+
+F12=$(mk_del_fixture) || { echo "❌ 夹具12 建不起来"; exit 1; }
+(
+  cd "$F12" || exit 1
+  git rm -q a.txt                               # 别人**已经把删除暂存**了：状态 `D `、索引里已无此枚
+  HEAD_BEFORE=$(git rev-parse HEAD)
+  MSG='test: 臂12' PATHS_OVERRIDE='a.txt|docs/plans/mine.md' UNCARRIED_OVERRIDE='' \
+    ANCHORS='正文（改过）' \
+    bash research/tools/calendar-line-commit-plan.sh --confirm > "${L}.arm12.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "NAMED=$(grep -c '不满足「本线删除」那三条件' "${L}.arm12.out" || true)"
+    # 🔴 判"没被吞"要看**那枚暂存本身还在不在**，不能拿 `git show HEAD` 数文件 ——
+    #    这一臂 HEAD 根本不该动，而 base 提交里本来就有 a.txt ⇒ 那样数恒 1（我第一版就是这么写错的，
+    #    臂当场红给我看：红的是臂的断言，不是闸门。日志三行显示 rc=1 + 点名 + HEAD 未动，全对）。
+    echo "STILL_STAGED=$(git status --porcelain -- a.txt | cut -c1)"
+    echo "HEAD_SAME=$([ "$(git rev-parse HEAD)" = "$HEAD_BEFORE" ] && echo yes || echo no)"
+  } > "${L}.arm12.rd"
+  exit $RC
+)
+A12=$(cat "${L}.arm12.rd" 2>/dev/null)
+if [ "$(rd "$A12" RC)" != "0" ] && [ "$(rd "$A12" NAMED)" != "0" ] \
+   && [ "$(rd "$A12" STILL_STAGED)" = "D" ] && [ "$(rd "$A12" HEAD_SAME)" = "yes" ]; then
+  ok "臂12 下界②：别人暂存的删除不被当成「本线删除」带走 ⇒ rc=$(rd "$A12" RC) 拒绝、那枚的索引列仍是 D（暂存原样留着）、HEAD 未动（出路是 restore --staged，不是放宽判据）"
+else
+  bad "臂12 未按预期 ⇒ 别人暂存的删除被吞进本笔：$(printf '%s\n' "$A12" | tr '\n' ' ')"
+  echo '--- 臂12 日志尾部 ---'; tail -25 "${L}.arm12.out"
+fi
+
+# --------- 臂 13/14 1b 的「推导格」：NS_RE 看不见的那一枚，它必须看得见
+# 🔴 为什么要这两臂（12:5x，与加格同趟）：这一格的存在理由**不是**"再多一条反查"，而是
+#    "反查的范围由仓库事实推导，不由我手写的正则决定"。所以它的判据必须是
+#    **一枚 NS_RE 结构上匹配不到的文件** —— 否则红了也分不清是谁干的，
+#    而"分不清是谁干的"就等于这条新格从来没有牙（trap #165 那一族：变异要配对的断言）。
+#    夹具形状：`apps/web/evidence/zderived/` 这枚目录名**不在 NS_RE 的任何交替式里**，
+#    但它的 README 里有一行 UIPIN ⇒ 推导格据 README 认出"图字节与锚点绑死"。
+mk_deriv_fixture() {
+  local F; F=$(mk_fixture) || return 1
+  ( cd "$F" || exit 1
+    mkdir -p apps/web/evidence/zderived
+    printf '# 取证\n\nUIPIN zderived/z.png %s apps/web/src/calendar/CalendarBoard.tsx\n' \
+      "$(git rev-parse --short HEAD)" > apps/web/evidence/zderived/README.md
+    printf 'PNG-BYTES-v1\n' > apps/web/evidence/zderived/z.png
+    git add -A >/dev/null && git commit -qm 'evidence base' >/dev/null
+    # 模拟"重拍写了整目录"：README 与图的字节**同时**变了，而点名清单只有 README。
+    printf '# 取证（重钉锚点后）\n\nUIPIN zderived/z.png %s apps/web/src/calendar/CalendarBoard.tsx\n' \
+      "$(git rev-parse --short HEAD)" > apps/web/evidence/zderived/README.md
+    printf 'PNG-BYTES-v2-reshoot\n' > apps/web/evidence/zderived/z.png )
+  printf '%s\n' "$F"
+}
+
+F13=$(mk_deriv_fixture) || { echo "❌ 夹具13 建不起来"; exit 1; }
+(
+  cd "$F13" || exit 1
+  # 先自证前提成立（两条都必须是"匹配不到 / 脏着"，否则这一臂测的是空气）：
+  #   ① NS_RE 里那支证据目录的交替式对 `zderived` 不命中，② 图在 git 眼里是 ' M'。
+  {
+    echo "PRE_NS_RE_HIT=$(printf 'apps/web/evidence/zderived/z.png\n' | grep -cE \
+      '^apps/web/evidence/(calendar-day|calendar-view-options|profile-panel)/[^/]+\.(md|png)$|^apps/web/evidence/(calendar-year|calendar-day-time|calendar-cells|calendar-week|calendar-capture)/[^/]+\.(md|png)$' || true)"
+    echo "PRE_DIRTY=$(git status --porcelain -- apps/web/evidence/zderived/z.png | cut -c1-2 | tr -d ' ')"
+  } > "${L}.arm13.pre"
+  RC_PRE=0
+  MSG_UNUSED=1 PATHS_OVERRIDE='docs/plans/mine.md|apps/web/evidence/zderived/README.md' \
+    UNCARRIED_OVERRIDE='' \
+    bash research/tools/calendar-line-commit-plan.sh > "${L}.arm13.out" 2>&1 || RC_PRE=$?
+  {
+    echo "RC=$RC_PRE"
+    echo "DERIV_NAMED=$(grep -c '推导格.*脏了却没点名.*zderived/z\.png' "${L}.arm13.out" || true)"
+    echo "NS_NAMED=$(grep -c '本线命名空间有改动却没点名.*zderived' "${L}.arm13.out" || true)"
+    echo "DERIV_COUNT=$(grep -oE '钉锚点目录内脏 png [0-9]+ 枚，未点名 [0-9]+ 枚' "${L}.arm13.out" || true)"
+  } > "${L}.arm13.rd"
+  exit $RC_PRE
+)
+A13=$(cat "${L}.arm13.rd" 2>/dev/null); P13=$(cat "${L}.arm13.pre" 2>/dev/null)
+if [ "$(rd "$A13" RC)" != "0" ] && [ "$(rd "$A13" DERIV_NAMED)" != "0" ] \
+   && [ "$(rd "$A13" NS_NAMED)" = "0" ] && [ "$(rd "$P13" PRE_NS_RE_HIT)" = "0" ] \
+   && [ "$(rd "$P13" PRE_DIRTY)" = "M" ] && [ "$(rd "$A13" DERIV_COUNT)" = "钉锚点目录内脏 png 1 枚，未点名 1 枚" ]; then
+  ok "臂13 推导格有牙：NS_RE 结构上匹配不到的那枚脏图（前置现量 PRE_NS_RE_HIT=0）被推导格判红并点名，而手写枚举那一格确实一个字没说它（NS_NAMED=0）⇒ 这一格挡住的正是枚举少一支的那类漏"
+else
+  bad "臂13 未按预期 ⇒ 推导格坏了、或它红的原因是别的、或前提（NS_RE 匹配不到）不成立：$(printf '%s\n' "$A13" "$P13" | tr '\n' ' ')"
+  echo '--- 臂13 日志尾部 ---'; tail -25 "${L}.arm13.out"
+fi
+
+F14=$(mk_deriv_fixture) || { echo "❌ 夹具14 建不起来"; exit 1; }
+(
+  cd "$F14" || exit 1
+  # 配对臂：同一枚夹具、只把图**点名列进清单** ⇒ 那一格必须转绿。
+  # 没有这一臂，臂13 的红可能来自"这棵夹具树本来就跑不通"，而不是"推导格抓到了漏"。
+  MSG_UNUSED=1 PATHS_OVERRIDE='docs/plans/mine.md|apps/web/evidence/zderived/README.md|apps/web/evidence/zderived/z.png' \
+    UNCARRIED_OVERRIDE='' \
+    bash research/tools/calendar-line-commit-plan.sh > "${L}.arm14.out" 2>&1
+  RC=$?
+  {
+    echo "RC=$RC"
+    echo "DERIV_NAMED=$(grep -c '推导格.*脏了却没点名' "${L}.arm14.out" || true)"
+    echo "CLEAN=$(grep -c '钉锚点目录内脏 png 1 枚，未点名 0 枚' "${L}.arm14.out" || true)"
+    echo "ALSO_OK=$(grep -c '推导格 1 枚也全部已点名' "${L}.arm14.out" || true)"
+  } > "${L}.arm14.rd"
+  exit $RC
+)
+A14=$(cat "${L}.arm14.rd" 2>/dev/null)
+if [ "$(rd "$A14" RC)" = "0" ] && [ "$(rd "$A14" DERIV_NAMED)" = "0" ] \
+   && [ "$(rd "$A14" CLEAN)" != "0" ] && [ "$(rd "$A14" ALSO_OK)" != "0" ]; then
+  ok "臂14 配对下界：同一夹具把图点名后 rc=0、未点名归零 ⇒ 臂13 的红来自'没点名'而不是夹具本身跑不通"
+else
+  bad "臂14 未按预期 ⇒ 推导格是一条天生红的闸门（会把正常入库一直挡在外面）：$(printf '%s\n' "$A14" | tr '\n' ' ')"
+  echo '--- 臂14 日志尾部 ---'; tail -25 "${L}.arm14.out"
+fi
+
+rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8" "$F9" "$F10" "$F11" "$F12" "$F13" "$F14"
 echo "== 合计 pass=$PASS fail=$FAIL =="
 rm -f "${L}".arm*.out "${L}".arm*.rd
 [ "$FAIL" = 0 ] || exit 1

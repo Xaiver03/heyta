@@ -94,7 +94,18 @@ flush() {
 }
 
 for p in "$@"; do
-  [ -e "$p" ] || { echo "❌ 路径不存在：${p}（判不了就是判不了，不许跳过）"; exit 1; }
+  if [ ! -e "$p" ]; then
+    # 🔴 「本线删除一枚已跟踪的产物」也要能判 —— 它的 hunk 全在**删除行**里，`git diff HEAD` 量得到。
+    #    放行条件与 `calendar-line-commit-plan.sh` 第 1 格**逐字同一套**（索引里有 + 状态恰好 " D"）：
+    #    两处口子不一样，就会出现"计划放行、归属判不了"或反过来的裂缝（本仓那一族：一个判断只许有一处）。
+    #    不满足的那两种（清单写错路径 / 别人已把删除暂存）仍然在这里响亮失败，不替它圆场。
+    if ! git ls-files --error-unmatch -- "$p" >/dev/null 2>&1; then
+      echo "❌ 路径不存在，索引里也没有它：${p}（判不了就是判不了，不许跳过）"; exit 1
+    fi
+    if [ "$(git status --porcelain -- "$p" | cut -c1-2)" != ' D' ]; then
+      echo "❌ 路径不存在，但工作树状态不是「 D」（不是本线刚删的那一枚）：${p}"; exit 1
+    fi
+  fi
   CUR_PATH="$p"
   PH=0
   PO=0
