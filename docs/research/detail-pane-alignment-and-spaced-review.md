@@ -126,7 +126,18 @@
 | 月历（可点） | ❌ 现在是 **90 天周列热力图**，格子是裸 `View`、**无 `onPress`**（`HabitBoard.tsx:358-374`、`:625-696`） | 数学现成（`date.ts:341`），缺第三个消费者 |
 | 每日完成量 (页) 图 | ❌ 未找到任何按习惯的单值时序图 | 🔴 **数据源本身不可达**，见下 |
 
+> 🔴 **上面那张表里四档 ❌（月打卡 / 月完成率 / 月完成量 / 总完成量）与下一段那句"`HabitLog.value` 界面不可达"，
+> 在 2026-10-05 → 10-06 之间都过期了**：自然月那一族现在有唯一所有者
+> `computeHabitPeriodStats`（`packages/domain/src/habit-streak.ts:328`，出口 `packages/app-host/src/motivation.ts:202`，
+> 四格渲染 `packages/ui/src/habits/HabitBoard.tsx:590-631`），落地账见计划 §8.121 与
+> [习惯面完整计划](../plans/habits-alignment.md) §8。原文照留，是为了让后来者认出
+> **"状态写在两份文档里、代码往前走了"** 这个形状 —— 要状态就现量，别读任何一份文档的断言。
+
 🔴 **最重要的一米**：`HabitLog.value` **界面不可达** —— `HabitBoard` 回调只有 `onCheckIn(habitId, date?)`（`HabitBoard.tsx:180`），两端调用处都不带 value，落盘写 `value ?? habit.target ?? 1`（[`habit-actions.ts:311`](../../packages/app-host/src/habit-actions.ts)）。⇒ **计数型习惯只能"一键记满目标值"**，记不了"今天读 5 页 / 目标 8 页"。这条不修，「每日完成量」图与「月/总完成量」两卡**即使做出来也没有部分值数据**。它也正是 [dida365-feature-benchmark.md:224](dida365-feature-benchmark.md) 第 9 条"看起来有、其实没有"里**至今仍未修**的那一半（同表的 target/unit/goalType 已补，见 [multi-end-unified-strategy.md §幻觉复核第 9 项:821-860](../plans/multi-end-unified-strategy.md)）。
+🔴 **这一句已过期（2026-10-06 现量）**：`checkIn(habitId, date?, value?)` 在 `packages/app-host/src/habit-actions.ts:167`，
+两端宿主都把 `value` 递下去（`apps/web/src/features/habits/store.ts:123`、`apps/mobile/src/screens/HabitsScreen.tsx:403`）
+⇒ 这就是 **W6**，落在 `ca2cf606`（本篇后面那句"W6 落在 `ca2cf606`：`onCheckIn` 现在带 `value`"已把这件事更正过一次，
+但**上面这句"界面不可达"当时没跟着改** —— 于是先读到 ❌ 那半句的人，要往下翻很远才撞见已修）。
 
 **补打卡**：滴答是点月历任意某天；我们只有"昨天"，且要同时满足 `REPAIR_WINDOW_DAYS = 1` 与 `current === 0` 两道闸（`HabitBoard.tsx:564-592`；[`habit-resilience.ts:58`](../../packages/domain/src/habit-resilience.ts)、`:226-250`）。🔴 且 `Habit.backfillDays`（`entities.ts:300`）是**死字段**：全仓只有两处声明、**零读取方** —— 而 [phase-1-single-client-loop.md:194](../plans/phase-1-single-client-loop.md) 写着"补打卡上限由 `Habit.backfillDays` 控制"。**那句承诺从未兑现。**
 
