@@ -13450,3 +13450,46 @@ M3 打在 `predict()` 而 A3 自己那处调用没动（**变异要打在待证�
 
 我倾向 **A**：一次对外动作、一次线上验收，而 §8.246 已证落地载体保住这两处修正。但发布节奏由负责人拍。
 
+### 8.248 入库那 7 张落地页截图重拍完（G-58 / G-57 的落地页半格闭合），顺手量出一枚**分支落后但载体已修**的对外域名抄件（2026-10-05 20:0x）
+
+**做了什么**：`screenshot:capture --only L01…L07` 七枚全部 `rc=0`，`verify-artifacts.mjs` **`VERIFY_RC=0`**
+（注册表 23 个目标；已生成的均尺寸正确、无 alpha、非空白）。
+载体是一枚本地 `vite preview :4173` 服务着**从本分支 HEAD 重打的** `apps/landing/dist`
+（`BUILD_RC=0`；`grep` 证：`可安装` 在 dist 里 **0 个文件**、`litopia` 0、`finlaw` 1）。
+🔴 人打开看过 `screenshots/landing/L03-平台.png`：Web 卡正文现在是
+「完整产品，不是演示。断网也能照常记，恢复后自动补传；数据就存在你自己的浏览器里。」
+—— 被摘掉的"可安装"这句**不再印在入库产物里**。这关掉的是 G-58 里"入库截图仍印着摘掉的安装承诺"那一半。
+
+**两个过程形状（都便宜，都不该第二次踩）**
+
+1. `capture.mjs` **不自己起服务**：它打 `http://localhost:4173/…`。第一次跑（没起服务）七枚全 `rc=1`，
+   而它**没有覆盖任何 PNG**，只把 `screenshots/manifest.json` 改成了"失败态" ——
+   症状是"产物被弄坏了"，实际只有清单动了。判据：跑失败后先看 `git status -- screenshots`，
+   别急着以为图没了。
+2. 起服务那次 `npx vite preview` 报 `sh: vite: command not found`（根目录没有 vite bin），
+   正解是 `pnpm --filter @heyta/landing exec vite preview --outDir dist --port 4173 --strictPort`。
+   我只 kill 自己记下的那个 pid，端口回空。
+
+**顺带量出来的一枚（结论：不归本批改，落地即修，但形状值得记）**
+
+`grep finlaw` 在 dist 里那 1 个命中是 **`apps/landing/public/robots.txt`** 的 `Sitemap:` 行。逐棵树现量：
+
+| 树 | `Sitemap:` | `gen-entries` 是否生成这枚文件 | 文件头是否"由 gen-entries 生成" |
+|---|---|---|---|
+| 本分支 `946fb5fa` | `heyta.finlaw.cloud`（旧） | **0** | 0 |
+| `main` / `origin/main` | `heyta.waytofuture.cn`（对） | **1** | 1 |
+| 落地载体 `bd98a4d6` | `heyta.waytofuture.cn`（对） | **1** | 1 |
+
+⇒ 不是"我们写错了一行"，是**这枚文件在 main 上已经从手抄件升级成生成物**（唯一事实源 `origin.ts` / `VITE_SITE_URL`），
+而本分支从升级之前就分出去、从没动过它（`git log <mb>..HEAD -- 该路径` 为空）。
+**载体带的是 main 的那一版** ⇒ 落地把它一起带进来，本批不需要也不应该另开一笔去改（改了会在合并时多撞一枚）。
+线上现量：`https://heyta.waytofuture.cn/robots.txt` 的 `Sitemap:` 已是**对的域名**，所以这**不是**一条正在对外的错话。
+真正的对外风险是"**从本分支这棵树发布**"—— 而 `publish-public-sites.mjs` 的 `HEAD == main` 守卫本来就挡着它（§8.247 第四节）。
+
+🔴 **一条探针形状（本节自己先踩后修）**：上面那张表第一版是**四行全 MISSING**，
+而 `cat` 明明看得见文件。成因是 zsh 的**历史修饰符**：循环里写 `git show $ref:apps/…`，
+`$ref:a` 被当成 `:a`（转绝对路径）修饰符吃掉 ⇒ 路径错、`git show` 静默失败、`2>/dev/null` 把死因盖掉。
+正解是 `"${ref}:path"`。形状与 §7 那族"命令静默失效"同一条：**判"某棵树没有这枚文件"之前，
+先用一条不带变量的 `git show` 证明探针本身读得到它** —— 否则"没有"永远是探针够不着。
+
+
