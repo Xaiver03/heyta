@@ -58,6 +58,7 @@ import { useTokens } from '../theme';
 import type { SyncCredentialForm } from '../sync/credential-form';
 import { DEFAULT_SERVER_URL } from '../sync/config';
 import { VaultSettingsSection } from './VaultSettingsSection';
+import { AiSettingsSection } from '../ai/AiSettingsSection';
 import {
   privacyConsent,
   privacyConsentActions,
@@ -392,6 +393,15 @@ export function SettingsScreen({
                 />
               </View>
             </Card>
+
+            {/*
+              ── AI 设置（四道闸 + 端点 + 逐功能授权 + 逐工具授权 + 助手档位）──
+              🔴 与同步凭据**同一层**是有意的：AI 的端点就是"这台设备跟谁说话"，
+              把它放到「我的」的滚动流里会撞 `check:mobile-settings` 那条注入判据。
+              判断本身（默认值、fail-closed 归一、bindAddress 不许从磁盘读）
+              全在 `@heyta/app-host`，这里只是通道（AGENTS §3.5）。
+            */}
+            <AiSettingsSection />
 
             <VaultSettingsSection onVaultCleanupPending={onVaultCleanupPending} />
             {vaultCleanupPending && onRetryVaultCleanup !== undefined ? (

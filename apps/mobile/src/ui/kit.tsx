@@ -134,6 +134,8 @@ export interface AppBarAction {
   icon: IconName;
   label: string;
   onPress: () => void;
+  /** 设备级验收（真模拟器 AX 探针）按它定位控件。 */
+  testID?: string;
 }
 
 /**
@@ -180,7 +182,13 @@ export function AppBar({
           </Text>
         </View>
         {actions?.map((a) => (
-          <IconButton key={a.label} icon={a.icon} label={a.label} onPress={a.onPress} />
+          <IconButton
+            key={a.label}
+            icon={a.icon}
+            label={a.label}
+            testID={a.testID}
+            onPress={a.onPress}
+          />
         ))}
       </View>
     </View>
@@ -193,17 +201,20 @@ export function IconButton({
   label,
   onPress,
   color,
+  testID,
 }: {
   icon: IconName;
   label: string;
   onPress: () => void;
   color?: string;
+  testID?: string;
 }): React.JSX.Element {
   const t = useTokens();
   const { reducedMotion } = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       style={({ pressed }) => ({
@@ -402,10 +413,12 @@ export function Checkbox({
   onToggle,
   busy,
   label,
+  testID,
 }: {
   checked: boolean;
   onToggle: () => void;
   busy?: boolean;
+  testID?: string;
   /**
    * 无障碍名。默认是「标记完成 / 取消完成」。
    *
@@ -428,6 +441,7 @@ export function Checkbox({
   return (
     <Pressable
       onPress={onToggle}
+      testID={testID}
       disabled={busy}
       accessibilityRole="checkbox"
       accessibilityState={{ checked, disabled: busy === true }}
@@ -653,6 +667,11 @@ export interface ButtonProps {
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
   /**
+   * 设备级验收的锚点 id（真模拟器 AX 探针按它找控件）。
+   * 🔴 它不参与样式或逻辑：可见文案换词条时它要跟着想清楚，用例找的是"那个按钮"。
+   */
+  testID?: string;
+  /**
    * 可选的**无障碍名**，默认就是可见的 `label`。
    *
    * 🔴 列表里重复出现的同一个按钮需要它：回收站每一行都有「恢复」/「彻底删除」，
@@ -670,6 +689,7 @@ export function Button({
   disabled,
   loading,
   style,
+  testID,
   accessibilityLabel,
 }: ButtonProps): React.JSX.Element {
   const t = useTokens();
@@ -692,6 +712,7 @@ export function Button({
   return (
     <Pressable
       onPress={onPress}
+      testID={testID}
       disabled={isDisabled}
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading === true }}

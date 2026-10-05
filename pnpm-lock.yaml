@@ -133,6 +133,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@heyta/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@heyta/app-host':
         specifier: workspace:*
         version: link:../../packages/app-host
@@ -145,6 +148,9 @@ importers:
       '@heyta/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@heyta/local-api':
+        specifier: workspace:*
+        version: link:../../packages/local-api
       '@heyta/op-log':
         specifier: workspace:*
         version: link:../../packages/op-log
