@@ -24,8 +24,16 @@
  *
  * **规则二（W6，2026-10-05）**：渲染共享日历板 `<CalendarBoard` 的宿主必须
  * ① 真的**读**过倒数日、② 真的把它**喂**进板子，且不许喂字面空数组。
- * 这条存在的原因是必填 prop 只挡得住"没传"，挡不住"传了一个永远为空的数组" ——
+ * 这条存在的原因是 prop 那一层只挡得住"根本没传"，挡不住"传了一个永远为空的数组" ——
  * 而后者在界面上与"这台设备没有倒数日"逐像素相同（§7 第 195 条）。
+ *
+ * ⚠️ **本文件曾有第三条规则，2026-10-05 合流时随那一代一起退役**（产品负责人拍的
+ * 是"倒数日上日历这一族取 `8c468c2a` 那一代"）。第三条查的是共享板那三枚组件的
+ * `events` **必须是必填 prop**，而留下的那一代刻意把它做成 `events?:`（不给时整块
+ * 不投影、逐字节等于改动前）。于是 §7 第 195 条那个形状**此刻是活的**：新宿主忘接
+ * 倒数日时 typecheck 不报，**只有本文件这一条还在说话**。
+ * 把必填那一档补回来的工单登记在 `docs/plans/countdown-anniversary.md` W6 那一节末尾
+ * （那一代的字节在 `93a1c378` 逐字可达，含它自己的第三条规则与变异台）。
  *
  * 它是**静态**检查，不是运行时检查 —— 因为运行时那种 bug 需要
  * "屏挂着 + 恰好此时同步" 的时序，单元测试很难稳定复现。
@@ -154,9 +162,12 @@ let scanned = 0;
  *
  * 为什么第一条挡不住这件事：第一条问的是"读了物化状态有没有订阅同步完成信号"。
  * 移动端完全可以把 `listEvents()` 那一句删掉、留下 `const [events] = useState([])`，
- * 于是 `events={events}` 照样传、typecheck 照样绿（必填 prop 只挡"根本没传"，
- * **挡不住"传了一个永远为空的数组"**），而界面上"这台设备没有倒数日"与
+ * 于是 `events={events}` 照样传、typecheck 照样绿（那道缝现在是 `events?:`，
+ * **连"根本没传"都不挡**，更挡不住"传了一个永远为空的数组"），而界面上"这台设备没有倒数日"与
  * "宿主没接"长得一模一样 —— §7 第 195 条记的就是这个形状。
+ *
+ * ⚠️ 也正因为那道缝是可选的，**这一条是此刻唯一还在说话的一层**（第三条规则已随合流退役，
+ * 理由与补回来的工单见本文件头）。
  *
  * 所以这一条把**宿主侧那一端**钉成一对：
  *   · 渲染 `<CalendarBoard` 的文件必须**读**过倒数日（`listEvents(` 或 store 的 `.events`）；
@@ -260,69 +271,31 @@ if (feedProblems.length > 0) {
   console.error('❌ 渲染共享日历板的宿主没有把倒数日接进去（W6 第二条规则）：\n');
   for (const p of feedProblems) console.error(`   ${p.file}\n      ${p.why}`);
   console.error(
-    '\n   为什么这一条要常驻：`events` 是**必填** prop，它挡得住"根本没传"，' +
-      '\n   挡不住"传了一个永远为空的数组"。后者的界面与"这台设备没有倒数日"' +
-      '\n   逐像素相同（§7 第 195 条）。修法是从宿主读它：移动端 `actions.listEvents(today)`，' +
+    '\n   为什么这一条要常驻：共享板的 `events` 是**可选** prop，它连"根本没传"都不挡。' +
+      '\n   而"传了一个永远为空的数组"在界面上与"这台设备没有倒数日"逐像素相同' +
+      '\n   （§7 第 195 条）。修法是从宿主读它：移动端 `actions.listEvents(today)`，' +
       '\n   Web 端 `useCountdownStore((s) => s.events)`。\n',
   );
   process.exit(1);
 }
 
 /*
- * **规则三（W6，2026-10-05 22:3x）**：共享日历板那三枚组件的 `events` prop **不许退回可选**。
+ * **规则三：已退役（2026-10-05 合流），不在这里。**
  *
- * 为什么单独立一条：规则二查的是"宿主喂没喂"，它的前提是**那道缝是必填的**。
- * 一旦有人把它改回 `events?:`（合流时两边各有一份实现，这是最可能被选中的那一份），
- * 于是：宿主全都还在传 `events` ⇒ **typecheck 一个字都不报**、规则二**照样全绿**
- * （它查的是 JSX 上有没有 `events={…}`），而"某个新宿主忘了接"从此静默通过。
- * 一条只在"有人犯错时"才响的判据，等那个错误发生就已经太晚了 —— 所以查**形状本身**。
+ * 它原本查共享板那三枚组件的 `events` 是不是**必填**。那一档住在 `93a1c378`，
+ * 而产品负责人拍的是"倒数日上日历这一族整体取 `8c468c2a` 那一代" —— 那一代的缝是
+ * `events?:`，且它的可选**有理由**：`CalendarBoard.tsx` 的 `eventsByDate` 那段写着
+ * "没给 ⇒ 整块 `undefined`、一次投影都不做（不是投影成空）"，`model.ts` 的
+ * `calendarCellBars` 那句写着"都不给时逐字节等于改动前" —— 不显示倒数日的宿主不必被迫传。
+ * 两条只能留一条，留的是代码那一代。
  *
- * 判据按符号锚定（`events?:` 这个成员声明），不按行号、不抄整段文本 ——
- * 后者会让它成为第二份格式规范，改缩进就红。
- *
- * `--seam-dir` 是**取证旋钮**，不是逃生门：默认查真实路径，
- * 只用来在别处（例如另一条线那份实现的 blob 副本）证明这条判据真的会红。
+ * 🔴 这条规则自己的文件头预判中了这个结局："一旦有人把它改回 `events?:`
+ * （合流时两边各有一份实现，这是最可能被选中的那一份）" —— 被预判中的风险不是风险，
+ * 是**待办**。补回必填那一档（连带把这条规则和它那台变异台一起搬回来）的工单在
+ * `docs/plans/countdown-anniversary.md` W6 那一节末尾。
  */
-const SEAM_DIR_ARG = process.argv.indexOf('--seam-dir');
-const SEAM_DIR =
-  SEAM_DIR_ARG >= 0 && process.argv[SEAM_DIR_ARG + 1]
-    ? resolve(process.argv[SEAM_DIR_ARG + 1])
-    : join(ROOT, 'packages/ui/src/calendar');
-const SEAM_FILES = ['CalendarBoard.tsx', 'CalendarDayBoard.tsx', 'CalendarYearBoard.tsx'];
-/** 可选成员声明：`events?:` （带不带 `readonly` 都算）。 */
-const OPTIONAL_EVENTS_PROP = /^\s*(?:readonly\s+)?events\?\s*:/m;
-
-const seamProblems = [];
-for (const file of SEAM_FILES) {
-  const path = join(SEAM_DIR, file);
-  if (!existsSync(path)) {
-    // 🔴 文件不在 = 红，不是跳过（§7 第 191 条：挂在文件枚举上的门禁，
-    //    目标被删时会安静地不执行还照样打印通过）。
-    seamProblems.push({ file: relative(ROOT, path), why: '文件不在了 —— 这条判据不能因为改名/删除而静默失效' });
-    continue;
-  }
-  const source = stripComments(readFileSync(path, 'utf8'));
-  if (OPTIONAL_EVENTS_PROP.test(source)) {
-    seamProblems.push({
-      file: relative(ROOT, path),
-      why: '`events` 被声明成了**可选** prop（`events?:`）—— 见本文件规则三那段',
-    });
-  }
-}
-
-if (seamProblems.length > 0) {
-  console.error('❌ 共享日历板的倒数日缝不再是必填 prop（W6 第三条规则）：\n');
-  for (const p of seamProblems) console.error(`   ${p.file}\n      ${p.why}`);
-  console.error(
-    '\n   后果：宿主忘接倒数日时 typecheck 与规则二**都不响**，"这台设备没有倒数日"' +
-      '\n   会被静默画成正常界面。改回 `readonly events: readonly CountdownEvent[];`，' +
-      '\n   没有倒数日就传 `[]`。\n',
-  );
-  process.exit(1);
-}
 
 console.log(
   `✅ ${scanned} 个屏：读物化状态的那些都订阅了 dataRevision；` +
-    `${boardHosts} 个渲染共享日历板的宿主都读了并喂进了倒数日；` +
-    `${SEAM_FILES.length} 枚共享板组件的 \`events\` 仍是必填。`,
+    `${boardHosts} 个渲染共享日历板的宿主都读了并喂进了倒数日。`,
 );

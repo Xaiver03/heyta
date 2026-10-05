@@ -1252,6 +1252,25 @@ main 的字节 ⇒ **rc=0**；载体 `8c468c2a` 的三枚 blob ⇒ **rc=1，2 �
    （倒数日那个数只有一个真源 = 倒数纪念日面板那张卡）。🔴 这是**产品口径差异不是技术差异**，
    要人拍 —— 我不替那条线把它撤掉，也不把本侧这句读成"已生效"。
 
+**合流裁决（2026-10-05 23:5x，产品负责人拍，本线不代拍）**：
+「倒数日上日历这一族」**整体取载体那一代**（`8c468c2a`），上面三条随之定为
+**① 可选 `events?:` ② `-event` ③ 画**。
+🔴 今天那一代**没有被销毁**：它在 `93a1c378` 里逐字可达（16 文件 / +1517 −59），
+差集就是下面这张单子 —— 它不是"被否决的方案"，是**还没搬过来的四层东西**。
+
+| 开单（W6b，未开工） | 补回来要动哪几处 | 一条读数（今天现量） |
+|---|---|---|
+| ① **共享板的 `events` 改回必填** | `packages/ui/src/calendar/{CalendarBoard,CalendarDayBoard}.tsx` 的 prop 声明 + 三处聚合层（`calendarCellBars` / `calendarDayTone` / `groupEventsForGrid`），且**每个宿主都得真的传**（不显示倒数日的宿主传 `[]`） | 载体那一代的可选是**有理由的**：`CalendarBoard.tsx` 的 `eventsByDate` 写明"没给 ⇒ 整块 `undefined`、一次投影都不做"，`model.ts` 的 `calendarCellBars` 写明"都不给时逐字节等于改动前" ⇒ 这一档不是无脑翻回，要连那两个理由一起处理 |
+| ② **`check:materialized-reads` 规则三** | 那三枚组件的形状判据 + 它的 `--seam-dir` 取证旋钮 | 已随①退役（`scripts/check-materialized-reads.mjs` 里那段注释就是退役记录，含它自己被预判中的那句话）；规则二**留下**，实测对**载体那一代**仍有牙：`CalendarView.tsx` 的 `events={events}`→`events={[]}` ⇒ RC=1 命中「字面空数组」；`CalendarScreen.tsx` 摘掉 `events={events}` ⇒ RC=1 命中「没有把它作为」（两臂各自跑完立刻按 sha256 写回原字节，前后一致才继续） |
+| ③ **变异台 `scripts/mutate-calendar-event-source.mjs`** | 它的臂里凡是以①那一代字节为 needle 的那些（`packages/ui/src/calendar/model.ts` 那一族） | 现量 `grep -c "for (const event of events)" packages/ui/src/calendar/model.ts` 回 **0** ⇒ M1 的 needle 已不在合流后的树上，而这台台子对"目标字节不是恰好出现 1 次"是 `process.exit(1)`（脚本自己那段 occurrences 校验）⇒ 它现在**会在起跑处响亮退出**（不是静默存活），所以留在树里等①；文件头"臂数由脚本自己打印"的规矩照旧 |
+| ④ **`calendar-year-board.spec.tsx` 两臂 + `packages/domain` 农历锚点更正** | 年档那颗点"任务+倒数日一起数"、`lunarToSolar` 那条假前提（2025-12-15 落公历 **2026-02-02** 不是 1 月） | 载体版 `packages/domain/tests/events.spec.ts` 里 `2026-01-03` 与 `month: 11` 命中 **0**（上面④行原读数）—— 🔴 这一条**与合流无关、是真缺陷**，不该等①，可以单独开工 |
+
+**⏹→✅ 上面那段"合并中、`git ls-files -u` 非 0"的登记已过期**（10-05 23:5x 现量：
+`git ls-files -u | wc -l` = **0**，`HEAD` = `3cf84310`，载体已并进 `main`）：
+本线不替别人解冲突那句**仍然有效**，但触发条件已经不成立。
+🔴 而那三条"合流后必须重跑"的复验（变异台整趟、`cd e2e && npx playwright test tests/countdown-calendar.spec.ts` 并**逐张重看**、
+`pnpm reinstall:all` 的当前产物那一格）**一件都没做** —— 合并把树并齐了，不等于取证做完了。
+
 **就地更正两句**（原句留在旁边，是为了让后来者认出这个形状）：
 
 - 1152 行那句「**W6 落地时必须复用 `dayMarker?` 那条缝，不要另开一个注入点**」—— 🔴 **不成立，已否证**：

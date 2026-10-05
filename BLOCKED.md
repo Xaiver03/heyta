@@ -5641,3 +5641,24 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 ② 三把验证台进 `package.json` 常驻消费者；③ traps 那条「差分形状 ≠ 差分语义」入册。
 **复跑命令**：`git ls-files -u | wc -l` 回 `0` 才动，非 `0` 就是仍在别人手里 —— 本线不替别人解冲突，
 也不为了变绿去改任何一条判据的口径。
+
+## B87（2026-10-05 23:5x，合流会话）：全量合并之后剩的**三条静态红**，逐条先过归属再动手
+
+**为什么这条值得占一个号**：合流把五条线并成一条之后，"`pnpm check` 还红 3 条"这句话**读起来像
+我搞坏了三处**，而实际只有一处是我造成的。归属不是措辞问题 —— 它决定谁来修、修哪一层。
+
+| 红 | 现量命令与读数 | 归属 | 处置 |
+|---|---|---|---|
+| `check:materialized-reads` | `node scripts/check-materialized-reads.mjs` ⇒ **RC=1**，报两枚组件的 `events?:` | 🔴 **我造成的**：规则三住在 `93a1c378`（本地那一代），代码整体取了载体那一代（`8c468c2a`，`events?:` 是它的设计：不给时整块不投影）⇒ 判据与被选中的那一代相冲 | **按同一裁决退役规则三**（不是放宽：它随那一代整体退役，字节仍在 `93a1c378` 可达，工单在 `docs/plans/countdown-anniversary.md` W6 末尾）。规则二**留下**，并在**载体那一代**上重验它有牙：`CalendarView.tsx` 的 `events={events}`→`events={[]}` ⇒ RC=1 命中「字面空数组」；`CalendarScreen.tsx` 摘掉 `events={events}` ⇒ RC=1 命中「没有把它作为」（两臂各自按 sha256 写回原字节）。现量 **RC=0**：`✅ 30 个屏…；2 个渲染共享日历板的宿主都读了并喂进了倒数日。` |
+| `check:md-tables` | `node scripts/check-md-table-rows.mjs` ⇒ **RC=1**：`docs/plans/trash-and-archive.md:744` 第 5 格一枚落单反引号（基线 0，只许减） | **回收线已提交的缺陷**：那一行在 HEAD 与工作树**逐字相同**，合流没碰它 | ⚠️ **登记不代改**，理由不是"别人的文件"这一条规矩，是**写者此刻就在这枚文件上**：`git diff -- docs/plans/trash-and-archive.md` 现量是**两个 hunk**（我那 1 字符 + 末尾 `+62` 行是他们正在追加的 §10.x）。我先改了那一字符，现量到这个并发写痕之后**把自己那处退回去**，让整枚文件留在他们那笔里 —— 现在 `git diff --numstat` 回 `62 0`，我的 hunk 已不在。修法就一个字符：`:744` 那格末尾 `仍待闸门\` ⇒` 的反引号删掉 |
+| `check:selection-single-source` | `node scripts/check-selection-single-source.mjs` ⇒ **RC=1**，两格：断言 G 的 `AdminPanel.tsx pendingApproveId`、断言 B 的 `AssistantScreen.tsx:690/:1036 selectedId` | 🔴 **断言 G 那格是公开 main 自己带的红**：门禁脚本 `git diff 8c468c2a -- scripts/check-selection-single-source.mjs` = **0 行**，`AdminPanel.tsx` 同样 0 行，而在**载体 worktree 里逐字跑它自己的门禁**（`cd …/heyta-wt-consolidate && node scripts/check-selection-single-source.mjs`）⇒ **RC=1，同一格、同一个变量名**。断言 B 那格来自 AI 线 `a9f0867a`（`git cat-file -e 8c468c2a:apps/mobile/src/ai/AssistantScreen.tsx` 回 **no** ⇒ 载体里没有这枚文件） | **两格都不代改**：G 要人判它是"第二个选中所有者"还是四类瞬态里的 `confirm-gate`（代码自己那句注释写的是"待确认的那一条退款 id（两步式批准）"，读起来像后者，但**类别由写它的人登记**，我替他登记就等于把名册变成第二套口径）；B 要接 `@heyta/app-host` 的 `selection.ts`，是 AI 线的活（他们还在跑） |
+
+🔴 **可迁移的一条**：合流后剩下的每一条红，**先问"这条红在哪个树上已经存在"**再动手 ——
+载体那一代有没有这枚文件、门禁脚本本身漂没漂、以及**能不能在载体的检出里逐字复跑**。
+三条里若只按"我现在树上看到的"归因，会把公开 main 自带的一条记成我合并搞坏的。
+另一条同样重要：**"我先改了再退回去"不是反复** —— 是现量到并发写痕之后唯一 reversible 的收口（§8.9 独占验收）。
+
+**本格的边界（别读成"合并完成了"）**：`git ls-files -u | wc -l` = **0**、`pnpm -r build` rc=0、
+除 `@heyta/node-host` 外全包 typecheck rc=0（node-host 那枚文件正被回收线在飞编辑占着）。
+**未做**：`pnpm -r test` 全量（内存闸门 tfa-shield 拒跑，未用 `TFA_ALLOW_CONCURRENT_TEST` 抢）、
+`pnpm reinstall:all` 的四端当前产物、e2e 那一族（含 B86 要求"逐张重看"的那五张）。
