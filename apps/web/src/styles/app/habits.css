@@ -373,3 +373,118 @@
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
+
+/*
+ * 频次编辑器（工单 H5）。形状与上面 `.ht-habit__icon-*` 那一族同一套
+ * （展开式，不是浮层）—— 同一栏里两个"挑一个值"的控件不该长得不一样。
+ *
+ * 🔴 为什么不写成内联样式（组件里一条 `style={{…}}` 都没有）：
+ *    `scripts/check-l4-no-style.mjs` 的棘轮只减不增（现量见该脚本），
+ *    新组件加内联样式会直接把 `pnpm check` 弄红。这条不是风格偏好，是门禁口径。
+ */
+.ht-habit__freq {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--ht-space-1);
+  flex: none;
+}
+
+.ht-habit__freq-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__freq-word {
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__freq-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-habit__freq-tiers,
+.ht-habit__freq-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+  align-items: center;
+}
+
+/* 档位与星期格子**同等样式**：没有哪一档被标成推荐（与八个字形同一条立场）。
+   选中态走边框 + 主色底，两种线索，色觉障碍下仍分得出（同 `.ht-habit__row`）。 */
+.ht-habit__freq-chip {
+  min-width: var(--ht-touch-target-min);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__freq-chip[aria-pressed='true'] {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-habit__freq-n {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* `tabular-nums`：这是数字输入（AGENTS §5 —— 不写就会随字符宽度跳）。 */
+.ht-habit__freq-n input {
+  inline-size: calc(var(--ht-space-8) * 2);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 这句是**产品说明**不是装饰：`interval` 的锚点是固定日历格
+   （`isScheduledOn` 拿 `1970-01-01` 取模），不写出来用户会以为"每 3 天"
+   的下一天必然是三天后。 */
+.ht-habit__freq-hint {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-habit__freq-error {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-danger);
+}
+
+.ht-habit__freq-toggle:focus-visible,
+.ht-habit__freq-chip:focus-visible,
+.ht-habit__freq-n input:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}

@@ -54,9 +54,7 @@
  *      但那条门禁扫的是通用界面，这里点名这一处）
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { mobileSources, read, stripComments } from './source-reading';
 
 import type { Habit } from '@heyta/domain';
 import { createHabitActions, type HabitActions } from '@heyta/app-host';
@@ -66,36 +64,10 @@ import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 import { OpType } from '@heyta/sync-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// `apps/mobile/tests` 上**三级**才是仓库根。
-const REPO = join(dirname(fileURLToPath(import.meta.url)), '../../..');
+// 读文件 / 剥注释 / 列源码这三件事住在 `./source-reading`（工单 H5 起收口成一份；
+// 原来本文件与 `habit-icon-picker.spec.ts` 各有一份**已经漂移**的实现 ——
+// 一份剥注释用 `^\s*//`、另一份用 `^[ \t]*//`，这正是"同一判断写两遍"的必然结果）。
 const SCREEN = 'apps/mobile/src/screens/HabitsScreen.tsx';
-
-const read = (rel: string): string => readFileSync(join(REPO, rel), 'utf8');
-
-/** 剥掉块注释与行注释：判据读的是**代码**，不是注释里的一句话。 */
-const stripComments = (src: string): string =>
-  src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
-
-/** 列出 `apps/mobile/src` 下所有源文件（.ts/.tsx，不含测试与 node_modules）。 */
-function mobileSources(): string[] {
-  const root = join(REPO, 'apps/mobile/src');
-  const acc: string[] = [];
-  const walk = (dir: string): void => {
-    for (const name of readdirSync(dir)) {
-      const full = join(dir, name);
-      if (name === 'node_modules') continue;
-      if (statSync(full).isDirectory()) {
-        walk(full);
-      } else if (/\.tsx?$/.test(name) && !/__tests__/.test(full)) {
-        acc.push(relative(REPO, full));
-      }
-    }
-  };
-  walk(root);
-  return acc.sort();
-}
 
 // ── 行为层夹具（与 organizer-rename.spec.ts 同一副；真引擎、真 SQLite、零 mock）──
 let adapter: SqliteAdapter;

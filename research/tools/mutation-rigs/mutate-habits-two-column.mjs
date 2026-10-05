@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * 习惯清单两列卡片（工单 H1）与图标选择器那一排（工单 H3）的**真浏览器层**变异臂。
+ * 习惯清单两列卡片（H1）、图标选择器那一排（H3）与频次面板那一排（H5）的**真浏览器层**变异臂。
  *
  * 这台臂台要回答的问题只有一个：`e2e/tests/habits-two-column.spec.ts` 那 7 条
  * 是不是 `apps/web/tests/habits-list-pane.spec.tsx` 那 8 组的**重复**？
  * 答案必须是"不是"，证明方式与 `mutate-detail-pane-habits-e2e` 那一台同形：
  * **造只有浏览器能看见的坏，看 jsdom 那一层红不红。**
  *
- * 四份坏都是"布局坏了而 DOM 一行没动"那一族，jsdom 结构上看不见（它不做布局，
+ * 五份坏都是"布局坏了而 DOM 一行没动"那一族，jsdom 结构上看不见（它不做布局，
  * `boundingBox()` 恒为 0）：
  *
  *   N1 摘掉 `.ht-habit__side` 的 `container-type` ⇒ `@container` 那条**永不命中**，
@@ -44,11 +44,15 @@ import process from 'node:process';
 const ROOT = process.cwd();
 const CSS = 'apps/web/src/styles/app/habits.css';
 const JSDOM_SPEC = 'tests/habits-list-pane.spec.tsx';
-/* 🔴 e2e 腿一次跑**两份** spec：这一族共用同一枚 `habits.css`、同一个
-   `vite preview` 载体，而 N4 打的是图标选择器那一条几何判据。分开起两次载体
-   要多花两倍的时间等端口，红集却不会因此更清楚 —— 判据的"恰好等于点名那几条"
-   是拿标题前缀比的（`T*` = 两列那一族，`I*` = 图标那一族）。 */
-const E2E_SPECS = ['tests/habits-two-column.spec.ts', 'tests/habit-icon-picker.spec.ts'];
+/* 🔴 e2e 腿一次跑**三份** spec：这一族共用同一枚 `habits.css`、同一个
+   `vite preview` 载体，而 N4/N5 打的都是**几何**判据（图标那一排 / 频次那一排）。
+   分开起三次载体要多花三倍的时间等端口，红集却不会因此更清楚 —— 判据的"恰好等于点名那几条"
+   是拿标题前缀比的（`T*` = 两列那一族，`I*` = 图标那一族，`Q*` = 频次那一族）。 */
+const E2E_SPECS = [
+  'tests/habits-two-column.spec.ts',
+  'tests/habit-icon-picker.spec.ts',
+  'tests/habit-frequency.spec.ts',
+];
 const BIN = (rel) => path.join(ROOT, 'apps/web', 'node_modules', '.bin', rel);
 
 /** `from` 必须**恰好命中一次**（命中 0 次 = 臂打空，命中 2 次 = 改到了不该改的地方）。 */
@@ -119,6 +123,44 @@ const ARMS = [
     marker: '--h1-arm-n4',
     expectTitles: ['I6'],
     expectMessage: /超出视口宽|超出窗格右边界|被推到视口左边外面/,
+  },
+  {
+    /* 工单 H5 的频次面板与图标那一排是**同一族坏**（一排定宽控件在窄窗格里被撑出去）。
+       这一臂把星期那一排改回**修之前的形状**：不换行、每枚 chip 仍带 `min-width: 44px`
+       ⇒ 7×44 + 6×4 = 332 一定超出窗格，而 DOM 一个都不少：jsdom 那 23 条与 G 层那 11 条
+       **结构上看不见**（`boundingBox()` 在 jsdom 里恒 0）。⇒ 只有 `Q6` 那条几何判据会红。
+       🔴 **第一版这一臂是无效的注入，而它报出来的读数长得像"Q6 没牙"**：
+       它写的是 `display: grid; grid-template-columns: repeat(9, …44px)` —— 那一排只有
+       **七枚** chip，于是溢出去的是**第 8、9 根空的轨道**，七枚看得见的一格都没挪位置，
+       Q6 逐格量右边界当然全绿。"存活"在这里回答的是"**这份坏没落到界面上**"，
+       不是"判据没牙"（与 §7 第 273 条"变异要先过'进没进产物'那道前置"同向，
+       只是这里过的是"进没进**布局**"）。改成 `flex-wrap: nowrap` 之后它真的把
+       第 6、7 枚推出窗外，Q6 红。 */
+    name: 'N5 频次面板的星期那一排不换行（被撑出窗格右边界）',
+    kind: 'append',
+    marker: '--h1-arm-n5',
+    css: `
+/* MUTATION-ARM N5（临时，本脚本收尾会删）：星期那一排不退行、且每枚变宽
+   = "给 chip 加字"那一类改动的 CSS 等价物。
+   🔴 前两版**都打空**，而报出来的读数都长得像"Q6 没牙"：
+      ① 「display: grid; grid-template-columns: repeat(9, …44px)」 —— 那一排只有七枚，
+         溢出去的是第 8、9 根**空轨道**，看得见的一格都没挪位置（§7 第 323 条）；
+      ② 只写「flex-wrap: nowrap」 —— 七枚各 44px 加空隙共 332px，而这一视口下
+         详情窗格**放得下**，于是"不换行"没有让任何一枚越界，Q6 逐枚量右边界当然全绿。
+      ⇒ 几何臂的前置是"**这一份坏必须真的把某个可见元素推出边界**"。
+      加宽（「padding-inline」）是把 332 变成 532 的最小改动，而它对应的正是
+      代码里那句被记过账的诱惑："给星期名前面拼一个「周」字"。 */
+.ht-habit__freq-days {
+  --h1-arm-n5: 1;
+  flex-wrap: nowrap;
+}
+.ht-habit__freq-days .ht-habit__freq-chip {
+  flex-shrink: 0;
+  padding-inline: var(--ht-space-4);
+}
+`,
+    expectTitles: ['Q6'],
+    expectMessage: /超出视口宽|超出窗格右边界|被推到视口左边外面|展开的格数不是/,
   },
 ];
 
@@ -251,7 +293,7 @@ const fail = (msg) => {
 
 const redTitles = (out) => [
   ...new Set(
-    [...out.matchAll(/✘[^\n]*?›\s*([TI]\d[^\n]*?)\s*$/gm)].map((m) => (m[1] ?? '').trim().slice(0, 4)),
+    [...out.matchAll(/✘[^\n]*?›\s*([TIQ]\d[^\n]*?)\s*$/gm)].map((m) => (m[1] ?? '').trim().slice(0, 4)),
   ),
 ];
 
@@ -262,15 +304,15 @@ const cleanDigest = distDigest();
 const bj = jsdom();
 if (bj.rc !== 0 || bj.passed < 1) fail(`干净态 jsdom 层不干净：${bj.line}`);
 const be = e2e();
-/* 🔴 基线的"至少多少条"是**两份 spec 之和**（两列那族 7 条 + 图标那族 6 条）。
+/* 🔴 基线的"至少多少条"是**三份 spec 之和**（两列 7 + 图标 6 + 频次 7）。
    这个数字只用于"载体是不是根本没跑起来"这一档，不用于判红集 —— 红集永远逐条点名。 */
-if (be.rc !== 0 || be.passed < 13 || be.failed > 0) {
+if (be.rc !== 0 || be.passed < 20 || be.failed > 0) {
   /* 🔴 报错必须带上原始尾巴：本轮第一次跑就是 `passed=-1 failed=-1`，
      那**不是**判据没牙，是 4371 被上一次运行留下的 `vite preview` 占着
      （Playwright 直接拒绝起 webServer，一行汇总都不打）。
      只看这两个 -1 会把它读成"干净态不干净 = 产品坏了"。 */
   fail(
-    `干净态 e2e 层不干净（要 >=13 passed / 0 failed）：${be.line}\n` +
+    `干净态 e2e 层不干净（要 >=20 passed / 0 failed）：${be.line}\n` +
       `—— 尾巴：\n${be.out.slice(-1200)}`,
   );
 }
@@ -333,6 +375,19 @@ for (const arm of ARMS) {
   );
   if (blind && teeth) ok += 1;
   else bad.push(`${arm.name}（红集=${titles.join(',') || '空'}，期望=${expected.join(',')}）`);
+  /* 🔴 红集不等于期望时，把**每条红的报错头两行**打出来。
+     原来这里只打一行标题集，于是"多了两条 I2/I4"这种读数**无法归因**：
+     看的人分不清那是这一臂真的连带打坏了别的可见东西，还是用例在等一个没到的状态。
+     没有报错原文就只能重跑一遍专门去抓它 —— 而重跑一次要 8 分钟。 */
+  if (!(blind && teeth)) {
+    const lines = me.out.split('\n');
+    const heads = [];
+    for (const [i, l] of lines.entries()) {
+      if (/^\s*\d+\) /.test(l)) heads.push(lines.slice(i, i + 4).join('\n'));
+      if (heads.length >= 6) break;
+    }
+    console.log(`   报错原文（红集与期望不一致时才有这一段）：\n${heads.join('\n---\n') || '(解析不到报错块)'}`);
+  }
 
   restore();
   if (md5() !== origMd5) fail(`${arm.name}：复原失败，habits.css 与基线 md5 不同，必须手工核对`);

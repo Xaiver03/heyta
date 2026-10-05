@@ -33,7 +33,18 @@
  */
 
 import type { I18nValue, MessageKey } from '@heyta/i18n';
-import type { HabitBoardLabels, HabitProgressListLabels } from '@heyta/ui';
+import type { HabitDayState, LocalDate } from '@heyta/domain';
+import {
+  CALENDAR_VIEW_LABEL_KEYS,
+  WEEKDAY_MESSAGE_KEYS,
+  formatDayTitleText,
+  formatMonthTitleText,
+  type CalendarViewTabsLabels,
+  type HabitBoardLabels,
+  type HabitMonthLabels,
+  type HabitYearLabels,
+  type HabitProgressListLabels,
+} from '@heyta/ui';
 
 /**
  * 月份词条 key（1 月 → 12 月，下标 = 月份 − 1）。
@@ -200,5 +211,79 @@ export function habitListLabels(t: I18nValue['t']): HabitProgressListLabels {
     streakCurrent: (count) => currentStreakText(count, t),
     streakLongest: (count) => longestStreakText(count, t),
     streakTotal: (count) => totalCheckInText(count, t),
+  };
+}
+
+/**
+ * 构造共享 `HabitMonthBoard`（月历 + 可点补打卡，工单 H4）需要的文案。
+ *
+ * 🔴 六档句子与 web 用的是**同一批 `web.habits.month.*` key**（本文件开头那条
+ * "命名残差"在这里继续成立）：月历格子上说的是"这天能不能补"，四端同一个事实。
+ * 在移动端另开一组 `mobile.habits.month.*` 会出现"同一个 too-old，
+ * web 说『已超过补打卡窗口』、手机说『太久了』"，而词条表多几条同义键不会让
+ * 任何测试变红。
+ *
+ * ⚠️ 移动端**不注入** `cellTitle`：那是悬停提示，触屏没有悬停
+ * （与 `HabitBoard` 的 `cellTooltip` 同一条约定 —— 不传就完全不产出属性）。
+ */
+const MONTH_STATE_KEYS = {
+  logged: 'web.habits.month.logged',
+  today: 'web.habits.month.today',
+  backfillable: 'web.habits.month.backfillable',
+  'not-scheduled': 'web.habits.month.notScheduled',
+  future: 'web.habits.month.future',
+  'too-old': 'web.habits.month.tooOld',
+} as const satisfies Record<HabitDayState, MessageKey>;
+
+export function habitMonthLabels(t: I18nValue['t']): HabitMonthLabels {
+  return {
+    grid: ({ name, month }) => t('web.habits.month.grid', { name, month }),
+    weekdays: WEEKDAY_MESSAGE_KEYS.map((key) => t(key)),
+    monthTitle: (date) => formatMonthTitleText(date, t),
+    prevMonth: t('mobile.common.prevMonth'),
+    nextMonth: t('mobile.common.nextMonth'),
+    windowHint: (days) => t('web.habits.month.window', { n: days }),
+    // 每档的句子**自带 `{date}`**（与 web 那份同一个形状）：这里只把日期用共享的
+    // `formatDayTitleText` 说出来，不参与拼装。
+    day: ({ date, state }) =>
+      t(MONTH_STATE_KEYS[state], { date: formatDayTitleText(date, t) }),
+    // 补白格另有一句：上一月视图里"今天"是一格尾随补白，按状态念会变成
+    // "今天还没打卡"而点不动 —— 那句话必须是"它不在这个月里"。
+    outOfMonth: ({ date }) =>
+      t('web.habits.month.outOfMonth', { date: formatDayTitleText(date, t) }),
+  };
+}
+
+/**
+ * 年那一档的文案（工单 H7，移动端）。
+ *
+ * 🔴 与 web 那份**各自存在**是刻意的：两端的构造器都要吃自己那侧的 `t`，
+ * 而共享层不许 import i18n（第二份 React）。相同的是**关名表**：
+ * 档位名走共享层那一份 `CALENDAR_VIEW_LABEL_KEYS`，月份名走共享的
+ * `formatMonthTitleText` —— 两端都没有第二套"月份/档位叫什么"。
+ */
+export function habitYearLabels(t: I18nValue['t']): HabitYearLabels {
+  return {
+    grid: ({ name, year }) => t('web.habits.year.grid', { name, year }),
+    yearTitle: (year) => t('common.date.yearTitle', { year }),
+    monthName: (monthKey) => formatMonthTitleText(`${monthKey}-01` as LocalDate, t),
+    achieved: (days) => t('web.habits.year.achieved', { n: days }),
+    rate: (percent) => t('web.habits.year.rate', { n: percent }),
+    noDenominator: t('web.habits.year.none'),
+    future: t('web.habits.year.future'),
+    card: ({ monthName, achievedDays, rateText }) =>
+      t('web.habits.year.card', { month: monthName, state: rateText, achieved: achievedDays }),
+    prevYear: t('common.calendar.prevYear'),
+    nextYear: t('common.calendar.nextYear'),
+    summary: ({ achievedDays, rateText }) =>
+      t('web.habits.year.summary', { achieved: achievedDays, state: rateText }),
+  };
+}
+
+/** 「月 ⇄ 年」那排切换器：档位名取共享层那一张表，不新增词条。 */
+export function habitTrendTabs(t: I18nValue['t']): CalendarViewTabsLabels {
+  return {
+    group: t('common.calendar.view.aria'),
+    name: (kind) => t(CALENDAR_VIEW_LABEL_KEYS[kind]),
   };
 }

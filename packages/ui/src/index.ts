@@ -1154,3 +1154,60 @@ export {
   HABIT_ICON_LABEL_KEYS,
   type HabitIconLabelKey,
 } from './habits/HabitProgressList.js';
+
+/**
+ * ── 工单 H5：频次的「哪种说法」与「1–7 念作什么」 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 与 `habitGoalSummaryKey` 同一类收编：web 与移动端各有一个频次编辑器，
+ * 而"哪一种频次说哪句话""`3` 念作『三』"是同一个判断。各写一份的症状是
+ * "同一个 `weekly`，web 说『每周 三』、移动端说『周三』"，两边都不报错。
+ *
+ * ⚠️ 只给 **key**，句子本身在词条表里（本包不 import `@heyta/i18n`）。
+ */
+export {
+  HABIT_WEEKDAY_MESSAGE_KEYS,
+  habitFrequencySummaryKey,
+  type HabitFrequencySummaryKey,
+  type HabitWeekdayMessageKey,
+} from './habits/model.js';
+
+/**
+ * ── 工单 H4：习惯月历 + 可点补打卡 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 判定的唯一所有者在 `@heyta/domain#habitDayState`（`backfillDays` 那位迟到三年的读取者），
+ * 本块导出的是**视图与映射**：格子怎么排、哪一格按下去是打卡还是撤销。
+ *
+ * ⚠️ 文案全部由宿主注入（`labels` 是函数表）—— 本包不 import `@heyta/i18n`，
+ *    理由与 `calendar/model.ts` 文件头那条"第二份 React"同一条。
+ */
+export {
+  HabitMonthBoard,
+  type HabitMonthLabels,
+  type HabitMonthBoardProps,
+} from './habits/HabitMonthBoard.js';
+export {
+  habitMonthCellAction,
+  habitMonthCells,
+  habitMonthWindowDays,
+  isHabitMonthCellInteractive,
+  isHabitMonthForwardCapped,
+  type HabitMonthCell,
+} from './habits/month-model.js';
+/* 工单 H7：年那一档 + 持有游标的容器。
+   🔴 宿主挂的是 `HabitTrendBoard`（不是两块板各挂一次）—— 两档共用一枚游标，
+   各挂一次就是各持一枚，"年在 2026、月在 2025"那种状态会不需要错误就出现。 */
+export {
+  HabitYearBoard,
+  type HabitYearLabels,
+  type HabitYearBoardProps,
+} from './habits/HabitYearBoard.js';
+export {
+  HabitTrendBoard,
+  type HabitTrendLabels,
+  type HabitTrendBoardProps,
+  type HabitTrendView,
+} from './habits/HabitTrendBoard.js';

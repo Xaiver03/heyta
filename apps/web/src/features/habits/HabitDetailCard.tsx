@@ -25,16 +25,23 @@
 import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { habitGrowth } from '@heyta/app-host';
 import { cssVar, ICON_SIZE } from '@heyta/design-system';
-import { parseCategorySlot, type Habit, type LocalDate } from '@heyta/domain';
+import { parseCategorySlot, toLocalDate, type Habit, type LocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { HabitBoard, HeytaUiProvider, type HabitBoardLabels } from '@heyta/ui';
+import {
+  HabitBoard,
+  HabitTrendBoard,
+  HeytaUiProvider,
+  type HabitBoardLabels,
+  type HabitTrendLabels,
+} from '@heyta/ui';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
 
 import { selection, useSelected } from '../../lib/selection.js';
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
+import { HabitFrequencyEditor } from './HabitFrequencyEditor.js';
 import { HabitGoalEditor } from './HabitGoalEditor.js';
 import { HabitIconPicker } from './HabitIconPicker.js';
-import { habitBoardLabels, paneEmptyText } from './board-labels.js';
+import { habitBoardLabels, habitMonthLabels, habitTrendTabs, habitYearLabels, paneEmptyText } from './board-labels.js';
 import { readNow, useHabitStore } from './store.js';
 
 /*
@@ -107,6 +114,15 @@ export function HabitDetailCard({ inset }: { inset: boolean }): React.JSX.Elemen
     [t, store.habits.length],
   );
 
+  /** 月历的文案（工单 H4）。六档句子与列头表都在共享层，这里只注入措辞。 */
+  const monthLabels = useMemo(() => habitMonthLabels(t), [t]);
+  // 「月 ⇄ 年」切换器的文案 + 年那一档的文案（工单 H7）。游标住在共享容器里，
+  // 宿主不另存一份 —— 两档共用同一枚游标，各存各的会不需要错误就漂。
+  const trendLabels = useMemo<HabitTrendLabels>(
+    () => ({ tabs: habitTrendTabs(t), month: monthLabels, year: habitYearLabels(t) }),
+    [t, monthLabels],
+  );
+
   /** 一次变更：先置灰，落盘后恢复。**不在这里判断业务**（那是 action 层的事）。 */
   const run = useCallback((habitId: string, pending: Promise<unknown>): void => {
     setBusyId(habitId);
@@ -129,21 +145,34 @@ export function HabitDetailCard({ inset }: { inset: boolean }): React.JSX.Elemen
   );
 
   /**
-   * 目标编辑入口。
+   * 目标与**频次**这两个编辑入口。
    *
    * 🔴 与 `renderColorSlot` 同一个形状：**编辑控件留在各端**，共享的 `HabitBoard`
    * 只负责把位置让出来（`renderGoalSlot`）。这里**不判断业务**（合法与否在 action 层）。
    *
+   * 🔴 频次为什么**跟着这一条插槽**而不是新加一条 `renderFrequencySlot`：
+   *    共享层那条新插槽只能是**可选**的（否则移动端不传就编译不过），而可选插槽
+   *    正是 §7 第 195 条点名的形状 —— "默认值等于原值的可选 prop 会把'宿主没接'
+   *    伪装成'做完了'"，typecheck 与既有门禁全绿。这一行让出来的是
+   *    **"这条习惯的规则"**那一格，目标与频次说的都是它，放一起是同一件事的两个字段。
+   *
    * ⚠️ 刻意**不包 `run()`**：`run()` 只 `.finally()`，没有 `.catch` ——
-   * 而 `setHabitGoal` 会 reject（非法数值 / 找不到习惯）。
+   * 而 `setHabitGoal` / `setHabitFrequency` 都会 reject（非法数值 / 非法频次 / 找不到习惯）。
    * 交给编辑器自己接住，它才显示得出那行错误（直接交给 `run` 会变成
    * 一条 unhandled rejection，用户看到的是"点了没反应"）。
    */
   const renderGoalSlot = useCallback(
     (habit: Habit): ReactNode => (
-      <HabitGoalEditor habit={habit} onSetGoal={(goal) => store.setHabitGoal(habit.id, goal)} />
+      <>
+        <HabitGoalEditor habit={habit} onSetGoal={(goal) => store.setHabitGoal(habit.id, goal)} />
+        <HabitFrequencyEditor
+          habit={habit}
+          today={toLocalDate(now)}
+          onSet={(frequency) => store.setHabitFrequency(habit.id, frequency)}
+        />
+      </>
     ),
-    [store],
+    [store, now],
   );
 
   return (
@@ -273,6 +302,31 @@ export function HabitDetailCard({ inset }: { inset: boolean }): React.JSX.Elemen
           renderGoalSlot={renderGoalSlot}
           testID="habit-board"
         />
+        {/*
+          工单 H4（月历）+ H7（年那一档）：**这格是宿主直接挂的兄弟节点**，不是给 `HabitBoard`
+          新加一条 `renderMonthBoard?` 插槽。理由是 §7 第 195 条：那条插槽只能是可选的（移动端
+          没接就编译不过），而"默认值等于原值的可选 prop"会把"宿主没接"伪装成"做完了"，
+          typecheck 与既有门禁全绿。挂在这里就没有这个形状 —— 不接就是没有。
+
+          ⚠️ 只有选中那一条才渲染（与板子同一个分母）：没选中时这里没有"哪条习惯的月历"
+          这件事，画一张空历比不画更容易被读成"这习惯没记录"。
+        */}
+        {selected === undefined ? null : (
+          <HabitTrendBoard
+            habit={selected}
+            logs={store.logs}
+            today={toLocalDate(now)}
+            labels={trendLabels}
+            onCheckIn={(habitId, date) => {
+              run(habitId, store.checkIn(habitId, date));
+            }}
+            onUndoCheckIn={(habitId, date) => {
+              run(habitId, store.undoCheckIn(habitId, date));
+            }}
+            busy={busyId === selected.id}
+            testID="habit-trend"
+          />
+        )}
       </HeytaUiProvider>
     </div>
   );

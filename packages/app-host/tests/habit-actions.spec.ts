@@ -19,7 +19,7 @@ import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 import { OpType, type Operation } from '@heyta/sync-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { isAchieved } from '@heyta/domain';
+import { computeStreak, isAchieved, isScheduledOn } from '@heyta/domain';
 
 import { createHabitActions, habitLogId, type HabitActions } from '../src/habit-actions.js';
 
@@ -332,6 +332,185 @@ describe('习惯图标（setHabitIcon）', () => {
 });
 
 /**
+ * 频次写入口（工单 H5）
+ * ======================
+ *
+ * 🔴 这一族要挡的坏，与"判定侧"无关 —— 判定侧（`isScheduledOn` → `computeStreak`）
+ * 早就按计划日数连续天数了，缺的**从来不是算法，是一条能写进去的路径**。
+ * 所以最后那两条（F6 / F7）是这一单的全部意义：**写完立刻拿判定侧读回来**。
+ * 只测"payload 里有 frequency"的话，"写入口接上了而判定根本不读这个键"
+ * 这个形状没有任何一层会红（§7 第 195 条：字段看起来有功能，而功能不可达）。
+ *
+ * ⚠️ 校验与归一**在动作层**（`normalizeHabitFrequency`），界面一个判断都不写：
+ *   · `{interval, everyNDays: 0}` 会让 `isScheduledOn` 里的取模除零 ⇒ NaN ⇒ 恒 false
+ *     ⇒ 连续天数永远 0，而界面上看不出哪里不对；
+ *   · `weekly` 空集合 = "没有计划日"，当"每天"会在用户没打算打卡的日子里判他断链；
+ *   · `interval:1` 与"七天全选"归一成 `daily` —— 同一语义在磁盘上只允许一种存法
+ *     （§3.3：已落盘的数据会长期存在）。
+ */
+describe('频次（setHabitFrequency / normalizeHabitFrequency）', () => {
+  /** 2026-03-01 是**周日**（ISO 7），03-02 周一、03-03 周二、03-09 周一。 */
+  const MON1: LocalDate = '2026-03-02';
+  const TUE: LocalDate = '2026-03-03';
+  const MON2: LocalDate = '2026-03-09';
+
+  const frequencyOps = async (id: string) =>
+    (await engine.getOpsForEntity('HABIT', id)).filter((op) => 'frequency' in payloadOf(op));
+
+  it('F1 建的时候带频次 ⇒ CREATE 的 payload 里就有它', async () => {
+    const id = await actions.createHabit('写周报', { frequency: { type: 'weekly', daysOfWeek: [5] } });
+    const create = (await engine.getOpsForEntity('HABIT', id)).at(-1);
+
+    expect(create?.opType).toBe(OpType.Create);
+    expect(payloadOf(create!).frequency).toEqual({ type: 'weekly', daysOfWeek: [5] });
+    expect(engine.getState().habits[id]?.frequency).toEqual({ type: 'weekly', daysOfWeek: [5] });
+  });
+
+  it('F2 改频次 = 恰好一条 UPD，且物化状态读得到', async () => {
+    const id = await actions.createHabit('拉伸');
+    const before = (await engine.getOpsForEntity('HABIT', id)).length;
+
+    await actions.setHabitFrequency(id, { type: 'interval', everyNDays: 3 });
+
+    const after = await engine.getOpsForEntity('HABIT', id);
+    expect(after).toHaveLength(before + 1);
+    expect((await frequencyOps(id)).at(-1)?.opType).toBe(OpType.Update);
+    expect(engine.getState().habits[id]?.frequency).toEqual({ type: 'interval', everyNDays: 3 });
+  });
+
+  it('🔴 F3 清除写成显式 null，不是"不放这个键"（不放 = 不改）', async () => {
+    const id = await actions.createHabit('冥想', { frequency: { type: 'interval', everyNDays: 4 } });
+    expect(engine.getState().habits[id]?.frequency).toBeDefined();
+
+    await actions.setHabitFrequency(id, undefined);
+
+    const cleared = (await frequencyOps(id)).at(-1);
+    expect(payloadOf(cleared!).frequency).toBeNull();
+    expect(engine.getState().habits[id]?.frequency).toBeUndefined();
+  });
+
+  it('🔴 F4 非法值一条 op 都不发出（落成"看起来改了而判定恒 false"最坏）', async () => {
+    const id = await actions.createHabit('背单词');
+    const before = (await engine.getOpsForEntity('HABIT', id)).length;
+    const state = engine.getState().habits[id]?.frequency;
+
+    // 四份坏：除零那一档、非整数、空的日子集合、闭集外的星期号。
+    const bad: unknown[] = [
+      { type: 'interval', everyNDays: 0 },
+      { type: 'interval', everyNDays: 2.5 },
+      { type: 'weekly', daysOfWeek: [] },
+      { type: 'weekly', daysOfWeek: [8] },
+    ];
+    for (const input of bad) {
+      await expect(
+        actions.setHabitFrequency(id, input as never),
+        `非法频次被放过去了：${JSON.stringify(input)}`,
+      ).rejects.toThrow();
+    }
+
+    const after = await engine.getOpsForEntity('HABIT', id);
+    expect(after).toHaveLength(before);
+    expect(after.some((op) => 'frequency' in payloadOf(op))).toBe(false);
+    expect(engine.getState().habits[id]?.frequency).toBe(state);
+  });
+
+  it('🔴 F5 归一：`interval:1` 与"七天全选"都存成 daily（同一语义只许一种存法）', async () => {
+    const a = await actions.createHabit('喝水');
+    const b = await actions.createHabit('深呼吸');
+
+    await actions.setHabitFrequency(a, { type: 'interval', everyNDays: 1 });
+    await actions.setHabitFrequency(b, {
+      type: 'weekly',
+      daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
+    });
+
+    expect(payloadOf((await frequencyOps(a)).at(-1)!).frequency).toEqual({ type: 'daily' });
+    expect(payloadOf((await frequencyOps(b)).at(-1)!).frequency).toEqual({ type: 'daily' });
+  });
+
+  it('🔴 F5b 日子集合去重 + 升序（不去重就会有 `[3,1,3]` 与 `[1,3]` 两份存量）', async () => {
+    const id = await actions.createHabit('周会');
+    await actions.setHabitFrequency(id, { type: 'weekly', daysOfWeek: [3, 1, 3, 1] });
+
+    expect(engine.getState().habits[id]?.frequency).toEqual({ type: 'weekly', daysOfWeek: [1, 3] });
+  });
+
+  it('F6 🔴 写完判定侧真的读得到：每周只挑周一 ⇒ 周二不是计划日', async () => {
+    const id = await actions.createHabit('写周报');
+    await actions.setHabitFrequency(id, { type: 'weekly', daysOfWeek: [1] });
+
+    const habit = engine.getState().habits[id]!;
+    expect(isScheduledOn(habit.frequency, MON1)).toBe(true);
+    expect(isScheduledOn(habit.frequency, TUE)).toBe(false);
+    // 对照：没设过频次的那条恒真（"未设置 = 每天"这条口径没被本单改掉）。
+    const plain = await actions.createHabit('随便');
+    expect(isScheduledOn(engine.getState().habits[plain]!.frequency, TUE)).toBe(true);
+  });
+
+  it('F7 🔴 连续天数按计划日数：同样两个周一，weekly 连成 2、daily 只算 1', async () => {
+    const weekly = await actions.createHabit('周复盘');
+    await actions.setHabitFrequency(weekly, { type: 'weekly', daysOfWeek: [1] });
+    const daily = await actions.createHabit('每日复盘');
+
+    for (const id of [weekly, daily]) {
+      await actions.checkIn(id, MON1);
+      await actions.checkIn(id, MON2);
+    }
+    const state = engine.getState();
+    const logs = Object.values(state.habitLogs);
+
+    const w = computeStreak(state.habits[weekly]!, logs, MON2);
+    const d = computeStreak(state.habits[daily]!, logs, MON2);
+
+    // 🔴 这一条是"写入口 ↔ 判定"那根接缝本身：中间那 6 天对 weekly 习惯**不是**计划日，
+    //    所以连续不该断；对 daily 习惯它们是计划日而空着，于是从 03-09 往回一步就断。
+    expect(w.current).toBe(2);
+    expect(d.current).toBe(1);
+    expect(w.longest).toBe(2);
+  });
+
+  it('F8 改频次不动打卡（规则变更不清历史；与改图标同族）', async () => {
+    const id = await actions.createHabit('拉伸', { target: 1 });
+    await actions.checkIn(id, MON1);
+    await actions.setHabitFrequency(id, { type: 'interval', everyNDays: 3 });
+
+    expect(Object.values(engine.getState().habitLogs)).toHaveLength(1);
+    expect(engine.getState().habits[id]?.target).toBe(1);
+  });
+
+  it('F9 找不到的习惯抛错，不静默空操作', async () => {
+    await expect(
+      actions.setHabitFrequency('不存在', { type: 'daily' }),
+    ).rejects.toThrow(/找不到习惯/);
+  });
+
+  it('F10 🔴 另一台设备 applyRemote 之后读到同一个频次（不是只活在本机）', async () => {
+    const id = await actions.createHabit('晨跑');
+    await actions.setHabitFrequency(id, { type: 'weekly', daysOfWeek: [2, 4] });
+
+    const adapterB = new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: () => new NodeSqliteDriver(':memory:'),
+    });
+    await adapterB.init();
+    const engineB = new OpLogEngine({
+      store: new DbOpLogStore<Operation<string>>(adapterB),
+      clientId: 'client-peer',
+      now,
+    });
+
+    await engineB.applyRemote(await engine.getPendingUpload());
+
+    const onB = createHabitActions(engineB);
+    expect(onB.listHabits().find((h) => h.id === id)?.frequency).toEqual({
+      type: 'weekly',
+      daysOfWeek: [2, 4],
+    });
+    adapterB.close();
+  });
+});
+
+/**
  * 习惯目标：数值 / 单位 / 达成口径
  * ==================================
  *
@@ -479,8 +658,13 @@ describe('习惯进回收站（W4 / P-1）', () => {
     await expect(actions.purgeHabit(live)).rejects.toThrow(/不在回收站里/);
 
     await actions.removeHabit(live);
-    await actions.purgeHabit(live);
+    // 🔴 布尔与 op 数各钉一格（G-8）：`undefined` 与 `false` 在"只数 op"的判据里长得一样。
+    expect(await actions.purgeHabit(live), '真的打上了标记却返回 false').toBe(true);
     const ops = (await engine.getOpsForEntity('HABIT', live)).length;
+    expect(
+      await actions.purgeHabit(live),
+      '早已彻底删除却返回 true ⇒ 宿主会把什么都没写成的一句报成"已彻底删除"',
+    ).toBe(false);
     await actions.purgeHabit(live);
     expect(await engine.getOpsForEntity('HABIT', live)).toHaveLength(ops);
   });

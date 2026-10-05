@@ -39,6 +39,7 @@ import {
   isoWeekday,
   toLocalDate,
   type Habit,
+  type HabitFrequency,
   type HabitLog,
   type HabitPeriodStats,
   type HabitResilienceView,
@@ -452,3 +453,57 @@ export function habitGoalSummaryKey(goalType: string | undefined): HabitGoalSumm
       return 'web.habits.goal.summaryAtLeast';
   }
 }
+
+/**
+ * ── 频次（工单 H5）：「哪种频次说哪句话」与「1–7 → 星期词条」──
+ *
+ * 🔴 与 `habitGoalSummaryKey` 同一类收编，同一条理由：
+ *    web 与移动端各有一个习惯编辑器（`HabitGoalEditor` / `HabitGoalSlot`），
+ *    现在也各有一个频次编辑器，而"哪一种频次说哪句话""`3` 念作『三』"是
+ *    **同一个判断**。各写一份的症状是"同一个 `weekly`，web 说『每周 三』、
+ *    移动端说『周三去做』"，两边都不报错。
+ *
+ * ⚠️ 这里只给 **key**，句子在词条表里（本包不 import `@heyta/i18n`）。
+ */
+export type HabitFrequencySummaryKey =
+  | 'web.habits.freq.summary.daily'
+  | 'web.habits.freq.summary.weekly'
+  | 'web.habits.freq.summary.interval';
+
+/**
+ * 频次 → 摘要词条 key。
+ *
+ * ⚠️ `undefined` 与 `daily` **都给"每天"那一条**：判定侧 `isScheduledOn(undefined)` = 每天，
+ *    界面读出来必须与判定一致 —— 否则"没设过频次的习惯"在界面上没有频次，
+ *    而连续天数却按每天算（§7 第 195 条那个"看起来没功能其实有"的断面）。
+ */
+export function habitFrequencySummaryKey(
+  frequency: HabitFrequency | undefined,
+): HabitFrequencySummaryKey {
+  if (frequency === undefined || frequency.type === 'daily') {
+    return 'web.habits.freq.summary.daily';
+  }
+  if (frequency.type === 'weekly') return 'web.habits.freq.summary.weekly';
+  return 'web.habits.freq.summary.interval';
+}
+
+/**
+ * ISO 星期序号（1=周一 … 7=周日）→ 星期名词条 key。
+ *
+ * 🔴 下标从 0 起，取值按 `isoWeekday()` 的定义（1–7），**不是** JS `Date.getDay()`
+ *    的 0=周日。写成 `getDay()` 形状会得到"周一显示成周二"，
+ *    而 `HabitFrequency.daysOfWeek` 的注释明确写着 1=周一。
+ *    穷尽性用**七元组**表达：少一个会在这里编译不过，而不是在界面上少一格。
+ */
+export const HABIT_WEEKDAY_MESSAGE_KEYS = [
+  'common.weekday.mon',
+  'common.weekday.tue',
+  'common.weekday.wed',
+  'common.weekday.thu',
+  'common.weekday.fri',
+  'common.weekday.sat',
+  'common.weekday.sun',
+] as const;
+
+/** {@link HABIT_WEEKDAY_MESSAGE_KEYS} 的值类型（宿主 `t()` 的入参上界）。 */
+export type HabitWeekdayMessageKey = (typeof HABIT_WEEKDAY_MESSAGE_KEYS)[number];
