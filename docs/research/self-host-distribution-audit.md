@@ -12957,3 +12957,39 @@ abort 在这里是救场的：软链没被解引用，源树逐字节完好（�
 `node research/tools/../../scripts/check-selfhost-entry-command.mjs` ⇒ rc=**0`（它确实会读这枚脚本的 `COMPOSE_FILES` 抄件，R7 仍成立）。
 另：`scripts.check` 里**没有** `verify-selfhost-stack`（现量：90 段中 selfhost 相关只有 `check:selfhost-entry-command`）
 ⇒ 这次编辑不在全链射程内，v3 那 30 段绿不会因为它而失效。
+
+### 8.236 §8.16 的三行在载体上重算：`check:docs` 那五处现在是**空集**，而阻塞集**换了人**（2026-10-05 17:5x）
+
+**§8.16 那三行逐条重算**（对载体那一笔 `0ff1055e` 用 `git cat-file`，不读任何工作树）：
+
+| §8.16 的那一行 | 现在的读数 | 还成立吗 |
+|---|---|---|
+| 两枚引用方只存在于 main | `docs/plans/detail-pane-alignment.md`、`docs/research/detail-pane-alignment-and-spaced-review.md` 在载体里 **yes**、在 `feat/self-host-distribution` 里 **NO** | ✅ 成立（仍是 main 侧带进来的，红也轮不到本批） |
+| 那两行"只在 main 的版本里"（旧写法钉 `PROGRESS.md:1362` / `countdown-anniversary.md:1280`） | **不再按行号量**：`check:docs` 是载体链第 **23**/90 段，这一趟落在 1–41 的全绿区间里 ⇒ 载体上这道门 exit 0，红集为空 | ⚠️ 行号那格的单位已经过期（见 §8.235 的更正注），结论改由门本身给 |
+| 四枚死链目标在主检出全是 `??` 未跟踪 | 载体里 `docs/plans/trash-and-archive.md`、`docs/plans/calendar-year-time-and-mobile-profile.md`、`docs/research/aed-implementation-evidence.md` **已被跟踪**；`docs/plans/aed-implementation-evidence.md`、`docs/plans/trash-and-archive-best-practice.md` 不在载体（也不被活引用，否则 23 段会红） | ✅ 已被其所有者提交 ⇒ 这一行从"红"变成"空" |
+| 本批写集一个都没碰这四类引用方 | `git diff --name-only origin/main…feat/self-host-distribution` 对 `detail-pane|trash-and-archive|calendar-year-time|aed-implementation|PROGRESS.md|countdown-anniversary` ⇒ **零命中** | ✅ 成立 |
+
+🔴 这三行合起来的形状与 §8.195 同向、但**不是免做**：门绿 ⇒ 归属层是空集，
+而空集要能复核（上面每一行都带一条现量命令），否则下一次有人拿"绿"当"不用看"。
+
+**阻塞集换人了**（`node research/tools/selfhost-landing-blockers.mjs`，17:5x 现量）：
+`写集 82 枚 · 主检出脏 74 枚 · 阻塞集 5 枚` = `package.json` · `packages/i18n/src/locales/{zh-CN,en}.ts` ·
+**`server/docker-compose.yml`** · **`server/env.example`**。
+任务书点名的那五枚里，`docs/README.md` 与 `scripts/check-script-snapshot.mjs` **已经不阻塞了**（被其所有者提交），
+新进的两枚是本批核心产物 —— 这正是"等他们提交是瞬时事件不是状态"的又一次现形。
+
+⚠️ **新进那两枚不在预置十一族里**（blockers 自己写的是「未预置 ⇒ 交人判（不要猜）」）。
+现在还不烧窗口：`node research/tools/selfhost-conflict-screen.mjs --main=main --src=feat/self-host-distribution`
+在 `main=0afad3b1` 上读 `预测 unmerged：内容冲突 9 · modify/delete 0`、
+`分族：pkg=1 gi=0 png=0 audit=1 snap=1 gen=1 cov=1 cap=1 dock=1 deploy=1 lspec=1 **other=0**`、盲点 0、`rc=0`。
+⇒ **这一刻**没有集外冲突。但这一格是"这一刻"的：他们把 `docker-compose.yml` / `env.example` 提交进来之后，
+如果与本批同段相撞，载体的处理是 `die(2)`（预置族之外不许自动决定）。
+所以落地前**必须再跑一次这枚 screen**（#45 那条纪律），而不是拿今天这个 `other=0` 当凭据。
+
+**第 2 项的起跑资格（`selfhost-verify-window-runner.mjs`，两把尺的合取）**：
+`--selftest` ⇒ `臂数 9（拒绝类 8，按 tier 认领）· 红 0`，含 A8 阳性对照（挡"恒 wait"的退化实现）；
+`--dry-run` ⇒ `rc=3`、`现量：负载=25.06 锁=活持有者 75888 阻塞集=5 枚` ⇒ **继续等**。
+🔴 这个 rc=3 就是任务书说的"环境无效≠产品失败"那一格，也是"等窗口而不是调低阈值"的现场：
+`LOAD_MAX=12` 是判据不是旋钮（脚本注释自己就这么写），本趟一个字没动。
+另：`scripts/verify-selfhost-stack.sh` 从今天起自己也有同一枚负载门（§8.235），
+所以起跑资格不再只由跑器把守 —— 两把尺现在同向。
