@@ -72,7 +72,7 @@ function scaleSample(value, bitDepth) {
  *
  * 遇到不支持的形式**显式抛错**，不猜 —— 静默给错值比直接失败更危险。
  */
-function decodePng(buffer) {
+export function decodePng(buffer) {
   if (!buffer.subarray(0, 8).equals(PNG_SIGNATURE)) {
     throw new Error('不是 PNG（签名不匹配）');
   }

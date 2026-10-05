@@ -14,7 +14,8 @@
 // 完整命令（在 `e2e/` 里跑）：
 //   ../apps/web/node_modules/.bin/tsc --noEmit -p tsconfig.detail-pane.json
 //
-// 🔴 `include` 只列本单那一族六个文件，不是偷懒：同一趟对 `tests/*.ts` 全量跑，
+// 🔴 `include` 只列本单这一族那几个文件，不是偷懒，也不许改成整目录通配：
+// 同一趟对 `tests/*.ts` 全量跑，
 // 现量 **13 条错误，分布在另外 6 个文件**（`calendar-cells` 5 / `calendar-week` 3 /
 // `quadrant-fill` 2 / `task-row-touch-target` 1 / `search-overlay` 1 / `due-date-edit` 1），
 // 那些是别的线在飞的活。把整目录收进来只会得到"这道检查天生是红的"，
@@ -25,7 +26,7 @@
     "noEmit": true,
     "strict": true,
     "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "skipLibCheck": true
@@ -35,6 +36,9 @@
     "tests/detail-column-slot.spec.ts",
     "tests/detail-pane-overlay.spec.ts",
     "tests/detail-pane-collapse.spec.ts",
+    "tests/detail-pane-note-editor.spec.ts",
+    "tests/detail-pane-habit.spec.ts",
+    "tests/detail-pane-task.spec.ts",
     "tests/focus-detail-pane.spec.ts",
     "tests/keyboard-cursor.spec.ts"
   ]

@@ -1,6 +1,21 @@
 /**
- * 任务行上的「截止」控件
- * =======================
+ * 任务的「截止」字段：一份实现、两个落点（工单 §8.146）
+ * ====================================================
+ *
+ * 本文件现在导出**三件**东西，各自住在哪儿是这一单的全部形状：
+ *
+ * | 产品 | 谁消费 | 画在哪 |
+ * |---|---|---|
+ * | `DueField` | `TaskDetailCard`（栏里）**和** `DueEditor`（行尾浮层内） | 编辑本体，**在流、无外壳** |
+ * | `DueEditor`（`<summary>` + `<details>` + Portal/在流两副外壳） | `App.tsx` 行尾，`taskPaneInColumn` 为假时 | 行上（窄档回落） |
+ * | —— 行上**没有**只读徽标这一件 | 截止的显示一直住在共享行的元信息条里（`task-meta` → `TaskBadges.due`） | 行上（两档都在） |
+ *
+ * 🔴 第三行是这一格与 §8.138/§8.141/§8.144/§8.145 那四格的**唯一形状差**，而且是现量查出来的：
+ * 行尾那颗 `<summary>` 原本也在显示当前值（「截止 10月5日」），而同一行的元信息条**已经**在显示
+ * 同一个 `dueDate`（`date` 档是 `10-05`、`countdown` 档是「明天」）。也就是说列表上那条任务
+ * 此前把同一件事说了两遍。搬走编辑入口时**不补徽标**，就是把那第二份显示一并撤掉 ——
+ * 工单 §8.141 第 5 节那条硬约束（截止的**显示**必须留在行上）由既有的 `task-meta` 满足，
+ * 不是由本文件满足。
  *
  * 🔴 **这个文件补的是 Web 端的一个真实空洞**（多端覆盖审计 P0-3）：
  * `setDueDate` 的语义一直完整（动作层 + store），但全 Web **零 UI 调用点** ——
@@ -14,6 +29,8 @@
  * 1. **用原生 `<details>/<summary>`**：自带键盘操作与读屏语义。
  *    jsdom 不实现 summary 的展开切换 —— 组件级判据直接置 `open`，
  *    "点开"这个用户动作由真浏览器 e2e 钉。
+ *    ⚠️ 这套机关属于**行尾那一支**：栏里那一格画的是 `DueField`，没有 `<details>`、
+ *    也没有 `.ht-material`（§8.141/§8.144/§8.145 立过的 pane 级不变量）。
  * 2. **月历是共享 `DatePicker`**（`@heyta/ui`）：文案经 `labels` 注入，
  *    日期措辞复用 `common.date.*` / `common.weekday.*` —— 两端同一个说法。
  * 3. **一次选择 = 一条 op**：`onChange` 直接交给 `store.setDueDate`
@@ -91,7 +108,16 @@ const QUICK_PICK_LABEL_KEYS: Record<string, MessageKey> = {
   'next-week': 'web.due.nextWeek',
 };
 
-export function DueEditor({
+/**
+ * 截止的**编辑本体**：共享 `DatePicker`（四个快捷项 + 月历 + 清除），**在流**、
+ * 不带任何外壳。🔴 工单 §8.146 起它有两个落点 —— 栏里那一格直接画它，
+ * 行尾那一支把它装进自己的两副外壳里（`DueEditor`）。
+ *
+ * ⚠️ 它带**本地 state**（`DatePicker` 里那个"正在看哪个月"），所以栏里那一支
+ * 必须挂 `key={task.id}` —— 否则 ↑↓ 换选中时上一条浏览到的月份会跟着人走。
+ * 这一格与 §8.145 那条"有本地 state 才要 key"的纪律正好是一组对照。
+ */
+export function DueField({
   task,
   now,
   onSetDueDate,
@@ -105,6 +131,85 @@ export function DueEditor({
   const { t } = useI18n();
 
   const today = toLocalDate(now);
+  const value = task.dueDate === undefined ? undefined : toLocalDate(task.dueDate);
+
+  const quickPicks: readonly DatePickerQuickPick[] = quickDuePickDates(today).map((pick) => ({
+    key: pick.key,
+    label: t(QUICK_PICK_LABEL_KEYS[pick.key]!),
+    date: pick.date,
+  }));
+
+  /*
+   * 判"有没有时刻"用的是共享层那一份 `localTimeOf`（时间线那条「全天」带
+   * 读的是同一个判定）—— 这里如果自己再 `getHours() !== 0` 一次，
+   * 就会出现"编辑器说全天、时间线画在 16:00"。
+   */
+  const timeValue = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
+
+  return (
+    <DatePicker
+      value={value}
+      today={today}
+      quickPicks={quickPicks}
+      labels={{
+        weekdays: WEEKDAY_MESSAGE_KEYS.map((key) => t(key)),
+        monthTitle: (month) => formatMonthTitleText(month, t),
+        clear: t('web.due.clear'),
+        prevMonth: t('web.due.prevMonth'),
+        nextMonth: t('web.due.nextMonth'),
+        dayLabel: (month, day) => t('web.due.dayLabel', { month, day }),
+      }}
+      time={{
+        value: timeValue,
+        // 🔴 没有日期就没有"几点"可言 —— 这一行会画出来但填不进字。
+        enabled: value !== undefined,
+        labels: {
+          timeLabel: t('common.due.timeLabel'),
+          allDay: t('common.due.allDay'),
+          placeholder: t('common.due.timePlaceholder'),
+          aria: t('common.due.timeAria', { title: task.title }),
+        },
+        onChange: (next) => {
+          // `value` 一定在（`enabled` 为假时组件不会回调），这个判断是给
+          // 类型看的，不是给运行时兜底的。
+          if (value === undefined) return;
+          onSetDueDate(dueDateToEpoch(value, next));
+        },
+      }}
+      onChange={(date) => {
+        /*
+         * 换日子**搬运已填的时刻**。
+         *
+         * 🔴 不搬就是"改个日期，16:00 悄悄没了" —— 界面上看不出任何事发生过，
+         *   而提醒会因此提前一整天到（提醒算的是 `dueDate - offset`）。
+         *   仓里对这件事已有先例：`postponeToToday` 用
+         *   `dueDate - startOfDay(dueDate)` 主动把时分搬到新的一天，
+         *   同一条立场在这里的输入侧执行一次。
+         *   清掉日子（`undefined`）没有"哪一天的几点"可言，那时才真的归零。
+         */
+        onSetDueDate(date === undefined ? undefined : dueDateToEpoch(date, timeValue));
+      }}
+    />
+  );
+}
+
+/**
+ * 行尾那一支：`<details>` 展开机关 + 带当前值的触发器 + **两副外壳**（Portal 的 fixed 卡 /
+ * details 内的在流卡）。🔴 工单 §8.146 起它**只在详情列没在画时挂在行尾**。
+ */
+export function DueEditor({
+  task,
+  now,
+  onSetDueDate,
+}: {
+  task: Task;
+  /** 冻结的"现在"（ms）。今天从它推，不由组件自己取时钟。 */
+  now: number;
+  /** 传 `undefined` 表示清除截止（动作层写 `null`）。 */
+  onSetDueDate: (due: number | undefined) => void;
+}): React.JSX.Element {
+  const { t } = useI18n();
+
   const value = task.dueDate === undefined ? undefined : toLocalDate(task.dueDate);
 
   /**
@@ -168,17 +273,10 @@ export function DueEditor({
     };
   }, [anchor]);
 
-  const quickPicks: readonly DatePickerQuickPick[] = quickDuePickDates(today).map((pick) => ({
-    key: pick.key,
-    label: t(QUICK_PICK_LABEL_KEYS[pick.key]!),
-    date: pick.date,
-  }));
-
   /*
    * 触发器上写的是**这条截止的精度**：`10月4日` 或 `10月4日 16:00`。
-   * 判"有没有时刻"用的是共享层那一份 `localTimeOf`（时间线那条「全天」带
-   * 读的是同一个判定）—— 这里如果自己再 `getHours() !== 0` 一次，
-   * 就会出现"编辑器说全天、时间线画在 16:00"。
+   * 编辑本体（`DueField`）里那一行时刻读的是同一个 `localTimeOf` ——
+   * 两处各算一次就会出现"触发器说全天、面板里填着 16:00"。
    */
   const timeValue = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
   const valueText =
@@ -189,52 +287,8 @@ export function DueEditor({
           day: Number(value.slice(8, 10)),
         })}${timeValue === undefined ? '' : ` ${timeValue}`}`;
 
-  /** 选择器本体 —— 两副身体（Portal 的 fixed 卡 / details 内的在流卡）共用。 */
-  const panelBody = (
-    <DatePicker
-      value={value}
-      today={today}
-      quickPicks={quickPicks}
-      labels={{
-        weekdays: WEEKDAY_MESSAGE_KEYS.map((key) => t(key)),
-        monthTitle: (month) => formatMonthTitleText(month, t),
-        clear: t('web.due.clear'),
-        prevMonth: t('web.due.prevMonth'),
-        nextMonth: t('web.due.nextMonth'),
-        dayLabel: (month, day) => t('web.due.dayLabel', { month, day }),
-      }}
-      time={{
-        value: timeValue,
-        // 🔴 没有日期就没有"几点"可言 —— 这一行会画出来但填不进字。
-        enabled: value !== undefined,
-        labels: {
-          timeLabel: t('common.due.timeLabel'),
-          allDay: t('common.due.allDay'),
-          placeholder: t('common.due.timePlaceholder'),
-          aria: t('common.due.timeAria', { title: task.title }),
-        },
-        onChange: (next) => {
-          // `value` 一定在（`enabled` 为假时组件不会回调），这个判断是给
-          // 类型看的，不是给运行时兜底的。
-          if (value === undefined) return;
-          onSetDueDate(dueDateToEpoch(value, next));
-        },
-      }}
-      onChange={(date) => {
-        /*
-         * 换日子**搬运已填的时刻**。
-         *
-         * 🔴 不搬就是"改个日期，16:00 悄悄没了" —— 界面上看不出任何事发生过，
-         *   而提醒会因此提前一整天到（提醒算的是 `dueDate - offset`）。
-         *   仓里对这件事已有先例：`postponeToToday` 用
-         *   `dueDate - startOfDay(dueDate)` 主动把时分搬到新的一天，
-         *   同一条立场在这里的输入侧执行一次。
-         *   清掉日子（`undefined`）没有"哪一天的几点"可言，那时才真的归零。
-         */
-        onSetDueDate(date === undefined ? undefined : dueDateToEpoch(date, timeValue));
-      }}
-    />
-  );
+  /** 编辑本体 —— 两副身体（Portal 的 fixed 卡 / details 内的在流卡）共用同一份。 */
+  const panelBody = <DueField task={task} now={now} onSetDueDate={onSetDueDate} />;
 
   return (
     <details ref={detailsRef}>
