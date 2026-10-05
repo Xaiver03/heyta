@@ -15,10 +15,14 @@
  *      `renderTaskTrailing` 那段注释与台账 G9）—— 把字段往栏里搬，行的宽度问题才真的解决。
  *
  * 🔴 所以本文件遵守的不变量是：**每个字段任何时刻只有一个编辑器所有者**。
- * 这一单搬的是**备注**（`NoteField`）：搬进栏里的同一笔提交里，行尾那颗备注 chip 不再渲染
- * （`App.tsx` 的 `noteInColumn` 反向条件），所以不存在"同一字段两处可编辑"的那个中间态。
- * 其余字段（子任务 / 清单标签 / 重复 / 截止 / 提醒 / AI）仍住在行尾，登记成后续单，
- * 每一单都要重做"搬进来 + 行里撤掉"这两半，不许只搬一半。
+ * 已搬进来的是**备注**（`NoteField`，§8.138）与**重复**（`RepeatField`，§8.141）：
+ * 每一单的同一笔提交里都要把行尾那半撤掉（`App.tsx` 的 `taskPaneInColumn` 反向条件），
+ * 所以不存在"同一字段两处可编辑"的那个中间态；列表侧留下的分别是**只读徽标** `NoteBadge`
+ * 与**只读徽标** `RepeatChip`（"扫一眼要能看出哪条任务写过 / 是重复的"这一档不因为搬进栏里就丢掉）。
+ * ⚠️ 这一条是**分阶段**的，不是"这一单顺手做完"：其余字段（子任务 / 清单标签 / 截止 / 提醒 / AI）
+ * 仍住在行尾，登记成后续单，每一单都要重做"搬进来 + 行里撤掉"这两半，不许只搬一半。
+ * 🔴 截止那一栏特别注明：`check:row-single-source` 的断言 A 要求"复选框 + 标题 + 截止"三种信号
+ * 同时出现在任务行里，所以截止的**显示**必须留在行上，能搬的只有它的**编辑入口**。
  *
  * ⚠️ 为什么这里**没有**未选中时的空态句子：沿用便签那一格的先例（§8.130 —— 未选中时那一格
  * 什么都不放）。习惯那一格放一句"选一条习惯…"是因为那块板子必须始终挂载
@@ -33,6 +37,7 @@ import { useI18n } from '@heyta/i18n';
 import { useSelected } from '../../lib/selection.js';
 import { text } from '../../lib/text.js';
 import { NoteField } from './NoteEditor.js';
+import { RepeatField } from './TaskRepeat.js';
 import { useTaskStore } from './store.js';
 
 /*
@@ -108,6 +113,23 @@ export function TaskDetailCard(): React.JSX.Element | null {
         task={task}
         onSetNote={(note) => {
           void store.setNote(task.id, note);
+        }}
+      />
+
+      {/*
+        重复。🔴 它**自带**区块头（编辑本体的 `<legend>` 就是那一句「重复规则」），
+        所以这里不再叠一枚 `h3` —— 两处同一个词说两遍，读到的是"有两个区块"。
+        这一格里也**没有浮层外壳**：`.ht-material` 与 `position: absolute` 属于行尾那一支
+        （"这一格在哪儿画"的细节），栏里要的只是控件本身。
+        `key={task.id}` 与备注同一理由：自定义 RRULE 那只草稿框是受控的本地 state，
+        ↑↓ 换选中时不换 key 就会把上一条任务没提交的草稿带过来。
+      */}
+      <RepeatField
+        key={`repeat-${task.id}`}
+        task={task}
+        now={store.now}
+        onSetRepeat={(rule) => {
+          void store.setRepeat(task.id, rule);
         }}
       />
     </div>
