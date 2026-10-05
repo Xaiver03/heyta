@@ -56,6 +56,11 @@ import {
 } from '@heyta/ai';
 import type { AiFailureReason } from '@heyta/ai';
 import {
+  CALENDAR_ANCHOR_RULES,
+  calendarAnchor,
+  calendarAnchorLine,
+} from './calendar-anchor.js';
+import {
   outputLanguageDirective,
   type AiOutputLocale,
 } from './ai-output-language.js';
@@ -115,6 +120,20 @@ export interface DurationSource {
    * 「可选」指的是数据可能没有，不是「可以偷偷不发」。
    */
   history?: readonly DurationHistoryRow[];
+  /**
+   * 时间源（epoch ms）。默认 `Date.now`。
+   *
+   * 🔴 **必须可注入**，两条理由与 `CaptureSource.now` 逐字同源：
+   *
+   *   1. 输出依赖"今天是几号" —— 用真实时钟写测试会得到一个**过几天就变红**的用例。
+   *   2. 披露与请求必须用同一个 `now`：壳一次构造好 `source`，同一个对象既进
+   *      `buildDurationInvocation`（界面披露）也进 `requestDuration`（真正发送）。
+   *
+   * ⚠️ 注意本模块**其它**数据的时间性：历史记录刻意只送"估了多久 / 实际多久"
+   * 两个时长，**不送时间戳**。`today` 送的是这台设备的日历日 —— 它是这条链路上
+   * 唯一的时间信息，所以必须逐字段披露（见 `buildDurationInvocation`）。
+   */
+  now?: number;
 }
 
 /** 这条记录能不能参与估计：两端都必须是正的有限数（比值才成立）。 */
@@ -196,6 +215,9 @@ function renderHistoryBlock(rows: readonly DurationHistoryRow[], total: number):
  *
  * 所以规则与 `ai-breakdown.ts` 一致：**`user` 里出现的每一个数据字段，
  * `fields` 里必须有同名项**。有测试逐字段核对这件事。
+ *
+ * ⚠️ `today` 也算一个字段（与 `ai-capture.ts` 同一条纪律）：它是这台设备的本地日期，
+ * 一条关于用户的信息，而且确实随请求出境。藏起来就是"披露里没有、请求里有"。
  */
 export function buildDurationInvocation(
   source: DurationSource,
@@ -213,8 +235,12 @@ export function buildDurationInvocation(
   user: string;
   fields: readonly string[];
 } {
-  const fields: string[] = ['title'];
-  const lines = [`任务标题：${source.title}`];
+  const fields: string[] = ['today', 'title'];
+  // 🔴 锚点由 `calendar-anchor.ts` **唯一**生产（与 capture / breakdown / prioritize 同一行）。
+  //    `today` 是这台设备的本地日历日：一条关于用户的信息，且确实随请求出境 ⇒ 必须披露。
+  //    对估时它不是装饰 —— 「每周的周报」这类标题的耗时取决于它落在本周的哪天，
+  //    而模型**不许自己算日期**（实测错过四个半月，见 `calendar-anchor.ts` 文件头）。
+  const lines = [calendarAnchorLine(calendarAnchor(source.now)), `任务标题：${source.title}`];
 
   if (source.note !== undefined && source.note.trim() !== '') {
     fields.push('note');
@@ -244,6 +270,11 @@ export function buildDurationInvocation(
       '只输出一个整数，单位是分钟。不要输出单位、不要输出解释、不要输出标点或任何其他文字。',
       `数值必须在 ${String(MIN_DURATION_MINUTES)} 到 ${String(MAX_DURATION_MINUTES)} 之间；如果你觉得更长，就报上限。`,
       '如果给出了这位用户的历史耗时，请据此校正你的估计，但不要照抄其中某一个数。',
+      '',
+      // 🔴 日期硬规则与锚点是**一对**（同 `ai-breakdown.ts` / `ai-prioritize.ts`）：
+      // 只给"今天是"而不给规则，模型仍会凭训练语料里的"今天"去推相对日期。
+      // 本功能的输出是一个整数分钟，规则约束的是它**读**标题里相对日期的方式。
+      CALENDAR_ANCHOR_RULES,
       '',
       outputLanguageDirective(source.locale),
     ].join('\n'),

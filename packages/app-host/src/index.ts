@@ -510,6 +510,21 @@ export {
   type AssistantTierStorePort,
 } from './assistant-tier-settings.js';
 export {
+  createAiSettingsStore,
+  defaultAiSettingsState,
+  parseAiSettingsState,
+  type AiSettingsState,
+  type AiSettingsStore,
+  type AiSettingsStorePort,
+} from './ai-settings-store.js';
+export {
+  pickNoCandidateReason,
+  resolveAiRoute,
+  type AiNoCandidateReason,
+  type AiRouteTarget,
+} from './ai-route-target.js';
+export { destinationForFeature, recomputeConsents } from './ai-settings-shared.js';
+export {
   CALENDAR_ANCHOR_RULES,
   calendarAnchor,
   calendarAnchorLine,
@@ -792,3 +807,18 @@ export {
   type SelectionSnapshot,
   type SelectionStore,
 } from './selection.js';
+
+/**
+ * 助手会话的**跨设备实体**（ADR-0045 D-4 (ii)，产品负责人 2026-10-05 拍"做"）。
+ *
+ * 🔴 op 的构造只在这里一份（AGENTS §3.5）。此前会话历史只落这台设备的
+ * `localStorage`（D-4 (i)），换端点的两台设备合并历史时既读不到彼此的对话、
+ * 也分不出"这句是哪个端点答的"。`destinationKind` 与 `originClientId` 两格
+ * 就是为了让那两件事在合并后仍然可判 —— 逐条理由在 `assistant-session-actions.ts` 文件头。
+ */
+export {
+  createAssistantSessionActions,
+  type AssistantSessionActions,
+  type AssistantSessionActionsOptions,
+  type NewAssistantTurn,
+} from './assistant-session-actions.js';
