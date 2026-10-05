@@ -474,4 +474,128 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await page.screenshot({ path: SHOT('t9-narrow-subtask-falls-back-to-row') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
+
+  test('T10 宽档：提醒的编辑本体在栏里那一格，行尾只剩只读徽标（§8.145）', async ({ page }) => {
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTaskAndRelease(page, '提醒甲');
+    /* 🔴 第二条是**没有提醒**的那一条，加它只有一个理由：给臂台 M3（"徽标不判有没有提醒"）
+       留一枚牙。T10 原本只有一条任务，而那条本来就该有一枚徽标 ⇒ "record 档变成常驻"
+       这种坏在 e2e 层数出来仍是 1，看不见。有了这一条，整机判据 `[data-testid^="task-reminder-badge-"]`
+       等于 1 才真的会红（与 §8.144 的 S3 同一档，A5/R3 那两臂当初就是缺这一条而成了盲区）。 */
+    await addTaskAndRelease(page, '提醒乙·不挂提醒');
+
+    await rowOf(page, '提醒甲').click();
+    const pane = paneInColumn(page);
+    await expect(pane, '栏里没画面单').toHaveCount(1);
+
+    // 🔴 整页只有一份提醒列表，且它在栏里。只量"栏里有"会把"两处都能编辑"读成对。
+    const listEverywhere = page.locator('[data-testid^="reminder-list-"]');
+    await expect(
+      listEverywhere,
+      '提醒列表不止一份 ⇒ 两处可编辑（两套写入语义迟早漂）',
+    ).toHaveCount(1);
+    await expect(pane.locator('[data-testid^="reminder-list-"]').first(), '栏里没有那份列表').toBeVisible();
+
+    // 行尾那两层外壳都不许留着：`details.ht-compose--popover` 一没了指的是"入口还在行上"，
+    // `.ht-material` 一没了指的是"栏里漂着一块浮层"。两档各挡一种坏形状。
+    await expect(
+      page.locator('details.ht-compose--popover'),
+      '栏里画着的时候行尾还留着那颗提醒 chip ⇒ 提醒两处可编辑',
+    ).toHaveCount(0);
+    await expect(pane.locator('.ht-material'), '栏里那一格拿到了行尾的玻璃浮层').toHaveCount(0);
+
+    // 「提醒」这一块在栏里只有一处区块头（它由共享 `ReminderList` 自己渲染）。
+    await expect(pane.getByText('提醒', { exact: true }), '「提醒」区块头不止一处').toHaveCount(1);
+
+    // 没有截止时间 ⇒ 唯一入口是绝对时刻那颗，而且它建出来的必须是 now + 1 小时
+    // （键名里的 `1h` 与文案是同一份契约）。这里量的是**真点下去之后行上留下了什么**。
+    await pane.getByTestId('reminder-add-absolute').click();
+    const badge = page.locator('[data-testid^="task-reminder-badge-"]');
+    await expect(badge, '栏里点了「1 小时后提醒」而行上没有痕迹').toHaveCount(1);
+    await expect(badge).toHaveText('1');
+    await expect(
+      badge.locator('button, details, [data-testid^="reminder-"]'),
+      '徽标里长出可编辑控件（那是第二个编辑器）',
+    ).toHaveCount(0);
+
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await expect(
+      page.locator('[data-testid^="task-reminder-badge-"]'),
+      '那次点击没落成 op（刷新后行上没有提醒徽标）',
+    ).toHaveCount(1);
+    // ⚠️ 选中态**不跨刷新**（刷新后没有一条被选中 ⇒ 栏里根本不画面单），所以"整页一份列表"
+    //   这一句必须先重新选中一条再量 —— 否则量到的是 0，而 0 看起来像"没重复"其实是"没画"。
+    await rowOf(page, '提醒甲').click();
+    await expect(listEverywhere, '刷新后列表又不是整页一份').toHaveCount(1);
+
+    await badge.scrollIntoViewIfNeeded();
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('t10-reminder-field-in-column') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
+
+  test('T11 窄档：那一栏整个不在，提醒的编辑入口回到行尾那颗 chip', async ({ page }) => {
+    const errors = watchErrors(page);
+    /* 🔴 窄档这里用 **900×900** 而不是 T7/T9 的 900×600，理由只有一条且是实测出来的：
+       行尾那颗 chip 的面板**朝下开**（`.ht-compose-panel{position:absolute}`），600 高时
+       锚点行下方没有余量 ⇒ 面板伸出视口下沿，图里只露出"提醒"两个字。
+       宽度仍是 900（< 1024 ⇒ 栏不画，见 `detail-pane-visible.ts` 的 `DETAIL_FITS_QUERY`），
+       所以"窄档"这一档没有因为高度被换掉。 */
+    await page.setViewportSize({ width: 900, height: 900 });
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTaskAndRelease(page, '窄档提醒乙');
+
+    await expect(paneEverywhere(page), '窄档不该画面单').toHaveCount(0);
+    /**
+     * 🔴 定位走**可访问名**（`reminder.a11y.list`），与 T9 同一条理由：尾部动作是行体的
+     * 兄弟节点，而窄档那颗 chip 的面板会把别的任务正文写进 DOM。
+     * ⚠️ 零条提醒时那颗 chip 显示的是「提醒」二字 = **入口**（`record` 档只约束栏里那枚徽标）。
+     */
+    const trigger = page.getByLabel('「窄档提醒乙」的提醒');
+    await expect(trigger, '窄档下行尾没有提醒入口 ⇒ "建不了提醒"').toHaveCount(1);
+    // 先把锚点行滚到它所在分组容器的上沿：那一格是 `overflow:hidden auto` 的滚动容器，
+    // 面板朝下开，不滚的话整块在容器外（Playwright 的 click 自己也会滚，所以这一步是为了**拍得到**）。
+    // ⚠️ 不用 `scrollIntoViewIfNeeded()`：它只在"完全看不见"时才滚，露出半个就什么都不做。
+    await trigger.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    await trigger.click();
+
+    /* 🔴 那只按钮必须**钉在本行的那颗 chip 上**：`<details>` 收起时子树留在 DOM 里，
+       所以列表里有几行就有几枚 `reminder-add-absolute`（实测：垫一条邻居 ⇒ strict mode violation，
+       报的是"resolved to 2 elements"而不是"没找到"）。整页 `getByTestId` 在这一族里从来不安全。 */
+    const ownChip = page.locator('details:has(> summary[aria-label="「窄档提醒乙」的提醒"])');
+    const button = ownChip.getByTestId('reminder-add-absolute');
+    const box = await paintedBox(page, button);
+    expect(box.width, '窄档那只在行尾的按钮被挤成 0 宽').toBeGreaterThan(20);
+    /* 🔴 等**入场动效走完**再拍：`.ht-material` 带 200ms 的 `opacity 0 → 1` 淡入
+       （`material.css` 的 `ht-material-in`），而 `toBeVisible()` 不看 opacity ——
+       第一趟看图照出来的是"整块面板像被调到了 15% 不透明度"，字都在但读不清。
+       那是探针抢跑，不是界面坏；`toHaveCSS('opacity','1')` 会轮询，正好把它等掉。 */
+    await expect(ownChip.locator('.ht-compose-panel')).toHaveCSS('opacity', '1');
+    /* 🔴 这张图**故意**留着它现在的样子：面板被一个只有 **90px 高**的分组滚动容器裁掉了
+       （实测 2026-10-05：容器 top 546 / bottom 636，面板 top 586 / bottom 751，
+       那颗按钮 top 664 —— 整颗在容器外，`elementFromPoint` 命中的是 `.ht-content`）。
+       同一趟还量到第二档：行包装 div 是 `position:relative; z-index:0`，所以面板的
+       `z-index:500` 出不了自己那一行 ⇒ 下面还有行时会被下一行的尾部控件盖住。
+       两档都**与 §8.145 无关**（`ReminderPanel` 的 DOM/样式这一单没动），
+       登记在待办 #58（行尾下拉面板的可见性）。
+       ⚠️ 所以这一族的判据读的是"入口在不在、写没写进去"，**不是**"面板整块看得见"。 */
+    await page.screenshot({ path: SHOT('t11-narrow-reminder-panel-open') });
+    await button.click();
+
+    await expect(trigger, '窄档点了提醒而 chip 上没写条数').toHaveText('1');
+    await page.reload();
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    const chipAfter = page.getByLabel('「窄档提醒乙」的提醒');
+    await expect(chipAfter, '窄档那次点击没落成（刷新后行上的 chip 没写条数）').toHaveText('1');
+
+    await chipAfter.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await page.screenshot({ path: SHOT('t11-narrow-reminder-falls-back-to-row') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
 });

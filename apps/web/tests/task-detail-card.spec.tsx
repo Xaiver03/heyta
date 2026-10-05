@@ -23,15 +23,17 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { I18nProvider } from '@heyta/i18n';
+import { I18nProvider, zhCN } from '@heyta/i18n';
 
 import { __resetOpLogForTests, initOpLog, useTaskStore } from '../src/features/tasks/store.js';
+import { useReminderStore } from '../src/features/reminders/store.js';
 import { selection } from '../src/lib/selection.js';
 
 const { TaskDetailCard } = await import('../src/features/tasks/TaskDetailCard.js');
 const { NoteBadge } = await import('../src/features/tasks/NoteEditor.js');
 const { RepeatChip } = await import('../src/features/tasks/TaskRepeat.js');
 const { SubtaskBadge } = await import('../src/features/tasks/SubtaskPicker.js');
+const { ReminderBadge } = await import('../src/features/reminders/ReminderPanel.js');
 
 const APP_SRC = readFileSync(join(process.cwd(), 'src', 'App.tsx'), 'utf8');
 
@@ -86,6 +88,10 @@ beforeEach(async () => {
   localStorage.clear();
   selection.clear();
   __resetOpLogForTests();
+  // 🔴 提醒 store 是**模块级单例**（`features/reminders/store.ts` 在模块顶层 `create()`），
+  //   而每条用例换的是新的 op-log 库：不清的话 `byTask`/`error` 里留着上一条用例那批
+  //   已经不存在于当前引擎的提醒，§8.145 那一族读的就是别人的状态。
+  useReminderStore.setState({ byTask: {}, due: [], error: undefined });
   await initOpLog(`task-pane-${Math.random().toString(36).slice(2)}`);
   useTaskStore.setState({ filter: { kind: 'all' } });
 });
@@ -235,6 +241,30 @@ describe('宿主的落点接线（读 App.tsx 的源码形状）', () => {
   });
 });
 
+describe('栏里那一格的外壳形状（pane 级不变量，四格共用一条）', () => {
+  /**
+   * 🔴 这条**从三格各自的用例里搬出来合成一条**，理由是臂台自己照出来的：
+   *   §8.145 给提醒补了"栏里没有 `<details>` / 没有 `.ht-material`"两句之后，
+   *   臂 R4 / S4 / M4 / M5 各自一次注入让**三条**用例同时红（判据量的是整个 pane，
+   *   注入落在这个 pane 里的哪一格都一样）。同一个判断写三遍，就是 AGENTS §3.2
+   *   那条"失败判据被抄了三遍、三遍都漏"的同族形状 —— 而且它会把臂的红集读成"判据变多了"。
+   *   合成一条之后：一条不变量 → 一个所有者 → 一次注入红一条。
+   */
+  it('🔴 栏里那一格不许有行尾的两层外壳（`<details>` 展开机关 / `.ht-material` 玻璃浮层）', async () => {
+    const id = await addTask('外壳甲');
+    selection.select('task', id);
+    mount();
+    const box = document.querySelector('[data-testid="task-pane"]');
+    if (box === null) throw new Error('栏里没画面单 ⇒ 这一条判据在空转');
+    // 展开机关属于行尾那一支：栏里那一格再套一层 `<details>`，收起时里面**不画**，
+    // 用户读到的是"这一格里还有一层没打开"。
+    expect(box.querySelector('details'), '拿到了行尾的展开机关').toBeNull();
+    // 玻璃浮层同理：一栏里出现 `position:absolute` 的浮层面板，读到的是"这格里漂着
+    // 一块不属于这格的板子"。
+    expect(box.querySelector('.ht-material'), '拿到了行尾的浮层外壳').toBeNull();
+  });
+});
+
 describe('重复这一字段此刻归谁（§8.141）', () => {
   /** 单独挂一枚只读徽标（它用的是同一个词条表，得在 Provider 里）。 */
   function mountNode(node: React.ReactNode): HTMLElement {
@@ -256,7 +286,7 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
 
   const pane = () => document.querySelector('[data-testid="task-pane"]');
 
-  it('🔴 栏里那一格画着重复的**编辑本体**，且整栏只有一份（不是第二份浮层）', async () => {
+  it('🔴 栏里那一格画着重复的**编辑本体**，且整栏只有一份', async () => {
     const a = await addTask('重复甲');
     selection.select('task', a);
     mount();
@@ -264,10 +294,8 @@ describe('重复这一字段此刻归谁（§8.141）', () => {
     if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
     expect(box.querySelectorAll('[data-testid="task-repeat-custom-input"]').length).toBe(1);
     expect(box.querySelectorAll('input[type="radio"]').length, '预设单选没画出来').toBeGreaterThan(2);
-    // 🔴 浮层外壳不许跟着编辑本体搬进栏里：一栏里出现 `position:absolute` 的玻璃面板，
-    // 用户看到的是"这一格里漂着一块不属于这一块的板子"。
-    const style = box.querySelector('.ht-material');
-    expect(style, '栏里那一格拿到了行尾的浮层外壳').toBeNull();
+    // ⚠️ "栏里不许有行尾的浮层外壳"这一档**不住在这一格**：它量的是整个 pane，
+    //   四格共用一条（见上面那个 describe 的理由 —— 同一条判断抄四遍会把臂的红集读成判据变多）。
   });
 
   it('🔴 换选中 ⇒ 上一条**没提交的 RRULE 草稿**不跟着人走', async () => {
@@ -344,15 +372,14 @@ describe('子任务这一字段此刻归谁（§8.144）', () => {
 
   const pane = () => document.querySelector('[data-testid="task-pane"]');
 
-  it('🔴 栏里画的是子任务的**编辑本体**，且整栏只有一只 `<select>`、没有 `<details>`', async () => {
+  it('🔴 栏里画的是子任务的**编辑本体**，且整栏只有一只 `<select>`', async () => {
     const { a } = await makeChain();
     selection.select('task', a);
     mount();
     const box = pane();
     if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
     expect(box.querySelectorAll('[data-testid^="subtask-select-"]').length).toBe(1);
-    // 展开机关属于行尾那一支：栏里那一格再套一层 `<details>`，用户读到的是"还有一层没打开"。
-    expect(box.querySelector('details'), '栏里那一格拿到了行尾的展开机关').toBeNull();
+    // ⚠️ "栏里不许有 `<details>`"住在 pane 级那一条（理由见那里），不在这一格重复。
   });
 
   it('🔴 候选的预过滤在栏里**同样成立**（选得到自己的后代 = 界面上能造出环）', async () => {
@@ -426,5 +453,109 @@ describe('子任务这一字段此刻归谁（§8.144）', () => {
       src,
       '栏里画着的时候行尾还在挂 `<SubtaskPicker/>` ⇒ 子任务两处可编辑',
     ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<SubtaskBadge\s+task=\{task\}\s*\/>\s*\)\s*:\s*\(\s*<SubtaskPicker/);
+  });
+});
+
+describe('提醒这一字段此刻归谁（§8.145）', () => {
+  /** 数**叶子节点**里文本等于那一句区块头的个数。 */
+  function headerLeaves(box: HTMLElement, text_: string): number {
+    return [...box.querySelectorAll('*')].filter(
+      (el) => el.children.length === 0 && (el.textContent ?? '').trim() === text_,
+    ).length;
+  }
+
+  const pane = () => document.querySelector('[data-testid="task-pane"]');
+
+  it('🔴 栏里画的是提醒的**编辑本体**（共享 `ReminderList`），整栏只有一份', async () => {
+    const id = await addTask('提醒甲');
+    selection.select('task', id);
+    mount();
+    const box = pane();
+    if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
+    expect(box.querySelectorAll(`[data-testid="reminder-list-${id}"]`).length, '栏里的提醒列表不是一份').toBe(1);
+    // 无截止时间 ⇒ 只有绝对时刻那一颗按钮，且它必须说清"为什么没有提前量预设"。
+    expect(box.querySelector('[data-testid="reminder-add-absolute"]'), '栏里没有绝对时刻入口').not.toBeNull();
+    expect(box.textContent ?? '', '栏里没解释为什么没有提前量预设').toContain(zhCN['reminder.hint.noDueDate']);
+    // ⚠️ "栏里不许有行尾的两层外壳"住在 pane 级那一条，不在这一格重复（理由写在那里）。
+  });
+
+  it('🔴 「提醒」这个区块头在栏里**只出现一次**（共享列表自带，宿主不许再叠一枚）', async () => {
+    const id = await addTask('提醒乙');
+    selection.select('task', id);
+    mount();
+    const box = pane();
+    if (box === null) throw new Error('栏里没画面单 ⇒ 这一族判据在空转');
+    // 两处同一个词说两遍，读到的是"有两个区块"（§8.141 里重复那一格同一条纪律）。
+    expect(headerLeaves(box, zhCN['reminder.title']), '「提醒」区块头不止一处').toBe(1);
+  });
+
+  it('🔴 在栏里点「1 小时后提醒」⇒ 真的落 `REMINDER` op（不是只改内存里那一条）', async () => {
+    const id = await addTask('提醒丙');
+    selection.select('task', id);
+    mount();
+    const button = pane()?.querySelector<HTMLButtonElement>('[data-testid="reminder-add-absolute"]');
+    if (button == null) throw new Error('栏里没有那颗按钮 ⇒ 判据在空转');
+    const before = Date.now() + 60 * 60 * 1000;
+    await act(async () => {
+      button.click();
+    });
+    await flush();
+    const after = Date.now() + 60 * 60 * 1000;
+
+    const created = useReminderStore.getState().byTask[id] ?? [];
+    expect(created.length, '栏里那次点击没建出提醒').toBe(1);
+    // 物化状态里也有 ⇒ 证明走到了 op-log，而不是只改了 store 的本地表。
+    expect(useTaskStore.getState().entities.reminders[created[0]!.id]?.triggerAt, '提醒没落库').toBe(
+      created[0]!.triggerAt,
+    );
+    // 🔴 键名里的 `1h` 与文案是同一份契约：按钮说 1 小时，建的必须是 now + 1 小时。
+    expect(created[0]!.triggerAt).toBeGreaterThanOrEqual(before);
+    expect(created[0]!.triggerAt).toBeLessThanOrEqual(after);
+  });
+
+  it('ReminderBadge 是只读的：有条数才出现，里面没有列表、按钮、展开机关', async () => {
+    const id = await addTask('提醒丁');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    const mountBadge = (): void => {
+      act(() => {
+        r.render(
+          <I18nProvider locale="zh-CN">
+            <ReminderBadge task={useTaskStore.getState().entities.tasks[id]!} />
+          </I18nProvider>,
+        );
+      });
+    };
+
+    // 零条 ⇒ **不占位**。原来那颗 chip 在零条时显示「提醒」= 入口，而入口现在住在栏里的区块头；
+    // 把它留在行上就成了一份"两处都能开始编辑"（拍板 #8 的 `record` 档）。
+    mountBadge();
+    expect(host.innerHTML, '零条提醒却占了位，还写着入口那两个字').toBe('');
+
+    await act(async () => {
+      await useReminderStore.getState().addAbsolute(id, Date.now() + 3600_000);
+    });
+    await flush();
+    mountBadge();
+    const chip = host.querySelector(`[data-testid="task-reminder-badge-${id}"]`);
+    expect(chip, '挂了一条提醒而徽标没出现 ⇒ 列表看不出这一条有提醒').not.toBeNull();
+    expect(chip?.textContent ?? '', '徽标没显示条数').toContain('1');
+    expect(chip?.querySelector(`[data-testid="reminder-list-${id}"]`), '徽标里长出提醒列表 ⇒ 第二个编辑器').toBeNull();
+    expect(chip?.querySelector('button'), '徽标里长出按钮 ⇒ 第二个编辑器').toBeNull();
+    expect(chip?.querySelector('details'), '徽标里长出展开机关 ⇒ 那是编辑器不是痕迹').toBeNull();
+
+    act(() => {
+      r.unmount();
+    });
+    host.remove();
+  });
+
+  it('🔴 宿主那一支也读同一枚布尔：栏里画着时行尾只剩只读徽标', () => {
+    const src = stripComments(APP_SRC);
+    expect(
+      src,
+      '栏里画着的时候行尾还在挂 `<ReminderPanel/>` ⇒ 提醒两处可编辑',
+    ).toMatch(/\{\s*taskPaneInColumn\s*\?\s*\(\s*<ReminderBadge\s+task=\{task\}\s*\/>\s*\)\s*:\s*\(\s*<ReminderPanel/);
   });
 });

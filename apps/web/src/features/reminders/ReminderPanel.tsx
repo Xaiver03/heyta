@@ -1,10 +1,16 @@
 /**
- * 任务行上的「提醒」面板
- * ========================
+ * 「提醒」这一字段的三件产物
+ * ==========================
  *
- * 形状与 `features/tasks/NoteEditor.tsx` / `TaskOrganizer.tsx` 同族：
+ * 形状与 `features/tasks/NoteEditor.tsx` / `TaskOrganizer.tsx` / `SubtaskPicker.tsx` 同族：
  * **`<details>` + `<summary>` chip**，有提醒时 chip 常驻（显示条数），
- * 展开才是真正的操作面板。
+ * 展开才是真正的操作面板。§8.145 把它拆成三件事，各自落在不同地方：
+ *
+ *   | 产物 | 落在哪 | 是什么 |
+ *   |---|---|---|
+ *   | `ReminderField` | 详情列（`TaskDetailCard`）**和**行尾那颗 chip 的浮层里 | 编辑本体 |
+ *   | `ReminderBadge` | 行尾（详情列画着的时候） | 只读条数，零条不占位 |
+ *   | `ReminderPanel` | 行尾（详情列没画的时候） | 入口 chip + 玻璃浮层 + 本体 |
  *
  * 🔴 列表本身（一行提醒是什么状态、能对它做什么、按钮给哪几档提前量）
  * 全部由 `@heyta/ui` 的 `ReminderList` 渲染 —— 与 mobile 是**同一份实现**。
@@ -112,7 +118,19 @@ export function reminderListLabels(t: I18nValue['t'], locale: Locale): ReminderL
 /** 空数组必须**引用稳定**：每次渲染给一个新 `[]` 会让下游 memo 白跑。 */
 const NO_REMINDERS: readonly never[] = [];
 
-export function ReminderPanel({ task }: { task: Task }): React.JSX.Element {
+/**
+ * 提醒的**编辑本体**（不含展开机关与浮层外壳）。
+ *
+ * 🔴 为什么单独导出：与备注（`NoteField`，§8.138）、重复（`RepeatField`，§8.141）、
+ * 子任务（`SubtaskField`，§8.144）同一形状 —— 这一栏有两个落点（详情列 / 行尾那颗 chip 的
+ * `<details>`），两处要的是**同一份语义**：同一份 `labels` 构造（含"顺序必须等于预设数组"那条契约）、
+ * 同一个"正好 1 小时"的绝对时刻、同一份错误显示。抄两遍就是 AGENTS §3.5 那两条事故形状。
+ *
+ * ⚠️ 玻璃外壳（`.ht-compose-panel ht-material`）**留在行尾那一支**，不跟着本体进栏 ——
+ * 一栏里出现 `position: absolute` 的浮层面板，用户读到的是"这一格里漂着一块不属于这格的板子"
+ * （§8.141 的 R4 就是钉这一档的臂）。
+ */
+export function ReminderField({ task }: { task: Task }): React.JSX.Element {
   const { t, locale } = useI18n();
   // ⚠️ 取整个 `byTask` 对象，**不要**在 selector 里现算数组：
   // zustand v5 用 `useSyncExternalStore`，selector 每次返回新引用会被判成
@@ -144,7 +162,73 @@ export function ReminderPanel({ task }: { task: Task }): React.JSX.Element {
      * 门禁会把它报成"落在 Provider 子树之外"（与 NotesView 同一条纪律）。
      */
     <HeytaUiProvider>
-      <details className="ht-compose--popover">
+      <ReminderList
+        reminders={reminders}
+        now={now}
+        hasDueDate={task.dueDate !== undefined}
+        onAdd={(offsetMs) => {
+          void addBeforeDue(task.id, offsetMs);
+        }}
+        // 🔴 正好 1 小时 —— 与 `reminder.absolute.1h` 的文案是同一个契约（见文件头）。
+        onAddAbsolute={() => {
+          void addAbsolute(task.id, Date.now() + ABSOLUTE_LEAD_MS);
+        }}
+        // 传的是**提醒自己的 id**，不是 taskId（共享层与动作层的契约）。
+        onSnooze={(entityId) => {
+          void snooze(entityId);
+        }}
+        onDismiss={(entityId) => {
+          void dismiss(entityId);
+        }}
+        onRemove={(entityId) => {
+          void remove(entityId);
+        }}
+        labels={labels}
+        formatWhen={(at) => formatReminderWhen(at, locale)}
+        testID={`reminder-list-${task.id}`}
+      />
+
+      {message !== undefined && (
+        <p className="ht-settings__hint" role="alert">
+          {message}
+        </p>
+      )}
+    </HeytaUiProvider>
+  );
+}
+
+/**
+ * 行尾那枚**只读徽标** —— 编辑本体搬进栏里之后，列表还要能看出"这一条挂了几条提醒"。
+ *
+ * 🔴 刻意不是第二份编辑器：没有 `<details>`、没有 `ReminderList`、没有按钮。
+ * ⚠️ 没挂提醒时**不占位**（拍板 #8 的 `record` 档）：原来那颗 chip 在零提醒时显示的是
+ * 「提醒」二字 = 入口，而入口现在住在栏里的区块头 —— 把它留在行上就是一份"两处都能开始编辑"。
+ */
+export function ReminderBadge({ task }: { task: Task }): React.JSX.Element | null {
+  // 返回的是**数字**而不是数组：selector 给新引用会被 zustand 判成"快照一直变"（上面那条崩溃）。
+  const count = useReminderStore((s) => s.byTask[task.id]?.length ?? 0);
+  if (count === 0) return null;
+  return (
+    <span className="ht-chip ht-chip--on" data-testid={`task-reminder-badge-${task.id}`}>
+      <Bell size={CHIP_ICON_SIZE} aria-hidden="true" />
+      <span>{String(count)}</span>
+    </span>
+  );
+}
+
+/**
+ * 行尾那一颗**提醒 chip**：详情列没在画的时候，编辑本体就住在这它的 `<details>` + 玻璃面板里。
+ *
+ * ⚠️ 与 `NoteEditor` / `TaskRepeat` / `SubtaskPicker` 同一条：由 `App.tsx` 的
+ * `taskPaneInColumn` **条件挂载**，栏里画着的时候这里整个不渲染。
+ */
+export function ReminderPanel({ task }: { task: Task }): React.JSX.Element {
+  const { t } = useI18n();
+  const byTask = useReminderStore((s) => s.byTask);
+  const reminders = byTask[task.id] ?? NO_REMINDERS;
+
+  return (
+    <details className="ht-compose--popover">
       {/*
         有提醒时常驻一个**实心** chip 并显示条数 —— 扫一眼列表就知道
         哪些任务挂了提醒、各挂了几条。没有提醒时退成一个低调的入口。
@@ -159,40 +243,10 @@ export function ReminderPanel({ task }: { task: Task }): React.JSX.Element {
         <span>{reminders.length > 0 ? String(reminders.length) : t('reminder.title')}</span>
       </summary>
 
+      {/* 玻璃外壳属于行尾这一支（"这一格在哪儿画"的细节）；本体自带 `HeytaUiProvider`。 */}
       <div className="ht-compose-panel ht-material">
-        <ReminderList
-          reminders={reminders}
-          now={now}
-          hasDueDate={task.dueDate !== undefined}
-          onAdd={(offsetMs) => {
-            void addBeforeDue(task.id, offsetMs);
-          }}
-          // 🔴 正好 1 小时 —— 与 `reminder.absolute.1h` 的文案是同一个契约（见文件头）。
-          onAddAbsolute={() => {
-            void addAbsolute(task.id, Date.now() + ABSOLUTE_LEAD_MS);
-          }}
-          // 传的是**提醒自己的 id**，不是 taskId（共享层与动作层的契约）。
-          onSnooze={(entityId) => {
-            void snooze(entityId);
-          }}
-          onDismiss={(entityId) => {
-            void dismiss(entityId);
-          }}
-          onRemove={(entityId) => {
-            void remove(entityId);
-          }}
-          labels={labels}
-          formatWhen={(at) => formatReminderWhen(at, locale)}
-          testID={`reminder-list-${task.id}`}
-        />
-
-        {message !== undefined && (
-          <p className="ht-settings__hint" role="alert">
-            {message}
-          </p>
-        )}
+        <ReminderField task={task} />
       </div>
-      </details>
-    </HeytaUiProvider>
+    </details>
   );
 }

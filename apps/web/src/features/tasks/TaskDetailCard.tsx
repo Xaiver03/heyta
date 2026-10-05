@@ -15,13 +15,13 @@
  *      `renderTaskTrailing` 那段注释与台账 G9）—— 把字段往栏里搬，行的宽度问题才真的解决。
  *
  * 🔴 所以本文件遵守的不变量是：**每个字段任何时刻只有一个编辑器所有者**。
- * 已搬进来的是**备注**（`NoteField`，§8.138）、**重复**（`RepeatField`，§8.141）与
- * **子任务**（`SubtaskField`，§8.144）：
+ * 已搬进来的是**备注**（`NoteField`，§8.138）、**重复**（`RepeatField`，§8.141）、
+ * **子任务**（`SubtaskField`，§8.144）与**提醒**（`ReminderField`，§8.145）：
  * 每一单的同一笔提交里都要把行尾那半撤掉（`App.tsx` 的 `taskPaneInColumn` 反向条件），
  * 所以不存在"同一字段两处可编辑"的那个中间态；列表侧留下的分别是**只读徽标** `NoteBadge`、
- * **只读徽标** `RepeatChip` 与**只读徽标** `SubtaskBadge`（"扫一眼要能看出哪条任务写过 /
- * 是重复的 / 挂在谁下面"这一档不因为搬进栏里就丢掉）。
- * ⚠️ 这一条是**分阶段**的，不是"这一单顺手做完"：其余字段（清单标签 / 截止 / 提醒 / AI）
+ * **只读徽标** `RepeatChip`、**只读徽标** `SubtaskBadge` 与**只读徽标** `ReminderBadge`（"扫一眼要能看出哪条任务写过 /
+ * 是重复的 / 挂在谁下面 / 挂了几条提醒"这一档不因为搬进栏里就丢掉）。
+ * ⚠️ 这一条是**分阶段**的，不是"这一单顺手做完"：其余字段（清单标签 / 截止 / AI）
  * 仍住在行尾，登记成后续单，每一单都要重做"搬进来 + 行里撤掉"这两半，不许只搬一半。
  * 🔴 截止那一栏特别注明：`check:row-single-source` 的断言 A 要求"复选框 + 标题 + 截止"三种信号
  * 同时出现在任务行里，所以截止的**显示**必须留在行上，能搬的只有它的**编辑入口**。
@@ -41,6 +41,7 @@ import { text } from '../../lib/text.js';
 import { NoteField } from './NoteEditor.js';
 import { RepeatField } from './TaskRepeat.js';
 import { SubtaskField } from './SubtaskPicker.js';
+import { ReminderField } from '../reminders/ReminderPanel.js';
 import { useTaskStore } from './store.js';
 
 /*
@@ -149,6 +150,20 @@ export function TaskDetailCard(): React.JSX.Element | null {
           void store.setRepeat(task.id, rule);
         }}
       />
+
+      {/*
+        提醒（§8.145）。与重复那一格同一条理由，这里**不叠 `h3`**：共享的 `ReminderList`
+        自带区块头（`labels.title` 渲染成 `accessibilityRole="header"`，见
+        `packages/ui/src/reminders/ReminderList.tsx`），两处同一个词说两遍，读到的是"有两个区块"。
+        行尾那一支的玻璃浮层外壳（`.ht-compose-panel ht-material`）也**不跟着本体进栏** ——
+        一栏里漂一块 `position: absolute` 的板子，用户读到的是"这格里浮着不属于这格的东西"
+        （§8.141 的 R4 钉的就是这一档）。
+        ⚠️ 这里**没有** `key`，而且不是漏掉：上面三格都要 key 是因为它们各自带**本地草稿 state**
+        （非受控框 / 拒绝提示 / RRULE 草稿），而 `ReminderField` 与 `ReminderList` 全程只有
+        `useMemo`、零 `useState`（提醒列表来自 store，按 `task.id` 取）。↑↓ 换选中时它没有
+        上一条的状态可带 —— "搬进栏里就要加 key"不是这条纪律，**有本地 state 才是**。
+      */}
+      <ReminderField task={task} />
     </div>
   );
 }
