@@ -11697,3 +11697,54 @@ web 侧只有 `apps/web/tests/realtime-wiring.spec.ts` 那枚接线测试；`app
 ⚠️ 同一趟的对照读数：阻塞集仍 **1 枚**（`package.json`），而主检出脏条目从 12:4x 的 29 涨到 13:1x 的 **56**
 —— 那条线正在大批落笔。**"等他们提交"是瞬时事件，不是状态**：这一格只在落地那一刻重取才有意义（任务 #43）。
 
+
+### 8.206 公开 main 12:59 前进了 594 笔，而本地 main 一滴不剩 ⇒ 落地的**基线**自己成了一格（2026-10-05 13:2x）
+
+取现量的过程里先撞上一次自己的探针错：`git fetch --quiet origin 2>&1 | tail -2` 之后 `$?`
+读的是 `tail` 的（§7 第 184 条**第三次**在同一双手上现形），而 `origin` 是那枚 SSH 远端
+（`git@github.com:Xaiver03/heyta.git`），这台机器今天没有可用访问权（报
+"make sure you have the correct access rights"）。
+⇒ 换回台账里昨天那条**成功过的只读路径**重跑，且不经管道：
+`git fetch https://github.com/Xaiver03/heyta.git +refs/heads/main:refs/remotes/origin/main`
+→ `FETCH_RC=0`，`8ae4bfcc..564ad047`（公开那笔 **12:59:42**；本地 main=`8cb33f55` 是 **11:58:54**）。
+
+🔴 四笔现量（都可复跑）：
+
+```
+git rev-list --count origin/main..main  =   0    ← 本地 main 没有任何公开树没有的东西
+git rev-list --count main..origin/main  = 594    ← 公开 main 领先本地 594 笔
+git merge-base --is-ancestor 8cb33f55 origin/main = 是
+git merge-base --is-ancestor 673e6a43 origin/main = 否   （本分支 tip 不在公开树里）
+```
+
+⇒ **本批已经"部分公开"**：公开树里有那条 `RUN npm pkg delete devDependencies`（`:309`）、
+有 24 枚 `research/tools/selfhost-*.mjs`、台账写到 **§8.182**；而分支后半段（含今天这五笔）不在。
+"落地"这件事的 mental model 由此过期了一格 —— 要落的是**差集**，不是整批。
+
+### 这条现量逼出的三件事
+
+1. **给 lander 加了一道基线闸门**（`research/tools/selfhost-land-main.mjs`，新 `--baseline-leg`）。
+   原有那道"载体双亲对上"只比对**本地** main，看不见"本地 main 自己就是旧的" ——
+   装在旧基线上的那一笔并不代表"批次 + 当前公开基线"，一旦被人推上去，就是把别人 594 笔当分叉处理。
+   读不到远端 ref 按**判不了**处理（`--confirm` 下拦、纯体检只报不拦），口径与
+   `selfhost-carrier-busy` 同一句：**"判不了"不等于"没问题"**。
+   三臂现量（两腿都用真 ref 打，没有造假旋钮）：
+   `HEYTA_LAND_REMOTE_MAIN=main` ⇒ ✅ 落后 0 笔、rc=0；默认 `origin/main` ⇒
+   🔴 领先 **594 笔**、rc=1 并给出恢复动作；`HEYTA_LAND_REMOTE_MAIN=no/such/ref` ⇒
+   🔴 判不了、rc=2。**这条判据能红是拿真数据证的**，不是推断。
+2. **G-55 换问题、不换编号**：它的前提"公开树缺那条 prune ⇒ 建不出镜像"今天**已不成立**
+   （那一行现在就在公开树里）。剩下没人证的命题是"外人从公开树按那三条 `-f` 整条 build 走不走得通"，
+   判据：一次性 detached 检出公开那一笔，真跑一次 `docker compose build`（需要窗口）。
+   ⚠️ 别把它读成"公开树现在能建了" —— 那是还没量的另一格。
+3. **落地时 Dockerfile 那一族的新形状要现量看**：两棵树在这段**只差注释**
+   （公开侧多了一段讲"devDependencies 必须在装之前剪掉"的说明，本分支是另一套精简措辞），
+   而 `ARG`/`RUN` 行为行**逐字相同**。⇒ `selfhost-dockerfile-merge.mjs` 若只按行为行解冲突，
+   这一格（纯注释分叉）怎么落地要在**那趟运行里**取读数，不许事后用"反正是注释"解释掉。
+
+### 对第 1 项的影响：外部合取从一条变成两条
+
+原来只剩"owner 提交 `package.json`"。现在多一条**只有主检出所有者能做**的动作：把主检出快进到公开那一笔
+（`git merge --ff-only origin/main`）。本批**不动主检出**、不 `git branch -f main`、不 push ⇒ 这道快进
+不能由我代做；而 lander 现在会**响亮拒绝**装在旧基线上。
+⚠️ 哨兵那台 `--run-on-open` 仍会照开 —— 开窗后被这道新闸门挡下（rc=1，一个字节都不写）。
+**这是设计要的**：宁可退，也不要装出一笔会被人当分叉处理的合并。
