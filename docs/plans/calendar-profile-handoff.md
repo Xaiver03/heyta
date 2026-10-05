@@ -2295,9 +2295,16 @@ done
   判据 = 看产出那张图的 spec 里有没有 `Date.now()` / `Math.random()` 的 STAMP）→
   复跑 `--all` 看 `dirs_without_readme` / `dirs_unpinned` 是否各减一。
   🔴 **基线要跟着现量改小，而且注释里写明偿掉的是哪一枚**（两个旋钮旁边都留了现量命令）。
-- **另有一枚本线内的缺口**：`e2e/tests/calendar-capture.spec.ts` 的**第 2 条**
-  （"输入里写『后天』时以输入为准"）**没有截图** —— 整个 spec 只有第 1 条 `page.screenshot`。
-  那条主张现在只有 DOM 断言撑着。补图与上面那九张 UISTALE 的重拍共用同一个窗口前置（§5 的 H）。
+- ~~**另有一枚本线内的缺口**：`e2e/tests/calendar-capture.spec.ts` 的**第 2 条**（"输入里写『后天』时以输入为准"）
+  **没有截图** —— 整个 spec 只有第 1 条 `page.screenshot`，那条主张只有 DOM 断言撑着。~~
+  ✅ **已闭合（10-05 18:2x 现量，别照旧文行动）**：第 2 条现在有自己的采集
+  （`grep -c 'page.screenshot' e2e/tests/calendar-capture.spec.ts` ⇒ **2**，落在 `:83` 与 `:121`），
+  产物与常驻判据都在（`ls apps/web/evidence/calendar-capture/` ⇒ 两枚 png；
+  `grep -c '^UIPIN' apps/web/evidence/calendar-capture/README.md` ⇒ 2，两条都把 `packages/design-system/src/tokens.css`
+  纳进"决定形状的路径"）。窗口前置与上面那九张 UISTALE 共用 §5 的 H —— 那一格现量已偿清：
+  `bash research/tools/r17-evidence-md5-check.sh --all` ⇒ rc=0 且 `dirs_with_mismatch=0`。
+  📌 留这段划掉原文的理由：台账正文里"还有缺口"的句子如果不在偿清那一步改掉，下一个读它的人会
+  **把已经做完的事重新排一遍队**（AGENTS §8.8 说的那两套状态）。
 
 **K. 负载那把尺还剩两份抄件，其中一份今天还在把读数印成一行谎话。**（17:5x 发现，登记不修，理由在每条下面）
 
