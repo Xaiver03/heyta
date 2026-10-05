@@ -43,6 +43,13 @@
  *   M23 承重(腿6) 那行自身可解析，且"已结案 + 缺 == 总条数"
  *   M24 同一份变异喂「还没有腿 6 的那版」→ RC=0（减法现量；旧版按内容认，不按 HEAD）
  *   脱牙 摘掉腿 6 的命中集合           → M17/M18/M21 三份全部失能
+ *   —— 腿 7（一条 Markdown 表格行 = 一个物理行）2026-10-05 起加（工单 §8.139）：
+ *   M25 把 C1 表某一行从中间拆成两半    → 点名 2 处（起而不收 + 收而不起）且 RC=1
+ *   M25b 同一形状放进围栏代码块里       → 放过（反方向臂：挡"把代码块里的示例表格当断行"）
+ *   脱牙 摘掉腿 7 的命中集合           → 同一份断行文档**整条判据回到 RC=0**。
+ *                          🔴 这一档是"有腿"的唯一证明：其余六腿取行用的是 `^\|\s*N\s*\|`，
+ *                          断开的两半各被认成"一行"，"有节/有推荐/有外部锚"照样全成立，
+ *                          而它在渲染里根本不是表格 —— 2026-10-05 实测 C1 表 #14 就是这个形状。
  *   对照 未变异的副本 / 复位后           → 全绿 RC=0
  *   ⚠️ 同一轮把 M8 的文档来源从 `git archive HEAD` 改成**工作树拷贝**：原版把"我这轮还没提交"
  *      写成了前提 —— 台账补结案档那一批还没提交时，HEAD 那份缺结案档，这条守 `--root` 的臂
@@ -566,6 +573,55 @@ check(
   !!l6 && Number(l6[1]) + Number(l6[2]) === Number(l6[3]) + Number(l6[4]) && Number(l6[4]) === 0,
   l6 ? `B6 ${l6[1]}｜C2 ${l6[2]}｜已结案 ${l6[3]}｜缺 ${l6[4]}` : '读数行没解析出来',
 );
+
+// —— 腿 7（一条 Markdown 表格行必须是一个物理行）。2026-10-05 加。
+// 🔴 来路不是整洁癖：§8.135 在 §8 工单表上实测过一次（一枚被写成 8 个物理行的工单行活了
+//   **12 趟门禁**没人看见），本线当天往 C1 表 #14 行里插更正时**又**写出同一形状。
+//   前面那些腿取行用的是 `/^\|\s*(\d+)\s*\|(.*)$/`，断行照样匹配、照样计数 ⇒
+//   "这一行有对照节 / 有推荐 / 有外部锚"全部成立，而它在渲染里根本不是表格。
+//   所以这一腿只判**形状**，且必须和"取行"那些腿并存 —— 它们判的是不同的事。
+const ROW7 = '这一行不是完整的表格行';
+const splitRow = (text, n, at) => {
+  const L = text.split('\n');
+  const k = L.findIndex((l) => new RegExp(`^\\|\\s*${n}\\s*\\|`).test(l));
+  if (k === -1) throw new Error(`装置找不到 C1 表的第 ${n} 行 —— 表的形状变了，腿 7 的臂要跟着改`);
+  if (L[k].length < at + 10) throw new Error(`C1 第 ${n} 行短于拆点 ${at} —— 夹具没有靶`);
+  L.splice(k, 1, L[k].slice(0, at), L[k].slice(at));
+  return L.join('\n');
+};
+// M25 把 C1 表第 8 行从中间拆成两个物理行 → 点名两处（起而不收 + 收而不起）
+const m24 = withDoc((t) => splitRow(t, 8, 200));
+check(
+  'M25 把 C1 表一行拆成两个物理行 → 腿 7 点名 2 处（断行的两半各算一处，且 RC=1）',
+  m24.rc === 1 && legCountHas(m24.out, ROW7) === 2,
+  `RC=${m24.rc}｜腿7 点名 ${legCountHas(m24.out, ROW7)} 处`,
+);
+// M25b 反向臂：同样的形状放进**围栏代码块**里 → 不许报。
+// 没有这条，下一轮把围栏判定摘掉（或把代码块里的示例表格当成断行）都不会有东西失败。
+const m24b = withDoc((t) => `${t.replace(/\n+$/, '')}\n\n\`\`\`md\n| 这行在代码块里，起而不收，但它不是表格行\n\`\`\`\n`);
+check(
+  'M25b 围栏代码块里"起而不收"的竖线行 → 不报（形状判只认正文，反方向有臂）',
+  m24b.rc === 0 && legCountHas(m24b.out, ROW7) === 0,
+  `RC=${m24b.rc}｜腿7 点名 ${legCountHas(m24b.out, ROW7)} 处`,
+);
+// 脱牙（腿 7）：摘掉命中集合后，M25 那份文档不再报那一句，而基线仍绿 ⇒ 这一腿是承重的
+const neuter7Decl = 'if (starts !== ends) brokenRows.push(';
+if (!readFileSync(GATE, 'utf8').includes(neuter7Decl)) {
+  console.log('🔴 装置找不到腿 7 的命中行 —— 脱牙臂会假装成功，拒绝继续。');
+  process.exit(2);
+}
+const neuter7Gate = join(scratch, 'gate-no-leg7.mjs');
+writeFileSync(neuter7Gate, readFileSync(GATE, 'utf8').replace(neuter7Decl, 'if (false) brokenRows.push('), 'utf8');
+{
+  const doc7 = join(scratch, 'doc-split-row.md'); writeFileSync(doc7, splitRow(ORIGINAL, 8, 200), 'utf8');
+  const r = spawnSync(process.execPath, [neuter7Gate, doc7], { encoding: 'utf8' });
+  const clean = spawnSync(process.execPath, [neuter7Gate, join(repoRoot, DOC)], { encoding: 'utf8' });
+  check(
+    '脱牙对照 摘掉腿 7 → M25 那份文档**整条判据回到 RC=0**（断行的两半仍被 `/^\\|\\s*N\\s*\\|/` 各认一行、各算"有节/有推荐"）—— 这一腿是唯一的消费者，仓库那份也仍绿',
+    r.status === 0 && !`${r.stdout}${r.stderr}`.includes(ROW7) && clean.status === 0,
+    `断行文档 RC=${r.status} 且不含腿 7 那句=${!`${r.stdout}${r.stderr}`.includes(ROW7)}｜干净文档 RC=${clean.status}`,
+  );
+}
 
 // M8b 🔴 M8 换取材方式之后**分辨力会掉**：树里那份与仓库那份字节相同 ⇒ "读错了对象"也照样绿。
 //   补一条反向臂：往树里放一份**缺结案档**的副本 ⇒ 必须红、点名那一条，

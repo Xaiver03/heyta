@@ -9594,8 +9594,27 @@ B2 相反，jsdom 根本没有布局。所以这一栏的意义是**每档坏都
 |---|---|
 | 归属门 | 本单动的是 9 枚文件：新增 `TaskDetailCard.tsx` / `task-detail-card.spec.tsx` / `detail-pane-task.spec.ts` / `mutate-detail-pane-task.mjs` / 五枚新图，改动 `NoteEditor.tsx` / `App.tsx` / `keyboard-cursor.ts` / `base.css` / `playwright.detail-pane.config.ts` / 两份 spec（keyboard-cursor）+ 本文档与调研。开工前现量主检出：`git status --porcelain -- apps/web packages/ui packages/app-host e2e/tests` 只有 3 枚 `apps/web/evidence/calendar-capture/*`（别线的图），**落点逐个干净** —— 与 §8.125 那段"撞车判据是同一文件的未提交 diff，不是某条线在忙的印象"同口径。`scripts/mutate-closeout-gates.sh` 恒 `M`、不提交 |
 | 两道余量为 0 的棘轮 | 都没动基线：`check:row-single-source` ✅ **28 = 锚点 28**（新类挂在既有 `.ht-app` 族下）、`check:l4-no-style` ✅ mobile **90 = 锚点 90** / web 未升（两处样式走模块级常量与既有类，没往 JSX 里塞 `style={{}}` 字面量） |
-| 干净检出复跑 | 🔴 **提交态复跑 = 下一笔（载体 = 本单收口点提交，尚未取）**；工作树这一趟已跑，**14 道里 13 道 RC=0**（`check-detail-pane-slot` / `-c1-coverage` / `-evidence-refs` / `-status-table` / `check-docs-voice` / `check-claims` / `check-reachability` / `check-selection-single-source` / `check-layering` / `check-l4-no-style` / `check-row-single-source` / `check-ratchet-ceilings` / `check-hardcoded`），唯一 RC=1 是 `research/tools/docs-link-check.mjs` 那枚别线的 `PROGRESS.md:1362` aed 死链（待办 #49；本单文件命中数现量 `0`）。⚠️ **这一格里 `-evidence-refs` 的成立前提是新图已进 git 索引**：它先红过一趟 5 处，而那 5 处正是本单自己那 5 枚未跟踪的 t1..t5 —— 门禁量的是"盘上有、库里没"，我第一趟把它读成了"别族的图被 e2e 重写"（那种脏是真的，但**不是这 5 处的成因**）；`git restore` 复原了 37 枚别族图、复跑仍 RC=1，`git add` 这 5 枚之后才 RC=0。📌 症状相同的两件事要分开归因，别把"我顺手动过的一堆文件"当成失败项的清单 |
+| 干净检出复跑 | ✅ **已做**（载体 `0ecb4995` = 本单收口点提交）：`git worktree add --detach /tmp/dp_clean_8138 0ecb4995` ⇒ 树里只有提交态内容，跑完 `git worktree remove --force` 摘掉。**那棵干净树里 14 道纯 fs / git 门禁 13 道 EXIT=0**，唯一 EXIT=1 现量仍只有 `PROGRESS.md:1362 → docs/research/aed-implementation-evidence.md`（别线、待办 #49）。🔴 **jsdom 与 e2e 两层没有在这棵树里跑** —— 射程与 §8.126/§8.132/§8.135/§8.137 逐字相同：裸检出 + 部分 `node_modules` 软链 = 混合载体，根软链会把 `@heyta/*` 解析到主检出的包，那种读数红绿都不作数；两层的读数是工作树里的臂台（第 4 节 `RIG_RESULT=8/8`）与电池。工作树这一趟先前也跑过同 14 道（清单：`check-detail-pane-slot` / `-c1-coverage` / `-evidence-refs` / `-status-table` / `check-docs-voice` / `check-claims` / `check-reachability` / `check-selection-single-source` / `check-layering` / `check-l4-no-style` / `check-row-single-source` / `check-ratchet-ceilings` / `check-hardcoded`），唯一 RC=1 是 `research/tools/docs-link-check.mjs` 那枚别线的 `PROGRESS.md:1362` aed 死链（待办 #49；本单文件命中数现量 `0`）。⚠️ **这一格里 `-evidence-refs` 的成立前提是新图已进 git 索引**：它先红过一趟 5 处，而那 5 处正是本单自己那 5 枚未跟踪的 t1..t5 —— 门禁量的是"盘上有、库里没"，我第一趟把它读成了"别族的图被 e2e 重写"（那种脏是真的，但**不是这 5 处的成因**）；`git restore` 复原了 37 枚别族图、复跑仍 RC=1，`git add` 这 5 枚之后才 RC=0，提交后在那棵干净树里再跑仍是 RC=0。📌 症状相同的两件事要分开归因，别把"我顺手动过的一堆文件"当成失败项的清单 |
 | packages 改完先 build | 本单**没改** `packages/*`（改动全在 `apps/web` 与 `e2e`）。载体是 `apps/web/dist`，所以 `tsc -b` + `vite build` 每步都重打（臂台里每臂各重打一次并核产物摘要） |
+
+### 6.5 电池（`scripts/verify-detail-pane-closeout-battery.mjs`，36 步）
+
+第二趟 `BATTERY_RESULT=ALL_GREEN`（`BATTERY_EXIT=0`）。分步读数：typecheck 六条 RC=0；
+单测 domain **845** / app-host **1023** / i18n **26** / ui **474** / web **1645 passed | 12 skipped (1657)** /
+mobile **608**；`build web` 两步（`tsc -b` + `vite build`）RC=0；`typecheck e2e family` RC=0；
+真浏览器详情面整族 **54 passed**；证据守卫 `SNAPSHOT 登记=164 枚（跑前就脏 0 枚）` →
+`EVIDENCE_GUARD=RESTORED 39 枚` → `EVIDENCE_DIRTY=0`。
+
+💥 **第一趟 `BATTERY_RESULT=RED:test web`，而那一条红不是本单的**：唯一失败是
+`tests/reminders-panel.spec.tsx > 🔴 超过每任务上限时把错误显示出来，不静默吞掉`，红在
+`waitFor`（`:160`，由 `:265` 调用）的"等待超上限的错误被记下"超时。**归因用了三条现量，
+不靠印象**：① 单独跑那个文件 **3/3 RC=0**（`Tests 6 passed (6)`）；② 整包 web 复跑
+**1645 passed | 12 skipped (1657)** —— 总数与电池那一趟**逐字相同**，所以没有第二条被掩盖；
+③ 复跑时 `vm.loadavg` 是 **31.1**，比电池那一趟的 **18.8** 更高却过了 ⇒ 它不是确定性坏。
+这正是待办 **#47** 记的那一条（提醒上限用例仍取决于机器负载，§8.133 第 6 节第 7 条），
+**本单没修它、也没把它的红读成自己的缺陷**。
+📌 记这条的形状：**一趟电池里"只有一个红"不等于"那个红是我的"** —— 分辨靠总数是否逐字相同 +
+单跑能否复现，而不是靠"我只改了任务那一格"这种推理。
 
 ### 7. 边界（别读多）
 
@@ -9611,3 +9630,62 @@ B2 相反，jsdom 根本没有布局。所以这一栏的意义是**每档坏都
 这条最短路径今天不成立。登记成待办，不在本单顺手改（改它要动 W1b 那三条闸门的语义）。
 ④ 接线只在 web：触屏端没有键盘光标这回事（同 W1b 边界 ②）。
 ⑤ 四端重装未做（真实前置是合流，待办 #13）⇒ 本单与 W1/W1b 一样不许读成"已完成"。
+
+## 8.139 调研文档 C1 表里有一条表格行被写成两个物理行：给它补上腿 7（2026-10-05 15:0x，状态：**已完成**）
+
+### 1. 怎么发现的：我自己写 §8.138 第 6 节那一行时**又**断了一次
+
+我往"四道前置闸门"那张表里插长句，Edit 把一行分成了两个物理行（9597 + 9598）。发现它靠的是
+**数行数与量每行长度**（`awk 'NR>=9595 && NR<=9601 {printf "%d[%d]", NR, length($0)}'`），不是任何门禁。
+回头把同一形状扫全文 ⇒ 本线自己的调研文档 **C1 表 #14 行在 HEAD 里就已经是这个形状**
+（295 行起而不收、296 行收而不起）。🔴 §8.135 记的正是同一件事（一枚工单行被写成 8 个物理行，
+活了 **12 趟门禁**没人看见）—— 也就是说**那一轮修的是那一枚，不是这一族**：形状判据只挂在
+§8 工单表上，C1 表那一档仍然没有人守。这与 §8.72 数过的那一档同族（有脚本、没消费者），
+只不过这次的形态是**有判据、只覆盖了出事那一处**。
+
+### 2. 为什么已有的六条腿看不见它
+
+腿 1–5 取行取节用的是 `^\|\s*(\d+)\s*\|(.*)$` 这一类**前缀匹配**：断开的两半各自被认成"一行/一节"，
+于是"有对照节""有推荐""有外部锚"全部照样成立 —— 而它在渲染里根本不是表格，那一格的状态等于没人记。
+现量（不是推理）：**摘掉新腿之后喂同一份断行文档，整条判据 `RC=0`** —— 臂台里那条脱牙对照钉的就是这一档。
+
+### 3. 落的判据（`scripts/check-detail-pane-c1-coverage.mjs` 新增腿 7）
+
+非围栏区里「以竖线起头却不以竖线收尾」或「以竖线收尾却不以竖线起头」的行都算断；
+引用块里的表格行（`> | …`）先剥前缀再判（那是合法形状，不是断行）。披露行：
+`承重(腿7)：非围栏区里以竖线起头或收尾的行 183 行参与形状判 ⇒ 断成多个物理行的 0 处`；
+红集用 `…（N 条）：` 那一句点名**行号 + 半型**（起而不收 / 收而不起），结论串里也带上断行处数。
+
+### 4. 三臂（臂台 `research/tools/mutation-rigs/mutate-detail-pane-c1-coverage.mjs`，整台 `39/39 臂符合预期`）
+
+| 臂 | 注入 | 读数 |
+|---|---|---|
+| M25 | 把 C1 表第 8 行从中间拆成两个物理行 | RC=1，腿 7 点名 **2 处**（两半各算一处） |
+| M25b | 同一形状放进**围栏代码块**里 | RC=0，点名 0 处（反方向臂：挡"把代码块里的示例表格当断行"） |
+| 脱牙 7 | 摘掉腿 7 的命中集合 | 断行文档**整条判据回到 RC=0**，而干净文档仍 RC=0 ⇒ 这一腿是唯一的消费者 |
+
+💥 **两处装置自己的事故，都要记**：① 我第一版把脱牙臂的期望写成 `RC=1`（假设"别的腿会接住断行"），
+实测 `RC=0` —— 按我的假设写下去，"其实没有别的消费者"这件事就永远照不出来。**期望值与读数冲突时
+改主张不改判据**（与 §8.138 第 4 节 A3 同一处理）。② 臂号 `M24` 已被"减法现量"那条占用（它就在同一台
+装置里），新臂只能排到 `M25/M25b` —— 臂号是**从文件里抄的**，不是凭记忆排的；我先写完 M24 才去核对。
+
+### 5. 修的结构（内容一字未动）
+
+调研文档 C1 表 #14 行的两个物理行并回一行，只去掉那一个换行符；并回后两份文档现量均为
+`断成多个物理行的 0 处`，`check-detail-pane-c1-coverage` 与其余文档门禁一起 RC=0
+（`check-docs-voice` / `check-claims` / `-status-table` / `-evidence-refs` / `check-reachability`）。
+
+### 6. 四道前置闸门 与 边界
+
+| 闸门 | 读数 |
+|---|---|
+| 归属门 | 动的是本线资产四枚：`scripts/check-detail-pane-c1-coverage.mjs`、它的臂台、本文档、调研文档。不碰别人的文件 |
+| 两道余量为 0 的棘轮 | 本单不碰样式与类名；与 §8.138 同一趟复跑 `check:l4` / `check:row-single-source` 均 RC=0，基线没动 |
+| 干净检出复跑 | 🔴 **待取，见 §8.140**（提交后在同一棵裸检出里跑那 14 道）—— 这一格在拿到读数前不许写成已做 |
+| packages 改完先 build | 本单没改 `packages/*` |
+
+⚠️ **射程边界（别读多）**：腿 7 只扫**被取样的那一份文档**（这台判据按单文档取样，`--root` / 文档参数照旧）。
+仓库里其它文档有没有同类断行**没有量过** ⇒ 不许把"0 处"读成"全仓表格行形状已清"。
+把它推广到全仓要连"哪些文档算本线资产、其余谁负责"一起拍，登记成待办 #56。
+另一条同样成立的边界：腿 7 判的是**形状**，判不了"这一行是不是它自称的那条工单"——
+形状与真假是两件事，前者这轮有了消费者，后者仍由腿 1–5 各管一档。
