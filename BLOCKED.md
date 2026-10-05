@@ -5404,3 +5404,39 @@ tip 是自己 10 秒前造的那笔 —— `git reset --soft HEAD~1` + `git rest
    `grep -oE '^[0-9]+\. ' | tr -d '. ' | sort -n | tail -1`，再按上面那三行对账（本条故意不写死条数）。
 
 **边界**：本格**没有** merge、**没有** pull/fetch、**没有** push、**没有**改 CI；改的只有本线自己的两把装置与台账。
+
+---
+
+## B82. ⏳ 日历+Profile 线有两枚**只差"文件腾开"这一步**的自闸收口，以及一枚已挂的看守（10-05 19:3x 现量）
+
+**为什么记在这里**：这两件事的阻塞对象不是判据、不是工具，而是**别人正握着的两个文件**。写在本线台账里只有本线的会话会读到；
+谁把那两个文件提交了，谁就是下一个能让它们落地的人 —— 所以交接要放在这本并行会话共用的册子里。
+
+**① `package.json` 腾开之后（本线三把验证台进仓库级常驻消费者的最后一步）**
+
+```bash
+git diff HEAD --numstat -- package.json                     # 要 0/0（19:2x 现量：2 增 1 删 = 别人的 check:ios-ax-shim）
+node research/tools/calendar-line-wire-evidence-rigs.mjs            # 干跑：脏 ⇒ rc=3 且一个字节不写（已被臂22–27 逐档证明能红）
+node research/tools/calendar-line-wire-evidence-rigs.mjs --confirm  # 干净才跑；锚点数≠1 ⇒ rc=4「不猜插入点」
+node scripts/check-gate-wiring.mjs --pkg package.json               # 插完自己过仓库那把对账
+ANCHORS='check:calendar-evidence-rigs' MSG='…' bash research/tools/calendar-line-commit-plan.sh --confirm
+```
+🔴 **不要**在它脏的时候用 `--only package.json` 之类的手法"把自己的行夹带进去"：
+`git commit --only` 提交的是**该路径工作树内容的全部**，那 2 行未提交字节会被算成本线提交的（归属闸门 3b 会红，但人在红面前容易顺手 `ALLOW_ORPHAN=1`）。
+
+**② `docs/reference/environment-traps.md` 腾开之后（那条「差分形状 ≠ 差分语义」）**
+
+```bash
+git diff HEAD --numstat -- docs/reference/environment-traps.md      # 要 0/0（19:2x 现量：518 增 1 删 = 几条线还在往尾部追加）
+node research/tools/calendar-line-append-trap.mjs --text research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt            # 干跑
+node research/tools/calendar-line-append-trap.mjs --text research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt --confirm  # 干净才写；号由它现量给并按 10-05 的收号裁决自动顺延
+bash research/tools/r17-evidence-md5-check.sh --all                 # 落完复跑，rc 仍要 0
+```
+裁决与分档见 B81；**编号这件事已经不需要等人了**，只差册子干净。
+
+**③ 已挂的 C 看守（不是等待项，是"别去抢它"的告示）**
+`research/tools/r14c-window-retry.sh` 于 19:18 挂上，pid 记在 `/tmp/ht-r14c-keeper.pid`（`ps -p "$(cat …)" -o pid=,etime=` 现量），
+预算 14400s、每 60s 问一次 `verify-mobile-window-gate.sh --target c`（dry-run，绝不动设备）。
+它会在开窗那趟自己 checkout 到主检出当前提交、重打产物、再跑 `scripts/verify-mobile-due-time.sh` 那 37 条腿。
+⚠️ 日志与 pidfile 都在 `/tmp`（一次重启就没）——**别把它当持久证据**；要重新主张这一格就再挂一次，别同时挂两枚（同一张设备面，AGENTS §8.9）。
+**这一格仍未闭合**：37 条腿没在开窗后真跑过，读数就只有"装置在等"这一种。
