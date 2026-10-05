@@ -7022,6 +7022,11 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     这条判据就把每一次正常滚动都判成失败（§7 元规则二：不能失败的检查没价值，**会乱红的检查更危险**）。
     常驻门禁：`check:mobile-ai-anchors` 的合成 AX 树臂（臂 9/10 取哪一层、臂 13/14 参照锚不许是根，
     各带 min→max / 摘过滤两道变异）。
+    第四种面目（rig25）：**读的是另一枚库**。`device_pref` 住在 `heyta-device-prefs.sqlite`，
+    拿 op-log 那枚 `heyta.sqlite` 去查得到 `BAD:DatabaseError`；而 `adb exec-out run-as … > 文件`
+    在**不可调试的 Release 装机**上把 `run-as: package not debuggable` 那 42 字节当成库写进来，
+    退出码仍是 0（重定向的码，不是命令的码 —— #179/#184 同族）。⇒ 取库要有**魔数前置**
+    （`head -c 16` 必须等于 `SQLite format 3`），root+`adb pull` 优先，run-as 只当兜底。
 
 329. 🔴 **验收脚本的中文文案里不要写反引号**——双引号串里的反引号是**命令替换**，
     脚本会真的执行那条"看起来像注释"的命令，而读数照常打。

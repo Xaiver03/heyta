@@ -131,6 +131,7 @@ EP_PLAINTEXT="stub-plaintext"
 
 LAPTOP_DB="/tmp/heyta-ai-laptop.sqlite"
 PHONE_DB="/tmp/heyta-ai-phone.sqlite"
+PREFS_DB="${HEYTA_PREFS_DB:-/tmp/heyta-device-prefs.sqlite}"   # 与 PHONE_DB 同一个旋钮家族
 EVIDENCE="$HEYTA_REPO_ROOT/apps/mobile/evidence"
 STUB_LOG="/tmp/heyta-ai-stub.log"
 STUB_PIDFILE="/tmp/heyta-ai-stub.pid"
@@ -638,6 +639,66 @@ bind_route() {  # <功能名> <端点标签>
   return 0
 }
 
+# 🔴 绑定到底有没有写进去，**不拿 AX 的 selected 判**（rig20 现量：整棵树 `selected="true"`
+#   命中 0，而 Chip 明明写了 accessibilityState={{selected}} —— 选中态在 Android 无障碍上读不到，
+#   已登记成产品侧可访问性缺口）。改成从设备库里读回那份 JSON：
+#   表 `device_pref`、键 `heyta.ai.settings`（apps/mobile/src/ai/settings-store.ts:41），
+#   值里就是 `routes[feature]` 与 `consents` —— **在被写那一侧读**，而不是看手指落没落。
+# 🔴 `device_pref` **不在** op-log 那枚库里（现量：`/data/data/com.heyta/databases/` 下有两枚
+#   —— `heyta.sqlite`(73,728B) 与 `heyta-device-prefs.sqlite`(12,288B)）。第一版拿 `$PHONE_DB`
+#   （op-log 那份）去 `SELECT … FROM device_pref`，读出 `BAD:DatabaseError`，
+#   那条"绑定要从库里回读"的判据于是把**探针开错文件**报成了"绑定无从判定"（traps #328 的第四种面目：
+#   尺子自己坏了）。取现量：adb -s <dev> shell ls -la /data/data/com.heyta/databases/
+pull_prefs_db() {
+  rm -f "$PREFS_DB" 2>/dev/null
+  $ADB root >/dev/null 2>&1 || true
+  sleep 1
+  # 🔴 通道顺序有因：这台装机是**不可调试的 Release 产物**，`run-as` 只回一行
+  #   "run-as: package not debuggable"（42 字节），而 `exec-out … > 文件` 的退出码属于**重定向**，
+  #   于是那行报错被当成库文件写进去，判据读出「不是数据库」—— 那是探针挑了条走不通的通道，
+  #   不是设备里没有库（traps #328 的第四种面目：尺子自己坏了）。
+  #   root + `adb pull` 在这台模拟器上拿得到真库（现量 12,288B、头部 `SQLite format 3`）；
+  #   run-as 只留作可调试装机的兜底，且**必须验过魔数才算数**。
+  $ADB pull "/data/data/$PKG/databases/heyta-device-prefs.sqlite" "$PREFS_DB" >/dev/null 2>&1 || true
+  if ! head -c 16 "$PREFS_DB" 2>/dev/null | grep -q 'SQLite format 3'; then
+    $ADB exec-out run-as "$PKG" cat "databases/heyta-device-prefs.sqlite" > "$PREFS_DB" 2>/dev/null || true
+  fi
+  $ADB unroot >/dev/null 2>&1 || true
+}
+
+routes_reading() {  # → 每档一行 "feature=<绑定端点数>/<同意数>"；读不到库打 NOFILE、解析不了打 BAD
+  pull_prefs_db
+  if [ ! -s "$PREFS_DB" ] || [ "$(wc -c < "$PREFS_DB")" -lt 512 ]; then printf 'NOFILE'; return 1; fi
+  # 头部一验：不是 SQLite 文件就直说（42 字节的 run-as 报错文本会被 sqlite 当成"打不开"）
+  head -c 16 "$PREFS_DB" | grep -q 'SQLite format 3' || { printf 'BAD:not-a-db'; return 1; }
+  HEYTA_DB="$PREFS_DB" python3 - <<'PYR'
+import json, os, re, sqlite3, sys
+db = os.environ["HEYTA_DB"]
+try:
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    row = con.execute("SELECT value FROM device_pref WHERE key='heyta.ai.settings'").fetchone()
+except sqlite3.Error as e:
+    print(f"BAD:{type(e).__name__}")
+    sys.exit(0)
+if not row:
+    print("BAD:no-row")
+    sys.exit(0)
+try:
+    v = json.loads(row[0])
+except json.JSONDecodeError:
+    print("BAD:json")
+    sys.exit(0)
+routing = v.get("routing") or {}
+routes = routing.get("routes") or {}
+consents = v.get("consents") or []
+feats = ["capture", "breakdown", "prioritize", "duration-estimate", "tool-calling"]
+granted = {c.get("feature") for c in consents if isinstance(c, dict) and c.get("granted") is not False}
+for f in feats:
+    print(f"{f}={len(routes.get(f) or [])}/{1 if f in granted else 0}", end=" ")
+print()
+PYR
+}
+
 bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要指名是哪一档
   local label=$1 f MISSING=""
   # 🔴 建完端点那一发把焦点留在 `ai-endpoint-model` 上（rig21 现量 `focused="true"`），
@@ -655,7 +716,26 @@ bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要�
     echo "   ❌ 这些档没绑上端点:$MISSING" >&2
     return 1
   fi
-  echo "   · 五档路由各点了一次这枚端点（生效与否由第 5 步的 enabled 当场判）" >&2
+  # 🔴 回读，不接受"点了就行"：五档每档的 routes 里必须有 ≥1 枚端点。
+  local read line miss2
+  read=$(routes_reading)
+  echo "   · 设备库回读（routes/同意，键 heyta.ai.settings）：${read:-读不出}" >&2
+  if [ -z "$read" ] || [ "$read" = "NOFILE" ] || printf '%s' "$read" | grep -q '^BAD\| BAD'; then
+    echo "   ❌ 库回读没拿到（$read）—— 绑定这件事就无从判定，不拿"点过了"当已通过" >&2
+    return 1
+  fi
+  miss2=""
+  local n
+  for line in $read; do
+    n=${line#*=}; n=${n%%/*}
+    # 🔴 判"≥1 枚"而不是"以 1 开头"：绑第二枚端点之后那格会读成 2，用前缀匹配就把正常状态判成红
+    case "$n" in (''|*[!0-9]) miss2="$miss2 $line(读不出)" ;; *) [ "$n" -ge 1 ] || miss2="$miss2 $line" ;; esac
+  done
+  if [ -n "$miss2" ]; then
+    echo "   ❌ 库里这些档仍然没绑上（点到了 ≠ 写进去了）:$miss2" >&2
+    return 1
+  fi
+  echo "   · 五档在库里各有 ≥1 枚端点（这条判据读的是被写那一侧，不是手指）" >&2
   return 0
 }
 
@@ -1223,7 +1303,7 @@ stub_reset; RB=$(stub_count) || summary "移动端 AI 助手真机验收" "假�
 #   —— 框里已有文字（上面逐字读回过），所以 enabled=true 只可能来自"路由真的绑上了"。
 dump
 if [ "$(rid_attr tool-start-assistant enabled)" != "true" ]; then
-  bad "输入框里有文字、按钮却还是 disabled ⇒ 这一档的候选集是空的（不是产品闸门：「target」取的是 routes[feature]，见 bind_route 那段；两种成因——路由没绑上／这一档的同意没给——要由后面的现量分辨，不许在这一句里替它选一个）"
+  bad "输入框里有文字、按钮却还是 disabled ⇒ 这一档的候选集是空的；两种成因用库回读分辨——\n      现量 routes/同意：$(routes_reading)\n      （routes 那一格为 0 ⇒ 第 3 步的点击没写进去；为 ≥1 而同意为 0 ⇒ 这一档的逐功能同意没给。都不许读成"产品闸门拦住了"，那条闸门另有判据）"
   screen_txt
   summary "移动端 AI 助手真机验收" "路由没绑上" 1
 fi
