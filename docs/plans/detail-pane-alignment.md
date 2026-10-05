@@ -9681,7 +9681,7 @@ mobile **608**；`build web` 两步（`tsc -b` + `vite build`）RC=0；`typechec
 |---|---|
 | 归属门 | 动的是本线资产四枚：`scripts/check-detail-pane-c1-coverage.mjs`、它的臂台、本文档、调研文档。不碰别人的文件 |
 | 两道余量为 0 的棘轮 | 本单不碰样式与类名；与 §8.138 同一趟复跑 `check:l4` / `check:row-single-source` 均 RC=0，基线没动 |
-| 干净检出复跑 | 🔴 **待取，见 §8.140**（提交后在同一棵裸检出里跑那 14 道）—— 这一格在拿到读数前不许写成已做 |
+| 干净检出复跑 | ✅ **已做，见 §8.140**：那 14 道在 `6b1f2712` 的提交态树上同判（13/14 EXIT=0，唯一红仍是别线那枚 aed 死链），且 `承重(腿7)` 在裸树里现量 **0 处** ⇒ 修掉的那一行在提交态上真的闭合了 |
 | packages 改完先 build | 本单没改 `packages/*` |
 
 ⚠️ **射程边界（别读多）**：腿 7 只扫**被取样的那一份文档**（这台判据按单文档取样，`--root` / 文档参数照旧）。
@@ -9689,3 +9689,30 @@ mobile **608**；`build web` 两步（`tsc -b` + `vite build`）RC=0；`typechec
 把它推广到全仓要连"哪些文档算本线资产、其余谁负责"一起拍，登记成待办 #56。
 另一条同样成立的边界：腿 7 判的是**形状**，判不了"这一行是不是它自称的那条工单"——
 形状与真假是两件事，前者这轮有了消费者，后者仍由腿 1–5 各管一档。
+
+## 8.140 §8.138 与 §8.139 两批的第 3 道闸门：干净检出复跑（2026-10-05 15:0x，状态：**已完成**）
+
+载体：`git worktree add --detach /tmp/dp_clean_8140 6b1f2712`（`6b1f2712` = §8.139 那笔；
+**覆盖的提交：`0ecb4995`（§8.138）+ `6b1f2712`（§8.139）**）⇒ 树里只有提交态内容；跑完
+`git worktree remove --force` 摘掉。
+
+| 判据（纯 fs / git 那一档，14 道） | 干净检出 EXIT |
+|---|---|
+| `check-detail-pane-slot` / `-c1-coverage` / `-evidence-refs` / `-status-table` | 0 / 0 / 0 / 0 |
+| `check-docs-voice` / `check-claims` / `check-reachability` | 0 / 0 / 0 |
+| `check-selection-single-source` / `check-layering` | 0 / 0 |
+| `check-l4-no-style` / `check-row-single-source` / `check-ratchet-ceilings` | 0 / 0 / 0 |
+| `design-system/heyta/check-hardcoded`（`check:design`） | 0 |
+| `research/tools/docs-link-check.mjs` | 🔴 **1** —— 仍是别线那枚 `PROGRESS.md:1362` aed 死链（待办 #49，合流当时自己消失） |
+
+🔴 **13/14 EXIT=0**，唯一红与 §8.135/§8.137/§8.138 同一枚、同一成因，没有新增。
+`承重(腿7)` 在那棵裸树里现量 `183 行参与形状判 ⇒ 断成多个物理行的 0 处` —— 也就是说 §8.139
+修掉的那一行**在提交态上**确实是闭合的，不是只在工作树里成立。
+
+臂台在干净树里的两档读数（**这条是射程的正面证据，不是附带伤害**）：
+`mutate-detail-pane-c1-coverage.mjs` ⇒ `39/39 臂符合预期`（它只要 git 历史，裸检出给得出）；
+`mutate-detail-pane-task.mjs` ⇒ `VERDICT=PROBE_BROKEN 干净态打不出包：tsc -b 失败`（RC=2）。
+后者**不是判据红、也不是产品坏**：裸检出 + 部分 `node_modules` 软链 = 混合载体（§8.126/§8.132 的否证），
+而这台装置**自己响亮地拒绝**在打不出包的载体上报绿 —— 这正是它该有的行为。
+所以两层判据（jsdom 41 + e2e 5）的读数只在 §8.138 第 4 节（工作树臂台 `RIG_RESULT=8/8`）
+与第 6.5 节（电池 `ALL_GREEN`）那一档成立，合流当时还要在真检出整族复跑一次（待办 #21）。
