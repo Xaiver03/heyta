@@ -32,7 +32,10 @@ const files = {
   gate: GATE,
   webTrash: 'apps/web/src/features/trash/TrashView.tsx',
   mobHabits: 'apps/mobile/src/screens/HabitsScreen.tsx',
-  webHabits: 'apps/web/src/features/habits/HabitsView.tsx',
+  // 🔴 2026-10-06 改锚：G5 原来注入在 `HabitsView.tsx`，但 §8.133 把 `busyId` / `renamingId`
+  // 随面单一起搬进了 `HabitDetailCard.tsx` —— 那之后这一臂**一直 MUTATE-NO-OP**（整台子 exit 1），
+  // 而"复数不在射程"这条阴性对照从来没有真跑过。锚点按落点搬，判据不动。
+  webHabitsCard: 'apps/web/src/features/habits/HabitDetailCard.tsx',
 };
 const md5 = (p) => createHash('md5').update(readFileSync(`${ROOT}/${p}`)).digest('hex');
 const BASE = Object.fromEntries(Object.entries(files).map(([k, p]) => [k, md5(p)]));
@@ -79,7 +82,7 @@ const arms = [
   },
   {
     name: 'G5 复数 selectedIds（阴性对照）',
-    file: 'webHabits',
+    file: 'webHabitsCard',
     expect: 'green',
     mutate: (s) => s.replace('  const [busyId', '  const [selectedIds, setSelectedIds] = useState<string[]>([]);\n  const [busyId'),
   },

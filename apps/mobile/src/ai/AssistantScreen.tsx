@@ -687,7 +687,10 @@ function priorityWord(priority: Priority | undefined): 'none' | 'low' | 'medium'
 
 function BreakdownPanel(props: SharedPanelProps): React.JSX.Element {
   const { t, locale } = useI18n();
-  const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  /* 🔴 表单草稿，**不是** IA 的"现在看的是哪一条"：接进共享 `'task'` 槽会让 `TasksScreen`
+     那枚 `visible={detailTaskId !== null}` 的详情 Modal 在面板里点任务时弹出来。
+     边界钉在 `apps/mobile/tests/ai-panel-local-selection.spec.ts`，档位登记在门禁的 `form-draft`。 */
+  const [targetTaskId, setTargetTaskId] = useState<string | undefined>(undefined);
   const [phase, setPhase] = useState<Phase>('input');
   const [frozen, setFrozen] = useState<{ taskId: string; title: string; note: string | undefined; now: number }>({
     taskId: '',
@@ -770,9 +773,9 @@ function BreakdownPanel(props: SharedPanelProps): React.JSX.Element {
     <Stack gap="loose">
       <TaskPicker
         tasks={props.tasks}
-        selectedId={selectedId}
+        selectedId={targetTaskId}
         onSelect={(id) => {
-          setSelectedId(id);
+          setTargetTaskId(id);
           setApplied(false);
         }}
       />
@@ -823,9 +826,9 @@ function BreakdownPanel(props: SharedPanelProps): React.JSX.Element {
           label={t('web.ai.breakdown.button')}
           tone="primary"
           testID="breakdown-start"
-          disabled={selectedId === undefined || props.route.target === undefined}
+          disabled={targetTaskId === undefined || props.route.target === undefined}
           onPress={() => {
-            const task = props.tasks.find((row) => row.id === selectedId);
+            const task = props.tasks.find((row) => row.id === targetTaskId);
             if (task === undefined) return;
             setFrozen({ taskId: task.id, title: task.title, note: task.note, now: Date.now() });
             setApplied(false);
@@ -1033,7 +1036,10 @@ function PrioritizePanel(props: SharedPanelProps): React.JSX.Element {
 
 function DurationPanel(props: SharedPanelProps): React.JSX.Element {
   const { t, locale } = useI18n();
-  const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  /* 🔴 表单草稿，**不是** IA 的"现在看的是哪一条"：接进共享 `'task'` 槽会让 `TasksScreen`
+     那枚 `visible={detailTaskId !== null}` 的详情 Modal 在面板里点任务时弹出来。
+     边界钉在 `apps/mobile/tests/ai-panel-local-selection.spec.ts`，档位登记在门禁的 `form-draft`。 */
+  const [targetTaskId, setTargetTaskId] = useState<string | undefined>(undefined);
   const [phase, setPhase] = useState<Phase>('input');
   const [frozen, setFrozen] = useState<{ taskId: string; title: string; note: string | undefined; now: number }>({
     taskId: '',
@@ -1117,9 +1123,9 @@ function DurationPanel(props: SharedPanelProps): React.JSX.Element {
     <Stack gap="loose">
       <TaskPicker
         tasks={props.tasks}
-        selectedId={selectedId}
+        selectedId={targetTaskId}
         onSelect={(id) => {
-          setSelectedId(id);
+          setTargetTaskId(id);
           setApplied(false);
         }}
       />
@@ -1166,9 +1172,9 @@ function DurationPanel(props: SharedPanelProps): React.JSX.Element {
           label={t('web.ai.duration.button')}
           tone="primary"
           testID="duration-start"
-          disabled={selectedId === undefined || props.route.target === undefined}
+          disabled={targetTaskId === undefined || props.route.target === undefined}
           onPress={() => {
-            const task = props.tasks.find((row) => row.id === selectedId);
+            const task = props.tasks.find((row) => row.id === targetTaskId);
             if (task === undefined) return;
             setFrozen({ taskId: task.id, title: task.title, note: task.note, now: Date.now() });
             setApplied(false);

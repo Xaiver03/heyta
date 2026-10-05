@@ -476,12 +476,16 @@ for (const dir of WIRE_DIRS) {
  *
  * 🔴 表按 `文件 + 变量名` 索引，**不按行号**：同一棵树里产品文件与剥掉块注释后的行号
  * 差了 40+ 行（取数时量到的），拿行号当键的话这条门禁会在任何人加一段注释时批量假红。
- * 🔴 类别是**封闭词表**（四档，§8.28 立的那四类）。填一个不在词表里的词**按未登记处理** ——
+ * 🔴 类别是**封闭词表**。填一个不在词表里的词**按未登记处理** ——
  * 否则"随便写个理由"就能绕过这条，而绕过判据最省力的写法恰好就是填一张表。
+ * ⚠️ 档位会随"读到的真实概念"长：§8.28 立了前四档，第五档 `form-draft` 是 2026-10-05 合流之后
+ * 才被迫命名的（移动端 AI 面板那个"这条提案作用在哪条任务上"，见下面那行的注释）——
+ * 它**不是**为了让某处变绿而加的口子：加档的同时必须有一行登记 + 一条判据钉住"这一档不许写成 IA 选中态"
+ * （`apps/mobile/tests/ai-panel-local-selection.spec.ts`），否则第五档就只是第四个借口。
  * 🔴 **过期豁免也判红**：表里一条在当前代码里找不到对应声明，就是那条豁免已经不再命中。
  *     让它悄悄躺着，等于用一张"看起来很全"的表把真正的覆盖面盖住（元规则二那种病）。
  */
-const ROW_ID_CLASSES = ['in-flight', 'inline-rename', 'confirm-gate', 'dragging'];
+const ROW_ID_CLASSES = ['in-flight', 'inline-rename', 'confirm-gate', 'dragging', 'form-draft'];
 
 /** §8.28 那一趟逐处归类后的结果（条数以断言 G 打印的为准，别在这里抄数）。改名／删掉某处时必须同时改这里，否则 G 报过期豁免。 */
 const ROW_ID_EXEMPT = [
@@ -494,8 +498,18 @@ const ROW_ID_EXEMPT = [
   ['apps/web/src/features/quadrant/QuadrantBoard.tsx', 'activeId', 'dragging'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'confirmingId', 'confirm-gate'],
   ['apps/web/src/features/settings/PasskeyPanel.tsx', 'editingRowId', 'inline-rename'],
+  // 后台退款那两枚按钮是**两步式批准**：第一下记下"待批准的是哪一条"，第二下（确认框里那枚）才发请求。
+  // 类别按那处代码自己的注释归（`AdminPanel.tsx`：「待确认的那一条退款 id（两步式"批准"）」）。
+  ['apps/web/src/features/admin/AdminPanel.tsx', 'pendingApproveId', 'confirm-gate'],
   ['apps/web/src/features/trash/TrashView.tsx', 'busyId', 'in-flight'],
   ['apps/web/src/features/trash/TrashView.tsx', 'confirmingId', 'confirm-gate'],
+  // 🔴 这一行是第五档 `form-draft` 的**唯一住户**，也是那一档存在的理由：
+  // AI 面板（拆解 / 设时长）里那个"这条提案作用在哪条任务上"，提交时冻进 `frozen.taskId`，
+  // 面板卸载即消失。它**不能**接进共享的 `'task'` 槽 —— 现量：`TasksScreen.tsx` 把
+  // `detailTaskId = useSelected('task')` 直接喂给一枚 `visible={detailTaskId !== null}` 的详情 Modal，
+  // 接进去的后果是"在 AI 面板里点一条任务 ⇒ 任务详情弹出来"。
+  // 钉住这个边界的判据在 `apps/mobile/tests/ai-panel-local-selection.spec.ts`。
+  ['apps/mobile/src/ai/AssistantScreen.tsx', 'targetTaskId', 'form-draft'],
   ['apps/mobile/src/screens/CalendarScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/HabitsScreen.tsx', 'busyId', 'in-flight'],
   ['apps/mobile/src/screens/HabitsScreen.tsx', 'renamingId', 'inline-rename'],
@@ -542,7 +556,7 @@ if (unregistered.length > 0) {
   failures.push(
     `断言 G：宿主里有 ${unregistered.length} 处本地 \`…Id\` useState 没有语义登记：\n  ${unregistered.join('\n  ')}\n` +
       `  先问它在这一屏决定什么：是"当前看的是哪一条"⇒ 那是**第二个选中所有者**，删掉它、改用 @heyta/app-host 的 selection；\n` +
-      `  是四类瞬态之一（${ROW_ID_CLASSES.join(' / ')}）⇒ 在 ROW_ID_EXEMPT 里登记一行并写明是哪一类。`,
+      `  是 ${ROW_ID_CLASSES.length} 类瞬态之一（${ROW_ID_CLASSES.join(' / ')}）⇒ 在 ROW_ID_EXEMPT 里登记一行并写明是哪一类。`,
   );
 }
 const stale = ROW_ID_EXEMPT.filter(([f, n]) => !rowIdSeen.includes(rowIdKey(f, n)));
@@ -1197,7 +1211,7 @@ console.log(
 );
 
 console.log(
-  `✅ G：宿主内 …Id 本地态 ${rowIdSeen.length} 处全部有语义登记（四类：` +
+  `✅ G：宿主内 …Id 本地态 ${rowIdSeen.length} 处全部有语义登记（${ROW_ID_CLASSES.length} 类：` +
     ROW_ID_CLASSES.map((c) => `${c} ${ROW_ID_EXEMPT.filter(([, , t]) => t === c).length}`).join(' / ') +
     `），过期豁免 0 条`,
 );
