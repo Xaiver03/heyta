@@ -5502,3 +5502,25 @@ done
      索引行改成"§7 收号=后落地方顺延，CI 那枚前置自造已消"（≤150 码点）。
      复跑：`node <记忆工具目录>/check-memory-index.mjs --dir <项目记忆目录>` 与
      `node <记忆工具目录>/verify-index-no-loss.mjs <该目录>/MEMORY.md <该目录>` ⇒ 均 rc=0。
+- (67) **10-05 19:1x：第 4 项不再用"等窗口"交差 —— 看守已挂上（pid 与起手读数在这格）；②③ 两枚自闸装置各被实测确认"脏就 rc=3、一个字不写"。**
+
+  ① **C 的看守已挂载**（`CARRIER=<主检出同级的 heyta-wt-r14c> BUDGET=14400 INTERVAL=60 bash research/tools/r14c-window-retry.sh`，后台、不抢前台）：
+     起手日志（现量 `head -2 /tmp/ht-r14c-window.log`）写着 `selftest=positive_ok`（装置自己先过一次阳性对照才进等待）、
+     `载体 sha / 主检出 sha / 需要同步=yes` 三个旋钮，稳定名已指到本次唯一日志。pid 用 pidfile 记：`cat /tmp/ht-r14c-keeper.pid`，
+     活着与否 `ps -p "$(cat /tmp/ht-r14c-keeper.pid)" -o pid=,etime=,args=`（**不按名字 kill**，只动我自己起的这一枚）。
+     挂之前先跑装置臂证明它**能红**：`bash research/tools/r14c-window-retry-arms.sh | tail -1`（末行自己打印过/红枚数，文档里不抄）。
+     🔴 窗口开时这趟做的事是**同步载体到主检出当前提交 → 重打产物 → 跑 37 条设备腿**，
+     所以"载体落后主检出"不是阻塞而是它的设计（文件头那条 33 枚 APK 输入面文件的否证就是它存在的原因，§7 第 27 条那一族）。
+     此刻开窗判据现量：`NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target c` ⇒ **rc=3、`REDS=load,src,apk`**
+     （负载 161 > 12、43 枚未提交源码会被打进产物、APK 比源码旧）⇒ 这一格记的是**装置在等**，不是"跑完了"。
+  ② **两枚自闸装置的"脏就不动"实测**（各带一条复跑命令，腾开那趟直接把 `--confirm` 接上即可）：
+     `node research/tools/calendar-line-append-trap.mjs --text research/tools/calendar-line-trap-entry-diff-shape-vs-semantics.txt` ⇒ rc=**3**、
+     册子字节未变（它点名"别人未提交的 hunk 不替他们带"）；
+     `node research/tools/calendar-line-wire-evidence-rigs.mjs` ⇒ rc=**3**、`package.json` 未变（锚点现量：定义行 1 次、链片段 1 次，
+     也就是插入点是唯一的，只差目标干净这一件事）。
+     🔴 **我自己在这一步先犯了 §7 第 45/179 条**：`命令 … | tail -6; echo "RC=$?"` 读到的是 `tail` 的 0，
+     于是差点把"装置拒了"记成"装置放行"。改成先重定向再 `echo $?` 才看到真值 3。
+     这枚读数如果没复算，下一位会照"rc=0"直接把 `--confirm` 接在别人的脏文件上。
+  ③ 两格仍**不是本线能拍的**：`git diff HEAD --numstat -- package.json` 现量 2/1（那一格是 `check:ios-ax-shim`，所有者会话仍在写 iOS 提醒取证）、
+     `git diff HEAD --numstat -- docs/reference/environment-traps.md` 现量 518/1（并行几条线还在往册子尾部追加）。
+     处置与理由同 (65)⑪：**能代拍的是判断，不能代拍的是别人的字节。**
