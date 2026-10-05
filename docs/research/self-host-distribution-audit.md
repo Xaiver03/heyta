@@ -12856,3 +12856,60 @@ ahead>0 时它按设计 refuse —— 本线没有代做、没有降级、没有
 
 
 
+
+### 8.234 完整 `pnpm check` 落在载体上：红集只有**一道**，而它是别人的现场；那条 flaky 在链里读起来是绿的（2026-10-05 17:0x）
+
+**读数（载体 `bea0741d`，`NO_COLOR=1 pnpm check`，日志末行 `FULLCHECK_RC=1`）**：
+
+| 段 | 读数 |
+|---|---|
+| 倒数第二段之前（typecheck / `-r build` / 各 `check:*` / `pnpm -r test`） | 全过 —— 链是 `&&` 串的，能走到最后一段就是前面每一段都 exit 0 |
+| `check:ai-e2e` | **exit 0**，`195 passed / 1 flaky / 2 skipped (11.0m)` |
+| `pnpm --dir e2e run test:privacy-consent`（最后一段） | **exit 1**，理由由它自己的内存闸门打印：`已有测试在跑（pid=59691，锁 /tmp/tfa-test.lock；它是：/bin/sh ~/.tfa-shield/bin/npx playwright test tests/renew-panel.spec.ts）` |
+
+🔴 **我没有用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕过它**。那是别人在这台机器上正在跑的测试，共用同一把机器级锁；
+这一道红的归属写在这里而不是被消掉：**它不是产品失败，也不在本批能改的集合里**（要的是安静窗口，同一台机器上
+`verify:selfhost-stack` 那条负载判据是同一族）。窗口到了再复跑这一段取绿。
+
+**那条 flaky 的逐条归属（三把独立的尺，不是"看起来不是我们的"）** —— `tests/ai-assistant.spec.ts:65:3`，
+红点 `:139` `toHaveCount(0)` 实得 1（retry #1 用 5.8s 过）：
+
+1. **引入者**：`git merge-base --is-ancestor 78cdff67 origin/main` = YES，同一枚对**本批尖** = NO
+   ⇒ 那笔「feat(web): AI 面搬进最右那一栏」（10-04 14:51）是从 **main 侧**进载体的，不在本批独有的 53 笔里。
+2. **可达面**：本批相对 `origin/main` 只改 **22 枚**文件（`research/tools` 14 · `e2e/selfhost-stack-results` 3 ·
+   `packages/i18n` 2 · `server/Caddyfile` 1 · `scripts/verify-selfhost-stack.sh` 1 · `docs/runbooks` 1 · `docs/research` 1），
+   `apps/**`、`packages/ui`、`packages/ai` **零命中**；i18n 那两枚的 diff 只在 `site.docs.selfhost.*` 四个键上。
+3. **在册的账**：`BLOCKED.md` **B79 ③**（main 侧，10-05 00:5x）把这条写成「1 硬失败 + 2 flaky，三条同一个成因……
+   这是 `78cdff67` 带出来的」并明确「不代拍」；A/B 两臂与两条已否证的修法在 B76 补记 #17。
+
+⚠️ **别读小的一条副产品**：带默认 retry 时这条红**不影响链的退出码**。所以「`pnpm check` 绿」永远不能当作
+「这条用例没有红」—— 要那个结论只能 `--retries=0` 复跑。B79 ③ 讲的是这件事在自己线上成立，
+这次是它在**合并载体**上第二次成立 ⇒ 归属做完 ≠ 那条用例被治好，两件事分别记账。
+
+**基线又往前走了一格 —— §8.232 那枚闸门第二次用到，这次的目标是本地 main**：
+
+- 16:48 的两笔（`843a4d19`、`d53e63a9`，B80 的账）落在 `bea0741d` 的第一父 `0873275a` **之后**
+  ⇒ 拿 `bea0741d` 去 ff 本地 main 会把这两笔从分支上摘掉。与 §8.232 是同一个错的**第二个落地目标**
+  （那次是公开 main，这次是本地 main），也就是说"只对 origin/main 合格"是不够的。
+- 新基线 `heyta-main-union-v2` = **`d0d208b2`** = `merge-tree(main@d53e63a9 × origin/main@a40d304a)` → `commit-tree` 两个父，
+  oracle rc=0 且只有一行树 OID（无冲突）。`selfhost-carrier-base.mjs` 对**两个**目标都读 `missing=0`
+  （`--landing=origin/main`：反向 8 笔 · `--landing=main`：反向 596 笔）。
+- 载体 v3 = **`0ff1055e`** = `d0d208b2` × `feat/self-host-distribution@d868b35f`，分支 `feat/self-host-merge-main-union-v3`，
+  `CARRIER_RC=0`、门禁 **17 道全 exit 0**；第 0b 步第一次在真链上生效：
+  `基线闸门：6 臂 · 不符 0 · 落地目标=main@d53e63a9 · 未被基线包含的笔数=0`。
+
+🔴 **借来的 store 满足载体的 `hasStore()`，却不满足 `pnpm check`** —— 这一格是新踩的：
+v3 用 `HEYTA_CARRIER_LINK_STORE_FROM` 从旧载体检出软链 `node_modules`（锁逐字节相同 `0f3c1bf6d9e2` / `021a9df4add8`，
+载体 17 道门禁全绿，读数里也如实写了"它不是这棵树自己装的"），但 `pnpm check` 一启动就撞上 pnpm 的
+run 前依赖校验，它判定这棵树的 modules 目录该整个清掉，于是打印
+`[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY` 并退 1。
+**它要清的是那个软链的目标 = 别人那棵检出**（`/tmp/heyta-merge-carrier-union/node_modules`）。
+abort 在这里是救场的：软链没被解引用，源树逐字节完好（复量 `ls -ld` 两边都在）。
+⇒ 结论写死：**载体那 17 道可以用借来的 store，完整 `pnpm check` 必须在本树装一份真的**。
+收尾动作是把两枚软链 `unlink` 掉（不是 `rm -rf`，那条路径带尾斜杠就会删穿别人那棵树），再
+`pnpm install --frozen-lockfile`（根 + `e2e/`）后复跑。
+
+**#7 前置的现量（每次现量，AGENTS §9 那条纪律）**：主检出脏面 **58** 枚；那 5 枚重叠文件里
+`scripts/check-script-snapshot.mjs` 已干净（= 已被其所有者提交），`docs/README.md`、`package.json`、
+两份 i18n 词条表**仍是 ` M` 未提交** ⇒ 「等他们提交」这一格还差 4 枚。现量命令：
+`git -C <主检出> status --porcelain -- docs/README.md package.json packages/i18n/src/locales/zh-CN.ts packages/i18n/src/locales/en.ts scripts/check-script-snapshot.mjs`。
