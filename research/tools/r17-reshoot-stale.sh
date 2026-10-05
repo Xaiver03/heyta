@@ -172,21 +172,64 @@ settle_dir() {
   #   判成"零产出、不算完成"（假红），或者在别的图也动了的时候**静默不提那张新图**（假绿）。
   #   两种坏方向都要挡，所以把"新增"与"就地改了"当成两种分开点名的形状打出来 ——
   #   新增意味着这张图还没有 README、也没有锚点，它与"字节变了"不是同一件事。
+  # 🔴 第三档「只在旧侧」（图**没了**）（10-05 15:3x 补）：上面 (57)⑧ 自己写的规矩要求
+  #   逐档枚举输入存在性 —— 两侧都有 / 只在新侧 / **只在旧侧**。前两档有判据、第三档当时既无判据也不响，
+  #   等于把"某张取证图在这趟里消失了"交给沉默。它不该算"产出"（没拍到东西），但必须被点名。
   CHG=$(awk -F'\t' '
     NR==FNR { a[$1]=$2; next }
+    { seen[$1]=1 }
     !($1 in a)        { print "新增\t" $1; next }
-    a[$1] != $2       { print "就地\t" $1 }' "$ST_DIR/before" "$ST_DIR/after")
-  INPLACE=0
+    a[$1] != $2       { print "就地\t" $1 }
+    END { for (k in a) if (!(k in seen)) print "消失\t" k }' "$ST_DIR/before" "$ST_DIR/after")
+  N_NEW=0; N_MOD=0; N_GONE=0; S_NEW=0; S_MOD=0; S_GONE=0
   SIB=""
   while IFS=$'\t' read -r kind p; do
     [ -n "$p" ] || continue
-    case "$p" in
-      "$d"/*) INPLACE=$((INPLACE + 1)); printf '      %s %s  %s\n' "$kind" "$(basename "$p")" "$(md5 -q "$p" | cut -c1-8)" ;;
-      *) SIB="$SIB $(basename "$(dirname "$p")")" ;;
+    INTGT=0
+    case "$p" in "$d"/*) INTGT=1 ;; esac
+    case "$kind" in
+      新增) if [ "$INTGT" = 1 ]; then N_NEW=$((N_NEW + 1)); else S_NEW=$((S_NEW + 1)); fi ;;
+      消失) if [ "$INTGT" = 1 ]; then N_GONE=$((N_GONE + 1)); else S_GONE=$((S_GONE + 1)); fi ;;
+      *)    if [ "$INTGT" = 1 ]; then N_MOD=$((N_MOD + 1)); else S_MOD=$((S_MOD + 1)); fi ;;
     esac
+    if [ "$INTGT" = 1 ]; then
+      if [ "$kind" = "消失" ]; then
+        # 文件已经不在盘上，md5 读不到 ⇒ 只能报**改前**那一份的哈希（它是对账用的唯一线索）
+        printf '      %s %s  改前 %s\n' "$kind" "$(basename "$p")" \
+          "$(awk -F'\t' -v k="$p" '$1==k { print substr($2,1,8); exit }' "$ST_DIR/before")"
+      else
+        printf '      %s %s  %s\n' "$kind" "$(basename "$p")" "$(md5 -q "$p" | cut -c1-8)"
+      fi
+    else
+      SIB="$SIB $(basename "$(dirname "$p")")"
+    fi
   done <<CHG_BLOCK
 $CHG
 CHG_BLOCK
+  # 🔴 **对账**：上面那三档是**一条 awk 谓词**分的，而"这条谓词会不会又漏一档"这件事，
+  #    臂只能钉住它已经测过的那几档 —— 下一位再写一档而没配臂，洞照样静默（这一枚装置一周内静默了两次）。
+  #    所以这里换成**另一套算法**独立数一遍：两侧路径集合用 `comm` 做差得"新增/消失"，
+  #    交集逐枚比哈希得"就地"。两套数字不等 ⇒ 响亮失败（不是让下一位数日志行）。
+  cut -f1 "$ST_DIR/before" | LC_ALL=C sort > "$ST_DIR/b.paths"
+  cut -f1 "$ST_DIR/after"  | LC_ALL=C sort > "$ST_DIR/a.paths"
+  EXP_NEW=$(comm -13 "$ST_DIR/b.paths" "$ST_DIR/a.paths" | grep -c . || true)
+  EXP_GONE=$(comm -23 "$ST_DIR/b.paths" "$ST_DIR/a.paths" | grep -c . || true)
+  EXP_MOD=0
+  while IFS= read -r one; do
+    [ -n "$one" ] || continue
+    h1=$(awk -F'\t' -v k="$one" '$1==k { print $2; exit }' "$ST_DIR/before")
+    h2=$(awk -F'\t' -v k="$one" '$1==k { print $2; exit }' "$ST_DIR/after")
+    if [ "$h1" != "$h2" ]; then EXP_MOD=$((EXP_MOD + 1)); fi
+  done <<PATHS_BLOCK
+$(comm -12 "$ST_DIR/b.paths" "$ST_DIR/a.paths")
+PATHS_BLOCK
+  GOT_NEW=$((N_NEW + S_NEW)); GOT_MOD=$((N_MOD + S_MOD)); GOT_GONE=$((N_GONE + S_GONE))
+  if [ "$GOT_NEW" != "$EXP_NEW" ] || [ "$GOT_MOD" != "$EXP_MOD" ] || [ "$GOT_GONE" != "$EXP_GONE" ]; then
+    echo "      ❌ 差集**对账不上**：点名 新增=${GOT_NEW} 就地=${GOT_MOD} 消失=${GOT_GONE}，另一套算法给 新增=${EXP_NEW} 就地=${EXP_MOD} 消失=${EXP_GONE}" >&2
+    echo "         ⇒ 上面点名的那几行**不是这趟的全部变化**，少点名的那一档会静默留在盘上；不读成「重拍完成」。" >&2
+    return 3
+  fi
+  printf '      对账 ok：新增 %s / 就地 %s / 消失 %s（awk 谓词与路径集合做差两套算法一致）\n' "$GOT_NEW" "$GOT_MOD" "$GOT_GONE"
   NCP=0
   for f in "$TR_ROOT"/*.png; do
     [ -f "$f" ] || continue
@@ -208,10 +251,13 @@ CHG_BLOCK
     printf '      ⚠️ 这一趟还改了目标目录**之外**的取证目录：%s\n' "$(printf '%s\n' $SIB | sort -u | tr '\n' ' ')"
     echo "         ⇒ 它们的「人看过」主张同样过期了；人看与重钉要把这几枚一起算进来（本脚本不代改 README）。"
   fi
-  if [ "$INPLACE" = "0" ] && [ "$NCP" = "0" ]; then
+  if [ "$N_NEW" = "0" ] && [ "$N_MOD" = "0" ] && [ "$NCP" = "0" ]; then
     echo "      ❌ ${s} 跑绿了，但这一枚目录**一张图都没有动**（既没有就地写入，也没有 test-results 产物）" >&2
     echo "         ⇒ 不把它读成「重拍完成」。要么这条映射的 spec 不产出本目录的图（去改 spec_for），" >&2
     echo "           要么它写去了别处（看上面有没有点名别的目录），要么它根本没跑。" >&2
+    if [ "$N_GONE" != "0" ]; then
+      echo "         ⚠️ 这一趟还有图**消失**（上面点名 ${N_GONE} 枚）⇒ 取证面少了一张，那更不叫完成，要单独处置。" >&2
+    fi
     return 1
   fi
   return 0
@@ -256,6 +302,26 @@ if [ "$SELFTEST" = "1" ]; then
   N_NEW=$(printf '%s\n' "$OUT" | grep -c '新增 c.png')
   if [ "$RC" != "0" ] || [ "$N_MOD" != "1" ] || [ "$N_NEW" != "1" ]; then
     echo "❌ 臂 a2b 坏了（rc=${RC} 就地=${N_MOD} 新增=${N_NEW}）⇒ 两档里有一档又失明了" >&2; bad=$((bad+1))
+  fi
+  # 第三档「只在旧侧」：某张取证图在这趟里**消失**了。它不该算产出，但必须点名 ——
+  # (57)⑧ 写的规矩是"逐档枚举输入存在性，每档要么有判据、要么响亮跳过"，前两档做了，这一档当时既无判据也不响。
+  echo "== selftest 臂 a3：同一趟既改 a.png 又**删掉** b.png ⇒ rc=0，两行都要在（就地 a.png + 消失 b.png）=="
+  reset_tree
+  SPEC_CMD='printf NEW > "$EVID_ROOT/cal/a.png"; rm -f "$EVID_ROOT/cal/b.png"'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-gone.spec.ts" 2>&1); RC=$?
+  printf '%s\n' "$OUT" | sed 's/^/      /'
+  N_M3=$(printf '%s\n' "$OUT" | grep -c '就地 a.png')
+  N_G3=$(printf '%s\n' "$OUT" | grep -c '消失 b.png')
+  if [ "$RC" != "0" ] || [ "$N_M3" != "1" ] || [ "$N_G3" != "1" ]; then
+    echo "❌ 臂 a3 坏了（rc=${RC} 就地=${N_M3} 消失=${N_G3}）⇒ 一张取证图消失了却没人报，README 里那条'人看过'还在指它" >&2; bad=$((bad+1))
+  fi
+  echo "== selftest 臂 a4：**只**删图（一张都没拍）⇒ 必须 rc=1，但消失那一行仍然要在 =="
+  reset_tree
+  SPEC_CMD='rm -f "$EVID_ROOT/cal/b.png"'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-onlygone.spec.ts" 2>&1); RC=$?
+  N_G4=$(printf '%s\n' "$OUT" | grep -c '消失 b.png')
+  if [ "$RC" != "1" ] || [ "$N_G4" != "1" ]; then
+    echo "❌ 臂 a4 坏了（rc=${RC} 消失=${N_G4}）⇒ '少了一张图'被读成'重拍完成'，或者反过来把点名弄丢" >&2; bad=$((bad+1))
   fi
   echo "== selftest 臂 b：test-results 形状（要拷回证据目录）=="
   reset_tree
@@ -384,9 +450,50 @@ SPS
     fi
     eval "$(sed -n '/^settle_dir()/,/^}/p' "$0")"
   fi
-  rm -rf "$V" "$MUT"
+  # 🔴 臂 j：对账那一格自己有没有牙。摘掉 awk 的 END 那条规则（= 让"消失"这一档重新失明），
+  #    臂 a3 那个夹具必须**不是因为少印一行而绿**，而是因为**对账不上**红 ——
+  #    这条证明的是："下一位再写一档没配臂"时，兜底的是那套独立算法，不是我的记性。
+  echo "== selftest 臂 j（变异）：摘掉 awk 的「消失」规则 ⇒ 对账必须响亮失败（不是静默少一行）=="
+  JHITS=$(grep -cE '^    END \{ for \(k in a\) if \(!\(k in seen\)\) print ' "$0"); JHITS=${JHITS:-0}
+  J_LINE=$(grep -nE '^    END \{ for \(k in a\) if \(!\(k in seen\)\) print ' "$0" | head -1 | cut -d: -f1)
+  MUT2=$(mktemp /tmp/ht-reshoot-mut2.sh.XXXXXX)
+  if [ "$JHITS" != "1" ] || [ -z "$J_LINE" ]; then
+    echo "❌ 臂 j 的针脚命中 ${JHITS} 行（要恰好 1）⇒ awk 那条 END 规则改了形，对账的牙此刻无法证明" >&2; bad=$((bad+1))
+  else
+    # 摘的是**这一行里的 END 规则**，不是整行 —— 整行末尾还挂着 awk 程序的收尾单引号与两个路径参数，
+    # 连行删掉会让副本语法不过（臂 j 第一版就是这么坏的：`unexpected EOF while looking for matching ''`，
+    # 那读数证明的是"我删错了"，不是"对账有牙"）。
+    sed "${J_LINE}s/END {.* k }//" "$0" > "$MUT2"
+    J_AFTER=$(sed -n "${J_LINE}p" "$MUT2")
+    # 自证打在**目标行那一行的内容**上，不打在"整份文件里还有没有这串字"上 ——
+    # 后者会命中我自己这行检查代码（副本是整份文件拷贝），于是"摘除没落地"永远是真、
+    # 臂 j 的前两版依次就是这样把**成功的变异**报成"副本坏了"和"摘除没落地"的。
+    # 同族：按行号施变时 `MUT_LAND` 只看文件哈希变了不算施上。
+    if ! bash -n "$MUT2"; then
+      echo "❌ 臂 j 的变异副本语法不过 ⇒ 摘错地方了，这一趟不产出读数" >&2; bad=$((bad+1))
+    elif printf '%s' "$J_AFTER" | grep -q '消失'; then
+      echo "❌ 臂 j 的摘除没落地（第 ${J_LINE} 行仍含消失规则：[${J_AFTER}]）⇒ 这一趟不产出读数" >&2; bad=$((bad+1))
+    elif ! printf '%s' "$J_AFTER" | grep -qE "^ *' \"\\\$ST_DIR/before\" \"\\\$ST_DIR/after\"\\)\$"; then
+      # 目标行的**内容**自证：剩下的必须是 awk 的收尾，逐字形状可判
+      echo "❌ 臂 j 摘完之后的那一行不是 awk 收尾（[${J_AFTER}]）⇒ 摘错了地方，不产出读数" >&2; bad=$((bad+1))
+    else
+      reset_tree
+      SPEC_CMD='printf NEW > "$EVID_ROOT/cal/a.png"; rm -f "$EVID_ROOT/cal/b.png"'
+      eval "$(sed -n '/^settle_dir()/,/^}/p' "$MUT2")"
+      OUT=$(settle_dir "$EVID_ROOT/cal" "fake-j.spec.ts" 2>&1); RC=$?
+      HIT=$(printf '%s\n' "$OUT" | grep -c '对账不上'); HIT=${HIT:-0}
+      MISS=$(printf '%s\n' "$OUT" | grep -c '消失 b.png'); MISS=${MISS:-0}
+      if [ "$RC" = "0" ] || [ "$HIT" != "1" ] || [ "$MISS" != "0" ]; then
+        echo "❌ 臂 j 坏了（rc=${RC} 对账句=${HIT} 消失行=${MISS}）⇒ 失明那一档又只能靠臂 a3 发现，兜底那格是虚的" >&2; bad=$((bad+1))
+      else
+        printf '   MUT_LAND=1：摘掉 END 规则后 rc=%s、消失行 0 枚、且打了「差集对账不上」⇒ 牙在那套独立算法上，不在臂名里\n' "$RC"
+      fi
+      eval "$(sed -n '/^settle_dir()/,/^}/p' "$0")"
+    fi
+  fi
+  rm -rf "$V" "$MUT" "$MUT2"
   [ "$bad" = "0" ] || { echo "❌ selftest ${bad} 臂红" >&2; exit 1; }
-  echo "SELFTEST=OK（就地报数 / 新增点名（单独新增、以及新增与改动同趟两行都要在）/ 拷贝报数 / 字节相同仍印 / 零产出必须红 / 残留被清 / 只改别的目录时点名且不判成完成 / 变异腿证明牙在清残留那一行 / 覆盖判据两腿 / 出厂映射表逐枚自查没有无人认领的图 / 一枚目录摊成多行 PLAN）"
+  echo "SELFTEST=OK（就地报数 / 新增点名（单独新增、以及新增与改动同趟两行都要在）/ 消失点名（混合趟与纯消失趟两档）/ 拷贝报数 / 字节相同仍印 / 零产出必须红 / 残留被清 / 只改别的目录时点名且不判成完成 / 变异腿证明牙在清残留那一行 / 变异腿证明对账兜底独立于臂名 / 覆盖判据两腿 / 出厂映射表逐枚自查没有无人认领的图 / 一枚目录摊成多行 PLAN）"
   exit 0
 fi
 
