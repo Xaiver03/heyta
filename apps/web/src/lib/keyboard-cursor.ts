@@ -8,6 +8,9 @@
  * 本文件只回答宿主才知道的四件事：**当前是哪个视图、那一串 id 现在在 DOM 里的
  * 顺序、什么时候不该响应、要不要把走到的那一行带进视野**。
  *
+ * 两条键、一套闸门：↑↓ 移动选中（第 1 条腿），Enter 把焦点交给**这一格**（第 3 条腿，
+ * 工单 W1b）。第 2 条腿（"换选中 ⇒ 那一格跟着换人"）住在两张面单里，不在这里。
+ *
  * ## 为什么顺序从 DOM 取，而不是再算一遍
  *
  * 列表顺序的所有者分散在四处（任务侧是 `groupTasksByDate` + 每组一个 `TaskList` +
@@ -82,13 +85,39 @@ import { selection } from './selection.js';
  *   `start(taskId?)`（`:101`）带进来。工单 §6 明文"不许把番茄页塞进列表模型"。
  * · `growth` / `settings`：面本身不是列表（成长是图与卡，设置是浮层/面板），没有行可走。
  */
-const CURSOR_VIEWS: Partial<Record<ViewKey, { readonly kind: SelectableKind; readonly prefix: string }>> =
+/**
+ * 一个"可走 + 可打开"的视图登记的是什么。
+ *
+ * ⚠️ 字面量的**缩进是判据的一部分**：`keyboard-cursor.spec.tsx` 用 `^\\s{4}key:\\s*\\{\\s*kind:`
+ * 从源码里读这张表（它要的是"表里有哪些视图"这份真源，而不是再手抄一份名单）。
+ * 把条目缩进改掉，那两条判据会读成空表。
+ */
+interface CursorView {
+  readonly kind: SelectableKind;
+  readonly prefix: string;
+  /**
+   * Enter 的落点（工单 W1b 第 3 条腿）：**这一格里第一个该被聚焦的东西**的选择器。
+   *
+   * 🔴 缺席 = 这一面的 Enter **不接管**，而不是"忘了配"。今天缺席的三个是任务那一族
+   * （`tasks` / `quadrant` / `timeline`）：Enter 在任务行上的既有语义是"就地展开编辑"，
+   * 而"任务那一格是行内展开还是栏里编辑"是 §8.130 记下的那道**二选一**，没裁决之前
+   * 在这里加一行就是把答案猜了。习惯与便签两面已经各有一个明确落点。
+   *
+   * ⚠️ 两个落点**不是一种东西**，这是刻意的：习惯那一格是"读 + 打卡"的一块区域，
+   * 所以焦点给**区域本体**（`tabIndex={-1}` 的 `.ht-habit__pane`，屏幕阅读器会念出
+   * 它那句 `aria-label`）；便签那一格是编辑器，焦点给**正文输入框**（"打开便签"的
+   * 自然落点就是光标进正文）。共同点只有一条：都在那一格里，都不是列表。
+   */
+  readonly enterTarget?: string;
+}
+
+const CURSOR_VIEWS: Partial<Record<ViewKey, CursorView>> =
   {
     tasks: { kind: 'task', prefix: 'task-item' },
     quadrant: { kind: 'task', prefix: 'task-item' },
     timeline: { kind: 'task', prefix: 'task-item' },
-    habits: { kind: 'habit', prefix: 'habit-row' },
-    notes: { kind: 'note', prefix: 'note-row' },
+    habits: { kind: 'habit', prefix: 'habit-row', enterTarget: '[data-testid="habit-pane"]' },
+    notes: { kind: 'note', prefix: 'note-row', enterTarget: '[data-testid="notes-editor-input"]' },
   };
 
 /** 当前渲染出来的那一串 id，**文档序**，按 id 去重（同一批 id 被两处渲染时不重复走）。 */
@@ -138,6 +167,28 @@ function revealRow(prefix: string, id: string): void {
 }
 
 /**
+ * Enter（W1b 第 3 条腿）：把焦点交给**这一格**，不代为触发任何写入。
+ *
+ * 三条"不接管"各挡一种坏，前两条与 ↑↓ 共用同一套闸门（正在打字 / 有浮层 / 焦点在
+ * 自导航控件上），第三条是 Enter 独有的：
+ *
+ * 🔴 **焦点必须落在"当前带着选中痕迹的那一行"上**。行本身是按钮，Enter 在按钮上的
+ * 既有行为是"按下它"（= 选中这一行）。用户在 Tab 序列里走到一条**没选中**的行上按 Enter，
+ * 要的是"选它"，不是"打开底下那一格现在画的那条"—— 抢过来会变成按 Enter 什么也没选中、
+ * 焦点却跳走了。所以这里只在"焦点行 == 选中的那条"时接管，其余一律让按钮自己处理。
+ *
+ * ⚠️ 面单不在 DOM 里（那一面还没选中 / 那一格今天没有可打开的东西）⇒ **不吞键也不报错**，
+ * 什么都不做。这一条不是偷懒：Enter 落空时把事件吞掉，用户读到的是"回车坏了"。
+ */
+function openPane(target: CursorView): boolean {
+  if (target.enterTarget === undefined) return false;
+  const pane = document.querySelector<HTMLElement>(target.enterTarget);
+  if (pane === null) return false;
+  pane.focus();
+  return true;
+}
+
+/**
  * 绑定当前视图的键盘光标。`view` 变了就重挂 —— 表里没有的视图**不绑**，
  * 所以"在日历页按 ↓"不会去动底下那栏的选中。
  */
@@ -147,9 +198,23 @@ export function useSelectionKeyboardCursor(view: ViewKey): void {
     if (target === undefined) return;
 
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      const arrows = event.key === 'ArrowUp' || event.key === 'ArrowDown';
+      if (!arrows && event.key !== 'Enter') return;
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
       if (isTypingTarget(event.target) || isOverlayOpen() || targetOwnsArrowKeys(event.target)) {
+        return;
+      }
+
+      if (!arrows) {
+        /* 焦点行 = 事件目标所属的那一行（不在本视图的任何一行上 ⇒ 不接管）。 */
+        const row =
+          event.target instanceof Element
+            ? event.target.closest<HTMLElement>(`[data-testid^="${target.prefix}-"]`)
+            : null;
+        if (row === null) return;
+        const id = (row.getAttribute('data-testid') ?? '').slice(target.prefix.length + 1);
+        if (id === '' || id !== selection.get(target.kind)) return;
+        if (openPane(target)) event.preventDefault();
         return;
       }
 
