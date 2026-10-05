@@ -109,6 +109,11 @@ PATHS=(
   #    入库理由与 b-window-keeper 同形：会自己起浏览器的那条腿，必须带着它的牙一起进 HEAD。
   research/tools/r17-reshoot-keeper.sh
   research/tools/r17-reshoot-arms.sh
+  # 15:5x 新写：把"第 3 项仓库级入口"那一步做成一条自闸命令（默认 dry-run、目标脏 exit 3、
+  # 锚点数不对 exit 4、候选过不了仓库自己的 check:gate-wiring 就 exit 6）。
+  # 🔴 它的牙在 `calendar-line-commit-only-arms.sh` 的臂 22–27 那一族里，而那把 rig 正是下面 3c 格
+  #    每次入库都要跑的三台之一 ⇒ 这枚新工具从落笔起就有常驻消费者，不靠"下次想起来再跑"。
+  research/tools/calendar-line-wire-evidence-rigs.mjs
   # 15:4x：上面那条 --only 前置被换成后置对账之后，**这一把就是它的牙**（三臂：正向 / 摘掉 --only /
   # 我方路径暂存≠工作树）。同样是 1b 自己抓出来的（落盘即报 `[??]`）—— 第四次。
   research/tools/calendar-line-commit-only-arms.sh
