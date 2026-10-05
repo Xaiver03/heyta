@@ -166,13 +166,22 @@ settle_dir() {
   # （`SHOT()` 直接返回 `../apps/web/evidence/<目录>/<名字>.png` 的那种形状 ——
   #  calendar-day / calendar-day-en / profile-panel / calendar-view-options / calendar-year 都是）。
   snap_tree > "$ST_DIR/after"
-  CHG=$(awk -F'\t' 'NR==FNR{a[$1]=$2; next} ($1 in a) && a[$1] != $2 {print $1}' "$ST_DIR/before" "$ST_DIR/after")
+  # 🔴 差集必须含**新增**那一档（10-05 15:1x 修）。第一版是
+  #   `($1 in a) && a[$1] != $2` —— 它对"before 里根本没有的路径"**结构性失明**：
+  #   spec 新产出一张图时这里一行都不印，接着 `INPLACE=0 && NCP=0` 那格会把一趟**成功的新增**
+  #   判成"零产出、不算完成"（假红），或者在别的图也动了的时候**静默不提那张新图**（假绿）。
+  #   两种坏方向都要挡，所以把"新增"与"就地改了"当成两种分开点名的形状打出来 ——
+  #   新增意味着这张图还没有 README、也没有锚点，它与"字节变了"不是同一件事。
+  CHG=$(awk -F'\t' '
+    NR==FNR { a[$1]=$2; next }
+    !($1 in a)        { print "新增\t" $1; next }
+    a[$1] != $2       { print "就地\t" $1 }' "$ST_DIR/before" "$ST_DIR/after")
   INPLACE=0
   SIB=""
-  while IFS= read -r p; do
+  while IFS=$'\t' read -r kind p; do
     [ -n "$p" ] || continue
     case "$p" in
-      "$d"/*) INPLACE=$((INPLACE + 1)); printf '      就地 %s  %s\n' "$(basename "$p")" "$(md5 -q "$p" | cut -c1-8)" ;;
+      "$d"/*) INPLACE=$((INPLACE + 1)); printf '      %s %s  %s\n' "$kind" "$(basename "$p")" "$(md5 -q "$p" | cut -c1-8)" ;;
       *) SIB="$SIB $(basename "$(dirname "$p")")" ;;
     esac
   done <<CHG_BLOCK
@@ -228,6 +237,25 @@ if [ "$SELFTEST" = "1" ]; then
   printf '%s\n' "$OUT" | sed 's/^/      /'
   if [ "$RC" != "0" ] || ! printf '%s' "$OUT" | grep -q '就地 a.png'; then
     echo "❌ 臂 a 坏了（rc=${RC}）⇒ 就地写图的那一类仍然报不出字节" >&2; bad=$((bad+1))
+  fi
+  echo "== selftest 臂 a2：spec **新产出**一张图（before 里没有这枚路径）⇒ 必须点名'新增'且不算零产出 =="
+  reset_tree
+  SPEC_CMD='printf BRANDNEW > "$EVID_ROOT/cal/c.png"'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-newfile.spec.ts" 2>&1); RC=$?
+  printf '%s\n' "$OUT" | sed 's/^/      /'
+  if [ "$RC" != "0" ] || ! printf '%s' "$OUT" | grep -q '新增 c.png'; then
+    echo "❌ 臂 a2 坏了（rc=${RC}）⇒ 新增那张图要么被静默吞掉，要么把成功的趟判成'零产出'" >&2; bad=$((bad+1))
+  fi
+  # 配对：只新增、别的一张没动时，旧形状会走成 rc=1（假红）。上面那条已经覆盖，这里补方向另一面 ——
+  # 新增**加**改动同时发生时两行都要点名（少一行就是差集又漏了一档）
+  echo "== selftest 臂 a2b：同一趟既改 a.png 又新增 c.png ⇒ 两行必须都在 =="
+  reset_tree
+  SPEC_CMD='printf NEW > "$EVID_ROOT/cal/a.png"; printf BRANDNEW > "$EVID_ROOT/cal/c.png"'
+  OUT=$(settle_dir "$EVID_ROOT/cal" "fake-both.spec.ts" 2>&1); RC=$?
+  N_MOD=$(printf '%s\n' "$OUT" | grep -c '就地 a.png')
+  N_NEW=$(printf '%s\n' "$OUT" | grep -c '新增 c.png')
+  if [ "$RC" != "0" ] || [ "$N_MOD" != "1" ] || [ "$N_NEW" != "1" ]; then
+    echo "❌ 臂 a2b 坏了（rc=${RC} 就地=${N_MOD} 新增=${N_NEW}）⇒ 两档里有一档又失明了" >&2; bad=$((bad+1))
   fi
   echo "== selftest 臂 b：test-results 形状（要拷回证据目录）=="
   reset_tree
@@ -358,7 +386,7 @@ SPS
   fi
   rm -rf "$V" "$MUT"
   [ "$bad" = "0" ] || { echo "❌ selftest ${bad} 臂红" >&2; exit 1; }
-  echo "SELFTEST=OK（就地报数 / 拷贝报数 / 字节相同仍印 / 零产出必须红 / 残留被清 / 只改别的目录时点名且不判成完成 / 变异腿证明牙在清残留那一行 / 覆盖判据两腿 / 出厂映射表逐枚自查没有无人认领的图 / 一枚目录摊成多行 PLAN）"
+  echo "SELFTEST=OK（就地报数 / 新增点名（单独新增、以及新增与改动同趟两行都要在）/ 拷贝报数 / 字节相同仍印 / 零产出必须红 / 残留被清 / 只改别的目录时点名且不判成完成 / 变异腿证明牙在清残留那一行 / 覆盖判据两腿 / 出厂映射表逐枚自查没有无人认领的图 / 一枚目录摊成多行 PLAN）"
   exit 0
 fi
 
