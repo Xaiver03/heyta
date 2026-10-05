@@ -38,6 +38,7 @@ import { activityRoutes } from './activity/activity.routes';
 import { accountProfileRoutes } from './account/account-profile.routes';
 import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { adminRoutes } from './admin/admin.routes';
+import { managedAiProxyRoutes } from './ai/managed-proxy.routes';
 
 // HTML escape to prevent XSS in generated HTML
 export const escapeHtml = (unsafe: string): string => {
@@ -590,6 +591,24 @@ export const createServer = (
       // 🔴 闸门在插件内部（`admin.routes.ts` 的 `addHook('preHandler', requireAdmin)`），
       //    不是在这里 —— 这样"新增一条 admin 路由忘了加鉴权"是不可能的。
       await fastifyServer.register(adminRoutes, { prefix: '/api/admin' });
+
+      // 托管 AI 的服务端代理（ADR-0054 §6 前置顺序里"把计量接到生产路径上"那一步）。
+      //
+      // 🔴 **这里不传任何选项**，是有意的：上游配置走环境（`MANAGED_AI_*`）、
+      //    白名单表走 `ai/managed-upstream.ts` 那份常量、额度走 `metering.ts` 那个常量、
+      //    SQL 面走 Prisma、传输层走 `globalThis.fetch`。测试注入的是**同一批入参的替身**，
+      //    所以"测试里合格的上游在生产上仍然合格"这句话不是靠信任维持的。
+      //
+      // 🔴 这条路由**不受** `ENTITLEMENT_GATE_ENABLED` 影响，与上面 `syncRoutes` 的权益闸门**相反**。
+      //    理由不是遗漏：`consumeManagedAiRequest` 的**周期锚点**取自"有效且授予 `ai` 的那一行
+      //    订阅的最晚到期时刻"（`ai/metering.ts` 的 `managedAiPeriodAnchor`），
+      //    没有这样一行时它返回 `MISSING_PERIOD_END` 并**拒绝** —— 也就是说这条路上
+      //    "关掉权益判定"在数据结构上就不存在，额度计的是"哪一个周期"这件事本身来自订阅行。
+      //    ⚠️ 代价要说破：一台自托管实例即使配了 `MANAGED_AI_ENABLED=true`，
+      //    也要给账号**写入一行带 `ai` grants 的订阅**才能用这条路由
+      //    （运营者动作，同 `admin:grant` 那一类）。"给自托管一个不需要订阅的形态"
+      //    需要先改锚点的来源，那是**另一个决定**，不在本轮里顺手做。
+      await fastifyServer.register(managedAiProxyRoutes, { prefix: '/api/ai' });
 
       // Test Routes (only in test mode)
       if (fullConfig.testMode?.enabled) {

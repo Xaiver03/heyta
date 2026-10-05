@@ -153,6 +153,33 @@ export interface WebPushConfig {
   readonly subject: string;
 }
 
+/**
+ * 托管 AI 的**上游模型供应商**（服务端代理那一档）。
+ *
+ * 🔴 三个值**全部必填**、默认不存在（= 这台实例没有开通托管 AI，
+ * `/api/ai/managed/chat` 一律回 503 而不是 404 —— 与 `webPush` 那两条路由同一姿态：
+ * 404 与"这个能力没开"是两件事，客户端分不清"这台服务器不支持"和"我路径写错了"）。
+ *
+ * ## 为什么上游地址与模型 id 是**服务端配置**，不是客户端能决定的
+ *
+ * | 如果由客户端给 | 后果 |
+ * |---|---|
+ * | 上游地址 | 每个请求都在问"请把用户的明文转发到我给的这个 host" —— 那等于把境内白名单交给请求体，而 ADR-0053 §5 的红线正是**只有境内** |
+ * | 模型 id | ADR-0021 §1 那句"换模型就是改价，这不是提醒，是等式"：pro 级的月度成本已经越过售价。客户端能选模型 = 客户端能选我们倒贴多少 |
+ *
+ * ⚠️ 地址的**所在地**不在这里校验，在 `ai/managed-upstream.ts` 的判定里校验 ——
+ * 配置能写出一个合法 URL 却不合格（`https://api.openai.com/v1`）。启动期不拦它是有意的：
+ * 一台已经跑着的服务器不该因为"上游以后会不合格"而起不来，而每一次转发前都会响亮拒绝。
+ */
+export interface ManagedAiConfig {
+  /** 上游基址，OpenAI 兼容形状（如 `https://api.deepseek.com/v1`）。**必须以 https**。 */
+  readonly baseUrl: string;
+  /** 上游密钥。**是秘密**：不进日志、不进响应、不发给客户端。 */
+  readonly apiKey: string;
+  /** 实际请求的 model id（ADR-0021 §3 第 3 条：模型 id 必须是配置）。 */
+  readonly modelId: string;
+}
+
 export interface ServerConfig {
   port: number;
   host: string;
@@ -240,6 +267,8 @@ export interface ServerConfig {
   wechatPay?: WechatPayConfig;
   /** Web Push（Windows PWA 小组件的刷新机制）。**默认不存在**，见下面接口的说明。 */
   webPush?: WebPushConfig;
+  /** 托管 AI 的上游供应商。**默认不存在**（= 该档在这台实例上不可用）。 */
+  managedAi?: ManagedAiConfig;
   /**
    * 注册是否必须以"点过验证邮件里的链接"为前提。**默认 true**。
    *
@@ -736,6 +765,39 @@ export const loadConfigFromEnv = (
       publicKey: publicKey as string,
       privateKey: privateKey as string,
       subject: subject as string,
+    };
+  }
+
+  // 托管 AI 的上游（可选能力）。与 `WECHAT_PAY_ENABLED` / `WEB_PUSH_ENABLED` 同一姿态：
+  // **显式 ENABLED=true 且三项齐全才存在**，缺任何一项就在启动期**硬报错**，不静默落到"没开"。
+  //
+  // 🔴 为什么齐全性要在启动期判，而不是等第一个请求：一个"配了地址但没配密钥"的实例
+  // 会走到"向境内供应商发一次**无授权头**的请求"—— 那既是一个 401，又是一次
+  // 用户明文已经出去了的事实。顺序上它还在额度之后（`managed-proxy.routes.ts` 的闸门顺序），
+  // 于是症状是"扣了一次数、拿到一个 502"。启动期报错是唯一不会付出这个代价的位置。
+  //
+  // ⚠️ 这里**故意不做**境内白名单校验：那是每次转发前的判据（`ai/managed-upstream.ts`），
+  // 而且它必须在**发送点**再算一次（ADR-0053 §5 第 2 条）。配置层判一次就够的错觉，
+  // 正是 ADR-0010 从 SSOS 抄来的那句「Enforcement has to sit on the path that actually
+  // sends the request, not only on the path that stores it.」所要防的。
+  if (process.env.MANAGED_AI_ENABLED === 'true') {
+    const baseUrl = process.env.MANAGED_AI_UPSTREAM_BASE_URL?.trim();
+    const apiKey = process.env.MANAGED_AI_UPSTREAM_API_KEY?.trim();
+    const modelId = process.env.MANAGED_AI_UPSTREAM_MODEL_ID?.trim();
+    const missing = [['MANAGED_AI_UPSTREAM_BASE_URL', baseUrl], ['MANAGED_AI_UPSTREAM_API_KEY', apiKey], ['MANAGED_AI_UPSTREAM_MODEL_ID', modelId]]
+      .filter(([, value]) => !value)
+      .map(([key]) => key);
+    if (missing.length > 0) {
+      throw new Error(
+        `MANAGED_AI_ENABLED=true 但缺少 ${missing.join(' / ')}。` +
+          '要么三项都配上，要么把 MANAGED_AI_ENABLED 去掉 —— 半套配置比没有配置危险：' +
+          '它会先扣掉用户一次额度，再把明文送到一个必然拒绝它的端点。',
+      );
+    }
+    config.managedAi = {
+      baseUrl: (baseUrl as string).replace(/\/+$/, ''),
+      apiKey: apiKey as string,
+      modelId: modelId as string,
     };
   }
 
