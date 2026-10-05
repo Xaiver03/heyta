@@ -173,9 +173,12 @@ export function ConflictSheet({
               <Text variant="section-title">
                 {/* 英文单复数：只有 1 处时走单数兄弟词条（词条表没有 ICU）。
                     只在 JSX 子节点里分支，不放进属性 —— 属性里门禁只认
-                    "字面量紧跟 `t(`"这一种形状。 */}
+                    "字面量紧跟 `t(`"这一种形状。
+                    🔴 单数那一支**也要传 `{count}`**：`tests/plural-keys.spec.ts` 钉住了
+                    中文的单数兄弟词条与复数版**刻意逐字相同**（中文本来不分单复数），
+                    所以那句里就有 `{count}` 这个洞 —— 不传，用户看到"这 {count} 处"。 */}
                 {conflicts.length === 1
-                  ? t('mobile.conflict.titleOne')
+                  ? t('mobile.conflict.titleOne', { count: conflicts.length })
                   : t('mobile.conflict.title', { count: conflicts.length })}
               </Text>
               <Text variant="caption" tone="muted">

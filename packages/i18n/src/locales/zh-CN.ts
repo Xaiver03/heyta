@@ -2974,7 +2974,7 @@ export const zhCN = {
   // ── 移动端 · 冲突面板 ─────────────────────────────────────
   'mobile.conflict.title': '这 {count} 处改动两边都改过',
   // 同 `mobile.common.badge.countOne`：中文无单复数，刻意逐字相同。
-  'mobile.conflict.titleOne': '这一处改动两边都改过',
+  'mobile.conflict.titleOne': '这 {count} 处改动两边都改过',
   'mobile.conflict.body': 'heyta 不会替你决定保留哪一版——自动挑一个会悄悄丢掉另一边的改动。每一处都请你看一眼再选；没选的那些会一直留在本地，不会丢。',
   'mobile.conflict.close': '稍后再处理',
   'mobile.conflict.newer': '较新',
