@@ -5662,3 +5662,61 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 除 `@heyta/node-host` 外全包 typecheck rc=0（node-host 那枚文件正被回收线在飞编辑占着）。
 **未做**：`pnpm -r test` 全量（内存闸门 tfa-shield 拒跑，未用 `TFA_ALLOW_CONCURRENT_TEST` 抢）、
 `pnpm reinstall:all` 的四端当前产物、e2e 那一族（含 B86 要求"逐张重看"的那五张）。
+
+## B88（2026-10-05 23:5x，合流会话的换班指针）：main 已推到 `f193454b`，之后我这一会话又落了两笔 —— 下一条会话从这里起跑
+
+**起跑点**：`git rev-parse --short HEAD` 现量 = **`8111e015`**（`f193454b` 之后两笔：
+`bde3cb15` 合流归属 + `8111e015` 习惯中栏开单）。推送通道仍是那一条**一次性 HTTPS**
+（这台机器的代理把 SSH:22 挡在 fake-ip 后面，**不动代理、不改 remote**）：
+`git -c http.proxy=http://127.0.0.1:7890 -c credential.helper='!gh auth git-credential' push https://github.com/Xaiver03/heyta.git HEAD:main`
+
+**合并这一格现在到哪**：五条线 + 工作树分组提交全部并在一条线上，
+`git ls-files -u` = **0**、`ahead/behind` 对 `origin/main` = **0/0**。
+🔴 **但"全部分支都已并入"这句在本格**不成立**，而且原因正是本篇一直在记的那个形状**：
+`fix/selfhost-e2ee-first-run-key`（`0b2be19d` 23:28、`9535f8b8` 23:40）与 `merge/20261005`（`a7badaa8` 23:38）
+**在我并完之后又各落了新的提交**（现量 `git cherry main <b> | grep -c '^+'` = 2 与 1，`integrate/…-closeout`
+与 `tmp/ai-cov-on-main` 那两条的非合并提交按 patch-id 已等价进入、计数 0）。
+我这三次补并不会去 —— 回收线**刚刚在共享检出里 `git add` 了自己的文件**：
+`git status --porcelain docs/adr/` 现量 `A  docs/adr/0055-account-tombstones-and-restore-gate.md`，
+`git merge` 因此直接拒绝（`error: Your local changes to the following files would be overwritten by merge`），
+这是**索引被别人的暂存区占着**，不是合并坏了。
+⇒ 下一个空窗的复跑命令（先确认这格，再动）：
+`git diff --cached --name-only | wc -l` 回 **0**（索引相对 HEAD 干净）才合；
+`git merge fix/selfhost-e2ee-first-run-key && git merge merge/20261005`，
+两枚分支与当前脏文件的**交集现量为空**（已核：前者只动 `e2e/selfhost-stack/selfhost-web.spec.ts`，
+后者动 `docs/reference/environment-traps.md` + 两枚 `scripts/mutate-*.mjs`）。
+**本格声明的"节点"**（用户拍的就是"某个节点之前的全都并过来"）：
+`origin/main` = **`f193454b`**，其后本地两笔 = `bde3cb15`、`8111e015`。
+
+| 读数 | 值 | 边界（这一列不许省） |
+|---|---|---|
+| `pnpm -r build` | rc=0 | —— |
+| `pnpm -r typecheck` | rc=0 | 🔴 **含 `apps/node-host`**，而那枚 `src/host.ts` / `src/cli.ts` 此刻正被回收线**在飞编辑** ⇒ 这个绿**覆盖了他们未提交的代码**，不等于他们的代码被验过，也不等于我的合流在他们的版本上仍成立 |
+| `pnpm -r --no-bail test`（排除 `@heyta/sync-server`） | **FINAL_RC=0**，19 包 **9661 passed / 13 skipped**（`apps/web` 1963+13、`app-host` 1512、`landing` 1317、`domain` 1004、`mobile` 766、`node-host` 192…） | ① `sync-server` 因沙箱 `prisma generate` EPERM 排除（AGENTS §6 那条）；② 同样落在回收线的在飞文件上；③ **e2e（Playwright）一族没跑**；④ 第一趟曾在 23:28 被 tfa 闸门在 `sync-core` 处拒掉 ⇒ 那是**竞态不是判据**，第二趟 `--no-bail` 起跑前无锁、全程无拒跑 |
+| 静态门禁 | `reachability / claims / layering / ui-language / design / docs / doc-citations / docs-voice / row-single-source / detail-pane-slot / integration-coverage / materialized-reads` 各 **RC=0** | 🔴 仍红的两条 + 一条瞬时的，全部见 B87：`md-tables`（回收线 1 字符）、`selection-single-source`（一格是 `origin/main` 自带的、一格是 AI 线的），以及此刻 `check:docs` 报 4 处死链**全指向 `docs/adr/0055-account-tombstones-and-restore-gate.md`** —— 回收线刚写下、尚未 `git add` 的那枚文件，**随他们那笔自动消失**，我不替他们 add |
+
+**AGENTS §6 那句测试数字已过期**（不是这一笔造成的，登记在这里免得下一个人再核一遍）：
+正文写"当前 2592 个通过 + 12 个跳过"，本会话现量是 **9661 passed / 13 skipped**（同一道命令口径：
+排除 `sync-server`）。⚠️ 我**没有**动 `AGENTS.md` —— 那属于规则区，要改由负责人点头；
+而且 `docs/reference/environment-traps.md` 自己就写明"本文件不写条数，要现量"，同一条道理。
+
+**traps 的两件事实**（下一个人会撞上，先说清）：
+① 台账**存在历史重号** `38 / 93 / 94 / 95`，且它们在 **`origin/main` 上就已经重着**
+（现量：`git show 8c468c2a:… | grep -oE '^[0-9]+\. 🔴' …` 与 `origin/main` 同样输出这四个号）⇒ 不是我合流造成的，
+别按"合并搞坏了台账"去查；② 取最大号只能 `sort -n`（现量 **319**、`grep -cE '^[0-9]+\. '` 328 —— 两者不等是因为
+`1./2./3./4.` 那种**条目内的有序列表**也被后者数进去了）。回收线在 `self-host-distribution-audit.md` 里写的
+"待入 traps **#216**（当时最大号 215）"已经漂了，真要落号必须现量取。
+
+**没闭合、按优先级排好的六格**（都不是"顺手就能绿"的东西）：
+1. **e2e 那一族没跑**（含 B86 明确要求"逐张重看"的 `countdown-calendar` 五张图 —— 载体已换，旧图不作数）；
+2. **`pnpm reinstall:all` 四端当前产物**（AGENTS §6.1.1 是固定收尾，本会话**一格没做**）；
+3. `check:selection-single-source` 两格：G 那格要么承认它是**第二个选中所有者**、要么由写它的人按 `confirm-gate` 登记（**类别由作者登记**，我替他登记就等于把名册变成第二套口径）；B 那格接 `@heyta/app-host` 的 `selection.ts`；
+4. `check:md-tables` 那一字符（修法写在 B87 表里，写者正在同一枚文件上追加 62 行 ⇒ 由他们那笔带走）；
+5. W6b 四条单子（`countdown-anniversary.md` W6 节末尾，含"规则三随那一代退役"那条判据债）；
+6. **习惯中栏 W13a**（`detail-pane-alignment.md` §2 + 文末那一节）：不等任何拍板、与 W1–W8 正交，
+   是产品负责人两次点名的那一格 —— 想立刻看见进展就从它开。
+
+**载体清理：我一件都没删**。`git worktree list` 现量 21 枚（`/private/tmp/heyta-merge-carrier*` 五枚、
+`heyta-wt-*` 九枚、`.worktrees/detail-pane` 等）。删除需要**证明某个载体是本会话创建的**，
+而这份上下文里没有那份 pid/path 登记 —— 按"只对自己创建的对象动手"，我不按名字清。
+真要清，先用上面那条 `git cherry` 计数确认内容已在 main，再逐枚 `git worktree remove`（不 `prune --force` 一把梭）。
