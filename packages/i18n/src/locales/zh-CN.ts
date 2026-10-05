@@ -1175,6 +1175,7 @@ export const zhCN = {
   // ── Web · 习惯的「列表 + 窗格」─────────────────────────────
   'web.habits.list.aria': '习惯清单',
   'web.habits.pane.aria': '「{name}」的打卡记录',
+  'web.habits.pane.pickOne': '选一条习惯，这里看它的打卡与统计。',
   // 行首的 7 个点：日期本身已经在 `aria-label` 里，这里只说"打没打"。
   'web.habits.week.aria': '最近 7 天',
   'web.habits.week.done': '{date} 已打卡',
