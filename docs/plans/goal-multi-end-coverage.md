@@ -3287,9 +3287,47 @@ CARRIER_SHA_AT_END=7911ad02c80d3741ee7117f20c09ab93e684595a
 **断言 `mk` 存在否则 throw** —— 缺这条断言的话，"标记没传进来"会永远长得像"产品没把改动打进字节码"。
 载体状态已复核干净：`被跟踪未提交=0`（收尾还原 + md5 兜底那条真的兜住了）。
 
-⏭ **修完重跑在飞**（21:51:51 起跑，pid 87669，证据 `~/.heyta-evidence/judge4-1005-215151/`，闸门再次 rc=0/REDS 空）。
-这一趟要看的只有 R3 的两条：`latin1≥1` **且** `utf16le≥1`，以及装机腿在同意卡上读到 `J4MARK`。
-**在它出读数之前，判据 4 只能主张到"两条主腿已过 + 标记腿未闭合"**，不许把上面那张表的三个正读数说成判据 4 已闭合。
+修完重跑两趟：
+
+**21:51:51 那一趟（pid 87669，`~/.heyta-evidence/judge4-1005-215151/`）红在 ssh 传输，不在判据**：
+R1 的远程 gradle 中途掉线（`build.log:727` `Read from remote host 10.111.127.237: Operation timed out` ⇒ 远端退出码 255），
+`run-gradle.mjs` **没有**偷偷退回本机（它原话：「这一条**不会**自动退回本机执行」，`HEYTA_ANDROID_LOCAL_GRADLE=1` 是显式例外开关、我没用）
+⇒ 这一趟只主张到"远程通道抖动过一次"，不主张任何判据读数。
+
+**21:58:27 那一趟（pid 6962，`~/.heyta-evidence/judge4-1005-215827/`，闸门再次 rc=0/REDS 空）出了四条读数**：
+
+```
+R1=49d0c5f248ae7dfa…   R2=49d0c5f248ae7dfa…   ⇒ 零改动重打逐字相同（比较有牙）
+R3=6db897a49800b201…                          ⇒ 改可见词条后不同（源码改动进了字节码）
+APK sha  R1=314eda50205d6192  R2=314eda50205d6192  R3=8dbae397615b1f16
+BUNDLE_BYTES=5987544  MAGIC=c61fbc03（hbc）
+MARKER_BUNDLE=latin1=1 utf16le=1     INSTALL=Success     MARKER_AX=0     RESULT=FAIL
+```
+
+⚠️ 上一节的 R3 是 `e3c756c6…`、这趟是 `6db897a4…` —— **两枚都对**，因为拼进词条的标记不同
+（`"undefined"` vs `J4MARK`）。这正好是"sha 只证'变了'，不证'变成了什么'"的现量例子。
+
+🔴 **`MARKER_AX=0` 又是装置坏，而且是第二处、和第一处不同种**：装置用
+`adb shell monkey -p com.heyta -c android.intent.category.LAUNCHER 1` 拉起 App，随后 `sleep 8` 直接 dump。
+那 8 秒后 `mCurrentFocus` 是 `com.google.android.apps.nexuslauncher`（`run.log` 当场印了这行），
+所以 dump 出来的 `ui.xml` 是**桌面的树** —— 里面 `J4MARK` 命中 0 是必然，而 `packaged-judge4.png` 里就是桌面 All-apps 页。
+第一处 bug 让标记**没写进产物**，这一处让标记**在产物里也没被读到**：两次都是"探针够不着"长得像"产品没做"。
+
+**手动把这一腿走通了**（同一台 `emulator-5554`、同一枚已装好的 R3 APK，不改产品代码）：
+`cmd package resolve-activity --brief com.heyta` 现量组件是 `com.heyta/com.heytamobile.MainActivity`
+（⚠️ `applicationId` 是 `com.heyta` 而 Activity 类在 `com.heytamobile` 命名空间下 —— 我第一次把它误读成"别的包"，
+第二次按 `am start -n com.heyta/.MainActivity` 拼 ⇒ `Error type 3`），
+`am start -n com.heyta/com.heytamobile.MainActivity` ⇒ `mCurrentFocus=Window{2fb5812 u0 com.heyta/com.heytamobile.MainActivity}`，
+同一份 `uiautomator dump` 里**就印着** `在使用联网功能之前 MK=J4MARK`。截图两张都人打开看过：
+`packaged-judge4.png`（279,192 B = 桌面 All-apps，"heyta" 图标在列）、
+`manual-correct-component.png`（266,187 B = 我们的 App，同意卡标题带标记）。
+22:14 复量：焦点仍在 `com.heyta/com.heytamobile.MainActivity`，新 dump `marker_hits=1`（不是只有一次幸运读数）。
+
+⇒ 装置的 launch 腿已按现量改成 **resolve-activity 取组件 → `am start -n` → 轮询 `mCurrentFocus` 到 `com.heyta` 才 dump**，
+并加了"解析不到组件就 `RESULT=FAIL` 并印出拿到的是什么"的响亮失败（不能让"起不来"再长得像"界面没渲染"）。
+修完整条重跑在飞（22:2x 起跑，`/tmp/j4-rerun-2220.log`）。
+**在它出读数之前，判据 4 只能主张到"确定性腿 + 变更传播腿 + 标记进字节码腿 + 装机腿有读数、界面腿靠手动走通"**：
+`MARKER_AX` 必须由修好的装置自己打印出 ≥ 1 才算四条腿全闭合。
 
 ### 7.31 ③ 的输入多了一道「能不能重放」的门，另一枚探针先被自己作废（2026-10-04 12:4x–13:0x，载体 `458249f6`，窗口仍不在）
 
