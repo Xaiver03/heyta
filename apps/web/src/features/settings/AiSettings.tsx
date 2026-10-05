@@ -25,22 +25,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  AI_ENDPOINT_PRESETS,
-  classifyDestination,
-  validateEndpointUrl,
-  requiredCapabilities,
-  endpointHealthDisclosure,
-  fromHealthSnapshot,
-  isAvailable,
-  requiresEgressConsent,
-  type AiRoutingConfig,
-  type AiCapability,
-  type AiEndpointConfig,
-  type AiEndpointPreset,
-  type AiFeature,
-  type EgressConsent,
-} from '@heyta/ai';
+import { AI_ENDPOINT_PRESETS, classifyDestination, validateEndpointUrl, requiredCapabilities, endpointHealthDisclosure, fromHealthSnapshot, isAvailable, requiresEgressConsent, type AiRoutingConfig, type AiCapability, type AiEndpointConfig, type AiEndpointPreset, type AiFeature, type EgressConsent, CAPABILITY_ORDER } from '@heyta/ai';
 
 /**
  * 能力词表与中文名。
@@ -57,12 +42,6 @@ import {
  *
  * 教训：**一个"必须由用户声明"的字段，如果界面上无处可填，等于这个功能不存在。**
  */
-const CAPABILITY_ORDER: readonly AiCapability[] = [
-  'structured_output',
-  'long_context',
-  'vision',
-  'tool_calling',
-];
 
 /** 能力的中文名。**不直接用 `AiCapability` 字面量**，那对用户没有意义。 */
 function capabilityLabels(t: I18nValue['t']): Readonly<Record<AiCapability, string>> {

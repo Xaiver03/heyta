@@ -161,6 +161,7 @@ export {
   resolveRoute,
   shouldTryNextEndpoint,
   validateEndpointUrl,
+  CAPABILITY_ORDER,
   type AiCapability,
   type AiEndpointConfig,
   type AiRouteTarget,

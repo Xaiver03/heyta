@@ -33,6 +33,8 @@ import {
   validateEndpointUrl,
   type AiEndpointConfig,
   type AiFeature,
+  CAPABILITY_ORDER,
+  type AiCapability
 } from '@heyta/ai';
 import {
   ASSISTANT_TIER_ORDER,
@@ -82,6 +84,11 @@ export function AiSettingsSection(): React.JSX.Element {
   const [draftLabel, setDraftLabel] = useState('');
   const [draftModel, setDraftModel] = useState('');
   const [draftKey, setDraftKey] = useState('');
+  // 🔴 建端点时要能**声明能力**（ADR-0010 §3.4：显式声明、不做推断）。
+  //   这一格此前移动侧压根不存在，后果不是"少个选项"，是：移动上建出来的端点永远只拿基线
+  //   `structured_output`，于是 `tool-calling` 与 `breakdown` 两档在手机上**结构上不可用**，
+  //   而界面只表现为"发送按钮一直灰着"（排除原因 `capability-missing` 从不递给人）。
+  const [draftCaps, setDraftCaps] = useState<readonly AiCapability[]>([]);
   const [urlError, setUrlError] = useState<MessageKey | undefined>(undefined);
   const [savedWithoutKey, setSavedWithoutKey] = useState(false);
 
@@ -115,6 +122,11 @@ export function AiSettingsSection(): React.JSX.Element {
       label: draftEndpointName,
       endpoint: draftUrl.trim(),
       model: draftModel.trim(),
+      // 一条都没勾 = **不写这个字段**，让 `endpointCapabilities()` 落到基线；
+      // 勾了就按顺序表定序写入（库里两份同端点的 JSON 只有顺序不同的话，回读判据会假红）。
+      ...(draftCaps.length === 0
+        ? {}
+        : { capabilities: CAPABILITY_ORDER.filter((c) => draftCaps.includes(c)) }),
     };
     // 🔴 新端点**不带任何能力声明**：ADR-0010 §3.4 要求能力显式声明、不做推断，
     // 而 `undefined` 的语义是"只有基线 `structured_output`"（= 保守），不是"支持一切"。
@@ -359,6 +371,29 @@ export function AiSettingsSection(): React.JSX.Element {
           hint={t('mobile.ai.keyNotice')}
           testID="ai-endpoint-key"
         />
+        <Stack gap="tight">
+          <Text variant="caption" tone="subtle">
+            {t('web.ai.settings.field.capability')}
+          </Text>
+          <HStackish>
+            {CAPABILITY_ORDER.map((capability) => (
+              <View key={capability} testID={`ai-endpoint-cap-${capability}`}>
+                <Chip
+                  label={t(CAPABILITY_LABEL_KEY[capability])}
+                  selected={draftCaps.includes(capability)}
+                  onPress={() => {
+                    setDraftCaps((prev) =>
+                      prev.includes(capability)
+                        ? prev.filter((c) => c !== capability)
+                        : [...prev, capability],
+                    );
+                  }}
+                />
+              </View>
+            ))}
+          </HStackish>
+        </Stack>
+
         <Button
           label={t('web.ai.settings.addCustom')}
           tone="primary"
@@ -543,6 +578,14 @@ function HStackish({ children }: { children: React.ReactNode }): React.JSX.Eleme
 }
 
 /** `validateEndpointUrl` 的拒绝码 → 词条（穷尽：新增一档而这里没登记就编译红）。 */
+/** 能力的中文名走词条（界面零硬编码）；`Record<AiCapability, …>` 让"新增一档没登记"变成编译错。 */
+const CAPABILITY_LABEL_KEY: Record<AiCapability, MessageKey> = {
+  structured_output: 'web.ai.capability.structuredOutput',
+  long_context: 'web.ai.capability.longContext',
+  vision: 'web.ai.capability.vision',
+  tool_calling: 'web.ai.capability.toolCalling',
+};
+
 const VERDICT_KEY = {
   'bad-scheme': 'web.ai.settings.endpointError.badScheme',
   'credentials-in-url': 'web.ai.settings.endpointError.credentialsInUrl',

@@ -691,6 +691,22 @@ print(len((v.get('routing') or {}).get('endpoints') or []))
 PYE
 }
 
+endpoint_caps() {  # → 库里的能力声明读数（只读回、不判定；读不到打 NOFILE/BAD:*）
+  pull_prefs_db
+  if [ ! -s "$PREFS_DB" ] || [ "$(wc -c < "$PREFS_DB")" -lt 512 ]; then printf 'NOFILE'; return 1; fi
+  head -c 16 "$PREFS_DB" | grep -q 'SQLite format 3' || { printf 'BAD:not-a-db'; return 1; }
+  HEYTA_DB="$PREFS_DB" python3 - <<'PYC'
+import json, os, sqlite3
+try:
+    row = sqlite3.connect(f"file:{os.environ['HEYTA_DB']}?mode=ro", uri=True).execute(
+        "SELECT value FROM device_pref WHERE key='heyta.ai.settings'").fetchone()
+    eps = (json.loads(row[0]).get('routing') or {}).get('endpoints') or [] if row else []
+except Exception as e:
+    print(f"BAD:{type(e).__name__}"); raise SystemExit(0)
+print(' '.join(f"{e.get('label','?')}=[{','.join(e.get('capabilities') or ['<baseline>'])}]" for e in eps) or 'BAD:no-endpoint')
+PYC
+}
+
 routes_reading() {  # → 每档一行 "feature=<绑定端点数>/<同意数>"；读不到库打 NOFILE、解析不了打 BAD
   pull_prefs_db
   if [ ! -s "$PREFS_DB" ] || [ "$(wc -c < "$PREFS_DB")" -lt 512 ]; then printf 'NOFILE'; return 1; fi
@@ -779,7 +795,7 @@ bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要�
   #   ⇒ 只登记读数，等第 5 步自己的 enabled 判定来说话；成因候选因此仍留着，不许在这一格替它编结论。
   if [ -n "$MISSC" ]; then
     echo "   ⓘ 这些档没找到可点的同意控件:$MISSC" >&2
-    echo "     （`ai-consent-*` 罩在 needs 条件下，本模式可能压根不渲染；也可能是载体没滚到 —— 设备侧分不开）" >&2
+    echo "     （ai-consent-* 罩在 needs 条件下，本模式可能压根不渲染；也可能是载体没滚到 —— 设备侧分不开）" >&2
     echo "     不判红、不中止：第 5 步的 enabled 才是真判据，它红会自己说清差哪一档" >&2
   fi
   local readc linec cc missc2=""
@@ -1172,6 +1188,16 @@ add_endpoint() {  # <名称> <地址>
   #   先摘焦点再回到顶部（同一个理由见 bind_all_routes 头上那段）。
   blur_focus
   scroll_to_top
+  # 🔴 声明能力：移动侧此前**没有这一格**，建出来的端点只拿基线 structured_output，
+  #   于是 tool-calling（要 tool_calling）与 breakdown（要 long_context）在手机上永远进不了候选，
+  #   助手面就表现为"发送按钮恒灰"。三档都勾上，第 5 步才量得到真东西。
+  #   ⚠️ 这一格需要**当前源码的 APK**（`check:*-freshness` 会挡旧产物），所以这一发在旧包上必然报
+  #   "滚不出来" —— 那是产物过期，不是产品坏了；判据不为此降级。
+  local cap
+  for cap in structured_output long_context tool_calling; do
+    reveal_rid "ai-endpoint-cap-$cap" || { echo "   ❌ 能力格子 ai-endpoint-cap-$cap 不在屏上（旧 APK 没有这一格？）" >&2; return 1; }
+    tap_rid "ai-endpoint-cap-$cap" || { echo "   ❌ 能力格子 ai-endpoint-cap-$cap 点不动" >&2; return 1; }
+  done
   disable_ime
   for pair in "ai-endpoint-label|$name" "ai-endpoint-url|$url" "ai-endpoint-model|stub-model"; do
     rid=${pair%%|*}; val=${pair#*|}

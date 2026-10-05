@@ -846,3 +846,27 @@ capture=1 breakdown=1 prioritize=1 duration-estimate=1 tool-calling=1
 而能力按 ADR-0010 是显式声明、不做推断），以及 `assistantTier` 在只用本机模式下是否把这档挡在外面。
 判完才是产品裁决（若落在 tier，要拍的是「只用本机模式下助手可用到哪一档」）。
 **本轮设备级读数收在这里：14/15，一条红如实留着 —— 不降级判据，也不拿载体跑通当产品完成。**
+
+#### 第 5 步那条红的真身（2026-10-06 21:3x 读代码定源，不需要设备）
+
+`resolveRoute`（`packages/ai/src/routing.ts:524`）的候选过滤里**没有"逐功能同意"这一道**，
+所以库里 `consents=0` 与按钮 disabled 无因果关系 —— 上一节把它列成候选是错的（已删到 #330b 的教训里）。
+真正拦住的是**能力过滤**：`requiredCapabilities('tool-calling') = ['tool_calling']`，
+而 `endpointCapabilities()` 在端点没声明时回落到基线 `['structured_output']`
+（`routing.ts:166`）；移动壳的端点表单**从来没有能力这一格**
+（`AiSettingsSection.tsx` 里 `capabilit` 命中 0，web 的 `AiSettings.tsx` 有 27 处）。
+
+⇒ 这是一条**真产品缺口**，不是载体问题：在手机上配好的端点，`tool-calling` 与 `breakdown`
+两档永远进不了候选，而界面只表现为"发送按钮恒灰"，排除原因 `capability-missing` 从不递给人。
+web 文件上方本来就写着这条教训（"一个必须由用户声明的字段，如果界面上无处可填，等于这个功能不存在"），
+移动侧正是它的实例。
+
+**本轮落地的修法**：`CAPABILITY_ORDER` 从 `apps/web` 提到 `packages/ai`（唯一事实源，两枚宿主共用），
+移动表单补上能力声明那一格（chip + `ai-endpoint-cap-<capability>` 锚点 + 走现有 `web.ai.capability.*` 词条，
+不新增文案）；一条都没勾 = 不写该字段，语义仍是"只有基线"（保守），勾了按顺序表定序写入。
+新门禁：`check:mobile-ai-anchors` 判据 ⑨（每一枚能力都必须在移动表单里可填、顺序表不许被抄第二份），
+三臂变异证明它会红（臂数由 `--self-test` 自己打印）。
+
+**边界（不写成已闭合）**：装到设备上的那枚 APK 还没有这一格，`apps/mobile/src` 一改就把新鲜度门
+顶成 rc=3，而 `windows-pc` 本轮不可达 ⇒ **第 5 步那条设备级判据（规则命中且零外发）本轮仍取不到读数**，
+载体已经把"勾三档能力"接进建端点那一步，等一个能打新包窗口去量。
