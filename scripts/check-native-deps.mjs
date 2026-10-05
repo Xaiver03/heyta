@@ -21,13 +21,15 @@
  * 而**所有既有断言都测不出它**：无障碍断言查的是 `content-desc` 与文案，
  * 它测不出"这个 View 到底画成了什么"。
  *
- * 所以这里把那条只有人眼能看见的事实，变成两条机器可查的规则：
+ * 所以这里把那条只有人眼能看见的事实，变成三条机器可查的规则：
  *
  *   1. **收录**：每个第三方原生依赖的 pod 名，必须出现在 `Podfile.lock` 的 PODS 段。
  *      第 32 号陷阱就是这条被违反。
  *   2. **版本一致**：`Podfile.lock` 记的版本，必须等于该包 `package.json` 的 `version`。
  *   3. **工程文件不许重复登记**：`project.pbxproj` 里同一个 PBXBuildFile 只能有一条，
  *      且同一个 `files = (…)` 阶段里不许出现两次。
+ *   4. **调用环境一致**：`scripts/reinstall-all.sh` 里那条 `pod install` 必须带齐
+ *      `POD_ENV`（见该常量注释）—— 它决定这条命令**跑不跑得起来**，2026-10-04 实测。
  *
  * 规则 2 之所以能做成**确定性的**（而不是像最初设想的那样比 mtime）：
  * 实测这四个 podspec 全都用 `s.version = package['version']` 取值
@@ -53,7 +55,8 @@
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const KNOWN_FLAGS = new Set(['--json', '--flagged', '--help']);
 const argv = process.argv.slice(2);
@@ -83,6 +86,78 @@ const MAX_DEPTH = 3;
  * 纳入检查会因条件性 prebuilt pod 而**假红**。
  */
 const EXCLUDED_PACKAGES = new Set(['react', 'react-native']);
+
+/**
+ * 🔴 `pod install` 在本机的调用环境 —— **唯一事实源**。
+ *
+ * 每一项的依据都是四臂实测（2026-10-04，同一棵长活树、同一分钟，日志
+ * `/tmp/pod-arms-{A-no-lcall,B-with-lcall,C-no-locale,D-restore}.txt`）：
+ *
+ * - `-u NODE_USE_ENV_PROXY`：CocoaPods 会读它去走代理下载 spec，本机那个代理地址不可达。
+ * - `LANG=en_US.UTF-8`：**承重的是"至少有一个 locale 变量"**。两个都不给 ⇒
+ *   `Encoding.default_external=US-ASCII` ⇒ 崩在 `config.rb:167 installation_root`
+ *   （`Unicode Normalization not appropriate for ASCII-8BIT`）。
+ *   ⚠️ **`LC_ALL` 不是必需** —— 显式 `-u LC_ALL`、只给 `LANG` 的那一趟（A 臂）照样
+ *   `Pod installation complete!`（84 deps / 83 pods）。这里曾经写着"`LC_ALL` 不能省"，
+ *   那四臂把它否证了；留着这句是因为仓库里**三份文档各抄了一份不一样的 env 串**
+ *   （runbook 写 `LANG`+`LC_ALL`、这两处只写 `LANG`），而"哪一项承重"此前没人量过。
+ * - `RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0`：从源码构建（AGENTS §7 第 30 条）。
+ *   只给 locale、不给这两个的那一趟（= 那条 runbook 命令的 env）停在
+ *   `React-Core-prebuilt`：仓库路径含空格 ⇒ `bad component(expected absolute path component)`
+ *   ⇒ `Missing required attribute source`。
+ *
+ * ⚠️ **这串 env 治不了 `null byte`**：`ArgumentError - path name contains null byte`
+ * （`project.rb:452 realdirpath`）在同一 env 形状下 3 趟 2 成 1 崩（D 臂崩、A/B 成），
+ * 是**逐趟非确定性**（上游 CocoaPods #12798 / #12866，两条都还 open，后者标题写着 "sometimes"）。
+ * `reinstall-all.sh` 对它的处置是有界重试，不是改 env。
+ *
+ * 这个常量同时喂两处：本文件打印的"修法"，和下面那条对 `scripts/reinstall-all.sh`
+ * 里那一条 `pod install` 调用的对账。shell 里那句"改一处要改两处"是注释 ——
+ * 现在它是一条**会红的门禁**（变异：从 shell 那条调用里摘掉 `LANG=` ⇒ 本门禁红）。
+ */
+const POD_ENV = [
+  '-u NODE_USE_ENV_PROXY',
+  'LANG=en_US.UTF-8',
+  'RCT_USE_PREBUILT_RNCORE=0',
+  'RCT_USE_RN_DEP=0',
+];
+const podFix = (iosDir) => `cd ${iosDir} && env ${POD_ENV.join(' ')} pod install`;
+
+/** 把 shell 续行（`\` + 换行）折回一行，这样"同一条命令"能被整条扫到。 */
+const joinContinuations = (text) => text.replace(/\\\r?\n/g, ' ');
+
+/**
+ * 只留下**调用**形状：整行注释去掉、引号里的字符串挖空（`echo "…pod install…"` 那句
+ * 文案里也有这个词，按字面扫会把四行提示语当成四条调用 —— 每条都是假阳性，
+ * 而假阳性会教人忽略红色）。挖空用 `'""'` 占位，不改变词边界。
+ */
+const toCallShape = (line) =>
+  line
+    .replace(/^\s*#.*$/, '')
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''");
+
+/**
+ * `reinstall-all.sh` 里每一条 `pod install` 调用必须带齐 POD_ENV。
+ * 返回违规描述数组；**找不到任何调用也算违规** —— 挂在"扫不到就跳过"上的门禁，
+ * 在调用被删掉的那天会安静地不再执行（traps #191 同一个形状）。
+ */
+function auditPodEnvInShell(text) {
+  const calls = joinContinuations(text)
+    .split('\n')
+    .map(toCallShape)
+    .filter((l) => /\bpod\s+install\b/.test(l));
+  if (calls.length === 0) return ['里没有一条 `pod install` 调用（这条对账失去对象）'];
+  const bad = [];
+  for (const call of calls) {
+    const missing = POD_ENV.filter((tok) => !call.includes(tok));
+    if (missing.length > 0) {
+      bad.push(`带缺的 env：${missing.join(' / ')}\n      该行：${call.trim().slice(0, 160)}`);
+    }
+  }
+  return bad;
+}
+
 
 const isDir = (p) => {
   try {
@@ -192,7 +267,7 @@ if (natives.length > 0 && !existsSync(lockPath)) {
     dep: '(整个 iOS 工程)',
     pod: '(缺失)',
     why: `${lockPath} 不存在，无法证明任何原生模块被链接`,
-    fix: `cd ${APP_DIR}/ios && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install`,
+    fix: podFix(`${APP_DIR}/ios`),
   });
 } else if (natives.length > 0) {
   const pods = parsePodfileLock(lockPath);
@@ -202,7 +277,7 @@ if (natives.length > 0 && !existsSync(lockPath)) {
         kind: 'missing',
         ...n,
         why: `pod 名 "${n.pod}" 完全不在 ${lockPath} 的 PODS 段里 —— 这个原生模块没有被链接，它会被渲染成 "Unsupported" 占位`,
-        fix: `cd ${APP_DIR}/ios && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install`,
+        fix: podFix(`${APP_DIR}/ios`),
       });
       continue;
     }
@@ -213,7 +288,7 @@ if (natives.length > 0 && !existsSync(lockPath)) {
         ...n,
         locked,
         why: `已安装的包版本是 ${n.version}，而 ${lockPath} 记的是 ${locked} —— lock 是过期状态，实际链接的是旧版原生代码`,
-        fix: `cd ${APP_DIR}/ios && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install`,
+        fix: podFix(`${APP_DIR}/ios`),
       });
     }
   }
@@ -276,6 +351,32 @@ if (!isFile(PBXPROJ)) {
       pod: dup,
       why: `同一个编译条目出现两次 —— 构建只会 succeed 并留下一行 "Skipping duplicate build file" 警告`,
       fix: `在 ${PBXPROJ} 里删掉多余的那一份（PBXBuildFile 段与 Sources 阶段各一处）`,
+    });
+  }
+}
+
+// ── 规则 4：调用环境与 reinstall-all.sh 对账 ────────────────────────────────
+//
+// 打印"修法"的那串 env 与真正跑装包流程的那串 env 必须是**同一串**。
+// 这里不引第三方共享模块（`scripts/` 是脚本目录、不是包），做法是门禁直接读
+// shell 文件并把它的续行折回来比对 —— 与 POD_ENV 常量对账，而不是对着一段注释对账。
+const REINSTALL_SH = resolve(dirname(fileURLToPath(import.meta.url)), 'reinstall-all.sh');
+if (!existsSync(REINSTALL_SH)) {
+  violations.push({
+    dep: 'scripts/reinstall-all.sh',
+    pod: '(缺失)',
+    kind: 'no-reinstall-script',
+    why: `对账对象读不到：${REINSTALL_SH}`,
+    fix: '恢复该脚本，或把本条对账改到它真正的新家',
+  });
+} else {
+  for (const msg of auditPodEnvInShell(readFileSync(REINSTALL_SH, 'utf8'))) {
+    violations.push({
+      dep: 'scripts/reinstall-all.sh',
+      pod: '(pod install 调用)',
+      kind: 'pod-env',
+      why: `那条 \`pod install\` 与本文件打印的修法不是同一串 —— ${msg}`,
+      fix: podFix(`${APP_DIR}/ios`),
     });
   }
 }

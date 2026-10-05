@@ -193,9 +193,23 @@ fi
 if printf '%s' "$WANT" | grep -q "mac"; then
   echo ""
   echo "═══ 1. macOS：清旧包 → 打包 → 卸旧 → 装新 ═══"
-  MAC_OUT="/tmp/heyta-macos-dist"
+  # 🔴 这个输出目录以前是**写死的**，而它下面第一句就是 `rm -rf`。
+  #    2026-10-04 实测：另一条会话 03:13 那一趟的证据正好落在同一个路径上，
+  #    本脚本一跑就会把**别人的现场**整个删掉 —— 当时靠起跑前手动改名保住，
+  #    而"我记得先改名"不是判据（AGENTS §8 第 9 条：共享资源要先定所有者与运行窗口）。
+  #    旋钮的默认值逐字不变，所以不带 env 的行为与今天完全一致。
+  MAC_OUT="${HEYTA_MACOS_DIST_DIR:-/tmp/heyta-macos-dist}"
   INSTALLED_APP="/Applications/Heyta.app"
   RESULT_mac=FAIL
+  # 🔴 删之前把"删的是哪个目录、里面有什么"打进日志：这一句的失败模式是**安静**，
+  #    出事后日志里连"原来那里有东西"都读不出来。
+  echo "  macOS 输出目录 = ${MAC_OUT}（覆盖旋钮 HEYTA_MACOS_DIST_DIR）"
+  if [ -d "$MAC_OUT" ]; then
+    echo "  清空前里面有 $(ls -1 "$MAC_OUT" 2>/dev/null | wc -l | tr -d ' ') 项："
+    ls -1 "$MAC_OUT" 2>/dev/null | head -8 | sed 's/^/     /'
+  else
+    echo "  清空前该目录不存在（首次运行）"
+  fi
   rm -rf "$MAC_OUT"                                   # 清掉旧安装包
   if bash apps/desktop-macos/scripts/package-app.sh "$MAC_OUT" > /tmp/heyta-reinstall-mac.log 2>&1; then
     echo "  ✅ 打包完成（.app + .dmg，含打包即启动的自截屏验证；日志 /tmp/heyta-reinstall-mac.log）"
@@ -392,7 +406,38 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     #    这一步以前**不在流程里** —— `ios/Pods/` 是 gitignored 的，隔离检出里换一次 HEAD
     #    沙盒就对不上了，而脚本原来只会打印"xcodebuild 失败 + 日志末尾"，
     #    读起来像产品坏了（实际缺的是构建输入）。
-    #    env 那一串与 `scripts/check-native-deps.mjs` 打印的修法同源，**改一处要改两处**。
+    #    env 那一串与 `scripts/check-native-deps.mjs` 打印的修法同源，**改一处要改两处** ——
+    #    自 2026-10-04 起这一句由 `check:native-deps` 的第三条规则钉住（不靠注释）。
+    #
+    #    🔴 那串 env 里**唯一承重的**是"至少有一个 locale 变量"。四臂实测（同一棵树、
+    #    同一分钟内、`/tmp/pod-arms-*.txt`）：
+    #      · `LANG` 与 `LC_ALL` **都不给** ⇒ 崩在 `config.rb:167 installation_root`
+    #        （`Unicode Normalization not appropriate for ASCII-8BIT`，
+    #        `Encoding.default_external=US-ASCII`）。
+    #      · 只给 `LANG`（显式 `-u LC_ALL`）⇒ ✅ `Pod installation complete!` 84 deps/83 pods。
+    #      · 给 `LANG`+`LC_ALL` ⇒ ✅ 同上。
+    #    ⚠️ 所以 `LC_ALL` **不是**必需项，这里不给它；`LANG` 必须给。
+    #
+    #    🔴 而 `ArgumentError - path name contains null byte`（`project.rb:452 realdirpath`）
+    #    与 locale **无关**：给它 `LANG`+`LC_ALL` 的那一趟（D 臂）就崩了，而 5 秒前同样 env
+    #    形状的两趟（A/B）都成功。⇒ 它是**逐趟非确定性**的（上游 CocoaPods #12798 / #12866，
+    #    两条都还 open，后者标题就写着 "sometimes"）。
+    #    这也**否证**了 traps #154 当时的结论"变量是这棵长活的树本身"——同一棵树上三趟两成
+    #    一崩，树不是那个变量。⚠️ 它当时另一条否证（"换一棵新克隆就好了"）依然成立，只是
+    #    解释力更弱：新克隆也一样可能崩，只是没撞上。
+    #
+    #    ⇒ 这里的处置是**有界重试**（每趟 ~10 s，最多 3 趟，逐趟落日志与 RC），
+    #      而不是改 env。判据没放松：仍然要求 `Manifest.lock == Podfile.lock`，
+    #      三趟全崩就照常判红。
+    #
+    #    🔴 而且**不再因为"哈希已经相等"就跳过这一趟**（2026-10-04 实测的理由）：
+    #    上一趟 `pod install` 崩在"Generating Pods project"中段时，`Manifest.lock` 已经写完、
+    #    与 `Podfile.lock` 逐字节相同，但 `Pods/Headers/Public/RCTSwiftUI/` 整层没生成 ——
+    #    于是"沙盒一致"的哈希判据**被一个半写沙盒满足**，xcodebuild 接着报
+    #    `fatal error: module map file '…/RCTSwiftUI.modulemap' not found`（4 个 target 全挂）。
+    #    那一次失败是**响亮**的（装包段判红），所以这不是假绿；但它把"缺构建输入"
+    #    伪装成"产品构建不过"，正是本文件第 396 行自己写过的那个形状。
+    #    ⇒ 现在每次都跑（幂等、~10 s），把"沙盒完整"这件事交给生成器本身，而不是交给一个哈希。
     IOS_IOS_DIR="$ROOT/apps/mobile/ios"
     PODS_SYNC=OK
     LOCK_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | cut -d' ' -f1)"
@@ -400,27 +445,35 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     if [ -z "$LOCK_SHA" ]; then
       echo "  🔴 读不到 apps/mobile/ios/Podfile.lock —— 无法判断沙盒该不该装"
       PODS_SYNC=FAIL
-    elif [ "$LOCK_SHA" != "$MANI_SHA" ]; then
-      echo "  Pods 沙盒与 Podfile.lock 不一致（或缺 Manifest.lock）→ 跑 pod install…"
-      # 🔴 允许**一次**重试，而且两趟各自落账。理由不是"重试通常能过"这种印象，是
-      #    2026-10-05 03:0x 现量：CocoaPods 1.17.0 在 "Generating Pods project"
-      #    加 source file 引用那一步偶发崩 `ArgumentError - path name contains null byte`
-      #    （`Pathname#realdirpath`；上游 #12798 / #12866 当时都还 open），
-      #    崩完沙盒是半写状态，而**同一棵载体上 45 分钟前刚成功跑过一遍、手跑第二趟 rc=0**。
-      #    一次就红会把这条偶发报成"ios 腿失败"，而红字里没有一个字指向"可重试" ——
-      #    读的人会去查构建，构建是好的（与 `afe7ff7a`/`d924853e` 那两发同形：
-      #    **红的那一句把原因说反了**）。
-      #    这不是降级判据：两趟都失败仍然整腿判红，两本日志都留着。
+    else
+      if [ "$LOCK_SHA" = "$MANI_SHA" ]; then
+        echo "  Pods 哈希本已一致，仍重跑 pod install（半写沙盒不会被哈希相等挡住）…"
+      else
+        echo "  Pods 沙盒与 Podfile.lock 不一致（或缺 Manifest.lock）→ 跑 pod install…"
+      fi
+      # 🔴 允许**有界重试**，而且每一趟各自落账（`/tmp/heyta-reinstall-pod-<n>.log`）。
+      #    理由不是"重试通常能过"这种印象，是 2026-10-05 03:0x 现量：CocoaPods 1.17.0 在
+      #    "Generating Pods project" 加 source file 引用那一步偶发崩
+      #    `ArgumentError - path name contains null byte`（`Pathname#realdirpath`；
+      #    上游 #12798 / #12866 当时都还 open），崩完沙盒是半写状态，而**同一棵载体上
+      #    45 分钟前刚成功跑过一遍、手跑第二趟 rc=0**。一次就红会把这条偶发报成
+      #    "ios 腿失败"，而红字里没有一个字指向"可重试" —— 读的人会去查构建，
+      #    构建是好的（与 `afe7ff7a`/`d924853e` 那两发同形：**红的那一句把原因说反了**）。
+      #    这不是降级判据：三趟都失败仍然整腿判红，每一趟的日志都留着。
       POD_OK=0
-      for POD_ATTEMPT in 1 2; do
-        POD_LOG="/tmp/heyta-reinstall-pod.${POD_ATTEMPT}.log"
-        (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
-            RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) >"$POD_LOG" 2>&1
-        POD_RC=$?
-        echo "     pod install 第 ${POD_ATTEMPT} 趟 rc=${POD_RC}（日志 ${POD_LOG}）"
-        if [ "$POD_RC" = 0 ]; then POD_OK=1; break; fi
+      for POD_TRI in 1 2 3; do
+        POD_LOG="/tmp/heyta-reinstall-pod-$POD_TRI.log"
+        if (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
+            RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) \
+            >"$POD_LOG" 2>&1; then
+          POD_OK=1
+          break
+        fi
+        echo "    ⚠️ 第 ${POD_TRI} 趟失败：$(grep -m1 -oE "ArgumentError - [^\"]*|\[!\] [^\"]*" "$POD_LOG" | head -1)（日志 ${POD_LOG}）"
       done
+      cp -f "$POD_LOG" /tmp/heyta-reinstall-pod.log 2>/dev/null || true
       if [ "$POD_OK" = 1 ]; then
+        [ "$POD_TRI" -gt 1 ] && echo "    （第 ${POD_TRI} 趟才成功 —— 与上面那条非确定性记录一致）"
         MANI_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Pods/Manifest.lock" 2>/dev/null | cut -d' ' -f1)"
         NEW_LOCK_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | cut -d' ' -f1)"
         if [ "$NEW_LOCK_SHA" != "$LOCK_SHA" ]; then
@@ -438,8 +491,8 @@ if printf '%s' "$WANT" | grep -q "ios"; then
           PODS_SYNC=FAIL
         fi
       else
-        echo "  🔴 pod install **两趟**都失败 ⇒ 不是那条偶发崩溃；日志末尾："
-        tail -10 /tmp/heyta-reinstall-pod.2.log | sed 's/^/     /'
+        echo "  🔴 pod install **三趟**都失败 ⇒ 不是那条偶发崩溃；最后一趟日志末尾："
+        tail -10 "$POD_LOG" | sed 's/^/     /'
         PODS_SYNC=FAIL
       fi
     fi

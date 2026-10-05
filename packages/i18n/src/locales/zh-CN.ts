@@ -3934,6 +3934,11 @@ export const zhCN = {
   // `calendarDayMarkerView` 里 `spoken` 直接取它，所以英文侧必须是能念出来的词，不能是符号。
   'common.calendar.dayMarker.off': '休',
   'common.calendar.dayMarker.work': '班',
+  // 日历格子里倒数日那一行（W6 第二个数据源）。住 `common.*` 因为共享板两端同一份；
+  // 措辞与倒数日面板那条逐字相同 —— 同一个数在两处两种说法是漂移的开始。
+  'common.calendar.event.today': '就是今天',
+  'common.calendar.event.until': '还有 {days} 天',
+  'common.calendar.event.since': '已经 {days} 天',
 
   // 🔴 这一组住在 `common.*` 而不是 `web.*`：**两端都要用**（档位每批会加一档，
   //    所以这里刻意**不写条数** —— 写过数字的注释一定会漂）。

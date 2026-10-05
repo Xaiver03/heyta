@@ -136,9 +136,30 @@ function taskOf(id: string): Task {
   return task!;
 }
 
+/**
+ * 🔴 面板里的东西一律从 **`document`** 取，不从 `container` 取。
+ *
+ * 理由不是风格，是实测：`DueEditor` 的面板有**两副身体**（`details` 内的在流卡 /
+ * Portal 到 `body` 的 fixed 卡），换身体由 `toggle` 事件 + 一帧 `requestAnimationFrame`
+ * 置位的 `anchor` 决定。组件注释里那句"jsdom 不触发 `toggle`"**在 jsdom 27 上已被否证**
+ * （探针 `/tmp/jsdom-toggle-probe.js`：`details.open = true` 之后一个宏任务里
+ * `toggle` 计数 = 1，正向对照是同刻手动派发 = 2；`raf-leg.js`：rAF 在第 17ms 回调）。
+ * 于是用例里那句 `await engine.getOpsForEntity(...)` 一旦跨过一个宏任务边界，
+ * 格子就已经不在 `container` 里了 —— 机器空的时候等得短就绿、负载高的时候等得长就红，
+ * 症状是"月历里应有 10 月 18 日 这格：expected null not to be null"，
+ * 而**产品行为完全没变**（2026-10-04 05:21 全量 `pnpm -r test` 就是这个形状红的）。
+ * 同文件的 R14 那几条早就改成从 `document` 找了；这两条是漏改的那两条腿。
+ */
+function buttonByAriaLabel(label: string): HTMLDivElement | null {
+  for (const node of document.querySelectorAll<HTMLDivElement>('[role="button"]')) {
+    if (node.getAttribute('aria-label') === label) return node;
+  }
+  return null;
+}
+
 /** 在所有 role="button" 里按可见文案找（快捷项 / 清除 chip 的定位钩子）。 */
 function buttonByText(text: string): HTMLDivElement | null {
-  const nodes = container.querySelectorAll<HTMLDivElement>('[role="button"]');
+  const nodes = document.querySelectorAll<HTMLDivElement>('[role="button"]');
   for (const node of nodes) {
     if (node.textContent === text) return node;
   }
@@ -187,7 +208,7 @@ describe('🔴 批一判据 ①：选截止日 → 恰好一条只带 dueDate �
     const engine = requireEngine();
     const before = await engine.getOpsForEntity('TASK', taskId);
 
-    const cell = container.querySelector<HTMLDivElement>('[role="button"][aria-label="10月18日"]');
+    const cell = buttonByAriaLabel('10月18日');
     expect(cell, '月历里应有 10月18日 这格（无障碍名 = 完整日期）').not.toBeNull();
     act(() => {
       cell!.click();
@@ -381,9 +402,7 @@ await drainWrites();
 
   it('🔴 换日子**搬运时刻**：18日16:00 → 点 25 号 ⇒ 25日16:00，不是 25日零点', async () => {
     const before = await seedTimedTask();
-    const cell = container.querySelector<HTMLDivElement>(
-      '[role="button"][aria-label="10月25日"]',
-    );
+    const cell = buttonByAriaLabel('10月25日');
     expect(cell, '月历里应有 10月25日 这格').not.toBeNull();
     act(() => {
       cell!.click();
