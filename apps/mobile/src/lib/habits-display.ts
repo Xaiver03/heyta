@@ -34,16 +34,26 @@
 
 import type { I18nValue, MessageKey } from '@heyta/i18n';
 import type { HabitDayState, LocalDate } from '@heyta/domain';
+/*
+ * 🔴 值从 `@heyta/ui/node` 拿，**不从 barrel 拿**。barrel 会连带把 `HabitBoard` 拉进来，
+ *    而它 `import 'react-native'` —— 移动端单测跑在 node 里，本仓刻意不 mock RN，
+ *    于是整份 spec 以 `RolldownError: Flow is not supported` 挂在**加载期**：
+ *    没有一条用例被收集，读数长得像"这个文件没测试"。工单 H4/H5/H7 落地时踩过这里，
+ *    边界与本包 `src/node.ts` 文件头是同一条（"按要不要 RN 运行时切，不按像不像组件切"）。
+ *    类型不受影响 —— 编译期就擦掉，所以仍从 barrel 引。
+ */
 import {
   CALENDAR_VIEW_LABEL_KEYS,
   WEEKDAY_MESSAGE_KEYS,
   formatDayTitleText,
   formatMonthTitleText,
-  type CalendarViewTabsLabels,
-  type HabitBoardLabels,
-  type HabitMonthLabels,
-  type HabitYearLabels,
-  type HabitProgressListLabels,
+} from '@heyta/ui/node';
+import type {
+  CalendarViewTabsLabels,
+  HabitBoardLabels,
+  HabitMonthLabels,
+  HabitYearLabels,
+  HabitProgressListLabels,
 } from '@heyta/ui';
 
 /**

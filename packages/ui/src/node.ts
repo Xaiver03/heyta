@@ -49,6 +49,18 @@ export {
   type EventCardTextLabels,
   type EventCardTexts,
 } from './countdown/model.js';
+/*
+ * 习惯/日历那几枚**纯措辞**的表与格式化函数：`apps/mobile/src/lib/habits-display.ts` 要它们，
+ * 而移动端在 node 下跑单测时**加载不了 `react-native`**（本文件文件头那条边界）。
+ * 从 barrel 走会把 `HabitBoard` 一起拉进来 —— 那正是移动端单测在 `pnpm -r test` 里
+ * 以 `RolldownError: Flow is not supported` 挂掉的成因（工单 H4/H5/H7 落地时踩到的）。
+ */
+export { CALENDAR_VIEW_LABEL_KEYS } from './calendar/model.js';
+export {
+  WEEKDAY_MESSAGE_KEYS,
+  formatDayTitleText,
+  formatMonthTitleText,
+} from './calendar/date-text.js';
 export { categorySlotToken, type CategoryColorToken } from './categories/model.js';
 // `CategorySlot` 的真身在 `@heyta/domain`；`categories/model.ts` 只是 import 它，
 // 没有 re-export ⇒ 从这里 re-export 会报 TS2459，得直接说出处。
