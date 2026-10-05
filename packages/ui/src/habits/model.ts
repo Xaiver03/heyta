@@ -401,7 +401,7 @@ export function toHeatmapWeeks(
  * 的切列方式不一致，症状是"标签与它标注的那一列错开"—— 正是 `HabitBoard` 文件头
  * 那句承诺作废的样子。
  *
- * 🔴 一列宽（`icon.xs` = 16px）装不下「10月」这种 2–3 枚字形 ⇒ 每一枚都折成两行
+ * 🔴 一列宽（`icon.xs` = 14px 现量）装不下「10月」这种 2–3 枚字形 ⇒ 每一枚都折成两行
  * （工单 H8 照出来的缺陷）。跨列之后**整行与网格同宽**：
  * `Σ(span×格宽 + (span−1)×空隙) + (标签数−1)×空隙 == 网格总宽`，
  * 因为相邻两个标签块之间恰好隔着网格自己那一列的空隙。
@@ -425,12 +425,14 @@ export function heatMonthSpans(weeks: readonly HeatmapWeek[]): number[] {
  * 而"跨几列"由 `heatMonthSpans` 从同一份列数据数出来 —— 组件里就只剩一次乘法，
  * 没有第二套"这个月占几周"的判断。
  *
- * 🔴 下界是**两列**（`2 × 格宽 + 一枚空隙`），不是拍出来的：窗口末尾那一列通常只有
- * 零星几天 ⇒ 它的 `span == 1`，而「10月」这种三枚字形在 16px 里**必然折成两行**
+ * 🔴 下界是**两列**（`2 × cell + gap`），不是拍出来的：窗口末尾那一列通常只有
+ * 零星几天 ⇒ 它的 `span == 1`，而「10月」这种三枚字形在一列宽（`icon.xs`）里**必然折成两行**
  * （工单 H8 看图照出来的就是这件事）。取"两列"而不是"三列"的理由是可验证的：
- * 两列 = 36px，比最宽的那句月份标签（`caption` 字号下三枚字形 ≈ 26px）宽，
- * 又只比网格右边界多出 20px —— 窗格那一侧的余量比这个大。
- * **这条"比最宽标签宽"不是注释说了算，是 `e2e/tests/habit-heatmap-labels.spec.ts` 的 HL1 量的。**
+ * 两列 = `2 × icon.xs + space.1`（现量 `grep -E -- '--ht-(icon-xs|space-1):' packages/design-system/src/tokens.css`
+ * ⇒ 2×14 + 4 = **32px**），比最宽的那句月份标签（`caption` = `font-size.xs` = 12px 下三枚字形 ≈ 26px）宽，
+ * 而它探出网格右边界的最大量就是"下界减一列"= **18px** —— 窗格那一侧的余量比这个大。
+ * **这两句（"装得下"与"没探出窗格"）不是注释说了算，是 `e2e/tests/habit-heatmap-labels.spec.ts`
+ * 的 HL1 与 HL3 量的。**
  */
 export function heatMonthLabelWidths(
   weeks: readonly HeatmapWeek[],

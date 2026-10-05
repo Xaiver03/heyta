@@ -424,7 +424,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
     /**
      * 月份标签那一格**不在这里写宽度**：宽度 = 它标注的那几周（下界两列），
      * 由 `heatMonthLabelWidths` 按调用方传进来的 `cell`/`gap` 算出来。
-     * 原先这里是 `width: icon.xs`(16px)，而标签是「7月」「10月」这种 2–3 枚字形
+     * 原先这里是 `width: tokens['icon.xs']`（现量 14px），而标签是「7月」「10月」这种 2–3 枚字形
      * ⇒ **每一枚都折成两行**（工单 H8，看图照出来的）。
      */
     heatMonthCell: {
