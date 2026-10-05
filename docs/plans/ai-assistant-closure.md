@@ -720,3 +720,46 @@ for i in $(seq 1 12); do printf "%s cpu=%s etime=%s netfd=%s\n" "$(date '+%H:%M:
 **改法（不是"少用 /tmp"）**：取证命令**直接把读数打到 stdout**；确实需要落盘时，文件名带上本趟 pid
 与前缀（`/tmp/heyta-<线>-<pid>.txt`），并在读回后**先确认字符串集合是本项目产生的**再引用它。
 
+
+## 9. 2026-10-05 合并批收尾：抓出来但**没做完**的两张（W15 / W13 的设备半）
+
+> 载体：隔离检出 `heyta-wt-merge`，分支 `merge/20261005`。本节只登记**现量**与**归属**，
+> 不代任何一张主张完成。
+
+### W15 🔴 `ASSISTANT_TURN` 只有 `node-host` 在写，两枚 UI 壳都没接
+
+`check:reachability` 判据 C 在本批尖端当场报红：
+
+> `ASSISTANT_TURN 有写路径，但 ACTION_FAMILIES 里没有它的宿主 action 家族 —— **无法判定**。`
+
+这条红是 `10b53a81`（D-4 (ii) 跨设备会话实体）**自己带出来的**，也是这张门禁设计的用途：
+新实体不许悄悄跳过 C。处置分两步，第二步没做：
+
+1. ✅ 把家族登记进 `ACTION_FAMILIES`。合法性按 `REMINDER` / `NOTE` 那两行已有的纪律核过：
+   `createAssistantSessionActions` 真存在（`packages/app-host/src/assistant-session-actions.ts:155`，
+   `index.ts:820` 导出），宿主有真实生产调用点（`apps/node-host/src/host.ts:273`）。
+   **牙齿现量**：把那枚唯一调用点改名 ⇒ C 报"apps 下各宿主的 src/ 里**零调用点**"、`REACH_RC=1`；
+   还原后 `cmp -s` 逐字节相同、门禁回到 RC=0（读数 `tmp/reach-mut.log`）。
+2. 🔴 **没做**：`apps/web` 的助手对话仍然只落本机 `localStorage`
+   （`apps/web/src/features/ai/assistant-history.ts`，D-4 (i) 那条路径**没有被替换**），
+   `apps/mobile` 完全不写会话实体。⇒ 引擎与协议层已经能跨设备同步一段对话，
+   但**用户在 Web 或手机上得不到这件事**。判据 C 只回答"≥1 枚宿主接了"，
+   它结构上看不见"另外两枚没接"，所以这一半只能靠本节的台账活着。
+   开工时的形状：写入走 `createAssistantSessionActions`（业务语义留在 app-host，AGENTS §3.5），
+   读侧改吃 op-log 的物化投影，**并且**把 `localStorage` 那条**删掉**而不是并存 ——
+   两份历史 = 两个事实源，那是本仓库反复踩过的那类"抽出了新的、没删旧的"。
+
+### W13 的设备半：入口与接线有了，**验收载体还没有**
+
+`a9f0867a` 落了移动端助手入口 + 五项接线，`check:ai-coverage` 对 mobile 从 `0/5` 转正。
+但那条工单原本要求的判据是"**至少一条真模拟器 E2E，零 mock**"（§3 那张表里 W13 那一格）。
+现量核对（2026-10-05 22:5x，条数不写死在这里 —— 取现量用
+`node -e "const p=require('./package.json');console.log(Object.keys(p.scripts).filter(x=>/^verify:mobile/.test(x)).length, Object.keys(p.scripts).filter(x=>/^verify:mobile/.test(x)&&/ai|assistant/i.test(x)).length)"`）：
+`verify:mobile-*` 若干条里**覆盖助手的恰好 0 条**，`ls scripts | grep -i mobile-ai` 命中 0 ⇒
+移动端 AI 的"设备级验收"不是**在排队等模拟器**，而是**判据载体尚未存在**。
+这一步要连载体带读数一起做，载体形状照 `verify:mobile-edit` 那批：
+真模拟器 + 真服务端 + 真另一台设备回读，并且要能失败（摘掉一项接线 ⇒ 恰好对应那格转红）。
+
+⚠️ 本批 22:5x 现量（写这条时的设备面）：iOS **0 台 booted**（`simctl list devices booted` 两段标题下均空），
+Android `emulator-5554` 在线但归属未知，`idb_companion` 3 枚在跑，1 分钟负载 55.71 ⇒
+即便载体写好了，这一轮也拿不到有效读数；**不降级判据、不把"环境被占"当已交付**。

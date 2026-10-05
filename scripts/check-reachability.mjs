@@ -302,6 +302,27 @@ const ACTION_FAMILIES = [
    */
   { entity: 'NOTE', family: 'createNoteActions' },
   { entity: 'EVENT', family: 'createEventActions' },
+  /**
+   * D-4 (ii) 跨设备会话实体（`app-host/src/assistant-session-actions.ts`，2026-10-05）。
+   *
+   * 🔴 这一行是**本门禁当场抓出来的**，不是补登记补出来的：`10b53a81` 落了新实体与写路径后，
+   * 判据 C 报「ASSISTANT_TURN 有写路径，但 ACTION_FAMILIES 里没有它的宿主 action 家族 ——
+   * 无法判定」。这正是本文件设计的用途：**新实体不许悄悄跳过 C**。
+   *
+   * 合法性按 `REMINDER` / `NOTE` 那两行的同一条纪律核过：
+   * `createAssistantSessionActions` 在 `assistant-session-actions.ts:155` **真的存在**、
+   * `index.ts:820` 导出、且宿主里有真实生产调用点
+   * （`apps/node-host/src/host.ts:273`；测试与 `e2e/` 一律不算）。
+   *
+   * ⚠️ **但这一行只回答"有没有宿主接了"，不回答"用户碰得到吗"** —— 现量：
+   * 只有 `apps/node-host` 写这个实体。`apps/web` 的助手对话仍只落本机 `localStorage`
+   * （`assistant-history.ts`，D-4 (i)），`apps/mobile` 完全不写会话实体。
+   * ⇒ "手机上的一段对话出现在电脑上"这件事，在**两个 UI 壳上都还没成立**。
+   * 本门禁拦不住这种"宿主只有一枚"的缺口（它的判据本来就是 ≥1），所以这条缺口
+   * 记在 `docs/adr/0045-*.md` 的落地情况与 `docs/plans/ai-assistant-closure.md` 的未闭合清单里，
+   * **别把这行读成 D-4 (ii) 对用户可用了**。
+   */
+  { entity: 'ASSISTANT_TURN', family: 'createAssistantSessionActions' },
 ];
 
 /** 写 op 的锚点：`entityType: 'X'` 后允许 `as EntityType` 之类的类型断言。 */
