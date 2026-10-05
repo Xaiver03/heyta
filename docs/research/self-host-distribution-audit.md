@@ -10891,3 +10891,73 @@ K1 实量 `0|0|1`、K2 实量 `0|1`（两条都退回 no-target），副本自�
 "这一档里有没有我其实没判的东西"**，并且**新增一档形态之前先扫真实数据**。
 G-65 的关闭判据被自己那档 `no-target` 喂了一次假绿 —— 而它看起来完全不像假绿，
 因为它把名字打印出来了。
+
+### 8.184 落笔前门禁从 9 道加到 17 道；"纯"是**造一棵载体形状但没有 store 没有 dist 的树**量出来的（2026-10-05 11:1x）
+
+§8.181 那条边界（靠 `packages/*/dist` 的门禁不要加进落笔前那段）此前是**读出来的**。
+这一轮把它改成**跑出来的**，并且顺手把八枚成对一致性门禁挂了进去。量法是关键，
+因为它推翻了"在 `/tmp/heyta-merge-carrier` 里绿过"这种看起来最像证据的东西：
+
+```
+git worktree add --detach /tmp/heyta-puregate2 89850262   # 两侧都合好了 + 没有 node_modules + 没有任何 dist
+（跑完 git worktree remove --force；不碰共用那棵热载体）
+```
+
+为什么不能拿热载体当纯度凭据：那棵树**有人为别的会话装过 store、还留着 10-04 21:01 的旧 dist**。
+这正是 `selfhost-merge-carrier.mjs` 文件头为第 2 腿记过的那条（§8.161："在这棵树上绿过
+≠ 不依赖这棵树的环境"）—— 这次是第二次命中，而且**更坏的一面现形了**（见下面 B 组两枚红）。
+
+#### A 组：入选的八枚（两棵树都有这些文件，配对成立）
+
+| 门禁 | 纯树（无 store / 无 dist） | 热载体 |
+|---|---|---|
+| `check:ui-language`（词条 zh↔en） | rc=0（词条表 zh-CN 3103 / en 3103） | rc=0 |
+| `check:legal-tools`（工具目录↔法务中英表，逐行同序） | rc=0（26 条） | rc=0 |
+| `check:legal-permissions`（权限承诺↔manifest） | rc=0（Android 3 条） | rc=0 |
+| `check:legal-host`（对外域名三方） | rc=0 | rc=0 |
+| `check:pricing` | rc=0 | rc=0 |
+| `check:ai-quota` | rc=0 | rc=0 |
+| `check:claims` | rc=0 | rc=0 |
+| `check:docs-voice` | rc=0（site.* 1018 条 / 豁免自托管 120） | rc=0 |
+
+🔴 两枚 `check:legal-tools` / `check:legal-permissions` **本分支没有那两枚文件**（`git cat-file -e` 现量：
+main=yes / br=NO）—— 载体与配对树（干净 main 那一棵）都有 ⇒ 配对没问题，但**第一次在纯树里跑它们时
+它们报的是 `Cannot find module`**，那不是我判的"红"，是**我这棵树里根本没有这道门禁**。
+先按"文件不在"归零再看 rc，否则会把一次探针寿命问题读成一次门禁缺陷。
+
+为什么这八枚值得挂进落笔前：它们判的全是**成对一致性**（真源 ↔ 生成物 / 中 ↔ 英 / 声称 ↔ 实现），
+而十一族并集只按**冲突路径逐行**保序 —— "一侧改真源、另一侧改生成物"这种破法 union 看不见，
+只有这些裁判看得见。本批恰好动了 `packages/i18n` 两张词条表与法务文案。
+
+#### B 组：反面教材（同一棵纯树上全红，热载体上六绿二红）
+
+`check:legal-gdpr` / `check:legal-closure-truth` / `check:public-facts` / `check:card-export` /
+`check:doc-citations` / `check:shell-surfaces` / `check:verify-script-copy` / `check:brand-assets`
+—— 纯树上 rc 分别 1/1/1/1/1/1/**2**/1（`verify-script-copy` 那枚 rc=2 且直接点名
+`词条产物目录不存在：packages/i18n/dist`，是这一族里唯一"响亮拒绝"的形态）。
+热载体上**六绿**。剩两枚两边都红，而它们的成因值得单独留：
+
+| 门禁 | 红因（现量） | 是不是落地阻塞 |
+|---|---|---|
+| `check:shell-surfaces` | 它自己的第 27 条式判据命中：`[web] countdown · W5 产物比源码旧（dist 2026-10-04T13:01:19 < src 2026-10-04T20:19:43）`，另有两栏"包里的 web-dist 与本工作树 sha256 不同 ⇒ 那是别的检出／别的会话打的包，不计为通过" | 不是 —— 链第一步就是 `pnpm build` |
+| `check:brand-assets` | `TypeError: brandMarkSvg is not a function`（`gen-app-icons.mjs:331`）。那枚导出在 `packages/design-system/src/brand-mark.ts:141`，而旧 `dist/index.js` 里出现 **0** 次（mtime 10-04 21:01）| 同上 |
+
+🔴 **这就是比"恒红"更坏的那一面**：dist 依赖型门禁在一棵**有旧 dist** 的树上不是安静地红，
+而是**红得像个真缺陷** —— 症状写着"品牌产物接线对账失败"，谁读了都会去找那个不存在的缺陷。
+§8.181 那条边界原来的理由（"在正常树上恒红"）比实测轻了一档。
+
+#### 归属预读数（给 #26 省一次现场推理，不代替落地那一刻的复跑）
+
+`check:shell-surfaces` 与 `check:brand-assets` 那两枚红**不在落地阻塞集里**，两条独立理由：
+① 成因都是"这棵树没跑 build"，而 `pnpm check` 的第一项就是 `pnpm build`；
+② 这四枚文件（两枚门禁 + 两枚生成器）本分支**一个都没有**（`git cat-file -e HEAD:…` 全部 NO）⇒
+它们进载体只可能来自 main 那一侧。⚠️ 但 ② **不是**"与本批无关"的证明 —— `shell-surfaces` 判的正是
+`apps/web` 那一面，而本批改过 `apps/web`。所以落地那一刻仍要按原办法逐条配对复跑，
+这一节只保证**没人会把它当成新出现的谜**。
+
+#### 落笔
+
+`selfhost-merge-carrier.mjs`：`GATES` 9 → 17 道（条数由它自己 `GATES.length` 打进读数，文档不抄）。
+文件头那段"落笔前的门禁"清单**先前已经漏记了两批**（`链里每条脚本目标都在树里` 那条也没在清单里），
+本次一并补齐 —— 这正是 §8.177/§8.180 那族"行与正文两个方向都会漂"的第三次命中，
+只不过这次漂的是**注释 vs 数组**。`node --check` 通过；八枚在热载体与纯树两侧都 exit 0。
