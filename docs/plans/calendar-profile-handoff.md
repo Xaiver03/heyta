@@ -1587,7 +1587,55 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
 
 
 
+- (36) **10-05 10:2x：#11 收口 —— 五枚过期取证目录重拍完、逐张人看过、锚点重钉，全树对账第一次 `dirs_with_mismatch=0`。**
+
+  ① **收口读数**（`bash research/tools/r17-evidence-md5-check.sh --all`，10:22 现量，**rc=0**）：
+  `dirs_scanned=14 entries_parsed=8 pins_parsed=27 dirs_with_mismatch=0 dirs_without_readme=20 noreadme_baseline=20 dirs_unpinned=3 unpinned_baseline=3 dirs_with_broken_pin=0`。
+  ⚠️ 取 rc 的写法：`OUT=$(…); rc=$?` 或先重定向到文件 —— 这台机的默认 shell 是 zsh，
+  `${PIPESTATUS[0]}` 在那里是**空值**（traps #184），我这一轮第一次就把它读成了 `RC=?`。
+  两档棘轮**都在基线上、没有超额**（20/20、3/3），所以这句"归零"只针对 md5/pin 那一档，
+  别读成"所有证据目录都有 README 了"。
+
+  ② **五枚目录各做了什么**（拍法：`bash research/tools/r17-reshoot-stale.sh`，产物 09:52）：
+  `calendar-cells` 5 枚、`calendar-week` 3 枚、`calendar-day` 5 枚、`calendar-capture` 1 枚、
+  `profile-panel` 1 枚（暗色那张）+ 三张 md5 行改值 ⇒ 共 **13 张新字节 + 5 份 README**，
+  每一枚都**先逐张打开看图、再改字**（顺序是判据，不是仪式：直接改字就是把"我看过的字节"和"当前形状"混成一件事）。
+  锚点统一重钉 `73ad62a3`，理由逐目录写在各 README 里，共同的一条是：
+  那几组路径里最后一次动它们的是 `1e5dd492`（10-05 00:06，`tokens.css`），
+  而拍图是 09:52 ⇒ "拍图晚于决定形状的代码"成立，且 `1e5dd492` 是 `73ad62a3` 的祖先（`merge-base --is-ancestor` 现量 YES）
+  ⇒ **钉批次号与钉"最后一次动它的那笔"在这一刻判据完全等价**，下一笔动那些路径时两者同时转红。
+
+  ③ **只有看图才拿得到的五条读数**（断言层一条都给不出）：
+  a) `calendar-cells` 暗色那张里 chip **不再是白底** ⇒ README 原来那句暗色主张**已过期**，就地改成新形状；
+  b) `calendar-day` 的页头**确实折成多行**（三行：「日历」/「‹ 日期 › 回到今天 + 视图」/「未同步 …语言…主题」）
+     ⇒ 把"页头换行没取证"那一格从敞口变成读数；
+  c) `day-en-no-timed.png` 与 `day-en-full.png` 现在**逐字节相同**（`bac2e33145…`）
+     ⇒ 那是一枚**冗余取证**（`calendar-day-en.spec.ts:290` 那次重复截图），登记给下一批删；
+  d) `calendar-capture` 那张的缺口**复跑仍在**：`grep -c 'page.screenshot'` = 1 而 `test(` 有 2 条
+     ⇒ "输入里写『后天』时以输入为准"那条**依旧只有 DOM 断言、没有图**；
+  e) `profile-panel` 抓到一条**跨面不一致**（新账，见 §4.1 新增那条）：上传成功后设置卡里是那张图、
+     rail 顶部那颗圈仍是字母，而 `AccountMenu.tsx` 全文不消费头像 URL。
+
+  ④  **两条装置缺陷是这一格的真正产出**（都已提交，不是"顺手"）：
+  证据门 `--dir` 分支**裸跑打印全树口吻的 ✅ 而只扫 1/14 份 README**（作用域谎报）
+  ⇒ 新增单一取数尺 `dfield()` + `作用域=点名：扫 N 份／共 M 份 ⇒ 未扫 K 份`，牙是臂 11 的三腿（1/3/2 → 加一枚 → 4/3 → 全点名 → 未扫 0），`--selftest` 现 **11 臂 rc=0**（`3546ad39`）；
+  重拍装置对"**就地写图**"那一类**跑完一行都不印** ⇒ 日志把重拍读成无事可做
+  ⇒ 新增 `snap_tree`/`settle_dir` 三态（0=至少一张确认动了 / 1=跑绿但零信号 / 2=spec 自己红），
+  `--selftest` **7 臂 rc=0** 且臂 f 用 `MUT_LAND` 证明臂 d 会红（`73ad62a3`）。
+  ⚠️ **这一轮我自己造过一枚假绿臂**：臂 e 原来 `grep 'sibling'`，命中了 spec 的**文件名** `fake-sibling.spec.ts`
+  ⇒ 警告行没打印也过。改成断言**那一行本身**（`grep -F '取证目录：'`）+ 兄弟图字节确实变了。
+  形状值得入 traps：**在输出里 grep 一个"我以为只出现在正文"的词，先确认它不出现在被 grep 的那批文件名里。**
+
+  ⑤ **仍未闭合（逐条带归属与可复跑命令）**：
+  B —— 还是 §5 那行：远端打包机 `node_modules` 落后，`ssh windows-pc "cd /d C:\src\heyta && pnpm install --frozen-lockfile"`，
+  **等远端空闲**（六秒 CPU 差分命令在那行里），看守 `RUN=1 bash research/tools/b-window-keeper.sh` 未重挂；
+  证据门**没有自动消费者** —— 它现在 rc=0，所以可以接进 `pnpm check` 了（下一批第一件，前置条件已满足）；
+  锚点覆盖面不齐 —— `calendar-year` / `calendar-view-options` / `calendar-day` 的 R16 那三枚仍钉 `39032107`
+  且路径集里**没有 `packages/design-system/src/tokens.css`** ⇒ 主题 token 换值不会让它们红（`calendar-day-time` 这一轮已补宽）。
+  现量：`grep -c tokens.css apps/web/evidence/*/README.md`。本轮不补，因为补就要重拍重看那三批图，那是下一批的活。
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
+
 
 **G0. 调休标记（休/班）只画在月档，年档那 12 张月格里一颗都没有，而文档里没有"刻意不做"的登记。**
 看图看出来的（22:0x，`calendar-view-options/view-select-closed.png` 月档里 10-01…10-07 与 10-09 带绿色「休」、
@@ -1600,6 +1648,21 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
 `sed -n '425,434p' packages/ui/src/calendar/CalendarBoard.tsx`。
 ⚠️ **本条不判它是缺陷还是刻意**：`docs/plans/countdown-anniversary.md` 里 `grep -n '年档\|年视图' | grep -E '休|班|dayMarker'`
 现量 **0 命中** ⇒ 既没登记"不做"，也就不能主张"故意留白"。归属＝倒数纪念日那条线（W4b 的落点），本线只登记。
+
+**G1. 上传头像成功后，rail 顶部那颗账号圈仍是字母 —— 同一份账号数据在两个面上呈现不一致。**
+看图看出来的（10-05 10:2x，`apps/web/evidence/profile-panel/r15b-2-ready.png`：设置卡里那个圈已经是
+**上传后的那张图**、提示「头像已更新」，而**同一帧**里 rail 顶部那颗圈是字母 `D`）。
+🔴 **判"rail 不跟着换"读了被调方本体**，不是看图猜：`apps/web/src/features/shell/AccountMenu.tsx:150`
+只有 `const initial = avatarInitialFromEmail(email)`，整个文件不消费头像 URL
+（现量 `grep -n avatar apps/web/src/features/shell/AccountMenu.tsx` ⇒ 只有 `initial` / `avatarRef` / `className`）。
+⚠️ **这不是"违反了裁决"**：同文件头 §"另外两个刻意的决定"第 1 条（2026-09-30）写的是
+"头像里是邮箱首字母，不是随机色块或通用图标"，它防的是"刚登录是首字母、刷新后变通用图标"那一类自相矛盾，
+**没有回答**"用户传了图之后 rail 该不该跟着换" —— R15b（10-03）落地后这条裁决的**适用边界变窄了**，
+而文件头没跟着改。⇒ 要拍的是产品问题（rail 用图就得处理"本机无口令 ⇒ 解不开"那一档画什么：
+空白圈？退回字母？转圈？），**不是**一行 CSS。
+**归属**：界面批（`AccountMenu.tsx` 归它所有，本线不代改）。
+**现量命令**：`grep -n 'avatarInitialFromEmail\|<img' apps/web/src/features/shell/AccountMenu.tsx`（只有前者）·
+`grep -n 'profile-avatar-img' apps/web/src/features/settings/ProfilePanel.tsx`（只有设置卡里有图）。
 
 **G. `docs/plans/README.md` 第 17 行是一张错位行。** 「一、权威入口」那张表表头是 3 列
 （我想知道 / 看这一份 / 说明），而 `| [countdown-anniversary.md](countdown-anniversary.md) | …`

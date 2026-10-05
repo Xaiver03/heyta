@@ -58,11 +58,41 @@
   但**看图才会注意到**，而它正是上面"侧栏迷你月历与它同源"那条主张的边界：
   迷你月历跟 cursor 走，选中日不跟。别把这张图当成"整屏同步移动"的证据。
 
-UIPIN calendar-week-bars.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
-UIPIN calendar-week-nav.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
-UIPIN calendar-week-tall.png 401bbcd6 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-week-bars.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-week-nav.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
+UIPIN calendar-week-tall.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css packages/design-system/src/tokens.css
 
 pin 取拍图（mtime 03:47）之前最后一次动过那组路径的提交 `401bbcd6`（10-03 03:13）。
 🔴 补完锚点后 `--all` 报这三枚 UISTALE —— 与 `../calendar-cells/` 同一个原因
 （`39032107` 10-04 10:11 动了 `main-area.css`，页头形状已变，而这三张图里的页头是旧的）。
 重拍与登记同 §4.1，窗口前置同 §5 的 H。
+
+## 2026-10-05 09:52 重拍 + 10:0x 逐张看过（三张都看了），锚点换到 `73ad62a3`
+
+重拍命令与前置门读数在 `../calendar-cells/README.md` 那一节（同一趟）。
+
+**三张都还在证明原来那件事**：
+- `calendar-week-tall.png`（批三最重要的一张）：1280×1200 下**那一行仍停在内容高度**，
+  多出来的高度整个归下方清单区 —— 那根 772px 纯蓝立柱没有回来。
+- `calendar-week-bars.png`：格子里画满 **6 条** + `+2`，下方清单计数 **8** —— 三个数字对得上
+  （6 来自 `packages/ui/src/calendar/model.ts:72` 的 `MAX_WEEK_CALENDAR_BARS`，
+  spec 的断言也从它推导，不抄字面量）。
+- `calendar-week-nav.png`：点 `›` 之后整周跳到**下一个周一**（10月12日–18日），
+  侧栏迷你月历与主区同源；下方那一格**不跟**（仍锚在选中日）。
+
+🔴 **两条"位置/日期"级别的主张随拍摄日漂走了**（形状没变，图里的字变了）：
+上面 14:1x 那节写的是「**周六**那一格里画了 7 条」「页头标题是 9月28日–10月4日」
+「下方那一格仍写 **10月3日 星期六**」—— 重拍后分别是「**周一**（10月5日）那一格」
+「2026年10月5日–10月11日」「10月5日 星期一 · 0」。
+原因不是代码：spec 把任务播在**今天**，所以"哪一格带条形""区间是哪一周"跟着日历走。
+⇒ **这几张图能引用的主张只能是形状**（几格、几行、折叠、剩余空间归谁），
+   不能引用图里的日期与星期 —— 那一层每次重拍都会动。
+
+⚠️ **一条我自己看错的东西（记下来挡下一次）**：第一眼看 `calendar-week-bars.png`
+数出"7 条 bar"，差点登记成"折叠数与清单数差一"的缺陷。实际是**把当天那格的「休」标记行**
+数成了第 7 条条形；条形真实数量是常量推导的 6，而 spec 断言的就是它。
+⇒ 像素行数不是计数判据；要计数就去看 DOM 或看那条断言（§7 那一族：先怀疑探针）。
+
+🟡 新出现、上面那张表没写的：日期下方的**绿色「休」/橙色「班」**调休标记（这三张里都有）。
+它属于并行那条线（W4b），本线只登记"图里现在有它"，主张与判据不归这里写。
+
