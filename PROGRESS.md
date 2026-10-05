@@ -1662,3 +1662,41 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 - D-3 交付差额（首屏帧/图标进线上）+ 补记 #3 那格回填（2026-10-05 03:3x–04:1x，载体 `ad61621a`）：上一行"生产**不必为这两个提交重发**"的判据（产品面只差一枚 pbxproj）被 `66ce1545` 推翻——那一次动的正是 `apps/web/src/boot-splash.ts`，它进 entry chunk。⇒ 按手册顺序重发（站点先 → 应用后，五步 rc 全 0 含 `check:web-artifact:app`），发完的等式有哈希：载体 `/app/` 产物 `index.html` sha256 `5abcb0e889ed40b0…` **==** 线上逐字相同，entry 由 `index-BEJaUzcy.js` 换成 `index-DtOAMgSr.js` 且把线上那份拉下来对着看到了兜底代码；线上套件复验 **live-site 23 passed rc=0**。**顺带修掉一条无界移除路径**（`66ce1545`）：首屏遮罩的退场押在"`animationend` 会来"上，而页面以 `visibilityState==='hidden'` 起跑时 WebKit 不推进 CSS 动画（`playState:running / currentTime:0`，5 拍 8 秒一个字段没动）⇒ 遮罩永久盖着应用。查出来的方式是门禁红不是投诉（`check:macos-window` 比值 0.046 → **0.011** 而 M2 探针三条全 ✅）；修法两半（不可见直接摘 / 可见则等 `animationend` + 由计算样式推导的 `+120ms` 有界兜底），判据 6 条 + 两臂变异 + 真 WKWebView 复跑读到 `null` + 门禁回到 **0.046 rc=0** 且那张图人眼看过。🔴 这条同时否证了此前**全部** mac 像素证据的载体：那些图量的都是品牌帧，而"主蓝命中 2169 ⇒ 是共享 UI"就是拿品牌帧的蓝底板过的（§7 #82 的形状）。补记 #3 明写"留给下一位"的 `pod install` 重试格已填（`ad61621a`，两趟两本账、两趟都失败仍判红、三臂台架 OK/FAIL/FAIL）。🟡 **还剩两格"没量到"**：② 的逐段读数与 ③ 的四端重装此刻由队列 pid **70122** 在阶段 2 跑（现装的四端仍是 `9c3557c1` 的产物），落账前"四端装的是含 `66ce1545` 的树"不成立。明细 `BLOCKED.md` B79 补记 #4。
 
 - D-3 ②③ 两格"没量到"翻成读数（2026-10-05 04:0x–04:5x，链载体 `ad61621a` / 重装载体 `f8ecbd8f`）：**② 干净检出链 `rc=0`，分母现量 84 段 = 82 绿 / 1 红 / 1 按规则不跑 / 0 环境挡**——唯一红是第 42 段 `check:docs`（三条"已提交文档引用了未提交章节"），而**其中一条是本线自己造的**：`docs-link-check` 的引用正则吃的是"同行 `.md` + `§` + 数字"这个**文本形状**，我用来记录别人坏了的那句话本身就被解析成第三条引用 ⇒ `808d584a` 只改自己那一行（编号写成"编号 10.87"），干净检体现量 **3 → 2**，剩下两条归回收站/归档那条线。第 69 段 `check:ai-e2e` 按规则不在链里跑（preflight 会 SIGKILL 别人 vite，§7 #87）⇒ 队列阶段 4 单独补跑 **`AI_E2E rc=0`**。**③ 四端 `REINSTALL rc=0` + `LANDING-CURRENT`（post_drift=0）**：mac `PAX_MAC=MATCH`（已装 `index-C9iddvlQ.js` sha == 载体 `5c83a10f4c0f…`）、android `MATCH`（66,915,556 B == 构建、`lastUpdateTime 04:23:50`）、windows `FACTS-OK facts=5` + `WIN-FRESH`、ios 先报 `MISMATCH` ⇒ **查出来是探针在读错设备**：本机四台同时 Booted，探针 `head -1` 挑到别人的 `heyta-batch2-closeout`（10-04 17:04 那枚），而真目标 `heyta-iphone-17pro` 的 `main.jsbundle` sha `7655111d0df1…` **逐字等于构建产物**（mtime 04:26:59）；🔴 **这个盲选生产脚本 `reinstall-all.sh:365` 早就改掉了**（B76 那批的注释就写着"下一个动作是 simctl uninstall"），我在只读探针里把它重写了一遍 ⇒ 选择式照抄生产 + 同一个 `IOS_DEVICE_NAME` 旋钮，三臂台架 `MATCH`/`MISMATCH`/`NOT-READABLE` 全中。五枚图逐张人眼看过（mac 两枚 / ios 04:27 / android 4:24 / windows 真应用 + 菜单），**mac 的"窗口"那枚是近空的**（后台壳不合成 WKWebView）⇒ 内容判据数 `.webview.png`，窗口那枚只当尺寸核对。✅ **整链随后在 `808d584a` 补跑过**（04:36–04:59，同一枚干净载体，`chain-ai-closeout-0436`）：`pass=82 / fail=1 / skip=1 / total=84 / env-blocked=0`，与 `ad61621a` 逐项同数，唯一红仍是别线那两条"引用未提交章节"⇒ **② 的正式读数绑 `808d584a`**。（先写"没重跑"再补跑，是因为那 16 笔全是文档；补跑把"按路径集合推断等价"换成了直接读数。）明细 `BLOCKED.md` B79 补记 #5。
+
+- **大规模合并（产品经理视角的一次收口）2026-10-05 09:2x–11:4x，载体 `heyta-wt-merge` @ 分支 `merge/20261005`**：
+  把主检出 9 组未提交改动按逻辑分组提交（`f9152fbf`…`fd8cd780`，其中两笔是**代提交**——作者是在飞的别的会话，
+  提交信息里逐条写明"代提交"与不签发的部分），再把四条线并成一棵：`origin/main` → 自托管分发（载体 + 尖端两笔）
+  → **详情面 184 笔 / 19 处冲突** → 本地 main 尖端 → 三次追平。冲突面**没有一处按左右文字接龙解**：
+  追加型台账（`detail-pane-alignment.md` / `self-host-distribution-audit.md` / `environment-traps.md`）一律按**节次与号段**重排，
+  代码面按"两侧的能力都不许掉"重派（`App.tsx` 那一栏现在是 `focus → notes → AI 面` 的按视图分派，
+  main 的 AI 兜底与分支的两面同时保住，`ref={detailRef}` 是 `detailHasRoom` 的承重所以留着）。
+  🔴 **traps 撞号撞了两轮**：第一次把分支的 #215/#216 续到 #273/#274，追平 main 时主线把这两个号连同 #275/#276 又各自占了
+  ⇒ 按"先落 main 的号不动、后到的续号"再续到 **#279–#282**，别名链长在条目自己那一行（下一个人只读条目），
+  并 sweep 全仓 4 处活引用 + `AGENTS.md` §7 索引行 `177–276 → 177–282`；顺手把 `trash-and-archive.md:9971` 那行
+  "待入 traps #273" **就地标注它已被占**（照抄会撞第三次）。
+  **合并照出来的真缺陷（不是冲突）**：① 习惯 `checkIn` 的下界两侧不一致（一条线当 `<=0` 无效、外部 MCP 契约承诺的是"不小于 0"）
+  ⇒ 按对外契约裁决并改写两侧判据（`3f22029a`）；② `server/README.md` 把一次性披露挤到第 134 行 ⇒ 重排回 102（`4fa88938`）；
+  ③ 三处"各自都对、并起来才红"的门禁：`verify-mobile-card-export.sh` 在 source lib 之后写裸 `trap` 把快照自删摘掉、
+  回收站两端各一枚 `busyId` 没登记、`countdown` 这个第 12 个 ViewKey 从没对"选中"交代过立场（`ba57b1eb`）；
+  ④ 追平之后 `pnpm -r typecheck` 第一次红在一处类型收窄（并顺手把同段那条 `if (!second.ok) return;` **静默跳过**改成抛，
+  它失败时后面四条断言一条都不跑而用例照样绿，`aa33064d`）。
+  **读数（全部在合流态同一棵树上现量）**：`pnpm -r build` RC=0、`pnpm -r typecheck` RC=0、
+  `pnpm -r test` **RC=0 / 20 个包 / 11607 passed**（上一趟那条 `calendar-sidebar` 的 5s 超时单独复跑 **13 passed** ⇒ 记为并行负载超时不是产品失败）；
+  静态门禁分母**从 `package.json` 的 `check` 链现量**（90 段里 85 枚 `check:*`，排除 5 段会抢共享载体的：
+  `check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e` / `check:macos-window` / `check:apk-freshness`）
+  ⇒ **80 段跑完，79 绿 / 1 红**，唯一红是 `check:shell-surfaces` 的两栏**未取证**（`desktop-macos / countdown · 产物`、
+  `desktop-windows / countdown · 产物`）——它要的是装机证据不是代码修法，按它自己那份"不许修绿"清单留着，
+  归落地后的 `pnpm reinstall:desktop`；`check:vault-diagnostics` 那一红查出来是**载体缺件**
+  （`e2e/` 是独立 workspace，这棵 worktree 从没装过它 ⇒ 探针读不到报告），`cd e2e && pnpm install` 后两腿 PASS。
+  详情面那一族按它自己 §3e 留的处置补完：合流时 `--ours` 取的 10 枚证据 PNG **重跑三个 spec 重出并逐张看过**
+  （`8 passed / 11.8s`，`0a1475a2` 的提交信息里逐枚写读数）。
+  🔴 **已推送**：`git push https://github.com/Xaiver03/heyta.git merge/20261005:main` ⇒ `d1ab7f26..8ace31e9`（**fast-forward，无 force**；
+  这台机器上 SSH 那条通道不可达，走的是既有的 HTTPS，未改任何 remote 配置）。
+  ⚠️ **还剩两格没闭合，别读成已完成**：① **本地 main 落地**——主检出此刻有 21 枚未提交文件，其中
+  `AGENTS.md` / `docs/README.md` / `package.json` / `trash-and-archive.md` / `android-build-on-windows.md` 与本批**同文件重叠**，
+  `git merge` 在脏树上会拒绝，归各所有者提交后执行（main 在两个小时内自己推进了 6 笔，这是个移动靶）；
+  ② 上面那两栏**未取证**，要在落地后的那棵树上跑四端重装才量得到。
+  另记一条**看图照出来、但不属于本批口径**的产品观察：四象限与时间线那两张图里右栏是空的，
+  这是 main 侧既有设计（`App.tsx:1605` 的 `aiPanels` 自己写着 `{contentView === 'tasks' && …}`），
+  而产品负责人 2026-10-04 那句"无状态的时候默认显示 AI Chatbot"要不要从任务视图扩到全视图，归详情面那一单判——
+  我没有在合并笔里顺手改产品语义。
