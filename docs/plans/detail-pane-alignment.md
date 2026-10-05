@@ -10448,7 +10448,7 @@ pane 级"不许有行尾的两层外壳"在 e2e 层**只有 T10 一个消费者*
 ⑥ 本单只完成"截止"这一格 ⇒ #53 仍是**进行中**：行尾余下的编辑器所有者以 §8.141 第 5 节那张现量表为准
 （§8.146 第三次重测了那一列行号）。
 
-## 8.147 「清单 + 标签」搬进栏里那一格（第六个字段；2026-10-05 20:5x–21:4x，状态：**本单已完成**，#53 那一行只剩 AI 那一格）
+## 8.147 「清单 + 标签」搬进栏里那一格（第六个字段；2026-10-05 20:5x – 10-06 00:2x，状态：**本单已完成**，#53 随之收口）
 
 同一套纪律的**第六次**落地（备注 §8.138 → 重复 §8.141 → 子任务 §8.144 → 提醒 §8.145 → 截止 §8.146 → 清单+标签）。
 形状那一层第六次照抄成立（一份实现、两个落点、宿主读同一枚布尔），所以本节只写这一格**独有**的东西与
@@ -10605,7 +10605,7 @@ pane 级"不许有行尾的两层外壳"在 e2e 层只有 T10 一个消费者（
 |---|---|
 | ① 归属门 | 起跑前 `git status` 里本单七枚路径逐个干净；收口后工作树只剩 `scripts/mutate-closeout-gates.sh`（恒脏、永不提交）与两枚 `node_modules` 软链。🔴 **A/B 读数（回答"本单有没有把别人的判据弄红"）**：把 `App.tsx` / `TaskOrganizer.tsx` / `TaskDetailCard.tsx` 三枚换回 `HEAD` 态（换之前逐枚 sha256 备份：`7ba88747…` / `513be9ef…` / `88da085c…`，换回来之后逐字核对相同）⇒ 重打 `apps/web/dist` ⇒ 单跑 `DP_SWEEP=1 … tests/task-organize.spec.ts` 第一支 ⇒ **仍红在同一行**（`task-organize.spec.ts:72`，`sidebar.getByText(LIST,{exact:true})` 收到 `hidden`）。所以那条红是**载体 + 侧栏形状**的既有事实，不是本单造成的；本单没改它的判据口径 |
 | ② 两道余量为 0 的棘轮 | `check:l4` web **97 ≤ 基线 104**（与本单基线 §8.146 逐字相同 ⇒ 本单**没加一枚内联样式**）、mobile **90 = 基线 90**；`check:row-single-source` 任务行单一来源 + `ht-*` 族 **28 = 基线 28**（本单没新起 `ht-*` 族）；`check-ratchet-ceilings` ⇒ `RATCHET_RESULT=OK`、`ROWS=3/3`、锚点 `f419df75e590…`（merge-base main HEAD）；另 `check:selection-single-source`（G/H/I 四段全过：宿主内本地选中态 0 处、词表 3 类全有消费者、11 个 ViewKey 全部对"选中"交代过立场）/ `check:layering`（337 文件 9 规则）/ `check:ui-language`（**zh 2872 = en 2872**，本单零新词条）/ `check:design` ⇒ **全部 RC=0** ⇒ **没调任何基线** |
-| ③ 干净检出复跑 | 见本节末"③ 的读数"（在文档这笔提交之后跑，覆盖代码 + 文档两半） |
+| ③ 干净检出复跑 | `git worktree add --detach /tmp/dp_clean_8147 23f801a6`（这笔 = 玻璃那一腿的修法 + 本节文档，**覆盖 `ebfebeb8`（§8.147 代码与判据）+ `23f801a6` 两半**）⇒ **13/14 道 EXIT=0**，唯一红仍是别线那枚 `PROGRESS.md:1362 → docs/research/aed-implementation-evidence.md` 死链（待办 #49，合流当时自己消失；`grep -c` 于该趟日志 ⇒ **1**，本单没新增死链）。跑完 `git worktree remove --force` 摘掉 |
 | ④ packages 改完先 build | 本单**零 `packages/` 改动**（现量：`git diff --name-only ebfebeb8^..HEAD -- packages/` 为空）⇒ 这一道闸门本单**不适用**，不是"过了" |
 
 图证（AGENTS §6.2 规定一）：新增 `apps/web/evidence/detail-pane-task/t14-organizer-field-in-column.png`
