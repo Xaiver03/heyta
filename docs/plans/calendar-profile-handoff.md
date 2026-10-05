@@ -1845,13 +1845,64 @@ H 那把 flaky 看守（pid 27489）此刻仍挂着等负载，与本条无关�
   同处还就地改掉一句**现在时态的过期主张**：README 原文写"后五枚此刻是红的"，而 10:2x 重拍后它们已经绿了 ⇒
   改成"曾经红过 + 转绿的那条路（重拍 → 看图 → 重钉）+ 现量字节 `6e17d015…` 随 `da8688b6` 入库"。
 
+- (43) **10-05 11:1x：10:59 那次窗口真的开过，被 B 自己的一条坏前置吃掉了 —— 根因读到了字节级，修完并补了五臂。**
+
+  ① **读数顺序**：看守日志（`tail -6 /tmp/ht-b-window.log`）—— `try=7..9` 是 `load,src`，`try=10/11` 加上 `dev`，
+  然后 **10:59:49 `WINDOW=OPEN` → `STEP op-log-build rc=1` → `STOP=op-log-build`**，B 一次都没起。
+  停住这件事本身是**设计**（"装一个构建不过的产物不是当前产物"），所以这条不是事故，是**一次开窗被自己的前置吃掉**。
+
+  ② **根因不是 op-log 坏了，是载体里没有它依赖的那四枚产物。** 日志里那一片
+  `TS7006: Parameter 'op' implicitly has an 'any' type` / `TS7005: Variable 'checkpoint' implicitly has an 'any' type`
+  出自 tsup 的 **dts 阶段**：它要读 `@heyta/{domain,shared-schema,storage,sync-core}` 的 `.d.ts`，
+  而一棵**刚建的 worktree** 里那四份 `dist` 不存在 ⇒ 类型全解成 `any` ⇒ `DTS Build error`、rc=1。
+  现量（只读，11:1x）：`ls -d ../heyta-wt-reinstall-b/packages/*/dist` ⇒ **只有 `op-log` 一枚**（那一趟失败前自己建的），
+  逐枚对账（就是新加那一步的逻辑）⇒ `缺 dist: domain / shared-schema / storage / sync-core`；
+  同一分钟主检出 `ls -d packages/*/dist | wc -l` ⇒ **16**。
+  🔴 **所以这一形在本机永远量不到** —— 看守以前调的是 `pnpm --filter @heyta/op-log build`（不带 `...`），
+  在**主检出**那棵树上试多少次都是绿的。与 §7 第 162 条同族（"vitest 绿 ≠ `pnpm -r build` 绿，dts 阶段才查的那些"）。
+
+  ③ **改了两处，两处各自挡一种坏法**（`research/tools/b-window-keeper.sh`）：
+  - 选择器加 `...` **后缀**。方向是现量确认的，不是我记得的：
+    `pnpm --filter '@heyta/op-log...' list --depth -1`（在载体里）⇒ **5 枚**（op-log + 那四枚依赖）；
+    `pnpm --filter '...@heyta/op-log' list --depth -1` ⇒ 7 枚且是**依赖它的**那些（mobile / node-host / desktop / web / app-host / sync-server）
+    ⇒ **后缀=它依赖的，前缀=依赖它的**，写反了就等于永远只挑一枚。
+  - 新增 **5·对账**：构建 rc=0 **之后**再逐枚查依赖的 `dist` 在不在，缺任何一枚 ⇒
+    `STOP=oplog-dep-dist-missing` 并**点名缺的是哪一枚**，重装一次都不起。
+    ⚠️ 为什么 rc=0 还不够：这条对账拦的是"构建读了别人的旧 `.d.ts` 也算绿"那一形 ——
+    而载体里没有 op-log 清单时它**必须响亮地打 `DEPDIST=unavailable`**，不许静默跳过
+    （一条没被执行过的前置，输出与被执行过的逐字相同）。
+    📌 顺带量到一条减轻后果的事实：`scripts/reinstall-all.sh:183` 第 0 步本来就是 `pnpm -r build`，
+    所以真跑起 B 会自己补齐全树 —— **但那是 B 的第 0 步，不是 op-log 那枚前置**，两者不能互相顶。
+
+  ④ **五臂读数**：`bash research/tools/b-window-keeper-arms.sh` ⇒ **rc=0**、最后一行 `pass=… fail=0`
+  （**臂数由它自己打印，别抄进正文** —— 上一笔 (40)② 我刚为这件事清过漂值）。新增这一组：
+  T 基线（清单里塞一枚**不该被对账**的 `zod`，基线能走通就说明前缀过滤真生效）/
+  T2 缺一枚依赖 dist ⇒ rc=1、重装段 0 次、大字点名 `dep-b` /
+  T2b 把 `[ -d ]` 那一行摘掉 ⇒ 同一趟**真的起了重装**（T2 的红长在那一行上）/
+  **U 不注入 OPLOG 桩** ⇒ 看守真调了一次 pnpm，臂读到的记录是 `PNPM --filter @heyta/op-log... build` /
+  U2 把 `...` 摘掉 ⇒ 记录只剩 op-log 一枚（U 的正例此刻会红）。
+  🔴 U 这一臂是 K 臂那条教训的第三次命中：**全臂都注入桩 ⇒ 真路径上那行命令从来没被量过**。
+
+  ⑤ 📌 **本趟新撞的一条、关于我自己的装置**（和 ②③ 无关，但正是这条臂第一次跑的时候照出来的）：
+  双臂 rig 的 `ok "…"` / `no "…"` 消息里**用反引号包代码**，在 bash 双引号里就是**命令替换** ——
+  第一趟打出 `line 383: zod: command not found`、消息里那一格渲染成空，
+  而 **T 那条臂照样判 ✅**。也就是说"消息顺手执行了一条不存在的命令"不会让任何判据红，
+  只会把证据文字吃掉。⇒ 规矩：**臂的文案里引用代码一律写 `「」`，不许写反引号**；
+  已把三处改掉（`grep -n '` ' research/tools/b-window-keeper-arms.sh` 现在只剩注释与已转义那处）。
+
+  ⑥ **B 的当前前置**（11:1x 现量）：闸门 `rc=3`、`REDS=load,src,dev`，负载 `{ 47.75 41.85 48.18 }`（阈值 12）
+  ⇒ 看守已按修好的那行**重挂**（pid 会漂：`pgrep -f b-window-keeper.sh`；日志 `tail -4 /tmp/ht-b-window.log`）。
+  载体仍是 `../heyta-wt-reinstall-b`（收口后由本线自己 `git worktree remove`）。
+
+
+
+
+
+
+
+
+
 ### 4.1 撞见但不归本线的缺陷（登记 + 现量命令，不许静默消失）
-
-
-
-
-
-
 **G0. 调休标记（休/班）只画在月档，年档那 12 张月格里一颗都没有，而文档里没有"刻意不做"的登记。**
 看图看出来的（22:0x，`calendar-view-options/view-select-closed.png` 月档里 10-01…10-07 与 10-09 带绿色「休」、
 10-10 带橙色「班」；同目录 `view-tabs-year.png` 的年档 12 张月格**零枚**标记）。
