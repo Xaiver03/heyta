@@ -428,6 +428,36 @@ function revealDirection(scriptRel) {
       'reveal_rid_top_fallback 没有调用 scroll_to_top ⇒ 那一档只是换一句更温和的红字，方向局限一点没排除。',
     );
   }
+
+  // tap_rid 是**点击路径**上的同一把尺（rig32 现量：`tool-input` 那句
+  //   「滚了 5 次仍没有落在安全带里的可点节点 —— 界面形状或 testID 变了」就是它打印的，
+  //   而 reveal_rid 已经修好 —— 同一个缺陷在两枚 helper 上，只修一枚等于没修）。
+  //   它比 reveal_rid 多一个条件：它**知道** y 在安全带的哪一侧，所以方向必须由读数选。
+  const tap = helperBody(scriptRel, 'tap_rid');
+  if (tap === null) return null;
+  if (!/540 900 540 1900/.test(tap)) {
+    red.push(
+      'tap_rid 里只有往下滚那一种手势（1900→900）⇒ 可点节点在安全带**上方**时它越滚越远，' +
+        '五发滚满后把"还没滚到位"打印成"界面形状或 testID 变了"。方向要由 y 与带子的符号选。',
+    );
+  }
+  if (!/for pass in 1 2/.test(tap)) {
+    red.push(
+      'tap_rid 没有第二趟（摘焦点回到顶部再走一遍）⇒ "控件在视口上方"这一档永远没有机会。',
+    );
+  }
+  // 顺序判据（这条最容易写错的地方）：「没找到」那一格必须在**两趟都走完**之后。
+  //   写在 pass 循环里面时，第 1 趟没找到就 return 1 退出函数，换方向那一趟永远不会执行，
+  //   而读数看着像"两种方向都试过"（本轮第一次改完就是这个形状，靠 shellcheck 之外的
+  //   人读循环层次才发现 —— 所以把它写成会红的顺序断言，不靠下一次有人认真读）。
+  const lastDone = tap.lastIndexOf('done');
+  const notFound = tap.indexOf('if [ -z "$ctrl" ]');
+  if (notFound !== -1 && lastDone !== -1 && notFound < lastDone) {
+    red.push(
+      'tap_rid 里「没拿到可点节点」那一格排在最后一层 done **之前** ⇒ 它在 pass 循环内部，' +
+        '第 1 趟就 return 了，第二趟（换方向）永远不会跑。',
+    );
+  }
   return red;
 }
 
@@ -849,6 +879,31 @@ if (process.argv.includes('--self-test')) {
   );
   const m28 = runMutantFile(mutDir28, 'reveal-no-scroll');
   arms.push(['臂 28 那一档只是空壳（没反向手势）⇒ 非零退出且点名', m28.code !== 0 && m28.out.includes('scroll_to_top')]);
+
+  // 臂 29/30/31（tap_rid 的三种漏法）：单方向手势 / 没有第二趟 / 把"没找到"挪回循环里。
+  const mutDir29 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8')
+    .split('        $ADB shell input swipe 540 900 540 1900 300')
+    .join('        $ADB shell input swipe 540 1900 540 900 300');
+  const m29 = runMutantFile(mutDir29, 'tap-one-way');
+    // 🔴 断言字串要**从红字里取**，不是凭印象写：这一臂第一版查的是「只有一种手势」，
+  //    而红字写的是「只有往下滚那一种手势」—— 于是变异真的生效、门禁真的红了，
+  //    臂却报 FAIL（§7 #274 那一族：负向断言的正向对照要落在真的会动的那一侧）。
+  //    并且加一道"变异必须真的进副本"的前置，否则臂会退化成"没测任何东西的绿"。
+  arms.push([
+    '臂 29 的变异确实改掉了那一行（前置：否则这条臂等于没有）',
+    mutDir29 !== readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8'),
+  ]);
+  arms.push(['臂 29 tap_rid 只留一个方向 ⇒ 非零退出且点名方向由读数选', m29.code !== 0 && m29.out.includes('tap_rid 里只有往下滚')]);
+  const mutDir30 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8').replace('for pass in 1 2; do', 'for pass in 1; do');
+  const m30 = runMutantFile(mutDir30, 'tap-one-pass');
+  arms.push(['臂 30 tap_rid 没有第二趟 ⇒ 非零退出且点名', m30.code !== 0 && m30.out.includes('没有第二趟')]);
+  const mutDir31 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8')
+    .replace('      ctrl=""\n      sleep 1.5\n    done\n', '      ctrl=""\n      sleep 1.5\n      if [ -z "$ctrl" ]; then return 1; fi\n    done\n');
+  const m31 = runMutantFile(mutDir31, 'tap-return-inside');
+  arms.push([
+    '臂 31 「没找到」挪回 pass 循环里面 ⇒ 非零退出且点名顺序',
+    mutDir31 !== readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8') && m31.code !== 0 && m31.out.includes('永远不会跑'),
+  ]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
