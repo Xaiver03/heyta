@@ -129,11 +129,11 @@ X/Y/AB/AC 要重写 `packages/ui/dist`，而另一条会话正在读它打移动
 UIPIN day-en-full.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
 UIPIN day-en-no-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
 UIPIN day-en-empty.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-full.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-drag-next.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-drag-prev.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-away.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN calendar-day-back-today.png 5e23b7bf packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-full.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-drag-next.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-drag-prev.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-away.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN calendar-day-back-today.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
 ```
 
 ⚠️ **后五枚此刻是红的（UISTALE），这是要的结果不是事故**：钉 `5e23b7bf`（10-03 23:58）之后
@@ -144,8 +144,8 @@ UIPIN calendar-day-back-today.png 5e23b7bf packages/ui/src/calendar apps/web/src
 | 文件 | md5 | 人看到的 |
 |---|---|---|
 | `day-en-full.png` | 非锚点（每趟随机）：`d9916538a42055e92d034ac7913b37b3` 是 06:46 那趟的字节；11:54 重跑版 `382ac057fa4ac8a514291d11279c4da8` | 整屏英文：页头 `Calendar` / `Sun, 10/4` / `Back to today` / `View Day` / `Not synced yet`；「All day」带里一条 `en-day-589776`（随机后缀每次现造 ⇒ 这三张的 md5 **跨趟必不同是设计**）；轴从 `0:00` 起；⚠️ 06:46 那趟重渲染后**这张里没有红色 now 线**（拍于 06:46，线落在 `6:00` 之下、不在取景内。旧文案那句"`1:00` 与 `2:00` 之间有一条红色 now 线"是 01:34 那一趟的事实，**对这张不成立**）；**最长那句说明在轴卡下面整行读得出**：`Nothing on this day has a specific time — they are all in the "All day" band above.`（单行、没换行、没省略号、没出容器） |
-| `day-en-no-timed.png` | 非锚点（每趟随机）：`40e71764e83853ba81fad6b50cdb2a4e` 是 06:46 那趟的字节；11:54 重跑版 `a89a9a6c12a336d6884567fc76ebf415` | ⚠️ **与上一张是同一屏**（人眼看内容相同，md5 不同 ⇒ 差异不在说明的可读性上）。这张的存在理由是 spec 里那句注释"`day-en-full` 可能已经把说明滚出视口"—— **1280×720 下没发生**，所以它在这个视口下**不构成独立证据**，只是"视口更矮时"的保险。要它成为证据得先有一个把说明挤出视口的窄视口 |
-| `day-en-empty.png` | `57d2d0085e46dcd469aa00d2a19aa28b` | 空的那天的英文态：「All day」卡里居中 `Nothing is due on this day.`，**没有**上面那句"都在全天里"（那天两条带都空，说了就是谎），底部仍有一句 `Tasks without a due date are not on the calendar; they live in the Inbox on the Tasks tab.`；轴只到 `4:00` 那一档；⚠️ 旧文案的"同样带红色 now 线"对这张同样不成立（now 线在取景外） |
+| `day-en-no-timed.png` | 非锚点（每趟随机）：10-05 02:1x 现量 `bac2e33145d264ab07f777d0654e40ff` —— 🔴 **与上一张逐字节相同**（旧文案写的是"人眼看内容相同，md5 不同"，现在连 md5 都相同了：`spec` 第 290 行那次补拍落在同一帧上） | ⚠️ **与上一张是同一屏**，而且**这一趟是同一份字节**。这张的存在理由是 spec 里那句注释"`day-en-full` 可能已经把说明滚出视口"—— **1280×720 下没发生**（那句话在 full 那张里本来就整行读得出），所以它在这个视口下**不构成独立证据**，只是"视口更矮时"的保险。要它成为证据得先有一个把说明挤出视口的窄视口。 处置：下一趟有窗口时**把 `calendar-day-en.spec.ts:290` 那次重复截图去掉**（留一行说明为什么去掉），而不是留着让"两张图"读起来像两个证据 —— 本行只登记读数，不在这一趟改 spec（改完必须重拍同一族三张，而那是另一趟窗口的事） |
+| `day-en-empty.png` | `d64c4994508cd993b4fb9775f2dd65f3`（10-05 02:1x 重取；上一枚 `57d2d0085e…` 落后于 10-04 21:3x 那批提交带进来的字节 —— 这枚 md5 是**常驻锚点**，所以那次覆盖被 `--all` 报成 MISMATCH，不是靠人记住） | 空的那天的英文态：「All day」卡里居中 `Nothing is due on this day.`，**没有**上面那句"都在全天里"（那天两条带都空，说了就是谎），底部仍有一句 `Tasks without a due date are not on the calendar, they live in the Inbox on the Tasks tab.`；轴只到 `4:00` 那一档；⚠️ 旧文案的"同样带红色 now 线"对这张同样不成立（now 线在取景外）。🔴 **新字节里页头是两行**（第一行 `‹ Sun, 10/4 › Back to today + View[Day ▾]`，第二行 `Not synced yet ⟳ ⚙ Language 中文/English ✓ 🌙`）—— 与旧文案第 30 行那句"页头一行排满"是同一件事的反面，见下面 10-05 那一节 |
 
 🔴 **05:4x 更正：上面这三枚 md5 是重取的，原来那三枚（`46d2e2fb…` / `51926322…` / `eb50b404…`）已经对不上盘上字节**。
 成因与 `calendar-view-options/README.md` 那一条**是同一件事**：2026-10-04 01:34 另一条会话跑 e2e 时把同名 png 覆盖，
@@ -196,3 +196,38 @@ git log -1 --format='%h %ad' --date=format:'%m-%d %H:%M' -- \
 （R16 英文取证）字节是 **10-04 12:41**，晚于那一笔 ⇒ 它们的 `UIPIN … 39032107` 现在成立，
 工具打的是 `UIOC`（信息行）而不是红。**五张红、三张不红，是同一目录内的真实差别** ——
 别为了"这个目录干净"把它们一起改口。
+
+## 🔴 2026-10-05 09:52 重拍 + 10:1x 逐张看过：上面第 ② 条那句"没取证"**现在有读数了，而且它推翻了一句旧文案**
+
+重拍走 `bash research/tools/r17-reshoot-stale.sh --confirm`（前置门现量：4318/4319 空闲、
+`load1=7 ≤ 12`、内存 free 45%、dist 新鲜、判据路径无未提交改动）。五张字节全换：
+`a619f82a→6e17d015`（full）/ `c3489770→6641533d`（drag-next）/ `fe8f9d40→92a1920b`（drag-prev）/
+`0281e9fb→5537c9bd`（away）/ `7b82a6b5→602be474`（back-today）。五枚 `UIPIN` 从 `5e23b7bf` 换到 `73ad62a3`。
+
+🔴 **被推翻的那句**：上面第 30 行写"人此刻看到的：页头**一行排满**、**没有折行**"，
+并在第 36 行留了一句"这五张**不证明**今天的 HEAD 在日档下也画一行页头 —— 这一处**没取证**"。
+⇒ **重拍之后这五张的页头全是两行**：第一行 `‹ 10月5日 星期一 › 回到今天 + 视图[日 ▾]`，
+第二行 `未同步 ⟳ ⚙ 语言[中文 ✓ English] 🌙`。也就是 `39032107`（页头可换行）在日档下**同样折行**，
+与 `../calendar-view-options/` 那两枚年视图一致。第 ② 条那个敞口**已闭合**，
+而闭合的方式正是第 ③ 条写的那一步（重拍 + 人看 + 换 pin），不是把 pin 改成 `39032107`。
+
+**逐张看见的**（只写图里真有的）：
+- `calendar-day-full.png`：今天 10月5日 星期一，「全天」带里一条 `日视图-113718`，
+  轴从 `0:00` 排到 `6:00`（720 高到此为止），底部两句说明都在。
+- `calendar-day-drag-next.png`：往左横拖 800px 之后标题到 **10月6日 星期二**、
+  侧栏圈住 6 ⇒ "往左=下一天"这条主张成立（旧图里是 10月4日 星期日，**日期随拍摄日走，形状没走**）。
+  全天带空 ⇒ 只剩共享空态 `这一天没有到期的任务。`，而"都在上面那条「全天」里"那句**不再出现** ✓。
+- `calendar-day-drag-prev.png`：拖回来之后回到今天，且**那条任务还在、复选框是空的**
+  （标题就叫「别拖我就被勾了-113718」）⇒ 这条图存在的理由（起手点在可点的行上）仍然成立。
+- `calendar-day-away.png`：点两次 `›` → 10月7日 星期三，侧栏**同时**画两样东西：
+  方框圈住 7（cursor）+ **5 号下面一枚实心小蓝点（今天）**。这个"选中/今天"双标记
+  上面那张表没写过，是这次看图新记的一条。
+- `calendar-day-back-today.png`：点「回到今天」→ 标题与侧栏都回 5 ✓。
+  ⚠️ 这张里**「全天」带是空的**（而 `full` 那张有一条）—— 查过出处，不是不一致：
+  `e2e/tests/calendar-day.spec.ts:252` 那一条用例**本来就不播任务**（只翻两天再点回来，
+  断言 `now-line` 计数 0→1）。现在线本身在 720 的取景外（拍于 10:0x，线在 4:00 之下），
+  所以这张图**只**能作证"标题/侧栏回来了"，线由那条 DOM 断言作证 —— 与上面
+  "不证明现在线画在哪"那一格同一条边界。
+
+⇒ 复跑对账：`bash research/tools/r17-evidence-md5-check.sh --dir apps/web/evidence/calendar-day`。
+

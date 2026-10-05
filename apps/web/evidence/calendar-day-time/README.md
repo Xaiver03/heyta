@@ -80,14 +80,16 @@ cd e2e && npx playwright test tests/calendar-day.spec.ts
 同一状态重跑必然不同字节 ⇒ md5 是"每跑必红"的判据，§8.3 说它会把人训练成忽略红。
 
 ```
-UIPIN day-hour-labels.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN day-timed.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
-UIPIN day-timed-hour16.png 39032107 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css
+UIPIN day-hour-labels.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN day-timed.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
+UIPIN day-timed-hour16.png 73ad62a3 packages/ui/src/calendar apps/web/src/features/calendar apps/web/src/styles/app/main-area.css apps/web/src/styles/app/rail.css packages/design-system/src/tokens.css
 ```
 
-钉 `39032107` 的理由（现取，不是抄 HEAD）：上面五条路径里最后一次动过的提交就是它
-（10-04 10:11，那一笔把 `.ht-header` 改成可换行 + 加纵向 padding），而三张的字节是 **10-04 12:41**
-（`stat` 现量）⇒ **拍图晚于决定形状的代码**。字节是别人那一趟跑的，13:5x 由本线**逐张打开看过**。
+钉 `73ad62a3` 的理由（10-05 重钉，见下面那节）：这五条路径里最后一次动它们的提交是
+`1e5dd492`（10-05 00:06，`tokens.css`），而三张的字节是 **10-05 09:52** ⇒ 拍图晚于决定形状的代码。
+逐路径的最后时刻（`git log -1 --format='%h %ad' --date=format:'%m-%d %H:%M' -- <路径>` 现量）：
+`packages/ui/src/calendar` 与 `apps/web/src/features/calendar` 7f7bc447（10-04 00:11）、
+`main-area.css` 39032107（10-04 10:11）、`rail.css` 2989c717（10-02 08:58）、`tokens.css` 1e5dd492（10-05 00:06）。
 
 ## 人看到的（13:5x 逐张复核，三张是三种不同状态，别当同一张的三个副本）
 
@@ -99,3 +101,31 @@ UIPIN day-timed-hour16.png 39032107 packages/ui/src/calendar apps/web/src/featur
 
 ⚠️ 这三张与 `../calendar-day/` 那五张是**两批**取证（那五张字节 10-03 11:09、已因页头形状过期而留红待重拍；
 本目录这三张字节 12:41、晚于那笔改动 ⇒ 锚点成立）。别把两批混成一句"日视图的图都旧了"。
+
+## 🔴 10-05 09:52 字节被顺带轮换、10:2x 逐张重看，并把锚点补宽
+
+这三张**不是**本目录的 spec 拍的 —— 它们由 `e2e/tests/calendar-day.spec.ts` **就地**写进本目录
+（`SHOT()` 直接指 `../apps/web/evidence/calendar-day-time/`），所以 10-05 重拍 `calendar-day` 那一趟
+**顺带**把这三张换了字节（`stat` 现量三张同为 `10-05 09:52`；新 md5：
+`day-timed.png` `fdb62ab46e…`、`day-timed-hour16.png` `69fd5e0c61…`、`day-hour-labels.png` `19a86bd3f5…`）。
+
+🔴 **而常驻判据对这次轮换是瞎的**：`bash research/tools/r17-evidence-md5-check.sh --dir` 本目录
+`entries=0 mismatch=0 pins=3` —— 本目录**按设计不钉 md5**（上面那节两条随机源），
+所以唯一能红的层是代码锚点，而旧锚点的五条路径里**没有 `packages/design-system/src/tokens.css`**：
+`1e5dd492`（10-05 00:06，首屏动画落到 web）动了它，三张照旧报 `UIOC`。
+⇒ 这不是"这次恰好没变"，是**形状主张的覆盖面**问题：主题 token 换值不会让这三张红。
+处置 = 把 `tokens.css` **并进那五条路径**并重钉到本批次号 `73ad62a3`（上面那三行已改）。
+⚠️ 顺序要说清：**先逐张打开看图、确认主张仍成立，才允许重钉** —— 直接改字就是把"我看过的字节"
+和"当前形状"混成一件事（`../calendar-capture/README.md` 里那条 UISTALE 的处置写的就是同一件事）。
+
+10-2x 人逐张看过（新字节），上面那张三行表**逐条复核成立**，另记三条只有看图才有的读数：
+
+1. 页头现在是**三行**形状：第一行「日历」、第二行「‹ 10月5日 星期一 › 回到今天 `+` 视图 [日 ▾]」、
+   第三行「未同步 / 刷新 / 齿轮 / 语言 / 主题」⇒ 这正是 `39032107` 那笔"可换行"的形状，
+   锚点与图一致（不是旧图残留）。
+2. 三张里 rail 顶部那颗圈是**通用图标**而不是字母 —— 与 `../profile-panel/` 那四张里的 `D` 不同：
+   这条线的 e2e 账号没有落盘邮箱，`AccountMenu.tsx:59` 那句"拿不到邮箱时退回通用图标"在图里现形了。
+   记在这里是为了**别把它当成缺陷**（它是那条裁决的正确行为）。
+3. `day-timed-hour16.png` 里那条任务名是 `挂在十六点-113718`（上一批是 `-867223`）
+   ⇒ 再次直接看到"每跑必红"的那条随机源，钉 md5 不可行的理由不是推理出来的，是这两串数字。
+
