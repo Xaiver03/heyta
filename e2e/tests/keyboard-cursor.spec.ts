@@ -798,7 +798,8 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
    * ⚠️ 为什么 jsdom 那两条不算数：jsdom 里行是插出来的 `<div>`，"行里到底有没有可聚焦的
    * 东西"是夹具说的；真实渲染里 `task-item-*` 外层是裸 `View`（`TaskRow.tsx:300`），
    * 可聚焦的是行里那颗 `role="checkbox"`。**只有浏览器知道那颗东西真的存在** ——
-   * 摘掉 `focusRow` 之后这一条会红在"焦点还在 body"上（臂台 F2 就是这一档）。
+   * 摘掉 `focusRow` 之后这一条会红在"焦点还在 body"上（臂台 F1 就是这一档），
+   * 而"焦点恒落在第一行"那一类坏红在后面那两句"焦点行 == 痕迹行"上（臂台 F2）。
    */
   test('K12 🔴 一次点击都不给：↓ 走两行再 Enter ⇒ 焦点已经在栏里那只正文框', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
