@@ -596,13 +596,23 @@ describe('打卡量（W6）', () => {
     expect(await actions.checkIn(id, DAY1, 5)).toBe(true);
   });
 
-  it('0 / 负数 / 非有限数 ⇒ 抛，且不留下任何 op', async () => {
+  it('负数 / 非有限数 ⇒ 抛且零 op；而 **0 是合法读数**（合并 main 时的裁决）', async () => {
     const id = await actions.createHabit('阅读', { target: 8 });
-    for (const bad of [0, -3, Number.NaN, Number.POSITIVE_INFINITY]) {
-      await expect(actions.checkIn(id, DAY1, bad)).rejects.toThrow(/大于 0 的有限数/);
+    for (const bad of [-3, Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(actions.checkIn(id, DAY1, bad)).rejects.toThrow(/不小于 0 的有限数/);
     }
     expect(actions.listLogs()).toEqual([]);
     expect(await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).toHaveLength(0);
+
+    // 这一档原来写作"0 也抛"（详情面那条线的选择：今天没做请撤销打卡）。
+    // 合并 main 时否证了它，两条都是**已承诺的对外行为**：
+    //   · `local-api-host.ts` 的 `record-checkin` 在写入前按 `value < 0` 判 invalid ⇒ 0 一路通行，
+    //     收紧到 >0 会让本机 API / MCP 这个对外工具面在同一次调用里由内层抛错（契约悄悄改窄）；
+    //   · `atMost` 型习惯里"今天 0 次"就是**达成**的样子，删掉记录反而把读数换成"没记"。
+    // 它担心的"这一格同时读起来像打过卡又像没做"是真的，但那是**显示层**要分开的事
+    //（存在性 ≠ 达成，`isAchieved` 走 `habitLogValue`：0 对 atMost 达成、对 atLeast 不达成）。
+    expect(await actions.checkIn(id, DAY1, 0)).toBe(true);
+    expect(actions.listLogs()[0]!.value).toBe(0);
   });
 
   it('⚠️ 刻意**允许小数**（"每天 0.5 小时"是合法目标，卡整数会把合法数据判成非法输入）', async () => {

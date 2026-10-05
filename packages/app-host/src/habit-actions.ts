@@ -150,9 +150,15 @@ export interface HabitActions {
    *
    * 返回"这次到底写没写" —— 调用方据此决定要不要提示"今天已经打过卡了"。
    *
-   * 🔴 `value` 必须是**大于 0 的有限数**。0 与负数在这里没有合法意思：
-   * "今天没做"是**撤销打卡**（`undoCheckIn`），不是一条值为 0 的打卡记录 ——
-   * 后者会让 `doneToday` 为真而这一格读起来同时是"打过卡"和"没做"。
+   * 🔴 `value` 必须是**不小于 0 的有限数**（合并 main 时的裁决，理由写在这里）：
+   * 详情面那条线原本把它收紧成"大于 0"，让"今天没做"走 `undoCheckIn`；
+   * 而本机 API / MCP 的 `record-checkin` 契约（`local-api-host.ts` 在写入前就按
+   * `intent.value < 0` 判 invalid）与 `atMost` 型习惯都需要一个显式的 0 ——
+   * "今天刷手机 0 次"是一条**读数**，不是一次缺席。
+   * ⚠️ 那一收紧担心的"这一格同时读起来像打过卡又像没做"是真问题，但它住在**显示层**：
+   * 存在性（打过卡）与达成（`isAchieved` 走 `habitLogValue`，0 对 atMost 达成、
+   * 对 atLeast 不达成）本来就是两件事，把其中一件做没了会让另一件变成唯一答案。
+   * 所以这一层的字段不许用写入侧的抛错去替显示层做决定。
    *
    * ⚠️ 刻意**不要求整数**：`setHabitGoal` 允许 `target: 0` 与任意有限正数
    *（"每天 0.5 小时"是合法目标），所以"记 1.5 格"可能是这个习惯唯一的步进形状。
@@ -327,9 +333,11 @@ export function createHabitActions(
       if (habit === undefined) throw new Error(`找不到习惯「${habitId}」`);
       // 校验在写入侧（与 `setHabitGoal` / `setHabitColor` 同一条纪律）：
       // 不认识的值直接抛，不悄悄落成一个"看起来对"的数。
-      if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {
+      // ⚠️ 下限是 **0 不是 1**：见上面接口注释里那条合并裁决
+      //（本机 API/MCP 契约与 `atMost` 都需要显式的 0）。
+      if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
         throw new Error(
-          `打卡量必须是大于 0 的有限数（收到 ${String(value)}）；"今天没做"请撤销打卡，不要记一条 0`,
+          `打卡量必须是不小于 0 的有限数（收到 ${String(value)}）；负数、NaN、Infinity 都不是一个读数`,
         );
       }
 
