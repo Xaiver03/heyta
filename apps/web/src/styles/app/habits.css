@@ -93,11 +93,24 @@
 /* 整行是一个 `<button>`（点哪都算选中），所以：
    `text-align: start` 取消按钮默认的居中，`width: 100%` 让它铺满列宽。
    ⚠️ 行内不能再嵌可交互元素 —— 图标选择器因此住在右窗格的页眉，不在这里。 */
+/*
+  行 = **两列**：左边「名字 + 这一周打没打」，右边「三个数字」。
+
+  🔴 为什么数字不再跟在名字下面：面单搬进详情列之后，清单从 2fr 变成整列宽，
+     而三份内容全贴在左边 —— 选中那一行右侧空了 **690px**（§8.133 看图第 ② 条：
+     "行的视觉重心跟着漂"）。判据 `e2e/tests/detail-pane-habit.spec.ts` H8 量的是
+     "每行最靠右的有内容元素必须落在行右边界附近"，阈值从行自己的内边距 token 推导；
+     臂台 `mutate-detail-pane-habit-e2e.mjs` 的 **E5** 把数字挪回左列，它就是为这一条存在的。
+
+  ⚠️ `minmax(0, 1fr)` 不是 `1fr`：超长习惯名要能省略号，而不是把右边的数字挤出列
+     （`.ht-habit__name` 自己带 `min-width: 0` + ellipsis，两件事要同时成立）。
+*/
 .ht-habit__row {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--ht-space-2);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--ht-space-4);
+  row-gap: var(--ht-space-2);
+  align-items: center;
   width: 100%;
   padding: var(--ht-space-3);
   cursor: pointer;
@@ -126,6 +139,19 @@
   align-items: center;
   gap: var(--ht-space-2);
   min-width: 0;
+}
+
+/*
+  第一行 = 「名字 ←→ 三个数字」，第二行 = 七个点横跨整行。
+  ⚠️ 数字**不竖排**：竖排会把行高顶到三行，名字与点之间裂开一道空档（看图实测过那一版，
+     空白只是从行右侧搬到了行中间）。横排贴在名字右边才是列表行的常见读法。
+*/
+.ht-habit__head {
+  grid-column: 1;
+}
+
+.ht-habit__week {
+  grid-column: 1 / span 2;
 }
 
 /* 图标底盘。颜色由 JSX 给（分类槽位 / 未设色走 `UNSET_CATEGORY_TOKEN`）；
@@ -167,7 +193,9 @@
 
 .ht-habit__chips {
   display: flex;
-  flex-wrap: wrap;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
   align-items: center;
   gap: var(--ht-space-3);
 }

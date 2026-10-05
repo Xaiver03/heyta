@@ -2,10 +2,11 @@
 /**
  * 习惯面单落点（工单 §8.133）的**真浏览器层**变异臂。
  *
- * 这一台要回答的问题只有一个：`e2e/tests/detail-pane-habit.spec.ts` 那 7 条
+ * 这一台要回答的问题只有一个：`e2e/tests/detail-pane-habit.spec.ts` 那 8 条
  * 是不是 `apps/web/tests/habits-detail-card.spec.tsx` 那 13 条的**重复**？
  * 答案是"不是"，证明方式与便签那一台（`mutate-detail-pane-note-editor-e2e.mjs`）同形：
- * 造**只有浏览器能看见**的坏，看 jsdom 那一层红不红。E1/E2 来自 §8.133，E3/E4 来自 §8.134。
+ * 造**只有浏览器能看见**的坏，看 jsdom 那一层红不红。
+ * E1/E2 来自 §8.133（落点与溢出），E3/E4 来自 §8.134（头行），E5 来自 §8.136（清单行右侧空白）。
  *
  *   E1 往栏里那条 CSS 里把板子 `display:none` 藏掉 ——
  *      用户在宽屏点习惯会看到"右边那一栏什么都没有"，而选中态已经进了模型。
@@ -128,6 +129,25 @@ const ARMS = [
     expectTitles: ['H6'],
     expectMessage: /工具不在同一行/,
   },
+  /* E5 = §8.136 那一处（清单行拉宽到整列之后，三个数字全贴左、行右侧空出 690px）。
+     注入的就是**改前的形状**：把数字挪回左列、点阵下面那一行。
+     🔴 选择器带三枚类：`habits.css` 里那条只有 1 枚，而 `base.css`（本文件的宿主）在它**前面**
+        被导入 —— 等特异性会被后导入的赢（E2 第一版就是这么打空的）。 */
+  {
+    name: 'E5 三个数字挪回左列（行右侧又空出一大片，§8.133 看图第 ② 条的形状）',
+    marker: '--dp-arm-e5',
+    css: `
+/* MUTATION-ARM E5（临时，本脚本收尾会删）：数字回到左列、点阵下面那一行。 */
+.ht-habit__list .ht-habit__row .ht-habit__chips {
+  --dp-arm-e5: 1;
+  grid-column: 1;
+  grid-row: 3;
+  justify-self: start;
+}
+`,
+    expectTitles: ['H8'],
+    expectMessage: /右侧空了|内容全贴左/,
+  },
 ];
 
 const orig = readFileSync(path.join(ROOT, CSS), 'utf8');
@@ -236,8 +256,8 @@ const cleanDigest = distDigest();
 const bj = jsdom();
 if (bj.rc !== 0 || bj.passed < 13) fail(`干净态 jsdom 层不干净（要 >=13 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 7 || be.failed > 0) {
-  fail(`干净态 e2e 层不干净（要 >=7 passed / 0 failed）：${be.line}`);
+if (be.rc !== 0 || be.passed < 8 || be.failed > 0) {
+  fail(`干净态 e2e 层不干净（要 >=8 passed / 0 failed）：${be.line}`);
 }
 console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}｜dist=${cleanDigest}`);
 

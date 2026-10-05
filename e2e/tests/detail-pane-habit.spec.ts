@@ -434,4 +434,59 @@ test.describe('习惯面单落进详情列', () => {
     await page.screenshot({ path: SHOT('h7-tools-with-their-card') });
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
   });
+
+  test('H8 清单行拉宽到整列之后，右侧不许空着一大片（内容要铺满行宽）', async ({ page }) => {
+    /*
+      §8.133 看图登记的**第 ② 条**：面单搬进那一栏之后，清单行从 2fr 变成整列宽，
+      而行的内容（名字 / 七个点 / 三个数字）全贴在左边 —— 选中那一行右侧出现一大片空白，
+      "行的视觉重心跟着漂"。这一条不是回归，是换掉形状留下的观感；
+      量法写成**存在性**："每一行里最靠右的有内容元素，必须落在行的右边界附近"，
+      而不是给"我以为会有的那几行"逐个写内容判据（同一族教训见 AGENTS §9 倒计时批次二）。
+
+      🔴 阈值从**行自己的内边距 token** 推导，不抄像素：行有 `padding: --ht-space-3`，
+         内容右边缘离"内容盒右边界"超过一个 `--ht-space-4` 就算空着。
+    */
+    const errors = watchErrors(page);
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '习惯');
+    await addHabitAndRelease(page, '铺满甲');
+    await addHabitAndRelease(page, '铺满乙');
+    await page.locator('[data-testid^="habit-row-"]').first().click();
+
+    const pad = await pxOfCssVar(page, '--ht-space-3');
+    const slack = await pxOfCssVar(page, '--ht-space-4');
+    expect(pad, '行内边距 token 量为 0 ⇒ 下面的阈值会退化成"内容必须贴住边框"').toBeGreaterThan(0);
+    const rows = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll<HTMLElement>('.ht-habit__row')).map((row) => {
+        const rb = row.getBoundingClientRect();
+        const cs = getComputedStyle(row);
+        const boxRight = rb.right - parseFloat(cs.paddingRight);
+        // 只数**画得出来**的叶子内容：`display:none` 的元素 rect 全 0，
+        // 拿它们参与 max 会让"右侧空着"被零尺寸满足（§7 元规则 2）。
+        let maxRight = -1;
+        let leaves = 0;
+        for (const el of Array.from(row.querySelectorAll<HTMLElement>('*'))) {
+          if (el.childElementCount > 0) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width <= 0 || r.height <= 0) continue;
+          leaves += 1;
+          maxRight = Math.max(maxRight, r.right);
+        }
+        return { right: boxRight, maxRight, leaves, emptyBand: boxRight - maxRight };
+      });
+    });
+    expect(rows.length, '清单没渲染出行 ⇒ 这一族判据量的是空集').toBeGreaterThanOrEqual(2);
+    for (const [i, r] of rows.entries()) {
+      expect(r.leaves, `第 ${String(i + 1)} 行没有任何画得出来的内容`).toBeGreaterThan(0);
+      expect(
+        r.emptyBand,
+        `第 ${String(i + 1)} 行右侧空了 ${r.emptyBand.toFixed(1)}px（> 栏内间距 ${String(slack)}px）` +
+          ` —— 内容全贴左，行的重心在漂`,
+      ).toBeLessThanOrEqual(slack);
+    }
+
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('h8-rows-fill-width') });
+    expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
+  });
 });
