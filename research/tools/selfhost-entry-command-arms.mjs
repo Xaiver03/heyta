@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * `scripts/check-selfhost-entry-command.mjs` 里 **R8（漏登记哨兵）** 的变异台。
+ * `scripts/check-selfhost-entry-command.mjs` 的变异台：**R8/R9** 一组（A*）+ **R1–R7** 一组（T*）。
+ * R1–R7 那一组先前不在仓里 —— §8.99 那趟靠 /tmp 里的一次性装置拿到"能红"的读数，重启就把臂带走了（见台账 §8.221）。
  *
  * 为什么单独一份：R8 是 2026-10-05 新加的判据，而"任何新增判据先注入验证它能失败"是硬约束
  * （AGENTS §8.3「不能失败的检查没有价值」）。它同时管**两个方向**（多出来没人管的抄件 / 登记的豁免
@@ -14,6 +15,13 @@
  *
  * 用法：node research/tools/selfhost-entry-command-arms.mjs            # 跑全部臂（条数由末尾自己打）
  *      退出码：0 = 全臂符合期望；1 = 有臂不符合（判据没牙 / 守卫被摘弱 / 缺臂）；2 = 装置自己坏了。
+ *
+ * 🔴 A 组与 T 组是**两种装置形状**，不是一种的两份写法，别把它们并成一段：
+ *    A 组（R8/R9）变异的是**门禁本体**（跑副本），因为那两条判据的"牙"就在门禁的分支里；
+ *    T 组（R1–R7）变异的是**被检对象**（一次性假树 + `--repo-root` 指过去，跑的是真门禁），
+ *    因为那七条判据要证的正是"抄件漂了会红"，把门禁换成副本就什么都没验。
+ *    假树的分母、三个 override 文件名、载体路径**全部从门禁本体现取** —— 装置自己抄一份字面量，
+ *    它就是第五份抄件，而"漂了会红"的判据变成一份自己也不会红的抄件。
  */
 import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -290,9 +298,170 @@ try {
       /没有分母|读不出 scripts\.check/.test(out) && !/前提由 package.json/.test(out),
       `[R9] 红 ${r9Reds(out)} 条 · 措辞=${(out.match(/没有分母|读不出 scripts\.check/) || ['（无）'])[0]}`);
   }
+  /* ── R1–R7 那一组（T0–T7）：变异的是**抄件本身或载体本身**，跑的是**真门禁** ───────
+   * 这一组先前不在仓里：§8.99 那趟"能红"的读数靠 `/tmp/g85-arm.mjs` 拿到，装置没入库，
+   * 一次重启就把臂带走了（台账 6105 行自己写着"登记在此不代做"）。于是本文件的文件头
+   * 那句"R1–R7 各自有别的臂"其实指的是 /tmp —— 一条**只在当天成立**的声明被抄进了长期文件。
+   * 🔴 后果不是难看，是判据假在：G-49 的关闭判据是"进对账**且判据能红**"，
+   *   而"能红"这半在仓里没有任何一层可复现。
+   *
+   * 做法：把门禁列出的每一份文件**原样**拷进一棵一次性假树，`--repo-root` 指过去，
+   * 在假树里做定向漂移（摘 override / 中英各改一边 / 整条命令删掉 / 文件名 typo /
+   * 点名服务漏掉迁移服务），只数**自己那条 tag** 的红。
+   * ⚠️ 假树不在 git 仓里 ⇒ R8 必然报"没有分母"，R7/R9 也可能红，那些是噪音 ——
+   *    T0 的正对照要求 `[R1]…[R6]` **全零**，所以噪音不会冒充牙。 */
+  const GATE_SRC = readFileSync(GATE, 'utf8');
+  // 分母**从门禁本体现取**（把清单抄进装置就是这条线反复栽的那个坑）：凡 `file: '<路径>'` 都在内。
+  const listed = [...GATE_SRC.matchAll(/file: '([^']+)'/g)].map((m) => m[1]);
+  const TREE_FILES = [...new Set([
+    ...listed,
+    'package.json',
+    'scripts/verify-selfhost-stack.sh',
+    'server/docker-compose.yml',
+    'server/docker-compose.build.yml',
+    'server/docker-compose.migrate-once.yml',
+  ])].filter((f) => existsSync(join(ROOT, f)));
+  if (TREE_FILES.length < 6) throw new Error(`假树分母只导出 ${TREE_FILES.length} 枚（门禁的 file: 写法变了？装置与被检对象漂了）`);
+  const BASELINE = new Map(TREE_FILES.map((f) => [f, readFileSync(join(ROOT, f), 'utf8')]));
+  const ZH = 'packages/i18n/src/locales/zh-CN.ts';
+  const EN = 'packages/i18n/src/locales/en.ts';
+  const GUIDE = 'docs/runbooks/self-host.md';
+  // 🔴 三个覆盖文件名**从门禁本体现取**，不在装置里再抄一份字面量：本仓的入口命令抄件已有四份，
+  //   判据装置自己是第五份的话，"漂了会红"的那条判据就成了自己也不会红的抄件。
+  const constOf = (name) => {
+    const m = GATE_SRC.match(new RegExp(`^const ${name} = '([^']+)'`, 'm'));
+    if (!m) throw new Error(`门禁本体里读不到 \`const ${name} = '…'\` ⇒ 装置与被检对象漂了`);
+    return m[1];
+  };
+  const BUILD_OVERRIDE = constOf('BUILD_OVERRIDE');
+  const MIGRATE_OVERRIDE = constOf('MIGRATE_OVERRIDE');
+  const MIGRATOR_SERVICE = constOf('MIGRATOR_SERVICE');
+  // T7 的变异对象：验收载体住哪一枚文件同样**从门禁本体现取**（它改了路径而装置还在原地变异，
+  // 那一臂会静默打空 —— 打空在这里读成"R7 没红=牙掉了"，成本是误判整条判据坏了）。
+  const HARNESS = constOf('HARNESS_FILE');
+  if (!TREE_FILES.includes(HARNESS)) throw new Error(`假树里没有验收载体 ${HARNESS} ⇒ T7 的变异打不中，臂会假红`);
+  const MAIN_CMD = `-f docker-compose.yml -f ${BUILD_OVERRIDE} -f ${MIGRATE_OVERRIDE} up -d --build`;
+  const tagReds = (out, tag) => (out.match(new RegExp(`\\[${tag}\\]`, 'g')) || []).length;
+  const hist = (out) => ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7'].map((t) => `${t}=${tagReds(out, t)}`).join(' ');
+
+  function fullTree(mut = {}) {
+    rmSync(FAKE, { recursive: true, force: true });
+    for (const f of TREE_FILES) {
+      let t = readFileSync(join(ROOT, f), 'utf8');
+      if (mut[f]) {
+        const before = t;
+        t = mut[f](t);
+        if (t === before) throw new Error(`假树里 ${f} 的变异锚点没命中（那一串漂了）：臂的锚点要跟着真文件改`);
+      }
+      mkdirSync(dirname(join(FAKE, f)), { recursive: true });
+      writeFileSync(join(FAKE, f), t);
+    }
+  }
+  /** 跑**真门禁**（不是副本）指到假树。 */
+  function runGateFake() {
+    let rc = 0;
+    let out = '';
+    try {
+      out = execFileSync(process.execPath, [GATE, '--repo-root', FAKE], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 });
+    } catch (e) {
+      rc = e.status ?? 1;
+      out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+    }
+    return { rc, out };
+  }
+
+  // T0 正对照：原样假树 ⇒ R1–R7 一条都不许红。没有这条，T1–T7 的"红"可能只是假树根本够不着。
+  fullTree();
+  {
+    const { out } = runGateFake();
+    record('T0 原样假树 ⇒ [R1]…[R7] 全零（后面各臂的正对照）',
+      ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7'].every((t) => tagReds(out, t) === 0),
+      `${hist(out)} · 假树 ${TREE_FILES.length} 枚文件`);
+  }
+
+  // T1 站内指南（中文那份）少一份 build override ⇒ R1 必须点名那枚词条文件。
+  fullTree({ [ZH]: (t) => t.replace(MAIN_CMD, MAIN_CMD.replace(` ${BUILD_OVERRIDE}`, '')) });
+  {
+    const { out } = runGateFake();
+    record('T1 词条抄件里摘掉 `-f docker-compose.build.yml` ⇒ [R1] 红且点名中文那份',
+      tagReds(out, 'R1') >= 1 && out.split('\n').some((l) => l.includes('[R1]') && l.includes(ZH)),
+      `${hist(out)} · 点名 ${ZH}=${out.split('\n').filter((l) => l.includes('[R1]') && l.includes(ZH)).length} 条`);
+  }
+
+  // T2 只把**英文那份**的 `--build` 摘掉 ⇒ R5（跨抄件逐字相同）必须红。
+  //    这一臂就是"中英只改一边"那个最常发生的形状：R1 不会响（build.yml 还在），只有 R5 会。
+  fullTree({ [EN]: (t) => t.replace(` ${MIGRATE_OVERRIDE} up -d --build`, ` ${MIGRATE_OVERRIDE} up -d`) });
+  {
+    const { out } = runGateFake();
+    record('T2 只改英文那份（摘 `--build`）⇒ [R5] 红而 [R1] 零红（各条判据互不代抓）',
+      tagReds(out, 'R5') >= 1 && tagReds(out, 'R1') === 0,
+      `${hist(out)}`);
+  }
+
+  // T3 中文那份整条命令被删 ⇒ 对外文档命中 0 条 ⇒ R6（非空哨兵）必须红。
+  fullTree({ [ZH]: (t) => t.replace(MAIN_CMD, '（那条入口命令被摘掉了）') });
+  {
+    const { out } = runGateFake();
+    record('T3 中文那份的入口命令整串删掉 ⇒ [R6] 红（非空哨兵不许静默空转）',
+      tagReds(out, 'R6') >= 1,
+      `${hist(out)}`);
+  }
+
+  // T4 指南里那份 override 文件名打错 ⇒ R2（每条 -f 指向的文件必须真存在）红。
+  fullTree({ [GUIDE]: (t) => t.replace(`-f ${BUILD_OVERRIDE}`, '-f docker-compose.bulid.yml') });
+  {
+    const { out } = runGateFake();
+    record('T4 把 `-f docker-compose.build.yml` 打成 `bulid` ⇒ [R2] 红（typo 在这一条现形）',
+      tagReds(out, 'R2') >= 1,
+      `${hist(out)}`);
+  }
+
+  // T5 对外文档的主命令少一份一次性迁移 override ⇒ R3 红。
+  fullTree({ [GUIDE]: (t) => t.replace(` ${MIGRATE_OVERRIDE}`, '') });
+  {
+    const { out } = runGateFake();
+    record('T5 指南主命令摘掉 `docker-compose.migrate-once.yml` ⇒ [R3] 红（起了但未迁移那一档）',
+      tagReds(out, 'R3') >= 1,
+      `${hist(out)}`);
+  }
+
+  // T6 §6 点名服务那一条漏掉迁移服务 ⇒ R4 红。
+  fullTree({ [GUIDE]: (t) => t.replace(`up -d postgres supersync ${MIGRATOR_SERVICE}`, 'up -d postgres supersync') });
+  {
+    const { out } = runGateFake();
+    record('T6 点名服务那条摘掉 `supersync-migrate` ⇒ [R4] 红',
+      tagReds(out, 'R4') >= 1,
+      `${hist(out)}`);
+  }
+
+  // T7 **验收载体自己**的 COMPOSE_FILES 少一份 override ⇒ R7 必须红，且 R5 不许响。
+  //    变异对象为什么是脚本不是文档：R7 的期望值**从对外主命令导出**，所以只改一份对外抄件时
+  //    它不该响（那叫 R5 的射程，T5 已经打过一次）；能把 R7 单独打红的只有载体那一端漂了 ——
+  //    而那正是它存在的理由：文档改对了、跑验收的那套文件留在旧集合，
+  //    于是"外人照文档跑通"与"我们验过的那一趟"不再是同一件事，§8.211 那行 rc=0 失去代言资格。
+  //    同臂要求 [R5]=0：这一条红必须由 R7 自己认领，不许是文档漂移的连带读数（T2 立的那条规矩）。
+  fullTree({ [HARNESS]: (t) => t.replace(` -f "$REPO_ROOT/server/${MIGRATE_OVERRIDE}"`, '') });
+  {
+    const { out } = runGateFake();
+    record('T7 验收载体的 COMPOSE_FILES 摘掉一份 override ⇒ [R7] 红而 [R5] 零红（对外文档没动，这轮只有载体漂）',
+      tagReds(out, 'R7') >= 1 && tagReds(out, 'R5') === 0,
+      `${hist(out)} · R7 红行认领载体=${out.split('\n').some((l) => l.includes('[R7]') && l.includes(HARNESS))}`);
+  }
+
+  // C3 T 组只动了假树：四枚被定向漂移的原文件在**真工作树**里仍与进组前的基线逐字相同。
+  //    判据为什么是"与基线逐字相同"而不是"git status 干净"：后者会把本批早前的未提交改动
+  //    读成装置在改真文件（假红），而它要证的只是"变异没漏出假树"这一件事。
   rmSync(FAKE, { recursive: true, force: true });
+  {
+    const touched = [ZH, EN, GUIDE, HARNESS];
+    const drifted = touched.filter((f) => readFileSync(join(ROOT, f), 'utf8') !== BASELINE.get(f));
+    record('C3 T 组七臂只动假树 ⇒ 四枚被变异的原文件与进组基线逐字相同',
+      drifted.length === 0,
+      `逐字回原 ${touched.length - drifted.length}/${touched.length} 枚${drifted.length ? ` · 漂了：${drifted.join(',')}` : ''}`);
+  }
 
   // 收尾复原对照：全部跑完再原样跑一次，证明**变异没漏进真门禁**。
+
   const gateNow = readFileSync(GATE, 'utf8');
   const clean = !gateNow.includes('这枚文件不存在') && !gateNow.includes('_ZZZ') && gateNow.includes(`file: '${SELF_FILE}',`);
   record('C1 真门禁本体没被任何一臂改到（三个变异串都不在，自登记那条在）', clean,
@@ -311,12 +480,14 @@ try {
 }
 
 const bad = results.filter((r) => !r.ok).length;
-console.log(`R8+R9 变异台：臂数 ${results.length} · 红 ${bad} · 副本已删=${!existsSync(COPY)} · 假树已删=${!existsSync(FAKE)}`);
-/* 🔴 臂数下限就是本文件里 record() 的条数（A0–A6 那 R8 的七臂 + A7–A13 那 R9 的七臂 + C1/C2 = 16）。
+console.log(`入口命令变异台（R1–R7 + R8 + R9）：臂数 ${results.length} · 红 ${bad} · 副本已删=${!existsSync(COPY)} · 假树已删=${!existsSync(FAKE)}`);
+/* 🔴 臂数下限就是本文件里 record() 的条数（R8 的 A0–A6 + R9 的 A7–A13 + T 组 T0–T7 + C1/C2/C3）。
  *    写死它是刻意的：一臂被注释掉或抛异常中断时，"红 0"不能读成"全绿" —— 缺臂 = 装置坏了。 */
-if (bad > 0 || results.length < 16) {
-  console.log('❌ 有臂不符合期望 ⇒ R8/R9 的牙没钉牢（或者装置与被检对象漂了）');
+if (bad > 0 || results.length < 25) {
+  console.log('❌ 有臂不符合期望 ⇒ R1–R7 / R8 / R9 的牙没钉牢（或者装置与被检对象漂了）');
   process.exit(1);
 }
-console.log('✅ R8 三方向各有臂打红过（漏登记 / 豁免失效 / 分母读不出）+ 一处 POSIX 形状自缩分母的坑；' +
+console.log('✅ R1–R7 各有臂打红过（少一份 build override / 中英只改一边 / 整条命令被删 / 文件名 typo / 少迁移 override / 点名服务漏迁移服务 / 对外与验收载体分叉），' +
+  'T0 证明原样假树七条全零；' +
+  'R8 三方向各有臂打红过（漏登记 / 豁免失效 / 分母读不出）+ 一处 POSIX 形状自缩分母的坑；' +
   'R9 三方向各有臂打红过（义务落点被摘 / 落点退成散文 / 时机句被摘）+ 前提自己变红 + 两份分母读不出');
