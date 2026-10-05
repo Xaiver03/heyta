@@ -243,6 +243,46 @@ describe('Q. 落点：面单要么在栏里，要么在列表右边，不会两�
   });
 });
 
+describe('S. 面单的头行：名字在左、三颗工具在右，同一行（工单 §8.134）', () => {
+  /* 🔴 这一族量的是**归属**，不是像素。§8.133 看图照出来的那个坏形状（三颗工具浮在栏顶、
+     与页头同高，读起来像页头的工具条）在 jsdom 里量不到高度 —— 高度由
+     `e2e/tests/detail-pane-habit.spec.ts` H6 量。这里能钉住的是"工具挂在哪一行的**结构**"：
+     摘掉头行、把工具挪回头行外面、未选中时还把这一行画出来，三档都在这里红。 */
+  const head = (view: ParentNode): Element | undefined =>
+    view.querySelector('.ht-habit__pane-head') ?? undefined;
+
+  it('标题行 = 所选那条的名字 + 三颗工具同一行，且板子不在这行里', async () => {
+    await act(async () => {
+      selection.select('habit', habitIdOf('阅读'));
+    });
+    const view = await mount(<HabitDetailCard inset />);
+    const row = head(view);
+    expect(row, '面单没有头行 ⇒ 三颗工具又回到"浮在栏顶"那一档').not.toBeNull();
+    expect(
+      row?.querySelector('.ht-habit__pane-title')?.textContent?.trim(),
+      '头行的标题不是所选那条（用户不知道这三颗工具改的是谁）',
+    ).toBe('阅读');
+    const tools = row?.querySelector('.ht-habit__pane-tools');
+    expect(tools, '三颗工具不在头行里').not.toBeNull();
+    // 图标那颗 + 改名 + 删除 = 三颗，一个都不许多（多一颗说明工具行在往页头靠）。
+    expect(tools?.children.length, `工具行里有 ${String(tools?.children.length)} 颗`).toBe(3);
+    expect(
+      row?.querySelector('[data-testid="habit-board"]'),
+      '板子被画进了头行 ⇒ 这一行不再是"标题行"而是整栏',
+    ).toBeNull();
+  });
+
+  it('🔴 未选中时这一行整个不存在（不许画一条指着没选中的那条的头行）', async () => {
+    const view = await mount(<HabitDetailCard inset />);
+    expect(head(view), '未选中时仍有头行').toBeUndefined();
+    // 与 Q 组那条同一件事的另一面：这里钉的是**结构**（那一行不在），
+    // Q 组钉的是**文本**（说的是「选一条习惯」）。两档各挡一种坏：
+    // 只查文本的话，"头行写着第一条的名字、板子写着选一条习惯"这种分裂界面照样绿。
+    expect(inRoot('.ht-habit__pane-tools', view)).toHaveLength(0);
+    expect(inRoot('.ht-habit__pane-title', view)).toHaveLength(0);
+  });
+});
+
 describe('R. 宿主接线与布局开关（直接挂组件的用例看不见这一层）', () => {
   /* 🔴 先剥注释（§8.130 为此撞过两处）：这些判据读的是代码形状，而注释里会引用
      被禁的那个写法本身。行注释只认行首的。 */

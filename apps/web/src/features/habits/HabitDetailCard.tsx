@@ -42,13 +42,11 @@ import { readNow, useHabitStore } from './store.js';
   `scripts/check-l4-no-style.mjs` 按出现次数计进棘轮（web 上限 104）。
   值与搬过来之前逐字相同（字段高 = `touch-target.min`、字号 ≥16px 防 iOS Safari
   聚焦缩放），只是换了宿主文件 —— 本单不该顺手把内联样式换成类。
-*/
-const paneHeadStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: cssVar('space.2'),
-};
 
+  ⚠️ 标题那一行**不在这里**：`.ht-habit__pane-head` / `-title` / `-tools` 是类而不是
+  内联样式（§8.134）。理由不是整洁 —— 是这一行**要靠几何判据守**（工具必须与标题同行、
+  且在页头之下），而 `style={{…}}` 里的 `alignItems: 'baseline'` 在 jsdom 里读不出来。
+*/
 const renameFormStyle: CSSProperties = {
   display: 'flex',
   gap: cssVar('space.1'),
@@ -156,43 +154,54 @@ export function HabitDetailCard({ inset }: { inset: boolean }): React.JSX.Elemen
     >
       {selected === undefined ? null : (
         <>
-          <div className="ht-habit__pane-head" style={paneHeadStyle}>
-            <HabitIconPicker
-              habit={selected}
-              onChange={(icon) => {
-                void store.setHabitIcon(selected.id, icon);
-              }}
-            />
+          <div className="ht-habit__pane-head">
             {/*
-              🔴 改名与删除此前**只有动作层有、界面没有**：`store.deleteHabit`
-              早就存在却零调用点，`renameHabit` 是后来才补的。于是 web 上
-              "建错了改不了、不想要了删不掉"，而界面上看不出这是缺功能 ——
-              它长得和"做完了"一模一样。
+              🔴 标题行是 §8.133 **看图照出来的那一处**，修在 §8.134：三颗工具原来单独
+              浮在栏顶，与页头那排图标同高、离它们真正说话的卡片隔着一整段空白 —— 读起来像
+              **页头的工具条**而不是"这条习惯的工具"。搬进那一栏之前不会这样（窗格在内容列里，
+              上面就是本页的页标题）。修法是把工具挂到**这一栏自己的第一行**上，与所选那条的名字同行。
+              ⚠️ 看图读数：这一行的**纵向带没变**（详情列的顶就是页头的顶），归属是靠
+              "左边写着这条习惯的名字"建立的 —— 那一半要动列结构，登记成边界，不在这里顺手做。
             */}
-            <button
-              type="button"
-              aria-label={t('common.habits.rename.button', { name: selected.name })}
-              onClick={() => {
-                setRenamingId(selected.id);
-                setRenameDraft(selected.name);
-              }}
-              style={iconButtonStyle}
-            >
-              <Pencil size={ICON_SIZE.sm} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              aria-label={t('common.habits.delete.button', { name: selected.name })}
-              onClick={() => {
-                // 先收编辑器再发 op：名字改到一半把习惯删掉，编辑器会指着一条
-                // 已经不存在的习惯（保存按钮还在，而动作层会抛"找不到习惯"）。
-                setRenamingId(null);
-                void store.deleteHabit(selected.id);
-              }}
-              style={iconButtonStyle}
-            >
-              <Trash2 size={ICON_SIZE.sm} aria-hidden="true" />
-            </button>
+            <h2 className="ht-habit__pane-title">{selected.name}</h2>
+            <div className="ht-habit__pane-tools">
+              <HabitIconPicker
+                habit={selected}
+                onChange={(icon) => {
+                  void store.setHabitIcon(selected.id, icon);
+                }}
+              />
+              {/*
+                🔴 改名与删除此前**只有动作层有、界面没有**：`store.deleteHabit`
+                早就存在却零调用点，`renameHabit` 是后来才补的。于是 web 上
+                "建错了改不了、不想要了删不掉"，而界面上看不出这是缺功能 ——
+                它长得和"做完了"一模一样。
+              */}
+              <button
+                type="button"
+                aria-label={t('common.habits.rename.button', { name: selected.name })}
+                onClick={() => {
+                  setRenamingId(selected.id);
+                  setRenameDraft(selected.name);
+                }}
+                style={iconButtonStyle}
+              >
+                <Pencil size={ICON_SIZE.sm} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label={t('common.habits.delete.button', { name: selected.name })}
+                onClick={() => {
+                  // 先收编辑器再发 op：名字改到一半把习惯删掉，编辑器会指着一条
+                  // 已经不存在的习惯（保存按钮还在，而动作层会抛"找不到习惯"）。
+                  setRenamingId(null);
+                  void store.deleteHabit(selected.id);
+                }}
+                style={iconButtonStyle}
+              >
+                <Trash2 size={ICON_SIZE.sm} aria-hidden="true" />
+              </button>
+            </div>
           </div>
 
           {renamingId === selected.id ? (
