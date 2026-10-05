@@ -113,6 +113,11 @@ const ENDPOINTS = [
       'scripts/verify-mobile-conflict.sh', // 并发冲突在界面上解决
       'scripts/verify-mobile-autosync.sh', // 全程不点同步按钮，写入也必须自己出去
       'scripts/verify-mobile-restore.sh', // 备份还原（只还原到空库）
+      // 🔴 回收站与注销这两格是 2026-10 批次补的，之前**装置存在但清单里没有**，
+      //    于是"入口被删/改名"这一档（本门禁的 ①）对它们完全失明。
+      'scripts/verify-mobile-trash.sh', // 回收站：手机删便签/清单 → 零点击出去 → 两端回收站都列出 → 还原回活体（W6）
+      'scripts/verify-mobile-account-erasure.sh', // 注销之后 Android 容器里的本机明文库真的没了（E2 的 op-sqlite Android 后端）
+      'scripts/verify-mobile-ios-account-erasure.sh', // 同一件事的 iOS 后端那一格 —— 两份 removeDatabase 实现，缺一端不许报"移动端已证"
       'scripts/verify-multi-end-sync.sh', // Web ↔ 服务端 ↔ 笔记本三相（移动数据的对端）
       // 视图与交互
       'scripts/verify-mobile-calendar.sh',
@@ -134,7 +139,8 @@ const ENDPOINTS = [
     shellSpecs: [],
     covers:
       'J1–J7 全覆盖（真模拟器 + 真服务端，零 mock）：身份注册/登录 → 凭据管理 → 写入并跨设备读回同一条 → ' +
-      '冲突解决 → 零点击自动同步 → 备份还原 → 六个视图 → 专注/重复/提醒投递，Android 与 iOS 两端',
+      '冲突解决 → 零点击自动同步 → 备份还原 → 回收站四类跨设备 → 注销后本机明文库销毁 → 六个视图 → ' +
+      '专注/重复/提醒投递，Android 与 iOS 两端',
   },
   {
     end: 'macos',
@@ -396,8 +402,21 @@ for (const { end, journeySpecs, shellSpecs, covers } of ENDPOINTS) {
 if (!bad) {
   console.log('');
   console.log('   —— 抽查：web 的旅程验收真的能跑 ——');
+  /**
+   🔴 **三种结局要分开，原来是两种**（2026-10-04 实测撞出来的）。
+   `stdio:'inherit'` 让这段除了"退 0 / 退非 0"之外什么都不知道，于是
+   **内存闸门拒绝启动**（tfa-shield 在 /tmp/tfa-test.lock 上挡下 vitest，根本没跑一条用例）
+   被报成「旅程验收跑不过 —— 入口在，但它不成立」——
+   而那句是一个**产品断言**，它当时的依据只是一次没跑成的启动。
+   ⇒ 现在把输出接回来自己分类：跑通 / **没跑成（环境，退 3）** / 跑了而不成立（退 1）。
+   ⚠️ 这不是放松：环境档照样非零退出，`pnpm check` 的 `&&` 一样会停 ——
+      变的只是**它说什么**，不是**它拦不拦**。
+   */
+  let out = '';
+  let ran = true;
+  let refusal = false;
   try {
-    execFileSync(
+    out = execFileSync(
       'pnpm',
       [
         '--dir',
@@ -410,11 +429,27 @@ if (!bad) {
         'tests/credential-storage.spec.ts',
         '--reporter=dot',
       ],
-      { cwd: ROOT, stdio: 'inherit' },
+      {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
     );
+  } catch (e) {
+    out = String((e && e.stdout) || '') + String((e && e.stderr) || '') + String((e && e.message) || '');
+    ran = false;
+  }
+  refusal = /内存闸门拒绝启动|tfa-test\.lock/.test(out);
+  if (ran) {
     console.log('   ✅ web 旅程验收跑通。');
-  } catch {
+  } else if (refusal) {
+    console.error('⏸ web 的旅程抽查**没跑成**：内存闸门拒绝启动（有别的测试在跑，锁 /tmp/tfa-test.lock）。');
+    console.error('   ⇒ 这是环境条件，不构成"旅程不成立"的读数；静态对账（每端有入口或有登记）仍然成立。');
+    console.error('   重跑：等那趟测试结束后 `pnpm check:journey-coverage`。退出码 3 = 本轮没有读数。');
+    process.exit(3);
+  } else {
     console.error('❌ web 的旅程验收**跑不过** —— 入口在，但它不成立。');
+    console.error(out.split('\n').slice(-25).join('\n'));
     bad = true;
   }
 }
