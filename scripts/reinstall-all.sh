@@ -108,10 +108,25 @@ PNPM="$(resolve_pnpm)"
 #    ⇒ 窗口合成既会**假红**（没合成 = 空白）也会**假绿**（自家底 = 非空白），
 #    "画没画出来"这个问题只能压在 WebView 快照上；窗口图只负责"是不是真窗口"
 #    （透明/标题/尺寸）。没有快照时才退回窗口图当内容载体。
+# 🔴 第五轮实测（2026-10-05，合流态现量）：**首屏品牌帧是一枚"擦边才没骗过判据"的图**。
+#    同一枚 `png-stats` 量三张：
+#      · 品牌帧 `e2e/test-results/boot-splash-frame.png` ⇒ 内容占比 **0.00943**、主蓝 **2000**
+#      · 真界面（本机 mac 段 WebView 快照）             ⇒ 内容占比  **0.7141**、主蓝 1127
+#      · 真图里最"空"的一张（浮层压在压暗底上）         ⇒ 内容占比  **0.1034**、主蓝  835
+#    品牌帧那块底板**本身就是主蓝** `#2563EB`（`scripts/gen-boot-splash.mjs` 的
+#    `--heyta-boot-plate: PRIMARY`），所以"主蓝 ≥ 20"那条不但拦不住它，还给它打了真界面的**一倍以上**。
+#    它今天之所以没骗过去，只因为 `looksBlank` 的 0.01 恰好压在 0.00943 上 —— **余量 5.7%**，
+#    而这两个数之间没有任何因果关系（画幅 / DPR / `MARK_SIZE` token / 采样步长，
+#    任何一个动一下擦边就没了 ⇒ 变成"非空白 + 主蓝充足"的满分假绿，正是 #82 那一族的第五种面目）。
+#    ⇒ 加一条**内容占比下界**，把"擦边的巧合"换成有推导的判据。取值不靠拍：
+#    下界 = 最低真图实测 0.1034 的一半 ⇒ **0.05**（对品牌帧留 5.3 倍、对最低真图留 2 倍）。
+#    为什么不复用 `check:macos-window` 的 0.02：那个下界是从"错误屏 0.004 / 未合成 0.006"推的，
+#    对品牌帧只剩 2.1 倍 —— 同一枚阈值不该同时服务两个不同的推导。
 # 用法：shot_ok <窗口 png> [webView png]；输出 ✅/🔴 行。
 shot_ok() {
   node - "$1" "${2:-}" <<'JS'
 import('./scripts/screenshots/png-stats.mjs').then((m) => {
+  const MIN_CONTENT_RATIO = 0.05;
   const st = m.inspectPng(process.argv[2]);
   const brandShot = process.argv[3] || process.argv[2];
   const cs = brandShot === process.argv[2] ? st : m.inspectPng(brandShot);
@@ -125,6 +140,12 @@ import('./scripts/screenshots/png-stats.mjs').then((m) => {
   const blue = m.countBrandBlue(brandShot);
   console.log(`  主蓝采样命中 ${blue}（数的是 ${base(brandShot)}）`);
   if (blue < 20) { console.log('  🔴 截图里没有 heyta 主蓝 —— 是错误屏/别的界面，不是共享 UI'); bad = true; }
+  if (cs.contentRatio < MIN_CONTENT_RATIO) {
+    console.log(`  🔴 ${(cs.contentRatio * 100).toFixed(1)}% < ${MIN_CONTENT_RATIO * 100}% 内容占比下界 ——` +
+                `     主蓝再多也不算数：**首屏品牌帧**就是一块主蓝底板压在近白底上（实测命中 2000、占比 0.9%），` +
+                `     它是遮罩还没从 DOM 摘掉的那一帧，不是装好的应用`);
+    bad = true;
+  }
   if (bad) process.exit(1);
   console.log(`  ✅ 窗口 ${st.width}x${st.height}、${base(brandShot)} 内容占比 ${(cs.contentRatio * 100).toFixed(1)}%、主蓝命中 ${blue} —— 是共享 UI`);
 }).catch((e) => { console.log(`  🔴 读不了截图：${e.message}`); process.exit(1); });
