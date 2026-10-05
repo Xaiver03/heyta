@@ -36,6 +36,11 @@
   flex-direction: column;
   gap: var(--ht-space-3);
   min-width: 0;
+  /* 工单 H1：卡片排两列的触发条件量的是**这一列自己的宽度**，不是视口。
+     `.ht-habit` 的轨道会随面单落点搬家（宽屏单列铺满 / 窄屏塌缩 / 回落那支只有 2fr），
+     用视口媒体查询会得到"视口够宽而这一列其实很窄"的错判 —— 那正是把卡片挤成
+     半张卡宽度、数字被裁的那一份坏（判据 `e2e/tests/habits-two-column.spec.ts` T5）。 */
+  container-type: inline-size;
 }
 
 /* 新建习惯：一行「输入框 + 图标按钮」。这两件以前是行内样式，
@@ -77,13 +82,34 @@
   outline-offset: var(--ht-space-1);
 }
 
+/*
+ * 工单 H1（= W13a）：中栏从**一条纵列**改成**两列卡片**。
+ *
+ * 产品负责人对照滴答指的不是数字不够多，是排法。落点只有这里 ——
+ * `.ht-habit__item` 本来就是带边框与圆角的一枚卡（`.ht-habit__row` 画的就是卡片表面），
+ * 所以这一单**DOM 一行不动**，只把外层从"逐行往下排"换成"两根等宽轨道"。
+ * 🔴 不动 `packages/ui/src/habits/*`：中栏是 web 的 DOM 层，共享层一动就推给四端。
+ *
+ * 阈值 33rem **不是拍的**，由本文件里已有的两个常量推出来：
+ *   一张卡的可读下限 = 16rem（就是上面 `.ht-habit` 那根 `minmax(16rem, 2fr)` 自己写的下限，
+ *   也就是这一列"还读得下去"的既有判定），两列 ⇒ 2 × 16rem，再加网格间距
+ *   `--ht-space-2`（8px = 0.5rem）⇒ 32.5rem，向上取整到 33rem。
+ * ⚠️ `@container` 里不能写 `var()`（查询特性不接受变量），所以这里是算出来的数 ——
+ *   注释把算式留下，改任一常量的人必须回来重算这条（判据 T2/T4 会同时点名前提）。
+ */
 .ht-habit__list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--ht-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+@container (min-width: 33rem) {
+  .ht-habit__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .ht-habit__item {
