@@ -119,6 +119,18 @@ for (const [rel, info] of Object.entries(snap.tracked || {})) {
   }
   rewritten.push(rel);
 }
+/**
+ * 🔴 "跑前就脏"且**这一趟又换了字节**的那一档：还原不了（还原会把别人/上一趟未提交的版本抹得更干净），
+ * 但必须点名报 —— 否则"提交态就是人看过那一版"这句话对已暂存的新图并不成立（§8.153 第 3 节现量：
+ * 守卫不动它，而它确实被这一趟重写了一遍）。
+ */
+const preexistingRewritten = [];
+for (const rel of untouchedPreexisting) {
+  const info = snap.tracked[rel];
+  if (!info) continue;
+  const after = md5(rel);
+  if (after !== null && after !== info.md5) preexistingRewritten.push(rel);
+}
 const added = onDisk().filter((rel) => !trackedNow.has(rel) && !(snap.untrackedAtSnapshot || []).some((e) => e.rel === rel));
 /**
  * 🔴 跑前就存在的**未跟踪**文件被这一趟换了字节 —— 守卫**还原不了**它（`git restore` 对未跟踪无意义），
@@ -135,9 +147,12 @@ for (const e of snap.untrackedAtSnapshot || []) {
 }
 
 console.log(
-  `EVIDENCE 本趟重写=${rewritten.length} 枚｜跑前就脏（不动）=${untouchedPreexisting.length} 枚｜新增未跟踪（不动）=${added.length} 枚｜EVIDENCE_UNTRACKED_REWRITTEN=${untrackedRewritten.length}`,
+  `EVIDENCE 本趟重写=${rewritten.length} 枚｜跑前就脏（不动）=${untouchedPreexisting.length} 枚（其中被这一趟换了字节 ${preexistingRewritten.length} 枚）｜新增未跟踪（不动）=${added.length} 枚｜EVIDENCE_UNTRACKED_REWRITTEN=${untrackedRewritten.length}`,
 );
 for (const l of untouchedPreexisting) console.log(`  · 不动（跑前就是脏的，可能是别人的在途证据）：${l}`);
+for (const l of preexistingRewritten) {
+  console.log(`  · 🔴 跑前就脏、这一趟又换了字节：${l} —— 还原会把未提交的那版抹得更干净，所以只报不动手；提交前请重新打开它`);
+}
 for (const l of added) console.log(`  · 新增未跟踪：${l}`);
 for (const l of untrackedRewritten) {
   console.log(`  · 🔴 未跟踪且被这一趟换了字节：${l} —— 看过的不等于盘上的；先 git add 再跑，或提交前重新打开它`);
