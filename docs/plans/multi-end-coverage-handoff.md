@@ -3756,10 +3756,13 @@ git grep -ohE 'AGENTS\.md §[0-9]+(\.[0-9]+)*' main -- docs | sort | uniq -c
 
 | 格 | 由谁消 | 命令与判据 |
 |---|---|---|
-| ① 的图 5（Windows 第一屏） | **人，两层**：① windows-pc **此刻不可达**（20:47 现量三条通道：ssh rc=255 / `nc -z` rc=1 / ping 100% 丢包；它 20:00 还打得进）② 控制台**还锁着**（20:26 现量 `LogonUI` 在跑 ⇒ `LOCKED=yes`） | 恢复可达 + 解锁后 `pnpm reinstall:all --only windows`，判据仍是"那张图**人打开看过**"（AGENTS §6.2 规定一），文本侧继续认 `M2D=OK` 五条。⚠️ 现在跑会红在"主机不可达"那一格，别读成产品缺陷 |
-| ② 段 85 归属 | 窗口（20:47 现量 `--target b` ⇒ `REDS=src`；锁也被 pid 88878 活着持有过） | BLOCKED **B83/B83.1** 那条命令（干净载体 checkout main → install → build → 单跑 `@heyta/mobile test`）。20:47 已削掉"装置态"一半：两棵树 `apps/mobile/node_modules/vitest` 软链**指向同一枚 `.pnpm` 目录** ⇒ 变换管线不是差异 |
+| ① 的图 5（Windows 第一屏） | **人，一层**（可达那层已自己翻面：20:47 三条通道都报不可达，20:51 同一条 ssh 就通了）：21:08 再探仍 `LOCKED=yes` ⇒ 只剩"有人在 windows-pc 前解锁会话" | 解锁后 `pnpm reinstall:all --only windows`，判据仍是"那张图**人打开看过**"（AGENTS §6.2 规定一），文本侧继续认 `M2D=OK` 五条 |
+| ② 段 85 归属 | **本线已给出归属，只差半格**（见 BLOCKED **B83.4**）：同一包同一提交**单独跑** `pnpm --filter @heyta/mobile test` 在 `7911ad02`（21:06，rc=0/52/739/Unhandled 0）和 main（20:54，同样 rc=0）都绿 ⇒ 红在"**全仓递归这条命令在这台机器上的运行形态**"，不在 mobile 代码里 | 缺的半格是"递归跑在 main 上时 mobile 那一档会不会红"——被 `apps/web` 的 **24 条真用例**（干净检出 main `8f870ea3` 的提交态，B83.3）挡住。等那 24 条的主人修完再复跑 `pnpm -r test`，**不要**用 `--no-bail`/跳包绕（那会把这条判据读成另一件事） |
 | Android 判据 4（连续两轮重打） | 窗口 | `~/.heyta-window-rigs/heyta-judge4-two-rounds.sh --go`（判据 3 已在 ① 里取到读数，别重取） |
-| traps 候选 #273–**#292** | 等 `docs/reference/environment-traps.md` 腾开（20:45 现量仍 `M`，正文最大号 303） | 落地时**按写入当时的现量最大号顺延**，别抄 303；#292 = `cp` 不带 `-p` 会毁掉归档里"属于哪一趟"这个唯一可判别属性 |
+| traps 候选 #273–**#294** | 等 `docs/reference/environment-traps.md` 腾开（21:08 现量仍 `M`，20:26 那次正文最大号 303 —— **落地时按写入当刻现量顺延，别抄**） | #292 = `cp` 不带 `-p` 会毁掉归档里"属于哪一趟"这个唯一可判别属性；**#293** = 不带引号的 heredoc 往共享台账写正文，正文里的反引号**是命令替换**（我 21:01 因此在主检出跑掉一条 `git checkout --detach`，落在分支自己的 tip ⇒ 字节零变化、40 秒内恢复；它照样 rc=0 且落盘是残句）；**#294** = 一条读数答的是哪一问**取决于命令形状而不是被测包**（`--filter` 单跑 vs `pnpm -r` 递归），补配对腿只花 25 秒 |
+
+🔴 **窗口这一格现在是三条红**（21:08 现量 `--target b` ⇒ `REDS=load,src,dev`，gate_rc=3；20:47 那次只有 `src`）：
+负载、别人的未提交源码、别人的 dev 端口/设备面同时在占 ⇒ 本线**没有**起任何设备/Playwright/重装类运行，包括上面那两条待窗口的。
 
 🔴 两条横切纪律这轮又被证明是承重的：**读产物前先证明它属于哪一趟**（那 98 枚 seg 日志）；
 **归档要收逐条原始读数，不是收我自己数出来的聚合行**（Windows 那五条、逐段那 85 枚）。
