@@ -86,7 +86,7 @@ import {
   saveDetailPane,
   type DetailPanePref,
 } from './features/shell/detail-pane-pref.js';
-import { TaskOrganizer } from './features/tasks/TaskOrganizer.js';
+import { TagChips, TaskOrganizer } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
 import { RepeatChip, TaskRepeat } from './features/tasks/TaskRepeat.js';
 import { DueEditor } from './features/tasks/DueEditor.js';
@@ -941,16 +941,29 @@ export function App(): React.JSX.Element {
 
           {/* 清单归属 + 标签。Web 端此前**根本没有入口** ——
               `moveToProject` 没有任何调用点、`tagIds` 全仓库零读写，
-              于是侧栏里建出来的清单和标签一个也用不上。 */}
-          <TaskOrganizer
-            task={task}
-            onMoveToProject={(projectId) => {
-              void store.moveToProject(task.id, projectId);
-            }}
-            onSetTags={(tagIds) => {
-              void store.setTags(task.id, tagIds);
-            }}
-          />
+              于是侧栏里建出来的清单和标签一个也用不上。
+
+              ⚠️ 工单 §8.147 起它**只在详情列没在画时整块挂在这里**：栏里画着的时候编辑本体
+              （清单下拉 + 标签复选框）住在 `TaskDetailCard` 那一格。
+              🔴 这一格留的是**只读 chip**（`TagChips`），不是截止那种"整块不画"：
+              截止的显示另有其人（共享 `task-meta` 那一槽），而**标签在共享层没有对应槽**，
+              行上这两枚 chip 就是它唯一的显示位 —— 撤掉会让列表里"看不出哪条挂了标签"，
+              那是 §8.138 那条不变量明确不许的。归属的显示本来就在 `task-meta`，所以这里
+              不重复画清单名（同一行说两遍）。窄档（栏不出现）时整块退回这一格，
+              所以"归不了类"在任何一档都不会发生。 */}
+          {taskPaneInColumn ? (
+            <TagChips task={task} />
+          ) : (
+            <TaskOrganizer
+              task={task}
+              onMoveToProject={(projectId) => {
+                void store.moveToProject(task.id, projectId);
+              }}
+              onSetTags={(tagIds) => {
+                void store.setTags(task.id, tagIds);
+              }}
+            />
+          )}
 
           {/* 重复。🔴 Web 此前**没有入口** —— 移动端早就能设，
               两端不一致；这一处补的正是 B2-3 的「Web 入口」那一半，

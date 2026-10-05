@@ -28,6 +28,7 @@ import { I18nProvider, zhCN } from '@heyta/i18n';
 import { HeytaUiProvider } from '@heyta/ui';
 
 import { __resetOpLogForTests, initOpLog, useTaskStore } from '../src/features/tasks/store.js';
+import { useProjectStore } from '../src/features/projects/store.js';
 import { useReminderStore } from '../src/features/reminders/store.js';
 import { selection } from '../src/lib/selection.js';
 
@@ -36,6 +37,7 @@ const { NoteBadge } = await import('../src/features/tasks/NoteEditor.js');
 const { RepeatChip } = await import('../src/features/tasks/TaskRepeat.js');
 const { SubtaskBadge } = await import('../src/features/tasks/SubtaskPicker.js');
 const { ReminderBadge } = await import('../src/features/reminders/ReminderPanel.js');
+const { TagChips } = await import('../src/features/tasks/TaskOrganizer.js');
 
 const APP_SRC = readFileSync(join(process.cwd(), 'src', 'App.tsx'), 'utf8');
 
@@ -658,6 +660,207 @@ describe('截止这一字段此刻归谁（§8.146）', () => {
     expect(
       /taskPaneInColumn\s*\?\s*<DueBadge/.test(src),
       '宽档行尾长出了截止徽标 ⇒ 行上把截止的显示说了两遍',
+    ).toBe(false);
+  });
+});
+
+/**
+ * 清单 + 标签这一字段此刻归谁（工单 §8.147 —— 同一套纪律的**第六次**落地）
+ * ======================================================================
+ *
+ * 与前五格同一条不变量（一个字段任何时刻只有一个编辑器所有者），但这一格有两处**只属于它**的形状，
+ * 判据必须照着它们写，否则量不到：
+ *
+ * ① **它是唯一"编辑本体自带两个区块头"的一格**（「清单」在 `<label>` 的 span 里、
+ *    「标签」在 `<fieldset>` 的 `<legend>` 里）。所以宿主**不许**再叠 `h3`，
+ *    而判"多写"只有一条路：**数节点**（§8.145 的 M2 那条规律在这里第二次生效）。
+ * ② **它是唯一"两个控件全部受控、整块零 `useState`"的一格** ⇒ 换选中**不需要** `key`
+ *    （§8.145 立的那条纪律在这一格落在"不挂"那一侧）。但"不挂 key 也对"这件事本身要有读数，
+ *    所以下面那条判据量的是**换选中后值跟着换人** —— 一旦有人把它改成非受控草稿，那条就红。
+ */
+describe('清单 + 标签这一字段此刻归谁（§8.147）', () => {
+  const pane = () => document.querySelector('[data-testid="task-pane"]');
+  const selectIn = (root: Element | null | undefined): HTMLSelectElement | null =>
+    root?.querySelector<HTMLSelectElement>('[data-testid="organize-project-select"]') ?? null;
+  /** 数某一档区块头：只数**叶子文本节点所在的那个元素**，不数 aria-label。 */
+  const countText = (root: Element | null | undefined, selector: string, want: string): number =>
+    [...(root?.querySelectorAll(selector) ?? [])].filter((n) => n.textContent === want).length;
+
+  /** 建一条清单并返回它的 id（走的是真 op-log，不是塞内存）。 */
+  async function addProject(name: string): Promise<string> {
+    await act(async () => {
+      await useProjectStore.getState().addProject(name);
+    });
+    await flush();
+    const id = useProjectStore.getState().projects.find((p) => p.name === name)?.id;
+    if (id === undefined) throw new Error(`没建出清单「${name}」⇒ 后面的判据在空转`);
+    return id;
+  }
+
+  async function addTag(name: string): Promise<string> {
+    await act(async () => {
+      await useProjectStore.getState().addTag(name);
+    });
+    await flush();
+    const id = useProjectStore.getState().tags.find((tag) => tag.name === name)?.id;
+    if (id === undefined) throw new Error(`没建出标签「${name}」⇒ 后面的判据在空转`);
+    return id;
+  }
+
+  it('🔴 栏里画的是整理的编辑本体（下拉 + 复选框），整页只有一份', async () => {
+    const projectId = await addProject('整理清单甲');
+    const tagId = await addTag('整理标签甲');
+    const id = await addTask('整理甲');
+    await act(async () => {
+      await useTaskStore.getState().setTags(id, [tagId]);
+    });
+    await flush();
+    selection.select('task', id);
+    mount();
+
+    const selects = document.querySelectorAll('[data-testid="organize-project-select"]');
+    expect(selects.length, `整页应有且只有一份清单下拉，实到 ${String(selects.length)}`).toBe(1);
+    expect(pane()?.contains(selects[0]!), '那一份清单下拉不在栏里 ⇒ 编辑本体没搬进来').toBe(true);
+    // "是编辑器不是痕迹"的证据：候选在场（只读徽标长不出 `<option>`）。
+    const options = selects[0]?.querySelectorAll('option') ?? [];
+    expect(
+      [...options].some((o) => o.textContent === '整理清单甲'),
+      '清单下拉里没有那条清单 ⇒ 画的不是编辑器',
+    ).toBe(true);
+    // 🔴 勾着的那个标签的复选框在栏里（不是行上），且整页只有一只。
+    const boxes = document.querySelectorAll<HTMLInputElement>('input[type="checkbox"][aria-label]');
+    const inPane = [...boxes].filter((b) => pane()?.contains(b));
+    expect(boxes.length, `整页应有且只有一只标签复选框，实到 ${String(boxes.length)}`).toBe(1);
+    expect(inPane.length, '那只复选框不在栏里').toBe(1);
+    expect(inPane[0]?.checked, '已挂的标签在栏里没显示成勾上').toBe(true);
+    void projectId;
+  });
+
+  it('🔴 区块头：「清单」「标签」各恰好一处，而宿主没有再叠 h3（这一格自带两个）', async () => {
+    await addTag('整理标签乙');
+    const id = await addTask('整理乙');
+    selection.select('task', id);
+    mount();
+    expect(countText(pane(), 'span', '清单'), '「清单」区块头在栏里不是恰好一处').toBe(1);
+    expect(countText(pane(), 'legend', '标签'), '「标签」区块头在栏里不是恰好一处').toBe(1);
+    expect(
+      countText(pane(), 'h3', '清单') + countText(pane(), 'h3', '标签'),
+      '宿主又叠了一枚 h3 ⇒ 同一格把同一个词说两遍，读到的是"有两个区块"',
+    ).toBe(0);
+  });
+
+  it('🔴 在栏里选清单 ⇒ 真的写进物化状态（不是只改内存里那一条）', async () => {
+    const projectId = await addProject('整理清单丙');
+    const id = await addTask('整理丙');
+    selection.select('task', id);
+    mount();
+    const select = selectIn(pane());
+    if (select == null) throw new Error('栏里没有清单下拉 ⇒ 判据在空转');
+    const option = [...select.querySelectorAll('option')].find((o) => o.textContent === '整理清单丙');
+    if (option == null) throw new Error('下拉里没有那条清单 ⇒ 判据在空转');
+    await act(async () => {
+      select.value = option.value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await flush();
+    expect(useTaskStore.getState().entities.tasks[id]?.projectId, '栏里那次选择没落到 projectId 上').toBe(
+      projectId,
+    );
+  });
+
+  it('🔴 在栏里勾标签 ⇒ 整组写进 tagIds（一条交互 = 一条 op）', async () => {
+    const tagId = await addTag('整理标签丁');
+    const id = await addTask('整理丁');
+    selection.select('task', id);
+    mount();
+    const box = [...(pane()?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])].find(
+      (b) => b.getAttribute('aria-label')?.includes('整理标签丁'),
+    );
+    if (box == null) throw new Error('栏里没有那只复选框 ⇒ 判据在空转');
+    expect(box.checked, '刚建的任务不该已经挂着标签').toBe(false);
+    await act(async () => {
+      box.click();
+    });
+    await flush();
+    expect(useTaskStore.getState().entities.tasks[id]?.tagIds, '栏里那次勾选没落到 tagIds 上').toEqual([
+      tagId,
+    ]);
+  });
+
+  it('🔴 换选中 ⇒ 栏里的下拉与勾选跟着换人（这一格不挂 key 的成立条件）', async () => {
+    const projectId = await addProject('整理清单戊');
+    const tagId = await addTag('整理标签戊');
+    const a = await addTask('整理戊甲');
+    const b = await addTask('整理戊乙');
+    await act(async () => {
+      await useTaskStore.getState().moveToProject(a, projectId);
+      await useTaskStore.getState().setTags(a, [tagId]);
+    });
+    await flush();
+    selection.select('task', a);
+    mount();
+    expect(selectIn(pane())?.value, '起始态：甲应显示挂着那条清单').toBe(projectId);
+
+    // 🔴 同一枚 root 里换选中（另起 root 会把"值没跟着换"这份坏抹掉 —— §8.138 的 A2 同一族）。
+    act(() => {
+      selection.select('task', b);
+    });
+    await flush();
+    expect(selectIn(pane())?.value, '换选中后栏里还停在上一条的清单上 ⇒ 那份 state 不是受控的').toBe('');
+    const stillChecked = [...(pane()?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])].filter(
+      (box) => box.checked,
+    );
+    expect(stillChecked.length, '换选中后上一条的勾选跟着带过来了').toBe(0);
+    expect(
+      pane()?.querySelector('h2')?.textContent,
+      '栏里的标题没跟着换人（这一格换选中的对象错了）',
+    ).toBe('整理戊乙');
+  });
+
+  it('TagChips 是只读的：挂了标签才出现，里面没有下拉、复选框、展开机关', async () => {
+    const tagId = await addTag('整理标签己');
+    const id = await addTask('整理己');
+
+    const mountChips = (): HTMLElement => {
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const badgeRoot = createRoot(host);
+      act(() => {
+        badgeRoot.render(
+          <I18nProvider locale="zh-CN">
+            <TagChips task={useTaskStore.getState().entities.tasks[id]!} />
+          </I18nProvider>,
+        );
+      });
+      return host;
+    };
+
+    expect(mountChips().querySelectorAll('[data-testid="task-chip-tag"]').length, '没挂标签却占了位').toBe(0);
+
+    await act(async () => {
+      await useTaskStore.getState().setTags(id, [tagId]);
+    });
+    await flush();
+    const after = mountChips();
+    expect(after.querySelectorAll('[data-testid="task-chip-tag"]').length, '挂了标签却没画 chip').toBe(1);
+    expect(after.textContent ?? '', 'chip 上没写标签名').toContain('整理标签己');
+    // 🔴 它是显示不是第二个编辑器：整块里不许长出下拉 / 复选框 / `<details>`。
+    expect(after.querySelector('select'), 'chip 里长出了下拉').toBeNull();
+    expect(after.querySelector('input'), 'chip 里长出了复选框').toBeNull();
+    expect(after.querySelector('details'), 'chip 里长出了展开机关').toBeNull();
+  });
+
+  it('宿主两支读同一枚布尔（源码形状）', () => {
+    const src = readFileSync(join(process.cwd(), 'src', 'App.tsx'), 'utf8');
+    expect(
+      /\{\s*taskPaneInColumn\s*\?\s*\(\s*<TagChips\s+task=\{task\}\s*\/>\s*\)\s*:\s*\(\s*<TaskOrganizer/.test(
+        stripComments(src),
+      ),
+      '行尾那两支不是读同一枚 taskPaneInColumn 的三目 ⇒ 开关没接上或长出了第二份',
+    ).toBe(true);
+    expect(
+      /taskPaneInColumn\s*\?\s*<TaskOrganizer/.test(stripComments(src)),
+      '宽档行尾还挂着整块 TaskOrganizer ⇒ 整理长出第二个编辑器',
     ).toBe(false);
   });
 });

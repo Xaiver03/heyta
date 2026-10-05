@@ -59,6 +59,16 @@
  *   M5 展开机关跟着本体搬进栏里          → jsdom 1 红 + e2e T10 红（同 S4：`<details>` 收起时
  *       里面**不画**，`toBeVisible()` 挡不住）
  *
+ * ── §8.147（第六个字段：清单 + 标签）六臂 ───────────────────────────
+ *   O1 宽档行尾仍挂编辑本体（两处可编辑）  → jsdom 1 红（源码形状）+ e2e T14 红
+ *   O2 窄档不回落（恒只剩只读 chip）        → jsdom 1 红（同一枚布尔的另一侧）+ e2e **T15** 红
+ *   O3 宿主在栏里再叠「清单」区块头          → jsdom 1 红 + e2e T14 红（这一格自带两个头）
+ *   O4 展开机关跟着本体搬进栏里             → jsdom 1 红 + e2e T14 红
+ *   O5 玻璃浮层跟着本体搬进栏里             → jsdom 1 红 + e2e **T10** 红（同 D4：pane 级
+ *       那条在 e2e 层只有一个消费者）
+ *   O6 TagChips 不判有没有标签（零标签占位） → jsdom 1 红 + e2e T14 红（"起始态不许有 chip"
+ *       那一档就是这一臂的消费者；没有它，"勾了才长出"在占位实现下照样为真）
+ *
  * ── §8.146（第五个字段：截止）五臂 ─────────────────────────────────
  *   D1 宽档行尾还挂 `<DueEditor/>`（两处可编辑）→ jsdom 1 红（源码形状）+ e2e T12 红
  *   D2 栏里那一支少挂 key                → jsdom 1 红 + e2e T12 红（这一格带本地 state）
@@ -77,7 +87,7 @@
  *   node research/tools/mutation-rigs/mutate-detail-pane-task.mjs A3 B1    # 只点名那两臂
  * ⚠️ 它会占 4371 端口、起 Chromium，且**原地改下面这些源文件**（收尾逐文件复原并核对 md5；
  *    清单由 `FILES` 现量，别在这里抄枚数）：
- *    `apps/web/src/features/tasks/{TaskDetailCard,NoteEditor,TaskRepeat,SubtaskPicker}.tsx`、
+ *    `apps/web/src/features/tasks/{TaskDetailCard,NoteEditor,TaskRepeat,SubtaskPicker,TaskOrganizer}.tsx`、
  *    `apps/web/src/features/reminders/ReminderPanel.tsx`、
  *    `apps/web/src/App.tsx`、`apps/web/src/lib/keyboard-cursor.ts`、`apps/web/src/styles/app/base.css`。
  *    跑之前确认这些文件没有别人的在飞改动。
@@ -97,6 +107,7 @@ const CSS = 'apps/web/src/styles/app/base.css';
 const REPEAT = 'apps/web/src/features/tasks/TaskRepeat.tsx';
 const SUBTASK = 'apps/web/src/features/tasks/SubtaskPicker.tsx';
 const REMINDER = 'apps/web/src/features/reminders/ReminderPanel.tsx';
+const ORG = 'apps/web/src/features/tasks/TaskOrganizer.tsx';
 const JSDOM_SPECS = ['tests/task-detail-card.spec.tsx', 'tests/keyboard-cursor.spec.tsx'];
 const E2E_SPEC = 'tests/detail-pane-task.spec.ts';
 const BIN = (rel) => path.join(ROOT, 'apps/web', 'node_modules', '.bin', rel);
@@ -462,9 +473,121 @@ const ARMS = [
     expectJs: ['「截止」区块头在栏里不是恰好一处'],
     expectE: ['T12'],
   },
+  /* ── §8.147（第六个字段：清单 + 标签）六臂 ────────────────────────────
+     这一格的形状与前五格有一处不同：**留下的那半是 chip，不是"整块不画"**
+     （标签在共享层没有对应槽），所以 O1/O2 两支分别打在三元表达式的两侧 ——
+     少任何一侧，"两处可编辑"或"窄档归不了类"就没人守。 */
+  {
+    name: 'O1 宽档行尾仍挂着整理的编辑本体（同一字段两处可编辑）',
+    file: APP,
+    from: `          {taskPaneInColumn ? (
+            <TagChips task={task} />
+          ) : (`,
+    to: `          {false ? (
+            <TagChips task={task} />
+          ) : (`,
+    expectJs: ['宿主两支读同一枚布尔'],
+    /* 栏里那一份照旧在 ⇒ 整页出现两只清单下拉，T14 那条"只有一份"当场红。 */
+    expectE: ['T14'],
+  },
+  {
+    name: 'O2 窄档不回落（行尾恒只剩只读 chip ⇒ 那一档根本归不了类）',
+    file: APP,
+    from: `          {taskPaneInColumn ? (
+            <TagChips task={task} />
+          ) : (`,
+    to: `          {true ? (
+            <TagChips task={task} />
+          ) : (`,
+    expectJs: ['宿主两支读同一枚布尔'],
+    expectE: ['T15'],
+  },
+  {
+    name: 'O3 宿主在栏里给整理再叠一枚「清单」区块头（同一个词说两遍）',
+    file: CARD,
+    from: `      <OrganizerField
+        task={task}`,
+    // ⚠️ 这里是**变异夹具**，字面量「清单」不会进任何提交物（收尾按 md5 复原）。
+    // 写成字面量而不是 `t(...)` 是因为这一臂要量的正是"多出来一个区块头"，
+    // 而词条里那句带参数（渲染出来不是 exact 的「清单」，探针就抓不到了）。
+    to: `      <h3 style={blockLabelStyle}>清单</h3>
+      <OrganizerField
+        task={task}`,
+    expectJs: ['「清单」「标签」各恰好一处'],
+    expectE: ['T14'],
+  },
+  {
+    name: 'O4 行尾的展开机关跟着编辑本体搬进栏里（栏里那一格自己收起来了）',
+    file: CARD,
+    from: `      <OrganizerField
+        task={task}
+        onMoveToProject={(projectId) => {
+          void store.moveToProject(task.id, projectId);
+        }}
+        onSetTags={(tagIds) => {
+          void store.setTags(task.id, tagIds);
+        }}
+      />`,
+    to: `      <details>
+        <OrganizerField
+          task={task}
+          onMoveToProject={(projectId) => {
+            void store.moveToProject(task.id, projectId);
+          }}
+          onSetTags={(tagIds) => {
+            void store.setTags(task.id, tagIds);
+          }}
+        />
+      </details>`,
+    expectJs: ['不许有行尾的两层外壳'],
+    expectE: ['T14'],
+  },
+  {
+    name: 'O5 玻璃浮层跟着编辑本体搬进栏里（栏里漂着一块板子）',
+    file: CARD,
+    from: `      <OrganizerField
+        task={task}
+        onMoveToProject={(projectId) => {
+          void store.moveToProject(task.id, projectId);
+        }}
+        onSetTags={(tagIds) => {
+          void store.setTags(task.id, tagIds);
+        }}
+      />`,
+    to: `      <div className="ht-compose-panel ht-material">
+        <OrganizerField
+          task={task}
+          onMoveToProject={(projectId) => {
+            void store.moveToProject(task.id, projectId);
+          }}
+          onSetTags={(tagIds) => {
+            void store.setTags(task.id, tagIds);
+          }}
+        />
+      </div>`,
+    expectJs: ['不许有行尾的两层外壳'],
+    /* 与 D4 同一档读数：pane 级那条"栏里不许有 `.ht-material`"在 e2e 层的唯一消费者
+       是 T10（一条不变量一个所有者），往整理这一格塞壳也红在 T10 身上。 */
+    expectE: ['T10'],
+  },
+  {
+    name: 'O6 TagChips 不判"有没有标签"（零标签也占一位）',
+    file: ORG,
+    from: `  if (assignedTags.length === 0) return null;`,
+    to: `  if (assignedTags.length === 0)
+    return (
+      <span style={chipStyle} data-testid="task-chip-tag" aria-hidden="true">
+        <TagIcon size={CHIP_ICON_SIZE} aria-hidden="true" />
+      </span>
+    );`,
+    expectJs: ['TagChips 是只读的'],
+    /* T14 里那条"起始态行上不该有 chip"就是这一臂的消费者 —— 没有它，
+       "勾了标签才长出 chip"在"一直占位"的实现下照样为真（假绿）。 */
+    expectE: ['T14'],
+  },
 ];
 
-const FILES = [CARD, NOTE, APP, CURSOR, CSS, REPEAT, SUBTASK, REMINDER];
+const FILES = [CARD, NOTE, APP, CURSOR, CSS, REPEAT, SUBTASK, REMINDER, ORG];
 const orig = new Map(FILES.map((f) => [f, readFileSync(path.join(ROOT, f), 'utf8')]));
 const md5 = (s) => createHash('md5').update(s).digest('hex');
 const origMd5 = new Map([...orig].map(([f, s]) => [f, md5(s)]));
@@ -605,14 +728,14 @@ const b = build();
 if (b.rc !== 0) fail(`干净态打不出包：\n${b.out.slice(-1500)}`);
 const cleanDigest = distDigest();
 const bj = jsdom();
-if (bj.rc !== 0 || bj.passed < 63) fail(`干净态 jsdom 层不干净（要 >=63 passed）：${bj.line}`);
+if (bj.rc !== 0 || bj.passed < 70) fail(`干净态 jsdom 层不干净（要 >=70 passed）：${bj.line}`);
 const be = e2e();
-if (be.rc !== 0 || be.passed < 13 || be.failed > 0) {
+if (be.rc !== 0 || be.passed < 15 || be.failed > 0) {
   fail(
-    `干净态 e2e 层不干净（要 >=13 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
+    `干净态 e2e 层不干净（要 >=15 passed / 0 failed）：${be.line}｜红集=${titlesOf(be.out, 'T').join(' ｜ ')}`,
   );
 }
-console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T13）｜dist=${cleanDigest}`);
+console.log(`基线：jsdom=${bj.line}｜e2e=${be.line}（T1..T15）｜dist=${cleanDigest}`);
 
 /* 只跑点名的臂：`node … A3 B1`。存在的理由是**改完一条主张之后不必把八臂全部重跑** ——
    否则"改臂"这个动作的成本会把人推回去改判据（那才是真正要避免的）。
