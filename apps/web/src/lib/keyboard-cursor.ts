@@ -171,6 +171,39 @@ function revealRow(prefix: string, id: string): void {
 }
 
 /**
+ * 让 **DOM 焦点跟着选中痕迹走**（工单 §8.143，收 §8.138 边界 ③）。
+ *
+ * 🔴 为什么这一格非补不可：Enter 那条腿的接管条件是"焦点行 == 带痕迹那一行"，
+ * 而 ↑↓ 今天只改选中、不挪 DOM 焦点 —— 于是"Tab 进列表 → ↓ 到底 → Enter"这条
+ * **最短的纯键盘路径**不成立（要先多按一次 Enter 把焦点落到行上）。
+ * 方向键光标的标准形状就是"焦点跟着痕迹走"，两边分家才是异常状态。
+ *
+ * 🔴 **焦点落在行里第一个可聚焦的控件上，不是落在行本身上** —— 这一条是现量逼出来的，
+ * 不是偏好：`task-item-*` 的外层是裸 `<View>`（`packages/ui/src/task-list/TaskRow.tsx:300`，
+ * 没有 `tabIndex`），对它 `focus()` 在浏览器和 jsdom 里都是**空操作**。
+ * §8.138 边界 ③ 原文写"Tab 能走到行（行是按钮）"—— 那句**是错的**，Tab 走到的是
+ * 行**里面**那颗 `role="checkbox"`。所以这里量的是"行里第一个可聚焦的东西"，
+ * 三张面（任务 / 习惯 / 便签）**同一条机制**，不为任何一面单开分支。
+ *
+ * ⚠️ `preventScroll: true` 是必需的，不是装饰：`focus()` 自己会把目标滚进视野，
+ * 而我们要的是 `revealRow` 那一条 `block: 'nearest'` 的滚法（焦点默认会把整页拽到
+ * 元素居中，症状是"按一次 ↓ 页面跳一大截"）。⇒ 顺序是**先聚焦再滚**。
+ *
+ * ⚠️ 抢的是 **Enter**，不是勾选：焦点落进那颗 checkbox 之后，勾选仍走它自己的
+ * Space（复选框的规范键），而 Enter 归"打开这一格"—— 这正是 §8.137 已经拍过的裁决，
+ * 本单只是让它在"↓ 再 Enter"这条路上真的能用。
+ */
+const FOCUSABLE =
+  '[tabindex]:not([tabindex="-1"]), button, a[href], input, select, textarea, [role="checkbox"], [role="button"], [role="link"]';
+
+function focusRow(prefix: string, id: string): void {
+  const row = document.querySelector<HTMLElement>(`[data-testid="${prefix}-${id}"]`);
+  if (row === null) return;
+  const control = row.matches(FOCUSABLE) ? row : row.querySelector<HTMLElement>(FOCUSABLE);
+  (control ?? row).focus({ preventScroll: true });
+}
+
+/**
  * Enter（W1b 第 3 条腿）：把焦点交给**这一格**，不代为触发任何写入。
  *
  * 三条"不接管"各挡一种坏，前两条与 ↑↓ 共用同一套闸门（正在打字 / 有浮层 / 焦点在
@@ -235,6 +268,7 @@ export function useSelectionKeyboardCursor(view: ViewKey): void {
       // 所以这里不会白重渲染一次。
       event.preventDefault();
       selection.select(target.kind, next);
+      focusRow(target.prefix, next);
       revealRow(target.prefix, next);
     };
 

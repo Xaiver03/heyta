@@ -785,4 +785,68 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
     await parkCursor(page);
     await page.screenshot({ path: SHOT('k11-unmarked-row-keeps-enter') });
   });
+
+  /**
+   * K12 = 工单 §8.143：把 §8.138 边界 ③ 那条"最短路径今天不成立"变成成立的读数。
+   *
+   * 🔴 与 K9/K10/K11 的区别**不是多测一面，是一次都不点**：那三条都用
+   * `locator.press('Enter')`，而 Playwright 的 `press` 会先把焦点打到那个 locator 上 ——
+   * 也就是说"焦点已经在行上"这件事是**探针给的**，不是机制挣来的。这一条只往 `body`
+   * 上发键（`press()` + `releaseFocus()`），所以它量的是真用户那条路：
+   * **↓ 走一行 → Enter**，中间没有任何一次点击。
+   *
+   * ⚠️ 为什么 jsdom 那两条不算数：jsdom 里行是插出来的 `<div>`，"行里到底有没有可聚焦的
+   * 东西"是夹具说的；真实渲染里 `task-item-*` 外层是裸 `View`（`TaskRow.tsx:300`），
+   * 可聚焦的是行里那颗 `role="checkbox"`。**只有浏览器知道那颗东西真的存在** ——
+   * 摘掉 `focusRow` 之后这一条会红在"焦点还在 body"上（臂台 F2 就是这一档）。
+   */
+  test('K12 🔴 一次点击都不给：↓ 走两行再 Enter ⇒ 焦点已经在栏里那只正文框', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openApp(page, '/?lang=zh-CN');
+    await switchView(page, '任务');
+    await addTask(page, '焦点跟走甲');
+    await addTask(page, '焦点跟走乙');
+    // 建完两条任务，焦点还停在捕获框里（= 正在打字，闸门会挡下 ↓）。交回 body。
+    await releaseFocus(page);
+
+    await press(page, 'ArrowDown');
+    const afterArrow = await page.evaluate(
+      () => (document.activeElement as HTMLElement | null)?.getAttribute('data-testid') ?? null,
+    );
+    expect(
+      afterArrow,
+      '↓ 之后 DOM 焦点还停在 body ⇒ Enter 的接管条件（焦点行 == 痕迹行）永远不成立',
+    ).not.toBeNull();
+
+    // 🔴 再走一行。第一下不能单独当判据：**没选中时第一次 ↓ 走到的就是第一行**，
+    // 于是"焦点永远落在第一行"那一类坏在它身上比不出来（臂 F2 就是那一类），
+    // 痕迹与焦点要到**第二行**才分得开。
+    await press(page, 'ArrowDown');
+
+    // 焦点所在那一行必须**就是**带痕迹那一行 —— 比 id，不比文本（K4 同一口径）。
+    const marked = await page
+      .locator(`${ROWS}[aria-current="true"]`)
+      .getAttribute('data-testid');
+    const focusedRow = await page.evaluate(
+      () =>
+        document
+          .activeElement?.closest('[data-testid^="task-item-"]')
+          ?.getAttribute('data-testid') ?? null,
+    );
+    expect(focusedRow, `焦点落在的行（${String(focusedRow)}）与带痕迹那一行（${String(marked)}）不是同一条`).toBe(
+      marked,
+    );
+
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByTestId('task-note-input'),
+      '↓ 再 Enter 没把焦点送进栏里的正文框',
+    ).toBeFocused();
+
+    // Enter 只许挪焦点，不许发 op：两条任务还在，且都没被勾成完成。
+    await expect(page.locator(ROWS)).toHaveCount(2);
+    await expect(page.locator('[data-testid^="task-item-"][aria-checked="true"]')).toHaveCount(0);
+
+    await page.screenshot({ path: SHOT('k12-arrows-then-enter-focuses-pane') });
+  });
 });
