@@ -250,7 +250,7 @@ describe('跨挂载点（右栏 ⇄ 中间列）不掉未决状态', () => {
     const fetch = recordingFetch();
     const el = await mount({ slot: 'detail', fetchImpl: fetch.impl });
 
-    await type(el, '今天有什么任务');
+    await type(el, '随便说点什么吧');
     await click(el, 'ai-assistant-send-button');
     // 第一次发送只披露，不出境。
     expect(disclosureCount(el), '点发送后应该出现一次性披露').toBe(1);
@@ -270,7 +270,7 @@ describe('跨挂载点（右栏 ⇄ 中间列）不掉未决状态', () => {
     expect(
       fetch.bodies[0],
       '发出去的必须是换挂载点之前那一句，不是空串、也不是输入框里的别的',
-    ).toContain('今天有什么任务');
+    ).toContain('随便说点什么吧');
   });
 
   it('还没发出去的那句草稿，换挂载点之后仍在输入框里', async () => {

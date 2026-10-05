@@ -65,6 +65,7 @@ import {
 import {
   ASSISTANT_TIER_READ_ONLY,
   assistantEgressFields,
+  assistantNeedsEgressDisclosure,
   confirmAiToolProposal,
   planAssistantEgress,
   requestAssistantTurn,
@@ -291,6 +292,13 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
     if (text === '') return;
     append({ role: 'user', text });
     setDraft('');
+    // 🔴 先按规则试一次（本机、纯函数、零出境）：命中就说明这一句根本不会出境，
+    // 那就**不该弹出境披露** —— 单步面板 `AiToolRun` 一直是这个顺序。
+    // 判定住在 `@heyta/app-host`（和循环里那一次是同一个函数），壳不另写规则。
+    if (!assistantNeedsEgressDisclosure(text, { tier: props.tier })) {
+      void turn(text);
+      return;
+    }
     // 🔴 第一次发送必须先见过一次性披露 —— 这一条不能由"用户大概知道"代替。
     if (!disclosed) {
       setPending(text);
