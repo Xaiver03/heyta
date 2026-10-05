@@ -855,6 +855,13 @@ GATE_design=0 GATE_text-color=0 GATE_theme=0 GATE_row-single-source=0
 GATE_reachability=0 GATE_ui-provider=0 GATE_ui-language=0
 GATE_migrations=0 GATE_payment-entry=0 GATE_server-copy=0 GATE_server-design=0
 GATE_md-tables=0 GATE_docs-voice=0 GATE_claims=0 GATE_doc-citations=0
+RC_TYPECHECK=2 → 0 # 🔴 `pnpm --filter @heyta/web typecheck` 抓到我自己用例里一处
+                   #    `split('?')[0]` 在 `noUncheckedIndexedAccess` 下是 `string | undefined`，
+                   #    而**同一份代码 vitest 全绿** —— 又一例"测试绿 ≠ 类型过"（环境陷阱 #162 同族）。
+                   #    修在 `f7409d5b`。
+RC_WEB_ADMIN_TEST2=1  # 整包复跑时红 2 条，红的**不是**本批文件而是 `due-date-edit.spec.tsx`。
+                      # 对照跑排除掉污染源：`RC_SOLO=0`（它单独 15/15）+ `RC_PAIR=0`
+                      # （它与 `admin-panel` 同跑 44/44）⇒ 已登记 `BLOCKED.md` B85，未归因。
 GATE_docs=1 → 0    # 提交前那枚红：四枚 png 还没 `git add`，门禁判的是"干净检出上是死链"。
                    # 出路是它自己给的第 ① 条（该入库就 add），不是放宽判据 —— 随 `ec33731f` 转绿。
 ```
