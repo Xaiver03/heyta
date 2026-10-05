@@ -299,6 +299,12 @@ export function TaskRow({
      */
     <View
       style={active ? [styles.row, styles.rowActive] : styles.row}
+      // 🔴 选中还要**说出来**，不能只画出来（工单 W1c）：底色对色觉障碍用户与
+      // 高对比模式不成立，而 web 的习惯面（`HabitsList.tsx` 的 `aria-current`）早就有这一路。
+      // 三张面用同一个属性同一个取值，"各处同一套"才是可核对的而不是口号。
+      // 载体实测（2026-10-04 一次性探针，阳性对照是 `aria-checked`）：RNW 会把平铺的
+      // `aria-current="true"` 写进 DOM，`undefined` 时属性整个不出现 —— 所以不需要 `?? null`。
+      aria-current={active ? 'true' : undefined}
       testID={`task-item-${row.id}`}
     >
       <Pressable

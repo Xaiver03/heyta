@@ -18,6 +18,7 @@
 | `mutate-p07b.mjs` | P0-7（提醒读侧一次遍历归组） | 退回 O(任务×提醒) / 不滤墓碑 / 丢 id 序 / 对照 |
 | `mutate-p118.mjs` | P1-18（记忆层关着也付） | ⚠️ 它原地改 `apps/web/src/App.tsx`，**只能在那个文件干净时跑** |
 | `verify-gate-wiring-candidate.mjs` | §8 第 17 步那道新门禁的**接线补丁** | C0 现状 / C1 进链 / C2 只加定义 / C3 插出 `&&&` —— 🔴 **它不改工作树**：改的是 `/tmp` 下的候选副本（见下面第 4 条） |
+| `mutate-shell-surfaces-anchor.mjs` | `check:shell-surfaces` 断言 A 的**锚点分类**（2026-10-05 把"未跟踪的取证产物"从源码锚点里摘出来那次修法） | A0 原样副本绿 / A1 ps1 改取证文件名红 / A2 sh 的 scp 行改名红 / A3 删一枚**真**源码锚点仍红 / **A4 两半**：产物缺席不再红 + `HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 照样红。🔴 每台里最值钱的是 A4 那两半——少了 a 就是没修，少了 b 就是借修名的放宽。它同样**只改副本**（`rsync --link-dest` 硬链接 + 先 `rm` 再写，绝不就地 truncate） |
 
 跑法（本机有测试内存闸门，别的套件在跑时会拒绝启动）：
 

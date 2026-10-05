@@ -26,6 +26,7 @@ import process from 'node:process';
 import { chromium } from 'playwright';
 
 import { inspectPng, looksBlank } from './png-stats.mjs';
+import { settleForShot } from './head-reveal.mjs';
 import { APP_STORE_DEVICES, ARTIFACT_ROOT, DEVICES, SITES, TARGETS, artifactName, expectedGroups } from './targets.mjs';
 
 const root = process.cwd();
@@ -268,17 +269,23 @@ for (const job of jobs) {
 
     // 先清悬浮/焦点态，再等动画收敛（顺序反了会把气泡的淡出留在图里）
     await clearHoverAndFocus(page);
-    // 动画/字体收敛，避免截到过渡中间态
-    await page.waitForTimeout(600);
+    // 🔴 截图前的收尾等待：**等揭示落位，不等时间**（本文件头部设计约束第 1 条）。
+    //    原来这里是固定 `waitForTimeout(600)`，而落地页页头走 `.lp-mask` +
+    //    `translateY(112%)→0%` 的错峰揭示 —— 600ms 在快机器上浪费、在慢机器上
+    //    **截到一条空白带**（审计文档 §8.110：六张图里四张是这样，而它们被当成
+    //    "界面有问题"的证据去查，查的是一个不存在的问题）。
+    //    没有 `.lp-h1` 的应用视图仍走那 600ms：那些页面没有可等的揭示，
+    //    把它们接进新判据只会让每张图都等一个永远不成立的条件。
+    const settled = await settleForShot(page);
     await page.screenshot({ path: outPath, fullPage: target.fullPage });
 
     // 截完**立刻**自检：空白图当场报出来，别等最后的门禁
     const stats = inspectPng(outPath);
     const blank = looksBlank(stats);
-    written.push({ outPath, stats, blank });
+    written.push({ outPath, stats, blank, settled });
     console.log(
       `  ${blank ? '🔴' : '✅'} ${folder}/${stats.name}  ${stats.width}×${stats.height}` +
-        `  内容 ${(stats.contentRatio * 100).toFixed(1)}%  色阶 ${stats.colorSpan}`,
+        `  内容 ${(stats.contentRatio * 100).toFixed(1)}%  色阶 ${stats.colorSpan}  等待 ${settled}`,
     );
     if (blank) failed.push(stats.name);
   } catch (error) {

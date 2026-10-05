@@ -79,7 +79,10 @@ async function mount(): Promise<HTMLDivElement> {
   await act(async () => {
     root?.render(
       <I18nProvider locale="zh-CN">
-        <NotesView />
+        {/* `editorInColumn={false}` = 编辑卡留在板子上方（窄屏/收起那一档）。
+            本文件的用例找的是**板子上方**那枚编辑器，所以取这一支；
+            "看得见时进详情列"由 `note-editor-placement.spec.tsx` 判。 */}
+        <NotesView editorInColumn={false} />
       </I18nProvider>,
     );
   });

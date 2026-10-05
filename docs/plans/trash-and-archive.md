@@ -7964,7 +7964,7 @@ iOS 那把载具第一趟 `SELFTEST=fail: L4`：我断的是"预检排在**第�
 | 现量 | 读数 |
 |---|---|
 | `apps/desktop-macos/Sources/HeytaMac/ShellStorageHost.swift:90` | `HEYTA_SHELL_DB_DIR` 分支已在，且**只接受绝对路径**（:92 那句 `.off(reason:)`），默认分支表达式逐字不变 |
-| rig 是否真的传了它 | `scripts/verify-macos-account-erasure.sh:131` 的 `HEYTA_SHELL_DB_DIR="$DB_DIR" \` |
+| rig 是否真的传了它 | `scripts/verify-macos-account-erasure.sh:230` 的 `HEYTA_SHELL_DB_DIR="$DB_DIR"`（行尾是 shell 续行符，值随那条 exec 一起进壳） |
 | **编译证据（不是"能编"，是"编过了"）** | `apps/desktop-macos/.build/out/Products/Debug/HeytaMac` 里 grep 得到 `HEYTA_SHELL_DB_DIR` 这个串 ⇒ 这个旋钮**已经进过二进制**；产物 mtime 10-04 21:32 = 最后一次源码改动的同一分钟 |
 | 两个 Swift 文件的归属 | 都在我名下未提交（`git diff --stat`：HeytaMacApp.swift +185 / ShellStorageHost.swift +23） |
 
@@ -9968,7 +9968,7 @@ M2a `/tmp/heyta-mac-erase-061051`、M2b `/tmp/heyta-mac-erase-061119`。
 第二趟六条新鲜度读数全 0，三处源码 md5 全部回到基线
 （`eabae9fe…` / `52ae5d24…` / `8a29ff23…`，收尾复量逐字相同），载体 `git status` 对这三个路径为空。
 
-> 🔴 **待入 traps #273**（`docs/reference/environment-traps.md` 此刻正被并行会话写着 **+857/−7**，
+> 🔴 **待入 traps #273**（🔴 2026-10-05 11:2x 现量：这个号连同 #274–#278 已被主线落定的条目占了，本行保留原文是为了让下一个人看清"预留号会被别人先落"这件事，**照抄它会撞号** —— 入册时按行末那条命令重取；此刻工作树最大号 282。`docs/reference/environment-traps.md` 此刻正被并行会话写着 **+857/−7**，
 > 按纪律不往它追加；取号按工作树现量：`grep -oE '^[0-9]+\. ' … | sort -n | tail -1` = 272）：
 > **变异臂之间"只重建下一层产物"会把上一臂的变异带进下一臂** —— 跨包产物依赖（workspace 包的
 > `dist` 被上层打包器内联）使"改源码→重建上层"这条最短路径不成立，而"上层产物比源码新"这把尺

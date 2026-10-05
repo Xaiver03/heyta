@@ -319,7 +319,39 @@ export function inspectPng(filePath) {
 export const BLANK_CONTENT_RATIO = 0.01;
 export const BLANK_COLOR_SPAN = 16;
 
+/**
+ * 🔴 **入参形状的门禁**：本文件的 `looks*` 一族收的是 `inspectPng()` 的**结果对象**，
+ * 而同一文件里的 `count*` 一族收的是**路径**（它们自己读像素）。两族相邻、名字都像谓词，
+ * 入参却不同形 —— 2026-10-05 实测踩过：`looksBlank(<路径字符串>)` 里
+ * `stats.contentRatio` 是 `undefined`，而 `undefined < 0.01` 恒为 `false`，
+ * 于是"这张图是空白的"这条判据**永远不判空白**，一个字都不报。
+ * 症状不是红，是**一条被无声摘掉的判据**（AGENTS §7 元规则 2 点名的形状）。
+ */
+function requireStats(caller, stats, keys) {
+  if (typeof stats === 'string') {
+    throw new TypeError(
+      `${caller}() 收的是 inspectPng() 的结果对象，不是路径 —— 传进来的正是路径 ` +
+        `${JSON.stringify(stats)}；请先 inspectPng(该路径) 再判。`,
+    );
+  }
+  if (!stats || typeof stats !== 'object') {
+    throw new TypeError(
+      `${caller}() 需要一个 stats 对象，收到 ${stats === null ? 'null' : typeof stats}。`,
+    );
+  }
+  for (const key of keys) {
+    if (typeof stats[key] !== 'number') {
+      throw new TypeError(
+        `${caller}() 的 stats 里 ${key} 不是数字（拿到 ${typeof stats[key]}）—— ` +
+          '这不是 inspectPng() 的返回值。',
+      );
+    }
+  }
+  return stats;
+}
+
 export function looksBlank(stats) {
+  requireStats('looksBlank', stats, ['contentRatio', 'colorSpan']);
   return stats.contentRatio < BLANK_CONTENT_RATIO || stats.colorSpan < BLANK_COLOR_SPAN;
 }
 
@@ -434,6 +466,7 @@ export const SMEAR_EDGE_ON_CONTENT_MAX = 0.3;
 
 /** 有内容，但"摊满却没梯度" ⇒ 疑似糊了 / 渲染坏了。 */
 export function looksSmeared(stats) {
+  requireStats('looksSmeared', stats, ['contentOnModalRatio', 'edgeOnContent']);
   if (looksBlank(stats)) return false; // 空白是另一类问题，分开报
   return (
     stats.contentOnModalRatio >= SMEAR_CONTENT_RATIO_MIN &&
