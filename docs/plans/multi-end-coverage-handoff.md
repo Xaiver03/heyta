@@ -3471,6 +3471,72 @@ reinstall 的 ios 段会 `simctl uninstall` 目标机 ⇒ 换到**别人命名�
    **脚本根本没被改**（因为它在写盘前就抛了）—— 我看见 "patched" 没打印才发现。
    反过来说：把"改装置"写成"先 assert 再一次性写"是对的形状，半写状态比报错更糟。
 
+## 19:4x（2026-10-05）② 第 69 段的红**定案了**，而且定案方式是我自己的装置污染了载体 —— 外加 ① 的外部依赖现量：新规不再挡它
+
+### 1. 定案链条（逐环都有字节级证据，不是推理）
+
+19:14 那次静态归因排除到只剩"低负载复跑才能裁"，挂了两小时多。真正的成因不需要复跑就能看见：**载体的工作树不等于载体的 HEAD**。
+
+| 环 | 现量（19:41–19:45） |
+|---|---|
+| 载体 `heyta-wt-reinstall` 的 `e2e/tests/list-folder.spec.ts` 是脏的 | `git diff --stat` ⇒ **4 insertions / 35 deletions**，删掉的正是 HEAD 里 10-04 加的 `scrollFreshAndShoot`（detach 重试壳）；mtime **10-05 09:54:04** |
+| 那份脏内容来自哪 | `/tmp/list-folder.spec.ts`：mtime **10-04 03:42:54**、9345 B、`grep -c scrollFreshAndShoot` = **0**、md5 **d73db784d41243ef46c25781f4feffaf** |
+| 字节级配对 | 我把载体那份还原前 `cp` 出来归档，同一枚 md5 **d73db784…** ⇒ 覆盖进载体的就是这份过期草稿，逐字相同 |
+| 谁做的覆盖 | 我自己的取证装置 `~/.heyta-window-rigs/heyta-run-folderspec.sh:64-72`（④ 那条）："草稿与目标 sha 不一致就 `cp` 覆盖"，**跑完不还原** |
+| 于是 | 09:54 覆盖 → 10:0x ② 的全量 check 在同一棵树上继承它 → 段 69 红在 `list-folder.spec.ts:115 Element is not attached to the DOM` ⇒ **既不是产品缺陷，也不是负载抖动，是"被上一段的草稿换掉的测试"** |
+| 而日志看不出任何异常 | `CARRIER_SHA` 与 `CARRIER_SHA_AT_END` 逐字相同（`3546ad39…`）—— **那两道载体身份门只比 HEAD 指针** |
+
+⚠️ 我 19:14 写的第一条排除项（"三个文件在 `3546ad39..HEAD` 的 diff 为空 ⇒ 不能推给载体旧"）**本身没错**，但它比的是**两枚提交之间**，从没比过**工作树与它自己的提交**。"载体旧"和"载体被改过"是两件事，我的排除只覆盖了前者 —— 这就是它没能更早定案的原因。
+
+### 2. 已做的三件事（都做完并验过能失败）
+
+1. **还原载体**：`git checkout -- e2e/tests/list-folder.spec.ts apps/web/evidence apps/mobile/evidence` ⇒ 被跟踪文件的 diff 归零；还原前把草稿 `cp` 进 `~/.heyta-evidence/carrier-residue-1005-1941/`（归档 = 不删）。
+   载体现在只剩 1 枚未跟踪文件：`apps/mobile/evidence/android-notes-3-from-search.png`（mtime 03:19，**③ 第 8 步那张第三张截图的证据本体**，故意保留）。
+2. **② 的启动器加了一道工作树门**（`heyta-run-checks.sh` 新 1a 段）：打印 `CARRIER_DIRTY_TRACKED=` / `CARRIER_UNTRACKED=` 与 `git status --porcelain` 全文，**被跟踪文件有 diff 就 `VERDICT=NOT-RUNNING` + exit 3**，并把还原命令打出来。未跟踪只报数不拦（③ 那张证据图合法地未跟踪）。
+   双臂现量：干净载体 `0` → 往 spec 末尾追加一行 ⇒ `1` → `git checkout --` ⇒ 回到 `0`。
+   ⚠️ 这段补丁我自己先写错过一次：`git ls-files -co` 里 `-c` 是 **cached（已跟踪）**，`-co` 打的是"全部已跟踪 + 未跟踪"⇒ 首测报 `CARRIER_UNTRACKED=3335`，而 `git status` 只有 1 行。改成 `git ls-files -o` 后实测 `1`。（`sync_windows_sources()` 用 `-co` 是**故意**的，那是"打包集合 = 已跟踪 + 未跟踪非忽略"，与我这里要的"未跟踪清单"不是同一个集合。）
+3. **取证装置加了作用域终点**（`heyta-run-folderspec.sh:60-89`）：覆盖时置 `SPEC_OVERWRITTEN=1`，`trap restore_spec EXIT` 退出即把该文件还原回载体 HEAD；并把草稿的 **mtime 与载体 HEAD 那份的 blob sha 一起打印**（过期草稿与新鲜草稿在 sha 上长得一样，只有 mtime 能区分）。
+   双臂现量（用 `sed -n '60,89p'` 从**正式那份**里抽块、在一枚 scratch git 仓里跑，被测代码与在跑的代码逐字相同）：
+   A 草稿不同 ⇒ 打印"覆盖（d4f3a00d → **43b0884b**，与载体那次脏 diff 头行的目标 blob 同一枚）"、轮内文件确实被换掉、退出后 `git status` 为空；
+   B 阴性对照 载体那份 == 草稿 ⇒ 不覆盖、`SPEC_OVERWRITTEN` 未设、trap 不动作、status 为空。
+   过期草稿已退役：`rm /tmp/list-folder.spec.ts`（先归档），该装置以后没有草稿就走 HEAD 那份。
+
+### 3. 顺带把 ① 的外部依赖现量了一遍（读侧，零起跑）——**2026-10-04 那条新规不再挡 ①**
+
+| 现量 | 值 |
+|---|---|
+| 载体 `scripts/run-gradle.mjs` 里 windows-pc 分流 | **6 处**命中，`:89 const HOST = process.env.HEYTA_ANDROID_HOST \|\| 'windows-pc'`（文件 mtime 10-05 02:12） |
+| `heyta_android_route_landed "$载体"` | **rc=0** |
+| `heyta_android_guard "$载体"`（`heyta-prep-apk.sh:94` 用的就是它） | **rc=0**，主检出同样 rc=0 |
+| `ssh -o BatchMode=yes windows-pc` | **rc=0**，回 `SSH_OK` |
+
+⇒ 之前记的 `ANDROID-RULE=… ⇒ **不起本机 gradle**` 是**那一时刻**的读数（载体的收口文件 02:12 才落上分流），现在这道门自己开了。
+边界：**"远端真能打出 APK"仍未实测**（AGENTS §6.1 那条待验证判据没被这次现量推翻）—— 这次只证明"闸门放行 + 主机可达"。
+
+### 4. 窗口为什么迟迟不开：把"负载"这一格拆成"谁的"
+
+19:43:30 `--target b` 现量：`REDS=load,dev`。
+
+- `dev`：**pid 48424** = `heyta-wt-r14c/scripts/.verify-mobile-due-time.sh.snap.48424`（ elapsed 2 分钟，别的线的设备验收在场）⇒ 按 §8.9 让路，不动它。
+- `load`：1 分钟读数在阈值附近**摆**（19:43:14 `vm.loadavg` = `10.88`，19:43:30 闸门打印 `13`），5/15 分钟是 `35.23 / 86.80`。
+  占 CPU 榜（`ps -arcxo`）：**pid 83033 `qemu-system-aarch64-headless -avd heyta-w3-yearly`，已跑 1 天 12:43，113.3% CPU、3.0 GB RSS**；
+  其余是 `ZCode Helper` / `WindowServer` / `pairedsyncd`×2 / Qoder 渲染进程，以及 **6 台 booted 模拟器**（`heyta-batch2-closeout; heyta-bc-reminders; heyta-e2-ios-erasure; heyta-iphone-17pro; heyta-multiend-reinstall; heyta-ios-isolated`）。
+  ⇒ 这台机器上**常驻**着一枚为"每年重复"那趟验收起的安卓模拟器，而它的 owning 线早已落地合并；它不是我起的（我的安卓面按新规在 windows-pc），**所以我不动它**，只把这个归属记在账上：
+  它的属主一条命令就能让负载底噪掉一档 —— `adb -s emulator-5554 emu kill` 或直接 `kill 83033`（先 `ps -p 83033 -o command=` 复认是同一枚 `-avd heyta-w3-yearly`）。
+  ⚠️ 这条**不是**我主张"等不到窗口"的证据：`load` 那一格是能在阈值下成交的（10.88 那一次就是），只是 4 分钟前它被别的线的验收顶上去。
+
+### 5. 待入 traps 候选（接在 #289 之后；`docs/reference/environment-traps.md` 仍被别线脏着，落点等释放）
+
+🔴 **#290**：**"载体身份"只比 HEAD 指针的验收，证明不了工作树等于那枚提交。**
+   两条 `CARRIER_SHA == CARRIER_SHA_AT_END` 逐字相同的读数，可以完全建立在一份被上一段装置覆盖过的源码上。
+   形状：起跑前除了 `rev-parse`，还要 `git diff --name-only` 为空（未跟踪单独报数、不拦 —— 合法的证据文件常常未跟踪）。
+   怎么证明这条有牙：往任一被跟踪文件追加一行 ⇒ 门必须 `exit 3`；还原 ⇒ 必须回到放行。
+🔴 **#291**：**取证装置对目标文件的"临时覆盖"必须有作用域终点。**
+   `cp 草稿 进仓库` 之后不还原，等于让后面每一段继承一份没人认领的源码；而草稿如果住在 `/tmp`，它还会**过期**（重启/清理不保证，sha 又不带时刻），
+   于是"跑的是最新草稿"这件事只在草稿活着的那一刻成立。形状：覆盖置标志 + `trap … EXIT` 还原，并把草稿 **mtime 与目标 HEAD 的 blob sha 一起打印**。
+   复现代价：这一条让我把一次真红（段 69）当"未定归因"挂了 9 小时。
+
+
 🔴 待入 traps 候选 **#288**：**"日志文件是空的"有三种成因，输出上长得一模一样** ——
    ① 块缓冲未刷、② 生产者写到别处（硬编码路径 / 另一个 fd）、③ 进程根本没跑到那一步。
    分开的办法是按顺序做三个现量：`pgrep -P` 证活着 → `ls -l` 看该文件的 mtime 是否在推进 →

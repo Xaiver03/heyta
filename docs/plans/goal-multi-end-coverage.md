@@ -2997,15 +2997,21 @@ VERDICT=<装置打印值>                   # 收尾判决行（装置会打 VER
   |---|---|---|
   | 8 | `check:op-log-semantics` | 🔴 **19:31 定案：与第 84 段同族，是内存闸门拒绝**。日志原文写着「内存闸门拒绝启动：已有测试在跑（pid=40338，锁 `/tmp/tfa-test.lock`；它是 `.tfa-shield/bin/npx vitest run tests/security/revisionsL…`）」⇒ `run()` 拿到 `result.error` 就在 `:73` 抛、`:79` 是调用点。**不是产品红，是别人持锁时按设计不起跑**（那条旋钮 `TFA_ALLOW_CONCURRENT_TEST=1` 用户明令不用） |
   | 42 | `check:docs` | 🔴 **载体年龄**，不是死链：引用的 `trash-and-archive.md §10.87` 在**主检出行 7330 存在**、在**载体那棵老树里 0 命中**（`grep -cE '^#+ *(§)?10\.87'` 主=1 / 载体=0） |
-  | 69 | `check:ai-e2e` | 🔴 **本批自己的**：`tests/list-folder.spec.ts:72:1`（④ 那条取证）第 115 行 `scrollIntoViewIfNeeded` 报 `Element is not attached to the DOM`，**retry #1 同样红** ⇒ 不是纯抖动；产品/测试两侧未裁定，见下面边界条 |
+  | 69 | `check:ai-e2e` | 🔴 **19:46 定案（原来的"未裁定"作废）**：既不是产品也不是负载 —— **载体工作树被我自己上一段的取证装置换过**。`heyta-run-folderspec.sh:64-72` 把 `/tmp/list-folder.spec.ts`（mtime 10-04 03:42、md5 `d73db784d41243ef46c25781f4feffaf`、**没有** HEAD 里 10-04 加的 detach 重试壳 `scrollFreshAndShoot`）覆盖进 `e2e/tests/list-folder.spec.ts`（09:54）且**不还原**；10:0x 的全量 check 继承它，于是红在 `:115 Element is not attached to the DOM`、retry #1 同样红。链条字节级闭合：载体的脏 blob `43b0884b` == 草稿的 `git hash-object`，归档的还原前副本 md5 == 草稿 md5。判据/装置修复与双臂现量见交接账 19:4x 那节（traps 候选 #290/#291）。
+    ⚠️ 已证的是**成因**（覆盖链条字节级闭合）；还差一次**干净载体上的单 spec 复跑**做最后确认，预测是不再出现 `:115 not attached`（HEAD 那份带 detach 重试壳）。窗口到了就补，不拿"应该好了"当读数。 |
   | 70/71 | `check:privacy-consent-e2e`、`check:landing-e2e` | 同一趟里**两种读数**：第 3 步单跑 rc=0，第 5 步逐段 rc=1 ⇒ 归到竞争/负载（当时 15 分钟均值 47.65），不算产品证据 |
   | 84 | `pnpm -r test` | 🔴 **内存闸门按设计拒绝**：`packages/sync-core test` 打印"并发测试会把进程推到 1.8–26GB…等它跑完"，唯一放行旋钮是 `TFA_ALLOW_CONCURRENT_TEST=1`（**用户明令不用**）⇒ 环境拒绝，不是产品红 |
-- `CARRIER_SHA=3546ad39a52ac487d7264965c4659c509e7b9cf2` 与 `CARRIER_SHA_AT_END=` **逐字相同** ⇒ 本轮读数可整体钉给这一个 sha（载体身份那条门自己过了）。
+- `CARRIER_SHA=3546ad39a52ac487d7264965c4659c509e7b9cf2` 与 `CARRIER_SHA_AT_END=` **逐字相同** ⇒ 载体身份那条门自己过了。
+  ⚠️ **19:46 给这句补一条它当年缺的范围声明**：这两枚 sha 只证 **HEAD 指针**首尾没动，**不证工作树等于那枚提交** ——
+  本轮第 69 段就是被这个缺口放过的（载体的 spec 在 09:54 被覆盖过，sha 照样逐字相同）。
+  该启动器现已补上门（新 1a 段 `CARRIER_DIRTY_TRACKED=`，非 0 就 `VERDICT=NOT-RUNNING` / exit 3；双臂：追加一行 ⇒ 1、还原 ⇒ 0）。
 - ⚠️ 边界：**"可过段数 = 1/84" 不等于"83 段是红的"** —— 整条是 `&&` 串，第 8 段之后各段**从未执行**；
   78/84 那个数来自另一台仪表（逐段单跑），两者语义不同，谁都不能替谁（本档 03:37 那节的原话，这里照它执行）。
 - ⚠️ 本条**不主张** ① 的任何读数：`/tmp/heyta-reinstall-{mac-installed,android,ios}.png` 三枚 18:32 现量**已不存在**
   （`/tmp` 被清理），四端重装**从未跑出 `INNER_EXIT=`**；04:15 那张 md5 基线因此成为唯一的"曾经在场"记录。
-- 🔴 **19:14 对第 69 段那条红做了静态归因，排除掉两条、剩下一条待验**（**没有**为了让它绿而改测试）：
+- 🔴 **19:14 对第 69 段那条红做了静态归因，排除掉两条、剩下一条待验**（**没有**为了让它绿而改测试）
+  —— ⚠️ **19:46 收口：这三条都被否证，成因在别处（见上面表格第 69 行）**。这一段保留是为了标出**排除手段的边界**：
+  它比的是**提交与提交之间**，从没比过**工作树与它自己的提交**，而真成因恰好住在那个没比过的地方。
   1. **不是载体年龄**：那 48 笔（`3546ad39..HEAD`）里 `git log` 与 `git diff --numstat` 对
      `packages/ui/src/projects/OrganizerList.tsx`、`apps/web/src/features/projects/ProjectsPanel.tsx`、
      `e2e/tests/list-folder.spec.ts` **三个文件都是空** ⇒ 两棵树在这三处逐字相同，红不能推给"载体旧"。
