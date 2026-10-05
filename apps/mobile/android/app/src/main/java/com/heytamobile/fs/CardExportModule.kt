@@ -34,7 +34,7 @@ import java.io.File
  * ## 单位与字节
  *
  * 这里**不做任何图像处理**，也不判断尺寸：字节进、字节出，
- * 尺寸对不对由验收脚本去数那张图的 IHDR（`scripts/verify-mobile-card-export.mjs`）。
+ * 尺寸对不对由验收脚本去数那张图的 IHDR（`scripts/verify-mobile-card-export.sh`）。
  * 图像尺寸是产品语义，产品语义不进外壳（AGENTS §3.5）。
  */
 class CardExportModule(reactContext: ReactApplicationContext) :

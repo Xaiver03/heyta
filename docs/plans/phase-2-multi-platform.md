@@ -683,7 +683,9 @@ ADR-0008 §5 记了未核实项（存量受害账号能否自愈、100↔101 的
 
 ```bash
 cd apps/mobile/ios
-# 1) 装 pods —— 两个 env 修正都必需，去掉任何一个都会失败
+# 1) 装 pods —— 这一串由 `check:native-deps` 与 scripts/reinstall-all.sh 对账钉住，
+#    改这里不改那里会红。2026-10-04 四臂实测：`LANG` 承重（两个 locale 都不给 ⇒
+#    崩在 `config.rb:167` 的 ASCII-8BIT），`LC_ALL` **不**承重（只给 `LANG` 也成功）。
 env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
     RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install
 

@@ -103,12 +103,22 @@ async function bgOfTestId(page: Page, testId: string): Promise<string> {
     el
       .first()
       .evaluate((node) => (node.isConnected ? getComputedStyle(node).backgroundColor : ''));
+  /**
+   * 🔴 这里原来写的是「`poll(read)` 等它非空，然后 `return read()`」—— **两次独立的读**。
+   *   症状（11:5x 现量，同一个构建连跑三次红一次，不是负载也不是产品）：
+   *   `Expected: "rgba(0, 0, 0, 0)" / Received: ""`。轮询确认非空之后、函数返回之前，
+   *   React 把那一行换成了新节点 ⇒ 第二次读落到分离节点上，拿到空串。
+   *   ⇒ 探针自己会造红。改法：**记下轮询真正接受的那一次读数**，不再另读一遍。
+   */
+  let seen = '';
   await expect
-    .poll(read, {
-      message: `${testId} 的底色一直算不出来 —— 读到的是分离节点，不能拿空串去比`,
-    })
+    .poll(async () => {
+      const value = await read();
+      if (value !== '') seen = value;
+      return seen;
+    }, { message: `${testId} 的底色一直算不出来 —— 读到的一直是分离节点，不能拿空串去比` })
     .not.toBe('');
-  return read();
+  return seen;
 }
 
 /**
@@ -199,6 +209,20 @@ test.describe('选中：一条任务在三种投影里都是同一条被高亮',
       await bgOfTestId(page, `timeline-lane-item-${other}`),
       '时间线里没选中的那条也被画了选中色',
     ).toBe(timeline.base);
+    /**
+     * 🔴 底色是给眼睛的，下面这一条是给读屏的。时间线这一块此前**只有底色**：
+     * 共享 `TimelineBoard` 自己按 id 等值算、自己上 `rowActive`，却登记在"递送层"里，
+     * 而递送层不要求发无障碍通道（工单 §8.42 记的就是这个类别漏洞）。
+     * 摘掉 `aria-pressed` 只有这两条会红，上面三条底色读数**不跟着红** —— 它们各自量的是别的东西。
+     */
+    await expect(
+      page.locator(`[data-testid="timeline-lane-item-${picked}"]`),
+      '选中的那条时间线行没有把"我被选中"说出来',
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(
+      page.locator(`[data-testid="timeline-lane-item-${other}"]`),
+      '没选中的那条也声称自己被选中',
+    ).not.toHaveAttribute('aria-pressed', 'true');
     await parkCursor(page);
     await page.screenshot({ path: SHOT('03-timeline') });
 

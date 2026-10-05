@@ -98,6 +98,11 @@ PORT="${HEYTA_SELFHOST_PORT:-1900}"
 BASE="http://127.0.0.1:${PORT}/app/"
 BUILD=1
 KEEP=0
+# 🔴 栈起没起来必须由**脚本自己**记着（2026-10-04 现量：08:0x 那趟在浏览器那一腿之前
+# 因缺 e2e 依赖而 die，三个容器在机器上活了 23 分钟，占着 :1900 与内存，而输出里只有一个 rc=1）。
+# `cleanup()` 从来不拆栈 —— 拆栈是各个失败分支**各自**调 `down_stack`，所以任何一条没调到的
+# `die` 都会留一栈。这条标志位就是"trap 有没有活要干"的判据。
+STACK_UP=0
 
 # 🔴 三份 compose 文件写成**一个数组**，因为"带不带 override"就是这条验收的判据本体。
 # 各段自己拼 `-f a -f b` 的写法，漂起来的方向是某个调用忘了带 override ——
@@ -137,6 +142,13 @@ cleanup() {
     log "   一次性凭据文件**保留**（上面那条拆栈命令的 --env-file 就是它）：${ENV_FILE}"
     return 0
   fi
+  # 🔴 **中途 die 也必须拆栈**。`down_stack` 要读这份 env 才算得出这套资源，
+  # 所以它必须在 `rm -f "$ENV_FILE"` **之前**；顺序反了就是"拆了个寂寞"（compose 报 env file not found）。
+  # `declare -F` 那一层不是装饰：`down_stack` 定义在起栈之后，而 `die` 在那之前也会走到这里
+  # （比如容器名冲突那条），bash 对未定义函数是 127 而不是"跳过"。
+  if [ "$STACK_UP" = "1" ] && declare -F down_stack >/dev/null; then
+    down_stack
+  fi
   rm -f "$ENV_FILE"
 }
 # 🔴 必须把 cleanup 与快照删除**串在同一条** trap 里（见上面 cleanup 的第一行）。
@@ -161,20 +173,154 @@ for name in supersync-server supersync-postgres; do
   fi
 done
 
+# 挂载前缀**从 Dockerfile 现取**，不写死 `/app/`：这条判据要回答的正是"构建里那条 RUN 与
+# 镜像里那份产物说的是不是同一个挂载值"，而把答案抄进脚本就又造出一份抄件（§8 那一族）。
+# 读不到、或读到**不止一条**（那时"该对哪一个挂载"这个问题没有唯一答案）都 die ——
+# 判据没有唯一输入时不许按空值/首值通过（与 R6/R7 那两条哨兵同一设计）。
+# 不用 `sed … | head -1`：本脚本开着 `pipefail`，head 先退出会给 sed 留一个 SIGPIPE，
+# 那是"成功读取却以 141 退出"的形状（§7 第 45 条同一族），所以在这里不借管道取首行。
+EXPECT_MOUNT=$(sed -n 's|^RUN node scripts/check-web-artifact\.mjs .*--mount \([^ ]*\)$|\1|p' \
+  "$REPO_ROOT/server/Dockerfile")
+EXPECT_MOUNT_LINES=$(printf '%s\n' "$EXPECT_MOUNT" | wc -l | tr -d ' ')
+if [ -z "$EXPECT_MOUNT" ] || [ "$EXPECT_MOUNT_LINES" != "1" ]; then
+  die "从 server/Dockerfile 里没能取到**唯一**那条 check-web-artifact 的 --mount 值（现量取到 ${EXPECT_MOUNT_LINES} 行）。
+   要么那条 RUN 改了形状，要么 Dockerfile 里现在有多条 —— 后者说明"该对哪个挂载"没有答案，
+   要人先决定，不要为了让这一行过去而在这里写死 /app/ 或取首行。"
+fi
+
 if [ "$BUILD" = "1" ]; then
-  log "==> 打镜像（${IMAGE}，VCS_REF=$(git rev-parse --short HEAD)）"
+  log "==> 打镜像（${IMAGE}，VCS_REF=$(git rev-parse --short HEAD)，Dockerfile 那条 RUN 声明的挂载=${EXPECT_MOUNT}）"
   # 构建上下文 = 仓库根（与 docker-compose.build.yml 的 context: .. 一致）。
-  DOCKER_BUILDKIT=1 docker build -f server/Dockerfile \
+  # 🔴 `--progress=plain`（2026-10-04，#28 那笔可观测性欠账）：默认输出只打 step 名、
+  # 不打 RUN 的 stdout，于是"构建里那条产物自洽判据跑没跑"这件事在留档里**根本读不到**。
+  # G-48 当初的取证是我手工重跑一遍 `docker build --no-cache-filter web` 才拿到的 ——
+  # "判据的证据要靠手工重跑才拿得到"就等于这条判据没有自动消费者。
+  # ⚠️ 但 plain 也不保证看得见：BuildKit 命中缓存时那一层只打 `CACHED`。所以下面不拿它当唯一读数，
+  #    缓存态另有一条与缓存无关的判据（在**建出来的镜像里**跑同一个 checker）。
+  DOCKER_BUILDKIT=1 docker build --progress=plain -f server/Dockerfile \
     --build-arg VCS_REF="$(git rev-parse HEAD)" \
+    ${NODE_IMAGE:+--build-arg NODE_IMAGE=$NODE_IMAGE} \
     ${APK_MIRROR:+--build-arg APK_MIRROR=$APK_MIRROR} \
     ${NPM_REGISTRY:+--build-arg NPM_REGISTRY=$NPM_REGISTRY} \
     -t "$IMAGE" . >/tmp/heyta-selfhost-image.log 2>&1 || {
       tail -30 /tmp/heyta-selfhost-image.log
       die "镜像构建失败（完整日志 /tmp/heyta-selfhost-image.log）"
     }
-  log "    镜像 OK"
+  # 构建层那条 RUN 的读数：两种合法形状，命中哪一种都打进日志（不写死"必须执行过"，
+  # 因为缓存命中时"这趟没执行"是正常的，硬判红会把探针坏和产品坏混成一坨）。
+  if grep -qF -- "✅ 产物自洽：挂载 ${EXPECT_MOUNT}" /tmp/heyta-selfhost-image.log; then
+    WEB_STEP=ran
+  elif grep -qF -- "check-web-artifact.mjs --dist apps/web/dist --mount ${EXPECT_MOUNT}" /tmp/heyta-selfhost-image.log; then
+    WEB_STEP=cached-or-silent
+  else
+    die "构建日志里既没有那条 RUN 的执行输出、也没有它的命令行本身（/tmp/heyta-selfhost-image.log）。
+   要么 Dockerfile 里那条产物自洽检查整条没了，要么 --progress=plain 没生效 ——
+   两种都不是"构建成功"可以代替的结论。"
+  fi
+  log "    镜像 OK（构建层产物自洽那条 RUN 的读数形状=${WEB_STEP}；完整日志 /tmp/heyta-selfhost-image.log）"
 else
   docker image inspect "$IMAGE" >/dev/null 2>&1 || die "--no-build 但本地没有 $IMAGE"
+  WEB_STEP=skipped-no-build
+  log "==> 复用本地镜像（--no-build）：本轮没有构建层读数，下面那条镜像内判据仍然跑"
+fi
+
+# 🔴 **被验的那枚镜像必须来自这一棵树**。这是 AGENTS §6.1.1 那条"送到别处构建／运行的流程，
+#    收尾必须有一次内容对账"在本条验收上的落点，也是 §7 第 27／82 条（"测试全绿 ≠ 这是当前产物"）
+#    在这一族的形状：`--no-build` 走的是"复用本地那个 tag"，而 tag 可以是任何一棵树的产物；
+#    没有这条读回，整趟结论都是在给一枚旧二进制打分，而日志看起来跟新鲜运行一模一样。
+#    现量（2026-10-04 15:2x，写这条判据的当时）：本机 `supersync:selfhost-verify` 的
+#    `org.opencontainers.image.revision` = `959fd1e6…`（6 小时前 `VERIFY_EXIT=0` 那一趟的树），
+#    而分支 HEAD 已是 `8bcc53d2…` ⇒ 这一档不是假想敌，它此刻就在这台机器上成立。
+TREE_SHA=$(git rev-parse HEAD)
+IMAGE_REV=$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' 2>/dev/null || echo '读不到')
+if [ "$IMAGE_REV" != "$TREE_SHA" ]; then
+  die "被验镜像的 OCI revision 与当前树不是同一笔：
+     镜像 label = ${IMAGE_REV}
+     git HEAD   = ${TREE_SHA}
+   这一趟如果继续，报的是**另一棵树**的产物（§7 第 27／82 条那一族）。
+   \`--no-build\` 时这条就是硬闸：要故意验旧镜像，请先把旧那棵树整个检出去再跑，
+   不要为了让这一行过去而改这条判据 —— 改了就等于把\"装上去验的是什么\"这个问题重新交回给人记。"
+fi
+log "    被验镜像的 revision == 当前 HEAD（${TREE_SHA:0:12}…）"
+# 诚实边界：label 只证明"构建时那笔 commit"，**不**证明"构建时工作树是干净的"
+# （构建上下文 = 工作树的字节，不是 commit）。所以把脏不脏打进日志，
+# 让下一读的人能把这趟解释成"这一笔 + N 枚未提交改动"，而不是"这一笔"。
+# 🔴 2026-10-04 改：原来那句把**整棵工作树**的脏条目计数直接冠名为"构建上下文的未提交条目"，
+#    而哪些脏行真进上下文由仓库根的 `.dockerignore` 决定 —— 本脚本不复制那份规则（抄件会漂），
+#    所以这里只打印清单、不替它下结论。旧的措辞是**自我削弱式的错话**：
+#    本机现量那 1 枚是 `?? e2e/node_modules`，而 `.dockerignore` 里有 `**/node_modules`，
+#    它根本进不了镜像，旧文案却读起来像"这趟不是纯提交物"⇒ 把已经成立的证据自己说软了。
+DIRTY_AT_BUILD=$(git status --porcelain | wc -l | tr -d ' ')
+log "    工作树未提交条目=${DIRTY_AT_BUILD}（上下文=仓库根；下列逐条，是否进上下文由 .dockerignore 与 Dockerfile 的 COPY 决定，本脚本不代它判）"
+if [ "$DIRTY_AT_BUILD" != "0" ]; then
+  git status --porcelain | sed 's/^/      /'
+fi
+
+# 🔴 **在镜像里**跑同一条产物自洽检查（2026-10-04，#28）。为什么不拿上面那条构建层读数当结论：
+#  · 构建阶段那条判的是 `/repo/apps/web/dist`（**拷贝之前**），而外人拿到的是 `COPY --from=web`
+#    之后的 `/app/web-dist` —— 挂载前缀与产物落点这两件事一旦说不上（G-48 就是这个形状），
+#    构建阶段那条照样绿；
+#  · BuildKit 命中缓存时那一层根本不出声。
+# 这条与两者都无关：它读的是**发出去的那份字节**，`--no-build` 复用时也照跑。
+# checker 本体从宿主只读挂进去（不在镜像里再抄一份判定 —— 那份判定的实现只该有一处）。
+log "==> 在被验镜像里跑产物自洽检查（挂载=${EXPECT_MOUNT}，产物=/app/web-dist）"
+IN_IMAGE_RC=0
+IN_IMAGE_OUT=$(docker run --rm --entrypoint node \
+  --volume "$REPO_ROOT/scripts:/heyta-chk:ro" \
+  "$IMAGE" /heyta-chk/check-web-artifact.mjs --dist /app/web-dist --mount "$EXPECT_MOUNT" 2>&1) ||
+  IN_IMAGE_RC=$?
+if [ "$IN_IMAGE_RC" != "0" ]; then
+  printf '%s\n' "$IN_IMAGE_OUT" | tail -20
+  die "镜像里那份产物对它自己声明的挂载（${EXPECT_MOUNT}）不自洽，或 checker 没跑起来（rc=${IN_IMAGE_RC}）。
+   这一条红有两种成因，分别要修：产物落点/挂载漂了（G-48 那一族），
+   或者宿主目录挂不进容器（OrbStack 的文件共享）—— 后者是环境，不是产品，但也要人来看一眼再判。"
+fi
+log "    ${IN_IMAGE_OUT}"
+log "    WEB_ARTIFACT_IN_IMAGE=OK（构建层那条的形状=${WEB_STEP}）"
+
+# 🔴 **这一趟验的是哪个架构的产物**必须落在日志里，否则"整套验收过了"会被读成
+#    "要发布的那枚过了"。`docker build` 不带 `--platform` ⇒ 镜像架构 = 构建机架构；
+#    而发布 workflow 钉的是 `linux/amd64`
+#    （`.github/workflows/heyta-server-image.yml` 的 `platforms`）。
+#    2026-10-04 现量：本机这枚是 `linux/arm64`，它里面的平台二进制包与快照/许可证门禁
+#    按 `linux/x64/musl` 预测的那批**不是同一批**（`@node-rs/argon2-linux-arm64-musl`
+#    谁都没扫过 —— 审计文档 §8.38 / G-53）。
+IMAGE_ARCH=$(docker image inspect "$IMAGE" --format '{{.Os}}/{{.Architecture}}' 2>/dev/null || echo '读不到')
+case "$IMAGE_ARCH" in
+  linux/amd64)
+    log "    被验的镜像：${IMAGE_ARCH}（与发布 workflow 钉的那枚同架构）"
+    ;;
+  *)
+    log "    被验的镜像：${IMAGE_ARCH} —— 🔴 不等于发布 workflow 钉的 linux/amd64。"
+    log "      这趟证明的是「外人在自己机器上 build 出来的那一枚能跑」（M 系列自建者正是这种），"
+    log "      它**不构成**对 amd64 发布物的运行证据；两者的平台二进制包不是同一批。"
+    ;;
+esac
+
+# ── 镜像内那棵依赖树：对到许可证门禁的扫描集上 ─────────────────────
+# 为什么放在这里而不是 pnpm check 里：这条判据的输入**必须是刚构建出来的那枚镜像**。
+# check:image-license 那条链上跑的读的是预测快照（不联网、不 docker 也能跑），
+# 而审计 §8.38/§8.43 量到预测与真树之间确实有差 —— 差的那一截只有构建之后才看得见。
+# 🔴 不许用 npm ci --dry-run 代替它：那条命令对 file: 依赖一个字节都不碰（§8.43）。
+log "==> 镜像内依赖树 × 许可证门禁扫描集（真产物载体）"
+IMAGE_TREE_JSON="$(mktemp -t heyta-image-tree.XXXXXX.json)"
+set +e
+docker run --rm -i --entrypoint node "$IMAGE" --input-type=commonjs - \
+  < "$REPO_ROOT/research/tools/dump-installed-tree.js" > "$IMAGE_TREE_JSON"
+TREE_RC=$?
+set -e
+if [ "$TREE_RC" != "0" ] || [ ! -s "$IMAGE_TREE_JSON" ]; then
+  rm -f "$IMAGE_TREE_JSON"
+  die "在镜像里枚举已装依赖树失败（rc=${TREE_RC}）—— 没有输入，这条对账不能算过"
+fi
+set +e
+node "$REPO_ROOT/research/tools/check-image-license-coverage.mjs" \
+  --installed-tree "$IMAGE_TREE_JSON"
+COVER_RC=$?
+set -e
+rm -f "$IMAGE_TREE_JSON"
+if [ "$COVER_RC" != "0" ]; then
+  die "镜像里装的树对不上许可证门禁 —— 上面逐条点名了是哪几条、为什么"
 fi
 
 # ── 一次性凭据：够长、只在这条命令的进程里存在 ─────────────────────
@@ -279,12 +425,18 @@ compose up -d postgres supersync >/tmp/heyta-selfhost-up.log 2>&1 || {
   [ "$KEEP" = "1" ] || compose down -v >/dev/null 2>&1
   die "compose 起栈失败（/tmp/heyta-selfhost-up.log）"
 }
+# 从这一行起，**任何**一条 die 都欠这台机器一次拆栈（上面那条失败分支自己拆过了，所以标志位在它之后）。
+STACK_UP=1
 cd "$REPO_ROOT"
 
 down_stack() {
   [ "$KEEP" = "1" ] && return 0
   log "==> 拆栈"
   compose down -v --remove-orphans >/dev/null 2>&1 || true
+  # 🔴 拆过就把标志位放下：正常结束那条路**显式调**了本函数，之后 EXIT trap 还会再问一次
+  # `STACK_UP`。不清零就是"同一栈拆两遍、日志里两行 `==> 拆栈`"（`compose down` 幂等，
+  # 不会坏，但下一读日志的人会先怀疑是不是起栈失败走了两条分支）。
+  STACK_UP=0
 }
 
 # ── 等健康：迁移要跑完（含 CONCURRENTLY 的带外恢复），最长 240s ────
@@ -387,6 +539,9 @@ esac
 log "    界面挂载确认：$(printf '%s\n' "$SERVER_LOGS" | grep '\[web-app\]' | tail -1)"
 
 log "==> 真浏览器三条判据（${BASE}）"
+# 🔴 起跑时刻要先落到变量里，**再**跑用例 —— 后面那条新鲜度判据要比的就是这个数。
+# （顺序反了就是"拿同一棵树量两次"：判据永远绿。）
+BROWSER_T0=$(date +%s)
 cd e2e
 [ -d node_modules/@playwright/test ] || die "e2e 的依赖没装：先 cd e2e && pnpm install（它自己一份 lockfile）"
 set +e
@@ -397,7 +552,39 @@ cd "$REPO_ROOT"
 
 log ""
 log "截图落在 e2e/selfhost-stack-results/ —— 按 §6.2 规定一，**人必须打开看**："
-ls -1 e2e/selfhost-stack-results/*.png 2>/dev/null | sed 's/^/  /' || log "  （没有截图 = 有用例在截图前就失败了）"
+# 🔴 「文件存在」不是证据。内存闸门拒绝启动时，Playwright 一条用例都没跑，
+#    而这个目录里还躺着**上一批**那四张同名同尺寸的图（2026-10-04 实测：
+#    这一趟 03:41 起跑，四张图全是 Oct 3 14:32 的）—— 任何人 `ls` 一次就会把它们
+#    当成这次的界面证据。所以判据是「mtime 晚于本次起跑」，不是「有这四张」。
+SHOTS=$(node --input-type=commonjs -e '
+const fs = require("fs"), path = require("path");
+const t0 = Number(process.argv[1]), dir = process.argv[2];
+const want = ["s1-app-loaded.png", "s2-signed-in.png", "s3-device-a-synced.png", "s3-device-b-recovered.png"];
+let fresh = 0;
+for (const n of want) {
+  let st = null;
+  try { st = fs.statSync(path.join(dir, n)); } catch (e) { /* 文件不存在 */ }
+  const m = st ? Math.floor(st.mtimeMs / 1000) : null;
+  const ok = st !== null && m >= t0;
+  if (ok) fresh += 1;
+  console.log("  " + n + "  mtime=" + (m === null ? "不存在" : new Date(m * 1000).toISOString()) +
+    "  bytes=" + (st ? st.size : "-") + "  " + (ok ? "本次的" : "不是本次的"));
+}
+console.log("FRESH=" + fresh + "/" + String(want.length));
+if (fresh !== want.length) process.exit(1);
+' "$BROWSER_T0" "e2e/selfhost-stack-results")
+SHOT_RC=$?
+printf '%s\n' "$SHOTS"
+# 🔴 先算进变量再插值：bash 3.2 解析不了 `"… $(date -r "$X" '…') …"` 这种**双引号里套
+#    双引号**的写法（`syntax error near unexpected token ')'`，2026-10-04 实测）。
+BROWSER_T0_HUMAN=$(date -r "$BROWSER_T0" '+%Y-%m-%dT%H:%M:%S')
+log "   （起跑时刻 ${BROWSER_T0_HUMAN} —— 只有标「本次的」那几张才算这一趟的证据）"
+
+if [ "$RC" = "0" ] && [ "$SHOT_RC" != "0" ]; then
+  die "Playwright 退出码 0，但四张截图里**没有一张是本次的**（见上面那张 mtime 表）。
+   「退出码 0」+「截图是旧的」这个组合只有一种解释：用例没走到截图那一步就返回了 0 ——
+   也就是**没有证据**。这一趟不算闭合。"
+fi
 
 if [ "$KEEP" = "1" ]; then
   log ""

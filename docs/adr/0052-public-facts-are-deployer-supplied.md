@@ -114,6 +114,14 @@
    `PUBLIC_FACT_SHAPES`，往那里加第二种形状（或给公开路径加身份参数）会让它红。
    ⚠️ **该门禁本轮尚未接进 `pnpm check`**（契约文件头已经把它写成 `scripts/check-public-facts.mjs`，
    但那个脚本此刻在 main 里**不存在** —— `ls scripts/check-public-facts.mjs` 现量；登记为 W4b 收尾项，别读成已存在）。
+   ✅ **上面这句已经过期**（2026-10-04 现量）：脚本存在且已接进 `pnpm check`
+   （`package.json` 里 `check:public-facts` 一条 + `check` 串里那一处），
+   实跑 rc=0、分母把 21 条 GET 与 3 条匿名面打印在输出里。留原句是为了让人认出
+   "**引用的运行落后于实际跑过的运行**"这个第三种漂移形状。
+   🔴 同批补上的一处真缺口：契约与路由两边此前都指着
+   `server/tests/holiday-public-route.spec.ts`，而那个文件**不存在** ——
+   匿名读面（ETag 四种写法、304 空 body、500 不退化成空集、per-route 速率）
+   从没有过任何消费者。现在它存在了。
 3. **法务口径经判定不改**。`packages/legal/src/documents/third-parties.ts` 那张"heyta 服务器发出的对外请求"表管的是
    **出网**（server → 第三方），本通道是 server → 用户自己的设备，中间没有任何第三方 ⇒ 四类集合不变。
    这条判定在计划 §8.2 L' 的普查表里，带 82 行候选的读数，不是本文新立的断言。
@@ -144,7 +152,7 @@ ADR-0038 §2 第三条把首版写面钉成"仅三个、都不涉及钱"。W4b �
 
 ---
 
-## 7. 证据与读数（本 ADR 接受时，实现**尚未合进 main**）
+## 7. 证据与读数（接受时实现尚未合进 main —— 04 22:2x 已在 `origin/main`，见本节末条）
 
 ⚠️ **下面每条都写明它是哪一趟的读数** —— 本 ADR 是在工单进行中提前定性的，代码还在并行工区里。
 
@@ -157,9 +165,35 @@ ADR-0038 §2 第三条把首版写面钉成"仅三个、都不涉及钱"。W4b �
   （插件级 `requireAdmin` 覆盖，见 ADR-0038 §2）；`packages/domain` 的 `adjustmentOn` 覆盖表入口（commit `7049bfed`，
   该笔的信息自己就写着"后台做完、全绿，客户端读的仍是随包表，判据①根本没有载体"）；
   迁移 `server/prisma/migrations/20261009000000_add_holiday_adjustments` + PGlite 判据。
-- 🔴 **尚未落地**（20:30 现量，命令：`grep -rln "holidayAdjustment\|dayMarker" packages/app-host/src packages/ui/src apps/web/src packages/storage/src`）：
+  ⚠️ **这一格的名字是"那一趟的名字"**：合流时它与 vault 密钥包那笔撞号，盘上与 `HEAD` 里那笔
+  重编成了 **`20261013000000_add_holiday_adjustments`**（`git ls-tree HEAD server/prisma/migrations/` 现量；
+  改名原因写在那笔 `migration.sql` 的第 2 行注释里）。
+  📌 同族教训：**这份 ADR、交接文档、以及那份 PGlite spec 曾各自抄了同一个目录名**，
+  而真正会因为它炸的是 spec —— 它现在**从盘上推导目录名、不写死**
+  （`server/tests/holiday-adjustment-migration.pglite.spec.ts:37` 的注释记了这次 ENOENT）。
+  ⇒ **值的抄件要分两类**：只有"会被执行的那一份"改成推导/门禁才算修好，正文里的引用不改也只是留了个会漂的句子。
+- 🔴 ~~**尚未落地**（20:30 现量，命令：`grep -rln "holidayAdjustment\|dayMarker" packages/app-host/src packages/ui/src apps/web/src packages/storage/src`）：
   命中集合里**没有** app-host / ui / web / storage 的落点 ⇒ **客户端拉取那半 + `dayMarker` 那个可选 prop 都还没写**。
-  所以 W4b 的"判据①（拿不到数据 ⇒ 不报错、不留空块）"目前**仍没有载体**，这条工单**不能打勾**。
+  所以 W4b 的"判据①（拿不到数据 ⇒ 不报错、不留空块）"目前**仍没有载体**，这条工单**不能打勾**。~~
+  ✅ **04 22:2x 现量更正：这两半都已落地，本条被后来的工作追上而失效**（不是当时的探针坏了 ——
+  `git log` 自证：`dayMarker` 那笔是 10-03 **22:06**（`509a06cd`）、客户端拉取那笔是 **22:58**（`b05fbc50`），
+  都在这条读数的 20:30 **之后** ⇒ 那句"还没写"在它自己的时间戳上是对的。载体 = 本分支 `9adb5f08`；
+  复现命令与原文一致，只把 `packages/storage/src` 换成 `apps/mobile/src`（存储层不参与公共事实，
+  原文把它列进落点清单是个**空目录项**，但它对结论无影响 —— 另外三个目录当时确实都还没有命中））：
+  ① 客户端拉取那半 = `packages/app-host/src/public-facts.ts`（`startPublicFacts`/`onFactsChanged`，
+  经 `packages/app-host/src/index.ts:711` 导出）+ web 侧宿主接线 `apps/web/src/features/calendar/public-facts.ts`
+  与 `apps/web/src/main.tsx:34` 的 `startPublicFacts(...)`；判据载体 `packages/app-host/tests/public-facts.spec.ts`（11 条 `it`）。
+  ② `dayMarker` 可选 prop：定义在 `packages/ui/src/calendar/CalendarBoard.tsx:152`
+  （`readonly dayMarker?: ((date: LocalDate) => CalendarDayMarker | undefined) | undefined`，默认 `undefined` ⇒ 什么都不画），
+  现量命中 8 个文件：上面那份 + `calendar/model.ts`、`countdown/EventBoard.tsx`、`timeline/GanttChart.tsx`、
+  `apps/web/src/features/calendar/{CalendarView,CalendarSidebar,store}.ts(x)`、`apps/mobile/src/screens/CalendarScreen.tsx`
+  ⇒ 三端都接上了，不是"共享层做了、宿主没接"那一档。
+  📌 **这条的价值在于它证明了本文的日期标注是承重的**：一句带时间戳的"还没做"会在 **96 分钟**后变成假的，
+  而它不会自己通知你。所以 §7 每一格的读数都必须写载体，引用本文状态前先现量。
+- 🟢 **合并态读数（04 22:3x）**：本 ADR 的代码已在 `main` 上（`origin/feat/countdown-batch2` 与 `origin/main`
+  同一个 tip；**这里不写 SHA**，现量：
+  `git ls-remote origin refs/heads/main`，SSH 被代理挡时见计划 §8.5 第 14 条的 HTTPS 读法），
+  §2.1/§2.2 从"已决定 + 已在写"升级为**已上线**；W4b 的判据①自此有载体。
 - ⚠️ **编号撞车登记**：该分支的契约文件头写的是「定性见 [ADR-0050] `docs/adr/0050-public-facts-are-deployer-supplied.md`」——
   那个号已被另一条会话占用（`0050-e2ee-key-lifecycle-and-recovery.md`，未跟踪），
   `0051` 是移动端提醒投递。⇒ 本决定落在 **0052**，合流时必须把契约里那个 `0050` 指针改成 `0052`；

@@ -39,7 +39,7 @@ import {
   enableAllModules,
   openSettingsView,
   stubLegalRecheck,
-  stubEmptyHolidayAdjustments,
+  stubPublicFacts,
 } from './helpers';
 import { installMissingProducerShims } from './shims';
 
@@ -159,7 +159,10 @@ async function fakeServer(
   // 塞了凭据之后这几条也会真发出去；给空但合法的响应，免得无关的 404 淹掉真正的失败
   // （与 `admin-console.spec.ts` / `inbox.spec.ts` 同一条补位纪律）。
   await stubLegalRecheck(page, SERVER);
-  await stubEmptyHolidayAdjustments(page, SERVER);
+  // 🔴 同一条纪律下的**另一道**开机无关请求（W4b）：应用一启动就拉公共事实
+  // `/api/holiday-adjustments`，与头像这个主题无关；不登记它，catch-all 会把
+  // 这条合法读取计入 `unexpected`，红的就是头像那条判据。
+  await stubPublicFacts(page, SERVER);
   // 设置页会探测管理员权限；此夹具是普通账号，真实接口应返回 403。
   await page.route(`${SERVER}/api/admin/overview`, (route) =>
     route.fulfill({

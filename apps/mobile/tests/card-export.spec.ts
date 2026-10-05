@@ -35,12 +35,19 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { tokensForTheme, resolveTextStyle } from '@heyta/design-system';
+import { resolveTextStyle, tokensForTheme } from '@heyta/design-system';
 import { EXPORT_CARD_EDGE_PX, EXPORT_CARD_HEIGHT_PX, EXPORT_CARD_SCALE, EXPORT_CARD_SIZE } from '@heyta/shared-schema';
 import { buildCardExportLayout, type CardExportDrawOp, type CardExportRequest } from '@heyta/ui/node';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { cardTextLinesFor, rasterRequestFor, rasterScaleFor } from '../src/lib/card-export-units';
+import {
+  afterNextFrame,
+  cardTextLinesFor,
+  rasterRequestFor,
+  rasterScaleFor,
+  RASTERIZE_SETTLE_MS,
+  settleRasterize,
+} from '../src/lib/card-export-units';
 import { writeCardPng } from '../src/lib/card-export-native';
 
 const MOBILE_LIB = (name: string): string =>
@@ -62,6 +69,8 @@ function codeOf(file: string): string {
 }
 
 function requestOf(dark = false): CardExportRequest {
+  // 走 `tokensForTheme()` 而不是直接拿 `lightTokens`/`darkTokens`：L0 原始表只允许
+  // design-system 内部与 `packages/ui` 的建表点引用（`check:theme` 的 R3）。
   const tokens = tokensForTheme(dark ? 'dark' : 'light');
   return {
     texts: {
@@ -229,16 +238,28 @@ describe('W7 · 接线：那些没有编译器帮忙的名字', () => {
   const SWIFT = codeOf(IOS('HeytaCardExportModule.swift'));
   const BRIDGE_M = codeOf(IOS('HeytaCardExportModuleBridge.m'));
 
-  it('模块名三处逐字相同（JS / Swift `moduleName()` / `.m` 的 RCT_EXTERN_MODULE）', () => {
+  it('模块名三处逐字相同（JS / Swift `moduleName()` / `.m` 交给 JS 的那个名字）', () => {
     const js = /const CARD_EXPORT_MODULE_NAME = '([^']+)'/u.exec(MOBILE_TS)?.[1];
     const swift = /static func moduleName\(\) -> String! \{ "([^"]+)" \}/u.exec(SWIFT)?.[1];
-    const objc = /RCT_EXTERN_MODULE\((\w+),/u.exec(BRIDGE_M)?.[1];
     expect(js, 'JS 侧没抓到模块名 —— 形状变了，这条判据已经失效').toBeTruthy();
     expect(swift).toBe(js);
-    // `.m` 里的那个是 **ObjC 类名**，Swift 侧靠 `@objc(名字)` 给它一个稳定 extern 名。
+    // `.m` 里的 ObjC 类名由 Swift 侧的 `@objc(名字)` 给一个稳定 extern 名。
     const objcName = /@objc\((\w+)\)/u.exec(SWIFT)?.[1];
     expect(objcName, 'Swift 类没有 @objc(...) extern 名').toBeTruthy();
-    expect(objc).toBe(objcName);
+    // 🔴 这条判据 04 10:0x 之前是**钉错对象**的：它比的是"`.m` 的第一个参数 == ObjC 类名"，
+    //    而那个位置在 `RCT_EXTERN_MODULE(a, b)` 里展开成 `RCT_EXTERN_REMAP_MODULE(, a, b)` ——
+    //    第一个参数是**空**的，JS 名因此拿不到 `HeytaCardExport`。
+    //    真机现量：不经过点击、不经过 react-native-svg，只在 hook 挂载处调
+    //    `writeCardPng('dbg-M-ios.txt')`，沙盒 30 秒后仍为空；同趟界面出现
+    //    `倒数纪念日·DIAG` ⇒ 换进去的 bundle 确实在跑 ⇒ 坏的是这条桥的名字。
+    //    ⇒ 现在要求显式 REMAP：第一个参数 = JS 看到的名字，第二个 = ObjC 类名。
+    const remap = /RCT_EXTERN_REMAP_MODULE\(\s*(\w+)\s*,\s*(\w+)\s*,/u.exec(BRIDGE_M);
+    expect(
+      /(^|[^A-Z_])RCT_EXTERN_MODULE\s*\(/u.test(BRIDGE_M.replace(/RCT_EXTERN_REMAP_MODULE\s*\(/gu, 'REMAP(')),
+      '`.m` 用的是裸 RCT_EXTERN_MODULE —— 它的 js_name 是空的，`NativeModules.HeytaCardExport` 会是 undefined',
+    ).toBe(false);
+    expect(remap?.[1], 'REMAP 的第一个参数就是 JS 侧的名字，必须逐字等于 CARD_EXPORT_MODULE_NAME').toBe(js);
+    expect(remap?.[2], 'REMAP 的第二个参数是 ObjC 类名，必须等于 Swift 的 @objc(...) 名').toBe(objcName);
   });
 
   it('Swift 的选择器与 `.m` 的 RCT_EXTERN_METHOD 逐字符对齐', () => {
@@ -312,5 +333,121 @@ describe('W7 · 接线：那些没有编译器帮忙的名字', () => {
     for (const source of [painter, webPainter]) {
       expect(/function buildCardExportLayout/u.test(source)).toBe(false);
     }
+  });
+});
+describe('W7 · 「等不到栅格化」必须是一个值，不是一句承诺', () => {
+  type Outcome = Awaited<ReturnType<typeof settleRasterize>>;
+
+  it('回调永远不来 ⇒ 到点拿到 fired:false/timeout（Promise 不许悬着）', async () => {
+    vi.useFakeTimers();
+    try {
+      let observed: Outcome | undefined;
+      void settleRasterize(() => {}).then((r) => {
+        observed = r;
+      });
+      await vi.advanceTimersByTimeAsync(RASTERIZE_SETTLE_MS - 1);
+      expect(observed, '还没到点就先结算 —— 那这条兜底会把慢设备上的正常出图判成失败').toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(observed).toEqual({ fired: false, reason: 'timeout' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('回调来了 ⇒ 拿到值，并且超时那一支不再触发', async () => {
+    vi.useFakeTimers();
+    try {
+      let observed: Outcome | undefined;
+      void settleRasterize((cb) => {
+        cb('QUJD');
+      }).then((r) => {
+        observed = r;
+      });
+      await vi.advanceTimersByTimeAsync(RASTERIZE_SETTLE_MS * 2);
+      expect(observed).toEqual({ fired: true, base64: 'QUJD' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('回调来了但没带值 ⇒ 空串（`complete()` 那一档把空串算失败，不算成功）', async () => {
+    let observed: Outcome | undefined;
+    await settleRasterize((cb) => {
+      cb(undefined);
+    }).then((r) => {
+      observed = r;
+    });
+    expect(observed).toEqual({ fired: true, base64: '' });
+  });
+
+  it('invoke 同步抛错 ⇒ fired:false/threw，而不是把异常留给调用方', async () => {
+    let observed: Outcome | undefined;
+    await settleRasterize(() => {
+      throw new Error('no native module');
+    }).then((r) => {
+      observed = r;
+    });
+    expect(observed).toEqual({ fired: false, reason: 'threw' });
+  });
+
+  it('生产路径真的走这条兜底：`svg.toDataURL` 只许出现在 settleRasterize 的实参里', () => {
+    const src = codeOf(MOBILE_LIB('card-export.tsx'));
+    expect(src.includes('settleRasterize('), 'card-export.tsx 没有经过 settleRasterize —— 那条兜底成了死代码').toBe(true);
+    expect(src.includes('svg.toDataURL(cb'), 'svg.toDataURL 没有把回调交给 settleRasterize 包着').toBe(true);
+    // 旧的形状是「把内联函数直接交给 toDataURL」—— 它编译得过、跑得起来，只是永远不回来时没人兜底。
+    expect(/toDataURL\(\(base64/u.test(src), '又退回内联回调那一档了（那一档没有超时支路）').toBe(false);
+  });
+});
+
+describe("W7 · 问原生要图之前必须先让出一帧（iOS 实测到的那枚 nil registry）", () => {
+  it("注入的调度器没跑 ⇒ 不结算；跑了一帧 ⇒ 才结算", async () => {
+    const queued: Array<() => void> = [];
+    const p = afterNextFrame((run) => {
+      queued.push(run);
+    });
+    let settled = false;
+    void p.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(queued.length, "afterNextFrame 根本没把活儿交给调度器 —— 那它等于同步放行").toBe(1);
+    expect(settled, "没让帧就结算 ⇒ 这条兜底等于没有").toBe(false);
+    queued.forEach((run) => {
+      run();
+    });
+    await p;
+    expect(settled).toBe(true);
+  });
+
+  it("card-export.tsx 里 toDataURL 的调用点在让帧之后（不是「我记得加了」）", () => {
+    const src = codeOf(MOBILE_LIB("card-export.tsx"));
+    /**
+     * 🔴 让帧这一步现在是**带预算的** `afterNextFrameWithin`。
+     *
+     * 改名不是审美：`requestAnimationFrame` 在后台不触发，而 `afterNextFrame` 那个
+     * Promise 永远不结算 ⇒ 这段等待落在 `RASTERIZE_SETTLE_MS` 那 15 s **管不到的地方**。
+     * 症状两枚：点了没反应（挂死）+ 回前台后突然弹出分享面板。
+     * 所以这条判据跟着换成新名字，并加断"等不到帧也要有个结论"。
+     */
+    const gate = src.indexOf("afterNextFrameWithin(");
+    const call = src.indexOf(".toDataURL(");
+    expect(gate, "源码里没有让帧这一步 ⇒ iOS 会重演 nil registry 然后超时").toBeGreaterThan(-1);
+    expect(call, "找不到 toDataURL 调用点，这条判据失去对象").toBeGreaterThan(-1);
+    expect(call, "toDataURL 排在让帧之前 —— 那一档原生拿不到 tag 且不回调").toBeGreaterThan(gate);
+    expect(src.match(/afterNextFrameWithin\(/gu)?.length, "让帧被调用了不止一次（每多一次就多等一帧）").toBe(1);
+    expect(src.includes("'frame-timeout'"), "等不到帧那一支没有结论点 ⇒ Promise 悬着，回前台再突然弹一次").toBe(true);
+  });
+
+  it("一次点击只能有一个结论点：被顶掉/被卸载的那次必须结算成 cancelled", () => {
+    const src = codeOf(MOBILE_LIB("card-export.tsx"));
+    // cleanup 里结算 —— 少了它，第二次点击会把第一次的 Promise 永远悬着（按钮停在"进行中"），
+    // 而第一次的 complete() 仍会跑完 ⇒ 两张分享面板 + 图与文件名错配。
+    expect(src.includes("resolve({ ok: false, cancelled: true })"), "作废路径没把上一次结算掉 ⇒ 悬着的 Promise 让按钮永远转圈").toBe(true);
+    expect(src.match(/if \(settled\) return;/gu)?.length, "结论点守卫少了（每条分支都得先问一次）").toBeGreaterThanOrEqual(3);
+  });
+
+  it("让帧之后视图可能已经没了 ⇒ 出一句话，不许静默", () => {
+    const src = codeOf(MOBILE_LIB("card-export.tsx"));
+    expect(src.includes("svg-unmounted-in-frame"), "帧间卸载那一支没被 resolve 出去 ——  Promise 会悬着").toBe(true);
   });
 });
