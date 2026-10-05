@@ -382,6 +382,11 @@ edit_value() {  # <标签>
 xy_text() {
   python3 "$XY_PY" text "$1" "${2:-0}"
 }
+# 🔴 只认**在可点区域里**的文本节点（与 `desc-sane` / `edit-sane` 同一条理由）。
+#    单独补这一枚是因为 `xy_text` 的裸坐标会给出被裁掉的行，点上等于点到别的东西。
+xy_text_sane() {
+  python3 "$XY_PY" text-sane "$1" 0
+}
 has_text()  { grep -q "text=\"$1\"" "$UI_XML" && echo 1 || echo 0; }
 # 安全输入框（`secureTextEntry`）的内容**永远不出现在 dump 里**，节点上只有
 # `password="true"`。所以「口令填对了吗」这件事无法用 UI dump 证明。
@@ -621,6 +626,31 @@ wait_laptop_has() {  # <标题> <轮数>，每轮 5 秒；默认 60 轮 = 300 �
   return 1
 }
 
+# 把内容**往上**滚（= 露出上面的行），直到某个 `text` 节点出现。成功 0 / 滚到顶还没有 1。
+#
+# 🔴 现成的 `scroll_to_*` 三兄弟只会往下滚（swipe 1900→1100），而"刚建出来的行排在
+#    输入框**上面**"这一类断言需要反方向。2026-10-04 21:46 的 W6-c 真跑就是被这件事判红的：
+#    清单确实建出来了（那一行四个按钮的 `content-desc` 全在树里），但整行
+#    `bounds="[87,213][993,3]"`（bottom < top ⇒ 被滚出可视区）、行名的 `text` 节点根本不在树里，
+#    于是「清单没出现在列表里」是一枚**探针假红** —— 而它长得和真缺陷一模一样。
+#    同屏的便签行（在输入框**下面**）有 `text=`，所以那一腿照常绿 ——
+#    这正是"一条腿绿、另一条腿红"最该先怀疑载体的形状。
+#
+# 🔴 **本 helper 只证到"行被滚出可视区"这一半；"往上滚能把它滚回来"尚未实测**
+#    （21:57:47 别人往同一台模拟器重装了 APK，随后的验证量的是清过数据的新实例）。
+#    调用方因此把它当**只报不判**的诊断用（见 `verify-mobile-trash.sh` 第 2 步），
+#    别把它的返回值当"界面上看得见"的判据。
+scroll_up_until_text() {  # <文本> [最多滚几次=4]
+  local want="${1:-}" n="${2:-4}" i
+  [ -z "$want" ] && return 1
+  for ((i = 0; i <= n; i++)); do
+    dump
+    [ "$(has_text "$want")" = "1" ] && return 0
+    $ADB shell input swipe 540 1100 540 1900 300; sleep 1.2
+  done
+  return 1
+}
+
 # 按 content-desc 把一个节点**滚进可点区域**并返回坐标（失败返回空）。
 # 用于面板里被 ScrollView 裁掉的控件 —— 见 `desc-sane` 的注释。
 scroll_to_desc() {
@@ -690,16 +720,51 @@ tap_label() {  # <标签>
 #    下面的 disable/restore 对空集是无操作，不放大伤害。
 ADB_TIMEOUT_CMD="$(command -v timeout >/dev/null 2>&1 && echo 'timeout 10' || true)"
 IMES=$(${ADB_TIMEOUT_CMD} $ADB shell ime list -s 2>/dev/null | tr -d '\r' | grep -v '^$')
+# 这一趟**真的**关过软键盘没有 —— `summary` 的收尾自检只在这个前提下才判红，
+# 否则从不调 `disable_ime` 的 rig（例如纯截图那一枚）会被判成"把设备留在坏状态"，
+# 那是假红。
+IME_DISABLED=0
 disable_ime() {
   for ime in $IMES; do ${ADB_TIMEOUT_CMD} $ADB shell ime disable "$ime" >/dev/null 2>&1; done
   # AVD 带硬件键盘（hw.keyboard=yes），这条让软键盘不再弹出
   ${ADB_TIMEOUT_CMD} $ADB shell settings put secure show_ime_with_hard_keyboard 0 >/dev/null 2>&1
+  IME_DISABLED=1
 }
 restore_ime() {
   for ime in $IMES; do ${ADB_TIMEOUT_CMD} $ADB shell ime enable "$ime" >/dev/null 2>&1; done
   ${ADB_TIMEOUT_CMD} $ADB shell settings put secure show_ime_with_hard_keyboard 1 >/dev/null 2>&1
 }
-trap restore_ime EXIT
+
+# 🔴 **bash 的 EXIT trap 是"后一条整体替换前一条"，不是叠加。** 每枚 rig 的第 19 行
+#    都有一条 `trap 'rm -f -- "$0"' EXIT`（快照自删，traps #110/#113），而 source 本文件
+#    发生在它**之后** —— 原来这里写的是裸 `trap restore_ime EXIT`，于是每次验收都在
+#    **静默摘掉调用方自己的清理**。现量（2026-10-04 23:0x，`ls scripts/verify-mobile-*.sh`
+#    = 30 枚，其中 **27 枚 source 本 lib**；**23 枚**的 trap 排在 source 之前 = 被摘掉的那批，
+#    另 4 枚（account-erasure / ios-account-erasure / focus / due-time）排在之后、
+#    自己把 `restore_ime` 手抄进去了）：表在 `docs/plans/trash-and-archive.md` §10.87。
+#    症状不是报错，是"该删的没删"，而字面门禁只看见文件里有 `trap`。
+#    `verify-mobile-account-erasure.sh:21` 早就为这个坑写了"trap 必须排在 source 之后"，
+#    但那是一句**靠人记住**的约定；下面把它变成 lib 侧的结构性保证。
+heyta_chain_exit() {  # <新 handler 文本>；已有一条 EXIT handler 时与它串起来（新的先跑）
+  local prev old
+  prev=$(trap -p EXIT)
+  if [ -z "$prev" ]; then trap -- "$1" EXIT; return 0; fi
+  old=${prev#trap -- }
+  old=${old% EXIT}
+  # 这一层 `eval` **只为解引号**：`trap -p` 印出来的是合法 shell 字面量
+  # （`'…'` 或 `$'…'` 两种形都吃），`printf %s` 拿到的就是 handler 原文。
+  # 里面的 `$0` / `$( )` 都在引号内，这一步不展开 —— 它们要留到 trap 真的触发时才算。
+  # 🔴 这里**不能**写 `printf %s -- $old`：bash 的 `printf` 在格式串之后**不把
+  #    `--` 当选项结束符**，它会把 `--` 当成一个数据实参印出来 —— 解出来的
+  #    handler 就变成 `--echo NEW` 这种"命令找不到"（实测，装置 A/C/D/E 腿全报）。
+  # 解不出来（不是 `trap -- …` 形）就退回"只装新的"，行为等于修改前，不会更糟。
+  if ! eval "old=\$(printf %s $old)"; then trap -- "$1" EXIT; return 1; fi
+  # 顺序是**新的先跑**：调用方那条旧 handler 里可能有 `exit`，把它排在后面会跳过
+  # lib 的设备状态恢复（IME 恢复不了 = 把真机留在没有软键盘的状态）。
+  trap -- "$1
+$old" EXIT
+}
+heyta_chain_exit restore_ime
 
 # 启动应用（冷启动或已经在后台都能用）。
 #
@@ -1417,6 +1482,22 @@ PY
 # 每个脚本自己报验收名，但"通过几项 / 失败几项 / 退出码"只有这一处定义 ——
 # 两个脚本各写一份的话，迟早一个是 `-gt 0` 另一个是 `-ne 0`。
 summary() {  # <验收名> [结尾语] [退出码]
+  # 🔴 **收尾自检：这一趟真的会把关掉的东西恢复回去吗？**
+  #    `heyta_chain_exit` 只救得了"调用方的 trap 排在 source **前面**"那一半；
+  #    排在**后面**的裸 `trap … EXIT` 依然会整体替换掉串好的那条，而 bash 不报错。
+  #    现量：4 枚 rig 的 trap 排在 source 之后，其中 3 枚（account-erasure:29、
+  #    focus:149、due-time:106）手抄了 `restore_ime`，1 枚（`verify-mobile-ios-account-erasure.sh:31`）
+  #    没抄。它没抄**是否算缺陷**取决于它有没有关过软键盘 —— 所以这条判据的前提是
+  #    `IME_DISABLED=1`，不是"trap 文本长得不像"。判据不许把没量过的前提当已成立。
+  local trap_now
+  trap_now=$(trap -p EXIT | tr '\n' ' ')
+  if [ "${IME_DISABLED:-0}" = "1" ]; then
+    case "$trap_now" in
+      *restore_ime*) ;;
+      *) bad "这一趟关过软键盘，但当前 EXIT handler 里没有 restore_ime ⇒ 设备会被留在没有软键盘的状态：${trap_now}" ;;
+    esac
+  fi
+
   # ⚠️ 结尾语可传。原先是写死的「真机全链路通过」—— 那对**移动端**脚本准确，
   # 但三端同步验收（`verify-multi-end-sync.sh`）里没有"真机"参与，照抄会
   # 让输出说一句不成立的话。默认值保持原样，移动端脚本的输出一个字符都不变。
