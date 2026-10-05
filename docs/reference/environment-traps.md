@@ -6603,3 +6603,25 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     视口并回读长度，再分块输入、回读完整值，使用 `KEYCODE_ENTER` 收起键盘后重新抓 bounds；只点击一次验证按钮，
     通过脱敏的 session/账号状态确认结果。验收结束恢复模拟器原来的默认输入法和硬键盘设置。不要用 `KEYCODE_BACK`
     或 `KEYCODE_ESCAPE` 收键盘：它们可能关闭 RN Modal/应用并清掉只在内存中的登录凭据。
+
+283. 🔴 **直接跑 `check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e` 会重写**别人那一族**的证据图，而那条"别覆盖别人的图"的守卫只包在电池脚本里。**
+    （2026-10-05 11:5x 现量，载体 `heyta-wt-merge`：为了补"合并态没跑过的三段 e2e"，串行跑了这三条 ⇒ `git status` 里
+    `apps/web/evidence/` 下 **88 枚** PNG 变成 `M`，跨 12 个族（vault-panel / task-priority-checkbox / habit-month-stats /
+    keyboard-cursor / quadrant-fill / profile-panel / countdown-* / detail-pane-* / selection-projections …）。
+    这些图的内容**不是本轮任何改动造成的变化**——是那些 spec 本来就把截图写进受版本管理的证据目录。）
+    为什么守卫没挡住：这枚"证据图的本性是趟产物 ⇒ 跑完还原本趟改写的那几枚"的守卫长在
+    **合流电池里**（`docs/plans/detail-pane-alignment.md` §8.123 第 2 节 #40：原来只打印
+    `EVIDENCE_DIRTY=N`，那一节把它补成判定），它包的是电池里 e2e 那一步的**两侧**；
+    而我走的是裸 `pnpm check:ai-e2e` = `check-ai-e2e-preflight.mjs && playwright test`，
+    中间没有任何一层。🔴 别把这条读成"电池外的跑法都该被拦"——门禁 `check:detail-pane-evidence-refs`
+    判的是**引用完整性**（图在不在、被谁引用），它从来不管字节是谁写的；把两件事混起来，
+    下一个人就会去给那条门禁加还原逻辑，而那正是 #40 特意没做的方向。
+    🔴 真正危险的后果不是"树脏了"，是**下一次 `git add apps/web/evidence` 会把 88 枚没人复核过的图当成读数签进 main** ——
+    §6.2 规定一要求的是"人真的看了那张图"，而这三段 e2e 的判据根本不读那些目录，它们只是顺手把文件写了。
+    ✅ 处置（当场做完）：`git restore -- apps/web/evidence`（88 枚全回 HEAD，复量 `git status` 对该目录为空），
+    只留下本笔真正改的两枚文件。
+    📌 **可迁移的规律**：跑任何"会写受版本管理目录"的验收之前，先 `git status --porcelain` 存一份基线，
+    跑完拿它做差集，**差集里不属于本单的每一枚文件都要当场还原**；
+    而"这条命令的判据不读那些图"不能作为豁免理由——写文件的就是判据本身，谁跑谁负责。
+    取号现量：本条并入时载体最大号 282 ⇒ 取 **283**
+    （`grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md | tr -d '. ' | sort -n | tail -1`）。
