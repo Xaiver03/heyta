@@ -33,17 +33,23 @@
  *     中间插了 3 行 ⇒ 公共前缀只到第 88 行，两条尾巴各带后半份，拼出 318 段 = 后半份抄两遍。
  *  3. `apps/web/evidence/**.png`（binary）：取 **main** 侧。它们是产物不是源码，
  *     留 main 的不丢任何判据，留本批的会把 main 上另一批的现场覆盖掉。
- *  4. `docs/research/self-host-distribution-audit.md`（add/add）：取**本分支**侧，
- *     但不靠印象 —— 断言是**结构粒度**的：main 那份的每一个小节标题（`^#{2,6} `）和每一个
- *     `§8.NN` 编号都必须能在本分支那份里找到；缺任何一个 ⇒ 那是别人写的"一节"，退 2 交人判。
- *     🔴 为什么不是行粒度（本轮实测出来的）：第一版要求"main 那份的每一行都在本分支该文件的
- *     历史 blob 里出现过"，它在 main=59f0ab45 上**判红了两行**，而那两行确实是本批自己的话
- *     （一条讲 `apps/web/dist` 无人引用，一条是"缺的成本"表格行）。原因是并行会话
- *     （GDPR 那笔 `6e447033`）把**当时工作树里未提交的中间态**整文件带进了 main，
- *     而我随后又把那两句改写了一版 ⇒ 旧措辞在 git 历史里**从来没有过 blob**。
- *     行粒度挡不住这种漂，只会把"我自己改过措辞"误报成"别人有内容"；
- *     而"别人的内容"在这个文件里的真实形状是**一整节**（标题 + §编号），那一层挡得住。
- *     行级孤儿数量仍然打印并进提交说明，只是不作门禁。
+ *  4. `docs/research/self-host-distribution-audit.md`（追加型台账）：**并集**，不是择一。
+ *     判据与产出在 `research/tools/selfhost-audit-union.mjs`（单一所有者）。
+ *     它带 `--selftest`（合成 + 真三份两类臂，臂数由它自己打印），牙的存在性由
+ *     `selfhost-audit-union-mutants.mjs` 逐条断言二阶证明 —— 这两件都是 2026-10-05 才补的，
+ *     在此之前本行写的是"可拿合成样本离线变异"而**全仓没有一处真跑过变异**（见台账 §8.216）。
+ *     产出 = 本分支那份 + main 侧"base 没有、本分支也没有"的行，带一条标明"下面这块不是本批写的"的哨兵；
+ *     只有五类事停下来交人判：仍含冲突标记 / 丢了 main 侧新增行 / 丢了本分支行 / 混入两侧都没有的行 /
+ *     告示牌被摘（别人那一块会读起来像本批写的）。
+ *     ⚠️ 别再把它读成"取本分支侧 + main 有额外的节就退 2" —— **那是旧规则**（2026-10-04 06:4x 现量：
+ *     main 被另一条会话提交进一整节 `## 9. 交还一条现场…`，本分支一行都没有 ⇒ 择一就是静默删别人的证据）。
+ *     旧规则只做到"不背锅"，没做到"把这单落地"；现在这一格是**能自动解**的。
+ *     （2026-10-05 14:1x 我正是读了这段历史、没读被调本体，据此做了一笔多余的真实提交 —— 见台账 §8.215。）
+ *     另一条历史教训留在这里仍然有用：断言方向曾是"main 的每一行都要在本分支出现过"，
+ *     它在 main=59f0ab45 上把**本批自己改写过的两句话**判成"别人有内容"——因为并行会话
+ *     （GDPR 那笔 `6e447033`）把当时工作树的未提交中间态整文件带进了 main，旧措辞在历史里从来没有过 blob。
+ *     现行模块因此只管"别人**新增**的行必须活着"，基线上被本批改写/删除的行不算丢。
+ *     行级孤儿数量仍然打印并进读数，只是不作门禁。
  *
  *  5. `server/image-npm-tree.json`（镜像 npm 依赖树快照，派生物）：取**本分支**侧。
  *     这一族的取舍**不是偏好**：main 那份是 10-03 傍晚由**旧版联网生成器**解出来的，
@@ -94,6 +100,17 @@
  * 第 2 腿 = 提交物锁里每条依赖都在许可证登记表里有归属；第 3 腿 = 镜像安装合同，
  * 含"prune devDependencies 必须是第一条 install 之前的一步"与 prisma 三处同源）。
  * 唯一被排除的是 `--installed-tree` 那一**模式**（要从跑起来的镜像里取树）。
+ * 🔴 **上面那段清单先前漏记了两批**（本次补）：`链里每条脚本目标都在树里`（G-65/G-67 那一族的哨兵，
+ * 见下面 `GATES` 里那条注释）以及下面这**八枚成对一致性门禁** ——
+ * `check:ui-language`（词条 zh↔en 同步）、`check:legal-tools`（AI 工具目录↔法务中英表）、
+ * `check:legal-permissions`（权限承诺↔manifest）、`check:legal-host`（对外域名三方）、
+ * `check:pricing`、`check:ai-quota`、`check:claims`、`check:docs-voice`。
+ * 它们入选的**唯一门槛**是"在一棵没有 node_modules、没有任何 dist 的载体形状树上 exit 0"，
+ * 那条量法与两枚反面教材（`check:shell-surfaces` / `check:brand-assets` 在旧 dist 上红得像缺陷）
+ * 都记在 `GATES` 数组上面那段注释里。
+ * 🔴 上面这份清单是**门禁**，不是落笔前跑的**全部**判据：另有三处"判据自己的牙"在同一趟跑 ——
+ * 第八族（replay 捕获）、第九族（Dockerfile 解法）、借 store 守卫（`selfhost-store-borrow.mjs`），
+ * 各自 `--selftest` 的臂数由它们自己的输出打印，本文件不抄数字。
  * 完整 `pnpm check`（要 node_modules、要起栈、`check:ai-e2e` 会 SIGKILL 别人的 dev server，
  * §7 #87）**不在这里跑** —— 它是落地那一刻的判据，载体绿不绿不由本脚本主张。
  *
@@ -110,8 +127,13 @@
  * "这棵树此刻是不是别人的现场"：argv 腿（命令行里点了这个目录）+ cwd 腿（进程坐在里面）
  * + `MERGE_HEAD` 三条，任何一条命中 ⇒ **退 6 且一个字节都不写**；两条腿读不到 ⇒ **退 2**
  * （"判不了"不等于"没人用"）。判据本体在 `selfhost-carrier-busy.mjs`（九臂自检）。
- * `HEYTA_CARRIER_BUSY_FORCE` 只能把它**逼红**（`busy`/`blind`），没有让它放行的取值 ——
+ * `HEYTA_CARRIER_BUSY_FORCE` 只能把它**逼红**（`busy`/`blind`/`state`），没有让它放行的取值 ——
  * 那是给变异复现用的，不是给绕过用的：写错值本身按"判不了"退 2。
+ * 🔴 **`MERGE_HEAD` 那一格和另外两格不能共用一句建议**（10-05 实测出来的）：前两格是**进程**，
+ * "等那一趟跑完再重跑"成立；`MERGE_HEAD` 是**状态**，没有会跑完的那一趟，而第 0 步那次
+ * `merge --abort` 排在闸门后面走不到 ⇒ 直接重跑会永远退 6。所以这一格的话术改成
+ * "先证明这场合并是谁起的（`rev-parse MERGE_HEAD` 对分支尖 + `MERGE_MSG` 的 mtime 对窗口），
+ * 再由那个所有者 `merge --abort`"。触发形状：本脚本崩在合并与落笔之间（本次是一个未定义标识符）。
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
@@ -127,6 +149,7 @@ import {
 } from './selfhost-red-attribution.mjs';
 import { readImageInstallShape, readImageInstallShapeFromText } from './image-install-shape.mjs';
 import { liveCarrierUsers } from './selfhost-carrier-busy.mjs';
+import { borrowStep, selftestArms as borrowSelftestArms, UNREADABLE } from './selfhost-store-borrow.mjs';
 import { unionMerge, oursMerge, sameCountAs } from './selfhost-text-merge.mjs';
 
 const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
@@ -193,6 +216,48 @@ const die = (code, msg) => {
   process.exit(code);
 };
 
+/* 🔴 `die()` 会擦现场，**未捕获的异常不会** —— 10-05 实测：借 store 判据段里一个从未定义的标识符
+ *    让整趟崩在"合并之后、落笔之前"，只留下一叠裸 stack，而共享载体里存着一场 MERGE_HEAD。
+ *    下一趟因此被第 0a 步读成"别人的现场"（`pid=-1` 那一格），而清理动作排在闸门后面走不到 ——
+ *    一个纯代码缺陷就这样变成落地路径上要人手工收拾的循环。
+ *    这一档**不改变"失败"这件事本身**（原始异常照打、专属退出码 7 不与任何一道守卫的码相撞），
+ *    它只保证失败的**形状**与 die 一致：已量到的读数 + 擦现场 + 复验它真的干净了。
+ *    两档都要挂：同步代码里抛的是 `uncaughtException`，而本文件有顶层 await，
+ *    异步里没接住的会走 `unhandledRejection`（Node 22 默认直接终止且**不**经过前者）。
+ *    注入臂：`HEYTA_CARRIER_CRASH_AFTER_MERGE=1`（下面"合并已确认"那一行之后 throw）。 */
+const crashOut = (what, e) => {
+  if (notes.length) console.error(`   已量到的读数：\n${notes.map((n) => `     · ${n}`).join('\n')}`);
+  console.error(`❌ ${what}：${e?.stack ?? e}`);
+  const td = teardown();
+  console.error(`   ${td.ok ? '现场：' : '🔴 现场没擦干净：'}${td.line}`);
+  if (!td.ok) {
+    console.error(`   恢复动作（由人确认这棵树此刻属于谁之后执行）：git -C ${WT} merge --abort && git -C ${WT} status --porcelain`);
+  }
+  process.exit(7);
+};
+process.on('uncaughtException', (e) => crashOut('未捕获异常（不是任何一道守卫的拒绝）', e));
+process.on('unhandledRejection', (e) => crashOut('未接住的 Promise 拒绝（顶层 await 那一族）', e));
+
+/* 🔴 读数登记守卫 —— 必须在**任何写动作之前**（它判的是这份源码自己的形状，不依赖运行态）。
+ *    规则：凡是 `xxxReading = …` 赋过值的名字，必须出现在某条 `notes.push(…)` 的参数里；
+ *    否则成功路径末尾那份"整页 notes dump"收不到它 ⇒ 退 2 点名。
+ *    为什么用读源码而不是维护一张清单：**清单本身就是第四次漏掉的地方**（§8.197 同族的理由，
+ *    文件里"记得打印"这句注释写过两次，第三次仍然漏在新加的段上）。
+ *    本守卫第一次运行就抓到三处，其中 `auditReading` 是真漏（四条"零丢行"断言的读数只进了提交说明，
+ *    stdout 上一个字都没有），另两处 `pkgReading` / `giReading` 是**我的正则太窄**：
+ *    它们走的是 `notes.push(\`package.json ${pkgReading}\`)` 这种带前缀的写法 ⇒ 规则改成"出现在
+ *    push 的参数里"而不是"等于 push 的实参"，否则这条守卫会把合法写法判成缺陷。 */
+{
+  const src = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+  const assigned = [...new Set([...src.matchAll(/^\s*(\w+Reading) = /gm)].map((m) => m[1]))];
+  const pushBlobs = [...src.matchAll(/notes\.push\([\s\S]{0,900}?\);/g)].map((m) => m[0]);
+  const unregistered = assigned.filter((n) => !pushBlobs.some((b) => new RegExp(`\\b${n}\\b`).test(b)));
+  if (unregistered.length) {
+    die(2, `这些读数只赋值、没进任何一条 notes.push ⇒ 成功路径的整页 dump 收不到它（§8.197 那一族）：${unregistered.join(', ')}`);
+  }
+  notes.push(`读数登记守卫：${assigned.length} 个 *Reading 赋值点，全部出现在某条 notes.push 的参数里`);
+}
+
 // ── 0. 起点 ──────────────────────────────────────────────────────────
 const mainSha = git(['rev-parse', MAIN]).trim();
 const srcSha = git(['rev-parse', SOURCE]).trim();
@@ -223,26 +288,86 @@ if (existsSync(WT)) {
   } catch { /* 没有进行中的合并 */ }
 }
 const FORCE_BUSY = process.env.HEYTA_CARRIER_BUSY_FORCE;
-if (FORCE_BUSY && FORCE_BUSY !== 'busy' && FORCE_BUSY !== 'blind') {
+if (FORCE_BUSY && !['busy', 'blind', 'state'].includes(FORCE_BUSY)) {
   die(2, `不认识 HEYTA_CARRIER_BUSY_FORCE=${FORCE_BUSY} ⇒ 这道闸门没有"绕过"取值，打错就当判不了`);
 }
 const busyProbe = FORCE_BUSY === 'blind'
   ? { error: `变异注入：强制判不了（HEYTA_CARRIER_BUSY_FORCE=blind）` }
   : FORCE_BUSY === 'busy'
     ? { users: [{ pid: 999999, via: 'argv', what: `变异注入：强制有人在用（HEYTA_CARRIER_BUSY_FORCE=busy）` }], psRows: 0, cwdRows: 0, exempt: [process.pid] }
-    : liveCarrierUsers({ dir: WT, mergeHead: mergeHeadBefore });
+    : FORCE_BUSY === 'state'
+      // 第三档注入的是**形状**而不是进程：闸门自己那两档读数（argv/cwd）都为空，只有
+      // "上一趟崩在合并与落笔之间"留下的 MERGE_HEAD。用它来验退 6 话术里那条恢复分支，
+      // 不必去共用载体那棵树上真造一场合并。
+      ? { users: [{ pid: -1, via: 'MERGE_HEAD', what: `变异注入：强制只有"没收拾干净的在飞合并"这一格状态` }], psRows: 0, cwdRows: 0, exempt: [process.pid] }
+      : liveCarrierUsers({ dir: WT, mergeHead: mergeHeadBefore });
 if (busyProbe.error) {
   die(2, `载体在用者**判不了**：${busyProbe.error}\n` +
     `   不拿"读不到"当"没人用" —— 那正是 §8.122 端口探针那个假 0 的形状，代价是硬重置别人的现场。`);
 }
 if (busyProbe.users.length) {
+  // 🔴 两种占用形状要分开说话，因为**只有一种能等**。10-05 实测：借 store 那段判据里一个
+  //    未定义标识符让本脚本崩在合并之后、落笔之前，于是载体里留下一场 MERGE_HEAD；
+  //    下一趟退 6 却被告知"等那一趟跑完再重跑" —— 那一趟根本不存在（pid=-1 是状态不是进程），
+  //    而第 0 步那次 `merge --abort` 排在闸门**后面**，闸门不通就永远走不到它。
+  //    话术错一格 = 落地路径上一格没有出口的循环。判拒不变（照样退 6、不自动收拾）。
+  const onlyState = busyProbe.users.every((u) => u.via === 'MERGE_HEAD');
   die(6, `载体 ${WT} 此刻有 ${busyProbe.users.length} 个**别人的**进程在用：\n` +
     busyProbe.users.map((u) => `     pid=${u.pid} [${u.via}] ${u.what}`).join('\n') +
-    `\n   ⇒ 不重算、不硬重置、不动这棵树（本工具**不提供绕过开关**）。` +
-    `   等那一趟跑完再重跑本脚本；要现在就落地，得由那个现场的所有者自己挪开，不是由我替他决定。`);
+    (onlyState
+      ? `\n   ⇒ 这一格是**状态**，不是进程：没有"哪一趟"会跑完，直接重跑本脚本会永远退 6` +
+        `（第 0 步的 merge --abort 排在这道闸门后面，走不到）。` +
+        `\n     先证明这场合并是谁起的，再动这棵树：` +
+        `\n       git -C ${WT} rev-parse MERGE_HEAD        # 等于哪条分支的尖，它就是那条分支的所有者起的` +
+        `\n       ls -l "$(git -C ${WT} rev-parse --git-dir)/MERGE_MSG"   # mtime 落在哪一趟的窗口里` +
+        `\n     确认后由那个所有者自己收拾：git -C ${WT} merge --abort && git -C ${WT} status --porcelain（应当 0 行）` +
+        `\n     本工具不替他决定 —— 也不提供绕过开关。`
+      : `\n   ⇒ 不重算、不硬重置、不动这棵树（本工具**不提供绕过开关**）。` +
+        `   等那一趟跑完再重跑本脚本；要现在就落地，得由那个现场的所有者自己挪开，不是由我替他决定。`));
 }
 notes.push(`载体空闲（argv+cwd 两腿：ps ${busyProbe.psRows} 行 · cwd ${busyProbe.cwdRows} 行 · ` +
   `豁免自己链 ${busyProbe.exempt.join('←')} · MERGE_HEAD=${mergeHeadBefore ? '有' : '无'}）`);
+
+/* 🔴 第 0b 步：基线必须**已经含**落地目标那条线（10-05 16:4x 现量换来的，不是预防性仪式）。
+ * `6921ac77` 那一发用本地 `main` 当第一父，而本地 main 落后公开侧 595 笔 —— 第 11 族写的正是
+ * "冲突时取 **main** 侧"，于是"取 main 侧"取到**旧版**：本批自己的
+ * `test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功')` 整条用例连同 `?lang=zh-CN`
+ * 那句断言一起被摘（该族的守卫只数两处命中数，"少了一整个 `test(`"不在射程里；账面只打印了
+ * "被丢的独有行 18 条" —— 有名字，没有牙）。
+ * 反方向同样错：只用 `origin/main` 当基线时，本地 main 上并行会话刚落的笔就在新尖的后代之外
+ * ⇒ 推上去会把**别人的提交**从分支上摘掉。
+ * 所以判据是一条可数的性质：**落地目标必须是基线的祖先**（missing=0）。本体在
+ * `selfhost-carrier-base.mjs`（六臂自检），本工具只调它、不另写一份。 */
+const CBASE = join(dirname(fileURLToPath(import.meta.url)), 'selfhost-carrier-base.mjs');
+const LANDING_REF = process.env.HEYTA_LANDING_REF || 'origin/main';
+{
+  let stOut = '';
+  try {
+    stOut = execFileSync('node', [CBASE, '--selftest'], { encoding: 'utf8' });
+  } catch (e) {
+    const reds = String(e.stdout ?? '').split('\n').filter((l) => /^BAD/.test(l)).slice(0, 4).join('\n');
+    die(2, `基线闸门的自检不过 ⇒ 不用它判基线（不能拿一枚没有牙的闸门放行落地）：\n${reds}`);
+  }
+  const armLine = (stOut.split('\n').find((l) => /臂数\s\d+/.test(l)) ?? '').trim();
+  const claimed = armLine.match(/臂数\s(\d+)\s·\s不符\s(\d+)/);
+  if (!claimed || Number(claimed[1]) < 6 || Number(claimed[2]) !== 0) {
+    die(2, `基线闸门的自检读数对不上（臂数行：“${armLine || '（没有这一行）'}”，要求 臂数 ≥6 且 不符 = 0）`);
+  }
+  let baseRc = 0, baseOut = '';
+  try {
+    baseOut = execFileSync('node', [CBASE, `--main=${MAIN}`, `--landing=${LANDING_REF}`], { encoding: 'utf8' });
+  } catch (e) {
+    baseRc = e.status ?? 1;
+    baseOut = `${String(e.stdout ?? '')}${String(e.stderr ?? '')}`;
+  }
+  if (baseRc !== 0) {
+    die(2, `基线不合格（${CBASE} 退 ${baseRc}）：\n${baseOut.trim()}\n` +
+      `   ⇒ 本工具不替你并基线、也不提供绕过开关：先 ` +
+      `git merge-tree --write-tree ${MAIN} ${LANDING_REF}（rc=0 时）→ git commit-tree 两个父 → ` +
+      `拿那支临时 ref 当 HEYTA_MAIN_REF 重跑本脚本。`);
+  }
+  notes.push(`基线闸门：${claimed[1]} 臂 · 不符 0 · ${baseOut.split('\n')[0].trim()}（落地目标=${LANDING_REF}）`);
+}
 
 if (!existsSync(WT)) {
   git(['worktree', 'add', '--detach', WT, mainSha]);
@@ -284,6 +409,15 @@ if (mergeHead !== srcSha) {
 const conflicts = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
 mergeStarted = true; // 从这里起的每一条 die 路径都必须把这一场合并中止干净（见上面的 teardown）
 notes.push(`MERGE_HEAD=${mergeHead.slice(0, 8)} 已确认 · 冲突 ${conflicts.length} 条：${conflicts.join(', ') || '（无）'}`);
+
+/* 注入臂：`HEYTA_CARRIER_CRASH_AFTER_MERGE=1` 在"合并已确认、还没落笔"这一格崩一次。
+ * 没有它，上面那档 `uncaughtException` 就只是"我写了所以应该在" —— 而它守的恰好是
+ * 10-05 真发生过的那件事（一个裸 stack 崩在这里，共享载体留着一场 MERGE_HEAD）。
+ * 判据：跑完 `git -C 载体 rev-parse --verify MERGE_HEAD` 必须**失败**、`status --porcelain` 必须 0 行、
+ * 退出码必须是 7（不是任何一道守卫用过的码）。 */
+if (process.env.HEYTA_CARRIER_CRASH_AFTER_MERGE === '1') {
+  throw new Error('变异注入：合并之后、落笔之前崩一次（验未捕获异常那档真的会擦现场）');
+}
 
 // ── 2. 分族并逐个解 ─────────────────────────────────────────────────
 const stage = (path, n) => git(['-C', WT, 'show', `:${n}:${path}`]);
@@ -413,6 +547,48 @@ if (!existsSync(join(WT, DMERGE))) {
   }
   dockSelftestReading = `第九族判据自检：${claimed[1]} 条臂（拒绝类 ${claimed[2]}，按理由认领）红 0 · 四道守卫各做过摘除变异、各打红自己那条臂`;
   notes.push(dockSelftestReading);
+}
+
+/* ── 借 store 那条守卫的牙（与第八/九族同一处挂法、同一个理由）───────────
+ * `selfhost-store-borrow.mjs --selftest` 的臂在载体树上现跑。这条性质先前**只有现场读数**
+ * （一次成功配对 + 一次退 3 响亮拒绝），摘掉"两侧锁必须相同"那一行不会有任何东西失败 ——
+ * 台账 §8.161 记的是它坏的方向（假归属），这一格记的是它没有牙。 */
+const SBORROW = 'research/tools/selfhost-store-borrow.mjs';
+let borrowSelftestReading = '';
+{
+  let out = '';
+  let rc = 0;
+  if (!existsSync(join(WT, SBORROW))) {
+    die(2, `借 store 守卫的判据文件不在载体树上（${SBORROW}）⇒ 没有臂就不许用这个旋钮配对`);
+  }
+  try {
+    out = execFileSync('node', [join(WT, SBORROW), '--selftest'], { encoding: 'utf8', maxBuffer: 8 << 20 });
+  } catch (e) {
+    rc = e.status ?? 1;
+    out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+  }
+  const redArms = out.split('\n').filter((l) => /^RED\s/.test(l));
+  const armLine = out.split('\n').find((l) => /臂数\s\d+/.test(l)) ?? '';
+  const claimed = armLine.match(/臂数\s(\d+)（拒绝类\s(\d+)/);
+  if (rc !== 0) die(2, `借 store 守卫的自检退 ${rc} ⇒ 这条性质没有牙，不许拿它配对：\n${redArms.slice(0, 8).join('\n')}`);
+  if (redArms.length) die(2, `借 store 守卫的自检**退出码 0 却带着红臂**：${redArms[0]}`);
+  if (!claimed || Number(claimed[1]) < 13 || Number(claimed[2]) < 7) {
+    die(2, `借 store 守卫的自检读数对不上（臂数行：“${armLine || '（没有这一行）'}”，要求 臂数 ≥13 且拒绝类 ≥7）`);
+  }
+  // 正向对照：判定函数当场能被 import 且拒绝臂全真（输出形状变了而这里没跟上 ⇒ 不拿"rc 0"当通过）。
+  const bArms = borrowSelftestArms();
+  const bRefuse = bArms.filter((a) => a.name.startsWith('A'));
+  if (bRefuse.length < 7 || bRefuse.some((a) => a.got !== true)) {
+    die(2, `借 store 守卫的拒绝臂从**函数**这一侧数出来对不上：拒绝类 ${bRefuse.length} 条、非真 ${bRefuse.filter((a) => a.got !== true).length} 条`);
+  }
+  // 🔴 判定本体与本文件跑的是同一份：这行读的是**正在执行的这份**脚本（SELF），不是载体树里的副本 ——
+  //    臂打在跑的那份上才有意义，否则载体树上那份改了、跑的那份没改，臂判的是别人。
+  const SELF = fileURLToPath(import.meta.url);
+  if (!/borrowStep\(\{/.test(readFileSync(SELF, 'utf8'))) {
+    die(2, `借 store 的判定不走过 selfhost-store-borrow.mjs 的 borrowStep ⇒ 臂判的是另一份实现，不作数`);
+  }
+  borrowSelftestReading = `借 store 守卫判据自检：${claimed[1]} 条臂（拒绝类 ${claimed[2]}，按理由认领）红 0 · 判定本体=本文件调用的 borrowStep`;
+  notes.push(borrowSelftestReading);
 }
 
 /* ── package.json ─────────────────────────────────────────────────── */
@@ -624,6 +800,38 @@ if (fam.cap.length) {
  *   main 刚被另一条会话提交进一整节 `## 9. 交还一条现场…`，相对 merge-base +70/−0，本分支一份都没有），
  *   但它只做到"不背这个锅"，没做到"把这单落地"。落地路径上唯一不误删的解法是两份都留。 */
 let auditReading = '';
+/* 🔴 这一族的判据有没有牙，在**用它之前**问，不在用它之后问（与第八/九族同一处挂法、同一个理由）。
+ *   `selfhost-audit-union.mjs --selftest` 先前不存在：四条无损断言的唯一执行路径是"真落到一次冲突上"，
+ *   所以"它能不能红"在落地之前无人能答（2026-10-05 06:1x 现量：全仓只有本体与这里两处引用）。
+ *   真输入那三条臂的 ref 由本文件已有的 mainSha/srcSha 显式喂进去 ⇒ 不依赖载体里有没有 origin/main。 */
+const AUNION = 'research/tools/selfhost-audit-union.mjs';
+if (!existsSync(join(WT, AUNION))) {
+  die(2, `审计文档那一族的判据文件不在载体树上（${AUNION}）⇒ 没有它就不许解这一族，也不许当"没有这一族"混过去`);
+}
+{
+  let out = '';
+  let rc = 0;
+  try {
+    out = execFileSync('node', [join(WT, AUNION), '--selftest'], {
+      encoding: 'utf8',
+      maxBuffer: 64 << 20,
+      env: { ...process.env, HEYTA_MAIN_REF: mainSha, HEYTA_SOURCE_REF: srcSha },
+    });
+  } catch (e) {
+    rc = e.status ?? 1;
+    out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+  }
+  const redArms = out.split('\n').filter((l) => /^BAD\s/.test(l));
+  const armLine = out.split('\n').find((l) => /臂数\s\d+/.test(l)) ?? '';
+  const claimed = armLine.match(/臂数\s(\d+)（拒绝类\s(\d+)/);
+  if (rc !== 0) die(2, `审计并集判据的自检退 ${rc} ⇒ 不用它解冲突：\n${redArms.slice(0, 6).join('\n') || out.slice(0, 400)}`);
+  if (redArms.length) die(2, `审计并集判据的自检**退出码 0 却带着红臂**（判据坏了）：${redArms[0]}`);
+  if (!claimed || Number(claimed[1]) < 12 || Number(claimed[2]) < 7) {
+    die(2, `审计并集判据的自检读数对不上（臂数行：“${armLine || '（没有这一行）'}”，要求 臂数 ≥12 且拒绝类 ≥7）` +
+      ` ⇒ 要么臂被删了，要么输出形状变了而这里没跟上 —— 不拿"rc 0"当通过。`);
+  }
+  notes.push(`审计并集判据自检：${claimed[1]} 条臂（按理由认领的拒绝类 ${claimed[2]}）红 0 · 六条变异对照各打红自己那条臂`);
+}
 if (fam.audit.length) {
   // base 那一版优先从合并的 stage 1 取；add/add（没有 stage 1）时退回 merge-base 提交里的 blob。
   // 🔴 两条路都取不到就**绝不**按"base 为空"去做并集 —— 产出虽无损但会把两份全文叠起来，
@@ -645,7 +853,8 @@ if (fam.audit.length) {
   auditReading = `并集：保留 main 侧 ${r.stats.mainOnly} 行（含 ${r.stats.extraMainHeadings} 个本分支没有的节标题）` +
     ` + 本分支独有 ${r.stats.srcOnly} 行；断言 main 零丢行 / 本分支零丢行 / 无两侧之外的新行 / 无冲突标记 全过`;
   notes.push(`审计文档并集：main 节 ${r.stats.mainHeadings}、本分支节 ${r.stats.srcHeadings}、` +
-    `main 独有行 ${r.stats.mainOnly}、本分支独有行 ${r.stats.srcOnly}、产出非空行 ${r.text.split('\n').filter((l) => l.trim() !== '').length}`);
+    `main 独有行 ${r.stats.mainOnly}、本分支独有行 ${r.stats.srcOnly}、产出非空行 ${r.text.split('\n').filter((l) => l.trim() !== '').length}` +
+    ` · ${auditReading}`); // ← 登记守卫第一次运行抓到的那处：这四条"零丢行"断言先前只进提交说明，stdout 一个字都没有
 }
 
 /* ── 第十族 / 第十一族（10-05 01:1x 出现的两枚文本冲突路径）───────────────
@@ -889,6 +1098,28 @@ const GATES = [
   ['image-npm-tree 新鲜度（check:image-license 第 1 腿）', ['research/tools/gen-image-npm-tree.mjs', '--check']],
   ['镜像许可证覆盖（check:image-license 第 2 腿）', ['research/tools/check-image-license-coverage.mjs', '--quiet']],
   ['镜像安装合同（check:image-license 第 3 腿）', ['research/tools/check-image-install-contract.mjs']],
+  /* 🔴 下面这八枚的"纯"是**跑出来的**，不是读出来的，而且量的是一棵特意造的树（台账 §8.184）：
+   *    `git worktree add --detach <载体那一笔提交>` ⇒ 一棵"两侧都合好了、但没有 node_modules、
+   *    没有任何 dist"的树（`/tmp/heyta-puregate2`，跑完 `remove --force`）。八枚全部 exit 0。
+   *    为什么不能用"在 `/tmp/heyta-merge-carrier` 里绿过"当凭据：那棵树**有人为别的会话装过 store、
+   *    还留着 10-04 21:01 的旧 dist** —— 同一批 dist 依赖型门禁在那里 6 绿 2 红，而两枚红的成因
+   *    都是旧产物（`check:shell-surfaces` 自己就判"产物比源码旧"；`check:brand-assets` 崩在
+   *    `TypeError: brandMarkSvg is not a function`，因为 design-system 的旧 dist 里还没有那个导出）。
+   *    ⇒ "在这棵树上绿过 ≠ 不依赖这棵树的环境"（§8.161 已经为第 2 腿记过一次，这是第二次），
+   *    而且比"恒红"更坏：**红得像个缺陷**，会把人推去修一个不存在的缺陷。
+   * 为什么值得挂进落笔前：这八枚判的全是**成对一致性**（词条 zh↔en、目录↔法务中英表、价格/额度
+   * 多处、对外域名三方、平台声称↔roadmap），而十一族并集只按**冲突路径逐行**保序 ——
+   * 一侧改真源、另一侧改生成物这种破法，union 看不见、只有这些裁判看得见。
+   * ⚠️ 两枚 `check:legal-*` 只存在于 main 侧（本分支没有那两枚文件），载体与配对树都有 ⇒ 配对成立；
+   *    若哪一天它们被改名或摘掉，这里会当场红，而不是静默少一道（`check:gate-wiring` 那一条的裁判）。 */
+  ['词条中英同步（check:ui-language）', ['scripts/check-ui-language.mjs']],
+  ['本机接口工具表↔法务表（check:legal-tools）', ['scripts/check-legal-tool-catalog.mjs']],
+  ['权限承诺↔清单（check:legal-permissions）', ['scripts/check-legal-permissions.mjs']],
+  ['官方托管域名三方（check:legal-host）', ['scripts/check-legal-host.mjs']],
+  ['价格四处一致（check:pricing）', ['scripts/check-pricing-consistency.mjs']],
+  ['托管 AI 额度五处一致（check:ai-quota）', ['scripts/check-ai-quota-consistency.mjs']],
+  ['平台声称↔roadmap（check:claims）', ['scripts/check-claims.mjs']],
+  ['文档口音（check:docs-voice）', ['scripts/check-docs-voice.mjs']],
 ];
 const runGate = (argv, cwd) => {
   try {
@@ -921,21 +1152,30 @@ const STORE_BLIND_RE = /找不到任何 pnpm store|请先运行 pnpm install/;
  *    根本不是这一把锁的，借来只会让"配对"量错东西 ⇒ 退 3 不软链。软链建完还要**回读**一次
  *    `.pnpm` 真的在（`symlinkSync` 成功不等于链路通）。 */
 const BORROW_SRC = process.env.HEYTA_CARRIER_LINK_STORE_FROM || '';
-const sha256Of = (p) => (existsSync(p) ? createHash('sha256').update(readFileSync(p)).digest('hex') : '读不到');
+const sha256Of = (p) => (existsSync(p) ? createHash('sha256').update(readFileSync(p)).digest('hex') : UNREADABLE);
+/* 🔴 判定本体搬进 `selfhost-store-borrow.mjs`（单一所有者，带 `--selftest`，臂数由它自己打印）：
+ *    原先这三档判断（锁必须相同 / 源必须有 .pnpm / skip 排在 refuse 之后）只住在本函数里，
+ *    于是它**只有现场读数、没有臂** —— 摘掉"锁相同"那一行不会有任何东西失败。
+ *    臂打在跑的那份上：本函数调 `borrowStep`，不自己再写一遍（两套裁决标准的自检版）。 */
 const borrowStore = (dir, tag) => {
   const linked = [];
   for (const rel of ['', 'e2e/']) {
     const a = sha256Of(join(BORROW_SRC, rel, 'pnpm-lock.yaml'));
     const b = sha256Of(join(dir, rel, 'pnpm-lock.yaml'));
-    if (a !== b) {
-      die(3, `${tag} 借 store 的前提不成立：${rel || '（根）'}那侧 ${BORROW_SRC} 的锁=${String(a).slice(0, 16)} ` +
-        `而 ${dir} 的锁=${String(b).slice(0, 16)} ⇒ 那边装出来的字节不是这一把锁的，不软链`);
-    }
     const srcNm = join(BORROW_SRC, rel, 'node_modules');
     const dstNm = join(dir, rel, 'node_modules');
-    if (!existsSync(join(srcNm, '.pnpm'))) die(3, `${tag} 借 store 的前提不成立：${srcNm} 里没有 .pnpm 那一层`);
-    if (hasStore(dir) && rel === '') continue; // 这棵树自己就有根 store（上一趟留下的），不覆盖
-    if (existsSync(dstNm) && rel !== '') continue;
+    const step = borrowStep({
+      rel,
+      lockSrc: a,
+      lockDst: b,
+      srcHasPnpm: existsSync(join(srcNm, '.pnpm')),
+      dstHasStore: hasStore(dir),
+      dstNmExists: existsSync(dstNm),
+    });
+    if (step.action === 'refuse') {
+      die(3, `${tag} 借 store 的前提不成立（${step.reason}）：${step.detail}（源 ${srcNm} → 目标 ${dstNm}）⇒ 不软链`);
+    }
+    if (step.action === 'skip') continue;
     symlinkSync(srcNm, dstNm, 'dir');
     if (!existsSync(join(dstNm, '.pnpm'))) die(3, `${tag} 软链建了却读不到 .pnpm（${dstNm} → ${srcNm}）⇒ 链路没通`);
     linked.push(`${rel || '（根）'}${a.slice(0, 12)}`);
@@ -1036,6 +1276,14 @@ if (reds.length) {
     mainSha, mainRc: m2.rc, mainOut: m2.out, defectRe: g.re, defectKey: g.key,
   }));
   const badVerdict = attributionVerdict(results);
+  /* 🔴 红门禁的**原始输出**先前只在内存里、从不打印：`brief()` 只留末尾 8 行，而 `check:docs`
+   *    那类检查器把"是哪一条死链、在哪个文件的哪一行"印在前面 —— 于是归属报"这条红是本批带进来的"
+   *    时，操作者拿不到任何可以照着修的东西（10-05 16:2x 现量：日志 33 行里没有一枚死链）。
+   *    归属判据本身不动，这里只把已有的 `g.out` / `m2.out` 交出来。*/
+  const rawDump = paired.filter(({ g }) => g.rc !== 0)
+    .map(({ g, m2 }) => `\n──── ${g.label} 载体原始输出（退 ${g.rc}）────\n${g.out}` +
+      `\n──── ${g.label} 配对树(main ${mainSha.slice(0, 8)}) 原始输出（退 ${m2.rc}）────\n${m2.out}`)
+    .join('\n').slice(-24000);
   if (badVerdict) {
     // 🔴 两种"没有全部通过"要分开说：一条是"这条红是本批的"（要修），一条是"这条红我判不了"
     //    （要先让判据能被逐条点名）。把后者也念成前者，就是让人去修一条并不存在的缺陷。
@@ -1045,7 +1293,7 @@ if (reds.length) {
         ? '   ⇒ 上面带"判不了"的那些**不是**本批的缺陷判定，是这道门没能把缺陷逐条点名（提取式没接上或两侧输出对不上）。' +
           '先把那道门的点名形状补上（并注入验证它能抓到），再谈这条红归谁。\n'
         : '') +
-      `   ⇒ 归属不成立的那些必须先在解法侧修掉；本工具不拿"看起来差不多"当放行。`);
+      `   ⇒ 归属不成立的那些必须先在解法侧修掉；本工具不拿"看起来差不多"当放行。` + rawDump);
   }
   for (const r of results) {
     attribution.push(r.why);
@@ -1090,12 +1338,11 @@ if (p1 !== mainSha || p2 !== srcSha) {
 }
 git(['branch', '-f', BRANCH, carrierSha]);
 console.log(`✅ 载体 ${carrierSha.slice(0, 8)} = ${MAIN}(${mainSha.slice(0, 8)}) × ${SOURCE}(${srcSha.slice(0, 8)})，分支 ${BRANCH} 已指过去`);
-console.log(`   ${pkgReading}`);
-console.log(`   ${giReading}`);
-// 🔴 自检这条必须在**成功路径**上也打出来：只进 notes（失败时才 dump）的判据，
-//    在成功时是静默的，而"静默的通过"会被下一轮读成"没跑"或"跑了但没人看"。
-console.log(`   ${capSelftestReading}`);
-console.log(`   ${dockSelftestReading}`);
+/* 🔴 读数不再逐条 `console.log`，改成**整份 notes 在成功路径上也 dump**（登记守卫在上面第 0 步之前）。
+ *    理由不是整洁，是这一族已经撞了三次（§8.197）：判据每次都跑，只有 die 路径 dump notes，
+ *    于是"跑过"在绿路上不留痕迹，下一轮要么重做、要么把那段当没接线删掉。 */
+console.log(`   ── 这一趟量到的 ${notes.length} 条读数（成功路径也 dump；与 die 路径同一份）──`);
+for (const n of notes) console.log(`   · ${n}`);
 if (attribution.length) console.log(`   🔴 载体红 ${attribution.length} 道，已逐条归属到非本批（那条红仍在 main 上，不由本批修）：\n     ${attribution.join('\n     ')}`);
 // 🔴 这句是**推导**出来的，不是写死的"全 exit 0"：归属过的红仍然是红（缺陷还躺在 main 上），
 //    把它印成"8 道全 exit 0"就是本批一直在拦的那类对外错话，只不过读者是下一轮的我（§8.143 实测撞到的）。
