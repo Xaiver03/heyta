@@ -837,7 +837,7 @@ function stubRefundServer(
     Promise.resolve({ status, ok: false, json: () => Promise.resolve(body) } as unknown as Response);
 
   fetchMock = vi.fn((url: string, init?: { method?: string; body?: string }) => {
-    const path = url.replace(/^.*\/api\/admin/, '').split('?')[0];
+    const path = url.replace(/^.*\/api\/admin/, '').split('?')[0] ?? '';
     const method = init?.method ?? 'GET';
     if (path === '/overview') return Promise.resolve(json(OVERVIEW));
 
