@@ -12240,3 +12240,30 @@ G-70 挂的是"WS 升级从未经验 bundled Caddy"。查它之前先问了一�
 `apps/web/src/features/sync|apps/mobile/src/sync|packages/legal` 命中 **0** ⇒ 这三处都在本批写集外。
 本批**不改、也不加进写集**：理由与 §8.137 对 `packages/i18n` 那条同一个 —— 落地窗口前不把合并面撑宽一枚文件。
 登记给出：realtime/移动端那条线与法务那条线（后者若要动 `minors.ts` 要走它自己的版本与同意指纹纪律）。
+
+### 8.219 三格"窗口一开才会被烧掉"的未知，这轮换成读数；两格明写**没做以及为什么不做**（2026-10-05 14:3x，负载 65 ⇒ 只能做不占机器的那部分）
+
+| 格 | 现量 | 复现 | 性质 |
+|---|---|---|---|
+| §8.216 那枚新闸门**喂完整 SHA** 走不走得通（载体用的是 `mainSha`/`srcSha` 不是 ref 名） | ✅ `臂数 12（拒绝类 7）红 0`，`mainSha=564ad047d718 srcSha=e1ba2e1a5dcf` | `HEYTA_MAIN_REF=$(git rev-parse origin/main) HEYTA_SOURCE_REF=$(git rev-parse HEAD) node research/tools/selfhost-audit-union.mjs --selftest` | 实测 |
+| 第 2 项那趟 rc=0 还**现不现**（自那以后本分支又落了 4 笔） | ✅ 产品面改动 **0**：`git diff --name-only 673e6a43 HEAD -- apps/web server/src server/docker-compose.yml server/Caddyfile e2e/selfhost-stack` 空；唯二变化是那三张截图本身 | 同上 | 实测 |
+| 落地口径在"本地 main 与公开 main 是两条线"那一档下**要不要新代码** | ✅ 不要：载体基线本就有旋钮（`selfhost-merge-carrier.mjs:156` `HEYTA_MAIN_REF`），公开侧有 `HEYTA_LAND_REMOTE_MAIN`（`selfhost-land-main.mjs:337`）；唯一硬编码是 `MAIN_REF='main'`（`:47`）= 主检出那个分支名，本来就该是它 | 读码 | 读码（这一格的答案只决定"要不要写"，不决定任何对外事实） |
+
+### 两格明写"没做"，写清楚是为了让下一位不必重新怀疑
+
+1. **`research/tools/**` 的自检在 `pnpm check` 链里没有消费者。** 本批在这些目录里落了十几枚判据，
+   现在只有合并载体那几道闸门消费其中几枚（第八/九/十/十一族 + §8.216 这一枚）。
+   补法已经想清楚并且**故意不写成手写清单**（这条线第五次栽的坑就是手写枚举，见主检出 `3281ebb2`）：
+   按**存在性**扫 `research/tools/*.mjs`，凡是文件里出现 `--selftest` 字样就必须跑它并判输出内容（红臂计数 + 臂数行），
+   一条都不许"找不到就跳过"；阈值由被扫文件自己打印的臂数推导。
+   🔴 **现在不做的理由不是"以后再说"**：加一条链段要动根 `package.json` 的 `scripts.check`，
+   而那是本批**唯一剩下**的合并重叠文件；§8.137 对 `packages/i18n` 用的是同一条判断 ——
+   落地窗口前不把合并面撑宽一枚。排在落地之后，与 G-62、③"静态腿拆进链"（§8.164）同一批。
+2. **G-70（一次真 WS upgrade 穿过 bundled Caddy）没有写成脚本。** 想过的形状是
+   复用 `e2e/selfhost-stack/selfhost-web.spec.ts` 里 S2 之后那条**已注册、已同意、已配好凭据**的真会话，
+   在 Playwright 侧收 `websocket` 事件并要求 URL 落在同域 `/api/` 上。
+   本轮**不写**，理由是硬的：这条判据要两次整套跑才配被登记为"有牙"（正向 + 注入把它打红），
+   而现在负载 65，跑一次就是拿"环境无效"换一张**未经反证**的绿条 —— 那张绿条比没有更坏，
+   它会让人以为 G-70 已闭合。先决条件写在这：谁写这条判据，必须同一趟里交注入腿，
+   并且把"摘掉 consent 同意 ⇒ WS 不建"（`store.ts:253` 那道闸）也算作一条臂，
+   这样它同时回答 §8.218 那条隐私披露的行为面（现在只证到代码面）。
