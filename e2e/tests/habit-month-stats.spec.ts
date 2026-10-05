@@ -73,6 +73,10 @@ test('M1 🔴 每一张卡都带着这四格（存在性先于取值）', async 
   const a = await createHabit(page, `月度统计A-${STAMP}`);
   const b = await createHabit(page, `月度统计B-${STAMP}`);
 
+  /* 🔴 2026-10-05（工单 §8.131）：窗格不再"默认展示第一条"，所以这里**必须先选一条**，
+     否则这一面在浏览器里根本没有卡片（旧版本这条判据靠那枚宿主猜的回落拿到分母）。 */
+  await selectHabit(page, a);
+
   const cards = page.locator('[data-testid^="habit-card-"]');
   const count = await cards.count();
   expect(count, '卡片数就是分母：零张卡的存在性判据是空集，什么都不说明').toBeGreaterThan(0);
@@ -93,7 +97,8 @@ test('M1 🔴 每一张卡都带着这四格（存在性先于取值）', async 
   await expect(page.getByTestId(`habit-month-rate-${a}`)).toContainText('本月完成率');
 
   // 🔴 上面那个循环的分母其实只有"窗格里当前这一枚卡片"（这一面是列表 + 窗格）。
-  //    换一条习惯再查一遍，才把"四格只长在默认选中那枚上"这种形状挡住。
+  //    换一条习惯再查一遍，才把"四格只长在**某一枚**上"这种形状挡住 —— 自 §8.131 起
+  //    窗格里没有"默认那一枚"，所以这一腿量的正是**换人之后新那一枚**也带着四格。
   await selectHabit(page, b);
   for (const prefix of CELL_PREFIXES) {
     await expect(

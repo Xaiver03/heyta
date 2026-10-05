@@ -286,14 +286,15 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
    * 这一条存在理由：`CURSOR_VIEWS` 里 `habits` 那一行在 jsdom 里只对着**插出来的**
    * DOM 跑过，在真浏览器里一直没走过真数据。
    *
-   * 🔴 读数与任务面**不同形**，这点必须写清楚而不是含糊过去：习惯行的选中态由
-   * `HabitsView.tsx:217` 的派生回落 `?? rows[0]` 决定 —— **没选中时右窗格也永远有内容**，
-   * 而 `aria-current` 挂的是那个回落行（`HabitsList.tsx:106`）。
-   * 于是"第一次 ↓"在界面上是**不可见的**（回落行 = 光标进入的第一行，同一个下标）。
-   * 这条判据因此不假装能证第一次按键，它证的是**之后每一步都跟着光标**，
-   * 并且把"两种线索说同一件事"钉住：`aria-current` 那一行必等于带底色那一行。
+   * 🔴 读数与任务面**同形**（2026-10-05 起；工单 §8.131）：习惯行的选中态**只**由共享选中态决定。
+   * 旧形状里它由 `HabitsView` 的派生回落 `?? rows[0]` 决定 —— 没选中时右窗格也永远有内容，
+   * `aria-current` 挂的是那枚回落行，于是"第一次 ↓"在界面上**不可见**（回落行 = 光标进入的第一行），
+   * 而旧版这条判据只能退而证"之后每一步跟着走"。回落撤掉之后：
+   *   · 没按键时**零行**带痕迹、窗格说的是「选一条习惯」；
+   *   · **第一次按键就看得见**（下面 after1 那一格是旧形状做不到的覆盖）。
+   * 并且继续钉住"两种线索说同一件事"：`aria-current` 那一行必等于带底色那一行。
    */
-  test('K6 🔴 习惯面走同一套光标：aria-current 与浅底始终同一行，↑↓ 逐格跟', async ({ page }) => {
+  test('K6 🔴 习惯面走同一套光标：没按键时零痕迹，第一次按键就看得见，↑↓ 逐格跟', async ({ page }) => {
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '习惯');
     await addHabit(page, '光标甲');
@@ -330,29 +331,48 @@ test.describe('键盘光标（↑↓ 移动选中）', () => {
 
     const rows0 = await read();
     expect(rows0.ids.length, '习惯列表里没有行（数据没灌进去，这条判据量不到东西）').toBe(3);
-    // 回落读数：界面必须自己说清"窗格开的是哪一行"，且只有一行。
+    // 🔴 没人点过时**零行**带痕迹，且**零行**是被少数派底色标出来的那一行 ——
+    // 两种线索同时为空，才叫"这一面没有回落"。（旧形状这里读的是"恰好一个"，钉的是猜位置。）
     expect(
       rows0.current,
-      `没按键时 aria-current 的下标应恰好一个（派生回落），实际 ${JSON.stringify(rows0)}`,
-    ).toHaveLength(1);
+      `没按键时不该有任何一行带 aria-current（习惯面没有"回落第一行"）：${JSON.stringify(rows0)}`,
+    ).toHaveLength(0);
     expect(
       rows0.painted,
-      `底色线索与 aria-current 线索不一致（选中态有两种说法）：${JSON.stringify(rows0)}`,
-    ).toEqual(rows0.current);
+      `没按键时却有行带选中底色，而共享选中态是空的：${JSON.stringify(rows0)}`,
+    ).toHaveLength(0);
+    // 窗格在"有习惯但没选中"时说的那句措辞（不是"还没有习惯"，也不是某条习惯的数据）。
+    await expect(page.locator('.ht-habit__pane')).toContainText('选一条习惯');
+    // 🔴 先截图，再断言（§6.2 规定一第 1 条）：这一帧是本单**唯一**画着"未选中"那一格的图，
+    //    后面的步骤会把窗格切成某条习惯，就再也回不到这个状态了。
+    await page.screenshot({ path: SHOT('k6-habits-unselected-pane') });
 
     // 焦点交回页面：`addHabit` 之后光标还留在**新建输入框**里，那时第①道闸门
     // （正在打字）本来就该吃掉方向键 —— 不复位焦点的话这条判据量的是闸门，不是光标。
     await releaseFocus(page);
     await press(page, 'ArrowDown');
+    const after1 = await read();
+    // 🔴 这一格是旧形状**量不到**的：第一次按键必须看得见。
+    expect(
+      after1.current.length === 1 && after1.current[0] === 0,
+      `第一次 ↓ 之后 aria-current 没落在第一行：${JSON.stringify(after1)}`,
+    ).toBe(true);
+    expect(
+      after1.painted,
+      `第一次 ↓ 之后浅底与 aria-current 分叉：${JSON.stringify(after1)}`,
+    ).toEqual(after1.current);
+    // 窗格跟着换人，而且说的是**那一行**的名字（痕迹与内容同源）。
+    await expect(page.locator('.ht-habit__pane')).not.toContainText('选一条习惯');
+
     await press(page, 'ArrowDown');
     const step = await read();
     expect(
       step.painted,
-      `连按两次 ↓ 之后浅底没跟着走：${JSON.stringify(rows0)} → ${JSON.stringify(step)}`,
+      `再按一次 ↓ 之后浅底没跟着走：${JSON.stringify(after1)} → ${JSON.stringify(step)}`,
     ).toEqual(step.current);
     expect(
-      step.current.length === 1 && (step.current[0] as number) > (rows0.current[0] as number),
-      `连按两次 ↓ 之后 aria-current 没往前走（${JSON.stringify(rows0.current)} → ${JSON.stringify(step.current)}）`,
+      step.current.length === 1 && (step.current[0] as number) > (after1.current[0] as number),
+      `↓ 之后 aria-current 没往前走（${JSON.stringify(after1.current)} → ${JSON.stringify(step.current)}）`,
     ).toBe(true);
 
     await press(page, 'ArrowUp');
