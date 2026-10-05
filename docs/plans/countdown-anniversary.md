@@ -1265,6 +1265,13 @@ main 的字节 ⇒ **rc=0**；载体 `8c468c2a` 的三枚 blob ⇒ **rc=1，2 �
 | ③ **变异台 `scripts/mutate-calendar-event-source.mjs`** | 它的臂里凡是以①那一代字节为 needle 的那些（`packages/ui/src/calendar/model.ts` 那一族） | 现量 `grep -c "for (const event of events)" packages/ui/src/calendar/model.ts` 回 **0** ⇒ M1 的 needle 已不在合流后的树上，而这台台子对"目标字节不是恰好出现 1 次"是 `process.exit(1)`（脚本自己那段 occurrences 校验）⇒ 它现在**会在起跑处响亮退出**（不是静默存活），所以留在树里等①；文件头"臂数由脚本自己打印"的规矩照旧 |
 | ④ **`calendar-year-board.spec.tsx` 两臂 + `packages/domain` 农历锚点更正** | 年档那颗点"任务+倒数日一起数"、`lunarToSolar` 那条假前提（2025-12-15 落公历 **2026-02-02** 不是 1 月） | 载体版 `packages/domain/tests/events.spec.ts` 里 `2026-01-03` 与 `month: 11` 命中 **0**（上面④行原读数）—— 🔴 这一条**与合流无关、是真缺陷**，不该等①，可以单独开工 |
 
+**④ 的那一行已经不需要开工了（10-06 08:0x 现量）**：合流在 `packages/domain/tests/events.spec.ts`
+这一枚上取的是 `93a1c378` 那一代 —— 当前树里 `:308` 就是
+`lunarToSolar({year:2025, month:11, day:15})` + `expect(anchor).toBe('2026-01-03')`，
+而那条假前提（`month: 12` 配 `startsWith('2026-01')`）在本文件里现量 **0 命中**；
+`pnpm --filter @heyta/domain test` 在该字节上 **40 文件 / events.spec 27 条全过**。
+⇒ 上面那句"载体版命中 0"读的是 `8c468c2a` 的 blob，不是合流后的树 —— 又是一条"读数没带载体就过期"的现场样本。
+
 **⏹→✅ 上面那段"合并中、`git ls-files -u` 非 0"的登记已过期**（10-05 23:5x 现量：
 `git ls-files -u | wc -l` = **0**，`HEAD` = `3cf84310`，载体已并进 `main`）：
 本线不替别人解冲突那句**仍然有效**，但触发条件已经不成立。
