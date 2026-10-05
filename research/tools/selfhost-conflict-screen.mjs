@@ -29,9 +29,13 @@
  *
  * ## 它看不见什么（这几样明写，不折算成 0）
  *
- *  - **改名参与**（任一侧是 `R`）：git 的重命名跟随与本工具的近似判定会给不同答案，
- *    所以这类路径只进 `blind` 清单，不进"无冲突"；
- *  - 文件/目录同名碰撞、mode/symlink 位变化：`--name-status` 不报，看不见；
+ *  - **改名**：两侧求交用的是**路径名**，而 git 合并按 blob 身份跟随改名 —— 所以"改名"不能只靠
+ *    新名恰好也出现在交集里来发现。`predictFromMaps` 里先单独走一遍改名身份：一侧改名而**对侧动过那个旧名**
+ *    ⇒ 进 `blind`（真合并这里一定留冲突条目）；两侧把同一旧名改成**不同**新名（rename/rename）⇒ 也进 `blind`。
+ *    这一层是 2026-10-05 补的：补之前旧名与新名都不沾交集，这里报的是"0 冲突 0 盲点"，
+ *    也就是**假的全绿** —— 对一个专门用来防"假全绿"的工具，那是最坏的一种错法。
+ *    （当下现量：本批与 main 之间这一类命中 0 枚，所以补的是**潜伏**的洞，不是正在骗人的洞。）
+ *  - 文件/目录同名碰撞、mode/symlink 位变化：`--name-status` 不报，**仍然**看不见；
  *  - 载体里那些**取一侧之外还有专门解法**的族（第 1 族并集、第 9 族剪枝切块、
  *    第 10 族纯追加）在这里仍会被算成"内容冲突"—— 那是对的：载体确实要处理它们，
  *    只是处理得了。所以本工具的读数**不是**"会不会有冲突"，而是
@@ -137,6 +141,37 @@ export const predictFromMaps = (oursMap, theirsMap, readBlob, tryMerge) => {
   const conflicts = [];
   const blind = [];
   const unreadable = [];
+  // 🔴 **改名身份那一层要先单独走一遍**：两侧都按"路径名"求交，而 git 的合并是按 blob 身份跟随改名的。
+  //    一侧把 `a.ts` 改名成 `b.ts`、另一侧改了 `a.ts` ⇒ 真合并会留一条 rename/modify 冲突条目，
+  //    而按名字求交**两边都不沾**（新名只在改名侧、旧名只在改动侧），于是这里会报"0 冲突、0 盲点"——
+  //    对一个专门用来防"假的全绿"的工具，那是最坏的一种错法（现量：2026-10-05 10:0x 本批与 main
+  //    之间这一类命中 0 枚，所以它是**潜伏**的洞，不是当下在骗人的洞）。
+  const seenRename = new Set();
+  const renameCross = (map, otherMap, dir) => {
+    for (const [to, v] of map) {
+      if (!v.from) continue;
+      if (!otherMap.has(v.from)) continue;
+      const key = `${v.from}→${to}`;
+      if (seenRename.has(key)) continue;
+      seenRename.add(key);
+      blind.push({ path: key, why: `改名参与（${dir}侧把 ${v.from} 改名为 ${to}，对侧动过旧名）` });
+    }
+  };
+  renameCross(oursMap, theirsMap, 'main');
+  renameCross(theirsMap, oursMap, '本批');
+  // rename/rename：两侧都把同一个旧名改成**不同**的新名 ⇒ 两个新名各带同一个 from，上面收过一遍后这里补一次对撞。
+  const fromsOf = (map) => {
+    const byFrom = new Map();
+    for (const [to, v] of map) if (v.from) byFrom.set(v.from, (byFrom.get(v.from) ?? []).concat(to));
+    return byFrom;
+  };
+  const ourFroms = fromsOf(oursMap);
+  for (const [from, tos] of fromsOf(theirsMap)) {
+    const ours = ourFroms.get(from);
+    if (ours && ours.join() !== tos.join()) {
+      blind.push({ path: from, why: `rename/rename（main→${ours.join()} · 本批→${tos.join()}）` });
+    }
+  }
   for (const [path, ours] of oursMap) {
     if (!theirsMap.has(path)) continue;
     const theirs = theirsMap.get(path);
@@ -249,6 +284,16 @@ const selftest = () => {
     r8.blind.length === 1 && r8.conflicts.length === 0);
   push('A8b 阳性对照：改名那枚没被算成"无冲突"', 0,
     r8.conflicts.filter((c) => c.path === 'old.txt').length);
+  // A8c/A8d/A8e：改名**身份**那一层（旧名与新名都不沾按名字的交集 ⇒ 补之前是假的全绿）
+  const r8c = predictFromMaps(m([['new.txt', 'R', 'old.txt']]), m([['old.txt', 'M']]), reader, () => 0);
+  push('A8c main 改名 old→new 而本批改 old ⇒ 必须进 blind（补前这里两个数都是 0）', 1, r8c.blind.length);
+  push('A8c-1 报的是"旧名→新名"这一枚，不是新名单独一条', 'old.txt→new.txt', r8c.blind[0]?.path);
+  push('A8c-2 且不进冲突集（这里判不了内容）', 0, r8c.conflicts.length);
+  const r8d = predictFromMaps(m([['old.txt', 'M']]), m([['new.txt', 'R', 'old.txt']]), reader, () => 0);
+  push('A8d 方向反过来（本批改名、main 改旧名）也要抓到', 1, r8d.blind.length);
+  const r8e = predictFromMaps(m([['b.txt', 'R', 'a.txt']]), m([['c.txt', 'R', 'a.txt']]), reader, () => 0);
+  push('A8e rename/rename（同一旧名改成两个新名）⇒ 抓到且只报一枚', 1,
+    r8e.blind.filter((x) => x.why.includes('rename/rename')).length);
   const r9 = predictFromMaps(m([['gone.txt', 'M']]), m([['gone.txt', 'M']]), reader, () => 0);
   push('A9 blob 读不到 ⇒ 进 unreadable，不许折算成 0 冲突', 1, r9.unreadable.length);
   const r10 = predictFromMaps(m([['gone.txt', 'D']]), m([['gone.txt', 'D']]), reader, () => 1);
