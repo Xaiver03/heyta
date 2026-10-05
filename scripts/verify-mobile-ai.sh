@@ -761,6 +761,31 @@ bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要�
     return 1
   fi
   echo "   · 五档在库里各有 ≥1 枚端点（这条判据读的是被写那一侧，不是手指）" >&2
+  # 🔴 端点绑上 ≠ 同意给了。`resolveAiRoute` 要**逐功能同意**才产出 target：
+  #   rig26/27 现量五档 routes 各 1 枚而 consents 全 0 ⇒ 助手面按钮恒 disabled，第 5 步那条
+  #   "规则命中且零外发"的设备级判据**根本没有输入**。这一格此前载体整段少走，
+  #   于是"产品闸门按设计拦住"和"载体没给同意"在同一条读数里混成了一件事。
+  #   逐档点开关（开关自己的 testID 是 `ai-consent-<feature>`），再回读库里那一半。
+  local cf MISSC=""
+  for cf in capture breakdown prioritize duration-estimate tool-calling; do
+    reveal_rid "ai-consent-$cf" || { MISSC="$MISSC $cf(滚不出来)"; continue; }
+    tap_rid "ai-consent-$cf" || MISSC="$MISSC $cf(点不动)"
+  done
+  if [ -n "$MISSC" ]; then
+    echo "   ❌ 这些档的同意开关没点到:$MISSC —— 后面的零外发判据会因为没有 target 而恒红，那是载体的事" >&2
+    return 1
+  fi
+  local readc linec cc missc2=""
+  readc=$(routes_reading)
+  for linec in $readc; do
+    cc=${linec#*/}
+    case "$cc" in (''|*[!0-9]) missc2="$missc2 $linec(读不出)" ;; *) [ "$cc" -ge 1 ] || missc2="$missc2 $linec" ;; esac
+  done
+  if [ -n "$missc2" ]; then
+    echo "   ❌ 点了开关而库里这些档的同意仍是 0（$missc2）—— 不拿「点过了」当已通过" >&2
+    return 1
+  fi
+  echo "   · 五档逐功能同意在库里各有 ≥1 条（回读：$readc）" >&2
   return 0
 }
 
