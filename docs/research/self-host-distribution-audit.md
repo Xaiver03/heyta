@@ -11386,3 +11386,24 @@ node research/tools/selfhost-license-coverage-arms.mjs --installed-tree /tmp/tre
 而 12:08 之后我又落了三笔（`80dba899` 只动 `research/tools/selfhost-merge-carrier.mjs`、
 `cab59fc6`/`1e35790a` 只动本台账），**都不在 `server/Dockerfile` 的 COPY 集合里**，
 所以这棵树对"许可证扫的那棵树"仍然代表当前产物 —— 这一句是有条件的，条件就是刚才那三条 `--stat`。
+
+### 8.195 任务书第 1 项那句"main 自己现在红在 check:docs 5 处"**已经不成立** —— 归属层现在是"两侧都绿"，判据因此变严不变松（2026-10-05 12:2x）
+
+同一道门在两棵**只读**树上各跑一遍（`node research/tools/docs-link-check.mjs`，零依赖、不写盘）：
+
+| 树 | 取法 | 读数 |
+|---|---|---|
+| 干净 main `8cb33f55` | `git worktree add --detach /tmp/heyta-main-redcheck 8cb33f55` | **退 0**「✅ 无死链…」（扫描 282 份 md / 1977 条相对链接 / 55 处页内锚点；2 条"本机有仓库里没有"的登记豁免、8 条指 `research/upstream` 的刻意跳过，都照原样打印） |
+| 载体 `c7c4e0ad`（双亲 `8cb33f55` × `cab59fc6`） | 直接在 `/tmp/heyta-merge-carrier` 里跑 | **退 0**，同一句结论 |
+
+⇒ 任务书里那"5 处红"（引用方只在 main 版本、4 个死链目标在主检出是 `??` 未跟踪）**已经被它的所有者提交掉了** ——
+那 4 枚文件不再是未跟踪，于是链接在干净检出上点得开了。
+🔴 **这一格的方向要读对**：它不是"归属这一关可以少做"。`selfhost-red-attribution.mjs` 的三条放行条件里
+第 2 条要的是"同一道门在**干净 main** 上也退非 0" —— main 现在退 0，于是**载体一旦红，判定就是
+"这条红是本批带进去的"**（那是它的 `main 退 0 ⇒` 那条拒绝臂，A 族里最硬的一条）。
+⇒ 落地那一刻 `check:docs` 若红，**没有归属可退**，只能真修。这一格从"要逐条写归属"变成"空集且可复核"，
+标准没降，是**可主张的更强**：两侧同绿这件事本身是可复跑的两条命令，不是我的说法。
+
+⚠️ 别把这条读成"整条链两侧都绿"：这只量了 `check:docs` 一道门，而完整链 86 段里那 15 段
+（要 `packages/*/dist` / APK / 远端 Windows / Playwright）**仍然只能在落地那一刻的窗口里跑**（§8.174 ⑤）。
+一次性对照树用完就收：`git worktree remove --force /tmp/heyta-main-redcheck`（本轮已收）。
