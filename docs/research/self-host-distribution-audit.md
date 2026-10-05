@@ -13322,3 +13322,51 @@ M3 打在 `predict()` 而 A3 自己那处调用没动（**变异要打在待证�
 ⇒ 交回给决策者的不是"在等窗口"，是一句话的选择题：**要么请那条会话把 `package.json` 那枚 2+/1− 提掉
 （其余 4 枚同理，越新越该问它主人是不是正在写），要么今晚就让看守继续等**。
 两条都不要求我动主检出。
+
+### 8.246 外人路径 12 枚逐枚比、本批那两句对外话逐键比 —— 结果：载体保住了修正，但**同一句话在三棵树上处于三种状态**（2026-10-05 19:4x）
+
+**① 外人今天从公开树（`origin/main=a40d304a`）拿到的东西，逐枚点名比**（不是枚数汇总，是每枚的 blob 等值）：
+
+| 路径 | 公开树 vs 本批 tip |
+|---|---|
+| `server/docker-compose.yml` / `.build.yml` / `.migrate-once.yml` | 逐字相同 |
+| `server/env.example` / `server/image-npm-tree.json` / `server/package-lock.json` | 逐字相同 |
+| `research/tools/check-image-license-coverage.mjs` / `gen-image-npm-tree.mjs` | 逐字相同 |
+| `server/Dockerfile` | **内容不同** |
+| `docs/runbooks/self-host.md` | **内容不同** |
+| `scripts/verify-selfhost-stack.sh` | **内容不同**（负载门那一笔） |
+| `packages/i18n/src/locales/zh-CN.ts` | **内容不同** |
+
+⇒ "公开树里 selfhost 相关枚数 36 / 本地 main 12 / 分支 43" 这种**汇总数**我第一次拿它当结论时是错的：
+`git diff --name-status origin/main 分支` 里的 `D` 行含义是"公开侧有、我分支没有"（别的线的工具），
+被我那串关键字一把抓进"外人还缺 60 枚"里。**改成逐枚点名才答得出问题**（同一个形状的第三次：编 pattern 而不是读原件）。
+
+**② 本批改的对外词条到底是不是 4 行**：`git diff --numstat merge-base..分支` 现量
+`en.ts +2 -2`、`zh-CN.ts +2 -2`，逐键点名 = `site.platforms.web.body`（摘掉"可安装"那句）与
+`site.docs.selfhost.s3p1`（把"跟这一页讲的每句都对得上"换成"起服务命令逐字同一条 + 有门禁盯着抄件"）。
+⚠️ 我第一版逐键脚本对这两枚报了 `键=0` —— 因为我给键写了白名单前缀 `common.|web.|server.|mobile.|ai.`，
+而这两枚是 `site.` 开头。**"0 枚"永远要先怀疑筛子，不是先怀疑事实。**
+
+**③ 落地那棵树（`feat/self-host-merge-main-union-v5` = `bd98a4d6`）逐键判**：四格全部 **载体=本批**（`是`），
+⇒ **落地不会把本批停掉的那两句带回去**。反向也量了：`baf125e5`（10-04 20:45，陷阱 #212 那条"只用本机 ≠ 禁用本地提醒"的措辞修正）
+在 `main`/`origin/main`/载体里都在（`zh=1`），**只有我这枚分支不含它**（`否`）——
+即分支上是旧文案，而合并后的载体取的是**新**的那版 ⇒ 落地不会把**别人**的更正带回旧的。
+🔴 判这条时我又错一次探针：grep 英文句子编的 needle 是 `local reminders can still be delivered`，
+而原件写的是 `Local reminders on mobile remain available after you grant system notification permission.`
+⇒ 一度得出"英文没同步"的假缺陷。读原文之后撤回（这正是记忆里"代改/登记前先取原话"那格）。
+
+**④ 新暴露的一格，比①②③都更贴"停掉对外错话"这个目标**：同两枚键在三棵树上的状态**互不相同**——
+
+| 键 | 分支/载体 | `origin/main` | 本地 `main` |
+|---|---|---|---|
+| `site.platforms.web.body` | 已停掉的那版 | **已停掉**（同分支） | **旧的那版** |
+| `site.docs.selfhost.s3p1` | 新版 | 旧的 | 旧的 |
+
+⇒ 公开线与本地线在**一枚对外承诺的词条**上已经分叉，而且分叉方向是"公开侧新、本地侧旧"。
+这一格决定了两件事：
+(a) 落地只把本地 main 推进到载体那版，它**不改变** `origin/main` 与公开站点各自的旧状态；
+    对外界面上那句到底是哪一版，取决于发布装置钉的是哪一笔（`research/tools/publish-public-sites.mjs`
+    自己打印它拒绝的字节形状），**本轮没有复跑 live-site 就没取这个读数**；
+(b) 推 `origin/main` 不在本轮授权里（`不推远端`），所以本地/公开那枚分叉只能等人处理。
+⇒ 任务 #20/#21/#32（都问的是"对外那一句现在说什么"）合并成一次 live 复跑，
+且必须在**落地 + 重发之后**跑 —— 在此之前跑出来的绿/红都只属于今天这一版字节。
