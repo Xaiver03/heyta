@@ -206,6 +206,23 @@ export {
 } from './entitlement.js';
 
 /**
+ * 收银台客户端。**所有宿主共用这一份**（AGENTS.md §3.5）—— 见 `checkout.ts` 文件头：
+ * 🔴 请求体里**没有金额字段**，收多少钱只由服务端报价决定。
+ */
+export {
+  CHECKOUT_PATH,
+  RENEWAL_PRICE_ID,
+  startCheckout,
+  type CheckoutFailure,
+  type CheckoutFailureCode,
+  type CheckoutOutcome,
+  type CheckoutQr,
+  type CheckoutRedirect,
+  type RejectedCouponEcho,
+  type StartCheckoutOptions,
+} from './checkout.js';
+
+/**
  * 运营管理后台的数据访问（ADR-0038）。**宿主无关**地放在这里，
  * 与权益探测同一条口径（AGENTS.md §3.5：`apps/*` 只留平台差异）。
  *

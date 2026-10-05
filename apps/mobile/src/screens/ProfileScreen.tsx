@@ -84,6 +84,8 @@ import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { CountdownScreen } from './CountdownScreen';
 import { EntitlementSection } from './EntitlementSection';
+// 托管同步的续费入口（与 web 的 RenewPanel 共用 @heyta/app-host 那一份接线）。
+import { RenewSection } from './RenewSection';
 import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';
 import { HabitsScreen } from './HabitsScreen';
@@ -1001,6 +1003,7 @@ export function ProfileScreen(): React.JSX.Element {
         没有权益可说时它自己返回 null（不占位）。
       */}
       <EntitlementSection />
+      <RenewSection />
 
       {/* 清单 / 标签 / 便签管理。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}

@@ -132,6 +132,7 @@ import { SidebarResizer } from './features/shell/SidebarResizer.js';
 import { SyncBar } from './features/sync/SyncBar.js';
 import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
+import { RenewPanel } from './features/subscription/RenewPanel.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
@@ -2494,6 +2495,14 @@ export function App(): React.JSX.Element {
               {/* 从滴答清单迁进来（B2-1）—— 与上面的"还原自己的导出"是两件事，
                   走普通 op、可与既有数据共存。见 TickTickImportPanel 文件头。 */}
               <TickTickImportPanel />
+              {/*
+                托管同步续费（临时方案：再下一单 = 在当前到期日之后叠 30 天）。
+                它排在"数据进出"之后、"账号安全"之前：这一档买的是**服务**，
+                不是登录方式 —— 与下面三块（通行密钥 / 密码 / 注销）不是一类东西。
+                🔴 入口与支付渠道由 `check:payment-entry` 钉成同一件事：
+                渠道没配时这里的请求会拿到 503，界面如实说"这台实例没配收款通道"。
+              */}
+              <RenewPanel />
               {/* 账号安全：管理自己的通行密钥（列 / 删）。见 PasskeyPanel 文件头。 */}
               <PasskeyPanel />
               {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
