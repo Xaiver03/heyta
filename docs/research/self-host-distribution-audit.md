@@ -11407,3 +11407,21 @@ node research/tools/selfhost-license-coverage-arms.mjs --installed-tree /tmp/tre
 ⚠️ 别把这条读成"整条链两侧都绿"：这只量了 `check:docs` 一道门，而完整链 86 段里那 15 段
 （要 `packages/*/dist` / APK / 远端 Windows / Playwright）**仍然只能在落地那一刻的窗口里跑**（§8.174 ⑤）。
 一次性对照树用完就收：`git worktree remove --force /tmp/heyta-main-redcheck`（本轮已收）。
+
+### 8.196 "崩在合并与落笔之间"这一档现在有自己的牙：A/B 各跑一次（2026-10-05 12:2x）
+
+§8.192 那格记的是**事故**（一个未定义标识符把共享载体留在半合状态）。补完处理器后不能只留一句"已修"，
+要能当场复现"没修会怎样"。注入臂 `HEYTA_CARRIER_CRASH_AFTER_MERGE=1` 打在"合并已确认、还没落笔"那一格，
+A/B 两趟都跑真脚本、真载体：
+
+| 趟 | 实现 | 退出码 | 事后现场（独立复核，不看脚本自己说了什么） |
+|---|---|---|---|
+| 负对照 | 同一份文件 `sed` 掉两行 `process.on(...)`（一次性副本 `research/tools/.tmp-crashbench.mjs`，跑完即删） | **1** + 裸 stack 直接吐到 stderr | `MERGE_HEAD=4bd397af` **还在** · 工作树脏 **77 条** |
+| 正对照 | 规范版（`uncaughtException` + `unhandledRejection` 两档） | **7**（不与任何一道守卫的码相撞） | 打出"已量到的读数"三条 + `现场：已 merge --abort ⇒ MERGE_HEAD=无 · 工作树脏 0 条`；事后独立取数：**无 MERGE_HEAD · 脏 0 条** |
+
+🔴 两档都要挂的理由不是保险，是形状不同：本文件有**顶层 await**，异步里没接住的走
+`unhandledRejection`，Node 22 默认**直接终止且不经过** `uncaughtException` —— 只挂前者会留一整类崩漏掉擦现场。
+
+⚠️ 一条边界别读错：**处理器只擦"自己这一趟起的"合并**（`mergeStarted` 之后才可能非空）。
+别人留下的 MERGE_HEAD 仍然由第 0a 步拒在门外 —— 负对照那趟留下的现场就是**手工** `merge --abort` 收的，
+因为规范版对它的判断是"不是我起的，不动"。⇒ 修的是"别再制造现场"，不是"替别人收拾"。

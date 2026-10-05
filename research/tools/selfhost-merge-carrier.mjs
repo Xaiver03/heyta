@@ -210,6 +210,28 @@ const die = (code, msg) => {
   process.exit(code);
 };
 
+/* 🔴 `die()` 会擦现场，**未捕获的异常不会** —— 10-05 实测：借 store 判据段里一个从未定义的标识符
+ *    让整趟崩在"合并之后、落笔之前"，只留下一叠裸 stack，而共享载体里存着一场 MERGE_HEAD。
+ *    下一趟因此被第 0a 步读成"别人的现场"（`pid=-1` 那一格），而清理动作排在闸门后面走不到 ——
+ *    一个纯代码缺陷就这样变成落地路径上要人手工收拾的循环。
+ *    这一档**不改变"失败"这件事本身**（原始异常照打、专属退出码 7 不与任何一道守卫的码相撞），
+ *    它只保证失败的**形状**与 die 一致：已量到的读数 + 擦现场 + 复验它真的干净了。
+ *    两档都要挂：同步代码里抛的是 `uncaughtException`，而本文件有顶层 await，
+ *    异步里没接住的会走 `unhandledRejection`（Node 22 默认直接终止且**不**经过前者）。
+ *    注入臂：`HEYTA_CARRIER_CRASH_AFTER_MERGE=1`（下面"合并已确认"那一行之后 throw）。 */
+const crashOut = (what, e) => {
+  if (notes.length) console.error(`   已量到的读数：\n${notes.map((n) => `     · ${n}`).join('\n')}`);
+  console.error(`❌ ${what}：${e?.stack ?? e}`);
+  const td = teardown();
+  console.error(`   ${td.ok ? '现场：' : '🔴 现场没擦干净：'}${td.line}`);
+  if (!td.ok) {
+    console.error(`   恢复动作（由人确认这棵树此刻属于谁之后执行）：git -C ${WT} merge --abort && git -C ${WT} status --porcelain`);
+  }
+  process.exit(7);
+};
+process.on('uncaughtException', (e) => crashOut('未捕获异常（不是任何一道守卫的拒绝）', e));
+process.on('unhandledRejection', (e) => crashOut('未接住的 Promise 拒绝（顶层 await 那一族）', e));
+
 // ── 0. 起点 ──────────────────────────────────────────────────────────
 const mainSha = git(['rev-parse', MAIN]).trim();
 const srcSha = git(['rev-parse', SOURCE]).trim();
@@ -320,6 +342,15 @@ if (mergeHead !== srcSha) {
 const conflicts = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
 mergeStarted = true; // 从这里起的每一条 die 路径都必须把这一场合并中止干净（见上面的 teardown）
 notes.push(`MERGE_HEAD=${mergeHead.slice(0, 8)} 已确认 · 冲突 ${conflicts.length} 条：${conflicts.join(', ') || '（无）'}`);
+
+/* 注入臂：`HEYTA_CARRIER_CRASH_AFTER_MERGE=1` 在"合并已确认、还没落笔"这一格崩一次。
+ * 没有它，上面那档 `uncaughtException` 就只是"我写了所以应该在" —— 而它守的恰好是
+ * 10-05 真发生过的那件事（一个裸 stack 崩在这里，共享载体留着一场 MERGE_HEAD）。
+ * 判据：跑完 `git -C 载体 rev-parse --verify MERGE_HEAD` 必须**失败**、`status --porcelain` 必须 0 行、
+ * 退出码必须是 7（不是任何一道守卫用过的码）。 */
+if (process.env.HEYTA_CARRIER_CRASH_AFTER_MERGE === '1') {
+  throw new Error('变异注入：合并之后、落笔之前崩一次（验未捕获异常那档真的会擦现场）');
+}
 
 // ── 2. 分族并逐个解 ─────────────────────────────────────────────────
 const stage = (path, n) => git(['-C', WT, 'show', `:${n}:${path}`]);
