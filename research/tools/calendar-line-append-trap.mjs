@@ -7,9 +7,11 @@
  * 所以这里把三个判断固化成退出码（默认 dry-run，`--confirm` 才动盘；缺 `--text` 直接 exit 1）：
  *
  *   ① 目标在工作树里脏 ⇒ `exit 3`。那本册子是并行会话的取证账本，别人正在写的 hunk 不替他们带。
- *   ② 远端跟踪分支（`origin/main`，以**上次 fetch 到的那份**为准）里那个号已被占用 ⇒ `exit 3`。
+ *   ② 远端跟踪分支（`origin/main`，以**上次 fetch 到的那份**为准）与本检出的**编号集合对不上号** ⇒ `exit 3`。
+ *      两种形状各自会红：算出来的 N 已被远端占用；以及 N 不撞、但远端有本检出没有的号 / 同号写着两条不同的坑
+ *      （§4.05 (61)③ 在真字节上量到的是后者：`origin/main` 末号 283、本检出 HEAD 278，`#279`–`#283` 同号不同文）。
  *      这一条不是仪式：本检出此刻 `ahead 8 / behind 594`，"没拉下来的条目"是真实存在的一批编号。
- *      没有该 ref 时**如实打印** `REMOTE=absent`，不假装验过。
+ *      没有该 ref 时**如实打印** `REMOTE=absent`，不假装验过；对得上时打印"对得上号"（阳性对照，臂 35）。
  *   ③ 正文首行已在册 ⇒ 报"已在册（现量号 X）"并 `exit 0`（幂等**按正文判**，见下面那腿）。
  *
  * 编号**只在写的那一刻现量**（`grep -oE '^[0-9]+\. ' | sort -n | tail -1`），
@@ -96,6 +98,31 @@ if (ROOT) {
     if (new RegExp(`^${N}\\. `, 'm').test(out)) {
       die(3, `❌ 上次 fetch 到的 \`origin/main\` 里号 ${N} 已被占用 ⇒ 本检出落后远端时"没拉下来的条目"是真实存在的一批编号；先让同步那一头收号，本工具不猜下一个空号`);
     }
+    // 🔴 上面那一格只挡"N 恰好撞远端已用的号"，而 §4.05 (61)③ 在**真数据**上量到的形状比它宽：
+    //    `origin/main` 末号 283、本检出 HEAD 278，`#277`/`#278` 两边同文而 `#279`–`#283` **同号写着两条不同的坑**。
+    //    那种状态下等本地未提交那 14 条一落地，N 会算成 293 —— 不与远端撞，于是这一枚被追加进一本
+    //    **已经重号**的册子，把歧义从 5 枚加到 6 枚，而输出看着完全正常。
+    //    ⇒ 这一格判的是"这本册子当前与远端对得上号吗"，跟 N 撞不撞无关。
+    const numMap = (s) => {
+      const m = new Map();
+      for (const line of s.split('\n')) {
+        const hit = line.match(/^(\d+)\.\s(.*)$/);
+        if (hit) m.set(parseInt(hit[1], 10), hit[2]);
+      }
+      return m;
+    };
+    const LMAP = numMap(src);
+    const RMAP = numMap(out);
+    const missing = [...RMAP.keys()].filter((k) => !LMAP.has(k));
+    const clash = [...RMAP.keys()].filter((k) => LMAP.has(k) && LMAP.get(k) !== RMAP.get(k));
+    if (missing.length || clash.length) {
+      const show = (xs) => xs.slice(0, 6).join(', ') + (xs.length > 6 ? ` …（共 ${xs.length} 枚）` : '');
+      die(3, `❌ 这本册子与上次 fetch 到的 \`origin/main\` **已经对不上号**：`
+        + (missing.length ? ` 远端有 ${missing.length} 枚号在本检出里不存在（${show(missing)}）；` : '')
+        + (clash.length ? ` 同号不同文 ${clash.length} 枚（${show(clash)}）；` : '')
+        + `⇒ 先让同步那一头把两边收进同一份，本工具不往一本重号的册子尾部再加一枚`);
+    }
+    console.log('   · 远端对照：本检出的编号集合与 origin/main **对得上号**（号同、首行文本同）');
   }
 }
 console.log(`   远端那一格：REMOTE=${remote}${remote === 'absent' ? '（这个仓库没有可读的 origin/main ref ⇒ 那一格真的没验，不是验过说没问题）' : ''}`);
