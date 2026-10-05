@@ -5459,3 +5459,27 @@ git commit --only -m '…' -- docs/reference/environment-traps.md      # 🔴 �
 `SYNC rc=0（目标 a4ca347c）` → 全链 rc=0 → **`通过 37 项，失败 0 项`** → `ALL_DONE final_rc=0`，`RESTORE_DONE 10 枚`、载体 `dirty=0`，整趟约 6 分钟。
 ⚠️ 引用这条读数前先跑翻面判据 `git diff --name-only a4ca347c HEAD -- packages apps`（现量 0；一旦非 0 就退回"没在当前产物上验过"）——
 它不是永久绿，而**6 分钟就能重取一次**，所以下一个人应该重跑而不是转述。
+
+## B83. ⏳ ② 的段 85 在**锁空重跑之后仍然红**，红面是 `apps/mobile` 的 vitest —— 两种解释已被现量否证，第三种要一枚干净树才能判（10-05 20:4x）
+
+`pnpm check` 逐段实测 `通过 83 / 失败 2 / 跳过 0 / 合计 85`（载体 `7911ad02`，`~/.heyta-evidence/checks-queued-1005-201130/`）。
+两枚红里段 42 `check:docs` 已定案为**载体年龄**（main 上那枚死引用已不存在，且带分母：`git grep -ohE 'AGENTS\.md §[0-9]+…' main -- docs`
+现量 15 种取值全落在真实章节集合内）。**本节登记的是另一枚 —— 段 85 `pnpm -r test`：**
+
+- **20:31 那趟读到的不是它**：`packages/sync-core` 的内存闸门拒绝启动（原话 `已有测试在跑（pid=51036，锁 /tmp/tfa-test.lock；它是：bash tmp-rf-e2e-wait.sh）`），
+  那把锁属于另一条线的有界等待器。`pnpm -r` 默认**第一枚失败即停** ⇒ 那一趟**根本没走到 apps/mobile**。
+- **20:36 锁空重跑**（装置 `~/.heyta-window-rigs/heyta-seg85-clean-rerun.sh`，等锁 + 负载 >12 不抢，**没有**用 `TFA_ALLOW_CONCURRENT_TEST=1` 绕）：
+  `SEG85_RC=1`，红面 `apps/mobile test: Failed` / `[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @heyta/mobile@0.0.0 test: vitest run`，
+  **5 枚未处理拒绝**：`RolldownError: Parse failure … Flow is not supported`，文件 `react-native/index.js:1:0`，vitest 标的来源 `tests/auth-flow.spec.ts`。
+  证据 `~/.heyta-evidence/seg85-clean-1005-203507/`。
+- 🔴 **已否证的两种解释**（不是推断，是现量）：① **不是四端重装造成的**（① 不改源码）；② **不是"载体落后 17 笔"造成的**
+  （`git diff --name-only 7911ad02..main -- pnpm-lock.yaml package.json apps/mobile` 输出为空，两棵树 `.pnpm` 里装出来的
+  `vite@7.3.6_*` / `vite@8.3.1_*` 目录名逐字相同）。
+- ⚠️ **没排掉的第三种**：它可能是那 17 笔里 `packages/*` 带进来的 —— 那样**当前 main 也会红**，就该归 mobile/日历那条线，不是环境噪声。
+  判它需要**在干净树上跑 main**：主检出此刻正被另一条线占着（`apps/mobile/src/db/open-host.ts`、`AccountClosureScreen.tsx` 等 8 枚 `M`/`A`），
+  在那儿跑出来的读数**不属于任何一枚提交**，所以本线没去跑，也不去动那棵树。
+- **下一步谁能消、怎么消**（一条命令，约 6-10 分钟，含重建）：另建一枚载体 `git worktree add <父目录>/heyta-wt-seg85 main`
+  → `pnpm install --frozen-lockfile` → `pnpm -r build` → `NO_COLOR=1 pnpm --filter @heyta/mobile test`。
+  绿 ⇒ 成因在 `7911ad02` 那批的依赖/产物形状（回到本线）；红 ⇒ 报给 mobile 线，本线这条登记随之关闭并注明"不是本线的东西"。
+- 📌 **别把这条读成"② 没跑完"**：② 的两问已分别回答（整条 `&&` 链 exit 0 ❌ / 每段各自读数 ✅ 83/85），
+  登记本条只是为了让下一位不把段 85 那枚红随手归给"环境"或"沙箱"。
