@@ -10679,3 +10679,21 @@ check:android-gradle-remote · check:apk-freshness · check:shell-erasure-parity
 §8.159 是第二次，今天是第三次，同一台装置、同一个原因）。
 📌 一般形状：**"这行有没有出处"和"这行的状态对不对"是两个正交的缺陷**；
 只修后者会留下一堆"句句真话、但没人会被带回去再看一眼"的行，而那种行就是几天后自己烂掉的那一种。
+
+### 8.178 第 2 项起跑前的三格环境预检（2026-10-05 10:4x，负载 98.8 的时候做的，零成本）
+
+开窗前先把"跑到最后一步才发现环境不允许"的那几格量掉。这一趟**没有起跑**（负载 10:41 现量 **98.83**），
+但三格前置有了确定答案：
+
+| 格 | 现量 | 判 |
+|---|---|---|
+| Docker daemon | `docker version` 打出 **29.4.0** | 可用。⚠️ 顺带一处**探针错**：我先用 `pgrep -x OrbStack` 判"守护进程在不在"，输出是"不在"—— 名称假设错了，**能用的那格答案是 `docker version` 给的**，不是进程清单 |
+| `e2e` 那份额外 lockfile 的依赖 | 分支树与载体树**两侧都在**（`e2e/node_modules/@playwright/test`） | 第 2 项那三条浏览器腿不会因为"e2e 不在根工作区、依赖没装"而红（AGENTS §6 那条注释讲的正是这个坑） |
+| 🔴 会不会 SIGKILL 别人的 dev server | `verify-selfhost-stack.sh` 全文**没有** `kill/pkill/lsof`，只有 `PORT=1900` 那套专用 compose project，且它撞到别人的栈是**响亮拒绝**（`:172`"要么先停掉那一套，要么换 `HEYTA_SELFHOST_PORT`"）；`playwright.selfhost.config.ts` 里没有 globalSetup 杀端口 | **可以跑**。此刻 `:3000` 被别人占着**不是** blockers —— 那三条腿打的是 `http://127.0.0.1:1900/app/`，与 `:3000` 无关 |
+
+⇒ 第 2 项落地后起跑的**唯一**前置回到那一格老的：**负载 ≤12 且 `/tmp/tfa-test.lock` 空**（后者是这台机器的
+全局内存闸门，`verify` 脚本自己在起跑前查它；昨天那一趟就是被它挡下的）。
+⚠️ 这一条仍然**不**授权我绕开它 —— `TFA_ALLOW_CONCURRENT_TEST=1` 是那枚闸门的逃生门，
+台账里逐次记的都是"**不用**"（现量：`grep -n 'TFA_ALLOW_CONCURRENT_TEST' docs/research/self-host-distribution-audit.md`
+—— 本节故意**不**在这里写行号，那正是 G-66 讲的会漂的形状，而我上一版差一点就写了），
+理由各处都是同一句："它拦的是 OOM，不是礼貌；别人正在跑时绕过去拿到的读数也不该被当成环境有效"。
