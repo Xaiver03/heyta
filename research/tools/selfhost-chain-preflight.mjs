@@ -17,6 +17,9 @@
 //
 // 用法：node research/tools/selfhost-chain-preflight.mjs        # 默认对 main
 //       node research/tools/selfhost-chain-preflight.mjs <ref>  # 换一支（排障用）
+// ⚠️ 换成**没被主检出签出**的那支 ref 时（落地前先看 `origin/main` 就是这种），
+//    第 4 格与"未提交新增段"两格自动标成不适用：它们拿的是主检出那棵树的工作树字节，
+//    而工作树签出的是别的一笔。判词（载体能不能自动解）只取前三格之和。
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -63,16 +66,36 @@ const dirs = {
   '并集 vs base': lostFromUnion,
   [`${MAIN_REF} vs base`]: B.chain.filter((s) => !M.chain.includes(s)),
   '本分支 vs base': B.chain.filter((s) => !T.chain.includes(s)),
-  [`${MAIN_REF}工作树 vs ${MAIN_REF}`]: M.chain.filter((s) => !W.chain.includes(s)),
 };
-let anyErode = 0;
+
+/**
+ * 第四格拿的是**主检出那棵树的工作树字节**，所以它只在"这一支 ref 就是那棵树签出的那一笔"时成立。
+ * 把预检打在一支没被签出的 ref 上（例如落地前先看 `origin/main`）时，工作树比 ref 旧 ⇒
+ * ref 自己新增的段会被这条读成"摘段"，于是判词喊一句**必然出现的假红**。
+ * 2026-10-05 13:5x 实测：`origin/main` 那一趟的"摘段=5"里四条是 detail-pane 段、一条是
+ * `check:image-build-args` —— 全是 origin/main 有而陈旧工作树没有的段，与载体的自动解能力无关。
+ */
+const treeHead = git(['-C', MAIN_DIR, 'rev-parse', 'HEAD']).trim();
+const refSha = git(['rev-parse', MAIN_REF]).trim();
+const diskComparable = treeHead === refSha;
+console.log(`\n摘段四格（判词取**前三格之和**；第 4 格问的是别的事，单独报不进判词）：`);
 for (const [name, lost] of Object.entries(dirs)) {
-  anyErode += lost.length;
   console.log(`  摘段 ${name} = ${lost.length}${lost.length ? ` ⇒ ${lost.join(' | ')}` : ''}`);
 }
+const diskLost = diskComparable ? M.chain.filter((s) => !W.chain.includes(s)) : [];
+console.log(`  ${diskComparable
+  ? `摘段 ${MAIN_REF}工作树 vs ${MAIN_REF} = ${diskLost.length}${diskLost.length ? ` ⇒ ${diskLost.join(' | ')}` : ''}`
+  : `第 4 格**不适用**：主检出签出的是 ${treeHead.slice(0, 8)}，不是 ${MAIN_REF}=${refSha.slice(0, 8)} ⇒ ` +
+    `拿陈旧工作树比这支 ref 只会读到"这支 ref 新增的段"，那不是摘段`}`);
 
-const theirNew = onlyIn(W.chain, M.chain);
-console.log(`\n主检出未提交**新增**的链段 = ${theirNew.length}：${theirNew.map((s) => (s.match(/check:[a-z0-9:._-]+/i) ?? ['?'])[0]).join(', ') || '无'}`);
+/**
+ * 判词只取**前三格**（并集/main/本分支各自 vs base）之和 —— 它们才是"载体第 1 族会不会停下来要人拍"的等价物，
+ * 而且每一格都能红：拿一支把某段摘掉的合成 ref 打，第 2 格就是 1（今天实测过）。
+ * 第 4 格问的是另一件事（他们未提交的链里有没有没 add 的实现），已经单独报，不进判词。
+ */
+const erosion = Object.values(dirs).reduce((n, lost) => n + lost.length, 0);
+const theirNew = diskComparable ? onlyIn(W.chain, M.chain) : [];
+console.log(`\n主检出未提交**新增**的链段 = ${diskComparable ? `${theirNew.length}：${theirNew.map((s) => (s.match(/check:[a-z0-9:._-]+/i) ?? ['?'])[0]).join(', ') || '无'}` : '不适用（工作树签出的不是这支 ref ⇒ 这格读不出来，**不是 0**）'}`);
 // 每一段去找它的实现文件在 main 里是已提交还是未跟踪 —— 未跟踪那一档是"提了链忘了 add 文件"的风险面。
 const trackedList = new Set(git(['-C', MAIN_DIR, 'ls-files']).split('\n').filter(Boolean));
 const risky = [];
@@ -86,6 +109,16 @@ for (const seg of theirNew) {
   console.log(`  · ${key} → ${file ?? '?'}  ${state}`);
 }
 
-console.log(`\n结论：并集与 base 之间摘段=${anyErode} ${anyErode === 0 ? '⇒ 载体第 1 族这次可以自动解（不会停下来要人拍）' : '⇒ 🔴 会 die，要人先判'}`);
-console.log(`      主检出那批新链段里实现未跟踪的 ${risky.length} 枚${risky.length ? `：\n      ${risky.join('\n      ')}` : ''}`);
-console.log('      （未跟踪不是本批的债：那一类红要逐条归属到非本批，不代改、不摘段 —— §8.105）');
+console.log(`\n结论：三格（并集/${MAIN_REF}/本分支 各自 vs base）摘段合计=${erosion} ${erosion === 0 ? '⇒ 载体第 1 族这次可以自动解（不会停下来要人拍）' : '⇒ 🔴 会 die，要人先判'}`);
+if (!diskComparable) {
+  console.log(`      ⚠️ 这一趟的第 4 格与"未提交新增段"两格**不适用**（工作树签出的不是 ${MAIN_REF}），` +
+    `所以这趟只答"载体能不能自动解"，不答"他们未提交的链里有没有没 add 的实现"。`);
+}
+console.log(`      主检出那批新链段里实现未跟踪的 ${diskComparable ? `${risky.length} 枚${risky.length ? `：\n      ${risky.join('\n      ')}` : ''}` : '不适用'}`);
+if (diskComparable) console.log('      （未跟踪不是本批的债：那一类红要逐条归属到非本批，不代改、不摘段 —— §8.105）');
+/**
+ * 判红就要**退出去挡**：这句结论印"🔴 会 die，要人先判"却仍以 0 结束，等于把红留在纸面上、
+ * 链上没人接（`&&` 的下一段照跑）。未跟踪实现那一档**不进**出口码 —— 它不是本批的债，
+ * 按 §8.105 走逐条归属，不是把预检变成别人的门禁。
+ */
+process.exit(erosion > 0 ? 1 : 0);
