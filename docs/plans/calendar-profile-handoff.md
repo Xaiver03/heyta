@@ -2430,6 +2430,131 @@ done
   所以判断"这条闸门值不值得再加一支"的标准不是"这次补齐了"，而是**"它下次还会不会漏"** ——
   会，就说明该换的是判据的**来源**（从仓库事实推导），不是再补一支。
 
+- (50) **10-05 12:5x：`3281ebb2` 刚落库，我就按 §4 自己要求的那句"再跑一次看枚数归零"复跑了一遍 —— 它红了，而红因是我上一笔刚加的"本线删除"那一格。**
+  ① 读数（原样抄，这就是这一格存在的全部理由）：
+  `bash research/tools/calendar-line-commit-plan.sh` ⇒ **rc=1**、
+  `❌ 点名路径在磁盘上不存在，且不满足「本线删除」那三条件：apps/web/evidence/calendar-day/day-en-no-timed.png —— 清单过期，先修清单（exit 1）`。
+  而同一枚路径在**提交前**干跑里是 `🗑 本线删除（索引里有它、工作树状态恰好是 " D"）`、在提交那笔里是
+  `delete mode 100644 …day-en-no-timed.png`。也就是说**那条分支只在"删除还没落库"那一段有效**：
+  落库之后 HEAD 没有它、索引没有它、`git status` 对它回 0 行 ⇒ 三条前置一条都不成立 ⇒ 掉进出口就是 exit 1。
+  ② 🔴 **这正是上一笔提交信息（`8cb33f55`）点名要防的那件事，而我这一次是同一件事的新面目**：
+  "给生产路径加闸门的人没同步测这条闸门的**下一轮**"。14 臂当时**全绿**（`pass=14 fail=0`），
+  臂 10 走的就是"删除被带走"那一条腿 —— 但它验的是**当轮**，没有任何一臂把"同一份清单原样再跑一次"
+  这件事做进去，而 §4 的打印里明写着收尾要复跑。**一套全绿的验证台可以完整地覆盖一条腿的所有分支，
+  仍然一条都不覆盖这条腿的时间轴。**
+  ③ 修法：§1 里加第三种状态（不是放宽，是多一种**有直接证据**的读数）——
+  「删除已落库」= 盘上没有 **且** 索引里没有 **且** HEAD 树里没有 **且** `git log --diff-filter=D -1 --format=%h -- <路径>` 非空，
+  四条同时成立才放行，打印带出那笔 SHA（现量 `D=3281ebb2`），**不计数、不判红**，另在汇总行打
+  `⇒ 另「删除已落库」1 枚（下一轮复跑不判红；要从点名清单里摘掉）` —— 摘条这件事从此在输出里看得见，不靠人记得。
+  ⚠️ 为什么不会开成"没有也放行"：清单写错路径 / 别人已暂存的删除，**历史里从来没有它们的一条 D** ⇒ 仍然 exit 1，
+  臂 11/12 的口径一字未动（臂 15 与这两臂同时跑绿，就是这三条前置互斥的证明）。
+  ④ **牙**（与改法同趟，rig 14 臂 → **15 臂**）：臂 15 是一条**两腿**臂 ——
+  第一腿用与臂 10 同一条 `--confirm` 路径把删除真落库（`RC_COMMIT=0`），
+  第二腿拿**同一份点名清单**原样干跑复跑，断言 `RC=0` + 打「已落库」 + 汇总行含「删除已落库 1 枚」 +
+  `无待办` 出现 + **`清单过期` 那句一次都不出现**（`STALE_MSG=0`，否则"红换了个说法"也算没过）。
+  现量：`bash research/tools/calendar-line-commit-only-arms.sh` ⇒ **`== 合计 pass=15 fail=0 ==`**。
+  ⑤ 主检出处置完的复跑读数（这一格闭合的证据）：`PLAN_RC=0`、
+  `🗑 本线删除**已落库**（HEAD 无此枚、索引无此枚、历史里有它的一条 D=3281ebb2）`、
+  `DERIV 反查…：钉锚点目录内脏 png 0 枚，未点名 0 枚`、
+  `✅ 命名空间命中 2 枚全部已点名，推导格 0 枚也全部已点名`（工作树脏行分母 34）。
+  ⑥ 📌 一般规律（写给下一位，也写给我自己下一趟）：**验收一条新分支，要问的不是"它的所有分支都测了吗"，
+  还有"它跑第二次会怎样"**。凡是"点名清单 / 在册条目 / 登记册"这类**由同一枚工具在前后两轮都读**的清单，
+  每一轮之间都要加一臂"拿同一份清单复跑"，因为**条目失效**本身就是这类清单的正常下一状态。
+
+- (51) **10-05 13:5x：为了拍那张新图去挂看守，看守 4 秒就"完成"了 —— 它宣布 `WINDOW=OPEN GATES=〈空〉`，而那一刻负载门是红的。**
+  ① 原样读数（这条账的全部起点）：`/tmp/ht-r17-reshoot.20261005-134801.27921.log` 三行
+  `13:48:03 WINDOW=OPEN try=1 GATES=〈空〉` → `13:48:03 DEFER=…开工` → `13:48:05 RESHOOT_DONE rc=0 secs=4`，
+  而**盘上什么都没多出来**（`ls apps/web/evidence/calendar-capture/` 只有旧的 `calendar-capture.png`，mtime 09:51）。
+  同一分钟我手工 `. scripts/lib/wait-for-quiet-host.sh; host_load_gate` 的量是 **`load1=13`（原始 13.97）对阈值 12 ⇒ 红**。
+  ② 根因是**两枚缺陷叠在一起**（本仓 §7 第 86 条那一族：一条判据里藏两个缺陷）：
+    · **内层**（`r17-reshoot-stale.sh`）：`--only <目录>` 在"零枚过期"的树上走到 §1 的
+      `✅ 没有过期目录 ⇒ 无事可做` **直接 exit 0**，而 §2 那条
+      `--only 一枚都没匹配上 ⇒ 参数写错了，不能当成「无事可做」` 在它**后面**，永远走不到。
+      也就是说那句"不能当成无事可做"是**写给不给 --only 的人看的**，点名这一档它自己漏了。
+    · **看守**（`r17-reshoot-keeper.sh`）：开窗判据是"被守的那条命令自己退 0"，而它**分不清 rc=0 的三种来源**
+      （闸门全绿 / 没活可跑在 §1 早退 / 用法坏）—— 于是 ② 那种"闸门一个都没跑"的 0 被读成"门开了"。
+      🔴 一声没有闸门背书的 `WINDOW=OPEN` 比没有这声更糟：下一个人会以为它绿过（§7 第 50 条那一族）。
+  ③ 修法按"先修探针"的顺序做，两处都改、各带标记：
+    · 内层：`--only` 给了而那枚不在待重拍集合 ⇒ **exit 1** 并打 `ONLY_MISMATCH=<名>`；
+      零枚且没给 `--only` 那条**合法**的早退，补打 `NOTHING_TO_SHOOT=1（本条早退未执行第 3 节前置门 ⇒ 不许被读成 WINDOW=OPEN）`。
+      主检出处 A/B 现量：`--only calendar-capture` 由**改前的 rc=0**（13:48 那份日志）变成**改后的 rc=1 + ONLY_MISMATCH**；
+      不给 `--only` 则 `rc=0` 且两行标记都在。
+    · 看守：`rc=0` 那一支现在**要求证据** —— 输出里有 `== 3. 前置门` 才宣布 `WINDOW=OPEN`（话里补一句"不是「没跑」"）；
+      有 `NOTHING_TO_SHOOT=1` 就**不起 `--confirm`** 直接收工；两枚标记都没有 ⇒ `PROBE=SUSPECT` **exit 4**。
+  ④ 牙：`r17-reshoot-arms.sh` 的桩原来在 `rc=0` 时**什么都不印**（那正是让它测不到这件事的形状），
+    扩成 `rc:GATES:SHAPE` 三段（`gates` / `nothing` / `bare`，旧行不带第三段= `gates`，所以 13 条旧臂口径一字未动），
+    加 **L1/L2/L3** 三条：L1 `bare` ⇒ 期望 `rc=4` + `PROBE=SUSPECT` + `confirm 枚数 0`；
+    L2 `nothing` ⇒ 期望 `rc=0` + **一次 `--confirm` 都不起**；L3 `gates` ⇒ 配对正向腿，照常起跑一次。
+    现量：`bash research/tools/r17-reshoot-arms.sh` ⇒ **`r17-reshoot-keeper 臂：pass=16 fail=0`**；
+    `bash research/tools/r17-reshoot-stale.sh --selftest` ⇒ `SELFTEST=OK`（十档，含"零产出必须红"与变异腿）。
+    ⚠️ 这台 rig 的文件头原来写着"十三臂"，加到 L3 那天就漂了 ⇒ 已改成"臂数只由最后一行打印"（本仓老规矩，别在正文抄数）。
+  ⑤ **新图为什么必须有个旋钮才拍得出来**（这不是 ② 的同一个 bug，是判据的**适用范围**）：
+    "过期与否"是从 `UIPIN` 推的，而 `calendar-capture-input-wins.png` **从没钉过锚点** ⇒ 它永远进不了待重拍集合。
+    放宽过期判据是错的（那等于任何人跑默认档都无视 `r17` 的读数），所以加一档**只管一枚**的点名旋钮
+    `FORCE_SHOOT=<目录>`，三条前置缺一不可：必须与 `--only` 同用、两枚名字必须相同、那枚目录必须在盘上。
+    负对照逐条现量（各打中一次点名那句）：不给 `--only` ⇒ 1、`FORCE_SHOOT=calendar-day --only calendar-capture` ⇒ 1、
+    `ghostdir` ⇒ 1。正向：`FORCED=1` + 映射 `calendar-capture → e2e/tests/calendar-capture.spec.ts` + §3 全部门照跑。
+  ⑥ **第 2 项的后半就此闭合**（不是登记等待，是拿到了图）：13:57 `--confirm` 拍出
+    `calendar-capture-input-wins.png`（`932b1541…`）并把 `calendar-capture.png` 重拍成 `ddfcf5cd…`；
+    🔴 **人真的看了，而且第一遍看错了方向**：缩略图上那条 `覆盖-8…` 像是压在 6/7 之间，
+    我差点把"落在 7 号"写成"落在 6 号右边"。裁 300% 之后两张并排才看清 ——
+    新图里 chip 在**数字 7 的正下方**，而同一趟拍的 `calendar-capture.png` 里 `捕获-8…` 在**实心蓝的 6 号格内部**。
+    ⇒ 这个"两张对照"的裁法已写进该 README（`magick <图> -crop 460x230+380+290 +repage -resize 300%`），
+    因为**单看新一张推不出"7 是输入格而不是选中格"**。README 补了「人看到的」+ 一枚 `UIPIN`（pin=`3281ebb2`），
+    缺口那两行按现量改成 `grep -c page.screenshot`=**2** / `^test(`=**2**。
+    全树复跑：`r17-evidence-md5-check.sh --all` ⇒ **rc=0**、`pins_parsed=26 → 27`、`dirs_with_mismatch=0`。
+  ⑦ 起跑前按 §5 第 1 条做的体检**当场照出两枚旧产物**：`dist-freshness.mjs --only <apps/web 的 @heyta/*>`
+    报 `op-log 产物比源码旧 44771s` / `sync-core 旧 44768s`。两枚包工作树**干净**（`git status` 对它们回 0 行、
+    内容等于 HEAD）⇒ 重建无歧义，`pnpm --filter @heyta/op-log --filter @heyta/sync-core build` 之后 `落后 0 个`。
+    ⚠️ 顺带记一次**我自己写坏的探针**：第一遍 `--only` 传的是 node 一行流拼出来的名字，拼成了
+    `packages/app-hostapp-host` 这种双后缀 —— 那枚脚本**响亮地**报了"13 个名字没匹配到"并列出可选目录名，
+    所以没造成假绿（它文件头写着"不响亮失败就会打印 0 个包并退 0"，这次正是它在起作用）。
+  ⑧ 🔴 我在 (50) ⑦ 里写过一句"`/tmp/tfa-test.lock` 现量已不存在 ⇒ 那道并发门**自解**"——**那句是过度主张，已就地更正**：
+    12:47 `ls` 确实没有，12:50 就被别人的一趟 `npx vitest --run`（pid 38581）重新占上，13:5x 又换成
+    `pnpm --dir e2e run test:landing`（pid 59559）。**"锁不在"是瞬时事件不是状态**，
+    唯一正确口径是动手前当场 `ls /tmp/tfa-test.lock`；写在正文里的"现在空着"一定会漂。
+  ⑨ 📌 同一趟**第三次**踩到那条"双引号里的反引号照样执行"：我在新增的报错句里写了 `` `r17 --all` ``，
+    于是那枚 `r17 --all` **被真的跑了一遍**，打印出来的句子中间空了一截（`…集合里： 现量没把它报成过期`）。
+    已改成裸文本。⇒ 这条值得有一条常驻门禁（"运行时字符串里不许有反引号"），**尚未做**，
+    落点就在 `scripts/check-shell-unicode-vars.mjs` 旁边那一族；现在只有这三次阅读过它的人记得。
+  ⑩ 🔴 一条**没修、只登记**的载体边界：`--confirm` 那趟的逐文件打印只有
+    `就地 calendar-capture.png ddfcf5cd` **一行**，新落盘的 `calendar-capture-input-wins.png` 没被报出来
+    （那一格是拿"改前/改后 md5 不同"筛的，**新文件没有"改前"**）。
+    后果分两种：只产出一枚新图的那趟会被它的"零产出必须红"抓住（这一趟因为同时改了旧图，所以没抓）；
+    而"改了一枚 + 新增一枚"这种混合形状会**少报一行**。复现：`FORCE_SHOOT=calendar-capture bash research/tools/r17-reshoot-stale.sh --only calendar-capture --confirm`
+    然后数 `grep -c '就地' 那份日志`（现量 **1**，而目录里 png 是 **2** 枚）。归属：本线（这枚装置是我写的）。
+  ⑪ 🔴 **一笔不是我写的 hunk，被本线这笔代提交 —— 逐字披露在这里**（不是静默吸收）：
+    `research/tools/r17-reshoot-stale.sh` 的 selftest 那一行
+    `MUT=$(mktemp /tmp/ht-reshoot-mut.XXXXXX.sh)` → `MUT=$(mktemp /tmp/ht-reshoot-mut.sh.XXXXXX)`
+    （BSD `mktemp` 要求 `X` 在模板末尾，旧写法在这台 Mac 上根本建不出临时文件）。
+    **现量它不归本线**：13:4x 那次干跑打的是 `✅ 已在 HEAD 且工作树与 HEAD 一致：research/tools/r17-reshoot-stale.sh`，
+    而 13:58 该文件 mtime 变了、这一行已经不是 HEAD 那份；本会话记录里 `ht-reshoot-mut` 只出现过 HEAD 那种写法
+    （`grep -o 'ht-reshoot-mut[^"]{0,40}' 那份 jsonl` 现量：只有 `.XXXXXX.sh` 形状），
+    且 selftest 那段代码只往 `$MUT` 里写、从不改 `$0` ⇒ **是并行会话在同一棵树上改的**。
+    🔴 **所有者已查到，不用猜**：`docs/reference/environment-traps.md` 第 **289** 条就是这一族
+    （"BSD `mktemp` 只替换模板**末尾**的 `XXXXXX`"），那条末尾写着一次性 sweep
+    `grep -rn 'mktemp [^ "]*XXXXXX\.' research/tools scripts --include='*.sh'` ⇒ 本线带走的这一行是那场 sweep 的一部分。
+    **为什么仍然带走**：`git commit --only` 的单位是整份文件，而本线在这枚文件里的三处修复
+    （`ONLY_MISMATCH` / `NOTHING_TO_SHOOT` / `FORCE_SHOOT`）与 §51 ③ 那两处看守改动**必须同批**——
+    拆开会在 HEAD 里留下一枚"看守要求标记、被守的脚本从不打印标记"的断链（每次无事可做都会被判 `PROBE=SUSPECT` exit 4）。
+    装置的出口就是为此而设：`ALLOW_ORPHAN=1` 会在输出里大字列出被放行的 hunk，提交信息里写明理由，
+    而这一条是它的**台账落点**。持有者要找自己那一行：`git log -L 342,342:research/tools/r17-reshoot-stale.sh`。
+
+  ⑦ 同一趟重取的三件被挡项现量（**别抄，跑之前重取**）：
+  · `docs/reference/environment-traps.md` 仍 ` M`（别人正在写），且最大号已从 287 涨到 **288**
+  （`grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md | tr -d '. ' | sort -n | tail -1`）
+  ⇒ 本线那条目号落点要按现量取，取到最大号 +1；**不代别人提交他们的 hunk**，这条继续挂着。
+  · `package.json` 仍 ` M` ⇒ 第 3 项（把入库 rig 接进常驻消费者）的前置不成立，继续登记等待。
+  · `bash scripts/verify-mobile-window-gate.sh` 侧的负载门现量 `load1=13`（`host_load_gate` 推的阈值 12）
+  ⇒ 第 4 项（`--target c` 的 37 条设备腿）继续等；而 `calendar-capture` 那枚并发锁的现量是
+  **12:47 `ls` 回 "No such file"、12:50 就被 pid 38581（别人的一趟 `npx vitest --run`）重新占上**。
+  🔴 **我在这条的第一版把它写成了"那三道门自解"，那句是过度主张，当场更正**：
+  锁不存在是一个**瞬时事件**，不是一种状态 —— 同一台机器上它平均几分钟就被别人占一次，
+  所以"12:47 没有锁"推不出"12:50 可以跑"。（同族教训在项目 memory 里写着：「等他们提交」是瞬时事件不是状态。）
+  正确口径只有一种：**动手前当场 `ls /tmp/tfa-test.lock` 再决定**，任何写在正文里的"锁现在空着"都会漂。
+
+
+
 
 ---
 
