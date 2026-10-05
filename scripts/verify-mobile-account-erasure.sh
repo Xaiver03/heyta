@@ -545,6 +545,19 @@ fi
 #    不引入新假设 —— 用的就是 A 那一条读数的同一个 helper、同一条 SQL，两边只差在时间上。
 #    ⚠️ 这一腿的读数只能这样读：行数变了 ⇒ B 红（401 动过数据）；
 #    行数没变而文件也没变 ⇒ 才可以说"401 这一档在真机上确实没被走到销毁分支"。
+# 🔴 前提腿（设备那一半，#82）：先证明"这台设备**确实收到过**一次 401"，再谈"401 之后库还在"。
+#    上面那条只证到**服务端会回** 401（自己 curl 一发），而 B 的结论是关于设备行为的 ——
+#    两者之间缺的那一环一直没人量（计划 §10.135 之后登记为 #82）。载体沿用 iOS 那一档的形状：
+#    `packages/sync-client/src/client.ts:1734` 把状态码拼进错误句、界面逐字渲染，
+#    13:2x 的截图 apps/mobile/evidence/android-account-erasure-1-401-keeps-db.png 里
+#    就有那行「同步请求失败：HTTP 401 — Invalid token」⇒ 这一腿有量程，不是拿界面当装饰。
+dump
+if [ "$(has_sub 'HTTP 401')" = "1" ]; then
+  ok "判据 B 的**前提**成立（设备那一半）：界面上读得到「HTTP 401」⇒ 这一次同步真被服务端拒过"
+else
+  bad "🔴 判据 B 的前提不成立（设备那一半）：界面上没有「HTTP 401」⇒ 下面两条腿读到的"库还在"与 401 无关，
+      本趟 B 不作数（先修探针：确认「立即同步」真按下了、错误行没被折叠）"
+fi
 phone_db_pull_erase
 require_db_probe "判据B（数据腿）"
 OPS_AFTER_B=$(sqlite3 "$PHONE_DB" "SELECT COUNT(*) FROM ops;" 2>/dev/null | tr -d ' ')
@@ -573,75 +586,126 @@ else
   bad "换回有效令牌后库反而没了 —— 上一档的 401 才是删它的，判据 B 的红成立"
 fi
 
-step "5. 判据 C：真 UI 走到注销并看到那句「本地副本也已清除」"
+step "5. 判据 C：注销之后界面上出现那句结果文案（触发通道由 ERASURE_TRIGGER 选：ui=主动 / external=被动）"
 # 🔴 原来这里写死 `$ADB shell input tap 945 2253`（"与 verify-mobile-account.sh 同一锚点"）。
 #    两个问题，都是这台机器上量过的：像素坐标跟着分辨率与 DPI 漂，而**底部标签的位置还跟着
 #    系统导航条样式**；更直接的是上一趟——那一刻应用根本不在「我的」页（甚至被 BACK 退到桌面），
 #    那一下点的就是别的东西。坐标每次现取，且取不到要响亮失败。
-go_profile || summary "移动端注销销毁" "" 1
-XY=$(scroll_to_text "注销账号")
-if [ -z "$XY" ]; then bad "「我的」页里没有「注销账号」入口行"; screen_txt; summary "移动端注销销毁" "" 1; fi
-$ADB shell input tap $XY; sleep 3
-# 🔴 判"这一屏真的开了"要用**只有这一屏才有**的句子（词条 `accountClosure.lead`）。
-#    原先写的是 entryHint + 「注销账号」两选一，两处都不成立：
-#    · entryHint「删除云端账号，并清除这台设备上的数据」是**「我的」页那条入口行的副标题**
-#      （ProfileScreen.tsx:680 `hint:`），AccountClosureScreen 里根本不渲染它；
-#    · 「注销账号」两页都有（入口 label 与本页标题）。
-#    ⇒ 入口没跳走也能判"屏开了"，下一步的"找不到勾选框"就会被读成产品缺陷（§7 #46 那一族）。
-if ! settle_for "注销会永久删除这个账号在服务端的全部数据" 8 2; then
-  bad "注销屏没打开（没看到那句 lead）"; screen_txt; save_failure_dump; summary "移动端注销销毁" "" 1
-fi
-# 🔴 勾选框是 Pressable + accessibilityLabel（kit.tsx:400），它的可辨识名在 **content-desc** 上；
-#    而同一句话在本屏还被当**不可点的说明文字**又渲染了一遍（AccountClosureScreen.tsx:190（:187 是 label））。
-#    `xy_text` 拿到的是那段文字的坐标 ⇒ 点下去勾选不变、提交按钮永远不出现，
-#    而症状长得像"产品没有提交按钮"。走 desc，再退回 scroll_to_desc（屏外时滚动感知）。
-XY=$(xy_desc "我确认：这台设备上还没同步出去的数据，连同本机明文存储，也会一起被清除。")
-if [ -z "$XY" ]; then XY=$(scroll_to_desc "我确认：这台设备上还没同步出去的数据，连同本机明文存储，也会一起被清除。"); fi
-if [ -z "$XY" ]; then bad "勾不到那条「本机未同步数据也会被清」的确认（没有它就不该允许提交）"; screen_txt; save_failure_dump; summary "移动端注销销毁" "" 1; fi
-$ADB shell input tap $XY; sleep 1
-# 那一下到底勾上没有：**提交按钮只在 acked 时渲染**（:195-204）。
-# 这是行为判据，不依赖节点形状 —— 它把"探针没点到"和"产品没有这个按钮"分开。
-if ! settle_for "注销这个账号" 8 2; then
-  bad "打勾之后提交按钮没出现 ⇒ 那一下没勾上（探针层的问题），不是产品没有这个按钮"; screen_txt; summary "移动端注销销毁" "" 1
-fi
-XY=$(scroll_to_text "注销这个账号")
-if [ -z "$XY" ]; then bad "提交按钮在树里但取不到坐标（滚动位置？）"; screen_txt; summary "移动端注销销毁" "" 1; fi
-$ADB shell input tap $XY; sleep 2
-# 第二层确认是 RN Modal（:220-270），里面**又渲染了一遍同名的「注销这个账号」**。
-# 整棵树都被 dump 出来时有两个同名节点，必须点**最后一个**（模态渲染在后面）；
-# 只 dump 活动窗口时只有一个 ⇒ index 取 0。两种形状都走同一条代码。
-if settle_for "确认注销这个账号？" 8 2; then
-  # 🔴 数**命中数**不是"行数"：lib 的 `dump` 落的是单行 XML（`wc -l /tmp/ui.xml` = 0 行、
-  #    `grep -c '<node'` 恒为 1），所以 `grep -c` 在这里永远是 1 ⇒ `IDX` 永远 0 ⇒
-  #    两个同名节点时永远点**背后那一屏的**提交按钮，模态那一下从没被点过。
-  #    与 §7 那条"helper 把结论放输出而调用方读退出码"同族：形状看着对，读数不成立。
-  N=$(grep -o 'text="注销这个账号"' "$UI_XML" | wc -l | tr -d ' ')
-  IDX=$((N - 1)); [ "$IDX" -lt 0 ] && IDX=0
-  XY2=$(xy_text "注销这个账号" "$IDX")
-  if [ -n "$XY2" ]; then
-    $ADB shell input tap $XY2
-    echo "     第二层确认：树里有 $N 个同名提交按钮，点了第 $((IDX + 1)) 个"
+if [ "${ERASURE_TRIGGER:-ui}" = "external" ]; then
+  # ── `external` 档（#77）：**注销那一发由宿主机发出**，设备端一个注销控件都不点 ──
+  #    于是界面上那句话只可能来自被动通道：`packages/sync-client/src/client.ts` 读到
+  #    `ACCOUNT_CLOSED` ⇒ 同步原因 `account-closed` ⇒ `packages/ui/src/sync/model.ts:275`
+  #    把它映射到词条 `common.sync.error.accountClosed`。
+  #    🔴 这一档存在的理由：设备级 M1′ 臂（§10.135）摘的就是被动那一发，而它"臂存活"的原因
+  #    正是脚本驱动的是**主动**通道 ⇒ 那枚臂一直没有载体。两档共用**同一批判据 D/E**，
+  #    差别只在 C 的触发源与 C 读的那句文案。
+  PROBE_URL="$HOST_SERVER/api/sync/status"
+  PROBE_PRE=$(curl -s -o /dev/null -w '%{http_code}' "$PROBE_URL" -H "authorization: Bearer $TOKEN")
+  if [ "$PROBE_PRE" = "200" ]; then
+    ok "前提腿 P0：注销**前** $PROBE_URL 用设备上那枚令牌回 200（这样下面 410/404 之差才读得出信号）"
   else
-    echo "     ⚠️ 确认框开了但提交按钮取不到坐标 —— 下面的结果轮询会替我们判真假"
+    bad "探针自己不通：注销前 $PROBE_URL 回的是 ${PROBE_PRE} 而不是 200 ⇒ 本趟不判产品（先修探针）"
+    summary "移动端注销销毁" "" 1
+  fi
+  CLOSE_BODY=/tmp/heyta-android-close-${STAMP}.json
+  CLOSE=$(curl -s -o "$CLOSE_BODY" -w '%{http_code}' -X DELETE "$HOST_SERVER/api/account" \
+    -H "authorization: Bearer $TOKEN")
+  echo "     DELETE /api/account → HTTP ${CLOSE}  body: $(head -c 160 "$CLOSE_BODY" 2>/dev/null)"
+  AFTER_BODY=/tmp/heyta-android-after-${STAMP}.json
+  AFTER=$(curl -s -o "$AFTER_BODY" -w '%{http_code}' "$PROBE_URL" -H "authorization: Bearer $TOKEN")
+  AFTER_CODE=$(python3 -c 'import json,sys
+try: print(json.load(open(sys.argv[1],encoding="utf-8")).get("code",""))
+except Exception: print("")' "$AFTER_BODY" 2>/dev/null)
+  echo "     注销后同一发 → HTTP ${AFTER}  code=${AFTER_CODE:-（body 里没有 code 字段）}"
+  rm -f "$CLOSE_BODY" "$AFTER_BODY"
+  if [ "$AFTER" = "410" ] && [ "$AFTER_CODE" = "ACCOUNT_CLOSED" ]; then
+    ok "前提腿 P1 成立：服务端对旧令牌此后回 **410 + code=ACCOUNT_CLOSED**（设备要读到的就是这一发）"
+  else
+    bad "前提腿 P1 不成立：注销后同一发是 HTTP=${AFTER} code=${AFTER_CODE:-无} 而不是 410/ACCOUNT_CLOSED ⇒ 设备收到的信号不是「账号已注销」，C 与 D 都不作数"
+    summary "移动端注销销毁" "" 1
+  fi
+  # 让设备自己去读：**只按「立即同步」**。用 `ensure_phone_sync`（共用库那条自动同步感知的**发起**腿），
+  # 🔴 不能用 `phone_sync` —— 它等的是"结算成功"，而这一趟同步按设计**不会成功**（410）。
+  go_profile || summary "移动端注销销毁" "" 1
+  ensure_phone_sync || echo "     发起腿没点到（自动同步可能已经自己跑过）—— 下面按界面读数判，不据此判红"
+  DONE=0
+  for i in $(seq 1 45); do
+    dump
+    if [ "$(has_sub "这个账号已经注销，无法再次登录，同步已停止")" = "1" ]; then DONE=1; break; fi
+    sleep 2
+  done
+  if [ "$DONE" = "1" ]; then
+    ok "判据 C（被动通道）成立：界面上出现了那句「这个账号已经注销，无法再次登录，同步已停止」（词条名 common.sync.error.accountClosed） —— 注销屏本趟从没打开过，这句话只可能来自同步读到的 ACCOUNT_CLOSED"
+  else
+    bad "45×2s 内界面上没出现「这个账号已经注销…同步已停止」⇒ 被动通道那一发没被设备读成「账号已注销」（D 就算红也不能算产品缺陷）"
+    screen_txt
   fi
 else
-  echo "     没出现第二层确认（这一版可能直接提交）—— 继续等结果文案"
-fi
-DONE=0
-for i in $(seq 1 45); do
-  dump
-  if [ "$(has_sub "账号已注销，这台设备上的本地副本也已清除")" = "1" ]; then DONE=1; break; fi
-  # 🔴 这条腿抓的是 partial 与 eraseFailed **两句共有的尾串**（词条表里两处都以它开头），
-  #    而不是其中一句的中段 —— 抓单句中段的写法在措辞一改就静默失效。
-  if [ "$(has_sub "需要你手动处理")" = "1" ]; then DONE=2; break; fi
-  sleep 2
-done
-if [ "$DONE" = "1" ]; then
-  ok "判据 C 成立：界面报了「已清除」"
-elif [ "$DONE" = "2" ]; then
-  bad "界面自己报了「需要你手动处理」（部分清除或全部失败）⇒ 判据 D 预期同向红（这是产品状态，不是探针问题）"
-else
-  bad "45×2s 内没等到注销结果的文案"; screen_txt
+  go_profile || summary "移动端注销销毁" "" 1
+  XY=$(scroll_to_text "注销账号")
+  if [ -z "$XY" ]; then bad "「我的」页里没有「注销账号」入口行"; screen_txt; summary "移动端注销销毁" "" 1; fi
+  $ADB shell input tap $XY; sleep 3
+  # 🔴 判"这一屏真的开了"要用**只有这一屏才有**的句子（词条 `accountClosure.lead`）。
+  #    原先写的是 entryHint + 「注销账号」两选一，两处都不成立：
+  #    · entryHint「删除云端账号，并清除这台设备上的数据」是**「我的」页那条入口行的副标题**
+  #      （ProfileScreen.tsx:680 `hint:`），AccountClosureScreen 里根本不渲染它；
+  #    · 「注销账号」两页都有（入口 label 与本页标题）。
+  #    ⇒ 入口没跳走也能判"屏开了"，下一步的"找不到勾选框"就会被读成产品缺陷（§7 #46 那一族）。
+  if ! settle_for "注销会永久删除这个账号在服务端的全部数据" 8 2; then
+    bad "注销屏没打开（没看到那句 lead）"; screen_txt; save_failure_dump; summary "移动端注销销毁" "" 1
+  fi
+  # 🔴 勾选框是 Pressable + accessibilityLabel（kit.tsx:400），它的可辨识名在 **content-desc** 上；
+  #    而同一句话在本屏还被当**不可点的说明文字**又渲染了一遍（AccountClosureScreen.tsx:190（:187 是 label））。
+  #    `xy_text` 拿到的是那段文字的坐标 ⇒ 点下去勾选不变、提交按钮永远不出现，
+  #    而症状长得像"产品没有提交按钮"。走 desc，再退回 scroll_to_desc（屏外时滚动感知）。
+  XY=$(xy_desc "我确认：这台设备上还没同步出去的数据，连同本机明文存储，也会一起被清除。")
+  if [ -z "$XY" ]; then XY=$(scroll_to_desc "我确认：这台设备上还没同步出去的数据，连同本机明文存储，也会一起被清除。"); fi
+  if [ -z "$XY" ]; then bad "勾不到那条「本机未同步数据也会被清」的确认（没有它就不该允许提交）"; screen_txt; save_failure_dump; summary "移动端注销销毁" "" 1; fi
+  $ADB shell input tap $XY; sleep 1
+  # 那一下到底勾上没有：**提交按钮只在 acked 时渲染**（:195-204）。
+  # 这是行为判据，不依赖节点形状 —— 它把"探针没点到"和"产品没有这个按钮"分开。
+  if ! settle_for "注销这个账号" 8 2; then
+    bad "打勾之后提交按钮没出现 ⇒ 那一下没勾上（探针层的问题），不是产品没有这个按钮"; screen_txt; summary "移动端注销销毁" "" 1
+  fi
+  XY=$(scroll_to_text "注销这个账号")
+  if [ -z "$XY" ]; then bad "提交按钮在树里但取不到坐标（滚动位置？）"; screen_txt; summary "移动端注销销毁" "" 1; fi
+  $ADB shell input tap $XY; sleep 2
+  # 第二层确认是 RN Modal（:220-270），里面**又渲染了一遍同名的「注销这个账号」**。
+  # 整棵树都被 dump 出来时有两个同名节点，必须点**最后一个**（模态渲染在后面）；
+  # 只 dump 活动窗口时只有一个 ⇒ index 取 0。两种形状都走同一条代码。
+  if settle_for "确认注销这个账号？" 8 2; then
+    # 🔴 数**命中数**不是"行数"：lib 的 `dump` 落的是单行 XML（`wc -l /tmp/ui.xml` = 0 行、
+    #    `grep -c '<node'` 恒为 1），所以 `grep -c` 在这里永远是 1 ⇒ `IDX` 永远 0 ⇒
+    #    两个同名节点时永远点**背后那一屏的**提交按钮，模态那一下从没被点过。
+    #    与 §7 那条"helper 把结论放输出而调用方读退出码"同族：形状看着对，读数不成立。
+    N=$(grep -o 'text="注销这个账号"' "$UI_XML" | wc -l | tr -d ' ')
+    IDX=$((N - 1)); [ "$IDX" -lt 0 ] && IDX=0
+    XY2=$(xy_text "注销这个账号" "$IDX")
+    if [ -n "$XY2" ]; then
+      $ADB shell input tap $XY2
+      echo "     第二层确认：树里有 $N 个同名提交按钮，点了第 $((IDX + 1)) 个"
+    else
+      echo "     ⚠️ 确认框开了但提交按钮取不到坐标 —— 下面的结果轮询会替我们判真假"
+    fi
+  else
+    echo "     没出现第二层确认（这一版可能直接提交）—— 继续等结果文案"
+  fi
+  DONE=0
+  for i in $(seq 1 45); do
+    dump
+    if [ "$(has_sub "账号已注销，这台设备上的本地副本也已清除")" = "1" ]; then DONE=1; break; fi
+    # 🔴 这条腿抓的是 partial 与 eraseFailed **两句共有的尾串**（词条表里两处都以它开头），
+    #    而不是其中一句的中段 —— 抓单句中段的写法在措辞一改就静默失效。
+    if [ "$(has_sub "需要你手动处理")" = "1" ]; then DONE=2; break; fi
+    sleep 2
+  done
+  if [ "$DONE" = "1" ]; then
+    ok "判据 C 成立：界面报了「已清除」"
+  elif [ "$DONE" = "2" ]; then
+    bad "界面自己报了「需要你手动处理」（部分清除或全部失败）⇒ 判据 D 预期同向红（这是产品状态，不是探针问题）"
+  else
+    bad "45×2s 内没等到注销结果的文案"; screen_txt
+  fi
 fi
 $ADB exec-out screencap -p > "$EVIDENCE/android-account-erasure-2-after-closure.png" 2>/dev/null
 
@@ -669,6 +733,21 @@ if [ "$RESIDUE" = "0" ]; then
 else
   bad "判据 D 红：以 $DB_NAME 为开头的残留有 $RESIDUE 枚 ⇒ E2 移动端那一格没闭合"
   printf '%s\n' "$LISTING" | sed 's#.*/##' | grep "^${DB_NAME}" | sed 's/^/       残留：/'
+  # 🔴 「有几枚残留」与「残留里还有没有明文」是两件事（iOS 那一档早就分了两条腿，Android 这边
+  #    一直只有文件腿 —— 与 §10.131 照出的 B 档同一个形状）。13:2x 实测：文件 1 枚，而库里
+  #    ops=0 行、本轮便签原文命中 0 处 ⇒ 销毁**跑过了**，剩下的是被一次普通读重开的空壳（#87）。
+  #    不补这一腿，下一位读到这枚红就会以为"注销没清库"，而那正是假话的方向。
+  phone_db_pull_erase || true
+  OPS_D=$(sqlite3 "$PHONE_DB" "SELECT COUNT(*) FROM ops;" 2>/dev/null | tr -d ' ')
+  PLAIN_D=$(grep -ac "$NOTE_A" "$PHONE_DB" 2>/dev/null || true)
+  PLAIN_D=${PLAIN_D:-0}
+  printf '     残留的内容读数：ops=%s 行、本轮便签原文命中=%s 处\n' "${OPS_D:-读不到}" "$PLAIN_D"
+  if [ "${OPS_D:-x}" = "0" ] && [ "$PLAIN_D" = "0" ]; then
+    echo "       ⇒ 残留是**空壳**（销毁确实跑过，之后被一次普通读重开）⇒ 归 #87 那条待裁决，"
+    echo "         不是「本机明文仍在」；这一枚红的仍是**文件残留**这件事本身。"
+  else
+    echo "       ⇒ 🔴 残留里**仍有内容**（ops=${OPS_D:-读不到}、明文命中=${PLAIN_D}）⇒ 这才是 E2 那一格没闭合的实义读数。"
+  fi
 fi
 echo "     （另：设备本地偏好库 $PREFS 枚在册 —— 它不属于本机明文库，注销不动它，这一行只是把形状打在读数里）"
 
@@ -682,7 +761,10 @@ if [ "$RESIDUE2" != "0" ]; then
     #    这句原来无条件写"销毁不是幂等的（或有第二条写路径在重建它）"，而设备级 M1″ 臂
     #    （计划 §10.137）实测：摘掉主动通道那一发之后 D 就已经是 1 枚，E 再读到 1 枚 ——
     #    讲"不幂等/重建"是把没发生过的事说成发生过。判据强度没动（两支都还是 bad）。
-    bad "第二次读仍有 $RESIDUE2 枚残留 —— 这是上一档（D：$RESIDUE 枚）的**下游**，不是幂等问题：销毁那条路压根没跑过"
+    bad "第二次读仍有 $RESIDUE2 枚残留 —— 与上一档（D：$RESIDUE 枚）是**同一枚**的下游，不是幂等问题。
+      残留里有没有内容按 D 那两条量：ops=${OPS_D:-读不到} 行、本轮便签原文命中=${PLAIN_D:-读不到} 处
+      ⇒ 本档**不**另立结论（13:2x 之前这里印的是「销毁那条路压根没跑过」，被 D 的内容腿否证：
+      销毁跑过了，剩下的是重开的空壳 —— 那句话当时没有任何读数撑着，见计划 §10.156）"
   else
     bad "第一次读是 0、第二次读变成 $RESIDUE2 枚 —— 这才叫销毁不是幂等的（或有第二条写路径在重建它）"
   fi
@@ -695,7 +777,11 @@ if [ -n "$XY" ]; then $ADB shell input tap $XY; sleep 3; dump; fi
 if [ "$(has_sub "这台设备还没有登录")" = "1" ]; then
   ok "入口回落到「还没有可注销的账号」（凭据也一起清了，不只是库文件）"
 else
-  bad "注销后界面没有回到未登录态 —— 凭据没清，这台设备下次同步会把远端又拉回来"
+  bad "注销后界面没有回到未登录态 —— 凭据还挂在配置里（这一条判的是**入口形状**）。
+      ⚠️ 这一档以前印的是「下次同步会把远端又拉回来」，那句没有读数撑着且方向是错的：
+      账号已注销 ⇒ 服务端对这台设备此后永远回 410 + ACCOUNT_CLOSED（P1 那条量的就是它），
+      拉不回任何东西。真实形状是：本机明文库已销毁（D 的内容腿 ops=0/明文命中=0），
+      界面上留着一枚用不了的凭据 + 那句「已注销、同步已停止」。"
 fi
 
 rm -f "$PHONE_DB"   # 拉下来的那份含明文，用完即删

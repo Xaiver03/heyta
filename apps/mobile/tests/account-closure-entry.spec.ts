@@ -108,11 +108,36 @@ describe('注销账号：移动端的接线', () => {
     expect(screen).toMatch(/disabled=\{busy\}/);
   });
 
-  it('只有账号确认没了才清凭据', () => {
-    expect(screen).toMatch(/if \(closure\.disposition !== 'not-closed'\) onClosed\(\)/);
-    // 反方向：`not-closed` 时一次都不许调。这条形状判据挡不住"写成无条件调用"吗？
-    // 挡得住 —— 上面那句要求的是**带条件的**调用，无条件那一行匹配不上。
+  it('只有账号确认没了才清凭据，而且清之前先把那个已被销毁的宿主单例换掉', () => {
+    // 🔴 后半句是批次 E2 口径 B（§10.186/§10.187）逼出来的：
+    // `open-host.ts` 的 `pending` / `resolvedHost` 是**模块级单例**，全部屏共用一个 `AppHost`，
+    // 而兜底销毁器（`host.ts:341`）销毁的正是它手里那个 adapter。不在这儿作废它的话，
+    // 下一屏的 `openTaskHost()` 会把同一个死实例再交出去 ——
+    // 加了守卫之后那会当场抛 `AdapterDestroyedError`，加守卫**之前**则是
+    // "静默把刚删掉的空壳建回盘上"（§10.146 那枚 73728 字节 / 6 张空表）。
+    // 两种都不是注销完该有的样子：政策承诺这台设备回到**全新空库**。
+    expect(screen).toMatch(
+      /if \(closure\.disposition !== 'not-closed'\) \{\s*resetTaskHostCache\(\);\s*onClosed\(\);\s*\}/,
+    );
+    // 反方向：`not-closed` 时一次都不许调。这条形状判据挡得住"写成无条件调用"吗？
+    // 挡得住 —— 上面那句要求的是**带条件的**块，无条件那一行匹配不上。
     expect(screen.match(/onClosed\(\)/g) ?? []).toHaveLength(1);
+    expect(screen.match(/resetTaskHostCache\(\)/g) ?? []).toHaveLength(1);
+    // 来源必须是那一个模块，而不是在本屏再抄一份"清单例"的逻辑（那正是漂移的开始）。
+    expect(screen).toMatch(
+      /import \{[^}]*\bresetTaskHostCache\b[^}]*\} from '\.\.\/db\/open-host'/,
+    );
+  });
+
+  it('🔴 被动通道也作废单例：`open-host.ts` 必须把 `resetTaskHostCache` 接到宿主销毁通知上', () => {
+    // 主动通道那一发在 `AccountClosureScreen` 里（上一条钉它）。
+    // 但注销常常是**另一台设备**按下的：本机某次同步读到 `ACCOUNT_CLOSED` ⇒
+    // `client.ts:937` 的 `eraseLocalData()` 销毁同一个 adapter，而那条路上**没有那屏**。
+    // 所以作废单例这件事必须挂在"销毁成功"这个**事件**上，而不是挂在某个界面上。
+    const hostSrc = stripComments(readFileSync(join(MOBILE_SRC, 'db/open-host.ts'), 'utf8'));
+    expect(hostSrc).toMatch(/onLocalDataErased:\s*resetTaskHostCache/);
+    // 反面对照：不能只是"两个符号都在文件里"—— 要真的接进 `openAppHost` 的那一份选项里。
+    expect(hostSrc).toMatch(/openAppHost\(\{[\s\S]{0,3000}onLocalDataErased:\s*resetTaskHostCache/);
   });
 
   it('本屏的可见文字全部走词条，且有汉字的地方不含裸文案', () => {

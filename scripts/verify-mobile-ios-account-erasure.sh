@@ -200,6 +200,85 @@ PY
 
 residue_count() { printf '%s\n' "$1" | sed 's#.*/##' | grep -c "^${DB_NAME}"; }
 
+# 界面**签名**：树上所有非空可及名（NFKC、截 60 字）排序去重拼成一行。
+# 为什么判据是"签名变了"而不是"看见 busy"：真机实测「正在同步…」在 12 个 1s 采样里
+# **一次都没命中**（同步比采样快），而这一腿要回答的只是"这一下有没有被接住"。
+# 🔴 10-05 10:2x 第二版：关键字版（只收 同步/正在/失败/注销/离线/最新）在**步骤 3** 上假红过 ——
+#    那次同步无事可做、前后都是「已是最新」，唯一变的是「上次成功同步」旁边那枚**时间值**
+#    （`10-05 09:46` → `10-05 10:16`），而它不含任何关键字。所以签名改成**整棵树的全部可及名**。
+#    这一腿是**诊断腿**（它红了不代表产品坏了），宁可宽一点，也不要它恒红；
+#    承重的判据不在这儿 —— 是步骤 5 的 `HTTP 401`、步骤 6 的 `已是最新`、步骤 8 的注销那句。
+sync_signature() {
+  idb_dump
+  python3 - "$IDB_DUMP_FILE" <<'PY'
+import json, sys, unicodedata
+try:
+    nodes = json.load(open(sys.argv[1]))
+except Exception:
+    print("TREE-UNREADABLE")
+    raise SystemExit
+def walk(n):
+    yield n
+    for c in (n.get("children") or []):
+        yield from walk(c)
+seen = set()
+for t in (nodes if isinstance(nodes, list) else [nodes]):
+    for n in walk(t):
+        for key in ("AXLabel", "AXValue", "label", "value", "title"):
+            v = n.get(key)
+            if isinstance(v, str) and v.strip():
+                seen.add(unicodedata.normalize("NFKC", v).strip()[:60])
+                break
+print(" | ".join(sorted(seen)))
+PY
+}
+
+# 内容级取证（判据 D/E 的新腿）：每表行数 + 明文 needle 在**整个文件字节**里的命中
+# + 空闲页 + 文件的 birth/mtime。为什么必须有它（10-05 10:0x 实测，计划 §10.142）：
+# 注销那一秒销毁确实跑了（六张表 0 行、便签原文在 73 728 字节里 UTF-8 与 UTF-16LE 都 0 命中、
+# freelist 0），但**这个文件的 birth 就是那一秒** ⇒ 它被删掉之后又被一次重开建回了空壳。
+# 只看"heyta.sqlite 还在不在"分不出这两种结局，而它们的处置完全不同：
+# 前者是"明文仍在"（产品缺陷），后者是"销毁后有复活路径"（登记缺口）。
+# ⚠️ 明文检索走字节、不走 SQL：`DELETE FROM` 之后行读不到了，页里的字节还在（traps #171
+#    那一族：Hermes/SQLite 里的中文可能是 UTF-16LE，按 UTF-8 grep 恒 0 命中会读成"干净"）。
+db_forensics() {  # <库文件路径> <明文 needle>
+  python3 - "$1" "$2" <<'PY'
+import datetime, os, subprocess, sys
+db, needle = sys.argv[1], sys.argv[2]
+if not os.path.exists(db):
+    print("文件不存在 ⇒ 容器已删（内容级取证无从谈起）")
+    raise SystemExit
+def q(sql):
+    r = subprocess.run(["sqlite3", db, sql], capture_output=True, text=True)
+    out = r.stdout.strip().replace("\n", ";")
+    return out if out else ("ERR:" + r.stderr.strip()[:60])
+tables = [t for t in q("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;").split(";") if t]
+pairs = [(t, q('SELECT COUNT(*) FROM "%s";' % t)) for t in tables]
+print("表与行数：" + " ".join("%s=%s" % p for p in pairs))
+print("freelist=%s page_count=%s" % (q("PRAGMA freelist_count;"), q("PRAGMA page_count;")))
+if needle:
+    raw = open(db, "rb").read()
+    print("明文 needle %r 命中：UTF-8=%d UTF-16LE=%d（文件 %d 字节）"
+          % (needle, raw.count(needle.encode()), raw.count(needle.encode("utf-16-le")), len(raw)))
+st = os.stat(db)
+print("birth=%s mtime=%s birth_epoch=%d" % (
+    datetime.datetime.fromtimestamp(st.st_birthtime).strftime("%m-%d %H:%M:%S"),
+    datetime.datetime.fromtimestamp(st.st_mtime).strftime("%m-%d %H:%M:%S"),
+    st.st_birthtime))
+# 回给 shell 的三个数**必须分内容行与 meta 行**：`meta` 里那枚 `clientId` 不是用户内容，
+# 而"销毁之后还有没有用户明文"与"销毁之后还有没有写路径"是两条不同的判据（10-05 10:1x
+# 自测照出来的：设备现库 ops/state/archive 全 0、meta 恰好 1 行 ⇒ 合并计数会把"空壳被重建"
+# 误报成"明文仍在"，而这两件事的处置完全不同）。
+content = sum(int(v) for t, v in pairs if t != "meta" and v.isdigit())
+meta_rows = sum(int(v) for t, v in pairs if t == "meta" and v.isdigit())
+plain = 0
+if needle:
+    plain = raw.count(needle.encode()) + raw.count(needle.encode("utf-16-le"))
+print("SUMMARY content_rows=%d meta_rows=%d plain=%d tables=%d" % (content, meta_rows, plain, len(tables)))
+PY
+}
+
+
 dismiss_ios_save_password() {
   # 系统「保存密码？」弹窗**不在应用的 AX 树里**，而它会让整棵树只剩 AXApplication。
   # 配方来自兄弟 rig `scripts/verify-mobile-ios.sh` 的同名函数（那边 2026-09-29 第 37/42 轮
@@ -473,7 +552,30 @@ else
   echo "   ❌ 建不了新号（服务端没开 TEST_MODE？）—— 沿用旧凭据会把销毁判据打在别人的历史上 ⇒ exit 3"
   exit 3
 fi
-BAD_TOKEN="eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.000000000000000000000000000000.sub-not-real"
+# 🔴 坏令牌**必须是结构合法的 JWT、只有签名是错的** —— 这一条是照着兄弟 rig 抄的
+#    （`scripts/verify-mobile-account-erasure.sh:499-510`，那边把理由和实测都写下来了）。
+#    本仓库今天（10-05 10:2x）为没先读它又付了一次代价：旧那枚 `eyJ….0000….sub-not-real`
+#    的 payload 不是合法 JSON，服务端在**验签之前**就 JSON.parse 炸出 SyntaxError ⇒
+#    真机日志里是 `Request failed 500 GET /api/sync/ops`，而判据 B 想测的是
+#    **401 + `TOKEN_INVALID`** 那条路径。修那枚 500 的提交是 `f9152fbf`，
+#    而这台载体（`heyta-wt-trash-e2e`，服务端 HEAD=ad61621a）**不含它** ——
+#    也就是说：拿"坏形状"当坏令牌，判据的成立与否会**取决于服务端的构建新旧**，
+#    那是判据不该有的性质。换签名不换结构 ⇒ 新旧服务端都回 401。
+BAD_SIG=$(python3 -c 'import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("="))')
+BAD_TOKEN="${TOKEN%.*}.$BAD_SIG"
+# 前提证明（服务端的**那一半**，与下面步骤 5 的设备那一半各证一段）：
+# 直接问一次，先确认这枚令牌在这台服务端上确实回 401 + TOKEN_INVALID。
+# 没有这一腿，步骤 5 那句"界面上没有 HTTP 401"会同时兼容"令牌没换上""设备没请求"
+# "服务端回的是 500"三种完全不同的病。
+SRV_PRE=$(curl -s -o /tmp/heyta-ios-badsig-body.txt -w '%{http_code}' \
+  -H "Authorization: Bearer $BAD_TOKEN" "$HOST_SERVER/api/sync/status")
+SRV_PRE_BODY=$(head -c 160 /tmp/heyta-ios-badsig-body.txt 2>/dev/null)
+if [ "$SRV_PRE" = "401" ] && grep -q 'TOKEN_INVALID' /tmp/heyta-ios-badsig-body.txt; then
+  ok "前提（服务端那一半）成立：这台坏签名令牌在这台服务端上回 401 + TOKEN_INVALID（不是 500、不是 410）"
+else
+  bad "前提（服务端那一半）不成立：回的是 HTTP=${SRV_PRE:-取不到} body=${SRV_PRE_BODY:-空}
+      ⇒ 判据 B 在这台服务端上量不到它想量的那条路径，本趟 B 不作数（先修令牌形状或服务端构建）"
+fi
 
 open_settings_sheet() {  # 打开设置面并等「服务器地址」输入框进树
   dismiss_keyboard
@@ -585,18 +687,64 @@ sync_now() {  # 点「立即同步」：忙时它会改名叫「正在同步…�
   ax "我的" --pressable --press --json >/dev/null 2>&1
   sleep 3
   # 🔴 10-05 08:55 实测：「保存密码？」是**填完 secure 框之后**才弹的，
-  #    所以填写步里那次 dismiss 挡不住它 —— 截图里按钮就在弹窗底下被盖着，
-  #    而 AX 树只剩 AXApplication ⇒ 等标签必然空转到超时。
+  #    所以填写步里那次 dismiss 挡不住它 —— 弹窗立着时**底部两个标签都不在树上**
+  #    （`dismiss_ios_save_password` 就靠这条判"这是系统弹窗态"，摘完回读 任务/我的 又都在）。
+  #    ⚠️ 这一腿的证据是**日志那三行**，不是某张截图：09:00:54 存下的那张
+  #    `apps/mobile/evidence/ios-account-erasure-2-no-composer.png` 拍的是**摘掉弹窗之后**，
+  #    画面是任务页空态 + FAB，里面没有弹窗（10-05 11:0x 逐张回看时发现自己此前把这张图
+  #    描述成了"按钮在弹窗底下被盖着"，那是错的 ⇒ 计划 §10.141 ⑤ 已原地撤回那句）。
   #    超时**不直接判红**：先摘弹窗、再等一轮，两条都没等到才 bad（并把两轮的读数都打出来）。
   if ! idb_wait_label "立即同步" 90; then
     echo "     第一轮没等到 ⇒ 先按系统弹窗处置一遍再等第二轮"
     dismiss_ios_save_password || true
-    idb_wait_label "立即同步" 90 || {
-      bad "90+90 秒内（第二轮前摘过一次系统弹窗）仍没等到「立即同步」—— 这一次同步没被触发，后面的读数不作数"
+    # 🔴 摘掉弹窗之后**必须重新导航**（10-05 11:0x 对着 08:57 那一趟的日志 + 那张截图复核出来的）：
+    #    上面那一下 `ax "我的" --press` 是在弹窗立着的时候发的，它没落地 —— 那一趟摘完弹窗的
+    #    回读是「任务=True 我的=True」（两个标签回到树上），而截图显示界面停在**任务页**。
+    #    所以第二轮若就这么等，等的是"任务页上永远不会出现的标签" ⇒ 必然再空转 90 秒，
+    #    最后判一条长得像"同步没被触发"的红（真因是探针停在错的页上）。
+    ax "我的" --pressable --press --json >/dev/null 2>&1
+    sleep 3
+    if idb_wait_label "立即同步" 90; then
+      echo "     第二轮等到 ⇒ 弹窗腿成立（第一轮那一下确实是被系统弹窗吃掉的）"
+    else
+      bad "90+90 秒内（第二轮前摘过一次系统弹窗、并重按过一次「我的」）仍没等到「立即同步」—— 这一次同步没被触发，后面的读数不作数"
       return 1
-    }
+    fi
   fi
+  # 🔴 按之前必须先把状态块**从导航栏底下让出来**（10-05 10:0x 手探 `tmp/probe-sync-press3.sh`）：
+  #    步骤 3 为了点便签输入框把这一页滚到了底部，于是「立即同步」落在 y=72..116，
+  #    而导航栏（标题「我的」y=80..100）**正盖在它上面**。shim 的 press 是按坐标 tap
+  #    （它文件头写的"键盘遮挡"就是同一族事故），tap 打在导航栏上照样回 result=success，
+  #    而服务端**一条请求都收不到** —— 判据 C 连红 40 个采样窗，症状长得像
+  #    "移动端不渲染注销那句"，而那句其实一直会渲染（同一枚假服务端实测：y=410 处
+  #    出现了逐字相同的「这个账号已经注销，无法再次登录，同步已停止」）。
+  #    `--scroll-into-view "账号"`（页面首行；整块在折叠线上方时 shim 会真的向下拖）
+  #    把状态块让到 y≈552，实测让位之后那一发请求就到了服务端。
+  ax "账号" --scroll-into-view --list --json >/dev/null 2>&1
+  SIG0=$(sync_signature)
   ax_press "立即同步"
+  ACKED=0
+  for _ in $(seq 1 12); do
+    sleep 1
+    [ "$(sync_signature)" != "$SIG0" ] && { ACKED=1; break; }
+  done
+  if [ -z "${SIG0// /}" ]; then
+    # 这一条**是真门**：签名空 = 连"上次成功同步/失败原因"那一块都不在树上 ⇒ 根本不在状态面，
+    # 后面每一步的读数都没有承载面。它与"按了没变化"是两件事，不能混在一起判。
+    bad "按下「立即同步」之前界面签名是**空的** ⇒ 不在同步状态面上，这一步之后所有读数都不作数"
+    return 1
+  fi
+  if [ "$ACKED" = "0" ]; then
+    # 🔴 这一档 10-05 10:16 那趟从 `bad` 降成诊断腿（当时它在步骤 3 与步骤 10 各假红一次）：
+    #    "签名一字未变"在产品**按设计**不产生第二次可见变化时是正常读数 ——
+    #    · 无东西可同步 ⇒ 只有时间戳动（甚至不动）；
+    #    · 再点一次而同一个 401/410 失败 ⇒ 那行字一模一样。
+    #    承重证据因此一律放在**各步自己的前提腿**里（步骤 5 读 `HTTP 401`、步骤 6 读 `已是最新`、
+    #    步骤 8 读注销那句、步骤 10 改冷启动 + birth 对账），这里只报"这一发有没有让界面动过"。
+    echo "     ACK=unchanged（诊断腿，不判红；签名前 160 字：${SIG0:0:160}）"
+  else
+    echo "     ACK=changed"
+  fi
 }
 
 fill_three_credentials "$TOKEN" \
@@ -680,12 +828,43 @@ else
   summary "iOS 注销销毁" "" 1
 fi
 
+# 🔴 内容腿的**阳性对照**（10-05 10:2x 加，不是仪式）：判据 D 里"便签原文在整个文件字节里
+#    0 命中"这一句，只有先量到"注销**前**它命中得到"才叫销毁。本机库如果是**密文**落盘
+#    （E2EE 的一种合理实现），这个 needle 会恒 0 命中，于是 D 的内容腿是一枚**永远通过**的判据。
+#    读不到就如实说"这一趟没有量程"，不许把 0 命中归功给销毁器。
+FORE0=$(db_forensics "${DATA_CONTAINER}/Library/${DB_NAME}" "$NOTE_A")
+echo "   销毁之前的内容级读数（这一行是步骤 9 那三腿的阳性对照）："
+printf '%s\n' "$FORE0" | sed 's/^/     /'
+SUM0=$(printf '%s\n' "$FORE0" | sed -n 's/^SUMMARY content_rows=\([0-9]*\) meta_rows=\([0-9]*\) plain=\([0-9]*\).*/\1 \2 \3/p')
+ROWS0=$(printf '%s' "$SUM0" | awk '{print $1}'); PLAIN0=$(printf '%s' "$SUM0" | awk '{print $3}')
+if [ "${PLAIN0:-x}" != "0" ] && [ "${ROWS0:-x}" != "0" ]; then
+  ok "阳性对照成立：注销**前**这份库里有内容行 ${ROWS0} 条、便签原文在文件字节里命中 ${PLAIN0} 处 ⇒ 步骤 9 那个 0 命中才读得出「销毁」"
+else
+  bad "阳性对照红：注销**前**内容行=${ROWS0:-读不到}、便签原文命中=${PLAIN0:-读不到} ⇒ 本机库不是明文落盘（或这条便签没落库）
+      ⇒ 判据 D 的内容腿在这一趟**没有量程**，它的 0 命中不许写成「销毁成功」"
+  printf '%s\n' "$FORE0" > "$EVIDENCE/ios-account-erasure-0-plaintext-control.txt" 2>/dev/null || true
+fi
+
 # ── 5. 判据 B：401 不许清库 ────────────────────────────────────────────────
 step "5. 判据 B：换成服务端不认的令牌（401 TOKEN_INVALID），库必须还在"
 fill_three_credentials "$BAD_TOKEN" \
   || { bad "B 这一档的令牌没换成 ⇒ 判据 B 没跑到，本趟不作数"; summary "iOS 注销销毁" "" 1; }
 sync_now
 sleep 10
+# 🔴 前提腿（10-05 10:1x 加）：先证明"确实发生了一次 401"，再谈"401 之后库还在"。
+#    这一档以前**没有**这条腿，而 09:42 那一趟的现量是：换坏令牌之后服务端零请求
+#    （日志 01:46:41 之后直到 01:48:58 注销之间一行都没有）⇒ 那两腿量到的其实是
+#    "换了个令牌、库还在"，跟 401 无关。遮挡修好之后前提**仍然**不能默认成立 ——
+#    界面上的错误详情行是逐字渲染的（假服务端实测：'同步请求失败：HTTP 410 — Account unavailable — …'
+#    原样出现在 AX 树里），所以 "HTTP 401" 读得到就是真发生了。
+idb_dump
+if text_on_screen "HTTP 401"; then
+  ok "判据 B 的**前提**成立：这台设备真的收到了一次 HTTP 401（不是"换了个令牌但没人请求"）"
+else
+  bad "判据 B 的前提不成立：界面上没有 HTTP 401 ⇒ 这一次同步压根没被服务端拒过，
+      下面两条腿读到的"库还在"与 401 无关，本趟 B 不作数（先修探针：见 sync_now 的让位与接住腿）"
+  cp "$IDB_DUMP_FILE" "$EVIDENCE/ios-account-erasure-3b-no-401-dump.json" 2>/dev/null || true
+fi
 if db_present; then
   ok "判据 B（文件腿）成立：一次 401 之后 ${DB_NAME} 仍在盘上"
 else
@@ -713,6 +892,16 @@ step "6. 换回真令牌并同步（D 需要一条「曾经配好过」的对照
 fill_three_credentials "$TOKEN" || { bad "换回真令牌没走通"; summary "iOS 注销销毁" "" 1; }
 sync_now
 sleep 10
+# 配对腿：这一档必须**真的同步成**，否则"库仍在"只是"没人碰过它"，D 也就没有
+# 一条"曾经配好过"的基线可对照。（"已是最新" = `mobile.sync.synced`，实测在 AX 树里。）
+idb_dump
+if text_on_screen "已是最新"; then
+  ok "步骤 6 的配对腿成立：换回真令牌之后这台设备又同步成了一次（界面上读得到「已是最新」）"
+else
+  bad "步骤 6 的配对腿红：换回真令牌后没读到「已是最新」⇒ 这一档没真的同步，
+      后面 D「销毁前库里有东西」的基线不成立"
+  cp "$IDB_DUMP_FILE" "$EVIDENCE/ios-account-erasure-6b-no-synced-dump.json" 2>/dev/null || true
+fi
 if db_present; then
   ok "换回有效令牌后库仍在（B 的读数不是「库里本来就没人写过」）"
 else
@@ -739,6 +928,10 @@ if [ "$PROBE_PRE" = "200" ]; then
 else
   bad "探针自己不通：注销前 $PROBE_URL 回的是 ${PROBE_PRE} 而不是 200 ⇒ 本趟不判产品（先修探针）"
 fi
+# 🔴 注销那一刻的时间戳要**在发 DELETE 之前**取：D/E 两档要用它判"这枚文件的 birth 在注销之前
+#    还是之后"。以前这两档把"birth 就是注销那一秒"当固定话术印出来 —— 那是一句不管量到什么都
+#    会打印的断言（恒真），而它恰好是 D 的结论里最要紧的那一半。
+CLOSE_EPOCH=$(date +%s)
 CLOSE=$(curl -s -o "$CLOSE_BODY" -w '%{http_code}' -X DELETE "$HOST_SERVER/api/account" \
   -H "authorization: Bearer ${TOKEN}")
 echo "     DELETE /api/account → HTTP ${CLOSE}  body: $(head -c 160 "$CLOSE_BODY" 2>/dev/null)"
@@ -776,34 +969,85 @@ else
 fi
 xcrun simctl io "$UDID" screenshot "$EVIDENCE/ios-account-erasure-4-after-closure.png" >/dev/null 2>&1
 
-step "9. 判据 D（这一格的正证）：容器 Library 里以 ${DB_NAME} 为前缀的残留 0 枚"
+step "9. 判据 D（这一格的正证）：容器 Library 里以 ${DB_NAME} 为前缀的残留 0 枚 + 内容级取证"
 DATA_CONTAINER=$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null)
 sleep 4
 LISTING=$(ls_lib_dir)
 RESIDUE=$(residue_count "$LISTING")
 PREFS=$(printf '%s\n' "$LISTING" | sed 's#.*/##' | grep -c "^${LIB_NAME}$")
+FORE1=$(db_forensics "${DATA_CONTAINER}/Library/${DB_NAME}" "$NOTE_A")
+echo "   内容级取证（每一行都是量出来的）："
+printf '%s\n' "$FORE1" | sed 's/^/     /'
+SUM1=$(printf '%s\n' "$FORE1" | sed -n 's/^SUMMARY content_rows=\([0-9]*\) meta_rows=\([0-9]*\) plain=\([0-9]*\).*/\1 \2 \3/p')
+ROWS1=$(printf '%s' "$SUM1" | awk '{print $1}'); META1=$(printf '%s' "$SUM1" | awk '{print $2}'); PLAIN1=$(printf '%s' "$SUM1" | awk '{print $3}')
+EPOCH1=$(printf '%s\n' "$FORE1" | sed -n 's/^.*birth_epoch=\([0-9]*\)$/\1/p')
+# Δ = 这枚文件的 birth 相对"发出 DELETE 那一刻"的秒数（负 = 文件比注销更早，说明销毁没删掉它）
+if [ -n "$EPOCH1" ] && [ -n "$CLOSE_EPOCH" ]; then D1=$(( EPOCH1 - CLOSE_EPOCH )); else D1=""; fi
+echo "     birth 相对注销那一发 = ${D1:-读不到} 秒（>0 ⇒ 销毁之后新建的；<0 ⇒ 注销之前就在，销毁没删掉它）"
 if [ "$RESIDUE" = "0" ]; then
   ok "判据 D 成立：${DATA_CONTAINER}/Library 里以 ${DB_NAME} 为前缀的残留 0 枚（真机运行时，不是桩；-wal / -shm / -journal 任何旁挂都在射程内）"
+elif [ "$ROWS1" = "0" ] && [ "$PLAIN1" = "0" ]; then  # 内容行 0 + 明文 0（meta 里的 clientId 另计）
+  # 🔴 这一档 10-05 10:0x 才分得出来：以前它和"明文仍在"共用同一句红话，而两者是完全
+  #    不同的缺陷（一个是销毁没跑，一个是跑完之后有东西把**空壳**建回来）。
+  #    10-05 10:16 那一趟里"销毁没跑"那一支被**否证**了（birth 在注销之后），
+  #    而 meta 那一支的两趟读数不一致（手探 meta=1 / rig meta=0）⇒ 只报量，不进结论。
+  if [ -n "$D1" ] && [ "$D1" -lt 0 ]; then
+    bad "判据 D 红：**销毁那一发没删掉文件** —— 内容行 ${ROWS1}、明文命中 ${PLAIN1}，
+      而 ${DB_NAME} 的 birth 比发出 DELETE 早 ${D1#-} 秒 ⇒ 这一枚从注销之前一直躺在盘上。
+      （这是设备级 M1″ 臂的形状，不该出现在未变异的运行里。）"
+  else
+    bad "判据 D 红，但**不是**「明文仍在」：用户内容级三腿全过（内容行 ${ROWS1}、便签原文在整个文件字节里命中 ${PLAIN1}、freelist 见上），
+      而 ${DB_NAME} 的 birth 在发出 DELETE **之后** ${D1:-（读不到）} 秒 ⇒ 文件确实被删掉了，
+      之后有一次重开把**空 schema** 建了回来（meta 行数=${META1:-读不到}：10-05 两趟读数不一致 ——
+      手探那一趟 meta=1（一枚新 clientId），rig 干净这一趟 meta=0 ⇒ 不把它写进结论，只记"重建的是空壳"）。
+      这一格量到的是「销毁之后仍有一条写路径把它重建」，不是「没销毁」。它仍然判红：
+      计划 §10.2 的承诺是文件级残留 0 枚，而判据 E 存在的理由就是抓这条重建路径。"
+  fi
+  printf '%s\n' "$LISTING" | sed 's#.*/##' | grep "^${DB_NAME}" | sed 's/^/       残留：/'
 else
-  bad "判据 D 红：以 ${DB_NAME} 为开头的残留有 ${RESIDUE} 枚 ⇒ E2 的 iOS 那一格没闭合"
+  bad "判据 D 红：残留 ${RESIDUE} 枚**且用户内容没清空**（内容行=${ROWS1:-读不到}，明文命中=${PLAIN1:-读不到}，meta=${META1:-读不到}）⇒ 本机明文仍在"
   printf '%s\n' "$LISTING" | sed 's#.*/##' | grep "^${DB_NAME}" | sed 's/^/       残留：/'
 fi
 echo "     （另：设备本地偏好库 ${PREFS} 枚在册（${LIB_NAME}）—— 它不属于本机明文库，注销不该动它；这一行只把形状打在读数里，见计划 §10.68.6 的 G-prefs）"
 
-step "10. 判据 E：再同步一次之后残留仍是 0（没有第二条写路径把它重建）"
-sync_now
-sleep 8
+step "10. 判据 E：重启一趟（不点任何按钮、不发任何请求）之后残留仍是 0（没有第二条写路径把它重建）"
+# 🔴 载体为什么从"再同步一次"换成"重启一趟"（10-05 10:16 那趟照出来的）：判据 C 之后
+#    客户端**按设计**进入「同步已停止」，再点「立即同步」在产品上就是什么都不做 ——
+#    而 sync_now 的 ACK 腿把"界面签名一字未变"读成「这一发没被接住」，判了一条红。
+#    服务端日志同期零条连接，证明那一发根本没出去，也**不该**出去。
+#    重启一趟是更强的载体：它走宿主完整的启动/开库路径，且不需要网络。
+BIRTH1=$(printf '%s\n' "$FORE1" | sed -n 's/^birth=\(.*\) mtime=.*$/\1/p')
+xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1
+sleep 3
+if ! xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1; then
+  bad "重启起不来（${BID} @ ${UDID}）—— 这一档的载体没成立，E 没有读数"
+fi
+sleep 10
 DATA_CONTAINER=$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null)
 RESIDUE2=$(residue_count "$(ls_lib_dir)")
+FORE2=$(db_forensics "${DATA_CONTAINER}/Library/${DB_NAME}" "$NOTE_A")
+echo "   第二次内容级取证（birth/mtime 与第一次对照）："
+printf '%s\n' "$FORE2" | sed 's/^/     /'
+EPOCH2=$(printf '%s\n' "$FORE2" | sed -n 's/^.*birth_epoch=\([0-9]*\)$/\1/p')
+BIRTH2=$(printf '%s\n' "$FORE2" | sed -n 's/^birth=\(.*\) mtime=.*$/\1/p')
+if [ -n "$EPOCH2" ] && [ -n "$EPOCH1" ]; then D2=$(( EPOCH2 - EPOCH1 )); else D2=""; fi
+echo "     birth：D=${BIRTH1:-读不到} → E=${BIRTH2:-读不到}（差 ${D2:-读不到} 秒）"
+echo "     （>0 ⇒ 重启这一趟把文件删了又新建；0 ⇒ 还是 D 那一枚）"
 if [ "$RESIDUE2" = "0" ]; then
-  ok "两次读都是 0 枚残留：销毁成立，且没有复活路径"
-elif [ "$RESIDUE" != "0" ]; then
-  # 🔴 上一档已经量到残留 ⇒ 这一条是它的**下游**，不许读成"清掉过又长回来"。
-  #    这句原先无条件写"销毁之后有东西把它重建了"，而设备级 M1″ 臂（计划 §10.137）实测：
-  #    摘掉销毁那一发之后 D 就已经是 1 枚，E 再读到 1 枚 —— 讲"重建"是把没发生过的事说成发生过。
-  bad "第二次读仍有 ${RESIDUE2} 枚残留 —— 这是上一档（D：${RESIDUE} 枚）的**下游**，不是复活：销毁那条路压根没跑过"
+  ok "两次读都是 0 枚残留：销毁成立，且重启一趟没有把它建回来"
+elif [ "$RESIDUE" = "0" ]; then
+  bad "第一次读是 0、重启一趟之后变成 ${RESIDUE2} 枚 —— 这才叫销毁之后有东西把它重建了（复活路径）"
+elif [ -n "$D2" ] && [ "$D2" -gt 0 ]; then
+  # 🔴 10-05 10:16 那趟量到的正是"残留两枚相邻读数之间 birth 前移了 15 秒"，
+  #    而服务端日志在那 15 秒里**零条连接** —— 那一趟中间发生的是"滚动 + 点一次立即同步"，
+  #    不是冷启动。所以这一支只说量到的事：**不需要网络也会长出一枚新的空壳**。
+  #    到底是不是"每次开 App 都会"，由本档的冷启动载体回答（EPOCH2 > EPOCH1 且这一趟只有 terminate/launch）。
+  bad "重启这一趟之后盘上是**另一枚** ${DB_NAME}（birth 比 D 那次晚 ${D2} 秒），内容行/明文见上 ⇒
+      销毁跑过了，但它之后**不需要任何网络活动**就能再长出一枚空壳。
+      这一趟 intervening 动作只有 terminate + launch（零点击），所以这条就是冷启动路径本身。"
 else
-  bad "第一次读是 0、第二次读变成 ${RESIDUE2} 枚 —— 这才叫销毁之后有东西把它重建了（复活路径）"
+  bad "重启一趟之后仍是 D 那一枚（birth 未变，残留 ${RESIDUE2} 枚）⇒ 冷启动没有再动它；
+      残留是注销那一秒之后的重建（见判据 D 那一档的读数），不是每条启动路径都在写。"
 fi
 
 echo "     截图：apps/mobile/evidence/ios-account-erasure-{0-not-on-main,1-credential-fill,2-no-composer,3-401-keeps-db,4-after-closure}.png"

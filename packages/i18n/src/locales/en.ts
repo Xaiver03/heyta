@@ -2086,7 +2086,7 @@ export const en = {
   //    heyta's own export into an empty store; this one migrates from another
   //    product through ordinary ops and can coexist with existing data.
   'web.ticktick.title': 'Import from TickTick',
-  'web.ticktick.intro': 'Pick a CSV backup exported by TickTick. **You see a preview first; nothing is written until you confirm** — the numbers in the preview and what actually gets written come from the same parse.',
+  'web.ticktick.intro': 'Pick a CSV backup exported by TickTick. You see a preview first; nothing is written until you confirm — the numbers in the preview and what actually gets written come from the same parse.',
   'web.ticktick.fileLabel': 'TickTick CSV backup',
   'web.ticktick.picked': 'Selected: {name}',
   'web.ticktick.ticktickOnly': 'Only CSV files exported by TickTick are recognised. Todoist parsing does not exist yet, so this page does not claim to support it.',

@@ -2247,7 +2247,7 @@ export const zhCN = {
   //    只支持空库；这个是从另一个产品迁进来、走普通 op、可与既有数据共存。
   //    两套承诺必须在界面上分开说，所以是两组词条。
   'web.ticktick.title': '从滴答清单导入',
-  'web.ticktick.intro': '选一份滴答清单导出的 CSV 备份。**先看预览，确认后才写入** —— 预览里的数字与真的写进去的是同一次解析。',
+  'web.ticktick.intro': '选一份滴答清单导出的 CSV 备份。先看预览，确认后才写入 —— 预览里的数字与真的写进去的是同一次解析。',
   'web.ticktick.fileLabel': '滴答清单 CSV 备份',
   'web.ticktick.picked': '已选择：{name}',
   'web.ticktick.ticktickOnly': '目前只认滴答清单导出的 CSV。Todoist 的解析还没做，界面上不写"支持"两个字。',

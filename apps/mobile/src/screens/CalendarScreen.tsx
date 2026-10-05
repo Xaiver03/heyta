@@ -37,9 +37,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { startOfMonth, toLocalDate, type LocalDate, type Task } from '@heyta/domain';
+import { startOfMonth, toLocalDate, type CountdownEvent, type LocalDate, type Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { createTaskActions, type AppHost, type TaskActions } from '@heyta/app-host';
+import {
+  createEventActions,
+  createTaskActions,
+  type AppHost,
+  type TaskActions,
+} from '@heyta/app-host';
 import {
   CalendarBoard,
   CalendarViewTabs,

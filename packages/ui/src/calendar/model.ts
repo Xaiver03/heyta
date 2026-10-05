@@ -34,8 +34,11 @@ import {
   MONTHS_PER_YEAR,
   startOfMonth,
   toLocalDate,
+  type CountdownEvent,
   type LocalDate,
+  type MonthGridCell,
   type Task,
+  eventOccurrencesInRange,
 } from '@heyta/domain';
 
 import { isAllDayMs } from '../timeline/board-model.js';
@@ -71,7 +74,14 @@ export const MAX_CALENDAR_BARS = 3;
  */
 export const MAX_WEEK_CALENDAR_BARS = 6;
 
-/** 格子里一条任务条需要的最小事实。🔴 不是 `Task`：格子只画标题与两个状态。 */
+/**
+ * 格子里一条任务条需要的最小事实。🔴 不是 `Task`：格子只画标题与两个状态。
+ *
+ * ⚠️ 倒数日进来时**不需要一个新字段**：它在这四个字段里的形状就是
+ * `done: false, overdue: false`（一件"到那天就发生"的事没有"做完"，
+ * 也不该因为过了正日子被标红）。界面上要区分它，靠的是**标题本身**
+ *（判据按"这一格里出现了这条倒数日的标题"来断言），不是靠一个只有代码知道的标记位。
+ */
 export type CalendarCellBar = {
   readonly id: string;
   readonly title: string;
@@ -80,22 +90,30 @@ export type CalendarCellBar = {
 };
 
 /**
- * 把当天的任务折成"可见条 + 被折叠数"。
+ * 把当天**两个来源**折成"可见条 + 被折叠数"。
  *
  * 排序是**有内容的**：逾期 → 未做 → 已做。
  * 理由是格子只有 3 个位置，把已完成的排进来等于用掉一个"这天还有什么要做"的信号，
  * 而那个信号才是她翻日历时想要的东西。
  *
- * ⚠️ `hidden` 是**从数据算出来的**（`tasks.length - visible.length`），
+ * 🔴 倒数日排在"未做"那一档，且**永不进 `overdue`**：
+ *   正日子过了就是过了，把它标红等于替用户审判一件他没做错的事（§2.7）。
+ *
+ * ⚠️ `hidden` 是**从数据算出来的**（`entries.length - visible.length`），
  * 不是界面数 DOM 数出来的 —— 后者会让"3 条 + +0"这种废话出现在界面上。
+ *
+ * @param events 这一天的倒数日。**必填**（没有就给 `[]`）——
+ *   刻意不做成可选 prop：那条"默认值等于原值的可选参数"会把"宿主没接"
+ *   伪装成"做完了"，而 typecheck 与既有门禁两边都不响。
  */
 export function calendarCellBars(
   tasks: readonly Task[],
+  events: readonly CountdownEvent[],
   today: LocalDate,
   date: LocalDate,
   max: number = MAX_CALENDAR_BARS,
 ): { readonly bars: readonly CalendarCellBar[]; readonly hidden: number } {
-  const decorated = tasks.map((task) => {
+  const decorated: CalendarCellBar[] = tasks.map((task) => {
     const done = task.completedAt !== undefined;
     // 逾期 = 截止时间在今天之前**且还没做完**。已完成的不再算逾期 ——
     // 给一件做完的事标红是噪音，而红色在这个应用里只表示"要注意"（见 `calendarDayTone`）。
@@ -104,8 +122,16 @@ export function calendarCellBars(
       title: task.title,
       done,
       overdue: !done && date < today,
-    } satisfies CalendarCellBar;
+    };
   });
+  for (const event of events) {
+    decorated.push({
+      id: event.id,
+      title: event.title,
+      done: false,
+      overdue: false,
+    });
+  }
   const rank = (bar: CalendarCellBar): number => (bar.overdue ? 0 : bar.done ? 2 : 1);
   decorated.sort((a, b) => rank(a) - rank(b));
   const bars = decorated.slice(0, Math.max(0, max));
@@ -118,20 +144,33 @@ export function calendarCellBars(
 export type CalendarDayTone = 'plain' | 'primary' | 'danger' | 'subtle';
 
 /**
- * 从当天的任务推出格子里点的颜色。
+ * 从当天的**两个来源**推出格子里点的颜色。
  *
  * 🔴 逾期用 `danger`：它是**需要被注意到**的状态，不是一种分类。
  * 而"全做完了"给 `subtle` 而不是 `plain` —— 两者在视觉上都"没有待办"，
  * 但"这天清空了"值得一个不同的档（与"这天本来就没安排"区分开）。
+ *
+ * ⚠️ 倒数日（第二个事件源，W6）只有两条影响，且**都不是红色**：
+ *  · 它把"本来空着的一天"变成"有安排的一天"（`plain` → `primary`）——
+ *    只有一条生日的那天不是"清空了"，把它画成 `subtle`（灰字、无点）
+ *    等于对着用户说这天什么都没有；
+ *  · 它**永不**把这天判成逾期。`danger` 说的是"有件事你没做"，
+ *    而正日子过了不是用户做错的一件事（§2.7 那条"从不制造愧疚"）。
+ *
+ * 🔴 有倒计任务时**任务赢**：`pending.length > 0` 那两档不看事件 ——
+ * 一格里既有逾期的活又有生日时，要被注意到的是前者。
+ *
+ * @param events 这一天的倒数日。**必填**，理由同 `calendarCellBars`。
  */
 export function calendarDayTone(
   tasks: readonly Task[],
+  events: readonly CountdownEvent[],
   today: LocalDate,
   date: LocalDate,
 ): CalendarDayTone {
-  if (tasks.length === 0) return 'plain';
+  if (tasks.length === 0 && events.length === 0) return 'plain';
   const pending = tasks.filter((task) => task.completedAt === undefined);
-  if (pending.length === 0) return 'subtle';
+  if (pending.length === 0) return events.length > 0 ? 'primary' : 'subtle';
   return date < today ? 'danger' : 'primary';
 }
 
@@ -553,6 +592,70 @@ export function groupTasksByDueDate(tasks: readonly Task[]): Map<LocalDate, Task
     else list.push(task);
   }
   return map;
+}
+
+/**
+ * 日历的**第二个事件源**（W6）：把倒数日按"发生日"分到 `[from, to]` 这段格子里。
+ *
+ * 🔴 它与 `groupTasksByDueDate` 不是"同一件事写两遍"：分日归属的**依据**不同 ——
+ * 任务看它自己的 `dueDate`（一个绝对时刻），倒数日看"这一条规则/锚点在这段时间的
+ * 哪几天落地"（可以一年两次，也可以一次都没有）。把两者压成同一个函数，
+ * 要么给倒数日发明一个它没有的 `dueDate`，要么让农历 `both` 档丢掉第二个正日子。
+ *
+ * ⚠️ 区间枚举本身在 `@heyta/domain`（`eventOccurrencesInRange`）—— 这里不重新判断
+ * 农历、闰月档位或规则解析（AGENTS §3.5：业务语义不许出现在摆放层）。
+ * 归档与已删除的条目也不由这里挡：宿主传进来的就该是 `aliveEvents` 的结果，
+ * 两道过滤各判一次，就会有"归档的生日还在日历上"这种两边都绿的状态。
+ */
+export function groupEventsByOccurrence(
+  events: readonly CountdownEvent[],
+  from: LocalDate,
+  to: LocalDate,
+): Map<LocalDate, CountdownEvent[]> {
+  const map = new Map<LocalDate, CountdownEvent[]>();
+  if (to < from) return map;
+  for (const event of events) {
+    for (const date of eventOccurrencesInRange(event, from, to)) {
+      const list = map.get(date);
+      if (list === undefined) map.set(date, [event]);
+      else list.push(event);
+    }
+  }
+  return map;
+}
+
+/**
+ * 把倒数日分到**一屏网格**覆盖的那段日子里。
+ *
+ * 🔴 它是 `groupEventsByOccurrence` 之上的唯一一层"这段是哪几天"：
+ * 板子（月/周两档 42 格或 7 格）与 Web 侧栏那张迷你月历**共用这一份**。
+ * 各自推一遍区间的下场是某一处忘了补白格 —— 症状是"点上月 30 号，主区有那条生日、
+ * 侧栏那颗点没有"，而两处单测都数得出自己的格子数。
+ *
+ * @param weeks 屏幕上的那些行（`monthGrid` / `weekGrid` 的原样输出）。
+ * @param include 额外要含进来的一天（月/周档传 `selected`）：`byDate` 那份是从**全量任务**
+ *   建的，选中哪天都有它的任务，事件这一份若只按网格枚举，选中落在网格外时
+ *   就会出现"格子那套数、下面那块另一套数"。
+ */
+export function groupEventsForGrid(
+  events: readonly CountdownEvent[],
+  weeks: readonly (readonly MonthGridCell[])[],
+  include?: LocalDate,
+): Map<LocalDate, CountdownEvent[]> {
+  let from: LocalDate | undefined;
+  let to: LocalDate | undefined;
+  for (const week of weeks) {
+    for (const cell of week) {
+      if (from === undefined || cell.date < from) from = cell.date;
+      if (to === undefined || cell.date > to) to = cell.date;
+    }
+  }
+  if (include !== undefined) {
+    if (from === undefined || include < from) from = include;
+    if (to === undefined || include > to) to = include;
+  }
+  if (from === undefined || to === undefined) return new Map();
+  return groupEventsByOccurrence(events, from, to);
 }
 
 /** `dayMarker` 能答的三种说法（`undefined` = 这一天在公共事实里没有它）。 */
