@@ -94,6 +94,14 @@
  * 第 2 腿 = 提交物锁里每条依赖都在许可证登记表里有归属；第 3 腿 = 镜像安装合同，
  * 含"prune devDependencies 必须是第一条 install 之前的一步"与 prisma 三处同源）。
  * 唯一被排除的是 `--installed-tree` 那一**模式**（要从跑起来的镜像里取树）。
+ * 🔴 **上面那段清单先前漏记了两批**（本次补）：`链里每条脚本目标都在树里`（G-65/G-67 那一族的哨兵，
+ * 见下面 `GATES` 里那条注释）以及下面这**八枚成对一致性门禁** ——
+ * `check:ui-language`（词条 zh↔en 同步）、`check:legal-tools`（AI 工具目录↔法务中英表）、
+ * `check:legal-permissions`（权限承诺↔manifest）、`check:legal-host`（对外域名三方）、
+ * `check:pricing`、`check:ai-quota`、`check:claims`、`check:docs-voice`。
+ * 它们入选的**唯一门槛**是"在一棵没有 node_modules、没有任何 dist 的载体形状树上 exit 0"，
+ * 那条量法与两枚反面教材（`check:shell-surfaces` / `check:brand-assets` 在旧 dist 上红得像缺陷）
+ * 都记在 `GATES` 数组上面那段注释里。
  * 完整 `pnpm check`（要 node_modules、要起栈、`check:ai-e2e` 会 SIGKILL 别人的 dev server，
  * §7 #87）**不在这里跑** —— 它是落地那一刻的判据，载体绿不绿不由本脚本主张。
  *
@@ -889,6 +897,28 @@ const GATES = [
   ['image-npm-tree 新鲜度（check:image-license 第 1 腿）', ['research/tools/gen-image-npm-tree.mjs', '--check']],
   ['镜像许可证覆盖（check:image-license 第 2 腿）', ['research/tools/check-image-license-coverage.mjs', '--quiet']],
   ['镜像安装合同（check:image-license 第 3 腿）', ['research/tools/check-image-install-contract.mjs']],
+  /* 🔴 下面这八枚的"纯"是**跑出来的**，不是读出来的，而且量的是一棵特意造的树（台账 §8.184）：
+   *    `git worktree add --detach <载体那一笔提交>` ⇒ 一棵"两侧都合好了、但没有 node_modules、
+   *    没有任何 dist"的树（`/tmp/heyta-puregate2`，跑完 `remove --force`）。八枚全部 exit 0。
+   *    为什么不能用"在 `/tmp/heyta-merge-carrier` 里绿过"当凭据：那棵树**有人为别的会话装过 store、
+   *    还留着 10-04 21:01 的旧 dist** —— 同一批 dist 依赖型门禁在那里 6 绿 2 红，而两枚红的成因
+   *    都是旧产物（`check:shell-surfaces` 自己就判"产物比源码旧"；`check:brand-assets` 崩在
+   *    `TypeError: brandMarkSvg is not a function`，因为 design-system 的旧 dist 里还没有那个导出）。
+   *    ⇒ "在这棵树上绿过 ≠ 不依赖这棵树的环境"（§8.161 已经为第 2 腿记过一次，这是第二次），
+   *    而且比"恒红"更坏：**红得像个缺陷**，会把人推去修一个不存在的缺陷。
+   * 为什么值得挂进落笔前：这八枚判的全是**成对一致性**（词条 zh↔en、目录↔法务中英表、价格/额度
+   * 多处、对外域名三方、平台声称↔roadmap），而十一族并集只按**冲突路径逐行**保序 ——
+   * 一侧改真源、另一侧改生成物这种破法，union 看不见、只有这些裁判看得见。
+   * ⚠️ 两枚 `check:legal-*` 只存在于 main 侧（本分支没有那两枚文件），载体与配对树都有 ⇒ 配对成立；
+   *    若哪一天它们被改名或摘掉，这里会当场红，而不是静默少一道（`check:gate-wiring` 那一条的裁判）。 */
+  ['词条中英同步（check:ui-language）', ['scripts/check-ui-language.mjs']],
+  ['本机接口工具表↔法务表（check:legal-tools）', ['scripts/check-legal-tool-catalog.mjs']],
+  ['权限承诺↔清单（check:legal-permissions）', ['scripts/check-legal-permissions.mjs']],
+  ['官方托管域名三方（check:legal-host）', ['scripts/check-legal-host.mjs']],
+  ['价格四处一致（check:pricing）', ['scripts/check-pricing-consistency.mjs']],
+  ['托管 AI 额度五处一致（check:ai-quota）', ['scripts/check-ai-quota-consistency.mjs']],
+  ['平台声称↔roadmap（check:claims）', ['scripts/check-claims.mjs']],
+  ['文档口音（check:docs-voice）', ['scripts/check-docs-voice.mjs']],
 ];
 const runGate = (argv, cwd) => {
   try {
