@@ -34,6 +34,13 @@ The server uses an **append-on-write retained operation log** backed by **Postgr
 
 ### Docker (Recommended)
 
+The override adds exactly one service and does not touch the default graph. It waits for
+Postgres to be healthy, runs `scripts/migrate-deploy.sh` from the image, and only then lets the
+app start (`service_completed_successfully`). ⚠️ It migrates on **first** boot: a one-shot
+container whose config hash did not change is not re-run by a later `up -d`, so upgrades still
+need `deploy.sh` (or `--force-recreate supersync-migrate`). A migration entry that quietly only
+works once, documented as if it worked always, would be worse than none — it would make the
+operator believe the schema is current.
 The easiest way to run the server is using the provided Docker Compose configuration.
 Deploy hosts need Docker with the Compose plugin, `curl`, `git`, and `jq`.
 The image revision check requires Docker Compose support for
@@ -127,13 +134,6 @@ behavior, and no regional mirror is hardcoded in this repo for the same reason a
 ⚠️ `server/Dockerfile` has three stages and `ARG` does not cross `FROM`, so all three declare it;
 they must stay on the same base or the `web` and `production` stages end up built on different images.
 
-The override adds exactly one service and does not touch the default graph. It waits for
-Postgres to be healthy, runs `scripts/migrate-deploy.sh` from the image, and only then lets the
-app start (`service_completed_successfully`). ⚠️ It migrates on **first** boot: a one-shot
-container whose config hash did not change is not re-run by a later `up -d`, so upgrades still
-need `deploy.sh` (or `--force-recreate supersync-migrate`). A migration entry that quietly only
-works once, documented as if it worked always, would be worse than none — it would make the
-operator believe the schema is current.
 
 **That is the whole setup — there is no separate frontend to build or host.** The image
 contains the web client, built from the same commit as the server it ships with, and the

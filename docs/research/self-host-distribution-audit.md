@@ -13929,3 +13929,22 @@ head -6 /tmp/sec4.log
 | ①②（合并为一条）：两枚 `^ {4}` 锚点 → `^[ \t]+` | **未落**（补丁已写好、一次可贴）；落地前必须实跑取"改后绿 + 摘掉脱敏/Referer 那两行各自转红"三组读数 |
 | ③ `README.md` 的入口段掉出前 120 行（现量在第 134 行） | **未动**，真修 = 把那段搬回第一屏；放宽 `slice(0, 120)` 不做 |
 | 服务端全量复跑（那 114 份文件） | 待 #65 修完后取，仍要避开别人的锁 |
+
+### 8.262 #65 两条都真修好了，服务端全量 **114 份文件全过**（先前那 2 failed 清零）；三枚注入各自打到语义断言（2026-10-05 21:0x）
+
+```
+补丁 A：server/tests/server-security.spec.ts 里两枚锚点 `^ {4}` → `^[ \t]+`（缩进无关；	 在 JS 字符类里一个反斜杠）
+补丁 B：server/README.md 把"一次性迁移入口"那段搬回第一屏 ⇒ 那句 `--force-recreate supersync-migrate` 从第 134 行到第 **41** 行
+
+npx vitest run tests/server-security.spec.ts tests/migration-sql.spec.ts ⇒ TWO_RC=0 · Test Files 2 passed (2)
+npx vitest run（服务端全量）                                              ⇒ FULL_RC=0 · Test Files 114 passed (114)
+三枚注入                                                                  ⇒ 各 rc=1，且 `grep -c 内存闸门` = 0（这一轮不是拒绝码）
+```
+
+⇒ 第 1 项的落地前置**从"三枚本批红"减到 0**：载体上那道 `pnpm check` 里服务端这一段现在自己有读数。
+`git status --porcelain` 只剩这两枚我改的文件（`server/README.md`、`server/tests/server-security.spec.ts`），
+`Caddyfile` 与 `RESTORED_RC=0` 证两次注入都还原干净。
+
+⚠️ 两条边界，别把这一轮读多：① 这是**服务端那 114 份**，不是全仓 `pnpm -r test`（其余包没在这趟里）；
+② 判据的语义腿我按"摘掉真东西它就会红"来验（uri 脱敏行 / Referer delete 行 / 入口句），
+名字级证据在下面这三行原始 FAIL 里 —— 打完就还原，没留半成品。
