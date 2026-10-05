@@ -26,7 +26,7 @@
  * | ④ 在 ⑤ **之前** | 上游配置不合格时**白扣用户一次额度**（一次配置错误被乘以每个用户的每个月） | 「境外上游 ⇒ 计数器一字未动」 |
  * | ① 在全部之前 | 未认证的请求去消耗额度、去读别人的订阅 | 「无令牌 ⇒ 401 且**一条 SQL 都没发**」 |
  *
- * ⑥ 与 ④ 是**同一个纯函数被调两次**，不是重复劳动：ADR-0053 §5 第 2 条要求的正是
+ * ⑥ 与 ④ 是**同一个纯函数被调两次**，不是重复劳动：ADR-0056 §5 第 2 条要求的正是
  * 「保存配置时校验一次，真发请求前再校验一次」，出处是 ADR-0010 从 SSOS 抄来的那句
  * 「Enforcement has to sit on the path that actually sends the request,
  * not only on the path that stores it.」。两把尺子各自**单独**被一条用例钉住：
@@ -417,7 +417,7 @@ export const managedAiProxyRoutes: FastifyPluginAsync<ManagedAiProxyRoutesOption
         });
       }
 
-      // ── ⑥ 发送点复算（ADR-0053 §5 第 2 条）───────────────────────────
+      // ── ⑥ 发送点复算（ADR-0056 §5 第 2 条）───────────────────────────
       const url = `${upstream.baseUrl}/chat/completions`;
       const sendPoint = domesticUpstreamVerdict(upstream.baseUrl, hosts, plaintextHosts);
       if (sendPoint.ok === false) {

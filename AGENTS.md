@@ -352,6 +352,10 @@ pnpm check                      # 全部门禁 + **全量单元测试**：类型
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）
+pnpm check:adr-numbering        # ADR 编号唯一 + 裸写的 `ADR-NNNN` 只指向一枚文件
+                                #   🔴 它挡的是 2026-10-05 那次"两条会话同一天各占 0053"：
+                                #      文件名不同 ⇒ git 不报冲突，死链检查也不报（链接各指各的），
+                                #      而正文里的 `ADR-0053 §5 第 11 条` 从此有两种读法。
 pnpm check:tokens               # 原生 token 产物（Swift/ArkTS/JSON/RN）是否与 tokens.css 同步
 pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets 产物
 pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podfile.lock，见 §7 第 32 条）

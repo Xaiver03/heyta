@@ -2,7 +2,7 @@
  * 端点地址的**类别**（纯字面量判定）
  * ===================================
  *
- * [ADR-0053](../../../docs/adr/0053-endpoint-address-class-and-domestic-managed-allowlist.md)
+ * [ADR-0056](../../../docs/adr/0056-endpoint-address-class-and-domestic-managed-allowlist.md)
  * 的第一条裁决落在这里。它补的是一个**类型上就缺的维度**：
  * `classifyDestination` 过去只有两样输入（`mode` 与 `endpoint` 字符串），
  * 判出来的目的地只有"没出设备 / 出了设备"这一档粗细 ——
@@ -78,7 +78,7 @@ export type UnknownAddressReason =
    *
    * 🔴 它**实际会连到回环**，而 `new URL()` 不会把它折回点分十进制，
    * 所以字面量层看不穿。旧判定把它算远端（要授权）——本轮**保持**那个结论：
-   * 收紧可以，放宽不行（见 ADR-0053 §3.2 的"只紧不松"）。
+   * 收紧可以，放宽不行（见 ADR-0056 §3.2 的"只紧不松"）。
    * 它是本文件里唯一一个"**类别其实更宽松、但我们故意不采纳**"的取值，
    * 所以必须留在这里而不是被悄悄修掉。
    */

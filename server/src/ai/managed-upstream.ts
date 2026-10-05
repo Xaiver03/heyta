@@ -2,7 +2,7 @@
  * 托管 AI 代理的**境内上游**判定 —— 服务端这一侧的那份表。
  * =========================================================
  *
- * 依据：[ADR-0053](../../../docs/adr/0053-endpoint-address-class-and-domestic-managed-allowlist.md) §5
+ * 依据：[ADR-0056](../../../docs/adr/0056-endpoint-address-class-and-domestic-managed-allowlist.md) §5
  * 与 [ADR-0054](../../../docs/adr/0054-managed-ai-retention-and-selling-preconditions.md) §5。
  * 客户端那份在 `packages/ai/src/managed-endpoints.ts`，它管的是"这台设备肯不肯把明文交出去"；
  * 本文件管的是"**这台服务器肯不肯把明文转发出去**"—— 两个决定点，两张必须同形的表。
@@ -73,7 +73,7 @@ export const SERVER_MANAGED_MODEL_HOSTS: readonly ServerManagedModelHost[] = [
     jurisdiction: 'cn',
     evidence:
       'ADR-0021 §1 第 3 条：单价已于 2026-09-27 从官方定价页 https://api-docs.deepseek.com/quick_start/pricing 直取；' +
-      '该 API 由境内主体在境内机房运营。⚠️ 机房所在地未独立核验，见 ADR-0053 §5 第 2 条。',
+      '该 API 由境内主体在境内机房运营。⚠️ 机房所在地未独立核验，见 ADR-0056 §5 第 2 条。',
   },
   {
     host: 'heyta.waytofuture.cn',

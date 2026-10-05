@@ -2,7 +2,7 @@
  * 托管 AI 的**境内供应商白名单**
  * ==============================
  *
- * [ADR-0053](../../../docs/adr/0053-endpoint-address-class-and-domestic-managed-allowlist.md)
+ * [ADR-0056](../../../docs/adr/0056-endpoint-address-class-and-domestic-managed-allowlist.md)
  * 第二条裁决落在这里：产品要开 `mode: 'managed'` 这一档，红线是
  * **托管路径只能接中国境内的模型供应商**。
  *
@@ -74,7 +74,7 @@ export interface ManagedModelHost {
  * ⚠️ 今天是两行，而且两行的性质不同：
  *   - `api.deepseek.com` 是**第三方境内供应商**（ADR-0021 选定的那一家）；
  *   - `heyta.waytofuture.cn` 是**我们自己那台已备案的服务器**（托管档的入口）。
- * 加第三行之前要先想清楚 ADR-0053 §5 那两条边界：机房所在地与"备案 ≠ 境内"的区别。
+ * 加第三行之前要先想清楚 ADR-0056 §5 那两条边界：机房所在地与"备案 ≠ 境内"的区别。
  */
 export const MANAGED_MODEL_HOSTS: readonly ManagedModelHost[] = [
   {
@@ -83,7 +83,7 @@ export const MANAGED_MODEL_HOSTS: readonly ManagedModelHost[] = [
     jurisdiction: 'cn',
     evidence:
       'ADR-0021 §1 第 3 条：单价已于 2026-09-27 从官方定价页 https://api-docs.deepseek.com/quick_start/pricing 直取；' +
-      '该 API 由境内主体在境内机房运营。⚠️ 机房所在地未独立核验，见 ADR-0053 §5 第 2 条。',
+      '该 API 由境内主体在境内机房运营。⚠️ 机房所在地未独立核验，见 ADR-0056 §5 第 2 条。',
   },
   {
     host: 'heyta.waytofuture.cn',

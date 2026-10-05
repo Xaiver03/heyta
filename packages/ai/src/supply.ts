@@ -36,7 +36,7 @@ export type AiSupplyMode =
  *
  * 🔴 **由端点推导，不由模式声明** —— 见文件头。
  * ⚠️ `managed` 那一支过去**不看端点**（无条件返回 `heyta-cloud`），那是
- * [ADR-0053](../../../docs/adr/0053-endpoint-address-class-and-domestic-managed-allowlist.md) §3.3
+ * [ADR-0056](../../../docs/adr/0056-endpoint-address-class-and-domestic-managed-allowlist.md) §3.3
  * 堵掉的洞：把 `mode` 写成 `managed` 不构成"明文到了我们手里"这个事实，
  * 那个事实只能由**端点落在境内白名单上**来证明。
  */
@@ -57,7 +57,7 @@ import { isDomesticManagedEndpoint, managedEndpointVerdict } from './managed-end
 /*
  * 回环地址判定**原来定义在这个文件里**，现在住在 `endpoint-address.ts`。
  * 搬走的理由不是"文件太长"，而是它原来只回答一个二元问题（本机 / 非本机），
- * 而 ADR-0053 要把"链路本地 / 私网 / 公网 / 未定性"补进模型 ——
+ * 而 ADR-0056 要把"链路本地 / 私网 / 公网 / 未定性"补进模型 ——
  * 一个返回 `boolean` 的函数没法长成分档判定还留在原地，因为消费者必须能拿到
  * 那个**形状**（`known` 可判别），而不是一句 `true / false`。
  *
@@ -88,7 +88,7 @@ export function classifyDestination(config: {
     // 🔴 托管的目的地**也从端点推导**：只有落在境内白名单上的端点，
     // 才配被说成"明文到了 heyta 的服务器"。推导不出来时按 `user-endpoint` 处理 ——
     // 它同样需要授权（不会放宽），但它不再撒谎说数据在我们手里。
-    // 那个"不看端点"的形状是 ADR-0053 §3.3 点名的洞。
+    // 那个"不看端点"的形状是 ADR-0056 §3.3 点名的洞。
     return isDomesticManagedEndpoint(config.endpoint) ? 'heyta-cloud' : 'user-endpoint';
   }
 
@@ -347,7 +347,7 @@ export class AiConfigError extends Error {
     readonly reason:
       | 'endpoint-required'
       | 'endpoint-invalid'
-      /** 🔴 托管档的端点不在**境内**白名单上（ADR-0053 §3.3）。 */
+      /** 🔴 托管档的端点不在**境内**白名单上（ADR-0056 §3.3）。 */
       | 'managed-endpoint-not-domestic',
   ) {
     super(message);
@@ -376,7 +376,7 @@ export class AiConfigError extends Error {
  * 🔴 结构上到不了 ≠ 那条路是对的：如果将来把托管档接到 `invokeRouted` 上，
  * 我们的自建端点会被推导成 `user-endpoint`，于是披露变成"该端点由你提供、heyta 不参与"
  * —— **那句是假的**。那一档必须先为新 ADR 把目的地词表与路由配置对齐，
- * 见 ADR-0053 §5 第 1 条登记的边界。
+ * 见 ADR-0056 §5 第 1 条登记的边界。
  *
  * 🟢 **`managed` 从 2026-10-05 起可以启用了**，条件是端点落在境内白名单上。
  * 挡着它的那条"保留策略未定案"已由 ADR-0054 定案（正文不保留、元数据 45 天），

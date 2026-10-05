@@ -68,7 +68,7 @@
 
 ### 19.5 目的地判定（决定"要不要写出境条款"的分岔点）
 
-> 🔴 **勘误（2026-10-05，[ADR-0053](../adr/0053-endpoint-address-class-and-domestic-managed-allowlist.md)）**：
+> 🔴 **勘误（2026-10-05，[ADR-0056](../adr/0056-endpoint-address-class-and-domestic-managed-allowlist.md)）**：
 > 本节两条已被改动，正文按"不可变的当时记录"留着，改判如下——
 > ① `managed` **不再**无条件 → `heyta-cloud`：那个值现在也只能由端点推导，
 > 端点必须落在境内白名单（`packages/ai/src/managed-endpoints.ts` 的 `MANAGED_MODEL_HOSTS`，

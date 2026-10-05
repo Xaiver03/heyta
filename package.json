@@ -187,3 +187,4 @@
   },
   "license": "MIT"
 }
+    "check:adr-numbering": "node scripts/check-adr-numbering.mjs",

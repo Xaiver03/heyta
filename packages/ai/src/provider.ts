@@ -272,7 +272,7 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
     endpointLabel: config.endpoint,
 
     async invoke(invocation, consents) {
-      // ── 0. 🔴 发送前的**目的地复算**（ADR-0053 §3.3 的第二点）─────────────
+      // ── 0. 🔴 发送前的**目的地复算**（ADR-0056 §3.3 的第二点）─────────────
       //
       // 为什么这里要再算一遍（工厂里已经 `assertEnableable` + `classifyDestination` 了）：
       // `config` 是被**引用**捕获的，`invoke` 读的是当下的 `config.endpoint`。
