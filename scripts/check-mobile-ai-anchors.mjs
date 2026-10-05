@@ -265,7 +265,46 @@ function descAnchors(text, label) {
   };
 }
 
-function run() {  const files = walk(join(ROOT, SRC_ROOT));
+// 判据 ⑧：双引号**文案**里不许出现反引号。
+//   在 bash 里反引号是命令替换，`bash -n` 不报（语法完全合法），症状是"打印判据的那一行
+//   自己去执行了一条命令"：实测 `line 1226: target: command not found`，判据行输出成半句话。
+//   🔴 这条在本仓库犯了**两次**，第二次就发生在把它写进环境陷阱 #329 之后几分钟的下一次编辑里 ——
+//   所以光有一条文档规矩是不够的（文档不会在编辑时说话），这里把它做成会红的门禁。
+//   注释行里的反引号不算（那些是给读者看的代码名）。
+function quoteBackticks(text) {
+  const red = [];
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^\s*#/.test(line)) continue;
+    let state = 'code'; // code | single | double
+    for (let j = 0; j < line.length; j += 1) {
+      const c = line[j];
+      if (state === 'code') {
+        if (c === "'") state = 'single';
+        else if (c === '"') state = 'double';
+        else if (c === '#') break; // 行内注释，后面不判
+      } else if (state === 'single') {
+        if (c === "'") state = 'code';
+      } else {
+        if (c === '\\') { j += 1; continue; }
+        if (c === "'") { state = 'single'; continue; }
+        if (c === '"') { state = 'code'; continue; }
+        if (c === '`') {
+          red.push(
+            `${i + 1} 行  双引号串里的反引号 = 命令替换：${line.trim().slice(0, 72)}\n` +
+              '        修法：把那段改成「」或直接去掉反引号（`$(…)` 形式的替换不在此列）。',
+          );
+          break;
+        }
+      }
+    }
+  }
+  return red;
+}
+
+function run() {
+  const files = walk(join(ROOT, SRC_ROOT));
   if (files.length === 0) {
     console.error(`🔴 ${SRC_ROOT} 里一个 .tsx/.ts 都没读到 —— 探针没有输入，不报"锚点都对"`);
     process.exit(2);
@@ -373,11 +412,14 @@ function run() {  const files = walk(join(ROOT, SRC_ROOT));
   );
   console.log(`模式清单：\n${decl.patterns.map((p) => `  ${p.regex.source}  ← ${p.source}`).join('\n')}`);
 
-  if (missing.length > 0 || descRed.length > 0) {
+  const backtickRed = quoteBackticks(scriptText);
+  for (const line of backtickRed) console.log(`文案反引号\t${line}`);
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
-      '，desc/text 未命中=' + String(descRed.length) + '。' +
+      '，desc/text 未命中=' + String(descRed.length) +
+      '，双引号文案里的反引号=' + String(backtickRed.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
-      '要么界面换了锚点而验收没跟着改。两条都是红。');
+      '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
   }
   console.log('✅ 每条 rid 锚点都对得上源码里的 testID 声明；每条 desc/text 字面锚点都对得上词条');
@@ -385,7 +427,8 @@ function run() {  const files = walk(join(ROOT, SRC_ROOT));
 }
 
 if (process.argv.includes('--self-test')) {
-  // 四臂：证明这条门禁**会**红，而不是证明它今天绿。
+  // 逐臂：证明这条门禁**会**红，而不是证明它今天绿。
+  //   ⚠️ 臂数**只由下面的 ARMS= 自己打印**，注释与任何文档里都不许抄（抄一次就开始漂）。
   // 臂 0/3 走**整条流水线**（子进程 + 变异副本），只调用匹配函数证明不了
   // "有缺失时退非零"那一半 —— 那条病在仓里出现过不止一次（§7）。
   const lit = declarations(walk(join(ROOT, SRC_ROOT)));
@@ -487,6 +530,16 @@ if (process.argv.includes('--self-test')) {
   //   没有这条，"跳过注释"就是一条没人验过的豁免（它可以悄悄把真锚点也跳掉而全绿）。
   const m7 = runMutant(`# 别再写 has_desc "${BOGUS_ZH}" 这种锚点`, 'desc-comment');
   arms.push(['臂 7 同一句只写在注释里 ⇒ 整条流水线仍为 0（注释不是调用点）', m7.code === 0]);
+
+  // 臂 15/16（判据 ⑧）：双引号文案里的反引号 = bash 命令替换。
+  //   🔴 这两臂是**我自己踩了两次之后**才加的，第二次就在写下文档规矩之后的下一次编辑里 ——
+  //   文档拦不住编辑动作，能拦的只有会红的门禁。臂 15 证明它会红，臂 16 证明注释里的不算（否则
+  //   这条判据会把所有写给读者看的代码名全判红，一条乱红的检查比没有检查更危险）。
+  const m8 = runMutant('bad "把「x」写成 `stub-model` 这种反引号"', 'backtick-prose');
+  arms.push(['臂 15 双引号文案里的反引号 ⇒ 整条流水线非零退出', m8.code !== 0]);
+  arms.push(['臂 15 红字点名了那一行（不是只退码）', m8.out.includes('文案反引号')]);
+  const m9 = runMutant('# 别在文案里写 `反引号`，那是命令替换', 'backtick-comment');
+  arms.push(['臂 16 同一个反引号只写在注释里 ⇒ 整条流水线仍为 0', m9.code === 0]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
