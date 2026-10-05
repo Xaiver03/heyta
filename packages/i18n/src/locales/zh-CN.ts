@@ -1887,13 +1887,13 @@ export const zhCN = {
   'web.ai.settings.features.hintStrong': '列表顺序就是尝试顺序',
   'web.ai.settings.features.hintTail': '（靠前的先试）。',
   'web.ai.settings.features.empty': '先添加端点',
-  'web.ai.settings.consentLead': '「{feature}」有远端端点，需要你授权数据出境。',
+  'web.ai.settings.consentLead': '「{feature}」的端点不在这台设备上，需要你批准后内容才会离开本机。',
   'web.ai.settings.grant': '授权',
   'web.ai.settings.gapLead': '⚠️ 「{feature}」需要',
   'web.ai.settings.gapMid': '，但',
   'web.ai.settings.gapTail': '没有声明它 —— 这个功能会一直不工作。',
   'web.ai.settings.gapFix': '给「{name}」补上',
-  'web.ai.settings.granted': '已授权数据出境',
+  'web.ai.settings.granted': '已批准内容离开本机',
   'web.ai.settings.revoke': '撤销',
   // ── 对话助手（ADR-0045）：第二个授权前端 ──────────────────────────
   // 🔴 这一块的存在理由：`localApi.grants` 管的是"**外部程序**能不能调这个工具"
@@ -2110,7 +2110,7 @@ export const zhCN = {
   // ⚠️ 别在这里重新概括：同一句用户可见文案有两个来源就一定会漂移（见 §7.10 通道 #5）。
   // ⚠️ 引号照抄 `packages/ai`（ASCII 双引号）—— 有测试逐字比对，别改成「」。
   'web.ai.failure.cause.notConfigured': 'AI 未启用。在设置里选择"使用自己的 AI 端点"即可开启。',
-  'web.ai.failure.cause.egressNotAuthorized': '该功能需要你先授权数据出境。',
+  'web.ai.failure.cause.egressNotAuthorized': '该功能需要你先批准内容离开本机。',
   'web.ai.failure.cause.noRoute': '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。',
   'web.ai.failure.cause.fallbackNeedsConsent': '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。',
   'web.ai.failure.cause.network': '连不上端点。检查网络，以及端点地址是否可达。',
