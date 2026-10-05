@@ -232,6 +232,26 @@ const crashOut = (what, e) => {
 process.on('uncaughtException', (e) => crashOut('未捕获异常（不是任何一道守卫的拒绝）', e));
 process.on('unhandledRejection', (e) => crashOut('未接住的 Promise 拒绝（顶层 await 那一族）', e));
 
+/* 🔴 读数登记守卫 —— 必须在**任何写动作之前**（它判的是这份源码自己的形状，不依赖运行态）。
+ *    规则：凡是 `xxxReading = …` 赋过值的名字，必须出现在某条 `notes.push(…)` 的参数里；
+ *    否则成功路径末尾那份"整页 notes dump"收不到它 ⇒ 退 2 点名。
+ *    为什么用读源码而不是维护一张清单：**清单本身就是第四次漏掉的地方**（§8.197 同族的理由，
+ *    文件里"记得打印"这句注释写过两次，第三次仍然漏在新加的段上）。
+ *    本守卫第一次运行就抓到三处，其中 `auditReading` 是真漏（四条"零丢行"断言的读数只进了提交说明，
+ *    stdout 上一个字都没有），另两处 `pkgReading` / `giReading` 是**我的正则太窄**：
+ *    它们走的是 `notes.push(\`package.json ${pkgReading}\`)` 这种带前缀的写法 ⇒ 规则改成"出现在
+ *    push 的参数里"而不是"等于 push 的实参"，否则这条守卫会把合法写法判成缺陷。 */
+{
+  const src = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+  const assigned = [...new Set([...src.matchAll(/^\s*(\w+Reading) = /gm)].map((m) => m[1]))];
+  const pushBlobs = [...src.matchAll(/notes\.push\([\s\S]{0,900}?\);/g)].map((m) => m[0]);
+  const unregistered = assigned.filter((n) => !pushBlobs.some((b) => new RegExp(`\\b${n}\\b`).test(b)));
+  if (unregistered.length) {
+    die(2, `这些读数只赋值、没进任何一条 notes.push ⇒ 成功路径的整页 dump 收不到它（§8.197 那一族）：${unregistered.join(', ')}`);
+  }
+  notes.push(`读数登记守卫：${assigned.length} 个 *Reading 赋值点，全部出现在某条 notes.push 的参数里`);
+}
+
 // ── 0. 起点 ──────────────────────────────────────────────────────────
 const mainSha = git(['rev-parse', MAIN]).trim();
 const srcSha = git(['rev-parse', SOURCE]).trim();
@@ -754,7 +774,8 @@ if (fam.audit.length) {
   auditReading = `并集：保留 main 侧 ${r.stats.mainOnly} 行（含 ${r.stats.extraMainHeadings} 个本分支没有的节标题）` +
     ` + 本分支独有 ${r.stats.srcOnly} 行；断言 main 零丢行 / 本分支零丢行 / 无两侧之外的新行 / 无冲突标记 全过`;
   notes.push(`审计文档并集：main 节 ${r.stats.mainHeadings}、本分支节 ${r.stats.srcHeadings}、` +
-    `main 独有行 ${r.stats.mainOnly}、本分支独有行 ${r.stats.srcOnly}、产出非空行 ${r.text.split('\n').filter((l) => l.trim() !== '').length}`);
+    `main 独有行 ${r.stats.mainOnly}、本分支独有行 ${r.stats.srcOnly}、产出非空行 ${r.text.split('\n').filter((l) => l.trim() !== '').length}` +
+    ` · ${auditReading}`); // ← 登记守卫第一次运行抓到的那处：这四条"零丢行"断言先前只进提交说明，stdout 一个字都没有
 }
 
 /* ── 第十族 / 第十一族（10-05 01:1x 出现的两枚文本冲突路径）───────────────
@@ -1230,16 +1251,11 @@ if (p1 !== mainSha || p2 !== srcSha) {
 }
 git(['branch', '-f', BRANCH, carrierSha]);
 console.log(`✅ 载体 ${carrierSha.slice(0, 8)} = ${MAIN}(${mainSha.slice(0, 8)}) × ${SOURCE}(${srcSha.slice(0, 8)})，分支 ${BRANCH} 已指过去`);
-console.log(`   ${pkgReading}`);
-console.log(`   ${giReading}`);
-// 🔴 自检这条必须在**成功路径**上也打出来：只进 notes（失败时才 dump）的判据，
-//    在成功时是静默的，而"静默的通过"会被下一轮读成"没跑"或"跑了但没人看"。
-console.log(`   ${capSelftestReading}`);
-console.log(`   ${dockSelftestReading}`);
-// 同一句理由，同一趟里第二次撞上：借 store 那段自检**每次载体重算都跑**（它是无条件的裸块），
-// 但只 push 进 notes ⇒ 只有 die 路径 dump 时才看得见。10-05 那趟带旋钮的重算退了 3，
-// 读数就"出现过"；紧接着两趟 rc=0 的里面它一个字都没印 —— 于是"跑过"和"看得见跑过"被混成一件事。
-console.log(`   ${borrowSelftestReading}`);
+/* 🔴 读数不再逐条 `console.log`，改成**整份 notes 在成功路径上也 dump**（登记守卫在上面第 0 步之前）。
+ *    理由不是整洁，是这一族已经撞了三次（§8.197）：判据每次都跑，只有 die 路径 dump notes，
+ *    于是"跑过"在绿路上不留痕迹，下一轮要么重做、要么把那段当没接线删掉。 */
+console.log(`   ── 这一趟量到的 ${notes.length} 条读数（成功路径也 dump；与 die 路径同一份）──`);
+for (const n of notes) console.log(`   · ${n}`);
 if (attribution.length) console.log(`   🔴 载体红 ${attribution.length} 道，已逐条归属到非本批（那条红仍在 main 上，不由本批修）：\n     ${attribution.join('\n     ')}`);
 // 🔴 这句是**推导**出来的，不是写死的"全 exit 0"：归属过的红仍然是红（缺陷还躺在 main 上），
 //    把它印成"8 道全 exit 0"就是本批一直在拦的那类对外错话，只不过读者是下一轮的我（§8.143 实测撞到的）。
