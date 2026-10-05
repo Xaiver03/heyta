@@ -5568,3 +5568,22 @@ done
      `CARRIER=<干净载体> BUDGET=… INTERVAL=60 bash research/tools/r14c-window-retry.sh`，前置一律问闸门，不另建第二套。
      另外两件顺手确认：`docs-link` 现在 rc=0（先前那两条 `AGENTS.md §18` 与未跟踪 ADR 的红已被它们的所有者收走）；
      本线三把 rig 与 `r17 --all` 在这一发之后复跑，读数写在 (70)。
+- (70) **10-05 19:5x：链跑完之后的复跑读数，外加一句会救人的"哪一棵树"限定。**
+
+  ① 复跑（三条命令，读数现取）：
+     `NO_COLOR=1 bash research/tools/r17-evidence-md5-check.sh --all` ⇒ rc=**0**，
+     `ALLCHECK dirs_scanned=14 entries_parsed=8 pins_parsed=27 dirs_with_mismatch=0 dirs_with_broken_pin=0 dirs_with_skipped_pin=0`
+     （两枚棘轮基线仍在原位：`dirs_without_readme=20/20`、`dirs_unpinned=3/3` ⇒ 本线没新增无判据的截图）；
+     本线三把 rig 由入库工具的 3c 格在同一笔里跑：台 1 `pass=36 fail=0`、台 2 `pass=16 fail=0`、台 3 `SELFTEST=OK` ⇒ `LINE_RIGS=3 红=0`；
+     `NO_COLOR=1 node research/tools/docs-link-check.mjs` ⇒ rc=**0**（先前那两条 `AGENTS.md §18` 与未跟踪 ADR 的红，被它们的所有者收走了）。
+  ② 🔴 **"37/0 是在当前产物上跑的"这句话必须带载体限定**，否则下一个人在主检出里复跑会以为账错了：
+     `NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target c`（**不带** `--repo`，量的是主检出）⇒ 现在仍 rc=**3**、
+     `REDS=load,apk`（现量：1 分钟负载 38 > 12；主检出那枚 APK `2026-10-05 17:19:50` 比最新源码 `18:59:40` 旧）。
+     而 (69) 那一发是 `--repo <heyta-wt-r14c>`，载体的 APK 是链在 19:37 自己重打的（`build_android rc=0` + `preflight_after_build rc=0`）。
+     ⇒ 两棵树、两个 APK，**都对**；这正是 §7 第 27 条那一族最容易被读错的样子。
+     要在主检出这一侧也拿到绿，得先 `pnpm --filter @heyta/ui build && pnpm build:android`（走 `scripts/run-gradle.mjs` ⇒ 实际打包在 `windows-pc`），
+     而那一步归"每轮交付固定收尾 `pnpm reinstall:all`"那一格管，不在本目标范围内顺手做。
+  ③ 一条会救人的形状教训（也是 (68) 那两格收口改对的根因）：**本线入库工具"点名对象全部进入 HEAD"这句话的范围 = 它自己的 `PATHS` 清单**。
+     清单外的路径（`package.json`、`docs/reference/environment-traps.md`）不会被拒绝，也不会被报告 —— 它**看不见**。
+     所以凡是改完清单外路径，收尾必须是"静态门 + `calendar-line-hunk-ownership.sh` + 显式 `git commit --only -- <那枚路径>`"，
+     而不是"跑一遍本线工具然后相信它"。
