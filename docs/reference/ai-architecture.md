@@ -88,7 +88,8 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 | `packages/local-api/src/tools.ts` | 499 | 工具契约 + 授权判定（**唯一实现点**）。`isToolGranted()` 被 MCP 与内置 AI **共用** |
 | `packages/local-api/src/server.ts` | 359 | 传输无关的 JSON-RPC 处理器。`runReadTool()` / `toWriteIntent()` 亦被内置 AI 复用 |
 | `packages/local-api/src/mcp.ts` | 252 | 工具形状：`listAuthorizedTools()`（中性定义，MCP 与内置 AI 共用）+ 错误码 + 会话闸门 |
-| `apps/web/src/features/settings/aiStore.ts` | — | AI 设置状态 + 本地持久化（含熔断健康快照） |
+| `packages/app-host/src/assistant-tier-settings.ts` | — | 助手档位 `assistantTier` 的**持久化语义唯一出处**：两档字面量、出厂默认、读回的 fail-closed 归一、低→高顺序，以及 `createAssistantTierStore(port)`（给"自己存这一档"的宿主）。🔴 存储**通道**不归它：web 仍存 `heyta.ai.settings` 那块 JSON |
+| `apps/web/src/features/settings/aiStore.ts` | — | AI 设置状态 + 本地持久化（含熔断健康快照）。档位那一格只**存**，默认值与归一取自上面那个模块 |
 | `apps/web/src/features/settings/AiSettings.tsx` | — | 开关界面（三道闸 / 端点 / 授权 / 停用开关） |
 | `apps/web/src/features/settings/MemoryPanel.tsx` | — | 偏好的可见 / 可忘掉 / 可恢复 + 「说的 vs 做的」落差 |
 | `apps/web/src/features/ai/AiBreakdown.tsx` | — | 拆解界面（含逐条取舍） |

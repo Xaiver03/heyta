@@ -497,6 +497,16 @@ export {
   type AssistantTurnDeps,
 } from './ai-assistant.js';
 export {
+  ASSISTANT_TIER_ORDER,
+  ASSISTANT_TIER_READ_AND_PROPOSE,
+  ASSISTANT_TIER_READ_ONLY,
+  DEFAULT_ASSISTANT_TIER,
+  createAssistantTierStore,
+  normalizeAssistantTier,
+  type AssistantTierStore,
+  type AssistantTierStorePort,
+} from './assistant-tier-settings.js';
+export {
   CALENDAR_ANCHOR_RULES,
   calendarAnchor,
   calendarAnchorLine,
