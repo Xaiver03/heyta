@@ -150,6 +150,13 @@ export function HabitDetailCard({ inset }: { inset: boolean }): React.JSX.Elemen
     <div
       className={inset ? 'ht-habit__pane ht-app__detail-habit' : 'ht-habit__pane'}
       data-testid="habit-pane"
+      // 🔴 `tabIndex={-1}` 是给**键盘光标**用的落点（工单 W1b 第 3 条腿）：在选中那一行上按
+      // Enter，焦点交给这一格（`keyboard-cursor.ts#openPane` 按 `[data-testid="habit-pane"]` 找）。
+      // 不是"-1 就能进 Tab 序列"（恰恰相反，-1 只许程序聚焦），也不指望它自己可见 ——
+      // 可见性由设计系统的**全局** `:focus-visible`（`packages/design-system/src/reset.css:119`）
+      // 负责。这里**刻意不另写一条**：§8.137 那一臂（撤掉本组件自己那条环规则）实测照出
+      // 两条给的是同一套 token，写在这里就是第二份所有者（AGENTS §5：焦点样式不许组件自己发明）。
+      tabIndex={-1}
       aria-label={selected === undefined ? undefined : t('web.habits.pane.aria', { name: selected.name })}
     >
       {selected === undefined ? null : (

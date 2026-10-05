@@ -82,7 +82,9 @@ function rows(prefix: string, ids: string[]): void {
 }
 
 // `key` 不收窄成 `'ArrowUp' | 'ArrowDown'`：「别的键不抢」那一条就是要**故意**发一个
-// 光标词表之外的键（← → / Enter / Home）。收窄会把那条用例挡住，而它挡的是"词表判定失效"。
+// 光标词表之外的键（← → / Home）。收窄会把那条用例挡住，而它挡的是"词表判定失效"。
+// ⚠️ 这里原来还列着 **Enter** —— 它从 §8.137 起**已经在词表里了**（第 3 条腿），
+//    所以"Enter 不抢"这句话是错的，用例发的键也换成了 ← →。
 async function press(key: string, target: EventTarget = window): Promise<void> {
   await act(async () => {
     target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
@@ -493,5 +495,114 @@ describe('接线的三个细节', () => {
     const src = readFileSync(resolve(__dirname, '../src/App.tsx'), 'utf8');
     expect(src).toContain('useSelectionKeyboardCursor(contentView);');
     expect(src).not.toMatch(/useSelectionKeyboardCursor\(view\)/);
+  });
+});
+
+/*
+ * Enter = 工单 W1b 的**第 3 条腿**（§8.137）：焦点交给这一格，不代为触发任何写入。
+ * 这一族量的是"接管 / 不接管"这条线，因为它是宿主唯一能自己决定的一部分；
+ * "落点选择器在真 DOM 里有没有生产者"这一档 jsdom 看不见（这里没有 App 树），
+ * 由 `e2e/tests/keyboard-cursor.spec.ts` 的 K9/K10 在真浏览器里钉。
+ */
+describe('Enter 把焦点交给这一格（W1b 第 3 条腿）', () => {
+  /** 摆一枚"这一格"（面单根）。`tabIndex=-1` 是它可被程序聚焦的前提，缺了 `focus()` 无效。 */
+  function pane(testid: string): HTMLElement {
+    const el = document.createElement('div');
+    el.setAttribute('data-testid', testid);
+    el.tabIndex = -1;
+    document.body.appendChild(el);
+    return el;
+  }
+
+  /** 焦点落在某一行上按 Enter，返回事件有没有被吞。 */
+  async function enterOn(rowId: string, prefix = 'habit-row'): Promise<boolean> {
+    const row = document.querySelector<HTMLElement>(`[data-testid="${prefix}-${rowId}"]`);
+    if (row === null) throw new Error(`找不到行 ${prefix}-${rowId} ⇒ 这一族判据在空转`);
+    let prevented = false;
+    const probe = (e: Event): void => {
+      prevented = e.defaultPrevented;
+    };
+    window.addEventListener('keydown', probe);
+    await press('Enter', row);
+    window.removeEventListener('keydown', probe);
+    return prevented;
+  }
+
+  it('🔴 焦点在**带痕迹那一行**上 ⇒ 焦点交给这一格、吞掉按键，且选中一个字都没动', async () => {
+    rows('habit-row', ['h1', 'h2']);
+    const p = pane('habit-pane');
+    selection.select('habit', 'h2');
+    await mount('habits');
+    expect(await enterOn('h2')).toBe(true);
+    expect(document.activeElement, '按了 Enter，焦点却没进这一格（静默跳焦点 = 界面没说、模型已变）').toBe(p);
+    // Enter **不许**顺手写任何东西：选中还是那一条，也没发出 op（这里能验的就是前者）。
+    expect(selection.get('habit')).toBe('h2');
+  });
+
+  it('🔴 焦点在**没选中**的那一行上 ⇒ 不接管（那是"选它"那一下，不是"打开"）', async () => {
+    rows('habit-row', ['h1', 'h2']);
+    const p = pane('habit-pane');
+    selection.select('habit', 'h2');
+    await mount('habits');
+    p.focus();
+    expect(document.activeElement).toBe(p);
+    // 抢走的症状很具体：Tab 到第 1 行按 Enter，用户要的是"选这一行"（行是按钮，Enter = 按下它），
+    // 结果选中没变、焦点却跳进右边那一格 —— 一次按键做了两件谁都没要的事。
+    expect(await enterOn('h1')).toBe(false);
+    expect(document.activeElement, '焦点被抢进这一格了，而痕迹还在另一条').toBe(p);
+    expect(selection.get('habit')).toBe('h2');
+  });
+
+  it('这一格不在 DOM 里（没渲染面单）⇒ 什么都不做，也**不吞键**', async () => {
+    rows('habit-row', ['h1']);
+    selection.select('habit', 'h1');
+    await mount('habits');
+    // 没有 `[data-testid="habit-pane"]`：落点找不到。吞掉一次落空的 Enter，
+    // 用户读到的是"回车坏了"，而界面上没有任何东西说明为什么。
+    expect(await enterOn('h1')).toBe(false);
+    expect(selection.get('habit')).toBe('h1');
+  });
+
+  it('表里**没登记落点**的视图（任务那一族）⇒ Enter 不接管，等那道二选一', async () => {
+    rows('task-item', ['t1', 't2']);
+    const p = pane('task-pane-that-does-not-exist');
+    selection.select('task', 't1');
+    await mount('tasks');
+    expect(await enterOn('t1', 'task-item')).toBe(false);
+    expect(document.activeElement, '任务那一面今天没有落点，焦点却跳了').not.toBe(p);
+    expect(selection.get('task')).toBe('t1');
+  });
+
+  it('Enter 走的是**同一套闸门**：正在打字 / 浮层开着 / 焦点在菜单里，都不接管', async () => {
+    rows('habit-row', ['h1']);
+    selection.select('habit', 'h1');
+    await mount('habits');
+
+    // ① 正在打字：输入框里的 Enter 是换行/提交，不是"打开右边"。
+    const input = document.createElement('input');
+    input.setAttribute('data-testid', 'habit-row-h1');
+    document.body.appendChild(input);
+    const p1 = pane('habit-pane');
+    await press('Enter', input);
+    expect(document.activeElement, '输入框里的 Enter 被抢走了').not.toBe(p1);
+    input.remove();
+    p1.remove();
+
+    // ② 浮层开着：界面指的不是底下那一栏。
+    document.body.insertAdjacentHTML('beforeend', '<div class="ht-sheet"></div>');
+    const p2 = pane('habit-pane');
+    await press('Enter', document.querySelector('[data-testid="habit-row-h1"]')!);
+    expect(document.activeElement, '浮层开着时焦点跳进了底下那一栏').not.toBe(p2);
+    document.querySelector('.ht-sheet')?.remove();
+    p2.remove();
+
+    // ③ 焦点在带子菜单的触发器上：Enter 归那颗按钮（打开菜单）。
+    const trigger = document.createElement('button');
+    trigger.setAttribute('data-testid', 'habit-row-h1');
+    trigger.setAttribute('aria-haspopup', 'menu');
+    document.body.appendChild(trigger);
+    const p3 = pane('habit-pane');
+    await press('Enter', trigger);
+    expect(document.activeElement, '菜单触发器上的 Enter 被列表光标抢了').not.toBe(p3);
   });
 });
