@@ -257,6 +257,181 @@ has_rid() {  # <testID> → 1/0
   dump
   [ -n "$(rid_center "$1")" ] && echo 1 || echo 0
 }
+# 🔴 存在性判据的前置：那一行此刻在不在**裁切窗口**里。
+# 为什么必须有这一层（2026-10-06 现量，一趟滚到底的逐帧 bounds 读数 `tmp/arm-profile-bounds.sh`）：
+#   「我的」顶部那一帧里 `profile-entry-habits` 的矩形是 **[42,2283][1038,2166]**（y1>y2，被
+#   容器底沿 2166 裁成退化），而它下面的 assistant/trash/export/close-account **整枚不在树里**；
+#   一次下滑之后 assistant=1236-1351、trash=1383-1498、export=1530-1645、close-account=1677-1792
+#   同时完整出现。⇒ `has_rid` 的那个 0 有两种读法："这一行没渲染"与"这一行在裁切线以外"，
+#   而第 5 步要的恰恰是前者。rig15 就是拿后者当成了产品缺陷（`❌ 配好端点后「我的」里仍没有…`）。
+# 用法：`reveal_rid <testID>` 先把它滚进窗口（退化成"看得见"），返回 1 才说明真没有。
+reveal_rid() {  # <testID> [最多滚几次=6] → 0=滚出来了 / 1=滚不出来
+  local rid=$1 max=${2:-6} i ref now stuck=0 blurred=0
+  for i in 1 2 3 4 5 6 7 8; do
+    [ "$i" -gt "$max" ] && break
+    dump
+    if [ -n "$(rid_center "$rid")" ]; then
+      [ "$i" -gt 1 ] && echo "   · testID=$rid 第 ${i} 帧滚进窗口（此前它在裁切线以外，不在树里）" >&2
+      return 0
+    fi
+    # 🔴 rig21 现量：焦点挂在 `ai-endpoint-model` 上时，一条 1900→900 的 swipe 会被输入框
+    #   当文本拖拽吞掉（受控 A/B：同一条手势前后 `ai-feature-capture` 的矩形逐字节相同）。
+    #   旧写法滚满 6 次然后报"滚不出来"，读起来像"产品没渲染那两行"——
+    #   而 `AiSettingsSection.tsx:381` 是 `FEATURE_ORDER.map(...)`，五档全都渲染。
+    #   所以要分开三件事：**画面没动**（手势被吞）/ **画面动了但还没到**（继续滚）/
+    #   **滚遍了也没有**（那才是可达性失败）。
+    ref=$(scroll_anchor_bounds)
+    $ADB shell input swipe 540 1900 540 900 300 >/dev/null 2>&1
+    sleep 1.5
+    dump
+    now=$(scroll_anchor_bounds)
+    if [ -n "$ref" ] && [ "$ref" = "$now" ]; then
+      stuck=$((stuck + 1))
+      if [ "$stuck" -ge 2 ] && [ "$blurred" = 0 ]; then
+        echo "   ↻ 连 ${stuck} 发 swipe 参照锚没动（$ref）—— 焦点多半挂在输入框上，先摘焦点" >&2
+        blur_focus; blurred=1; stuck=1
+      elif [ "$stuck" -ge 3 ]; then
+        echo "   ❌ 摘过焦点之后仍连续 ${stuck} 发 swipe 画面一格没动 ⇒ 载体够不到这一屏（不把「滚不出来」记成产品缺陷）" >&2
+        return 1
+      fi
+    else
+      stuck=0
+    fi
+  done
+  dump
+  [ -n "$(rid_center "$rid")" ]
+}
+# 判断"这一发手势到底让画面动了没有"的参照锚。
+# 🔴 rig23 现量：第一版取"树里第一枚有 resource-id 的节点"，那是 `android:id/content`
+#   [0,0][1080,2400] —— **整棵树的根，永远不会动**。于是每一发 swipe 都读成"画面一格没动"，
+#   而同一趟里 `ai-feature-breakdown` 确实被滚出来了（滚动真的发生过）。
+#   一条自己坏掉的判据比没有判据更糟：它把四格本来能成的绑定拦死，还把原因写成"载体够不到"。
+#   ⇒ 参照锚必须是**会随列表位移的内容节点**：带 text/content-desc、非 `android:` 系统 id、
+#   矩形非退化。
+scroll_anchor_bounds() {
+  python3 - <<'PYA'
+import os, re, sys
+try:
+    s = open(os.environ["UI_XML"]).read()
+except OSError:
+    sys.exit(0)
+for m in re.finditer(r'<node\b[^>]*?>', s):
+    d = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', m.group(0)))
+    rid = d.get('resource-id', '')
+    if rid.startswith('android:') or not (d.get('text') or d.get('content-desc')):
+        continue
+    b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', m.group(0))
+    if not b:
+        continue
+    x1, y1, x2, y2 = (int(g) for g in b.groups())
+    if x2 <= x1 or y2 <= y1:
+        continue
+    print(rid, x1, y1, x2, y2)
+    break
+PYA
+}
+# 兼容旧调用名（同一枚 picker）。
+any_anchor_bounds() { scroll_anchor_bounds; }
+# 把焦点从输入框上摘下来（RN 的 `keyboardShouldPersistTaps` 默认 `never`：
+# 第一次点输入框之外的地方只负责收起焦点，不会落到别的控件上）。
+# 点的是标题栏那条空白带（y=300 在 sheet 标题区，不在任何控件的矩形里）。
+blur_focus() {
+  local i n
+  for i in 1 2 3; do
+    dump
+    # 🔴 `grep -c` 数的是**行数**，而 uiautomator 的产物是**一整行** ⇒ 恒等于 1（有焦点也报 1、
+    #    没焦点报 0 只是恰好）。要 occurrences 只能用 `grep -o | wc -l`。
+    n=$(grep -o 'focused="true"' "$UI_XML" 2>/dev/null | wc -l | tr -d ' ')
+    [ "${n:-0}" = 0 ] && return 0
+    $ADB shell input tap 540 300 >/dev/null 2>&1
+    sleep 1
+  done
+  dump
+  n=$(grep -o 'focused="true"' "$UI_XML" 2>/dev/null | wc -l | tr -d ' ')
+  [ "${n:-0}" != 0 ] && echo "   ⚠️ 点了三次仍有 ${n} 枚 focused —— 只报读数，不替它编一个「已失焦」" >&2
+  return 0
+}
+# 🔴 **反向**存在性判据不能只用上面那条：把目标滚进窗口这件事，本身证明不了"目标那一带被渲染过"。
+# 要的是**两枚邻锚同时**有非退化矩形 —— 它们之间那一格这一秒确实在窗口里，缺席才读得出"没渲染"。
+# 现量：滚1 那一帧 habits=942-1057 与 trash=1383-1498 同帧成立，而 assistant 的位置就在两者中间。
+# 滚不到那样的帧 ⇒ **响亮地失败**，不许把"载体够不到"记成"产品没渲染"，也不许记成"缺席判据通过"。
+reveal_between() {  # <上锚> <下锚> [最多滚几次=6] → 0=两锚同帧可见 / 1=没有那样的帧
+  local up=$1 lo2=$2 max=${3:-6} i
+  for i in 1 2 3 4 5 6 7 8; do
+    [ "$i" -gt "$max" ] && break
+    dump
+    if [ -n "$(rid_center "$up")" ] && [ -n "$(rid_center "$lo2")" ]; then
+      echo "   · 邻锚同帧成立：$up 与 $lo2 都在窗口里（第 ${i} 帧）—— 它们之间那一格的缺席才是"没渲染"" >&2
+      return 0
+    fi
+    $ADB shell input swipe 540 1900 540 900 300 >/dev/null 2>&1
+    sleep 1.5
+  done
+  echo "   ❌ 滚了 ${max} 次都凑不出「$up 与 $lo2 同帧可见」——「$up/$lo2 之间那一格不在树里」这句话无从判定，不拿它当通过也不当失败" >&2
+  return 1
+}
+# 滚回列表顶部（后面的步骤要从顶部那一带点第一枚锚点）。
+scroll_to_top() {
+  local i
+  for i in 1 2 3 4 5; do
+    $ADB shell input swipe 540 900 540 1900 300 >/dev/null 2>&1
+    sleep 1
+  done
+}
+# 挂在 `content-desc` 上的那一类（chip / 按钮）用的 reveal：同一条裁切道理，
+# 只是取锚点换成 `has_desc_sub`。有界等待 + 滚动都在这条里，返回 1 才是"滚遍也没有"。
+reveal_desc() {  # <content-desc 片段> [最多滚几次=5] → 0=屏上出现了 / 1=滚过也没有
+  # 🔴 Chip / 按钮这一类的可辨识名挂在 `content-desc` 上，而 `reveal_sub` 走的是 `has_sub`
+  #   （只匹配 `text="…"`）⇒ 拿它去找一枚 chip 会**滚满五次然后报"没有"**，
+  #   读起来像产品没渲染那一行。rig22 现量：端点行已经 0→1（存进去了），chip 却命中 0。
+  local want=$1 max=${2:-5} i ref now
+  for i in 1 2 3 4 5 6; do
+    [ "$i" -gt "$max" ] && break
+    dump
+    if [ "$(has_desc_sub "$want")" = "1" ]; then
+      [ "$i" -gt 1 ] && echo "   · 「$want」第 ${i} 帧才出现在屏上（前几帧它在裁切线以外）" >&2
+      return 0
+    fi
+    ref=$(any_anchor_bounds)
+    $ADB shell input swipe 540 1900 540 900 300 >/dev/null 2>&1
+    sleep 1.5
+    dump
+    now=$(any_anchor_bounds)
+    if [ -n "$ref" ] && [ "$ref" = "$now" ]; then
+      echo "   ↻ 这一发 swipe 画面一格没动（焦点多半挂在输入框上），先摘焦点再继续滚" >&2
+      blur_focus
+    fi
+  done
+  dump
+  [ "$(has_desc_sub "$want")" = "1" ]
+}
+reveal_sub() {  # <文本片段> [最多滚几次=5] → 0=屏上出现了 / 1=滚过也没有
+  local want=$1 max=${2:-5} i
+  for i in 1 2 3 4 5 6; do
+    [ "$i" -gt "$max" ] && break
+    dump
+    if [ "$(has_sub "$want")" = "1" ]; then
+      [ "$i" -gt 1 ] && echo "   · 「$want」第 ${i} 帧才出现在屏上（前几帧它在裁切线以外）" >&2
+      return 0
+    fi
+    $ADB shell input swipe 540 1900 540 900 300 >/dev/null 2>&1
+    sleep 1.5
+  done
+  dump
+  [ "$(has_sub "$want")" = "1" ]
+}
+# 🔴 助手那一档是 ProfileScreen 盖上来的一层，**底部标签不在树里**
+#   （rig16 现量：第 6 步三次 `点了「我的」但标记「立即同步」没出现` ⇒ 整轮中止）。
+#   所以离开助手面必须走它自己的出口（testID=assistant-back），不能指望 tab。
+leave_assistant() {
+  dump
+  if [ -z "$(rid_center assistant-back)" ]; then
+    return 0          # 没开着助手层 ⇒ 不用收（这条不报错，它是"顺手收一层"）
+  fi
+  tap_rid assistant-back || { echo "   ❌ 助手层的返回键（testID=assistant-back）点不动" >&2; return 1; }
+  scroll_to_top
+  return 0
+}
 # 🔴 在一个块（testID）的矩形里找出**真正能点、能读状态的那一枚节点**。
 # 为什么必须有这一层（2026-10-06 实测，`ai-gate-enabled`）：
 #   `GateRow` 是 `<View testID="ai-gate-enabled">` 包着 `<Checkbox>`（AiSettingsSection.tsx:526），
@@ -357,22 +532,131 @@ for m in re.finditer(r"<node\b[^>]*>", s):
         sys.exit(0)
 PY
 }
+# 🔴 块内要找**真正能点的那一枚**：`xy_in_rid` 按 content-desc 命中的往往是标签文字自己。
+# 现量（2026-10-06 rig20）：`ui/kit.tsx` 的 `Chip` 写的是
+# `Pressable(accessibilityRole=button, accessibilityLabel=label)`，
+# 而 AX 树上带 `content-desc="stub-loopback"` 的那一枚是 **clickable=false**
+# —— 点它退出码 0、什么都不发生，读起来像"路由没绑上"，其实是指落在了不会响的那一层。
+# 与 #324-2 同一条（"这一下送到谁"），只是这次发生在**块内**而不是块上。
+# 取"包含该标签矩形、且面积最小的 clickable 祖先"；找不到就退回标签自己并如实说明。
+xy_clickable_in_rid() {  # <块 testID> <content-desc> -> "<x> <y> <src>"（或 BLOCK-ABSENT）
+  HEYTA_BLOCK="$1" HEYTA_DESC="$2" python3 - <<'PYPY'
+import os, re, sys
+try:
+    s = open(os.environ["UI_XML"]).read()
+except OSError:
+    sys.exit(0)
+block, desc = os.environ["HEYTA_BLOCK"], os.environ["HEYTA_DESC"]
+
+def box(tag):
+    m = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+    return [int(g) for g in m.groups()] if m else None
+
+nodes = []
+for m in re.finditer(r'<node\b[^>]*?>', s):
+    d = dict(re.findall(r'(\w[\w-]*)="([^"]*)"', m.group(0)))
+    b = box(m.group(0))
+    if not b or b[2] <= b[0] or b[3] <= b[1]:
+        continue
+    nodes.append((d, b))
+
+host = next((n for n in nodes if n[0].get('resource-id') == block), None)
+if host is None:
+    print('BLOCK-ABSENT')
+    sys.exit(0)
+bx = host[1]
+hit = None
+for n in nodes:
+    if n is host:
+        continue
+    if n[0].get('content-desc') != desc and n[0].get('text') != desc:
+        continue
+    if bx[0] <= n[1][0] and n[1][2] <= bx[2] + 1 and bx[1] <= n[1][1] and n[1][3] <= bx[3] + 1:
+        hit = n
+        break
+if hit is None:
+    sys.exit(0)
+hx = hit[1]
+anc = [n for n in nodes
+       if n[1][0] <= hx[0] and hx[2] <= n[1][2] + 1
+       and n[1][1] <= hx[1] and hx[3] <= n[1][3] + 1
+       and (n[0].get('clickable') == 'true' or n[0].get('checkable') == 'true')]
+if anc:
+    pick = min(anc, key=lambda n: (n[1][2] - n[1][0]) * (n[1][3] - n[1][1]))
+    print((pick[1][0] + pick[1][2]) // 2, (pick[1][1] + pick[1][3]) // 2, 'clickable-ancestor')
+else:
+    print((hx[0] + hx[2]) // 2, (hx[1] + hx[3]) // 2, 'label-self-no-clickable-ancestor')
+PYPY
+}
+
 tap_in_rid() {  # <块 testID> <content-desc>
-  local block=$1 desc=$2 i out
+  local block=$1 desc=$2 i out src cx cy
   for i in 1 2 3 4 5; do
     dump
-    out=$(xy_in_rid "$block" "$desc")
-    if [ -n "$out" ]; then
-      set -- $out
-      $ADB shell input tap "$1" "$2" >/dev/null 2>&1
+    out=$(xy_clickable_in_rid "$block" "$desc")
+    if [ "$out" = "BLOCK-ABSENT" ]; then
+      # 块本身不在这一秒的树里 —— 与"块里没有那枚 chip"是两句话，不许混着报
+      echo "   ↻ 块 $block 还没进窗口（第 ${i} 帧），先滚进来" >&2
+    elif [ -n "$out" ]; then
+      read -r cx cy src <<<"$out"
+      echo "   · 点 $block 里的「$desc」→ 落在 [${src}] @ ${cx},${cy}" >&2
+      $ADB shell input tap "$cx" "$cy" >/dev/null 2>&1
       sleep 1
+      if [ "$src" = "label-self-no-clickable-ancestor" ]; then
+        echo "   ❌ $block 里的「$desc」找不到可点祖先（只有 clickable=false 的标签层）—— 这一下会落空" >&2
+        return 1
+      fi
       return 0
     fi
     $ADB shell input swipe 540 1900 540 1100 250
     sleep 1.5
   done
-  echo "   ❌ 块 $block 里没有 content-desc=$desc 的节点（滚了 5 次）" >&2
+  echo "   ❌ 滚了 5 次，块 $block 里找不到 content-desc=$desc 的节点" >&2
   return 1
+}
+
+# 🔴 建完端点**还不够**：必须把它绑进各功能的 routes。
+#   `resolveRoute` 吃的是 `config.routes[feature]`（`packages/app-host/src/ai-route-target.ts`
+#   → `packages/ai/src/routing.ts`），端点只躺在 `endpoints[]` 里时那一档的候选集是空的 ⇒
+#   `resolveAiRoute().target` 为 undefined ⇒ 助手屏的六枚按钮（`tool-start-single` /
+#   `tool-start-assistant` / `breakdown-start` / …）**全部 enabled=false**。
+#   rig18 现量：输入框里已经躺着文字，`tool-start-assistant` 仍 disabled ——
+#   那不是产品坏了，是这一发配置步骤在载体里从来没做过。
+#   ⚠️ 点完必须**读回 selected**：`tap_in_rid` 只证明"手指落下去了"，不证明"路由真的写进去了"
+#   （AGENTS §7 元规则二：点了没回读 = 把探针的故障留给下一条判据去猜）。
+bind_route() {  # <功能名> <端点标签>
+  local f=$1 label=$2 block="ai-feature-$1" sel
+  reveal_rid "$block" || { echo "   ❌ 逐功能块 $block 滚不出来" >&2; return 1; }
+  tap_in_rid "$block" "$label" || return 1
+  # ⚠️ 这里**不拿 `selected` 当判据**，只把读数打印出来：rig20 现量整棵 AX 树
+  #   `selected="true"` 命中 **0** 枚，而 `ui/kit.tsx` 的 Chip 明明写了
+  #   `accessibilityState={{ selected }}` ⇒ 选中态在 Android 无障碍树上读不到
+  #   （产品侧的可访问性缺口，已登记进计划；载体不能替它编一个读数）。
+  #   绑定到底有没有生效，判据放在**被绑那一侧**：第 5 步的按钮必须 enabled。
+  sel=$(xy_in_rid "$block" "$label" selected | awk '{print $3}')
+  echo "   ↷ 现量：$block 里「$label」的 selected=${sel:-读不出}（Android 读不到选中态，理由见上）" >&2
+  return 0
+}
+
+bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要指名是哪一档
+  local label=$1 f MISSING=""
+  # 🔴 建完端点那一发把焦点留在 `ai-endpoint-model` 上（rig21 现量 `focused="true"`），
+  #   而带着焦点的长距离 swipe 会被输入框当文本拖拽吞掉（受控 A/B：同一条手势前后
+  #   参照锚逐字节相同）。不先摘焦点，后三档一律"滚不出来"——那是载体的手势没送达，
+  #   不是产品没渲染（`AiSettingsSection.tsx:381` 是 `FEATURE_ORDER.map`，五档全渲染）。
+  blur_focus
+  scroll_to_top
+  # 这一串必须与 `AiSettingsSection.tsx` 的 FEATURE_ORDER 同序同值；
+  # 取现量：grep -A 6 "const FEATURE_ORDER = \[" apps/mobile/src/ai/AiSettingsSection.tsx
+  for f in capture breakdown prioritize duration-estimate tool-calling; do
+    bind_route "$f" "$label" || MISSING="$MISSING $f"
+  done
+  if [ -n "$MISSING" ]; then
+    echo "   ❌ 这些档没绑上端点:$MISSING" >&2
+    return 1
+  fi
+  echo "   · 五档路由各点了一次这枚端点（生效与否由第 5 步的 enabled 当场判）" >&2
+  return 0
 }
 
 # ── 截图证据（与 verify-mobile-notes 同一条判据）────────────────────
@@ -687,6 +971,10 @@ goto_me_page() {
 }
 
 open_ai_settings() {
+  # 🔴 先收助手层：它是盖在「我的」上的一层，立着的时候**底部标签不在树里**
+  #   （rig16 现量：第 6 步三次 `点了「我的」但标记「立即同步」没出现` ⇒ 整轮中止，
+  #    而上一个屏正是第 5 步留下的助手结果卡）。
+  leave_assistant || summary "移动端 AI 助手真机验收" "助手层收不掉" 1
   goto_me_page || { echo "   ❌ 到不了「我的」页，后面没有屏可点"; return 1; }
   # 🔴 这一段的锚点原先写的是 `xy_desc "设置"`，2026-10-06 实测**恒取空**：
   #    那一格的 content-desc 实际是「设置, 同步凭据、桌面小组件与语言」——
@@ -785,12 +1073,18 @@ add_endpoint() {  # <名称> <地址>
 step "2. 配端点之前：入口整行不在树里（aiEntryVisible 的反向那一半）"
 # 🔴 反向判据必须先站对屏（见 goto_me_page 的注释）：「不在树里」这句话
 #    在别的屏上一样成立，不验正面锚点就是"一句恒绿的判据"。
+# 🔴 第二层：同一句话在**对的屏**上也有两种读法 —— "没渲染"与"在裁切线以外"
+#    （见 reveal_rid 的现量）。所以这里必须先把"助手的两枚邻锚凑到同一帧"做出来，
+#    缺席才有判决力；凑不出那样的帧 ⇒ 载体响亮失败，不记产品红、也不记通过。
 goto_me_page || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
+reveal_between profile-entry-habits profile-entry-trash \
+  || summary "移动端 AI 助手真机验收" "载体滚不出邻锚同帧（反向判据无从判定）" 1
 if [ "$(has_rid profile-entry-assistant)" = "1" ]; then
   bad "还没配端点，「AI 助手」那一格就已经在树里 —— 未配置的功能不该进 DOM，那这条反向判据也就守不住任何东西"
 else
-  ok "未配置时「AI 助手」入口整行不在 AX 树里"
+  ok "未配置时「AI 助手」入口整行不在 AX 树里（邻锚同帧已证：不是裁切线以外）"
 fi
+scroll_to_top   # 第 3 步要从顶部那一带点「设置」，别把滚到底的状态留给它
 
 step "3. 开总开关 + 配一枚回环假端点（仍处「只用本机」）"
 open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
@@ -824,14 +1118,30 @@ ROWS_BEFORE=$(endpoint_rows)
 add_endpoint "$EP_LOOPBACK" "$DEVICE_LOOPBACK_URL" \
   || { echo "   ❌ 回环假端点没存进去"; screen_txt; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
 ROWS_AFTER=$(endpoint_rows)
+# 🔴 两件事不许并成一句（rig22 现量：`行 0→1` 已经写进去了，而单帧 `has_desc` 命中 0）：
+#   ① **存没存进去** —— 数的是配置里的端点行（这一格当时就成立了）；
+#   ② **界面读不读得到那枚 chip** —— chip 挂在 `content-desc` 上，可能在裁切窗口以外，
+#      而且刚点完「添加自定义端点」，焦点还赖在模型输入框上，长 swipe 会被它吞掉（见 reveal_desc）。
+#   把 ① 和 ② 合成"端点没落进去"，症状与真没保存一模一样，而修法完全不同。
+blur_focus
+CHIP=1
+[ "$(has_desc "$EP_LOOPBACK")" = "1" ] || { reveal_desc "$EP_LOOPBACK" && CHIP=1 || CHIP=0; }
 dump
-if [ "$(has_desc "$EP_LOOPBACK")" = "1" ] && [ "$ROWS_AFTER" -gt "$ROWS_BEFORE" ]; then
+if [ "$CHIP" = "1" ] && [ "$ROWS_AFTER" -gt "$ROWS_BEFORE" ]; then
   ok "回环假端点已落进配置（端点行 ${ROWS_BEFORE}→${ROWS_AFTER}，chip 在树里）"
 else
-  bad "回环假端点没落进去：chip 命中=$(has_desc "$EP_LOOPBACK")，行 ${ROWS_BEFORE}→${ROWS_AFTER}"
+  if [ "$ROWS_AFTER" -gt "$ROWS_BEFORE" ]; then
+    bad "端点**存进去了**（行 ${ROWS_BEFORE}→${ROWS_AFTER}）但界面滚遍也读不到那枚 chip —— 这是渲染/可达性问题，不是保存失败"
+  else
+    bad "端点没存进去（行 ${ROWS_BEFORE}→${ROWS_AFTER}），chip 命中=$(has_desc "$EP_LOOPBACK") —— 先修保存那一步"
+  fi
   screen_txt
   summary "移动端 AI 助手真机验收" "端点存不进" 1
 fi
+# ④ 🔴 端点存进去 ≠ 路由绑上了（见 bind_route 头上那段现量）：不绑，助手面六枚按钮全 disabled，
+#    第 5 步往后每一条判据都没有输入。
+bind_all_routes "$EP_LOOPBACK" \
+  || { echo "   ❌ 回环端点没能绑进五档路由 —— 助手面的按钮会一直 disabled，那不是产品闸门" >&2; screen_txt; summary "移动端 AI 助手真机验收" "载体没把路由绑上" 1; }
 
 step "4. 明文 + 非回环端点**存不进去**（validateEndpointUrl 的 plaintext-remote）"
 ROWS_BEFORE2=$(endpoint_rows)
@@ -853,13 +1163,23 @@ step "5. 只用本机时：规则句命中且零外发（Goal-1 的设备级判�
 # 第 3/4 步整段停在「AI 设置」屏上，而「AI 助手」那一格在「我的」页 ——
 # 原先这里直接 dump，等于在设置屏上找「我的」页的格子（恒红），
 # 而第 2 步那句反向判据又在任意错屏上恒绿。两头都要靠 goto_me_page 钉住屏。
-goto_me_page || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
+# 🔴 但**不能直接 goto_me_page**：设置是浮层，浮层开着的时候底部标签根本不在树里
+#   （rig14 现量：`↻ 「我的」不在树里` 三连 ⇒ 未跑完就中止，11 项通过却拿不到后面的读数）。
+#   先 `leave_settings`（收键盘 → BACK 收浮层 → 兜住前台），再由它的正面锚点收尾。
+leave_settings || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
+# 🔴 先把它滚进窗口再断言（rig15 现量：顶部那一帧它本就够不到裁切线，
+#   `has_rid` 的 0 当时被读成了"产品没渲染这一行"，而手工逐帧滚到底证明 assistant=1236-1351 完整出现）。
+reveal_rid profile-entry-assistant || {
+  bad "配好端点后「我的」里滚到底也没有「AI 助手」这一格（testID=profile-entry-assistant）"
+  screen_txt
+  summary "移动端 AI 助手真机验收" "入口没出现" 1
+}
 if [ "$(has_rid profile-entry-assistant)" = "1" ]; then
   ok "配好端点后「AI 助手」这一格进了树（与第 2 步的缺席对照成对）"
 else
-  bad "配好端点后「我的」里仍没有「AI 助手」这一格（testID=profile-entry-assistant）"
+  bad "reveal_rid 说滚出来了，has_rid 却说没有 —— 两把尺读的不是同一帧或同一谓词，载体自坏"
   screen_txt
-  summary "移动端 AI 助手真机验收" "入口没出现" 1
+  summary "移动端 AI 助手真机验收" "载体两把尺不一致" 1
 fi
 tap_rid profile-entry-assistant || summary "移动端 AI 助手真机验收" "入口点不动" 1
 dump
@@ -881,25 +1201,94 @@ dump
 disable_ime
 # 🔴 同一枚"只 dump 一次、取不到就报锚点坏了"的形状（见 add_endpoint 那段现量）：
 #    输入框在面板下方时它**根本没进那一秒的树**，红字却说"界面形状变了"。
-tap_rid tool-input || { echo "   ❌ 工具档里滚不出输入框 testID=tool-input"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
-clear_and_type "list all tasks"
+tap_rid tool-input || { echo "   🔴 工具档里滚不出输入框 testID=tool-input"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
+# 🔴 带标签发（标签 = 这枚输入框的 content-desc）：`clear_and_type` 只有拿到标签才会
+#    **读回并补齐**。rig18 现量：不带标签发 "list all tasks"，框里只剩 `list`
+#    —— 空格在 adb→device shell 那一跳被当成语界，`input text` 退 0、一声不响
+#    （`%s` 才对，见 lib 里 `_adb_text` 那段 A/B）。
+RULE_PROMPT="list all tasks"
+NO_MATCH_PROMPT="write a haiku about rain"
+clear_and_type "$RULE_PROMPT" "想让它怎么帮你" \
+  || { echo "   🔴 助手输入框读不回「$RULE_PROMPT」（发进去的内容与期望不符）—— 这是输入通道坏了，不是产品没答" >&2; screen_txt; restore_ime; summary "移动端 AI 助手真机验收" "载体输入通道坏了" 1; }
 restore_ime
 stub_reset; RB=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
+# 🔴 原先这里写的是裸 `$ADB shell input tap $XY`（取 rid_center 的中心）—— 那是 #324-4
+#   的同一条：`tool-start-assistant` 是 `<Button testID=…>`，点它**只是走进披露步**
+#   （phase: input → disclose），真正的发送在 `ai-tool-send` 上（AssistantScreen.tsx:1216
+#   `send()` 只由 DisclosureStep 的 onSend 触发）。rig16 现量：那句红同时打出
+#   `端点收到过的功能：`（空）——**不是因为零外发成立，是因为压根没发**。
+#   两半都要修：① 走 tap_rid 并确认披露步真的出现；② 补一次"披露步的发送"。
+# 🔴 绑定生效的**正面判据**（也就是第 3 步那五发点击真正的读回口）：
+#   `disabled = text.trim()==='' || props.route.target===undefined`
+#   —— 框里已有文字（上面逐字读回过），所以 enabled=true 只可能来自"路由真的绑上了"。
 dump
-XY=$(rid_center tool-start-assistant)
-[ -n "$XY" ] || { echo "   ❌ 找不到 testID=tool-start-assistant（多步循环那颗发送）"; screen_txt; summary "移动端 AI 助手真机验收" "载体锚点失效" 1; }
-$ADB shell input tap $XY >/dev/null 2>&1
+if [ "$(rid_attr tool-start-assistant enabled)" != "true" ]; then
+  bad "输入框里有文字、按钮却还是 disabled ⇒ 这一档的候选集是空的（不是产品闸门：「target」取的是 routes[feature]，见 bind_route 那段；两种成因——路由没绑上／这一档的同意没给——要由后面的现量分辨，不许在这一句里替它选一个）"
+  screen_txt
+  summary "移动端 AI 助手真机验收" "路由没绑上" 1
+fi
+ok "五档路由绑定生效：tool-start-assistant 的 enabled=true（disabled 的另一半条件已由读回的输入框满足）"
+tap_rid tool-start-assistant || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
+dump
+if [ -z "$(rid_center ai-tool-send)" ]; then
+  bad "点完「发送（多轮）」之后披露步没出现（testID=ai-tool-send 不在树里）—— 那一档的相位机换了，后面的判据没有输入"
+  screen_txt
+  summary "移动端 AI 助手真机验收" "披露步没出现" 1
+fi
+ok "点「发送（多轮）」后进的是披露步（ai-tool-send 在树里）—— 请求还没出去，用户先看披露"
+tap_rid ai-tool-send || summary "移动端 AI 助手真机验收" "披露步的发送点不动" 1
 sleep 4
 dump
+# 结果卡在面板下方 ⇒ 先滚进来再读（同 reveal_rid 那条裁切现量）。
+reveal_sub "本机规则命中"
 RULE_HIT=$(has_sub "本机规则命中")
 RC1=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
-if [ "$RULE_HIT" = "1" ] && [ "$RC1" = "$RB" ]; then
-  ok "「list all tasks」走本机规则（那句「本机规则命中 —— 没有联网」在屏上），假端点计数 ${RB}→${RC1} 一次没动"
-elif [ "$RULE_HIT" != "1" ]; then
-  bad "界面没有「本机规则命中」那行：规则短路在设备上没成立（或措辞变了）"
-  echo "      端点收到过的功能：$(feature_lines)"
+
+# ── 5a 反向对照：规则表**选不到**的那一句必须真的走出去 ─────────────────
+# 为什么这条必须先跑：没有它，"计数一次没动"就分不清是"零外发成立"还是"根本没发"
+# （rig16 那次就是后者，而输出长得和成功一模一样 —— §7 元规则二）。
+# 这句不是拍的：真表逐条 `.test()` 过（现量，2026-10-06 19:42）：
+#   node -e 'const R=require("./packages/app-host/dist/index.js").DEFAULT_TOOL_SELECTION_RULES;
+#     console.log(R.length, ["list all tasks","write a haiku about rain","列出所有任务"]
+#       .map(p=>p+"⇒"+(R.filter(r=>new RegExp(r.pattern.source,r.pattern.flags).test(p)).map(r=>r.id).join(",")||"零命中")))'
+#   → 表 12 条；两句 ASCII 全零命中，「列出所有任务」命中 list.tasks。
+tap_rid tool-input || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
+clear_and_type "$NO_MATCH_PROMPT" "想让它怎么帮你" \
+  || { echo "   🔴 第二发没进框（读回不符）" >&2; restore_ime; summary "移动端 AI 助手真机验收" "载体输入通道坏了" 1; }
+restore_ime
+RB2=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
+tap_rid tool-start-assistant || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
+dump
+[ -n "$(rid_center ai-tool-send)" ] || summary "移动端 AI 助手真机验收" "披露步没出现" 1
+tap_rid ai-tool-send || summary "移动端 AI 助手真机验收" "披露步的发送点不动" 1
+sleep 5
+RC2=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
+if [ "$RC2" -gt "$RB2" ]; then
+  ok "反向对照成立：「$NO_MATCH_PROMPT」规则表选不到 ⇒ 假端点计数 ${RB2}→${RC2}（确实会外发，所以下面那条「计数没动」才有意义）"
 else
+  bad "🔴 反向对照不成立：规则表选不到的一句也没有走出去（${RB2}→${RC2}）—— 要么发送链路断了，要么这一档根本没接外发；"
+  echo "      此时上面任何「零外发」读数都不能当作 Goal-1 的证据。"
+  echo "      端点收到过的功能：$(feature_lines)"
+  summary "移动端 AI 助手真机验收" "反向对照不成立" 1
+fi
+
+# ── 5b 规则命中那一腿：装的是旧产物时**明确记未闭合** ────────────────────
+# 🔴 为什么这里可能拿不到读数（三条通道现量，2026-10-06）：
+#   · 本机规则表的 12 条 `pattern`（`packages/app-host/src/ai-tool-selection.ts` 的
+#     `DEFAULT_TOOL_SELECTION_RULES`；条数现量：见 5a 上面那条 node -e）
+#     **谓词头全是中文**（列出/列一下/看看/看一下/查看/有哪些…），ASCII 句子永远选不中；
+#   · 而这台模拟器发不出中文：`input text "列出所有任务"` 与 `input keyboard text …`
+#     都抛 `java.lang.NullPointerException`（#43 复测），`cmd clipboard` 回
+#     「No shell command implementation」—— 三条注入通道逐个试完，不是只试一条。
+#   ⇒ 这一腿要闭合，得先给规则表补 ASCII 别名（并配正反样本）**再重打 Android 产物**，
+#     或走 iOS 那条能输中文的通道。载体现量：`ssh windows-pc` 现不可达（Host is down），
+#     而 `pnpm build:android` 按 §6.1 一律走那台打包机 ⇒ 本机不擅自降级。
+if [ "$RULE_HIT" = "1" ] && [ "$RC1" = "$RB" ]; then
+  ok "「$RULE_PROMPT」走本机规则（那句「本机规则命中 —— 没有联网」在屏上），假端点计数 ${RB}→${RC1} 一次没动"
+elif [ "$RC1" != "$RB" ] && [ "$RULE_HIT" = "1" ]; then
   bad "🔴 规则命中却仍然外发了：计数 ${RB}→${RC1}"
+else
+  bad "这一腿没有读数：界面没有「本机规则命中」那行，而计数 ${RB}→${RC1} 说明请求确实发出去了 —— 与 5a 同因（ASCII 句子命中不了全中文谓词的规则表）。上面 5a 已把这条通道证到能用，所以这里记的是**规则表缺 ASCII 别名**，不是载体坏了、也不是零外发成立。"
 fi
 
 step "6. 同意联网，但逐功能授权一律不给"
