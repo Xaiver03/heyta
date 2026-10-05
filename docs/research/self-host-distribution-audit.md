@@ -14203,3 +14203,18 @@ VERIFY_RC=0
 - 我这一班**没有**动主检出：原本授权的是一次 `ff-only`，而 main 与 fix 分支已分叉
   （`main 独有=27 / fix 独有=2`），ff 的前提不成立，所以我把它换成"交一条可直接 merge 的分支 + 现量读数"，
   并把 CalendarView 那处的成因与修法留在 §8.269（它已由合流那条线自己进 main，blob `10d18c28` 逐字同一）。
+
+### 8.271 就地更正 §8.270 的两句（我写得太快，两枚都是方向性错误）
+
+1. ❌ "`git diff --name-only main de761797` 只有那一枚测试文件" —— 现量是**两枚**：
+   `e2e/selfhost-stack/selfhost-web.spec.ts` **和** `research/licenses-inventory.generated.md`。
+   第二枚的成因不是我的分支带了它，而是**我分支之后 main 又前进了**，于是 `diff main..de761797`
+   在那个文件上表示的是"从 main 退回我这版"。⇒ 正确说法：**我这侧只前进了一枚测试文件**，
+   另一枚是别人在 main 上的新内容；所以并回 main 必须走 **merge**（不是 checkout/reset 那棵树），
+   否则会把人家那一笔生成物**revert 掉**。判"差集"之前要先确认差在哪一侧 —— 裸 `diff A B` 不区分。
+2. ❌ "没有任何打包输入读 `e2e/selfhost-stack`" —— `grep` 实际命中了 `scripts/verify-selfhost-stack.sh`。
+   它读这份 spec 是**设计如此**（它就是那条验收尺的运行时），不是打包输入。
+   准确口径：**四端产物（.app/.dmg/APK/MSIX/HAP 与镜像）不读它；链外的自托管验收读它**，
+   所以"这一格没并进 main 时四端产物仍与 main 等价"成立，而"没人读它"不成立。
+
+结论不变的那半：第 8 项 `reinstall:all` 不被这次合并挡着（它装的是产物，不是判据）。
