@@ -824,6 +824,116 @@ else
   echo '--- 臂21 日志尾部 ---'; tail -20 "${L}.arm21.out"
 fi
 
+# ============================================================================
+# 臂 22–27：`calendar-line-wire-evidence-rigs.mjs`（把三台验证台接进 check 链的那一步，§4.05 (59)）
+#   这一族测的是**写盘工具的闸门**，不是链的内容：默认不写、脏就拒、锚点不猜、半截不补、写第二次是空操作。
+#   夹具用**迷你 package.json**（不碰真的那枚），且目标放在非仓库目录 ⇒ 对账门禁那一格如实报 skipped。
+# ============================================================================
+WIRE=research/tools/calendar-line-wire-evidence-rigs.mjs
+# 🔴 臂 23 那腿在子 shell 里 `cd` 进了夹具 ⇒ 相对路径会解析成"夹具里的文件"，
+#    node 报 "Cannot find module" 并退 1，读数会长得像"工具没拒绝"（码对、来路错）。绝对路径才行。
+WIRE_ABS="$PWD/$WIRE"
+[ -f "$WIRE" ] || { bad "臂22–27 的夹具没建：$WIRE 不在树里（这一族的存在理由整格作废）"; }
+mk_pkg() {   # $1 = 目标文件路径
+  printf '{\n  "scripts": {\n    "check:md-tables": "node scripts/check-md-table-rows.mjs",\n    "check": "pnpm check:md-tables && pnpm check:pricing"\n  }\n}\n' > "$1"
+}
+FW=$(mktemp -d /tmp/clc-wire.XXXXXX)
+if [ -f "$WIRE" ]; then
+  # --- 臂22：默认必须是 dry-run，且**逐字节不写**（哈希对账，不看它自己怎么说）---
+  mk_pkg "$FW/base.json"; cp "$FW/base.json" "$FW/a22.json"
+  H0=$(md5 -q "$FW/a22.json")
+  O22=$(node "$WIRE" --pkg "$FW/a22.json" 2>&1); R22=$?
+  H1=$(md5 -q "$FW/a22.json")
+  if [ "$R22" = 0 ] && [ "$H0" = "$H1" ] && printf '%s' "$O22" | grep -q 'dry-run 结束（没写盘）'; then
+    ok "臂22 默认 dry-run ⇒ rc=0、打印两处、文件 md5 逐字未变 ⇒ \"默认不动盘\"是被证明的，不是被声称的"
+  else
+    bad "臂22 未按预期 ⇒ 默认档没保证不写盘或读数不对（rc=${R22} 变没变=${H0}/${H1}）"
+    printf '%s\n' "$O22" | tail -6 | sed 's/^/      /'
+  fi
+
+  # --- 臂23：目标在工作树里脏 ⇒ 拒绝（exit 3），且必须落在那条"同一行"的理由上 ---
+  FR=$(mktemp -d /tmp/clc-wiredirty.XXXXXX)
+  (
+    cd "$FR" || exit 1
+    git init -q .; git config user.email t@t; git config user.name t
+    mkdir -p scripts research/tools
+    printf '#!/usr/bin/env node\nconsole.log("STUB gate");\n' > scripts/check-gate-wiring.mjs
+    mk_pkg "$FR/package.json"
+    git add -A >/dev/null 2>&1; git commit -qm base
+    # 🔴 脏的那一份**必须保留两处锚点**（改的是不相干的一行）—— 第一版我在这里顺手改了链串，
+    #    于是 rc 走的是"锚点数不对"那一档（exit 4），臂 23 测的却是"脏 ⇒ 拒绝"（exit 3）。
+    #    夹具改坏了被测前提，读数就会退化成另一条不相干的码。
+    printf '{\n  "scripts": {\n    "check:md-tables": "node scripts/check-md-table-rows.mjs",\n    "check:someones-work": "echo 别人正在加的门禁",\n    "check": "pnpm check:md-tables && pnpm check:pricing"\n  }\n}\n' > package.json
+    echo "DIRTY=$(git status --porcelain -- package.json)"
+    echo "BEFORE=$(md5 -q package.json)"
+    O=$(node "$WIRE_ABS" --pkg "$FR/package.json" --confirm 2>&1); echo "RC=$?"
+    printf '%s\n' "$O" | sed 's/^/      OUT: /'
+    printf '%s\n' "$O" | grep -q '别人未提交的字节' && echo REFUSED=yes || echo REFUSED=no
+    echo "AFTER=$(md5 -q package.json)"
+  ) > "${L}.arm23.out" 2>&1
+  A23=$(cat "${L}.arm23.out")
+  if [ "$(rd "$A23" RC)" = "3" ] && [ "$(rd "$A23" REFUSED)" = "yes" ] \
+     && [ "$(rd "$A23" BEFORE)" = "$(rd "$A23" AFTER)" ] && [ -n "$(rd "$A23" DIRTY)" ]; then
+    ok "臂23 目标脏 + --confirm ⇒ rc=3、点名\"别人未提交的字节\"、文件 md5 前后一致 ⇒ 同一行相撞时它不替别人带字节"
+  else
+    bad "臂23 未按预期 ⇒ 脏目标上的 --confirm 没有拒绝（这一格是整个工具的存在理由）"
+    printf '%s\n' "$A23" | tail -6 | sed 's/^/      /'
+  fi
+
+  # --- 臂24：锚点数不对 ⇒ exit 4「不猜插入点」，一条字节都不许写 ---
+  mk_pkg "$FW/a24.json"
+  sed 's/pnpm check:md-tables \&\& pnpm check:pricing/pnpm check:md-tables \&\& pnpm check:tokens/' "$FW/a24.json" > "$FW/a24b.json"
+  B0=$(md5 -q "$FW/a24b.json")
+  O24=$(node "$WIRE" --pkg "$FW/a24b.json" --confirm 2>&1); R24=$?
+  B1=$(md5 -q "$FW/a24b.json")
+  if [ "$R24" = 4 ] && [ "$B0" = "$B1" ] && printf '%s' "$O24" | grep -q '不猜插入点'; then
+    ok "臂24 链锚点数 0 ⇒ rc=4、大字\"不猜插入点\"、文件 md5 未变 ⇒ 改了形的链不会被它猜着插进别处"
+  else
+    bad "臂24 未按预期 ⇒ 锚点缺失时它没拒绝或动手写了（rc=${R24} 变没变=${B0}/${B1}）"
+    printf '%s\n' "$O24" | tail -6 | sed 's/^/      /'
+  fi
+
+  # --- 臂25：半截状态（链里有、定义没有）⇒ 不许"顺手补定义"，exit 4 ---
+  printf '{\n  "scripts": {\n    "check:md-tables": "node scripts/check-md-table-rows.mjs",\n    "check": "pnpm check:md-tables && pnpm check:calendar-evidence-rigs && pnpm check:pricing"\n  }\n}\n' > "$FW/a25.json"
+  O25=$(node "$WIRE" --pkg "$FW/a25.json" --confirm 2>&1); R25=$?
+  if [ "$R25" = 4 ] && printf '%s' "$O25" | grep -q '半截状态'; then
+    ok "臂25 链里已有名而定义行不在 ⇒ rc=4 并写清\"正确的修法不是自动补定义\" ⇒ 它不会把别人的半截改动圆成自己的"
+  else
+    bad "臂25 未按预期 ⇒ 半截状态被它自动补全了（那是造第二份真相）rc=${R25}"
+    printf '%s\n' "$O25" | tail -4 | sed 's/^/      /'
+  fi
+
+  # --- 臂26：干净目标 + --confirm 写一次，再跑第二次必须是空操作（幂等）；写入结果必须是合法 JSON ---
+  mk_pkg "$FW/a26.json"
+  node "$WIRE" --pkg "$FW/a26.json" --confirm > "${L}.arm26a.out" 2>&1; R26A=$?
+  JOK=$(node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$FW/a26.json" >/dev/null 2>&1 && echo yes || echo no)
+  NDEF=$(grep -c '"check:calendar-evidence-rigs":' "$FW/a26.json" || true)
+  NCHAIN=$(grep -o 'pnpm check:calendar-evidence-rigs' "$FW/a26.json" | grep -c . || true)
+  node "$WIRE" --pkg "$FW/a26.json" --confirm > "${L}.arm26b.out" 2>&1; R26B=$?
+  IDP=$(grep -c '两处都已在册' "${L}.arm26b.out" || true)
+  if [ "$R26A" = 0 ] && [ "$JOK" = yes ] && [ "$NDEF" = 1 ] && [ "$NCHAIN" = 1 ] \
+     && [ "$R26B" = 0 ] && [ "$IDP" = 1 ]; then
+    ok "臂26 干净目标 --confirm ⇒ rc=0、JSON 合法、定义 1 枚且链里 1 枚（**不会插成两份**）、第二次跑报\"两处都已在册\"仍 rc=0 ⇒ 反复跑安全"
+  else
+    bad "臂26 未按预期 ⇒ rc=${R26A}/${R26B} JSON=${JOK} 定义=${NDEF} 链=${NCHAIN} 幂等句=${IDP}"
+    tail -6 "${L}.arm26a.out" "${L}.arm26b.out" | sed 's/^/      /'
+  fi
+fi
+# --- 臂27：半缺的另一侧（定义已在、链没接）⇒ 只补缺的那一半，不许把定义插成两份 ---
+printf '{\n  "scripts": {\n    "check:md-tables": "node scripts/check-md-table-rows.mjs",\n    "check:calendar-evidence-rigs": "bash research/tools/calendar-line-commit-only-arms.sh && bash research/tools/r17-reshoot-arms.sh && bash research/tools/r17-reshoot-stale.sh --selftest",\n    "check": "pnpm check:md-tables && pnpm check:pricing"\n  }\n}\n' > "$FW/a27.json"
+node "$WIRE" --pkg "$FW/a27.json" --confirm > "${L}.arm27.out" 2>&1; R27=$?
+J27=$(node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$FW/a27.json" >/dev/null 2>&1 && echo yes || echo no)
+D27=$(grep -c '"check:calendar-evidence-rigs":' "$FW/a27.json" || true)
+C27=$(grep -o 'pnpm check:calendar-evidence-rigs' "$FW/a27.json" | grep -c . || true)
+if [ "$R27" = 0 ] && [ "$J27" = yes ] && [ "$D27" = 1 ] && [ "$C27" = 1 ]; then
+  ok "臂27 定义已在而链没接 ⇒ rc=0、链补上 1 枚、定义**仍是 1 枚**（没插成两份同名键）⇒ 补缺那一半是被证明的"
+else
+  bad "臂27 未按预期 ⇒ rc=${R27} JSON=${J27} 定义=${D27}（要 1）链=${C27}（要 1）"
+  tail -6 "${L}.arm27.out" | sed 's/^/      /'
+fi
+
+rm -rf "$FW" "$FR"
+
 rm -rf "$F" "$F2" "$F3" "$F4" "$F5" "$F6" "$F7" "$F8" "$F9" "$F10" "$F11" "$F12" "$F13" "$F14" "$F15" "$F16" "$F17" "$F18" "$F19" "$F20" "$F21"
 echo "== 合计 pass=$PASS fail=$FAIL =="
 rm -f "${L}".arm*.out "${L}".arm*.rd
