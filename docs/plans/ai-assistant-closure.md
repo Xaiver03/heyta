@@ -511,7 +511,57 @@ W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的�
      ② `newSession()` 里我多写了一次 `clearAssistantHistory` —— 变异摘掉它 **0 红**，
      因为落盘 effect 的 `items.length === 0` 分支已经删了；多余的那次已删，
      变异锚点也搬到了真正承重的 effect 那一支。
-     ⚠️ **仍然没做**：D-4 的 (ii)（跨设备会话实体，产品未拍）。
+     ✅ **D-4 的 (ii)「跨设备会话实体」已拍并已落地（产品负责人 2026-10-05 拍"做"）**。
+     裁决与新实体逐条在下面这段，实现状态跟着一起写在这里（不留两套状态）。
+
+     🔴 **实体粒度：一条消息 = 一个实体**（`ASSISTANT_TURN`），不是"整段会话一个实体"。
+     理由不是风格：会话级实体要把 `turns` 整个数组当载荷写，而本引擎的 LWW
+     **在数组上是覆盖语义** —— 两台设备各追加一条，胜出那条会把对端刚追加的一整条
+     吞掉，且**没有任何一层会报错**。一条消息一个实体时"只增不减"是结构给的。
+     行为版判据：`packages/op-log/tests/assistant-turn-convergence.spec.ts`
+     第 3 条（两台设备各追加一条 ⇒ 两条都在）。
+
+     🔴 **跨设备可确认性**（那条实体方案原先欠着的第三个问题的答案）：
+     **改动提案的可确认性只在产生它的那台设备上**。判定在
+     `packages/domain/src/assistant-turn.ts`（`assistantTurnIsConfirmableHere` /
+     `assistantTurnIsExpiredHere`），依据是载荷里显式的 `originClientId`，
+     **不是**归约器的 `_lastClientId`（理由写在 `AssistantTurn.originClientId` 上）；
+     写侧 `setDisposition()` 在**构造 op 之前**就拒绝，所以这条不是界面装饰。
+     反面同样钉住：**本机自己写的未确认提案不算过期**（变异 M6 专打这一半）。
+
+     纯可加性变更，**没有 bump `CURRENT_SCHEMA_VERSION`**，逐点清单照 `EVENT`
+     （`docs/plans/countdown-anniversary.md` §3 的 W2）与 `PREFERENCE_CORRECTION`
+     （ADR-0014）：`ENTITY_TYPES` → `EntityModelMap`/`MODELED_ENTITY_TYPES` →
+     `BUCKET_BY_ENTITY` → `packages/ui/src/sync/model.ts` 的 `ENTITY_LABEL_KEYS` →
+     中英词条 `common.entity.ASSISTANT_TURN` → op 构造在
+     `packages/app-host/src/assistant-session-actions.ts`。
+     服务端白名单**零改动**：`ALLOWED_ENTITY_TYPES` 是从 `ENTITY_TYPES` 派生的
+     （`server/src/sync/services/validation.service.ts:25`），另建一份就是第二套词表。
+     🔴 部署顺序仍是硬的（§2.1 同一条）：**服务端先于客户端上线**，
+     否则老服务端回 `INVALID_ENTITY_TYPE` 永久拒绝那条 op。
+
+     覆盖面分母的联动在**生成器的真源**：`scripts/gen-ai-capability-manifest.mjs` 的
+     `DENOMINATOR_EXCLUSIONS` 加了第三条（对话记录不是用户可操作的业务实体，
+     而且正文里含 provider 的回复），产物 `capability-manifest.generated.ts` 重生成，
+     分母算术由 `check-ai-coverage.mjs` 9a 钉住。
+
+     ⚠️ **两条仍然开着的边界**（不要把这段读成"三端已接"）：
+     ① **界面接线未做**：web 的 `AssistantPanel.tsx` / `aiStore.ts` 与
+     `packages/app-host/src/ai-assistant.ts` 此刻正被并行会话重写（档位抽取），
+     本轮**没有**把它们接过来 —— 现在的调用方是
+     `apps/node-host` 的 `assistant` 命令（真实 SQLite、真实进程）。
+     ② 目的地档位**没有"局域网"这一档**：沿用 `supply.ts` 既有裁决
+     （只认字面回环，局域网按 Joplin 先例判远端），所以局域网的答案落
+     `'third-party-endpoint'`。要改那一档得先改 `supply.ts` 并动它的判据。
+
+     🔴 **一条可迁移的判据教训（本轮自己踩的）**：把变异打在
+     `packages/domain/src/assistant-turn.ts` 上、再去跑 `@heyta/app-host` 套件 ⇒ **0 红**。
+     因为 app-host 经**包解析**读的是 `packages/domain/dist` 的产物 ——
+     这是 §7 第 27 条（"测试绿 ≠ 当前产物"）的**第三种面目**：前两种是"只改 packages/ 时
+     APK 打进旧 bundle"和"验收脚本只验不装"，这次是**变异本身**改源码、判据读产物。
+     修法是让判据落在"改了源码就立刻 measurable"的那一层（domain 自己的 spec 用
+     相对路径 import `../src/`），而不是给变异脚本补一次 build。
+
      🔴 **并且更正我上面写过的一句**：这里原本记成"移动端接线漏了，
      同一判据要接 `apps/mobile/src/prefs/device-prefs.ts`"—— 那个框架是错的。
      实测 `apps/mobile/src` 里 `requestAssistantTurn` / `AssistantPanel` / `assistantTier`

@@ -86,9 +86,9 @@ ADR-0020 把付费定成月付两档，第二档（¥12 / 月）买的是**我�
 
 | 检查 | 结果 |
 |---|---|
-| `server/src` 里 `deepseek` 的出现次数 | 🔴 **0**（大小写不敏感） |
-| 托管 AI 的服务端客户端 / 调用点 | 🔴 **不存在** |
-| 真实状态 | [`ADR-0023`](0023-managed-ai-quota-not-implemented.md) 的**已知状态**：配额与托管推理都未实现 |
+| `server/src` 里 `deepseek` 的出现次数 | 🔴 **0**（大小写不敏感）—— ⚠️ 2026-10-05 更正：这一行连同下一行是**当时的读数**，托管上游已落地（`server/src/ai/managed-upstream.ts` + `server/src/config.ts`）。现量取，别抄这里的数：数一下 `grep -ri deepseek server/src` 输出的行数 |
+| 托管 AI 的服务端客户端 / 调用点 | 🔴 **不存在** —— ⚠️ 2026-10-05 更正：服务端那半段**存在**（`managed-proxy.routes.ts` 是代理入口、`managed-upstream.ts` 是上游调用），🔴 缺的是**客户端调用点**：`/api/ai/managed/chat` 在任何壳里都没被调过（ADR-0054 §8）。"服务端没有"与"服务端有、没人按"是两件事，混成一句会让下一轮把它当已交付 |
+| 真实状态 | [`ADR-0023`](0023-managed-ai-quota-not-implemented.md) 的**已知状态**：配额与托管推理都未实现 —— 🔴 **2026-10-05 更正**：这一行是当时的读数，[ADR-0054](0054-managed-ai-retention-and-selling-preconditions.md) §6 把"计量存在"补出来之后按顺序解除了禁售；**本 ADR 定的模型与单位经济没被改** |
 
 **所以本 ADR 与 ADR-0023 必须互相指引** —— 只读这一份，会得到
 "托管 AI 用 DeepSeek V4.1 Flash"这个结论，而它缺了最关键的前半句：

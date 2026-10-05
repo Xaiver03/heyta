@@ -7,7 +7,7 @@
 > 「收费的是服务器不是功能」这条产品边界见
 > [subscription-boundary.md](../plans/subscription-boundary.md)。
 >
-> 最后核对：2026-09-27。
+> 最后核对：2026-10-05。
 
 ---
 
@@ -18,8 +18,8 @@
 | **开源档**（自建 / 自托管） | — | — | **免费** | 永久，**且不校验** | **除云端 AI 外**的全部能力 | ✅ 可以 |
 | **官方托管 · 大陆** | `hosted-monthly` | CNY | **¥5 / 月** | 按月付，**不自动续费** | `hosting` | 🔴 **还不能**（见 §5.1） |
 | **官方托管 · 海外** | `hosted-monthly` | USD | **$5 / 月** | 按月付，**不自动续费** | `hosting` | 🔴 **还不能**（通道未开） |
-| **官方托管 + 云端 AI · 大陆** | `hosted-ai-monthly` | CNY | **¥12 / 月** | 按月付，**不自动续费** | `hosting` + `ai` | 🔴 **还不能** |
-| **官方托管 + 云端 AI · 海外** | `hosted-ai-monthly` | USD | **$12 / 月** | 按月付，**不自动续费** | `hosting` + `ai` | 🔴 **还不能** |
+| **官方托管 + 云端 AI · 大陆** | `hosted-ai-monthly` | CNY | **¥12 / 月** | 按月付，**不自动续费** | `hosting` + `ai` | 🔴 **还不能收款**（这一台没配真实通道、客户端还没有付款按钮，见 §5.1；**不是**交付不了 —— [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 已解除禁售） |
+| **官方托管 + 云端 AI · 海外** | `hosted-ai-monthly` | USD | **$12 / 月** | 按月付，**不自动续费** | `hosting` + `ai` | 🔴 **还不能收款**（海外通道未放行，见 §5.2；**不是**交付不了 —— [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 已解除禁售） |
 
 - **恰好两个 SKU，没有第三个。** 门禁断言"恰好 2 个"（`EXPECTED_SKU_COUNT`），
   不是"至多 2 个" —— 多一个就红。
@@ -74,14 +74,14 @@
 **明确说出来**，`scripts/check-ai-coverage.mjs` 会强制断言那句否定
 （`不受端到端加密`）。
 
-### 2.1 🔴 「300 次/月」的当前状态：**已声明、未实现**
+### 2.1 🔴 「300 次/月」的当前状态：**已实现**（2026-10-05）
 
 ```json ai-quota-ssot
 {
   "quota": 300,
   "unit": "次 / 计费周期",
-  "enforcement": "not-implemented",
-  "decidedIn": "docs/adr/0023-managed-ai-quota-not-implemented.md"
+  "enforcement": "enforced",
+  "decidedIn": "docs/adr/0054-managed-ai-retention-and-selling-preconditions.md"
 }
 ```
 
@@ -89,16 +89,24 @@
 都必须与它相等 —— 由 `pnpm check:ai-quota` 强制
 （`scripts/check-ai-quota-consistency.mjs`）。
 
-🔴 **`enforcement = not-implemented` 的含义是：这 300 次的计量与端点都还不存在。**
-具体到文件：没有云端 AI 路由、没有计数器、没有一处 `deepseek` 调用、也没有能卖
-¥12 的收银台。承诺写在落地页与法务里是**已锁定的产品决定**（ADR-0020 §3.2），
-但从这份状态推出一条硬约束：
+🟢 **`enforcement = enforced` 的含义是：这一档买的东西现在真的存在。**
+计量在 `server/src/ai/metering.ts`（读占用、对上限裁决、`+1` 全在**同一条语句**里，
+超额那一次 `WHERE` 匹配零行 ⇒ 什么都没写），云端路由在
+`server/src/ai/managed-proxy.routes.ts`，境内白名单在
+`packages/ai/src/managed-endpoints.ts`（接境外端点 ⇒ `managed-endpoint-not-domestic`）。
 
-> **在计量存在之前，`hosted-ai-monthly` 不得被售卖。** 收了钱交付不了就是虚假宣传。
+原来那条硬约束（[ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) §3.1
+「在计量存在之前，`hosted-ai-monthly` 不得被售卖」）**不是被打断的，是按它自己的
+条款解除的** —— 它约束的是"承诺已写、交付未做"这个状态，而那个状态已经结束。
+解除与实现必须在**同一个提交**里：`NOT_YET_DELIVERABLE_SKUS` 里那一条与这份状态
+翻转是一件事的两半，先翻状态后做计量就是 ADR-0023 立规时唯一想挡的那件事。
 
-状态是**被声明的**，不是被推断的：把 `enforcement` 改成 `enforced` 会让门禁要求
-计量实现真的存在；删掉这个块、或只改一处数字，门禁立刻变红。
-决定与最小实现清单见 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md)。
+⚠️ **`enforced` 说的是"实现存在"，不是"线上在跑"。** 服务端镜像重建与生产部署
+是另一条授权（AGENTS §6.1.1：门禁绿 ≠ 已部署），在那之前线上仍然是旧行为。
+
+状态是**被声明的**，不是被推断的：删掉这个块、只改一处数字、或把 `enforcement`
+改成一个词表外的值，门禁立刻变红。裁决全文见
+[ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md)。
 
 ℹ️ **我们云端 AI 跑的是 `deepseek-flash`（DeepSeek V4.1 Flash）** ——
 [ADR-0021](../adr/0021-managed-ai-model-deepseek-flash.md)。这**不是技术细节，

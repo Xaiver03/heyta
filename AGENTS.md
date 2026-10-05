@@ -1065,9 +1065,13 @@ WebAuthn RP ID 挡着，**本次没动**。
   默认关（**每个工具单独默认关**）、只监听回环、显式 token、逐工具授权；
   🔴 **加密条目可列举、不可读**；写入只能经 `dispatch()` 形状的端口。
 - **ADR-0013 云端 AI 与 MaaS** ✅（[文档](docs/adr/0013-cloud-ai-and-maas.md)）。
-  **方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS），但**开放条件未满足**：
-  `assertEnableable()` 继续抛 `retention-undecided` 挡住 `managed`。
-  ⚠️ 这**不是没写完的占位符，是有意的失败** —— 不许"先把计费做了，保留策略以后再说"。
+  **方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS）。
+  🔴 **2026-10-05 状态更正（[ADR-0054](docs/adr/0054-managed-ai-retention-and-selling-preconditions.md)）**：
+  原来那句"`assertEnableable()` 继续抛 `retention-undecided` 挡住 `managed`"**已过期** ——
+  保留策略定案、计量与托管代理路由落地、那条 reason 连成员一起删了；
+  本 ADR **没有改**的那一条是"托管 AI 与端到端加密互斥，只能作为明确、可撤销、按功能开启的例外"。
+  ⚠️ 顺序纪律仍然有效（原句"不许先把计费做了、保留策略以后再说"）：ADR-0054 走的是
+  **先补计量、后解禁售**，不是绕过它。而这一档**今天在客户端仍打不开**（0054 §8）。
 - **ADR-0014 记忆偏好层的两个闸门** ✅（[文档](docs/adr/0014-memory-switch-and-corrections.md)）。
   `memoryEnabled` **必填且默认关闭（fail-closed）**；推断结果**不持久化**
   （纯函数，每次从 op-log 重算），只有用户**纠正**进 op-log 跨设备同步；
