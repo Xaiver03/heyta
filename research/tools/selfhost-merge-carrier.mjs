@@ -34,9 +34,13 @@
  *  3. `apps/web/evidence/**.png`（binary）：取 **main** 侧。它们是产物不是源码，
  *     留 main 的不丢任何判据，留本批的会把 main 上另一批的现场覆盖掉。
  *  4. `docs/research/self-host-distribution-audit.md`（追加型台账）：**并集**，不是择一。
- *     判据与产出在 `research/tools/selfhost-audit-union.mjs`（单一所有者，可拿合成样本离线变异）。
+ *     判据与产出在 `research/tools/selfhost-audit-union.mjs`（单一所有者）。
+ *     它带 `--selftest`（合成 + 真三份两类臂，臂数由它自己打印），牙的存在性由
+ *     `selfhost-audit-union-mutants.mjs` 逐条断言二阶证明 —— 这两件都是 2026-10-05 才补的，
+ *     在此之前本行写的是"可拿合成样本离线变异"而**全仓没有一处真跑过变异**（见台账 §8.216）。
  *     产出 = 本分支那份 + main 侧"base 没有、本分支也没有"的行，带一条标明"下面这块不是本批写的"的哨兵；
- *     只有四类事停下来交人判：仍含冲突标记 / 丢了 main 侧新增行 / 丢了本分支行 / 混入两侧都没有的行。
+ *     只有五类事停下来交人判：仍含冲突标记 / 丢了 main 侧新增行 / 丢了本分支行 / 混入两侧都没有的行 /
+ *     告示牌被摘（别人那一块会读起来像本批写的）。
  *     ⚠️ 别再把它读成"取本分支侧 + main 有额外的节就退 2" —— **那是旧规则**（2026-10-04 06:4x 现量：
  *     main 被另一条会话提交进一整节 `## 9. 交还一条现场…`，本分支一行都没有 ⇒ 择一就是静默删别人的证据）。
  *     旧规则只做到"不背锅"，没做到"把这单落地"；现在这一格是**能自动解**的。
@@ -755,6 +759,38 @@ if (fam.cap.length) {
  *   main 刚被另一条会话提交进一整节 `## 9. 交还一条现场…`，相对 merge-base +70/−0，本分支一份都没有），
  *   但它只做到"不背这个锅"，没做到"把这单落地"。落地路径上唯一不误删的解法是两份都留。 */
 let auditReading = '';
+/* 🔴 这一族的判据有没有牙，在**用它之前**问，不在用它之后问（与第八/九族同一处挂法、同一个理由）。
+ *   `selfhost-audit-union.mjs --selftest` 先前不存在：四条无损断言的唯一执行路径是"真落到一次冲突上"，
+ *   所以"它能不能红"在落地之前无人能答（2026-10-05 06:1x 现量：全仓只有本体与这里两处引用）。
+ *   真输入那三条臂的 ref 由本文件已有的 mainSha/srcSha 显式喂进去 ⇒ 不依赖载体里有没有 origin/main。 */
+const AUNION = 'research/tools/selfhost-audit-union.mjs';
+if (!existsSync(join(WT, AUNION))) {
+  die(2, `审计文档那一族的判据文件不在载体树上（${AUNION}）⇒ 没有它就不许解这一族，也不许当"没有这一族"混过去`);
+}
+{
+  let out = '';
+  let rc = 0;
+  try {
+    out = execFileSync('node', [join(WT, AUNION), '--selftest'], {
+      encoding: 'utf8',
+      maxBuffer: 64 << 20,
+      env: { ...process.env, HEYTA_MAIN_REF: mainSha, HEYTA_SOURCE_REF: srcSha },
+    });
+  } catch (e) {
+    rc = e.status ?? 1;
+    out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
+  }
+  const redArms = out.split('\n').filter((l) => /^BAD\s/.test(l));
+  const armLine = out.split('\n').find((l) => /臂数\s\d+/.test(l)) ?? '';
+  const claimed = armLine.match(/臂数\s(\d+)（拒绝类\s(\d+)/);
+  if (rc !== 0) die(2, `审计并集判据的自检退 ${rc} ⇒ 不用它解冲突：\n${redArms.slice(0, 6).join('\n') || out.slice(0, 400)}`);
+  if (redArms.length) die(2, `审计并集判据的自检**退出码 0 却带着红臂**（判据坏了）：${redArms[0]}`);
+  if (!claimed || Number(claimed[1]) < 12 || Number(claimed[2]) < 7) {
+    die(2, `审计并集判据的自检读数对不上（臂数行：“${armLine || '（没有这一行）'}”，要求 臂数 ≥12 且拒绝类 ≥7）` +
+      ` ⇒ 要么臂被删了，要么输出形状变了而这里没跟上 —— 不拿"rc 0"当通过。`);
+  }
+  notes.push(`审计并集判据自检：${claimed[1]} 条臂（按理由认领的拒绝类 ${claimed[2]}）红 0 · 六条变异对照各打红自己那条臂`);
+}
 if (fam.audit.length) {
   // base 那一版优先从合并的 stage 1 取；add/add（没有 stage 1）时退回 merge-base 提交里的 blob。
   // 🔴 两条路都取不到就**绝不**按"base 为空"去做并集 —— 产出虽无损但会把两份全文叠起来，
