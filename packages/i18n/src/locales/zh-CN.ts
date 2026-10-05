@@ -1626,15 +1626,22 @@ export const zhCN = {
   'web.ai.disclosure.fallbackLead': '如果它失败，会接着依次尝试：',
   'web.ai.disclosure.retentionLead': '保留：',
   // 「留多久」的**结构化披露** → 词条。`disclosure.retentionDisclosure.kind`
-  // 是判别式（`not-applicable` / `third-party-decides` / `undecided`），
+  // 是判别式（`not-applicable` / `third-party-decides` / `metadata-only`），
   // 界面按它取词条，**不再渲染 `packages/ai` 的中文兼容句 `retentionText`**。
   // 那两句兼容句仍然留在 `packages/ai`（零依赖的包，CLI 与 check-ai-coverage 在用），
   // 只是 web 壳里没有生产消费者了。
   'web.ai.disclosure.retentionNotApplicable': '未离开设备，不涉及服务端保留。',
   'web.ai.disclosure.retentionThirdParty': '保留策略由你自己的端点决定，heyta 无从知晓。',
-  // 端点没有给出保留策略时的**面板兜底句**。它归 web 壳所有；
-  // `packages/ai` 那条真正的披露链（来自跨包函数）仍由另一批单独处理（计划 §9）。
-  'web.ai.disclosure.retentionUndecided': '未定案 —— 在 heyta 说明清楚之前，这个端点不允许启用。',
+  // 托管档（ADR-0054 定案）。🔴 `{metadataDays}` 的取值**只能来自 `packages/ai` 的常量**
+  // （`MANAGED_AI_METADATA_RETENTION_DAYS`，壳从披露对象里取）—— 词条表里不许写死天数，
+  // 否则改了常量而这里没改，界面就会报出一个不存在的保留期。
+  // 🔴 这句必须点到**两个载体**（计数表 + 每次调用一行的运维日志）。少写一个就不是
+  // "保守"而是少说了一样真存在的数据，而没人会发现 —— `check:ai-coverage` 有一条臂拦它。
+  // ⚠️ 天数只给计数表；日志那一侧的上限是**容量不是时间**，所以绝不给它写一个天数
+  //（写了就是关于一个不存在的定时删除的承诺）。
+  // ⚠️ "该计费周期结束后删除"是**策略**，删除作业在代码里（`purgeExpiredAiUsageCounters`）；
+  // 这句话**不许先于该作业的部署上线** —— 顺序记在 ADR-0054 §8。
+  'web.ai.disclosure.retentionMetadataOnly': '正文不留存，只在一次调用的内存里存在；服务端只留两类元数据，都不含正文：一张计数表（账号、计费周期、次数、最后使用时间），自最后一次使用起保留 {metadataDays} 天，且该计费周期结束后删除；以及每次调用一行的运维日志（时间、功能名、结果、字节数、耗时），按日志容量滚动清除，没有定时删除。',
   // 端点健康状态。⚠️ 英文刻意避开 `{n} times` / `{n} seconds` 这种句式：
   // 词条表没有复数规则，而英文里 `1 times` 是错的。改写句式（`Recent failures: 1`）
   // 比加一串 `…One` 兄弟词条更不容易漏 —— 中文不受影响，逐字沿用兼容句。
@@ -1847,9 +1854,15 @@ export const zhCN = {
   'web.ai.settings.remote.strong': '不受端到端加密保护',
   'web.ai.settings.remote.tail': '，与任务同步是不同的通道。每个功能需要单独授权。',
   'web.ai.settings.endpoints.title': '端点',
-  // 首词 `heyta` 走 `common.brand`，所以这里从"即将提供"开始。
-  'web.ai.settings.managed.offer': '即将提供',
-  'web.ai.settings.managed.rest': '云端 AI 服务（仍在开发中，暂时无法启用）。在那之前，需要你自己接一个端点（本机或远端）。托管模式的性质不一样：用它的请求，你的任务内容会',
+  // 首词 `heyta` 走 `common.brand`，所以这里从动词起。
+  // 🔴 2026-10-05（ADR-0054）把理由从"仍在开发中"换成"界面还没那个开关"：
+  //    服务端那一半（额度计量 / 境内白名单 / 保留策略 / 解除禁售）**已经落地**，
+  //    再说"还在开发"就是把做完的事说成没做完 —— 而结论（这里点不动）仍然为真。
+  // ⚠️ 这句里不许出现 `**`（JSX 不解析 markdown，`ai-settings.spec.tsx` 有一条测试专门钉它），
+  //    也不许出现「没有」（同文件用 `not.toContain('没有')` 挡"我们不提供托管 AI"的回潮 ——
+  //    那条判据粗，所以文案绕开它；想动文案先弄清那条测试为什么在那）。
+  'web.ai.settings.managed.offer': '暂不在这里开放',
+  'web.ai.settings.managed.rest': '云端 AI 服务（服务端那一半已经做完：额度计量、境内供应商白名单、保留策略、解除禁售，见 ADR-0054；但这个版本的界面还没挂上那个开关，所以这里点不动）。在那之前，需要你自己接一个端点（本机或远端）。托管模式的性质不一样：用它的请求，你的任务内容会',
   'web.ai.settings.managed.strongPlain': '以明文到达 heyta 的服务器',
   'web.ai.settings.managed.mid': '，所以它',
   'web.ai.settings.managed.strongNot': '不是',
@@ -3503,7 +3516,7 @@ export const zhCN = {
   'site.help.q.selfhost': '怎么自己搭一套？',
   'site.help.a.selfhost': '可以，但它是「自己运维一套服务」：目前**没有发布任何现成镜像**（要自己构建），而**升级不是一条命令** —— 那个一次性迁移服务跑完就退出，compose 不会重跑一个已退出的服务，改过表结构之后要照指南里点名 `supersync-migrate` 的那条再执行一次。注册与登录走的是**邮箱 + 口令**；邮件服务只管「激活账号」那一步 —— 不配也建得了号，界面会明说那封信没发出去，只给自己人用时也可以显式跳过（`REQUIRE_EMAIL_VERIFICATION=false`）。详见「自建一套同步服务器」。',
   'site.help.q.privacy': '数据到底放在哪？',
-  'site.help.a.privacy': '先落在你自己的设备上；开了同步之后，云端也只存密文 —— 服务端收到明文会直接拒绝。但**元数据不是密的**：同步时间、设备标识、以及"有一个任务被改过"这件事服务端能看到。我们不会把"什么都看不到"拿来宣传。',
+  'site.help.a.privacy': '先落在你自己的设备上；**这一条说的是同步那条通道** —— 开了同步之后它在云端只存密文，同步端点收到明文会直接拒绝。⚠️ AI 是另一条路，不在上面这句话里：语言模型必须读到明文才能给出建议，逐功能、逐字段的披露见页脚的《AI 功能与数据流向》。另外同步的**元数据不是密的** —— 同步时间、设备标识、以及"有一个任务被改过"这件事服务端看得到。我们不会把"什么都看不到"拿来宣传。',
 
   // ── 文档中心（帮助中心的文章层）──────────────────────────
   // 组织方式沿用上面五个模块的标题（`site.help.module.*`），不另起一套词表：
@@ -3559,7 +3572,7 @@ export const zhCN = {
   'site.docs.how.s2i2': '移动端：写入后约两秒自动出去；回到前台时补一次；失败会退避重试，不会反复打服务器。',
   'site.docs.how.s2i3': '任意一端：**别人写的东西会自动进来**。服务端在有新记录时推一个信号，收到信号的那一端自己去拉。',
   'site.docs.how.s3': '服务端到底看不到什么',
-  'site.docs.how.s3p1': '上传的载荷是**端到端加密**的：加密与解密都发生在你的设备上，服务端收到（也只收得到）密文。某个客户端尝试上传明文时，服务端会直接拒绝而不写入。',
+  'site.docs.how.s3p1': '**这一节讲的是同步那条通道**：它上传的载荷是端到端加密的，加密与解密都发生在你的设备上，同步服务端收到（也只收得到）密文。某个客户端尝试上传明文时，服务端会直接拒绝而不写入。🔴 这句话**不覆盖 AI 那条路径** —— 模型要读到明文才能给出建议，所以那一格是你逐项授权后交出去的原文，逐功能的字段清单见页脚的《AI 功能与数据流向》。',
   'site.docs.how.s3p2': '但**外围信息不是密的**：同步时间、你用的是哪几台设备、动的是哪类东西与先后顺序，服务端都看得到。被保护的是内容本身（任务标题、备注这些），不是"你在用 heyta 的哪些功能"。我们不会把"什么都看不到"拿来宣传。',
 
   // 账号、令牌与登录方式
@@ -3990,6 +4003,7 @@ export const zhCN = {
   'common.entity.FOCUS_SESSION': '专注记录',
   'common.entity.AI_FEEDBACK': 'AI 使用记录',
   'common.entity.PREFERENCE_CORRECTION': '偏好纠正',
+  'common.entity.ASSISTANT_TURN': '助手消息',
   'common.entity.GLOBAL_CONFIG': '全局设置',
   'common.entity.MIGRATION': '数据迁移',
   'common.entity.RECOVERY': '灾难恢复',
@@ -4317,9 +4331,9 @@ export const zhCN = {
   "site.legal.minors.seo.title": "未成年人保护 —— heyta",
   "site.legal.minors.seo.description": "面向成年人的效率工具如何处理未成年人：我们不核验年龄、依赖监护人声明；不满十四周岁信息的专门规则、条例义务逐条判定适用性，以及监护人的行使渠道与退款入口。",
   "site.legal.subscription-refund.title": "订阅、计费与退款规则",
-  "site.legal.subscription-refund.lede": "托管同步与云端 AI 两件**互相独立**的收费服务各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。",
+  "site.legal.subscription-refund.lede": "托管同步与云端 AI 两件**各有各的条款**的收费服务（今天能买到云端 AI 的那一档同时含托管同步）各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。",
   "site.legal.subscription-refund.seo.title": "订阅、计费与退款规则 —— heyta",
-  "site.legal.subscription-refund.seo.description": "托管同步与云端 AI 两件互相独立的收费服务各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。",
+  "site.legal.subscription-refund.seo.description": "托管同步与云端 AI 两件各有各的条款的收费服务（今天能买到云端 AI 的那一档同时含托管同步）各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。",
   "site.legal.data-rights.title": "个人权利行使与请求响应",
   "site.legal.data-rights.lede": "查阅、复制、更正、删除、注销、撤回同意逐项在 heyta 里怎么做；哪些能自助、哪些只能走邮件、答复时限 15 个工作日，以及\"删除\"在这个架构里到底意味着什么。",
   "site.legal.data-rights.seo.title": "个人权利行使与请求响应 —— heyta",
@@ -4441,6 +4455,33 @@ export const zhCN = {
   'mobile.countdown.export.rasterize': '系统没能把卡片画成图。倒数日没有丢，也没有发出任何请求。',
   'mobile.countdown.export.write': '图已经画好了，但没能写进这台设备的存储。',
   'mobile.countdown.export.share': '分享面板拒绝了这张图。',
+
+  // ── AI 助手（移动端五个功能共用的一屏）──────────────────────────────
+  //    🔴 口径：全文只说"离开本机"，不写监管定性词（见 check:ui-language 规则 7）。
+  //    数字（字数上限、条数）一律由代码插值进来，不写进词条 —— 那是第二套取值。
+  'mobile.ai.entry': 'AI 助手',
+  'mobile.ai.entry.hint': '拆解任务、排优先级、估时间、记一句话、问你自己的数据',
+  'mobile.ai.title': 'AI 助手',
+  'mobile.ai.back': '返回',
+  'mobile.ai.section.mode': '这次做什么',
+  'mobile.ai.hostFailed.title': '读不到这台设备上的数据',
+  'mobile.ai.hostFailed.hint': '没有发出任何请求。退回上一页再进来一次；还是不行就重启 heyta。',
+  'mobile.ai.notConfigured.title': 'AI 还没启用',
+  'mobile.ai.notConfigured': '到「设置 → AI」里打开总开关、填一个你自己的端点，这一屏才会有能用的链路。',
+  'mobile.ai.goSettings': '到「设置 → AI」里给这个功能选一个端点。',
+  'mobile.ai.proposalNeverAuto': 'AI 只给建议：没有任何一条改动会在你确认之前写进去。',
+  'mobile.ai.task.label': '选一条任务',
+  'mobile.ai.task.none': '这台设备上还没有任务。',
+  'mobile.ai.task.more': '还有 {count} 条没有列出来。',
+  'mobile.ai.input.capture': '要记的那句话',
+  'mobile.ai.input.capture.placeholder': '例：明天下午三点去看牙，回来顺路买猫粮',
+  'mobile.ai.input.limit': '这句话最长处理 {max} 个字。',
+  'mobile.ai.input.tool': '想让它怎么帮你',
+  'mobile.ai.tools.grantsHint': '一次工具调用最长 {max} 个字，而且只有你勾过的工具才会被调用。',
+  'mobile.ai.prioritize.scope': '排序只在你自己的任务之间比较 —— 没有别人，也没有排行榜。',
+  'mobile.ai.keyNotice': '密钥只留在这一台设备上：不进备份、不同步、退出登录即清除。',
+  'mobile.ai.saveFailed': '这台设备没能保存这次改动（本机存储拒绝了写入）。',
+  'mobile.ai.tier.defaultNote': '新配的端点默认按「{tier}」跑，随时可以改。',
 } as const;
 
 /**

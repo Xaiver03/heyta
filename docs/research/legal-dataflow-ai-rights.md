@@ -68,6 +68,18 @@
 
 ### 19.5 目的地判定（决定"要不要写出境条款"的分岔点）
 
+> 🔴 **勘误（2026-10-05，[ADR-0053](../adr/0053-endpoint-address-class-and-domestic-managed-allowlist.md)）**：
+> 本节两条已被改动，正文按"不可变的当时记录"留着，改判如下——
+> ① `managed` **不再**无条件 → `heyta-cloud`：那个值现在也只能由端点推导，
+> 端点必须落在境内白名单（`packages/ai/src/managed-endpoints.ts` 的 `MANAGED_MODEL_HOSTS`，
+> 主机名逐字相等）上，否则推出 `user-endpoint`。政策口径"托管云到不了是结构上保证的"**仍然成立**，
+> 但理由换了一个：以前靠 `mode` 推不出，现在连"把 `mode` 写成 `managed`"也推不出谎话。
+> ② 回环判定已从 `supply.ts:73-88` 搬到 `packages/ai/src/endpoint-address.ts`（本节所有 `supply.ts:NN` 行号都别再照抄），
+> 判定面从二元扩成五档（回环 / 链路本地 / 私网 / 公网 / 未定性）。
+> 🔴 **对法务口径没有任何一处需要改写**：免授权的一格**一格都没扩大**，
+> 所以《第三方说明》里那句"判定只看地址是不是字面上的回环、不做域名解析，
+> 所以 `my-nas.local` 会被判成远端并要求逐功能授权"**逐字仍然为真**（中英两处都是）。
+
 - `classifyDestination`（`supply.ts:91-101`）：`off` → `none`；`managed` → `heyta-cloud`；
   `own` 且端点为空 → `none`；`own` 且回环 → `none`；**其余 → `user-endpoint`**。
 - 回环判定 `isLoopbackEndpoint`（`supply.ts:73-88`）：只认**字面** `localhost` / `::1` / `127.0.0.0/8`；

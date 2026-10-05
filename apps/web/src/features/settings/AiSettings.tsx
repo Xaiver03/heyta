@@ -34,14 +34,12 @@ import {
   fromHealthSnapshot,
   isAvailable,
   requiresEgressConsent,
-  retainValidConsents,
   type AiRoutingConfig,
   type AiCapability,
   type AiEndpointConfig,
   type AiEndpointPreset,
   type AiFeature,
   type EgressConsent,
-  type EgressDestination,
 } from '@heyta/ai';
 
 /**
@@ -96,7 +94,9 @@ import {
   ASSISTANT_TIER_ORDER,
   ASSISTANT_TIER_READ_AND_PROPOSE,
   ASSISTANT_TIER_READ_ONLY,
+  destinationForFeature,
   planAssistantEgress,
+  recomputeConsents,
   type AssistantTier,
 } from '@heyta/app-host';
 import { AlertTriangle, Check, Lock, Plus, ShieldCheck, Trash2 } from 'lucide-react';
@@ -347,63 +347,18 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
   }
 
   /**
-   * 一个功能当前会走到的目的地 —— **由端点推导**（`classifyDestination`），
-   * 不读存储里的声明，也不硬编码。
-   *
-   * 🔴 这替换掉原来 `grant()` 里硬编码的 `'user-endpoint'`。硬编码的后果是：
-   * 授权记录看起来**永远合理**，于是"同意的是 A、实际放行的是 B"这件事
-   * 没有任何地方会发现 —— 而这正是本闸门存在的理由。
-   *
-   * 链上只要有一个端点会把明文送出设备，就必须为那个目的地征求授权
-   * （回退候选各自过闸门，见 `invokeRouted`）。
-   */
-  function destinationForFeature(feature: AiFeature, from: AiRoutingConfig): EgressDestination {
-    for (const target of from.routes[feature] ?? []) {
-      const endpoint = from.endpoints.find((e) => e.id === target.endpointId);
-      if (endpoint === undefined) continue;
-      const destination = classifyDestination({ mode: 'own', endpoint: endpoint.endpoint });
-      if (requiresEgressConsent(destination)) return destination;
-    }
-    return 'none';
-  }
-
-  /**
-   * 路由变了 → 授权跟着**重算并写回存储**。
-   *
-   * 🔴 唯一的过滤事实源是 `retainValidConsents()`（`packages/ai/src/egress.ts`）。
-   * 这里只按功能把它调用一次，**绝不自己再写一套目的地比对** ——
-   * 两套规则一定会漂移，而这是隐私闸门。
-   *
-   * 不重算的后果（这就是本组件原来的洞）：旧授权一直躺在存储里，
-   * 等用户删掉旧端点、再配一个新端点时，那条记录会重新变得可匹配 ——
-   * 于是"我没同意过的组合"被放行。
-   */
-  function recomputeConsents(
-    consents: readonly EgressConsent[],
-    next: AiRoutingConfig,
-  ): EgressConsent[] {
-    // 先按功能归堆：`(功能, 目的地)` 是授权的粒度，
-    // 而 `retainValidConsents` 只判断目的地。归堆不是第二套过滤规则。
-    const byFeature = new Map<AiFeature, EgressConsent[]>();
-    for (const consent of consents) {
-      const bucket = byFeature.get(consent.feature) ?? [];
-      bucket.push(consent);
-      byFeature.set(consent.feature, bucket);
-    }
-    const kept: EgressConsent[] = [];
-    for (const feature of FEATURE_ORDER) {
-      kept.push(
-        ...retainValidConsents(byFeature.get(feature) ?? [], destinationForFeature(feature, next)),
-      );
-    }
-    return kept;
-  }
-
-  /**
    * 唯一的路由写入路径 —— 改路由时顺手把授权重算并写回。
    *
    * 任何绕过它的路由改动都会把陈旧授权留在存储里，所以所有端点/路由修改
    * 都必须走这里（`update()` 只留给与路由无关的字段）。
+   *
+   * 🔴 「哪个功能会走到哪个目的地」（`destinationForFeature`）与
+   * 「路由变了授权怎么重算」（`recomputeConsents`）**不住在这个壳里** ——
+   * 它们在 `packages/app-host/src/ai-settings-shared.ts`（AGENTS §3.5）。
+   * 理由不是整洁：移动端接 AI 时必然要同一份判定，而两份规则只要归一方向差一点，
+   * 同一个用户在两台设备上就有两种权限 —— 症状是"同意的是 A、实际放行的是 B"，
+   * **没有任何一层会报错**。原来这里的注释就写着"两套规则一定会漂移，而这是隐私闸门"；
+   * 现在不再靠注释，只留一个地方能算出它。
    */
   function updateRouting(next: AiRoutingConfig): void {
     update({
@@ -663,15 +618,17 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
           >
             <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.settings.endpoints.title')}</h3>
 
-            {/* 🔴🔴 **这一段曾经写的是"我们没有提供托管 AI"，那是错的。**
-                产品负责人已明确：heyta **会**提供统一云端 AI 服务并按此收费，
-                后续还有 MaaS（见 ADR-0013）。
+            {/* 🔴🔴 **这一段的话术改过两次，两次都是因为"把做没做完说反了"。**
+                ① 曾经写"我们没有提供托管 AI" —— 那是错的：产品负责人已明确
+                   heyta **会**提供统一云端 AI 并按此收费（ADR-0013），
+                   把"我暂时无法决定"写成"我们不做"会变成一个对用户的承诺。
+                ② 2026-10-05（ADR-0054）之后"即将提供 / 仍在开发中"也变成假话了 ——
+                   服务端那一半已经落地（额度计量、境内白名单、保留策略、解除禁售），
+                   缺的是**这个版本的界面还没有那个开关**。
+                   两个方向都错在同一条上：把状态写反，而界面是用户唯一的状态来源。
 
-                把"我暂时无法决定"写成"我们不做"、并把它放进用户可见文案，
-                是最贵的一种错 —— 它会变成产品对用户的承诺。
-
-                现在改成"即将提供"，并把**性质**说清楚：
-                用托管 AI 时内容会明文到 heyta 服务器，所以它**不是**端到端加密。 */}
+                不变的那半句：用托管 AI 时内容会明文到 heyta 服务器，
+                所以它**不是**端到端加密（ADR-0005 / ADR-0006）。 */}
             <p className="ht-settings__hint" data-testid="managed-ai-note">
               {t('common.brand')} <strong>{t('web.ai.settings.managed.offer')}</strong>{t('web.ai.settings.managed.rest')}
               <strong>{t('web.ai.settings.managed.strongPlain')}</strong>{t('web.ai.settings.managed.mid')}

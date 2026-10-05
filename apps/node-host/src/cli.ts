@@ -41,6 +41,11 @@ const VALUE_FLAGS = new Set([
   'due',
   'out',
   'in',
+  'session',
+  'role',
+  'text',
+  'destination',
+  'tool',
 ]);
 const BOOL_FLAGS = new Set(['json', 'all', 'help', 'confirm']);
 
@@ -219,6 +224,31 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   habits add <名称>         新建习惯
   habits remove <id>        软删除习惯（进回收站）
   tags                      列出标签
+  assistant new             生成一段新会话的 id（这台设备上，**不写 op**）
+  assistant append          追加一条助手会话消息（ADR-0045 D-4 (ii)：**一次调用 = 一条 op**）
+      --session <id>        归属会话（必填，来自 assistant new）
+      --role <user|assistant|proposal|error>
+                            角色（必填；词表在 @heyta/domain，非法值直接拒绝）
+      --text <文本>         那条消息（空文本拒绝）
+      --destination <local|third-party-endpoint|heyta-cloud|unknown>
+                            🔴 这一条**经手哪个目的地**：user 记"发去了哪里"、
+                            assistant/proposal/error 记"谁答的"。省略 = unknown，
+                            而 unknown **不等于** local（ADR-0006 的保守方向）
+      --tool <name>         --role proposal 时必填（确认框要写明改的是哪个动作）
+  assistant list [--session <id>]
+                            列出会话消息（未删除、**展示顺序**）。每行带
+                            dest= 与 expired= —— 后者是"这条提案在**本设备**上
+                            还能不能确认"的可观察读数：另一台设备写的未确认提案
+                            必须 expired=yes，而本机自己写的必须 expired=no。
+                            🔴 没有这条命令，"跨设备只读不可确认"就只能停在单测里
+  assistant confirm <id> [--disposition confirmed|rejected]
+                            记录一条提案的处置（一次点击 = **一条** UPD op）。
+                            🔴 别的设备写的未确认提案在这里**非零退出**且不写 op ——
+                            没有这条命令，"跨设备不可确认"就只是界面上的装饰，
+                            真设备上没有任何东西会失败
+  assistant clear --session <id>
+                            清掉一段会话：**一条** DEL op（批量域，AGENTS §3.4），
+                            墓碑保留内容 ⇒ 对端离线也不会把它复活回来
   export --out <路径>       导出全部数据到 JSON 文件（含已删除记录与完整操作日志）
   import --in <路径>        从导出的 JSON 还原 —— **只支持还原到空库**；
                             本机已有数据时拒绝，且不会改动任何现有数据
@@ -512,6 +542,92 @@ async function main(): Promise<number> {
           for (const tag of tags) out(`${tag.name}  (${tag.id})`);
         }
         return 0;
+      }
+
+      case 'assistant': {
+        const sub = positionals[0];
+        const sessionId = stringFlag(flags, 'session');
+        if (sub === 'new') {
+          const id = host.newAssistantSessionId();
+          out(json ? JSON.stringify({ ok: true, command: 'assistant', sub, id }) : id);
+          return 0;
+        }
+        if (sub === 'append') {
+          if (sessionId === undefined) throw new Error('assistant append 需要 --session <id>（来自 `assistant new`）');
+          const role = stringFlag(flags, 'role');
+          const text = stringFlag(flags, 'text');
+          if (role === undefined) throw new Error('assistant append 需要 --role <user|assistant|proposal|error>');
+          if (text === undefined) throw new Error('assistant append 需要 --text <文本>');
+          const destination = stringFlag(flags, 'destination');
+          const tool = stringFlag(flags, 'tool');
+          // 🔴 本壳**不校验词表**：`appendTurn` 会拒绝非法 role / 目的地 / 缺 toolName
+          // 的提案，并把拒绝理由说清。在这里再判一遍就是第二套定义（会漂）。
+          const id = await host.appendAssistantTurn({
+            sessionId,
+            role: role as never,
+            text,
+            ...(destination === undefined ? {} : { destinationKind: destination as never }),
+            ...(tool === undefined ? {} : { toolName: tool }),
+          });
+          if (json) out(JSON.stringify({ ok: true, command: 'assistant', sub, id }));
+          else out(`已追加助手消息 ${id}`);
+          return 0;
+        }
+        if (sub === 'list') {
+          const rows = host.listAssistantTurns(sessionId);
+          if (json) {
+            out(
+              JSON.stringify({
+                ok: true,
+                command: 'assistant',
+                sub,
+                turns: rows.map((turn) => ({
+                  id: turn.id,
+                  sessionId: turn.sessionId ?? null,
+                  role: turn.role ?? null,
+                  text: turn.text ?? '',
+                  at: turn.at ?? turn.createdAt,
+                  destinationKind: turn.destinationKind ?? 'unknown',
+                  originClientId: turn.originClientId ?? null,
+                  disposition: turn.disposition ?? 'pending',
+                  toolName: turn.toolName ?? null,
+                  expiredHere: host.assistantTurnExpiredHere(turn),
+                })),
+              }),
+            );
+            return 0;
+          }
+          if (rows.length === 0) out(sessionId === undefined ? '（没有会话消息）' : `（会话 ${sessionId} 是空的）`);
+          for (const turn of rows) {
+            out(
+              `${turn.role ?? 'assistant'}: ${turn.text ?? ''}  ` +
+                `(id=${turn.id} dest=${turn.destinationKind ?? 'unknown'} ` +
+                `origin=${turn.originClientId ?? '-'} disp=${turn.disposition ?? 'pending'} ` +
+                `expired=${host.assistantTurnExpiredHere(turn) ? 'yes' : 'no'})`,
+            );
+          }
+          return 0;
+        }
+        if (sub === 'confirm') {
+          const id = positionals[1];
+          if (id === undefined) throw new Error('assistant confirm 需要 <消息 id>');
+          const disposition = stringFlag(flags, 'disposition') ?? 'confirmed';
+          // 🔴 拒绝**不在这里判**：`setDisposition()` 在构造 op 之前就拒（跨设备的
+          // 未确认提案不可确认），异常一路冒到进程退出码。这里加一句"先看看能不能确认"
+          // 就是第二套判定 —— 它会漂，而且会让真设备上的失败变得不可信。
+          await host.setAssistantDisposition(id, disposition as 'confirmed' | 'rejected');
+          if (json) out(JSON.stringify({ ok: true, command: 'assistant', sub, id, disposition }));
+          else out(`已记录提案处置 ${disposition}：${id}`);
+          return 0;
+        }
+        if (sub === 'clear') {
+          if (sessionId === undefined) throw new Error('assistant clear 需要 --session <id>');
+          const cleared = await host.clearAssistantSession(sessionId);
+          if (json) out(JSON.stringify({ ok: true, command: 'assistant', sub, cleared }));
+          else out(`已清掉 ${String(cleared)} 条（一条 DEL op，墓碑保留内容）`);
+          return 0;
+        }
+        throw new Error(`assistant 子命令不认识「${String(sub)}」（可用：new / append / list / clear）`);
       }
 
       case 'rename': {

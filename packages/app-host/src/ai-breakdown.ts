@@ -52,6 +52,11 @@ import {
   type AiOutputLocale,
 } from './ai-output-language.js';
 import { describeRoutedFailure } from './ai-failure-fallback.js';
+import {
+  CALENDAR_ANCHOR_RULES,
+  calendarAnchor,
+  calendarAnchorLine,
+} from './calendar-anchor.js';
 
 /** 一次拆解最多收多少条。超出直接截断并**如实告诉用户**。 */
 export const MAX_BREAKDOWN_ITEMS = 20;
@@ -70,6 +75,19 @@ export interface BreakdownSource {
   locale: AiOutputLocale;
   /** 已有备注。**会一起发出去** —— 所以必须出现在 `fields` 里被披露。 */
   note?: string;
+  /**
+   * 时间源（epoch ms）。默认 `Date.now`。
+   *
+   * 🔴 **必须可注入**，两条理由与 `CaptureSource.now` 逐字同源：
+   *
+   *   1. 本函数的输出依赖"今天是几号" —— 用真实时钟写测试会得到一个
+   *      **过几天就变红**的用例。
+   *   2. 披露与请求**必须用同一个 `now`**。壳把 `source` 一次构造好，
+   *      同一个对象既进 `buildBreakdownInvocation`（决定界面披露），
+   *      也进 `requestBreakdown`（决定真正发出去的那段 prompt）——
+   *      跨过午夜时两边才不会是**两个不同的"今天"**。
+   */
+  now?: number;
 }
 
 /**
@@ -81,6 +99,10 @@ export interface BreakdownSource {
  *
  * 所以这里的规则是：**`user` 里出现的每一个数据字段，`fields` 里必须有同名项**。
  * 有测试逐字段核对这件事。
+ *
+ * ⚠️ `today` 也算一个字段（与 `ai-capture.ts` 同一条纪律）。它看起来"不是用户数据"，
+ * 但它是**这台设备的本地日期** —— 一条关于用户的信息，而且确实随请求出境。
+ * 把它藏起来（不写进 `fields`）就是"披露里没有、请求里有"。
  */
 export function buildBreakdownInvocation(
   source: BreakdownSource,
@@ -101,8 +123,11 @@ export function buildBreakdownInvocation(
   user: string;
   fields: readonly string[];
 } {
-  const fields: string[] = ['title'];
-  const lines = [`任务标题：${source.title}`];
+  const fields: string[] = ['today', 'title'];
+  // 🔴 锚点由 `calendar-anchor.ts` **唯一**生产（与 `ai-capture.ts` 同一行、同一措辞）。
+  //    `today` 是这台设备的本地日历日 —— 一条关于用户的信息，且它确实随请求出境，
+  //    所以它必须进 `fields`（藏起来就是"披露里没有、请求里有"）。
+  const lines = [calendarAnchorLine(calendarAnchor(source.now)), `任务标题：${source.title}`];
   if (source.note !== undefined && source.note.trim() !== '') {
     fields.push('note');
     lines.push(`已有备注：\n${source.note}`);
@@ -124,6 +149,10 @@ export function buildBreakdownInvocation(
       '如果给出了用户的历史习惯，请据此调整子项数量与措辞，但不要复述这些习惯。',
       '每个子项一行，用「- 」开头。',
       '不要输出任何解释、前言或结语，只输出这份清单。',
+      '',
+      // 🔴 日期硬规则与锚点是**一对**：只给日期不给规则，模型仍会凭训练语料里的
+      // "今天"去写子项里的相对日期（实测过，见 `calendar-anchor.ts` 文件头）。
+      CALENDAR_ANCHOR_RULES,
       '',
       outputLanguageDirective(source.locale),
     ].join('\n'),

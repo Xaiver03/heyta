@@ -19,6 +19,11 @@
  * 2. **"你可以在设置里注销账号"** —— 服务端确实有一条真·硬删的路由（引用 `users` 且
  *    CASCADE 的外键 16 条、覆盖 15 张表 —— ⚠️ 这两个数已于 2026-10-04 被 `structure.spec.ts`
  *    重量为 **19 条 / 18 张表**（04:27 那一跑报的就是这条；下面 GDPR 行原先抄的是本注释的旧数）；
+ *    ⚠️ **本注释的旧数已于 2026-10-05 第三次漂**：ADR-0054 §2 的 `ai_usage_counters`
+ *    （带 `user_id → users` 的 `ON DELETE CASCADE`）把真源推到 **20 条 / 19 张表**，
+ *    而 GDPR 那一行照抄了本注释的 19/18、被同一条判据再次当场报红。
+ *    **这段历史读到这里就可以停了：文案的数字只从 `userCascades.size` /
+ *    `cascadeTables.length` 来，注释、ADR 与上一版文案都不是数据源。**
  *    2026-10-03 更正：此前这里写的"级联 18 处"与
  *    隐私政策的"19 处"是两个错误口径的抄件 —— 它们数的是全部迁移里 `ON DELETE CASCADE`
  *    的出现次数，既含与账号无关的级联又把历史重建重复计入。真值由
@@ -203,7 +208,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '服务端侧的注销是**真删除**，不是打标记：账号行连同它名下的同步数据、设备记录、通行密钥、订阅与订单、邀请关系与通知一并级联清除，口令与令牌随之失效，活动连接被踢下线。这一步没有冷静期、没有回收站，做完不可恢复。🔴 本地优先意味着每台设备自己存着一份可读的库，所以注销还得回答"其它设备上那一份怎么办"：**你点下注销的这台设备当场清掉本机明文**，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。⚠️ **今天不承诺的有两处**：① 那台**从此再也不联网、再也不登录**的设备 —— 我们没有远程擦除未连接设备的能力，它上面的副本只能靠系统层面的卸载并清除应用数据交还干净；② 🟡 **Linux 桌面壳**：那台机器上的本机销毁通道今天只走到「把内容清空并重写这个库文件」，**删不掉文件本体** —— 那个壳的驱动没有把「删掉容器」这一步递给界面这一层，而清空 + 重写这个补救按我们自己的说法是**不完备**的：空闲页里仍可能翻得出旧内容。✅ **macOS 与 Windows 的桌面壳已在 2026-10-04 接上这一步**：那两个壳把存储托管给桌面程序自己那一份本地库（界面一起来就改用壳交出来的存储，可读的那份数据从此写进壳的库文件），而现在本机销毁通道会连那个库文件一起删掉，连它的 WAL 日志与共享内存旁挂一个都不留。手机端与网页版没有「壳自己的库」这一层。',
+        text: '服务端侧的注销是**真删除**，不是打标记：账号行连同它名下的同步数据、设备记录、通行密钥、订阅与订单、邀请关系与通知、托管 AI 用量计数一并级联清除，口令与令牌随之失效，活动连接被踢下线。这一步没有冷静期、没有回收站，做完不可恢复。🔴 本地优先意味着每台设备自己存着一份可读的库，所以注销还得回答"其它设备上那一份怎么办"：**你点下注销的这台设备当场清掉本机明文**，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。⚠️ **今天不承诺的有两处**：① 那台**从此再也不联网、再也不登录**的设备 —— 我们没有远程擦除未连接设备的能力，它上面的副本只能靠系统层面的卸载并清除应用数据交还干净；② 🟡 **Linux 桌面壳**：那台机器上的本机销毁通道今天只走到「把内容清空并重写这个库文件」，**删不掉文件本体** —— 那个壳的驱动没有把「删掉容器」这一步递给界面这一层，而清空 + 重写这个补救按我们自己的说法是**不完备**的：空闲页里仍可能翻得出旧内容。✅ **macOS 与 Windows 的桌面壳已在 2026-10-04 接上这一步**：那两个壳把存储托管给桌面程序自己那一份本地库（界面一起来就改用壳交出来的存储，可读的那份数据从此写进壳的库文件），而现在本机销毁通道会连那个库文件一起删掉，连它的 WAL 日志与共享内存旁挂一个都不留。手机端与网页版没有「壳自己的库」这一层。',
       },
       {
         kind: 'p',
@@ -309,7 +314,7 @@ const zh = [
           ['第 13、14 条 透明度', '处理目的、类别、保留、接收方逐项告知', '这一套对外文本本身就是告知载体：数据清单、保留与备份、第三方、权限逐项列开', '本套文本没有公布数据保护专员或欧盟代表（第 27、37 条）的联系方式；受理渠道只有邮箱'],
           ['第 15 条 访问', '告知并复制其个人数据', '导出是**自助**的，而且只有你解得开：服务端存的是端到端加密的事件，我们没有口令就还原不出明文', '正因为你给的从来不是明文，我们无法替你查出"你的任务标题是什么"——这一条由你的设备行使，不由我们代查'],
           ['第 16 条 更正', '在不合理延迟内更正', '在界面里直接改，改完经同步到达你的其他设备', '**邮箱改不了**：服务端没有换绑邮箱的路由，所以"账号标识本身写错了"这一类更正今天只能重新注册并请我们注销旧账号'],
-          ['第 17 条 删除', '在不合理延迟内删除', '应用内删除与回收站里的"彻底删除"标记 + 账号级联硬删（现量：引用 `users` 且 CASCADE 的外键 19 条、覆盖 18 张表）+ 点下注销的那台设备当场清本机明文，其它设备在下次同步收到注销信号时各自清', '两个"不承诺"：从此不再上线的设备上的本地副本无法远程清除；整库备份里没有单点删除，随备份保留期自然结束'],
+          ['第 17 条 删除', '在不合理延迟内删除', '应用内删除与回收站里的"彻底删除"标记 + 账号级联硬删（现量：引用 `users` 且 CASCADE 的外键 20 条、覆盖 19 张表）+ 点下注销的那台设备当场清本机明文，其它设备在下次同步收到注销信号时各自清', '两个"不承诺"：从此不再上线的设备上的本地副本无法远程清除；整库备份里没有单点删除，随备份保留期自然结束'],
           ['第 18 条 限制处理', '暂停处理但保留数据', '实际能用的是撤回同意：关掉某项开关后该项出站动作立即停止、已建立的实时连接当场关掉', '没有"整号冻结但数据保留"这一档（产品里没有这个状态），要停就走到注销'],
           ['第 20 条 数据可携带', '以结构化、通用、机器可读格式取得并转移', '导出文件是明文 JSON，含**墓碑**与完整操作日志，另带可核对的 counts（丢掉墓碑的备份在回放时会让已删数据复活）', '我们没有替你把这份文件搬进别家服务的通道；转换由你自己完成'],
           ['第 21、22 条 反对与自动化决策', '反对特定处理；不受仅凭自动化产生法律效果的决策约束', 'AI 在这套代码里**类型上产生不了写入**：读操作即时执行，写操作只产出提案，确认之后才真的落到你的数据里；出境还要过逐功能授权', '撤回同意后已同步到其它设备的既有数据不会自动回滚，那要你自己删'],
@@ -337,7 +342,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '本文件里的每一处"目前不能"都是**带着触发条件的**，不是敷衍的措辞。下面四项一变，文本就跟着改；改版会提升版本号，因为同意记录里存的就是版本号。',
+        text: '本文件里的每一处"目前不能"都是**带着触发条件的**，不是敷衍的措辞。下面每一项一变，文本就跟着改；改版会提升版本号，因为同意记录里存的就是版本号。',
       },
       {
         kind: 'ul',
@@ -346,6 +351,7 @@ const zh = [
           '**Linux 桌面壳把「删掉容器」这一步递给界面这一层之后**：第五节 ② 那条"删不掉文件本体"就会消失，"今天不承诺的"从两处回到一处。（macOS 与 Windows 两个桌面壳已在 2026-10-04 接上这一步，所以这里只剩 Linux 一端。）',
           '**邮箱换绑实现之后**：第三节那条"邮箱不可更换"会被删除，并换成换绑流程。',
           '**保留期调整之后**：第四节的 45 天要跟着改。它是产品设定、不是你可以自选的选项，改它需要发版。还有第二件事也要让文案跟着改：**清理真正开始对我们的数据生效**的那一天（见第四节如实补出的那条边界）。',
+          '**托管 AI 那份调用元数据的到期删除装上之后**：《隐私政策》与《个人信息收集清单》里那一格今天写的是"期限定为 45 天，但到期就删这一步还没实现"。那条作业装上、并且真的对这些字段生效的那一天，两处的表述都改成到期删除，本文件第 17 条那一行的"对不上的部分"跟着改。⚠️ 这是表里**第二个** 45 天：它与上一条说的同步流水窗口同值，但不是同一个旋钮，所以"保留期调整"这条触发条件今后要指明是哪一个。',
         ],
       },
       {
@@ -362,6 +368,16 @@ const zh = [
             '1.2',
             '2026-10-04',
             '第五节从"承诺渠道"改写为**自助表述**：注销入口在网页版设置页、手机端「我的」与命令行版三处都有，并逐条写明二次确认、先导出提示、命令行版对未上传操作的硬拒。同节把本地副本那条边界改成分层实话——点下注销的设备当场清除、其它设备在下次同步收到注销信号时各自清除，**唯一不承诺的是从此不再上线的设备**。第一节与第七节两张表的对应行同步改写。同批新增《欧盟 GDPR 口径：逐条对得上什么、对不上什么》一节：八条条文各自对到一条代码事实，**每一行都带"对不上的部分"那一栏**（数据保护专员与欧盟代表、邮箱不可改、无远程擦除、整库备份无单点删除、转移机制不声称），中英两份逐段镜像。同一版还把"不承诺"从一处扩成**两处**：除了那台从此离线的设备，🟡 **Linux 桌面壳**上那条本机销毁通道今天只走到"把内容清空并重写库文件"，**删不掉文件本体**。✅ macOS 与 Windows 两个桌面壳在同一天（2026-10-04）把这一步接上了——它们把界面上可读的那份数据托管进壳自己那一份本地库，而本机销毁通道现在连那个库文件带它的 WAL 日志与共享内存旁挂一起删掉；两端各自在壳级验收里真跑到 `containerRemoved:true`，并从壳外确认文件已不在盘上。第八节的触发条件跟着改成"只剩 Linux 一端"。',
+          ],
+          [
+            '1.3',
+            '2026-10-05',
+            '改的原因不是措辞，是**服务端库结构变了**：ADR-0054 §2 把托管 AI 那条路径的保留裁决落成一张只装计数的表 `ai_usage_counters`（账号、计费周期锚点、次数、更新时间四列，带 `user_id → users` 的 `ON DELETE CASCADE`）。它装的是**每个计费周期用了几次**，提示词与模型输出都不在表里，所以第五节那一串级联清单与 GDPR 第 17 条那一行各多一类，注销的级联数量按迁移真源重算。⚠️ 这两格上一版抄的都是本文件头注释里的旧数，而那行注释自己在 10-04 就已经漂过一次 —— 所以这一版把「文案的数字只从判据现量来，注释、ADR 与上一版文案都不是数据源」这句话写进了注释。本行不复述那两个数字：变更日志里再抄一份，就是给一个会漂的副本又多一处落点。中英两栏同步。',
+          ],
+          [
+            '1.4',
+            '2026-10-05',
+            '第八节的触发清单加一项，并把"保留期调整"那条**限定到具体哪一个 45 天**：ADR-0054 定案之后，《隐私政策》与《个人信息收集清单》的期限表里多了一个同值但不同物的 45 天（托管 AI 调用元数据的保留期），而它的到期删除作业本轮没有实现。这一份文件因此多登记一条改写条件 —— 那条作业装上并真的生效时，那两处的表述与本文件第 17 条那一行的"对不上的部分"要同批改。同一版把上面那句"下面四项"改成"下面每一项"：项数不该写进正文，它一改就得漂。中英两栏同步。',
           ],
         ],
       },
@@ -526,7 +542,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'On the server side, account closure is a **real delete**, not a marker: the account row and everything under it — synced data, device records, passkeys, subscriptions and orders, referral relationships and notifications — are removed by cascade. Passwords and tokens die with it, and live connections are dropped. There is no cooling-off period and no Trash: once done, it cannot be undone. 🔴 Local-first means each device keeps its own readable database, so closure also has to answer "what about the copies on the other devices": **the device you press it on wipes its local plaintext on the spot**, and every other device wipes its own copy **the next time it syncs and receives the "account closed" signal**. ⚠️ **Two things we do not promise today**: (1) a device that **never comes back online and never signs in again** — we have no way to remotely erase a device that is not connected, and the copy on it is returned to a clean state only by uninstalling at the operating-system level and clearing the app’s data; (2) 🟡 **the Linux desktop shell**: there the path that is supposed to wipe this device’s local data stops at "empty the content and rewrite the database file" and **cannot remove the file itself** — that shell\'s driver does not hand "remove the container" to the interface layer, and by our own account empty-and-rewrite is an **incomplete** remedy: old content may still be recoverable from free pages. ✅ **The macOS and Windows desktop shells were wired up on 2026-10-04**: those shells keep the storage themselves (the interface switches to the storage the shell hands it as it starts, and its readable copy is written into the desktop program\'s own database file), and the local destruction path now removes that file too, together with its WAL log and shared-memory side files. The phone and the web app do not have a "shell\'s own database" layer.',
+        text: 'On the server side, account closure is a **real delete**, not a marker: the account row and everything under it — synced data, device records, passkeys, subscriptions and orders, referral relationships and notifications, managed-AI usage counters — are removed by cascade. Passwords and tokens die with it, and live connections are dropped. There is no cooling-off period and no Trash: once done, it cannot be undone. 🔴 Local-first means each device keeps its own readable database, so closure also has to answer "what about the copies on the other devices": **the device you press it on wipes its local plaintext on the spot**, and every other device wipes its own copy **the next time it syncs and receives the "account closed" signal**. ⚠️ **Two things we do not promise today**: (1) a device that **never comes back online and never signs in again** — we have no way to remotely erase a device that is not connected, and the copy on it is returned to a clean state only by uninstalling at the operating-system level and clearing the app’s data; (2) 🟡 **the Linux desktop shell**: there the path that is supposed to wipe this device’s local data stops at "empty the content and rewrite the database file" and **cannot remove the file itself** — that shell\'s driver does not hand "remove the container" to the interface layer, and by our own account empty-and-rewrite is an **incomplete** remedy: old content may still be recoverable from free pages. ✅ **The macOS and Windows desktop shells were wired up on 2026-10-04**: those shells keep the storage themselves (the interface switches to the storage the shell hands it as it starts, and its readable copy is written into the desktop program\'s own database file), and the local destruction path now removes that file too, together with its WAL log and shared-memory side files. The phone and the web app do not have a "shell\'s own database" layer.',
       },
       {
         kind: 'p',
@@ -632,7 +648,7 @@ const en = [
           ['Arts. 13, 14 transparency', 'Purposes, categories, retention and recipients disclosed item by item', 'This set of documents **is** the disclosure vehicle: the data inventory, retention and backups, third parties and permissions are each listed out', 'These texts publish no data-protection-officer or EU-representative contact (Arts. 27, 37); the only channel is the mailbox'],
           ['Art. 15 access', 'Inform and provide a copy of the personal data', 'Export is **self-service**, and only you can open it: the server stores end-to-end-encrypted events, which cannot be turned back into plaintext without your passphrase', 'Precisely because what you hold is never our plaintext, we cannot look up "what your task titles are" on your behalf — this right is exercised by your device, not by us querying for you'],
           ['Art. 16 rectification', 'Correct without undue delay', 'Edit it in the interface; the change reaches your other devices through sync', '**The e-mail address cannot be corrected**: there is no rebinding route on the server, so an account identifier written wrong can only be handled by registering the right one and asking us to close the wrong one'],
-          ['Art. 17 erasure', 'Delete without undue delay', 'In-app deletion plus the "purge" marker in Trash plus the account-level cascade hard delete (measured: 19 foreign keys referencing `users` with CASCADE, covering 18 tables) + the device you press closure on wipes its local plaintext on the spot, and every other device wipes its own on the next sync that receives the closure signal', 'Two things not promised: a device that never comes back online cannot be erased remotely, and a whole-database snapshot offers no targeted removal — it goes away when that backup ages out'],
+          ['Art. 17 erasure', 'Delete without undue delay', 'In-app deletion plus the "purge" marker in Trash plus the account-level cascade hard delete (measured: 20 foreign keys referencing `users` with CASCADE, covering 19 tables) + the device you press closure on wipes its local plaintext on the spot, and every other device wipes its own on the next sync that receives the closure signal', 'Two things not promised: a device that never comes back online cannot be erased remotely, and a whole-database snapshot offers no targeted removal — it goes away when that backup ages out'],
           ['Art. 18 restriction', 'Suspend processing while keeping the data', 'What actually exists is withdrawal of consent: switch an item off and every outbound action for it stops immediately, and a realtime connection already open is closed on the spot', 'There is no "freeze the whole account but keep the data" state (the product has no such state); stopping everything means closing the account'],
           ['Art. 20 portability', 'Structured, commonly used, machine-readable data, transmitted to another controller', 'The export file is plaintext JSON containing the **tombstones** and the complete operation log, with verifiable counts (a backup that drops tombstones resurrects deleted data on replay)', 'We offer no channel that moves that file into somebody else’s service for you; the conversion is yours'],
           ['Arts. 21, 22 objection and automated decisions', 'Object to specific processing; not be subject to a decision taken solely on automated processing', 'In this code base AI **cannot produce a write at the type level**: reads execute immediately, writes only produce a proposal, and nothing is written into your data until you confirm; leaving the device additionally requires per-feature authorisation', 'Withdrawing consent does not roll back data already synced to your other devices — that part you delete yourself'],
@@ -660,7 +676,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'Every "not today" in this document comes with its trigger condition; none of them is filler wording. When the four items below change, the text changes with them. A change also raises the version number, because the version number is what your consent record stores.',
+        text: 'Every "not today" in this document comes with its trigger condition; none of them is filler wording. When the items below change, the text changes with them. A change also raises the version number, because the version number is what your consent record stores.',
       },
       {
         kind: 'ul',
@@ -669,6 +685,7 @@ const en = [
           '**Once the Linux desktop shell hands the "remove the container" step down to the interface layer**: item (2) in section five — "the file itself cannot be removed" — disappears and the list of what is not promised goes back from two items to one. (The macOS and Windows desktop shells were wired up on 2026-10-04, so Linux is the only shell left.)',
           '**Once email rebinding is implemented**: "the email address cannot be changed" in section three is deleted and replaced by the rebinding procedure.',
           '**Once the retention period changes**: the 45 days in section four changes with it. It is a product setting, not an option you can pick, and changing it requires a release. A second event also requires this text to change: **the day the sweep really starts applying to our data** (see the boundary spelled out in section four).',
+          '**Once the delete-at-expiry job for managed-AI call metadata exists**: the cell in the Privacy Policy and in the Collection Inventory currently reads "the period is set at 45 days, but the deletion at expiry is not implemented". On the day that job lands and really applies to those fields, both places are rewritten as deletion at expiry, and the "where it does not line up" cell for Article 17 in this document changes with them. ⚠️ This is the **second** 45-day period in those tables: the same value as the window for the sync stream discussed just above, but not the same knob — which is why "the retention period changes" now has to say which one it means.',
         ],
       },
       {
@@ -686,6 +703,16 @@ const en = [
             '2026-10-04',
             'Section five moves from “a channel, not self-service” to a **self-service statement**: closure entries exist in Web settings, in the mobile “Mine” tab and in the command-line client, each with the tick-box acknowledgement, the export-first prompt, and the command line refusing to run while un-uploaded operations exist. The same section now states the local-copy boundary as **layered truth** — the device you press it on is wiped on the spot, other devices wipe themselves on the next sync that receives the closure signal, and the only thing not promised is a device that never comes back online. The matching rows of the tables in sections one and seven are rewritten with it. A new section, “The GDPR position: what lines up, article by article, and what does not”, was added in the same change: eight articles each mapped to one code fact, and **every row carries its own “where it does not line up” cell** (no data-protection officer or EU representative, the e-mail address cannot be corrected, no remote wipe of an offline device, no targeted removal from a whole-database snapshot, no claimed transfer mechanism), mirrored block by block in both languages. The same version widens the list of what is not promised from one item to **two**: besides the device that never comes back online, 🟡 on the **Linux desktop shell** the path that is supposed to wipe this device’s local data still stops at "empty the content and rewrite the database file" and **cannot remove the file itself**. ✅ The macOS and Windows desktop shells were wired up on the same day (2026-10-04): those two shells hand the interface’s readable copy to their own local database, and the destruction path now removes that database file together with its WAL log and shared-memory sidecar — both shells were measured doing it end to end at shell level (`containerRemoved:true`, with the files confirmed gone from outside the shell). Section eight’s trigger list is rewritten with it, so the outstanding item there is Linux only.',
           ],
+          [
+            '1.3',
+            '2026-10-05',
+            'What changed is not the wording — **the server schema changed**: ADR-0054 §2 turns the retention ruling for the managed-AI path into a table that can only hold counts, `ai_usage_counters` (account, billing-period anchor, request count, last updated, with an `ON DELETE CASCADE` from `user_id` to `users`). What it stores is **how many calls in one billing period**; prompts and model output are not in it. So the cascade list in section five and the Article 17 row of the GDPR table each gain one category, and the cascade counts are recomputed from the migrations. ⚠️ Both of those cells had been copied from the stale figure in this file’s own header comment, and that comment had already drifted once on 2026-10-04 — which is why this revision writes the rule itself into the comment: document numbers come only from the measurement, never from a comment, an ADR, or the previous revision. This row does not restate those numbers; a changelog copy is just one more place for them to drift from. Both language columns updated together.',
+          ],
+          [
+            '1.4',
+            '2026-10-05',
+            'The trigger list in section eight gains one item, and the "the retention period changes" trigger is now **pinned to which 45-day window it means**: after ADR-0054 settled the ruling, the period tables in the Privacy Policy and in the Collection Inventory carry a second 45-day value that is the same number but not the same knob (the retention period set for managed-AI call metadata), and its deletion at expiry is not implemented in this round. This document therefore registers one more rewrite condition — when that job lands and really applies, those two cells and the "where it does not line up" cell for Article 17 here change in the same edit. The same revision changes "the four items below" into "the items below": an item count does not belong in prose, because it drifts the moment a row is added. Both language columns updated together.',
+          ],
         ],
       },
     ],
@@ -694,9 +721,13 @@ const en = [
 
 export const dataRights: LegalDocument = {
   id: 'data-rights',
-  version: '1.2',
+  // 🔴 1.3 → 1.4：第八节的触发清单新增一条（托管 AI 调用元数据的到期删除作业装上之日，
+  // 三处表述同批改），并把"保留期调整"这条限定到**具体哪一个 45 天** —— ADR-0054 之后
+  // 期限表里有两个同值的 45 天，不限定就会让下一次改窗口改错那一格。
+  // 版本号进同意指纹（`legalSetVersion()`）。
+  version: '1.4',
   status: 'draft',
-  updatedDate: '2026-10-04',
+  updatedDate: '2026-10-05',
   title: {
     'zh-CN': '个人权利行使与请求响应',
     en: 'Exercising Your Rights: Requests and Responses',

@@ -171,7 +171,7 @@
         "name": "Where does my data actually live?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "On your own device first; once sync is on, the cloud holds ciphertext only — the server rejects plaintext outright. Metadata is not encrypted, though — sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise \"we can see nothing\"."
+          "text": "On your own device first. This answer is about the sync channel - once sync is on, that channel holds ciphertext only in the cloud, and a sync endpoint that receives plaintext rejects it outright. ⚠️ AI is a different path and is not covered by that sentence: a language model has to read your text in order to suggest anything, so the field-by-field, feature-by-feature disclosure lives in the \"AI & Data Flow\" document, linked in the footer. One more thing: sync metadata is not encrypted - sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise \"we can see nothing\"."
         }
       }
     ]

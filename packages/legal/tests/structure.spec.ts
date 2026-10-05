@@ -379,6 +379,12 @@ describe('对外承诺里的主体不许错', () => {
  * `vault_key_migrations` / `revoked_sync_devices`）。旧数字留着是 10-03 那次更正的现场，
  * **不要照它们抄文案**：本轮 `data-rights` 第六节那行就是这么抄的，被这条判据当场报红。
  * 文案里的数字只能从 `userCascades.size` / `cascadeTables.length` 来，不能从注释、ADR 或上一版文案来。
+ *
+ * ⚠️ **2026-10-05 再补（同一条规律，第二次命中）**：上面那组"19 条 / 18 张表"**又漂了** ——
+ * ADR-0054 §2 的托管 AI 计量表 `ai_usage_counters`（`user_id → users`，`ON DELETE CASCADE`）
+ * 让真源变成 **20 条 / 19 张表**，而 `privacy` 与 `data-rights` 的中英四栏仍写着旧数，
+ * 本判据再次当场报红。这正是"不许从注释抄文案"这句话存在的理由：注释里那句"今天量到"
+ * 的保质期，等于下一张账号表落进 `schema.prisma` 的那一天。
  */
 describe('对外文本里可复算的数字，回到真源对账', () => {
   /** 迁移目录相对本包：`packages/legal/tests` → 仓库根的 `server/prisma/migrations`（上三级）。 */
@@ -457,6 +463,10 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
     { table: 'vault_key_packages', zh: '密钥包', en: 'key package' },
     { table: 'vault_key_migrations', zh: '密钥迁移记录', en: 'key migration record' },
     { table: 'revoked_sync_devices', zh: '撤销设备记录', en: 'revoked device record' },
+    // 2026-10-05 ADR-0054（托管 AI 的保留裁决）新长的第四张：`ai_usage_counters`。
+    // 🔴 它只有计数、没有内容列，所以这一类的名字必须能让用户读出"次数"而不是"内容"——
+    // 写成「AI 使用记录」会把一张计数表说成一份内容档案，那正是 ADR §2 要避免的读法。
+    { table: 'ai_usage_counters', zh: 'AI 用量计数', en: 'AI usage counter' },
   ];
 
   it('🔴 推导本身有产出（数不出约束 = 探针坏了，不是"没有级联"）', () => {

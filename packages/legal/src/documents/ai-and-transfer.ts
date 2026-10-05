@@ -15,8 +15,12 @@
  * 1. **禁止写"我们会先脱敏、匿名化或摘要后再发送"。** 代码里不存在任何这类环节：
  *    任务备注是整段正文照发，任务列表是 JSON 原文。这条路径有五个可查的调用点，一查就穿。
  * 2. **禁止写"heyta 云端 AI / 我们替你调用模型 / 我们可能使用自有 AI 服务"。**
- *    `managed` 供给在类型结构上不可达（出境路由配置里没有"模式"字段，目的地只能由端点地址推导），
- *    而且那个有意的断言会因"保留策略未定"直接失败。写了就是在描述一个不存在的功能。
+ *    `managed` 供给在生产出境路径上仍然不可达：`AiRoutingConfig` 里没有"模式"字段，
+ *    目的地只能由端点地址推导，所以那条链路推不出 `heyta-cloud`（服务端那条代理路由要真的
+ *    工作还得运营方配上境内上游）。⚠️ 2026-10-05 换过一次理由：那句"因为保留策略未定所以
+ *    挡住"已经过期 —— ADR-0054 把保留期定案了，`assertEnableable` 里那条有意的检查
+ *    从此不再触发。**禁令本身一条没松**，只是它现在只靠结构那条腿撑着；写了那句就是在
+ *    描述一个用户打不开的功能。
  * 3. **禁止把云端 AI 与端到端加密写在同一句话里。** 模型必须读到明文才能工作 ——
  *    这是定义外的例外，不是可调和的细节。
  *
@@ -95,10 +99,10 @@ const zh = [
         head: ['功能', '出境的字段', '发出去的是什么', '上限'],
         rows: [
           ['一句话捕获', '`today`、`text`，可选 `preferences`', '你刚敲进去的那句话**原文**，加上这台设备的本地日期与星期', '输入超过 500 字符直接拒绝，不截断后发送'],
-          ['拆解任务', '`title`、可选 `note`，可选 `preferences`', '任务标题原文，加上任务备注**整段正文**', '备注不截断；只有完全为空才不发送'],
-          ['优先级建议', '`tasks`，可选 `preferences`', '至多 50 条任务的标识、标题、截止时间、优先级，按 JSON 原文', '50 条，且在构造请求之前就收窄'],
-          ['估时', '`title`、可选 `note`、`history`，可选 `preferences`', '标题与备注原文；最近至多 20 条专注记录的"计划用时 / 实际用时"分钟数', '20 条；这些记录里没有时间戳、也没有任务标识'],
-          ['工具选择', '`text`、`tools`', '你那句话的原文，加上这台设备上**已授权工具的名字、描述与参数结构**', '500 字符；纯规则能选中的场景一次都不出境'],
+          ['拆解任务', '`today`、`title`，可选 `note`，可选 `preferences`', '这台设备的本地日期与星期（用于把"下周三"这类说法算对），加上任务标题原文与任务备注**整段正文**', '备注不截断；只有完全为空才不发送'],
+          ['优先级建议', '`today`、`tasks`，可选 `preferences`', '这台设备的本地日期与星期，加上至多 50 条任务的标识、标题、截止时间、优先级，按 JSON 原文', '50 条，且在构造请求之前就收窄'],
+          ['估时', '`today`、`title`，可选 `note`、`history`，可选 `preferences`', '这台设备的本地日期与星期，加上标题与备注原文；最近至多 20 条专注记录的"计划用时 / 实际用时"分钟数', '20 条记录；记录本身里面没有时间戳、也没有任务标识'],
+          ['工具选择', '`today`、`text`、`tools`', '这台设备的本地日期与星期，加上你那句话的原文，以及这台设备上**已授权工具的名字、描述与参数结构**', '500 字符；纯规则能选中的场景一次都不出境'],
         ],
       },
       {
@@ -146,19 +150,27 @@ const zh = [
   },
   {
     id: 's5',
-    title: '由我们提供并计费的云端 AI：当前不可用',
+    title: '由我们提供并计费的云端 AI：保留策略已定案，但这一档仍打不开',
     blocks: [
       {
         kind: 'p',
-        text: 'heyta 里存在一条**没有实现、也无法靠配置打开**的路：由我们统一提供、统一计费、由我们选择模型的云端 AI。它不可达不是修辞：出境路由的配置里根本没有"服务模式"这个字段，目的地只能从端点地址推导，因此结构上永远推不出"heyta 云端"。同时，我们对这类服务的数据保留期还没有作出决定，而代码里有一道有意的检查会在保留期未定时直接失败 —— 它宁可报错，也不肯编一个听起来合理的保留期数字。',
-      },
-      {
-        kind: 'callout',
-        text: '**这项服务现在没有提供，也不在"关着的选项"里 —— 它是一个不存在的选项。** 本文件不会写"我们可能使用自有 AI 服务"来预留空间。你今天能在 heyta 里用到的 AI 功能，只有你自己配了端点、逐项授权过的那几个。',
+        text: 'heyta 里存在一条**由我们统一提供、统一计费、由我们挑选模型**的云端 AI 的路。这条路的**数据保留策略已于 2026-10-05 定案**（ADR-0054，"托管 AI 的数据保留策略与可售卖的前置顺序"），下面第二段写的就是定案内容 —— 它不再是"还没想清楚数据留多久，所以不许打开"。但它**今天仍然不是一个用户打得开的功能**，理由是一条可核对的结构事实：内置 AI 真正走的那份出境路由配置里没有"服务模式"这个字段，目的地只能从端点地址推导，因此那条链路推不出"heyta 云端"；而服务端那条代理路径要真的工作，还需要运营方先把境内上游配上 —— 没配的时候它一律回"未配置"，一个字节都不转发。',
       },
       {
         kind: 'p',
-        text: '为什么这条界限必须写死：任何由平台侧提供、由平台挑选模型的 AI 服务，定义上必须能看到明文；它**永远不能**被描述成端到端加密。把两句话拼成"我们全程加密，还用 AI 帮你整理"是一种会在监管与用户两侧同时翻车的写法。我们的立场是：这类服务如果将来要做，必须先解决保留期、出境手续与单独同意三件事，届时本文件这一节要整段重写。',
+        text: '定案下来的保留规则有**三条**，每一条都被写成可失败的判据，而不是一句措辞：**（一）服务端不保留内容。** 承载用量的那张表按设计只有四列：账号、计费周期锚点、次数、更新时间 —— 没有提示词列、没有模型输出列，也没有一个装得下内容的兜底列。有一条判据断言它的列集合**等于**这四个，多一列就红；理由是本文件反复用的那一条 —— "不保留内容"这句话的证据必须是表形状，不是我们的形容词。**（二）请求体与返回体只在一次代理调用的内存里存在，调用返回即丢弃**：不写日志、不进 trace、不进崩溃上报，排障看的是元数据而不是内容。**（三）保留的运维元数据只有**时间、用户、功能名（封闭词表里的那一个）、结果状态、请求与响应的**字节数**（不是内容）、耗时；这一档的**保留期定为 45 天**，推导是一次计费周期 30 天加 15 天出账缓冲，为了让"上一期到底用了几次"可核对 —— ⚠️ **不是**因为某部法律要求 45 天。🔴 还有一句必须一起写、否则这段会被读成承诺：**"到期就删"这一步本轮没有落地**。这些元数据走的是运行日志那条通道，而运行日志目前没有轮转与到期删除机制，要等一条部署侧的作业把它配上。所以我们写"期限定为 45 天"，**不写**"45 天后会自动删除"。',
+      },
+      {
+        kind: 'p',
+        text: '与"发给谁"有关的一条定案也要写在这里，因为它与第四节讲的你自备端点**不是同一件事**：托管这一档的目的地不由客户端声明，而是由端点地址落在一份**境内供应商白名单**上推导出来的；主机名逐条登记，不在表里就不可用，保存配置与真要发请求**两个点各校验一次**，接了不合格的端点是响亮拒绝而不是静默降级。第四节那句"我们不做服务商白名单、也不判断那个端点在哪个国家"说的始终是你自己填的自备端点 —— 那里地址由你决定，我们无权替你判断，也无法审计。',
+      },
+      {
+        kind: 'callout',
+        text: '**这项服务现在没有提供，而且它不是一个"暂时关着"的选项** —— 今天的客户端里没有任何一个开关能把它打开，本文件也不会写"我们可能使用自有 AI 服务"来预留空间。你今天能在 heyta 里用到的 AI 功能，只有你自己配了端点、逐项授权过的那几个。',
+      },
+      {
+        kind: 'p',
+        text: '为什么这条界限必须写死：任何由平台侧提供、由平台挑选模型的 AI 服务，定义上必须能看到明文；它**永远不能**被描述成端到端加密。把两句话拼成"我们全程加密，还用 AI 帮你整理"是一种会在监管与用户两侧同时翻车的写法。这一节的改写**不等于**这条路已经开放：保留期那一件有了答案，另两件没有 —— 它面向用户时必须是**逐项、可撤销的单独同意**（不能随订阅默认生效），而第 8 节那一格关于境外端点的定性仍然**不下结论**。它真正开放的那一天，这一节还是得整段重写，而"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。',
       },
     ],
   },
@@ -293,7 +305,7 @@ const zh = [
           [
             '第 44–49 条（向第三国转移）',
             '个人数据离开欧洲经济区时，有没有一条被承认的传输依据',
-            '今天**一次都不会发生**：托管云端 AI 被 `assertEnableable()` 挡着，逐项出境授权默认关闭，所以没有数据在我们这一侧被送往境外',
+            '今天**一次都不会发生**：托管路径按 ADR-0054 §5 只能接**境内白名单里**的供应商（保存与发送两个点各校验一次，不在表里就响亮拒绝），逐项出境授权默认关闭，所以没有数据在我们这一侧被送往境外',
             '我们**没有**标准合同条款、**没有**充分性决定可依赖、**也没有**约束性公司规则。如果用户在自建实例里填入境外端点，那次传输的依据由**用户自己**承担，本文件不代任何人写"已有依据"',
           ],
           [
@@ -343,7 +355,7 @@ const zh = [
         kind: 'ul',
         items: [
           '**加任何一个新的出境字段**：第三节那张表必须先扩、再上线 —— 出境面必须在数据被写进请求之前收窄，披露不能虚报，也不能少报。',
-          '**提供云端 AI**：第五节整段重写，并必须先落地保留策略、出境手续与单独同意；届时"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。',
+          '**提供云端 AI**：第五节整段重写。它列的三件前置条件里，**保留期那一件已在 2026-10-05 定案并写进第五节**，另两件没有 —— 逐项可撤销的单独同意，以及第 8 节那一格仍然**不下结论**的定性；届时"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。',
           '**把"受保护条目"做进产品**：第六节那条提示才允许从"警告"改成"承诺"。在此之前，任何"加密条目读不出来"的表述都不写。',
         ],
       },
@@ -366,6 +378,16 @@ const zh = [
             '1.3',
             '2026-10-04',
             '新增第十节：GDPR 第五章（第 44–49 条）问的是"个人数据离开欧洲经济区"，与本文件的"数据出境离开中国境内"**不是同一个问题**，所以两侧结论不互抄。逐格写明拿得出与拿不出的：没有标准合同条款、没有可依赖的充分性决定、没有约束性公司规则；第 9 条不做内容识别也不过滤；第 22 条只在"确认"这道人工关口存在时成立；第 25/32 条只有本仓库的代码与测试作证据，没有第三方认证。权利行使那张逐条表不在这里复制，只用 docRef 指向《个人权利行使与请求响应》。',
+          ],
+          [
+            '1.4',
+            '2026-10-05',
+            '第三节那张表的**拆解任务 / 优先级建议 / 估时**三行各加了 `today`，工具选择那行也补上 `today`：这三条链路此前不知道"今天是哪天"，用户说"下周三""14 号"时模型只能自己编（实测编错过四个半月），而唯一的修法是往提示词里注入这一行。它看起来不像用户数据，实际上是**这台设备的本地日期**，所以按"新增任何一个出境字段都要先扩表再上线"那条纪律，先改这张表。工具选择那行的 `today` 不是新增出境面，是**补一句漏写**：内置助手早就带这一项，而这张表把它漏掉了。',
+          ],
+          [
+            '1.5',
+            '2026-10-05',
+            '第五节按 ADR-0054 改写：这类服务的**数据保留策略已经定案**，所以本节不再把"保留期还没决定"当成它不可用的理由（那道为此而写的有意的检查，在定案之后不再触发）。定案本身写在第五节第二段，逐条落到可核对的东西上：一张只装计数的表（证据是列集合，不是措辞）、请求与返回体只存在于一次代理调用的内存里、保留下来的运维元数据是一份封闭字段清单加一个有出处的期限，以及托管档的目的地由**境内白名单**推导而不是由客户端声明。两处刻意没写成更满的话：那一个期限**没有**配"到期会自动删除"（清理作业本轮未落地，它落地时本节要改），而第 8 节关于你自己配置的境外端点那一格**仍然不下结论** —— 本次定案不涉及它，本文件也不替它定性。第九节的触发清单同步改掉保留期这一件。开放与购买按 ADR-0054 §6 的顺序走，走到那一步本节还要整段重写。本行不复述那个数字与那份字段清单：它们只住在第五节，抄一份就是多一个会漂的副本。',
           ],
         ],
       },
@@ -439,10 +461,10 @@ const en = [
         head: ['Feature', 'Fields that leave', 'What is actually sent', 'Cap'],
         rows: [
           ['One-line capture', '`today`, `text`, optionally `preferences`', 'The **original text** of the line you just typed, plus this device\'s local date and weekday', 'Input over 500 characters is refused outright, never truncated and sent'],
-          ['Task breakdown', '`title`, optionally `note`, optionally `preferences`', 'The original task title, plus the **entire note body** of that task', 'Notes are not truncated; an entirely blank note is what is left out'],
-          ['Prioritisation', '`tasks`, optionally `preferences`', 'Up to 50 tasks\' identifier, title, due date and priority, as JSON in the original', '50 items, narrowed before the request is even constructed'],
-          ['Duration estimate', '`title`, optionally `note`, `history`, optionally `preferences`', 'The original title and note; up to the 20 most recent focus records as "planned / actual" minutes', '20 records; no timestamps and no task identifiers in them'],
-          ['Tool selection', '`text`, `tools`', 'The original text of your line, plus **the names, descriptions and parameter structures of the tools authorised on this device**', '500 characters; where pure rules can pick the tool, nothing leaves at all'],
+          ['Task breakdown', '`today`, `title`, optionally `note`, optionally `preferences`', 'This device\'s local date and weekday (so that wording like "next Wednesday" resolves against a real day), plus the original task title and the **entire note body** of that task', 'Notes are not truncated; an entirely blank note is what is left out'],
+          ['Prioritisation', '`today`, `tasks`, optionally `preferences`', 'This device\'s local date and weekday, plus up to 50 tasks\' identifier, title, due date and priority, as JSON in the original', '50 items, narrowed before the request is even constructed'],
+          ['Duration estimate', '`today`, `title`, optionally `note`, `history`, optionally `preferences`', 'This device\'s local date and weekday, plus the original title and note; up to the 20 most recent focus records as "planned / actual" minutes', '20 records; the records themselves carry no timestamps and no task identifiers'],
+          ['Tool selection', '`today`, `text`, `tools`', 'This device\'s local date and weekday, plus the original text of your line, and **the names, descriptions and parameter structures of the tools authorised on this device**', '500 characters; where pure rules can pick the tool, nothing leaves at all'],
         ],
       },
       {
@@ -490,19 +512,27 @@ const en = [
   },
   {
     id: 's5',
-    title: 'Cloud AI operated and billed by us: currently unavailable',
+    title: 'Cloud AI operated and billed by us: the retention policy is settled, the tier is still not switchable on',
     blocks: [
       {
         kind: 'p',
-        text: 'There is a path in heyta that is **not implemented and cannot be switched on by configuration**: cloud AI provided and billed by us, with models chosen by us. Its unreachability is not rhetoric — the egress routing configuration has no "service mode" field at all, and destinations are derived solely from endpoint addresses, so "heyta cloud" can never be derived. At the same time we have not decided a data retention period for such a service, and a deliberate check in the code fails outright while retention is undecided: it prefers an error over inventing a plausible-sounding retention figure.',
-      },
-      {
-        kind: 'callout',
-        text: '**This service is not offered today, and it is not an option that happens to be switched off — it is an option that does not exist.** This document will not say "we may use our own AI service" to leave room. The only AI you can use in heyta today is what you configured yourself, endpoint by endpoint and feature by feature.',
+        text: 'There is a path in heyta for cloud AI **provided and billed by us, with the model chosen by us**. The **data retention policy for that path was settled on 2026-10-05** (ADR-0054, the decision on managed-AI retention and the preconditions for selling it); the second paragraph below is what was settled, so the reason is no longer "we have not worked out how long data stays, so nobody may turn it on". It is **still not a feature a user can switch on**, and that rests on a checkable structural fact: the egress routing configuration the built-in AI actually uses has no "service mode" field at all, destinations are derived solely from endpoint addresses, and so "heyta cloud" can never be derived on that path. For the server-side proxy route to do anything at all, the operator must first point it at a domestic upstream; while that is unset it answers "not configured" and forwards nothing.',
       },
       {
         kind: 'p',
-        text: 'Why this line must be held hard: any AI service provided by the platform, with models picked by the platform, must see plaintext by definition, and can **never** be described as end-to-end encrypted. Stitching the two into "we encrypt everything and also let AI tidy your notes" is the kind of sentence that fails both a regulator and a user. Our position: if such a service is ever built, retention, cross-border procedures, and separate consent must be settled first — and this section would then be rewritten in full.',
+        text: 'The settled retention rules are **three**, and each is written as a check that can fail rather than as wording. **(1) The server keeps no content.** The table holding usage has exactly four columns by design — account, billing-period anchor, request count, last updated. There is no prompt column, no model-output column and no catch-all column able to hold content; a check asserts the column set **equals** those four and fails red if one is added, for the reason this document keeps using: the evidence for "no content is kept" has to be the shape of the table, not our adjective. **(2) Request and response bodies exist only in the memory of one proxied call and are dropped when it returns** — not written to logs, not put in a trace, not sent to crash reporting; troubleshooting reads metadata, never content. **(3) The operational metadata that is kept** is limited to time, user, feature name (one entry from a closed vocabulary), outcome, the **byte counts** of request and response (not their content) and duration, and **the retention period for it is set at 45 days**. The derivation is one 30-day billing period plus a 15-day reconciliation buffer, so that "how many did I actually use last period" can be checked against a bill — ⚠️ **not** because some law asks for 45 days. 🔴 One more sentence has to travel with that number or the paragraph reads as an undertaking: **the "delete it when the period ends" step is not implemented in this round**. Those fields go out over the application log channel, and the application log has neither rotation nor an expiry sweep today; a deployment-side job still has to be added. So we write "the period is set at 45 days" and we do **not** write "it is deleted automatically after 45 days".',
+      },
+      {
+        kind: 'p',
+        text: 'One settled point about "who receives it" belongs here too, because it is **not the same thing** as the endpoint you configure yourself (section four): on the managed tier the destination is not declared by the client, it is derived from an endpoint address matching a **whitelist of domestic providers** — host names registered one by one, anything off the list unavailable, checked twice (when the configuration is saved and again immediately before a request is actually sent), and an unqualified endpoint is refused loudly rather than silently downgraded. The sentence in section four, "we maintain no allowlist of providers and do not determine which country an endpoint sits in", is about **your** endpoint — you choose that address, we have no standing to judge it for you and no ability to audit it.',
+      },
+      {
+        kind: 'callout',
+        text: '**This service is not offered today, and it is not an option that happens to be switched off** — no switch anywhere in the shipped clients can turn it on, and this document will not say "we may use our own AI service" to leave room. The only AI you can use in heyta today is what you configured yourself, endpoint by endpoint and feature by feature.',
+      },
+      {
+        kind: 'p',
+        text: 'Why this line must be held hard: any AI service provided by the platform, with models picked by the platform, must see plaintext by definition, and can **never** be described as end-to-end encrypted. Stitching the two into "we encrypt everything and also let AI tidy your notes" is the kind of sentence that fails both a regulator and a user. Rewriting this section is **not** the same as opening the path: one of the three preconditions now has an answer, two do not — when this tier faces a user it must be a **per-feature, revocable, separate consent** (never something a subscription grants by default), and the characterisation in section 8 about an endpoint abroad still **stays open**. On the day it really does open, this section gets rewritten end to end again, and "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions that are never merged into one sentence.',
       },
     ],
   },
@@ -635,7 +665,7 @@ const en = [
           [
             'Articles 44-49 (transfers to a third country)',
             'Whether there is a recognised transfer basis once personal data leaves the EEA',
-            'Today it **never happens**: hosted cloud AI is blocked by `assertEnableable()` and per-feature egress consent defaults to off, so no data is sent abroad on our side',
+            'Today it **never happens**: ADR-0054 §5 allows the managed path to reach **only hosts on the domestic allowlist** (validated once when the config is saved and again before the request is actually sent, anything off the table is refused loudly), and per-feature egress consent defaults to off, so no data is sent abroad on our side',
             'We have **not** filed standard contractual clauses, there is **no** adequacy decision we rely on, and there are **no** binding corporate rules. If a self-hosted instance is pointed at an endpoint abroad, the basis for that transfer is the **operator**\'s to carry; this document will not write "a basis exists" on anyone\'s behalf',
           ],
           [
@@ -685,7 +715,7 @@ const en = [
         kind: 'ul',
         items: [
           '**Any new egress field**: the table in section three must be widened before the feature ships. The outbound surface has to be narrowed before data is written into the request, and disclosure may neither overstate nor understate.',
-          '**Cloud AI being offered**: section five is rewritten end to end, and only after retention, cross-border procedures and separate consent exist. At that point "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions and may never be merged into one sentence.',
+          '**Cloud AI being offered**: section five is rewritten end to end. Of the three preconditions it names, **the retention period was settled on 2026-10-05 and is written into section five**; the other two are not — a per-feature, revocable, separate consent, and the characterisation in section 8 which still **stays open**. At that point "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions and may never be merged into one sentence.',
           '**"Protected entries" becoming a product concept**: only then may the callout in section six change from a warning into a promise. Until then, no sentence claiming "encrypted entries cannot be read" is written.',
         ],
       },
@@ -709,6 +739,16 @@ const en = [
             '2026-10-04',
             'Added section ten. Chapter V of the GDPR (Articles 44-49) asks whether personal data leaves the European Economic Area, which is **not the same question** as the cross-border wording elsewhere in this document, so neither side borrows the other conclusion. Each cell states what can be produced and what cannot: no standard contractual clauses, no adequacy decision we rely on, no binding corporate rules; Article 9 content is never classified or filtered; Article 22 holds only while the human confirmation stands in the way; Articles 25 and 32 rest on this repository\'s code and tests, with no third-party certification. The article-by-article rights table is deliberately not copied here - it is pointed at through a document reference instead.',
           ],
+          [
+            '1.4',
+            '2026-10-05',
+            'The **Task breakdown / Prioritisation / Duration estimate** rows of the table in section three each gained `today`, and the Tool selection row gained it too. Those three chains did not know which day it was, so when you wrote "next Wednesday" or "the 14th" the model had to invent a date (measured: it was once off by four and a half months); the only fix is to inject that line into the prompt. It does not look like user data, but it is **this device\'s local date**, so the rule "any new egress field extends this table before it ships" applies. For Tool selection the `today` is not new egress - it is a **missing line being added back**: the built-in assistant already sent it while this table omitted it.',
+          ],
+          [
+            '1.5',
+            '2026-10-05',
+            'Section five is rewritten against ADR-0054: the **data retention policy for this kind of service has been settled**, so the section no longer gives "the retention period is undecided" as the reason the tier is unavailable (the deliberate check written for that purpose no longer fires once the period is decided). What was settled is stated in the second paragraph of section five, item by item against things that can be checked: a table that can only hold counts (its column set is the evidence, not our wording), request and response bodies that exist only in the memory of one proxied call, the operational metadata as a closed field list plus one dated period with a stated derivation, and the managed destination being derived from a **domestic allowlist** rather than declared by the client. Two places deliberately say less than they could: that period carries **no** "it is deleted automatically when it expires" (the sweep is not implemented in this round, and section five changes again when it is), and the cell in section 8 about an endpoint you configure abroad **still reaches no conclusion** - this decision does not touch it and this document will not settle it. The trigger list in section nine drops the retention item with this change. Opening the tier and selling it follow the order in ADR-0054 §6; when that step arrives this section is rewritten end to end again. This row does not restate that number or that field list: they live in section five only, and a second copy is a second thing that can drift.',
+          ],
         ],
       },
     ],
@@ -726,9 +766,18 @@ export const aiAndTransfer: LegalDocument = {
   // 🔴 1.2 → 1.3：新增第十节（GDPR 第五章那一档）。加的是**实质承诺的边界**
   // （没有传输依据、不识别第 9 条内容、第 22 条依赖人工确认），不是措辞打磨，
   // 所以必须换版本号：同意留痕要能回答"他同意的那一版里有没有这一段"。
-  version: '1.3',
+  // 🔴 1.3 → 1.4：第三节那张表加了 `today`（拆解 / 排序 / 估时三条链路 + 工具选择补漏）。
+  // 触发的还是同一条纪律，而且这次是本文件自己列的第一种触发："加任何一个新的出境字段，
+  // 那张表必须先扩、再上线"。出境面变了而不换版本号 = 让 1.3 那枚同意去覆盖
+  // 一段它没见过的数据，正是条款 s9 禁止的事。
+  // 🔴 1.4 → 1.5：第五节按 ADR-0054 改写 —— 改的是**对外承诺的实质**（保留策略从"还没定"
+  // 变成一份可核对的定案：只装计数的表 / 内容只活在一次调用里 / 运维元数据一个有出处的期限 /
+  // 目的地由境内白名单推导），不是措辞。而且这一版**撤掉了一句真话的旧版本**：
+  // "因为保留策略未定所以这一档打不开"在 2026-10-05 之后不再成立。同意留痕要能回答
+  // "他同意的那一版里，这一节写的是哪一套理由"，所以必须换版本号。
+  version: '1.5',
   status: 'draft',
-  updatedDate: '2026-10-04',
+  updatedDate: '2026-10-05',
   title: {
     'zh-CN': 'AI 功能与数据流向',
     en: 'AI Features and Where Your Data Goes',

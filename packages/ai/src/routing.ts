@@ -725,14 +725,13 @@ export async function invokeRouted(
       if (isFirst) {
         // 首选就没授权 → 就是"需要授权"，照常报
         const d = decision.disclosure;
-        const retention = d.retentionText === undefined ? '（保留策略未定案）' : d.retentionText;
         return {
           result: {
             ok: false,
             reason: 'egress-not-authorized',
             message:
               `该功能需要你先批准内容离开本机。\n发送内容：${d.fields.join('、') || '（无）'}\n` +
-              `${d.destinationText}\n保留：${retention}`,
+              `${d.destinationText}\n保留：${d.retentionText}`,
           },
           attempts,
           health,

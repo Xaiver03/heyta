@@ -26,46 +26,35 @@
  * 里记的那次实测：披露说 A、实际发到 B）。四条路由解释如果各写一套，
  * 一定会漂移 —— 而其中一条漂移的后果是**用户按提示做了却解决不了问题**。
  *
- * 顺带把四份重复的"取首选候选并描述它"也收在这里：它们本来就只差一个
- * `feature` 参数（四个文件里各自的注释都在说"应当抽出来"）。
+ * 顺带把四份重复的"取首选候选并描述它"收掉了 —— 而那一份现在又在
+ * `packages/app-host/src/ai-route-target.ts`（移动壳是第二个消费者）。
+ * 本文件因此只剩**两件事**：原因 → 词条、原因 → 设置的哪一块。
  */
 
 import {
-  isLoopbackEndpoint,
-  resolveRoute,
   type AiFeature,
   type AiRoutingConfig,
   type CandidateExclusionReason,
-  type EgressDestination,
   type HealthMap,
   type RouteResolution,
 } from '@heyta/ai';
+import {
+  pickNoCandidateReason,
+  resolveAiRoute,
+  type AiNoCandidateReason,
+  type AiRouteTarget,
+} from '@heyta/app-host';
 import type { MessageKey, MessageVars } from '@heyta/i18n';
 
 /**
  * 首选目标的界面视图 —— 四个面板披露与发送都用它。
  *
- * ⚠️ 它**不是** `ResolvedCandidate` 的别名：这里只保留界面要显示的东西
- * （标签、地址、模型、回环判据、回退链），不把端点的 `keyRef` / `capabilities`
- * 这类配置细节带到渲染层。
+ * 🔴 它**就是** `@heyta/app-host` 的那一份（`AiRouteTarget`），不再是本文件的
+ * 私有形状。"取哪一个候选 / 是不是回环 / 回退链上有谁"这三个判断
+ * 在移动壳接 AI 之后会有两个消费者，两份实现必漂
+ * （理由见 `packages/app-host/src/ai-route-target.ts` 文件头）。
  */
-export interface ResolvedRouteTarget {
-  endpointId: string;
-  label: string;
-  endpoint: string;
-  model: string;
-  isLocal: boolean;
-  /** `resolveRoute` 算出的目的地类别 —— 传给 `buildDisclosure`，不在这里重新判。 */
-  destination: EgressDestination;
-  /**
-   * 🔴 回退链上**其余**的端点标签（不含首选）。
-   *
-   * 回退是真实行为 —— 首选失败会自动试下一个。所以披露只说首选是不够的：
-   * 用户同意了 A，数据却可能发到 B（**另一家公司**），
-   * 而这一类切换**不会报错**，因为最终成功了。
-   */
-  fallbacks: readonly string[];
-}
+export type ResolvedRouteTarget = AiRouteTarget;
 
 /**
  * "去设置"要落到哪一块。
@@ -154,67 +143,58 @@ const REASON_SETTINGS_TARGET: Record<CandidateExclusionReason, SettingsTarget> =
  *
  * ⚠️ 刻意**只报一个**：同时列六条原因对用户不是信息，是噪音；
  * 而且改完第一条之后，第二条多半会自己消失（闸 2 打开后能力才被检查）。
+ *
+ * 🔴 那六条的**顺序**现在在 `@heyta/app-host` 的 `ai-route-target.ts`
+ * （`pickNoCandidateReason`）。下面 `REASON_KEY` / `REASON_SETTINGS_TARGET`
+ * 两张表按 `CandidateExclusionReason` **穷尽**，所以词表新增一档时这里仍会
+ * 编译红 —— 搬家搬走的是"报哪一条"，留在这里的是"那一条怎么说"。
  */
-const REASON_PRIORITY: readonly CandidateExclusionReason[] = [
-  'remote-not-allowed',
-  'capability-missing',
-  'endpoint-disabled',
-  'endpoint-url-rejected',
-  'circuit-open',
-  'endpoint-missing',
-];
 
 /**
  * 「一个候选都没有」→ 一条能读的解释。
  *
- * 三种情形，**必须分开**：
- *   - `unconfigured`：压根没配路由 → 复用已有的"先去添加端点"话术；
- *   - 有排除记录：报优先级最高的那条原因（含下一步）；
- *   - 两者都不是（理论上到不了）：宁可承认"判断不了"，也不编一个原因。
+ * 三种情形，**必须分开**（`unconfigured` / 有排除记录 / 两者都不是），
+ * 而"是哪一种"的判断在 `@heyta/app-host` 的 `pickNoCandidateReason()` ——
+ * 包括那六条原因的**报告优先级**。这里只剩"这个原因说成哪句词条、
+ * 下一步带用户去设置哪一块"，因为那两件事是措辞与导航，属于壳。
+ *
+ * ⚠️ 优先级原先住在本文件。移动壳接 AI 时它要么抄一份、要么不显示原因，
+ * 两条都不可接受（抄的那份一改就漂，不显示则披露制度不成立），
+ * 所以上收成一份。**这里删掉了那一行数组，不是复制了一份。**
  */
 export function explainNoCandidate(
   resolution: RouteResolution,
   feature: AiFeature,
 ): RouteExplanation {
-  if (resolution.unconfigured) {
-    return {
-      reason: 'unconfigured',
-      key: NO_TARGET_KEY[feature],
-      params: {},
-      settingsTarget: 'endpoints',
-    };
-  }
-
-  const present = new Set(resolution.excluded.map((e) => e.reason));
-  for (const reason of REASON_PRIORITY) {
-    if (present.has(reason)) {
-      return {
-        reason,
-        key: REASON_KEY[reason],
-        params: {},
-        settingsTarget: REASON_SETTINGS_TARGET[reason],
-      };
-    }
-  }
+  const reason = pickNoCandidateReason(resolution);
+  const settingsTarget: SettingsTarget =
+    reason === 'unconfigured' || reason === 'unknown'
+      ? 'endpoints'
+      : REASON_SETTINGS_TARGET[reason];
 
   return {
-    reason: 'unknown',
-    key: 'web.ai.routeExplain.unknown',
+    reason,
+    key:
+      reason === 'unconfigured'
+        ? NO_TARGET_KEY[feature]
+        : reason === 'unknown'
+          ? 'web.ai.routeExplain.unknown'
+          : REASON_KEY[reason],
     params: {},
-    settingsTarget: 'endpoints',
+    settingsTarget,
   };
 }
 
 /**
  * 解析一个功能的路由 —— **四个面板唯一允许的取法**。
  *
- * 🔴 内部用 `packages/ai` 的 `resolveRoute`，**不在这里做一份平行的过滤**。
- * 披露说 A、实际发到 B（**另一家公司**）的 bug 就是同一件事两个实现造成的
- * （见 `AiBreakdown.resolvePreferredTarget` 的实测记录）。
+ * 🔴 取哪一个候选、回环判据、回退链、以及"一个候选都没有时报哪个原因"
+ * 全在 `@heyta/app-host` 的 `resolveAiRoute()`（与移动壳同一份）。
+ * 本文件只做**词条映射**。
  *
  * ⚠️ `ok` 的判据是"有没有候选"，不是"配置好不好看"：熔断中的端点此刻
  * 确实没有路可走，界面就该说熔断，而不是继续披露一个不会被打到的端点。
- * 这要求把**熔断状态**一并传进来（`options.health`）——否则
+ * 这要求把**熔断状态**一并传进去（`options.health`）——否则
  * `circuit-open` 这条原因永远不会出现，那条词条就成了死分支。
  *
  * 🔴 传进来的 health 必须是**发送时同一份**（组件的 `healthSnapshot` 经
@@ -226,27 +206,9 @@ export function resolveFeatureRoute(
   feature: AiFeature,
   options: { now?: number; health?: HealthMap } = {},
 ): FeatureRoute {
-  const resolution = resolveRoute(routing, feature, {
-    now: options.now ?? Date.now(),
-    ...(options.health === undefined ? {} : { health: options.health }),
-  });
-  const first = resolution.candidates[0];
-  if (first === undefined) {
+  const { resolution, target, noCandidate } = resolveAiRoute(routing, feature, options);
+  if (target === undefined) {
     return { resolution, target: undefined, explanation: explainNoCandidate(resolution, feature) };
   }
-
-  return {
-    resolution,
-    target: {
-      endpointId: first.endpointConfig.id,
-      label: first.endpointConfig.label,
-      endpoint: first.endpointConfig.endpoint,
-      model: first.model,
-      // 回环判据只有一份 —— `packages/ai` 的 `isLoopbackEndpoint`。
-      isLocal: isLoopbackEndpoint(first.endpointConfig.endpoint),
-      destination: first.destination,
-      fallbacks: resolution.candidates.slice(1).map((c) => c.endpointConfig.label),
-    },
-    explanation: undefined,
-  };
+  return { resolution, target, explanation: undefined };
 }

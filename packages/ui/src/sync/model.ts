@@ -492,6 +492,7 @@ export type EntityLabelKey =
   | 'common.entity.FOCUS_SESSION'
   | 'common.entity.AI_FEEDBACK'
   | 'common.entity.PREFERENCE_CORRECTION'
+  | 'common.entity.ASSISTANT_TURN'
   | 'common.entity.GLOBAL_CONFIG'
   | 'common.entity.MIGRATION'
   | 'common.entity.RECOVERY'
@@ -513,6 +514,9 @@ export const ENTITY_LABEL_KEYS: Record<string, EntityLabelKey> = {
   // 用户看到 `AI_FEEDBACK` 不可能知道是什么东西，也就没法在冲突里做选择。
   AI_FEEDBACK: 'common.entity.AI_FEEDBACK',
   PREFERENCE_CORRECTION: 'common.entity.PREFERENCE_CORRECTION',
+  // 🔴 助手会话的一条消息（ADR-0045 D-4 (ii)）。它同样会同步、会冲突，
+  // 而冲突面板里显示 `ASSISTANT_TURN` 这种代号，用户就没法判断该保哪一边。
+  ASSISTANT_TURN: 'common.entity.ASSISTANT_TURN',
   GLOBAL_CONFIG: 'common.entity.GLOBAL_CONFIG',
   MIGRATION: 'common.entity.MIGRATION',
   RECOVERY: 'common.entity.RECOVERY',

@@ -55,7 +55,9 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 
 | 路径 | 行数 | 职责 |
 |---|---|---|
-| `packages/ai/src/supply.ts` | 321 | 供给模式 `off`/`own`/`managed`；**由端点推导目的地**；托管不可启用的判据 |
+| `packages/ai/src/supply.ts` | 357 | 供给模式 `off`/`own`/`managed`；**由端点推导目的地**；托管不可启用的判据。🔴 回环判定**不在这里了**（搬到 `endpoint-address.ts`，见下） |
+| `packages/ai/src/endpoint-address.ts` | 321 | 🔴 端点地址的**类别**（`loopback`/`link-local`/`private`/`public`/`unknown`）——**唯一**一份判定，纯字面量、绝不解析域名（ADR-0053 §3.1）。`isLoopbackEndpoint()` 是它的兼容谓词；免授权只认"字面量已定性且是回环" |
+| `packages/ai/src/managed-endpoints.ts` | 218 | 🔴 托管档的**境内供应商白名单** `MANAGED_MODEL_HOSTS`（主机名逐字相等 + 每行带出处）与 `managedEndpointVerdict()`。保存/启用点与发送点共用这一份判断；形状由 `check:ai-coverage` 8d 对**构建产物**核（ADR-0053 §3.3） |
 | `packages/ai/src/egress.ts` | 182 | 出境闸门。授权绑定 `(功能, 目的地)`；切换模式时失效旧授权 |
 | `packages/ai/src/provider.ts` | 348 | 单一 provider 端口，OpenAI 兼容 HTTP；**只产出建议，产生不了 op**；含工具线格式（`AiInvocation.tools` / `extractToolCalls`）；⚠️ 单端点/测试/历史路径，**不是生产出境执行点** |
 | `packages/ai/src/routing.ts` | 980 | 多端点路由、能力声明匹配、回退、熔断接线、`invokeRouted()`（**生产唯一出境执行点**）；**回退不得跨越隐私边界** |
@@ -84,7 +86,7 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 | `scripts/gen-ai-capability-manifest.mjs` | — | 上面那份的生成器（从工具目录 + `EntityModelMap`）。`check:ai-tools` 规则 7 调它的 `--check` |
 | `packages/ai/src/wire.ts` | — | 请求线格式的**唯一实现**（url / headers / body / 空响应判定），`provider.ts` 与 `routing.ts` 共用。⚠️ **刻意不从 `@heyta/ai` 导出**：导出去等于邀请包外再拼一份 |
 | `packages/app-host/src/ai-failure-fallback.ts` | — | `describeRoutedFailure()` 的**唯一**定义点（曾抄了四遍）。入参是封闭词表 `AiFailureReason`，不是 `string` |
-| `packages/ai/src/diagnose.ts` | — | 端点失败的**可诊断性**（W1）：本机端点拒绝来源 vs 其他原因分开，复用 `supply.ts` 的 `isLoopbackEndpoint` |
+| `packages/ai/src/diagnose.ts` | — | 端点失败的**可诊断性**（W1）：本机端点拒绝来源 vs 其他原因分开，复用 `endpoint-address.ts` 的 `isLoopbackEndpoint`（2026-10-05 前它住在 `supply.ts`） |
 | `packages/local-api/src/tools.ts` | 499 | 工具契约 + 授权判定（**唯一实现点**）。`isToolGranted()` 被 MCP 与内置 AI **共用** |
 | `packages/local-api/src/server.ts` | 359 | 传输无关的 JSON-RPC 处理器。`runReadTool()` / `toWriteIntent()` 亦被内置 AI 复用 |
 | `packages/local-api/src/mcp.ts` | 252 | 工具形状：`listAuthorizedTools()`（中性定义，MCP 与内置 AI 共用）+ 错误码 + 会话闸门 |
@@ -130,58 +132,98 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 
 ADR-0006 的实现。**这是全系统"数据出不出设备"的唯一判据。**
 
-### 2.1 两个封闭词表
+### 2.1 封闭词表（2026-10-05 起是三张，不是一张）
 
 ```ts
 type AiSupplyMode    = 'off' | 'own' | 'managed';        // 用户选什么
 type EgressDestination = 'none' | 'user-endpoint' | 'heyta-cloud';  // 数据实际去哪
+// ↓ ADR-0053 补进来的第三张：地址**类别**。它是推导之前的信息，不是新的目的地取值
+type EndpointAddressCategory = 'loopback' | 'link-local' | 'private' | 'public' | 'unknown';
 ```
 
-⚠️ 它们是**两个不同的东西**。模式是用户的意图，目的地是推导出的事实。
+⚠️ 前两个是**两个不同的东西**。模式是用户的意图，目的地是推导出的事实。
+第三个是**事实的证据**：目的地只有三档粗细，而"这台机器在哪儿"有五档 ——
+没有它，`BLOCKED.md` B34 那句"蜂窝算不算远程"在类型里**连主语都没有**。
 
 ### 2.2 🔴 目的地由端点推导，不由模式声明
 
 ```ts
 classifyDestination({ mode, endpoint }):
   mode === 'off'                      → 'none'
-  mode === 'managed'                  → 'heyta-cloud'
+  mode === 'managed'                  → 端点在境内白名单上 ? 'heyta-cloud' : 'user-endpoint'   // 🔴 看端点了
   mode === 'own' && endpoint 为空      → 'none'
-  mode === 'own'                      → isLoopbackEndpoint(endpoint) ? 'none' : 'user-endpoint'
+  mode === 'own'                      → isLoopbackAddress(endpoint) ? 'none' : 'user-endpoint'
 ```
 
 原话是「**声明可以被写错，推导不会**」。用户从"自备 + `localhost`"改成
 "自备 + 公网"，目的地**自动**从 `none` 变成 `user-endpoint`，不需要他记得改什么。
 
-`isLoopbackEndpoint()` 的判定面（**不做 DNS 解析**）：
+🔴 `managed` 那一支**过去无条件返回 `heyta-cloud`、一眼都不看端点**（原 `supply.ts:96`）。
+那是 ADR-0053 §3.3 点名的洞：`heyta-cloud` 这个值**本身就是一句陈述**
+（"明文到了 heyta 的服务器上"），而一句陈述不能由一个字段名来作证。
 
-| 输入 | 结果 | 说明 |
-|---|---|---|
-| `localhost` | 本机 | 字面量 |
-| `::1` / `[::1]` | 本机 | 字面量；带方括号也认 |
-| `127.0.0.0/8` 任意地址 | 本机 | |
-| `.local` / `my-nas.lan` | **远端** | 需要 DNS → 按远端处理（照抄 Joplin 的先例） |
+地址类别的判定面（**纯字面量，不做 DNS 解析**；定义点已从 `supply.ts` 搬到
+`endpoint-address.ts`，`isLoopbackEndpoint()` 留作兼容谓词）：
 
-⚠️ **不做 DNS 解析**是刻意的：解析结果依赖网络与 hosts 文件，同一个配置
-在不同时刻会得到不同答案 —— 而这是隐私判定。
+| 输入 | 类别 | `known` | 免授权？ |
+|---|---|---|---|
+| `localhost`（**精确**） | `loopback` | ✅ `localhost-literal` | ✅ |
+| `127.0.0.0/8` 任意地址 | `loopback` | ✅ `ip-literal` | ✅ |
+| `::1` / `[::1]` | `loopback` | ✅ `ip-literal` | ✅ |
+| `169.254.0.0/16`、`fe80::/10` | `link-local` | ✅ | 🔴 要授权 |
+| RFC 1918 三段、CGNAT `100.64.0.0/10`、ULA `fd00::/8` | `private` | ✅ | 🔴 要授权 |
+| 公网**字面量** IP | `public` | ✅ | 🔴 要授权 |
+| `api.openai.com` 这类域名 | `unknown` (`reason: domain`) | ❌ | 🔴 要授权 |
+| `nas.local` / `my-nas.lan` / `x.home.arpa` / `box.internal` | `unknown` (`reason: lan-name`) | ❌ | 🔴 要授权 |
+| `[::ffff:127.0.0.1]`（其实连得到回环） | `unknown` (`reason: ipv4-mapped-ipv6`) | ❌ | 🔴 要授权 |
+| 保留段（`0/8`、组播、`240/4`、文档段、`::`、`fc00::/8`…） | `unknown` (`reason: reserved`) | ❌ | 🔴 要授权 |
 
-### 2.3 `managed` 是**故意不可启用**的
+⚠️ **不做 DNS 解析**是刻意的，三条理由见 ADR-0053 §3.4：解析结果依赖网络与 hosts 文件，
+同一个配置在不同时刻会得到不同答案（而这是隐私判定）；解析会把"未知"悄悄变成"可信"；
+授权必须在**发请求之前**索取，而"解析后落在哪儿"要到发请求那一刻才知道。
+
+🔴 **补进这一维没有放宽任何一格**：免授权的条件仍然只有"字面量已定性且是回环"。
+这条不靠注释，靠 `packages/ai/tests/endpoint-address.spec.ts` 里那张
+**冻住旧算法逐字副本**（`legacyIsLoopback`）的样本表 —— 新版比旧版宽会红，
+新版比旧版意外收窄也会红（`e2e/` 与 `scripts/verify-ai-*.mjs` 正靠 `127.0.0.1` 免授权跑）。
+
+### 2.3 `managed`：**库层的闸门已经拆掉，客户端仍然打不开**（2026-10-05）
 
 ```ts
-assertEnableable(config)   // mode === 'managed' 时抛错
-describeRetention('heyta-cloud')  // 返回 undefined
+assertEnableable({ mode: 'managed', endpoint: 'https://api.deepseek.com/v1' })
+// ✅ 通过 —— 这一行以前必抛 `retention-undecided`
+assertEnableable({ mode: 'managed' })
+// 抛 endpoint-required（没填端点）
+assertEnableable({ mode: 'managed', endpoint: 'https://api.openai.com/v1' })
+// 抛 managed-endpoint-not-domestic（境外，直接拒）
+describeRetention('heyta-cloud')
+// 返回那句**点名两个载体**的保留说明，不再返回 undefined
 ```
 
-`AiConfigError.reason` 的封闭取值：`'retention-undecided' | 'endpoint-required' | 'endpoint-invalid'`。
+`AiConfigError.reason` 的封闭取值：`'endpoint-required' | 'endpoint-invalid' | 'managed-endpoint-not-domestic'`。
 ⚠️ 曾经并列过一个 `'consent-required'`，但它**从未被构造过**；已收敛掉（"缺少出境同意"是
 `egress.ts` 的 `consent-missing`，与"配置能不能启用"是两件事）。
+最后那个取值是 ADR-0053 §3.3 加的，它**有构造点、今天可达**
+（`assertEnableable({ mode:'managed', endpoint:'https://api.openai.com/v1' })` 当场抛），
+与那条被删掉的死成员正好是反例。
 
-🔴 **这不是没写完的占位符，是有意的失败。** ADR-0013 §4 原文：「不能『先把计费
-做了，保留策略以后再说』——那样会先产生数据，再补规则。」要真正开放托管 AI
-还差 5 件事（服务本体 / 保留策略 / 计费与计量 / Harness 边界 / 上云粒度），
-**一件都没完成**。
+🔴 **这句在 2026-10-05 之前为真，现在要为反面让路。** ADR-0013 §4 原文：「不能『先把计费
+做了，保留策略以后再说』——那样会先产生数据，再补规则。」那份约束**没有被打断**：
+ADR-0054 做的是按它自己写的顺序把"计量存在"补出来，**然后**才拆闸门。
+五件前置里三件有了可核对的执行点（服务本体 `server/src/ai/managed-proxy.routes.ts` /
+保留策略 ADR-0054 §2–§4.1 / 计费与计量 `server/src/ai/metering.ts`），
+剩下两件（Harness 边界、上云粒度）**在这份文档里没有执行点** ——
+它们的状态只按 [ADR-0054 §8「现在还没做到的」](../adr/0054-managed-ai-retention-and-selling-preconditions.md)
+读，本节不重述、也不替它担保。
 
-`describeRetention('heyta-cloud')` 返回 `undefined` 会让披露里显示「未定案」，
-这比编一个保留期诚实。
+⚠️ **而"闸门拆了"离"用户能用"还差一整段**：`AiSupplyMode` 在 `packages/ai` 之外零引用、
+`/api/ai/managed/chat` 在任何客户端**没有调用点** ⇒ 这一档今天在任何壳里都打不开。
+🔴 曾经那个"诚实的空白"形状（`describeRetention` 返回 `undefined` ⇒ 界面显示「未定案」）
+**已经跟着定案一起删掉了**，删得掉是因为它没有构造点了。
+留下的纪律不是"保留一个空值以防万一"，而是：**新的目的地必须新增一个有构造点的判别成员** ——
+靠留一个到不了的成员来表达"还没定"，迟早会变成关于不存在状态的假话
+（同一个文件里 `'consent-required'` 那条死成员就是被同一条理由删掉的，见 `supply.ts` 的
+`AiConfigError` 注释）。
 
 ### 2.4 🔴 托管文案必须否认 E2EE
 
@@ -191,6 +233,44 @@ describeRetention('heyta-cloud')  // 返回 undefined
 这条是 ADR-0006 的总结论：托管 AI 与 E2EE 在定义上不能共存，
 所以它只能是一个**明确、可撤销、按功能开启的例外**。
 `tests/egress.spec.ts` 用逐字断言钉住它。
+
+### 2.5 🔴 托管只能接**境内**供应商：那是一张表，不是形容词（ADR-0053 §3.3）
+
+```ts
+MANAGED_MODEL_HOSTS                        // 唯一事实源：packages/ai/src/managed-endpoints.ts
+managedEndpointVerdict(endpoint)           // 保存/启用点与发送点共用的那一份判断
+managedEndpointVerdictAgainst(endpoint, table)  // 同一判断，表作为**入参**（为了能被证伪）
+```
+
+四件可失败的东西，缺一件那句话就只是文档：
+
+| # | 判据 | 谁在执行 |
+|---|---|---|
+| 1 | 表本身：主机名唯一且规范化、每行 `jurisdiction === 'cn'`、每行带**指向 ADR / `docs/` / URL 的出处**、每行**真的匹配得上** | 单测 `managed-allowlist.spec.ts` + 门禁 8d（跑构建产物） |
+| 2 | 非白名单 / 明文 / 坏写法 ⇒ 推不出 `heyta-cloud`，且**照旧一律要授权** | `classifyDestination` + 门禁 8e |
+| 3 | 保存/启用点：`assertEnableable` 里**境内那条排在保留策略之前** | 单测第 ④ 组 + 门禁 8b（那扇门仍在） |
+| 4 | 发送点：`provider.invoke` 在任何网络动作之前**复算目的地**，与构造时不一致 ⇒ 一个请求都不发 | 单测 `endpoint-address.spec.ts` 最后一组 |
+
+两处刻意的取舍要写明白，否则下一个会话会"顺手补上"：
+
+- **匹配是主机名逐字相等**，不是后缀 —— `endsWith` 会放 `api.deepseek.com.evil.cn` 进来。
+  代价是多一个子域就要多登记一行，那个成本是故意的。
+- **`managed` 的发送点没有第二支 `if`**。白名单已经通过 `classifyDestination` 站在
+  第 4 行那条复算里；不给它单独写一支的理由**原来是**"`managed` 在工厂里就被保留策略
+  挡住，构造不出 provider" —— 🔴 那句在 2026-10-05 闸门拆掉后**当场过期**，
+  而它当时把"测不到"当成了"不需要测"。现在这条纪律有真用例：
+  `managed-allowlist.spec.ts` 第 ⑤ 段（provider 构造完之后把端点换成境外 / 换成回环，
+  两条都必须**零请求**，且拒绝理由点名为白名单）。
+- **`managedEndpointVerdictAgainst` 的表是必填参数，不给默认值**：
+  默认值等于真表的话，"所在地那把尺子"永远打不到（生产表里全是 `cn`），
+  判据就成了装饰。作为必填参数，生产调用点必须点名传真表，测试则拿合成表证明它会拒。
+
+🔴 **本 ADR（0053）没有打开托管档** —— 这半句永远为真，打开它的是 ADR-0054。
+2026-10-05 之前这里写着"`managed` 整体仍然不可启用，门禁 8b 钉的理由仍然是
+`retention-undecided`"，那两半同一天过期：闸门拆了，8b 现在钉的是**两道都必须在运行时咬人**
+—— 境内白名单（接境外 ⇒ `managed-endpoint-not-domestic`）与"必须填端点"（⇒ `endpoint-required`）。
+境内白名单是**必要条件**、不是放行牌 —— 这一层没变，
+`managed-allowlist.spec.ts` 现在用第 ④ 段钉顺序、第 ⑤ 段钉发送点的复算。
 
 > 调研事实（[`../research/e2ee-apps-ai.md`](../research/e2ee-apps-ai.md)）：
 > **没有任何产品同时提供厂商托管 AI 与 E2EE**。Proton Lumo 承认这点，
@@ -1024,7 +1104,7 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 
 | 门禁 | 与 AI 的关系 |
 |---|---|
-| `check:ai-coverage` | 每个 `AiFeature` 从「实现 → 导出 → 路由声明 → 偏好声明 → 界面」端到端可达，**不许有豁免**；并断言托管 AI 仍被挡住 |
+| `check:ai-coverage` | 每个 `AiFeature` 从「实现 → 导出 → 路由声明 → 偏好声明 → 界面」端到端可达，**不许有豁免**；并断言托管 AI 仍被挡住。运行时那一段（第 8 组）现在还有 **8d / 8e / 8f** 三条对**构建产物**的核对：白名单表的形状（含"拿一张含境外条目的合成表去打它"的阳性对照）、`heyta-cloud` 不得由不合格端点推出、地址类别进了模型而免授权面一格没扩（ADR-0053 §3.5） |
 | `check:ai-e2e` | 真 Chromium 跑用户旅程（假端点，不接真模型） |
 | `check:ai-quota` | 「300 次/月」只有一个数字源；托管 AI 额度未实现的状态被**显式声明**（ADR-0023） |
 | `check:ai-tools` | 内置 AI 工具路径 **7 条规则**：写只能出现在 `confirmAiToolProposal()` 里且恰好一处；无 op 构造、无网络调用、不 import `@heyta/op-log`（ADR-0035；已做 5 类故障注入）。规则 6 = W7 删掉的冗余前门（`runAiTool` / `grantedToolNames`）不许回来 + `describeRoutedFailure()` 定义点恰好一处（两条变异各自实测转红）；🔴 **规则 7 = 能力清单与上游一致**（跑 `gen-ai-capability-manifest.mjs --check`，不一致 exit 1）。⚠️ 它**没有**独立的 `check:ai-capability` 包脚本 —— 因为 `package.json` 此刻有别的会话的未提交改动，加脚本会带走它们；等该文件干净时抽成独立脚本（已登记） |
@@ -1071,6 +1151,15 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
     且 `today` **必须在出境声明里** —— 注入进提示词的每一项都是出境数据
 25. 🔴 能力清单**只能生成、不许手写**（`scripts/gen-ai-capability-manifest.mjs`），
     不一致由 `check:ai-tools` 规则 7 判红
+26. 🔴 **免授权的一格只认「字面量已定性且是回环」**（ADR-0053 §3.1/§3.2）。
+    `private` / `link-local` / `unknown` 一律算"离开本机"；域名**绝不在库里解析**。
+    这条由一张**冻住旧算法逐字副本**的样本表钉（新版变宽会红，意外变窄也会红），
+    不是靠注释 —— 想放宽任何一格要新写一份 ADR 并先删掉那张表里的反向断言
+27. 🔴 **托管档的"境内"是一张表 + 两点执行 + 一条门禁**（ADR-0053 §3.3）：
+    `heyta-cloud` 只能由 `MANAGED_MODEL_HOSTS`（主机名逐字相等）推导出来，
+    保存/启用点（`assertEnableable`）与发送点（`provider.invoke` 的目的地复算）各执行一次，
+    表的形状由 `check:ai-coverage` 8d 对构建产物核。
+    ⚠️ 它是**必要条件不是放行牌**：`managed` 整体仍被保留策略挡着（门禁 8b）
 
 ---
 
@@ -1097,7 +1186,7 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 
 | 项 | 卡在 |
 |---|---|
-| 托管 AI / MaaS | 已定档（ADR-0020/0021：¥12/月 · 300 次/月 · `deepseek-flash`），但**本轮不实现**（ADR-0023）：服务本体端点 / 计量 / 收银台**都不存在**；保留策略未定案，`assertEnableable` 继续抛 `retention-undecided` |
+| 托管 AI / MaaS **对用户可用** | 🔴 2026-10-05 变了三半：服务本体（`server/src/ai/managed-proxy.routes.ts`）、计量（`server/src/ai/metering.ts`）、收银台（`hosted-ai-monthly` 下单回 200）**都已存在**，保留策略也已定案（ADR-0054），那条 `retention-undecided` 连成员一起删了。仍然没做的是**最后一段**：任何客户端都没有那个开关（`AiSupplyMode` 在 `packages/ai` 之外零引用、`/api/ai/managed/chat` 没有任何调用点）、过期清理只在代码里（要等镜像重建才在线上生效）、DPA 未签。逐条边界以 [ADR-0054 §8](../adr/0054-managed-ai-retention-and-selling-preconditions.md) 为准，本表不复述 |
 | AI-3 规划 | 有意推迟（需要真实数据） |
 | AI-4 复盘 | 受限分支，未开工 |
 | **AI 工具调用的 P4** | P0–P3 已落地：规则选择 + 单步执行 + 模型线格式 + 面板入口 + **多步读循环与末尾一次写提案**（[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)，Web 壳）。**需实体 id 的工具（P4）仍未开工** —— 单步入口下它结构性不可达，多步循环把"先查再改"变成可达了，但**目录里有 26 个工具**（读 12 / 写 14，覆盖面 **9/9** 实体（10-03 那批记的是 22 / 8-8） —— 口径是"读和写都有"，见 `ai-event-tool-contract.md` §2；2026-10-03 这一行先后错过两次："6 个 / 覆盖面 2/8"（`covered` 把只读的 `PROJECT` 计成已覆盖）与"9 个 / 覆盖面 3/8"（同批早几个小时的抄件，那五格本批已补齐）），且**覆盖面已有门禁**（`check-ai-coverage.mjs` §9，挂在 `check:ai-coverage` ⇒ 在 `pnpm check` 里）；托管路径的权益闸门（`capability:'ai'`）也因托管 AI 未实现而未接 |

@@ -80,8 +80,22 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await expect(page.locator('[data-testid="ai-assistant-tier"]')).toContainText('只读');
     await expect(page.locator('[data-testid="ai-assistant-disclaimer"]')).toBeVisible();
 
-    // ══ 2. 🔴 第一次发送：只披露，不出境 ═══════════════════════════════
+    // ══ 1b. 🔴 规则本机就答得出的那一句：**不弹披露**，而且一个请求都不发 ══
+    //    这是"规则先跑"那条短路在真浏览器里的对应物。单测能证明接线通了，但
+    //    "披露承诺了一次不会发生的出境"这种谎，只有在真浏览器里连点带看图才抓得住：
+    //    界面要求用户批准"这句话要离开本机"、用户批准了、然后什么都没出去。
     await page.locator('[data-testid="ai-assistant-input"]').fill('今天有什么任务');
+    await page.locator('[data-testid="ai-assistant-send-button"]').click();
+    await expect(page.locator('[data-testid="ai-assistant-disclosure"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="ai-chat-assistant"]').last()).toContainText(
+      '没有发出任何请求',
+    );
+    await expectNoStubCall(request);
+
+    // ══ 2. 🔴 第一次发送：只披露，不出境 ═══════════════════════════════
+    // ⚠️ 这句刻意是**规则答不出**的（上面 1b 用的那句会被本机短路）：这一节测的是
+    //    "披露 → 出境 → 多步循环"，问句要是被规则接走，下面那一发 click 就永远等不到披露。
+    await page.locator('[data-testid="ai-assistant-input"]').fill('随便说点什么吧');
     await page.locator('[data-testid="ai-assistant-send-button"]').click();
 
     const disclosure = page.locator('[data-testid="ai-assistant-disclosure"]');

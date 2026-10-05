@@ -2,13 +2,18 @@
  * 订阅、计费与退款规则
  * =====================
  *
- * 这一份管的是**钱**：两件各自收费的服务（托管同步、云端 AI 订阅）的价格、
+ * 这一份管的是**钱**：两件服务（托管同步、云端 AI 订阅）的价格、
  * 计费方式、到期后果、退款、发票，以及一件我们**故意不做**的事（自动续费）。
  *
- * 🔴 **两件服务互相独立，这条是本文件的地基**：可以只买其中一个，买了一个
- * 不等于另一个，计价 / 期限 / 到期后果 / 退款各自计算。把它们写成一份条款会
- * 让"我买了同步是不是也买了 AI"变成一句要靠解释的话 —— 而解释在法律文本里
- * 就是争议的开始。所以第 1 条先摆一张对应表，并各自 `docRef` 到真正的条款文件。
+ * 🔴 **两件服务在条款上各自成立，这条是本文件的地基**：各自的计价、保留、退款口径不同，
+ * 一份的说法不许挪去给另一份撑场面，把它们写成一份条款会让"我买了同步是不是也买了 AI"
+ * 变成一句要靠解释的话 —— 而解释在法律文本里就是争议的开始。所以第 1 条先摆一张对应表，
+ * 并各自 `docRef` 到真正的条款文件。
+ *
+ * ⚠️ 但**"各自成立"不等于"价目表能任意组合"**，这句必须一起写：今天只有两个条目 ——
+ * ¥5 只给托管同步，¥12 同时给托管同步**与**云端 AI。云端 AI 没有单独定价，"只买 AI
+ * 不买同步"这个组合在价目表里不存在。以前那句"买 AI 不等于买同步"因此在开档之后
+ * 变成假话，已按现实改掉（第 1 条的表格与那句话本身）。
  *
  * ⚠️ **本文件刻意不写的三样东西，都是刻意的，不是漏了**：
  * ① **税率** —— 是否含税以支付页标示为准；本文件只给定价，不给含税结算口径；
@@ -17,12 +22,22 @@
  * ③ **App 备案号** —— 尚未核准。第 9 条把它显式留白并说明核准之后怎么补，
  *    而不是先编一个数字。
  *
- * 🔴 **云端 AI 订阅当前不提供，本文件不许把它写成可购买项。**该供给模式在
- * 实现里结构性不可达（无对应配置分支，且启用前检查会主动抛错，结论是
- * "数据保留策略未定"），并且有一条红线：**计量能力存在之前不得售卖**。
- * 因此第 8 条只写"不提供 + 为什么不提供 + 将来提供时怎么办（不溯及已支付期间）"。
- * 本文件也**不出现任何 AI 用量的次数或档位数字** —— 那些数字本身即承诺，
- * 而承诺要能对上实现。
+ * 🔴 **云端 AI 订阅自 2026-10-05 起提供**（裁决：
+ * [ADR-0054](../../../docs/adr/0054-managed-ai-retention-and-selling-preconditions.md)，
+ * 它**取代** ADR-0023 §5 那张最小清单的第 1–3 条）。本文件以前写的那套"不提供"
+ * 的理由——保留策略未定、启用前检查主动拒绝、没有任何价格额度账单——**已经逐条不再成立**，
+ * 留着它们就是对外说假话。
+ *
+ * ⚠️ 但**开档解除的是"不许卖"，不是"可以随便写"**。这一档在本文件里的每一条事实
+ * 都要指得回一个真的东西：
+ *   · 额度数字**只能抄** `docs/reference/pricing-and-entitlements.md` §2.1 那个
+ *     `ai-quota-ssot` 块（由 `pnpm check:ai-quota` 对账），**不许在这里新造数字**；
+ *   · 保留那一段的**每一样留存项都必须在表里真的存在**（那张表只有四列，没有正文列、
+ *     也没有功能名／结果状态／字节数），多写一样就是关于不存在的数据的承诺；
+ *   · "到期删除"必须带着它那半个条件（超过 45 天**且**该计费周期已结束），
+ *     无条件句在这一档上讲不出真话；
+ *   · 🔴 **一条一个字都没软化**：云端 AI **不受端到端加密**保护，而它绝不与
+ *     "同步是端到端加密"混成一份条款（ADR-0005 / ADR-0006）。
  *
  * 📌 第 4 条（到期后果）与第 6 条（无自动续费）是**产品承诺**，不是套话：
  * 到期不删数据、不锁功能、不催缴；每一次扣款都要你主动确认。这两条写下来就是
@@ -41,7 +56,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: 'heyta 有**两件互相独立、各自收费**的服务：① **托管同步服务** —— 我们的服务器在你各设备之间中转并保管同步数据；② **云端 AI 订阅** —— 由我们代你使用云端大模型的用量。两件服务**可以只买其中一个**；买了其中一件**不等于**另一件也在生效。两件的计价、期限、到期后果与退款**各自计算、互不牵连**。',
+        text: 'heyta 有**两件收费的服务**：① **托管同步服务** —— 我们的服务器在你各设备之间中转并保管同步数据；② **云端 AI 订阅** —— 由我们代你使用云端大模型的用量。⚠️ 先把一条现实说清：**价目表今天只有两个条目** —— ¥5 那一档只买托管同步，¥12 那一档同时买托管同步**与**云端 AI；云端 AI **没有单独定价**，"只买 AI、不买同步"这个组合不存在。但两件服务在**条款上各自成立**：各自的额度、保留与退款口径不同，互不挪用，一份的承诺不许拿来给另一份背书。',
       },
       {
         kind: 'table',
@@ -54,8 +69,8 @@ const zh = [
           ],
           [
             '云端 AI 订阅',
-            '由我们替你调用云端大模型的用量。🔴 **当前不提供**，原因与本条的完整说明见第 8 条。',
-            '本文件（第 8 条）+《AI 功能与数据出境说明》（哪些数据交给谁、出境授权怎么给）',
+            '由我们替你调用云端大模型的用量。**这一档现在提供**：¥12 / 一个计费周期、含 300 次请求，完整说明见第 8 条。⚠️ 价目表里**没有"只买 AI、不买同步"的条目** —— 能买到 AI 的那一档同时授予托管同步，所以这一档的 ¥12 里已经包含了上面那 ¥5 所买的东西。',
+            '本文件（第 8 条）+《AI 功能与数据流向》（哪些内容交给谁处理、在什么条件下离开这台设备、授权怎么给）',
           ],
         ],
       },
@@ -67,11 +82,11 @@ const zh = [
       {
         kind: 'docRef',
         docId: 'ai-and-transfer',
-        text: '《AI 功能与数据出境说明》：AI 功能把哪些内容交给谁处理、什么条件下会离开你的设备，以及云端 AI 与本机 AI 的区别。',
+        text: '《AI 功能与数据流向》：AI 功能把哪些内容交给谁处理、什么条件下会离开你的设备，以及云端 AI 与本机 AI 的区别。',
       },
       {
         kind: 'callout',
-        text: '一句话：**买同步不等于买 AI，买 AI 不等于买同步。**两件服务的账单分开出现，退掉其中一件不影响另一件的剩余服务期。',
+        text: '一句话：**买同步不等于买 AI。**¥5 那一档里没有云端 AI。反过来今天要说明白：能买到云端 AI 的那一档**同时含托管同步**，因为价目表里只有两个条目。两件服务在**条款上**各自成立（价格、保留、退款各有各的口径，互不挪用），但同一笔付款覆盖同一个 30 天服务期 —— 那一笔到期时，它授予的两项一起停；退掉的也**是同一笔付款里未使用的天数**。',
       },
     ],
   },
@@ -93,7 +108,7 @@ const zh = [
             '$5 / 月',
             '⚠️ 是否含税**以支付页标示为准**',
           ],
-          ['云端 AI 订阅', '暂未提供', '暂未提供', '—'],
+          ['云端 AI 订阅', '¥12 / 一个计费周期（30 天，见第 3 条；该档同时含托管同步）', '$12 / 一个计费周期（同上）', '⚠️ 是否含税**以支付页标示为准**'],
         ],
       },
       {
@@ -150,12 +165,16 @@ const zh = [
             '🔴 不删除：不以删除数据作为催缴手段',
           ],
           ['托管同步', '⏸ 停止（所有设备，不只是新设备）'],
-          ['出路', '① 续费；② 改用你自己的服务器，同步立即恢复、数据无损'],
+          [
+            '云端 AI（如果你买的那一档含它）',
+            '⏸ 停止：那一期的请求会被拒绝并说明原因，额度不自动补。🔴 你自己配置端点的那条 AI 路**不受任何影响** —— 它本来就不经过我们的服务器，也不限次',
+          ],
+          ['出路', '① 续费；② 改用你自己的服务器，同步立即恢复、数据无损；③ AI 改用你自己配置的端点（免费、不限次、功能不减）'],
         ],
       },
       {
         kind: 'callout',
-        text: '我们不把数据当作人质：未按期续费的后果**仅限于停止托管同步**这一件事。heyta 是本地优先的应用，你的数据先落在你自己的设备上，服务器只是一条通道 —— 通道停了，东西还在你手里。续费之后同步自动接上；你也可以把地址换成你自己搭的服务器，那条路同样**数据无损**。',
+        text: '我们不把数据当作人质：未按期续费的后果**仅限于停止你付的那一档所托管的那部分服务**（托管同步；如果你买的那一档含云端 AI，也含它）—— 你的数据、应用本体与自备端点的 AI 都不在其中。heyta 是本地优先的应用，你的数据先落在你自己的设备上，服务器只是一条通道 —— 通道停了，东西还在你手里。续费之后同步自动接上；你也可以把地址换成你自己搭的服务器，那条路同样**数据无损**。',
       },
     ],
   },
@@ -170,7 +189,7 @@ const zh = [
       {
         kind: 'ol',
         items: [
-          '支付后 **7 日内**提出，且**未实际使用托管同步的**：**全额退款**。',
+          '支付后 **7 日内**提出，且**未实际使用你买的这一档所提供的服务**：**全额退款**。判断"用过没有"只看服务端本来就有的记录 —— 同步那一侧是有没有事件进出过，云端 AI 那一侧**只有第 8 条那个次数计数**（我们读不到内容，也不需要读）。',
           '支付 **7 日之后**提出：按**剩余未使用天数**的比例退款，已经使用的那部分服务期不予退款。',
           '服务期已届满之后提出：**不予退款** —— 那一期的服务已履行完毕。',
           '退款**按原支付路径退回**，我们在收到申请后 **7 个工作日**内处理。',
@@ -178,7 +197,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '三点边界，一次说清：① 上表中的"云端 AI 订阅"当前不提供，因此**不存在针对它的退款**，本条的退款对象只有托管同步；② 一次支付对应一个 30 天服务期，退款只计算**该服务期内未使用的天数**，不回溯你此前的历史支付；③ 本条是我们对你的承诺，其中一部分**可能比我们负有的法定义务更宽** —— 你按本条主张即可，不需要自己去分辨哪一部分是法定义务、哪一部分是我们主动多给的。',
+        text: '三点边界，一次说清：① 本条对上表里的**两件服务都适用**，判断口径也是同一条：只按**那一期内你没有用掉的天数**算比例，**不回溯**你此前的历史支付。对云端 AI，"有没有用过"只看**那一期的用量计数**（第 8 条：服务端只知道次数，不知道内容）—— 所以这件事双方都能核对，也不需要任何人去读你发了什么；② 一次支付对应一个 30 天服务期，退款只计算该服务期内未使用的天数；③ 本条是我们对你的承诺，其中一部分**可能比我们负有的法定义务更宽** —— 你按本条主张即可，不需要自己去分辨哪一部分是法定义务、哪一部分是我们主动多给的。',
       },
     ],
   },
@@ -219,31 +238,40 @@ const zh = [
   },
   {
     id: 's8',
-    title: '云端 AI 订阅的现状：当前不提供',
+    title: '云端 AI 订阅：现在提供，价格、额度、保留各自是什么',
     blocks: [
       {
         kind: 'p',
-        text: '🔴 **当前不提供云端 AI 订阅**，本文件也不把它写成可购买项。第 2 条价格表里那一行"暂未提供"就是这个意思：现在**没有任何人可以购买它**，也没有任何关于它的价格、额度或账单。',
+        text: '🔴 **云端 AI 订阅现在提供**，第 2 条价格表里那一行不再是"暂未提供"：**¥12 买下一个计费周期，含 300 次云端 AI 请求**（海外那一档是 $12）。⚠️ 这 300 次**不按自然月重置** —— 一个计费周期就是**一次付款买下的那 30 天**，起点是支付成功的那一刻（与第 3 条同一条口径）；跨过边界就换到新的一期、从 0 起算，而边界取自你那一期的**到期时刻**，不是墙上时钟猜出来的"这个月"。用满之后当期的请求被**拒绝并说明原因**，而那一次**不计数** —— 超额的判定与计数写在同一条语句里，所以"先把请求转发出去、事后再发现超额"这个形状不存在。额度用尽**不会**产生任何自动扣费。',
       },
       {
         kind: 'ul',
         items: [
-          '这个供给模式在我们的系统里**尚未开通**：既没有把请求发往云端的服务配置，也有一道启用前的检查会**主动拒绝**而不是放行 —— 它当前给出的理由是"数据保留策略未定"。',
-          '我们的纪律是：**在能够准确计量用量之前，不出售按用量计费的服务。**否则就是收了钱却不交付，或者收了钱却无法向你说明你到底用掉了什么。',
+          '🔴 **正文不留存。**你发出去的原文与模型返回的内容，只在**一次代理调用的内存里**存在，调用返回即丢弃：不写日志（含请求日志与错误序列化）、不进 trace、不进崩溃上报、不进任何生成物。所以这一档没有"内容留多久"这个问题 —— 它从来没被写过盘。这件事的证据不是我们的措辞：判据往假上游与假请求里各放一枚标记串，然后断言这两枚串**既不在全部日志输出里，也不在库里任何一张表的任何一行里**。',
+          '**服务端只记四列计数**：账号、计费周期、这一期用了几次、最后一次使用的时间。那张表按设计**只有这四列** —— 没有正文列、没有提示词列、没有模型输出列，也没有一个装得下内容的兜底列。"我们不保留 AI 的内容"这句话的证据因此是**这张表的列集合**（有一条判据把它钉成"多一列就红"），而不是我们的形容词。那张表里也**没有**功能名、结果状态、字节数这些列，这一段因此不为它们承诺任何保留期：写进这一段的每一样都必须在表里真的存在。',
+          '**计数**保留多久：自最后一次使用起 **45 天**，🔴 而且**要等到它所属的那个计费周期结束**才删 —— 两个条件缺一个都不行，只按时间删会把还在生效的那一期的额度抹掉。⚠️ 所以我们写的是"**超过 45 天、且该期已结束**"这一条有条件的删除，不写"到期就自动清空"那种没有条件的句子。注销账号时，这些计数行随账号一起按数据库外键**级联删除**（见《个人信息收集清单》与《行使你的权利》）。',
         ],
       },
       {
         kind: 'p',
-        text: '为什么"保留策略未定"就不能卖：云端 AI **必须**看到你的明文内容才能工作，而"这些内容在我们这一侧停留多久、以什么形式留存、到期怎么清除"恰恰是保留策略要回答的问题。在这个问题还没有答案的时候把它挂上收银台，等于把一个我们无法说明边界的处理过程卖给你。',
+        text: '🔴 **这一档只接中国境内的模型供应商，而且那是一条判据、不是一句措辞。**"只用境内供应商"如果只写在文档里，它约束不了任何东西，所以它被拆成三件可以失败的事：**境内供应商的端点主机名逐条登记成一张白名单**（不在表里就不可用，加一行要写清"为什么算境内"）；**保存配置与真要发请求两个点各校验一次**；动手之前**再复算一次目的地**。上游地址与模型由**服务端配置**决定，客户端请求里换不了它 —— 否则等于把那张白名单交给请求体。端点不合格 ⇒ **响亮地拒绝**，一个字节都不转发。',
+      },
+      {
+        kind: 'p',
+        text: '⚠️ **一句必须一起写的边界，免得这一节被读成"此刻就能用"。**收银台这一侧是开放的：价格、额度、计量、闸门、条款都已成立，下单不会被"这一档交付不了"挡回来。而"买完马上就能发请求"还差两件我们核对得到的事：**运营方要在服务器上开通这一档并配上境内的模型上游**（没有那份配置时这条路径直接回"未配置"，一个字节都不转发），以及**客户端里还没有一个把内置 AI 接到这一档的开关**（今天你在 heyta 里用到的 AI，仍然只有你自己配了端点、逐项授权过的那几个）。这两件的现状与判据写在《AI 功能与数据流向》第五节。',
+      },
+      {
+        kind: 'p',
+        text: '🔴 一条**自我解除**的规矩，这里写成历史，免得被读成还在生效：我们原先立的是"**在能够准确计量用量之前，不出售按用量计费的服务**"。它约束的是"**承诺已经写下、交付还没有做**"那个状态 —— 违反它就是收钱不交付。2026-10-05 计量在服务端真的存在、并且真的拦截之后，那个前提消失了，于是这条规矩按**它自己的条款**解除（裁决见 ADR-0054，它**取代** ADR-0023 §5 那张最小清单里的第 1–3 条）。规矩本身没有拆：那一份"暂时交付不了"的清单仍留在收银台前面，只是今天它是空的 —— 下一档"已定价、但还交付不了"的服务要靠它。',
       },
       {
         kind: 'docRef',
         docId: 'ai-and-transfer',
-        text: '《AI 功能与数据出境说明》：本机 AI 与云端 AI 的区别、哪些内容会交给谁处理、出境授权怎么给、以及每一项 AI 功能的开关分别在哪里。',
+        text: '《AI 功能与数据流向》：本机 AI 与云端 AI 的区别、哪些内容会交给谁处理、什么条件下离开这台设备、每一项 AI 功能的开关分别在哪里，以及这一档今天能不能被打开。',
       },
       {
         kind: 'callout',
-        text: '一条重要的边界：**托管同步的核心承诺是"我们只中转密文"，而云端 AI 必须看到明文。**所以这是**两份独立的条款**，各自适用、不合并解释，我们也**不会把 heyta 的云端 AI 描述成端到端加密**。一旦我们决定提供云端 AI 订阅，会**另行发布适用的条款并提前通知**，🔴 且新条款**不溯及你已经支付的服务期**。',
+        text: '一条重要的边界，**一个字都不软化**：托管同步的核心承诺是"我们只中转密文"，而**云端 AI 必须看到明文**。所以这是**两份独立的条款**，各自适用、不合并解释，我们也**永远不会把 heyta 的云端 AI 描述成端到端加密** —— 这条路径**不受端到端加密**保护，那是定义，不是我们可以改进的细节。你的内容因此会**离开这台设备、交给第三方处理**（那一家由我们选定，且必须是境内的）。任务同步走的是另一条通道，它仍然是端到端加密的：同步那一份加密承诺，不适用于这一条路径，也不许被用来给它背书。',
       },
     ],
   },
@@ -318,6 +346,11 @@ const zh = [
             '2026-10-04',
             '新增第十节：GDPR 一侧"为了收款而留下的记录"按 `payment_events` 与 `checkout_orders` 的真实字段写（数据最小化、法定留存、撤回同意这条路有多短、仅自动化决策四格）。同时写明两件做不到的：退款不会让那几行当场消失，你在邮件里发来的抬头与税号不在这两张表的删除范围内。权利行使的逐条对照表只在《个人权利行使与请求响应》那一份里，本节只指向它，不另抄一份。',
           ],
+          [
+            '1.2',
+            '2026-10-05',
+            '第八节整段改写：那一档**现在提供**了。旧版那句"因为数据保留策略还没定案、所以这一档不能卖"的前提被 ADR-0054 撤掉（它取代 ADR-0023 §5 最小清单的第 1–3 条），留着那一套句子就是对外说假话。新版写的是当前为真的事实：¥12 / 一个计费周期、300 次、正文不留存、服务端只有四列计数、计数"超过 45 天且该期已结束"才删、随账号级联删除、托管那一档只接境内模型供应商（白名单 + 两个校验点 + 发送前复算）。同时改掉四处连带失效的句子：第一节表格里那一行与它的说明、第二节价格表那一行的金额、第五节"因此不存在针对它的退款"（退款现在对两件服务都适用）、第四节到期后果表（新增云端 AI 那一行，并把"后果仅限停止托管同步"改成"仅限停止你买的那一档所托管的那部分"）。**一条一个字都没动**：云端 AI 不受端到端加密保护，而且它与同步两份条款不合并解释。版本号必须换：同意留痕要能回答"他同意的那一版里，云端 AI 是可买的还是不可买的"。',
+          ],
         ],
       },
     ],
@@ -331,7 +364,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'heyta charges for **two separate services**: ① **Hosted sync** — our server relays and holds the sync data between your devices; ② **Cloud AI subscription** — usage of a cloud large language model that we operate on your behalf. You may buy **either one alone**; buying one **does not** mean the other is active. Price, term, expiry and refund are calculated **for each service on its own** and never affect one another.',
+        text: 'heyta charges for **two services**: ① **Hosted sync** — our server relays and holds the sync data between your devices; ② **Cloud AI subscription** — usage of a cloud large language model that we operate on your behalf. ⚠️ One fact about the catalogue comes first: **the price book has exactly two entries today** — ¥5 buys hosted sync alone, ¥12 buys hosted sync **and** cloud AI together. Cloud AI is **not priced separately**, and an "AI without sync" combination does not exist. The two services still hold **separate terms**: their quota, retention and refund rules differ, are never borrowed from one another, and a promise made in one is not used to vouch for the other.',
       },
       {
         kind: 'table',
@@ -344,8 +377,8 @@ const en = [
           ],
           [
             'Cloud AI subscription',
-            'Usage of a cloud large language model that we call for you. 🔴 **Not currently offered**; section 8 explains why in full.',
-            'This document (section 8) plus the AI Features and Cross-border Data statement (what is handed to whom, and on what authorisation)',
+            'Usage of a cloud large language model that we call for you. **This tier is now offered**: ¥12 per billing period, including 300 requests; section 8 gives the full terms. ⚠️ The price book has **no entry for "AI without sync"** — the tier that grants cloud AI also grants hosted sync, so the ¥12 already contains what the ¥5 line buys.',
+            'This document (section 8) plus AI Features and Where Your Data Goes (what content goes to whom, when it leaves this device, and how the authorisation is given)',
           ],
         ],
       },
@@ -357,11 +390,11 @@ const en = [
       {
         kind: 'docRef',
         docId: 'ai-and-transfer',
-        text: 'AI Features and Cross-border Data statement: which content AI features hand to whom, under what conditions it leaves your device, and how hosted AI differs from on-device AI.',
+        text: 'AI Features and Where Your Data Goes: which content AI features hand to whom, under what conditions it leaves your device, and how hosted AI differs from on-device AI.',
       },
       {
         kind: 'callout',
-        text: 'In one sentence: **buying sync does not buy AI, and buying AI does not buy sync.** The two appear as separate charges, and refunding one leaves the remaining term of the other untouched.',
+        text: 'In one sentence: **buying sync does not buy AI** — the ¥5 tier contains no cloud AI. What has to be said the other way round today is that the tier which grants cloud AI **also includes hosted sync**, because the price book has exactly two entries. The two services stay **separate as terms** (each has its own price, retention and refund rule, and none of them is borrowed from the other), but one payment covers one 30-day term: when that payment runs out, everything it granted stops together, and a refund is calculated over the unused days of **that same payment**.',
       },
     ],
   },
@@ -383,7 +416,7 @@ const en = [
             '$5 / month',
             '⚠️ Whether tax is included **is stated on the payment page**',
           ],
-          ['Cloud AI subscription', 'Not currently offered', 'Not currently offered', '—'],
+          ['Cloud AI subscription', '¥12 per billing period (30 days, see section 3; this tier also includes hosted sync)', '$12 per billing period (same)', '⚠️ Whether tax is included **is stated on the payment page**'],
         ],
       },
       {
@@ -441,14 +474,18 @@ const en = [
           ],
           ['Hosted sync', '⏸ Stops (on all of your devices, not only newly added ones)'],
           [
+            'Cloud AI (if the tier you bought includes it)',
+            '⏸ Stops: requests in that period are refused with the reason shown, and the quota is not topped up on its own. 🔴 The AI route where **you** supply the endpoint is **not affected at all** — it never passes through our server and is not metered',
+          ],
+          [
             'What you can do',
-            '① renew; or ② point sync at your own server — sync resumes immediately and no data is lost',
+            '① renew; ② point sync at your own server — sync resumes immediately and no data is lost; ③ switch AI to an endpoint you configure yourself (free, unmetered, no feature removed)',
           ],
         ],
       },
       {
         kind: 'callout',
-        text: 'We do not hold your data hostage: the only consequence of not renewing on time is **that hosted sync stops**. heyta is local-first — your data is written to your own device first, and the server is only a channel. When the channel stops, what you have is still in your hands. After you renew, sync reconnects on its own; you may equally switch the address to a server you run yourself, and that route is likewise **lossless**.',
+        text: 'We do not hold your data hostage: the only consequence of not renewing on time is **that the hosted part of the tier you paid for stops** (hosted sync, plus cloud AI if your tier includes it) — your data, the app itself and AI on your own endpoint are not among the things that stop. heyta is local-first — your data is written to your own device first, and the server is only a channel. When the channel stops, what you have is still in your hands. After you renew, sync reconnects on its own; you may equally switch the address to a server you run yourself, and that route is likewise **lossless**.',
       },
     ],
   },
@@ -463,7 +500,7 @@ const en = [
       {
         kind: 'ol',
         items: [
-          'Requested **within 7 days** of payment, where **hosted sync has not actually been used**: **full refund**.',
+          'Requested **within 7 days** of payment, where **the service your tier provides has not actually been used**: **full refund**. "Used or not" is read from records the server already holds — on the sync side, whether events passed through; on the cloud AI side, **only the request counter from section 8** (we cannot read the content, and do not need to).',
           'Requested **more than 7 days** after payment: refunded **pro rata by remaining unused days**; the part of the term you have used is not refundable.',
           'Requested after the term has already run out: **no refund** — that term has been performed in full.',
           'Refunds are returned **along the original payment route**, and we process them **within 7 working days** of receiving the request.',
@@ -471,7 +508,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'Three boundaries, stated once: ① the "cloud AI subscription" in the table above is not currently offered, so **there is nothing to refund under it** — this section applies to hosted sync only; ② one payment corresponds to one 30-day term, and a refund is calculated **only over the unused days of that term**, never rolled back across your earlier payments; ③ this section is our commitment to you, and part of it **may be more generous than our legal obligations** — you can simply rely on this section, without having to work out for yourself which parts are owed by law and which we give voluntarily.',
+        text: 'Three boundaries, stated once: ① this section applies to **both services** in the table above, on one single test: the refund covers **the days of that term you did not use**, and it never **retroactively** re-opens your earlier payments. For cloud AI, "was it used" is read from **that period\'s usage counter** alone (section 8: our server knows the count, not the content) — so both sides can check it, and nobody has to read what you sent; ② one payment corresponds to one 30-day term, and a refund is calculated only over the unused days of that term; ③ this section is our commitment to you, and part of it **may be more generous than our legal obligations** — you can simply rely on this section, without having to work out for yourself which parts are owed by law and which we give voluntarily.',
       },
     ],
   },
@@ -512,31 +549,40 @@ const en = [
   },
   {
     id: 's8',
-    title: 'Status of the cloud AI subscription: currently not offered',
+    title: 'Cloud AI subscription: now offered — price, quota and retention',
     blocks: [
       {
         kind: 'p',
-        text: '🔴 **The cloud AI subscription is not currently offered**, and this document does not present it as something you can buy. The line "Not currently offered" in the price table in section 2 means exactly that: **nobody can purchase it today**, and there is no price, quota or bill associated with it.',
+        text: '🔴 **The cloud AI subscription is now offered**, and the line in the section 2 price table no longer says "not currently offered": **¥12 buys one billing period containing 300 cloud AI requests** (the overseas entry is $12). ⚠️ Those 300 requests **do not reset on the first of a calendar month** — a billing period is exactly **the 30 days one payment buys**, counted from the moment payment succeeds (the same rule as section 3); cross that boundary and you start a new period from zero, and the boundary is taken from the **expiry moment of your period**, not from a calendar month guessed at by a wall clock. Once the quota is spent, further requests in that period are **refused with the reason shown**, and the refused attempt **is not counted** — the over-quota decision and the increment happen in one and the same statement, so the shape "forward it first, discover the overrun afterwards" cannot occur. Running out of quota **never** triggers an automatic charge.',
       },
       {
         kind: 'ul',
         items: [
-          'This supply mode is **not switched on** in our system: there is no service configuration that routes requests to the cloud, and a pre-enablement check **actively refuses** rather than permits — the reason it currently gives is that the data retention policy is undecided.',
-          'Our rule is: **we do not sell metered services before we can meter them accurately.** Otherwise we would be taking money without delivering, or taking money while being unable to tell you what you actually consumed.',
+          '🔴 **No content is retained.** The text you send and what the model returns exist **only in the memory of one proxy call** and are discarded when it returns: not written to logs (including request logs and error serialisation), not in a trace, not in a crash report, not in any generated artifact. So the question "how long is content kept on your side" has no answering step here — it was never written to disk. The evidence for this is not our wording: the check plants one marker string in the fake upstream response and another in the fake request, then asserts that neither appears **in any captured log output or in any row of any table in the database**.',
+          '**The server records four columns of counters only**: your account, the billing period, how many requests that period used, and the time of the last use. By design that table **has exactly those four columns** — no content column, no prompt column, no completion column, and no catch-all column that could hold content. The evidence for "we do not keep your AI content" is therefore **the column set of that table** (one check fails the build the moment a column is added), not our adjectives. That table also has **no** feature-name, outcome-status or byte-size column, so this section promises no retention period for such items: everything named here has to exist in the table.',
+          '**How long the counters stay**: **45 days** from the last time one was used, and 🔴 **only once the billing period it belongs to has also ended** — both conditions are required, because deleting on time alone would wipe the quota of a period that is still active. ⚠️ That is why we write "**more than 45 days, and the period ended**" as a conditional deletion, and not an unconditional "wiped when it expires". When you close your account these counter rows are removed by the database foreign-key **cascade**, together with the account (see Personal Information Collection Inventory and Exercising Your Rights).',
         ],
       },
       {
         kind: 'p',
-        text: 'Why an undecided retention policy means we cannot sell it: cloud AI **must** see your content in order to work, and "how long that content stays on our side, in what form, and how it is then removed" is precisely what the retention policy has to answer. Putting it on the checkout before that question is answered would mean selling you a processing arrangement whose boundaries we cannot describe.',
+        text: '🔴 **This tier only connects to model providers located in mainland China, and that is a check, not a wording.** "Domestic providers only" written into a document constrains nothing, so it is split into three things that can fail: **the host names of domestic providers are registered one by one in a whitelist** (anything not in the table is unavailable, and adding a row requires stating why it counts as domestic); **the address is validated twice, once when the configuration is saved and once when a request is actually about to be sent**; and the destination is **recomputed immediately before the action**. The upstream address and the model are fixed by **server-side configuration** and cannot be replaced by a client request — otherwise the whitelist would be handed to whoever sends the request. A non-qualifying endpoint ⇒ **a loud refusal**, not one byte forwarded.',
+      },
+      {
+        kind: 'p',
+        text: '⚠️ **A boundary that has to be written in the same breath, so this section is not read as "usable right now".** The checkout side is open: the price, the quota, the metering, the gates and these terms all exist, and an order is no longer bounced back with "this tier cannot be delivered yet". Two things we can verify are still missing before a purchase means a working request: **the operator has to switch this tier on and configure a domestic upstream on the server** (without that configuration the route answers "not configured" and forwards not one byte), and **the client has no switch yet that wires the built-in AI to this tier** (the AI you can use in heyta today is still only what you configured an endpoint for and authorised feature by feature). The current state of both is written in section five of AI Features and Where Your Data Goes.',
+      },
+      {
+        kind: 'p',
+        text: '🔴 One rule that **dissolves itself**, recorded here as history so nobody reads it as still in force: our previous rule was "**we do not sell a metered service before we can meter it accurately**". What it governed was the state "the promise is already written, the delivery is not" — breaking that state means taking money without delivering. On 2026-10-05 metering came to exist on the server and really does refuse requests, the premise disappeared, and the rule was released **by its own terms** (the decision is ADR-0054, which **supersedes** items 1-3 of the short checklist in ADR-0023 §5). The mechanism itself was not removed: that "not yet deliverable" list still stands in front of the checkout, it is just empty today — the next tier that is priced but cannot yet be delivered depends on it.',
       },
       {
         kind: 'docRef',
         docId: 'ai-and-transfer',
-        text: 'AI Features and Cross-border Data statement: how on-device AI differs from hosted AI, which content is handed to whom, how cross-border authorisation is granted, and where each AI feature is switched on or off.',
+        text: 'AI Features and Where Your Data Goes: how on-device AI differs from hosted AI, which content is handed to whom, under what conditions it leaves this device, where each AI feature is switched on or off, and whether this tier can be turned on today.',
       },
       {
         kind: 'callout',
-        text: 'An important boundary: **hosted sync promises that we relay ciphertext only, whereas cloud AI must see plaintext.** These are therefore **two separate sets of terms**, applied independently and never read as one — and we **will not describe heyta\'s cloud AI as end-to-end encrypted**. If we ever decide to offer the cloud AI subscription, we will **publish the terms that apply to it separately and notify you in advance**, 🔴 and those new terms will **not reach back into a service period you have already paid for**.',
+        text: 'The boundary that matters most, **not softened by one word**: **hosted sync promises that we relay ciphertext only, whereas cloud AI must see plaintext.** These are therefore **two separate sets of terms**, applied independently and never read as one — and we **will never describe heyta\'s cloud AI as end-to-end encrypted**: this route is **not protected by end-to-end encryption**, and that is a definition, not a detail we could improve. Your content therefore **leaves this device and is handed to a third party** for processing (we choose that provider, and it must be one located in mainland China). Task sync runs on a different channel and remains end-to-end encrypted: the encryption promise of that one does not extend to this route, and must never be borrowed to vouch for it.',
       },
     ],
   },
@@ -611,6 +657,11 @@ const en = [
             '2026-10-04',
             'Added section ten: the GDPR side of "the rows we keep in order to take payment", written against the real columns of `payment_events` and `checkout_orders` (minimisation, legal retention, how short the withdrawal path is, solely automated decisions - four cells). It also states the two things that cannot be promised: a refund does not make those rows vanish on the spot, and the invoice name of payee and tax number you email us are outside the deletion scope of these two tables. The article-by-article rights table stays in the Data rights document only; this section points at it instead of copying it.',
           ],
+          [
+            '1.2',
+            '2026-10-05',
+            'Section eight rewritten in full: the tier **is now offered**. The old premise - "the retention policy is undecided, so this tier cannot be sold" - was removed by ADR-0054, which supersedes items 1-3 of the checklist in ADR-0023 §5, so leaving those sentences in place would be an outward falsehood. The new text states only what is currently true: ¥12 per billing period, 300 requests, no content retained, four counter columns only, counters deleted after "more than 45 days and the period ended", the counters cascaded on account closure, and a domestic-only provider whitelist enforced at save, at enablement and again before sending. Four further sentences that went stale with it were fixed: the cloud AI row and its note in section one, the amount in the price table in section two, the "nothing to refund under it" claim in section five (refunds now cover both services), and the expiry table in section four (a cloud AI row was added, and "the only consequence is that hosted sync stops" became "the hosted part of the tier you paid for stops"). **One sentence was not softened by one word**: cloud AI is not protected by end-to-end encryption, and its terms are never merged with those of sync. The version had to change because consent records must answer whether the version a person agreed to said this tier could be bought or could not.',
+          ],
         ],
       },
     ],
@@ -622,18 +673,22 @@ export const subscriptionAndRefund: LegalDocument = {
   // 🔴 1.0 → 1.1：新增第十节（GDPR 一侧"为了收款而留下的记录"）。
   // 加的是**承诺的边界**（退款不即时删、邮件里的抬头与税号不在这两张表的范围内），
   // 不是措辞打磨，所以必须换版本号：同意留痕要能回答"他同意的那一版里有没有这一段"。
-  version: '1.1',
+  // 🔴 1.1 → 1.2（2026-10-05，ADR-0054 开档）：第八节从"这一档不提供"改成"这一档提供"，
+  // 连带改掉价格、退款对象、到期后果四处。**这是对外承诺的实质**——旧版同意里那一档
+  // 是"谁也买不到"，新版是"¥12 能买到、有 300 次额度、只留计数"，两版根本不是同一件事，
+  // 所以必须换版本号；沿用 1.1 会让一份"买不到"的同意去覆盖一段"可以买"的条款。
+  version: '1.2',
   status: 'draft',
-  updatedDate: '2026-10-04',
+  updatedDate: '2026-10-05',
   title: {
     'zh-CN': '订阅、计费与退款规则',
     en: 'Subscription, Billing and Refund Rules',
   },
   summary: {
     'zh-CN':
-      '托管同步与云端 AI 两件**互相独立**的收费服务各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。',
+      '托管同步与云端 AI 两件**各有各的条款**的收费服务（今天能买到云端 AI 的那一档同时含托管同步）各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。',
     en:
-      'How two **independent** paid services — hosted sync and cloud AI — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.',
+      'How two paid services with **their own separate terms** — hosted sync and cloud AI, where the tier that grants cloud AI today also includes hosted sync — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.',
   },
   sections: { 'zh-CN': zh, en },
 };

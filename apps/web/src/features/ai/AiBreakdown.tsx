@@ -232,6 +232,11 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
   const source = {
     title: task.title,
     locale,
+    // 🔴 时间锚点的时间源：**这一次渲染取一次**，写进 `source`。同一个 `source` 既进
+    // `buildBreakdownInvocation`（决定界面披露里的 `today`），也进 `requestBreakdown`
+    // （决定真正发出去的那行「今天是」）—— 跨过午夜时两边不可能给出两个不同的"今天"。
+    // 与 `AiCapture` 的 `frozenAt` 同一条纪律。
+    now: Date.now(),
     ...(task.note === undefined ? {} : { note: task.note }),
   };
 

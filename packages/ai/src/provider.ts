@@ -272,6 +272,43 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
     endpointLabel: config.endpoint,
 
     async invoke(invocation, consents) {
+      // ── 0. 🔴 发送前的**目的地复算**（ADR-0053 §3.3 的第二点）─────────────
+      //
+      // 为什么这里要再算一遍（工厂里已经 `assertEnableable` + `classifyDestination` 了）：
+      // `config` 是被**引用**捕获的，`invoke` 读的是当下的 `config.endpoint`。
+      // 任何在构造之后改写它的路径（导入 / 同步 / 手工改存储）都会让
+      // "已披露、已授权的那份目的地"与实际发送目的地**分叉**。最坏的一种分叉是
+      // `localhost` 被改成远端：免授权的目的地是 `none`，于是下面第 1 步的闸门
+      // **根本不会索要授权**，而明文已经要去远端了。
+      // 这条纪律不是新发明：`routing.ts` 的 `attemptOnce()` 早就在发送点重查了一次
+      // （"Enforcement has to sit on the path that actually sends the request"）。
+      //
+      // ⚠️ 托管白名单在这里**不是第二个分支**，而是这一次复算的传递结果：
+      // `classifyDestination` 对 `managed` 就是调 `isDomesticManagedEndpoint`，
+      // 所以"端点不再是境内白名单上的那一家"必然让目的地离开 `heyta-cloud`、
+      // 于是被这一条拒掉。**刻意不给它单独写一支 if**。
+      // 🔴 这里原来的理由是假的，得记住它假过：它写的是"`managed` 在工厂里就被
+      //   保留策略挡住，构造不出 provider，所以那支 if 写不出可达用例"。
+      //   2026-10-05 闸门拆掉（ADR-0054）之后托管 provider **构造得出来**，那句话
+      //   当场过期，而这条纪律当时**一条用例都没有**。现在有了：
+      //   `managed-allowlist.spec.ts` 第 ⑤ 段（构造完把端点换成境外 / 换成回环，
+      //   两条都必须零请求）。把"测不到"当成"不需要测"，就是判据空洞的产生方式。
+      // 想再核对它有没有牙：把 `classifyDestination` 的 managed 那一支改回
+      // 无条件 `heyta-cloud`，`managed-allowlist.spec.ts` 与门禁 8e 都会红。
+      const currentDestination = classifyDestination(config);
+      if (currentDestination !== destination) {
+        return {
+          ok: false,
+          reason: 'http-error',
+          message:
+            config.mode === 'managed'
+              ? `托管端点不再落在境内白名单上（出境目的地从「${destination}」变成「${currentDestination}」），这次**一个请求都不发**。`
+              : `端点地址在 provider 构造之后被改动过：出境目的地从「${destination}」变成「${currentDestination}」。` +
+                '已披露与已授权的是前一份，所以这次**一个请求都不发**。',
+          ...(config.endpoint === undefined ? {} : { endpointUrl: config.endpoint }),
+        };
+      }
+
       // ── 1. 出境闸门。**必须在任何网络动作之前。** ──────────────────────
       const decision = authorizeEgress(
         { feature: invocation.feature, destination, fields: invocation.fields },
@@ -281,14 +318,13 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
         // 把披露一并带回：只说"未授权"而不说"授权后什么会被发出去"，
         // 等于逼用户盲签。
         const d = decision.disclosure;
-        const retention = d.retentionText === undefined ? '（保留策略未定案）' : d.retentionText;
         return {
           ok: false,
           reason: 'egress-not-authorized',
           message:
             `该功能需要你先批准内容离开本机。\n` +
             `发送内容：${d.fields.join('、') || '（无）'}\n` +
-            `${d.destinationText}\n保留：${retention}`,
+            `${d.destinationText}\n保留：${d.retentionText}`,
         };
       }
 
