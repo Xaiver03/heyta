@@ -277,6 +277,37 @@ function descAnchors(text, label) {
   };
 }
 
+/**
+ * 判据 ⑳：`tap_tab <标签> <标记>` 的**第二参**也是锚点，必须进同一本账。
+ *
+ * 为什么单开一判据（2026-10-06 rig44 实测）：判据 ⑤ 的调用点表里只有
+ * `xy_desc / has_desc / xy_text / has_text`，于是把被它判红的
+ * `xy_desc "设置"` 换成 `tap_tab "我的" "设置"` 就**从账上消失了** ——
+ * 而两者在设备上是同一条恒取空的精确匹配（content-desc 实为
+ * `"设置, 同步凭据、桌面小组件与语言"`）。rig44 因此白跑一轮。
+ * ⇒ "把锚点从一张表挪到另一张表的视野外"本身就是一种逃逸，要钉住。
+ *
+ * 写了 `rid:` 前缀的走 testID 那一侧（进判据 ① 的对账面），不当文案判。
+ */
+function tapTabMarkers(text, label) {
+  const desc = [];
+  const rid = [];
+  text.split('\n').forEach((line, i) => {
+    if (line.trim().startsWith('#')) return; // 同一条规矩：注释不是调用点
+    const m = line.match(
+      /\btap_tab +(["'])((?:\\.|(?!\1)[^\\])*)\1 +(["'])((?:\\.|(?!\3)[^\\])*)\3/,
+    );
+    if (!m) return;
+    const at = `${label}:${String(i + 1)}`;
+    if (m[4].startsWith('rid:')) {
+      if (m[4] !== 'rid:') rid.push({ anchor: m[4].slice(4), at, fn: 'tap_tab(rid:)' });
+    } else if (m[4] !== '') {
+      desc.push({ anchor: m[4], at, fn: 'tap_tab(标记)' });
+    }
+  });
+  return { desc, rid };
+}
+
 // 判据 ⑧：双引号**文案**里不许出现反引号。
 //   在 bash 里反引号是命令替换，`bash -n` 不报（语法完全合法），症状是"打印判据的那一行
 //   自己去执行了一条命令"：实测 `line 1226: target: command not found`，判据行输出成半句话。
@@ -906,7 +937,13 @@ function run() {
   const decl = declarations(files);
   const scriptRel = process.env.HEYTA_ANCHOR_SCRIPT ?? DEFAULT_SCRIPT;
   const scriptText = readScript(join(ROOT, scriptRel));
-  const anchors = anchorsFromScript(scriptText, scriptRel);
+  // 判据 ⑳：`tap_tab` 的第二参（"切过去之后应当出现"的标记）与其余锚点**同账**。
+  const tabMarkers = tapTabMarkers(scriptText, scriptRel);
+  const anchors = (() => {
+    const all = anchorsFromScript(scriptText, scriptRel).concat(tabMarkers.rid);
+    const seen = new Set();
+    return all.filter((a) => (seen.has(a.anchor) ? false : (seen.add(a.anchor), true)));
+  })();
   if (anchors.length === 0) {
     console.error('🔴 脚本里一个 rid 锚点都没取到 —— 那是探针坏了，不是脚本干净（报退 2）');
     process.exit(2);
@@ -953,7 +990,15 @@ function run() {
     process.exit(2);
   }
   const allowed = mobileValues(files, zh);
-  const { anchors: dAnchors, dynamic: dDyn } = descAnchors(scriptText, scriptRel);
+  const { anchors: dAnchors0, dynamic: dDyn } = descAnchors(scriptText, scriptRel);
+  // 判据 ⑳ 的另一半：`tap_tab` 的**裸文案标记**与 xy_desc/has_desc 走同一条精确等值匹配，
+  // 所以必须进同一本账，否则"把锚点从一张表挪到另一张表的视野外"就能逃逸。
+  const dAnchorsSeen = new Set();
+  const dAnchors = dAnchors0.concat(tabMarkers.desc).filter((a) => {
+    if (dAnchorsSeen.has(a.anchor)) return false;
+    dAnchorsSeen.add(a.anchor);
+    return true;
+  });
   if (dAnchors.length === 0) {
     console.error('🔴 脚本里一条 desc/text 字面锚点都没取到 —— 探针坏了，不报"都对"');
     process.exit(2);
@@ -1600,6 +1645,38 @@ if (process.argv.includes('--self-test')) {
   arms.push(['臂 61 的变异确实造出一行不进台账的 ✅（前置）', mutL61 !== baseTun && /echo "   ✅ 设备内回环可达/.test(mutL61)]);
   const m61 = runMutantFile(mutL61, 'pass-not-counted');
   arms.push(['臂 61 打印 ✅ 却不走 ok() ⇒ 非零退出且点名', m61.code !== 0 && m61.out.includes('自称通过而不走 ok()')]);
+
+  // ── 判据 ⑳（`tap_tab` 的标记与其余锚点同账 —— rig44 白跑一轮的成因）的臂 ──
+  const tabReal = tapTabMarkers(readScript(join(ROOT, DEFAULT_SCRIPT)), DEFAULT_SCRIPT);
+  arms.push([
+    '臂 63 真脚本的 tap_tab 标记取得到（探针确有输入：一枚 rid + 一枚裸文案，逐字现量）',
+    tabReal.rid.length === 1 &&
+      tabReal.rid[0].anchor === 'profile-entry-settings' &&
+      tabReal.desc.length === 1 &&
+      tabReal.desc[0].anchor === '新建任务',
+  ]);
+  // 臂 64：把标记从 testID 退回到行标签「设置」（= 09f54d85 那一版）⇒ 必须红。
+  const mutT64 = baseTun.replace('tap_tab "我的" "rid:profile-entry-settings"', 'tap_tab "我的" "设置"');
+  arms.push([
+    '臂 64 的变异确实把标记退回了行标签（前置）',
+    mutT64 !== baseTun && mutT64.includes('tap_tab "我的" "设置"'),
+  ]);
+  const m64 = runMutantFile(mutT64, 'tab-marker-text-only');
+  arms.push([
+    '臂 64 标记用行标签（content-desc 是合成串、恒取空）⇒ 非零退出且点名',
+    m64.code !== 0 && m64.out.includes('恒取空') && m64.out.includes('tap_tab(标记)'),
+  ]);
+  // 臂 65：`rid:` 前缀里写一枚源码没有的 testID ⇒ 必须走判据 ① 红（前缀不是免检通道）。
+  const mutT65 = baseTun.replace('rid:profile-entry-settings', 'rid:profile-entry-nope');
+  arms.push([
+    '臂 65 的变异确实把 testID 换成不存在的那枚（前置）',
+    mutT65 !== baseTun && mutT65.includes('rid:profile-entry-nope'),
+  ]);
+  const m65 = runMutantFile(mutT65, 'tab-marker-unknown-rid');
+  arms.push([
+    '臂 65 rid: 标记指向源码里不存在的 testID ⇒ 非零退出且点名',
+    m65.code !== 0 && m65.out.includes('profile-entry-nope') && m65.out.includes('tap_tab(rid:)'),
+  ]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把

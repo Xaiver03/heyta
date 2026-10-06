@@ -545,7 +545,11 @@ fi
 step "9. 手机同步（上传 + 下载）"
 # 同样走 tap_tab（见那条 helper 的注释）：同步按钮在「我的」页，
 # 点了没切过去就会在任务页上找「同步」，两处都有那个按钮 —— 读起来一切正常。
-if tap_tab "我的" "同步"; then
+# 🔴 标记改用 testID：原写法 `xy_desc "同步"` 精确匹配的是**整条 content-desc**，
+#    而树里那一枚是「立即同步」，于是这条标记恒不成立 —— tap_tab 每次都白试三发
+#    再走"仍按原样继续"的分支，"证明真的切过去了"这一半等于没有（同族事故见
+#    verify-mobile-ai.sh 的 goto_me_page：文案会跟着 hint/i18n 合成变，testID 不会）。
+if tap_tab "我的" "rid:profile-entry-settings"; then
   ok "已回到「我的」页"
 else
   echo "   ⚠️ 没能确认切到「我的」页，仍按原样继续（下一步的同步判据自己会红）" >&2
