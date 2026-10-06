@@ -443,6 +443,22 @@ else
   else
     bad "找不到构建产物 $IOS_APP_DIR"
   fi
+  # 🔴 归属章（与 reinstall-all.sh 同一把尺、同一个文件）：这枚构建目录是**跨树共享**的
+  #   默认 derivedDataPath，下游消费者（verify-mobile-ios-ai.sh）判"是不是这一棵树"要用它，
+  #   而不是只看时间戳先后。2026-10-06 rig64 的形状：另一棵树刚打完包，本树的验收按
+  #   bundle mtime 放行、第 3 步红在设置面读不到 AI 段。写不成本身不判红 ——
+  #   它只意味着下一位消费者会**响亮地拒绝**这枚产物（那条门在 heyta_ios_owner_check 里）。
+  if [ -f "$HEYTA_REPO_ROOT/scripts/lib/apk-freshness.sh" ]; then
+    # shellcheck source=lib/apk-freshness.sh
+    . "$HEYTA_REPO_ROOT/scripts/lib/apk-freshness.sh"
+    if heyta_ios_owner_write "$HEYTA_IOS_DERIVED" "$HEYTA_REPO_ROOT"; then
+      ok "已写产物归属章（${HEYTA_IOS_DERIVED}/.heyta-build-owner）"
+    else
+      echo "   ⓘ 归属章没写成（内容章取不到？）⇒ 下游验收会拒绝拿这枚产物取读数"
+    fi
+  else
+    echo "   ⓘ 没有 scripts/lib/apk-freshness.sh ⇒ 这一趟写不了归属章"
+  fi
 fi
 
 # 无论跳不跳过，都断言"**我们验的正是刚装上去的那个包**"。
