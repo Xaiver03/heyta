@@ -131,6 +131,10 @@ export PATH="/opt/homebrew/bin:$PATH"
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 . "$(dirname "$0")/lib/wait-for-quiet-host.sh"
 . "$(dirname "$0")/lib/apk-freshness.sh"
+# `zh()` 住在 `lib/card-export-probe.sh`（单一所有者的词条取值层，iOS 助手载体 source 同一个文件）。
+# 这里要它是因为 5c 判的是**整句失败标题** —— 把词条抄成字面量就成了 i18n 的第二份抄件：
+# 改了词条的一侧不会让这里变红，而这一格的意义恰恰是"界面上那句是这一句"。
+. "$(dirname "$0")/lib/card-export-probe.sh"
 
 # ── 本 rig 自己的旋钮（都在 source 之后定，lib 会覆盖同名全局）────────────
 STUB_PORT="${HEYTA_AI_STUB_PORT:-4399}"
@@ -1721,22 +1725,47 @@ dump
 #   比没有判据更糟 —— §7 元规则二）：
 #   · 旧 5a「规则表选不到的一句必须真的走出去（计数要涨）」：第 0 步选的隐私档是「只用本机」，
 #     而这一档下 `packages/app-host/src/privacy-consent.ts` 的 blanket 闸门在任何 fetch 之前就
-#     返回 `PRIVACY_CONSENT_BLOCKED_MARKER`（= 屏上那句 privacy-consent-not-granted），
+#     抛 `PrivacyConsentBlockedError`（契约字符串 `PRIVACY_CONSENT_BLOCKED_MARKER`
+#     = 屏上那句 privacy-consent-not-granted，现在住在 `packages/ai/src/egress.ts`），
 #     所以计数**永远不会**涨。rig33 现量：`通过 16 项 / 失败 0 项` 之后整趟在第二发
 #     `tap_rid tool-input` 上中止 —— 因为发送失败后进的是 FailureStep，那一屏压根没有输入框
 #     （`AssistantScreen.tsx` 的 `if (phase === 'failed') return <FailureStep/>` 是整屏 return），
 #     而载体以为"发完就能接着打第二句"。
 #   · 旧 5b 的 `else bad "这一腿没有读数…"`：ASCII 句子命中不了规则表（谓词头全中文），
 #     所以那个 else 分支同样是恒红。
-# 现在这一腿判三件**在这一档真的可观察**的事，第四件如实登记成未覆盖。
+# 🔴 rig52 在 iOS 那一侧把这一腿的另一半照了出来，这里跟着补：闸门拒绝原先渲染的是
+#   `web.ai.failure.cause.network` 那句「连不上端点。检查网络，以及端点地址是否可达。」，
+#   而真相是设备级同意没给、一个字都没发（根因：`packages/ai` 的 catch 把闸门抛的错误一律
+#   归成 `network`，副作用还包括给没被访问过的端点记熔断锅 —— 设备库实测
+#   consecutiveFailures=2 / lastError=network）。现在归 `consent-not-granted`。
+#   ⇒ 下面那条 `privacy-consent-not-granted` **只**证明"技术详情里有诊断原文"，它在改前改后
+#   都成立，所以它对**标题句**完全无感：标题撒谎时这一腿照样绿。两句都得判。
+# 现在这一腿判四件**在这一档真的可观察**的事，第五件如实登记成未覆盖。
 reveal_sub "privacy-consent-not-granted"
 BLOCKED=$(has_sub "privacy-consent-not-granted")
 NAMED=$(has_sub "127.0.0.1")
+CONSENT_HEAD=$(zh web.ai.failure.cause.consentNotGranted)
+WRONG_HEAD=$(zh web.ai.failure.cause.network)
+HEAD_OK=$(has_sub "$CONSENT_HEAD")
+HEAD_LIES=$(has_sub "$WRONG_HEAD")
 RC1=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
-if [ "$BLOCKED" = "1" ]; then
-  ok "只用本机档：发送在本机闸门处被拦下，界面给出拒绝原文（privacy-consent-not-granted）—— 不是静默失败"
+if [ "$HEAD_OK" = "1" ]; then
+  ok "只用本机档：失败面的**标题句**就是「只用本机」那一句（逐字取自词条表）—— 用户被告知的是真正的原因"
 else
-  bad "🔴 点完披露步的发送之后，屏上没有本机闸门的拒绝原文 —— 要么闸门换了措辞（判据要跟着改），要么这一档根本没拦"
+  bad "🔴 失败面的标题不是「只用本机」那一句 —— 「界面在说谎」这一类：技术详情对、标题错，用户会被支去查网络"
+  echo "   · 期望标题：「${CONSENT_HEAD}」"
+  echo "   · 取证：屏上有「连不上端点」=$([ "$HEAD_LIES" = "1" ] && echo 是 || echo 否) 有「同意并联网」=$(has_sub "同意并联网") 有「只用本机」=$(has_sub "只用本机") 有诊断原文=$BLOCKED"
+  screen_txt
+fi
+if [ "$HEAD_LIES" = "0" ]; then
+  ok "标题句不是那句「连不上端点…检查网络」（原因码没被归错）"
+else
+  bad "🔴 闸门拒绝被渲染成「连不上端点。检查网络…」—— 设备级同意没给 ≠ 端点连不上，这句把用户支去查网络"
+fi
+if [ "$BLOCKED" = "1" ]; then
+  ok "技术详情里带着闸门的诊断原文（privacy-consent-not-granted）—— 拦下来这件事是可归因的，不是静默失败"
+else
+  bad "🔴 点完披露步的发送之后，屏上没有本机闸门的诊断原文 —— 要么闸门换了措辞（判据要跟着改），要么这一档根本没拦"
   screen_txt
 fi
 if [ "$NAMED" = "1" ]; then

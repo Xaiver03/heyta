@@ -15,7 +15,7 @@ case "$(basename "$0")" in
     exec bash "$_snap" "$@"
     ;;
 esac
-trap 'rm -f -- "$0"' EXIT
+trap 'rm -f -- "$0"; declare -F cleanup_stub >/dev/null && cleanup_stub' EXIT
 #
 # iOS「AI 助手」真机验收（真模拟器 + 确定性假端点，零 mock 产品代码）
 # =====================================================================
@@ -79,6 +79,10 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 # 🔴 收尾：假端点是本脚本自己 spawn 的，必须自己关掉 —— Android 那一趟第 14 步的教训
 #   （rig39 现量：上一轮泄漏的桩坐在端口上，本轮借用它照常跑，读数全是别人的）。
+# ⚠️ 它的 EXIT 挂**不在这里**，在文件头第 18 行那条自快照 trap 里（`declare -F` 现查）。
+#   理由不是风格：`lib/mobile-e2e.sh` 的 `heyta_chain_exit` 只能救"rig 的 trap 排在
+#   source **之前**"那一半 —— 在 source 之后再写一条裸 `trap … EXIT` 会**整体替换**掉
+#   串好的那条（bash 不报错），症状是"该删的自快照没删"。`check:shell-exit-chain` 判的就是它。
 cleanup_stub() {
   local sp=""
   [ -n "${STUB_PIDFILE:-}" ] && [ -f "$STUB_PIDFILE" ] || return 0
@@ -89,7 +93,6 @@ cleanup_stub() {
   fi
   rm -f "$STUB_PIDFILE"
 }
-trap cleanup_stub EXIT
 
 # ── 旋钮 ────────────────────────────────────────────────────────────────
 UDID=${IOS_UDID:-}
@@ -214,28 +217,15 @@ set_id() {  # <testID> <值>
   bad "写 id:$id 四次都没回读出「$val」（最后回读：${back:-空}，setRc=$(jget "$out" setRc)）"
   return 1
 }
-# 中文只能走 HID 键盘（`set-value` 对 RN 的 onChangeText 不可信，实测过两次）。
-type_id() {  # <testID> <值>
-  local out back
-  ax --dismiss-keyboard --json >/dev/null 2>&1
-  out=$(ax "id:$1" --type-text "$2" --json)
-  if [ "$(jget "$out" typedRc)" != "0" ]; then
-    bad "中文送不进 id:$1（typedRc=$(jget "$out" typedRc)）—— 这一格在 Android 上就是死在这里"
-    return 1
-  fi
-  # 🔴 判"写进去没有"的是**回读**，不是 rc：HID 打字 rc=0 而字段仍是空串是实测过的形状，
-  #   而调用方拿着"已写入"的假设往下走，那条「计数没动」就会变成"压根没人发"。
-  back=$(jget "$out" detail)
-  if [ "$back" != "$2" ]; then
-    ax --dismiss-keyboard --json >/dev/null 2>&1
-    back=$(jget "$(ax "id:$1" --list --json)" detail)
-  fi
-  if [ "$back" != "$2" ]; then
-    bad "HID 送进 id:$1 后回读不是「$2」（最后回读：${back:-空}）⇒ 这一格没有输入"
-    return 1
-  fi
-  return 0
-}
+# 🔴 iOS 这一侧中文**只能走 AXSetValue（`set_id`），HID 那条路结构上送不进中文**
+#   （rig49 现量：`idb ui text` 走的是 HID 键码表，`text_to_events` 对每个字符查键码，
+#    非 ASCII 直接 `Exception: No keycode found for 列` ⇒ 打字这一步恒失败）。
+#    HID 只在 **secure 输入框**上才是必需的（`verify-mobile-ios.sh:1298` 那条实测：
+#    set-value 对 secure 框 rc=0、AXValue 回读成掩码而 onChangeText 不触发）。
+#    普通 TextInput 上中文走 set-value 是被 `verify-mobile-ios.sh` 证过的：
+#    它的任务标题就是中文（`TITLE="iOS输入验收…"`），第 1156 行按**逐字**去 ops 表里找那条 op，
+#    找不到就 bad —— 也就是"中文进了 RN 状态并写进了 op 载荷"有库级读数，不是界面级印象。
+#    写进来的字这里判两层：`set_id` 回读逐字（AX 层）+ 调用方判「运行」按钮的启用态（RN 层）。
 enabled_id() {  # <testID> → 0 = enabled=True
   [ "$(jget "$(ax "id:$1" --list --json)" enabled)" = "True" ]
 }
@@ -334,19 +324,119 @@ for f in ["capture", "breakdown", "prioritize", "duration-estimate", "tool-calli
 print()
 PYR
 }
+# 逐工具授权位（`localApi.grants`）。🔴 层与 `endpoint_count` 同一条纪律：grants 住在
+# `localApi` 下面，不在顶层；走错层会得到"一个都没授权"，而那与"真没授权"输出上一样。
+grants_reading() {  # → "list_tasks=1 create_task=0"；读不到打印 NOFILE/BAD:*
+  local db
+  db=$(prefs_db)
+  if [ -z "$db" ] || [ ! -s "$db" ]; then printf 'NOFILE'; return 1; fi
+  HEYTA_DB="$db" python3 - <<'PYG'
+import json, os, sqlite3, sys
+try:
+    con = sqlite3.connect(f"file:{os.environ['HEYTA_DB']}?mode=ro", uri=True)
+    row = con.execute("SELECT value FROM device_pref WHERE key='heyta.ai.settings'").fetchone()
+except sqlite3.Error as e:
+    print(f"BAD:{type(e).__name__}"); sys.exit(0)
+if not row:
+    print("BAD:no-row"); sys.exit(0)
+try:
+    v = json.loads(row[0])
+except json.JSONDecodeError:
+    print("BAD:json"); sys.exit(0)
+local = v.get("localApi") or {}
+grants = local.get("grants") or {}
+for k in ("list_tasks", "create_task"):
+    print(f"{k}={1 if grants.get(k) is True else 0}", end=" ")
+print()
+PYG
+}
+# 🔴 设备级隐私同意住在**另一个 key**（`privacy.consent`，不是 `heyta.ai.settings`）。
+#   这一枚读的是"决定真落盘了没有"，不是"按钮点住了"（§7 第 25 条那一族）。
+consent_reading() {  # → accepted / local-only / NOFILE / BAD:*
+  local db
+  db=$(prefs_db)
+  if [ -z "$db" ] || [ ! -s "$db" ]; then printf 'NOFILE'; return 1; fi
+  HEYTA_DB="$db" python3 - <<'PYC'
+import json, os, sqlite3, sys
+try:
+    con = sqlite3.connect(f"file:{os.environ['HEYTA_DB']}?mode=ro", uri=True)
+    row = con.execute("SELECT value FROM device_pref WHERE key='privacy.consent'").fetchone()
+except sqlite3.Error as e:
+    print(f"BAD:{type(e).__name__}"); sys.exit(0)
+if not row:
+    print("BAD:no-row"); sys.exit(0)
+try:
+    print(json.loads(row[0]).get("decision") or "BAD:no-decision")
+except Exception:
+    print("BAD:json")
+PYC
+}
+# 把设备的联网决定从「只用本机」改成「同意并联网」——**正向对照的前置**。
+# 闸门是绝对的（`apps/mobile/src/privacy/consent-gate.ts`：没有同意一个字节都不出这台设备，
+# 回环端点也不例外），所以"计数会涨"这一条在闸门关着时**结构上取不到**。
+# rig52 现量：第 10 步那两条红（回环这一趟 0→0、等 40 秒没有提案卡）就是这个 sequencing
+# 问题，不是产品问题 —— 而它同时让第 7 步那条"0→0 没动"失去分母（traps #335 那一族）。
+# 这一格没有 testID 锚点：`privacy-consent-section` 是裸 `<Stack>`，iOS 不发节点（#348），
+# 而「重新选择」那颗按钮是共享 `Button` ⇒ 按可见标签点。
+flip_consent_to_network() {
+  # 🔴 走既有的 `open_ai_settings`，不许自己拼"点「我的」再点「设置」"：rig54 现量就是这么拼的，
+  # 而第 8 步结束时屏幕上立着的是**助手层**（失败面）—— 它立着时底部标签整条不在 AX 树里
+  # （#348 那一族的同源事实），于是 `profile-entry-settings` 滚不进可见区
+  # （`scrollRc=element-left-tree`），读起来像"合规区块被摘掉了"。
+  # `open_ai_settings` 里那两条 `leave_assistant` / `leave_settings` 才是这一格的必要前置。
+  open_ai_settings || { echo "   ❌ 进不去设置面 ⇒ 改不了联网决定" >&2; return 1; }
+  # 隐私同意就在设置面**第一段**（合规位置，`SettingsScreen.tsx:305` 那段注释）。
+  # 🔴 那两颗按钮**互斥**，由产品的状态机决定（`SettingsScreen.tsx:330` 那个三元）：
+  #   consentRecord !== null（已同意 **或** 明确选了「只用本机」）⇒ 屏上只有「撤回同意」
+  #   consentRecord === null（没决定过 / 刚撤回）⇒ 屏上只有「重新作出选择」
+  # 走到这里时设备停在「只用本机」= **有记录** ⇒ 屏上是「撤回同意」，不是「重新作出选择」。
+  # Android 那一侧在 rig34/rig35 就是假定后者存在而两次取空，报成"合规区块被摘掉了"
+  # （traps #335 那一族：期望值要由产品自己的状态机推，不能挑一颗按钮写死）。
+  if found_label "$(zh common.privacy.settings.revoke)"; then
+    press_label "$(zh common.privacy.settings.revoke)" || { echo "   ❌ 点不到「撤回同意」（这一档屏上有的那颗）" >&2; return 1; }
+    sleep 2
+    found_label "$(zh common.privacy.settings.chooseAgain)" \
+      || { echo "   ❌ 撤回之后没换成「重新作出选择」⇒ 状态机或措辞变了，下一指没有落点" >&2; return 1; }
+  fi
+  press_label "$(zh common.privacy.settings.chooseAgain)" || { echo "   ❌ 点不到「重新选择」那颗按钮" >&2; return 1; }
+  sleep 2
+  found_label "$CONSENT_TITLE" || { echo "   ❌ 按了「重新选择」而那张面板没再出现" >&2; return 1; }
+  press_label "$(zh common.privacy.consent.accept)" || { echo "   ❌ 点不到「同意并联网」" >&2; return 1; }
+  sleep 3
+  found_label "$CONSENT_TITLE" && { echo "   ❌ 面板还立着 ⇒ 这一指没落地" >&2; return 1; }
+  [ "$(consent_reading)" = "accepted" ] || { echo "   ❌ 库里读到的决定不是 accepted（实际：$(consent_reading)）" >&2; return 1; }
+  return 0
+}
 endpoint_count() {  # → 库里的端点条数（整数）；读不到打印 NOFILE/BAD:*
+  # 🔴 端点住在 **`routing.endpoints`** 那一层，不是顶层（写入侧：`packages/app-host`
+  #   的 `defaultAiSettingsState()` / `sanitizeRouting()`）。rig49 现量：这一枚读成
+  #   `v["endpoints"]` ⇒ 库里明明有 1 条（且三档能力都勾上了）却报「端点条数读成 0」。
+  #   症状是"存进去没有"，成因是探针走错了层 —— 而"回读=0"与"真没存"在输出上长得一样
+  #   （§7 元规则一）。同一次的 `routes_reading` 走的是对的那一层，两者现在口径一致。
   local db
   db=$(prefs_db)
   if [ -z "$db" ] || [ ! -s "$db" ]; then printf 'NOFILE'; return 1; fi
   HEYTA_DB="$db" python3 - <<'PYE'
-import json, os, sqlite3
+import json, os, sqlite3, sys
 try:
     con = sqlite3.connect(f"file:{os.environ['HEYTA_DB']}?mode=ro", uri=True)
     row = con.execute("SELECT value FROM device_pref WHERE key='heyta.ai.settings'").fetchone()
-    v = json.loads(row[0]) if row else {}
-    print(len(v.get("endpoints") or []))
-except Exception as e:
-    print(f"BAD:{type(e).__name__}")
+except sqlite3.Error as e:
+    print(f"BAD:{type(e).__name__}"); sys.exit(0)
+if not row:
+    print("BAD:no-row"); sys.exit(0)
+try:
+    v = json.loads(row[0])
+except json.JSONDecodeError:
+    print("BAD:json"); sys.exit(0)
+if not isinstance(v, dict):
+    print("BAD:not-object"); sys.exit(0)
+routing = v.get("routing")
+if not isinstance(routing, dict):
+    # 读不出这一层与"库里没有端点"是两种事实：这里必须分开，否则第 3 步会把探针坏
+    # 读成"用户那一下没存进去"。
+    print("BAD:no-routing-layer"); sys.exit(0)
+print(len(routing.get("endpoints") or []))
 PYE
 }
 ops_count() {  # → op-log 里的 op 条数（整数）；读不到打印 NOFILE/BAD:*
@@ -665,6 +755,73 @@ else
   ok "回环端点下界面不索取逐功能授权（五档逐枚查过）—— 与 destination='none' 同一口径"
 fi
 
+step "6b. 逐工具授权（规则前门的必要输入）"
+# 🔴 规则表的候选集 = **用户逐枚授权过**的那些工具（ADR-0011 §3.1：默认全关）。
+#   一枚都没勾时 `resolveToolSelection` 得到 `no-tool-granted`，任何句子都到不了规则那一支
+#   —— rig51 第 7 步那两条红就是这个形状（界面报"还没有授权任何工具"，载体把它读成
+#   "规则没有先跑"）。授权位从库里回读，不拿"勾过了"当数。
+press_id "ai-tool-grant-list_tasks" || bad "勾不上逐工具授权 ai-tool-grant-list_tasks ⇒ 第 7 步没有输入"
+sleep 1
+GR=$(grants_reading)
+case "$GR" in
+  NOFILE|BAD*)
+    bad "库回读没拿到（$GR）—— 授权到底写进去没有，不许拿「勾了」当已通过"
+    ;;
+  *)
+    echo "   · 设备库回读（localApi.grants）：$GR"
+    case "$GR" in
+      *'list_tasks=1'*) ok "库里 list_tasks 的授权位 = 1（读的是被写那一侧）" ;;
+      *) bad "库里 list_tasks 仍是未授权（$GR）⇒ 第 7 步的规则前门没有候选集" ;;
+    esac
+    ;;
+esac
+
+step "6c. 种一条真任务（第 9/10 步的输入：拆解那一档从任务列表里选一条）"
+# 🔴 `breakdown-start` 的 disabled 表达式是 `selectedId === undefined || route.target === undefined`
+#   —— 拆解的对象是**已存在的任务**，全新安装的设备上列表是空的 ⇒ 恒禁用。
+#   rig51 第 9/10 步那三条红（按钮禁用 / 计数不动 / 没有提案卡）都是这一个原因，
+#   不是产品缺功能。种任务走真 UI（FAB → 输入 → 「添加」），与 verify-mobile-ios 同一条通道。
+leave_settings || { bad "设置面收不掉 ⇒ 种任务没有屏"; summary "iOS 助手真机验收"; }
+press_tab "$(zh mobile.tab.tasks)" || bad "切不到「任务」那一页 ⇒ 种任务没有屏"
+sleep 2
+TASK_TITLE="AI验收任务$(date +%m%d%H%M%S)"
+BASE_OPS=$(ops_count)
+ax "新建任务" --pressable --press --json >/dev/null 2>&1
+sleep 1
+ax - --field --set "$TASK_TITLE" --json >/dev/null 2>&1
+sleep 1
+if [ "$(jget "$(ax "添加" --pressable --exact --list --json)" enabled)" != "True" ]; then
+  ax - --field --type-text "$TASK_TITLE" >/dev/null 2>&1
+  sleep 1
+fi
+if [ "$(jget "$(ax "添加" --pressable --exact --list --json)" enabled)" = "True" ]; then
+  ok "「添加」由空输入禁用变成启用 ⇒ 标题真进了应用状态（${TASK_TITLE}）"
+else
+  bad "写进 Composer 后「添加」仍禁用 ⇒ 标题没进应用状态，第 9/10 步没有输入"
+  summary "iOS 助手真机验收"
+fi
+# 🔴 「添加」必须**逐字**匹配：退化子串会命中「排序：按添加时间」那枚 chip（陷阱 #109
+#   的同一条），于是"Composer 还开着"会被读成永远开着，而重试全打在排序面板上。
+add_btn_present() { [ "$(jget "$(ax "添加" --pressable --exact --list --json)" found)" = "True" ]; }
+for _t in 1 2 3; do
+  ax "添加" --pressable --exact --press --json >/dev/null 2>&1
+  sleep 2
+  add_btn_present || break
+  ax --dismiss-keyboard --json >/dev/null 2>&1
+done
+if add_btn_present; then
+  bad "按了「添加」而 Composer 还开着 ⇒ 那条任务没落库，第 9/10 步没有输入"
+  summary "iOS 助手真机验收"
+fi
+AFTER_OPS=$(ops_count)
+case "$AFTER_OPS" in (''|*[!0-9]) bad "op-log 条数读不出（$AFTER_OPS）" ;; esac
+if [ "$AFTER_OPS" -gt "$BASE_OPS" ]; then
+  ok "种下的任务落了库（ops ${BASE_OPS}→${AFTER_OPS}）—— 拆解那一档现在有得选"
+else
+  bad "种完任务而库里一条 op 都没多（${BASE_OPS}→${AFTER_OPS}）⇒ 第 9/10 步的输入不成立"
+  summary "iOS 助手真机验收"
+fi
+
 step "7. 判据⑦（Goal-D 那一格）：本机规则命中 ⇒ 零外发"
 open_assistant || { bad "回不到助手屏 ⇒ 这一格没有输入"; summary "iOS 助手真机验收"; }
 # 切到「AI 工具调用」那一档：规则前门只在这条链路上跑。
@@ -672,9 +829,12 @@ press_id "ai-mode-tool-calling" || bad "切不到「AI 工具调用」那一档"
 sleep 2
 # 🔴 Goal-D 的全部内容在这一行：规则表 12 条的**谓词头全是中文**，所以这一格在 Android
 #   载体上是不可达的（三条输入通道都送不进中文，记在 verify-mobile-ai.sh 第 5 步 5d）。
-#   iOS 这一侧中文走 HID 键盘（type_id），送得进去 ⇒ 这一格第一次有设备读数。
+#   iOS 这一侧中文走 **AXSetValue**（rig49 现量否证了"HID 是唯一路"那句假设：
+#   `idb ui text` 按 HID 键码表逐字符查码，非 ASCII 直接抛 "No keycode found for 列"），
+#   而"中文经 set-value 真进了 RN 状态"在 verify-mobile-ios.sh 里早已被**库级**判据证过
+#   （它按逐字去 ops 表里找那条中文标题的 op）。⇒ 这一格第一次有设备读数。
 RULE_PROMPT="列出我的任务"
-type_id "tool-input" "$RULE_PROMPT" || summary "iOS 助手真机验收"
+set_id "tool-input" "$RULE_PROMPT" || summary "iOS 助手真机验收"
 ax --dismiss-keyboard --json >/dev/null 2>&1
 sleep 1
 stub_reset
@@ -740,11 +900,24 @@ if found_id "capture-send"; then
 fi
 sleep 5
 AF=$(stub_count)
-LEAD=$(zh web.ai.settings.consentLead); LEAD_TAIL="${LEAD##*」}"
-if found_label "$LEAD_TAIL"; then
-  ok "只用本机档：发送在本机闸门处被拦下，界面给出拒绝原文"
+# 🔴 rig51 现量更正：这一格读的是**失败面**上那句拒绝（`web.ai.failure.cause.egressNotAuthorized`
+#   —— Android rig46 那张 `android-ai-2-egress-blocked.png` 上的红字逐字就是它），
+#   不是披露步里的 consentLead。目的地是回环时 consentLead **按设计不渲染**（与第 6 步
+#   "回环端点不索取逐功能授权"同一个口径），拿它当"拒绝原文"就是一条恒不成立的判据 ——
+#   而恒红比恒绿更贵：它把载体的期望错拼进产品结论里（rig51 那条红就是这么来的）。
+# 🔴 rig52 现量更正（这一条把一条真缺陷照了出来）：闸门拒绝原先在界面上渲染的是
+#   `web.ai.failure.cause.network` 那句「连不上端点。检查网络，以及端点地址是否可达。」，
+#   而真相是设备级同意没给、一个字都没发。根因在 `packages/ai` 的 catch 一律归成
+#   `network`（见 `egress.ts` 末尾那段与 `routing.ts` 的 `attemptOnce`），
+#   副作用还包括给没被访问过的端点记熔断锅（设备库实测 consecutiveFailures=2 /
+#   lastError=network）。现在归 `consent-not-granted`，判据读的就是那句新词条。
+REJECT=$(zh web.ai.failure.cause.consentNotGranted)
+if found_label "$REJECT"; then
+  ok "只用本机档：发送在本机闸门处被拦下，界面给出拒绝原文（逐字取自词条表）"
 else
-  bad "没看到那句拒绝原文（尾部「${LEAD_TAIL}」不在树里）—— 静默失败或静默成功都算这一条红"
+  bad "没看到那句拒绝原文（「${REJECT}」不在树里）—— 静默失败或静默成功都算这一条红"
+  # 取证：把"界面上到底是哪一句"带进日志，下一轮不必再靠猜（§7 元规则一：先修探针）。
+  echo "   · 取证：树里含「同意并联网」=$(found_label "同意并联网" && echo 是 || echo 否) 含「检查网络」=$(found_label "检查网络" && echo 是 || echo 否) 含「只用本机」=$(found_label "只用本机" && echo 是 || echo 否)"
 fi
 if found_label "127.0.0.1"; then
   ok "那句拒绝点名了它本来要去哪个端点（含 127.0.0.1 的 URL）⇒ 下面那条「计数没动」不是压根没走传输边界"
@@ -765,6 +938,13 @@ else
 fi
 
 step "9. 判据⑤：非回环目的地 ⇒ 授权入口出现、逐字段披露点名"
+# 🔴 先开设备级同意闸，**再**做这一格。它是绝对的（`consent-gate.ts`：没有同意一个字节
+#   都不出这台设备，回环也不例外），闸门关着时下面那句"未授权就发出去 ⇒ 计数会涨"
+#   恒不成立、而"零外发"那条恒成立 —— 两条都会被读成"授权面在起作用"，其实读到的是
+#   另一道闸。第 8 步必须在**关着**的时候跑（它判的就是那道闸），所以翻转放在这里。
+CONSENT_BEFORE=$(consent_reading)
+flip_consent_to_network || { bad "改不成「同意并联网」（改之前 = ${CONSENT_BEFORE}）⇒ 判据⑤⑥与 Goal-D 那一格都没有分母"; summary "iOS 助手真机验收"; }
+ok "设备级同意已改成「同意并联网」（库里回读 = $(consent_reading)，读的是被写那一侧）"
 # 先开「允许远程端点」，再存一枚 https 的非回环端点，然后把「拆解任务」那档指过去。
 open_ai_settings || { bad "进不去设置面的 AI 段 ⇒ 这一格没有输入"; summary "iOS 助手真机验收"; }
 press_id "ai-gate-remote" || bad "开不了「允许远程端点」"
@@ -772,6 +952,14 @@ sleep 1
 set_id "ai-endpoint-label" "$EP_REMOTE" || summary "iOS 助手真机验收"
 set_id "ai-endpoint-url" "$DEVICE_REMOTE_URL" || summary "iOS 助手真机验收"
 set_id "ai-endpoint-model" "stub-model" || summary "iOS 助手真机验收"
+# 🔴 能力必须**声明**，否则这一枚端点永远进不了「拆解任务」的候选集：
+#   `requiredCapabilities.breakdown = ['structured_output','long_context']`（`routing.ts`），
+#   而"没声明"按 ADR-0010 等于保守 = 没能力。rig52 那两条红（「拆解」禁用态 ⇒
+#   判据⑤⑥没有读数）根因就在这里，不在产品 —— 第 3 步那枚回环端点勾了三档，
+#   这一枚一枚都没勾。
+for cap in structured_output long_context; do
+  press_id "ai-endpoint-cap-$cap" || bad "勾不上能力 chip ai-endpoint-cap-$cap（非回环那枚）"
+done
 ax --dismiss-keyboard --json >/dev/null 2>&1
 press_id "ai-endpoint-add" || bad "远程端点存不下去"
 sleep 2
@@ -801,6 +989,11 @@ fi
 open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
 press_id "ai-mode-breakdown" || bad "切不到「拆解任务」"
 sleep 2
+# 🔴 拆解的对象是从任务列表里**选**的一条（`breakdown-start` 的 disabled =
+#   `selectedId === undefined || route.target === undefined`）。rig51 那两条红
+#   不是产品缺功能，是载体没选行、而 6c 之前列表压根是空的。
+press_label "$TASK_TITLE" || bad "选不中第 6c 步种下的那条任务（「${TASK_TITLE}」）⇒ 拆解那一档没有输入"
+sleep 1
 stub_reset
 B4=$(stub_count)
 if enabled_id "breakdown-start"; then
@@ -840,11 +1033,57 @@ if enabled_id "breakdown-start"; then
 else
   bad "「拆解」按钮是禁用态（路由没绑上 / 输入没写进去）⇒ 判据⑤没有读数"
 fi
-# 逐功能授权点下去（下一步换回回环时它不影响，但这一档"点得动"本身就是判据的一部分）
-press_id "ai-consent-breakdown" || bad "非回环那档的授权入口点不动"
+# 逐功能授权点下去。
+# 🔴 rig55 唯一那条红的定源（**载体时序，不是产品**）：这一指原先写在上面那段
+#   「未授权 ⇒ 零外发」**之后**，而那段早已把界面切到助手屏的失败面 ——
+#   `ai-consent-breakdown` 住在**设置面**（`AiSettingsSection.tsx:448`），此刻不在树上，
+#   `press_id` 的 scroll-into-view 报 `found=False / element-left-tree`。
+#   "点不动"与"界面把入口摘掉了"在探针输出上长得一样（§7 元规则一），而后者才是
+#   这句 bad 文案说的意思 —— 它会把人引向一条不存在的产品缺陷。
+#   修法不是放宽判据，是**回到它住的那个面**再点；点后还要从库里回读授权位：
+#   按到了 ≠ 存住了（§7 第 25 条那一族，读的是被写那一侧）。
+#   放在零外发那段**之后**是有意的：先证明没授权时一发都不出去，再给授权。
+#   换回回环那一档时它不影响 —— `needs = requiresEgressConsent(destination)` 只看地址类别，
+#   授权位只翻转按钮文案（「授权」↔「撤回」），所以下一步那条"入口消失"的成对判据照旧成立。
+open_ai_settings || bad "回不进设置面 ⇒ 这一档「点得动」没有读数"
+press_id "ai-consent-breakdown" || bad "非回环那档的授权入口点不动（此刻设置面开着、地址仍是非回环 ⇒ 这一回才是真红）"
+sleep 1
+READ_GRANT=$(routes_reading)
+if printf '%s' "$READ_GRANT" | grep -q 'breakdown=1/1'; then
+  ok "逐功能授权点下去并落进设备库（库里回读：breakdown 那一档 路由=1 / 同意=1）"
+else
+  bad "按了授权位而库里读到的不是「已授权」（$READ_GRANT）⇒ 点住了没存住"
+fi
 sleep 1
 
 step "10. 判据⑥：提案卡出现，且没点确认 ⇒ 本机库一条都不多（同趟带正向对照）"
+# 10b：闸门**开着**再跑一遍第 7 句那条规则句。第 7 步那一趟闸门还关着，它的 0→0 与
+#      "压根发不出去"在输出上长得一样；这一趟才是 Goal-D 那一格要的读数。
+open_assistant || { bad "回不到助手屏 ⇒ Goal-D 那一格没有读数"; summary "iOS 助手真机验收"; }
+press_id "ai-mode-tool-calling" || bad "切不到「AI 工具调用」那一档"
+sleep 2
+set_id "tool-input" "$RULE_PROMPT" || summary "iOS 助手真机验收"
+ax --dismiss-keyboard --json >/dev/null 2>&1
+sleep 1
+stub_reset
+B_RULE=$(stub_count)
+if enabled_id "tool-start-single"; then
+  press_id "tool-start-single" || bad "「运行」点不动（联网开着也一样）"
+  sleep 6
+  A_RULE=$(stub_count)
+  if found_label "$(zh web.ai.tools.viaRule)"; then
+    ok "联网开着时结果卡上仍是规则章 ⇒ 下面那条 0→0 归因给规则短路，而不是归因给闸门"
+  else
+    bad "联网开着时结果卡没有规则章 ⇒ 这一趟的 0→0 无法归因给规则短路"
+  fi
+  if [ "$B_RULE" = "$A_RULE" ]; then
+    ok "🔴 Goal-D 那一格（闸门开着的版本）：规则命中 ⇒ 假端点计数 ${B_RULE}→${A_RULE} 一次没动"
+  else
+    bad "联网开着而规则命中那一趟计数动了（${B_RULE}→${A_RULE}）—— 短路没生效"
+  fi
+else
+  bad "「运行」按钮是禁用态（联网开着也一样）⇒ Goal-D 那一格没有读数"
+fi
 # 把「拆解任务」换回**回环**假端点：这一发该真打出去，而假端点返回确定内容 ⇒ 提案卡出得来。
 # 🔴 这一趟同时是第 7/9 步那句「计数没动」的**分母**：同一次运行里计数会 +1，
 #   说明那两条 0→0 不是"压根没人数"（traps #335 那一族：否定判据必须出示分母）。
@@ -859,6 +1098,9 @@ fi
 open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
 press_id "ai-mode-breakdown" || bad "切不到「拆解任务」"
 sleep 2
+# 重新进面板会丢掉上一次的选中行 ⇒ 这里再选一次（选中态不是持久状态，别假设它跨挂载）。
+press_label "$TASK_TITLE" || bad "第 10 步选不中那条任务 ⇒ 提案卡判据没有输入"
+sleep 1
 BASE=$(ops_count)
 case "$BASE" in (''|*[!0-9]*) bad "op-log 基线读不出（$BASE）⇒ \"不写库\"这一条没有输入"; summary "iOS 助手真机验收" ;; esac
 stub_reset
