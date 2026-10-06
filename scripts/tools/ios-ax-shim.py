@@ -320,6 +320,27 @@ def center(n):
     return x + w // 2, y + h // 2
 
 
+def readback_after_set(fresh, node):
+    """设值之后从**新拉的树**里回读这个字段的值；读不到返回 None（调用方再退到按标签找）。
+
+    🔴 第一档按标识符（`AXUniqueId`），不是按坐标。rig50 现量的形状：
+    `id:tool-input`（RN 的 multiline 输入框）写完之后中文确实在 AXValue 里
+    （事后单独 `--list` 读得到），而按"设值前那圈 frame"在新树里找却找不到 ——
+    弹键盘会把整屏顶上去，字段坐标变了。探针读不到值与"值没写进去"在输出上
+    长得一模一样，而这句话决定红的是产品还是尺子（AGENTS §7 元规则一）。
+    """
+    uid = node.get("AXUniqueId")
+    if uid:
+        for n in fresh:
+            if n.get("AXUniqueId") == uid:
+                return n.get("AXValue")
+    tx, ty, tw, th = frame_of(node)
+    for n in fresh:
+        if is_field(n) and frame_of(n) == (tx, ty, tw, th):
+            return n.get("AXValue")
+    return None
+
+
 def bool_str(v):
     return "True" if v else "False"
 
@@ -1018,23 +1039,13 @@ def main():
         #    回读拿到的是**服务器地址的值**（http://127.0.0.1:3000）——
         #    脚本于是报"填写访问令牌失败"，而真因是**我读错了框**。
         fresh = dump_nodes(args.idb, args.companion, args.udid)
-        tx, ty, tw, th = frame_of(node)
-        back = None
-        for n in fresh:
-            if not is_field(n):
-                continue
-            if frame_of(n) == (tx, ty, tw, th):
-                back = n.get("AXValue")
-                break
+        back = readback_after_set(fresh, node)
         if back is None:
             kb = dismiss_keyboard(args.idb, args.companion, args.udid)
             if kb.get("present") == "True":
                 time.sleep(0.5)
             fresh = dump_nodes(args.idb, args.companion, args.udid)
-            for n in fresh:
-                if is_field(n) and frame_of(n) == (tx, ty, tw, th):
-                    back = n.get("AXValue")
-                    break
+            back = readback_after_set(fresh, node)
         if back is None:  # 兜底：frame 变了（布局移动）时退回按标签找
             for n in fresh:
                 if is_field(n) and label_of(n) == label_of(node):

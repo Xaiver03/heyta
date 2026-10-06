@@ -140,7 +140,7 @@ const ENDPOINTS = [
       //    两端各自有只在自家设备上现形的失效面（合成 AXLabel、软键盘摘元素、
       //    press success ≠ 控件收到事件），所以这里是两个条目而不是一个。
       'scripts/verify-mobile-ai.sh', // Android：闸门/披露/授权/提案四判据族（真模拟器 + 确定性假端点）
-      'scripts/verify-mobile-ios-ai.sh', // iOS 同一判据族（AXUniqueId 通道 + HID 中文输入）
+      'scripts/verify-mobile-ios-ai.sh', // iOS 同一判据族（AXUniqueId 通道；中文走 AXSetValue —— HID 键码表没有非 ASCII）
     ],
     shellSpecs: [],
     covers:
