@@ -978,5 +978,51 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
 与桌面这一半不冲突，因为那一档把手 `display:none`）；
 ② 只重跑了**受影响的三族**（9 passed），`check:ai-e2e` 整族与 `pnpm check` 整链这一轮没重跑；
 ③ 臂台只覆盖 `shell-no-document-scroll` + `detail-column-slot` 两族，
-`quadrant-fill`/`calendar-wheel` 的臂是臂 C 那一趟顺带跑的（13 passed，用于证明"存活"，不是证明"能红"）。
+`quadrant-fill`/`calendar-wheel` 的臂是臂 C 那一趟顺带覆盖的（13 passed，用于证明"存活"，不是证明"能红"）。
+
+### 9.16 B100 第 5 格闭合：两组红各自都不是"等人让开"，而 B90 那 8 枚**早就被修好了**
+
+第 5 格登记的是两组红。两组现在都有 rc=0 读数，但**两组的"等谁"都要更正** ——
+一组是等错了对象，另一组是根本不用再等。
+
+**① `landing` 那 1 枚（象限展厅复刻）** —— 已随 `86d00c4c` 关掉：判据从"复刻里画了几块象限"
+改成**形状无关 + 方向从产品读**（对账轴 = 产品源码里那份象限定义，不是截图上的格子数）。
+现量：`pnpm --filter @heyta/landing test` ⇒ rc=0。
+🔴 原先那格写的"等象限线那枚未提交的 `quadrant/copy.ts`"**是等错了对象**：
+红因在本仓库那**条判据自己**（它把一种布局形状写死成了契约），不在他们那枚未提交文件里。
+
+**② B90 那 8 枚 `check:ai-e2e`** —— 在**当前 HEAD 上已经不复存在**，本会话现量：
+
+```
+cd e2e && NO_COLOR=1 npx playwright test --reporter=line \
+  tests/ai-assistant.spec.ts tests/ai-row-layout.spec.ts tests/ai-tool-run.spec.ts \
+  tests/calendar-sidebar.spec.ts tests/glass-materials.spec.ts
+→ 10 passed (49.1s) / RC=0        （载体 = 隔离检出，HEAD + 本单 H11）
+```
+
+根因是详情面线 `0e9fac95`（10-06 15:37，H10 那一刀）补进 `taskPaneInColumn` 的**第三半**
+`selectedTaskId !== null`，而那段注释里就点名了"B90 那 8 枚红的另一条侧"。
+⇒ B90 把这一格登记成"等回收线自己"（06:0x 记的），而修它的那一刀 15:37 就落了 ——
+**台账比代码落后 6.5 小时**，这一格因此是"去读现量"而不是"去等人"。
+
+🔴 **一条不能省的控制实验**（`scripts/b90-attribution-control.sh`）：这 10 条是在**带着我 H11 改动**
+的那棵树上绿的，而 H11 恰好也动了 `task-organize-summary` 那颗触发器的宿主 ——
+不跑对照就会把别人修好的东西记成自己修的。做法：把 H11 那四枚源码摘回 `86d00c4c` 再跑同一批，
+然后 md5 对账还原。读数：
+
+| 臂 | 读数 |
+|---|---|
+| WITHOUT-H11（四枚源码 = `86d00c4c`） | `10 passed / RC=0` ⇒ **H11 不是它们绿的原因** |
+| RESTORED_OK | 还原后四枚文件 md5 逐字回到运行前 |
+| WITH-H11（同树复跑，作对照） | `10 passed / RC=0` |
+
+⚠️ 这台对照臂台**第一次跑就撞在自己的前置断言上**：`base.css` 的提交 blob 与工作树差 1 字节
+（`86d00c4c` 起那份就没有行尾换行，两棵工作树都有），逐字 `cmp` 报 `PRECOND_FAIL` 并**在改动任何文件之前**退出。
+⇒ 断言写对了才会在这里停，而不是跑完一趟"看起来没问题"的对照。脚本里那条容忍只放行
+"只差一枚末尾换行"，其余差异照旧响亮。
+
+⚠️ **这一格闭合的边界**（别读成"整族绿"）：只跑了 B90 点名的那 5 份 spec（10 条用例），
+`check:ai-e2e` 整族 250+ 条这一轮**没有**重跑；B90 自己那句"`pnpm check` 整链不可能 rc=0"
+的判据（`check` 串里含 `ai-e2e`）现在**不再被这 8 枚挡着**，但整链仍受别的格影响，
+本会话没有取整链读数（§9.15 边界②同一条）。
 
