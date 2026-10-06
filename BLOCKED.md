@@ -6422,3 +6422,28 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 2. 详情列仍**无无障碍名**（要新词条、中英成对，不在这一笔顺手定）。
 3. 本刀**没有**在四端当前产物上验（`pnpm reinstall:all` 未跑）；`FULLCHECK-01` 那一档仍开着。
 4. 臂台只覆盖新写的 6 条；`check:ai-e2e` 整族绿是**这一趟载体**的读数，不代替下一位在自己载体上的复跑。
+
+## B97（2026-10-06 15:4x，本会话）：`HEAD:package.json` 连续 **26 枚提交**不是合法 JSON，而这段时间所有 pnpm 门禁照常绿
+
+发现它是偶然：我要把 `check:e2e-helper-exports` 接进 `package.json`，先 `node -e` 解析了一下
+`git show HEAD:package.json` —— **FAIL**（`line 190 column 5`）。工作树里那份是 OK 的，
+所以这个坏法在本机完全不可见。
+
+| 项 | 读数 |
+|---|---|
+| 引入 | `4b31fde5`（10-06 01:34，"fix(adr 编号): 0053 撞号改判 0056 + 新门禁"）把 `"check:adr-numbering"` 加在 `}` **之后** |
+| 影响面 | 从 `4b31fde5` 到 `0e9fac95` 共 **26 枚**提交每一笔都坏；上一笔 `bd4e676e` OK。逐笔现量：`for c in $(git log --format=%h -40); do git show $c:package.json \| node -e 'JSON.parse(require("fs").readFileSync(0,"utf8"))' && echo OK; done` |
+| 后果 | 干净检出 / CI 上 pnpm 没有入口（`install`、`-r build`、`check` 全起不来）。本机这几十趟 `pnpm check`、`-r test`、`check:ai-e2e` 整族**都不算**对干净检出的证据 |
+| 修法 | `81cc0370` —— 一笔**只删那一枚尾行**（`git diff --cached --stat` = `1 file changed, 1 deletion(-)`），不新增脚本、不动 `check` 那条串 |
+| 入档 | `docs/reference/environment-traps.md` **#359**（"从工作树判仓库是好的，永远看不见 HEAD 是坏的"） |
+
+### 这一条留下的两件事（都不是我能一个人做完的）
+
+1. **`check:e2e-helper-exports` 仍没接进 `package.json`**（任务 #17）。不是忘了，是**现在接会踩人**：
+   工作树里那两处未提交的接线（`check:adr-numbering`、`check:backup-retention`）属于另外两条线，
+   我从 HEAD 那份干净基线加一行，它们提交时就会把"我这行"读成一次删除。
+   ⇒ 等它们那笔落地之后再接，接法是把脚本名加进 `scripts.check` 串（一条命令可验：
+   `node -e 'console.log(/e2e-helper-exports/.test(require("./package.json").scripts.check))'`）。
+2. **门禁里缺一条"HEAD 的 package.json 解析得开"**。`check:docs` 已经会报"本机有、仓库里没有"的
+   死链，同一形状的语法判据还没有。要补的话它必须读 `git show HEAD:package.json`
+   （不是读工作树），否则它自己就是一条永远绿的判据。登记在此，不占本单。
