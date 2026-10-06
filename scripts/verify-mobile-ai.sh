@@ -757,6 +757,10 @@ pull_prefs_db() {
     $ADB exec-out run-as "$PKG" cat "databases/heyta-device-prefs.sqlite" > "$PREFS_DB" 2>/dev/null || true
   fi
   $ADB unroot >/dev/null 2>&1 || true
+  # 🔴 这对 root/unroot 会重启 adbd ⇒ **每一枚 adb reverse 被清掉**（A/B 见 ensure_tunnel 头）。
+  #   这里补回来；补没补上**不在这里判**，由发送前那一句 tunnel_or_environment_fail 判 ——
+  #   隧道是"用到那一刻的断言"，不是库回读的副产品。
+  ensure_tunnel >/dev/null 2>&1 || true
 }
 
 # 🔴 存进去没有，只能由**被写那一侧**回答（同 routes_reading 的理由）。
@@ -990,7 +994,8 @@ rm -f "$LAPTOP_DB" "$PHONE_DB" "$STUB_PIDFILE"
 # 这里必须换号 —— 与本仓 e2e 的 4318/4319/4320 撞上时，症状是「另一套的门禁红」，
 # 而不是「本 rig 配错了」（§7 第 87 条同族）。
 STUB_PORT="$STUB_PORT" nohup "$NODE" "$HEYTA_REPO_ROOT/e2e/stub-provider.mjs" >"$STUB_LOG" 2>&1 &
-echo $! > "$STUB_PIDFILE"
+STUB_PID=$!
+echo "$STUB_PID" > "$STUB_PIDFILE"
 STUB_READY=0
 for _ in $(seq 1 20); do
   if curl -s --noproxy '*' -m 2 "${STUB_HOST_URL}/__requests" | grep -q '"count"'; then STUB_READY=1; break; fi
@@ -999,6 +1004,23 @@ done
 if [ "$STUB_READY" -ne 1 ]; then
   echo "   ❌ 假端点 20 秒内没起来（日志 tail：）"; tail -5 "$STUB_LOG"
   summary "移动端 AI 助手真机验收" "载体坏了" 1
+fi
+# 🔴 "有人答"不等于"答的是本轮这一枚"。rig39 现量的正是这一格：4399 上坐着的是**上一轮泄漏的**
+#   假端点（pid=98095，01:24 起），本轮那枚一 listen 就 EADDRINUSE 退出（那句崩溃就在
+#   $STUB_LOG 里，而 readiness 循环只看"有没有带 count 的 JSON"，于是**借用了别人的桩**照常开跑）。
+#   借用的代价不是一句不整洁：每一次 /__reset 清的是别人的计数、"绑定仍是 127.0.0.1"说的是别人的
+#   进程，而第 14 步只 kill 自己那枚**已经死了的** pid ⇒ 泄漏逐轮累积，每一轮继承上一轮的桩
+#   （traps #340）。判据形状：端口上的监听者必须逐字等于本轮 spawn 的 pid。
+#   ⚠️ 这里用 lsof 而不 kill：别人的进程**不由本脚本动手**，只把 pid 与启动时刻如实交出来。
+STUB_OWNER=$(lsof -nP -tiTCP:"${STUB_PORT}" -sTCP:LISTEN 2>/dev/null | tr -d '\r' | head -1)
+if [ "${STUB_OWNER:-无}" != "$STUB_PID" ]; then
+  echo "   ❌ ${STUB_PORT} 上的监听者不是本轮起的假端点（端口 owner=${STUB_OWNER:-无}，本轮 pid=${STUB_PID}）"
+  if [ "${STUB_OWNER:-无}" != "无" ]; then
+    echo "      占着端口的那一枚（**不动它**，等它的owner收或换端口）："
+    ps -o lstart=,command= -p "$STUB_OWNER" 2>/dev/null | head -1 | cut -c1-150
+  fi
+  tail -3 "$STUB_LOG" 2>/dev/null
+  summary "移动端 AI 助手真机验收" "假端点端口坐着上一轮遗留的进程 —— 不借用别人的桩，环境不成立" 3
 fi
 # 🔴 反假绿：计数读不出来时**不许**按 0 处理。后面每一条「零外发」判据都读这个数 ——
 #    把读不出当成 0，等于"每一条零外发自动成立"（§7 元规则 2）。
@@ -1030,6 +1052,39 @@ except Exception:
   fi
   printf '%s' "$raw"
 }
+# 🔴 隧道不是"起跑前的一次性前置"，是**用到那一刻的断言**。
+#   成因（rig39 现量，A/B 做过）：`adb root` 与 `adb unroot` 都会**重启 adbd**，
+#   而重启会把该设备上**全部 `adb reverse` 转发清掉** ——
+#     root 前：`reverse --list` = `host-20 tcp:4399 tcp:4399`
+#     root 后：`reverse --list` = 空
+#   而 `pull_prefs_db` / `pull_phone_db` 各含一对 root+unroot（读设备库那几条判据要用），
+#   于是第一次库回读（第 3 步）就把后面每一发 AI 请求依赖的通道拆了。
+#   后果不只是第 9 步红：第 5/7/8 步那几条「假端点计数 0→0」在**通道断了**与
+#   **闸门拦住了**两种状态下读数一模一样 —— 判据失去区分力，读起来却像隐私闸门成立。
+#   所以这里把"补隧道 + 正向对照"收成**一个函数**（同一判断不许写三遍，§3.2 那条教训），
+#   在每一次真发请求之前调用它，而不是只在起跑时证明一次。
+ensure_tunnel() {  # → 0 可达（成功时**不打印**，靠空输出判别）；非 0 时把原因打到 stdout
+  $ADB reverse "tcp:${STUB_PORT}" "tcp:${STUB_PORT}" >/dev/null 2>&1 || { printf 'reverse-failed'; return 1; }
+  local p0 p1
+  p0=$(stub_probe_hits) || { printf 'reach-unreadable'; return 1; }
+  $ADB shell "(printf 'GET /__probe HTTP/1.0\r\n\r\n'; sleep 2) | toybox nc -w 4 127.0.0.1 ${STUB_PORT} >/dev/null 2>&1; true" >/dev/null 2>&1
+  p1=$(stub_probe_hits) || { printf 'reach-unreadable'; return 1; }
+  # 只认"涨了"。旁边有人 curl 别的诊断路径不会顶 probeHits（stub 只数命中 /__probe 的请求），
+  # 所以"没涨"只剩一种解释：设备发不出去。
+  if [ "$p1" -le "$p0" ]; then printf 'probe-not-counted(%s→%s)' "$p0" "$p1"; return 1; fi
+  return 0
+}
+# 🔴 `summary` 必须在**父 shell** 里调用才退得了整趟：`$(ensure_tunnel)` 是子 shell，
+#   把退出写进子 shell 等于没退出（这一族已经踩过一次，见 scan_rids 的 SCAN-CAP 注释）。
+#   所以判别形状是"成功时空输出"，调用方拿字符串后自己决定退不退。
+tunnel_or_environment_fail() {  # <这一步的名字>
+  TUNNEL_WHY=$(ensure_tunnel)
+  if [ -n "$TUNNEL_WHY" ]; then
+    echo "   ❌ 设备够不到假端点（${1}：${TUNNEL_WHY}）—— 探针的通道断了，**不记为产品失败**"
+    summary "移动端 AI 助手真机验收" "设备够不到假端点（${1}）—— 环境不成立，不是产品失败" 3
+  fi
+}
+
 feature_lines() {
   curl -s --noproxy '*' -m 5 "${STUB_HOST_URL}/__requests" | python3 -c 'import sys,json
 try:
@@ -1043,9 +1098,6 @@ C0=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数�
 echo "   ✅ 假端点在 ${STUB_HOST_URL}（当前计数 ${C0}，绑定仍是 127.0.0.1）"
 
 step "设备侧端口转发：adb reverse（假端点不改绑定）"
-$ADB reverse "tcp:${STUB_PORT}" "tcp:${STUB_PORT}" || {
-  echo "   ❌ adb reverse 失败 —— 环境不成立"; summary "移动端 AI 助手真机验收" "载体坏了" 3; }
-echo "   ✅ 转发表：$($ADB reverse --list | tr -d '\r')"
 # 正向对照：从**设备里**打一次假端点。这一条证明"通了"，
 # 否则后面每一条「计数没动」都有两种解释（没通 / 真的没发）。
 #
@@ -1061,18 +1113,20 @@ echo "   ✅ 转发表：$($ADB reverse --list | tr -d '\r')"
 #    toybox nc 在 stdin 立刻 EOF 时不冲写缓冲（`-q SECS` 就是为它存在的选项）。
 #    所以发送侧必须把 stdin 按住两秒：`(printf … ; sleep 2) | toybox nc -w 4 …`。
 #    A/B 读数：管道直发 probeHits 0→0；按住 stdin 后 0→1 且响应字节也回来了。
+#
+# 🔴 补隧道 + 这一发对照**只有 `ensure_tunnel` 一份实现**（同一判断写两遍就会漂移，
+#    §3.2 那条教训的第三种面目）；起跑这一处与每一步发送前那几处走的是同一条。
 if ! $ADB shell 'which nc' 2>/dev/null | tr -d '\r' | grep -q nc; then
   echo "   ❌ 设备镜像里没有 nc —— 正向对照无法建立，载体不成立（不是产品失败）"
   summary "移动端 AI 助手真机验收" "探针二进制缺失" 3
 fi
-P0=$(stub_probe_hits) || summary "移动端 AI 助手真机验收" "reach 计数读不出" 1
-$ADB shell "(printf 'GET /__probe HTTP/1.0\r\n\r\n'; sleep 2) | toybox nc -w 4 127.0.0.1 ${STUB_PORT} >/dev/null 2>&1; true" >/dev/null 2>&1
-P1=$(stub_probe_hits) || summary "移动端 AI 助手真机验收" "reach 计数读不出" 1
-if [ "$P1" -le "$P0" ]; then
-  echo "   ❌ 设备里发出的 /__probe 没被假端点数到（${P0} → ${P1}）—— 设备够不到假端点，环境不成立，不是产品失败"
-  summary "移动端 AI 助手真机验收" "设备够不到假端点" 3
+TUNNEL_WHY=$(ensure_tunnel)
+if [ -n "$TUNNEL_WHY" ]; then
+  echo "   ❌ 设备里发出的 /__probe 没被假端点数到（${TUNNEL_WHY}）—— 设备够不到假端点，环境不成立，不是产品失败"
+  summary "移动端 AI 助手真机验收" "设备够不到假端点（起跑前置）" 3
 fi
-echo "   ✅ 设备内回环可达（/__probe 计数 ${P0} → ${P1}）"
+echo "   ✅ 转发表：$($ADB reverse --list | tr -d '\r')"
+echo "   ✅ 设备内回环可达（/__probe 正向对照 +1，实现见 ensure_tunnel）"
 
 step "0. 全新安装 + 隐私门（先选「只用本机」）"
 $ADB shell pm clear "$PKG" >/dev/null 2>&1 || true
@@ -1238,6 +1292,8 @@ pull_phone_db() {
     head -c 16 "$PHONE_DB" 2>/dev/null | grep -q 'SQLite format 3' || rm -f "$PHONE_DB" 2>/dev/null
   fi
   $ADB unroot >/dev/null 2>&1 || true
+  # 同 pull_prefs_db：这一对 root/unroot 拆掉了 adb reverse，补回来（判据在发送前那句）。
+  ensure_tunnel >/dev/null 2>&1 || true
 }
 db_count() {  # <sqlite 文件> <SQL>
   if [ ! -s "$1" ]; then printf 'NOFILE'; return 1; fi
@@ -1573,6 +1629,8 @@ if [ "$(rid_attr tool-start-assistant enabled)" != "true" ]; then
   summary "移动端 AI 助手真机验收" "路由没绑上" 1
 fi
 ok "五档路由绑定生效：tool-start-assistant 的 enabled=true（disabled 的另一半条件已由读回的输入框满足）"
+# 🔴 这一趟的第一个发送点之前证一次通道（后面的 ai-tool-send 属同一趟，不再重复）。
+tunnel_or_environment_fail "第 5 步进披露前"
 tap_rid tool-start-assistant || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 dump
 if [ -z "$(rid_center ai-tool-send)" ]; then
@@ -1581,6 +1639,10 @@ if [ -z "$(rid_center ai-tool-send)" ]; then
   summary "移动端 AI 助手真机验收" "披露步没出现" 1
 fi
 ok "点「发送（多轮）」后进的是披露步（ai-tool-send 在树里）—— 请求还没出去，用户先看披露"
+# 🔴 发送前重新证明通道（第 5 步之后已经做过好几次库回读 = 好几次 root/unroot）。
+#    这一发**预期被本机闸门拦下**、永远到不了端点，所以"计数没动"这条判据只有在一个
+#    仍然通得了的通道上才有力；通道断了时它也会读到 0→0，而那句话就不再是隐私闸门的证据。
+tunnel_or_environment_fail "第 5 步发送前"
 tap_rid ai-tool-send || summary "移动端 AI 助手真机验收" "披露步的发送点不动" 1
 sleep 4
 dump
@@ -1751,6 +1813,9 @@ tap_desc "拆解任务" || summary "移动端 AI 助手真机验收" "载体锚�
 #    于是「探针选不中那枚 chip」与「产品上的闸门」报出来是同一条 disabled 读数。
 tap_desc "$TASK_TITLE" || summary "移动端 AI 助手真机验收" "拆解没有输入（种子任务没选中）" 1
 stub_reset; G0=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
+# 🔴 本步第一发之前证一次通道：这一档要的正是"未授权 ⇒ 一次都没落到端点"，
+#    而通道断了也读成"一次都没落到端点"。
+tunnel_or_environment_fail "第 7 步第一发前"
 # 🔴 前置条件要在**被测那一侧**读到：disabled 就是"路由或任务选择没接上"，
 #    这一格由 tap_rid 自己那句话说清，这里只负责不让后面的读数替它打分。
 tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
@@ -1768,6 +1833,8 @@ fi
 # ④ 硬点一次发送：闸门必须在 socket 之前，而不是发出去再判。
 #    🔴 原先这里把坐标直接喂给 `input tap`：rid_center 取空 ⇒ 零参数 ⇒ 一声不响，
 #       而下一句读的是「有没有那句拦截说明」，于是一枚没点到的发送键会报成"闸门放行了"。
+#    🔴 发送前重新证明通道：这一档要的正是"没落到端点"，而通道断了也读成"没落到端点"。
+tunnel_or_environment_fail "第 7 步发送前"
 tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
 sleep 5
 dump
@@ -1798,6 +1865,8 @@ tap_desc "$TASK_TITLE" || summary "移动端 AI 助手真机验收" "拆解没�
 #    `input tap` 只收到零个参数 ⇒ 一声不响，随后那句读披露元素的判据就在**没点过的屏**上打分。
 # 同上：这一枚在面板底部，**没滚到位时不在树里**；tap_rid 负责滚进安全带再点，
 # 并且"不在树里 / 贴着边 / disabled"三种成因各说各的话（disabled 它也会响亮拒绝）。
+# 🔴 本步第一发之前证一次通道（"失败必须可见"与"通道断了"在界面上是同一句话）。
+tunnel_or_environment_fail "第 8 步第一发前"
 tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
 sleep 3
 dump
@@ -1814,6 +1883,10 @@ else
 fi
 shot_evidence "android-ai-3-disclosure.png"
 stub_reset; U0=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
+# 🔴 这一档的判据是「那条不可达地址的失败必须可见」。"可见"与"通道断了"在界面上是**同一句话**
+#    （都落到那句连不上端点），所以先把同一刻的通道证一次：设备此刻够得到假端点，
+#    它报的连不上才只能指 192.0.2.1 那一趟。
+tunnel_or_environment_fail "第 8 步发送前"
 tap_rid ai-send || summary "移动端 AI 助手真机验收" "发送键点不动" 1
 sleep 8
 dump
@@ -1850,8 +1923,10 @@ tap_rid profile-entry-assistant || summary "移动端 AI 助手真机验收" "�
 tap_desc "拆解任务" || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 tap_desc "$TASK_TITLE" || summary "移动端 AI 助手真机验收" "拆解没有输入（种子任务没选中）" 1
 stub_reset; S0=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
+# 🔴 「AI 拆解」这一发**就是**真正的发送（回环那一档可以没有披露步），所以通道要在它之前证。
 # 同上：这一枚在面板底部，**没滚到位时不在树里**；tap_rid 负责滚进安全带再点，
 # 并且"不在树里 / 贴着边 / disabled"三种成因各说各的话（disabled 它也会响亮拒绝）。
+tunnel_or_environment_fail "第 9 步发送前"
 tap_rid breakdown-start || summary "移动端 AI 助手真机验收" "「AI 拆解」点不到（不存在／贴边／未启用，理由见上一行）" 1
 sleep 3
 dump
@@ -1864,7 +1939,12 @@ else
   echo "   ↷ 回环这一趟没有单独披露步（本机目的地不该问）—— 直接看提案"
 fi
 dump
+# 🔴 提案卡是后面两条判据的**分母**（rig39 现量：屏上是那句"连不上端点"，
+#   而下一行照样打了 ✅「只看了提案、没点确认 ⇒ 手机库条数不变」——
+#   压根没有提案可看，"没写库"就只是"什么都没发生"的另一个名字，traps #335 的同族）。
+PROPOSAL=0
 if [ "$(has_sub "拆解结果")" = "1" ]; then
+  PROPOSAL=1
   ok "提案卡出来（「拆解结果（N 项）」那句在屏上）"
 else
   bad "没有提案卡"; screen_txt
@@ -1873,12 +1953,22 @@ shot_evidence "android-ai-4-proposal.png"
 pull_phone_db
 OPS_NOCONFIRM=$(db_count "$PHONE_DB" "select count(*) from ops")
 S1=$(stub_count) || true
-if [ "$OPS_NOCONFIRM" = "$OPS_BEFORE" ]; then
+if [ "$PROPOSAL" = "0" ]; then
+  echo "   ↷ 「不点确认不写库」这一格**未取证**：没有提案可看，比较条数没有输入（不给它打分）"
+elif [ "$OPS_NOCONFIRM" = "$OPS_BEFORE" ]; then
   ok "只看了提案、没点确认 ⇒ 手机库条数不变（${OPS_BEFORE}→${OPS_NOCONFIRM}）—— 这是「只产出提案」的设备级判据"
 else
   bad "🔴 没点确认就写了 $((OPS_NOCONFIRM-OPS_BEFORE)) 条 op —— 提案与写入的边界破了"
 fi
-echo "   ↷ 这一段假端点计数 ${S0}→${S1}（回环那一次拆解应恰好 +1）"
+# 🔴 计数期望值从"这一趟该发出去一次"推导（S0→S0+1），不是打个 ↷ 让人自己看：
+#    提案卡出现而假端点一次没被打到，说明那张卡不是这一发送回来的（缓存／上一趟残留）。
+if [ "$PROPOSAL" = "0" ]; then
+  echo "   ↷ 假端点计数 ${S0}→${S1} 不作判据（没有提案可比）"
+elif [ "$S1" = "$((S0+1))" ]; then
+  ok "回环这一趟确实打到了假端点（计数 ${S0}→${S1}，恰好 +1）—— 上面那条「没点确认不写库」有分母"
+else
+  bad "提案卡出现而假端点计数 ${S0}→${S1}（期望恰好 +1）—— 那张卡不是这一发送回来的，判据没有输入"
+fi
 
 step "10. 点「写入备注」⇒ 恰好 +1 条 TASK/UPD 且载荷键集合是 note"
 UPD_BEFORE=$(db_count "$PHONE_DB" "select count(*) from ops where json_extract(data,'\$.op.entityType')='TASK' and json_extract(data,'\$.op.opType')='UPD'")
