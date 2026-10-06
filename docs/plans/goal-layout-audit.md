@@ -832,3 +832,37 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
 被钉住的是历史那一刻而不是产品，所以凡是"照抄真应用"的对账判据，方向必须从真应用**读**出来。
 另一条：**注入接缝（env 旋钮）本身也要有唯一所有者**，多份定义等于把"变异一定打进真在跑那份"
 这个前提悄悄废掉（与 §7 第 82 条、上面 #17 那格是同一族的第三种面目）。
+
+### 9.13 固定收尾 `reinstall:all` 在隔离载体里跑完：三端有读数、iOS 端没有，外加一枚我自己装置的缺陷
+
+**为什么在载体里跑**：规范闸门 `research/tools/b-reinstall-readiness.sh` 对主检出报
+`❌ 目标树里有 140 枚未提交的打包输入 —— 装进四端的就是别人的半成品`，并明确写
+"这一条**没有**'照样跑'的旋钮，要么等所有者提交，要么传 `CARRIER=<干净载体>`"。
+⇒ 载体 `~/heyta-carriers/heyta-reinstall-1006`（`git worktree add --detach` 到当时的 `a649def8`、
+`pnpm install --frozen-lockfile`、被跟踪脏 0、软链来的 node_modules 0、
+`@heyta/domain` 逐条 `realpath` 都落在载体内）。窗口只挡在负载那一格（16 > 12），
+而那一尖峰是**我自己那趟 install** 造成的 —— 等它过去之后第 0 轮就 OPEN。
+
+| 腿 | 读数 | 看没看 |
+|---|---|---|
+| mac | `PHASE_1_EXIT=0`；`.app` 里 `web-dist` 与本机同一次构建；自截屏 `内容占比 71.4% / 主蓝命中 1127` | ✅ 看过 `.webview.png`：是共享 UI（rail + 范围列 + 收集箱 + 详情列 + 首启联网同意弹窗） |
+| mac 窗口那一枚 | 判据**不吃它**（只打 ⚠️ 不判红） | ✅ 看过：纯白框只有三个红绿灯 —— 与 10-05 记的形状一致，不是本轮缺陷，但也**不能**拿它当"渲染了共享 UI"的证据 |
+| windows | 同步 tar `sha256` 逐字相同 + 远端新鲜度对账（`web-dist/index.html` / `bridge` / `assets/*.js` 7 枚）+ `判据齐了：5 条全在位` | ✅ 看过：**是真应用**（收集箱 + 头像菜单展开「登录 / 注册」「设置」+ 联网弹窗），10-05 那枚锁屏没复发。⚠️ 但这张取证图**右侧与底部被裁**（详情列与 rail 底部图标不在画面内）⇒ 它证"装上真应用"，不证"整屏排版对" |
+| android | `release APK 64M` 重打 + `emulator-5554 全新安装成功`；`1080x2400 / 内容占比 56.7% / 主蓝命中 4001` | ✅ 看过 |
+| ios | 🔴 **本轮没有读数**：`pod install` 三趟都失败 —— 第 1/2 趟是 CocoaPods #12866 的 `path name contains null byte`，第 3 趟走到更远处死在 `git clone https://github.com/facebook/hermes.git` 的 `curl 92 HTTP/2 stream … CANCEL` + `early EOF`（取 spec 仓库的网络断流）。脚本随后自己判"沙盒未同步 ⇒ 这一轮没有跑 xcodebuild" | —— 没有图可看 |
+
+`PHASE_2_EXIT=1` ⇒ **这一轮固定收尾没做完**，不包装成"四端已装当前产物"。
+补跑挂在**两道规范闸门**后面（carrier 那道 + `verify-mobile-window-gate.sh --target b` 那道），
+起跑第 0 轮 device 那道报 `REDS=src,dev` —— `dev` 是别线此刻正在 `heyta-wt-merge` 里跑
+`verify-mobile-ai.sh`（我第一版只挂了 carrier 那道，它只查"有没有别的 reinstall-all 在跑"，
+查不到设备验收 ⇒ 已经补上；这台机器的网络环境按硬约束不动）。
+
+🔴 **顺带查出我自己那一枚张数装置的缺陷**（值得下一位当戒律）：
+`FRESH_2=2` 里**只有 1 枚属于本轮**。`/tmp/heyta-reinstall-ios.png` 的 mtime 落在本轮窗口内
+（18:50:19）而 md5 与基线不同（`765e879f…` → `d0e91b4b…`）—— 那是**别的会话**在同一小时
+覆写共享 `/tmp` 路径写出来的，而 ios 腿这轮根本没跑 xcodebuild、不可能产图。
+⇒ "新生"判据按 mtime 数会**把别人的一枚算进我的张数**。修法（下一次补跑带上的两条）：
+① 张数只数**那一腿 exit 0** 的腿；② 归档时同时落 `基线 md5 → 本轮 md5` 两列，
+只有一枚文件"mtime 新且 md5 变且腿绿"才算数。这与 10-05 那条"共享 `/tmp` 会被别的会话覆写"
+是同一条的**新面目**：那次是覆写让我误判成我的，这次是覆写让我把它**数进了分母**。
+
