@@ -67,6 +67,7 @@ import {
   createLocalApiHost,
   createTaskActions,
   mergeChecklistIntoNote,
+  assistantNeedsEgressDisclosure,
   planAssistantEgress,
   requestAssistantTurn,
   requestBreakdown,
@@ -75,6 +76,7 @@ import {
   requestPrioritize,
   requestToolCall,
   resolveAiRoute,
+  resolveToolSelection,
   toToolDescriptors,
   writeDurationIntoNote,
   type AiRouteTarget,
@@ -1221,14 +1223,28 @@ function ToolPanel(
   const assistantPlan = planAssistantEgress(props.tier);
   const fields = assistantTurn ? assistantPlan.fields : invocation.fields;
 
-  async function send(): Promise<void> {
+  // 🔴 这一句需不需要出境披露，由 `@heyta/app-host` 的规则判定回答 —— 和循环里真正
+  // 短路用的是**同一个函数**（单步走 `resolveToolSelection` + 用户逐工具授权，多轮走
+  // `assistantNeedsEgressDisclosure` + 档位授权集）。壳里再写一遍"要不要弹披露"就是
+  // 第二套口径，而它的症状是：一句本机就答得出的话先对用户承诺"这些要离开本机"，
+  // 用户点了发送却一个字都没出去 —— 那句承诺是假的（app-host 里为这条专门留了注释）。
+  function willStayLocal(nextText: string, asAssistant: boolean): boolean {
+    return asAssistant
+      ? !assistantNeedsEgressDisclosure(nextText, { tier: props.tier })
+      : resolveToolSelection(nextText, { grants }).kind === 'tool';
+  }
+
+  // 🔴 `frozen` 与 `asAssistant` 一律由调用方**当场传进来**，不在这里读 state：
+  // 规则命中的那一句话要绕过披露步**在同一次按压里**就发出去，而 `setFrozenText` /
+  // `setAssistantTurn` 在这一帧还没生效 —— 读 state 会把上一句的文本发出去。
+  async function send(frozen: string, asAssistant: boolean): Promise<void> {
     setPhase('sending');
     setConfirmed(undefined);
     if (props.toolHost === null) return;
 
-    if (assistantTurn) {
+    if (asAssistant) {
       const outcome = await requestAssistantTurn(
-        { text: frozenText },
+        { text: frozen },
         {
           routing: props.routing,
           consents: props.consents,
@@ -1241,7 +1257,19 @@ function ToolPanel(
       props.persistHealth(outcome.health);
       setAssistantOutcome(outcome);
       if (!outcome.ok) {
-        setFailure({ key: ASSISTANT_FAILURE_KEY[outcome.reason], detail: outcome.message });
+        // 🔴 与同文件另外五处失败落点同一口径：**有 `cause` 就先按原因码取句**，
+        //   面板级那个粗码（`routing-failed` / `ai-unavailable`）只在没有原因码时用。
+        //   rig45 现量：设备级同意闸拦下之后，这一面印的是「AI 服务暂时不可用。」——
+        //   而 heyta 没有"AI 服务"可不可用这件事（BYOK，端点是用户自己填的），
+        //   真相是"这台设备还没批准任何网络请求"。技术详情那行一直是对的，
+        //   撒谎的是标题 —— 与 traps #353 同一条缺陷的**第二个消费者**（第一次是捕获面）。
+        setFailure({
+          key:
+            outcome.cause !== undefined
+              ? AI_CAUSE_KEY[outcome.cause]
+              : ASSISTANT_FAILURE_KEY[outcome.reason],
+          detail: outcome.message,
+        });
         setPhase('failed');
         return;
       }
@@ -1251,7 +1279,7 @@ function ToolPanel(
     }
 
     const outcome = await requestToolCall(
-      { text: frozenText },
+      { text: frozen },
       {
         routing: props.routing,
         consents: props.consents,
@@ -1309,7 +1337,7 @@ function ToolPanel(
         routing={props.routing}
         testIdPrefix="ai-tool-"
         onSend={() => {
-          void send();
+          void send(frozenText, assistantTurn);
         }}
         onCancel={() => {
           setPhase('input');
@@ -1366,6 +1394,12 @@ function ToolPanel(
             onPress={() => {
               setAssistantTurn(false);
               setFrozenText(text);
+              // 规则会答的句子**不弹出境披露**：弹了就等于对用户说"这些话要离开本机"，
+              // 而这一条路径一个字节都不发。
+              if (willStayLocal(text, false)) {
+                void send(text, false);
+                return;
+              }
               setPhase('disclose');
             }}
           />
@@ -1377,6 +1411,10 @@ function ToolPanel(
             onPress={() => {
               setAssistantTurn(true);
               setFrozenText(text);
+              if (willStayLocal(text, true)) {
+                void send(text, true);
+                return;
+              }
               setPhase('disclose');
             }}
           />
