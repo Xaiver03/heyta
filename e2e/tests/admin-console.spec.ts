@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openApp, openSettingsView, stubLegalRecheck, stubPublicFacts } from './helpers';
+import { STUB_ORIGIN, STUB_PORT } from '../ports';
 
 /**
  * 运营管理后台：真浏览器契约（截图为判据）。
@@ -37,8 +38,8 @@ import { openApp, openSettingsView, stubLegalRecheck, stubPublicFacts } from './
  * （M3 共享 UI 迁移），并发改共享文件会撞车。第三次出现时再抽，并且一次抽干净。
  */
 
-/** 与 `playwright.config.ts` 的 stub 端口一致；这里只当"一个非空的服务器地址"用。 */
-const SERVER = 'http://127.0.0.1:4319';
+/** 与 `playwright.config.ts` 的 stub 端口同源（`e2e/ports.ts`）；这里只当"一个非空的服务器地址"用。 */
+const SERVER = STUB_ORIGIN;
 const ADMIN = `${SERVER}/api/admin`;
 /**
  * 🔴 裁 `url.pathname` 只能用**这个**长度，不能用 `ADMIN.length`。
@@ -49,7 +50,7 @@ const ADMIN = `${SERVER}/api/admin`;
  */
 const ADMIN_PATH = new URL(ADMIN).pathname;
 /** 塞了凭据之后应用会真去连它，对端由测试提供（同 `inbox.spec.ts` 的处理）。 */
-const REALTIME_WS_GLOB = 'ws://127.0.0.1:4319/api/sync/ws*';
+const REALTIME_WS_GLOB = `ws://127.0.0.1:${String(STUB_PORT)}/api/sync/ws*`;
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 20, 4, 0, 0);

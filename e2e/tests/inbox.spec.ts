@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { openApp, stubLegalRecheck, stubPublicFacts } from './helpers';
+import { STUB_ORIGIN, STUB_PORT } from '../ports';
 
 /**
  * 通知中心 + 活动（福利中心）：真浏览器契约。
@@ -27,8 +28,8 @@ import { openApp, stubLegalRecheck, stubPublicFacts } from './helpers';
  * 活动 Tab —— 面板的位置（`position: fixed` 不被 rail 裁剪）只有图能证明。
  */
 
-/** 与 `playwright.config.ts` 的 stub 端口一致；这里只当"一个非空的服务器地址"用。 */
-const SERVER = 'http://127.0.0.1:4319';
+/** 与 `playwright.config.ts` 的 stub 端口同源（`e2e/ports.ts`）；这里只当"一个非空的服务器地址"用。 */
+const SERVER = STUB_ORIGIN;
 
 const NOTIFICATIONS_BODY = {
   notifications: [
@@ -226,7 +227,7 @@ function assertNoProblems(problems: PageProblems): void {
  * 资源 404 一起藏掉。所以这里用它该有的办法：`routeWebSocket` 把这条连接
  * 接住并保持打开 —— 产品行为（连上去）照常发生，只是对端由测试提供。
  */
-const REALTIME_WS_GLOB = 'ws://127.0.0.1:4319/api/sync/ws*';
+const REALTIME_WS_GLOB = `ws://127.0.0.1:${String(STUB_PORT)}/api/sync/ws*`;
 
 test.describe('通知中心 + 活动', () => {
   test('rail 底部铃铛 → 面板两个 Tab，内容与徽标都对', async ({ page }) => {

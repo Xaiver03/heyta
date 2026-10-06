@@ -48,8 +48,31 @@ import { dirname, join } from 'node:path';
 /** 本仓根：本文件住在 `<root>/scripts/`。用于"这条进程是不是我们的"。 */
 const REPO_ROOT = realpathSync(dirname(dirname(fileURLToPath(import.meta.url))));
 
-/** 与 `e2e/playwright.config.ts` 里的两个 webServer 端口保持一致。 */
-const DEFAULT_PORTS = [4318, 4319];
+/**
+ * 与 `e2e/ports.ts` 那一族 webServer 端口保持一致（默认值逐字不变）。
+ *
+ * 🔴 为什么这里也要认这两个环境变量：清场判的是**端口**，而端口现在是**槽**。
+ * 只让配置读 env、清场读死值 ⇒ 换槽之后清的是**没人听的端口**，而真正占着的那枚没人判归属 ——
+ * 症状恰好是它该挡的那件事（跑到一半端口换人，后半程连的是别人那棵树，traps #358）。
+ */
+function portFromEnv(env, name, fallback) {
+  const raw = env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1024 || value > 65535) {
+    throw new Error(`${name}=${String(raw)} 不是一个合法端口（要 1024–65535 的整数）`);
+  }
+  return value;
+}
+
+function defaultPortsFromEnv(env) {
+  return [
+    portFromEnv(env, 'HEYTA_E2E_APP_PORT', 4318),
+    portFromEnv(env, 'HEYTA_E2E_STUB_PORT', 4319),
+  ];
+}
+
+const DEFAULT_PORTS = defaultPortsFromEnv(process.env);
 
 const ARGS = process.argv
   .slice(2)
@@ -260,6 +283,30 @@ function selfTest() {
   arm(
     '旧写法在臂 1 样本上会误判（证明臂 1 有牙）',
     legacy('/Users/x/01_PROJECTS/heyta-wt-merge/node_modules/.pnpm/vite@7/bin/vite.js --port 4318', ROOT),
+  );
+
+  // 臂 8：端口是**槽**不是常量 —— env 设了就必须跟着走（配置读 env 而清场读死值 ⇒ 清的是没人听的端口）。
+  arm(
+    'env 设了槽位时默认端口跟着走',
+    JSON.stringify(defaultPortsFromEnv({ HEYTA_E2E_APP_PORT: '4418', HEYTA_E2E_STUB_PORT: '4419' })) ===
+      '[4418,4419]',
+  );
+
+  // 臂 9：非法的槽值必须响亮拒绝，不能退成默认端口（那等于"清场清了别人那枚"）。
+  arm(
+    '非法端口值拒绝而不是退回默认',
+    ['80', '0', 'abc', '4318.5', ''].every((bad) => {
+      if (bad === '') {
+        // 空串按"未设"处理是刻意的（`FOO= pnpm …` 是本机常见的设空写法）。
+        return JSON.stringify(defaultPortsFromEnv({ HEYTA_E2E_APP_PORT: '' })) === '[4318,4319]';
+      }
+      try {
+        defaultPortsFromEnv({ HEYTA_E2E_APP_PORT: bad });
+        return false;
+      } catch {
+        return true;
+      }
+    }),
   );
 
   let bad = 0;
