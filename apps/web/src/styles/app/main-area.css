@@ -161,6 +161,47 @@
 }
 
 /*
+ * 🔴 工单 H11「外壳不滚」桌面那一半：滚动发生在**这一层**。
+ *
+ * 为什么挂在 `.ht-content` 而不是 `.ht-main`（塌缩态那边是挂在 `.ht-main` 上的）。
+ * 两条**实测**理由，都带读数（载体：`~/heyta-carriers/heyta-reinstall-1006` @ `86d00c4c`
+ * + 本单改动，1280×700，`e2e/playwright.parallel.config.ts` 4418/4419）：
+ *
+ *   1. **页头会跟着滚走**。`.ht-header` 与内容列是 `.ht-main` 的两个兄弟，滚动挂在
+ *      `.ht-main` 上就等于把常驻栏一起滚 —— 臂 D 让 `shell-no-document-scroll` 的 W1 红
+ *      （它量的是"滚完内容之后内容列的顶边还在原位"）。
+ *   2. **详情列那枚把手会给这一栏长出 4px 横向可滚范围**。把手有意骑在 `.ht-main`
+ *      右边缘之外（`base.css` 的 `.ht-app__detail-resizer`：`inset-inline-end: -0.5 × space-2`），
+ *      现量：挂在 `.ht-content` 时 `.ht-main` 是 `overflow: visible/visible`、
+ *      `scrollWidth 628 / clientWidth 624` 那 4px 差**不**成为滚动范围；
+ *      搬到 `.ht-main` 之后它的 computed `overflow-x` 从 `visible` 变 `auto`，
+ *      同一组读数变成 `scrollWidth 628 / clientWidth 624` ⇒ 一条只装得下 4px 的横滚。
+ *
+ * ⚠️ **我最初写的理由是错的，这里把它否证掉**：那条是照抄 `sidebar.css` 里
+ * "直接写 `overflow-y: auto` 会把 `overflow-x` 变成 `clip` ⇒ 把手命中带被裁掉一半 ⇒
+ * 在那儿、拖不动"。臂 D 探针实测：两种形态下把手中心 `elementFromPoint` **都**命中它自己
+ * （`hitIsResizer: true`，`overhangRight: 4`）—— 因为 `visible` 配 `auto` 时算出来的是
+ * `auto`（可滚）而不是 `clip`（裁掉）。那条历史理由在它自己的文件里可能仍然成立
+ * （那里写的是 `overflow-x: clip` 一档），但**不能**当成本单的理由。
+ * 记下来是为了不让下一个人拿一条没在自己场景里验过的历史结论再推一遍。
+ *
+ * ⚠️ 这里**不需要** `min-block-size: 0`（第一版写了，删了）：flex 项的自动最小尺寸
+ *   只在 `overflow: visible` 时才等于内容高度，而这一层现在正是 `overflow-y: auto` ⇒
+ *   它已经归零。臂台证据：拿掉那一行之后 `quadrant-fill`/`calendar-wheel`/
+ *   `detail-column-slot`/`shell-no-document-scroll` **13 条全绿**（臂 C 存活），
+ *   也就是说没有任何一条判据需要它 —— 留着一行"看起来更安全"的声明就是下一漂移的起点。
+ *
+ * ⚠️ 只在 ≥769px 生效：≤768px 那一档早已有 `.ht-main { overflow-y: auto }`，
+ * 再叠一层会把塌缩态的滚动参照系改成两层嵌套，而那一批几何判据（含设备侧脚本）
+ * 量的是 `.ht-main`。这一单的改动范围是"桌面"，不是"顺手统一两种模型"。
+ */
+@media (min-width: 769px) {
+  .ht-content {
+    overflow-y: auto;
+  }
+}
+
+/*
  * 日历那一屏的宿主层（`CalendarView.tsx` 里挂滚轮翻月监听的那个 div）。
  *
  * 🔴 它必须把 `.ht-content` 的**确定高度**传下去。`.ht-content` 是 flex 列且有确定高度，

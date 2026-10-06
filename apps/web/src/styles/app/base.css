@@ -35,7 +35,36 @@
 
   /* 默认两层 + 详情列：rail + main + detail（四象限/习惯/番茄钟… 没有范围列） */
   grid-template-columns: var(--ht-layout-rail-width) 1fr var(--ht-detail-track);
-  min-height: 100dvh;
+  /*
+   * 🔴 工单 H11「外壳不滚」：**钉死，不是 `min-height`**，而且行轨必须写 `minmax(0, 1fr)`。
+   *
+   * 为什么原来那条是错的：`min-height` 之下网格行仍是默认的 `auto`，
+   * 于是**谁的内容最高，谁就替整篇文档定高** —— 症状不是难看，是三条：
+   *   · rail 与详情栏明明各自 `block-size: 100dvh`，却被这根长柱子带着**整页滚上去**
+   *     （`inbox.css` 里那条"试过给 rail 加 `position: sticky`、结果头像菜单被
+   *     `.ht-sidebar` 盖住 ⇒ 60s 超时"的记录，最后那句"代价如实说清楚：主列比视口高时
+   *     整页会滚，rail 跟着滚上去"记的就是这一档，它当时只能把**这一单**开出来）；
+   *   · 文档最大滚动量由**另一栏**的内容高度决定 ⇒ 一栏收起表单会让文档变矮 ⇒
+   *     浏览器把 `scrollY` 夹到新最大值 ⇒ 任务行在**静止的指针底下**跳 52px，
+   *     `click` 的 target 变成共同祖先，用户看到"第一下点击没有反应"（BLOCKED.md **B94** §3，
+   *     判据在 `e2e/tests/shell-sidebar-height.spec.ts`）；
+   *   · `.ht-sheet`（设置浮层，`position: absolute; inset: 0; overflow-y: auto`）挂在
+   *     `.ht-content` 里，而 `.ht-content` 当时和内容一样高（真浏览器量到 2365px）⇒
+   *     它自己的 `overflow-y: auto` 永远不触发、那枚 `position: sticky` 的退出口
+   *     贴在"滚动容器的可视区"这条注释所说的**前提本来不成立**。钉死之后才成立。
+   *
+   * 两条要一起改，缺一不可：只把 `min-height` 换成 `height` 而不动行轨，
+   * 那条 `auto` 行的**下限是内容高度**（网格项 `min-height: auto`），
+   * 容器再钉死也压不回去 ⇒ 必须是 `minmax(0, 1fr)`。
+   * 塌缩态（≤768px）本来就是这个形状（`narrow.css` 开头那段 W4 的记录），
+   * 这一单补的是它剩下的桌面那一半。
+   *
+   * ⚠️ 滚动**不挂在 `.ht-main` 上**，挂在里面的 `.ht-content`（见 `main-area.css`
+   * 那段带读数的理由：页头会跟着滚走 + 详情列把手那 4px 会变成一条只装得下 4px 的横滚）。
+   * 塌缩态挂在 `.ht-main` 上不冲突，因为那一档把手是 `display: none`。
+   */
+  grid-template-rows: minmax(0, 1fr);
+  height: 100dvh;
   background: var(--ht-color-background);
 }
 
