@@ -164,35 +164,121 @@ async function signIn(page: Page, email: string): Promise<void> {
   await expect(form, '口令登录必须把面板关掉（面板还开着 = 登录没成）').toBeHidden({ timeout: 20_000 });
 }
 
-/** 在同步设置里补端到端加密口令并保存（保存顺带触发一次同步）。 */
-async function setE2eePassword(page: Page): Promise<void> {
-  await page.getByRole('button', { name: '同步设置' }).click();
-  const dialog = page.getByRole('dialog', { name: '同步设置' });
-  await expect(dialog).toBeVisible();
-  // 🔴 全新实例上这张面板是**另一档**：先「创建加密数据钥匙」，再把钥匙包发布出去。
-  // 上一版只认「已有钥匙」那一档的 label（`web.sync.password.label`），所以在自己
-  // 造的干净栈上必然等不到 —— 外人照着指南走的第一条路，验收从没驱动过它。
-  const create = dialog.getByTestId('vault-create-form');
-  if (await create.isVisible()) {
-    await create.getByTestId('vault-create-passphrase').fill(E2EE_PASSWORD);
-    await create.getByTestId('vault-create').click();
-    const pending = dialog.getByTestId('vault-pending');
-    await expect(pending, '创建之后必须进入待发布，并且给出恢复码').toBeVisible();
-    await expect(dialog.getByTestId('vault-recovery-display')).not.toHaveText('');
-    await pending.getByTestId('vault-publish').click();
-    await expect(
-      dialog.getByTestId('vault-ready'),
-      '发布后界面必须说出钥匙就绪（否则同步只会在后台失败）',
-    ).toBeVisible({ timeout: 30_000 });
-  } else {
-    await dialog.getByLabel('端到端加密口令').fill(E2EE_PASSWORD);
-  }
-  await dialog.getByRole('button', { name: '保存并同步' }).click();
-  await expect(dialog).toBeHidden();
+/**
+ * 打开 **设置 → 同步** 那一节，返回它的定位符。
+ *
+ * 🔴 H9 第 3 刀（2026-10-06）之后「同步设置」不再是 rail 齿轮点开的同级对话框，
+ * 而是设置浮层里的**一节**：`SyncSettingsPanel.tsx` 是个带 `aria-label` 的
+ * `<section>` ⇒ 可访问角色是 **region**，`getByRole('dialog', { name: '同步设置' })`
+ * 从此恒不命中（裸 `getByRole('dialog')` 命中的是设置浮层，语义完全不同）。
+ * 唯一路径是头像 → 设置；这一节住在**可滚动的长列表**里，不先
+ * `scrollIntoViewIfNeeded()` 就点不到密钥表单、那张截图也拍的是浮层顶部。
+ *
+ * 🔴 这一份是**本套件自己的** helper：本套件跑在真容器的 `/app/` 子路径上，
+ * 入口和语言钉法都跟离线套件不同，不把两套夹具接起来（不去 import
+ * `e2e/tests/helpers.ts` 里那份同名的 `openSettingsView`）。
+ */
+async function openSyncSection(page: Page): Promise<Locator> {
+  await page.getByTestId('account-menu-avatar').click();
+  await page.getByTestId('account-menu-settings').click();
+  const section = page.getByTestId('sync-settings-panel');
+  await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();
+  await section.scrollIntoViewIfNeeded();
+  return section;
 }
 
+/** 退出设置浮层：走它自己的 ✕（`settings-sheet-close`），不是凭空按 Esc。 */
+async function closeSettingsSheet(page: Page): Promise<void> {
+  await page.getByTestId('settings-sheet-close').click();
+  await expect(page.getByTestId('settings-sheet'), '设置浮层没关上').toHaveCount(0);
+}
+
+/** 在 设置 → 同步 那一节里补端到端加密口令并保存（保存顺带触发一次同步）。 */
+async function setE2eePassword(page: Page): Promise<void> {
+  const section = await openSyncSection(page);
+  // 🔴 全新实例上这一节是**另一档**：先「创建加密数据钥匙」，再把钥匙包发布出去。
+  // 上一版只认「已有钥匙」那一档的 label（`web.sync.password.label`），所以在自己
+  // 造的干净栈上必然等不到 —— 外人照着指南走的第一条路，验收从没驱动过它。
+  //
+  // 🔴 **分档必须有界地等，不许用瞬时 `isVisible()`**（2026-10-06 实测）：这两档都由
+  // `!loading && …` 决定，而 `loading` 是"钥匙包 refresh 还没回来"。读那一瞬间还没决定档位
+  // ⇒ 走 else ⇒ 去等一个界面根本不会出现的 label ⇒ 症状是整条用例超时（本机负载 16–18 时
+  // S2/S3/S4 **三条同时**死在 `locator.fill` 的等待上，而失败快照里「创建钥匙」那档就在屏幕上）。
+  // 现在两档各等各的锚点，两档都没出现就**点名报错** —— 静默走 else 比红更糟。
+  const create = section.getByTestId('vault-create-form');
+  const unlock = section.getByTestId('vault-unlock-form');
+  const seen = await Promise.race([
+    create.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'create' as const).catch(() => undefined),
+    unlock.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'unlock' as const).catch(() => undefined),
+  ]);
+  if (seen === 'create') {
+    await create.getByTestId('vault-create-passphrase').fill(E2EE_PASSWORD);
+    await create.getByTestId('vault-create').click();
+    const pending = section.getByTestId('vault-pending');
+    await expect(pending, '创建之后必须进入待发布，并且给出恢复码').toBeVisible();
+    await expect(section.getByTestId('vault-recovery-display')).not.toHaveText('');
+    // 🔴 「确认并发布」在**照抄一遍恢复码**之前是 disabled（`VaultSettingsPanel.tsx:377` 那个
+    // `vault-recovery-confirm` + `:383` 的 `disabled=… pendingCode.length === 0`）。
+    // 上一版直接点它 ⇒ Playwright 反复"element is not enabled"直到用例预算耗尽，
+    // 症状和"产品发不出去"一模一样，而红面会记在产品头上。这里把界面上那串码**读回来再填回去** ——
+    // 这一步同时是判据：界面说"只显示这一次"，探针就必须能从界面拿到它。
+    // ⚠️ 码本身**不进日志**（AGENTS §10：恢复码不得出现在证据里），只打印它的长度。
+    const recovery = (await section.getByTestId('vault-recovery-display').innerText()).trim();
+    expect(recovery.length, '恢复码必须真的显示出来').toBeGreaterThan(8);
+    await section.getByTestId('vault-recovery-confirm').fill(recovery);
+    await expect(pending.getByTestId('vault-publish')).toBeEnabled({ timeout: 30_000 });
+    await pending.getByTestId('vault-publish').click();
+    await expect(
+      section.getByTestId('vault-ready'),
+      '发布后界面必须说出钥匙就绪（否则同步只会在后台失败）',
+    ).toBeVisible({ timeout: 30_000 });
+  } else if (seen === 'unlock') {
+    // 🔴 这一支以前写的是 `getByLabel('端到端加密口令')`。**那句话在产品里是有的**
+    // （`web.sync.password.label` = 「端到端加密口令」，现量 `packages/i18n/src/locales/zh-CN.ts:701`），
+    // 但它长在 `SyncSettingsPanel.tsx` 的 **`!vaultMode` 那一块**（legacy 口令字段），
+    // 而走到这一支时 `vaultMode` 已经是真（`sync.accountId` 非空 —— 托管登录会把
+    // `session.user.id` 交进去，`features/auth/store.ts:323`）⇒ 那一块根本不在 DOM 里，
+    // 这个 label 在这档位上恒不命中。钥匙面板两档的输入框用的是另一条词条
+    // `web.sync.vault.passphrase`（中文值「加密口令」，`VaultSettingsPanel.tsx:294` 与 `:327`）。
+    // 加上这一支还漏了第二件事 —— 填完口令**从没点「解锁」**，直接去点「保存并同步」。
+    // 两条叠在一起，这一支从写下那天起就不可能走通，而它此前从没被执行过：
+    // 只有 S3 的**第二台设备**（服务端已有钥匙包、本地空库）才会落到解锁档。
+    // ⇒ 判据换成产品自己给的 testid 锚点（`vault-passphrase` 只在解锁档：`:329`），
+    //   并把"解锁成功"那句话真的断出来。
+    await unlock.getByTestId('vault-passphrase').fill(E2EE_PASSWORD);
+    await expect(unlock.getByTestId('vault-unlock'), '口令填了就必须允许解锁').toBeEnabled({ timeout: 30_000 });
+    await unlock.getByTestId('vault-unlock').click();
+    await expect(
+      section.getByTestId('vault-unlocked'),
+      '解锁之后界面必须进入"钥匙已解锁"那一档（否则同步只会在后台失败）',
+    ).toBeVisible({ timeout: 30_000 });
+  } else {
+    throw new Error(
+      '设置 → 同步 那一节里的钥匙面板既没有 `vault-create-form`（创建档）也没有 `vault-unlock-form`（解锁档）' +
+        '⇒ 探针不认识当前档位；不把这一格读成产品坏了，也不静默走 else',
+    );
+  }
+  await section.getByRole('button', { name: '保存并同步' }).click();
+  // 🔴 旧断言 `expect(dialog).toBeHidden()` 的载体没了：这一节住在设置浮层里，
+  // 保存不再关任何东西。这里必须**自己把浮层收掉**再判它离开 DOM ——
+  // 不收的话 S2 之后要点头像、S3/S4 之后要填任务输入框，全都在浮层底下，
+  // 而那张 `s2-signed-in.png` 拍到的会是设置页（§6.2 规定一：图里得真是那件事）。
+  await closeSettingsSheet(page);
+  await expect(
+    section,
+    '关掉设置之后那一节还在 DOM 里 ⇒ 它其实是常驻浮层，不是设置的一部分',
+  ).toHaveCount(0);
+}
+
+/**
+ * 同步那一枚所在的容器（rail 底部）。
+ *
+ * 🔴 H9 第 1 刀之后没有「立即同步」按钮，`div[role="status"]` + `has:` 那条
+ * 结构判据恒不命中；容器 testID 才是"结构上唯一"那一条，整句状态文案常驻其内
+ * （与 `e2e/multi-end/helpers.ts` 的 `statusBar` 同理由）。
+ */
 function statusBar(page: Page) {
-  return page.locator('div[role="status"]').filter({ has: page.getByLabel('立即同步') });
+  return page.getByTestId('sync-rail');
 }
 
 const credentialsOf = (page: Page) =>
@@ -288,7 +374,7 @@ test('S3 建一条任务同步出去，全新设备只能从服务端读到它',
   await composer.press('Enter');
   await expect(row).toBeVisible();
 
-  await statusBar(page).getByLabel('立即同步').click();
+  await page.getByTestId('sync-rail-action').click();
   await expect(statusBar(page)).toContainText('已同步', { timeout: 30_000 });
   await page.screenshot({ path: 'selfhost-stack-results/s3-device-a-synced.png' });
 

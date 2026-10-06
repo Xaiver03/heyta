@@ -4,7 +4,7 @@ import { fillVaultSecret } from './privacy';
  * Traces/video are disabled by playwright.vault.config.ts. Captured requests and
  * synthetic secrets remain in memory; failures expose only boolean predicates.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createServer } from 'node:http';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +15,33 @@ import {
   enableAllModules, pinChineseUi, decidePrivacyConsent, addTask, rowFor,
   switchView, configureEndpoint, CAP_STRUCTURED_OUTPUT, CAP_LONG_CONTEXT,
 } from '../tests/helpers.js';
+
+/**
+ * 进 **设置 → 同步** 那一节（工单 H9 第 3 刀，2026-10-06 之后的形状）。
+ *
+ * 🔴 「同步设置」不再是 rail 齿轮点开的同级对话框，而是设置浮层里的**一节**：
+ * `SyncSettingsPanel.tsx` 是个带 `aria-label` 的 `<section>` ⇒ 可访问角色是
+ * **region**，`getByRole('button', { name: '同步设置' })` 与
+ * `getByRole('dialog', { name: '同步设置' })` 从此都不再命中。
+ * 唯一路径是头像 → 设置（只走 testID ⇒ 语言中立）；这一节住在可滚动的长列表里，
+ * 不先 `scrollIntoViewIfNeeded()` 就点不到密钥表单。
+ * 本套件自己的 helper，不借用 `e2e/tests/helpers.ts` 那份 —— 不同 testDir、
+ * 不同 config，两套夹具接起来会让离线套件的改动连带改红这一套。
+ */
+async function openSyncSection(page: Page): Promise<Locator> {
+  await page.getByTestId('account-menu-avatar').click();
+  await page.getByTestId('account-menu-settings').click();
+  const section = page.getByTestId('sync-settings-panel');
+  await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();
+  await section.scrollIntoViewIfNeeded();
+  return section;
+}
+
+/** 退出设置浮层：旧的「关闭同步设置」✕ 随 H9 第 3 刀一起没了。 */
+async function closeSyncSettings(page: Page): Promise<void> {
+  await page.getByTestId('settings-sheet-close').click();
+  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
+}
 
 test('unlocked vault exports only the disclosed task fields to the breakdown provider', async ({ browser, request }) => {
   const api = process.env['HEYTA_VAULT_TEST_SERVER'];
@@ -56,7 +83,7 @@ test('unlocked vault exports only the disclosed task fields to the breakdown pro
     await pinChineseUi(page);
     await page.goto('/');
     await decidePrivacyConsent(page, 'accepted');
-    await page.getByRole('button', { name: '同步设置', exact: true }).click();
+    await openSyncSection(page);
     const passphrase = 'synthetic egress vault passphrase';
     await fillVaultSecret(page.getByTestId('vault-create-passphrase'), passphrase);
     await page.getByTestId('vault-create').click();
@@ -65,7 +92,7 @@ test('unlocked vault exports only the disclosed task fields to the breakdown pro
     await fillVaultSecret(page.getByTestId('vault-recovery-confirm'), recovery);
     await page.getByTestId('vault-publish').click();
     await expect(page.getByTestId('vault-ready')).toBeVisible();
-    await page.getByRole('button', { name: '关闭同步设置', exact: true }).click();
+    await closeSyncSettings(page);
 
     const target = 'DISCLOSED_TARGET_TASK';
     const unrelated = 'UNDISCLOSED_OTHER_TASK';
@@ -81,7 +108,10 @@ test('unlocked vault exports only the disclosed task fields to the breakdown pro
     await expect(page.getByRole('button', { name: '暂停专注', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '中止', exact: true }).click();
     await switchView(page, '任务');
-    await page.getByRole('button', { name: '立即同步', exact: true }).click();
+    // 🔴 H9 第 1 刀之后没有「立即同步」那颗按钮了：rail 底部只剩**同一枚**，
+    // 状态是「冲突」时它的点击语义才会改成打开冲突对话框（判据在共享层
+    // `syncStatusAffordances`）。这一趟前面没有任何冲突写入，所以它仍是"再同步一次"。
+    await page.getByTestId('sync-rail-action').click();
     // Positive controls: excluded entities really exist in the same encrypted vault.
     const vaultHeader = Buffer.from('heyta-vault-op/\x01', 'ascii');
     await expect.poll(async () => {

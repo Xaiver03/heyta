@@ -2,7 +2,7 @@ import { fillVaultSecret } from './privacy';
 /** Real production UI + HTTP/PG. Independent browser contexts are devices;
  * no routes or key APIs are mocked. Only authentication is pre-established.
  */
-import { expect, test, type Browser, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { decidePrivacyConsent } from '../tests/helpers';
@@ -29,9 +29,59 @@ async function device(browser: Browser, credentials: { baseUrl: string; token: s
   return { context, page, errors };
 }
 
-async function settings(page: Page) {
-  await page.getByRole('button', { name: 'Sync settings', exact: true }).click();
-  return page.getByRole('dialog', { name: 'Sync settings', exact: true });
+/**
+ * 进 **设置 → 同步** 那一节（工单 H9 第 3 刀，2026-10-06 之后的形状）。
+ *
+ * 🔴 它不再是 rail 齿轮点开的同级对话框：`SyncSettingsPanel.tsx` 是一个带
+ * `aria-label` 的 `<section>` ⇒ 可访问角色是 **region**，所以旧的
+ * `getByRole('dialog', { name: 'Sync settings' })` 恒不命中，而裸
+ * `getByRole('dialog')` 会命中**设置浮层**本身（语义完全变了）。
+ * 真实路径只剩头像 → 设置（testID 走，语言中立 —— 这一套是英文界面）。
+ * ⚠️ 这一节住在可滚动的长列表里 ⇒ 必须 `scrollIntoViewIfNeeded()` 才点得到。
+ *
+ * 🔴 **浮层已开着就不重复点**：调用点里有一组是"同一台设备连着进两次这一节"。
+ * 旧形状下每次点齿轮重开那个同级对话框，成本为零；现在浮层开着的时候头像在它
+ * 底下，再点一次会被判成 "…intercepts pointer events" —— 那是探针抢跑，不是产品坏了。
+ *
+ * 这一份是本套件自己的 helper，不去 import `e2e/tests/helpers.ts` 里那份
+ * `openSettingsView` —— 不同 testDir、不同 config，两套夹具不该接起来。
+ */
+async function settings(page: Page): Promise<Locator> {
+  await openSettingsSheet(page);
+  const section = page.getByTestId('sync-settings-panel');
+  await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();
+  await section.scrollIntoViewIfNeeded();
+  return section;
+}
+
+/**
+ * 打开**设置浮层**（头像 → 设置），已经开着就不重复点。
+ *
+ * 🔴 「设置」不在 rail 上，它在头像菜单里（`AccountMenu.tsx` 的
+ * `account-menu-settings`）；只走 testID ⇒ **语言中立**，英文界面这一套也走得到。
+ * 主题开关同样住在浮层里（H9 第 1 刀从页头搬进 设置 → 显示），所以它和
+ * 上面那一节共用同一条到达路径。
+ */
+async function openSettingsSheet(page: Page): Promise<void> {
+  if (await page.getByTestId('settings-sheet').isVisible().catch(() => false)) return;
+  await page.getByTestId('account-menu-avatar').click();
+  await page.getByTestId('account-menu-settings').click();
+}
+
+/**
+ * 退出设置浮层。
+ *
+ * 🔴 旧的那颗「关闭同步设置」✕ 随 H9 第 3 刀一起没了（同步设置不再是浮层）；
+ * 这一层的出口是它自己的 `settings-sheet-close`。顺带断一句"那一节离开了 DOM"——
+ * 它取代旧 `toBeHidden()` 想证的那件事，而且口径更硬：常驻的同级浮层会当场红。
+ */
+async function closeSyncSettings(page: Page): Promise<void> {
+  await page.getByTestId('settings-sheet-close').click();
+  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
+  await expect(
+    page.getByTestId('sync-settings-panel'),
+    '关掉设置之后那一节还在 DOM 里 ⇒ 它其实是常驻浮层，不是设置的一部分',
+  ).toHaveCount(0);
 }
 
 async function confirmCode(page: Page) {
@@ -71,11 +121,11 @@ test('three devices recover, rotate root, and rebuild tasks from the migrated se
     await shot(a.page, 'pg-01-created');
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
     await shot(a.page, 'pg-01-created');
-    await a.page.getByRole('button', { name: 'Close sync settings' }).click();
+    await closeSyncSettings(a.page);
     const title = `vault real task ${Date.now()}`;
     await a.page.locator('input[placeholder^="Add a task"]').fill(title);
     await a.page.locator('input[placeholder^="Add a task"]').press('Enter');
-    await a.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await a.page.getByTestId('sync-rail-action').click();
     await expect.poll(async () => {
       const response = await request.get(`${api}/api/sync/key-migration/inventory`, { headers: { authorization: `Bearer ${account.token}` } });
       expect(response.status()).toBe(200);
@@ -94,8 +144,8 @@ test('three devices recover, rotate root, and rebuild tasks from the migrated se
     await b.page.getByTestId('vault-change-passphrase').click();
     await confirmCode(b.page);
     await expect(b.page.getByTestId('vault-ready')).toBeVisible();
-    await b.page.getByRole('button', { name: 'Close sync settings' }).click();
-    await b.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await closeSyncSettings(b.page);
+    await b.page.getByTestId('sync-rail-action').click();
     await shot(b.page, 'pg-03-restored-task');
     await expect(b.page.getByText(title, { exact: true }).first()).toBeVisible();
 
@@ -117,9 +167,18 @@ test('three devices recover, rotate root, and rebuild tasks from the migrated se
     await fillVaultSecret(c.page.getByTestId('vault-passphrase'), rotatedPassphrase);
     await c.page.getByTestId('vault-unlock').click();
     await expect(c.page.getByTestId('vault-ready')).toBeVisible();
-    await c.page.getByRole('button', { name: 'Close sync settings' }).click();
-    await c.page.getByRole('button', { name: 'Sync now', exact: true }).click();
-    await c.page.getByRole('button', { name: 'Switch to dark theme', exact: true }).click();
+    await closeSyncSettings(c.page);
+    await c.page.getByTestId('sync-rail-action').click();
+    // 🔴 主题开关也随 H9 第 1 刀从页头搬进了 **设置 → 显示**（`App.tsx` 浮层里那枚
+    //    `theme-toggle`，旧的可访问名「Switch to dark theme」现在是它的可见文字）。
+    //    口径不变：必须点**真开关** —— 往 localStorage 塞 `heyta.theme` 或
+    //    `emulateMedia({colorScheme:'dark'})` 只改系统偏好，应用一旦记到"用户显式选过"
+    //    那一档就再也不看它，于是"用例名写着暗色、量的是亮色"（离线套件 `switchTheme`
+    //    记过的那个假绿）。开→点→**关**：不关的话下一张图拍的是设置浮层，
+    //    而不是它声称在量的那台暗色应用（§6.2 规定一：图里得真是那件事）。
+    await openSettingsSheet(c.page);
+    await c.page.getByTestId('theme-toggle').click();
+    await closeSyncSettings(c.page);
     await shot(c.page, 'pg-05-new-device-after-rotation-dark');
     await expect(c.page.getByText(title, { exact: true }).first()).toBeVisible();
   } catch (error) {
@@ -148,11 +207,11 @@ test('migration resumes after a browser restart and cancellation releases real s
     await a.page.getByTestId('vault-create').click();
     await confirmCode(a.page);
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
-    await a.page.getByRole('button', { name: 'Close sync settings' }).click();
+    await closeSyncSettings(a.page);
     const title = `resume migration task ${Date.now()}`;
     await a.page.locator('input[placeholder^="Add a task"]').fill(title);
     await a.page.locator('input[placeholder^="Add a task"]').press('Enter');
-    await a.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await a.page.getByTestId('sync-rail-action').click();
     await expect.poll(async () => (await (await request.get(`${api}/api/sync/key-migration/inventory`, { headers })).json()).operations.length).toBeGreaterThan(0);
     await settings(a.page);
     await fillVaultSecret(a.page.getByTestId('vault-new-passphrase'), rotatedPassphrase);
@@ -268,12 +327,12 @@ test('a task added during root migration syncs with the new generation after pub
     await a.page.getByTestId('vault-rotate-root').click();
     await confirmCode(a.page);
     await expect.poll(() => inventorySeen, { message: 'production migration reached the inventory barrier' }).toBe(true);
-    await a.page.getByRole('button', { name: 'Close sync settings' }).click();
+    await closeSyncSettings(a.page);
     const title = `task created during migration ${Date.now()}`;
     await a.page.locator('input[placeholder^="Add a task"]').fill(title);
     await a.page.locator('input[placeholder^="Add a task"]').press('Enter');
     await expect(a.page.getByText(title, { exact: true }).first()).toBeVisible();
-    await a.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await a.page.getByTestId('sync-rail-action').click();
     await shot(a.page, 'pg-concurrent-local-task');
     // The local edit must remain responsive while its network upload waits.
     const during = await request.get(`${api}/api/sync/key-migration/inventory`, { headers });
@@ -287,8 +346,8 @@ test('a task added during root migration syncs with the new generation after pub
     await fillVaultSecret(b.page.getByTestId('vault-passphrase'), rotatedPassphrase);
     await b.page.getByTestId('vault-unlock').click();
     await expect(b.page.getByTestId('vault-ready')).toBeVisible();
-    await b.page.getByRole('button', { name: 'Close sync settings' }).click();
-    await b.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await closeSyncSettings(b.page);
+    await b.page.getByTestId('sync-rail-action').click();
     await shot(b.page, 'pg-concurrent-new-device');
     await expect(b.page.getByText(title, { exact: true }).first()).toBeVisible();
     await shot(b.page, 'pg-concurrent-new-device');
@@ -420,8 +479,8 @@ test('legacy history survives first vault publication and explicit migration to 
     await fillVaultSecret(b.page.getByTestId('vault-passphrase'), rotatedPassphrase);
     await b.page.getByTestId('vault-unlock').click();
     await expect(b.page.getByTestId('vault-ready')).toBeVisible();
-    await b.page.getByRole('button', { name: 'Close sync settings' }).click();
-    await b.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await closeSyncSettings(b.page);
+    await b.page.getByTestId('sync-rail-action').click();
     await shot(b.page, 'pg-legacy-new-device');
     await expect(b.page.getByText(title, { exact: true }).first()).toBeVisible();
     await shot(b.page, 'pg-legacy-new-device');
@@ -460,10 +519,10 @@ test('device settings revoke every old session, then trusted reauthentication an
     await a.page.getByTestId('vault-create').click();
     await confirmCode(a.page);
     await expect(a.page.getByTestId('vault-ready')).toBeVisible();
-    await a.page.getByRole('button', { name: 'Close sync settings' }).click();
+    await closeSyncSettings(a.page);
     await a.page.locator('input[placeholder^="Add a task"]').fill(title);
     await a.page.locator('input[placeholder^="Add a task"]').press('Enter');
-    await a.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await a.page.getByTestId('sync-rail-action').click();
     await expect.poll(async () => {
       const response = await request.get(`${api}/api/sync/key-migration/inventory`, { headers: oldHeaders });
       expect(response.status()).toBe(200);
@@ -479,8 +538,8 @@ test('device settings revoke every old session, then trusted reauthentication an
     await fillVaultSecret(b.page.getByTestId('vault-passphrase'), passphrase);
     await b.page.getByTestId('vault-unlock').click();
     await expect(b.page.getByTestId('vault-ready')).toBeVisible();
-    await b.page.getByRole('button', { name: 'Close sync settings' }).click();
-    await b.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await closeSyncSettings(b.page);
+    await b.page.getByTestId('sync-rail-action').click();
     await expect(b.page.getByText(title, { exact: true }).first()).toBeVisible();
 
     // Observe a real authenticated server connection, including its connected
@@ -513,7 +572,7 @@ test('device settings revoke every old session, then trusted reauthentication an
     });
     await b.page.locator('input[placeholder^="Add a task"]').fill(`offline removed-device task ${stamp}`);
     await b.page.locator('input[placeholder^="Add a task"]').press('Enter');
-    await b.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await b.page.getByTestId('sync-rail-action').click();
     await expect.poll(() => pendingBody?.ops.length ?? 0).toBeGreaterThan(0);
     const stale = pendingBody!;
     expect(stale.ops.every((op) => op.isPayloadEncrypted)).toBe(true);
@@ -559,8 +618,8 @@ test('device settings revoke every old session, then trusted reauthentication an
     const activePackage = await active.json() as { package: { rootKeyFingerprint: string }; payloadKeyVersion: number };
     expect(activePackage.payloadKeyVersion).toBe(2);
     expect(activePackage.package.rootKeyFingerprint).not.toBe(originalPackage.package.rootKeyFingerprint);
-    await c.page.getByRole('button', { name: 'Close sync settings' }).click();
-    await c.page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await closeSyncSettings(c.page);
+    await c.page.getByTestId('sync-rail-action').click();
     await shot(c.page, 'pg-device-rotation-restored-task');
     await expect(c.page.getByText(title, { exact: true }).first()).toBeVisible();
 
