@@ -1971,6 +1971,14 @@ export function App(): React.JSX.Element {
           <CircleHelp size={ICON_SIZE.sm} aria-hidden="true" />
           <span className="ht-rail__label ht-type-caption">{t('web.shell.nav.help')}</span>
         </button>
+
+        {/*
+          同步（工单 H9，2026-10-06 从页头搬下来）。**在「帮助」之后 = rail 最底下一组**，
+          与滴答左下角那一枚同位。它自己是一枚 `<div>` 包着的两三个按钮，
+          所以不会抢走 `.ht-rail__tab--tool:first-of-type { margin-top: auto }` 那条贴底规则
+          （`SyncBar.tsx` 里写着为什么必须是 `<div>`）。
+        */}
+        <SyncBar />
       </nav>
 
       {/*
@@ -2136,7 +2144,16 @@ export function App(): React.JSX.Element {
                 }}
               />
             ) : null}
-            <SyncBar />
+            {/*
+              🔴 工单 H9（2026-10-06）：`<SyncBar/>` **不在这里了** —— 它搬进 rail 底部
+              （见下面 `rail-help` 之后那一行）。页头这一排原本平铺着
+              状态 / 立即同步 / 同步设置 / 语言 / 详情开关 / 主题 六枚不相关控件，
+              而"同步"在滴答里是左下角的东西。裁决与现量：
+              `docs/plans/goal-layout-audit.md` §9.1 第 1 行。
+              ⚠️ `ConflictDialog` 与两张首启面板**留在页头这一层**：它们是
+              `position: fixed` + `z.modal` 的顶层浮层，挂在哪一个 flex 容器里都不影响
+              渲染位置，而"同意之前不许发请求"必须在应用之上（G-11 / G-27 两段原注释）。
+            */}
             <ConflictDialog />
             {/* G-11：首启隐私同意面板。与 `ConflictDialog` 同一处挂载 ——
                 两者都是 `position: fixed` + `z.modal` 的顶层浮层，

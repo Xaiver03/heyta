@@ -52,6 +52,8 @@
     "tests/habit-month.spec.ts",
     "tests/habit-year.spec.ts",
     "tests/habits-pane.spec.ts",
-    "tests/habits-two-column.spec.ts"
+    "tests/habits-two-column.spec.ts",
+    "tests/shell-sync-rail.spec.ts",
+    "tests/rail-trash-anchor.spec.ts"
   ]
 }

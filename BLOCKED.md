@@ -6201,3 +6201,98 @@ research/tools/check-segments.mjs
 "谁认领哪一枚号"的当面对齐 —— 与 AGENTS §9 里 2026-10-05 那次"两条会话同一天各占 0053"是同一类事，
 而那次的修法（`check:adr-numbering`）之所以存在，就是因为这种撞号**git 不会报**：
 文件名/行内容各自独立，合并时不冲突，只有读的人会被骗。
+
+## B94（2026-10-06 10:1x–11:2x，本会话 H9 第一刀）：同步搬进 rail 底部落了，但它照出一条**被 rail 高度意外遮住的旧缺陷** —— 两枚新红归那条缺陷，不归搬家
+
+产品负责人 10-06 09:23 提的六条里，第 1 条（"同步按钮不应该放在左下角侧边栏的左下角吗？"）落了第一刀。
+逐条现量与裁决在 `docs/plans/goal-layout-audit.md` §9.1，落地账在同文 §9.3/§9.4。
+
+### 1. 这一格现在有什么
+
+| 项 | 读数 |
+|---|---|
+| 改动 | `SyncBar.tsx`（页头状态条 → rail 下段那一列）、`App.tsx`（`<SyncBar/>` 从 `.ht-header__actions` 挪到 `rail-help` 之后，两枚 hunk）、`inbox.css`（`.ht-rail` 一屏封顶 + `.ht-rail__tabs` 拿滚动）、`rail.css`（下段那一组的样式与状态点）、`narrow.css`（塌缩态收回高度）、两份词条（`web.sync.rail.aria` 中英各一条） |
+| 判据 | 新 `e2e/tests/shell-sync-rail.spec.ts` **3 passed**（S1 页头反向存在性 / S2 下段**逐枚**在视口内 + 上段放不下必须自己滚 / S3 齿轮开对话框且里面有共享状态条）；`rail-trash-anchor` **1 passed**（④ 跟着换成下段末位，阈值没放松）；`account-menu`+`admin-console`+`narrow-sweep`+`rail-trash-anchor` **23 passed**；`tsc -p tsconfig.detail-pane.json` RC=0；`check:design` ✅；`pnpm --filter @heyta/web build` RC=0 |
+| 牙齿台 | `tmp/h7-readings/h9-rail-teeth-arm.sh`：两臂 **`ARM_RED_OK=1-no-block-size` / `ARM_RED_OK=2-tabs-clipped-without-scroll`**、`BACK_TO_CLEAN=OK`、`TEETH_FAILS=0`。臂 2 是**判据 2 唯一的证据**（"只把 `.ht-rail` 改成 `overflow: hidden` 而不给上段滚动区"这件事，判据 1 全绿抓不到） |
+| 图 | `apps/web/evidence/shell-sync-rail/{rail-sync-button,rail-bottom-group,sync-settings-dialog}.png`，**都打开看过**。`rail-bottom-group.png`（裁 128×300）是它照出"状态点像一颗孤立的点"的 —— 整页图里 64px 那一列看不清任何一枚，所以补了这张裁图 |
+| 我自己走错的 | 给 `.ht-rail` 加过 `position: sticky` 想让下段在整页滚动时也常驻 ⇒ `admin-console` 的「点设置」被 `.ht-sidebar` 拦下（sticky 造层叠上下文，把面板那枚 `--ht-z-popover` 关在 rail 内部）。已撤。入档 traps **#353**；同族还有 **#352**（`min-height` 之下子元素 `overflow-y: auto` 是空护栏）与 **#354**（kill 包装 pid 之后 4318/4319 仍被我这一轮的孤儿占着，下一条命令以"already used"失败） |
+
+### 2. 🔴 两枚新红：`check:ai-e2e` 从 B90 的 8 枚变 10 枚，多出来的是 `detail-pane-task.spec.ts:876`(T15) 与 `task-organize.spec.ts:56`
+
+整趟全量读数：**`10 failed / 2 skipped / 258 passed (28.2m)`**，`INNER_RC=1`。
+其中 8 枚**逐条对上 B90**（`ai-assistant:65`、`ai-row-layout:115`、`ai-tool-run:103`、`ai-tool-run:155`、
+`calendar-sidebar:111`、`calendar-sidebar:226`、`glass-materials:158` 的 light 与 dark）。多出来的两枚都在
+**"行尾那颗整理触发器"这一条路上**，且**都单跑可复现**（不是负载/计时）：
+
+```
+detail-pane-task T15（900×600）：selectOption 等 60s 超时，`element is not visible`（重试 118 次）
+task-organize:56（同一档视口，回收线 06:2x 刚把它补成 900×600）：同一条路，同样超时
+```
+
+**归因不是我猜的，是二分出来的**（`tmp/h7-readings/h9-attribution-ab.sh`，7 枚文件整体还原成 HEAD 再跑）：
+
+| 载体 | T15 | task-organize:56 |
+|---|---|---|
+| 当前工作树（带本单改动） | ✘ 60s 超时 | ✘ 60s 超时 |
+| 只把 `inbox.css` + `narrow.css` 还原成 HEAD | ✓ 10.3s | — |
+| 7 枚全还原成 HEAD | ✓ 9.4s | ✓ 3.2s |
+
+⇒ 触发点是 rail 的高度那两条 CSS。**但 CSS 不是缺陷，它只是把缺陷照出来了**：
+
+### 3. 那条旧缺陷是什么（四次探针的原始数字，够下一位直接复量）
+
+把一次点击拆成 down/up 两半，各量一次（`H9CLICK_*`）：
+
+```
+BEFORE     {"docH":769,"scrollY":169,"active":"BUTTON.","sumY":308,"detOpen":false}
+AFTERDOWN  {"docH":717,"scrollY":117,"active":"SUMMARY[task-organize-summary].","sumY":360,"detOpen":false}
+AFTERUP    同 AFTERDOWN
+H9PROBE_EVENTS（随后 Playwright 自己那一下真点击）
+  ["found sum=true det=true open=false","cap target=SUMMARY prevented=false", ...]   ← 第二次点击就过了，整条用例 PASS
+```
+
+再对全树做高度快照取差（`H9COLLAPSE`），塌掉的那一块点名了：
+
+```
+NAV.ht-sidebar h 769->717   ← 整篇文档的高度是**侧栏**给的
+ASIDE h 351->299  →  SECTION h 130->78（−52）  →  里面 DIV h 44->0 + FORM/BUTTON
+```
+
+**机制，一句话**：`seedListAndTag` 用侧栏那个"新建清单/标签"的**内联表单**建完数据后，焦点还停在表单里的一枚
+`BUTTON` 上；用户按下鼠标点行尾触发器的那一刻，焦点被 `<summary>` 抢走 ⇒ **内联表单失焦收起 52px** ⇒
+侧栏是这个文档里最高的那一栏，于是**整篇文档矮 52px** ⇒ 浏览器把 `scrollY` 从最大值 169 夹到 117 ⇒
+触发器在**静止的指针底下**往下跳 52px ⇒ `mouseup` 落在别的元素上 ⇒ `click` 事件的 target 变成两者的共同祖先
+（探针里读到的就是 `SECTION`），`<details>` 的 `toggle` **一次都没发生**。
+第二次点击（版面已经稳了）就成功 —— 这也解释了为什么它**只在"刚建完清单/标签"之后**出现。
+
+**为什么以前不红**：`.ht-app` 是 `min-height: 100dvh` 而网格行是 `auto`，rail 没封顶 ⇒ **rail 自己的内容高度（实测 864px）
+把整篇文档撑住了**。那时候侧栏收 52px 不改变最大滚动量，跳不动。本单把 rail 封顶之后，文档高度改由
+侧栏/main 决定，这条"一栏收一点、别栏在指针底下跳"的老问题就从**被遮住**变成**可见**。
+⇒ 它不是本单造成的缺陷，本单是**揭发者**；把它压回去（恢复 rail 不封顶）等于把同步按钮重新推出视口 + 继续藏一个真 bug。
+
+### 4. 修法与它的前置（为什么不代改）
+
+正解是**外壳不滚、每栏各自滚**（`docs/plans/goal-layout-audit.md` §9.4 第 1 条已登记）：
+`.ht-app` 由 `min-height: 100dvh` 改成钉死 + `.ht-main`/`.ht-sidebar` 各自 `overflow-y: auto`。
+塌缩态 2026-09-30 就是这么修的（`narrow.css:9-22`），`.ht-app__detail` 也早就是"一屏封顶 + 内部滚动"。
+
+⚠️ **它不是纯 CSS，别当一行改法**：`<SidebarResizer/>` 是 `.ht-sidebar` 的**绝对定位孩子**（挂在右边缘，
+`App.tsx:2039` 那一行注释就是这句话）。一旦侧栏自己成为滚动容器，这枚手柄会**随内容滚走**，
+滚一下之后右边缘就没有可拖的地方了 ⇒ 必须同时把柄搬出滚动容器（或改成 `position: sticky`）。
+这正好压在 **H10 第 1 步**（列表列↔详情窗格那条缝也要一枚同款手柄）上 ⇒ **两件事一起做**，
+别把 resizer 改两次。
+
+⇒ 归属：**本单不代改**。两枚红的口径也不动（它们各自钉的是"窄档回落要能归类"，那是真要求，
+只是被这条跳版面的路挡住了）。谁接 §9.4 第 1 条，接完这两枚应当**自己变绿** —— 这是它们的收口判据。
+
+### 5. 本单仍然没闭合的（别读成已完）
+
+1. **§9.2 第 3 步**：「同步设置」仍是对话框，入口是 rail 那枚齿轮 ⇒ §9.1 第 2 行我写的"歧义随下移自然消失"
+   **被现量否证**（齿轮还在，只是换了地方）。真正的解法是搬进 设置 → 同步。
+2. **§9.2 第 4 步**：语言分段控件仍在页头。施工清单（含一份**最容易踩的**：
+   `language-first-launch.spec.ts` 拿 `language-option-en` 当语言中立的"应用起来了"锚点，
+   搬进设置之后那个锚就没了 ⇒ 换成 rail 的 `sync-rail`/`rail-help`）在同文 §9.4 第 3 条。
+3. **1280×720 全开模块档**：rail 上段 11 枚视图 tab 放不下 ⇒ 回收站要滚一下才看到（默认档 7 枚，放得下）。
+   算术与取舍在 §9.4 第 1 条。
+4. 本单**没有**在四端当前产物上验（`pnpm reinstall:all` 未跑）；`check:ai-e2e` 之外的那 60+ 道门禁
+   也没在最终载体上重跑（`FULLCHECK-01` 那一档仍然开着，理由见倒数纪念日批 §8.5 第 16 条）。

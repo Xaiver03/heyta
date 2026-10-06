@@ -406,8 +406,36 @@
   padding: var(--ht-space-3) var(--ht-space-2);
   border-right: var(--ht-border-width-thin) solid var(--ht-color-border);
   background: var(--ht-color-surface-sunken);
-  /* 视图多起来时**自身滚动**，而不是把 main 挤走 */
-  overflow-y: auto;
+  /*
+   * 🔴 2026-10-06（工单 H9）：rail 现在**自己就是视口那一高**，滚动区是 `.ht-rail__tabs`。
+   *
+   * 原来这里只有一条 `overflow-y: auto`，注释写着"视图多起来时自身滚动，而不是把 main 挤走"，
+   * 实际**永远不成立**：`.ht-app` 是 `min-height: 100dvh`（`base.css:31`）而网格行是 `auto`
+   * ⇒ rail 的盒子被**自己的内容**撑到多高就多高，容器比内容高时 `overflow` 根本没有可裁的东西。
+   * 1280×720 实测：通知 y=644..688、帮助 y=700..744、同步底边 800 —— 整组下段都在折叠线以下，
+   * 要**滚整页**才够得着。而"同步在左下角"（产品负责人原话）要的是不管视口多矮都看得见。
+   *
+   * 两条一起才成立：
+   *   · `block-size: 100dvh` —— 与视口同源的高度上界（不是内容高度）；
+   *   · `overflow: hidden` —— 裁切发生在 rail 上，滚动交给 `.ht-rail__tabs`
+   *     （**放不下的是上段的视图列表，不是下段的动作**）。
+   * 这与 `.ht-app__detail`（`base.css:76-80`）、`.ht-sidebar--calendar` 是同一条纪律：
+   * **每一栏各自一屏封顶、内部滚动**。
+   *
+   * 🔴 这一条上**不许加 `position: sticky`**（我试过，它是一次真回归，不是一处风格分歧）：
+   * sticky 会造一个层叠上下文，于是头像菜单面板那枚 `--ht-z-popover`（`rail.css:138`）
+   * **只在 rail 内部有效**，整块面板被后面那列 `.ht-sidebar` 盖住 ——
+   * `e2e/tests/admin-console.spec.ts` 的「点设置」报
+   * `<nav class="ht-sidebar"> intercepts pointer events`，重试 114 次到 60s 超时。
+   * 代价如实说清楚：主列比视口高时整页会滚，rail 跟着滚上去（与详情栏同一行为）。
+   * 要做到"外壳不滚、每栏各自滚"得先把 `.ht-main` 也一屏封顶，那会牵动
+   * `calendar-wheel` / `quadrant-fill` / `search-overlay` 三份用窗口滚动的用例 ⇒ 另开一单。
+   *
+   * ⚠️ 塌缩态（≤768px）这两条要在 `narrow.css` 里收回：那里 rail 是网格 `1fr auto` 的第二行，
+   *   高度由内容定，`100dvh` 会把底部导航撑满整屏。
+   */
+  block-size: 100dvh;
+  overflow: hidden;
 }
 
 .ht-rail__tabs {
@@ -415,10 +443,21 @@
   flex-direction: column;
   gap: var(--ht-space-2);
   /* 🔴 必须**撑满**rail 的剩余高度，否则段内的 `margin-top: auto` 没有空白可分配，
-     回收站就还贴在上段列表的尾巴上（`min-height: 0` 是给 `overflow-y: auto` 的
-     rail 留的：不写它，视图开多了时这一列会顶穿容器而不是滚动）。 */
+     回收站就还贴在上段列表的尾巴上（`min-height: 0` 是给下面那条 `overflow-y: auto`
+     留的：不写它，flex 项的最小高度是内容高度，这一列会顶穿容器而不是滚动）。 */
   flex: 1 1 auto;
   min-height: 0;
+  /* 工单 H9：这一列是 rail 里**唯一**会滚的那一段（理由见 `.ht-rail`）。
+     滚动条隐藏是刻意的，与 `.ht-viewtabs` 同一条：rail 的内容宽度只有 48px
+     （44px 点击目标 + 8×2 内边距 = 64px 总宽），一条 classic 滚动条要占掉 15px ——
+     那会把每一枚 tab 挤偏，而 tab 的图标居中是 `focus-detail-pane` 那族几何判据的基准。
+     键盘焦点会把聚焦项自动滚进视野，鼠标滚轮在这段上直接生效，不需要滑块。 */
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.ht-rail__tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .ht-rail__tab {

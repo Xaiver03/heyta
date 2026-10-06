@@ -48,8 +48,8 @@ import { cssVar } from '@heyta/design-system';
 import { useI18n, type I18nValue } from '@heyta/i18n';
 import { useSyncStore } from './store.js';
 import type { HostedAuthSession } from '@heyta/app-host';
-import { HeytaUiProvider, SyncStatusBar, syncFailureMessageKey, syncStatusAffordances, type SyncStatusLike } from '@heyta/ui';
-import { RefreshCw, Settings, X } from 'lucide-react';
+import { HeytaUiProvider, SyncStatusBar, syncFailureMessageKey, syncStatusAffordances, syncStatusGlyph, syncStatusSeverity, type SyncStatusLike } from '@heyta/ui';
+import { AlertTriangle, CheckCircle2, CircleHelp, CloudOff, RefreshCw, Settings, X } from 'lucide-react';
 
 import { AuthPanel } from '../auth/AuthPanel.js';
 import { HELP_SYNC_ANCHOR, siteLink } from '../../lib/site-url.js';
@@ -112,10 +112,27 @@ function describeSyncStatus(status: SyncStatusLike, t: I18nValue['t']): string {
   }
 }
 
+/**
+ * 共享那份字形族 → web 的 `lucide-react` 组件。
+ *
+ * 🔴 映射本身**不在这里判断**（`syncStatusGlyph` 是唯一事实源，mobile 走同一份）；
+ * 这里只是把名字落成组件 —— 与 `habit-glyphs.ts` 那半张表同一条分工。
+ * `spinner` 用 `RefreshCw` 配一条旋转动画（共享层那边是 `ActivityIndicator`）。
+ */
+const GLYPH_COMPONENTS = {
+  check: CheckCircle2,
+  'cloud-off': CloudOff,
+  alert: AlertTriangle,
+  spinner: RefreshCw,
+} as const;
+
 export function SyncBar() {
   const { t } = useI18n();
   const sync = useSyncStore();
   const affordances = syncStatusAffordances(sync.status);
+  const statusText = describeSyncStatus(sync.status, t);
+  const severity = syncStatusSeverity(sync.status);
+  const Glyph = GLYPH_COMPONENTS[syncStatusGlyph(sync.status)];
   /**
    * 对话框的开合状态**在 `useSyncStore` 里**，不是这里的局部 state ——
    * 订阅提示的「改用你自己的服务器」也要打开它（见 store 里的注释）。
@@ -173,79 +190,95 @@ export function SyncBar() {
 
   return (
     <>
-      {/* 🔴 状态条骨架来自共享层。上面那层 Provider 见文件头
-          （顶栏不在任何一棵 Provider 子树里）。 */}
-      <HeytaUiProvider>
-        <SyncStatusBar
-          status={sync.status}
-          labels={{ status: (status) => describeSyncStatus(status, t) }}
-          testID="sync-status-bar"
-          actions={
-            <>
-              {/*
-                🔴 W2（注册/登录前置）：入口**搬进了 rail 顶部账号区的头像菜单**
-                （2026-09-29 撤掉顶栏那块大主按钮；2026-09-30 又撤掉头像旁边
-                那个 pill —— 产品负责人："应该是点击头像出来注册、登录吧？"）。
-                `AccountMenu` 在未登录时把「登录 / 注册」渲染成菜单**第一项**
-                （同一个 `sync-signin-entry` testID），开合状态在 store 的
-                `signInOpen`。这里**不再**渲染第二个入口。
-              */}
+      {/*
+        🔴 2026-10-06（工单 H9）：同步这一组从**页头**搬进 **rail 底部**，形状也从
+        "图标 + 文字的状态条"收成 48px 装得下的一枚。理由不是审美：页头那一排已经成了
+        六个不相关控件的平铺（状态 / 立即同步 / 同步设置 / 语言 / 登录 / 主题），
+        而"同步"在滴答里是左下角的东西。负责人原话与逐条现量在
+        `docs/plans/goal-layout-audit.md` §9.1 第 1 行。
 
-              {/* 冲突需要一个**看得见的入口**：关掉对话框之后，
-                  用户还得能再打开它，否则问题就从"没法解决"变成"看不见了" */}
-              {affordances.needsResolution ? (
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--primary"
-                  onClick={sync.openConflictDialog}
-                >
-                  {t('web.sync.resolveConflicts')}
-                </button>
-              ) : null}
+        状态条原本负责的三件事，一件都不许因为"变小"而丢：
+        1. **状态要说得出**：整句状态进 `aria-label`，另有一枚 `role="status"` +
+           `aria-live="polite"` 的 live region 承担"异步变化要播报"。
+           hover 时那句状态也看得见（复用 rail 既有的 `.ht-rail__label` 机制，
+           不新造一套 tooltip）。
+        2. **冲突要看得见**：`needsResolution` 时这枚的**点击语义改成打开冲突对话框** ——
+           有冲突时用户下一步要的是"处理"，不是"再同步一次"。原来那颗
+           「处理冲突」主按钮因此不再单独存在（48px 里放不下两枚主按钮），
+           而"关掉对话框之后还得能再打开它"这条由"同一枚按钮 + 警示态"兑现。
+        3. **同步中不可再点**：沿用共享的 `syncStatusAffordances`，不在这里另判一次。
 
-              {/*
-                🔴 出错时才给「查看帮助」，而且**直接落到「同步」那一问**上
-                （`/help#sync`），不是帮助页顶部 —— 报错的人要找的就是那一篇，
-                让他再找一次是把成本从我们这边挪到他那边。
-                只在 `error` 分支出现（`showsHelp`），是因为"没配置同步""没登录"
-                这两种状态旁边本来就有可以点的出路（设置 / 登录），
-                再给一条帮助链接会稀释那两条真正的出路。
-              */}
-              {affordances.showsHelp ? (
-                <a
-                  className="ht-btn ht-btn--ghost"
-                  href={siteLink(HELP_SYNC_ANCHOR)}
-                  rel="noopener noreferrer"
-                  data-testid="sync-help-link"
-                >
-                  {t('web.sync.help.link')}
-                </a>
-              ) : null}
+        ⚠️ 外层必须是 `<div>` 而不是把两枚按钮直接摊进 `<nav>`：rail 的贴底靠
+        `.ht-rail__tab--tool:first-of-type { margin-top: auto }`，而 `:first-of-type`
+        选的是父元素里**第一个 `<button>`**（`App.tsx` 里铃铛那段注释是同一条纪律）。
+        同理，**这一列里的按钮一律不带 `--tool`**：带了就会在 `<div>` 内部再匹配一次
+        `:first-of-type`，把第一枚往下推。
 
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
-                aria-label={t('web.sync.a11y.syncNow')}
-                disabled={!affordances.canSyncNow}
-                onClick={() => {
-                  void sync.syncNow();
-                }}
-              >
-                <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
-              </button>
-
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
-                aria-label={t('web.sync.settings.title')}
-                onClick={sync.openSettings}
-              >
-                <Settings size={ICON_SIZE.xs} aria-hidden="true" />
-              </button>
-            </>
-          }
-        />
-      </HeytaUiProvider>
+        ⚠️ 字形与颜色**不在这份文件里判断**：`syncStatusGlyph` / `syncStatusSeverity`
+        是 `@heyta/ui` 那份唯一映射（web 与 mobile 各一份的历史事故见文件头）。
+      */}
+      <div className="ht-rail__sync" data-testid="sync-rail" data-severity={severity}>
+        <button
+          type="button"
+          className="ht-rail__tab ht-rail__sync__action"
+          aria-label={t('web.sync.rail.aria', { status: statusText })}
+          disabled={!affordances.canSyncNow && !affordances.needsResolution}
+          onClick={() => {
+            if (affordances.needsResolution) {
+              sync.openConflictDialog();
+              return;
+            }
+            void sync.syncNow();
+          }}
+        >
+          <span className="ht-rail__sync__icon" aria-hidden="true">
+            <Glyph
+              size={ICON_SIZE.sm}
+              className={severity === 'progress' ? 'ht-rail__sync__spin' : undefined}
+            />
+            <span
+              className={`ht-rail__sync__dot ht-rail__sync__dot--${severity}`}
+              data-testid="sync-status-dot"
+            />
+          </span>
+          <span className="ht-rail__label ht-type-caption" aria-hidden="true">
+            {statusText}
+          </span>
+        </button>
+        {/* live region 与上面那枚 hover 标签是**两个元素**：标签 `aria-hidden`，只服务眼睛；
+            这句只服务读屏，视觉上被收成 1 个像素见 `rail.css`。 */}
+        <span className="ht-rail__sync__status" role="status" aria-live="polite">
+          {statusText}
+        </span>
+        <button
+          type="button"
+          className="ht-rail__tab"
+          aria-label={t('web.sync.settings.title')}
+          data-testid="sync-settings-entry"
+          onClick={sync.openSettings}
+        >
+          <Settings size={ICON_SIZE.sm} aria-hidden="true" />
+          <span className="ht-rail__label ht-type-caption">{t('web.sync.settings.title')}</span>
+        </button>
+        {affordances.showsHelp ? (
+          /*
+            🔴 出错时才给「查看帮助」，而且**直接落到「同步」那一问**上（`/help#sync`），
+            不是帮助页顶部 —— 报错的人要找的就是那一篇，让他再找一次是把成本
+            从我们这边挪到他那边。只在 `error` 分支出现（`showsHelp`）的理由见
+            `syncStatusAffordances` 那段原注释。
+          */
+          <a
+            className="ht-rail__tab"
+            href={siteLink(HELP_SYNC_ANCHOR)}
+            rel="noopener noreferrer"
+            data-testid="sync-help-link"
+            aria-label={t('web.sync.help.link')}
+          >
+            <CircleHelp size={ICON_SIZE.sm} aria-hidden="true" />
+            <span className="ht-rail__label ht-type-caption">{t('web.sync.help.link')}</span>
+          </a>
+        ) : null}
+      </div>
 
       {open && (
         <div
@@ -293,6 +326,27 @@ export function SyncBar() {
                 <X size={ICON_SIZE.sm} aria-hidden="true" />
               </button>
             </div>
+
+            {/*
+              共享那枚状态条骨架**仍然有消费者**：H9 之后它不住在页头，住在这里 ——
+              对话框才是"把状态说清楚、再给出路"的地方，而它是四个端共用的那一枚状态条形状。
+              ⚠️ 这层 `<HeytaUiProvider>` 不能拆：`scripts/check-ui-provider.mjs` 的
+              `PROVIDER_DEPENDENT` 清单就是为它登记的（拆掉会让那道门禁变红并指名道姓）。
+
+              🔴 顺带留住一段搬家理由（原来写在页头那层里）：注册/登录的入口**只有**
+              rail 顶部头像菜单那一处（2026-09-29 撤掉页头那块大主按钮、2026-09-30 又撤掉
+              头像旁边的 pill —— 产品负责人："应该是点击头像出来注册、登录吧？"）。
+              `AccountMenu` 未登录时把「登录 / 注册」渲染成菜单**第一项**（同一个
+              `sync-signin-entry` testID），开合状态在 store 的 `signInOpen`。
+              这里**不再**渲染第二个入口。
+            */}
+            <HeytaUiProvider>
+              <SyncStatusBar
+                status={sync.status}
+                labels={{ status: (status) => describeSyncStatus(status, t) }}
+                testID="sync-status-bar"
+              />
+            </HeytaUiProvider>
 
             <label style={labelStyle}>
               {t('web.sync.serverUrl.label')}

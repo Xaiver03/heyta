@@ -198,3 +198,102 @@
 .ht-accountmenu__item--primary:hover {
   background: var(--ht-color-primary-subtle-hover);
 }
+
+/*
+ * 同步（工单 H9，2026-10-06）：从页头搬进 rail 最底下的一组。
+ *
+ * 🔴 这一组里的按钮**不带 `--tool`**：`.ht-rail__tab--tool:first-of-type` 带
+ * `margin-top: auto`（贴底靠它），而 `:first-of-type` 是**相对父元素**的 ——
+ * 加了 `--tool` 会让这个 `<div>` 里的第一枚再去抢那条 `margin-top: auto`，
+ * 于是同步与齿轮之间裂开一块空白。贴底这件事由外层 `<div>` 在 nav 里的位置自然成立。
+ *
+ * ⚠️ 状态点只是"远看一眼"的那一层：**它旁边永远有整句状态**（按钮的 `aria-label`
+ * 与一枚 `role="status"` 的 live region），颜色从不是唯一通道 —— 与
+ * `SyncBar.tsx` 文件头那条"离线在两端呈现成两种态度"的事故同一条立场。
+ * 颜色取 `@heyta/ui` 的 `SEVERITY_COLOR` 那五个 token，不在这另起一套。
+ */
+.ht-rail__sync {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding-bottom: var(--ht-space-2);
+}
+
+.ht-rail__sync__action {
+  position: relative;
+}
+
+.ht-rail__sync__icon {
+  /* 状态点的锚。**必须是图标自己**而不是那枚按钮：按钮被撑成 rail 的内容宽 48px、
+     高 44px，图标只有 16px 居中 —— 点在按钮角上会飘出去十几像素，读起来是
+     "rail 上多了一颗孤立的点"（1280×720 裁图实测就是这样）。
+     `.ht-inbox__badge` 那段注释预言的正是这个形状，它给的解法就是"给图标套一层定位容器"。 */
+  position: relative;
+  display: inline-flex;
+}
+
+.ht-rail__sync__dot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  /* 骑在图标的右上角：一半压在图标上、一半压在按钮底色上。用 translate 而不是
+     负 margin —— 后者要把像素值写进样式里（§5 不许裸值）。 */
+  transform: translate(50%, -50%);
+  width: var(--ht-space-1);
+  height: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  /* 点在图标上，得与图标底色分开才读得出"有一颗点" —— 用浮层的实色底。 */
+  border: 1px solid var(--ht-color-surface-raised);
+}
+
+.ht-rail__sync__dot--neutral {
+  background: var(--ht-color-foreground-muted);
+}
+
+.ht-rail__sync__dot--progress {
+  background: var(--ht-color-info-strong);
+}
+
+.ht-rail__sync__dot--success {
+  background: var(--ht-color-success-strong);
+}
+
+.ht-rail__sync__dot--attention {
+  background: var(--ht-color-warning-strong);
+}
+
+.ht-rail__sync__dot--failure {
+  background: var(--ht-color-danger-strong);
+}
+
+/* live region：读屏要念，眼睛不需要看它（眼睛那一份是 hover 标签）。
+   收成 1px 而不是 `display: none` —— 后者会让整个元素从无障碍树里消失。 */
+.ht-rail__sync__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 「同步中」的字形是 `RefreshCw`，让它转起来。周期从 `--ht-duration-slow` 推，
+   不写字面毫秒（§5：不许裸值）。 */
+.ht-rail__sync__spin {
+  animation: ht-rail-sync-spin calc(var(--ht-duration-slow) * 3) linear infinite;
+}
+
+@keyframes ht-rail-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-rail__sync__spin {
+    animation: none;
+  }
+}

@@ -7718,3 +7718,72 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     那句 `toHaveLength` 就不是判据，是**门槛**。门槛不自己等到位，后面那串就在替一个
     不存在的现场作证 —— 而且它红的时候，报的是**错的那件事**。
     同族：#176（桩在外面预取值 ⇒ 没走到被测那一步）、#349（前提有固定失败概率，别记成抖动）。
+
+352. 🔴 **容器是 `min-height` 时，写在它子元素上的 `overflow-y: auto` 永远没有可裁的东西 ——
+    那条注释描述的护栏根本不存在。**
+
+    `apps/web` 的 rail 上挂着一条 `overflow-y: auto`，注释写着"视图多起来时**自身滚动**，
+    而不是把 main 挤走"（2026-09-28 那次 rail 改造写的）。它**从来没生效过**：
+    `.ht-app` 是 `min-height: 100dvh` 而网格行是 `auto` ⇒ rail 的盒子高度**等于内容高度**，
+    容器比内容高，`overflow` 无事可做。真实后果直到 2026-10-06 才现形：把同步那一组搬进
+    rail 下段之后，1280×720 实测 通知 y=644..688、帮助 y=700..744、同步底边 **800** ——
+    整组下段在折叠线以下，要**滚整页**才够得着，而界面上一切看起来都"正常"。
+
+    ✅ 修法：给那一栏一个**与视口同源**的高度上界（`block-size: 100dvh`）+ `overflow: hidden`，
+    滚动让给内部那一段（`.ht-rail__tabs`）。这与 `.ht-app__detail`、`.ht-sidebar--calendar`
+    已经是同一条纪律：**每一栏各自一屏封顶、内部滚动**。
+
+    📌 **一般规律**：`overflow: auto` 是**有条件**的行为，条件就是"容器高度 < 内容高度"。
+    而 `min-height` 恰恰保证容器**不低于**内容。所以"给 X 加个滚动"这句话里，
+    X 的高度是谁给的必须能答出来；答不出就用判据问它 ——
+    **量元素的底边在不在视口内**，不要量"容器会不会滚"（后者在 CSS 里永远是真的）。
+    同族：#82 那一族（判据回答的是"有没有东西"，不是"是不是这一屏"）。
+
+353. 🔴 **`position: sticky` 会造一个层叠上下文，把 `position: fixed` 后代的高 `z-index` 关在里面 ——
+    症状是"浮层被后面那一列拦住点击"，而那个浮层的 z 明明是全场最高。**
+
+    接着 #352 修 rail 时，为了让下段在整页滚动时不跟着滚上去，我给 `.ht-rail` 加了
+    `position: sticky; top: 0`。`pnpm check:ai-e2e` 头两条就红：
+    `admin-console.spec.ts` 点头像菜单里的「设置」，
+    报 `<nav class="ht-sidebar" aria-label="当前视图的范围"> intercepts pointer events`，
+    **重试 114 次到 60s 超时**。而那块面板的 z 是 `--ht-z-popover`（500，全场最高一档）。
+
+    机制：sticky（与 fixed 一样）**总是**创建层叠上下文。面板是 rail 的后代，
+    它的 500 从此只在 rail 内部比大小；rail 自身在根上下文里是 `z-index: auto`，
+    而 `.ht-sidebar` 在 DOM 里**排在它后面** ⇒ 整列 sidebar 盖住整块面板。
+    `position: fixed` 让后代逃得掉**裁剪**（祖先 `overflow: hidden` 切不到它），
+    逃不掉**层叠上下文** —— 这两件事经常被当成一件。
+
+    ✅ 修法：撤掉 sticky，只留 `block-size: 100dvh` + `overflow: hidden`（#352）。
+    代价如实记下：主列比视口高时整页会滚，rail 跟着滚上去 —— 与 `.ht-app__detail` 同一行为。
+    要"外壳不滚、每栏各自滚"，得先把 `.ht-main` 也一屏封顶，那会牵动
+    `calendar-wheel` / `quadrant-fill` / `search-overlay` 三份用窗口滚动的用例 ⇒ 另开一单，
+    **不是**顺手把 sticky 加回来。
+
+    📌 **一般规律**：给一个**含浮层**的容器加 `transform / filter / will-change / contain /
+    position: fixed|sticky` 之前，先问"这里面有没有靠 `position: fixed` 逃出去的浮层"。
+    有，就必须同时给它一个**根上下文里够高**的 z（或把浮层 portal 到 body），
+    否则坏法是安静的、且只在特定页面上坏（这一枚只在 sidebar 那一列存在时才拦得到）。
+    同族：`rail.css` 里那条"将来若给 rail 的按钮加 transform 动画，`.ht-rail__label` 会跟着退化"
+    —— 同一个坑的两个面，那一份是**偏移参照**，这一份是**层叠次序**。
+
+354. 🔴 **`nohup pnpm check:ai-e2e` 之后 kill 那个包装 pid，vite 与假端点还活着，
+    而它们占的是 `--strictPort` 的 4318/4319 ⇒ 下一条命令以 "already used" 立刻失败。**
+
+    2026-10-06 实测：整条套件跑了两分钟我看出了根因，`kill 36628`（`pnpm` 那层）之后
+    `ps` 里 `pnpm` 没了，但 `node scripts/stub-provider.mjs`（4319）与
+    `node .../vite/bin/vite.js --port 4318 --strictPort` 两个子进程**是孤儿，继续监听**。
+    下一条 `npx playwright test …` 的报错不是"端口被占"这种可读信息，而是
+    `Error: http://127.0.0.1:4319/__requests is already used, make sure that nothing is running…`
+    —— 它长得像**配置错**，而真实原因是我上一轮没杀干净。
+
+    ✅ 正确顺序：① 按**端口**取 pid（`lsof -nP -iTCP:4318 -iTCP:4319 -sTCP:LISTEN -t`），
+    ② 用 `ps -o pid=,ppid=,lstart=,command= -p <pid>` 逐个确认 `lstart` 落在**我这一轮起跑时刻**
+    （这一步是"只对自己创建的对象动手"的落地 —— 本机常驻着别的会话起的 `npm exec vite preview`，
+    按名字 kill 会把它一起带走），③ 只 kill 确认过的 pid，④ 再取一次端口，`listeners_left=0` 才继续。
+
+    📌 **一般规律**：`--strictPort` 的载体在"被中断"之后一定是脏的，而它的脏**不会**表现为
+    "端口被占"的直白报错。任何自己起服务的验证装置，收尾要有一条**独立于退出码**的
+    端口/监听器复查；而中断长任务时，要杀的是**这一轮创建的那批 pid**，不是那个包装进程。
+    同族：#87（e2e 前置 SIGKILL 别人的 dev server —— 那是反方向：不许动别人的），
+    #164（后台任务的 `exit code 0` 是包装命令的）。
