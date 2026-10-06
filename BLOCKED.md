@@ -6595,10 +6595,10 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 |---|---|---|---|---|
 | 1 | ~~固定收尾的 **iOS 腿**没有读数~~ ✅ **19:1x 闭合**：等到第 12 轮开窗，`IOS_RETRY_EXIT=0`，沙盒/构建/安装/新鲜度四条各有读数，图人看过 | —— 不再等 | `tail -6 ~/.heyta-evidence/reinstall-1006-ios-retry-190234/facts.txt` | 它等的正是设备窗口，等到就绿了，没有需要代改的东西。读数与「那张图不证 H9/H10 形状」的边界在 `docs/plans/goal-layout-audit.md` §9.14 |
 | 2 | ~~本会话那几枚提交未推~~ ✅ **19:19 已推**（两趟有界循环各 rc=0，`FINAL_RC=0`） | —— 网络那一格自己好了 | 现量只认 `git -c credential.helper='!gh auth git-credential' ls-remote https://github.com/Xaiver03/heyta.git refs/heads/main`：🔴 按 URL 推**不推进本地 `origin/main` 追踪 ref**，所以 `git rev-list --count origin/main..HEAD` 会一直虚报（19:19 实测推完仍报 42） | 这一格从此是**常态**而不是阻塞：每新增一笔都要重推。快进、不 force、不改写已公开历史这三条没变 |
-| 3 | 任务 #17：`check:e2e-helper-exports` 写了却没接进链 | `package.json` 的 `check` 那一行正被别线重写 | `git status --porcelain -- package.json` 为空 ⇒ 才动那一行 | 改那一行 = 覆盖别人在飞的定义。盲区机制与改法建议已登记在 `docs/plans/goal-layout-audit.md` §9.11（"既无定义又不在链上的实现文件"落在 `check:gate-wiring` 两条判据之外） |
+| 3 | ~~任务 #17：`check:e2e-helper-exports` 写了却没接进链~~ ✅ **20:39 闭合（提交 `6065e575`），07 01:3x 补上"当场更新本格"这一笔欠账** | —— 不再等 | `node scripts/check-e2e-helper-exports.mjs --self-test` ⇒ **`SELFTEST_RC=0` / 自检 8 臂，失败 0 臂**（A2 生产者少一个名字、A4 再导出链、A7 默认+具名各红自己那条）；常态一趟 `node scripts/check-e2e-helper-exports.mjs` ⇒ rc=0，现量 **射程 123 份文件 / 对账 421 个导入名 / 缺失 0**；接线位置现量：`node -e '…scripts.check.split("&&").findIndex(…)'` ⇒ **第 79 步 / 共 97 步**（刻意排在 `check:ai-e2e` 之前：静态对账秒级，先响，别等 Playwright 起来才发现载不进） | 原先那句"`package.json` 的 `check` 那一行正被别线重写"**仍然对，但不是拦路石**：那一行此刻只有两枚别线新增定义未提交（`check:backup-retention` / `check:adr-numbering`），我把自己的**定义与链上那一行同时写进工作树那份** ⇒ 他们整份提交时带得走我这枚，不会被吞；而 `check:backup-retention` 的实现文件还没入库，**没有**替他们接进链（接了会让干净检出上 `MODULE_NOT_FOUND`）。🔴 本格原先漏改是**流程缺陷不是遗漏**：目标纪律写的是"每格落完当场更新 B100 那一格"，而这一格落地当晚只写了提交信息、没动台账 —— 于是它带着"等谁"的字样在表里又躺了 5 小时，下一个读表的人会以为 #17 还没做 |
 | 4 | ~~工单 H11 / 任务 #25：外壳不滚（桌面那一半）~~ ✅ **22:1x 闭合**：落地 + 四条新判据 + 臂台 + 5 张图人看过，提交 `1cbcbf34` | —— 不再等 | `cd e2e && npx playwright test -c playwright.parallel.config.ts tests/shell-no-document-scroll.spec.ts tests/shell-sidebar-height.spec.ts tests/search-overlay.spec.ts` ⇒ **9 passed**；臂台 `bash scripts/h11-arms.sh`（A/B/D 各红，末臂是还原后的阳性对照） | 🔴 **起跑条件② 没有翻面，是换的载体**：`apps/web/src/styles/app/narrow.css` 在主检出现量仍 ` M`（147 插 / 59 删，正是 W4 塌缩态那一片），所以"等它干净"这一半**不成立**。走的是隔离载体（`~/heyta-carriers/heyta-reinstall-1006`，那一棵 `narrow.css` 干净、`HEAD` 与主检出同指 `86d00c4c`）。落点不相交：我改 `base.css`/`main-area.css`/`material.css`/`TaskOrganizer.tsx`，他们改 `narrow.css`；唯一共享的那枚 `base.css` 用"blob 由 `HEAD` 重建 + 私有索引 `commit-tree` + CAS `update-ref`"只带走我自己的 31/2 行，他们那 22 行**继续留在工作树**（现量：`git diff -- apps/web/src/styles/app/base.css` 只剩 `.ht-app[data-detail-suppressed]` 与 `.ht-app__detail[hidden]` 两条）。全部读数、两条被自己的臂台**否证**的判断、`TaskRepeat.tsx` 同形态浮层的后续改法，以及"刷索引会把他们 base.css 的 staged 态一并刷成 HEAD 那份（工作树内容不受影响）"这条副作用，都在 §9.15 |
 | 5 | ~~`landing test` 那 1 枚红 + `pnpm check` 整链的 9 枚 e2e 红~~ ✅ **22:2x 两组都有 rc=0 读数** | —— 两组"等谁"都要更正，见右 | `pnpm --filter @heyta/landing test` ⇒ rc=0；`cd e2e && NO_COLOR=1 npx playwright test --reporter=line tests/ai-assistant.spec.ts tests/ai-row-layout.spec.ts tests/ai-tool-run.spec.ts tests/calendar-sidebar.spec.ts tests/glass-materials.spec.ts` ⇒ **10 passed / RC=0** | 🔴 **① 等错了对象**：`landing` 那枚的红因是**本仓库那条判据自己**（把一种布局形状写死成契约），不是象限线那枚未提交的 `quadrant/copy.ts` —— 判据改成"形状无关 + 方向从产品读"就绿（`86d00c4c`）。🔴 **② 根本不用再等**：B90 那 8 枚在**当前 HEAD 上已经不存在**，根因由详情面线 `0e9fac95`（10-06 15:37，`taskPaneInColumn` 的第三半 `selectedTaskId !== null`）修掉，而它自己的注释就点名"B90 那 8 枚红的另一条侧" ⇒ **台账比代码落后 6.5 小时**，这一格该做的是去读现量。⚠️ 边界：只跑了点名的那 5 份（10 条），`check:ai-e2e` 整族 250+ 条与 `pnpm check` 整链这一轮没重跑。归因对照（摘掉 H11 再跑一遍，证明不是我顺带修绿的）在 §9.16 |
-| 7 | 习惯屏的**设备侧装机判据缺一枚常驻载体**（工单 H12）—— 🟡 **06 23:5x→07 00:1x 补跑：载体修完（`615253f3`），八条判据里 4–10 步逐条现量，查出的**五处全在探针侧**（§9.18 那张表）；一趟 32 项通过 / 3 项失败，三处失败当场修完** | 不是"等谁"：等的是**机器窗口**里最后那一条腿的绿读数（重新输入口令 → 同步 → 对端读到 2 条）与九张图的入库。07 00:4x 现量 `load1=23–146`（别的项目在跑 Playwright 抓取），阈值 12 ⇒ 负载门退 3 = 环境无效，不记产品失败 | `pnpm verify:mobile-habits`（包要在隔离载体里打并**成对**传 `HEYTA_HABITS_APK` + `HEYTA_HABITS_APK_ROOT`，完整命令在 §9.17）；重试台 `bash ~/.heyta-window-rigs/heyta-h12-retry.sh`，读数在 `~/.heyta-window-rigs/heyta-h12-retry.log` | 与 #17 同族（没有载体的面 = 静默面）。🔴 **不在主检出打这个包**：`ProfileScreen.tsx`（习惯入口所在）与 `packages/i18n/src/locales/*.ts`、`app-host/*-actions.ts` 此刻都是别线未提交态，而 `run-gradle.mjs` 同步的是**当前工作树** ⇒ 会把他们的 WIP 打进我这份证据里。载体与 APK 成对取自 `~/heyta-carriers/heyta-reinstall-1006`（那一棵 `86d00c4c`），且 `git diff 86d00c4c..HEAD -- apps/mobile/src packages/*/src` **为空** ⇒ 这份包就是当前源码的移动产物。八条判据的构成与五枚探针缺陷在 §9.17 / §9.18 |
+| 7 | ~~习惯屏的**设备侧装机判据缺一枚常驻载体**（工单 H12）~~ ✅ **07 03:2x 闭合在"最终那份文本"上**：载体 `cd546407` 入库、**九处**探针缺陷修完（`615253f3` + §9.19 那三处 + §9.20 的口径一处）、**当前产物上整条链 39 项通过 / 0 项失败**（`H12_GREEN round=1` / `ROUND_EXIT=0`），九张证据图入库且**人逐张看过两趟** | —— 不再等 | `pnpm verify:mobile-habits`（包要在隔离载体里打并**成对**传 `HEYTA_HABITS_APK` + `HEYTA_HABITS_APK_ROOT`，完整命令在 §9.17）；判据臂台 `bash scripts/h12-shot-set-arms.sh` ⇒ 末行 `ARMS=7 FAILS=0`；重试台 `bash ~/.heyta-window-rigs/heyta-h12-retry.sh`，绿的那趟读数在 `~/.heyta-window-rigs/heyta-h12-retry.log` 第 1–100 行 | 等的是**机器窗口**：此前一轮等满 900s 负载仍未过（`load1=14`，阈值 12）判 `ROUND_EXIT=3` = 环境无效；07 03:19 那趟负载门 `load1=9 ≤ 12` + 内存门 `free 58%` 一次放行 ⇒ **没有一轮重排**。🔴 **这一格最后落下的不是设备，是判据自己的口径**：第 ⑨ 条原写成"九张各自是不同的一屏"，而 `5-list-after-checkin` ↔ `6-list-after-restart`（⑥ 重启前后）**按设计就应当同屏** —— 逐像素对账：两张只有 **189 个像素**不同，全在第 32–43 / 2364–2373 行（状态栏时钟 + home indicator），界面内容区**逐像素相同**。那种口径**既能假绿**（把"重启前后同屏"当成图像成就）**又能假红**（同一分钟内完成重启 ⇒ 两张字节相同 ⇒ 把正确的产品行为报成"重复交证据"）。修法：判据改成"除这一对之外两两不许字节相同"，豁免**按具体的一对**写（不是"允许 N 对重复" —— 那会把 4↔5 那一类真缺陷一起放过，臂 1 就是它），并把这一对的实际状态打出来（`same`/`differ`/`absent`）⇒ 从漏洞变成读数。臂台加到 7 臂：新增"豁免对相同 ⇒ 该绿"与"豁免对之外又撞一组 ⇒ 该红"。🔴 **跨设备那一半不是等来的，是它自己照出来的一条设计事实**：`force-stop` 之后界面显示"填好服务器地址与访问令牌后才能同步"，因为 E2EE 口令**按设计只在内存**（i18n `mobile.profile.password.hint` 原文），所以重启腿之后必须重新输入凭据才能发起同步 —— 载体把这一条做成显式分支，而不是拿"同步失败"当环境噪声放过。⚠️ 两条边界：新鲜度那一格扫的是**隔离载体**那棵树（APK 22:34 / 源码 18:17），主检出 22:34 之后又被别线改过 ⇒ 证的是"载体那棵树的当前产物"；`emulator-5554` 是共享设备，并发检测只证**这一趟**没人换设备。全部读数在 §9.18–§9.20 |
 
 📌 **19:3x 更新**：第 1、2 两格已闭合（iOS 腿补跑绿、提交已推）；表内 3/4/5 与段外第 6 格的所有权
 都不在本会话 ⇒ 这一节是**交棒清单**，不是待办池。原先那句「只有第 1 格是我这一刀本来能带走、被环境挡住」
@@ -6616,8 +6616,16 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 📌 **22:2x 更新（Goal 收尾块）/ 23:3x 续**：第 4 格已闭合（H11 桌面那一半，提交 `1cbcbf34`，
 读数与两条被自己臂台否证的判断在 §9.15）；第 3 格（#17 接链 + 反方向判据）、第 6 格
 （CI 线那 2 处死链）与此前的第 5 格（两组红，§9.16）都已闭合。
-⇒ **这一节只剩第 7 格，而且它现在欠的只有一件事**：`verify:mobile-habits` 的
-4–8 步设备读数与 9 张证据图（载体本身已入库 `cd546407`）。
+⇒ ~~**这一节只剩第 7 格，而且它现在欠的只有一件事**：`verify:mobile-habits` 的
+4–8 步设备读数与 9 张证据图（载体本身已入库 `cd546407`）。~~
+✅ **07 01:1x 现量：第 7 格闭合；07 03:2x 在"最终那份文本"上重取了一遍闭合读数 ⇒ 这一节五格全部有闭合读数，没有一格是以"等谁"收尾的。**
+最新绿的那趟 = `H12_GREEN round=1` / `ROUND_EXIT=0` / **通过 39 项，失败 0 项**，逐条读数与九张入库图在 §9.20。
+📌 这一格从"半闭合"到"闭合"之间**没有发生任何产品改动** —— 变的只有三件事：负载门放行了一次，
+那条"跨设备"腿被按设计补上了重新输入凭据这一步，以及第 ⑨ 条判据的**口径**看图之后修准了
+（01:1x 那趟的 38 项与 03:2x 这趟的 39 项**不是同一份判据文本**：中间修了三处探针缺陷 + 一处口径）。
+留这一段是为了让下一位不把"再跑一遍就绿了"读成"上一次那三处失败其实不算数"，
+也不把 39 读成"多了一条产品判据"（多的那一项**就是新加的第 ⑨ 条本身**；现量：两趟的 ✅ 尾差一条
+`9 张证据图里没有重复采集…`，旧那趟以 `两次写入都到了对端` 收尾）。
 
 🔴 **第 6 格自愈之后，`check:docs` 又红了 6 处，但那**不是**同一批**（别把这条读成"第 6 格没修完"）：
 死链目标是 P0 体验整改 / IA 审计那条线**今晚 19:35–21:19 新写的 4 枚未跟踪文档**
@@ -6629,6 +6637,17 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 就是 ` M` / `AM` 态）。现量：`pnpm run check:docs` 取末尾那 6 段 `-> 路径（…git 没有跟踪它）`。
 ⇒ 与第 6 格同族同处置：**他们 `git add` 即自愈，本会话不代提交**（同一理由：整篇新文档的
 内容归属不在我这儿，"一条命令可回退"不成立）。
+
+📌 **07 01:3x 现量更正（给下一个跑 `check:docs` 的人，别让 TA 以为是自己的）**：上面那句"又红了 6 处"
+已经开始漂 —— 这一趟 `pnpm run check:docs` 报的是 **21 处链接 / 10 枚未跟踪目标**，
+新加进来的那一批属 **Linux 适配线**（`docs/adr/0057-native-system-library-linking.md`、
+`docs/plans/linux-adaptation.md`、`docs/runbooks/linux-dev-box.md`、
+`docs/reference/native-library-licenses.md`），宿主是 `apps/desktop-linux/README.md`、
+`docs/reference/build-matrix.md`、`docs/reference/environment-traps.md`、
+`docs/plans/multi-end-unified-strategy.md`。⇒ **本线那两格没有一处命中**：第 6 格原来那 2 处的目标
+`docs/research/ci-proxy-traffic-attribution.md` 现量**已被跟踪**（`git ls-files --error-unmatch` 通过），
+而 21 条里逐条按目标去重后**没有一条落在我改过的文件上**。现量命令（别抄条数，它一小时就漂）：
+`pnpm run check:docs 2>&1 | grep -oE '\-> [^ ]+' | sort -u`。
 ⚠️ 顺带一条**否证**：本节原先记的 `check:md-tables` 在 `docs/plans/trash-and-archive.md:744`
 那一格红，22:1x 现量已经不复存在（`pnpm run check:md-tables` ⇒ rc=0，"12 个文件…第四类基线 3 行"）。
 是回收线自己补上的，不是本会话动的。
