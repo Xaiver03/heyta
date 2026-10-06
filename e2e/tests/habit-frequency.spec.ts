@@ -22,7 +22,14 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
-import { addHabit, boxOf, openApp, selectHabit, switchView } from './helpers';
+import {
+  addHabit,
+  boxOf,
+  openApp,
+  selectHabit,
+  switchTheme,
+  switchView,
+} from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 
@@ -256,8 +263,7 @@ test.describe('习惯频次编辑器（H5，web 端）', () => {
     await page.getByRole('button', { name: '每周挑几天' }).click();
     await expectSummary(page, /每周/, '暗色前置：先切到每周');
 
-    await page.getByRole('button', { name: '切换到暗色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await switchTheme(page, 'dark');
 
     await openPanel(page, '阅读');
     const text = (await summary(page).textContent()) ?? '';

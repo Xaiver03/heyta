@@ -6320,3 +6320,50 @@ ASIDE h 351->299  →  SECTION h 130->78（−52）  →  里面 DIV h 44->0 + F
 | 图 | `apps/web/evidence/shell-sidebar-height/{before-first-click,after-first-click,resizer-hit-box}.png`，**三张都打开看过**。`after-first-click` 读到的就是结果本身：表单收起、那一行一格没动、编辑器开在行尾 |
 | 夹具的两处自纠 | ① 第一版只加 1 条任务 ⇒ 页面不滚 ⇒ **坏形态里"第一下点击"仍然绿**（是臂台照出来的，不是看出来的）；现在触发条件本身写成断言（文档比视口高、`scrollY` 停在最大值、表单 `aria-expanded=true`）。② 快照必须在 down 与 up **之间**取：松开之后编辑器自己会撑高，那时再比"文档高度没变"就把两种效应混成一格。③ §3 末的归因更正（收起挂在**面板外捕获 `pointerdown`**，不是失焦）。入档 traps **#355** |
 | 看图时顺手记下的 | 最靠下那一行的编辑器**朝下弹**，底边掉到折叠线以下（图里"清单"那一格被切了一半）。不是够不着（外壳仍整页滚，滚一下就在），但它是 §9.4 第 1 条"外壳不滚"之后**会变成够不着**的那一类 ⇒ 登记给那条，不另开单 |
+## B95（2026-10-06 12:0x–12:4x，本会话 H9 第三刀）：语言 + 主题从页头搬进「设置 → 显示」落完了，但**它照出一条只在"浮层开着"时才成立的 DOM 事实**
+
+产品负责人第 3 条：「中文语言不应该在设置里面弄吗？」这一刀做完 §9.2 第 4 步（清单在原计划 §9.4 第 3 条，
+逐条照做，读数在 `docs/plans/goal-layout-audit.md` §9.6）。
+
+### 1. 落地内容
+
+| 面 | 改动 |
+|---|---|
+| 界面 | `App.tsx`：页头动作区摘掉 `<LanguageSwitcher/>` 与那颗图标主题按钮，两者**一起**放进 `data-testid="display-pref-panel"`（详情视图 radiogroup 之后）。只搬一个会把 `language-switcher.spec.tsx` 钉的"与主题切换**并列**"拆开 |
+| 样式 | `ht-header__lang*` → `ht-settings__lang*`，那块 92 行从 `main-area.css` 整块搬进 `ai-panels.css`。**复用既有顶层族**：`check:row-single-source` 的 `HT_FAMILY_BASELINE` 余量为 0，新开一族必红 |
+| 词条 | `web.settings.display.langNote` / `.themeNote`，中英各一条 |
+| jsdom | `language-switcher.spec.tsx` 拆出 `mountIntoSettings()` / `closeSettings()`；`theme-boot-no-persist.spec.tsx` 的 `themeButton()` 找 `[data-testid="theme-toggle"]` 并钉它在设置那一节里、**不在**页头；`openSettingsViaAvatar` 从三份逐字相同的本地副本收成一份导出（`apps/web/tests/open-settings-via-avatar.ts`），另两份形态不同的留原处、理由写文件头 |
+| e2e | `helpers.ts` 加 `openSettingsSheet` / `openSettingsView` / `closeSettingsSheet` / `switchTheme`；9 份 spec 里 13 处散点"点主题按钮 + 断言 `data-theme`"换成一次 `switchTheme`；`lang-shots` / `language-first-launch` / `calendar-day-en` / `theme-switch-contrast` 的锚点与特写目标跟着改 |
+
+### 2. 🔴 这一刀照出的那条机制（不是本单造成的缺陷，本单是揭发者）
+
+**设置是条件渲染的浮层：它开着的时候，范围列 `.ht-sidebar` 根本不在 DOM 里**（那一列只存在于有范围的视图）。
+症状：把 14 份 jsdom 用例改成"先进设置再断言"之后 **5 枚红**，全部红在"读到了空文本"，
+没有一枚说"那个元素不存在"—— 因为 `shellText()` 那类 helper 把"没找到"返回成空字符串。
+✅ 处置三件，缺一件就会把这条重新埋回去：
+① 锚点换成同一次挂载里**始终存在**的 `rail-help`（`language-first-launch` 那张清单里预想的方案，实测成立）；
+② `shellText()` 找不到范围列就**抛**，不返回空串 —— "读到空字符串"与"界面是英文的"必须在载体上可区分；
+③ 位置判据**两头钉**：`closest('[data-testid="display-pref-panel"]')` 命中 **且** `closest('.ht-header__actions')` 为 `null`。
+只钉前一半时，"搬过去了"和"两处都留着"在判据上完全同形。
+
+### 3. 看图抓到、断言没抓到的一格
+
+`h9c-lang-en-dark-660-display.png` 里主题按钮被列向 flex 的 `stretch` 拉成一条**整宽横条**。
+所有断言（存在 / 可点 / 文案 / 位置）全绿。补 `.ht-settings__theme-toggle { align-self: flex-start; }` 后复跑再看。
+这是本仓第**三**次同一形状（前两次记在同文 §8 与 §9.5）：**判据天然只验"写了什么"，不验"看得见的有多少"**。
+
+### 4. 读数
+
+`pnpm --filter @heyta/web typecheck` RC=0；web **1998 passed | 13 skipped**（150 文件）；i18n 26；
+`check:ui-language` RC=0（zh 3254 / en 3254）、`check:layering` RC=0、`check:design` RC=0；
+e2e 类型载体 RC=0；e2e 第一批 `language-first-launch` 5 passed、第二批 14 份 **66 passed RC=0**；
+取证载体 `HEYTA_LANG_TAG=h9c` **4 passed / 18 张图**，人打开看了其中三张（其中两张直接产出了 §3 那条修复）。
+
+### 5. 本单仍然没闭合的（别读成已完）
+
+1. **§9.4 第 3 条要求的那枚语言中立字形标记（"文/A"）没做**。现在的识别手段是分组可见标签「语言」+
+   两项各写自己的自称（`中文` / `English`，改造前就在）。代价如实记下：一个**完全读不懂**当前界面语言的人，
+   此刻要先能读出「设置」两个字。要补的那位**判据要跟着加**，否则"补了"与"没补"在载体上同样不可区分。
+2. **§9.2 第 3 步**（同步设置搬进 设置 → 同步、rail 齿轮随之删除）仍未动 —— 它和 §9.4 第 1 条剩下的
+   "外壳不滚"那一半、以及 H10 的把手，是同一批要一起想的。
+3. 本单**没有**在四端当前产物上验（`pnpm reinstall:all` 未跑）；`FULLCHECK-01` 那一档仍开着。

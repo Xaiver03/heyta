@@ -25,7 +25,11 @@
  * 一份"靠探针写进去的数据"渲染出的界面，证明不了用户点出来的数据能渲染。
  */
 import { expect, test } from '@playwright/test';
-import { openApp, switchView } from './helpers';
+import {
+  openApp,
+  switchTheme,
+  switchView,
+} from './helpers';
 
 const ADD_PLACEHOLDER = '新习惯，例如「喝水」';
 
@@ -304,8 +308,7 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
     const id = await createHabit(page, '喝水');
     await createHabit(page, '阅读');
 
-    await page.getByRole('button', { name: '切换到暗色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await switchTheme(page, 'dark');
 
     const selected = page.locator(`[data-testid="habit-row-${id}"]`);
     await selected.click();

@@ -466,6 +466,8 @@ PWA 里必然无事发生的「检查更新」· 记忆面板「忘掉」不加�
    （进 设置 → 同步 一节，rail 齿轮随之删除）。
 3. **语言分段控件仍在页头**（§9.2 第 4 步未动）。它要同时改 4 份判据与
    `i18n-multilingual.md` 那两节，不能只改界面留两套状态。
+   ✅ **状态更新（10-06 12:4x）：这一条随 §9.6 落地** —— 下面那张施工清单是当时的现量，
+   逐条怎么做的、读数、以及**那一格没做到的**（语言中立字形标记）都记在 §9.6。
    🔴 **施工清单（现量过一遍才写的，下一位可以直接照做）**：
    · **落点**：设置浮层里那一节"显示"（`App.tsx:2607`，标题词条 `web.settings.display.title`，
      现在里面已经有详情列的 展开/收起 两档）—— 把 `<LanguageSwitcher/>` 与页头那颗
@@ -534,3 +536,54 @@ B94 揭出的那条旧缺陷（一栏收起 52px ⇒ 整篇文档矮 52px ⇒ `s
 ⚠️ 台账卫生（不是本单的活，登记给下一位读号的人）：`docs/reference/environment-traps.md` 的工作树里
 **#342 出现了两枚**（HEAD 里 0 枚 ⇒ 两枚都来自未提交那批），而 **#344–#351 是空号**、
 #326–#343 物理上排在 #352–#355 之前。拿裸号去读正文前先确认是哪一批。
+
+### 9.6 H9 第三刀的落地与读数（2026-10-06 12:0x–12:4x）
+
+§9.4 第 3 条那张施工清单逐条照做完：`<LanguageSwitcher/>` 与页头那颗主题按钮**一起**搬进
+设置浮层「显示」那一节（`data-testid="display-pref-panel"`，详情视图 radiogroup 之后），
+类名族 `ht-header__lang*` → `ht-settings__lang*`，样式块从 `main-area.css` 整块搬进
+`ai-panels.css` 里 `.ht-settings__*` 那一片的邻居 —— **复用既有顶层族**，
+因为 `check:row-single-source` 的 `HT_FAMILY_BASELINE` 余量为 0，新开一族必红。
+两条说明词条（`web.settings.display.langNote` / `.themeNote`）中英同步。
+
+| 门禁/读数 | 结果 |
+|---|---|
+| `pnpm --filter @heyta/web typecheck` | RC=0 |
+| `pnpm --filter @heyta/web test` | **1998 passed \| 13 skipped**（150 文件） |
+| `pnpm --filter @heyta/i18n test` | 26 passed |
+| `check:ui-language` | RC=0，zh **3254** / en **3254**（逐键对账相等） |
+| `check:layering` / `check:design` | RC=0 / 无硬编码设计变量 |
+| e2e 类型载体 `tsc --noEmit -p tsconfig.detail-pane.json` | RC=0（本单把 6 份 spec 点名加进 include：`shell-sidebar-height` `theme-switch-contrast` `language-first-launch` `calendar-day-en` `inbox-dida` `ai-assistant`；**没有**加 `countdown-export`/`task-row-touch-target`/`calendar-cells` —— 那三份带着别的线的 3+1+1 条既有错误，通配会把别人的红算进本单） |
+| e2e 第一批（本单直接命中的） | `language-first-launch` **5 passed**；另 15/16 → 修完复跑绿 |
+| e2e 第二批（14 份含 `shell-sync-rail`/`shell-sidebar-height`/`rail-trash-anchor`/`account-menu`/`settings-exit`/`admin-console`/`detail-pane-collapse`/习惯族/`calendar-cells`/`countdown-export`/`task-row-touch-target`） | **66 passed，RC=0** |
+| 取证载体 `HEYTA_LANG_TAG=h9c` | **4 passed / 18 张图** |
+| 图 | 人打开看了 `h9c-lang-zh-CN-light-1280-display.png`、`h9c-lang-en-dark-660-display.png`、`h9c-lang-en-light-1280.png` |
+
+🔴 **看图抓到的那一格，不是断言抓到的**：主题按钮在列向 flex 的分区里被 `stretch` 拉成一条整宽横条
+（`h9c-lang-en-dark-660-display.png` 里那条"切换到亮色主题"占满整行）。补
+`.ht-settings__theme-toggle { align-self: flex-start; }` 后复跑再看。
+这是本仓第 **三** 次"15 条断言全绿的截图里界面是错的"（前两次见 §8 与 §9.5）——
+判据写的是"按钮存在且可点"，它天然回答不了"它长什么样"。
+
+**清单里那四份判据的落地方式**（都改了，没删）：
+① `language-switcher.spec.tsx` 位置判据改成**两头钉** ——
+`closest('[data-testid="display-pref-panel"]')` 命中 **且** `closest('.ht-header__actions')` 为 `null`；
+只钉前一半时"搬过去"和"两处都留着"读起来完全一样。
+② `e2e/lang-shots` 那份的用例名与位置判据一起改，并把特写目标从 `.ht-header__actions` 换成
+`display-pref-panel`（否则那张特写图从此对着一个空的页头）。
+③ `language-first-launch` 的语言中立锚点换成 `rail-help`（清单里预想的方案，实测成立）。
+④ `detail-pane-collapse` T5 只改注释里的例子，阈值未动。
+反向存在性判据加了：页头动作区里既没有语言分组也没有主题按钮（jsdom 与 e2e 各一份）。
+
+🔴 **一条只在改判据时才现形的机制**（入档 `BLOCKED.md` 对应条目）：设置是**条件渲染**的浮层，
+它开着的时候范围列 `.ht-sidebar` **不在 DOM 里** —— 那一列只存在于有范围的视图。
+于是所有原来锚在「收集箱 / Inbox」文本上的断言在"打开设置"之后**必然假红**。
+本单的处置：`mountIntoSettings()` / `closeSettings()` 拆开挂载与进入设置，锚点改 `rail-help`，
+`shellText()` 改成找不到范围列就**抛**（"读到了空字符串"与"界面是英文的"必须在载体上可区分）。
+
+⚠️ **仍然开着的一格，不包装成完成**：§9.4 第 3 条要求的那枚语言中立**字形标记**（"文/A"）**没做**。
+现在的识别手段是分组可见标签「语言」+ 两项各写自己的自称（`中文` / `English`，改造前就在、本轮保留）。
+判断依据：设置浮层里每一节的标题都是纯文字，插一枚图标会让它成为那一面唯一的例外；
+而"找不到去哪切语言"这个可发现性问题本来就属于"入口在页头"那一档，搬进设置后入口正是负责人要的位置。
+⚠️ 但**它换来的代价是真的**：一个完全读不懂当前界面语言的人，此刻要先能读出「设置」两个字。
+下一位若要补那枚标记，判据要跟着加（否则"补了"与"没补"在载体上同样不可区分）。

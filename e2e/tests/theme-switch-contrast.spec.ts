@@ -10,9 +10,13 @@
  * ⚠️ **2026-10-03 的载体变更（判据一条没动）**：顶栏那个语言控件不再是 `.ht-chip`，
  * 换成了带可见标签的分组（`LanguageSwitcher.tsx` 文件头记着为什么）。
  * 本文件量的载体随之换成 `.ht-header__lang-option`，而**定位符仍按 testID 找**
- * —— 它测的是"页头那个语言项在切主题的那一瞬读不读得出"，与它穿哪件 CSS 无关。
- * 🔴 新那件 CSS 刻意**不写任何 transition**（`main-area.css` 里写了这条理由），
- * 所以判据 1 现在是"保持"而不是"修复"。变异：往 `.ht-header__lang-option` 上加
+ * —— 它测的是"那个语言项在切主题的那一瞬读不读得出"，与它穿哪件 CSS 无关。
+ * ⚠️ **2026-10-06 载体再搬（判据一条没动）**：语言与主题一起进了 设置 → 显示
+ * （H9 第三刀），类名随之叫 `.ht-settings__lang-option`、CSS 住在 `ai-panels.css`。
+ * 这一条现在**必须先打开设置**才量得到 —— 而"切主题的那一瞬"这件事本身没换地方：
+ * 开关与被量的那一项**就在同一节里**，中间没有换页。
+ * 🔴 那件 CSS 刻意**不写任何 transition**（`ai-panels.css` 里写了这条理由），
+ * 所以判据 1 现在是"保持"而不是"修复"。变异：往 `.ht-settings__lang-option` 上加
  * `transition: background var(--ht-duration-fast)` ⇒ 判据 1 当场红。
  *
  *
@@ -36,13 +40,14 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { openApp } from './helpers';
+import { openApp, openSettingsSheet } from './helpers';
 
 /** 与 `calendar-cells.spec.ts` 同一个理由：不钉 `?lang=` 会得到英文界面。 */
 const APP_ZH = '/?lang=zh-CN';
 /**
- * 载体：页头语言分组里**当前语言那一项**（中文界面 ⇒ zh 项是选中态）。
- * 按 testID 找而不是按类名 —— 类名 2026-10-03 换过一次，而这条判据不该跟着漂。
+ * 载体：语言分组里**当前语言那一项**（中文界面 ⇒ zh 项是选中态）。
+ * 按 testID 找而不是按类名 —— 类名 2026-10-03 与 2026-10-06 各换过一次，
+ * 而这条判据不该跟着漂。
  */
 const LANG_OPTION = '[data-testid="language-option-zh-CN"]';
 const AA_BODY = 4.5;
@@ -99,9 +104,11 @@ function contrastOf(page: Page, selector: string) {
   }, selector);
 }
 
-test('🔴 主题切换的那一瞬，页头语言项的文字不许压在旧主题的底上', async ({ page }) => {
+test('🔴 主题切换的那一瞬，语言项的文字不许压在旧主题的底上', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openApp(page, APP_ZH);
+  // 🔴 语言项与主题开关都在 设置 → 显示 那一节里（条件渲染的浮层）⇒ 先走真路径过去。
+  await openSettingsSheet(page);
 
   const errors: string[] = [];
   page.on('console', (m) => {
@@ -110,7 +117,7 @@ test('🔴 主题切换的那一瞬，页头语言项的文字不许压在旧主
   page.on('pageerror', (e) => errors.push(e.message));
 
   const steady = await contrastOf(page, LANG_OPTION);
-  expect(steady, '页头找不到语言控件那一项 —— 后面量的都是空气').not.toBeNull();
+  expect(steady, '找不到语言控件那一项（设置没打开？还是那一节没渲染？）—— 后面量的都是空气').not.toBeNull();
   // 前提：稳态本身得合规。稳态就不合规的话，下面那条"切换瞬间 ≥ 4.5"没有意义。
   expect(
     steady!.ratio,

@@ -41,6 +41,22 @@
  * `aria-current`、点当前项无操作，这五件一条都没动 ——
  * 判据仍在 `apps/web/tests/language-switcher.spec.tsx`。
  *
+ * ## 🔴 2026-10-06 摆位再变：从页头搬进 设置 → 显示（工单 H9 第三刀）
+ *
+ * 产品负责人：「中文语言不应该在设置里面弄吗？」—— 与移动端（`SettingsScreen.tsx`
+ * 的「语言」一节）和落地页的既有形态对齐之后，页头那一格是**三端里唯一的例外**。
+ *
+ * 这次搬家**换掉的是"永远看得见"，没换掉"自己说明自己"**：上面第 1 条规范
+ * （控件必须自己说明自己是什么）原来靠页头常驻来免解释，现在由
+ * 设置里那一格的可见标签 + 一句说明（`web.settings.display.langNote`）承担。
+ *
+ * ⚠️ **代价要写清楚，别让它读起来像纯收益**：看不懂当前界面语言的人，
+ * 现在要先认出头像菜单里那一项「设置」才能到这里。兜住它的是解析链本身
+ * （`resolveInitialLocale`：`?lang=` > 浏览器语言 > 默认中文），
+ * 所以"英文浏览器首启看到中文"这一档**不会发生**；剩下的是
+ * "浏览器说中文但本人更想用英文"—— 那一档的人读得懂中文界面，找得到设置。
+ * 裁决与现量：`docs/plans/goal-layout-audit.md` §9.6。
+ *
  * ## 几个刻意的选择
  *
  * - **不做成下拉**（落地页那颗 globe 菜单是营销面，切语言是**整页跳转**，
@@ -74,7 +90,7 @@ import { pushLocaleToAccount } from '../../lib/locale-account.js';
 import { useLocalePreference } from '../../lib/locale-preference.js';
 
 /** 可见标签的 `id`。只此一个实例（顶栏），所以不需要后缀。 */
-const LABEL_ID = 'ht-header-lang-label';
+const LABEL_ID = 'ht-settings-lang-label';
 
 export function LanguageSwitcher(): React.JSX.Element {
   const { locale, t } = useI18n();
@@ -83,14 +99,14 @@ export function LanguageSwitcher(): React.JSX.Element {
 
   return (
     <div
-      className="ht-header__lang"
+      className="ht-settings__lang"
       // 一组互斥选项 = `role="group"`（不是 radiogroup：那要自己实现方向键漫游，
       // 而这里 Tab 到每一项本来就是可用的）。名字由**可见**的那个标签提供。
       role="group"
       aria-labelledby={LABEL_ID}
       data-testid="language-switcher"
     >
-      <span id={LABEL_ID} className="ht-header__lang-label ht-type-caption">
+      <span id={LABEL_ID} className="ht-settings__lang-label ht-type-caption">
         {label}
       </span>
       {LOCALES.map((option) => (
@@ -99,8 +115,8 @@ export function LanguageSwitcher(): React.JSX.Element {
           type="button"
           className={
             option === locale
-              ? 'ht-header__lang-option ht-header__lang-option--on ht-type-caption'
-              : 'ht-header__lang-option ht-type-caption'
+              ? 'ht-settings__lang-option ht-settings__lang-option--on ht-type-caption'
+              : 'ht-settings__lang-option ht-type-caption'
           }
           data-testid={`language-option-${option}`}
           // 当前语言：标出来，但点了不做事（下面 onClick 直接返回）。

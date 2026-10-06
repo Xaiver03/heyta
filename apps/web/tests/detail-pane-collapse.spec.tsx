@@ -31,6 +31,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { emptyState } from '@heyta/op-log';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
+import { openSettingsViaAvatar } from './open-settings-via-avatar.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { loadDetailPane, saveDetailPane } from '../src/features/shell/detail-pane-pref.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
@@ -81,19 +82,6 @@ function detailAttrOf(el: HTMLElement): string | null {
 }
 
 /** 头像菜单 → 设置（`app-mount.spec.tsx` 里那条路的同一写法，不另发明一条）。 */
-async function openSettings(el: HTMLElement): Promise<void> {
-  const avatar = el.querySelector<HTMLButtonElement>('[data-testid="account-menu-avatar"]');
-  expect(avatar, '找不到头像').not.toBeNull();
-  await act(async () => {
-    avatar!.click();
-  });
-  const item = el.querySelector<HTMLButtonElement>('[data-testid="account-menu-settings"]');
-  expect(item, '头像菜单里没有「设置」').not.toBeNull();
-  await act(async () => {
-    item!.click();
-  });
-}
-
 describe('A. 详情列 pref 模块：缺省、词表、永不抛', () => {
   it('没有存过 ⇒ 默认 open（"即使没东西也空在那里"是产品原话，收起必须是用户主动）', () => {
     expect(loadDetailPane()).toBe('open');
@@ -186,7 +174,7 @@ describe('C. 设置里那一项（恢复路径②）', () => {
     localStorage.setItem(STORAGE_KEY, '"collapsed"');
     const el = await mountApp();
     expect(detailAttrOf(el), '挂载时没把存储里的收起读回来').toBe('collapsed');
-    await openSettings(el);
+    await openSettingsViaAvatar(el);
 
     const group = el.querySelector('[data-testid="detail-pane-pref"]');
     expect(group, '设置里没有详情面那一组').not.toBeNull();
@@ -205,7 +193,7 @@ describe('C. 设置里那一项（恢复路径②）', () => {
 
   it('反方向也走一次：从 open 选「收起」⇒ collapsed', async () => {
     const el = await mountApp();
-    await openSettings(el);
+    await openSettingsViaAvatar(el);
     const radios = [...el.querySelectorAll<HTMLInputElement>('input[type="radio"][name="detail-pane-pref"]')];
     expect(radios).toHaveLength(2);
     await act(async () => {
@@ -217,7 +205,7 @@ describe('C. 设置里那一项（恢复路径②）', () => {
 
   it('🔴 说明句必须写出"什么时候这一项不起作用"（窗口太窄/太矮时它自己不出现）', async () => {
     const el = await mountApp();
-    await openSettings(el);
+    await openSettingsViaAvatar(el);
     const note = el
       .querySelector('[data-testid="detail-pane-pref"]')!
       .previousElementSibling!.textContent!.trim();

@@ -58,7 +58,11 @@ import {
   looksBlank,
   looksSmeared,
 } from '../../scripts/screenshots/png-stats.mjs';
-import { openApp, switchView } from './helpers';
+import {
+  openApp,
+  switchTheme,
+  switchView,
+} from './helpers';
 import {
   TAB,
   addCountdownEvent,
@@ -294,7 +298,7 @@ test.describe('W7 · 导出成品图：零出站、尺寸对账、token 跟着�
     const lightPath = `${EVIDENCE}/card-light.png`;
     await exportCardImage(page, lightPath);
 
-    await page.getByRole('button', { name: '切换到暗色主题' }).click();
+    await switchTheme(page, 'dark');
     const darkBackground = await tokenRgb(page, '--ht-color-background');
     // 前提：主题**真的**切了。两值相同的话，下面那条"跟着走"就是恒真。
     expect(

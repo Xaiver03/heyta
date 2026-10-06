@@ -2158,7 +2158,9 @@ export function App(): React.JSX.Element {
             {/*
               🔴 工单 H9（2026-10-06）：`<SyncBar/>` **不在这里了** —— 它搬进 rail 底部
               （见下面 `rail-help` 之后那一行）。页头这一排原本平铺着
-              状态 / 立即同步 / 同步设置 / 语言 / 详情开关 / 主题 六枚不相关控件，
+              状态 / 立即同步 / 同步设置 / 语言 / 详情开关 / 主题 六枚不相关控件
+              （2026-10-06 两刀之后只剩**详情开关**一枚：同步整组下移 rail 底部，
+              语言与主题搬进 设置 → 显示 —— 裁决见 §9.3/§9.6），
               而"同步"在滴答里是左下角的东西。裁决与现量：
               `docs/plans/goal-layout-audit.md` §9.1 第 1 行。
               ⚠️ `ConflictDialog` 与两张首启面板**留在页头这一层**：它们是
@@ -2173,9 +2175,6 @@ export function App(): React.JSX.Element {
             {/* 🔴 G-27：账号级补签面板。挂在隐私面板**之后** —— 两道闸同时成立时，
                 "这台设备还没被问过"是更前置的那句话，界面不许同时摆两个模态。 */}
             <LegalReconfirmSheet />
-            {/* 语言切换。外壳顶栏的全局控件区，与主题切换并列 ——
-                这是**真实用户唯一能把界面切到英文的入口**（见该文件的注释）。 */}
-            <LanguageSwitcher />
             {/*
               详情列的开关（工单 W4 ②的第一条路径）。
               与主题按钮同一档位：**纯图标 + 自带可访问名**，名字说的是"点下去会怎样"
@@ -2202,26 +2201,6 @@ export function App(): React.JSX.Element {
               ) : (
                 <PanelRightClose size={ICON_SIZE.md} aria-hidden="true" />
               )}
-            </button>
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
-              // 主题按钮是纯图标，所以必须自带可访问名（AGENTS.md §5）。
-              aria-label={
-                theme === 'light'
-                  ? t('common.a11y.toDarkTheme')
-                  : t('common.a11y.toLightTheme')
-              }
-              onClick={() => {
-                const next: Theme = theme === 'light' ? 'dark' : 'light';
-                // 🔴 这是**唯一**记账的地方：启动时的那次 `applyTheme` 只改 DOM。
-                // 否则"用户没做过选择"与"用户选了亮色"在存储里长得一模一样，
-                // 系统偏好从此再也进不来（`lib/theme.ts` 里记着症状）。
-                rememberThemeChoice(next);
-                setTheme(next);
-              }}
-            >
-              {theme === 'light' ? <Moon size={ICON_SIZE.md} /> : <Sun size={ICON_SIZE.md} />}
             </button>
           </div>
         </header>
@@ -2677,6 +2656,40 @@ export function App(): React.JSX.Element {
                   </label>
                 ))}
               </div>
+              {/*
+                🔴 **界面语言**（H9 第三刀，2026-10-06 从页头搬进来）。
+                它自带可见标签「语言」（`aria-labelledby` 指向那个标签），所以这里
+                **不再补一行标题** —— 两个标题会被读成两格设置。
+                搬走的代价与兜法写进 `LanguageSwitcher.tsx` 文件头。
+              */}
+              <p className="ht-settings__hint">{t('web.settings.display.langNote')}</p>
+              <LanguageSwitcher />
+              {/*
+                **主题**（与语言同一刀搬进来，两者原来就是并列的一对"显示偏好"）。
+                页头那一枚是**纯图标 + aria-label**，那是页头的规矩（那一排全是图标）；
+                在设置里同一枚控件必须**把字写在脸上** —— 所以这里没有 `aria-label`，
+                可访问名就是可见文字（`common.a11y.toDarkTheme` 那两条措辞本来就写着
+                "点下去会怎样"，直接当文案用）。
+              */}
+              <p className="ht-settings__hint">{t('web.settings.display.themeNote')}</p>
+              <button
+                type="button"
+                className="ht-btn ht-btn--ghost ht-settings__theme-toggle"
+                data-testid="theme-toggle"
+                onClick={() => {
+                  const next: Theme = theme === 'light' ? 'dark' : 'light';
+                  // 🔴 这是**唯一**记账的地方：启动时的那次 `applyTheme` 只改 DOM。
+                  // 否则"用户没做过选择"与"用户选了亮色"在存储里长得一模一样，
+                  // 系统偏好从此再也进不来（`lib/theme.ts` 里记着症状）。
+                  rememberThemeChoice(next);
+                  setTheme(next);
+                }}
+              >
+                {theme === 'light' ? <Moon size={ICON_SIZE.md} /> : <Sun size={ICON_SIZE.md} />}
+                <span>
+                  {theme === 'light' ? t('common.a11y.toDarkTheme') : t('common.a11y.toLightTheme')}
+                </span>
+              </button>
             </section>
             {/*
               🔴 **看得见的退出口**（2026-09-30 补）。此前这个浮层**没有任何出口**：

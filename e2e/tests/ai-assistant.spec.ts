@@ -33,6 +33,7 @@ import {
   openApp,
   resetStub,
   STUB_ENDPOINT,
+  switchTheme,
   switchView,
   waitForStubCalls,
 } from './helpers.js';
@@ -141,11 +142,9 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     // ══ 3b. 暗色主题（AGENTS §5「不测暗色主题就交付」是列出来的错）══════
     // 气泡的底色与描边全走 token，暗色下 `--ht-color-primary-subtle` 是半透明蓝、
     // `--ht-color-surface` 是近黑 —— 只看代码判断不了"角色还分得出来"，必须看图。
-    await page.getByRole('button', { name: '切换到暗色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await switchTheme(page, 'dark');
     await page.screenshot({ path: `${EVIDENCE}/2b-chat-dark.png`, fullPage: true });
-    await page.getByRole('button', { name: '切换到亮色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await switchTheme(page, 'light');
 
     // ══ 4. 同一段会话不再重复拦 ════════════════════════════════════════
     await page.locator('[data-testid="ai-assistant-input"]').fill('再说一遍');

@@ -27,7 +27,14 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
-import { addHabit, boxOf, openApp, selectHabit, switchView } from './helpers';
+import {
+  addHabit,
+  boxOf,
+  openApp,
+  selectHabit,
+  switchTheme,
+  switchView,
+} from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 
@@ -307,8 +314,7 @@ test.describe('习惯年视图（H7，web 端）', () => {
     const bgBefore = await cards(page)
       .first()
       .evaluate((el) => getComputedStyle(el).backgroundColor);
-    await page.getByRole('button', { name: '切换到暗色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await switchTheme(page, 'dark');
     const bgAfter = await cards(page)
       .first()
       .evaluate((el) => getComputedStyle(el).backgroundColor);

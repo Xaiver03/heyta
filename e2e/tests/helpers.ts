@@ -354,12 +354,49 @@ export async function openApp(
 /**
  * 🔴 「设置」**不是** rail 上的 tab —— 它收在**头像菜单**里（2026-09-29）。
  * 所以它必须单独一条路：点头像 → 点菜单里的「设置」。
+ *
+ * 这一条**语言中立**（只按 testID 走，不断言任何一句界面文字）：
+ * 语言与主题搬进 设置 → 显示 之后（H9 第三刀），英文界面的用例也要走得到那一层，
+ * 而那里没有「设置」这两个字。
  */
-export async function openSettingsView(page: Page): Promise<void> {
+export async function openSettingsSheet(page: Page): Promise<void> {
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('account-menu-settings').click();
-  await expect(page.locator('.ht-header__title').first()).toHaveText('设置');
   await waitForOverlaySettled(page, 'settings-sheet');
+}
+
+/** 收掉设置浮层（走它自己的出口，不是按 Esc —— 浮层里可能有别的 Esc 消费者）。 */
+export async function closeSettingsSheet(page: Page): Promise<void> {
+  await page.getByTestId('settings-sheet-close').click();
+  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
+}
+
+/**
+ * 走**真开关**切主题：设置 → 显示 里那枚（2026-10-06 之前它在页头那一排）。
+ *
+ * 🔴 为什么不许改成"往 localStorage 塞 `heyta.theme`"或 `emulateMedia`：
+ * `calendar-cells.spec.ts` 与 `habit-month-stats.spec.ts` 各记过一次同一个假绿 ——
+ * `emulateMedia({colorScheme:'dark'})` 只改 `prefers-color-scheme`，而应用一旦
+ * "用户显式选过"那一档就再也不看系统偏好，于是**用例名字写着暗色、量的是亮色**。
+ * 只有点真开关，`applyTheme` 与 `setTheme` 才同时改。
+ *
+ * 这条把"必须钉住 `html[data-theme]` 真的翻了"收在一处；起点若不是亮色，
+ * 断言会当场红（而不是悄悄量到反过来的那一档）。
+ *
+ * ⚠️ 开关住在条件渲染的浮层里 ⇒ 必须开→点→**关**：不关的话，调用方接下来那张
+ * 截图拍到的是设置浮层，不是它声称在量的那个视图。
+ */
+export async function switchTheme(page: Page, target: 'dark' | 'light'): Promise<void> {
+  await openSettingsSheet(page);
+  await page.getByTestId('theme-toggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', target);
+  await closeSettingsSheet(page);
+}
+
+/** `openSettingsSheet()` + 中文界面上"标题真的是设置"那一条。 */
+export async function openSettingsView(page: Page): Promise<void> {
+  await openSettingsSheet(page);
+  await expect(page.locator('.ht-header__title').first()).toHaveText('设置');
 }
 
 /**

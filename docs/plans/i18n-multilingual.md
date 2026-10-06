@@ -780,6 +780,30 @@ node scripts/check-pricing-consistency.mjs
    🔴 那条提交信息里"当时已经过了午夜"这句归因是**错的** —— 时间戳是 17:55，
    没有任何午夜可言，写错就是写错。留在这里是因为提交信息改不掉：
    **写进历史里的因果句也是断言**，被否证就要在能改的地方撤回。
+   🔴 **2026-10-06 摆位再变（上面"顶栏的控件"那句随之过期，工单 H9 第三刀）**：产品负责人
+   「中文语言不应该在设置里面弄吗？」。`<LanguageSwitcher/>` 与页头那颗主题按钮**一起**搬进
+   设置浮层的「显示」那一节（`data-testid="display-pref-panel"`，紧跟详情视图 radiogroup）。
+   上面那**四条规范判据一条没动**（自说明 / 不借 `.ht-chip` 那层 / 触控高度 / 不用主色边框
+   表达选中），动的只是它住在哪 —— 而"自己说明自己是什么"在设置里反而更成立：
+   那里每一条都有可见标题与一句说明。类名族跟着换 `ht-header__lang*` → `ht-settings__lang*`，
+   样式块从 `main-area.css` 整块搬进 `.ht-settings__*` 那一片的邻居 `ai-panels.css`
+   （复用既有顶层族，不是新开一族 —— `check:row-single-source` 的基线余量为 0）。
+   新增两条说明词条 `web.settings.display.langNote` / `.themeNote`（中英各一条，`check:ui-language` 现量 3254/3254）。
+   - **搬走的代价如实记在这里**：页头不再有可见入口，于是"切语言/切主题"在**所有**载体里都多一步
+     "先开设置"。e2e 侧收成 `openSettingsSheet` / `openSettingsView` / `closeSettingsSheet` / `switchTheme`
+     四把助手（`e2e/tests/helpers.ts`），9 份 spec 里 13 处散点调用换成一次 `switchTheme`；
+     jsdom 侧 `openSettingsViaAvatar` 从**三份逐字相同**的本地副本收成一份导出
+     （`apps/web/tests/open-settings-via-avatar.ts`；另两份形态不同的留原处，理由写在该文件头）。
+   - **判据两头都钉**：设置里找得到（`closest('[data-testid="display-pref-panel"]')`）**且**页头找得到就红
+     （`closest('.ht-header__actions')` → `toBeNull`）。只钉前一半，"搬过去"和"两处都留着"读起来一样。
+   - 🔴 **一条只在这里现形的机制**：设置是**条件渲染**的浮层，它开着的时候范围列 `.ht-sidebar`
+     **根本不在 DOM 里**（那一列只存在于有范围的视图）。原来锚在「收集箱 / Inbox」上的断言因此**假红**；
+     锚点换成同一次挂载里始终存在的 `rail-help`，而 `shellText()` 改成"找不到范围列就抛"，
+     免得下一位再把"读到了空字符串"当成"界面是英文的"。
+   - 读数：web **1998 passed | 13 skipped**（150 文件）、i18n 26、`check:ui-language` / `check:layering` /
+     `check:design` / e2e 类型载体全 RC=0；e2e 两批 5 + 66 passed；取证载体
+     `HEYTA_LANG_TAG=h9c` **4 passed / 18 张图**，人打开看了三张 —— 其中两张照出主题按钮在列向
+     flex 里被拉成一条整宽横条，补 `align-self: flex-start` 后复跑再看。
 9. **`packages/sync-client` 的 `describeConflictPayload` 仍是中文，且会吐出内部标识符。**
    它返回一句中文（空载荷 `（空）`），其中一支还会把载荷的**字段名**拼进去（`completedAt: 123`）。
    现在加了一个结构化兄弟函数 `summarizeConflictPayload(payload)` →

@@ -23,7 +23,11 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
-import { openApp, switchView } from './helpers';
+import {
+  openApp,
+  switchTheme,
+  switchView,
+} from './helpers';
 
 const ADD_PLACEHOLDER = '新习惯，例如「喝水」';
 const APP_ZH = '/?lang=zh-CN';
@@ -227,8 +231,7 @@ test('M4 🔴 暗色要真的切过去（emulateMedia 不算），四格字色�
   // 🔴 主题由应用自己的开关决定（`html[data-theme]`），`emulateMedia` 改的是
   //   `prefers-color-scheme`，切不动它 —— 上一版这一条**过了但量的是亮色那张图**，
   //   是"用例名字比断言强"的假绿。断言必须钉住属性真的翻了。
-  await page.getByRole('button', { name: '切换到暗色主题' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await switchTheme(page, 'dark');
   await expect(page.getByTestId(`habit-month-rate-${id}`)).toBeVisible();
 
   const dark = await inkAndBackdrop(page, `habit-month-days-${id}`);
