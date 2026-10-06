@@ -1307,3 +1307,73 @@ FULLCHECK_RC=1
  1093 那一张登记表**从来不是**由当前声明算出来的，它是某个历史时刻的 expo 实验留下的安装态。
  也就是说**这一次没有把产品弄错**（961 才是当前声明的集），但**判据本身以前挡不住反过来的那种错** ——
  一份永远对不上当前 lockfile 的安装可以长期把登记表印胖而全绿。
+
+#### E 项第三批：整链走过许可证段，红在 e2e —— 并把"载体中途死了"补成一条会红的门
+
+ 这次整条 `pnpm check`（载体 = 本树 @ `d16e5d4c`+`876e1928`）**走过**了 1–76 段，
+ 包括上一次判红的那两格：`check:licenses` rc=0、`check:licenses:stamp` rc=0（`a60c9f81c96f52a8`）、
+ `check:image-license` rc=0、`check:gate-wiring` rc=0。链尾其余段逐段现量 rc=0：
+ `check:shell-unicode` / `shell-exit-chain` / `selfhost-entry-command` / `web-storage` / `web-migration` /
+ `web-artifact` / `script-snapshot` / `verify-script-copy` / `mobile-ai-anchors` / `android-gradle-remote` /
+ `apk-freshness` / `shell-erasure-parity` / `mobile-first-run-gate` / `screenshot:verify`（23 个目标）。
+
+ 🔴 **红在第 78 段 `check:ai-e2e`，而它不是产品红**：起跑 `✅ 4318 / 4319 都是空的` ⇒ 归属门放行，
+ 前 6 条 ✅（17 s 量级），**第 7 条起逐条在 ~130 ms 上红到套件尾**（`23 ✓ / 238 ✘`），
+ 取一条 `error-context.md` 才看到真身：`page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4318/`。
+ 全过程、第二半（后半程连的是**别人那棵树**的 dev server）与修法都写进 [traps #358](../reference/environment-traps.md)；
+ 这一轮的 `238 failed` **不作**任何产品结论，也不回填成"206 条缺陷"。
+
+ 补出来的判据（链 94 → **95** 段，新增第 77 段 `check:e2e-carrier`，插在 ai-e2e **之前**）：
+
+ | 落点 | 内容 |
+ |---|---|
+ | `e2e/reporters/carrier-signature.mjs` | 签名表单一所有者，**零 import**（`e2e/` 不在 pnpm 工作区内，根门禁只引得动这一半） |
+ | `e2e/reporters/carrier-health.mjs` | 命中即打印「这一轮 e2e **作废**，立刻停止（不是产品失败）」并以 **160** 退出（刻意不用 1） |
+ | 三份进链配置 | 各带一份报告器；少带一份由门禁判红 |
+ | `scripts/check-e2e-carrier.mjs` | 七臂自检（臂数由它自己打印）：真原文阳性对照 / 普通断言与 60 s 超时**不许**命中 / 签名表分母自检 / 三份配置逐份引用 / 摘一份必红（反证）/ 真子进程命中退 160 / 真子进程不命中不中止 |
+
+ ✅ 读数：`--self-test` **7 臂 0 失败**、真实检查 rc=0（`3 份进链配置各引用 …，签名表 4 枚`）、
+ `check:gate-wiring` rc=0（它把新这道门算进"链里被引用"的分母）。
+
+ 🔴 **这一格只补了一半**：报告器认"没人在"（传输层拒绝），**认不出"有人应答但不是我这棵树"**。
+ 而后者这次是**实际发生过**的 —— `apps/web/evidence/keyboard-cursor/` 下 6 枚证据图采集于 20:35–20:38、
+ 内容是真界面（人已打开看过），但那一刻 4318 上应答的是主检出的 server ⇒ 它们不是本树的证据。
+ 已按路径 `git checkout --` 还原成上一轮合法采集的那份（**没有**留成"看起来对"的图），
+ 干净重采等 ai-e2e 拿到端口窗口那一轮。要真闭合这一格需要往 `index.html` 注入一次性构建标记并逐条对账
+ （与 #356 同一条"写入方署名 + 读方判归属"的路）—— **本轮没做，登记成待办**。
+
+ 🔴 根因**不在并发这一维**：两次跑都停在同一处 ⇒ 去查"谁 kill 了本树的 vite"，命中本仓自己的跑前清场 ——
+ `scripts/check-ai-e2e-preflight.mjs:124` 的归属判定用 `args.includes(REPO_ROOT)`，而本机有
+ `…/01_PROJECTS/heyta` 与 `…/01_PROJECTS/heyta-wt-merge` 这对**互为前缀的兄弟目录名**，
+ 于是主检出的清场把本树的 vite 判成"本仓残留"SIGKILL 掉。
+ 🔴 文件头第 29 行本来就承诺了"多个检出/工作树互不误伤"，而代码没实现它 —— 这条的形状不是"缺判据"，
+ 是"承诺写在注释里"。`cwd` 那一支一直带分隔符（`REPO_ROOT + '/'`），漏的只有 args 这一支。
+
+ ✅ 修法与读数（逐项现量）：
+
+ | 落点 | 内容 | 读数 |
+|---|---|---|
+| 归属判定 | args 那一支改成**按路径比**（命中根路径后紧跟 `[A-Za-z0-9._+~%-]` ⇒ 另一个目录名，不算本仓）；纯判定抽成 `ownsProcess({args,cwd},root)` | `--self-test` ⇒ `ST_RC=0`（臂数由它自己打印） |
+| kill 主体 | 收进 `main()`，只在**直接运行**时执行 ⇒ 被 import 或被 `--self-test` 时零进程副作用 | 自检全程不碰真实进程 |
+| 消费者 | `check:ai-e2e` 前置 `--self-test`：**敢杀进程的的门先自证判得对** | `check:gate-wiring` rc=0 |
+| 变异 | 把分隔符判定退化成裸 `includes`（同目录写副本、跑完即删） | `MUT_RC=1`，红集**恰好只有臂 1**（证明咬的是"路径边界"这一维）；`scripts/__mutate*` 残留现量 0 枚 |
+| 相关门禁复跑 | `check:e2e-carrier` / `check:gate-wiring` / `check:shell-unicode` / `check:docs` / `check:doc-citations` | 各 rc=0 |
+
+ ⚠️ **两条边界，不包装成完成**：① 只修了**本树**这一份 —— 主检出那份前置门现量仍是 `args.includes(REPO_ROOT)`
+ （该文件在它那边是已提交状态、不由我代改），所以本树拿到干净 e2e 窗口的外部前提多一条"对面也落了这个修复"；
+ ② `e2e/` 里 19 个文件把 4318/4319 **硬编码**（`grep -rl` 现量），把端口彻底参数化是独立一批
+ （它会撞到别人会话正在跑的套件），本轮**没做**。
+
+ `pnpm -r test`（链最后一段）这一趟 rc=1，两条都要分开记：
+
+ 1. **一条真红形状**：`apps/mobile` 的 `tests/legal-recheck-mobile.spec.ts:215`
+ 「没配凭据时问 ⇒ 一个请求都不发，判 anonymous 且不拦」`Test timed out in 5000ms`（5043 ms），
+ 汇总 `Tests 1 failed | 771 passed (772)`。**单跑该文件 29/29 rc=0**，
+ 而跑动期间宿主负载从门上的 12 涨到 23–32（别人那条 Chrome + playwright）。
+ ⇒ 按 AGENTS §8 第 7 条的口径记：**这一格红由别人的负载消**，本轮**既不记产品失败、也不折进
+ `RTEST-UNHANDLED-01`**（那是 unhandled rejection，与超时不同形状），留一条"低负载重跑该包"的收口动作。
+ 2. **`pnpm -r` 默认在第一个失败处 bail**（日志末 `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL @heyta/mobile`）
+ ⇒ "20 枚有 `test` 脚本的包 vs 只有 15 行 `Tests … passed` 汇总"**不是**"有一层从来没被跑过"，
+ 而是被截断。这一趟拿到的通过条数是 **6696（15 个包）**，**不是全量**。
+ 全量收口动作：`pnpm -r --no-bail test` 一次，把 20 行汇总凑齐再对一次数（AGENTS §6 那条元规则要的是相等，
+ 不是"看起来都跑了"）。
