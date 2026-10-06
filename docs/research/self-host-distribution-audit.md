@@ -14344,3 +14344,57 @@ worktree**（`~/heyta-carriers/heyta-g62-1007`，分支 `feat/selfhost-g62-g44b`
 （豁免自托管 124 条）/ `check:selfhost-entry-command`（R1–R9 全过，新正文没多造一份入口命令抄件）各 rc=0；
 `@heyta/landing` 全量 **22 文件 / 1318 条**通过；`--filter "@heyta/landing..." typecheck` rc=0
 （第一次红在 `@heyta/shared-schema` 没 build —— 新开载体的必做步骤，不是代码问题）。
+
+### 8.277 G-44b（#64）四件套同趟落地：版本真源定在仓库根 `package.json`（`0.0.0`→`0.1.0`），生产者接上，README 与 C3 一起翻面（2026-10-07 00:5x–01:0x）
+
+§8.258 留下的结论是"**这四样必须一起动，缺一即红**"。这一笔就是那四样，提交 `bfe4497c`（在
+`feat/selfhost-g62-g44b` 上，与 §8.276 同一棵载体）。
+
+**先记拍板的那一步**（原先挂在"要人拍板"那一档，本轮由产品负责人一句"你能做的全部做掉"授权代拍）：
+
+| 决定 | 取值 | 理由与不选的那一侧 |
+|---|---|---|
+| 真源在哪 | 仓库根 `package.json` 的 `version` | 版本号**不是平台差异**（AGENTS §3.5 里 `apps/*` 只许有一处差异 = 注入哪个 SQLite 驱动），它是产品语义。不选"各宿主自己传"：那正是这件事烂在原地的成因 —— `b467e758` 把机制补成"宿主注入"之后**停在原地**，因为每个宿主都得记得传、而没有一个宿主有值可传 |
+| 第一个值 | `0.1.0` | 不选 `0.0.0`：那是"还没有版本"，不是版本 `0.0.0`，发出去就是把假版本写进运营面那张设备清单（`admin.routes.ts:340/394` 在读它）。不选 `git describe`/提交号：服务端那条形状是 `x.y.z[-prerelease]`，把 sha 塞进 prerelease 位会让"预发布"语义说谎，而逐构建对账另有 `org.opencontainers.image.revision` 那条路 |
+| 怎么到运行时 | `scripts/gen-app-version.mjs` → 生成物 `packages/app-host/src/app-version.generated.ts` → `createSyncClient()` 的**默认值** | 沿用本仓"唯一真源 + 生成物 + 门禁"那一族（`check:server-copy` / `check:legal-copy` / `check:entries` 同形）。宿主仍可覆盖，留给**自己另构建一份客户端**的人 |
+
+**C2 那一枚扫描集的洞（顺手补掉，属于"判据恰好放过它该管的那一枚"）**：C2 判的是
+"本仓库任何工作区的版本都不满足闸门"，而它的 `manifestRels` 只走 `packages/*`、`apps/*`、
+`server/package.json` —— **根 `package.json` 从来不在里面**。以前无所谓，因为真源还不存在；
+这一笔把真源定在根之后，它就是**唯一一枚要紧的那份**，漏在扫描集外等于让 C2 恰好放过它该管的。
+⇒ 补进 `manifestRels`，现量 `workspaceCount` 由 20 变 **21**、`workspaceVersions` 读出
+`["0.0.0","0.1.0","1.0.0"]`。
+
+**C3 翻面**：原先钉"没有 heyta 客户端发它 + 查询串只有那三个键"，现在钉四件新事实 ——
+① 构造点**恰好一处**（0 = 生产者又没了；>1 = 多了一条会漂的第二来源）；
+② 值必须来自注入（`this.options.appVersion`），客户端里写死字面量即红；
+③ 真源→生成物→接线三段每接错一处都红，且真源必须过服务端**自己的** `parseAppVersion`
+（解不开 = 记进设备清单的是沉默，而代码看起来"在发版本" —— 最难归因的那种假信号）；
+④ README 必须正面说出这件事、不许留着那句旧否定、并印着当前真源值（抄件恰好 1 处 + 阳性对照）。
+注入臂从 1 枚换成 **6 枚**，逐臂 `expectIds` 精确（`firedIds` 必须等于期望集，多响一枚也算臂坏）。
+
+**`checkpoint-gate.ts` 那句上游前提**（§8.258 留的第四条）：原文 "every release that reports one is
+newer than the cut, so silence can only mean a pre-reporting client" 在 heyta 一发 `0.x` 之后**不成立**。
+注释改成：本叉里"沉默"与"`0.1.0`"同判 old（闸门结果一样），但在 `unversionedDevices` 那一栏仍各归各 ——
+**别把低版本读成"旧的上游发布"，也别把沉默读成安全**。
+
+**顺带清掉的一份第二抄件**：`scripts/package-desktop.mjs:183` 原来写着 `appVersion: '0.0.0'`，
+现在读真源。它以前只是"Electron 包的字段"，现在同一列值会随同步上报进设备清单，
+那份字面量就从"无害"变成"会漂的第二来源"。
+
+读数：`server/tests/version-coupling.spec.ts` **17/17**（基线干净 + 全部臂各只让它该响的那几条响）；
+`@heyta/sync-client` **134/134**（含新两腿：给了必须带 / 没给一个字都不发 —— 第二腿判**键集合相等**，
+因为 `set('appVersion', undefined)` 会留下 `appVersion=undefined`，只查"不含那个词"抓不到多发的键）；
+`@heyta/app-host` **1526/1526**（含新那份 `sync-wiring-app-version.spec.ts` 3 条）；
+`check:app-version` / `check:gate-wiring` / `check:docs` / `check:claims` 各 rc=0。
+四枚链外臂另测：真源退回 `0.0.0` ⇒ 门禁红；手改生成物 ⇒ 门禁红；摘掉下载段的发送 ⇒ 那条腿红（rc=1）；
+接线不给默认值 ⇒ 那条腿红（rc=1）。
+
+⚠️ 三条边界，不写成"前置条件成立了"：
+① **翻面 ≠ 成立** —— README 前置条件 1 讲的是**版本空间**（heyta 的 `0.x` 对不上 `18.21.2` 那个上游号），
+   那一半仍不成立，自动 checkpoint 节奏对 heyta 账号仍然不可达；
+② **移动端打包里还有第二份版本声称**：`versionName "1.0"` / `MARKETING_VERSION = 1.0`，
+   连服务端那条 `x.y.z` 形状都不合（发出去会被 `parseAppVersion` 判成沉默）。它归各端打包链，
+   登记为 **G-74**；
+③ 本趟没跑 `pnpm -r test` 全量（载体上单跑的是那三个包 + server 那一份 spec），
+   全量那一格仍归 §8.266 的"落地时同一把尺复跑"。
