@@ -149,14 +149,32 @@ const tarPath = `/tmp/heyta-gate-${runId}.tar.gz`;
 
 console.log(`步骤 2：打包源码 ${DIRTY ? '**当前工作树**（--dirty）' : `已提交 ref ${short}`}`);
 if (DIRTY) {
-  // ⚠️ 这一条必须是 `git ls-files -co --exclude-standard`：`-c` 带已跟踪、`-o` 带
-  //    "未跟踪但未忽略"（⇒ 我这轮新写但还没提交的脚本也在包里），而 `--exclude-standard`
-  //    把 `.env` 这类 ignore 掉。**不许**换成"对目录打 tar"—— 那会把 server/.env 一起
-  //    送上去并就地覆盖生产配置（deployment.md 记过一次代价是 JWT_SECRET 被换掉）。
-  const files = run('sh', ['-c', "git ls-files -co --exclude-standard"]);
-  if (files.status !== 0) die('步骤 2（工作树清单）', files.stderr.slice(0, 400));
-  const tf = run('sh', ['-c', `git ls-files -co --exclude-standard | tar czf ${tarPath} -T -`]);
-  if (tf.status !== 0) die('步骤 2（打包）', tf.stderr.slice(0, 400));
+  // ⚠️ 第一版这里是 `git ls-files -co --exclude-standard | tar czf - -T -`，实测**当场失败**：
+  //    `git ls-files` 默认 `core.quotepath=true`，非 ASCII 文件名被打印成
+  //    `"apps/web/evidence/…/\351\200\232\351\201\223….png"` 这种**带引号的八进制转义**，
+  //    tar 拿去 stat 得到 `No such file or directory` ⇒ 本仓库有几十个中文截图，
+  //    照那一版跑永远打包失败（而它失败得很响，倒是没假装成功）。
+  //
+  // 现在改成"临时索引 + write-tree + git archive"：只读工作树、按 .gitignore 排除
+  // （⇒ `.env` 与 `node_modules` 天然不在包里）、不碰真索引、不受 quotepath 影响。
+  // 🔴 仍然坚持"只有被 git 看见的文件进包"：`-o --exclude-standard` 的语义就是它。
+  const sh = [
+    'set -e',
+    'IDX=$(mktemp)',
+    'export GIT_INDEX_FILE="$IDX"',
+    'git read-tree HEAD',
+    // ⚠️ 不能写成 `git add -A --refresh`：`--refresh` 只更新 stat 缓存、**不会收未跟踪文件**，
+    //    那样 write-tree 出来的树里就没有我这轮新写的脚本 —— 症状是远端"文件不存在"，
+    //    而本地看起来打包成功了。
+    'git add -A .',
+    'T=$(git write-tree)',
+    `git archive --format=tar.gz -o ${tarPath} "$T"`,
+    'rm -f "$IDX"',
+  ].join(' && ');
+  const tf = run('sh', ['-c', sh]);
+  if (!DRY && (tf.status !== 0 || !existsSync(tarPath))) {
+    die('步骤 2（工作树打包）', tf.stderr.slice(0, 500) || '没产出归档');
+  }
 } else {
   const a = run('git', ['archive', '--format=tar.gz', '-o', tarPath, ref || 'HEAD']);
   if (!DRY && (a.status !== 0 || !existsSync(tarPath))) die('步骤 2（git archive）', a.stderr.slice(0, 400) || '归档没产出');
@@ -273,7 +291,7 @@ if (!DRY && !installOk) {
   console.log('\n🔴 步骤 7 失败：`pnpm install --frozen-lockfile` 没通过。');
   console.log(`   ⇒ ${steps.length} 段门禁**一段都没有执行**。汇总不会给出"0 失败"这种话。`);
   console.log('   这是 package.json 与 lockfile 漂移的探测器（本机有 node_modules，毫无感觉）。');
-  report({ install: false, executed: 0, results: [] });
+  report({ install: false, executed: 0, results: [], runId, egress: EGRESS });
   process.exit(1);
 }
 
@@ -352,7 +370,10 @@ function report({ install, executed, results, runId = '<dry>', egress = 'DRY' })
   console.log('\n════════════════ 汇总 ════════════════');
   console.log(`运行 id        : ${runId}`);
   console.log(`源码           : ${DIRTY ? '工作树（--dirty）' : 'ref ' + short}${ref ? ' (' + ref + ')' : ''}`);
-  console.log(`门禁链段数     : ${total}（取自根 package.json，不是抄的）`);
+  console.log(`门禁链段数     : ${CHAIN.length}（取自根 package.json，不是抄的）`);
+  // 🔴 `--only` 跑出来的绿**不是一次完整验证**。这一条不写出来，下一次有人拿
+  //    "步骤 8：逐段执行（共 1 段）… 全绿"去当"门禁过了"，就是 §8.1 那个形状的翻版。
+  if (ONLY) console.log(`⚠️ 本次只跑了子集 : ${steps.length} / ${CHAIN.length} 段（--only）⇒ **这不是一次完整验证**`);
   console.log(`装依赖         : ${install ? '✅' : '🔴 失败 ⇒ 后面全部未执行'}`);
   console.log(`出口结论       : ${egress}`);
   console.log(`真正执行       : ${executed} / ${total}`);
