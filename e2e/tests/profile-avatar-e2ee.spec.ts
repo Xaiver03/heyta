@@ -245,18 +245,19 @@ test('🔴 头像：口令缺失 → 真上传 → 刷新之后仍说"要先填�
   // 「换一张」按钮**在**，但一次点击也传不上去 —— 所以那句是陈述句而不是错误。
   await expect(page.locator(AVATAR_IMG)).toHaveCount(0);
   await page.screenshot({ path: SHOT('r15b-1-need-password'), fullPage: false });
-  await page.keyboard.press('Escape');
 
-  // ── ② 填口令（SyncBar 在页头，浮层关掉之后才点得到）────────────
-  await page
-    .getByRole('button', { name: await zhValue('web.sync.settings.title') })
-    .click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel(await zhValue('web.sync.password.label')).fill(PASSWORD);
-  await dialog.getByRole('button', { name: await zhValue('web.sync.saveAndSync') }).click();
-
-  await openSettingsView(page);
+  /*
+    ── ② 填口令 ─────────────────────────────────────────────────
+    2026-10-06（H9 第 3 刀）之前这里先 `Escape` 关掉设置浮层，再点页头/rail 那颗
+    「同步设置」齿轮，在同级对话框里填 —— 关掉浮层的唯一理由是**浮层盖住了齿轮**。
+    现在 同步 就是设置里的**一节**：同一个表面里滚下去填完保存，不用再出去一趟。
+  */
+  const syncSection = page.getByTestId('sync-settings-panel');
+  await syncSection.scrollIntoViewIfNeeded();
+  await syncSection.getByLabel(await zhValue('web.sync.password.label')).fill(PASSWORD);
+  await syncSection.getByRole('button', { name: await zhValue('web.sync.saveAndSync') }).click();
+  // 「保存并同步」不再关浮层（它本来就在浮层里）⇒ 回到顶部看头像那一节改口了没有。
+  await page.getByTestId('profile-section-anchor').scrollIntoViewIfNeeded();
   await expect(page.locator(NEED_PASSWORD)).toHaveCount(0);
 
   // 真图：拿一张真截图当"用户交来的照片"（尺寸刻意小，避免撞 512 KB 的原图上限）。

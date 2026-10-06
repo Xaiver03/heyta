@@ -614,7 +614,10 @@ export const en = {
   // Full label of the sync button at the bottom of the rail: action + current status.
   'web.sync.rail.aria': 'Sync. Current status: {status}',
   'web.sync.settings.title': 'Sync settings',
-  'web.sync.settings.close': 'Close sync settings',
+  // Cut 3 of ticket H9: this section says what sync actually sends out.
+  // "Close sync settings" went away with that sibling overlay — a settings
+  // section has no "close" action; leaving settings is the exit.
+  'web.settings.sync.note': 'Your data lands on this device first. A sync server only ever receives ciphertext, never your plaintext. Leave the address empty to stay local-only.',
   'web.sync.serverUrl.label': 'Server URL',
   'web.sync.token.label': 'Access token',
   'web.sync.password.label': 'End-to-end encryption passphrase',

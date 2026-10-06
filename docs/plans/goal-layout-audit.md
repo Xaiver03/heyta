@@ -342,7 +342,7 @@ PWA 里必然无事发生的「检查更新」· 记忆面板「忘掉」不加�
    （未配置 / 未同步 / 同步中 / 已同步 / 失败 / **有冲突**）。`aria-label` 念出当前状态。
 2. 🔴 有冲突时那枚的点击语义**改成打开冲突对话框**而不是同步 —— 保住 `SyncBar.tsx:196`
    那条原意（"冲突需要一个看得见的入口，关掉之后还得能再打开"），又不给高频动作加层数。
-3. 页头整块 `SyncBar` 撤掉。「同步设置」的表单复用现有对话框内容，挂进 **设置 → 同步**（新增一节）；
+3. ✅ **已落（2026-10-06 17:1x，见 §9.8）** 页头整块 `SyncBar` 撤掉。「同步设置」的表单复用现有对话框内容，挂进 **设置 → 同步**（新增一节）；
    「查看帮助」（仅 error 态）跟着进那一节。⚠️ 顺带把 §8.2 登记的 **第 6 条**（同步设置对话框没 Esc /
    焦点不入内）一起解掉 —— 它搬进设置面之后就不是同级浮层了。
 4. 语言分段控件从页头撤，进 **设置 → 外观与语言**；`i18n-multilingual.md` 那两节改写成现在的形态，
@@ -675,3 +675,46 @@ AI 侧 4 枚（`ai-assistant:65`、`ai-row-layout:115`、`ai-tool-run:103`、`ai
    一句提示占一整栏，要改得先给那条前提找别的证人。
 2. 详情列仍然**没有无障碍名**（定名字要新词条、中英成对，不在这一笔里顺手定）。
 3. 本刀**没有**在四端当前产物上验（`pnpm reinstall:all` 未跑）；`FULLCHECK-01` 那一档仍开着。
+
+### 9.8 H9 第 3 刀的落地与读数（2026-10-06 16:2x–17:1x）
+
+§9.2 H9 第 3 步：「同步设置」不再是**齿轮点开的同级浮层**，它是设置浮层里的**一节**。
+负责人第 2 条（「设置不应该点击头像之后再打开吗？」）到这一刀才算真的答完 ——
+第 1 刀之后 rail 上仍留着一颗长得像全局设置的齿轮。顺带解掉 §8.2 第 6 条那一格
+（同级浮层没有 Esc、焦点进不去）：一节设置没有"关闭"这个动作，退出设置就有出口。
+
+| 面 | 落点 | 一条读数 |
+|---|---|---|
+| 新节 | `apps/web/src/features/sync/SyncSettingsPanel.tsx`：`<section id="settings-sync" data-testid="sync-settings-panel">`，排在 功能模块之后、隐私/AI 之前（地址是"准不准出门"那三道闸的前提） | `settings-sync-section.png` 人已看：标题 + 说明 + 状态 + 地址 + 令牌 + 登录/注册 + 口令 + 加密数据钥匙 + 保存并同步 |
+| 撤掉 | rail 那颗 `sync-settings-entry` 齿轮、同级对话框、`sync-help-link`（跟着表单进这一节）、`web.sync.settings.close` 词条（中英各一条） | 新判据 S4：齿轮 `toHaveCount(0)` + 未开设置时地址框 `toHaveCount(0)` + 开设置后 `sync-settings-panel` **恰 1 处** + 关设置后回到 0 |
+| 草稿的家 | `store.ts` 的 `syncDraft` / `syncDraftShown`，由 `configure` / `applyAuthToken` / `clearCredentials` 三处镜像推进 | 理由与 `signInOpen` 同一条：`AuthPanel` 仍挂在常驻 `SyncBar`（头像那条路也要开它），而地址框现在住在设置里 —— **触发者在 A、面板在 B** |
+| 请求语义 | `settingsOpen` → `syncSettingsRequested`：一次性请求，`App.tsx` 消费（切设置视图 + 落在这一节 + 立刻清） | 臂 U4：不"取到即清" ⇒ 第二次点「改用你自己的服务器」没有反应，那条判据当场红 |
+| 收的债 | 三处"滚到某一节"的 boolean 拷贝（help / profile / 新增 sync）合成 `features/shell/settings-anchors.ts` 一张表 + 一条 effect | AGENTS §3.5"同形状的第三次"：第三份写出来之前先合，否则前两份开始漂移 |
+
+🔴 **这一刀照出来的三件事**（各自有判据与臂，不是"顺手改"）：
+
+1. **"焦点也要一起给"从来没成立过。** `sheetRef.focus()` 声明在落位 effect **之后**，
+   把刚给出去的焦点抢回去；而全仓没有任何一条判据读过 `document.activeElement`。
+   新判据 `apps/web/tests/settings-anchor-focus.spec.tsx` 三条 + 臂 U3（删掉 `.focus()` ⇒ 三条全红）。
+   入档 **陷阱 #360**。
+2. **第 1 刀删掉「立即同步」之后，四套 e2e + 一个脚本的定位符恒 0 命中六小时**，
+   期间 `pnpm check` 与 `check:ai-e2e` 整族（276 passed）全绿 —— 那些目录各有各的 testDir/config，
+   默认载体走不到它们。入档 **陷阱 #361**（含"改可访问名之前先列消费者清单"的现量命令）。
+3. **第一版那张"同步那一节"的截图拍的是浮层顶部。** `toBeVisible()` 不要求在视口内，
+   而设置是一列很长的可滚动列表 —— 判据全绿、图是错的，只有人看图发现。
+   修法是补一条几何判据（顶边必须 `0 <= y < 视口高`），臂 E1 证明删掉滚动它会红。
+   入档 **陷阱 #362**。
+
+**读数**：牙齿台 `research/tools/mutation-rigs/h9-sync-settings-arms.sh` **七臂七 KILLED +
+`BACK_TO_CLEAN=OK`**；`apps/web` 全量 **2002 passed / 13 skipped / 0 failed**（149 文件）；
+`--filter @heyta/web typecheck` 干净；真浏览器 `shell-sync-rail` **4 passed**、
+`vault-settings` **1 passed**、`profile-avatar-e2ee` **1 passed**。
+台账：**B98**。
+
+⚠️ **仍然开着的四格（B98 里逐条带跑法）**：① 那四套 e2e 只做了静态核对 + 单文件 `tsc`，
+**一次都没运行**（要真服务端 / docker / 另一台设备）；② `pnpm --filter @heyta/web build`
+此刻红在两处与本单无关的半截改动（`NotesView` 缺 `labels.saveFailed`、
+`TaskDetailCard.tsx:192` 的 `EventTarget.value`）⇒ 本单的 e2e 证据取自 **vite dev 载体**，
+不是打包产物，`-r build` 与 `check:ai-e2e` 整族要在那两处补齐之后重跑；
+③ 落地页那张手抄复刻仍画着 H9 之前的页头（对外素材，任务 #23）；
+④ 四端当前产物未验（`pnpm reinstall:all` 未跑）。
