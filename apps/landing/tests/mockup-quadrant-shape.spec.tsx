@@ -67,27 +67,41 @@ import {
   type MockQuadrantShape,
 } from '../src/mockup/quadrant-shape.js';
 import { SHOWCASE_NOW, SHOWCASE_TASKS } from '../src/mockup/showcase-data.js';
+import { readUiSource, readWebSource } from './helpers/source-text.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = resolve(HERE, '..');
-const REPO = resolve(HERE, '../../..');
 
-const WEB_SRC = process.env.HEYTA_MOCKUP_WEB_SRC ?? join(REPO, 'apps/web/src');
-const UI_SRC = process.env.HEYTA_MOCKUP_UI_SRC ?? join(REPO, 'packages/ui/src');
-
-function readWeb(relative: string): string {
-  return readFileSync(join(WEB_SRC, relative), 'utf8');
-}
-
-function readUi(relative: string): string {
-  return readFileSync(join(UI_SRC, relative), 'utf8');
-}
+/** 接缝与读取器的唯一所有者在 `./helpers/source-text.ts`（两份定义会让注入台架只重定向其中一份）。 */
+const readWeb = readWebSource;
+const readUi = readUiSource;
 
 const quadrantModelSource = (): string => readUi('quadrant/model.ts');
 const quadrantBoardSource = (): string => readUi('quadrant/QuadrantBoard.tsx');
 const quadrantCopySource = (): string => readWeb('features/quadrant/copy.ts');
 const taskListSource = (): string => readUi('task-list/TaskList.tsx');
 const mockupCss = (): string => readFileSync(join(APP, 'src/mockup/mockup.css'), 'utf8');
+
+/**
+ * 从 `copy.ts` 返回的那个对象里切出**某个字段**的初始化表达式（到下一个同缩进字段为止）。
+ *
+ * 为什么不用一条正则直接取词条：`empty` 有过两种形状 —— `empty: () => t('k')` 与
+ * `empty: (quadrant) => quadrant === firstEmpty ? t('k') : ''`。写死其中一种，
+ * 别人把"四个空格各念一遍引导句"改成"只给第一个空象限念"时，这条对账会把
+ * **产品的形状变化**报成**复刻坏了**。判的是词条 key，不是括号的写法。
+ */
+function copyFieldExpr(copy: string, field: string): string | undefined {
+  const start = new RegExp(`\\n\\s{4}${field}:`).exec(copy);
+  if (!start) return undefined;
+  const rest = copy.slice(start.index + start[0].length);
+  const end = /\n\s{4}[A-Za-z_$][\w$]*:/.exec(rest);
+  return (end ? rest.slice(0, end.index) : rest).trim();
+}
+
+/** 那段表达式里**第一个** `t('…')` 的 key。 */
+function firstKeyIn(expr: string | undefined): string | undefined {
+  return expr === undefined ? undefined : /t\('([^']+)'/.exec(expr)?.[1];
+}
 
 /** 从源码里切出一个 `const X: Record<…> = { … };` 登记块。 */
 function recordBlock(source: string, declaration: string): string {
@@ -334,14 +348,30 @@ describe('每格的标题 / 说明 / 空态 / 无障碍 = web `copy.ts`', () => 
 
   it('`cellA11y` / `empty` / `footnote` 三个 key = `copy.ts` 里 `t(...)` 的实参', () => {
     const copy = quadrantCopySource();
-    const cell = /cellA11y:[^\n]*?t\('([^']+)'/.exec(copy)?.[1];
-    const empty = /empty:\s*\(\)\s*=>\s*t\('([^']+)'\)/.exec(copy)?.[1];
-    const footnote = /footnote:\s*t\('([^']+)'\)/.exec(copy)?.[1];
+    const cell = firstKeyIn(copyFieldExpr(copy, 'cellA11y'));
+    const empty = firstKeyIn(copyFieldExpr(copy, 'empty'));
     expect(cell, 'copy.ts 里找不到 cellA11y 的词条实参').toBeDefined();
     expect(empty, 'copy.ts 里找不到 empty 的词条实参').toBeDefined();
-    expect(footnote, 'copy.ts 里找不到 footnote 的词条实参').toBeDefined();
     expect(MOCK_QUADRANT_KEYS.cellA11y).toBe(cell);
     expect(MOCK_QUADRANT_KEYS.empty).toBe(empty);
+
+    const footnoteExpr = copyFieldExpr(copy, 'footnote');
+    if (footnoteExpr === undefined) {
+      // 🔴 **方向从产品源码读出来**，不是写死"这一行一定在"（与今天 #24 那条同一口径）：
+      // 产品哪天不再给 footnote，复刻就不许画它。
+      const view = renderMockup('quadrant');
+      expect(
+        view.querySelector('.mk-quadrant__footnote'),
+        '产品侧 `copy.ts` 已经没有 `footnote` 这一项，而复刻还在画 `.mk-quadrant__footnote`。' +
+          '要撤的有三处：`AppWindow.tsx` 里那个节点、`mockup.css` 里那条规则、' +
+          '`mockup-fidelity.spec.tsx` 的「四象限底部有 footnote」那一条。' +
+          '⚠️ 若产品侧那半**还没入库**（现量：`git status --porcelain -- apps/web/src/features/quadrant/copy.ts`），' +
+          '这条红说的是"提交那一笔要同时改复刻"，不是"复刻坏了"。',
+      ).toBeNull();
+      return;
+    }
+    const footnote = firstKeyIn(footnoteExpr);
+    expect(footnote, 'copy.ts 里有 footnote 这一项，但取不到它的词条实参').toBeDefined();
     expect(MOCK_QUADRANT_KEYS.footnote).toBe(footnote);
   });
 

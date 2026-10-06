@@ -15,8 +15,12 @@
  * 1. **禁止写"我们会先脱敏、匿名化或摘要后再发送"。** 代码里不存在任何这类环节：
  *    任务备注是整段正文照发，任务列表是 JSON 原文。这条路径有五个可查的调用点，一查就穿。
  * 2. **禁止写"heyta 云端 AI / 我们替你调用模型 / 我们可能使用自有 AI 服务"。**
- *    `managed` 供给在类型结构上不可达（出境路由配置里没有"模式"字段，目的地只能由端点地址推导），
- *    而且那个有意的断言会因"保留策略未定"直接失败。写了就是在描述一个不存在的功能。
+ *    `managed` 供给在生产出境路径上仍然不可达：`AiRoutingConfig` 里没有"模式"字段，
+ *    目的地只能由端点地址推导，所以那条链路推不出 `heyta-cloud`（服务端那条代理路由要真的
+ *    工作还得运营方配上境内上游）。⚠️ 2026-10-05 换过一次理由：那句"因为保留策略未定所以
+ *    挡住"已经过期 —— ADR-0054 把保留期定案了，`assertEnableable` 里那条有意的检查
+ *    从此不再触发。**禁令本身一条没松**，只是它现在只靠结构那条腿撑着；写了那句就是在
+ *    描述一个用户打不开的功能。
  * 3. **禁止把云端 AI 与端到端加密写在同一句话里。** 模型必须读到明文才能工作 ——
  *    这是定义外的例外，不是可调和的细节。
  *
@@ -95,10 +99,10 @@ const zh = [
         head: ['功能', '出境的字段', '发出去的是什么', '上限'],
         rows: [
           ['一句话捕获', '`today`、`text`，可选 `preferences`', '你刚敲进去的那句话**原文**，加上这台设备的本地日期与星期', '输入超过 500 字符直接拒绝，不截断后发送'],
-          ['拆解任务', '`title`、可选 `note`，可选 `preferences`', '任务标题原文，加上任务备注**整段正文**', '备注不截断；只有完全为空才不发送'],
-          ['优先级建议', '`tasks`，可选 `preferences`', '至多 50 条任务的标识、标题、截止时间、优先级，按 JSON 原文', '50 条，且在构造请求之前就收窄'],
-          ['估时', '`title`、可选 `note`、`history`，可选 `preferences`', '标题与备注原文；最近至多 20 条专注记录的"计划用时 / 实际用时"分钟数', '20 条；这些记录里没有时间戳、也没有任务标识'],
-          ['工具选择', '`text`、`tools`', '你那句话的原文，加上这台设备上**已授权工具的名字、描述与参数结构**', '500 字符；纯规则能选中的场景一次都不出境'],
+          ['拆解任务', '`today`、`title`，可选 `note`，可选 `preferences`', '这台设备的本地日期与星期（用于把"下周三"这类说法算对），加上任务标题原文与任务备注**整段正文**', '备注不截断；只有完全为空才不发送'],
+          ['优先级建议', '`today`、`tasks`，可选 `preferences`', '这台设备的本地日期与星期，加上至多 50 条任务的标识、标题、截止时间、优先级，按 JSON 原文', '50 条，且在构造请求之前就收窄'],
+          ['估时', '`today`、`title`，可选 `note`、`history`，可选 `preferences`', '这台设备的本地日期与星期，加上标题与备注原文；最近至多 20 条专注记录的"计划用时 / 实际用时"分钟数', '20 条记录；记录本身里面没有时间戳、也没有任务标识'],
+          ['工具选择', '`today`、`text`、`tools`', '这台设备的本地日期与星期，加上你那句话的原文，以及这台设备上**已授权工具的名字、描述与参数结构**', '500 字符；纯规则能选中的场景一次都不出境'],
         ],
       },
       {
@@ -146,19 +150,27 @@ const zh = [
   },
   {
     id: 's5',
-    title: '由我们提供并计费的云端 AI：当前不可用',
+    title: '由我们提供并计费的云端 AI：保留策略已定案，但这一档仍打不开',
     blocks: [
       {
         kind: 'p',
-        text: 'heyta 里存在一条**没有实现、也无法靠配置打开**的路：由我们统一提供、统一计费、由我们选择模型的云端 AI。它不可达不是修辞：出境路由的配置里根本没有"服务模式"这个字段，目的地只能从端点地址推导，因此结构上永远推不出"heyta 云端"。同时，我们对这类服务的数据保留期还没有作出决定，而代码里有一道有意的检查会在保留期未定时直接失败 —— 它宁可报错，也不肯编一个听起来合理的保留期数字。',
-      },
-      {
-        kind: 'callout',
-        text: '**这项服务现在没有提供，也不在"关着的选项"里 —— 它是一个不存在的选项。** 本文件不会写"我们可能使用自有 AI 服务"来预留空间。你今天能在 heyta 里用到的 AI 功能，只有你自己配了端点、逐项授权过的那几个。',
+        text: 'heyta 里存在一条**由我们统一提供、统一计费、由我们挑选模型**的云端 AI 的路。这条路的**数据保留策略已于 2026-10-05 定案**（ADR-0054，"托管 AI 的数据保留策略与可售卖的前置顺序"），下面第二段写的就是定案内容 —— 它不再是"还没想清楚数据留多久，所以不许打开"。但它**今天仍然不是一个用户打得开的功能**，理由是一条可核对的结构事实：内置 AI 真正走的那份出境路由配置里没有"服务模式"这个字段，目的地只能从端点地址推导，因此那条链路推不出"heyta 云端"；而服务端那条代理路径要真的工作，还需要运营方先把境内上游配上 —— 没配的时候它一律回"未配置"，一个字节都不转发。',
       },
       {
         kind: 'p',
-        text: '为什么这条界限必须写死：任何由平台侧提供、由平台挑选模型的 AI 服务，定义上必须能看到明文；它**永远不能**被描述成端到端加密。把两句话拼成"我们全程加密，还用 AI 帮你整理"是一种会在监管与用户两侧同时翻车的写法。我们的立场是：这类服务如果将来要做，必须先解决保留期、出境手续与单独同意三件事，届时本文件这一节要整段重写。',
+        text: '定案下来的保留规则有**三条**，每一条都被写成可失败的判据，而不是一句措辞：**（一）服务端不保留内容。** 承载用量的那张表按设计只有四列：账号、计费周期锚点、次数、更新时间 —— 没有提示词列、没有模型输出列，也没有一个装得下内容的兜底列。有一条判据断言它的列集合**等于**这四个，多一列就红；理由是本文件反复用的那一条 —— "不保留内容"这句话的证据必须是表形状，不是我们的形容词。**（二）请求体与返回体只在一次代理调用的内存里存在，调用返回即丢弃**：不写日志、不进 trace、不进崩溃上报，排障看的是元数据而不是内容。**（三）保留的运维元数据只有**时间、用户、功能名（封闭词表里的那一个）、结果状态、请求与响应的**字节数**（不是内容）、耗时；这一档的**保留期定为 45 天**，推导是一次计费周期 30 天加 15 天出账缓冲，为了让"上一期到底用了几次"可核对 —— ⚠️ **不是**因为某部法律要求 45 天。🔴 还有一句必须一起写、否则这段会被读成承诺：**"到期就删"这一步本轮没有落地**。这些元数据走的是运行日志那条通道，而运行日志目前没有轮转与到期删除机制，要等一条部署侧的作业把它配上。所以我们写"期限定为 45 天"，**不写**"45 天后会自动删除"。',
+      },
+      {
+        kind: 'p',
+        text: '与"发给谁"有关的一条定案也要写在这里，因为它与第四节讲的你自备端点**不是同一件事**：托管这一档的目的地不由客户端声明，而是由端点地址落在一份**境内供应商白名单**上推导出来的；主机名逐条登记，不在表里就不可用，保存配置与真要发请求**两个点各校验一次**，接了不合格的端点是响亮拒绝而不是静默降级。第四节那句"我们不做服务商白名单、也不判断那个端点在哪个国家"说的始终是你自己填的自备端点 —— 那里地址由你决定，我们无权替你判断，也无法审计。',
+      },
+      {
+        kind: 'callout',
+        text: '**这项服务现在没有提供，而且它不是一个"暂时关着"的选项** —— 今天的客户端里没有任何一个开关能把它打开，本文件也不会写"我们可能使用自有 AI 服务"来预留空间。你今天能在 heyta 里用到的 AI 功能，只有你自己配了端点、逐项授权过的那几个。',
+      },
+      {
+        kind: 'p',
+        text: '为什么这条界限必须写死：任何由平台侧提供、由平台挑选模型的 AI 服务，定义上必须能看到明文；它**永远不能**被描述成端到端加密。把两句话拼成"我们全程加密，还用 AI 帮你整理"是一种会在监管与用户两侧同时翻车的写法。这一节的改写**不等于**这条路已经开放：保留期那一件有了答案，另两件没有 —— 它面向用户时必须是**逐项、可撤销的单独同意**（不能随订阅默认生效），而第 8 节那一格关于境外端点的定性仍然**不下结论**。它真正开放的那一天，这一节还是得整段重写，而"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。',
       },
     ],
   },
@@ -180,6 +192,33 @@ const zh = [
           ['`create_task`', '新建任务', '不读数据；写入必须经操作日志'],
           ['`update_task`', '修改任务', '只改你显式给出的字段'],
           ['`complete_task`', '完成任务', '不读数据'],
+          // 🔴 W10 给目录加了四条 EVENT 工具 ⇒ 这张表**必须同时**加行：条款里那句
+          // "未列出的工具视为未授权"把这行当成了授权面，少一行就是对着用户少说一项能读到什么。
+          // 对账由 `pnpm check:legal-tools` 钉住（工具目录 ↔ 中英两张表三方集合相等）。
+          ['`list_events`', '列出倒数日与纪念日', '标识、标题、锚点日期、下一次发生日、距今几天、种类、是否重复/农历/置顶，一次最多 50 条 —— **不含正文**（列表连可读条目的正文也不给）'],
+          ['`get_event`', '读取单条倒数日详情', '上面全部，**再加这条倒数日的正文全文**（写了正文才有这一格）'],
+          ['`create_event`', '新建倒数日', '不读数据；写入必须经操作日志'],
+          ['`update_event`', '修改倒数日', '只改你显式给出的字段'],
+          // 🔴 批次二把覆盖面从 4 个实体补到 9 个 ⇒ 这张表**必须同时**加行（下面 16 条）。
+          // 条款里那句"未列出的工具视为未授权"把这张表变成了授权面：目录里有、表里没说，
+          // 就是对着用户少说一项"打开之后别人读得到什么"。对账由 `pnpm check:legal-tools` 钉住
+          // （目录 ↔ 中文表 ↔ 英文表：集合相等 + 中英**逐行同序**，行贴错对象也会红）。
+          ['`list_habits`', '列出习惯', '习惯标识、名称、每天的目标数值、单位、达成口径（至少/至多/恰好）—— **不含打卡记录**'],
+          ['`create_habit`', '新建习惯', '不读数据；写入必须经操作日志'],
+          ['`list_checkins`', '列出打卡记录', '哪条习惯、哪一天、当天记录的数值，一次最多 50 条 —— **不含习惯名称**，但"哪天做了什么、数值多少"本身已经是一份行为记录'],
+          ['`record_checkin`', '记录一次打卡', '不读数据；写入必须经操作日志'],
+          ['`list_focuses`', '列出专注记录', '种类、关联的任务标识、计划时长、实际时长、是否完成、开始时刻，一次最多 50 条 —— **不含任务标题**，但加上时间戳就能看出一个人的作息'],
+          ['`log_focus`', '记录一次专注', '不读数据；写入必须经操作日志'],
+          ['`list_tags`', '列出标签', '标签标识与名称'],
+          ['`create_tag`', '新建标签', '不读数据；写入必须经操作日志'],
+          ['`set_task_tags`', '给任务设置标签', '不读数据；它按你显式给出的那一组**整组覆盖**该任务的标签（不是追加，没写进去的会被摘掉）'],
+          ['`create_project`', '新建清单', '不读数据；写入必须经操作日志'],
+          ['`list_notes`', '列出便签', '便签标识、所属清单、是否置顶到今天、最后修改时刻，一次最多 50 条 —— **不含正文**。便签没有标题，所以这一格出境的只有"什么时候动过"'],
+          ['`get_note`', '读取单条便签', '上面全部，**再加这张便签的正文全文**'],
+          ['`create_note`', '新建便签', '不读数据；写入必须经操作日志'],
+          ['`update_note`', '修改便签', '整段替换那张便签的正文（不是追加）'],
+          ['`list_reminders`', '列出提醒', '提醒标识、关联的任务标识、触发时刻、当前走到哪一步（还没到/已顺延/该响了/已响过/已忽略）—— **不含任务标题**'],
+          ['`create_reminder`', '新建提醒', '不读数据；写入必须经操作日志'],
         ],
       },
       {
@@ -194,7 +233,7 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '**不要以为"加密条目"在本机接口前是读不出来的。** 协议层确实做了字段白名单投影，但这款产品目前还没有"受保护条目"这个概念，两个真实宿主都把"可读"判为真。结论很简单：你一旦打开 `get_task`，那台机器上的那个程序就能读到你的任务备注正文全文。只开 `list_tasks` 也不算安全 —— 标题加截止时间足以拼出一个人的日程。',
+        text: '**不要以为"加密条目"在本机接口前是读不出来的。** 协议层确实做了字段白名单投影，但这款产品目前还没有"受保护条目"这个概念，两个真实宿主都把"可读"判为真。结论很简单：你一旦打开 `get_task`，那台机器上的那个程序就能读到你的任务备注正文全文。只开 `list_tasks` 也不算安全 —— 标题加截止时间足以拼出一个人的日程。🔴 倒数日那两条同理，而且**更窄不了**：`get_event` 给正文全文，而倒数日的标题往往本身就是内容（「妈妈的生日」加上那一天，不读正文也已经说出一件事）。',
       },
       {
         kind: 'p',
@@ -252,6 +291,59 @@ const zh = [
     ],
   },
   {
+    id: 's10',
+    title: '欧盟 GDPR 口径：这一份讲的"出境"在 GDPR 里算哪一档',
+    blocks: [
+      {
+        kind: 'p',
+        text: '本文件的"数据出境"原本是按中国法写的：《个人信息保护法》第三十八条那一类规则问的是**个人信息离开中国境内**。GDPR 第五章问的是**另一件事** —— 个人数据离开欧洲经济区。两个词在中文里长得一样，判据、依据形式和举证责任都不同，所以这里**不把任一侧的结论抄到另一侧**：中国法侧的定性仍然是上面第 8 节那个"待确认"，而下面这一栏只回答 GDPR 侧此刻能拿出什么、拿不出什么。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 44–49 条（向第三国转移）',
+            '个人数据离开欧洲经济区时，有没有一条被承认的传输依据',
+            '今天**一次都不会发生**：托管路径按 ADR-0054 §5 只能接**境内白名单里**的供应商（保存与发送两个点各校验一次，不在表里就响亮拒绝），逐项出境授权默认关闭，所以没有数据在我们这一侧被送往境外',
+            '我们**没有**标准合同条款、**没有**充分性决定可依赖、**也没有**约束性公司规则。如果用户在自建实例里填入境外端点，那次传输的依据由**用户自己**承担，本文件不代任何人写"已有依据"',
+          ],
+          [
+            '第 9 条（特殊类别数据）',
+            '有没有在处理健康、宗教信仰、性取向一类的敏感数据',
+            '我们不识别内容类别，也不做任何"检测到敏感词就拦下"的过滤',
+            '送出去的上下文来自用户自己写的任务与便签，里面可能就有第 9 条所指的内容；我们没有能力声称"发送前会被识别并拦下"，所以也不写这句',
+          ],
+          [
+            '第 22 条（仅自动化决策）',
+            '有没有对用户产生法律或显著影响的决定是只由机器作出的',
+            '这一条对得上：AI 在类型上就产生不了写入，读操作直接执行、写操作只到提案，确认之后才成为一次 op',
+            '但它成立的前提就是那道人工确认。任何"把建议直接落成写入"的改动都会让这一格立刻变成对不上，所以它不是一项一次性的资质，而是一条需要一直有人守着的判据',
+          ],
+          [
+            '第 25、32 条（默认数据保护与安全性）',
+            '默认设置是否隐私友好，措施是否与风险相称',
+            '默认关闭、本机接口只监听回环、逐工具授权、端到端加密使服务端读不到明文、回退不得跨越隐私边界',
+            '这些主张只有本仓库的代码与测试作为证据，**没有**第三方认证或审计报告；因此本节不写"已通过 GDPR 认证"这一类话',
+          ],
+        ],
+      },
+      {
+        kind: 'ul',
+        items: [
+          '同意在 heyta 里是**逐功能**的（第 6(1)(a) 与第 7 条要的"特定、明确、可撤回"），不是一个总开关；关掉某一项，那一项就一个字节都不出站。',
+          '自建部署时控制者（controller）是运行这个实例的人，GDPR 的对外义务随之在他那一侧；我们提供的是软件。',
+          '逐条的权利行使怎么落地，写在《个人权利行使与请求响应》的 GDPR 对照表里，本文件**不重复那张表** —— 两处各抄一份一定会漂，而漂掉的那一份通常是话说得更满的那一份。',
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '《个人权利行使与请求响应》：GDPR 逐条对照表在那里（含第 13/14、15、16、17、18、20、21/22、32/33 条各自"对不上的部分"）。本文件只讲 AI 与出境这一段，权利行使的具体做法以那份为准。',
+      },
+    ],
+  },
+  {
     id: 's9',
     title: '这份文件什么时候会变',
     blocks: [
@@ -263,7 +355,7 @@ const zh = [
         kind: 'ul',
         items: [
           '**加任何一个新的出境字段**：第三节那张表必须先扩、再上线 —— 出境面必须在数据被写进请求之前收窄，披露不能虚报，也不能少报。',
-          '**提供云端 AI**：第五节整段重写，并必须先落地保留策略、出境手续与单独同意；届时"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。',
+          '**提供云端 AI**：第五节整段重写。它列的三件前置条件里，**保留期那一件已在 2026-10-05 定案并写进第五节**，另两件没有 —— 逐项可撤销的单独同意，以及第 8 节那一格仍然**不下结论**的定性；届时"端到端加密"与"云端 AI"必须写成两个功能面，不得并成一句。',
           '**把"受保护条目"做进产品**：第六节那条提示才允许从"警告"改成"承诺"。在此之前，任何"加密条目读不出来"的表述都不写。',
         ],
       },
@@ -272,6 +364,31 @@ const zh = [
         head: ['版本', '日期', '变化'],
         rows: [
           ['1.0', '2026-10-01', '首版草案（尚未生效）：逐字段出境表按实现写；明确不做脱敏；云端 AI 写作"当前不可用"；出境定性标为待法务复核。'],
+          [
+            '1.1',
+            '2026-10-03',
+            '第六节那张本机接口工具表加了四条倒数日工具（`list_events` / `get_event` / `create_event` / `update_event`），并写明倒数日标题往往本身就是内容。这份清单与产品内的工具目录逐一核对，产品新增工具时会同步更新这里。',
+          ],
+          [
+            '1.2',
+            '2026-10-04',
+            '第六节那张表补齐**剩下的 16 条工具**（习惯 / 打卡 / 专注 / 标签 / 便签 / 清单 / 提醒）：目录已随 AI 覆盖面扩到 9 个实体 26 条，而条款只披露了 10 条。那句"未列出的工具视为未授权"把这张表变成了授权面，所以少一行就是对用户少说一项"打开之后别人读得到什么"。逐格取值按构建产物里的 `egressFields` 写，不写字段名以外的推测；`list_notes` 明确写明便签没有标题、列表出境的只有"什么时候动过"。',
+          ],
+          [
+            '1.3',
+            '2026-10-04',
+            '新增第十节：GDPR 第五章（第 44–49 条）问的是"个人数据离开欧洲经济区"，与本文件的"数据出境离开中国境内"**不是同一个问题**，所以两侧结论不互抄。逐格写明拿得出与拿不出的：没有标准合同条款、没有可依赖的充分性决定、没有约束性公司规则；第 9 条不做内容识别也不过滤；第 22 条只在"确认"这道人工关口存在时成立；第 25/32 条只有本仓库的代码与测试作证据，没有第三方认证。权利行使那张逐条表不在这里复制，只用 docRef 指向《个人权利行使与请求响应》。',
+          ],
+          [
+            '1.4',
+            '2026-10-05',
+            '第三节那张表的**拆解任务 / 优先级建议 / 估时**三行各加了 `today`，工具选择那行也补上 `today`：这三条链路此前不知道"今天是哪天"，用户说"下周三""14 号"时模型只能自己编（实测编错过四个半月），而唯一的修法是往提示词里注入这一行。它看起来不像用户数据，实际上是**这台设备的本地日期**，所以按"新增任何一个出境字段都要先扩表再上线"那条纪律，先改这张表。工具选择那行的 `today` 不是新增出境面，是**补一句漏写**：内置助手早就带这一项，而这张表把它漏掉了。',
+          ],
+          [
+            '1.5',
+            '2026-10-05',
+            '第五节按 ADR-0054 改写：这类服务的**数据保留策略已经定案**，所以本节不再把"保留期还没决定"当成它不可用的理由（那道为此而写的有意的检查，在定案之后不再触发）。定案本身写在第五节第二段，逐条落到可核对的东西上：一张只装计数的表（证据是列集合，不是措辞）、请求与返回体只存在于一次代理调用的内存里、保留下来的运维元数据是一份封闭字段清单加一个有出处的期限，以及托管档的目的地由**境内白名单**推导而不是由客户端声明。两处刻意没写成更满的话：那一个期限**没有**配"到期会自动删除"（清理作业本轮未落地，它落地时本节要改），而第 8 节关于你自己配置的境外端点那一格**仍然不下结论** —— 本次定案不涉及它，本文件也不替它定性。第九节的触发清单同步改掉保留期这一件。开放与购买按 ADR-0054 §6 的顺序走，走到那一步本节还要整段重写。本行不复述那个数字与那份字段清单：它们只住在第五节，抄一份就是多一个会漂的副本。',
+          ],
         ],
       },
     ],
@@ -344,10 +461,10 @@ const en = [
         head: ['Feature', 'Fields that leave', 'What is actually sent', 'Cap'],
         rows: [
           ['One-line capture', '`today`, `text`, optionally `preferences`', 'The **original text** of the line you just typed, plus this device\'s local date and weekday', 'Input over 500 characters is refused outright, never truncated and sent'],
-          ['Task breakdown', '`title`, optionally `note`, optionally `preferences`', 'The original task title, plus the **entire note body** of that task', 'Notes are not truncated; an entirely blank note is what is left out'],
-          ['Prioritisation', '`tasks`, optionally `preferences`', 'Up to 50 tasks\' identifier, title, due date and priority, as JSON in the original', '50 items, narrowed before the request is even constructed'],
-          ['Duration estimate', '`title`, optionally `note`, `history`, optionally `preferences`', 'The original title and note; up to the 20 most recent focus records as "planned / actual" minutes', '20 records; no timestamps and no task identifiers in them'],
-          ['Tool selection', '`text`, `tools`', 'The original text of your line, plus **the names, descriptions and parameter structures of the tools authorised on this device**', '500 characters; where pure rules can pick the tool, nothing leaves at all'],
+          ['Task breakdown', '`today`, `title`, optionally `note`, optionally `preferences`', 'This device\'s local date and weekday (so that wording like "next Wednesday" resolves against a real day), plus the original task title and the **entire note body** of that task', 'Notes are not truncated; an entirely blank note is what is left out'],
+          ['Prioritisation', '`today`, `tasks`, optionally `preferences`', 'This device\'s local date and weekday, plus up to 50 tasks\' identifier, title, due date and priority, as JSON in the original', '50 items, narrowed before the request is even constructed'],
+          ['Duration estimate', '`today`, `title`, optionally `note`, `history`, optionally `preferences`', 'This device\'s local date and weekday, plus the original title and note; up to the 20 most recent focus records as "planned / actual" minutes', '20 records; the records themselves carry no timestamps and no task identifiers'],
+          ['Tool selection', '`today`, `text`, `tools`', 'This device\'s local date and weekday, plus the original text of your line, and **the names, descriptions and parameter structures of the tools authorised on this device**', '500 characters; where pure rules can pick the tool, nothing leaves at all'],
         ],
       },
       {
@@ -395,19 +512,27 @@ const en = [
   },
   {
     id: 's5',
-    title: 'Cloud AI operated and billed by us: currently unavailable',
+    title: 'Cloud AI operated and billed by us: the retention policy is settled, the tier is still not switchable on',
     blocks: [
       {
         kind: 'p',
-        text: 'There is a path in heyta that is **not implemented and cannot be switched on by configuration**: cloud AI provided and billed by us, with models chosen by us. Its unreachability is not rhetoric — the egress routing configuration has no "service mode" field at all, and destinations are derived solely from endpoint addresses, so "heyta cloud" can never be derived. At the same time we have not decided a data retention period for such a service, and a deliberate check in the code fails outright while retention is undecided: it prefers an error over inventing a plausible-sounding retention figure.',
-      },
-      {
-        kind: 'callout',
-        text: '**This service is not offered today, and it is not an option that happens to be switched off — it is an option that does not exist.** This document will not say "we may use our own AI service" to leave room. The only AI you can use in heyta today is what you configured yourself, endpoint by endpoint and feature by feature.',
+        text: 'There is a path in heyta for cloud AI **provided and billed by us, with the model chosen by us**. The **data retention policy for that path was settled on 2026-10-05** (ADR-0054, the decision on managed-AI retention and the preconditions for selling it); the second paragraph below is what was settled, so the reason is no longer "we have not worked out how long data stays, so nobody may turn it on". It is **still not a feature a user can switch on**, and that rests on a checkable structural fact: the egress routing configuration the built-in AI actually uses has no "service mode" field at all, destinations are derived solely from endpoint addresses, and so "heyta cloud" can never be derived on that path. For the server-side proxy route to do anything at all, the operator must first point it at a domestic upstream; while that is unset it answers "not configured" and forwards nothing.',
       },
       {
         kind: 'p',
-        text: 'Why this line must be held hard: any AI service provided by the platform, with models picked by the platform, must see plaintext by definition, and can **never** be described as end-to-end encrypted. Stitching the two into "we encrypt everything and also let AI tidy your notes" is the kind of sentence that fails both a regulator and a user. Our position: if such a service is ever built, retention, cross-border procedures, and separate consent must be settled first — and this section would then be rewritten in full.',
+        text: 'The settled retention rules are **three**, and each is written as a check that can fail rather than as wording. **(1) The server keeps no content.** The table holding usage has exactly four columns by design — account, billing-period anchor, request count, last updated. There is no prompt column, no model-output column and no catch-all column able to hold content; a check asserts the column set **equals** those four and fails red if one is added, for the reason this document keeps using: the evidence for "no content is kept" has to be the shape of the table, not our adjective. **(2) Request and response bodies exist only in the memory of one proxied call and are dropped when it returns** — not written to logs, not put in a trace, not sent to crash reporting; troubleshooting reads metadata, never content. **(3) The operational metadata that is kept** is limited to time, user, feature name (one entry from a closed vocabulary), outcome, the **byte counts** of request and response (not their content) and duration, and **the retention period for it is set at 45 days**. The derivation is one 30-day billing period plus a 15-day reconciliation buffer, so that "how many did I actually use last period" can be checked against a bill — ⚠️ **not** because some law asks for 45 days. 🔴 One more sentence has to travel with that number or the paragraph reads as an undertaking: **the "delete it when the period ends" step is not implemented in this round**. Those fields go out over the application log channel, and the application log has neither rotation nor an expiry sweep today; a deployment-side job still has to be added. So we write "the period is set at 45 days" and we do **not** write "it is deleted automatically after 45 days".',
+      },
+      {
+        kind: 'p',
+        text: 'One settled point about "who receives it" belongs here too, because it is **not the same thing** as the endpoint you configure yourself (section four): on the managed tier the destination is not declared by the client, it is derived from an endpoint address matching a **whitelist of domestic providers** — host names registered one by one, anything off the list unavailable, checked twice (when the configuration is saved and again immediately before a request is actually sent), and an unqualified endpoint is refused loudly rather than silently downgraded. The sentence in section four, "we maintain no allowlist of providers and do not determine which country an endpoint sits in", is about **your** endpoint — you choose that address, we have no standing to judge it for you and no ability to audit it.',
+      },
+      {
+        kind: 'callout',
+        text: '**This service is not offered today, and it is not an option that happens to be switched off** — no switch anywhere in the shipped clients can turn it on, and this document will not say "we may use our own AI service" to leave room. The only AI you can use in heyta today is what you configured yourself, endpoint by endpoint and feature by feature.',
+      },
+      {
+        kind: 'p',
+        text: 'Why this line must be held hard: any AI service provided by the platform, with models picked by the platform, must see plaintext by definition, and can **never** be described as end-to-end encrypted. Stitching the two into "we encrypt everything and also let AI tidy your notes" is the kind of sentence that fails both a regulator and a user. Rewriting this section is **not** the same as opening the path: one of the three preconditions now has an answer, two do not — when this tier faces a user it must be a **per-feature, revocable, separate consent** (never something a subscription grants by default), and the characterisation in section 8 about an endpoint abroad still **stays open**. On the day it really does open, this section gets rewritten end to end again, and "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions that are never merged into one sentence.',
       },
     ],
   },
@@ -429,6 +554,31 @@ const en = [
           ['`create_task`', 'Create a task', 'Reads nothing; writes go through the operation log'],
           ['`update_task`', 'Update a task', 'Only the fields explicitly supplied'],
           ['`complete_task`', 'Complete a task', 'Reads nothing'],
+          // The same four EVENT tools, in the same order as the Chinese table —
+          // `pnpm check:legal-tools` asserts the two language tables carry identical name sets.
+          ['`list_events`', 'List countdowns and anniversaries', 'Id, title, anchor date, next occurrence, days from today, kind, whether it repeats/is lunar/is pinned — 50 at a time, **without note bodies** (the list projection strips them even for readable entries)'],
+          ['`get_event`', 'Read one countdown in full', 'Everything above, **plus the complete note body of that entry** (only when one was written)'],
+          ['`create_event`', 'Create a countdown', 'Reads nothing; writes go through the operation log'],
+          ['`update_event`', 'Update a countdown', 'Only the fields explicitly supplied'],
+          // The same sixteen tools the second batch added (4 entities → 9), in the same order as
+          // the Chinese table — `pnpm check:legal-tools` asserts set equality against the catalog
+          // *and* row-by-row agreement between the two language tables.
+          ['`list_habits`', 'List habits', 'Habit id, name, daily target value, unit, goal type (at least / at most / exactly) — **no check-in records**'],
+          ['`create_habit`', 'Create a habit', 'Reads nothing; writes go through the operation log'],
+          ['`list_checkins`', 'List check-ins', 'Which habit, which date, the value recorded that day — 50 at a time. **Without habit names**, but "what you did on which day, and how much" is itself a behavioural record'],
+          ['`record_checkin`', 'Record a check-in', 'Reads nothing; writes go through the operation log'],
+          ['`list_focuses`', 'List focus sessions', 'Kind, related task id, planned duration, actual duration, whether completed, start time — 50 at a time. **Without task titles**, but timestamps alone already show a person\'s daily rhythm'],
+          ['`log_focus`', 'Log a focus session', 'Reads nothing; writes go through the operation log'],
+          ['`list_tags`', 'List tags', 'Tag ids and names'],
+          ['`create_tag`', 'Create a tag', 'Reads nothing; writes go through the operation log'],
+          ['`set_task_tags`', 'Set a task\'s tags', 'Reads nothing; it **replaces the whole tag set** of that task with the group you explicitly supply (not an addition — tags you leave out are removed)'],
+          ['`create_project`', 'Create a project', 'Reads nothing; writes go through the operation log'],
+          ['`list_notes`', 'List notes', 'Note id, owning project, whether pinned to today, last modified — 50 at a time, **without bodies**. Notes have no titles, so this row discloses only "when something was touched"'],
+          ['`get_note`', 'Read one note in full', 'Everything above, **plus the complete body of that note**'],
+          ['`create_note`', 'Create a note', 'Reads nothing; writes go through the operation log'],
+          ['`update_note`', 'Update a note', 'Replaces the note body outright (not an append)'],
+          ['`list_reminders`', 'List reminders', 'Reminder id, related task id, trigger time, current phase (pending / postponed / due / fired / dismissed) — **without task titles**'],
+          ['`create_reminder`', 'Create a reminder', 'Reads nothing; writes go through the operation log'],
         ],
       },
       {
@@ -443,7 +593,7 @@ const en = [
       },
       {
         kind: 'callout',
-        text: '**Do not assume that "encrypted entries" are unreadable through the local interface.** The protocol layer really does project fields through a whitelist, but this product has no concept of a "protected entry" yet, and both real hosts currently evaluate readability as true. The consequence is simple: once you enable `get_task`, that program on that machine can read your task note bodies in full. Enabling only `list_tasks` is not the safe option either — titles plus due dates are enough to reconstruct somebody\'s schedule.',
+        text: '**Do not assume that "encrypted entries" are unreadable through the local interface.** The protocol layer really does project fields through a whitelist, but this product has no concept of a "protected entry" yet, and both real hosts currently evaluate readability as true. The consequence is simple: once you enable `get_task`, that program on that machine can read your task note bodies in full. Enabling only `list_tasks` is not the safe option either — titles plus due dates are enough to reconstruct somebody\'s schedule. 🔴 The two countdown tools are the same, and there is no narrower option to fall back on: `get_event` returns the full note body, and a countdown title is often itself the content — a title naming a person plus that date already discloses something even when no note exists.',
       },
       {
         kind: 'p',
@@ -501,6 +651,59 @@ const en = [
     ],
   },
   {
+    id: 's10',
+    title: 'The EU GDPR view: which box the "egress" in this document falls into',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'The "cross-border transfer" wording above was written against Chinese law: the rules around Article 38 of the PIPL ask whether personal information has left **mainland China**. Chapter V of the GDPR asks about **a different thing** - personal data leaving the European Economic Area. The two phrases look identical in translation while the test, the accepted forms of legal basis and the burden of proof all differ, so this document **does not copy a conclusion from one side onto the other**: the characterisation on the Chinese side is still the "pending legal review" in section 8, and the column below answers only what can be produced under the GDPR right now, and what cannot.',
+      },
+      {
+        kind: 'table',
+        head: ['Where in the GDPR', 'What it asks', 'What heyta can produce', 'What does not line up'],
+        rows: [
+          [
+            'Articles 44-49 (transfers to a third country)',
+            'Whether there is a recognised transfer basis once personal data leaves the EEA',
+            'Today it **never happens**: ADR-0054 §5 allows the managed path to reach **only hosts on the domestic allowlist** (validated once when the config is saved and again before the request is actually sent, anything off the table is refused loudly), and per-feature egress consent defaults to off, so no data is sent abroad on our side',
+            'We have **not** filed standard contractual clauses, there is **no** adequacy decision we rely on, and there are **no** binding corporate rules. If a self-hosted instance is pointed at an endpoint abroad, the basis for that transfer is the **operator**\'s to carry; this document will not write "a basis exists" on anyone\'s behalf',
+          ],
+          [
+            'Article 9 (special categories)',
+            'Whether data such as health, religious beliefs or sexual orientation is being processed',
+            'We neither classify content nor run any "detect a sensitive term and block the send" filter',
+            'The context sent comes from the user\'s own tasks and notes, which may well contain Article 9 data; we cannot claim it "will be recognised and stopped before sending", so we do not write that',
+          ],
+          [
+            'Article 22 (solely automated decisions)',
+            'Whether a decision with legal or similarly significant effect on the user is made by machine alone',
+            'This one lines up: the AI cannot produce a write at the type level - reads execute, writes stop at a proposal, and only confirmation becomes an op',
+            'But that holds **only** while the human confirmation exists. Any change that turns a suggestion directly into a write makes this row stop lining up, so it is not a qualification earned once - it is a judgement that has to keep being defended',
+          ],
+          [
+            'Articles 25 and 32 (data protection by default, security)',
+            'Whether default settings are privacy-friendly and measures are appropriate to the risk',
+            'Off by default, the local interface binds to loopback only, per-tool authorisation, end-to-end encryption that leaves the server unable to read plaintext, and no fallback may cross a privacy boundary',
+            'These claims rest on this repository\'s code and tests alone; there is **no** third-party certification or audit report, so this section does not claim "GDPR certified" or anything like it',
+          ],
+        ],
+      },
+      {
+        kind: 'ul',
+        items: [
+          'Consent in heyta is **per feature** (the "specific, informed, withdrawable" that Articles 6(1)(a) and 7 ask for), not one master switch; switch a feature off and that feature sends not a single byte.',
+          'For a self-hosted deployment the controller is the person running the instance, and the GDPR obligations travel with them; what we supply is the software.',
+          'How each right is exercised is in the GDPR comparison table of the Data rights document, and this document **does not duplicate that table** - two copies of one list always drift, and the copy that drifts is usually the one that says more.',
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: 'Data rights document: the article-by-article GDPR table lives there (including what does not line up for Articles 13/14, 15, 16, 17, 18, 20, 21/22 and 32/33). This document covers only the AI and egress part; for exercising a right, that document governs.',
+      },
+    ],
+  },
+  {
     id: 's9',
     title: 'When this document changes',
     blocks: [
@@ -512,7 +715,7 @@ const en = [
         kind: 'ul',
         items: [
           '**Any new egress field**: the table in section three must be widened before the feature ships. The outbound surface has to be narrowed before data is written into the request, and disclosure may neither overstate nor understate.',
-          '**Cloud AI being offered**: section five is rewritten end to end, and only after retention, cross-border procedures and separate consent exist. At that point "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions and may never be merged into one sentence.',
+          '**Cloud AI being offered**: section five is rewritten end to end. Of the three preconditions it names, **the retention period was settled on 2026-10-05 and is written into section five**; the other two are not — a per-feature, revocable, separate consent, and the characterisation in section 8 which still **stays open**. At that point "end-to-end encryption" and "cloud AI" must stay two separate feature descriptions and may never be merged into one sentence.',
           '**"Protected entries" becoming a product concept**: only then may the callout in section six change from a warning into a promise. Until then, no sentence claiming "encrypted entries cannot be read" is written.',
         ],
       },
@@ -521,6 +724,31 @@ const en = [
         head: ['Version', 'Date', 'Change'],
         rows: [
           ['1.0', '2026-10-01', 'First draft (not yet in force): field-by-field egress table written from the implementation; redaction explicitly disclaimed; cloud AI described as currently unavailable; the cross-border characterisation marked as pending legal review.'],
+          [
+            '1.1',
+            '2026-10-03',
+            'The local-interface tool table in section six gained the four countdown tools (`list_events` / `get_event` / `create_event` / `update_event`), together with the note that a countdown title is often itself the content. This list is reconciled one-by-one against the tool catalogue inside the product, and it is updated whenever a new tool is added.',
+          ],
+          [
+            '1.2',
+            '2026-10-04',
+            'The same table now discloses **the remaining 16 tools** (habits / check-ins / focus / tags / notes / projects / reminders): the catalog had grown to 9 entities and 26 tools with the AI coverage work, while this document still listed 10. Because the sentence "a tool not listed is not granted" turns this table into the authorisation surface, a missing row is a missing disclosure of what becomes readable once a tool is enabled. Each cell follows the `egressFields` actually present in the built catalog, with no inference beyond the field names; `list_notes` states explicitly that notes have no titles, so the list projection discloses only "when something was touched".',
+          ],
+          [
+            '1.3',
+            '2026-10-04',
+            'Added section ten. Chapter V of the GDPR (Articles 44-49) asks whether personal data leaves the European Economic Area, which is **not the same question** as the cross-border wording elsewhere in this document, so neither side borrows the other conclusion. Each cell states what can be produced and what cannot: no standard contractual clauses, no adequacy decision we rely on, no binding corporate rules; Article 9 content is never classified or filtered; Article 22 holds only while the human confirmation stands in the way; Articles 25 and 32 rest on this repository\'s code and tests, with no third-party certification. The article-by-article rights table is deliberately not copied here - it is pointed at through a document reference instead.',
+          ],
+          [
+            '1.4',
+            '2026-10-05',
+            'The **Task breakdown / Prioritisation / Duration estimate** rows of the table in section three each gained `today`, and the Tool selection row gained it too. Those three chains did not know which day it was, so when you wrote "next Wednesday" or "the 14th" the model had to invent a date (measured: it was once off by four and a half months); the only fix is to inject that line into the prompt. It does not look like user data, but it is **this device\'s local date**, so the rule "any new egress field extends this table before it ships" applies. For Tool selection the `today` is not new egress - it is a **missing line being added back**: the built-in assistant already sent it while this table omitted it.',
+          ],
+          [
+            '1.5',
+            '2026-10-05',
+            'Section five is rewritten against ADR-0054: the **data retention policy for this kind of service has been settled**, so the section no longer gives "the retention period is undecided" as the reason the tier is unavailable (the deliberate check written for that purpose no longer fires once the period is decided). What was settled is stated in the second paragraph of section five, item by item against things that can be checked: a table that can only hold counts (its column set is the evidence, not our wording), request and response bodies that exist only in the memory of one proxied call, the operational metadata as a closed field list plus one dated period with a stated derivation, and the managed destination being derived from a **domestic allowlist** rather than declared by the client. Two places deliberately say less than they could: that period carries **no** "it is deleted automatically when it expires" (the sweep is not implemented in this round, and section five changes again when it is), and the cell in section 8 about an endpoint you configure abroad **still reaches no conclusion** - this decision does not touch it and this document will not settle it. The trigger list in section nine drops the retention item with this change. Opening the tier and selling it follow the order in ADR-0054 §6; when that step arrives this section is rewritten end to end again. This row does not restate that number or that field list: they live in section five only, and a second copy is a second thing that can drift.',
+          ],
         ],
       },
     ],
@@ -529,9 +757,27 @@ const en = [
 
 export const aiAndTransfer: LegalDocument = {
   id: 'ai-and-transfer',
-  version: '1.0',
+  // 🔴 1.0 → 1.1：这次改的是**披露本身**（本机接口工具表 + 那句"打开之后能读到什么"）。
+  // 版本号进同意指纹（`packages/legal/src/index.ts:125` 把每张文档拼成 `id@version`），
+  // 改了文字而不 bump，等于让 1.0 那枚已存的同意去覆盖一段它没见过的话 ——
+  // 这正是条款 s12 那条纪律禁止的事（"否则等于偷偷改"）。
+  // 🔴 1.1 → 1.2：同一张表又补了 16 条工具（目录 26 条此前只披露 10 条）。
+  // 触发的是同一句纪律，而且这次更直白：条款把这张表当授权面，表少一行 = 同意少一项。
+  // 🔴 1.2 → 1.3：新增第十节（GDPR 第五章那一档）。加的是**实质承诺的边界**
+  // （没有传输依据、不识别第 9 条内容、第 22 条依赖人工确认），不是措辞打磨，
+  // 所以必须换版本号：同意留痕要能回答"他同意的那一版里有没有这一段"。
+  // 🔴 1.3 → 1.4：第三节那张表加了 `today`（拆解 / 排序 / 估时三条链路 + 工具选择补漏）。
+  // 触发的还是同一条纪律，而且这次是本文件自己列的第一种触发："加任何一个新的出境字段，
+  // 那张表必须先扩、再上线"。出境面变了而不换版本号 = 让 1.3 那枚同意去覆盖
+  // 一段它没见过的数据，正是条款 s9 禁止的事。
+  // 🔴 1.4 → 1.5：第五节按 ADR-0054 改写 —— 改的是**对外承诺的实质**（保留策略从"还没定"
+  // 变成一份可核对的定案：只装计数的表 / 内容只活在一次调用里 / 运维元数据一个有出处的期限 /
+  // 目的地由境内白名单推导），不是措辞。而且这一版**撤掉了一句真话的旧版本**：
+  // "因为保留策略未定所以这一档打不开"在 2026-10-05 之后不再成立。同意留痕要能回答
+  // "他同意的那一版里，这一节写的是哪一套理由"，所以必须换版本号。
+  version: '1.5',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-05',
   title: {
     'zh-CN': 'AI 功能与数据流向',
     en: 'AI Features and Where Your Data Goes',

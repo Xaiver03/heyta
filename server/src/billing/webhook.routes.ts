@@ -58,6 +58,7 @@ import {
   DEFAULT_BILLING_ADAPTERS,
 } from './registry';
 import { grantsForSku } from './price-book';
+import { applyRefundResultInTransaction, type ApplyRefundResultOutcome } from './refund-store';
 import {
   createPrismaSqlRunner,
   settleOrderPaidInTransaction,
@@ -83,6 +84,14 @@ export const BILLING_AUDIT_EVENTS = {
    * 只报后者会让"有一笔钱没能交付权益，原因在订单上"看不出来。
    */
   SETTLED: 'ORDER_SETTLED',
+  /**
+   * 一条**退款通知**被处理了一次（回收 / 只记状态 / 幂等命中 / 对不上账）。
+   *
+   * 与 `SETTLED` 分开是同一个理由的两半：那一条说"有一笔钱进来了，订单侧怎么判"，
+   * 这一条说"有一笔钱出去了，权益侧怎么回"。把它们混成一个事件名，
+   * 日志里就分不清"授予失败"与"回收失败" —— 而后者是要退钱给用户的。
+   */
+  REFUND_APPLIED: 'REFUND_APPLIED',
 } as const;
 
 export interface WebhookRoutesOptions {
@@ -377,6 +386,8 @@ export const webhookRoutes = async (
       // 与 `duplicate` 是两回事，所以不再用 `undefined` 兼表后者。
       let applied: PaymentEventApplyOutcome | null = null;
       let settlement: SettleOrderOutcome | null = null;
+      // 退款通知的处理结论。`null` = 这一条**不是**退款通知。
+      let refundOutcome: ApplyRefundResultOutcome | null = null;
 
       try {
         const outcome = await prisma.$transaction(async (tx) => {
@@ -403,10 +414,31 @@ export const webhookRoutes = async (
           //    "权益发了、订单没结算（券的 `reserved` 名额被永久占住）"或反之的
           //    半截状态。`settleOrderPaidInTransaction` 收的是 `SqlRunner`（不是
           //    `SqlExecutor`），正是为了能落在这个已经开着的事务里。
-          const { settlement: orderSettlement, result } = await settleAndApplyEvent(event, {
-            sql: (options.sqlRunner ?? createPrismaSqlRunner)(tx),
-            subscriptions: buildSubscriptionApplyDeps(tx, now),
-          });
+          // 🔴 退款通知走**另一条**路，绝不进 `settleAndApplyEvent`。
+          // 那条路的语义是"有一笔钱进来了 → 该授予什么"，而退款通知里**没有**新的钱；
+          // 让它走进去的后果是 `applyPaymentEvent` 按"没有订阅引用"归成
+          // `NO_SUBSCRIPTION_REFERENCE` 而**什么都不做** —— 钱退了、权益却不回来，
+          // 且库里看起来像"这条事件本来就不该动权益"。
+          // 声明式分流（`event.refundNotice`）与授予侧的 `oneTimeGrant` 是同一条纪律。
+          const runner = (options.sqlRunner ?? createPrismaSqlRunner)(tx);
+          let orderSettlement: SettleOrderOutcome | null = null;
+          let result: PaymentEventApplyOutcome | null = null;
+          let refund: ApplyRefundResultOutcome | null = null;
+          if (event.refundNotice != null) {
+            refund = await applyRefundResultInTransaction(runner, {
+              outRefundNo: event.refundNotice.outRefundNo,
+              status: event.refundNotice.status,
+              providerRefundId: event.refundNotice.providerRefundId,
+              now: now(),
+            });
+          } else {
+            const settled = await settleAndApplyEvent(event, {
+              sql: runner,
+              subscriptions: buildSubscriptionApplyDeps(tx, now),
+            });
+            orderSettlement = settled.settlement;
+            result = settled.result;
+          }
 
           await tx.paymentEvent.update({
             where: { id: inserted.id },
@@ -420,10 +452,11 @@ export const webhookRoutes = async (
             },
           });
 
-          return { result, orderSettlement };
+          return { result, orderSettlement, refund };
         });
         applied = outcome.result;
         settlement = outcome.orderSettlement;
+        refundOutcome = outcome.refund;
       } catch (err) {
         if (isDuplicatePaymentEventError(err)) {
           duplicate = true;
@@ -469,6 +502,30 @@ export const webhookRoutes = async (
             orderId: settlement.orderId,
             afterExpiry: settlement.afterExpiry,
             quotaExceeded: settlement.quotaExceeded,
+          });
+        }
+      }
+
+      // 🔴 退款通知的审计。`unknown-refund` 必须能在日志里查到 —— 它的意思是
+      // "通道退了一笔我们库里没有记录的钱"，那是需要人对账的事实，不是无事发生。
+      if (refundOutcome !== null) {
+        Logger.audit({
+          event: BILLING_AUDIT_EVENTS.REFUND_APPLIED,
+          // 退款通知**不带**用户归属（那是 `refunds` 那一行上的事实），
+          // 而审计行的形状要求一个 userId —— 与 `SETTLED` 那条同一做法。
+          userId: event.userId ?? 0,
+          provider: event.provider,
+          providerEventId: event.providerEventId,
+          outRefundNo: event.refundNotice?.outRefundNo,
+          outcome: refundOutcome.outcome,
+          refundId: 'refundId' in refundOutcome ? refundOutcome.refundId : undefined,
+          ip: req.ip,
+        });
+        if (refundOutcome.outcome === 'unknown-refund') {
+          Logger.warn('webhook：收到一条对不上任何退款记录的通道通知（需要人工对账）', {
+            provider: event.provider,
+            outRefundNo: event.refundNotice?.outRefundNo,
+            status: event.refundNotice?.status,
           });
         }
       }

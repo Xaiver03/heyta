@@ -58,7 +58,10 @@ import {
   PASSWORD_POLICY_CODES,
   type PasswordPolicyCode,
   ACCOUNT_PROFILE_PATHS,
+  ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS,
   accountProfileResponseSchema,
+  avatarDataUri,
+  displayNameCodePoints,
   parseAvatarPayload,
   type AccountAvatarContentType,
   type AccountProfileResponse,
@@ -133,6 +136,13 @@ export const HOSTED_AUTH_PATHS = {
   passwordChange: `/api${AUTH_PASSWORD_PATHS.change}`,
   /** 已登录**加上第一个**口令（与 `passwordChange` 不是一条路，见共享契约）。 */
   passwordSet: `/api${AUTH_PASSWORD_PATHS.set}`,
+  /**
+   * 注销账号。服务端是 `DELETE /api/account`（**级联硬删**：ops / syncState / devices）。
+   *
+   * ⚠️ 这条路径以前只存在于服务端源码里 —— 客户端**没有任何调用点**，
+   * 所以"自助注销"这句话在界面上是空的（批次 E3 量的就是它）。
+   */
+  accountClosure: '/api/account',
 } as const;
 
 /**
@@ -1073,6 +1083,48 @@ export async function updateAccountDisplayName(
   return { ok: true, ...parsed.data };
 }
 
+/** 「要不要发这一发昵称写入」的**唯一**判定。 */
+export type DisplayNameWritePlan =
+  | {
+      readonly action: 'skip';
+      readonly reason: 'no-credential' | 'unchanged' | 'too-long';
+    }
+  | { readonly action: 'write'; readonly token: string; readonly value: string | null };
+
+/**
+ * 点「保存」时到底发生什么 —— **两个壳必须得到同一个答案**，所以判定住在这一层。
+ *
+ * 🔴 三条"什么都不发"各是一个真缺陷的形状，不是一种懒：
+ * - `no-credential`：没登录还发请求，会拿到一个 401 并把它渲染成"保存失败"，
+ *   而用户看到的是一句假话（他根本没登录，不是保存失败了）。
+ * - `too-long`：服务端也会拒（同一枚 `ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS`），
+ *   但那让红字晚一个来回出现，而这一发往返本身就是用户不需要的代价。
+ * - `unchanged`：不发。这条链**不是 op、不进 op-log** —— 它是专用 HTTP 路由，
+ *   写的就是服务端 `User` 上那一列明文。没改内容的保存发出去，只是让一次点击
+ *   变成一次对权威数据的重写。
+ *
+ * ⚠️ `value` 的 `null` 与 `''` **不是**同义词：`null` 是"清除"（服务端写 null，
+ *   界面回落到邮箱派生名），`''` 会被契约拒成无效输入。所以空白草稿在这里被折成
+ *   `null`，而不是原样发出去。非空时发的是**未 trim 的原稿**（与 web 既有行为逐字一致）。
+ */
+export function planDisplayNameWrite(input: {
+  /** 没有可用凭据时传 `undefined`（"哪个服务端都没定"这件事由宿主判断，不在这层）。 */
+  readonly token: string | undefined;
+  readonly draft: string;
+  readonly saved: string | null | undefined;
+}): DisplayNameWritePlan {
+  if (input.token === undefined || input.token.trim() === '') {
+    return { action: 'skip', reason: 'no-credential' };
+  }
+  if (displayNameCodePoints(input.draft) > ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS) {
+    return { action: 'skip', reason: 'too-long' };
+  }
+  if (input.draft.trim() === (input.saved ?? '').trim()) {
+    return { action: 'skip', reason: 'unchanged' };
+  }
+  return { action: 'write', token: input.token, value: input.draft.trim() === '' ? null : input.draft };
+}
+
 /**
  * 上传头像（客户端加密后交出去）。
  *
@@ -1143,6 +1195,56 @@ export async function fetchAccountAvatar(
     return { ok: false, reason: 'bad-shape' };
   }
   return decodeAvatarCipher(password, body.cipherBase64);
+}
+
+/**
+ * 「这台设备现在该显示什么」的**唯一**裁决（R15b 抽出来，AGENTS §3.5）。
+ *
+ * 抽之前这件事在 web 的 `ProfilePanel` 里是这样活的：`decoded.ok ? dataUri : undefined`
+ * —— 五种失败被并成一个 `undefined`，于是界面对**口令不对**的人说"你还没有头像"，
+ * 他接着点「换一张」，把服务端那张**覆盖掉**。生产那条警告的注释就写在
+ * `AvatarDecodeResult` 上面，但界面层没读它。移动端接的是同一个功能，
+ * 各写一遍就会把同一个洞挖第二次。
+ *
+ * ## 为什么是六个状态而不是五个 reason
+ *
+ * | 状态 | 来自 | 界面上那句 | 用户动作 |
+ * |---|---|---|---|
+ * | `absent` | `avatarHash === null`（**根本没发请求**） | 无（显示首字母） | 想设就设 |
+ * | `ready` | 解码成功 | 显示图 | —— |
+ * | `needs-password` | `no-password` | 「…本机没有保存这个口令」 | 去填口令 |
+ * | `undecryptable` | `undecryptable` | 「这台设备解不开你的头像」 | 核对口令 |
+ * | `unreadable` | `network` / `bad-shape` | 「暂时取不到」 | 稍后重试 |
+ * | （不是一种状态）| `no-token` | —— | —— |
+ *
+ * ⚠️ `no-token` 被折进 `unreadable` 是有前提的：调用它意味着 `avatarHash` 不是 `null`，
+ * 而那个 hash 只能从**带令牌的资料读取**里拿到，所以"有 hash 却没令牌"在本机是造不出来的。
+ * 真造出来（调用方写错）时它的表现是一次可重试的失败，而不是"催你登录"——
+ * 那比给一个从没登录的人看一句"你没设口令"更接近真相。
+ *
+ * 🔴 `absent` 与 `unreadable` **不许合并**：前者是"服务端确实没有"，
+ * 后者是"有，但这台设备此刻拿不到"。合并的症状和上面那个洞同一形状 ——
+ * 网络抖动时用户被告知"你还没有头像"。
+ */
+export type AccountAvatarImage =
+  | { readonly state: 'absent' }
+  | { readonly state: 'ready'; readonly dataUri: string }
+  | { readonly state: 'needs-password' }
+  | { readonly state: 'undecryptable' }
+  | { readonly state: 'unreadable' };
+
+export async function resolveAccountAvatarImage(
+  options: HostedAuthOptions,
+  token: string,
+  password: string | undefined,
+  avatarHash: string | null,
+): Promise<AccountAvatarImage> {
+  if (avatarHash === null) return { state: 'absent' };
+  const decoded = await fetchAccountAvatar(options, token, password);
+  if (decoded.ok) return { state: 'ready', dataUri: avatarDataUri(decoded.image) };
+  if (decoded.reason === 'no-password') return { state: 'needs-password' };
+  if (decoded.reason === 'undecryptable') return { state: 'undecryptable' };
+  return { state: 'unreadable' };
 }
 
 /** 移除头像。**幂等**：本来就没有也算成功（服务端用 `deleteMany`，不会抛 P2025）。 */
@@ -1769,4 +1871,38 @@ export async function setInitialPassword(
   );
   if (!result.ok) return result;
   return { ok: true, message: readServerMessage(result.body) ?? '' };
+}
+
+/**
+ * 注销当前令牌所属的账号（`DELETE /api/account`，服务端**级联硬删**）。
+ *
+ * 🔴 **这个函数只做协议，不做"清本机"。** 清了哪些存储只有宿主知道
+ * （见 `./local-erasure.ts` 文件头），而这条路上有一件事绝不能写反：
+ *
+ *   **服务端没删成，就一次本机销毁都不许发生。**
+ *
+ * 反过来的那次事故是可以自己造出来的：一次 5xx 或断网就把本机数据清了，
+ * 而账号在服务端**还活着** —— 用户下次登录会看到云端那份旧数据，
+ * 于是"注销"变成了一次无声的数据丢失，而他刚刚还以为自己行使了删除权。
+ * 这个顺序由 `closeAccountAndEraseLocal()` 保证，并由
+ * `tests/account-closure.spec.ts` 逐条钉住（包括"失败时销毁器调用次数为 0"）。
+ *
+ * 令牌是**必填**的：归属由服务端按令牌判，这里不发任何"这是谁的"字段。
+ */
+export async function closeAccount(
+  options: HostedAuthOptions,
+  token: string,
+): Promise<HostedAuthOutcome<{ closed: true }>> {
+  const trimmedToken = token.trim();
+  if (trimmedToken === '') return failure('unauthorized');
+
+  const result = await sendJson(options, 'DELETE', HOSTED_AUTH_PATHS.accountClosure, undefined, trimmedToken);
+  if (!result.ok) return result;
+
+  // 服务端成功形状是 `{ success: true }`。2xx 但**不是**这个形状时不当成功 ——
+  // 注销是唯一一个"下游动作不可逆"的调用，宁可让用户重试一次。
+  const body = result.body as { success?: unknown } | undefined;
+  if (body?.success !== true) return failure('malformed-response');
+
+  return { ok: true, closed: true };
 }

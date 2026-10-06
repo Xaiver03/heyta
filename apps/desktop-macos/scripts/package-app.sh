@@ -16,6 +16,13 @@
 #   只签名不公证，别人下载后仍会看到"来自身份不明的开发者"。
 #   本脚本**两个都做**，且**分别报告**成功与否 —— 不许把"签了名"说成"能分发"。
 #
+# `HEYTA_SKIP_NOTARIZE=1` 只跳过第 ⑥ 步（默认不跳，行为逐字不变）。
+#   它**不会**把红变成绿：第 ⑥ 步从不在判据里 —— `if xcrun notarytool … | tail -8 | awk`
+#   判的是 `awk` 的退出码（AGENTS §7 第 179 条那个形状），失败分支只打印一句红就继续走完。
+#   它去掉的是**没有上界的等待**：`--wait` 没有超时，2026-10-04 实测同一档被卡住 11h25m
+#   （pid 98934，父链是另一条会话的 `reinstall-all`），而验证载体的排队被这一格占死。
+#   ⇒ 跳过之后这一趟**不许**主张"包已通过公证"；那句只有不带这个变量的一趟能说。
+#
 # ── 为什么需要 entitlements ─────────────────────────────────────────────
 #
 # hardened runtime（公证的硬性前提）默认禁止 JIT 与可写可执行内存，
@@ -69,6 +76,41 @@ node "$REPO/packages/app-host/scripts/build-native-bridge.mjs" || { echo "🔴 �
 #    根下散目录让 codesign 报 "unsealed contents present in the bundle root"（实测）。
 WEB_DIST="$REPO/apps/web/dist"
 [ -f "$WEB_DIST/index.html" ] || { echo "🔴 缺少共享 UI 产物：$WEB_DIST/index.html（先 pnpm -r build）"; exit 1; }
+
+# 🔴 **存在 ≠ 是当前源码打出来的**（2026-10-03 实测事故）。
+#    产品负责人在装好的 .app 里看到日历"内容超出容器范围"，而当前源码同一尺寸同一状态
+#    量出来是能放下的（真浏览器现量：脚注 y=697 < 视口 720）。差在哪：包里的 web-dist 是
+#    **另一次构建** —— 4 个 chunk 哈希与本机 `apps/web/dist` 不同，且
+#    `now-line` / `clock-` 两个标记在包里的 JS 里 **0 命中**（当前产物各 1 命中），
+#    也就是那份产物**早于 R13/R14**：日历的工具栏还在卡片里（多占一行）、行更高，
+#    于是当天那张卡被顶到窗口下沿之外。
+#    🔴 关键是**已有判据全绿**：截图非空白 + 主蓝命中，量的是"有没有界面"，
+#    回答不了"是不是这份源码的界面"（AGENTS §7 第 82 条的第四次露面）。
+#    所以下面这条不是仪式：它比的是**产物的输入**，输入变新而产物没重建 = 拒绝打包。
+#    ⚠️ 刻意**不**在这里顺手 `pnpm -r build`：打包脚本替别人重建共享 dist
+#       会把并行会话的 WIP 打进产品包里（那是比"旧产物"更坏的结果）。它只拒绝，并给出命令。
+WEB_STALE=""
+for d in "$REPO/apps/web/src" "$REPO/apps/web/public" "$REPO/apps/web/index.html"; do
+  [ -e "$d" ] || continue
+  hit=$(find "$d" -type f -newer "$WEB_DIST/index.html" 2>/dev/null | head -6)
+  [ -n "$hit" ] && WEB_STALE="$WEB_STALE$hit
+"
+done
+for p in "$REPO"/packages/*/; do
+  for d in "${p}src" "${p}dist"; do
+    [ -d "$d" ] || continue
+    hit=$(find "$d" -type f -newer "$WEB_DIST/index.html" 2>/dev/null | head -6)
+    [ -n "$hit" ] && WEB_STALE="$WEB_STALE$hit
+"
+  done
+done
+if [ -n "$WEB_STALE" ]; then
+  echo "🔴 共享 UI 产物比它的输入**旧** —— 打进 .app 的会是旧界面，而截图判据拦不住这件事。"
+  printf '%s' "$WEB_STALE" | sed '/^$/d' | sed 's/^/     比产物新的输入: /'
+  echo "   （每个目录最多列 6 条）闭合命令：pnpm -r build && pnpm --filter @heyta/web build"
+  exit 1
+fi
+echo "  ✅ web-dist 新鲜度对账通过（不比 apps/web 与 packages/* 的任何输入旧）"
 
 # ── ② 组装 .app ─────────────────────────────────────────────────────────
 echo ""
@@ -206,6 +248,17 @@ if (looksSmeared(cs)) console.error('  ⚠️ 启发式提示疑似渲染坏了 
 const blue = countBrandBlue(brandShot);
 console.log(`  主蓝采样命中 ${blue}（数的是 ${brandShot.split('/').pop()}）`);
 if (blue < 20) { console.error('  🔴 截图里没有 heyta 主蓝 —— 这是错误屏/别的界面，不是共享 UI'); bad = true; }
+// 🔴 2026-10-05：同一枚洞在这条腿上的第二份（第一份修在 `scripts/reinstall-all.sh` 的 `shot_ok`，
+//    两处判据必须一起走，否则"打包自验"与"装机复验"会给出相反的答案）。
+//    首屏**品牌帧**那块底板本身就是主蓝 `#2563EB`，实测命中 **2000**（真界面 1127）——
+//    "主蓝 ≥ 20"不但拦不住它，还给它打更高分数；它此前只靠 `looksBlank` 的 0.01 擦边压住
+//    （品牌帧实测 contentRatio **0.00943**，余量 5.7%，而画幅/DPR/MARK_SIZE/采样步长任一变动即翻）。
+//    ⇒ 下界 **0.05** = 最低真图实测 0.1034 的一半（对品牌帧 5.3 倍、对最低真图 2 倍）。
+if (cs.contentRatio < 0.05) {
+  console.error(`  🔴 内容占比 ${(cs.contentRatio * 100).toFixed(1)}% < 5% —— 主蓝再多也不算数：` +
+    `**首屏品牌帧**就是一块主蓝底板压在近白底上（实测命中 2000、占比 0.9%），那是遮罩还没从 DOM 摘掉的一帧`);
+  bad = true;
+}
 if (bad) process.exit(1);
 console.log('  ✅ 打包后的 .app 能起来、界面有真实内容（且确实是共享 UI）');
 JS
@@ -234,18 +287,65 @@ done
 KEY_ID="T2H876K8MJ"
 ISSUER="627afa93-122d-4739-a780-0ad593aee505"
 
-if [ "$SIGN_KIND" != "developer-id" ]; then
+if [ "${HEYTA_SKIP_NOTARIZE:-}" = "1" ]; then
+  echo "  ⏭ 显式跳过（HEYTA_SKIP_NOTARIZE=1）。这一趟的判据是「装出来的包里有这一屏」（第 ④ 步已经量过），"
+  echo "     公证不是它的组成部分 ⇒ 本趟**不主张**「这个包已通过公证」，那句要等不带这个变量的一趟。"
+elif [ "$SIGN_KIND" != "developer-id" ]; then
   echo "  ⏭ 跳过：不是 Developer ID 签名，公证必然被拒"
 elif [ -z "$KEY_FILE" ]; then
   echo "  ⏭ 跳过：找不到 ASC API key（试过 ~/Library/Private/AppStoreConnect、~/Desktop、~/.appstoreconnect/private_keys）"
 else
   echo "  用 key：$(basename "$KEY_FILE")（内容不打印）"
-  if xcrun notarytool submit "$DMG" --key "$KEY_FILE" --key-id "$KEY_ID" --issuer "$ISSUER" --wait 2>&1 | tail -8 | awk '{print "  " $0}'; then
+  # 🔴 `--wait` 原来**没有上限**：Apple 侧不回话时整段永久挂住。2026-10-04 05:1x 实测另一条会话的
+  #    `reinstall:all` 卡在这一行 1h57m：进程累计 CPU 0:00.03、**一条 TCP 连接都没有**
+  #    （即它连"正在重试"都不是，就是在等一个不会来的东西），而它同时是"有别人在重装"那道互斥门的
+  #    持有者 ⇒ 一个外部调用把并行会话的固定收尾一起钉死了。上限走 `HEYTA_NOTARY_TIMEOUT`
+  #    （默认 900s；设 `0` = 显式要旧行为"不设限"）。**超时不等于通过**：走 🔴 那一支，不装订票据。
+  NOTARY_TIMEOUT="${HEYTA_NOTARY_TIMEOUT:-900}"
+  TIMEOUT_BIN=""
+  for t in timeout gtimeout; do
+    command -v "$t" >/dev/null 2>&1 && { TIMEOUT_BIN="$t"; break; }
+  done
+  NOTARY_LOG="$(mktemp)"
+  # 🔴 裸 macOS **不带** timeout（它属于 GNU coreutils / homebrew），所以"没有 timeout"是
+  #    打包机的默认情况而不是边角；那种时候退化成"不设限"就等于没修。这里用纯 bash 看门狗兜底。
+  run_bounded() {
+    local limit="$1"; shift
+    if [ "$TIMEOUT_BIN" != "" ]; then
+      "$TIMEOUT_BIN" "$limit" "$@"
+      return $?
+    fi
+    "$@" &
+    local pid=$! waited=0
+    while kill -0 "$pid" 2>/dev/null; do
+      if [ "$waited" -ge "$limit" ]; then
+        kill -TERM "$pid" 2>/dev/null; sleep 2; kill -KILL "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+        return 124
+      fi
+      sleep 2; waited=$((waited + 2))
+    done
+    wait "$pid" 2>/dev/null
+  }
+  notary_rc=0
+  if [ "$NOTARY_TIMEOUT" != "0" ]; then
+    run_bounded "$NOTARY_TIMEOUT" xcrun notarytool submit "$DMG" --key "$KEY_FILE" --key-id "$KEY_ID" --issuer "$ISSUER" --wait >"$NOTARY_LOG" 2>&1 || notary_rc=$?
+  else
+    echo "  ⚠️ HEYTA_NOTARY_TIMEOUT=0 ⇒ 显式要求不设限（旧行为）"
+    xcrun notarytool submit "$DMG" --key "$KEY_FILE" --key-id "$KEY_ID" --issuer "$ISSUER" --wait >"$NOTARY_LOG" 2>&1 || notary_rc=$?
+  fi
+  tail -8 "$NOTARY_LOG" | awk '{print "  " $0}'
+  rm -f "$NOTARY_LOG"
+  # ⚠️ 输出走临时文件而不是管道：`set -o pipefail` 下管道能保住退出码，但**区分不了**
+  #    "Apple 拒绝"与"到点没回话"（124），而这两种要说的话不一样。
+  if [ "$notary_rc" -eq 0 ]; then
     echo "  ✅ 公证通过，开始装订票据"
     xcrun stapler staple "$DMG" 2>&1 | tail -2 | awk '{print "  " $0}'
     xcrun stapler validate "$DMG" 2>&1 | tail -2 | awk '{print "  " $0}'
+  elif [ "$notary_rc" -eq 124 ]; then
+    echo "  🔴 公证在 ${NOTARY_TIMEOUT}s 内没有返回（Apple 侧未回话）。包本身已签名可用，但**没通过公证**，不装订票据。"
   else
-    echo "  🔴 公证失败（上面的输出是 Apple 的原话）。包本身已签名可用，但**没通过公证**。"
+    echo "  🔴 公证失败（上面的输出是 Apple 的原话，rc=$notary_rc）。包本身已签名可用，但**没通过公证**。"
   fi
 fi
 

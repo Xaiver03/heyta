@@ -142,6 +142,96 @@ const withPrefs = (): PreferenceSet => ({
 // 构造调用
 // ─────────────────────────────────────────────────────────────────────────
 
+/**
+ * 🔴 `fields` 与 `user` 的**对照表**（与 `ai-capture.spec.ts` 同一形状）。
+ * 出境披露读 `fields`，真正出去的内容在 `user` 里 —— 双向核对，漂移就红。
+ */
+const FIELD_MARKER: Readonly<Record<string, string>> = {
+  today: '今天是：',
+  tasks: '待排序任务（JSON）：',
+  preferences: '关于这位用户的历史习惯',
+};
+
+function expectFieldsMatchUser(inv: { user: string; fields: readonly string[] }): void {
+  for (const field of inv.fields) {
+    const marker = FIELD_MARKER[field];
+    expect(marker, `字段 ${field} 没有登记对照标记`).toBeDefined();
+    expect(inv.user, `字段 ${field} 声明了却没进 user`).toContain(marker as string);
+  }
+  for (const [field, marker] of Object.entries(FIELD_MARKER)) {
+    if (inv.user.includes(marker)) {
+      expect(inv.fields, `user 里有 ${field} 的内容，fields 却没声明`).toContain(field);
+    }
+  }
+}
+
+/** 固定时钟：本地中午 ⇒ 任何时区下本地日历日都是 2026-09-25（周五）。 */
+const NOW = Date.parse('2026-09-25T12:00:00');
+const CROSS_MIDNIGHT = Date.parse('2026-09-26T12:00:00');
+
+describe('buildPrioritizeInvocation —— 🔴 W4 时间锚点', () => {
+  it('锚点真的进了 prompt：注入的 `now` 决定「今天是」那一行', () => {
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS, now: NOW });
+    expect(inv.user).toContain('今天是：2026-09-25（周五，');
+  });
+
+  it('🔴 换 `now` 就换日期（锚点不许冻在第一次调用）', () => {
+    const before = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS, now: NOW });
+    const after = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS, now: CROSS_MIDNIGHT });
+    expect(before.user).toContain('今天是：2026-09-25');
+    expect(after.user).toContain('今天是：2026-09-26');
+    expect(before.user).not.toBe(after.user);
+  });
+
+  it('🔴 系统提示带日期硬规则（只给日期不给规则 = 模型仍自己算）', () => {
+    const { system } = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS, now: NOW });
+    expect(system).toContain('关于日期的硬规则：');
+    expect(system).toContain('不许凭印象写一个日期');
+  });
+
+  it('🔴 `today` 是**真实出境字段**：在披露清单里，且不在清单外', () => {
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS, now: NOW });
+    expect(inv.fields).toContain('today');
+    expect(inv.fields).toEqual(['today', 'tasks']);
+    expectFieldsMatchUser(inv);
+  });
+
+  it('🔴 带偏好时双向核对仍然成立（不多报也不少报）', () => {
+    const hints = renderPreferenceHints(withPrefs(), 'prioritize');
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS, now: NOW }, hints);
+    expect(inv.fields).toEqual(['today', 'tasks', 'preferences']);
+    expectFieldsMatchUser(inv);
+  });
+
+  it('🔴🔴 授权后：锚点那行**真的在 HTTP 请求体里**（正向对照，挡"探针根本没带锚点"）', async () => {
+    const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
+    await requestPrioritize(
+      { locale: 'zh-CN', tasks: TASKS, now: NOW },
+      {
+        routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body).toContain('今天是：2026-09-25');
+  });
+
+  it('🔴🔴 未授权该功能时**一个请求都不发**，连时间锚点那行都没出境', async () => {
+    const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
+    const outcome = await requestPrioritize(
+      { locale: 'zh-CN', tasks: TASKS, now: NOW },
+      {
+        routing: routing([REMOTE_ENDPOINT], { prioritize: ['remote'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+    expect(outcome.ok).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe('buildPrioritizeInvocation', () => {
   it('功能是 prioritize', () => {
     expect(buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS }).feature).toBe('prioritize');
@@ -149,7 +239,7 @@ describe('buildPrioritizeInvocation', () => {
 
   it('🔴 `fields` 覆盖 `user` 里出现的每个数据字段（披露的依据）', () => {
     const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS });
-    expect(inv.fields).toEqual(['tasks']);
+    expect(inv.fields).toEqual(['today', 'tasks']);
     // 字段声明了，正文里就必须真有
     expect(inv.user).toContain('做发布');
     expect(inv.user).toContain('t1');
@@ -164,7 +254,7 @@ describe('buildPrioritizeInvocation', () => {
     ] as unknown as PrioritizeTaskInput[];
     const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: withNote });
 
-    expect(inv.fields).toEqual(['tasks']);
+    expect(inv.fields).toEqual(['today', 'tasks']);
     expect(inv.user).toContain('做发布');
     // 🔴 一个字节的备注都不许出现
     expect(inv.user).not.toContain('机密');
@@ -190,14 +280,14 @@ describe('buildPrioritizeInvocation', () => {
 
   it('没有偏好时：不出现 preferences 字段，也不出现任何提示段落', () => {
     const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS });
-    expect(inv.fields).toEqual(['tasks']);
+    expect(inv.fields).toEqual(['today', 'tasks']);
     expect(inv.user).not.toContain('历史习惯');
   });
 
   it('🔴 传了偏好：`preferences` 必须进 `fields`（否则就是偷偷多发数据）', () => {
     const hints = renderPreferenceHints(withPrefs(), 'prioritize');
     const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS }, hints);
-    expect(inv.fields).toEqual(['tasks', 'preferences']);
+    expect(inv.fields).toEqual(['today', 'tasks', 'preferences']);
     expect(inv.user).toContain('关于这位用户的历史习惯');
   });
 
@@ -217,7 +307,7 @@ describe('buildPrioritizeInvocation', () => {
     expect(hints).toEqual([]);
 
     const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS }, hints);
-    expect(inv.fields).toEqual(['tasks']);
+    expect(inv.fields).toEqual(['today', 'tasks']);
     expect(inv.user).not.toContain('历史习惯');
     expect(inv.user).not.toContain('提前 2 天');
   });

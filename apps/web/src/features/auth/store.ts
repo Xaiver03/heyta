@@ -320,7 +320,12 @@ export interface AuthStoreState {
 function applyAuthSession(baseUrl: string, session: HostedAuthSession): void {
   // 邮箱一起交过去：左侧导航顶部的头像要用它算首字母，
   // 而刷新之后 `useAuthStore` 会回到 signed-out —— 头像得能从落盘的凭据里拿到它。
-  useSyncStore.getState().applyAuthToken(baseUrl, session.token, session.user.email);
+  useSyncStore.getState().applyAuthToken(
+    baseUrl,
+    session.token,
+    session.user.email,
+    String(session.user.id),
+  );
 
   /**
    * 账号语言（应用语言解析链第 2 层，2026-10-01 拍板）：本机**没有**显式选择时

@@ -110,9 +110,14 @@ esbuild 加一个别名把 `vitest` 指到本目录的 **`vitest-shim.ts`**（�
 覆盖面是按**实测**选的，不是猜的 —— 两个契约文件用到的 API 只有
 `describe` / `it` / `expect`，匹配器只有
 `toBe` / `toEqual` / `toHaveLength` / `toBeDefined` / `toBeUndefined` /
-`toBeGreaterThanOrEqual`，外加 `rejects.toThrow(...)`；**没有任何生命周期钩子**。
+`toBeGreaterThan` / `toBeGreaterThanOrEqual` / `toBeLessThan`，外加 `rejects.toThrow(...)`；**没有任何生命周期钩子**。
 
 ⚠️ 这是替身，不是 vitest：**语义对齐的是"通过/不通过"，不是报错文案**。
+
+契约新增 matcher 时必须同步补全这里的适配器，并验证正例、反例与 `.not`。2026-10-04
+新增计数契约使用严格大小比较，缺失方法曾让 67 条中的 1 条在装载断言时失败；补齐后
+真实 C# 契约 67/67 通过，严格大小比较的相等边界、反向值、NaN、非数值及 `.not` 共 20 条检查通过。
+方法缺失不能算存储实现失败，也不能跳过整条契约。
 另外 `toEqual` 特意实现了 vitest 的"**忽略值为 `undefined` 的键**"语义 ——
 不实现的话会报一堆**假失败**（记录里带不带可选字段取决于写入路径）。
 

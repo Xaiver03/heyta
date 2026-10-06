@@ -26,9 +26,11 @@ import { type Operation } from '@heyta/sync-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTaskActions } from '../src/actions.js';
-import { buildExportDocument, type ExportDocument } from '../src/export-dump.js';
+import { buildExportDocument, type ExportDocument, type RestoreDocument } from '../src/export-dump.js';
 import {
   parseExportDocument,
+  previewRestore,
+
   restoreIntoEmptyTarget,
   stateMatchesDocument,
   type ExportImportFailureReason,
@@ -83,7 +85,9 @@ async function device(clientId: string, now: () => number): Promise<Device> {
 
   const created: Device = {
     engine,
-    target: { engine, readOpLog: ops },
+    // 🔴 目标只交引擎 —— `ImportTarget` 上已经没有"读全库"的口子了
+    // （空库守卫改成条数判定），所以这里连 `readOpLog` 都不用再提供。
+    target: { engine },
     ops,
     close: () => adapter.close(),
   };
@@ -342,5 +346,121 @@ describe('stateMatchesDocument（判据本身能否失败）', () => {
       },
     } as ExportDocument;
     expect(stateMatchesDocument(state, resurrected)).toBe(false);
+  });
+});
+
+// ── 只声明 op-log 的还原文档（恢复工具那一路，§10.10.1 的 route B） ──────────
+//
+// 🔴 这四条钉的是同一个产品结论：**实体的物化权只属于客户端 reducer**。
+// 服务端对 `DEL` 是 `delete state[type][id]`（`server/src/sync/op-replay.ts`），
+// 客户端是 field-level `deletedAt`（`packages/op-log/src/state.ts`）。
+// 让恢复工具自己填 `entities`，产物就**结构上不可能有墓碑** ——
+// 那台设备恢复出来后回收站是空的，而对端那条活体会把它再同步回来（复活）。
+// 所以它的产物只交 op-log，`entities` 整格缺省。
+describe('只声明 op-log 的还原文档（entities 缺省 ⇒ 由客户端 reducer 物化）', () => {
+  /** 把完整导出降级成"只交 op-log"：`entities` 整格拿掉，counts 只留能被证明的那一格。 */
+  function toOpsOnly(doc: ExportDocument): string {
+    const { entities: _drop, counts, ...rest } = doc;
+    return JSON.stringify({ ...rest, counts: { totalOps: counts.totalOps } });
+  }
+
+  it('🔴 entities 缺省时，墓碑由客户端 reducer 物化回来（回收站不空）', async () => {
+    const source = await buildExportWithTombstone();
+    const parsed = parseExportDocument(toOpsOnly(source));
+    expect(parsed.ok, JSON.stringify(parsed)).toBe(true);
+    if (!parsed.ok) throw new Error('unreachable');
+    expect(parsed.document.entities).toBeUndefined();
+
+    const target = await device('device-b', () => 1_000_000_000_000);
+    const result = await restoreIntoEmptyTarget(target.target, parsed.document);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) throw new Error('unreachable');
+
+    // 两条记录、其中一条是墓碑 —— 这两个数字就是"DEL 语义没被服务端那一份污染"的证据。
+    expect(result.entities).toBe(2);
+    expect(result.deleted).toBe(1);
+
+    const state = target.engine.getState();
+    expect(state.tasks['task-002']?.deletedAt, '被删的那条必须在回收站里，而不是消失').toBeTypeOf('number');
+    expect(state.tasks['task-001']?.deletedAt).toBeUndefined();
+    expect(createTaskActions(target.engine, { now: () => 1_000_000_000_000 }).listTasks().map((t) => t.id))
+      .toEqual(['task-001']);
+  });
+
+  it('同一份 ops-only 文档，物化结果与完整导出逐字节同形（两个来源不许各说一套）', async () => {
+    const full = await buildExportWithTombstone();
+    const parsed = parseExportDocument(toOpsOnly(full));
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed));
+
+    const target = await device('device-c', () => 1_000_000_000_000);
+    const result = await restoreIntoEmptyTarget(target.target, parsed.document);
+    if (!result.ok) throw new Error(JSON.stringify(result));
+
+    // 用文档自己声明的那一份去核对**物化**出来的状态：两条路必须收敛到同一个形状。
+    expect(stateMatchesDocument(target.engine.getState(), full)).toBe(true);
+  });
+
+  // 🔴 这条是被变异**照出来**的：把第 4 步（写后核对）整块摘掉，其余 18 条全绿 ——
+  // 也就是说"写完之后必须再核对一次"这句话当时**没有任何一层在守**。
+  // 判据用真实引擎写、只在"读回来的状态"上造一次可控分歧：
+  // 测的是"对不上时不许谎报成功"这条接线，不是测引擎本身。
+  it('🔴 写完之后对不上必须报 verification-failed（第 4 步不是装饰）', async () => {
+    const source = await buildExportWithTombstone();
+    const parsed = parseExportDocument(toOpsOnly(source));
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed));
+
+    const honest = await device('device-diverge', () => 1_000_000_000_000);
+    const target: ImportTarget = {
+      engine: {
+        importOperations: (ops) => honest.engine.importOperations(ops),
+        getState: () => {
+          const state = structuredClone(honest.engine.getState());
+          // 多出一条重放里根本没有的记录 —— 等价于"写进去的和声称的不是一套"。
+          // 复制一条真实记录再改 id，而不是手写一个字面量：Task 的必填字段以后加
+          // 了也不用回来改这条用例（它要量的是"多一条"，不是"这一条长什么样"）。
+          const [first] = Object.values(state.tasks);
+          if (!first) throw new Error('夹具里没有任务可复制 —— 这条分歧造不出来');
+          state.tasks['phantom'] = { ...first, id: 'phantom' };
+          return state;
+        },
+        // 空库守卫读的是**引擎真实**的 op 数，这里必须原样转发：
+        // 这条用例要造的分歧只在"读回来的状态"上，把 countStoredOps 一起改掉的话，
+        // "目标非空就拒绝"那一档就被夹具顺手满足了，测的就不再是接线。
+        countStoredOps: () => honest.engine.countStoredOps(),
+      },
+    };
+
+    const result = await restoreIntoEmptyTarget(target, parsed.document);
+    expect(result.ok, '状态对不上却报成功 —— 那就是谎报').toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.reason).toBe('verification-failed');
+    // ⚠️ 数据确实已经落库（这一步在拒绝之前就发生了），如实上报而不是假装回滚。
+    expect(await honest.ops()).toHaveLength(source.opLog.length);
+  });
+
+  // 确认面板说"按下去会发生什么"。它读文件自己声明的计数时，
+  // "只交 op-log"的产物会让它显示 0 条 / 0 条已删，而实际要导进 2 条含 1 墓碑。
+  it('🔴 预告数字来自重放，不来自文件的声明（少一条就是界面在说谎）', async () => {
+    const doc = await buildExportWithTombstone();
+    const stripped = JSON.parse(toOpsOnly(doc)) as RestoreDocument;
+
+    const preview = previewRestore(stripped);
+    expect(preview.totalOps).toBe(doc.counts.totalOps);
+    expect(preview.totalEntities, '记录总数必须是重放出来的 2 条，不是文件里"没有"的 0 条').toBe(2);
+    expect(preview.totalDeleted, '墓碑数必须是 1 —— 确认面板上"含已删除"那一句靠它').toBe(1);
+    expect(preview.perType.TASK).toEqual({ total: 2, deleted: 1 });
+  });
+
+  it('`entities: null` 仍是坏文件 —— "写了个坏值"不许当成"没写这一格"', async () => {
+    const doc = await buildExportWithTombstone();
+    const broken = JSON.stringify({ ...doc, entities: null });
+    expectParseReason(parseExportDocument(broken), 'invalid-document');
+  });
+
+  it('ops-only 文档的 counts.totalOps 与 opLog 不符时仍然先拒绝', async () => {
+    const doc = await buildExportWithTombstone();
+    const { entities: _drop, counts, ...rest } = doc;
+    const lying = JSON.stringify({ ...rest, counts: { totalOps: counts.totalOps + 1 } });
+    expectParseReason(parseExportDocument(lying), 'inconsistent-document');
   });
 });

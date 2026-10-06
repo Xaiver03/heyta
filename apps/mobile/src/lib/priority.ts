@@ -1,6 +1,6 @@
 /**
- * 优先级文案与语义色
- * ==================
+ * 优先级文案与选择器顺序
+ * ======================
  *
  * 🔴 这个文件存在的理由：`Priority` 是**数值枚举**（`High = 3`），
  * 而数值枚举最容易写出"永远为假"的条件。
@@ -10,8 +10,13 @@
  * 它的行为是**高优先级任务不显示任何标记，而且不报错**。
  * 所以"数值 → 文案"的映射只写在这里一次，并配可失败的测试。
  *
- * 颜色**只给语义 token 名，不给取值** —— 取值由设计系统唯一决定
- * （`AGENTS.md` §5 第 2 条：语义名，不用外观名）。
+ * ⚠️ **颜色不在这里了**（2026-10-04，W5）：档位 → 语义色 token 名
+ * 之前在本文件与 `apps/web/src/features/tasks/priority-display.ts` 各有一份
+ * 逐字相同的实现，现在唯一的所有者是
+ * `packages/ui/src/task-list/priority-color.ts`（由 `@heyta/ui` 转出）。
+ * 共享得动的原因是它只需要 `@heyta/domain`，不需要 i18n ——
+ * 而**文案**那一半仍然必须各端各写（`packages/ui` 依赖不了 `@heyta/i18n`）。
+ * 两边都只给语义 token 名、不给取值（`AGENTS.md` §5 第 2 条）。
  */
 
 import { Priority } from '@heyta/domain';
@@ -46,27 +51,6 @@ export const PRIORITY_ORDER: readonly Priority[] = [
   Priority.Medium,
   Priority.High,
 ];
-
-/** 语义色 token 名（**名字**，不是取值）。 */
-export type PriorityColorToken =
-  | 'color.priority-none'
-  | 'color.priority-low'
-  | 'color.priority-medium'
-  | 'color.priority-high';
-
-/** 档位 → 语义色 token 名。 */
-export function priorityColorToken(priority: Priority): PriorityColorToken {
-  switch (priority) {
-    case Priority.High:
-      return 'color.priority-high';
-    case Priority.Medium:
-      return 'color.priority-medium';
-    case Priority.Low:
-      return 'color.priority-low';
-    default:
-      return 'color.priority-none';
-  }
-}
 
 /** 档位 → 当前语言的名称。 */
 export function priorityLabel(priority: Priority, t: Translate): string {

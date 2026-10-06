@@ -53,6 +53,15 @@ test('行尾「截止」：点开 → 选日 → DueBadge 变化 → 刷新后�
   });
   page.on('pageerror', (e) => errors.push(String(e)));
 
+  /* 🔴 工单 §8.146 起这一条**必须跑在窄档**。不是随手加的：那一单把截止的编辑本体搬进了
+     详情列那一格，宽档的行尾**整块不画** `DueEditor`（连徽标都不留 —— 截止的显示在共享
+     元信息条 `task-meta` 上），所以默认 1440 视口下这里第 ① 段"App 真的挂上了触发器"
+     会量到 0 枚。
+     ⚠️ 覆盖面没有因此变窄：这个文件问的三件事（App 挂没挂上 / `<summary>` 点击展开在真
+     浏览器里通不通 / 选日刷新后还在不在）在窄档全部成立且都问得到，而它独有的那一段
+     —— **Portal 面板整块落在视口内** —— 只在行尾那一支才存在（栏里那一份是在流的）。
+     宽档那一格由 `detail-pane-task.spec.ts` 的 T12 负责。 */
+  await page.setViewportSize({ width: 900, height: 600 });
   await openApp(page);
   const title = `due-e2e-${Date.now() % 100000}`;
   await addTaskViaComposer(page, title);

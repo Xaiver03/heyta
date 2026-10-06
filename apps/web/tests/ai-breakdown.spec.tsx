@@ -13,6 +13,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { zhCN } from '@heyta/i18n';
+
 
 import type { AiRoutingConfig, EgressConsent, SecretStore } from '@heyta/ai';
 import type { PreferenceSet, Task } from '@heyta/domain';
@@ -337,7 +339,12 @@ describe('失败路径', () => {
     const el = render({ routing: makeRouting(REMOTE_ENDPOINT), consents: [], fetchImpl: impl });
     click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
     await clickAsync(el.querySelector('[data-testid="ai-send"]'));
-    expect(el.querySelector('[data-testid="ai-failure-message"]')?.textContent).toContain('授权');
+        // 🔴 钉的是**哪一个词条**，不是它此刻的字面量：界面口径已统一成「批准内容离开本机」，
+    //    既不写"授权"也不写监管定性词（check:ui-language 规则 7）。抓 substring 会在下次
+    //    改文案时再红一次，而钉 key 同时留住真正的判据 —— 失败面渲染的是这一条原因。
+    expect(
+      el.querySelector('[data-testid="ai-failure-message"]')?.textContent,
+    ).toContain(zhCN['web.ai.failure.cause.egressNotAuthorized']);
     expect(calls).toHaveLength(0);
   });
 });

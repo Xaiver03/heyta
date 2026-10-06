@@ -92,6 +92,9 @@ model User {
   operations                  Operation[]
   syncState                   UserSyncState?
   devices                     SyncDevice[]
+  revokedSyncDevices          RevokedSyncDevice[]
+  vaultKeyPackage             VaultKeyPackage?
+  vaultKeyMigrations          VaultKeyMigration[]
   passkeys                    Passkey[]
   pendingPasskeyRegistrations PendingPasskeyRegistration[]
   subscriptions               Subscription[]
@@ -104,6 +107,7 @@ model User {
   notifications               AccountNotification[]
   consents                    UserConsent[]
   avatar                      UserAvatar?
+  aiUsageCounters             AiUsageCounter[]
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
@@ -363,6 +367,119 @@ model SyncDevice {
   @@map("sync_devices")
 }
 
+/// Tombstone for a clientId explicitly revoked by the account owner. Keeping
+/// it separate from SyncDevice prevents a revoked offline client from
+/// re-registering itself on its next upload.
+model RevokedSyncDevice {
+  userId    Int    @map("user_id")
+  clientId  String @map("client_id")
+  revokedAt BigInt @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, clientId])
+  @@map("revoked_sync_devices")
+}
+
+/// Opaque E2EE key package. The server stores wrappers only; it cannot derive
+/// or decrypt the vault root key. A new keyVersion is published after a
+/// client-side rotation has re-encrypted every local record.
+model VaultKeyPackage {
+  userId              Int      @id @map("user_id")
+  keyVersion          Int      @map("key_version")
+  packageData         Json     @map("package_data")
+  /// Null means this account has not completed the first payload migration.
+  /// This is independent from key_version: changing a passphrase wrapper does
+  /// not require rewriting operation ciphertext.
+  activePayloadKeyVersion Int? @map("active_payload_key_version")
+  createdAt           BigInt   @map("created_at")
+  updatedAt           BigInt   @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("vault_key_packages")
+}
+
+/// Durable idempotency receipt for an atomic vault payload migration.
+/// The request fingerprint is over opaque request metadata and ciphertext;
+/// it never contains a plaintext key. A committed row is the recovery answer
+/// when the HTTP response was lost after the database transaction committed.
+model VaultKeyMigration {
+  id                    String   @id @default(cuid())
+  userId                Int      @map("user_id")
+  requestId             String   @map("request_id")
+  requestFingerprint    String   @map("request_fingerprint")
+  state                 String   @default("STAGING")
+  expectedKeyVersion    Int      @map("expected_key_version")
+  expectedLatestSeq     Int      @map("expected_latest_seq")
+  targetPayloadKeyVersion Int   @map("target_payload_key_version")
+  keyVersion            Int      @map("key_version")
+  latestSeq             Int      @map("latest_seq")
+  expectedOperationCount Int     @default(0) @map("expected_operation_count")
+  expectedPayloadBytes  BigInt   @default(0) @map("expected_payload_bytes")
+  uploadedOperationCount Int    @default(0) @map("uploaded_operation_count")
+  uploadedPayloadBytes  BigInt   @default(0) @map("uploaded_payload_bytes")
+  reservedStorageBytes  BigInt   @default(0) @map("reserved_storage_bytes")
+  migratedOperationCount Int    @default(0) @map("migrated_operation_count")
+  expiresAt             BigInt   @map("expires_at")
+  cancelledAt           BigInt?  @map("cancelled_at")
+  packageData           Json     @map("package_data")
+  createdAt             BigInt   @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks VaultKeyMigrationChunk[]
+  stagedOperations VaultKeyMigrationOperation[]
+
+  @@unique([userId, requestId])
+  @@index([userId, state, expiresAt])
+  @@index([userId, createdAt])
+  @@map("vault_key_migrations")
+}
+
+/// A bounded, retryable ciphertext chunk belonging to a staged migration.
+/// Child operation rows make identity coverage and duplicate detection
+/// relational rather than trusting a large JSON array at commit time.
+model VaultKeyMigrationChunk {
+  id                String   @id @default(cuid())
+  migrationId       String   @map("migration_id")
+  chunkId           String   @map("chunk_id")
+  chunkIndex        Int      @map("chunk_index")
+  requestFingerprint String  @map("request_fingerprint")
+  operationCount    Int      @map("operation_count")
+  payloadBytes      BigInt   @map("payload_bytes")
+  createdAt         BigInt   @map("created_at")
+
+  migration  VaultKeyMigration @relation(fields: [migrationId], references: [id], onDelete: Cascade)
+  operations VaultKeyMigrationOperation[]
+
+  @@unique([migrationId, chunkId])
+  @@unique([migrationId, chunkIndex])
+  @@index([migrationId, createdAt])
+  @@map("vault_key_migration_chunks")
+}
+
+/// One staged replacement. It is opaque to the server apart from the public
+/// envelope generation and is removed after publication/cancellation.
+model VaultKeyMigrationOperation {
+  id           String   @id @default(cuid())
+  migrationId  String   @map("migration_id")
+  chunkId      String   @map("chunk_id")
+  operationId  String   @map("operation_id")
+  serverSeq    Int      @map("server_seq")
+  payload      Json
+  payloadBytes BigInt   @map("payload_bytes")
+  storageBytes BigInt   @map("storage_bytes")
+  createdAt    BigInt   @map("created_at")
+
+  migration VaultKeyMigration @relation(fields: [migrationId], references: [id], onDelete: Cascade)
+  chunk     VaultKeyMigrationChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+
+  @@unique([migrationId, operationId])
+  @@unique([migrationId, serverSeq])
+  @@index([migrationId, serverSeq])
+  @@map("vault_key_migration_operations")
+}
+
 // ---------------------------------------------------------------------------
 // 可调价 + 优惠券（见 docs/adr/0018-adjustable-pricing-and-coupons.md）
 // ---------------------------------------------------------------------------
@@ -595,6 +712,9 @@ model CheckoutOrder {
   /// 它同时强制了"一单只能用一张券"这条产品策略。
   redemption CouponRedemption?
 
+  /// 这一单的退款行（0 或 1 条有效退款；见 `Refund` 的注释里"为什么允许多行"）。
+  refunds Refund[]
+
   @@index([userId, status])
   @@index([status, expiresAt])
   @@map("checkout_orders")
@@ -661,6 +781,103 @@ model CouponRedemption {
   /// sweep 的扫描面：`state = 'reserved' AND reserved_until < now`。
   @@index([state, reservedUntil])
   @@map("coupon_redemptions")
+}
+
+// ---------------------------------------------------------------------------
+// 退款（临时方案：7×24 小时内全额，超期默认不退，例外只走运营后台）
+// ---------------------------------------------------------------------------
+
+/// 一次**退款申请**及其终态。ADR-0053。
+///
+/// ## 为什么这张表是"钱侧唯一的一行"，而 `checkout_orders.status='refunded'` 不算
+///
+/// 订单状态只说"结果"，说不出**是谁在什么时候按什么口径退的**。退款是可争议
+/// 的（用户会说"我七天内申请过"），所以那一次判断必须原样留在库里：
+/// `reason` 存被拒时的口径码、`operator_note` 存批例外时的理由、
+/// `amount_minor` 存**冻结下来的实付**（不是原价、不是报价）。
+///
+/// ## 一个订单为什么可以有多行
+///
+/// 退款**失败**（通道拒、余额不足）后运营者要能重试，而微信要求重试换一个
+/// `out_refund_no`。所以这里 `(order_id)` 上只是索引，不是唯一约束。
+/// 🔴 但"同一笔钱退两次"仍然不可能 —— 它挡在两处，缺一不可：
+/// - 库里：`checkout_orders.status` 一旦推进到 `refunded` 就再也进不来
+///   （`decideRefundEligibility` 对 `refunded` 直接判 `ALREADY_REFUNDED`，
+///   而 `reverseOrderOnRefund` 的 `WHERE status = 'paid'` 是第二道）；
+/// - 通道：`(provider, out_refund_no)` 唯一，重投的同一通知被幂等键挡住。
+///
+/// ## 每一列都是可选或带默认值以外的**必填**？
+///
+/// 这是**新表**，没有存量行，所以这里允许 `NOT NULL` 且无默认的列
+/// （`amount_minor`、`currency`、`period_days`、`out_refund_no`）。
+/// AGENTS §3.3 那条"新字段必须可选"管的是**已落盘的数据**，不是新对象。
+/// 反过来，把金额写成可空会让"退一个算不清的数"变成可能 —— 那正是 §3.3 要防的形状。
+model Refund {
+  id Int @id @default(autoincrement())
+
+  orderId Int          @map("order_id")
+  order   CheckoutOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// 退款属于哪个账号。**冗余自订单**，为的是"按用户查退款"不用 join 订单表，
+  /// 也让权益回收那一步能直接用它定位订阅行（`subscription-boundary.md` §6.2 一行一用户）。
+  userId Int @map("user_id")
+
+  /// 支付通道名。与 `checkout_orders.provider` 同值 —— 退款必须回到**同一个**通道，
+  /// 不存在"从另一条通道退"这种操作。
+  provider String
+
+  /// 🔴 我方退款单号，发给通道的幂等键。**由本仓库生成、原样使用**，
+  /// 与 `checkout_orders.out_trade_no` 的关系同源于下单那一条纪律。
+  /// 微信的"退款查询 / 退款通知"也都以它回锚，所以它同时是回调侧唯一的认单依据。
+  outRefundNo String @unique @map("out_refund_no")
+
+  /// 通道侧的退款 id（微信 `refund_id`）。`null` = 还没拿到通道受理，或压根没通道。
+  providerRefundId String? @map("provider_refund_id")
+
+  /// 退多少钱（最小单位整数）。**冻结在申请成功的那一刻**，之后改价目表/券都影响不到它。
+  amountMinor Int @map("amount_minor")
+
+  /// 币种。必填、无默认：金额是"最小单位的整数"，不带币种就不可比
+  /// （同 `CreateCheckoutInput.currency`，两处是同一个理由）。
+  currency String
+
+  /// 🔴 这一单当初授予了**多少天**。权益回收扣的就是这一段。
+  ///
+  /// 为什么把天数存下来而不是回收时再算：退款发生在授予之后，中间可能有
+  /// 第二次购买、可能有别的通道的事件先到。把"这一段有多长"冻在退款行上，
+  /// 回收才是一个**可重放**的减法，而不是对当前状态的猜测。
+  /// 写入侧的唯一来源是 `SUBSCRIPTION_PERIOD_DAYS`（见 `refund-policy.ts`）。
+  periodDays Int @map("period_days")
+
+  /// `requested` | `approved` | `rejected` | `processing` | `success` | `abnormal` | `closed` | `failed`
+  /// （词表在 `refund-store.ts` 的 `REFUND_STATUSES`，与下单侧同一套做法：库不设 CHECK，
+  /// 由写入函数在**词表外**直接抛。）
+  status String @default("requested")
+
+  /// 被拒 / 失败时的**口径码**（`WINDOW_PASSED`、`REFUND_CHANNEL_UNAVAILABLE`…）。
+  /// 存码不存句子：句子会变（中文/英文/文案改写），码才是可对账的事实。
+  reason String?
+
+  /// 运营者批例外时写的理由。`operatorApproved` 是**唯一**能跳过时间窗的开关，
+  /// 所以它必须留下"谁批的、为什么批"（`requested_by` / `decided_by` 是那两个"谁"）。
+  operatorNote String? @map("operator_note")
+
+  requestedBy Int? @map("requested_by")
+  decidedBy   Int? @map("decided_by")
+
+  requestedAt BigInt  @default(0) @map("requested_at")
+  decidedAt   BigInt? @map("decided_at")
+  /// 通道确认退款成功的时刻。**只有这一列非空才允许动权益。**
+  refundedAt  BigInt? @map("refunded_at")
+
+  createdAt BigInt @default(0) @map("created_at")
+  updatedAt BigInt @default(0) @map("updated_at")
+
+  /// 后台列表：按账号翻退款。
+  @@index([userId, status])
+  /// 权益回收与"这一单退过没有"的查找回路。
+  @@index([orderId, status])
+  @@map("refunds")
 }
 
 // ---------------------------------------------------------------------------
@@ -963,4 +1180,146 @@ model AccountNotification {
   /// 唯一的热路径：取某人的通知、按时间倒序。
   @@index([userId, createdAt])
   @@map("account_notifications")
+}
+
+/// 调休/补班公告的**年度录入**（一行 = 一个年度 = 一次运营录入）。W4b。
+///
+/// ## 这是 heyta 第一条服务端→客户端的**内容**通道的数据源
+///
+/// 定性见 [ADR-0052](../../docs/adr/0052-public-facts-are-deployer-supplied.md) §2：
+/// 它装的是**公共事实**（国务院哪天让上班、哪天让放假 + 公告原文出处），
+/// 不是用户数据 ⇒ 不进 op-log、不加密、不参与向量时钟与 LWW。
+/// AGENTS §1 那句「云端不是事实源」约束的是用户数据，不约束这一张表。
+///
+/// ## 为什么是两张表而不是一张表 + 一个 `Json` 的 `days`
+///
+/// 判据③要求"日期非法 / `isOffDay` 不是布尔"**在库层就拦得住**，而
+/// `Json` 列对这两件事一个都不拦：`{"day":"2026-02-30","isOffDay":1}`
+/// 是一段完全合法的 JSON，Postgres 存得下去、服务端读得出来，
+/// 于是症状推迟到客户端 —— 那一天永远不上界面（`2 月 30 日` 谁都查不到），
+/// 而 `isOffDay: 1` 会被当成"休"，把一个补班日标成放假日。
+/// **界面在说谎，而两层都没报错**，这就是把校验下沉到列类型的那个数钱的理由。
+///
+/// 于是：`holiday_adjustment_days` 用 `DATE` 主键 + `BOOLEAN NOT NULL`；
+/// 这张表只存**元信息与出处**（`papers` 是数组，逐日表里没必要重复 40 遍）。
+///
+/// ## 为什么"全有或全无"必须在写入层而不是读取层
+///
+/// 一年一次录入。允许"2027 年有 3 天，其中 1 天校验失败但另 2 天先存进去"，
+/// 客户端就会拿到一个**半套**的 2027 年：那半天在界面上显示"休"，
+/// 另外半天什么都不显示，而这两者都是"部署方下发的权威数据"的表现形式。
+/// 判据④因此要求"非法 ⇒ 整年拒绝"，实现见 `packages/domain` 的
+/// `installHolidayAdjustmentOverrides()`（先在校验副本上跑完，再一次性提交）。
+model HolidayAdjustmentYear {
+  /// 年份本身是主键：一年一条，`2027.5` 与重复年份在库里装不下。
+  year Int @id
+
+  /// 🔴 公告原文出处（gov.cn 的链接）。**不许为空** —— 没有出处的节假日数据
+  /// 不能进库，这条纪律随包那份 `scripts/vendor/holiday-cn/load.mjs:52` 先立过，
+  /// 运营录入没有理由比自动抓取更宽松。判据②"链接随数据入库且能回显"要看的就是它。
+  papers String[] @default([])
+
+  /// 运营备注（例如「据 2026-11 调整公告，原定 10-11 上班改为不上班」）。
+  /// 可选：它只是给人看的线索，不参与任何裁决。
+  note String?
+
+  /// 写入时间与操作者（追责与回滚都要它；`updatedBy` 是邮箱字符串而不是外键 ——
+  /// 与 `PriceVersion.createdBy` 同一决定：录入可能来自 CLI/运维，强绑 `users`
+  /// 会让"脚本代录"无法表达）。
+  updatedAt BigInt  @default(0) @map("updated_at")
+  updatedBy String? @map("updated_by")
+
+  days HolidayAdjustmentDay[]
+
+  @@map("holiday_adjustment_years")
+}
+
+/// 逐日表：某一天是**放假**（`true`）还是**补班**（`false`）。W4b。
+///
+/// 🔴 一张**没有这列就拦不住判据③**的表 —— 见 `HolidayAdjustmentYear` 那段。
+/// `day` 用 `DATE`（不是 `String`）正是为了让 `2026-02-30` 在库里就不是一个值。
+model HolidayAdjustmentDay {
+  /// 主键 = 那一天：同一天既休又补班、或同一天录两条，物理上装不下。
+  ///
+  /// ⚠️ Prisma 把 `DATE` 列读成 **UTC 零点的 `Date`**。回成字符串只能用
+  /// `toISOString().slice(0, 10)`，**不许**用本地 getter（`packages/domain` 的
+  /// `toLocalDate()`）—— 那会让 UTC-5 的部署把 `2027-01-01` 读成 `2026-12-31`。
+  /// 这条是 `dayColumnToIso()` 存在的全部理由，钉在
+  /// `server/tests/holiday-adjustment-migration.pglite.spec.ts`。
+  day      DateTime @id @map("day") @db.Date
+  isOffDay Boolean  @map("is_off_day")
+
+  /// 冗余一份年份：取某一年的全部安排是热路径（后台回显、公开 GET 都按年取），
+  /// 而 `day::date` 上的主键范围扫描要走索引边界。也是 CHECK「年份与日期必须一致」
+  /// 的左操作数 —— 没有这一列，那条约束就得每次逐行 cast。
+  year     Int
+
+  yearRef HolidayAdjustmentYear @relation(fields: [year], references: [year], onDelete: Cascade)
+
+  @@index([year])
+  @@map("holiday_adjustment_days")
+}
+
+/// 托管 AI 的**用量计数器**：一行 = 一个账号在一个计费周期里用掉了几次。
+///
+/// 依据：[ADR-0054](../../../docs/adr/0054-managed-ai-retention-and-selling-preconditions.md) §2
+///（保留裁决）与 [ADR-0023](../../../docs/adr/0023-managed-ai-quota-not-implemented.md) §5 第 3 条。
+/// 写入与裁决在 `server/src/ai/metering.ts`，库层证据在
+/// `server/tests/ai-metering.pglite.spec.ts`。
+///
+/// ## 🔴 这张表的**列集合本身**就是对外承诺
+///
+/// 只有下面四列。**没有 `prompt`、没有 `completion`、没有 `payload`、
+/// 也没有一个 `Json` 兜底列** —— 这不是"以后再加"，是**故意装不下**：
+/// 一张带 `payload Json` 的表会在某次"顺手存一下便于排障"之后变成事实上的内容仓库，
+/// 而那时《AI 服务条款》§5.3 与隐私政策里"服务端不保留内容"那几句全都成了假话，
+/// 且**没有任何一层会报错**。判据断言列集合**等于**这四个（多一列就红），
+/// 不断言"没有内容列" —— 黑名单永远漏掉下一个想加的名字。
+///
+/// ## 为什么 `periodAnchor` 是计费周期边界，不是自然月
+///
+/// 一次付款买 **30 天**（`packages/domain` 的 `SUBSCRIPTION_PERIOD_DAYS`），起点是支付
+/// 成功那一刻，**不是每月 1 号**。锚点取 `subscriptions.current_period_end`：
+/// 取自然月会让 9 月 20 日付的钱在 10 月 1 日**清零重来**（一次付款拿两轮 300）；
+/// 服务端自己拿墙上时钟 +30 天则与库里已有的权威边界**各说各话**。
+/// 跨边界自然落到**另一行**，新的一轮从 0 开始 —— 这条由 pglite 那条锚点算术钉住。
+///
+/// ## 为什么 `requests` 是普通整数，而不是 `Json`
+///
+/// 裁决要在**一条语句**里读、比、+1（`… WHERE requests < N RETURNING requests`），
+/// 那依赖 `INTEGER` 上的算术与比较；`Json` 给不了原子 +1，也给不了
+/// `CHECK (requests >= 0)`，于是"负数一行就多一次额度"这类残留只能靠人记得。
+/// 一旦开了 `Json`，下一个人塞进来的第一个键就会是 `prompt`。
+model AiUsageCounter {
+  /// 归属账号。**级联删除**是保留承诺的一半（ADR-0054 §2「计数随账号级联删除」）：
+  /// 少了它，删掉的账号会留下一堆指向不存在的 `user_id` 的计数行 —— 任何界面读不到、
+  /// 任何清理任务不知道该删谁，"删账号即删"就只在文档里成立。
+  userId Int  @map("user_id")
+
+  /// 这一行属于**哪一个计费周期** = 该周期结束时刻（epoch 毫秒），
+  /// 出处是 `subscriptions.current_period_end`（唯一权威边界，不做墙上时钟推算）。
+  ///
+  /// 🔴 它与 `userId` 合起来是唯一键，这有两件事一起做成了：
+  /// 1. 「新周期从 0 开始」= 换锚 = 换一行，不需要任何"清零"写入，也没有清零窗口；
+  /// 2. 同一账号同一周期的并发 +1 撞在同一行上 ⇒ 被行锁串行化（裁决的原子性靠它）。
+  /// 第二件事是 `metering.ts` 那条 `WHERE requests < N` **能守住并发**的前提。
+  periodAnchor BigInt @map("period_anchor")
+
+  /// 本周期已用次数。`>= 0` 钉在库里（迁移里的 `ai_usage_counters_requests_non_negative`）：
+  /// 应用路径只做 +1，但这张表还有运维脚本与未来的重置迁移**不是应用路径**的写入口。
+  requests Int @default(0)
+
+  /// 最后一次 +1 的时刻（epoch 毫秒）。它是**元数据**不是内容，
+  /// 用来回答"这一期额度是什么时候用掉的"，不参与任何裁决。
+  ///
+  /// 🔴 别把 ADR-0054 §4 那份"时间 / 功能名 / 结果状态 / 字节数 / 耗时"读成这张表 ——
+  /// 那份清单说的是**每次调用一行的运维审计日志**（`recordManagedAiAttempt`），
+  /// 上限是日志容量而不是天数。这张表只有上面这四列，多一列 `ai-metering.pglite` 就红。
+  /// 两者的区别记在 ADR-0054 §4.1（2026-10-05 落地更正）。
+  updatedAt BigInt @default(0) @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodAnchor])
+  @@map("ai_usage_counters")
 }

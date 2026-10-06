@@ -48,16 +48,19 @@
 
 import type { OpLogEngine } from '@heyta/op-log';
 import type { OpLogStore } from '@heyta/storage';
+import { eraseLocalData } from './local-erasure.js';
+import { HEYTA_APP_VERSION } from './app-version.generated.js';
 import type { EntityType } from '@heyta/shared-schema';
 import type { Operation, OpType } from '@heyta/sync-core';
 import {
   createRealtimeClient as createRealtimeClientRaw,
   SyncClient,
   type RealtimeClient,
+  type SyncEncryptionOptions,
   type WebSocketFactory,
 } from '@heyta/sync-client';
 
-export interface SyncWiringOptions {
+export type SyncWiringOptions = SyncEncryptionOptions & {
   /** op-log 引擎。待上传队列、重新派发、应用远端都从它派生。 */
   engine: OpLogEngine;
   /**
@@ -68,6 +71,15 @@ export interface SyncWiringOptions {
   store: OpLogStore<Operation<string>>;
   /** 自建服务器地址。空字符串 = 未配置（→ 同步直接失败，不会假装成功）。 */
   baseUrl: string;
+  /**
+   * 随下载请求上报的客户端版本号。**默认就是生成物 `HEYTA_APP_VERSION`，宿主不需要传** ——
+   * 真源是仓库根 `package.json`（`scripts/gen-app-version.mjs` 的文件头写了为什么不让各宿主
+   * 自己传：那正是这件事烂在原地的成因）。留这个口子是给**自己另构建一份客户端**的人。
+   *
+   * ⚠️ 要传就传真版本，**不要传 `0.0.0` 之类的占位值**：服务端把"沉默"和"低于 cut"
+   * 算同一档（都判 old），所以沉默不改任何行为，而占位值会把假版本写进运营面那份设备清单。
+   */
+  appVersion?: string;
   getToken: () => Promise<string | undefined>;
   getPassword: () => Promise<string | undefined>;
   /**
@@ -79,6 +91,15 @@ export interface SyncWiringOptions {
   applyRemote: (ops: Operation<string>[]) => Promise<void>;
   /** 网络实现。原生宿主用它注入证书固定等平台能力。 */
   fetchImpl?: typeof fetch;
+  /**
+   * 账号注销时要做的本机销毁。**不传就用注册表里的那一个**
+   * （`registerLocalEraser`，见 `./local-erasure.ts` 文件头讲的两条理由）。
+   *
+   * 这里给默认值不是"方便"，是**承重**：`openAppHost()` 与各壳的构造点都在
+   * 这个包外面，如果默认值不存在，那条路径上的宿主会静默没有销毁器 ——
+   * 而"信号收到了、本机什么都没少"正是这批工单要修的那个缺陷。
+   */
+  onAccountClosed?: () => Promise<void>;
 }
 
 /**
@@ -94,8 +115,12 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
   return new SyncClient({
     baseUrl: options.baseUrl,
     clientId: engine.getClientId(),
+    appVersion: options.appVersion ?? HEYTA_APP_VERSION,
     getToken: options.getToken,
     getPassword: options.getPassword,
+    ...(options.encryptionMode === 'vault'
+      ? { encryptionMode: 'vault' as const, getPayloadCipher: options.getPayloadCipher }
+      : { encryptionMode: 'password' as const }),
     // 游标走 OpLogStore 接口，不碰 adapter：键名与事务语义只由存储层决定。
     getLastServerSeq: () => store.getLastServerSeq(),
     setLastServerSeq: (seq) => store.setLastServerSeq(seq),
@@ -104,6 +129,8 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
     getLocalOps: () => engine.getPendingUpload(),
     markUploaded: (seqs) => engine.markUploaded(seqs),
     applyRemote: options.applyRemote,
+    mergeRemoteClock: (clock) => engine.observeRemoteClockDurably(clock),
+    markHistoryIncomplete: () => engine.markHistoryIncomplete(),
     // 冲突判定为「本地胜出」→ 重新派发（新 op，时钟已压过远端）。
     redispatch: async (op) => {
       await engine.redispatch(op);
@@ -126,6 +153,9 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
       });
     },
     ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+    // 账号注销 ⇒ 销毁本机明文。**默认值读注册表**，所以经这条路的所有宿主
+    // 都有反应，包括构造点在别的文件里、这一轮改不动的那些。
+    onAccountClosed: options.onAccountClosed ?? (async () => void (await eraseLocalData())),
   });
 }
 /**

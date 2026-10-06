@@ -18,7 +18,9 @@
 import { describe, expect, it } from 'vitest';
 import { noteExcerpt, sortNotesForDisplay, type Note } from '@heyta/domain';
 
-import { NOTE_EXCERPT_LENGTH, toNoteRows } from '../src/notes/model.js';
+import { NOTE_EXCERPT_LENGTH } from '@heyta/domain';
+
+import { toNoteRows } from '../src/notes/model.js';
 
 const NOW = 1_700_000_000_000;
 

@@ -117,11 +117,12 @@ CONSENT_GATE_PREFERRED=只用本机
 # 写成 /tmp 下的独立探针文件（和 lib 里 `_xy.py` 同一个路子），不进共享 lib，
 # 免得和另一条会话撞车。
 cat > "$QRECT" <<'PY'
+import os
 import re
 import sys
 import xml.etree.ElementTree as ET
 
-XML = "/tmp/ui.xml"
+XML = os.environ["UI_XML"]
 BOARD = "quadrant-board"
 
 

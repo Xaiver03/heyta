@@ -86,6 +86,48 @@ describe('searchTasks', () => {
   it('没有命中的返回空数组', () => {
     expect(searchTasks([task({ id: 'a', title: '周报' })], '月报')).toEqual([]);
   });
+
+  /**
+   * 🔴 墓碑不进搜索结果（缺陷 D9 的钉子）。
+   *
+   * 这一组之所以断言**原始表整个递进来**：此前 `searchTasks` 自己不滤，
+   * 滤不滤取决于调用方 —— Web 的搜索面板递 `Object.values(store.entities.tasks)`
+   * （含墓碑），移动端递已过滤的列表。症状是"网页能搜出已彻底删除的任务、
+   * 手机搜不到"，而两端**都没有报错**。判据必须能独立于调用方成立。
+   *
+   * ⚠️ `purgedAt` 的形态按 `entities.ts` 的四态语义**带着** `deletedAt`
+   *（清掉 `deletedAt` 会让离线对端把数据复活），不是"只有 purgedAt"。
+   */
+  describe('墓碑不进结果', () => {
+    const rows = [
+      task({ id: 'alive', title: '周报' }),
+      task({ id: 'trashed', title: '周报', deletedAt: 10 }),
+      task({ id: 'purged', title: '周报', deletedAt: 10, purgedAt: 20 }),
+    ];
+
+    it('查询命中的回收站任务与已彻底删除任务都不出现', () => {
+      // 三条标题完全相同 ⇒ 匹配判据对它们一视同仁，被排除的**唯一**理由是墓碑。
+      // 阳性对照在下一条：同样这张表里活着的那条必须还在（否则"0 条墓碑"
+      // 可能只是搜索整体坏了）。
+      expect(searchTasks(rows, '周报').map((t) => t.id)).toEqual(['alive']);
+    });
+
+    it('🔴 空查询（"返回全部"那条分支）同样不返回墓碑', () => {
+      // 这是**第二个**可以单独漏掉的点：只在 filter 里加条件，
+      // 早退的 `return [...tasks]` 仍然会整张表交出去。
+      expect(searchTasks(rows, '').map((t) => t.id)).toEqual(['alive']);
+      expect(searchTasks(rows, '   ').map((t) => t.id)).toEqual(['alive']);
+    });
+
+    it('已完成（不是删除）的任务仍然搜得到 —— 别把两种隐藏混成一个条件', () => {
+      expect(
+        searchTasks(
+          [task({ id: 'done', title: '周报', completedAt: 5 }), task({ id: 'gone', title: '周报', deletedAt: 7 })],
+          '周报',
+        ).map((t) => t.id),
+      ).toEqual(['done']);
+    });
+  });
 });
 
 describe('haystackOf', () => {

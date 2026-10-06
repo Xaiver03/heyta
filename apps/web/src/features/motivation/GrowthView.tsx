@@ -227,14 +227,17 @@ function heatmapLabels(t: I18nValue['t']): ActivityHeatmapLabels {
     // 就是漂移的起点。索引越界理论上不可能（由日期串切出 1–12），兜底写字面量。
     month: (month) => t(HEATMAP_MONTH_KEYS[month - 1] ?? 'web.heatmap.month.1'),
     /*
-      🔴 `web.growth.year.heatmap` 是为 **react-activity-calendar** 写的
-      （它认 `{{count}}` 双花括号），而 i18n 的插值器只认单层 `{count}` ——
-      直接 `t(key, { count })` 会得到字面的 `{2}`（那个 bug 在习惯热力图那边
-      已经踩过一次，见 `HabitsView.tsx` 文件头）。自绘热力图由宿主自己展开
-      这个库占位符：整句仍是同一条词条、同一个数字。
-      缺的 `web.growth.year.heatmap.a11y` 记在 `labels.ts` 文件头。
+      🔴 这条词条**以前**写的是 `{{count}}` —— 那是 **react-activity-calendar** 的
+      占位符语法（它认双花括号），而 i18n 的插值器只认单层 `{count}`，直接
+      `t(key, { count })` 会得到字面的 `{2}`（习惯热力图那边踩过一次，见
+      `HabitsView.tsx` 文件头）。旧代码因此在本行手工 `.replace('{{count}}', …)`。
+
+      自绘热力图之后那个库已经不在依赖里，这条词条现在是**普通插值词条**
+      （中英两侧都是 `{count}`，2026-10-03 统一），手工 replace 一并删掉。
+      ⚠️ 字形统一前不要把 key 改回双花括号：`apps/mobile/tests/growth-display.spec.ts`
+      的对偶用例会把两种字形当成两份事实源。
     */
-    grid: ({ total }) => t('web.growth.year.heatmap').replace('{{count}}', String(total)),
+    grid: ({ total }) => t('web.growth.year.heatmap', { count: total }),
     // `web.habits.heatmap.cell` 是 "{date}：{count} 次"，**不含"打卡"字样**，
     // 对"打卡 + 完成任务 + 专注轮次"的年度总览同样成立。
     cellTooltip: ({ date, count }) => t('web.habits.heatmap.cell', { date, count }),
@@ -282,18 +285,35 @@ export function GrowthView() {
 
   const labels = useMemo(() => growthBoardLabels(t), [t]);
 
-  // 投影**只取一次**，四块共用同一个 `now` —— 分两次取就可能落在不同日期上。
-  const todayProgress = selectTodayProgress(entities, now);
-  const review = selectWeeklyReview(entities, now);
-  const totals = selectTotals(entities);
-  const milestones = selectMilestones(entities);
-  const tags = selectIdentityTags(entities, now);
+  /**
+   * 🔴 六次投影全部**记忆化**（P0-6 的 web 半）。
+   *
+   * 投影**只取一次**，四块共用同一个 `now` —— 分两次取就可能落在不同日期上。
+   *
+   * 为什么要收进 `useMemo`：这个视图挂在整个 App 树上，而 App 的重渲染源很多
+   * （同步状态、语言、`store` 的任意字段）。不记忆化时**每一轮重渲染**都要把
+   * 五张表重摊一遍 —— 移动端 `GrowthScreen.tsx:173/194/198/211` 早就是这个写法。
+   *
+   * ⚠️ 这一刀**不**解决"每 60 秒那一轮"：那个 60 秒是 `now` 这个**输入**在变，
+   *   记忆化按定义就该重算。要止住它得先把"这些投影到底吃不吃一天以内的精度"
+   *   审清楚（或按 `§8` 第 14 步把 `habit-streak` 改成按记录数走），
+   *   那是行为变更、不是缓存。这一句写在这里是为了不让下一个读代码的人
+   *   把"加了 useMemo"当成"每分钟那一轮已经没了"。
+   */
+  const todayProgress = useMemo(() => selectTodayProgress(entities, now), [entities, now]);
+  const review = useMemo(() => selectWeeklyReview(entities, now), [entities, now]);
+  const totals = useMemo(() => selectTotals(entities), [entities]);
+  const milestones = useMemo(() => selectMilestones(entities), [entities]);
+  const tags = useMemo(() => selectIdentityTags(entities, now), [entities, now]);
 
   /**
    * 年视图的**事实**序列（旧 → 新、窗口内每天补齐）。
    * ⚠️ 只传事实，分档由 `ActivityHeatmap` 内部做（见文件头）。
    */
-  const activityDays = dailyActivityCountsFromState(entities, now, 365);
+  const activityDays = useMemo(
+    () => dailyActivityCountsFromState(entities, now, 365),
+    [entities, now],
+  );
 
   const summary = buildShareSummary(review, totals, t);
 

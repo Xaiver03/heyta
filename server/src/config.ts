@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from './logger';
 
@@ -129,6 +130,61 @@ export interface WechatPayConfig {
 }
 
 /**
+ * 微信凭证的**取值形态**要能直接复用运维上已有的一份配置：内联 PEM，或指向磁盘上的
+ * PEM 文件（`WX_PRIVATE_KEY_PATH` / `WX_PUBLIC_KEY_PATH`，与内联变量同名的两枚加 `_PATH`）。
+ *
+ * 🔴 **两种形态同时给且内容不同 ⇒ 启动红。** 这不是洁癖：内联与文件谁赢如果靠"代码里
+ * 先读哪个"决定，那么换机器/换部署方式时**签名用的私钥与证书序列号会悄悄不配对**，
+ * 症状是微信把每一笔下单都拒掉，而我们的日志里一切正常。
+ * 🔴 **报错只报键名与路径，绝不带内容。**
+ */
+const readWechatKeyFile = (fileVar: string, rawPath: string): string => {
+  const resolved = path.resolve(rawPath.trim());
+  let contents: string;
+  try {
+    contents = fs.readFileSync(resolved, 'utf8');
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'unknown';
+    throw new Error(
+      `${fileVar} 指向的文件读不出来（${code}）：${resolved}. ` +
+        '要么把文件放到位，要么改用内联变量；私钥读不出时微信签名会全程失败，不许带着空密钥启动。',
+    );
+  }
+  if (!contents.includes('-----BEGIN')) {
+    throw new Error(
+      `${fileVar} 指向的文件里没有 PEM（${resolved}）—— 期望 -----BEGIN ... KEY----- 开头。`,
+    );
+  }
+  // 内联形态允许 `\\n` 转义与 base64，文件形态不需要：文件本来就是 PEM。
+  // 但**归一化交给 adapter 的 `normalizePemKey`**，这里只做"能不能用"的启动期判断，
+  // 于是同一份内容在内联/文件两条路上得到逐字相同的最终值（否则"哪个赢"又有第二套答案）。
+  return contents;
+};
+
+/** 内联与 `_PATH` 两枚旋钮 → 一份密钥值。见上面 `readWechatKeyFile` 的两条红线。 */
+const resolveWechatKey = (
+  inlineVar: 'WX_PRIVATE_KEY' | 'WX_PUBLIC_KEY',
+  fileVar: string,
+): string => {
+  const inline = process.env[inlineVar]?.trim();
+  const file = process.env[fileVar]?.trim();
+  if (!inline && !file) return '';
+
+  const fromFile = file ? readWechatKeyFile(fileVar, file) : undefined;
+  if (fromFile === undefined) return inline ?? '';
+  if (!inline) return fromFile;
+
+  const same = inline.replace(/\\n/g, '\n').trim() === fromFile.trim();
+  if (!same) {
+    throw new Error(
+      `${inlineVar} 与 ${fileVar} 同时给出且内容不一致（文件：${path.resolve(file as string)}）—— ` +
+        '签名用哪一份不能由读变量的顺序决定。删掉其中一种写法。',
+    );
+  }
+  return inline;
+};
+
+/**
  * Web Push 的配置（RFC 8292 的 VAPID 密钥对）。
  *
  * 🔴 **默认不存在**：只有运营者显式设 `WEB_PUSH_ENABLED=true` 且**两个变量
@@ -151,6 +207,33 @@ export interface WebPushConfig {
   readonly privateKey: string;
   /** VAPID 的 `sub`：`mailto:` 或 `https:`。推送服务会校验它。 */
   readonly subject: string;
+}
+
+/**
+ * 托管 AI 的**上游模型供应商**（服务端代理那一档）。
+ *
+ * 🔴 三个值**全部必填**、默认不存在（= 这台实例没有开通托管 AI，
+ * `/api/ai/managed/chat` 一律回 503 而不是 404 —— 与 `webPush` 那两条路由同一姿态：
+ * 404 与"这个能力没开"是两件事，客户端分不清"这台服务器不支持"和"我路径写错了"）。
+ *
+ * ## 为什么上游地址与模型 id 是**服务端配置**，不是客户端能决定的
+ *
+ * | 如果由客户端给 | 后果 |
+ * |---|---|
+ * | 上游地址 | 每个请求都在问"请把用户的明文转发到我给的这个 host" —— 那等于把境内白名单交给请求体，而 ADR-0056 §5 的红线正是**只有境内** |
+ * | 模型 id | ADR-0021 §1 那句"换模型就是改价，这不是提醒，是等式"：pro 级的月度成本已经越过售价。客户端能选模型 = 客户端能选我们倒贴多少 |
+ *
+ * ⚠️ 地址的**所在地**不在这里校验，在 `ai/managed-upstream.ts` 的判定里校验 ——
+ * 配置能写出一个合法 URL 却不合格（`https://api.openai.com/v1`）。启动期不拦它是有意的：
+ * 一台已经跑着的服务器不该因为"上游以后会不合格"而起不来，而每一次转发前都会响亮拒绝。
+ */
+export interface ManagedAiConfig {
+  /** 上游基址，OpenAI 兼容形状（如 `https://api.deepseek.com/v1`）。**必须以 https**。 */
+  readonly baseUrl: string;
+  /** 上游密钥。**是秘密**：不进日志、不进响应、不发给客户端。 */
+  readonly apiKey: string;
+  /** 实际请求的 model id（ADR-0021 §3 第 3 条：模型 id 必须是配置）。 */
+  readonly modelId: string;
 }
 
 export interface ServerConfig {
@@ -240,6 +323,8 @@ export interface ServerConfig {
   wechatPay?: WechatPayConfig;
   /** Web Push（Windows PWA 小组件的刷新机制）。**默认不存在**，见下面接口的说明。 */
   webPush?: WebPushConfig;
+  /** 托管 AI 的上游供应商。**默认不存在**（= 该档在这台实例上不可用）。 */
+  managedAi?: ManagedAiConfig;
   /**
    * 注册是否必须以"点过验证邮件里的链接"为前提。**默认 true**。
    *
@@ -631,8 +716,8 @@ export const loadConfigFromEnv = (
         mchId: process.env.WX_MCH_ID,
         serialNo: process.env.WX_SERIAL_NO,
         apiV3Key: process.env.WX_API_V3_KEY,
-        privateKey: process.env.WX_PRIVATE_KEY,
-        publicKey: process.env.WX_PUBLIC_KEY,
+        privateKey: resolveWechatKey('WX_PRIVATE_KEY', 'WX_PRIVATE_KEY_PATH'),
+        publicKey: resolveWechatKey('WX_PUBLIC_KEY', 'WX_PUBLIC_KEY_PATH'),
       };
       const credentialKeys = Object.keys(credentials) as (keyof typeof credentials)[];
       const missing = credentialKeys.filter((key) => !credentials[key]?.trim());
@@ -640,7 +725,8 @@ export const loadConfigFromEnv = (
         throw new Error(
           'WECHAT_PAY_ENABLED=true but wechat pay credentials are incomplete. Missing: ' +
             `${missing.map((key) => `WX_${key.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`).join(', ')}. ` +
-            'Set all of them, or turn WECHAT_PAY_ENABLED off.',
+            'Set all of them (私钥/平台公钥也可改用 `WX_PRIVATE_KEY_PATH` / `WX_PUBLIC_KEY_PATH` ' +
+            '指向磁盘上的 PEM 文件), or turn WECHAT_PAY_ENABLED off.',
         );
       }
 
@@ -661,6 +747,33 @@ export const loadConfigFromEnv = (
           `WX_NOTIFY_URL must be an absolute https:// URL (got ${notifyUrl}). ` +
             'WeChat Pay refuses non-HTTPS notify URLs.',
         );
+      }
+
+      // 🔴 **回调送到别的 host 时要显式确认。** 复用另一套部署的配置时，
+      // 运维会顺手把对面的 `PAY_NOTIFY_URL` 字面值抄过来 —— 那意味着"钱到账了"
+      // 这条消息进了**另一个实例的库**：那边没有这些订单号，授予不出去，
+      // 而微信看到的是 200、我们这边连一条日志都没有。**收了钱不发货，且两边都不报错。**
+      // 所以 host 不一致默认启动红，只有显式声明"这就是有意的"才放行。
+      if (process.env.WX_NOTIFY_URL?.trim()) {
+        const hostOf = (value: string, label: string): string => {
+          try {
+            return new URL(value).host;
+          } catch {
+            throw new Error(`${label} 不是可解析的绝对 URL：${value}`);
+          }
+        };
+        const notifyHost = hostOf(notifyUrl, 'WX_NOTIFY_URL');
+        const publicHost = hostOf(config.publicUrl, 'PUBLIC_URL');
+        if (notifyHost !== publicHost) {
+          const confirm = process.env.WX_NOTIFY_URL_CONFIRM?.trim();
+          if (confirm !== 'host-mismatch-is-intentional') {
+            throw new Error(
+              `WX_NOTIFY_URL 的 host（${notifyHost}）与 PUBLIC_URL 的 host（${publicHost}）不一致。` +
+                '到账回调会送进另一台实例的库 ⇒ 那边的订单号查不到、这边收了钱不发权益。' +
+                '确实要跨 host 就设 WX_NOTIFY_URL_CONFIRM=host-mismatch-is-intentional。',
+            );
+          }
+        }
       }
 
       config.wechatPay = {
@@ -736,6 +849,39 @@ export const loadConfigFromEnv = (
       publicKey: publicKey as string,
       privateKey: privateKey as string,
       subject: subject as string,
+    };
+  }
+
+  // 托管 AI 的上游（可选能力）。与 `WECHAT_PAY_ENABLED` / `WEB_PUSH_ENABLED` 同一姿态：
+  // **显式 ENABLED=true 且三项齐全才存在**，缺任何一项就在启动期**硬报错**，不静默落到"没开"。
+  //
+  // 🔴 为什么齐全性要在启动期判，而不是等第一个请求：一个"配了地址但没配密钥"的实例
+  // 会走到"向境内供应商发一次**无授权头**的请求"—— 那既是一个 401，又是一次
+  // 用户明文已经出去了的事实。顺序上它还在额度之后（`managed-proxy.routes.ts` 的闸门顺序），
+  // 于是症状是"扣了一次数、拿到一个 502"。启动期报错是唯一不会付出这个代价的位置。
+  //
+  // ⚠️ 这里**故意不做**境内白名单校验：那是每次转发前的判据（`ai/managed-upstream.ts`），
+  // 而且它必须在**发送点**再算一次（ADR-0056 §5 第 2 条）。配置层判一次就够的错觉，
+  // 正是 ADR-0010 从 SSOS 抄来的那句「Enforcement has to sit on the path that actually
+  // sends the request, not only on the path that stores it.」所要防的。
+  if (process.env.MANAGED_AI_ENABLED === 'true') {
+    const baseUrl = process.env.MANAGED_AI_UPSTREAM_BASE_URL?.trim();
+    const apiKey = process.env.MANAGED_AI_UPSTREAM_API_KEY?.trim();
+    const modelId = process.env.MANAGED_AI_UPSTREAM_MODEL_ID?.trim();
+    const missing = [['MANAGED_AI_UPSTREAM_BASE_URL', baseUrl], ['MANAGED_AI_UPSTREAM_API_KEY', apiKey], ['MANAGED_AI_UPSTREAM_MODEL_ID', modelId]]
+      .filter(([, value]) => !value)
+      .map(([key]) => key);
+    if (missing.length > 0) {
+      throw new Error(
+        `MANAGED_AI_ENABLED=true 但缺少 ${missing.join(' / ')}。` +
+          '要么三项都配上，要么把 MANAGED_AI_ENABLED 去掉 —— 半套配置比没有配置危险：' +
+          '它会先扣掉用户一次额度，再把明文送到一个必然拒绝它的端点。',
+      );
+    }
+    config.managedAi = {
+      baseUrl: (baseUrl as string).replace(/\/+$/, ''),
+      apiKey: apiKey as string,
+      modelId: modelId as string,
     };
   }
 

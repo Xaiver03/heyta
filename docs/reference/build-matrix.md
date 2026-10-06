@@ -24,8 +24,8 @@
 
 | 环境 | SSH 别名 | 地址 | 用户 | 密钥 | 能力 |
 |---|---|---|---|---|---|
-| **本地 Mac**（当前开发机） | — | 本机 | `rocalight` | — | iOS 构建、Android 构建、鸿蒙出包（HAP）验证 |
-| **Windows 打包机** | `windows-pc` | `10.111.127.237`（ZeroTier）<br>`192.168.1.3`（局域网） | `41478` | `~/.ssh/id_ed25519` | Android ✅（debug + release 均实测，见 §2.5）、Windows 桌面构建（选型未定）、**通用构建/测试外包**（见 §1.1.1） |
+| **本地 Mac**（当前开发机） | — | 本机 | `rocalight` | — | iOS 构建、鸿蒙出包（HAP）验证、**Android 装机与模拟器**（设备侧验收仍在这里）；🔴 **Android 构建已不再从这里起**（2026-10-04 起一律远程，见 §2） |
+| **Windows 打包机** | `windows-pc` | `10.111.127.237`（ZeroTier）<br>`192.168.1.3`（局域网） | `41478` | `~/.ssh/id_ed25519` | **Android 构建的唯一宿主**（2026-10-04 起；debug + release 均实测，见 §2.5）、Windows 桌面构建（选型未定）、**通用构建/测试外包**（见 §1.1.1）。⚠️ **无 emulator 本体、无 system-images** ⇒ 设备侧验收仍在 Mac |
 | **第二台 Windows**（笔记本） | `windows-codex`<br>`laptop-5ueuu7ps` | `10.111.127.151`（ZeroTier） | `rayne` | `~/.ssh/id_ed25519` | ⚪ **未纳入构建矩阵**。2026-09-27 实测**离线**（重试 3 次后由 timeout 变 `Host is down`）。此处只固化身份，**不代表可用** |
 | 另一台开发 Mac | `chatgpt-other-mac` | `10.111.127.23`（ZeroTier） | `rocalight` | `~/.ssh/id_ed25519` | 备用 |
 
@@ -184,10 +184,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\setup-build-
 
 | 项 | 值 |
 |---|---|
-| 构建环境 | 本地 Mac ✅ / Windows 打包机 ✅（debug + release 均实测，见 §2.5） |
-| 产物 | `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` |
+| 构建宿主 | 🔴 **`windows-pc`（Windows 打包机）—— 2026-10-04 起是唯一宿主**。Mac/Linux 上调用 `pnpm build:android` 时由 `scripts/run-gradle.mjs` 自动分流：同步工作树 → 远端 gradle → 产物回传。Windows 上跑同一命令 = 本机执行（逐字不变） |
+| 装机 / 模拟器 | **仍在本地 Mac**：`windows-pc` 无 emulator 本体、无 system-images（设备侧验收的兜底，见 `docs/runbooks/android-build-on-windows.md` §五） |
+| 构建环境（历史读数） | 本地 Mac ✅ / Windows 打包机 ✅（debug + release 均实测，见 §2.5）—— Mac 那半是**规则生效前**的实测记录，保留不删 |
+| 产物 | `apps/mobile/android/app/build/outputs/apk/release/app-release.apk`（回传落点**刻意保持原路径**：`scripts/reinstall-all.sh:292` 的 `$APK` 与 §7 第 27 条的新鲜度判据都读它） |
 | AAB 产物 | `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab` |
-| 状态 | ✅ **实机跑通**（`AGENTS.md` §1） |
+| 状态 | ✅ **实机跑通**（`AGENTS.md` §1）；⚠️ **远程那半尚未真跑过一次**（分流与门禁已落地，验收判据 0/3，见手册 §三） |
 
 ### 2.1 工具链要求
 
@@ -240,6 +242,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\setup-build-
 > （见 `apps/mobile/android/local.properties`）。
 > macOS 上 JDK 17 来自 Homebrew 的 `/opt/homebrew/opt/openjdk@17`，
 > 这就是同一份代码在 Mac 上没撞上 foojay 的原因。
+> ⚠️ 2026-10-04 起，这套装的是**装机与模拟器**用的（`adb` / 模拟器），gradle 不再在 Mac 上跑；
+> 它已进 Mac 释放清单（`docs/runbooks/android-build-on-windows.md` §四），
+> 但**验收判据 0/3 之前不许删**。另：`local.properties` 不入库 ⇒ 源码同步不会覆盖它，
+> 远端那份若留着 Mac 的 `sdk.dir`，`run-gradle.mjs` 会在步骤 1 点名让人删那一行。
 
 ### 2.2 构建命令
 
@@ -249,6 +255,12 @@ pnpm build:android                 # Release APK
 pnpm build:android:debug           # Debug APK
 pnpm --filter @heyta/mobile run build:android:bundle   # Release AAB（上架用）
 ```
+
+🔴 这四条在**任何平台**都是同一个形状 —— 分流在唯一收口点 `scripts/run-gradle.mjs` 里：
+Mac/Linux 调用 ⇒ `ssh windows-pc` 远端构建 + 产物回传；Windows 调用 ⇒ 本机 `gradlew.bat`。
+先看计划不落地：`node scripts/run-gradle.mjs assembleRelease --dry-run`。
+显式例外（不是兜底）：`HEYTA_ANDROID_LOCAL_GRADLE=1`。
+规则、验收判据、Mac 释放清单与边界：`docs/runbooks/android-build-on-windows.md`。
 
 ### 2.3 两个必须知道的坑
 
@@ -452,8 +464,8 @@ pnpm build:ios                     # Release, iphonesimulator
 
 | 平台 | 环境 | 命令 | 产物 | 状态 |
 |---|---|---|---|---|
-| Android (Mac) | Mac | `pnpm build:android` | `app-release.apk` | ✅ 实机 |
-| Android (Windows) | Windows 打包机 | `pnpm build:android[:debug]` | `app-release.apk` / `app-debug.apk` | ✅ 两个变体实测 |
+| Android 构建 | 🔴 `windows-pc`（唯一宿主；Mac 调用=自动远程） | `pnpm build:android` | `app-release.apk`（回传到原路径） | ⚠️ 分流已落地，**远程真构建未跑过**（§2.5 那两个变体的实测读数属于规则生效前） |
+| Android 装机 / 模拟器 | Mac（兜底：远端无 emulator 与 system-images） | `adb install` + `verify:mobile-*` | — | ✅ 实机 |
 | iOS | 仅 Mac | `pnpm build:ios` | `Heyta.app` | ✅ 模拟器 |
 | Windows 桌面 | Windows | — | — | 🔲 选型未定 |
 | macOS 桌面 | Mac | — | — | 🔲 未规划 |

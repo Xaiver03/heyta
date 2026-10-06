@@ -159,3 +159,65 @@ heyta 的 web 是**单页 + 视图切换**（`App.tsx` 的视图状态机），
   `Passkey.credentialId`/公钥 一律不出现在响应里（白名单投影，与
   `packages/local-api` 的 `projectForTool` 同一立场）。
 - **不新增通知 kind、不改动计费路径。**
+
+---
+
+## 5. 勘误（2026-10-03）
+
+按 [`README.md`](README.md) §1a 的边界写：本节**只追加**，上面正文一字未改；它属于允许的那两类
+（① 正文里的某个断言与现状不符、② 该决定的落地进度），**不是**结论变更 —— 结论若真要变，是新写一份 ADR。
+
+**① §2 第三条那个"三"字，今天不再是当前范围的描述。**
+正文写的是「写（仅三个，都不涉及钱）」，这在 2026-09-30 是完整的。2026-10-03 的 W4b 加了**第四个写动作**：
+公共事实（调休/补班）的年度录入，由 [ADR-0052](0052-public-facts-are-deployer-supplied.md) 定性。
+⇒ 读 §2 第三条时请带上这一条：**"仅三个"是当时的范围决定，不是当前清单。**
+之所以不直接把 bullet 改成四个：那条"仅三个"是当时取舍的**证据本身**（§3.4 整节论证靠它 —— 为什么首版敢只做三个动作），
+改掉它，后来人就没法 reconstruct 当时的判断了。
+
+**② 新加的那一个和原来三个不是同一种东西 —— 差别在作用域，不在"涉不涉及钱"。**
+三个支持动作（解锁 / 调配额 / 强制登出）的作用域都是**单个账号**；公共事实录入的作用域是**该部署方的全体用户**
+（录错一年，所有人日历上错一年，且用户端看不出"这条来自部署方"、没有除撤销之外的自愈路径）。
+⇒ ADR-0052 §4 代价第 1 条据此给写面钉了三道：**权限最高的一组 + 只能整年替换 + 出处（`papers`）必填**，
+而不是"把它当第四个支持动作照样放行"。
+
+**③ §4.2 第 4 条（"三个写动作没有审计表"）里的"三个"同样过时。**
+审计表那件事的结论**没变**（要合规级审计就新发 ADR，不悄悄加表）；变的是它覆盖的对象数量，
+以及其中一条判断的强度 —— 公共事实录入是这四个里**唯一会渲染给全体用户**的，
+`Logger` 那层留痕对它是否够用，是 §4.2 当时没有考虑过的一种东西。
+
+**没破的不变量（逐条核过，不是"应该没破"）**：§4.3 三条一条没动 ——
+管理端点仍不返回密文/密钥类字段（`holidayAdjustmentAdminDeleteQuerySchema` 是 `strictObject`，只接 `year`）；
+**没有新增通知 kind**（这条下行不走 `account_notifications`）；**没有碰计费路径**（不涉及 `Subscription`/`CheckoutOrder`/`Coupon`）。
+§2 第二条（单级 `isAdmin`，不做 RBAC）也没变：新三端点走的是**同一个** `addHook('preHandler', requireAdmin)`，
+所以"新增路由忘了鉴权是不可能的"那条结构性保证继续成立。
+
+**证据与读数（写明是哪一趟 —— 代码此刻还没合进 main）**：
+`git grep -n "holiday-adjustments" feat/countdown-w4b -- server/src/admin/admin.routes.ts`
+⇒ `:772` GET、`:783` PUT `/holiday-adjustments/years`、`:842` DELETE（年份走查询串，`20:30 现量`）；
+公开读面 `server/src/holidays/holiday-adjustment.routes.ts:89`（`fastify.get`，**无 `preHandler authenticate`**，
+对照 `server/src/push/push.routes.ts:127` 那条挂了鉴权的先例）；
+契约在 `packages/shared-schema/src/holiday-adjustment-contract.ts`（`papers` ≥1、整年替换、`PUBLIC_FACT_SHAPES`）。
+⚠️ `pnpm check:public-facts` 那条门禁**尚未接进 `pnpm check`** —— 别把本文读成它已存在。
+
+## 6. 勘误（2026-10-05）
+
+**只追加，正文一字未改。** 触发它的实测：`grep -n "'/refunds" server/src/admin/admin.routes.ts`
+现量四条路由（列表 / 申请 / approve / reject），全部在插件级 `addHook('preHandler', requireAdmin)` 之后。
+
+**§2 第三条「不做：改订阅／退款／发券／群发通知」里的"退款"一项已被
+[ADR-0053](0053-refunds-only-for-countable-segments.md) 修订** —— 那一项当时的理由是
+"它需要一份逐笔支付权益账本才能算对"，而 ADR-0053 把可退范围收窄到
+**不需要改权益模型也能数对**的那个子域（只退经收银台下过、且 `checkout_orders` 里有自己那一行的单），
+所以它现在是一句已知为假的话，必须留指路而不是留着让人照它做决定。
+
+**没破的三条（逐条核过，不是"应该没破"）**：
+① **仍然不做 RBAC** —— 四条退款路由走的是**同一个** `requireAdmin`，
+"新增路由忘了鉴权是不可能的"那条结构性保证继续成立；
+② **仍然不做改订阅** —— 后台没有任何一处直接写 `subscriptions`，
+权益变动只由 `refund-store.ts` 的回收那一步做（且只在通道确认到账之后）；
+③ **仍然不做发券与群发通知** —— 没新增通知 `kind`，没新增券写入面。
+
+⚠️ 一个 §2 当时没有的概念现在出现了：退款是这四个动作里**唯一真的动钱**的，
+而它带的闸门是"单级 `isAdmin` + 批准必须带非空理由"（`refundRequestSchema` 的
+`.refine`），不是四眼原则。这仍然落在 §3「只有一位运营者」的前提内 ——
+**出现第二个运营者时该重判的是 §2 第二条，触发条件与 ADR-0053 无关。**

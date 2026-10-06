@@ -31,6 +31,7 @@
  */
 
 import type { Note, Task } from './entities.js';
+import { aliveTasks } from './task-filter.js';
 
 /** 一条任务里**可被搜索**的字段。加字段时这里与 `haystackOf` 一起改。 */
 export interface SearchableText {
@@ -91,11 +92,26 @@ export function searchNotes(notes: readonly Note[], query: string): Note[] {
   return notes.filter((note) => matchesQuery(noteSearchText(note), query));
 }
 
-/** 按查询串过滤一组任务。**顺序不动** —— 排序是调用方的事（见 `task-filter.ts`）。 */
+/**
+ * 按查询串过滤一组任务。**顺序不动** —— 排序是调用方的事（见 `task-filter.ts`）。
+ *
+ * 🔴 **墓碑过滤在这里，不在调用方。** 此前它取决于调用方递进来什么表：Web 递
+ * 原始物化表（`Object.values(store.entities.tasks)`，含 `deletedAt`/`purgedAt`），
+ * 移动端递已过滤的列表 —— 同一个词在网页上能搜出"已经彻底删除"的任务，
+ * 在手机上搜不到。这类"滤不滤看心情"的分叉不会报错，只会让用户以为
+ * 回收站没删干净（而它确实没从搜索里消失）。
+ *
+ * 复用 `aliveTasks` 而不是在这里另写一遍判定：**"什么算隐藏"必须只有一处定义**
+ * （`deletedAt` 有值即隐藏，`purgedAt` 必然带着 `deletedAt`，见 `entities.ts` 的
+ * 四态语义）。所以判据的形状是一句话：**把原始表整个递进来也不得出现墓碑**。
+ *
+ * ⚠️ 空查询那条分支也要滤 —— 它是"返回全部"，不是"返回整张表"。
+ */
 export function searchTasks(tasks: readonly Task[], query: string): Task[] {
+  const alive = aliveTasks(tasks);
   const terms = termsOf(query);
-  if (terms.length === 0) return [...tasks];
-  return tasks.filter((task) => matchesQuery(task, query));
+  if (terms.length === 0) return alive;
+  return alive.filter((task) => matchesQuery(task, query));
 }
 
 /**

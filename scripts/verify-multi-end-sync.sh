@@ -94,7 +94,7 @@ PLAYWRIGHT_CONFIG="playwright.multi-end.config.ts"
 
 echo ""
 echo "=== 三端同步验收（真浏览器 + 真服务端 + 真 SQLite，零 mock）==="
-echo "  服务端: $SERVER   库: heyta_mobile_smoke"
+echo "  服务端: $SERVER   库: $E2E_DB"
 echo "  账号:   $EMAIL"
 echo "  笔记本任务: $NODE_TASK"
 echo "  浏览器端口: ${WEB_PORT}（离线套件用 4318，刻意错开）"
@@ -145,14 +145,14 @@ print(d.get('$1',''))
 #   ② **distinct client_id 数**（是不是真的有两台设备在写）。
 # "收到的是不是我想的那一条"只能由**另一台设备解密后读出来**回答 —— 那正是第 3 步。
 account_ops() {  # <opType> <entityType>
-  psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+  psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
     "SELECT count(*) FROM operations o JOIN users u ON u.id=o.user_id
       WHERE u.email='$EMAIL' AND o.op_type='$1' AND o.entity_type='$2';" 2>/dev/null | tr -d ' '
 }
 
 # 该账号的 distinct client_id 数（= 有几台设备真的写过）。
 account_clients() {
-  psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+  psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
     "SELECT count(DISTINCT o.client_id) FROM operations o JOIN users u ON u.id=o.user_id
       WHERE u.email='$EMAIL';" 2>/dev/null | tr -d ' '
 }
@@ -378,11 +378,11 @@ fi
 # ── 第 6 步：服务端汇总 ──────────────────────────────────────
 
 step "6. 服务端汇总"
-psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
   "SELECT count(DISTINCT client_id) FROM operations o JOIN users u ON u.id=o.user_id
     WHERE u.email='$EMAIL';" 2>/dev/null \
   | sed 's|^|      该账号的 client 数 = |'
-psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
   "SELECT count(*) FROM operations o JOIN users u ON u.id=o.user_id
     WHERE u.email='$EMAIL';" 2>/dev/null \
   | sed 's|^|      该账号的 op 总数 = |'

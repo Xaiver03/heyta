@@ -12,7 +12,7 @@
  * 抓的就是这个形状，它是全称量化：**每一个**已建模实体都必须有写路径）。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 四个由这里**独占**的语义决定：
+ * 五个由这里**独占**的语义决定：
  *
  * 1. 🔴 **便签的 id 是随机的，而 `habitLogId` / `reminderId` 是复合键 ——
  *    这个差别是刻意的，不是不一致。**
@@ -37,6 +37,17 @@
  *    **同步回来** —— 用户会看到自己删掉的便签自己复活（同 `habit-actions.ts`
  *    文件头第 3 条）。`restoreNote` 因此只是清墓碑，不重建实体。
  *
+ * 5. 🔴 **便签的回收站三件套（进 / 回 / 彻底删）与任务同一套语义，不做特例。**
+ *    `listTrashed()` 与 `purgeNote()` 是 W1 补的：只给"能还原、不能彻底删除"
+ *    会让便签成为四态模型里唯一的半截公民，而**特例正是漂移的开始** ——
+ *    下一次加实体（W4 的清单/习惯）就会有人问"照便签那样？"，答案却没人维护。
+ *    两个因此钉死的细节：
+ *      · "什么算在回收站里""按什么序"不写第二份，用 `@heyta/domain` 的
+ *        `inTrash` / `byDeletedOrder`（见 `entities.ts`）；
+ *      · `purgedAt` 之后 `restoreNote` **抛错**而不是返回 `false` ——
+ *        "没做成"与"这件事永远做不成"是两句不同的话，界面要说的也是后者
+ *        （任务侧 `restore()` 同一个形状）。
+ *
  * ⚠️ **本轮刻意没有做 `isLock` / `imgUrl` 的 setter。**
  * 两个字段在 {@link Note} 上有定义，但**没有任何界面要用它们**。
  * 现在补一个没有消费者的 setter，恰好就是本文件开头在修的那个形状
@@ -53,6 +64,7 @@ import {
   noteRejection,
   notesInGroup,
   sortNotesForDisplay,
+  trashedIn,
   type Note,
 } from '@heyta/domain';
 import type { EntityType } from '@heyta/shared-schema';
@@ -72,6 +84,11 @@ export interface NewNoteFields {
 export interface NoteActionsOptions {
   /** 便签 id 生成器。可注入，理由见 `TaskActionsOptions.newTaskId`。 */
   newNoteId?: () => string;
+  /**
+   * 时钟。`purgeNote` 要把删除时刻写进载荷，因此与 `TaskActionsOptions.now`
+   * 同一个理由：**结构性断言不能靠 `Date.now()` 的容差**。
+   */
+  now?: () => number;
 }
 
 export interface NoteActions {
@@ -85,10 +102,36 @@ export interface NoteActions {
   setNotePinnedToToday(entityId: string, pinned: boolean): Promise<void>;
   /** 软删除（见文件头第 4 条）。 */
   removeNote(entityId: string): Promise<void>;
-  /** 撤销删除。**未删除时返回 `false`** 且不写 op（不产生空 op）。 */
+  /**
+   * 撤销删除。**未删除时返回 `false`** 且不写 op（不产生空 op）。
+   *
+   * 🔴 **已彻底删除（`purgedAt`）的便签抛错**，不是返回 `false`：
+   * "这条现在不用恢复"与"这条永远恢复不了"是两句话，界面对第二句要说"不可恢复"
+   * 而不是"没反应"（任务侧 `restore()` 同一个形状，见 `actions.ts` 的注释）。
+   */
   restoreNote(entityId: string): Promise<boolean>;
+  /**
+   * 彻底删除 —— 回收站里的**不可逆**动作，与任务侧 `purge()` 同一套语义：
+   * 只追加可加性标记 `purgedAt`，**墓碑 `deletedAt` 保留**（清掉它会让离线端
+   * 把这条便签当成"从未删除"又同步回来）。
+   *
+   * ⚠️ 它**不**抹掉 op-log 里的历史载荷，也不是加密擦除（`EntityBase.purgedAt`
+   * 与 ADR-0048 写明了这条边界）。确认框里那句"这不是物理擦除"是承重的。
+   *
+   * 只能对**已软删除**的便签用：对一条活着的便签发 purge 会让它在没有墓碑的
+   * 情况下从视图里消失，而离线端完全不知道发生过什么 ⇒ **抛错**。
+   */
+  purgeNote(entityId: string): Promise<void>;
   /** 未删除的便签，**规范顺序**（`sortNotesForDisplay`：钉选 → 更新时间 → id）。 */
   listNotes(): Note[];
+  /**
+   * 回收站里的便签（有墓碑、未被彻底删除），**最近删除的在前**。
+   *
+   * ⚠️ 判据与顺序来自动作层之外（`@heyta/domain` 的 `inTrash` / `byDeletedOrder`），
+   * 宿主**不要**自己 `filter(n => n.deletedAt)` —— 那会漏掉 `purgedAt` 那一半，
+   * 把"彻底删除"变成一个界面上没有产出的动作。
+   */
+  listTrashed(): Note[];
   /** 某个归属下（`null` = 未归属）的便签，顺序同上。 */
   notesOf(projectId: string | null): Note[];
   /** 钉到「今天」的那些 —— 界面上的"今日便签"分组直接用它，不要自己 filter。 */
@@ -100,6 +143,7 @@ export function createNoteActions(
   options: NoteActionsOptions = {},
 ): NoteActions {
   const makeNoteId = options.newNoteId ?? ((): string => `note-${randomId()}`);
+  const now = options.now ?? ((): number => Date.now());
 
   const noteOf = (entityId: string): Note | undefined => {
     const note = ctx.getState().notes[entityId];
@@ -155,13 +199,25 @@ export function createNoteActions(
     },
 
     async updateNoteContent(entityId, content) {
-      if (noteOf(entityId) === undefined) throw new Error(`找不到便签「${entityId}」`);
+      const current = noteOf(entityId);
+      if (current === undefined) throw new Error(`找不到便签「${entityId}」`);
       assertContent(content);
+      const next = content.trim();
+      /**
+       * 🔴 **正文没变就不写 op** —— 这条闸门只能住在这里，不能下放到界面。
+       *
+       * `UPD` 会推进 `updatedAt`，而 `updatedAt` 是 `sortNotesForDisplay` 的第二段。
+       * 于是"点开便签、什么都没改、点一下保存"会让这条便签**跳到列表最前面**，
+       * 而用户看到的现象是"我只是看了一眼，顺序就变了"—— 全程没有任何一处报错。
+       * 两端共用这一个入口之后，界面上少写一次判断、这里多挡一次，
+       * 比"两个端各自记得挡"便宜得多（AGENTS §3.5）。
+       */
+      if (next === current.content) return;
       await ctx.dispatch({
         entityType: 'NOTE' as EntityType,
         entityId,
         opType: OpType.Update,
-        payload: { content: content.trim() },
+        payload: { content: next },
       });
     },
 
@@ -202,7 +258,13 @@ export function createNoteActions(
       // 注意这里读的是**含墓碑**的原始记录：`noteOf` 会滤掉墓碑，
       // 用它会让"撤销删除"永远判定成"找不到便签"。
       const raw = ctx.getState().notes[entityId];
-      if (raw === undefined || raw.deletedAt === undefined) return false;
+      if (raw === undefined) throw new Error(`找不到便签「${entityId}」`);
+      // 🔴 不可逆必须在动作层真的拦住，而不是只靠界面不画那个按钮
+      //（同一台设备上还有 CLI / 本机 API 两条路会调到这个方法）。
+      if (raw.purgedAt !== undefined) {
+        throw new Error(`便签「${entityId}」已被彻底删除，无法恢复`);
+      }
+      if (raw.deletedAt === undefined) return false;
       await ctx.dispatch({
         entityType: 'NOTE' as EntityType,
         entityId,
@@ -214,8 +276,30 @@ export function createNoteActions(
       return true;
     },
 
+    async purgeNote(entityId) {
+      const raw = ctx.getState().notes[entityId];
+      if (raw === undefined) throw new Error(`找不到便签「${entityId}」`);
+      if (raw.deletedAt === undefined) {
+        throw new Error(`便签「${entityId}」不在回收站里，不能彻底删除`);
+      }
+      // 已彻底删除：幂等，不重复发 op。
+      if (raw.purgedAt !== undefined) return;
+      // 只加标记，**不清 `deletedAt`** —— 墓碑留着，离线端才不会复活它。
+      await ctx.dispatch({
+        entityType: 'NOTE' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        payload: { purgedAt: now() },
+      });
+    },
+
     listNotes() {
       return sortNotesForDisplay(aliveOf());
+    },
+
+    listTrashed() {
+      // 判据、顺序、"挑 + 排"这一遍都在领域层（`trashedIn`），这里不重写。
+      return trashedIn(Object.values(ctx.getState().notes));
     },
 
     notesOf(projectId) {

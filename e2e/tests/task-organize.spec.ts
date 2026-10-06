@@ -169,6 +169,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
 
   test('取消归属：标签摘掉、任务回到收集箱，刷新后依然是取消态', async ({ page }) => {
     const title = `${TITLE}-undo`;
+    // 同一理由：这一支量的仍是**窄档行尾**那枚触发器（§8.147 起宽档不画它）。
+    await page.setViewportSize({ width: 900, height: 600 });
     await openApp(page);
     await addTask(page, title);
 

@@ -1,12 +1,18 @@
 import { expect, test } from '@playwright/test';
-import { openApp } from './helpers';
+import {
+  openApp,
+  switchTheme,
+  switchView,
+} from './helpers';
 
 /**
  * 收集箱界面 vs 滴答清单参照图（产品负责人 2026-10-01 附 macOS 截图）
  * ============================================================
  *
  * 参照图结构（第二列 + 第三列）：
- *   第二列：智能清单（今天 / 最近 7 天 / 收集箱，各带计数，选中行 = 灰底圆角）
+ *   第二列：智能清单（今天 / 最近 7 天 / 已完成，各带计数，选中行 = 灰底圆角）
+ *           ⚠️ 2026-10-04：**这一列里没有「收集箱」那一行**（产品负责人：与页头
+ *           标题重复 = 同一个目的地的两个入口）。回收集箱 = 再点一次 rail 的「任务」。
  *           → 清单（空 = 淡色说明卡）→ 过滤器（空 = 淡色说明卡）
  *           → 标签（图标 + 名字 + 右端色点）→ 底部 已完成 / 垃圾桶
  *   第三列：页头（视图切换 + 标题 + 排序 + ⋯）
@@ -36,9 +42,29 @@ test('收集箱：当前形态取证', async ({ page }) => {
     await composer.press('Enter');
   }
 
-  // 收集箱 = 侧栏第一项。
-  await page.getByRole('button', { name: /收集箱/ }).first().click();
-  await expect(page.locator('.ht-header__title').first()).toHaveText('收集箱');
+  /*
+   * 🔴 2026-10-04 之后「收集箱」不再是侧栏的一行（与页头标题重复 = 同一个目的地
+   * 有两个控件）。这里必须**先挪走再回来**：种子数据落进的就是收集箱，
+   * 直接在默认态断言"标题是收集箱"是一条永远通过的判据（§7 元规则 2）。
+   *
+   * 三条一起才完整：① 那一行确实不在 DOM 里（不是"渲染了但隐藏"）；
+   * ② 停在「今天」时页头说的是「今天」；③ 回收集箱的手势是**再点一次 rail 的「任务」**。
+   */
+  await expect(
+    page.locator('[data-testid="nav-scope-all"]'),
+    '侧栏不该再有「收集箱」那一行',
+  ).toHaveCount(0);
+
+  const todayRow = page.locator('[data-testid="nav-scope-today"]');
+  await expect(todayRow, '侧栏必须有「今天」').toBeVisible();
+  await todayRow.click();
+  await expect(page.locator('.ht-header__title').first()).toHaveText('今天');
+
+  await switchView(page, '任务');
+  await expect(
+    page.locator('.ht-header__title').first(),
+    '停在「今天」时再点一次 rail 的「任务」应当回收集箱 —— 删掉那一行之后这是唯一的路',
+  ).toHaveText('收集箱');
 
   await page.screenshot({ path: SHOT('inbox'), fullPage: false });
 
@@ -91,8 +117,7 @@ test('组头折叠：收起后行消失、组头与计数留下', async ({ page 
 
   // 🔴 暗色不是亮色的反相（AGENTS §5）：那枚 ▸ 用的是 `color.foreground-subtle`，
   // 在亮底上是浅灰 —— 只截图看一眼才知道它在暗底上有没有跟着翻。
-  await page.getByRole('button', { name: '切换到暗色主题' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await switchTheme(page, 'dark');
   await toggle.click();
   await expect(group.locator('[role="checkbox"]')).toHaveCount(0);
   await page.screenshot({ path: SHOT('collapse-collapsed-dark') });
@@ -150,8 +175,7 @@ test('最近 7 天：侧栏计数 == 点进去的行数，逾期那条不在里�
   await page.screenshot({ path: SHOT('next7-list') });
 
   // 暗色：这一列的组头/计数/勾选框在暗底上有没有跟着翻（AGENTS §5）。
-  await page.getByRole('button', { name: '切换到暗色主题' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await switchTheme(page, 'dark');
   await page.screenshot({ path: SHOT('next7-dark') });
 
   expect(consoleErrors, '控制台不应有异常').toEqual([]);
@@ -204,8 +228,7 @@ test('页头排序：换档位真的换行序，控件带可见标签', async ({
   await page.screenshot({ path: SHOT('sort-priority') });
 
   // 暗色：下拉的底色/边框/文字是否跟着 token 翻（AGENTS §5）。
-  await page.getByRole('button', { name: '切换到暗色主题' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await switchTheme(page, 'dark');
   // ⚠️ 等动效落位再拍：主题切换带 duration token 的过渡，抢拍会把
   // 行尾那些按钮拍成"灰底没文字"——那是探针的假象，不是界面的样子（e2e 探针陷阱）。
   await page.waitForTimeout(600);

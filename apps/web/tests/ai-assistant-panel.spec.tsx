@@ -28,6 +28,7 @@ import { planAssistantEgress, type AssistantTier } from '@heyta/app-host';
 import type { AiRoutingConfig } from '@heyta/ai';
 import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
+import { PanelEphemeralProvider } from '../src/features/ai/panel-ephemeral.js';
 import { AssistantPanel } from '../src/features/ai/AssistantPanel.js';
 
 const ROUTING: AiRoutingConfig = {
@@ -60,6 +61,15 @@ function fakeHost(items: readonly LocalApiItem[] = ITEMS): LocalApiHost & { subm
     listTasks: () => Promise.resolve(items),
     getTask: (taskId: string) => Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: () => Promise.resolve([{ id: 'p1', name: '工作', taskCount: 1 }]),
+    listHabits: () => Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]),
+    listTags: () => Promise.resolve([]),
+    listNotes: () => Promise.resolve([]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([]),
+    listFocusSessions: () => Promise.resolve([]),
+    listEvents: () => Promise.resolve([]),
+    getEvent: () => Promise.resolve(undefined),
+    listReminders: () => Promise.resolve([]),
     submit: () => {
       host.submits += 1;
       return Promise.resolve({ ok: true as const, taskId: 'created-1' });
@@ -122,6 +132,7 @@ async function render(props: {
   await act(async () => {
     root!.render(
       <I18nProvider locale={props.locale ?? 'zh-CN'}>
+      <PanelEphemeralProvider>
         <AssistantPanel
           routing={props.routing ?? ROUTING}
           consents={props.consents ?? CONSENTS}
@@ -130,6 +141,7 @@ async function render(props: {
           host={props.host}
           {...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl })}
         />
+      </PanelEphemeralProvider>
       </I18nProvider>,
     );
   });
@@ -181,7 +193,7 @@ describe('🔴 一次性披露在循环之前', () => {
     const { impl, bodies } = scriptedFetch([{ kind: 'text', text: '今天有一条任务。' }]);
     const el = await render({ host, fetchImpl: impl });
 
-    await type(el, '今天有什么');
+    await type(el, '随便说点什么吧');
     await click(el, 'ai-assistant-send-button');
 
     expect(el.querySelector('[data-testid="ai-assistant-disclosure"]')).not.toBeNull();
@@ -194,7 +206,7 @@ describe('🔴 一次性披露在循环之前', () => {
     const { impl, bodies } = scriptedFetch([{ kind: 'text', text: '今天有一条任务。' }]);
     const el = await render({ host, fetchImpl: impl });
 
-    await type(el, '今天有什么');
+    await type(el, '随便说点什么吧');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
 
@@ -202,6 +214,22 @@ describe('🔴 一次性披露在循环之前', () => {
     expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain(
       '今天有一条任务。',
     );
+  });
+
+  it('🔴 规则本机就能答的那一句**不弹披露**，而且零请求', async () => {
+    const host = fakeHost();
+    const { impl, bodies } = scriptedFetch([{ kind: 'text', text: '这一条不该被用到。' }]);
+    const el = await render({ host, fetchImpl: impl });
+
+    await type(el, '今天有什么任务');
+    await click(el, 'ai-assistant-send-button');
+
+    expect(
+      el.querySelector('[data-testid="ai-assistant-disclosure"]'),
+      '本机就答得出的一句话，界面却要求用户批准"内容离开本机" —— 那是一次不会发生的出境的承诺',
+    ).toBeNull();
+    expect(bodies).toHaveLength(0);
+    expect(host.submits).toBe(0);
   });
 
   it('🔴 披露的字段与工具**逐字等于** `planAssistantEgress(tier)`，不是界面另抄的一份', async () => {
@@ -465,7 +493,7 @@ describe('对话记录里"谁说的"看得出来', () => {
     const host = fakeHost();
     const { impl } = scriptedFetch([{ kind: 'text', text: '今天有 1 条' }]);
     const el = await render({ host, fetchImpl: impl });
-    await type(el, '今天有什么');
+    await type(el, '随便说点什么吧');
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
 

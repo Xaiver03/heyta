@@ -7,7 +7,8 @@
  * 有就说明它该在 `packages/` 里，不在 `apps/` 里。
  *
  * 但那条判据是**靠人读的**，而人读过一次之后就不再看第二遍。本文件把它变成
- * 四条机器可查的具体形状 —— 全部来自**已经真实发生过**的漂移：
+ * 一批机器可查的具体形状（**条数以本文件打印的为准，别在文档里抄数**）——
+ * 全部来自**已经真实发生过**的漂移：
  *
  *   1. `new SyncClient(` —— 12 个回调的接线。曾在 `packages/app-host` 与
  *      `apps/web` 里各有一份，**逐字相同，连注释都是复制的**。
@@ -33,6 +34,12 @@
  *      加这条规则时它一次抓出了 **17 处**（实测 `apps/web`：7 TASK / 4 PROJECT /
  *      2 TAG / 2 HABIT / 2 HABIT_LOG）—— 那是**真实存在的违规**，
  *      比注入一个假违规更有说服力。
+ *   7. **外壳里自己声明助手档位**（`no-assistant-tier-literal-in-apps`）。
+ *      同一条收尾动作的第二遍：`assistantTier` 的**默认值 + fail-closed 归一 +
+ *      两档顺序**原先住在 `apps/web/src/features/settings/aiStore.ts` 与
+ *      `AiSettings.tsx` 里，2026-10 抽进 `packages/app-host/src/assistant-tier-settings.ts`。
+ *      这一档决定"模型这次能不能改用户的数据"，而**两个壳的默认值不一样时不会报错** ——
+ *      症状是同一个用户在两台设备上权限不同，界面却都写着"只读"。
  *
  * 前两条是本文件写出来时**刚刚修掉的**；后四条是仓库里已经记录过的同形状事故
  * 与已定案的 ADR 约束。
@@ -209,6 +216,31 @@ const RULES = [
       '用 `CATEGORY_SLOT_TOKEN_BY_SLOT` / `HEAT_TOKENS` / `UNSET_CATEGORY_TOKEN`' +
       '（`@heyta/design-system`）。外壳只保留**最后一层适配**：' +
       'Web 用 `cssVar()` 包成 `var(--ht-*)`，RN 多传一个 `tokens` 参数。',
+  },
+  {
+    id: 'no-assistant-tier-literal-in-apps',
+    // 档位只有两个取值，而它们的**值本身**是磁盘格式（已写进用户设备的
+    // `localStorage`，将来还会写进原生端的表）。外壳里出现引号字面量，
+    // 就意味着这个外壳在自己声明"哪一档是只读、哪一档算开写"。
+    pattern: /['"](?:read-only|read-and-propose)['"]/,
+    what: '外壳里自己声明助手档位（写死了档位字面量）',
+    why:
+      '档位决定**模型这一次能不能改用户的数据**：默认值是哪一档、坏值往哪边落、' +
+      '两档谁高谁低 —— 全是产品语义（ADR-0045 §2.2 / ADR-0014 的 fail-closed）。' +
+      '抽取之前这三行住在 `apps/web/src/features/settings/aiStore.ts` 里。' +
+      '下一个壳（node-host、移动）接助手时**必然自己再写一遍**，而两份的默认值或' +
+      '归一方向只要有一个不同，同一个用户在两台设备上就有两种权限 —— ' +
+      '症状还是"界面上写着只读、其实能写"，**没有任何一层会报错**。' +
+      '这与 §3.5 记的 `createTaskActions` 事故同形：共享实现抽出来了、旧那份从没删掉，' +
+      '因为当时没有门禁。所以本条同时钉住"顺序第一格必须是默认档"赖以成立的那份列表。',
+    fix:
+      '从 `@heyta/app-host` 取：`DEFAULT_ASSISTANT_TIER`（出厂默认）、' +
+      '`normalizeAssistantTier(raw)`（读回时的 fail-closed 归一）、' +
+      '`ASSISTANT_TIER_ORDER`（低→高，界面渲染顺序）、' +
+      '`ASSISTANT_TIER_READ_ONLY` / `ASSISTANT_TIER_READ_AND_PROPOSE`（要比较或建 `Record` 时用常量）。' +
+      '**存储通道仍归壳**（Web 是 `heyta.ai.settings` 那块 JSON，原生端是 SQLite/偏好）：' +
+      '壳可以决定"存在哪"，不可以决定"默认算什么、坏值算不算开写"。' +
+      '自己存这一档的宿主用 `createAssistantTierStore(port)`。',
   },
 ];
 

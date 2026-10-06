@@ -26,12 +26,11 @@ import { Priority, formatTaskRemaining, parseLocalDate, type Task } from '@heyta
 import { translate } from '@heyta/i18n';
 
 import { dueTone, toDueDisplay } from '../src/lib/due-display';
-import {
-  PRIORITY_ORDER,
-  priorityBadgeLabel,
-  priorityColorToken,
-  priorityLabel,
-} from '../src/lib/priority';
+import { PRIORITY_ORDER, priorityBadgeLabel, priorityLabel } from '../src/lib/priority';
+// ⚠️ 档位 → 语义色 token 名的判据**不在这里了**（W5，2026-10-04）：
+// 那份映射的唯一所有者是 `packages/ui/src/task-list/priority-color.ts`，
+// 判据跟着它进了 `packages/ui/tests/task-row-priority.spec.ts`。
+// 在本文件再抄四行只是把同一个判断放进第三个包。
 
 const zh = translate.bind(null, 'zh-CN');
 const en = translate.bind(null, 'en');
@@ -174,13 +173,6 @@ describe('优先级文案', () => {
 
   it('🔴 顺序是显式升序，不靠枚举反向映射', () => {
     expect([...PRIORITY_ORDER]).toEqual([0, 1, 2, 3]);
-  });
-
-  it('每个档位映射到一个语义色 token 名', () => {
-    expect(priorityColorToken(Priority.High)).toBe('color.priority-high');
-    expect(priorityColorToken(Priority.Medium)).toBe('color.priority-medium');
-    expect(priorityColorToken(Priority.Low)).toBe('color.priority-low');
-    expect(priorityColorToken(Priority.None)).toBe('color.priority-none');
   });
 
   it('🔴 数值枚举的比较：3 才是高优先级', () => {

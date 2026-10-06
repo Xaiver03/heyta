@@ -38,6 +38,8 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
+import { swState, trackEgress } from './net-egress';
+
 
 const CONSENT_KEY = 'privacy.consent';
 
@@ -50,76 +52,16 @@ const CLOSE = '[data-testid="privacy-consent-close"]';
 /** 固定的取证图路径（§6.2 规定一：先截图、再断言，失败时也得有图）。 */
 const SHOT = (name: string): string => `/tmp/heyta-privacy-consent-results/${name}.png`;
 
-interface Egress {
-  readonly url: string;
-  readonly method: string;
-}
-
 /**
- * 开始记录出站请求。**必须在 `goto` 之前**挂上 —— 挂晚了收不到启动序列里那几条，
- * 而那正是本套件要数的东西（Electron 那条同一个教训：监听挂晚了会得到"日志干净"）。
- *
- * 🔴 `origin` 由调用方从 `baseURL` fixture 传进来，不在这里现算：
- * `page.url()` 在第一条请求（document 本身）那一刻还是 `about:blank`，
- * 拿它当本源会把首页那一次算成"出站"，症状是**每条用例都红在第一条断言**。
+ * 出站/套接字/SW 这三支探针现在住在 './net-egress.ts'（W7 的导出用例要用**同一套**
+ * 分类规则）。搬走而不是留一份本地副本：两份分类器会漂，而漂了的“零出站”
+ * 仍是绿色的 —— 那是承诺悄悄变宽，不是测试失败。原注释里那些道理（为什么要在
+ * goto 之前挂、为什么 'NO_SW_SUPPORT' 不能当正向对照）跟着函数一起走了。
  */
-function trackEgress(page: Page, origin: string): { egress: Egress[]; sockets: string[] } {
-  const egress: Egress[] = [];
-  const sockets: string[] = [];
-  const appOrigin = new URL(origin).origin;
-
-  // 🔴 §6.2 规定一第 3 条：白屏/没反应的根因**几乎只在这里现形**。SW 注册失败就是
-  // `register.ts` 里一句 `console.warn`，不收控制台只会得到"它没注册"这四个字。
-  page.on('console', (message) => {
-    if (message.type() !== 'warning' && message.type() !== 'error') return;
-    console.log(`[browser ${message.type()}] ${message.text()}`);
-  });
-  page.on('pageerror', (error) => console.log(`[pageerror] ${error.message}`));
-
-  page.on('request', (request) => {
-    let url: URL;
-    try {
-      url = new URL(request.url());
-    } catch {
-      egress.push({ url: request.url(), method: request.method() });
-      return;
-    }
-    if (url.origin !== appOrigin) {
-      egress.push({ url: url.toString(), method: request.method() });
-      return;
-    }
-    if (url.pathname === '/sw.js' || url.pathname.startsWith('/api/')) {
-      egress.push({ url: url.pathname, method: request.method() });
-    }
-  });
-  page.on('websocket', (socket) => sockets.push(socket.url()));
-
-  return { egress, sockets };
-}
 
 /** 这台设备上当前的决定记录（直接读 `localStorage`，不经过应用的任何判断）。 */
 async function readRecord(page: Page): Promise<string | null> {
   return page.evaluate((key) => window.localStorage.getItem(key), CONSENT_KEY);
-}
-
-/**
- * SW 的注册状态。返回值一律**要求匹配** `/installing|waiting|active/` 才算"注册上了"，
- * 而不是判它非 null —— 因为 `'NO_SW_SUPPORT'` 也非 null，
- * 用它做正向对照会让那条"零"重新变成恒真（浏览器不支持 SW 时整套照样绿）。
- */
-async function swState(page: Page): Promise<string> {
-  return page.evaluate(async () => {
-    if (!('serviceWorker' in navigator)) return 'NO_SW_SUPPORT';
-    const registration = await navigator.serviceWorker.getRegistration();
-    if (!registration) return 'NONE';
-    return [
-      registration.installing ? 'installing' : '',
-      registration.waiting ? 'waiting' : '',
-      registration.active ? 'active' : '',
-    ]
-      .filter(Boolean)
-      .join('+');
-  });
 }
 
 async function openFresh(page: Page, origin: string): Promise<void> {

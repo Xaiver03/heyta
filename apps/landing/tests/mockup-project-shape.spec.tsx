@@ -53,20 +53,17 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { MOCK_PROJECT_DRAWN_PARTS, ORGANIZER_ROW_PARTS } from '../src/mockup/project-shape.js';
+import { readUiSource, readWebSource } from './helpers/source-text.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = resolve(HERE, '..');
-const REPO = resolve(HERE, '../../..');
 
-const WEB_SRC = process.env.HEYTA_MOCKUP_WEB_SRC ?? join(REPO, 'apps/web/src');
-const UI_SRC = process.env.HEYTA_MOCKUP_UI_SRC ?? join(REPO, 'packages/ui/src');
-
-const readUi = (relative: string): string => readFileSync(join(UI_SRC, relative), 'utf8');
+/** 接缝与读取器的唯一所有者在 `./helpers/source-text.ts`。 */
+const readUi = readUiSource;
 
 const organizerListSource = (): string => readUi('projects/OrganizerList.tsx');
 const projectsModelSource = (): string => readUi('projects/model.ts');
-const webHostSource = (): string =>
-  readFileSync(join(WEB_SRC, 'features/projects/ProjectsPanel.tsx'), 'utf8');
+const webHostSource = (): string => readWebSource('features/projects/ProjectsPanel.tsx');
 const appWindowSource = (): string =>
   readFileSync(join(APP, 'src/mockup/AppWindow.tsx'), 'utf8');
 const projectShapeSource = (): string =>

@@ -27,6 +27,7 @@ import {
   DEVICES,
   KNOWN_BAD_CAPTURE_METHODS,
   SHELL_EVIDENCE,
+  TARGETS,
   artifactName,
   expectedGroups,
 } from './targets.mjs';
@@ -92,6 +93,63 @@ for (const group of expectedGroups()) {
   if (extra.length > 0) {
     notes.push(`${group.label}: 有 ${extra.length} 张不在注册表里（可能是改名后残留）—— ${extra.slice(0, 3).map((f) => f.name).join('、')}`);
   }
+}
+
+// ── 5. 🔴 `dismissTexts` 与 i18n 词条真源的对账 ───────────────────────────────
+//
+// 为什么这条长在**门禁**里而不是运行时：截图点的是按钮的**无障碍名**，而那个名字来自
+// `packages/i18n`。`scripts/` 不在 pnpm 工作区里（`import('@heyta/i18n')` 实测
+// `ERR_MODULE_NOT_FOUND`），所以 `targets.mjs` 里的串是一份**抄件**。
+// 有人改了词条而没改这里 ⇒ 遮挡物再也点不掉，症状是"capture 报视图没切"
+// （10-04 的 W07 就是撞在这个形状上：首启同意闸门 10-02 落地，清单没跟上），
+// 而不是"文案过期"—— 一个不好归因的失败。所以它必须每次 push 都跑
+// （`screenshot:verify` 已在 `pnpm check` 链里）。
+//
+// ⚠️ 匹配的是「作为某个词条的值出现」这一种形状（`'key': '<串>',`），
+//    串只在注释/文档里出现过不算数。若将来某个串本身含引号或转义，
+//    这里要换成 TS 解析器（先例：`server` 的 copy 生成器 —— 正则会变成第二套转义规则）。
+const LOCALE_SOURCE = {
+  'zh-CN': 'packages/i18n/src/locales/zh-CN.ts',
+  en: 'packages/i18n/src/locales/en.ts',
+};
+const escapeForRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const localeTables = new Map();
+let dismissChecked = 0;
+
+for (const target of TARGETS) {
+  if (target.site !== 'web' || target.dismissTexts.length === 0) continue;
+  const source = LOCALE_SOURCE[target.locale];
+  if (!source) {
+    problems.push(`目标 ${target.id}: locale「${target.locale}」没有登记词条表来源，无法对账 dismissTexts`);
+    continue;
+  }
+  if (!localeTables.has(source)) {
+    if (!existsSync(join(root, source))) {
+      problems.push(`目标 ${target.id}: 词条表 ${source} 不存在`);
+      continue;
+    }
+    localeTables.set(source, readFileSync(join(root, source), 'utf8'));
+  }
+  const table = localeTables.get(source);
+  for (const text of target.dismissTexts) {
+    dismissChecked += 1;
+    const appearsAsEntryValue = newRegExpValue(table, text);
+    if (!appearsAsEntryValue) {
+      problems.push(
+        `目标 ${target.id} 的遮挡物文案「${text}」在 ${source} 里不再是任何词条的值\n` +
+          `    ⇒ 词条改了、清单没跟上：那层遮挡物会再也点不掉，截图会静默停在被盖住的视图上`,
+      );
+    }
+  }
+}
+if (dismissChecked === 0) {
+  // 对账自己也要有分母：一条都没比 = 这条门是空的
+  problems.push('dismissTexts 对账一条都没跑（web 目标的遮挡物清单为空？）');
+}
+
+/** 只在 `: '<串>'` / `: "<串>"` 这一种形状上匹配 —— 即"它是某个词条的值"。 */
+function newRegExpValue(table, text) {
+  return new RegExp(`:[ \\t]*(['"])${escapeForRegex(text)}\\1[ \\t]*(?:[,;\\n])`).test(table);
 }
 
 // ── 原生壳证据：**来源门禁**（防回归的核心）＋ 糊字启发式 ─────────────────

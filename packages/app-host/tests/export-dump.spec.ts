@@ -277,6 +277,43 @@ describe('buildTaskExportRows / renderTasksMarkdown（人能直接看的那一�
     expect(text).toContain('（没有任务）');
     expect(text).not.toContain('| --- |');
   });
+
+  it('🔴 时刻不丢：有时刻的那格带 HH:MM，没时刻的一格都不多写', () => {
+    // 用**本地**时钟构造（`new Date(y, m, d, h, mi)` 就是本地那一时刻），
+    // 所以期望值与运行时区无关，也不是从被测函数推出来的。
+    const timed = makeOp({
+      entityType: 'TASK',
+      entityId: 'task-timed',
+      payload: { title: '接孩子', dueDate: new Date(2026, 2, 15, 16, 0, 0, 0).getTime() },
+    });
+    const allDay = makeOp({
+      entityType: 'TASK',
+      entityId: 'task-allday',
+      payload: { title: '交房租', dueDate: new Date(2026, 2, 16, 0, 0, 0, 0).getTime() },
+    });
+    const rows = buildTaskExportRows(stateFrom([timed, allDay]));
+    const timedRow = rows[0]!;
+    const allDayRow = rows[1]!;
+    // 先钉住"索引 == 这一条"的前提，否则下面的断言可能在比错的对象。
+    expect([timedRow.title, allDayRow.title]).toEqual(['接孩子', '交房租']);
+
+    expect(timedRow.dueDate).toBe('2026-03-15');
+    expect(timedRow.dueTime).toBe('16:00');
+    expect(allDayRow.dueDate).toBe('2026-03-16');
+    // "只到日"落成**键缺席**而不是空串：空串会让两种情况走同一条渲染分支，
+    // 于是"丢了时刻"和"本来就没时刻"在清单里长得一样 —— 那就是静默有损。
+    expect(Object.hasOwn(allDayRow, 'dueTime')).toBe(false);
+
+    const text = renderTasksMarkdown(rows, copy, '2026-01-01T00:00:00.000Z');
+    expect(text).toContain('| 接孩子 | 未完成 | 2026-03-15 16:00 |');
+    expect(text).toContain('| 交房租 | 未完成 | 2026-03-16 |');
+    expect(text).not.toContain('2026-03-16 00:00');
+
+    // 表的形状没变（本批改的是单元格内容，不是列数）。
+    for (const line of text.split('\n').filter((l) => l.startsWith('| '))) {
+      expect((line.match(/\|/g) ?? []).length, line).toBe(7);
+    }
+  });
 });
 
 describe('exportFileName', () => {

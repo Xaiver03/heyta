@@ -645,16 +645,16 @@ pnpm --filter @heyta/server pricing set-price \
    今天**不可达**（微信的 `mapSubscriptionState` 明确返回 `null`），
    但谁实现第一个订阅式 provider，谁就必须把 grants 接进来，否则每个订阅用户
    都会被闸门拒绝，而拒绝原因看起来像"没买这一档"。
-17. **「300 次/月」承诺了，而计量与端点都不存在 —— 已记录成一个有终点的决定。**
+17. 🔴 **（下面整条是当时（2026-09/10）的判断，不是现状）「300 次/月」承诺了，而计量与端点都不存在 —— 已记录成一个有终点的决定。**
    `¥12 / 月 · 300 次/月` 是一个已经写进落地页与法务的承诺，而它依赖的四件事
-   **一件都没有**：云端 AI 路由（`server/src/routes/` 不存在）、计量
+   **当时一件都没有**：云端 AI 路由（`server/src/routes/` 不存在）、计量
    （全仓 `quota` 只命中同步存储配额）、`deepseek` 调用（0 命中）、
    能卖 ¥12 的收银台（见第 1 条）。仓库原有门禁校验的是"**收多少钱**"与
    "**文案怎么说**"，**没有一道校验"承诺的东西是否存在"** ——
    所以任何照着文案去接线收银台的人，都会卖出一档收了钱交付不了的服务，
    而 `pnpm check` 每一道都是绿的。
 
-   **本轮的处理**（[ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md)）：
+   **当时那一轮的处理**（[ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md)）：
    - 结论是**本轮不实现**，并把它的**最小实现清单**写进 ADR §5 ——
      "不做"因此是一个**有终点**的决定（清单清空之日即被取代），不是拖延；
    - 硬约束：**在计量存在之前，`hosted-ai-monthly` 不得被售卖**；
@@ -672,6 +672,14 @@ pnpm --filter @heyta/server pricing set-price \
    那正是第 9 条里 `settleOrderPaid` 曾长期无生产调用方留下的教训
    （那件事**已经**接通，教训本身不变）：
    为一个不存在的端点建一个永远为 0 的计数器，测试只能自证。
+
+   🔴 **2026-10-05 已解除**：见 [ADR-0054](../adr/0054-managed-ai-retention-and-selling-preconditions.md) §6
+   （计量已实现，禁售**按上面那条顺序**解除 —— 不是把那条约束打断，是它自己走到了终点）
+   与 `pnpm check:ai-quota` **现在的两条判据**：`enforcement = enforced` 时
+   `NOT_YET_DELIVERABLE_SKUS` 里那一条**必须是空的**，而收银台对
+   `notSellableReason(...)` 的**调用点必须在** —— 放开这一档不等于拆掉那道门。
+   ⚠️ 所以上面 ② 那条变异已经**反向**：把状态改成 `enforced` 现在不再红，
+   红的是"声明了 `enforced` 而没有实现撑着它"。
 
 18. **收银台接通了（`POST /api/billing/checkout`）—— 那条链第一次有用户入口。**
    在此之前 `quoteOrder` / `createOrderWithReservation` / `createCheckout` /

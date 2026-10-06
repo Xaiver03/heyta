@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { openApp, switchView } from './helpers';
+import {
+  openApp,
+  switchTheme,
+  switchView,
+} from './helpers';
 
 /**
  * R1 判据 · 任务行的勾选框：**命中区是一条真实的尺寸声明，而且没被裁**。
@@ -183,8 +187,7 @@ test.describe('R1 · 勾选框命中区与不被裁（桌面载荷）', () => {
 
     // ── 暗色不是亮色的反相（§5）：勾选框的边框色/填充色都要真的看过
     await switchView(page, '任务');
-    await page.getByRole('button', { name: '切换到暗色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await switchTheme(page, 'dark');
     // 🔴 等过渡落位再按快门：主题切换后**立刻**截，行尾那排 chip 会拍成空心灰块
     // （文字还没画上）—— 实测一次，据此差点登记成一个不存在的暗色缺陷。
     // 判据量的是盒模型（不受影响），但**图是给人看的证据**，糊的证据比没证据更糟。

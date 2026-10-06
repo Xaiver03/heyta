@@ -1,0 +1,28 @@
+iOS Release vault UI continuation — 2026-10-05
+================================================
+
+Device: dedicated iOS 27.1 simulator (UDID intentionally omitted from the
+committed evidence; the run log retains it locally).
+Build: existing Release artifact at /tmp/heyta-b-ios-main-release-xcode27.
+Transport: idb companion over TCP; every scroll was followed by a fresh AX
+lookup. The AX shim rejected stale taps that overlapped the bottom tab bar.
+
+Observed sequence (secrets omitted):
+
+1. A fresh TEST_MODE account was authenticated with a one-time magic-link
+   token. The UI completed both phases: token verification, then the explicit
+   “保存并启用同步” action. The latter was scrolled into view and pressed.
+2. The Vault settings section was opened. “创建钥匙” was a two-step flow:
+   begin creation, read the one-time recovery-code control, then enter the
+   same code and press “确认并发布”. The recovery code was never printed or
+   committed.
+3. The settings UI then read “这台设备上的加密数据已经解锁”; the server
+   package row was `key_version=1`, `active_payload_key_version=1`.
+4. A pre-existing local task was synchronised from the iOS install after the
+   Vault was unlocked. PostgreSQL readback for this isolated account found
+   5 operations; no plaintext payload was copied into this evidence.
+
+This closes only the iOS Release authentication → Vault creation → unlock →
+encrypted upload leg. It does not close iOS device revocation, root rotation,
+legacy payload migration, or physical-device Keychain lock-screen semantics;
+those remain explicitly open in ADR-0050.

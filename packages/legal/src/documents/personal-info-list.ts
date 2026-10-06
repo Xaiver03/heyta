@@ -274,6 +274,13 @@ const zh = [
             '🔴 **服务器密文**（用它自己的 Argon2id + AES-GCM 口令加密后整块存二进制，我们解不开）。服务器上另存该密文的 SHA-256，只用于跨设备判断"换过没有"；原图不存磁盘、不进对象存储。两条边界：① 它需要**已设置 E2EE 口令**才能上传与读回；② 密文相同即哈希相同，严格说这一点泄露"同一张图重复上传过"',
             '非必要',
           ],
+          [
+            '托管 AI 用量计数（一个计费周期里用了几次）',
+            '额度计量与账单对账：回答「这一期用掉了几次、上限到点没有」。🔴 **只有次数**：这张表按设计只有账号、计费周期锚点、次数、更新时间四列，提示词与模型输出都不落库，连一个能装内容的兜底列都没有 —— 所以「服务端不保留 AI 内容」这句话的证据是它的**列集合**，而有一条判据钉着"多一列就红"。（这张表随 ADR-0054 落进服务端的库结构；托管那一档按 ADR-0054 §6 的顺序被开放之后，它才开始累计。）',
+            '托管那一档被开放之后，由服务端在代理调用的裁决语句里自己 +1；🔴 客户端自报的计数一律不采信',
+            '服务器明文（一个整数）。随账号注销按外键级联删除；周期边界取自订阅的到期时刻，跨期换到新的一行、从 0 起算',
+            '使用该功能时必需 —— 它是「到点即停」唯一能被服务端证明的形式',
+          ],
         ],
       },
       {
@@ -433,7 +440,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '一处必须逐端说清、不能拿一份最全的说法套所有端：**移动端的所有凭据（地址、令牌、口令）刻意完全不落盘**，冷启动后都要重填；Web 的同步凭据落 `localStorage` 且是明文。两者是不同的取舍，也不同风险。另有一条要说白：**目前任何一端都没有「一键抹掉本机全部数据」的按钮**——彻底清除本机明文数据要靠卸载应用或清除浏览器站点数据。',
+        text: '一处必须逐端说清、不能拿一份最全的说法套所有端：**移动端的所有凭据（地址、令牌、口令）刻意完全不落盘**，冷启动后都要重填；Web 的同步凭据落 `localStorage` 且是明文。两者是不同的取舍，也不同风险。另有一条要说白：**任何一端都没有「不注销也能一键抹掉本机全部数据」的独立按钮**——会在本机抹掉可读数据的那个动作就是注销账号（点下它的那台当场抹掉，其它设备在下次同步拿到注销信号时各自抹掉）；不注销而只想清干净这台设备，走系统层面：卸载应用，或清除浏览器站点数据。',
       },
     ],
   },
@@ -515,8 +522,8 @@ const zh = [
         rows: [
           [
             '同步事件（密文操作日志）与设备记录',
-            '**45 天**',
-            '每日定时任务自动清扫。删除条数**即使为 0 也会记一条日志**——这是为了将来能证明清扫真的执行过，而不是只看「没报错」',
+            '**45 天窗口**，但两类要分开说：**设备记录**确实按这个窗口每日清扫；**同步事件当前一条都不会被清掉**——那条清扫只处理已经存在「完整状态边界」的账号，而本产品当前的客户端不会产生这种边界（实测：每日任务的删除条数恒为 0）。窗口本身是代码里的固定常量，改它要发版本',
+            '设备记录：超过窗口仍未出现过的行直接删。同步事件：**在当前版本下不删**，保留到账号注销，或保留到清理条件真的具备的那一天。每日任务即使删除条数为 0 也会记一条日志——这是为了将来能证明清扫真的执行过，而不是只看「没报错」',
           ],
           [
             '服务器数据库备份',
@@ -524,9 +531,9 @@ const zh = [
             '随备份保留期自然过期。⚠️ 备份是整库快照，**代码里没有「从既有备份中定点删除某一位用户的数据」的能力**',
           ],
           [
-            '账户、凭据、订阅、订单、邀请与通知记录',
+            '账户、凭据、订阅、订单、邀请、通知与托管 AI 用量计数记录',
             '直到你**注销账号**',
-            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站',
+            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知、托管 AI 用量计数一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站。🔴 这一行删的是服务端那一份；本机那一层：你点下注销的设备当场清掉本地明文库，其它设备在下次同步拿到“账号已注销”信号时各自清掉自己那一份 —— 从此不再上线的设备我们无法远程擦除',
           ],
           [
             '一次性令牌',
@@ -539,6 +546,11 @@ const zh = [
             '应用内删除是**打标记**（墓碑），彻底删除也只是加一个标记而不清历史——本地明文数据不会在磁盘上被物理擦除。物理清除依赖卸载应用或清除浏览器站点数据',
           ],
           [
+            '托管 AI **那一次调用的内容**，与它的**运维元数据**',
+            '内容：🔴 **不落盘** —— 请求体与返回体只在一次代理调用的内存里存在，调用返回即丢弃，不写日志、不进 trace、不进崩溃上报。元数据：保留期**定为 45 天**，字段是一份封闭清单（时间、用户、功能名、结果状态、请求与响应的字节数、耗时），推导是一个计费周期 30 天加 15 天出账缓冲 —— ⚠️ 不是因为某部法律要求这个数',
+            '内容那一半没有"到期怎么处理"这一步，因为它从来没被写过盘。🔴 元数据那一半要如实补一句：**到期删除的作业本轮没有实现** —— 这些字段走的是下面"服务器运行日志"那一条通道，而那条通道没有轮转与到期删除机制。所以这一格只写期限、**不写**"到期自动删除"；那条作业落地并真的对这些字段生效之后才改口。托管那一档今天仍然打不开，这一格按 ADR-0054 提前把定案写进来，等 §6 的顺序走完它才开始真的累计',
+          ],
+          [
             '服务器运行日志',
             '见下面那段说明',
             '应用侧不记录 HTTP 访问日志；运行日志走标准输出，是否另写磁盘文件由部署配置决定，**代码里没有轮转与到期删除机制**',
@@ -547,7 +559,52 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '两句要一起写、否则这段会被读成承诺：**45 天是产品当前设定，不是你可以自选的选项**，界面上没有「更短保留期」的开关，改它要发版本。而「你在应用里点了彻底删除」**不会缩短**这个期限——它让这条数据从你的所有设备界面里消失，服务器上的那条加密历史仍要等保留期届满或注销账号才真的不在了。另有一条边界要如实登记：主机与网络层（如前置代理）的访问日志留存由部署环境决定，法定底线是网络日志留存不少于六个月；官方实例当前配置的具体留存期需运营在发布前确认。',
+        text: '三句要一起写、否则这段会被读成承诺：**45 天是产品当前设定，不是你可以自选的选项**，界面上没有「更短保留期」的开关，改它要发版本。而「你在应用里点了彻底删除」**不会缩短**这个期限——它让这条数据从你的所有设备界面里消失。🔴 还要如实补第三句：按当前版本，服务器上那条加密历史**等不到「保留期届满」**——每日清扫对我们的数据一条都不命中（见上表那一行），它真的不在，目前只有注销账号这一条路。⚠️ 第四句别把两个数并成一件事：上表里现在写着**两个 45 天**，一个是同步流水的清理窗口（就是上面这三句说的那一个），另一个是托管 AI 调用元数据的期限；它们同值而不是同一个东西 —— 后者的到期删除连作业都还没有。另有一条边界要如实登记：主机与网络层（如前置代理）的访问日志留存由部署环境决定，法定底线是网络日志留存不少于六个月；官方实例当前配置的具体留存期需运营在发布前确认。',
+      },
+    ],
+  },
+  {
+    id: 's9',
+    title: '欧盟 GDPR 口径：这份清单能当哪半份用、不能当哪半份用',
+    blocks: [
+      {
+        kind: 'p',
+        text: '这份清单是按《个人信息保护法》的口径写的：它逐类说明收集什么、存在哪儿、服务端能不能读到。GDPR 里最接近它的是第 30 条的处理活动记录（ROPA），但 ROPA 还要求**每一类各自的处理目的、法律依据与留存期** —— 那三列本清单没有，所以这里写清它能顶哪一半、不能顶哪一半，而不是把它改名成 ROPA 交出去。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 30 条（处理活动记录）',
+            '有没有一份按 GDPR 格式写成的处理活动记录',
+            '清单确实逐类写了"存什么、存在哪、谁能读到"，端到端加密那一列还写明服务端只拿到密文',
+            '但它**没有**为每一类标出法律依据与留存期，分类也是按中国法而不是按 GDPR 的分组；补上那两列之前，这份文件不能自称 ROPA'
+          ],
+          [
+            '第 9 条（特殊类别数据）对照"敏感个人信息"',
+            '两套"敏感"定义是不是同一批数据',
+            '清单里的敏感项严格按中国法的列举写，没有擅自加宽也没有收窄',
+            '两个集合**不相等**：GDPR 把生物识别与基因数据明确列入第 9 条，中国法的敏感信息口径与之不同。符合这边的表不自动符合那边，所以本文件不做任何一一对应的换算'
+          ],
+          [
+            '第 15 条（访问权）',
+            '这份清单是不是"你能看到的关于你的一切"',
+            '不是，而且清单自己就这么写：访问权走**导出**，三个端都有，导出含墓碑与完整操作日志',
+            '清单给的是类别，不是你的数据本身；而类别表与实际库不一致时以实际数据为准（本文件第八节写明的那条），这类不一致目前没有逐字段的常驻对账'
+          ],
+          [
+            '第 13(1)(c) 条（留存期限或其确定标准）',
+            '每一类要写明存多久、按什么标准到期',
+            '清单不写期限，期限统一放在《隐私政策》与保留策略里，避免同一件事两处各写一个数字',
+            '留存期今天只能写到"标准"而不能写到"日期"：托管侧的备份是整库快照，代码里**没有**"从既有备份中单独删掉某一条或某一个人"的能力，所以任何按类写死的到期日都会变成一句做不到的话'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: '《隐私政策》：处理目的、法律依据与留存期在那里逐条给出；本清单只回答"有哪些类、存在哪儿、服务端看得见吗"。',
       },
     ],
   },
@@ -831,6 +888,13 @@ const en = [
             '🔴 **Ciphertext on the server** — encrypted with your own Argon2id + AES-GCM passphrase and stored as one indivisible binary blob we cannot open. The server also stores the SHA-256 of that ciphertext, used only to tell across devices whether it changed. The original file is never written to disk or to object storage. Two boundaries: ① uploading and reading it back require an **E2EE passphrase to be set**; ② identical ciphertext yields an identical hash, so strictly speaking that leaks "the same image was uploaded twice"',
             'Not necessary',
           ],
+          [
+            'Managed-AI usage counters (how many calls in one billing period)',
+            'Allowance metering and bill reconciliation: they answer "how many did I use this period, has the cap been reached". 🔴 **A count only** — the table has exactly four columns by design (account, billing-period anchor, request count, last updated). There is no prompt column, no model-output column and no catch-all column able to hold content, so the evidence for "the server keeps no AI content" is its **column set**, and a check pins it as "add a column and it fails red". (The table landed in the server schema together with ADR-0054; it starts accumulating once the managed tier is enabled in the order that decision sets out.)',
+            'Once the managed tier is enabled, incremented by our own server inside the deciding statement of the proxied call; 🔴 a count reported by a client is never trusted',
+            'Cleartext on the server (a single integer). Deleted by the account foreign-key cascade when you close the account; the period boundary comes from the subscription’s expiry moment, and crossing it moves you onto a new row starting from zero',
+            'Required to use that feature — it is the only form in which "it stops when the cap is reached" can be proven server-side',
+          ],
         ],
       },
       {
@@ -990,7 +1054,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'One point that must be stated per platform instead of applying the most generous description everywhere: **on mobile, all credentials (address, token, passphrase) are deliberately kept off disk** and re-entered after a cold start, whereas on Web the sync credentials are persisted to `localStorage` in cleartext. Different trade-offs, different risks. And one more, said plainly: **no platform currently has a "wipe all local data" button** — physically clearing local cleartext means uninstalling the app or clearing browser site data.',
+        text: 'One point that must be stated per platform instead of applying the most generous description everywhere: **on mobile, all credentials (address, token, passphrase) are deliberately kept off disk** and re-entered after a cold start, whereas on Web the sync credentials are persisted to `localStorage` in cleartext. Different trade-offs, different risks. And one more, said plainly: **no platform has a standalone "wipe all local data" button that works without closing the account** — the one action that erases readable local data on a device is account closure (the device you press it on immediately, each other device the next time it synchronises and receives the closure signal); to clear this device without closing the account, use the operating-system route: uninstall the app, or clear browser site data.',
       },
     ],
   },
@@ -1072,8 +1136,8 @@ const en = [
         rows: [
           [
             'Sync events (ciphertext operation log) and device records',
-            '**45 days**',
-            'Swept by a daily scheduled job. The number of deleted rows is logged **even when it is zero** — so that a future reader can prove the sweep actually ran, rather than relying on "no error appeared"',
+            '**A 45-day window**, but the two kinds have to be said apart: **device records** really are swept on that window daily; **sync events are not pruned by a single row today** — that sweep only processes accounts whose stream already contains a "full-state boundary", which the clients this product ships never produce (measured: the daily job deletes 0 rows). The window itself is a fixed constant in the code; changing it takes a release',
+            'Device records: rows absent past the window are deleted. Sync events: **not deleted under the current version** — they are kept until the account is closed, or until the pruning condition really becomes reachable. The number of deleted rows is logged **even when it is zero** — so that a future reader can prove the sweep actually ran, rather than relying on "no error appeared"',
           ],
           [
             'Server database backups',
@@ -1081,9 +1145,9 @@ const en = [
             'Age out with the backup retention window. ⚠️ Backups are whole-database snapshots, and **there is no capability in the code to delete one user\'s data from an existing backup**',
           ],
           [
-            'Accounts, credentials, subscriptions, orders, referrals and notifications',
+            'Accounts, credentials, subscriptions, orders, referrals, notifications and managed-AI usage counters',
             'Until you **close your account**',
-            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals and notifications all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin',
+            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals, notifications and managed-AI usage counters all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin. 🔴 What this removes is the server copy; for the local plaintext data, the device you press closure on is wiped on the spot and every other device wipes its own readable copy the next time it syncs and receives the "account closed" signal — a device that never comes back online is one we cannot wipe remotely',
           ],
           [
             'One-time tokens',
@@ -1096,6 +1160,11 @@ const en = [
             'Deleting inside the app **writes a marker** (a tombstone); "delete forever" adds another marker without erasing history — local cleartext is not physically wiped from disk. Physical removal means uninstalling or clearing site data',
           ],
           [
+            'The content of **one managed-AI call**, and its **operational metadata**',
+            'Content: 🔴 **never persisted** — the request body and the response body exist only in the memory of one proxied call and are dropped when it returns; not written to logs, not put in a trace, not sent to crash reporting. Metadata: the retention period is **set at 45 days** over a closed field list (time, user, feature name, outcome, request and response byte counts, duration), derived as one 30-day billing period plus a 15-day reconciliation buffer — ⚠️ not because any law asks for that number',
+            'The content half has no "what happens at expiry" step, because it was never written to disk. 🔴 The metadata half has to be stated with its gap: **the delete-at-expiry job is not implemented in this round** — those fields travel over the same channel as "Server runtime logs" below, and that channel has neither rotation nor an expiry mechanism. So this cell gives a period and does **not** say "deleted automatically when it ends"; it is rewritten once that job exists and really applies to these fields. The managed tier is still not switchable on today: this row records the ruling from ADR-0054 in advance, and it starts accumulating only once the order in §6 of that decision is completed',
+          ],
+          [
             'Server runtime logs',
             'See the paragraph below',
             'The application records no HTTP access logs; runtime logs go to standard output, and whether they are also written to a disk file depends on deployment configuration. **There is no rotation or expiry mechanism in the code**',
@@ -1104,7 +1173,52 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'Two sentences that must travel together with that table, or it reads like a promise: **45 days is the product\'s current setting, not an option you can choose**, there is no shorter-retention switch in the interface, and changing it takes a release. And pressing "delete forever" in the app **does not shorten it** — the item disappears from every one of your screens, while the encrypted history carrying it on our server remains until the retention window expires or the account is closed. One more boundary, registered honestly: access-log retention at the host and network layer (for example a fronting proxy) is decided by the deployment environment, and the statutory floor is that network logs are kept for no less than six months; the retention actually configured for the official instance needs to be confirmed by operations before this document is published.',
+        text: 'Three sentences that must travel together with that table, or it reads like a promise: **45 days is the product\'s current setting, not an option you can choose**, there is no shorter-retention switch in the interface, and changing it takes a release. And pressing "delete forever" in the app **does not shorten it** — the item disappears from every one of your screens. 🔴 A third sentence has to be added, also honestly: under the current version that encrypted history **never reaches "the retention window expiring"** — the daily sweep does not match our data at all (see that row above), so the one route by which it really stops existing is closing the account. ⚠️ A fourth sentence keeps two numbers from being read as one thing: the table now carries **two 45-day periods**, one being the window for the sync stream (what the three sentences above are about) and the other the period set for managed-AI call metadata — the same value, but not the same knob, and for the second one the delete-at-expiry job is not implemented in this round. One more boundary, registered honestly: access-log retention at the host and network layer (for example a fronting proxy) is decided by the deployment environment, and the statutory floor is that network logs are kept for no less than six months; the retention actually configured for the official instance needs to be confirmed by operations before this document is published.',
+      },
+    ],
+  },
+  {
+    id: 's9',
+    title: 'The EU GDPR view: which half of a record of processing this inventory is, and which half it is not',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'This inventory is written against the PIPL: category by category it says what is collected, where it lives, and whether the server can read it. The closest GDPR instrument is the record of processing activities under Article 30, but a record of processing also requires **the purpose, lawful basis and retention for each category** - three columns this inventory does not have. So the cells below state which half this document can stand in for and which it cannot, rather than renaming it and handing it over.',
+      },
+      {
+        kind: 'table',
+        head: ['Where in the GDPR', 'What it asks', 'What heyta can produce', 'What does not line up'],
+        rows: [
+          [
+            'Article 30 (record of processing activities)',
+            'Is there a record of processing activities in the GDPR\'s shape',
+            'The inventory really does state per category "what is stored, where, and who can read it", and one column records that under end-to-end encryption the server receives ciphertext only',
+            'It carries **no** lawful basis and no retention period per category, and its categories follow Chinese law rather than the GDPR grouping; until those two columns exist this document must not call itself a record of processing'
+          ],
+          [
+            'Article 9 (special categories) against "sensitive personal information"',
+            'Whether the two "sensitive" definitions cover the same data',
+            'The sensitive items listed here follow the Chinese enumeration exactly - neither widened on our own initiative nor narrowed',
+            'The two sets are **not equal**: the GDPR puts biometric and genetic data inside Article 9 while the Chinese definition differs, so a table that satisfies one side does not automatically satisfy the other and no one-to-one mapping is performed here'
+          ],
+          [
+            'Article 15 (access)',
+            'Whether this inventory is "everything we hold about you"',
+            'It is not, and the inventory says so: access is exercised through **export**, available on all three clients, including tombstones and the full operation log',
+            'The inventory gives categories, not your data; and where the category table and the real database disagree, the database governs (section eight of this document) - that kind of disagreement has no field-by-field standing reconciliation today'
+          ],
+          [
+            'Article 13(1)(c) (the retention period, or the criteria used to set it)',
+            'Each category must state how long it is kept, or by what criterion it expires',
+            'The inventory states no periods at all; retention lives in the Privacy policy and the retention rules, so one fact is never written as two different numbers',
+            'Retention can currently be given as a **criterion** but not as a date: hosted backups are whole-database snapshots and the code has **no** ability to remove a single row or a single person from an existing backup, so any hard-coded expiry per category would become a promise we cannot keep'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'privacy',
+        text: 'Privacy policy: purposes, lawful bases and retention periods are given there article by article; this inventory answers only "which categories exist, where they are stored, and whether the server can see them".',
       },
     ],
   },
@@ -1144,9 +1258,13 @@ const en = [
 
 export const personalInfoList: LegalDocument = {
   id: 'personal-info-list',
-  version: '1.0',
+  // 🔴 1.3 → 1.4：保留期限那张表新增两格**对外承诺**（托管 AI 一次调用的内容不落盘、
+  // 运维元数据的期限定为 45 天且到期删除尚未实现），并把那段"45 天不是可选项"的说明
+  // 补成"表里有两个同值的 45 天，不是同一个旋钮"。版本号进同意指纹（`legalSetVersion()`），
+  // 改了期限表述而不 bump = 让旧那枚同意覆盖一段它没见过的话。
+  version: '1.4',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-05',
   title: {
     'zh-CN': '个人信息收集清单',
     en: 'Personal Information Collection Inventory',

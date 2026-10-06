@@ -37,6 +37,7 @@ import {
   openAuthPanel,
   readCredentials,
   requireServer,
+  revealSelfHostField,
   serverOpCount,
   setE2eePasswordAndSync,
   statusBar,
@@ -278,7 +279,10 @@ test('W6 反向：服务端地址错了，界面必须说出失败而不是假�
 
   // 127.0.0.1:9 （discard 端口）上没有服务端 —— 注册必须失败且**可见**。
   // 先走到注册档（它会预填真实服务端地址），再把地址**改坏**。
+  // ⚠️ 显式展开一次：地址栏自 G-28 起默认收起（`auth-entry-default.spec.tsx` B 段），
+  // 这里靠 `toCredentialStage` 顺带展开并不显然，写出来才挡得住"以后有人把它改成条件调用"。
   await toRegisterMode(dialog, freshEmail());
+  await revealSelfHostField(dialog);
   await dialog.getByTestId('auth-form-server-url').fill('http://127.0.0.1:9');
   await acceptTerms(dialog);
   await dialog.getByRole('button', { name: '用通行密钥注册' }).click();

@@ -78,7 +78,7 @@ function progress(over: Partial<TodayProgress> = {}): TodayProgress {
 }
 
 function totals(over: Partial<ActivityTotals> = {}): ActivityTotals {
-  return { checkIns: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0, ...over };
+  return { checkIns: 0, focusCount: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0, ...over };
 }
 
 /** 本周复盘的最小底：用例只声明它关心的字段。 */
@@ -154,7 +154,7 @@ describe('milestoneGroups：每维度一块，顺序不按达成数重排', () =
     const few = milestoneGroups(deriveMilestones(totals({ checkIns: 12 })));
     // 反过来：让最后一个维度（activeDays）达成最多。
     const many = milestoneGroups(
-      deriveMilestones(totals({ checkIns: 0, focusMs: 0, tasksCompleted: 0, activeDays: 400 })),
+      deriveMilestones(totals({ checkIns: 0, focusCount: 0, focusMs: 0, tasksCompleted: 0, activeDays: 400 })),
     );
     expect(many.map((g) => g.kind)).toEqual(few.map((g) => g.kind));
     expect(many[3]!.maxed).toBe(true);
@@ -165,6 +165,7 @@ describe('milestoneGroups：每维度一块，顺序不按达成数重排', () =
       deriveMilestones(
         totals({
           checkIns: 5000,
+          focusCount: 0,
           focusMs: 2000 * 3_600_000,
           tasksCompleted: 9000,
           activeDays: 400,
@@ -285,7 +286,7 @@ describe('growthBoardLabels：移动壳与共享 GrowthBoard 的**唯一接缝**
     expect(labels.streaks.empty).not.toBe('');
     expect(labels.streaks.current).toBe('当前连续（天）');
     expect(labels.streaks.longest(21)).toBe('最长 21 天');
-    expect(labels.streaks.total(40)).toBe('累计 40 次');
+    expect(labels.streaks.total(40)).toBe('累计 40 天');
     const repair = labels.streaks.repair({ date: '2026-09-26', count: 5 });
     expect(repair).toContain('5');
     const fresh = labels.streaks.freshStart({ days: 9, longest: 21, total: 40 });

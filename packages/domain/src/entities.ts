@@ -15,6 +15,9 @@
 
 import type { EntityType } from '@heyta/shared-schema';
 
+import type { CategorySlot } from './activity-categories.js';
+import type { LocalDate } from './date.js';
+
 /** 所有实体共有的元数据。 */
 export interface EntityBase {
   /** 全局唯一 ID（客户端生成，离线可用）。 */
@@ -49,6 +52,114 @@ export interface EntityBase {
    * 这正是它不需要 bump schema 的原因。
    */
   purgedAt?: number;
+}
+
+/**
+ * 「这条现在算在回收站里吗」—— 四态语义里**唯一一处**判回收站归属的地方。
+ *
+ * 🔴 两个条件都要，缺一不可：
+ *  · 只看 `deletedAt` ⇒ 已彻底删除的条目会一直留在回收站里，而"彻底删除"
+ *    这个动作在界面上就没有产出（用户点了、它还在）；
+ *  · 只看 `purgedAt` ⇒ 一条活着的实体被误标 `purgedAt`（不该发生，但类型上
+ *    挡不住）会凭空从回收站"消失"，而它其实还在所有视图里。
+ *
+ * 为什么放在领域层而不是各动作层各写一遍：`purge` 已经从任务扩到便签
+ * （W1），下一步是清单与习惯（W4）。**"什么算在回收站里"是一个产品语义**
+ * （AGENTS §3.5），写成 N 份就是 N 个可能各答一半的地方。
+ *
+ * 🔴 返回的是**类型谓词**而不是 `boolean`：它同时把 `deletedAt` 收窄成
+ * `number`。于是"回收站里的一行一定有删除时刻"这件事由编译器保证，
+ * 下游不必再写 `deletedAt ?? updatedAt` 那种**永远走不到**的兜底 ——
+ * 而那个兜底原来正是两端各自"小心一点"的来源。
+ */
+export function inTrash(entity: EntityBase): entity is EntityBase & { deletedAt: number } {
+  return entity.deletedAt !== undefined && entity.purgedAt === undefined;
+}
+
+/**
+ * 回收站顺序：**最近删除的在前**，同刻按 id 字典序。
+ *
+ * 泛型到 {@link EntityBase} ⇒ 任务、便签、清单、习惯共用同一个序，
+ * 于是"两路数据源并进同一个回收站"时**合并结果也是确定的**。
+ *
+ * ⚠️ 决胜项与 `byCanonicalOrder` 同一个理由：`deletedAt` 来自毫秒时钟，
+ * 同一台设备连续删两条经常落在同一毫秒里，此时顺序会退化成
+ * `Object.values` 的枚举顺序 —— 那是**各端不同**的。
+ */
+export function byDeletedOrder(a: EntityBase, b: EntityBase): number {
+  const ad = a.deletedAt ?? 0;
+  const bd = b.deletedAt ?? 0;
+  if (ad !== bd) return bd - ad;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * 「这条算已归档吗」—— 唯一的读侧判据（P-7）。
+ *
+ * 🔴 判的是 `=== true` 而不是"有值"：`archived` 是可选布尔，历史上**从未写过
+ * `false`**（早期只有"归档"没有"取消"）。写成 `!!entity.archived` 眼下等价，
+ * 但那条线一旦有人补一个 `archived: undefined` 的清除操作就会分叉 ——
+ * 而"清除归档"必须等于"未归档"，不是"未知"。
+ *
+ * 为什么在领域层：同一个判断此前有 `packages/ui/src/projects/model.ts` 与
+ * 动作层两份字面量，而 W9 之后动作层也要判（`listProjects()` 藏归档、
+ * `listArchivedProjects()` 只留归档）。两份字面量的表现是"一边改了另一边没改"，
+ * 而界面上看不出任何区别。
+ */
+export function isArchived(entity: { archived?: boolean }): boolean {
+  return entity.archived === true;
+}
+
+/**
+ * 「这条还活着吗」—— 未软删除的唯一判据。
+ *
+ * 🔴 它**不等于** `!inTrash(x)`：一条已彻底删除（`purgedAt`）的实体既不在回收站里
+ *   （`inTrash` 为假）、也不算活着。把两者混用会让"彻底删除过的任务"被算进
+ *   清单的任务数、被数进统计 —— 而那正是"界面还在说一条已经不存在的数据"。
+ *
+ * 权威在领域层，是因为这句判断曾经散在六处各写一遍（动作层的 `aliveOf` 两份 +
+ * `listAlive`、领域层自己的 `aliveTasks` / `aliveNotes`，外加回收站那句"数活着的任务"）。
+ * 六处可以各漏一半，而漏的那一半不会报错 —— 它只是少滤了几条。
+ *
+ * ⚠️ 入参刻意写成结构类型而不是 `EntityBase`：`aliveOf` 那类跨实体的辅助函数
+ *   手上只有 `T extends { deletedAt?: number }`，收窄参数才会**逼着**它们改调用
+ *   而不是再写一份字面量。
+ */
+export function isLive(entity: { deletedAt?: number }): boolean {
+  return entity.deletedAt === undefined;
+}
+
+/**
+ * 回收站的成员：**有墓碑、且没有被彻底删除**，按 {@link byDeletedOrder} 排。
+ *
+ * 它就是 `Object.values(...).filter(inTrash).sort(byDeletedOrder)` 这一行。
+ * 判据与顺序都不在这里重写（权威是上面那两个），这里只把"挑 + 排"这一遍
+ * 固定成一次 —— 任务 / 便签 / 清单 / 习惯四处都要用，写四遍就有四种可能各漏一半，
+ * 而漏掉 `purgedAt` 那一半的表现是"彻底删除过的条目一直赖在回收站里"。
+ */
+export function trashedIn<T extends EntityBase>(entities: readonly T[]): T[] {
+  return entities.filter(inTrash).sort(byDeletedOrder);
+}
+
+/**
+ * 跨端一致的规范顺序：创建时间升序，同刻按 id 字典序。
+ *
+ * 🔴 **不要去掉那个 id 决胜**：`createdAt` 来自毫秒时钟，同一台设备连续建两条
+ * 经常落在同一毫秒里，此时排序结果取决于 `Object.values` 的枚举顺序 ——
+ * 那是**各端不同**的（IndexedDB 按索引键、SQLite 按主键，见 AGENTS §7 第 16 条）。
+ * 表现是同一份数据在两台设备上顺序不同，而没有任何一处报错。
+ *
+ * 这条规则原先在 `TaskActions`、`ProjectActions`、`HabitActions` 里**各写了一遍**
+ *（逐字相同）。收成一处还有一个具体的下游：W9 之后"可见清单 + 已归档清单"两路要
+ * 并成一个列表喂给界面，而**合并之后再排序**必须有唯一的比较器 ——
+ * 每个宿主自己写一遍就是"两端的侧栏顺序可以不同"。
+ */
+export function byCreatedAtOrder(
+  a: { createdAt: number; id: string },
+  b: { createdAt: number; id: string },
+): number {
+  if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -307,6 +418,19 @@ export interface HabitLog extends EntityBase {
   date: string;
   /** 实际完成值。默认等于 Habit.target。 */
   value?: number;
+  /**
+   * 🔴 **预留位：界面不碰，也没有读取者**（工单 H6 拍板，见
+   * [`docs/plans/habits-alignment.md`](../../../docs/plans/habits-alignment.md) §2 与 §5 的 P-3）。
+   *
+   * 为什么留着而不删：它已经在磁盘与服务端库里（删它就是 §3.3 那条"改已落盘数据"的代价），
+   * 而留着一条**明说的**预留位不撒谎。为什么界面不做：打卡记录的语义是"达成判定"，
+   * 叙述性文本在 heyta 已经有正式去处（`NOTE` 实体，两端都有界面、有搜索、有导出），
+   * 再开一处自由文本只会多出一份没有入口、没有搜索、没有留存承诺的密文存量。
+   *
+   * ⚠️ 什么时候要重新判：真要在这条打卡上挂一句时，必须连带补三侧
+   * （web 面单 / mobile 面单 / `local-api` 的 `habit-log` 工具）与留存说明，
+   * **不许只让某一层偷偷写它** —— 那正是"字段看起来有功能"的那个读数。
+   */
   note?: string;
 }
 
@@ -446,10 +570,207 @@ export interface Reminder extends EntityBase {
   offsetMs?: number;
   /** 已投递的时刻。存在即表示本机已经发过这条通知（幂等依据）。 */
   firedAt?: number;
+  /**
+   * `firedAt` 所对应的有效触发时刻。旧数据没有这个 marker 时，保留旧的
+   * "曾投递即结束" 语义；新数据在 snooze/改期后可凭 marker 识别新 occurrence。
+   */
+  firedForTriggerAt?: number;
   /** 「稍后提醒」到（epoch ms）。存在且未到时，触发时刻以它为准。 */
   snoozedUntil?: number;
   /** 用户主动关闭。存在即不再触发（清除写 `null`，见 `reminders.ts`）。 */
   dismissedAt?: number;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 倒数日 / 纪念日
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 倒数日的**类型档位**。
+ *
+ * 🔴 这四档是**用户选的**，不是从日期推出来的（§2.6「App 不替用户决定含义」）：
+ * 哪天出生、哪天是节日，只有用户知道。唯一能从日期说的是
+ * "还没到 / 已过"这副面孔，所以它是 `kind` 缺席时的兜底，而不是反过来。
+ */
+export type CountdownEventKind = 'countdown' | 'anniversary' | 'birthday' | 'festival';
+
+/**
+ * 农历闰月那年怎么过（ADR-0044 D2 的产品决定）。
+ *
+ * · `first`（默认）= 逢闰过正：闰月那年过**非闰**的那个同名月
+ * · `last` = 逢闰过闰
+ * · `both` = 两个月各过一次（下一次发生日取两者中较早的那个）
+ */
+export type LunarLeapMonthPolicy = 'first' | 'last' | 'both';
+
+/**
+ * 倒数日 / 纪念日（**倒数纪念日**功能的载体，ADR-0044 D1 拍定新建实体）。
+ *
+ * 🔴 **为什么是独立实体而不是"没有截止日的 Task"**（依据逐条）：
+ *
+ * 1. **视图不建实体，但倒数日不是视图。** `docs/plans/countdown-anniversary.md` §0
+ *    的立项理由就是它有自己的字段（历法、闰月口径、归档、置顶、样式），
+ *    这些塞进 Task 会让"改标题"与"改历法"在同一实体上 LWW 互斥 ——
+ *    与 `Reminder` 不用 `Task.dueDate` 承载是同一条推理。
+ * 2. **它没有"完成"这个状态。** Task 的 reducer 语义（完成 → 顺延时 `completedAt`）
+ *    套在一个"每年都要来一次"的东西上是错的。
+ * 3. **日历需要第二个源**（W6）：一条没有截止日的倒数日能上日历，
+ *    这正是它区别于 TASK 的可观测判据。
+ *
+ * ⚠️ 持久化字段的可选性（AGENTS §3.3）：`title` / `date` 是**实体身份的一部分**
+ * （没有它们这张卡片什么都没有），与 `Note.content`、`HabitLog.habitId`、
+ * `Reminder.taskId` 同一条先例，是必填；**其余一律可选 + 运行时默认值**。
+ *
+ * ⚠️ `date` 存的一律是**公历 LocalDate**（`YYYY-MM-DD`）。农历不是第二个字段：
+ * `isLunar` 说的是"每年重复时按农历那一天推"，锚点本身仍用公历写，
+ * 读的时候经 `solarToLunar` 换算。这样排序、日历、回收站都不必认识两套日期。
+ */
+export interface CountdownEvent extends EntityBase {
+  /** 标题。空白标题在写入侧拒绝（见 `domain/src/events.ts` 的 `eventRejection`）。 */
+  title: string;
+  /** 锚点日期（公历 `YYYY-MM-DD`，**不是时间戳** —— 倒数日没有"几点"）。 */
+  date: LocalDate;
+  /** 类型档位；**缺席 = 用户没选过**，由日期方向兜底（见 `eventKindOf`）。 */
+  kind?: CountdownEventKind;
+  /** 每年重复时按农历锚点推（`true`）。默认 `false` = 公历。 */
+  isLunar?: boolean;
+  /** 闰月口径；默认 `'first'`（ADR-0044 D2）。只在 `isLunar` 为真时有意义。 */
+  leapMonthPolicy?: LunarLeapMonthPolicy;
+  /**
+   * RRULE 字符串（与 `Task.repeatRule` 同一套词表，由 `Recurrence` 构造，
+   * **不许界面手拼**）。缺席 = 不重复（一次性倒数日）。
+   */
+  recurrence?: string;
+  /**
+   * 置顶时刻。🔴 **它同时就是"排在最前"**，不再另设 `sortOrder`／`isPinned`
+   * 第二个字段（§2.4：两个字段必然在一次编辑里漂移；先例是 `Note.isPinnedToToday`）。
+   */
+  pinnedAt?: number;
+  /**
+   * 归档时刻。**归档 ≠ 删除**（§2.5）：它不进回收站、不可被"还原"，
+   * 只在归档视图里出现。🔴 实现成"打 `deletedAt` 再打回来"是错的 ——
+   * 那会让归档项出现在回收站，且离线端会把它当"从未删除"同步回来。
+   */
+  archivedAt?: number;
+  /** 图标名（Lucide）。🔴 只给图标不给含义（§2.6）。 */
+  icon?: string;
+  /**
+   * 色槽**编号**（1–8），不是颜色值。与活动分类同一条纪律：
+   * 存不变量而不是"长什么样"，调色板改版不该动磁盘上的旧数据。
+   */
+  color?: CategorySlot;
+  /** 备注（卡片上的那行小字）。 */
+  notes?: string;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 助手会话的一条消息
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 一条会话消息的角色。**四档与界面 transcript 逐字同名**
+ * （`apps/web/src/features/ai/assistant-transcript.ts` 的 `ChatItem`）。
+ *
+ * ⚠️ 这里**不 import** 那个类型：domain 不依赖任何壳（文件头的包边界声明），
+ * 而这条同名是持久化取值，必须能独立于界面演进。对账由
+ * `packages/app-host/tests/assistant-session-actions.spec.ts` 的"词表同源"那条判据钉住
+ * —— 壳侧加一档而这里没有，测试会红。
+ */
+export type AssistantTurnRole = 'user' | 'assistant' | 'proposal' | 'error';
+
+/**
+ * 这条消息**由哪一类目的地产出**。
+ *
+ * 🔴 取值就是 `packages/ai` 的 `DestinationDisclosure['kind']` 那三档 + `'unknown'`，
+ * **没有第四档"局域网"** —— 这不是漏了，是沿用既有裁决：`supply.ts` 的
+ * `isLoopbackEndpoint()` **只认字面回环**，局域网主机名按 Joplin 先例判成远端
+ * （`.local` 证明不了"这是你这台机器"）。所以局域网端点的答案落在
+ * `'third-party-endpoint'`。另开一档等于造第二套目的地词表，而词表会漂（§7 #4）。
+ *
+ * ⚠️ domain **不 import `@heyta/ai`**（与 `AiFeedback.feature` 用 `string` 而不用
+ * `AiFeature` 同一个理由：持久化取值要独立演进）。两边的一致性由
+ * `assistantTurnDestinationRejection()` 的封闭词表 + app-host 那条对账测试钉住。
+ */
+export type AssistantTurnDestinationKind =
+  | 'local'
+  | 'third-party-endpoint'
+  | 'heyta-cloud'
+  | 'unknown';
+
+/**
+ * 一条**改动提案**的处置。
+ *
+ * 🔴 只有 `'confirmed'` 才是"落过库"。`'pending'` 是**未确认**，而它在另一台设备上
+ * 一律按 `expired` 展示 —— 判据见 `assistantTurnIsConfirmableHere()`。
+ * 没有 `'expired'` 这一档是刻意的：过期**不是数据**，是"本机能不能确认"的派生结论，
+ * 写进磁盘就等于让一台设备的判断变成全局事实（ADR-0022"状态留在派生侧"同一条）。
+ */
+export type AssistantTurnDisposition = 'pending' | 'confirmed' | 'rejected';
+
+/**
+ * 助手会话的一条消息（ADR-0045 D-4 (ii)，产品负责人 2026-10-05 拍"做"）。
+ *
+ * 🔴 **一条消息 = 一个实体**（不是"一段会话一个实体"）。理由与它**不**做成
+ * `GLOBAL_CONFIG` 里一个会话对象的依据是同一条：数组在 LWW 下是覆盖语义，
+ * 两台设备并发追加会互相吞消息，而且**没有任何一层会报错**
+ * （`entity-types.ts` 里那条注释就是这个决定的落点）。
+ *
+ * 🔴 **全部字段可选**（AGENTS §3.3），这里比 `CountdownEvent` 更严一档，理由要说清：
+ * `CountdownEvent.title` 必填，是因为**那个实体存在就有标题**（标题是它的身份）；
+ * 而一条会话消息的**任何**一格都可能是某个旧宿主没写的 —— 这个实体类型以前根本不存在，
+ * 上线后第一批落库的载荷形状取决于写它的那个构建版本。把 `role` 做成必填，
+ * 症状是"某条老消息在 hydration 时炸掉整个助手面板"，而 **typecheck 与构建都会绿**
+ * （TS 只保护新数据）。所以每一格都给运行时默认值，读侧永远不许 `!`。
+ *
+ * ⚠️ **不落库的东西**（这条边界比落库的字段更容易漂，所以写在模型旁边而不是别处）：
+ * 工具调用的**中间步骤**、失败的 `cause` 枚举、提案的结构化 `intent` 载荷。
+ * 前两个是"这台设备上这一次运行"的细节，同步过去既读不懂也用不上；
+ * 🔴 第三个是**故意不同步**的：那个载荷要改的是本机的某个实体，
+ * 而对端按规则根本不能确认它（见 `assistantTurnIsConfirmableHere`），
+ * 于是它在对端是一段永远不可执行的载荷 —— 落库只会让人以为"另一台设备也能点确认"。
+ * 本机那份仍在本机的 `localStorage` 里（D-4 (i)）。
+ */
+export interface AssistantTurn extends EntityBase {
+  /**
+   * 同一段会话的分组键（由**产生它的那台设备**生成，不是服务端 id）。
+   *
+   * ⚠️ 缺席 = 老数据没写。读侧按"未分组"处理（`assistantTurnsOfSession` 会把它排除），
+   * **不是**按"空会话"处理 —— 后者会让一个真有一段话的设备看起来什么都没说过。
+   */
+  sessionId?: string;
+  /** 角色；缺席按 `'assistant'` 展示（详见 `assistantTurnRoleOf` 的取舍理由）。 */
+  role?: AssistantTurnRole;
+  /** 那条消息的文本。🔴 它就是同步的内容 —— 端到端加密在上传那一步，服务端只见密文。 */
+  text?: string;
+  /**
+   * 这条消息在**会话内**的时刻（本机墙上时钟，epoch ms）。
+   *
+   * ⚠️ 它与 `createdAt` 不是一回事：`createdAt` 由 reducer 从 **op 时间戳**派生，
+   * 是"这条 op 什么时候被写入"，两设备并发时它跟着到达顺序走。`at` 是用户在
+   * 自己界面上看到的那个时刻，也是**展示顺序的键**（排序三段见 `assistant-turn.ts`，
+   * 第三段是 id 兜底 —— 少了它，同一毫秒的两条在两端会换位置，先例见 §2.4）。
+   */
+  at?: number;
+  /** 这一条是哪一类目的地答的；缺席按 `'unknown'`（**不许**猜成 `'local'`）。 */
+  destinationKind?: AssistantTurnDestinationKind;
+  /** 提案那一档：是哪个工具产出的（如 `create_task`）。缺席 = 老数据没写。 */
+  toolName?: string;
+  /** 提案的处置；缺席按 `'pending'`（= 未确认 ⇒ 在对端按过期展示）。 */
+  disposition?: AssistantTurnDisposition;
+  /**
+   * 🔴 **写这条消息的那台设备的 clientId** —— 提案可确认性的唯一判据。
+   *
+   * 为什么不直接读归约器的 `_lastClientId`（它确实记着同一件事）：那个键是
+   * **reducer 的内部元数据**（下划线前缀、随投影走、不承诺形状），把一条安全语义
+   * 挂在它上面，将来某次归约器重构就会无声摘掉"跨设备不许确认"这条规则。
+   * 显式写一格，代价是载荷里多一个字符串，换来的是这条判据有一个**读得到的落点**
+   * 和一条能打红的测试。
+   *
+   * ⚠️ 它是**自报**：同账号下的设备自己写自己的 id，不是不可伪造的证明。
+   * 这里要拦的不是攻击者，而是"另一台设备误以为自己可以确认"这个真实会发生的误用；
+   * 威胁模型写清楚，不要把它读成访问控制。
+   */
+  originClientId?: string;
 }
 
 /**
@@ -467,6 +788,8 @@ export interface EntityModelMap {
   AI_FEEDBACK: AiFeedback;
   PREFERENCE_CORRECTION: PreferenceCorrection;
   REMINDER: Reminder;
+  EVENT: CountdownEvent;
+  ASSISTANT_TURN: AssistantTurn;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -494,6 +817,8 @@ export const MODELED_ENTITY_TYPES = [
   'AI_FEEDBACK',
   'PREFERENCE_CORRECTION',
   'REMINDER',
+  'EVENT',
+  'ASSISTANT_TURN',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */

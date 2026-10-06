@@ -12,6 +12,7 @@ export * from './db.types';
 export * from './errors';
 export * from './stores';
 export * from './op-log-store';
+export * from './checkpoint';
 export * from './indexeddb/index';
 export * from './sqlite/index';
 

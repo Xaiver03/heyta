@@ -282,7 +282,15 @@ describe('🔴 本地日界的两侧', () => {
 
     const items = await host.listTasks({ dueOn: today(now()) });
     expect(ids(items)).toEqual([lateId]);
-    expect(items[0]?.dueDate).toBe('2026-03-15');
+    /*
+     * ⚠️ R14 之后返回里的 `dueDate` 会带时刻（这一条变成 `2026-03-15T23:30`）。
+     *   这条判据要钉的两件事一件没少：① 深夜那条**没有**从"今天"里消失（上一行）；
+     *   ② 筛的日子与显示的日子是同一个 —— 按**日**比，所以量前 10 位。
+     *   时刻本身不在这里重复钉（那是 `local-api-host.spec.ts` 里
+     *   「R14 本机工具那一侧的时刻」那一组的活）—— 同一个结论钉两处，
+     *   将来就只改得动一处。
+     */
+    expect(items[0]?.dueDate?.slice(0, 10)).toBe('2026-03-15');
   });
 
   it('过滤口径与**投影字段**口径一致：筛哪天，返回里的 dueDate 就是哪天', async () => {

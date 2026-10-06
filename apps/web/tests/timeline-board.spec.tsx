@@ -346,3 +346,93 @@ describe('全天 vs 有时刻（落笔位置）', () => {
     );
   });
 });
+
+/**
+ * 选中（工单 W1）：时间线是任务的**第三种投影**，它必须跟随同一个选中。
+ *
+ * 🔴 **载体**：底色判据走 `getComputedStyle`，**不能用 `el.style.*`**。
+ * 实测（2026-10-03 一次性探针）：RNW 把样式对象编译成 class
+ * （`r-backgroundColor-o5e8d5`），不写内联 `style`，于是 `el.style.backgroundColor`
+ * 恒为 `''` —— 拿它当判据会得到"三种投影全都没底色"这种**看起来像三个真缺陷**的空读数。
+ * （对照：本文件上面那批几何判据读 `style.left` 是有效的，那是运行时算出的内联值。）
+ */
+describe('选中：时间线这一种投影也跟随', () => {
+  const TWO = [
+    { id: 'a', title: '甲', dueDate: ms(15) },
+    { id: 'b', title: '乙', dueDate: ms(16) },
+  ];
+
+  /** 行在板上那一行（`timeline-row-*` 就是挂 `onPress` 的那颗 Pressable）。 */
+  const rowOf = (el: HTMLElement, id: string): HTMLElement | null =>
+    el.querySelector<HTMLElement>(`[data-testid="timeline-row-${id}"]`);
+
+  const paint = (el: HTMLElement, id: string): string => {
+    const node = rowOf(el, id);
+    expect(node, `行 ${id} 没渲染出来`).not.toBeNull();
+    return getComputedStyle(node as Element).backgroundColor.trim();
+  };
+
+  /** 探针实测：未选中是 `rgba(0, 0, 0, 0)`（透明），不是 `''`。 */
+  const TRANSPARENT = 'rgba(0, 0, 0, 0)';
+
+  function press(el: HTMLElement | null): void {
+    expect(el, '要点的行没渲染出来').not.toBeNull();
+    act(() => {
+      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'] as const) {
+        (el as HTMLElement).dispatchEvent(
+          type.startsWith('pointer')
+            ? new PointerEvent(type, { bubbles: true, pointerId: 1 })
+            : new MouseEvent(type, { bubbles: true }),
+        );
+      }
+    });
+  }
+
+  it('🔴 只给 activeTaskId 那一条画底色，另外两条情形都是透明', () => {
+    const el = renderElement(
+      <TimelinePanel tasks={TWO} today={DAY} now={NOW} activeTaskId="b" />,
+    );
+    const selected = paint(el, 'b');
+    expect(selected, 'activeTaskId 那一行没有底色').not.toBe(TRANSPARENT);
+    expect(paint(el, 'a'), '没被选中的行也画了底色 —— 高亮等于没有信息').toBe(TRANSPARENT);
+
+    // 阳性对照：不递 activeTaskId 时**两条都**该是透明。
+    // 少了这一句，"高亮"可能量的只是行自己的默认底色，用例会在一个根本没有
+    // 高亮的实现上照样绿。
+    const bare = renderBoard(TWO);
+    expect(paint(bare, 'a') + paint(bare, 'b'), '没递 activeTaskId 却有底色').toBe(
+      TRANSPARENT + TRANSPARENT,
+    );
+  });
+
+  it('🔴 点一行 ⇒ 宿主收到那一行的 id（此前 web 的行体根本不可点，触屏端早能）', () => {
+    const seen: string[] = [];
+    const el = renderElement(
+      <TimelinePanel tasks={TWO} today={DAY} now={NOW} onOpenTask={(id) => seen.push(id)} />,
+    );
+    press(rowOf(el, 'b'));
+    // 计数器是"事件没被吞"的阳性对照：为空时这条用例什么都没测。
+    expect(seen, '一次按下没到达宿主').toEqual(['b']);
+  });
+
+  /**
+   * 无障碍表面**当前**的样子，钉住它并在改的时候红一次。
+   *
+   * 🔴 已登记缺口（工单 §8）：这一行的 `role` 是 `listitem` 而不是 `button` ——
+   * `TimelineBoard` 在同一个 `Pressable` 上同时给了硬写的 `role="listitem"` 与
+   * 条件 `accessibilityRole="button"`，而 RNW 让前者胜出（实测两种接线状态下
+   * `role`、`tabindex="0"`、`cursor: pointer` **三者都一样**）。
+   * 后果：读屏用户听到"列表项"而不是"按钮"，但键盘与点击是能用的。
+   * 本条断言的是现状而不是理想 —— 将来谁把它改成 `button`（或改成外层
+   * `listitem` + 内层 `button`）时这里会红，那是**该红**：它要求改的人顺手
+   * 把这条缺口划掉，而不是让它悄悄漂成"没人记得为什么长这样"。
+   */
+  it('无障碍表面现状：可点但报 listitem（缺口已登记，改动要显式认领）', () => {
+    const el = renderElement(
+      <TimelinePanel tasks={TWO} today={DAY} now={NOW} onOpenTask={() => {}} />,
+    );
+    const row = rowOf(el, 'b');
+    expect(row?.getAttribute('role')).toBe('listitem');
+    expect(row?.getAttribute('tabindex'), '可点的行拿不到焦点').toBe('0');
+  });
+});

@@ -292,10 +292,18 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2592 个通过 + 12 个跳过：11 浏览器 E2E 默认跳过 + 1 服务端）
+pnpm -r test                    # 全量测试。⚠️ **条数不写在这里**（这里曾写"2592 个通过 + 12 个跳过"，
+                                #    那是会漂的值 —— 与 §7 开头"本文件不写条数"同一个理由）。
+                                #    取现量：逐包的 `Tests  N passed (N)` 汇总行相加；跳过看 `N passed | M skipped`。
+                                # 🔴 收尾必须对一次数：**有 `test` 脚本的包数 == 打了 `Tests` 汇总行的包数**。
+                                #    不相等就说明有一层从来没被跑过，而 `pnpm -r` 的 rc=0 不会告诉你
+                                #    （2026-10-05 实测：19 个包有 test 脚本、19 行汇总，这才敢说没漏层）。
                                 # ⚠️ 沙箱里跑不了 `@heyta/sync-server`（`prisma generate` EPERM），
-                                #    用 `pnpm -r --filter '!@heyta/sync-server' test` 复现这 2592；
-                                #    该包本身只贡献 1 个跳过、0 个通过，所以两者可比
+                                #    用 `pnpm -r --filter '!@heyta/sync-server' test` 复现其余各包。
+                                # 🔴 那条 `--filter` 有两种读数都不指向被测命令：**包名写错**（真名带 `sync-` 前缀）
+                                #    时它打一行 `No projects matched the filters` 然后**退 0**（假绿）；
+                                #    包存在但**没有该 script** 时打 `ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT` **退 1**
+                                #    （假红 —— `@heyta/sync-server` 根本没有 `typecheck` 这一步）。
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -344,6 +352,10 @@ pnpm check                      # 全部门禁 + **全量单元测试**：类型
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）
+pnpm check:adr-numbering        # ADR 编号唯一 + 裸写的 `ADR-NNNN` 只指向一枚文件
+                                #   🔴 它挡的是 2026-10-05 那次"两条会话同一天各占 0053"：
+                                #      文件名不同 ⇒ git 不报冲突，死链检查也不报（链接各指各的），
+                                #      而正文里的 `ADR-0053 §5 第 11 条` 从此有两种读法。
 pnpm check:tokens               # 原生 token 产物（Swift/ArkTS/JSON/RN）是否与 tokens.css 同步
 pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets 产物
 pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podfile.lock，见 §7 第 32 条）
@@ -353,11 +365,36 @@ pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podf
 
 ```bash
 pnpm -r build                   # 🔴 打包前**必须**先跑：APK/.app 里打的是 packages/*/dist
-pnpm build:android              # Android Release APK（Mac 或 Windows 打包机）
+pnpm build:android              # Android Release APK（🔴 从 Mac/Linux 调用时会 ssh windows-pc，见下方新规）
 pnpm build:android:debug        # Android Debug APK
 pnpm build:ios                  # iOS Release（仅 macOS）
 pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
 ```
+
+> 🔴 **2026-10-04 新规（产品负责人拍板）**：Android 任务一律 `ssh windows-pc`，
+> **不要再在这台 Mac 上起新的 Gradle 构建或模拟器**。原因不是整洁，是资源：
+> headless 模拟器 3.6G+ 常驻 / 90% CPU，SDK+AVD+Gradle 缓存吃掉 20G+ 磁盘。
+>
+> - 落地方式是**只在一枚收口点分流**：`scripts/run-gradle.mjs`。所有 android 入口
+>   （根 `package.json` 的 `build:android{,:debug,:bundle}` / `clean:android` → `@heyta/mobile`）
+>   本来就汇成那一枚，所以不需要改各端命令，也不需要在 CI 里加条件。
+>   Windows 上（就是打包机本身）**逐字不变**地跑本机 gradle；macOS/Linux 走远端并把产物
+>   回传到**消费者原本期望的路径**，好让 §7 第 27 条"APK 必须比源码新"继续有效。
+> - **不静默降级**：远端不可达就红。`HEYTA_ANDROID_LOCAL_GRADLE=1` 是**显式例外开关**
+>   （给"远程主机正在重装"这类场景），不是兜底。
+> - 门禁：`pnpm check:android-gradle-remote`（已进 `pnpm check`）。它钉的是**形状**——
+>   新开一条 `./gradlew` 入口、白名单比现实宽、回传路径与 `reinstall-all.sh` 的 `$APK`
+>   对不上、绕开收口点、远程支里出现 `runLocal(`、第二份源码同步实现 —— 各自都会红
+>   （`--self-test` 逐臂证明，臂 0 是阳性对照 —— **臂数由它自己打印，文档里不许抄**）。
+> - 操作步骤 / 验收判据 / Mac 释放清单 / 边界（**Windows 侧没有 Android 模拟器**，
+>   所以设备侧验收目前仍在 Mac）见
+>   [`docs/runbooks/android-build-on-windows.md`](docs/runbooks/android-build-on-windows.md)。
+>   ✅ 那条"远程真打出 APK"的判据**已实测通过**（2026-10-05 02:14–02:34：`BUILD SUCCESSFUL in 41s`、
+>   回传 `size=66,915,556 B` 且 sha256 与远端逐字相同、本地 mtime 回写为远端完成时刻、
+>   `apksigner verify` rc=0 —— 逐项读数在 [`docs/runbooks/android-build-on-windows.md`](docs/runbooks/android-build-on-windows.md) §7 那张表的第 2 格）。
+>   ⚠️ 它证到的是"远程打出的是一份**合法签名**的 APK"，**不是**"可以上架的发布签名"：
+>   四个发布 keystore 键任一缺失时 `build.gradle` 把 release 变体挂到 `signingConfigs.debug`，
+>   所以那趟的证书 `CN=Android Debug`。分流**已**替换本机通道，签名这一格没有。
 
 ### 6.1.1 🔴 固定收尾流程：清旧包 → 重打 → **四端重装**（每轮交付必须）
 
@@ -426,12 +463,25 @@ cd e2e && npx playwright test tests/<某个>.spec.ts
    否则失败只会得到一个 `Test timeout of 60000ms exceeded`，它**不会告诉你
    界面长什么样**。
 2. **截图放固定路径**（如 `e2e/test-results/desktop-window.png`），不随测试名变化，
-   这样 `pnpm check` 之后可以直接打开同一个文件看。
+   这样 `pnpm check` 之后可以直接打开同一个文件看。采集前清除同名旧文件，
+   采集失败不得沿用旧图；工具切换传输方式时，AX、手势、截图调用必须一起切换（环境陷阱 #208）。
 3. **抓控制台 `console` 与 `pageerror`**，并在断言失败时打印。
    白窗口的根因**几乎只在这里现形**（模块 404、CSP 拦脚本、React 抛错）。
    ⚠️ 监听要在**窗口一创建**就挂上（Electron 用 `app.on('window')`），
    挂晚了收不到加载期错误 —— 输出会显示"控制台无内容"，那是最误导人的结果。
 4. **人必须打开那张图看一眼。** 不是"截了就算"，是"看了才算"。
+
+移动端真实 AX 验收在滚动后必须重新读取当前节点的 bounds，再计算点击/滑动坐标；不能复用滚动前的
+屏幕坐标或旧 AX 树。ScrollView 底部的登录、保存和解锁按钮尤其如此，否则点击可能返回成功却作用于
+错误节点，必须回读 UI 和 SQLite 状态确认实际业务动作。
+
+Android Vault 验收还必须把恢复码控件的滚动、输入和业务回读分开记录：隐藏键盘后再滚动，
+每次滚动后重新抓 AX bounds；ADB 连续快速退格会丢字符，清空文本框要逐键退格并留间隔。
+设备撤销后的固定顺序是 token-version fence → 重新认证 → 恢复码解锁 → 新 E2EE 口令/恢复码
+发布 → keyVersion 与 payloadKeyVersion 对账。Node host 的 `--db`、`--server`、`--token`、
+`--password`、`--account-id` 是全局参数，必须放在 `sync`/`list` 命令之前；缺 `account-id`
+会误选 legacy codec。只报告 `synced` 或 CLI 退出码不够，必须回读 payload generation、任务
+列表和 pending；空历史不能冒充跨端互读（环境陷阱 #248）。
 
 **为什么定成硬性规定 —— 这是当天实测出来的三连击。**
 桌面端窗口**全白**，而当时的断言只写了"某个元素可见"。加上截图之后，
@@ -485,8 +535,10 @@ cd e2e && npx playwright test tests/<某个>.spec.ts
 | 61–79 | **工具链与脚本**（bash 3.2 / vite / Playwright / 远端 PS） | #64 `_VAR` 后跟全角字符 · #71 bundle 魔数 · #77 sed 的 C locale · #79 i18n 改完必须 build |
 | 80–83 | **壳与安装包验收**（2026-09-30 新增） | #80 RNW 吞 keydown ⇒ Esc 用捕获 · #81 窗口取证三坑 · #82 错误屏"非空白"假绿 ⇒ 主蓝判据 · #83 探针污染状态 / 原生控件跟系统强调色 |
 | 86–90 | **验证与对账脚本的自检盲区**（2026-09-30 – 10-01） | #86 一条判据里藏两个缺陷 · #87 e2e 前置 SIGKILL 别人的 dev server · #88 plumbing 半个文件的索引尾巴 · #90 diff-tree 两参比 A↔B，不是各自对父 |
+| 91–160 | ⚠️ **本表历史上漏了这一整段**（条数请现量，本文件不写条数，理由见本节开头：`grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md` 再筛 91–160） | 这一行的用途是**挡"按本表推断这段没内容"** —— 查号请直接读正文。（把这一段补成逐号索引属于 `BLOCKED.md` 的 `B63` 那一档，要连"局部列表要不要并进全局号"一起拍。） |
 | 161–164 | **构建期数据与验证载体**（2026-10-03，倒数纪念日批次一） | #161 负数闰月被 `& 0xf` 折成 11 · #162 vitest 绿 ≠ `pnpm -r build` 绿（tsup 的 dts 阶段才查 `noUncheckedIndexedAccess`）· #163 数失败用例必须先 `NO_COLOR=1`，否则红了报 0 条 · #164 后台任务通知的 `exit code 0` 是包装命令的，不是被测命令的 |
 | 165–176 | **判据的载体、枚举与同步源**（2026-10-03；#165–#167、#172–#174 由并行那条线追加，本行是收口时补的索引，措辞以条目原文为准） | #165 变异"复跑变回绿"要配对的断言 · #166 邮件正则截断 `&lang=` · #167 改不变量要按"谁引用了输入"枚举 · #168 等负载的 `vm.loadavg` 解析自己坏了 15 轮 · #169 卸载类脚本不许盲选目标（ios 段 `head -1` + `simctl uninstall`） · #170 窗口截图当内容载体会**同时**假红和假绿 · #171 Hermes 字节码里的中文是 UTF-16LE，`grep` 恒 0 · #172 宿主挂 pointermove 的轻拖/重拖分叉 · #173 `--` 原样传进重装脚本的参数位 · #174 只哈希两三个文件的对账证明的就是那两个文件 · #175 哈希命名的产物目录被覆盖式解包 = 只增不减（Windows `web-dist` 实测 26 vs 本地 7） · #176 桩在外面预取值 ⇒ 用例没走到被测判据就返回，"PASS"是假的 |
+| 177–310 | **判据与取证装置的第二批**（2026-10-03 晚 – 10-05，四条并行线各追加一段，本行是收口时补的索引）。⚠️ 这一段在正文里**物理顺序与编号不同序**：`#191–#195` 夹在 `#177` 与 `#178` 之间，`#196` 往后才落在文件末尾 —— 按行号推断"号到几了"会读错，取最大号要 `sort -n`。⚠️ **`#279–#283` 与 `#284–#310` 是两条线各自从 `#278` 往后取的号**：公开侧那批占 `#279–#283`（`#273/#274/#275/#276` 那几条的续号同伴），注销/销毁那条线的 27 枚在合流时**整体后移五位**成 `#284–#310`（引用同批跟着改，104 处移位 / 14 处保留）。⇒ 拿裸号去读正文一定要先确认是哪一代。措辞以条目原文为准 | #178 四端重装的判据回答"装上了、起得来、画的是我们的界面"，**不回答**"装的是不是这一批的产物" · #179 `cmd > log 2>&1` 之后 `echo EXIT=$?` 接在 `tee -a log` 上 ⇒ 那个码是 `tee` 的 · #184 zsh 里 `${PIPESTATUS[0]}` 是**空值**（不是 bash 的数组下标），退出码读成空串比读错更危险 · #191 挂在"文件名枚举"上的门禁，目标文件被删时安静地**不执行**还照样打印通过 · #195 共享层那条"默认值等于原值的可选 prop"会把"宿主没接"伪装成"做完了"，typecheck 与既有门禁全绿 · #196 `.gitignore` 带尾斜杠的 `node_modules/` **只匹配目录**，软链挡不住 ⇒ `ls-files -co` 形状的打包集合会把 21 枚软链当未跟踪送出去 · #197 一行 `Operation not permitted` 在**成功**运行里也出现 ⇒ 它连必要条件都不是 · #198 macOS 没有 `setsid`，投放后台后第一个动作是用 pid 证明它在 · #208 iOS 多显示器模拟器截图必须显式选 `primary`，并用 `png-stats` 拒绝全黑有效 PNG · #209 AX 点击 success 不等于异步删除写入完成，必须回读 SQLite/AX/ledger · #230 iOS 提醒验收必须在真实 triggerAt 前终止进程，并用 console 会话退出证明 killed-process 投递前提成立 · #236 重复 AX 标签必须用 occurrence 全程传递 · #237 macOS Bash 3.2 空数组在 nounset 下会令验收在构建前退出 · #238 非 UI 宿主必须传 authenticated accountId 并显式 unlock Vault codec · #239 Android 滚动后必须重新读取 AX bounds · #240 stale legal UI 不能替代服务端 legal-consent 读数 · #263 TCP companion 地址与可执行文件必须分离，重启自愈仍需沿用同一传输方式 · #264 共享 idb helper 也必须按 TCP/Unix 选择对应 flag · #265 粘贴令牌成功后必须完成“保存并启用同步”阶段 · #273 变异的"存活"读数要先过一道"变异到底进没进产物"的前置（原 #215，并入 main 时续号） · #274 负向断言的正向对照要落在"条件不成立时确实会变"的那一侧（原 #216，同上） · #275 同一次运行里输入法/端口/一次性令牌共同决定读数（原与 #269 同号 ⇒ 合并时收掉） · #276 页面以 `visibilityState===hidden` 起跑时 WebKit 不推进 CSS 动画 ⇒ 等 `animationend` 退场是无界等待 |
 
 三条**元规则**（跨条目通用，先读这个再查号）：
 
@@ -507,6 +559,27 @@ cd e2e && npx playwright test tests/<某个>.spec.ts
 4. **不要为了让测试变绿而改测试**。如果是数据/模型的问题，改模型。
 5. **提交信息说清"为什么"**，尤其是反直觉的地方（比如为什么用 `"*"` 而不是 `workspace:*`）。
 6. 文档按 [`docs/README.md`](docs/README.md) 的分层规则放置，提交前跑死链检查。
+7. **完成范围逐项对账**：Goal 的范围以用户要求和原计划为准。按「设计 / 生产接线 / 失败与恢复 / 平台验收 / 当前产物」分别记证据；基础函数、子 Agent 回报、单包测试或构建成功均不能代替功能闭环。范围扩大后，旧范围的完成证据不能覆盖新增项。 并行执行时，Goal 生命周期只由主会话统一更新；子 Agent 只回报本分工的证据与未完成边界，不得用局部成功或局部环境失败修改整个 Goal 状态。
+8. **过程经验写回原入口**：可复用约束融入本文件对应规则；具体事故追加到 [环境陷阱](docs/reference/environment-traps.md)，同类事故扩充原条；实现状态写回原计划与 ADR。新增证据文档必须由原计划或文档中心链接，不另建孤立的“记忆”文件。尚未实测的判据明确写“待验证”。 新证据改变结论时，同步修正原计划状态表与 ADR 的当前摘要；只在文末追加成功记录、却保留正文“未验证”或“全部完成”的旧断言，会制造两套状态。历史失败记录可保留，但必须指向后续裁决和未覆盖的边界。
+9. **共享资源独占验收**：同一模拟器、同一平台的安装/构建目录、直接改源码的变异运行，必须先协调所有者与运行窗口；不得并行覆盖。安装脚本须核对真实 applicationId 和退出码，安装失败立即停止，不能拿旧包继续验收。参见 §6.1.1 与 [环境陷阱](docs/reference/environment-traps.md) 的 B/C 验收记录。 共享检出仍有其他写入者时，全量验收须固定到隔离副本，记录基线与复制文件的哈希；运行中不更新源码或重建依赖产物，隔离副本通过不能冒充主检出后续改动已验。 网络故障注入也须证明目标请求实际命中屏障；Service Worker 等中间层绕过拦截时，先修探针，不能把无请求当作安全通过（环境陷阱 #191）。
+10. **安全判据不得为测试桩降级**：认证边界不能依赖客户端自报 clientId；持久密钥包须运行时校验，并以原子 CAS 发布版本。测试桩缺接口时补桩，不在生产路径用可选调用或 `typeof` 绕过鉴权。密码学批处理函数全部成功不等于数据库/服务端原子迁移完成。出境验收须先证明被排除的数据确实存在，再检查真实请求体和请求头；模型凭据与账号凭据分别断言。密钥泄漏判据只输出布尔结果，失败截图遮敏、trace/video 关闭，原始请求仅存于内存。还须禁止测试框架自动保存未遮敏的无障碍树；Playwright 的 `error-context.md` 不受截图遮罩或 trace 开关保护，须以真实失败和合成秘密反证。秘密输入的失败日志与断言也只能输出脱敏信息。锁定/登出必须使在途解锁与 KDF 结果失效，不能让较早启动的异步操作在锁定后重新安装密钥；恢复码解锁后的必要轮换必须由共享会话阻断写入，不能只靠界面提示。原生安全存储的登出清理必须排在已开始的保存之后；只拒绝较晚返回的保存结果，不能证明原生密钥已删除。 原生安全存储探针必须调用生产的保存/读取/删除入口；复制系统 API 只能验证探针自身。跨进程删除须由新进程读空证明，访问属性须校验期望值，不能以“两个值相同”或同进程读回代替。Node/非 UI 宿主进入 Vault codec 必须传入 authenticated `accountId` 并显式 unlock key package；**本地优先仍然成立：宿主构造、列举、写入、导出和查看 pending 不得因取远端 key-package 而触网或失败，远端解锁必须延迟到显式 sync 边界，且错误要原样可见**；不能把 E2EE 口令当 legacy password cipher，也不能用只粘贴 JWT 的同步配置冒充 Vault 会话。跨端互操作必须由当前真实安装产物与独立真实 SQLite host 双向读写证明：iOS Release → Node 与 Node → iOS 各自要有同步后另一端的可观察记录；Web/Android 证据不能替代它。token、root key、恢复码、E2EE 口令不得进入日志、dump、trace、截图或证据文件；证据只写脱敏状态与可复现判据。
+11. **提醒回执与事实分层**：系统接收排程、通知已发布、用户已看到是不同事实；只记录实际可观察的层级。投递回执绑定 occurrence，业务写入成功后才确认回执，失败须可重试。Android 普通进程终止与 force-stop 分别验收，不能承诺平台不支持的强停后投递。跨设备必须真实下载另一台设备写入的 fired receipt，不能把本机回执推断成全局去重；改期、贪睡和下一次重复发生必须生成新的 occurrence，旧回执不能挡住新触发；平台排程窗口（当前 iOS 为最早 64 条）和“用户看见”证据也必须单独验收。真实 HTTP/数据库测试若使用受控通知 port，只证明回执传播与调度决策，不能记作系统已投递；独立旅程须隔离账号与本地库，避免上一例未同步状态污染下一例。通知中心的标题判据必须绑定本轮唯一标题（含进程级 nonce），不能用只精确到秒的可重复标题，否则旧通知可能被误认成当前投递。iOS 权限恢复、重启恢复、不确定回执和 64 条窗口统一使用 ADR-0051 的显式验收模式；只读 probe 必须在不挂载 React Native 的进程中读取 OS 列表，避免 startup reconcile 改变被测状态；probe 还必须避开生产通知 delegate/category 注册和回调，否则 `willPresent`/`didReceive` 会在观察期间写入本地 ledger，污染恢复前证据。
+12. **修本地竞态不得破坏回放收敛**：reducer 不能因“当前状态不匹配”永久丢弃本应保留的事件。条件语义优先写成可版本化数据，再按领域规则读取；必须验证乱序、重复、先于 CREATE 到达等情形。提醒回执的实例如环境陷阱 #188。
+13. **同步语义必须在引擎边界做可复现状态机验证**：只测 `replayOperations()` 的一个顺序，不能证明存储、`appliedOpIds` 幂等闸门和远端批次编排正确。至少用固定 seed 生成合法因果图，让两台独立引擎经过不同批次、乱序、重复投递后，分别与纯 reducer 的规范投影对账；同时断言收敛、重试不产生新状态、接收后的时钟等于已见操作的逐维最大值、墓碑不会被更旧写入清掉。失败必须打印 seed，变异必须能把对应断言打红；不以不可复现的时间随机数或“测试跑过”替代这些判据。
+14. **系统授权完成是独立唤醒信号**：权限弹窗关闭不保证触发 AppState/页面回前台。需要权限的异步副作用必须在授权完成后显式重算，并验证“数据先到 / 授权先到 / 拒绝”三个时序；用户意图落库不得等待或依赖系统授权。提醒实例如 ADR-0051。
+15. **共享预算必须与占用变更原子裁决**：普通写入、迁移 staging 等路径若消耗同一配额，必须在同一个数据库锁/事务边界内重新读取全部占用再提交。事务外预检只用于提前报错，不能充当最终门禁；读取预留量失败不得按零处理。并发判据要覆盖不同实例，进程内 mutex 不能替代数据库约束；用可控事务屏障把新占用提交在预检之后，静态先放一条 reservation 只能证明计量，不能证明无竞态。密钥迁移实例如 ADR-0050。
+16. **可恢复的加密迁移必须重用同一密文**：随机 nonce 的重加密结果不是可重算的幂等请求。跨进程续传应持久化绑定账号/服务端/请求的密文 journal，不能保存 root、口令、恢复码或明文；commit 响应丢失先查询原请求状态，不能另建迁移。远端 PUBLISHED 与本地密钥安装是两个提交边界：本地安装持久成功后才能清 journal，启动 refresh 不得先覆盖恢复所需的旧包。判据必须重建客户端实例后续传，并验证 snapshot/压实边界后的新设备可完整重建。实例如 ADR-0050。
+17. **密文验收必须经过实际下载形状**：AAD 中可选字段的省略、空数组与 null 必须使用同一规范表示。迁移后从数据库直接解密通过，只证明存储行自洽；还必须由新设备走真实 HTTP 下载并重建完整状态，尤其是压实后的 full-state 起点。实例如 ADR-0050 的 entityIds 缺口。
+18. **新增持久数据与系统权限须同步原有对外说明**：增加账号关联表、加密存储、恢复路径或系统权限时，同时核对现有隐私文档的类别、用途、留存和注销范围，中英同步并按原文档规则更新版本；级联数量从迁移最终状态计算，不数 SQL 中的词频。不得为遗漏类别而放宽现有对账测试。权限清单更新还须检索隐私正文、第三方说明里的旧否定承诺；仅修清单会留下跨文档矛盾。恢复与投递等能力变化还须核对原帮助中心、FAQ、首启隐私面板和静态 SEO 生成物；帮助页能渲染、语言测试通过不代表其承诺仍符合实现，必须实际读图和核对当前能力。联网同意与系统通知授权是不同开关：说明中须区分服务器推送与本地通知，不能把“只用本机”说成禁用授权后的移动本地提醒（环境陷阱 #212）。
+19. **设备撤销必须同时守住认证与密钥两个边界**：设备管理只能复用 `@heyta/app-host` 的共享 transport 与共享撤销编排，GET/DELETE 路径、`clientId` 和响应形状必须运行时校验；DELETE 成功代表服务端使该账号**全部**会话（包括当前设备）失效并要求重新认证，不能只删 `sync_devices` 行。客户端必须先用既有完整清理路径使本地 token、vault session、记住解锁 fence 和原生 root key 失效；异步撤销返回后只有当账号、服务端和 token 仍与发起请求绑定一致时才清理当前凭据，不能误伤新会话。确认框打开前就要捕获这组三元组，列表请求也不得把旧 server URL 与新 token 拼在一起。DELETE 响应丢失，或首次成功响应无法校验（JSON 损坏、clientId 不匹配）时，均不能证明服务端未提交；可用同一绑定重试一次；**若重试仍失败（网络失败、非成功 HTTP 或响应无法校验），一律标成状态不确定，保留轮换提示并本地退出**，不能把它写成已观察到的成功，也不能把旧 root/凭据留在本地。轮换提示要能跨重新挂载保留，并在 root rotation 完成后清除。不得承诺离线设备被远程擦除。撤销后的 `requiresKeyRotation` 只是后续动作信号，必须由重新认证后的可信设备单独完成 root rotation 与保留密文迁移，不能在 UI 中把撤销当成轮换已完成。真实验收还须证明旧 WebSocket/旧 JWT 不能继续同步，并覆盖响应 `clientId` 与请求不一致时的拒绝。
+
+
+20. **iOS AX 验收的传输方式必须贯穿自愈路径**：若使用 TCP companion，必须单独保存 companion 可执行文件路径；模拟器 AX 空树触发 shutdown/boot 后仍启动同一 TCP companion，并把 `HOST:PORT` 只传给 `idb --companion`。不能把 TCP 地址传给 `--companion-path` 或当作可执行文件，也不能因 Unix socket 自愈分支失败就把后续 UI 失败归因于产品。每轮必须保留目标 UDID、传输方式、companion 日志和重启后连接结果；AX/companion 载体失败只能记载为验收未闭合，不能升级为产品缺陷或通过。
+21. **iOS 通知探针必须给冷启动服务留出有界时间，并对账真实容器路径**：iOS 27 模拟器重启后，`UNUserNotificationCenter` 的 XPC 服务可能在 `simctl launch` 返回后才恢复；只等待 120 秒会把“探针稍后写出文件”误判为 OS 无快照。边界模式的 `run_probe` 必须保留旧文件清理、进程启动和文件内容校验，使用可配置但有限的等待上限（默认 240 秒），并把 `simctl get_app_container` 返回的 Data 根拼到 `Library/Application Support`；不能漏掉 `Library` 造成“统一日志显示已写、轮询却永远找不到”的假失败。超时仍判红；随后要用统一日志确认探针是否晚写，不能把迟到的探针结果回填成同一轮的成功证据。规则与 ADR-0051 的 iOS 边界模式保持一致。
+22. **iOS 主认证验收必须滚动回读阶段按钮**：AuthScreen 的“保存并启用同步”位于长表单下方，令牌兑换成功后必须用 `--scroll-into-view` 回读该按钮且确认可见，再要求 AX 按压成功；viewport-only `--list` 找不到它时不得退回手工凭据并把中间阶段记成令牌失败。该阶段仍需按现有状态机顺序写入同步配置并启动同步。
+23. **iOS 重启补算必须分开观察 OS 投递与应用回执**：系统 delivered 可能晚于首次启动和首次只读 probe；边界脚本要轮询本轮 occurrence 的 delivered，再重新启动生产 RN 进程执行 reconcile，最后以真 SQLite 的 `firedAt + firedForTriggerAt` 收口。probe 进程不能写业务 op，也不能用 ledger 的 posted/receipts 代替同步事实。
+24. **只读 iOS probe 结束前不能假定生产 App 已重新启动**：probe 为了延迟写快照会暂时保持进程存活；在 delivered 快照后必须先 `simctl terminate` 该 bundle，再显式启动生产 RN，避免 iOS 复用 probe 进程而跳过 startup reconcile。
+25. **iOS AX 按压必须做几何安全检查**：AX 报告 `success` 只代表 HID tap 被设备接受，不代表目标控件收到事件。shim 在发 tap 前必须拒绝屏外坐标和与底部 tab 栏重叠的非 tab 控件，返回 `tap-outside-screen` 或 `tap-blocked-by-tab-bar`；调用方随后必须重新滚动并回读新 bounds。保存、登录、解锁等长表单按钮不得复用滚动前的坐标。`scripts/tools/ios-ax-shim.test.py` 的几何回归必须保持为门禁输入，不能把一次误切 tab 当产品成功。
 
 ### 不要擅自做的事
 
@@ -552,6 +625,130 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
 **只与自己的过去比**（排行榜/联赛/自习室/组队打 Boss 在 E2EE 下结构上不可能）、
 **从不制造愧疚**。关键裁决见下面 ADR-0022 与
 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
+
+### 2026-10-03：倒数纪念日 批次二（✅ **已完成质量审计、合并，并已进 `main`**）
+
+> ⚠️ **本标题不写 `origin/main` 的 SHA** —— 写进正文的那一刻它就开始漂（本批实测：同一个 tip 在
+> 40 分钟里被引用 8 次、跨 4 份文档，其中 2 处是"当前状态"声明）。当前 tip 请现量：
+> `git -c credential.helper='!gh auth git-credential' ls-remote https://github.com/Xaiver03/heyta.git refs/heads/main`
+> （SSH 通道被本机代理挡时的备用读法，见计划 §8.5 第 14 条）。
+
+> 逐项状态与全部读数：[`docs/plans/countdown-anniversary.md`](docs/plans/countdown-anniversary.md) §8.2 / §8.4。
+> **本轮质量审计 + 分组提交 + 合并的逐条裁决与合并态读数：同文 §8.5**（2026-10-04）。
+> 分支：`feat/countdown-batch2`（W0/W0b/W2/W5/W10）、`feat/countdown-w9`、
+> `feat/countdown-w4b`、`feat/countdown-w7`、`feat/countdown-w8`（后三条由并行子 Agent 在独立 worktree 里跑）。
+
+✅ **04 22:0x：`origin/main` 已收下这批**（`c343b923..91a672f6`，**一次快进、不带 `--force`**）。
+通道不是"改写主检出"，是 `git push origin feat/countdown-batch2:main` ——
+之前记的"落地只能等主检出干净"把**本地 ref** 当成了"合入 main"的实质，已被一次 `--dry-run` 否证
+（全过程与六步读数在 §8.5 第 12 条，那里也写清了它**没有**重跑全量单测的边界）。
+
+🔴 **给并行会话的一条硬提示**：这次快进把他们**原先只在本地的 10 笔**（`4f0b3894`、`83359555`、
+`4023fc5f`、`eaf14080`、`e088c92f` 等）一起公开到了 `origin/main`。
+⇒ **那些笔现在不能再 `commit --amend` / rebase 了**（一改就要 force push，而"不改写已公开历史"是硬边界）；
+要修就新写一笔。⚠️ ~~他们本地 `main` 是远端的祖先（`merge-base --is-ancestor main origin/main` = YES），
+**一次 `git pull` 就收敛，零冲突**。~~
+🔴 **04 22:3x 现量更正：这句已经被他们自己那 4 笔新的文档笔否证了** —— 现在
+`git rev-list --count <远端 tip>..HEAD` = **4**、反向 = **158** ⇒ **两侧都分叉了**，
+`--is-ancestor` 不再成立，`git pull` 会是一次**真正的 merge**而不是快进。
+**"零冲突"这一半只覆盖"已提交那层"**：`git merge-tree --write-tree --name-only <他们的本地 main> <远端 tip>`
+= rc=0 且 `<<<<<<<` 0 处，加上他们那 4 笔带得走的 3 个文件与本批并入集**交集为 0**；
+🔴 **但未提交的工作树另有一处** —— 主检出的 `AGENTS.md` 正被他们写着（`M`），而本批改的就是这份的 §9，
+⇒ 他们 pull 时这一份要按 §8.5 第 4 条的既有做法**取并集、不改对方编号与措辞**。
+明细在 §8.5 第 15 条。
+📌 **教训（与我这一批反复踩的是同一条）**：`--is-ancestor = YES` 是**瞬时属性**，
+它只描述"我查的那一刻"。凡把"对方现在能一次 ff 收平"写进文档，都必须同时写上**重量命令**，
+否则下一个照它行动的人会按一个已经不成立的事实行动。
+⚠️ 反过来，**下一个只读本地 `main` 的判据**（`git show main:<file>` 形状）在他们 pull 之前会读到旧内容 ——
+跨检出引用请写 `origin/main`。
+
+🔴 **本轮（质量审计 + 分组提交 + 合并 + 合并态读数）收口状态**：五步都有读数，
+第①②③④步在 §8.5 第 1–13 条，第⑤步在 **§8.5 第 14–15 条**（落地态 15 道门禁逐条 rc=0、
+`-r build`/`-r typecheck` = 0、阳性对照做了一例、全量单测那格的形状与两条边界都写在那里）。
+🔴 **三条仍然开着的边界，不包装成完成**：
+① `RTEST-UNHANDLED-01` —— `pnpm -r test` 在共享载体上会以 rc=1 结束（5 条 Rolldown Flow 解析的
+unhandled rejection，单跑不现），归因未定，**不记产品失败也不记"抖动"**；
+② `check:ai-e2e` **整族**没在合并态载体上跑过（本轮只跑了那 4 份手工裁决的用例，见上面 `E2E-MERGE-01`）；
+③ 主检出的本地 `main` 指针在他们手里，**不代 pull、不代推他们那 4 笔未公开的笔**；
+④ `FULLCHECK-01` —— **`pnpm check` 整条 76 步链没在最终载体上重跑**（第⑤步只单独取了 17 道门禁 +
+build/typecheck + 每包一份单测）；当刻 1 分钟负载 **261**（阈值 12），
+且那三段 e2e 会按专用端口 SIGKILL、末尾 `-r test` 受 `RTEST-UNHANDLED-01` 挡着
+⇒ **记环境无效、不记产品失败、也不记"已验证"**；闭合的四个前置条件写在 §8.5 第 16 条。
+
+🔴 ~~全在本地分支，**未 push、未 merge 进 main**~~（04 21:3x 的第一次更正，留形）：
+`feat/countdown-batch2` 已 push；main **六次并入本分支**（`75114cd3` 带 13 处冲突逐处裁决，
+理由在 `git show 75114cd3` 的提交信息里；后五次都是并行会话在上一笔合并之后又落的笔，
+`git merge-tree` 预检冲突 0 处 ⇒ 不需要新裁决）。
+
+**这一批收拢了并行会话的改动**：主检出上 158/167 个未提交路径按逻辑分组成 **13 笔提交**
+（设备撤销共享层 / mobile / web / node-host+op-log / vault e2e / 抹除设备脚本+门禁 / iOS 提醒投递 /
+门禁装置 / 法务六份+中英词条 / 回收站锚点 / 帮助中心+ADR / 33 张证据图 / 卡片导出桥）。
+每笔提交信息里写明"这条线的工作由并行会话产生，我按用户指令代为收拢"，**归属没有改写**；
+7 枚当时仍在被写的 live 文件**没有代提交**，逐枚登记在 §8.5 第 1 条。
+
+**审计当场修完的 7 条**（每条都做了变异验证，明细在 §8.5 第 2 条）：public-facts 的整批替换语义、
+后台 `papers` 链接的非 http 兜底、服务端匿名读面**新增 7 条判据**（`server/tests/holiday-public-route.spec.ts`）、
+card-export 的失败文案不再把内部 `detail` 拼进界面、让帧判据加了**自己的预算**与作废必 resolve、
+iOS 三座桥的 `RCT_EXTERN_REMAP_MODULE` 名字错位、以及 `sync-client` 那句**没有代码兑现的谎话**
+（"升级服务端之后再同步一次"）连同钉在谎话上的判据。
+🔴 另有 **7 条改不动的登记成 `G-AUDIT-1..7`**（§8.5 第 3 条），逐条写明归属与修法，**没有硬压**。
+🔴 **`E2E-MERGE-01` 已闭合，而且它抓到一条真缺陷**：合并里手工裁决的 4 份 Playwright 用例
+第一次真跑 ⇒ `1 failed / 10 passed`，红的是后台「调休/补班」年度那一格被裁掉 **13px**
+（`admin-console.spec.ts:862` 的**几何**判据 `scrollWidth − clientWidth ≤ 1`），
+而**同一趟里 `toContainText('2026')`、`href` 逐字、`rel` 那十条文本断言全绿** ——
+这是"断言只验写了什么、不验看得见的有多少"在本轮的第二次实证，也是**唯一**跑到它的那一层。
+修法按不变量走：`admin.css` 新增 `.ht-settings__admin-rowMain--wrap` 只挂年度那一格
+（年度/条数/备注没有一段允许被省略号替掉；邮箱排的 ellipsis 是有意的，共用那条不动），
+**没有**去抬阈值。三条读数：修前 `RC_E2E4=1` ⇒ 修后 `RC_REFINAL=0` ⇒
+🔴 摘掉修饰符变异 `RC_MUT_WRAP=1`（裁切值又是 13px）。两张图人都看过，
+证据与 md5 表在 `apps/web/evidence/admin-holiday/README.md`。
+⚠️ 边界：这 **不等于** `check:ai-e2e` 整族绿（整族还有 50+ 条，本轮共享载体上没跑）。
+📌 顺带撤回一条我自己写错的判断：曾记"`check:ai-e2e` 会 SIGKILL 别人的 vite（`:3000`/`:3100`）"——
+读 `scripts/check-ai-e2e-preflight.mjs` 后否证，它清的是本套件专用端口 **4318/4319**。
+**判"某条路会伤到别人"要先读它实际碰哪个资源**，别从"端口被占"推。
+
+| 单 | 落到哪一步 | 一条读数 |
+|---|---|---|
+| W2 `EVENT` 实体 | ✅ | `ENTITY_TYPES` 加一项即穿过整链（**存储三套适配与线协议零改动**），不 bump schema；20/7/17/41/30 passed |
+| W10 AI 工具 | ✅ | 目录 4 条 EVENT 工具（读 2 写 2），MCP 与内置 AI **共用同一份目录**；写路径只到提案 |
+| W9 提醒 | ✅ web 半 | 「提前 N 天」改走日历日算术 ⇒ DST 不漂；变异 **9 臂 9/9 转红** |
+| W9 原生投递 | 🔄 **Android 主链与异常恢复已验，iOS 续验中** | Android 当前 Release 主链 11 项、权限恢复/重启补发/待排程取消各 5 项通过，禁用调度器的 Release 变异被 OS 判据抓到。iOS 修复桥接导出名后已取得模拟器投递与业务回执，仍需异常路径、截图及最终当前产物验收；整批尚未完成。范围与判据见 [ADR-0051](docs/adr/0051-mobile-reminder-delivery.md) 和 [原计划](docs/plans/goal-multi-end-coverage.md) §4。 |
+| W5 卡片网格 | ✅ | e2e **6 passed**（整族 15 passed）、三张图**人看过**；看图照出"逾期卡整行不画日期"并修掉（两腿变异各红一次） |
+| W0b 遗留缺口 | 🟡 ①② | `/tmp/ui.xml`/`_xy.py`/库名改成带默认值的旋钮（默认值逐字不变），harness 22 绿 0 红 |
+| W7 成品图导出 | ✅ **两端设备读数都取到** | 共享版面 `packages/ui/src/countdown/card-export-layout.ts` + web `<canvas>` + 移动原生落盘（Android `cacheDir` / iOS 沙盒，**两端都不走相册** ⇒ 零权限、零法务变更）。Android 04 13:20 `RC_ANDROID=0`；**iOS 04 17:13:17 `RC_PROBE=0`（17 项 / 0 失败）**，两端 IHDR 都逐字等于契约 `1080×1440`，成品图入库 `apps/mobile/evidence/card-export/` 且**人打开看过并互相并排比过**。🔴 iOS 第一次真跑红在 `rasterize-timeout`，**根因是我们自己的调用时机**（RN effect 跑在 Fabric 把挂载事务刷到主队列之前 ⇒ 原生按 tag 查不到视图，而那条分支不回调），修法是**让出一帧再要图**，不是把超时拍长 |
+| W4b 调休通道 | ✅ | 服务端半 + `check:public-facts` 门禁（八臂 8 红 0 存活）+ 客户端拉取三笔 + 后台 `HolidayPanel` 把 `papers` 回显成可点链接；判据①真界面三档截图人已看，三臂变异各红自己那条 |
+| W8 三端接线 + 壳级门禁 | ✅ 三端代码 + 门禁五格全绿 | `check:shell-surfaces` 的"未取证"从 2 栏降到 0：windows 走远端取证文件（`HEYTA_WINDOWS_FACTS`，四臂变异），mac 走 `HEYTA_MACOS_WEB_DIST` 读**包内**那份（链 W，`HEYTA_SKIP_NOTARIZE=1` 去掉的是没有上界的等待，不是判据） |
+| L' 法务联动 | ✅ 前置闸门量完 | 普查 82 行候选 ⇒ 唯一真命中是 `ai-and-transfer` 的本机接口工具表漏了 W10 那 4 条 EVENT 工具（条款把那张表当授权面）。已修 + 版本 `1.0→1.1`（进同意指纹）+ 新门禁 `check:legal-tools` 四臂变异全红。✅ 原先留的那条前置闸门 ——「`permissions.ts` 那句"不申请照片"要等 W7 的 manifest 才知会不会变假」—— **04 16:4x 现量：不变假**（声明面 Android 1 条 INTERNET / iOS plist 28 把键里 `photo\|library` 命中 0、Swift 只写沙盒 `temporaryDirectory`、entitlements 只有 app groups + keychain，每条带阳性对照） |
+
+🔴 ~~**只剩 W6 一条是被撞车面挡住的**（19:2x 现量）：它的落点 `packages/ui/src/calendar/{CalendarBoard,model,CalendarToolbar,date-text}.ts(x)`、
+`apps/web/src/features/calendar/*`、`apps/mobile/src/screens/CalendarScreen.tsx` 在主检出里**逐个都是 `M`**，
+正被并行会话整片重写 ⇒ 现在做它 = 造一次没人能干净解的三方冲突。~~
+—— ✅ **04 02:5x 现量否证并落地**（`e2def90f`）：那六个路径的未提交 diff 随 main 推进被各自所有者提交掉了，
+落地前重跑关闭判据（`git status --porcelain -- <那六个路径>` 输出为空）。它复用了 W4b 那条 `dayMarker?` 可选 prop 的缝，
+没有另开注入点。**留一条编号缺口 W6-G1**：接进「今天」/收集箱要先给共享 `TaskList` 一条"不可交互行"的契约变更，不属于这一批。
+
+这一段先前还列过两条，都被**逐文件现量否证**了，留着是为了让后来者认出这个形状：
+① **W8** —— 我按"日历线在忙"整条线推断把它排后，实际它的落点在主检出里逐个都干净，web 半还早已随 W5 落地；
+② **L 系列** —— 记过一句"`packages/legal` 有 3 个文件脏 ⇒ 只登记不动"，现量是 **6 个**文件脏，
+而 L' 命中的那份（`documents/ai-and-transfer.ts`）**恰好不在脏集合里**。
+**撞车的判据是同一文件的未提交 diff，不是"某条线在忙"的印象**；脏清单每次都要重新现量 ——
+我自己那条"3 个"在六天内就变成了"6 个"。
+
+⚠️ 一条**可迁移的判据教训**（W10 实测）：变异**第一趟 6 臂里 3 臂存活**（写工具默认打开、
+列表投影不剥正文、工具改名 ⇒ 清单推不出实体），也就是说那三条承诺当时**没有任何一层在守**。
+"做过变异验证"不等于"判据有牙" —— 要逐臂看红集，存活的那几条才是这单真正产出的判据。
+
+⚠️ 另一条（W5 的 e2e 实测，与 §7 第 82 条同族但**不是同一件事**）：**15 条断言全绿的截图里，
+逾期那张卡少了一整行日期**。§7 第 82 条讲的是"非空白挡不住错误屏"，这一条讲的是
+**断言只会验界面写了什么，不会验界面少了什么** —— 想抓住"少了一行"，判据得写成
+**存在性**（每一张卡都有日期行），而不是给"我以为会有的那几行"逐个写内容判据。
+
+⚠️ 第三条（L' 普查实测）：**条款里那种"未列出的即视为未授权"的句子，会把一张表变成授权面**。
+此后往代码里的目录加一项，是一个**对外承诺的变更**，而它只体现为一行 `name: 'xxx'` ——
+代码评审看不见它，`check:legal-copy` 也看不见（它只比生成物与真源）。
+⇒ `check:legal-tools` 现在把 目录 ↔ 中文表 ↔ 英文表 三方对账钉住（含**逐行同序**，
+因为集合相等挡不住"行贴错对象"）。**凡是文档里出现"以下即为全部/未列出即不适用"这类封闭句式，
+它指的那个集合就必须有一条对账门禁**，否则句式本身就是一个会悄悄烂掉的断言。
 
 ### 2026-09-30：服务端面向用户的产物全部中文化 + 用设计系统 + 零渐变 ✅ **已完成**
 
@@ -881,9 +1078,13 @@ WebAuthn RP ID 挡着，**本次没动**。
   默认关（**每个工具单独默认关**）、只监听回环、显式 token、逐工具授权；
   🔴 **加密条目可列举、不可读**；写入只能经 `dispatch()` 形状的端口。
 - **ADR-0013 云端 AI 与 MaaS** ✅（[文档](docs/adr/0013-cloud-ai-and-maas.md)）。
-  **方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS），但**开放条件未满足**：
-  `assertEnableable()` 继续抛 `retention-undecided` 挡住 `managed`。
-  ⚠️ 这**不是没写完的占位符，是有意的失败** —— 不许"先把计费做了，保留策略以后再说"。
+  **方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS）。
+  🔴 **2026-10-05 状态更正（[ADR-0054](docs/adr/0054-managed-ai-retention-and-selling-preconditions.md)）**：
+  原来那句"`assertEnableable()` 继续抛 `retention-undecided` 挡住 `managed`"**已过期** ——
+  保留策略定案、计量与托管代理路由落地、那条 reason 连成员一起删了；
+  本 ADR **没有改**的那一条是"托管 AI 与端到端加密互斥，只能作为明确、可撤销、按功能开启的例外"。
+  ⚠️ 顺序纪律仍然有效（原句"不许先把计费做了、保留策略以后再说"）：ADR-0054 走的是
+  **先补计量、后解禁售**，不是绕过它。而这一档**今天在客户端仍打不开**（0054 §8）。
 - **ADR-0014 记忆偏好层的两个闸门** ✅（[文档](docs/adr/0014-memory-switch-and-corrections.md)）。
   `memoryEnabled` **必填且默认关闭（fail-closed）**；推断结果**不持久化**
   （纯函数，每次从 op-log 重算），只有用户**纠正**进 op-log 跨设备同步；

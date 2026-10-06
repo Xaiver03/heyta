@@ -152,7 +152,7 @@ describe('deliverDueReminders', () => {
       ctor,
     );
     expect(calls).toHaveLength(0);
-    expect(outcome).toEqual({ delivered: 0, reason: 'permission' });
+    expect(outcome).toEqual({ delivered: 0, deliveredIds: [], reason: 'permission' });
   });
 
   it('浏览器不支持时 reason 是 `unsupported`（与"权限被拒"区分开）', () => {
@@ -163,12 +163,12 @@ describe('deliverDueReminders', () => {
       LABELS,
       undefined,
     );
-    expect(outcome).toEqual({ delivered: 0, reason: 'unsupported' });
+    expect(outcome).toEqual({ delivered: 0, deliveredIds: [], reason: 'unsupported' });
   });
 
   it('没有到点的提醒时 reason 是 `empty`，**不去碰权限**', () => {
     const outcome = deliverDueReminders([], {}, new Set(), LABELS, undefined);
-    expect(outcome).toEqual({ delivered: 0, reason: 'empty' });
+    expect(outcome).toEqual({ delivered: 0, deliveredIds: [], reason: 'empty' });
   });
 
   it('任务已被删掉时跳过它，但不影响其余几条', () => {
@@ -183,6 +183,68 @@ describe('deliverDueReminders', () => {
     // 墓碑与提醒是两条记录，所以"提醒还在、任务没了"是真实存在的状态。
     expect(outcome.delivered).toBe(1);
     expect(calls.map((c) => c.options?.body)).toEqual(['该做「还在的任务」了']);
+  });
+
+  /**
+   * 🔴 缺陷 D1 的投递面那一半：`task === undefined` **挡不住墓碑任务**。
+   *
+   * 已软删除的任务在表里是**存在**的（`deletedAt` 有值），而这里原来只判"在不在"，
+   * 注释却写着"这种情况不投"。所以这一组必须喂一张**含墓碑的表** ——
+   * 那正是动作层 `due()` 之外、调用方可能递进来的真实形状。
+   */
+  it('🔴 任务在表里但带 deletedAt（回收站）时不投，其余几条照投', () => {
+    const { ctor, calls } = fakeCtor('granted');
+    const trashed = { id: 't-gone', title: '已删除的任务', createdAt: 0, updatedAt: 0, deletedAt: 999 } as Task;
+    const outcome = deliverDueReminders(
+      [reminder('r-gone', 't-gone'), reminder('r2', 't2')],
+      { 't-gone': trashed, t2: task('t2', '还在的任务') },
+      new Set(),
+      LABELS,
+      ctor,
+    );
+    expect(outcome.delivered, '墓碑任务那条不该投出去').toBe(1);
+    expect(calls.map((c) => c.options?.body)).toEqual(['该做「还在的任务」了']);
+  });
+
+  it('🔴 已彻底删除（purgedAt）的任务同样不投', () => {
+    const { ctor, calls } = fakeCtor('granted');
+    const purged = {
+      id: 't-purged',
+      title: '彻底删除的任务',
+      createdAt: 0,
+      updatedAt: 0,
+      deletedAt: 999,
+      purgedAt: 1000,
+    } as Task;
+    const outcome = deliverDueReminders([reminder('r-p', 't-purged')], { 't-purged': purged }, new Set(), LABELS, ctor);
+    expect(outcome.delivered).toBe(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  /**
+   * 🔴 投出去的是**哪几条**必须交回给调用方（缺陷 D14 的前半）。
+   *
+   * 只有条数的话，调用方无法把"firedAt"写到正确的提醒上 —— 而那正是
+   * "刷新一次就再弹一遍"的根因：内存 `shown` 集合跨不了页面加载，
+   * 落库靠的是 id。
+   */
+  it('deliveredIds 精确等于真投出去的那几条 id（顺序同输入）', () => {
+    const { ctor } = fakeCtor('granted');
+    const shown = new Set(['skip-me']);
+    const outcome = deliverDueReminders(
+      [reminder('skip-me', 't1'), reminder('a', 't1'), reminder('b', 't1')],
+      { t1: task('t1', '交周报') },
+      shown,
+      LABELS,
+      ctor,
+    );
+    expect(outcome.deliveredIds).toEqual(['a', 'b']);
+    expect(outcome.delivered).toBe(outcome.deliveredIds.length);
+  });
+
+  it('一条都没投出去时 deliveredIds 是空数组（而不是 undefined）', () => {
+    const outcome = deliverDueReminders([], {}, new Set(), LABELS, fakeCtor('granted').ctor);
+    expect(outcome.deliveredIds).toEqual([]);
   });
 
   it('构造抛错时**不中断**其余几条，也不把那条记成已投', () => {

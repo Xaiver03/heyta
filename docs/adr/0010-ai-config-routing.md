@@ -531,6 +531,11 @@ https://127.0.0.1:80@evil.com/v1  → 同样被 validateEndpointUrl **拒绝**
 这条分支**目前不可达**（`managed` 被 `assertEnableable` 挡着），
 是纯防御性的，我不假装它有测试覆盖。
 
+> 🔴 2026-10-05 更正：上面那条分支**不再是"暂时不可达的防御分支"，而是不存在的分支** ——
+> `retentionText` 现在是 `string`（`packages/ai/src/egress.ts`），`RetentionDisclosure` 里
+> 已没有 `undecided` 成员（[ADR-0054](0054-managed-ai-retention-and-selling-preconditions.md) 把保留策略定案，
+> 当日又把"没有构造点的成员"整个删掉）。原文留作历史。
+
 ## 4. 被否决的方案
 
 | 方案 | 否决理由 |

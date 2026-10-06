@@ -16,7 +16,10 @@ import { createRoot } from 'react-dom/client';
 
 import { StorageError } from '@heyta/storage';
 
+import { registerLocalEraser } from '@heyta/app-host';
+
 import { App } from './App.js';
+import { armBootSplashDismiss } from './boot-splash.js';
 import { holdPendingLogin, releasePendingLogin } from './features/auth/pending-login.js';
 import { createStartupNetwork } from './features/privacy/startup-network.js';
 import {
@@ -29,10 +32,26 @@ import { useSyncStore } from './features/sync/store.js';
 import { askLegalRecheck } from './features/legal-recheck/gate.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
 import { storageHintKey } from './features/shell/error-hint.js';
+import { startPublicFacts } from './features/calendar/public-facts.js';
 import { initOpLog } from './features/tasks/store.js';
 import { LocaleHost } from './lib/locale-host.js';
+import { eraseWebLocalData } from './lib/local-data-destruction.js';
 import { startWidgetLifecycle } from './pwa/lifecycle.js';
 import { registerWidgetServiceWorker } from './pwa/register.js';
+
+/**
+ * 本机数据销毁器（E2）。
+ *
+ * 🔴 必须是**入口的第一批语句**，而且要早于任何一次同步：`createSyncClient()`
+ * 在共享接缝装的默认回调读的就是这个注册表，注册晚于第一次同步的话，
+ * 那一次 `ACCOUNT_CLOSED` 会走到"没有销毁器"的分支。
+ *
+ * 为什么注册在这里而不是 `features/sync/store.ts`（同步客户端的构造点）：
+ * 销毁是**设备级**的，不属于任何一个界面状态机；而入口是这个文件里
+ * 唯一"必定先于所有宿主动作"的位置。判据：
+ * `apps/web/tests/local-data-destruction.spec.ts`。
+ */
+registerLocalEraser(eraseWebLocalData);
 
 /**
  * 🔴 **同意之前，一个字节都不许出这个进程**（计划 G-12）。
@@ -80,6 +99,18 @@ if (container === null) {
 }
 
 const root = createRoot(container);
+
+/**
+ * 🔴 首屏遮罩的退场接线 —— 必须在**任何** `root.render()` 之前挂上。
+ *
+ * `index.html` 里那段生成物是一层 `position: fixed; inset: 0` 的满屏品牌帧，
+ * 本文件在它下面有**四条**渲染出口（`?shell=1` / `?slice=1` / 正常 `<App />` /
+ * 存储不可用的 `ErrorScreen`）。观察者挂在容器上而不是某条分支里，
+ * 是为了让"漏掉某条出口"这件事结构上不可能发生 ——
+ * 漏掉的后果不是报错，是**装出来的桌面端永远停在品牌帧上**
+ * （而截图判据还全是绿的：那块底板就是主蓝）。详见 `boot-splash.ts` 文件头。
+ */
+armBootSplashDismiss(container);
 
 /**
  * 🔴 M1 垂直切片的验证入口（`?slice=1`）。
@@ -135,6 +166,20 @@ if (new URLSearchParams(window.location.search).has('shell')) {
        * 它自己吞掉所有失败（见 `pwa/lifecycle.ts`）：组件是增强，不是功能前提。
        */
       startWidgetLifecycle();
+
+      /**
+       * 公共事实（调休 / 补班）的下行（W4b，ADR-0052）。
+       *
+       * 🔴 排在这里的两个理由缺一不可：
+       *  · 它要 `requireStore()` —— 引擎没就绪时那是**一条会抛的读**，而它没有重试；
+       *  · 装缓存是**异步**的，所以首屏很可能先没有标记、装完再补上 —— 这不是缺陷，
+       *    但补上那一步必须有人敲（`publicFactsEpoch`），否则界面会一直停在首屏那张图。
+       *
+       * ⚠️ 它自己判闸门（G-12）：没同意时一个请求都不发，缓存照装。
+       *    所以这里无条件调，而不是把它挂到"已登录"那条分支上 ——
+       *    这条通道是匿名的，未登录的用户同样该看到部署方录的调休。
+       */
+      startPublicFacts();
 
       /**
        * W1：消费**邮件登录链接**带回来的令牌。

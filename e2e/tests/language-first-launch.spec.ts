@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { decidePrivacyConsent, enableAllModules } from './helpers';
+import { closeSettingsSheet, decidePrivacyConsent, enableAllModules, openSettingsSheet } from './helpers';
 import { installMissingProducerShims } from './shims';
 
 /**
@@ -29,20 +29,22 @@ import { installMissingProducerShims } from './shims';
 
 const STORAGE_KEY = 'heyta.locale';
 
-/** 打开应用并等**顶栏的语言切换器**真的渲染出来（白屏不算通过）。 */
+/** 打开应用并等**外壳真的渲染出来**（白屏不算通过）。 */
 async function openAppNeutral(page: Page, path = '/'): Promise<void> {
   await enableAllModules(page);
   await installMissingProducerShims(page);
   await page.goto(path);
   // 判据不能用"添加任务"输入框：`openApp()` 那条中文锚点在英文界面上必然超时。
-  // （这里也不改用英文 placeholder 当锚 —— 那等于把 i18n 文案抄进测试，抄件一定会漂。
-  // `language-option-en` 是 testID，语言中立，且它本身就是"顶栏渲染完了"的证据。）
-  await expect(page.getByTestId('language-option-en')).toBeVisible();
+  // （这里也不改用英文 placeholder 当锚 —— 那等于把 i18n 文案抄进测试，抄件一定会漂。）
+  // 🔴 锚点原来是 `language-option-en`（语言中立的 testID，且它就是"顶栏渲染完了"的证据）。
+  //   H9 第三刀把语言搬进 设置 → 显示 之后，"打开应用"这一步**没有**那个控件了 ——
+  //   换成 rail 底部那两枚：它们不随语言变、不随视图变，也不在设置浮层里面。
+  await expect(page.getByTestId('rail-help')).toBeVisible();
   // 🔴 首启隐私同意必须收掉，但它**不碰这一条判据的地盘**：决定写的是
   // `heyta.consent.*` 而不是 `heyta.locale`，所以下面"推断语言不落盘"那条
   // （`getItem(STORAGE_KEY) === null`）测的仍然是纯首启。
   // 不关掉它，第 5 条用例点语言切换器时会卡在 `div[role="presentation"] …
-  // intercepts pointer events` —— 遮罩是整屏的，顶栏也在它底下。
+  // intercepts pointer events` —— 遮罩是整屏的，rail 与设置浮层也在它底下。
   await decidePrivacyConsent(page);
 }
 
@@ -114,9 +116,13 @@ test('显式选择压过一切：存过之后，浏览器语言与 ?lang= 都翻
   await openAppNeutral(page);
   expect(await uiLanguage(page)).toBe('zh');
 
-  // 真的点切换器（不是往 localStorage 里塞值）。
+  // 真的点切换器（不是往 localStorage 里塞值）⇒ 先走真路径到设置那一层。
+  await openSettingsSheet(page);
   await page.getByTestId('language-option-en').click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  // 🔴 先关掉设置再判语言：`uiLanguage()` 读的是**范围列**那个导航词，而设置是浮层、
+  //   开着的时候范围列不在 DOM 里 —— 那时两条都不命中，这条会报成"侧栏没渲染"。
+  await closeSettingsSheet(page);
   expect(await uiLanguage(page)).toBe('en');
   // 这次**必须**落盘 —— 它是用户的选择，不是推断。
   expect(await page.evaluate((k) => localStorage.getItem(k), STORAGE_KEY)).toBe('en');
@@ -125,13 +131,13 @@ test('显式选择压过一切：存过之后，浏览器语言与 ?lang= 都翻
 
   // ① 刷新：同浏览器（zh）⇒ 仍是英文。
   await page.reload();
-  await expect(page.getByTestId('language-option-en')).toBeVisible();
+  await expect(page.getByTestId('rail-help')).toBeVisible();
   expect(await uiLanguage(page)).toBe('en');
 
   // ② 带一个**相反**的 ?lang= 进来 ⇒ 仍是英文。
   //    这条钉的是"陈旧参数不许覆盖用户明确的意图"（locale.ts 文件头那条纪律）。
   await page.goto('/?lang=zh-CN');
-  await expect(page.getByTestId('language-option-en')).toBeVisible();
+  await expect(page.getByTestId('rail-help')).toBeVisible();
   expect(await uiLanguage(page), '?lang=zh-CN 不该把已存的英文偏好翻回去').toBe('en');
 
   await page.screenshot({ path: 'test-results/language-first-launch-stored-wins.png' });

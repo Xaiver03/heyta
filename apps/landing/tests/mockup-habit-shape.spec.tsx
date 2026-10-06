@@ -61,16 +61,15 @@ import {
   MOCK_HABIT_KEYS,
   mockHeatCellClass,
 } from '../src/mockup/habit-shape.js';
+import { readUiSource, readWebSource } from './helpers/source-text.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = resolve(HERE, '..');
 const REPO = resolve(HERE, '../../..');
 
-const WEB_SRC = process.env.HEYTA_MOCKUP_WEB_SRC ?? join(REPO, 'apps/web/src');
-const UI_SRC = process.env.HEYTA_MOCKUP_UI_SRC ?? join(REPO, 'packages/ui/src');
-
-const readUi = (relative: string): string => readFileSync(join(UI_SRC, relative), 'utf8');
-const readWeb = (relative: string): string => readFileSync(join(WEB_SRC, relative), 'utf8');
+// 两枚注入接缝的唯一所有者是 `./helpers/source-text.ts`（理由见那份文件头）。
+const readUi = readUiSource;
+const readWeb = readWebSource;
 
 const habitsModelSource = (): string => readUi('habits/model.ts');
 const habitBoardSource = (): string => readUi('habits/HabitBoard.tsx');

@@ -98,7 +98,17 @@
    已全部改为跟着 `MAX_VECTOR_CLOCK_SIZE` 走（并补"输入确实超限"的前提断言）。
    写死数字的边界测试会在常量变动时**静默停止测试任何东西**。
 
-**除此之外，`src/` 的代码与上游一致；`tests/` 仅在上述第 5 条涉及的边界数据构造上做了常量化的调整。**
+6. **新增 heyta 薄层协议工具，不改上游向量比较语义**：
+   `src/conflict-classification.ts` 统一服务器/客户端使用的向量关系分类，
+   `src/causal-clock.ts` 只允许相对于已确认稳定前沿做安全压缩，并提供展开函数。
+   两者均是 heyta 的适配层，未修改上游 `compareVectorClocks` 或现有线协议字段。
+
+7. **新增 heyta 的同根口令重包裹 helper**：
+   `src/key-lifecycle.ts` 的 `rewrapVaultKeyPackage` 用于 E2EE 口令更换：保留
+   现有随机 root、递增 keyVersion，并生成新的恢复码/恢复包。它不改变上游同步
+   算法，也不把 root 或恢复码写入同步协议。
+
+**除此之外，`src/` 的代码与上游一致；`tests/` 仅在上述第 5 条涉及的边界数据构造上做了常量化的调整，另加了第 6 条适配层的单测。**
 
 > 保持改动最小是刻意的：这样将来上游修 bug 时，我们可以直接 diff 并同步。
 > 上面第 3、4 条都是**同一个根因**：上游代码假定了浏览器/Node 的运行时能力，
@@ -135,3 +145,7 @@ heyta 自己的逻辑**不应该写在这里**。集成代码请放在 `packages
 通过 `src/ports.ts` 里的 7 个 host Port 接入。
 
 改动本包会让"跟随上游更新"变得昂贵。
+
+## 2026-10-03 A3 压缩前提勘误（heyta 原创）
+
+`src/causal-clock.ts` 的压缩要求原操作时钟支配或等于前沿。仅接收端确认前沿不够：事后下载的前沿不能增加离线旧操作的因果依赖。只省略相等计数；更大计数和前沿未知键原样保留。`tests/causal-clock.spec.ts` 包含拒绝不支配前沿、101 设备生成时钟的精确往返和比较等价判据。HTTP 签名与协商位于 server/shared-schema/sync-client，不进入 vendored 算法层。

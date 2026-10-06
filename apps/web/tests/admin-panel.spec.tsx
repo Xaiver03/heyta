@@ -22,6 +22,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '@heyta/i18n';
+// 🔴 请求体的**唯一事实源**。测试直接拿它判发出的 body，所以界面里再写一份校验
+// 既没必要、也不会让这里变松 —— 两边标准必须只有一个。
+import { holidayYearPutSchema } from '@heyta/shared-schema';
 
 import { AdminPanel } from '../src/features/admin/AdminPanel.js';
 import { __resetAdminForTests } from '../src/features/admin/store.js';
@@ -172,12 +175,16 @@ describe('是管理员：渲染面板与概览', () => {
     expect(overview!.textContent).toContain('123.00 CNY');
   });
 
-  it('面板上有六个标签页，默认停在概览', async () => {
+  it('面板上有八个标签页，默认停在概览', async () => {
     stubFetch(200);
     const el = await renderPanel();
 
     const tabs = [...el.querySelectorAll('[role="tab"]')];
-    expect(tabs).toHaveLength(6);
+    // 第六个是 W4b 的「调休/补班」，第七个之前是「邀请」，第八个是本批的「退款」
+    // （三处都是 `TABS` 与 `AdminTab` 同批加的）。
+    // ⚠️ 这条判据的价值在"标签页数 = TABS 的长度"：
+    // 只改数字不改 TABS（或反过来）都会让它红。
+    expect(tabs).toHaveLength(8);
     expect(tabs[0]!.getAttribute('aria-selected')).toBe('true');
   });
 
@@ -458,3 +465,594 @@ async function clickIn(scope: HTMLElement, text: string): Promise<void> {
   });
   await flush();
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * W4b · 后台「调休 / 补班」面板。
+ *
+ * 服务端与线协议先于这一块存在（三条端点在 `server/src/admin/admin.routes.ts`，
+ * 请求体的**唯一事实源**是 `packages/shared-schema` 的 `holidayYearPutSchema`），
+ * 所以这一组判据钉的全是**接线层**能做错的事：
+ *
+ *   ① 出处链接必须**作为链接**渲染出来（判据②"回显"；只印一个数量不算）；
+ *   ② 保存发的是 **PUT**，body 过**契约**（界面里不许再写一份校验，
+ *      所以这里也不是"照着界面实现写一份断言"，而是直接拿契约来判）；
+ *   ③ 服务端拒绝时**错误可见**，而且不许把运营刚敲的那一年清空；
+ *   ④ 令牌没了 ⇒ 写面与读面**一个请求都不发**（那道闸住在 admin-client，
+ *      这里从界面侧确认它对新动词同样成立）；
+ *   ⑤ 撤销是**两步**，措辞是"退回随包数据"，不是"清空那一年"。
+ *
+ * 假后台**带状态**（PUT 真的写进 state、GET 真的读回来）：如果假服务端自己不变，
+ * 一个只改本地副本的实现也能让断言通过（§7 第 50 条）。
+ * ──────────────────────────────────────────────────────────────────────── */
+
+const PAPER_GOV_A = 'https://www.gov.cn/zhengce/content/202611/content_a.htm';
+const PAPER_GOV_B = 'https://www.gov.cn/gongbao/content/2027/content_b.htm';
+const HOLIDAY_T0 = Date.UTC(2026, 9, 1, 8, 30, 0);
+
+/** 后台 GET 的一行（`holidayAdjustmentsAdminListSchema` 的年度形状）。 */
+function recordedYear(overrides: Record<string, unknown> = {}) {
+  return {
+    year: 2026,
+    papers: [PAPER_GOV_A, PAPER_GOV_B],
+    days: [
+      { day: '2026-01-03', isOffDay: false },
+      { day: '2026-02-15', isOffDay: true },
+    ],
+    dayCount: 2,
+    updatedAt: HOLIDAY_T0,
+    updatedBy: 'boss@example.test',
+    note: '据 2026-11 调整公告',
+    ...overrides,
+  };
+}
+
+interface FakeHolidayServer {
+  listFetches: number;
+  putBodies: unknown[];
+  deletes: string[];
+}
+
+/**
+ * @param putStatus 400 用来演"契约拒了这次录入"（服务端会把逐字段原因回出来，
+ *                  但 `AdminResult` 的信封只带状态码 —— 界面要说的是"被拒绝"，
+ *                  而不是假装知道是哪一行错了）。
+ */
+function stubHolidayServer(
+  initial: ReturnType<typeof recordedYear>[] = [],
+  putStatus = 200,
+): FakeHolidayServer {
+  const years: unknown[] = [...initial];
+  const state: FakeHolidayServer = { listFetches: 0, putBodies: [], deletes: [] };
+  fetchMock = vi.fn((url: string, init?: { method?: string; body?: string }) => {
+    const path = url.replace(/^.*\/api\/admin/, '').split('?')[0];
+    const method = init?.method ?? 'GET';
+    if (path === '/overview') return Promise.resolve(json(OVERVIEW));
+    if (path === '/holiday-adjustments' && method === 'GET') {
+      state.listFetches += 1;
+      return Promise.resolve(json({ version: `1.${String(years.length)}.2`, years }));
+    }
+    if (path === '/holiday-adjustments/years' && method === 'PUT') {
+      const body = JSON.parse(String(init?.body)) as {
+        year: number;
+        papers: string[];
+        note: string | null;
+        days: { day: string; isOffDay: boolean }[];
+      };
+      state.putBodies.push(body);
+      if (putStatus !== 200) {
+        return Promise.resolve({
+          status: putStatus,
+          ok: false,
+          json: () =>
+            Promise.resolve({ error: 'Invalid holiday adjustment year.', issues: [] }),
+        } as unknown as Response);
+      }
+      // 🔴 真的写进 state：判据②要的是"**入库后**能回显"，不是"把请求里的字符串再印一遍"。
+      const stored = {
+        ...body,
+        dayCount: body.days.length,
+        updatedAt: HOLIDAY_T0 + 1,
+        updatedBy: 'boss@example.test',
+      };
+      years.splice(0, years.length, ...years.filter((y) => (y as { year: number }).year !== body.year), stored);
+      return Promise.resolve(
+        json({ ok: true, year: body.year, papers: body.papers, dayCount: body.days.length }),
+      );
+    }
+    if (path === '/holiday-adjustments/years' && method === 'DELETE') {
+      const year = Number(new URL(url).searchParams.get('year'));
+      const before = years.length;
+      years.splice(0, years.length, ...years.filter((y) => (y as { year: number }).year !== year));
+      state.deletes.push(`${method} ${url}`);
+      return Promise.resolve(json({ ok: true, year, deleted: before - years.length }));
+    }
+    return Promise.resolve(json({ items: [], total: 0, limit: 50, offset: 0 }));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return state;
+}
+
+/** 受控组件要**真的**触发 React 的 onChange（直接改 `.value` 会被 React 覆盖回去）。 */
+async function typeInto(el: HTMLElement, testId: string, value: string): Promise<void> {
+  const node = el.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+    `[data-testid="${testId}"]`,
+  );
+  if (node === null) throw new Error(`找不到输入框 ${testId}`);
+  const proto = node instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(proto.prototype, 'value')?.set?.call(node, value);
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function pressTestId(el: HTMLElement, testId: string): Promise<void> {
+  const node = el.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`);
+  if (node === null) throw new Error(`找不到控件 ${testId}`);
+  await act(async () => {
+    node.click();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
+/** 打开调休页（会触发一次列表 GET）。 */
+async function openHolidayTab(el: HTMLElement): Promise<void> {
+  await clickTab(el, '调休/补班');
+}
+
+describe('🔴 调休：出处链接必须回显成可点链接（判据②）', () => {
+  it('papers 渲染成 <a href>，链接文字就是那条 URL 本身', async () => {
+    stubHolidayServer([recordedYear()]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+
+    const links = [
+      ...el.querySelectorAll<HTMLAnchorElement>('[data-testid="admin-holiday-papers"] a'),
+    ];
+    expect(links).toHaveLength(2);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([PAPER_GOV_A, PAPER_GOV_B]);
+    expect(links[0]?.textContent).toBe(PAPER_GOV_A);
+    // 后台是被录入内容喂数据的页面：新标签页打开必须切断 window 反向引用。
+    expect(links[0]?.getAttribute('rel')).toContain('noopener');
+    // 录入者也要看得见 —— 这是"谁录的"这条审计事实唯一面向运营者的出口。
+    expect(el.querySelector('[data-testid="admin-holiday-years"]')!.textContent).toContain(
+      'boss@example.test',
+    );
+  });
+
+  it('没有任何录入时说的是"各端读的是随包数据"，不是"出错了"', async () => {
+    stubHolidayServer([]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+
+    expect(el.querySelectorAll('[data-testid="admin-holiday-papers"] a')).toHaveLength(0);
+    expect(el.textContent).toContain('还没有录入过任何一年');
+  });
+});
+
+describe('🔴 调休：保存 = 一次 PUT，body 由契约判', () => {
+  it('两个日期框各自决定 isOffDay，且整年只发一个请求', async () => {
+    const state = stubHolidayServer([]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+
+    await typeInto(el, 'admin-holiday-year-input', '2027');
+    await typeInto(el, 'admin-holiday-papers-input', PAPER_GOV_A);
+    await typeInto(el, 'admin-holiday-off-input', '2027-01-02\n2027-01-03\n');
+    await typeInto(el, 'admin-holiday-work-input', '2027-01-09');
+
+    await pressTestId(el, 'admin-holiday-save');
+
+    expect(state.putBodies).toHaveLength(1);
+    const body = state.putBodies[0];
+    // 🔴 唯一事实源是契约：这里**不重写一份校验**，只是把发出的东西交给它判。
+    // 界面少发一个键、把 isOffDay 写成字符串、note 发空串而不是 null ⇒ 这一条就红。
+    const parsed = holidayYearPutSchema.safeParse(body);
+    expect(parsed.success, JSON.stringify(parsed.success ? {} : parsed.error.issues)).toBe(true);
+    expect(body).toEqual({
+      year: 2027,
+      papers: [PAPER_GOV_A],
+      // 一个用户意图 = 一个请求：整年替换，不 fan-out。
+      note: null,
+      days: [
+        { day: '2027-01-02', isOffDay: true },
+        { day: '2027-01-03', isOffDay: true },
+        { day: '2027-01-09', isOffDay: false },
+      ],
+    });
+
+    // 保存**之后**必须再读一次服务端（`listFetches`：进页面 1 次 + 保存后 1 次）。
+    expect(state.listFetches).toBe(2);
+    const shown = [
+      ...el.querySelectorAll<HTMLAnchorElement>('[data-testid="admin-holiday-papers"] a'),
+    ];
+    expect(shown.map((link) => link.getAttribute('href'))).toEqual([PAPER_GOV_A]);
+    expect(el.querySelector('[data-testid="admin-holiday-notice"]')!.textContent).toContain(
+      '2027 年已保存，共 3 天安排',
+    );
+  });
+
+  it('填了备注就带上；不填是 null，不是空串', async () => {
+    const state = stubHolidayServer([]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+    await typeInto(el, 'admin-holiday-year-input', '2027');
+    await typeInto(el, 'admin-holiday-papers-input', PAPER_GOV_A);
+    await typeInto(el, 'admin-holiday-off-input', '2027-05-01');
+    await typeInto(el, 'admin-holiday-note-input', '据 2026-11 调整公告');
+    await pressTestId(el, 'admin-holiday-save');
+
+    const body = state.putBodies[0] as { note: string | null };
+    expect(body.note).toBe('据 2026-11 调整公告');
+    expect(holidayYearPutSchema.safeParse(body).success).toBe(true);
+  });
+});
+
+describe('🔴 调休：服务端拒绝时不许静默，也不许吞掉输入', () => {
+  it('PUT 回 400 ⇒ 错误行与"没有保存"都在，而那一年逐日表还留在框里', async () => {
+    const state = stubHolidayServer([], 400);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+    await typeInto(el, 'admin-holiday-year-input', '2027');
+    await typeInto(el, 'admin-holiday-papers-input', PAPER_GOV_A);
+    await typeInto(el, 'admin-holiday-off-input', '2027-02-30');
+    await pressTestId(el, 'admin-holiday-save');
+
+    // 界面**不判日期**：`2027-02-30` 照样发出去了 —— 判它的是契约。
+    // 这条断言防的是"以后有人往界面里加一份正则校验"，那会变成两套标准。
+    expect(state.putBodies).toHaveLength(1);
+    expect(
+      (state.putBodies[0] as { days: { day: string }[] }).days[0]?.day,
+    ).toBe('2027-02-30');
+
+    expect(el.querySelector('[data-testid="admin-error"]')!.textContent).toContain(
+      '请求参数不合法',
+    );
+    expect(el.querySelector('[data-testid="admin-holiday-notice"]')!.textContent).toContain(
+      '没有保存',
+    );
+    // 失败了还清空 = 把运营刚敲的一整年丢掉，让他从头再打一遍。
+    expect(
+      (el.querySelector('[data-testid="admin-holiday-off-input"]') as HTMLTextAreaElement).value,
+    ).toBe('2027-02-30');
+    // 没存进去就不许假装回显。
+    expect(el.querySelectorAll('[data-testid="admin-holiday-papers"] a')).toHaveLength(0);
+  });
+});
+
+describe('🔴 调休：没有令牌就一个请求都不发', () => {
+  it('会话中途令牌消失 ⇒ 保存/撤销都不许出门，并把原因说出来', async () => {
+    const state = stubHolidayServer([recordedYear({ year: 2026 })]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+    const before = fetchMock.mock.calls.length;
+
+    useSyncStore.setState({ token: undefined });
+    await typeInto(el, 'admin-holiday-year-input', '2027');
+    await typeInto(el, 'admin-holiday-papers-input', PAPER_GOV_A);
+    await typeInto(el, 'admin-holiday-off-input', '2027-01-02');
+    await pressTestId(el, 'admin-holiday-save');
+    await pressTestId(el, 'admin-holiday-revoke');
+    await pressTestId(el, 'admin-holiday-revoke-yes');
+
+    // 写面与读面共用同一道闸（`adminRequest` 里那一处短路）。
+    expect(fetchMock.mock.calls.length).toBe(before);
+    expect(state.putBodies).toHaveLength(0);
+    expect(state.deletes).toHaveLength(0);
+    expect(el.querySelector('[data-testid="admin-error"]')!.textContent).toContain('尚未登录');
+  });
+});
+
+describe('🔴 调休：撤销是两步，而且说的是"退回随包数据"', () => {
+  it('第一下只出确认文案，第二下才发 DELETE，年份在查询串里', async () => {
+    const state = stubHolidayServer([recordedYear({ year: 2026 })]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+
+    await pressTestId(el, 'admin-holiday-revoke');
+    const confirm = el.querySelector('[data-testid="admin-holiday-revoke-confirm"]');
+    expect(confirm).not.toBeNull();
+    // 🔴 语义判据：撤销一年 = 退回随包表，**不是**"清空那一年"。
+    expect(confirm!.textContent).toContain('随包');
+    expect(confirm!.textContent).not.toContain('清空');
+    // 一次点击不许删数据。
+    expect(state.deletes).toHaveLength(0);
+
+    await pressTestId(el, 'admin-holiday-revoke-cancel');
+    expect(el.querySelector('[data-testid="admin-holiday-revoke-confirm"]')).toBeNull();
+    expect(state.deletes).toHaveLength(0);
+
+    await pressTestId(el, 'admin-holiday-revoke');
+    await pressTestId(el, 'admin-holiday-revoke-yes');
+
+    expect(state.deletes).toHaveLength(1);
+    expect(state.deletes[0]).toContain('DELETE');
+    expect(state.deletes[0]).toContain('/api/admin/holiday-adjustments/years?year=2026');
+    // 撤销之后重读：那一行是从服务端消失的，不是本地抹掉的。
+    expect(state.listFetches).toBe(2);
+    expect(el.querySelector('[data-testid="admin-holiday-notice"]')!.textContent).toContain(
+      '2026 年的录入已撤销',
+    );
+    expect(el.querySelectorAll('[data-testid="admin-holiday-papers"] a')).toHaveLength(0);
+  });
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * 退款 tab（ADR-0053 落地面的最后一块：把那四条接口变成运营点得动的界面）。
+ *
+ * 这一组钉的全是**这一片界面自己能做错**的事：
+ *   ① 列表按 `listRefunds` 的投影逐字段渲染（少画一个字段 = 运营看不见那条事实）；
+ *   ② 🔴 **批准是两步**：点一次只出确认，第二次才发请求 —— 这一步会把钱交给通道，
+ *      发出去收不回来。驳回一步就够（它是什么都不发生的出口）；
+ *   ③ 动作之后**重新读回服务端**，界面说的状态来自 GET，不来自请求；
+ *   ④ 🔴 409 的**原因码要渲染成人话**（§5 第 11 条）：折成一句"服务端出错了"
+ *      就是让运营对一条"已经过了 7 天"的申请反复点同一个按钮；
+ *   ⑤ 不认识的码 ⇒ 把**原码**打出来（降级成"看得见码"，不降级成"编一个原因"）；
+ *   ⑥ 只有 `requested` 那一行给按钮（不是安全措施，是不制造一次注定失败的点击）。
+ *
+ * 假服务端**带状态**（批准真的把行改成 `processing`），理由与调休那一组相同：
+ * 一个自己不变的替身，能让"只改本地副本"的实现也通过（§7 第 50 条）。
+ * ──────────────────────────────────────────────────────────────────────── */
+const REFUND_DEMO_ROW = {
+  id: 1207,
+  orderId: 3304,
+  userId: 7719,
+  provider: 'wechat',
+  outRefundNo: 'HYRFDEMO0001',
+  amountMinor: 4012,
+  currency: 'CNY',
+  periodDays: 30,
+  status: 'requested',
+};
+
+interface FakeRefundServer {
+  listFetches: number;
+  approveBodies: unknown[];
+  rejectBodies: unknown[];
+  requestBodies: unknown[];
+}
+
+/**
+ * @param requestStatus `POST /refunds` 的返回码：409 用来演"政策拒绝这次申请"，
+ *                      而**被拒的那一单永远不该出现在列表里**。
+ * @param denyReason    409 体里的原因码（`undefined` = 服务端没给码）。
+ */
+function stubRefundServer(
+  initial: Record<string, unknown>[] = [REFUND_DEMO_ROW],
+  requestStatus = 201,
+  denyReason?: string,
+): FakeRefundServer {
+  // 🔴 逐行**浅拷贝一份**：假服务端会改 `row.status`，而 `initial` 的默认值是模块级常量 ——
+  // 只摊开数组会让上一条用例把同一枚对象改脏，下一条用例于是报「找不到输入框」（本次实测撞到过）。
+  const rows: Record<string, unknown>[] = initial.map((row) => ({ ...row }));
+  let nextId = 9001;
+  const state: FakeRefundServer = {
+    listFetches: 0,
+    approveBodies: [],
+    rejectBodies: [],
+    requestBodies: [],
+  };
+  const fail = (status: number, body: unknown) =>
+    Promise.resolve({ status, ok: false, json: () => Promise.resolve(body) } as unknown as Response);
+
+  fetchMock = vi.fn((url: string, init?: { method?: string; body?: string }) => {
+    const path = url.replace(/^.*\/api\/admin/, '').split('?')[0] ?? '';
+    const method = init?.method ?? 'GET';
+    if (path === '/overview') return Promise.resolve(json(OVERVIEW));
+
+    if (path === '/refunds' && method === 'GET') {
+      state.listFetches += 1;
+      return Promise.resolve(json({ refunds: rows }));
+    }
+    if (path === '/refunds' && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      state.requestBodies.push(body);
+      if (requestStatus !== 201) {
+        return fail(requestStatus, {
+          error: 'Refund not allowed.',
+          ...(denyReason === undefined ? {} : { reason: denyReason }),
+        });
+      }
+      rows.unshift({
+        ...REFUND_DEMO_ROW,
+        id: nextId,
+        orderId: body.orderId,
+        outRefundNo: `HYRFNEW${String(nextId)}`,
+        status: 'requested',
+      });
+      nextId += 1;
+      return Promise.resolve(
+        json({ ok: true, outcome: 'requested', refundId: nextId - 1, outRefundNo: 'x', amountMinor: 4012 }),
+      );
+    }
+    const decided = /^\/refunds\/(\d+)\/(approve|reject)$/.exec(path);
+    if (decided !== null) {
+      const id = Number(decided[1]);
+      const body = JSON.parse(String(init?.body)) as { note: string };
+      const row = rows.find((entry) => entry.id === id);
+      if (row === undefined || row.status !== 'requested') {
+        return fail(409, { error: 'Refund already decided or finished.', reason: 'NOT_DECIDABLE' });
+      }
+      // 🔴 真的改 state：批准之后 GET 回来的那一行必须是**新状态**，
+      // 否则"界面说的是请求里带的字"这种实现也能通过。
+      row.status = decided[2] === 'approve' ? 'processing' : 'rejected';
+      (decided[2] === 'approve' ? state.approveBodies : state.rejectBodies).push(body);
+      return Promise.resolve(
+        json(
+          decided[2] === 'approve'
+            ? { ok: true, outcome: 'submitted', status: 'processing', providerRefundId: '5030' }
+            : { ok: true, outcome: 'decided', status: 'rejected' },
+        ),
+      );
+    }
+    return Promise.resolve(json({ items: [], total: 0, limit: 50, offset: 0 }));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return state;
+}
+
+async function openRefundTab(el: HTMLElement): Promise<void> {
+  await clickTab(el, '退款');
+}
+
+function refundNoticeText(el: HTMLElement): string {
+  return el.querySelector('[data-testid="admin-refund-notice"]')?.textContent ?? '';
+}
+
+describe('🔴 退款：列表把投影里的每个字段都画出来', () => {
+  it('9 个投影键逐键可见，且没有 undefined 漏进界面', async () => {
+    stubRefundServer();
+    const el = await renderPanel();
+    await openRefundTab(el);
+
+    const row = el.querySelector('[data-testid="admin-refunds"] li')!.textContent ?? '';
+    // 存在性判据（W5 那条教训：**断言只会验界面写了什么，不会验界面少了什么**）：
+    // 少画任何一列 ⇒ 这一条红，而"整块渲染了"是看不出来的。
+    for (const value of [
+      '#1207',
+      '3304',
+      '7719',
+      'HYRFDEMO0001',
+      '40.12',
+      'CNY',
+      '30',
+      'wechat',
+      'requested',
+    ]) {
+      expect(row).toContain(value);
+    }
+    expect(row).not.toContain('undefined');
+  });
+
+  it('一条申请都没有时说的是"还没有过任何一条"，不是"出错了"', async () => {
+    stubRefundServer([]);
+    const el = await renderPanel();
+    await openRefundTab(el);
+
+    expect(el.textContent).toContain('还没有过任何一条退款申请');
+    expect(el.querySelector('[data-testid="admin-error"]')).toBeNull();
+  });
+});
+
+describe('🔴 退款：批准要两步，驳回一步', () => {
+  it('点「批准」只出确认，**不发请求**；确认之后才发给通道', async () => {
+    const state = stubRefundServer();
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-note-1207', '用户坚持，客服同意');
+
+    await pressTestId(el, 'admin-refund-approve-1207');
+    // 🔴 这一条是钱的那道闸：一次点击就动钱的界面，靠"再确认"挡住手滑。
+    expect(state.approveBodies).toHaveLength(0);
+    expect(el.querySelector('[data-testid="admin-refund-approve-confirm"]')).not.toBeNull();
+
+    await pressTestId(el, 'admin-refund-approve-yes-1207');
+    expect(state.approveBodies).toEqual([{ note: '用户坚持，客服同意' }]);
+    // 动作之后**再读一次**（进页面 1 次 + 动作后 1 次）。
+    expect(state.listFetches).toBe(2);
+    // 界面说的是重新读回来的那一行：processing，而且**没有**"已退款"。
+    const row = el.querySelector('[data-testid="admin-refunds"] li')!.textContent ?? '';
+    expect(row).toContain('processing');
+    expect(refundNoticeText(el)).toContain('已交给支付通道');
+    expect(el.textContent).not.toContain('已退款');
+    // 已经不在 `requested` 的那一行不再给按钮（⑥）。
+    expect(el.querySelector('[data-testid="admin-refund-approve-1207"]')).toBeNull();
+  });
+
+  it('「驳回」一步就发，且说的是"钱和权益都不动"', async () => {
+    const state = stubRefundServer();
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-note-1207', '不在政策内');
+
+    await pressTestId(el, 'admin-refund-reject-1207');
+
+    expect(state.rejectBodies).toEqual([{ note: '不在政策内' }]);
+    expect(refundNoticeText(el)).toContain('已驳回');
+    expect(refundNoticeText(el)).toContain('钱和权益都不动');
+  });
+});
+
+describe('🔴 退款：409 的原因码必须到得了运营眼前（ADR-0053 §5 第 11 条）', () => {
+  it('超窗被拒 ⇒ 界面说的是"时间窗"这句话，而不是一句笼统的服务端错误', async () => {
+    const state = stubRefundServer([], 409, 'WINDOW_PASSED');
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-order-input', '3304');
+    await typeInto(el, 'admin-refund-request-note', '用户来申请');
+
+    await pressTestId(el, 'admin-refund-request');
+
+    expect(state.requestBodies).toEqual([{ orderId: 3304, note: '用户来申请' }]);
+    // 🔴 变异点：把 `readServerReason` 拿掉 ⇒ 这里只剩通用措辞，这一条转红。
+    expect(refundNoticeText(el)).toContain('超出当前退款政策的时间窗');
+    // 折成 5xx 那句"服务端出错了"就是把"你的参数没问题、是那一单的状态不允许"这条事实弄丢了。
+    expect(el.textContent).not.toContain('服务端出错了');
+    // 被拒的申请**不该**出现在列表里（假服务端也没真的加行）。
+    expect(el.querySelector('[data-testid="admin-refunds"] li')).toBeNull();
+  });
+
+  it('服务端给了一个这台界面**不认识**的码 ⇒ 原码打出来，界面不猜', async () => {
+    stubRefundServer([], 409, 'SOMETHING_NEW');
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-order-input', '3304');
+    await pressTestId(el, 'admin-refund-request');
+
+    expect(refundNoticeText(el)).toContain('SOMETHING_NEW');
+  });
+
+  it('409 但体里**没有**原因码 ⇒ 界面承认"没有码"，不编一个原因', async () => {
+    stubRefundServer([], 409);
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-order-input', '3304');
+    await pressTestId(el, 'admin-refund-request');
+
+    // 说的是"没给码"这一句（而不是某个具体原因，也不是"服务端坏了"）。
+    expect(refundNoticeText(el)).toContain('而服务端没有给出原因码');
+    expect(refundNoticeText(el)).not.toContain('原因码：');
+    expect(el.textContent).not.toContain('服务端出错了');
+  });
+
+  it('服务端回了一个这台界面**不认识**的 outcome ⇒ 说"不认识"，不说成功', async () => {
+    // 客户端那份 outcome 联合是手抄的（词表住在服务端）。这一条钉的是抄漏之后会静默
+    // "读成成功"那一格：界面宁可承认自己看不懂，也不许替运营编一个"钱已经发出去了"。
+    fetchMock = vi.fn((url: string, init?: { method?: string }) => {
+      const path = url.replace(/^.*\/api\/admin/, '').split('?')[0];
+      if (path === '/overview') return Promise.resolve(json(OVERVIEW));
+      if (path === '/refunds' && (init?.method ?? 'GET') === 'GET') {
+        return Promise.resolve(json({ refunds: [{ ...REFUND_DEMO_ROW }] }));
+      }
+      return Promise.resolve(
+        json({ ok: true, outcome: 'refunded_out_of_band', status: 'success' }),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await pressTestId(el, 'admin-refund-approve-1207');
+    await pressTestId(el, 'admin-refund-approve-yes-1207');
+
+    expect(refundNoticeText(el)).toContain('不认识的结果码');
+    expect(refundNoticeText(el)).toContain('refunded_out_of_band');
+    expect(refundNoticeText(el)).not.toContain('已交给支付通道');
+  });
+
+  it('勾了"例外"才会带上 operatorApproved（不勾就是不带这个键，由服务端按默认处理）', async () => {
+    const state = stubRefundServer();
+    const el = await renderPanel();
+    await openRefundTab(el);
+    await typeInto(el, 'admin-refund-order-input', '3304');
+    await typeInto(el, 'admin-refund-request-note', '超窗但客服同意');
+    await pressTestId(el, 'admin-refund-exception');
+
+    await pressTestId(el, 'admin-refund-request');
+
+    expect(state.requestBodies).toEqual([
+      { orderId: 3304, note: '超窗但客服同意', operatorApproved: true },
+    ]);
+  });
+});

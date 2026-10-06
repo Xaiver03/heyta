@@ -39,28 +39,43 @@
  */
 
 export {
+  DEFAULT_LIST_LIMIT,
   DEFAULT_LOCAL_API_CONFIG,
+  LIST_TASKS_MAX_DUE_SPAN_DAYS,
   LOCAL_API_TOOLS,
+  MAX_TASKS_PER_BATCH_COMPLETE,
+  MAX_TOOLS_PER_ENTITY,
   TOOL_ENVELOPE_EGRESS_FIELDS,
   authorizeToolCall,
+  calendarDaysBetween,
+  clampListLimit,
   findTool,
   isLoopbackAddress,
   isToolGranted,
+  parseCalendarDay,
+  parseTimeOfDay,
   projectAllForTool,
+  projectEventListForTool,
   projectListForTool,
   projectForTool,
+  readEventForTool,
   readItemForTool,
+  readListTasksDueArgs,
   toolNames,
   validateLocalApiConfig,
+  type EventReadVerdict,
   type LocalApiConfig,
   type LocalApiConfigError,
   type LocalApiConfigVerdict,
+  type LocalApiEventItem,
   type LocalApiItem,
   type LocalApiTool,
   type LocalApiWriteIntent,
   type LocalApiWritePort,
   type LocalApiWriteResult,
+  type LocalApiWrittenEntityType,
   type ReadVerdict,
+  type TimeOfDay,
   type ToolCallDenialReason,
   type ToolCallVerdict,
   type ToolKind,
@@ -72,8 +87,10 @@ export {
   MCP_SERVER_NAME,
   errorCodeForDenial,
   handleToolsCall,
+  hasInputSchemaFor,
   listAuthorizedTools,
   listMcpTools,
+  recordedInputSchemaNames,
   type AuthorizedToolDefinition,
   type JsonRpcError,
   type JsonRpcRequest,
@@ -82,15 +99,41 @@ export {
   type ToolCallOutcome,
 } from './mcp.js';
 
+/**
+ * 实体工具包的接缝与聚合结果。
+ *
+ * 🔴 `LOCAL_API_TOOL_PACKS` 是**导出件**，不只是内部实现：
+ * `scripts/gen-ai-capability-manifest.mjs` 从构建产物里读它的 `schemas` 键集，
+ * 用来回答"这个工具的参数 schema 有没有被登记过"（`schemaRecorded`）——
+ * 那是 dist 层面唯一问得到、而 `listAuthorizedTools()` 的空 `properties` 回退
+ * 会把两种情况长得一模一样的问题。
+ */
+export {
+  LOCAL_API_TOOL_PACKS,
+  buildToolPackRegistry,
+  type ToolPackRegistry,
+} from './tools/registry.js';
+export type { EntityToolPack } from './tools/pack.js';
+
 export {
   LOCAL_API_METHODS,
   createLocalApiHandler,
   runReadTool,
   toWriteIntent,
+  type LocalApiFocusSession,
+  type LocalApiHabit,
+  type LocalApiHabitLog,
   type LocalApiHandler,
   type LocalApiHandlerDeps,
   type LocalApiHost,
+  type LocalApiNote,
+  type LocalApiNoteRow,
   type LocalApiProject,
+  type LocalApiReminder,
+  type LocalApiTag,
+
+  type ListEventsQuery,
+  type ListTasksQuery,
   type ToolReadOutcome,
   type ToolWriteIntentOutcome,
 } from './server.js';

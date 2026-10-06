@@ -20,11 +20,16 @@ import { consentFetch } from '../privacy/consent-gate';
 import { emitLocalWrite } from '../sync/write-signal';
 import { hostPublishSource } from '../widgets/publish-source';
 import { publishWidgetSnapshot } from '../widgets/publish';
+import {
+  isVaultRootAutoUnlockDisabled,
+  loadVaultRootKey,
+} from '../lib/vault-secure-storage';
 import { opSqliteDriverFactory } from './op-sqlite-driver';
 
 const DB_NAME = 'heyta.sqlite';
 
 let pending: Promise<AppHost> | null = null;
+let resolvedHost: AppHost | undefined;
 
 /**
  * 在宿主外面包一层：**每次写入之后喊一声"写了"**，自动同步据此把改动推出去，
@@ -95,6 +100,13 @@ export function openTaskHost(): Promise<AppHost> {
        * 立刻生效，不需要重启应用。
        */
       getSyncConfig: readSyncConfig,
+      // The host reads the opt-in root before constructing the first vault
+      // sync client. Settings UI is only the control surface; it is not part
+      // of the unlock path required for background/automatic sync.
+      vaultRootKeyStore: {
+        load: (scope) => loadVaultRootKey(scope),
+        isAutoUnlockDisabled: async (scope) => isVaultRootAutoUnlockDisabled(scope),
+      },
       /**
        * 🔴 **显式注入闸门，而不是靠"全局那个 `fetch` 已经被换掉了"。**
        *
@@ -111,12 +123,33 @@ export function openTaskHost(): Promise<AppHost> {
        * **以后新加的调用点忘了传 `fetchImpl`**。两半各拦一类失效，都要在。
        */
       fetchImpl: consentFetch,
-    }).then(withWriteSignal);
+      /**
+       * 🔴 本机明文被销毁（主动注销或别的设备注销后同步读到信号）之后，
+       * **把这个单例作废**：`pending`/`resolvedHost` 里那个 `AppHost` 已经持着一个
+       * 按口径 B 拒绝读写的 adapter，留着它，下一屏拿到的还是同一个死实例。
+       * 作废之后下一次 `openTaskHost()` 会重开一份全新空库 —— 那才是政策承诺的形状。
+       */
+      onLocalDataErased: resetTaskHostCache,
+    }).then(withWriteSignal).then((host) => {
+      resolvedHost = host;
+      return host;
+    });
   }
   return pending;
+}
+
+/** Return the singleton only when it has already finished opening. */
+export function getOpenTaskHostIfReady(): AppHost | undefined {
+  return resolvedHost;
+}
+
+/** Synchronously fence the host session during logout; never opens a host. */
+export function invalidateTaskHostVaultSession(): void {
+  resolvedHost?.invalidateVaultSession();
 }
 
 /** 仅供测试与"重开数据库"这类显式场景使用。 */
 export function resetTaskHostCache(): void {
   pending = null;
+  resolvedHost = undefined;
 }

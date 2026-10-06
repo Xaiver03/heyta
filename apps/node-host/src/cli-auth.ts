@@ -185,8 +185,20 @@ function policyText(policyCode: string | undefined): string | undefined {
   }
 }
 
+/**
+ * 失败原因 → 终端上那句话。**唯一事实源是上面的 `REASON_TEXT`。**
+ *
+ * 🔴 导出去给 `account close` 用，而不是在那边再抄一份：那张表是
+ * `Record<HostedAuthFailureReason, string>`，抄第二份就等于把"编译期穷尽检查"
+ * 变成"两份各自漂"（本仓库为这个形状栽过多次）。
+ */
+export function reasonText(reason: HostedAuthFailureReason): string {
+  return REASON_TEXT[reason];
+}
+
 function describeFailure(failure: HostedAuthFailure): string {
   const base = REASON_TEXT[failure.reason];
+
   const policy =
     failure.reason === 'password-policy' ? policyText(failure.policyCode) : undefined;
   const locked =

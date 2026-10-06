@@ -16,12 +16,21 @@ import { describe, expect, it } from 'vitest';
 
 import {
   JSON_RPC_ERRORS,
+  LOCAL_API_TOOLS,
   createLocalApiHandler,
+  runReadTool,
+  toWriteIntent,
   type JsonRpcRequest,
   type JsonRpcResponse,
   type LocalApiConfig,
+  type LocalApiFocusSession,
+  type LocalApiHabitLog,
+  type LocalApiEventItem,
   type LocalApiHost,
   type LocalApiItem,
+  type LocalApiNoteRow,
+  type LocalApiReminder,
+  type LocalApiTag,
   type LocalApiWriteIntent,
   type LocalApiWriteResult,
 } from '../src/index.js';
@@ -33,14 +42,12 @@ const CONFIG: LocalApiConfig = {
   bindAddress: '127.0.0.1',
   port: 47_119,
   token: TOKEN,
-  grants: {
-    list_tasks: true,
-    get_task: true,
-    list_projects: true,
-    create_task: true,
-    update_task: true,
-    complete_task: true,
-  },
+  // 🔴 授权集合**从目录派生**，不是手抄工具名。
+  // 原来这里抄了 6 个名字，于是 W10 给目录加 4 条时，`tools/list` 那条
+  // `toHaveLength(6)` 会**因为"没授权新工具"而假绿** —— 它测的还是旧的那 6 条。
+  // 派生之后目录一扩，这个文件的所有"全量"断言自动跟过去（而"前提确实成立"
+  // 由下面那条 `>= 10` 与逐条点名兜住，见 AGENTS §7 元规则 2）。
+  grants: Object.fromEntries(LOCAL_API_TOOLS.map((t) => [t.name, true])),
 };
 
 /** 只授权一部分 —— 用来测"未授权的调不动"。 */
@@ -79,6 +86,18 @@ function recordingHost() {
       calls.push('listProjects');
       return Promise.resolve([{ id: 'p1', name: '工作', taskCount: 3 }]);
     },
+    listHabits: () => {
+      calls.push('listHabits');
+      return Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]);
+    },
+    listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+    listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+    listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+    listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+    getEvent: () => Promise.resolve(undefined),
     submit: (intent) => {
       calls.push('submit');
       submitted.push(intent);
@@ -181,7 +200,14 @@ describe('🔴 tools/list —— 未授权的工具不可见', () => {
     const { handle } = handler();
     const res = expectResponse(await handle(req('tools/list'), TOKEN));
     const tools = (res as { result: { tools: readonly { name: string }[] } }).result.tools;
-    expect(tools).toHaveLength(6);
+    // 前提：**目录确实有 10 条**（W10 之前是 6）。这条会随目录增长而需要人再看一眼，
+    // 这是刻意的 —— 它就是"有人动过目录"的信号，不是要维护的抄件。
+    expect(LOCAL_API_TOOLS.length).toBeGreaterThanOrEqual(10);
+    expect(tools).toHaveLength(LOCAL_API_TOOLS.length);
+    // 倒数日的四条**真的在列表里**（少了 `>= 10` 那条前提时，这条是唯一会红的）
+    for (const name of ['list_events', 'get_event', 'create_event', 'update_event']) {
+      expect(tools.map((t) => t.name)).toContain(name);
+    }
     // 限制授权后只剩 4 个
     const restricted = handler(RESTRICTED);
     const r2 = await restricted.handle(req('tools/list'), TOKEN);
@@ -295,6 +321,15 @@ describe('🔴🔴 写操作：只经 host.submit', () => {
       listTasks: () => Promise.resolve([]),
       getTask: () => Promise.resolve(undefined),
       listProjects: () => Promise.resolve([]),
+      listHabits: () => Promise.resolve([]),
+      listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+      listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+      getNote: () => Promise.resolve(undefined),
+      listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+      listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+      listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+      listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+      getEvent: () => Promise.resolve(undefined),
       submit: () => Promise.resolve({ ok: false, reason: 'invalid', message: '标题太长' }),
     };
     const { handle } = handler(CONFIG, failing);
@@ -393,6 +428,15 @@ function captureHost(items: readonly LocalApiItem[] = TASKS) {
     },
     getTask: () => Promise.resolve(undefined),
     listProjects: () => Promise.resolve([]),
+    listHabits: () => Promise.resolve([]),
+    listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+    listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+    listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+    listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+    getEvent: () => Promise.resolve(undefined),
     submit: () => Promise.resolve<LocalApiWriteResult>({ ok: true, taskId: 'x' }),
   };
   return { host, seen };
@@ -570,5 +614,185 @@ describe('🔴🔴 通知（notification）不得有响应', () => {
     const handle = createLocalApiHandler({ host, getConfig: () => CONFIG });
     const response = await handle({ jsonrpc: '2.0', id: 1, method: 'initialize' }, CONFIG.token);
     expect(response).toBeDefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// W10：倒数日（`EVENT`）的两条读 + 两条写
+// ─────────────────────────────────────────────────────────────────────────
+
+const EVENTS: readonly LocalApiEventItem[] = [
+  {
+    id: 'e1',
+    title: '妈妈生日',
+    date: '1968-04-12',
+    kind: 'birthday',
+    nextOccurrence: '2027-04-12',
+    daysFromToday: 190,
+    repeating: true,
+    isLunar: false,
+    pinned: false,
+    notes: '记得订蛋糕',
+    readable: true,
+  },
+  {
+    id: 'e2',
+    title: '体检报告',
+    date: '2026-11-01',
+    kind: 'countdown',
+    nextOccurrence: '2026-11-01',
+    daysFromToday: 28,
+    repeating: false,
+    isLunar: false,
+    pinned: true,
+    notes: '身份证号 110101...',
+    readable: false,
+  },
+];
+
+/** 只给倒数日数据的假宿主（其余方法沿用记账宿主，不影响本段的断言）。 */
+function eventHost(events: readonly LocalApiEventItem[] = EVENTS): LocalApiHost & { listCalls: unknown[] } {
+  const base = recordingHost();
+  const listCalls: unknown[] = [];
+  return {
+    ...base.host,
+    listEvents: (args) => {
+      listCalls.push(args);
+      return Promise.resolve(events);
+    },
+    getEvent: (id) => Promise.resolve(events.find((e) => e.id === id)),
+    listCalls,
+  };
+}
+
+describe('runReadTool —— 倒数日的读侧', () => {
+  it('list_events：正文一律不出（目录描述与 egressFields 都这么承诺）', async () => {
+    const run = await runReadTool(eventHost(), 'list_events', {});
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    const json = JSON.stringify(run.payload);
+    expect(json).not.toContain('记得订蛋糕');
+    expect(json).not.toContain('110101');
+    const items = run.payload as readonly Record<string, unknown>[];
+    expect(items.map((i) => i['id'])).toEqual(['e1', 'e2']);
+    // 元数据仍在 —— "可列举"是这条立场的另一半
+    expect(items[0]).toMatchObject({ title: '妈妈生日', kind: 'birthday', daysFromToday: 190 });
+  });
+
+  it('list_events：受保护的那条仍然出现，只是 readable=false', async () => {
+    const run = await runReadTool(eventHost(), 'list_events', {});
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    const protectedItem = (run.payload as readonly LocalApiEventItem[]).find((e) => e.id === 'e2');
+    expect(protectedItem?.readable).toBe(false);
+    expect(protectedItem?.notes).toBeUndefined();
+    // 🔴 白名单重建：**没有**这个键，而不是"键在但值为空"
+    expect(Object.keys(protectedItem ?? {})).not.toContain('notes');
+  });
+
+  it('get_event：可读的那条带正文，不可读的那条**明确拒绝**', async () => {
+    const ok = await runReadTool(eventHost(), 'get_event', { eventId: 'e1' });
+    expect(ok.ok).toBe(true);
+    if (!ok.ok) return;
+    expect((ok.payload as LocalApiEventItem).notes).toBe('记得订蛋糕');
+
+    const denied = await runReadTool(eventHost(), 'get_event', { eventId: 'e2' });
+    expect(denied.ok).toBe(false);
+    if (denied.ok) return;
+    expect(denied.kind).toBe('not-readable');
+    expect(denied.message).toContain('受保护');
+  });
+
+  it('get_event 找不到时是带 error 的正常结果（与 get_task 同一形状，钉着别改）', async () => {
+    const run = await runReadTool(eventHost(), 'get_event', { eventId: '没有这条' });
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    expect(run.payload).toEqual({ error: '没有找到这个倒数日。' });
+  });
+
+  it('get_event 缺 eventId ⇒ invalid-args（不猜、不用列表代替）', async () => {
+    const run = await runReadTool(eventHost(), 'get_event', {});
+    expect(run.ok).toBe(false);
+    if (run.ok) return;
+    expect(run.kind).toBe('invalid-args');
+  });
+
+  // （原"宿主没接倒数日 ⇒ 响亮报错"那条测试随 2026-10-03 合流撤掉：
+  //   listEvents/getEvent 已改为必填成员 —— 保护从运行时检查升级成编译期闸，
+  //   与 listHabits/listTags 同一立场；recordingHost 现在必须实现它们。）
+
+  it('limit 是递过去的，截断由宿主做（协议层不擅自截）', async () => {
+    const h = eventHost();
+    await runReadTool(h, 'list_events', { limit: 7 });
+    expect(h.listCalls[0]).toEqual({ limit: 7 });
+    await runReadTool(h, 'list_events', { limit: '不是数' });
+    expect(h.listCalls[1]).toEqual({});
+  });
+});
+
+describe('toWriteIntent —— 倒数日的写侧（**只产意图，不落库**）', () => {
+  it('create_event 收齐字段', () => {
+    const w = toWriteIntent('create_event', {
+      title: '结婚纪念日',
+      date: '2016-05-01',
+      kind: 'anniversary',
+      isLunar: true,
+      recurrence: 'FREQ=YEARLY;INTERVAL=1',
+      notes: '每年',
+    });
+    expect(w.ok).toBe(true);
+    if (!w.ok) return;
+    expect(w.intent).toEqual({
+      action: 'create-event',
+      title: '结婚纪念日',
+      date: '2016-05-01',
+      kind: 'anniversary',
+      isLunar: true,
+      recurrence: 'FREQ=YEARLY;INTERVAL=1',
+      notes: '每年',
+    });
+  });
+
+  it('create_event 缺 date ⇒ 拒绝（倒数日没有日期就没有意义，不猜"今天"）', () => {
+    const w = toWriteIntent('create_event', { title: '某事' });
+    expect(w.ok).toBe(false);
+    if (w.ok) return;
+    expect(w.message).toContain('date');
+  });
+
+  it('create_event 缺 title ⇒ 拒绝', () => {
+    expect(toWriteIntent('create_event', { date: '2026-01-01' }).ok).toBe(false);
+  });
+
+  it('update_event 要 eventId 与 fields', () => {
+    const w = toWriteIntent('update_event', { eventId: 'e1', fields: { pinned: true } });
+    expect(w.ok).toBe(true);
+    if (w.ok) expect(w.intent).toEqual({ action: 'update-event', eventId: 'e1', fields: { pinned: true } });
+    expect(toWriteIntent('update_event', { fields: {} }).ok).toBe(false);
+    expect(toWriteIntent('update_event', { eventId: 'e1' }).ok).toBe(false);
+  });
+
+  it('🔴 意图里**没有** op 的形状：只有 action 与字段，实体类型不在其中', () => {
+    // `entityType` 字面量出现 = 本包在拼 op，那必须经 `dispatch()` 的动作层。
+    const w = toWriteIntent('create_event', { title: 'a', date: '2026-01-01' });
+    expect(w.ok).toBe(true);
+    if (!w.ok) return;
+    expect(JSON.stringify(w.intent)).not.toContain('entityType');
+    expect(JSON.stringify(w.intent)).not.toContain('EVENT');
+  });
+
+  it('写工具经由协议层时**只**通过 host.submit 发生', async () => {
+    const { host, submitted, calls } = recordingHost();
+    const handle = createLocalApiHandler({
+      host: { ...host },
+      getConfig: () => CONFIG,
+    });
+    const res = await handle(
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'create_event', arguments: { title: '生日', date: '2026-01-01' } } },
+      TOKEN,
+    );
+    expect(res).toBeDefined();
+    expect(calls).toEqual(['submit']);
+    expect(submitted[0]?.action).toBe('create-event');
   });
 });

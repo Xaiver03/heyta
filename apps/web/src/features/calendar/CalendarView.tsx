@@ -32,9 +32,10 @@
  * 共享板仍然只管画：翻月、选日都是宿主的事（手机上也许是手势翻月）。
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
+import { adjustmentOn, scopeTasks, toLocalDate, type LocalDate } from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
 import {
   CalendarBoard as SharedCalendarBoard,
   HeytaUiProvider,
@@ -42,8 +43,10 @@ import {
 } from '@heyta/ui';
 
 import { CaptureComposer } from '../capture/CaptureComposer.js';
+import { useCountdownStore } from '../countdown/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
+import { useDragDayNav } from './useDragDayNav.js';
 import { useWheelMonthNav } from './useWheelMonthNav.js';
 import { useCalendarViewStore } from './store.js';
 
@@ -85,6 +88,60 @@ export function CalendarView(): React.JSX.Element {
   const labels = useCalendarLabels();
 
   /**
+   * 「休 / 班」标记（W4b 公共事实，ADR-0052 §2.6）。
+   *
+   * 🔴 这里**只有一条读**：`adjustmentOn(date)` —— 判断（有覆盖用覆盖、没覆盖退回随包表、
+   * 覆盖里日期非法整年拒绝）全在 `@heyta/domain`，而"什么时候去拉、拉回来存哪"
+   * 全在 `@heyta/app-host`。宿主这一层要是能自己决定"这天算不算休"，
+   * 那就是 AGENTS §3.5 那条分界线上的一次后退。
+   *
+   * ⚠️ 函数身份挂在 `publicFactsEpoch` 上：覆盖表是领域层的模块级状态，React 看不见它，
+   * 换一次函数身份才保证那 42 个格子**无论有没有被 memo 包住**都会重读。
+   */
+  const markerEpoch = view.publicFactsEpoch;
+  const dayMarker = useCallback(
+    (date: LocalDate): 'off' | 'work' | undefined => adjustmentOn(date),
+    [markerEpoch],
+  );
+
+  const { t } = useI18n();
+  /** 词表没给时共享层会退化成一颗点 —— 而"用颜色说话"违反 AGENTS §5，所以必须给。 */
+  const dayMarkerLabels = useMemo(
+    () => ({
+      off: t('common.calendar.dayMarker.off'),
+      work: t('common.calendar.dayMarker.work'),
+    }),
+    [t],
+  );
+
+  /**
+   * 倒数日：日历的**第二个日期数据源**（W6）。
+   *
+   * 🔴 宿主在这里只做两件事：把 store 里那份活的事件交给板子，并把三个说法注入。
+   * "哪一天真的发生"是 `@heyta/domain` 的 `eventOccurrencesInRange`，
+   * "折成几条 +N"是共享层的 `calendarCellBars` —— 这里再算一遍就是第二份数学。
+   *
+   * ⚠️ `syncToday` 这一句不是客套：那份 store 的"今天"原先**只由倒数日页播种**，
+   *   没进过倒数日页就直接开日历时它是 `undefined`，而 `refresh()` 在拿到
+   *   "今天"之前**不猜**（故意的）。后果不是报错，是日历上安静地一个倒数日都没有 ——
+   *   "共享组件支持了"与"宿主真的接上了"是两件事，这条就是那条坑的第五种面目。
+   */
+  const events = useCountdownStore((s) => s.events);
+  const syncCountdownToday = useCountdownStore((s) => s.syncToday);
+  useEffect(() => {
+    syncCountdownToday(today);
+  }, [syncCountdownToday, today]);
+
+  const eventLabels = useMemo(
+    () => ({
+      today: t('common.calendar.event.today'),
+      until: (days: number) => t('common.calendar.event.until', { days }),
+      since: (days: number) => t('common.calendar.event.since', { days }),
+    }),
+    [t],
+  );
+
+  /**
    * 滚轮翻月 / 翻周（产品负责人 2026-10-01：「上下滑动自由无限切换日历」）。
    *
    * 🔴 走的是**和页头那两个箭头同一个** `stepCalendarCursor` ——
@@ -100,6 +157,22 @@ export function CalendarView(): React.JSX.Element {
       view.setCursor(stepCalendarCursor(view.view, view.cursor, step));
     },
     { within: `[data-testid="${BOARD_TEST_ID}-month-card"]` },
+  );
+
+  /**
+   * 横向拖拽换天（R11 批四，产品负责人："鼠标在这里左右滑动…就是上一天和下一天的切换"）。
+   *
+   * 🔴 走多远仍然只有 `stepCalendarCursor` 一个来源 —— 与页头那两个箭头、
+   *   与滚轮**同一个函数**，只是 `segments` 来自横向位移。
+   *   只在日档挂这个监听（`enabled`）：在月档里"横拖一下"不是任何人的意图，
+   *   而它会和"点某一格"抢同一次按下。
+   */
+  useDragDayNav(
+    wheelHost,
+    (step) => {
+      view.setCursor(stepCalendarCursor('day', view.cursor, step));
+    },
+    { within: `[data-testid="${BOARD_TEST_ID}-day"]`, enabled: view.view === 'day' },
   );
 
   const onToggleTask = useCallback(
@@ -151,12 +224,21 @@ export function CalendarView(): React.JSX.Element {
           selected={view.selected}
           onCursorChange={view.setCursor}
           onSelect={view.selectDay}
+          /*
+            年档里点一张月卡（R13）。🔴 宿主**只做接线**，"去哪"由共享层决定
+            （`calendarMonthDrill`）—— 移动端接同一档时抄的是同一个函数，
+            而不是"两边都试过、看着都对"的两套状态迁移。
+          */
+          onPickMonth={view.drillIntoMonth}
           /* 🔴 批二：工具栏搬到**页头**（`CalendarHeaderToolbar`），板子里那份撤掉。
              与下面的 `onToday` 是**一对**：宿主接了跳回，工具栏才有那颗「今天」；
              两处不同时改，结局是"整屏没有回到今天的入口"或"同一屏两个入口"。 */
           toolbar="external"
           /* 档位由页头那个下拉决定（store 里唯一一份），板子只照它画。 */
           view={view.view}
+          /* 🔴 日档那条"现在"线的时钟**只有一个来源**：任务 store 的 `now`。
+             界面 store 刻意不存时钟（存了就会漂 —— 放着不动的一屏，线还在走才算"现在"）。 */
+          now={store.now}
           onToday={() => {
             // 「今天」跳回：选中今天 + 月份跟过去（与迷你月历的 ○ 同一条路径）。
             view.goToToday(today);
@@ -164,6 +246,10 @@ export function CalendarView(): React.JSX.Element {
           onToggleTask={onToggleTask}
           busyTaskId={busyId}
           labels={labels}
+          dayMarker={dayMarker}
+          dayMarkerLabels={dayMarkerLabels}
+          events={events}
+          eventLabels={eventLabels}
           testID={BOARD_TEST_ID}
         />
       </div>

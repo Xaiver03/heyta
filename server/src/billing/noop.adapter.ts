@@ -18,7 +18,9 @@
 import type {
   BillingAdapter,
   CheckoutResult,
+  CreateRefundInput,
   CreateCheckoutInput,
+  RefundResult,
   RevokeEntitlementInput,
   SubscriptionStatus,
   WebhookHeaders,
@@ -81,5 +83,20 @@ export const createNoopBillingAdapter = (): BillingAdapter => ({
   async revokeEntitlement(_input: RevokeEntitlementInput): Promise<void> {
     // 有意为空：自托管默认什么都不做，且**绝不删除任何服务端数据**。
     // 到期 / 退款只影响"能不能新增设备接入"（entitlement 守卫），不影响已有数据。
+  },
+
+  /**
+   * 🔴 与 `createCheckout` 同一个形状：**抛**，不是"返回一个成功的假象"。
+   *
+   * 为什么这里绝不能返回 `{ status: 'success' }`：退款流程只在通道确认 `success`
+   * 之后回收权益（`refund-store.ts`）。一个假的 success 会让自托管实例
+   * **在一分钱都没退出去的情况下把用户的托管同步砍掉 30 天** ——
+   * 那是 ADR-0026 禁止的半真状态里最坏的那个方向（用户既没拿到钱、又丢了权益）。
+   *
+   * 这个方法**存在**且**必填**（而不是 `refund?()`）正是为了这一点：
+   * "没有通道"是一个要被如实上报的事实，不是一个可以让调用方忘了处理的缺省。
+   */
+  async refund(_input: CreateRefundInput): Promise<RefundResult> {
+    throw new BillingProviderNotConfiguredError(NOOP_PROVIDER);
   },
 });

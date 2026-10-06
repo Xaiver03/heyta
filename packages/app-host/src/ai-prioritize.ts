@@ -65,6 +65,11 @@ import {
   type AiOutputLocale,
 } from './ai-output-language.js';
 import { describeRoutedFailure } from './ai-failure-fallback.js';
+import {
+  CALENDAR_ANCHOR_RULES,
+  calendarAnchor,
+  calendarAnchorLine,
+} from './calendar-anchor.js';
 
 /**
  * 一次排序最多带多少条任务。
@@ -111,6 +116,17 @@ export interface PrioritizeSource {
    * 见 `ai-output-language.ts` 文件头。
    */
   locale: AiOutputLocale;
+  /**
+   * 时间源（epoch ms）。默认 `Date.now`。
+   *
+   * 🔴 **必须可注入**，两条理由与 `CaptureSource.now` 逐字同源：
+   *
+   *   1. 输出依赖"今天是几号" —— 用真实时钟写测试会得到一个**过几天就变红**的用例。
+   *   2. 披露与请求必须用同一个 `now`：壳一次构造好 `source`，同一个对象既进
+   *      `buildPrioritizeInvocation`（界面披露）也进 `requestPrioritize`（真正发送），
+   *      跨过午夜时两边才不会是**两个不同的"今天"**。
+   */
+  now?: number;
 }
 
 /** 一条建议。`id` 必须来自输入集合（由 `parsePrioritizeResult` 核对）。 */
@@ -174,6 +190,9 @@ function normalizePriority(raw: unknown): Priority | undefined {
  * 🔴 `fields` 不是装饰：出境授权是按 `(功能, 目的地)` 绑定的，
  * 而**披露**（"将要送出这些字段"）读的就是它。少写一个字段名，
  * 用户就会在不知情的情况下多送一份数据出去。
+ *
+ * 所以规则同 `ai-breakdown.ts`：**`user` 里出现的每一个数据字段，`fields` 里必须有同名项**。
+ * 有测试逐字段核对这件事。
  */
 export function buildPrioritizeInvocation(
   source: PrioritizeSource,
@@ -203,8 +222,15 @@ export function buildPrioritizeInvocation(
 
   // 🔴 任务数组整体算**一个**字段（`tasks`），不是每任务一个字段名。
   // 理由同偏好：出境授权与披露按字段名绑定，而用户要能读懂"这一项是什么"。
-  const fields: string[] = ['tasks'];
-  const lines = [`待排序任务（JSON）：\n${JSON.stringify(tasks)}`];
+  //
+  // ⚠️ `today` 也算一个字段（与 `ai-capture.ts` / `ai-breakdown.ts` 同一条纪律）：
+  // 它是这台设备的本地日期，一条关于用户的信息，而且确实随请求出境。
+  // 排序尤其吃它 —— 输入里的 `dueDate` 是 epoch ms，"紧不紧急"只有对着"今天"才判得出来。
+  const fields: string[] = ['today', 'tasks'];
+  const lines = [
+    calendarAnchorLine(calendarAnchor(source.now)),
+    `待排序任务（JSON）：\n${JSON.stringify(tasks)}`,
+  ];
 
   // 🔴 偏好看成**一个**字段（`preferences`），不是每项一个。
   const hintBlock = renderHintBlock(hints);
@@ -223,6 +249,13 @@ export function buildPrioritizeInvocation(
       '如果给出了用户的历史习惯，请据此调整判断，但不要复述这些习惯。',
       '只输出一个 JSON 数组，格式为 [{"id":"...","priority":"high","reason":"..."}]。',
       '不要输出任何解释、前言、结语或代码围栏。',
+      '',
+      // 🔴 日期硬规则与锚点是**一对**（同 `ai-breakdown.ts`）：只给"今天是"而不给规则，
+      // 模型仍会凭训练语料里的"今天"去写理由里的相对日期 —— 而这里的输入本身就带日期
+      // （`dueDate`），"紧不紧急"必须对着今天判。
+      // ⚠️ **已知边界**：`dueDate` 送出去的是 epoch ms，锚点只回答了"今天是哪天"，
+      // 没有替模型做 epoch→日历日的换算（那属于改线形状，不在本单范围）。
+      CALENDAR_ANCHOR_RULES,
       '',
       outputLanguageDirective(source.locale),
     ].join('\n'),
@@ -405,7 +438,11 @@ export async function requestPrioritize(
   }
 
   const invocation = buildPrioritizeInvocation(
-    { tasks, locale: source.locale },
+    // ⚠️ `now` 必须**逐字段带过来**：这里是重新构造一个 source（为了复用同一份
+    // 截断后的 `tasks`），漏掉一个字段就等于把锚点退回真实时钟 ——
+    // 于是"界面披露的今天"与"请求体里的今天"可以是两天。
+    // 这条不是假设：HTTP 级判据（`ai-prioritize.spec.ts`）第一次就是这么照出来的。
+    { tasks, locale: source.locale, now: source.now },
     deps.preferences ?? [],
   );
 

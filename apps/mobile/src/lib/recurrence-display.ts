@@ -38,8 +38,12 @@ import type { Translate } from '../i18n/translate';
  * 于是它回到代码里，按语言查表。代价是"再加一种语言"要在两处各改一行
  * （这里 + 词条表）；收益是那条防"用英文占位中文"的规则不被开一个口子。
  * 这个取舍是刻意的。
+ *
+ * ⚠️ 工单 H5 起它**导出**：习惯频次摘要（`ui/habit-frequency-slot.tsx`）要说
+ *    「每周 一、三」，那是同一个判断。移动端这一壳的分隔符只许有这一位所有者 ——
+ *    在别的文件再写一张 `{ 'zh-CN': '、', en: ', ' }` 就是第二份事实源。
  */
-const LIST_SEPARATOR: Record<Locale, string> = {
+export const LIST_SEPARATOR: Record<Locale, string> = {
   'zh-CN': '、',
   en: ', ',
 };

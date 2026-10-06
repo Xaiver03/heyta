@@ -4,12 +4,19 @@ import {
   WECHAT_API_BASE_URL,
   WECHAT_NATIVE_PATH,
   WECHAT_PROVIDER,
+  WECHAT_REFUND_EVENT_STATUS,
+  WECHAT_REFUND_PATH,
+  WECHAT_REFUND_STATUS_MAP,
   WECHAT_SIGNATURE_MAX_AGE_MS,
   WECHAT_SUPPORTED_CURRENCIES,
+  WechatApiError,
+  WechatInvalidRefundNoError,
+  WechatRefundExceedsPaymentError,
   WechatUnsupportedCurrencyError,
   buildRequestSignatureMessage,
   buildWechatAuthorizationHeader,
   buildWechatOutTradeNo,
+  buildWechatRefundEventId,
   buildWebhookSignatureMessage,
   createWechatBillingAdapter,
   decryptWechatResource,
@@ -21,6 +28,7 @@ import {
   signWechatRequest,
   verifyWechatSignature,
 } from '../src/billing/wechat.adapter';
+import type { CreateRefundInput } from '../src/billing/types';
 import {
   TEST_WECHAT_API_V3_KEY,
   TEST_WECHAT_APP_ID,
@@ -28,8 +36,10 @@ import {
   TEST_WECHAT_NOTIFY_URL,
   TEST_WECHAT_SERIAL_NO,
   buildWechatPaymentWebhook,
+  buildWechatRefundWebhook,
   createWechatTestKeyPair,
   encryptWechatResource,
+  type WechatRefundWebhookFixtureOptions,
 } from './wechat-test-fixture.helper';
 
 /**
@@ -655,15 +665,31 @@ describe('wechat adapter — verifyWebhook 的失败路径（fail-closed）', ()
     ).resolves.toEqual({ ok: false, reason: 'decrypt-failed' });
   });
 
-  it('只认 TRANSACTION.SUCCESS；其它事件类型明确拒绝', async () => {
-    const fixture = buildPaymentWebhook({
-      timestampSeconds: Math.floor(NOW / 1000),
-      eventType: 'REFUND.SUCCESS',
-    });
-    await expect(adapter.verifyWebhook(fixture.body, fixture.headers)).resolves.toEqual({
-      ok: false,
-      reason: 'unsupported-event-type',
-    });
+  it('🔴 只认 `TRANSACTION.SUCCESS` 与那三种退款终态；其它事件类型仍然明确拒绝', async () => {
+    // 这条以前写的是"只认 TRANSACTION.SUCCESS"，而它当时用的例子就是 `REFUND.SUCCESS`。
+    // 2026-10-05 ADR-0053 接进退款通知之后那句话不再成立 —— 改例子，**不改判据的形状**：
+    // 词表外的事件仍然必须是 401 而不是静默忽略（静默忽略会落一条 PaymentEvent
+    // 却没有对应语义，比 401 更难排查）。
+    for (const eventType of [
+      'REFUND.PROCESSING',
+      'TRADE_CANCEL_SUCCESS',
+      'DOWNLOADBILL_SUCCESS',
+    ]) {
+      const fixture = buildPaymentWebhook({
+        timestampSeconds: Math.floor(NOW / 1000),
+        eventType,
+      });
+      await expect(
+        adapter.verifyWebhook(fixture.body, fixture.headers),
+        eventType,
+      ).resolves.toEqual({ ok: false, reason: 'unsupported-event-type' });
+    }
+    // 三种终态在词表内（正例在下面那组退款通知用例里逐条走）。
+    expect(Object.keys(WECHAT_REFUND_EVENT_STATUS).sort()).toEqual([
+      'REFUND.ABNORMAL',
+      'REFUND.CLOSED',
+      'REFUND.SUCCESS',
+    ]);
   });
 
   it('trade_state 不是 SUCCESS → unsupported-trade-state', async () => {
@@ -809,6 +835,7 @@ describe('wechat adapter — 接口语义', () => {
       'createCheckout',
       'mapSubscriptionState',
       'provider',
+      'refund',
       'revokeEntitlement',
       'supportedCurrencies',
       'verifyWebhook',
@@ -955,3 +982,245 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
   });
 });
 
+
+describe('wechat adapter — refund()（stub fetch，🔴 没有真网络）', () => {
+  const NOW = 1_700_000_000_000;
+  const OUT_TRADE_NO = buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
+  const OUT_REFUND_NO = 'hyrf7x1700000000xdeadbeef';
+
+  const stub = (response: Record<string, unknown>, ok = true) => {
+    const seen: { url: string; init: RequestInit }[] = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      seen.push({ url, init });
+      return {
+        ok,
+        status: ok ? 200 : 400,
+        json: async () => response,
+      };
+    }) as unknown as typeof fetch;
+    return { adapter: createAdapter({ fetchImpl, now: () => NOW }), seen };
+  };
+
+  // 刻意用一次 cast：这一组喂的就是**类型上不该存在**的输入（`currency: 'EUR'`、
+  // `refundAmountMinor: 12.5`），要验的正是运行时闸门而不是编译器。
+  const baseInput = (over: Record<string, unknown> = {}): CreateRefundInput =>
+    ({
+      outTradeNo: OUT_TRADE_NO,
+      outRefundNo: OUT_REFUND_NO,
+      refundAmountMinor: 400,
+      totalAmountMinor: 400,
+      currency: 'CNY',
+      ...over,
+    }) as CreateRefundInput;
+
+  it('POST /v3/refund/domestic/refunds：`amount.total` 是**实付**，`refund` 是**这一次退的额**', async () => {
+    // 🔴 两个数**必须不相等**。两边都填 400 时，这条用例的名字断言的东西
+    // 一个都没有断言到 —— 把 `total` 写成 `refundAmountMinor` 照样全绿
+    // （实测：变异臂 8 存活）。不对称之后它才真的能红。
+    const { adapter, seen } = stub({ refund_id: '5030000000000000000000000001', status: 'PROCESSING' });
+    const result = await adapter.refund(
+      baseInput({ refundAmountMinor: 200, totalAmountMinor: 400, reason: '运营已核实的客诉' }),
+    );
+
+    expect(result).toEqual({ providerRefundId: '5030000000000000000000000001', status: 'processing' });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.url).toBe(`${WECHAT_API_BASE_URL}${WECHAT_REFUND_PATH}`);
+
+    const body = JSON.parse(String(seen[0]!.init.body)) as Record<string, unknown>;
+    // 🔴 键集合逐字断言：多一个 `notify_url`、少一个 `total` 都是**协议**变化，
+    // 而 `toMatchObject` 挡不住"多传了一个通道根本不认识的字段"。
+    expect(Object.keys(body).sort()).toEqual([
+      'amount',
+      'out_refund_no',
+      'out_trade_no',
+      'reason',
+    ]);
+    expect(body.amount).toEqual({ refund: 200, total: 400, currency: 'CNY' });
+    expect(body.out_trade_no).toBe(OUT_TRADE_NO);
+    expect(body.out_refund_no).toBe(OUT_REFUND_NO);
+  });
+
+  it('🔴 不传 `reason` 就整个省略这一列 —— 不给一个"默认理由"', async () => {
+    const { adapter, seen } = stub({ status: 'SUCCESS' });
+    await adapter.refund(baseInput());
+    const body = JSON.parse(String(seen[0]!.init.body)) as Record<string, unknown>;
+    expect('reason' in body).toBe(false);
+    // `reason` 会出现在**用户的微信账单**上：一个没人负责的句子不该由代码生成。
+    expect(body).not.toHaveProperty('reason');
+  });
+
+  it('Authorization 的签名串覆盖的是**发出去的那一份 body**（一次序列化，不是两次）', async () => {
+    const { adapter, seen } = stub({ status: 'PROCESSING' });
+    await adapter.refund(baseInput({ reason: '  两端有空格的理由  ' }));
+
+    const headers = seen[0]!.init.headers as Record<string, string>;
+    const fields = Object.fromEntries(
+      [...headers.Authorization.matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]]),
+    );
+    expect(
+      fields.signature,
+    ).toBe(
+      signWechatRequest(
+        {
+          method: 'POST',
+          url: WECHAT_REFUND_PATH,
+          timestamp: Number(fields.timestamp),
+          nonce: fields.nonce_str,
+          body: String(seen[0]!.init.body),
+        },
+        privateKey,
+      ),
+    );
+    // `reason` 被 trim 之后**同一个字符串**既进 body 又进签名。
+    const body = JSON.parse(String(seen[0]!.init.body)) as Record<string, unknown>;
+    expect(body.reason).toBe('两端有空格的理由');
+  });
+
+  it('四种通道状态各自映射；`PROCESSING` 是常态而不是失败', async () => {
+    for (const [raw, mapped] of Object.entries(WECHAT_REFUND_STATUS_MAP)) {
+      const { adapter } = stub({ refund_id: 'r-1', status: raw });
+      expect(await adapter.refund(baseInput()), raw).toEqual({
+        providerRefundId: 'r-1',
+        status: mapped,
+      });
+    }
+  });
+
+  it('🔴 陌生的 `status` 抛，不归成 processing 也不归成 success', async () => {
+    const { adapter } = stub({ refund_id: 'r-1', status: 'REFUND_PENDING_WECHAT_NEW' });
+    const error = await adapter.refund(baseInput()).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(WechatApiError);
+    expect((error as WechatApiError).apiCode).toBe('UNKNOWN_REFUND_STATUS');
+  });
+
+  it('HTTP 非 2xx → WechatApiError（带通道的 code，不吞掉）', async () => {
+    const { adapter } = stub({ code: 'NOT_ENOUGH_PAY_AMOUNT', message: '余额不足' }, false);
+    const error = await adapter.refund(baseInput()).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(WechatApiError);
+    expect((error as WechatApiError).httpStatus).toBe(400);
+    expect((error as WechatApiError).apiCode).toBe('NOT_ENOUGH_PAY_AMOUNT');
+  });
+
+  it('退款额超过实付 → 本地就抛，一个请求都不发', async () => {
+    const { adapter, seen } = stub({ status: 'SUCCESS' });
+    await expect(adapter.refund(baseInput({ refundAmountMinor: 401 }))).rejects.toBeInstanceOf(
+      WechatRefundExceedsPaymentError,
+    );
+    // 🔴 抛在**发请求之前**才是这条判据的全部：否则一次误操作就已经在通道侧开了一张退款单。
+    expect(seen).toHaveLength(0);
+  });
+
+  it('币种不在词表 / 金额不是正整数 / 号是空串 —— 四种坏输入都抛在出网前', async () => {
+    const { adapter, seen } = stub({ status: 'SUCCESS' });
+    for (const over of [
+      { currency: 'EUR' },
+      { refundAmountMinor: 0 },
+      { refundAmountMinor: 12.5 },
+      { totalAmountMinor: -1 },
+      { outTradeNo: '' },
+      { outRefundNo: '' },
+    ]) {
+      await expect(adapter.refund(baseInput(over)), JSON.stringify(over)).rejects.toThrow();
+    }
+    expect(seen).toHaveLength(0);
+    await expect(adapter.refund(baseInput({ outRefundNo: '' }))).rejects.toBeInstanceOf(
+      WechatInvalidRefundNoError,
+    );
+  });
+});
+
+describe('wechat adapter — 退款通知归一化（ADR-0053）', () => {
+  const NOW = 1_700_000_000_000;
+  const adapter = createAdapter({ now: () => NOW });
+  const OUT_TRADE_NO = buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
+  const OUT_REFUND_NO = 'hyrf7x1700000000xdeadbeef';
+
+  const refundEvent = (over: Partial<WechatRefundWebhookFixtureOptions> = {}) =>
+    buildWechatRefundWebhook({
+      privateKey,
+      timestampSeconds: Math.floor(NOW / 1000),
+      outTradeNo: OUT_TRADE_NO,
+      outRefundNo: OUT_REFUND_NO,
+      refundId: '5030000000000000000000000002',
+      ...over,
+    });
+
+  it('🔴 `REFUND.SUCCESS` 归一化出来的事件**给不出授予**：没有 oneTimeGrant、没有 userId', async () => {
+    const f = refundEvent();
+    const r = await adapter.verifyWebhook(f.body, f.headers);
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 把它落到支付那条路径上 = **再发一次 30 天权益**。所以这两格必须是 null。
+    expect(r.event.oneTimeGrant).toBeNull();
+    expect(r.event.userId).toBeNull();
+    expect(r.event.currentPeriodEnd).toBeNull();
+    expect(r.event.status).toBeNull();
+    expect(r.event.refundNotice).toEqual({
+      outRefundNo: OUT_REFUND_NO,
+      providerRefundId: '5030000000000000000000000002',
+      status: 'success',
+    });
+  });
+
+  it('幂等键带状态：同一笔退款的 ABNORMAL 之后转 SUCCESS 不会被前一条挡掉', () => {
+    const abnormal = buildWechatRefundEventId(OUT_REFUND_NO, 'abnormal');
+    const success = buildWechatRefundEventId(OUT_REFUND_NO, 'success');
+    expect(abnormal).not.toBe(success);
+    expect(success).toBe(`refund_success:${OUT_REFUND_NO}`);
+    // 支付事件的键与退款的键不能撞：两套语义共用一张 `payment_events` 表。
+    expect(success).not.toBe(`payment_succeeded:${OUT_TRADE_NO}`);
+  });
+
+  it('三种终态各自归一化；`CLOSED` / `ABNORMAL` 没有 success_time 也不编一个', async () => {
+    for (const [eventType, status] of [
+      ['REFUND.ABNORMAL', 'abnormal'],
+      ['REFUND.CLOSED', 'closed'],
+    ] as const) {
+      const f = refundEvent({ eventType, refundStatus: status.toUpperCase(), successTime: null });
+      const r = await adapter.verifyWebhook(f.body, f.headers);
+      expect(r.ok, eventType).toBe(true);
+      if (!r.ok) return;
+      expect(r.event.refundNotice?.status).toBe(status);
+      // `occurredAt` 回落到到达时间是**注释里写明的取舍**，不是漏字段：
+      // 这条通知不参与订阅行的乱序闸门。
+      expect(r.event.occurredAt).toBeGreaterThanOrEqual(NOW);
+      expect(r.event.eventType).toBe(eventType);
+    }
+  });
+
+  it('载荷里没有 `out_refund_no` → 拒（不能靠 `out_trade_no` 反推是哪张退款行）', async () => {
+    // `refund_status` 缺失是允许的（以 `event_type` 为准，见下面那条冲突用例），
+    // `out_refund_no` 缺失不是：它是 `refunds` 那一行的**唯一**寻址方式。
+    const f = refundEvent({ omitOutRefundNo: true });
+    expect(await adapter.verifyWebhook(f.body, f.headers)).toEqual({
+      ok: false,
+      reason: 'missing-out-refund-no',
+    });
+  });
+
+  it('🔴 `refund_status` 与 `event_type` 互相矛盾 → 拒，不挑一个', async () => {
+    const f = refundEvent({ eventType: 'REFUND.SUCCESS', refundStatus: 'ABNORMAL' });
+    expect(await adapter.verifyWebhook(f.body, f.headers)).toEqual({
+      ok: false,
+      reason: 'refund-status-conflict',
+    });
+    // 两个值各自的下游动作**相反**（一个回收权益、一个不回收），所以"取哪个"不是风格问题。
+    const consistent = refundEvent({ eventType: 'REFUND.ABNORMAL', refundStatus: 'ABNORMAL' });
+    const r = await adapter.verifyWebhook(consistent.body, consistent.headers);
+    expect(r.ok).toBe(true);
+  });
+
+  it('验签失败 / 时间戳过期对退款通知同样生效（同一道闸门，不是第二条）', async () => {
+    const f = refundEvent();
+    await expect(
+      adapter.verifyWebhook(f.body, { ...f.headers, 'wechatpay-signature': 'bogus' }),
+    ).resolves.toEqual({ ok: false, reason: 'invalid-signature' });
+
+    const stale = refundEvent({ timestampSeconds: Math.floor(NOW / 1000) - 7200 });
+    await expect(adapter.verifyWebhook(stale.body, stale.headers)).resolves.toEqual({
+      ok: false,
+      reason: 'stale-timestamp',
+    });
+  });
+});

@@ -20,6 +20,7 @@
 # Writes:
 #   C:\src\heyta-msix\packaged-first-run.png   the app window (not the desktop)
 #   C:\src\heyta-msix\install-capture.txt      measured facts, last line DONE
+#   <Desktop>\heyta.lnk                        the launch-a-user-can-reach icon
 
 $ErrorActionPreference = 'Continue'
 
@@ -78,14 +79,119 @@ $lines += ('PAYLOAD_XBF=' + (@(Get-ChildItem $loc -Filter '*.xbf' -File -ErrorAc
 $webDist = Join-Path $loc 'web-dist'
 $lines += ('PAYLOAD_WEBDIST=' + (Test-Path (Join-Path $webDist 'index.html')))
 
-# ---- launch ------------------------------------------------------------------
-$app = Get-StartApps -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $displayName } | Select-Object -First 1
-if ($app) {
-  $appId = $app.AppID
-} else {
-  $appId = $identityName + '!App'
-  $lines += 'NOTE Get-StartApps did not list it; using <identity>!App'
+# W8-GAP-W1: `PAYLOAD_WEBDIST=True` only proves ONE file is there. The gate that
+# reads this file has to answer "are the bytes the shell actually serves the ones
+# this worktree built?", and a boolean cannot carry that. Three machine-readable
+# facts instead, all MEASURED from the installed payload:
+#   PAYLOAD_INDEX_SHA    - sha256 of the installed index.html. Vite writes
+#                          content-hashed chunk names into it, so a matching hash
+#                          means the same asset graph, not just the same file.
+#   PAYLOAD_CHUNK_TOTAL  - how many /assets/... entries that index.html references
+#   PAYLOAD_CHUNK_PRESENT- how many of those actually exist next to the exe
+# The last two are the leg that catches "index.html shipped, chunks did not" -
+# which renders a blank window while every existing criterion stays green.
+$indexFile = Join-Path $webDist 'index.html'
+$indexSha = 'NONE'
+$chunkTotal = 0
+$chunkPresent = 0
+if (Test-Path $indexFile) {
+  $indexSha = (Get-FileHash -Algorithm SHA256 -Path $indexFile).Hash
+  $html = Get-Content -Raw -Path $indexFile
+  foreach ($m in [regex]::Matches($html, '(?:src|href)="(/?assets/[^"]+)"')) {
+    $chunkTotal += 1
+    $rel = $m.Groups[1].Value -replace '^/', ''
+    if (Test-Path (Join-Path $webDist ($rel -replace '/', '\'))) { $chunkPresent += 1 }
+  }
 }
+$lines += ('PAYLOAD_INDEX_SHA=' + $indexSha)
+$lines += ('PAYLOAD_CHUNK_TOTAL=' + $chunkTotal)
+$lines += ('PAYLOAD_CHUNK_PRESENT=' + $chunkPresent)
+
+# ---- desktop shortcut --------------------------------------------------------
+# WHY THIS IS A SEPARATE CRITERION. An MSIX gets a Start Menu entry by itself
+# (measured on the packaging machine: Get-StartApps lists
+#   Name=heyta  AppID=cloud.finlaw.heyta.desktop_<hash>!App),
+# but NOTHING puts an icon on the Desktop. A user who was told "it is installed"
+# and sees no icon on the desktop will conclude it is not -- so "installed" has to
+# include a way to launch it that does not require knowing the app exists.
+#
+# A packaged (MSIX) app cannot be pointed at by a normal .lnk TargetPath:
+# WindowsApps is ACL-protected and the real exe is not user-launchable. The
+# supported indirection is the AUMID through the shell namespace, i.e.
+#   explorer.exe  shell:AppsFolder\<PackageFamilyName>!App
+# which is exactly how this script launches it below, so the shortcut and the
+# verification share one launch path -- a shortcut that works differently would
+# prove nothing about the thing we screenshotted.
+$startApp = Get-StartApps -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq $displayName } | Select-Object -First 1
+if ($startApp) {
+  $aumid = $startApp.AppID
+  $lines += ('SHORTCUT_STARTAPP=True  ' + $aumid)
+} else {
+  # Not listed yet (the Start Menu database is refreshed asynchronously after
+  # deployment). Fall back to the documented identity form and say so --
+  # silently using a guess would make a broken shortcut look correct.
+  $aumid = $installed.PackageFamilyName + '!App'
+  $lines += 'SHORTCUT_STARTAPP=False  fallback=' + $aumid
+}
+
+$desktop = [Environment]::GetFolderPath('Desktop')
+$lnkPath = Join-Path $desktop 'heyta.lnk'
+$shortcutOk = $false
+try {
+  $wsh = New-Object -ComObject WScript.Shell
+  $lnk = $wsh.CreateShortcut($lnkPath)
+  $lnk.TargetPath = 'explorer.exe'
+  $lnk.Arguments = 'shell:AppsFolder\' + $aumid
+  $lnk.WorkingDirectory = $desktop
+  # SHORTCUT ICON. Measured 2026-10-04: two separate bugs made the desktop tile
+  # the generic Explorer glyph, and neither could fail anything --
+  #   a) package-msix.ps1 never generated Square44x44Logo.targetsize-48_altform-unplated.png,
+  #      so the Test-Path below was always false;
+  #   b) even the logos it DID generate are staged under Assets\, while this looked
+  #      at the install-location ROOT.
+  # A silently-missing icon is precisely how "there is no app logo anywhere" survived
+  # every green install criterion, so the choice is now printed and readability is
+  # tested (a packaged path can exist yet not be openable from outside the package).
+  # .ico is tried first because a .lnk's IconLocation only reliably renders
+  # ICO/EXE/DLL; a PNG there shows as blank in Explorer even when it is readable.
+  $candidates = @(
+    (Join-Path $loc 'heyta.ico'),
+    (Join-Path $loc 'Assets\Square44x44Logo.targetsize-48_altform-unplated.png'),
+    (Join-Path $loc 'Square44x44Logo.targetsize-48_altform-unplated.png')
+  )
+  $iconChosen = ''
+  foreach ($c in $candidates) {
+    if (-not (Test-Path $c)) { continue }
+    $readable = $true
+    try { $fs = [System.IO.File]::OpenRead($c); $fs.Close() } catch { $readable = $false }
+    if ($readable) { $iconChosen = $c; break }
+    $lines += ('SHORTCUT_ICON_UNREADABLE=' + $c)
+  }
+  if ($iconChosen -ne '') { $lnk.IconLocation = $iconChosen }
+  # A shortcut without the right icon is still a working shortcut; one without a target is not.
+  $lines += ('SHORTCUT_ICON=' + $(if ($iconChosen -eq '') { 'NONE' } else { $iconChosen }))
+
+  $lnk.Description = 'heyta'
+  $lnk.Save()
+  $lines += ('SHORTCUT_PATH=' + $lnkPath)
+  $lines += ('SHORTCUT_CREATED=' + (Test-Path $lnkPath))
+  # READ IT BACK. Creating a .lnk and trusting the call to have succeeded is the
+  # same mistake as trusting an install exit code: verify the target that is
+  # actually written in the file.
+  $check = $wsh.CreateShortcut($lnkPath)
+  $lines += ('SHORTCUT_ARGS=' + $check.Arguments)
+  $lines += ('SHORTCUT_RESOLVES=' + ($check.Arguments -like '*shell:AppsFolder*'))
+  $shortcutOk = ($check.Arguments -like '*shell:AppsFolder*') -and (Test-Path $lnkPath)
+} catch {
+  $lines += 'SHORTCUT_CREATED=False'
+  $lines += ('  message=' + $_.Exception.Message)
+}
+
+# ---- launch ------------------------------------------------------------------
+# Reuse the SAME AUMID the shortcut was written with (see above). Two lookups
+# would mean the screenshot could prove a launch that the desktop icon does not
+# perform -- the criterion would be about a different artifact than the product.
+$appId = $aumid
 $lines += ('APP_ID=' + $appId)
 
 # The shell writes its M2-D verdict into <LocalAppData>\heyta\m2-evidence.txt.
@@ -178,7 +284,11 @@ if ($fail) {
   Get-Process HeytaWindows -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
+$lines += ('SHORTCUT_OK=' + $shortcutOk)
 $lines += 'DONE'
 $lines | Set-Content $factsFile -Encoding ASCII
 $lines | ForEach-Object { Write-Output $_ }
-if ($lines -contains 'RESULT=OK') { exit 0 } else { exit 1 }
+# The desktop shortcut is part of "installed", not a nicety: a packaged app the
+# user can only start via a script is not something a person can use. So RESULT=OK
+# AND a shortcut that reads back with an AppsFolder target are BOTH required.
+if (($lines -contains 'RESULT=OK') -and $shortcutOk) { exit 0 } else { exit 1 }

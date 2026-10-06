@@ -400,8 +400,8 @@ ADHD 视觉计时器，以及用户原话 "seeing 3 weeks left motivates me more
 |---|---|
 | 实现 | `packages/domain/src/capture.ts`（`parseCapture` / `dueDateToEpoch`） |
 | 界面 | `apps/web/src/features/capture/CaptureComposer.tsx` |
-| 测试 | `packages/domain/tests/capture.spec.ts`（49 条）+ `apps/web/tests/capture-composer.spec.tsx`（14 条） |
-| 支持 | 相对日（今天/明天/后天/大后天/昨天/前天/N天后）、周几（周/星期/礼拜 × 下周/本周/裸）、绝对日（`M月D日`/`M月D号`/`YYYY-M-D`/`M/D`）、优先级（`!1..!4` / `p1..p4`） |
+| 测试 | `packages/domain/tests/capture.spec.ts`（现量 68 条，2026-10-03；登记时 49 条）+ `apps/web/tests/capture-composer.spec.tsx`（14 条） |
+| 支持 | 相对日（今天/明天/后天/大后天/昨天/前天/N天后）、周几（周/星期/礼拜 × 下周/本周/裸）、绝对日（`M月D日`/`M月D号`/`N号`（裸月内日，2026-10-03 加）/`YYYY-M-D`/`M/D`）、优先级（`!1..!4` / `p1..p4` / 中文词） |
 
 **三条被测试钉住的不变量**（都是"下一个人会顺手改掉"的那类）：
 

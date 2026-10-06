@@ -1,0 +1,19 @@
+iOS 提醒验收载体失败记录（脱敏）
+====================================
+
+日期：2026-10-04 16:50–16:58（Asia/Shanghai）
+设备：heyta-bc-reminders / 9DC7F824-00C5-4757-B5E9-2177FAE8CC9A
+产物：当前源码 Release；第一次运行构建并校验 bundle hash，第二次复用同一当前 Release 包
+
+两轮均通过：卸载旧包并安装、main.jsbundle 新鲜度、首启隐私选择、离线入口、RN Composer
+建唯一标题任务、真 SQLite 回读 TASK CRT/entityId。
+
+失败边界：
+
+1. TCP companion `127.0.0.1:10988`：在详情页 `scroll_into_view("今天")` 的 `idb swipe`
+   长调用未返回；未取得通知授权、REMINDER CRT 或系统通知证据。
+2. 强制 Unix companion：同一 `scroll_into_view("今天")` 边界再次未返回；未取得通知授权、
+   REMINDER CRT 或系统通知证据。
+
+裁决：这是 iOS 27 AX/companion 验收载体失败，不是提醒投递成功或失败。两轮没有产生可晋级
+的 OS 证据；旧截图、任务写入和原生 schedule 返回值均不能替代通知中心判据。

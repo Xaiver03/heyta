@@ -39,6 +39,7 @@ import {
 import type {
   CategorySlot,
   Habit,
+  HabitFrequency,
   HabitGoalType,
   HabitIcon,
   HabitLog,
@@ -52,6 +53,8 @@ import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js
 interface HabitState {
   habits: Habit[];
   logs: HabitLog[];
+  /** 🔴 回收站那一路（有墓碑且未彻底删除）。判据与顺序在领域层，这里不写。 */
+  trashed: Habit[];
   error?: string;
 
   addHabit: (name: string, over?: NewHabitFields) => Promise<void>;
@@ -60,6 +63,22 @@ interface HabitState {
   /** 撤销打卡。 */
   undoCheckIn: (habitId: string, date?: LocalDate) => Promise<void>;
   deleteHabit: (habitId: string) => Promise<void>;
+  /**
+   * 从回收站还原习惯。返回 `false` = 它本来不在回收站里（没有写 op）；
+   * 已被彻底删除的那条由动作层**抛错**，界面必须接住并说出来（不许 `void` 掉）。
+   */
+  restoreHabit: (habitId: string) => Promise<boolean>;
+  /**
+   * 彻底删除一条习惯：只追加 `purgedAt` 标记，打卡记录一条都不动。
+   *
+   * 返回 `false` = 它早就被彻底删过（这一句没有写 op）。
+   */
+  purgeHabit: (habitId: string) => Promise<boolean>;
+  /**
+   * 改名。**不许**用"删了重建"代替它 —— 打卡记录按 `(习惯 id, 日期)` 寻址，
+   * 重建会换 id，于是那条习惯的历史整个清零（`app-host` 侧同一条理由）。
+   */
+  renameHabit: (habitId: string, name: string) => Promise<void>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setHabitColor: (habitId: string, slot?: CategorySlot) => Promise<void>;
   /**
@@ -67,6 +86,17 @@ interface HabitState {
    * **不是**"没有图标"。非法 key 由动作层 `throw`。
    */
   setHabitIcon: (habitId: string, icon?: HabitIcon) => Promise<void>;
+  /**
+   * 改**频次**（工单 H5）。`undefined` = 清除，回到"每天"。
+   *
+   * 🔴 这一米存在的全部理由：判定侧（`isScheduledOn` → `computeStreak`）**早就按计划日
+   * 数连续天数**了，而在本转发出现之前，全仓库没有任何一条路径能把 `frequency` 写进去 ——
+   * 那套口径对界面是不可达的（§7 第 195 条"字段看起来有功能"那个形状）。
+   *
+   * ⚠️ 校验与归一**不在这里**：非法值 `throw`、`interval:1` 与"七天全选"归一成 `daily`，
+   * 全在 `app-host` 的 `normalizeHabitFrequency`（界面里一个判断都不写）。
+   */
+  setHabitFrequency: (habitId: string, frequency?: HabitFrequency) => Promise<void>;
   /**
    * 改习惯的**目标**（数值 / 单位 / 达成口径）。
    *
@@ -90,6 +120,7 @@ const habitActions = createHabitActions(actionContext);
 export const useHabitStore = create<HabitState>(() => ({
   habits: [],
   logs: [],
+  trashed: [],
 
   addHabit: async (name, over) => {
     // 交互决策：空名字什么都不做（动作层对空名字抛错）。
@@ -110,10 +141,31 @@ export const useHabitStore = create<HabitState>(() => ({
     refresh();
   },
 
+  renameHabit: async (habitId, name) => {
+    // 交互决策，不是数据决策：按了空回车就该什么都不发生。
+    // 空名字的**校验**在动作层（它会抛错），这里只拦"用户其实没想改"。
+    if (name.trim() === '') return;
+    await habitActions.renameHabit(habitId, name);
+    refresh();
+  },
+
   deleteHabit: async (habitId) => {
     // 软删除。打卡记录**不**级联删除 —— 撤销删除后历史还在。
     await habitActions.removeHabit(habitId);
     refresh();
+  },
+
+  restoreHabit: async (habitId) => {
+    const changed = await habitActions.restoreHabit(habitId);
+    refresh();
+    return changed;
+  },
+
+  purgeHabit: async (habitId) => {
+    // 不 catch：不可逆动作被拒绝（例如它已被别处恢复）必须让界面说给用户。
+    const purged = await habitActions.purgeHabit(habitId);
+    refresh();
+    return purged;
   },
 
   setHabitGoal: async (habitId, goal) => {
@@ -128,6 +180,13 @@ export const useHabitStore = create<HabitState>(() => ({
     refresh();
   },
 
+  setHabitFrequency: async (habitId, frequency) => {
+    // 不 catch：非法频次（`每 0 天` / 空的日子集合）必须让界面说给用户，
+    // 而不是变成一条"点了没反应"。归一（`interval:1`→每天、七天全选→每天）在动作层。
+    await habitActions.setHabitFrequency(habitId, frequency);
+    refresh();
+  },
+
   setHabitColor: async (habitId, slot) => {
     await habitActions.setHabitColor(habitId, slot);
     refresh();
@@ -139,6 +198,7 @@ function refresh(): void {
   useHabitStore.setState({
     habits: habitActions.listHabits(),
     logs: habitActions.listLogs(),
+    trashed: habitActions.listTrashedHabits(),
   });
 }
 
@@ -170,4 +230,22 @@ export function selectHeatmap(
   days = 90,
 ): ReturnType<typeof habitHeatmap> {
   return habitHeatmap(state.logs, habitId, now, days);
+}
+
+/**
+ * 界面里"现在"的取值缝。
+ *
+ * 🔴 为什么在这里：左列（`HabitsView` 的 7 个点）与面单（`HabitDetailCard` 的 90 天热力图）
+ * 必须用**同一个时刻**，否则同一次渲染里跨午夜会让"列表说打过、窗格说没打"。
+ * 这一单把面单拆成独立组件之后，那句话不再是"显然成立"—— 两边各写一遍
+ * `Number(sessionStorage.getItem('now') ?? Date.now())` 就变成两处可以各自漂移的实现。
+ * 留在数据模块而不是新建一个文件，理由是它和这个 store 一样属于"界面读数据时的口径"，
+ * 而它**不判断任何业务**（与上面那句"转发里一个判断都不能写"同一条纪律）。
+ *
+ * ⚠️ 测试经 `sessionStorage['now']` 钉住同一天（`habits-list-pane.spec.tsx` 的 `NOW`）。
+ */
+export const NOW_STATE_KEY = 'now';
+
+export function readNow(): number {
+  return Number(sessionStorage.getItem(NOW_STATE_KEY) ?? Date.now());
 }

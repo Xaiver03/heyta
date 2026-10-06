@@ -33,7 +33,7 @@ import { openApp } from '../tests/helpers';
 // 认证面板由共享表单渲染（2026-10-01 起），"走到注册档"这一步因此是**所有**
 // 要在面板里点东西的套件共同的入口 —— 只在 auth-journey 里写一份。
 // ⚠️ 本套件不导出它的 `openApp`：这里的 `openApp` 带 `?lang=zh-CN`（定位符是中文）。
-import { toRegisterMode } from '../auth-journey/helpers';
+import { revealSelfHostField, toRegisterMode } from '../auth-journey/helpers';
 
 /** 官方托管域（与 `packages/app-host/src/legal-links.ts` 的常量同一个值）。 */
 const OFFICIAL = 'https://heyta.waytofuture.cn';
@@ -105,14 +105,25 @@ async function openAuthPanel(page: Page): Promise<void> {
  * （`AuthForm.tsx` 的 `mode === 'register'`）。所以这一段多了两步真用户步骤
  * （点「继续」、切「注册」）—— 少一步的紅长得像"链接没渲染"。
  *
+ * 🔴 第三步也是同一批加的：地址栏自己也被收进了「我自己部署」展开入口
+ * （G-28 `4774b07e`，产品契约 `apps/web/tests/auth-entry-default.spec.tsx` B 段）。
+ * 原来这段写的是"未配置时它必然渲染"——**那句已被现量否证**，默认 DOM 里根本没有它，
+ * 于四条用例全红在 `auth-form-server-url` 找不到上（而第五条不碰地址栏，照样绿）。
+ * 现在这里是**真点一次展开**，再断栏出现：少这一步的红仍然长得像"地址框不存在"，
+ * 但至少它是产品真的坏了才会红，而不是探针追不上界面。
+ *
  * ⚠️ 地址必须在 `toRegisterMode` **之后**填：`toCredentialStage` 会先把
- * `HEYTA_AUTH_JOURNEY_SERVER` 写进地址栏（未配置时它必然渲染），顺序倒了就被覆盖。
+ * `HEYTA_AUTH_JOURNEY_SERVER` 写进地址栏（导出了这个变量时），顺序倒了就被覆盖。
  */
 async function setBaseUrl(page: Page, url: string): Promise<void> {
   const dialog = page.locator('[role="dialog"][aria-label="登录 / 注册"]');
   await toRegisterMode(dialog, 'legal-links@example.invalid');
+  await revealSelfHostField(dialog);
   const field = dialog.getByTestId('auth-form-server-url');
-  await expect(field, '未配置服务端时地址框必须在（已配置时整块不渲染）').toBeVisible();
+  await expect(
+    field,
+    '未配置服务端时展开「我自己部署」之后地址框必须在（已配置时整块不渲染）',
+  ).toBeVisible();
   await field.fill(url);
   await expect(dialog.locator('a[target="_blank"]')).toHaveCount(2);
 }

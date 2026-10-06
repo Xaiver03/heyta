@@ -107,6 +107,32 @@ services:
       - SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES=${SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES:-}
       - OLD_OPS_CLEANUP_DELETE_BATCH_SIZE=${OLD_OPS_CLEANUP_DELETE_BATCH_SIZE:-5000}
       - OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN=${OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN:-25000}
+      # 🔧 heyta 改动：微信支付（Native 扫码）的整组旋钮。
+      #
+      # 默认值 `false` 与 `server/src/config.ts` 一致 ⇒ **不设时行为逐字不变**
+      # （adapter 不注册、webhook 回 404、自托管看不到任何付款入口）。
+      # 这一组必须由 `pnpm check:payment-entry` 与 `check:server-env` 同时守：
+      # 前者钉"渠道接通 ⟺ 客户端有入口"，后者钉"文档化的键必须真能进容器"。
+      #
+      # ⚠️ 六枚凭证都走 `:-`（空串=未设置）：它们在 `config.ts` 里只在
+      # `WECHAT_PAY_ENABLED=true` 时才被要求齐全，空串在那里等价于"没填"，
+      # 而"没填"是**启动期硬错误**，不是静默关闭。
+      - WECHAT_PAY_ENABLED=${WECHAT_PAY_ENABLED:-false}
+      - WX_APP_ID=${WX_APP_ID:-}
+      - WX_MCH_ID=${WX_MCH_ID:-}
+      - WX_SERIAL_NO=${WX_SERIAL_NO:-}
+      - WX_API_V3_KEY=${WX_API_V3_KEY:-}
+      - WX_PRIVATE_KEY=${WX_PRIVATE_KEY:-}
+      - WX_PUBLIC_KEY=${WX_PUBLIC_KEY:-}
+      # 两把密钥也可以用**文件路径**给（复用运维已有的 PEM 落盘位置）。
+      # 🔴 真实值不进仓库、不进日志：这里只搬运旋钮，容器里读不到就启动红。
+      - WX_PRIVATE_KEY_PATH=${WX_PRIVATE_KEY_PATH:-}
+      - WX_PUBLIC_KEY_PATH=${WX_PUBLIC_KEY_PATH:-}
+      # 回调地址。留空时服务端由 PUBLIC_URL 推导。
+      - WX_NOTIFY_URL=${WX_NOTIFY_URL:-}
+      # 🔴 host 与 PUBLIC_URL 不一致时的显式放行开关（默认空 = 启动红）。
+      # 它的存在是因为"把到账消息送到另一台实例的库"= 收了钱不发权益且两边都不报错。
+      - WX_NOTIFY_URL_CONFIRM=${WX_NOTIFY_URL_CONFIRM:-}
     ports:
       # 宿主端口可换（同一台机器上跑第二套栈时真的需要），**容器内端口固定 1900**：
       # 服务端自己 `PORT=1900`（上面那行），换宿主端口不要动它。

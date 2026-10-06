@@ -21,6 +21,7 @@
 
 import type { I18nValue, MessageKey } from '@heyta/i18n';
 
+import { buildShareSummary as buildShareSummaryShared } from '@heyta/app-host';
 import type { ActivityTotals, MilestoneKind, WeeklyReview } from '@heyta/domain';
 
 export interface KindCopy {
@@ -99,48 +100,17 @@ export function headlineCount(review: WeeklyReview): number {
 /**
  * 生成一份**纯文本**的本周小结，用于复制到任何地方。
  *
- * 🔴 刻意不做成图片分享卡：出图要引 canvas/字体/排版三套东西，
- * 而它换来的传播收益在这个阶段无法验证（E2EE 下我们也拿不到任何回传数据）。
- * 纯文本能被粘进任意对话、笔记、待办 —— 而且它**不携带任何标识符**，
- * 用户不会因为分享一次就泄露自己在用哪个应用、哪台设备。
+ * 🔴 实现搬到了 `@heyta/app-host#buildShareSummary`（理由见那边的文件头：移动端要接
+ * 分享块，而壳与壳之间不许互相 import —— 再写一份就是 AGENTS §3.5 记过两次的那个形状）。
+ * **这一层转发是承重的**：`apps/web/tests/motivation.spec.ts` 从这个路径 import 它，
+ * 而那个文件不在本轮可改范围内 —— 删掉这层转发会红一条与本次改动无关的判据。
  *
- * ⚠️ `t` 是**参数**而不是 hook：这是一个纯函数，而且它拼出来的东西
- * 会离开界面（进剪贴板）—— 拿当前语言拼，是它唯一正确的行为。
+ * ⚠️ 输出与搬家前逐字节相同（四条 `t()` 调用、同样的顺序、同样的 `join('\n')`）。
  */
 export function buildShareSummary(
   review: WeeklyReview,
   totals: ActivityTotals,
   t: I18nValue['t'],
 ): string {
-  const lines: string[] = [];
-  lines.push(
-    t('web.growth.summary.title', { start: review.weekStart, end: review.weekEnd }),
-  );
-  lines.push(
-    t('web.growth.summary.line', {
-      checkIns: review.checkIns,
-      tasks: review.tasksCompleted,
-      minutes: review.focusMinutes,
-    }),
-  );
-
-  if (review.bestFocusDay !== undefined) {
-    lines.push(
-      t('web.growth.summary.bestDay', {
-        date: review.bestFocusDay.date,
-        minutes: review.bestFocusDay.minutes,
-      }),
-    );
-  }
-
-  lines.push(
-    t('web.growth.summary.totals', {
-      checkIns: totals.checkIns,
-      hours: Math.floor(totals.focusMs / 3_600_000),
-      tasks: totals.tasksCompleted,
-      activeDays: totals.activeDays,
-    }),
-  );
-
-  return lines.join('\n');
+  return buildShareSummaryShared(review, totals, t);
 }

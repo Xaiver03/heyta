@@ -33,7 +33,7 @@
  * 2. **服务端真的接受/拒绝**（Bearer 归属、密文形状、`bodyLimit`、
  *    登录响应的白名单投影）—— 那是 `server/tests/account-profile*.spec.ts` 的活。
  */
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -74,6 +74,20 @@ const state: { displayName: string | null; avatarHash: string | null; cipher: st
   cipher: null,
 };
 let calls: { method: string; path: string; body: unknown }[] = [];
+/** 让 `PUT /account/profile` 回 500 —— 「保存失败时说什么」那条判据的开关。 */
+let putProfileFails = false;
+/** 让 `GET /account/profile` 回 500 —— 「读失败说的是哪一句」那条判据的开关。 */
+let getProfileFails = false;
+/**
+ * 让服务端有一份**口令解不开**的头像。
+ *
+ * 🔴 这是 R15b 那条最贵的判据的夹具：以前界面把"解不开"渲染成"没有头像"，
+ * 于是用户点「换一张」就把自己原来那张**覆盖掉**了。数据没丢，图丢了，
+ * 而服务端全程都只回 2xx —— 没有任何一层会报错。
+ */
+let avatarUndecryptable = false;
+let holdProfileGets = false;
+let heldProfileGets: Array<(response: Response) => void> = [];
 
 let container: HTMLDivElement;
 let root: Root;
@@ -109,9 +123,11 @@ const waitUntil = async (label: string, done: () => boolean): Promise<void> => {
 const mount = async (): Promise<void> => {
   await act(async () => {
     root.render(
-      <I18nProvider locale="zh-CN">
-        <ProfilePanel />
-      </I18nProvider>,
+      <StrictMode>
+        <I18nProvider locale="zh-CN">
+          <ProfilePanel />
+        </I18nProvider>
+      </StrictMode>,
     );
   });
   await flush();
@@ -147,6 +163,11 @@ beforeEach(() => {
   state.cipher = null;
   calls = [];
   encoder.fail = null;
+  putProfileFails = false;
+  getProfileFails = false;
+  avatarUndecryptable = false;
+  holdProfileGets = false;
+  heldProfileGets = [];
 
   useSyncStore.setState({
     baseUrl: SERVER,
@@ -167,8 +188,21 @@ beforeEach(() => {
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
       calls.push({ method, path, body });
       const profile = () => Response.json({ displayName: state.displayName, avatarHash: state.avatarHash });
-      if (path === PROFILE && method === 'GET') return profile();
+      if (path === PROFILE && method === 'GET') {
+        if (holdProfileGets) {
+          return await new Promise<Response>((resolve) => {
+            heldProfileGets.push(resolve);
+          });
+        }
+        if (getProfileFails) {
+          return Response.json({ error: 'boom', code: 'server-error' }, { status: 500 });
+        }
+        return profile();
+      }
       if (path === PROFILE && method === 'PUT') {
+        if (putProfileFails) {
+          return Response.json({ error: 'boom', code: 'server-error' }, { status: 500 });
+        }
         state.displayName = (body as { displayName: string | null }).displayName;
         return profile();
       }
@@ -179,6 +213,10 @@ beforeEach(() => {
         return profile();
       }
       if (path === AVATAR && method === 'GET') {
+        if (avatarUndecryptable) {
+          // 一份"形状像密文但解不开"的东西：服务端仍是 200（它只看字节）。
+          return Response.json({ cipherBase64: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' });
+        }
         if (state.cipher === null) {
           return Response.json({ error: 'No avatar.', code: 'avatar-absent' }, { status: 404 });
         }
@@ -240,6 +278,32 @@ describe('个人信息面板（R10）', () => {
     expect(find<HTMLInputElement>('profile-nickname-input')?.value).toBe('小鹿');
   });
 
+  it('凭据更换后，旧的 StrictMode 读取响应不能覆盖当前账号', async () => {
+    holdProfileGets = true;
+    await mount();
+    const firstGeneration = heldProfileGets.splice(0);
+    expect(firstGeneration.length).toBeGreaterThanOrEqual(2);
+
+    await act(async () => {
+      useSyncStore.setState({ token: 'token-new', password: 'password-new' });
+    });
+    await waitUntil('新凭据的资料请求', () => heldProfileGets.length >= 1);
+    const secondGeneration = heldProfileGets.splice(0);
+
+    for (const resolve of secondGeneration) {
+      resolve(Response.json({ displayName: '新账号', avatarHash: null }));
+    }
+    await waitUntil('新账号资料显示', () =>
+      find<HTMLInputElement>('profile-nickname-input')?.value === '新账号',
+    );
+
+    for (const resolve of firstGeneration) {
+      resolve(Response.json({ displayName: '旧账号', avatarHash: null }));
+    }
+    await flush();
+    expect(find<HTMLInputElement>('profile-nickname-input')?.value).toBe('新账号');
+  });
+
   it('改昵称 → 保存 → **重新挂载后还在**（真的存进服务端，不是组件 state）', async () => {
     await mount();
     await setInput(find<HTMLInputElement>('profile-nickname-input')!, '小鹿鹿');
@@ -296,6 +360,25 @@ describe('个人信息面板（R10）', () => {
     expect(text('profile-nickname-toolong')).toContain('32');
     await click(find<HTMLElement>('profile-nickname-save'));
     expect(calls.filter((c) => c.method === 'PUT')).toEqual([]);
+  });
+
+  it('🔴 昵称保存失败时说的是**昵称**那句，界面上不出现「头像」二字', async () => {
+    // 这一条原本是**没有**的，而它本该拦住的缺陷真的存在过：`saveNickname` 的失败
+    // 分支复用了 `avatar.failed`（『头像没有传上去，请稍后再试。』）。
+    // 昵称没存上时界面在讲另一件事 —— 用户会去找刚刚没传成功的头像。
+    // 变异：把那一句改回 `avatar.failed` ⇒ 本条精确报红（`not.toContain('头像')`）。
+    await mount();
+    await waitUntil('昵称读回', () => find<HTMLInputElement>('profile-nickname-input') !== null);
+    putProfileFails = true;
+    await setInput(find<HTMLInputElement>('profile-nickname-input')!, '改不掉的昵称');
+    await click(find<HTMLElement>('profile-nickname-save'));
+    await waitUntil('失败提示出现', () => text('profile-nickname-notice').length > 0);
+
+    const notice = text('profile-nickname-notice');
+    expect(notice, `失败提示应当讲昵称，实际是「${notice}」`).toContain('昵称');
+    expect(notice, `失败提示里出现了「头像」= 界面在说另一件事：「${notice}」`).not.toContain('头像');
+    // 🔴 失败**不写库**：假服务端里仍然是旧的 null。
+    expect(state.displayName).toBeNull();
   });
 
   it('32 个 emoji（每个两个 UTF-16 单元）不算超长 —— 钉住"按码点数"这条口径', async () => {
@@ -374,5 +457,59 @@ describe('个人信息面板（R10）', () => {
     const clickSpy = vi.spyOn(fileInput!, 'click').mockImplementation(() => undefined);
     await click(find<HTMLElement>('profile-avatar-change'));
     expect(clickSpy).toHaveBeenCalledOnce();
+  });
+
+  it('🔴 资料**读取**失败说的是"没读到"，界面上不出现「头像」二字', async () => {
+    // 这一条本该在 R10 就有。原先的分支写的是 `nameNotice = avatar.failed`
+    //（『头像没有传上去，请稍后再试。』），于是一次 GET 失败后，界面在昵称下面
+    // 宣布了一件**从没发生过**的上传失败。R15b 接移动端时读到了它。
+    // 变异：把 `loadFailed` 改回 `avatar.failed` ⇒ 本条精确报红。
+    getProfileFails = true;
+    await mount();
+    await waitUntil('读取失败提示出现', () => text('profile-load-notice').length > 0);
+    const notice = text('profile-load-notice');
+    expect(notice).toContain('没有读到');
+    expect(notice, `读失败提示里出现了「头像」：「${notice}」`).not.toContain('头像');
+    // 正向对照：这句话是 i18n 的那一枚，不是空壳元素。
+    expect(find<HTMLElement>('profile-nickname-notice')).toBeNull();
+  });
+
+  it('🔴 上传成功说的是**头像**那句，不是"昵称已保存"', async () => {
+    // web 原来的成功分支复用了 `nickname.saved`。换完照片看到一句关于昵称的话，
+    // 与 R15a 钉住的那族是同一个错，只是它长在成功支上、没人去点它。
+    await mount();
+    const fileInput = find<HTMLInputElement>('profile-avatar-file')!;
+    await act(async () => {
+      Object.defineProperty(fileInput, 'files', {
+        value: [new File([new Uint8Array([137, 80, 78, 71])], 'a.png', { type: 'image/png' })],
+        configurable: true,
+      });
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await waitUntil('头像 PUT 落定', () => state.avatarHash !== null);
+    const notice = text('profile-avatar-notice');
+    expect(notice).toContain('头像');
+    expect(notice, `成功提示讲的是别的事：「${notice}」`).not.toContain('昵称');
+    // 正向对照：预览真的出现了（成功句不是唯一可观察结果）。
+    expect(find<HTMLElement>('profile-avatar-img')).not.toBeNull();
+  });
+
+  it('🔴 口令解不开时说的是"解不开"，**不是**"你没有头像"，且服务端的 hash 原样留着', async () => {
+    // 这是 R15b 抽 `resolveAccountAvatarImage` 的**唯一理由**：
+    // 合并失败支的症状不是报错，是用户点「换一张」把自己那张好图覆盖掉。
+    avatarUndecryptable = true;
+    state.avatarHash = 'someone-elses-avatar';
+    await mount();
+    await waitUntil('读侧提示出现', () => text('profile-avatar-read-notice').length > 0);
+    const notice = text('profile-avatar-read-notice');
+    // 合法结果集是这两句（解不开 / 暂时取不到），取决于假密文撞到哪条分支；
+    // 两者都是**读侧**句子，都明确"头像在那里"。不许的是第三种：沉默。
+    expect(notice).toContain('头像');
+    expect(notice, `读失败被说成上传失败：「${notice}」`).not.toContain('没有传上去');
+    expect(find<HTMLElement>('profile-avatar-img')).toBeNull();
+    // 🔴 承重的那一条：**没有**因为解不开就把服务端那枚 hash 抹掉。
+    expect(state.avatarHash).toBe('someone-elses-avatar');
+    // 正向对照：取图请求真的发出去了（提示不是因为"根本没读"而产生的空壳）。
+    expect(calls.some((c) => c.method === 'GET' && c.path === AVATAR)).toBe(true);
   });
 });

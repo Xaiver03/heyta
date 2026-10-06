@@ -251,14 +251,26 @@ describe('宿主接线：共享组件的必填回调真的传了（少传不会�
     expect(screen).toContain('onRemove={removeReminder}');
   });
 
-  it('`NotesSection` 把 NotesBoard 的三个回调都接上了', () => {
+  it('`NotesSection` 把 NotesBoard 的四个回调都接上了（含 onEdit）', () => {
     const screen = readFileSync(resolve(here, '../src/screens/NotesSection.tsx'), 'utf8');
     expect(screen).toContain('<NotesBoard');
     expect(screen).toContain('onAdd={(content) => {');
     expect(screen).toContain('onRemove={(entityId) => {');
     expect(screen).toContain('onTogglePinned={(entityId, pinned) => {');
-    // 移动端没有便签编辑屏 —— 传 `onEdit` 会画一个通往不存在的屏的入口。
-    expect(screen).not.toContain('onEdit=');
+    // 🔴 **这条断言是翻向的**（多端第二批，2026-10-03）。原文是
+    // `expect(screen).not.toContain('onEdit=')`，理由「移动端没有便签编辑屏」。
+    // 屏有了（`NoteEditScreen`），所以"不传"从正确变成缺陷：摘要那段会退回纯文本，
+    // 用户写错一个字只能删掉重建一条（丢掉钉选与创建时间）。
+    expect(screen).toContain('onEdit=');
+    /**
+     * 但"传了 onEdit"本身不等于"改动能落库" —— 接线只证明入口在。
+     * 所以这里同时钉住**那条真 op 的落点**：编辑屏走的是动作层的
+     * `updateNoteContent`（op 的构造只有 app-host 一份，AGENTS §3.5），
+     * 而不是在界面里改状态、也不是拼一个 `entityType: 'NOTE'`。
+     */
+    const editor = readFileSync(resolve(here, '../src/screens/NoteEditScreen.tsx'), 'utf8');
+    expect(editor).toContain('.updateNoteContent(noteId, content)');
+    expect(editor).not.toContain("entityType: 'NOTE'");
   });
 
   it('`ProfileScreen` 真的挂了 NotesSection（挂不上就白做，且没有别的门禁）', () => {

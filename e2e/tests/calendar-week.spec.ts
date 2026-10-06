@@ -259,7 +259,7 @@ test('🔴 标题说的是周区间，`›` 走的是一整周，侧栏迷你月
   expect(errors, `控制台报错：${errors.join(' | ')}`).toEqual([]);
 });
 
-test('🔴 下拉里只有**真的能用**的档位（月 / 周 / 时间线），没有点了没反应的档', async ({ page }) => {
+test('🔴 下拉里只有**真的能用**的档位（月 / 周 / 日 / 时间线），没有点了没反应的档', async ({ page }) => {
   await openApp(page, APP_ZH);
   await gotoCalendar(page);
   const options = await page.locator(`${VIEW_SELECT} option`).evaluateAll((els) =>
@@ -269,5 +269,12 @@ test('🔴 下拉里只有**真的能用**的档位（月 / 周 / 时间线）�
   // ⚠️ 第三档「时间线」于 R11 批五下半进来（§9.3 差异化第 3 条）。它**不是**
   //   `CalendarViewKind`，走的是外壳那条路 —— 真点了能不能走通由
   //   `apps/web/tests/calendar-view-family.spec.tsx` 钉，这里钉的是"没有摆设"。
-  expect(options, `档位下拉里出现了 ${String(options.length)} 项`).toEqual(['月', '周', '时间线']);
+  // ⚠️ 「日」于批四进来（§9.12）、「年」于 R13 进来：顺序就是下拉里的顺序，多一个少一个都红。
+  expect(options, `档位下拉里出现了 ${String(options.length)} 项`).toEqual([
+    '月',
+    '周',
+    '日',
+    '年',
+    '时间线',
+  ]);
 });

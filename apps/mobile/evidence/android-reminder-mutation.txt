@@ -1,0 +1,7 @@
+2026-10-03 Android Release OS-delivery mutation
+Baseline: 11 passed, 0 failed.
+Mutation: replace createReminderReconciler(reconcileOnce) with a no-op reconciler; rebuild and reinstall.
+Task ring-e2e-230928 and reminder CREATE persisted through real UI; due 23:13.
+Caught: 120 x 2s notification assertion failed; 3 passed, 1 failed; exit 1.
+Source restored byte-for-byte before running device test; normal Release rebuilt successfully.
+Screenshot opened: no heyta notification in the system notification shade.

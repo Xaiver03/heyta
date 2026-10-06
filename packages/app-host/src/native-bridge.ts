@@ -48,8 +48,10 @@ import {
   decodeOpLogWire,
   encodeOpLogWire,
   handleOpLogWorkerRequest,
+  type DbDestroyReport,
   type OpLogStore,
   type OpLogWorkerRequest,
+  type SqliteContainerRemoval,
 } from '@heyta/storage';
 import type { Operation } from '@heyta/sync-core';
 
@@ -94,6 +96,15 @@ interface NativeSqliteDriver {
   run(sql: string, paramsJson: string): unknown;
   all(sql: string, paramsJson: string): unknown;
   close(): void;
+  /**
+   * 原生侧的**移除库文件**（见 `sqlite-driver.ts` 里那条"为什么这一层可选"）。
+   *
+   * 🔴 返回**字符串**而不是对象：跨 JSContext / CLR 边界只有字符串是可靠的
+   * （`all` 与 `run` 同一个道理）。形状 = `SqliteContainerRemoval` 的 JSON。
+   * 删不掉时**不许抛**，要回 `{containerRemoved:false, reason}` ——
+   * 抛了会让 `destroy()` 整体失败，而"剩下的几类根本不做"正是这条契约要防的。
+   */
+  removeDatabase?(): unknown;
 }
 
 /** 信封的键。⚠️ 改它必须同步改 `apps/desktop-macos/.../SqliteBridge.swift`。 */
@@ -149,7 +160,61 @@ const wrapDriver = (native: NativeSqliteDriver) => ({
     return JSON.parse(payload as string) as T[];
   },
   close: (): void => native.close(),
+  /**
+   * 🔴 **只在原生真的提供了它时才把这一个键挂上。**
+   *
+   * `SqliteAdapter.destroy()` 读的是 `driver.removeDatabase === undefined`，
+   * 并据此在报告里写"内容已清空，文件仍在"。把键无条件写成
+   * `removeDatabase: () => native.removeDatabase!()` 会让这个判定**永远是"有"**，
+   * 于是"壳还没实现"这一档被包成一次静默成功 —— 而这条契约存在的理由
+   * 恰恰是"漏了不会报错，只会继续留着明文"（`db.types.ts:249`）。
+   */
+  ...(typeof native.removeDatabase === 'function'
+    ? {
+        removeDatabase: (): SqliteContainerRemoval =>
+          parseContainerRemoval(native.removeDatabase!()),
+      }
+    : {}),
 });
+
+/**
+ * 把原生侧回传的"容器处置"解成契约里的形状。
+ *
+ * ⚠️ 三条都不抛：这一层的任何失败都要变成一条**书面凭据**，
+ * 因为抛出去会让 `destroy()` 整体失败、剩下的几类存储根本不被清。
+ */
+function parseContainerRemoval(payload: unknown): SqliteContainerRemoval {
+  const fallback: SqliteContainerRemoval = {
+    target: 'sqlite',
+    containerRemoved: false,
+    reason: 'host-driver-returned-unreadable-removal',
+  };
+  if (typeof payload !== 'string') return fallback;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return fallback;
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return fallback;
+  const record = parsed as Record<string, unknown>;
+  // 驱动信封（同一套 `DRIVER_ERROR_KEY`）在这里意味着"删的时候出错了"，不是"崩了"。
+  if (typeof record[DRIVER_ERROR_KEY] === 'string') {
+    return {
+      target: typeof record.target === 'string' ? record.target : 'sqlite',
+      containerRemoved: false,
+      reason: `host-driver-error: ${record[DRIVER_ERROR_KEY] as string}`,
+    };
+  }
+  if (typeof record.target !== 'string' || typeof record.containerRemoved !== 'boolean') {
+    return fallback;
+  }
+  return {
+    target: record.target,
+    containerRemoved: record.containerRemoved,
+    ...(typeof record.reason === 'string' ? { reason: record.reason } : {}),
+  };
+}
 
 /**
  * 打开（或确认已打开）应用宿主。幂等。
@@ -295,6 +360,12 @@ let opLogStore: OpLogStore<Operation> | null = null;
 let opLogClientId: string | null = null;
 /** adapter 的关闭只能走它自己（`OpLogStore` 接口上没有 close）。 */
 let closeOpLogAdapter: (() => void) | null = null;
+/**
+ * adapter 的**销毁**句柄。它和 close 是两个动作，不是同一动作的两种写法：
+ * `close` 只断连接（`db.types.ts:257` 明写"把 close 当 destroy 是本条存在的历史原因"），
+ * 而 `destroy` 会把内容清空**并移除库文件**，交回一份 `DbDestroyReport`。
+ */
+let destroyOpLogAdapter: (() => Promise<DbDestroyReport>) | null = null;
 
 /**
  * 为页侧的真应用打开存储（无引擎）。幂等。
@@ -313,6 +384,7 @@ export async function openOpLog(_input: { dbPath: string }): Promise<{ clientId:
   opLogStore = store;
   opLogClientId = clientId;
   closeOpLogAdapter = () => adapter.close();
+  destroyOpLogAdapter = () => adapter.destroy();
   return { clientId };
 }
 
@@ -353,6 +425,32 @@ export async function handleHostMessage(input: {
     return { outboundJson: [JSON.stringify({ type: 'ready', clientId })] };
   }
 
+  /**
+   * 🔴 **销毁这一发不能走 `handleOpLogWorkerRequest`。**
+   *
+   * 那个函数的第一个实参是 `OpLogStore`，而 `destroy()` 是**适配器**上的动作
+   * （`OpLogStore` 接口上没有它 —— 与 `close` 同一个原因）。所以这一发和 `hello`
+   * 一样是"壳自己认的一条"，走的是 `openOpLog` 存下来的销毁句柄。
+   *
+   * ⚠️ 页侧的会话（`createWorkerOpLogSession`）会把这条回包当成"没有 id 的消息"**静默忽略**
+   * （`oplog-worker-bridge.ts:283`），因此共用同一个端口不会打扰正在跑的引擎。
+   */
+  if ('type' in decoded && decoded.type === 'oplog-destroy') {
+    const destroy = destroyOpLogAdapter;
+    if (destroy === null) {
+      throw new Error('op-log 适配器没有销毁句柄（openOpLog 返回了却没装）—— 接线 bug');
+    }
+    const report = await destroy();
+    // 销毁后必须把模块态清空：否则下一条消息会拿着一个**已关闭**的 store 去调用，
+    // 症状是"注销之后的第一个操作报 no such table"。清空之后 `openOpLog` 的幂等门
+    // 会重新开一份（空库），那才是"这台设备上的这个账号已经不在了"的形状。
+    opLogStore = null;
+    opLogClientId = null;
+    closeOpLogAdapter = null;
+    destroyOpLogAdapter = null;
+    return { outboundJson: [JSON.stringify(encodeOpLogWire({ type: 'oplog-destroyed', report }))] };
+  }
+
   const store = opLogStore;
   if (store === null) {
     // 走到这里说明 openOpLog 刚返回但没落下 store —— 那是接线 bug，必须响亮。
@@ -371,6 +469,7 @@ export function close(): void {
   if (closeOpLogAdapter !== null) {
     closeOpLogAdapter();
     closeOpLogAdapter = null;
+    destroyOpLogAdapter = null;
     opLogStore = null;
     opLogClientId = null;
   }

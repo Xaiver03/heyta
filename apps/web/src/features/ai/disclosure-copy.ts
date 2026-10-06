@@ -19,16 +19,29 @@
  * `check-ai-coverage` 还在用，而且那是个零依赖的包。
  */
 import type { RetentionDisclosure } from '@heyta/ai';
-import type { MessageKey } from '@heyta/i18n';
+import type { MessageKey, MessageVars } from '@heyta/i18n';
 
-/** 结构化保留策略 → 词条 key。判别式穷举，漏一种编译就不过。 */
-export function retentionMessageKey(kind: RetentionDisclosure['kind']): MessageKey {
-  switch (kind) {
+/**
+ * 结构化保留策略 → 词条 + 插值。判别式穷举，漏一种编译就不过。
+ *
+ * 🔴 返回的是**整个披露对象**而不是 `kind`：`metadata-only` 那一句里有天数，
+ * 而天数**只能从披露对象取**（它由 `packages/ai` 的那两个常量投影出来）。
+ * 只传 `kind` 的话，壳就只能自己写一个 45 —— 那就是"同一个数字两处写"，
+ * 而改了常量之后界面会报出一个不存在的保留期。
+ */
+export function retentionMessage(disclosure: RetentionDisclosure): {
+  readonly key: MessageKey;
+  readonly vars?: MessageVars;
+} {
+  switch (disclosure.kind) {
     case 'not-applicable':
-      return 'web.ai.disclosure.retentionNotApplicable';
+      return { key: 'web.ai.disclosure.retentionNotApplicable' };
     case 'third-party-decides':
-      return 'web.ai.disclosure.retentionThirdParty';
-    case 'undecided':
-      return 'web.ai.disclosure.retentionUndecided';
+      return { key: 'web.ai.disclosure.retentionThirdParty' };
+    case 'metadata-only':
+      return {
+        key: 'web.ai.disclosure.retentionMetadataOnly',
+        vars: { contentDays: disclosure.contentDays, metadataDays: disclosure.metadataDays },
+      };
   }
 }

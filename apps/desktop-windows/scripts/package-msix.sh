@@ -76,6 +76,18 @@ echo "=== ③ 取回 MSIX 与验证截图 ==="
 scp -q "$HOST:C:/src/heyta-msix/heyta.msix" "$OUT_DIR/" || { echo "  🔴 取不到 heyta.msix"; exit 1; }
 scp -q "$HOST:C:/src/heyta-msix/heyta-selfsigned.cer" "$OUT_DIR/" || true
 scp -q "$HOST:C:/src/heyta-msix/install-capture.txt" "$OUT_DIR/" || true
+# 🔴 取证文件**必须判**。以前这里 `|| true` 之后就再没人看过它一眼，
+#    而交互会话里那条 `install-and-capture.ps1` 的 `exit 1` 传不上来
+#    （ssh 的输出走管道 ⇒ 尾命令的 rc 覆盖掉远端的；schtasks 又是异步投递）
+#    ⇒ 装失败、快捷方式没建成，都能以 rc=0 收场。判据清单的单一所有者在
+#    `scripts/lib/msix-install-facts.sh`（`reinstall-all.sh` 调的是同一份）。
+source "$REPO/scripts/lib/msix-install-facts.sh"
+if ! msix_fact_out=$(msix_check_facts "$OUT_DIR/install-capture.txt"); then
+  echo "  🔴 远端安装取证不成立 —— ${msix_fact_out}"
+  [ -f "$OUT_DIR/install-capture.txt" ] && sed 's/^/     /' "$OUT_DIR/install-capture.txt"
+  exit 1
+fi
+echo "  ✅ 远端安装取证：${msix_fact_out}"
 scp -q "$HOST:C:/src/heyta-msix/packaged-first-run.png" "$OUT_DIR/" || echo "  ⚠️ 没有验证截图（说明没跑到"启动并截图"那步）"
 ls -la "$OUT_DIR" | awk '{print "  " $0}'
 

@@ -37,7 +37,7 @@ import { AiDisclosure, HeytaUiProvider, type AiDisclosureLabels } from '@heyta/u
 import type { RetentionDisclosure } from '@heyta/ai';
 import { useI18n } from '@heyta/i18n';
 
-import { retentionMessageKey } from './disclosure-copy.js';
+import { retentionMessage } from './disclosure-copy.js';
 import { LIST_SEPARATOR } from './locale-punctuation.js';
 import type { ResolvedRouteTarget } from './route-explanation.js';
 
@@ -68,6 +68,9 @@ export function AiDisclosureHost({
 }: AiDisclosureHostProps): React.JSX.Element {
   const { t, locale } = useI18n();
 
+  const retention =
+    retentionDisclosure === undefined ? undefined : retentionMessage(retentionDisclosure);
+
   const labels: AiDisclosureLabels = {
     destinationLead: t('web.ai.disclosure.destinationLead'),
     local: t('web.ai.disclosure.local'),
@@ -93,11 +96,7 @@ export function AiDisclosureHost({
           fallbacks: target.fallbacks,
         }}
         fields={fields}
-        retentionText={
-          retentionDisclosure === undefined
-            ? undefined
-            : t(retentionMessageKey(retentionDisclosure.kind))
-        }
+        retentionText={retention === undefined ? undefined : t(retention.key, retention.vars)}
         separator={LIST_SEPARATOR[locale]}
       >
         {children}

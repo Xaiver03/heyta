@@ -37,7 +37,7 @@ import {
   type LocalDate,
   toLocalDate,
 } from './date.js';
-import { Quadrant, type Task } from './entities.js';
+import { Quadrant, isLive, type Task } from './entities.js';
 import { bucketByQuadrant } from './quadrant.js';
 
 /**
@@ -74,7 +74,7 @@ export interface FilterContext {
 
 /** 未删除的任务。**每一个筛选都先过这一道**，所以它是单独一步而不是分支里的重复。 */
 export function aliveTasks(tasks: readonly Task[]): Task[] {
-  return tasks.filter((t) => t.deletedAt === undefined);
+  return tasks.filter(isLive);
 }
 
 /** 是否已完成。「已完成」只有一个判据：`completedAt` 有值。 */

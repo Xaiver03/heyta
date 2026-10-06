@@ -12,14 +12,19 @@
  */
 
 import type { Reminder } from '@heyta/domain';
-import { MAX_REMINDERS_PER_TASK } from '@heyta/domain';
+import {
+  ALL_REMINDER_OFFSET_PRESETS_MS,
+  MAX_REMINDERS_PER_TASK,
+  REMINDER_LONG_OFFSET_PRESETS_MS,
+  reminderIsFired,
+} from '@heyta/domain';
 import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 import { OpType } from '@heyta/sync-core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createTaskActions, type TaskActions } from '../src/actions.js';
+import { createTaskActions, type ActionContext, type TaskActions } from '../src/actions.js';
 import { createReminderActions, reminderId, type ReminderActions } from '../src/reminder-actions.js';
 
 let adapter: SqliteAdapter;
@@ -146,6 +151,62 @@ describe('新建提醒', () => {
     await expect(actions.createReminder(taskId, clock + 99 * MINUTE)).rejects.toThrow(/上限/);
   });
 
+  it('🔴 并发连点 8 次也不能突破上限（上限检查的 TOCTOU 回归）', async () => {
+    // 上一条是"逐条 await"的形状，它挡不住真正的失效模式：
+    // `dispatch` 落到物化状态是异步的，所以 N 个并发调用会在**同一个旧快照**上
+    // 同时通过 `aliveOfTask(...) < 上限` 的检查。加写链之前实测 8 条全落库。
+    const taskId = await makeTask();
+    const results = await Promise.allSettled(
+      Array.from({ length: 8 }, (_, i) => actions.createReminder(taskId, clock + (i + 1) * MINUTE)),
+    );
+    const alive = Object.values(state().reminders).filter(
+      (r) => r.taskId === taskId && r.deletedAt === undefined,
+    ).length;
+    expect(alive, '存活数超过上限 ⇒ 检查跑在旧快照上，上限等于没有').toBe(MAX_REMINDERS_PER_TASK);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(MAX_REMINDERS_PER_TASK);
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(3);
+  });
+
+  it('🔴 排队期间任务被删除，等待中的创建会在真正写入前拒绝', async () => {
+    const taskId = await makeTask();
+    const originalDispatch = engine.dispatch.bind(engine);
+    let holdFirstReminder = true;
+    let releaseFirst!: () => void;
+    let dispatchStarted!: () => void;
+    const dispatchStartedPromise = new Promise<void>((resolve) => {
+      dispatchStarted = resolve;
+    });
+    const queuedContext: ActionContext = {
+      getState: () => engine.getState(),
+      dispatch: (intent) => {
+        if (holdFirstReminder && intent.entityType === 'REMINDER') {
+          holdFirstReminder = false;
+          dispatchStarted();
+          return new Promise((resolve, reject) => {
+            releaseFirst = () => {
+              void originalDispatch(intent).then(resolve, reject);
+            };
+          });
+        }
+        return originalDispatch(intent);
+      },
+    };
+    const queuedActions = createReminderActions(queuedContext, { now });
+
+    const first = queuedActions.createReminder(taskId, clock + MINUTE);
+    await dispatchStartedPromise;
+    const waiting = queuedActions.createReminder(taskId, clock + 2 * MINUTE);
+
+    // The first request is already at its write point. The second is still
+    // behind it in the per-task queue and must observe this tombstone.
+    await tasks.remove(taskId);
+    releaseFirst();
+
+    await expect(first).resolves.toBe(`${taskId}:${String(clock + MINUTE)}`);
+    await expect(waiting).rejects.toThrow(/找不到任务/);
+    expect(queuedActions.listForTask(taskId)).toHaveLength(1);
+  });
+
   it('墓碑不占上限名额（删一条还能再建一条）', async () => {
     const taskId = await makeTask();
     const ids: string[] = [];
@@ -233,6 +294,18 @@ describe('投递 / 关闭', () => {
     expect(await opCount(id)).toBe(2);
   });
 
+  it('legacy firedAt 的提醒同样不写 snooze（与新 marker 语义一致）', async () => {
+    const taskId = await makeTask();
+    const id = await actions.createReminder(taskId, clock + MINUTE);
+    await engine.dispatch({
+      entityType: 'REMINDER', entityId: id, opType: OpType.Update,
+      payload: { firedAt: clock },
+    });
+
+    expect(await actions.snoozeReminder(id, clock + 10 * MINUTE)).toBe(false);
+    expect(await opCount(id)).toBe(2);
+  });
+
   it('关闭 / 撤销关闭都幂等，且撤销能重新到点', async () => {
     const taskId = await makeTask();
     const id = await actions.createReminder(taskId, clock + MINUTE);
@@ -261,6 +334,25 @@ describe('改期 / 删除', () => {
     expect(state().reminders[id]?.triggerAt).toBe(clock + 5 * MINUTE);
   });
 
+  it('legacy firedAt 在改期时惰性绑定旧 trigger，新 occurrence 重新可投递', async () => {
+    const taskId = await makeTask();
+    const oldTrigger = clock + MINUTE;
+    const id = await actions.createReminder(taskId, oldTrigger);
+    await engine.dispatch({
+      entityType: 'REMINDER', entityId: id, opType: OpType.Update,
+      payload: { firedAt: clock },
+    });
+    const nextTrigger = clock + 2 * HOUR;
+
+    await actions.rescheduleReminder(id, nextTrigger);
+
+    const moved = state().reminders[id]!;
+    expect(moved.firedAt).toBe(clock);
+    expect(moved.firedForTriggerAt).toBe(oldTrigger);
+    expect(moved.triggerAt).toBe(nextTrigger);
+    expect(reminderIsFired(moved)).toBe(false);
+  });
+
   it('删除是软删除：墓碑留着、列表里不再出现、动作层认不出它', async () => {
     const taskId = await makeTask();
     const id = await actions.createReminder(taskId, clock + MINUTE);
@@ -274,7 +366,7 @@ describe('改期 / 删除', () => {
 });
 
 describe('重复任务顺延', () => {
-  it('🔴 带提前量的提醒跟着新截止走，并重置上一个周期的投递/关闭/推迟状态', async () => {
+  it('🔴 带提前量的提醒跟着新截止走，并让旧 occurrence 的投递 marker 失效', async () => {
     const due = clock + DAY;
     const taskId = await makeTask({ dueDate: due });
     const id = await actions.createReminderBeforeDue(taskId, 30 * MINUTE);
@@ -289,7 +381,8 @@ describe('重复任务顺延', () => {
 
     const moved = state().reminders[id];
     expect(moved?.triggerAt).toBe(nextDue - 30 * MINUTE);
-    expect(moved?.firedAt).toBeUndefined();
+    expect(moved?.firedAt).toBeDefined();
+    expect(moved?.firedForTriggerAt).toBe(due - 30 * MINUTE);
     expect(moved?.dismissedAt).toBeUndefined();
     expect(moved?.snoozedUntil).toBeUndefined();
     // 顺延不新建实体 → 上限不会被周期数吃掉
@@ -308,5 +401,308 @@ describe('重复任务顺延', () => {
     const taskId = await makeTask({ dueDate: clock + DAY });
     await actions.createReminderBeforeDue(taskId, HOUR);
     expect(await actions.rescheduleForRepeat(taskId, undefined)).toBe(0);
+  });
+});
+
+/**
+ * 🔴 缺陷 D1：**已删除任务的提醒仍会弹**。
+ *
+ * 任务与提醒是两条独立记录，`remove` 只给任务打 `DEL`（已实测：它不级联提醒），
+ * 而 `dueReminders` 只看提醒**自己**的 `deletedAt`。于是"删掉任务"之后
+ * 那条到点提醒依然算 pending，投递处又只挡 `task === undefined`
+ *（墓碑任务在表里**是存在的**）⇒ 通知照弹，点进去什么都没有。
+ *
+ * 每一组都先打一次**阳性对照**（删之前它确实在 `due()` 里）——
+ * 否则"空数组"可能只是提醒根本没建起来。
+ */
+describe('🔴 所属任务被删除 ⇒ 不算到点（D1）', () => {
+  it('任务进回收站后它的到点提醒不再出现，而提醒本身没有被删', async () => {
+    const taskId = await makeTask();
+    const id = await actions.createReminder(taskId, clock + 10 * MINUTE);
+    clock += 10 * MINUTE;
+
+    // 阳性对照：删之前确实到点
+    expect(actions.due().map((r) => r.id)).toEqual([id]);
+
+    await tasks.remove(taskId);
+
+    expect(actions.due(), '已删除任务的提醒不该再算到点').toEqual([]);
+    // 排除必须是因为"任务不活着"，不是因为提醒被顺带删了（那是另一种正确）
+    expect(state().reminders[id]?.deletedAt).toBeUndefined();
+  });
+
+  it('🔴 已彻底删除（purgedAt）的任务同样挡住', async () => {
+    const taskId = await makeTask();
+    const id = await actions.createReminder(taskId, clock + 10 * MINUTE);
+    clock += 10 * MINUTE;
+    expect(actions.due().map((r) => r.id)).toEqual([id]);
+
+    await tasks.remove(taskId);
+    await tasks.purge(taskId);
+
+    expect(actions.due()).toEqual([]);
+  });
+
+  it('还原任务 ⇒ 提醒重新算到点（这一道门是隐藏，不是吞掉）', async () => {
+    const taskId = await makeTask();
+    const id = await actions.createReminder(taskId, clock + 10 * MINUTE);
+    clock += 10 * MINUTE;
+    await tasks.remove(taskId);
+    expect(actions.due()).toEqual([]);
+
+    await tasks.restore(taskId);
+
+    expect(actions.due().map((r) => r.id), '还原后提醒应当重新算到点').toEqual([id]);
+  });
+});
+
+/**
+ * 🔴 缺陷 D14：**同一条到点提醒会再弹一次**。
+ *
+ * `markReminderFired`（写 `firedAt`）此前生产零调用点，投递处的去重集合只是
+ * `useRef(new Set())` —— 一次页面加载内的内存。⇒ 刷新之后、以及**另一台设备**
+ * 回放同一份 op-log 时，这条提醒仍然是 pending，会再弹一遍。
+ *
+ * 第二组是这条的**第二个载体**：不在同一台设备上测，而是把 op 交给另一个引擎
+ * 回放（模拟"另一台设备/刷新后的冷启动"）。只证 A 上 `due()` 变空是不够的 ——
+ * 那可能只是内存态。
+ */
+describe('🔴 firedAt 落库后，另一台设备不再重弹（D14）', () => {
+  it('A 投递落库 → B 回放同一批 op → B 的 due() 不含它、且 firedAt 真的物化了', async () => {
+    const taskId = await makeTask();
+    const id = await actions.createReminder(taskId, clock + MINUTE);
+    clock += MINUTE;
+
+    // 阳性对照：到点、还没投
+    expect(actions.due().map((r) => r.id)).toEqual([id]);
+
+    expect(await actions.markReminderFired(id)).toBe(true);
+    expect(actions.due(), '本机投过之后不该再算到点').toEqual([]);
+
+    const adapterB = new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: () => new NodeSqliteDriver(':memory:'),
+    });
+    await adapterB.init();
+    try {
+      const engineB = new OpLogEngine({
+        store: new DbOpLogStore(adapterB),
+        clientId: 'client-reminder-other',
+        now,
+      });
+      const pending = await engine.getPendingUpload();
+      const result = await engineB.applyRemote(pending);
+      expect(result.applied, 'B 必须真的收到这批 op（否则下面的"不含它"是空集）')
+        .toHaveLength(pending.length);
+
+      const onB = createReminderActions(engineB, { now });
+      expect(
+        onB.due().map((r) => r.id),
+        'B 回放后不该把它当成就弹过的反面 —— 到点集合里不许有它',
+      ).toEqual([]);
+      // 结论的依据必须是**落库的 firedAt**，不是别的偶然
+      const bState = engineB.getState() as unknown as { reminders: Record<string, Reminder> };
+      expect(bState.reminders[id]?.firedAt, 'firedAt 要作为 op 传过去，而不是只活在本机内存里')
+        .toBe(clock);
+    } finally {
+      await adapterB.close();
+    }
+  });
+});
+
+/**
+ * W9 ① + ③ 在**真实写路径**上的判据。
+ *
+ * 领域层那边（`packages/domain/tests/reminders-*.spec.ts`）证的是算术；
+ * 这里证的是"算术真的被 op 载荷与到期判定用上了" —— 本仓最高发的失效恰好是
+ * "纯函数有测试、没有调用点"，所以档位与 DST 两条都必须穿过
+ * `createReminderBeforeDue` / `rescheduleForRepeat` 各跑一遍。
+ *
+ * 🔴 期望值一律用**测试自己写的** `localNDaysBefore`（独立实现），
+ * 不去调 `reminderTriggerFromOffset` —— 拿被测函数算期望值等于没测。
+ */
+describe('W9 ① 日级以上的长档位走同一条写路径', () => {
+  /** 独立 oracle：本地日历日回退（`setDate` 手法，与领域层不是同一份代码）。 */
+  const localNDaysBefore = (ms: number, n: number): number => {
+    const d = new Date(ms);
+    d.setDate(d.getDate() - n);
+    return d.getTime();
+  };
+
+  it('每一档都能建出来，且 offsetMs 落进载荷、triggerAt 落在同一套钟表时间', async () => {
+    const due = clock + 60 * DAY; // 最远一档（30 天）也远在 365 天闸门之内
+    for (const offset of REMINDER_LONG_OFFSET_PRESETS_MS) {
+      const taskId = await makeTask({ dueDate: due });
+      const id = await actions.createReminderBeforeDue(taskId, offset);
+      const saved = state().reminders[id];
+      const n = offset / DAY;
+
+      expect(saved?.offsetMs, `档位 ${String(offset)}`).toBe(offset);
+      expect(saved?.triggerAt, `档位 ${String(offset)}`).toBe(localNDaysBefore(due, n));
+      // 载荷里也是同一个值（证明落到了 op 上，不只是内存）。
+      expect(await lastPayload(id)).toMatchObject({ triggerAt: saved?.triggerAt, offsetMs: offset });
+      // 钟表时间没漂：分钟与小时必须与截止那一刻一致。
+      expect([new Date(saved!.triggerAt).getHours(), new Date(saved!.triggerAt).getMinutes()]).toEqual(
+        [new Date(due).getHours(), new Date(due).getMinutes()],
+      );
+    }
+  });
+
+  it('🔴 到点判定用的就是这个时刻（前一秒不算到点、到点那一秒算）', async () => {
+    const due = clock + 40 * DAY;
+    const taskId = await makeTask({ dueDate: due });
+    const id = await actions.createReminderBeforeDue(taskId, 3 * DAY);
+    const trigger = state().reminders[id]!.triggerAt;
+
+    clock = trigger - 1;
+    expect(actions.due().map((r) => r.id)).toEqual([]);
+    clock = trigger;
+    expect(actions.due().map((r) => r.id)).toEqual([id]);
+  });
+
+  it('全部档位（短 + 长）都能过闸门，且不会因"提前太久"被判 too-far', async () => {
+    for (const offset of ALL_REMINDER_OFFSET_PRESETS_MS) {
+      const taskId = await makeTask({ dueDate: clock + 200 * DAY });
+      const id = await actions.createReminderBeforeDue(taskId, offset);
+      expect(state().reminders[id], `档位 ${String(offset)} 没建出来`).toBeDefined();
+    }
+  });
+});
+
+describe('W9 ③ 长档位跨夏令时不漂（真实写路径，TZ = America/New_York）', () => {
+  beforeAll(() => {
+    vi.stubEnv('TZ', 'America/New_York');
+  });
+  afterAll(() => {
+    vi.unstubAllEnvs();
+  });
+
+  /** 本地时刻（月份 0 起）。**必须在用例里现算**，见 domain 那份 DST 文件的说明。 */
+  const at = (y: number, m: number, d: number, hh = 0, mm = 0): number =>
+    new Date(y, m, d, hh, mm, 0, 0).getTime();
+
+  it('🔴 建提醒：截止 2026-03-09 09:30 EDT + 提前 3 天 = 03-06 09:30 EST', async () => {
+    // 夹具前提：这两天真的分属 EST / EDT，否则这条判据会与朴素减法逐字相同。
+    expect(new Date(at(2026, 2, 6, 9, 30)).getTimezoneOffset()).not.toBe(
+      new Date(at(2026, 2, 9, 9, 30)).getTimezoneOffset(),
+    );
+
+    clock = at(2026, 0, 20, 8, 0); // "现在" = 1 月 20 日，三月既在未来又在 365 天内
+    const taskId = await makeTask({ dueDate: at(2026, 2, 9, 9, 30) });
+    const id = await actions.createReminderBeforeDue(taskId, 3 * DAY);
+
+    expect(state().reminders[id]!.triggerAt).toBe(at(2026, 2, 6, 9, 30));
+    // 朴素 epoch 减法得到的正是错的那一个（这条断言让"改回减法"必然转红）。
+    expect(at(2026, 2, 9, 9, 30) - 3 * DAY).toBe(at(2026, 2, 6, 8, 30));
+    expect(state().reminders[id]!.triggerAt).not.toBe(at(2026, 2, 9, 9, 30) - 3 * DAY);
+  });
+
+  it('🔴 顺延到下一个周期也不漂（rescheduleForRepeat 与建提醒同一个实现）', async () => {
+    clock = at(2026, 0, 20, 8, 0);
+    // 本周期截止 3 月 5 日（还在 EST 里），下一周期截止 3 月 8 日 09:30 —— 就是
+    // 拨快那一天。前 3 个日历日是 3 月 5 日 09:30 EST，朴素减法会给 08:30。
+    const taskId = await makeTask({ dueDate: at(2026, 2, 5, 9, 30) });
+    const id = await actions.createReminderBeforeDue(taskId, 3 * DAY);
+    expect(state().reminders[id]!.triggerAt).toBe(at(2026, 2, 2, 9, 30)); // 前置事实
+
+    const nextDue = at(2026, 2, 8, 9, 30);
+    expect(await actions.rescheduleForRepeat(taskId, nextDue)).toBe(1);
+    expect(state().reminders[id]!.triggerAt).toBe(at(2026, 2, 5, 9, 30));
+    expect(nextDue - 3 * DAY).toBe(at(2026, 2, 5, 8, 30));
+    expect(state().reminders[id]!.triggerAt).not.toBe(nextDue - 3 * DAY);
+  });
+});
+
+/**
+ * 读侧：一次刷新只许把提醒表摊**一遍**（P0-7）
+ * ==============================================
+ *
+ * ## 原先的形状为什么贵
+ *
+ * 宿主 `refresh()` 对**每个任务**各调一次 `listForTask`，而每次调用都把整张提醒表
+ * `Object.values` 摊平再按 `taskId` 滤 ⇒ 代价是 **任务数 × 提醒数**，
+ * 并且这条刷新挂在**每一条 op** 上（本地写、远端应用、同步回来的每一批）。
+ * 1000 任务 + 1000 提醒 ≈ 10⁶ 次比较，为的是一屏早就画好的界面。
+ *
+ * ## 为什么这几条要一起走
+ *
+ * "只读一遍"单独断是**没有区分力**的：把归组实现改成什么都不返回，读数也是 1。
+ * 所以五面一起钉：
+ *
+ *   1. `listByTask()` 一趟 ⇒ `getState` 恰好 **1** 次；
+ *   2. 同一个计数器下逐任务调 `listForTask` ⇒ 读数 = **任务数**（活体对照，
+ *      证明这个计数器数的就是"摊表"这件事，而不是恒 1 的摆设）；
+ *   3. 归组结果与逐任务结果**逐条相同**（含组内顺序 —— `aliveReminders` 按 id
+ *      字典序排，从全局有序序列分桶后每桶仍有序，这条就是钉这件事的）；
+ *   4. 墓碑提醒**不在**归组结果里，而同任务的存活提醒在（防止"一遍扫"顺手把
+ *      D1 那道滤挪走 —— 注释里明写那道滤是防已删任务到点照样弹的）；
+ *   5. 没有提醒的任务**不出现在键里**，而 `listForTask` 对它回 `[]`。
+ *      这条钉的是接口边界：补空数组是宿主的事，不是这里的。
+ */
+describe('🔴 提醒读侧一次遍历归组（P0-7）', () => {
+  it('listByTask 只摊一遍表，且结果与逐任务读逐条相同', async () => {
+    const TASK_COUNT = 8;
+    const PER_TASK = 3;
+
+    const taskIds: string[] = [];
+    for (let i = 0; i < TASK_COUNT; i += 1) {
+      const taskId = await makeTask();
+      taskIds.push(taskId);
+      for (let j = 1; j <= PER_TASK; j += 1) {
+        await actions.createReminder(taskId, clock + j * MINUTE);
+      }
+    }
+    // 一个没有任何提醒的任务（钉第 5 面用）。
+    const emptyTask = await makeTask();
+    // 一条被删掉的提醒（钉第 4 面用）。
+    const firstTask = taskIds[0]!;
+    const removedId = reminderId(firstTask, clock + PER_TASK * MINUTE);
+    await actions.removeReminder(removedId);
+
+    let reads = 0;
+    const countingContext: ActionContext = {
+      getState: () => {
+        reads += 1;
+        return engine.getState();
+      },
+      dispatch: (intent) => engine.dispatch(intent),
+    };
+    const counted = createReminderActions(countingContext, { now });
+
+    // ① 一遍
+    reads = 0;
+    const grouped = counted.listByTask();
+    expect(
+      reads,
+      `listByTask 把提醒表摊了 ${String(reads)} 遍 ⇒ 归组没有做成一次`,
+    ).toBe(1);
+
+    // ② 活体对照：同一个计数器下，逐任务读就是任务数遍
+    reads = 0;
+    for (const taskId of taskIds) counted.listForTask(taskId);
+    expect(
+      reads,
+      `逐任务调 ${String(TASK_COUNT)} 次 listForTask，计数器只读到 ${String(reads)} ⇒ 它数的不是"摊表"，① 那个 1 没有意义`,
+    ).toBe(TASK_COUNT);
+
+    // ③ 等价：每个任务的归组结果与逐任务读**逐条相同**（顺序也算）
+    for (const taskId of taskIds) {
+      expect(grouped[taskId] ?? [], `${taskId} 的归组结果与逐任务读不同`).toEqual(
+        counted.listForTask(taskId),
+      );
+    }
+
+    // ④ 那道"滤存活"还在：墓碑不在，同任务的存活那几条在
+    const groupedIds = (grouped[firstTask] ?? []).map((reminder) => reminder.id);
+    expect(groupedIds, '被删的提醒出现在归组结果里 ⇒ "一遍扫"把防 D1 那道滤带走了').not.toContain(
+      removedId,
+    );
+    expect(groupedIds, '同任务的存活提醒不该一起消失').toContain(
+      reminderId(firstTask, clock + MINUTE),
+    );
+
+    // ⑤ 接口边界：没提醒的任务不留键，而补空是宿主的事
+    expect(grouped[emptyTask], '没有提醒的任务不应产生键（补空由宿主做）').toBeUndefined();
+    expect(counted.listForTask(emptyTask), '逐任务读仍然回空数组').toEqual([]);
   });
 });

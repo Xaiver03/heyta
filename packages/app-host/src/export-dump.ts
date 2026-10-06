@@ -34,7 +34,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import type { Priority, Task } from '@heyta/domain';
+import { localTimeOf, type LocalTime, type Priority, type Task } from '@heyta/domain';
 import { bucketFor, type MaterializedState } from '@heyta/op-log';
 import { CURRENT_SCHEMA_VERSION, ENTITY_TYPES } from '@heyta/shared-schema';
 import type { Operation } from '@heyta/sync-core';
@@ -110,6 +110,32 @@ export interface ExportDocument {
   opLog: Operation<string>[];
   /** 计数区。见 {@link ExportCounts}。 */
   counts: ExportCounts;
+}
+
+/**
+ * 一份**只声明 op-log** 的还原文档：`entities` 与实体计数缺省，由导入器用
+ * **客户端那份 reducer** 物化。
+ *
+ * 🔴 为什么要有这一格，而不是让产出方自己把 `entities` 填上：
+ * 恢复工具（`server/scripts/recover-user.ts`）手里只有服务端 replay 的结果，而两层对
+ * `DEL` 的语义**不一致且各自都有注释**：服务端是 `delete state[type][id]`
+ * （`server/src/sync/op-replay.ts` 的 `case 'DEL'`），客户端是 field-level tombstone
+ * （`packages/op-log/src/state.ts` 里那句 *"must be materialized even when the create
+ * has not arrived yet, otherwise an out-of-order replay can resurrect the entity"*）。
+ * 让服务端那一份去填 `entities`，产物就**结构上不可能有墓碑** —— 恢复出来的设备上
+ * 用户回收站里的东西全没了，而对端那条活体会被当成"本机缺的"再同步回来（正是上面那句
+ * 注释防的事）。所以这里不是"允许少写一个字段"，是**把实体交给唯一有权物化它的那一层**：
+ * 还原本来就靠重放 op-log 得到状态（见 `import-dump.ts` 文件头），`entities` 只用来核对。
+ *
+ * ⚠️ 代价必须说清：文件不再自己声明一份实体，写之前那次"两个来源交叉"就少了一个来源
+ * （`restoreIntoEmptyTarget` 第 2 步）。剩下的真判据是**写完之后再重放一次比对**，
+ * 它仍然抓得住半截导入 / 引擎物化漂移。
+ */
+export interface RestoreDocument extends Omit<ExportDocument, 'entities' | 'counts'> {
+  /** 缺省 ⇒ 由导入器用客户端 reducer 从 `opLog` 物化。 */
+  entities?: Record<string, unknown[]>;
+  /** 只有 `totalOps` 是必填的（它是唯一能被 op-log 自己证明的计数）。 */
+  counts: Pick<ExportCounts, 'totalOps'> & Partial<Omit<ExportCounts, 'totalOps'>>;
 }
 
 /** `buildExportDocument()` 的输入。 */
@@ -248,6 +274,15 @@ export interface ExportTaskRow {
   completed: boolean;
   /** 本地日期 `YYYY-MM-DD`（时区语义来自宿主，复用 `toLocalDateString`）。 */
   dueDate?: string;
+  /**
+   * 本地时刻 `HH:MM`，**没有时刻（"只到日"）时整个键缺席**。
+   *
+   * 🔴 为什么必须有这一栏：`toLocalDateString` 是**有损**的 —— 它只留日。
+   * 一条"明天 16:00"的任务在没有 `dueTime` 的清单里会被写成"明天"，
+   * 而清单看起来是完整的：用户看不出丢了什么，核对的人也看不出导出少了一栏。
+   * 这类"静默有损"正是本文件开头对墓碑的那条纪律要防的东西。
+   */
+  dueTime?: LocalTime;
   priority?: Priority;
   projectName?: string;
   /** 已解析成名字并排序。 */
@@ -273,12 +308,16 @@ function toExportTaskRow(task: Task, state: MaterializedState): ExportTaskRow {
     .map((id) => state.tags[id]?.name)
     .filter((name): name is string => name !== undefined)
     .sort();
+  // 🔴 只算一次：`localTimeOf` 与 `isAllDue` 的互斥性由领域层保证，
+  //   这里不许自己再判"零点不算时刻"—— 那就是第二套判据（AGENTS §3.5）。
+  const dueTime = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
 
   return {
     id: task.id,
     title: task.title,
     completed: task.completedAt !== undefined,
     ...(task.dueDate !== undefined ? { dueDate: toLocalDateString(task.dueDate) } : {}),
+    ...(dueTime === undefined ? {} : { dueTime }),
     ...(task.priority !== undefined ? { priority: task.priority } : {}),
     ...(project !== undefined ? { projectName: project.name } : {}),
     tagNames,
@@ -339,10 +378,19 @@ export function renderTasksMarkdown(
     );
     lines.push('| --- | --- | --- | --- | --- | --- |');
     for (const row of rows) {
+      // 「截止」这一栏**不加第二列**：日 + 时刻合成一个单元格（`2026-10-04 16:00`），
+      // 没时刻时逐字节还是旧的那一份。列数变了会同时改掉表头分隔行与所有
+      // 既有断言，而产品上要的只是"时刻别丢"。
+      const due =
+        row.dueDate === undefined
+          ? copy.none
+          : row.dueTime === undefined
+            ? row.dueDate
+            : `${row.dueDate} ${row.dueTime}`;
       const cells = [
         row.title,
         row.completed ? copy.done : copy.open,
-        row.dueDate ?? copy.none,
+        due,
         row.priority === undefined ? copy.none : copy.priorityLabel(row.priority),
         row.projectName ?? copy.none,
         row.tagNames.length === 0 ? copy.none : row.tagNames.join(', '),

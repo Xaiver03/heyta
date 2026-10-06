@@ -65,14 +65,23 @@ function hardErrors(logs: readonly string[]): string[] {
  * 才叫"应用打开了"。字符数只记进日志，**不做断言**。
  */
 async function waitForAppRender(page: Page): Promise<number> {
+  // 🔴 两条 needle 都是**词条文本**，而这一发进来的语言不一定是中文：
+  //    `withLocale`（`apps/landing/src/lib/app-url.ts`）只给**非默认**那一档打标，
+  //    中文落地页的入口地址就是裸的 `/app`，于是应用自己按浏览器语言选 ——
+  //    Playwright 的浏览器是 en-US，界面就是英文（实测截图：整页外壳都在，
+  //    只是写着 "Add a task…" 与 "Inbox"）。
+  //    这条判据要问的是"**应用外壳在不在**"，不是"它写了哪句中文"，
+  //    所以中英两版**都算**（写死一版 = 一条会在正确的时候变红的判据）。
   await page
-    .locator('input[placeholder*="添加任务"]')
+    .locator('input[placeholder*="添加任务"], input[placeholder*="Add a task"]')
     .first()
     .waitFor({ state: 'visible', timeout: 60_000 });
   // 收件箱标题也要在：只有输入框可能是某个残缺的中间态。
   // ⚠️ 不要用 `getByRole('button', { name: '任务' })` —— 侧栏导航不是 button，
   // 那样写会红在一个**选择器猜错**上，而不是应用有问题。
-  await expect(page.getByText('收集箱').first()).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByText('收集箱').or(page.getByText('Inbox')).first(),
+  ).toBeVisible({ timeout: 30_000 });
   return page.evaluate(() => document.querySelector('#root')?.textContent?.length ?? 0);
 }
 
@@ -285,38 +294,55 @@ test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功',
   console.log(`📷 应用（PWA 验收）：${SHOT_DIR}/live-app-pwa.png（#root textContent ${String(rootLength)} 字符）`);
 
   /**
-   * 🔴 **必须先在真界面上点「同意」，下面那段探测才有东西可探。**
+   * 🔴 线上这一层必须**先答掉那份隐私披露**，再等 SW。
    *
-   * 这道闸是隐私那条线（G-12 / G-27）落进来的，它把**三件事一起**搬到同意之后：
-   * `window.fetch` 换成带闸的（未同意一个字节都不出进程）、实时通道、以及
-   * **`serviceWorker.register()` 本身**（`apps/web/src/features/privacy/startup-network.ts`
-   * 那张表最后一行）。所以在这个全新上下文里，未同意时下面两件事必然发生：
+   * 注册是刻意排在同意之后的（`apps/web/src/main.tsx` 的 `createStartupNetwork`，
+   * G-12：注册本身会向 `scope` 发一次请求，而那时用户还没决定"这台应用会不会
+   * 跟服务端说话"）。所以未同意时 `getRegistrations()` **恒空、控制台一条错都没有**
+   * —— 这条断言等的是一件产品设计上还没做的事，红的是探针，不是产品。
+   * 实测（2026-10-05 线上）：不点同意 ⇒ `sw:"timeout"` 且 `logs: []`；
+   * 其余六条读数（`start_url` / `scope` / 图标 / `sw.js` 的 200 与
+   * `application/javascript`）当时就已经全对。
    *
-   * - `fetch(manifestUrl)` 同步抛 `PrivacyConsentBlockedError`；
-   * - `navigator.serviceWorker.ready` **永远不 resolve**（不是失败，是没人注册过）——
-   *   这条最坏，因为它会被读成"SW 坏了"，而产品行为是完全对的。
-   *
-   * ⚠️ 本条用例在 2026-09-30 是**没有这一步也能绿**的，因为那时还没有这道闸。
-   *    它的标题那句"SW 真的注册成功"现在的准确口径是**"同意之后"** ——
-   *    这与 `live-signin-entry.spec.ts:106` 走的是同一个动作，不是这条用例自己造的约定。
+   * ⚠️ 点，而不是往 `localStorage` 塞一条已同意记录：这条用例的价值一半在
+   * "真人那条路走得通"，预置存储会把同意面板这一段整个绕过去。
    */
-  await page.locator('[data-testid="privacy-consent-accept"]').first().click();
-  await expect(page.locator('[data-testid="privacy-consent-dialog"]')).toHaveCount(0);
+  const accept = page.locator('[data-testid="privacy-consent-accept"]');
+  await accept.waitFor({ state: 'visible', timeout: 30_000 });
+  await accept.click();
+  await expect(
+    page.locator('[data-testid="privacy-consent-dialog"]'),
+    '点了同意之后披露面板必须收掉（还开着就是决定没落）',
+  ).toHaveCount(0, { timeout: 15_000 });
 
-  const probe = await page.evaluate(async () => {
-    const manifestUrl = new URL('manifest.webmanifest', window.location.href);
-    const response = await fetch(manifestUrl);
-    const manifest = (await response.json()) as {
-      start_url: string;
-      scope: string;
-      icons: { src: string }[];
-    };
+  /**
+   * 🔴 这两个资产**不许**在 `page.evaluate` 里用 `fetch` 取 —— 要用 `page.request`。
+   *
+   * 应用把 `globalThis.fetch` 换成了隐私同意闸门（`consent-gate.ts:179`），
+   * 而这条用例开的是**全新 context = 还没答过那份披露**，于是页面里的每一次
+   * `fetch` 都抛 `PrivacyConsentBlockedError`。症状长得像"PWA 资产取不回来"，
+   * 实际取不回来的只有探针 —— 先怀疑探针（§7 元规则 1）。
+   *
+   * ⚠️ 这**不是**产品缺陷，别去给闸门开后门：浏览器为 PWA 取 manifest、注册 SW
+   * 走的是网络栈而不是 `window.fetch`，所以未同意的用户照样装得上 —— 下面那条
+   * `serviceWorker.ready` 断言就是这件事的证据，它必须留在页面里等。
+   */
+  const manifestUrl = new URL('manifest.webmanifest', `${ORIGIN}/app/`);
+  const manifestRes = await page.request.get(manifestUrl.toString());
+  expect(
+    manifestRes.status(),
+    `线上 manifest 取回 ${String(manifestRes.status())}，不是 200`,
+  ).toBe(200);
+  const manifest = (await manifestRes.json()) as {
+    start_url: string;
+    scope: string;
+    icons: { src: string }[];
+  };
+  // 相对 URL 必须相对 **manifest 自己** 解析（这正是修法的依据）。
+  const resolve = (value: string): string => new URL(value, manifestUrl).pathname;
+  const swRes = await page.request.get(new URL('sw.js', manifestUrl).toString());
 
-    // 相对 URL 必须相对 **manifest 自己** 解析（这正是修法的依据）。
-    const resolve = (value: string): string => new URL(value, manifestUrl).pathname;
-
-    const swResponse = await fetch(new URL('sw.js', manifestUrl));
-
+  const sw = await page.evaluate(async () => {
     // SW 真的注册上了吗 —— 这条比"文件取得回来"更强：
     // 它要求浏览器**接受**了那份脚本（MIME 与语法都对）。
     const ready = navigator.serviceWorker.ready.then((registration) => ({
@@ -330,18 +356,18 @@ test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功',
     const timeout = new Promise<'timeout'>((resolveTimeout) => {
       setTimeout(() => resolveTimeout('timeout'), 20_000);
     });
-    const sw = await Promise.race([ready, timeout]);
-
-    return {
-      startUrl: resolve(manifest.start_url),
-      scope: resolve(manifest.scope),
-      iconPath: resolve(manifest.icons[0]?.src ?? ''),
-      swStatus: swResponse.status,
-      swType: swResponse.headers.get('content-type'),
-      manifestType: response.headers.get('content-type'),
-      sw,
-    };
+    return Promise.race([ready, timeout]);
   });
+
+  const probe = {
+    startUrl: resolve(manifest.start_url),
+    scope: resolve(manifest.scope),
+    iconPath: resolve(manifest.icons[0]?.src ?? ''),
+    swStatus: swRes.status(),
+    swType: swRes.headers()['content-type'] ?? null,
+    manifestType: manifestRes.headers()['content-type'] ?? null,
+    sw,
+  };
 
   console.log(`PWA PROBE: ${JSON.stringify(probe)}`);
 
@@ -532,4 +558,73 @@ test('自托管文案：线上不许再印那句已被现量否证的话', async
 
   const hard = hardErrors(logs);
   expect(hard, `线上文档页抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+});
+
+/**
+ * G-62：线上那篇自建指南必须**读得到**"起完打开 `/app/` 就能用"，
+ * 也要读得到同域那一档的排查顺序 —— 中英两份各判一次。
+ *
+ * 离线侧那三条 needle 由 `apps/landing/tests/public-copy-register.spec.tsx` 判，
+ * 四枚变异臂各自打红过一次；**这一条判的是"发出去的那一份"**：词条改了 ≠ 页面改了，
+ * §8.255 那五枚红就是这一族（改完不重发，线上印的还是能力变之前那个世界）。
+ *
+ * 🔴 needle 与离线那份**同源同值**（三段正文各自独有的片段），因为这一格要防的正是
+ * "只发了半份文案"；阳性对照取本节本来就在场的入口命令 override 文件名 ——
+ * 它在待验状态之外（旧版页面也有它），所以页面整块没烘自托管文案时它同样会是 0，
+ * 此时那三条命中数不构成证据。
+ */
+test('自建指南（线上）：正文要读得到 /app/、同域那一档的排查段与 CORS 的分叉限定', async ({
+  page,
+}) => {
+  const logs = attachLogs(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  const CONTROL = 'docker-compose.migrate-once.yml';
+  const cases = [
+    {
+      path: '/docs/selfhost/',
+      shot: 'live-selfhost-app-path-zh.png',
+      needles: ['https://你的域名/app/', 'https://你的域名/health', '先分清是哪一档'],
+    },
+    {
+      path: '/en/docs/selfhost/',
+      shot: 'live-selfhost-app-path-en.png',
+      needles: [
+        'https://your-domain/app/',
+        'https://your-domain/health',
+        'First work out which setup you are in',
+      ],
+    },
+  ];
+
+  for (const c of cases) {
+    await page.goto(`${ORIGIN}${c.path}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('h1').first().waitFor({ state: 'visible', timeout: 30_000 });
+    // 规定一：先截图，再断言（失败时也要有图）。
+    await page.screenshot({ path: `${SHOT_DIR}/${c.shot}` });
+    console.log(`📷 线上自建指南（${c.path}）：${SHOT_DIR}/${c.shot}`);
+
+    const bodyText = await page.locator('body').innerText();
+    const count = (needle: string) => bodyText.split(needle).length - 1;
+    console.log(
+      `${c.path} 正文：${c.needles.map((n) => `${n} → ${String(count(n))}`).join('  |  ')}` +
+        `  ||  对照 ${CONTROL} → ${String(count(CONTROL))}`,
+    );
+    expect(
+      count(CONTROL),
+      `${c.path} 里连入口命令的 override 文件名「${CONTROL}」都没有 ⇒ 页面没渲染完或没烘这一节，` +
+        '下面那三条命中数不算证据',
+    ).toBeGreaterThan(0);
+    for (const needle of c.needles) {
+      expect(
+        count(needle),
+        `线上 ${c.path} 正文读不到「${needle}」。仓库里这一句已在（词条 ` +
+          '`site.docs.selfhost.s7p4` / `s6p3` / `s6p1`），但落地页要**重新发一次**才会变 ——' +
+          '发布命令见 docs/runbooks/deployment.md。',
+      ).toBeGreaterThan(0);
+    }
+  }
+
+  const hard = hardErrors(logs);
+  expect(hard, `线上自建指南页抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
 });

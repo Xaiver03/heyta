@@ -13,12 +13,12 @@ import { join } from 'node:path';
 
 import { OpLogEngine } from '@heyta/op-log';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
-import type { Operation } from '@heyta/sync-core';
+import { encodeBase64, setArgon2ParamsForTesting, type Operation } from '@heyta/sync-core';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter, STORES, META_KEYS } from '@heyta/storage';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTaskActions } from '../src/actions.js';
-import { openAppHost, type AppHost } from '../src/host.js';
+import { openAppHost, type AppHost, type SyncConfig } from '../src/host.js';
 
 let dir: string;
 let dbPath: string;
@@ -38,6 +38,159 @@ afterEach(() => {
 const driverFor = (path: string) => () => new NodeSqliteDriver(path);
 
 describe('openAppHost：真实 SQLite 文件', () => {
+  beforeEach(() => {
+    setArgon2ParamsForTesting({ parallelism: 1, memorySize: 8, iterations: 1 });
+  });
+
+  it('在首次 vault sync 前从注入的安全存储恢复 root，不依赖设置界面', async () => {
+    const first = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      serverUrl: 'https://sync.example.test',
+      accountId: 'account-1',
+    });
+    const firstSession = await first.getVaultSession();
+    expect(firstSession).toBeDefined();
+    const pending = await firstSession!.beginCreation('passphrase');
+    await firstSession!.confirmAndPublish(pending, pending.recoveryCode);
+    const root = firstSession!.copyUnlockedRootKey();
+    firstSession!.lock();
+    first.close();
+    host = undefined;
+
+    const remembered = encodeBase64(root);
+    root.fill(0);
+    let loads = 0;
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      serverUrl: 'https://sync.example.test',
+      token: 'token',
+      accountId: 'account-1',
+      fetchImpl: (async () => new Response(null, { status: 404 })) as typeof fetch,
+      vaultRootKeyStore: {
+        load: async (scope) => {
+          loads += 1;
+          expect(scope).toEqual({ accountId: 'account-1', serverOrigin: 'https://sync.example.test' });
+          return remembered;
+        },
+      },
+    });
+
+    const restored = await host.getVaultSession();
+    expect(loads).toBe(1);
+    expect(restored?.state).toBe('unlocked');
+  });
+
+  it('remembered-unlock fence 为真时不读取安全存储，且保持 locked', async () => {
+    const first = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      serverUrl: 'https://sync.example.test',
+      accountId: 'account-1',
+    });
+    const firstSession = await first.getVaultSession();
+    const pending = await firstSession!.beginCreation('passphrase');
+    await firstSession!.confirmAndPublish(pending, pending.recoveryCode);
+    const root = firstSession!.copyUnlockedRootKey();
+    first.close();
+    host = undefined;
+
+    let loads = 0;
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      serverUrl: 'https://sync.example.test',
+      accountId: 'account-1',
+      vaultRootKeyStore: {
+        isAutoUnlockDisabled: async () => true,
+        load: async () => {
+          loads += 1;
+          return encodeBase64(root);
+        },
+      },
+    });
+    const restored = await host.getVaultSession();
+    expect(restored?.state).toBe('locked');
+    expect(loads).toBe(0);
+    root.fill(0);
+  });
+
+  it('invalidateVaultSession 是同步 fence，后续读取不会自动重新解锁', async () => {
+    let loads = 0;
+    const first = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      serverUrl: 'https://sync.example.test',
+      accountId: 'account-1',
+    });
+    const firstSession = await first.getVaultSession();
+    const pending = await firstSession!.beginCreation('passphrase');
+    await firstSession!.confirmAndPublish(pending, pending.recoveryCode);
+    const root = firstSession!.copyUnlockedRootKey();
+    first.close();
+    host = undefined;
+
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      serverUrl: 'https://sync.example.test',
+      accountId: 'account-1',
+      vaultRootKeyStore: {
+        load: async () => {
+          loads += 1;
+          return encodeBase64(root);
+        },
+      },
+    });
+    expect((await host.getVaultSession())?.state).toBe('unlocked');
+    expect(loads).toBe(1);
+    host.invalidateVaultSession();
+    expect((await host.getVaultSession())?.state).toBe('locked');
+    expect(loads).toBe(1);
+    root.fill(0);
+  });
+
+  it('invalidateVaultSession 会丢弃在途的 remembered-root 加载', async () => {
+    let release!: (value: string | undefined) => void;
+    const loading = new Promise<string | undefined>((resolve) => {
+      release = resolve;
+    });
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      serverUrl: 'https://sync.example.test',
+      accountId: 'account-1',
+      vaultRootKeyStore: {
+        load: async () => loading,
+      },
+    });
+    const reading = host.getVaultSession();
+    host.invalidateVaultSession();
+    release(undefined);
+    expect(await reading).toBeUndefined();
+    expect((await host.getVaultSession())?.state).toBe('locked');
+  });
+
+  it('server/token 绑定改变时丢弃旧 session，不继承旧认证上下文', async () => {
+    let config: SyncConfig = {
+      serverUrl: 'https://sync.example.test',
+      accountId: 'account-1',
+    };
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      getSyncConfig: () => config,
+      fetchImpl: (async () => new Response(null, { status: 404 })) as typeof fetch,
+    });
+    const first = await host.getVaultSession();
+    config = { ...config, token: 'new-token' };
+    const second = await host.getVaultSession();
+    expect(second).toBeDefined();
+    expect(second).not.toBe(first);
+    expect(second?.state).toBe('locked');
+  });
+
   it('建任务 → 关闭 → 重开：任务仍在，且 clientId **不变**', async () => {
     host = await openAppHost({ dbPath, driverFactory: driverFor(dbPath) });
     const actions = createTaskActions(host);

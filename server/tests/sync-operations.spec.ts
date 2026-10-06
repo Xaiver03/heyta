@@ -20,6 +20,7 @@ vi.mock('../src/db', async () => {
   const { Prisma: PrismaModule } = await import('@prisma/client');
 
   const createTxMock = () => ({
+    vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
     operation: {
       create: vi.fn().mockImplementation(async (args: any) => {
         if (state.operations.has(args.data.id)) {
@@ -294,7 +295,7 @@ vi.mock('../src/db', async () => {
       }),
     },
     // Upload transaction writes the storage counter atomically via $executeRaw.
-    $executeRaw: vi.fn().mockResolvedValue(0),
+    $executeRaw: vi.fn().mockResolvedValue(1),
     // Raw queries issued inside the upload transaction. Every shape must be
     // recognised explicitly and anything else must THROW: this mock used to fall
     // through to a `total` row, which conflict.ts reads via
@@ -306,6 +307,17 @@ vi.mock('../src/db', async () => {
       // `entity_ids @> ARRAY[id]`, scoped to ONE entity.
       if (isEntityArrayBranchQuery(strings)) {
         return entityArrayBranchRows(state.operations, params);
+      }
+      if (sql.includes('FROM user_sync_state') && sql.includes('FOR UPDATE')) {
+        const [userId] = params as [number];
+        const syncState = state.userSyncStates.get(userId);
+        return [{
+          lastSeq: syncState?.lastSeq ?? 0,
+          latestStateReplacementSeq: syncState?.latestStateReplacementSeq ?? null,
+        }];
+      }
+      if (sql.includes('SELECT id FROM users WHERE id') && sql.includes('FOR UPDATE')) {
+        return [];
       }
       // Full-state op uploads aggregate prior vector clocks in the same transaction.
       if (sql.includes('jsonb_each_text(vector_clock)')) {

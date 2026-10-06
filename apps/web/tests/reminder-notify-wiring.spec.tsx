@@ -148,6 +148,91 @@ describe('提醒投递的接线（真 App）', () => {
     expect(calls.some((c) => (c.body ?? '').includes('交周报'))).toBe(true);
   });
 
+  /**
+   * 🔴 缺陷 D1 的宿主级钉子：**已删除任务的提醒仍会弹**。
+   *
+   * 纯函数那两组测的是"喂进来的表里有墓碑"，而这里测的是**真接线**：
+   * `due` 由 store 从引擎算出来、`tasks` 由 `useTaskStore` 递进去，
+   * 两边都是真的物化状态。修在动作层（`due()` 滤掉任务不活着的提醒），
+   * 投递处再补一道 —— 两条腿在同一张真表上一起验。
+   *
+   * ⚠️ 必须**同时**断言"另一条没被删的任务照旧投出"：只断"这条没投"的话，
+   * 通知整体坏掉、权限没开、任务根本没建起来……任何一种都会让它假绿。
+   */
+  it('🔴 任务在回收站里 ⇒ 它的到点提醒不投，而另一条活任务的提醒照投', async () => {
+    await useTaskStore.getState().addTask('交周报');
+    const aliveId = Object.values(useTaskStore.getState().entities.tasks)
+      .find((t) => t.title === '交周报')!.id;
+    await useTaskStore.getState().addTask('已经删掉的事');
+    const goneId = Object.values(useTaskStore.getState().entities.tasks)
+      .find((t) => t.title === '已经删掉的事')!.id;
+
+    // 提醒在挂载前就建好并让它**已过期**，这样挂载那一次计算 `due` 就是判据本身。
+    const past = Date.now() - 5_000;
+    await act(async () => {
+      await useReminderStore.getState().addAbsolute(aliveId, past);
+    });
+    await act(async () => {
+      await useReminderStore.getState().addAbsolute(goneId, past);
+    });
+    await act(async () => {
+      await useTaskStore.getState().deleteTask(goneId);
+    });
+
+    // 前提要成立，否则后面的"没投"什么都证明不了：
+    // 任务确实是墓碑，而**提醒本身没有被删**（删除不级联 —— 这正是漏投的来源）。
+    expect(useTaskStore.getState().entities.tasks[goneId]!.deletedAt).toBeTypeOf('number');
+    const goneReminder = Object.values(useTaskStore.getState().entities.reminders)
+      .find((r) => r.taskId === goneId)!;
+    expect(goneReminder.deletedAt, '提醒不该被级联删除').toBeUndefined();
+
+    await mount();
+    await waitFor('活任务那条被投递', () => calls.length > 0);
+
+    const bodies = calls.map((c) => c.body ?? '');
+    expect(bodies.some((b) => b.includes('交周报')), '活任务的提醒应当照旧投出（阳性对照）')
+      .toBe(true);
+    expect(
+      bodies.find((b) => b.includes('已经删掉的事')),
+      '已删除任务的提醒被投出去了（缺陷 D1）',
+    ).toBeUndefined();
+  });
+
+  /**
+   * 🔴 缺陷 D14：**投出去之后要把 `firedAt` 写成 op**。
+   *
+   * 投递处的去重集合是 `useRef(new Set())` —— 一次页面加载内的内存。
+   * `markReminderFired` 早就写好了（还专门做了幂等），但**生产零调用点**，
+   * 于是刷新一次、或另一台设备上线，同一条到点提醒会再弹一遍。
+   *
+   * 这一条钉的就是"那次调用真的存在"：断言的是**落库的实体字段**，
+   * 不是内存里的集合（内存集合在上一条用例里已经被覆盖）。
+   */
+  it('🔴 投递成功后 `firedAt` 落进物化状态，且它从 `due` 里消失', async () => {
+    await useTaskStore.getState().addTask('交周报');
+    const taskId = Object.keys(useTaskStore.getState().entities.tasks)[0]!;
+    await mount();
+
+    await act(async () => {
+      await useReminderStore.getState().addAbsolute(taskId, Date.now() - 5_000);
+    });
+    await waitFor('通知被投递', () => calls.length > 0);
+
+    await waitFor(
+      'firedAt 落库',
+      () => Object.values(useTaskStore.getState().entities.reminders)
+        .some((r) => r.firedAt !== undefined),
+    );
+    expect(
+      useReminderStore.getState().due,
+      '已经投过的提醒不该还留在"到点待投"里',
+    ).toHaveLength(0);
+
+    // 再等一轮：投过之后不该又冒出一条通知（内存 + 落库两道门都在）。
+    await flush();
+    expect(calls, '投过之后又弹了一遍').toHaveLength(1);
+  });
+
   it('🔴 权限没开时**不投**（而不是投了失败）—— 且不抛', async () => {
     FakeNotification.permission = 'default';
     await useTaskStore.getState().addTask('不该被通知的事');

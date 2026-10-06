@@ -156,6 +156,36 @@ const withPrefs = (): PreferenceSet => ({
 // 构造调用
 // ─────────────────────────────────────────────────────────────────────────
 
+/**
+ * 🔴 `fields` 与 `user` 的**对照表**（与 `ai-capture.spec.ts` 同一形状）。
+ *
+ * 出境披露读的是 `fields`，而真正出去的内容在 `user` 里。两者一旦漂移，
+ * 披露就是假的 —— 所以用一张表把"字段名 ↔ 正文里的标记"**双向**核对。
+ */
+const FIELD_MARKER: Readonly<Record<string, string>> = {
+  today: '今天是：',
+  title: '任务标题：',
+  note: '已有备注：',
+  preferences: '关于这位用户的历史习惯',
+};
+
+function expectFieldsMatchUser(inv: { user: string; fields: readonly string[] }): void {
+  for (const field of inv.fields) {
+    const marker = FIELD_MARKER[field];
+    expect(marker, `字段 ${field} 没有登记对照标记`).toBeDefined();
+    expect(inv.user, `字段 ${field} 声明了却没进 user`).toContain(marker as string);
+  }
+  for (const [field, marker] of Object.entries(FIELD_MARKER)) {
+    if (inv.user.includes(marker)) {
+      expect(inv.fields, `user 里有 ${field} 的内容，fields 却没声明`).toContain(field);
+    }
+  }
+}
+
+/** 固定时钟：本地中午 ⇒ 任何时区下本地日历日都是 2026-09-25（周五）。 */
+const NOW = Date.parse('2026-09-25T12:00:00');
+const CROSS_MIDNIGHT = Date.parse('2026-09-26T12:00:00');
+
 describe('buildBreakdownInvocation', () => {
   it('功能是 breakdown', () => {
     expect(buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' }).feature).toBe('breakdown');
@@ -169,12 +199,46 @@ describe('buildBreakdownInvocation', () => {
     expect(withNote.user).toContain('别忘灰度');
 
     const withoutNote = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' });
-    expect(withoutNote.fields).toEqual(['title']);
+    expect(withoutNote.fields).toEqual(['today', 'title']);
     expect(withoutNote.user).not.toContain('note');
   });
 
   it('空备注不算一个字段（避免披露里出现没送的东西）', () => {
-    expect(buildBreakdownInvocation({ locale: 'zh-CN', title: 'x', note: '   ' }).fields).toEqual(['title']);
+    expect(buildBreakdownInvocation({ locale: 'zh-CN', title: 'x', note: '   ' }).fields).toEqual(['today', 'title']);
+  });
+
+  // ── 🔴 W4：时间锚点（注入系统提示词，不加 get_today 工具） ──────────────
+
+  it('🔴 锚点真的进了 prompt：注入的 `now` 决定「今天是」那一行', () => {
+    const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', now: NOW });
+    expect(inv.user).toContain('今天是：2026-09-25（周五，');
+  });
+
+  it('🔴 换 `now` 就换日期（锚点不许冻在第一次调用）', () => {
+    const before = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', now: NOW });
+    const after = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', now: CROSS_MIDNIGHT });
+    expect(before.user).toContain('今天是：2026-09-25');
+    expect(after.user).toContain('今天是：2026-09-26');
+    expect(before.user).not.toBe(after.user);
+  });
+
+  it('🔴 系统提示带日期硬规则（只给日期不给规则 = 模型仍自己算）', () => {
+    const { system } = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', now: NOW });
+    expect(system).toContain('关于日期的硬规则：');
+    expect(system).toContain('不许凭印象写一个日期');
+  });
+
+  it('🔴 `today` 是**真实出境字段**：在披露清单里，且不在清单外', () => {
+    const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', now: NOW });
+    expect(inv.fields).toContain('today');
+    expectFieldsMatchUser(inv);
+  });
+
+  it('🔴 有备注 + 有偏好时双向核对仍然成立（不多报也不少报）', () => {
+    const hints = renderPreferenceHints(withPrefs(), 'breakdown');
+    const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', note: '别忘灰度', now: NOW }, hints);
+    expect([...inv.fields].sort()).toEqual(['note', 'preferences', 'title', 'today']);
+    expectFieldsMatchUser(inv);
   });
 
   // ── 记忆层：偏好注入 prompt 与披露 ─────────────────────────────
@@ -182,7 +246,7 @@ describe('buildBreakdownInvocation', () => {
 
   it('没有偏好时：不出现 preferences 字段，也不出现任何提示段落', () => {
     const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' });
-    expect(inv.fields).toEqual(['title']);
+    expect(inv.fields).toEqual(['today', 'title']);
     expect(inv.user).not.toContain('历史习惯');
   });
 
@@ -217,7 +281,7 @@ describe('buildBreakdownInvocation', () => {
     expect(hints).toEqual([]);
 
     const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' }, hints);
-    expect(inv.fields).toEqual(['title']);
+    expect(inv.fields).toEqual(['today', 'title']);
     expect(inv.user).not.toContain('历史习惯');
     expect(inv.user).not.toContain('6 项');
   });
@@ -373,6 +437,35 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
     if (!outcome.ok) expect(outcome.reason).toBe('ai-unavailable');
     // 🔴 关键：一个字节都没发出去
     expect(calls).toHaveLength(0);
+  });
+
+  it('🔴🔴 未授权该功能时，**连时间锚点那行都没出境**（`today` 是真字段）', async () => {
+    const { impl, calls } = fetchReturning('- 甲');
+    await requestBreakdown(
+      { locale: 'zh-CN', title: '做发布', now: NOW },
+      {
+        routing: routing([REMOTE_ENDPOINT], { breakdown: ['remote'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+    // 请求数为 0 ⇒ 那行日期一次都没出去。这条断言的承重不是"没发"（上一条已证），
+    // 而是**探针确实带着锚点**：授权后同一条路径必须能在请求体里数出那一行（下一条）。
+    expect(calls).toHaveLength(0);
+  });
+
+  it('🔴🔴 授权后：锚点那行**真的在 HTTP 请求体里**（正向对照，挡"探针根本没带锚点"）', async () => {
+    const { impl, calls } = fetchReturning('- 甲');
+    await requestBreakdown(
+      { locale: 'zh-CN', title: '做发布', now: NOW },
+      {
+        routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body).toContain('今天是：2026-09-25');
   });
 
   it('🔴 授权绑的是 `(功能, 目的地)` —— 别的功能的授权不算数', async () => {

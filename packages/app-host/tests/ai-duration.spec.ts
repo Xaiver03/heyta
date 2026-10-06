@@ -142,9 +142,9 @@ describe('buildDurationInvocation', () => {
     expect(buildDurationInvocation({ locale: 'zh-CN', title: '写周报' }).feature).toBe('duration-estimate');
   });
 
-  it('🔴 只给标题时，`fields` 恰好是 [title]（不声明没送的东西）', () => {
+  it('🔴 只给标题时，`fields` 恰好是 [today, title]（不声明没送的东西）', () => {
     const inv = buildDurationInvocation({ locale: 'zh-CN', title: '写周报' });
-    expect(inv.fields).toEqual(['title']);
+    expect(inv.fields).toEqual(['today', 'title']);
     expect(inv.user).toContain('写周报');
   });
 
@@ -153,7 +153,7 @@ describe('buildDurationInvocation', () => {
       { locale: 'zh-CN', title: '写周报', note: '别忘附数据', history: [row(30, 54)] },
       renderPreferenceHints(withPrefs(), 'duration-estimate'),
     );
-    expect(inv.fields).toEqual(['title', 'note', 'history', 'preferences']);
+    expect(inv.fields).toEqual(['today', 'title', 'note', 'history', 'preferences']);
     // 声明了就必须真有 —— 两边的规则是对称的
     expect(inv.user).toContain('别忘附数据');
     expect(inv.user).toContain('这个任务的历史专注记录');
@@ -161,7 +161,7 @@ describe('buildDurationInvocation', () => {
   });
 
   it('空备注不算一个字段（避免披露里出现没送的东西）', () => {
-    expect(buildDurationInvocation({ locale: 'zh-CN', title: 'x', note: '   ' }).fields).toEqual(['title']);
+    expect(buildDurationInvocation({ locale: 'zh-CN', title: 'x', note: '   ' }).fields).toEqual(['today', 'title']);
   });
 
   it('🔴 没有历史时不出现 history 字段，也不出现历史段落', () => {
@@ -180,7 +180,7 @@ describe('buildDurationInvocation', () => {
         { plannedMs: 60_000, actualMs: Number.NaN },
       ],
     });
-    expect(inv.fields).toEqual(['title']);
+    expect(inv.fields).toEqual(['today', 'title']);
     expect(inv.user).not.toContain('这个任务的历史专注记录');
   });
 
@@ -222,7 +222,7 @@ describe('buildDurationInvocation', () => {
     const hints = renderPreferenceHints(off, 'duration-estimate');
     expect(hints).toEqual([]);
     const inv = buildDurationInvocation({ locale: 'zh-CN', title: 'x' }, hints);
-    expect(inv.fields).toEqual(['title']);
+    expect(inv.fields).toEqual(['today', 'title']);
     expect(inv.user).not.toContain('关于这位用户的历史习惯');
   });
 
@@ -236,6 +236,67 @@ describe('buildDurationInvocation', () => {
 // ─────────────────────────────────────────────────────────────────────────
 // 🔴 历史封顶（出境面不随时间增长）
 // ─────────────────────────────────────────────────────────────────────────
+
+describe('🔴 W4 buildDurationInvocation —— 时间锚点', () => {
+  /** 固定时钟：本地中午 ⇒ 任何时区下本地日历日都是 2026-09-25（周五）。 */
+  const NOW = Date.parse('2026-09-25T12:00:00');
+  const CROSS_MIDNIGHT = Date.parse('2026-09-26T12:00:00');
+
+  it('锚点真的进了 prompt：注入的 `now` 决定「今天是」那一行', () => {
+    const inv = buildDurationInvocation({ locale: 'zh-CN', title: '写周报', now: NOW });
+    expect(inv.user).toContain('今天是：2026-09-25（周五，');
+  });
+
+  it('🔴 换 `now` 就换日期（锚点不许冻在第一次调用）', () => {
+    const before = buildDurationInvocation({ locale: 'zh-CN', title: '写周报', now: NOW });
+    const after = buildDurationInvocation({ locale: 'zh-CN', title: '写周报', now: CROSS_MIDNIGHT });
+    expect(before.user).toContain('今天是：2026-09-25');
+    expect(after.user).toContain('今天是：2026-09-26');
+    expect(before.user).not.toBe(after.user);
+  });
+
+  it('🔴 系统提示带日期硬规则（只给日期不给规则 = 模型仍自己算）', () => {
+    const { system } = buildDurationInvocation({ locale: 'zh-CN', title: '写周报', now: NOW });
+    expect(system).toContain('关于日期的硬规则：');
+    expect(system).toContain('不许凭印象写一个日期');
+  });
+
+  it('🔴 `today` 是**真实出境字段**：在披露清单里，且逐字段核对', () => {
+    const inv = buildDurationInvocation({ locale: 'zh-CN', title: '写周报', now: NOW });
+    expect(inv.fields).toContain('today');
+    expect(inv.fields).toEqual(['today', 'title']);
+    expect(inv.user).toContain('今天是：');
+    expect(inv.user).toContain('任务标题：');
+  });
+
+  it('🔴🔴 授权后：锚点那行**真的在 HTTP 请求体里**（正向对照）', async () => {
+    const { impl, calls } = fetchReturning('90');
+    await requestDuration(
+      { locale: 'zh-CN', title: '写周报', now: NOW },
+      {
+        routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body).toContain('今天是：2026-09-25');
+  });
+
+  it('🔴🔴 未授权该功能时**一个请求都不发**，连时间锚点那行都没出境', async () => {
+    const { impl, calls } = fetchReturning('90');
+    const outcome = await requestDuration(
+      { locale: 'zh-CN', title: '写周报', now: NOW },
+      {
+        routing: routing([REMOTE_ENDPOINT], { 'duration-estimate': ['remote'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+    expect(outcome.ok).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+});
 
 describe('🔴 selectDurationHistory —— 历史必须封顶', () => {
   it('undefined → 空数组', () => {
@@ -598,7 +659,10 @@ describe('🔴🔴 出境面：`fields` 必须与实际发送逐字段一致', (
 
     const body = calls[0]?.body ?? '';
     // 逐字段核对：字段名 → 正文里的标记
+    // ⚠️ `today` 用**前缀**当标记（不带具体日期）：这条用例没注入 `now`，
+    // 断言里写死日期就会变成一个**过几天就变红**的用例。
     const markers: Record<string, string> = {
+      today: '今天是：',
       title: '写周报',
       note: '别忘附数据',
       history: '这个任务的历史专注记录',

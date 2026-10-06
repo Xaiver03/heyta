@@ -46,9 +46,30 @@ import {
   type SyncClient,
   type SyncStatus,
 } from '@heyta/sync-client';
+import { decodeBase64 } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
+import type { VaultKeyMigrationResponse } from '@heyta/shared-schema';
 import { randomId } from './ids.js';
+import { hasLocalEraser, registerLocalEraser } from './local-erasure.js';
 import { createSyncClient } from './sync-wiring.js';
+import {
+  createVaultKeyMigrationRemote,
+  createVaultMigrationInventorySource,
+  createVaultMigrationJournal,
+  acknowledgeVaultPayloadMigration,
+  cancelVaultPayloadMigrationForScope,
+  migrateVaultPayloads,
+  type VaultMigrationProgress,
+} from './vault-migration.js';
+import {
+  createVaultKeyPackageRemote,
+  createVaultKeySession,
+  type VaultKeyPackageRemote,
+  type VaultKeySession,
+} from './vault-session.js';
+import type { PendingVaultCreation } from './vault-session.js';
+import { createVaultKeyPackageStore } from './vault-key-package-store.js';
+import type { VaultKeyPackageScope } from './vault-key-package-store.js';
 
 /**
  * 一次同步所需的全部凭据。
@@ -70,6 +91,8 @@ export interface SyncConfig {
   serverUrl: string;
   token?: string;
   password?: string;
+  /** Stable authenticated account id; its presence selects vault mode. */
+  accountId?: string;
 }
 
 export interface AppHostOptions {
@@ -93,6 +116,19 @@ export interface AppHostOptions {
   token?: string;
   /** E2EE 口令。缺失时同步会明确失败，**不会降级成明文**。 */
   password?: string;
+  /** Stable authenticated account id; when set, the host uses vault mode. */
+  accountId?: string;
+  /**
+   * Optional platform secure-storage read port. The host owns when it is
+   * consulted: before the first vault sync, never from a settings screen.
+   * The returned base64 value is wiped from the decoded buffer after the
+   * session consumes it; the port must not persist it in ordinary storage.
+   */
+  vaultRootKeyStore?: {
+    load(scope: VaultKeyPackageScope): Promise<string | undefined>;
+    /** `true` must be the safe default when the marker cannot be read. */
+    isAutoUnlockDisabled?(scope: VaultKeyPackageScope): Promise<boolean>;
+  };
   /**
    * **运行时可变**的同步凭据。给了它就**取代**上面的 `serverUrl` / `token` / `password`。
    *
@@ -117,6 +153,21 @@ export interface AppHostOptions {
    * 差异全在时间戳里，看起来像行为漂移，其实是时钟没被控制。
    */
   now?: () => number;
+  /**
+   * 本机明文**销毁成功之后**的宿主回调（批次 E2 口径 B）。
+   *
+   * 🔴 为什么要有这个钩子，而不是让共享层自己去清：
+   * 宿主常常把 adapter 缓存成**单例**（移动端的 `open-host.ts` 用 `pending`/`resolvedHost`，
+   * 全部屏共用一个 `AppHost`）。`destroy()` 之后再把同一个实例交出去，
+   * 在口径 B 之前是"静默把刚删掉的空壳建回盘上"（§10.146 那枚 73728 字节），
+   * 加了守卫之后是"下一次读当场抛" —— 两者都不是"这台设备回到全新空库"。
+   * 而"要作废哪些缓存"是**宿主自己的生命周期知识**（AGENTS §3.5 的分界），
+   * 所以这里开一个钩子，不在共享层复制一份。
+   *
+   * 语义：只在**这条兜底销毁器**（没人自己注册时）真的把 `adapter.destroy()` 跑成之后调一次；
+   * 销毁抛错时不调（那份库还在，宿主不该假装清过）。
+   */
+  onLocalDataErased?: () => void;
 }
 
 export interface AppHost {
@@ -124,6 +175,24 @@ export interface AppHost {
   readonly clientId: string;
   /** 底层引擎。读状态用它，**写状态一律走 dispatch / 各动作方法**。 */
   readonly engine: OpLogEngine;
+
+  /** Current account-bound vault session, or undefined before authenticated setup. */
+  getVaultSession(): Promise<VaultKeySession | undefined>;
+  /** Opaque package transport for the current authenticated server. */
+  getVaultKeyPackageRemote(): VaultKeyPackageRemote | undefined;
+  /** Synchronously fences and invalidates the current vault session. */
+  invalidateVaultSession(): void;
+  /** Prepare a new random root; no server mutation occurs until confirmation. */
+  beginVaultRootRotation(newPassphrase: string): Promise<PendingVaultCreation | undefined>;
+  /** Confirm the recovery code and atomically migrate/publish all ciphertext. */
+  confirmVaultRootRotation(
+    pending: PendingVaultCreation,
+    enteredRecoveryCode: string,
+    onProgress?: (progress: VaultMigrationProgress) => void,
+    options?: VaultRootRotationOptions,
+  ): Promise<VaultKeyMigrationResponse>;
+  /** Release any staged root migration and remove its local encrypted draft. */
+  cancelVaultRootRotation(): Promise<void>;
 
   /**
    * 当前物化状态。
@@ -174,6 +243,15 @@ export interface AppHost {
 
   /** 关闭 SQLite 连接。之后不可再用。 */
   close(): void;
+}
+
+/**
+ * Optional bridge for accounts whose retained payloads still use the legacy
+ * password cipher. The value is supplied by the explicit migration UI and is
+ * never persisted in the sync configuration.
+ */
+export interface VaultRootRotationOptions {
+  legacyPassword?: string;
 }
 
 /**
@@ -262,12 +340,60 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     ...(options.clientId !== undefined ? { clientId: options.clientId } : {}),
   });
 
+  /**
+   * 本机数据销毁器的**兜底注册**（E2）。
+   *
+   * 🔴 为什么在宿主内部注册，而不是要求每个壳自己传一个回调：
+   * `createSyncClient()` 的构造点有四个宿主（node-host、移动端、两个桌面壳），
+   * 而它们都经这一个函数拿到 adapter。写在这里，"这个宿主忘了接"就**不是**
+   * 一个可能的状态 —— 那正是 §10.2 那条取证量的东西（信号收到了、没人清）。
+   *
+   * ⚠️ **只在没人注册时注册**：Web 有自己的销毁器（要清 OPFS/`localStorage`/
+   * SW 那四类，adapter 一份清不完），它先注册 ⇒ 这里就不许把它盖掉。
+   * 反过来如果这里无条件注册，症状是"Web 注销后 OPFS 里那份库还在"。
+   */
+  if (!hasLocalEraser()) {
+    registerLocalEraser(async () => {
+      const report = await adapter.destroy();
+      // 🔴 顺序：**销毁成功之后**才通知，且抛错时一句都不通知。
+      // 理由是这一格真正防的那件事：宿主把 adapter  caches 在单例里
+      // （移动端 `open-host.ts` 的 `pending`/`resolvedHost` 就是全部屏共用的那一个）。
+      // 销毁之后继续把同一个实例交出去，在口径 B 之前是"静默把空壳建回盘上"，
+      // 之后是"下一次读当场抛 `AdapterDestroyedError`" —— 两种都不是注销完该有的样子，
+      // 政策承诺的是这台设备回到**全新空库**（计划 §10.188）。
+      // 共享层**不自己清单例**：哪些东西要作废是宿主的生命周期知识（AGENTS §3.5）。
+      options.onLocalDataErased?.();
+      return [report];
+    });
+  }
+
   const engine = new OpLogEngine({
     store,
     clientId,
     ...(options.now !== undefined ? { now: options.now } : {}),
   });
   await engine.recover();
+
+  const vaultStore = createVaultKeyPackageStore(adapter);
+  const vaultMigrationJournal = createVaultMigrationJournal(adapter);
+  let vaultSession: VaultKeySession | undefined;
+  let vaultSessionScope: string | undefined;
+  let vaultSessionBinding: string | undefined;
+  let vaultEpoch = 0;
+  let autoUnlockDisabledScope: string | undefined;
+  let vaultExclusiveTail: Promise<void> = Promise.resolve();
+
+  const withVaultExclusive = async <T>(action: () => Promise<T>): Promise<T> => {
+    const previous = vaultExclusiveTail;
+    let release!: () => void;
+    vaultExclusiveTail = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    try {
+      return await action();
+    } finally {
+      release();
+    }
+  };
 
   /**
    * 读取当前生效的同步凭据。
@@ -282,7 +408,100 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       serverUrl: options.serverUrl ?? '',
       ...(options.token !== undefined ? { token: options.token } : {}),
       ...(options.password !== undefined ? { password: options.password } : {}),
+      ...(options.accountId !== undefined ? { accountId: options.accountId } : {}),
     };
+  };
+
+  const readVaultSession = async (): Promise<VaultKeySession | undefined> => {
+    const config = readSyncConfig();
+    const accountId = config.accountId?.trim();
+    if (accountId === undefined || accountId === '' || config.serverUrl.trim() === '') {
+      return undefined;
+    }
+    let serverOrigin: string;
+    try {
+      serverOrigin = new URL(config.serverUrl).origin;
+    } catch {
+      throw new Error('Invalid vault server URL');
+    }
+    const scopeKey = `${accountId}\u0000${serverOrigin}`;
+    const bindingKey = `${scopeKey}\u0000${config.token ?? ''}`;
+    if (vaultSession !== undefined && vaultSessionBinding === bindingKey) {
+      return vaultSession;
+    }
+    // A changed server/token binding must never inherit an old in-memory
+    // session, even when a caller accidentally retained the same account id.
+    if (vaultSession !== undefined) {
+      vaultEpoch += 1;
+      vaultSession.lock();
+      vaultSession = undefined;
+      vaultSessionScope = undefined;
+      vaultSessionBinding = undefined;
+    }
+    {
+      const epoch = ++vaultEpoch;
+      const nextSession = await createVaultKeySession({
+        store: vaultStore,
+        scope: { accountId, serverOrigin },
+      });
+      // The server's active payload generation is independent from the local
+      // wrapper revision. Load it before the first cipher is handed to sync;
+      // otherwise a passphrase re-wrap would make new uploads use the wrapper
+      // revision and hit the generation gate after an atomic migration.
+      if (config.token !== undefined && config.token !== '') {
+        const remote = createVaultKeyPackageRemote({
+          baseUrl: config.serverUrl,
+          getToken: async () => readSyncConfig().token,
+          ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        });
+        await nextSession.refreshFromRemote(remote);
+      }
+      if (epoch !== vaultEpoch) {
+        nextSession.lock();
+        return undefined;
+      }
+      const disabled = autoUnlockDisabledScope === scopeKey ||
+        (options.vaultRootKeyStore?.isAutoUnlockDisabled !== undefined &&
+          await options.vaultRootKeyStore.isAutoUnlockDisabled({ accountId, serverOrigin }));
+      if (epoch !== vaultEpoch) {
+        nextSession.lock();
+        return undefined;
+      }
+      if (!disabled && nextSession.keyPackage !== undefined && options.vaultRootKeyStore !== undefined) {
+        const remembered = await options.vaultRootKeyStore.load({ accountId, serverOrigin });
+        if (epoch !== vaultEpoch) {
+          nextSession.lock();
+          return undefined;
+        }
+        if (remembered !== undefined) {
+          const root = new Uint8Array(decodeBase64(remembered));
+          try {
+            nextSession.unlockWithRootKey(root);
+            await nextSession.restorePendingRootRotation();
+          } finally {
+            root.fill(0);
+          }
+        }
+      }
+      if (epoch !== vaultEpoch) {
+        nextSession.lock();
+        return undefined;
+      }
+      vaultSession = nextSession;
+      vaultSessionScope = scopeKey;
+      vaultSessionBinding = bindingKey;
+    }
+    return vaultSession;
+  };
+
+  const readVaultRemote = (): VaultKeyPackageRemote | undefined => {
+    const config = readSyncConfig();
+    if (config.serverUrl.trim() === '' || config.token === undefined || config.token === '') return undefined;
+    return createVaultKeyPackageRemote({
+      baseUrl: config.serverUrl,
+      getToken: async () => readSyncConfig().token,
+      ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+    });
   };
 
   /**
@@ -300,6 +519,22 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     // 口令可以不填（那样同步会在 E2EE 那一步明确失败，且不会降级成明文），
     // 但地址与令牌缺一不可 —— 没有它们连请求都发不出去。
     if (config.serverUrl === '' || config.token === undefined) return undefined;
+
+    if (config.accountId !== undefined && config.accountId.trim() !== '') {
+      return createSyncClient({
+        engine,
+        store,
+        baseUrl: config.serverUrl,
+        getToken: async () => readSyncConfig().token,
+        getPassword: async () => undefined,
+        encryptionMode: 'vault',
+        getPayloadCipher: async () => (await readVaultSession())?.getPayloadCipher() ?? undefined,
+        applyRemote: async (ops) => {
+          await engine.applyRemote(ops);
+        },
+        ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+      });
+    }
 
     return createSyncClient({
       engine,
@@ -328,6 +563,108 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     clientId,
     engine,
 
+    getVaultSession: readVaultSession,
+    getVaultKeyPackageRemote: readVaultRemote,
+
+    invalidateVaultSession(): void {
+      vaultEpoch += 1;
+      // Record the fence synchronously even when the first load is still in
+      // flight and has not installed a session yet.
+      const config = readSyncConfig();
+      let scopeKey = vaultSessionScope;
+      if (scopeKey === undefined && config?.accountId !== undefined && config.serverUrl.trim() !== '') {
+        try {
+          scopeKey = `${config.accountId.trim()}\u0000${new URL(config.serverUrl).origin}`;
+        } catch {
+          // Invalid configuration is cleared by the caller; no scope can be
+          // safely associated with it here.
+        }
+      }
+      if (scopeKey !== undefined) autoUnlockDisabledScope = scopeKey;
+      vaultSession?.lock();
+      vaultSession = undefined;
+      vaultSessionScope = undefined;
+      vaultSessionBinding = undefined;
+    },
+
+    async beginVaultRootRotation(newPassphrase: string): Promise<PendingVaultCreation | undefined> {
+      return (await readVaultSession())?.beginRootRotation(newPassphrase);
+    },
+
+    async confirmVaultRootRotation(
+      pending: PendingVaultCreation,
+      enteredRecoveryCode: string,
+      onProgress?: (progress: VaultMigrationProgress) => void,
+      rotationOptions?: VaultRootRotationOptions,
+    ): Promise<VaultKeyMigrationResponse> {
+      return withVaultExclusive(async () => {
+        const session = await readVaultSession();
+        if (session === undefined) throw new Error('Vault session is unavailable');
+        const config = readSyncConfig();
+        if (config.token === undefined || config.token === '' || config.serverUrl.trim() === '') {
+          throw new Error('Vault migration credentials are unavailable');
+        }
+        const migrationEpoch = vaultEpoch;
+        const migrationToken = config.token;
+        const currentPayloadKeyVersion = session.payloadKeyVersion ?? null;
+        const targetPayloadKeyVersion = (session.payloadKeyVersion ?? 0) + 1;
+        const legacyPassword = rotationOptions?.legacyPassword ?? config.password;
+        const remoteOptions = {
+          baseUrl: config.serverUrl,
+          getToken: async () => migrationToken,
+          ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        };
+        const inventory = createVaultMigrationInventorySource(remoteOptions);
+        const migrationRemote = createVaultKeyMigrationRemote(remoteOptions);
+        const journalScope = `${session.scope.accountId}\u0000${session.scope.serverOrigin}`;
+        let published: VaultKeyMigrationResponse | undefined;
+        await session.confirmAndMigrateRootRotation(pending, enteredRecoveryCode, async (input) => {
+          published = await migrateVaultPayloads({
+            inventory,
+            remote: migrationRemote,
+            package: input.targetPackage,
+            expectedKeyVersion: input.currentPackage.keyVersion,
+            currentPayloadKeyVersion,
+            targetPayloadKeyVersion,
+            currentRootKey: input.currentRootKey,
+            targetRootKey: input.targetRootKey,
+            ...(currentPayloadKeyVersion === null && legacyPassword !== undefined
+              ? { legacyPassword }
+              : {}),
+            journal: vaultMigrationJournal,
+            journalScope,
+            clearJournalOnPublished: false,
+            onProgress,
+          });
+          return published;
+        });
+        if (migrationEpoch !== vaultEpoch) throw new Error('Vault migration was invalidated by credential changes');
+        if (published === undefined) throw new Error('Vault migration did not publish a result');
+        // The migration journal is acknowledged only after confirmAndMigrate...
+        // has atomically installed the package, payload generation, and root.
+        await acknowledgeVaultPayloadMigration(vaultMigrationJournal, journalScope, published.requestId);
+        return published;
+      });
+    },
+
+    async cancelVaultRootRotation(): Promise<void> {
+      await withVaultExclusive(async () => {
+        const session = await readVaultSession();
+        if (session === undefined) return;
+        const config = readSyncConfig();
+        const remote = config.token === undefined || config.token === '' || config.serverUrl.trim() === ''
+          ? undefined
+          : createVaultKeyMigrationRemote({
+            baseUrl: config.serverUrl,
+            getToken: async () => config.token,
+            ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+          });
+        const journalScope = `${session.scope.accountId}\u0000${session.scope.serverOrigin}`;
+        if (remote !== undefined) await cancelVaultPayloadMigrationForScope(remote, vaultMigrationJournal, journalScope);
+        await session.cancelPendingRootRotation();
+      });
+    },
+
     async dispatch(intent: OpIntent): Promise<void> {
       await engine.dispatch(intent);
     },
@@ -335,22 +672,32 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     getState: () => engine.getState(),
 
     async sync(): Promise<SyncStatus> {
-      const client = buildSyncClient();
-      if (client === undefined) return notConfigured();
-      return client.sync();
+      return withVaultExclusive(async () => {
+        const client = buildSyncClient();
+        if (client === undefined) return notConfigured();
+        return client.sync();
+      });
     },
 
     async resolveConflict(
       conflict: ConflictInfo,
       choice: 'keep-local' | 'keep-remote',
     ): Promise<SyncStatus> {
-      const client = buildSyncClient();
-      if (client === undefined) return notConfigured();
-      return client.resolveConflict(conflict, choice);
+      return withVaultExclusive(async () => {
+        const client = buildSyncClient();
+        if (client === undefined) return notConfigured();
+        return client.resolveConflict(conflict, choice);
+      });
     },
 
+    /**
+     * 界面上那个「待上传 N 项」徽标。
+     *
+     * 🔴 走计数，不走 `getPendingUpload().length` —— 后者每次刷新都把整条队列
+     * 连密文正文一起物化进内存，只为了显示一个数字。这个数还在同步前后各读一次。
+     */
     async pendingUploadCount(): Promise<number> {
-      return (await engine.getPendingUpload()).length;
+      return engine.countPendingUpload();
     },
 
     async readOpLog(): Promise<Operation<string>[]> {

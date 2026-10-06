@@ -451,6 +451,7 @@ describe('Duplicate Operation Pre-check', () => {
     it('should answer a lost insert race with the concurrent row as idempotent success', async () => {
       const raceTimestamp = Date.now() - 1000;
       const tx = {
+        vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
         operation: {
           deleteMany: vi.fn(),
           findUnique: vi
@@ -535,6 +536,7 @@ describe('Duplicate Operation Pre-check', () => {
     it('should reject insert-race ID collisions instead of marking them synced', async () => {
       const raceTimestamp = Date.now() - 1000;
       const tx = {
+        vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
         operation: {
           deleteMany: vi.fn(),
           findUnique: vi
@@ -608,6 +610,7 @@ describe('Duplicate Operation Pre-check', () => {
 
     it('should not report non-id insert skips as duplicate operations', async () => {
       const tx = {
+        vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
         operation: {
           deleteMany: vi.fn(),
           findUnique: vi.fn().mockResolvedValue(null),

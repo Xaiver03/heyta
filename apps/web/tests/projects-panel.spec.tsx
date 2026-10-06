@@ -17,7 +17,7 @@
  *   A. **层级**：顶层行是列表的直接子节点，子清单行嵌在缩进容器里。
  *   B. **计数口径**：未完成 + 未删除 + 属于这条清单；`0` 不渲染计数位
  *      （与 `App.tsx` 的 `NavButton` 同一条 `count > 0`）。
- *   C. **点一行报给宿主**：`onSelect` 收到的是**用户选了哪个**，
+ *   C. **点一行报给宿主**：`onFilterWith` 收到的是**用户选了哪个**，
  *      不是组件自己改筛选（见 `ProjectsPanel.tsx` 文件头 —— 直接 `setFilter`
  *      会让"人在习惯页点清单"看起来点了没反应）。
  *   D. **删除走宿主 action**：组件不写库。
@@ -56,6 +56,7 @@ const actions = vi.hoisted(() => ({
   deleteProject: vi.fn(() => Promise.resolve()),
   deleteTag: vi.fn(() => Promise.resolve()),
   setProjectColor: vi.fn(() => Promise.resolve()),
+  setProjectParent: vi.fn(() => Promise.resolve()),
 }));
 
 const projectsState = vi.hoisted(() => ({
@@ -147,7 +148,7 @@ function render(): HTMLDivElement {
     root!.render(
       <I18nProvider locale="zh-CN">
         <ProjectsPanel
-          onSelect={(filter) => {
+          onFilterWith={(filter) => {
             selected.push(filter);
           }}
         />
@@ -211,7 +212,7 @@ describe('A/B 清单：层级 + 计数口径', () => {
 });
 
 describe('C/D 清单：点一行报给宿主，删除走 action', () => {
-  it('点清单行 → `onSelect` 收到 `{ kind: "project", projectId }`', () => {
+  it('点清单行 → `onFilterWith` 收到 `{ kind: "project", projectId }`', () => {
     seed();
     const view = render();
     click(byTestId(view, 'project-p1-select'));
@@ -225,7 +226,7 @@ describe('C/D 清单：点一行报给宿主，删除走 action', () => {
     expect(selected).toEqual([{ kind: 'project', projectId: 'p1a' }]);
   });
 
-  it('删除按钮 → 调宿主的 `deleteProject`，且**不**触发 onSelect', () => {
+  it('删除按钮 → 调宿主的 `deleteProject`，且**不**触发 onFilterWith', () => {
     seed();
     const view = render();
     click(byTestId(view, 'project-p1-remove'));
@@ -235,7 +236,7 @@ describe('C/D 清单：点一行报给宿主，删除走 action', () => {
 });
 
 describe('E 标签：与清单同一棵骨架，计数口径也是同一套', () => {
-  it('标签行渲染、可点、可删', () => {
+  it('标签行渲染、可点；删除要**两步**（W4b 之后）', () => {
     seed();
     const view = render();
     expect(byTestId(view, 'tag-g1-row')).not.toBeNull();
@@ -243,8 +244,14 @@ describe('E 标签：与清单同一棵骨架，计数口径也是同一套', ()
     click(byTestId(view, 'tag-g2-select'));
     expect(selected).toEqual([{ kind: 'tag', tagId: 'g2' }]);
 
+    // 🔴 这一条**改过**（原话是"点 `tag-g1-remove` → `deleteTag('g1')`"）。
+    // 改它不是因为测试坏了，是因为**产品语义变了**：§7.1 P-1 拍板标签不进回收站
+    // （重建成本≈0），于是删之前告知影响面是唯一的防护 —— 而按下即写 op 时，
+    // 那句告知没有任何一处能出现。判据跟着改成"点删除只出确认行"，
+    // 完整的两步在下面的 `W4b` 那一块逐条钉。
     click(byTestId(view, 'tag-g1-remove'));
-    expect(actions.deleteTag).toHaveBeenCalledWith('g1');
+    expect(actions.deleteTag).not.toHaveBeenCalled();
+    expect(byTestId(view, 'tag-g1-confirm')).not.toBeNull();
   });
 
   it('计数 = 挂着这个标签的未完成任务；一条任务挂两个标签则**两边各 +1**', () => {
@@ -399,6 +406,141 @@ describe('取色入口（宿主插槽）逐行挂上', () => {
     const view = render();
     // p1 / p1a / p2 三行（p9 归档不渲染）。
     expect(view.querySelectorAll('.ht-slot-picker')).toHaveLength(3);
+  });
+});
+
+/**
+ * H「移入文件夹」：按**渲染结果**判，不按源码里有没有那几个字判
+ * =============================================================
+ *
+ * 现场（`seed()`）：p1「工作」= 文件夹（下面挂着 p1a），p1a「汇报」在 p1 里，
+ * p2「生活」= 顶级，p9「旧项目」= 已归档。领域规则（`folderTargetsFor`）在这份数据上
+ * 给出的答案是三种互不相同的形状，所以下面每条都只钉一个形状：
+ *
+ *   - **p2**：能进 p1；p1a 不进（它自己就在文件夹里 = 挂过去是第三层）；
+ *     p9 不进（归档父默认不画，挂进去这条会从侧栏消失）。
+ *   - **p1a**：p1 是它现在的父 —— 候选里但**不许点**（点它 = 写一条内容不变的 UPD，
+ *     违反 §3.4"一个用户意图 = 一个 op"）；p2 可点；「不放进文件夹」= 提为顶级，可点。
+ *   - **p1**：它是文件夹，`has_children` 把所有目标都挡掉 → 一个候选都没有，
+ *     而「不放进文件夹」就是它的当前位置，同样不可点。
+ *
+ * ⚠️ 这批用例**必须用 `dist/`**（同文件头那条）：改完 `packages/ui` 不 build，
+ * 这里验的是上一次构建的组件。
+ */
+describe('H 移入文件夹：菜单只在选择后出现，选项就是领域给的那些', () => {
+  /** 菜单里画出来的候选目标 id（按渲染顺序）。前缀带行 id，所以那个参数是必需的。 */
+  const optionIds = (menu: HTMLElement, rowId: string): string[] =>
+    Array.from(menu.querySelectorAll(`[data-testid^="web-list-folder-${rowId}-to-"]`)).map((el) =>
+      // 🔴 用 `getAttribute` 不用 `dataset.testID`：`data-testid` 在 HTML 里映射成
+      // `dataset.testid`（全小写），`dataset.testID` 恒 `undefined` —— 实测那样会得到
+      // `Cannot read properties of undefined (reading 'slice')`，症状长得像"候选集坏了"，
+      // 而坏的是探针自己。
+      el.getAttribute('data-testid')!.slice(`web-list-folder-${rowId}-to-`.length),
+    );
+
+  function openFolderMenu(view: HTMLDivElement, id: string): HTMLElement {
+    click(byTestId(view, `web-list-folder-${id}-trigger`));
+    const menu = byTestId(view, `web-list-folder-${id}-menu`);
+    expect(menu, `点「${id}」那行的移入文件夹没有展开菜单`).not.toBeNull();
+    return menu!;
+  }
+
+  const ariaDisabled = (el: HTMLElement): boolean =>
+    el.getAttribute('aria-disabled') === 'true';
+
+  it('没点触发按钮时菜单**不在 DOM 里**（不是"渲染出来但看不见"）', () => {
+    seed();
+    const view = render();
+    expect(byTestId(view, 'web-list-folder-p1-trigger'), '入口没逐行挂上').not.toBeNull();
+    expect(byTestId(view, 'web-list-folder-p2-menu')).toBeNull();
+
+    openFolderMenu(view, 'p2');
+    expect(byTestId(view, 'web-list-folder-p2-menu')).not.toBeNull();
+    // 另一行的菜单不许被一起打开（`open` 是每条行自己的状态）。
+    expect(byTestId(view, 'web-list-folder-p1-menu')).toBeNull();
+  });
+
+  it('p2 的候选恰好是 p1 —— 别人文件夹里的清单与已归档的清单都不给', () => {
+    seed();
+    const view = render();
+    const menu = openFolderMenu(view, 'p2');
+    expect(byTestId(menu, 'web-list-folder-p2-to-p1'), 'p1 是合法目标却没画').not.toBeNull();
+    const options = menu.querySelectorAll('[data-testid^="web-list-folder-p2-to-"]');
+    expect(
+      options,
+      `多画了非法目标：${optionIds(menu, 'p2').join(', ') || '（只剩这一条 p1）'}`,
+    ).toHaveLength(1);
+  });
+
+  it('p1a 的候选 = 它的当前父 p1（标着当前位置、不可点）+ 同为顶级的 p2（可点）', () => {
+    seed();
+    const view = render();
+    const menu = openFolderMenu(view, 'p1a');
+    expect(optionIds(menu, 'p1a')).toEqual(['p1', 'p2']);
+
+    const current = byTestId(menu, 'web-list-folder-p1a-to-p1')!;
+    expect(ariaDisabled(current), '当前所在文件夹还能点 = 会写一条内容不变的 op').toBe(true);
+    expect(current.textContent ?? '').toContain('当前位置');
+    expect(ariaDisabled(byTestId(menu, 'web-list-folder-p1a-to-p2')!)).toBe(false);
+    // 🔴 光看 `aria-disabled` 不够：那只是"说给自己听的"。真判据是**点它什么都不该发生**
+    // —— 把 `disabled` 摘掉而留着 `aria-disabled` 是最坏的一种漂法（读屏说"不可点"，
+    // 而鼠标照样能点出一条 no-op op）。
+    click(current);
+    expect(actions.setProjectParent, '点了"当前位置"却发出了写入').not.toHaveBeenCalled();
+
+    const none = byTestId(menu, 'web-list-folder-p1a-none')!;
+    expect(ariaDisabled(none), '在文件夹里的清单应该能提为顶级').toBe(false);
+  });
+
+  it('p1 是文件夹：一个候选都没有，而「不放进文件夹」是它的当前位置 → 整块菜单没有可点的', () => {
+    seed();
+    const view = render();
+    const menu = openFolderMenu(view, 'p1');
+    expect(menu.querySelectorAll('[data-testid^="web-list-folder-p1-to-"]')).toHaveLength(0);
+    const none = byTestId(menu, 'web-list-folder-p1-none')!;
+    expect(ariaDisabled(none)).toBe(true);
+    expect(none.textContent ?? '').toContain('当前位置');
+    click(none);
+    expect(actions.setProjectParent, '顶级清单点「不放进文件夹」= 一条 no-op op').not.toHaveBeenCalled();
+  });
+
+  it('点候选调 `setProjectParent(这条, 目标)`；点「不放进文件夹」传的是 `undefined` 而不是字符串', () => {
+    seed();
+    const view = render();
+
+    openFolderMenu(view, 'p2');
+    click(byTestId(view, 'web-list-folder-p2-to-p1'));
+    expect(actions.setProjectParent).toHaveBeenCalledWith('p2', 'p1');
+
+    openFolderMenu(view, 'p1a');
+    click(byTestId(view, 'web-list-folder-p1a-none'));
+    // 🔴 必须是 `undefined`：传 `''` 会走到 `parent_not_found`，传 `null` 过不了类型。
+    expect(actions.setProjectParent).toHaveBeenLastCalledWith('p1a', undefined);
+    // 单独再钉**元数**：`toHaveBeenCalledWith(x, undefined)` 对"只传了一个参数"也成立，
+    // 而 `parentId` 键在不在载荷里是动作层文件头第 1 条要区分的那件事。
+    const lastCall = actions.setProjectParent.mock.calls.at(-1) as unknown[] | undefined;
+    expect(lastCall, '一次都没调用').not.toBeUndefined();
+    expect(lastCall!.length, '提到顶级必须显式传第二个参数').toBe(2);
+    expect(lastCall![1]).toBeUndefined();
+  });
+
+  it('🔴 写失败时，那句"为什么不能移"要出现在界面上（不许只 console）', async () => {
+    seed();
+    const view = render();
+    actions.setProjectParent.mockRejectedValueOnce(
+      new Error('改父被拒绝（cycle）：p2 → p1'),
+    );
+
+    openFolderMenu(view, 'p2');
+    await act(async () => {
+      click(byTestId(view, 'web-list-folder-p2-to-p1'));
+    });
+
+    const failed = byTestId(view, 'list-folder-failed');
+    expect(failed, '移动失败了，但界面上没有任何一句话告诉用户').not.toBeNull();
+    // 认的是**机器可读的原因**映射出来的词条原文，不是错误串（里面带着原始 id）。
+    expect(failed!.textContent).toBe('这样会形成循环：清单不能放进自己的子清单里');
+    expect(failed!.getAttribute('role')).toBe('alert');
   });
 });
 
@@ -616,5 +758,113 @@ describe('F 一份实现：web 侧只剩接线', () => {
     expect(source).toContain("t('web.projects.newPlaceholder')");
     expect(source).toContain("t('web.tags.heading')");
     expect(source).toContain("t('web.tags.newPlaceholder')");
+  });
+
+  it('🔴 侧栏的数据源必须是两路合并（W9 之后开关才有数据可放出来）', () => {
+    // `listProjects()` 从 W9 起**不含归档**（归档不进任何出口，P-9），
+    // 而本面板的「显示已归档」开关与 `archivedCount` 都要求归档那一路在数据里。
+    // 读错那一路的症状不是报错 —— 是"开关按了什么都没出现"。
+    const store = readFileSync(resolve(WEB_SRC, 'features/projects/store.ts'), 'utf8');
+    expect(store).toContain('projectActions.listAllProjects()');
+    expect(store).not.toContain('projectActions.listProjects()');
+
+    const panel = readFileSync(resolve(WEB_SRC, 'features/projects/ProjectsPanel.tsx'), 'utf8');
+    expect(panel).toContain('archivedProjects(projects.projects)');
+    expect(panel).toContain('includeArchived: showArchived');
+  });
+});
+
+/**
+ * W4b · 标签删除确认（回收站与归档批次 B）
+ * ------------------------------------------
+ *
+ * 产品裁决（§7.1 P-1）：标签**不进回收站**，重建成本≈0，所以唯一的防护是
+ * "删之前告诉你影响几条任务"。这一步住在共享 `OrganizerList`（`labels.confirmRemove`），
+ * 两端同一份 —— 这里钉的是**渲染结果**，因为坏法恰恰是"确认框画了，按下还是直接删"
+ * 和"数字用了行上那个常驻计数"，两者都不报错、都不空白，只有点下去才看得出来。
+ *
+ * 🔴 变异对照（本轮实测，读数写在计划 §11.13）：
+ *   · 把 `onPress` 里的 `setPendingRemove` 换成 `onRemove` ⇒ 前两条红；
+ *   · 把宿主传的 `removeImpact` 换成 `tagCounts` ⇒ 只有「两个数字同时在场」那条红
+ *     —— 也就是说**这一条是唯一能抓住"口径用错"的**，别把它当冗余删掉。
+ */
+describe('W4b 标签删除确认：一次点击不许写 op', () => {
+  /** g1 上挂：1 条未完成 + 2 条已完成 + 1 条墓碑 ⇒ 影响面 3，常驻计数 1。 */
+  function seedImpact(): void {
+    seed([
+      task({ id: 't1', tagIds: ['g1'] }),
+      task({ id: 't2', tagIds: ['g1'], completedAt: NOW }),
+      task({ id: 't3', tagIds: ['g1'], deletedAt: NOW }),
+      task({ id: 't4', tagIds: ['g1'], completedAt: NOW }),
+    ]);
+  }
+
+  it('点删除 → 确认行出现，`deleteTag` **一次都没调**', () => {
+    seedImpact();
+    const view = render();
+    click(byTestId(view, 'tag-g1-remove'));
+    expect(actions.deleteTag).not.toHaveBeenCalled();
+    const confirm = byTestId(view, 'tag-g1-confirm');
+    expect(confirm, '确认行没出现').not.toBeNull();
+    expect(confirm!.textContent).toContain('确定要删除「紧急」吗？');
+    // 原来那个删除按钮**收起来**了：armed 态下再点它不该有第二种含义。
+    expect(byTestId(view, 'tag-g1-remove')).toBeNull();
+  });
+
+  it('点「确认删除」→ `deleteTag` 恰好一次，确认行随之消失', () => {
+    seedImpact();
+    const view = render();
+    click(byTestId(view, 'tag-g1-remove'));
+    click(byTestId(view, 'tag-g1-confirm-yes'));
+    expect(actions.deleteTag).toHaveBeenCalledTimes(1);
+    expect(actions.deleteTag).toHaveBeenCalledWith('g1');
+    expect(byTestId(view, 'tag-g1-confirm')).toBeNull();
+  });
+
+  it('点「取消删除」→ 一条 op 都不写，行回到常态', () => {
+    seedImpact();
+    const view = render();
+    click(byTestId(view, 'tag-g1-remove'));
+    click(byTestId(view, 'tag-g1-confirm-no'));
+    expect(actions.deleteTag).not.toHaveBeenCalled();
+    expect(byTestId(view, 'tag-g1-confirm')).toBeNull();
+    expect(byTestId(view, 'tag-g1-remove'), '取消后必须还能再删').not.toBeNull();
+  });
+
+  it('🔴 那句影响面 = 3（含已完成），同一趟里行上的常驻计数 = 1', () => {
+    seedImpact();
+    const view = render();
+    expect(byTestId(view, 'tag-g1-count')?.textContent).toBe('1');
+    click(byTestId(view, 'tag-g1-remove'));
+    expect(byTestId(view, 'tag-g1-confirm')?.textContent).toContain('它挂在 3 条任务上');
+    // 措辞必须把"任务不会被删除"说出来 —— 只有数字的话读起来仍像"会动那 3 条"。
+    expect(byTestId(view, 'tag-g1-confirm')?.textContent).toContain('这些任务不会被删除');
+  });
+
+  it('没有存活任务时**不画**那句影响面（宁可少说一句，不编"挂在 0 条上"）', () => {
+    seed();
+    const view = render();
+    click(byTestId(view, 'tag-g2-remove'));
+    expect(byTestId(view, 'tag-g2-confirm')?.textContent).toContain('确定要删除「等回复」吗？');
+    expect(byTestId(view, 'tag-g2-confirm')?.textContent).not.toContain('它挂在');
+  });
+
+  it('一次只 armed 一行（两条同时 armed 时"确认删除"落在哪条只能靠猜）', () => {
+    seed();
+    const view = render();
+    click(byTestId(view, 'tag-g1-remove'));
+    expect(byTestId(view, 'tag-g1-confirm')).not.toBeNull();
+    click(byTestId(view, 'tag-g2-remove'));
+    expect(byTestId(view, 'tag-g1-confirm'), '第一条的确认行没收回').toBeNull();
+    expect(byTestId(view, 'tag-g2-confirm')).not.toBeNull();
+    expect(actions.deleteTag).not.toHaveBeenCalled();
+  });
+
+  it('清单行**不受影响**：仍然一次点击直接删，且没有确认行（默认形态逐字相同）', () => {
+    seed();
+    const view = render();
+    expect(byTestId(view, 'project-p1-confirm')).toBeNull();
+    click(byTestId(view, 'project-p1-remove'));
+    expect(actions.deleteProject).toHaveBeenCalledWith('p1');
   });
 });

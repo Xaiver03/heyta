@@ -126,7 +126,8 @@ List         — id, name, icon, color, folderId, sortOrder, rev, ...
 Tag          — id, name, color              TaskTag — taskId, tagId
 Habit        — id, name, icon, color, goalType(target/unit), frequency, rrule
 HabitLog     — id, habitId, date, value, note
-FocusSession — id, taskId?, startedAt, endedAt, mode(pomo/stopwatch), duration
+FocusSession — id, taskId?, kind(work/shortBreak/longBreak), plannedMs, actualMs?,
+               completed?, startedAt?, endedAt?
 Reminder     — id, taskId, triggerAt, offset, fired
 ```
 

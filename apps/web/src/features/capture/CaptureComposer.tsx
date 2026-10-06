@@ -78,6 +78,7 @@ import {
   CaptureComposer as SharedCaptureComposer,
   HeytaUiProvider,
   captureChipRemainingDays,
+  captureChipTimeLabel,
   capturePriorityLabelKey,
   type CaptureAssistantContext,
   type CaptureComposerLabels,
@@ -168,6 +169,9 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
       restoreAria: (raw) => t('web.capture.restoreAria', { raw }),
       ignoreAria: (raw) => t('web.capture.ignoreAria', { raw }),
       valueLabel: (chip, now) => {
+        // 🔴 时刻芯片先走共享层那句（否则它会掉进下面的优先级兜底、念成「不设置」）。
+        const timeLabel = captureChipTimeLabel(chip);
+        if (timeLabel !== undefined) return timeLabel;
         const days = captureChipRemainingDays(chip, now);
         if (chip.dueDate !== undefined && days !== undefined) {
           return dateWithRemaining(chip.dueDate, remainingText(days, t), locale);

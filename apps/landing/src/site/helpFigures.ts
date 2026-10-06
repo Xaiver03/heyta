@@ -160,7 +160,7 @@ export const HELP_FIGURES: Record<DocsArticleId, readonly HelpFigure[]> = {
   trash: [
     {
       locale: 'zh-CN',
-      sectionId: 'tasks-only',
+      sectionId: 'what-the-trash-holds',
       targetId: 'W07',
       slug: 'trash',
       captionKey: 'site.docs.trash.fig.trash',
@@ -168,7 +168,7 @@ export const HELP_FIGURES: Record<DocsArticleId, readonly HelpFigure[]> = {
     },
     {
       locale: 'en',
-      sectionId: 'tasks-only',
+      sectionId: 'what-the-trash-holds',
       targetId: 'W07-en',
       slug: 'trash',
       captionKey: 'site.docs.trash.fig.trash',

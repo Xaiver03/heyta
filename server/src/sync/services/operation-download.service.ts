@@ -12,9 +12,9 @@ import {
   Operation,
   ServerOperation,
   VectorClock,
-  limitVectorClockSize,
 } from '../sync.types';
 import { Logger } from '../../logger';
+import { issueCausalFrontierToken } from '../causal-frontier';
 
 const OPERATION_DOWNLOAD_SELECT = {
   id: true,
@@ -43,6 +43,7 @@ type OperationDownloadResult = {
   gapDetected: boolean;
   latestSnapshotSeq?: number;
   snapshotVectorClock?: VectorClock;
+  causalFrontier?: { token: string; vectorClock: VectorClock };
 };
 
 type OperationDownloadTransactionResult = OperationDownloadResult & {
@@ -319,24 +320,25 @@ export class OperationDownloadService {
     ); // Matches other sync transactions; stays below Fastify's 80s request timeout.
 
     let snapshotVectorClock: VectorClock | undefined;
+    let causalFrontier: { token: string; vectorClock: VectorClock } | undefined;
     if (
       result.shouldComputeSnapshotVectorClock &&
       result.latestSnapshotSeq !== undefined
     ) {
-      // Preserve the requesting client's ID and the snapshot author's ID from
-      // pruning to avoid false EQUAL in vector-clock comparison.
-      const preserveClientIds: string[] = [];
-      if (excludeClient) preserveClientIds.push(excludeClient);
-      if (result.snapshotAuthorClientId) {
-        preserveClientIds.push(result.snapshotAuthorClientId);
+      const frontierClock = result.persistedSnapshotVectorClock
+        ? result.persistedSnapshotVectorClock
+        : await this._computeSnapshotVectorClock(userId, result.latestSnapshotSeq);
+      // The frontier is a causal proof. Serve it losslessly; top-K pruning here
+      // used to make a client appear concurrent with a valid server head.
+      snapshotVectorClock = { ...frontierClock };
+      const token = issueCausalFrontierToken(
+        userId,
+        result.latestSnapshotSeq,
+        frontierClock,
+      );
+      if (token !== undefined) {
+        causalFrontier = { token, vectorClock: frontierClock };
       }
-      snapshotVectorClock = result.persistedSnapshotVectorClock
-        ? limitVectorClockSize(result.persistedSnapshotVectorClock, preserveClientIds)
-        : await this._computeSnapshotVectorClock(
-            userId,
-            result.latestSnapshotSeq,
-            preserveClientIds,
-          );
     }
 
     return {
@@ -345,13 +347,13 @@ export class OperationDownloadService {
       gapDetected: result.gapDetected,
       latestSnapshotSeq: result.latestSnapshotSeq,
       snapshotVectorClock,
+      causalFrontier,
     };
   }
 
   private async _computeSnapshotVectorClock(
     userId: number,
     latestSnapshotSeq: number,
-    preserveClientIds: ReadonlyArray<string>,
   ): Promise<VectorClock> {
     const startedAt = Date.now();
     // Legacy fallback: aggregate the vector clock from all ops up to and
@@ -396,10 +398,6 @@ export class OperationDownloadService {
     for (const row of clockRows) {
       snapshotVectorClock[row.client_id] = Number(row.max_counter);
     }
-
-    snapshotVectorClock = limitVectorClockSize(snapshotVectorClock, [
-      ...preserveClientIds,
-    ]);
 
     const elapsedMs = Date.now() - startedAt;
     const logMessage =

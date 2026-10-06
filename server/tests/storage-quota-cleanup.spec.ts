@@ -40,6 +40,7 @@ vi.mock('../src/db', () => {
     prisma: {
       $transaction: vi.fn().mockImplementation(async (callback: any) => {
         const tx = {
+          vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
           operation: {
             create: vi.fn().mockImplementation(async (args: any) => {
               serverSeqCounter++;
@@ -124,8 +125,11 @@ vi.mock('../src/db', () => {
             upsert: vi.fn().mockResolvedValue({}),
             count: vi.fn().mockResolvedValue(1),
           },
+          vaultKeyMigration: {
+            aggregate: vi.fn().mockResolvedValue({ _sum: { reservedStorageBytes: 0n } }),
+          },
           // Upload transaction writes the storage counter atomically via $executeRaw.
-          $executeRaw: vi.fn().mockResolvedValue(0),
+          $executeRaw: vi.fn().mockResolvedValue(1),
         };
         return callback(tx);
       }),
@@ -209,6 +213,9 @@ vi.mock('../src/db', () => {
           return testUsers.get(args.where.id) || null;
         }),
         update: vi.fn().mockResolvedValue({}),
+      },
+      vaultKeyMigration: {
+        aggregate: vi.fn().mockResolvedValue({ _sum: { reservedStorageBytes: 0n } }),
       },
       $queryRaw: vi
         .fn()

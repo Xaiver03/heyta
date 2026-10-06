@@ -61,6 +61,17 @@ export const en = {
   // Without the second one the first reaction is "did I lose my data?", and people
   // respond to that by wiping the local store.
   'common.sync.error.unauthorized': 'This device’s sign-in credential is no longer valid (you may have signed out on another device, or changed your password), so syncing stopped — your local data is intact and still readable; it will continue syncing once you sign in again',
+  // reason === 'account-closed': the account itself was deleted (stable code
+  // ACCOUNT_CLOSED). This sentence and the one above are a pair that MUST stay
+  // apart - each promises the opposite about the local store. Merging them lies
+  // in both directions: reading "wrong password" as "closed" destroys the user's
+  // data, and reading "closed" as "just sign in again" leaves the plaintext here.
+  // Wording boundary (ADR-0048): this states the *rule* - closing an account
+  // erases this device's copy - not the outcome of this particular run. A failed
+  // erasure surfaces through the status' `message` and the console; this sentence
+  // must not promise success on their behalf, and must not claim that backups or
+  // other devices were handled.
+  'common.sync.error.accountClosed': 'This account has been closed and can no longer sign in, so syncing stopped — closing an account erases the local copy on this device. Contact the server operator if this is unexpected.',
   // reason === 'consent-required': no consent yet, so not a single request was sent.
   // Do not fold this into "not configured" or "offline": those tell the user to fill in
   // an address or check the network, while the only useful action here is to decide.
@@ -86,7 +97,7 @@ export const en = {
   // by declining - that is the minimum "fully informed" requires, not a style choice.
   'common.privacy.consent.title': 'Before any network feature runs',
   'common.privacy.consent.intro': 'heyta is local-first: your tasks, lists, notes and history are written to this device first. This choice decides one thing only - whether this device may talk to a server.',
-  'common.privacy.consent.localOnlyGuarantee': 'With "This device only", everything still works: creating, editing, calendar, quadrants, focus timer, habits and export. Nothing is synced, no account is used, and no notifications are delivered.',
+  'common.privacy.consent.localOnlyGuarantee': 'With "This device only", everything still works: creating, editing, calendar, quadrants, focus timer, habits and export. Nothing is synced, no account is used, and no server push notifications are received. Local reminders on mobile remain available after you grant system notification permission.',
   'common.privacy.consent.acceptedGuarantee': 'With "Agree and connect", this device may talk to the server you configured - and it sends only end-to-end encrypted data plus sync cursors, so the server never sees your plaintext.',
   'common.privacy.consent.termsLink': 'Terms of Service',
   'common.privacy.consent.privacyLink': 'Privacy Policy',
@@ -399,6 +410,13 @@ export const en = {
   'web.shell.nav.q3': 'Urgent, not important',
   'web.shell.nav.q4': 'Not important, not urgent',
   'web.shell.sidebar.resize': 'Resize the sidebar',
+  // The drag handle on the left edge of the details column (`DetailColumnResizer`).
+  'web.shell.detail.resize': 'Resize the details panel',
+  // Visible label of the header language group (`LanguageSwitcher.tsx`). It has to be
+  // text on screen, not just an `aria-label` - this exact spot was judged twice for
+  // "the user has no idea what these are". The options themselves stay in their own
+  // language (`中文` / `English`), see the `common.lang.*` note above.
+  'web.shell.lang.label': 'Language',
   'web.shell.views.aria': 'Views',
   'web.shell.views.groupMain': 'Main',
   'web.shell.modules.title': 'Feature modules',
@@ -477,31 +495,48 @@ export const en = {
   // Nickname and avatar. This page is for you alone: heyta has no sharing and
   // no collaboration, and the server exposes no endpoint that looks another
   // user's profile up — so never phrase these as "others will see".
-  'web.settings.profile.title': 'Profile',
-  'web.settings.profile.nickname.label': 'Nickname',
-  'web.settings.profile.nickname.placeholder': 'Leave empty to show your email',
-  'web.settings.profile.nickname.hint': 'Up to {max} characters. A nickname is a display name, not your legal name; your sign-in identifier stays the email address.',
-  'web.settings.profile.nickname.toolong': 'The nickname allows at most {max} characters, this has {count}.',
-  'web.settings.profile.nickname.save': 'Save nickname',
-  'web.settings.profile.nickname.saved': 'Nickname saved',
-  'web.settings.profile.nickname.cleared': 'Nickname cleared',
-  'web.settings.profile.avatar.label': 'Avatar',
-  'web.settings.profile.avatar.change': 'Choose a new image',
-  'web.settings.profile.avatar.remove': 'Remove avatar',
-  'web.settings.profile.avatar.removed': 'Avatar removed',
-  'web.settings.profile.avatar.uploading': 'Uploading…',
+  'common.profile.title': 'Profile',
+  'common.profile.nickname.label': 'Nickname',
+  'common.profile.nickname.placeholder': 'Leave empty to show your email',
+  'common.profile.nickname.hint': 'Up to {max} characters. A nickname is a display name, not your legal name; your sign-in identifier stays the email address.',
+  'common.profile.nickname.toolong': 'The nickname allows at most {max} characters, this has {count}.',
+  'common.profile.nickname.save': 'Save nickname',
+  'common.profile.nickname.saved': 'Nickname saved',
+  'common.profile.nickname.cleared': 'Nickname cleared',
+  'common.profile.nickname.failed': 'Couldn\'t save the nickname. Please try again.',
+  'common.profile.avatar.label': 'Avatar',
+  'common.profile.avatar.change': 'Choose a new image',
+  'common.profile.avatar.remove': 'Remove avatar',
+  'common.profile.avatar.removed': 'Avatar removed',
+  'common.profile.avatar.uploading': 'Uploading…',
   // 🔴 Not an error message but a product fact: the passphrase is never written
   // to disk, so after a refresh the device cannot open the avatar — neither can we.
-  'web.settings.profile.avatar.needPassword': 'Your avatar is protected by your end-to-end encryption passphrase, which this device does not keep. Enter it once under Sync settings to change or preview your avatar.',
-  'web.settings.profile.avatar.badType': 'Only these image formats are supported: {types}.',
-  'web.settings.profile.avatar.tooBig': 'Even after compression the image exceeds {max}. Please pick a smaller one.',
-  'web.settings.profile.avatar.failed': 'The avatar could not be uploaded. Please try again.',
-  'web.settings.profile.email.label': 'Email',
+  'common.profile.avatar.needPassword': 'Your avatar is protected by your end-to-end encryption passphrase, which this device does not keep. Enter it once under Sync settings to change or preview your avatar.',
+  'common.profile.avatar.badType': 'Only these image formats are supported: {types}.',
+  'common.profile.avatar.tooBig': 'Even after compression the image exceeds {max}. Please pick a smaller one.',
+  'common.profile.avatar.failed': 'The avatar could not be uploaded. Please try again.',
+  'common.profile.avatar.uploaded': 'Avatar updated',
+  'common.profile.avatar.undecryptable': 'This device cannot decrypt your avatar — the end-to-end encryption passphrase does not match. Enter it once under Sync settings.',
+  'common.profile.avatar.unreadable': 'The avatar could not be read right now. Please try again later.',
+  'common.profile.loadFailed': 'Your profile could not be loaded. Please try again later.',
+  'common.profile.email.label': 'Email',
   // A read-only field needs a reason, or it reads as a broken input.
-  'web.settings.profile.email.hint': 'Your email address is your sign-in identifier and the only way to recover the account. It cannot be changed here.',
+  'common.profile.email.hint': 'Your email address is your sign-in identifier and the only way to recover the account. It cannot be changed here.',
 
   'web.settings.display.title': 'Display',
   'web.settings.display.dueNote': 'Show due dates on task rows as a date, or as a countdown to the deadline.',
+  // Ticket W4: the details pane (right column) — when it shows up and how to get it back.
+  'web.shell.detailPane.collapse': 'Hide details pane',
+  'web.shell.detailPane.expand': 'Show details pane',
+  'web.settings.display.detail.title': 'Details pane',
+  'web.settings.display.detail.modeOpen': 'Always shown',
+  'web.settings.display.detail.modeCollapsed': 'Hidden',
+  'web.settings.display.detailNote': 'The right column shows the details pane for the current selection. When the window is too narrow or too short it hides itself and this setting does nothing. Once you hide it on this device, the header button, this setting, or ⌘/Ctrl + Shift + \\ brings it back.',
+  // Settings → Display: language and theme (moved out of the header on 2026-10-06).
+  // The two notes are not decoration: once these live in Settings, the screen has to
+  // say what each row does — the header used to buy that by always being visible.
+  'web.settings.display.langNote': 'Which language this app shows its interface in. It does not change your system language.',
+  'web.settings.display.themeNote': 'A preference for this device. Until you choose here, the interface follows your system light or dark setting.',
   'web.shell.dueMode.countdown': 'Countdown',
   // Icon-only buttons on a task row: the name must carry the task title, or a
   // screen reader reads out a run of indistinguishable "button"s.
@@ -534,16 +569,23 @@ export const en = {
   // a soft delete — this is where a user can see it and restore it. Permanent
   // deletion is a separate, confirmed, irreversible action.
   'web.trash.nav': 'Trash',
-  'web.trash.intro': 'Deleted tasks land here. Restore one and it goes back where it was.',
+  'web.trash.intro': 'Deleted tasks, notes, lists and habits land here. Restore one and it goes back where it was.',
   'web.trash.empty.title': 'Trash is empty',
-  'web.trash.empty.hint': 'Tasks you delete show up here first',
+  'web.trash.empty.hint': 'Tasks, notes, lists and habits you delete show up here first',
   'web.trash.deletedAt': 'Deleted {date}',
   'web.trash.restore': 'Restore: {title}',
   'web.trash.purge': 'Delete permanently: {title}',
   'web.trash.confirm.title': 'Delete “{title}” permanently?',
   'web.trash.confirm.body': 'Once deleted permanently it leaves the trash and cannot be restored.',
+  // Same sentence as mobile.trash.confirm.notErasure: purging stops offering a restore, it does not erase history.
+  'web.trash.confirm.notErasure': 'This is not a physical erase: the operation log still holds this record — the app simply stops offering a restore.',
+  // Same sentence as mobile.trash.confirm.projectTasks: deleting a list never cascades into its tasks.
+  'web.trash.confirm.projectTasks': 'It still holds {count} task(s) — those will not be deleted.',
+  'web.trash.confirm.habitLogs': 'Its check-in records are kept — restore the habit and the streak continues.',
   'web.trash.confirm.submit': 'Delete permanently',
   'web.trash.confirm.cancel': 'Cancel',
+  // The action layer refuses some operations (e.g. restoring a purged item). Saying nothing is the "button does nothing" bug.
+  'web.trash.error': 'That did not work: {reason}',
   // Empty states: every list needs one, and it must say what to do next -
   // a blank screen makes users think the app is broken.
   'web.shell.empty.all.title': 'Your inbox is empty',
@@ -569,17 +611,54 @@ export const en = {
   // ── Web · sync bar ────────────────────────────────────────
   'web.sync.resolveConflicts': 'Resolve conflicts',
   'web.sync.a11y.syncNow': 'Sync now',
+  // Full label of the sync button at the bottom of the rail: action + current status.
+  'web.sync.rail.aria': 'Sync. Current status: {status}',
   'web.sync.settings.title': 'Sync settings',
-  'web.sync.settings.close': 'Close sync settings',
+  // Cut 3 of ticket H9: this section says what sync actually sends out.
+  // "Close sync settings" went away with that sibling overlay — a settings
+  // section has no "close" action; leaving settings is the exit.
+  'web.settings.sync.note': 'Your data lands on this device first. A sync server only ever receives ciphertext, never your plaintext. Leave the address empty to stay local-only.',
   'web.sync.serverUrl.label': 'Server URL',
   'web.sync.token.label': 'Access token',
   'web.sync.password.label': 'End-to-end encryption passphrase',
   // Three-part split around `<strong>`, same as the landing page's
   // ledeLead/ledeStrong/ledeTail: markup boundaries are never guessed from
   // symbols inside a translated string.
-  'web.sync.password.lead': 'The passphrase is ',
+  'web.sync.password.lead': 'This legacy passphrase is ',
   'web.sync.password.strong': 'never',
-  'web.sync.password.tail': ' saved to disk - it lives only in this session. If it is lost, already-synced data can no longer be decrypted, so keep it safe. Sync is refused without it; the server only accepts end-to-end encrypted payloads.',
+  'web.sync.password.tail': ' saved to disk; it lives only in this session. Data protected by an encrypted data key can be unlocked below with its passphrase or saved recovery code. Unmigrated legacy data still needs its original passphrase. Resetting your sign-in password does not decrypt data.',
+  'web.sync.vault.title': 'Encrypted data key',
+  'web.sync.vault.description': 'This key unlocks your synced data. It is separate from your sign-in password and is never stored in the browser.',
+  'web.sync.vault.accountRequired': 'Sign in first to manage this account’s encrypted data key.',
+  'web.sync.vault.createTitle': 'Create the encrypted data key',
+  'web.sync.vault.passphrase': 'Encryption passphrase',
+  'web.sync.vault.create': 'Create key',
+  'web.sync.vault.recoveryLabel': 'Recovery code',
+  'web.sync.vault.recoveryHint': 'Save this code in a password manager or offline record. It is shown once and cannot be recovered from the server.',
+  'web.sync.vault.recoveryResume': 'This rotation was prepared earlier. Enter the recovery code you saved to resume it.',
+  'web.sync.vault.recoveryConfirm': 'Enter the recovery code to confirm',
+  'web.sync.vault.confirm': 'Confirm and publish',
+  'web.sync.vault.cancel': 'Cancel',
+  'web.sync.vault.unlockTitle': 'Unlock encrypted data',
+  'web.sync.vault.unlock': 'Unlock with passphrase',
+  'web.sync.vault.recoveryCode': 'Recovery code',
+  'web.sync.vault.unlockRecovery': 'Unlock with recovery code',
+  'web.sync.vault.ready': 'Encrypted data is unlocked on this device.',
+  'web.sync.vault.recoveryRotationRequired': 'Recovery unlock succeeded. Set a new passphrase and save the new recovery code before encrypted data can be used.',
+  'web.sync.vault.lock': 'Lock data key',
+  'web.sync.vault.changeTitle': 'New passphrase and recovery code',
+  'web.sync.vault.newPassphrase': 'New encryption passphrase',
+  'web.sync.vault.change': 'Change passphrase',
+  'web.sync.vault.rotateRoot': 'Rotate data key and migrate data',
+  'web.sync.vault.rootRotationHint': 'This creates a new data key and migrates all retained encrypted records before publishing it.',
+  'web.sync.vault.rootRotationProgress': 'Migrating encrypted data: {completed}/{total}',
+  'web.sync.vault.legacyPassphrase': 'Previous encryption passphrase (migration only)',
+  'web.sync.vault.legacyPassphraseHint': 'Leave this empty when all retained records already use a vault key. Enter the old passphrase only if this account still has legacy password-encrypted records.',
+  'web.sync.vault.busy': 'Loading encrypted data key…',
+  'web.sync.vault.error': 'The encrypted data key could not be loaded or used. Your local data is unchanged; check the server and try again.',
+  'web.sync.vault.errorMismatch': 'The recovery code does not match. Enter the displayed code exactly.',
+  'web.sync.vault.errorConflict': 'The key changed on another device. Reload the key and try again.',
+  'web.sync.vault.errorRotation': 'The server requires the full encrypted data migration before this key can be changed.',
   'web.sync.saveAndSync': 'Save and sync',
   // Status wording. It used to come back as Chinese from
   // `features/sync/store.ts`'s `describeStatus`; the sentence now lives in the
@@ -800,6 +879,33 @@ export const en = {
   'web.passkeys.error.lastPasskey': 'This is the account’s only passkey, and removing it would leave no way to sign in at all, so it cannot be removed. Add a new passkey first - or set a sign-in password on the settings page - then delete this one.',
   'web.passkeys.error.unauthorized': 'Your sign-in has expired — sign in again.',
   'web.passkeys.error.network': 'Could not reach the server. Try again later.',
+  // Account closure (batch E3). Mirror of the zh block above.
+  // 🔴 Every failure sentence states BOTH "the account is still there" and
+  // "nothing on this device was touched": the downstream action is irreversible,
+  // so a user who assumes a 5xx already closed the account will take the next
+  // step (sell the device) while it is still unsafe.
+  'common.accountClosure.title': 'Delete account',
+  'common.accountClosure.lead': 'Deleting this account permanently erases all of its data on the server (sync history and device records). It cannot be undone.',
+  'common.accountClosure.exportHint': 'If you want to keep that data, export a backup first. After deletion the server can no longer read it back.',
+  'common.accountClosure.confirmLocal': 'I understand that data on this device which has not been synced yet, including its local plaintext store, will also be erased.',
+  'common.accountClosure.action': 'Delete this account',
+  'common.accountClosure.busy': 'Deleting…',
+  'common.accountClosure.pending': 'This device still has {count} change(s) that have not been synced. Deleting the account erases them too - the server never had them, and they cannot be recovered afterwards.',
+  'common.accountClosure.cancel': 'Not now',
+  'common.accountClosure.confirmTitle': 'Delete this account?',
+  'common.accountClosure.entryHint': 'Delete the cloud account and erase the data on this device',
+  'common.accountClosure.needLogin': 'This device is not signed in, so there is no account to delete.',
+  'common.accountClosure.done.erased': 'The account has been deleted and the copy on this device has been erased. Backups and your other devices are outside the scope of this action.',
+  'common.accountClosure.done.partial': 'The account has been deleted, but only part of the local data on this device was erased - you will need to handle the rest manually.',
+  'common.accountClosure.done.eraseFailed': 'The account has been deleted, but the local data on this device could not be erased - you will need to handle it manually.',
+  'common.accountClosure.failed.unconfigured': 'No server address is configured, so not a single request was sent - the account is intact and nothing on this device changed.',
+  'common.accountClosure.failed.consentRequired': 'You have not agreed to this device\'s privacy rules yet, so not a single request was sent - the account is intact and nothing on this device changed.',
+  'common.accountClosure.failed.unauthorized': 'Your sign-in session is no longer valid, so nothing was deleted - the account is intact and nothing on this device changed. Sign in again and retry.',
+  'common.accountClosure.failed.rateLimited': 'Too many deletion requests, so this one was refused for now. The account is intact and nothing on this device changed - try again later.',
+  'common.accountClosure.failed.serverError': 'The server did not finish the deletion. The account is intact and nothing on this device changed - try again later.',
+  'common.accountClosure.failed.network': 'The server could not be reached, so nothing was deleted. The account is intact and nothing on this device changed.',
+  'common.accountClosure.failed.malformedResponse': 'The server reply was not something we can recognise, so this is not treated as a deletion. The account may still exist - check, then retry. Nothing on this device changed.',
+  'common.accountClosure.failed.other': 'The deletion did not complete. The account is intact and nothing on this device changed.',
 
   // ── Settings "sign-in password" panel: where the two secrets are separated ──
   //
@@ -987,6 +1093,18 @@ export const en = {
   'web.focus.config.locked': 'Durations cannot change while the timer runs — stop this round, edit, then start again.',
   'web.focus.config.a11y.minutes': '{label} duration in minutes',
   'web.focus.config.a11y.sessions': '{label} in sessions',
+  // Ticket W7: the focus details pane (four overview cards + the record list).
+  // ⚠️ Card labels carry **no count** — the number is its own field, so English does not
+  // need a sibling pair like `web.focus.completedTodayOne` for these.
+  'web.focus.detail.title': 'Focus overview',
+  'web.focus.detail.todayCount': 'Sessions today',
+  'web.focus.detail.todayDuration': 'Focus time today',
+  'web.focus.detail.totalCount': 'Total sessions',
+  'web.focus.detail.totalDuration': 'Total focus time',
+  'web.focus.detail.records': 'Focus records',
+  'web.focus.detail.recordsEmpty': 'No focus records yet. Finish a session and it will show up here.',
+  'web.focus.detail.unlinked': 'No linked task',
+  'web.focus.detail.aborted': 'Ended early',
 
   // ── Web · habits ──────────────────────────────────────────
   'web.habits.addPlaceholder': 'New habit, for example "Drink water"',
@@ -1023,8 +1141,25 @@ export const en = {
   'web.habits.freshStartAction': 'Start again today',
   'web.habits.a11y.freshStart': 'Check in "{name}" again today',
   // The third metric: the one that only ever grows (never reset by a break).
-  'web.habits.streak.total': '{count} check-ins',
-  'web.habits.streak.totalOne': '{count} check-in',
+  'web.habits.streak.total': 'Total {count} days',
+  'web.habits.streak.totalOne': 'Total {count} day',
+  // ── W8: habit period stats (this-month chips) ──
+  // Semantics live in `@heyta/domain#computeHabitPeriodStats`; these lines
+  // are its projection only. "check-in" counts DAYS, the rate denominator
+  // counts DUE scheduled days (a zero denominator renders the pending line,
+  // never "0%"). English uses noun-first shapes so each sentence holds for
+  // both 1 and N — no `…One` siblings needed (catalog HAZARD rule).
+  'web.habits.stats.monthDays': 'Check-in days this month: {count}',
+  // The rate cell says "by days" on purpose: a count-type habit can show
+  // "0%" next to "3 cups" on the same screen (target 8, today 3 => today does
+  // not count as achieved). Both numbers are right; the label carries the unit
+  // so the pair does not read as a contradiction (work order §8.121 / #39).
+  'web.habits.stats.monthRate': 'Completion rate this month (by days): {percent}%',
+  'web.habits.stats.monthRatePending': 'Completion rate (by days): no scheduled days yet',
+  'web.habits.stats.monthValue': 'Done this month: {value}',
+  'web.habits.stats.monthValueUnit': 'Done this month: {value} {unit}',
+  'web.habits.stats.totalValue': 'Done in total: {value}',
+  'web.habits.stats.totalValueUnit': 'Done in total: {value} {unit}',
   // Heatmap copy is passed *by us* to react-activity-calendar; its defaults are English-only.
   // `{{count}}` is the library's own placeholder and must survive verbatim.
   // ── M3 knife 7 (habits): copy for the self-drawn heatmap ──
@@ -1054,9 +1189,54 @@ export const en = {
   'web.habits.icon.a11y': 'Choose an icon for "{name}"',
   'web.habits.icon.a11yDefault': '"{name}" uses the derived icon',
 
+  // ── Web · habit frequency (ticket H5) ─────────────────────
+  // 🔴 与中文那一块**逐键对应**（词条表唯一文案事实源，中英必须同步）。
+  // ⚠️ `summary.interval` 的 `{n}` 只会出现 **≥2**：`interval` 且 `everyNDays === 1`
+  //    在写入侧被归一成 `daily`（`normalizeHabitFrequency`），所以这条不需要复数变形。
+  //    本仓库的词条表没有 ICU 复数（见上面 `web.habits.row.aria` 那条注释）。
+  'web.habits.freq.aria': 'Frequency for "{name}"',
+  'web.habits.freq.toggle': 'Frequency',
+  'web.habits.freq.daily': 'Once a day',
+  'web.habits.freq.weekly': 'A few weekdays',
+  'web.habits.freq.interval': 'Every few days',
+  'web.habits.freq.summary.daily': 'Every day',
+  'web.habits.freq.summary.weekly': 'Weekly on {days}',
+  'web.habits.freq.summary.interval': 'Every {n} days',
+  // Singular sibling: the catalog's hazard rule renders every `web.habits.*` placeholder
+  // with 1, and "Every 1 days" is exactly what it is there to catch.
+  'web.habits.freq.summary.intervalOne': 'Every {n} day',
+  'web.habits.freq.nDays': 'Days between each time',
+  'web.habits.freq.invalid': '“Days between each time” must be a whole number of 1 or more',
+  'web.habits.freq.intervalHint': 'Lands every {n} calendar days on a fixed grid — it does not shift to the day this habit was created.',
+  'web.habits.freq.default': 'Back to every day',
+
+  // ── Habit month calendar + backfill (ticket H4) ────────────
+  'web.habits.month.grid': 'Check-in calendar for {name} — {month}',
+  'web.habits.month.window': 'You can backfill up to {n} day(s)',
+  'web.habits.month.logged': '{date}, checked in',
+  'web.habits.month.today': '{date}, today — not checked in yet',
+  'web.habits.month.backfillable': '{date}, can be backfilled',
+  'web.habits.month.notScheduled': '{date}, not a scheduled day',
+  'web.habits.month.future': '{date}, not reached yet',
+  'web.habits.month.tooOld': '{date}, outside the backfill window',
+  'web.habits.month.outOfMonth': '{date}, a neighbouring month’s day (not in this month)',
+
+  // ── Habit year view (ticket H7) ────────────────────────────
+  // 🔴 "not reached" and "nothing to count" are two different sentences: the first has a
+  //    zero denominator because the month is in the future, the second because none of its
+  //    days belong to this habit. Merging them would let the UI call "not done" "not yet".
+  'web.habits.year.grid': 'Year view of {name} — {year}',
+  'web.habits.year.achieved': '{n} day(s) done',
+  'web.habits.year.rate': '{n}% complete',
+  'web.habits.year.none': 'Nothing to count this month yet',
+  'web.habits.year.future': 'Month not reached yet',
+  'web.habits.year.card': '{month}: {state}, {achieved} day(s) done',
+  'web.habits.year.summary': 'This year: {achieved} day(s) done, {state}',
+
   // ── Web · habits list + pane ──────────────────────────────
   'web.habits.list.aria': 'Habits list',
   'web.habits.pane.aria': 'Check-in history for "{name}"',
+  'web.habits.pane.pickOne': 'Select a habit to see its check-ins and stats here.',
   'web.habits.week.aria': 'Last 7 days',
   'web.habits.week.done': '{date} checked in',
   'web.habits.week.missed': '{date} no check-in',
@@ -1213,6 +1393,17 @@ export const en = {
   'web.due.prevMonth': 'Previous month',
   'web.due.nextMonth': 'Next month',
   'web.due.dayLabel': '{month}/{day}',
+  // 🔴 Time and date are two precisions of the **same `dueDate` number**, not a
+  //    second field: empty = local midnight = "day only"; set = that minute.
+  //    "All day" is the same word the timeline band uses — two names for one
+  //    state would read as two different things.
+  // 🔴 The namespace is `common.`, not `web.`: these four say **whether this due
+  //    date carries a time**, one product fact both ends read. A key named after
+  //    "which shell drew it" forces the next shell to copy the value instead.
+  'common.due.timeLabel': 'Time',
+  'common.due.allDay': 'All day',
+  'common.due.timePlaceholder': 'HH:MM',
+  'common.due.timeAria': 'Due time for task "{title}" (empty means all day)',
 
   // ── Web · repeat (B2-3) ───────────────────────────────────
   //    🔴 This family fixes an **inconsistency between the two ends**: mobile has
@@ -1378,9 +1569,19 @@ export const en = {
   // check-ai-coverage); the web shell simply has no production consumer left.
   'web.ai.disclosure.retentionNotApplicable': 'Data does not leave this device, so there is no server-side retention.',
   'web.ai.disclosure.retentionThirdParty': 'Retention is decided by your own endpoint; heyta has no way to know.',
-  // Panel-side fallback for when an endpoint reports no retention policy. The
-  // real disclosure chain in `packages/ai` is handled separately (plan §9).
-  'web.ai.disclosure.retentionUndecided': 'Undecided - this endpoint stays disabled until heyta explains it clearly.',
+  // Managed tier (ADR-0054). 🔴 `{metadataDays}` must come from the disclosure
+  // object (`MANAGED_AI_METADATA_RETENTION_DAYS` in `packages/ai`) — never a
+  // literal here, otherwise changing the constant leaves the UI promising a
+  // retention period that no longer exists.
+  // 🔴 This sentence names BOTH carriers (the counter row *and* the per-call
+  // operational log). Dropping one is not conservatism - it under-states data
+  // that really exists, and nothing but the `check:ai-coverage` arm would notice.
+  // ⚠️ The day count belongs to the counter row only. The log's bound is
+  // *volume*, not time, so it must never be given a number (that would promise
+  // a scheduled deletion that does not exist).
+  // ⚠️ One physical line: `check:ui-language` parses this table line by line, and
+  // a key/value split across two lines is silently dropped as unparsed.
+  'web.ai.disclosure.retentionMetadataOnly': 'Your content is not retained - it exists only in the memory of a single call. heyta keeps two kinds of metadata, neither containing your content: a usage counter row (account, billing period, number of requests, last used), held for {metadataDays} days after the last request and deleted once that billing period has closed; and one operational log line per call (time, feature, outcome, byte counts, duration), which is bounded by log volume rather than by a timer.',
   'web.ai.health.ok': 'OK',
   'web.ai.health.failing': 'Recent failures: {failures}',
   'web.ai.health.circuitOpen': 'Temporarily stopped (recent failures: {failures}; retrying in {retryInSeconds}s)',
@@ -1453,6 +1654,31 @@ export const en = {
   'web.ai.tools.intentCreate': 'Create task "{title}"',
   'web.ai.tools.intentUpdate': 'Update task {id}',
   'web.ai.tools.intentComplete': 'Mark task {id} as done',
+  'web.ai.tools.intentCompleteBatch': 'Mark {count} tasks as done',
+  'web.ai.tools.intentCreateProject': 'Create list "{name}"',
+  'web.ai.tools.intentCreateHabit': 'Create habit "{name}"',
+  'web.ai.tools.intentCreateTag': 'Create tag "{name}"',
+  'web.ai.tools.intentSetTaskTags': 'Replace the tags of task {id} with {count} tags',
+  'web.ai.tools.intentCreateNote': 'Create note: {content}',
+  'web.ai.tools.intentUpdateNote': 'Replace the text of note {id}: {content}',
+  'web.ai.tools.intentRecordCheckin': 'Record a check-in for habit {habitId} on {date}',
+  'web.ai.tools.todayLabel': 'today',
+  'web.ai.tools.intentLogFocus': 'Log a {kind} session: {planned} min planned',
+  'web.ai.tools.intentLogFocusWithActual': 'Log a {kind} session: {planned} min planned, {actual} min actual',
+  'web.ai.tools.focusKindWork': 'work',
+  'web.ai.tools.focusKindShortBreak': 'short break',
+  'web.ai.tools.focusKindLongBreak': 'long break',
+  'web.ai.tools.intentCreateReminderAt': 'Add a reminder for task {id}: {when}',
+  'web.ai.tools.intentCreateReminderBeforeDue': 'Add a reminder for task {id}: {minutes} min before due',
+  'web.ai.tools.intentCreateReminderIncomplete': 'Add a reminder for task {id}, but no time was given — pick a time or a "minutes before due"',
+  // 🔴 W10: every new closed variant of `LocalApiWriteIntent` must grow a sentence here
+  // in the same commit - a proposal card must never render "unknown operation",
+  // that is asking the user to confirm something they were never shown.
+  // What enforces it: two compile-time gates, both harder than a test —
+  // the exhaustive switch in `AiToolRun.tsx:intentText()` (TS2366 when a variant
+  // is missing) and `en: Record<MessageKey, string>` (missing translation = build error).
+  'web.ai.tools.intentCreateEvent': 'Create countdown/anniversary "{title}" ({date})',
+  'web.ai.tools.intentUpdateEvent': 'Update countdown/anniversary {id}',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',
@@ -1560,8 +1786,12 @@ export const en = {
   'web.ai.settings.remote.tail': ', and it is a different channel from task sync. Each feature needs separate consent.',
   'web.ai.settings.endpoints.title': 'Endpoints',
   // The leading `heyta` comes from `common.brand`, so this starts at the verb.
-  'web.ai.settings.managed.offer': 'will soon offer',
-  'web.ai.settings.managed.rest': 'a cloud AI service (still in development, not yet available). Until then you need to connect an endpoint yourself (on-device or remote). The hosted mode is different in kind: with it, your task content reaches the heyta servers ',
+  // 🔴 2026-10-05 (ADR-0054): the *reason* changed, the *conclusion* did not. The server
+  // half is done (metering, domestic allowlist, retention decision, sales ban lifted);
+  // what is missing is a switch in this build of the app. Saying "still in development"
+  // now understates work that shipped.
+  'web.ai.settings.managed.offer': 'is not on offer here yet',
+  'web.ai.settings.managed.rest': 'a cloud AI service (the server half is done - quota metering, the domestic provider allowlist, the retention decision, the sales ban lifted; see ADR-0054 - but this build of the app does not carry the switch yet, so there is nothing to turn on here). Until then you need to connect an endpoint yourself (on-device or remote). The hosted mode is different in kind: with it, your task content reaches the heyta servers ',
   'web.ai.settings.managed.strongPlain': 'in plaintext',
   'web.ai.settings.managed.mid': ', so it is ',
   'web.ai.settings.managed.strongNot': 'not',
@@ -1600,14 +1830,14 @@ export const en = {
   'web.ai.settings.features.hintStrong': 'List order is try order',
   'web.ai.settings.features.hintTail': ' (earlier ones are tried first).',
   'web.ai.settings.features.empty': 'Add an endpoint first',
-  'web.ai.settings.consentLead': '"{feature}" has a remote endpoint, so your consent to send data out is required.',
+  'web.ai.settings.consentLead': '"{feature}" has an endpoint outside this device, so your approval is needed before anything leaves it.',
   'web.ai.settings.grant': 'Allow',
   // Trailing space: the missing-capability list is spliced in right after.
   'web.ai.settings.gapLead': 'Warning: "{feature}" needs ',
   'web.ai.settings.gapMid': ', but ',
   'web.ai.settings.gapTail': 'does not declare it - the feature will never work.',
   'web.ai.settings.gapFix': 'Add it to "{name}"',
-  'web.ai.settings.granted': 'Data egress allowed',
+  'web.ai.settings.granted': 'Allowed to leave this device',
   'web.ai.settings.revoke': 'Revoke',
   // Conversational assistant (ADR-0045): the second authorization front.
   'web.ai.assistant.title': 'Chat assistant',
@@ -1639,6 +1869,8 @@ export const en = {
   'web.ai.chat.noTrace': 'No tools were called',
   'web.ai.chat.stoppedLead': 'Stopped at a limit: ',
   'web.ai.chat.disclaimer': 'AI output can be wrong. Check it before you rely on it.',
+  'web.ai.chat.historyLocalOnly': 'This chat is kept on this device only — never synced, never sent anywhere.',
+  'web.ai.chat.expiredProposal': 'This chat was restored from this device. A change you had not confirmed is no longer actionable — ask again to make it.',
   'web.ai.chat.resultAria': 'Assistant reply',
   'web.ai.assistant.failure.emptyText': 'Nothing to send yet.',
   'web.ai.assistant.failure.textTooLong': 'That is too long - the assistant handles short commands.',
@@ -1744,6 +1976,38 @@ export const en = {
   'web.subscription.notice.localData': 'Everything on this device can still be viewed, edited and exported — no renewal needed.',
   'web.subscription.notice.selfHost': 'Use your own server',
   'web.subscription.notice.a11y': 'Hosted sync status notice',
+  // Hosted sync renewal entry (interim scheme: placing another order stacks 30 days
+  // after the current expiry). Wording must never promise auto-renewal — there is no
+  // signing / recurring charge anywhere in this repo.
+  'web.subscription.renew.title': 'Renew hosted sync',
+  'web.subscription.renew.intro': 'A one-off 30-day purchase, stacked on top of your current expiry date. No automatic charges, and your data stays untouched when a period ends.',
+  'web.subscription.renew.couponPlaceholder': 'Promo code (optional)',
+  'web.subscription.renew.action': 'Place renewal order',
+  'web.subscription.renew.busy': 'Creating the order…',
+  'web.subscription.renew.amount': 'Amount due {amount}',
+  'web.subscription.renew.validUntil': 'This order is valid until {time}',
+  'web.subscription.renew.payLinkLabel': 'Payment link',
+  'web.subscription.renew.payHint': 'Open this link in WeChat on your phone to pay. Desktop QR rendering is not wired up yet (no new dependencies), so the link is the route for now.',
+  'web.subscription.renew.copy': 'Copy link',
+  'web.subscription.renew.copied': 'Copied',
+  'web.subscription.renew.rejected': 'That code was not applied: {code}',
+  'web.subscription.renew.fail.provider': 'This instance has no payment channel configured, so nothing can be bought yet.',
+  'web.subscription.renew.fail.unauthorized': 'Sign in to your heyta account before placing an order.',
+  'web.subscription.renew.fail.unconfigured': 'No sync server address yet — set one up in the sync settings first.',
+  'web.subscription.renew.fail.sellable': 'This plan cannot be sold right now; the server refused the order.',
+  'web.subscription.renew.fail.network': 'Could not reach the server; the order was not created.',
+  'web.subscription.renew.fail.unknown': 'Order failed ({code}).',
+  'mobile.entitlement.renew.action': 'Place renewal order',
+  'mobile.entitlement.renew.busy': 'Creating the order…',
+  'mobile.entitlement.renew.opened': 'Payment page opened',
+  'mobile.entitlement.renew.payHint': 'If WeChat did not open automatically, copy this link and open it in your phone browser.',
+  'mobile.entitlement.renew.payLinkLabel': 'Payment link',
+  'mobile.entitlement.renew.copy': 'Copy',
+  'mobile.entitlement.renew.copied': 'Copied',
+  'mobile.entitlement.renew.fail.provider': 'This instance has no payment channel configured, so nothing can be bought yet.',
+  'mobile.entitlement.renew.fail.unauthorized': 'Sign in to your heyta account before placing an order.',
+  'mobile.entitlement.renew.fail.network': 'Could not reach the server; the order was not created.',
+  'mobile.entitlement.renew.fail.unknown': 'Order failed ({code}).',
   // AI panel failure states - see the zh file for why these moved out of app-host.
   'web.ai.failure.breakdown.emptyTitle': 'This task has no title, so there is nothing to break down.',
   'web.ai.failure.breakdown.unparseable': 'The model did not return a recognisable list of steps. Try again, or write them yourself.',
@@ -1929,7 +2193,7 @@ export const en = {
   //    heyta's own export into an empty store; this one migrates from another
   //    product through ordinary ops and can coexist with existing data.
   'web.ticktick.title': 'Import from TickTick',
-  'web.ticktick.intro': 'Pick a CSV backup exported by TickTick. **You see a preview first; nothing is written until you confirm** — the numbers in the preview and what actually gets written come from the same parse.',
+  'web.ticktick.intro': 'Pick a CSV backup exported by TickTick. You see a preview first; nothing is written until you confirm — the numbers in the preview and what actually gets written come from the same parse.',
   'web.ticktick.fileLabel': 'TickTick CSV backup',
   'web.ticktick.picked': 'Selected: {name}',
   'web.ticktick.ticktickOnly': 'Only CSV files exported by TickTick are recognised. Todoist parsing does not exist yet, so this page does not claim to support it.',
@@ -1990,6 +2254,9 @@ export const en = {
   'common.weekday.fri': 'Fri',
   'common.weekday.sat': 'Sat',
   'common.weekday.sun': 'Sun',
+  // R13: the year-view heading. English reads a bare number as a year,
+  // so this is just the placeholder — Chinese needs the 「年」 character.
+  'common.date.yearTitle': '{year}',
   'common.date.monthTitle': '{month}/{year}',
   'common.date.dayTitle': '{weekday}, {month}/{day}',
   'common.date.weekRangeTitle': '{startMonth}/{startDay} – {endMonth}/{endDay}, {year}',
@@ -2004,6 +2271,18 @@ export const en = {
   'web.reminder.notify.denied': 'Notifications are blocked by the browser. To re-enable, change it in the site settings.',
   'web.reminder.notify.limit': 'Notifications only fire while heyta is open. They do not fire when the app is closed - background wake-up needs a separate protocol we do not have yet.',
   'web.reminder.notify.body': 'Due: {title}',
+  // ── Long reminder leads (W9 ①, 2026-10-03) ──
+  // 🔴 These four must stay 1:1 with `REMINDER_LONG_OFFSET_PRESETS_MS`; the mapping
+  //    lives in apps/web/src/features/reminders/reminder-tiers.ts
+  //    (its `default` branch throws on purpose).
+  // The 2d / 3d / 1w / 30d in the key names are part of the contract: the label says
+  // "3 days before", so the host must schedule 3 *calendar* days before the due time
+  // (not 72 hours - that drifts an hour across DST, see W9 ③).
+  'web.reminder.offset.groupLabel': 'Earlier (by day)',
+  'web.reminder.offset.2d': '2 days before',
+  'web.reminder.offset.3d': '3 days before',
+  'web.reminder.offset.1w': '1 week before',
+  'web.reminder.offset.30d': '30 days before',
   'web.search.title': 'Search',
   'web.search.placeholder': 'Search task titles, notes and note bodies',
   'web.search.tasksSection': 'Tasks',
@@ -2021,11 +2300,6 @@ export const en = {
   'web.calendar.title': 'Calendar',
   'web.calendar.prevMonth': 'Previous month',
   'web.calendar.nextMonth': 'Next month',
-  'web.calendar.prevWeek': 'Previous week',
-  'web.calendar.nextWeek': 'Next week',
-  'web.calendar.view.aria': 'View',
-  'web.calendar.view.month': 'Month',
-  'web.calendar.view.week': 'Week',
   'web.calendar.weekShort': 'W{n}',
   'web.calendar.backToToday': 'Back to today',
   'web.calendar.monthTitle': '{month}/{year}',
@@ -2345,6 +2619,45 @@ export const en = {
   'mobile.lists.add': 'New list',
   'mobile.lists.removeHint': 'Deleting a list does not delete its tasks — they go back to the Inbox.',
   'mobile.lists.remove': 'Delete list "{name}"',
+  // Inline rename / archive (multi-end batch 2, 2026-10-03).
+  // Consumed by the shared `OrganizerList` via `labels.rename` / `labels.archive`;
+  // one sentence, one entry — no per-端 copies.
+  'common.organizer.rename.button': 'Rename "{name}"',
+  'common.organizer.rename.save': 'Save name',
+  'common.organizer.rename.cancel': 'Cancel renaming',
+  // "Archive" and "Unarchive" must be two different strings: one label covering
+  // both states leaves the user guessing what the second press does.
+  'common.organizer.archive.button': 'Archive "{name}"',
+  'common.organizer.archive.unarchive': 'Unarchive "{name}"',
+  'common.organizer.folder.button': 'Move "{name}" into a folder',
+  'common.organizer.folder.title': 'Move into folder',
+  'common.organizer.folder.none': 'No folder (top level)',
+  'common.organizer.folder.current': '(current location)',
+  'common.organizer.folder.reject.projectNotFound': 'That list is gone (it may have been deleted, or sync has not arrived yet)',
+  'common.organizer.folder.reject.parentNotFound': 'That folder does not exist',
+  'common.organizer.folder.reject.self': 'A list cannot go inside itself',
+  'common.organizer.folder.reject.cycle': 'That would create a loop: a list cannot go inside one of its own sublists',
+  'common.organizer.folder.reject.parentNotTopLevel': 'A folder holds lists — it cannot hold another folder',
+  'common.organizer.folder.reject.hasChildren': 'This list contains other lists, so it cannot go inside a folder',
+  'common.organizer.folder.reject.unknown': 'Could not move it — please try again later',
+  'common.organizer.showArchived': 'Show archived',
+  'common.organizer.hideArchived': 'Hide archived',
+  // Delete confirmation (trash & archive W4b, 2026-10-03) — consumed by the
+  // shared `OrganizerList` via `labels.confirmRemove`; one sentence, one entry.
+  // impactTags is the whole reason this step exists: "on 8 tasks" reads as
+  // "deleting it touches those 8" (so people never delete), while "you can always
+  // recreate it" is also false — a new tag has a NEW id, those tasks do not re-attach.
+  'common.organizer.confirm.ask': 'Delete "{name}"?',
+  'common.organizer.confirm.impactTags': 'It is on {count} task(s). Those tasks will not be deleted — they just lose this tag.',
+  'common.organizer.confirm.delete': 'Confirm deletion',
+  'common.organizer.confirm.cancel': 'Cancel deletion',
+  'common.habits.rename.button': 'Rename habit "{name}"',
+  'common.habits.rename.label': 'Habit name',
+  'common.habits.delete.button': 'Delete habit "{name}"',
+  // 工单 W6：与 zh 同三条（键集对等由类型系统钉住，少一条就编译不过）。
+  'common.habits.amount.today': 'Today {value}/{target} {unit}',
+  'common.habits.amount.plus': 'Increase {name} by 1',
+  'common.habits.amount.minus': 'Decrease {name} by 1',
   'mobile.profile.section.tags': 'Tags',
   'common.organizer.tags.empty': 'No tags yet',
   'common.organizer.tags.empty.hint': 'Tags group tasks across lists — for example "Urgent" or "Waiting".',
@@ -2424,6 +2737,8 @@ export const en = {
   'mobile.profile.entry.settings.hint': 'Sync credentials, widgets and language',
   'mobile.profile.section.sync': 'Sync',
   'mobile.profile.section.status': 'Status',
+  // Mirrors the zh side: shown only when the server **explicitly** says entitled / denied.
+  'mobile.profile.entitlement.entitled': 'Hosted sync is on',
   'mobile.profile.section.language': 'Language',
   'mobile.profile.section.lists': 'Lists',
   // The auth entry sits in the top card of this screen so it is one tap away;
@@ -2433,6 +2748,8 @@ export const en = {
   'mobile.profile.account.signInHint': 'Sign in with an email link or a passkey; sync is wired up for you so you never copy a token by hand.',
   'mobile.profile.account.signedInLabel': 'Current account',
   'mobile.profile.account.signedInHint': 'An access token is already in place. Sign in again to switch accounts or add another credential.',
+  'mobile.profile.nickname.hint': 'Tap this row to change your nickname.',
+  'mobile.profile.avatar.noChannel': 'This device cannot read images from local storage yet. Change your avatar on the web app for now; the same image will show up here.',
   'mobile.profile.account.offline': 'Not signed in',
   // The form moved into the Settings sheet: pointing "below" would send the user
   // hunting through Profile for something that is no longer there.
@@ -2461,6 +2778,69 @@ export const en = {
   'mobile.profile.lastSync.label': 'Last successful sync',
   'mobile.profile.lastSync.never': 'Never',
   'mobile.profile.clearCredentials': 'Clear credentials saved on this device',
+  'mobile.vault.title': 'Encrypted data key',
+  'mobile.vault.description': 'This key unlocks synced data. It is separate from your sign-in password. The passphrase and recovery code stay on this device.',
+  'web.sync.devices.title': 'Connected devices',
+  'web.sync.devices.description': 'Revoking a device signs every device out, including this one. An offline device is not remotely erased; after signing in again, use a trusted device to rotate the data key and migrate retained ciphertext.',
+  'web.sync.devices.loading': 'Loading devices…',
+  'web.sync.devices.empty': 'No devices are available to manage yet.',
+  'web.sync.devices.lastSeen': 'Last activity: {date}',
+  'web.sync.devices.revoke': 'Revoke device',
+  'web.sync.devices.revoking': 'Revoking…',
+  'web.sync.devices.confirm': 'Revoking signs every device out. Local data on an offline device is not remotely erased. Continue?',
+  'web.sync.devices.revoked': 'Device revoked. Every device must sign in again. After signing in on a trusted device, rotate the data key and migrate retained ciphertext.',
+  'web.sync.devices.revocationUncertain': 'The revoke response was lost. This browser was signed out locally; sign in again and verify the device list before rotating the data key.',
+  'web.sync.devices.unauthorized': 'The session has expired. Sign in again to manage devices.',
+  'web.sync.devices.sessionChanged': 'The account or server changed while you were confirming. No device was revoked.',
+  'web.sync.devices.error': 'The device request failed. Check the network and try again.',
+  'mobile.vault.devicesTitle': 'Connected devices',
+  'mobile.vault.devicesDescription': 'Revoking a device signs every device out, including this one. An offline device is not remotely erased; after signing in again, use a trusted device to rotate the data key and migrate retained ciphertext.',
+  'mobile.vault.devicesLoading': 'Loading devices…',
+  'mobile.vault.devicesEmpty': 'No devices are available to manage yet.',
+  'mobile.vault.devicesLastSeen': 'Last activity: {date}',
+  'mobile.vault.devicesRevoke': 'Revoke device',
+  'mobile.vault.devicesRevoking': 'Revoking…',
+  'mobile.vault.devicesConfirmTitle': 'Revoke device',
+  'mobile.vault.devicesConfirm': 'Revoking signs every device out. Local data on an offline device is not remotely erased. Continue?',
+  'mobile.vault.devicesRevoked': 'Device revoked. Every device must sign in again. After signing in on a trusted device, rotate the data key and migrate retained ciphertext.',
+  'mobile.vault.devicesRevocationUncertain': 'The revoke response was lost. This device was signed out locally; sign in again and verify the device list before rotating the data key.',
+  'mobile.vault.devicesUnauthorized': 'The session has expired. Sign in again to manage devices.',
+  'mobile.vault.devicesSessionChanged': 'The account or server changed while you were confirming. No device was revoked.',
+  'mobile.vault.devicesCleanupFailed': 'The session was signed out, but secure local cleanup needs a retry before this device is trusted again.',
+  'mobile.vault.devicesError': 'The device request failed. Check the network and try again.',
+  'mobile.vault.accountRequired': 'Sign in first to manage this account’s encrypted data key.',
+  'mobile.vault.createTitle': 'Create the encrypted data key',
+  'mobile.vault.passphrase': 'Encryption passphrase',
+  'mobile.vault.create': 'Create key',
+  'mobile.vault.recoveryLabel': 'Recovery code',
+  'mobile.vault.recoveryHint': 'Save this code in a password manager or offline record. It is shown once and cannot be recovered from the server.',
+  'mobile.vault.recoveryResume': 'This rotation was prepared earlier. Enter the recovery code you saved to resume it.',
+  'mobile.vault.recoveryConfirm': 'Enter the recovery code to confirm',
+  'mobile.vault.confirm': 'Confirm and publish',
+  'mobile.vault.cancel': 'Cancel',
+  'mobile.vault.unlockTitle': 'Unlock encrypted data',
+  'mobile.vault.unlock': 'Unlock with passphrase',
+  'mobile.vault.recoveryCode': 'Recovery code',
+  'mobile.vault.unlockRecovery': 'Unlock with recovery code',
+  'mobile.vault.ready': 'Encrypted data is unlocked on this device.',
+  'mobile.vault.recoveryRotationRequired': 'Recovery unlock succeeded. Set a new passphrase and save the new recovery code before encrypted data can be used.',
+  'mobile.vault.legacyMigrationRequired': 'Legacy encrypted data has not been migrated. Use the old encryption passphrase to complete data-key rotation before syncing or writing encrypted data.',
+  'mobile.vault.lock': 'Lock data key',
+  'mobile.vault.remember': 'Remember unlock on this device',
+  'mobile.vault.changeTitle': 'New passphrase and recovery code',
+  'mobile.vault.newPassphrase': 'New encryption passphrase',
+  'mobile.vault.change': 'Change passphrase',
+  'mobile.vault.rotateRoot': 'Rotate data key and migrate data',
+  'mobile.vault.rootRotationHint': 'A new data key will be published only after every retained encrypted record has been migrated.',
+  'mobile.vault.rootRotationProgress': 'Migrating encrypted data: {completed}/{total}',
+  'mobile.vault.busy': 'Loading encrypted data key…',
+  'mobile.vault.error': 'The encrypted data key could not be loaded or used. Your local data is unchanged; check the server and try again.',
+  'mobile.vault.errorMismatch': 'The recovery code does not match. Enter it exactly.',
+  'mobile.vault.errorRememberedKey': 'The remembered key does not match this account. Unlock with your passphrase or recovery code.',
+  'mobile.vault.errorConflict': 'The key changed on another device. Reload the key and try again.',
+  'mobile.vault.errorRotation': 'The server requires the full encrypted data migration before this key can be changed.',
+  'mobile.vault.logoutCleanupFailed': 'The encrypted key could not be removed from this device. Credentials are cleared; retry removal before using this account again.',
+  'mobile.vault.retryCleanup': 'Retry encrypted key cleanup',
   'mobile.profile.footnote': 'Credentials are kept in memory only and must be re-entered after the app fully exits.',
   'mobile.profile.conflict.body': 'Both sides changed these places, and heyta will not choose for you - picking one automatically would silently drop the other side. Nothing is lost, but nothing uploads until you choose.',
   'mobile.profile.conflict.open': 'Review one by one',
@@ -2612,7 +2992,7 @@ export const en = {
   // `purgedAt` marker — the op-log payload survives locally and on the server.
   'mobile.trash.title': 'Trash',
   'mobile.trash.entry': 'Trash',
-  'mobile.trash.entry.hint': 'Restore tasks you deleted',
+  'mobile.trash.entry.hint': 'Restore the tasks, notes, lists and habits you deleted',
   // ── Notification center / activity (batch 2, multi-end coverage audit P0-2) ──
   'mobile.inbox.title': 'Notifications',
   'mobile.inbox.back': 'Back',
@@ -2689,9 +3069,9 @@ export const en = {
   'mobile.security.passkeys.delete': 'Delete',
   'mobile.security.passkeys.deleteConfirm': 'Tap again to confirm',
   'mobile.security.passkeys.deleteTitle': 'Delete this passkey?',
-  'mobile.trash.intro': 'Deleted tasks land here. Restore one and it goes back where it was.',
+  'mobile.trash.intro': 'Deleted tasks, notes, lists and habits land here. Restore one and it goes back where it was.',
   'mobile.trash.empty.title': 'Trash is empty',
-  'mobile.trash.empty.hint': 'Tasks you delete show up here first',
+  'mobile.trash.empty.hint': 'Tasks, notes, lists and habits you delete show up here first',
   'mobile.trash.deletedAt': 'Deleted {date}',
   'mobile.trash.restore': 'Restore',
   'mobile.trash.restoreA11y': 'Restore: {title}',
@@ -2700,6 +3080,8 @@ export const en = {
   'mobile.trash.confirm.title': 'Delete “{title}” permanently?',
   'mobile.trash.confirm.body': 'It leaves the trash and cannot be restored.',
   'mobile.trash.confirm.notErasure': 'This is not a physical erase: the operation log still holds this record — the app simply stops offering a restore.',
+  'mobile.trash.confirm.projectTasks': 'It still holds {count} task(s) — those will not be deleted.',
+  'mobile.trash.confirm.habitLogs': 'Its check-in records are kept — restore the habit and the streak continues.',
   'mobile.trash.confirm.submit': 'Delete permanently',
   'mobile.trash.confirm.cancel': 'Cancel',
 
@@ -2799,7 +3181,7 @@ export const en = {
   'site.features.item.task.fields': 'Title, note (Markdown), priority, due date, list, tags',
   'site.features.item.task.repeat': 'Recurring tasks: daily / weekly / weekdays / monthly — four presets, one tap',
   'site.features.item.task.projects': 'Lists support one level of folders; lists and tags each have their own panel',
-  'site.features.item.task.trash': 'Trash: deleted items are kept first — restore them anytime, or clear them for good',
+  'site.features.item.task.trash': 'Trash: deleted items are kept first — restore them anytime, or delete any one of them for good',
   'site.features.item.task.export': 'One-click export: a complete JSON backup (deleted records included, counts you can verify) plus readable Markdown',
   'site.features.item.view.quadrant': 'Four quadrants: sorted automatically by importance and due date — drag to adjust',
   'site.features.item.view.timeline': 'Timeline: laid out by estimated duration, for personal project planning',
@@ -2894,7 +3276,7 @@ export const en = {
   'site.integrations.e2ee.title': 'End-to-end encrypted sync',
   'site.integrations.e2ee.body': 'Tasks are encrypted on your device before they ever upload; the server only ever handles ciphertext. There is **no readable copy** of your tasks on the server — anyone who takes it holds nothing but noise.',
   'site.integrations.e2ee.item.ingress': 'The server accepts ciphertext only — plaintext is refused outright. Not a setting, a hard rule',
-  'site.integrations.e2ee.item.keys': 'Keys stay with you. Forget the passphrase and even we cannot help — that is what real encryption means',
+  'site.integrations.e2ee.item.keys': 'Decryption keys stay on your devices. After setting up a data key, you can unlock with its saved recovery code; if both passphrase and recovery code are lost, the server cannot decrypt for you',
   'site.integrations.selfhost.title': 'Self-host it, free forever',
   'site.integrations.selfhost.body': 'The sync server runs entirely on your own machine: one docker compose file brings up the whole stack, and data lands on your own disk. No fees, and no permission needed from us.',
   'site.integrations.selfhost.item.compose': 'One command brings up the whole stack; data lands on your own disk',
@@ -2945,7 +3327,7 @@ export const en = {
   'site.help.q.sync': 'I have a new device — how does my data get there?',
   'site.help.a.sync': 'Enter the sync server address and an access token in settings. Data is uploaded encrypted, so **the passphrase must match** — data encrypted under a different passphrase cannot be decrypted. That is the cost of end-to-end encryption, not a bug.',
   'site.help.q.passphrase': 'I forgot my encryption passphrase. What now?',
-  'site.help.a.passphrase': '**There is no recovery, and that is by design, not an oversight.** End-to-end encryption means the server holds only ciphertext and has no passphrase that unlocks it — any "recovery" would mean the server could read your data. What you can do: export your data from an old device that can still unlock, then start fresh with a new passphrase on the new one. So keep the passphrase safe.',
+  'site.help.a.passphrase': 'If you have set up an encrypted data key and saved its recovery code, **unlock with that code** in sync settings, then set a new passphrase and save the new recovery code. Resetting your sign-in password does not unlock data. If both the passphrase and recovery code are lost, the server cannot recover them; export from an old device that can still read your data. Unmigrated legacy ciphertext still needs its original passphrase.',
   'site.help.q.passkey': 'How do passkeys work?',
   'site.help.a.passkey': 'Choose "passkey" when signing in and confirm with your device\'s face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the app\'s sign-in panel offers "Lost your passkey?", which emails a recovery link where you register a new one. ⚠️ **The last remaining credential cannot be deleted** — delete it and you are locked out.',
   'site.help.q.quadrant': 'How are the four quadrants classified?',
@@ -2959,7 +3341,7 @@ export const en = {
   'site.help.q.selfhost': 'How do I run my own server?',
   'site.help.a.selfhost': 'You can, but this is "operate a service yourself": **no prebuilt image is published** (you build it), and **upgrading is not one command** — the one-shot migration service exits after it runs and compose does not restart an exited service, so after a table-structure change you re-run the command that names `supersync-migrate`. Registration and sign-in run on **email + password**; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with `REQUIRE_EMAIL_VERIFICATION=false`. See "Running your own sync server".',
   'site.help.q.privacy': 'Where does my data actually live?',
-  'site.help.a.privacy': 'On your own device first; once sync is on, the cloud holds ciphertext only — the server rejects plaintext outright. **Metadata is not encrypted**, though — sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise "we can see nothing".',
+  'site.help.a.privacy': 'On your own device first. **This answer is about the sync channel** - once sync is on, that channel holds ciphertext only in the cloud, and a sync endpoint that receives plaintext rejects it outright. ⚠️ AI is a different path and is not covered by that sentence: a language model has to read your text in order to suggest anything, so the field-by-field, feature-by-feature disclosure lives in the "AI & Data Flow" document, linked in the footer. One more thing: sync **metadata is not encrypted** - sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise "we can see nothing".',
 
   // ── Documentation centre (the article layer under /help) ────
   // Group headings deliberately reuse the five `site.help.module.*` keys above:
@@ -3018,18 +3400,18 @@ export const en = {
   'site.docs.how.s2i2': 'Mobile: a write goes out about two seconds later; returning to the foreground adds another pass; failures back off instead of hammering the server.',
   'site.docs.how.s2i3': 'Every end: **what other devices wrote arrives on its own**. The server pushes a signal when there is something new, and the side that receives it pulls.',
   'site.docs.how.s3': 'What the server actually cannot see',
-  'site.docs.how.s3p1': 'Uploaded payloads are **encrypted end to end**: encryption and decryption both happen on your devices, and the server receives — and can only ever receive — ciphertext. A client that tries to upload plaintext is rejected outright and nothing is written.',
+  'site.docs.how.s3p1': '**This section is about the sync channel**: payloads uploaded over it are encrypted end to end — encryption and decryption both happen on your devices, and the sync server receives (and can only ever receive) ciphertext. A client that tries to upload plaintext over it is rejected outright and nothing is written. 🔴 That sentence does **not** cover the AI path: a model has to read plaintext to be useful, so what goes there is the original text you authorised feature by feature — the field-by-field table is in the "AI & Data Flow" document, linked in the footer.',
   'site.docs.how.s3p2': 'But the **surrounding metadata is not encrypted**: sync times, which devices you use, which kinds of things were touched and in what order are all visible to it. What is protected is the content itself — task titles, notes — not "which heyta features you use". We do not advertise "we can see nothing".',
 
   // Accounts, tokens, and how you sign in
   'site.docs.account.title': 'Accounts, tokens, and how you sign in',
   'site.docs.account.seo.title': 'Accounts, tokens, and how you sign in — heyta',
   'site.docs.account.sum': 'Registration and sign-in run on email plus password, and the passkey and the emailed link both stayed — so where does the access token that syncing needs come from?',
-  'site.docs.account.s1': 'Three boxes, that is all',
-  'site.docs.account.s1p1': 'The sync settings have exactly three fields: server address, access token, end-to-end encryption passphrase.',
+  'site.docs.account.s1': 'Sync settings and data unlock',
+  'site.docs.account.s1p1': 'Sync settings contain the server connection and separate encrypted data key controls. After signing in, you can create a key, save its recovery code, or unlock existing data.',
   'site.docs.account.s1i1': 'Server address: the sync server you want to connect to. Leave everything empty and you are using heyta purely locally — the data stays on this device.',
   'site.docs.account.s1i2': 'Access token: issued by the server, it stands for "this account\'s space on that server". If you already have one, paste it straight in.',
-  'site.docs.account.s1i3': 'Encryption passphrase: **never stored on disk**, it exists only in this session\'s memory. It gets its own article — see "The encryption passphrase".',
+  'site.docs.account.s1i3': 'Encryption passphrase: never sent to the server, and separate from your sign-in password. See “The encryption passphrase” for recovery codes and remembering unlock on a device.',
   'site.docs.account.s2': 'Three ways in, with email plus password as the main one',
   'site.docs.account.s2p1': 'Registration and sign-in run on **email plus password**; the emailed link and the passkey both stayed. What the server holds for your password is not something it can read back or hand to anyone — if you forget it, "Forgot your password" mails a one-time reset link, which is a real reset rather than a way around the password.',
   'site.docs.account.s2i1': 'Email plus password: give your address, set a password (at least 8 characters), click the link in the verification mail to activate, then sign in with that password.',
@@ -3045,18 +3427,18 @@ export const en = {
   // The encryption passphrase
   'site.docs.passphrase.title': 'The encryption passphrase',
   'site.docs.passphrase.seo.title': 'The encryption passphrase — heyta',
-  'site.docs.passphrase.sum': 'It is the only key in the whole design, and losing it genuinely cannot be undone — that is the definition of end-to-end encryption, not something we failed to build.',
+  'site.docs.passphrase.sum': 'The encryption passphrase is separate from your sign-in password. After setting up a data key, keep its recovery code so you can unlock if you forget the passphrase.',
   'site.docs.passphrase.s1': 'What the passphrase is',
-  'site.docs.passphrase.s1p1': 'The passphrase encrypts your data on your device before it is uploaded. It is **never sent to the server**, and the server holds no copy of it.',
-  'site.docs.passphrase.s1p2': 'It is never written to disk either: it lives only in the current session\'s memory, so every new session asks for it again. That is not friction — not persisting it is what makes the encryption end-to-end.',
-  'site.docs.passphrase.s2': 'Why there is no "forgot password"',
-  'site.docs.passphrase.s2p1': 'Any mechanism that could "recover" the passphrase means somewhere there is a credential able to decrypt everything you have, and that credential would live on the server or with a third party — which is the end of end-to-end encryption. So there is no support channel and no back-end switch. **Lose the passphrase and the synced data cannot be decrypted.**',
-  'site.docs.passphrase.s2i1': 'On an old device that can still unlock: export your data first.',
-  'site.docs.passphrase.s2i2': 'Then set a new passphrase on the new device and start writing again.',
-  'site.docs.passphrase.s2i3': 'Keep the passphrase in your own password manager — that is where it belongs.',
+  'site.docs.passphrase.s1p1': 'The passphrase unlocks your data key on your device, and data is encrypted before upload. The passphrase, recovery code and unlocked key are **never sent to the server**; it stores only encrypted key packages and data.',
+  'site.docs.passphrase.s1p2': 'Reopening the browser requires another unlock. On mobile, you can opt in to remembering unlock, which stores the data key in OS secure storage; this is off by default and does not save the passphrase. Locking the data key stops use of the sync key; it does not encrypt or hide existing local data.',
+  'site.docs.passphrase.s2': 'Recovering when you forget the passphrase',
+  'site.docs.passphrase.s2p1': 'Setting up a data key displays a recovery code once and asks you to enter it again to confirm. If you saved it, choose “Unlock with recovery code” in sync settings. After recovery, you must set a new passphrase and save a new recovery code before using encrypted data. Neither the server nor support can retrieve either secret, and resetting your sign-in password cannot replace this step.',
+  'site.docs.passphrase.s2i1': 'Keep the recovery code in your own password manager or an offline record, not only on the device you might lose.',
+  'site.docs.passphrase.s2i2': 'If both the passphrase and recovery code are lost, first export from an old device that can still read the data; the server has no decryption copy.',
+  'site.docs.passphrase.s2i3': 'Creating a recovery code does not automatically migrate legacy ciphertext. Existing legacy data must be migrated using its original encryption passphrase before the new data key protects it.',
   'site.docs.passphrase.s3': 'What happens if it is wrong',
-  'site.docs.passphrase.s3p1': 'Records written under a different passphrase cannot be decrypted. heyta neither falls over nor substitutes plaintext: it **skips** what it cannot open, or **pauses syncing** when this is plainly a misconfiguration, and tells you which of the two it is.',
-  'site.docs.passphrase.s3w1': 'A "the passphrase may be wrong" message is the second case — it is not a network problem, and reconnecting will not fix it.',
+  'site.docs.passphrase.s3p1': 'An incorrect passphrase or recovery code fails to unlock and does not overwrite data. Changing the passphrase updates protection of the key; rotating the data key and migrating data re-encrypts synced history and requires migration to finish and a new recovery code to be confirmed. If migration is interrupted, resume or cancel through the interface rather than creating another key to replace it.',
+  'site.docs.passphrase.s3w1': 'If the passphrase is reported as incorrect, check the current account, server and encryption passphrase. Reconnecting the network cannot fix an unlock failure.',
 
   // Conflicts
   'site.docs.conflict.title': 'When two devices change the same thing',
@@ -3096,13 +3478,15 @@ export const en = {
   'site.docs.selfhost.s5p2': 'For a backup a human can read, use the client export (see "Taking your data with you"). It unpacks the materialized state on that one device, so what comes out matches what you could see.',
   'site.docs.selfhost.s5w1': 'Do not mistake "the database yields no plaintext" for "this backup is useless": it is the complete source for putting the service back together. Being readable by a person was never its job.',
   'site.docs.selfhost.s6': 'If the interface says offline, check this first',
-  'site.docs.selfhost.s6p1': 'The usual answer is not "the service is down" but "the request never left the browser". The server lets through only the front-end origins listed in its configuration; if the origin of your page is not on that list, the browser blocks the request locally — the interface reads "offline" and the service log contains nothing at all.',
+  'site.docs.selfhost.s6p1': 'First work out which setup you are in. **By default you do not host a front end separately**: the client is served by the same container, on the same origin, so a same-origin request is never blocked locally by CORS and whether `CORS_ORIGINS` lists your address simply does not participate — for what to check in that case, see "In the same-origin form, check these three" below. The rest of this section is about the form where **you host the front end yourself on another origin**: the usual answer is not "the service is down" but "the request never left the browser". The server lets through only the front-end origins listed in its configuration; if the origin of your page is not on that list, the browser blocks the request locally — the interface reads "offline" and the service log contains nothing at all.',
   'site.docs.selfhost.s6p2': 'So debug in reverse: look at the browser console for a cross-origin error before you look at the server. A quiet log does not mean a healthy service — it can mean nobody asked it anything.',
+  'site.docs.selfhost.s6p3': '**In the same-origin form, check these three.** First open **`https://your-domain/health`** in the browser itself: if it does not load, the certificate or the DNS record is missing — and this is the one case where **every container can read `healthy` while the site is broken**, because the gateway does not exit when it cannot obtain a certificate, its own health check keeps passing, and it retries quietly for up to thirty days. Second, look in the server log for the `[web-app]` startup line that reports the shared UI being mounted (it names the prefix and where the artifacts came from); without it this instance serves the API only (no artifact directory in the image, which is a legitimate deployment, not an error). Third, check whether one mount knob was moved alone: changing `WEB_APP_PATH` (the URL prefix) without `WEB_APP_DIR` (the artifact path inside the image), or a prefix that does not match the base the UI was built with, shows up as a **blank page** while the API keeps working — and nothing checks that pair at runtime.',
   'site.docs.selfhost.s6i1': 'Which origins get through is the server setting `CORS_ORIGINS`, a comma-separated list; in production a wildcard there makes the service refuse to start.',
   'site.docs.selfhost.s7': 'How to install: no ready-made images, two routes to pick from',
   'site.docs.selfhost.s7p1': 'No heyta images are published today, so there is no version number to pin here. Do **not** point `SUPERSYNC_IMAGE` at upstream `master-<commit>` tags: those images belong to a different project, whose table layout and encryption requirements have already diverged from heyta. Doing so leaves you with a server that **starts fine and passes its health check while running an unfamiliar schema**. To pin a version, build from this repository and pass that source revision into the build as its version label.',
   'site.docs.selfhost.s7p2': 'Both entries are supported, and the difference shows up when you upgrade. `./scripts/deploy.sh --build` brings up the whole stack (app, PostgreSQL database, Caddy gateway), applies the database migration **while the old containers are still serving**, **refuses to swap in** the new container if that fails, and checks the health endpoint afterwards. The other one is a single command that brings the whole stack up: `docker compose -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml up -d --build`. Neither the build override nor the one-shot migration override can be left out, and neither can `--build` — without `docker-compose.build.yml` compose goes after an image that does not exist, while without `--build` nothing gets built, and both shortcuts end at the same failure to start. And it migrates **only on the first boot**: to upgrade, either use the deploy script or explicitly re-run that one-shot migration service. Note that a bare `docker compose up` is **not** a deployment: automatic migrations at container startup are off by default (so a restart cannot race the migrator) — a stack started that way runs against an unmigrated schema.',
   'site.docs.selfhost.s7p3': 'With `--build` the image is compiled right on the deploy host — a full build of the whole repository: expect a peak of 1.5 GB of extra RAM (the containers already reserve about 2.5 GB), and a build cache that grows by roughly 1.4 GB per build and is **never pruned for you**. On a small machine, build elsewhere and push the image, or pin a ready-made tag. `--build` also refuses to build from dirty sources — a build artifact must trace back to one exact source tree.',
+  'site.docs.selfhost.s7p4': 'Once the stack is up there is **no separate front end to build or host**: the client is baked into the same image and served by the same container on the same domain — `/app/` is the interface, `/api/` is the sync API. Open **`https://your-domain/app/`** in a browser and it works; on the deploy host itself it is `http://127.0.0.1:1900/app/` (the app container publishes port 1900 on loopback only, and the gateway in this stack reverse-proxies everything to it, so the UI needs no path configuration of its own). To confirm the container really carries a UI, find the `[web-app]` startup line that reports the shared UI being mounted. To move the interface somewhere else you have to change both knobs together — `WEB_APP_PATH` (the URL prefix) and `WEB_APP_DIR` (the artifact path inside the image) — and the prefix must match the base this UI was built with; change only one and nothing complains: the containers stay `healthy`, `/health` keeps returning 200, and the browser shows a blank page because the stylesheet requests come back as HTML.',
   'site.docs.selfhost.s7i1': 'The three required settings (`JWT_SECRET`, `PASSWORD_PEPPER`, `POSTGRES_PASSWORD`) leave no room for defaults: the first two are enforced by the service itself, which **refuses to start**, the third by the database container, which exits immediately. There is deliberately no "launch with a default secret" path. The public hostname is not on that list and fails in a different way: `DOMAIN` is only the gateway site address (the sync service never reads it, and left empty it is the gateway that fails to start), while `PUBLIC_URL` defaults to `http://localhost:1900` — leaving it alone raises no error, it quietly points the links in emails at localhost.',
   'site.docs.selfhost.s7i2': 'The deploy script cross-checks the image\'s source-revision label so an old image cannot run new migrations. Custom images must pass the same revision; there is an explicit switch to skip the check, and it exists for deliberate overrides — not for oversights.',
   'site.docs.selfhost.s8': 'The environment variables, one by one',
@@ -3111,7 +3495,7 @@ export const en = {
   'site.docs.selfhost.s8i2': '`JWT_SECRET`: the signing secret for login tokens. Empty means the service refuses to start; once set at first deployment, **do not change it** — rotating it signs out every logged-in device immediately and voids any email link already in flight.',
   'site.docs.selfhost.s8i3': '`POSTGRES_PASSWORD`: the database password, also with no default. When you use the bundled database there is no separate connection string to set — the default points at the stack\'s own PostgreSQL 16.',
   'site.docs.selfhost.s8i4': '`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN`: the domain passkeys are bound to. It holds exactly **one** value, so changing the domain invalidates every passkey registered on this server (accounts survive; sign in with an email link and register a new passkey). It must be a real domain — browsers reject bare IP addresses.',
-  'site.docs.selfhost.s8i5': '`CORS_ORIGINS`: which front-end origins may call the API, comma-separated, with `https://*.example.com`-style wildcards supported. The default points at the upstream demo site — **self-hosters must change it**, and not changing it is exactly the "the interface always reads offline" symptom from the previous section.',
+  'site.docs.selfhost.s8i5': '`CORS_ORIGINS`: which front-end origins may call the API, comma-separated, with `https://*.example.com`-style wildcards supported. The default points at the upstream demo site — **if you host the front end yourself, change it to that page\'s actual origin**, and not doing so is exactly the "the interface always reads offline" symptom from the previous section. What this setting governs is **someone calling your API from another domain**: when the interface is served by the same container on the same origin (the default form), it does not participate at all and leaving the default is harmless.',
   'site.docs.selfhost.s8i6': '`SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`: outgoing mail. This group decides whether the **verification email** goes out (i.e. whether an account can self-activate) — it does **not** decide whether someone can register. Without it the account is still created, and the app says the mail was not sent.',
   'site.docs.selfhost.s8i7': '`HOST`: the address the service itself listens on, all interfaces by default. Behind a gateway you can tighten it to the local machine.',
   'site.docs.selfhost.s9': 'The database and schema changes',
@@ -3119,9 +3503,9 @@ export const en = {
   'site.docs.selfhost.s9p2': 'The two paths differ in timing. With `./scripts/deploy.sh` the deploy script runs migrations once before swapping containers; with `docker compose` the one-shot migration service (named `supersync-migrate`) runs them on first boot and then exits — and compose never re-runs an exited service, **so after a schema change, upgrading means naming that step once more**. Some changes build indexes in the background and may wait on locks on a busy large database — upgrade off-peak and give the migration a generous timeout (15 minutes by default, adjustable). A timeout has its own exit code; clear the blocking transaction and re-run.',
   'site.docs.selfhost.s9p3': 'The minimal backup discipline: back the database up regularly. A backup holds ciphertext payloads plus surrounding metadata — it is everything you need to restore the service, and not a photo album you can flip through (see "your backup is ciphertext" below).',
   'site.docs.selfhost.s10': 'What your server actually stores',
-  'site.docs.selfhost.s10p1': 'Every change is one **encrypted operation record**: the client derives a key from the user\'s passphrase (Argon2id) and encrypts the payload with AES-GCM before upload. The server **rejects plaintext outright**, so the database contains no "forgot to encrypt" plaintext payloads.',
+  'site.docs.selfhost.s10p1': 'Each change is an **encrypted operation record**. After setting up a data key, the passphrase or recovery code unlocks that key on the device; operation payloads are encrypted before upload. Unmigrated legacy records still use their original encryption passphrase. The server stores ciphertext and cannot decrypt its contents.',
   'site.docs.selfhost.s10p2': 'The surrounding metadata is plaintext: action types, entity types and ids, timestamps, the ordering of devices\' versions, ciphertext sizes. A sync protocol cannot work without these — and one of the points of self-hosting is precisely that they end up in **your** hands, not a third party\'s.',
-  'site.docs.selfhost.s10p3': 'Corollary: the only things that can decrypt the data are the devices holding each account\'s encryption passphrase. The server cannot help a user who forgot the passphrase — the other side of "your backup is ciphertext".',
+  'site.docs.selfhost.s10p3': 'Recovering synced data requires a device-held decryption key or the passphrase or recovery code that unlocks it. A sign-in password reset and a server backup cannot replace those credentials. If both are lost, first export from an old device that can still read your data. Unmigrated legacy ciphertext still needs its original passphrase.',
   'site.docs.selfhost.s11': 'The command-line host: using heyta without a browser',
   'site.docs.selfhost.s11p1': 'Besides the web and mobile, the repository ships a **command-line host**: it opens a real local database file and creates, lists and syncs tasks from a terminal. It speaks exactly the same sync protocol as every other end — pointed at the same server, it is just one more "device".',
   'site.docs.selfhost.s11i1': 'Configuration comes from flags or environment variables: `--db` the local database file (required), `--server` the sync server, `--token` the access token, `--password` the end-to-end encryption passphrase; uppercase environment variables (`HEYTA_DB` / `HEYTA_SERVER_URL` / `HEYTA_TOKEN` / `HEYTA_PASSWORD`) work too.',
@@ -3265,11 +3649,11 @@ export const en = {
   'site.docs.reminders.s2': 'When it fires — and why sometimes it will not',
   'site.docs.reminders.s2p1': 'Web: **only while the app is open**. The browser raises the notification when the time arrives, provided you granted the permission in the interface first — that grant has to come from a click of yours, which is the browser\'s rule, not ours.',
   'site.docs.reminders.s2p2': '⚠️ Close the page and nothing fires: the trigger times were computed locally in advance, but **nobody is reading them**. That limit is written into the code comments as a known boundary, not a temporary state.',
-  'site.docs.reminders.s2p3': 'Mobile: there is **no system local notification wired up**, so nothing pops outside the app. On a phone, due times and reminders are currently "visible in the interface", not "will sound".',
+  'site.docs.reminders.s2p3': 'Mobile: Android and iOS use their system local notification centers. Delivery still depends on platform permission and OS scheduling; a missing permission or uncertain receipt keeps the reminder due instead of inventing a sent fact.',
   'site.docs.reminders.s2p4': 'Time has bounds: a trigger may sit at most **one year** out; snoozing defaults to **10 minutes** and caps at **7 days**, and past the cap it is **clamped to the cap with the real value shown** instead of letting your click fail. Landing slightly before now is allowed — a one-minute window, because milliseconds pass between computing the moment and writing it down.',
-  'site.docs.reminders.s2i1': 'Three conditions to hear anything: the time arrived, the app is open, you already granted permission — miss one and it stays quiet.',
+  'site.docs.reminders.s2i1': 'Web needs the page open and notification permission granted. Android/iOS reminders already scheduled with the OS can be delivered after the app process exits, subject to permission, OS scheduling and device state.',
   'site.docs.reminders.s2i2': 'Muting and snoozing are different roads: the first stops that one reminder from popping, the second moves its trigger time wholesale.',
-  'site.docs.reminders.s2i3': 'The only way to get background delivery today is to build a server-side push channel of your own — this version has none, and does not pretend to.',
+  'site.docs.reminders.s2i3': 'Mobile local notifications do not need server push. After an Android force-stop, reopen the app for catch-up. iOS schedules the earliest 64 reminders and fills the queue on launch or return to the foreground. Offline devices may each notify; there is no global once-only delivery guarantee.',
   'site.docs.reminders.s3': 'Reminders on repeating tasks move with it',
   'site.docs.reminders.s3p1': 'Ticking a repeating task re-queues the reminders **computed from an offset** onto the next occurrence; a reminder pinned to an absolute moment stays where it was.',
   'site.docs.reminders.s3p2': 'So "daily 9am, 10 minutes before" advances by itself, while "March 5 at 14:00" does not — it has no idea which task occurrence it hangs off.',
@@ -3282,16 +3666,17 @@ export const en = {
   'site.docs.trash.title': 'Trash, and why "permanent delete" deletes nothing',
   'site.docs.trash.seo.title': 'Trash and permanent delete — why history survives — heyta',
   'site.docs.trash.sum': 'Both actions are in the interface, but the second one removes visibility, not the record — and that is a deliberate sync-protocol decision.',
-  'site.docs.trash.s1': 'The trash holds tasks only',
-  'site.docs.trash.s1p1': 'Lists, tags and notes do not go to the trash today — once deleted they have no restore entry. That is not an oversight: their delete semantics differ from a task\'s.',
-  'site.docs.trash.s1p2': 'The trash is not a separate bin and there is no second table: it is exactly the tasks that are "deleted and not yet permanently deleted", **most recently deleted first**.',
+  'site.docs.trash.s1': 'What the trash holds',
+  'site.docs.trash.s1p1': 'Tasks, notes, lists and habits all land in the trash once deleted — restore and delete-forever both live on that one panel. Tags, reminders and focus sessions deliberately do **not**: a tag is trivial to recreate, deleting a reminder means \'cancel it\', which is not the same decision as \'I don\'t want this thing anymore\', and a focus session is the source of truth for your statistics — letting it be deleted would mean letting your history be rewritten.',
+  'site.docs.trash.s1p3': 'Deleting a list never takes its tasks with it — they simply become \'no list\', and restoring the list brings the assignment back. Deleting a habit never erases its check-ins: restore it and the streak is still there.',
+  'site.docs.trash.s1p2': 'The trash is not a separate bin and there is no second table: it is exactly the records that are "deleted and not yet permanently deleted", **most recently deleted first**.',
   'site.docs.trash.s1i1': 'Web: "Trash" in the left sidebar, always visible.',
   'site.docs.trash.s1i2': 'Mobile: a trash entry inside the Mine screen.',
   'site.docs.trash.s1i3': 'Both actions are on the same board: restore, and delete permanently — the latter asks you to confirm twice.',
-  'site.docs.trash.fig.trash': 'The trash states plainly that it holds tasks only — and, when empty, where the entries will come from',
+  'site.docs.trash.fig.trash': 'The trash names which kinds it holds — and, when empty, where the entries will come from',
   'site.docs.trash.fig.trash.alt': 'Web trash panel with its explanatory line and empty state',
   'site.docs.trash.s2': 'What restore changes',
-  'site.docs.trash.s2p1': 'Restore = clearing the task\'s deletion flag back to empty, written as an ordinary update. It is not "copying something back from a backup": the same task with the same history keeps growing.',
+  'site.docs.trash.s2p1': 'Restore = clearing the deletion flag back to empty, written as an ordinary update. It is not "copying something back from a backup": the same record with the same history keeps growing.',
   'site.docs.trash.s2p2': 'An entry you have already permanently deleted stops appearing in the trash and so cannot be restored — the interface treats the two separately, by design rather than as a missing step.',
   'site.docs.trash.s2p3': 'Even if you bypass the interface and call it directly, restoring a permanently deleted task is **rejected on the spot**. That is a deliberate point of no return, not a step that has not been built yet.',
   'site.docs.trash.s3': 'Why "permanent delete" does not really delete',
@@ -3334,21 +3719,21 @@ export const en = {
   'site.docs.loss.seo.title': 'Losing a device, a passkey, or the passphrase — heyta',
   'site.docs.loss.sum': 'A device, a passkey, the end-to-end encryption passphrase — the three have completely different consequences, and knowing in advance is cheaper than finding out after.',
   'site.docs.loss.s1': 'One: a device',
-  'site.docs.loss.s1p1': 'Sign in on a new device and the data is **replayed** back from the server — that is exactly what syncing is for. "Local-first" never meant "only on this one machine".',
+  'site.docs.loss.s1p1': 'Sign in on a new device, then unlock with your encryption passphrase or saved recovery code to **replay** synced data from the server. Signing in alone does not provide decryption, and data never uploaded is not on the server.',
   'site.docs.loss.s1p2': 'But a device that never had sync on holds its data only in that machine\'s local database. If it is gone, it is gone — there is no server-side backup anywhere on that route.',
   'site.docs.loss.s2': 'Two: a passkey (recoverable)',
   'site.docs.loss.s2p1': 'Tapping "Lost your passkey?" inside the app sends a recovery email; the page it links to is rendered by the server, and from there you can register a new passkey.',
   'site.docs.loss.s2p2': 'The condition is **that you can still receive mail at the address**. Proving the mailbox is yours is enough — the old credential does not have to still be present.',
-  'site.docs.loss.s2p3': 'One more thing you can do: in Settings, list **your own** passkeys and rename or delete them. That is the only credential management entry there is.',
-  'site.docs.loss.s2w1': '⚠️ There is **no** "sign out of every device" button in the interface and no "revoke all sessions" action. To pull access back from an old device, delete each key you do not recognise one at a time — while you can still sign in.',
-  'site.docs.loss.s3': 'Three: the end-to-end passphrase (not recoverable)',
-  'site.docs.loss.s3p1': 'That passphrase is the key used to encrypt and decrypt outside the server. It is **not stored on the server**, so the server has no ability to "reset it for you" — not unwillingness: building that would mean the encryption does not exist.',
-  'site.docs.loss.s3p2': 'Forgetting it is not losing sign-in: you may still get in, still see the plaintext fields, but the encrypted content stays undecryptable and the interface will tell you honestly that it cannot open it.',
-  'site.docs.loss.s3p3': 'The only self-rescue is **export**: take a complete JSON while you can still decrypt. Restore only works into an empty library, so this is a server-migration and disaster tool, not an everyday "backup" button.',
+  'site.docs.loss.s2p3': 'You can manage your passkeys in Settings, renaming or deleting credentials you no longer use. Deleting a passkey is different from revoking an already issued sign-in session.',
+  'site.docs.loss.s2w1': 'A lost device may still hold local plaintext and old keys. Revoking sign-in access cannot erase offline copies; protecting subsequent sync also requires a trusted device to rotate the data key and migrate data.',
+  'site.docs.loss.s3': 'Three: lost the passphrase? Find your recovery code',
+  'site.docs.loss.s3p1': 'The encryption passphrase is never given to the server. If you set up a data key and saved its recovery code, use that code to unlock on your device, then set a new passphrase and recovery code.',
+  'site.docs.loss.s3p2': 'Forgetting the encryption passphrase does not mean losing sign-in access; conversely, resetting your sign-in password does not restore decryption. If both the passphrase and recovery code are lost, the server cannot decrypt synced data for you.',
+  'site.docs.loss.s3p3': 'An old device that can still read the data can **export a complete JSON** for recovery through the import flow. Unmigrated legacy ciphertext needs its original passphrase; creating a recovery code cannot bypass decryption of old data.',
   'site.docs.loss.s4': 'So the sensible order is this',
-  'site.docs.loss.s4p1': 'Write the passphrase somewhere you will **not lose along with it**. Keeping it in a note on the same device is hanging the key on the doorknob.',
+  'site.docs.loss.s4p1': 'Keep the passphrase and recovery code somewhere you will not lose with the device, such as your own password manager or an offline record.',
   'site.docs.loss.s4p2': 'Before turning sync on, confirm you can sign in and the mailbox still receives. After it is on, export now and then — and actually verify once that it restores. An unverified backup is not a backup.',
-  'site.docs.loss.s4p3': 'None of this is scare copy: the benefit of end-to-end encryption (the server cannot see your content) and its cost (nobody can recover your password for you) are two sides of one decision. Want one side, manage the other.',
+  'site.docs.loss.s4p3': 'You hold the recovery code yourself. It provides another on-device unlock path without giving the server decryption capability. If neither secret is available, recovery still depends on a readable local copy or a previous export.',
 
   // ── Changelog ──
   'site.changelog.seo.title': 'What\'s new — heyta',
@@ -3422,11 +3807,13 @@ export const en = {
   'common.entity.NOTE': 'Note',
   'common.entity.TASK_REPEAT_CFG': 'Repeat rule',
   'common.entity.REMINDER': 'Reminder',
+  'common.entity.EVENT': 'Countdown',
   'common.entity.HABIT': 'Habit',
   'common.entity.HABIT_LOG': 'Check-in record',
   'common.entity.FOCUS_SESSION': 'Focus session',
   'common.entity.AI_FEEDBACK': 'AI usage record',
   'common.entity.PREFERENCE_CORRECTION': 'Preference correction',
+  'common.entity.ASSISTANT_TURN': 'Assistant message',
   'common.entity.GLOBAL_CONFIG': 'Global settings',
   'common.entity.MIGRATION': 'Data migration',
   'common.entity.RECOVERY': 'Disaster recovery',
@@ -3441,6 +3828,44 @@ export const en = {
   'common.conflict.reason.remoteArchive': 'The other device archived it',
   'common.conflict.reason.localArchive': 'This device archived it',
   'common.conflict.reason.fallback': 'Both sides made different changes to the same thing',
+  'common.calendar.dayMarker.off': 'Off',
+  'common.calendar.dayMarker.work': 'Work',
+  // The countdown line inside a calendar cell (W6, the calendar's second source).
+  // Lives under `common.*` because the shared board is one implementation for both
+  // shells; worded exactly like the countdown panel's own line.
+  'common.calendar.event.today': 'Today',
+  'common.calendar.event.until': '{days} days to go',
+  'common.calendar.event.since': '{days} days so far',
+
+  // 🔴 This group lives under `common.*`, not `web.*`: **both shells read it**
+  //    (a view tier is added per batch, so the count is deliberately not written
+  //    here — comments that carry a number always drift).
+  //    They used to be `web.calendar.view.*`, and the mobile shell had to read
+  //    the same words once it got the view switcher — a second copy is where
+  //    "one word, two spellings" starts (AGENTS §3.5).
+  'common.calendar.view.aria': 'View',
+  'common.calendar.view.month': 'Month',
+  'common.calendar.view.week': 'Week',
+  'common.calendar.view.day': 'Day',
+  // R13: the year tier. 🔴 It is a calendar tier, unlike "Timeline", which is a
+  //   shell-view jump and never enters `CalendarViewKind`.
+  'common.calendar.view.year': 'Year',
+  // 🔴 这六条也在 `common.*`：它们是**共享板**在周/日两档要的词，
+  //    而共享板两端同一份 ⇒ 移动端补上档位入口后必须给得出同样的词。
+  //    留在 `web.*` 里的下场就是移动端再抄一份（AGENTS §3.5 同形状的第二次）。
+  'common.calendar.prevWeek': 'Previous week',
+  'common.calendar.nextWeek': 'Next week',
+  'common.calendar.prevDay': 'Previous day',
+  'common.calendar.nextDay': 'Next day',
+  // R13: the two year arrows (screen-reader names), same `common.*` reason as above.
+  'common.calendar.prevYear': 'Previous year',
+  'common.calendar.nextYear': 'Next year',
+  'common.calendar.dayAllDay': 'All day',
+  'common.calendar.dayNoTimed': 'Nothing on this day has a specific time — they are all in the "All day" band above.',
+  // 🔴 「全天」那条带**自己**的空态，不能说"这一天没有到期的任务" ——
+  //   当天完全可以在 16:00 挂一条（R14 之后这是常态），那句话就成了谎话，
+  //   而它下面 20 行就是那条任务。两条句子各说各的范围。
+  'common.calendar.dayAllDayEmpty': 'Nothing in "All day" — tasks set to a time sit on the hour axis below.',
 
   // Reminders (B1-1 UI layer; shared by web and mobile).
   // 🔴 `reminder.offset.*` must stay 1:1 and in order with
@@ -3464,6 +3889,7 @@ export const en = {
   'reminder.phase.scheduled': 'Scheduled',
   'reminder.phase.snoozed': 'Snoozed',
   'reminder.phase.due': 'Due now',
+  'reminder.delivery.uncertain': 'Delivery on this device is unconfirmed. Choose Snooze to schedule again.',
   'reminder.phase.fired': 'Sent',
   'reminder.phase.dismissed': 'Dismissed',
   'reminder.hint.noDueDate': 'This task has no due date, so only an absolute time can be set',
@@ -3488,10 +3914,15 @@ export const en = {
   'notes.a11y.pin': 'Pin the note "{excerpt}" to today',
   'notes.a11y.unpin': 'Unpin the note "{excerpt}"',
   'notes.error.empty': 'A note cannot be empty',
+  // Note editor screen (multi-end batch two). The no-change gate lives in app-host updateNoteContent.
+  'notes.edit.title': 'Edit note',
+  'notes.save': 'Save',
+  'notes.cancel': 'Cancel',
+  'notes.edit.notFound': 'This note is gone (it may have been deleted on another device)',
 
   // ── Admin console (ADR-0038) ─────────────────────────────────────────
   'web.admin.title': 'Admin',
-  'web.admin.lead': 'Read-mostly: users, subscriptions, orders, coupons, invites.',
+  'web.admin.lead': 'Read-mostly: users, subscriptions, orders, coupons, invites. Three places write: unlock/quota/force-logout in the user detail, holiday rows, and refund decisions.',
   'web.admin.tab.overview': 'Overview',
   'web.admin.tab.users': 'Users',
   'web.admin.tab.subscriptions': 'Subscriptions',
@@ -3507,6 +3938,7 @@ export const en = {
   'web.admin.error.forbidden': 'This account does not have admin access.',
   'web.admin.error.not-found': 'That item no longer exists.',
   'web.admin.error.invalid': 'The request was rejected as invalid.',
+  'web.admin.error.conflict': 'The current state of that row does not allow this action; see the message below for the reason.',
   'web.admin.error.server': 'The server failed. See the server logs for details.',
   'web.admin.overview.users.total': 'Users',
   'web.admin.overview.users.verified': 'Verified',
@@ -3695,12 +4127,148 @@ export const en = {
   "site.legal.minors.seo.title": "Protection of Minors — heyta",
   "site.legal.minors.seo.description": "How an adult-oriented productivity app handles minors: we do not verify age and rely on declarations; the dedicated processing rules for children under fourteen, article-by-article applicability under the Minors Protection Regulations, and the channels open to guardians.",
   "site.legal.subscription-refund.title": "Subscription, Billing and Refund Rules",
-  "site.legal.subscription-refund.lede": "How two **independent** paid services — hosted sync and cloud AI — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.",
+  "site.legal.subscription-refund.lede": "How two paid services with **their own separate terms** — hosted sync and cloud AI, where the tier that grants cloud AI today also includes hosted sync — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.",
   "site.legal.subscription-refund.seo.title": "Subscription, Billing and Refund Rules — heyta",
-  "site.legal.subscription-refund.seo.description": "How two independent paid services — hosted sync and cloud AI — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.",
+  "site.legal.subscription-refund.seo.description": "How two paid services with their own separate terms — hosted sync and cloud AI, where the tier that grants cloud AI today also includes hosted sync — are priced, how they end, how they are refunded and invoiced, including one deliberate absence: we never charge you without your confirmation.",
   "site.legal.data-rights.title": "Exercising Your Rights: Requests and Responses",
   "site.legal.data-rights.lede": "Access, copy, correction, deletion, account closure and withdrawal of consent — what is self-service in heyta, what is email-only, the 15-working-day response window, and what \"deletion\" actually means in this architecture.",
   "site.legal.data-rights.seo.title": "Exercising Your Rights: Requests and Responses — heyta",
   "site.legal.data-rights.seo.description": "Access, copy, correction, deletion, account closure and withdrawal of consent — what is self-service in heyta, what is email-only, the 15-working-day response window, and what \"deletion\" actually means in this architecture.",
   // <<<end:generated:packages/legal/scripts/gen-site-copy.mjs>>>
+  // ── Countdowns & anniversaries (batch two, W5) ──
+  'web.countdown.title': 'Countdowns',
+  'web.countdown.empty': 'No countdowns yet',
+  'web.countdown.empty.hint': 'Name a date and it stays on every one of your devices — the server never needs to know what it is.',
+  'web.countdown.archived.empty': 'No archived countdowns',
+  'web.countdown.archived.empty.hint': 'Archiving tucks away a date you no longer watch. It is not deletion — you can bring it back.',
+  'web.countdown.composer.placeholder': 'Name this date',
+  'web.countdown.add': 'Add',
+  'web.countdown.pickDate': 'Pick a date',
+  'web.countdown.filter.all': 'All',
+  'web.countdown.kind.countdown': 'Countdown',
+  'web.countdown.kind.anniversary': 'Anniversary',
+  'web.countdown.kind.birthday': 'Birthday',
+  'web.countdown.kind.festival': 'Festival',
+  'web.countdown.kind.unset': 'Unset',
+  'web.countdown.view.active': 'Active',
+  'web.countdown.view.archived': 'Archived',
+  'web.countdown.face.until': '{days} days to go',
+  'web.countdown.face.today': 'Today',
+  'web.countdown.since': '{days} days so far',
+  'web.countdown.badge.pinned': 'Pinned',
+  'web.countdown.pin': 'Pin',
+  'web.countdown.unpin': 'Unpin',
+  'web.countdown.edit': 'Edit',
+  'web.countdown.save': 'Save',
+  'web.countdown.cancel': 'Cancel',
+  'web.countdown.archive': 'Archive',
+  'web.countdown.unarchive': 'Restore',
+  'web.countdown.remove': 'Delete',
+  'web.countdown.field.title': 'Name',
+  'web.countdown.field.date': 'Date',
+  'web.countdown.field.kind': 'Type',
+  'web.countdown.field.template': 'Style',
+  'web.countdown.yearly': 'Yearly',
+  'web.countdown.lunar': 'Lunar',
+  'web.countdown.template.none': 'Default',
+  'web.countdown.template.slot': 'Template {slot}',
+  'web.countdown.a11y.menu': 'Actions for “{title}”',
+  'web.countdown.a11y.menuClose': 'Close actions for “{title}”',
+  'web.countdown.export': 'Export card image',
+  'web.countdown.export.failed': 'Export failed: this device gave us no canvas. Nothing was changed and nothing was sent.',
+  'web.countdown.error': 'Not saved: ',
+  'web.shell.modules.countdown.label': 'Countdowns',
+  'web.shell.modules.countdown.note': 'Keep the dates you watch at the top. A date that has passed is not a failure.',
+  'web.shell.views.countdown': 'Countdowns',
+  // W8（三端接线）：与 zh-CN.ts 同批追加的两条，**中英成对**（`check:ui-language` 拦）。
+  'mobile.countdown.entry': 'Countdowns',
+  'mobile.countdown.entry.hint': 'Keep the dates you watch, and see how far off they are',
+  // W4b: the admin "work-day changes" panel. Same two wording constraints as zh-CN:
+  // revoking a year falls back to the bundled gazette data (it is NOT "empty that year"),
+  // and the UI never claims to validate dates - the server contract is the only judge.
+  'web.admin.tab.holidays': 'Work-day changes',
+  'web.admin.holiday.lead': 'What you enter here is an override: once a year is replaced, every client reads it instead of the bundled gazette data.',
+  'web.admin.holiday.list': 'Recorded years',
+  'web.admin.holiday.version': 'Content version: {version}',
+  'web.admin.holiday.dayCount': '{count} scheduled days',
+  'web.admin.holiday.list.none': 'No year recorded yet, so every client is reading the bundled data.',
+  'web.admin.holiday.revoke': 'Revoke this year',
+  'web.admin.holiday.revoke.confirm': 'After revoking, that year falls back to the bundled gazette data and the calendar still marks rest and work days from it.',
+  'web.admin.holiday.revoke.yes': 'Confirm revoke',
+  'web.admin.holiday.form.title': 'Record a whole year',
+  'web.admin.holiday.form.lead': 'One submission replaces the entire year: what is written here is all of that year, and any date not listed stays a normal working day.',
+  'web.admin.holiday.form.year': 'Year',
+  'web.admin.holiday.form.papers': 'Gazette source links (one per line, at least one)',
+  'web.admin.holiday.form.offDays': 'Days off (one YYYY-MM-DD per line)',
+  'web.admin.holiday.form.workDays': 'Make-up working days (one YYYY-MM-DD per line)',
+  'web.admin.holiday.form.note': 'Operator note (admin only, never delivered to clients)',
+  'web.admin.holiday.save': 'Save this year',
+  'web.admin.holiday.notice.saved': 'Saved {year}: {count} scheduled days.',
+  'web.admin.holiday.notice.deleted': 'The {year} entry has been revoked; that year falls back to the bundled gazette data.',
+  'web.admin.holiday.notice.failed': 'Not saved: the server rejected this submission, see the message above for why.',
+  'web.admin.tab.refunds': 'Refunds',
+  'web.admin.refund.lead': 'This panel covers the first two steps of the chain: request → approve → channel → callback. Approving hands the refund to the payment channel, and money sent cannot be taken back. "Refunded" is only ever confirmed by the signed callback from WeChat, never by this panel.',
+  'web.admin.refund.list': 'Refund requests',
+  'web.admin.refund.list.none': 'No refund requests have been recorded yet.',
+  'web.admin.refund.filter': 'Filter by user id',
+  'web.admin.refund.filter.submit': 'Filter',
+  'web.admin.refund.order': 'Order #{order}',
+  'web.admin.refund.user': 'User #{user}',
+  'web.admin.refund.period': '{days} days',
+  'web.admin.refund.note': 'Reason (required for both approve and reject)',
+  'web.admin.refund.approve': 'Approve',
+  'web.admin.refund.approve.confirm': 'Approving sends this refund to the payment channel right away; money sent cannot be recalled. Continue?',
+  'web.admin.refund.approve.yes': 'Send the refund',
+  'web.admin.refund.reject': 'Reject',
+  'web.admin.refund.form.title': 'Open a new request',
+  'web.admin.refund.form.lead': 'Requests are opened by order id: the amount can only be what checkout froze as paid, and the days can only be the segment that order bought. Neither is editable here.',
+  'web.admin.refund.form.orderId': 'Order id',
+  'web.admin.refund.form.note': 'Note (goes to the audit trail, admin only)',
+  'web.admin.refund.form.exception': 'Approve even past the time window (the server requires a non-empty reason)',
+  'web.admin.refund.form.submit': 'Submit request',
+  'web.admin.refund.notice.requested': 'Recorded: refund #{id} (order #{order}) is now {status}. No money moves before it is approved.',
+  'web.admin.refund.notice.submitted': 'Refund #{id} is decided and handed to the payment channel ({status}). Whether it actually landed is decided by the WeChat callback.',
+  'web.admin.refund.notice.channelFailed': 'Refund #{id} stays approved, but the channel call failed (reason code {code}). No money moved; it can be approved again.',
+  'web.admin.refund.notice.notSubmittable': 'This row is in state {status}, which cannot be submitted to the channel. The panel did not change it.',
+  'web.admin.refund.notice.rejected': 'Refund #{id} rejected: neither the money nor the entitlement changed, and the row is no longer pending.',
+  'web.admin.refund.notice.denied': 'The server refused this action, reason code: {code}',
+  'web.admin.refund.notice.conflict': 'This action is not allowed for the current state of that row, and the server sent no reason code.',
+  'web.admin.refund.notice.unknown': 'The server returned an outcome this panel does not know: {code}. The panel did not guess what it means; check the server.',
+  'web.admin.refund.code.windowPassed': 'This order is outside the refund window of the current policy and was not approved as an exception.',
+  'web.admin.refund.code.alreadyRefunded': 'This order is already refunded: the same money cannot be refunded twice.',
+  'web.admin.refund.code.alreadyOpen': 'This order already has a refund that has not finished; a second open one is not allowed.',
+  'web.admin.refund.code.notPayable': 'The order does not exist, or it never reached "paid".',
+  'web.admin.refund.code.amountUnverified': 'Checkout never recorded a comparable paid amount for this order, so the refund amount cannot be computed and nothing is refunded.',
+  'web.admin.refund.code.notCheckoutOrder': 'This order did not come from the checkout path, so there is no countable segment to retract.',
+  'web.admin.refund.code.notDecidable': 'This row was already decided or has finished; a decision can only be made once.',
+  'web.admin.refund.code.providerNotRegistered': 'The approval is recorded, but this instance does not have the channel that originally took the payment, so no money was sent. Reconnect that channel or handle it manually.',
+  'mobile.countdown.export.noModule': 'This build of heyta ships without the export component — it is not a data problem; reinstalling this version fixes it.',
+  'mobile.countdown.export.rasterize': 'The system could not draw the card into an image. Nothing was lost and nothing left this device.',
+  'mobile.countdown.export.write': 'The image was rendered, but it could not be written to storage on this device.',
+  'mobile.countdown.export.share': 'The share sheet rejected this image.',
+
+  // ── AI assistant (one mobile screen shared by all five features) ──────
+  'mobile.ai.entry': 'AI assistant',
+  'mobile.ai.entry.hint': 'Break tasks down, prioritise, estimate, capture a line, ask your own data',
+  'mobile.ai.title': 'AI assistant',
+  'mobile.ai.back': 'Back',
+  'mobile.ai.section.mode': 'What to do',
+  'mobile.ai.hostFailed.title': 'Could not read the data on this device',
+  'mobile.ai.hostFailed.hint': 'Nothing was sent anywhere. Go back and open this again; if it still fails, restart heyta.',
+  'mobile.ai.notConfigured.title': 'AI is not set up yet',
+  'mobile.ai.notConfigured': 'Turn it on and add an endpoint of your own under Settings → AI — until then there is no working path here.',
+  'mobile.ai.goSettings': 'Pick an endpoint for this feature under Settings → AI.',
+  'mobile.ai.proposalNeverAuto': 'AI only suggests: nothing is written until you confirm it.',
+  'mobile.ai.task.label': 'Pick a task',
+  'mobile.ai.task.none': 'No tasks on this device yet.',
+  'mobile.ai.task.more': '{count} more not shown.',
+  'mobile.ai.input.capture': 'The line to capture',
+  'mobile.ai.input.capture.placeholder': 'e.g. Dentist at 3pm tomorrow, buy cat food on the way back',
+  'mobile.ai.input.limit': 'Up to {max} characters per line.',
+  'mobile.ai.input.tool': 'What should it do',
+  'mobile.ai.tools.grantsHint': 'Up to {max} characters per call, and only the tools you ticked can be used.',
+  'mobile.ai.prioritize.scope': 'Ranking only compares your own tasks — nobody else, no leaderboard.',
+  'mobile.ai.keyNotice': 'The key stays on this device: never backed up, never synced, cleared when you log out.',
+  'mobile.ai.saveFailed': 'This device could not store the change (local storage refused the write).',
+  'mobile.ai.tier.defaultNote': 'A new endpoint starts at “{tier}”; you can change it any time.',
 } satisfies Record<MessageKey, string>;

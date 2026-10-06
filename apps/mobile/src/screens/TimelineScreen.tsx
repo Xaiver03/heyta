@@ -44,10 +44,12 @@ export interface TimelineScreenProps {
   readonly today?: LocalDate;
   /** 用于日期格式化的时间戳。默认 `Date.now()`。 */
   readonly now?: number;
+  /** 选中的那一条 ⇒ 高亮。传的是宿主的**全局选中**，不是本屏自己记的 id。 */
+  readonly activeTaskId?: string | null;
 }
 
 export function TimelineScreen(props: TimelineScreenProps): React.JSX.Element {
-  const { tasks, today, now, onOpenTask } = props;
+  const { tasks, today, now, onOpenTask, activeTaskId } = props;
   const labels = useTimelineLabels();
   const { width } = useWindowDimensions();
   // 规划是纯函数，但没必要每帧重算 —— `tasks` 变了才重排（与 web 同一条做法）。
@@ -58,6 +60,7 @@ export function TimelineScreen(props: TimelineScreenProps): React.JSX.Element {
       rows={rows}
       labels={labels.board}
       onOpenTask={onOpenTask}
+      activeTaskId={activeTaskId}
       compactTicks={width < COMPACT_BELOW_DP}
       {...(today === undefined ? {} : { today })}
       {...(now === undefined ? {} : { now })}

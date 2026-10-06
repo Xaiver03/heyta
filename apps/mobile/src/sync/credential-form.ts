@@ -62,7 +62,14 @@ export function useSyncCredentialForm(): SyncCredentialForm {
   const wasConfigured = useRef(false);
   useEffect(() => {
     // 守卫：只有真的填了凭据才写（理由见文件头）。
-    if (token.trim() === '' && password === '') return;
+    // Authentication fills token and E2EE password through two controlled
+    // state updates. During that handoff React can briefly render the new
+    // password with the old empty token. Do not write that transient tuple:
+    // it would erase the authenticated accountId binding before the token
+    // update arrives, leaving VaultSettingsSection saying "please sign in".
+    // Explicit credential logout calls clearSyncConfig separately, so an
+    // empty token here does not weaken the logout path.
+    if (token.trim() === '') return;
     writeSyncConfig({ serverUrl, token, password });
 
     // 凭据刚变完整的那一刻，必须通知一次（启动实时通道的钩子就在这里）。

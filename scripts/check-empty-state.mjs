@@ -49,7 +49,7 @@
  *   |---|---|---|---|
  *   | `features/trash/TrashView.tsx` | 87-90 | 手抄 `ht-empty` 三件套 + `Trash2` 图标 | `web.trash.empty.{title,hint}` |
  *   | `features/auth/AuthPanel.tsx` | 225-229 | `<strong>+<span>` 自成一格 | `web.auth.empty.{title,body}` |
- *   | `features/habits/HabitsView.tsx` | 127-128 | 单句 `<p>` | `web.habits.empty` |
+ *   | `features/habits/HabitsView.tsx` | 127-128 | 单句 `<p>` | `web.habits.empty`（🔴 §8.133 起构造器在 `features/habits/board-labels.ts`，本表其余行号同样是当时读数） |
  *   | `features/categories/CategoryBreakdown.tsx` | 67-68 | `ht-categories__empty` | `web.categories.empty` |
  *   | `features/motivation/GrowthView.tsx` | 78-79 | `ht-growth__empty` | `web.growth.week.empty` |
  *   | `features/motivation/IdentityTagList.tsx` | 71-72 / 111 | `ht-tags__empty` ×2 | `web.growth.tags.empty` |
@@ -367,7 +367,14 @@ const EMPTY_SITES = {
      * 它留在账上的理由只剩"谁来做"，不再有"做不到"。
      */
     'apps/web/src/features/categories/copy.ts',
-    'apps/web/src/features/habits/HabitsView.tsx',
+    /**
+     * 🔴 工单 §8.133：这一处**是搬家，不是新增债务**（账上仍然只有站点一枚）。
+     * 习惯面单拆成独立生产者（`HabitDetailCard.tsx`）之后，板子的文案构造器落在
+     * `features/habits/board-labels.ts` —— 视图与卡片互相 import 会成环，所以构造器
+     * 住在被用的那一侧。**渲染仍在共享层**（`HabitBoard` 用 `labels.empty`），
+     * 这里只是文案站点换了文件名，与上面 `categories/copy.ts` 同一形状。
+     */
+    'apps/web/src/features/habits/board-labels.ts',
     // ⚠️ 它只从「空槽位类」消失了（那个槽位被收编），**文案站点仍在账上**。
     'apps/web/src/features/motivation/GrowthView.tsx',
     'apps/web/src/features/settings/AiSettings.tsx',
@@ -462,6 +469,41 @@ const EMPTY_SITES = {
     // 仍然成立，仍然挂在 `site-and-parity-alignment.md` 的欠账上。
     // 判据也没松：故障注入实测 —— 新文件里手写 `<Text>{t('x.empty')}</Text>` 仍然红，
     // 同一个文件里"共享组件 + 另写一处"仍然红，只有纯共享组件用法不再点名。
+    /**
+     * 倒数纪念日（批次二 W5，2026-10-03）。
+     *
+     * 🔴 **这是真 +1，不是搬家**：倒数日在此之前**没有任何界面**，"还没有倒数日"
+     * 这两行文案是随功能新生的（与 `notes` / `reminders` 那条的措辞同一个性质，
+     * 与 `categories/copy.ts` 那条"换了个位置"的性质相反）。
+     *
+     * **渲染已经收编**：共享 `EventBoard` 用的是
+     * `packages/ui/src/empty-state/EmptyState.tsx`（`icon` + `title` + `hint` +
+     * `testID="event-empty"`），宿主侧没有手写骨架、没有空槽位类、没有空态 testid
+     * —— 所以这个文件**只**出现在本栏。
+     * 它不是 `NotesBoard` 那种"区块级空态塞不进页面级组件"的例外：倒数日是**一个视图**，
+     * 空的时候整块内容区就是空的，正是页面级那一档。
+     *
+     * **为什么文案仍在宿主侧**：与 `timeline/labels.ts`、`categories/copy.ts`
+     * 逐字相同的理由 —— 共享层**不许 import `@heyta/i18n`**（会拖进第二份 React，
+     * `check:mobile-bundle` 盯着），模板只能留在有 i18n 的那一侧。
+     */
+    'apps/web/src/features/countdown/CountdownView.tsx',
+    /**
+     * Vault 设备管理（2026-10-04，并行会话的在制品功能）。
+     *
+     * 🔴 **真 +1**：设备列表在此之前不存在，`web.sync.devices.empty`
+     * （"还没有其它设备"那一句 hint）随功能新生。
+     *
+     * **为什么登记而不是收编**：与 `notes` / `reminders` 那两条**同一形状** ——
+     * 这是设置面板里的一行区块级 hint（`ht-settings__hint` 的 `<p>`），
+     * 不是页面级空态；共享 `EmptyState` 是居中、带 icon/detail 槽位的
+     * 页面级组件，塞进设置行是视觉回归，而这两个面没有任何端到端视觉
+     * 判据兜底。"区块级要不要成为 EmptyState 的一档（size: page|section）"
+     * 已挂在 `site-and-parity-alignment.md` 的欠账上，这一条跟着那笔走。
+     * ⚠️ 该文件此刻仍被并行会话活跃编辑，收编动作留给它那条线或空态
+     * 收编轮——现在动它等于制造三方冲突。
+     */
+    'apps/web/src/features/sync/VaultSettingsPanel.tsx',
   ],
   '空态文案 prop': [
     /**

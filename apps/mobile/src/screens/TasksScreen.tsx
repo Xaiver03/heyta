@@ -33,7 +33,6 @@ import type { Project, Tag, Task, TaskSortKey } from '@heyta/domain';
 // **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
 // 壳里只负责措辞（见 `apps/mobile/src/lib/date.ts` 文件头）。
 import {
-  Priority,
   // 🔴 分组归属规则与 Web 共用同一份（见下面 `groups` 的说明）。
   sectionTasks,
   // 标签筛选的判据也共用 —— Web 侧栏点标签走的就是它。
@@ -47,12 +46,15 @@ import {
 import { useI18n } from '@heyta/i18n';
 // 🔴 共享捕获件：与 web 用的是**同一份**（识别日期/优先级 + 芯片 + 预览）。
 // 在这一刀之前移动端只有一个纯标题输入框 —— 同一句话在两端建出不同的任务。
-import { CaptureComposer, type CaptureSubmitPlan } from '@heyta/ui';
+import { CaptureComposer, priorityColorToken, type CaptureSubmitPlan } from '@heyta/ui';
 import { useCaptureLabels } from '../lib/capture-labels';
+import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import {
+  createNoteActions,
   createProjectActions,
   createTaskActions,
   type AppHost,
+  type NoteActions,
   type ProjectActions,
   type TaskActions,
 } from '@heyta/app-host';
@@ -121,9 +123,10 @@ import {
   taskSortName,
   writeTaskSort,
 } from '../lib/task-sort';
-import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
+import { priorityBadgeLabel } from '../lib/priority';
 import { TaskDetailSheet } from './TaskDetailSheet';
 import { SearchScreen } from './SearchScreen';
+import { NoteEditScreen } from './NoteEditScreen';
 // 🔴 「四象限」那一档的实现（P10 收敛后**唯一**的实现）——
 // 它是共享 `QuadrantBoard` 的移动宿主，不再是第 6 个 tab 的整屏。
 import { QuadrantScreen } from './QuadrantScreen';
@@ -151,6 +154,10 @@ function Composer({
   const labels = useCaptureLabels();
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
+  const [presented, setPresented] = useState(false);
+  useEffect(() => {
+    if (!visible) setPresented(false);
+  }, [visible]);
 
   const submit = useCallback(
     async (plan: CaptureSubmitPlan) => {
@@ -172,6 +179,7 @@ function Composer({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      onShow={() => setPresented(true)}
       // 说明：遮罩用 material.scrim。它是**纯色半透明**，不需要模糊 ——
       // 这正是它能用在 RN 上、而 chrome-tint 不能的原因。
       statusBarTranslucent
@@ -204,7 +212,10 @@ function Composer({
       />
       <KeyboardAvoidingView
         style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Android edge-to-edge Modal can retain full window bounds despite
+        // adjustResize, leaving the composer underneath the IME. Explicitly
+        // resize its content so accessibility coordinates remain tappable.
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View
           style={{
@@ -244,12 +255,15 @@ function Composer({
                 自动抢焦点，所以那是宿主的参数而不是共享层的默认值）；
               · 提交后的清空由共享组件自己做（`apply` / `submit` 里都清了草稿）。
             */}
-            <CaptureComposer
+            {/* Mount the auto-focused input only after the native dialog is
+                shown. Otherwise its keyboard can appear before the parent
+                KeyboardAvoidingView has subscribed or measured its frame. */}
+            {presented ? <CaptureComposer
               labels={labels}
               onSubmit={submit}
               autoFocus
               testID="mobile-capture"
-            />
+            /> : null}
             {/* 取消留在这里：共享组件只管"添加"，关闭面板是 modal 的事。
 
                 ⚠️ 这里原来写着 `style={{ flex: 1 }}`，我一度以为它就是「取消」被压到
@@ -402,9 +416,18 @@ export function TasksScreen({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
-  /** 打开详情的任务 id。用 id 而不是 Task 对象：列表刷新后对象会换新引用，
-      存对象会让面板在每次同步后拿到过期快照。 */
-  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  /**
+   * 打开详情的任务 id —— 读**全壳那一份**选中态（`lib/selection.ts` →
+   * `@heyta/app-host` 的 `selection.ts`），不再是本屏的 `useState`。
+   *
+   * 用 id 而不是 Task 对象：列表刷新后对象会换新引用，
+   * 存对象会让面板在每次同步后拿到过期快照。
+   *
+   * 🔴 收成一份之后才成立的行为：**选中跨视图保持**（列表 / 搜索 / 日历 /
+   * 四象限 / 时间线 / 回收站是同一批任务，"当前选中哪一条"不该各屏各记一遍）。
+   * 而实体被删时选中会**自己回落**（回落规则在共享层，见 `pruneSelectionAgainst`）。
+   */
+  const detailTaskId = useSelected('task');
   /**
    * 全局搜索浮层。
    *
@@ -413,6 +436,16 @@ export function TasksScreen({
    * 两个入口各管一件事，所以两个状态也各留一份。
    */
   const [searchOpen, setSearchOpen] = useState(false);
+  /**
+   * 从**搜索结果**里点开的那条便签 = **选中的那一条**（W1）。
+   *
+   * ~~与 `NotesSection` 里那个同名状态是分开的两份……合成一份要跨屏传回调~~
+   * **（2026-10-03 已推翻，留原文是为了让后来者认出这个形状）**：选中态是
+   * `lib/selection` 的模块级单例，两个入口各写一次 `select('note', id)`，**没有回调要传**。
+   * 而分开两份的代价当场现形：web 那条搜索路径没有共同的地方可写，于是 id 被丢掉。
+   * `NoteEditScreen` 是全屏 `Modal`，一次只有一个 tab 挂在树上 ⇒ 不会叠两层。
+   */
+  const editingNoteId = useSelected('note');
   /** 截止时间的呈现方式。与 Web 端 `DueBadge` 的开关一致，默认 `date`。 */
   const [dueMode, setDueMode] = useState<DueDisplayMode>('date');
   /**
@@ -503,6 +536,12 @@ export function TasksScreen({
     [host],
   );
   /**
+   * 便签动作集。**这一屏自己就挂着便签编辑层**（`editingNoteId` 决定 `NoteEditScreen`
+   * 开不开），所以它和 `NotesSection` / `SearchScreen` 一样是"手里有便签实体全集"的屏 ——
+   * 回落要在这里也跑一次，理由见下面 `refresh` 里那条注释。
+   */
+  const noteActions = useMemo<NoteActions | null>(() => (host ? createNoteActions(host) : null), [host]);
+  /**
    * 可选的清单。**与「我的」页读的是同一份物化状态**，所以两处永远一致。
    *
    * 🔴 这里**不含「收集箱」**：「收集箱」不是一条清单，而是
@@ -521,12 +560,57 @@ export function TasksScreen({
     // ⚠️ `listTasks()` 是**同步**的（读的是已物化的内存状态），不是 Promise。
     // 我一度写成 `.then(...)` —— 运行时那里直接抛 "then is not a function"，
     // 而界面只是停在"正在打开本地数据"，看起来像数据库慢。
-    setTasks(actions.listTasks());
+    const aliveTasks = actions.listTasks();
+    setTasks(aliveTasks);
+    /**
+     * 选中态的**回落**：详情面正开着的那条任务如果被删掉（本机删、或另一台
+     * 设备删了同步过来），选中就没了 ⇒ 浮层自己关上。
+     *
+     * 🔴 传的是 `listTasks()` 的**全集**（未删除的所有任务），不是筛完/分组后的
+     * 那一截。写成后者的话，用户切一下视图，正在详情面里看的那条就被判成
+     * "不存在"、面板凭空关掉 —— 而这条规则本身在共享层（`app-host/selection.ts`），
+     * 这里只负责把事实源递进去。
+     *
+     * 🔴 `note` 这一项是 2026-10-04 补的（工单 §8.43）：**这一屏自己就挂着便签编辑层**
+     * （`editingNoteId` 决定 `NoteEditScreen` 开不开），而回落只跑"这一屏递进去的那几类"。
+     * ⚠️ 补它的理由**不是**"当时面板不会自己关"—— 那句话已被 §8.43 第 7 节否证：
+     *   这一屏**无条件挂载**着 `SearchScreen`（`:1156`），它那个喂 `note` 全集的 effect
+     *   在浮层关着的时候也在跑，所以当时那一格有人兜着，界面上看不见缺陷。
+     *   这一行真正移除的是一条隐式依赖：**自己界面的回落曾经寄在别人的挂载策略上**。
+     *   把浮层改成条件挂载（`{searchOpen ? <SearchScreen …/> : null}`，一次很自然的重构）
+     *   就会让它当天变成真缺陷，而判据、门禁、类型检查三层实测全绿（§8.43 第 7 节的 A/B/C 读数）。
+     */
+    const aliveNotes = noteActions === null ? undefined : noteActions.listNotes();
+    pruneSelectionAgainst({
+      task: aliveTasks.map((task) => task.id),
+      ...(aliveNotes === undefined ? {} : { note: aliveNotes.map((note) => note.id) }),
+    });
     if (projectActions) {
       setProjects(projectActions.listProjects());
       setTags(projectActions.listTags());
     }
-  }, [actions, projectActions]);
+  }, [actions, projectActions, noteActions]);
+
+  /**
+   * 离开这一屏时收起"详情"这一层。
+   *
+   * 🔴 这一条**不是**共享层的规则，是移动端的形态决定的：这里的详情是一个
+   * `Modal` 浮层（外壳按标签切屏时会把本屏**卸载**），选中态若留着，
+   * 用户切回「任务」标签就会**凭空弹出一个面板**。
+   * web 恰好相反 —— 详情是常驻列，跨视图保持选中就是它要的东西。
+   *
+   * ⚠️ 所以"移动端要不要也做成常驻栏"仍然是一条待拍的产品决定
+   * （调研 `detail-pane-alignment-and-spaced-review.md` C2 第 6 条），
+   * 本行只是**保持现状**，不是替它做决定。
+   */
+  useEffect(
+    () => () => {
+      selection.select('task', null);
+      // 本屏还挂着搜索那条入口的便签编辑屏（`NoteEditScreen`），同一条理由一起收。
+      selection.select('note', null);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!host) return;
@@ -681,7 +765,7 @@ export function TasksScreen({
           priority={
             badge === null
               ? null
-              : { text: badge, color: tokens[priorityColorToken(task.priority ?? Priority.None)] }
+              : { text: badge, color: tokens[priorityColorToken(task.priority)] }
           }
           repeat={repeat === undefined ? null : describeRecurrenceText(repeat.rule, t, locale)}
         />
@@ -992,6 +1076,7 @@ export function TasksScreen({
             tasks={tasks}
             now={now}
             busyTaskId={busyId}
+            activeTaskId={detailTaskId}
             labels={taskRowLabels}
             renderMeta={renderTaskMeta}
             renderTrailing={renderTaskTrailing}
@@ -999,7 +1084,7 @@ export function TasksScreen({
               runFor(id, actions.toggleCompleted(id));
             }}
             onOpenTask={(id) => {
-              setDetailTaskId(id);
+              selection.select('task', id);
             }}
           />
         ) : view === 'timeline' ? (
@@ -1014,9 +1099,10 @@ export function TasksScreen({
             tasks={tasks}
             today={today}
             now={now}
+            activeTaskId={detailTaskId}
             // 触屏端的排期入口：点行 → 详情表单（横向拖拽与滚动冲突，不搬鼠标手势）。
             onOpenTask={(id) => {
-              setDetailTaskId(id);
+              selection.select('task', id);
             }}
           />
         ) : nothing ? (
@@ -1038,8 +1124,9 @@ export function TasksScreen({
                 runFor(id, actions.toggleCompleted(id));
               }}
               onOpenTask={(id) => {
-                setDetailTaskId(id);
+                selection.select('task', id);
               }}
+              activeTaskId={detailTaskId}
               busyTaskId={busyId}
               labels={taskRowLabels}
               renderMeta={renderTaskMeta}
@@ -1064,7 +1151,7 @@ export function TasksScreen({
           task={detailTask}
           visible={detailTaskId !== null}
           onClose={() => {
-            setDetailTaskId(null);
+            selection.select('task', null);
           }}
           actions={actions}
           projects={projects}
@@ -1093,9 +1180,24 @@ export function TasksScreen({
         }}
         onOpenTask={(id) => {
           setSearchOpen(false);
-          setDetailTaskId(id);
+          selection.select('task', id);
+        }}
+        onOpenNote={(id) => {
+          // 🔴 先关浮层再开编辑屏：两个 `Modal` 同时在场在 Android 上没实测过，
+          //    而"关掉搜索再看这条便签"本来就是用户想要的次序。
+          setSearchOpen(false);
+          selection.select('note', id);
         }}
       />
+
+      {editingNoteId === null ? null : (
+        <NoteEditScreen
+          noteId={editingNoteId}
+          onBack={() => {
+            selection.select('note', null);
+          }}
+        />
+      )}
 
       <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
       <SortPicker

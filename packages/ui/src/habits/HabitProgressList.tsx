@@ -82,8 +82,13 @@ import {
  * 🔴 类型是 `Record<HabitIcon, …>`，所以往 `HABIT_ICONS` 里加第 9 个 key
  *    而没在这里补上，`typecheck` 会直接指出缺哪一项 —— 不会出现"新图标在
  *    清单里静默画成上一个"的错。
+ *
+ * 🔴 **从工单 H3 起这半张表是导出的**：移动端的图标选择器（`HabitsScreen` 详情层）
+ *    必须画**同一批字形**。宿主里再抄一张就是第三份"key → 字形"的事实源 ——
+ *    而它坏的时候的症状是"手机上水滴、web 上月亮"，两边都不报错
+ *    （现有判据 `apps/web/tests/habits-list-pane.spec.tsx` F 组只对着**清单**比那两张）。
  */
-const HABIT_GLYPHS: Record<HabitIcon, HeytaIconData> = {
+export const HABIT_GLYPHS: Record<HabitIcon, HeytaIconData> = {
   drop: Droplet,
   activity: Activity,
   book: BookOpen,
@@ -93,6 +98,39 @@ const HABIT_GLYPHS: Record<HabitIcon, HeytaIconData> = {
   sun: Sun,
   music: Music,
 };
+
+/**
+ * 闭集 key → **名称词条 key**（工单 H3 起也从这里导出）。
+ *
+ * 🔴 为什么放在共享层而不是各端自己抄一份：这一张表**没有平台差异**
+ *    （不像字形：web 配的是 `lucide-react` 组件、共享层配的是 `lucide` 图标数据，
+ *    那两张表结构上必须分开，由 `apps/web/tests/habits-list-pane.spec.tsx` F 组逐对比）。
+ *    宿主里各抄一份"key → 词条"，坏的时候是"手机上那个字形没有名字念出来"，
+ *    而 `Record` 的穷尽性挡不住"某一端少一项"。
+ *
+ * ⚠️ 这里刻意**不 import `@heyta/i18n`**：`packages/ui` 不依赖词条包（依赖清单里就
+ *    没有它），共享层的文案一律由宿主注入（见下面 `HabitProgressListLabels`）。
+ *    所以这张表的值是**字面量联合**而不是 `MessageKey`。两条检查都还在：
+ *      · 穷尽性：`Record<HabitIcon, …>` —— 加第 9 个 key 不补这里就编译不过；
+ *      · 词条存在性：宿主把它交给 `t()` 时，若这个名字不在 `MessageKey` 里，
+ *        **在宿主那一侧**报错。词条改名也同样在宿主侧暴露，不会静默显示 key 字符串。
+ *
+ * 🔴 这些名字描述的是"这个字形**看起来像**什么"（水滴 / 书本），不是"这个习惯该是什么活动" ——
+ *    与 `@heyta/domain#HABIT_ICONS` 文件头那条红线同一条：App 不给活动贴健康标签。
+ */
+export const HABIT_ICON_LABEL_KEYS = {
+  drop: 'web.habits.icon.drop',
+  activity: 'web.habits.icon.activity',
+  book: 'web.habits.icon.book',
+  moon: 'web.habits.icon.moon',
+  leaf: 'web.habits.icon.leaf',
+  pencil: 'web.habits.icon.pencil',
+  sun: 'web.habits.icon.sun',
+  music: 'web.habits.icon.music',
+} as const satisfies Record<HabitIcon, string>;
+
+/** {@link HABIT_ICON_LABEL_KEYS} 的值类型（宿主 `t()` 的入参上界）。 */
+export type HabitIconLabelKey = (typeof HABIT_ICON_LABEL_KEYS)[HabitIcon];
 
 /** 清单全部文案，每一项由宿主注入（见文件头）。 */
 export interface HabitProgressListLabels {

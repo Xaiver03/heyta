@@ -90,7 +90,7 @@ beforeEach(async () => {
     baseUrl: '',
     token: undefined,
     password: undefined,
-    settingsOpen: false,
+    syncSettingsRequested: false,
     signInOpen: false,
   });
   // 首启隐私面板会盖住首屏，也会让"看到了登录表单"这条断言变成假红。

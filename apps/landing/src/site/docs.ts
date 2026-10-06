@@ -469,6 +469,7 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
           'site.docs.selfhost.s7p1',
           'site.docs.selfhost.s7p2',
           'site.docs.selfhost.s7p3',
+          'site.docs.selfhost.s7p4',
         ],
         itemKeys: [
           'site.docs.selfhost.s7i1',
@@ -528,7 +529,7 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
       {
         id: 'why-offline',
         titleKey: 'site.docs.selfhost.s6',
-        bodyKeys: ['site.docs.selfhost.s6p1', 'site.docs.selfhost.s6p2'],
+        bodyKeys: ['site.docs.selfhost.s6p1', 'site.docs.selfhost.s6p2', 'site.docs.selfhost.s6p3'],
         itemKeys: ['site.docs.selfhost.s6i1'],
       },
       {
@@ -598,9 +599,9 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
     moduleId: 'data',
     sections: [
       {
-        id: 'tasks-only',
+        id: 'what-the-trash-holds',
         titleKey: 'site.docs.trash.s1',
-        bodyKeys: ['site.docs.trash.s1p1', 'site.docs.trash.s1p2'],
+        bodyKeys: ['site.docs.trash.s1p1', 'site.docs.trash.s1p2', 'site.docs.trash.s1p3'],
         itemKeys: [
           'site.docs.trash.s1i1',
           'site.docs.trash.s1i2',

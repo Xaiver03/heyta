@@ -243,11 +243,62 @@ export const replaceToken = async (
   return { token, user: { id: userId, email } };
 };
 
+/**
+ * 一枚令牌为什么不能用 —— **必填**，不是可选装饰。
+ *
+ * 存在的理由是一条产品动作：注销账号必须让每台设备真的销毁自己的**明文本地库**
+ * （服务端删完只是删掉密文历史；数据在设备上）。而客户端唯一安全的触发条件是
+ * `ACCOUNT_CLOSED` —— `TOKEN_REVOKED` 是改密 / 管理员强制登出 / passkey 恢复，
+ * 那时用户的数据还在，删库就是毁掉他的数据。
+ *
+ * 这两个原因此前**共用同一句自由文本** `'Account unavailable'`（已注销 vs 邮箱未验证），
+ * 所以"靠调用点各自记得区分"不成立：判据缺失时它会静默走错分支。
+ * 类型上必填 ⇒ 新增的失败分支不声明原因是编译不过的。
+ */
+export type TokenFailureCode =
+  | 'ACCOUNT_CLOSED'
+  | 'ACCOUNT_UNVERIFIED'
+  | 'TOKEN_REVOKED'
+  | 'TOKEN_INVALID';
+
 export type TokenVerificationResult =
   | { valid: true; userId: number; email: string }
-  | { valid: false; reason: string };
+  | { valid: false; reason: string; code: TokenFailureCode };
+
+/**
+ * 这枚字符串**能不能被判定**（结构上），与它"签名对不对"是两件事。
+ *
+ * 🔴 为什么要有这一层（2026-10-05 真机验收量到的，判据在
+ * `tests/account-closed-signal.spec.ts` 的"payload 解不出 JSON 的令牌"那条）：
+ * payload 段不是合法 base64url JSON 时，`jsonwebtoken` 在解码那一步抛的是**裸 `SyntaxError`**
+ * （栈：`jws/lib/verify-stream.js` → `jsonwebtoken/decode.js`），它既不是 `TokenExpiredError`
+ * 也不是 `JsonWebTokenError`，于是落到下面那条"数据库错误必须当 500 传播"的分支被 rethrow。
+ * 同一台服务端、两个请求只差令牌形状的实测：
+ *   `eyJ….0000….sub-not-real` → **HTTP 500** `{"statusCode":500,"error":"Internal Server Error"}`
+ *   结构合法、签名错 → **HTTP 401** `{"error":"Invalid token","code":"TOKEN_INVALID"}`
+ * 代价不是"日志难看"：客户端按**稳定码**判要不要销毁本机明文（ADR-0049），500 没有码，
+ * 于是移动端把"这枚令牌是坏的"渲染成 `同步失败：HTTP 500 — Internal Server Error`，
+ * 而"任何 401 都不许清库"那条负向判据也测不到它想测的那条路径。
+ *
+ * ⚠️ 这里**只**判结构，不判签名与有效期（那些仍由 `jwt.verify` 裁决），
+ * 也**不**碰"DB 错误必须传播成 500"那条既有不变量 —— 它挡的是"读不到库被当成账号已注销"，
+ * 那是会让人删掉自己数据的那一类误判。
+ */
+function isParseableJwt(token: string): boolean {
+  const parts = typeof token === 'string' ? token.split('.') : [];
+  if (parts.length !== 3 || parts.some((part) => part.length === 0)) return false;
+  try {
+    const decoded: unknown = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    return typeof decoded === 'object' && decoded !== null;
+  } catch {
+    return false;
+  }
+}
 
 export const verifyToken = async (token: string): Promise<TokenVerificationResult> => {
+  if (!isParseableJwt(token)) {
+    return { valid: false, reason: 'Invalid token', code: 'TOKEN_INVALID' };
+  }
   try {
     const payload = await new Promise<{
       userId: number;
@@ -274,11 +325,16 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
     });
 
     if (!user) {
+      // 「这枚令牌指向的账号行已经不存在」= 注销过。这一支**不需要墓碑表**：
+      // `DELETE /api/account` 是级联硬删，行没了就是没了，而 `users.id` 由序列发出、
+      // 不复用，所以"查不到"不会被误读成"还没建"。少一张表也少一份注销后仍留存的 PII。
       Logger.warn(`Token verification failed: User ${payload.userId} not found in DB`);
-      return { valid: false, reason: 'Account unavailable' };
+      return { valid: false, reason: 'Account unavailable', code: 'ACCOUNT_CLOSED' };
     }
 
     if (!user.isVerified) {
+      // 同一句 reason、**不同的 code**：邮箱未验证的账号绝不能被客户端当成"已注销"，
+      // 否则一次没点验证链接就把自己所有设备上的数据删了。
       Logger.warn(`Token verification failed: User ${payload.userId} is not verified`);
       authCache.setIfCurrent(
         payload.userId,
@@ -286,7 +342,7 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
         false,
         cacheVersionBeforeRead,
       );
-      return { valid: false, reason: 'Account unavailable' };
+      return { valid: false, reason: 'Account unavailable', code: 'ACCOUNT_UNVERIFIED' };
     }
 
     // Check token version - if it doesn't match, the token has been revoked
@@ -300,6 +356,7 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       return {
         valid: false,
         reason: 'Token was revoked. Please log in again to get a new token.',
+        code: 'TOKEN_REVOKED',
       };
     }
 
@@ -310,12 +367,13 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       return {
         valid: false,
         reason: 'Token expired. Please log in again to get a new token.',
+        code: 'TOKEN_INVALID',
       };
     }
     // Only treat actual JWT errors as "Invalid token" (NotBeforeError extends JsonWebTokenError).
     // Database errors must propagate as 500s, not masquerade as auth failures.
     if (err instanceof JsonWebTokenError) {
-      return { valid: false, reason: 'Invalid token' };
+      return { valid: false, reason: 'Invalid token', code: 'TOKEN_INVALID' };
     }
     const errMsg =
       err instanceof Error ? `[${err.name}] ${err.message}` : 'non-Error value';
