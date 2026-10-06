@@ -438,7 +438,9 @@ PWA 里必然无事发生的「检查更新」· 记忆面板「忘掉」不加�
 ### 9.4 这一刀之后仍然开着的三格（不包装成完成）
 
 1. **外壳整页仍会滚**：主列比视口高时（后台、设置、长列表），rail 与详情栏一起滚上去，
-   "同步常驻左下角"只在**未滚动**时成立。要做成"外壳不滚、每栏各自滚"，
+   "同步常驻左下角"只在**未滚动**时成立。
+   ⚠️ **状态更新（10-06 11:5x）**：这一条的**侧栏那一半已经随 §9.5 落地**（那一列现在有界、自己滚），
+   剩下的正是这里写的"外壳钉死 + `.ht-main` 自己滚"那一半 —— 它仍按本节原来的裁决**单独一单**。要做成"外壳不滚、每栏各自滚"，
    桌面档得照塌缩态那一版做（`narrow.css:9-22`：钉死 `height: 100dvh` + `.ht-main { overflow-y: auto }`）。
    牵动 `calendar-wheel` / `quadrant-fill` / `search-overlay` 三份用窗口滚动的用例，
    以及所有"量元素底边"的判据的参照系 ⇒ **单独一单**，不夹在 H9 里顺手做。
@@ -498,3 +500,37 @@ PWA 里必然无事发生的「检查更新」· 记忆面板「忘掉」不加�
 
 
 
+
+### 9.5 H9 第二刀的落地与读数（2026-10-06 11:2x–11:5x）
+
+B94 揭出的那条旧缺陷（一栏收起 52px ⇒ 整篇文档矮 52px ⇒ `scrollY` 被夹 ⇒ 主区那一行在**静止的指针底下**跳
+⇒ 第一下点击白点）修掉了，但**只修侧栏那一列**：形状照日历线已经踩过的 `.ht-sidebar--calendar`
+（列自己 `position: sticky` + `inset-block-start: 0` + `max-block-size: 100dvh`，滚动交给里面那一层
+`.ht-sidebar__body`），而 `<SidebarResizer/>` **留在滚动层外面** —— 在里面会被 `overflow-x: clip`
+裁掉那 4px 骑在右边缘之外的命中带（日历线写下的第二条后果，臂 B 就是它的证据）。
+
+| 门禁/读数 | 结果 |
+|---|---|
+| `tsc --noEmit -p tsconfig.detail-pane.json`（e2e 的类型载体） | RC=0 |
+| `e2e/tests/shell-sidebar-height.spec.ts` | **2 passed**（X1 真手势；X2 把手几何） |
+| 牙齿台 `tmp/h7-readings/h9-sidebar-teeth-arm.sh` | `ARM_RED_OK=A-unbounded-sidebar`（只拿掉 `max-block-size` ⇒ 红在**症状**那条「第一下点击没打开」，X2 绿）／`ARM_RED_OK=B-wrong-scroll-host`（在列上直接写 `overflow-y: auto` ⇒ 红在**「命中带被祖先裁掉」**，X1 绿）／`BACK_TO_CLEAN=OK`／`SIDE_TEETH_FAILS=0` |
+| B94 §4 的收口判据（那两枚红要自己变绿） | `detail-pane-task` + `task-organize` + 本单两份 = **19 passed，RC=0**（同一趟、同一载体） |
+| `check:design` | ✅ 无硬编码设计变量 |
+| 图 | `apps/web/evidence/shell-sidebar-height/{before-first-click,after-first-click,resizer-hit-box}.png`，**三张都打开看过** |
+
+🔴 **这一刀真正的产出是夹具上的两条**（细节入档 traps **#355**）：
+① 第一版臂台里，坏形态**没有**让"第一下点击"那条红 —— 因为夹具只建了 1 条任务，页面不滚，
+`scrollY` 恒 0，那一跳**结构上不可能发生**。现在触发条件本身是三条断言（`docH > vh`、
+`scrollY` 停在最大值、内联表单 `aria-expanded="true"`），夹具改成"8 条清单撑高侧栏 + 8 条任务撑高主区"。
+② 机制快照取在 `mouse.down()` 与 `mouse.up()` **之间**：取在 `up` 之后，编辑器自己撑高会和"收起 52px"混成同一格。
+③ 顺带更正 B94 §3 的归因：收起挂在**面板外的捕获 `pointerdown`** 上（`ProjectsPanel.tsx:107-128` 那段注释
+连"为什么不能挂 `blur`"都写了），不是"失焦"—— 探针读到的焦点变化只是伴随事实，而**错归因直接错到了夹具上**。
+
+**本节 §9.4 第 1 条的状态**：只完成了侧栏那一半。`.ht-app` 仍是 `min-height: 100dvh`、`.ht-main` 仍不自己滚 ⇒
+**外壳整页滚这件事没变**，rail 与详情栏仍会跟着滚上去。看图时顺手记下一条给那条：最靠下那一行的整理编辑器
+**朝下弹**，底边掉到折叠线以下（`after-first-click.png` 里"清单"那一格被切一半）。今天它靠整页滚还够得着，
+而 §9.4 第 1 条落地之后那一档会变成**够不着** ⇒ 那条单做的时候必须一并处理浮层的弹出方向。
+
+⚠️ 台账卫生（不是本单的活，登记给下一位读号的人）：`docs/reference/environment-traps.md` 的工作树里
+**#342 出现了两枚**（HEAD 里 0 枚 ⇒ 两枚都来自未提交那批），而 **#344–#351 是空号**、
+#326–#343 物理上排在 #352–#355 之前。拿裸号去读正文前先确认是哪一批。

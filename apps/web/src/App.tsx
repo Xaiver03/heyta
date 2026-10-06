@@ -1989,53 +1989,64 @@ export function App(): React.JSX.Element {
       */}
       {view === 'tasks' ? (
         <nav className="ht-sidebar" aria-label={t('web.shell.nav.scopeAria')}>
-          <div className="ht-nav">
-            {PRIMARY_NAV.map((entry) => (
-              <NavButton
-                key={entry.labelKey}
-                entry={entry}
-                count={
-                  entry.filter.kind === 'today'
-                    ? navCounts.today
-                    : entry.filter.kind === 'next7Days'
-                      ? navCounts.next7Days
-                      : entry.filter.kind === 'completed'
-                        ? navCounts.completed
-                        : undefined
-                }
-                active={isActive(store.filter, entry.filter)}
-                onClick={() => goToFilter(entry.filter)}
-              />
-            ))}
-          </div>
-
           {/*
-            侧栏这一节就叫**「四象限」** —— 它列的就是那四个象限，名字直说。
-
-            ⚠️ 这里一度被我改成「按象限筛选」，理由是它与 rail 里的**四象限视图**同名。
-            产品负责人当场否掉：**侧栏列的是四个象限，叫「四象限」才对**。
-            ⇒ 我记下的"同名冲突"确实存在（点它会 `setView('tasks')`，得到的是
-            任务列表的一个筛选，不是那个 2×2 网格视图），但**解法不是改名字**。
-            真要动，动的是**行为**（或者让 rail 的那个视图换个名字），
-            而不是把用户认得的词从侧栏拿掉。
+            🔴 这一层 `.ht-sidebar__body` 是**这一列唯一的滚动区**，而右边缘那枚
+            `SidebarResizer` **刻意留在它外面**（是 `<nav>` 的直接孩子）。
+            理由两条都在 `sidebar.css` 的 `.ht-sidebar` 那条注释里写死了：
+            ① 这一列必须有界，否则"新建清单"那个内联表单在面板外一次 pointerdown 上收起 52px 会缩短**整篇文档**，
+               别的列就在指针底下跳走（实测把行尾整理触发器的第一下点击作废，BLOCKED.md B94）；
+            ② 有界的方式不能是"在 `<nav>` 上写 `overflow-y: auto`" —— 那会连带把
+               `overflow-x` 变成 `clip`，而把手的命中带有 4px 骑在右边缘之外，会被裁掉一半。
           */}
-          <div className="ht-nav__section ht-type-group-label">{t('web.shell.nav.quadrantSection')}</div>
-          <div className="ht-nav">
-            {QUADRANT_NAV.map((entry) => (
-              <NavButton
-                key={entry.labelKey}
-                entry={entry}
-                count={
-                  entry.filter.kind === 'quadrant'
-                    ? counts[entry.filter.quadrant]
-                    : undefined
-                }
-                active={isActive(store.filter, entry.filter)}
-                onClick={() => goToFilter(entry.filter)}
-              />
-            ))}
+          <div className="ht-sidebar__body">
+            <div className="ht-nav">
+              {PRIMARY_NAV.map((entry) => (
+                <NavButton
+                  key={entry.labelKey}
+                  entry={entry}
+                  count={
+                    entry.filter.kind === 'today'
+                      ? navCounts.today
+                      : entry.filter.kind === 'next7Days'
+                        ? navCounts.next7Days
+                        : entry.filter.kind === 'completed'
+                          ? navCounts.completed
+                          : undefined
+                  }
+                  active={isActive(store.filter, entry.filter)}
+                  onClick={() => goToFilter(entry.filter)}
+                />
+              ))}
+            </div>
+
+            {/*
+              侧栏这一节就叫**「四象限」** —— 它列的就是那四个象限，名字直说。
+
+              ⚠️ 这里一度被我改成「按象限筛选」，理由是它与 rail 里的**四象限视图**同名。
+              产品负责人当场否掉：**侧栏列的是四个象限，叫「四象限」才对**。
+              ⇒ 我记下的"同名冲突"确实存在（点它会 `setView('tasks')`，得到的是
+              任务列表的一个筛选，不是那个 2×2 网格视图），但**解法不是改名字**。
+              真要动，动的是**行为**（或者让 rail 的那个视图换个名字），
+              而不是把用户认得的词从侧栏拿掉。
+            */}
+            <div className="ht-nav__section ht-type-group-label">{t('web.shell.nav.quadrantSection')}</div>
+            <div className="ht-nav">
+              {QUADRANT_NAV.map((entry) => (
+                <NavButton
+                  key={entry.labelKey}
+                  entry={entry}
+                  count={
+                    entry.filter.kind === 'quadrant'
+                      ? counts[entry.filter.quadrant]
+                      : undefined
+                  }
+                  active={isActive(store.filter, entry.filter)}
+                  onClick={() => goToFilter(entry.filter)}
+                />
+              ))}
+            </div>
+            <ProjectsPanel onFilterWith={goToFilter} />
           </div>
-          <ProjectsPanel onFilterWith={goToFilter} />
           {/* 右边缘的拖拽手柄（绝对定位在这一列上，不占布局）。 */}
           <SidebarResizer />
         </nav>

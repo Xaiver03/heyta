@@ -92,8 +92,21 @@
     justify-content: space-around;
     border-right: none;
     border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
+    /* 🔴 桌面态那三条"有界 + 钉住"（工单 H9 第二刀，理由见 `sidebar.css`）在这里全部收回：
+       塌缩态这一列是网格 `1fr auto` 的**第二行**，横向一条底部导航，
+       留着 `sticky` 没有意义（它已经在文档末尾、不会滚走），
+       而 `max-block-size: 100dvh` 会让一条本该按内容长的横条被视口高度限制住。
+       内层 `.ht-sidebar__body` 的纵向滚动同理要改回不滚。 */
+    position: static;
+    max-block-size: none;
     /* 刘海屏安全区 */
     padding-block-end: max(var(--ht-space-2), env(safe-area-inset-bottom));
+  }
+
+  /* 塌缩态这一列是横着的一条，里面那一层跟着横排；它没有"纵向滚"这件事。 */
+  .ht-sidebar__body {
+    flex-direction: row;
+    overflow-y: visible;
   }
 
   /* 🔴 塌缩态里侧栏已经是**横着的一条底部导航**，"拖它的右边缘"没有语义。
