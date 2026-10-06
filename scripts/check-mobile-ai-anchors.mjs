@@ -713,6 +713,62 @@ function proposalDenominator(scriptRel) {
   return red;
 }
 
+/**
+ * 判据 ⑰：收尾必须挂在**退出路径**上，而"清干净"必须是判据。
+ * rig41 现量：第 11 步 `summary … 1` 中止 ⇒ 第 14 步（摘 reverse + kill 假端点）从来没跑到，
+ * 机器上留下一枚 `ppid=1` 的桩和一条 `adb reverse`；下一轮的 readiness 只问"有没有人答"，
+ * 于是借用上一轮的桩（#341）。而固定名的 pidfile 会被下一轮起跑第一句 `rm -f` 抹掉 ⇒
+ * **清理凭据本身就是会被销毁的证据**（#342）。
+ */
+function teardownInvariant(scriptRel) {
+  const full = codeOf(readFileSync(join(ROOT, scriptRel), 'utf8'));
+  const body = helperBody(scriptRel, 'teardown_rig');
+  if (body === null) return null; // 抽不到定义 ⇒ 让调用它的臂红，而不是"这几臂不存在"
+  const bodyCode = codeOf(body);
+  const red = [];
+
+  // ① 注册在 EXIT trap 上，并且**早于** spawn 假端点那一行（晚注册等于这一轮没人接）。
+  const trapIdx = full.search(/trap '[^']*teardown_rig[^']*' EXIT/);
+  const spawnIdx = full.search(/nohup "\$NODE" "\$HEYTA_REPO_ROOT\/e2e\/stub-provider\.mjs"/);
+  if (trapIdx === -1 || spawnIdx === -1 || trapIdx > spawnIdx) {
+    red.push(
+      '收尾没有注册在 spawn 假端点之前的 EXIT trap 上 ⇒ 任何一步 `summary … 1/3` 中止都是 exit，' +
+        '写在最后一步的清理其实只在成功路径上执行，桩与 adb reverse 留给下一轮（#342）。',
+    );
+  }
+
+  // ② teardown 里那两件动作必须在，而且 kill 之前要核对 argv（pid 会复用，光看号码可能动到别人）。
+  if (
+    !/reverse --remove/.test(bodyCode) ||
+    !/kill -TERM/.test(bodyCode) ||
+    !/ps -o args=/.test(bodyCode) ||
+    !/stub-provider\.mjs/.test(bodyCode)
+  ) {
+    red.push(
+      'teardown_rig 少了"摘 reverse / kill / 按 argv 核对那枚是本脚本的桩"里的一环 ⇒ ' +
+        '要么残留照旧，要么按号 kill 打到别人的进程。',
+    );
+  }
+
+  // ③ 清理凭据按轮隔离。
+  if (!/STUB_PIDFILE="[^"]*\$\$[^"]*"/.test(full)) {
+    red.push(
+      'pidfile 是固定名（不带本轮 $$）⇒ 下一轮起跑的 `rm -f "$STUB_PIDFILE"` 抹掉的是上一轮那份' +
+        '"该关谁"的记录，清理按 pidfile 找人时找的已不是该找的那枚（#342）。',
+    );
+  }
+
+  // ④ 第 14 步是判据：清没清都要读，不许只在"有东西可清"时打印一行。
+  const tail = full.slice(full.indexOf('step "14.'));
+  if (!/STUB_GONE/.test(tail) || !/bad "[^"]*监听者/.test(tail) || !/bad "[^"]*反向代理/.test(tail)) {
+    red.push(
+      '第 14 步没有把"端口上已无监听者 / reverse 清单里已无这一枚"写成 ok／bad 判据 ⇒ ' +
+        '"没东西可清"和"什么都没清"在日志上长得一样，逐轮累积的那条路不会自己出声（元规则二）。',
+    );
+  }
+  return red;
+}
+
 function run() {
   const files = walk(join(ROOT, SRC_ROOT));
   if (files.length === 0) {
@@ -901,13 +957,23 @@ function run() {
   for (const line of proposalRed) console.log(`提案分母\t${line}`);
   console.log(`PROPOSAL_SUMMARY 红=${String(proposalRed.length)}`);
 
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0) {
+  // ── 判据 ⑰：收尾挂在退出路径上，且"清干净"是判据（traps #342）──
+  const teardownRed = teardownInvariant(scriptRel);
+  if (teardownRed === null) {
+    console.error('🔴 取不到 teardown_rig 的函数体 —— 探针没输入，不报"收尾有人管"');
+    process.exit(2);
+  }
+  for (const line of teardownRed) console.log(`收尾判据\t${line}`);
+  console.log(`TEARDOWN_SUMMARY helper 取得到=1 红=${String(teardownRed.length)}`);
+
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0 || teardownRed.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
       '，双引号文案里的反引号=' + String(backtickRed.length) +
       '，移动侧能力字段缺口=' + String(capRed.length) + '，装包通道=' + String(installRed.length) + '，滚动方向=' + String(dirRed.length) + '，规则句诚实性=' + String(honesty.red.length) +
       '，授权期望值=' + String(consentRed.length) +
-      '，隧道断言=' + String(tunnelRed.length) + '，提案分母=' + String(proposalRed.length) + '。' +
+      '，隧道断言=' + String(tunnelRed.length) + '，提案分母=' + String(proposalRed.length) +
+      '，收尾判据=' + String(teardownRed.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
       '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
@@ -1286,6 +1352,35 @@ if (process.argv.includes('--self-test')) {
   arms.push(['臂 46 的变异确实改了期望值（前置）', mutP46 !== baseTun && mutP46.includes('[ "$S1" = "$S0" ]')]);
   const m46 = runMutantFile(mutP46, 'count-expectation-lost');
   arms.push(['臂 46 计数期望值不再是恰好 +1 ⇒ 非零退出且点名', m46.code !== 0 && m46.out.includes('恰好 +1 的期望值被退成')]);
+
+  // ── 判据 ⑰（收尾挂在退出路径上，"清干净"是判据 —— traps #342）的臂 ──
+  //   rig41 现量：第 11 步中止 ⇒ 第 14 步从没跑到 ⇒ 4399 上留下一枚 ppid=1 的桩和一条 adb reverse，
+  //   下一轮就绪循环只问"有没有人答"就借用了它。这几臂证明现在会红，而不是证明今天绿。
+  const dReal = teardownInvariant(DEFAULT_SCRIPT);
+  arms.push(['臂 47 真脚本 teardown_rig 取得到、⑰ 不误红（探针确有输入）', dReal !== null && dReal.length === 0]);
+  // 臂 48：把 EXIT trap 摘回"只删快照"那一版（= rig41 跑过的形状）⇒ 必须红。
+  const mutTun48 = baseTun.replace(`trap 'rm -f -- "$0"; declare -F teardown_rig >/dev/null && teardown_rig' EXIT`, `trap 'rm -f -- "$0"' EXIT`);
+  arms.push(['臂 48 的变异确实把收尾从 EXIT trap 上摘掉了（前置）', mutTun48 !== baseTun && !mutTun48.includes("teardown_rig' EXIT")]);
+  const m48 = runMutantFile(mutTun48, 'teardown-not-on-exit');
+  arms.push(['臂 48 收尾不挂退出路径 ⇒ 非零退出且点名', m48.code !== 0 && m48.out.includes('收尾没有注册在 spawn 假端点之前')]);
+  // 臂 49：pidfile 退回固定名 ⇒ 必须红（清理凭据会被下一轮起跑的 rm -f 抹掉）。
+  const mutTun49 = baseTun.replace('STUB_PIDFILE="/tmp/heyta-ai-stub.$$.pid"', 'STUB_PIDFILE="/tmp/heyta-ai-stub.pid"');
+  arms.push(['臂 49 的变异确实把 pidfile 改成固定名（前置）', mutTun49 !== baseTun && !mutTun49.includes('heyta-ai-stub.$$.pid')]);
+  const m49 = runMutantFile(mutTun49, 'shared-pidfile');
+  arms.push(['臂 49 清理凭据共享一个名字 ⇒ 非零退出且点名', m49.code !== 0 && m49.out.includes('pidfile 是固定名')]);
+  // 臂 50：把第 14 步"端口还坐着东西"从 bad 退成一 ↷ 打印 ⇒ 必须红。
+  const mutTun50 = baseTun.replace('bad "${STUB_PORT} 仍有监听者', 'echo "   ↷ ${STUB_PORT} 仍有监听者');
+  arms.push(['臂 50 的变异确实把那条 bad 退成打印（前置）', mutTun50 !== baseTun && mutTun50.includes('↷ ${STUB_PORT} 仍有监听者')]);
+  const m50 = runMutantFile(mutTun50, 'teardown-not-a-claim');
+  arms.push(['臂 50 收尾不再打分 ⇒ 非零退出且点名', m50.code !== 0 && m50.out.includes('第 14 步没有把')]);
+  // 臂 51：摘掉 kill 之前的 argv 核对 ⇒ 必须红（按号 kill 可能打到别人的进程）。
+  const mutTun51 = baseTun.replace(
+    `ps -o args= -p "$sp" 2>/dev/null | grep -q "e2e/stub-provider.mjs"`,
+    `ps -p "$sp" >/dev/null 2>&1`,
+  );
+  arms.push(['臂 51 的变异确实摘掉了 argv 核对（前置）', mutTun51 !== baseTun && !mutTun51.includes('ps -o args= -p "$sp"')]);
+  const m51 = runMutantFile(mutTun51, 'kill-without-argv');
+  arms.push(['臂 51 按号码就 kill ⇒ 非零退出且点名', m51.code !== 0 && m51.out.includes('teardown_rig 少了')]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
