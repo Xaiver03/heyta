@@ -16,7 +16,26 @@ case "$(basename "$0")" in
     exec bash "$_snap" "$@"
     ;;
 esac
-trap 'rm -f -- "$0"' EXIT
+# 🔴 收尾挂在 EXIT trap 上，不能只写在第 14 步：rig 中途任何 `summary … 1/3` 都是 exit，
+#    第 14 步从来不会跑到 ⇒ 假端点进程和 adb reverse 留在机器上被下一轮继承。
+#    rig41 现量：4399 上那枚桩 ppid=1、09:31 起，正是上一趟第 11 步中止留下的；
+#    下一轮的 readiness 循环只问"有没有带 count 的 JSON"，就会**借用别人的桩**继续跑
+#    （traps #340/#341）。第 14 步仍然保留，它把"清干净"当成一条判据来读。
+teardown_rig() {
+  if [ -n "${ADB:-}" ] && [ -n "${STUB_PORT:-}" ]; then
+    $ADB reverse --remove "tcp:${STUB_PORT}" >/dev/null 2>&1 || true
+  fi
+  [ -n "${STUB_PIDFILE:-}" ] && [ -f "$STUB_PIDFILE" ] || return 0
+  local sp
+  sp=$(head -1 "$STUB_PIDFILE" | tr -dc '0-9')
+  # 只关 argv 里确实带着本脚本那枚 stub-provider 的 pid：pid 会被复用，光看号码可能动手动到别人
+  if [ -n "$sp" ] && ps -o args= -p "$sp" 2>/dev/null | grep -q "e2e/stub-provider.mjs"; then
+    kill -TERM "$sp" 2>/dev/null || true
+    echo "   · 收尾：关掉本轮起的假端点 pid=${sp}（只关这一枚，它是本脚本自己 spawn 的）" >&2
+  fi
+  rm -f "$STUB_PIDFILE"
+}
+trap 'rm -f -- "$0"; declare -F teardown_rig >/dev/null && teardown_rig' EXIT
 #
 # 移动端「AI 助手」真机验收（真模拟器 + 真服务端 + 确定性假端点，零 mock 产品代码）
 # ============================================================================
@@ -133,8 +152,11 @@ LAPTOP_DB="/tmp/heyta-ai-laptop.sqlite"
 PHONE_DB="/tmp/heyta-ai-phone.sqlite"
 PREFS_DB="${HEYTA_PREFS_DB:-/tmp/heyta-device-prefs.sqlite}"   # 与 PHONE_DB 同一个旋钮家族
 EVIDENCE="$HEYTA_REPO_ROOT/apps/mobile/evidence"
-STUB_LOG="/tmp/heyta-ai-stub.log"
-STUB_PIDFILE="/tmp/heyta-ai-stub.pid"
+STUB_LOG="/tmp/heyta-ai-stub.$$.log"
+# 🔴 pidfile 必须带本轮 pid：固定名时下一轮起跑的 `rm -f "$STUB_PIDFILE"`（见假端点那一步）
+#    会把上一轮那份抹掉，而收尾是按 pidfile 找人的 ⇒ 第 14 步永远关不到该关的那枚，
+#    泄漏逐轮累积（rig41 现量：4399 上的桩 ppid=1）。带 `$$` 之后每一轮只可能动自己那一枚。
+STUB_PIDFILE="/tmp/heyta-ai-stub.$$.pid"
 
 # 种子与断言输入的 needle 一律 ASCII；**断言用的界面文案**才用中文，逐字取自
 # packages/i18n 的 zh-CN 表（`check:verify-script-copy` 就是拿那张表对账这些串）。
@@ -522,6 +544,8 @@ leave_assistant() {
   if [ -z "$(rid_center assistant-back)" ]; then
     return 0          # 没开着助手层 ⇒ 不用收（这条不报错，它是"顺手收一层"）
   fi
+  # 🔴 收成了也要留一行：只在坏的时候出声的步骤，日志上读起来和"从没执行过"一模一样
+  echo "   · 助手层还立着 ⇒ 走它自己的出口收掉（罩着时底部标签不在树里）"
   tap_rid assistant-back || { echo "   ❌ 助手层的返回键（testID=assistant-back）点不动" >&2; return 1; }
   scroll_to_top
   return 0
@@ -1083,6 +1107,9 @@ tunnel_or_environment_fail() {  # <这一步的名字>
     echo "   ❌ 设备够不到假端点（${1}：${TUNNEL_WHY}）—— 探针的通道断了，**不记为产品失败**"
     summary "移动端 AI 助手真机验收" "设备够不到假端点（${1}）—— 环境不成立，不是产品失败" 3
   fi
+  # 🔴 成功也要留一行：一条只在坏的时候出声的判据，日志上读起来和"从没执行过"一模一样
+  #    （#191 那一族：挂在执行上的门禁，没执行时安静地报绿）。
+  echo "   · 通道已证（${1}：设备里的 /__probe 被数到了）"
 }
 
 feature_lines() {
@@ -1709,9 +1736,7 @@ echo "   ⓘ 设备侧未覆盖：「本机规则命中 ⇒ 零外发」这一�
 echo "     已证的是 5c：只用本机档下任何一次发送都到不了端点；**不许**把 5c 的计数没动读成规则短路的证据。" >&2
 
 # 发完停在失败面 ⇒ 先退出助手屏再走第 6 步（探针留下的状态就是后续判据的输入，#83.1）
-if [ -n "$(rid_center assistant-back)" ]; then
-  tap_rid assistant-back || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
-fi
+leave_assistant || summary "移动端 AI 助手真机验收" "助手层收不掉（它的出口点不动），第 6 步没有屏可点" 1
 
 step "6. 同意联网，但逐功能授权一律不给"
 open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
@@ -2020,6 +2045,10 @@ if [ "$APPLIED" = "0" ]; then
 elif [ "$(has_sub "已写入备注")" = "1" ]; then ok "写完有回执那句"; else bad "写完没有回执（用户看不出这件事发生了）"; fi
 
 step "11. 出得去：手机同步出去（服务端只存密文 ⇒ 只数条数）"
+# 🔴 第 10 步停在助手面的回执上，而助手层立着时**底部标签不在树里**（同一形状见上面
+#    leave_assistant 的注释）。rig41 现量：这里连三发「我的」都读成"标记 立即同步 没出现"，
+#    红字指向同步，而真正坏的是"根本没离开助手面"—— 探针留下的状态是后续判据的输入（#83.1）。
+leave_assistant || summary "移动端 AI 助手真机验收" "助手层收不掉（它的出口点不动），第 11 步没有屏可点" 1
 goto_me_page || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
 ensure_phone_sync
 S=$(phone_sync) && ok "手机同步出去（${S}s）" || bad "手机同步没完成 —— 第 12 步的下载判据没有上游"
@@ -2069,13 +2098,23 @@ fi
 echo "   ↷ 图在这里，**人要打开看**（AGENTS §6.2 规定一）：$EVIDENCE/android-ai-*.png"
 
 step "14. 收尾对账：不能留下 adb 反向代理与假端点进程"
-$ADB reverse --remove "tcp:${STUB_PORT}" >/dev/null 2>&1 || true
-if [ -f "$STUB_PIDFILE" ]; then
-  SP=$(head -1 "$STUB_PIDFILE" | tr -dc '0-9')
-  if [ -n "$SP" ] && ps -p "$SP" >/dev/null 2>&1; then
-    kill -TERM "$SP" 2>/dev/null || true
-    echo "   ✅ 关掉本轮起的假端点 pid=${SP}（只关这个，它是本脚本自己 spawn 的）"
-  fi
-  rm -f "$STUB_PIDFILE"
+# 🔴 这一步是**判据**，不是清理动作：旧形状只在"有东西可清"时打印一行，什么都没清时它一声不响地过，
+#    于是"上一轮的桩还活着"这件事一路没人报，直到下一轮借用别人的桩（traps #341）。
+#    现在无论清没清，都要求这一轮结束时该端口上**没有**监听者、reverse 清单里**没有**这一枚。
+teardown_rig
+STUB_GONE=0
+for _ in $(seq 1 10); do
+  if [ -z "$(lsof -nP -tiTCP:"${STUB_PORT}" -sTCP:LISTEN 2>/dev/null | tr -d '\r')" ]; then STUB_GONE=1; break; fi
+  sleep 0.5
+done
+if [ "$STUB_GONE" = "1" ]; then
+  ok "${STUB_PORT} 上已无监听者（本轮那枚 pid=${STUB_PID} 关掉了，reverse 也摘了）"
+else
+  bad "${STUB_PORT} 仍有监听者 —— 假端点泄漏到下一轮（占着的：$(lsof -nP -tiTCP:"${STUB_PORT}" -sTCP:LISTEN 2>/dev/null | tr -d '\r' | head -1)）"
+fi
+if $ADB reverse --list 2>/dev/null | grep -q "tcp:${STUB_PORT}"; then
+  bad "adb 反向代理没摘干净（下一轮的设备通道会被这条残留影响）"
+else
+  ok "adb reverse 清单里没有 tcp:${STUB_PORT}"
 fi
 summary "移动端 AI 助手真机验收"
