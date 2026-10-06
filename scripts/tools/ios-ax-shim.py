@@ -204,6 +204,14 @@ def find(nodes, label, want_pressable, want_field, role, exact_only=False, occur
     `exact_only`（--exact）把退化也关掉：当"精确打不中"本身就是判据时
     （composer_open / 关闭确认），子串退化会把撞车元素当成命中 —— 恒真判据
     比没有判据更糟（§7 元规则 2）。
+
+    🔴 **`id:<testID>` 前缀走 `AXUniqueId`，不看标签**（2026-10-06 现量：
+    `idb ui describe-all` 的节点里带 `AXUniqueId`，「我的」页那 11 枚逐字是
+    RN 的 testID —— `profile-entry-settings` / `notes-input` …）。
+    这条通道与 Android 的 `resource-id` 是**同一个约定**（`rid:` / `id:` 前缀），
+    所以两个端可以用**同一份锚点词表**对账源码声明。
+    为什么不能只用标签：文案会跟着 i18n 与 hint 变，而 Android 那侧已经实测过一次
+    "标签被合成成 `"设置, 同步凭据、桌面小组件与语言"` ⇒ 精确匹配恒取空"。
     """
     pool = nodes
     if want_field:
@@ -212,6 +220,11 @@ def find(nodes, label, want_pressable, want_field, role, exact_only=False, occur
         pool = [n for n in pool if is_pressable(n)]
     if role:
         pool = [n for n in pool if (n.get("role") or n.get("type") or "") == role]
+
+    if label and label.startswith("id:"):
+        want_id = label[3:]
+        hits = [n for n in pool if (n.get("AXUniqueId") or "") == want_id]
+        return hits[occurrence] if occurrence < len(hits) else None
 
     if label and label != "-":
         exact = [n for n in pool if label_of(n) == label]
@@ -226,6 +239,20 @@ def find(nodes, label, want_pressable, want_field, role, exact_only=False, occur
 
     # 标签是 `-`：只要有一个符合类别约束的就行（原 AXPRESS 的 `-` 语义）
     return pool[occurrence] if occurrence < len(pool) else None
+
+
+NO_ID_CHANNEL = "tree-has-no-AXUniqueId"
+
+
+def id_channel_warning(nodes, label):
+    """用了 `id:` 前缀，而**整棵树里一枚 `AXUniqueId` 都没有** ⇒ 这是探针/桥的问题，
+    不是"那个控件没渲染"。不报出来就会把"载体读不到通道"当成产品红（§7 元规则一），
+    也会让第 2 步那类"入口不在树里"的反向判据恒成立。"""
+    if label and label.startswith("id:") and nodes and not any(
+        (n.get("AXUniqueId") or "") for n in nodes
+    ):
+        return NO_ID_CHANNEL
+    return ""
 
 
 def frame_of(n):
@@ -527,6 +554,7 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
     if node is None and nodes is None:
         out["scrollRc"] = "tree-empty-repeated"
         return out
+    out["detail"] = id_channel_warning(nodes or [], label)
     swipes = 0
     recoveries = 0
     while node is not None and swipes < 10:
@@ -849,11 +877,14 @@ def main():
     if node is None:
         # found=False 是**给调用方断言用的**，不是"工具坏了"。
         # 原 AXPRESS 也是这个语义：查询失败不影响退出码，由调用方判。
+        # 🔴 但 `id:` 前缀那一档要再分一层：整棵树都没有 AXUniqueId 时，"没找到"
+        #    说的是桥，不是界面 —— 那句话必须由 detail 带出来（见 id_channel_warning）。
+        warn = id_channel_warning(nodes or [], args.label)
         if args.press:
-            emit({"result": "not-found"})
+            emit({"result": "not-found", "detail": warn})
         else:
             emit({"found": "False", "x": "0", "y": "0",
-                  "width": "0", "height": "0", "enabled": "False", "detail": ""})
+                  "width": "0", "height": "0", "enabled": "False", "detail": warn})
         return 0
 
     x, y, w, h = frame_of(node)
