@@ -687,7 +687,8 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
             node, nodes = locate_now()
             if node is not None:
                 out["scrollRc"] = f"recovered-after-{recoveries}"
-                return scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence)
+                return scroll_into_view(idb, companion, udid, label, want_pressable, want_field,
+                                        role, occurrence, within)
             if nodes is None:
                 # 恢复拖拽之后树读空了：停手，绝不能拿着坏数据再拖一次。
                 out["scrollRc"] = "tree-empty-repeated"
