@@ -162,6 +162,20 @@ press_label() {  # <标签>
   }
   ax "$1" --pressable --press --json >/dev/null 2>&1
 }
+# 🔴 底部标签**不许**走 scroll-into-view。shim 的"可见"是给滚动区里的元素算的，
+#   标签栏不在滚动区里 ⇒ 它回 `visible≠True`、按压被整句跳过、界面停在原地，
+#   而下一句读到的"入口不在树里"就被报成"产品没渲染那一格"。
+#   rig47b 第 2 步现量：`我的` 用 `--pressable` 找得到（321,776 80×64）、直接 `--press`
+#   回 `success`、按下之后 `id:profile-entry-settings` 立刻 found=True ——
+#   三件事一起证明那一格从头到尾都在，缺的只是这一次按压。
+#   同一条教训在 Android 侧记在 verify-mobile-ios.sh 的底部标签那段头上（#339 那族：
+#   同一个缺陷只修一枚 helper 等于没修）。
+press_tab() {  # <标签> → 0 = 这次按压真的送进了设备
+  local r
+  r=$(jget "$(ax "$1" --pressable --press --json)" result)
+  [ "$r" = "success" ] || { echo "   · 按底部标签「$1」没落地（result=${r:-空}）" >&2; return 1; }
+  return 0
+}
 # 一枚**块内**的 chip：五档功能块里各有一枚同名端点 chip（端点标签），
 # 只按标签会打到第一次出现的那一枚 ⇒ `--within` 按锚点矩形收窄（与 Android 的
 # `xy_in_rid` 同一个语义，两端共用一份锚点词表对账）。
@@ -255,7 +269,7 @@ enabled_id() {  # <testID> → 0 = enabled=True
 #    「非回环端点没存进去」）。探针留下的状态就是后续判据的输入（§7 第 83.1 条），
 #    所以"收层"是导航的一部分，不是可选项。
 goto_me_page() {  # 只负责按下并留渲染时间；到没到由调用方的锚点判
-  press_label "$TAB_ME" || return 1
+  press_tab "$TAB_ME" || return 1
   sleep 2
 }
 leave_assistant() {
@@ -541,9 +555,10 @@ fi
 ok "已离开首启面板，进入主屏"
 
 step "2. 判据①（反向那一半）：配端点之前「AI 助手」入口整行不在树里"
-# 切到「我的」：底部标签不在 shim 的"可见"定义里（它给滚动区让位），走直接按压。
-press_label "$TAB_ME" || true
-sleep 3
+# 切到「我的」：底部标签走 press_tab（**不滚**，理由写在那枚 helper 头上）。
+#   rig47b 现量：这句原来调的是 press_label ⇒ 滚动判据把标签栏判成"不可见"、按压被跳过，
+#   于是三条邻锚全空，报出来的是"探针没落到这一页"（那一格自己救了自己）。
+goto_me_page || echo "   · 底部标签没按下 —— 下面的同帧邻锚就是唯一能分辨「停在哪儿」的证据"
 # 🔴 反向判据必须有**同帧**的正向对照，否则"读不到"与"没渲染"在输出上长得一模一样。
 #   这里同时当两件事用：① 桥与 `AXUniqueId` 通道是通的（整棵树没有一枚 AXUniqueId 时
 #   `id:` 前缀会恒取空，那条反向判据就变成装饰）；② 页面确实停在「我的」。
