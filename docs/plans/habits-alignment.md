@@ -149,6 +149,10 @@ H6 HabitLog.note ── 一条决定，不阻塞别人
       本批单独取到的门禁读数（不含 e2e 全族）：`-r typecheck`（domain/ui/app-host/web/mobile）rc=0、
       `check:layering` rc=0、`check:ui-language` rc=0（词条 zh-CN 3250 = en 3250）、
       `check:design` rc=0、`check:docs` 无死链。
+      ⚠️ **19:2x 现量：最后那半句只对当时那棵树成立** —— `check:docs` 现在红 2 处，
+      两处都指向 CI/代理那条线今天新写、**尚未提交**的 `docs/research/ci-proxy-traffic-attribution.md`
+      （宿主 `docs/README.md` 与 `docs/runbooks/ci-and-runner.md` 也未提交）。
+      不是本批引入，也不是仓库里的链接烂了 —— 成因与"他们 add 即自愈"的处置在 `BLOCKED.md` B100 第 6 格。
 - [x] 习惯面的 e2e 用例**在当前产物上**重跑，截图逐张打开看过，主蓝数得出（§7 第 82 条）；
       载体：`pnpm --filter @heyta/ui build` + `pnpm --filter @heyta/web build` 之后才跑 e2e（不是旧 dist）。
       复跑读数：`keyboard-cursor + detail-pane-habit + habit-month + habit-year` **33 passed**、
@@ -163,8 +167,15 @@ H6 HabitLog.note ── 一条决定，不阻塞别人
       断言 `<html data-theme>` 翻了 + 断言真正画出来的底色变了"（R7/S5）。
 - [ ] `pnpm reinstall:all` 四端装上当前源码产物（AGENTS §6.1.1）—— 桌面三壳与 node-host 无习惯 UI 是**已登记边界**，
       这一格只要求 web / Android / iOS 三端的习惯屏各有一张"装上的是当前产物"的判据；
-      🔴 **本轮没跑**（要 Windows 打包机与 iOS 模拟器同时空；§6.1 规定 Android 一律走 `windows-pc`）。
-      登记在 `BLOCKED.md` B91 §1 第三格，与 H3-V1 是同一档缺口。
+      ⚠️ **19:1x 现量更正：原先那句"本轮没跑"已经不成立** —— 固定收尾已在**隔离载体**
+      （`~/heyta-carriers/heyta-reinstall-1006`，载体 `90232ce0`）里四端跑齐，各有自己的判据：
+      mac `PHASE_1_EXIT=0` 且包内 `web-dist` 与本机同一次构建；windows 源码 sha256 对账 + 五条取证判据齐；
+      android 重打 64 MB APK + 全新安装 `Success`；ios 补跑 `IOS_RETRY_EXIT=0`（沙盒/构建/安装/新鲜度四条）。
+      逐腿读数与四张人看过的图在 `docs/plans/goal-layout-audit.md` §9.13、§9.14。
+      🔴 **但这一格仍然不打勾，理由换了一条**：四端那几张装机图全是**首启态**
+      （联网同意弹窗 / 收集箱），习惯屏没进画面 ⇒ 它们证"装上的是当前产物"，
+      **不证**"习惯屏在当前产物上画对了"。这一格现在欠的是**习惯屏那一屏的装机判据**，不是"没跑收尾"。
+      仍与 H3-V1 同档；`BLOCKED.md` B91 §1 第三格那句"本轮没跑"按本节改，别照它再跑一遍四端。
 - [x] 本篇 §1 那张现状表**重跑并回填**（哪几行从 🔴 翻成 ✅，附命令与读数）；
       三行翻面（有没有视图切换 / 有没有月历与年视图 / 词条是否中英同步），每行都带**可复现命令**，
       并撤回了一条写早了的 `63/63`（现量 91/2/6 两侧一致）。
