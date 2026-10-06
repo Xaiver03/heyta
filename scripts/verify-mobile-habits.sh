@@ -268,6 +268,38 @@ print("N=%d UNIQ=%d DUPES=%s" % (len(paths), len(names), ",".join(dupes) or "-")
   ok "$n 张证据图各自是不同的一屏（内容哈希 $uniq/$n）"
 }
 
+apk_install_identity() {  # 设备上 com.heyta 的**安装身份**（两次时间戳）
+  # 🔴 为什么需要它：`emulator-5554` 是**共享**设备（AGENTS §8 第 9 条要求独占验收）。
+  #    实测 07 01:5x 那一趟：第 1–9 步全过，到第 10 步重新输入凭据时三个字段全部"找不到"，
+  #    而界面回到了**首启欢迎遮罩** —— 现量 `dumpsys package com.heyta`：
+  #    `firstInstallTime=lastUpdateTime=2026-10-07 01:58:11`（我自己那次安装在 01:53）。
+  #    也就是说**另一会话在这台设备上卸装了一次**，把它的本地库与内存里的口令一起清掉了。
+  #    那种红既不是产品缺陷也不是探针缺陷，是**载体被并发方换掉了**。
+  #    所以：开局记一次身份，收尾再记一次；对不上 ⇒ **退 3（环境无效）**，
+  #    绝不退 1 —— 退 1 会被重试台读成"这一格要人读的产品红"，也会写进台账变成一条假缺陷。
+  $ADB shell dumpsys package com.heyta 2>/dev/null \
+    | grep -oE '(firstInstallTime|lastUpdateTime)=[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9:]{8}' \
+    | tr '\n' ' '
+}
+
+require_untouched_device() {  # <标签> —— 设备还是我开局那一台吗
+  local now
+  [ -n "${INSTALL_ID_START:-}" ] || { echo "     （没记到开局安装身份，跳过并发检测）"; return 0; }
+  now=$(apk_install_identity)
+  if [ "$now" != "$INSTALL_ID_START" ]; then
+    echo "❌ 设备被并发方动过（$1）：开局 [$INSTALL_ID_START] → 现在 [$now]"
+    echo "   ⇒ 本轮读数**作废**（不是产品失败，也不是探针失败）：另一会话在同一台 emulator 上重装了 com.heyta"
+    exit 3
+  fi
+}
+
+# 🔴 覆盖 lib 的 `step`：**每开一步先确认设备还是我开局那一台**。
+#    只在第 10 步之前查一次不够 —— 实测 07 02:09 那一趟第 1–9 步全过、第 10 步"找不到入口"，
+#    而 `logcat -b events` 显示 `02:09:24 am_kill … stop com.heyta due to deletePackageX`
+#    （另一会话在我跑的中途把包装掉了）。**任何一步都可能被换掉**，
+#    而"产品红"与"环境无效"必须分得开：退 1 会被重试台和台账都读成前者。
+step() { require_untouched_device "开步之前"; printf '\n════ %s ════\n' "$1"; }
+
 # 底部 5 个 tab 的中心 x（1080 宽均分，见 verify-mobile-calendar.sh 那段推导）。
 TAB_TASKS=108; TAB_CALENDAR=324; TAB_FOCUS=540; TAB_CATEGORIES=756; TAB_PROFILE=972
 TAB_Y=2253
@@ -300,6 +332,8 @@ case "$INSTALL" in
   *Success*) ok "全新安装：Success" ;;
   *) bad "安装失败：$(printf '%s' "$INSTALL" | head -2)"; exit 1 ;;
 esac
+INSTALL_ID_START=$(apk_install_identity)
+echo "     开局安装身份：[${INSTALL_ID_START:-读不到}]"
 launch_app; sleep 8
 ensure_app_foreground || { blame_crash; exit 1; }
 dismiss_permission_dialog
@@ -316,9 +350,29 @@ configure_sync_credentials || exit 1
 $ADB shell input tap "$TAB_PROFILE" "$TAB_Y"; sleep 3
 dump
 if XY=$(tap_label "立即同步"); then
-  echo "     首次同步含一次纯 JS 的 Argon2id 派生，实测 30–900 秒 ⇒ 等 180 轮 × 5s"
-  T=$(wait_synced 180)
-  if [ -n "$T" ]; then ok "首次同步完成（约 $T 秒）"; else bad "首次同步未完成（900 秒）"; exit 1; fi
+  echo "     首次同步含一次纯 JS 的 Argon2id 派生，实测 30–900 秒 ⇒ 18 段 × 10 轮 × 5s"
+  # 🔴 分段的唯一理由：**首启的隐私同意面板可以晚于开机那一次检查才出现**。
+  #    实测 07 01:3x：启动时 `handle_privacy_consent` 等满 10 秒没见到面板（它只在
+  #    真出现时才动作），于是脚本往下填凭据、点「立即同步」；而**第一次真要出网**时
+  #    那张面板才盖上来 ⇒ 同步状态永远不会结算，`wait_synced` 空转 900 秒后报
+  #    "首次同步未完成" —— 一条**长得像产品坏了**的假红（§7 元规则一：先怀疑探针）。
+  #    所以每段之间重看一次面板；总预算不变（180 轮 × 5s）。
+  T=""; seg=1
+  while [ "$seg" -le 18 ]; do
+    T=$(wait_synced 10)
+    [ -n "$T" ] && break
+    handle_privacy_consent
+    if [ "${CONSENT_GATE_SEEN:-0}" = "1" ]; then
+      echo "     第 $seg 段被首启隐私同意面板挡住 ⇒ 已点「${CONSENT_GATE_CHOSEN:-?}」，继续等"
+    fi
+    seg=$((seg + 1))
+  done
+  if [ -n "$T" ]; then
+    ok "首次同步完成（第 $seg 段内约 $T 秒；每段 50 秒）"
+  else
+    bad "首次同步未完成（900 秒，且每段之间都重看过同意面板）—— 这一条不能记成产品失败前先查面板"
+    exit 1
+  fi
 else
   bad "找不到「立即同步」按钮 —— 凭据面板没走完，不是同步慢"
   exit 1
@@ -514,6 +568,7 @@ dump
 #    直到口令被重新输入。这一版一开始把它当成"同步卡住了"，`wait_synced` 空转到 180 轮
 #    （900 秒）才红 —— 症状是"慢"，成因是"这条路根本不通"。
 #    先例：`verify-mobile-account-erasure.sh` 每次重启之后都重新配一遍（7 次）。
+require_untouched_device "第 10 步：决定要不要重新输入凭据之前"
 if [ "$(has_desc "立即同步")" = "1" ] && [ "$(has_text "填好服务器地址与访问令牌后才能同步。")" != "1" ]; then
   ok "重启后凭据仍在（这一档不需要重新输入）"
 else
@@ -540,5 +595,6 @@ fi
 
 step "11. ⑨ 这一批证据图各自是不同的一屏（内容哈希对账，不是按文件名）"
 judge_shot_set
+require_untouched_device "收尾：全部读数取完之后"
 
 summary "移动端习惯屏装机验收"
