@@ -78,9 +78,24 @@ test.describe('rail 下段：回收站贴底', () => {
 
     // ④ 它在 rail 的下半段，且整组离底部不远
     expect(trashBox.y, '回收站不在 rail 的下半段').toBeGreaterThan(railBox.y + railBox.height / 2);
-    expect(railBox.y + railBox.height - (helpBox.y + helpBox.height), '帮助没有贴着 rail 底部').toBeLessThan(
-      helpBox.height,
-    );
+    /*
+      🔴 这一条原来量的是「帮助」的底边 —— 因为写它的时候帮助就是下段**最后一枚**。
+      2026-10-06 工单 H9 把同步那一组搬到下段末尾（产品负责人："同步按钮不应该放在
+      左下角侧边栏的左下角吗？"），于是"贴着 rail 底部"的那个人换了。
+      这里跟着换成下段的**末位**（同步那一组），而不是把阈值放松 ——
+      这条钉的从来是"下段这一组贴底"，不是"帮助这一枚贴底"。
+    */
+    const syncGroup = page.getByTestId('sync-rail');
+    const syncBox = await syncGroup.boundingBox();
+    expect(syncBox, '量不到同步那一组的盒子 ⇒ 下段末尾没画出来').not.toBeNull();
+    expect(
+      railBox.y + railBox.height - (syncBox!.y + syncBox!.height),
+      '同步那一组没有贴着 rail 底部（下段末尾浮起来了）',
+    ).toBeLessThan(syncBox!.height);
+    expect(
+      syncBox!.y,
+      '同步那一组不在「帮助」之下 ⇒ 下段顺序变了（回收站 → 通知 → 帮助 → 同步）',
+    ).toBeGreaterThan(helpBox.y + helpBox.height - 1);
 
     expect(consoleErrors, `控制台报错：${consoleErrors.join(' | ')}`).toEqual([]);
   });

@@ -672,6 +672,9 @@ export const zhCN = {
   // ── Web · 同步条 ──────────────────────────────────────────
   'web.sync.resolveConflicts': '处理冲突',
   'web.sync.a11y.syncNow': '立即同步',
+  // rail 底部那一枚同步按钮的完整标签：动作 + 当前状态一句话。
+  // 🔴 状态必须进标签：图标加一个状态点在色觉障碍下不可分辨，而这一枚没有可见文字。
+  'web.sync.rail.aria': '同步，当前状态：{status}',
   'web.sync.settings.title': '同步设置',
   'web.sync.settings.close': '关闭同步设置',
   'web.sync.serverUrl.label': '服务端地址',

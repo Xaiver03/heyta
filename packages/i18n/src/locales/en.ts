@@ -604,6 +604,8 @@ export const en = {
   // ── Web · sync bar ────────────────────────────────────────
   'web.sync.resolveConflicts': 'Resolve conflicts',
   'web.sync.a11y.syncNow': 'Sync now',
+  // Full label of the sync button at the bottom of the rail: action + current status.
+  'web.sync.rail.aria': 'Sync. Current status: {status}',
   'web.sync.settings.title': 'Sync settings',
   'web.sync.settings.close': 'Close sync settings',
   'web.sync.serverUrl.label': 'Server URL',

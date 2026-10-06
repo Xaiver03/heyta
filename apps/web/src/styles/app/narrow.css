@@ -27,6 +27,12 @@
     order: 2;
     flex-direction: row;
     align-items: center;
+    /* 🔴 桌面态那两条（`block-size: 100dvh` + `overflow: hidden`，工单 H9）在这一档收回高度那条：
+       塌缩态 rail 是网格 `1fr auto` 的第二行，高度本来就由内容定，
+       留着 `100dvh` 会把底部导航撑满整屏、把 main 挤没。
+       `overflow` 那两条不用收 —— 上面已经写了 `overflow-x: auto / overflow-y: hidden`，
+       横条底部导航正是"内容放不下就横向滚"。 */
+    block-size: auto;
     gap: var(--ht-space-2);
     padding: var(--ht-space-1) var(--ht-space-2);
     border-right: none;
@@ -47,6 +53,10 @@
     flex-direction: row;
     flex: 1;
     overflow-x: auto;
+    /* 桌面态这一段是**纵向**滚动区（工单 H9：放不下的是视图列表，下段动作常驻）。
+       塌缩成横条底部导航后纵向没有可滚的内容，必须显式关掉 ——
+       留着 `auto` 会在一条固定高度的导航里长出横向滚动条。 */
+    overflow-y: hidden;
   }
 
   .ht-rail__tab {
