@@ -7825,3 +7825,37 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     `node .../@playwright/test/cli.js test`（命令行里 "playwright" 与 "test" 不相邻），
     于是"已收干净"的读数是真的没收 —— pid 9972 又跑了 20 多分钟。按名字猜模式杀，
     不如按 **pid** 杀：自己 spawn 的那一枚当时就记下来（AGENTS §8 第 9 条同一立场）。
+
+359. 🔴 **手装 `electron` 运行时二进制时，`path.txt` 里写的路径是相对于 `dist/` 的，不是相对包根。**
+    写全 `dist/Electron.app/Contents/MacOS/Electron` 的症状**不是**"找不到文件"，
+    而是 `require('electron')` 判定"没装" ⇒ **自己去发起一次 100 MB+ 下载**，失败后抛
+    `Electron failed to install correctly, please delete node_modules/electron and try installing again`
+    —— 那句报错会把人推向"重装依赖"，而真正错的只是两行文本。
+
+    macOS 上的正确取值是 `Electron.app/Contents/MacOS/Electron`。机制在包自己的 `index.js`：
+    `const fullPath = path.join(__dirname, 'dist', executablePath)` —— `dist` 已经拼进去了。
+    验证方式只有一条，而且必须**逐字**照它做：从**消费方那侧**解析一次
+    `createRequire(<apps/desktop/package.json>)('electron')`，打印出来必须是绝对路径且
+    `existsSync` 为真；直接在 Node REPL 里 `require('electron')` 拿到的是**对象**而不是路径字符串
+    （`e2e` 是独立 workspace、解析起点不同 ⇒ 只有按包的 package.json 出发才唯一）。
+
+    📌 **可迁移的规律**：把一段"路径片段"写进配置文件前，先读**消费它的那段代码怎么拼它**。
+    这里出错不是因为不知道二进制在哪（`dist/` 下、能跑、`--version` 都对），
+    而是因为我按"相对包根"的直觉补全了一个**已经被别人加过前缀**的相对路径。
+    同族形状：#29（相对导入带 `.js`）、#263（companion 地址与可执行文件路径混用）。
+
+360. 🔴 **一次 `fetch failed` 不能写成"这条通道走不通"—— 要拿同一条通道的多次读数，且探针要一致。**
+    我据一次 `TypeError: fetch failed`（undici）写下过"GitHub 那条发布通道走不通"，
+    并据此把桌面端那一格记成"外部前提不成立"。同一 URL 后续三种探针的现量把它否证了：
+    `curl -r 0-0` → **206**、`curl` → **curl(16)**（HTTP/2 层断流）、`curl` → **curl(28)**（超时）。
+    ⇒ 真相是**通道不稳定**（有时成、有时断），不是单向不通；而"不通"这个结论还顺手把
+    下一步该做的事（换镜像取包 + 校验）挡掉了。
+
+    正确修法要的是**换一个能成的通道**，而不是给"不通"补证据：
+    本次经 npmmirror 取到 `electron-v44.4.5-darwin-arm64.zip`（130,418,529 B），
+    校验权威**不是镜像**、是包内自带的 `checksums.json`（该文件 sha256 `a212eee6…0e2c` 与
+    下载回来的字节逐字相等）⇒ 换道取包不构成信任降级，也不新增依赖（AGENTS §3.1/§3.2 两道门没动）。
+
+    📌 与本文件元规则第 1 条同族，但这里是它的**否定式**：探针失败时，"没观测到成功"同样不等于
+    "观测到失败"。凡把网络类结论写成"某通道不可用"，必须给出**重试次数 + 每次的码**，
+    而不是一趟 `fetch failed` 的栈。与 #145（一次失败被写成永久结论）同一形状。
