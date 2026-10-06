@@ -48,11 +48,17 @@ trap 'rm -f -- "$0"' EXIT
 #      且两边都还数得出主蓝（挡"暗色只是叠了一层黑"与"暗色把品牌色丢了"两种假绿）
 #   ⑧ 撤销 → `HABIT_LOG` 多**恰好 1 条 DEL**、`连续` 回到 0；随后**笔记本**同步后
 #      读得到这条 HABIT 与那次打卡的痕迹（跨设备，不是本机自说自话）
-#   ⑨ 这一批证据图**各自必须是不同的一屏**（按内容哈希对账，不是按文件名）。
+#   ⑨ 这一批证据图**不许有"同一屏连拍两次"**（按内容哈希两两对账，不是按文件名）。
 #      实测撞过：`4-checked` 与 `5-list-after-checkin` 逐字节相同（同一秒、同一 md5），
 #      因为两张之间**没有导航** —— 同一屏连拍了两次。每张自己的判据（非空白 / 数得出主蓝 /
 #      暗色翻面）全过，所以"九张图"里其实只有八屏，而输出上看不出差别。
 #      🔴 这是 §7 元规则二的一个新面目：**逐张合格的判据，合起来挡不住"重复交证据"**。
+#      ⚠️ 但它**只**回答"有没有重复采集"，不回答"每屏内容都不同"：⑥ 那一对
+#      （`5-list-after-checkin` ↔ `6-list-after-restart`）**按设计就应当同屏** —— 重启前后
+#      内容不许变，变的只有系统状态栏的时钟。所以这一对**显式豁免**在成对判据之外
+#      （07 03:1x 人逐张看图照出来的：那两张的字节差就是 3:08 → 3:09，
+#      而"重启后状态还在"由 ⑥ 那条 aria 回读判据负责，不由图像负责）。
+#      豁免是**按具体的一对**，不是"允许 N 对重复" —— 后者会把 4↔5 那一类真缺陷也放过。
 #
 # 🔴 ③⑤⑧ 三条都写成**数 op 的条数**，不是"有没有那条 op"。理由与
 #    `verify-mobile-trash.sh` 第 6b 步同一条：一个用户意图 = 一个 op（AGENTS §3.4），
@@ -243,29 +249,50 @@ judge_shot() {  # <标签> <路径> [暗色对照路径]
   fi
 }
 
-judge_shot_set() {  # 这一批证据图必须**各是一屏**（按内容哈希对账，不按文件名）
+# 按设计**应当同屏**的一对（⑥ 重启前后：状态在库里不在 React 里 ⇒ 界面内容不许变）。
+# 这一对不进"两两不许字节相同"的集合，否则同一分钟内完成重启就会**假红**。
+# 🔴 豁免按**具体的一对**写，不是"允许 N 对重复" —— 后者会把 4↔5 那一类真缺陷一并放过。
+SHOT_EQUIV_A="5-list-after-checkin"
+SHOT_EQUIV_B="6-list-after-restart"
+
+judge_shot_set() {  # 这一批证据图不许有"同一屏连拍两次"（按内容哈希对账，不按文件名）
   # 🔴 逐张判据（非空白 / 数得出主蓝 / 暗色翻面）**合起来挡不住"同一屏连拍两次"**：
   #    两张一样的图各自都合格。实测 07 01:13:27 那两张 md5 逐字相同，而输出上没人变红。
-  local out n uniq dupes
-  out=$(printf '%s' "${SHOT_FILES:-}" | python3 -c '
-import hashlib, sys, collections
+  # ⚠️ 它回答的是"有没有重复采集"，**不**回答"每屏内容都不同"（见上面那对豁免）。
+  local out n uniq dupes equiv
+  out=$(printf '%s' "${SHOT_FILES:-}" | EQUIV_A="$SHOT_EQUIV_A" EQUIV_B="$SHOT_EQUIV_B" python3 -c '
+import hashlib, sys, os, collections
 paths = [l for l in sys.stdin.read().splitlines() if l.strip()]
 names = collections.defaultdict(list)
 for p in paths:
     names[hashlib.sha256(open(p, "rb").read()).hexdigest()].append(p.rsplit("/", 1)[-1])
-dupes = sorted(sum([v for v in names.values() if len(v) > 1], []))
-print("N=%d UNIQ=%d DUPES=%s" % (len(paths), len(names), ",".join(dupes) or "-"))
+a, b = os.environ["EQUIV_A"], os.environ["EQUIV_B"]
+def stem(nm):  # 文件名可能带 .png，也可能带路径尾巴 —— 只按"包含"匹配
+    return a in nm or b in nm
+dupes, equiv = [], "absent"
+for h, v in names.items():
+    if len(v) < 2:
+        continue
+    if all(stem(x) for x in v) and any(a in x for x in v) and any(b in x for x in v):
+        equiv = "same"      # 按设计应当同屏 ⇒ 不算重复交证据
+    else:
+        dupes += v
+dupes = sorted(dupes)
+if equiv == "absent":       # 两张各自都与其他不同 ⇒ 豁免对没撞车（正常）
+    equiv = "differ"
+print("N=%d UNIQ=%d DUPES=%s EQUIV=%s" % (len(paths), len(names), ",".join(dupes) or "-", equiv))
 ' 2>&1)
   n=$(printf '%s' "$out" | sed -n 's/.*N=\([0-9][0-9]*\).*/\1/p')
   uniq=$(printf '%s' "$out" | sed -n 's/.*UNIQ=\([0-9][0-9]*\).*/\1/p')
   dupes=$(printf '%s' "$out" | sed -n 's/.*DUPES=\([^ ]*\).*/\1/p')
+  equiv=$(printf '%s' "$out" | sed -n 's/.*EQUIV=\([^ ]*\).*/\1/p')
   [ -n "$n" ] || { bad "重复检测探针没读数（原文：${out:-空}）—— 判据没跑，不算产品失败"; return 1; }
   if [ "$n" = "0" ]; then bad "没有任何一张证据图入账（账单 0 张）"; return 1; fi
-  if [ "$n" != "$uniq" ]; then
+  if [ "$dupes" != "-" ]; then
     bad "$n 张证据图只对应 $uniq 个不同内容 ⇒ 有重复交的证据：$dupes"
     return 1
   fi
-  ok "$n 张证据图各自是不同的一屏（内容哈希 $uniq/$n）"
+  ok "$n 张证据图里没有重复采集（内容哈希 $uniq/$n；按设计同屏的那一对 $SHOT_EQUIV_A↔$SHOT_EQUIV_B：$equiv）"
 }
 
 apk_install_identity() {  # 设备上 com.heyta 的**安装身份**（两次时间戳）
@@ -625,7 +652,7 @@ else
   bad "笔记本在 $((ROUNDS*5)) 秒里没读到那条习惯 —— 跨设备没闭环"
 fi
 
-step "11. ⑨ 这一批证据图各自是不同的一屏（内容哈希对账，不是按文件名）"
+step "11. ⑨ 这一批证据图不许有重复采集（内容哈希两两对账，不是按文件名）"
 judge_shot_set
 require_untouched_device "收尾：全部读数取完之后"
 
