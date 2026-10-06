@@ -1220,17 +1220,35 @@ dump
 if [ "$(has_sub "$TASK_TITLE")" = "1" ]; then ok "种子任务在界面上（${TASK_TITLE}）"; else bad "种子任务没建出来 —— 后面每条判据都没有输入"; fi
 restore_ime
 
+# 🔴 通道顺序照 pull_prefs_db 那条已验证的形状，**不能**先跑 run-as：
+#   这台装机是不可调试的 Release 产物，`run-as` 只回一行 "run-as: package not debuggable"，
+#   而 `exec-out … > 文件 || adb pull` 里那个退出码属于**重定向**（恒 0）⇒ 兜底那支永不执行，
+#   于是那行报错文本被当成库文件写进去，`db_count` 读出 BAD。
+#   rig38 现量：第 9 步「手机库读不出（BAD）」—— 那是**探针挑了条走不通的通道**（traps #328
+#   的第四种面目），不是设备里没有库（同一时刻 `ls` 得到 heyta.sqlite 73,728B）。
 pull_phone_db() {
+  rm -f "$PHONE_DB" 2>/dev/null
   $ADB root >/dev/null 2>&1 || true
   sleep 1
-  $ADB exec-out run-as "$PKG" cat "databases/heyta.sqlite" > "$PHONE_DB" 2>/dev/null || \
-    $ADB pull "/data/data/$PKG/databases/heyta.sqlite" "$PHONE_DB" >/dev/null 2>&1 || true
+  $ADB pull "/data/data/$PKG/databases/heyta.sqlite" "$PHONE_DB" >/dev/null 2>&1 || true
+  if ! head -c 16 "$PHONE_DB" 2>/dev/null | grep -q 'SQLite format 3'; then
+    # 只有验过魔数才算数；不行就清掉，别让上一支的报错文本冒充库文件
+    rm -f "$PHONE_DB" 2>/dev/null
+    $ADB exec-out run-as "$PKG" cat "databases/heyta.sqlite" > "$PHONE_DB" 2>/dev/null || true
+    head -c 16 "$PHONE_DB" 2>/dev/null | grep -q 'SQLite format 3' || rm -f "$PHONE_DB" 2>/dev/null
+  fi
   $ADB unroot >/dev/null 2>&1 || true
 }
 db_count() {  # <sqlite 文件> <SQL>
   if [ ! -s "$1" ]; then printf 'NOFILE'; return 1; fi
+  # 头部一验：不是 SQLite 就把**读到的是什么**说清楚（42 字节的 run-as 报错文本
+  # 与半个下载中的库，在"查询失败"这一格里长得一模一样）
+  head -c 16 "$1" 2>/dev/null | grep -q 'SQLite format 3' || {
+    printf 'BAD:not-a-db(%sB)' "$(wc -c < "$1" | tr -d ' ')"; return 1; }
   out=$(sqlite3 "$1" "$2" 2>/dev/null | tr -d '\r')
-  if ! printf '%s' "$out" | grep -qE '^[0-9-]+$'; then printf 'BAD'; return 1; fi
+  if ! printf '%s' "$out" | grep -qE '^[0-9-]+$'; then
+    printf 'BAD:%s' "$(sqlite3 "$1" "$2" 2>&1 | head -1 | tr -d '\r' | tr -d ':')" ; return 1
+  fi
   printf '%s' "$out"
 }
 # 端点**行数**：已存的每枚端点渲染成一行 `ai-endpoint-<id>`。
@@ -1682,6 +1700,13 @@ step "7. 非回环 https 端点：授权入口按地址类别出现，未授权�
 open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 add_endpoint "$EP_REMOTE" "$DEVICE_REMOTE_URL" \
   || { echo "   ❌ 非回环端点没存进去"; screen_txt; summary "移动端 AI 助手真机验收" "载体坏了" 1; }
+# 🔴 存完之后不能直接 open_ai_settings：那一枚入口住在「我的」上，而设置面此刻**还开着**
+#   （端点表单是内联在设置面里的），Modal 立着的时候底部标签不在树里
+#   （同一件事见 open_ai_settings 头上 leave_assistant 那段）。
+#   rig37 现量：三次「我的」不在树里 ⇒ 中止，读起来像导航坏了。
+#   ⇒ 先退出设置面回到「我的」，再按正规路径进来（退面不会丢掉刚存的端点：
+#     提交发生在点「添加自定义端点」那一刻，不在关闭里）。
+leave_settings || summary "移动端 AI 助手真机验收" "载体回不到「我的」页" 1
 open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失效" 1
 # ① 只在「拆解任务」那一块里点 chip（五块同名，块外定位会选错档）。
 tap_in_rid ai-feature-breakdown "$EP_REMOTE" \
