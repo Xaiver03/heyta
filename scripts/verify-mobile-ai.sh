@@ -227,7 +227,7 @@ for v in SAFE_TOP SAFE_BOTTOM; do
   got=${!v}
   case "$got" in
     ''|*[!0-9]*)
-      echo "   ❌ 取不到 $v（dumpsys 的 ROTATION_0 那行没给出可点区）—— 安全带没有边界，载体不成立" >&2
+      echo "   ❌ 取不到 ${v}（dumpsys 的 ROTATION_0 那行没给出可点区）—— 安全带没有边界，载体不成立" >&2
       exit 3;;
   esac
 done
@@ -307,7 +307,7 @@ tap_rid() {  # <testID> [期望 checked]
     dump
     got=$(gate_state "$rid")
     if [ "$got" != "$want" ]; then
-      echo "   ❌ testID=$rid 点完之后 checked=${got:-读不出}，期望 $want（读的是 [${src}] 那一枚，不是容器）" >&2
+      echo "   ❌ testID=$rid 点完之后 checked=${got:-读不出}，期望 ${want}（读的是 [${src}] 那一枚，不是容器）" >&2
       return 1
     fi
   fi
@@ -417,7 +417,7 @@ reveal_rid() {  # <testID> [最多滚几次=6] → 0=滚出来了 / 1=滚不出�
     if [ -n "$ref" ] && [ "$ref" = "$now" ]; then
       stuck=$((stuck + 1))
       if [ "$stuck" -ge 2 ] && [ "$blurred" = 0 ]; then
-        echo "   ↻ 连 ${stuck} 发 swipe 参照锚没动（$ref）—— 焦点多半挂在输入框上，先摘焦点" >&2
+        echo "   ↻ 连 ${stuck} 发 swipe 参照锚没动（${ref}）—— 焦点多半挂在输入框上，先摘焦点" >&2
         blur_focus; blurred=1; stuck=1
       elif [ "$stuck" -ge 3 ]; then
         # 画面不动有两种：滚到列表底了（目标在上方 ⇒ 换方向才有救）/ 这一屏真的滚不动。
@@ -524,7 +524,7 @@ reveal_desc() {  # <content-desc 片段> [最多滚几次=5] → 0=屏上出现�
     [ "$i" -gt "$max" ] && break
     dump
     if [ "$(has_desc_sub "$want")" = "1" ]; then
-      [ "$i" -gt 1 ] && echo "   · 「$want」第 ${i} 帧才出现在屏上（前几帧它在裁切线以外）" >&2
+      [ "$i" -gt 1 ] && echo "   · 「${want}」第 ${i} 帧才出现在屏上（前几帧它在裁切线以外）" >&2
       return 0
     fi
     ref=$(any_anchor_bounds)
@@ -546,7 +546,7 @@ reveal_sub() {  # <文本片段> [最多滚几次=5] → 0=屏上出现了 / 1=�
     [ "$i" -gt "$max" ] && break
     dump
     if [ "$(has_sub "$want")" = "1" ]; then
-      [ "$i" -gt 1 ] && echo "   · 「$want」第 ${i} 帧才出现在屏上（前几帧它在裁切线以外）" >&2
+      [ "$i" -gt 1 ] && echo "   · 「${want}」第 ${i} 帧才出现在屏上（前几帧它在裁切线以外）" >&2
       return 0
     fi
     $ADB shell input swipe 540 1900 540 900 300 >/dev/null 2>&1
@@ -741,17 +741,17 @@ tap_in_rid() {  # <块 testID> <content-desc>
       #    照样报"落在 [clickable-ancestor]"，实际打开的是端点表单，
       #    下一条否定判据「ai-consent-breakdown 没出现」就打在根本没到过的面上。
       if ! in_band "$cy"; then
-        echo "   ↻ $block 里「$desc」的可点节点（${src}）中心 y=$cy 在安全带 [$SAFE_TOP,$SAFE_BOTTOM] 外（贴系统栏），先滚进中段（第 ${i} 次）" >&2
+        echo "   ↻ $block 里「${desc}」的可点节点（${src}）中心 y=$cy 在安全带 [$SAFE_TOP,$SAFE_BOTTOM] 外（贴系统栏），先滚进中段（第 ${i} 次）" >&2
         band_skips=$((band_skips + 1))
         scroll_toward_y "$cy"
         sleep 1.5
         continue
       fi
-      echo "   · 点 $block 里的「$desc」→ 落在 [${src}] @ ${cx},${cy}" >&2
+      echo "   · 点 $block 里的「${desc}」→ 落在 [${src}] @ ${cx},${cy}" >&2
       $ADB shell input tap "$cx" "$cy" >/dev/null 2>&1
       sleep 1
       if [ "$src" = "label-self-no-clickable-ancestor" ]; then
-        echo "   ❌ $block 里的「$desc」找不到可点祖先（只有 clickable=false 的标签层）—— 这一下会落空" >&2
+        echo "   ❌ $block 里的「${desc}」找不到可点祖先（只有 clickable=false 的标签层）—— 这一下会落空" >&2
         return 1
       fi
       return 0
@@ -762,7 +762,7 @@ tap_in_rid() {  # <块 testID> <content-desc>
   # 🔴 两种"没点成"要分开说：块里**从来没出现过**那一枚，与出现过但一直贴着可点带滚不进来。
   #    后一种要是报成"找不到节点"，下一个读的人会去查 testID/界面形状，而真问题是几何。
   if [ "$band_skips" -gt 0 ]; then
-    echo "   ❌ 块 $block 里出现过「$desc」，但 $band_skips 次按读数滚过都没把它带进安全带 [$SAFE_TOP,$SAFE_BOTTOM] ⇒ 载体没量到位，不记成产品缺陷" >&2
+    echo "   ❌ 块 $block 里出现过「${desc}」，但 $band_skips 次按读数滚过都没把它带进安全带 [$SAFE_TOP,$SAFE_BOTTOM] ⇒ 载体没量到位，不记成产品缺陷" >&2
     return 1
   fi
   echo "   ❌ 滚了 5 次，块 $block 里找不到 content-desc=$desc 的节点" >&2
@@ -788,7 +788,7 @@ bind_route() {  # <功能名> <端点标签>
   #   （产品侧的可访问性缺口，已登记进计划；载体不能替它编一个读数）。
   #   绑定到底有没有生效，判据放在**被绑那一侧**：第 5 步的按钮必须 enabled。
   sel=$(xy_in_rid "$block" "$label" selected | awk '{print $3}')
-  echo "   ↷ 现量：$block 里「$label」的 selected=${sel:-读不出}（Android 读不到选中态，理由见上）" >&2
+  echo "   ↷ 现量：$block 里「${label}」的 selected=${sel:-读不出}（Android 读不到选中态，理由见上）" >&2
   return 0
 }
 
@@ -919,7 +919,7 @@ bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要�
   read=$(routes_reading)
   echo "   · 设备库回读（routes/同意，键 heyta.ai.settings）：${read:-读不出}" >&2
   if [ -z "$read" ] || [ "$read" = "NOFILE" ] || printf '%s' "$read" | grep -q '^BAD\| BAD'; then
-    echo "   ❌ 库回读没拿到（$read）—— 绑定这件事就无从判定，不拿"点过了"当已通过" >&2
+    echo "   ❌ 库回读没拿到（${read}）—— 绑定这件事就无从判定，不拿"点过了"当已通过" >&2
     return 1
   fi
   miss2=""
@@ -997,10 +997,10 @@ bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要�
   if [ "$NEEDS_CONSENT" = 0 ]; then
     echo "   · 库里五档同意数与界面一致（回环那一档没有授权可给）：$readc" >&2
   elif [ -n "$missc2" ]; then
-    echo "   ❌ 点了授权而库里仍是 0：$missc2（$readc）⇒ 写路径没落地，不是「点过了」就算过" >&2
+    echo "   ❌ 点了授权而库里仍是 0：${missc2}（${readc}）⇒ 写路径没落地，不是「点过了」就算过" >&2
     return 1
   else
-    echo "   · 五档逐功能同意在库里各有 ≥1 条（回读：$readc）" >&2
+    echo "   · 五档逐功能同意在库里各有 ≥1 条（回读：${readc}）" >&2
   fi
   return 0
 }
@@ -1683,7 +1683,7 @@ tap_rid tool-input || { echo "   🔴 工具档里滚不出输入框 testID=tool
 #   名字要是还留着 RULE_，门禁判据 ⑬ 会当场红 —— 那是刻意的：名字也是一种承诺。
 SEND_PROMPT="list all tasks"
 clear_and_type "$SEND_PROMPT" "想让它怎么帮你" \
-  || { echo "   🔴 助手输入框读不回「$SEND_PROMPT」（发进去的内容与期望不符）—— 这是输入通道坏了，不是产品没答" >&2; screen_txt; restore_ime; summary "移动端 AI 助手真机验收" "载体输入通道坏了" 1; }
+  || { echo "   🔴 助手输入框读不回「${SEND_PROMPT}」（发进去的内容与期望不符）—— 这是输入通道坏了，不是产品没答" >&2; screen_txt; restore_ime; summary "移动端 AI 助手真机验收" "载体输入通道坏了" 1; }
 restore_ime
 stub_reset; RB=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
 # 🔴 原先这里写的是裸 `$ADB shell input tap $XY`（取 rid_center 的中心）—— 那是 #324-4
