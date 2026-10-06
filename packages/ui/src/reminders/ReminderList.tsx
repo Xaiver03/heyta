@@ -119,6 +119,7 @@ export interface ReminderListLabels {
   readonly absolute: string;
   /** 状态 → 徽标文字。`Record` 是刻意的：五个状态一个都不能漏。 */
   readonly phase: Record<ReminderPhase, string>;
+  readonly deliveryUncertain?: string;
   readonly a11yRemove: (when: number) => string;
   readonly a11ySnooze: (when: number) => string;
   readonly a11yDismiss: (when: number) => string;
@@ -129,6 +130,7 @@ export interface ReminderListLabels {
 export interface ReminderListProps {
   /** 未删除的提醒（由宿主从 action 层取，`listReminders()` 已经是）。 */
   readonly reminders: readonly Reminder[];
+  readonly uncertainOccurrences?: readonly string[];
   /** 当前时间（epoch ms）。显式传入，否则跨触发点与测试都不可复现。 */
   readonly now: number;
   /**
@@ -257,6 +259,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
 
 export function ReminderList({
   reminders,
+  uncertainOccurrences,
   now,
   hasDueDate,
   onAdd,
@@ -271,7 +274,7 @@ export function ReminderList({
   const tokens = useHeytaTokens();
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
-  const rows = useMemo(() => toReminderRows(reminders, now), [reminders, now]);
+  const rows = useMemo(() => toReminderRows(reminders, now, uncertainOccurrences), [reminders, now, uncertainOccurrences]);
 
   /**
    * 🔴 有截止时间 → 相对提前量预设；没有 → **一个绝对时刻入口**。
@@ -326,6 +329,12 @@ export function ReminderList({
                     {labels.phase[row.phase]}
                   </Text>
                 </View>
+                {row.deliveryUncertain && labels.deliveryUncertain ? (
+                  <Text style={[text.caption, { color: tokens['color.warning-strong'] }]}
+                    testID={`reminder-uncertain-${row.id}`}>
+                    {labels.deliveryUncertain}
+                  </Text>
+                ) : null}
               </View>
 
               <View style={styles.actions}>

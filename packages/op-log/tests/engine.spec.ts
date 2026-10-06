@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { OpType } from '@heyta/sync-core';
 import type { Operation, VectorClock } from '@heyta/sync-core';
-import { IndexedDbAdapter, IndexedDbOpLogStore } from '@heyta/storage';
+import { IndexedDbAdapter, IndexedDbOpLogStore, STORES } from '@heyta/storage';
 
 import { OpLogEngine } from '../src/engine.js';
 import { applyOperation, emptyState, replayOperations } from '../src/state.js';
@@ -80,7 +80,7 @@ describe('reducer（必须是纯函数）', () => {
     expect(s.tasks['task-1']!.title).toBe('新');
   });
 
-  it('同毫秒用 op.id 确定性决胜（不留"谁先到谁赢"）', () => {
+  it('同毫秒同 client 用 op.id 作最终确定性决胜（不留"谁先到谁赢"）', () => {
     const s1 = replayOperations(emptyState(), [
       makeOp({ id: 'aaa', timestamp: 1000, payload: { title: 'first' } }),
       makeOp({ id: 'zzz', timestamp: 1000, payload: { title: 'second' } }),
@@ -207,6 +207,12 @@ describe('OpLogEngine', () => {
     expect(engine.getClock()['device-1']).toBe(1);
     await engine.dispatch({ entityType: 'TASK', entityId: 't2', opType: OpType.Create, payload: {} });
     expect(engine.getClock()['device-1']).toBe(2);
+  });
+
+  it('服务端压实前沿即使没有逐条 op 也会进入下一次本地时钟', () => {
+    const engine = makeEngine();
+    engine.observeRemoteClock({ 'archived-device': 7 });
+    expect(engine.getClock()).toEqual({ 'archived-device': 7 });
   });
 
   it('🔴 op 的时钟**包含**本次递增（否则第一条 op 会被对端静默丢弃）', async () => {
@@ -363,6 +369,156 @@ describe('OpLogEngine', () => {
 
     expect(r.ops).toHaveLength(1); // 一次操作 = 一条 op（AGENTS.md §3.4）
     expect(r.ops[0]!.entityIds).toEqual(['t1', 't2', 't3']);
+    expect(engine.getState().tasks.t1).toMatchObject({ projectId: 'p1' });
+    expect(engine.getState().tasks.t2).toMatchObject({ projectId: 'p1' });
+    expect(engine.getState().tasks.t3).toMatchObject({ projectId: 'p1' });
+
+    // The same op is safe to deliver again: storage idempotency skips it, and
+    // reducer metadata also prevents duplicate field versions.
+    const duplicate = await engine.applyRemote(r.ops);
+    expect(duplicate.applied).toEqual([]);
+    expect(duplicate.skipped).toBe(1);
+
+  });
+
+  it('多实体批次在崩溃恢复后仍物化全部成员', async () => {
+    const adapter = new IndexedDbAdapter(`batch-recovery-${Math.random().toString(36).slice(2)}`);
+    await adapter.init();
+    const sharedStore = new IndexedDbOpLogStore<Operation<string>>(adapter);
+    const first = new OpLogEngine({ store: sharedStore, clientId: 'device-1', now: () => 1000 });
+    await first.dispatch({
+      entityType: 'TASK',
+      entityId: 't1',
+      entityIds: ['t1', 't2', 't3'],
+      opType: OpType.Update,
+      payload: { projectId: 'p1' },
+    });
+    const restarted = new OpLogEngine({ store: sharedStore, clientId: 'device-1' });
+    await restarted.recover();
+    expect(restarted.getState().tasks).toMatchObject({
+      t1: { projectId: 'p1' },
+      t2: { projectId: 'p1' },
+      t3: { projectId: 'p1' },
+    });
+  });
+
+  it('101 个 clientId 的时钟在客户端合并、恢复和下一次写入中保持完整', async () => {
+    const engine = makeEngine();
+    const clock = Object.fromEntries(
+      Array.from({ length: 101 }, (_, index) => [`device-${index}`, index + 1]),
+    );
+    await engine.applyRemote([
+      makeOp({
+        id: 'wide-clock',
+        clientId: 'device-100',
+        vectorClock: clock,
+        payload: { title: 'wide' },
+      }),
+    ]);
+    expect(Object.keys(engine.getClock())).toHaveLength(101);
+
+    const local = await engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'task-2',
+      opType: OpType.Update,
+      payload: { title: 'after-wide-clock' },
+    });
+    expect(Object.keys(local.ops[0]!.vectorClock)).toHaveLength(101);
+    expect(local.ops[0]!.vectorClock['device-1']).toBe(3);
+  });
+
+  it('checkpoint 保留 reducer 元数据并只重放 checkpoint 之后的增量', async () => {
+    const first = makeEngine('checkpoint-device');
+    await first.dispatch({
+      entityType: 'TASK',
+      entityId: 'checkpoint-task',
+      opType: OpType.Create,
+      payload: { title: 'base', dueDate: 1 },
+    });
+    await first.checkpoint();
+    await first.applyRemote([
+      makeOp({
+        id: 'checkpoint-concurrent',
+        clientId: 'peer-device',
+        entityId: 'checkpoint-task',
+        payload: { title: 'peer' },
+        vectorClock: { 'peer-device': 1 },
+        timestamp: 2000,
+      }),
+    ]);
+
+    const restarted = new OpLogEngine({ store, clientId: 'checkpoint-device' });
+    const result = await restarted.recover();
+    expect(result.replayed).toBe(1);
+    expect(restarted.getState().tasks['checkpoint-task']).toMatchObject({
+      title: 'peer',
+      dueDate: 1,
+    });
+
+    // A stale concurrent write must still lose after the checkpoint path,
+    // proving the hidden field-version metadata survived serialization.
+    await restarted.applyRemote([
+      makeOp({
+        id: 'checkpoint-old',
+        clientId: 'old-device',
+        entityId: 'checkpoint-task',
+        payload: { title: 'old' },
+        vectorClock: { 'old-device': 1 },
+        timestamp: 1000,
+      }),
+    ]);
+    expect(restarted.getState().tasks['checkpoint-task']!.title).toBe('peer');
+  });
+
+  it('checkpoint 损坏且历史已归档时回退到完整归档日志', async () => {
+    const ops = Array.from({ length: 505 }, (_, index) =>
+      makeOp({
+        id: `archived-${index}`,
+        entityId: 'archived-task',
+        opType: index === 0 ? OpType.Create : OpType.Update,
+        timestamp: index + 1,
+        vectorClock: { 'archive-device': index + 1 },
+        clientId: 'archive-device',
+        payload: { title: `title-${index}` },
+      }),
+    );
+    await store.appendImported(ops);
+
+    const first = new OpLogEngine({ store, clientId: 'archive-device' });
+    await first.recover();
+    await first.checkpoint();
+    expect(await store.archiveUpTo(505)).toBeGreaterThan(0);
+
+    const saved = await db.get<{ key: string; value: unknown }>(STORES.META, 'materializedCheckpoint');
+    expect(saved).toBeDefined();
+    await db.put(STORES.META, {
+      key: 'materializedCheckpoint',
+      value: { ...(saved!.value as Record<string, unknown>), checksum: 'corrupted' },
+    });
+
+    const restarted = new OpLogEngine({ store, clientId: 'archive-device' });
+    const result = await restarted.recover();
+    expect(result.replayed).toBe(505);
+    expect(restarted.getState().tasks['archived-task']!.title).toBe('title-504');
+  }, 20_000);
+
+  it('同毫秒并发写入按 clientId 决胜，而非按 opId 或到达顺序', () => {
+    const a = makeOp({
+      id: 'zzz',
+      clientId: 'device-a',
+      timestamp: 5000,
+      vectorClock: { 'device-a': 1 },
+      payload: { title: 'a' },
+    });
+    const z = makeOp({
+      id: 'aaa',
+      clientId: 'device-z',
+      timestamp: 5000,
+      vectorClock: { 'device-z': 1 },
+      payload: { title: 'z' },
+    });
+    expect(replayOperations(emptyState(), [a, z]).tasks['task-1']!.title).toBe('z');
+    expect(replayOperations(emptyState(), [z, a]).tasks['task-1']!.title).toBe('z');
   });
 
   it('空批次 applyRemote 是安全空操作', async () => {
@@ -494,7 +650,7 @@ describe('🔴 写入闸门：因果优先，不被同毫秒的墙上时钟击�
 });
 
 describe('🔴 删除也要记下自己的时钟', () => {
-  it('删除之后，因果上更旧的写入必须被拒绝（而不是因为时钟过期被放进来）', () => {
+  it('迟到的删除前内容保留在回收站，但不能清除墓碑', () => {
     // 场景：A 编辑过这条任务，B 随后把它删了，然后一条 B **更早**的写入迟到。
     // 那条迟到的写入因果上先于删除，必须被拒绝。
     let s = emptyState();
@@ -542,7 +698,11 @@ describe('🔴 删除也要记下自己的时钟', () => {
       }),
     );
 
-    expect(s.tasks['e1']!.title).toBe('A 改过');
+    // B:3 is older than the deletion, but concurrent with A:2's title.
+    // Soft deletion retains the deterministic winning content for restoration;
+    // the visibility assertion is the tombstone, not arrival-dependent content.
+    expect(s.tasks['e1']!.title).toBe('迟到的旧写入');
+    expect(s.tasks['e1']!.deletedAt).toBe(2000);
   });
 
   it('删除之后，因果上更新的写入仍必须被接受', () => {

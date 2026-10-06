@@ -124,7 +124,7 @@ task_ops_in() {  # <sqlite 文件> <实体 id> <opType>
 # 无障碍名在 `accessibilityLabel` 上。所以断言必须读 content-desc。
 # `has_desc` 是**全等**匹配，而格子的标签是"标题 + 任务数"拼出来的，只能用子串。
 has_desc_sub() {  # <子串>
-  grep -q "content-desc=\"[^\"]*$1[^\"]*\"" /tmp/ui.xml && echo 1 || echo 0
+  grep -q "content-desc=\"[^\"]*$1[^\"]*\"" "$UI_XML" && echo 1 || echo 0
 }
 
 # **唯一处于选中态的那一格**的 content-desc，按三种情形回显：
@@ -141,8 +141,8 @@ has_desc_sub() {  # <子串>
 # `selected`。初始状态 `selected` 就是今天（点过「回到今天」之后也是）。
 selected_day_desc() {
   python3 - <<'PY'
-import re
-s = open('/tmp/ui.xml', encoding='utf-8', errors='replace').read()
+import os, re
+s = open(os.environ['UI_XML'], encoding='utf-8', errors='replace').read()
 hits = []
 for m in re.finditer(r'<node[^>]*?>', s):
     tag = m.group(0)
@@ -199,7 +199,7 @@ ok "期望月份「${MONTH_TITLE}」，今天「${TODAY_TITLE}」，目标日「
 # ── 开始 ────────────────────────────────────────────────────
 echo ""
 echo "=== 移动端日历验收（真实模拟器 + 真服务端 + 真笔记本设备，零 mock）==="
-echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: heyta_mobile_smoke"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: $E2E_DB"
 echo "  账号: $EMAIL"
 echo "  任务: ${TASK_TITLE}（截止 ${DUE_DATE}）"
 
@@ -306,7 +306,7 @@ elif [ -n "$TASK_ID" ]; then
   bad "「${DUE_TITLE}」那格不是「1 个任务」—— 任务被放到了别的一天（或没同步过来）"
   # 把每格的读数打出来，好判断是"整体偏一天"还是"根本没到"
   echo "     各格实际读数："
-  grep -o 'content-desc="[0-9]*月[0-9]*日[^"]*"' /tmp/ui.xml | sort -u | head -12 | sed 's/^/       /'
+  grep -o 'content-desc="[0-9]*月[0-9]*日[^"]*"' "$UI_XML" | sort -u | head -12 | sed 's/^/       /'
 fi
 
 step "9. 点那一天 → 当天列表里出现那条任务"
@@ -314,9 +314,9 @@ DAY_XY=$(xy_desc "${DUE_TITLE}，1 个任务")
 if [ -z "$DAY_XY" ]; then
   # 标签里任务数可能因为同步差异不同，退一步按"日期标题开头"找
   DAY_XY=$(python3 - "$DUE_TITLE" <<'PY'
-import re, sys
+import os, re, sys
 want = sys.argv[1]
-s = open('/tmp/ui.xml', encoding='utf-8', errors='replace').read()
+s = open(os.environ['UI_XML'], encoding='utf-8', errors='replace').read()
 for m in re.finditer(r'<node[^>]*?>', s):
     tag = m.group(0)
     d = re.search(r'content-desc="([^"]*)"', tag)

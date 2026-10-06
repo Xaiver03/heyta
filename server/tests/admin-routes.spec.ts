@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises';
 import Fastify, { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { REDEMPTION_STATES, type RedemptionState } from '../src/billing/pricing-store';
 
 /**
  * `/api/admin/*` 的**安全边界**与契约。
@@ -89,7 +91,69 @@ const ALL_ROUTES: readonly (readonly [string, string])[] = [
   ['GET', '/api/admin/orders'],
   ['GET', '/api/admin/coupons'],
   ['GET', '/api/admin/invites'],
+  // W4b 调休/补班录入面（三条新路由；判据细节在 `holiday-admin-routes.spec.ts`，
+  // 这里只管一件事：**它们进不了闸门就没有任何别的地方在守**）。
+  ['GET', '/api/admin/holiday-adjustments'],
+  ['PUT', '/api/admin/holiday-adjustments/years'],
+  ['DELETE', '/api/admin/holiday-adjustments/years?year=2027'],
+  // ADR-0053 退款那四条（判据细节在 `billing-refund-admin-routes.spec.ts`，
+  // 这里只管一件事：**它们进不了闸门就没有任何别的地方在守**）。
+  ['GET', '/api/admin/refunds'],
+  ['POST', '/api/admin/refunds'],
+  ['POST', '/api/admin/refunds/1/approve'],
+  ['POST', '/api/admin/refunds/1/reject'],
 ];
+
+/**
+ * 🔴 「遍历全部路由」这句话**此前是假的** —— 上面那张表是手抄的，
+ * 新增一条路由不会自动进这本账，而漏掉的那条正好是"没人测它有没有闸门"的那条。
+ * 下面三条用例把它变成真的：路由清单从**注册完成的 app** 里取，与表逐条对账。
+ *
+ * 为什么用「数方法条目」而不是「解析 `printRoutes()` 的路径树」：
+ * 那棵树带**前缀压缩**（实测输出里 `overview` 与 `orders` 挂在 `o` 底下，
+ * 参数化路由写成 `:id` 再套一层 `/`）。自己拼路径字符串的解析器会数出
+ * `/o/verview` 这种东西，于是每条都"未注册"，红的原因和真实原因无关。
+ * 数 `METHOD` 条目 + 用 `inject` 探"存不存在"这两件事都不依赖树形，
+ * 而它们合起来覆盖了两个方向（表里有但没注册 / 注册了但表里没有）。
+ *
+ * `HEAD` 一律排除：Fastify 给每条 GET 自动加一个 HEAD，它不是一个新入口。
+ */
+function registeredMethodCount(): number {
+  const groups = app.printRoutes({ commonDeps: false }).match(/\(([^)]*)\)/g) ?? [];
+  return groups.reduce(
+    (acc, group) =>
+      acc + group.slice(1, -1).split(',').filter((m) => m.trim() !== 'HEAD').length,
+    0,
+  );
+}
+
+describe('🔴 「遍历全部路由」这句话本身（判据的判据）', () => {
+  it('表里每一条都**真的注册了** —— 未注册的入口 `inject` 会是 404', async () => {
+    for (const [method, url] of ALL_ROUTES) {
+      const res = await app.inject({ method, url });
+      // 闸门命中是 401（preHandler 在路由**之后**跑），路由没了才是 404。
+      // 把这条单独钉出来，是为了让"路由改名了"报在这里，
+      // 而不是让上面那两个 describe 报成"某条路由没有闸门"—— 那是假根因。
+      expect(res.statusCode, `${method} ${url} 没有注册`).not.toBe(404);
+    }
+  });
+
+  it('反方向：注册数 == 表长 ⇒ 新增入口**必须**先登记进这张表', () => {
+    // 有人加了一条 `/api/admin/refunds` 而没写进表 ⇒ 这里 12 !== 13 当场红。
+    // ⚠️ 这条是**数量**对账，不是集合对账：它能拦住"忘了登记"这一类，
+    //    拦不住"登记的 URL 拼错了但同时漏了另一条"这种两两抵消。
+    //    后一半由上面那条（逐条非 404）补 —— 两条合起来才闭合，删任何一条都会留一个洞。
+    expect(registeredMethodCount()).toBe(ALL_ROUTES.length);
+  });
+
+  it('解析器自己也要有哨兵：数出来 0 条就是解析器坏了，不是"没有路由"', () => {
+    // §7 元规则 2：一条永远通过的判据比没有判据更糟。
+    // `?? []` 让"匹配失败"变成 0，而 `0 === 0` 在表为空时会假绿 ——
+    // 所以这里断言它数得出的**就是**表的长度，且长度本身 > 0。
+    expect(ALL_ROUTES.length).toBeGreaterThan(0);
+    expect(registeredMethodCount()).toBeGreaterThan(0);
+  });
+});
 
 describe('🔴 准入：插件级闸门覆盖**每一条**路由', () => {
   it('没有 Authorization 头 ⇒ 每条路由都是 401', async () => {
@@ -167,6 +231,35 @@ describe('GET /overview', () => {
     // `DEFAULT_ENTITLEMENT_POLICY` 只有 active 算有效 ⇒ past_due 不计入。
     expect(body.subscriptions.active).toBe(3);
     expect(body.subscriptions.entitledStatuses).toContain('active');
+  });
+
+  it('🔴 「已结算的核销」数的是 `settledAt` 那一列，不是 `state` 的一个取值', async () => {
+    setAdmin(true);
+    mocks.couponRedemption.count.mockResolvedValue(7);
+
+    const res = await app.inject({ method: 'GET', url: '/api/admin/overview', headers: AUTH });
+
+    // 词表（`REDEMPTION_STATES`）里没有 `settled` 这个取值：写 `state: 'settled'`
+    // 会命中一个**存在的索引**，于是又快又错地恒返回 0 —— 界面上就是一个"没人用券"。
+    expect(mocks.couponRedemption.count).toHaveBeenCalledWith({ where: { settledAt: { not: null } } });
+    expect(res.json().coupons.settledRedemptions).toBe(7);
+  });
+
+  it('🔴 管理路由里出现的核销状态字面量必须全部来自词表（真源只有一处）', async () => {
+    const src = await readFile(new URL('../src/admin/admin.routes.ts', import.meta.url), 'utf8');
+    // ⚠️ 必须先剥注释再匹配：本文件上面那段解释"以前写成 `state: 'settled'`"的注释
+    //   本身就是**对这个形状的转述**，不剥的话分类器会把说明当成违规。
+    const code = src
+      .split('\n')
+      .map((line) => line.replace(/\/\/.*$/, '').replace(/^\s*\*.*$/, ''))
+      .join('\n');
+    const literals = [...code.matchAll(/state:\s*'([a-z_]+)'/g)].map((m) => m[1]);
+    const outside = literals.filter((s) => !REDEMPTION_STATES.includes(s as RedemptionState));
+    expect(outside, `词表外的核销状态：${outside.join(', ')}`).toEqual([]);
+
+    // 阳性对照：这条分类器自己必须能红 —— 拿一个已知违规的写法喂它。
+    const probe = [...`count({ where: { state: 'settled' } })`.matchAll(/state:\s*'([a-z_]+)'/g)].map((m) => m[1]);
+    expect(probe.filter((s) => !REDEMPTION_STATES.includes(s as RedemptionState))).toEqual(['settled']);
   });
 });
 

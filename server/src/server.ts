@@ -36,7 +36,9 @@ import {
 import { testRoutes } from './test-routes';
 import { activityRoutes } from './activity/activity.routes';
 import { accountProfileRoutes } from './account/account-profile.routes';
+import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { adminRoutes } from './admin/admin.routes';
+import { managedAiProxyRoutes } from './ai/managed-proxy.routes';
 
 // HTML escape to prevent XSS in generated HTML
 export const escapeHtml = (unsafe: string): string => {
@@ -569,13 +571,51 @@ export const createServer = (
       // ⚠️ 它同样不受计费闸门影响 —— 改自己的昵称不是付费能力。
       await fastifyServer.register(accountProfileRoutes, { prefix: '/api' });
 
+      // 调休/补班（公共事实）的**匿名只读**下行。W4b，定性见 ADR-0052。
+      //
+      // 🔴 这是这个服务端上**第一条**不需要凭据就能读的 JSON 下行
+      //（`push.routes.ts:127` 那条 vapid 是认证**后**只读，未登录 401）。
+      // 因此两件事必须在这一处显式决定，而不是沿用默认：
+      //   · 速率：per-route `rateLimit`（见 `HOLIDAY_PUBLIC_RATE_LIMIT`），比全局那一条紧；
+      //   · 缓存：ETag + `Cache-Control`，让"匿名 + 全量数据"不变成每次渲染都打一遍服务端。
+      // ⚠️ 它**不受计费闸门影响**，与 `activityRoutes` 同一条理由：
+      //    日历上"哪天上班"不是付费能力，把它放到闸门后面会让到期用户看到
+      //    一个**少了标注**的日历，而那不是"降级"，那是**界面在悄悄说谎**。
+      //    同理它也**不需要** `requireTermsConsent`：读公共事实不产生任何账号级写入。
+      await fastifyServer.register(holidayAdjustmentRoutes, { prefix: '/api' });
+
       // 运营管理后台（ADR-0038）。**默认没有人是管理员**（`users.is_admin` 默认
       // false），所以这个前缀对所有人都是 403，直到有人跑过
       // `pnpm --filter @heyta/server admin:grant <email>`。
       //
       // 🔴 闸门在插件内部（`admin.routes.ts` 的 `addHook('preHandler', requireAdmin)`），
       //    不是在这里 —— 这样"新增一条 admin 路由忘了加鉴权"是不可能的。
-      await fastifyServer.register(adminRoutes, { prefix: '/api/admin' });
+      await fastifyServer.register(adminRoutes, {
+        prefix: '/api/admin',
+        // 退款那三条要挑通道：按**订单当初的 provider** 挑，所以这里给的是
+        // 与收银台/回调**同一份** adapter 列表（同一个构造函数、同一个配置源）。
+        // 另起一份 `createWechatBillingAdapter(...)` 会造出"下单能通、退款说没配"
+        // 这种分叉 —— 两处配置迟早漂移，而漂移的第一现场总是钱。
+        adapters: createBillingAdaptersFromConfig(fullConfig),
+      });
+
+      // 托管 AI 的服务端代理（ADR-0054 §6 前置顺序里"把计量接到生产路径上"那一步）。
+      //
+      // 🔴 **这里不传任何选项**，是有意的：上游配置走环境（`MANAGED_AI_*`）、
+      //    白名单表走 `ai/managed-upstream.ts` 那份常量、额度走 `metering.ts` 那个常量、
+      //    SQL 面走 Prisma、传输层走 `globalThis.fetch`。测试注入的是**同一批入参的替身**，
+      //    所以"测试里合格的上游在生产上仍然合格"这句话不是靠信任维持的。
+      //
+      // 🔴 这条路由**不受** `ENTITLEMENT_GATE_ENABLED` 影响，与上面 `syncRoutes` 的权益闸门**相反**。
+      //    理由不是遗漏：`consumeManagedAiRequest` 的**周期锚点**取自"有效且授予 `ai` 的那一行
+      //    订阅的最晚到期时刻"（`ai/metering.ts` 的 `managedAiPeriodAnchor`），
+      //    没有这样一行时它返回 `MISSING_PERIOD_END` 并**拒绝** —— 也就是说这条路上
+      //    "关掉权益判定"在数据结构上就不存在，额度计的是"哪一个周期"这件事本身来自订阅行。
+      //    ⚠️ 代价要说破：一台自托管实例即使配了 `MANAGED_AI_ENABLED=true`，
+      //    也要给账号**写入一行带 `ai` grants 的订阅**才能用这条路由
+      //    （运营者动作，同 `admin:grant` 那一类）。"给自托管一个不需要订阅的形态"
+      //    需要先改锚点的来源，那是**另一个决定**，不在本轮里顺手做。
+      await fastifyServer.register(managedAiProxyRoutes, { prefix: '/api/ai' });
 
       // Test Routes (only in test mode)
       if (fullConfig.testMode?.enabled) {

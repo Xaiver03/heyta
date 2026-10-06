@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openApp, openSettingsView, stubLegalRecheck } from './helpers';
+import { openApp, openSettingsView, stubLegalRecheck, stubPublicFacts } from './helpers';
 
 /**
  * 运营管理后台：真浏览器契约（截图为判据）。
@@ -54,6 +54,15 @@ const REALTIME_WS_GLOB = 'ws://127.0.0.1:4319/api/sync/ws*';
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 20, 4, 0, 0);
 
+/**
+ * 判据②那两条出处。🔴 假服务端的响应与下面的断言**共用这一个常量** ——
+ * 抄两份的漂移形状是"改了夹具没改期望"，那条判据就悄悄变成只对自己成立。
+ */
+const HOLIDAY_PAPERS = [
+  'https://www.gov.cn/zhengce/content/2025-11/holiday-2026.pdf',
+  'https://www.gov.cn/zhengce/content/2025-11/make-up-2026.pdf',
+] as const;
+
 /** 详情页那台"假服务端"的可变状态。界面的新值只能从这里读回来。 */
 interface FakeServerState {
   locked: boolean;
@@ -71,6 +80,40 @@ function defaultFake(): FakeServerState {
     quotaBytes: 104_857_600, // 100 MiB
     tokenVersion: 3,
   };
+}
+
+/**
+ * `GET /api/admin/refunds` 的两行（投影 = 服务端 `listRefunds` 选的那 9 个键，**逐键对齐**）。
+ *
+ * ⚠️ 取值刻意**互不重叠**：`4012` 分 / `30` 天 / `#1207` / `3304` / `7719` /
+ * `HYRFDEMO0001` —— "投影里每个字段都画出来了"这条存在性判据，
+ * 只有在各值不会互相冒充时才有牙（两个金额都填 400 那种写法判不出来）。
+ */
+function refundRows() {
+  return [
+    {
+      id: 1207,
+      orderId: 3304,
+      userId: 7719,
+      provider: 'wechat',
+      outRefundNo: 'HYRFDEMO0001',
+      amountMinor: 4012,
+      currency: 'CNY',
+      periodDays: 30,
+      status: 'requested',
+    },
+    {
+      id: 1206,
+      orderId: 3301,
+      userId: 7718,
+      provider: 'wechat',
+      outRefundNo: 'HYRFDEMO0002',
+      amountMinor: 1299,
+      currency: 'CNY',
+      periodDays: 30,
+      status: 'success',
+    },
+  ];
 }
 
 const OVERVIEW_BODY = {
@@ -204,11 +247,20 @@ async function seed({
   page,
   overviewStatus = 200,
   fake = defaultFake(),
+  refundDenyReason = null,
 }: {
   page: Page;
   /** 403 用来演"非管理员什么都不渲染"。 */
   overviewStatus?: number;
   fake?: FakeServerState;
+  /**
+   * 非 `null` ⇒ `POST /api/admin/refunds` 以 **409 + 这个原因码**回答。
+   *
+   * 🔴 这一格是 ADR-0053 §5 第 11 条那条判据的载体：409 体里的 `reason` 必须**一路走到界面**。
+   * 只断言"有一条错误行"挡不住把 409 折成一句"服务端出错了"的实现 —— 而那正是这一片
+   * 界面存在的理由（运营分不清"这一单过了 7 天"与"这条已经决定过了"就会反复点同一个按钮）。
+   */
+  refundDenyReason?: string | null;
 }): Promise<{ adminCalls: string[] }> {
   // ⚠️ 生产者垫片由 `openApp` 装（同 `inbox.spec.ts`：`page.route` 注册两次会让
   // 后一份把前一份静默遮掉）。
@@ -221,6 +273,11 @@ async function seed({
 
   // 🔴 补签那道读侧闸：塞了凭据应用一启动就会问一次，与后台这个主题无关。
   await stubLegalRecheck(page, SERVER);
+  // 🔴 同一条理由的第二例，而且是**本批自己带来的**：W4b 的公共事实通道挂在
+  // `apps/web/src/main.tsx:152 startPublicFacts()` ⇒ 一开机就发 `GET /api/holiday-adjustments`。
+  // 2026-10-04 03:0x 实测：不补它 ⇒ 本套件**一次红五条**，五条报错逐字相同
+  // （`除已登记缺失外不该有非 2xx：["/api/holiday-adjustments"]`），其中四条与后台无关。
+  await stubPublicFacts(page, SERVER);
 
   // 实时同步的 WS 与权益探测：塞了凭据应用就会真发，对端得补上，
   // 否则无关的 404 会淹掉真正的失败（同 `inbox.spec.ts` 的理由）。
@@ -274,11 +331,18 @@ async function seed({
     });
   });
 
+
   const adminCalls: string[] = [];
 
   // ⚠️ 这一条 glob 写错（少一个斜杠）的**症状不是静默通过**，而是两样都会响：
   // 请求回落到 `stub-provider.mjs` 拿 404 ⇒ `assertNoProblems` 的"不该有非 2xx"红；
   // 而"六个 Tab 各自按需拉数据"那条对 `adminCalls` 的逐字断言也红。
+  // 🔴 退款那两条端点**带状态**：批准之后 `GET /refunds` 必须回一个新状态，
+  // 否则界面只要"把请求里的话再印一遍"就能通过（§7 第 50 条那一族）。
+  const refunds = {
+    rows: refundRows().map((row) => ({ ...row })),
+  };
+
   await page.route(`${ADMIN}/**`, async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.slice(ADMIN_PATH.length); // 例如 '/users/7/unlock'
@@ -463,6 +527,62 @@ async function seed({
       });
       return;
     }
+    // ── 退款四条端点 ───────────────────────────────────────────────
+    if (path === '/refunds' && method === 'GET') {
+      await json({ refunds: refunds.rows });
+      return;
+    }
+    if (path === '/refunds' && method === 'POST') {
+      const body = route.request().postDataJSON() as {
+        orderId: number;
+        note?: string;
+        operatorApproved?: boolean;
+      };
+      if (refundDenyReason !== null) {
+        // 🔴 409 + 体里的**机器码**：这一格要验的就是这个码能不能走到界面。
+        await route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Refund not allowed.', reason: refundDenyReason }),
+        });
+        return;
+      }
+      const id = Math.max(...refunds.rows.map((row) => Number(row.id)), 9000) + 1;
+      refunds.rows.unshift({ ...refundRows()[0], id, orderId: body.orderId });
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          outcome: 'requested',
+          refundId: id,
+          outRefundNo: `HYRFNEW${String(id)}`,
+          amountMinor: 4012,
+        }),
+      });
+      return;
+    }
+    const decided = /^\/refunds\/(\d+)\/(approve|reject)$/.exec(path);
+    if (decided !== null) {
+      const row = refunds.rows.find((entry) => entry.id === Number(decided[1]));
+      if (row === undefined || row.status !== 'requested') {
+        await route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Refund already decided or finished.', reason: 'NOT_DECIDABLE' }),
+        });
+        return;
+      }
+      // 🔴 假服务端**自己变**：界面那一行的新状态只能从下一次 GET 读回来。
+      row.status = decided[2] === 'approve' ? 'processing' : 'rejected';
+      await json(
+        decided[2] === 'approve'
+          ? { ok: true, outcome: 'submitted', status: 'processing', providerRefundId: '5030' }
+          : { ok: true, outcome: 'decided', status: 'rejected' },
+      );
+      return;
+    }
+
     if (/^\/users\/\d+$/.test(path)) {
       await json(detailBody(fake));
       return;
@@ -484,6 +604,29 @@ async function seed({
     if (path.endsWith('/logout')) {
       fake.tokenVersion += 1;
       await json({ ok: true });
+      return;
+    }
+
+    if (path === '/holiday-adjustments') {
+      // 判据②的那份数据：一年、两条出处、两天逐日表。
+      // `dayCount` 是服务端算的，界面拿它核对"存进去的 == 显示出来的"。
+      await json({
+        version: '1759000000000.1.2',
+        years: [
+          {
+            year: 2026,
+            papers: HOLIDAY_PAPERS,
+            days: [
+              { day: '2026-10-10', isOffDay: true },
+              { day: '2026-10-11', isOffDay: false },
+            ],
+            dayCount: 2,
+            updatedAt: 1_759_000_000_000,
+            updatedBy: 'ops@example.test',
+            note: '国务院办公厅通知',
+          },
+        ],
+      });
       return;
     }
 
@@ -518,14 +661,24 @@ function stat(page: Page, label: string) {
  * 页头，那张图**证明不了面板长什么样**，而 §6.2 规定一要的恰好就是这张图。
  * （Playwright 的 `click` 会自动滚动，`screenshot` 不会 —— 这个差别很容易踩。）
  */
-async function shoot(page: Page, target: Locator, name: string): Promise<void> {
+async function shoot(
+  page: Page,
+  target: Locator,
+  name: string,
+  /**
+   * 落在哪。默认仍是 `test-results/`（既有那些用例一张都没改）。
+   * 🔴 但**新落的判据要留证**就给受版本控制的那份：`e2e/test-results/` 每趟被清，
+   *   一张"截图为证"的图如果只活在那里，下一趟跑完就没有人能再打开它看。
+   */
+  dir = 'test-results',
+): Promise<void> {
   await target
     // 🔴 必须给它一个**短超时**：默认会等到整条用例超时（60s），那时页面已被关掉，
     // `screenshot` 直接报 "Target page, context or browser has been closed" ——
     // 于是"失败时也要有图"（§6.2 规定一第 1 条）在最需要它的时候失效。
     .scrollIntoViewIfNeeded({ timeout: 3_000 })
     .catch(() => null); // 目标不在时不在这儿报错，交给后面的断言。
-  await page.screenshot({ path: `test-results/${name}` });
+  await page.screenshot({ path: `${dir}/${name}` });
 }
 
 interface PageProblems {
@@ -564,8 +717,8 @@ function assertNoProblems(problems: PageProblems, expectedBad: readonly string[]
   expect(problems.pageErrors, `不该有未捕获异常：${JSON.stringify(problems.pageErrors)}`).toEqual([]);
 }
 
-/** 后台的六个 Tab（词条来自 `packages/i18n` 的 `web.admin.tab.*`）。 */
-type AdminTabLabel = '概览' | '用户' | '订阅' | '订单' | '优惠码' | '邀请';
+/** 后台的标签页（词条来自 `packages/i18n` 的 `web.admin.tab.*`）。 */
+type AdminTabLabel = '概览' | '用户' | '订阅' | '订单' | '优惠码' | '邀请' | '调休/补班' | '退款';
 
 /**
  * 🔴 必须**限定在面板内**：`role="tab"` 在这个应用里不止一处
@@ -573,6 +726,30 @@ type AdminTabLabel = '概览' | '用户' | '订阅' | '订单' | '优惠码' | '
  */
 function adminTab(page: Page, label: AdminTabLabel) {
   return page.getByTestId('admin-panel').getByRole('tab', { name: label, exact: true });
+}
+
+/**
+ * 🔴 「这一行的标识在**屏幕上**完整看得见」—— 不是「DOM 里有这段文字」。
+ *
+ * `toContainText` 读的是 DOM，而 CSS `text-overflow: ellipsis` 截断时**字还在 DOM 里**，
+ * 于是三条断言全绿的截图上，运营其实看不见自己在批哪一笔。看图实测到的形状：
+ * 带批准按钮的那一行被压成 `用户 #7719…`（`out_refund_no` 整段消失），
+ * 展开二次确认时更糟 —— 整行标识挤到看不见，而那正是最要看清的一刻。
+ *
+ * 判据用 `scrollWidth > clientWidth`（内容比盒子宽 = 被裁），留 1 px 给亚像素舍入。
+ */
+async function expectRowIdentityNotClipped(list: Locator): Promise<void> {
+  const rows = list.locator('li');
+  const count = await rows.count();
+  expect(count, '退款列表一行都没有，这条判据就成了空判').toBeGreaterThan(0);
+  for (let index = 0; index < count; index += 1) {
+    const main = rows.nth(index).locator('.ht-settings__admin-rowMain');
+    const clipped = await main.evaluate((el) => el.scrollWidth - el.clientWidth);
+    const text = await main.innerText();
+    expect(clipped, `第 ${String(index + 1)} 行的标识被裁掉 ${String(clipped)} px：${text}`).toBeLessThanOrEqual(
+      1,
+    );
+  }
 }
 
 test.describe('运营管理后台（真浏览器）', () => {
@@ -777,6 +954,94 @@ test.describe('运营管理后台（真浏览器）', () => {
     assertNoProblems(problems, ['/api/admin/overview']);
   });
 
+  test('🔴 退款 Tab：投影里每一行都画出来，而只有待批准的那一行给按钮', async ({ page }) => {
+    const problems = captureProblems(page);
+    await seed({ page });
+    await openPanel(page);
+    await adminTab(page, '退款').click();
+
+    const list = page.getByTestId('admin-refunds');
+    // 先截图，再断言（§6.2 规定一第 1 条）。
+    await shoot(page, list, 'admin-tab-refunds.png');
+
+    await expect(list.locator('li')).toHaveCount(2);
+    const first = list.locator('li').first();
+    // 🔴 **逐字段的存在性**：少画任何一列（比如不显示 `out_refund_no`）运营就看不见那条事实，
+    // 而"整块渲染了"看不出来（W5 那条教训：断言只会验界面写了什么，不会验界面少了什么）。
+    for (const value of [
+      '#1207',
+      '3304',
+      '7719',
+      'HYRFDEMO0001',
+      '40.12',
+      'CNY',
+      '30',
+      'wechat',
+      'requested',
+    ]) {
+      await expect(first).toContainText(value);
+    }
+    // DOM 里有 ≠ 屏上看得见：上面那九条在"被 ellipsis 截断"的画面上**全部照样绿**。
+    await expectRowIdentityNotClipped(list);
+    await expect(first.locator('[data-testid="admin-refund-approve-1207"]')).toBeVisible();
+    // 已经走到 `success` 的那一行不再给按钮：状态机不认这一跳，点下去只会拿到一次 409。
+    // ⚠️ 这**不是**安全措施（服务端才是裁决者），是不制造一次注定失败的点击。
+    await expect(list.locator('[data-testid="admin-refund-approve-1206"]')).toHaveCount(0);
+    assertNoProblems(problems);
+  });
+
+  test('🔴 退款：批准是两步 —— 第一次点只出确认、一个请求都不发', async ({ page }) => {
+    const problems = captureProblems(page);
+    const { adminCalls } = await seed({ page });
+    await openPanel(page);
+    await adminTab(page, '退款').click();
+    await page.getByTestId('admin-refund-note-1207').fill('用户坚持，客服同意');
+
+    await page.getByTestId('admin-refund-approve-1207').click();
+    await shoot(page, page.getByTestId('admin-refund-approve-confirm'), 'admin-refund-confirm.png');
+    // 这一条是钱的那道闸：一次点击就动钱、且动出去收不回来的动作不许一步做完。
+    expect(adminCalls.filter((call) => call.includes('/approve')), '第一步不许发请求').toEqual([]);
+    await expect(page.getByTestId('admin-refund-approve-confirm')).toContainText('收不回来');
+    // 🔴 确认这一步**展开在行里**，会把行主内容挤没 —— 而"我在批哪一笔"必须看得见。
+    await expectRowIdentityNotClipped(page.getByTestId('admin-refunds'));
+
+    await page.getByTestId('admin-refund-approve-yes-1207').click();
+    expect(
+      adminCalls.filter((call) => call === 'POST /refunds/1207/approve'),
+      '第二步才发，且只发一次',
+    ).toHaveLength(1);
+    // 界面上那一行来自**重新读回的 GET**：新状态是 processing，而界面不许说"已退款"
+    // （`success` 只由签名有效的回调认领，ADR-0053 §4）。
+    await expect(page.getByTestId('admin-refunds').locator('li').first()).toContainText('processing');
+    await expect(page.getByTestId('admin-refund-notice')).toContainText('已交给支付通道');
+    await expect(page.getByTestId('admin-panel')).not.toContainText('已退款');
+    await shoot(page, page.getByTestId('admin-refunds'), 'admin-refund-approved.png');
+    assertNoProblems(problems);
+  });
+
+  test('🔴 退款：409 的原因码要走到运营眼前（ADR-0053 §5 第 11 条）', async ({ page }) => {
+    const problems = captureProblems(page);
+    const { adminCalls } = await seed({ page, refundDenyReason: 'WINDOW_PASSED' });
+    await openPanel(page);
+    await adminTab(page, '退款').click();
+    await page.getByTestId('admin-refund-order-input').fill('3304');
+    await page.getByTestId('admin-refund-request-note').fill('用户来申请');
+    await page.getByTestId('admin-refund-request').click();
+
+    const notice = page.getByTestId('admin-refund-notice');
+    await shoot(page, notice, 'admin-refund-denied.png');
+
+    expect(adminCalls.filter((call) => call === 'POST /refunds')).toHaveLength(1);
+    // 🔴 这一条判的是"码 → 那句话"整条链路：传输层带不带 `serverReason`、
+    // store 认不认这一档、面板有没有把码映射成词条 —— 三段里断任何一段都会红。
+    await expect(notice).toContainText('超出当前退款政策的时间窗');
+    // 折成 5xx 那句"服务端出错了"就是把"请求没写错、是那一单的状态不允许"这条事实弄丢了。
+    await expect(page.getByTestId('admin-panel')).not.toContainText('服务端出错了');
+    // 被拒的申请没进列表（假服务端也没加行）—— 界面不许显示一条不存在的申请。
+    await expect(page.getByTestId('admin-refunds').locator('li')).toHaveCount(2);
+    assertNoProblems(problems, ['/api/admin/refunds']);
+  });
+
   test('🔴 没登录 ⇒ 一个后台请求都不发', async ({ page }) => {
     const problems = captureProblems(page);
     const adminCalls: string[] = [];
@@ -799,6 +1064,69 @@ test.describe('运营管理后台（真浏览器）', () => {
     expect(adminCalls, `未登录时不该有任何后台请求：${JSON.stringify(adminCalls)}`).toEqual([]);
     // 同 403 那条：锚到后台该在的那一片再拍（`fullPage` 拍不进设置浮层这个滚动容器）。
     await shoot(page, page.getByTestId('import-panel'), 'admin-not-configured.png');
+
+    assertNoProblems(problems);
+  });
+
+  /*
+    🔴 **W4b 判据②的界面那一半**：出处（papers）在后台回显成可点的链接。
+    jsdom 那一份（`apps/web/tests/admin-panel.spec.tsx`）钉的是"渲染成 `<a href>`"，
+    这一条要的是真浏览器里的四件事：真的打了一次 `/api/admin/holiday-adjustments`、
+    链接的 `href` 就是那条 URL、**链接的文字也是那条 URL**（写成"查看出处"就把
+    取证链接藏进了标签里，运营者无法核对原文），以及那张图里看得见它。
+    图落在受版本控制的 `apps/web/evidence/admin-holiday/`（`test-results/` 每趟被清）。
+  */
+  test('🔴 调休/补班那一页把出处回显成可点链接（判据②，截图为证）', async ({ page }) => {
+    const problems = captureProblems(page);
+    const { adminCalls } = await seed({ page });
+    await openPanel(page);
+    await expect(page.getByTestId('admin-panel')).toBeVisible();
+
+    await adminTab(page, '调休/补班').click();
+    const years = page.getByTestId('admin-holiday-years');
+    await expect(years, '调休/补班那一页没渲染出年度列表').toBeVisible();
+    await shoot(page, years, 'admin-holiday-papers.png', '../apps/web/evidence/admin-holiday');
+
+    await expect(years.locator('li')).toHaveCount(1);
+    // 按需拉取：这个端点恰好一次（与其余六个 Tab 同一条纪律）。
+    expect(
+      adminCalls.filter(
+        (call) => call === 'GET /holiday-adjustments' || call.startsWith('GET /holiday-adjustments?'),
+      ),
+      '出处那一页要么没拉、要么重拉了',
+    ).toHaveLength(1);
+
+    const links = years.locator('[data-testid="admin-holiday-papers"] a');
+    await expect(links).toHaveCount(HOLIDAY_PAPERS.length);
+    for (const paper of HOLIDAY_PAPERS) {
+      const link = links.filter({ hasText: paper });
+      await expect(link, `界面上找不到那条出处：${paper}`).toHaveCount(1);
+      // `href` 逐字等于那条 URL（不是被包了一层跳转页）。
+      await expect(link).toHaveAttribute('href', paper);
+      // 防线：新窗口打开时不许把后台这一页的 window 交出去。
+      await expect(link).toHaveAttribute('rel', 'noreferrer noopener');
+    }
+    // 界面显示的条数 == 服务端算出的 `dayCount`（"存进去的 == 显示出来的"）。
+    await expect(years).toContainText('国务院办公厅通知');
+
+    // 🔴 这一条是**看图**加进来的，不是从需求推出来的。第一趟截图里年份显示成「2026…」：
+    // 两条 gov.cn 长 URL 的出处徽标把同一行的主体挤到被省略号裁切。
+    // **文本断言抓不到它** —— DOM 里文字是完整的，裁切只发生在渲染上（与 §8.4 里 W5 那条
+    // "断言只验写了什么、不验少了什么"是同一族，这次是"少了看得见的部分"）。
+    // 所以判据必须是几何的：这一格的滚动宽度不超过它自己的宽度 = 没有任何内容被藏起来。
+    const rowMain = years.locator('li').first().locator('.ht-settings__admin-rowMain');
+    await expect(rowMain, '年度那一格连年份都没有').toContainText('2026');
+    const box = await rowMain.evaluate((el) => ({
+      hidden: el.scrollWidth - el.clientWidth,
+      width: el.clientWidth,
+      text: el.textContent ?? '',
+    }));
+    // 🔴 正向对照：一条"元素没参与布局"的读数（`0 - 0 = 0`）会让上面那条判据**永远通过**。
+    // 先证明这一格真的被排版了（宽度 > 100px：整条后台面板有 1000px 可用），
+    // 才有资格说"没被裁切"。（AGENTS §7 元规则 2；这条对照是被自己的假绿逼出来的。）
+    expect(box.width, `这一格根本没参与布局（clientWidth=${box.width}），"没被裁切"是空测`).toBeGreaterThan(100);
+    // `1` 是亚像素舍入的容差，不是"裁掉一点没关系"：实测被挤掉时这个数是几十。
+    expect(box.hidden, `年度那一格被裁掉 ${box.hidden}px ⇒ 年份在界面上看不见（文本="${box.text}"）`).toBeLessThanOrEqual(1);
 
     assertNoProblems(problems);
   });

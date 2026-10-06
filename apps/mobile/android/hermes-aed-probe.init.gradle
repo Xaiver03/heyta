@@ -1,0 +1,12 @@
+// Gradle init script used only by scripts/verify-mobile-aed.sh.
+// It keeps the production app/build.gradle and index.js untouched.
+gradle.projectsLoaded { gradle.allprojects { project ->
+  if (project.path == ':app') {
+    project.afterEvaluate {
+      def reactExtension = project.extensions.findByName('react')
+      if (reactExtension != null) {
+        reactExtension.entryFile = project.file('../../hermes-aed-probe-entry.js')
+      }
+    }
+  }
+} }

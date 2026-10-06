@@ -324,19 +324,47 @@ export function createWorkerOpLogSession<TOperation extends Operation<string> = 
     getLastLocalSeq: () => call('getLastLocalSeq', []) as Promise<number>,
     getAllOps: (range, limit) =>
       call('getAllOps', [range, limit]) as ReturnType<OpLogStore<TOperation>['getAllOps']>,
+    countAllOps: () => call('countAllOps', []) as Promise<number>,
     findPendingApply: () =>
       call('findPendingApply', []) as ReturnType<OpLogStore<TOperation>['findPendingApply']>,
+    countPendingApply: () => call('countPendingApply', []) as Promise<number>,
     findPendingUpload: () =>
       call('findPendingUpload', []) as ReturnType<OpLogStore<TOperation>['findPendingUpload']>,
+    countPendingUpload: () => call('countPendingUpload', []) as Promise<number>,
     markUploaded: (serverSeqsByOpId) =>
       call('markUploaded', [serverSeqsByOpId]) as Promise<number>,
     discardPendingUpload: (opIds) => call('discardPendingUpload', [opIds]) as Promise<number>,
     markRejected: (opIds) => call('markRejected', [opIds]) as Promise<number>,
     archiveUpTo: (upToSeq) => call('archiveUpTo', [upToSeq]) as Promise<number>,
+    readCheckpoint: () => call('readCheckpoint', []) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['readCheckpoint']>
+    >,
+    writeCheckpoint: (checkpoint) => call('writeCheckpoint', [checkpoint]) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['writeCheckpoint']>
+    >,
+    readObservedClock: () => call('readObservedClock', []) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['readObservedClock']>
+    >,
+    mergeObservedClock: (clock) => call('mergeObservedClock', [clock]) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['mergeObservedClock']>
+    >,
+    hasIncompleteHistory: () => call('hasIncompleteHistory', []) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['hasIncompleteHistory']>
+    >,
+    markHistoryIncomplete: () => call('markHistoryIncomplete', []) as ReturnType<
+      NonNullable<OpLogStore<TOperation>['markHistoryIncomplete']>
+    >,
 
     // ── 簿记（同步游标）──
     getLastServerSeq: () => call('getLastServerSeq', []) as Promise<number>,
     setLastServerSeq: (seq) => call('setLastServerSeq', [seq]) as Promise<void>,
+
+    // ── META 通用读写（公共事实缓存走这里，ADR-0052 §2.5）──
+    // 🔴 页侧**没有** `DbAdapter`（库在 Worker / 壳里），所以这条是三条后端路径
+    // 唯一都能到达 `STORES.META` 的口子。漏转发不会静默返回空值：
+    // `handleOpLogWorkerRequest` 找不到方法名时会响亮报错。
+    getMetaValue: (key) => call('getMetaValue', [key]) as Promise<string | number | undefined>,
+    setMetaValue: (key, value) => call('setMetaValue', [key, value]) as Promise<void>,
 
     // ── 继承自 `RemoteOperationApplyStorePort` ──
     appendBatchSkipDuplicates: (ops, source, options) =>

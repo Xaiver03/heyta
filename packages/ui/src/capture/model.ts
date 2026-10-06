@@ -72,6 +72,7 @@ import {
   type CaptureMatch,
   type CaptureParse,
   type LocalDate,
+  type LocalTime,
 } from '@heyta/domain';
 
 /* ========================================================================
@@ -108,6 +109,12 @@ export interface CaptureChip {
   readonly dueDate?: LocalDate;
   /** 领域层解析出的优先级。同 {@link CaptureChip.dueDate}：未被采纳也可能带值。 */
   readonly priority?: Priority;
+  /**
+   * 领域层解析出的**时刻**（`HH:MM`）。同上面两个：未被采纳也可能带值。
+   * 没有它就没有"这一条是时刻"的判据 —— 芯片只能靠 `field` 认，
+   * 而宿主迟早会去比 `dueDate`/`priority`（那就是漏了一类字段的开始）。
+   */
+  readonly dueTime?: LocalTime;
   /** 这一条该显示哪种操作。 */
   readonly action: CaptureChipAction;
 }
@@ -135,9 +142,26 @@ export function toCaptureChips(parsed: CaptureParse): CaptureChip[] {
     field: match.field,
     display: match.display,
     ...(match.dueDate !== undefined ? { dueDate: match.dueDate } : {}),
+    ...(match.dueTime !== undefined ? { dueTime: match.dueTime } : {}),
     ...(match.priority !== undefined ? { priority: match.priority } : {}),
     action: captureChipAction(match),
   }));
+}
+
+/**
+ * 时刻芯片该念什么 —— **归一化后的 `HH:MM` 本身**，不是任何措辞。
+ *
+ * 🔴 为什么这条判定必须在共享层：宿主注入的 `valueLabel` 只有两类分支
+ * （有 `dueDate` → 日期 + 剩余天数，否则 → 优先级）。时刻芯片落进那个
+ * `else` 会被念成**「不设置」**（`capturePriorityLabelKey(undefined)` 的返回值）——
+ * 芯片在说谎，而类型完全合法、界面看着正常。与日历档位"加一档不改进去
+ * 年会念成日"是同一个形状，所以这里给的是一个**必答的口子**，
+ * 两端各自 `if (timeLabel !== undefined) return timeLabel`。
+ *
+ * 非时刻的芯片返回 `undefined`（宿主继续走自己那两条）。
+ */
+export function captureChipTimeLabel(chip: CaptureChip): string | undefined {
+  return chip.field === 'dueTime' ? chip.display : undefined;
 }
 
 /* ========================================================================
@@ -228,7 +252,13 @@ export function toCaptureSubmitPlan(
   const dueDate = parsed.dueDate ?? anchor;
   return {
     title: parsed.title,
-    ...(dueDate !== undefined ? { dueDate: dueDateToEpoch(dueDate) } : {}),
+    /*
+     * `parsed.dueTime` 与 `parsed.dueDate` 是**成对**的：领域层保证没有日期
+     * 就不可能有采纳到的时刻（`parseCapture` 里那条 `dueTimeNeedsDate`）。
+     * 所以这里不需要再判"锚点补的日期能不能配解析出的时刻"——那种组合
+     * 根本到不了这一行。（写成三元判断会是给一条不存在的分支上锁。）
+     */
+    ...(dueDate !== undefined ? { dueDate: dueDateToEpoch(dueDate, parsed.dueTime) } : {}),
     ...(parsed.priority !== undefined ? { priority: parsed.priority } : {}),
   };
 }

@@ -24,13 +24,23 @@ import { ICON_SIZE } from '@heyta/design-system';
  * `confirmAiToolProposal()` → `host.submit()` → `dispatch()`。
  * 本文件**没有任何**自动确认、超时确认、或"上次同意过这类改动"的捷径。
  *
- * ## 🔴 3. 会话历史只在内存里
+ * ## 🔴 3. 会话历史落在这台设备上（D-4 的 (i)，不是 (ii)）
  *
- * 聊天文本**没有**对应的领域实体，写进 `localStorage` 等于把用户内容
- * 明文放在任何同源脚本都读得到的地方（`aiStore.ts` 的文件头就是为这件事写的）。
- * 真要持久化，得先决定它是不是 op-log 实体（那要同步、要加密、要有墓碑）——
- * 那是一个产品决策，不是这一层的顺手事，已按缺口登记。
- * 刷新即清空，界面明说（「新会话」按钮就在旁边）。
+ * 这一段原来写的是"只在内存里，因为写进 `localStorage` 等于把用户内容明文
+ * 放在任何同源脚本都读得到的地方"。**这句理由被实测否证了**：
+ * 加密发生在**上传那一步**（`sync-client/src/client.ts:873`），
+ * 本地 `state` store 里本来就躺着解开的实体，而同源脚本读得到 `localStorage`
+ * 就读得到那份 IndexedDB —— 所以"明文落在本机"不是这一层新开的敞口，
+ * 是现状。这个仓库真正守住的线是**口令与密钥不落盘**
+ * （`credential-storage.ts` 那张表：JWT ✅、口令 ❌），它没有松，也不该被
+ * 这段注释冒充成"更严"。细节写在 `assistant-history.ts` 文件头。
+ *
+ * 仍然**没有**做的是 D-4 的 (ii)：把对话做成 op-log 实体跨设备同步。
+ * 那要新实体、墓碑，以及"另一台设备上能不能确认这条改动提案"的答案 ——
+ * 产品没拍，这一层不预支。
+ *
+ * 界面因此必须说清历史存在哪儿（`web.ai.chat.historyLocalOnly` 那条），
+ * 而未确认的改动提案**不跟着恢复**（见 `ProposalCard` 的 `expired` 分支）。
  *
  * ## 🔴 4. 本组件不发任何请求
  *
@@ -38,7 +48,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  * （`check:layering` 的 `no-model-endpoint-in-apps` 会拦下试图在这里 fetch 的代码）。
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Sparkles } from 'lucide-react';
 
 import { useI18n, type I18nValue } from '@heyta/i18n';
@@ -53,17 +63,18 @@ import {
   type SecretStore,
 } from '@heyta/ai';
 import {
+  ASSISTANT_TIER_READ_ONLY,
   assistantEgressFields,
+  assistantNeedsEgressDisclosure,
   confirmAiToolProposal,
   planAssistantEgress,
   requestAssistantTurn,
-  type AiToolProposal,
   type AssistantFailureReason,
   type AssistantMessage,
   type AssistantStep,
   type AssistantTier,
 } from '@heyta/app-host';
-import type { LocalApiHost, LocalApiWriteResult } from '@heyta/local-api';
+import type { LocalApiHost } from '@heyta/local-api';
 
 import { AiDisclosureHost } from './AiDisclosureHost.js';
 import { AiPanelHeadHost } from './AiPanelHeadHost.js';
@@ -75,6 +86,14 @@ import { LIST_SEPARATOR } from './locale-punctuation.js';
 import { resolveFeatureRoute, type SettingsTarget } from './route-explanation.js';
 import { intentText } from './AiToolRun.js';
 import { createAiToolHost } from '../tasks/store.js';
+import {
+  clearAssistantHistory,
+  type HistoryStorage,
+  loadAssistantHistory,
+  saveAssistantHistory,
+} from './assistant-history.js';
+import type { ChatItem, WithoutId } from './assistant-transcript.js';
+import { currentAccount, usePanelEphemeral } from './panel-ephemeral.js';
 
 export interface AssistantPanelProps {
   routing: AiRoutingConfig;
@@ -95,62 +114,90 @@ export interface AssistantPanelProps {
   fetchImpl?: typeof fetch;
   /** 「去设置」的导航。注入缝，只为测试。 */
   onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
+  /**
+   * 会话历史的落盘位置。默认浏览器 `localStorage`。
+   *
+   * 注入它是为了能测两件只在失败时才看得出来的事：隐私模式下访问本身抛、
+   * 配额满时写失败。两者都不许把面板带崩。
+   */
+  historyStorage?: HistoryStorage | null;
 }
 
-/** 界面上的一条消息。`history` 由 `user`/`assistant` 两类拼出来。 */
-type ChatItem =
-  | { readonly id: number; readonly role: 'user'; readonly text: string }
-  | {
-      readonly id: number;
-      readonly role: 'assistant';
-      readonly text: string;
-      readonly steps: readonly AssistantStep[];
-      /** 触顶时的那一句（`stopped` 也是回答，只是带"我停在哪儿"）。 */
-      readonly stoppedAt: string | undefined;
-    }
-  | {
-      readonly id: number;
-      readonly role: 'proposal';
-      readonly text: string;
-      readonly proposal: AiToolProposal;
-      readonly confirmed: LocalApiWriteResult | undefined;
-    }
-  | {
-      readonly id: number;
-      readonly role: 'error';
-      readonly reason: AssistantFailureReason;
-      readonly message: string;
-      readonly cause: AiFailureReason | undefined;
-      readonly endpointUrl: string | undefined;
-      readonly outsideFields: readonly string[] | undefined;
-    };
-
-type Phase = 'idle' | 'disclose' | 'running';
+/** 界面上的一条消息（类型定义在 `assistant-transcript.ts`，落盘层共用它）。 */
 
 /**
- * 追加一条消息时的输入形状（`id` 由组件里的递增计数给）。
+ * 未决状态的形状与**初始值**（初始值必须是模块级常量：`usePanelEphemeral` 的
+ * `write` 把它列进依赖，render 里现造字面量会让每次渲染都换一个新回调）。
  *
- * ⚠️ 用**条件类型**而不是 `Omit<ChatItem, 'id'>`：后者会把判别联合塌成
- * 一个"所有分支的公共属性"对象，于是 `reason` / `text` 这些分支独有的字段
- * 全部报"未知属性" —— 这是 TS 的经典坑，症状看着像类型定义写错了。
+ * ⚠️ 这三样原来住在组件里（`type Phase` + 三个 `useState`）—— 那正是缺陷本身：
+ * 住在组件里就要跟着组件一起被重挂载。
  */
-type WithoutId<T> = T extends { readonly id: number } ? Omit<T, 'id'> : never;
+type AssistantPhase = 'idle' | 'disclose' | 'running';
+
+interface AssistantEphemeralShape {
+  draft: string;
+  pending: string | undefined;
+  phase: AssistantPhase;
+}
+
+const ASSISTANT_EPHEMERAL: AssistantEphemeralShape = {
+  draft: '',
+  pending: undefined,
+  phase: 'idle',
+};
 
 export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   const { t, locale } = useI18n();
-  const [items, setItems] = useState<readonly ChatItem[]>([]);
-  const [draft, setDraft] = useState('');
-  const [phase, setPhase] = useState<Phase>('idle');
-  /** 🔴 本段会话是否已经看过一次性披露。`新会话` 把它清掉。 */
-  const [disclosed, setDisclosed] = useState(false);
+  /**
+   * 挂载时从本机读一次。
+   *
+   * 🔴 读的是**磁盘**而不是状态，所以它只能在初始化时发生一次：
+   * 放进 render 体里会让每次重渲染都多读一遍，而这条会话的"身份"
+   * （属于哪个账号）必须在整段会话里固定 —— 中途换账号还继续显示，
+   * 就绕过了 `assistant-history.ts` 文件头第 3 条那道绑定。
+   */
+  const [session] = useState(() => {
+    const account = currentAccount();
+    return { account, history: loadAssistantHistory(account, props.historyStorage ?? null) };
+  });
+  const restored = session.history;
+  const [items, setItems] = useState<readonly ChatItem[]>(restored?.items ?? []);
+  /** 本段会话是否已经看过一次性披露。`新会话` 把它清掉。 */
+  const [disclosed, setDisclosed] = useState(restored?.disclosed ?? false);
+  /**
+   * 🔴 未决的三样（草稿 / 等披露确认的那一句 / 阶段指示）**不住在这里**。
+   *
+   * 理由在 `panel-ephemeral.tsx` 文件头：AI 面在右栏与中间列之间换挂载点
+   * = 换子树 = 重挂载，而重挂载会把**已经摆在用户眼前的出境披露**连同他打了一半
+   * 的那句一起收回初始态（等于替他取消一次同意请求）。那三样提到挂载点之上的
+   * Provider 里，重挂载就不再是用户的一次损失。
+   * 账号绑定（读写两侧都查）也在那一层，两个面板共用同一份实现。
+   */
+  const ephemeral = usePanelEphemeral('assistant', session.account, ASSISTANT_EPHEMERAL);
+  const { draft, phase } = ephemeral.value;
   /**
    * 等披露确认后才要发出去的那句。
    *
    * ⚠️ 不复用 `draft`：用户在披露块上按"发送"之前可能又编辑了输入框，
    * 那一句与"他看到披露时的那一句"就不是同一句了。
    */
-  const [pending, setPending] = useState<string | undefined>(undefined);
-  const idRef = useRef(0);
+  const { pending } = ephemeral.value;
+  /**
+   * 三个 setter 全部写进 Provider（函数名沿用改造前的 `setXxx`，让 diff 只落在"住哪儿"）。
+   *
+   * ⚠️ `send()` 一次连写三个（清草稿、记 pending、置阶段），靠的是 `write()` 里的
+   * **函数式** updater：同一拍里三次调用逐次基于前一次的结果，不会互相覆盖。
+   * 把 `write` 改成读闭包里的当前值就会只留最后一条 —— 这条不是假想，
+   * `send()` 的"草稿清空但披露没弹出来"就是它的症状。
+   */
+  const setDraft = (value: string): void => ephemeral.write(session.account, { draft: value });
+  const setPhase = (value: AssistantPhase): void =>
+    ephemeral.write(session.account, { phase: value });
+  const setPending = (value: string | undefined): void =>
+    ephemeral.write(session.account, { pending: value });
+  // 恢复出来的条目占用了 1..n（见 `assistant-history.ts` 的重新编号），
+  // 计数器必须从 n 之后接着走，否则第一条新消息会和恢复出来的一条撞 key。
+  const idRef = useRef(restored?.items.length ?? 0);
 
   const host = useMemo(() => props.host ?? createAiToolHost(), [props.host]);
   const settingsNavigation = useAiSettingsNavigation();
@@ -176,6 +223,20 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   const history: readonly AssistantMessage[] = items
     .filter((x) => x.role === 'user' || x.role === 'assistant')
     .map((x) => ({ role: x.role as 'user' | 'assistant', text: x.text }));
+
+  // 🔴 每一段可见的会话变化都要落一次本机盘；空会话则**删掉**那份记录。
+  // 为什么在这儿写而不是在 `append` 里写：`append` 有两处会改状态却不改历史
+  // （提案被确认、用户点忽略），漏一处就是"存的那份与看见的那份不一样"。
+  useEffect(() => {
+    if (items.length === 0) {
+      clearAssistantHistory(props.historyStorage ?? null);
+      return;
+    }
+    saveAssistantHistory(
+      { items, disclosed, account: currentAccount() },
+      props.historyStorage ?? null,
+    );
+  }, [items, disclosed, props.historyStorage]);
 
   /** 追加一条并返回它（`id` 由 ref 递增，不用数组长度 —— 长度会在同批两次追加时撞号）。 */
   function append(item: WithoutId<ChatItem>): void {
@@ -231,6 +292,13 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
     if (text === '') return;
     append({ role: 'user', text });
     setDraft('');
+    // 🔴 先按规则试一次（本机、纯函数、零出境）：命中就说明这一句根本不会出境，
+    // 那就**不该弹出境披露** —— 单步面板 `AiToolRun` 一直是这个顺序。
+    // 判定住在 `@heyta/app-host`（和循环里那一次是同一个函数），壳不另写规则。
+    if (!assistantNeedsEgressDisclosure(text, { tier: props.tier })) {
+      void turn(text);
+      return;
+    }
     // 🔴 第一次发送必须先见过一次性披露 —— 这一条不能由"用户大概知道"代替。
     if (!disclosed) {
       setPending(text);
@@ -259,6 +327,11 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
     setDisclosed(false);
     setPending(undefined);
     setPhase('idle');
+    // ⚠️ 这里**不**再单独调 `clearAssistantHistory`：`setItems([])` 之后
+    // 那个落盘 effect 就会删（判据是 `items.length === 0`）。
+    // 原来这里多写了一次，变异验证把它照出来了：摘掉那次调用 ⇒ 0 红。
+    // 留着它的代价不是行为差异，是"下一个读代码的人以为删盘有两条路，
+    // 于是要改语义时只改一处"。
   }
 
   return (
@@ -269,8 +342,10 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         title={t('web.ai.chat.title')}
         lead={<Sparkles size={ICON_SIZE.xs} aria-hidden="true" />}
       />
+      {/* 这一行是**这一档此刻到底是什么**的陈述，判据（哪一档算只读）来自
+          `@heyta/app-host`，不在外壳里重写字面量 —— 见 `assistant-tier-settings.ts`。 */}
       <p className="ht-ai__note" data-testid="ai-assistant-tier">
-        {props.tier === 'read-only'
+        {props.tier === ASSISTANT_TIER_READ_ONLY
           ? t('web.ai.chat.tier.readOnly')
           : t('web.ai.chat.tier.readAndPropose')}
       </p>
@@ -370,7 +445,14 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         </AiPanelHost>
       )}
 
-      {phase === 'running' && <p className="ht-ai__note">{t('web.ai.loading.waiting')}</p>}
+      {/* ⚠️ 这个 testid 是给判据用的，不是装饰：`ai-assistant-remount.spec.tsx`
+          要靠它区分"请求还在飞"与"阶段被重挂载归零"—— 发送键在两种情况下都是禁用的
+          （草稿已被清空），所以拿它当判据会一条都测不出来。 */}
+      {phase === 'running' && (
+        <p className="ht-ai__note" data-testid="ai-assistant-waiting">
+          {t('web.ai.loading.waiting')}
+        </p>
+      )}
 
       <div className="ht-ai__actions">
         <input
@@ -411,6 +493,18 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
       <p className="ht-ai__note" data-testid="ai-assistant-disclaimer">
         {t('web.ai.chat.disclaimer')}
       </p>
+
+      {/*
+        🔴 会话历史现在会落在这台设备上，那句话就必须**由界面说出来**而不是写在
+        代码注释里。"存在哪儿"是用户决定要不要在这台机器上聊天的依据；
+        只有落盘没有声明，等于应用替他做了一个他没同意过的决定。
+        只在真有对话时出现 —— 空面板上说这句是噪音。
+      */}
+      {items.length > 0 && (
+        <p className="ht-ai__note" data-testid="ai-assistant-local-only">
+          {t('web.ai.chat.historyLocalOnly')}
+        </p>
+      )}
     </section>
   );
 }
@@ -456,7 +550,13 @@ function ProposalCard(props: {
         {t('web.ai.tools.proposalLead')}
         <strong>{intentText(item.proposal.intent, t)}</strong>
       </p>
-      {item.confirmed === undefined ? (
+      {item.expired === true ? (
+        // 🔴 恢复出来的未确认提案：卡片留着（对话断在这儿要看得懂为什么），
+        // 但**没有确认按钮** —— 一次隔着页面重载的确认，用户已经看不见它的依据了。
+        <p className="ht-ai__done" data-testid="ai-chat-expired">
+          {t('web.ai.chat.expiredProposal')}
+        </p>
+      ) : item.confirmed === undefined ? (
         <div className="ht-ai__actions">
           <button
             type="button"

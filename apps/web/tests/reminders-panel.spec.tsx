@@ -30,11 +30,11 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { emptyState } from '@heyta/op-log';
 import { I18nProvider, zhCN, type I18nValue } from '@heyta/i18n';
-import { REMINDER_OFFSET_PRESETS_MS } from '@heyta/domain';
+import { MAX_REMINDERS_PER_TASK, REMINDER_OFFSET_PRESETS_MS } from '@heyta/domain';
 import { HeytaUiProvider } from '@heyta/ui';
 
 import {
@@ -49,6 +49,7 @@ const { ReminderPanel } = await import('../src/features/reminders/ReminderPanel.
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
 
 /** 复刻 i18n 的 `t`：用真词条表，不自己编文案。 */
 const t = ((key: string) => zhCN[key as keyof typeof zhCN]) as I18nValue['t'];
@@ -188,6 +189,21 @@ describe('A. 提前量预设与文案的下标对齐', () => {
   });
 
   it('🔴 第 i 档按钮建出的提醒 = dueDate − `REMINDER_OFFSET_PRESETS_MS[i]`', async () => {
+    /**
+     * 期望值按**档位的语义**算，而不是无脑 `dueDate - offset`（W9 ③）。
+     *
+     * 不足一天的档位说的就是"那 N 毫秒"；整天以上的说的是"前 N 个**日历日**的
+     * 同一套钟表时间" —— 在有夏令时的时区里两者相差一小时，而这条判据若继续
+     * 写 `dueDate - DAY`，它会在每年那两天把正确的产品行为报成红。
+     * 这里用测试自己写的 `setDate` 当独立 oracle（不 import 领域层的实现）。
+     */
+    const expectedTriggerAt = (dueDate: number, offsetMs: number): number => {
+      if (offsetMs < DAY || offsetMs % DAY !== 0) return dueDate - offsetMs;
+      const d = new Date(dueDate);
+      d.setDate(d.getDate() - offsetMs / DAY);
+      return d.getTime();
+    };
+
     for (let index = 0; index < REMINDER_OFFSET_PRESETS_MS.length; index += 1) {
       const dueDate = Date.now() + 30 * 24 * HOUR;
       // 每档用一条新任务：每任务存活提醒有上限，全建在同一条上会撞上限。
@@ -198,7 +214,7 @@ describe('A. 提前量预设与文案的下标对齐', () => {
       await waitFor(`第 ${String(index)} 档建出提醒`, () => remindersOf(taskId).length === 1);
 
       const created = remindersOf(taskId);
-      const expected = dueDate - REMINDER_OFFSET_PRESETS_MS[index]!;
+      const expected = expectedTriggerAt(dueDate, REMINDER_OFFSET_PRESETS_MS[index]!);
       expect(
         created[0]?.triggerAt,
         `第 ${String(index)} 档的提前量错位了`,
@@ -243,21 +259,50 @@ describe('B. 没有截止时间时只有绝对时刻入口', () => {
     const taskId = await addTask('没有截止时间');
     const view = await mountFor(taskId);
 
-    // 上限是 5 条（`MAX_REMINDERS_PER_TASK`）；连点 8 次必然撞上限。
-    // ⚠️ 每次点击的触发时刻必须**不同**（`Date.now() + 1h`），否则同一刻的
-    //    提醒会幂等地落到同一条上，永远撞不到上限 —— 所以显式让时钟前进。
-    for (let i = 0; i < 8; i += 1) {
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 3));
-        click(view, 'reminder-add-absolute');
-      });
+    /* 上限是 `MAX_REMINDERS_PER_TASK`（现量：`packages/domain/src/reminders.ts`），
+       这里**不抄那个数** —— 抄了之后改常量会让本用例的前提静默变形。
+       🔴 每次点击的触发时刻必须**逐次不同**：幂等分支（`reminder-actions.ts` 的
+       `writeNew`，按 `taskId:triggerAt` 认实体）走在封顶检查**前面**，两次点击落进
+       同一毫秒就合成同一条、永远撞不到上限。这一档靠"按点击序号推进 `Date.now()`"钉住。
+
+       🔴 而**每一次点击都必须等它落定再点下一次**。上一版靠 `setTimeout(3)` 隔开，
+       那是把"异步落库"当成"3 毫秒"来赌：单独跑必绿，全量并行时（实测 2026-10-05，
+       §8.145 那一趟）**八次点击只落进封顶检查五条 ⇒ 界面画出 6 条提醒而不报错**，
+       等待错误的 `waitFor` 超时。⇒ 与文件头那条纪律同一个形状：**等条件，不等固定 tick**。
+       ⚠️ 这只修了**判据的确定性**。产品侧"用户连点可以把存活提醒点到超过上限"那道竞态
+       **仍然存在、本单没修**（登记在待办 #47）。 */
+    const realNow = Date.now.bind(Date);
+    let step = 0;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + step * MINUTE);
+    try {
+      for (let i = 0; i < MAX_REMINDERS_PER_TASK + 3; i += 1) {
+        step += 1;
+        await act(async () => {
+          click(view, 'reminder-add-absolute');
+        });
+        const target = Math.min(i + 1, MAX_REMINDERS_PER_TASK);
+        await waitFor(
+          `第 ${String(i + 1)} 次点击落定（要么建出来，要么被拒）`,
+          () =>
+            (useReminderStore.getState().byTask[taskId]?.length ?? 0) >= target ||
+            useReminderStore.getState().error !== undefined,
+        );
+      }
+
+      await waitFor('超上限的错误被记下', () => useReminderStore.getState().error !== undefined);
+      await waitFor('错误渲染出来', () => view.querySelector('[role="alert"]') !== null);
+    } finally {
+      clock.mockRestore();
     }
 
-    await waitFor('超上限的错误被记下', () => useReminderStore.getState().error !== undefined);
-    await waitFor('错误渲染出来', () => view.querySelector('[role="alert"]') !== null);
-
     const alert = view.querySelector('[role="alert"]');
-    expect(alert?.textContent ?? '').toContain('最多 5 条提醒');
+    expect(alert?.textContent ?? '').toContain(
+      `最多 ${String(MAX_REMINDERS_PER_TASK)} 条提醒`,
+    );
+    // 🔴 存活数**停在封顶值**：这一句挡的是"上限根本没生效"，而上面那句只挡"错误看得见"。
+    expect((useReminderStore.getState().byTask[taskId] ?? []).length).toBe(
+      MAX_REMINDERS_PER_TASK,
+    );
   });
 });
 

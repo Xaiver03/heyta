@@ -195,18 +195,26 @@ describe('收银台 —— 认证与准入', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('🔴 ¥12 那一档 → 409 PRICE_NOT_SELLABLE，且**连订单都不建**', async () => {
-    // 这是 ADR-0023 §3.1「计量存在之前不得被售卖」的执行点。
-    // 关键在于它发生在**报价之前**：一档交付不了的货连价都不该报出来。
+  it('🟢 ¥12 那一档现在**可以下单**（ADR-0054 解除禁售：计量与代理路由都在了）', async () => {
+    // 这一条原来断言的是**反面的事**：`409 PRICE_NOT_SELLABLE`，
+    // 依据 ADR-0023 §3.1「计量存在之前不得被售卖」。那份红线没有被打断 ——
+    // 它的前提（"计量不存在"）被满足了之后**它自己要求解除**：
+    // `server/src/ai/metering.ts`（同一条语句里读占用+裁决+1）、
+    // `managed-proxy.routes.ts`（真的按额度拦截）、`managed-endpoints.ts`（境内白名单）。
+    // 🔴 所以这条断言现在是有牙的：把 `hosted-ai-monthly` 再塞回
+    // `NOT_YET_DELIVERABLE_SKUS`，这里立刻回到 409 并红。
+    // ⚠️ 而"调用点被删掉"这件事不在这里测 —— 那是 `pnpm check:ai-quota` §3 的臂
+    // （清单可以空，那道问句不许消失）。两条判据各挡一边，别把它们并成一条。
     const res = await post({ priceId: 'hosted-ai-monthly' });
 
-    expect(res.statusCode).toBe(409);
-    expect(res.json().error).toBe('PRICE_NOT_SELLABLE');
-    // 拒绝理由必须是**给用户看的**话，而不是一个错误码。
-    expect(res.json().reason).toContain('ADR-0023');
-    const rows = await sql.query<{ n: unknown }>('SELECT count(*)::int AS n FROM checkout_orders');
-    expect(Number(rows[0]?.n)).toBe(0);
-    expect(checkoutCalls).toHaveLength(0);
+    expect(res.statusCode).toBe(200);
+    const outTradeNo = res.json().outTradeNo as string;
+    const row = await orderRow(outTradeNo);
+    expect(row).not.toBeNull();
+    expect(row!.price_id).toBe('hosted-ai-monthly');
+    expect(row!.final_amount_minor).toBe(1_200);
+    expect(checkoutCalls).toHaveLength(1);
+    expect(checkoutCalls[0]!.amountMinor).toBe(1_200);
   });
 
   it('不认识的 priceId → 400 UNKNOWN_PRICE（不是 500，也不是"价目表坏了"）', async () => {

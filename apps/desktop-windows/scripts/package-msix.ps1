@@ -114,32 +114,61 @@ if (-not (Test-Path (Join-Path $pubDir 'HeytaWindows.pri'))) {
 
 # ---- 2. logos ---------------------------------------------------------------
 # makeappx requires these exact names/sizes.
+#
+# RED -- these are NO LONGER drawn here. They used to be: System.Drawing cleared a
+# canvas with FromArgb(37, 99, 235) -- a second copy of the brand colour and a
+# second copy of the glyph, both outside the design system -- and it squashed the
+# 512 square straight into 310x150, so the wide tile showed a ~2:1 flattened "h".
+# The single source is packages/design-system/src/brand-mark.ts; the committed
+# bitmaps under apps/desktop-windows/assets are generated from it by
+# `node scripts/gen-app-icons.mjs`. This step now only copies and verifies.
 $facts += '=== 2. logo assets ==='
 Copy-Item $pubDir\* $stage -Recurse -Force
-Add-Type -AssemblyName System.Drawing
-$srcPng = Join-Path $repo 'apps\web\public\icons\icon-512.png'
-$sizes = @{ 'Square44x44Logo.png' = 44; 'Square150x150Logo.png' = 150; 'StoreLogo.png' = 50; 'Wide310x150Logo.png' = $null }
-foreach ($name in $sizes.Keys) {
-  $out = Join-Path $stage ('Assets\' + $name)
-  New-Item -ItemType Directory -Path (Split-Path $out) -Force | Out-Null
-  if ($name -eq 'Wide310x150Logo.png') {
-    $bmp = New-Object System.Drawing.Bitmap(310, 150)
-  } else {
-    $s = $sizes[$name]
-    $bmp = New-Object System.Drawing.Bitmap($s, $s)
-  }
-  $g = [System.Drawing.Graphics]::FromImage($bmp)
-  $g.Clear([System.Drawing.Color]::FromArgb(37, 99, 235))
-  if (Test-Path $srcPng) {
-    $img = [System.Drawing.Image]::FromFile($srcPng)
-    $g.DrawImage($img, 0, 0, $bmp.Width, $bmp.Height)
-    $img.Dispose()
-  }
-  $g.Dispose()
-  $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
-  $bmp.Dispose()
+
+$assetSrc = Join-Path $repo 'apps\desktop-windows\assets'
+$assetDst = Join-Path $stage 'Assets'
+New-Item -ItemType Directory -Path $assetDst -Force | Out-Null
+
+# name -> required pixel size (WxH). targetsize-48_altform-unplated is what
+# install-and-capture.ps1 hands to the desktop shortcut's IconLocation; it used
+# to be missing, which is why the desktop tile was the generic Explorer glyph.
+$need = @{
+  'Square44x44Logo.png' = '44x44'
+  'Square150x150Logo.png' = '150x150'
+  'StoreLogo.png' = '50x50'
+  'Wide310x150Logo.png' = '310x150'
+  'Square44x44Logo.targetsize-24_altform-unplated.png' = '24x24'
+  'Square44x44Logo.targetsize-48_altform-unplated.png' = '48x48'
 }
-$facts += ('  generated = ' + ($sizes.Keys -join ', '))
+$missing = @()
+$wrongSize = @()
+foreach ($name in $need.Keys) {
+  $src = Join-Path (Join-Path $assetSrc 'msix') $name
+  if (-not (Test-Path $src)) { $missing += $name; continue }
+  $bytes = [System.IO.File]::ReadAllBytes($src)
+  if ($bytes.Length -lt 24) { $missing += ($name + ' (truncated)'); continue }
+  # PNG IHDR: width at byte 16, height at byte 20, both big-endian.
+  $w = [int]$bytes[16] * 16777216 + [int]$bytes[17] * 65536 + [int]$bytes[18] * 256 + [int]$bytes[19]
+  $h = [int]$bytes[20] * 16777216 + [int]$bytes[21] * 65536 + [int]$bytes[22] * 256 + [int]$bytes[23]
+  if (("$w" + "x" + "$h") -ne $need[$name]) { $wrongSize += ($name + ' = ' + $w + 'x' + $h + ', want ' + $need[$name]); continue }
+  Copy-Item $src (Join-Path $assetDst $name) -Force
+}
+$icoSrc = Join-Path $assetSrc 'heyta.ico'
+if (Test-Path $icoSrc) {
+  Copy-Item $icoSrc (Join-Path $stage 'heyta.ico') -Force
+  $facts += '  heyta.ico copied (PE icon for the unpackaged exe is set in the csproj)'
+} else {
+  $missing += 'heyta.ico'
+}
+
+if ($missing.Count -gt 0 -or $wrongSize.Count -gt 0) {
+  $facts += ('  MISSING = ' + ($missing -join ', '))
+  $facts += ('  WRONG_SIZE = ' + ($wrongSize -join ', '))
+  $facts += 'RESULT=ASSET_MISSING (run: node scripts/gen-app-icons.mjs, then re-sync the source tree)'
+  $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1
+}
+$facts += ('  copied = ' + (($need.Keys | Sort-Object) -join ', ') + ' (all IHDR sizes verified)')
+
 
 # ---- 3. manifest ------------------------------------------------------------
 $facts += '=== 3. AppxManifest.xml ==='

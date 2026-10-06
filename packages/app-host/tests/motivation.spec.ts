@@ -15,7 +15,15 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { toLocalDate, type FocusSession, type Habit, type HabitLog, type Project, type Task } from '@heyta/domain';
+import {
+  computeHabitPeriodStats,
+  toLocalDate,
+  type FocusSession,
+  type Habit,
+  type HabitLog,
+  type Project,
+  type Task,
+} from '@heyta/domain';
 
 import {
   bestCurrentStreak,
@@ -200,6 +208,70 @@ describe('habitGrowth：连续与韧性共用同一份日志、同一个 today',
       NOW,
     );
     expect(rows.map((r) => r.habit.id)).toEqual(['h1']);
+  });
+});
+
+describe('W8：habitGrowth 出口带上 month（钉"出口没接"与"两层各算一遍漂移"）', () => {
+  /**
+   * 🔴 这条判据钉的是两件不同的事，各用一个断言：
+   *   1. **出口没接** —— 若 `habitGrowth` 忘了算 `month`（或类型上漏了字段），
+   *      `row.month` 会是 `undefined`，与"domain 直接算"的对照当场红；
+   *   2. **两层各算一遍、口径漂移** —— app-host 若不走 `computeHabitPeriodStats`
+   *      而是自己抄了一份求和，逐字段 `toEqual` 会逮到（W8 的教训：抽出来不等于不漂）。
+   *
+   * 期望值全部**手算**（夹具：今天 2026-09-24，daily、target 5、创建于 epoch 0 ⇒
+   * 该月下界 = 9/1，到期计划日 = 9/1..9/24 = **24**；达成 9/1、9/2（各记满 5），
+   * 9/3 只记 3（未达标）⇒ `achievedDays = 2`、`rate = 2/24`、
+   * `monthValue = 5+5+3 = 13`（9/3 的量照进）、上月 8/28 记满 5 只进总量
+   * ⇒ `totalValue = 18`、`totalAchievedDays = 3`）。
+   */
+  const w8Logs = [
+    log('h1', '2026-09-01', { value: 5 }),
+    log('h1', '2026-09-02', { value: 5 }),
+    log('h1', '2026-09-03', { value: 3 }),
+    log('h1', '2026-08-28', { value: 5 }),
+  ];
+
+  it('month 在，且与 domain 层直接算的**逐字段相同**', () => {
+    const h = habit({ id: 'h1', target: 5, frequency: { type: 'daily' } });
+    const row = habitGrowth(h, w8Logs, TODAY);
+    const direct = computeHabitPeriodStats(h, w8Logs, TODAY);
+    // 前提：`month` 不是 `undefined`（出口没接的第一刀）。
+    expect(row.month).toBeDefined();
+    // 逐字段对账（app-host 只做转发，不重写求和）。
+    expect(row.month).toEqual(direct);
+    // 手算的期望形状也独立写一遍，防 `toEqual(direct)` 因两边同源而空转：
+    expect(row.month).toMatchObject({
+      monthKey: '2026-09',
+      achievedDays: 2,
+      scheduledDays: 24,
+      rate: 2 / 24,
+      monthValue: 13,
+      totalValue: 18,
+      totalAchievedDays: 3,
+    });
+  });
+
+  it('🔴 totalAchievedDays 与 resilience.total 同口径（"总打卡 N 天"只有一处真相）', () => {
+    const h = habit({ id: 'h1', target: 5, frequency: { type: 'daily' } });
+    const row = habitGrowth(h, w8Logs, TODAY);
+    // 夹具前提：这个数不是 0，否则等式会被"两边都空"糊过去。
+    expect(row.resilience.resilience.total).toBeGreaterThan(0);
+    expect(row.month.totalAchievedDays).toBe(row.resilience.resilience.total);
+  });
+
+  it('habitGrowthFromState 每行自动带 month（与 domain 直算一致）', () => {
+    const rows = habitGrowthFromState(
+      flat({
+        habits: byId([habit({ id: 'h1', target: 5, frequency: { type: 'daily' } })]),
+        habitLogs: byId(w8Logs),
+      }),
+      NOW,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.month).toEqual(
+      computeHabitPeriodStats(rows[0]!.habit, w8Logs, TODAY),
+    );
   });
 });
 

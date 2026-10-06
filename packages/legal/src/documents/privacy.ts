@@ -52,11 +52,14 @@
  *   pepper、HIBP 前缀 / A4 passkey 字段与 challenge 不落库 / A5 五封邮件与 SMTP /
  *   A6 邀请关系里的第三人邮箱 / A7 微信支付 `attach` 逐字段 / A8 后台白名单投影 /
  *   A9 `logger: false`、IP 不落库 / A10 埋点与崩溃上报 14 个关键词零命中 + 出网四类目的地 /
- *   附：45 天保留期与每日清理、`DELETE /api/account` 的 19 处级联硬删）。
- *   🔴 **19 这个数是可复算的**：对 `server/prisma/migrations` 下的迁移 SQL 数 `ON DELETE CASCADE`
- *   的出现次数（`grep -rho "ON DELETE CASCADE" server/prisma/migrations | wc -l`）。
- *   它由 `structure.spec.ts` 里那条判据钉住（数字与迁移不一致即红），所以**加一条级联关系时必须同时改这里**。
- *   （2026-10-03 从 18 变 19：`user_avatars.user_id → users.id` 那条级联，见 R10 §8.7。）
+ *   附：45 天保留期与每日清理、`DELETE /api/account` 的级联硬删（引用 `users` 且 CASCADE 的
+ *   外键 **20 条、覆盖 19 张表** —— 2026-10-05 现量：在 10-04 那次的 19/18 之上加了
+ *   `ai_usage_counters`，见 ADR-0054 §2。那份考古文件本身仍停在 10-03 的 16/15 读数，
+ *   所以下面那条纪律不是可选项）。
+ *   数字由 `packages/legal/tests/structure.spec.ts` 顺序回放迁移中的外键增删后计算，
+ *   不能用全部 SQL 中 CASCADE 的出现次数替代；新增关系须同步更新类别说明与中英数字。
+ *   🔴 **这条注释里出现的任何数字都只是现场读数，不是文案的数据源** —— 文案只能从
+ *   `userCascades.size` / `cascadeTables.length` 来（判据会把两种抄法都报红）。
  * - 各端本地存了什么、明文还是密文、权限清单实际内容：`docs/research/legal-dataflow-client.md`
  *   （B11 clientId 是随机假名 / **B12 本地存储是明文、E2EE 只覆盖传输** / B13 凭据落盘面 /
  *   B14 三条通知通路 / B15 小组件加密快照 / B16 导出是明文且三端通道不同 /
@@ -124,7 +127,11 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '这一节放在第二条，因为它是整份政策里最容易被写成假话的地方。heyta 的加密**只覆盖同步通道**：一条改动在离开你的设备之前就被加密，服务器收到的是密文，而它不持有解密所需的密钥（密钥由你的口令在你的设备上派生）。但这**不等于"你的数据全是加密的"** —— 下面三种位置必须分开说。',
+        text: '这一节放在第二条，因为它是整份政策里最容易被写成假话的地方。heyta 的加密**只覆盖同步通道**：一条改动在离开你的设备之前就被加密，服务器收到的是密文，而它不持有解密所需的密钥（新格式使用设备生成的随机数据密钥，由加密口令和恢复码分别加密保护；旧格式仍由加密口令派生密钥）。但这**不等于"你的数据全是加密的"** —— 下面三种位置必须分开说。',
+      },
+      {
+        kind: 'p',
+        text: '加密密钥与恢复：服务器保存加密密钥包及其版本、密钥指纹，以及撤销设备记录，用于跨设备解锁、迁移和阻止已撤销会话继续访问；这些记录保留至账号注销。服务器不接收加密口令、恢复码或未包裹的数据密钥。迁移期间暂存替换密文，发布或取消时释放；未完成的暂存 24 小时后过期，由清理任务释放，迁移状态回执保留至注销。密钥管理在浏览器中只持久化加密包、加密迁移草稿与密文续传记录；移动端仅在你明确选择记住解锁后，将数据密钥交给系统安全存储。加密口令与恢复码都丢失时，服务端无法恢复你的内容；撤销设备无法抹除该设备已经取得的本地内容或密钥。',
       },
       {
         kind: 'table',
@@ -132,7 +139,7 @@ const zh = [
         rows: [
           [
             '**你自己的设备**（Web 用浏览器自带的本地存储，移动端与桌面端用本机的数据库文件）',
-            '🔴 **明文**。heyta 不加密磁盘上的数据，一个字节都不加。',
+            '🔴 任务等业务数据是**明文**。这不包括下述加密密钥包和系统安全存储。',
             '拿到这台设备、解开这个账户的人，就能读到你的全部任务、清单、便签、习惯与专注记录。防线是设备自身的锁屏、系统账户与文件权限 —— FileVault、APFS、Android FBE 这些是**操作系统**的能力，不是本应用提供的。',
           ],
           [
@@ -238,8 +245,8 @@ const zh = [
             '明文',
           ],
           [
-            '账号语言、条款接受时刻与当时那一套文件的版本号、存储用量与配额、登录失败计数与锁定状态',
-            '界面语言、同意留痕、容量闸门、暴力破解防护。',
+            '账号语言、条款接受时刻与当时那一套文件的版本号、存储用量与配额、登录失败计数与锁定状态、托管 AI 用量计数（每个计费周期一个整数）',
+            '界面语言、同意留痕、容量闸门、暴力破解防护、按计费周期核对额度。🔴 最后那一项是**次数**，不是内容：提示词与模型输出都不在这张表里，见第 7 条那一行。',
             '我们的服务器',
             '明文',
           ],
@@ -356,7 +363,7 @@ const zh = [
       {
         kind: 'docRef',
         docId: 'permissions',
-        text: '《应用权限清单》逐项列出：权限名、对应功能、什么时候申请、拒绝之后哪些功能照常可用（目前 Android 只有 `INTERNET`，iOS 没有任何需要说明的隐私权限申请）。',
+        text: '《应用权限清单》逐项列出：各端声明的系统能力、对应功能、什么时候申请、拒绝之后哪些功能照常可用；通知授权与精确闹钟能力也按端单独说明。',
       },
       {
         kind: 'callout',
@@ -378,8 +385,8 @@ const zh = [
         rows: [
           [
             '同步事件（密文内容 + 那 11 项明文形状）',
-            '🔴 **45 天**。这是代码里的固定常量，当前**不可由配置改**，配合**每日一次**的自动清理任务。清理任务即使删除条数为 0 也会打一条日志，为的是"保留期真的执行过"这件事可以被证明，而不是只能靠缺失来诊断。',
-            '从数据库删除；已被快照覆盖的旧事件同样在清理范围内。',
+            '🔴 **窗口写的是 45 天，但当前实际不会清理**。45 天是代码里的固定常量、清理任务也确实每日执行一次；那条任务**只在一个账号的同步流水里已经存在"完整状态边界"时才动手**，而本产品当前的客户端不会产生这种边界。所以对我们现在的账号，它一条也清不掉 —— 每日任务日志里的删除条数恒为 0。我们照实写这一条，而不是把它写成承诺。',
+            '在清理条件具备之前：**不删除**，保留到你注销账号（注销那一行是真的删）。清理生效之后：按 45 天窗口删除，含已被完整状态边界覆盖的旧事件。',
           ],
           [
             '设备记录',
@@ -394,12 +401,27 @@ const zh = [
           [
             '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像密文、条款接受时刻）',
             '到你注销账号为止。',
-            '🔴 注销是**真删除**：账号行连同名下的事件、同步状态、设备、通行密钥、订阅、订单、邀请、通知、昵称与头像按数据库级联删除（共 19 处级联），**没有冷静期，也没有回收站**。',
+            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录、托管 AI 用量计数，按数据库外键级联删除（共 20 处级联，覆盖 19 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份。所以这一条既不写成"你的所有数据立即彻底销毁"，也不写成"你在所有设备上的数据都会被删除" —— 一台从此不再上线、也不再登录的设备，我们没有远程擦除它的能力。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
           ],
           [
             '订阅、订单与优惠码核销记录',
-            '账号存续期间；注销时随账号一起级联删除。法律与税务要求保留的凭证，在其法定期限内仅用于履行该义务。',
+            '账号存续期间；注销时随账号一起级联删除。🔴 一处要分清：**支付事件**（第三方通道的回调与对账流水）没有账号外键，注销后那一行仍在，但指向订阅的指针会被置空 —— 它与你不再有任何关联，只剩金额与时间，仅用于履行法律与税务要求保留凭证的义务，在其法定期限内保存。',
             '到期删除。',
+          ],
+          [
+            '托管 AI 用量计数（一个计费周期里用了几次）',
+            '🔴 **只有次数，没有内容。** 这张表按设计只有四列：账号、计费周期锚点、次数、更新时间 —— 没有提示词列、没有模型输出列，也没有一个能装下内容的兜底列。「服务端不保留 AI 的内容」这句话的证据因此是**这张表的列集合**，而不是我们的措辞：多一列，那句承诺就会变成假话，所以有一条判据把它钉成"多一列就红"。（这张表随 ADR-0054 落进服务端的库结构；托管那一档按 ADR-0054 §6 的顺序被开放之后，它才开始累计。）',
+            '随账号注销按上一行那条级联删除。计数跟着计费周期走：周期边界取自订阅的到期时刻（一次付款买的是 30 天，不是每月 1 号），跨过边界就换到新的一行、从 0 起算 —— 这样「这一期我用了几次」才与你对账时看到的那张账单同源。',
+          ],
+          [
+            '托管 AI **那一次调用的内容**（提示词与模型返回）',
+            '🔴 **不落盘，所以没有"留多久"这个问题**：请求体与返回体只在一次代理调用的内存里存在，调用返回即丢弃 —— 不写进日志（含请求日志与错误序列化）、不进 trace、不进崩溃上报、不进任何生成物。排障看的是下面那一行的元数据，不是内容。',
+            '没有"到期怎么处理"这一步，因为它从来没被写过盘。⚠️ 这句不是靠注释维持的：判据往假上游与假请求里各塞一枚标记串，然后断言这两枚串**既不在捕获到的全部日志输出里，也不在库里任何一张表的任何一行里** —— 只断言"我们没有内容列"拦不住一行把请求体交给日志的调用。',
+          ],
+          [
+            '托管 AI 的**运维元数据**（时间、用户、功能名、结果状态、请求与响应的字节数、耗时）',
+            '🔴 保留期**定为 45 天**。推导写死在裁决里：一次计费周期 30 天 + 15 天出账缓冲，为了让"上一期到底用了几次"这件事事后能核对。⚠️ 这一条**不是**因为某部法律要求 45 天 —— 那是我们自己的口径。字节数是长度，不是内容；功能名取自一个封闭词表，不是用户写的文本。',
+            '🔴 一句必须一起写的实话：**"到期就删"这一步本轮没有实现** —— 这些字段走的是上面"服务端日志"那一行的同一条通道，而那条通道今天没有轮转与到期删除机制，还缺一条部署侧的作业；这个天数眼下也只写在裁决里，代码里还没有与它对应的常量。所以我们在这里写"期限定为 45 天"，**不写**"45 天后会自动删除"；那条作业落地、并且真的对这些字段生效之后，这一格才允许改成到期删除。托管那一档今天仍然不是打得开的功能（见第 8 条），这一格提前把定案写出来。',
           ],
           [
             '数据库备份',
@@ -419,7 +441,7 @@ const zh = [
       },
       {
         kind: 'callout',
-        text: '⚠️ 「45 天」的诚实边界：每日清扫有一条运维侧的删除预算开关，把它设成 0 会让清扫停摆。我们**按"45 天、每日执行"来设计并监控它**，而不是把它写成一条自然规律 —— 一项可被验证的运维承诺，比一个绝对化的保证更靠得住。',
+        text: '⚠️ 「45 天」的诚实边界，有三条，我们三条都写出来。**第一条**：每日清扫有一条运维侧的删除预算开关，把它设成 0 会让清扫停摆。**第二条**（比第一条更关键）：对同步事件而言，这条清扫当前**根本不会命中任何数据** —— 它只处理已经存在"完整状态边界"的账号，而本产品当前的客户端不产生那种边界，实测每日任务的删除条数恒为 0。**第三条**属于**另一个** 45 天，别把两个读成同一个旋钮：上面那两条说的是同步流水的清理窗口，这一条说的是托管 AI 那份调用元数据的期限 —— 它今天连到期删除的作业都还没有（见上面那一行）。我们按"代码里写了什么、跑起来发生什么"来写这一节，而不是按设计意图 —— 一项可被核验的陈述，比一个绝对化的保证更靠得住。等清理真的对我们的数据生效，这一节会改写并重新发布。',
       },
     ],
   },
@@ -437,7 +459,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '**第二件：AI 功能。** heyta 里的 AI 不是"我们提供的 AI 服务"，而是一种**接入能力**：模型端点由**你在设置里自己填写**（内置的两个预设都是你本机的地址，我们刻意不内置任何云端服务商，不维护服务商清单，也不判断某家在哪一个国家）；请求由**你的设备直接发往你填的那个端点**，我们的服务器不是这条链路的中转、不代发、不代持密钥、不从中收费。所以法律上这是「**你自行向第三方提供**」，不是「我们向境外提供」。而它有一个硬前提要一起说清：**发出去的是原文，不做摘要、不做脱敏** —— 任务标题与备注正文会整段照发，已授权工具的名字与参数结构也会作为"这台机器有什么能力"一起发出。AI 的三道闸（总开关、允许远程、逐功能出境授权）**出厂全部关闭**；撤回后不再发新请求，且变更数据接收方后此前的授权**不被继承**；但撤回**不溯及已经发出的那一次请求**。托管的云端 AI（由我们替你调用并计费的形态）目前**根本不存在**，所以我们也不在这里描述它。',
+        text: '**第二件：AI 功能。** heyta 里的 AI 不是"我们提供的 AI 服务"，而是一种**接入能力**：模型端点由**你在设置里自己填写**（内置的两个预设都是你本机的地址，我们刻意不内置任何云端服务商，不维护服务商清单，也不判断某家在哪一个国家）；请求由**你的设备直接发往你填的那个端点**，我们的服务器不是这条链路的中转、不代发、不代持密钥、不从中收费。所以法律上这是「**你自行向第三方提供**」，不是「我们向境外提供」。而它有一个硬前提要一起说清：**发出去的是原文，不做摘要、不做脱敏** —— 任务标题与备注正文会整段照发，已授权工具的名字与参数结构也会作为"这台机器有什么能力"一起发出。AI 的三道闸（总开关、允许远程、逐功能出境授权）**出厂全部关闭**；撤回后不再发新请求，且变更数据接收方后此前的授权**不被继承**；但撤回**不溯及已经发出的那一次请求**。托管的云端 AI（由我们替你调用并计费的形态）今天仍然不是一个打得开的功能，所以我们不在这里描述它的处理过程 —— 但它的**保留裁决已经定案**，第 7 条的期限表因此为它单列条目：承载用量的那张表只装次数、那一次调用的内容不落盘、留下的运维元数据是一份封闭字段清单加一个有出处的期限。这些是提前落进库结构与判据的，为的是在它被打开之前就把「服务端不保留 AI 内容」钉成一件可核对的事，而不是等开放之后再补一句承诺。另有一句要同批写清：托管这一档的目的地**不是由客户端声明**的，而是由端点地址落在一份**境内供应商白名单**上推导出来的，保存与发送两个点各校验一次 —— 这与上面那句"不维护服务商清单"说的是两条路，那句讲的是你自己填的端点。',
       },
       {
         kind: 'docRef',
@@ -482,8 +504,8 @@ const zh = [
         items: [
           '**查阅与复制**：✅ 三个端（Web、命令行、移动端）都能导出**全量**数据 —— 你看得见的全部内容、完整的事件日志、已删除记录（墓碑），外加可核对的计数。**导出文件本身是明文 JSON、不加任何保护**，它落在哪里、要不要转给别人，由你负责。',
           '**更正与补充**：✅ 任务、清单、标签、习惯等业务字段你在任一端改一次，就会同步到其他所有端。⚠️ 服务器上那些事件是密文，我们**无法读取、也无法替你改写**其中某一条 —— 只能由你登录后自行修改。❌ **邮箱不可更换**：产品目前没有换绑邮箱的能力，我们如实写这条限制，而不是摆一个点了没反应的入口。',
-          '**删除**：✅ 应用内的删除在事件模型里是**追加一条删除事件**，不是抹掉记录。它从你的所有设备与界面上消失，但服务器上承载它的加密历史记录会在**保留期（当前 45 天）届满后**被清理掉。🔴 界面里的"彻底删除"**只是一个标记**，它不缩短这个期限，也不等于"已从服务器销毁"。',
-          '**注销账号**：⚠️ 服务端有真正的硬删除能力，但**应用界面里目前没有这个入口**。所以现在的路径是**写信给我们**（`heyta@waytofuture.cn`，从你注册时用的那个邮箱发出，以便我们核验归属），我们在 15 个工作日内完成核查与删除。注销之后仍然存在的副本只有一处：上条那个 14 天的备份窗口。',
+          '**删除**：✅ 应用内的删除在事件模型里是**追加一条删除事件**，不是抹掉记录。它从你的所有设备与界面上消失。🔴 至于服务器上承载它的那段加密历史：**当前不会定期清理**。我们部署了每日运行的保留期清扫（窗口 45 天），但它只对已经存在"完整状态边界"的账号动手，而本产品当前的客户端不会产生那种边界 —— 实测每天清掉的条数是 0。所以在那之前，这段加密历史实际只有一条路真的消失：**注销账号**。界面里的"彻底删除"**只是一个标记**，它不缩短任何期限，也不等于"已从服务器销毁"。我们不会把"会到期清理"写成承诺，除非它真的对我们的数据成立。',
+          '**注销账号**：服务端有真正的硬删除能力，**入口也在三个面上给了**：网页版设置页、手机端「我的」与命令行版（`account close`），三处都要先勾一次"我知道这会把本机上包括还没同步出去的数据一起清掉"、再做第二次确认，并且都先提示导出。也可以**写信给我们**（`heyta@waytofuture.cn`，从你注册时用的那个邮箱发出，以便我们核验归属），我们在 15 个工作日内完成核查与删除。注销之后仍可能存在的副本有**四处**，我们逐处写明：① 上条那个 14 天的整库备份窗口；② 🔴 **你其它设备上的本地数据** —— 本地优先意味着每台设备自己存着一份可读的库：你点下注销的那台**当场**清掉本机明文，其它设备在**下一次同步拿到"账号已注销"这个信号**时各自清掉自己那一份，所以我们只写"下次联网的设备会自己清掉"，不写"你在所有设备上的数据都会被删除" —— 一台从此不再上线的设备，我们没有远程擦除它的能力；③ 🟡 **macOS 与 Windows 的桌面壳**：这一层清到哪一格、边界在哪，以《你的数据权利》第五节为准，本文件不抄第二份；④ 支付事件的审计行，它没有账号外键，注销后指向订阅的指针被置空、只剩金额与时间，仅用于履行法定留存义务。',
           '**撤回同意**：✅ **联网这件事有它自己的撤回入口** —— 设置页里那一项叫「隐私同意」，点「撤回同意」之后这台设备**立刻**停止对外发出任何请求，**已经建立的实时连接当场关掉**，而且状态清回"没问过"：界面会重新问你一次，不是默默换成"你已经拒绝了"。本地数据一条都不动。此外 AI 出境授权、记忆偏好层、推送订阅三处也各自能撤回，关掉之后**下一次调用连输入都不再被读取**（不是只在数据库里标成"已关闭"）。限制：撤回不溯及已经发出的请求。',
           '**要求解释说明**：✅ 你有权要求我们对这份处理规则作出解释，同样走上面的邮箱。',
         ],
@@ -574,6 +596,51 @@ const zh = [
     ],
   },
   {
+    id: 's15',
+    title: '欧盟 GDPR 口径：这份政策能顶到哪几条、哪几条它今天顶不上',
+    blocks: [
+      {
+        kind: 'p',
+        text: '这份政策是按《个人信息保护法》的口径写的，它逐类说明收集什么、存在哪儿、服务端能不能读到。GDPR 问的问题和它并不完全重合，所以这一节的作用不是给政策贴一个"符合 GDPR"的标签，而是**把两套问题摆在同一张表上，指出对不上的那一列**。逐条对照的总表只维护在《你的数据权利》里一份，本节不抄第二份 —— 同一对抄件长期一定漂。',
+      },
+      {
+        kind: 'table',
+        head: ['GDPR 的位置', '它问的是什么', 'heyta 现在拿得出的', '对不上的部分'],
+        rows: [
+          [
+            '第 6(1)(a) 条与第 7 条（同意作为合法性基础、同意的条件）',
+            '每一类处理是不是各自有合法性基础；同意是不是自由作出、可撤回，且撤回不比作出同意更难',
+            '任何数据出站之前都有一道按功能打开的同意闸门：出境要总开关、允许远程、逐功能授权三道都过；本机端点失败时不许悄悄改发云端，这条由常驻判据钉住；用户在同一处就能把该项关掉',
+            '但同意的**粒度**是"功能开关"，不是按 GDPR 的处理目的逐项采集的，两者之间没有做过一张对应表。所以"每一类处理都各自有一条有效同意"这句话我们今天说不出，也不把它写在承诺的位置上'
+          ],
+          [
+            '第 25 条（默认数据保护与设计即隐私）',
+            '默认值本身是不是最小的；有没有一份写过的设计与定期评估',
+            '默认值是先本地、服务端只见密文，而不是先上传再让用户去关；托管那一档的闸门现在**只剩境内白名单这一道**（ADR-0054 §5：保存配置与真发请求两个点各校验一次，不在白名单就响亮拒绝而不是静默降级），逐项授权默认关；⚠️ 曾经那道"保留策略未定案所以直接让它失败"的闸门已随 ADR-0054 定案而撤掉，**撤掉它的同时把保留策略写成了可核对的两个载体**（计数表 45 天 + 每次调用一行的运维日志按容量滚动），不是"打开了但说不出留多久"',
+            '没有一份按第 25 条口径归档的设计评估文档，也没有独立于开发方的验证者。政策自己不能同时充当那份评估 —— 它在这里被写成缺口，而不是被写成"我们遵循隐私-by-design"'
+          ],
+          [
+            '第 33 条（个人数据泄露时向监管机构通知）',
+            '真出事的时候，由谁、在多长时间内、按什么程序通知谁',
+            '到今天为止没有向任何监管机构作过此类通知，也没有收到过相关询问',
+            '🔴 **这一条今天靠人，不靠机制**：没有成文的泄露响应程序，没有指定责任人与送达渠道，也没有演练过。把"72 小时内通知"写进政策而不写它背后的程序，等于把一句此刻做不到的话放在承诺的位置上'
+          ],
+          [
+            '第 17 条与第 5(1)(c) 条（擦除权、数据最小化）',
+            '删除是不是真的删除；留下来的是不是必要范围',
+            '注销走数据库外键级联的硬删除，你点下注销的那台设备当场清掉本机的明文，其它设备各自那份本地数据在下次同步拿到"账号已注销"信号时才清掉；服务端只存密文，明文元数据逐类列在《个人信息清单》',
+            '两处顶不上，而且都写在正文里而不是只写在这一格：**整库备份**是快照，代码层没有"从既有备份里单独摘掉某一个人或某一条"的能力，副本要等那份备份自己过期；**从此不再上线、也不再登录的设备**我们没有远程擦除它的手段。级联的逐处条数只在《你的数据权利》里给一份，本文件不抄第二份'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '《你的数据权利》：GDPR 条文的逐条对照表（含我们拿得出的与拿不出的那一列）只在那一份里维护；本节只回答"这份政策自己顶到哪几条"。',
+      },
+    ],
+  },
+  {
     id: 's14',
     title: '版本记录',
     blocks: [
@@ -585,6 +652,12 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
         rows: [
+          ['1.7', '`2026-10-05` 这一版补的是**托管 AI 的保留裁决**（ADR-0054 §3、§4、§5），而不是上一版那张表：第 7 条的期限表为"那一次调用的内容"与"留下的运维元数据"各加一行 —— 内容那一行说的是它从来没被写过盘（因此没有"到期怎么处理"这一步），元数据那一行的期限**定为 45 天**并写明推导（一个计费周期加出账缓冲，不是任何法律要求的数）。🔴 两处刻意没写成执行承诺：到期删除的作业本轮没有实现，而第 8 条那句"今天仍然不是打得开的功能"一字不动。第 7 条那段"45 天的诚实边界"从两条改成三条，第三条专门把**两个不同的 45 天**分开 —— 一个是同步流水的清理窗口，一个是调用元数据的期限，同值不等于同物。第 8 条同时补一句：托管档的目的地由境内供应商白名单推导、保存与发送两个点各校验一次，并点名这句与"不维护服务商清单"讲的是两条路。中英两栏同步。**状态：草案，尚未经法务复核、尚未生效。**'],
+          ['1.6', '`2026-10-05` 改的原因不是措辞，是**服务端库结构变了**：ADR-0054 §2 把托管 AI 那条路径的保留裁决落成一张只装计数的表 `ai_usage_counters`（账号、计费周期锚点、次数、更新时间四列），它带 `user_id → users` 的 `ON DELETE CASCADE`，因此注销的级联范围多一类。第 7 条那一格的级联数量按迁移真源重算，第 3 条的账号元数据行与第 7 条的期限表各补这一类，写明它是**次数而不是内容**、以及它的证据是列集合而不是措辞。中英两栏同步。⚠️ 这一版**没有**把托管 AI 写成已经在提供的功能：第 8 条那句"它今天还打不开"仍然成立，开放顺序见 ADR-0054 §6。本行刻意不复述那两个数字 —— 数字的真源是判据现量，在变更日志里再抄一份就是给它多加一个会漂的副本。**状态：草案，尚未经法务复核、尚未生效。**'],
+          ['1.5', '`2026-10-04` 新增第十五节《欧盟 GDPR 口径》：把这份政策与 GDPR 的条文逐格摆开，写明哪几格顶得上、哪几格顶不上，并指向《你的数据权利》里那张逐条对照表（本文件不抄第二份）。这一节里最要紧的一格是**第 33 条**：泄露通知今天只有人、没有程序。具体口径只写在那一节的正文里，本行不复述 —— 复述就会漂。**状态：草案，尚未经法务复核、尚未生效。**'],
+          ['1.4', '`2026-10-04` 改的原因不是措辞，是**代码变了**：注销入口现在在网页版设置页、手机端「我的」与命令行版三处都有（勾一次风险确认、再做第二次确认、并先提示导出），随注销信号清除本机明文那一步也已经落地 —— 点下注销的设备当场清掉，其它设备在下次同步拿到「账号已注销」信号时各自清掉自己那一份；从此不再上线的设备仍然是我们不承诺的那一格。第四节那一行的副本清单因此按四处逐处写明，桌面壳那一层的边界改成指针交给《你的数据权利》第五节，本文件不抄第二份。**状态：草案，尚未经法务复核、尚未生效。**'],
+          ['1.3', '`2026-10-04` 更正权限清单的交叉引用：移动端已使用系统通知与 Android 精确闹钟能力，不能再写成 Android 只有 `INTERNET`、iOS 没有需要说明的权限；具体申请时机与拒绝后的行为以《应用权限清单》为准。**状态：草案，尚未经法务复核、尚未生效。**'],
+          ['1.2', '`2026-10-04` 补充密钥包、恢复码、系统安全存储与密文迁移记录的用途和留存边界；注销范围增加三类记录，按迁移真源更新级联数量。业务本地库仍为明文。**状态：草案，尚未经法务复核、尚未生效。**'],
           [
             '1.0',
             '`2026-10-01` 首次起草。全文依据三份代码考古（服务端数据流 / 客户端与权限 / AI 出境与权利实现）写成，逐条对照《认定方法》六大类与第十七条的四项必备内容。**状态：草案，尚未经法务复核、尚未生效** —— 页面顶部会显示"尚未生效"横幅，本文中的时限（15 个工作日）、保留期（45 天 / 14 天）与各项承诺在产品负责人核定、法务复核之前仍可能改写。',
@@ -645,7 +718,11 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'This section comes second because it is where this policy would most easily turn into a false statement. heyta’s encryption **covers the sync channel only**: a change is encrypted before it leaves your device, the server receives ciphertext, and the server does not hold what would be needed to decrypt it (the key is derived from your password, on your device). That is **not** the same as “all of your data is encrypted”, and the three locations below must be kept apart.',
+        text: 'This section comes second because it is where this policy would most easily turn into a false statement. heyta’s encryption **covers the sync channel only**: a change is encrypted before it leaves your device, the server receives ciphertext, and the server does not hold what would be needed to decrypt it (new-format data uses a random key generated on your device and separately wrapped with your encryption passphrase and recovery code; legacy data still uses a passphrase-derived key). That is **not** the same as “all of your data is encrypted”, and the three locations below must be kept apart.',
+      },
+      {
+        kind: 'p',
+        text: 'Encryption keys and recovery: the server retains wrapped key packages, their versions and key fingerprints, and revoked device records until account closure to support unlocking across devices, migration and rejection of revoked sessions. It never receives your encryption passphrase, recovery code or unwrapped data key. Replacement ciphertext is staged during migration and released on publication or cancellation; unfinished staging expires after 24 hours and is released by cleanup, while migration status receipts remain until account closure. For key management, browsers persist only wrapped packages, encrypted migration drafts and ciphertext resume records. Mobile devices place a data key in OS secure storage only when you explicitly choose to remember unlocking. If both the encryption passphrase and recovery code are lost, the server cannot recover your content. Revocation cannot erase content or keys a device already obtained.',
       },
       {
         kind: 'table',
@@ -653,7 +730,7 @@ const en = [
         rows: [
           [
             '**Your own device** (your browser\'s built-in local storage on the web; a database file on the device for mobile and desktop)',
-            '🔴 **Plaintext**. heyta does not encrypt anything on disk, not a single byte.',
+            '🔴 Task and other application data is **plaintext**. Wrapped key packages and OS secure storage described below are separate.',
             'Anyone holding this device who unlocks this account can read every task, list, note, habit and focus record you have. The line of defence is the device’s own lock screen, OS account and file permissions — FileVault, APFS and Android FBE are **operating system** capabilities, not features of this app.',
           ],
           [
@@ -759,8 +836,8 @@ const en = [
             'Plaintext',
           ],
           [
-            'Account language, the moment the terms were accepted together with the version fingerprint of the document set at that moment, storage usage and quota, failed-login counters and lockout state',
-            'Interface language, consent evidence, the storage gate, brute-force protection.',
+            'Account language, the moment the terms were accepted together with the version fingerprint of the document set at that moment, storage usage and quota, failed-login counters and lockout state, managed-AI usage counters (one integer per billing period)',
+            'Interface language, consent evidence, the storage gate, brute-force protection, and reconciling an allowance against a billing period. 🔴 That last item is a **count**, not content: neither the prompts nor the model output are in that table — see its row in section 7.',
             'Our servers',
             'Plaintext',
           ],
@@ -877,7 +954,7 @@ const en = [
       {
         kind: 'docRef',
         docId: 'permissions',
-        text: 'The “App Permissions List” itemises: the permission name, the feature it serves, when it is requested, and which features keep working if you decline (as of today Android lists `INTERNET` only, and iOS requests no privacy permission that would need explaining).',
+        text: 'The “App Permissions List” itemises the system capabilities declared on each platform, the feature each serves, when it is requested, and which features keep working if you decline; notification authorisation and exact-alarm access are described separately for the platforms that use them.',
       },
       {
         kind: 'callout',
@@ -899,8 +976,8 @@ const en = [
         rows: [
           [
             'Sync events (ciphertext content plus those 11 plaintext shape fields)',
-            '🔴 **45 days**. This is a fixed constant in the code, currently **not configurable**, paired with an automatic cleanup job that runs **once a day**. The job writes a log line even when it deletes zero records, so that “the retention period really was enforced” is provable rather than something you can only diagnose from an absence.',
-            'Deleted from the database; superseded older events already covered by a snapshot fall within the same cleanup scope.',
+            '🔴 **The window says 45 days, but nothing is actually pruned today.** The 45-day constant is in the code and the cleanup job does run once a day; that job, however, **only acts on accounts whose sync stream already contains a “full-state boundary”**, and the clients this product ships never produce one. So for the accounts we have today it deletes nothing — the daily job logs a deletion count of 0. We write this as it is rather than as a promise.',
+            'Until the pruning condition is actually reachable: **not deleted**; kept until your account is closed (that row really is deleted). Once the cleanup does apply: deleted on the 45-day window, including older events already covered by a full-state boundary.',
           ],
           [
             'Device records',
@@ -915,12 +992,27 @@ const en = [
           [
             'The account itself (email address, password hash, passkeys, language, nickname, avatar ciphertext, moment of accepting the terms)',
             'Until you close the account.',
-            '🔴 Closure is a **genuine hard delete**: the account row and, by database cascade, its events, sync state, devices, passkeys, subscriptions, orders, referrals, notifications, nickname and avatar are deleted (19 cascades in total). **There is no cooling-off period and no trash bin.**',
+            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones, push subscriptions, wrapped key packages, key migration records, revoked device records and managed-AI usage counters — are deleted (20 cascades in total, across 19 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database: the device you press it on wipes its local plaintext **on the spot**, and every other device wipes its own copy **the next time it synchronises and receives the "account closed" signal**. So we write neither "all your data is destroyed immediately" nor "your data is gone from every device" — a device that never connects or signs in again is one we cannot wipe remotely. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
           ],
           [
             'Subscriptions, orders and coupon redemptions',
-            'For as long as the account exists; deleted by cascade together with the account. Vouchers that law or tax rules require us to retain are kept for their statutory period and used only to discharge that obligation.',
+            'For as long as the account exists; deleted by cascade together with the account. 🔴 One distinction: **payment events** (provider callbacks and reconciliation rows) carry no account foreign key, so the row itself survives closure — but its pointer to the subscription is nulled. It is no longer linked to you and retains only an amount and a timestamp, kept for the statutory period solely to discharge our legal and tax record-keeping duty.',
             'Deleted at expiry.',
+          ],
+          [
+            'Managed-AI usage counters (how many calls in one billing period)',
+            '🔴 **A count, not content.** The table has exactly four columns by design: account, billing-period anchor, request count, last updated. There is no prompt column, no model-output column and no catch-all column able to hold content. The evidence for "the server keeps no AI content" is therefore **the column set of this table**, not our wording: one extra column would make that sentence false, so a check pins it as "add a column and it fails red". (The table landed in the server schema together with ADR-0054; it starts accumulating once the managed tier is enabled in the order that decision sets out.)',
+            'Removed by the same cascade as the row above when you close the account. The counter follows the billing period: the boundary comes from the subscription’s expiry moment (one payment buys 30 days, not the first of the month), so crossing it moves you onto a new row starting from zero — which is what lets "how many did I use this period" reconcile against the same bill you are shown.',
+          ],
+          [
+            'The content of **one managed-AI call** (the prompt and what the model returned)',
+            '🔴 **It is never persisted, so "how long is it kept" does not arise**: the request body and the response body exist only in the memory of one proxied call and are dropped when it returns — not written to any log (request logs and error serialisation included), not put in a trace, not sent to crash reporting, not written into any generated artefact. Troubleshooting reads the metadata in the next row, never content.',
+            'There is no "what happens at expiry" step, because it was never written to disk. ⚠️ This sentence is not held up by a comment: the check plants one marker string in the fake upstream response and another in the fake request, then asserts that **neither appears in any captured log output or in any row of any table in the database**. Asserting only "we have no content column" would not stop one line that hands the request body to the logger.',
+          ],
+          [
+            'Managed-AI **operational metadata** (time, user, feature name, outcome, request and response byte counts, duration)',
+            '🔴 The retention period is **set at 45 days**. The derivation is fixed by the decision itself: one 30-day billing period plus a 15-day reconciliation buffer, so that "how many did I actually use last period" can still be checked afterwards. ⚠️ That number is **not** one any law asks for — it is our own yardstick. Byte counts are lengths, not content, and the feature name comes from a closed vocabulary rather than from text you typed.',
+            '🔴 A sentence that has to travel with that period: **the "delete it when it expires" step is not implemented in this round** — those fields go out over the same channel as the "server logs" row above, and that channel has neither rotation nor an expiry sweep today; a deployment-side job is still missing, and the number itself currently lives only in the decision, with no matching constant in the code. So this cell says "the period is set at 45 days" and does **not** say "it is deleted automatically after 45 days". Only once that job exists and really applies to these fields may this cell be rewritten as deletion at expiry. The managed tier is still not a feature that can be switched on (see section 8); this row records the settled policy in advance.',
           ],
           [
             'Database backups',
@@ -940,7 +1032,7 @@ const en = [
       },
       {
         kind: 'callout',
-        text: '⚠️ The honest boundary around “45 days”: the daily sweep has an operator-side deletion-budget switch, and setting it to 0 stops the sweep. We **design for and monitor “45 days, executed daily”** rather than writing it as a law of nature — an operational commitment you can verify is worth more than an absolute assurance.',
+        text: '⚠️ There are three honest boundaries around “45 days”, and we write out all three. **First**: the daily sweep has an operator-side deletion-budget switch, and setting it to 0 stops the sweep. **Second** (the more important one): for sync events the sweep currently **matches no data at all** — it only processes accounts that already have a “full-state boundary” in their stream, and the clients this product ships never create one, so the measured daily deletion count is 0. **Third** belongs to a **different** 45 days, and the two must not be read as one knob: the first two are about the pruning window for the sync stream, this one is about the retention period set for managed-AI call metadata — for which the deletion-at-expiry job is still missing (see the row above). We write this section from what the code does and what the job actually removes, not from design intent — a statement you can check is worth more than an absolute assurance. When the cleanup really does apply to our data, this section will be rewritten and republished.',
       },
     ],
   },
@@ -958,7 +1050,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: '**The second: the AI features.** AI in heyta is not “an AI service we provide” but an **integration capability**: the model endpoint is **typed in by you, in settings** (both built-in presets point at your own machine; we deliberately bundle no cloud provider, maintain no provider list, and make no determination about which country a provider happens to be in); requests go **directly from your device to the endpoint you entered**, and our server is not a relay on that path — it does not forward on your behalf, does not custody your key, and takes no margin on it. In law this is therefore “**provision you make yourself to a third party**”, not “provision abroad by us”. It has one hard premise that must be said in the same breath: **what is sent is the original text — no summarisation, no redaction** — task titles and note bodies are sent in full, and the names and parameter structures of the tools you have authorised go out as well, as “what this machine is capable of”. All three AI gates (the master switch, allow-remote, and the per-feature egress consent) **ship in the off state**; revoking one stops new requests, and a change of destination is **not inherited** by the consent previously given; but revocation **does not reach back into a request already sent**. Hosted cloud AI — the form in which we would call a model for you and bill you for it — **does not exist at all**, which is why it is not described here.',
+        text: '**The second: the AI features.** AI in heyta is not “an AI service we provide” but an **integration capability**: the model endpoint is **typed in by you, in settings** (both built-in presets point at your own machine; we deliberately bundle no cloud provider, maintain no provider list, and make no determination about which country a provider happens to be in); requests go **directly from your device to the endpoint you entered**, and our server is not a relay on that path — it does not forward on your behalf, does not custody your key, and takes no margin on it. In law this is therefore “**provision you make yourself to a third party**”, not “provision abroad by us”. It has one hard premise that must be said in the same breath: **what is sent is the original text — no summarisation, no redaction** — task titles and note bodies are sent in full, and the names and parameter structures of the tools you have authorised go out as well, as “what this machine is capable of”. All three AI gates (the master switch, allow-remote, and the per-feature egress consent) **ship in the off state**; revoking one stops new requests, and a change of destination is **not inherited** by the consent previously given; but revocation **does not reach back into a request already sent**. Hosted cloud AI — the form in which we would call a model for you and bill you for it — is still not a feature that can be switched on, which is why its processing is not described here. **The retention ruling for it has been settled**, though, and the period table in section 7 carries its entries: the usage table holds a count only, the content of one such call is never persisted, and the operational metadata that is kept is a closed field list plus one period with a stated derivation. These were landed into the schema and into checks in advance, so that "the server keeps no AI content" is pinned as something you can check before the tier can be opened, rather than as a promise added after it is. One more sentence belongs in the same breath: on the managed tier the destination is **not declared by the client** — it is derived from an endpoint address matching a **whitelist of domestic providers**, validated both when the configuration is saved and again before a request is sent. That is a different path from the one described above, where “we maintain no provider list” is about the endpoint **you** type in.',
       },
       {
         kind: 'docRef',
@@ -1003,8 +1095,8 @@ const en = [
         items: [
           '**Access and copy**: ✅ all three ends (web, command line, mobile) can export **everything** — the materialised entities, the complete event log and the deleted records (tombstones) — with counts you can check against. **The export file is itself unguarded plaintext JSON**: where it lands, and whether you pass it on, is your responsibility.',
           '**Correction and completion**: ✅ business fields — tasks, lists, labels, habits — are changed once on any end and propagate to every other end. ⚠️ The events on our server are ciphertext: we **cannot read them and cannot rewrite one of them for you**; only you, once signed in, can. ❌ **The email address cannot be changed**: the product has no re-binding capability today, and we state the limitation plainly rather than mounting a control that does nothing when pressed.',
-          '**Deletion**: ✅ deleting inside the app is, in the event model, **appending a delete event**, not erasing a record. The item disappears from all your devices and from every interface, while the encrypted history carrying it on our server is cleared **once the retention period (currently 45 days) has run out**. 🔴 The “delete permanently” affordance in the interface **is only a marker**: it neither shortens that period nor means “destroyed on the server”.',
-          '**Account closure**: ⚠️ the server does have a genuine hard-delete capability, but **there is currently no entry point for it in the app interface**. The path today is therefore **to write to us** (`heyta@waytofuture.cn`, sent from the address you registered with, so that we can verify ownership), and we complete verification, deletion and our reply within 15 working days. Exactly one copy can still exist afterwards: the 14-day backup window described in section 7.',
+          '**Deletion**: ✅ deleting inside the app is, in the event model, **appending a delete event**, not erasing a record. The item disappears from all your devices and from every interface. 🔴 As for the encrypted history carrying it on our server: **it is not periodically pruned today**. We do run a daily retention sweep (45-day window), but it only acts on accounts that already contain a “full-state boundary”, which the clients this product ships never produce — the measured number of records removed per day is 0. So until that changes, there is exactly one route by which that history really disappears: **closing your account**. The “delete permanently” affordance in the interface **is only a marker** — it shortens no period and does not mean “destroyed on the server”. We will not phrase “it gets cleaned up after the retention period” as a promise while it is not true of your data.',
+          '**Account closure**: the server does have a genuine hard-delete capability, and **the entry point now exists on all three surfaces** — web settings, the mobile “Mine” tab, and the command-line client (`account close`). All three make you tick "I understand this also erases this device’s data, including anything not yet synced", then confirm a second time, and all three tell you to export first. You may also **write to us** (`heyta@waytofuture.cn`, sent from the address you registered with, so that we can verify ownership), and we complete verification, deletion and our reply within 15 working days. 🔴 Four copies may still exist afterwards, and we name each one: (1) the 14-day whole-database backup window described in section 7; (2) **local data on your other devices** — local-first means every device keeps its own readable database: the device you press it on is wiped on the spot, and each other device wipes its own copy the next time it synchronises and receives the "account closed" signal, which is why we write "devices that come back online will clear themselves" rather than "your data is deleted on all your devices" — a device that never connects again is one we cannot wipe remotely; (3) 🟡 the macOS and Windows desktop shells: where that boundary sits is set out in section 5 of *Your Data Rights*, and this file does not copy a second version of it; (4) payment-event audit rows, which carry no account foreign key — closure nulls their subscription pointer, leaving only an amount and a timestamp kept solely to discharge our statutory record-keeping duty.',
           '**Withdrawal of consent**: ✅ **going online has its own entry point** — the item in Settings is named “Privacy consent”, and pressing “Withdraw consent” makes this device stop sending any outbound request **immediately**, **closes the live sync connection on the spot**, and resets the state to “never asked”: the app asks you again rather than quietly filing your choice as “you declined”. Not one byte of local data moves. Beyond that, the AI egress consent, the memory preference layer and push subscriptions can each be withdrawn as well, and after you turn one off **the next call does not even read the input** (this is not a row quietly flagged as “off” while the behaviour continues). Limitation: withdrawal is not retroactive to requests already sent.',
           '**Requesting an explanation**: ✅ you may ask us to explain these rules of processing, through the same email address.',
         ],
@@ -1095,6 +1187,51 @@ const en = [
     ],
   },
   {
+    id: 's15',
+    title: 'The EU GDPR view: which articles this policy actually reaches, and which it does not',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'This policy was written against China\u2019s Personal Information Protection Law: it states, category by category, what is collected, where it lives, and whether our servers can read it. GDPR asks overlapping but not identical questions, so the point of this section is **not** to stamp the policy as "GDPR-compliant" but to put both sets of questions on one table and name the column that does not line up. The article-by-article master table is maintained in exactly one place, *Your Data Rights*; this section does not copy a second version of it, because two copies of the same pair always drift apart eventually.',
+      },
+      {
+        kind: 'table',
+        head: ['Where GDPR sits', 'What it asks', 'What heyta can show today', 'What does not line up'],
+        rows: [
+          [
+            'Articles 6(1)(a) and 7 (consent as a lawful basis, and the conditions for consent)',
+            'Does each processing activity have its own lawful basis; is consent freely given, as easy to withdraw as to give, and not bundled?',
+            'Nothing leaves the device before a per-feature consent gate: outbound traffic needs the master switch, the remote-allowance flag and a per-feature authorisation all three; if the local endpoint fails we are not allowed to silently fall back to the cloud, and a standing check pins that; the user can switch the same item off from the same screen',
+            'But the **granularity** of our consent is a feature switch, not per-purpose collection in the GDPR sense, and no mapping table between the two has ever been made. So "each processing activity has its own valid consent" is a sentence we cannot say today, and it is not written here as a promise'
+          ],
+          [
+            'Article 25 (data protection by design and by default)',
+            'Are the defaults themselves minimal, and is there a written design assessment that gets re-checked?',
+            'The default is local-first with ciphertext on the server rather than upload-first with opt-out; the managed tier is **impossible to enable** until a retention decision exists \u2014 that failure is deliberate in the code, not unfinished work',
+            'There is no archived design assessment written to the Article 25 standard and no verifier independent of the people writing the code. A privacy policy cannot double as that assessment, so this is recorded as a gap rather than as a claim that we "follow privacy by design"'
+          ],
+          [
+            'Article 33 (notifying the supervisory authority of a personal data breach)',
+            'If it actually happens, who notifies whom, within what window, following what procedure?',
+            'No such notification has been made to any authority to date, and no related inquiry has been received',
+            '\ud83d\udd34 **Today this depends on people, not on a mechanism**: there is no written breach-response procedure, no named owner, no delivery channel, and it has never been exercised. Putting "within 72 hours" into a policy without the procedure behind it places a sentence we cannot currently perform where a promise would sit'
+          ],
+          [
+            'Articles 17 and 5(1)(c) (right to erasure, data minimisation)',
+            'Is deletion really deletion, and is what remains within what is necessary?',
+            'Closing an account is a genuine foreign-key cascade hard delete: the device you press closure on wipes its plaintext on the spot, and the local database on each other device is wiped the next time it synchronises and receives the "account closed" signal. The server holds ciphertext only, and the cleartext metadata is itemised in the *Personal Information Inventory*',
+            'Two places do not reach, and both are stated in the body text rather than only in this cell: whole-database **backups** are snapshots and there is no capability in the code to excise one person or one record from an existing backup, so those copies wait for the backup to expire of itself; and a device that **never comes back online** is one we cannot wipe remotely. The cascade counts are given in exactly one place, *Your Data Rights*, and are not copied here'
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '*Your Data Rights*: the article-by-article GDPR table, including the column of what we cannot show, is maintained only there. This section answers one question only: which articles this policy itself reaches.',
+      },
+    ],
+  },
+  {
     id: 's14',
     title: 'Version history',
     blocks: [
@@ -1106,6 +1243,12 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date and summary of changes'],
         rows: [
+          ['1.7', '`2026-10-05` This revision adds the **managed-AI retention ruling** (ADR-0054 §3, §4, §5) rather than the table the previous version added: the period table in section 7 gains one row for "the content of one such call" and one for "the operational metadata that is kept". The content row says it is never persisted, so there is no expiry step to describe; the metadata row states a period **set at 45 days** together with its derivation (one billing period plus a reconciliation buffer - not a number any law asks for). 🔴 Two places deliberately stop short of an undertaking: the delete-at-expiry job is not implemented in this round, and the sentence in section 8 about this tier not being switchable on is untouched. The “45 days” boundary note in section 7 goes from two items to three, the third separating the **two different 45-day windows** - one is the pruning window for the sync stream, the other the period for call metadata; equal values are not the same knob. Section 8 also states that on the managed tier the destination is derived from a whitelist of domestic providers and validated at both the save point and the send point, and names that as a different path from "we maintain no provider list". Both language columns updated together. **Status: draft, not yet reviewed by counsel or in effect.**'],
+          ['1.6', '`2026-10-05` What changed is not the wording — **the server schema changed**: ADR-0054 §2 turns the retention ruling for the managed-AI path into a table that can only hold counts, `ai_usage_counters` (account, billing-period anchor, request count, last updated), carrying an `ON DELETE CASCADE` from `user_id` to `users`, so account closure now cascades one more category. The cascade count in that cell of section 7 is recomputed from the migrations; the account-metadata row in section 3 and the retention table in section 7 each gain this category, stated as a **count rather than content**, with its evidence named as the column set rather than our phrasing. Both language columns updated together. ⚠️ This revision does **not** present managed AI as something we already provide: the sentence in section 8 about that form still holds, and the order of gates is in ADR-0054 §6. The row deliberately does not restate those two numbers — their source of truth is the measurement, and copying them into a changelog is how a second drifting copy gets made. **Status: draft, not yet reviewed by counsel or in effect.**'],
+          ['1.5', '`2026-10-04` Added section 15, *The EU GDPR view*: it lays this policy against the GDPR articles cell by cell, states which ones it reaches and which it does not, and points at the article-by-article table in *Your Data Rights* rather than copying it here. The most consequential cell in that section is **Article 33**: breach notification rests on people today, with no written procedure. The substance lives in that section alone — restating it in a changelog row is exactly how a second copy starts to drift. **Status: draft, not yet reviewed by counsel or in effect.**'],
+          ['1.4', '`2026-10-04` The reason for this revision is not wording — **the code changed**: the closure entry point now exists on all three surfaces (web settings, the mobile “Mine” tab, the command-line client), each behind a risk tick, a second confirmation and an export prompt, and the step that wipes local plaintext on the closure signal has landed — the device you press it on is wiped on the spot while the others clear their own copy the next time they sync and receive the “account closed” signal; a device that never comes back online remains the one case we do not undertake. The retention row in section four therefore names four surviving copies, and the desktop-shell boundary is now a pointer to section 5 of *Your Data Rights* rather than a second copy of it. **Status: draft, not yet reviewed by counsel or in effect.**'],
+          ['1.3', '`2026-10-04` Corrects the permissions cross-reference: mobile now uses system notifications and Android exact-alarm access, so the policy must not say that Android lists only `INTERNET` or that iOS has no permission requiring explanation; request timing and decline behaviour are set out in the App Permissions Inventory. **Status: draft, not yet reviewed by counsel or in effect.**'],
+          ['1.2', '`2026-10-04` Adds purposes and retention boundaries for wrapped keys, recovery codes, OS secure storage and ciphertext migration records. Adds three categories to account deletion and updates cascade counts from migrations. Local application data remains plaintext. **Status: draft, not yet reviewed by counsel or in effect.**'],
           [
             '1.0',
             '`2026-10-01` First draft. Written clause by clause from three code archaeology reports (server data flow / clients and permissions / AI egress and rights as implemented), checked against all six categories of the Method and against the four mandatory elements of Article 17. **Status: draft — not yet reviewed by counsel, not yet in effect**; the page shows a “not yet in effect” banner, and the time limits (15 working days), retention periods (45 days / 14 days) and every other undertaking in this text may still be rewritten before sign-off by the product owner and legal review.',
@@ -1122,9 +1265,14 @@ const en = [
 
 export const privacy: LegalDocument = {
   id: 'privacy',
-  version: '1.1',
+  // 🔴 1.6 → 1.7：第 7 条的期限表新增两行**保留承诺**（托管 AI 那一次调用的内容不落盘、
+  // 运维元数据的期限定为 45 天），并把"45 天的诚实边界"从两条补成三条 —— 两个同值的
+  // 45 天必须分开写，否则第 7 条那段限定会被读成也管着托管那一档。
+  // 版本号进同意指纹（`legalSetVersion()` 把每张文档拼成 `id@version`），
+  // 改了对外承诺而不 bump，等于让旧那枚同意去覆盖一段它没见过的话。
+  version: '1.7',
   status: 'draft',
-  updatedDate: '2026-10-02',
+  updatedDate: '2026-10-05',
   title: {
     'zh-CN': '隐私政策',
     en: 'Privacy Policy',

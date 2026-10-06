@@ -45,25 +45,56 @@
  *    "槽位 → 颜色 token"的映射只有一处（`categories/model.ts#categorySlotToken`）。
  *    · 最小一步：mobile 接上 `ui/slot-picker.tsx`（那一刀属于分类，不属于本刀）。
  *
- * 3. **删除确认 / 改名 / 归档**都不在这里。web 的删除是**直接删**（无二次确认），
- *    mobile 也是；改名与归档在 `app-host` 里有动作、界面从未接上
- *    （与 `habits` 第 3 条同一个既有缺口）。影响：清单建出来改不了名。
+ * 3. ~~**删除确认**不在这里：web 的删除是**直接删**（无二次确认），mobile 也是。~~
  *    · 最小一步：行尾 `•••`（宿主插槽）或详情层，先要产品定"删除要不要确认"。
  *
+ *    ✅ **已过期（2026-10-04，回收站与归档 W4b）**：产品早已定了"删标签要确认"
+ *    （§7.1 P-1：标签不进回收站，防护改成删前告知影响面），落点是共享组件的
+ *    `labels.confirmRemove` + `removeImpact`（`OrganizerList`，两端同一份），
+ *    取数口径只有本文件的 `liveTaskCountsByTag` 一处。
+ *    🔴 留原句是因为它记的是一种**会反复出现的形状**：注释把一件事划给"宿主"，
+ *    两个宿主都没做，于是那句话读起来像分工、实际是一句**没人认领的 TODO** ——
+ *    而"删除要不要确认"这个产品问题，界面上的答案就是"不要"。
+ *
+ *    ✅ **「改名 / 归档界面从未接上」这句已过期（2026-10-03，多端第三批）**：
+ *    行内编辑器在 `OrganizerList` 里，两端都已传 `onRename` / `onArchive`
+ *    （`apps/mobile/src/screens/ListsSection.tsx`、`TagsSection.tsx`，
+ *    web 的 `features/projects/ProjectsPanel.tsx`）。判据：
+ *    `apps/mobile/tests/organizer-rename.spec.ts`。
+ *    留原文是为了让后来者认得出"零件都在、没人接线"这个形状。
+ *
  * 4. **`archived` 的显示开关**：本文件的 `aliveProjects` 一律**隐藏**归档清单
- *    （与迁移前的 web 选择器逐字一致）。"显示已归档"是一个新界面，不在这刀。
+ *    （与迁移前的 web 选择器逐字一致）。判据本身在 `@heyta/domain` 的 `isArchived`，
+ *    这里不写第二份 —— W9 之后动作层也要判同一件事（`listProjects()` 藏归档、
+ *    `listArchivedProjects()` 只留归档），两份字面量迟早分叉。
+ *    ⚠️ 正因为动作层从 W9 起会滤掉归档，宿主喂给本文件的必须是
+ *    `listAllProjects()`（两路合并）而不是 `listProjects()` —— 只喂一路的话，
+ *    这里的 `includeArchived` 就没有数据可放出来，开关按了什么都不出现。
+ *    ✅ "显示已归档"这一刀**已做**（2026-10-03）：`toOrganizerTree(projects,
+ *    { includeArchived })` + `archivedProjects()`，两端的开关都在
+ *    `archivedCount > 0` 时才画出来 —— 没有已归档清单时不占一行。
  */
 
-import type { Project, Tag, Task } from '@heyta/domain';
+import { isArchived, isLive, type Project, type Tag, type Task } from '@heyta/domain';
 
 /* ========================================================================
  * 一、行模型
  * ====================================================================== */
 
-/** 清单与标签共同的**最小**行字段集 —— 组件只认识这两样。 */
+/** 清单与标签共同的**最小**行字段集 —— 组件只认识这几样。 */
 export interface OrganizerItem {
   readonly id: string;
   readonly name: string;
+  /**
+   * 这一行是不是**已归档**（只有清单有；`Tag` 没这个字段）。
+   *
+   * 🔴 它存在的理由不是"多显示一个标记"，而是**让取消归档可达**：归档位一旦按下，
+   *    如果宿主不能把已归档的行也交回列表，那这条清单就再也回不来（两侧都没有
+   *    已归档视图）。`OrganizerList.onArchive` 传的是**目标状态**，
+   *    而目标状态要从这一行的真实状态推出来。
+   * ⚠️ 默认 `undefined`（= 不是已归档），所以两端不传时渲染与从前逐字相同。
+   */
+  readonly archived?: boolean;
 }
 
 /**
@@ -81,36 +112,76 @@ export interface OrganizerNode extends OrganizerItem {
  * 二、清单：拆层级
  * ====================================================================== */
 
-/** 未归档的清单。**归档 = 隐藏但保留数据**（`Project.archived` 的注释）。 */
-export function aliveProjects(projects: readonly Project[]): Project[] {
-  return projects.filter((project) => project.archived !== true);
+/**
+ * 默认只留**未归档**的清单（归档 = 隐藏但保留数据，`Project.archived` 的注释）。
+ *
+ * 🔴 `includeArchived` 不是"多显示一档"，是**让取消归档可达**：默认过滤掉归档行，
+ *    而界面上又没有别的已归档视图，那么任何一次归档都是**单向门** ——
+ *    数据还在、同步也正常，只是永远回不来。宿主开了这个开关，
+ *    就必须同时给 `OrganizerList` 传 `onArchive`（它按行的 `archived` 决定传哪个目标值）。
+ */
+export function aliveProjects(
+  projects: readonly Project[],
+  includeArchived = false,
+): Project[] {
+  if (includeArchived) return [...projects];
+  return projects.filter((project) => !isArchived(project));
+}
+
+/**
+ * 已归档的清单（`archived === true` 那部分）。
+ *
+ * 🔴 有它是因为「要不要把『显示已归档』这个开关画出来」取决于**有没有已归档的清单**，
+ * 而"哪几条算已归档"是领域判断。两端各写一遍 `filter(p => p.archived === true)`
+ * 就是两份口径 —— 一边写 `=== true`、一边写 `!!p.archived`，
+ * 在 `archived?: boolean` 上眼下等价，将来加第三种状态时只会有一边跟着变。
+ */
+export function archivedProjects(projects: readonly Project[]): Project[] {
+  return projects.filter(isArchived);
 }
 
 /** 顶层清单（无 `parentId`）。 */
-export function topLevelProjects(projects: readonly Project[]): Project[] {
-  return aliveProjects(projects).filter((project) => project.parentId === undefined);
+export function topLevelProjects(
+  projects: readonly Project[],
+  includeArchived = false,
+): Project[] {
+  return aliveProjects(projects, includeArchived).filter(
+    (project) => project.parentId === undefined,
+  );
 }
 
 /** 某个清单下的子清单（**一层**）。 */
-export function childProjects(projects: readonly Project[], parentId: string): Project[] {
-  return aliveProjects(projects).filter((project) => project.parentId === parentId);
+export function childProjects(
+  projects: readonly Project[],
+  parentId: string,
+  includeArchived = false,
+): Project[] {
+  return aliveProjects(projects, includeArchived).filter(
+    (project) => project.parentId === parentId,
+  );
 }
 
 /**
  * 清单 → 可渲染的树（顶层 + 一层子级），**保持输入顺序**。
  *
- * ⚠️ 父 id 指向一条**已归档 / 不存在**的清单时，子清单会从界面上消失 ——
- * 与迁移前的 web 选择器逐字一致（`parentId === parentId` 只从顶层算起）。
- * 这是已知取舍：一个孤儿清单不显示，比把它当成顶层清单**冒充**一个
- * 用户没设过的位置更好。要改的话先在产品层定"孤儿归哪"。
+ * ⚠️ 默认（不开 `includeArchived`）时，父 id 指向一条**已归档 / 不存在**的清单，
+ * 子清单会从界面上消失 —— 与迁移前的 web 选择器逐字一致。这是已知取舍：
+ * 一个孤儿清单不显示，比把它当成顶层清单**冒充**一个用户没设过的位置更好。
+ * ✅ 开了 `includeArchived` 就没有这个副作用：归档的父也在树上，子级跟着它。
  */
-export function toOrganizerTree(projects: readonly Project[]): OrganizerNode[] {
-  return topLevelProjects(projects).map((project) => ({
+export function toOrganizerTree(
+  projects: readonly Project[],
+  options?: { readonly includeArchived?: boolean },
+): OrganizerNode[] {
+  const includeArchived = options?.includeArchived === true;
+  return topLevelProjects(projects, includeArchived).map((project) => ({
     id: project.id,
     name: project.name,
-    children: childProjects(projects, project.id).map((child) => ({
+    archived: project.archived === true,
+    children: childProjects(projects, project.id, includeArchived).map((child) => ({
       id: child.id,
       name: child.name,
+      archived: child.archived === true,
     })),
   }));
 }
@@ -245,6 +316,37 @@ export function openTagCounts(tasks: readonly Task[]): Record<string, number> {
 }
 
 /**
+ * 一次遍历算出**所有标签的影响面**：每条标签挂在几条**还活着**的任务上（**含已完成**）。
+ *
+ * 🔴 它与 `openTagCounts` **不是同一件事**，两者混用会少承诺：
+ *
+ * | | `openTagCounts` | 这里 |
+ * |---|---|---|
+ * | 用途 | 行右侧那个常驻数字 | 删除确认里那句"影响 N 条任务" |
+ * | 滤掉已完成 | ✅ | ❌ |
+ * | 滤掉墓碑 | ✅（字面量） | ✅（`isLive`） |
+ *
+ * 为什么影响面**必须**含已完成：删一条标签之后，那些已完成的任务上的 `tagIds`
+ * 同样指向一个已经不存在的 id（`project-actions.ts#removeTag` 只 `DEL` 标签实体，
+ * 不回收任务上的引用）。只数未完成的 ⇒ 界面在一条**已经挂满已完成任务**的标签上
+ * 说"没有任务受影响"，而用户重建同名标签后那些任务**不会**重新挂回来 ——
+ * 那是假承诺，也正是"删标签 = 删了东西"这种误判的来源。
+ *
+ * ⚠️ 数字是**摘掉标签**的条数，不是"会被删除的任务"条数（任务一条都不删）。
+ * 措辞由词条承担，见 `common.organizer.remove.impact`。
+ */
+export function liveTaskCountsByTag(tasks: readonly Task[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const task of tasks) {
+    if (!isLive(task)) continue;
+    for (const tagId of task.tagIds ?? []) {
+      counts[tagId] = (counts[tagId] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/**
  * 平铺的行模型 → 树（每行都没有子级）。
  *
  * 标签用它：`Tag` 没有父子关系，但**必须**与清单走同一个 `OrganizerList`
@@ -252,7 +354,9 @@ export function openTagCounts(tasks: readonly Task[]): Record<string, number> {
  * 而那种漂移不会让任何测试变红。
  */
 export function toOrganizerNodes(items: readonly OrganizerItem[]): OrganizerNode[] {
-  return items.map((item) => ({ id: item.id, name: item.name, children: [] }));
+  // 整条 spread 而不是逐字段挑：漏一个字段（这里是 `archived`）的表现是
+  // "那一行永远显示成未归档"，而归档按钮于是永远说「归档」。
+  return items.map((item) => ({ ...item, children: [] }));
 }
 
 /* ========================================================================

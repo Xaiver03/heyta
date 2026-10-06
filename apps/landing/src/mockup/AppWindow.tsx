@@ -30,26 +30,23 @@ import {
   CheckCircle2,
   CircleDot,
   Inbox,
-  Moon,
+  PanelRightOpen,
   Plus,
-  RefreshCw,
   Search,
   Settings,
-  StickyNote,
   Sun,
-  Timer,
+  StickyNote,
   Trash2,
   TrendingUp,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
 
-import { LOCALE_LABEL_KEY, LOCALES, useI18n, type MessageKey } from '@heyta/i18n/provider';
+import { useI18n, type MessageKey } from '@heyta/i18n/provider';
 
 import './mockup.css';
 
 import {
-  SHELL_DUE_MODE_TABS,
+  SHELL_HEADER_ACTIONS,
   SHELL_PANEL_SECTIONS,
   SHELL_PRIMARY_NAV,
   SHELL_QUADRANT_NAV,
@@ -66,7 +63,7 @@ import {
   MOCK_CAPTURE_KEYS,
   mockCaptureAddClass,
 } from './capture-shape.js';
-import { SHOWCASE_TODAY_PROGRESS, showcaseQuadrantCounts } from './showcase-data.js';
+import { showcaseQuadrantCounts } from './showcase-data.js';
 import { TaskList } from './TaskList.js';
 import { QuadrantGrid } from './QuadrantGrid.js';
 import { HabitHeatmap } from './HabitHeatmap.js';
@@ -170,20 +167,7 @@ export function AppWindow({
 }): React.JSX.Element {
   const frameRef = useRef<HTMLDivElement>(null);
   const scale = useStageScale(frameRef);
-  const { t, locale } = useI18n();
-
-  /**
-   * 语言切换那排按钮 = **每种已启用语言自己的名字**（与 `LanguageSwitcher.tsx`
-   * 同一个形态：遍历 `LOCALES`，当前语言标出来）。
-   *
-   * 原来这里也是二态取反，和真应用一起带着同一个隐患 —— 现在两边都跟着
-   * `LOCALES`，加第三门语言时这张图会**自己多出一格**，而不是悄悄少一格。
-   */
-  const langOptions = LOCALES.map((option) => ({
-    option,
-    label: t(LOCALE_LABEL_KEY[option]),
-    active: option === locale,
-  }));
+  const { t } = useI18n();
 
   /**
    * 顶部标题。
@@ -236,8 +220,11 @@ export function AppWindow({
             </div>
 
             {/*
-              🔴 主导航四项（收集箱 / 今天 / 最近 7 天 / 已完成），从 `SHELL_PRIMARY_NAV` 派生。
+              🔴 主导航三项（今天 / 最近 7 天 / 已完成），从 `SHELL_PRIMARY_NAV` 派生。
               「已完成」原来是漏的（§2 #1）—— 少画一个入口是"不完整"。
+              ⚠️ 2026-10-04：「收集箱」那一行被删（与页头标题重复），所以这一组里
+              **没有会高亮的一项** —— 真应用也一样：停在收集箱时高亮的是 rail 的
+              「任务」，侧栏那三条都是"另有筛选"时才亮。
             */}
             <div className="mk-nav">
               {SHELL_PRIMARY_NAV.map((item) => {
@@ -247,7 +234,7 @@ export function AppWindow({
                     key={item.labelKey}
                     icon={<ItemIcon size={ICON_SIZE.sm} />}
                     label={t(item.labelKey)}
-                    active={item.labelKey === 'web.shell.nav.inbox' && view === 'tasks'}
+                    active={false}
                   />
                 );
               })}
@@ -318,90 +305,50 @@ export function AppWindow({
               </div>
 
               <div className="mk-header__actions">
-                <div className="mk-viewtabs">
-                  {SHELL_DUE_MODE_TABS.map((tab, index) => (
-                    <div
-                      key={tab.labelKey}
-                      className={`mk-viewtab${index === 0 ? ' mk-viewtab--active' : ''}`}
-                    >
-                      {index === 0 ? <CalendarDays size={ICON_SIZE.xs} /> : <Timer size={ICON_SIZE.xs} />}
-                      {t(tab.labelKey)}
-                    </div>
-                  ))}
-                </div>
-                <div className="mk-sync mk-sync--ok">
-                  <Zap size={ICON_SIZE.xs} />
-                  {t('web.sync.status.synced')}
-                </div>
                 {/*
-                  🔴 这三件原来都漏了。真应用的顶栏右侧是
-                  **SyncBar（状态 + 立即同步 + 设置）+ LanguageSwitcher + 主题**，
-                  而复刻只画了状态那一个胶囊。
-                  文案用应用自己的 key，图标与真应用同一套（lucide）。
+                  🔴 这一排**从登记处派生**，不再手抄。
+                  它原来在这里画着六件早已不在页头的东西：同步状态胶囊、「立即同步」、
+                  同步设置齿轮、两枚语言按钮、主题按钮（后两枚 2026-10-06 搬进
+                  设置 → 显示，同步那三枚同一天下移 rail 底部；「日期 / 倒计时」
+                  更早在 2026-09-30 就进了设置）。而当时那条判据是** positively 要求**
+                  这六件都在的 —— 于是 26 条展厅测试全绿，图上却是过时的形状。
+                  逐件去向写在 `SHELL_HEADER_MOVED_OUT`，对账与反向判据在
+                  `tests/mockup-shell-shape.spec.tsx` 的 #7 那一组。
                 */}
-                <div className="mk-iconbtn" role="img" aria-label={t('web.sync.a11y.syncNow')}>
-                  <RefreshCw size={ICON_SIZE.xs} />
-                </div>
-                <div className="mk-iconbtn" role="img" aria-label={t('web.sync.settings.title')}>
-                  <Settings size={ICON_SIZE.xs} />
-                </div>
-                {/* 当前语言在图上要看得出来（同 `mk-nav__item--active` 的处理）：
-                    一排同样式的格子会被读成"都是当前"。复刻是静态图，不写真控件的 aria。 */}
-                {langOptions.map(({ option, label, active }) => (
-                  <div
-                    key={option}
-                    className={active ? 'mk-lang mk-lang--on' : 'mk-lang'}
-                    lang={option}
-                  >
-                    {label}
-                  </div>
-                ))}
-                <div className="mk-iconbtn">
-                  <Moon size={ICON_SIZE.md} />
-                </div>
+                {SHELL_HEADER_ACTIONS.filter(
+                  (action) => action.onlyForView === undefined || action.onlyForView === view,
+                ).map((action) =>
+                  action.kind === 'sort-select' ? (
+                    <div key={action.id} className="mk-sort">
+                      {/* 与真应用同一条：**带可见的文字标签**，不是光秃秃一枚下拉。 */}
+                      <span className="mk-sort__label">{t(action.labelKey)}</span>
+                      <span className="mk-sort__value">{t(action.optionKey ?? action.labelKey)}</span>
+                    </div>
+                  ) : (
+                    <div
+                      key={action.id}
+                      className="mk-iconbtn"
+                      role="img"
+                      aria-label={t(action.labelKey)}
+                    >
+                      <PanelRightOpen size={ICON_SIZE.md} />
+                    </div>
+                  ),
+                )}
               </div>
             </header>
 
             {/*
-              🔴 内容区的顺序照抄 `apps/web/src/App.tsx`：
-              **今天进度卡 → 捕获输入框 → 视图内容**。
-              复刻原来只在"任务"那一屏画了输入框、四屏都没有进度卡 ——
-              而真应用两者在四个视图上**都在**。
+              🔴 内容区的顺序照抄 `apps/web/src/App.tsx`：**捕获输入框 → 视图内容**。
+
+              ⚠️ 这里**没有**今日进度卡，是刻意的而不是漏画：产品侧 R6 那一刀把它从
+              "做事"的四个视图撤了（理由写在 `App.tsx:2288-2304` —— 把三个位置该说的数字
+              压成一个谁都不看的分数，且 0/0 时它说的是"你什么都没安排"）。共享卡片本身
+              没删，它现在只住成长页。展厅这五屏全是"做事"屏 ⇒ 一张都不该画。
+              这条边界由 `tests/mockup-fidelity.spec.tsx` 反向钉住，并且**从产品源码派生**：
+              哪天真应用把卡放回做事视图，那条判据会先红，而不是让这里悄悄落后。
             */}
             <div className="mk-content">
-              {/*
-                🔴 M3 第十一刀（motivation）之后这张卡是**共享组件**
-                （`packages/ui/src/motivation/TodayProgressCard.tsx`），
-                结构变了：
-                  · **没有"今天"这个标签** —— 共享卡片只画"比例 + 提示 + 横条"；
-                  · 比例是 `done/total` **一整段**（`numeric-display`），不是"大数字 + 小分母"；
-                  · 提示与比例**并排**（head 是一行，`align-items: flex-end`），不换行到下面；
-                  · 横条填充用 `inline-size` 而不是 `scaleX`（RN 的 scaleX 以中心为原点）。
-                取值仍来自 `SHOWCASE_TODAY_PROGRESS`（产品决策 P5）。
-                token 逐个对账的判据在 `tests/mockup-today-shape.spec.tsx`。
-
-                ⚠️ 共享卡片在 `total > 0` 时还会画"习惯/任务/计划外"明细行，`focusMinutes > 0`
-                时画专注行，闭环时画闭环句 —— 展厅样例数据里没有这三组取值
-                （`SHOWCASE_TODAY_PROGRESS` 只有 done/total/remaining，见 `showcase-data.ts`），
-                故**未复刻**；补齐方式见上面那份 spec 的说明。
-              */}
-              <section className="mk-today" aria-label={t('web.progress.aria')}>
-                <div className="mk-today__head">
-                  <div className="mk-today__count">
-                    {today.done}/{today.total}
-                  </div>
-                  <div className="mk-today__hint">
-                    {t('web.progress.hint.remaining', { count: today.remaining })}
-                  </div>
-                </div>
-                <div className="mk-today__bar">
-                  <span
-                    className="mk-today__bar-fill"
-                    style={{ width: `${String((today.done / today.total) * 100)}%` }}
-                  />
-                </div>
-              </section>
-
               {/*
                 🔴 捕获输入行从 `./capture-shape.js` 的登记处派生。
                 它原来手抄了 `.mk-input` / `.mk-btn-primary` 两个类名，而那一族
@@ -435,20 +382,3 @@ export function AppWindow({
     </div>
   );
 }
-
-/**
- * 今日进度卡（复现共享 `packages/ui/src/motivation/TodayProgressCard.tsx`）。
- *
- * 🔴 真应用在**任务 / 四象限 / 习惯 / 番茄钟**四个视图上都常驻这张卡
- * （`App.tsx` 的 `view !== 'settings' && … && <TodayProgressBanner />`，
- * banner 是共享卡片的接线层），而复刻原来四屏**一张都没有**。
- *
- * ⚠️ M3 第十一刀之后它的来源是 `@heyta/ui`（web 侧不再有 `.ht-today` DOM/CSS），
- * 所以结构/取值的权威对照是共享组件本身 —— 逐 token 对账见
- * `tests/mockup-today-shape.spec.tsx`。
- *
- * 🔴 数值来自 `showcase-data.ts` 的 `SHOWCASE_TODAY_PROGRESS`（产品决策 P5）——
- * 那不是"随手写在渲染文件里的魔数"，而是**集中登记 + 有注释说明为何不可派生**的样例数据。
- * 详见那个常量上的说明。
- */
-const today = SHOWCASE_TODAY_PROGRESS;

@@ -19,19 +19,16 @@
  *     --token <jwt> --password <口令> sync
  *
  * 参数也可以走环境变量：HEYTA_DB / HEYTA_SERVER_URL / HEYTA_TOKEN /
- * HEYTA_PASSWORD / HEYTA_CLIENT_ID。加 `--json` 输出机器可读结果。
+ * HEYTA_PASSWORD / HEYTA_ACCOUNT_ID / HEYTA_CLIENT_ID。加 `--json` 输出机器可读结果。
  */
 
 import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 
 import { parseLocalDate } from '@heyta/domain';
-import {
-  parseExportDocument,
-  serializeExportDocument,
-  type NewTaskFields,
-} from '@heyta/app-host';
+import { parseExportDocument, serializeExportDocument, type NewTaskFields } from '@heyta/app-host';
 import { openNodeHost } from './host.js';
 import { runAuthCommand } from './cli-auth.js';
+import { runAccountCommand } from './cli-account.js';
 import type { SyncStatus } from '@heyta/sync-client';
 
 const VALUE_FLAGS = new Set([
@@ -39,12 +36,18 @@ const VALUE_FLAGS = new Set([
   'server',
   'token',
   'password',
+  'account-id',
   'client-id',
   'due',
   'out',
   'in',
+  'session',
+  'role',
+  'text',
+  'destination',
+  'tool',
 ]);
-const BOOL_FLAGS = new Set(['json', 'all', 'help']);
+const BOOL_FLAGS = new Set(['json', 'all', 'help', 'confirm']);
 
 interface ParsedArgs {
   command: string | undefined;
@@ -183,6 +186,7 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   --server <url>       同步服务端（或 HEYTA_SERVER_URL）
   --token <jwt>        访问令牌（或 HEYTA_TOKEN）
   --password <口令>    **端到端加密口令**（或 HEYTA_PASSWORD）—— 与「auth」收的那条登录口令**不是同一个秘密**
+  --account-id <id>    认证账号 id（或 HEYTA_ACCOUNT_ID）—— 启用 Vault key-package / payload codec
   --client-id <id>     覆盖设备 id（或 HEYTA_CLIENT_ID）
   --json               机器可读输出
 
@@ -195,10 +199,14 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
                             🔴 这一步只产出令牌：同步还要**另一个**口令，见 --password
   add <标题> [--due 2026-10-05]  创建一个任务（--due 是**本地日期**）
   list [--all]              列出任务（默认只列未完成）
-  trash                     列出回收站里的任务（有墓碑且未彻底删除）
+  trash                     列出回收站里的**全部四类**（任务 / 便签 / 清单 / 习惯）
+                            行形状、标题与顺序与两端界面同源（@heyta/domain）。
                             🔴 remove 与 purge 都会让 list 变空，没有这条
                             就区分不开"进了回收站"和"彻底删掉"——判据会在只做了
-                            前者时照样绿
+                            前者时照样绿。而它原来**只列任务**，于是"另一台设备的
+                            回收站里有没有这条清单"在这台设备上读不出来
+  notes                     列出未删除的便签（正文原样）。W6 的判据靠它读
+                            "手机上删掉又还原的那条便签，在这台设备上活着" 
   rename <id> <标题>        改标题
   complete <id>             标记完成
   reopen <id>               取消完成
@@ -209,10 +217,51 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   sync                      与真实服务端同步一次
   pending                   打印待上传队列长度
   projects                  列出清单
+  projects add <名称>       新建清单
+  projects remove <id>      软删除清单（进回收站）
+  notes add <正文>          新建便签
+  notes remove <id>         软删除便签（进回收站）
+  habits add <名称>         新建习惯
+  habits remove <id>        软删除习惯（进回收站）
   tags                      列出标签
+  assistant new             生成一段新会话的 id（这台设备上，**不写 op**）
+  assistant append          追加一条助手会话消息（ADR-0045 D-4 (ii)：**一次调用 = 一条 op**）
+      --session <id>        归属会话（必填，来自 assistant new）
+      --role <user|assistant|proposal|error>
+                            角色（必填；词表在 @heyta/domain，非法值直接拒绝）
+      --text <文本>         那条消息（空文本拒绝）
+      --destination <local|third-party-endpoint|heyta-cloud|unknown>
+                            🔴 这一条**经手哪个目的地**：user 记"发去了哪里"、
+                            assistant/proposal/error 记"谁答的"。省略 = unknown，
+                            而 unknown **不等于** local（ADR-0006 的保守方向）
+      --tool <name>         --role proposal 时必填（确认框要写明改的是哪个动作）
+  assistant list [--session <id>]
+                            列出会话消息（未删除、**展示顺序**）。每行带
+                            dest= 与 expired= —— 后者是"这条提案在**本设备**上
+                            还能不能确认"的可观察读数：另一台设备写的未确认提案
+                            必须 expired=yes，而本机自己写的必须 expired=no。
+                            🔴 没有这条命令，"跨设备只读不可确认"就只能停在单测里
+  assistant confirm <id> [--disposition confirmed|rejected]
+                            记录一条提案的处置（一次点击 = **一条** UPD op）。
+                            🔴 别的设备写的未确认提案在这里**非零退出**且不写 op ——
+                            没有这条命令，"跨设备不可确认"就只是界面上的装饰，
+                            真设备上没有任何东西会失败
+  assistant clear --session <id>
+                            清掉一段会话：**一条** DEL op（批量域，AGENTS §3.4），
+                            墓碑保留内容 ⇒ 对端离线也不会把它复活回来
   export --out <路径>       导出全部数据到 JSON 文件（含已删除记录与完整操作日志）
   import --in <路径>        从导出的 JSON 还原 —— **只支持还原到空库**；
                             本机已有数据时拒绝，且不会改动任何现有数据
+  account close             注销账号：**服务端那份删掉 + 这台设备上的明文库销毁**
+                            不带 --confirm 时是**预览**：不发请求、不动磁盘，
+                            只列出会清掉多少条、多少条还没上传，并提示先 export
+                            🔴 这台设备清不掉**别的设备**和**备份**（ADR-0048），
+                            所以句子永远不说"彻底销毁"
+      --server <url>        必填（或 HEYTA_SERVER_URL）
+      --token <jwt>         必填（或 HEYTA_TOKEN）—— 先跑 auth login 拿
+      --confirm             真的执行。没有它这条命令什么都不做；
+                            本机还有**没上传**的 op 时即使带它也照样拒绝 ——
+                            那时唯一的出口是先 sync（或先 export 留一份）
 `;
 
 /**
@@ -256,23 +305,34 @@ async function main(): Promise<number> {
   const serverUrl = stringFlag(flags, 'server') ?? process.env['HEYTA_SERVER_URL'];
   const token = stringFlag(flags, 'token') ?? process.env['HEYTA_TOKEN'];
   const password = stringFlag(flags, 'password') ?? process.env['HEYTA_PASSWORD'];
+  const accountId = stringFlag(flags, 'account-id') ?? process.env['HEYTA_ACCOUNT_ID'];
   const clientId = stringFlag(flags, 'client-id') ?? process.env['HEYTA_CLIENT_ID'];
 
-  if (command === 'sync') {
+  if (command === 'sync' || command === 'account') {
     // 在打开库之前就把配置错误说清楚。反过来的话，baseUrl='' 会让 fetch
     // 抛 TypeError，而 SyncClient 会把它归类成「离线」——看起来像网络问题，
     // 实际是参数没给。诊断方向直接被带偏。
-    if (serverUrl === undefined) throw new Error('sync 需要 --server <url>（或 HEYTA_SERVER_URL）');
-    if (token === undefined) {
-      throw new Error('sync 需要 --token <jwt>（或 HEYTA_TOKEN）—— 没有的话先跑一条命令拿：auth login');
-    }
-    if (password === undefined) {
+    if (serverUrl === undefined) {
       throw new Error(
-        'sync 需要 --password <端到端加密口令>（或 HEYTA_PASSWORD）；没有口令不会以明文上传。\n' +
-          '🔴 这一个**不是**登录口令（那条在 `auth login` 的 stdin 里）：' +
-          '拿登录口令当加密口令的症状是"能登录、同步却解不开自己的数据"。',
+        `${command} 需要 --server <url>（或 HEYTA_SERVER_URL）—— ` +
+          (command === 'account'
+            ? '注销的对象是"哪个实例上的哪个账号"，没有地址时这条命令不知道在对谁说话'
+            : '没有地址就没得同步'),
       );
     }
+    if (token === undefined) {
+      throw new Error(
+        `${command} 需要 --token <jwt>（或 HEYTA_TOKEN）—— 没有的话先跑一条命令拿：auth login`,
+      );
+    }
+  }
+
+  if (command === 'sync' && password === undefined) {
+    throw new Error(
+      'sync 需要 --password <端到端加密口令>（或 HEYTA_PASSWORD）；没有口令不会以明文上传。\n' +
+        '🔴 这一个**不是**登录口令（那条在 `auth login` 的 stdin 里）：' +
+        '拿登录口令当加密口令的症状是"能登录、同步却解不开自己的数据"。',
+    );
   }
 
   const host = await openNodeHost({
@@ -280,6 +340,7 @@ async function main(): Promise<number> {
     ...(serverUrl !== undefined ? { serverUrl } : {}),
     ...(token !== undefined ? { token } : {}),
     ...(password !== undefined ? { password } : {}),
+    ...(accountId !== undefined ? { accountId } : {}),
     ...(clientId !== undefined ? { clientId } : {}),
   });
 
@@ -357,31 +418,74 @@ async function main(): Promise<number> {
       }
 
       case 'trash': {
-        const trashed = host.listTrashed();
+        // 🔴 四路合并、取标题、判序**不在这里写**：规则在 `@heyta/domain#toTrashItems`，
+        // 与两端界面同源。这里曾经只列任务那一路，于是"另一台设备的回收站里
+        // 有没有这条清单/这条便签"在这个宿主上根本没法断言（W6 判据 ④ 的前提）。
+        const rows = host.trashRows();
+        if (json) {
+          out(JSON.stringify({ ok: true, command: 'trash', rows }));
+        } else if (rows.length === 0) {
+          out('（回收站为空）');
+        } else {
+          for (const row of rows) {
+            out(`${row.title}  [${row.kind}]  (${row.id})`);
+          }
+        }
+        return 0;
+      }
+
+      case 'notes': {
+        const verb = positionals[0];
+        if (verb === 'add' || verb === 'remove') {
+          const arg = positionals[1];
+          if (arg === undefined) {
+            throw new Error(`notes ${verb} 需要 <${verb === 'add' ? '正文' : 'id'}>`);
+          }
+          // 语义全在 `@heyta/app-host` 的 `createNote / removeNote`（remove 发 DEL op）。
+          const created = verb === 'add' ? await host.createNote(arg) : undefined;
+          if (verb === 'remove') await host.removeNote(arg);
+          const id = created ?? arg;
+          if (json) out(JSON.stringify({ ok: true, command: 'notes', verb, id }));
+          else out(`${verb === 'add' ? '已新建' : '已软删除（进回收站）'} ${id}`);
+          return 0;
+        }
+        const notes = host.listNotes();
         if (json) {
           out(
             JSON.stringify({
               ok: true,
-              command: 'trash',
-              tasks: trashed.map((task) => ({
-                id: task.id,
-                title: task.title,
-                deletedAt: task.deletedAt ?? null,
-                purgedAt: task.purgedAt ?? null,
+              command: 'notes',
+              notes: notes.map((note) => ({
+                id: note.id,
+                content: note.content,
+                updatedAt: note.updatedAt,
               })),
             }),
           );
-        } else if (trashed.length === 0) {
-          out('（回收站为空）');
+        } else if (notes.length === 0) {
+          out('（没有便签）');
         } else {
-          for (const task of trashed) {
-            out(`${task.title}  (${task.id})`);
+          for (const note of notes) {
+            out(`${note.content}  (${note.id})`);
           }
         }
         return 0;
       }
 
       case 'projects': {
+        const verb = positionals[0];
+        if (verb === 'add' || verb === 'remove') {
+          const arg = positionals[1];
+          if (arg === undefined) {
+            throw new Error(`projects ${verb} 需要 <${verb === 'add' ? '名称' : 'id'}>`);
+          }
+          const created = verb === 'add' ? await host.createProject(arg) : undefined;
+          if (verb === 'remove') await host.removeProject(arg);
+          const id = created ?? arg;
+          if (json) out(JSON.stringify({ ok: true, command: 'projects', verb, id }));
+          else out(`${verb === 'add' ? '已新建' : '已软删除（进回收站）'} ${id}`);
+          return 0;
+        }
         const projects = host.listProjects();
         if (json) {
           out(
@@ -404,6 +508,24 @@ async function main(): Promise<number> {
         return 0;
       }
 
+      case 'habits': {
+        const verb = positionals[0];
+        if (verb !== 'add' && verb !== 'remove') {
+          throw new Error('habits 需要 add <名称> 或 remove <id>');
+        }
+        const arg = positionals[1];
+        if (arg === undefined) {
+          throw new Error(`habits ${verb} 需要 <${verb === 'add' ? '名称' : 'id'}>`);
+        }
+        // 打卡记录不跟着删那条规则在 `@heyta/app-host#removeHabit`，本壳不判断。
+        const created = verb === 'add' ? await host.createHabit(arg) : undefined;
+        if (verb === 'remove') await host.removeHabit(arg);
+        const id = created ?? arg;
+        if (json) out(JSON.stringify({ ok: true, command: 'habits', verb, id }));
+        else out(`${verb === 'add' ? '已新建' : '已软删除（进回收站）'} ${id}`);
+        return 0;
+      }
+
       case 'tags': {
         const tags = host.listTags();
         if (json) {
@@ -420,6 +542,92 @@ async function main(): Promise<number> {
           for (const tag of tags) out(`${tag.name}  (${tag.id})`);
         }
         return 0;
+      }
+
+      case 'assistant': {
+        const sub = positionals[0];
+        const sessionId = stringFlag(flags, 'session');
+        if (sub === 'new') {
+          const id = host.newAssistantSessionId();
+          out(json ? JSON.stringify({ ok: true, command: 'assistant', sub, id }) : id);
+          return 0;
+        }
+        if (sub === 'append') {
+          if (sessionId === undefined) throw new Error('assistant append 需要 --session <id>（来自 `assistant new`）');
+          const role = stringFlag(flags, 'role');
+          const text = stringFlag(flags, 'text');
+          if (role === undefined) throw new Error('assistant append 需要 --role <user|assistant|proposal|error>');
+          if (text === undefined) throw new Error('assistant append 需要 --text <文本>');
+          const destination = stringFlag(flags, 'destination');
+          const tool = stringFlag(flags, 'tool');
+          // 🔴 本壳**不校验词表**：`appendTurn` 会拒绝非法 role / 目的地 / 缺 toolName
+          // 的提案，并把拒绝理由说清。在这里再判一遍就是第二套定义（会漂）。
+          const id = await host.appendAssistantTurn({
+            sessionId,
+            role: role as never,
+            text,
+            ...(destination === undefined ? {} : { destinationKind: destination as never }),
+            ...(tool === undefined ? {} : { toolName: tool }),
+          });
+          if (json) out(JSON.stringify({ ok: true, command: 'assistant', sub, id }));
+          else out(`已追加助手消息 ${id}`);
+          return 0;
+        }
+        if (sub === 'list') {
+          const rows = host.listAssistantTurns(sessionId);
+          if (json) {
+            out(
+              JSON.stringify({
+                ok: true,
+                command: 'assistant',
+                sub,
+                turns: rows.map((turn) => ({
+                  id: turn.id,
+                  sessionId: turn.sessionId ?? null,
+                  role: turn.role ?? null,
+                  text: turn.text ?? '',
+                  at: turn.at ?? turn.createdAt,
+                  destinationKind: turn.destinationKind ?? 'unknown',
+                  originClientId: turn.originClientId ?? null,
+                  disposition: turn.disposition ?? 'pending',
+                  toolName: turn.toolName ?? null,
+                  expiredHere: host.assistantTurnExpiredHere(turn),
+                })),
+              }),
+            );
+            return 0;
+          }
+          if (rows.length === 0) out(sessionId === undefined ? '（没有会话消息）' : `（会话 ${sessionId} 是空的）`);
+          for (const turn of rows) {
+            out(
+              `${turn.role ?? 'assistant'}: ${turn.text ?? ''}  ` +
+                `(id=${turn.id} dest=${turn.destinationKind ?? 'unknown'} ` +
+                `origin=${turn.originClientId ?? '-'} disp=${turn.disposition ?? 'pending'} ` +
+                `expired=${host.assistantTurnExpiredHere(turn) ? 'yes' : 'no'})`,
+            );
+          }
+          return 0;
+        }
+        if (sub === 'confirm') {
+          const id = positionals[1];
+          if (id === undefined) throw new Error('assistant confirm 需要 <消息 id>');
+          const disposition = stringFlag(flags, 'disposition') ?? 'confirmed';
+          // 🔴 拒绝**不在这里判**：`setDisposition()` 在构造 op 之前就拒（跨设备的
+          // 未确认提案不可确认），异常一路冒到进程退出码。这里加一句"先看看能不能确认"
+          // 就是第二套判定 —— 它会漂，而且会让真设备上的失败变得不可信。
+          await host.setAssistantDisposition(id, disposition as 'confirmed' | 'rejected');
+          if (json) out(JSON.stringify({ ok: true, command: 'assistant', sub, id, disposition }));
+          else out(`已记录提案处置 ${disposition}：${id}`);
+          return 0;
+        }
+        if (sub === 'clear') {
+          if (sessionId === undefined) throw new Error('assistant clear 需要 --session <id>');
+          const cleared = await host.clearAssistantSession(sessionId);
+          if (json) out(JSON.stringify({ ok: true, command: 'assistant', sub, cleared }));
+          else out(`已清掉 ${String(cleared)} 条（一条 DEL op，墓碑保留内容）`);
+          return 0;
+        }
+        throw new Error(`assistant 子命令不认识「${String(sub)}」（可用：new / append / list / clear）`);
       }
 
       case 'rename': {
@@ -572,6 +780,28 @@ async function main(): Promise<number> {
           out('注意：还原只作用在本机。服务端不会因此收到这些数据。');
         }
         return 0;
+      }
+
+      case 'account': {
+        // E3：自助注销在这台设备上**曾经没有调用点**。命令的解析与打印留在这里，
+        // 需要注入网络的那一段在 `cli-account.ts`（`auth` 同款拆法），这样判据
+        // 可以拿**真 SQLite 文件**跑一遍销毁，而不是拿一个假适配器。
+        const result = await runAccountCommand(
+          {
+            action: positionals[0],
+            confirm: flags['confirm'] === true,
+            json,
+          },
+          {
+            serverUrl: serverUrl ?? '',
+            token: token ?? '',
+            pendingUploadCount: () => host.pendingUploadCount(),
+            exportDocument: () => host.exportDocument(),
+          },
+        );
+        if (result.stdout !== '') out(result.stdout.replace(/\n$/, ''));
+        if (result.stderr !== '') err(result.stderr.replace(/\n$/, ''));
+        return result.code;
       }
 
       default:

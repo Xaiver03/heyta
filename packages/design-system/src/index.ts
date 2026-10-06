@@ -76,7 +76,35 @@ export { TEXT_STYLES, resolveTextStyle, resolveAllTextStyles } from './typograph
 // 图标尺寸的数值形态（lucide 的 size prop 需要 SVG 属性数字，CSS 变量帮不上）。
 // 视图住在 L0 内部（宿主直接拿表建视图被 check:theme 的 R3 禁止）。
 export { ICON_SIZE, type IconSizeName } from './icon-size.js';
+
+// 品牌 mark 的**几何真源**（一份「h」，各端图标都从它栅格化）。
+// 动机是实测出的两种失效：手抄一份路径数据（落地页 favicon 与 PWA 图标曾是两枚
+// 不同的 mark），或用脚手架默认图（Android 的 ic_launcher 曾是 React Native 模板）。
+// 🔴 这里只有几何、没有颜色 —— 颜色由调用方从 token 传进来，不构成第二份配色表。
+export {
+  BRAND_MARK_CANVAS,
+  BRAND_MARK_RADIUS,
+  BRAND_MARK_SAFE,
+  BRAND_MARK_PWA_SAFE,
+  BRAND_MARK_ANDROID_SAFE,
+  brandMarkRects,
+  brandMarkSvg,
+  brandMarkCircleSvg,
+  brandMarkGlyphSvg,
+} from './brand-mark.js';
+export type { BrandMarkOptions, BrandMarkTransform } from './brand-mark.js';
 export type { TextStyleName, TextStyleSpec, RnTextStyle } from './typography.js';
+
+/**
+ * tokens.css 的**读取层**。
+ *
+ * 为什么把它导出来：`scripts/gen-app-icons.mjs` 与 `scripts/gen-boot-splash.mjs`
+ * 要把 token 的字面 CSS 值搬到"运行时读不到 tokens.css"的地方（内联在 HTML 里的
+ * 首屏样式、Android 主题项）。那些搬运**不许自带一份解析器** —— 自写正则读
+ * tokens.css 就是第二个事实源，而它坏的方式是"静默搬错值"，不是报错。
+ * 用这里这份，等于和生成 Swift/ArkTS 产物走的是同一个解析器。
+ */
+export { extractVars, extractReducedMotion, resolveAllVars } from './css-tokens.js';
 
 // 任务行的**形状契约**（一行用哪些 token / 哪条语义文字样式）。
 // 🔴 它只**登记**已有取值，不引入新取值 —— 但它让"共享的 RN 行"与

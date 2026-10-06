@@ -182,7 +182,17 @@ export const META_FIELDS = {
 /**
  * `meta` store 中的已知键。
  *
- * 这些是**同步协议的关键状态**，不是普通配置。
+ * 原先这一节写的是"这些是**同步协议的关键状态**，不是普通配置"。那句话到今天
+ * 已经窄了一格：`PUBLIC_FACTS_*` 不是同步协议状态，它也不是用户配置 ——
+ * 它是**部署方下发的公共事实**的本地缓存（ADR-0052 §2.5）。
+ *
+ * 🔴 它进这里而不进 op-log 的理由（ADR-0052 原文）：这条下行不是"用户的某个意图"，
+ * 写进 op-log 会让另一台设备回放它时产生一个**从未发生过的用户动作**，违反
+ * AGENTS §3.4 那条"被回放的 op 不得再触发副作用"。所以它也不跨设备、不 bump
+ * `CURRENT_SCHEMA_VERSION`（AGENTS §3.3）。
+ *
+ * 值的形状：`DbAdapter.put(store, value: unknown, key?)` 本来就吃得下字符串，
+ * `resolveClientId()`（`packages/app-host/src/host.ts`）就是往这里放字符串的先例。
  */
 export const META_KEYS = {
   /** 本设备的稳定 id。LWW 冲突决胜依据，**一经生成不可更改**。 */
@@ -195,6 +205,31 @@ export const META_KEYS = {
   ENCRYPTION_ENABLED: 'encryptionEnabled',
   /** 最后成功同步的时间。 */
   LAST_SYNCED_AT: 'lastSyncedAt',
+  /**
+   * 服务端已确认的因果前沿。
+   *
+   * 这是同步恢复所需的独立簿记，不能复用 materialized checkpoint：
+   * checkpoint 是可删除的本地加速缓存，而这个前沿是服务端确认过的事实。
+   */
+  OBSERVED_CLOCK: 'observedClock',
+  /** 历史曾经不完整（例如存在无法解密的远程 op），只能置 true。 */
+  HISTORY_INCOMPLETE: 'historyIncomplete',
+  /** Opaque wrapped vault key package; never contains a plaintext root key. */
+  VAULT_KEY_PACKAGE: 'vaultKeyPackageV1',
+  /** Account/server scope paired atomically with the opaque vault package. */
+  VAULT_KEY_SCOPE: 'vaultKeyScopeV1',
+  /** Ciphertext-only durable key-migration journal; no root/plaintext/password. */
+  VAULT_MIGRATION_JOURNAL: 'vaultMigrationJournalV1',
+  /** 上一次成功拉到的公共事实响应体（`HolidayAdjustmentsResponse` 的 JSON）。 */
+  PUBLIC_FACTS_JSON: 'publicFactsJson',
+  /** 它对应的版本令牌（服务端 ETag 的候选值），条件请求时原样回传。 */
+  PUBLIC_FACTS_ETAG: 'publicFactsEtag',
+  /** 那次拉取的本地毫秒时间戳（只用于"缓存多旧"，不参与任何裁决）。 */
+  PUBLIC_FACTS_FETCHED_AT: 'publicFactsFetchedAt',
+  /** Active encrypted-payload generation paired with the local key package. */
+  VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
+  /** Encrypted pending root-rotation target; never stores a plaintext root. */
+  VAULT_PENDING_ROOT_ROTATION: 'vaultPendingRootRotationV1',
 } as const;
 
 export type MetaKey = (typeof META_KEYS)[keyof typeof META_KEYS];

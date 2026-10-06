@@ -1,27 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="heyta">
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 512 512" role="img" aria-label="heyta">
   <!--
-    品牌标记的出处：落地页导航里的 .lp-brand__dot 就是一个主色满圆点，
-    后面跟 "heyta" 字标。这里把那个圆点放大成图标底板，再压上字标首字母，
-    因为纯圆点在 16px 的标签页里和一堆其他站点分不出来。
+    生成物（scripts/gen-app-icons.mjs）—— 不要手改。
+    几何来自 packages/design-system/src/brand-mark.ts（全站唯一一份「h」），
+    色值来自 design-system token（SVG 的表现属性写不了 var()，所以是生成进来的字面值）。
 
-    "h" 用 path 描边而不是 <text>：favicon 里用 <text> 会依赖系统字体，
-    不同平台/容器渲染出的字形与宽度都不一样，而 path 是确定的。
-
-    色值 #2563eb 就是亮色下的主色（设计令牌 ht-blue-600，见 tokens.css:27）。
-    这里没法用 var()：favicon 是独立文档，拿不到落地页的 CSS 变量。
-
-    ⚠️ 上面把令牌名写成不带前导连字符的样子，不是笔误 ——
-    XML 注释里不允许出现连续两个连字符（U+002D）。写全了整份 SVG 就是
-    非法 XML，浏览器不会显示图标，而是渲染一个 XML 错误页，而 HTTP 层
-    依然是 200 + image/svg+xml，光看响应码根本发现不了。
-    所以不要把这个令牌名的前导连字符补回来。
+    ⚠️ 这段注释里**不许出现两个连续的连字符** —— XML 注释不允许，
+       写坏了整份 SVG 就是非法文档：浏览器不显示图标而渲染一个 XML 错误页，
+       而 HTTP 层仍然是 200 + image/svg+xml，光看响应码发现不了。
   -->
-  <circle cx="32" cy="32" r="32" fill="#2563eb" />
-  <path
-    d="M24 16 V50 M24 34 a8 8 0 0 1 16 0 V50"
-    fill="none"
-    stroke="#ffffff"
-    stroke-width="7"
-    stroke-linecap="round"
-  />
+  <rect width="512" height="512" rx="112" fill="#2563eb"/>
+  <rect x="140" y="120" width="52" height="272" rx="22" fill="#ffffff"/>
+  <rect x="320" y="228" width="52" height="164" rx="22" fill="#ffffff"/>
+  <rect x="140" y="228" width="232" height="48" rx="22" fill="#ffffff"/>
 </svg>

@@ -44,6 +44,13 @@ export interface TimelinePanelProps {
    * 宿主接**既有建任务 op**（create 带日期字段，一个 CRT 不 fan-out）。
    */
   readonly onCreateAt?: (atMs: number) => void;
+  /**
+   * 点行 = 选中（与列表/四象限同一个值）。不给 = 行不可点。
+   * 🔴 触屏端的这一条早就接了；web 此前往这里只递拖拽出口，于是同一个界面两端能力不同。
+   */
+  readonly onOpenTask?: (taskId: string) => void;
+  /** 选中的那一条 ⇒ 板上高亮。宿主递的是**全局选中**，不是"这一屏自己记住的 id"。 */
+  readonly activeTaskId?: string | null;
   /** 今天的本地日历日（窗口的周锚点 + 今天线）。 */
   readonly today?: LocalDate;
   /** 用于日期格式化的时间戳。默认 `Date.now()`。 */
@@ -51,7 +58,7 @@ export interface TimelinePanelProps {
 }
 
 export function TimelinePanel(props: TimelinePanelProps): React.JSX.Element {
-  const { tasks, today, now, onScheduleTask, onCreateAt } = props;
+  const { tasks, today, now, onScheduleTask, onCreateAt, onOpenTask, activeTaskId } = props;
   const labels = useTimelineLabels();
   // 规划是纯函数，但没必要每帧重算 —— `tasks` 变了才重排。
   const rows = useMemo(() => planTimelineRows(tasks), [tasks]);
@@ -65,6 +72,8 @@ export function TimelinePanel(props: TimelinePanelProps): React.JSX.Element {
         {...(onCreateAt === undefined ? {} : { onCreateAt })}
         {...(today === undefined ? {} : { today })}
         {...(now === undefined ? {} : { now })}
+        onOpenTask={onOpenTask}
+        activeTaskId={activeTaskId}
         testID="timeline-view"
       />
     </HeytaUiProvider>

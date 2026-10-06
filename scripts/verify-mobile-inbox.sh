@@ -135,7 +135,7 @@ else
   # 活动目录是**惰性建码**：第一次打开才创建邀请码，轮询等它出现。
   for i in $(seq 1 15); do
     dump
-    CODE=$(sed -n 's/.*content-desc="邀请码 \([^"]*\)".*/\1/p' /tmp/ui.xml | head -1)
+    CODE=$(sed -n 's/.*content-desc="邀请码 \([^"]*\)".*/\1/p' "$UI_XML" | head -1)
     if [ -n "$CODE" ]; then break; fi
     sleep 2
   done
@@ -197,7 +197,7 @@ fi
 BADGE=""
 for i in $(seq 1 15); do
   dump
-  BADGE=$(sed -n 's/.*content-desc="\([0-9][0-9]* 条未读\)".*/\1/p' /tmp/ui.xml | head -1)
+  BADGE=$(sed -n 's/.*content-desc="\([0-9][0-9]* 条未读\)".*/\1/p' "$UI_XML" | head -1)
   if [ -n "$BADGE" ]; then break; fi
   sleep 2
 done
@@ -234,7 +234,7 @@ else
   CLEAN=1
   for i in $(seq 1 8); do
     dump
-    if [ -z "$(sed -n 's/.*content-desc="\([0-9][0-9]* 条未读\)".*/\1/p' /tmp/ui.xml | head -1)" ]; then
+    if [ -z "$(sed -n 's/.*content-desc="\([0-9][0-9]* 条未读\)".*/\1/p' "$UI_XML" | head -1)" ]; then
       CLEAN=0; break
     fi
     sleep 2

@@ -11,7 +11,7 @@
  */
 
 import { HEAT_TOKENS } from '@heyta/design-system';
-import type { Habit, HabitLog, HabitResilienceView, LocalDate, StreakResult } from '@heyta/domain';
+import type { Habit, HabitLog, HabitPeriodStats, HabitResilienceView, LocalDate, StreakResult } from '@heyta/domain';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -19,9 +19,13 @@ import {
   HABIT_LIST_WEEK_DAYS,
   HEATMAP_WEEK_START,
   frozenDays,
+  habitFrequencySummaryKey,
   habitGoalSummaryKey,
   habitHeatLevel,
   habitHeatmap,
+  hasCountableGoal,
+  heatMonthLabelWidths,
+  heatMonthSpans,
   heatmapLevelToken,
   heatmapTotal,
   monthOfDate,
@@ -55,19 +59,35 @@ function log(date: LocalDate, over: Partial<HabitLog> = {}): HabitLog {
 function stubGrowth(result?: {
   streak: StreakResult;
   resilience: HabitResilienceView;
+  month?: HabitPeriodStats;
 }): { fn: HabitGrowthFn; calls: Array<{ habitId: string; logCount: number; today: LocalDate }> } {
   const calls: Array<{ habitId: string; logCount: number; today: LocalDate }> = [];
   const fn: HabitGrowthFn = (h, logs, today) => {
     calls.push({ habitId: h.id, logCount: logs.length, today });
     return (
-      result ?? {
-        streak: { current: 3, longest: 9 },
-        resilience: { resilience: { current: 3, longest: 9, total: 12, freezesHeld: 1, frozenDays: 2, frozenInCurrentRun: 0 } },
+      // W8：`month` 与 streak/resilience 一样**原样透传**，桩默认给一份
+      // 与 streak 数字处处不同的值，免得巧合相等时断言指错地方。
+      {
+        ...(result ?? {
+          streak: { current: 3, longest: 9 },
+          resilience: { resilience: { current: 3, longest: 9, total: 12, freezesHeld: 1, frozenDays: 2, frozenInCurrentRun: 0 } },
+        }),
+        month: result?.month ?? MONTH_STUB,
       }
     );
   };
   return { fn, calls };
 }
+
+const MONTH_STUB: HabitPeriodStats = {
+  monthKey: '2026-09',
+  achievedDays: 6,
+  scheduledDays: 9,
+  rate: 6 / 9,
+  monthValue: 14,
+  totalValue: 77,
+  totalAchievedDays: 33,
+};
 
 describe('热度分档只有两档，且与迁移前的 web 口径逐字一致', () => {
   it('0 次 = 0 档，≥1 次 = 4 档（不发明中间档）', () => {
@@ -223,10 +243,12 @@ describe('进度投影：连续/韧性由注入的配对函数给，model 不自
       },
       repair: { date: '2026-09-27', streakIfRepaired: 5 },
     };
-    const { fn } = stubGrowth({ streak, resilience });
+    const { fn } = stubGrowth({ streak, resilience, month: MONTH_STUB });
     const rows = toHabitProgressRows([habit()], [], NOW, fn);
     expect(rows[0]?.streak).toBe(streak);
     expect(rows[0]?.resilience).toBe(resilience);
+    // W8：月统计同一条纪律 —— 由注入函数给，共享层不重算。
+    expect(rows[0]?.month).toBe(MONTH_STUB);
   });
 });
 
@@ -365,5 +387,168 @@ describe('habitGoalSummaryKey —— 口径 → 摘要词条', () => {
 
   it('认不出来的值也落 `atLeast`，不编一句新话', () => {
     expect(habitGoalSummaryKey('some-future-goal')).toBe('web.habits.goal.summaryAtLeast');
+  });
+});
+
+/**
+ * 工单 W6：`todayValue`（今天记了几格）与"该不该出现数量行"的判据。
+ *
+ * 这两件事都必须**在判断层**：组件里不许有分支（本文件文件头的约定），
+ * 而"几格"的缺省算法在领域层（`@heyta/domain#habitLogValue`）——
+ * 这里验的是**共享行带上了它**，以及**什么时候该显示**。
+ */
+describe('todayValue / hasCountableGoal（W6）', () => {
+  const rowsOf = (h: Habit, logs: HabitLog[]) => toHabitProgressRows([h], logs, NOW, stubGrowth().fn);
+
+  it('🔴 目标 8、今天记 5 ⇒ 行上是 5（不是 1、不是 0.625）', () => {
+    const rows = rowsOf(habit({ target: 8 }), [log('2026-09-28', { value: 5 })]);
+    expect(rows[0]?.todayValue).toBe(5);
+    // 同一个数在比例那一腿上是 0.625 —— 两个字段说的是同一格，必须互相自洽。
+    expect(rows[0]?.todayRatio).toBeCloseTo(0.625, 5);
+  });
+
+  it('今天没有记录 ⇒ 0（不是 undefined，界面上不许出现"今天 /8"）', () => {
+    expect(rowsOf(habit({ target: 8 }), [])[0]?.todayValue).toBe(0);
+  });
+
+  it('打过卡但那条没写量 ⇒ 落 target，与 `isAchieved` 同一个读法', () => {
+    const rows = rowsOf(habit({ target: 8 }), [log('2026-09-28')]);
+    expect(rows[0]?.todayValue).toBe(8);
+    expect(rows[0]?.todayRatio).toBe(1);
+  });
+
+  it('🔴 超目标时 `todayValue` 不等于比例反算值（记 10 / 目标 8 要显示 10，不是 8）', () => {
+    const rows = rowsOf(habit({ target: 8 }), [log('2026-09-28', { value: 10 })]);
+    expect(rows[0]?.todayValue).toBe(10);
+    // 比例被 `Math.min(1, …)` 截断过 —— 这条同时证明两个字段**不能互换**。
+    expect(rows[0]?.todayRatio).toBe(1);
+  });
+
+  it('hasCountableGoal：只有"做过一次"这一档的习惯**不**出现数量行', () => {
+    // `createHabit` 给每条习惯都写 `target: 1`，所以判据不能是"填过目标没有" ——
+    // 那会让每条纯打卡型习惯多一行「1/1」。
+    expect(hasCountableGoal(habit())).toBe(false);
+    expect(hasCountableGoal(habit({ target: 1 }))).toBe(false);
+    expect(hasCountableGoal(habit({ target: 1, unit: '分钟' }))).toBe(false);
+  });
+
+  it('🔴 计数 / 时长 / **小数目标** / 目标 0 / `atMost`+1 五种都要出现', () => {
+    expect(hasCountableGoal(habit({ target: 8, unit: '杯' }))).toBe(true);
+    expect(hasCountableGoal(habit({ target: 30, unit: '分钟' }))).toBe(true);
+    // 判据第一版写的是 `target > 1`，被一条界面用例照出来：0.5 小时的目标
+    // 也是多格的（能记 0.25 / 0.5 / 1），却会整行不显示。合法域由 `setHabitGoal`
+    // 决定 —— 它只拦负数与非有限数，所以 `!== 1` 才是那个判据。
+    expect(hasCountableGoal(habit({ target: 0.5, unit: '小时' }))).toBe(true);
+    // "一次都不碰"与"最多 1 杯"要的正是能记下**破戒**那个数。
+    expect(hasCountableGoal(habit({ target: 0, goalType: 'atMost' }))).toBe(true);
+    expect(hasCountableGoal(habit({ target: 1, goalType: 'atMost' }))).toBe(true);
+    expect(hasCountableGoal(habit({ target: 1, goalType: 'exactly' }))).toBe(true);
+  });
+});
+
+describe('L 组：热力图月份标签**跨过它标注的那几周**（工单 H8）', () => {
+  /* `habitHeatmap` 的第三个参数是**毫秒时刻**（它自己 `toLocalDate(now)`），不是 `LocalDate`。
+     本地正午：跨时区也不会把那一天推到昨天/明天。 */
+  const at = (year: number, month: number, day: number) =>
+    new Date(year, month - 1, day, 12, 0, 0).getTime();
+  /** 一段窗口切成周列（`toHeatmapWeeks` 会补齐首尾，标签只打在月份变那一列）。 */
+  const weeksOf = (days: number, now: number) =>
+    toHeatmapWeeks(habitHeatmap([], 'h-1', now, days));
+
+  it('L1 与 `weeks` **同长**，且每一列恰好归一个标签块（Σspan == 列数）', () => {
+    for (const [days, now] of [
+      [90, at(2026, 10, 5)],
+      [30, at(2026, 1, 31)],
+      [371, at(2026, 12, 31)],
+    ] as const) {
+      const weeks = weeksOf(days, now);
+      const spans = heatMonthSpans(weeks);
+      expect(spans.length, `${String(days)} 天窗口的数组长度不等于列数`).toBe(weeks.length);
+      // 每一列要么是一个标签块的起点（span ≥ 1），要么被前一个块跨过去（记 0）。
+      // Σ == 列数 挡的是两种坏：漏列（标签比网格短 ⇒ 右边空一块）与重列（跨过了下一个标签）。
+      expect(spans.reduce((a, b) => a + b, 0), `${String(days)} 天窗口：列没有恰好分完`).toBe(
+        weeks.length,
+      );
+    }
+  });
+
+  it('L2 🔴 标签起点**恰好**是月份变的那几列（不重复打、不漏打）', () => {
+    const weeks = weeksOf(371, at(2025, 12, 31));
+    const spans = heatMonthSpans(weeks);
+    const starts = spans.map((s, i) => (s > 0 ? i : -1)).filter((i) => i >= 0);
+    const labelled = weeks.map((w, i) => (w.month === undefined ? -1 : i)).filter((i) => i >= 0);
+    expect(starts, '标签起点与 `toHeatmapWeeks` 打标签的那些列不是同一批').toEqual(labelled);
+    // 阳性对照：一年多的窗口**确实**有多枚标签（否则上面那条会因为"两边都空"而假绿）。
+    expect(starts.length, '371 天窗口里一枚月份标签都没有 ⇒ 时间轴整条没了').toBeGreaterThan(10);
+    // 每一枚跨的列数都 ≥1，且没有任何一枚靠"下一枚标签"来收尾。
+    expect(Math.min(...spans.filter((s) => s > 0)), '有标签只跨 0 列').toBeGreaterThanOrEqual(1);
+  });
+
+  it('L3 🔴 每一枚标签都**至少两列宽**（末列只有一两天时也不许退回一列）', () => {
+    /* 窗口末尾那一列通常只有零星几天 ⇒ 它的 `span == 1`。若宽度就等于 `span × 格宽`，
+       「10月」这种三枚字形在一列宽（`icon.xs` = 14px）里必然折成两行 —— 那正是工单 H8 看图照出来的形状。
+       🔴 下界取"两列"这件事**不靠注释自证**：字面能不能装下由 `e2e` 的 HL1 在真浏览器里量。 */
+    for (const [cell, gap] of [
+      [16, 4],
+      [1, 1],
+    ] as const) {
+      for (const [days, now] of [
+        [90, at(2026, 10, 6)],
+        [30, at(2026, 1, 31)],
+        [371, at(2026, 12, 31)],
+      ] as const) {
+        const weeks = weeksOf(days, now);
+        const widths = heatMonthLabelWidths(weeks, cell, gap).filter((w) => w > 0);
+        expect(widths.length, `${String(days)} 天窗口里没有月份标签`).toBeGreaterThan(0);
+        const tooNarrow = widths.filter((w) => w < 2 * cell + gap);
+        expect(tooNarrow, `cell=${String(cell)} 时有标签窄于一枚字形都放不下的宽度`).toEqual([]);
+      }
+    }
+  });
+
+  it('L4 标签排的总宽**有界**：不短于网格，也不多出超过一枚最小标签', () => {
+    /* 左边对齐是 HL2 量的，这里量的是"整排"的两端：
+       · 短于网格 ⇒ 标签会整体往左挤，与它标注的那一列错开；
+       · 长过"网格 + 一枚最小标签" ⇒ 溢出窗格右边界（那才是真会被裁的那种坏）。 */
+    const cell = 16;
+    const gap = 4;
+    const weeks = weeksOf(90, at(2026, 10, 6));
+    const widths = heatMonthLabelWidths(weeks, cell, gap).filter((w) => w > 0);
+    const labelRow = widths.reduce((a, w) => a + w, 0) + (widths.length - 1) * gap;
+    const gridRow = weeks.length * cell + (weeks.length - 1) * gap;
+    expect(labelRow, `标签排比网格短了 ${String(gridRow - labelRow)}px ⇒ 会错列`).toBeGreaterThanOrEqual(
+      gridRow,
+    );
+    expect(labelRow - gridRow, '标签排溢出网格太多 ⇒ 右边那枚会被窗格裁掉').toBeLessThanOrEqual(
+      2 * cell + gap,
+    );
+  });
+});
+
+describe('habitFrequencySummaryKey —— 单数那一档住在共享层（工单 H5 的补）', () => {
+  /*
+   * 起因：`pnpm -r test` 在 `@heyta/i18n` 那层报了一条红 ——
+   * `web.habits.freq.summary.interval → Every 1 days`。那条 hazard 规则把每张表的
+   * `{占位符}` 都填成 1 念一遍，而英文里"1 days"是坏句子。
+   * 🔴 修法不是把阈值调宽、也不是改那条规则：是**给 1 一条该走的话**，
+   *    并且分支只写一份（写在两个宿主里就是两份，而两份会漂）。
+   */
+  it('间隔 2 天与 5 天各给复数那一句', () => {
+    expect(habitFrequencySummaryKey({ type: 'interval', everyNDays: 2 }))
+      .toBe('web.habits.freq.summary.interval');
+    expect(habitFrequencySummaryKey({ type: 'interval', everyNDays: 5 }))
+      .toBe('web.habits.freq.summary.interval');
+  });
+
+  it('🔴 间隔恰好 1 天 ⇒ 走 `…intervalOne`（阳性对照：这一档与上面那条必须分得开）', () => {
+    expect(habitFrequencySummaryKey({ type: 'interval', everyNDays: 1 }))
+      .toBe('web.habits.freq.summary.intervalOne');
+  });
+
+  it('`daily` 与 `undefined` 仍给"每天"那一句，`weekly` 仍给星期那一句（新分支不许把它们带偏）', () => {
+    expect(habitFrequencySummaryKey(undefined)).toBe('web.habits.freq.summary.daily');
+    expect(habitFrequencySummaryKey({ type: 'daily' })).toBe('web.habits.freq.summary.daily');
+    expect(habitFrequencySummaryKey({ type: 'weekly', daysOfWeek: [3] }))
+      .toBe('web.habits.freq.summary.weekly');
   });
 });

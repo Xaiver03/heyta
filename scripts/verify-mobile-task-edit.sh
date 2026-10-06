@@ -154,7 +154,7 @@ if open_sheet "打开任务：$TITLE"; then
   #    实测后果：这里恒读到 ''，第 6 步 `xy_edit "任务标题"` 恒找不到输入框，
   #    再往下第 7、8 步全部连锁失败。**这条验收在自动同步之前就已经是红的**
   #    （A/B 实测：把自动同步关掉，失败点一模一样）。
-  VAL=$(python3 /tmp/_xy.py editval "标题" 0)
+  VAL=$(python3 "$XY_PY" editval "标题" 0)
   if [ "$VAL" = "$TITLE" ]; then
     ok "面板绑定的是这一条任务（标题框里是 ${TITLE}）"
   else
@@ -358,7 +358,7 @@ case "$VERDICT" in
 esac
 
 step "10. 直接查 Postgres"
-psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
   "SELECT (SELECT count(*) FROM operations) AS ops, (SELECT count(*) FROM sync_devices) AS devices" 2>/dev/null \
   | sed 's/^/      ops|devices = /'
 

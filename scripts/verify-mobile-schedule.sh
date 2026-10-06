@@ -146,8 +146,8 @@ step "3. 设开始（点日历格）+ 时长（1 小时）"
 # 就是排期的（截止日历在更上面，先滚出视野）。
 PICK_START_DAY() {
   python3 - <<'PY'
-import re
-s = open('/tmp/ui.xml', encoding='utf-8', errors='replace').read()
+import os, re
+s = open(os.environ['UI_XML'], encoding='utf-8', errors='replace').read()
 nodes = []
 for m in re.finditer(r'<node[^>]*?>', s):
     tag = m.group(0)

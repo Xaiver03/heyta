@@ -35,6 +35,11 @@ import { createHostRealtimeClient, createSyncClient } from '@heyta/app-host';
 
 // W4：凭据持久化。**只存 baseUrl 与 token，绝不存口令** —— 见该文件头。
 import { clearStoredCredentials, loadCredentials, saveCredentials } from './credential-storage.js';
+import {
+  getWebVaultSession,
+  invalidateWebVaultSession,
+  withWebSyncMutationExclusive,
+} from '../../lib/vault-session.js';
 
 // 🔴 同意闸门（G-12）。这个文件**只**用它做两件事：给客户端注入带闸的 `fetch`，
 // 以及在闸门关闭时不建实时通道。判定逻辑全在 `@heyta/app-host`。
@@ -63,6 +68,8 @@ interface SyncStoreState {
    * 未登录 / 老版本凭据里没有它时是 `undefined` —— 头像退回通用图标。
    */
   email?: string;
+  /** Stable authenticated account id; presence selects vault encryption mode. */
+  accountId?: string;
   /** E2EE 口令。**只在内存**。 */
   password?: string;
   /** 上次同步时间。 */
@@ -77,14 +84,39 @@ interface SyncStoreState {
    */
   conflictDialogOpen: boolean;
   /**
-   * 同步设置对话框是否打开。
+   * 「请把界面落到 **设置 → 同步** 那一节」的请求。
    *
-   * 🔴 从 `SyncBar` 的局部 state **提到这里**，是因为现在有两个入口要打开它：
-   * 同步条自己的齿轮，以及订阅提示的「改用你自己的服务器」。
-   * 让两处各持一份 `open` state 就必然漂移（一处打开、另一处不知道），
-   * 而这一条正是 `AGENTS.md §3.5` 反复记过的形状。
+   * 🔴 从 `SyncBar` 的局部 state **提到这里**，是因为有两个入口要提出它：
+   * rail 底部那枚同步（2026-10-06 之前它旁边还有一颗齿轮）以及订阅提示的
+   * 「改用你自己的服务器」。让两处各持一份 state 就必然漂移（一处打开、
+   * 另一处不知道），而这一条正是 `AGENTS.md §3.5` 反复记过的形状。
+   *
+   * 🔴 H9 第 3 刀之后它**不是**"对话框是否打开"了 —— 同步设置不再是浮层，
+   * 它是设置浮层里的**一节**（`features/sync/SyncSettingsPanel.tsx`）。
+   * 所以这个名字写的是**请求**而不是**状态**：`App.tsx` 消费它（切到设置视图、
+   * 滚到那一节）之后立刻清掉。留着 `settingsOpen` 这个名字会指着两个真相：
+   * "某一节是开着的"（它没有开关，永远整节渲染）和"有人要求去看它"（真的那个）。
    */
-  settingsOpen: boolean;
+  syncSettingsRequested: boolean;
+  /**
+   * 设置 → 同步 那一节里三个输入框的**草稿**。
+   *
+   * 🔴 与上面的 `baseUrl` / `token` / `password`（= 已生效的配置）刻意分开：
+   * 草稿要点了「保存并同步」才走 `configure()` 变成配置。
+   *
+   * 为什么从组件的局部 state 提到这里：H9 第 3 刀之后**触发者在读屏的另一侧** ——
+   * `AuthPanel` 仍挂在常驻的 `SyncBar`（rail 底部），而地址输入框现在住在设置浮层里。
+   * 「注册 / 登录」必须用**用户眼前那个地址**，否则会出现"对着 A 登录、令牌存到 B"
+   * （这条搬家理由与 `signInOpen` 逐字同形，见下面那段注释）。
+   */
+  syncDraft: { baseUrl: string; token: string; password: string };
+  /**
+   * 那一节当前**在不在屏幕上**。
+   *
+   * 它决定 `AuthPanel` 的地址来源（在 = 用草稿，不在 = 用已保存的配置），
+   * 取代原来那个"`open`（对话框开着）"的判据。由面板自己的挂载 effect 写。
+   */
+  syncDraftShown: boolean;
   /**
    * 注册 / 登录面板是否打开。
    *
@@ -92,7 +124,7 @@ interface SyncStoreState {
    * "注册/登录该长在头像区，不该顶栏横一块大按钮"）：入口搬进 rail 顶部的
    * **账号区**（`AccountMenu`，未登录时它旁边出现紧凑入口），而面板本体
    * 仍渲染在 `SyncBar`（地址来源的语义都在那边）。触发者在 A、面板在 B，
-   * 局部 state 就够不着了 —— 与 `settingsOpen` 同一条搬家理由。
+   * 局部 state 就够不着了 —— 与 `syncSettingsRequested` 同一条搬家理由。
    */
   signInOpen: boolean;
 
@@ -108,7 +140,7 @@ interface SyncStoreState {
    * 而用户刚在上一屏把口令输进去过。所以它是一条**专门的、窄的**动作，
    * 而不是复用 `configure(baseUrl, token, '')`。
    */
-  applyAuthToken: (baseUrl: string, token: string, email?: string) => void;
+  applyAuthToken: (baseUrl: string, token: string, email?: string, accountId?: string) => void;
   clearCredentials: () => void;
   syncNow: () => Promise<SyncStatus>;
   /**
@@ -130,6 +162,12 @@ interface SyncStoreState {
   closeConflictDialog: () => void;
   openSettings: () => void;
   closeSettings: () => void;
+  /** 改设置 → 同步 那一节的草稿（只改传入的字段）。 */
+  setSyncDraft: (patch: Partial<SyncStoreState['syncDraft']>) => void;
+  /** 面板挂载：按**当前已生效的配置**播种草稿并标记"在屏"。 */
+  showSyncDraft: () => void;
+  /** 面板卸载：撤掉"在屏"标记 ⇒ `AuthPanel` 退回已保存的配置。 */
+  hideSyncDraft: () => void;
   startAutoRetry: () => void;
   stopAutoRetry: () => void;
 }
@@ -178,6 +216,30 @@ function buildClient(
   const { baseUrl, token } = get();
   if (baseUrl === '' || token === undefined) return undefined;
 
+  const accountId = get().accountId;
+  if (accountId !== undefined && accountId !== '') {
+    return createSyncClient({
+      engine: requireEngine(),
+      store: requireStore(),
+      baseUrl,
+      getToken: async () => get().token,
+      getPassword: async () => undefined,
+      encryptionMode: 'vault',
+      getPayloadCipher: async () => {
+        const current = get();
+        if (current.accountId === undefined || current.accountId === '') return undefined;
+        const session = await getWebVaultSession(
+          current.accountId,
+          current.baseUrl,
+          async () => get().token,
+        );
+        return session.getPayloadCipher();
+      },
+      applyRemote: applyRemoteOps,
+      fetchImpl: consentFetch,
+    });
+  }
+
   return createSyncClient({
     engine: requireEngine(),
     store: requireStore(),
@@ -219,9 +281,10 @@ function buildClient(
  * 2. **把信号翻成一次普通同步**：`onNewOps` → `syncNow()`。
  *    🔴 契约见 `realtime.ts` 文件头：**这条通道只传"有新 op 了"，不传内容**，
  *    真正的 op 密文仍走 `/api/sync/ops`。不要顺手把内容搬进来。
- * 3. **合并并发**：`syncNow()` **没有**在途保护（它每次都会新建客户端并发请求），
- *    而服务端可能连续推。所以在途时**直接丢掉这一次信号**而不是排队 ——
- *    下一次推送会把状态带过来，排队只会把"几次变化"放大成"几次全量同步"。
+ * 3. **合并并发**：实时信号仍用 `syncInFlight` 合并重复通知；真正的同步请求
+ *    还要经过 `withWebSyncMutationExclusive`，与 root migration 共用同一条
+ *    进程内队列。否则 inventory/stage/commit 窗口中的本地上传会制造自发的
+ *    `stale_latest_seq`，把本来可以完成的迁移变成用户可见的失败。
  */
 let realtime: RealtimeClient | undefined;
 /** 在途同步标记（见上面第 3 条）。 */
@@ -413,8 +476,15 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   baseUrl: persisted?.baseUrl ?? '',
   token: persisted?.token,
   email: persisted?.email,
+  accountId: persisted?.accountId,
   conflictDialogOpen: false,
-  settingsOpen: false,
+  syncSettingsRequested: false,
+  syncDraft: {
+    baseUrl: persisted?.baseUrl ?? '',
+    token: persisted?.token ?? '',
+    password: '',
+  },
+  syncDraftShown: false,
   signInOpen: false,
 
   openConflictDialog: () => {
@@ -426,12 +496,29 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     set({ conflictDialogOpen: false });
   },
 
+  /** 提出"请把界面落到 设置 → 同步 那一节"的请求（由 `App.tsx` 消费并清掉）。 */
   openSettings: () => {
-    set({ settingsOpen: true });
+    set({ syncSettingsRequested: true });
   },
 
   closeSettings: () => {
-    set({ settingsOpen: false });
+    set({ syncSettingsRequested: false });
+  },
+
+  setSyncDraft: (patch) => {
+    set({ syncDraft: { ...get().syncDraft, ...patch } });
+  },
+
+  showSyncDraft: () => {
+    const { baseUrl, token, password } = get();
+    set({
+      syncDraft: { baseUrl, token: token ?? '', password: password ?? '' },
+      syncDraftShown: true,
+    });
+  },
+
+  hideSyncDraft: () => {
+    set({ syncDraftShown: false });
   },
 
   openSignIn: () => {
@@ -443,12 +530,19 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   configure: (baseUrl, token, password) => {
-    set({ baseUrl, token, password, status: { kind: 'idle' } });
+    // A server/token edit changes the authentication binding. Fence any
+    // in-flight vault load before the new credentials can be used.
+    const previous = get();
+    if (previous.baseUrl !== baseUrl || previous.token !== token) invalidateWebVaultSession();
+    // 🔴 草稿跟着走：「保存并同步」之后，那一节的输入框与配置**必须是同一份值**。
+    // 不写这一半的话，症状是配置已经生效、框里还留着上一次的内容 ——
+    // 那是 2026-09-30 那条"框与配置两套真相"缺陷的镜像版本。
+    set({ baseUrl, token, password, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
     // 🔴 W4：口令**不进** saveCredentials 的参数 —— 它只在内存。
     // ⚠️ 邮箱**保留已有的那个**：手填凭据这条路径不知道账号是谁，
     //    而它不该把上一次登录留下的标签抹掉。
     if (baseUrl !== '' && token !== '') {
-      saveCredentials({ baseUrl, token, email: get().email });
+      saveCredentials({ baseUrl, token, email: get().email, accountId: get().accountId });
     }
     // 🔴 凭据变了 ⇒ 补签状态必须**重问**（上一个账号的答案不属于这个账号）。
     syncLegalRecheckCredentials({ token, baseUrl });
@@ -456,14 +550,32 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     restartRealtime(get);
   },
 
-  applyAuthToken: (baseUrl, token, email) => {
+  applyAuthToken: (baseUrl, token, email, accountId) => {
+    invalidateWebVaultSession();
     // 口令与上次同步时间原样保留 —— 见接口上的说明。
     //
     // ⚠️ `email` 是**可选**的：手填凭据那条路径没有邮箱，此时**保留已有的那个**
     //（`email ?? get().email`）—— 否则重新登录一次会把头像的标签抹掉。
-    set({ baseUrl, token, email: email ?? get().email, status: { kind: 'idle' } });
+    set({
+      baseUrl,
+      token,
+      email: email ?? get().email,
+      accountId: accountId ?? get().accountId,
+      status: { kind: 'idle' },
+      // 🔴 登录成功时**那一节可能正开着**（头像 → 登录，设置浮层还在下面）。
+      // 地址与令牌要一起对齐，否则用户登录完看到的还是两个空框 ——
+      // 这是 2026-09-30 Windows 旅程验收 W3 那条缺陷的形状。
+      // ⚠️ **口令原样保留**：它可能是用户正在框里输入的那半截，
+      //    而登录从不代填口令（与上面 `password` 不进 `set` 是同一条理由）。
+      syncDraft: { baseUrl, token, password: get().syncDraft.password },
+    });
     // 🔴 W4：登录成功即落盘 ⇒ "登录后重开还在"。
-    saveCredentials({ baseUrl, token, email: email ?? get().email });
+    saveCredentials({
+      baseUrl,
+      token,
+      email: email ?? get().email,
+      accountId: accountId ?? get().accountId,
+    });
     // 🔴 登录后**先问补签状态，再**建实时连接（顺序有意义：`refresh()` 同步把闸门
     // 置成 `checking`，于是新连接不会在"还没问到答案"的窗口里建立起来）。
     // 答案回来后由 `legalRecheck.subscribe()` 重建，不需要这里等它。
@@ -477,6 +589,9 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   clearCredentials: () => {
+    // Logout must not await/open the host or let a pending GET/loader install
+    // a session after the token has been cleared.
+    invalidateWebVaultSession();
     retry?.stop();
     retry = undefined;
     // 🔴 登出必须断开实时通道 —— 否则那个连接会**带着已失效的令牌**继续重连，
@@ -486,7 +601,17 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // 🔴 G-27：登出要把补签状态一起清掉 —— 不许留着**上一个人**的版本与答案，
     // 否则下一个人（可能是另一次登录的另一个账号）会看到不相干的面板。
     clearLegalRecheckCredentials();
-    set({ token: undefined, email: undefined, password: undefined, status: { kind: 'idle' } });
+    set({
+      token: undefined,
+      email: undefined,
+      accountId: undefined,
+      password: undefined,
+      status: { kind: 'idle' },
+      // 🔴 框里也不许留着**上一个人**的令牌与口令：登出是"这台设备不再代表这个人"，
+      // 而设置那一节如果还显示着旧令牌，下一次"保存并同步"会把它当现值写回去。
+      // 地址留着（与上面 `baseUrl` 不进 `set` 同一条理由：换账号不必重填服务器）。
+      syncDraft: { baseUrl: get().baseUrl, token: '', password: '' },
+    });
     // 🔴 W4：登出必须把**落盘的那份**也清掉。
     // 只清内存的话，刷新一次令牌就"活"回来了 —— 用户以为登出了，其实没有。
     clearStoredCredentials();
@@ -534,9 +659,9 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
       return reconfirm;
     }
 
-    const status = await c.sync((s) => {
+    const status = await withWebSyncMutationExclusive(async () => c.sync((s) => {
       set({ status: s });
-    });
+    }));
 
     // 出现冲突就自动打开一次 —— 否则用户只会看到状态栏变了字，
     // 不知道需要自己去点一下
@@ -571,7 +696,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     }
 
     set({ status: { kind: 'syncing', phase: 'upload' } });
-    const status = await c.resolveConflict(conflict, choice);
+    const status = await withWebSyncMutationExclusive(() => c.resolveConflict(conflict, choice));
 
     // 解决完后把剩下的冲突（可能还有别的）一并反映到状态里
     set({ status });

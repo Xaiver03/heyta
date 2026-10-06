@@ -164,6 +164,119 @@ export const parseAvatarPayload = (plaintext: string): AvatarPayload | null => {
 };
 
 /**
+ * base64 字符串**解码后**的字节数（不真的解码：尾部 `=` 是唯一需要小心的地方）。
+ *
+ * 为什么住在契约层而不是各壳里：它是 `ACCOUNT_AVATAR_MAX_SOURCE_BYTES`
+ * 那条上限的**量法**。上限本身写在这里，量法写在 web 的 `avatar-encode.ts` 里，
+ * 结局就是"同一个产品规格两端各判一遍" —— 而 AGENTS §3.5 说得很直接：
+ * 两份实现 = 两套裁决标准。移动端要接头像时，它必须引用这一个。
+ */
+export const base64DecodedBytes = (base64: string): number => {
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+  return Math.floor((base64.length * 3) / 4) - padding;
+};
+
+/** 拒绝原因。🔴 **每种对应界面上一句不同的话**，所以不许合并成一句"头像不行"。 */
+export type AvatarRejectReason =
+  /** 不在 `ACCOUNT_AVATAR_CONTENT_TYPES` 白名单里（服务端看不到明文 ⇒ 只有客户端能拦）。 */
+  | 'bad-type'
+  /** 编码结果为空串：平台那条路"成功了但什么都没产出"。 */
+  | 'empty'
+  /** 压缩**之后**仍然超过 `ACCOUNT_AVATAR_MAX_SOURCE_BYTES`。 */
+  | 'too-big';
+
+/**
+ * 格式白名单的**唯一**判法。
+ *
+ * 单独导出是为了让壳能在**动手编码之前**就问一句（浏览器解一张 20 MB 的奇怪
+ * 文件是要花时间的，而"格式不支持"这句话不该等到画布跑完才说）。
+ * `planAvatarUpload` 内部用的也是它 —— 两处两个判法就是那条门禁要防的漂移。
+ */
+export const isAvatarContentType = (contentType: string): contentType is AccountAvatarContentType =>
+  (ACCOUNT_AVATAR_CONTENT_TYPES as readonly string[]).includes(contentType);
+
+/**
+ * 编码**输出**用哪一种格式。
+ *
+ * 规则：源图是 PNG 就继续输出 PNG（转 JPEG 会把透明铺成黑底），其余（含 webp）
+ * 统一转 JPEG。判的是**有没有透明通道**，而 PNG 是白名单里唯一保证带 alpha 的那一种。
+ *
+ * 为什么单独成一个函数：两个壳都要在同一处决定这件事（web 的 canvas、Android 的
+ * `Bitmap.compress`）。写成 `file.type === 'image/png' ? … : …` 的第三遍时，
+ * 结局是"同一张 webp 在网页上变 JPEG、在手机上还是 webp"，
+ * 而 `planAvatarUpload` 收不收它是按**输出**的 contentType 判的。
+ */
+export const avatarOutputContentType = (sourceType: string): AccountAvatarContentType =>
+  sourceType === 'image/png' ? 'image/png' : 'image/jpeg';
+
+export type AvatarUploadPlan =
+  | { readonly action: 'accept'; readonly payload: AvatarPayload }
+  | { readonly action: 'reject'; readonly reason: AvatarRejectReason };
+
+/**
+ * 「这张压好的图能不能当头像」的**唯一**裁决（客户端纪律那一半）。
+ *
+ * 只管**已编码**的载荷：怎么把一张原图变成方形 base64 是平台调用
+ *（浏览器 `<canvas>` / Android `Bitmap` / iOS `ImageEditor`），住在各自的壳里；
+ * 边长与字节上限是产品规格，住在本文件。这条分界与
+ * `apps/web/src/features/settings/avatar-encode.ts` 文件头写的是同一条。
+ *
+ * ⚠️ 判的是**压缩后**的字节 —— 原图多大不是我们能选的（一张 4 MB 的手机截图
+ * 压完可能 60 KB），拿原图大小去拒会把绝大多数相册照片挡在门外。
+ */
+export const planAvatarUpload = (input: {
+  readonly contentType: string;
+  readonly dataBase64: string;
+}): AvatarUploadPlan => {
+  if (!isAvatarContentType(input.contentType)) {
+    return { action: 'reject', reason: 'bad-type' };
+  }
+  if (input.dataBase64 === '') {
+    return { action: 'reject', reason: 'empty' };
+  }
+  if (base64DecodedBytes(input.dataBase64) > ACCOUNT_AVATAR_MAX_SOURCE_BYTES) {
+    return { action: 'reject', reason: 'too-big' };
+  }
+  return {
+    action: 'accept',
+    payload: { contentType: input.contentType as AccountAvatarContentType, dataBase64: input.dataBase64 },
+  };
+};
+
+/**
+ * 没有头像时那个圈里显示的**首字母**（取 `@` 之前第一段的第一个字符，转大写）。
+ *
+ * 🔴 为什么要抽进共享层：这条规则此前有**两份** ——
+ * `AccountMenu.tsx` 返回 `undefined`（于是那里渲染**空圈**），
+ * 而 `ProfilePanel.tsx` 返回 `''`（渲染一个空 `<span>`）。
+ * 两处的注释都写着"拿不到邮箱时不许编一个字母"，但实现各写了一遍。
+ * 症状不会是报错，而是"同一个账号在侧栏里是空圈、在设置页里是别的形状"，
+ * 以及移动端接第三份时又要重新决定一次"到底返回什么"。
+ *
+ * ⚠️ 返回 `string | undefined` 而不是 `''`：**空串与没有是两件事**。
+ * `''` 会让调用方写成 `{initial}`（渲染一个空文本节点），
+ * 而真正该问的是"这里到底有没有字母可显示"。用 `undefined` 才能把
+ * "没邮箱"与"邮箱本地部分为空"都收敛成一个调用方必须显式分支的状态。
+ */
+export const avatarInitialFromEmail = (email: string | undefined): string | undefined => {
+  if (email === undefined) return undefined;
+  const first = Array.from((email.split('@')[0] ?? '').trim())[0];
+  return first === undefined ? undefined : first.toUpperCase();
+};
+
+/**
+ * 把头像 payload 拼成 `<img src>` / RN `<Image source={{uri}}>` 直接能吃的 data URI。
+ *
+ * 🔴 抽出来的理由不是"少写一行模板字符串"，是**格式串里有两个必须一致的部分**：
+ * `contentType` 与 `base64`。各端各拼一遍时，拼错哪一半都不会报错 ——
+ * 浏览器只会把图渲染成坏图（RN 更糟：什么都不画）。
+ * web 此前在同一文件里拼了两次（读回来一次、上传成功后一次），
+ * 而"上传后立刻显示的那张图"与"刷新后显示的那张图"必须是同一个字节形状。
+ */
+export const avatarDataUri = (image: AvatarPayload): string =>
+  `data:${image.contentType};base64,${image.dataBase64}`;
+
+/**
  * `GET account/profile` 的响应，也是登录响应里 `user` 带的那两个字段。
  *
  * ⚠️ 只有 `avatarHash`，**没有**头像字节 —— 取图是另一条 `GET account/avatar`。

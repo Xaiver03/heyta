@@ -19,7 +19,7 @@
  *   3. **fixture**：往输入里注入一个新工具，产物里必须出现它；判不出实体的工具、
  *      归到没模型实体的工具、进了分母的视图名 —— 三种都必须让生成**当场失败**。
  *
- * 只有"现状基线 2/8"那一条是**故意钉住今天的事实**：W10 扩目录时它会红，
+ * 只有"现状基线 N/8"那一条是**故意钉住今天的事实**：W10 扩目录时它会红，
  * 而那正是要求的动作 —— 重新判断一次，而不是让它悄悄跟着变。
  *
  * ## 关于"从测试里 import 一个 Node 脚本"
@@ -57,6 +57,7 @@ interface GeneratorModule {
   DENOMINATOR_EXCLUSIONS: readonly { entityType: string; reason: string }[];
   NON_ENTITY_VIEWS: readonly string[];
   SYSTEM_ENTITY_TYPES: readonly string[];
+  TOOL_ENTITY_OVERRIDES: Readonly<Record<string, string>>;
   attributeToolByName: (name: string) => { entityType: string | null; how: string | null };
   buildCapabilityManifest: (input: unknown) => FixtureManifest;
   renderModelText: (manifest: unknown) => string;
@@ -78,6 +79,14 @@ interface FixtureManifest {
   coverage: { covered: number; denominator: number; ratio: string };
   userOperableEntityTypes: readonly string[];
   entityTypesWithoutTools: readonly string[];
+  entities: readonly {
+    entityType: string;
+    materialized: boolean;
+    countsTowardCoverage: boolean;
+    coverage: 'read-write' | 'read-only' | 'write-only' | 'none';
+    readToolNames: readonly string[];
+    writeToolNames: readonly string[];
+  }[];
   tools: readonly {
     name: string;
     kind: string;
@@ -146,6 +155,9 @@ function fixtureInput(
         'AI_FEEDBACK',
         'PREFERENCE_CORRECTION',
         'TASK_REPEAT_CFG',
+        // 🔴 与下面 `modeledEntityTypes` 里的同一项**成对**出现：生成器会交叉核对
+        // 两端实体清单，只补一边就是"`EntityModelMap` 与 `ENTITY_TYPES` 不一致"的红色形状。
+        'ASSISTANT_TURN',
         'GLOBAL_CONFIG',
         'MIGRATION',
         'RECOVERY',
@@ -153,7 +165,18 @@ function fixtureInput(
       ],
     modeledEntityTypes:
       overrides.modeledEntityTypes ??
-      ['TASK', 'PROJECT', 'REMINDER', 'AI_FEEDBACK', 'PREFERENCE_CORRECTION'],
+      [
+        'TASK',
+        'PROJECT',
+        'REMINDER',
+        'AI_FEEDBACK',
+        'PREFERENCE_CORRECTION',
+        // 🔴 剔除表里每一项都必须**真的在** `EntityModelMap` 里（生成器 :407 那条），
+        // 所以这张小 fixture 跟着剔除表一起长。`ASSISTANT_TURN` 是 ADR-0045 D-4 (ii)
+        // 的跨设备会话实体 —— 漏了它，四条注入用例全部撞在"剔除项已消失"上，
+        // 症状和"口径被重新拍了"一模一样（那就是这条判据存在的意义）。
+        'ASSISTANT_TURN',
+      ],
     tools: overrides.tools ?? [
       { name: 'list_tasks', kind: 'read', description: '列出任务。', schemaRecorded: true, args: [] },
       { name: 'create_task', kind: 'write', description: '新建任务。', schemaRecorded: true, args: [] },
@@ -287,10 +310,13 @@ describe('每一个工具都在清单里，且 kind 与目录一致', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// 3. 分母口径（ADR-0045 §2.7 钉死：8，且视图不进分母）
+// 3. 分母口径（ADR-0045 §2.7 钉的是**规则**：视图与两个落库载体不进分母。
+//    具体数字随实体清单走：批次二 W2 物化 `EVENT` 之后分母从 8 变 9。
+//    ⚠️ ADR-0045 正文里那句"分母是 8 / 现状基线 2/8"是**当时**的读数，
+//    它不是结论（结论是那条规则），所以不去改已接受的 ADR，只在这里写明口径。）
 // ─────────────────────────────────────────────────────────────────────────
 
-describe('分母恰好 8，且逐条列出是哪 8 个', () => {
+describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
   it('分母成员逐条点名（多一个少一个都红 —— 这条挡住"顺手把视图加进分母"）', async () => {
     const [gen, upstream] = [await loadGenerator(), await upstreamDirectory()];
     const excludedNames = gen.DENOMINATOR_EXCLUSIONS.map((e) => e.entityType);
@@ -298,8 +324,16 @@ describe('分母恰好 8，且逐条列出是哪 8 个', () => {
       (t) => !excludedNames.includes(t) && !gen.NON_ENTITY_VIEWS.includes(t),
     );
     expect([...manifest.userOperableEntityTypes]).toEqual(expected);
-    expect(manifest.userOperableEntityTypes.length).toBe(8);
-    expect(manifest.coverage.denominator).toBe(8);
+    expect(manifest.userOperableEntityTypes.length).toBe(9);
+    expect(manifest.coverage.denominator).toBe(9);
+    // 🔴 W10 **之前**这里是 `toContain('EVENT')` —— 清单的职责就是把"实体有了、
+    // 工具还没接"这件事显形。W10 做完之后它必须**不再**出现（这条改向就是那件事
+    // 做完了的机器化证据；反向漏做 ⇒ 这条与上面 3/9 那条一起红）。
+    expect(manifest.entityTypesWithoutTools).not.toContain('EVENT');
+    // 2026-10-03 合流后 9/9 全覆盖：分母里的实体**全部**有工具，
+    // 所以"有实体没工具"那句点名现在必须是空的。哪天目录丢了一个实体的工具，
+    // 这里会重新出现名字 —— 那就是这条判据重新开始咬人的时候。
+    expect([...manifest.entityTypesWithoutTools].sort()).toEqual([]);
   });
 
   it('分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体', async () => {
@@ -341,13 +375,57 @@ describe('分母恰好 8，且逐条列出是哪 8 个', () => {
     }
   });
 
-  it('现状基线 2/8：只有 TASK 与 PROJECT 有工具（W10 扩目录时这条会红，那是要的）', () => {
+  it('现状基线 9/9：分母里每个实体读写都有工具（以后少一个就要在这里重新判断）', () => {
+    // 2026-10-03 两次搬这条基线，都在这里重新判断过：
+    // ① PROJECT 补 `create_project`、HABIT 补 `list_habits` + `create_habit`（3/8）；
+    // ② 补齐 TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER 的读写工具（8/8）。
+    // 下一个动目录的人同样必须在这里重新判断一次 —— 改成从上游推导就是永真判据。
+    //
+    // ⚠️ 现在这个数已经顶到分母，**它不再能靠"加实体"变红**：往后新实体进了分母却没工具时，
+    // 报的是 `check-ai-coverage` 那条门禁，不是这个常数。
     const withTools = manifest.entities
       .filter((e) => e.countsTowardCoverage && e.coverage !== 'none')
       .map((e) => e.entityType);
-    expect(withTools.sort()).toEqual(['PROJECT', 'TASK']);
-    expect(manifest.coverage.covered).toBe(2);
-    expect(manifest.coverage.ratio).toBe('2/8');
+    expect(withTools.sort()).toEqual([
+      'EVENT',
+      'FOCUS_SESSION',
+      'HABIT',
+      'HABIT_LOG',
+      'NOTE',
+      'PROJECT',
+      'REMINDER',
+      'TAG',
+      'TASK',
+    ]);
+    // 2026-10-03 合流：EVENT 的四条工具随 W10 移植进 pack 目录（读 2 / 写 2），
+    // 基线从 8/8（W11 批次）与 3/9（批次二当时的中间态）收拢为 9/9。
+    expect(manifest.coverage.covered).toBe(9);
+    expect(manifest.coverage.ratio).toBe('9/9');
+    // `covered` 是分母名单的**统计结果**，`userOperableEntityTypes.length` 是名单本身：
+    // 两个数取自生成器里两条不同的路径，这里要求它们当下确实相等 ——
+    // 不等就是那两条口径漂了（比如覆盖率把某个已剔除的视图又算了进去）。
+    expect(manifest.coverage.covered).toBe(manifest.userOperableEntityTypes.length);
+  });
+
+  it('🔴 EVENT 的四个工具**读写都有**，且归因走的是名字（不是 override 名单）', async () => {
+    const event = manifest.entities.find((e) => e.entityType === 'EVENT');
+    expect(event).toBeDefined();
+    expect([...event!.readToolNames].sort()).toEqual(['get_event', 'list_events']);
+    expect([...event!.writeToolNames].sort()).toEqual(['create_event', 'update_event']);
+    // coverage 必须是 read-write —— 竞品那句"我们只能查看、不能新建"的产品谎言，
+    // 在 heyta 的**这一格**上被否证（gap-analysis §2.1 的靶子）
+    expect(event!.coverage).toBe('read-write');
+    // 四条都登记了参数 schema（`schemaRecorded:false` 会静默出现在给模型的投影里）
+    for (const name of ['list_events', 'get_event', 'create_event', 'update_event']) {
+      const tool = manifest.tools.find((t) => t.name === name);
+      expect(tool, `${name} 不在清单里`).toBeDefined();
+      expect(tool!.schemaRecorded, `${name} 没有登记 INPUT_SCHEMAS`).toBe(true);
+      expect(tool!.entityType).toBe('EVENT');
+    }
+    // 逃生门没有被用掉：EVENT 是靠**名字**归因的，不是靠 override 名单
+    // （`TOOL_ENTITY_OVERRIDES` 一旦开始被逐个点名，清单就开始变成第二份手写名单）
+    const gen = await loadGenerator();
+    expect(Object.keys(gen.TOOL_ENTITY_OVERRIDES)).toEqual([]);
   });
 });
 
@@ -375,12 +453,38 @@ describe('注入一个工具，清单里必须出现它（证明"生成"而不�
     expect(injected, '新加的工具没进清单 —— 生成器在抄旧清单').toBeTruthy();
     expect(injected!.entityType).toBe('REMINDER');
     expect(injected!.kind).toBe('write');
-    // 🔴 注入**改变了结论**：REMINDER 不再是"没有工具的实体"，覆盖面 +1。
+    // 🔴 注入**改变了结论**：REMINDER 不再是"没有工具的实体"。
     //    这一条才是"生成在跟随上游"的正面证据 —— 抄件做不到这件事。
     expect(built.entityTypesWithoutTools).toEqual(['PROJECT']);
     expect(built.coverage.denominator).toBe(3);
     expect(before.coverage.covered).toBe(1);
-    expect(built.coverage.covered).toBe(before.coverage.covered + 1);
+    // ⚠️ 但覆盖面**一格都没动**：只加了一个写工具，REMINDER 现在是 `write-only`。
+    //    口径见 `countsAsCovered` —— "读得到也改得动"才算覆盖，
+    //    所以这里必须钉住 `1/3` 而不是旧的那句 `2/3`（旧口径把只读/只写都算成已覆盖，
+    //    那正是 `2/8` 那句虚报的来源）。
+    expect(
+      built.entities.find((e) => e.entityType === 'REMINDER')!.coverage,
+    ).toBe('write-only');
+    expect(built.coverage.covered).toBe(before.coverage.covered);
+    expect(built.coverage.ratio).toBe('1/3');
+  });
+
+  it('🔴 补齐读 + 写两个工具，覆盖面才 +1 —— 「读得到也改得动」这条口径有牙齿', async () => {
+    const gen = await loadGenerator();
+    const built = gen.buildCapabilityManifest(
+      fixtureInput({
+        tools: [
+          { name: 'list_tasks', kind: 'read', description: '列出任务。', schemaRecorded: true, args: [] },
+          { name: 'create_task', kind: 'write', description: '新建任务。', schemaRecorded: true, args: [] },
+          { name: 'list_reminders', kind: 'read', description: '列提醒。', schemaRecorded: true, args: [] },
+          { name: 'create_reminder', kind: 'write', description: '给任务建一条提醒。', schemaRecorded: true, args: [] },
+        ],
+      }),
+    );
+    expect(
+      built.entities.find((e) => e.entityType === 'REMINDER')!.coverage,
+    ).toBe('read-write');
+    expect(built.coverage.covered).toBe(2);
     expect(built.coverage.ratio).toBe('2/3');
   });
 

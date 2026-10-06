@@ -102,11 +102,22 @@ target 'Heyta' do
         "#elif defined(__cpp_consteval)\n#  define FMT_USE_CONSTEVAL 1",
         "#elif defined(__cpp_consteval)\n#  define FMT_USE_CONSTEVAL 0",
       )
-      if patched == original
-        Pod::UI.puts '[heyta] fmt 补丁未命中 —— fmt 可能已升级，请复查是否还需要它'.yellow
-      else
+      # 🔴 三分支，不是两分支。原来只分"改了 / 没改"，而"没改"被写成
+      #   『fmt 可能已升级，请复查』—— 但**同一份文件已经是补丁态**时（第二次及以后
+      #   每次 `pod install` 都会走到这里，CocoaPods 不重新下载已有 pod）
+      #   `sub` 同样匹配不到，于是每次构建都印一句指向错原因的提示。
+      #   实测：fmt 仍是 11.0.2、那一支已经是 `FMT_USE_CONSTEVAL 0`，
+      #   而 03:0x 那次 pod install 照样报"可能已升级"。
+      #   把"已经补好了"和"头文件形状变了"分开，前者不需要人看，后者才需要。
+      branch = original[/#elif defined\(__cpp_consteval\)\n#  define FMT_USE_CONSTEVAL (\d)/, 1]
+      if patched != original
         File.write(fmt_base, patched)
         Pod::UI.puts '[heyta] 已对 fmt 关闭 consteval（Apple clang 21 兼容）'.green
+      elsif branch == '0'
+        Pod::UI.puts '[heyta] fmt consteval 绕行已在位（FMT_USE_CONSTEVAL 0），不动它'.green
+      else
+        Pod::UI.puts '[heyta] 🔴 fmt 头文件里没有那条 `#elif defined(__cpp_consteval)` 分支' \
+                     ' —— 绕行失效，构建会回到那个 consteval 报错，请复查 fmt 版本/形状'.red
       end
     end
   end

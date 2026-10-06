@@ -41,7 +41,7 @@
  * rsync 源路径根本不存在那个断点），以及本文件把"链外必须有可验消费方"变成判据。
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -106,6 +106,98 @@ const ALLOWED_OUTSIDE_CHAIN = new Map([
           file: 'server/Dockerfile',
           needle: 'RUN node scripts/check-web-artifact.mjs --dist apps/web/dist --mount /app/',
           role: '镜像构建阶段自动跑 —— 这是**同一条判据**的自动载体（跑的是脚本本身，不是 npm 别名）',
+        },
+      ],
+    },
+  ],
+  [
+    'check:android-build-host',
+    {
+      reason:
+        'Android 构建主机规则的**第二枚**门禁（模拟器侧 / 文档侧 / runbook 死链 / 载体对账）。' +
+        '同批的另一枚 `check:android-gradle-remote` 已经在链里，这一枚**本批刻意不进链**：' +
+        '`check` 那条 `&&` 串的分母正被并行会话计数（现量方式写在手册 §七 那条里），' +
+        '此时并进去会把别人的读数改成谁都对不上。⇒ 判它的载体现在是"照着手册跑远程构建那一趟"，' +
+        '不是"每次提交那一趟"。' +
+        '🔴 摘除条件：并行那批不再引用链段数之后把它并进链，并**同时删掉本条登记** ——' +
+        '登记留着而它已进链，本文件第 2 条判据会红（"留着就是在掩护下一道"）。',
+      consumers: [
+        {
+          file: 'docs/runbooks/android-build-on-windows.md',
+          needle: 'pnpm check:android-build-host',
+          role: '手册 §八 的代码块 —— 第一次真远程构建之前要跑的那条（也是本批唯一的载体）',
+        },
+      ],
+    },
+  ],
+  [
+    'check:adr-numbering',
+    {
+      reason:
+        'ADR 编号唯一 + 正文里裸写的 `ADR-NNNN` 必须只指向一枚文件。' +
+        '它拦的是 2026-10-05 那次**两条并行会话同一天各占 0053**：文件名不同 ⇒ git 不报冲突，' +
+        '每条链接各指各的 ⇒ 死链检查也不报，只有正文里的裸引用从此有两种读法，而挑错那种不会让任何东西红。' +
+        '🔴 **本批刻意不进链的唯一原因是提交面上的**：`package.json` 里 `check` 那一行此刻正被并行会话' +
+        '的未提交改动占着（同一行加 `check:backup-retention`），同一行无法按 hunk 拆开暂存 ⇒ ' +
+        '此刻并进去就等于替别人提交他那半。' +
+        '摘除条件：并行那半进 main 之后，把 `pnpm check:adr-numbering` 并进链（建议紧跟 `check:doc-citations`），' +
+        '并**同时删掉本条登记** —— 登记留着而它已进链，本文件第 2 条判据会红（"留着就是在掩护下一道"）。',
+      consumers: [
+        {
+          file: 'docs/adr/README.md',
+          needle: 'pnpm check:adr-numbering',
+          role: '「规则」第 2 条：定新 ADR 号之前要跑的那一趟（本批唯一的载体）',
+        },
+      ],
+    },
+  ],
+]);
+
+/**
+ * 树上存在、但**没有任何 package.json 定义引用**的 `scripts/check-*.mjs`。
+ *
+ * ## 为什么需要这一张表（2026-10-06 加）
+ *
+ * 上面 1/3/3b 三条判据的分母都来自 `pkg.scripts` 的键，所以"一枚从没写进 package.json 的
+ * 实现文件"落在三条之外：它不是"定义了没接链"（没有定义），也不是"链上引用了不存在的文件"
+ * （链上没有它）。于是它 0 次执行，而门禁绿得像"全都对上了"。
+ * 第一例是 `scripts/check-e2e-helper-exports.mjs`（17.7 KB / 自带 8 臂自检 / rc=0 /
+ * 射程 121 份文件、对账 414 个导入名），它文件头那句"由 pnpm check 调用"在接链之前
+ * **没有一行代码兑现** —— 与 10-04 那次"sync-client 里那句没有代码兑现的谎话"同一族。
+ *
+ * ⚠️ 这张表**不是**"允许表"的第二份，判据形状与第 2 条完全一样：理由 + 可验消费方
+ * （行首锚定的 needle，"提到"不算）。填不满这条的，正确出路是**给它加定义并接进链**，
+ * 不是往这里写一行。
+ */
+const ALLOWED_UNREFERENCED_IMPL = new Map([
+  [
+    'check-module-boundaries.mjs',
+    {
+      reason:
+        '三个 AI 模块的**写入租约**门禁：它判的是"这一笔改动有没有越到别人的模块里"，' +
+        '输入是**分支/修订号**（`--module 2 --rev <fork>`），不是工作树 —— ' +
+        '放进 `pnpm check` 那条无参数的链里它没有可判的对象。⇒ 判它的载体是"照着并行开工手册跑那一趟"。',
+      consumers: [
+        {
+          file: 'docs/plans/ai-remediation-parallel-runbook.md',
+          needle: 'node scripts/check-module-boundaries.mjs --module 2 --rev ai-remediation-fork',
+          role: '手册里"开工前 / 合流前"各跑一次的那条命令（§开工门 与 §合流门 两处代码块）',
+        },
+      ],
+    },
+  ],
+  [
+    'check-ratchet-ceilings.mjs',
+    {
+      reason:
+        '棘轮的**另一半**（"不许把基线本身抬高"）。它需要 `git merge-base main HEAD` 那个锚点，' +
+        '而在打包机/CI 的 detached 或浅检出上锚点不可靠 ⇒ 现在由**变异台架**跑它，' +
+        '不在每次提交的链里。',
+      consumers: [
+        {
+          file: 'research/tools/mutation-rigs/mutate-ratchet-ceilings.mjs',
+          needle: "const GATE = join(ROOT, 'scripts', 'check-ratchet-ceilings.mjs');",
+          role: '它的拒绝臂：这台架每次跑都真的 spawn 这道门禁（GATE 常量就是被 spawn 的那一枚）',
         },
       ],
     },
@@ -281,6 +373,68 @@ for (const name of chainTokens) {
   }
 }
 
+// 5) 🔴 反方向：树上每一枚 `scripts/check-*.mjs` 都必须被**某条定义**引用，否则它一次都不会被跑。
+//
+// 上面 1/3/3b 三条的分母都来自 `pkg.scripts` 的键，所以"一枚从没写进 package.json 的实现文件"
+// 落在三条之外：它不是"定义了没接链"（没有定义），也不是"链上引用了不存在的文件"（链上没有它）。
+// 2026-10-06 的第一例是 `scripts/check-e2e-helper-exports.mjs`（17.7 KB / 自带 8 臂自检 / rc=0 /
+// 射程 121 份文件、对账 414 个导入名），它文件头那句"由 pnpm check 调用"在接链之前
+// **没有一行代码兑现** —— 与 10-04 那次"sync-client 里那句没有代码兑现的谎话"同一族。
+const implOnDisk = readdirSync(join(ROOT, 'scripts'))
+  .filter((f) => /^check-.*\.mjs$/.test(f))
+  .sort();
+const defText = Object.values(pkg.scripts ?? {})
+  .filter((v) => typeof v === 'string')
+  .join('\n');
+const orphanImpl = implOnDisk.filter((f) => !defText.includes(f));
+const orphanReadings = [];
+for (const f of orphanImpl) {
+  const entry = ALLOWED_UNREFERENCED_IMPL.get(f);
+  if (!entry) {
+    failures.push(
+      `scripts/${f}: 这枚门禁实现**没有任何 package.json 定义引用它** ⇒ 0 次执行，而链照样绿。` +
+        '要么给它加定义并接进链（正确出路），要么进 `ALLOWED_UNREFERENCED_IMPL` 并点名**可验的**消费方。',
+    );
+    continue;
+  }
+  if (typeof entry.reason !== 'string' || entry.reason.trim().length === 0) {
+    failures.push(`scripts/${f}: 登记在"无定义"表里没有理由。没理由的豁免与没有豁免是同一种东西。`);
+  }
+  const consumers = Array.isArray(entry.consumers) ? entry.consumers : [];
+  if (consumers.length === 0) {
+    failures.push(
+      `scripts/${f}: 登记了但没有 consumers ⇒ 没人跑它。` +
+        '"手动跑的那一条"必须能指出**哪一趟**跑它，否则这张表就是"忘了加定义"的掩护。',
+    );
+    continue;
+  }
+  for (const consumer of consumers) {
+    const abs = join(consumersRoot, consumer.file);
+    if (!existsSync(abs)) {
+      failures.push(
+        `scripts/${f} 的消费方 \`${consumer.file}\` 不存在 —— 载体被改名/删掉/挪走了，而这里还登记着它。`,
+      );
+      continue;
+    }
+    if (typeof consumer.needle !== 'string' || consumer.needle.length === 0) {
+      failures.push(`scripts/${f} 的消费方 \`${consumer.file}\` 没有 needle —— "被提到了"不算消费。`);
+      continue;
+    }
+    // 行首锚定，与第 2b 条同一口径：散文里提到一次就能把豁免坐实，那这条判据就是装饰。
+    const hits = readFileSync(abs, 'utf8')
+      .split('\n')
+      .reduce((n, l) => (l.trimStart().startsWith(consumer.needle) ? n + 1 : n), 0);
+    if (hits === 0) {
+      failures.push(
+        `scripts/${f} 的消费方 \`${consumer.file}\` 里没有任何一行**以这条命令开头**：\n      ${consumer.needle}\n` +
+          `      （\`${consumer.role}\`）—— 那一趟不再跑它了。⚠️ 行首锚定：散文里"提到"不算。`,
+      );
+      continue;
+    }
+    orphanReadings.push(`${f} ← ${consumer.file}（${String(hits)} 处）`);
+  }
+}
+
 // 4) 锚点：`pnpm -r test` / `pnpm build` 必须逐字在链里
 for (const anchor of REQUIRED_ANCHORS) {
   if (!chain.includes(anchor)) {
@@ -296,6 +450,11 @@ console.log(
   `   · 实现文件判了 ${implOk.length} 段、跳过 ${implSkipped.length} 段（带 cd / --filter / 非 node|bash|sh 的形状）`,
 );
 for (const r of consumerReadings) console.log(`   · 链外门禁的消费方：${r}`);
+console.log(
+  `   · 树上 check-*.mjs ${implOnDisk.length} 枚 ｜ 没有任何定义引用的 ${orphanImpl.length} 枚` +
+    `（登记 ${ALLOWED_UNREFERENCED_IMPL.size} 条，每条都要有可验消费方）`,
+);
+for (const r of orphanReadings) console.log(`   · 无定义实现的消费方：${r}`);
 
 if (failures.length > 0) {
   for (const f of failures) console.error('🔴 ' + f);
@@ -303,4 +462,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('✅ check 链与门禁定义对上了（含"链外门禁"逐条有理由、有可验的消费方、锚点在场）');
+console.log(
+  '✅ check 链与门禁定义对上了（链外逐条有理由+可验消费方、锚点在场、树上没有"写了没人引用"的门禁实现）',
+);

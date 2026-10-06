@@ -24,7 +24,10 @@ TARGET="${1:-both}"
 IOS_UDID="${HEYTA_IOS_UDID:-1B785D80-049E-4BB0-9267-3A8A37EAADBC}"
 ANDROID_SERIAL="${HEYTA_ANDROID_SERIAL:-emulator-5554}"
 IOS_BUNDLE="com.heyta.mobile"
-ANDROID_PACKAGE="com.heytamobile"
+# Keep this in sync with the manifest's real applicationId. A stale package
+# name makes uninstall/launch silently target nothing and can leave an old
+# screenshot looking like a successful release verification.
+ANDROID_PACKAGE="com.heyta"
 
 mkdir -p "$EVIDENCE"
 
@@ -107,7 +110,17 @@ verify_android() {
   adb -s "$ANDROID_SERIAL" install "$apk" | tail -1 | awk '{print "  " $0}'
   adb -s "$ANDROID_SERIAL" reverse --remove-all >/dev/null 2>&1 || true
   adb -s "$ANDROID_SERIAL" shell am force-stop "$ANDROID_PACKAGE" >/dev/null 2>&1 || true
-  adb -s "$ANDROID_SERIAL" shell monkey -p "$ANDROID_PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+  # `monkey -p` returns result code -5 on this API 36 emulator when the
+  # installed component retains a disabled-state override, even though the
+  # real launcher activity is resolvable and starts correctly. Use the
+  # resolved component explicitly and require ActivityTaskManager to report a
+  # successful launch so a stale screenshot cannot make this green.
+  launch_output="$(adb -s "$ANDROID_SERIAL" shell am start -W -n "$ANDROID_PACKAGE/com.heytamobile.MainActivity" 2>&1)"
+  printf '%s\n' "$launch_output" | grep -q 'Status: ok' || {
+    printf '%s\n' "$launch_output" >&2
+    echo "  🔴 Android activity failed to launch" >&2
+    return 1
+  }
   sleep 25
   local png="$EVIDENCE/android-release.png"
   adb -s "$ANDROID_SERIAL" exec-out screencap -p > "$png"

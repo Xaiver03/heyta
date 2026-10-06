@@ -52,6 +52,8 @@ import { bucketByQuadrant, classifyQuadrant } from '../../../packages/domain/src
 import { Priority, type Task } from '../../../packages/domain/src/entities.js';
 import { AppWindow } from '../src/mockup/AppWindow.js';
 import {
+  SHELL_HEADER_ACTIONS,
+  SHELL_HEADER_MOVED_OUT,
   SHELL_PANEL_SECTIONS,
   SHELL_PRIMARY_NAV,
   SHELL_QUADRANT_NAV,
@@ -61,44 +63,37 @@ import {
 import {
   SHOWCASE_NOW,
   SHOWCASE_TASKS,
-  SHOWCASE_TODAY_PROGRESS,
   showcaseQuadrantCounts,
 } from '../src/mockup/showcase-data.js';
+import { readWebAppSource, readWebSource, stripComments } from './helpers/source-text.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../../..');
 
 /**
- * 真应用源码的位置。
- *
- * 🔴 `HEYTA_MOCKUP_WEB_SRC` 是**故障注入探针**专用的只读接缝
- *（与 `check-l0-no-style.mjs` 的 `HEYTA_CHECK_ROOT` 同一个约定）：
- * 把 `apps/web/src` 复制到 `/tmp`、在副本上改一处、再把本变量指过去，
- * 就能证明"真应用改了而复刻没跟 → 会红"，而**不必碰共享工作区里的 `apps/web`**。
- * 不设它时就是真实路径。
+ * 真应用源码的位置与读取器住在 `./helpers/source-text.ts` —— `HEYTA_MOCKUP_WEB_SRC`
+ * 那枚故障注入接缝（把 `apps/web/src` 复制到临时树、在副本上改一处、再把本变量指过去，
+ * 就能证明"真应用改了而复刻没跟 → 会红"，而不必碰共享工作区里的 `apps/web`）也在那里，
+ * 两份判据共用同一枚旋钮、同一套剥注释规则。
  */
-const WEB_SRC = process.env.HEYTA_MOCKUP_WEB_SRC ?? join(REPO, 'apps/web/src');
-
-function appSource(): string {
-  return readFileSync(join(WEB_SRC, 'App.tsx'), 'utf8');
-}
+const appSource = readWebAppSource;
 
 /** 视图/导航登记（2026-10-02 起从 App.tsx 抽到独立文件，声明逐字未动）。 */
 function viewTabsSource(): string {
-  return readFileSync(join(WEB_SRC, 'features/shell/view-tabs.ts'), 'utf8');
+  return readWebSource('features/shell/view-tabs.ts');
 }
 
 /** NavButton（计数位的 `count > 0` / `ht-nav__count` 在这份文件里）。 */
 function navButtonSource(): string {
-  return readFileSync(join(WEB_SRC, 'features/shell/NavButton.tsx'), 'utf8');
+  return readWebSource('features/shell/NavButton.tsx');
 }
 
 function projectsPanelSource(): string {
-  return readFileSync(join(WEB_SRC, 'features/projects/ProjectsPanel.tsx'), 'utf8');
+  return readWebSource('features/projects/ProjectsPanel.tsx');
 }
 
 function taskStoreSource(): string {
-  return readFileSync(join(WEB_SRC, 'features/tasks/store.ts'), 'utf8');
+  return readWebSource('features/tasks/store.ts');
 }
 
 /** 从源码里切出一个 `const X = [ … ];` 数组登记块。切不到 = 报错，不是"跳过"。 */
@@ -246,10 +241,12 @@ function toDomainTask(task: (typeof SHOWCASE_TASKS)[number]): Task {
 }
 
 describe('#1 主导航：登记处 ⟷ 真应用 `PRIMARY_NAV`', () => {
-  it('登记的四项与 `App.tsx` 的 `PRIMARY_NAV` 逐项同 key、同序', () => {
+  it('登记的每一项与 `App.tsx` 的 `PRIMARY_NAV` 逐项同 key、同序', () => {
     const appKeys = fieldValues(arrayBlock(viewTabsSource(), 'const PRIMARY_NAV'), 'labelKey');
+    // ⚠️ 「收集箱」在 2026-10-04 被删（产品负责人：与页头标题重复 = 同一目的地两个入口）。
+    // 这条字面清单是**解析器的阳性对照**：它证明上面那串真读出了东西，
+    // 而不是在 `PRIMARY_NAV` 改名/挪位置之后恒返回空集。
     expect(appKeys).toEqual([
-      'web.shell.nav.inbox',
       'web.shell.nav.today',
       'web.shell.nav.next7Days',
       'web.shell.nav.completed',
@@ -452,12 +449,16 @@ describe('外壳结构只从登记处派生', () => {
       'SHELL_QUADRANT_SECTION_KEY',
       'SHELL_VIEW_TABS',
       'SHELL_PANEL_SECTIONS',
+      'SHELL_HEADER_ACTIONS',
     ]) {
       expect(source, `AppWindow.tsx 没有从登记处取 ${symbol}`).toContain(symbol);
     }
     // 视图 tab 的 labelKey 不许再手写一份字面量。
     expect(source).not.toContain("t('web.shell.views.timeline')");
     expect(source).not.toContain("t('web.trash.nav')");
+    // 页头那一排也不许再各抄一份（这批漂移就是这么产生的）。
+    expect(source).not.toMatch(/className="mk-sync/);
+    expect(source).not.toMatch(/className=\{?['"]mk-lang/);
   });
 
   it('四象限导航登记项**没有** count 字段（计数不是结构的一部分）', () => {
@@ -467,39 +468,120 @@ describe('外壳结构只从登记处派生', () => {
   });
 });
 
-describe('#6 今天进度卡：编造值也必须自洽（产品决策 P5）', () => {
+/**
+ * #7 页头右侧那一排。
+ *
+ * 🔴 这一组是 2026-10-06 补的，因为**原来没有任何一层在管它**：
+ * 那一段是手抄在渲染文件里的，于是复刻画着六件产品早已搬走的东西
+ * （同步状态 / 立即同步 / 同步设置 / 语言 / 主题 / 日期-倒计时），
+ * 而展厅 26 条测试全绿 —— 其中一条 positively 要求那六件都在。
+ * 一条把过时形状钉成期望的判据，比没有判据更糟（AGENTS §8 第 3 条）。
+ *
+ * 两道一起才关得住：
+ *   · **正向**：登记处的锚点 ⟷ 产品页头那一段里实际出现的 `data-testid`（双向等集）；
+ *   · **反向**：`SHELL_HEADER_MOVED_OUT` 里每一件，产品侧的源码与复刻侧的图都不许再有。
+ *     只验"该在的都在"挡不住"把旧的加回来"（与 `e2e/tests/shell-sync-rail.spec.ts` S1
+ *     同一条理由）。
+ */
+describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () => {
   /**
-   * 🔴 这张卡的三个数字**派不出来**（展厅没有习惯 / 习惯日志 / 专注记录，
-   * `ShowcaseTask` 也没有完成时间）—— 完整理由写在
-   * `showcase-data.ts` 的 `SHOWCASE_TODAY_PROGRESS` 上方。
+   * 产品页头那一段，**注释已剥掉**。
    *
-   * **但它们必须是自洽的**：一个 `done > total` 或
-   * `remaining !== total - done` 的卡片，是"看起来像数据、其实自相矛盾"，
-   * 比明显是占位符更坏 —— 没人会去核对一张卡上的减法。
-   * 这三条断言就是那道核对，且它**会红**（下面每条都做过故障注入）。
+   * 🔴 剥注释不是洁癖：那段里留着一句"原本平铺着 状态 / 立即同步 / 同步设置 / 语言 /
+   * 详情开关 / 主题"的历史说明，里面写着 `<SyncBar/>` 与 `web.sync.a11y.syncNow` ——
+   * 不剥的话这条反向判据会在**产品是对的**那一天就红，而红字指向产品。
    */
-  it('remaining === total - done，且 0 < done <= total', () => {
-    expect(SHOWCASE_TODAY_PROGRESS.remaining).toBe(
-      SHOWCASE_TODAY_PROGRESS.total - SHOWCASE_TODAY_PROGRESS.done,
+  function headerActionsSource(): string {
+    const app = appSource();
+    const start = app.indexOf('<div className="ht-header__actions">');
+    if (start < 0) throw new Error('App.tsx 里找不到 .ht-header__actions —— 判据锚点已失效');
+    const end = app.indexOf('<div className="ht-content">', start);
+    if (end < 0) throw new Error('.ht-header__actions 之后找不到 .ht-content —— 判据锚点已失效');
+    return stripComments(app.slice(start, end));
+  }
+
+  function webTestids(): string[] {
+    return [...headerActionsSource().matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1] ?? '');
+  }
+
+  it('解析器读得出东西（阳性对照：挡"改名/挪走之后恒返回空集，于是双向都绿"）', () => {
+    expect(webTestids()).toEqual(['task-sort', 'task-sort-select', 'detail-pane-toggle']);
+  });
+
+  it('登记处的锚点与产品页头实际出现的 testid 是同一批（双向等集，不是子集）', () => {
+    const registered = SHELL_HEADER_ACTIONS.flatMap((action) => [...action.anchors]);
+    expect(registered.sort()).toEqual(webTestids().sort());
+    // 登记处内部不许重复登记同一枚锚点 —— 重复会让上面那条在"少一件 + 重一件"时仍然等长。
+    expect(new Set(registered).size).toBe(registered.length);
+  });
+
+  it('每一件的可访问名，产品那边确实按那个 key 在渲染', () => {
+    const app = appSource();
+    for (const action of SHELL_HEADER_ACTIONS) {
+      expect(
+        app.includes(`'${action.labelKey}'`) || app.includes(`'${action.optionKey ?? ''}'`),
+        `${action.id} 登记的词条 ${action.labelKey} 在产品源码里找不到`,
+      ).toBe(true);
+    }
+    // 排序那一档的**可见标签**是真应用与复刻共用的一条（裸 chip 的教训）。
+    expect(app).toContain("t('web.shell.sort.aria')");
+  });
+
+  it('复刻页头画的就是登记的这一批，数量与顺序逐字一致', () => {
+    const view = renderMockup('tasks');
+    const actions = view.querySelector('.mk-header__actions');
+    expect(actions, '复刻的页头动作区没画出来').not.toBeNull();
+    const aria = [...(actions?.querySelectorAll('[aria-label]') ?? [])].map(
+      (el) => el.getAttribute('aria-label') ?? '',
     );
-    expect(SHOWCASE_TODAY_PROGRESS.done).toBeGreaterThan(0);
-    expect(SHOWCASE_TODAY_PROGRESS.done).toBeLessThanOrEqual(SHOWCASE_TODAY_PROGRESS.total);
+    const text = actions?.textContent ?? '';
+    const shown = SHELL_HEADER_ACTIONS.filter((a) => a.onlyForView === undefined || a.onlyForView === 'tasks');
+    expect(actions?.children.length).toBe(shown.length);
+    for (const action of shown) {
+      const label = zhCN[action.labelKey];
+      expect(
+        aria.includes(label) || text.includes(label),
+        `复刻页头里没有 ${action.id}（${label}）`,
+      ).toBe(true);
+    }
   });
 
-  it('进度条的比例落在 (0, 1] —— 超出这个区间 CSS 会静默画错', () => {
-    const ratio = SHOWCASE_TODAY_PROGRESS.done / SHOWCASE_TODAY_PROGRESS.total;
-    expect(ratio).toBeGreaterThan(0);
-    expect(ratio).toBeLessThanOrEqual(1);
+  it('非任务视图里那一枚按产品的条件消失，详情开关仍在（条件不许抄错）', () => {
+    const view = renderMockup('quadrant');
+    const actions = view.querySelector('.mk-header__actions');
+    const conditional = SHELL_HEADER_ACTIONS.filter((a) => a.onlyForView !== undefined);
+    const unconditional = SHELL_HEADER_ACTIONS.length - conditional.length;
+    expect(
+      actions?.children.length,
+      `条件件数 ${String(conditional.length)} 在未命中视图里没被滤掉（实际 ${String(actions?.children.length)}）`,
+    ).toBe(unconditional);
   });
 
-  it('渲染出来的卡显示的就是登记的那三个数（渲染层不许再抄一份）', () => {
-    const app = renderMockup('tasks');
-    const count = app.querySelector('.mk-today__count');
-    expect(count).not.toBeNull();
-    expect(count?.textContent).toContain(String(SHOWCASE_TODAY_PROGRESS.done));
-    expect(count?.textContent).toContain(String(SHOWCASE_TODAY_PROGRESS.total));
-    // 渲染文件里不许再有裸的 today 魔数。
-    const source = readFileSync(join(HERE, '../src/mockup/AppWindow.tsx'), 'utf8');
-    expect(source).not.toMatch(/const today = \{ done:/);
+  it('🔴 搬走的四件：产品页头那一段里没有，复刻的图上也没有', () => {
+    const webHeader = headerActionsSource();
+    const view = renderMockup('tasks');
+    const actions = view.querySelector('.mk-header__actions');
+    const mockText = `${actions?.textContent ?? ''} ${[
+      ...(actions?.querySelectorAll('[aria-label]') ?? []),
+    ]
+      .map((el) => el.getAttribute('aria-label') ?? '')
+      .join(' ')}`;
+
+    for (const moved of SHELL_HEADER_MOVED_OUT) {
+      for (const needle of moved.absentInWeb) {
+        expect(webHeader, `产品页头又出现了 ${needle}（${moved.what} → ${moved.nowIn}）`)
+          .not.toContain(needle);
+      }
+      for (const key of moved.absentInMock) {
+        expect(mockText, `复刻页头又画了「${zhCN[key]}」（${moved.what} → ${moved.nowIn}）`)
+          .not.toContain(zhCN[key]);
+      }
+    }
+    // 阳性对照：上面那三串"不许出现"里，至少有一条**今天仍在 App.tsx 的别处**
+    // —— 否则这几条反向判据可能只是在"字符串在整个仓库里不存在"上恒真。
+    const app = appSource();
+    expect(app).toContain('LanguageSwitcher');
+    expect(app).toContain("'web.shell.dueMode.date'");
   });
 });
+

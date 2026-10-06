@@ -21,6 +21,10 @@
 set -u
 export PATH="/opt/homebrew/bin:$PATH"
 
+# 「别的验收在跑吗」的探针。用 BASH_SOURCE 而不是 `$0` 的 dirname：本文件是被
+# source 的，`$0` 是**调用方脚本**的路径（可能是绝对路径、也可能从 scripts/ 下起）。
+. "$(dirname "${BASH_SOURCE[0]:-$0}")/mobile-e2e-runner-probe.sh"
+
 # 🔴 设备号**只有一个住处**：`$E2E_SERIAL`。打印它的脚本一律引用这个变量，
 #    不要再抄一遍字面量 —— 实测 9 个 `verify-mobile-*.sh` 的横幅硬编码
 #    `emulator-5554`，而设备换到 5556 时它们照打 5554：跑的是对的机器，
@@ -28,6 +32,48 @@ export PATH="/opt/homebrew/bin:$PATH"
 E2E_SERIAL="${HEYTA_E2E_SERIAL:-emulator-5554}"
 ADB="adb -s $E2E_SERIAL"
 PKG=com.heyta
+
+# ── W0b ①：这一趟验收的**现场路径**（快照文件 + 定位器脚本）─────────────
+#
+# 🔴 为什么这两个名字必须可换：并行两轮验收共用 `/tmp/ui.xml` 时，B 轮的
+#    `rm`/`cat >` 会把 A 轮正在读的快照换掉，A 轮的每条断言于是都在读
+#    **另一屏**的界面 —— 表现是"上一屏"（第 60 行注释记的就是这个形状）。
+#    `/tmp/_xy.py` 更要命：它不是一个数据文件，而是 lib 每轮**重写再执行**的
+#    代码 —— 两轮并发时 A 可能执行到 B 刚写了一半的那份（半文件）。
+#
+#    默认值**逐字不变** ⇒ 单轮运行零行为变化；并行时导出两个变量就各用各的。
+# 🔴 `export` 是承重的，不是风格：`_xy.py` 与三处 `python3 - <<'PY'` 都是
+#    子进程，shell 变量不导过去就传不进去（症状是"设了环境变量，python 那几处
+#    还在读 /tmp/ui.xml"，而 grep 类断言已经切过去了 —— 半套现场比全套更难查）。
+UI_XML="${HEYTA_E2E_UI_XML:-/tmp/ui.xml}"
+XY_PY="${HEYTA_E2E_XY_PY:-/tmp/_xy.py}"
+export UI_XML XY_PY
+# 🔴 这一趟用的**库名**也只有一个住处。它今天只有两个用途：横幅打印，以及需要
+#    直连数据库的脚本（`verify-mobile-auth.sh`）拿它当 `PG_DB`。原来 5 个脚本的
+#    横幅把库名**印成字面量** —— 换私有库之后横幅还在说另一台库（W0b ②）。
+#    这与"设备号硬印 emulator-5554"是同一个错的另一副面目：跑的是对的现场，
+#    取证输出里写的是另一个现场，下次排查会把人引去查一台根本没用的库。
+E2E_DB="${HEYTA_E2E_DB:-heyta_mobile_smoke}"
+# 🔴 数据库**用户名**也不能印/连一个字面量：`verify-multi-end-sync.sh` 里三处
+#    `psql -U rocalight` 换一台机器（或 CI）就连不上别人建的库，而失败形态是
+#    "库不存在/连不上"，看起来像服务端坏了。口径与 `verify-mobile-auth.sh` 一致：
+#    变量可覆盖，默认取当前登录用户。
+E2E_DB_USER="${HEYTA_E2E_DB_USER:-$(whoami)}"
+export E2E_DB_USER
+
+# 🔴 建库那一头（`mobile-e2e-up.sh`）自己也有一份**默认值**。两处不一致的症状
+#    不是崩，是"横幅说库叫 A、容器里的库叫 B" —— 所以在这里当场比对，不一致就
+#    响亮失败（一次 grep 的成本，换掉一整轮误导人的取证）。
+#    比的是默认值而不是生效值：用户显式给了私有库名时不该报警。
+#    拿不到那一行（格式变了 / 文件不在）就**跳过**，不发明兜底值。
+E2E_DB_DEFAULT=heyta_mobile_smoke
+_UP_DEFAULT=$(sed -n 's/^HEYTA_E2E_DB="\${HEYTA_E2E_DB:-\([^"]*\)}"$/\1/p' \
+  "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/mobile-e2e-up.sh" 2>/dev/null | head -1)
+if [ -n "$_UP_DEFAULT" ] && [ "$_UP_DEFAULT" != "$E2E_DB_DEFAULT" ]; then
+  echo "❌ 库名默认值漂移：lib=$E2E_DB_DEFAULT mobile-e2e-up.sh=$_UP_DEFAULT" >&2
+  echo "   两处必须逐字相同 —— 横幅打印的库名就是建库那处用的库名。" >&2
+  exit 1
+fi
 # 🔴 这两个**必须**是绝对路径，不能是"仓库根相对"。
 #
 #    实测：脚本一旦不是从仓库根跑（例如 `cd scripts && bash verify-mobile-ios.sh`），
@@ -111,24 +157,19 @@ step() { echo ""; echo "════ $1 ════"; }
 #    满屏"找不到按钮""应用没起来" —— 看起来像产品坏了，其实只是撞车。
 #    这种"环境造成的假红"必须能被**说出来**，而不是让人去猜。
 #
+# 🔴 匹配规则**不在这里**：唯一实现在 `lib/mobile-e2e-runner-probe.sh`。
+#    那个文件没有 trap，所以 dry-run 类的消费者（`verify-mobile-window-gate.sh`）
+#    可以 source 它 —— 而它们**不能** source 本文件（本文件尾的 EXIT trap 会真动设备）。
+#    旧写法用 `bash [^ ]*…`，跨不过本仓路径里的空格，对被快照成 `.snap.<pid>` 的
+#    运行者**永久隐形**；原因、夹具与自检写在那个文件头。
+#
 # ⚠️ `$$` 在命令替换的子 shell 里仍是**父 shell 的 pid**（bash 的规定），
 #    但那个子 shell **自己的 pid 却不是** `$$` —— 而它的 argv 与本脚本逐字相同
 #    （`ps` 里就是一行 `bash scripts/verify-mobile-auth.sh`）。所以只排除 `$$`
 #    会把**自己**当成"别人"（实测踩过：脚本刚启动就报"还有别的验收在跑"）。
-#    因此这里同时排除 `$$` 的**直接子进程**（`ppid == me`），并且只认
-#    "直接跑脚本"那一行（`bash -c …` 的包装进程不算：它的 argv 里出现脚本名，
-#    但它并没有驱动设备）。
+#    因此探针同时排除 `$$` 的**直接子进程**（`ppid == me`）。
 another_mobile_e2e_running() {
-  ps -Ao pid=,ppid=,command= > /tmp/_heyta_mobile_e2e_ps.txt 2>/dev/null
-  awk -v me="$$" '
-    $1 == me { next }
-    $2 == me { next }
-    # `zsh -c` / `bash -c` 的包装进程 argv 里可能内嵌脚本名文本（上游用 printf
-    # 写启动器再执行、或工具链把整条命令记进 argv），它们不是真正的运行者 ——
-    # 真正的运行者永远是直接 `bash scripts/verify-….sh` 的那个进程，会被单独匹配到。
-    $0 ~ /(zsh|bash) -c/ { next }
-    $0 ~ /bash [^ ]*verify-mobile-[a-z-]+\.sh/ && $0 !~ /bash -n/ { print; exit }
-  ' /tmp/_heyta_mobile_e2e_ps.txt
+  mobile_e2e_runner_lines
 }
 
 # ── UI 辅助 ────────────────────────────────────────────────
@@ -150,14 +191,39 @@ another_mobile_e2e_running() {
 #      空快照会让断言**失败**，而不是让它读着过期数据通过。宁可假红，不可假绿。
 #   2. 重试几次 —— "界面还在动"通常几秒后就结束了。
 dump() {
-  local tries
+  local tries errfile last_err causes all_err non_idle
+  # 🔴 归因用的输出落在这文件里，**不**是 `/sdcard` 上（那是往设备写东西）。
+  #    命名跟着 `$UI_XML` 走，因为它是同一个旋钮的产物。
+  errfile="${UI_XML}.dump-err"
+  # 🔴 归因是**附加**职责，抓界面才是主职责。要是为了落一个临时文件把主职责弄坏了，
+  #    就成了探针自己制造故障：bash 的重定向失败会**中止整条命令**（adb 根本不会被调用），
+  #    于是 `$UI_XML` 永远为空、每条断言都报「找不到 X」。写不进去就退回 /dev/null。
+  if ! : >"$errfile" 2>/dev/null; then
+    [ "${HEYTA_E2E_DUMPERR_WARNED:-0}" = 1 ] || {
+      HEYTA_E2E_DUMPERR_WARNED=1
+      echo "   ⚠️ 写不了 $errfile —— 归因信息退回 /dev/null（dump 本身照常跑）" >&2
+    }
+    errfile=/dev/null
+  fi
+  all_err=""
   # 🔴 5 次不够：同步进行中界面一直在动，实测要等好几秒才会安静下来。
   # 代价只是变慢，而"抓不到"的代价是整轮结论作废。
+  # 🔴 这三条设备调用带 `|| true`：`dump` 对调用方的**契约是"软失败 + 打出归因"**，
+  #    而这个契约原本悄悄取决于调用方开没开 errexit —— 开了的话第一次 `uiautomator`
+  #    非零退出就当场死在循环里，10 次重试和整段归因输出**都不会发生**，
+  #    日志只剩半句，比"没有归因"更难读。现量（2026-10-04）：28 个 `verify-mobile-*.sh`
+  #    里唯一的 `set -euo pipefail` 是 `verify-mobile-aed.sh`，而它**不 source 本库**，
+  #    所以今天没有活着的触发路径 —— 这条是把契约钉住，不是修当前的红。
+  #    ⚠️ 保证范围只到"抓界面 + 归因"这一段；ANR 分支里那三条 `$(python3 …)` 没做同样处理。
   for tries in 1 2 3 4 5 6 7 8 9 10; do
-    $ADB shell rm -f /sdcard/ui.xml >/dev/null 2>&1
-    $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    $ADB shell cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
-    if grep -q '<hierarchy' /tmp/ui.xml 2>/dev/null; then
+    $ADB shell rm -f /sdcard/ui.xml >/dev/null 2>&1 || true
+    # 🔴 这一行以前是 `>/dev/null 2>&1`，把 `uiautomator` **自己说的原因**丢了，
+    #    于是下面的失败分支只能在「设备不空闲 / 宿主机过载」之间**猜**。
+    #    一次搜索浮层的验收里连排 10 次失败，日志给出的两种猜测哪种都对不上
+    #    —— 而原因本来就在 stderr 里。成功路径行为零变化（只是输出改落文件）。
+    $ADB shell uiautomator dump /sdcard/ui.xml >"$errfile" 2>&1 || true
+    $ADB shell cat /sdcard/ui.xml > "$UI_XML" 2>/dev/null || true
+    if grep -q '<hierarchy' "$UI_XML" 2>/dev/null; then
       # 🔴 **系统 ANR 弹窗要当场关掉，否则整轮验收都在看弹窗。**
       #
       # 实测（2026-09-26，宿主机 load average 66~233）：模拟器的 System UI
@@ -168,11 +234,11 @@ dump() {
       #
       # 这类"探针成功、内容是被别的东西盖住的"最费时间，所以在这里统一处理：
       # 认出 ANR 弹窗 → 点「Wait」→ 重新抓一次，让调用方拿到真正的界面。
-      if grep -q "isn't responding\|is not responding\|无响应" /tmp/ui.xml 2>/dev/null; then
+      if grep -q "isn't responding\|is not responding\|无响应" "$UI_XML" 2>/dev/null; then
         local anr_xy
-        anr_xy=$(python3 /tmp/_xy.py text "Wait" 0 2>/dev/null)
-        [ -z "$anr_xy" ] && anr_xy=$(python3 /tmp/_xy.py text "等待" 0 2>/dev/null)
-        [ -z "$anr_xy" ] && anr_xy=$(python3 /tmp/_xy.py text "Close app" 0 2>/dev/null)
+        anr_xy=$(python3 "$XY_PY" text "Wait" 0 2>/dev/null)
+        [ -z "$anr_xy" ] && anr_xy=$(python3 "$XY_PY" text "等待" 0 2>/dev/null)
+        [ -z "$anr_xy" ] && anr_xy=$(python3 "$XY_PY" text "Close app" 0 2>/dev/null)
         if [ -n "$anr_xy" ]; then
           echo "   ⚠️ 检测到系统 ANR 弹窗（宿主机过载），点掉它再重抓界面" >&2
           $ADB shell input tap $anr_xy >/dev/null 2>&1
@@ -194,6 +260,11 @@ dump() {
       fi
       return 0
     fi
+    # 把这一次的原因记下来（压成一行）。10 次全攒着，最后按次数去重打印 ——
+    # "10 次同一句" 和 "10 次换了 4 句" 是两种完全不同的故障。
+    last_err=$(tr '\r\n' ' ' <"$errfile" 2>/dev/null | sed -E 's/ +/ /g; s/^ //; s/ $//' | cut -c1-160)
+    all_err="${all_err}${last_err}
+"
     sleep 1
   done
   # 🔴 **抓不到界面时不要在这里 `exit` —— 有些"不空闲"是正常的。**
@@ -212,8 +283,33 @@ dump() {
   #   - 调用方：在"必须在真实界面上断言"的地方用 `require_screen`，
   #     由**它**决定是否终止整轮（退出码 3 = 这轮在环境上不成立，不是产品失败）。
   echo "" >&2
-  echo "   ⚠️ uiautomator 连续 10 次抓不到界面（设备不空闲 / 宿主机过载）。" >&2
-  echo "      **/tmp/ui.xml 已被截成空文件** —— 接下来任何断言都会报「找不到 X」，" >&2
+  echo "   ⚠️ uiautomator 连续 10 次抓不到界面。" >&2
+  # 🔴 这句话原来是「（设备不空闲 / 宿主机过载）」—— 那是**猜**，因为 stderr 被丢了。
+  #    现在按设备**实际说的话**分岔。判据不是"出现过一句 idle"，而是"**除了** idle
+  #    之外有没有别的"：10 次里混进一句别的原因时，把它整体归成「界面在动，等一等」
+  #    会把人按在原地等一个不会自己好的故障。
+  causes=$(printf '%s' "$all_err" | sed '/^$/d' | sort | uniq -c | sort -rn | head -4)
+  # `|| true` 是必需的：`grep -vc` 在计数为 0 时**退出 1**，少了它这条纯归因的读数
+  # 会反过来打死调用方（同上面那三条的理由）。
+  non_idle=$(printf '%s' "$all_err" | sed '/^$/d' | grep -vc 'could not get idle state' || true)
+  if [ -z "$causes" ]; then
+    # 🔴 这条分支单独存在：10 次里它一个字都没说，和"说了但没抓到界面"是两件事
+    #    —— 前者是命令根本没跑起来（adb 侧、设备侧），后者才是它跑完后拒绝出图。
+    echo "        ⚠️ 10 次里 uiautomator **一个字都没输出** —— 命令没跑起来，不是它跑完后拒绝出图。" >&2
+  elif [ "$non_idle" = 0 ]; then
+    echo "      10 次全是「取不到空闲状态」⇒ 界面一直在重绘（同步中转圈 / 计时器在跑），预期内：等它安静再跑。" >&2
+  elif printf '%s' "$all_err" | grep -q 'could not get idle state'; then
+    echo "      **混合**：既有「取不到空闲状态」也有别的 ⇒ 不能整轮按「界面在动」处置，逐句读下面。" >&2
+  else
+    echo "      设备报的**不是**「取不到空闲状态」⇒ 等待解决不了它，读下面那句原话。" >&2
+  fi
+  if [ -n "$causes" ]; then
+    echo "        10 次里的原因（次数 × 设备原话）：" >&2
+    while IFS= read -r line; do
+      printf '        %s\n' "$line" >&2
+    done <<<"$causes"
+  fi
+  echo "      **$UI_XML 已被截成空文件** —— 接下来任何断言都会报「找不到 X」，" >&2
   echo "      那是假红，不是产品缺陷。需要在真实界面上断言的地方请用 require_screen。" >&2
   echo "      本机负载：$(uptime | sed 's/.*load averages: //')" >&2
   return 1
@@ -227,7 +323,7 @@ dump() {
 # 退出码 3（**不是** 1）：1 = "有断言失败"，3 = "这轮在环境上就不成立"。
 # 两者的处置完全不同，不能混成一个数字。
 require_screen() {
-  if grep -q '<hierarchy' /tmp/ui.xml 2>/dev/null; then return 0; fi
+  if grep -q '<hierarchy' "$UI_XML" 2>/dev/null; then return 0; fi
   echo "" >&2
   echo "   ❌ 拿不到真实界面 —— **本轮结果无效**（环境失败，不是产品失败）。" >&2
   echo "      本机负载：$(uptime | sed 's/.*load averages: //')。等空闲后重跑。" >&2
@@ -247,7 +343,7 @@ settle_for() {  # <界面上应当出现的串> [轮数=8] [间隔秒=2]
   local needle=$1 tries=${2:-8} gap=${3:-2} i
   for ((i = 0; i < tries; i++)); do
     dump
-    grep -qF -- "$needle" /tmp/ui.xml 2>/dev/null && return 0
+    grep -qF -- "$needle" "$UI_XML" 2>/dev/null && return 0
     sleep "$gap"
   done
   return 1
@@ -255,14 +351,14 @@ settle_for() {  # <界面上应当出现的串> [轮数=8] [间隔秒=2]
 
 # 按 content-desc 定位任意节点（按钮、标签）
 xy_desc() {
-  python3 /tmp/_xy.py desc "$1" 0
+  python3 "$XY_PY" desc "$1" 0
 }
 # 🔴 只认输入框：标签和输入框的 desc 相同，必须靠 class 区分
 xy_edit() {
-  python3 /tmp/_xy.py edit "$1" 0
+  python3 "$XY_PY" edit "$1" 0
 }
 xy_edit_any() {
-  python3 /tmp/_xy.py editany "" 0
+  python3 "$XY_PY" editany "" 0
 }
 # 🔴 只认**在可点区域里**的输入框（与 `desc-sane` / `text-sane` 同一条理由）：
 #    ScrollView 折叠线以下的节点**仍然在无障碍树里**，但 `bounds` 的 top > bottom
@@ -270,7 +366,7 @@ xy_edit_any() {
 #    而调用方看到坐标拿到了、以为点成功了。
 #    注册/登录面板比一屏长（三个字段 + 同意项 + 六个动作），必然会用到它。
 xy_edit_sane() {
-  python3 /tmp/_xy.py edit-sane "$1" 0
+  python3 "$XY_PY" edit-sane "$1" 0
 }
 # 读某个输入框**当前实际内容**。
 #
@@ -280,26 +376,31 @@ xy_edit_sane() {
 #    于是脚本报"没填进去"，方向被引去怀疑应用 —— 而应用没问题，是输入没送到。
 #    有了读回，才能"发现少了什么、把缺的补上"，而不是赌它一次成功。
 edit_value() {  # <标签>
-  python3 /tmp/_xy.py editval "$1" 0
+  python3 "$XY_PY" editval "$1" 0
 }
 # 按可见文本定位（第 2 个参数是"第几个"，用于两个同名按钮）
 xy_text() {
-  python3 /tmp/_xy.py text "$1" "${2:-0}"
+  python3 "$XY_PY" text "$1" "${2:-0}"
 }
-has_text()  { grep -q "text=\"$1\"" /tmp/ui.xml && echo 1 || echo 0; }
+# 🔴 只认**在可点区域里**的文本节点（与 `desc-sane` / `edit-sane` 同一条理由）。
+#    单独补这一枚是因为 `xy_text` 的裸坐标会给出被裁掉的行，点上等于点到别的东西。
+xy_text_sane() {
+  python3 "$XY_PY" text-sane "$1" 0
+}
+has_text()  { grep -q "text=\"$1\"" "$UI_XML" && echo 1 || echo 0; }
 # 安全输入框（`secureTextEntry`）的内容**永远不出现在 dump 里**，节点上只有
 # `password="true"`。所以「口令填对了吗」这件事无法用 UI dump 证明。
-has_secure(){ grep -q 'password="true"' /tmp/ui.xml && echo 1 || echo 0; }
+has_secure(){ grep -q 'password="true"' "$UI_XML" && echo 1 || echo 0; }
 # 🔴 `has_text` 是**整节点精确匹配**（`text="..."` 后面必须紧跟引号）。
 # 状态行是「有 1 处冲突待你选择」这种拼接过的句子，用精确匹配永远查不到 ——
 # 那会让一条**已经出现**的冲突被记成"没出现"。
-has_sub()   { grep -q "text=\"[^\"]*$1" /tmp/ui.xml && echo 1 || echo 0; }
+has_sub()   { grep -q "text=\"[^\"]*$1" "$UI_XML" && echo 1 || echo 0; }
 # 按 content-desc 精确匹配。勾选框、按钮这类节点的可辨识名在 `content-desc` 上，
 # 而不是 `text` —— 用 `has_text` 查它们**永远是 0**，于是"没找到"会被误记成"没生效"。
-has_desc()  { grep -q "content-desc=\"$1\"" /tmp/ui.xml && echo 1 || echo 0; }
+has_desc()  { grep -q "content-desc=\"$1\"" "$UI_XML" && echo 1 || echo 0; }
 # content-desc 的**前缀**匹配。与 `has_sub` 同理，只是查 desc。
 # 用于"文案尾部会变"的节点（例如同步按钮在 busy 时是「正在同步…」）。
-has_desc_sub() { grep -q "content-desc=\"[^\"]*$1" /tmp/ui.xml && echo 1 || echo 0; }
+has_desc_sub() { grep -q "content-desc=\"[^\"]*$1" "$UI_XML" && echo 1 || echo 0; }
 
 # 等「我的」页出现「已是最新」。
 # 🔴 首次同步要付一次 Argon2id 密钥派生。Hermes 没有 WebAssembly，走纯 JS ——
@@ -345,21 +446,31 @@ wait_synced() {  # <轮数>，每轮 5 秒；默认 60 轮 = 300 秒
   return 1
 }
 
-# 触发一次手机同步：按「立即同步」再等结果。
+# 触发一次手机同步：让它开始，再等结算。
 #
 # 🔴 **这一步一度写在 `verify-mobile-lists.sh` 里**，而标签验收要的是同一件事
-#    （同一个按钮、同一个等待、同一条"按坐标点的是**上一次** dump 的树"的坑）。
-#    放在共用库里的理由是它**不是清单的业务语义** —— 它纯粹是"驱动这台设备"，
-#    与 `wait_synced` / `dump` / `require_screen` 是同一类东西。
-#    各写一份的话，"按钮改了位置"这种改动会只修一处。
+#    （同一个按钮、同一个等待）。放在共用库里的理由是它**不是清单的业务语义** ——
+#    它纯粹是"驱动这台设备"，与 `wait_synced` / `dump` / `require_screen` 是同一类东西。
 #
-# ⚠️ `xy_text` 读的是**上一次 dump 的树**。不重新 dump 就会拿着别的页面的
-#    坐标去点 —— 清单验收的第一版就在这里报过"找不到「立即同步」"。
+# 🔴 **发起那半原本由本函数自己找按钮**：`xy_text "立即同步"`，取不到就
+#    `bad "找不到「立即同步」"`。那是 traps 第 67 条记过的**假红**第三种变体：
+#    自动同步抢跑时按钮处于 `loading`，只渲染菊花，`text` 里没有「立即同步」，
+#    busy 文案也**只在 `content-desc`** —— 于是"同步正在正常进行"被报成"找不到按钮"。
+#    2026-10-04 现量：`verify-mobile-notes.sh` 第 9 步那两条 ❌（「找不到「立即同步」」
+#    「手机同步没成功」）就是这个形状，而**同一份库里 `ensure_phone_sync` 早已把三种
+#    情形分开处理**（空闲=点下去、忙=只等、两者都没有=响亮地红）。
+#    "抽出了一个共享实现不等于重复被消除"在这里现形：新实现有六个脚本在用，
+#    旧实现还留着三个调用点（`verify-mobile-notes.sh`、`verify-mobile-lists.sh`、
+#    `verify-mobile-tags.sh`）。现量命令（别抄这里的数字，它会漂）：
+#      grep -rl ensure_phone_sync scripts/*.sh | grep -v snap        # 用它的人
+#      grep -rnE '^[[:space:]]*(if )?phone_sync\b' scripts/verify-mobile-*.sh   # 还走旧入口的人
+# ⇒ 现在只有一条实现：**发起归 `ensure_phone_sync`（单一所有者），本函数只负责等结算**。
+#
+# ⚠️ `ensure_phone_sync` 自己先 `dump` 再取坐标，所以这里不许在前面补一次"取上一次树"的
+#    读取 —— 清单验收的第一版就是拿着**别的页面**的坐标去点，报的也是"找不到「立即同步」"。
 phone_sync() {
-  dump
-  local ax_xy; ax_xy=$(xy_text "立即同步")
-  if [ -z "$ax_xy" ]; then bad "找不到「立即同步」"; return 1; fi
-  $ADB shell input tap $ax_xy; sleep 5
+  ensure_phone_sync || return 1
+  sleep 5
   wait_synced 180
 }
 
@@ -515,12 +626,37 @@ wait_laptop_has() {  # <标题> <轮数>，每轮 5 秒；默认 60 轮 = 300 �
   return 1
 }
 
+# 把内容**往上**滚（= 露出上面的行），直到某个 `text` 节点出现。成功 0 / 滚到顶还没有 1。
+#
+# 🔴 现成的 `scroll_to_*` 三兄弟只会往下滚（swipe 1900→1100），而"刚建出来的行排在
+#    输入框**上面**"这一类断言需要反方向。2026-10-04 21:46 的 W6-c 真跑就是被这件事判红的：
+#    清单确实建出来了（那一行四个按钮的 `content-desc` 全在树里），但整行
+#    `bounds="[87,213][993,3]"`（bottom < top ⇒ 被滚出可视区）、行名的 `text` 节点根本不在树里，
+#    于是「清单没出现在列表里」是一枚**探针假红** —— 而它长得和真缺陷一模一样。
+#    同屏的便签行（在输入框**下面**）有 `text=`，所以那一腿照常绿 ——
+#    这正是"一条腿绿、另一条腿红"最该先怀疑载体的形状。
+#
+# 🔴 **本 helper 只证到"行被滚出可视区"这一半；"往上滚能把它滚回来"尚未实测**
+#    （21:57:47 别人往同一台模拟器重装了 APK，随后的验证量的是清过数据的新实例）。
+#    调用方因此把它当**只报不判**的诊断用（见 `verify-mobile-trash.sh` 第 2 步），
+#    别把它的返回值当"界面上看得见"的判据。
+scroll_up_until_text() {  # <文本> [最多滚几次=4]
+  local want="${1:-}" n="${2:-4}" i
+  [ -z "$want" ] && return 1
+  for ((i = 0; i <= n; i++)); do
+    dump
+    [ "$(has_text "$want")" = "1" ] && return 0
+    $ADB shell input swipe 540 1100 540 1900 300; sleep 1.2
+  done
+  return 1
+}
+
 # 按 content-desc 把一个节点**滚进可点区域**并返回坐标（失败返回空）。
 # 用于面板里被 ScrollView 裁掉的控件 —— 见 `desc-sane` 的注释。
 scroll_to_desc() {
   for _ in 1 2 3 4 5; do
     dump
-    XY=$(python3 /tmp/_xy.py desc-sane "$1" 0)
+    XY=$(python3 "$XY_PY" desc-sane "$1" 0)
     if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
     $ADB shell input swipe 540 1900 540 1100 300; sleep 1.5
   done
@@ -531,7 +667,7 @@ scroll_to_desc() {
 scroll_to_text() {
   for _ in 1 2 3 4 5; do
     dump
-    XY=$(python3 /tmp/_xy.py text-sane "$1" 0)
+    XY=$(python3 "$XY_PY" text-sane "$1" 0)
     if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
     $ADB shell input swipe 540 1900 540 1100 250; sleep 1.5
   done
@@ -584,16 +720,51 @@ tap_label() {  # <标签>
 #    下面的 disable/restore 对空集是无操作，不放大伤害。
 ADB_TIMEOUT_CMD="$(command -v timeout >/dev/null 2>&1 && echo 'timeout 10' || true)"
 IMES=$(${ADB_TIMEOUT_CMD} $ADB shell ime list -s 2>/dev/null | tr -d '\r' | grep -v '^$')
+# 这一趟**真的**关过软键盘没有 —— `summary` 的收尾自检只在这个前提下才判红，
+# 否则从不调 `disable_ime` 的 rig（例如纯截图那一枚）会被判成"把设备留在坏状态"，
+# 那是假红。
+IME_DISABLED=0
 disable_ime() {
   for ime in $IMES; do ${ADB_TIMEOUT_CMD} $ADB shell ime disable "$ime" >/dev/null 2>&1; done
   # AVD 带硬件键盘（hw.keyboard=yes），这条让软键盘不再弹出
   ${ADB_TIMEOUT_CMD} $ADB shell settings put secure show_ime_with_hard_keyboard 0 >/dev/null 2>&1
+  IME_DISABLED=1
 }
 restore_ime() {
   for ime in $IMES; do ${ADB_TIMEOUT_CMD} $ADB shell ime enable "$ime" >/dev/null 2>&1; done
   ${ADB_TIMEOUT_CMD} $ADB shell settings put secure show_ime_with_hard_keyboard 1 >/dev/null 2>&1
 }
-trap restore_ime EXIT
+
+# 🔴 **bash 的 EXIT trap 是"后一条整体替换前一条"，不是叠加。** 每枚 rig 的第 19 行
+#    都有一条 `trap 'rm -f -- "$0"' EXIT`（快照自删，traps #110/#113），而 source 本文件
+#    发生在它**之后** —— 原来这里写的是裸 `trap restore_ime EXIT`，于是每次验收都在
+#    **静默摘掉调用方自己的清理**。现量（2026-10-04 23:0x，`ls scripts/verify-mobile-*.sh`
+#    = 30 枚，其中 **27 枚 source 本 lib**；**23 枚**的 trap 排在 source 之前 = 被摘掉的那批，
+#    另 4 枚（account-erasure / ios-account-erasure / focus / due-time）排在之后、
+#    自己把 `restore_ime` 手抄进去了）：表在 `docs/plans/trash-and-archive.md` §10.87。
+#    症状不是报错，是"该删的没删"，而字面门禁只看见文件里有 `trap`。
+#    `verify-mobile-account-erasure.sh:21` 早就为这个坑写了"trap 必须排在 source 之后"，
+#    但那是一句**靠人记住**的约定；下面把它变成 lib 侧的结构性保证。
+heyta_chain_exit() {  # <新 handler 文本>；已有一条 EXIT handler 时与它串起来（新的先跑）
+  local prev old
+  prev=$(trap -p EXIT)
+  if [ -z "$prev" ]; then trap -- "$1" EXIT; return 0; fi
+  old=${prev#trap -- }
+  old=${old% EXIT}
+  # 这一层 `eval` **只为解引号**：`trap -p` 印出来的是合法 shell 字面量
+  # （`'…'` 或 `$'…'` 两种形都吃），`printf %s` 拿到的就是 handler 原文。
+  # 里面的 `$0` / `$( )` 都在引号内，这一步不展开 —— 它们要留到 trap 真的触发时才算。
+  # 🔴 这里**不能**写 `printf %s -- $old`：bash 的 `printf` 在格式串之后**不把
+  #    `--` 当选项结束符**，它会把 `--` 当成一个数据实参印出来 —— 解出来的
+  #    handler 就变成 `--echo NEW` 这种"命令找不到"（实测，装置 A/C/D/E 腿全报）。
+  # 解不出来（不是 `trap -- …` 形）就退回"只装新的"，行为等于修改前，不会更糟。
+  if ! eval "old=\$(printf %s $old)"; then trap -- "$1" EXIT; return 1; fi
+  # 顺序是**新的先跑**：调用方那条旧 handler 里可能有 `exit`，把它排在后面会跳过
+  # lib 的设备状态恢复（IME 恢复不了 = 把真机留在没有软键盘的状态）。
+  trap -- "$1
+$old" EXIT
+}
+heyta_chain_exit restore_ime
 
 # 启动应用（冷启动或已经在后台都能用）。
 #
@@ -788,8 +959,8 @@ handle_privacy_consent() {
 
 screen_txt(){
   python3 - <<'PY'
-import re
-s=open('/tmp/ui.xml',encoding='utf-8',errors='replace').read()
+import os, re
+s=open(os.environ['UI_XML'],encoding='utf-8',errors='replace').read()
 seen=[]
 for m in re.finditer(r'<node[^>]*?>', s):
     t=re.search(r'\stext="([^"]*)"',m.group(0))
@@ -947,7 +1118,13 @@ resolve_idb() {
   return 0
 }
 
-idb_ui() { "$IDB_BIN" --companion-path "$IDB_COMPANION" ui "$@" --udid "$IDB_UDID"; }
+idb_ui() {
+  if [[ "$IDB_COMPANION" == *:* && "$IDB_COMPANION" != /* ]]; then
+    "$IDB_BIN" --companion "$IDB_COMPANION" ui "$@" --udid "$IDB_UDID"
+  else
+    "$IDB_BIN" --companion-path "$IDB_COMPANION" ui "$@" --udid "$IDB_UDID"
+  fi
+}
 
 # 无障碍树只从这一个入口取，落到文件再交给解析器
 # （`cmd | python3 - <<'PY'` 的 heredoc 会顶掉管道 —— AGENTS §7 第 36 条）。
@@ -974,7 +1151,7 @@ idb_dump() { idb_ui describe-all > "$IDB_DUMP_FILE" 2>/dev/null; }
 # 那套把戏 —— 实测那套会把函数体里的引号/续行打散，包出来的函数**永远返回 0**，
 # 于是"变异生效了"和"变异把工具弄坏了"看起来一模一样（正是 §7 陷阱 58 的形状）。
 _idb_ax_count_raw() {
-  "$IDB_BIN" --companion-path "$IDB_COMPANION" ui describe-all --udid "$IDB_UDID" 2>/dev/null \
+  idb_ui describe-all 2>/dev/null \
     | python3 -c "
 import json,sys
 try: d=json.load(sys.stdin)
@@ -1160,10 +1337,10 @@ require_window() {  # <设备名前缀>
 }
 
 # ── 定位器（写成独立文件，避免在脚本里嵌套 heredoc）────────
-cat > /tmp/_xy.py <<'PY'
-import re, sys
+cat > "$XY_PY" <<'PY'
+import os, re, sys
 mode, want, nth = sys.argv[1], sys.argv[2], int(sys.argv[3])
-s = open('/tmp/ui.xml', encoding='utf-8', errors='replace').read()
+s = open(os.environ['UI_XML'], encoding='utf-8', errors='replace').read()
 
 if mode == 'editval':
     # 返回某个输入框的**当前文本**（按 content-desc 找，只认 EditText）。
@@ -1242,9 +1419,9 @@ configure_sync_credentials() {
   dump
   local settings_xy
   settings_xy=$(python3 - <<'PY'
-import re, sys
+import os, re, sys
 try:
-    s = open('/tmp/ui.xml').read()
+    s = open(os.environ['UI_XML']).read()
 except OSError:
     sys.exit(0)
 m = re.search(r'resource-id="profile-entry-settings"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', s)
@@ -1305,6 +1482,22 @@ PY
 # 每个脚本自己报验收名，但"通过几项 / 失败几项 / 退出码"只有这一处定义 ——
 # 两个脚本各写一份的话，迟早一个是 `-gt 0` 另一个是 `-ne 0`。
 summary() {  # <验收名> [结尾语] [退出码]
+  # 🔴 **收尾自检：这一趟真的会把关掉的东西恢复回去吗？**
+  #    `heyta_chain_exit` 只救得了"调用方的 trap 排在 source **前面**"那一半；
+  #    排在**后面**的裸 `trap … EXIT` 依然会整体替换掉串好的那条，而 bash 不报错。
+  #    现量：4 枚 rig 的 trap 排在 source 之后，其中 3 枚（account-erasure:29、
+  #    focus:149、due-time:106）手抄了 `restore_ime`，1 枚（`verify-mobile-ios-account-erasure.sh:31`）
+  #    没抄。它没抄**是否算缺陷**取决于它有没有关过软键盘 —— 所以这条判据的前提是
+  #    `IME_DISABLED=1`，不是"trap 文本长得不像"。判据不许把没量过的前提当已成立。
+  local trap_now
+  trap_now=$(trap -p EXIT | tr '\n' ' ')
+  if [ "${IME_DISABLED:-0}" = "1" ]; then
+    case "$trap_now" in
+      *restore_ime*) ;;
+      *) bad "这一趟关过软键盘，但当前 EXIT handler 里没有 restore_ime ⇒ 设备会被留在没有软键盘的状态：${trap_now}" ;;
+    esac
+  fi
+
   # ⚠️ 结尾语可传。原先是写死的「真机全链路通过」—— 那对**移动端**脚本准确，
   # 但三端同步验收（`verify-multi-end-sync.sh`）里没有"真机"参与，照抄会
   # 让输出说一句不成立的话。默认值保持原样，移动端脚本的输出一个字符都不变。
@@ -1344,4 +1537,103 @@ summary() {  # <验收名> [结尾语] [退出码]
     *) echo "  ❌ $1：以退出码 $code 结束" ;;
   esac
   exit "$code"
+}
+
+# ── 移动端「界面状态」类 helper（单点所有者）──────────────────────────────
+#
+# 原先只住在 verify-mobile-notes.sh 里。现在有两个消费者（notes / trash），
+# 再复制一份就是 AGENTS §3.5 点名的那个反面教材：抽出了共享实现，
+# 旧的那份却没删。四条都只碰**探针**（系统弹窗 / 前台归属 / 换页 /
+# 崩溃归因），不碰任何产品语义。
+# 走底部标签页：**坐标现取** + **点完必须验界面真的换了**。
+#
+# 🔴 这条 helper 是本脚本自己那次假红逼出来的，不是讲究：
+# 原先第 8 步写的是 `input tap 135 2253` 然后 `require_screen`，而
+# `require_screen` **只检查 /tmp/ui.xml 里有没有 `<hierarchy`，不重新抓界面**
+# —— 于是它读的是上一步（「我的」页）遗留的快照，报出
+# 「任务页没有「打开搜索」入口」。事后手动 dump 证明：**界面早就切过去了、
+# 入口也在**（content-desc="打开搜索" 就在任务页顶栏）。
+# 「没观测到 X」被当成了「X 没发生」（§7 元规则一）。
+#
+# 坐标现取的另一半理由：这台模拟器 1080×2400，标签文字下沿实测
+# `bounds=[78,2271][137,2308]`，写死的 2253 落在文字**上方**的图标区。
+tap_tab() {  # <标签无障碍名> <切过去之后应当出现的无障碍名>
+  local name=$1 marker=$2 i xy
+  for i in 1 2 3; do
+    dump || true
+    xy=$(xy_desc "$name")
+    if [ -n "$xy" ]; then
+      $ADB shell input tap $xy; sleep 3
+      dump || true
+      if [ -n "$(xy_desc "$marker")" ]; then return 0; fi
+    fi
+    echo "   ↻ 没切到「${name}」（第 ${i} 次，标记「${marker}」没出现）" >&2
+  done
+  return 1
+}
+
+# 🔴 **冷启动不保证一次落进前台**，而判据不能读界面文字。
+#
+# 实测（2026-10-03，本脚本首跑）：`pm clear` 之后 `monkey` 拉一次，6 秒后前台
+# 仍然是启动器（`mCurrentFocus` = nexuslauncher），于是第 2 步之后每一次点击都
+# 打在桌面图标上，报出来的是「找不到便签输入框」—— 听着像产品缺陷，其实是
+# 根本没进应用（§7 元规则一：先怀疑探针）。
+#
+# 原来那句 `has_text "任务"` 判「应用已启动」同时是**假绿**：欢迎页的说明文字里
+# 也有「任务」二字。窗口归属只能读 `mCurrentFocus`（§7 那条「截图判 UI 先读
+# mCurrentFocus」是同一件事）。
+# 系统的**权限弹窗**会盖在应用上面，而 `uiautomator dump` 导出的是**当前活动窗口**
+# 的树 —— 弹窗在时读到的是弹窗的节点，应用的一个都不在。
+#
+# 🔴 实测（2026-10-03，本脚本第二跑）：填完凭据、第一次唤起中文输入法时，
+# Google 输入法弹了「Allow Google to take pictures and record video?」。
+# 于是第 2 步报「找不到便签输入框（滚动到「便签」段也没找到）」—— 听着像产品缺陷，
+# 其实应用根本没被读到（§7 元规则一：先怀疑探针）。
+#
+# 只认那对**拒绝**按钮，而且**先证明弹窗在**才点：无条件按坐标点下去，
+# 点的会是应用自己的按钮（那才是真事故）。选「不允许」而不是"允许"：
+# 本验收不需要相机，而权限一旦授了就在这台镜像上留着。
+dismiss_permission_dialog() {
+  local xy
+  dump || true
+  xy=$(xy_text "Don’t allow")
+  if [ -z "$xy" ]; then xy=$(xy_text "不允许"); fi
+  if [ -z "$xy" ]; then return 0; fi
+  echo "   ⤷ 收掉系统权限弹窗（点「不允许」@ ${xy}）—— 那不是本应用的界面"
+  $ADB shell input tap $xy; sleep 2
+  dump || true
+  if [ -n "$(xy_text "Don’t allow")" ] || [ -n "$(xy_text "不允许")" ]; then
+    echo "   ⚠️ 点了「不允许」弹窗还在（可能连着两问）" >&2
+    return 1
+  fi
+  return 0
+}
+
+# 🔴 **崩了要当场说清是崩了。**
+#
+# 实测（2026-10-03）：便签 composer 提交时**整个应用进程没了**（两份 react-native
+# 进同一个 bundle ⇒ `Unsupported top level event type "topSelectionChange"`），
+# 而当时的脚本报的是「建完之后列表里没有这条便签」—— 那句会把排查带去
+# "产品没写入本地库"，而真相是**根本没有产品在跑**。
+# 判据不仅要会红，还要红在对的位置上。
+blame_crash() {  # <在哪一步之后>；返回 0 = 本趟确实有崩溃
+  local fatal
+  fatal=$($ADB logcat -d -b crash 2>/dev/null | grep -m2 -A1 'FATAL EXCEPTION' | tr '\n' ' ')
+  if [ -n "$fatal" ]; then
+    bad "「${1}」之后应用进程崩了（本趟 crash 缓冲区有内容）：${fatal}"
+    return 0
+  fi
+  return 1
+}
+
+settle_foreground() {
+  local i cur
+  for i in 1 2 3 4 5 6; do
+    cur=$($ADB shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r' | sed 's/.*u0 //;s/\/.*//')
+    [ "$cur" = "$PKG" ] && return 0
+    echo "   ↻ 前台是「${cur:-空}」，重新拉起 ${PKG}（第 ${i} 次）"
+    launch_app
+    sleep 3
+  done
+  return 1
 }

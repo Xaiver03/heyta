@@ -136,6 +136,8 @@ export interface ReminderRow {
   readonly canDismiss: boolean;
   /** 能不能移除。**任何存活状态都能移除**（见下）。 */
   readonly canRemove: boolean;
+  /** Device-local lack of delivery evidence; never changes the synced phase. */
+  readonly deliveryUncertain: boolean;
 }
 
 /**
@@ -160,7 +162,8 @@ function isClosedPhase(phase: ReminderPhase): boolean {
  * 这里**不再滤一遍**：两处都滤会让"删除之后这一条还算不算数"出现两个答案，
  * 而领域层已经提供了 `aliveReminders()` —— 重复实现正是本文件要避免的漂移。
  */
-export function toReminderRows(reminders: readonly Reminder[], now: number): ReminderRow[] {
+export function toReminderRows(reminders: readonly Reminder[], now: number, uncertainOccurrences: readonly string[] = []): ReminderRow[] {
+  const uncertain = new Set(uncertainOccurrences);
   return reminders.map((reminder) => {
     const phase = reminderPhase(reminder, now);
     const closed = isClosedPhase(phase);
@@ -178,6 +181,7 @@ export function toReminderRows(reminders: readonly Reminder[], now: number): Rem
       // 但仍然登记进行里 —— 宿主据它决定要不要画删除按钮，不需要
       // 在四个端各判断一次"什么状态能删"。
       canRemove: true,
+      deliveryUncertain: !closed && uncertain.has(`${reminder.id}|${reminderEffectiveAt(reminder)}`),
     };
   });
 }

@@ -34,6 +34,7 @@ import {
   type DbAdapter,
   type DbCursorAction,
   type DbCursorVisitor,
+  type DbDestroyReport,
   type DbIndexQuery,
   type DbIterateOptions,
   type DbKey,
@@ -43,6 +44,7 @@ import {
   type StoreSchema,
 } from '../db.types.js';
 import type { SqlValue, SqliteDriver } from './sqlite-driver.js';
+import { AdapterDestroyedError } from '../errors.js';
 
 /** 落进 SQLite 的键分量。 */
 type KeyValue = string | number;
@@ -199,6 +201,20 @@ class SqliteAdapter implements DbAdapter {
   private opening: Promise<SqliteDriver> | undefined;
 
   /**
+   * 销毁即死路（批次 E2 口径 B）。
+   *
+   * 🔴 挡的是这一条：`destroy()` 把连接关掉并把文件删了，而此后**任何一次普通读**
+   * 都会走 `ensureOpen()` 的重开路径 —— 于是刚删掉的容器被重新建成一张空壳
+   * （实测 73728 字节 / 6 张空表，字节数与 iOS 设备级那枚残留逐字相同，见计划 §10.146）。
+   * 那一趟里"销毁成功"的报告和"盘上又有库了"是**同一秒**打印的，而读出来的内容
+   * 确实是空的 ⇒ 每一层都觉得自己没说谎。
+   */
+  private destroyed = false;
+
+  /** 第二次 `destroy()` 走这份缓存，而不是把"删一遍"再跑一次（那需要先重开）。 */
+  private destroying: Promise<DbDestroyReport> | undefined;
+
+  /**
    * FIFO 队列。单连接 SQLite 不能并发跑事务，所以适配器自己排队 ——
    * 这正是 `DbAdapter` 契约"调用方不需要加锁"的落地方式。
    */
@@ -238,8 +254,83 @@ class SqliteAdapter implements DbAdapter {
     this.opening = undefined;
   }
 
+  /**
+   * 销毁这份库：**排空在途事务 → DROP 全部表 → VACUUM → close → 让驱动删文件**。
+   *
+   * 🔴 为什么不"逐行 `DELETE FROM` 就够了"（这一版之前的做法是根本没有这一步）：
+   *  `DELETE FROM` 只把页标成空闲，**内容还在文件里**，而 SQLite 默认还会
+   *  继续把 WAL 写到 `-wal`。`VACUUM` 重写整个库文件，把空闲页丢回去；
+   *  真正的收尾是**删文件**（`driver.removeDatabase`）—— 删不掉时
+   *  报告里必须写清"容器还在"，调用方才知道自己承诺了多少。
+   *
+   * 🔴 **走队列**（与 `transaction` 同一条 `this.queue`）：销毁与写入并发时，
+   *  不入队会让"写完又落回来"的 op 在 DROP 之后重新建表 ——
+   *  那时报告已经说了"销毁成功"，而数据还在。这是本条契约唯一真正要防的竞态。
+   */
+  async destroy(): Promise<DbDestroyReport> {
+    // 幂等：第二次销毁**不许**重开这份库（那正是上面那枚空壳的来路），
+    // 而是把第一次的书面凭据原样交回去。
+    if (this.destroying !== undefined) return this.destroying;
+
+    const run = async (): Promise<DbDestroyReport> => {
+      // 即使这份库这次从没开过也要开一下：文件可能由上一次运行留下，
+      // 而"销毁一份没打开过的库"必须是**幂等成功**，不是空操作。
+      const driver = await this.ensureOpen();
+
+      let storesCleared = 0;
+      for (const plan of this.plans) {
+        driver.exec(`DROP TABLE IF EXISTS ${q(plan.table)}`);
+        storesCleared += 1;
+        for (const index of plan.indexes) {
+          if (index.multiEntry !== true) continue;
+          driver.exec(`DROP TABLE IF EXISTS ${q(index.childTable!)}`);
+          storesCleared += 1;
+        }
+      }
+      driver.exec(`DROP TABLE IF EXISTS ${q(SEQ_TABLE)}`);
+      storesCleared += 1;
+      // 丢掉空闲页里残留的明文（容器删不掉时，这是唯一的补救，且不完备）。
+      driver.exec('VACUUM');
+
+      this.close();
+      // 从这一行起这个实例就是死路：`close()` 的契约是"后续操作透明重开"，
+      // 而销毁的契约是**不许**重开（见上面 `destroyed` 那段）。
+      this.destroyed = true;
+
+      if (driver.removeDatabase === undefined) {
+        return {
+          target: 'sqlite',
+          containerRemoved: false,
+          reason: '这个驱动没有 removeDatabase（原生桥尚未实现，见批次 E）：内容已清空，文件仍在',
+          storesCleared,
+        };
+      }
+      const removal = await driver.removeDatabase();
+      return { ...removal, storesCleared };
+    };
+
+    const result = this.queue.then(run, run);
+    // 🔴 销毁**失败**不许把这个实例永久锁死：被堵住/删文件报错时库还在盘上，
+    // 调用方的正确处置是重试，而不是从此每次读都抛"已销毁"。
+    // 成功时才留下缓存（第二次 destroy 直接复用第一次的书面凭据）。
+    this.destroying = result.catch((error: unknown) => {
+      this.destroying = undefined;
+      this.destroyed = false;
+      throw error;
+    });
+    this.queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return this.destroying;
+  }
+
   /** 打开连接并建 schema。幂等（`CREATE ... IF NOT EXISTS`），可并发调用。 */
   private ensureOpen(): Promise<SqliteDriver> {
+    // 🔴 这一行是 E2 口径 B 的全部落点：销毁之后**没有**"透明重开"这条路。
+    // 抛错而不是返回空结果 —— 后者会让上层把"读到 0 条"当成"库是空的"，
+    // 而真正发生的事情是容器刚刚被重建。
+    if (this.destroyed) return Promise.reject(new AdapterDestroyedError('sqlite'));
     if (this.driver !== undefined) return Promise.resolve(this.driver);
     if (this.opening !== undefined) return this.opening;
     this.opening = Promise.resolve().then(() => {
@@ -374,8 +465,8 @@ class SqliteAdapter implements DbAdapter {
     return this.transaction([store], 'readonly', (tx) => tx.get<T>(store, key));
   }
 
-  getAll<T>(store: string, range?: DbKeyRange): Promise<T[]> {
-    return this.transaction([store], 'readonly', (tx) => tx.getAll<T>(store, range));
+  getAll<T>(store: string, range?: DbKeyRange, limit?: number): Promise<T[]> {
+    return this.transaction([store], 'readonly', (tx) => tx.getAll<T>(store, range, limit));
   }
 
   delete(store: string, key: DbKey): Promise<void> {
@@ -522,9 +613,10 @@ class SqliteAdapter implements DbAdapter {
         return rows.length === 0 ? undefined : (JSON.parse(String(rows[0]![plan.dataColumn])) as T);
       },
 
-      getAll: async <T,>(storeName: string, range?: DbKeyRange) => {
+      getAll: async <T,>(storeName: string, range?: DbKeyRange, limit?: number) => {
+        assertIterateLimit(limit);
         const plan = assert(storeName);
-        return this.fetchRecords(driver, plan, range).map((r) => r.data as T);
+        return this.fetchRecords(driver, plan, range, limit).map((r) => r.data as T);
       },
 
       delete: async (storeName, key) => {
@@ -728,6 +820,7 @@ class SqliteAdapter implements DbAdapter {
     driver: SqliteDriver,
     plan: StorePlan,
     range?: DbKeyRange,
+    limit?: number,
   ): PhysicalRecord[] {
     const params: SqlValue[] = [];
     let where = '';
@@ -740,13 +833,15 @@ class SqliteAdapter implements DbAdapter {
       if (conditions.length > 0) where = ` WHERE ${conditions.join(' AND ')}`;
     }
 
+    const sqlLimit = limit !== undefined && (pushDown || range === undefined);
+    if (sqlLimit) params.push(limit);
     const rows = driver.all<SqlRow>(
-      `SELECT * FROM ${q(plan.table)}${where} ORDER BY ${orderByPk(plan)}`,
+      `SELECT * FROM ${q(plan.table)}${where} ORDER BY ${orderByPk(plan)}${sqlLimit ? ' LIMIT ?' : ''}`,
       params,
     );
 
     const projected = rows.map((row) => this.toPhysicalRecord(plan, row));
-    return pushDown ? projected : projected.filter((r) => keyInRange(r.pk, range));
+    return (pushDown ? projected : projected.filter((r) => keyInRange(r.pk, range))).slice(0, limit);
   }
 
   private fetchIndexRecords(

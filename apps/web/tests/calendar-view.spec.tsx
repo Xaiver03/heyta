@@ -408,13 +408,22 @@ describe('日历视图（Web）', () => {
     await openCalendar();
     const select = container!.querySelector<HTMLSelectElement>('[data-testid="calendar-view-select"]');
     const options = [...(select?.options ?? [])].map((o) => o.value);
-    // 🔴 这条钉的是"**日历档位**这一半"：`CalendarViewKind` 的全部取值就是
-    //    month / week，日/年**还不存在**，所以不许出现第三种日历档位。
-    expect(options.filter((v) => v === 'month' || v === 'week')).toEqual(['month', 'week']);
+    // 🔴 这条钉的是"**日历档位**这一半"：`CalendarViewKind` 的全部取值是
+    //    month / week / day / **year**（日档于批四、年档于 R13 进来）。
+    //    ⚠️ 上面那句"**年还不存在，所以不许出现第四种**"在 R13 之前是这条判据的理由本身 ——
+    //       它守的一直是"下拉里只有真的能用的档位"，而不是"最多三档"。
+    //       年档做出来了，这条立场第一次被**加一档**测试到：期望值跟着变，
+    //       而"多一种没实现的东西"仍然会红（第三行那个 `toEqual` 才是它的牙）。
+    expect(options.filter((v) => v === 'month' || v === 'week' || v === 'day' || v === 'year')).toEqual([
+      'month',
+      'week',
+      'day',
+      'year',
+    ]);
     // ⚠️ 2026-10-03 批五下半起，这一栏还多一项 `'timeline'` —— 它**不是**日历档位，
     //    而是外壳视图的跳转（点了真能走，且不会写进日历 store）。
-    //    那一条的形状由 `calendar-view-family.spec.tsx` 钉，这里只登记"没有第四种东西"。
-    expect(options).toEqual(['month', 'week', 'timeline']);
+    //    那一条的形状由 `calendar-view-family.spec.tsx` 钉，这里只登记"没有第六种东西"。
+    expect(options).toEqual(['month', 'week', 'day', 'year', 'timeline']);
   });
 
   it('功能模块里能关掉日历 —— 关掉之后 rail 上就没有它了', async () => {

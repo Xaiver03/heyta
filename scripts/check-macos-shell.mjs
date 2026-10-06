@@ -7,8 +7,9 @@
  * ⚠️ 如实标注的三条边界：
  *   · 不是 macOS、或没有 `swift` → **显式报告"已跳过"**，不是假装通过；
  *   · 它**不验**窗口（窗口要图形会话；那条路由 `HEYTA_SELF_CAPTURE` 单独验）；
- *   · macOS 侧目前只有 14 条冒烟，**还没有**把 Windows 那条 50 条的
- *     原样契约在 JavaScriptCore 上重放。
+ *   · macOS 侧的冒烟只是**壳自己的断言**，**还没有**把 Windows 那条原样存储契约
+ *     在 JavaScriptCore 上重放。（条数不写在这里 —— 写过一次"14 条"就漂了；
+ *     现量：`grep -c '^\s*check(' apps/desktop-macos/Sources/heyta-smoke/main.swift`）
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';

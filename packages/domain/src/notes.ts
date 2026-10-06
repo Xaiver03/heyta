@@ -21,7 +21,7 @@
  *    且单条便签的删除/钉选根本表达不出来。独立实体让每条便签有自己的 id
  *    与时钟 —— 与 `HabitLog` 相对 `Habit`、`Reminder` 相对 `Task` 是同一条推理。
  *
- * ## 这个文件钉住的三件事（写在 UI 里就会各端漂移）
+ * ## 这个文件钉住的四件事（写在 UI 里就会各端漂移）
  *
  * 1. **排序**（{@link sortNotesForDisplay}）：钉到「今天」的在前，然后按
  *    `updatedAt` 降序，再按 id 字典序。三段缺一不可 ——
@@ -31,12 +31,20 @@
  *    不是两套排序规则。做成两个字段必然在一次编辑里漂移。
  * 3. **正文长度是闸门不是玩法**（{@link NOTE_MAX_CONTENT_LENGTH}）：
  *    上限拦的是病态数据（一次粘贴整本书），不是产品限制。
+ * 4. **回收站那一条也不在这里另立判据**（实体级的 {@link trashedIn}）：
+ *    "什么算在回收站里"与"按什么序"是实体级语义，权威在 `entities.ts`
+ *    （{@link inTrash} / {@link byDeletedOrder} / {@link trashedIn}）。
+ *    ⚠️ 本文件**没有**便签专属的回收站函数（W4 起）：原来那个 `trashedNotes`
+ *    正是这句话的违反者 —— 它把"挑 + 排"这两行抄了一份便签版，于是任务、
+ *    便签、清单、习惯四处各要一遍，而漏掉 `purgedAt` 的那一半在四处里
+ *    可以各漏各的。
  *
  * ⚠️ **不发明默认值**：`isPinnedToToday` / `projectId` 的默认值在
  * `note-actions.ts` 的 `createNote` 里显式写出，这里不做"缺省填充" ——
  * 一个纯函数悄悄替调用方决定默认值，会让两端出现两种默认。
  */
 
+import { isLive } from './entities.js';
 import type { Note } from './entities.js';
 
 /**
@@ -48,6 +56,21 @@ import type { Note } from './entities.js';
  * 先定"便签要不要分页/懒加载"，而不是把这个数字调大。
  */
 export const NOTE_MAX_CONTENT_LENGTH = 10_000;
+
+/**
+ * 列表默认的摘要长度（字符数）。
+ *
+ * ⚠️ 它是**展示**尺度，不是领域闸门（正文上限是上面那个
+ * {@link NOTE_MAX_CONTENT_LENGTH}）。60 与迁移前 web 便签列表的视觉行宽一致 ——
+ * 改它会让所有已有截图里的截断位置变一次，所以它是常量而不是随手传的魔数。
+ *
+ * 🔴 它原先住在 `packages/ui/src/notes/model.ts`。搬到这里不是因为"展示尺度"
+ * 变成了领域概念，而是因为**要这个数的人不止 UI 宿主**：回收站那一行
+ * （`trash-rows.ts` 的便签分支）与 node-host 的 CLI 都要用**同一个**截断位置，
+ * 而它们不能依赖 `@heyta/ui`。留在 ui 的话，第二个宿主只会把 60 抄一遍 ——
+ * 那正好是"同一条便签在两个地方截在不同位置"的成因。
+ */
+export const NOTE_EXCERPT_LENGTH = 60;
 
 /** 建便签 / 改正文的拒绝原因。**返回原因而不是抛错** —— 调用方要能给出提示。 */
 export type NoteRejection = 'empty' | 'too-long';
@@ -66,7 +89,7 @@ export function noteRejection(content: string): NoteRejection | undefined {
 
 /** 未删除的便签。 */
 export function aliveNotes(notes: readonly Note[]): Note[] {
-  return notes.filter((note) => note.deletedAt === undefined);
+  return notes.filter(isLive);
 }
 
 /**

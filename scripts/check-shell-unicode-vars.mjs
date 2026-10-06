@@ -39,14 +39,27 @@
  *     python3 research/tools/fix-shell-unicode-vars.py --write
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** 跳过这些目录 —— 里面不是我们的 shell 脚本。 */
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.pnpm-store', 'release']);
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  '.worktrees',
+  'dist',
+  'build',
+  '.pnpm-store',
+  'release',
+  // 各并行线 agent 的 scratch（`.gitignore` 的 `tmp/`）。与 docs-link-check
+  // 跳过它同一条理由：实测 4 个 `tmp/*.sh` 的红全部来自草稿，被跟踪脚本
+  // 贡献 0 条——那种红不可归因给任何脚本作者，也永远不会在 CI 出现。
+  // 草稿被正式收进 `scripts/` 的那一刻起就在扫描面里（那正是该挡的时刻）。
+  'tmp',
+]);
 
 /** 与 Python 修复器**同一套判定**，避免"门禁说没问题、修复器却改了"这种不一致。 */
 const isNameStart = (c) => /[A-Za-z_]/.test(c);
@@ -151,8 +164,16 @@ function walk(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (SKIP_DIRS.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) walk(full, out);
-    else if (entry.isFile() && entry.name.endsWith('.sh')) out.push(full);
+    if (entry.isDirectory()) {
+      // 🔴 排除条件用**不变量**，不用目录名名单。名单里写着 `.worktrees`，
+      //    而并行 agent 的嵌套检出落在 `.qoder/worktrees/<id>` —— 实测本门禁
+      //    报的"扫了 242 个 .sh"里有 **160 枚**根本不是本工作树的脚本，
+      //    别人的检出里任何一处违规都会把这里的 `pnpm check` 判红，
+      //    而那行路径没人能在这棵树里修（同族事故见 `docs/plans/trash-and-archive.md` §10.85）。
+      //    `.git` 对 linked worktree 是**文件**、对 clone 是目录 ⇒ 判存在，不判类型。
+      if (existsSync(path.join(full, '.git'))) continue;
+      walk(full, out);
+    } else if (entry.isFile() && entry.name.endsWith('.sh')) out.push(full);
   }
   return out;
 }

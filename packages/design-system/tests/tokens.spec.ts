@@ -352,7 +352,15 @@ describe('非颜色 token 的尺度合理性', () => {
     //   press   —— 按下反馈。UIX Pro Max 的 150–300ms 管的是**过渡动画**；
     //              按压反馈按 Apple《Designing Fluid Interfaces》必须即刻出现，
     //              超过 ~100ms 就开始"发木"。它属于另一条规律，不是更快的过渡。
-    const exempt = new Set(['instant', 'exit', 'press']);
+    //   splash-* —— 启动那一帧的四个时长。它们不是界面内的过渡，而是被两条
+    //              **外部**约束夹住的一帧（Android 建议整段 ≤1000ms、短于 ~300ms
+    //              读不出"正在打开"）。豁免不是终点：这一族自己那条规律钉在
+    //              下面那条用例里，光摘掉它等于给漏洞上户口。
+    //
+    // ⚠️ 逐个点名（不是 `^splash-` 前缀匹配）是刻意的：前缀匹配会让"以后任何一枚
+    // 时长"都能靠**取名**绕过 150–300ms，而取名不是设计判断。新增一枚要改这里，
+    // 成本逼人说清它属于哪条规律。
+    const exempt = new Set(['instant', 'exit', 'press', 'splash-enter', 'splash-stagger', 'splash-hold', 'splash-exit']);
     for (const name of TOKEN_GROUPS.duration) {
       if (exempt.has(name)) continue;
       const raw = resolveVar(vars.get(`--ht-duration-${name}`)!, vars);
@@ -360,6 +368,27 @@ describe('非颜色 token 的尺度合理性', () => {
       expect(ms, `--ht-duration-${name} = ${ms}ms 超出 150–300ms`).toBeGreaterThanOrEqual(150);
       expect(ms, `--ht-duration-${name} = ${ms}ms 超出 150–300ms`).toBeLessThanOrEqual(300);
     }
+  });
+
+  it('首屏那一族受它自己那两条外部约束管住', () => {
+    // 阈值不是拍的，来自 `docs/plans/brand-icon-and-splash.md` §3 抄下来的平台事实：
+    //   · 上限：Android 官方建议整段 ≤1000ms（超了就该换成循环动画）。
+    //   · 下限：入场短于 ~300ms 读不出"正在打开"，那一帧就白做。
+    // 整段 = enter + stagger×2（三道字形错峰）+ hold，算法与 `gen-boot-splash.mjs`
+    // 打印的那个 800ms 同源；这里重新算一遍，而不是抄它输出的数（抄件一定会漂）。
+    const ms = (suffix: string) =>
+      Number(resolveVar(vars.get(`--ht-duration-${suffix}`)!, vars).replace('ms', ''));
+    const enter = ms('splash-enter');
+    const stagger = ms('splash-stagger');
+    const hold = ms('splash-hold');
+    const exit = ms('splash-exit');
+
+    expect(enter, '入场短于 300ms 读不出"正在打开"').toBeGreaterThanOrEqual(300);
+    const total = enter + stagger * 2 + hold;
+    expect(total, `整段 ${total}ms 超过 Android 建议的 1000ms`).toBeLessThanOrEqual(1000);
+    // 遮罩淡出走"退出比进入快"那条纪律，且不得比整段还长（会把启动帧拖成两段）。
+    expect(exit, '退场比入场慢').toBeLessThanOrEqual(enter);
+    expect(exit, '退场为 0 就等于没有退场').toBeGreaterThan(0);
   });
 
   it('z-index 阶梯严格递增（防止层叠顺序错乱）', () => {

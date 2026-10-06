@@ -1,6 +1,9 @@
 package com.heytamobile.fs
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -51,6 +54,89 @@ class LocalFsModule(reactContext: ReactApplicationContext) :
             promise.reject("READ_DENIED", e.message ?: e.javaClass.simpleName)
         } catch (e: Exception) {
             promise.reject("READ_FAILED", e.message ?: e.javaClass.simpleName)
+        }
+    }
+
+    /**
+     * 把一个本机 URI 的图**压成头像契约要的那张方形图**，回 base64（无换行）。
+     *
+     * ## 为什么这件事必须在原生侧，而不是一行 `readBase64Uri`
+     *
+     * 契约要的是"短边居中裁成正方形、缩到 `ACCOUNT_AVATAR_EDGE_PX`、再按
+     * `avatarOutputContentType` 选出的格式编码"（这三个数/规则都在
+     * `@heyta/shared-schema`，由 JS 侧当参数传进来 —— 本模块**不判断任何产品语义**）。
+     * RN 的 `ImageEditor` 在 Android 上**只能裁、不能缩放**（`displaySize`/`outputSize`
+     * 是 iOS 那支的实现），所以"缩到 512"这一步没有 JS 通道可走。
+     *
+     * 🔴 也**不**能复用上面那条 `readTextUri`：它按 `Charsets.UTF_8` 把字节强转成字符串，
+     * 对 PNG/JPEG 是**有损**的（非法 UTF-8 序列被替换字符吃掉），症状是
+     * "上传成功但服务端解不开"。二进制必须走 base64，且这里直接给。
+     *
+     * 失败**分码回抛**，与 `readTextUri` 同一条纪律：JS 侧按码选界面那句话。
+     */
+    @ReactMethod
+    fun prepareAvatarBase64(uri: String, edgePx: Int, format: String, promise: Promise) {
+        if (edgePx <= 0) {
+            promise.reject("BAD_EDGE", "edgePx 必须是正整数，收到 $edgePx")
+            return
+        }
+        val codec = when (format) {
+            "image/png" -> Bitmap.CompressFormat.PNG
+            "image/jpeg" -> Bitmap.CompressFormat.JPEG
+            else -> {
+                promise.reject("BAD_FORMAT", "不支持的输出格式：$format")
+                return
+            }
+        }
+        var source: Bitmap? = null
+        var squared: Bitmap? = null
+        var scaled: Bitmap? = null
+        try {
+            val stream = reactApplicationContext.contentResolver.openInputStream(Uri.parse(uri))
+            if (stream == null) {
+                promise.reject("OPEN_NULL", "openInputStream 对 $uri 返回 null")
+                return
+            }
+            source = stream.use { BitmapFactory.decodeStream(it) }
+            if (source == null || source.width == 0 || source.height == 0) {
+                promise.reject("DECODE_FAILED", "这张图解不开（不是图片或已损坏）")
+                return
+            }
+            val side = minOf(source!!.width, source!!.height)
+            val x = (source!!.width - side) / 2
+            val y = (source!!.height - side) / 2
+            squared = Bitmap.createBitmap(source!!, x, y, side, side)
+            scaled = if (side == edgePx) {
+                squared
+            } else {
+                Bitmap.createScaledBitmap(squared!!, edgePx, edgePx, true)
+            }
+            val out = ByteArrayOutputStream()
+            // PNG 带透明通道，quality 参数对它无意义（传 100）；JPEG 用 0.86 那一档，
+            // 与 web 的 canvas `toDataURL(type, 0.86)` 对齐 —— 两端压出来的字节数量级
+            // 差一截的话，"同一张图在网页上传得了、手机上传不了"就是必然。
+            val quality = if (codec == Bitmap.CompressFormat.PNG) 100 else 86
+            if (!scaled!!.compress(codec, quality, out)) {
+                promise.reject("ENCODE_FAILED", "Bitmap.compress 返回 false")
+                return
+            }
+            val bytes = out.toByteArray()
+            if (bytes.isEmpty()) {
+                promise.reject("ENCODE_FAILED", "编码结果为 0 字节")
+                return
+            }
+            promise.resolve(Base64.encodeToString(bytes, Base64.NO_WRAP))
+        } catch (e: SecurityException) {
+            promise.reject("READ_DENIED", e.message ?: e.javaClass.simpleName)
+        } catch (e: Exception) {
+            promise.reject("READ_FAILED", e.message ?: e.javaClass.simpleName)
+        } finally {
+            // 相册里的原图解开就是几十 MB，不显式回收要等 GC。
+            // 三处可能是**同一个对象**（方图不缩放时 scaled === squared、
+            // 整图即方图时 squared === source），所以逐个比过再回收。
+            if (scaled !== squared && scaled !== source) scaled?.recycle()
+            if (squared !== source) squared?.recycle()
+            source?.recycle()
         }
     }
 

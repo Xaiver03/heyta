@@ -28,10 +28,23 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useI18n, type MessageKey } from '@heyta/i18n/provider';
+import { isHttpPaperUrl } from '@heyta/shared-schema';
 import { EmptyState, HeytaUiProvider } from '@heyta/ui';
 import { ChevronLeft, ChevronRight, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 
-import { ADMIN_PAGE_SIZE, useAdminStore, type AdminTab } from './store.js';
+import {
+  ADMIN_HOLIDAY_NOTICE_KEY,
+  ADMIN_PAGE_SIZE,
+  ADMIN_REFUND_CODE_KEY,
+  ADMIN_REFUND_NOTICE_KEY,
+  useAdminStore,
+  type AdminHolidayNotice,
+  type AdminRefundNotice,
+  type AdminStoreState,
+  type AdminTab,
+  type HolidayYearInput,
+  type RefundRequestInput,
+} from './store.js';
 
 const TABS: readonly { key: AdminTab; labelKey: MessageKey }[] = [
   { key: 'overview', labelKey: 'web.admin.tab.overview' },
@@ -40,7 +53,25 @@ const TABS: readonly { key: AdminTab; labelKey: MessageKey }[] = [
   { key: 'orders', labelKey: 'web.admin.tab.orders' },
   { key: 'coupons', labelKey: 'web.admin.tab.coupons' },
   { key: 'invites', labelKey: 'web.admin.tab.invites' },
+  { key: 'holidays', labelKey: 'web.admin.tab.holidays' },
+  { key: 'refunds', labelKey: 'web.admin.tab.refunds' },
 ];
+
+/** 录入表单的初值。全空 —— **不给默认年份**：默认值会让人提交自己没看过的数字。 */
+const EMPTY_HOLIDAY_FORM: HolidayYearInput = {
+  yearText: '',
+  papersText: '',
+  noteText: '',
+  offDaysText: '',
+  workDaysText: '',
+};
+
+/** 退款申请表单的初值。同上：**不预填订单号**，也不默认勾上"例外"。 */
+const EMPTY_REFUND_FORM: RefundRequestInput = {
+  orderIdText: '',
+  noteText: '',
+  operatorApproved: false,
+};
 
 /** epoch 毫秒 → `YYYY-MM-DD HH:mm`（本地时区）。`null` → `—`。 */
 function formatTime(value: number | null): string {
@@ -139,6 +170,17 @@ export function AdminPanel(): React.JSX.Element | null {
       case 'invites':
         if (store.invites === null) void store.loadInvites();
         break;
+      case 'holidays':
+        // 服务端那三条端点里只有列表是 GET，年度**不分页**（一年一次录入，
+        // 区间 2007–2100 ⇒ 最多九十几行），所以没有 Pager。
+        if (store.holidayYears === null) void store.loadHolidayYears();
+        break;
+      case 'refunds':
+        // 同理没有 Pager：`GET /api/admin/refunds` 只有 `limit`，**没有 `offset`**。
+        // 这里造一个"下一页"按钮会点出第二个请求，而它拿回来的还是同一批最新行 ——
+        // 一个看起来在工作、实际上永远停在第一页的控件比没有控件更坏。
+        if (store.refunds === null) void store.loadRefunds();
+        break;
       case 'overview':
         break;
     }
@@ -179,6 +221,8 @@ export function AdminPanel(): React.JSX.Element | null {
             onClick={() => {
               setTab(entry.key);
               store.clearNotice();
+              store.clearHolidayNotice();
+              store.clearRefundNotice();
             }}
           >
             {t(entry.labelKey)}
@@ -594,7 +638,494 @@ export function AdminPanel(): React.JSX.Element | null {
           />
         </>
       )}
+
+      {/* ── 调休 / 补班（公共事实的唯一录入面）──────────────────── */}
+      {tab === 'holidays' && <HolidayPanel store={store} />}
+
+      {/* ── 退款（申请 / 批准 / 驳回）────────────────────────────── */}
+      {tab === 'refunds' && <RefundPanel store={store} />}
     </div>
+  );
+}
+
+/**
+ * 「退款」面板 —— ADR-0053 §5 第 10 条点名的那五件事里的**面板**那一件
+ * （传输在 `packages/app-host/src/admin-client.ts`，状态在 `./store.ts`）。
+ * ============================================================================
+ *
+ * 🔴 **一片判定都不在这里。** 能不能退、退多少、这一跳状态机走不走得通，
+ * 全部住在服务端（`refund-policy.ts` + `refund-store.ts`，三条 CHECK 在迁移里）。
+ * 这里只收集输入、发请求、把结果读回来显示。多判一次就是 `AGENTS §3.5`
+ * 那条"同一个判断抄两遍"，而两遍的标准迟早分叉。
+ *
+ * 🔴 **"批准"是两步**，"驳回"是一步。区别只有一件事：**批准会把钱发给通道**。
+ * 一次点击就动钱、而点下去之后**收不回来**（通道那侧没有"撤销退款请求"这种东西，
+ * 只能再退一笔钱回去 —— 那是第二笔账），所以它必须有一次明确的再确认。
+ * 驳回则相反：它是这条流程里唯一"什么都不发生"的出口，一步就够。
+ *
+ * ⚠️ 界面**没有**"已退款"这个结论：`success` 只由签名有效的微信回调认领（ADR-0053 §4）。
+ * 批准之后列表里那一行显示的是服务端给的状态原文（`approved` / `processing` / `failed`），
+ * 而不是"退款完成"。
+ */
+function RefundPanel(props: { store: AdminStoreState }): React.JSX.Element {
+  const { t } = useI18n();
+  const refunds = props.store.refunds;
+  const [filter, setFilter] = useState('');
+  const [form, setForm] = useState<RefundRequestInput>(EMPTY_REFUND_FORM);
+  /** 每一行的理由（`id → 文本`）。那是**输入**，不是状态，所以不进 store。 */
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  /** 待确认的那一条退款 id（两步式"批准"）。 */
+  const [pendingApproveId, setPendingApproveId] = useState<number | null>(null);
+
+  const notice = props.store.refundNotice;
+  const code = props.store.refundCode;
+  const echo = props.store.refundEcho;
+
+  // 有专属措辞的码用专属措辞；没有的落回通用那一句，而通用那一句会**把原码打出来** ——
+  // 降级成"看得见码"，不降级成"编一个原因"。
+  const noticeKey =
+    notice === null
+      ? null
+      : notice === 'denied' && code !== null && ADMIN_REFUND_CODE_KEY[code] !== undefined
+        ? ADMIN_REFUND_CODE_KEY[code]
+        : ADMIN_REFUND_NOTICE_KEY[notice];
+
+  const failed = notice === 'denied' || notice === 'conflict' || notice === 'unknown';
+
+  return (
+    <>
+      <p className="ht-settings__hint">{t('web.admin.refund.lead')}</p>
+
+      {notice !== null && noticeKey !== null && (
+        <p
+          className={failed ? 'ht-settings__danger' : 'ht-settings__notice'}
+          data-testid="admin-refund-notice"
+        >
+          {t(noticeKey as MessageKey)
+            .replace('{id}', String(echo?.id ?? '—'))
+            .replace('{order}', String(echo?.orderId ?? '—'))
+            .replace('{status}', echo?.detail ?? '—')
+            .replace('{code}', code ?? '—')}
+        </p>
+      )}
+
+      {/* ── 列表 ─────────────────────────────────────────────────── */}
+      <h5 className="ht-settings__admin-h5">{t('web.admin.refund.list')}</h5>
+      <form
+        className="ht-settings__admin-search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          props.store.clearRefundNotice();
+          setPendingApproveId(null);
+          void props.store.loadRefunds({ userId: filter });
+        }}
+      >
+        <Search size={ICON_SIZE.xs} aria-hidden="true" />
+        <input
+          className="ht-settings__admin-input ht-settings__admin-input--filter"
+          type="search"
+          inputMode="numeric"
+          data-testid="admin-refund-filter"
+          value={filter}
+          placeholder={t('web.admin.refund.filter')}
+          aria-label={t('web.admin.refund.filter')}
+          onChange={(event) => {
+            setFilter(event.target.value);
+          }}
+        />
+        <button type="submit" className="ht-settings__admin-btn">
+          {t('web.admin.refund.filter.submit')}
+        </button>
+      </form>
+
+      {refunds === null ? (
+        <p className="ht-settings__hint">{t('web.admin.loading')}</p>
+      ) : (
+        <>
+          {refunds.length === 0 ? (
+            <AdminEmpty titleKey="web.admin.refund.list.none" />
+          ) : (
+            <ul className="ht-settings__admin-list" data-testid="admin-refunds">
+              {refunds.map((refund) => (
+                <li key={refund.id} className="ht-settings__admin-staticRow ht-settings__admin-staticRow--stack">
+                  <span className="ht-settings__admin-rowMain">
+                    {`#${String(refund.id)}`} ·{' '}
+                    {t('web.admin.refund.order').replace('{order}', String(refund.orderId))} ·{' '}
+                    {t('web.admin.refund.user').replace('{user}', String(refund.userId))} ·{' '}
+                    {refund.outRefundNo}
+                  </span>
+                  <span className="ht-settings__admin-rowMeta">
+                    {formatMoney(refund.amountMinor, refund.currency)} ·{' '}
+                    {t('web.admin.refund.period').replace('{days}', String(refund.periodDays))} ·{' '}
+                    {refund.provider} · <code>{refund.status}</code>
+                  </span>
+
+                  {/* 🔴 只有 `requested` 给按钮：状态机只认这一档，其余档点下去必然 409。
+                      这不是安全措施（服务端才是裁决者），是**不制造一次注定失败的点击**。 */}
+                  {refund.status === 'requested' && (
+                    <div className="ht-settings__admin-actions">
+                      <input
+                        className="ht-settings__admin-input"
+                        data-testid={`admin-refund-note-${String(refund.id)}`}
+                        value={notes[refund.id] ?? ''}
+                        placeholder={t('web.admin.refund.note')}
+                        aria-label={t('web.admin.refund.note')}
+                        onChange={(event) => {
+                          setNotes((previous) => ({ ...previous, [refund.id]: event.target.value }));
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="ht-settings__admin-btn"
+                        data-testid={`admin-refund-approve-${String(refund.id)}`}
+                        onClick={() => {
+                          props.store.clearRefundNotice();
+                          setPendingApproveId(refund.id);
+                        }}
+                      >
+                        {t('web.admin.refund.approve')}
+                      </button>
+                      <button
+                        type="button"
+                        className="ht-settings__admin-btn ht-settings__admin-btn--danger"
+                        data-testid={`admin-refund-reject-${String(refund.id)}`}
+                        onClick={() => {
+                          setPendingApproveId(null);
+                          void props.store.rejectRefund(refund.id, notes[refund.id] ?? '');
+                        }}
+                      >
+                        {t('web.admin.refund.reject')}
+                      </button>
+                      {pendingApproveId === refund.id && (
+                        <span className="ht-settings__danger" data-testid="admin-refund-approve-confirm">
+                          {t('web.admin.refund.approve.confirm')}
+                          <button
+                            type="button"
+                            className="ht-settings__admin-btn ht-settings__admin-btn--danger"
+                            data-testid={`admin-refund-approve-yes-${String(refund.id)}`}
+                            onClick={() => {
+                              setPendingApproveId(null);
+                              void props.store.approveRefund(refund.id, notes[refund.id] ?? '');
+                            }}
+                          >
+                            {t('web.admin.refund.approve.yes')}
+                          </button>
+                          <button
+                            type="button"
+                            className="ht-settings__admin-btn"
+                            onClick={() => {
+                              setPendingApproveId(null);
+                            }}
+                          >
+                            {t('web.admin.close')}
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {/* ── 开一张新申请 ─────────────────────────────────────────── */}
+      <h5 className="ht-settings__admin-h5">{t('web.admin.refund.form.title')}</h5>
+      <p className="ht-settings__hint">{t('web.admin.refund.form.lead')}</p>
+      <form
+        className="ht-settings__admin-detail"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setPendingApproveId(null);
+          void props.store.requestRefund(form).then((accepted) => {
+            // 只有服务端**收了**才清输入（与调休表单同一处理）：被 409 拒了还清空，
+            // 运营就不知道自己刚才填的是哪一单了。
+            if (accepted) setForm(EMPTY_REFUND_FORM);
+          });
+        }}
+      >
+        <label className="ht-settings__admin-quota">
+          <span className="ht-settings__hint">{t('web.admin.refund.form.orderId')}</span>
+          <input
+            className="ht-settings__admin-input ht-settings__admin-input--narrow"
+            type="number"
+            inputMode="numeric"
+            data-testid="admin-refund-order-input"
+            value={form.orderIdText}
+            onChange={(event) => {
+              setForm((previous) => ({ ...previous, orderIdText: event.target.value }));
+            }}
+          />
+        </label>
+        <label className="ht-settings__admin-quota">
+          <span className="ht-settings__hint">{t('web.admin.refund.form.note')}</span>
+          <textarea
+            className="ht-settings__admin-input"
+            rows={2}
+            data-testid="admin-refund-request-note"
+            value={form.noteText}
+            onChange={(event) => {
+              setForm((previous) => ({ ...previous, noteText: event.target.value }));
+            }}
+          />
+        </label>
+        <label className="ht-settings__admin-quota">
+          <span className="ht-settings__hint">{t('web.admin.refund.form.exception')}</span>
+          <input
+            type="checkbox"
+            data-testid="admin-refund-exception"
+            checked={form.operatorApproved}
+            onChange={(event) => {
+              setForm((previous) => ({ ...previous, operatorApproved: event.target.checked }));
+            }}
+          />
+        </label>
+        <div className="ht-settings__admin-actions">
+          <button type="submit" className="ht-settings__admin-btn" data-testid="admin-refund-request">
+            {t('web.admin.refund.form.submit')}
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+
+/**
+ * 「调休 / 补班」面板。W4b 的最后一层（服务端与契约早已就绪，缺的就是这一块）。
+ * ============================================================================
+ *
+ * 🔴 **这一块不做任何合法性判断。** 日期存不存在、`isOffDay` 是不是布尔、
+ * 同一天有没有出现两次、年份在不在 2007–2100 —— 全部由
+ * `packages/shared-schema` 的 `holidayYearPutSchema` 在服务端裁决
+ * （那是**唯一一份**规则，见该文件头"为什么形状被钉成 days[] 这一种"）。
+ * 这里多判一次就是 §3.5 那条"同一个判断抄两遍"，而两遍的标准迟早会分叉：
+ * 表现是"界面放行了、服务端 400"或反过来，两种都让人以为对方坏了。
+ *
+ * 所以本组件只有三件事：
+ *   1. **回显**已录入的年度**连同 papers**（判据② —— 出处链接是这件事的举证入口，
+ *      看不见链接的后台等于让运营替数据背书）；
+ *   2. 收集一整年的输入并**一次 PUT**（一个用户意图 = 一次请求；
+ *      "整年替换"与"要么全收要么全不收"都在服务端那一层保证）；
+ *   3. 撤销某一年 —— 语义是**退回随包表**，不是"清空那一年"，
+ *      措辞必须说清，否则运营会以为撤销之后日历上什么都不标。
+ *
+ * ⚠️ 表单是**受控组件**，字段留在本地 state：每次键入都进 store 会让
+ * 整块后台随字符重渲染，而 store 是各标签页共用的。
+ */
+function HolidayPanel(props: { store: AdminStoreState }): React.JSX.Element {
+  const { t } = useI18n();
+  const years = props.store.holidayYears;
+  const [form, setForm] = useState<HolidayYearInput>(EMPTY_HOLIDAY_FORM);
+  /** 两步式撤销：`null` = 没有待确认的年份。见下面 `revoke` 那段注释。 */
+  const [pendingRevokeYear, setPendingRevokeYear] = useState<number | null>(null);
+
+  const field = (key: keyof HolidayYearInput) => (event: { target: { value: string } }): void => {
+    setForm((previous) => ({ ...previous, [key]: event.target.value }));
+  };
+
+  const notice = props.store.holidayNotice;
+  const echo = props.store.holidayEcho;
+
+  return (
+    // 🔴 返回**片段**而不是再套一层 `ht-settings__section`：外层那一节已经是
+    // 一个带边框与内边距的盒子，套第二层会画成"框里有框"（其余标签页同样是片段）。
+    <>
+      <p className="ht-settings__hint">{t('web.admin.holiday.lead')}</p>
+
+      {notice !== null && (
+        <p
+          className={notice === 'failed' ? 'ht-settings__danger' : 'ht-settings__notice'}
+          data-testid="admin-holiday-notice"
+        >
+          {t(ADMIN_HOLIDAY_NOTICE_KEY[notice] as MessageKey)
+            .replace('{year}', String(echo?.year ?? '—'))
+            .replace('{count}', String(echo?.dayCount ?? '—'))}
+        </p>
+      )}
+
+      {/* ── 已录入的年度（判据②：papers 必须**回显成可点的链接**）───── */}
+      <h5 className="ht-settings__admin-h5">{t('web.admin.holiday.list')}</h5>
+      {years === null ? (
+        <p className="ht-settings__hint">{t('web.admin.loading')}</p>
+      ) : (
+        <>
+          <p className="ht-settings__hint">
+            {t('web.admin.holiday.version').replace('{version}', years.version)}
+          </p>
+          {years.years.length === 0 ? (
+            <AdminEmpty titleKey="web.admin.holiday.list.none" />
+          ) : (
+            <ul className="ht-settings__admin-list" data-testid="admin-holiday-years">
+              {years.years.map((year) => (
+                <li key={year.year} className="ht-settings__admin-staticRow">
+                  <span className="ht-settings__admin-rowMain ht-settings__admin-rowMain--wrap">
+                    {year.year} ·{' '}
+                    {t('web.admin.holiday.dayCount').replace('{count}', String(year.dayCount))}
+                    {year.note === null ? '' : ` · ${year.note}`}
+                  </span>
+                  <span className="ht-settings__admin-rowMeta">
+                    {formatTime(year.updatedAt)} · {year.updatedBy ?? '—'}
+                  </span>
+                  {/* 🔴 出处链接**必须渲染出来**。契约把 papers 限定成 http/https
+                      的唯一理由就是这里要把它做成 `<a href>`（见
+                      `isHttpPaperUrl` 的注释：`z.string().url()` 放行 `javascript:`）。
+                      所以这三条同时是判据与防线：链接本身、它的文字、以及
+                      `rel` 防止被打开的站点反向拿到后台这一页的 window。 */}
+                  <span
+                    className="ht-settings__admin-badges ht-settings__admin-badges--papers"
+                    data-testid="admin-holiday-papers"
+                  >
+                    {year.papers.map((paper) =>
+                      /*
+                       * 🔴 渲染层这一道是**第二道**，不是装饰。
+                       * 迁移 SQL 的「手工补充 2/3」写的就是"http/https 由契约层 + 渲染层两处钉"，
+                       * 而只钉契约层的说法不成立：绕过 PUT 进来的行（运维直接跑 SQL、
+                       * 将来的导入通道、库里已存在的旧值）都不会再过 zod，于是后台的
+                       * `href` 里就是一条 `javascript:`。同一串还经公开 GET 原样下发，
+                       * 所以这里按**取到值的样子**判，不按"入库时应当合法"判。
+                       */
+                      isHttpPaperUrl(paper) ? (
+                        <a
+                          key={paper}
+                          className="ht-settings__admin-badge"
+                          href={paper}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                        >
+                          {paper}
+                        </a>
+                      ) : (
+                        <span key={paper} className="ht-settings__admin-badge" data-testid="admin-holiday-paper-rejected">
+                          {paper}
+                        </span>
+                      ),
+                    )}
+                  </span>
+                  <div className="ht-settings__admin-actions">
+                    <button
+                      type="button"
+                      className="ht-settings__admin-btn ht-settings__admin-btn--danger"
+                      data-testid="admin-holiday-revoke"
+                      onClick={() => {
+                        props.store.clearHolidayNotice();
+                        setPendingRevokeYear(year.year);
+                      }}
+                    >
+                      {t('web.admin.holiday.revoke')}
+                    </button>
+                    {pendingRevokeYear === year.year && (
+                      // 🔴 撤销是**两步**：服务端语义是"删掉这一年的覆盖行 ⇒ 客户端
+                      // 退回随包表"，不是"那一年没有任何安排"。一次点击就删掉一整年、
+                      // 而且措辞写成"清空"，会让运营在错误的理解上做出正确的点击。
+                      <span
+                        className="ht-settings__danger"
+                        data-testid="admin-holiday-revoke-confirm"
+                      >
+                        {t('web.admin.holiday.revoke.confirm')}
+                        <button
+                          type="button"
+                          className="ht-settings__admin-btn ht-settings__admin-btn--danger"
+                          data-testid="admin-holiday-revoke-yes"
+                          onClick={() => {
+                            setPendingRevokeYear(null);
+                            void props.store.deleteHolidayYear(year.year);
+                          }}
+                        >
+                          {t('web.admin.holiday.revoke.yes')}
+                        </button>
+                        <button
+                          type="button"
+                          className="ht-settings__admin-btn"
+                          data-testid="admin-holiday-revoke-cancel"
+                          onClick={() => {
+                            setPendingRevokeYear(null);
+                          }}
+                        >
+                          {t('web.admin.close')}
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {/* ── 录入一整年 ───────────────────────────────────────────── */}
+      <h5 className="ht-settings__admin-h5">{t('web.admin.holiday.form.title')}</h5>
+      <p className="ht-settings__hint">{t('web.admin.holiday.form.lead')}</p>
+      <form
+        className="ht-settings__admin-detail"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setPendingRevokeYear(null);
+          void props.store.saveHolidayYear(form).then((saved) => {
+            // 只有服务端**收了**才清输入：失败了还清空，等于把运营刚敲的一整年
+            // 逐日表丢掉，而他要从头再打一遍。
+            if (saved) setForm(EMPTY_HOLIDAY_FORM);
+          });
+        }}
+      >
+        <label className="ht-settings__admin-quota">
+          <span className="ht-settings__hint">{t('web.admin.holiday.form.year')}</span>
+          <input
+            className="ht-settings__admin-input ht-settings__admin-input--narrow"
+            type="number"
+            inputMode="numeric"
+            data-testid="admin-holiday-year-input"
+            value={form.yearText}
+            onChange={field('yearText')}
+          />
+        </label>
+        <label className="ht-settings__admin-quota">
+          <span className="ht-settings__hint">{t('web.admin.holiday.form.papers')}</span>
+          <textarea
+            className="ht-settings__admin-input"
+            rows={2}
+            data-testid="admin-holiday-papers-input"
+            value={form.papersText}
+            onChange={field('papersText')}
+          />
+        </label>
+        <label className="ht-settings__admin-quota">
+          <span className="ht-settings__hint">{t('web.admin.holiday.form.offDays')}</span>
+          <textarea
+            className="ht-settings__admin-input"
+            rows={4}
+            data-testid="admin-holiday-off-input"
+            value={form.offDaysText}
+            onChange={field('offDaysText')}
+          />
+        </label>
+        <label className="ht-settings__admin-quota">
+          <span className="ht-settings__hint">{t('web.admin.holiday.form.workDays')}</span>
+          <textarea
+            className="ht-settings__admin-input"
+            rows={4}
+            data-testid="admin-holiday-work-input"
+            value={form.workDaysText}
+            onChange={field('workDaysText')}
+          />
+        </label>
+        <label className="ht-settings__admin-quota">
+          <span className="ht-settings__hint">{t('web.admin.holiday.form.note')}</span>
+          <input
+            className="ht-settings__admin-input"
+            data-testid="admin-holiday-note-input"
+            value={form.noteText}
+            onChange={field('noteText')}
+          />
+        </label>
+        <div className="ht-settings__admin-actions">
+          <button type="submit" className="ht-settings__admin-btn" data-testid="admin-holiday-save">
+            {t('web.admin.holiday.save')}
+          </button>
+        </div>
+      </form>
+    </>
   );
 }
 

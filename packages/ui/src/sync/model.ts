@@ -252,6 +252,7 @@ export type SyncFailureMessageKey =
   | 'common.sync.error.undecryptablePage'
   | 'common.sync.error.uploadRejected'
   | 'common.sync.error.unauthorized'
+  | 'common.sync.error.accountClosed'
   | 'common.sync.error.consentRequired'
   | 'common.sync.error.legalReconfirmRequired';
 
@@ -267,6 +268,11 @@ const SYNC_FAILURE_MESSAGE_KEY: Record<string, SyncFailureMessageKey> = {
   // 令牌被服务端拒了：句子必须同时说"为什么停下"和"本地数据没事"，
   // 否则用户的第一反应是删库重装 —— 而那才是真的会丢东西的动作。
   'unauthorized': 'common.sync.error.unauthorized',
+  // 🔴 注销与"凭据失效"必须各有各的句子：两句对本机数据许的是**相反**的承诺
+  // （完好 / 已清除），合成一句就在两个方向上说谎。
+  // 这条 key 与 `SyncFailureReason` 的 `'account-closed'` 成对；
+  // 判据：`apps/web/tests/sync-reason-coverage.spec.ts`。
+  'account-closed': 'common.sync.error.accountClosed',
   // 🔴 G-12：还没同意隐私规则，所以**一个请求都没发**。这句必须与"网络坏了"、
   // "没配服务端"分开 —— 那两种的用户动作是"检查网络"和"填地址"，而这里的动作是"去同意"。
   // 写成前两者之一会让用户改一遍地址、回来还是不同步。
@@ -480,11 +486,13 @@ export type EntityLabelKey =
   | 'common.entity.NOTE'
   | 'common.entity.TASK_REPEAT_CFG'
   | 'common.entity.REMINDER'
+  | 'common.entity.EVENT'
   | 'common.entity.HABIT'
   | 'common.entity.HABIT_LOG'
   | 'common.entity.FOCUS_SESSION'
   | 'common.entity.AI_FEEDBACK'
   | 'common.entity.PREFERENCE_CORRECTION'
+  | 'common.entity.ASSISTANT_TURN'
   | 'common.entity.GLOBAL_CONFIG'
   | 'common.entity.MIGRATION'
   | 'common.entity.RECOVERY'
@@ -498,6 +506,7 @@ export const ENTITY_LABEL_KEYS: Record<string, EntityLabelKey> = {
   NOTE: 'common.entity.NOTE',
   TASK_REPEAT_CFG: 'common.entity.TASK_REPEAT_CFG',
   REMINDER: 'common.entity.REMINDER',
+  EVENT: 'common.entity.EVENT',
   HABIT: 'common.entity.HABIT',
   HABIT_LOG: 'common.entity.HABIT_LOG',
   FOCUS_SESSION: 'common.entity.FOCUS_SESSION',
@@ -505,6 +514,9 @@ export const ENTITY_LABEL_KEYS: Record<string, EntityLabelKey> = {
   // 用户看到 `AI_FEEDBACK` 不可能知道是什么东西，也就没法在冲突里做选择。
   AI_FEEDBACK: 'common.entity.AI_FEEDBACK',
   PREFERENCE_CORRECTION: 'common.entity.PREFERENCE_CORRECTION',
+  // 🔴 助手会话的一条消息（ADR-0045 D-4 (ii)）。它同样会同步、会冲突，
+  // 而冲突面板里显示 `ASSISTANT_TURN` 这种代号，用户就没法判断该保哪一边。
+  ASSISTANT_TURN: 'common.entity.ASSISTANT_TURN',
   GLOBAL_CONFIG: 'common.entity.GLOBAL_CONFIG',
   MIGRATION: 'common.entity.MIGRATION',
   RECOVERY: 'common.entity.RECOVERY',

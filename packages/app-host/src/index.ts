@@ -23,6 +23,7 @@ export {
   type AppHost,
   type AppHostOptions,
   type SyncConfig,
+  type VaultRootRotationOptions,
 } from './host.js';
 
 export {
@@ -48,6 +49,16 @@ export {
 } from './focus-actions.js';
 
 /**
+ * 专注概览（工单 W7）。**"两端今日专注时长来自同一个出口"这条判据的载体就是这一行** ——
+ * web 与 mobile 各自 `import { focusOverview }`，谁都不许自己 reduce。
+ */
+export {
+  focusOverview,
+  type FocusOverview,
+  type FocusRecord,
+} from './focus-overview.js';
+
+/**
  * 清单 / 标签 / 习惯动作。同一理由：**op 的构造只有一份**（AGENTS.md §3.5）。
  *
  * 🔴 `apps/*` 里**不得出现 `entityType: 'PROJECT' | 'TAG' | 'HABIT' | 'HABIT_LOG'`
@@ -63,6 +74,7 @@ export {
 export {
   createHabitActions,
   habitLogId,
+  normalizeHabitFrequency,
   type HabitActions,
   type HabitActionsOptions,
   type NewHabitFields,
@@ -83,6 +95,36 @@ export {
   type ReminderActions,
   type ReminderActionsOptions,
 } from './reminder-actions.js';
+export { planNativeReminders, type NativeReminderPlan } from './reminder-scheduler.js';
+export {
+  createVaultKeyMigrationRemote,
+  createVaultMigrationInventorySource,
+  cancelVaultPayloadMigration,
+  cancelVaultPayloadMigrationForScope,
+  createVaultMigrationJournal,
+  acknowledgeVaultPayloadMigration,
+  migrateVaultPayloads,
+  VAULT_KEY_MIGRATION_INVENTORY_PATH,
+  VAULT_KEY_MIGRATION_PATH,
+  VaultMigrationError,
+  type VaultKeyMigrationRemote,
+  type VaultKeyMigrationRemoteOptions,
+  type VaultMigrationInventoryOperation,
+  type VaultMigrationInventoryPage,
+  type VaultMigrationInventorySnapshot,
+  type VaultMigrationInventorySource,
+  type VaultMigrationJournal,
+  type VaultMigrationJournalRecord,
+  type VaultMigrationOptions,
+  type VaultMigrationProgress,
+} from './vault-migration.js';
+export {
+  createReminderReconciler,
+  reconcileReminderDelivery,
+  type ReminderAuthorization,
+  type ReminderDeliveryOptions,
+  type ReminderDeliveryPort,
+} from './reminder-delivery.js';
 
 /**
  * 便签动作（幻觉 #12「笔记模块」的写路径）。
@@ -101,6 +143,12 @@ export {
   type NoteActions,
   type NoteActionsOptions,
 } from './note-actions.js';
+export {
+  createEventActions,
+  type EventActions,
+  type EventActionsOptions,
+  type NewEventFields,
+} from './event-actions.js';
 
 /**
  * 同步接线。**所有宿主共用这一份** —— 见 `sync-wiring.ts` 文件头：
@@ -119,6 +167,45 @@ export {
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';
 
 /**
+ * Hosted device listing and revocation. The server invalidates every session
+ * when one device is revoked; callers must re-authenticate all devices and
+ * perform the root-key rotation separately.
+ */
+export {
+  HOSTED_SYNC_DEVICES_PATH,
+  HostedDeviceManagementError,
+  listHostedSyncDevices,
+  revokeHostedSyncDevice,
+  revokeHostedSyncDeviceBound,
+  runHostedDeviceRevocation,
+  type HostedDeviceManagementErrorCode,
+  type HostedDeviceManagementOptions,
+  type HostedDeviceRevocation,
+  type BoundHostedDeviceRevocation,
+  type HostedDeviceRevocationControllerOptions,
+  type HostedSyncAuthSnapshot,
+  type HostedSyncDevice,
+} from './device-management.js';
+
+/**
+ * 本机数据销毁器：宿主在自己的启动路径注册，`createSyncClient()` 在共享接缝
+ * 装默认回调（为什么是注册表而不是逐端传参，见 `local-erasure.ts` 文件头）。
+ */
+export {
+  eraseLocalData,
+  hasLocalEraser,
+  lastErasureReports,
+  type LocalEraser,
+  registerLocalEraser,
+} from './local-erasure.js';
+
+/**
+ * 注销账号那条**主动**路径（批次 E3）：服务端级联硬删 + 本机销毁，
+ * 以及"服务端没删成就不许清本机"这条顺序。见 `account-closure.ts` 文件头。
+ */
+export { closeAccountAndEraseLocal, type ClosureDisposition, type ClosureResult } from './account-closure.js';
+
+/**
  * 权益探测。**所有宿主共用这一份** —— 见 `entitlement.ts` 文件头：
  * 它是一次**不携带任何任务内容**的 GET（E2EE 硬约束：计费只碰账户与权益状态）。
  * 判定本身是 `@heyta/domain` 的纯函数，这里只负责发请求。
@@ -130,6 +217,23 @@ export {
 } from './entitlement.js';
 
 /**
+ * 收银台客户端。**所有宿主共用这一份**（AGENTS.md §3.5）—— 见 `checkout.ts` 文件头：
+ * 🔴 请求体里**没有金额字段**，收多少钱只由服务端报价决定。
+ */
+export {
+  CHECKOUT_PATH,
+  RENEWAL_PRICE_ID,
+  startCheckout,
+  type CheckoutFailure,
+  type CheckoutFailureCode,
+  type CheckoutOutcome,
+  type CheckoutQr,
+  type CheckoutRedirect,
+  type RejectedCouponEcho,
+  type StartCheckoutOptions,
+} from './checkout.js';
+
+/**
  * 运营管理后台的数据访问（ADR-0038）。**宿主无关**地放在这里，
  * 与权益探测同一条口径（AGENTS.md §3.5：`apps/*` 只留平台差异）。
  *
@@ -138,23 +242,35 @@ export {
  */
 export {
   ADMIN_API_PREFIX,
+  adminApproveRefund,
+  adminCreateRefundRequest,
   adminForceUserLogout,
+  adminRejectRefund,
   adminSetUserQuota,
   adminUnlockUser,
+  adminDeleteHolidayYear,
+  adminPutHolidayYear,
   fetchAdminCoupons,
+  fetchAdminHolidayYears,
   fetchAdminInvites,
   fetchAdminOrders,
   fetchAdminOverview,
+  fetchAdminRefunds,
   fetchAdminSubscriptions,
   fetchAdminUser,
   fetchAdminUsers,
   type AdminClientOptions,
   type AdminCouponRow,
   type AdminFailureReason,
+  type AdminHolidayYear,
+  type AdminHolidayYearPut,
+  type AdminHolidayYearPutResult,
+  type AdminHolidayYears,
   type AdminInvites,
   type AdminOrderRow,
   type AdminOverview,
   type AdminPage,
+  type AdminRefundRow,
   type AdminResult,
   type AdminSubscriptionRow,
   type AdminUserDetail,
@@ -231,6 +347,7 @@ export {
   parseLegalConsentStatus,
   passkeyDeletePath,
   passkeyPath,
+  planDisplayNameWrite,
   registerWithEmailPassword,
   registerWithMagicLink,
   renamePasskey,
@@ -238,13 +355,17 @@ export {
   requestPasskeyRecovery,
   requestPasswordReset,
   resetPasswordWithToken,
+  resolveAccountAvatarImage,
   setInitialPassword,
   updateAccountDisplayName,
   updateAccountLocale,
   uploadAccountAvatar,
   verifyEmailAddress,
   verifyMagicLink,
+  closeAccount,
+  type AccountAvatarImage,
   type AvatarDecodeResult,
+  type DisplayNameWritePlan,
   type HostedAuthFailure,
   type HostedAuthFailureReason,
   type HostedAuthLocale,
@@ -289,7 +410,9 @@ export {
 export {
   createLocalApiHost,
   fromLocalDateString,
+  LOCAL_API_DUE_FORMAT_HINT,
   taskToItem,
+  toLocalApiDueString,
   toLocalDateString,
   type LocalApiHostOptions,
 } from './local-api-host.js';
@@ -383,7 +506,10 @@ export {
   assistantEgressFields,
   assistantGrants,
   assistantMessages,
+  assistantNeedsEgressDisclosure,
+  LOCAL_ANSWER_MAX_ITEMS,
   assistantSystemPrompt,
+  localObservationText,
   declaredFieldNames,
   observedFieldNames,
   planAssistantEgress,
@@ -396,6 +522,31 @@ export {
   type AssistantTier,
   type AssistantTurnDeps,
 } from './ai-assistant.js';
+export {
+  ASSISTANT_TIER_ORDER,
+  ASSISTANT_TIER_READ_AND_PROPOSE,
+  ASSISTANT_TIER_READ_ONLY,
+  DEFAULT_ASSISTANT_TIER,
+  createAssistantTierStore,
+  normalizeAssistantTier,
+  type AssistantTierStore,
+  type AssistantTierStorePort,
+} from './assistant-tier-settings.js';
+export {
+  createAiSettingsStore,
+  defaultAiSettingsState,
+  parseAiSettingsState,
+  type AiSettingsState,
+  type AiSettingsStore,
+  type AiSettingsStorePort,
+} from './ai-settings-store.js';
+export {
+  pickNoCandidateReason,
+  resolveAiRoute,
+  type AiNoCandidateReason,
+  type AiRouteTarget,
+} from './ai-route-target.js';
+export { destinationForFeature, recomputeConsents } from './ai-settings-shared.js';
 export {
   CALENDAR_ANCHOR_RULES,
   calendarAnchor,
@@ -467,6 +618,17 @@ export {
 } from './motivation.js';
 
 /**
+ * 本周小结的纯文本。两端共用一份（原来只有 web 一份，移动端接分享块时会逼出第二份
+ * —— 理由见 `share-summary.ts` 文件头与 AGENTS §3.5）。
+ */
+export {
+  SHARE_SUMMARY_KEYS,
+  buildShareSummary,
+  type ShareSummaryKey,
+  type ShareSummaryTranslate,
+} from './share-summary.js';
+
+/**
  * 导出（**导出自由**，README 设计原则第 5 条）。
  *
  * 🔴 导出的**内容形状**是产品语义，所以它在这里而不在 `apps/*` ——
@@ -485,6 +647,7 @@ export {
   type BuildExportOptions,
   type ExportCounts,
   type ExportDocument,
+  type RestoreDocument,
   type ExportEntityCount,
   type ExportFormat,
   type ExportTaskRow,
@@ -500,6 +663,7 @@ export {
  */
 export {
   parseExportDocument,
+  previewRestore,
   restoreIntoEmptyTarget,
   stateMatchesDocument,
   type ExportImportFailureReason,
@@ -587,3 +751,97 @@ export {
   type PrivacyConsentRecord,
   type PrivacyDecision,
 } from './privacy-consent.js';
+
+/**
+ * 公共事实（调休 / 补班）的下行（W4b，ADR-0052）。
+ *
+ * 🔴 这是 heyta 第一条服务端→客户端的**内容**通道，宿主必须只从 `app-host` 拿它：
+ * 判断（匿名、失败不动缓存、坏形状不覆盖好数据、装进 domain 的覆盖表）出现在
+ * `apps/*` 里就是 AGENTS.md §3.5 那个分界线上的一次后退 —— 四个壳会各抄一份，
+ * 而"抄了没抄"在界面上完全看不出来（它的失败态就是"日历少一块"，判据①禁的正是这个）。
+ */
+export {
+  installPublicFactsFromCache,
+  readPublicFactsCache,
+  refreshPublicFacts,
+  type PublicFactsCachePort,
+  type PublicFactsRefreshOptions,
+  type PublicFactsRefreshResult,
+  type PublicFactsSnapshot,
+  type PublicFactsUnavailableCause,
+} from './public-facts.js';
+
+export {
+  createVaultKeyPackageStore,
+  type VaultKeyPackageStore,
+  type VaultKeyPackageScope,
+} from './vault-key-package-store.js';
+
+export {
+  VAULT_KEY_PACKAGE_PATH,
+  VaultSessionError,
+  createVaultKeyPackageRemote,
+  createVaultKeySession,
+  type PendingVaultCreation,
+  type VaultKeyPackageRemote,
+  type VaultKeyPackageRemoteOptions,
+  type VaultKeyPackageRemoteState,
+  type VaultRootRotationMigration,
+  type VaultRootRotationMigrationInput,
+  type VaultRootRotationMigrationResult,
+  type VaultRootRotationPort,
+  type VaultKeySession,
+  type VaultSessionState,
+} from './vault-session.js';
+
+/**
+ * 公共事实（调休 / 补班）的下行（W4b，ADR-0052）。
+ *
+ * 🔴 这是 heyta 第一条服务端→客户端的**内容**通道，宿主必须只从 `app-host` 拿它：
+ * 判断（匿名、失败不动缓存、坏形状不覆盖好数据、装进 domain 的覆盖表）出现在
+ * `apps/*` 里就是 AGENTS.md §3.5 那个分界线上的一次后退 —— 四个壳会各抄一份，
+ * 而"抄了没抄"在界面上完全看不出来（它的失败态就是"日历少一块"，判据①禁的正是这个）。
+ *//**
+ * 跨视图、跨端的**选中态**（详情面的地基）。
+ *
+ * 🔴 「哪一类当前选中了哪一条」此前散成三份实现（web 任务侧**根本没有**、
+ * web 习惯侧一个 `useState`、移动端任务侧另一个 `useState`），
+ * 三份 = 三套回落规则。它和任务 op 构造同一条理由待在这里（AGENTS.md §3.5）：
+ * **每个宿主都要做、且必须一模一样**，而"选中对象消失时怎么办"正是最容易各写各的那一行。
+ *
+ * ⚠️ 它**不是数据**：不进 op-log、不参与向量时钟、绝不同步。
+ * 所以这里一个 op 都不构造 —— 也别指望 `check:layering` 的
+ * `no-op-construction-in-apps` 会管它，它管不着没有 op 的东西，
+ * 这条由 `pnpm check:selection-single-source` 钉（宿主重新长出本地选中态即红）。
+ *
+ * 🔴 React 绑定**不在**本包：`@heyta/ui` 不依赖 `@heyta/app-host`（实测零 import），
+ * 而本包对宿主是"可直接 require 的接线层"，拽进 react 会让 node-host / CLI 跟着背上 UI 依赖。
+ * 所以宿主各留三行 `useSyncExternalStore` 的胶水 —— 胶水里不许有规则，
+ * 有规则的那几行（词表 / 替换 / 回落 / 通知）全在这里。
+ */
+export {
+  SELECTABLE_KINDS,
+  createSelectionStore,
+  moveSelectionInList,
+  pruneMissingSelection,
+  pruneSelection,
+  type CursorDelta,
+  type SelectableKind,
+  type SelectionSnapshot,
+  type SelectionStore,
+} from './selection.js';
+
+/**
+ * 助手会话的**跨设备实体**（ADR-0045 D-4 (ii)，产品负责人 2026-10-05 拍"做"）。
+ *
+ * 🔴 op 的构造只在这里一份（AGENTS §3.5）。此前会话历史只落这台设备的
+ * `localStorage`（D-4 (i)），换端点的两台设备合并历史时既读不到彼此的对话、
+ * 也分不出"这句是哪个端点答的"。`destinationKind` 与 `originClientId` 两格
+ * 就是为了让那两件事在合并后仍然可判 —— 逐条理由在 `assistant-session-actions.ts` 文件头。
+ */
+export {
+  createAssistantSessionActions,
+  type AssistantSessionActions,
+  type AssistantSessionActionsOptions,
+  type NewAssistantTurn,
+} from './assistant-session-actions.js';

@@ -17,11 +17,30 @@
   align-items: start;
 }
 
+/*
+ * 面单搬进详情列那一格时（工单 §8.133），这里**只剩一列**。
+ *
+ * 🔴 为什么要有这一条：`grid-template-columns` 声明的是两根轨道，而轨道不会因为
+ * 第二格里没有子项就自己消失。留着 `minmax(0, 5fr)` 的结果是清单只占 2/7 宽、
+ * 右边 5/7 是一整块空白 —— 症状恰好是这一单要消掉的那个（"中间一坨里再分栏"），
+ * 而它不会报错，只会看起来像布局坏了。
+ * ⚠️ 判据是几何的（清单的右边缘必须铺到内容列右边缘），在
+ * `e2e/tests/detail-pane-habit.spec.ts` 的 H1；jsdom 不做布局，量不到这一条。
+ */
+.ht-habit[data-pane='column'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .ht-habit__side {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-3);
   min-width: 0;
+  /* 工单 H1：卡片排两列的触发条件量的是**这一列自己的宽度**，不是视口。
+     `.ht-habit` 的轨道会随面单落点搬家（宽屏单列铺满 / 窄屏塌缩 / 回落那支只有 2fr），
+     用视口媒体查询会得到"视口够宽而这一列其实很窄"的错判 —— 那正是把卡片挤成
+     半张卡宽度、数字被裁的那一份坏（判据 `e2e/tests/habits-two-column.spec.ts` T5）。 */
+  container-type: inline-size;
 }
 
 /* 新建习惯：一行「输入框 + 图标按钮」。这两件以前是行内样式，
@@ -63,13 +82,34 @@
   outline-offset: var(--ht-space-1);
 }
 
+/*
+ * 工单 H1（= W13a）：中栏从**一条纵列**改成**两列卡片**。
+ *
+ * 产品负责人对照滴答指的不是数字不够多，是排法。落点只有这里 ——
+ * `.ht-habit__item` 本来就是带边框与圆角的一枚卡（`.ht-habit__row` 画的就是卡片表面），
+ * 所以这一单**DOM 一行不动**，只把外层从"逐行往下排"换成"两根等宽轨道"。
+ * 🔴 不动 `packages/ui/src/habits/*`：中栏是 web 的 DOM 层，共享层一动就推给四端。
+ *
+ * 阈值 33rem **不是拍的**，由本文件里已有的两个常量推出来：
+ *   一张卡的可读下限 = 16rem（就是上面 `.ht-habit` 那根 `minmax(16rem, 2fr)` 自己写的下限，
+ *   也就是这一列"还读得下去"的既有判定），两列 ⇒ 2 × 16rem，再加网格间距
+ *   `--ht-space-2`（8px = 0.5rem）⇒ 32.5rem，向上取整到 33rem。
+ * ⚠️ `@container` 里不能写 `var()`（查询特性不接受变量），所以这里是算出来的数 ——
+ *   注释把算式留下，改任一常量的人必须回来重算这条（判据 T2/T4 会同时点名前提）。
+ */
 .ht-habit__list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--ht-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+@container (min-width: 33rem) {
+  .ht-habit__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .ht-habit__item {
@@ -79,11 +119,24 @@
 /* 整行是一个 `<button>`（点哪都算选中），所以：
    `text-align: start` 取消按钮默认的居中，`width: 100%` 让它铺满列宽。
    ⚠️ 行内不能再嵌可交互元素 —— 图标选择器因此住在右窗格的页眉，不在这里。 */
+/*
+  行 = **两列**：左边「名字 + 这一周打没打」，右边「三个数字」。
+
+  🔴 为什么数字不再跟在名字下面：面单搬进详情列之后，清单从 2fr 变成整列宽，
+     而三份内容全贴在左边 —— 选中那一行右侧空了 **690px**（§8.133 看图第 ② 条：
+     "行的视觉重心跟着漂"）。判据 `e2e/tests/detail-pane-habit.spec.ts` H8 量的是
+     "每行最靠右的有内容元素必须落在行右边界附近"，阈值从行自己的内边距 token 推导；
+     臂台 `mutate-detail-pane-habit-e2e.mjs` 的 **E5** 把数字挪回左列，它就是为这一条存在的。
+
+  ⚠️ `minmax(0, 1fr)` 不是 `1fr`：超长习惯名要能省略号，而不是把右边的数字挤出列
+     （`.ht-habit__name` 自己带 `min-width: 0` + ellipsis，两件事要同时成立）。
+*/
 .ht-habit__row {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--ht-space-2);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--ht-space-4);
+  row-gap: var(--ht-space-2);
+  align-items: center;
   width: 100%;
   padding: var(--ht-space-3);
   cursor: pointer;
@@ -112,6 +165,19 @@
   align-items: center;
   gap: var(--ht-space-2);
   min-width: 0;
+}
+
+/*
+  第一行 = 「名字 ←→ 三个数字」，第二行 = 七个点横跨整行。
+  ⚠️ 数字**不竖排**：竖排会把行高顶到三行，名字与点之间裂开一道空档（看图实测过那一版，
+     空白只是从行右侧搬到了行中间）。横排贴在名字右边才是列表行的常见读法。
+*/
+.ht-habit__head {
+  grid-column: 1;
+}
+
+.ht-habit__week {
+  grid-column: 1 / span 2;
 }
 
 /* 图标底盘。颜色由 JSX 给（分类槽位 / 未设色走 `UNSET_CATEGORY_TOKEN`）；
@@ -153,7 +219,9 @@
 
 .ht-habit__chips {
   display: flex;
-  flex-wrap: wrap;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
   align-items: center;
   gap: var(--ht-space-3);
 }
@@ -176,10 +244,55 @@
   min-width: 0;
 }
 
+/*
+  环往**里**画。设计系统那条全局 `:focus-visible`（`reset.css:119`）给的是 `outline-offset: 2px`
+  = 画在盒子外面，而这一格的盒子贴着栏的**上边与视口右边**（现量 `top=0`、`right=1280`），
+  向外的环有两条边被裁掉 —— 图上只剩底下一条线，读不出"焦点进来了"（§8.137 看图）。
+  这是本栏特有的一处偏离，不是又一条通用焦点样式：负 offset 让环落在盒子内侧的 inset 里。
+*/
+.ht-habit__pane:focus-visible {
+  outline-offset: calc(var(--ht-space-1) * -1);
+}
+
+/*
+  标题行 = 这一栏的**第一行**：所选那条的名字在左，图标/改名/删除三颗在右。
+
+  🔴 这一行是 §8.133 看图照出来的缺陷的修法（工单 §8.134）：那三颗原来单独浮在栏顶、
+  与页头那排图标同高，读起来像**页头的工具条**而不是"这条习惯的工具"。
+  判据不写在注释里 —— `e2e/tests/detail-pane-habit.spec.ts` H6 量的是几何
+  （工具的上边缘必须在页头**之下**、且与标题行**竖向重叠**），变异臂 E3 证明它会红。
+
+  `baseline` 而不是 `center`：名字与那颗「图标：浇水」的按钮是两种字高的东西，
+  居中对齐会让标题看起来飘在按钮上方半个身位。
+*/
 .ht-habit__pane-head {
   display: flex;
-  justify-content: flex-end;
+  align-items: baseline;
+  justify-content: space-between;
   gap: var(--ht-space-2);
+  min-width: 0;
+}
+
+/* 整条消费 `section-title`（lg + semibold + tight + tracking.title，AGENTS §5 文字层级）。
+   超长名字必须省略号而不是把三颗工具挤出栏外 —— 习惯名是用户写的，长度不可知。 */
+.ht-habit__pane-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-title);
+}
+
+/* `flex: none`：工具那一坨不许被标题挤扁（图标选择器展开时是一整排字形）。 */
+.ht-habit__pane-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  flex: none;
 }
 
 /* 图标选择器：与 `.ht-slot-picker` 同一形状（展开式，不是浮层）。
@@ -191,7 +304,6 @@
   gap: var(--ht-space-1);
   flex: none;
 }
-
 .ht-habit__icon-toggle {
   display: inline-flex;
   align-items: center;
@@ -211,10 +323,28 @@
   font-size: var(--ht-font-size-xs);
 }
 
+/*
+ * 展开的那一排：🔴 **必须是定宽网格，不能按内容撑开**。
+ *
+ * 看图照出来的缺陷（工单 H3，2026-10-06 01:5x）：原来它是 `display:flex` + `flex-wrap:wrap`
+ * 而没有宽度上界，于是整排按内容撑到 8×44px 并把 `.ht-habit__pane-tools`（`flex: none`，
+ * 刻意不让标题挤扁工具）顶出窗格 —— 结果**第 8 个字形被视口右边缘裁掉、「默认」那一格
+ * 完全看不见**。而 `toBeVisible()` 五条判据全绿：它只验"有非空 bounding box"，
+ * 不验"在视口里"。看不见「默认」= 用户挑过就退不回去，正是那一格存在的唯一理由。
+ *
+ * 定成 4 列网格：宽度 = 4 × `touch-target.min` + 3 × `space.1`，
+ * 从被约束的常量推导，不写像素字面量；「默认」那一格独占一行（`grid-column: 1 / -1`）。
+ */
 .ht-habit__icon-options {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, var(--ht-touch-target-min));
   gap: var(--ht-space-1);
+  justify-content: end;
+}
+
+/* 「默认」那一格铺满整行：它不是第 9 个字形，挤在同一排会让人以为它是候选之一。 */
+.ht-habit__icon-option--default {
+  grid-column: 1 / -1;
 }
 
 .ht-habit__icon-option {
@@ -240,6 +370,121 @@
 
 .ht-habit__icon-toggle:focus-visible,
 .ht-habit__icon-option:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/*
+ * 频次编辑器（工单 H5）。形状与上面 `.ht-habit__icon-*` 那一族同一套
+ * （展开式，不是浮层）—— 同一栏里两个"挑一个值"的控件不该长得不一样。
+ *
+ * 🔴 为什么不写成内联样式（组件里一条 `style={{…}}` 都没有）：
+ *    `scripts/check-l4-no-style.mjs` 的棘轮只减不增（现量见该脚本），
+ *    新组件加内联样式会直接把 `pnpm check` 弄红。这条不是风格偏好，是门禁口径。
+ */
+.ht-habit__freq {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--ht-space-1);
+  flex: none;
+}
+
+.ht-habit__freq-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__freq-word {
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__freq-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-habit__freq-tiers,
+.ht-habit__freq-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+  align-items: center;
+}
+
+/* 档位与星期格子**同等样式**：没有哪一档被标成推荐（与八个字形同一条立场）。
+   选中态走边框 + 主色底，两种线索，色觉障碍下仍分得出（同 `.ht-habit__row`）。 */
+.ht-habit__freq-chip {
+  min-width: var(--ht-touch-target-min);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__freq-chip[aria-pressed='true'] {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-habit__freq-n {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* `tabular-nums`：这是数字输入（AGENTS §5 —— 不写就会随字符宽度跳）。 */
+.ht-habit__freq-n input {
+  inline-size: calc(var(--ht-space-8) * 2);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 这句是**产品说明**不是装饰：`interval` 的锚点是固定日历格
+   （`isScheduledOn` 拿 `1970-01-01` 取模），不写出来用户会以为"每 3 天"
+   的下一天必然是三天后。 */
+.ht-habit__freq-hint {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-habit__freq-error {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-danger);
+}
+
+.ht-habit__freq-toggle:focus-visible,
+.ht-habit__freq-chip:focus-visible,
+.ht-habit__freq-n input:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }

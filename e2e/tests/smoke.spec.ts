@@ -21,10 +21,12 @@ test.describe('冒烟：验收链路本身', () => {
     // 后者在白屏时也会通过。`openApp` 内部已经断言了输入框可见，
     // 这里再断言一次外壳标题，证明**应用骨架**也起来了（不只是那个输入框）。
     await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
-    // 冒烟走 `openApp`（默认打开全部模块）⇒ 9 个 tab。
-    // 「默认只开 3 个模块、rail 只有 6 个」由 `motivation.spec.ts` 那条专门钉。
-    // 全功能配置：11 个入口里 **10 个**是 rail 上的 tab —— 「设置」收在头像菜单里。
-    await expect(page.getByRole('tab')).toHaveCount(10);
+    // 冒烟走 `openApp`（默认打开全部模块）⇒ 10 个 tab。
+    // 「默认只开几个模块、rail 只有 7 个」由 `motivation.spec.ts` 那条专门钉。
+    // 全功能配置：12 个入口里 **11 个**是 rail 上的 tab —— 「设置」收在头像菜单里。
+    // ⚠️ 这个数字的两处副本（这里与 `motivation.spec.ts:137`）必须一起改，
+    // 两边都注释了这一点 —— 只改一处时，另一处会红成"界面少了/多了个 tab"。
+    await expect(page.getByRole('tab')).toHaveCount(11);
   });
 
   test('假端点活着，且计数接口可用', async ({ request }) => {

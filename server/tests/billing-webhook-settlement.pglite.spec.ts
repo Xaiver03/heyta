@@ -96,7 +96,8 @@ import type {
   WebhookHeaders,
   WebhookVerification,
 } from '../src/billing/types';
-import { PRICING_SCHEMA_DDL } from './pricing-ddl.helper';
+import { PRICING_SCHEMA_DDL, REFUND_SCHEMA_DDL } from './pricing-ddl.helper';
+import { decideRefund, requestRefund } from '../src/billing/refund-store';
 
 let db: PGlite;
 let sql: SqlExecutor;
@@ -142,6 +143,16 @@ interface TestPayload {
   /** adapter 的金额启发式结论；`null` = 它给不出档位（真实里的打折单）。 */
   declaredPriceId: string | null;
   declaredGrants?: string[];
+  /**
+   * 🔴 有这一格 = 这条通知**不是**"有一笔钱进来了"，而是通道在告知一张退款的结果。
+   * 真实 adapter 里它由 `event_type` 是 `REFUND.*` 推出来（`wechat.adapter.ts`），
+   * 这里直接由请求体给，为的是把"路由看见 refundNotice 就走回收分支"这条接线钉住。
+   */
+  refundNotice?: {
+    outRefundNo: string;
+    providerRefundId: string | null;
+    status: 'success' | 'abnormal' | 'closed';
+  } | null;
 }
 
 const createTestAdapter = (): BillingAdapter => ({
@@ -162,6 +173,32 @@ const createTestAdapter = (): BillingAdapter => ({
       return { ok: false, reason: 'bad-signature' };
     }
     const parsed = JSON.parse(rawBody.toString('utf8')) as TestPayload;
+    // 🔴 退款通知在这一支**先**出去，且带的是 `oneTimeGrant: null` + `userId: null`：
+    // 它与"有一笔钱进来了"共用这张表，但下游动作完全相反（一个是发权益、一个是收权益）。
+    // 让它落到下面那条路径的后果是 `NO_SUBSCRIPTION_REFERENCE` —— 什么都不做，
+    // 而库里看起来像"这条事件本来就不该动权益"。
+    if (parsed.refundNotice != null && parsed.refundNotice !== undefined) {
+      const notice = parsed.refundNotice;
+      return {
+        ok: true,
+        event: {
+          provider: PROVIDER,
+          // 幂等键带状态（与 `buildWechatRefundEventId` 同一形状）：
+          // 同一笔退款的 ABNORMAL 之后转 SUCCESS 不能被前一条挡掉。
+          providerEventId: `refund_${notice.status}:${notice.outRefundNo}`,
+          eventType: `refund_${notice.status}`,
+          occurredAt: parsed.occurredAt ?? NOW,
+          externalSubscriptionId: null,
+          status: null,
+          currentPeriodEnd: null,
+          userId: null,
+          oneTimeGrant: null,
+          outTradeNo: parsed.outTradeNo,
+          paidAmountMinor: null,
+          refundNotice: notice,
+        },
+      };
+    }
     const grant: OneTimeGrant | null =
       parsed.declaredPriceId === null
         ? null
@@ -307,7 +344,9 @@ const redemptionState = async (orderId: number) => {
 
 beforeAll(async () => {
   db = new PGlite();
-  await db.exec(PRICING_SCHEMA_DDL);
+  // 退款那两张表也建在这里：本文件下半部分要证明 webhook 的**退款分支**真的走回收，
+  // 而回收是对 `refunds` + `subscriptions` 两张表做真 SQL。
+  await db.exec(`${PRICING_SCHEMA_DDL}\n${REFUND_SCHEMA_DDL}`);
   sql = createPgliteExecutor(db);
   runner = { query: sql.query, execute: sql.execute };
 }, 60_000);
@@ -318,7 +357,9 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.exec(
-    'DELETE FROM coupon_redemptions; DELETE FROM checkout_orders; DELETE FROM coupons; DELETE FROM price_versions; DELETE FROM pricing_audit_log; DELETE FROM users;',
+    'DELETE FROM refunds; DELETE FROM subscriptions; DELETE FROM coupon_redemptions;' +
+      ' DELETE FROM checkout_orders; DELETE FROM coupons; DELETE FROM price_versions;' +
+      ' DELETE FROM pricing_audit_log; DELETE FROM users;',
   );
   await db.exec(
     `INSERT INTO users (id, email) VALUES (${USER_ID}, 'buyer@example.test') ON CONFLICT DO NOTHING`,
@@ -757,5 +798,176 @@ describe('`applySettlementToEvent` 逐结论的分支', () => {
       outTradeNo: 'hy-unit',
     });
     expect(result).toBe(input);
+  });
+});
+
+/**
+ * 🔴 退款通知在 webhook 里的分流（ADR-0053）。
+ *
+ * 这一组存在的理由：`refund-store.ts` 的回收逻辑自己已经被
+ * `billing-refund-store.pglite.spec.ts` 钉住了，但"**路由看见 `refundNotice` 就走回收、
+ * 不走授予**"这条接线在两边都没有证据。它坏了以后的症状非常安静：通道退完了钱、
+ * 我们落了一条 `payment_events`、`refunds` 那一行永远停在 `processing`、
+ * 用户的权益一格都不动 —— 而全部单测都是绿的。
+ *
+ * ⚠️ 这里的存储是**两个**（文件头写明的那条边界）：授予落内存 mock 的订阅行，
+ * 回收走 PGlite 上那张 `subscriptions` 替身。所以这组用例证明的是**分流与幂等**，
+ * 不是"回收读到的正是授予写过的那一行" —— 后者在生产里由同一个数据库保证，
+ * 在这里没有跨存储的通道可证，不假装。
+ */
+describe('webhook 退款分支 —— 通知走回收，不走授予', () => {
+  const DAY = 24 * HOUR;
+
+  /** 一张已经付过款的单 + 一行有 45 天未来的订阅（回收要动的东西）。 */
+  const paidOrderWithEntitlement = async (outTradeNo: string) => {
+    const placed = await placeOrder('hosted-monthly', { outTradeNo });
+    const delivered = await deliver(
+      eventBody({ outTradeNo, paidAmountMinor: placed.quote.finalAmountMinor }),
+    );
+    expect(delivered.statusCode).toBe(200);
+    await sql.execute(
+      `INSERT INTO subscriptions (user_id, provider, status, current_period_end, last_event_at, updated_at)
+       VALUES ($1, 'wechat', 'active', $2, $3, $3)`,
+      [USER_ID, NOW + 45 * DAY, NOW],
+    );
+    return placed;
+  };
+
+  const approvedRefund = async (orderId: number) => {
+    const request = await requestRefund(sql, { orderId, now: NOW, actor: 'admin:1' });
+    if (request.outcome !== 'requested') throw new Error(`测试前提不成立：${request.outcome}`);
+    const decided = await decideRefund(sql, {
+      refundId: request.refundId,
+      decision: 'approve',
+      actor: 'admin:1',
+      note: '批准',
+      now: NOW,
+    });
+    if (decided.outcome !== 'decided') throw new Error(`测试前提不成立：${decided.outcome}`);
+    return request;
+  };
+
+  const refundNoticeBody = (outRefundNo: string, status: 'success' | 'abnormal' | 'closed') =>
+    eventBody({
+      outTradeNo: 'hy-refund-hook-1',
+      paidAmountMinor: 500,
+      declaredPriceId: null,
+      eventId: `refund_${status}:${outRefundNo}`,
+      refundNotice: { outRefundNo, providerRefundId: '5030000000000000000000000009', status },
+    });
+
+  const readRefundRow = async (outRefundNo: string) => {
+    const rows = await sql.query<{ status: string; refunded_at: bigint | number | null }>(
+      `SELECT status, refunded_at FROM refunds WHERE out_refund_no = $1`,
+      [outRefundNo],
+    );
+    return rows[0] ?? null;
+  };
+
+  const readEntitlementEnd = async (): Promise<number | null> => {
+    const rows = await sql.query<{ current_period_end: bigint | number | null }>(
+      `SELECT current_period_end FROM subscriptions WHERE user_id = $1 LIMIT 1`,
+      [USER_ID],
+    );
+    const value = rows[0]?.current_period_end;
+    return value === null || value === undefined ? null : Number(value);
+  };
+
+  const auditCalls = (): Record<string, unknown>[] =>
+    (auditSpy.mock.calls as unknown as [Record<string, unknown>[]][]).map((c) => c[0]);
+
+  it('🔴 success 通知：订单转 refunded、那一段被回收，而授予侧一格都没被调用', async () => {
+    const placed = await paidOrderWithEntitlement('hy-refund-hook-1');
+    const { outRefundNo } = await approvedRefund(placed.orderId);
+    const createCallsBefore = mocks.state.subscriptionCreateCalls;
+    const updateCallsBefore = mocks.state.subscriptionUpdateCalls;
+
+    const res = await deliver(refundNoticeBody(outRefundNo, 'success'));
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ received: true });
+
+    expect(await readRefundRow(outRefundNo)).toMatchObject({
+      status: 'success',
+    });
+    expect(Number((await readRefundRow(outRefundNo))!.refunded_at)).toBe(NOW);
+    expect((await orderRow('hy-refund-hook-1'))?.status).toBe('refunded');
+    // 唯一一笔已付订单被翻掉 ⇒ 剩余 0 笔 ⇒ 到期日落到 now。
+    expect(await readEntitlementEnd()).toBe(NOW);
+
+    // 🔴 这一组里最关键的两行：退款通知**绝不**碰授予层。
+    expect(mocks.state.subscriptionCreateCalls).toBe(createCallsBefore);
+    expect(mocks.state.subscriptionUpdateCalls).toBe(updateCallsBefore);
+
+    const refundAudit = auditCalls().find((c) => c.event === BILLING_AUDIT_EVENTS.REFUND_APPLIED);
+    expect(refundAudit).toMatchObject({ outcome: 'retracted', outRefundNo });
+    // 审计里的 userId 不是从通知推的（通知里没有它），而是 `event.userId ?? 0` ——
+    // 记成 0 是**如实**，随便填一个才是事故。
+    expect(refundAudit).toMatchObject({ userId: 0 });
+  });
+
+  it('同一条通知重投：第二次按重复事件处理，`refunded_at` 不再变', async () => {
+    const placed = await paidOrderWithEntitlement('hy-refund-hook-2');
+    const { outRefundNo } = await approvedRefund(placed.orderId);
+    expect((await deliver(refundNoticeBody(outRefundNo, 'success'))).statusCode).toBe(200);
+    const first = await readRefundRow(outRefundNo);
+
+    const second = await deliver(refundNoticeBody(outRefundNo, 'success'));
+    expect(second.statusCode).toBe(200);
+    expect(second.json()).toEqual({ received: true, duplicate: true });
+    expect(await readRefundRow(outRefundNo)).toEqual(first);
+  });
+
+  it('🔴 `abnormal` 通知一格权益都不动（订单必须还是 paid）', async () => {
+    const placed = await paidOrderWithEntitlement('hy-refund-hook-3');
+    const { outRefundNo } = await approvedRefund(placed.orderId);
+    const before = await readEntitlementEnd();
+
+    expect((await deliver(refundNoticeBody(outRefundNo, 'abnormal'))).statusCode).toBe(200);
+    expect((await readRefundRow(outRefundNo))?.status).toBe('abnormal');
+    expect((await orderRow('hy-refund-hook-3'))?.status).toBe('paid');
+    expect(await readEntitlementEnd()).toBe(before);
+    expect(auditCalls().find((c) => c.event === BILLING_AUDIT_EVENTS.REFUND_APPLIED)).toMatchObject({
+      outcome: 'recorded',
+    });
+  });
+
+  it('库里对不上任何退款行的通知：200 + 响亮 warn，不静默、也不改任何一行', async () => {
+    await paidOrderWithEntitlement('hy-refund-hook-4');
+    const before = await readEntitlementEnd();
+    const warnSpy = vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+
+    const res = await deliver(refundNoticeBody('hyrf999x0000000000xdeadbeef', 'success'));
+    expect(res.statusCode).toBe(200);
+    expect(await readEntitlementEnd()).toBe(before);
+    expect((await orderRow('hy-refund-hook-4'))?.status).toBe('paid');
+    expect(auditCalls().find((c) => c.event === BILLING_AUDIT_EVENTS.REFUND_APPLIED)).toMatchObject({
+      outcome: 'unknown-refund',
+    });
+    // 🔴 "查无此退款"必须**能被告警层看见**：它的真实含义是"通道退了一笔我们没记录的钱"。
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('🔴 只批过一次之外的状态收不到回收：没批准的行 + success 通知 = 一格都不动', async () => {
+    const placed = await paidOrderWithEntitlement('hy-refund-hook-5');
+    // 只申请、**不批准**：行停在 `requested`，还没有发给通道。
+    const request = await requestRefund(sql, { orderId: placed.orderId, now: NOW, actor: 'admin:1' });
+    if (request.outcome !== 'requested') throw new Error('测试前提不成立');
+    const before = await readEntitlementEnd();
+
+    const res = await deliver(
+      refundNoticeBody(request.outRefundNo, 'success'),
+    );
+    expect(res.statusCode).toBe(200);
+    // 回收的条件更新只认 `approved` / `processing` / `failed`；这一行不在里面。
+    expect(await readRefundRow(request.outRefundNo)).toMatchObject({
+      status: 'requested',
+      refunded_at: null,
+    });
+    expect((await orderRow('hy-refund-hook-5'))?.status).toBe('paid');
+    expect(await readEntitlementEnd()).toBe(before);
+    expect(auditCalls().find((c) => c.event === BILLING_AUDIT_EVENTS.REFUND_APPLIED)).toMatchObject({
+      outcome: 'already-applied',
+    });
   });
 });

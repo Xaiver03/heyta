@@ -262,6 +262,186 @@ do {
     )
 }
 
+// ── 11. 移除库文件本体（`packages/storage` 契约里原生桥缺的那一格）──────
+//
+// 契约 = `packages/storage/src/sqlite/sqlite-driver.ts` 的 `removeDatabase?()`
+// 与它的消费方 `sqlite-adapter.ts:278-287`。三条各答一个**只有它能答**的问题：
+//
+//   a) 直接打桥：旁挂文件真的被带走。⚠️ `close()` 之后 SQLite 通常已自己收走
+//      `-wal`/`-shm`，所以这里**手动留下两个孤儿旁挂**（进程崩溃后的真实形状）——
+//      不留的话这一条只验到主文件，而"只删主文件会留下一份能重放回明文的日志"
+//      正是契约点名的那件事。
+//   b) 经**整条 JS 栈**（页侧那一发 `oplog-destroy`）：只有 JSExport 真把
+//      `removeDatabase` 暴露成了函数，`native-bridge.ts:172` 才会挂上那个键，
+//      `SqliteAdapter.destroy()` 才不会回"这个驱动没有 removeDatabase"。
+//      直接打桥证明不了这一格 —— Swift 里对象一直在、方法也一直在，
+//      "键有没有跨边界暴露出去"只有 JS 侧知道。
+//   c) 负臂：删不掉时必须是 `containerRemoved:false` + ASCII 原因，
+//      而**不是**错误信封 —— 信封会被 `throwIfDriverError` 拆成 `throw`，
+//      整个销毁随之失败、其余几类明文一类都不清。
+//      ⚠️ 负臂**只能**直接打桥，走不了 `oplog-destroy`：`destroy()` 在移除之前要跑
+//      `DROP TABLE` + `VACUUM`，而 `VACUUM` 必须在库文件旁边建临时库 ⇒
+//      **不可写的目录里那些 SQL 本身就失败**，根本走不到 `removeDatabase`。
+
+/// 解一条移除凭据；解不开就当场判红（而不是返回一个假的 `false` 蒙过去）。
+/// ⚠️ 必须标 `@MainActor`：它调 `check`，而顶层 `var failures` 归 MainActor（见文件头）。
+@MainActor
+func removalOf(_ text: String, _ site: String) -> (target: String, removed: Bool, reason: String?)? {
+    // 🔴 先问这一条：普通"删不掉"绝不能长成信封 —— 那个键在 JS 侧被拆成 `throw`，
+    // 整个 destroy() 会失败、其余几类明文一类都不清。它必须在**任何**返回值上都成立。
+    check(!text.contains("__heytaDriverError"),
+          "\(site)：回的是凭据而不是驱动错误信封（\(text.prefix(160))）")
+    guard let data = text.data(using: .utf8),
+          let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let target = obj["target"] as? String,
+          let removed = obj["containerRemoved"] as? Bool else {
+        check(false, "\(site)：移除凭据解不开（实测返回 \(text.prefix(220))）")
+        return nil
+    }
+    return (target, removed, obj["reason"] as? String)
+}
+
+let orphanSidecar = Data("orphaned WAL bytes that must not survive erase".utf8)
+
+// ── a. 直接打桥：主文件 + 两个旁挂 + 幂等 ────────────────────────────
+do {
+    let dir = workDir.appendingPathComponent("removal")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let db = dir.appendingPathComponent("gone.sqlite").path
+
+    let bridge = try SqliteBridge(path: db)
+    _ = bridge.exec("CREATE TABLE ops (id TEXT PRIMARY KEY)")
+    _ = bridge.run("INSERT INTO ops (id) VALUES (?)", "[\"op-1\"]")
+    bridge.close()
+
+    _ = FileManager.default.createFile(atPath: db + "-wal", contents: orphanSidecar)
+    _ = FileManager.default.createFile(atPath: db + "-shm", contents: orphanSidecar)
+    check(FileManager.default.fileExists(atPath: db + "-wal")
+          && FileManager.default.fileExists(atPath: db + "-shm"),
+          "a 的前提成立：close() 之后**确实**还留着孤儿旁挂（否则这一条只验到主文件）")
+
+    if let removal = removalOf(bridge.removeDatabase(), "a 直接打桥") {
+        check(removal.removed, "a containerRemoved 为 true")
+        check(removal.target == db, "a target 逐字等于真实库路径（判据读的就是这个字段）")
+    }
+    check(!FileManager.default.fileExists(atPath: db)
+          && !FileManager.default.fileExists(atPath: db + "-wal")
+          && !FileManager.default.fileExists(atPath: db + "-shm"),
+          "a 主文件与两个旁挂**都**从磁盘上没了")
+
+    // 契约明写"文件本来就不存在 = 成功（幂等），不是错误"。
+    if let again = removalOf(bridge.removeDatabase(), "a 幂等那一趟") {
+        check(again.removed, "a 再删一次仍是成功（幂等，不是\"没找到文件\"的失败）")
+    }
+}
+
+// ── a2. 没 close 就调用：实现**不假设**调用方记得契约里那条"必须在 close() 之后" ──
+//
+// 🔴 这一条抓的是"目录项没了但数据还活着"：句柄没关时 SQLite 仍握着那个 inode，
+// POSIX 上 unlink 照样成功 ⇒ 只查"文件在不在"**永远查不出来**。
+// 所以判据必须是"同一句柄之后再也写不进东西"—— 那才等于"真的先关了再删"。
+do {
+    let dir = workDir.appendingPathComponent("removal-open")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let db = dir.appendingPathComponent("still-open.sqlite").path
+
+    let bridge = try SqliteBridge(path: db)
+    _ = bridge.exec("CREATE TABLE t (v TEXT)")
+    check(FileManager.default.fileExists(atPath: db + "-wal"),
+          "a2 的前提成立：WAL 旁挂此刻**就在磁盘上**（句柄还开着）")
+
+    if let removal = removalOf(bridge.removeDatabase(), "a2 未 close 就移除") {
+        check(removal.removed, "a2 containerRemoved 为 true")
+    }
+    check(!FileManager.default.fileExists(atPath: db)
+          && !FileManager.default.fileExists(atPath: db + "-wal")
+          && !FileManager.default.fileExists(atPath: db + "-shm"),
+          "a2 主文件与旁挂都不在磁盘上了（句柄还开着也照样删）")
+
+    // 🔴 关键那一问：移除之后同一句柄**必须已经关闭**。
+    // 没关 → 这条 INSERT 会打到"已经没有目录项、但 inode 还被握着"的文件上，
+    // SQLite 报的是 `disk I/O error` —— 那是**另一种**失败，不能拿来冒充"已关闭"
+    // （变异实测：拿掉 `removeDatabase()` 里那句 `close()`，两种说法都会让
+    //  "返回信封"这一条过 ⇒ 判据必须钉**哪一个**信封）。
+    let after = bridge.exec("INSERT INTO t (v) VALUES ('x')")
+    check(after.contains("database is closed"),
+          "a2 移除后同一句柄已关：回的是 closedHandleMessage 而不是静默成功/别的错误（实测：\(after.prefix(120))）")
+}
+
+// ── b. 经页侧那一发 oplog-destroy：跨 JSContext 边界可见 ──────────────
+do {
+    let dir = workDir.appendingPathComponent("js-destroy")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let db = dir.appendingPathComponent("oplog.sqlite").path
+
+    let api = try AppApi(bundlePath: bundlePath, dbPath: db)
+    let clientId = try api.openOpLog()
+    let op: [String: Any] = [
+        "id": "op-erase-1", "entityType": "TASK", "entityId": "task-1", "opType": "CRT",
+        "payload": ["title": "要被销毁的一条"], "clientId": clientId,
+        "timestamp": 1, "vectorClock": [clientId: 1], "schemaVersion": 1,
+    ]
+    // ⚠️ `args` 是位置参数表，套两层（同第 9 节那条踩过的坑）。
+    let args = String(data: try JSONSerialization.data(withJSONObject: [[op]]), encoding: .utf8)!
+    let (appended, _, _) = try opRequest(api, 1, "appendLocal", args)
+    check(appended, "b 的前提成立：库里先有一条真的 op（销毁之后才谈\"没了\"）")
+    check(FileManager.default.fileExists(atPath: db), "b 的前提成立：壳的库文件此刻还在磁盘上")
+
+    let outbound = try api.handleHostMessage("{\"type\":\"oplog-destroy\"}")
+    let raw = outbound.first
+    let envelope: [String: Any]? = raw
+        .flatMap { $0.data(using: .utf8) }
+        .flatMap { ((try? JSONSerialization.jsonObject(with: $0)) as? [String: Any]) }
+    check(envelope?["type"] as? String == "oplog-destroyed",
+          "b 那一发回的是 oplog-destroyed（实测：\((raw ?? "<无回包>").prefix(220))）")
+    let report = envelope?["report"] as? [String: Any]
+    // 🔴 `containerRemoved` 为 true **且** `target` 是真实路径，才同时说明三件事：
+    // JSExport 把方法暴露成了函数、`wrapDriver` 挂上了键、适配器真的调了它。
+    // 少任何一件，适配器回的是 `{target:"sqlite", containerRemoved:false, reason:"…没有 removeDatabase"}`。
+    check(report?["containerRemoved"] as? Bool == true,
+          "b 适配器报告 containerRemoved:true（实测：\((raw ?? "nil").prefix(240))）")
+    check(report?["target"] as? String == db, "b 报告里的 target 就是壳的那个库文件")
+    check(report?["storesCleared"] as? Int != nil, "b 报告带数字 storesCleared（页侧 isDestroyReport 要的第三项）")
+    check(!FileManager.default.fileExists(atPath: db)
+          && !FileManager.default.fileExists(atPath: db + "-wal")
+          && !FileManager.default.fileExists(atPath: db + "-shm"),
+          "b 销毁之后从**壳外**看：库文件与旁挂都不在磁盘上了")
+    api.shutdown()
+}
+
+// ── c. 负臂：删不掉时要回凭据，不是异常、不是信封 ─────────────────────
+do {
+    let dir = workDir.appendingPathComponent("locked")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let db = dir.appendingPathComponent("stuck.sqlite").path
+
+    let bridge = try SqliteBridge(path: db)
+    _ = bridge.exec("CREATE TABLE t (v TEXT)")
+    _ = bridge.run("INSERT INTO t (v) VALUES (?)", "[\"plaintext-left-on-disk\"]")
+    bridge.close()
+
+    if geteuid() == 0 {
+        // 如实报**未验**，不降级成"这档也算过了"：root 下权限位根本不挡 unlink。
+        print("  ⚠️ c 负臂**未验**：以 root 运行时不可写目录挡不住 unlink，这一档构造不出失败")
+    } else {
+        check(chmod(dir.path, mode_t(0o500)) == 0, "c 的前提成立：库所在目录改成不可写（0500）")
+        let text = bridge.removeDatabase()
+        if let removal = removalOf(text, "c 负臂") {
+            check(!removal.removed, "c 删不掉时如实回 containerRemoved:false")
+            check(removal.target == db, "c 失败时 target 仍是真实路径（账面要指得到那个文件）")
+            let reason = removal.reason ?? ""
+            check(!reason.isEmpty, "c 带着原因：\(reason)")
+            check(reason.unicodeScalars.allSatisfy { $0.value < 0x80 },
+                  "c 原因是 ASCII（它会进证据文件）：\(reason)")
+        }
+        check(FileManager.default.fileExists(atPath: db), "c 文件**确实还在**磁盘上（判据不是自证的）")
+        check(chmod(dir.path, mode_t(0o700)) == 0, "c 恢复目录权限位")
+        if let freed = removalOf(bridge.removeDatabase(), "c 恢复之后那一趟") {
+            check(freed.removed, "c 目录恢复后同一个实例再删就成功了（一次失败没被永久锁住）")
+        }
+    }
+}
+
 try? FileManager.default.removeItem(at: workDir)
 
 print("")

@@ -121,7 +121,7 @@ __heyta_seq  archive  meta  ops  ops__mt3  state
 
 | 缺口 | 说明 |
 |---|---|
-| **厂商契约还没在 JSC 上重放** | Windows 侧有 `check:crosslang-contract`（50 条原样契约）。macOS 现在只有 14 条冒烟 |
+| **厂商契约还没在 JSC 上重放** | Windows 侧有 `check:crosslang-contract`（原样契约重放）。macOS 侧只有壳自己的冒烟；条数**不写在这里**（写过一次"14 条"，六天后就漂了），现量：`grep -c '^\s*check(' Sources/heyta-smoke/main.swift` |
 | **打包 / 签名 / 公证** | 未做。目前只能 `swift run`；`.app` 打包与 Developer ID 公证都还没有 |
 | **系统小组件** | 未做（WidgetKit 扩展需要 .app 打包先落地） |
 | **同步未接线** | 门面故意不传 `serverUrl` ⇒ 不建同步客户端。要接就在 facade 加函数，不是写进 Swift |

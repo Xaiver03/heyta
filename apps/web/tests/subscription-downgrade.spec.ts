@@ -90,7 +90,7 @@ beforeEach(async () => {
   dbName = `subscription-downgrade-${Math.random().toString(36).slice(2)}`;
   __resetOpLogForTests();
   __resetSubscriptionForTests();
-  useSyncStore.setState({ baseUrl: '', token: undefined, settingsOpen: false });
+  useSyncStore.setState({ baseUrl: '', token: undefined, syncSettingsRequested: false });
   useTaskStore.setState({
     entities: emptyState(),
     filter: { kind: 'all' },

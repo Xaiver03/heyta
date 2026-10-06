@@ -34,6 +34,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>heyta 需要通知权限来按时提醒你的任务。</string>
 	<!-- 只使用标准加密算法（HTTPS/TLS + AES-GCM），属豁免类，免去每次构建的出口合规问询 -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>

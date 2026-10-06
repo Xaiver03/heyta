@@ -65,7 +65,7 @@ import type { Note } from '@heyta/domain';
 import { Pin, PinOff, Plus, Trash2 } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { NOTE_EXCERPT_LENGTH, toNoteRows } from './model.js';
+import { isNoteDraftBlank, toNoteRows } from './model.js';
 
 /** 面板全部文案，**每一项都由宿主注入**（见文件头）。 */
 export interface NotesBoardLabels {
@@ -92,7 +92,7 @@ export interface NotesBoardLabels {
 export interface NotesBoardProps {
   /** 未删除的便签（由宿主从 action 层取，`listNotes()` 已经是）。 */
   readonly notes: readonly Note[];
-  /** 摘要长度。省略 = {@link NOTE_EXCERPT_LENGTH}（窄屏可收短）。 */
+  /** 摘要长度。省略 = 领域层的 `NOTE_EXCERPT_LENGTH`（窄屏可收短）。 */
   readonly excerptLength?: number;
   /**
    * 新建。**内容校验的权威是宿主的 `createNoteActions`**（见文件头）——
@@ -108,6 +108,17 @@ export interface NotesBoardProps {
    * 又要求存在 —— 不传就不渲染编辑入口（见文件头）。
    */
   readonly onEdit?: (entityId: string) => void;
+  /**
+   * 🔴 **选中/光标在哪一条**（工单 W1c，与 `TaskRowProps.active`、web 习惯面的
+   * `aria-current` 是同一个口径）。默认 `undefined` = 一行都不标，也就是本 prop
+   * 出现之前的行为，所以移动端不接它不会有任何变化。
+   *
+   * 它表达的是"编辑器开的是哪一条 / 键盘光标停在哪儿"，**不是**钉选、不是今天徽标：
+   * 那两件事已经有各自的通道（`note-today-*` 徽标 + 图标本身）。
+   * 底色同样只用 `color.primary-subtle`（与 `TaskRow.rowActive` 同一个 token），
+   * 因为便签摘要里可能带宿主不管的文字色。
+   */
+  readonly activeNoteId?: string;
   readonly labels: NotesBoardLabels;
   readonly testID?: string;
 }
@@ -163,6 +174,14 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.2'],
       minHeight: tokens['touch-target.min'],
     },
+    /**
+     * 选中那一行的底色（见 `activeNoteId`）。与 `TaskRow.rowActive` 同 token、同形状：
+     * **只加底色与圆角，不动任何几何** —— 光标上下移动时摘要的位置和宽度都不能跳。
+     */
+    rowActive: {
+      backgroundColor: tokens['color.primary-subtle'],
+      borderRadius: tokens['radius.md'],
+    },
     /** 摘要 + 徽标，吃掉剩余宽度。 */
     main: {
       flex: 1,
@@ -211,11 +230,12 @@ function makeStyles(tokens: HeytaNativeTokens) {
 
 export function NotesBoard({
   notes,
-  excerptLength = NOTE_EXCERPT_LENGTH,
+  excerptLength,
   onAdd,
   onRemove,
   onTogglePinned,
   onEdit,
+  activeNoteId,
   labels,
   testID,
 }: NotesBoardProps): React.JSX.Element {
@@ -231,7 +251,7 @@ export function NotesBoard({
    * 清空会让用户以为自己写的空格被当成了一张便签。
    */
   function submit(): void {
-    if (draft.trim() === '') return;
+    if (isNoteDraftBlank(draft)) return;
     onAdd(draft);
     setDraft('');
   }
@@ -257,10 +277,10 @@ export function NotesBoard({
         // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
         // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
         // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-          aria-disabled={draft.trim() === ''}
-          disabled={draft.trim() === ''}
+          aria-disabled={isNoteDraftBlank(draft)}
+          disabled={isNoteDraftBlank(draft)}
           onPress={submit}
-          style={[styles.addButton, draft.trim() === '' ? styles.addDisabled : null]}
+          style={[styles.addButton, isNoteDraftBlank(draft) ? styles.addDisabled : null]}
           testID="notes-submit"
         >
           <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.on-primary']} />
@@ -280,6 +300,7 @@ export function NotesBoard({
       ) : (
         <View style={styles.list} accessibilityRole="list" testID="notes-list">
           {rows.map((row) => {
+            const active = row.id === activeNoteId;
             /** 摘要那一段：宿主接了编辑就是可点入口，否则是纯文本（见文件头）。 */
             const excerptText = (
               <Text
@@ -291,7 +312,12 @@ export function NotesBoard({
             );
 
             return (
-              <View key={row.id} style={styles.row} testID={`note-row-${row.id}`}>
+              <View
+                key={row.id}
+                style={active ? [styles.row, styles.rowActive] : styles.row}
+                aria-current={active ? 'true' : undefined}
+                testID={`note-row-${row.id}`}
+              >
                 <View style={styles.main}>
                   {onEdit === undefined ? (
                     excerptText

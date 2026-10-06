@@ -80,6 +80,19 @@ export const zhCN = {
    */
   'common.sync.error.unauthorized': '这台设备的登录凭据已失效（可能是在别的设备上退出了登录，或改过口令），同步已停止 —— 本地数据完好、仍可读写，重新登录后会继续同步',
   /**
+   * 🔴 `reason === 'account-closed'`：账号**注销**了（稳定码 `ACCOUNT_CLOSED`）。
+   *
+   * 这一句与上面那句 `unauthorized` 是**一对必须分开的防线**：两句对本机数据许的是
+   * **相反**的承诺（完好 / 清除），合成一句就在两个方向上说谎 ——
+   * 把"口令打错"读成"注销"会当场毁掉用户的数据，把"注销"读成"重新登录就好"
+   * 会让明文永远留着。
+   *
+   * ⚠️ 措辞边界（ADR-0048）：这里说的是**规则**（注销后本机会清除这份副本），
+   * 不是这一次的**结果** —— 清除失败时状态里的 `message` 与 console 会另行说明，
+   * 这句不许替它承诺成功。其它设备与备份各有边界，那句话在隐私政策里。
+   */
+  'common.sync.error.accountClosed': '这个账号已经注销，无法再次登录，同步已停止 —— 注销后这台设备上的本地副本会被清除。如果这不是你的操作，请联系服务端运营者',
+  /**
    * 🔴 `reason === 'consent-required'`：**还没同意，所以一个请求都没发**（计划 G-12）。
    *
    * 这句不许写成"还没配置同步服务"或"当前离线"：那两种的用户动作是"填地址"和"查网络"，
@@ -108,7 +121,7 @@ export const zhCN = {
   // "充分知情"的最小要求，不是文案风格。
   'common.privacy.consent.title': '在使用联网功能之前',
   'common.privacy.consent.intro': 'heyta 是本地优先的：你的任务、清单、笔记与历史先写在这台设备上。这个选择只决定一件事 —— 这台设备能不能与服务器通信。',
-  'common.privacy.consent.localOnlyGuarantee': '选「只用本机」时，所有功能照常可用：新建、编辑、日历、四象限、番茄钟、习惯、导出，一个都不少。只是不会同步、不会登录、不会推送提醒。',
+  'common.privacy.consent.localOnlyGuarantee': '选「只用本机」时，所有功能照常可用：新建、编辑、日历、四象限、番茄钟、习惯、导出，一个都不少。不会同步、不会登录，也不会接收服务器推送；移动端本地提醒仍可在授予系统通知权限后使用。',
   'common.privacy.consent.acceptedGuarantee': '选「同意并联网」后，这台设备才会与你配置的那台服务器通信，而且只发端到端加密之后的密文与同步游标 —— 服务器看不到你的明文。',
   'common.privacy.consent.termsLink': '服务条款',
   'common.privacy.consent.privacyLink': '隐私政策',
@@ -451,6 +464,13 @@ export const zhCN = {
   'web.shell.nav.q3': '紧急不重要',
   'web.shell.nav.q4': '不重要不紧急',
   'web.shell.sidebar.resize': '调整侧栏宽度',
+  // 详情列（最右那一栏）左边缘那枚拖拽把手（`ColumnResizer.tsx` 的 `DetailColumnResizer`）。
+  'web.shell.detail.resize': '调整详情栏宽度',
+  // 顶栏语言分组的**可见**标签（`LanguageSwitcher.tsx`）。它必须看得见而不是只挂在
+  // `aria-label` 上：同一个位置已经判过两次"用户根本不知道它们是什么"
+  // （`App.tsx` 排序下拉那段、`main-area.css` 的 `.ht-header__view`）。
+  // 选项本身**不翻**（永远是 `中文` / `English` 的自称，见上面 `common.lang.*` 那段）。
+  'web.shell.lang.label': '语言',
   'web.shell.views.aria': '视图',
   'web.shell.views.groupMain': '主要',
   'web.shell.modules.title': '功能模块',
@@ -536,31 +556,56 @@ export const zhCN = {
   // "按别人身份查资料"的端点，所以措辞里不许出现"其他用户会看到"。
   // 规格（32 个码点 / 图片格式与原图上限）的唯一来源是
   // `packages/shared-schema/src/account-profile-contract.ts`，措辞在这里。
-  'web.settings.profile.title': '个人信息',
-  'web.settings.profile.nickname.label': '昵称',
-  'web.settings.profile.nickname.placeholder': '留空则显示邮箱',
-  'web.settings.profile.nickname.hint': '最多 {max} 个字。昵称只是显示名，不是你的真实姓名；登录标识始终是邮箱。',
-  'web.settings.profile.nickname.toolong': '昵称最多 {max} 个字，现在有 {count} 个。',
-  'web.settings.profile.nickname.save': '保存昵称',
-  'web.settings.profile.nickname.saved': '昵称已保存',
-  'web.settings.profile.nickname.cleared': '已清除昵称',
-  'web.settings.profile.avatar.label': '头像',
-  'web.settings.profile.avatar.change': '换一张',
-  'web.settings.profile.avatar.remove': '移除头像',
-  'web.settings.profile.avatar.removed': '头像已移除',
-  'web.settings.profile.avatar.uploading': '正在上传…',
+  'common.profile.title': '个人信息',
+  'common.profile.nickname.label': '昵称',
+  'common.profile.nickname.placeholder': '留空则显示邮箱',
+  'common.profile.nickname.hint': '最多 {max} 个字。昵称只是显示名，不是你的真实姓名；登录标识始终是邮箱。',
+  'common.profile.nickname.toolong': '昵称最多 {max} 个字，现在有 {count} 个。',
+  'common.profile.nickname.save': '保存昵称',
+  'common.profile.nickname.saved': '昵称已保存',
+  'common.profile.nickname.cleared': '已清除昵称',
+  // 🔴 这一句**只说昵称**。它曾经复用头像那句失败提示（『头像没有传上去』），
+  //    于是昵称没存上时界面在说另一件事 —— 判据钉在 `apps/web/tests/profile-panel.spec.tsx`。
+  'common.profile.nickname.failed': '昵称没有保存成功，请稍后再试。',
+  'common.profile.avatar.label': '头像',
+  'common.profile.avatar.change': '换一张',
+  'common.profile.avatar.remove': '移除头像',
+  'common.profile.avatar.removed': '头像已移除',
+  'common.profile.avatar.uploading': '正在上传…',
   // 🔴 这条不是错误提示，是**产品事实**：口令从不落盘（`credential-storage.ts`），
   // 所以刷新之后内存里没有它，而头像是用它加密的。没有它谁也解不开，包括我们自己。
-  'web.settings.profile.avatar.needPassword': '头像是用你的端到端加密口令保护的，本机没有保存这个口令 —— 请先在「同步设置」里填写一次，再更换或查看头像。',
-  'web.settings.profile.avatar.badType': '只支持 {types} 格式的图片。',
-  'web.settings.profile.avatar.tooBig': '图片压缩后仍超过 {max}，换一张小一点的。',
-  'web.settings.profile.avatar.failed': '头像没有传上去，请稍后再试。',
-  'web.settings.profile.email.label': '邮箱',
+  'common.profile.avatar.needPassword': '头像是用你的端到端加密口令保护的，本机没有保存这个口令 —— 请先在「同步设置」里填写一次，再更换或查看头像。',
+  'common.profile.avatar.badType': '只支持 {types} 格式的图片。',
+  'common.profile.avatar.tooBig': '图片压缩后仍超过 {max}，换一张小一点的。',
+  'common.profile.avatar.failed': '头像没有传上去，请稍后再试。',
+  // 🔴 读侧的三句（已上传 / 解不开 / 暂时取不到）与写侧那句**不能合并**：
+  // 用户动作分别是"等着""去核对口令""稍后重试"。以前读侧只有 `failed` 一句，
+  // 于是"这台设备解不开"被说成"头像没有传上去"——界面在讲一件没发生过的事。
+  'common.profile.avatar.uploaded': '头像已更新',
+  'common.profile.avatar.undecryptable': '这台设备解不开你的头像 —— 端到端加密口令不对。在「同步设置」里重新填一次口令即可。',
+  'common.profile.avatar.unreadable': '暂时读不到头像，请稍后再试。',
+  'common.profile.loadFailed': '个人信息没有读到，请稍后再试。',
+  'common.profile.email.label': '邮箱',
   // 只读要有理由，否则用户会以为这是个没做好的输入框。
-  'web.settings.profile.email.hint': '邮箱是登录标识，也是找回账号的唯一凭据，不能在这里修改。',
+  'common.profile.email.hint': '邮箱是登录标识，也是找回账号的唯一凭据，不能在这里修改。',
 
   'web.settings.display.title': '显示',
   'web.settings.display.dueNote': '任务行上的截止时间显示为日期，还是距离截止时间的倒计时。',
+  // 工单 W4：详情列（右侧那一栏）的出现与收起。
+  // 🔴 说明句里必须把"它自己不出来的两种情况"和"收起来之后怎么叫回来"都说完 ——
+  // 一个只写「常驻 / 收起」的开关，用户收起后在窗口变窄时看到它没了，
+  // 会以为自己按坏了。
+  'web.shell.detailPane.collapse': '收起详情面',
+  'web.shell.detailPane.expand': '展开详情面',
+  'web.settings.display.detail.title': '详情面',
+  'web.settings.display.detail.modeOpen': '常驻',
+  'web.settings.display.detail.modeCollapsed': '收起',
+  'web.settings.display.detailNote': '右侧那一栏显示当前选中项的面单。窗口太窄或太矮时它自己不出现，这时这一项设置不起作用。在这一台设备上收起之后，页头的按钮、这里的开关，或快捷键 ⌘/Ctrl + Shift + \\ 都能把它叫回来。',
+  // ── 设置 → 显示：语言与主题（H9 第三刀，2026-10-06 从页头搬进来）────────
+  // 两条说明都不是装饰：搬进设置之后，"这一格管什么"只能靠界面自己说清楚。
+  // 尤其语言那一格 —— 它过去在页头，靠"永远看得见"来免解释。
+  'web.settings.display.langNote': '界面用哪一种语言显示。只改这个应用，不改系统的语言。',
+  'web.settings.display.themeNote': '这台设备上的偏好。在这里选过之前，界面跟随系统的深/浅色设置。',
   'web.shell.dueMode.countdown': '倒计时',
   // 任务行上那几个**纯图标**按钮：名字里必须带上任务标题，
   // 否则屏幕阅读器听到的是一串没有区别的"按钮"。
@@ -591,16 +636,23 @@ export const zhCN = {
   // `apps/web/src/features/trash/TrashView.tsx`。删除仍然只是软删除，
   // 这里让用户能看见并且**恢复**；彻底删除是二次确认后的不可逆动作。
   'web.trash.nav': '回收站',
-  'web.trash.intro': '这里放着已删除的任务。恢复后它会回到原来的位置。',
+  'web.trash.intro': '这里放着已删除的任务、便签、清单和习惯。恢复后它会回到原来的位置。',
   'web.trash.empty.title': '回收站是空的',
-  'web.trash.empty.hint': '在任务页删除的任务会先放到这里',
+  'web.trash.empty.hint': '删掉的任务、便签、清单和习惯会先放到这里',
   'web.trash.deletedAt': '删除于 {date}',
   'web.trash.restore': '恢复：{title}',
   'web.trash.purge': '彻底删除：{title}',
   'web.trash.confirm.title': '彻底删除「{title}」？',
   'web.trash.confirm.body': '彻底删除后它不会再出现在回收站里，也无法恢复。',
+  // 🔴 与移动端 mobile.trash.confirm.notErasure 同一句话：彻底删除只是不再提供恢复，没有把历史抹掉。
+  'web.trash.confirm.notErasure': '这不是物理擦除：操作日志里仍然留着这条记录，只是界面不再提供恢复。',
+  // 与 mobile.trash.confirm.projectTasks 同一句：删清单不级联删任务（`project-actions.ts` 文件头第 2 条）。
+  'web.trash.confirm.projectTasks': '里面还有 {count} 条任务，它们不会被删除。',
+  'web.trash.confirm.habitLogs': '它已有的打卡记录不会被删除，恢复后连续天数照旧。',
   'web.trash.confirm.submit': '彻底删除',
   'web.trash.confirm.cancel': '取消',
+  // 动作层拒绝时必须说出来（例如"已被彻底删除，无法恢复"）—— 咽掉它就是"点了没反应"。
+  'web.trash.error': '这次操作没有成功：{reason}',
   // 空状态：任何列表都必须有空状态，而且要说**下一步做什么** ——
   // 留白屏会让用户以为应用坏了。`all` 同时是兜底（新的 filter.kind 不留白）。
   'web.shell.empty.all.title': '收集箱是空的',
@@ -627,16 +679,66 @@ export const zhCN = {
   // ── Web · 同步条 ──────────────────────────────────────────
   'web.sync.resolveConflicts': '处理冲突',
   'web.sync.a11y.syncNow': '立即同步',
+  // rail 底部那一枚同步按钮的完整标签：动作 + 当前状态一句话。
+  // 🔴 状态必须进标签：图标加一个状态点在色觉障碍下不可分辨，而这一枚没有可见文字。
+  'web.sync.rail.aria': '同步，当前状态：{status}',
   'web.sync.settings.title': '同步设置',
-  'web.sync.settings.close': '关闭同步设置',
+  // H9 第 3 刀：这一节说明"同步到底把什么送出去"。原来的「关闭同步设置」随着
+  // 那层同级浮层一起删掉了 —— 一节设置没有"关闭"这个动作，退出设置就有出口。
+  'web.settings.sync.note': '数据先落在这台设备上；同步服务器只会收到密文，看不到明文。不填地址就只在本机使用。',
   'web.sync.serverUrl.label': '服务端地址',
   'web.sync.token.label': '访问令牌',
   'web.sync.password.label': '端到端加密口令',
   // `<strong>不会</strong>` 的三段拆分，与落地页 ledeLead/ledeStrong/ledeTail 同一做法：
   // 强调标记的边界不能靠翻译字符串里的符号去猜。
-  'web.sync.password.lead': '口令',
+  'web.sync.password.lead': '旧格式的加密口令',
   'web.sync.password.strong': '不会',
-  'web.sync.password.tail': '被保存到磁盘，只存在于本次会话的内存中。它一旦丢失，已同步的数据将无法解密 —— 请自行妥善保管。没有口令时同步会被拒绝，服务端只接受端到端加密的载荷。',
+  'web.sync.password.tail': '被保存到磁盘，只存在于本次会话。已设置加密数据钥匙的数据，可在下方使用口令或已保存的恢复码解锁；尚未迁移的旧格式数据仍需要原口令。重置登录密码不能解密数据。',
+  'web.sync.vault.title': '加密数据钥匙',
+  'web.sync.vault.description': '这把钥匙用于解锁已同步的数据。它与登录密码分开，绝不会保存在浏览器里。',
+  'web.sync.devices.title': '已连接设备',
+  'web.sync.devices.description': '撤销会让这个账号的所有设备（包括当前设备）退出登录。设备离线时不会被远程擦除；重新登录后，请在可信设备上轮换数据密钥并迁移保留的密文。',
+  'web.sync.devices.loading': '正在加载设备…',
+  'web.sync.devices.empty': '暂时没有可管理的设备。',
+  'web.sync.devices.lastSeen': '最近活动：{date}',
+  'web.sync.devices.revoke': '撤销设备',
+  'web.sync.devices.revoking': '正在撤销…',
+  'web.sync.devices.confirm': '撤销后所有设备都必须重新登录。离线设备上的本地数据不会被远程擦除。确定继续吗？',
+  'web.sync.devices.revoked': '设备已撤销，所有设备都必须重新登录。请在可信设备重新登录后轮换数据密钥并迁移保留的密文。',
+  'web.sync.devices.revocationUncertain': '撤销请求的响应丢失了。本机已先退出登录；重新登录后请核对设备列表，再轮换数据密钥。',
+  'web.sync.devices.unauthorized': '会话已失效，请重新登录后再管理设备。',
+  'web.sync.devices.sessionChanged': '确认期间账号或服务器发生了变化，没有撤销任何设备。',
+  'web.sync.devices.error': '设备列表或撤销请求失败，请检查网络后重试。',
+  'web.sync.vault.accountRequired': '请先登录，再管理这个账号的加密数据钥匙。',
+  'web.sync.vault.createTitle': '创建加密数据钥匙',
+  'web.sync.vault.passphrase': '加密口令',
+  'web.sync.vault.create': '创建钥匙',
+  'web.sync.vault.recoveryLabel': '恢复码',
+  'web.sync.vault.recoveryHint': '请把这串恢复码保存到密码管理器或离线记录中。它只显示这一次，服务端无法替你找回。',
+  'web.sync.vault.recoveryResume': '这次轮换已经在之前准备好了。请输入你保存的恢复码以继续。',
+  'web.sync.vault.recoveryConfirm': '输入恢复码以确认',
+  'web.sync.vault.confirm': '确认并发布',
+  'web.sync.vault.cancel': '取消',
+  'web.sync.vault.unlockTitle': '解锁加密数据',
+  'web.sync.vault.unlock': '用口令解锁',
+  'web.sync.vault.recoveryCode': '恢复码',
+  'web.sync.vault.unlockRecovery': '用恢复码解锁',
+  'web.sync.vault.ready': '这台设备上的加密数据已经解锁。',
+  'web.sync.vault.recoveryRotationRequired': '恢复码解锁成功。请先设置新口令并保存新的恢复码，才能使用加密数据。',
+  'web.sync.vault.lock': '锁定数据钥匙',
+  'web.sync.vault.changeTitle': '新的口令与恢复码',
+  'web.sync.vault.newPassphrase': '新的加密口令',
+  'web.sync.vault.change': '更换口令',
+  'web.sync.vault.rotateRoot': '轮换数据密钥并迁移数据',
+  'web.sync.vault.rootRotationHint': '这会生成新的数据密钥，完成所有保留加密记录的迁移后才发布。',
+  'web.sync.vault.rootRotationProgress': '正在迁移加密数据：{completed}/{total}',
+  'web.sync.vault.legacyPassphrase': '旧版加密口令（仅用于迁移）',
+  'web.sync.vault.legacyPassphraseHint': '如果所有保留记录都已经使用数据钥匙加密，请留空。只有这个账号仍有旧版口令加密记录时，才输入旧口令。',
+  'web.sync.vault.busy': '正在加载加密数据钥匙…',
+  'web.sync.vault.error': '加密数据钥匙加载或使用失败。本地数据没有变化，请检查服务端后重试。',
+  'web.sync.vault.errorMismatch': '恢复码不匹配，请准确输入刚刚显示的恢复码。',
+  'web.sync.vault.errorConflict': '另一台设备已经更换了钥匙。请重新加载后再试。',
+  'web.sync.vault.errorRotation': '服务端要求先完成全部加密数据迁移，才能更换这把钥匙。',
   'web.sync.saveAndSync': '保存并同步',
   // 状态文案原先由 `features/sync/store.ts` 的 `describeStatus` 返回中文。
   // 句子现在搬到 SyncBar 里拼（state 只带数据），否则英文界面永远显示中文。
@@ -855,6 +957,37 @@ export const zhCN = {
   'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，而删掉它就没有任何登录方式了，所以不能删除。先添加一条新的，或者去设置页设一个登录密码，再删这条。',
   'web.passkeys.error.unauthorized': '登录状态已失效，请重新登录。',
   'web.passkeys.error.network': '连不上服务端，请稍后重试。',
+  // ── 注销账号（批次 E3）────────────────────────────────────────
+  // 🔴 失败那几句必须**同时**说"账号还在"和"本机没动"。这条路的下游是不可逆删除：
+  // 用户如果在一次 5xx 之后以为"已经注销了"，他会接着做下一步（比如把设备转卖），
+  // 而那一步此时是不安全的。
+  // 成功那句也划清作用域：这次动作只覆盖服务端 + **这台设备**，
+  // 备份与其它设备有各自的边界（ADR-0048 的分层实话，不写"彻底销毁"）。
+  'common.accountClosure.title': '注销账号',
+  'common.accountClosure.lead': '注销会永久删除这个账号在服务端的全部数据（同步历史与设备记录），而且不可撤销。',
+  'common.accountClosure.exportHint': '如果还想留着这些数据，先去「导出数据」存一份备份再回来。注销之后服务端就再也读不出来了。',
+  'common.accountClosure.confirmLocal': '我确认：这台设备上还没同步出去的数据，连同本机明文存储，也会一起被清除。',
+  'common.accountClosure.action': '注销这个账号',
+  'common.accountClosure.busy': '正在注销…',
+  // 🔴 `{count}` 是**现量**，不是修辞：这一句的存在理由就是把"这台设备上还有多少
+  // 东西没出去"变成一个具体的数，让用户在按下去之前看得见它。写成"可能有未同步数据"
+  // 等于没说。
+  'common.accountClosure.pending': '这台设备上还有 {count} 条改动没同步出去。注销会把它们一起清掉 —— 云端没有它们，之后也拿不回来。',
+  'common.accountClosure.cancel': '先不注销',
+  'common.accountClosure.confirmTitle': '确认注销这个账号？',
+  'common.accountClosure.entryHint': '删除云端账号，并清除这台设备上的数据',
+  'common.accountClosure.needLogin': '这台设备还没有登录，也没有可注销的账号。',
+  'common.accountClosure.done.erased': '账号已注销，这台设备上的本地副本也已清除。备份和你其它设备上的数据不在这次操作的范围里。',
+  'common.accountClosure.done.partial': '账号已注销，但这台设备上的本地数据只清掉了一部分，剩下的需要你手动处理。',
+  'common.accountClosure.done.eraseFailed': '账号已注销，但这台设备上的本地数据没能清干净，需要你手动处理。',
+  'common.accountClosure.failed.unconfigured': '还没有配置服务端地址，所以一个请求都没发 —— 账号还在，本机数据也没动。',
+  'common.accountClosure.failed.consentRequired': '你还没有同意这台设备的隐私规则，所以一个请求都没发 —— 账号还在，本机数据也没动。',
+  'common.accountClosure.failed.unauthorized': '登录状态已经失效，所以没有执行注销 —— 账号还在，本机数据也没动。请重新登录再来一次。',
+  'common.accountClosure.failed.rateLimited': '注销请求太频繁，暂时被拒绝了。账号还在，本机数据也没动，请过一会儿再试。',
+  'common.accountClosure.failed.serverError': '服务端没有完成注销。账号还在，本机数据也没动，请稍后重试。',
+  'common.accountClosure.failed.network': '连不上服务端，所以没有执行注销。账号还在，本机数据也没动。',
+  'common.accountClosure.failed.malformedResponse': '服务端回的内容我们认不出来，所以不算注销成功。账号可能还在 —— 确认之后再重试一次。本机数据也没动。',
+  'common.accountClosure.failed.other': '注销没有完成。账号还在，本机数据也没动。',
 
   // ── 设置页「修改登录密码」：两个秘密的界线在这里划一次 ──────────────
   //
@@ -1064,6 +1197,18 @@ export const zhCN = {
   'web.focus.config.locked': '计时进行中不能改时长 —— 先中止本轮，改完再开始。',
   'web.focus.config.a11y.minutes': '{label}时长，单位分钟',
   'web.focus.config.a11y.sessions': '{label}，单位个数',
+  // 工单 W7：专注详情面（四张概览卡 + 专注记录列表）。
+  // ⚠️ 卡上的标签**不带数量**，数字单独一格 —— 那样英文不需要为「1 session / 3 sessions」
+  // 再开一对兄弟词条，而 `web.focus.completedTodayOne` 那种成对词条的存在理由在这里不成立。
+  'web.focus.detail.title': '专注概览',
+  'web.focus.detail.todayCount': '今日番茄',
+  'web.focus.detail.todayDuration': '今日专注时长',
+  'web.focus.detail.totalCount': '总番茄',
+  'web.focus.detail.totalDuration': '总专注时长',
+  'web.focus.detail.records': '专注记录',
+  'web.focus.detail.recordsEmpty': '还没有专注记录。完成一轮就会出现在这里。',
+  'web.focus.detail.unlinked': '未关联任务',
+  'web.focus.detail.aborted': '中途放弃',
 
   // ── Web · 习惯 ────────────────────────────────────────────
   'web.habits.addPlaceholder': '新习惯，例如「喝水」',
@@ -1098,13 +1243,30 @@ export const zhCN = {
   'web.habits.repairAction': '补上',
   'web.habits.a11y.repair': '把 {date} 的「{name}」补上',
   // 新鲜开始：**不出现"你已经落后了"** —— 只陈述"过去的没有被清掉"。
-  'web.habits.freshStart': '已经 {days} 天没打卡了。最长 {longest} 天、累计 {total} 次都还在，重新开始不会清掉它们。',
+  'web.habits.freshStart': '已经 {days} 天没打卡了。最长 {longest} 天、累计 {total} 天都还在，重新开始不会清掉它们。',
   'web.habits.freshStartAction': '今天重新开始',
   'web.habits.a11y.freshStart': '今天为「{name}」重新打卡',
   // 三个指标里的第三个：**只增不减**的那个（累计）。
   // 中文无单复数，两句刻意逐字相同（en 侧才会不同）。
-  'web.habits.streak.total': '累计 {count} 次',
-  'web.habits.streak.totalOne': '累计 {count} 次',
+  'web.habits.streak.total': '累计 {count} 天',
+  'web.habits.streak.totalOne': '累计 {count} 天',
+  // ── 工单 W8：习惯统计的读侧（本月四格）。口径全在
+  //   `@heyta/domain#computeHabitPeriodStats`，这些句子只是它的投影：
+  //   「打卡」量的是**天**（不是次），完成率的分母是**已到期计划日**
+  //   （分母为 0 时没有率可言 ⇒ 界面上是占位句，不是 0%）。
+  //   ⚠️ 英文侧刻意用"名词在前、数字在后"的形状（`Check-in days…: {count}`），
+  //   与 `catalog.spec.ts` 的 `1 <复数名词>` HAZARD 同族 —— 词条表没有 ICU，
+  //   这些句子必须对 1 和 N 都成立，不配 `…One` 兄弟键。
+  'web.habits.stats.monthDays': '本月打卡 {count} 天',
+  // 🔴 率那一格必须自己说清"按天"：计数型习惯同屏会出现「完成率 0%」与「完成量 3 杯」
+  //   （目标 8 杯、今天 3 杯 ⇒ 今天不算达成），两个数都对、读起来自相矛盾（工单 §8.121 看图照出，
+  //   #39 的拍板：在率格里点明口径，而不是改算式或藏掉其中一个）。
+  'web.habits.stats.monthRate': '本月完成率（按天） {percent}%',
+  'web.habits.stats.monthRatePending': '本月完成率（按天） —',
+  'web.habits.stats.monthValue': '本月完成量 {value}',
+  'web.habits.stats.monthValueUnit': '本月完成量 {value} {unit}',
+  'web.habits.stats.totalValue': '总完成量 {value}',
+  'web.habits.stats.totalValueUnit': '总完成量 {value} {unit}',
   // 热力图文案由**我们**传给 react-activity-calendar —— 它的默认文案是英文，
   // 而 `{{count}}` 是**库自己的**占位符，必须原样留着（不是我们的 `{name}` 形状）。
   // ── M3 第七刀（habits）：共享热力图的两条文案 ──────────────
@@ -1133,15 +1295,70 @@ export const zhCN = {
   'web.habits.icon.a11y': '为「{name}」选图标',
   'web.habits.icon.a11yDefault': '「{name}」用默认图标',
 
+  // ── Web · 习惯的频次（工单 H5）────────────────────────────
+  // 🔴 判定侧**一直**是按频次数"计划日"的（`isScheduledOn` → `computeStreak`，
+  //    `habit-streak.ts:131/158/227/360`），这一批词条接上的是**写入口**那半米。
+  //    键名沿用 `web.habits.*`：移动端复用同一批（与新建 / 图标 / 目标那几处同一条决定 ——
+  //    端间同词，不各起一套）。
+  // ⚠️ `summary.interval` 里的 `{n}` **只会出现 ≥2**：`interval` 且 `everyNDays === 1`
+  //    在写入侧就被归一成 `daily`（`normalizeHabitFrequency`）。这条不是巧合，
+  //    英文因此不需要复数变形 —— 把归一拿掉，这里就会读出 "Every 1 days"。
+  'web.habits.freq.aria': '「{name}」的频次',
+  'web.habits.freq.toggle': '频次',
+  'web.habits.freq.daily': '每天一次',
+  'web.habits.freq.weekly': '每周挑几天',
+  'web.habits.freq.interval': '每隔几天',
+  'web.habits.freq.summary.daily': '每天',
+  'web.habits.freq.summary.weekly': '每周 {days}',
+  'web.habits.freq.summary.interval': '每 {n} 天',
+  // 中文没有单复数变化，这一条与上面逐字相同；它存在的理由是**词表形状**：
+  // 英文侧要靠 `…One` 兄弟条躲开 "Every 1 days"，调用方按 key 分支，两侧必须同键集。
+  'web.habits.freq.summary.intervalOne': '每 {n} 天',
+  'web.habits.freq.nDays': '每隔几天做一次',
+  'web.habits.freq.invalid': '「每隔几天」的天数要是一个 1 或更大的整数',
+  'web.habits.freq.intervalHint': '按日历固定隔 {n} 天排一次，起点不随建立习惯那天挪。',
+  'web.habits.freq.default': '回到每天',
+
+  // ── 习惯月历 + 补打卡（工单 H4）───────────────────────────
+  // 🔴 六档一句：档位词表是 `@heyta/domain#HabitDayState`，界面只负责把它念出来。
+  //    「不可点」也要有句子 —— 只画灰而不说原因，用户读到的是"应用坏了"。
+  'web.habits.month.grid': '{name} 在 {month} 的打卡月历',
+  'web.habits.month.window': '补打卡可以往回 {n} 天',
+  // 🔴 每句**自带 `{date}`**，不设 `{date}，{state}` 那种拼装模板：
+  //    那条模板除了一个全角逗号没有汉字，会被 `check:ui-language` 判成"拿别的语言占位"
+  //    （它抓的正是"整条只剩标点和占位符"这种假词条 —— 与工单 H5 那条 `separator = 、` 同一道闸）。
+  'web.habits.month.logged': '{date} 已打卡',
+  'web.habits.month.today': '{date}，今天还没打卡',
+  'web.habits.month.backfillable': '{date}，可以补打卡',
+  'web.habits.month.notScheduled': '{date}，这天本来不用打卡',
+  'web.habits.month.future': '{date}，还没到这天',
+  'web.habits.month.tooOld': '{date}，已超过补打卡窗口',
+  // 补白格**必须有自己的一句话**：上一月视图里的"今天"是一格尾随补白，
+  // 只按状态词表它会说「今天还没打卡」却点不动（= "点了没反应"那一族）。
+  'web.habits.month.outOfMonth': '{date}，邻月的日子，不在这个月里',
+
+  // ── 习惯年视图（工单 H7）─────────────────────────────────
+  // 年那一档只说"这一月过成什么样"，数全部来自领域层（逐月调用那一份月度裁决）。
+  // 🔴 「还没到这个月」与「这个月还没有可算的日」是**两句话**：前者分母为零因为未来，
+  //    后者因为这天都不归这条习惯管。合成一句就会把"没做"说成"还没到"。
+  'web.habits.year.grid': '{name} 在 {year} 年的打卡年视图',
+  'web.habits.year.achieved': '达成 {n} 天',
+  'web.habits.year.rate': '完成率 {n}%',
+  'web.habits.year.none': '这个月还没有可算的日',
+  'web.habits.year.future': '还没到这个月',
+  'web.habits.year.card': '{month}：{state}，达成 {achieved} 天',
+  'web.habits.year.summary': '全年达成 {achieved} 天，{state}',
+
   // ── Web · 习惯的「列表 + 窗格」─────────────────────────────
   'web.habits.list.aria': '习惯清单',
   'web.habits.pane.aria': '「{name}」的打卡记录',
+  'web.habits.pane.pickOne': '选一条习惯，这里看它的打卡与统计。',
   // 行首的 7 个点：日期本身已经在 `aria-label` 里，这里只说"打没打"。
   'web.habits.week.aria': '最近 7 天',
   'web.habits.week.done': '{date} 已打卡',
   'web.habits.week.missed': '{date} 没打卡',
   // 整行的读法：**三个数字一次说完**，屏幕阅读器不必逐 chip 猜。
-  'web.habits.row.aria': '「{name}」连续 {current} 天，最长 {longest} 天，累计 {total} 次',
+  'web.habits.row.aria': '「{name}」连续 {current} 天，最长 {longest} 天，累计 {total} 天',
   'web.habits.row.selectA11y': '查看「{name}」的打卡记录',
 
   // ── Web · 热力图共用文案（习惯页与成长页）─────────────────
@@ -1200,7 +1417,7 @@ export const zhCN = {
   'web.growth.stat.focus.unit': '分钟',
   'web.growth.year.title': '这一年',
   'web.growth.year.note': '一格是一天。有记录的日子才会亮起来 —— 打卡、完成任务、跑完一轮专注都算。',
-  'web.growth.year.heatmap': '最近一年共 {{count}} 次记录',
+  'web.growth.year.heatmap': '最近一年共 {count} 次记录',
   'web.growth.milestones.title': '里程碑',
   'web.growth.milestones.note': '只增不减。中断不会让这些数字变小。',
   'web.growth.milestone.allReached': '{name}的里程碑已全部达成',
@@ -1303,6 +1520,17 @@ export const zhCN = {
   'web.due.prevMonth': '上个月',
   'web.due.nextMonth': '下个月',
   'web.due.dayLabel': '{month}月{day}日',
+  // 🔴 时刻与日期是**同一个 `dueDate` 数字**的两种精度，不是第二个字段：
+  //    留空 = 本地零点 = "只到日"，填了 = 那天几点几分。
+  //    「全天」这个词与时间线那条带同源 —— 两处说不同话就会被读成两件事。
+  // 🔴 命名空间是 `common.` 而不是 `web.`：这四句说的是**这条截止有没有时刻**
+  //    这件事，两端共读一份（R15a 把 profile 那 19 键从 `web.` 搬进 `common.` 是
+  //    同一条裁决）。键名写"哪个壳画的"，下一端要复用时就只能再抄一份值。
+  'common.due.timeLabel': '时刻',
+  'common.due.allDay': '全天',
+  // 占位写"时:分"而不是照抄英文的 HH:MM —— 它是给人看的形状提示，不是格式代码。
+  'common.due.timePlaceholder': '时:分',
+  'common.due.timeAria': '任务「{title}」的截止时刻（留空表示全天）',
 
   // ── Web · 重复（B2-3）───────────────────────────────────────
   //    🔴 这一族补的是**两端不一致**：移动端任务详情早就能设重复，Web 一个入口都没有。
@@ -1464,15 +1692,22 @@ export const zhCN = {
   'web.ai.disclosure.fallbackLead': '如果它失败，会接着依次尝试：',
   'web.ai.disclosure.retentionLead': '保留：',
   // 「留多久」的**结构化披露** → 词条。`disclosure.retentionDisclosure.kind`
-  // 是判别式（`not-applicable` / `third-party-decides` / `undecided`），
+  // 是判别式（`not-applicable` / `third-party-decides` / `metadata-only`），
   // 界面按它取词条，**不再渲染 `packages/ai` 的中文兼容句 `retentionText`**。
   // 那两句兼容句仍然留在 `packages/ai`（零依赖的包，CLI 与 check-ai-coverage 在用），
   // 只是 web 壳里没有生产消费者了。
   'web.ai.disclosure.retentionNotApplicable': '未离开设备，不涉及服务端保留。',
   'web.ai.disclosure.retentionThirdParty': '保留策略由你自己的端点决定，heyta 无从知晓。',
-  // 端点没有给出保留策略时的**面板兜底句**。它归 web 壳所有；
-  // `packages/ai` 那条真正的披露链（来自跨包函数）仍由另一批单独处理（计划 §9）。
-  'web.ai.disclosure.retentionUndecided': '未定案 —— 在 heyta 说明清楚之前，这个端点不允许启用。',
+  // 托管档（ADR-0054 定案）。🔴 `{metadataDays}` 的取值**只能来自 `packages/ai` 的常量**
+  // （`MANAGED_AI_METADATA_RETENTION_DAYS`，壳从披露对象里取）—— 词条表里不许写死天数，
+  // 否则改了常量而这里没改，界面就会报出一个不存在的保留期。
+  // 🔴 这句必须点到**两个载体**（计数表 + 每次调用一行的运维日志）。少写一个就不是
+  // "保守"而是少说了一样真存在的数据，而没人会发现 —— `check:ai-coverage` 有一条臂拦它。
+  // ⚠️ 天数只给计数表；日志那一侧的上限是**容量不是时间**，所以绝不给它写一个天数
+  //（写了就是关于一个不存在的定时删除的承诺）。
+  // ⚠️ "该计费周期结束后删除"是**策略**，删除作业在代码里（`purgeExpiredAiUsageCounters`）；
+  // 这句话**不许先于该作业的部署上线** —— 顺序记在 ADR-0054 §8。
+  'web.ai.disclosure.retentionMetadataOnly': '正文不留存，只在一次调用的内存里存在；服务端只留两类元数据，都不含正文：一张计数表（账号、计费周期、次数、最后使用时间），自最后一次使用起保留 {metadataDays} 天，且该计费周期结束后删除；以及每次调用一行的运维日志（时间、功能名、结果、字节数、耗时），按日志容量滚动清除，没有定时删除。',
   // 端点健康状态。⚠️ 英文刻意避开 `{n} times` / `{n} seconds` 这种句式：
   // 词条表没有复数规则，而英文里 `1 times` 是错的。改写句式（`Recent failures: 1`）
   // 比加一串 `…One` 兄弟词条更不容易漏 —— 中文不受影响，逐字沿用兼容句。
@@ -1550,6 +1785,33 @@ export const zhCN = {
   'web.ai.tools.intentCreate': '新建任务「{title}」',
   'web.ai.tools.intentUpdate': '修改任务 {id}',
   'web.ai.tools.intentComplete': '把任务 {id} 标记完成',
+  'web.ai.tools.intentCompleteBatch': '把这 {count} 个任务标记完成',
+  'web.ai.tools.intentCreateProject': '新建清单「{name}」',
+  'web.ai.tools.intentCreateHabit': '新建习惯「{name}」',
+  'web.ai.tools.intentCreateTag': '新建标签「{name}」',
+  'web.ai.tools.intentSetTaskTags': '把任务 {id} 的标签整组换成 {count} 个',
+  'web.ai.tools.intentCreateNote': '新建便签：{content}',
+  'web.ai.tools.intentUpdateNote': '改写便签 {id} 的正文：{content}',
+  'web.ai.tools.intentRecordCheckin': '给习惯 {habitId} 在 {date} 记一次打卡',
+  'web.ai.tools.todayLabel': '今天',
+  'web.ai.tools.intentLogFocus': '记一段{kind}：计划 {planned} 分钟',
+  'web.ai.tools.intentLogFocusWithActual': '记一段{kind}：计划 {planned} 分钟，实际 {actual} 分钟',
+  'web.ai.tools.focusKindWork': '工作',
+  'web.ai.tools.focusKindShortBreak': '短休息',
+  'web.ai.tools.focusKindLongBreak': '长休息',
+  'web.ai.tools.intentCreateReminderAt': '给任务 {id} 加一条提醒：{when}',
+  'web.ai.tools.intentCreateReminderBeforeDue': '给任务 {id} 加一条提醒：比截止早 {minutes} 分钟',
+  'web.ai.tools.intentCreateReminderIncomplete': '给任务 {id} 加提醒，但没说清时刻 —— 要选一个时间或填"提前几分钟"',
+  // 🔴 W10：`LocalApiWriteIntent` 每加一个封闭变体，这里就**必须**同时长出一句 ——
+  // 提案卡不许出现"未知操作"，那是让用户对着没读过的东西点确认。
+  // 谁来拦：两道**编译期**的闸，都比测试硬 ——
+  //   ① `apps/web/src/features/ai/AiToolRun.tsx` 的 `intentText()` 是对
+  //      `intent.action` 的**穷尽 switch**，漏一个变体 `tsc` 报 TS2366（缺返回值）；
+  //   ② key 拼错 / 只加中文不加英文 ⇒ `MessageKey` 与 `en: Record<MessageKey, string>`
+  //      当场报错（见本文件头"漏翻译是编译失败"那条）。
+  // 实测：本轮先加 case 不加词条，`pnpm --filter @heyta/web typecheck` 立刻两条 TS2345。
+  'web.ai.tools.intentCreateEvent': '新建倒数纪念日「{title}」（{date}）',
+  'web.ai.tools.intentUpdateEvent': '修改倒数纪念日 {id}',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',
@@ -1658,9 +1920,15 @@ export const zhCN = {
   'web.ai.settings.remote.strong': '不受端到端加密保护',
   'web.ai.settings.remote.tail': '，与任务同步是不同的通道。每个功能需要单独授权。',
   'web.ai.settings.endpoints.title': '端点',
-  // 首词 `heyta` 走 `common.brand`，所以这里从"即将提供"开始。
-  'web.ai.settings.managed.offer': '即将提供',
-  'web.ai.settings.managed.rest': '云端 AI 服务（仍在开发中，暂时无法启用）。在那之前，需要你自己接一个端点（本机或远端）。托管模式的性质不一样：用它的请求，你的任务内容会',
+  // 首词 `heyta` 走 `common.brand`，所以这里从动词起。
+  // 🔴 2026-10-05（ADR-0054）把理由从"仍在开发中"换成"界面还没那个开关"：
+  //    服务端那一半（额度计量 / 境内白名单 / 保留策略 / 解除禁售）**已经落地**，
+  //    再说"还在开发"就是把做完的事说成没做完 —— 而结论（这里点不动）仍然为真。
+  // ⚠️ 这句里不许出现 `**`（JSX 不解析 markdown，`ai-settings.spec.tsx` 有一条测试专门钉它），
+  //    也不许出现「没有」（同文件用 `not.toContain('没有')` 挡"我们不提供托管 AI"的回潮 ——
+  //    那条判据粗，所以文案绕开它；想动文案先弄清那条测试为什么在那）。
+  'web.ai.settings.managed.offer': '暂不在这里开放',
+  'web.ai.settings.managed.rest': '云端 AI 服务（服务端那一半已经做完：额度计量、境内供应商白名单、保留策略、解除禁售，见 ADR-0054；但这个版本的界面还没挂上那个开关，所以这里点不动）。在那之前，需要你自己接一个端点（本机或远端）。托管模式的性质不一样：用它的请求，你的任务内容会',
   'web.ai.settings.managed.strongPlain': '以明文到达 heyta 的服务器',
   'web.ai.settings.managed.mid': '，所以它',
   'web.ai.settings.managed.strongNot': '不是',
@@ -1698,13 +1966,13 @@ export const zhCN = {
   'web.ai.settings.features.hintStrong': '列表顺序就是尝试顺序',
   'web.ai.settings.features.hintTail': '（靠前的先试）。',
   'web.ai.settings.features.empty': '先添加端点',
-  'web.ai.settings.consentLead': '「{feature}」有远端端点，需要你授权数据出境。',
+  'web.ai.settings.consentLead': '「{feature}」的端点不在这台设备上，需要你批准后内容才会离开本机。',
   'web.ai.settings.grant': '授权',
   'web.ai.settings.gapLead': '⚠️ 「{feature}」需要',
   'web.ai.settings.gapMid': '，但',
   'web.ai.settings.gapTail': '没有声明它 —— 这个功能会一直不工作。',
   'web.ai.settings.gapFix': '给「{name}」补上',
-  'web.ai.settings.granted': '已授权数据出境',
+  'web.ai.settings.granted': '已批准内容离开本机',
   'web.ai.settings.revoke': '撤销',
   // ── 对话助手（ADR-0045）：第二个授权前端 ──────────────────────────
   // 🔴 这一块的存在理由：`localApi.grants` 管的是"**外部程序**能不能调这个工具"
@@ -1740,6 +2008,8 @@ export const zhCN = {
   'web.ai.chat.noTrace': '没有调用工具',
   'web.ai.chat.stoppedLead': '在上界处停下了：',
   'web.ai.chat.disclaimer': '内容由 AI 生成，可能有错。落库前请自己看一眼。',
+  'web.ai.chat.historyLocalOnly': '这段对话只保存在这台设备上：不同步到其他设备，也不会发送到任何地方。',
+  'web.ai.chat.expiredProposal': '这段对话是从本机恢复的。其中那条你还没确认的改动已经失效 —— 要改请重新说一次。',
   'web.ai.chat.resultAria': '助手的回答',
   'web.ai.assistant.failure.emptyText': '还没有输入内容。',
   'web.ai.assistant.failure.textTooLong': '这句话太长了，助手只处理短命令。',
@@ -1861,6 +2131,38 @@ export const zhCN = {
   'web.subscription.notice.localData': '这台设备上的全部数据仍然可以正常查看、编辑和导出，不需要续费。',
   'web.subscription.notice.selfHost': '改用你自己的服务器',
   'web.subscription.notice.a11y': '托管同步状态提示',
+  // ── 托管同步续费入口（临时方案：再次下单 = 在当前到期日之后叠加 30 天）────
+  // 🔴 措辞里不许出现"自动续费"：全仓库没有任何签约/代扣（ADR-0017 的通道选型
+  // 与 `wechat.adapter.ts` 都只有单次 Native 支付）。承诺了就是假话。
+  'web.subscription.renew.title': '托管同步续费',
+  'web.subscription.renew.intro': '一次性购买 30 天，直接叠加在你当前的到期日之后；不会自动扣款，到期了数据也一个字都不动。',
+  'web.subscription.renew.couponPlaceholder': '促销码（可选）',
+  'web.subscription.renew.action': '下单续费',
+  'web.subscription.renew.busy': '正在下单…',
+  'web.subscription.renew.amount': '应付金额 {amount}',
+  'web.subscription.renew.validUntil': '这一单在 {time} 之前有效',
+  'web.subscription.renew.payLinkLabel': '支付链接',
+  'web.subscription.renew.payHint': '用手机微信打开这个链接就能完成付款。桌面端的二维码渲染还没接入（零新依赖约束），先用链接这条路。',
+  'web.subscription.renew.copy': '复制链接',
+  'web.subscription.renew.copied': '已复制',
+  'web.subscription.renew.rejected': '这个码没有生效：{code}',
+  'web.subscription.renew.fail.provider': '这台实例没有配置收款通道，现在买不了。',
+  'web.subscription.renew.fail.unauthorized': '先登录你的 heyta 账号，才能下单。',
+  'web.subscription.renew.fail.unconfigured': '还没有填写同步服务器地址，先在同步设置里配好。',
+  'web.subscription.renew.fail.sellable': '这一档现在还不能卖，服务端拒绝了这笔下单。',
+  'web.subscription.renew.fail.network': '连不上服务端，这一单没有下成。',
+  'web.subscription.renew.fail.unknown': '下单失败（{code}）。',
+  'mobile.entitlement.renew.action': '下单续费',
+  'mobile.entitlement.renew.busy': '正在下单…',
+  'mobile.entitlement.renew.opened': '已为你打开付款页',
+  'mobile.entitlement.renew.payHint': '如果微信没有自动打开，复制这条链接后用手机浏览器打开它。',
+  'mobile.entitlement.renew.payLinkLabel': '支付链接',
+  'mobile.entitlement.renew.copy': '复制',
+  'mobile.entitlement.renew.copied': '已复制',
+  'mobile.entitlement.renew.fail.provider': '这台实例没有配置收款通道，现在买不了。',
+  'mobile.entitlement.renew.fail.unauthorized': '先登录你的 heyta 账号，才能下单。',
+  'mobile.entitlement.renew.fail.network': '连不上服务端，这一单没有下成。',
+  'mobile.entitlement.renew.fail.unknown': '下单失败（{code}）。',
   // ── AI 面板的失败态（第 18 轮）───────────────────────────────
   // 🔴 这 11 条原来住在 `packages/app-host` 里（`*Outcome.message`），
   // 四个面板整句渲染它 → 英文界面露中文。现在壳**按 `reason` 取词条**，
@@ -1887,7 +2189,7 @@ export const zhCN = {
   // ⚠️ 别在这里重新概括：同一句用户可见文案有两个来源就一定会漂移（见 §7.10 通道 #5）。
   // ⚠️ 引号照抄 `packages/ai`（ASCII 双引号）—— 有测试逐字比对，别改成「」。
   'web.ai.failure.cause.notConfigured': 'AI 未启用。在设置里选择"使用自己的 AI 端点"即可开启。',
-  'web.ai.failure.cause.egressNotAuthorized': '该功能需要你先授权数据出境。',
+  'web.ai.failure.cause.egressNotAuthorized': '该功能需要你先批准内容离开本机。',
   'web.ai.failure.cause.noRoute': '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。',
   'web.ai.failure.cause.fallbackNeedsConsent': '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。',
   'web.ai.failure.cause.network': '连不上端点。检查网络，以及端点地址是否可达。',
@@ -2064,7 +2366,7 @@ export const zhCN = {
   //    只支持空库；这个是从另一个产品迁进来、走普通 op、可与既有数据共存。
   //    两套承诺必须在界面上分开说，所以是两组词条。
   'web.ticktick.title': '从滴答清单导入',
-  'web.ticktick.intro': '选一份滴答清单导出的 CSV 备份。**先看预览，确认后才写入** —— 预览里的数字与真的写进去的是同一次解析。',
+  'web.ticktick.intro': '选一份滴答清单导出的 CSV 备份。先看预览，确认后才写入 —— 预览里的数字与真的写进去的是同一次解析。',
   'web.ticktick.fileLabel': '滴答清单 CSV 备份',
   'web.ticktick.picked': '已选择：{name}',
   'web.ticktick.ticktickOnly': '目前只认滴答清单导出的 CSV。Todoist 的解析还没做，界面上不写"支持"两个字。',
@@ -2134,6 +2436,10 @@ export const zhCN = {
   'common.weekday.fri': '五',
   'common.weekday.sat': '六',
   'common.weekday.sun': '日',
+  // R13 年档的标题。🔴 它必须**单独有一条**，不能拿 `monthTitle` 顶：
+  // 年档摊开的是整年 12 个月，标题说「2026年10月」会把人指回某一个格子。
+  // 英文那边就是裸年份 —— 中文需要一个「年」字才读得出这是个年份而不是编号。
+  'common.date.yearTitle': '{year}年',
   'common.date.monthTitle': '{year}年{month}月',
   'common.date.dayTitle': '{month}月{day}日 星期{weekday}',
   // R11 批三：周视图的标题。**措辞按 locale 各排一次序**（中文把年份放在最前，
@@ -2153,6 +2459,20 @@ export const zhCN = {
   'web.reminder.notify.denied': '通知已被浏览器拒绝。要重新开启，请在浏览器的站点设置里改。',
   'web.reminder.notify.limit': '⚠️ 通知只在 heyta 开着的时候发得出来。应用关掉后不会响 —— 后台唤醒需要另一套协议，目前还没有。',
   'web.reminder.notify.body': '该做「{title}」了',
+  // ── 提醒的**长提前量档位**（W9 ①，2026-10-03）──
+  // 🔴 这四条**必须与 `REMINDER_LONG_OFFSET_PRESETS_MS` 一一对应**，映射写在
+  //    `apps/web/src/features/reminders/reminder-tiers.ts` 的 `longOffsetMessageKey`
+  //    （`default` 分支直接抛，就是防"领域层加了一档、这里忘了补 key"）。
+  // ⚠️ 键名里的 `2d/3d/1w/30d` 是契约的一部分：文案说"提前 3 天"，宿主就必须建
+  //    "截止前 3 个**日历日**"（不是 72 小时 —— 跨夏令时会漂一小时，见 W9 ③）。
+  // 为什么单独一组、不并进上面的 `reminder.offset.*`：那一组是共享组件
+  // `ReminderList` 的下标契约（web 与 mobile 各有一份 key 数组），移动端还没有
+  // 这几档的词条，硬并进去会让移动端一打开提醒面板就抛。
+  'web.reminder.offset.groupLabel': '更早（按天）',
+  'web.reminder.offset.2d': '提前 2 天',
+  'web.reminder.offset.3d': '提前 3 天',
+  'web.reminder.offset.1w': '提前 1 周',
+  'web.reminder.offset.30d': '提前 30 天',
   'web.search.title': '搜索',
   'web.search.placeholder': '搜任务标题、备注、便签正文',
   'web.search.tasksSection': '任务',
@@ -2172,11 +2492,8 @@ export const zhCN = {
   'web.calendar.title': '日历',
   'web.calendar.prevMonth': '上个月',
   'web.calendar.nextMonth': '下个月',
-  'web.calendar.prevWeek': '上一周',
-  'web.calendar.nextWeek': '下一周',
-  'web.calendar.view.aria': '视图',
-  'web.calendar.view.month': '月',
-  'web.calendar.view.week': '周',
+  // 🔴 轴整列空白时必须说这一句：不说，"这天没定到具体时刻"与"日视图没接上数据"
+  //    在界面上长得一模一样（后者本仓为它记过一整页账）。
   'web.calendar.weekShort': '{n}周',
   'web.calendar.backToToday': '回到今天',
   'web.calendar.monthTitle': '{year}年{month}月',
@@ -2513,6 +2830,49 @@ export const zhCN = {
   // 于是**不敢删**——一个不敢用的功能等于没有。
   'mobile.lists.removeHint': '删除清单不会删掉里面的任务，它们会回到「收集箱」。',
   'mobile.lists.remove': '删除清单「{name}」',
+  // ── 行内改名 / 归档（2026-10-03 多端第二批）─────────────────
+  // 这几句由共享组件 `OrganizerList` 的 `labels.rename` / `labels.archive` 消费，
+  // 两端同一套 —— 同一句话不许两个端各写一份。
+  // 🔴 无障碍名必须带上是哪一条：读屏用户听到一串「重命名」而无从分辨改哪个。
+  'common.organizer.rename.button': '重命名「{name}」',
+  'common.organizer.rename.save': '保存名称',
+  'common.organizer.rename.cancel': '取消改名',
+  // 归档 = 隐藏但保留数据。「归档」和「取消归档」必须是两句话术 ——
+  // 两个状态都叫同一个名字的按钮，用户按第二下时不知道自己在做什么。
+  'common.organizer.archive.button': '归档「{name}」',
+  'common.organizer.archive.unarchive': '取消归档「{name}」',
+  'common.organizer.folder.button': '把「{name}」移入文件夹',
+  'common.organizer.folder.title': '移入文件夹',
+  'common.organizer.folder.none': '不放进文件夹（顶级）',
+  'common.organizer.folder.current': '（当前位置）',
+  'common.organizer.folder.reject.projectNotFound': '这条清单已经不在了（可能刚被删除，或同步还没到）',
+  'common.organizer.folder.reject.parentNotFound': '目标文件夹不存在',
+  'common.organizer.folder.reject.self': '清单不能放进它自己里面',
+  'common.organizer.folder.reject.cycle': '这样会形成循环：清单不能放进自己的子清单里',
+  'common.organizer.folder.reject.parentNotTopLevel': '文件夹里只能放清单，不能再放一个文件夹',
+  'common.organizer.folder.reject.hasChildren': '这条清单里面有别的清单，文件夹不能再放进文件夹',
+  'common.organizer.folder.reject.unknown': '移动失败，请稍后重试',
+  'common.organizer.showArchived': '显示已归档',
+  'common.organizer.hideArchived': '收起已归档',
+  // ── 删除确认（2026-10-03 回收站与归档 W4b）────────────────────
+  // 由共享组件 `OrganizerList` 的 `labels.confirmRemove` 消费，两端同一套。
+  // 🔴 `impactTags` 这一句是这一档存在的全部理由，两个方向的误判都要堵上：
+  // 「它挂在 8 条任务上」会被读成"删它会动那 8 条任务"（于是不敢删）；
+  // 而"标签随时可以再建一个"也不成立 —— 新建的同名标签是**新 id**，
+  // 那 8 条任务的归属不会自己回来。
+  'common.organizer.confirm.ask': '确定要删除「{name}」吗？',
+  'common.organizer.confirm.impactTags': '它挂在 {count} 条任务上。这些任务不会被删除，只是不再带这个标签。',
+  'common.organizer.confirm.delete': '确认删除',
+  'common.organizer.confirm.cancel': '取消删除',
+  // 习惯的改名与删除入口（保存/取消复用上面那两句，不另立一份同义词条）。
+  'common.habits.rename.button': '重命名习惯「{name}」',
+  'common.habits.rename.label': '习惯名称',
+  'common.habits.delete.button': '删除习惯「{name}」',
+  // 工单 W6：计数型习惯"今天记了几格"。句子写成 `{value}/{target}{unit}` 而不是
+  // 三个占位符裸串 —— 纯占位符的 zh 词条在 `check:ui-language` 眼里与"忘了翻译"同一件事。
+  'common.habits.amount.today': '今天 {value}/{target} {unit}',
+  'common.habits.amount.plus': '给「{name}」加 1',
+  'common.habits.amount.minus': '给「{name}」减 1',
 
   // ── 标签 ───────────────────────────────────────────────────
   // 清单和标签在数据上是两个实体，在产品上是同一件事的两个面（组织任务）：
@@ -2603,6 +2963,9 @@ export const zhCN = {
   'mobile.profile.entry.settings.hint': '同步凭据、桌面小组件与语言',
   'mobile.profile.section.sync': '同步',
   'mobile.profile.section.status': '状态',
+  // 「我的」里那条托管同步权益。只有服务端**明确说**有才显示这一行
+  // （`entitled` / `denied`），未配置与探测失败一律不显示 —— 见 `EntitlementSection.tsx`。
+  'mobile.profile.entitlement.entitled': '官方托管同步已开启',
   'mobile.profile.section.language': '语言',
   'mobile.profile.section.lists': '清单',
   // 🔴 认证入口在这一屏的**顶部卡片**（一级可见）—— 规范 §3.1 的「前置」落点。
@@ -2612,6 +2975,10 @@ export const zhCN = {
   'mobile.profile.account.signInHint': '用邮箱或通行密钥登录；登录后自动接上同步，不必手抄令牌。',
   'mobile.profile.account.signedInLabel': '当前账号',
   'mobile.profile.account.signedInHint': '已拿到访问令牌。要换账号或补一条凭据，重新登录一次即可。',
+  'mobile.profile.nickname.hint': '点按这一行即可修改昵称。',
+  // 🔴 这一句必须与"图不行"分开：iOS 侧还没有读图通道，说"这张图解不开"会把人
+  // 支去换照片，而换多少张都一样。真相是这台设备暂时没有这条通道。
+  'mobile.profile.avatar.noChannel': '这台设备还不能读取本机里的图片，请先在网页版更换头像；换好之后这里会显示同一张。',
   'mobile.profile.account.offline': '还没登录',
   // ⚠️ 表单搬进设置面之后，"下面那一段"不再成立 —— 指路要说**现在**的位置，
   // 否则用户在「我的」上找一圈找不到表单，会以为功能没了。
@@ -2642,6 +3009,56 @@ export const zhCN = {
   'mobile.profile.lastSync.label': '上次成功同步',
   'mobile.profile.lastSync.never': '从未',
   'mobile.profile.clearCredentials': '清除本机保存的凭据',
+  'mobile.vault.title': '加密数据钥匙',
+  'mobile.vault.description': '这把钥匙用于解锁已同步的数据。它与登录密码分开，口令和恢复码只留在这台设备上。',
+  'mobile.vault.devicesTitle': '已连接设备',
+  'mobile.vault.devicesDescription': '撤销会让这个账号的所有设备（包括当前设备）退出登录。设备离线时不会被远程擦除；重新登录后，请在可信设备上轮换数据密钥并迁移保留的密文。',
+  'mobile.vault.devicesLoading': '正在加载设备…',
+  'mobile.vault.devicesEmpty': '暂时没有可管理的设备。',
+  'mobile.vault.devicesLastSeen': '最近活动：{date}',
+  'mobile.vault.devicesRevoke': '撤销设备',
+  'mobile.vault.devicesRevoking': '正在撤销…',
+  'mobile.vault.devicesConfirmTitle': '撤销设备',
+  'mobile.vault.devicesConfirm': '撤销后所有设备都必须重新登录。离线设备上的本地数据不会被远程擦除。确定继续吗？',
+  'mobile.vault.devicesRevoked': '设备已撤销，所有设备都必须重新登录。请在可信设备重新登录后轮换数据密钥并迁移保留的密文。',
+  'mobile.vault.devicesRevocationUncertain': '撤销请求的响应丢失了。本机已先退出登录；重新登录后请核对设备列表，再轮换数据密钥。',
+  'mobile.vault.devicesUnauthorized': '会话已失效，请重新登录后再管理设备。',
+  'mobile.vault.devicesSessionChanged': '确认期间账号或服务器发生了变化，没有撤销任何设备。',
+  'mobile.vault.devicesCleanupFailed': '本机已退出登录，但安全本地清理需要重试后才能再次信任这台设备。',
+  'mobile.vault.devicesError': '设备列表或撤销请求失败，请检查网络后重试。',
+  'mobile.vault.accountRequired': '请先登录，再管理这个账号的加密数据钥匙。',
+  'mobile.vault.createTitle': '创建加密数据钥匙',
+  'mobile.vault.passphrase': '加密口令',
+  'mobile.vault.create': '创建钥匙',
+  'mobile.vault.recoveryLabel': '恢复码',
+  'mobile.vault.recoveryHint': '请把这串恢复码保存到密码管理器或离线记录中。它只显示这一次，服务端无法替你找回。',
+  'mobile.vault.recoveryResume': '这次轮换已经在之前准备好了。请输入你保存的恢复码以继续。',
+  'mobile.vault.recoveryConfirm': '输入恢复码以确认',
+  'mobile.vault.confirm': '确认并发布',
+  'mobile.vault.cancel': '取消',
+  'mobile.vault.unlockTitle': '解锁加密数据',
+  'mobile.vault.unlock': '用口令解锁',
+  'mobile.vault.recoveryCode': '恢复码',
+  'mobile.vault.unlockRecovery': '用恢复码解锁',
+  'mobile.vault.ready': '这台设备上的加密数据已经解锁。',
+  'mobile.vault.recoveryRotationRequired': '恢复码解锁成功。请先设置新口令并保存新的恢复码，才能使用加密数据。',
+  'mobile.vault.legacyMigrationRequired': '旧版加密数据尚未迁移。请使用原加密口令完成数据密钥轮换后，才能同步或写入加密数据。',
+  'mobile.vault.lock': '锁定数据钥匙',
+  'mobile.vault.remember': '在这台设备上记住解锁状态',
+  'mobile.vault.changeTitle': '新的口令与恢复码',
+  'mobile.vault.newPassphrase': '新的加密口令',
+  'mobile.vault.change': '更换口令',
+  'mobile.vault.rotateRoot': '轮换数据密钥并迁移数据',
+  'mobile.vault.rootRotationHint': '只有所有保留的加密记录迁移完成后，才会发布新的数据密钥。',
+  'mobile.vault.rootRotationProgress': '正在迁移加密数据：{completed}/{total}',
+  'mobile.vault.busy': '正在加载加密数据钥匙…',
+  'mobile.vault.error': '加密数据钥匙加载或使用失败。本地数据没有变化，请检查服务端后重试。',
+  'mobile.vault.errorMismatch': '恢复码不匹配，请准确输入。',
+  'mobile.vault.errorRememberedKey': '记住的钥匙不属于这个账号，请用口令或恢复码解锁。',
+  'mobile.vault.errorConflict': '另一台设备已经更换了钥匙。请重新加载后再试。',
+  'mobile.vault.errorRotation': '服务端要求先完成全部加密数据迁移，才能更换这把钥匙。',
+  'mobile.vault.logoutCleanupFailed': '加密钥匙未能从这台设备清除。凭据已清掉；请先重试清理，再使用这个账号。',
+  'mobile.vault.retryCleanup': '重试清除加密钥匙',
   // 🔴 这句是**面向用户的陈述**，说错了就是应用在骗人 —— 迁移时可以"只搬不改"，
   // 但每做完一个功能就必须回来改它。原句是"日历、专注、清单与标签管理尚未实现"：
   //   日历（`CalendarScreen`）、专注（`FocusScreen`）先做完 → 去掉；
@@ -2687,7 +3104,7 @@ export const zhCN = {
   'mobile.entity.TASK': '任务',
   'mobile.entity.PROJECT': '清单',
   'mobile.entity.TAG': '标签',
-  'mobile.entity.NOTE': '笔记',
+  'mobile.entity.NOTE': '便签',
   'mobile.entity.TASK_REPEAT_CFG': '重复规则',
   'mobile.entity.REMINDER': '提醒',
   'mobile.entity.HABIT': '习惯',
@@ -2763,10 +3180,10 @@ export const zhCN = {
   'mobile.growth.streak.empty': '还没有习惯。在网页端建好习惯后会自动同步到这里。',
   'mobile.growth.streak.current': '当前连续（天）',
   'mobile.growth.streak.longest': '最长 {days} 天',
-  'mobile.growth.streak.total': '累计 {count} 次',
+  'mobile.growth.streak.total': '累计 {count} 天',
   'mobile.growth.streak.repair': '昨天还能补回来——补完是 {days} 天',
-  'mobile.growth.streak.freshStart': '距上次 {days} 天。最长 {longest} 天、累计 {total} 次都还在。',
-  'mobile.growth.streak.a11y': '{name}：当前连续 {current} 天，最长 {longest} 天，累计 {total} 次',
+  'mobile.growth.streak.freshStart': '距上次 {days} 天。最长 {longest} 天、累计 {total} 天都还在。',
+  'mobile.growth.streak.a11y': '{name}：当前连续 {current} 天，最长 {longest} 天，累计 {total} 天',
 
   // 里程碑（L3）。累计只加不减，没有扣分项。
   'mobile.growth.milestones.title': '里程碑',
@@ -2800,7 +3217,7 @@ export const zhCN = {
   // （本地与云端）都还在 —— Web 的措辞没有这一句，照抄会漏掉这个事实。
   'mobile.trash.title': '回收站',
   'mobile.trash.entry': '回收站',
-  'mobile.trash.entry.hint': '已删除的任务可以在这里恢复',
+  'mobile.trash.entry.hint': '已删除的任务、便签、清单和习惯可以在这里恢复',
   // ── 通知中心 / 活动（批二，多端覆盖审计 P0-2）────────────────────
   //    通知 kind 是封闭词表（referral-activated），措辞与 web 的
   //    web.inbox.* 同口径；服务端只存 kind + payload，话在这里说。
@@ -2883,9 +3300,9 @@ export const zhCN = {
   'mobile.security.passkeys.delete': '删除',
   'mobile.security.passkeys.deleteConfirm': '再点一次确认删除',
   'mobile.security.passkeys.deleteTitle': '删除这条通行密钥？',
-  'mobile.trash.intro': '这里放着已删除的任务。恢复后它会回到原来的位置。',
+  'mobile.trash.intro': '这里放着已删除的任务、便签、清单和习惯。恢复后它会回到原来的位置。',
   'mobile.trash.empty.title': '回收站是空的',
-  'mobile.trash.empty.hint': '在任务页删除的任务会先放到这里',
+  'mobile.trash.empty.hint': '删掉的任务、便签、清单和习惯会先放到这里',
   'mobile.trash.deletedAt': '删除于 {date}',
   'mobile.trash.restore': '恢复',
   'mobile.trash.restoreA11y': '恢复：{title}',
@@ -2894,6 +3311,8 @@ export const zhCN = {
   'mobile.trash.confirm.title': '彻底删除「{title}」？',
   'mobile.trash.confirm.body': '它会从回收站里消失，也无法再恢复。',
   'mobile.trash.confirm.notErasure': '这不是物理擦除：操作日志里仍然留着这条记录，只是界面不再提供恢复。',
+  'mobile.trash.confirm.projectTasks': '里面还有 {count} 条任务，它们不会被删除。',
+  'mobile.trash.confirm.habitLogs': '它已有的打卡记录不会被删除，恢复后连续天数照旧。',
   'mobile.trash.confirm.submit': '彻底删除',
   'mobile.trash.confirm.cancel': '取消',
 
@@ -3004,7 +3423,7 @@ export const zhCN = {
   'site.features.item.task.fields': '标题、备注（Markdown）、优先级、截止时间、所属清单、标签',
   'site.features.item.task.repeat': '重复任务：每天 / 每周 / 工作日 / 每月，四种预设一键选',
   'site.features.item.task.projects': '清单支持一层文件夹嵌套；清单与标签都有独立管理面板',
-  'site.features.item.task.trash': '回收站：删掉的内容先留着，随时恢复，也可以彻底清空',
+  'site.features.item.task.trash': '回收站：删掉的内容先留着，随时恢复，也可以逐条彻底删除',
   'site.features.item.task.export': '一键导出：完整 JSON 备份（连删除过的记录都在，条数可核对）+ 好读的 Markdown',
   'site.features.item.view.quadrant': '四象限：按重要程度与截止时间自动归类，拖动即可调整',
   'site.features.item.view.timeline': '时间线：按预估时长排布，用于个人项目排期',
@@ -3098,7 +3517,7 @@ export const zhCN = {
   'site.integrations.e2ee.title': '端到端加密同步',
   'site.integrations.e2ee.body': '任务在你的设备上加密之后才上传，服务器只经手密文。所以服务器上**不存在**一份可读的任务库 —— 就算有人拿到，也只是一串乱码。',
   'site.integrations.e2ee.item.ingress': '服务器只收密文 —— 明文一律拒绝。这不是设置项，是写死的',
-  'site.integrations.e2ee.item.keys': '密钥只在你手里。忘了口令，连我们也帮不了你 —— 这正是它真的加密的意思',
+  'site.integrations.e2ee.item.keys': '解密钥匙留在你的设备上。设置数据钥匙后可用保存的恢复码解锁；口令与恢复码都丢失时，服务端无法替你解密',
   'site.integrations.selfhost.title': '自建服务器，永久免费',
   'site.integrations.selfhost.body': '同步服务器可以完整跑在你自己的机器上：一条 docker compose 起全套，数据落在你自己的磁盘。不产生费用，也不需要经过我们同意。',
   'site.integrations.selfhost.item.compose': '一条命令起全套服务，数据落在你自己的磁盘上',
@@ -3149,7 +3568,7 @@ export const zhCN = {
   'site.help.q.sync': '换设备了，数据怎么过去？',
   'site.help.a.sync': '在设置里填同步服务器地址与访问令牌即可。数据是加密后上传的，所以**口令必须填对** —— 换了口令的旧数据解不开（这是端到端加密的代价，不是 bug）。',
   'site.help.q.passphrase': '忘了加密口令怎么办？',
-  'site.help.a.passphrase': '**没有找回途径，这是设计而不是疏漏。** 端到端加密意味着服务端只有密文、没有能解开它的口令 —— 任何"找回"都等于服务端能读你的数据。能做的是：在还能解锁的旧设备上把数据导出，然后在新设备上设一个新口令重新开始。所以口令请自己存好。',
+  'site.help.a.passphrase': '如果已经设置加密数据钥匙并保存了恢复码，可以在同步设置中**用恢复码解锁**，随后设置新口令并保存新的恢复码。登录密码重置不能解锁数据。若口令和恢复码都丢失，服务端无法替你恢复；仍能读取数据的旧设备可以先导出留底。尚未迁移的旧口令密文仍需要原口令。',
   'site.help.q.passkey': '通行密钥怎么用？',
   'site.help.a.passkey': '登录时选「通行密钥」，用设备本身的人脸 / 指纹 / 系统 PIN 确认即可，没有密码可记，也没有密码可撞库。丢了的话，应用里的登录面板有「丢失了通行密钥？」，会发一封找回邮件，点进去可以注册一条新的。⚠️ **最后一条凭据不允许被删除** —— 删掉就进不去了。',
   'site.help.q.quadrant': '四象限是怎么归类的？',
@@ -3163,7 +3582,7 @@ export const zhCN = {
   'site.help.q.selfhost': '怎么自己搭一套？',
   'site.help.a.selfhost': '可以，但它是「自己运维一套服务」：目前**没有发布任何现成镜像**（要自己构建），而**升级不是一条命令** —— 那个一次性迁移服务跑完就退出，compose 不会重跑一个已退出的服务，改过表结构之后要照指南里点名 `supersync-migrate` 的那条再执行一次。注册与登录走的是**邮箱 + 口令**；邮件服务只管「激活账号」那一步 —— 不配也建得了号，界面会明说那封信没发出去，只给自己人用时也可以显式跳过（`REQUIRE_EMAIL_VERIFICATION=false`）。详见「自建一套同步服务器」。',
   'site.help.q.privacy': '数据到底放在哪？',
-  'site.help.a.privacy': '先落在你自己的设备上；开了同步之后，云端也只存密文 —— 服务端收到明文会直接拒绝。但**元数据不是密的**：同步时间、设备标识、以及"有一个任务被改过"这件事服务端能看到。我们不会把"什么都看不到"拿来宣传。',
+  'site.help.a.privacy': '先落在你自己的设备上；**这一条说的是同步那条通道** —— 开了同步之后它在云端只存密文，同步端点收到明文会直接拒绝。⚠️ AI 是另一条路，不在上面这句话里：语言模型必须读到明文才能给出建议，逐功能、逐字段的披露见页脚的《AI 功能与数据流向》。另外同步的**元数据不是密的** —— 同步时间、设备标识、以及"有一个任务被改过"这件事服务端看得到。我们不会把"什么都看不到"拿来宣传。',
 
   // ── 文档中心（帮助中心的文章层）──────────────────────────
   // 组织方式沿用上面五个模块的标题（`site.help.module.*`），不另起一套词表：
@@ -3219,18 +3638,18 @@ export const zhCN = {
   'site.docs.how.s2i2': '移动端：写入后约两秒自动出去；回到前台时补一次；失败会退避重试，不会反复打服务器。',
   'site.docs.how.s2i3': '任意一端：**别人写的东西会自动进来**。服务端在有新记录时推一个信号，收到信号的那一端自己去拉。',
   'site.docs.how.s3': '服务端到底看不到什么',
-  'site.docs.how.s3p1': '上传的载荷是**端到端加密**的：加密与解密都发生在你的设备上，服务端收到（也只收得到）密文。某个客户端尝试上传明文时，服务端会直接拒绝而不写入。',
+  'site.docs.how.s3p1': '**这一节讲的是同步那条通道**：它上传的载荷是端到端加密的，加密与解密都发生在你的设备上，同步服务端收到（也只收得到）密文。某个客户端尝试上传明文时，服务端会直接拒绝而不写入。🔴 这句话**不覆盖 AI 那条路径** —— 模型要读到明文才能给出建议，所以那一格是你逐项授权后交出去的原文，逐功能的字段清单见页脚的《AI 功能与数据流向》。',
   'site.docs.how.s3p2': '但**外围信息不是密的**：同步时间、你用的是哪几台设备、动的是哪类东西与先后顺序，服务端都看得到。被保护的是内容本身（任务标题、备注这些），不是"你在用 heyta 的哪些功能"。我们不会把"什么都看不到"拿来宣传。',
 
   // 账号、令牌与登录方式
   'site.docs.account.title': '账号、令牌与登录方式',
   'site.docs.account.seo.title': '账号、令牌与登录方式 —— heyta',
   'site.docs.account.sum': '注册与登录走的是邮箱 + 口令，通行密钥与邮件链接也一直在 —— 那同步要用的访问令牌是从哪来的。',
-  'site.docs.account.s1': '同步设置里就三个框',
-  'site.docs.account.s1p1': '同步设置只有三个输入项：服务端地址、访问令牌、端到端加密口令。',
+  'site.docs.account.s1': '同步设置与数据解锁',
+  'site.docs.account.s1p1': '同步设置包含服务端连接信息，以及独立的加密数据钥匙管理。登录后可以创建钥匙、保存恢复码或解锁已有数据。',
   'site.docs.account.s1i1': '服务端地址：你要连的那台同步服务器。什么都不填就是纯本地使用，数据只留在这台设备上。',
   'site.docs.account.s1i2': '访问令牌：由服务端签发，代表「这个账号在这台服务器上的那块空间」。已经有令牌的可以直接粘贴。',
-  'site.docs.account.s1i3': '加密口令：**不会存盘**，只存在于这次会话的内存里。它单独写一篇，见「端到端加密口令」。',
+  'site.docs.account.s1i3': '加密口令：不发给服务端，与登录密码分开。恢复码与设备记住解锁的边界见「端到端加密口令」。',
   'site.docs.account.s2': '三条登录方式，邮箱 + 口令是主路',
   'site.docs.account.s2p1': '注册与登录走的是**邮箱 + 口令**，另外邮箱链接与通行密钥也一直在。服务器上存的口令不是能读回来的样子，也没有任何人能把它交还给你 —— 忘了就走「忘记密码」，它会发一封带一次性重置链接的信，那是真重置，不是绕过口令的后门。',
   'site.docs.account.s2i1': '邮箱 + 口令：填邮箱、设一个口令（至少 8 个字符）、点验证邮件里的链接激活，之后每次输口令登录。',
@@ -3246,18 +3665,18 @@ export const zhCN = {
   // 端到端加密口令
   'site.docs.passphrase.title': '端到端加密口令',
   'site.docs.passphrase.seo.title': '端到端加密口令 —— heyta',
-  'site.docs.passphrase.sum': '它是整套设计里唯一的一把钥匙，而它丢了真的没有找回途径 —— 这是端到端加密的定义，不是我们没做。',
+  'site.docs.passphrase.sum': '加密口令与登录密码分开。设置数据钥匙后，保存好恢复码，才能在忘记口令时自行恢复解锁。',
   'site.docs.passphrase.s1': '口令是什么',
-  'site.docs.passphrase.s1p1': '口令用来在你的设备上把数据加密后再上传。它**不发给服务端**，服务端也没有它的任何副本。',
-  'site.docs.passphrase.s1p2': '它不会被写到磁盘上：只存在于当前这次会话的内存里，所以每开一个新会话都要再填一次。这不是麻烦你，是它不落盘才叫端到端。',
-  'site.docs.passphrase.s2': '为什么没有「忘记密码」',
-  'site.docs.passphrase.s2p1': '任何能"找回"口令的机制，都意味着某处存着一份能解开你全部数据的凭据，而那份凭据要么在服务端、要么在第三方 —— 那端到端加密就没有了。所以这里没有客服通道，也没有后台开关。**丢了口令 = 那些已同步的数据解不开。**',
-  'site.docs.passphrase.s2i1': '在还能解锁的旧设备上：先把数据导出留底。',
-  'site.docs.passphrase.s2i2': '然后在新设备上设一个新口令，从头开始写。',
-  'site.docs.passphrase.s2i3': '把口令存进你自己的密码管理器 —— 那是它该待的地方。',
+  'site.docs.passphrase.s1p1': '加密口令在你的设备上解锁数据钥匙，数据在上传前加密。口令、恢复码和解锁后的钥匙**不发给服务端**；服务器保存的是加密的钥匙包与数据。',
+  'site.docs.passphrase.s1p2': '浏览器重新打开后需要再次解锁。移动端可主动选择「记住解锁」，将数据钥匙保存在系统安全存储中；默认不启用，也不会保存口令。锁定数据钥匙仅停止使用同步密钥，不会加密或隐藏设备上已有的本地数据。',
+  'site.docs.passphrase.s2': '忘记加密口令时如何恢复',
+  'site.docs.passphrase.s2p1': '设置数据钥匙时会显示一次恢复码，并要求再次输入确认。保存了这串码，就可以在同步设置中选择「用恢复码解锁」。恢复后必须设置新口令并保存新的恢复码，才能继续使用加密数据。服务端和客服都无法替你找回口令或恢复码；重置登录密码也不能代替这一步。',
+  'site.docs.passphrase.s2i1': '把恢复码保存到自己的密码管理器或离线记录中，不要只存放在可能丢失的那台设备上。',
+  'site.docs.passphrase.s2i2': '如果口令和恢复码都丢失，先在仍能读取数据的旧设备上导出留底；服务器没有解密副本。',
+  'site.docs.passphrase.s2i3': '创建恢复码不会自动迁移旧口令密文。已有旧数据需要使用原加密口令完成迁移，之后才由新的数据钥匙保护。',
   'site.docs.passphrase.s3': '填错口令会怎样',
-  'site.docs.passphrase.s3p1': '换过口令之后，旧口令写的那批记录解不开。heyta 不会因此崩掉，也不会拿明文去凑：它会把解不开的那些**跳过**，或在明显是配错的时候**暂停同步**并告诉你属于哪一种。',
-  'site.docs.passphrase.s3w1': '看到"口令可能不对"就是后一种 —— 它不是网络问题，重连不会变好。',
+  'site.docs.passphrase.s3p1': '填错口令或恢复码会解锁失败，不会覆盖原有数据。更换加密口令会更新钥匙的保护方式；「轮换数据钥匙并迁移数据」则会重新加密同步历史，必须完成迁移并确认新的恢复码。迁移中断时按界面提示继续或取消，不要另建一份钥匙来覆盖它。',
+  'site.docs.passphrase.s3w1': '提示口令不正确时，请核对当前账号、服务端与加密口令。重新连接网络不能修复解锁失败。',
 
   // 冲突
   'site.docs.conflict.title': '当两台设备改了同一条',
@@ -3297,13 +3716,15 @@ export const zhCN = {
   'site.docs.selfhost.s5p2': '想要一份**能读**的备份，走客户端的导出（见「把数据带走、带回来」）。导出解开的是这一台设备本地物化好的状态，所以导出的东西和你看得见的一致。',
   'site.docs.selfhost.s5w1': '别把"库里读不出明文"当成"这份备份没用"：它是服务恢复的完整来源。"给人读"不是它的职责。',
   'site.docs.selfhost.s6': '界面显示离线，先看这一条',
-  'site.docs.selfhost.s6p1': '最常见的不是服务挂了，而是**请求根本没发出去**。服务端只放行它在配置里明确列出的那几个前端来源；你的页面来源不在那份清单里时，浏览器会在本地就把请求拦下 —— 于是界面显示"离线"，而服务日志一条都不会有。',
+  'site.docs.selfhost.s6p1': '先分清是哪一档。**默认那档不用另托管前端**：界面与 API 同一个域、由同一个容器提供，同域请求不会在浏览器本地被跨域拦下，`CORS_ORIGINS` 里有没有你这台地址根本参与不了判断 —— 同域那一档要查什么，见本节「同域这一档先查这三件」。另托管一份前端那一档：**最常见的不是服务挂了，而是请求根本没发出去**。服务端只放行它在配置里明确列出的那几个前端来源；你的页面来源不在那份清单里时，浏览器会在本地就把请求拦下 —— 于是界面显示"离线"，而服务日志一条都不会有。',
   'site.docs.selfhost.s6p2': '所以排查的顺序是反的：先看浏览器控制台的跨域报错，再看服务端日志。日志安静不等于服务正常，也可能只是没有人问到它。',
+  'site.docs.selfhost.s6p3': '**同域这一档先查这三件**：一是用浏览器直接打开 **`https://你的域名/health`** 看通不通 —— 不通多半是证书或域名记录没到位，而这一处**容器全 `healthy` 也照样是坏的**：网关签不到证书时不退出、它自己的健康检查照旧通过，然后按六十秒一次安静重试，最长重试三十天。二是在服务日志里找 `[web-app] 共享 UI 挂在 /app/` 那一行；没有这一行说明这台实例只跑 API（镜像里没有产物目录，那是合法的部署形态，不是报错）。三是挂载旋钮有没有被单独动过：`WEB_APP_PATH`（对外前缀）与 `WEB_APP_DIR`（镜像内产物路径）只改了一个，或者前缀与这份产物构建时用的 base 不一致 —— 症状是界面**空白**而接口照常工作，且没有任何一层会在运行时拦你。',
   'site.docs.selfhost.s6i1': '放行哪些前端来源由服务端的 `CORS_ORIGINS` 决定，多个来源用逗号分开写；生产环境下"全都放行"会被直接拒绝启动。',
   'site.docs.selfhost.s7': '怎么装：没有现成镜像，两条路自己选',
   'site.docs.selfhost.s7p1': '目前**没有发布任何 heyta 镜像**，所以这里没有可钉的版本号。不要把 `SUPERSYNC_IMAGE` 指向上游的 `master-〈提交号〉`：那是另一个项目的服务端，它的数据表结构与加密要求早已和 heyta 分开——照做只会得到一台**能正常启动、健康检查也通过、跑的却是陌生的表结构**的服务器。要钉版本，就从本仓库源码构建，并把那份源码的提交号作为版本标识传进构建。',
   'site.docs.selfhost.s7p2': '两条路都受支持，差别在升级时。`./scripts/deploy.sh --build` 把整套栈（应用、PostgreSQL 数据库、Caddy 网关）一起拉起来，在**旧容器还在服务**的时候先把迁移跑完，迁移不成就**不换容器**，起来之后还会验一次健康检查。另一条是一条 `docker compose` 起全套：`docker compose -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml up -d --build`。构建与一次性迁移那两份 override 都不能省，`--build` 也不能省 —— 少掉 `docker-compose.build.yml` 它就会去拉一个根本不存在的镜像，而少了 `--build` 它也不会自己把镜像打出来，两种省法最后都停在同一个"起不来"上。而它**只在第一次开机时迁移**：升级要么回到部署脚本，要么显式把那个一次性迁移服务再跑一遍。注意裸的 `docker compose up` **不是**部署：容器启动时的自动迁移默认是关的（防止重启和迁移互相踩），所以"只把容器拉起来"会跑在没迁移过的表结构上。',
   'site.docs.selfhost.s7p3': '加 `--build` 可以在部署机上自己构建镜像，但那是把整个仓库在部署机上完整编译一遍：峰值内存要额外 1.5 GB 以上（容器本身已占约 2.5 GB），构建缓存每构建一次涨约 1.4 GB 且**不会自动清理**。小机器的正确姿势是在别处构建好再推过去，或者直接钉住现成标签。`--build` 还会拒绝在源码不干净时构建 —— 构建产物必须能对回到某一份确切的源码。',
+  'site.docs.selfhost.s7p4': '起完之后**不需要再装一份前端**：界面就打进同一个镜像、由同一个容器在同一个域名下提供 —— `/app/` 是界面，`/api/` 是同步接口。浏览器直接开 **`https://你的域名/app/`** 就能用；在部署机本机上是 `http://127.0.0.1:1900/app/`（应用容器只把 1900 发布到回环，对外那一层由栈里的网关整体反代到它，不需要为界面单独配路径）。想确认"这个容器真的带界面"，看启动日志里 `[web-app] 共享 UI 挂在 /app/` 那一行。要把界面挪到别的挂载点，`WEB_APP_PATH`（对外前缀）与 `WEB_APP_DIR`（镜像内产物路径）两个旋钮得一起改，而且前缀必须与这份产物构建时用的 base 一致 —— 只改一个不会报错：容器照常 `healthy`、`/health` 照常 200，浏览器开过去是空白页，因为样式表那些请求拿到的是 HTML。',
   'site.docs.selfhost.s7i1': '三个必填项（`JWT_SECRET`、`PASSWORD_PEPPER`、`POSTGRES_PASSWORD`）不给齐，这套栈起不来：前两个是服务自己抛、**拒绝启动**，第三个是数据库容器直接退出。没有"用默认密钥上线"这条路的活口，这是故意的。对外域名不在必填里，它坏的形态也不一样：`DOMAIN` 只给网关当站点地址（服务端本体不读它，空着是网关自己起不来），`PUBLIC_URL` 有默认值 `http://localhost:1900` —— 留着不改不会报错，坏得很安静：邮件里的链接指向 localhost。',
   'site.docs.selfhost.s7i2': '部署脚本会核对镜像的源码版本标签，防止"拿旧镜像跑新迁移"。自建自定义镜像时要传入同样的版本标识；确信要跳过这份核对也有显式开关，但那是给你的故意，不是给你的疏忽。',
   'site.docs.selfhost.s8': '要配的环境变量，逐个说',
@@ -3312,7 +3733,7 @@ export const zhCN = {
   'site.docs.selfhost.s8i2': '`JWT_SECRET`：登录令牌的签名密钥。空着拒绝启动；**部署定好之后不要再换** —— 换掉它，所有已登录设备立刻全部登出，在途的邮件链接一并作废。',
   'site.docs.selfhost.s8i3': '`POSTGRES_PASSWORD`：数据库口令。同样没有默认值。用栈里自带的数据库时不用另配连接串，默认连本栈的 PostgreSQL 16。',
   'site.docs.selfhost.s8i4': '`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN`：通行密钥绑定的域名。它只能取**一个**值，所以换域名 = 这台服务器上注册过的通行密钥全部作废（账号不丢，用邮件链接重新登入再注册一把即可）。必须是真实域名，纯 IP 浏览器不收。',
-  'site.docs.selfhost.s8i5': '`CORS_ORIGINS`：允许哪些前端来源调接口，逗号分隔，支持 `https://*.example.com` 这种通配。默认值指向上游的演示站 —— **自建必须改成自己的**，不改的症状就是前面那节说的"界面一直离线"。',
+  'site.docs.selfhost.s8i5': '`CORS_ORIGINS`：允许哪些前端来源调接口，逗号分隔，支持 `https://*.example.com` 这种通配。默认值指向上游的演示站 —— **你自己另托管一份前端时**必须改成那一页实际的来源，不改的症状就是前面那节说的"界面一直离线"。它管的是**别人从别的域名调你这台 API**：界面由同一个容器同域提供（默认形态）时这一项参与不了判断，留着默认值不会有任何症状。',
   'site.docs.selfhost.s8i6': '`SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`：发信配置。它决定**验证邮件**发不发得出去（也就是账号能不能自助激活），**不**决定能不能注册 —— 不配也建得了号，界面会明说信没发出去，而不是假装发了。',
   'site.docs.selfhost.s8i7': '`HOST`：服务自己监听的地址，默认所有网卡。放在网关后面时可以收紧到本机。',
   'site.docs.selfhost.s9': '数据库与表结构变更',
@@ -3320,9 +3741,9 @@ export const zhCN = {
   'site.docs.selfhost.s9p2': '两条路的时机不一样：走 `./scripts/deploy.sh` 时，迁移由部署脚本在换容器前跑一次；走 `docker compose` 时，它由那份一次性迁移服务（服务名 `supersync-migrate`）在第一次开机跑完就退出 —— 而 compose 不会重跑一个已退出的服务，**所以改过表结构之后的升级要再点名执行它一次**。个别变更用了"后台建索引"的方式，在繁忙的大库上可能等锁 —— 挑低峰期做升级，给迁移留足超时时间（默认 15 分钟，可调）。超时退出有专门的退出码，清掉堵住的事务重跑即可。',
   'site.docs.selfhost.s9p3': '备份的最小口径：定期备份数据库。备份里是密文载荷加上外围信息 —— 它是恢复服务的完整来源，但不是能直接翻看内容的相册（见下面「备份是密文」一节）。',
   'site.docs.selfhost.s10': '你的服务器上到底存了什么',
-  'site.docs.selfhost.s10p1': '每一笔改动是一条**加密的操作记录**：客户端从用户的加密口令派生密钥（Argon2id），载荷用 AES-GCM 加密后才上传。服务端收到明文会**直接拒收**，所以库里不存在"忘了加密"的明文载荷。',
+  'site.docs.selfhost.s10p1': '每一笔改动是一条**加密的操作记录**。设置数据钥匙后，口令或恢复码在设备上解锁钥匙，操作载荷加密后才上传；尚未迁移的旧格式记录仍使用原加密口令。服务端只保存密文，不能解密内容。',
   'site.docs.selfhost.s10p2': '外围信息是明的：动作类型、涉及的实体类型与编号、时间戳、各设备的版本先后、密文大小。这些是同步协议工作的必需品，躲不掉 —— 但自建的意义之一正是：它们落在**你**手里，不落在第三方手里。',
-  'site.docs.selfhost.s10p3': '推论：能解开数据的只有持有各账号加密口令的那些设备。服务端帮不了"忘了口令"的用户 —— 这是"备份是密文"的另一面。',
+  'site.docs.selfhost.s10p3': '恢复同步数据需要设备上的解密钥匙，或用于解锁钥匙的口令、恢复码。登录密码重置和服务端备份都不能替代这些凭据；口令与恢复码都丢失时，先从仍能读取数据的旧设备导出留底。尚未迁移的旧格式密文仍需要原口令。',
   'site.docs.selfhost.s11': '命令行宿主：不开浏览器也能用',
   'site.docs.selfhost.s11p1': '除了 Web 与手机，仓库里还有一个**命令行宿主**：它连一个真实的本地数据库文件，在终端里建任务、列任务、同步。它走的是和其它端完全相同的同步协议 —— 配上同一个服务端，它就是又一台"设备"。',
   'site.docs.selfhost.s11i1': '配置走参数或环境变量：`--db` 本地数据库文件（必填）、`--server` 服务端地址、`--token` 访问令牌、`--password` 端到端加密口令；也可以用大写环境变量（`HEYTA_DB` / `HEYTA_SERVER_URL` / `HEYTA_TOKEN` / `HEYTA_PASSWORD`）。',
@@ -3466,11 +3887,11 @@ export const zhCN = {
   'site.docs.reminders.s2': '什么时候会响 —— 以及为什么有时候不会',
   'site.docs.reminders.s2p1': 'Web：**应用开着**才响。到点之后由浏览器把通知弹出来，而前提是你先在界面上授权过通知权限 —— 授权必须由你那一下点击触发，这是浏览器的规则，不是我们的选择。',
   'site.docs.reminders.s2p2': '⚠️ 页面关了就什么都不会响：触发时间在本地早就算好了，但**没人在读它**。这条限制写在代码注释里，是一个已知的边界，不是临时状态。',
-  'site.docs.reminders.s2p3': '移动端：目前**没有接入系统本地通知**，所以不会在应用外弹通知。手机上的到期与提醒，现在是"在界面里看得见"，不是"会响"。',
+  'site.docs.reminders.s2p3': '移动端：Android 与 iOS 都使用系统本地通知中心。投递仍受平台权限和系统调度限制；没有权限或回执不确定时，提醒保持为到期，不伪造已投递事实。',
   'site.docs.reminders.s2p4': '时间上有几条边界：触发时刻最多排在**一年**以内；「稍后提醒」默认 **10 分钟**、最多 **7 天**，超出上限是**钳到上限并显示实际值**，而不是让你的点击失败；比当下早一点点是允许的（一分钟的窗口），因为算出时刻与真正落库之间本来就要过几百毫秒。',
-  'site.docs.reminders.s2i1': '会响的三个前提：时间到了、应用开着、你已经授权过通知 —— 少一个都安静。',
+  'site.docs.reminders.s2i1': 'Web 需要页面开着并已授权通知。Android/iOS 已排入系统的提醒可在应用进程退出后由系统投递，但仍受权限、系统调度和设备状态限制。',
   'site.docs.reminders.s2i2': '静音与"稍后提醒"是两条不同的路：前者只是这一条不再弹，后者会把触发时间整体推后。',
-  'site.docs.reminders.s2i3': '想让提醒在后台跑，现在唯一的办法是自建一个服务端的推送通道 —— 这一版没有，也不假装它有。',
+  'site.docs.reminders.s2i3': '移动端本地通知不需要服务端推送。Android 强行停止后要重新打开应用才能补算；iOS 只排最早的 64 个提醒，之后的提醒在启动或回前台时补排。多台设备离线时可能各自提醒，不能保证全局只响一次。',
   'site.docs.reminders.s3': '重复任务的提醒会跟着挪',
   'site.docs.reminders.s3p1': '勾掉一条重复任务时，**按提前量算出来**的那些提醒会重新排到下一次到期；写死某个时刻的提醒不动。',
   'site.docs.reminders.s3p2': '所以"每天 9 点、提前 10 分钟"会自己顺延，而"就定在 3 月 5 日 14:00"不会 —— 它不知道自己挂着哪条任务的下一次。',
@@ -3483,16 +3904,17 @@ export const zhCN = {
   'site.docs.trash.title': '回收站与"彻底删除"为什么删不掉历史',
   'site.docs.trash.seo.title': '回收站与彻底删除为什么删不掉历史 —— heyta',
   'site.docs.trash.sum': '还原与彻底删除都在界面里，但后者删的是可见性，不是那一条记录 —— 这背后是一个刻意的同步协议决定。',
-  'site.docs.trash.s1': '回收站里只有任务',
-  'site.docs.trash.s1p1': '清单、标签、便签目前不进回收站 —— 它们被删掉之后没有还原入口。这不是遗漏：它们的删除语义和任务不一样。',
-  'site.docs.trash.s1p2': '回收站也不是一个单独的"箱子"、更没有另一张表：它就是同一批任务里"已删除且还没彻底删除"的那部分，**最近删掉的排最前面**。',
+  'site.docs.trash.s1': '回收站里有什么',
+  'site.docs.trash.s1p1': '任务、便签、清单、习惯删掉之后都会先进回收站，还原与彻底删除的入口都在同一块面板上。标签、提醒和专注记录**不进**回收站，这不是遗漏：标签随时可以重新建一个，提醒的删除语义是「取消」，跟「这条东西我不要了」不是同一件事，而专注记录是统计的事实源 —— 能删它就等于允许改写成长历史。',
+  'site.docs.trash.s1p3': '删一条清单不会连带删掉里面的任务 —— 它们只是变成「没有清单」，还原那条清单之后归属又回来了。删一个习惯也不会抹掉它的打卡记录：还原之后连续天数照旧。',
+  'site.docs.trash.s1p2': '回收站也不是一个单独的"箱子"、更没有另一张表：它就是同一批记录里"已删除且还没彻底删除"的那部分，**最近删掉的排最前面**。',
   'site.docs.trash.s1i1': 'Web：左侧栏的「回收站」，常驻可见。',
   'site.docs.trash.s1i2': '移动端：「我的」页面里的回收站入口。',
   'site.docs.trash.s1i3': '两个动作都在同一块面板上：还原、彻底删除 —— 后者要你确认第二次。',
-  'site.docs.trash.fig.trash': '回收站：说明文字点明这里只有任务，空着的时候也写清条目从哪儿来',
+  'site.docs.trash.fig.trash': '回收站：说明文字点名这里放着哪几类，空着的时候也写清条目从哪儿来',
   'site.docs.trash.fig.trash.alt': 'Web 回收站面板，含一句说明文字与空状态提示',
   'site.docs.trash.s2': '还原改的是什么',
-  'site.docs.trash.s2p1': '还原 = 把任务的删除标志位**清回空**，写成一条普通的更新。它不是"从备份里搬回来"：同一条任务、同一段历史继续往下长。',
+  'site.docs.trash.s2p1': '还原 = 把删除标志**清回空**，写成一条普通的更新。它不是"从备份里搬回来"：同一条记录、同一段历史继续往下长。',
   'site.docs.trash.s2p2': '已经被你"彻底删除"过的条目不再出现在回收站里，因此也还原不了 —— 界面对这两件事分开处理，是设计而不是漏的一步。',
   'site.docs.trash.s2p3': '就算绕过界面直接调用，对一条已彻底删除的任务点还原也会被**当场拒绝**。这是有意的一去不回，不是还没做完的那一步。',
   'site.docs.trash.s3': '为什么"彻底删除"不真的删',
@@ -3535,21 +3957,21 @@ export const zhCN = {
   'site.docs.loss.seo.title': '丢了设备、通行密钥、加密口令会怎样 —— heyta',
   'site.docs.loss.sum': '设备、通行密钥、端到端加密口令 —— 三件事的后果完全不同，提前知道比事后聪明便宜。',
   'site.docs.loss.s1': '一、丢了设备',
-  'site.docs.loss.s1p1': '换一台设备重新登录，数据会从服务器**回放**回来 —— 这正是同步该做的事，"本地优先"的意思不是"只在这一台"。',
+  'site.docs.loss.s1p1': '换一台设备重新登录，再用加密口令或已保存的恢复码解锁，已同步的数据才能从服务器**回放**回来。登录本身不提供解密能力；没有上传的数据也不在服务器上。',
   'site.docs.loss.s1p2': '但没开同步的那台设备，数据只在那台机器的本地库里。设备没了就是没了，这条路上没有任何服务端备份兜底。',
   'site.docs.loss.s2': '二、丢了通行密钥（找得回）',
   'site.docs.loss.s2p1': '在应用里点「丢失了通行密钥？」会发一封找回邮件；那个页面由服务端渲染，点进去可以注册一把新的。',
   'site.docs.loss.s2p2': '前提是**邮箱还能收信**。能证明这个邮箱属于你，凭据本身不需要旧密钥还在场。',
-  'site.docs.loss.s2p3': '另一件你能做的事：在设置页列出**你自己**的通行密钥，改名或删掉。这是唯一的凭据管理入口。',
-  'site.docs.loss.s2w1': '⚠️ 界面上**没有**"一键退出所有设备"这颗按钮，也没有"吊销所有会话"这类动作。要把旧设备的访问收回来，只能在还登得进去的时候，把不认识的每一把密钥逐个删掉。',
-  'site.docs.loss.s3': '三、丢了端到端加密口令（找不回）',
-  'site.docs.loss.s3p1': '这把口令是在服务器之外用来加解密的钥匙。它**没有存在服务器上**，所以服务器没有"给你重置一下"这个能力 —— 不是不想做，是做了就等于加密不存在。',
-  'site.docs.loss.s3p2': '忘记口令不等于失去登录：你可能仍然登得进去、仍然看得见明文那部分字段，但那些加密内容解不开，界面上会老实告诉你解不开。',
-  'site.docs.loss.s3p3': '唯一的自救是**导出**：在还解得开的时候导出一份完整 JSON。还原只能导进一个空库，所以它是搬服务器与灾后重建的工具，不是日常那个"备份"按钮。',
+  'site.docs.loss.s2p3': '可以在设置里管理自己的通行密钥，改名或删除不再使用的凭据。删除通行密钥与撤销已经签发的登录会话不是同一件事。',
+  'site.docs.loss.s2w1': '丢失设备可能仍保有本地明文和旧钥匙。撤销登录访问不能擦除离线副本；保护后续同步还需要由受信任设备轮换数据钥匙并迁移数据。',
+  'site.docs.loss.s3': '三、丢了加密口令：先找恢复码',
+  'site.docs.loss.s3p1': '加密口令不会交给服务器。如果已经设置数据钥匙并保存恢复码，可以用恢复码在设备上解锁，再设置新口令和新的恢复码。',
+  'site.docs.loss.s3p2': '忘记加密口令不等于失去登录；反过来，重置登录密码也不会恢复解密能力。口令和恢复码都丢失时，服务器无法替你解开同步数据。',
+  'site.docs.loss.s3p3': '仍能读取数据的旧设备可以**导出完整 JSON**留底，再按导入流程恢复。尚未迁移的旧口令密文需要原口令；新建恢复码不能跳过旧数据的解密步骤。',
   'site.docs.loss.s4': '所以顺序应该是这样',
-  'site.docs.loss.s4p1': '把口令写在你**不会一起丢掉**的地方。放在同一台设备的备忘录里，等于把钥匙挂在门把上。',
+  'site.docs.loss.s4p1': '把口令与恢复码保存在不会随设备一起丢失的地方，例如自己的密码管理器或离线记录。',
   'site.docs.loss.s4p2': '开同步之前先确认你登得进去、邮箱还收得到；开同步之后偶尔导出一份，并真的验一次它能还原 —— 没验过的备份不叫备份。',
-  'site.docs.loss.s4p3': '这些不是吓唬人：端到端加密的收益（服务器看不到内容）和它的代价（没人能替你找回密码）是同一件事的两面。想要其中一面，就得管住另一面。',
+  'site.docs.loss.s4p3': '恢复码由你自己保管，它提供另一条端上解锁路径，不会让服务端获得解密能力。口令和恢复码都无法取得时，仍需依靠可读的本地副本或之前的导出。',
 
   // ── 更新动态 ──
   'site.changelog.seo.title': '更新动态 —— heyta',
@@ -3640,14 +4062,16 @@ export const zhCN = {
   'common.entity.TASK': '任务',
   'common.entity.PROJECT': '清单',
   'common.entity.TAG': '标签',
-  'common.entity.NOTE': '笔记',
+  'common.entity.NOTE': '便签',
   'common.entity.TASK_REPEAT_CFG': '重复规则',
   'common.entity.REMINDER': '提醒',
+  'common.entity.EVENT': '倒数纪念日',
   'common.entity.HABIT': '习惯',
   'common.entity.HABIT_LOG': '打卡记录',
   'common.entity.FOCUS_SESSION': '专注记录',
   'common.entity.AI_FEEDBACK': 'AI 使用记录',
   'common.entity.PREFERENCE_CORRECTION': '偏好纠正',
+  'common.entity.ASSISTANT_TURN': '助手消息',
   'common.entity.GLOBAL_CONFIG': '全局设置',
   'common.entity.MIGRATION': '数据迁移',
   'common.entity.RECOVERY': '灾难恢复',
@@ -3665,6 +4089,47 @@ export const zhCN = {
   'common.conflict.reason.localArchive': '本机把它归档了',
   // 认不出来时的兜底：不能回落成服务端那句英文诊断，也不能什么都不说。
   'common.conflict.reason.fallback': '两边对同一处做了不同的改动',
+  // 日历格子里的「休 / 班」（W4b 公共事实）。同一份词表既当可见字符也当读屏名 ——
+  // `calendarDayMarkerView` 里 `spoken` 直接取它，所以英文侧必须是能念出来的词，不能是符号。
+  'common.calendar.dayMarker.off': '休',
+  'common.calendar.dayMarker.work': '班',
+  // 日历格子里倒数日那一行（W6 第二个数据源）。住 `common.*` 因为共享板两端同一份；
+  // 措辞与倒数日面板那条逐字相同 —— 同一个数在两处两种说法是漂移的开始。
+  'common.calendar.event.today': '就是今天',
+  'common.calendar.event.until': '还有 {days} 天',
+  'common.calendar.event.since': '已经 {days} 天',
+
+  // 🔴 这一组住在 `common.*` 而不是 `web.*`：**两端都要用**（档位每批会加一档，
+  //    所以这里刻意**不写条数** —— 写过数字的注释一定会漂）。
+  //    原来它们是 `web.calendar.view.*`，而移动端补上档位入口时要读同一组词 ——
+  //    另抄一份就是「同一个词两种说法」的开始（AGENTS §3.5 那条同形状的第二次）。
+  'common.calendar.view.aria': '视图',
+  'common.calendar.view.month': '月',
+  'common.calendar.view.week': '周',
+  'common.calendar.view.day': '日',
+  // R13：年档。🔴 它与「时间线」是**两种不同的东西**：时间线不是日历档位，
+  //   而是外壳视图的跳转（见 `calendar-view-family.spec.tsx` 钉的那条），
+  //   所以它不进 `CalendarViewKind`，这一条也不该和它混成一句。
+  'common.calendar.view.year': '年',
+  // 🔴 这六条也在 `common.*`：它们是**共享板**在周/日两档要的词，
+  //    而共享板两端同一份 ⇒ 移动端补上档位入口后必须给得出同样的词。
+  //    留在 `web.*` 里的下场就是移动端再抄一份（AGENTS §3.5 同形状的第二次）。
+  'common.calendar.prevWeek': '上一周',
+  'common.calendar.nextWeek': '下一周',
+  'common.calendar.prevDay': '上一天',
+  'common.calendar.nextDay': '下一天',
+  // R13 年档的两个箭头（读屏名）。住在 `common.*` 的理由与上面几条同一条：
+  // 共享板两端同一份 ⇒ 两端都给得出同样的词（新标签一律可选，§9.1）。
+  'common.calendar.prevYear': '上一年',
+  'common.calendar.nextYear': '下一年',
+  'common.calendar.dayAllDay': '全天',
+  'common.calendar.dayNoTimed': '这一天没有定到具体时刻的任务，它们都在上面那条「全天」里。',
+  // 🔴 「全天」那条带**自己**的空态，不能说"这一天没有到期的任务" ——
+  //   当天完全可以在 16:00 挂一条（R14 之后这是常态），那句话就成了谎话，
+  //   而它下面 20 行就是那条任务。两条句子各说各的范围。
+  'common.calendar.dayAllDayEmpty': '「全天」里还没有任务；定到具体时刻的在下面那条轴上。',
+  // 日历格子里的「休 / 班」（W4b 公共事实）。同一份词表既当可见字符也当读屏名 ——
+  // `calendarDayMarkerView` 里 `spoken` 直接取它，所以英文侧必须是能念出来的词，不能是符号。
 
   // ─────────────────────────────────────────────────────────────
   // 提醒（B1-1 的界面层；web 与 mobile 共用同一批词条）
@@ -3694,6 +4159,7 @@ export const zhCN = {
   'reminder.phase.scheduled': '待触发',
   'reminder.phase.snoozed': '已推迟',
   'reminder.phase.due': '已到点',
+  'reminder.delivery.uncertain': '无法确认本机是否已提醒。可点“稍后提醒”重新安排。',
   'reminder.phase.fired': '已提醒',
   'reminder.phase.dismissed': '已关闭',
   // 没有截止时间时不能建"提前提醒"——说清原因，不要让按钮静默消失。
@@ -3723,12 +4189,17 @@ export const zhCN = {
   'notes.a11y.pin': '把便签「{excerpt}」钉到今天',
   'notes.a11y.unpin': '取消便签「{excerpt}」的钉选',
   'notes.error.empty': '便签不能是空的',
+  // 便签编辑屏（多端第二批）。正文没改动时不写 op，那条闸门在 app-host 的 updateNoteContent。
+  'notes.edit.title': '编辑便签',
+  'notes.save': '保存',
+  'notes.cancel': '取消',
+  'notes.edit.notFound': '这条便签已经不在了（可能是在另一台设备上删除的）',
 
   // ── 运营管理后台（ADR-0038）──────────────────────────────────────────
   // ⚠️ 这一层**只给运营者看**，但仍然走词条表：`apps/web/src` 已在
   // `check:ui-language` 的 MIGRATED 名单里，用户可见字面量必须走 `t()`。
   'web.admin.title': '管理后台',
-  'web.admin.lead': '只读为主：用户、订阅、订单、优惠码、邀请。',
+  'web.admin.lead': '只读为主：用户、订阅、订单、优惠码、邀请。会动数据的是三处：用户详情里的解锁/配额/强制登出、调休补班、退款审批。',
   'web.admin.tab.overview': '概览',
   'web.admin.tab.users': '用户',
   'web.admin.tab.subscriptions': '订阅',
@@ -3744,6 +4215,7 @@ export const zhCN = {
   'web.admin.error.forbidden': '当前账号没有管理后台权限。',
   'web.admin.error.not-found': '目标不存在，可能已被删除。',
   'web.admin.error.invalid': '请求参数不合法。',
+  'web.admin.error.conflict': '这一条当前的状态不允许这个动作，具体原因见下方提示。',
   'web.admin.error.server': '服务端出错了，详情见服务端日志。',
   'web.admin.overview.users.total': '用户总数',
   'web.admin.overview.users.verified': '已验证',
@@ -3927,14 +4399,157 @@ export const zhCN = {
   "site.legal.minors.seo.title": "未成年人保护 —— heyta",
   "site.legal.minors.seo.description": "面向成年人的效率工具如何处理未成年人：我们不核验年龄、依赖监护人声明；不满十四周岁信息的专门规则、条例义务逐条判定适用性，以及监护人的行使渠道与退款入口。",
   "site.legal.subscription-refund.title": "订阅、计费与退款规则",
-  "site.legal.subscription-refund.lede": "托管同步与云端 AI 两件**互相独立**的收费服务各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。",
+  "site.legal.subscription-refund.lede": "托管同步与云端 AI 两件**各有各的条款**的收费服务（今天能买到云端 AI 的那一档同时含托管同步）各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。",
   "site.legal.subscription-refund.seo.title": "订阅、计费与退款规则 —— heyta",
-  "site.legal.subscription-refund.seo.description": "托管同步与云端 AI 两件互相独立的收费服务各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。",
+  "site.legal.subscription-refund.seo.description": "托管同步与云端 AI 两件各有各的条款的收费服务（今天能买到云端 AI 的那一档同时含托管同步）各自怎么计价、怎么到期、怎么退、怎么开票 —— 包括一条刻意的不做：我们没有任何自动扣款。",
   "site.legal.data-rights.title": "个人权利行使与请求响应",
   "site.legal.data-rights.lede": "查阅、复制、更正、删除、注销、撤回同意逐项在 heyta 里怎么做；哪些能自助、哪些只能走邮件、答复时限 15 个工作日，以及\"删除\"在这个架构里到底意味着什么。",
   "site.legal.data-rights.seo.title": "个人权利行使与请求响应 —— heyta",
   "site.legal.data-rights.seo.description": "查阅、复制、更正、删除、注销、撤回同意逐项在 heyta 里怎么做；哪些能自助、哪些只能走邮件、答复时限 15 个工作日，以及\"删除\"在这个架构里到底意味着什么。",
   // <<<end:generated:packages/legal/scripts/gen-site-copy.mjs>>>
+  // ── 倒数日/纪念日（批次二 W5；文案唯一事实源在这里，界面里不许出现硬编码串）──
+  'web.countdown.title': '倒数纪念日',
+  'web.countdown.empty': '还没有倒数日',
+  'web.countdown.empty.hint': '记下一个日子，它会留在你的所有设备上 —— 服务器不需要知道它是什么。',
+  'web.countdown.archived.empty': '没有已归档的倒数日',
+  'web.countdown.archived.empty.hint': '归档是把不再盯的日子收起来，不是删除，随时能还原。',
+  'web.countdown.composer.placeholder': '给这一天起个名字',
+  'web.countdown.add': '添加',
+  'web.countdown.pickDate': '选日期',
+  'web.countdown.filter.all': '全部',
+  'web.countdown.kind.countdown': '倒数日',
+  'web.countdown.kind.anniversary': '纪念日',
+  'web.countdown.kind.birthday': '生日',
+  'web.countdown.kind.festival': '节日',
+  'web.countdown.kind.unset': '不选',
+  'web.countdown.view.active': '在用',
+  'web.countdown.view.archived': '已归档',
+  'web.countdown.face.until': '还有 {days} 天',
+  'web.countdown.face.today': '就是今天',
+  'web.countdown.since': '已经 {days} 天',
+  'web.countdown.badge.pinned': '置顶',
+  'web.countdown.pin': '置顶',
+  'web.countdown.unpin': '取消置顶',
+  'web.countdown.edit': '编辑',
+  'web.countdown.save': '保存',
+  'web.countdown.cancel': '取消',
+  'web.countdown.archive': '归档',
+  'web.countdown.unarchive': '还原',
+  'web.countdown.remove': '删除',
+  'web.countdown.field.title': '名称',
+  'web.countdown.field.date': '日期',
+  'web.countdown.field.kind': '类型',
+  'web.countdown.field.template': '样式',
+  'web.countdown.yearly': '每年',
+  'web.countdown.lunar': '农历',
+  'web.countdown.template.none': '默认',
+  'web.countdown.template.slot': '模板 {slot}',
+  'web.countdown.a11y.menu': '「{title}」的操作',
+  'web.countdown.a11y.menuClose': '收起「{title}」的操作',
+  'web.countdown.export': '导出成品图',
+  'web.countdown.export.failed': '导出失败：这台设备给不了画布。倒数日没有丢，也没有发出任何请求。',
+  'web.countdown.error': '没能保存：',
+  'web.shell.modules.countdown.label': '倒数纪念日',
+  'web.shell.modules.countdown.note': '把要盯的日子排在最前面；过去的那天不算失败。',
+  'web.shell.views.countdown': '倒数纪念日',
+  // W8（三端接线）：移动端「我的」页的功能域入口行。**只追加在表尾** ——
+  // 这两个文件此刻在别的会话里也是脏的，重排/格式化会造出一场没人能解的三方冲突。
+  'mobile.countdown.entry': '倒数纪念日',
+  'mobile.countdown.entry.hint': '记下要盯的日子，看它还有几天',
+  // ── W4b：后台「调休 / 补班」录入面板（公共事实的唯一写入口）─────────
+  // ⚠️ 两条措辞约束，都是产品语义不是修辞：
+  //   1. 撤销那一年**不等于**"那一年没有任何安排" —— 未覆盖的年份各端读的是
+  //      App 随包的国务院公告数据（`packages/domain` 的 holiday-cn 生成物），
+  //      所以界面必须说"退回随包数据"，说成"清空"会让运营以为撤销完日历上什么都不标。
+  //   2. 这一层**不判日期合法性**（判据在 `holidayYearPutSchema`），
+  //      所以文案不许出现"格式正确才能保存"这类承诺 —— 失败了界面只会转述服务端的拒绝。
+  'web.admin.tab.holidays': '调休/补班',
+  'web.admin.holiday.lead': '这里录入的是覆盖表：某一年一旦被整年替换，各端就用它，不再用随包的公告数据。',
+  'web.admin.holiday.list': '已录入的年度',
+  'web.admin.holiday.version': '内容版本：{version}',
+  'web.admin.holiday.dayCount': '{count} 天安排',
+  'web.admin.holiday.list.none': '还没有录入过任何一年，各端读的都是随包数据。',
+  'web.admin.holiday.revoke': '撤销这一年',
+  'web.admin.holiday.revoke.confirm': '撤销之后，那一年退回随包的公告数据，日历仍按那份数据标注休与班。',
+  'web.admin.holiday.revoke.yes': '确认撤销',
+  'web.admin.holiday.form.title': '录入一整年',
+  'web.admin.holiday.form.lead': '一次提交替换整年：这里写的就是那一年的全部安排，没有列到的日期一律按"正常上班"处理。',
+  'web.admin.holiday.form.year': '年份',
+  'web.admin.holiday.form.papers': '公告原文链接（一行一条，必须至少一条）',
+  'web.admin.holiday.form.offDays': '放假日期（一行一个 YYYY-MM-DD）',
+  'web.admin.holiday.form.workDays': '补班日期（一行一个 YYYY-MM-DD）',
+  'web.admin.holiday.form.note': '运营备注（只给后台看，不下发给客户端）',
+  'web.admin.holiday.save': '保存这一年',
+  'web.admin.holiday.notice.saved': '{year} 年已保存，共 {count} 天安排。',
+  'web.admin.holiday.notice.deleted': '{year} 年的录入已撤销，那一年退回随包的公告数据。',
+  'web.admin.holiday.notice.failed': '没有保存：服务端拒绝了这次录入，原因见上面的提示。',
+  'web.admin.tab.refunds': '退款',
+  'web.admin.refund.lead': '这里做的是「申请 → 批准 → 通道 → 回调」这条链的前两层。批准会把这笔退款交给支付通道，钱一旦发出就收不回来；而「已经退到账」只由微信的签名回调确认，不由这里点出来。',
+  'web.admin.refund.list': '退款申请',
+  'web.admin.refund.list.none': '还没有过任何一条退款申请。',
+  'web.admin.refund.filter': '按用户编号筛选',
+  'web.admin.refund.filter.submit': '筛选',
+  'web.admin.refund.order': '订单 #{order}',
+  'web.admin.refund.user': '用户 #{user}',
+  'web.admin.refund.period': '{days} 天',
+  'web.admin.refund.note': '理由（批准与驳回都要求非空）',
+  'web.admin.refund.approve': '批准',
+  'web.admin.refund.approve.confirm': '批准会立刻向支付通道发起这笔退款，钱发出去就收不回来。确认要这样做吗？',
+  'web.admin.refund.approve.yes': '确认发起退款',
+  'web.admin.refund.reject': '驳回',
+  'web.admin.refund.form.title': '开一张新的申请',
+  'web.admin.refund.form.lead': '按订单号开申请：金额只能是那一单结算时冻下的实付，天数只能是那一单买的那一段，两者都不许在这里手填。',
+  'web.admin.refund.form.orderId': '订单编号',
+  'web.admin.refund.form.note': '备注（进审计，只给后台看）',
+  'web.admin.refund.form.exception': '超出时间窗仍要批准（服务端要求这句理由非空）',
+  'web.admin.refund.form.submit': '提交申请',
+  'web.admin.refund.notice.requested': '已受理：退款 #{id}（订单 #{order}）现在是 {status}，批准之前不会动钱。',
+  'web.admin.refund.notice.submitted': '退款 #{id} 的决定已落库，并已交给支付通道（{status}）。是否真的到账以微信回调为准。',
+  'web.admin.refund.notice.channelFailed': '退款 #{id} 的批准已经落库，但通道这一跳失败了（原因码 {code}）。钱没动，可以再批一次。',
+  'web.admin.refund.notice.notSubmittable': '这一条现在的状态（{status}）不允许提交给通道，界面没有替它改状态。',
+  'web.admin.refund.notice.rejected': '退款 #{id} 已驳回：钱和权益都不动，这一条不再是待处理。',
+  'web.admin.refund.notice.denied': '服务端拒绝了这次操作，原因码：{code}',
+  'web.admin.refund.notice.conflict': '这一条当前的状态不允许这个动作，而服务端没有给出原因码。',
+  'web.admin.refund.notice.unknown': '服务端回了一个这台界面不认识的结果码：{code}。界面没有猜它的意思，请查服务端。',
+  'web.admin.refund.code.windowPassed': '这一单已经超出当前退款政策的时间窗，而且没有以例外方式批准。',
+  'web.admin.refund.code.alreadyRefunded': '这一单已经是「已退款」状态：同一笔钱不能退第二次。',
+  'web.admin.refund.code.alreadyOpen': '这一单已经有一条没走完的退款，不许再开第二条。',
+  'web.admin.refund.code.notPayable': '这一单不存在，或者还没有走到「付过钱」。',
+  'web.admin.refund.code.amountUnverified': '这一单在结算时没有记下可比的实付金额，退款金额算不出来，所以不退。',
+  'web.admin.refund.code.notCheckoutOrder': '这一单不是收银台那一路下的，库里没有可对账的那一段，所以不退。',
+  'web.admin.refund.code.notDecidable': '这一条已经决定过或者已经走完了，决定只能做一次。',
+  'web.admin.refund.code.providerNotRegistered': '批准已经落库，但这台实例没有注册这一单当初的那条通道，钱一分都没发；要等通道接回来或改走人工。',
+  'mobile.countdown.export.noModule': '这台设备上的 heyta 没有带导出组件 —— 不是数据问题，重装这个版本就能用。',
+  'mobile.countdown.export.rasterize': '系统没能把卡片画成图。倒数日没有丢，也没有发出任何请求。',
+  'mobile.countdown.export.write': '图已经画好了，但没能写进这台设备的存储。',
+  'mobile.countdown.export.share': '分享面板拒绝了这张图。',
+
+  // ── AI 助手（移动端五个功能共用的一屏）──────────────────────────────
+  //    🔴 口径：全文只说"离开本机"，不写监管定性词（见 check:ui-language 规则 7）。
+  //    数字（字数上限、条数）一律由代码插值进来，不写进词条 —— 那是第二套取值。
+  'mobile.ai.entry': 'AI 助手',
+  'mobile.ai.entry.hint': '拆解任务、排优先级、估时间、记一句话、问你自己的数据',
+  'mobile.ai.title': 'AI 助手',
+  'mobile.ai.back': '返回',
+  'mobile.ai.section.mode': '这次做什么',
+  'mobile.ai.hostFailed.title': '读不到这台设备上的数据',
+  'mobile.ai.hostFailed.hint': '没有发出任何请求。退回上一页再进来一次；还是不行就重启 heyta。',
+  'mobile.ai.notConfigured.title': 'AI 还没启用',
+  'mobile.ai.notConfigured': '到「设置 → AI」里打开总开关、填一个你自己的端点，这一屏才会有能用的链路。',
+  'mobile.ai.goSettings': '到「设置 → AI」里给这个功能选一个端点。',
+  'mobile.ai.proposalNeverAuto': 'AI 只给建议：没有任何一条改动会在你确认之前写进去。',
+  'mobile.ai.task.label': '选一条任务',
+  'mobile.ai.task.none': '这台设备上还没有任务。',
+  'mobile.ai.task.more': '还有 {count} 条没有列出来。',
+  'mobile.ai.input.capture': '要记的那句话',
+  'mobile.ai.input.capture.placeholder': '例：明天下午三点去看牙，回来顺路买猫粮',
+  'mobile.ai.input.limit': '这句话最长处理 {max} 个字。',
+  'mobile.ai.input.tool': '想让它怎么帮你',
+  'mobile.ai.tools.grantsHint': '一次工具调用最长 {max} 个字，而且只有你勾过的工具才会被调用。',
+  'mobile.ai.prioritize.scope': '排序只在你自己的任务之间比较 —— 没有别人，也没有排行榜。',
+  'mobile.ai.keyNotice': '密钥只留在这一台设备上：不进备份、不同步、退出登录即清除。',
+  'mobile.ai.saveFailed': '这台设备没能保存这次改动（本机存储拒绝了写入）。',
+  'mobile.ai.tier.defaultNote': '新配的端点默认按「{tier}」跑，随时可以改。',
 } as const;
 
 /**

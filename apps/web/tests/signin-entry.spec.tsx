@@ -93,7 +93,7 @@ beforeEach(async () => {
     baseUrl: '',
     token: undefined,
     password: undefined,
-    settingsOpen: false,
+    syncSettingsRequested: false,
     signInOpen: false,
   });
   // 🔴 G-12（2026-10-01）：冷启动现在会弹首启隐私面板（`App.tsx` 的

@@ -29,7 +29,7 @@
  * 出现了才点。这也意味着**远端授权链路在本套件里验不到**，见测试报告。
  */
 
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { installMissingProducerShims } from './shims';
 
 /** 假端点的来源（与 `playwright.config.ts` 的 webServer 端口一致）。 */
@@ -147,6 +147,9 @@ export async function enableAllModules(page: Page): Promise<void> {
         focus: true,
         growth: true,
         notes: true,
+        // W5 加的模块。**默认关**（`modules.ts` 的 `defaultOn: false`），而"关掉就不进 DOM"
+        // 由 `motivation.spec.ts` 那条"默认 rail 只有 7 个 tab"独立钉住 —— 它不走这里。
+        countdown: true,
       }),
     );
   });
@@ -267,6 +270,40 @@ export async function stubLegalRecheck(page: Page, origin: string = STUB_ORIGIN)
 }
 
 /**
+ * 给"公共事实"那条通道一个**中性**的应答（`GET /api/holiday-adjustments`）。
+ *
+ * 🔴 与 {@link stubLegalRecheck} 完全同形，且是**同一个成因**：应用一启动就会拉一次
+ * 公共事实（`apps/web/src/main.tsx:152 startPublicFacts()`，W4b 客户端那半），
+ * 而假服务端只实现 `/v1/chat/completions`，其余一律 404 ⇒ 那声 404 落进每条用例都挂的
+ * 「除已登记缺失外不该有非 2xx」，把真正的失败淹掉。
+ * 2026-10-04 03:0x 实测：`admin-console.spec.ts` **一次红五条**，五条的报错原文
+ * 逐字相同（`["/api/holiday-adjustments"]`），而其中四条与该套件的主题毫无关系。
+ *
+ * ⚠️ "中性"是有定义的：`years: []` 表示**部署方没下发任何一年**，
+ * 按 `holidayAdjustmentYearSchema` 的粒度（一整年逐日表**整体替换**，见契约 `:266` 那张表），
+ * 空数组 = 一年都不替换 ⇒ 随包节假日表照旧，日历上不该有任何肉眼可见的变化。
+ * `version` 那个串不是随手编的：`server/src/holidays/holiday-adjustment-store.ts:113`
+ * `holidayVersionToken()` 对空数据算出来就是 `0.0.0`（`maxUpdatedAt.yearCount.dayCount`）。
+ *
+ * ⚠️ 它**只答读侧、且刻意答"没有数据"**。要验"下发了数据日历会变"的是
+ * `public-facts.spec.ts`，它自己装了带具体数据与 404 的路由（后注册的会遮蔽这里）。
+ *
+ * 🔴 "只答读侧"是**代码层的**，不是注释里的：非 GET 一律 `fallback()` 交回夹具的
+ * catch-all，让"某个套件不该发的写请求"仍然按未登记计入红集 —— 把写侧也一并 fulfill
+ * 掉，就等于用一条中性夹具替产品开了后门。
+ */
+export async function stubPublicFacts(page: Page, origin: string = STUB_ORIGIN): Promise<void> {
+  await page.route(`${origin}/api/holiday-adjustments**`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ version: '0.0.0', years: [] }),
+    });
+  });
+}
+
+/**
  * 打开应用。
  *
  * @param path 打开哪个路径 —— 默认 `/`（应用根）。
@@ -280,6 +317,25 @@ export async function stubLegalRecheck(page: Page, origin: string = STUB_ORIGIN)
  * 反过来写会让这里等的那个元素被遮罩挡住（判据本身不受影响，
  * 但后面的点击会红成"元素点不动"而不是"面板没关"）。
  */
+/**
+ * 等首屏品牌帧（`#heyta-boot`）**真的从 DOM 上摘掉**。
+ *
+ * 🔴 由来不是设想，是 10-05 12:1x 那次重拍取证：`--all` 报的 8 枚 UISTALE 里两张
+ * 逐张打开后**整片变了**（`magick compare -metric AE` = 855096/921600 ≈ 93%），
+ * 画面上是一枚半透明的 `h` 品牌 mark 压在日档内容上 —— `1e5dd492` 那批首屏退场动画
+ * 还在跑，而 `page.screenshot` 发生在它之前。
+ * ⚠️ **产品行为没有错**（遮罩按 `animationend` + 有界兜底自己摘，见 `apps/web/src/boot-splash.ts`），
+ *    错在**取证拍到了过渡帧**：§6.2 规定一要的是"用户看见的那一屏"，
+ *    而一张正在淡出的遮罩既不是首屏也不是目标界面 —— 它同时污染像素判据和人的复核。
+ *
+ * 放在 `openApp` 末尾 ⇒ 所有走它的 spec 一起定帧。
+ * `e2e/tests/boot-splash.spec.ts` 是**故意**拍品牌帧的那一枚，它不走 `openApp`，因此不受影响。
+ * 品牌帧若真的摘不掉，这条等待 5s 后抛错 ⇒ 响亮失败，而不是继续拍一张被盖住的图。
+ */
+export async function waitForBootSplashGone(page: Page): Promise<void> {
+  await page.locator('#heyta-boot').waitFor({ state: 'detached', timeout: 5000 });
+}
+
 export async function openApp(
   page: Page,
   path = '/',
@@ -291,18 +347,56 @@ export async function openApp(
   await page.goto(path);
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
   await decidePrivacyConsent(page, consent);
+  await waitForBootSplashGone(page);
 }
 
 /** 切换顶部视图 tab。 */
 /**
  * 🔴 「设置」**不是** rail 上的 tab —— 它收在**头像菜单**里（2026-09-29）。
  * 所以它必须单独一条路：点头像 → 点菜单里的「设置」。
+ *
+ * 这一条**语言中立**（只按 testID 走，不断言任何一句界面文字）：
+ * 语言与主题搬进 设置 → 显示 之后（H9 第三刀），英文界面的用例也要走得到那一层，
+ * 而那里没有「设置」这两个字。
  */
-export async function openSettingsView(page: Page): Promise<void> {
+export async function openSettingsSheet(page: Page): Promise<void> {
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('account-menu-settings').click();
-  await expect(page.locator('.ht-header__title').first()).toHaveText('设置');
   await waitForOverlaySettled(page, 'settings-sheet');
+}
+
+/** 收掉设置浮层（走它自己的出口，不是按 Esc —— 浮层里可能有别的 Esc 消费者）。 */
+export async function closeSettingsSheet(page: Page): Promise<void> {
+  await page.getByTestId('settings-sheet-close').click();
+  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
+}
+
+/**
+ * 走**真开关**切主题：设置 → 显示 里那枚（2026-10-06 之前它在页头那一排）。
+ *
+ * 🔴 为什么不许改成"往 localStorage 塞 `heyta.theme`"或 `emulateMedia`：
+ * `calendar-cells.spec.ts` 与 `habit-month-stats.spec.ts` 各记过一次同一个假绿 ——
+ * `emulateMedia({colorScheme:'dark'})` 只改 `prefers-color-scheme`，而应用一旦
+ * "用户显式选过"那一档就再也不看系统偏好，于是**用例名字写着暗色、量的是亮色**。
+ * 只有点真开关，`applyTheme` 与 `setTheme` 才同时改。
+ *
+ * 这条把"必须钉住 `html[data-theme]` 真的翻了"收在一处；起点若不是亮色，
+ * 断言会当场红（而不是悄悄量到反过来的那一档）。
+ *
+ * ⚠️ 开关住在条件渲染的浮层里 ⇒ 必须开→点→**关**：不关的话，调用方接下来那张
+ * 截图拍到的是设置浮层，不是它声称在量的那个视图。
+ */
+export async function switchTheme(page: Page, target: 'dark' | 'light'): Promise<void> {
+  await openSettingsSheet(page);
+  await page.getByTestId('theme-toggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', target);
+  await closeSettingsSheet(page);
+}
+
+/** `openSettingsSheet()` + 中文界面上"标题真的是设置"那一条。 */
+export async function openSettingsView(page: Page): Promise<void> {
+  await openSettingsSheet(page);
+  await expect(page.locator('.ht-header__title').first()).toHaveText('设置');
 }
 
 /**
@@ -377,6 +471,7 @@ export async function switchView(
     | '番茄钟'
     | '成长'
     | '便签'
+    | '倒数纪念日'
     | '搜索'
     | '回收站'
     | '设置',
@@ -410,6 +505,40 @@ export async function addTask(page: Page, title: string): Promise<void> {
   await composer.fill(title);
   await composer.press('Enter');
   await expect(rowFor(page, title)).toBeVisible();
+}
+
+/**
+ * 让**详情列有东西可画**：建一条任务并点开它。
+ *
+ * 🔴 2026-10-06 工单 H10 第一刀之后新增。那一栏现在承诺"没东西可画就不占位"
+ * （产品负责人第 5 条：「数据侧边栏和那个侧边栏，哪有这么排版的？」），
+ * 于是所有问"这一栏在不在 / 多宽 / 贴不贴边"的判据都必须跑在**有内容**的那一档。
+ * 这条 helper 存在的理由就是把那一步前置**收在一处** —— 六个调用点各抄一遍
+ * "建任务 + 交还焦点 + 点行"就又是一份会漂的抄件。
+ *
+ * ⚠️ 它只喂内容，**不改变任何判据的口径**：调用它的那条断言一个字都不动。
+ * ⚠️ 点行必须走 `task-row-*`（行体）而不是 `task-item-*`（整行）：外层那棵 `View`
+ *   没有 `onPress`，点它不会选中 —— 这条实测记在 `detail-pane-task.spec.ts`
+ *   的 `rowItemOf` 注释里，这里不重抄理由。
+ */
+export async function showDetailColumnContent(page: Page, title = '详情列判据甲'): Promise<void> {
+  await addTask(page, title);
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+  });
+  await page
+    .locator('[data-testid^="task-row-"]')
+    .filter({ hasText: title })
+    .first()
+    .click();
+}
+
+/** 重新点开 `showDetailColumnContent` 建过的那条（刷新之后选中态不在了 —— 选中是视图内状态，不落盘）。 */
+export async function reselectDetailColumnContent(
+  page: Page,
+  title = '详情列判据甲',
+): Promise<void> {
+  await page.locator('[data-testid^="task-row-"]').filter({ hasText: title }).first().click();
 }
 
 /**
@@ -535,4 +664,86 @@ export async function disableAiMasterSwitch(page: Page): Promise<void> {
   await page.locator('#ai-enabled').uncheck();
   // 关掉之后端点那段应当整体消失（界面上不残留"可用"的错觉）。
   await expect(page.locator('#ai-allow-remote')).toHaveCount(0);
+}
+
+/**
+ * 截图前把鼠标挪开。
+ *
+ * 🔴 这条不是美化：`switchView` 用鼠标点 rail，rail 的 tooltip 会**留在下一张图上**。
+ * 两次实测同一个形状：`selection-projections/03-timeline.png` 里那句"四象限"压在
+ * 选中那条任务的标题上；`detail-column-slot/no-sidebar-view.png` 里它压在 rail 与
+ * 内容区的交界上。断言全绿，而证据图看不清（§6.2 规定一要的是"人能看懂的那张图"）。
+ *
+ * ⚠️ 落点是**按视口算的右下角**，不是常数坐标：第一版写死 `(640, 40)`，
+ * 而 1280 宽的顶栏在那个位置上恰好是「同步」按钮 ⇒ 图里那个按钮带着 hover 环
+ * （看图时才发现的，断言同样全绿）。右下角落在详情列里 —— 那里今天没有任何控件。
+ *
+ * ⚠️ 它住在**单一所有者**这里而不是各 spec 抄一份：这是 `switchView` 的副作用，
+ * 而 `switchView` 的调用方只会越来越多。
+ */
+export async function parkCursor(page: Page): Promise<void> {
+  const vp = page.viewportSize() ?? { width: 1280, height: 720 };
+  await page.mouse.move(vp.width - 180, vp.height - 60);
+  await page.waitForTimeout(120);
+}
+
+/**
+ * 通过习惯视图自己的表单建一个习惯（真 op-log，不碰内部状态）。
+ *
+ * 定位用的是**界面自己声明的可访问名**（`web.habits.addLabel` = 「新习惯名称」），
+ * 不是 CSS 类 —— `.ht-habit__add` 那类改名不会让判据误红，可访问名改名会是产品事件。
+ * 提交走 `Enter`（那是一个真 `<form onSubmit>`，`HabitsView.tsx:268-273`）。
+ */
+export async function addHabit(page: Page, name: string): Promise<void> {
+  const input = page.getByLabel('新习惯名称');
+  await input.fill(name);
+  await input.press('Enter');
+  await expect(
+    page.locator('[data-testid^="habit-row-"]').filter({ hasText: name }).first(),
+    `建了「${name}」但习惯列表里没有那一行`,
+  ).toBeVisible();
+}
+
+/**
+ * 通过便签板自己的输入框建一条便签（真 op-log）。
+ *
+ * 走共享 `NotesBoard` 的 testID 契约（`notes-input` / `notes-submit`，
+ * `packages/ui/src/notes/NotesBoard.tsx:241-264`）—— 那是界面自己给自动化留的名字。
+ */
+export async function addNote(page: Page, content: string): Promise<void> {
+  await page.getByTestId('notes-input').fill(content);
+  await page.getByTestId('notes-submit').click();
+  await expect(
+    page.locator('[data-testid^="note-row-"]').filter({ hasText: content }).first(),
+    `建了「${content}」但便签板里没有那一张`,
+  ).toBeVisible();
+}
+
+/**
+ * 量一个元素的**盒子**，并把"可见却量不到"当成失败响亮报出来。
+ *
+ * 🔴 为什么要单独一个 helper：`toBeVisible()` 回答的是"在 DOM 里、有尺寸、没被
+ *    `display:none`"，**它不回答"在不在视口内"**。第一版图标选择器五条断言全绿，
+ *    而展开的那一排被排到了视口右边外面 —— 只有盒子坐标能抓这种"存在但看不见"。
+ *    所以任何几何判据都必须先过这一道：拿不到 box 就红，不许按 `0` 继续算。
+ */
+export async function boxOf(page: Page, locator: Locator, what: string) {
+  await expect(locator, `界面上找不到${what}`).toBeVisible();
+  const box = await locator.boundingBox();
+  expect(box, `${what}"可见"却量不到 boundingBox`).not.toBeNull();
+  return box as { x: number; y: number; width: number; height: number };
+}
+
+/**
+ * 在习惯清单里**选中**那一条（右侧窗格随之打开）。
+ *
+ * 🔴 这一步不是铺垫而是**前提**：web 的窗格刻意**没有回落选中**
+ *    （`apps/web/tests/habits-list-pane.spec.tsx` 的 G 组钉住"没人点过时零行带
+ *    `aria-current`，窗格说的是「选一条习惯」而不是第一条"）。只 `addHabit` 的话
+ *    窗格里那些编辑器**根本不在 DOM 里**，而报错长这样：`locator.click` 等 90 秒超时 ——
+ *    第一版的图标用例五条全部红在这里，看起来像"选择器坏了"，其实是用例没走到它。
+ */
+export async function selectHabit(page: Page, name: string): Promise<void> {
+  await page.locator('[data-testid^="habit-row-"]').filter({ hasText: name }).first().click();
+  await expect(page.getByTestId('habit-pane')).toHaveAttribute('aria-label', new RegExp(name));
 }

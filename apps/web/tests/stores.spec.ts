@@ -317,7 +317,7 @@ describe('番茄钟 store', () => {
 
     // 推进到休息段（不是 work）
     expect(useFocusStore.getState().state.kind).not.toBe('work');
-    expect(useFocusStore.getState().completedToday).toBe(1);
+    expect(useFocusStore.getState().overview.todayCount).toBe(1);
   });
 
   it('未到时 tickOnce 只重绘、不落盘', async () => {

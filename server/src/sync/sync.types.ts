@@ -16,6 +16,14 @@ import {
   MAX_VECTOR_CLOCK_SIZE,
 } from '@heyta/sync-core';
 
+/**
+ * Resource guard for untrusted clocks. This is an explicit rejection bound,
+ * never a storage/comparison pruning bound: accepted clocks retain every
+ * client dimension. It is deliberately well above the old 100-entry limit so
+ * the 100/101 device boundary remains lossless.
+ */
+export const MAX_ACCEPTED_VECTOR_CLOCK_ENTRIES = 4096;
+
 const FULL_STATE_OP_TYPES: ReadonlySet<string> = new Set(SUPER_SYNC_SNAPSHOT_OP_TYPES);
 
 /**
@@ -168,10 +176,11 @@ export type OpType = SuperSyncOpType;
  * Returns a sanitized clock with validated entries, or an error.
  *
  * Validation rules:
- * - Maximum 50 entries (prevents DoS via huge clocks)
+ * - Maximum 4096 entries (prevents DoS via huge clocks; accepted entries are
+ *   never silently discarded)
  * - Keys must be non-empty strings, max 255 characters
  * - Values must be non-negative integers, capped at 100,000,000
- * - Invalid entries are removed (not rejected)
+ * - Any invalid entry rejects the entire clock; causality is never weakened
  */
 export const sanitizeVectorClock = (
   clock: unknown,
@@ -183,27 +192,19 @@ export const sanitizeVectorClock = (
   const entries = Object.entries(clock as Record<string, unknown>);
 
   // Reject absurdly large clocks (DoS protection).
-  // Legitimate clocks can temporarily exceed MAX_VECTOR_CLOCK_SIZE during conflict
-  // resolution: entity clock IDs + client ID + merged clocks from multiple concurrent
-  // clients. 2.5x MAX gives room for multi-client merge scenarios while catching
-  // adversarial inputs. Server-side pruning (limitVectorClockSize) will trim to MAX
-  // before storage.
-  const MAX_SANITIZE_VECTOR_CLOCK_SIZE = Math.ceil(MAX_VECTOR_CLOCK_SIZE * 2.5);
-  if (entries.length > MAX_SANITIZE_VECTOR_CLOCK_SIZE) {
+  if (entries.length > MAX_ACCEPTED_VECTOR_CLOCK_ENTRIES) {
     return {
       valid: false,
-      error: `Vector clock has too many entries (${entries.length}, max ${MAX_SANITIZE_VECTOR_CLOCK_SIZE})`,
+      error: `Vector clock has too many entries (${entries.length}, max ${MAX_ACCEPTED_VECTOR_CLOCK_ENTRIES})`,
     };
   }
 
   const sanitized: VectorClock = {};
-  let strippedCount = 0;
 
   for (const [key, value] of entries) {
     // Validate key
-    if (typeof key !== 'string' || key.length === 0 || key.length > 255) {
-      strippedCount++;
-      continue; // Skip invalid keys
+    if (key.length === 0 || key.length > 255 || Object.prototype.hasOwnProperty.call(Object.prototype, key)) {
+      return { valid: false, error: 'Invalid vector clock client id' };
     }
 
     // Validate value
@@ -216,17 +217,10 @@ export const sanitizeVectorClock = (
       // counter that makes all other clocks LESS_THAN it.
       value > 100_000_000
     ) {
-      strippedCount++;
-      continue; // Skip invalid values
+      return { valid: false, error: 'Invalid vector clock counter' };
     }
 
     sanitized[key] = value;
-  }
-
-  if (strippedCount > 0) {
-    Logger.warn(
-      `sanitizeVectorClock: Stripped ${strippedCount} invalid entries from vector clock`,
-    );
   }
 
   return { valid: true, clock: sanitized };
@@ -249,6 +243,7 @@ export interface Operation {
   isPayloadEncrypted?: boolean; // True if payload is E2E encrypted
   syncImportReason?: string;
   repairBaseServerSeq?: number;
+  vectorClockEncoding?: 'full' | 'frontier-delta';
 }
 
 export const isCausalFullStateOperation = (
@@ -326,6 +321,7 @@ export interface UploadOpsRequest {
   clientId: string;
   lastKnownServerSeq?: number;
   requestId?: string; // For request deduplication on retries
+  causalFrontierToken?: string;
 }
 
 export interface UploadResult {
@@ -375,6 +371,8 @@ export interface UploadOpsResponse {
    * Client should trigger a download to get the remaining operations.
    */
   hasMorePiggyback?: boolean;
+  /** History missing before the piggyback cursor; clients must preserve this diagnostic. */
+  gapDetected?: boolean;
 }
 
 // Download types
@@ -401,12 +399,17 @@ export interface DownloadOpsResponse {
    * Clients need this to create merged updates that dominate all known clocks.
    */
   snapshotVectorClock?: VectorClock;
+  causalFrontier?: {
+    token: string;
+    vectorClock: VectorClock;
+  };
   /**
    * Server timestamp for client clock drift detection.
    */
   serverTime?: number;
   capabilities?: {
     causalRepairSnapshots: true;
+    causalFrontierDelta?: boolean;
   };
 }
 

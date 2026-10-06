@@ -117,6 +117,7 @@ export function reminderOffsetKeys(): readonly MessageKey[] {
 export function reminderListLabels(t: Translate): ReminderListLabels {
   return {
     title: t('reminder.title'),
+    deliveryUncertain: t('reminder.delivery.uncertain'),
     empty: t('reminder.empty'),
     add: t('reminder.add'),
     // ⚠️ 顺序即契约：共享组件用 `labels.offsets[i]` 配 `presets[i]`。

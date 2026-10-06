@@ -18,6 +18,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseCapture, dueDateToEpoch } from '../src/capture.js';
+import { isAllDayDueMs, localTimeOf, parseLocalTime, timeOfDayMs } from '../src/date.js';
 import {
   SOON_THRESHOLD_DAYS,
   computeCountdown,
@@ -162,6 +163,81 @@ describe('parseCapture —— 绝对日期', () => {
     // 边界检查拦掉 `26/09`（前面是数字）与 `09/26`（后面跟着 /26）
     // → 不接受任何匹配，于是标题不动
     expect(r.title).toBe('2026/09/26 交');
+  });
+});
+
+describe('parseCapture —— 裸「N 号」（月内日）', () => {
+  // 这一组的存在理由写在 `capture.ts` 的裸号规则注释里：中文的「N 号」同时是
+  // **日子**和**编号**，而误伤的后果是删掉用户写的字。所以正例证明它认得出，
+  // 反例证明三层守卫各挡各的 —— 反例必须**逐条不同挡点**，否则一条守卫坏了
+  // 而其余守卫碰巧也挡住，测试会跟着一起绿。
+  const FEB = Date.parse('2026-02-01T10:00:00');
+  const DEC = Date.parse('2026-12-20T10:00:00');
+
+  it('本月还没过 = 本月；本月已过 = 下月（不是明年）', () => {
+    // 今天 2026-09-25
+    expect(parseCapture('26号交周报', { now: FRIDAY }).dueDate).toBe('2026-09-26');
+    expect(parseCapture('15号交材料', { now: FRIDAY }).dueDate).toBe('2026-10-15');
+    // 说的就是今天 → 今天，不跳到下个月
+    expect(parseCapture('25号', { now: FRIDAY }).dueDate).toBe('2026-09-25');
+  });
+
+  it('数字与「号」之间的空格照认，且 raw 原样带回（UI 要能撤销的就是这段字）', () => {
+    const r = parseCapture('5 号之前交', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-10-05');
+    expect(r.matches).toHaveLength(1);
+    expect(r.matches[0]!.raw).toBe('5 号');
+    expect(r.title).toBe('之前交');
+  });
+
+  it('🔴 这个日子在本月**不存在**时往后找，而不是夹到月末', () => {
+    // 2026 年 2 月没有 29 日（非闰年）也没有 31 日。
+    // 夹到月末会把"31 号"变成"28 号" —— 那不是用户说的日子。
+    expect(parseCapture('29号复查', { now: FEB }).dueDate).toBe('2026-03-29');
+    expect(parseCapture('31号交报告', { now: FEB }).dueDate).toBe('2026-03-31');
+  });
+
+  it('年末说"3 号"是明年 3 号，跨年由同一个循环完成', () => {
+    expect(parseCapture('3号交税', { now: DEC }).dueDate).toBe('2027-01-03');
+    expect(parseCapture('1号元旦', { now: DEC }).dueDate).toBe('2027-01-01');
+  });
+
+  it('🔴 编号不是日子：每一行挡点各不相同', () => {
+    const cases: readonly [string, string][] = [
+      ['买 5 号电池', '后缀黑名单（电）'],
+      ['37 号楼取快递', '后缀黑名单（楼）+ 日期存在性（37 不是任何月的日）'],
+      ['7号楼', '后缀黑名单（楼）—— 7 在范围内，只有这一层挡得住'],
+      ['3号会议室', '后缀黑名单（会）'],
+      ['房间8号', '前缀黑名单（间）'],
+      ['3单元8号取件', '前缀黑名单（元）'],
+      ['第5号', '前缀黑名单（第）'],
+      ['2026号', '双侧非数字边界'],
+      ['0号', '日期存在性（没有 0 号）'],
+      ['32号', '日期存在性（没有 32 号）'],
+      ['几月5号再说', '前缀黑名单（月）：月份没定的日子不是一个日期'],
+    ];
+    for (const [input, reason] of cases) {
+      const r = parseCapture(input, { now: FRIDAY });
+      expect(r.dueDate, `${input} 应当被拒（${reason}）`).toBeUndefined();
+      // 没认出来就一个字都不许动
+      expect(r.title, `${input} 的标题不该被改（${reason}）`).toBe(input);
+      expect(r.matches, `${input} 不该产生识别（${reason}）`).toHaveLength(0);
+    }
+  });
+
+  it('🔴 「10月8号」仍由月规则整段认领，裸号规则不抢第二段', () => {
+    const r = parseCapture('10月8号交', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-10-08');
+    // 去重叠生效时这里恰好是 1；裸号规则没有守卫就是 2 条。
+    expect(r.matches).toHaveLength(1);
+    expect(r.title).toBe('交');
+  });
+
+  it('两个裸号：只采纳第一条，第二条留在标题里（不变量 3）', () => {
+    const r = parseCapture('5号 6号 交', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-10-05');
+    expect(r.title).toContain('6号');
+    expect(r.matches.filter((m) => m.applied)).toHaveLength(1);
   });
 });
 
@@ -407,6 +483,117 @@ describe('parseCapture —— 边界与卫生', () => {
     expect(d.getDate()).toBe(26);
     expect(d.getHours()).toBe(0);
     expect(d.getMinutes()).toBe(0);
+  });
+});
+
+describe('parseCapture —— 时刻（R14：`明天16:00 交周报`）', () => {
+  it('日期 + 时刻一起采纳，两个片段都从标题里带走', () => {
+    const r = parseCapture('明天16:00 交周报', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-09-26');
+    expect(r.dueTime).toBe('16:00');
+    expect(r.title).toBe('交周报');
+    expect(r.matches).toHaveLength(2);
+    // 🔴 不丢字不变量在这里同样成立：两个片段都是 applied:true
+    expect(r.matches.map((m) => m.applied)).toEqual([true, true]);
+  });
+
+  it('绝对日期 + 时刻', () => {
+    const r = parseCapture('10月8号 09:30 开会', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-10-08');
+    expect(r.dueTime).toBe('09:30');
+    expect(r.title).toBe('开会');
+  });
+
+  it('🔴 时刻**从不单独成立**：没有日期时这条匹配 applied:false，原文留在标题里', () => {
+    // 若这里"采纳"了裸的 16:00，界面会写出一条 dueDate=今天零点 + 时刻的 op，
+    // 而用户从没说过"今天" —— 那是替用户编日期（文件头不变量禁止的事）。
+    const r = parseCapture('16:00 交周报', { now: FRIDAY });
+    expect(r.dueDate).toBeUndefined();
+    expect(r.dueTime).toBeUndefined();
+    expect(r.matches).toHaveLength(1);
+    expect(r.matches[0]!.applied).toBe(false);
+    expect(r.title).toBe('16:00 交周报');
+  });
+
+  it('同字段的第二条时刻留在标题里（与两个日期的规则逐字同形）', () => {
+    const r = parseCapture('明天 09:30-10:30 对齐', { now: FRIDAY });
+    expect(r.dueTime).toBe('09:30');
+    // ⚠️ 实测读数，不是理想形状：区间写法只吃头一点，连接符 `-` 会悬挂在残句开头。
+    //   这条**不是 R14 引入的** —— 日期侧一直是同一个形状（下面那条把它的读数钉在原地），
+    //   所以两处必须一起改才有意义；只改时刻侧会让两个字段行为分叉（AGENTS §3.5）。
+    //   台账 §6 登记成已知边界。
+    expect(r.title).toBe('-10:30 对齐');
+    expect(
+      parseCapture('明天-后天 开会', { now: FRIDAY }).title,
+      '日期侧的悬挂连接符（同一条边界的前例）',
+    ).toBe('-后天 开会');
+  });
+
+  it('🔴 不像时刻的一律不吃：带秒的、越界的、被数字贴住的', () => {
+    for (const [input, why] of [
+      ['开会 12:30:45', '带秒不是 HH:MM，整串原样留着'],
+      ['开会 24:00', '24 点不存在（而"4:00"被前面的数字贴住，不许从中间咬一口）'],
+      ['开会 9:70', '70 分不存在'],
+      ['开会 16:001', '后面贴着数字 = 这不是一个时刻'],
+    ] as const) {
+      const r = parseCapture(input, { now: FRIDAY });
+      expect(r.dueTime, why).toBeUndefined();
+      expect(r.matches, `${why}；也不该留下半条识别结果`).toHaveLength(0);
+      expect(r.title, why).toBe(input);
+    }
+  });
+
+  it('单位数小时补零：`9:05` 采纳成 `09:05`', () => {
+    const r = parseCapture('明天9:05 打卡', { now: FRIDAY });
+    expect(r.dueTime).toBe('09:05');
+    // raw 是原文（`9:05`），display 是归一化后的值 —— 两个通道分开，
+    // 否则"移除原文"和"写入的值"会互相顶替。
+    expect(r.matches[1]!.raw).toBe('9:05');
+    expect(r.matches[1]!.display).toBe('09:05');
+  });
+});
+
+describe('日期↔时刻的换算（R14 的"不 bump schema"就落在这两个函数上）', () => {
+  it('dueDateToEpoch 带时刻 → 本地那一刻；不带 → 本地零点', () => {
+    const withTime = dueDateToEpoch('2026-09-26', '16:00');
+    const d = new Date(withTime);
+    expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2026, 8, 26]);
+    expect([d.getHours(), d.getMinutes()]).toEqual([16, 0]);
+    expect(withTime).toBe(dueDateToEpoch('2026-09-26') + 16 * 60 * 60 * 1000);
+  });
+
+  it('🔴 `isAllDayDueMs` 与 `localTimeOf` 严格互斥（同一输入不能一个说"全天"、另一个给时刻）', () => {
+    const allDay = dueDateToEpoch('2026-09-26');
+    const timed = dueDateToEpoch('2026-09-26', '00:30');
+    expect(isAllDayDueMs(allDay)).toBe(true);
+    expect(localTimeOf(allDay)).toBeUndefined();
+    expect(isAllDayDueMs(timed)).toBe(false);
+    expect(localTimeOf(timed)).toBe('00:30');
+  });
+
+  it('非零点的秒/毫秒也算"有时刻"', () => {
+    // 这条防的是只判 `getHours()||getMinutes()` 的实现 —— 那种写法会把
+    // `00:00:30` 说成"全天"，而它不是本地零点。
+    const ts = dueDateToEpoch('2026-09-26') + 30_000;
+    expect(isAllDayDueMs(ts)).toBe(false);
+    expect(localTimeOf(ts)).toBe('00:00');
+  });
+
+  it('parseLocalTime 只认 `H:MM`/`HH:MM`，其余返回 undefined 而不是抛', () => {
+    expect(parseLocalTime('16:00')).toBe('16:00');
+    expect(parseLocalTime(' 9:05 ')).toBe('09:05');
+    for (const bad of ['', '24:00', '9:60', '9:5', '16', '16:00:00', 'abc', '16-00']) {
+      expect(parseLocalTime(bad), `不该过：${bad}`).toBeUndefined();
+    }
+  });
+
+  it('timeOfDayMs 对非法输入抛错：那是程序错，不是用户输入错', () => {
+    expect(timeOfDayMs('16:00')).toBe(16 * 60 * 60 * 1000);
+    // `LocalTime` 是 `string` 的别名（不是一等公民的标记类型），所以编译器挡不住，
+    // 只有运行时的形状检查挡得住 —— 这条用例就是那面墙存在过的证据。
+    expect(timeOfDayMs('09:05')).toBe(9 * 60 * 60 * 1000 + 5 * 60 * 1000);
+    expect(() => timeOfDayMs('16:00:00')).toThrow();
+    expect(() => timeOfDayMs('16-00')).toThrow();
   });
 });
 

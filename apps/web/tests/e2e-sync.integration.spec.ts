@@ -27,6 +27,7 @@ import { OpType } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 
 import { SyncClient } from '@heyta/sync-client';
+import { createSyncClient } from '@heyta/app-host';
 
 import { ConflictDialog } from '../src/features/sync/ConflictDialog.js';
 import { useSyncStore } from '../src/features/sync/store.js';
@@ -61,39 +62,11 @@ async function makeDevice(
   const engine = new OpLogEngine({ clientId, store });
   await engine.recover();
 
-  const client = new SyncClient({
-    baseUrl: URL_BASE!,
-    clientId,
+  const client = createSyncClient({
+    baseUrl: URL_BASE!, engine, store,
     getToken: async () => token,
     getPassword: async () => PASSWORD,
-    getLastServerSeq: async () => {
-      const r = await adapter.get<{ key: string; value: number }>(STORES.META, KEY);
-      return r?.value ?? 0;
-    },
-    setLastServerSeq: async (seq) => {
-      await adapter.put(STORES.META, { key: KEY, value: seq });
-    },
-    getLocalOps: () => engine.getPendingUpload(),
-    markUploaded: (m) => engine.markUploaded(m),
-    applyRemote: async (ops) => {
-      await engine.applyRemote(ops);
-    },
-    redispatch: async (op) => {
-      await engine.redispatch(op);
-    },
-    discardLocal: (ids) => engine.discardPendingUpload(ids),
-    markRejected: (ids) => engine.markRejected(ids),
-    getOpsForEntity: (entityType, entityId) =>
-      engine.getOpsForEntity(entityType as never, entityId),
-    getOpById: (opId) => engine.getOpById(opId),
-    redispatchPayload: async (intent) => {
-      await engine.dispatch({
-        entityType: intent.entityType as never,
-        entityId: intent.entityId,
-        opType: intent.opType as never,
-        payload: intent.payload,
-      });
-    },
+    applyRemote: async (ops) => { await engine.applyRemote(ops); },
     ...(fetchImpl !== undefined ? { fetchImpl } : {}),
   });
 
@@ -178,6 +151,47 @@ describe.skipIf(URL_BASE === undefined)('端到端同步（真实服务端）', 
       // 明文绝不允许出现在服务端
       expect(JSON.stringify(envelope)).not.toContain('端到端验证任务');
     }
+  }, 60_000);
+
+  it('A/D：101 维前沿、真实加密 checkpoint、新设备恢复及重启后写入', async () => {
+    Object.assign(globalThis, { indexedDB: new IDBFactory(), IDBKeyRange });
+    const reg = await fetch(`${URL_BASE}/api/test/create-user`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: `heyta-aed-${Date.now()}@example.com`, password: 'heyta-p1-password' }),
+    });
+    expect(reg.ok).toBe(true);
+    const { token } = await reg.json() as { token: string };
+    const source = await makeDevice('aed-source', token);
+    const target = await makeDevice('aed-target', token);
+    created.push(source, target);
+    const historicalClock = Object.fromEntries(Array.from({ length: 101 }, (_, i) => [`historical-${i}`, 1]));
+    await source.engine.observeRemoteClockDurably(historicalClock);
+    await source.engine.dispatch({ entityType: 'TASK', entityId: 'aed-task', opType: OpType.Create,
+      payload: { title: 'full-state restored task', priority: 2 } });
+    expect((await source.client.sync()).kind).toBe('synced');
+    await source.engine.createSyncCheckpoint();
+    expect(await source.client.sync()).toMatchObject({ kind: 'synced' });
+
+    // Simulate the previously pruned local clock. The snapshot must restore it.
+    await target.engine.observeRemoteClockDurably(Object.fromEntries(Object.entries(historicalClock).slice(0, 100)));
+    expect((await target.client.sync()).kind).toBe('synced');
+    expect(target.engine.getState().tasks['aed-task']).toMatchObject({ title: 'full-state restored task', priority: 2 });
+    const received = await target.engine.getAllOps();
+    expect(received).toHaveLength(1);
+    expect(received[0]!.opType).toBe('REPAIR');
+    expect(target.engine.getClock()['historical-100']).toBe(1);
+
+    const reboot = new OpLogEngine({ store: target.store, clientId: 'aed-target' });
+    await reboot.recover();
+    const successor = await reboot.dispatch({ entityType: 'TASK', entityId: 'aed-task', opType: OpType.Update,
+      payload: { title: 'after restart' } });
+    expect(successor.ops[0]!.vectorClock['historical-100']).toBe(1);
+    const client = createSyncClient({ engine: reboot, store: target.store, baseUrl: URL_BASE!,
+      getToken: async () => token, getPassword: async () => PASSWORD,
+      applyRemote: async (ops) => { await reboot.applyRemote(ops); } });
+    expect((await client.sync()).kind).toBe('synced');
+    expect((await source.client.sync()).kind).toBe('synced');
+    expect(source.engine.getState().tasks['aed-task']!.title).toBe('after restart');
   }, 60_000);
 
   it('🔴 增量下载：第二次同步不重复拉取（游标真的起作用）', async () => {
@@ -801,7 +815,13 @@ describe.skipIf(URL_BASE === undefined)(
       created.push(B);
 
       // 把 store 指向真实服务端 / 真实令牌 / 真实 E2EE 口令
+      // Real prerequisites of the production store: a fresh test profile has
+      // not yet consented, and account legal checks run asynchronously.
+      const { privacyConsentActions } = await import('../src/features/privacy/consent-gate.js');
+      const { legalRecheck } = await import('../src/features/legal-recheck/gate.js');
+      privacyConsentActions.accept();
       useSyncStore.getState().configure(URL_BASE!, token, PASSWORD);
+      await legalRecheck.refresh();
 
       await A.dispatch({
         entityType: 'TASK',
@@ -810,7 +830,7 @@ describe.skipIf(URL_BASE === undefined)(
         payload: { title: 'base' },
       });
       const first = await useSyncStore.getState().syncNow();
-      expect(first.kind).toBe('synced');
+      expect(first.kind, JSON.stringify(first)).toBe('synced');
 
       await B.client.sync();
       expect(B.engine.getState().tasks['c']!.title).toBe('base');

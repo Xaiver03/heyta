@@ -36,6 +36,7 @@ import {
   sendOpsBatchTooLargeReply,
 } from './sync.routes.quota';
 import { createOpsRequestFingerprint } from './services/request-deduplication.service';
+import { expandFrontierDelta, verifyCausalFrontierToken } from './causal-frontier';
 
 const isStateReplacementFenceRejection = (results: UploadResult[]): boolean =>
   results.length > 0 &&
@@ -100,8 +101,14 @@ export const uploadOpsHandler = async (
         .send(createValidationErrorResponse(parseResult.error.issues));
     }
 
-    const { ops, clientId, lastKnownServerSeq, requestId } = parseResult.data;
+    const { clientId, lastKnownServerSeq, requestId, causalFrontierToken } = parseResult.data;
+    let ops = parseResult.data.ops as unknown as Operation[];
+    // A causal maintenance snapshot is an independent transaction. Its base
+    // must describe the server prefix before that one snapshot is inserted.
+    const repairBase = ops.length === 1 && ops[0].opType === 'REPAIR'
+      ? ops[0].repairBaseServerSeq : undefined;
     const syncService = getSyncService();
+
 
     Logger.info(
       `[user:${userId}] Upload: ${ops.length} ops from client ${clientId.slice(0, 8)}...`,
@@ -134,6 +141,27 @@ export const uploadOpsHandler = async (
         opsCount: ops.length,
       });
     }
+
+    const hasFrontierDelta = ops.some((op) => op.vectorClockEncoding === 'frontier-delta');
+    if (hasFrontierDelta) {
+      const latestSeq = await syncService.getLatestSeq(userId);
+      const frontier = causalFrontierToken
+        ? verifyCausalFrontierToken(causalFrontierToken, userId, latestSeq)
+        : undefined;
+      if (!frontier) {
+        Logger.warn(`[user:${userId}] Causal frontier validation failed for encoded upload`);
+        return reply.status(400).send({
+          error: 'Invalid causal frontier',
+          errorCode: SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK,
+        });
+      }
+      try {
+        ops = expandFrontierDelta(ops, frontier);
+      } catch {
+        return reply.status(400).send({ error: 'Invalid causal frontier delta', errorCode: SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK });
+      }
+    }
+
 
     // Compute the request fingerprint AFTER the rate-limit gate (a rate-limited
     // client must not burn CPU on it) and BEFORE any processing: uploadOps and
@@ -259,6 +287,11 @@ export const uploadOpsHandler = async (
           );
         }
         const initialQuota = await syncService.checkStorageQuota(userId, estimatedDelta);
+        if (repairBase !== undefined && !requestStartOccupiedIds.has(ops[0].id) &&
+            repairBase !== await syncService.getLatestSeq(userId)) {
+          return [{ opId: ops[0].id, accepted: false, errorCode: SYNC_ERROR_CODES.REPAIR_STALE,
+            error: 'REPAIR snapshot does not include current server state' }];
+        }
         if (!initialQuota.allowed && lastKnownServerSeq !== undefined) {
           const latestStateReplacementSeq =
             await syncService.getLatestStateReplacementSeq(userId);
@@ -285,7 +318,7 @@ export const uploadOpsHandler = async (
           ops as unknown as Operation[],
           undefined,
           requestStartOccupiedIds,
-          undefined,
+          repairBase,
           false,
           lastKnownServerSeq,
         );
@@ -325,6 +358,7 @@ export const uploadOpsHandler = async (
     let newOps: ServerOperation[] | undefined;
     let latestSeq: number;
     let hasMorePiggyback = false;
+    let gapDetected = false;
     const PIGGYBACK_LIMIT = 500;
 
     if (lastKnownServerSeq !== undefined) {
@@ -341,6 +375,7 @@ export const uploadOpsHandler = async (
       );
       newOps = opsResult.ops;
       latestSeq = opsResult.latestSeq;
+      gapDetected = opsResult.gapDetected;
 
       // Check if there are more ops beyond what we piggybacked
       // This happens when we hit the limit AND there are more ops on the server
@@ -369,6 +404,7 @@ export const uploadOpsHandler = async (
       newOps: newOps && newOps.length > 0 ? newOps : undefined,
       latestSeq,
       ...(hasMorePiggyback ? { hasMorePiggyback: true } : {}),
+      ...(gapDetected ? { gapDetected: true } : {}),
     };
 
     // Notify other connected clients about new ops (fire-and-forget)

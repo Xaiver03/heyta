@@ -51,13 +51,20 @@
 
 ### 它同时守住一条裁决
 
-门禁还会在运行时断言托管云 AI **仍然被挡住**：
+门禁还会在运行时断言托管云 AI 的**两道门仍然咬人**（⚠️ 2026-10-05 改过一组判据）：
 
-- `describeRetention('heyta-cloud') === undefined`（保留策略仍未定案，ADR-0013）
-- `assertEnableable({ mode: 'managed' })` 抛 `retention-undecided`
+- ~~`describeRetention('heyta-cloud') === undefined`（保留策略仍未定案）~~ →
+  现在必须**有真数字**，而且**两个载体都要点到**（计数表 + 每次调用一行的运维日志）；
+  少说一个载体由 8a-bis 抓（ADR-0054 §4.1）
+- ~~`assertEnableable({ mode: 'managed' })` 抛 `retention-undecided`~~ → 那条 reason 与它的成员
+  一起随 ADR-0054 删了。现在 8b 钉的是：境内白名单上的端点**可启用**、
+  境外端点**必须**以 `managed-endpoint-not-domestic` 被拒、没填端点以 `endpoint-required` 被拒
 - `describeDestination('heyta-cloud')` 含**明确否定**「不受端到端加密」（ADR-0006）
 
-这条断言的意义是：**哪天有人悄悄把托管 AI 放开了，门禁会红，而不是悄悄上线。**
+这条断言的意义换了半句、方向没变：**哪天有人把托管接到境外供应商上、
+或把界面上那句"不受端到端加密"改掉，门禁会红，而不是悄悄上线。**
+🔴 而"放开托管档"这件事本身已经从"违规"变成"已裁决的动作"（产品负责人 2026-10-05），
+所以这一组判据盯的不再是"有没有放开"，而是**放开之后仍然成立的那几条边界**。
 
 ---
 

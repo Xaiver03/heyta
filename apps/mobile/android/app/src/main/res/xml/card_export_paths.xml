@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider 的路径白名单（W7 成品图落盘）。
+
+  🔴 只开放**一个子目录**（`cacheDir/card-export/`），也就是原生模块
+  `CardExportModule.kt` 里 `DIR_NAME` 写的那个。整棵缓存目录、外部存储、
+  数据库都**不**在这里 —— 分享面板拿到 URI 时只可能看到这一处，
+  多给一格就等于多一条"别的 App 借我们的名义读到用户数据"的路。
+
+  ⚠️ `path` 的值与 Kotlin 侧的 `DIR_NAME` 是一对**必须逐字相同**的抄件，
+  不同的表现是 `getUriForFile` 抛 `IllegalArgumentException: Failed to determine
+  '…' suitable shared path provider` —— 只在用户点"导出成品图"那一刻炸。
+  `scripts/check-card-export.mjs` 把这一对钉住（并验证它能红）。
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+  <cache-path name="card_export" path="card-export/" />
+</paths>

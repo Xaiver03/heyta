@@ -108,10 +108,25 @@ PNPM="$(resolve_pnpm)"
 #    ⇒ 窗口合成既会**假红**（没合成 = 空白）也会**假绿**（自家底 = 非空白），
 #    "画没画出来"这个问题只能压在 WebView 快照上；窗口图只负责"是不是真窗口"
 #    （透明/标题/尺寸）。没有快照时才退回窗口图当内容载体。
+# 🔴 第五轮实测（2026-10-05，合流态现量）：**首屏品牌帧是一枚"擦边才没骗过判据"的图**。
+#    同一枚 `png-stats` 量三张：
+#      · 品牌帧 `e2e/test-results/boot-splash-frame.png` ⇒ 内容占比 **0.00943**、主蓝 **2000**
+#      · 真界面（本机 mac 段 WebView 快照）             ⇒ 内容占比  **0.7141**、主蓝 1127
+#      · 真图里最"空"的一张（浮层压在压暗底上）         ⇒ 内容占比  **0.1034**、主蓝  835
+#    品牌帧那块底板**本身就是主蓝** `#2563EB`（`scripts/gen-boot-splash.mjs` 的
+#    `--heyta-boot-plate: PRIMARY`），所以"主蓝 ≥ 20"那条不但拦不住它，还给它打了真界面的**一倍以上**。
+#    它今天之所以没骗过去，只因为 `looksBlank` 的 0.01 恰好压在 0.00943 上 —— **余量 5.7%**，
+#    而这两个数之间没有任何因果关系（画幅 / DPR / `MARK_SIZE` token / 采样步长，
+#    任何一个动一下擦边就没了 ⇒ 变成"非空白 + 主蓝充足"的满分假绿，正是 #82 那一族的第五种面目）。
+#    ⇒ 加一条**内容占比下界**，把"擦边的巧合"换成有推导的判据。取值不靠拍：
+#    下界 = 最低真图实测 0.1034 的一半 ⇒ **0.05**（对品牌帧留 5.3 倍、对最低真图留 2 倍）。
+#    为什么不复用 `check:macos-window` 的 0.02：那个下界是从"错误屏 0.004 / 未合成 0.006"推的，
+#    对品牌帧只剩 2.1 倍 —— 同一枚阈值不该同时服务两个不同的推导。
 # 用法：shot_ok <窗口 png> [webView png]；输出 ✅/🔴 行。
 shot_ok() {
   node - "$1" "${2:-}" <<'JS'
 import('./scripts/screenshots/png-stats.mjs').then((m) => {
+  const MIN_CONTENT_RATIO = 0.05;
   const st = m.inspectPng(process.argv[2]);
   const brandShot = process.argv[3] || process.argv[2];
   const cs = brandShot === process.argv[2] ? st : m.inspectPng(brandShot);
@@ -125,6 +140,12 @@ import('./scripts/screenshots/png-stats.mjs').then((m) => {
   const blue = m.countBrandBlue(brandShot);
   console.log(`  主蓝采样命中 ${blue}（数的是 ${base(brandShot)}）`);
   if (blue < 20) { console.log('  🔴 截图里没有 heyta 主蓝 —— 是错误屏/别的界面，不是共享 UI'); bad = true; }
+  if (cs.contentRatio < MIN_CONTENT_RATIO) {
+    console.log(`  🔴 ${(cs.contentRatio * 100).toFixed(1)}% < ${MIN_CONTENT_RATIO * 100}% 内容占比下界 ——` +
+                `     主蓝再多也不算数：**首屏品牌帧**就是一块主蓝底板压在近白底上（实测命中 2000、占比 0.9%），` +
+                `     它是遮罩还没从 DOM 摘掉的那一帧，不是装好的应用`);
+    bad = true;
+  }
   if (bad) process.exit(1);
   console.log(`  ✅ 窗口 ${st.width}x${st.height}、${base(brandShot)} 内容占比 ${(cs.contentRatio * 100).toFixed(1)}%、主蓝命中 ${blue} —— 是共享 UI`);
 }).catch((e) => { console.log(`  🔴 读不了截图：${e.message}`); process.exit(1); });
@@ -152,6 +173,10 @@ shot_ok_logged() {
 #    Windows 旅程验收（`scripts/verify-windows-shell-journey.mjs`）用的是**同一份**。
 #    两份实现会漂移成"一个送新树、一个送旧树"，正是 §7 第 82 条那次事故的形状。
 source "$ROOT/scripts/lib/sync-windows-sources.sh"
+# 🔴 Windows 取证的判据清单同样只有一个所有者（`package-msix.sh` 也调它）。
+#    以前只有这里有一份四项清单，而打包脚本**一条都不判** ⇒ 快捷方式那条新判据
+#    只加进了生成它的一侧，读它的另一侧看不见。
+source "$ROOT/scripts/lib/msix-install-facts.sh"
 
 # ── 段选择 ────────────────────────────────────────────────────────────────
 ALL="mac windows android ios"
@@ -189,15 +214,52 @@ fi
 if printf '%s' "$WANT" | grep -q "mac"; then
   echo ""
   echo "═══ 1. macOS：清旧包 → 打包 → 卸旧 → 装新 ═══"
-  MAC_OUT="/tmp/heyta-macos-dist"
+  # 🔴 这个输出目录以前是**写死的**，而它下面第一句就是 `rm -rf`。
+  #    2026-10-04 实测：另一条会话 03:13 那一趟的证据正好落在同一个路径上，
+  #    本脚本一跑就会把**别人的现场**整个删掉 —— 当时靠起跑前手动改名保住，
+  #    而"我记得先改名"不是判据（AGENTS §8 第 9 条：共享资源要先定所有者与运行窗口）。
+  #    旋钮的默认值逐字不变，所以不带 env 的行为与今天完全一致。
+  MAC_OUT="${HEYTA_MACOS_DIST_DIR:-/tmp/heyta-macos-dist}"
   INSTALLED_APP="/Applications/Heyta.app"
   RESULT_mac=FAIL
+  # 🔴 删之前把"删的是哪个目录、里面有什么"打进日志：这一句的失败模式是**安静**，
+  #    出事后日志里连"原来那里有东西"都读不出来。
+  echo "  macOS 输出目录 = ${MAC_OUT}（覆盖旋钮 HEYTA_MACOS_DIST_DIR）"
+  if [ -d "$MAC_OUT" ]; then
+    echo "  清空前里面有 $(ls -1 "$MAC_OUT" 2>/dev/null | wc -l | tr -d ' ') 项："
+    ls -1 "$MAC_OUT" 2>/dev/null | head -8 | sed 's/^/     /'
+  else
+    echo "  清空前该目录不存在（首次运行）"
+  fi
   rm -rf "$MAC_OUT"                                   # 清掉旧安装包
   if bash apps/desktop-macos/scripts/package-app.sh "$MAC_OUT" > /tmp/heyta-reinstall-mac.log 2>&1; then
     echo "  ✅ 打包完成（.app + .dmg，含打包即启动的自截屏验证；日志 /tmp/heyta-reinstall-mac.log）"
     rm -rf "$INSTALLED_APP"                           # 卸旧：不留"上一次的包"
     if cp -R "$MAC_OUT/Heyta.app" "$INSTALLED_APP"; then
       echo "  ✅ 已安装到 $INSTALLED_APP"
+      # 🔴 **装上的必须就是刚打的那份，而那份必须是当前 dist**（2026-10-03 实测）。
+      #    产品负责人在装好的 .app 里看到日历"内容超出容器范围"，当前源码同一尺寸
+      #    同一状态量出来是能放下的 —— 差的就是包里那份 web-dist 是**早于 R13/R14 的
+      #    另一次构建**（`now-line`/`clock-` 两个标记在包内 JS 里 0 命中，本机产物各 1 命中）。
+      #    而 mac 段原有的两条判据（截图非空白 + 主蓝命中）**全绿** —— 它们量的是
+      #    "有没有界面"，回答不了"是不是这份源码的界面"（AGENTS §7 第 82 条第四次露面）。
+      #    比的是 `assets/` 的**文件名集合**：Vite 的文件名是内容寻址的哈希，
+      #    集合相等就等于两次构建相等，不用逐字节比（也比不动 —— 包内是签名后的副本）。
+      assets_of() { ls "$1" 2>/dev/null | sort; }
+      DIST_ASSETS="$ROOT/apps/web/dist/assets"
+      APP_ASSETS="$INSTALLED_APP/Contents/Resources/web-dist/assets"
+      MAC_DIST_OK=0
+      if [ ! -d "$DIST_ASSETS" ]; then
+        echo "  🔴 对账没有分母：本机没有 ${DIST_ASSETS}（先 pnpm --filter @heyta/web build）"
+      elif [ ! -d "$APP_ASSETS" ]; then
+        echo "  🔴 对账没有分母：装出来的 .app 里没有 web-dist/assets（打包环节没进包）"
+      elif diff <(assets_of "$APP_ASSETS") <(assets_of "$DIST_ASSETS") > /dev/null; then
+        echo "  ✅ 安装对账：.app 里的 web-dist 与本机 apps/web/dist 是**同一次构建**（$(assets_of "$APP_ASSETS" | wc -l | tr -d ' ') 个 chunk）"
+        MAC_DIST_OK=1
+      else
+        echo "  🔴 安装对账失败：.app 里的 web-dist 与本机 apps/web/dist **不是同一次构建**"
+        diff <(assets_of "$APP_ASSETS") <(assets_of "$DIST_ASSETS") | head -8 | sed 's/^/     /'
+      fi
       # 🔴 清壳的 WKWebView 存储（重装 = 首次运行态）。不清的话上一轮的
       #    localStorage（比如“最后停留在设置页”）会把应用带进别的视图，
       #    判据截图就不是冷启动第一屏（实测：曾因此对着设置 sheet 打分）。
@@ -211,11 +273,11 @@ if printf '%s' "$WANT" | grep -q "mac"; then
       rm -f "$MAC_SELFIE" "$MAC_SELFIE_WV"
       HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$MAC_SELFIE" \
         "$INSTALLED_APP/Contents/MacOS/HeytaMac" >/dev/null 2>&1 || true
-      if [ -f "$MAC_SELFIE" ] && shot_ok_logged "$MAC_SELFIE" "$MAC_SELFIE_WV"; then
+      if [ "$MAC_DIST_OK" = 1 ] && [ -f "$MAC_SELFIE" ] && shot_ok_logged "$MAC_SELFIE" "$MAC_SELFIE_WV"; then
         echo "  截图证据：${MAC_SELFIE}（窗口）+ ${MAC_SELFIE_WV}（共享 UI）"
         RESULT_mac=OK
       else
-        echo "  🔴 安装副本不可信 —— 窗口没起来，或共享 UI 没渲染"
+        echo "  🔴 安装副本不可信 —— 产物对账没过，或窗口没起来，或共享 UI 没渲染"
         echo "     证据：${MAC_SELFIE}:$([ -f "$MAC_SELFIE" ] && stat -f%z "$MAC_SELFIE" || echo 缺)" \
              "${MAC_SELFIE_WV}:$([ -f "$MAC_SELFIE_WV" ] && stat -f%z "$MAC_SELFIE_WV" || echo 缺)"
       fi
@@ -240,20 +302,13 @@ if printf '%s' "$WANT" | grep -q "windows"; then
         > /tmp/heyta-reinstall-win.log 2>&1; then
       echo "  ✅ 远端打包 + 安装 + 启动截图完成（日志 /tmp/heyta-reinstall-win.log）"
       FACTS="$WIN_OUT/install-capture.txt"
-      # 判据四件套（缺一不可）：
-      #   ADD_APPX=OK      装上了
-      #   RESULT=OK        起来了、截了图
-      #   PAYLOAD_WEBDIST  包里带**真共享 UI**（否则是通道试验页，不是产品）
-      #   M2D=OK           壳自己的身份菜单判据（第一项=登录/注册、无退出登录）
-      MISSING=""
-      for fact in "ADD_APPX=OK" "RESULT=OK" "PAYLOAD_WEBDIST=True" "M2D=OK"; do
-        grep -q "$fact" "$FACTS" 2>/dev/null || MISSING="$MISSING $fact"
-      done
-      if [ -z "$MISSING" ]; then
-        echo "  ✅ 远端取证：装上的是**当前源码的真应用**，且身份菜单判据成立"
+      # 判据清单的单一所有者：`scripts/lib/msix-install-facts.sh`
+      # （打包脚本 `package-msix.sh` 现在也调同一条，所以两处不会漂成两套标准）
+      if msix_fact_out=$(msix_check_facts "$FACTS"); then
+        echo "  ✅ 远端取证：${msix_fact_out}"
         RESULT_windows=OK
       else
-        echo "  🔴 远端取证不完整 —— 缺：${MISSING# }（${FACTS}：）"
+        echo "  🔴 远端取证不完整 —— ${msix_fact_out}"
         [ -f "$FACTS" ] && sed 's/^/     /' "$FACTS"
       fi
     else
@@ -372,7 +427,38 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     #    这一步以前**不在流程里** —— `ios/Pods/` 是 gitignored 的，隔离检出里换一次 HEAD
     #    沙盒就对不上了，而脚本原来只会打印"xcodebuild 失败 + 日志末尾"，
     #    读起来像产品坏了（实际缺的是构建输入）。
-    #    env 那一串与 `scripts/check-native-deps.mjs` 打印的修法同源，**改一处要改两处**。
+    #    env 那一串与 `scripts/check-native-deps.mjs` 打印的修法同源，**改一处要改两处** ——
+    #    自 2026-10-04 起这一句由 `check:native-deps` 的第三条规则钉住（不靠注释）。
+    #
+    #    🔴 那串 env 里**唯一承重的**是"至少有一个 locale 变量"。四臂实测（同一棵树、
+    #    同一分钟内、`/tmp/pod-arms-*.txt`）：
+    #      · `LANG` 与 `LC_ALL` **都不给** ⇒ 崩在 `config.rb:167 installation_root`
+    #        （`Unicode Normalization not appropriate for ASCII-8BIT`，
+    #        `Encoding.default_external=US-ASCII`）。
+    #      · 只给 `LANG`（显式 `-u LC_ALL`）⇒ ✅ `Pod installation complete!` 84 deps/83 pods。
+    #      · 给 `LANG`+`LC_ALL` ⇒ ✅ 同上。
+    #    ⚠️ 所以 `LC_ALL` **不是**必需项，这里不给它；`LANG` 必须给。
+    #
+    #    🔴 而 `ArgumentError - path name contains null byte`（`project.rb:452 realdirpath`）
+    #    与 locale **无关**：给它 `LANG`+`LC_ALL` 的那一趟（D 臂）就崩了，而 5 秒前同样 env
+    #    形状的两趟（A/B）都成功。⇒ 它是**逐趟非确定性**的（上游 CocoaPods #12798 / #12866，
+    #    两条都还 open，后者标题就写着 "sometimes"）。
+    #    这也**否证**了 traps #154 当时的结论"变量是这棵长活的树本身"——同一棵树上三趟两成
+    #    一崩，树不是那个变量。⚠️ 它当时另一条否证（"换一棵新克隆就好了"）依然成立，只是
+    #    解释力更弱：新克隆也一样可能崩，只是没撞上。
+    #
+    #    ⇒ 这里的处置是**有界重试**（每趟 ~10 s，最多 3 趟，逐趟落日志与 RC），
+    #      而不是改 env。判据没放松：仍然要求 `Manifest.lock == Podfile.lock`，
+    #      三趟全崩就照常判红。
+    #
+    #    🔴 而且**不再因为"哈希已经相等"就跳过这一趟**（2026-10-04 实测的理由）：
+    #    上一趟 `pod install` 崩在"Generating Pods project"中段时，`Manifest.lock` 已经写完、
+    #    与 `Podfile.lock` 逐字节相同，但 `Pods/Headers/Public/RCTSwiftUI/` 整层没生成 ——
+    #    于是"沙盒一致"的哈希判据**被一个半写沙盒满足**，xcodebuild 接着报
+    #    `fatal error: module map file '…/RCTSwiftUI.modulemap' not found`（4 个 target 全挂）。
+    #    那一次失败是**响亮**的（装包段判红），所以这不是假绿；但它把"缺构建输入"
+    #    伪装成"产品构建不过"，正是本文件第 396 行自己写过的那个形状。
+    #    ⇒ 现在每次都跑（幂等、~10 s），把"沙盒完整"这件事交给生成器本身，而不是交给一个哈希。
     IOS_IOS_DIR="$ROOT/apps/mobile/ios"
     PODS_SYNC=OK
     LOCK_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | cut -d' ' -f1)"
@@ -380,11 +466,35 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     if [ -z "$LOCK_SHA" ]; then
       echo "  🔴 读不到 apps/mobile/ios/Podfile.lock —— 无法判断沙盒该不该装"
       PODS_SYNC=FAIL
-    elif [ "$LOCK_SHA" != "$MANI_SHA" ]; then
-      echo "  Pods 沙盒与 Podfile.lock 不一致（或缺 Manifest.lock）→ 跑 pod install…"
-      if (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
-          RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) \
-          >/tmp/heyta-reinstall-pod.log 2>&1; then
+    else
+      if [ "$LOCK_SHA" = "$MANI_SHA" ]; then
+        echo "  Pods 哈希本已一致，仍重跑 pod install（半写沙盒不会被哈希相等挡住）…"
+      else
+        echo "  Pods 沙盒与 Podfile.lock 不一致（或缺 Manifest.lock）→ 跑 pod install…"
+      fi
+      # 🔴 允许**有界重试**，而且每一趟各自落账（`/tmp/heyta-reinstall-pod-<n>.log`）。
+      #    理由不是"重试通常能过"这种印象，是 2026-10-05 03:0x 现量：CocoaPods 1.17.0 在
+      #    "Generating Pods project" 加 source file 引用那一步偶发崩
+      #    `ArgumentError - path name contains null byte`（`Pathname#realdirpath`；
+      #    上游 #12798 / #12866 当时都还 open），崩完沙盒是半写状态，而**同一棵载体上
+      #    45 分钟前刚成功跑过一遍、手跑第二趟 rc=0**。一次就红会把这条偶发报成
+      #    "ios 腿失败"，而红字里没有一个字指向"可重试" —— 读的人会去查构建，
+      #    构建是好的（与 `afe7ff7a`/`d924853e` 那两发同形：**红的那一句把原因说反了**）。
+      #    这不是降级判据：三趟都失败仍然整腿判红，每一趟的日志都留着。
+      POD_OK=0
+      for POD_TRI in 1 2 3; do
+        POD_LOG="/tmp/heyta-reinstall-pod-$POD_TRI.log"
+        if (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
+            RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) \
+            >"$POD_LOG" 2>&1; then
+          POD_OK=1
+          break
+        fi
+        echo "    ⚠️ 第 ${POD_TRI} 趟失败：$(grep -m1 -oE "ArgumentError - [^\"]*|\[!\] [^\"]*" "$POD_LOG" | head -1)（日志 ${POD_LOG}）"
+      done
+      cp -f "$POD_LOG" /tmp/heyta-reinstall-pod.log 2>/dev/null || true
+      if [ "$POD_OK" = 1 ]; then
+        [ "$POD_TRI" -gt 1 ] && echo "    （第 ${POD_TRI} 趟才成功 —— 与上面那条非确定性记录一致）"
         MANI_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Pods/Manifest.lock" 2>/dev/null | cut -d' ' -f1)"
         NEW_LOCK_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | cut -d' ' -f1)"
         if [ "$NEW_LOCK_SHA" != "$LOCK_SHA" ]; then
@@ -392,18 +502,18 @@ if printf '%s' "$WANT" | grep -q "ios"; then
           # 提交态**是**可复现的）。这里只把差异如实打出来，不静默。
           DIFFN=$(diff <(git -C "$ROOT" show HEAD:apps/mobile/ios/Podfile.lock 2>/dev/null) \
                       "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | grep -c '^[<>]')
-          echo "  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 ${DIFFN} 行）—— 见 /tmp/heyta-reinstall-pod.log"
+          echo "  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 ${DIFFN} 行）—— 见 ${POD_LOG}"
         fi
         if [ -n "$MANI_SHA" ] && [ "$MANI_SHA" = "$NEW_LOCK_SHA" ]; then
           echo "  ✅ 沙盒已同步（Manifest.lock == Podfile.lock）"
         else
           echo "  🔴 pod install 之后 Manifest.lock 仍与 Podfile.lock 不一致"
-          tail -10 /tmp/heyta-reinstall-pod.log | sed 's/^/     /'
+          tail -10 "$POD_LOG" | sed 's/^/     /'
           PODS_SYNC=FAIL
         fi
       else
-        echo "  🔴 pod install 失败（日志末尾：）"
-        tail -10 /tmp/heyta-reinstall-pod.log | sed 's/^/     /'
+        echo "  🔴 pod install **三趟**都失败 ⇒ 不是那条偶发崩溃；最后一趟日志末尾："
+        tail -10 "$POD_LOG" | sed 's/^/     /'
         PODS_SYNC=FAIL
       fi
     fi

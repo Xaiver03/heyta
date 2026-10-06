@@ -101,9 +101,22 @@ export const TOKEN_GROUPS = {
   font: ['sans', 'mono'],
   radius: ['none', 'sm', 'md', 'lg', 'xl', 'full'],
   shadow: ['none', 'sm', 'md', 'lg', 'xl', 'focus'],
-  duration: ['instant', 'fast', 'normal', 'slow', 'exit', 'press'],
+  duration: [
+    'instant',
+    'fast',
+    'normal',
+    'slow',
+    'exit',
+    'press',
+    /* 首屏（启动）动画四档。上限受 Android 官方"整段 ≤ 1000ms"约束、
+       下限受"短于 ~300ms 读不出正在打开"约束 —— 取值理由见 tokens.css。 */
+    'splash-enter',
+    'splash-stagger',
+    'splash-hold',
+    'splash-exit',
+  ],
   ease: ['standard', 'enter', 'exit', 'spring'],
-  z: ['base', 'sticky', 'dropdown', 'overlay', 'modal', 'popover', 'toast', 'tooltip'],
+  z: ['base', 'sticky', 'dropdown', 'overlay', 'modal', 'popover', 'toast', 'tooltip', 'splash'],
   icon: ['xs', 'sm', 'md', 'lg', 'xl'],
   /** 触控目标下限（44px 硬性可访问性要求）。 */
   'touch-target': ['min'],
@@ -121,10 +134,21 @@ export const TOKEN_GROUPS = {
     'sidebar-min-width',
     'sidebar-max-width',
     'header-height',
+    /* 中间那一列的上限。⚠️ 2026-10-03（W2）它的**语义**从"整个内容区上限"改成
+       "中间列上限"，值没动 —— 第四列出现后"内容区"已经不指原来那个东西了。 */
     'content-max',
+    /* 详情列（第四列）。2026-10-03 加（详情面工单 W2）：它是 `.ht-app` 的直接子项，
+       所以宽度必须是 token —— 挂在 `.ht-content` 里面就永远贴不到窗口右边缘，
+       读起来不是三栏而是"中间一坨里再分两栏"（理由与判据见 detail-pane-alignment.md）。 */
+    'detail-width',
+    'detail-min-width',
+    'detail-max-width',
     'prose-max',
     'quadrant-min-height',
     'panel-max-height',
+    /* 首屏动画里品牌 mark 的边长（构图尺寸，不是功能图标尺寸）。
+       取值理由与"为什么属于 layout 而非 icon"见 tokens.css。 */
+    'splash-mark',
     /* 响应式断点与输入约束。2026-09-29 加：排版此前只管"值从哪来"，
        不管"窗口变化后排版塌不塌"——这两个值是布局判据的锚点。 */
     'two-column-min',

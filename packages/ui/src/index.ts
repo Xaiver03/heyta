@@ -51,6 +51,13 @@ export {
   type TrashBoardLabels,
   type TrashBoardProps,
 } from './trash/TrashBoard.js';
+/**
+ * 回收站的**行模型**不在本包转出（`TRASH_KINDS` / `TrashItem` / `toTrashItems` /
+ * `liveTaskCountOfProject`）—— 所有者是 `@heyta/domain#trash-rows`。
+ * 理由：`apps/node-host` 的 CLI 与验收脚本要用同一份"回收站里有什么"，
+ * 而它们不能依赖本包（RN 会被拖进 node 进程）。放在 ui 里就会出现第三个宿主
+ * 自己抄一遍，而它抄的那一份只包含任务。
+ */
 export {
   SearchPanel,
   type SearchPanelLabels,
@@ -84,23 +91,47 @@ export {
   type SearchGroups,
 } from './search/model.js';
 export { CalendarBoard, type CalendarBoardProps } from './calendar/CalendarBoard.js';
+export { CalendarDayBoard, type CalendarDayBoardProps } from './calendar/CalendarDayBoard.js';
+export { CalendarYearBoard, type CalendarYearBoardProps } from './calendar/CalendarYearBoard.js';
 export { CalendarToolbar, type CalendarToolbarProps } from './calendar/CalendarToolbar.js';
 export {
+  CalendarViewTabs,
+  type CalendarViewTabsLabels,
+  type CalendarViewTabsProps,
+} from './calendar/CalendarViewTabs.js';
+export {
   calendarDayTone,
+  calendarDayMarkerView,
   calendarCellBars,
+  calendarDayBuckets,
+  calendarHourMark,
+  calendarCursorFor,
+  calendarSelectedForCursor,
+  calendarYearColumns,
+  calendarMonthDrill,
   stepCalendarCursor,
   groupTasksByDueDate,
   MAX_CALENDAR_BARS,
+  MAX_WEEK_CALENDAR_BARS,
+  HOURS_IN_DAY,
+  CALENDAR_VIEW_LABEL_KEYS,
+  CALENDAR_VIEW_ORDER,
   type CalendarBoardLabels,
   type CalendarCellBar,
   type CalendarViewKind,
+  type CalendarViewLabelKey,
+  type CalendarDayBuckets,
   type CalendarDayTone,
+  type CalendarDayMarker,
   type CalendarToolbarLabels,
 } from './calendar/model.js';
 export {
   formatDayTitleText,
   formatWeekRangeText,
   weekdayMessageKey,
+  monthMessageKey,
+  formatMonthShortText,
+  formatYearTitleText,
   formatMonthTitleText,
   WEEKDAY_MESSAGE_KEYS,
   type CalendarDateKey,
@@ -543,8 +574,23 @@ export {
   type OrganizerListProps,
   type OrganizerRowContext,
 } from './projects/OrganizerList.js';
+/**
+ * 清单「移入文件夹」的行内选择器（经 `OrganizerList` 已有的 `renderItemExtra`
+ * 插槽接入 ⇒ 共享行骨架一行没改）。
+ *
+ * 🔴 候选集**由宿主按领域层 `validateProjectParentChange` 筛过再传进来** ——
+ * 组件自己不算"能不能移"，否则两端各有一套裁决标准（AGENTS §3.5）。
+ */
+export {
+  FolderPicker,
+  folderRejectionMessageKey,
+  type FolderPickerLabels,
+  type FolderPickerProps,
+  type FolderRejectionMessageKey,
+} from './projects/FolderPicker.js';
 export {
   aliveProjects,
+  archivedProjects,
   childProjects,
   openTagCounts,
   openTaskCount,
@@ -615,7 +661,6 @@ export {
   type NotesBoardProps,
 } from './notes/NotesBoard.js';
 export {
-  NOTE_EXCERPT_LENGTH,
   toNoteRows,
   type NoteRow,
 } from './notes/model.js';
@@ -925,4 +970,244 @@ export {
   DatePicker,
   type DatePickerLabels,
   type DatePickerQuickPick,
+  type DatePickerTime,
 } from './date-picker/DatePicker.js';
+
+/**
+ * ── R14（时刻输入侧）：芯片"时刻该念什么"的那一处判定 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 为什么单独转出一个函数，而不是让两端各自 `chip.field === 'dueTime'`：
+ * 宿主注入的 `valueLabel` 原本只有"日期 / 优先级"两条分支，时刻芯片掉进
+ * 优先级那条会念成**「不设置」**。判定写在共享层，两端只剩"取它给的串"，
+ * 新增字段时就不会有一端整块分支漏掉（AGENTS §3.5）。
+ */
+export { captureChipTimeLabel } from './capture/model.js';
+
+/**
+ * ── 多端第二批（便签编辑链）：**"改一张便签的正文"只有这一个实现** ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * "点开便签、什么都没改、点一下保存"在过去会推进 `updatedAt`，而 `updatedAt`
+ * 是列表排序的第二段 —— 那条 no-op 的闸门在 `@heyta/app-host#updateNoteContent`
+ * （写不写 op 是产品语义），这里只有视图和它的交互挡板。
+ */
+export {
+  NoteEditor,
+  type NoteEditorLabels,
+  type NoteEditorProps,
+} from './notes/NoteEditor.js';
+export { isNoteDraftBlank } from './notes/model.js';
+
+/**
+ * ── 批次二 W0：锚点弹层的定位算术 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 只转出算术，不转出测量：`packages/ui` 进不来 DOM，而"量触发器与面板的 rect"
+ * 与"捕获阶段的 scroll 重算"本来就必须住在每个宿主里（见 `overlay/model.ts` 文件头）。
+ */
+export {
+  placeAnchoredPanel,
+  type AnchoredPanelOptions,
+  type AnchoredPanelPosition,
+  type AnchoredPanelViewport,
+  type PanelPlacement,
+  type PanelSize,
+  type TriggerRect,
+} from './overlay/model.js';
+
+/**
+ * ── 批次二 W5：倒数日/纪念日板 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 转出的是**卡片怎么画、怎么筛、怎么分行**（`countdown/model.ts`）与那张板子本身；
+ * 天数、闰月、顺序、归档判定一律留在 `@heyta/domain`，op 的构造留在
+ * `@heyta/app-host` —— 这一层转出的是展示，不是判断。
+ */
+export {
+  EventBoard,
+  type EventBoardLabels,
+  type EventBoardProps,
+  type EventEditPatch,
+} from './countdown/EventBoard.js';
+export {
+  COUNTDOWN_FILTERS,
+  cardTextsFor,
+  countdownFace,
+  filterEventCards,
+  toEventCards,
+  toEventRows,
+  type CountdownFace,
+  type CountdownFilter,
+  type CountdownView,
+  type EventCard,
+  type EventCardTextLabels,
+  type EventCardTexts,
+} from './countdown/model.js';
+
+/**
+ * ── 回收站与归档 W4b：删除确认的那份**影响面**取数 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 与 `openTagCounts` 不是同一件事：那个是行右侧常驻的"还有几件没做完"，
+ * 这个是确认框里那句"删了会动到几条任务"（**含已完成**）。口径差别与理由
+ * 写在 `./projects/model.ts#liveTaskCountsByTag`。两端各数一遍的话，
+ * "删标签到底会不会动到已完成的任务"这个问题就会出现两个答案。
+ */
+export { liveTaskCountsByTag } from './projects/model.js';
+/**
+ * 成品图（W7）的**版面**。各端只许 import 这一份再画一遍 ——
+ * 在 `apps/web` 与 `apps/mobile` 各写一套版面 = 两张会漂移的图，
+ * 而漂移的表现（"屏幕上一行、导出少一行 / 字号不同"）只有人眼看得出。
+ * 倍率是**必填参数**：见 `countdown/card-export-layout.ts` 文件头那张表。
+ */
+export {
+  buildCardExportLayout,
+  cardExportFileName,
+  cardExportFileStem,
+  estimateAdvance,
+  wrapCardText,
+  type CardExportDrawOp,
+  type CardExportLayout,
+  type CardExportRequest,
+  type CardExportTheme,
+  type TextMeasurer,
+} from './countdown/card-export-layout.js';
+
+
+
+/**
+ * ── 详情面对齐 W5：**优先级 → 语义色 token 名，全仓唯一的一份** ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 这一刀搬的是「颜色」那一半，不是「文案」那一半：`packages/ui` 依赖不了
+ * `@heyta/i18n`（`MessageKey`），但已经依赖 `@heyta/domain`（`Priority`）。
+ * 之前那份"依赖不了 i18n ⇒ 整个文件都不能共享"的理由只挡住了标签，
+ * 却把颜色也一起留在了两个宿主里各写一遍 —— 逐字相同的两份，
+ * 而"复选框描边即优先级"正因为没人是它的唯一所有者而没落地。
+ * 理由与两边的分工表在 `task-list/priority-color.ts` 的文件头。
+ */
+export {
+  priorityColorToken,
+  type PriorityColorToken,
+} from './task-list/priority-color.js';
+
+/**
+ * ── 追加：注销账号（批次 E3）的"结局 → 词条 key"收在这里一份 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 形状与 `authFailureMessageKey` 完全一致：封闭集合在 `@heyta/app-host`
+ * （`ClosureDisposition` / `HostedAuthFailureReason`），句子在 `packages/i18n`，
+ * 而**中间那张路由表只能有一份** —— Web 的设置页与移动壳的「我的」今晚各自要显示
+ * 同一句"账号还在、本机没动"。各写一份的结局是漂，而漂掉的那一侧通常话说得更满。
+ */
+export {
+  accountClosureMessageKey,
+  type AccountClosureMessageKey,
+} from './auth/model.js';
+
+
+/**
+ * ── 批次二 W6：日历的**第二个日期数据源**（倒数日 / 纪念日）──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 转出的是"哪些格子有日子、那一行怎么写"；哪些天真的发生属于 `@heyta/domain`，
+ * 而 op 的构造属于 `@heyta/app-host`。宿主只许 `import` 这一份 ——
+ * web 与 mobile 各摊一遍的漂移形状是"面板说还有 12 天、日历那格画在明天"。
+ */
+export {
+  calendarEventBarTitle,
+  groupEventsByOccurrence,
+  type CalendarDayEvent,
+  type CalendarEventBarLabels,
+} from './calendar/model.js';
+
+/**
+ * ── 工单 H3：习惯图标的**两张共享表** ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 转出的动机不是"方便"，是**移动端要画同一批字形**：`HabitsScreen` 详情层的图标
+ * 选择器（工单 H3）如果自己在 `apps/mobile` 里再抄一张 `key → 字形`，那就是
+ * **第三份事实源** —— 而它坏的时候两端都不报错，症状只是"手机上水滴、web 上月亮"。
+ * 现有判据（`apps/web/tests/habits-list-pane.spec.tsx` F 组）比的是**清单**那两张
+ * （web 的组件表 vs 共享层的数据表），管不到宿主里新长出来的第三张。
+ *
+ * ⚠️ 两张表的性质不同，别读成"重复被消除了"：
+ *   · `HABIT_GLYPHS`（key → `lucide` **图标数据**，经 `HeytaIcon` 在 RN 上画）
+ *     与 web 那张 `key → lucide-react **组件**`**结构上必须分开**（画的不是同一种东西），
+ *     一致性由 F 组逐对比钉住 —— 这一份导出只是让移动端**不必**再抄；
+ *   · `HABIT_ICON_LABEL_KEYS`（key → 词条名）是**真的只有一份**：web 已改为从这里取
+ *     （`apps/web/src/features/habits/habit-glyphs.ts` 里那 10 行删掉了），
+ *     抽取的收尾动作是删掉旧的那份，不是再写一份更好的。
+ */
+export {
+  HABIT_GLYPHS,
+  HABIT_ICON_LABEL_KEYS,
+  type HabitIconLabelKey,
+} from './habits/HabitProgressList.js';
+
+/**
+ * ── 工单 H5：频次的「哪种说法」与「1–7 念作什么」 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 与 `habitGoalSummaryKey` 同一类收编：web 与移动端各有一个频次编辑器，
+ * 而"哪一种频次说哪句话""`3` 念作『三』"是同一个判断。各写一份的症状是
+ * "同一个 `weekly`，web 说『每周 三』、移动端说『周三』"，两边都不报错。
+ *
+ * ⚠️ 只给 **key**，句子本身在词条表里（本包不 import `@heyta/i18n`）。
+ */
+export {
+  HABIT_WEEKDAY_MESSAGE_KEYS,
+  habitFrequencySummaryKey,
+  type HabitFrequencySummaryKey,
+  type HabitWeekdayMessageKey,
+} from './habits/model.js';
+
+/**
+ * ── 工单 H4：习惯月历 + 可点补打卡 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 判定的唯一所有者在 `@heyta/domain#habitDayState`（`backfillDays` 那位迟到三年的读取者），
+ * 本块导出的是**视图与映射**：格子怎么排、哪一格按下去是打卡还是撤销。
+ *
+ * ⚠️ 文案全部由宿主注入（`labels` 是函数表）—— 本包不 import `@heyta/i18n`，
+ *    理由与 `calendar/model.ts` 文件头那条"第二份 React"同一条。
+ */
+export {
+  HabitMonthBoard,
+  type HabitMonthLabels,
+  type HabitMonthBoardProps,
+} from './habits/HabitMonthBoard.js';
+export {
+  habitMonthCellAction,
+  habitMonthCells,
+  habitMonthWindowDays,
+  isHabitMonthCellInteractive,
+  isHabitMonthForwardCapped,
+  type HabitMonthCell,
+} from './habits/month-model.js';
+/* 工单 H7：年那一档 + 持有游标的容器。
+   🔴 宿主挂的是 `HabitTrendBoard`（不是两块板各挂一次）—— 两档共用一枚游标，
+   各挂一次就是各持一枚，"年在 2026、月在 2025"那种状态会不需要错误就出现。 */
+export {
+  HabitYearBoard,
+  type HabitYearLabels,
+  type HabitYearBoardProps,
+} from './habits/HabitYearBoard.js';
+export {
+  HabitTrendBoard,
+  type HabitTrendLabels,
+  type HabitTrendBoardProps,
+  type HabitTrendView,
+} from './habits/HabitTrendBoard.js';

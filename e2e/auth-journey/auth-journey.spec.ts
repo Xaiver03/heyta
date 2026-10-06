@@ -47,6 +47,7 @@ import {
   openAuthPanel,
   readCredentials,
   requireServer,
+  revealSelfHostField,
   serverOpCount,
   setE2eePasswordAndSync,
   statusBar,

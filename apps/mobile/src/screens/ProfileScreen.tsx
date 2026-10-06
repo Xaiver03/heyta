@@ -47,10 +47,27 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
+import { pick } from '@react-native-documents/picker';
 import type { SyncStatus } from '@heyta/sync-client';
 import { useI18n } from '@heyta/i18n';
 import { isArgon2SlowBackend } from '@heyta/sync-core';
-import { fetchAccountNotifications } from '@heyta/app-host';
+import {
+  deleteAccountAvatar,
+  fetchAccountNotifications,
+  getAccountProfile,
+  planDisplayNameWrite,
+  resolveAccountAvatarImage,
+  updateAccountDisplayName,
+  uploadAccountAvatar,
+  type AccountAvatarImage,
+} from '@heyta/app-host';
+import {
+  ACCOUNT_AVATAR_CONTENT_TYPES,
+  ACCOUNT_AVATAR_MAX_SOURCE_BYTES,
+  ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS,
+  avatarDataUri,
+  displayNameCodePoints,
+} from '@heyta/shared-schema';
 import {
   SettingsRow,
   resolvePendingUploadPresentation,
@@ -58,9 +75,19 @@ import {
   type SettingsRowModel,
 } from '@heyta/ui';
 
-import { Button, Card, Divider, Screen, SectionHeader, Text } from '../ui/kit';
+import { Button, Card, Divider, HStack, Screen, SectionHeader, Text, TextField } from '../ui/kit';
+import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
+import { AssistantScreen } from '../ai/AssistantScreen';
+import { isAiConfiguredOnThisDevice, useAiSettings } from '../ai/settings-store';
+import { AvatarBadge } from '../ui/avatar';
+import { prepareAvatarFromUri, type AvatarPrepareError } from '../lib/avatar-prepare';
+import { AccountClosureScreen } from './AccountClosureScreen';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
+import { CountdownScreen } from './CountdownScreen';
+import { EntitlementSection } from './EntitlementSection';
+// 托管同步的续费入口（与 web 的 RenewPanel 共用 @heyta/app-host 那一份接线）。
+import { RenewSection } from './RenewSection';
 import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';
 import { HabitsScreen } from './HabitsScreen';
@@ -74,13 +101,17 @@ import { TrashScreen } from './TrashScreen';
 import { formatStamp } from '../lib/date';
 import { useTokens } from '../theme';
 import { useSyncCredentialForm } from '../sync/credential-form';
-import { clearSyncConfig, readSyncConfig } from '../sync/config';
+import { readSyncConfig, writeSyncConfig } from '../sync/config';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
 import { useMobileSync, refreshPendingUpload } from '../sync/store';
 import { currentSignedInEmail, forgetSignedInUser } from '../auth/session';
 import { privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate';
 import { wipeCredentialsAndWidgets } from '../widgets/credential-wipe';
 import { clearWidgetState } from '../widgets/widget-bridge';
+import {
+  type VaultSecureStorageScope,
+} from '../lib/vault-secure-storage';
+import { clearMobileVaultSession } from '../lib/vault-session-cleanup';
 
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
@@ -92,6 +123,7 @@ export function ProfileScreen(): React.JSX.Element {
    * `credential-form.ts` 文件头）。设置面拿的是值与回调。
    */
   const form = useSyncCredentialForm();
+  const [vaultCleanupPending, setVaultCleanupPending] = useState<VaultSecureStorageScope>();
 
   // 🔴 冲突界面的可见性只是**界面状态**，不进 store。
   const [conflictsOpen, setConflictsOpen] = useState(false);
@@ -116,6 +148,18 @@ export function ProfileScreen(): React.JSX.Element {
    * 把刚拿到的令牌覆盖掉 —— 症状是"明明登录成功了，一同步就说未配置"。
    */
   const onSignedIn = (saved: SavedAuthSession): void => {
+    // The form is already mounted while AuthScreen is open.  Replaying its
+    // three controlled values can run its input effect between React commits;
+    // that effect intentionally omits accountId because ordinary manual edits
+    // must not invent an authenticated binding.  Re-assert the complete
+    // authenticated tuple here so a login cannot leave VaultSettingsSection
+    // with a token but no account scope.
+    writeSyncConfig({
+      serverUrl: saved.serverUrl,
+      token: saved.token,
+      password: saved.password,
+      ...(saved.accountId === undefined ? {} : { accountId: saved.accountId }),
+    });
     form.setServerUrl(saved.serverUrl);
     form.setToken(saved.token);
     form.setPassword(saved.password);
@@ -143,35 +187,91 @@ export function ProfileScreen(): React.JSX.Element {
    *    "当前账号：x@y" —— 一句与实际同步状态矛盾的话。
    */
   const onClearCredentials = (): void => {
-    void wipeCredentialsAndWidgets({
-      clearCredentials: clearSyncConfig,
-      clearWidgets: clearWidgetState,
-      onWidgetError: (error) => {
-        // ⚠️ 组件没清干净是这里**唯一真正危险**的失败，
-        //    所以必须留下痕迹，而不是退化成没人知道的 false。
-        console.warn('[widgets] 清除凭据时没能清掉小组件状态', error);
-      },
-    });
-    form.clear();
-    forgetSignedInUser();
+    const config = readSyncConfig();
+    const accountId = config?.accountId?.trim();
+    let scope: VaultSecureStorageScope | undefined;
+    if (config !== undefined && accountId !== undefined && accountId !== '') {
+      try {
+        scope = { serverOrigin: new URL(config.serverUrl).origin, accountId };
+      } catch (error: unknown) {
+        console.warn('[vault] logout secure root cleanup skipped for invalid server URL', error);
+      }
+    }
+
+    void (async () => {
+      // This shared helper fences remembered unlock, invalidates the already
+      // open host, clears live credentials synchronously, and removes the
+      // native root key. Device revocation uses the same sequence.
+      const cleanupPromise = clearMobileVaultSession(scope);
+
+      // Credentials were already cleared by the shared helper. Keep the
+      // widget wipe in this existing composition point; it is unrelated to
+      // the vault security boundary and must still happen if secure cleanup
+      // later reports a native deletion failure.
+      const wipePromise = wipeCredentialsAndWidgets({
+        clearCredentials: () => undefined,
+        clearWidgets: clearWidgetState,
+        onWidgetError: (error) => {
+          console.warn('[widgets] 清除凭据时没能清掉小组件状态', error);
+        },
+      });
+      form.clear();
+      forgetSignedInUser();
+      await wipePromise;
+      const cleanup = await cleanupPromise;
+      if (cleanup.secureStorageError !== undefined) {
+        setVaultCleanupPending(scope);
+        console.warn('[vault] logout secure root cleanup failed', cleanup.secureStorageError);
+      } else {
+        setVaultCleanupPending(undefined);
+      }
+    })();
   };
+
+  const retryVaultCleanup = useCallback((): void => {
+    const scope = vaultCleanupPending;
+    if (scope === undefined) return;
+    void clearMobileVaultSession(scope, {
+      // Retry only the native item; credentials are already gone and the host
+      // fence is harmless but must not be replaced with a weaker direct call.
+      clearCredentials: () => undefined,
+    }).then((cleanup) => {
+      if (cleanup.secureStorageError === undefined) setVaultCleanupPending(undefined);
+      else console.warn('[vault] retry secure root cleanup failed', cleanup.secureStorageError);
+    });
+  }, [vaultCleanupPending]);
 
   /**
    * 「我的成长」是**第二层**页面，不是第 6 个底部标签。
    *
    * 🔴 底部标签必须保持 5 个（任务 / 日历 / 专注 / 分类 / 我的）。成长是
    * "关于我"的回顾视图，与设置同居一处才符合心智；挤进标签栏会让每个标签
-   * 都读不清。返回靠成长屏顶栏的返回键（`GrowthScreen` 的 `onBack`）。
+   * 都读不清。返回靠那一屏顶栏的返回键（各自的 `onBack`）。
+   *
+   * 🔴 **2026-10-04（W8）：功能域那一档入口改由 `nav/feature-entries.ts` 生成。**
+   * 原来是 `growthOpen` / `habitsOpen` 两个布尔 + 两段手写行 —— 那就是
+   * "同一个判断写两遍"，加第三个功能域（倒数纪念日）会写成第三遍，
+   * 而漏掉一处**不会报错**（少一个 setState 调用点 = 点了没反应）。
+   * 现在是一张表 + 一个状态 + 一个穷尽 switch：**加一项不接屏 = 编译错误**。
    *
    * ⚠️ 这些 `useState` 与下面的提前 return 必须**在所有 hook 之后** ——
    * 提前 return 会让后面没跑到的 hook 数量在两次渲染间变化，React 会直接报错。
    */
-  const [growthOpen, setGrowthOpen] = useState(false);
+  const [openFeature, setOpenFeature] = useState<MobileFeatureEntryKey | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [habitsOpen, setHabitsOpen] = useState(false);
+  const [closureOpen, setClosureOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
+  /**
+   * AI 助手那一屏（五个功能共用一个入口，见 `ai/AssistantScreen.tsx` 的文件头）。
+   *
+   * 🔴 它是**第二层屏**，不是第 6 个标签 —— 与成长 / 回收站 / 导出同一条纪律。
+   * 🔴 入口行**按本机开关决定是否进树**（`aiEntryVisible`）：
+   * 关掉的功能留在树上、点进去五个面板都发不出去，正是本仓反复记过的那类
+   * "界面在说谎"；而设置那一面**不受它影响** —— 闸就住在那里，看不见就无法打开。
+   */
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   /**
    * 「通知」入口行的未读徽标（批二，多端覆盖审计 P0-2）。
@@ -198,6 +298,241 @@ export function ProfileScreen(): React.JSX.Element {
       void fetchInboxUnread();
     });
   }, [fetchInboxUnread]);
+
+  /**
+   * 昵称：服务端 `User` 上的**一列明文**，不是 op、不进 op-log。
+   *
+   * 🔴 读用 `getAccountProfile`、判用 `planDisplayNameWrite`、写用
+   *   `updateAccountDisplayName` —— 三个函数与 web **同一份**（AGENTS §3.5）。
+   *   "空框=清除不是空串""超长不发""没凭据不发""没改不发"这四条各写一遍
+   *   就是四套裁决，而它们决定的正是"用户按下去到底发生了什么"。
+   *
+   * ⚠️ 出境同意闸门与徽标同一条：`networkAllowed()` 为假时**一个请求都不发**
+   *   （不是"发出去再失败"）。所以这里没凭据/没同意 ⇒ 那一行不出现，
+   *   而不是出现一个空的、点不动的昵称行。
+   *
+   * `savedName` 的三态是**有意的**：`undefined` = 还没读到（不渲染），
+   * `null` = 读到了、用户确实没设（渲染那句「留空则显示邮箱」）。
+   */
+  const [savedName, setSavedName] = useState<string | null | undefined>(undefined);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameEditing, setNameEditing] = useState(false);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameNotice, setNameNotice] = useState<{ text: string; danger: boolean } | null>(null);
+
+  const fetchDisplayName = useCallback((): Promise<void> => {
+    if (!privacyConsent.networkAllowed()) return Promise.resolve();
+    const config = readSyncConfig();
+    const token = config?.token ?? '';
+    if (config === undefined || config.serverUrl === '' || token === '') return Promise.resolve();
+    return getAccountProfile({ baseUrl: config.serverUrl }, token).then((outcome) => {
+      // 🔴 失败**不清空**已有读数：一次网络抖动不该让"你的昵称"在界面上凭空消失。
+      if (!outcome.ok) return;
+      setSavedName(outcome.displayName);
+      // 同一次读取顺手带回 `avatarHash` —— 头像"有没有"的事实源就是这一行，
+      // 不给它单开一次请求（多一次往返、还多一个可能不一致的读数）。
+      setAvatarHash(outcome.avatarHash);
+    });
+  }, []);
+  useEffect(() => {
+    void fetchDisplayName();
+  }, [fetchDisplayName]);
+
+  const saveDisplayName = useCallback(async (): Promise<void> => {
+    if (nameSaving) return;
+    const config = readSyncConfig();
+    const plan = planDisplayNameWrite({
+      token: config === undefined || config.serverUrl === '' ? undefined : (config.token ?? ''),
+      draft: nameDraft,
+      saved: savedName,
+    });
+    if (plan.action === 'skip') {
+      // 三种"不发"里只有超长需要说给用户：另外两种他看不出差别，说一句"没保存"
+      // 反而是在暗示出过事。
+      if (plan.reason === 'too-long') {
+        setNameNotice({
+          text: t('common.profile.nickname.toolong', {
+            max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
+            count: String(displayNameCodePoints(nameDraft)),
+          }),
+          danger: true,
+        });
+      }
+      return;
+    }
+    setNameSaving(true);
+    setNameNotice(null);
+    const outcome = await updateAccountDisplayName(
+      { baseUrl: config?.serverUrl ?? '' },
+      plan.token,
+      plan.value,
+    );
+    setNameSaving(false);
+    if (!outcome.ok) {
+      // 🔴 说的是**昵称**那句。web 这里曾经复用头像的失败文案（"头像没有传上去"），
+      //    于是昵称没存上时界面在讲另一件事 —— 判据钉在 profile-panel 那一侧。
+      setNameNotice({ text: t('common.profile.nickname.failed'), danger: true });
+      return;
+    }
+    setSavedName(outcome.displayName);
+    setNameEditing(false);
+    setNameNotice({
+      text:
+        outcome.displayName === null
+          ? t('common.profile.nickname.cleared')
+          : t('common.profile.nickname.saved'),
+      danger: false,
+    });
+    void fetchDisplayName();
+  }, [fetchDisplayName, nameDraft, nameSaving, savedName, t]);
+
+  /**
+   * 头像：一张**端到端加密的图片**，读写都要那把同步口令。
+   *
+   * 🔴 读它分两步，而且这两步答的是**两个不同的问题**：
+   * `getAccountProfile` 给的是 `avatarHash`（服务端只知道这个，它看不到内容），
+   * 有了 hash 才去 `GET account/avatar` 取密文并用口令解开。
+   * 所以"这台设备现在显示不出头像"有五种原因，而它们对应的**用户动作不同**：
+   * 没有头像（想设就设）/ 本机没填口令（去填）/ 口令不对（去核对）/
+   * 暂时取不到（稍后重试）/ 这台设备没有读图通道（先用网页版）。
+   * 把这五种并成一句"头像没有传上去"，症状是界面在对着一件没发生过的事说话 ——
+   * 这正是 web 那边已经钉过一次的那一族，所以这里从一开始就分开。
+   * 判定住在 `resolveAccountAvatarImage`（app-host），界面只按状态出句子。
+   *
+   * ⚠️ `avatarHash` 的三态与 `savedName` 同一条理由：`undefined` = 还没读到
+   * （那一整块不渲染），`null` = 读到了、确实没有头像。
+   */
+  const [avatarHash, setAvatarHash] = useState<string | null | undefined>(undefined);
+  const [avatarImage, setAvatarImage] = useState<string | undefined>(undefined);
+  const [avatarState, setAvatarState] = useState<AccountAvatarImage['state'] | undefined>(
+    undefined,
+  );
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarNotice, setAvatarNotice] = useState<{ text: string; danger: boolean } | null>(null);
+
+  /** 读侧的那句话：只有"有头像却显示不出来"才需要说，`absent` 不是一件事。 */
+  const avatarReadMessage =
+    avatarState === 'undecryptable'
+      ? t('common.profile.avatar.undecryptable')
+      : avatarState === 'unreadable'
+        ? t('common.profile.avatar.unreadable')
+        : null;
+
+  const fetchAvatarImage = useCallback((): Promise<void> => {
+    // `null` = 服务端说没有 ⇒ **一个请求都不发**（这是契约前提，不是优化）。
+    if (avatarHash === undefined || avatarHash === null) return Promise.resolve();
+    if (!privacyConsent.networkAllowed()) return Promise.resolve();
+    const config = readSyncConfig();
+    const token = config?.token ?? '';
+    if (config === undefined || config.serverUrl === '' || token === '') return Promise.resolve();
+    return resolveAccountAvatarImage(
+      { baseUrl: config.serverUrl },
+      token,
+      config.password,
+      avatarHash,
+    ).then((reading) => {
+      setAvatarState(reading.state);
+      // 🔴 失败**不清掉**上一次显示的那张图：一次取不到不该让已经看到的头像凭空消失，
+      //    但它也不会被当成"最新的"——下一句 `avatarReadMessage` 会说明它可能不是最新。
+      if (reading.state === 'ready') setAvatarImage(reading.dataUri);
+      else if (reading.state === 'absent') setAvatarImage(undefined);
+    });
+  }, [avatarHash]);
+  useEffect(() => {
+    void fetchAvatarImage();
+  }, [fetchAvatarImage]);
+
+  /**
+   * 需要口令的那句话只在**共享裁决**说"缺口令"时出现。
+   *
+   * ⚠️ 这里刻意不在渲染期读 `readSyncConfig()`：凭据是模块级可变状态，
+   * 渲染期读它会在"用户刚在设置面填了口令"那一刻保持旧值，
+   * 于是界面继续说"本机没有口令"。`avatarState` 是上一次真实读到的结论，
+   * 而"去设置里填一次"这个动作完成后会重读资料 —— 它跟着事实走，不跟着猜测走。
+   */
+  const needsPassword = avatarState === 'needs-password';
+
+  const prepareMessage = useCallback(
+    (error: AvatarPrepareError): string =>
+      error === 'bad-type'
+        ? t('common.profile.avatar.badType', {
+            types: ACCOUNT_AVATAR_CONTENT_TYPES.map((c) => c.replace('image/', '')).join(' / '),
+          })
+        : error === 'too-big'
+          ? t('common.profile.avatar.tooBig', {
+              max: `${Math.floor(ACCOUNT_AVATAR_MAX_SOURCE_BYTES / 1024)} KB`,
+            })
+          : error === 'no-channel'
+            ? t('mobile.profile.avatar.noChannel')
+            : t('common.profile.avatar.failed'),
+    [t],
+  );
+
+  const changeAvatar = useCallback(async (): Promise<void> => {
+    if (avatarBusy) return;
+    const config = readSyncConfig();
+    const token = config?.token ?? '';
+    const password = config?.password ?? '';
+    if (config === undefined || config.serverUrl === '' || token === '' || password === '') {
+      // 说的是"为什么现在不能换"，不是"换失败了"——一次请求都没发出去。
+      setAvatarNotice({ text: t('common.profile.avatar.needPassword'), danger: true });
+      return;
+    }
+    setAvatarNotice(null);
+    const picked = await pick({ allowMultiSelection: false }).catch((e: unknown) => {
+      // 取消是正常路径（静默）；其他码不能说谎。
+      if ((e as { code?: string }).code === 'OPERATION_CANCELED') return undefined;
+      setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
+      return undefined;
+    });
+    if (picked === undefined) return;
+    const doc = picked[0];
+    if (doc === undefined) {
+      setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
+      return;
+    }
+    setAvatarBusy(true);
+    const prepared = await prepareAvatarFromUri(doc.uri, doc.type ?? doc.nativeType ?? '');
+    if (!prepared.ok) {
+      setAvatarBusy(false);
+      setAvatarNotice({ text: prepareMessage(prepared.error), danger: true });
+      return;
+    }
+    const outcome = await uploadAccountAvatar(
+      { baseUrl: config.serverUrl },
+      token,
+      password,
+      prepared.image,
+    );
+    setAvatarBusy(false);
+    if (!outcome.ok) {
+      setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
+      return;
+    }
+    // 本地图立刻显示（不等下一次读），hash 换成服务端给的那一枚。
+    setAvatarImage(avatarDataUri(prepared.image));
+    setAvatarState('ready');
+    setAvatarHash(outcome.avatarHash);
+    setAvatarNotice({ text: t('common.profile.avatar.uploaded'), danger: false });
+  }, [avatarBusy, prepareMessage, t]);
+
+  const removeAvatar = useCallback(async (): Promise<void> => {
+    if (avatarBusy) return;
+    const config = readSyncConfig();
+    const token = config?.token ?? '';
+    if (config === undefined || config.serverUrl === '' || token === '') return;
+    setAvatarBusy(true);
+    const outcome = await deleteAccountAvatar({ baseUrl: config.serverUrl }, token);
+    setAvatarBusy(false);
+    if (!outcome.ok) {
+      setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
+      return;
+    }
+    setAvatarImage(undefined);
+    setAvatarState('absent');
+    setAvatarHash(null);
+    setAvatarNotice({ text: t('common.profile.avatar.removed'), danger: false });
+  }, [avatarBusy, t]);
 
   /**
    * 本会话内登录过的账号邮箱（**只放内存**，见 `auth/session.ts`）。
@@ -259,11 +594,47 @@ export function ProfileScreen(): React.JSX.Element {
   ];
 
   /**
+   * AI 助手那一格在不在树上。
+   *
+   * 🔴 判据是**本机的四道闸之一**（总开关 + 至少一个端点），纯本机读取、零请求。
+   * 为什么不是"永远显示"：web 那边"配置关着时入口仍然在，点了会说明该去开什么"
+   * 成立，是因为它把 AI 面板挂在**任务详情里**、那句话有地方说；
+   * 本端这一屏是**五个功能的唯一入口**，开着一条空链路等用户点，
+   * 就是本仓反复登记过的那个形状（"设置里能授权、授权了什么都不发生"）。
+   * 而"关掉的功能不进树"是本壳模块开关的既有口径。
+   */
+  const aiSettings = useAiSettings();
+  const aiEntryVisible = isAiConfiguredOnThisDevice(aiSettings);
+
+  /**
+   * 功能域那几行**由注册表生成**（`nav/feature-entries.ts`）。
+   *
+   * 🔴 这里不许再出现一份手写的 `{ key: 'habits', label: t('…') }`：
+   * 同一件事写两遍，迟早只改一遍（AGENTS §3.5 的那条教训）。
+   */
+  const featureRows: readonly SettingsRowModel[] = MOBILE_FEATURE_ENTRIES.map(
+    (entry): SettingsRowModel => ({
+      kind: 'action',
+      testID: entry.testID,
+      label: t(entry.labelKey),
+      hint: t(entry.hintKey),
+      onPress: () => {
+        setOpenFeature(entry.key);
+      },
+    }),
+  );
+
+  /**
    * 「关于我 / 我的数据」的入口行。
    *
    * 🔴 **「设置」排第一**（goal M1：入口要在首屏一眼可见）—— 它是这组里
-   * 唯一"配置类"的动作，也是搬动后凭据表单的新家；其余四项是"关于我"的
-   * 回顾与后悔药，频率都低于它。骨架来自共享动作行。
+   * 唯一"配置类"的动作，也是搬动后凭据表单的新家；后面几项是"关于我"的
+   * 回顾与后悔药（功能域那几行由 `nav/feature-entries.ts` 生成），频率都低于它。
+   * 骨架来自共享动作行。
+   *
+   * 🔴 **AI 助手那一格按开关进不进树**（`aiEntryVisible`）—— 关掉的功能
+   * 留在树上、点进去五个面板一个都发不出去，就是"界面在说谎"那个形状。
+   * 它排在功能域那几行之后：那是"让机器替我干活"，频率低于回顾与打卡。
    */
   const entryRows: readonly SettingsRowModel[] = [
     {
@@ -311,24 +682,20 @@ export function ProfileScreen(): React.JSX.Element {
         setSecurityOpen(true);
       },
     },
-    {
-      kind: 'action',
-      testID: 'profile-entry-growth',
-      label: t('mobile.growth.entry'),
-      hint: t('mobile.growth.entry.hint'),
-      onPress: () => {
-        setGrowthOpen(true);
-      },
-    },
-    {
-      kind: 'action',
-      testID: 'profile-entry-habits',
-      label: t('mobile.habits.entry'),
-      hint: t('mobile.habits.entry.hint'),
-      onPress: () => {
-        setHabitsOpen(true);
-      },
-    },
+    ...featureRows,
+    ...(aiEntryVisible
+      ? [
+          {
+            kind: 'action' as const,
+            testID: 'profile-entry-assistant',
+            label: t('mobile.ai.entry'),
+            hint: t('mobile.ai.entry.hint'),
+            onPress: () => {
+              setAssistantOpen(true);
+            },
+          },
+        ]
+      : []),
     {
       kind: 'action',
       testID: 'profile-entry-trash',
@@ -347,11 +714,22 @@ export function ProfileScreen(): React.JSX.Element {
         setExportOpen(true);
       },
     },
+    {
+      kind: 'action',
+      // 🔴 就排在「导出数据」的**下面一格**，不是随手追加在末尾：注销那道屏要求的
+      // 第一步恰恰是"先导出留一份"。两格相邻，那句话才有一个抬眼就够得着的出口。
+      testID: 'profile-entry-close-account',
+      label: t('common.accountClosure.title'),
+      hint: t('common.accountClosure.entryHint'),
+      onPress: () => {
+        setClosureOpen(true);
+      },
+    },
   ];
 
   /**
-   * 🔴 提前 return **必须在所有 hook 之后**（见 `growthOpen` 的注释）。
-   * 成长屏自带顶栏返回，所以这里不需要任何导航库。
+   * 🔴 提前 return **必须在所有 hook 之后**（见 `openFeature` 的注释）。
+   * 第二层屏各自带顶栏返回，所以这里不需要任何导航库。
    */
   if (securityOpen) {
     return (
@@ -383,6 +761,16 @@ export function ProfileScreen(): React.JSX.Element {
     );
   }
 
+  if (assistantOpen) {
+    return (
+      <AssistantScreen
+        onBack={() => {
+          setAssistantOpen(false);
+        }}
+      />
+    );
+  }
+
   if (trashOpen) {
     return (
       <TrashScreen
@@ -403,6 +791,17 @@ export function ProfileScreen(): React.JSX.Element {
     );
   }
 
+  if (closureOpen) {
+    return (
+      <AccountClosureScreen
+        onBack={() => {
+          setClosureOpen(false);
+        }}
+        onClosed={onClearCredentials}
+      />
+    );
+  }
+
   if (authOpen) {
     return (
       <AuthScreen
@@ -416,25 +815,30 @@ export function ProfileScreen(): React.JSX.Element {
     );
   }
 
-  if (growthOpen) {
-    return (
-      <GrowthScreen
-        onBack={() => {
-          setGrowthOpen(false);
-        }}
-      />
-    );
+  if (openFeature !== null) {
+    /**
+     * 🔴 功能域那几屏**整屏替换**（第二层），返回由那一屏自己的顶栏给。
+     * 组件由穷尽 switch 决定：注册表加一项而不在这儿接上 = `apps/mobile` 编译红
+     * （这条就是"入口存在但点了没反应"那类失效的编译期版本）。
+     */
+    return featureScreen(openFeature, () => {
+      setOpenFeature(null);
+    });
   }
 
-  if (habitsOpen) {
-    return (
-      <HabitsScreen
-        onBack={() => {
-          setHabitsOpen(false);
-        }}
-      />
-    );
-  }
+  /**
+   * 头像那一行**一次只说一句**，优先级从"用户刚做的事"往"环境缺什么"排：
+   * 刚上传/刚移除的结果 > 这台设备读不到头像 > 本机没有口令。
+   *
+   * 🔴 叠三句会被读成"出过三件事"，而这里三句互相排斥：
+   * 上传成功后再说一句"缺口令"就是自相矛盾（他刚用完口令）。
+   */
+  const avatarLine =
+    avatarNotice?.text ??
+    avatarReadMessage ??
+    (needsPassword ? t('common.profile.avatar.needPassword') : null);
+  const avatarLineDanger =
+    avatarNotice !== null ? avatarNotice.danger : avatarReadMessage !== null;
 
   return (
     <Screen title={t('mobile.profile.title')}>
@@ -457,6 +861,123 @@ export function ProfileScreen(): React.JSX.Element {
               valueTestID: 'profile-account-value',
             }}
           />
+          {/*
+            🔴 昵称行**只在真的读到之后**出现。没凭据 / 没同意出境 ⇒ 一个请求都不发，
+            于是这里连行都不画 —— 画一行"昵称：（空）"会被读成"设置坏了"，
+            而它其实是"你还没登录"。这两件事在界面上必须长得不一样。
+
+            ⚠️ 这一段**一个 `style={{ }}` 都不许出现**：`check:l4` 的 mobile 段
+            现量恰在基线 90、零余量（只减不增的棘轮）。行、输入框、按钮的样式
+            全在 `SettingsRow` 与 `ui/kit` 里，这里只给模型与文案。
+          */}
+          {/*
+            🔴 头像行与昵称行**同一次读取**才出现（`savedName === undefined` 就是不出现）。
+            理由与昵称那条一样：没登录时画一个空的、点不动的头像圈，
+            会被读成"设置坏了"，而它其实是"你还没登录"。
+
+            ⚠️ 这一段同样**一个 `style={{ }}` 都不许有**：圈和图的样式在 `ui/avatar.tsx`
+            （那是 `check:l4` mobile 段豁免的目录），这里只给数据与文案。
+          */}
+          {savedName === undefined ? null : (
+            <>
+              <HStack gap="default" align="center">
+                <AvatarBadge dataUri={avatarImage} email={signedInEmail} />
+                <Text variant="row-title" grow>
+                  {t('common.profile.avatar.label')}
+                </Text>
+              </HStack>
+              <HStack gap="tight">
+                <Button
+                  label={t('common.profile.avatar.change')}
+                  onPress={() => {
+                    void changeAvatar();
+                  }}
+                  tone="secondary"
+                  loading={avatarBusy}
+                />
+                {avatarImage === undefined ? null : (
+                  <Button
+                    label={t('common.profile.avatar.remove')}
+                    onPress={() => {
+                      void removeAvatar();
+                    }}
+                    tone="ghost"
+                    loading={avatarBusy}
+                  />
+                )}
+              </HStack>
+              {avatarLine === null ? null : (
+                <Text variant="caption" tone={avatarLineDanger ? 'danger' : 'subtle'}>
+                  {avatarLine}
+                </Text>
+              )}
+            </>
+          )}
+          {savedName === undefined ? null : nameEditing ? (
+            <>
+              <TextField
+                label={t('common.profile.nickname.label')}
+                value={nameDraft}
+                onChangeText={(next) => {
+                  setNameDraft(next);
+                  setNameNotice(null);
+                }}
+                placeholder={t('common.profile.nickname.placeholder')}
+                hint={
+                  nameNotice?.text ??
+                  t('common.profile.nickname.hint', {
+                    max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
+                  })
+                }
+                hintTone={nameNotice?.danger === true ? 'danger' : 'subtle'}
+                onSubmitEditing={() => {
+                  void saveDisplayName();
+                }}
+                testID="profile-nickname-input"
+              />
+              <Button
+                label={t('common.profile.nickname.save')}
+                onPress={() => {
+                  void saveDisplayName();
+                }}
+                tone="primary"
+                loading={nameSaving}
+              />
+              <Button
+                label={t('mobile.common.cancel')}
+                onPress={() => {
+                  setNameEditing(false);
+                  setNameNotice(null);
+                }}
+                tone="ghost"
+              />
+            </>
+          ) : (
+            <>
+              <SettingsRow
+                row={{
+                  kind: 'value',
+                  label: t('common.profile.nickname.label'),
+                  // 🔴 `null` 显示的是那句「留空则显示邮箱」，**不是空字符串**：
+                  //    空值会被读成"没读到"，而那与"读到了、用户确实没设"是两件事。
+                  value: savedName ?? t('common.profile.nickname.placeholder'),
+                  tone: savedName === null ? 'subtle' : 'default',
+                  onPress: () => {
+                    setNameDraft(savedName ?? '');
+                    setNameNotice(null);
+                    setNameEditing(true);
+                  },
+                  valueTestID: 'profile-nickname-value',
+                }}
+              />
+              <Text
+                variant="caption"
+                tone={nameNotice?.danger === true ? 'danger' : 'subtle'}
+              >
+                {nameNotice?.text ?? t('mobile.profile.nickname.hint')}
+              </Text>
+            </>
+          )}
           <Text variant="caption" tone="subtle">
             {signedInEmail === undefined
               ? t('mobile.profile.account.offlineHint')
@@ -524,6 +1045,17 @@ export function ProfileScreen(): React.JSX.Element {
         ))}
       </View>
 
+      {/*
+        托管同步权益（「已开启」/「已到期」/「暂不可用」）。独立成组件有两个理由：
+        ① 它要发一次出境探测，得跟着 `privacyConsent` 闸门走，不该混进这屏的
+        凭据/头像状态机；② 本文件的冻结判据（`profile-nickname-entry.spec.ts:144`）
+        要求这里**一个 web 前缀的词条调用都没有**，而那三条说明是 web 已有的真词条
+        —— 复用它们、不复制第二份，所以引用只能落在这个独立文件里。
+        没有权益可说时它自己返回 null（不占位）。
+      */}
+      <EntitlementSection />
+      <RenewSection />
+
       {/* 清单 / 标签 / 便签管理。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
       <ListsSection />
@@ -548,12 +1080,43 @@ export function ProfileScreen(): React.JSX.Element {
         }}
         form={form}
         onClearCredentials={onClearCredentials}
+        vaultCleanupPending={vaultCleanupPending !== undefined}
+        onRetryVaultCleanup={retryVaultCleanup}
+        onVaultCleanupPending={setVaultCleanupPending}
       />
     </Screen>
   );
 }
 
-/** 同步状态那一行。**它必须说清是哪一种失败**，不能只写"同步失败"。 */
+/**
+ * 注册表里的功能域 → 本端那张屏。
+ *
+ * 🔴 **穷尽 switch，没有 `default`**：`MobileFeatureEntryKey` 是从
+ * `MOBILE_FEATURE_ENTRIES` 推出来的联合类型，所以往注册表里加一项、
+ * 而忘了在这儿接上屏，这个函数就"所有分支之外还可能走到结尾"——
+ * 返回类型 `React.JSX.Element` 立刻不成立 ⇒ **编译错误**。
+ *
+ * 为什么要花一个函数换掉两段 `if (xxxOpen)`：入口失效最常见的形状是
+ * "行在、点了没反应"，而它**不报错、界面也不难看**（AGENTS §7 那类）。
+ * 让它在编译期就站不住，比给它写一条运行时判据更便宜。
+ */
+function featureScreen(key: MobileFeatureEntryKey, onBack: () => void): React.JSX.Element {
+  switch (key) {
+    case 'growth':
+      return <GrowthScreen onBack={onBack} />;
+    case 'habits':
+      return <HabitsScreen onBack={onBack} />;
+    // 🔴 注册表里加了 `countdown` 而这一行没接上 ⇒ 本函数"所有分支之外还可能走到结尾"，
+    //    返回类型立刻不成立 = **编译错误**。这就是"入口在、点了没反应"那类失效的
+    //    编译期版本（`nav/feature-entries.ts` 文件头第 2 条说的就是这件事）。
+    case 'countdown':
+      return <CountdownScreen onBack={onBack} />;
+  }
+}
+
+/**
+ * 同步状态那一行。**它必须说清是哪一种失败**，不能只写"同步失败"。
+ */
 function StatusRow({
   status,
   busy,

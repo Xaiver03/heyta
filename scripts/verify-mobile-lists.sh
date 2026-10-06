@@ -399,5 +399,9 @@ else
     bad "服务端 PROJECT/CRT op 数 = 0 —— 界面说清单建好了并同步了，服务端一条都没收到"
   fi
 fi
+step "10. 直接查 Postgres"
+psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
+  "SELECT count(*) FROM operations WHERE op_type='CRT' AND entity_type='PROJECT'" 2>/dev/null \
+  | sed 's|^|      服务端 PROJECT/CRT op 数 = |'
 
 summary "移动端清单闭环"

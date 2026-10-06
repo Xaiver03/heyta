@@ -42,6 +42,8 @@ export interface AuthSessionInput {
   /** E2EE 口令。空串 = 用户还没填 —— 同步会在 E2EE 那一步明确失败，不降级成明文。 */
   password: string;
   email: string;
+  /** Stable authenticated account id; never substitute the device client id. */
+  accountId?: string;
 }
 
 /**
@@ -56,10 +58,11 @@ export function saveAuthSession(input: AuthSessionInput): {
   serverUrl: string;
   token: string;
   password: string;
+  accountId?: string;
 } {
   const serverUrl = input.serverUrl.trim();
   const token = input.token.trim();
-  writeSyncConfig({ serverUrl, token, password: input.password });
+  writeSyncConfig({ serverUrl, token, password: input.password, accountId: input.accountId });
   /**
    * 🔴 **登录之后必须通知一次。**
    *
@@ -82,7 +85,12 @@ export function saveAuthSession(input: AuthSessionInput): {
     m.notifyConfigured();
   });
   signedInEmail = input.email.trim() === '' ? undefined : input.email.trim();
-  return { serverUrl, token, password: input.password };
+  return {
+    serverUrl,
+    token,
+    password: input.password,
+    ...(input.accountId === undefined ? {} : { accountId: input.accountId }),
+  };
 }
 
 /** 界面上"当前账号"那一行读它。**没有登录时是 `undefined`**，不要回落到空串。 */

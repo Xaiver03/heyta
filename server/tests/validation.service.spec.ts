@@ -393,12 +393,36 @@ describe('ValidationService', () => {
       expect(result.errorCode).toBe(SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK);
     });
 
-    it('should strip invalid vector clock entries (non-numeric values)', () => {
+    it('should reject invalid vector clock entries (non-numeric values)', () => {
       const op = createValidOp({ vectorClock: { client1: '5', client2: 10 } });
       const result = validationService.validateOp(op, clientId);
-      expect(result.valid).toBe(true);
-      // String values are stripped, only valid numeric entries remain
-      expect(op.vectorClock).toEqual({ client2: 10 });
+      expect(result.valid).toBe(false);
+      expect(result.errorCode).toBe(SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK);
+      expect(op.vectorClock).toEqual({ client1: '5', client2: 10 });
+    });
+
+    it('preserves the 4096-entry resource boundary and rejects 4097', () => {
+      const acceptedClock = Object.fromEntries(
+        Array.from({ length: 4096 }, (_, index) => [`device-${index}`, index + 1]),
+      );
+      const accepted = validationService.validateOp(
+        createValidOp({ vectorClock: acceptedClock }),
+        clientId,
+      );
+      expect(accepted.valid).toBe(true);
+      expect(Object.keys(acceptedClock)).toHaveLength(4096);
+
+      const rejectedClock = {
+        ...acceptedClock,
+        'device-4096': 4097,
+      };
+      const rejected = validationService.validateOp(
+        createValidOp({ vectorClock: rejectedClock }),
+        clientId,
+      );
+      expect(rejected.valid).toBe(false);
+      expect(rejected.errorCode).toBe(SYNC_ERROR_CODES.INVALID_VECTOR_CLOCK);
+      expect(rejected.error).toContain('max 4096');
     });
 
     it('should reject deeply nested payloads', () => {
@@ -622,6 +646,15 @@ describe('ValidationService', () => {
       'MIGRATION',
       'RECOVERY',
       'ALL',
+      // 倒数纪念日 W2 的 `EVENT`。它是**有意识的新增实体**（ADR-0044 那批），
+      // 而这条"精确数量"断言存在的意义就是让每一次新增都必须在这里认领一次 ——
+      // W2 落地时只跑了 packages/* 的套件，服务端这一侧没人跑过，所以欠到今天。
+      'EVENT',
+      // 助手会话的一条消息（ADR-0045 D-4 (ii)，2026-10-05 落地）。
+      // 🔴 同一条纪律：**服务端必须先于客户端上线** —— 这张白名单派生自
+      // `ENTITY_TYPES`，如果生产环境的库里没有它，带 `ASSISTANT_TURN` 的 op 会被
+      // 判成 `INVALID_ENTITY_TYPE` 永久拒绝（后果是 §7 第 34/41 条那两个 P0 的形状）。
+      'ASSISTANT_TURN',
     ];
 
     it('should include all heyta entity types', () => {

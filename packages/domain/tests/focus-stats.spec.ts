@@ -27,7 +27,6 @@ import {
   focusProgress,
   focusSessionDay,
   focusStatsForDay,
-  formatFocusDuration,
   initialFocusState,
   pause,
   selectKind,
@@ -194,22 +193,11 @@ describe('专注统计', () => {
   });
 });
 
-describe('时长展示', () => {
-  it('不足 1 小时给分钟', () => {
-    expect(formatFocusDuration(0)).toBe('0 分钟');
-    expect(formatFocusDuration(25 * 60 * 1000)).toBe('25 分钟');
-    expect(formatFocusDuration(59 * 60 * 1000)).toBe('59 分钟');
-  });
-
-  it('整小时不显示「0 分钟」', () => {
-    expect(formatFocusDuration(60 * 60 * 1000)).toBe('1 小时');
-    expect(formatFocusDuration(80 * 60 * 1000)).toBe('1 小时 20 分钟');
-  });
-
-  it('负数不会渲染出「-5 分钟」', () => {
-    expect(formatFocusDuration(-1000)).toBe('0 分钟');
-  });
-});
+/*
+ * 时长怎么"说人话"不在这里测 —— 判据在 `activity-categories.spec.ts:391`
+ * 起的 `durationParts`（那是唯一的所有者）。本文件原来测的是
+ * `formatFocusDuration`（返回写死中文），工单 W7 把它删了，理由写在 `focus.ts` 末尾。
+ */
 
 describe('选择轮次类型', () => {
   it('idle 时能换类型，且时长跟着配置走', () => {

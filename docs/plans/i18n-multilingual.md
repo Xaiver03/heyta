@@ -753,6 +753,57 @@ node scripts/check-pricing-consistency.mjs
    理由与它抓出的那个缺陷见 §7.14 第 1 条；"派生 ≠ 硬编码两种"这条也已在
    **隔离检出**里用真变异证完（见 §7.14 第 2 条），不再是没有证据的边界。
    落地页复刻改用同一份 `LOCALES`/`LOCALE_LABEL_KEY`。
+   🔴 **2026-10-03 形态变更（上面"一排 `.ht-chip`"那句随之过期）**：产品负责人
+   「中英文的那个切换组件太离谱了，你看一下规范应该是什么样子的」。查到的规范
+   **四条全在仓库里**，逐条的令牌名与实测数字记在
+   [`apps/web/src/styles/app/main-area.css`](../../apps/web/src/styles/app/main-area.css)
+   那段 `.ht-header__lang*` 头上：① 顶栏的控件必须**自己说明自己是什么**
+   （同位置同错法已判过两次：`App.tsx` 排序下拉那段、`.ht-header__view`，原话
+   "用户根本不知道它们是什么"）；② `.ht-chip` 是**设置/AI 面板内的筛选胶囊**，
+   顶栏借错了层（那一区的既有语言是 `.ht-btn`）；③ 它的盒高 ~20px，而
+   `MASTER.md` §3 写的是触控目标 ≥ 44px；④ 它的选中态用主色边框，而
+   `--ht-color-ring` 在两套主题里**就是**主色 —— 截图里那枚"看起来一直被聚焦"的蓝框。
+   **换的是摆位与外观，语义一条没动**：`LOCALES` 驱动、自称、`lang`、`aria-current`、
+   点当前项不写不回传，全部保留；新增的是可见标签（`web.shell.lang.label`，
+   中英各一条）+ `role="group"` + `aria-labelledby`（名字由可见标签提供，不抄第二份）
+   + 当前项一枚 `Check` 勾（「不靠颜色单独表意」）。
+   **不做成下拉**（落地页那颗 globe 是营销面、切语言是整页跳转的 `<a>`；这里切语言是
+   当场改状态，弹层多一次点击，而且收起状态就看不见"我当前是哪门语言"）。
+   用例 **12 条 → 14 条**；改前实测：把这 14 条跑在**旧组件**上 ⇒ **4 红 10 绿**
+   （红的全是形态那四条，10 条行为判据两边都绿 —— 说明这次加的是形态的牙，
+   没有顺手削弱行为覆盖）。e2e 侧另加一支取证配置
+   `e2e/playwright.lang-shots.config.ts`（私有端口 4327：`check:ai-e2e` 的预检
+   会对 4318/4319 下 SIGKILL，不能共用），它含"顶栏只有一个入口且入口自己说明自己"
+   与中/英 × 浅/暗 × 1280/660 共 16 张图。
+   ⚠️ **一处日期更正**：这一批改动的注释与文档最初把形态变更写成"2026-10-04"，
+   实际提交时间戳是 **2026-10-03**（`git log` 可查），已由 `fb0d7b0a` 改回。
+   🔴 那条提交信息里"当时已经过了午夜"这句归因是**错的** —— 时间戳是 17:55，
+   没有任何午夜可言，写错就是写错。留在这里是因为提交信息改不掉：
+   **写进历史里的因果句也是断言**，被否证就要在能改的地方撤回。
+   🔴 **2026-10-06 摆位再变（上面"顶栏的控件"那句随之过期，工单 H9 第三刀）**：产品负责人
+   「中文语言不应该在设置里面弄吗？」。`<LanguageSwitcher/>` 与页头那颗主题按钮**一起**搬进
+   设置浮层的「显示」那一节（`data-testid="display-pref-panel"`，紧跟详情视图 radiogroup）。
+   上面那**四条规范判据一条没动**（自说明 / 不借 `.ht-chip` 那层 / 触控高度 / 不用主色边框
+   表达选中），动的只是它住在哪 —— 而"自己说明自己是什么"在设置里反而更成立：
+   那里每一条都有可见标题与一句说明。类名族跟着换 `ht-header__lang*` → `ht-settings__lang*`，
+   样式块从 `main-area.css` 整块搬进 `.ht-settings__*` 那一片的邻居 `ai-panels.css`
+   （复用既有顶层族，不是新开一族 —— `check:row-single-source` 的基线余量为 0）。
+   新增两条说明词条 `web.settings.display.langNote` / `.themeNote`（中英各一条，`check:ui-language` 现量 3254/3254）。
+   - **搬走的代价如实记在这里**：页头不再有可见入口，于是"切语言/切主题"在**所有**载体里都多一步
+     "先开设置"。e2e 侧收成 `openSettingsSheet` / `openSettingsView` / `closeSettingsSheet` / `switchTheme`
+     四把助手（`e2e/tests/helpers.ts`），9 份 spec 里 13 处散点调用换成一次 `switchTheme`；
+     jsdom 侧 `openSettingsViaAvatar` 从**三份逐字相同**的本地副本收成一份导出
+     （`apps/web/tests/open-settings-via-avatar.ts`；另两份形态不同的留原处，理由写在该文件头）。
+   - **判据两头都钉**：设置里找得到（`closest('[data-testid="display-pref-panel"]')`）**且**页头找得到就红
+     （`closest('.ht-header__actions')` → `toBeNull`）。只钉前一半，"搬过去"和"两处都留着"读起来一样。
+   - 🔴 **一条只在这里现形的机制**：设置是**条件渲染**的浮层，它开着的时候范围列 `.ht-sidebar`
+     **根本不在 DOM 里**（那一列只存在于有范围的视图）。原来锚在「收集箱 / Inbox」上的断言因此**假红**；
+     锚点换成同一次挂载里始终存在的 `rail-help`，而 `shellText()` 改成"找不到范围列就抛"，
+     免得下一位再把"读到了空字符串"当成"界面是英文的"。
+   - 读数：web **1998 passed | 13 skipped**（150 文件）、i18n 26、`check:ui-language` / `check:layering` /
+     `check:design` / e2e 类型载体全 RC=0；e2e 两批 5 + 66 passed；取证载体
+     `HEYTA_LANG_TAG=h9c` **4 passed / 18 张图**，人打开看了三张 —— 其中两张照出主题按钮在列向
+     flex 里被拉成一条整宽横条，补 `align-self: flex-start` 后复跑再看。
 9. **`packages/sync-client` 的 `describeConflictPayload` 仍是中文，且会吐出内部标识符。**
    它返回一句中文（空载荷 `（空）`），其中一支还会把载荷的**字段名**拼进去（`completedAt: 123`）。
    现在加了一个结构化兄弟函数 `summarizeConflictPayload(payload)` →
@@ -1515,7 +1566,8 @@ case 'ollama': return t('common.ai.preset.ollama.label');
   判据：`verify-i18n-failures.mjs` 的 `readiness` 组 **12 条**（/tmp 副本隔离，不动真实仓库），
   含"塞规则但漏 locale""把 en 的 forbidden 拿掉""已迁移文件里写硬编码文案"等注入。
 - ✅ **web 切换器从二态 toggle 改 `LOCALES` 列表**（本轮）：`LanguageSwitcher.tsx` 渲染
-  `LOCALES.map(…)` 的一排 `.ht-chip`（复用既有 `.ht-chip--on`，零新增 CSS），语言名用**自称**词条
+  `LOCALES.map(…)` 的一排语言项（2026-10-03 起是页头那个**带可见标签的分组**，
+  见上面 §7.8 最后那段；此前是复用 `.ht-chip--on` 的一排胶囊），语言名用**自称**词条
   `common.lang.*`；自称 key 登记成 `LOCALE_LABEL_KEY`（`satisfies Record<Locale, MessageKey>`）
   —— **加 `Locale` 忘了登记自称 = 编译错误**，这就是"准备好但先不做"的具体形状。
   落地页复刻（`AppWindow.tsx`）用同一份 `LOCALES`/`LOCALE_LABEL_KEY`，不再自己列一份。

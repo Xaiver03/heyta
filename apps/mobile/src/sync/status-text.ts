@@ -87,6 +87,7 @@ const KNOWN_FAILURE_REASON_COVERAGE = {
   'undecryptable-page': true,
   'upload-rejected': true,
   'unauthorized': true,
+  'account-closed': true,
   // 🔴 G-12：被本机同意闸门拦下、一个请求都没发。漏这一条 `satisfies` 就会编译报错 ——
   // 这正是这个常量存在的理由（新增原因必须被"意识到一次"）。
   'consent-required': true,

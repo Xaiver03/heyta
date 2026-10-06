@@ -18,6 +18,9 @@
  * | GET  | `/orders`                | 订单列表 |
  * | GET  | `/coupons`               | 优惠码 + 核销数 |
  * | GET  | `/invites`               | 邀请码 + 推荐关系 |
+ * | GET  | `/holiday-adjustments`   | 调休/补班已录入的年度（含 `papers` 出处回显） |
+ * | PUT  | `/holiday-adjustments/years` | **整年替换**某一年（公共事实的唯一写入口，判据③的载体） |
+ * | DELETE | `/holiday-adjustments/years?year=` | 撤销某一年（退回随包表，不是"下发空的一年"） |
  *
  * **不做**：改订阅、退款、发券、群发通知。理由见 ADR-0038 §2 三 / §3.4 ——
  * 前三个动到钱与权益，各自需要幂等键、审计与回滚；群发自由文本会破坏
@@ -40,9 +43,31 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import {
+  HOLIDAY_ADJUSTMENT_PATHS,
+  holidayAdjustmentAdminDeleteQuerySchema,
+} from '@heyta/shared-schema';
+
 import { DEFAULT_ENTITLEMENT_POLICY } from '../entitlement';
+import { getAuthUser } from '../middleware';
 import { Logger } from '../logger';
+import {
+  deleteHolidayAdjustmentYear,
+  listHolidayAdjustmentYearsForAdmin,
+  parseHolidayYearPut,
+  replaceHolidayAdjustmentYear,
+} from '../holidays/holiday-adjustment-store';
 import { requireAdmin } from './admin.middleware';
+import { createBillingAdapterRegistry } from '../billing/registry';
+import type { BillingAdapter } from '../billing/types';
+import {
+  decideRefund,
+  listRefunds,
+  refundChannelOf,
+  requestRefund,
+  submitRefundToChannel,
+} from '../billing/refund-store';
+import { createPrismaSqlExecutor } from '../billing/pricing-store';
 import { prisma } from '../db';
 
 /** epoch 毫秒。`null` 原样返回（"未知"与 0 是两件事）。 */
@@ -142,7 +167,22 @@ function projectUserListRow(row: UserListRow, now: number) {
 // 路由
 // ─────────────────────────────────────────────────────────────────────
 
-export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
+/**
+ * 后台路由的可选注入。**只有退款那三条需要它**：
+ * 发起退款要挑一个支付通道 adapter，而"挑哪个"是配置事实，不是路由能猜的。
+ *
+ * ⚠️ 不传 = 这台实例没有配任何通道 ⇒ 批准会落到 `channel-failed`
+ * （`noop.adapter.ts#refund` 抛 `BILLING_PROVIDER_NOT_CONFIGURED`），
+ * 而**权益一格不动**。这不是降级路径，它就是"没有通道"的如实结果。
+ */
+export interface AdminRoutesOptions {
+  readonly adapters?: readonly BillingAdapter[];
+}
+
+export const adminRoutes = async (
+  fastify: FastifyInstance,
+  options: AdminRoutesOptions = {},
+): Promise<void> => {
   // 🔴 一个**路由级**的闸门：下面每条路由都继承它。
   //    用插件级 `addHook` 而不是给每条路由重复写 `preHandler` —— 漏写一条就是一个洞，
   //    而漏写是**静默**的。认证与判权都在 `requireAdmin` 内部按代码顺序完成。
@@ -187,7 +227,10 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
         }),
         prisma.coupon.count(),
         prisma.coupon.count({ where: { enabled: true } }),
-        prisma.couponRedemption.count({ where: { state: 'settled' } }),
+        // 🔴 「已结算」是 `settledAt` 这一列，不是 `state` 的一个取值 ——
+        //   `REDEMPTION_STATES` 只有 reserved/applied/expired/reversed，写 `state: 'settled'`
+        //   会命中一个**存在的索引**从而又快又错地恒返回 0。
+        prisma.couponRedemption.count({ where: { settledAt: { not: null } } }),
         prisma.inviteCode.count(),
         prisma.inviteCode.count({ where: { disabled: true } }),
         prisma.referral.count(),
@@ -420,7 +463,9 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
         data: { lockedUntil: null, failedLoginAttempts: 0 },
         select: { id: true, email: true },
       });
-      Logger.info(`Admin unlocked user #${String(user.id)} (${user.email})`);
+      // 日志里不落邮箱：GDPR 下这是可识别个人信息，而日志既没有脱敏也没有到期删除机制
+      // （隐私政策自己就写着这句）。审计要的是"谁被解锁了"，userId 足够定位。
+      Logger.info(`Admin unlocked user #${String(user.id)}`);
       return reply.send({ ok: true, user });
     } catch (err) {
       // Prisma 的 P2025 = 记录不存在。这是预期结果（并发删除 / 手输错 id），
@@ -490,7 +535,9 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
         data: { tokenVersion: { increment: 1 } },
         select: { id: true, email: true, tokenVersion: true },
       });
-      Logger.info(`Admin forced logout of user #${String(user.id)} (${user.email})`);
+      // 同上：强制登出的审计行不落邮箱明文（`admin-log-pii` 门禁会红，见
+      // `server/tests/admin-log-pii.spec.ts`）。
+      Logger.info(`Admin forced logout of user #${String(user.id)}`);
       return reply.send({ ok: true, user });
     } catch (err) {
       if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2025') {
@@ -741,5 +788,265 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
       Logger.error(`Admin invites error: ${message}`);
       return reply.status(500).send({ error: 'Failed to load invites.' });
     }
+  });
+
+  // ── 调休/补班（公共事实的唯一写入口）。W4b，定性见 ADR-0052 ─────────
+  //
+  // 🔴 这三条路由是这个服务端上**唯一**能写"会下发给所有人的内容"的地方，
+  //    所以它们继承上面那个插件级闸门（`addHook('preHandler', requireAdmin)`）。
+  //    闸门挂在这个文件里而不是 `admin.middleware.ts` —— 那个文件只有 `requireAdmin`
+  //    的**定义**；把注册当挂载等于没挂（工单原句就是这么写的，实测纠正过）。
+  //
+  //    为什么这件事值得单独一句：公共事实的**读**面是匿名的
+  //   （`GET /api/holiday-adjustments`），而**写**面是全后台权限最高的一组。
+  //    两者路径只差一个前缀（`/api/` vs `/api/admin/`），一个漏掉鉴权的复制粘贴
+  //    就会把"任何人可改国务院公告"变成一个 200。
+  fastify.get('/holiday-adjustments', async (_req, reply) => {
+    try {
+      // 🔴 与公开那条读**同一次换算**（`fetchYearRows`），只是出参多了元信息。
+      return reply.send(await listHolidayAdjustmentYearsForAdmin());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin holiday adjustments error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load holiday adjustments.' });
+    }
+  });
+
+  fastify.put('/holiday-adjustments/years', async (req, reply) => {
+    // 判据③的**实际载体**：非法日期 / `isOffDay` 不是布尔 ⇒ 400 + 逐字段原因。
+    // ⚠️ 校验入口只有 `parseHolidayYearPut` 这一个（它包着契约里那份
+    //    `holidayYearPutSchema`）。在 handler 里另写一份 zod 就是 §3.5 那条
+    //    "同一个判断抄两遍"，而两遍的区别会表现为"HTTP 收了、CLI 拒了"。
+    const parsed = parseHolidayYearPut(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'Invalid holiday adjustment year.',
+        // 逐字段回给运营看。**不含**任何用户数据 —— 这里根本没有用户数据可泄，
+        // 而把 `issues` 原样返回是 zod 的默认形状，改写成"人类可读"要一套映射、
+        // 一套映射就会漂。
+        issues: parsed.error.issues.map((i) => ({
+          path: i.path.join('.'),
+          message: i.message,
+        })),
+      });
+    }
+
+    // 操作者邮箱：`updatedBy` 是审计事实。`requireAdmin` 只查了 `isAdmin`
+    //（它不必读 email），所以这里补一次按主键的 `findUnique` ——
+    // 写一年一次，这次查询不是热路径。
+    const actor = await prisma.user.findUnique({
+      where: { id: getAuthUser(req).userId },
+      select: { email: true },
+    });
+
+    try {
+      await replaceHolidayAdjustmentYear({
+        year: parsed.data.year,
+        papers: parsed.data.papers,
+        note: parsed.data.note ?? null,
+        days: parsed.data.days,
+        updatedAt: Date.now(),
+        updatedBy: actor?.email ?? null,
+      });
+    } catch (err) {
+      // 🔴 走到了这里说明**契约层放过、库层拒了** —— 两层校验的并集漏了一格。
+      // 不能报 500 就当没事：500 会让运营以为"服务坏了，等等再试"，
+      // 而那一条数据永远进不去。报 400 + 把原始信息记进日志（日志是唯一能
+      // 指出"哪一层该补一条 CHECK"的地方）。
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(
+        `Admin holiday adjustment PUT rejected by the database (zod accepted it): ${message}`,
+      );
+      return reply.status(400).send({ error: 'Rejected by database constraints.', rejectedBy: 'database' });
+    }
+
+    // 🔴 判据②：`papers` 随数据入库且**能回显**。回显在 PUT 的响应里也给一份，
+    //    是为了让"提交了 3 条出处、界面只显示 2 条"这种丢法当场可见 ——
+    //    只让运营去刷列表的话，丢一行与列表坏了分不开。
+    return reply.send({
+      ok: true,
+      year: parsed.data.year,
+      papers: parsed.data.papers,
+      dayCount: parsed.data.days.length,
+    });
+  });
+
+  fastify.delete('/holiday-adjustments/years', async (req, reply) => {
+    // 年份走查询串而不是 `/years/:year` —— 与 PUT 同一口径，理由见契约里
+    // `HOLIDAY_ADJUSTMENT_PATHS.adminDelete` 那段（两个来源 = 一条必须额外写的守卫）。
+    const parsed = holidayAdjustmentAdminDeleteQuerySchema.safeParse(req.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+
+    const deleted = await deleteHolidayAdjustmentYear(parsed.data.year);
+    // 0 = 那一年本来就没录过。**这是幂等成功**，不是 404：
+    // "撤销一次录入"重复执行一次没有副作用，而把它报成错误会让运营以为没撤销掉。
+    return reply.send({ ok: true, year: parsed.data.year, deleted });
+  });
+
+  // ── 退款（ADR-0053） ─────────────────────────────────────────────
+  //
+  // 🔴 这三条是**动钱**的入口，所以它们的设计前提与上面那些"改配置"的路由不同：
+  // 每一个失败模式都必须留下一个**可举证的状态**，而不是一个 HTTP 码。
+  // 具体说：批准之后如果通道拒了，响应是 200 + `status:'failed'`，
+  // 不是 500 —— 因为"批准"这个决定**已经成立并落库**了，报 500 会让运营
+  // 以为什么都没发生而再点一次，而那一次点下去是**第二次向通道发起退款**。
+  //
+  // ⚠️ ADR-0038 当年把"退款"列在后台范围**之外**，理由是那时没有任何支付通道。
+  // 通道接通之后这一项由 ADR-0053 修订；本文件不重述那份理由。
+
+  const refundRequestSchema = z.object({
+    orderId: z.number().int().positive(),
+    note: z.string().trim().min(1).max(500).optional(),
+    // 🔴 跳过时间窗的唯一开关。它**必须**配一句理由（下面的 refine），
+    // 因为一次没有理由的例外批准在事后与"运营手滑"无法区分。
+    operatorApproved: z.boolean().optional(),
+  }).refine(
+    (value) => value.operatorApproved !== true || (value.note !== undefined && value.note.length > 0),
+    { message: 'operatorApproved requires a non-empty note', path: ['note'] },
+  );
+
+  const refundDecisionSchema = z.object({
+    note: z.string().trim().min(1).max(500),
+  });
+
+  const adminActor = async (userId: number): Promise<string> => `admin:${userId}`;
+
+  fastify.get('/refunds', async (req, reply) => {
+    const query = z
+      .object({
+        userId: z.coerce.number().int().positive().optional(),
+        limit: z.coerce.number().int().positive().max(200).optional(),
+      })
+      .safeParse(req.query);
+    if (!query.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+
+    try {
+      const refunds = await listRefunds(createPrismaSqlExecutor(prisma), {
+        userId: query.data.userId,
+        limit: query.data.limit,
+      });
+      return reply.send({ refunds });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin refunds list error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load refunds.' });
+    }
+  });
+
+  fastify.post('/refunds', async (req, reply) => {
+    const parsed = refundRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: 'Invalid refund request.',
+        issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+      });
+    }
+    const actor = await adminActor(getAuthUser(req).userId);
+
+    try {
+      const result = await requestRefund(createPrismaSqlExecutor(prisma), {
+        orderId: parsed.data.orderId,
+        actor,
+        note: parsed.data.note,
+        operatorApproved: parsed.data.operatorApproved,
+        now: Date.now(),
+      });
+
+      if (result.outcome === 'not-found') {
+        return reply.status(404).send({ error: 'Order not found.' });
+      }
+      if (result.outcome === 'denied') {
+        // 🔴 409 而不是 400：请求本身是**合法的**，被拒的是那一单当前的状态
+        // （过期、已退过、不是收银台的单）。把状态冲突报成"你传错了"，
+        // 运营会去改参数重试，而改参数永远改不动"这笔已经过了 7 天"。
+        return reply.status(409).send({ error: 'Refund not allowed.', reason: result.reason });
+      }
+      return reply.status(201).send({ ok: true, ...result });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin refund request error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to create refund.' });
+    }
+  });
+
+  fastify.post('/refunds/:id/approve', async (req, reply) => {
+    const params = req.params as { id?: string };
+    const id = z.coerce.number().int().positive().safeParse(params.id);
+    const body = refundDecisionSchema.safeParse(req.body);
+    if (!id.success || !body.success) {
+      return reply.status(400).send({ error: 'Invalid refund approval.' });
+    }
+    const actor = await adminActor(getAuthUser(req).userId);
+    const sql = createPrismaSqlExecutor(prisma);
+
+    const decided = await decideRefund(sql, {
+      refundId: id.data,
+      decision: 'approve',
+      actor,
+      note: body.data.note,
+      now: Date.now(),
+    });
+    if (decided.outcome === 'not-found') return reply.status(404).send({ error: 'Refund not found.' });
+    if (decided.outcome === 'not-decidable') {
+      // 🔴 409 一律带 `reason` 这个**机器码**：`error` 是给人读的散文，而界面要按码选措辞。
+      // 后台那一片拿不到码就只能说"状态冲突"，运营分不清"这条已经决定过了"与"这一单过期了"
+      // （ADR-0053 §5 第 11 条）。
+      return reply.status(409).send({
+        error: 'Refund already decided or finished.',
+        reason: 'NOT_DECIDABLE',
+      });
+    }
+
+    const channel = await refundChannelOf(sql, id.data);
+    if (channel === null) return reply.status(404).send({ error: 'Refund not found.' });
+    const adapter = createBillingAdapterRegistry(options.adapters ?? []).get(channel.provider);
+    if (adapter === undefined) {
+      // 订单写着某个 provider，而这台实例**没有**注册它 —— 换过支付商的形状。
+      // 如实报 409：批准已经落库，钱没动，等运营把旧通道接回来或改走人工。
+      return reply.status(409).send({
+        ok: true,
+        status: 'approved',
+        channel: 'unavailable',
+        error: 'Refund provider is not registered on this instance.',
+        reason: 'REFUND_PROVIDER_NOT_REGISTERED',
+      });
+    }
+
+    const submitted = await submitRefundToChannel(sql, {
+      refundId: id.data,
+      adapter,
+      now: Date.now(),
+    });
+    // 🔴 200 而不是 502：`approved` 这个决定已经成立，通道失败是**下一步**的事实，
+    // 它已经如实落在 `refunds.status='failed'` + 审计里。
+    return reply.send({ ok: true, ...submitted });
+  });
+
+  fastify.post('/refunds/:id/reject', async (req, reply) => {
+    const params = req.params as { id?: string };
+    const id = z.coerce.number().int().positive().safeParse(params.id);
+    const body = refundDecisionSchema.safeParse(req.body);
+    if (!id.success || !body.success) {
+      return reply.status(400).send({ error: 'Invalid refund rejection.' });
+    }
+
+    const decided = await decideRefund(createPrismaSqlExecutor(prisma), {
+      refundId: id.data,
+      decision: 'reject',
+      actor: await adminActor(getAuthUser(req).userId),
+      note: body.data.note,
+      now: Date.now(),
+    });
+    if (decided.outcome === 'not-found') return reply.status(404).send({ error: 'Refund not found.' });
+    if (decided.outcome === 'not-decidable') {
+      // 与 approve 那条同一码、同一理由：界面要能区分"这条已经决定过了"与别的状态冲突。
+      return reply.status(409).send({
+        error: 'Refund already decided or finished.',
+        reason: 'NOT_DECIDABLE',
+      });
+    }
+    // 拒绝**不碰钱也不碰权益** —— 它是这条流程里唯一"什么都不发生"的出口，
+    // 所以响应里如实只带状态，不带任何金额或到期日字段。
+    return reply.send({ ok: true, ...decided });
   });
 };

@@ -89,6 +89,14 @@ export async function requestNotificationPermission(
 export interface DeliveryOutcome {
   /** 真的投出去几条。 */
   readonly delivered: number;
+  /**
+   * 真的投出去的**提醒 id**（`Reminder.id`，形如 `taskId:triggerAt`）。
+   *
+   * 🔴 调用方要用它把"已经弹过了"写成 `firedAt` op。只返回条数不够：
+   * 内存里的 `shown` 集合只在**一次页面加载**内有效，刷新或换一台设备就会再弹
+   * 一遍（缺陷 D14）—— 而"哪几条投过"这个信息只有这一层知道。
+   */
+  readonly deliveredIds: readonly string[];
   /** 没投的原因；`undefined` = 全部都投了（或本来就没有可投的）。 */
   readonly reason?: 'unsupported' | 'permission' | 'empty';
 }
@@ -110,9 +118,10 @@ export interface ReminderNotifyLabels {
  * 重新落一次 `due` —— 一个 10 分钟前到点的提醒会在用户接下来的每一次操作里
  * 被重新投一遍，表现成"通知栏被同一条刷屏"。
  *
- * ⚠️ 去重集合只在**内存**里：刷新页面会忘掉，于是刚刷新时可能重复投一条。
- * 这是刻意选的 —— 落盘要处理"过期的 shown 记录怎么办"（会长到无限大），
- * 而重复一条远好过把一条该提醒的吞掉。
+ * ⚠️ `shown` 只在**内存**里 —— 它是"同一次页面加载内别刷屏"的那道门。
+ * **跨刷新与跨设备的去重不落在这里**：调用方要把 `deliveredIds` 经
+ * `markReminderFired` 写成提醒的 `firedAt` op（领域层判 `fired` 优先于 `due`），
+ * 否则刷新一次、或另一台设备上线，同一条到点提醒会**再弹一遍**（缺陷 D14）。
  *
  * ## 纯的部分与不纯的部分
  *
@@ -126,17 +135,21 @@ export function deliverDueReminders(
   labels: ReminderNotifyLabels,
   ctor: NotificationCtor | undefined = globalThis.Notification as NotificationCtor | undefined,
 ): DeliveryOutcome {
-  if (due.length === 0) return { delivered: 0, reason: 'empty' };
-  if (!notificationsSupported(ctor)) return { delivered: 0, reason: 'unsupported' };
-  if (ctor!.permission !== 'granted') return { delivered: 0, reason: 'permission' };
+  if (due.length === 0) return { delivered: 0, deliveredIds: [], reason: 'empty' };
+  if (!notificationsSupported(ctor)) return { delivered: 0, deliveredIds: [], reason: 'unsupported' };
+  if (ctor!.permission !== 'granted') return { delivered: 0, deliveredIds: [], reason: 'permission' };
 
-  let delivered = 0;
+  const deliveredIds: string[] = [];
   for (const reminder of due) {
     if (shown.has(reminder.id)) continue;
     const task = tasks[reminder.taskId];
-    // 任务被删掉时提醒可能还在（墓碑与提醒是两条记录）——
-    // 这种情况**不投**，但不能因此把整个循环断掉。
-    if (task === undefined) continue;
+    // 🔴 **两道门，缺一不可。**
+    // `task === undefined` 只挡"任务从来不在这张表里"；而**已软删除的任务在表里
+    // 是存在的**（墓碑是一条记录，`deletedAt` 有值）—— 此前这里的注释写着
+    // "这种情况不投"，而代码照投（缺陷 D1 的投递面那一半）。
+    // 主修在动作层 `due()`（那里连"该不该算到点"一起判），这一道是**同一层内的
+    // 第二道**：`tasks` 由调用方递进来，本函数不该假设递进来的表已经滤过。
+    if (task === undefined || task.deletedAt !== undefined) continue;
     try {
       new ctor!(labels.title, {
         body: labels.body(task.title),
@@ -144,11 +157,13 @@ export function deliverDueReminders(
         tag: reminder.id,
       });
       shown.add(reminder.id);
-      delivered += 1;
+      deliveredIds.push(reminder.id);
     } catch {
       // 构造失败（权限在两次检查之间被撤销、系统级静默…）——
       // 不中断其余几条，也**不**把这一条标记成已投（下次还会再试）。
     }
   }
-  return delivered > 0 ? { delivered } : { delivered: 0, reason: 'permission' };
+  return deliveredIds.length > 0
+    ? { delivered: deliveredIds.length, deliveredIds }
+    : { delivered: 0, deliveredIds: [], reason: 'permission' };
 }

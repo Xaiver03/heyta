@@ -82,7 +82,7 @@ function progress(over: Partial<TodayProgress> = {}): TodayProgress {
 }
 
 function totals(over: Partial<ActivityTotals> = {}): ActivityTotals {
-  return { checkIns: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0, ...over };
+  return { checkIns: 0, focusCount: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0, ...over };
 }
 
 /** 本周复盘的最小底：用例只声明它关心的字段。 */
@@ -279,6 +279,7 @@ describe('milestoneGroups：每维度一块，顺序与投影一致', () => {
       deriveMilestones(
         totals({
           checkIns: 5000,
+          focusCount: 0,
           focusMs: 2000 * 3_600_000,
           tasksCompleted: 9000,
           activeDays: 400,
@@ -453,6 +454,20 @@ const STUB_RESILIENCE = {
   frozenInCurrentRun: 0,
 };
 
+/**
+ * W8：`HabitGrowthFn` 的返回类型现在含**必填** `month` —— 这里的桩也得给。
+ * 不给不会运行时报错，而是**编译不过**：这正是"宿主/桩没接会被逼出来"的形状。
+ */
+const STUB_MONTH: import('@heyta/domain').HabitPeriodStats = {
+  monthKey: '2026-09',
+  achievedDays: 2,
+  scheduledDays: 8,
+  rate: 0.25,
+  monthValue: 5,
+  totalValue: 41,
+  totalAchievedDays: 9,
+};
+
 describe('toHabitStreakRows：配对由宿主注入，本层不自己配对', () => {
   it('空输入回空数组（没有习惯不抛错）', () => {
     const growth = vi.fn();
@@ -466,6 +481,7 @@ describe('toHabitStreakRows：配对由宿主注入，本层不自己配对', ()
     const growth: HabitGrowthFn = () => ({
       streak: { current: 1, longest: 1 },
       resilience: { resilience: STUB_RESILIENCE },
+      month: STUB_MONTH,
     });
     const rows = toHabitStreakRows(habits, [], Date.now(), growth);
     expect(rows.map((row) => row.habit.id)).toEqual(['c', 'a', 'b']);
@@ -476,7 +492,7 @@ describe('toHabitStreakRows：配对由宿主注入，本层不自己配对', ()
     const seen: string[] = [];
     const growth: HabitGrowthFn = (_habit, _logs, today) => {
       seen.push(today);
-      return { streak: { current: 0, longest: 0 }, resilience: { resilience: STUB_RESILIENCE } };
+      return { streak: { current: 0, longest: 0 }, resilience: { resilience: STUB_RESILIENCE }, month: STUB_MONTH };
     };
     toHabitStreakRows([habit('a'), habit('b')], [], now, growth);
     // 两个习惯拿到**同一个** today —— 不能各读一次时钟。
@@ -488,6 +504,7 @@ describe('toHabitStreakRows：配对由宿主注入，本层不自己配对', ()
     const growth: HabitGrowthFn = () => ({
       streak: { current: 1, longest: 1 },
       resilience: { resilience: injected },
+      month: STUB_MONTH,
     });
     const rows = toHabitStreakRows([habit('a')], [], Date.now(), growth);
     expect(rows[0]!.resilience.resilience.current).toBe(77);
@@ -498,7 +515,7 @@ describe('toHabitStreakRows：配对由宿主注入，本层不自己配对', ()
     const received: Array<readonly HabitLog[]> = [];
     const growth: HabitGrowthFn = (_habit, ownLogs) => {
       received.push(ownLogs);
-      return { streak: { current: 0, longest: 0 }, resilience: { resilience: STUB_RESILIENCE } };
+      return { streak: { current: 0, longest: 0 }, resilience: { resilience: STUB_RESILIENCE }, month: STUB_MONTH };
     };
     toHabitStreakRows([habit('a')], logs, Date.now(), growth);
     expect(received[0]).toBe(logs);

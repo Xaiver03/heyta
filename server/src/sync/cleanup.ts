@@ -1,8 +1,10 @@
 import { getSyncService } from './sync.service';
 import { Logger } from '../logger';
+import { purgeExpiredAiUsageCounters } from '../ai/metering';
 import { runBillingReconciliation } from '../billing/reconcile-job';
 import { DEFAULT_SYNC_CONFIG, MS_PER_DAY } from './sync.types';
 import { MIN_CHECKPOINT_SAFE_APP_VERSION } from './checkpoint-gate';
+import { vaultKeyMigrationService } from './services/vault-key-migration.service';
 
 let cleanupTimer: NodeJS.Timeout | null = null;
 let initialCleanupTimer: NodeJS.Timeout | null = null;
@@ -105,6 +107,16 @@ const runDailyCleanup = async (): Promise<void> => {
     Logger.error(`Cleanup [pending-passkeys] failed: ${error}`);
   }
 
+  // 5b. Release abandoned vault-rotation staging reservations and ciphertext
+  // chunks.  This is bounded so a fleet with many interrupted clients cannot
+  // turn the daily cleanup into one unbounded transaction.
+  try {
+    const expired = await vaultKeyMigrationService.cleanupExpired(100, Date.now());
+    Logger.info(`Cleanup [vault-migrations]: expired ${expired} staging session(s)`);
+  } catch (error) {
+    Logger.error(`Cleanup [vault-migrations] failed: ${error}`);
+  }
+
   // 6. Delete abandoned unverified users (never verified, no registration still
   // in flight, older than the grace window; verified users can never match)
   try {
@@ -144,6 +156,19 @@ const runDailyCleanup = async (): Promise<void> => {
     }
   } catch (error) {
     Logger.error(`Cleanup [billing-reconcile] failed: ${error}`);
+  }
+
+  // 8. Expire managed-AI usage counters. This is the **only** thing that makes
+  // the "retained for N days" line in the AI disclosure true — the number is
+  // published in the UI and in the legal texts, so a retention period with no
+  // sweep is a promise nothing executes (ADR-0054 §8 named exactly this gap).
+  // Logged unconditionally, INCLUDING zero, same reason as [old-ops]: "the sweep
+  // ran and had nothing to do" must stay distinguishable from "it never got here".
+  try {
+    const { deleted } = await purgeExpiredAiUsageCounters();
+    Logger.info(`Cleanup [ai-usage-counters]: removed ${deleted} row(s)`);
+  } catch (error) {
+    Logger.error(`Cleanup [ai-usage-counters] failed: ${error}`);
   }
 };
 

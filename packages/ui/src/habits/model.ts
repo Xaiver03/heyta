@@ -17,7 +17,8 @@
  * 所以配对**由宿主注入**（{@link HabitGrowthFn}）—— 两端都传
  * `habitGrowth`，测试传一个桩。这里只做**展示**上的事：
  *
- *   1. 把「今天有没有打卡」「今天那条 log」补上（宿主的两份投影都缺这一步）；
+ *   1. 把「今天有没有打卡」「今天那条 log」「**今天记了几格**」补上
+ *      （宿主的两份投影都缺前两步里的"几格"，工单 W6）；
  *   2. 近 N 天格子怎么排（列 = 周、行 = 星期几、跨月在哪一列打月份标签）；
  *   3. 0/4 两档的强度 token 映射（`@heyta/design-system` 的 `HEAT_TOKENS`）。
  *
@@ -34,10 +35,13 @@ import { HEAT_TOKENS } from '@heyta/design-system';
 import {
   addDays,
   completionRatio,
+  habitLogValue,
   isoWeekday,
   toLocalDate,
   type Habit,
+  type HabitFrequency,
   type HabitLog,
+  type HabitPeriodStats,
   type HabitResilienceView,
   type LocalDate,
   type StreakResult,
@@ -86,7 +90,7 @@ export type HabitHeatLevel = 0 | 1 | 2 | 3 | 4;
  */
 export type HabitHeatToken = (typeof HEAT_TOKENS)[number];
 
-/** 热力图里的一天。`count` 是**事实**（那天打了几次），`level` 是展示分档。 */
+/** 热力图里的一天。`count` 今天是 **0/1**（那天有没有打卡），`level` 是展示分档。 */
 export interface HeatmapDay {
   readonly date: LocalDate;
   readonly count: number;
@@ -113,11 +117,23 @@ export interface HabitProgressRow {
   /**
    * 今日完成比例（0–1）。
    *
-   * 🔴 它由 `@heyta/domain#completionRatio` 算（`log.value / (habit.target ?? 1)`），
+   * 🔴 它由 `@heyta/domain#completionRatio` 算（`habitLogValue / (habit.target ?? 1)`），
    * 不是"打过就是 1" —— 目标 8 杯水、今天喝了 4 杯时它是 0.5。
    * 共享层带上它，是为了让"今天完成了多少"在两端只有一个答案。
    */
   readonly todayRatio: number;
+  /**
+   * 今天**记了几格**（工单 W6 的那个数）。没有记录时是 0，不是 undefined。
+   *
+   * 🔴 算法在 `@heyta/domain#habitLogValue`，与"这天算不算达成"（`isAchieved`）
+   * 和上面那个比例**同一个缺省** —— 一条存在但没写 `value` 的打卡记录只能有一种
+   * 读法。以前这里没有所有者：详情自己写 `?? target ?? 1`、比例写 `?? 0`，
+   * 于是同一格可以同时"算达成"和"完成度 0 %"。
+   *
+   * ⚠️ 它**不是** `Math.round(todayRatio * target)`：比例被 `Math.min(1, …)` 截断过，
+   * 超目标时（记 10 / 目标 8）反算回来会掉成 8 —— 那是把用户写下的数字改小了。
+   */
+  readonly todayValue: number;
   /** 今日打卡记录（未删除；可能不存在）。 */
   readonly todayLog: HabitLog | undefined;
   /** 连续天数结果（current / longest / lastDate）。**日历口径**。 */
@@ -127,20 +143,37 @@ export interface HabitProgressRow {
    * 界面上显示的是它（与 `streak` 并存，但**不许相减** —— ADR-0022）。
    */
   readonly resilience: HabitResilienceView;
+  /**
+   * 自然月统计 + 历史总量（工单 W8）。
+   *
+   * 🔴 **必填**（来自注入的 {@link HabitGrowthFn}，而它由宿主接
+   * `@heyta/app-host#habitGrowth`）—— 可选字段会把"宿主没接"伪装成"做完了"，
+   * 那条教训在上一批工单里记过。口径（天 vs 次、自然月、到期分母）全部在
+   * `@heyta/domain#computeHabitPeriodStats`，这一层一个都不重写。
+   */
+  readonly month: HabitPeriodStats;
 }
 
 /**
- * 连续 + 韧性的配对函数。**宿主注入**，共享层不认识 `@heyta/app-host`。
+ * 连续 + 韧性 + 月统计的配对函数。**宿主注入**，共享层不认识 `@heyta/app-host`。
  *
  * 两端都传 `habitGrowth`（`packages/app-host/src/motivation.ts`）——
  * 那里是配对的唯一实现。测试传一个桩，就能在不碰领域层的前提下把
  * 本文件的每一个分支跑到。
+ *
+ * 🔴 返回类型上的 `month` 是**必填**（工单 W8）：与 `streak`/`resilience`
+ * 同一个理由 —— 可选字段会把"宿主没接"伪装成"做完了"。桩也必须给出 `month`，
+ * 否则编译不过；这正是想要的效果。
  */
 export type HabitGrowthFn = (
   habit: Habit,
   logs: readonly HabitLog[],
   today: LocalDate,
-) => { readonly streak: StreakResult; readonly resilience: HabitResilienceView };
+) => {
+  readonly streak: StreakResult;
+  readonly resilience: HabitResilienceView;
+  readonly month: HabitPeriodStats;
+};
 
 /**
  * 习惯 + 全部打卡记录 → 每个习惯一行的进度。
@@ -161,17 +194,47 @@ export function toHabitProgressRows(
   const today = toLocalDate(now);
   return habits.map((habit) => {
     const todayLog = logs.find((log) => log.habitId === habit.id && log.date === today);
-    const { streak, resilience } = growth(habit, logs, today);
+    const { streak, resilience, month } = growth(habit, logs, today);
     return {
       habit,
       todayLog,
       doneToday: todayLog !== undefined,
-      // 传 `undefined` 表示"今天还没打卡" —— 领域层会按 value 0 算。
+      // 传 `undefined` 表示"今天还没打卡" —— 领域层会按 0 格算。
       todayRatio: completionRatio(habit, todayLog),
+      todayValue: habitLogValue(habit, todayLog),
       streak,
       resilience,
+      // 与 streak/resilience **同一次 growth 调用**的产出：月统计和连续数字
+      // 必须出自同一份日志、同一个 today（`habitGrowth` 文件头的同一条纪律）。
+      month,
     };
   });
+}
+
+/**
+ * 这条习惯**有没有"量"可说**（工单 W6：数量行与步进器该不该出现）。
+ *
+ * 🔴 判据是"一天能不能记下 **1 格以外**的数"，不是"用户有没有填过目标"：
+ * `createHabit` 对每条习惯都写 `target: 1`，所以"`target !== undefined`"
+ * 会让每条纯打卡型习惯都多出一行「1/1」—— 那是噪声，不是信息。
+ *
+ * | 习惯 | 显示 | 为什么 |
+ * |---|---|---|
+ * | 目标 8 杯（`atLeast`） | ✅ | 8 格里记 5 格是事实 |
+ * | 目标 30 分钟（时长型） | ✅ | 同上，量纲是分钟 |
+ * | **目标 0.5 小时** | ✅ | 小数目标同样多格 —— 判据写成 `> 1` 会让它**看不见**（实测） |
+ * | 目标 1、口径 `atMost` / `exactly` | ✅ | **"最多 1 杯"要的正是能记下"今天 2 杯"** —— 破戒是数据 |
+ * | 目标 0（`atMost` + 0 = 一次都不碰） | ✅ | 同上 |
+ * | 目标 1、口径 `atLeast`（新建默认） | ❌ | 只有一格可记，量本身不携带信息 |
+ *
+ * ⚠️ 单位（`unit`）**不参与判定**：它只是量纲。"每天 1 分钟"在数据上确实只有
+ * 1 格可记，画一个步进器不会多出一个可写的数。
+ */
+export function hasCountableGoal(habit: Habit): boolean {
+  // 刻意是 `!== 1` 而不是 `> 1`：小数目标（0.5 小时）与 0 都在合法域里
+  //（`setHabitGoal` 只拦负数与非有限数），用 `> 1` 会把它们判成"没什么可记"。
+  if ((habit.target ?? 1) !== 1) return true;
+  return habit.goalType === 'atMost' || habit.goalType === 'exactly';
 }
 
 /**
@@ -331,6 +394,58 @@ export function toHeatmapWeeks(
 }
 
 /**
+ * 每个月份标签**该跨过几列**：返回与 `weeks` 同长的数组，`0` = 这一列不是标签起点。
+ *
+ * 🔴 为什么住在模型层而不是组件里：标签的宽度必须由"这一列真的属于那个月"推出来。
+ * 组件里再算一次月长就是第二套判断（AGENTS §3.5），而它一旦与 `toHeatmapWeeks`
+ * 的切列方式不一致，症状是"标签与它标注的那一列错开"—— 正是 `HabitBoard` 文件头
+ * 那句承诺作废的样子。
+ *
+ * 🔴 一列宽（`icon.xs` = 14px 现量）装不下「10月」这种 2–3 枚字形 ⇒ 每一枚都折成两行
+ * （工单 H8 照出来的缺陷）。跨列之后**整行与网格同宽**：
+ * `Σ(span×格宽 + (span−1)×空隙) + (标签数−1)×空隙 == 网格总宽`，
+ * 因为相邻两个标签块之间恰好隔着网格自己那一列的空隙。
+ */
+export function heatMonthSpans(weeks: readonly HeatmapWeek[]): number[] {
+  return weeks.map((week, index) => {
+    if (week.month === undefined) return 0;
+    let span = 1;
+    for (let next = index + 1; next < weeks.length; next += 1) {
+      if (weeks[next]?.month !== undefined) break;
+      span += 1;
+    }
+    return span;
+  });
+}
+
+/**
+ * 每一枚月份标签的**像素宽度**（`0` = 这一列不是标签起点）。
+ *
+ * 🔴 宽度住在模型层而不是组件里：`cell` 与 `gap` 由调用方（拿着设计 token 的那一侧）传进来，
+ * 而"跨几列"由 `heatMonthSpans` 从同一份列数据数出来 —— 组件里就只剩一次乘法，
+ * 没有第二套"这个月占几周"的判断。
+ *
+ * 🔴 下界是**两列**（`2 × cell + gap`），不是拍出来的：窗口末尾那一列通常只有
+ * 零星几天 ⇒ 它的 `span == 1`，而「10月」这种三枚字形在一列宽（`icon.xs`）里**必然折成两行**
+ * （工单 H8 看图照出来的就是这件事）。取"两列"而不是"三列"的理由是可验证的：
+ * 两列 = `2 × icon.xs + space.1`（现量 `grep -E -- '--ht-(icon-xs|space-1):' packages/design-system/src/tokens.css`
+ * ⇒ 2×14 + 4 = **32px**），比最宽的那句月份标签（`caption` = `font-size.xs` = 12px 下三枚字形 ≈ 26px）宽，
+ * 而它探出网格右边界的最大量就是"下界减一列"= **18px** —— 窗格那一侧的余量比这个大。
+ * **这两句（"装得下"与"没探出窗格"）不是注释说了算，是 `e2e/tests/habit-heatmap-labels.spec.ts`
+ * 的 HL1 与 HL3 量的。**
+ */
+export function heatMonthLabelWidths(
+  weeks: readonly HeatmapWeek[],
+  cell: number,
+  gap: number,
+): number[] {
+  const floor = 2 * cell + gap;
+  return heatMonthSpans(weeks).map((span) =>
+    span === 0 ? 0 : Math.max(floor, span * cell + (span - 1) * gap),
+  );
+}
+
+/**
  * 有没有"可以补回来的那一天"。判据在领域层（`describeHabitResilience` 只在
  * `streakIfRepaired ≥ 2` 时给出 `repair`），这里只做取反。
  */
@@ -390,3 +505,66 @@ export function habitGoalSummaryKey(goalType: string | undefined): HabitGoalSumm
       return 'web.habits.goal.summaryAtLeast';
   }
 }
+
+/**
+ * ── 频次（工单 H5）：「哪种频次说哪句话」与「1–7 → 星期词条」──
+ *
+ * 🔴 与 `habitGoalSummaryKey` 同一类收编，同一条理由：
+ *    web 与移动端各有一个习惯编辑器（`HabitGoalEditor` / `HabitGoalSlot`），
+ *    现在也各有一个频次编辑器，而"哪一种频次说哪句话""`3` 念作『三』"是
+ *    **同一个判断**。各写一份的症状是"同一个 `weekly`，web 说『每周 三』、
+ *    移动端说『周三去做』"，两边都不报错。
+ *
+ * ⚠️ 这里只给 **key**，句子在词条表里（本包不 import `@heyta/i18n`）。
+ */
+export type HabitFrequencySummaryKey =
+  | 'web.habits.freq.summary.daily'
+  | 'web.habits.freq.summary.weekly'
+  | 'web.habits.freq.summary.interval'
+  | 'web.habits.freq.summary.intervalOne';
+
+/**
+ * 频次 → 摘要词条 key。
+ *
+ * ⚠️ `undefined` 与 `daily` **都给"每天"那一条**：判定侧 `isScheduledOn(undefined)` = 每天，
+ *    界面读出来必须与判定一致 —— 否则"没设过频次的习惯"在界面上没有频次，
+ *    而连续天数却按每天算（§7 第 195 条那个"看起来没功能其实有"的断面）。
+ *
+ * 🔴 单数那一档也住在这里，不住在宿主里：`everyNDays === 1` 给 `…intervalOne`。
+ *    写入口会把 1 归一成 `daily`（`app-host#habit-actions:111`），所以这条**通常走不到**，
+ *    但"通常走不到"不是判据 —— `packages/i18n` 的 hazard 规则把每条 `web.habits.*` 的
+ *    占位符都用 1 渲染一遍，"Every 1 days" 就是它拦的东西，而两个宿主各写一份的话，
+ *    漂移的那一份不会报错（§3.5 同一条理由）。
+ */
+export function habitFrequencySummaryKey(
+  frequency: HabitFrequency | undefined,
+): HabitFrequencySummaryKey {
+  if (frequency === undefined || frequency.type === 'daily') {
+    return 'web.habits.freq.summary.daily';
+  }
+  if (frequency.type === 'weekly') return 'web.habits.freq.summary.weekly';
+  return frequency.everyNDays === 1
+    ? 'web.habits.freq.summary.intervalOne'
+    : 'web.habits.freq.summary.interval';
+}
+
+/**
+ * ISO 星期序号（1=周一 … 7=周日）→ 星期名词条 key。
+ *
+ * 🔴 下标从 0 起，取值按 `isoWeekday()` 的定义（1–7），**不是** JS `Date.getDay()`
+ *    的 0=周日。写成 `getDay()` 形状会得到"周一显示成周二"，
+ *    而 `HabitFrequency.daysOfWeek` 的注释明确写着 1=周一。
+ *    穷尽性用**七元组**表达：少一个会在这里编译不过，而不是在界面上少一格。
+ */
+export const HABIT_WEEKDAY_MESSAGE_KEYS = [
+  'common.weekday.mon',
+  'common.weekday.tue',
+  'common.weekday.wed',
+  'common.weekday.thu',
+  'common.weekday.fri',
+  'common.weekday.sat',
+  'common.weekday.sun',
+] as const;
+
+/** {@link HABIT_WEEKDAY_MESSAGE_KEYS} 的值类型（宿主 `t()` 的入参上界）。 */
+export type HabitWeekdayMessageKey = (typeof HABIT_WEEKDAY_MESSAGE_KEYS)[number];

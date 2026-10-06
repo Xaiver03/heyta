@@ -296,9 +296,12 @@ export function growthBoardLabels(t: I18nValue['t']): GrowthBoardLabels {
     },
 
     /**
-     * 🔴 分享块同样是**类型要求的死字段**：本端不传 `share`，共享层不渲染。
-     * 移动端没有剪贴板接线（`ShareSummarySection` 要一个真的 `onCopy`），
-     * 所以这里借用 web 那三条真词条 —— 一旦将来接上剪贴板，至少文案是真的。
+     * 分享块（「带走这一周」）的三条文案。
+     *
+     * ✅ 本端**从 2026-10-03 起真的渲染它**了（`GrowthScreen` 传 `share`，
+     * 复制走 RN 核心的 `Clipboard.setString`）。这三条借的是 web 的真词条 ——
+     * 与月份那批同一个理由：**同一句话不复制第二份**（抄件一定会漂）。
+     * 标题与那句"不含任何标识"的说明走 `renderSectionHeader`，也是同一批 key。
      */
     share: {
       copy: t('web.growth.share.copy'),

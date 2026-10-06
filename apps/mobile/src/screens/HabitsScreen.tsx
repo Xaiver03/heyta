@@ -71,23 +71,39 @@
 import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AppHost, HabitActions } from '@heyta/app-host';
 import { createHabitActions, habitGrowth } from '@heyta/app-host';
-import type { CategorySlot, Habit, HabitGoalType, HabitLog } from '@heyta/domain';
+import type {
+  CategorySlot,
+  Habit,
+  HabitFrequency,
+  HabitGoalType,
+  HabitIcon,
+  HabitLog,
+} from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { HabitBoard, HabitProgressList } from '@heyta/ui';
+import { HabitBoard, HabitProgressList, HabitTrendBoard } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
-import { habitBoardLabels, habitListLabels } from '../lib/habits-display';
+import {
+  habitBoardLabels,
+  habitListLabels,
+  habitMonthLabels,
+  habitTrendTabs,
+  habitYearLabels,
+} from '../lib/habits-display';
+import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { Button, Card, EmptyState, Screen, Text, TextField } from '../ui/kit';
 import { HabitGoalSlot } from '../ui/habit-goal-slot';
+import { HabitFrequencySlot } from '../ui/habit-frequency-slot';
+import { HabitIconSlot } from '../ui/habit-icon-slot';
 import { HabitColorSlot } from '../ui/slot-picker';
 
 export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
   const { t } = useI18n();
   // 🔴 "现在"由 `useToday` 提供：回到前台与跨过本地零点时会刷新。
   // 拿一个冻结的 `Date.now()` 会让"今天打过没打"在午夜之后一直停在昨天。
-  const { now } = useToday();
+  const { now, today } = useToday();
   /**
    * 🔴 `dataRevision` 是**同步完成**的信号。少了它，这一屏在整个应用生命周期里
    * 都不会重读：冷启动落在本屏（空的）→ 去「我的」同步 → 切回来仍是空的，
@@ -103,12 +119,25 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   /**
    * 🔴 详情层展开的那一条。`null` = 停在清单。
    *
-   * 它是**本地导航态**，不是业务数据 —— 不进 op-log、不落盘：手机上的
+   * 它是**视图态**，不是业务数据 —— 不进 op-log、不落盘：手机上
    * "我正在看哪一条"换一台设备没有意义，同步过去反而是噪音。
+   *
+   * ⚠️ 状态本身住在 `@heyta/app-host`（`lib/selection.ts` 只是本壳的胶水），
+   * 与任务详情、便签、清单、标签是**同一份**选中态。这里原本是 `useState`，
+   * 而 web 习惯页有它自己的一份、移动端任务页又有一份 —— 三份的回落规则不同，
+   * "在某个视图里选中消失后面板该不该自己关"就变成每个屏各答一遍。
    */
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedId = useSelected('habit');
   /** 正在落盘的那一条 —— 置灰它，防连点发出两条 op。 */
   const [busyId, setBusyId] = useState<string | null>(null);
+  /**
+   * 改名编辑器展开的那一条（`null` = 没展开）。
+   *
+   * 🔴 存的是**习惯 id**而不是一个布尔：详情层换一条习惯时，编辑器不能跟着
+   * 留在屏幕上 —— 布尔做不到这件事，而它做到的那次就是"改了 A 的名字存到 B 上"。
+   */
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -130,9 +159,32 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const refresh = useCallback(() => {
     if (!actions) return;
     // ⚠️ 两个 list 都是**同步**的（读的是已物化的内存状态），不是 Promise。
-    setHabits(actions.listHabits());
+    const aliveHabits = actions.listHabits();
+    setHabits(aliveHabits);
     setLogs(actions.listLogs());
+    /**
+     * 选中态的**回落**：详情层展开着的那条习惯被删掉（本机删、或另一台设备
+     * 删了同步过来）时，选中清空 ⇒ 界面退回清单。
+     *
+     * 🔴 传的是 `listHabits()` 的**全集**而不是筛选后的那一截 —— 后者会得到
+     * "用户换个筛选，正在看的那条就被判成不存在、面板自己关掉"。
+     */
+    pruneSelectionAgainst({ habit: aliveHabits.map((habit) => habit.id) });
   }, [actions]);
+
+  /**
+   * 离开这一屏时收起详情层（与 `TasksScreen` 同一条理由）。
+   *
+   * 🔴 这是**移动端的形态**决定的，不是共享层的规则：这里的详情是一个二级屏，
+   * 外壳按标签切屏会卸载本屏；选中态留着的话，切回「习惯」就发现自己
+   * 莫名站在某条习惯的详情里。web 相反 —— 常驻列跨视图保持选中正是它的价值。
+   */
+  useEffect(
+    () => () => {
+      selection.select('habit', null);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!host) return;
@@ -160,6 +212,12 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
 
   const labels = useMemo(() => habitBoardLabels(t), [t]);
   const listLabels = useMemo(() => habitListLabels(t), [t]);
+  const monthLabels = useMemo(() => habitMonthLabels(t), [t]);
+  // 「月 ⇄ 年」那一排切换器的文案 + 年那一档的文案（工单 H7）。
+  const trendLabels = useMemo(
+    () => ({ tabs: habitTrendTabs(t), month: monthLabels, year: habitYearLabels(t) }),
+    [t, monthLabels],
+  );
 
   /**
    * 详情层展开的那一条。
@@ -173,12 +231,74 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     [habits, selectedId],
   );
 
+  /**
+   * 保存改名 = **一条 UPD**。
+   *
+   * 🔴 空名字与"一个字没改"都不发 op：一次点击对应一个意图（AGENTS §3.4），
+   * 而"我打开了输入框又原样关掉"不是一个改名意图 —— 发出去会在别的设备上
+   * 多出一条没有信息量的历史。真正的空名字校验在动作层（它会抛错），
+   * 这里只管"按了回车什么都不该发生"。
+   */
+  const saveRename = useCallback((): void => {
+    if (actions === null || selected === undefined) return;
+    const next = renameDraft.trim();
+    const id = selected.id;
+    setRenamingId(null);
+    if (next === '' || next === selected.name) return;
+    runFor(id, actions.renameHabit(id, next));
+  }, [actions, renameDraft, runFor, selected]);
+
+  /**
+   * 删除习惯 = **一条墓碑**。
+   *
+   * 🔴 打卡历史**不级联删**（`removeHabit` 的注释）：撤销删除后连续天数还在。
+   * 先退回清单再发 op —— 不然那条记录在界面上被"看着"而它已经不在了。
+   */
+  const removeSelected = useCallback((): void => {
+    if (actions === null || selected === undefined) return;
+    const id = selected.id;
+    selection.select('habit', null);
+    runFor(id, actions.removeHabit(id));
+  }, [actions, runFor, selected]);
+
   const chooseColor = useCallback(
     (habit: Habit, slot: CategorySlot | undefined): void => {
       if (!actions) return;
       runFor(habit.id, actions.setHabitColor(habit.id, slot));
     },
     [actions, runFor],
+  );
+
+  /**
+   * 选图标（工单 H3）。与 `chooseColor` 同一条通路：一次意图 = 一条 op，
+   * 交给 `runFor` 置灰那一条防连点。
+   *
+   * 🔴 `undefined` **不是"清掉图标"**，是"回到按 id 派生的那个"（`HabitIconSlot`
+   *    里「默认」那一格说的就是这个）。动作层把它写成 `null`：
+   *    不写这个键 = 不改，写 `null` = 退回派生 —— 与 `color` 同一条约定。
+   *    闭集之外的值由 `parseHabitIcon` 在动作层**抛**，界面不自己判。
+   */
+  const chooseIcon = useCallback(
+    (habit: Habit, icon: HabitIcon | undefined): void => {
+      if (!actions) return;
+      runFor(habit.id, actions.setHabitIcon(habit.id, icon));
+    },
+    [actions, runFor],
+  );
+
+  /**
+   * 改频次（工单 H5）。返回 promise 而**不是** `void`：`HabitFrequencySlot` 必须
+   * 自己接住 reject 并显示原因 —— 交给 `runFor` 只会置灰，用户看到的是"点了没反应"。
+   *
+   * 🔴 `undefined` = 清除（回到"每天"），与图标那一格"回到派生"同一条约定；
+   *    校验与归一（`interval:1`→每天、七天全选→每天、空日子集合抛）全在动作层。
+   */
+  const chooseFrequency = useCallback(
+    (habit: Habit, frequency: HabitFrequency | undefined): Promise<void> => {
+      if (!actions) return Promise.resolve();
+      return actions.setHabitFrequency(habit.id, frequency);
+    },
+    [actions],
   );
 
   const setHabitGoal = useCallback(
@@ -270,19 +390,109 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
             icon: 'action.back',
             label: t('mobile.growth.back'),
             onPress: () => {
-              setSelectedId(null);
+              selection.select('habit', null);
             },
+          },
+          // 🔴 改名与删除此前**只在动作层存在**（`renameHabit` 是新补的、
+          // `removeHabit` 早就有），界面上一个入口都没有 —— 于是"建错了改不了、
+          // 不想要了删不掉"，而这两件事 web 同样做不到（`deleteHabit` 在 store 里、
+          // 没有调用点）。零件都在、没人接线，就是这个形状。
+          {
+            icon: 'action.rename',
+            label: t('common.habits.rename.button', { name: selected.name }),
+            onPress: () => {
+              setRenamingId(selected.id);
+              setRenameDraft(selected.name);
+            },
+          },
+          {
+            icon: 'task.delete',
+            label: t('common.habits.delete.button', { name: selected.name }),
+            onPress: removeSelected,
           },
         ]}
       >
+        {renamingId === selected.id ? (
+          /*
+            改名编辑器留在宿主（与「新建习惯」的输入框同一条处置）：移动端的
+            `TextField` 有自己的规范（44px 字段高、label/placeholder 分离），
+            web 是 DOM `<input>`，强行共享会逼一个端放弃自己的输入控件。
+            ⚠️ 初值必须是**当前名字**（不是空串）：打开后直接保存会改成空名，
+            而动作层会抛错 —— 用户看到的是"点了保存没反应"。
+          */
+          <Card>
+            <TextField
+              label={t('common.habits.rename.label')}
+              value={renameDraft}
+              onChangeText={setRenameDraft}
+              autoCapitalize="sentences"
+            />
+            <Button
+              label={t('common.organizer.rename.save')}
+              tone="primary"
+              icon="action.keep"
+              disabled={busyId === selected.id}
+              onPress={saveRename}
+            />
+            <Button
+              label={t('common.organizer.rename.cancel')}
+              tone="secondary"
+              icon="action.close"
+              onPress={() => {
+                setRenamingId(null);
+              }}
+            />
+          </Card>
+        ) : null}
+        {/*
+          图标选择器（工单 H3）住在这里，不是 `HabitBoard` 的又一个插槽：
+          共享层再加一条可选 `renderIconSlot` 会把"宿主没接"伪装成"做完了"
+          （§7 第 195 条那个形状 —— typecheck 与既有门禁全绿），而这一格只有移动端要。
+          放在标题区之下、热力图之上，与 web 的"标题行右边那颗"是同一个读法：
+          它是**这条习惯**的属性，不是这一屏的工具。
+        */}
+        <Card>
+          <HabitIconSlot habit={selected} onChoose={(icon) => chooseIcon(selected, icon)} />
+          {/* 频次（工单 H5）与图标同一格：都是**这条习惯**的规则，不是这一屏的工具。 */}
+          <HabitFrequencySlot
+            habit={selected}
+            today={today}
+            onSet={(frequency) => chooseFrequency(selected, frequency)}
+          />
+        </Card>
+        {/*
+          「月 ⇄ 年」那一格（工单 H4 起，H7 加了年那一档）。为什么是**宿主直接挂**而不是给
+          `HabitBoard` 再加一条可选插槽：§7 第 195 条那个形状 —— "默认值等于原值的可选 prop"
+          会把"宿主没接"伪装成"做完了"，typecheck 与既有门禁全绿。
+          热力图回答"打过没有"，月历回答"哪天还能补"，年卡回答"这一月过成什么样"，
+          三件事不该挤在同一块板里，所以是三个组件而不是一个带开关的组件。
+        */}
+        <Card>
+          <HabitTrendBoard
+            habit={selected}
+            logs={logs}
+            today={today}
+            labels={trendLabels}
+            onCheckIn={(habitId, date) => {
+              runFor(habitId, actions.checkIn(habitId, date));
+            }}
+            onUndoCheckIn={(habitId, date) => {
+              runFor(habitId, actions.undoCheckIn(habitId, date));
+            }}
+            busy={busyId === selected.id}
+            testID="habit-trend"
+          />
+        </Card>
         <HabitBoard
           habits={[selected]}
           logs={logs}
           now={now}
           growth={habitGrowth}
           labels={labels}
-          onCheckIn={(habitId, date) => {
-            runFor(habitId, actions.checkIn(habitId, date));
+          onCheckIn={(habitId, date, value) => {
+            // 🔴 第三个参数**必须透传**（工单 W6）：数量行的「+」带的是明确数值，
+            //    漏在这里就等于移动端能看见"今天记了几格"却永远改不了它。
+            runFor(habitId, actions.checkIn(habitId, date, value));
           }}
           onUndoCheckIn={(habitId, date) => {
             runFor(habitId, actions.undoCheckIn(habitId, date));
@@ -351,7 +561,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         growth={habitGrowth}
         labels={listLabels}
         onSelect={(habitId) => {
-          setSelectedId(habitId);
+          selection.select('habit', habitId);
         }}
         testID="habit-list"
       />

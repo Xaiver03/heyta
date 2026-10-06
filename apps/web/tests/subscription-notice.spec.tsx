@@ -75,7 +75,7 @@ beforeEach(() => {
   useSyncStore.setState({
     baseUrl: 'https://sync.example.com',
     token: 'token-123',
-    settingsOpen: false,
+    syncSettingsRequested: false,
   });
 });
 
@@ -135,7 +135,7 @@ describe('托管同步到期', () => {
     await act(async () => {
       button!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
-    expect(useSyncStore.getState().settingsOpen).toBe(true);
+    expect(useSyncStore.getState().syncSettingsRequested).toBe(true);
   });
 
   /**

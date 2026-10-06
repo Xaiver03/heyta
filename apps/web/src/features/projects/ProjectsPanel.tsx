@@ -10,10 +10,10 @@ import { ICON_SIZE } from '@heyta/design-system';
  *   1. 文案（`web.projects.*` / `web.tags.*`）；
  *   2. 数据从哪来（`useProjectStore` / `useTaskStore`）；
  *   3. 平台特有物：DOM `<form><input>` + `<ColorSlotPicker>`；
- *   4. 点一行之后要做什么 —— **必须经由 `onSelect`，不能直接 `tasks.setFilter`**。
+ *   4. 点一行之后要做什么 —— **必须经由 `onFilterWith`，不能直接 `tasks.setFilter`**。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴 点清单必须经由 `onSelect`，不能直接 `tasks.setFilter`
+ * 🔴 点清单必须经由 `onFilterWith`，不能直接 `tasks.setFilter`
  *
  * 侧栏在**所有视图**下都渲染（任务 / 四象限 / 习惯 / 番茄 / 时间线 / 成长 / 设置），
  * 而清单筛选只对**任务视图**有意义。直接 `setFilter` 会让"人在习惯页、点某个清单"
@@ -49,12 +49,16 @@ import { ICON_SIZE } from '@heyta/design-system';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
-import { useI18n } from '@heyta/i18n';
-import { parseCategorySlot } from '@heyta/domain';
-import { Check, Folder, Plus, Tag as TagIcon } from 'lucide-react';
+import { useI18n, type MessageKey } from '@heyta/i18n';
+import { folderTargetsFor, parseCategorySlot } from '@heyta/domain';
+import { Archive, Check, Folder, Plus, Tag as TagIcon } from 'lucide-react';
 import {
+  archivedProjects,
+  FolderPicker,
+  folderRejectionMessageKey,
   HeytaUiProvider,
   OrganizerList,
+  liveTaskCountsByTag,
   openTagCounts,
   openTaskCounts,
   toOrganizerNodes,
@@ -67,20 +71,36 @@ import { useTaskStore, type TaskFilter } from '../tasks/store.js';
 import { useProjectStore } from './store.js';
 
 export function ProjectsPanel({
-  onSelect,
+  onFilterWith,
 }: {
   /** 用户选了某个清单 / 标签。宿主负责切视图并落筛选（见文件头）。 */
-  onSelect: (filter: TaskFilter) => void;
+  onFilterWith: (filter: TaskFilter) => void;
 }) {
   const { t } = useI18n();
   const projects = useProjectStore();
   const tasks = useTaskStore();
   const [draft, setDraft] = useState('');
+  /**
+   * 「移入文件夹」被领域层拒绝时那一句人话（候选集本来就按同一条规则筛过，
+   * 走到这里通常是**另一端刚改了这棵树**）。
+   * 🔴 不许吞：吞掉的后果是"点了没反应"，而数据什么都没变。
+   */
+  const [folderError, setFolderError] = useState('');
   const [tagDraft, setTagDraft] = useState('');
   // 输入框**默认不出现**（点标题右侧的 + 才展开）。与草稿分开存：
   // 收起不清草稿，重新点开还能接着打 —— 只有 Esc 才明确丢弃。
   const [addingProject, setAddingProject] = useState(false);
   const [addingTag, setAddingTag] = useState(false);
+  /**
+   * 「显示已归档」。默认关 —— 与迁移前那个选择器逐字一致（归档 = 从列表里消失）。
+   *
+   * 🔴 它不是装饰，是**归档这扇门的一半**：`toOrganizerTree` 不开这个开关就把
+   *    `archived === true` 全滤掉，而侧栏之外再没有已归档视图。少了这一半，
+   *    界面上每一次归档都是**单向门** —— 数据还在、也照样同步，就是永远回不来。
+   * ⚠️ 按钮只在真有一条已归档时出现：一个点开永远什么都不会变多的按钮，
+   *    是"这按钮是不是坏了"那种噪音。
+   */
+  const [showArchived, setShowArchived] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
 
   /*
@@ -110,7 +130,31 @@ export function ProjectsPanel({
   }, [addingProject, addingTag]);
 
   // 层级与计数口径都在共享层（`toOrganizerTree` / `openTaskCounts`）。
-  const tree = useMemo(() => toOrganizerTree(projects.projects), [projects.projects]);
+  const archivedCount = useMemo(
+    () => archivedProjects(projects.projects).length,
+    [projects.projects],
+  );
+  const tree = useMemo(
+    () => toOrganizerTree(projects.projects, { includeArchived: showArchived }),
+    [projects.projects, showArchived],
+  );
+  /**
+   * 「移入文件夹」的候选集 —— 与移动端调的是**同一个领域函数**
+   * （`folderTargetsFor` = `validateProjectParentChange` 的逐目标展开）。
+   * 两端各筛一遍迟早漂成两套标准，而漂移的症状是"手机上能选、电脑上不能选"。
+   */
+  const folderTargets = useMemo(
+    () =>
+      new Map(
+        projects.projects.map((project) => [
+          project.id,
+          folderTargetsFor(projects.projects, project.id),
+        ]),
+      ),
+    [projects.projects],
+  );
+  const parentOf = (id: string): string | undefined =>
+    projects.projects.find((project) => project.id === id)?.parentId ?? undefined;
   const tagNodes = useMemo(
     () => toOrganizerNodes(toTagItems(projects.tags)),
     [projects.tags],
@@ -129,6 +173,18 @@ export function ProjectsPanel({
     () => openTagCounts(Object.values(tasks.entities.tasks)),
     [tasks.entities.tasks],
   );
+  /**
+   * 删除确认里那句"它挂在几条任务上"（W4b）。
+   *
+   * 🔴 **不是** `tagCounts` 换个名字：那个滤掉了已完成的任务，而这个必须含 ——
+   * 一条挂满已完成任务的标签，删它照样会让那些任务失去归属，
+   * 用 `tagCounts` 顶替就会在界面上说"没有任务受影响"。口径只有一处
+   * （`@heyta/ui#liveTaskCountsByTag`），移动端拿的是同一个函数。
+   */
+  const tagRemoveImpact = useMemo(
+    () => liveTaskCountsByTag(Object.values(tasks.entities.tasks)),
+    [tasks.entities.tasks],
+  );
 
   /**
    * 清单 id → 当前色槽。渲染时按 id 查，而不是把 map 塞进行模型 ——
@@ -144,6 +200,21 @@ export function ProjectsPanel({
         <section>
           <div className="ht-sidebar__organizer-heading">
             <h2 className="ht-nav__section ht-type-group-label">{t('web.projects.heading')}</h2>
+            {archivedCount === 0 ? null : (
+              <button
+                type="button"
+                className="ht-sidebar__organizer-add"
+                aria-label={
+                  showArchived ? t('common.organizer.hideArchived') : t('common.organizer.showArchived')
+                }
+                aria-pressed={showArchived}
+                onClick={() => {
+                  setShowArchived((prev) => !prev);
+                }}
+              >
+                <Archive size={ICON_SIZE.sm} aria-hidden="true" />
+              </button>
+            )}
             <button
               type="button"
               className="ht-sidebar__organizer-add"
@@ -197,14 +268,31 @@ export function ProjectsPanel({
             counts={counts}
             labels={{
               removeLabel: (name) => t('web.projects.delete', { name }),
+              rename: {
+                button: (name) => t('common.organizer.rename.button', { name }),
+                save: t('common.organizer.rename.save'),
+                cancel: t('common.organizer.rename.cancel'),
+              },
+              archive: {
+                button: (name) => t('common.organizer.archive.button', { name }),
+                unarchive: (name) => t('common.organizer.archive.unarchive', { name }),
+              },
               // 空态此前**根本没接线**（共享层注释写着"宿主不传就什么都不渲染"），
               // 于是侧栏里一块空白被当成"这个功能没东西"。词条与移动端同一套
               // （`common.organizer.*`）—— 同一句话不许有两个端各写一份。
               empty: t('common.organizer.lists.empty'),
               emptyHint: t('common.organizer.lists.empty.hint'),
             }}
-            onSelect={(item) => {
-              onSelect({ kind: 'project', projectId: item.id });
+            onFilterWith={(item) => {
+              onFilterWith({ kind: 'project', projectId: item.id });
+            }}
+            onRename={(item, name) => {
+              void projects.renameProject(item.id, name);
+            }}
+            onArchive={(item, archived) => {
+              // 传的是**目标状态**（共享层按这一行的 `archived` 推出来的），
+              // 不是"切换一下" —— 两个写"归档"的按钮里有一个其实在取消归档。
+              void projects.archiveProject(item.id, archived);
             }}
             onRemove={(item) => {
               void projects.deleteProject(item.id);
@@ -214,16 +302,55 @@ export function ProjectsPanel({
               context.isChild ? null : <Folder size={ICON_SIZE.xs} aria-hidden="true" />
             }
             renderItemExtra={(item) => (
-              <ColorSlotPicker
-                value={slotOf(item.id)}
-                onChange={(slot) => {
-                  void projects.setProjectColor(item.id, slot);
-                }}
-                targetName={item.name}
-              />
+              <>
+                <ColorSlotPicker
+                  value={slotOf(item.id)}
+                  onChange={(slot) => {
+                    void projects.setProjectColor(item.id, slot);
+                  }}
+                  targetName={item.name}
+                />
+                {/*
+                  ✅ 「移入文件夹」用的是共享层**已有**的 `renderItemExtra` 插槽
+                  （取色入口本来就走这条）⇒ `OrganizerList` 的行骨架一行没改。
+                  候选集来自领域层，与移动端同一个函数，所以两端不会出现
+                  "这边能选那边不能选"。
+                */}
+                <FolderPicker
+                  item={item}
+                  candidates={(folderTargets.get(item.id) ?? []).map((target) => ({
+                    id: target.id,
+                    name: target.name,
+                  }))}
+                  currentParentId={parentOf(item.id)}
+                  labels={{
+                    button: (name) => t('common.organizer.folder.button', { name }),
+                    title: t('common.organizer.folder.title'),
+                    none: t('common.organizer.folder.none'),
+                    current: t('common.organizer.folder.current'),
+                  }}
+                  onSelect={(targetId) => {
+                    setFolderError('');
+                    void projects
+                      .setProjectParent(item.id, targetId)
+                      .catch((cause: unknown) => {
+                        setFolderError(t(folderRejectionMessageKey(cause) as MessageKey));
+                      });
+                  }}
+                  testID={`web-list-folder-${item.id}`}
+                />
+              </>
             )}
             testID="projects-list"
           />
+          {folderError === '' ? null : (
+            // 复用 `.ht-settings__danger`（定义在 `ai-panels.css` 那组共享选择器里）
+            // 而不是新造一个类 —— 新增 CSS 类会去动 `check:design` / 行样式单一来源那几道
+            // 棘轮，而这里需要的只是"一句红字"，不是新的视觉语汇。
+            <p className="ht-settings__danger" role="alert" data-testid="list-folder-failed">
+              {folderError}
+            </p>
+          )}
         </section>
 
         <section>
@@ -276,19 +403,39 @@ export function ProjectsPanel({
             🔴 标签名此前是一个**不可点的 `<span>`** —— 于是 `TaskFilter` 的
             `{ kind: 'tag' }` 分支虽然存在于共享层（`packages/domain/src/task-filter.ts`）
             并有单测，**却没有任何界面能把筛选切过去**。现在它与清单走同一份
-            `OrganizerList`，`onSelect` 必须传下去 —— 否则这个空洞会静默回来。
+            `OrganizerList`，`onFilterWith` 必须传下去 —— 否则这个空洞会静默回来。
           */}
           <OrganizerList
             kind="tag"
             items={tagNodes}
             counts={tagCounts}
+            removeImpact={tagRemoveImpact}
             labels={{
               removeLabel: (name) => t('web.tags.delete', { name }),
+              /*
+                标签**只接改名、不接归档**：`Tag` 领域实体里没有 `archived` 字段
+                （`Project` 有），所以这里没有"归档"这个意图可表达 —— 共享层
+                因此不渲染那个按钮（`labels.archive` 省略即不画）。
+              */
+              rename: {
+                button: (name) => t('common.organizer.rename.button', { name }),
+                save: t('common.organizer.rename.save'),
+                cancel: t('common.organizer.rename.cancel'),
+              },
+              confirmRemove: {
+                ask: (name) => t('common.organizer.confirm.ask', { name }),
+                impact: (count) => t('common.organizer.confirm.impactTags', { count }),
+                confirm: t('common.organizer.confirm.delete'),
+                cancel: t('common.organizer.confirm.cancel'),
+              },
               empty: t('common.organizer.tags.empty'),
               emptyHint: t('common.organizer.tags.empty.hint'),
             }}
-            onSelect={(item) => {
-              onSelect({ kind: 'tag', tagId: item.id });
+            onFilterWith={(item) => {
+              onFilterWith({ kind: 'tag', tagId: item.id });
+            }}
+            onRename={(item, name) => {
+              void projects.renameTag(item.id, name);
             }}
             onRemove={(item) => {
               void projects.deleteTag(item.id);

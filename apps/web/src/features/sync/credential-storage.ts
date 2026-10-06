@@ -46,6 +46,8 @@ export interface PersistedCredentials {
    * ⚠️ 它**不改变那条承诺**：口令（解密密钥）**绝不落盘**，本字段不是口令。
    */
   readonly email?: string;
+  /** Stable authenticated account id for vault scope binding. */
+  readonly accountId?: string;
 }
 
 /** 存储的最小接口（可注入，便于测隐私模式与写失败）。 */
@@ -95,7 +97,13 @@ export function loadCredentials(
     // 邮箱是**可选**的：老版本存下来的记录里没有它，不该因此被判成无效
     //（那会让所有老用户"莫名被登出"）。
     const email = record['email'];
-    return typeof email === 'string' && email !== '' ? { baseUrl, token, email } : { baseUrl, token };
+    const accountId = record['accountId'];
+    return {
+      baseUrl,
+      token,
+      ...(typeof email === 'string' && email !== '' ? { email } : {}),
+      ...(typeof accountId === 'string' && accountId !== '' ? { accountId } : {}),
+    };
   } catch {
     // 读不懂就清掉，避免每次启动都再失败一次。
     try {

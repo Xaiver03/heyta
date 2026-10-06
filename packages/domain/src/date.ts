@@ -33,6 +33,81 @@ export function toLocalDate(timestamp: number): LocalDate {
 }
 
 /**
+ * 一天里的**时刻**：`HH:MM`（24 小时、补零）。
+ *
+ * 与 `LocalDate` 完全同构的一条纪律：它是**本地墙上时间**的字符串形状，
+ * 不绑时区、也不是 epoch —— "这一天在本机是哪一个时刻"仍然只由
+ * `parseLocalDate` 一处回答，本类型只回答"那天几点几分"。
+ *
+ * 🔴 因此 `Task.dueDate`（epoch ms）**不需要新字段**：同一个数字落在本地零点
+ * 就是"只到日"，落在 16:00 就是"到时刻"。仓里早就有非零点的写入
+ * （`ticktick-import.ts`），只是界面一直没有能写它的地方。
+ */
+export type LocalTime = string;
+
+const MINUTES_PER_HOUR = 60;
+const MS_PER_MINUTE = 60_000;
+const HOURS_PER_DAY = 24;
+
+/**
+ * `9:30` / `09:30` → `09:30`；读不懂就返回 `undefined`，**不抛**。
+ *
+ * 用户手打的东西里出现 `16:99` 是常态，解析器该有的答案是"没读懂"
+ * （那段文字因此原样留在标题里），不是异常。
+ */
+export function parseLocalTime(text: string): LocalTime | undefined {
+  const m = /^(\d{1,2}):(\d{2})$/u.exec(text.trim());
+  if (m === null) return undefined;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (hour === undefined || minute === undefined) return undefined;
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return undefined;
+  if (hour >= HOURS_PER_DAY || minute >= MINUTES_PER_HOUR) return undefined;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/**
+ * 该时刻距**本地零点**多少毫秒。
+ *
+ * ⚠️ 只接受 `parseLocalTime` 的返回值。这里抛错是**程序错**，不是用户输入错 ——
+ * 与 `parseLocalDate` 同一分工（越界形状在上游就变成 `undefined` 了）。
+ */
+export function timeOfDayMs(time: LocalTime): number {
+  const m = /^(\d{2}):(\d{2})$/u.exec(time);
+  if (m === null) throw new Error(`非法时刻（应为 HH:MM，且只能由 parseLocalTime 产出）：${time}`);
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  return (hour * MINUTES_PER_HOUR + minute) * MS_PER_MINUTE;
+}
+
+/**
+ * "这条截止**只到日、没到时刻**"（= 落在本地零点）。
+ *
+ * 🔴 它是时间线「全天」带、日历归属、`DueEditor` 的时刻框**共用**的那一处判定。
+ *   以前这份判定住在 `packages/ui/src/timeline/board-model.ts`（`isAllDayMs`），
+ *   而输入侧现在也要问同一件事 —— 同一个问题的第二个回答就是漂移的开始。
+ *   秒与毫秒也一起判：只有 h/m 归零而 s/ms 没归零的时间戳**不是**"只到日"。
+ */
+export function isAllDayDueMs(timestamp: number): boolean {
+  const d = new Date(timestamp);
+  return (
+    d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0
+  );
+}
+
+/**
+ * 一个时间戳落在本地几点几分；**"只到日"返回 `undefined`**。
+ *
+ * 与 `isAllDayDueMs` 必须严格互斥（同一个输入不能一个说"全天"、另一个给出时刻），
+ * 所以它直接建立在那条判定上，而不是自己再读一次 `getHours()`。
+ */
+export function localTimeOf(timestamp: number): LocalTime | undefined {
+  if (isAllDayDueMs(timestamp)) return undefined;
+  const d = new Date(timestamp);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/**
  * 解析本地日历日为「本地零点的 Date」。
  *
  * 🔴 **必须校验范围，不能只校验格式。**
@@ -308,6 +383,37 @@ export function weekGrid(date: LocalDate): MonthGridCell[] {
     cells.push({ date: cellDate, inMonth: anchorPrefix === cellDate.slice(0, 7) });
   }
   return cells;
+}
+
+/**
+ * 一年十二个月。与 `DAYS_PER_WEEK` 同一类事实：
+ * 🔴 **它是"一年"的定义，不是一个可调的显示参数** —— 想改它得先改历法。
+ */
+export const MONTHS_PER_YEAR = 12;
+
+/** 当年 1 月 1 日。 */
+export function startOfYear(date: LocalDate): LocalDate {
+  const d = parseLocalDate(date);
+  return toLocalDate(new Date(d.getFullYear(), 0, 1).getTime());
+}
+
+/**
+ * 年视图那一年的 12 个月，**每一项都是那个月的 1 号**（`2026-01-01` … `2026-12-01`）。
+ *
+ * 🔴 入参是**这一年里的任意一天**，与 `monthGrid` / `weekGrid` 的游标约定同一条
+ *   （游标 = "这一段里的任意一天"，见 `calendarCursorFor`）。这里若要求传 1 月 1 日，
+ *   宿主就得自己再归一化一次 —— 那就是同一条规则的第二份实现，而它的漂移形状是
+ *   "端 A 显示 2026 全年、端 B 因为忘了归一化而显示 2025 的 2 月起"。
+ *
+ * ⚠️ 用 `addMonths` 而不是 `new Date(y, i, 1)` 直接拼：从 1 月 1 日出发加 i 个月，
+ *   `addMonths` 里那条"日夹到目标月最大天数"的规则**天然不会触发**（1 号在哪儿都存在），
+ *   于是这一列月份与"翻月"用的是同一份数学，而不是另一套看着也对的拼法。
+ */
+export function monthsOfYear(date: LocalDate): LocalDate[] {
+  const janFirst = startOfYear(date);
+  const months: LocalDate[] = [];
+  for (let i = 0; i < MONTHS_PER_YEAR; i += 1) months.push(addMonths(janFirst, i));
+  return months;
 }
 
 /**

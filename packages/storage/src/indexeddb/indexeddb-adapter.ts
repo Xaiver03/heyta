@@ -27,6 +27,7 @@ import type {
   DbAdapter,
   DbCursorAction,
   DbCursorVisitor,
+  DbDestroyReport,
   DbIndexQuery,
   DbIterateOptions,
   DbKey,
@@ -37,7 +38,7 @@ import type {
   StoreSchema,
 } from '../db.types.js';
 import { assertIterateLimit } from '../db.types.js';
-import { StorageError, asStorageError, storageError } from '../errors.js';
+import { AdapterDestroyedError, StorageError, asStorageError, storageError } from '../errors.js';
 import {
   ALL_STORES,
   OP_FIELDS,
@@ -198,6 +199,12 @@ export class IndexedDbAdapter implements DbAdapter {
   private db: IDBDatabase | undefined;
   private opening: Promise<IDBDatabase> | undefined;
 
+  /** 销毁即死路 —— 理由与 `sqlite-adapter.ts` 的 `destroyed` 那段相同（E2 口径 B）。 */
+  private destroyed = false;
+
+  /** 第二次 `destroy()` 用这份缓存，不再跑一遍 `deleteDatabase`。 */
+  private destroying: Promise<DbDestroyReport> | undefined;
+
   constructor(private readonly dbName: string = 'heyta') {}
 
   init(): Promise<void> {
@@ -211,6 +218,10 @@ export class IndexedDbAdapter implements DbAdapter {
    * 否则并发 init 会开多个连接，而 upgrade 事务在多个连接间会互相阻塞。
    */
   private open(): Promise<IDBDatabase> {
+    // 🔴 E2 口径 B 的落点：`deleteDatabase` 之后任何一次普通读都会走到这里，
+    // 而 `indexedDB.open` 是**创建**语义 —— 库会带着全套 store 重新出现。
+    // 此前这里没有守卫，于是"销毁成功"与"容器被重建"在同一次运行里都会发生。
+    if (this.destroyed) return Promise.reject(new AdapterDestroyedError(this.dbName));
     if (this.db !== undefined) return Promise.resolve(this.db);
     if (this.opening !== undefined) return this.opening;
 
@@ -241,6 +252,20 @@ export class IndexedDbAdapter implements DbAdapter {
         this.db = request.result;
         // 连接被外部关闭（如浏览器回收）时清掉缓存，下次调用会重开
         request.result.onclose = () => {
+          this.db = undefined;
+          this.opening = undefined;
+        };
+        // 🔴 **让位**给别人的 `deleteDatabase`（或升版本）。浏览器在执行删除前会给
+        // 所有既有连接发 `versionchange`；**不接这个事件 = 那次删除永远停在 blocked**。
+        // 这条不是假想：注销路径上销毁器开的是**另一个** `IndexedDbAdapter` 实例
+        // （`apps/web/src/lib/local-data-destruction.ts:262`），而活连接握在应用手里
+        // （`oplog.ts:135` 的主库、`vault-session.ts:69` 的 `heyta-vault`）。
+        // 没有下面三行，Web 的"当场清掉本机明文"会**挂住不返回** ——
+        // 而挂住不返回在界面上长得像"正在注销"，什么都不报。
+        // 与 `tests/destroy.spec.ts` 那条"别的连接占着 ⇒ destroy 不许 resolve"是同一机制的
+        // 两面：那一面证明"不让位就会挡住"，这一面（`本适配器自己不许挡住`）钉"我们让位"。
+        request.result.onversionchange = () => {
+          request.result.close();
           this.db = undefined;
           this.opening = undefined;
         };
@@ -397,8 +422,10 @@ export class IndexedDbAdapter implements DbAdapter {
           : req(store(s).put(value, key)).then(() => undefined),
       get: <T,>(s: string, key: DbKey) =>
         req(store(s).get(key)) as Promise<T | undefined>,
-      getAll: <T,>(s: string, range?: DbKeyRange) =>
-        req(store(s).getAll(buildRange(range))) as Promise<T[]>,
+      getAll: <T,>(s: string, range?: DbKeyRange, limit?: number) => {
+        assertIterateLimit(limit);
+        return req(store(s).getAll(buildRange(range), limit)) as Promise<T[]>;
+      },
       delete: (s, key) => req(store(s).delete(key)).then(() => undefined),
       clear: (s) => req(store(s).clear()).then(() => undefined),
       count: (s, range?: DbKeyRange) => req(store(s).count(buildRange(range))),
@@ -481,8 +508,8 @@ export class IndexedDbAdapter implements DbAdapter {
     return this.transaction([store], 'readonly', (tx) => tx.get<T>(store, key));
   }
 
-  async getAll<T>(store: string, range?: DbKeyRange): Promise<T[]> {
-    return this.transaction([store], 'readonly', (tx) => tx.getAll<T>(store, range));
+  async getAll<T>(store: string, range?: DbKeyRange, limit?: number): Promise<T[]> {
+    return this.transaction([store], 'readonly', (tx) => tx.getAll<T>(store, range, limit));
   }
 
   async delete(store: string, key: DbKey): Promise<void> {
@@ -550,16 +577,45 @@ export class IndexedDbAdapter implements DbAdapter {
     });
   }
 
-  /** 删除整个数据库。测试与"清除所有数据"用。 */
-  async destroy(): Promise<void> {
-    this.close();
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase(this.dbName);
-      request.onsuccess = () => resolve();
-      request.onerror = () =>
-        reject(storageError(request.error, '删除数据库失败', { kind: 'request-failed' }));
-      request.onblocked = () => resolve(); // 有其它连接时也可能成功
+  /**
+   * 删除整个数据库（`indexedDB.deleteDatabase`）。
+   *
+   * 🔴 `onblocked` **以前是 `resolve()` 的，那是假凭据**：blocked 的含义是
+   * "还有别的标签页/窗口持有连接，删除请求排在它后面"，此刻数据库**还在**。
+   * 当场 resolve 会让销毁报告在"什么都没删掉"的情况下说"删了"，
+   * 而调用方拿到的正是那句用来对用户承诺的话。
+   * 现在 blocked 只是**等待**：决议只来自 onsuccess / onerror。
+   *
+   * ⚠️ 代价要想清楚：另一个标签页永不关闭时，这个 Promise 会一直挂着。
+   * 这是**诚实的**挂起（"我还没做到"），而不是虚假的完成（"我做到了"）。
+   * 宿主如果要给用户一个期限，应该在**调用这一层的界面**上做超时并说
+   * "另有一个窗口开着，关掉它才能清干净" —— 那不是这一层能替用户决定的事。
+   */
+  async destroy(): Promise<DbDestroyReport> {
+    if (this.destroying !== undefined) return this.destroying;
+    this.destroyed = true;
+    const pending = (async (): Promise<DbDestroyReport> => {
+      this.close();
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.deleteDatabase(this.dbName);
+        request.onsuccess = () => resolve();
+        request.onerror = () =>
+          reject(storageError(request.error, '删除数据库失败', { kind: 'request-failed' }));
+        request.onblocked = () => {
+          // 什么都不做：等 onsuccess。见上面那段。
+        };
+      });
+      return { target: this.dbName, containerRemoved: true, storesCleared: ALL_STORES.length };
+    })();
+    // 🔴 失败要把闸门撤回去：`destroyed` 只在**真的删掉了**之后才成立。
+    // 被别的标签页堵住而最终 `onerror` 时，这份库还在盘上，实例不该假装自己作废了
+    // （否则"销毁失败"会表现成"这个应用从此不能用"，而正确处置是重试）。
+    this.destroying = pending.catch((error: unknown) => {
+      this.destroyed = false;
+      this.destroying = undefined;
+      throw error;
     });
+    return this.destroying;
   }
 }
 

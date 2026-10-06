@@ -1,7 +1,7 @@
 import { ICON_SIZE } from '@heyta/design-system';
 /**
- * 同步状态条（web 外壳）
- * ========================
+ * 同步那一枚（web 外壳，rail 底部）
+ * ==================================
  *
  * 计划 3.3 的判据：**界面能看出"已同步 / 同步中 / 冲突 / 离线"**。
  *
@@ -10,385 +10,161 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 而这两者的用户动作完全不同（等待 vs 去修设置）。
  *
  * ═════════════════════════════════════════════════════════════════════════
- * 🔴 M3 第四刀之后，这里**只剩 web 特有的那一层**
+ * 🔴 这个文件现在**只剩 rail 底部那一枚 + 认证面板的挂载点**
  *
- * 两个平台共有的部分已经收进 `@heyta/ui`：
+ * 2026-10-06 两刀之后：
  *
- *   · `SyncStatusBar` —— 状态条骨架（字形 + 文字 + live region）；
- *   · `syncStatusSeverity` / `syncStatusColorToken` / `syncStatusGlyph` /
- *     `syncStatusAffordances` —— 状态 → 严重度/颜色/字形/可用动作的**唯一**映射。
+ *   · **H9 第 1 刀**：同步这一组从页头搬进 rail 底部（裁决与现量在
+ *     `docs/plans/goal-layout-audit.md` §9.1 第 1 行）。
+ *   · **H9 第 3 刀**：「同步设置」不再是浮层 —— 表单、状态条、密钥面板、
+ *     「查看帮助」全部住进 **设置 → 同步** 那一节
+ *     （`features/sync/SyncSettingsPanel.tsx`），rail 上那颗齿轮一起删掉。
+ *     产品负责人第 2 条（「设置不应该点击头像之后再打开吗？」）的病根就是
+ *     那颗齿轮**长得像**全局设置。
  *
  * 本文件只负责：
- *   · **措辞**（`describeSyncStatus`：下载与上传是两句话，冲突要分单复数）；
- *   · **按钮本体**（web 的 `ht-btn` 与真实 `<a>` 导航，RN 侧没有对应物）；
- *   · **同步设置对话框**与认证面板（那是另一件事，不在"状态条"里）。
+ *   · rail 那一枚（状态可读、冲突可点、同步中不可再点）；
+ *   · `AuthPanel` 的**唯一**挂载点（触发者有两处，见下面 `authOpen` 的注释）。
  *
- * 🔴 一处**修好的漂移**：状态 → 颜色的映射此前 web 与 mobile 各有一份，
- * 而 `offline` 在 web 是警示色、在 mobile 是中性 —— 同一个状态在两端
- * 呈现成两种态度，且没有任何测试会红。现在统一走共享 model
- * （选的是"离线不是错误"那一版，理由见 `packages/ui/src/sync/model.ts`）。
+ * 措辞在 `status-copy.ts`（rail 与设置里那一节共用**一份**），
+ * 状态 → 严重度/颜色/字形/可用动作的映射在 `@heyta/ui`（四端共用一份）。
  *
  * ═════════════════════════════════════════════════════════════════════════
- * 🔴 `HeytaUiProvider` 是**本文件自己挂**的
+ * 🔴 原本挂在这里的 `<HeytaUiProvider>` 跟着状态条搬走了
  *
- * 共享状态条透过 `useHeytaTokens` 取 token，缺 Provider 会**运行时抛错**。
- * `apps/web/src/App.tsx` 的 Provider 都挂在各视图局部，而 `<SyncBar/>`
- * 挂在顶栏 —— **不在任何一棵子树里**。`App.tsx` 不在本刀白名单里，
- * 所以在自己的入口挂是最小且不越界的一步。
- *
- * ✅ `SyncStatusBar` 已登记进 `scripts/check-ui-provider.mjs` 的
- * `PROVIDER_DEPENDENT` 清单：把这层 `<HeytaUiProvider>` 拆掉会让那道门禁
- * **变红并指名道姓**（"SyncBar.tsx:136 —— 组件 <SyncStatusBar>"，已故障注入实测）。
- * 第四刀刚落地时它**没登记**、门禁照样全绿，那是这批新组件唯一的覆盖缺口；
- * 已补齐，别再把这一层当成"手工保证"。
+ * 共享状态条透过 `useHeytaTokens` 取 token，缺 Provider 会**运行时抛错**；
+ * `scripts/check-ui-provider.mjs` 的 `PROVIDER_DEPENDENT` 清单认的是**符号**
+ * （`SyncStatusBar`），所以它现在盯的是 `SyncSettingsPanel.tsx` 里那一层。
+ * 把那里那层 Provider 拆掉，这道门禁会**变红并指名道姓**（已故障注入实测）。
  */
 
-import { useEffect, useState } from 'react';
-import { cssVar } from '@heyta/design-system';
-import { useI18n, type I18nValue } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n';
 import { useSyncStore } from './store.js';
 import type { HostedAuthSession } from '@heyta/app-host';
-import { HeytaUiProvider, SyncStatusBar, syncFailureMessageKey, syncStatusAffordances, type SyncStatusLike } from '@heyta/ui';
-import { RefreshCw, Settings, X } from 'lucide-react';
+import { syncStatusAffordances, syncStatusGlyph, syncStatusSeverity } from '@heyta/ui';
+import { AlertTriangle, CheckCircle2, CloudOff, RefreshCw } from 'lucide-react';
 
 import { AuthPanel } from '../auth/AuthPanel.js';
-import { HELP_SYNC_ANCHOR, siteLink } from '../../lib/site-url.js';
+import { describeSyncStatus } from './status-copy.js';
 
 /**
- * 服务端地址的示例。**不是文案，是 URL 字面量。**
+ * 共享那份字形族 → web 的 `lucide-react` 组件。
  *
- * URL 两种语言完全一样，不该翻译；而 zh 词条被门禁要求"必须含汉字"，
- * 一个纯 URL 词条放不进词条表。所以它在这里作为**具名常量**存在 ——
- * 直接把这个字面量写进输入的 placeholder 属性会被迁移模式判成"硬编码文案"，
- * 而它其实是数据（用户要照着填的地址格式）。
+ * 🔴 映射本身**不在这里判断**（`syncStatusGlyph` 是唯一事实源，mobile 走同一份）；
+ * 这里只是把名字落成组件 —— 与 `habit-glyphs.ts` 那半张表同一条分工。
+ * `spinner` 用 `RefreshCw` 配一条旋转动画（共享层那边是 `ActivityIndicator`）。
  */
-const SERVER_URL_EXAMPLE = 'http://127.0.0.1:3000';
-
-/**
- * 同步状态 → 用户能读、能行动的句子。
- *
- * 🔴 这段话原先由 `features/sync/store.ts` 的 `describeStatus` 在**非 UI 层**
- * 拼成中文返回，组件直接渲染 —— 英文界面因此永远显示中文。
- * 现在按"state 只带数据、句子在壳里拼"的纪律全部搬到这里：
- * `SyncStatus` 本身是结构化的判别联合，措辞属于壳。
- *
- * ⚠️ **哪些状态、哪些动作**不在这里判断：那是 `@heyta/ui` 的
- * `syncStatusAffordances`（有单测）。这里只把状态说成人话。
- *
- * ⚠️ `error.message` 其余情况仍是**数据**（来自网络或服务端的技术串），
- * 原样带进句子里，不编也不映射。
- */
-function describeSyncStatus(status: SyncStatusLike, t: I18nValue['t']): string {
-  switch (status.kind) {
-    case 'idle':
-      return t('web.sync.status.idle');
-    case 'syncing':
-      // 下载与上传是两件事，措辞必须分开。
-      return status.phase === 'download'
-        ? t('web.sync.status.downloading')
-        : t('web.sync.status.uploading');
-    case 'synced':
-      return t('web.sync.status.synced');
-    case 'offline':
-      return t('web.sync.status.offline');
-    case 'conflict': {
-      // 🔴 词条表没有 ICU：1 处冲突是最常见的情形，必须分支到单数兄弟词条。
-      // 不写 `t(count === 1 ? 'a' : 'b')` —— 那样两种形状都认不出（见门禁文件头）。
-      const count = status.conflicts?.length ?? 0;
-      if (count === 1) return t('web.sync.status.conflictOne', { count });
-      return t('web.sync.status.conflict', { count });
-    }
-    case 'error': {
-      // 🔴 已知原因：**整句**走词条，映射只有一处（`@heyta/ui` 的
-      // `syncFailureMessageKey`，与移动端共用）。不要退回成
-      // `t('web.sync.status.errorRetryable', { message: status.message })` ——
-      // 那会把包里的中文插进英文句子里（中英混排），而门禁扫不到这种变量渲染。
-      const known = syncFailureMessageKey(status.reason);
-      if (known !== undefined) return t(known);
-      // 意外异常：`message` 是诊断数据（不是文案），当参数带进来。
-      return t('web.sync.status.errorRetryable', { message: status.message ?? '' });
-    }
-  }
-}
+const GLYPH_COMPONENTS = {
+  check: CheckCircle2,
+  'cloud-off': CloudOff,
+  alert: AlertTriangle,
+  spinner: RefreshCw,
+} as const;
 
 export function SyncBar() {
   const { t } = useI18n();
   const sync = useSyncStore();
   const affordances = syncStatusAffordances(sync.status);
+  const statusText = describeSyncStatus(sync.status, t);
+  const severity = syncStatusSeverity(sync.status);
+  const Glyph = GLYPH_COMPONENTS[syncStatusGlyph(sync.status)];
   /**
-   * 对话框的开合状态**在 `useSyncStore` 里**，不是这里的局部 state ——
-   * 订阅提示的「改用你自己的服务器」也要打开它（见 store 里的注释）。
-   */
-  const open = useSyncStore((s) => s.settingsOpen);
-  const [baseUrl, setBaseUrl] = useState(sync.baseUrl ?? '');
-  const [token, setToken] = useState('');
-  const [password, setPassword] = useState('');
-
-  /**
-   * 🔴 对话框**打开时**把三个输入框对齐到已保存的配置。
+   * 注册 / 登录面板的开合**在 `useSyncStore` 里**，不是这里的局部 state：
    *
-   * 这几个 state 的初值只在 SyncBar **挂载那一刻**取一次，而 SyncBar 是常驻的
-   * 顶栏组件 —— 于是它们会长期停在一个过期的快照上：
-   *
-   *   · 冷启动（尤其刚清过存储的新设备）`sync.baseUrl` 还是空的，
-   *     之后登录虽然写进了 store，**这里不会自己更新**；
-   *   · `token` 的初值恒为空串。
-   *
-   * 后果不是"显示不对"这么轻：点「保存并同步」会走
-   * `sync.configure(baseUrl, token, password)`，把**空地址**写进内存配置 ——
-   * 同步当场变成"还没配置"（`configure` 只在两者都非空时才落盘，
-   * 所以磁盘上的凭据还在，刷新一次又能好 —— 这正是最难归因的那种形态）。
-   *
-   * 实测（2026-09-30，Windows 桌面壳旅程验收 W3）：用户能走到的路径正是
-   * 「点头像 → 登录 / 注册 → 打开同步设置 → 补端到端加密口令 → 保存并同步」，
-   * 而口令**从不落盘**，所以每个新会话都要用户再走一次。
-   *
-   * 口令也一起对齐：它只在内存里，而真值就在 store 里。
-   * 不这样，一次"打开设置 → 保存"就会把刚建立的口令抹成空串。
-   *
-   * ⚠️ 只在 `open` 翻转时播种（用 `getState()` 取当下值，不把 store 放进依赖）：
-   *    否则用户在输入框里打字时，任何一次 store 更新都会把他的输入覆盖掉。
-   */
-  useEffect(() => {
-    if (!open) return;
-    const current = useSyncStore.getState();
-    setBaseUrl(current.baseUrl ?? '');
-    setToken(current.token ?? '');
-    setPassword(current.password ?? '');
-  }, [open]);
-  /**
-   * 认证面板的开合。
-   *
-   * 🔴 它在**同步设置对话框里面**打开，而不是另做一个更靠前的入口：
-   * 认证要用的服务端地址就是这里的地址，两者分开会让用户对着 A 登录、
-   * 把令牌存到 B。
-   *
-   * 🔴 2026-09-29 起**状态在 store 里**（`signInOpen`）：入口搬进了
-   * rail 顶部的账号区（`AccountMenu`），触发者在这里之外 —— 与
-   * `settingsOpen` 同一条搬家理由（两个组件要开同一块面板）。
+   * 🔴 2026-09-29 起它是 store state，因为入口搬进了 rail 顶部的账号区
+   *    （`AccountMenu`，未登录时「登录 / 注册」是菜单第一项）—— 触发者在 A、
+   *    面板在 B，局部 state 够不着。
+   * 🔴 2026-10-06（H9 第 3 刀）之后**第二个**入口是 设置 → 同步 里的
+   *    「登录 / 注册」按钮。两处都必须能开**同一块**面板，所以挂载点仍只有一处。
    */
   const authOpen = useSyncStore((s) => s.signInOpen);
 
   return (
     <>
-      {/* 🔴 状态条骨架来自共享层。上面那层 Provider 见文件头
-          （顶栏不在任何一棵 Provider 子树里）。 */}
-      <HeytaUiProvider>
-        <SyncStatusBar
-          status={sync.status}
-          labels={{ status: (status) => describeSyncStatus(status, t) }}
-          testID="sync-status-bar"
-          actions={
-            <>
-              {/*
-                🔴 W2（注册/登录前置）：入口**搬进了 rail 顶部账号区的头像菜单**
-                （2026-09-29 撤掉顶栏那块大主按钮；2026-09-30 又撤掉头像旁边
-                那个 pill —— 产品负责人："应该是点击头像出来注册、登录吧？"）。
-                `AccountMenu` 在未登录时把「登录 / 注册」渲染成菜单**第一项**
-                （同一个 `sync-signin-entry` testID），开合状态在 store 的
-                `signInOpen`。这里**不再**渲染第二个入口。
-              */}
+      {/*
+        🔴 2026-10-06（工单 H9）：同步这一组从**页头**搬进 **rail 底部**，形状也从
+        "图标 + 文字的状态条"收成 48px 装得下的一枚。理由不是审美：页头那一排已经成了
+        六个不相关控件的平铺（状态 / 立即同步 / 同步设置 / 语言 / 登录 / 主题），
+        而"同步"在滴答里是左下角的东西。负责人原话与逐条现量在
+        `docs/plans/goal-layout-audit.md` §9.1 第 1 行。
 
-              {/* 冲突需要一个**看得见的入口**：关掉对话框之后，
-                  用户还得能再打开它，否则问题就从"没法解决"变成"看不见了" */}
-              {affordances.needsResolution ? (
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--primary"
-                  onClick={sync.openConflictDialog}
-                >
-                  {t('web.sync.resolveConflicts')}
-                </button>
-              ) : null}
+        状态条原本负责的三件事，一件都不许因为"变小"而丢：
+        1. **状态要说得出**：整句状态进 `aria-label`，另有一枚 `role="status"` +
+           `aria-live="polite"` 的 live region 承担"异步变化要播报"。
+           hover 时那句状态也看得见（复用 rail 既有的 `.ht-rail__label` 机制，
+           不新造一套 tooltip）。
+        2. **冲突要看得见**：`needsResolution` 时这枚的**点击语义改成打开冲突对话框** ——
+           有冲突时用户下一步要的是"处理"，不是"再同步一次"。原来那颗
+           「处理冲突」主按钮因此不再单独存在（48px 里放不下两枚主按钮），
+           而"关掉对话框之后还得能再打开它"这条由"同一枚按钮 + 警示态"兑现。
+        3. **同步中不可再点**：沿用共享的 `syncStatusAffordances`，不在这里另判一次。
 
-              {/*
-                🔴 出错时才给「查看帮助」，而且**直接落到「同步」那一问**上
-                （`/help#sync`），不是帮助页顶部 —— 报错的人要找的就是那一篇，
-                让他再找一次是把成本从我们这边挪到他那边。
-                只在 `error` 分支出现（`showsHelp`），是因为"没配置同步""没登录"
-                这两种状态旁边本来就有可以点的出路（设置 / 登录），
-                再给一条帮助链接会稀释那两条真正的出路。
-              */}
-              {affordances.showsHelp ? (
-                <a
-                  className="ht-btn ht-btn--ghost"
-                  href={siteLink(HELP_SYNC_ANCHOR)}
-                  rel="noopener noreferrer"
-                  data-testid="sync-help-link"
-                >
-                  {t('web.sync.help.link')}
-                </a>
-              ) : null}
+        ⚠️ 外层必须是 `<div>` 而不是把按钮直接摊进 `<nav>`：rail 的贴底靠
+        `.ht-rail__tab--tool:first-of-type { margin-top: auto }`，而 `:first-of-type`
+        选的是父元素里**第一个 `<button>`**（`App.tsx` 里铃铛那段注释是同一条纪律）。
+        同理，**这一列里的按钮一律不带 `--tool`**：带了就会在 `<div>` 内部再匹配一次
+        `:first-of-type`，把第一枚往下推。
 
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
-                aria-label={t('web.sync.a11y.syncNow')}
-                disabled={!affordances.canSyncNow}
-                onClick={() => {
-                  void sync.syncNow();
-                }}
-              >
-                <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
-              </button>
+        ⚠️ 字形与颜色**不在这份文件里判断**：`syncStatusGlyph` / `syncStatusSeverity`
+        是 `@heyta/ui` 那份唯一映射（web 与 mobile 各一份的历史事故见文件头）。
 
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
-                aria-label={t('web.sync.settings.title')}
-                onClick={sync.openSettings}
-              >
-                <Settings size={ICON_SIZE.xs} aria-hidden="true" />
-              </button>
-            </>
-          }
-        />
-      </HeytaUiProvider>
-
-      {open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('web.sync.settings.title')}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            display: 'grid',
-            placeItems: 'center',
-            background: cssVar('color.overlay'),
-            // 模态是真正的浮层 —— 这里用阴影是对的
-            zIndex: cssVar('z.modal'),
+        ⚠️ H9 第 3 刀之后这一列**只有这一枚按钮**：齿轮（同步设置）与「查看帮助」
+        都跟着表单住进 设置 → 同步 了。
+      */}
+      <div className="ht-rail__sync" data-testid="sync-rail" data-severity={severity}>
+        <button
+          type="button"
+          className="ht-rail__tab ht-rail__sync__action"
+          aria-label={t('web.sync.rail.aria', { status: statusText })}
+          data-testid="sync-rail-action"
+          disabled={!affordances.canSyncNow && !affordances.needsResolution}
+          onClick={() => {
+            if (affordances.needsResolution) {
+              sync.openConflictDialog();
+              return;
+            }
+            void sync.syncNow();
           }}
         >
-          <div
-            style={{
-              background: cssVar('color.surface-raised'),
-              borderRadius: cssVar('radius.lg'),
-              boxShadow: cssVar('shadow.lg'),
-              padding: cssVar('space.6'),
-              minWidth: cssVar('layout.content-max'),
-              maxWidth: '90vw',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: cssVar('space.3'),
-              color: cssVar('color.foreground'),
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontSize: cssVar('font-size.lg') }}>
-                {t('web.sync.settings.title')}
-              </h2>
-              <button
-                type="button"
-                onClick={sync.closeSettings}
-                aria-label={t('web.sync.settings.close')}
-                className="ht-btn ht-btn--ghost"
-                style={{ marginLeft: 'auto' }}
-              >
-                <X size={ICON_SIZE.sm} aria-hidden="true" />
-              </button>
-            </div>
-
-            <label style={labelStyle}>
-              {t('web.sync.serverUrl.label')}
-              <input
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder={SERVER_URL_EXAMPLE}
-                style={fieldStyle}
-              />
-            </label>
-
-            <label style={labelStyle}>
-              {t('web.sync.token.label')}
-              <input
-                type="password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                autoComplete="off"
-                style={fieldStyle}
-              />
-            </label>
-
-            {/* 「令牌从哪来」的入口。手填**保留**（自建用户可能已有令牌），
-                这里只是补上一条不必手填的路。 */}
-            <p style={hintStyle}>{t('web.auth.tokenHint')}</p>
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
-              style={{ alignSelf: 'flex-start' }}
-              onClick={() => sync.openSignIn()}
-            >
-              {t('web.auth.open')}
-            </button>
-
-            <label style={labelStyle}>
-              {t('web.sync.password.label')}
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                style={fieldStyle}
-              />
-            </label>
-
-            <p
-              style={{
-                margin: 0,
-                fontSize: cssVar('font-size.2xs'),
-                color: cssVar('color.foreground-muted'),
-                lineHeight: cssVar('line-height.normal'),
-              }}
-            >
-              {t('web.sync.password.lead')}
-              <strong>{t('web.sync.password.strong')}</strong>
-              {t('web.sync.password.tail')}
-            </p>
-
-            <div style={{ display: 'flex', gap: cssVar('space.2'), justifyContent: 'flex-end' }}>
-              {/*
-                🔴 2026-09-30 撤掉了这里的「清除凭据」按钮。
-                它和头像菜单里的「退出登录」是**同一个动作**（都走
-                `sync.clearCredentials()`），却：名字不同、视觉分量不同
-                （ghost 排在主按钮**之前**）、**未登录时也照常渲染**
-                （点了纯空操作 —— 那正是"给一个按不出效果的按钮"）。
-                产品负责人 2026-09-30 拍板的 IA 是**身份入口唯一**：
-                身份动作长在身份区（头像菜单），所以这里不再重复一个。
-                要断开这台设备 → 点头像 → 退出登录。
-              */}
-              <button
-                type="button"
-                className="ht-btn ht-btn--primary"
-                onClick={() => {
-                  sync.configure(baseUrl, token, password);
-                  sync.closeSettings();
-                  void sync.syncNow();
-                }}
-              >
-                {t('web.sync.saveAndSync')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          <span className="ht-rail__sync__icon" aria-hidden="true">
+            <Glyph
+              size={ICON_SIZE.sm}
+              className={severity === 'progress' ? 'ht-rail__sync__spin' : undefined}
+            />
+            <span
+              className={`ht-rail__sync__dot ht-rail__sync__dot--${severity}`}
+              data-testid="sync-status-dot"
+            />
+          </span>
+          <span className="ht-rail__label ht-type-caption" aria-hidden="true">
+            {statusText}
+          </span>
+        </button>
+        {/* live region 与上面那枚 hover 标签是**两个元素**：标签 `aria-hidden`，只服务眼睛；
+            这句只服务读屏，视觉上被收成 1 个像素见 `rail.css`。 */}
+        <span className="ht-rail__sync__status" role="status" aria-live="polite">
+          {statusText}
+        </span>
+      </div>
 
       {authOpen ? (
         <AuthPanel
           /**
-           * 🔴 地址来源取决于**从哪进来的**（W2）：
-           *   · 对话框开着时用它的输入框 —— 用户可能刚改过地址还没保存，
-           *     认证就该用他眼前那个值（原来的行为，保持不变）；
-           *   · 从**顶栏**进来时用**已保存的** `sync.baseUrl` —— 顶栏不该读到
-           *     对话框里未提交的草稿。若它为空，`AuthPanel` 会自己显示地址输入。
+           * 🔴 地址来源取决于**从哪儿进来的**（W2）：
+           *   · 从 **设置 → 同步** 那一节进来时用**输入框里的草稿** —— 用户可能
+           *     刚改过地址还没保存，认证就该用他眼前那个值（原来的行为，保持不变）；
+           *   · 从**头像菜单**进来时用**已保存的** `sync.baseUrl` —— 那一处没有
+           *     草稿可读。若它为空，`AuthPanel` 会自己显示地址输入。
            * 两种情况都只有**一个**地址来源，认证与同步永远指向同一个服务端。
+           * 「那一节在不在屏幕上」由面板自己的挂载 effect 写进
+           * `syncDraftShown`（见 `SyncSettingsPanel.tsx` 文件头）。
            */
-          baseUrl={open ? baseUrl : sync.baseUrl}
+          baseUrl={sync.syncDraftShown ? sync.syncDraft.baseUrl : sync.baseUrl}
           onClose={() => sync.closeSignIn()}
           onSignedIn={(session: HostedAuthSession) => {
-            // 认证 store 已经把令牌写进了同步配置；这里把**这个对话框的输入框**
+            // 认证 store 已经把令牌写进了同步配置；这里把**那一节的输入框**
             // 也对齐，否则用户接着点「保存并同步」会用空输入框把它覆盖掉。
-            setToken(session.token);
+            sync.setSyncDraft({ token: session.token });
             sync.closeSignIn();
           }}
         />
@@ -396,31 +172,3 @@ export function SyncBar() {
     </>
   );
 }
-
-const labelStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: cssVar('space.1'),
-  fontSize: cssVar('font-size.2xs'),
-  color: cssVar('color.foreground-muted'),
-};
-
-/** 字段下方的说明句 —— 比标签更轻，但仍然可读。 */
-const hintStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: cssVar('font-size.2xs'),
-  color: cssVar('color.foreground-muted'),
-  lineHeight: cssVar('line-height.normal'),
-};
-
-const fieldStyle: React.CSSProperties = {
-  minHeight: cssVar('touch-target.min'),
-  padding: `0 ${cssVar('space.2')}`,
-  borderRadius: cssVar('radius.md'),
-  border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-  background: cssVar('color.background'),
-  color: cssVar('color.foreground'),
-  // ≥16px，否则 iOS 聚焦时自动放大页面
-  fontSize: cssVar('font-size.base'),
-  fontFamily: cssVar('font.sans'),
-};

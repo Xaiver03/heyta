@@ -33,6 +33,7 @@ import {
   openApp,
   resetStub,
   STUB_ENDPOINT,
+  switchTheme,
   switchView,
   waitForStubCalls,
 } from './helpers.js';
@@ -80,8 +81,22 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await expect(page.locator('[data-testid="ai-assistant-tier"]')).toContainText('只读');
     await expect(page.locator('[data-testid="ai-assistant-disclaimer"]')).toBeVisible();
 
-    // ══ 2. 🔴 第一次发送：只披露，不出境 ═══════════════════════════════
+    // ══ 1b. 🔴 规则本机就答得出的那一句：**不弹披露**，而且一个请求都不发 ══
+    //    这是"规则先跑"那条短路在真浏览器里的对应物。单测能证明接线通了，但
+    //    "披露承诺了一次不会发生的出境"这种谎，只有在真浏览器里连点带看图才抓得住：
+    //    界面要求用户批准"这句话要离开本机"、用户批准了、然后什么都没出去。
     await page.locator('[data-testid="ai-assistant-input"]').fill('今天有什么任务');
+    await page.locator('[data-testid="ai-assistant-send-button"]').click();
+    await expect(page.locator('[data-testid="ai-assistant-disclosure"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="ai-chat-assistant"]').last()).toContainText(
+      '没有发出任何请求',
+    );
+    await expectNoStubCall(request);
+
+    // ══ 2. 🔴 第一次发送：只披露，不出境 ═══════════════════════════════
+    // ⚠️ 这句刻意是**规则答不出**的（上面 1b 用的那句会被本机短路）：这一节测的是
+    //    "披露 → 出境 → 多步循环"，问句要是被规则接走，下面那一发 click 就永远等不到披露。
+    await page.locator('[data-testid="ai-assistant-input"]').fill('随便说点什么吧');
     await page.locator('[data-testid="ai-assistant-send-button"]').click();
 
     const disclosure = page.locator('[data-testid="ai-assistant-disclosure"]');
@@ -102,6 +117,15 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
 
     await page.screenshot({ path: `${EVIDENCE}/1-disclosure.png`, fullPage: true });
 
+    // 🔴 这张 `fullPage` 截图会改视口高度 ⇒ 右栏那一列量到 0 ⇒ AI 面**换挂载点**。
+    //    2026-10-04 之前换挂载点=重挂载：披露对话框连同草稿一起消失，下面那一发
+    //    click 永远等不到 `[data-testid="ai-assistant-send"]`（60s 超时），
+    //    而症状读起来像"机器太忙"—— 实际是用户把窗口拖过 1023px 就会被
+    //    悄悄取消一次同意请求。修法不是把截图挪走，而是让**换挂载点不再等于丢状态**
+    //    （`features/ai/assistant-ephemeral.tsx`：未决那三样住在 Provider 里），
+    //    所以这条断言判的是产品行为"跨断点不掉状态"，不是给截图让路。
+    await expect(disclosure).toBeVisible();
+
     // ══ 3. 按「发送」才真的出境，循环跑了第二步 ════════════════════════
     await page.locator('[data-testid="ai-assistant-send"]').click();
     const two = await waitForStubCalls(request, 2);
@@ -118,11 +142,9 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     // ══ 3b. 暗色主题（AGENTS §5「不测暗色主题就交付」是列出来的错）══════
     // 气泡的底色与描边全走 token，暗色下 `--ht-color-primary-subtle` 是半透明蓝、
     // `--ht-color-surface` 是近黑 —— 只看代码判断不了"角色还分得出来"，必须看图。
-    await page.getByRole('button', { name: '切换到暗色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await switchTheme(page, 'dark');
     await page.screenshot({ path: `${EVIDENCE}/2b-chat-dark.png`, fullPage: true });
-    await page.getByRole('button', { name: '切换到亮色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await switchTheme(page, 'light');
 
     // ══ 4. 同一段会话不再重复拦 ════════════════════════════════════════
     await page.locator('[data-testid="ai-assistant-input"]').fill('再说一遍');

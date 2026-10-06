@@ -22,7 +22,15 @@
  *    与清单同一条原则（`project-actions.ts` 文件头第 2 条）：删一个分组不该
  *    毁掉里面的东西。但标签这里更微妙 —— 用户看到"标签在 N 个任务上用着"时
  *    会以为删标签=动那些任务，所以要**在界面上说清楚**（`mobile.tags.removeHint`）。
- * 2. **不改名。** 与清单一致：改名要一个内联编辑态，会把这一段的交互重量翻倍。
+ *    ⚠️ 那句静态提示**不是防护**：它站在列表下面，而按下删除按钮时没有任何东西
+ *    拦一下。W4b（2026-10-04）补的是**删除确认那一步**（`labels.confirmRemove`
+ *    + `removeImpact`，实现在共享 `OrganizerList`，与 web 同一份）——
+ *    标签**不进回收站**（§7.1 P-1 拍板：重建成本≈0），所以唯一的防护只能是"删之前
+ *    告诉你影响几条任务"，删完就没有反悔的地方了。
+ * 2. ~~**不改名。**~~ **改了**（2026-10-03 多端第三批）：行内改名走共享层的
+ *    `labels.rename` + `onRename`，与清单同一份实现。这行原话是"改名要把这一段的
+ *    交互重量翻倍"，实际代价是**移动端比 web 少一个功能**而两端都不报错 ——
+ *    留着它是因为它是"登记在注释里的取舍会悄悄变成缺口"的样本。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 与 `ListsSection` 同一条形状，但**不再各写一份 JSX**
@@ -37,10 +45,16 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Tag } from '@heyta/domain';
+import type { Tag, Task } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { createProjectActions, type AppHost, type ProjectActions } from '@heyta/app-host';
-import { OrganizerList, toOrganizerNodes, toTagItems } from '@heyta/ui';
+import {
+  createProjectActions,
+  createTaskActions,
+  type AppHost,
+  type ProjectActions,
+  type TaskActions,
+} from '@heyta/app-host';
+import { OrganizerList, liveTaskCountsByTag, toOrganizerNodes, toTagItems } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
@@ -58,6 +72,14 @@ export function TagsSection(): React.JSX.Element {
 
   const [host, setHost] = useState<AppHost | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
+  /**
+   * 只为算**删除确认里那句影响面**（"它挂在几条任务上"，W4b）。
+   *
+   * 🔴 读的是 `createTaskActions(host).listTasks()`（已滤墓碑、含已完成），
+   * 与本文件其余部分同一个物化状态源；不另开一次引擎遍历 ——
+   * 两批任务在两次读取之间会漂移，而漂移的表现是"数字对不上"。
+   */
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -76,11 +98,17 @@ export function TagsSection(): React.JSX.Element {
     [host],
   );
 
+  const taskActions = useMemo<TaskActions | null>(
+    () => (host ? createTaskActions(host) : null),
+    [host],
+  );
+
   const read = useCallback((): void => {
-    if (actions === null) return;
+    if (actions === null || taskActions === null) return;
     // ⚠️ 同步调用，不是 Promise。
     setTags(actions.listTags());
-  }, [actions]);
+    setTasks(taskActions.listTasks());
+  }, [actions, taskActions]);
 
   useEffect(read, [read, dataRevision]);
 
@@ -98,6 +126,9 @@ export function TagsSection(): React.JSX.Element {
 
   /** 标签是平表（没有父子关系），共享层把它包成"没有子级的树"。 */
   const nodes = useMemo(() => toOrganizerNodes(toTagItems(tags)), [tags]);
+
+  /** 确认那一行的影响面（口径与 web 同一个函数，见 `@heyta/ui#liveTaskCountsByTag`）。 */
+  const removeImpact = useMemo(() => liveTaskCountsByTag(tasks), [tasks]);
 
   const add = useCallback((): void => {
     const trimmed = name.trim();
@@ -121,10 +152,33 @@ export function TagsSection(): React.JSX.Element {
         <OrganizerList
           kind="tag"
           items={nodes}
+          removeImpact={removeImpact}
           labels={{
             removeLabel: (label) => t('mobile.tags.remove', { name: label }),
+            // 只接改名、不接归档：`Tag` 领域实体里**没有** `archived` 字段
+            // （`Project` 有），所以这里没有"归档标签"这个意图可表达。
+            // 共享层的规矩是"文案与回调成对"—— `labels.archive` 省略即不画那个按钮，
+            // 于是缺的不是接线，而是领域里还没有的那个概念。
+            rename: {
+              button: (label) => t('common.organizer.rename.button', { name: label }),
+              save: t('common.organizer.rename.save'),
+              cancel: t('common.organizer.rename.cancel'),
+            },
+            // 🔴 删除确认（W4b）：**传了这份文案就等于打开了这一步**。
+            // 与 web 的标签那一节同一套文案、同一个共享实现 ——
+            // "删标签要不要确认"不许在两端是两个答案。
+            confirmRemove: {
+              ask: (label) => t('common.organizer.confirm.ask', { name: label }),
+              impact: (count) => t('common.organizer.confirm.impactTags', { count }),
+              confirm: t('common.organizer.confirm.delete'),
+              cancel: t('common.organizer.confirm.cancel'),
+            },
             empty: t('common.organizer.tags.empty'),
             emptyHint: t('common.organizer.tags.empty.hint'),
+          }}
+          onRename={(item, next) => {
+            if (actions === null) return;
+            run(actions.renameTag(item.id, next));
           }}
           onRemove={(item) => {
             if (actions === null) return;

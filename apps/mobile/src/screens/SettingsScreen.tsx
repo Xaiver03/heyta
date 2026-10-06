@@ -57,6 +57,8 @@ import { useLocalePreference } from '../i18n/locale-preference';
 import { useTokens } from '../theme';
 import type { SyncCredentialForm } from '../sync/credential-form';
 import { DEFAULT_SERVER_URL } from '../sync/config';
+import { VaultSettingsSection } from './VaultSettingsSection';
+import { AiSettingsSection } from '../ai/AiSettingsSection';
 import {
   privacyConsent,
   privacyConsentActions,
@@ -87,6 +89,9 @@ export function SettingsScreen({
   onClose,
   form,
   onClearCredentials,
+  vaultCleanupPending,
+  onRetryVaultCleanup,
+  onVaultCleanupPending,
 }: {
   /** 「我的」持有这个状态；关闭只是把它拨回 `false`，不卸载「我的」。 */
   visible: boolean;
@@ -95,6 +100,10 @@ export function SettingsScreen({
   form: SyncCredentialForm;
   /** 清凭据（磁盘 + 小组件 + 账号 + 表单状态）由「我的」按序组合，这里只触发。 */
   onClearCredentials: () => void;
+  /** A failed native secure-store delete stays visible until it succeeds. */
+  vaultCleanupPending?: boolean;
+  onRetryVaultCleanup?: () => void;
+  onVaultCleanupPending?: (scope: import('../lib/vault-secure-storage').VaultSecureStorageScope) => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
@@ -384,6 +393,31 @@ export function SettingsScreen({
                 />
               </View>
             </Card>
+
+            {/*
+              ── AI 设置（四道闸 + 端点 + 逐功能授权 + 逐工具授权 + 助手档位）──
+              🔴 与同步凭据**同一层**是有意的：AI 的端点就是"这台设备跟谁说话"，
+              把它放到「我的」的滚动流里会撞 `check:mobile-settings` 那条注入判据。
+              判断本身（默认值、fail-closed 归一、bindAddress 不许从磁盘读）
+              全在 `@heyta/app-host`，这里只是通道（AGENTS §3.5）。
+            */}
+            <AiSettingsSection />
+
+            <VaultSettingsSection onVaultCleanupPending={onVaultCleanupPending} />
+            {vaultCleanupPending && onRetryVaultCleanup !== undefined ? (
+              <Card>
+                <Stack>
+                  <Text variant="caption" tone="danger">
+                    {t('mobile.vault.logoutCleanupFailed')}
+                  </Text>
+                  <Button
+                    label={t('mobile.vault.retryCleanup')}
+                    onPress={onRetryVaultCleanup}
+                    tone="ghost"
+                  />
+                </Stack>
+              </Card>
+            ) : null}
 
             {/*
               清凭据必须**连小组件一起清**（决策 D6）—— 组合逻辑在

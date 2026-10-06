@@ -13,11 +13,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   JSON_RPC_ERRORS,
+  LOCAL_API_TOOLS,
   MCP_PROTOCOL_VERSION,
   MCP_SERVER_NAME,
   errorCodeForDenial,
   handleToolsCall,
+  hasInputSchemaFor,
   listMcpTools,
+  recordedInputSchemaNames,
   type LocalApiConfig,
 } from '../src/index.js';
 
@@ -67,21 +70,33 @@ describe('listMcpTools —— 只暴露已授权的工具', () => {
   });
 
   it('additionalProperties 一律 false（不接受不认识的字段）', () => {
+    // 🔴 授权集合从**目录**派生：手抄 6 个名字的版本在目录扩到 10 条之后，
+    // 这条"全部工具"的检查其实只覆盖了旧的 6 条 —— 新加工具**不会**让它红，
+    // 于是"每个工具都守 additionalProperties:false"这句话开始说谎。
     const all = listMcpTools({
       ...CONFIG,
-      grants: {
-        list_tasks: true,
-        get_task: true,
-        list_projects: true,
-        create_task: true,
-        update_task: true,
-        complete_task: true,
-      },
+      grants: Object.fromEntries(LOCAL_API_TOOLS.map((t) => [t.name, true])),
     });
-    expect(all).toHaveLength(6);
+    expect(all.length).toBeGreaterThanOrEqual(10);
+    expect(all).toHaveLength(LOCAL_API_TOOLS.length);
     for (const tool of all) {
       expect(tool.inputSchema.additionalProperties, tool.name).toBe(false);
     }
+  });
+
+  it('🔴 目录里每一条工具都**登记过**参数 schema（`INPUT_SCHEMAS` 不许有静默回退）', () => {
+    // `listAuthorizedTools()` 对没登记的工具回退成空 `properties` ——
+    // 那与"这个工具真的不接参数"在 MCP 客户端与内置 AI 上**长得一模一样**，
+    // 而能力清单只会标 `schemaRecorded:false`、**不会红**（生成器文件头明写了这个取舍）。
+    // 所以"忘登记 schema"这件事只有这一条判据会响。目录驱动，不逐工具抄名字。
+    const unrecorded = LOCAL_API_TOOLS.filter((t) => !hasInputSchemaFor(t.name)).map((t) => t.name);
+    expect(unrecorded, `这些工具没有登记 INPUT_SCHEMAS：${unrecorded.join('、')}`).toEqual([]);
+  });
+
+  it('🔴 反向也对：schema 里不许留**孤儿抄件**（目录已删而 schema 还留着）', () => {
+    const names = new Set(LOCAL_API_TOOLS.map((t) => t.name));
+    const orphans = recordedInputSchemaNames().filter((n) => !names.has(n));
+    expect(orphans, `这些 schema 在目录里已经没有对应工具了：${orphans.join('、')}`).toEqual([]);
   });
 
   it('必填参数被如实标注', () => {
@@ -141,10 +156,36 @@ describe('🔴 list_tasks 的日期参数：schema 与出境描述', () => {
     expect(range).toContain('14');
   });
 
-  it('🔴 描述里没有内部黑话（这是出境数据，模型读不懂的行话会直接变成错调用）', () => {
-    const json = JSON.stringify(listTasksProperties());
-    for (const jargon of ['ADR', 'op-log', 'dispatch', 'W3', 'AI-G3', 'createLocalApiHost', 'LocalApiHost']) {
-      expect(json, jargon).not.toContain(jargon);
+  it('🔴 整份目录的描述里没有内部黑话（这是出境数据，模型读不懂的行话会直接变成错调用）', () => {
+    // 原来只扫 `list_tasks` 一个工具 —— 那意味着**每加一个工具就自动脱离这条判据**。
+    // 现在按整份目录扫：工具自己的 `description` 和它的 `inputSchema` 一起进 JSON，
+    // 因为模型两边都读。
+    const allGrants = Object.fromEntries(LOCAL_API_TOOLS.map((t) => [t.name, true]));
+    const tools = listMcpTools({ ...CONFIG, grants: allGrants });
+    // 前提：这份扫描真的覆盖了目录。授权漏一个就少扫一个工具，而那句断言不会报。
+    expect(tools.length).toBe(LOCAL_API_TOOLS.length);
+
+    const json = JSON.stringify(tools);
+    // 一次报**全部**命中，而不是撞到第一个就停 —— 否则修掉一个词之后，
+    // 第二个词要再跑一轮才现形，而那一轮可能根本不会有人跑。
+    const hits = [
+      'ADR',
+      'op-log',
+      'dispatch',
+      'W3',
+      'AI-G3',
+      'createLocalApiHost',
+      'LocalApiHost',
+      'EntityModelMap',
+      'LOCAL_API_TOOLS',
+      'egressFields',
+    ].filter((jargon) => json.includes(jargon));
+    expect(hits).toEqual([]);
+
+    // 阳性对照：同一份 JSON 里**必须**数得出这些真实存在的串。
+    // 少了这一句，"没有黑话"和"什么都没扫到"长得一模一样（比如 grants 少给一片）。
+    for (const needle of ['YYYY-MM-DD', '（只读，不会修改任何数据）', '（会修改数据：调用即生效）']) {
+      expect(json, needle).toContain(needle);
     }
   });
 

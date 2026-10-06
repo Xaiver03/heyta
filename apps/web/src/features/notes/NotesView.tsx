@@ -26,14 +26,20 @@
  * 在这里再写一句"还没有便签"会让同一个空态长出第二份实现
  * （`check:empty-state` 的断言抓的就是视图里手写的空态标记）。
  *
- * ⚠️ **刻意不传 `onEdit`**：web 目前没有便签编辑入口（那需要另一个界面）。
- * 不传的语义是"不渲染编辑入口"，而不是"渲染一个按下去没反应的按钮"。
+ * ⚠️ ~~**刻意不传 `onEdit`**~~ **（2026-10-03 多端第二批已补上，留原文是为了让
+ * 后来者认出这个形状）**：共享编辑器 {@link NoteEditor} 已经在
+ * `@heyta/ui`（与移动端**同一份实现**），本视图现在传 `onEdit`，
+ * 摘要那段因此变成可点的入口，点它在列表上方展开编辑面板。
+ * 当年那句"不传的语义是不渲染编辑入口，而不是渲染一个按下去没反应的按钮"
+ * 仍然是这里的判据 —— 面板与入口要么一起有，要么一个都不留。
  */
 
 import { useMemo } from 'react';
 import { useI18n, type I18nValue } from '@heyta/i18n';
 import { HeytaUiProvider, NotesBoard, type NotesBoardLabels } from '@heyta/ui';
 
+import { selection, useSelected } from '../../lib/selection.js';
+import { NoteEditorCard } from './NoteEditorCard.js';
 import { useNoteStore } from './store.js';
 
 /** 构造共享 `NotesBoard` 的全部文案。字段名与 `NotesBoardLabels` 逐项对应，漏了编译不过。 */
@@ -55,17 +61,44 @@ export function notesBoardLabels(t: I18nValue['t']): NotesBoardLabels {
   };
 }
 
-export function NotesView(): React.JSX.Element {
+/**
+ * 🔴 `editorInColumn` 是**必填**的，不是"默认值等于原行为"的可选开关：
+ * 那种形状会把"宿主根本没接"伪装成"做完了"（本线记过不止一次）。
+ * 它回答的是"这一屏详情列看得见吗"，由 `App.tsx` 用 `useDetailColumnShown` 算，
+ * 而编辑卡本身在 {@link NoteEditorCard} —— 两支落点共用一份实现。
+ */
+export function NotesView({ editorInColumn }: { editorInColumn: boolean }): React.JSX.Element {
   const { t } = useI18n();
   const notes = useNoteStore((s) => s.notes);
   const addNote = useNoteStore((s) => s.addNote);
   const removeNote = useNoteStore((s) => s.removeNote);
   const togglePinned = useNoteStore((s) => s.togglePinned);
 
+  /**
+   * 正在编辑的那条便签 = **选中的那一条**（`null` = 面板没开）。
+   *
+   * 🔴 用 **id** 而不是 `Note` 对象：`refresh()` 之后对象会换新引用，
+   * 存对象会让面板在每次同步后拿到一份过期快照（与移动端同一个取舍）。
+   * 而它读的是共享选中态、不是本地 `useState`：搜索那条入口只能把 id 交进选中态，
+   * 面板才会在切到便签视图时显示**被点的那一条**（此前 `openNoteFromSearch` 把 id 丢了，
+   * 用户看到的只是"视图换了，什么都没打开"）。
+   */
+  const editingId = useSelected('note');
+
   const labels = useMemo(() => notesBoardLabels(t), [t]);
+  const editing = editingId === null ? undefined : notes.find((note) => note.id === editingId);
+
+  /**
+   * 🔴 选中痕迹（工单 W1c）：递给共享板的是**当前打开的那一条**，不是又一个本地状态。
+   * 用 `editing?.id` 而不是 `editingId`：id 在 `notes` 里找不到时（别的设备删了它）
+   * 编辑卡本来就不渲染（`editing` 是 `undefined`），高亮也必须跟着没有 ——
+   * 留着会出现"列表里亮着一条、右边什么都没有"，两种线索互相矛盾。
+   */
+  const activeNoteId = editing?.id;
 
   return (
     <HeytaUiProvider>
+      {editorInColumn ? null : <NoteEditorCard inset={false} />}
       <NotesBoard
         notes={notes}
         onAdd={(content) => {
@@ -77,6 +110,10 @@ export function NotesView(): React.JSX.Element {
         onTogglePinned={(entityId, pinned) => {
           void togglePinned(entityId, pinned);
         }}
+        onEdit={(entityId) => {
+          selection.select('note', entityId);
+        }}
+        activeNoteId={activeNoteId}
         labels={labels}
         testID="notes-board"
       />

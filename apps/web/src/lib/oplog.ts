@@ -36,6 +36,14 @@ import {
 let engine: OpLogEngine | undefined;
 let db: IndexedDbAdapter | undefined;
 /**
+ * 当前活着的那个存储 worker（`sqlite` 后端那一条）。
+ *
+ * 🔴 留着它的**唯一**理由是"能在销毁之前关掉它" —— OPFS 的同步访问句柄在 worker 那一侧，
+ * 句柄不关，池目录就删不掉（见 `releaseStorageWorker()` 那段实测）。不是拿来复用、
+ * 也不是拿来重开：重开走 `openStorage()`。
+ */
+let storageWorker: Worker | undefined;
+/**
  * op-log 存储实例。
  *
  * ⚠️ 类型是 `OpLogStore`（接口），**不是** 某个具体实现 ——
@@ -211,6 +219,16 @@ async function openStorage(
   const worker = new Worker(new URL('../worker/storage.worker.ts', import.meta.url), {
     type: 'module',
   });
+  /**
+   * 🔴 留一份引用**不是为了复用这个 worker**，是为了能**关掉它**。
+   *
+   * OPFS 的同步访问句柄住在 worker 那一侧（SAH Pool 装在那里），而只要那些句柄
+   * 还开着，主线程的 `removeEntry(..., {recursive:true})` 就必然被拒
+   * （真浏览器实测：`NoModificationAllowedError`；对照三臂 —— 空白页能删、
+   * 应用活着但换别的目录名也能删、只有池自己那个目录删不掉）。
+   * 注销要的是"本机明文真的没了"，所以销毁路径必须能把这个 worker 关掉。
+   */
+  storageWorker = worker;
 
   /**
    * ⚠️ **顺序不能反**：`createWorkerOpLogSession` 会**同步**挂上监听，
@@ -226,6 +244,29 @@ async function openStorage(
   await migrateLegacyIndexedDb(session.store, dbName);
 
   return { store: session.store, clientId };
+}
+
+/**
+ * 关掉存储 worker，让 OPFS 那些同步访问句柄随 worker 全局一起消失。
+ *
+ * 🔴 为什么销毁路径**必须**先叫它：真浏览器实测（计划 §10.59）三臂对照 ——
+ * 不跑应用的空白页能删 `.heyta-web`、应用活着但换别的目录名也能删、
+ * **只有池自己那个目录删不掉**（`NoModificationAllowedError`），
+ * 而且重新加载后文件里种的明文串还在。句柄在 worker 那一侧，主线程拿它没办法。
+ *
+ * ⚠️ `terminate()` 之后句柄不是同步消失的，所以这里等一个宏任务；
+ *   真正的"删得掉与否"由调用方那侧的**有界重试**负责（不重试到永远）。
+ *
+ * 没开过 worker（`indexeddb` 回退档、或纯测试环境）就是空操作 —— 它不抛。
+ */
+export async function releaseStorageWorker(): Promise<void> {
+  const worker = storageWorker;
+  if (worker === undefined) return;
+  storageWorker = undefined;
+  worker.terminate();
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
 }
 
 /**
@@ -481,10 +522,10 @@ export async function restoreFromExport(text: string): Promise<RestoreExportResu
   }
 
   const result = await restoreIntoEmptyTarget(
-    {
-      engine: requireEngine(),
-      readOpLog: async () => (await requireStore().getAllOps()).map((row) => row.op),
-    },
+    // 🔴 只交引擎，不再交 `readOpLog`。空库守卫要的是条数，
+    // 而 `(await requireStore().getAllOps()).map(...)` 会在用户点"还原"的那一刻
+    // 把本机整库连密文正文搬进内存数一遍。`engine.countStoredOps()` 走计数。
+    { engine: requireEngine() },
     parsed.document,
   );
   if (result.ok) notify();
@@ -497,6 +538,8 @@ export function __resetOpLogForTests(): void {
   db = undefined;
   opLogStore = undefined;
   initPromise = undefined;
+  // 只丢引用，不在这里 terminate（重置是给下一段测试用的，不是销毁路径）。
+  storageWorker = undefined;
   // ⚠️ **不要清空 listeners。**
   // 订阅是模块级注册的（各 store 在模块加载时订阅一次），
   // 清空之后重新 initOpLog() 也不会再注册 —— 于是重置一次之后

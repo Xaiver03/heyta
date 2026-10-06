@@ -14,12 +14,14 @@
  * ⚠️ 它是**内存**实现：进程结束即消失。不要拿它当生产存储。
  */
 
+import { AdapterDestroyedError } from '../errors.js';
 import {
   assertIterateLimit,
   DEFAULT_ITERATE_LIMIT,
   type DbAdapter,
   type DbCursorAction,
   type DbCursorVisitor,
+  type DbDestroyReport,
   type DbIndexQuery,
   type DbIterateOptions,
   type DbKey,
@@ -162,6 +164,12 @@ interface PhysicalStore {
 export class MemoryDbAdapter implements DbAdapter {
   private stores = new Map<string, PhysicalStore>();
   private closing = false;
+
+  /** 销毁即死路（E2 口径 B，与两份持久实现同一条契约）。 */
+  private destroyed = false;
+
+  /** 第二次 `destroy()` 复用这份报告，不再"清空一遍"（清空需要先让实例可用）。 */
+  private destroying: Promise<DbDestroyReport> | undefined;
   private syncDepth = 0;
   private txQueue: Promise<unknown> = Promise.resolve();
 
@@ -176,11 +184,44 @@ export class MemoryDbAdapter implements DbAdapter {
   }
 
   async init(): Promise<void> {
+    if (this.destroyed) throw new AdapterDestroyedError('memory');
     this.closing = false;
   }
 
   close(): void {
     this.closing = true;
+  }
+
+  /**
+   * 清空全部 store 的记录与自增计数器，并把这个实例**作废**。
+   *
+   * ⚠️ **保留 store 的 schema**：把 `stores` 整张 Map 清空会让之后任何一次读
+   * 变成"没有这个 store"的异常，而那会被读成"销毁失败"。作废走的是另一条路：
+   * 每次操作在**进门时**就被 `AdapterDestroyedError` 拒掉（口径 B，见下）。
+   *
+   * 🔴 这一版之前它是"清空后仍可继续用"，而那条口径站在契约的对立面：
+   * `DbAdapter.destroy` 之后实例还能写，意味着**明文可以重新进这块内存**，
+   * 而四份实现里唯一能区分"销毁"与"清空"的判据就是共享契约那一条腿。
+   * 内存实现没有持久容器可删，所以 `containerRemoved` 报 true 的理由是
+   * **进程内没有任何东西留下来**（不是"文件删了"）—— `target` 与 `reason` 写明它。
+   */
+  async destroy(): Promise<DbDestroyReport> {
+    if (this.destroying !== undefined) return this.destroying;
+    this.closing = false;
+    let storesCleared = 0;
+    for (const store of this.stores.values()) {
+      store.records.clear();
+      store.autoIncrement = 0;
+      storesCleared += 1;
+    }
+    this.destroyed = true;
+    this.destroying = Promise.resolve({
+      target: 'memory',
+      containerRemoved: true,
+      reason: '内存实现：没有持久容器，清空即不留任何东西',
+      storesCleared,
+    });
+    return this.destroying;
   }
 
   /** 建表。可重复调用（幂等），用于测试里动态加 store。 */
@@ -203,8 +244,8 @@ export class MemoryDbAdapter implements DbAdapter {
     return this.transaction([store], 'readonly', async (tx) => tx.get<T>(store, key));
   }
 
-  getAll<T>(store: string, range?: DbKeyRange): Promise<T[]> {
-    return this.transaction([store], 'readonly', async (tx) => tx.getAll<T>(store, range));
+  getAll<T>(store: string, range?: DbKeyRange, limit?: number): Promise<T[]> {
+    return this.transaction([store], 'readonly', async (tx) => tx.getAll<T>(store, range, limit));
   }
 
   delete(store: string, key: DbKey): Promise<void> {
@@ -264,6 +305,10 @@ export class MemoryDbAdapter implements DbAdapter {
     if (this.syncDepth > 0) {
       throw new Error('不支持嵌套事务：在事务里又调用了 transaction()');
     }
+
+    // 🔴 销毁即死路：所有公开方法都走这一条 `transaction`，所以一个进门判据
+    // 就覆盖"之后任何一次读写"，包括看起来无害的 `count`。
+    if (this.destroyed) throw new AdapterDestroyedError('memory');
 
     for (const name of stores) {
       if (!this.stores.has(name)) {
@@ -477,10 +522,12 @@ export class MemoryDbAdapter implements DbAdapter {
         return store.records.get(serializeKey(key))?.value as T | undefined;
       },
 
-      getAll: async <T,>(storeName: string, range?: DbKeyRange) => {
+      getAll: async <T,>(storeName: string, range?: DbKeyRange, limit?: number) => {
+        assertIterateLimit(limit);
         const store = assert(storeName);
         return sortedRecords(store)
           .filter((r) => inRange(r.key, range))
+          .slice(0, limit)
           .map((r) => r.value as T);
       },
 

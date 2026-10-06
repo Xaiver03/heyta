@@ -19,15 +19,15 @@
  * 加密与向量时钟都来自 `@heyta/sync-core`（vendored, MIT），**不重写**。
  */
 
-import { isEntityType } from '@heyta/shared-schema';
+import { isEntityType, isHeytaFullStatePayload, SUPER_SYNC_SNAPSHOT_OP_TYPES } from '@heyta/shared-schema';
 import {
   compareVectorClocks,
-  decrypt,
-  encrypt,
+  compactVectorClockAgainstFrontier,
   isEncryptedPayloadTransportShape,
   suggestConflictResolution,
 } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
+import { createPasswordPayloadCipher, type SyncPayloadCipher, type SyncEncryptionOptions } from './payload-cipher.js';
 
 /** 服务端单次上传/下载的上限（契约里的常量，声明在此以便分页）。 */
 const MAX_OPS_PER_UPLOAD = 500;
@@ -60,6 +60,8 @@ const PERMANENT_REJECTION_CODES: readonly string[] = [
   'INVALID_PAYLOAD',
   'PAYLOAD_TOO_LARGE',
   'INVALID_VECTOR_CLOCK',
+  // A maintenance snapshot's fixed base cannot become current by retrying it.
+  'REPAIR_STALE',
   'INVALID_TIMESTAMP',
   'MISSING_ENTITY_ID',
   'INVALID_SCHEMA_VERSION',
@@ -382,6 +384,21 @@ export type SyncFailureReason =
    */
   | 'unauthorized'
   /**
+   * 服务端说**这个账号已经注销了**（稳定码 `ACCOUNT_CLOSED`，E1 落的）。
+   *
+   * 🔴 必须与 `'unauthorized'` 分开，因为两句话要用户做的事**正好相反**：
+   *   · `'unauthorized'` = 凭据过期/被别的设备登出/改了口令 ⇒「重新登录，数据都在」。
+   *     那一条的立场是「**绝不清本地数据**」，本地库是唯一可读的事实源（D5）。
+   *   · 这一条 = 账号这个法律主体没了 ⇒「重新登录是不可能的」，
+   *     而按 ADR-0048 的承诺，本机那份明文**必须**跟着消失。
+   * 合成一条的结果只能是两种错之一：把注销读成"再登录一次就好"（明文永远留着），
+   * 或把口令打错读成"账号没了"（**当场毁掉用户的数据**）。后者是不可逆的，
+   * 所以这一条的判据必须**只认稳定码，绝不认文案、绝不认状态码本身**。
+   *
+   * ⚠️ `retryable: false`：注销不会因为你再试一次就撤销。
+   */
+  | 'account-closed'
+  /**
    * 🔴 **用户还没有同意隐私规则，所以一个请求都不许发**（计划 G-12）。
    *
    * 由宿主判断，不是这个包 —— 与 `'not-configured'` 同一类。
@@ -445,6 +462,7 @@ interface UploadResponse {
   results?: UploadResult[];
   latestSeq?: number;
   newOps?: ServerOperation[];
+  gapDetected?: boolean;
   /**
    * 搭车返回的 `newOps` **只是第一页**（服务端达到 `PIGGYBACK_LIMIT` 且后面还有）。
    * 见 `sync.routes.ops-handler.ts`：设了它就不能把游标推到 `latestSeq`，
@@ -504,6 +522,7 @@ interface WireOperation {
   timestamp: number;
   schemaVersion: number;
   isPayloadEncrypted?: boolean;
+  vectorClockEncoding?: 'full' | 'frontier-delta';
 }
 
 /**
@@ -523,9 +542,23 @@ interface DownloadResponse {
   ops?: ServerOperation[];
   hasMore?: boolean;
   latestSeq?: number;
+  gapDetected?: boolean;
+  /** Causal frontier for history compacted before this download page. */
+  snapshotVectorClock?: Record<string, number>;
+  causalFrontier?: {
+    token: string;
+    vectorClock: Record<string, number>;
+  };
+  capabilities?: { causalFrontierDelta?: boolean };
 }
 
-export interface SyncClientOptions {
+interface CausalFrontier {
+  token: string;
+  vectorClock: Record<string, number>;
+}
+
+
+export type SyncClientOptions = SyncEncryptionOptions & {
   /** 服务端根地址，例如 http://127.0.0.1:3000 */
   baseUrl: string;
   /** 取当前访问令牌。返回 undefined 表示未登录。 */
@@ -536,6 +569,20 @@ export interface SyncClientOptions {
 
   /** 本设备的 clientId。 */
   clientId: string;
+  /**
+   * 本外壳的**裸 semver**（`0.1.0`），随下载请求以 `appVersion` 上报。
+   *
+   * 服务端拿它做 checkpoint 闸门（`server/src/sync/checkpoint-gate.ts`，#9962）：
+   * 闸门是**纯结构比较** —— 缺省与"低于 cut"算同一档（都判 old），所以上报真版本
+   * 不会放开任何裁历史的口子；反过来，**占位值**（`0.0.0`）会把假版本写进
+   * 运营面那份设备清单，所以宁可不传。
+   *
+   * 🔴 正常路径下**不要由宿主传**：真源是仓库根 `package.json`，经
+   * `scripts/gen-app-version.mjs` 生成到 `@heyta/app-host`，由 `createSyncClient()` 统一给
+   * （AGENTS §3.5：版本号不是平台差异）。这个参数留着，是给**自己另构建一份客户端**
+   * 的人覆盖用的。缺省 = 一个字都不发，与"沉默"同形。
+   */
+  appVersion?: string;
   /** E2EE 口令。未配置时必须**拒绝同步**而不是降级成明文。 */
   getPassword: () => Promise<string | undefined>;
 
@@ -553,6 +600,14 @@ export interface SyncClientOptions {
   applyRemote: (ops: Operation<string>[]) => Promise<void>;
 
   /**
+   * Merge a server-provided causal frontier even when its individual ops were
+   * compacted and therefore absent from this page.
+   */
+  mergeRemoteClock?: (clock: Record<string, number>) => Promise<void> | void;
+  /** Persist skipped history before committing a cursor beyond it. */
+  markHistoryIncomplete?: () => Promise<void>;
+
+  /**
    * 冲突判定为"本地胜出"时，把这条改动**重新派发**成一条新 op。
    *
    * 为什么要重新派发而不是改旧 op 的时钟：op 是**不可变**的。
@@ -563,6 +618,23 @@ export interface SyncClientOptions {
 
   /** 冲突判定为"远端胜出"时，把本地这条移出上传队列（不删除）。 */
   discardLocal: (opIds: string[]) => Promise<void>;
+
+  /**
+   * 服务端报出 `ACCOUNT_CLOSED` 时的处置：**把本机这份明文库真的销毁**。
+   *
+   * 🔴 客户端**先 await 这个回调，再上报状态**。顺序是有牙的：
+   * 反过来的话界面会先显示"账号已注销，数据已清除"，而销毁还在排队 ——
+   * 那一瞬间界面在说谎，而这句话是隐私承诺的落点（ADR-0048）。
+   *
+   * ⚠️ **没装回调时不许静默**。这条路径存在的唯一理由就是"信号收到了、
+   * 本机却什么都没少"（本仓库 §10.2 量的正是这个），所以缺回调会
+   * ① 打一条 console.error，② 把"本机明文仍在"写进 `message` 让界面能露出来。
+   * 具体清哪些存储由**宿主**决定（`@heyta/app-host` 的 local-erasure 注册表），
+   * 因为这个包不知道 IndexedDB / OPFS / localStorage 长什么样。
+   *
+   * 幂等：可能每次同步都被调一次（`SyncClient` 不缓存、每次重建）。
+   */
+  onAccountClosed?: () => Promise<void>;
 
   /**
    * 服务端**永久拒绝**时，把这些 op 移出上传队列（不删除、**不标成已上传**）。
@@ -607,7 +679,7 @@ export interface SyncClientOptions {
  */
 async function decodeServerOp(
   envelope: ServerOperation,
-  password: string,
+  payloadCipher: SyncPayloadCipher,
 ): Promise<Operation<string>> {
   const op = envelope.op;
   if (op === undefined || typeof op !== 'object') {
@@ -625,7 +697,7 @@ async function decodeServerOp(
         `op ${op.id} 标记为加密但 payload 不是字符串 —— 服务端数据可能损坏`,
       );
     }
-    const plain = await decrypt(op.payload, password);
+    const plain = await payloadCipher.decrypt(op.payload, op);
     payload = JSON.parse(plain) as unknown;
   }
 
@@ -678,6 +750,11 @@ export class SyncClient {
    */
   private transientRejects: { opId: string; errorCode: string; error: string }[] = [];
 
+  /** Last server-issued frontier for this account/device. Kept outside the
+   * op-log because it is a transport hint; absence simply disables compaction. */
+  private causalFrontier?: CausalFrontier;
+  private frontierSession?: string;
+
   constructor(private readonly options: SyncClientOptions) {
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.now = options.now ?? Date.now;
@@ -700,8 +777,20 @@ export class SyncClient {
       return report({ kind: 'error', reason: 'not-signed-in', retryable: false });
     }
 
-    const password = await this.options.getPassword();
-    if (password === undefined || password === '') {
+    // A transport hint is scoped to this authenticated client instance. Losing
+    // it is safe: logs always retain complete clocks, never transport deltas.
+    if (this.frontierSession !== token) this.causalFrontier = undefined;
+    this.frontierSession = token;
+
+    let payloadCipher: SyncPayloadCipher | undefined;
+    try {
+      payloadCipher = await this.getPayloadCipher();
+    } catch {
+      // Secure-storage and package validation errors must remain an observable
+      // locked state. Do not expose secret-bearing exception messages to logs/UI.
+      return report({ kind: 'error', reason: 'no-encryption-password', retryable: false });
+    }
+    if (payloadCipher === undefined) {
       // 🔴 绝不降级成明文。服务端会 400，但更糟的是"看起来同步成功"。
       // 宁可明确失败，也不让用户以为数据安全地上云了。
       return report({
@@ -727,7 +816,7 @@ export class SyncClient {
       // 实测：队列里混进一条 `INVALID_CLIENT_ID` 的 op 后，连续两次同步都是
       // error、待上传数恒为 1、设备再没拉到过任何远端数据。
       // 上传的问题只该影响"能不能上传"，不该影响"能不能下载"。
-      await this.upload(token, password, conflicts);
+      await this.upload(token, payloadCipher, conflicts);
 
       // 🔴 顺序：上传 → 下载 → 解决冲突 → 再上传。
       //
@@ -736,10 +825,10 @@ export class SyncClient {
       // 我第一版没有这一步，于是 CONCURRENT 会被当成硬错误 ——
       // 离线改一次就永远同步不上去。
       report({ kind: 'syncing', phase: 'download' });
-      await this.download(token, password);
+      await this.download(token, payloadCipher);
 
       if (conflicts.length > 0) {
-        const unresolved = await this.resolveConflicts(conflicts, token, password);
+        const unresolved = await this.resolveConflicts(conflicts, token, payloadCipher);
         if (unresolved.length > 0) {
           // 结构化上报，不是一句文案 —— 用户得看见两边分别是什么才能选
           return report({ kind: 'conflict', conflicts: unresolved });
@@ -764,6 +853,27 @@ export class SyncClient {
               this.rejectedOps
                 .map((r) => `${r.opId}(${r.errorCode}: ${r.error})`)
                 .join(', '),
+          );
+        }
+        /**
+         * 🔴 §2.1 那条硬顺序（服务端先于客户端）在这里落地成一句**可行动**的话。
+         *
+         * `INVALID_ENTITY_TYPE` 与"这条 op 本身坏"（`INVALID_PAYLOAD` 那一类）是
+         * **两件相反的事**：前者是服务器的词表落后，用户的动作是"升级服务端"，
+         * 而数据**完好地留在本机**；后者是数据坏了，升级服务端没有用。
+         * 两者共用一句"永久拒绝 N 条"，自托管的部署者只会去查自己的网络。
+         */
+        const vocabularyRejects = this.rejectedOps.filter(
+          (r) =>
+            r.errorCode === 'INVALID_ENTITY_TYPE' ||
+            r.errorCode === 'INVALID_SCHEMA_VERSION',
+        );
+        if (vocabularyRejects.length > 0) {
+          parts.push(
+            `其中 ${String(vocabularyRejects.length)} 条是服务端**不认识它的实体类型** —— ` +
+              '这台服务器的版本落后于客户端。这些数据仍完整保存在本机，但已被移出待上传队列：' +
+              '当前没有 rejected→待上传 的再入队路径，所以**升级服务端之后它也不会自动补传**。' +
+              '这句话刻意不写成"升级后再同步一次" —— 那是一条没有任何代码兑现的承诺。',
           );
         }
         if (this.transientRejects.length > 0) {
@@ -828,6 +938,21 @@ export class SyncClient {
       }
       const message = error instanceof Error ? error.message : String(error);
       /**
+       * 🔴 账号注销的判定必须在 `'unauthorized'` **之前**，两边都不能省。
+       *
+       * 顺序错了：注销被读成"重新登录"，本机明文永远留着。
+       * 只留一条：`401 ACCOUNT_CLOSED` 在两种读法下都合法，于是同一份响应
+       * 一会儿毁数据、一会儿留数据 —— 那比没有判据更难查。
+       */
+      if (isAccountClosedFailure(error)) {
+        return report({
+          kind: 'error',
+          reason: 'account-closed',
+          retryable: false,
+          message: await this.eraseLocalData(message),
+        });
+      }
+      /**
        * 🔴 令牌被拒**先于**离线判定，且**不可重试**。
        *
        * 落到下面那条通用通道意味着 `retryable: true` —— 退避调度器会拿着
@@ -847,75 +972,166 @@ export class SyncClient {
     }
   }
 
+  /**
+   * 账号注销时销毁本机数据，并把**处置结果**写成一句诊断（进 `message`）。
+   *
+   * 🔴 三种结局必须能区分，因为界面和取证都要回答"本机到底清了没有"：
+   *   · 宿主没装销毁器 → `console.error` + 「本机明文仍在」。
+   *     这一条不是装饰：批次 E 量的原始缺陷就是"信号收到了、没人清"，
+   *     而它当时**一个字节都不报**。
+   *   · 销毁器抛错 → 同样响亮，并把原因带出去（**不重试**：清不干净是环境问题，
+   *     不是再来一次就好的事）。
+   *   · 成功 → 只说"已按宿主的销毁器清除"，**不宣称"彻底销毁"** ——
+   *     备份与别的设备不在这次操作的作用域里（ADR-0048 的分层实话）。
+   */
+  private async eraseLocalData(diagnostic: string): Promise<string> {
+    const eraser = this.options.onAccountClosed;
+    if (eraser === undefined) {
+      // eslint-disable-next-line no-console -- 本机没清就必须留下痕迹，见上面那段。
+      console.error(
+        '[heyta] 服务端报出 ACCOUNT_CLOSED，但这个宿主没有安装本机销毁器：本地明文仍在。' +
+          ' 请给 createSyncClient 传 onAccountClosed（或经 @heyta/app-host 注册销毁器）。',
+      );
+      return `${diagnostic} — 本机明文仍在（宿主未安装销毁器）`;
+    }
+    try {
+      await eraser();
+      return `${diagnostic} — 本机数据已按宿主的销毁器清除（备份与其它设备不在此范围）`;
+    } catch (cause) {
+      // eslint-disable-next-line no-console -- 清不干净是要人来看的事，不是要吞的异常。
+      console.error('[heyta] 账号已注销，但本机数据销毁失败', cause);
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      return `${diagnostic} — 本机数据没能清干净：${reason}`;
+    }
+  }
+
   /** 上传本地 op。分批，避免超过服务端单次上限。 */
   private async upload(
     token: string,
-    password: string,
+    payloadCipher: SyncPayloadCipher,
     conflicts: ConflictReport[],
   ): Promise<void> {
     const pending = await this.options.getLocalOps();
     if (pending.length === 0) return;
 
-    for (let i = 0; i < pending.length; i += MAX_OPS_PER_UPLOAD) {
-      const batch = pending.slice(i, i + MAX_OPS_PER_UPLOAD);
+    const batches: Operation<string>[][] = [];
+    for (const op of pending) {
+      const previous = batches.at(-1);
+      if (op.opType === 'REPAIR' || previous === undefined ||
+          previous[0]?.opType === 'REPAIR' || previous.length === MAX_OPS_PER_UPLOAD) {
+        batches.push([op]);
+      } else previous.push(op);
+    }
+    for (const batch of batches) {
 
-      const ops = await Promise.all(
-        batch.map(async (op) => {
-          // 🔴 本地自查实体类型。线协议不校验成员，
-          // 拼错要到上传后才暴露，而且是一条一条地暴露。
-          if (!isEntityType(op.entityType)) {
-            throw new Error(
-              `拒绝上传未知实体类型 "${op.entityType}"（op ${op.id}）。` +
-                `线协议不会校验它，所以必须在本地拦住。`,
-            );
-          }
+      /**
+       * 🔴 **逐条串行加密**。这不是风格选择，是省掉一次移动端首批同步的峰值内存。
+       *
+       * 机制：`encrypt(payload, password)` 每次都走会话密钥缓存，而缓存是
+       * **「同步查一次 → miss 才 await Argon2id」，没有在途 Promise 复用**
+       * （`sync-core/src/encryption/session-cache.ts` 的 `getOrDeriveEncryptKey`）。
+       * Argon2id 单线程、**每次派生占 64 MiB**（`encryption/argon2.ts` 的
+       * `memorySize: 65536`）。
+       * ⇒ 用 `Promise.all` 并发时，会话**第一批**的 N 条 op 全都在第一个 await
+       *   之前查了缓存、全都 miss ⇒ 并发跑 N 次派生 = **N × 64 MiB**，
+       *   而并不会更快（只是微任务交错）。之后缓存命中不再付，所以症状是
+       *   "刚装好那一次同步特别吃力" —— 这类形状最容易长期躲过观察。
+       *
+       * 同一个包的**解密侧早就因为同一条理由改成了串行并写了理由**
+       * （`packages/sync-core/src/encryption.ts` 那段 Phase 2 注释，注意不是本包的文件）。加密侧是漏掉的另一半。
+       *
+       * 串行只改**调度**：密文、`ops` 与 `batch` 的下标配对（`send()` 里按
+       * `batch[index]` 取原始时钟）都不变。
+       */
+      const toWireOp = async (op: Operation<string>) => {
+        // 🔴 本地自查实体类型。线协议不校验成员，
+        // 拼错要到上传后才暴露，而且是一条一条地暴露。
+        if (!isEntityType(op.entityType)) {
+          throw new Error(
+            `拒绝上传未知实体类型 "${op.entityType}"（op ${op.id}）。` +
+              `线协议不会校验它，所以必须在本地拦住。`,
+          );
+        }
 
-          const cipher = await encrypt(JSON.stringify(op.payload ?? {}), password);
+        const cipher = await payloadCipher.encrypt(JSON.stringify(op.payload ?? {}), op);
 
-          // 自检：服务端会检查形状，本地先确认我们真的产出了合规密文。
-          // 这里失败说明加密层出了问题，而不是网络问题。
-          if (!isEncryptedPayloadTransportShape(cipher)) {
-            throw new Error(
-              `op ${op.id} 的密文不满足服务端传输形状要求 —— 加密层异常`,
-            );
-          }
+        // 自检：服务端会检查形状，本地先确认我们真的产出了合规密文。
+        // 这里失败说明加密层出了问题，而不是网络问题。
+        if (!isEncryptedPayloadTransportShape(cipher)) {
+          throw new Error(
+            `op ${op.id} 的密文不满足服务端传输形状要求 —— 加密层异常`,
+          );
+        }
 
-          return {
-            id: op.id,
-            clientId: op.clientId,
-            actionType: op.actionType,
-            opType: op.opType,
-            entityType: op.entityType,
-            ...(op.entityId !== undefined ? { entityId: op.entityId } : {}),
-            ...(op.entityIds !== undefined ? { entityIds: op.entityIds } : {}),
-            payload: cipher,
-            // 服务端要求**显式 true**；缺失算违规，不是"当作 false"
-            isPayloadEncrypted: true,
-            vectorClock: op.vectorClock,
-            timestamp: op.timestamp,
-            schemaVersion: op.schemaVersion,
-          };
-        }),
-      );
+        const frontier = this.causalFrontier;
+        const relation = frontier ? compareVectorClocks(op.vectorClock, frontier.vectorClock) : undefined;
+        const canCompact = frontier !== undefined && (relation === 'EQUAL' || relation === 'GREATER_THAN');
+        return {
+          id: op.id,
+          clientId: op.clientId,
+          actionType: op.actionType,
+          opType: op.opType,
+          entityType: op.entityType,
+          ...(op.entityId !== undefined ? { entityId: op.entityId } : {}),
+          ...(op.entityIds !== undefined ? { entityIds: op.entityIds } : {}),
+          payload: cipher,
+          ...(op.opType === 'REPAIR' && isHeytaFullStatePayload(op.payload)
+            ? { repairBaseServerSeq: op.payload.repairBaseServerSeq }
+            : {}),
+          // 服务端要求**显式 true**；缺失算违规，不是"当作 false"
+          isPayloadEncrypted: true,
+          vectorClock: canCompact
+            ? compactVectorClockAgainstFrontier(
+                op.vectorClock,
+                frontier.vectorClock,
+                [op.clientId],
+              )
+            : op.vectorClock,
+          ...(canCompact ? { vectorClockEncoding: 'frontier-delta' as const } : {}),
+          timestamp: op.timestamp,
+          schemaVersion: op.schemaVersion,
+        };
+      };
 
-      const res = await this.fetchImpl(`${this.options.baseUrl}/api/sync/ops`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${token}`,
+      /**
+       * 串行 await 每一条。`ops[i]` 与 `batch[i]` 的下标配对靠顺序 —— `send()`
+       * 里要用 `batch[index].vectorClock` 把压缩过的时钟换回完整时钟。
+       */
+      const ops: Awaited<ReturnType<typeof toWireOp>>[] = [];
+      for (const op of batch) ops.push(await toWireOp(op));
+
+      const usesDelta = ops.some((op) => op.vectorClockEncoding === 'frontier-delta');
+      const lastKnownServerSeq = await this.options.getLastServerSeq();
+      const send = (compact: boolean) => this.fetchImpl(
+        `${this.options.baseUrl}/api/sync/${compact ? 'ops/causal' : 'ops'}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            ops: compact ? ops : ops.map((op, index) => {
+              const { vectorClockEncoding: _encoding, ...full } = op;
+              return { ...full, vectorClock: batch[index]!.vectorClock };
+            }),
+            clientId: this.options.clientId,
+            lastKnownServerSeq,
+            ...(compact ? { causalFrontierToken: this.causalFrontier!.token } : {}),
+          }),
         },
-        body: JSON.stringify({
-          ops,
-          clientId: this.options.clientId,
-          lastKnownServerSeq: await this.options.getLastServerSeq(),
-        }),
-      });
+      );
+      let res = await send(usesDelta);
+      // Server downgrade or rotated signing key: retry the SAME operations
+      // with their original complete clocks. No extra op or re-encryption.
+      if (usesDelta && (res.status === 404 || res.status === 400)) {
+        this.causalFrontier = undefined;
+        res = await send(false);
+      }
 
       if (!res.ok) {
         throw await toHttpError(res);
       }
 
       const body = (await res.json()) as UploadResponse;
+      if (body.gapDetected === true) await this.markHistoryIncomplete();
 
       // 🔴 逐条检查 accepted。
       // HTTP 200 **不代表** op 被接受 —— 服务端会对单条 op 返回
@@ -1023,7 +1239,7 @@ export class SyncClient {
         const attempts = await Promise.all(
           body.newOps.map(async (o) => {
             try {
-              return { ok: true as const, op: await decodeServerOp(o, password) };
+              return { ok: true as const, op: await decodeServerOp(o, payloadCipher) };
             } catch (error: unknown) {
               return {
                 ok: false as const,
@@ -1037,6 +1253,10 @@ export class SyncClient {
 
         const decoded = attempts.filter((a) => a.ok).map((a) => a.op);
         const failed = attempts.filter((a) => !a.ok);
+
+        const failedSnapshot = failed.find((failure) => body.newOps!.some((envelope) =>
+          envelope.op?.id === failure.opId && (SUPER_SYNC_SNAPSHOT_OP_TYPES as readonly string[]).includes(envelope.op.opType)));
+        if (failedSnapshot !== undefined) throw new UndecryptablePageError(body.newOps.length, failedSnapshot);
 
         if (decoded.length > 0) await this.options.applyRemote(decoded);
 
@@ -1053,6 +1273,7 @@ export class SyncClient {
           piggybackAllUndecodable = true;
         } else {
           // 有的解开、有的解不开 = 口令是对的，只是历史里混着别的口令写的数据。
+          await this.markHistoryIncomplete();
           for (const f of failed) this.unreadableOps.push(f);
         }
       }
@@ -1112,7 +1333,7 @@ export class SyncClient {
   private async resolveConflicts(
     conflicts: ConflictReport[],
     token: string,
-    password: string,
+    payloadCipher: SyncPayloadCipher,
   ): Promise<ConflictInfo[]> {
     const unresolved: ConflictInfo[] = [];
     const toRedispatch: Operation<string>[] = [];
@@ -1217,7 +1438,7 @@ export class SyncClient {
       // 重传仍然冲突说明自动判定不成立，那正是**该交给用户**的情况，
       // 而不是我们自己再猜一轮。
       const retryConflicts: ConflictReport[] = [];
-      await this.upload(token, password, retryConflicts);
+      await this.upload(token, payloadCipher, retryConflicts);
       if (retryConflicts.length > 0) {
         const history = await this.options.getOpsForEntity(
           retryConflicts[0]!.op.entityType,
@@ -1262,8 +1483,13 @@ export class SyncClient {
     choice: 'keep-local' | 'keep-remote',
   ): Promise<SyncStatus> {
     const token = await this.options.getToken();
-    const password = await this.options.getPassword();
-    if (token === undefined || password === undefined || password === '') {
+    let payloadCipher: SyncPayloadCipher | undefined;
+    try {
+      payloadCipher = await this.getPayloadCipher();
+    } catch {
+      return { kind: 'error', reason: 'no-encryption-password', retryable: false };
+    }
+    if (token === undefined || payloadCipher === undefined) {
       // 分成两条精确原因，而不是原来那句"未登录或缺少加密口令" ——
       // 用户能做的事完全不同（去登录 vs 去填口令），混着说等于没说。
       if (token === undefined) {
@@ -1316,8 +1542,24 @@ export class SyncClient {
     }
   }
 
+  private async getPayloadCipher(): Promise<SyncPayloadCipher | undefined> {
+    if (this.options.encryptionMode === 'vault') {
+      // Runtime guard as well: JS/native callers do not all pass through tsc.
+      return this.options.getPayloadCipher ? this.options.getPayloadCipher() : undefined;
+    }
+    const password = await this.options.getPassword();
+    return password ? createPasswordPayloadCipher(password) : undefined;
+  }
+
+  private async markHistoryIncomplete(): Promise<void> {
+    if (this.options.markHistoryIncomplete === undefined) {
+      throw new Error('Skipping history requires durable incomplete-history storage');
+    }
+    await this.options.markHistoryIncomplete();
+  }
+
   /** 增量下载。按 serverSeq 游标分页，直到 hasMore 为 false。 */
-  private async download(token: string, password: string): Promise<void> {
+  private async download(token: string, payloadCipher: SyncPayloadCipher): Promise<void> {
     for (;;) {
       const since = await this.options.getLastServerSeq();
       const url = new URL(`${this.options.baseUrl}/api/sync/ops`);
@@ -1325,6 +1567,12 @@ export class SyncClient {
       url.searchParams.set('limit', String(DOWNLOAD_PAGE_SIZE));
       // 排除自己：我们的 op 已经应用过了，拉回来纯属浪费
       url.searchParams.set('excludeClient', this.options.clientId);
+      // `appVersion` 只搭在下载段这**一个**参数上：服务端 `touchDevice` 的触发条件就是
+      // `excludeClient` 在（`server/src/sync/sync.routes.ts`），所以缺了 clientId 那次连版本都不会记。
+      // 缺省不传 = 一个字都不发（沉默与"低于 cut"同档，见 options.appVersion 的注释）。
+      if (this.options.appVersion) {
+        url.searchParams.set('appVersion', this.options.appVersion);
+      }
 
       const res = await this.fetchImpl(url.toString(), {
         headers: { authorization: `Bearer ${token}` },
@@ -1334,6 +1582,16 @@ export class SyncClient {
 
       const body = (await res.json()) as DownloadResponse;
       const ops = body.ops ?? [];
+      if (body.gapDetected === true) await this.markHistoryIncomplete();
+
+      if (body.capabilities?.causalFrontierDelta === true && body.causalFrontier !== undefined) {
+        this.causalFrontier = body.causalFrontier;
+      } else if (body.capabilities?.causalFrontierDelta !== true) {
+        // A legacy server may silently strip the new request fields. Drop the
+        // cached token before the next upload so its compact clock is never
+        // interpreted as a complete clock by that server.
+        this.causalFrontier = undefined;
+      }
 
       if (ops.length > 0) {
         /**
@@ -1361,7 +1619,7 @@ export class SyncClient {
         const attempts = await Promise.all(
           ops.map(async (o) => {
             try {
-              return { ok: true as const, op: await decodeServerOp(o, password) };
+              return { ok: true as const, op: await decodeServerOp(o, payloadCipher) };
             } catch (error: unknown) {
               return {
                 ok: false as const,
@@ -1375,6 +1633,12 @@ export class SyncClient {
 
         const decoded = attempts.filter((a) => a.ok).map((a) => a.op);
         const failed = attempts.filter((a) => !a.ok);
+
+        // A full-state op may be the only copy of the purged server prefix.
+        // Unlike an isolated unreadable delta, skipping it loses that prefix.
+        const failedSnapshot = failed.find((failure) => ops.some((envelope) =>
+          envelope.op?.id === failure.opId && (SUPER_SYNC_SNAPSHOT_OP_TYPES as readonly string[]).includes(envelope.op.opType)));
+        if (failedSnapshot !== undefined) throw new UndecryptablePageError(ops.length, failedSnapshot);
 
         if (decoded.length > 0) await this.options.applyRemote(decoded);
 
@@ -1399,8 +1663,18 @@ export class SyncClient {
           }
           // 有的解开、有的解不开 = 口令确实是对的，只是历史里混着别的口令写的数据。
           // 跳过它们（重试也不会变好），但要**如实上报**，不能装作没这回事。
+          await this.markHistoryIncomplete();
           for (const f of failed) this.unreadableOps.push(f);
         }
+      }
+
+      // Persist snapshot-only history only after its materialization succeeds,
+      // and before the cursor commits. A failed payload must not grant causality.
+      if (body.snapshotVectorClock !== undefined) {
+        if (this.options.mergeRemoteClock === undefined) {
+          throw new Error('Snapshot frontier requires durable clock storage');
+        }
+        await this.options.mergeRemoteClock(body.snapshotVectorClock);
       }
 
       /**
@@ -1466,24 +1740,38 @@ export class SyncClient {
 export class SyncHttpError extends Error {
   readonly status: number;
 
-  constructor(status: number, detail: string) {
+  /**
+   * 服务端给的**稳定码**（`ACCOUNT_CLOSED` / `E2EE_REQUIRED` / …），原样留着。
+   *
+   * 🔴 必须有它：`status` 只能说"这枚令牌不行"，说不了"**为什么**不行"，
+   * 而注销账号与改口令/被踢下线在 `401` 上是**同一个状态码**。
+   * 少了这个字段，客户端要判"账号没了"就只剩对 `detail` 那句**文案**做匹配 ——
+   * 那是本文件已经写过两次的失败模式（见 `SyncHttpError` 文件头与
+   * `isNetworkError` 的注释）。状态码不能只进文案不进类型，稳定码也一样。
+   */
+  readonly code: string | undefined;
+
+  constructor(status: number, detail: string, code?: string) {
     super(`同步请求失败：HTTP ${String(status)}${detail === '' ? '' : ` — ${detail}`}`);
     this.name = 'SyncHttpError';
     this.status = status;
+    this.code = code;
   }
 }
 
 /** 把非 2xx 响应变成带服务端信息的错误。 */
 async function toHttpError(res: Response): Promise<SyncHttpError> {
   let detail = '';
+  let code: string | undefined;
   try {
-    const body = (await res.json()) as { error?: string; message?: string };
+    const body = (await res.json()) as { error?: string; message?: string; code?: string };
     detail = body.error ?? body.message ?? '';
+    code = body.code;
   } catch {
     // 响应体不是 JSON —— 不要因为解析失败而丢掉状态码
     detail = '';
   }
-  return new SyncHttpError(res.status, detail);
+  return new SyncHttpError(res.status, detail, code);
 }
 
 /**
@@ -1499,6 +1787,23 @@ async function toHttpError(res: Response): Promise<SyncHttpError> {
  */
 export function isUnauthorizedFailure(error: unknown): boolean {
   return error instanceof SyncHttpError && (error.status === 401 || error.status === 403);
+}
+
+/**
+ * 服务端用来标"账号已注销"的**稳定码**（E1 在 middleware 里发的）。
+ *
+ * 🔴 判定**只认这个码，不认状态码、不认文案**。理由不是洁癖：
+ * 这一条判据的下游动作是**销毁本机数据**，误判的代价是不可逆的。
+ *   · 状态码不行：`401` 同时是"令牌过期"（改口令、别的设备登出）的答复，
+ *     而那些情形下正确的动作恰恰是**什么都不删**（`'unauthorized'` 那条）。
+ *   · 文案不行：本文件已经有两处踩过"对一句随时会变的中文做正则"（见
+ *     `isNetworkError` 与 `SyncHttpError` 的注释）。
+ */
+export const ACCOUNT_CLOSED_CODE = 'ACCOUNT_CLOSED';
+
+/** 这次的失败是不是"账号没了"（而不是"这枚令牌没了"）。 */
+export function isAccountClosedFailure(error: unknown): boolean {
+  return error instanceof SyncHttpError && error.code === ACCOUNT_CLOSED_CODE;
 }
 
 /**

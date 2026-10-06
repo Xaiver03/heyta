@@ -113,6 +113,18 @@ export const SITES = {
 };
 
 /**
+ * 首启同意闸门上「不联网」那颗按钮的**逐语言**文案。
+ *
+ * 🔴 键必须与 `TARGETS` 里的 `locale` 取值同名（`zh-CN` / `en`）。
+ * 值抄自 `packages/i18n`（`common.privacy.consent.localOnly`，zh-CN:137 / en:111）——
+ * 抄件会被 `verify-artifacts.mjs` 逐条对账，见 `dismissTexts` 那段说明。
+ */
+export const CONSENT_LOCAL_ONLY = {
+  'zh-CN': '只用本机',
+  en: 'This device only',
+};
+
+/**
  * 目标清单。
  *
  * 字段说明：
@@ -149,7 +161,21 @@ export const TARGETS = [
   { id: 'W04', name: '番茄钟', site: 'web', openVia: 'tab', view: 'focus', readyText: '番茄钟', appStore: true },
   { id: 'W05', name: '时间线', site: 'web', openVia: 'tab', view: 'timeline', readyText: '时间线', appStore: true },
   { id: 'W06', name: '成长', site: 'web', openVia: 'tab', view: 'growth', readyText: '成长', appStore: true },
-  { id: 'W07', name: '回收站', site: 'web', openVia: 'tab', view: 'trash', readyText: '回收站' },
+  // 🔴 `seed`：这张图主张的是"回收站里四类都有"，而截图流水线原来**没有任何种数据的层**
+  //   （计划 §10.219 现量），所以它只能截出一个空回收站或只有任务的回收站。
+  //   `capture.mjs` 会把 `fixture` 走**产品自己的「从备份还原」通道**喂进去，
+  //   再按夹具里"每一条被删的行"逐条做存在性判据 —— 不是直接写 IndexedDB。
+  //   `settingsLabel` 与 `dismissTexts` 同规：`scripts/` 不在 pnpm 工作区里，这是一份**抄件**，
+  //   由 `verify-artifacts.mjs` 的词条对账钉住（改词条不改这里 ⇒ 门禁红）。
+  {
+    id: 'W07',
+    name: '回收站',
+    site: 'web',
+    openVia: 'tab',
+    view: 'trash',
+    readyText: '回收站',
+    seed: { fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json', settingsLabel: '设置' },
+  },
   { id: 'W08', name: '设置', site: 'web', openVia: 'tab', view: 'settings', readyText: '设置' },
 
   // ── 移动端（标签式的移动视口）────────────────────────────────────
@@ -166,16 +192,42 @@ export const TARGETS = [
   { id: 'W02-en', name: 'Quadrants', site: 'web', openVia: 'tab', view: 'quadrant', locale: 'en', readyText: 'Quadrants' },
   { id: 'W03-en', name: 'Habits', site: 'web', openVia: 'tab', view: 'habits', locale: 'en', readyText: 'Habits' },
   { id: 'W05-en', name: 'Timeline', site: 'web', openVia: 'tab', view: 'timeline', locale: 'en', readyText: 'Timeline' },
-  { id: 'W07-en', name: 'Trash', site: 'web', openVia: 'tab', view: 'trash', locale: 'en', readyText: 'Trash' },
-].map((target) => ({
-  device: 'desktop',
-  fullPage: false,
-  authRequired: false,
-  dismissTexts: [],
-  appStore: false,
-  locale: 'zh-CN',
-  ...target,
-}));
+  {
+    id: 'W07-en',
+    name: 'Trash',
+    site: 'web',
+    openVia: 'tab',
+    view: 'trash',
+    locale: 'en',
+    readyText: 'Trash',
+    // 夹具里的标题是**用户自己的字**，TrashBoard 原样显示、不翻译 ⇒ 中英两张图共用同一组期望值。
+    seed: { fixture: 'scripts/screenshots/fixtures/trash-four-kinds.json', settingsLabel: 'Settings' },
+  },
+].map((target) => {
+  const merged = {
+    device: 'desktop',
+    fullPage: false,
+    authRequired: false,
+    appStore: false,
+    locale: 'zh-CN',
+    // 默认不种数据：只有需要演示"有内容"的图才声明 seed（见 W07 的注释）。
+    seed: null,
+    ...target,
+  };
+  return {
+    ...merged,
+    // 🔴 web 站点默认要清掉**首启同意闸门**（`PrivacyConsentSheet`，10-02 `881aa92a`）。
+    //    它是全屏遮罩，挡的不只是"看"，而是**点导航标签**那一下 ⇒ 不处理它，
+    //    `openVia: 'tab'` 的 web 目标在**全新 context**（Playwright 每次都是空的 IndexedDB）
+    //    上全都点不动。本轮实测：`--only W07` 两趟都卡在 `aria-selected` 回读上。
+    //    选「只用本机」而不是「同意并联网」：截图环境连不上服务器，而这条主张正是要演示的东西。
+    // ⚠️ 这两个串是 `packages/i18n` 的**抄件** —— `scripts/` 不在 pnpm 工作区里，
+    //    `import('@heyta/i18n')` 实测 `ERR_MODULE_NOT_FOUND`，读不到真源。
+    //    所以由 `verify-artifacts.mjs` 常驻对账"串还在不在对应语言的词条表里"（改词条不改这里 ⇒ 门禁红）。
+    dismissTexts:
+      merged.dismissTexts ?? (merged.site === 'web' ? [CONSENT_LOCAL_ONLY[merged.locale]] : []),
+  };
+});
 
 /** 截图产物的落盘根目录（相对仓库根）。 */
 export const ARTIFACT_ROOT = 'screenshots';

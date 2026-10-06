@@ -248,9 +248,14 @@ push 只在用户明确要求时做。
 
 ## 10. 未决 / 需裁决
 
-- macOS 壳门禁 `check:macos-window` 的**跳过分支返回 `exit 0`**（非 darwin / 无 swift /
+- ~~macOS 壳门禁 `check:macos-window` 的**跳过分支返回 `exit 0`**（非 darwin / 无 swift /
   取证 `exit 4` / 非 Aqua）⇒ `pnpm check` 可全绿而这条从未执行。改它需要一个裁决，
-  建议分界：非 darwin 与无 swift 保持跳过，`exit 4` 与"有 Aqua 会话却取不到图"判红。**尚未拍**。
+  建议分界：非 darwin 与无 swift 保持跳过，`exit 4` 与"有 Aqua 会话却取不到图"判红。**尚未拍**。~~
+  ✅ **已拍并已落地**（本笔写于 10-01 03:38，裁决在九小时后由 `1030a560` 落进代码）：
+  现在**只有**"平台不符"与"没有 `swift`"两条返回 `exit 0`（工具链不存在，这台机器上本来就不可能跑），
+  `exit 4`（无屏幕录制权限）与"有 Aqua 会话却取不到图"**都判红**，分界就写在那条门禁的文件头
+  （`scripts/check-macos-window.mjs:40-54`）。⚠️ 本条被 `goal-multi-end-coverage.md` §7.18 的
+  "尚未拍"**照抄过一次**（10-03，比落地晚两天）—— 那句也一并更正在那里。
 - `check:shell-unicode` 的红来自另一条线未提交的 `scripts/reinstall-all.sh:174` hunk
   （HEAD 干净），归属那条线，本轮不动。
 - `pnpm check` 是 46 段 `&&` 链，**只暴露第一个红**；断点之后的段"没跑过"不等于"过了"。

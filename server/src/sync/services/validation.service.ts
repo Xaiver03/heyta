@@ -242,13 +242,8 @@ export class ValidationService {
     }
     op.vectorClock = clockValidation.clock;
 
-    // NOTE: Vector clock pruning (limitVectorClockSize) is intentionally NOT done here.
-    // It is performed in processOperation() AFTER conflict detection but BEFORE storage.
-    // Pruning before comparison drops entity clock IDs when the merged clock exceeds
-    // MAX_VECTOR_CLOCK_SIZE (e.g., during conflict resolution where the client includes
-    // all entity clock IDs + its own ID). The comparison then sees non-shared keys and
-    // returns CONCURRENT instead of GREATER_THAN → infinite rejection loop.
-    // DoS protection: sanitizeVectorClock() above caps at 2.5x MAX_VECTOR_CLOCK_SIZE (50).
+    // Accepted clocks are lossless. Invalid dimensions or resource overflow
+    // reject the operation explicitly instead of weakening its causal proof.
 
     // Validate payload complexity to prevent DoS attacks via deeply nested objects.
     // Full-state ops (SYNC_IMPORT, BACKUP_IMPORT, REPAIR) get higher thresholds

@@ -143,6 +143,7 @@ describe('syncFailureMessageKey', () => {
       'undecryptable-page',
       'upload-rejected',
       'unauthorized',
+      'account-closed',
     ] as const;
     const seen = new Set<string>();
     for (const reason of reasons) {

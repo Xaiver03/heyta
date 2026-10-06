@@ -143,3 +143,24 @@ describe('offsetPresets：转发领域层的同一个数组', () => {
     expect(offsetPresets()[0]).toBe(0);
   });
 });
+
+describe('local uncertain delivery evidence', () => {
+  it('is tied to an occurrence, remains actionable, and never changes the synced phase', () => {
+    const value = reminder({ id: 'uncertain', triggerAt: NOW - 1 });
+    const row = toReminderRows([value], NOW, [`uncertain|${NOW - 1}`])[0]!;
+    expect(row.deliveryUncertain).toBe(true);
+    expect(row.phase).toBe('due');
+    expect(row.canSnooze).toBe(true);
+    expect(value.firedAt).toBeUndefined();
+    expect(toReminderRows([{ ...value, snoozedUntil: NOW + HOUR }], NOW, [`uncertain|${NOW - 1}`])[0]!.deliveryUncertain).toBe(false);
+  });
+
+  it('does not override later fired or dismissed facts', () => {
+    for (const closed of [{ firedAt: NOW }, { dismissedAt: NOW }]) {
+      const value = reminder({ id: 'closed', triggerAt: NOW - 1, ...closed });
+      const row = toReminderRows([value], NOW, [`closed|${NOW - 1}`])[0]!;
+      expect(row.deliveryUncertain).toBe(false);
+      expect(row.canSnooze).toBe(false);
+    }
+  });
+});
