@@ -14504,6 +14504,57 @@ cd apps/mobile/ios && pod install && git diff -- Podfile.lock          # 必然�
 | G-73 / G-74 | iOS/mobile 线、各端打包线 | 见上面两段各自写的判据 |
 
 
+### 8.281 01:4x 抓到自己交出去的一次静默丢失：那三笔代码根本不在落地链默认读的那枚分支上
+
+**发现方式不是审代码，是准备交接班时把落地链的默认输入读了一遍。** 本批的三笔代码
+（`324b9e45` G-62 词条 / `bfe4497c` G-44b 四件套 / `8b4aaacb` #66 证据图，合计 20 枚文件）
+提交在 `feat/selfhost-g62-g44b`（载体 `~/heyta-carriers/heyta-g62-1007`），而落地链的两个入口
+**默认只读 `feat/self-host-distribution`**：
+
+- `research/tools/selfhost-land-main.mjs:48` — `const BRANCH_REF = process.env.HEYTA_LAND_BRANCH ?? 'feat/self-host-distribution';`
+- `research/tools/selfhost-merge-carrier.mjs:158` — `const SOURCE = process.env.HEYTA_SOURCE_REF || 'feat/self-host-distribution';`
+
+⇒ 窗口打开、有人（或未来的我）照默认跑落地时，**那 20 枚文件一笔都不会进 main**，而这件事
+没有任何一层会报：台账分支上 5 笔全是 docs 笔，读起来像"这批只剩文档没落地"，
+于是"代码没落地"这一格看起来已经闭合了。env 覆盖（`HEYTA_SOURCE_REF`）能救，但它要求
+**下一个人知道要用它** —— 依赖后人记得的开关不是判据。这与我这一批反复写的那条同族：
+**交付物的落点必须挂在执行者默认会读的地方，不是挂在文档里的说明上。**
+
+**做法**：把代码分支合进落地源分支（一次 `git merge --no-ff`，在本批 worktree
+`heyta-wt-selfhost`，合并前 tip `03829d50` ⇒ 回退就是 `git reset --hard 03829d50`）。
+只有一族冲突，正是那个已收口过的形状：
+
+| 项 | 读数（由工具自己拼出，不由我复述） |
+|---|---|
+| 冲突文件 | 仅 `docs/research/self-host-distribution-audit.md`（追加型台账） |
+| 解法 | 它自己的单一所有者 `research/tools/selfhost-audit-union.mjs` 的 `unionAudit({base, main: theirs, src: ours})` |
+| main 侧独有 | 55 行原样保留，带那张"下面这块不是本批写的"的哨兵 |
+| 本批独有 | 283 行 |
+| 四条无损断言 | `lostMain=0 / lostSrc=0 / droppedBase=0 / invented=0`，`markers=false`，`missingBanner=false` |
+| 其余合进来的 | 1622 枚 = main 从 `9651a4ac` 走到 `82e0ee6b` 那一段（986 A / 634 M / 2 D），是"分支落后于 main"的正常收敛，不是本批新写的东西 |
+
+**合并后新长出一条可复核的纯度判据**（落地那一刻也能拿它对着别人问"本批动了哪些文件"）：
+
+```bash
+git diff --name-only 82e0ee6b..feat/self-host-distribution   # 应当恰好 21 枚 = 本批 20 枚代码/e2e 文件 + 这份台账
+```
+
+三笔代码 SHAs 现在都是落地源分支的祖先（`git merge-base --is-ancestor` 三枚都 YES），
+`feat/selfhost-g62-g44b` 不必再单独落地。
+
+🔴 **边界，不包装成完成**：**合并后的这棵树没有跑过任何门禁**。取读数时 1 分钟负载 **47.73**
+（阈值 12）⇒ 环境无效，现在跑出来的读数不作数；落地那一刻本来就要在载体上跑完整链
+（`selfhost-land-main.mjs --confirm`），这一笔不替代它。要现量的最小集写在合并提交信息里。
+
+⚠️ **我自己这一趟又中了本仓已入档的那条 rc 陷阱，而且是同一 session 内第二次**：
+`git commit … | tail -5` 之后 `echo $?` 报的是 `tail` 的 0，而 git 其实**没提交**
+（选项写错：`--no-verify=false` 不是合法取值）。发现它靠的不是那个 0，是随后
+`git log` 仍显示 `03829d50`。同一族的还有本节上面那步的 `MERGE_RC=0`。
+⇒ **判"命令成没成"要拿它自己的 rc**：别接管线，或用 `bash -c 'cmd; echo RC=$?'` 的单引号形式。
+这不是新条（环境陷阱 #179 与 §7 第 45 条就是这个），是"知道规则仍会在顺手写命令时中招"的取证 ——
+所以合并这一步的**在场判据**我全部改成了内容核对（三枚 SHAs 的 `--is-ancestor`、21 枚纯度差集、
+关键符号 grep），而不是只看退出码。
+
 <!-- ↓↓ 载体并集：以下 55 行来自 main 侧（其他人已提交的节），逐行原样保留 ↓↓ -->
 <!-- ↓↓ 载体并集：以下 50 行来自 main 侧（其他人已提交的节），逐行原样保留 ↓↓ -->
 ## 9. 交还一条现场：`reinstall:all` 的 mac 段不是"慢"，是不朽（2026-10-04 06:0x 现量）
