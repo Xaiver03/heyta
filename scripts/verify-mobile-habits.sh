@@ -357,7 +357,10 @@ echo "     开局安装身份：[${INSTALL_ID_START:-读不到}]"
 launch_app; sleep 8
 ensure_app_foreground || { blame_crash; exit 1; }
 dismiss_permission_dialog
-handle_privacy_consent
+# ⚠️ 这里**不**单独调 `handle_privacy_consent`：`dismiss_welcome_if_present` 内部已经先按
+#    规范候选（`同意并联网` / `只用本机`）收过一遍面板。裸调一次等于传了个空候选表 ——
+#    它只会白等 10 秒并打印一行"面板在，但取不到候选按钮的坐标（候选：）"，
+#    看着像缺陷其实是我少传了参数（同一族错误在下面的首次同步那段也犯过一次，已修）。
 dismiss_welcome_if_present
 require_screen
 
@@ -381,9 +384,18 @@ if XY=$(tap_label "立即同步"); then
   while [ "$seg" -le 18 ]; do
     T=$(wait_synced 10)
     [ -n "$T" ] && break
-    handle_privacy_consent
+    # 🔴 候选按钮的标签**必须逐字传给** `handle_privacy_consent`：它是 `for want in "$@"`，
+    #    不传参就等于"面板在、但一个候选都没有"，于是每一段都只会打印
+    #    `隐私同意面板在，但取不到候选按钮的坐标（候选：）` 而永远点不掉 ——
+    #    实测 07 02:29 那一趟就是这么在第 2–18 段上空转的（我自己上一笔引入的缺陷）。
+    handle_privacy_consent "${CONSENT_GATE_PREFERRED:-同意并联网}" "只用本机"
     if [ "${CONSENT_GATE_SEEN:-0}" = "1" ]; then
-      echo "     第 $seg 段被首启隐私同意面板挡住 ⇒ 已点「${CONSENT_GATE_CHOSEN:-?}」，继续等"
+      if [ -n "${CONSENT_GATE_CHOSEN:-}" ]; then
+        echo "     第 $seg 段被首启隐私同意面板挡住 ⇒ 已点「$CONSENT_GATE_CHOSEN」，继续等"
+      else
+        echo "     第 $seg 段：面板在但**没点到任何候选** ⇒ 这一段的等待等于白等，把界面打出来给人看"
+        screen_txt
+      fi
     fi
     seg=$((seg + 1))
   done
