@@ -41,6 +41,7 @@ import { I18nProvider, zhCN } from '@heyta/i18n';
 
 import { AppWindow } from '../src/mockup/AppWindow.js';
 import {
+  SHELL_HEADER_ACTIONS,
   SHELL_PRIMARY_NAV,
   SHELL_QUADRANT_NAV,
   SHELL_VIEW_TABS,
@@ -156,26 +157,52 @@ describe('展厅复刻与应用一致', () => {
     expect(note?.textContent?.trim()).toBe(zhCN['web.quadrant.footnote']);
   });
 
-  it('顶栏右侧是完整的四件：同步状态 + 立即同步 + 设置 + 语言 + 主题', () => {
-    const view = renderMockup();
+  it('页头右侧画的就是登记处那几件，且搬走的四件一张都不许出现', () => {
+    const view = renderMockup('tasks');
     const actions = view.querySelector('.mk-header__actions');
-    expect(actions).not.toBeNull();
+    expect(actions, '页头动作区没画出来 ⇒ 这一条没有基准').not.toBeNull();
+
+    // 数量从登记处推导，不写死 —— 写死的数字就是下一次搬控件时的第三个漂移点。
+    // "登记本身对不对"由 `mockup-shell-shape.spec.tsx` #7 与 `App.tsx` 逐字对账负责。
+    // ⚠️ 任务视图：产品那边 `task-sort` 的条件是 `contentView === 'tasks' && visible.length > 0`，
+    // 所以这一屏应当是**全两件**；换一屏就不是这个数（那条条件判据在 #7 的另一条里）。
+    const shownOnTasks = SHELL_HEADER_ACTIONS.filter(
+      (a) => a.onlyForView === undefined || a.onlyForView === 'tasks',
+    );
+    expect(actions?.children.length, `页头画多了：${actions?.innerHTML ?? ''}`).toBe(
+      shownOnTasks.length,
+    );
     const text = actions?.textContent ?? '';
-    expect(text).toContain(zhCN['web.sync.status.synced']);
-    // 语言按钮上是**另一种语言自己的名字**
-    expect(text).toContain(zhCN['common.lang.en']);
     const labels = [...(actions?.querySelectorAll('[aria-label]') ?? [])].map((el) =>
       el.getAttribute('aria-label'),
     );
-    expect(labels).toContain(zhCN['web.sync.a11y.syncNow']);
-    expect(labels).toContain(zhCN['web.sync.settings.title']);
+    for (const action of shownOnTasks) {
+      expect(
+        text.includes(zhCN[action.labelKey]) || labels.includes(zhCN[action.labelKey]),
+        `页头少了 ${action.id}（${zhCN[action.labelKey]}）`,
+      ).toBe(true);
+    }
+
+    // 🔴 反向：这四件早已搬走，只验"登记处都在"挡不住"把旧的加回来"。
+    // 「立即同步」的可访问名在整个仓库此刻只剩这张复刻在用 —— 它在这里消失，
+    // 才算真的搬完了（工单 H9 第 1 刀的收尾）。
+    for (const gone of [
+      zhCN['web.sync.a11y.syncNow'],
+      zhCN['web.sync.settings.title'],
+      zhCN['web.sync.status.synced'],
+      zhCN['common.lang.en'],
+    ]) {
+      expect(text, `页头里还能读到「${gone}」—— 搬走没生效`).not.toContain(gone);
+      expect(labels, `页头里还有「${gone}」这枚控件`).not.toContain(gone);
+    }
   });
 
-  it('视图切换条是 8 项，且标签逐字等于应用自己的词条', () => {
+  it('视图切换条与登记处同项同序，且整个窗口里没有多画一组 tab', () => {
     const view = renderMockup();
     const tabs = [...view.querySelectorAll('.mk-viewtab')].map((el) => el.textContent?.trim() ?? '');
 
-    // 真应用的顶栏是 8 个视图 tab（不含右侧的「日期 / 倒计时」，那是另一组）
+    // 视图那一组在**真应用**里是 rail（不是页头 tab 条）；项数与顺序由
+    // `mockup-shell-shape.spec.tsx` #5 与 `view-tabs.ts` + `modules.ts` 的默认开关逐字对账。
     const bar = view.querySelector('.mk-header__viewtabs, .mk-viewtabs');
     expect(bar).not.toBeNull();
     const viewTabBar = view.querySelectorAll('.mk-header .mk-viewtabs')[0];
@@ -186,8 +213,10 @@ describe('展厅复刻与应用一致', () => {
 
     expect(labels).toHaveLength(APP_VIEW_TABS.length);
     expect(labels).toEqual(APP_VIEW_TABS.map((key) => zhCN[key]));
-    // 顺带确认没有多画：整个窗口里的 tab 总数 = 视图 8 + 日期/倒计时 2
-    expect(tabs).toHaveLength(APP_VIEW_TABS.length + 2);
+    // 🔴 原来这里写的是「视图 N + 2」—— 那两枚是页头上的「日期 / 倒计时」，
+    // 它们 2026-09-30 就搬进 设置 → 显示 了。现在整窗口里只剩视图那一组：
+    // 数量仍从登记处推导，写死的 +2 会把下一次"再搬一枚"读成"复刻少画了"。
+    expect(tabs).toHaveLength(APP_VIEW_TABS.length);
   });
 
   it('侧栏主导航把登记的每一项都画出来了，含「已完成」', () => {

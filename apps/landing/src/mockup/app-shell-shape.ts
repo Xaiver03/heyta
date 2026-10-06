@@ -198,8 +198,104 @@ export const SHELL_PANEL_SECTIONS: readonly ShellPanelSection[] = [
   },
 ];
 
-/** 顶栏右侧「日期 / 倒计时」这组开关。对应 `App.tsx` 的 `dueMode` 组。 */
-export const SHELL_DUE_MODE_TABS: readonly { readonly labelKey: MessageKey }[] = [
-  { labelKey: 'web.shell.dueMode.date' },
-  { labelKey: 'web.shell.dueMode.countdown' },
+/**
+ * 页头右侧那一排**今天真的有的**控件。
+ *
+ * 🔴 这份登记不是"复刻想画什么"，是"产品现在有什么"。它由
+ * `tests/mockup-shell-shape.spec.tsx` 与 `apps/web/src/App.tsx` 里
+ * `.ht-header__actions` 那一段（**去掉注释之后**的 `data-testid` 全集）逐项对账，
+ * 两边多一件少一件都红。
+ *
+ * 为什么需要这一条：这一排原来是**手抄在渲染文件里的**，于是复刻比产品多画了四枚
+ * 早已搬走的控件（见下面 `SHELL_HEADER_MOVED_OUT`），而 26 条展厅测试**全绿** ——
+ * 那条绿色的判据 positively 要求"页头要有同步 + 立即同步 + 设置 + 语言 + 主题"。
+ * 一条把过时的形状钉成期望的判据，比没有判据更糟（AGENTS §8 第 3 条）。
+ */
+export type ShellHeaderActionKind = 'sort-select' | 'detail-toggle';
+
+export type ShellHeaderAction = {
+  readonly id: 'task-sort' | 'detail-pane-toggle';
+  readonly kind: ShellHeaderActionKind;
+  /** 图上读到的名字（产品用它当可访问名 / 可见标签）。 */
+  readonly labelKey: MessageKey;
+  /** 真应用这一段里必须出现的 `data-testid`。 */
+  readonly anchors: readonly string[];
+  /** 只有某个视图才画 —— 与产品的条件一致，不是复刻自己的偏好。 */
+  readonly onlyForView?: MockView;
+  /** `sort-select` 展示的那一档（产品的默认值）。 */
+  readonly optionKey?: MessageKey;
+};
+
+export const SHELL_HEADER_ACTIONS: readonly ShellHeaderAction[] = [
+  {
+    id: 'task-sort',
+    kind: 'sort-select',
+    labelKey: 'web.shell.sort.aria',
+    anchors: ['task-sort', 'task-sort-select'],
+    // 产品那边是 `contentView === 'tasks' && visible.length > 0`；展厅的任务屏有样例任务，
+    // 其余视图没有列表 ⇒ 只有任务屏画它。
+    onlyForView: 'tasks',
+    optionKey: 'web.shell.sort.display',
+  },
+  {
+    id: 'detail-pane-toggle',
+    kind: 'detail-toggle',
+    // 图上画的是"展开"那一态：复刻是静态图，详情列在图里没有画出来，
+    // 所以按钮的自带名说的是"点下去会怎样"（与产品同一条语义）。
+    labelKey: 'web.shell.detailPane.expand',
+    anchors: ['detail-pane-toggle'],
+  },
+];
+
+/**
+ * 曾经住在页头、如今**搬走了**的 affordance。
+ *
+ * 🔴 这份清单是给反向判据用的：复刻里不许再出现它们，而它们在产品页头那一段里
+ * 也已经不存在（对账 spec 两头都查）。每一件都写清搬到哪、哪天搬的 ——
+ * 否则下一个人会把它当"复刻漏画了"补回来，那正是这批漂移的成因。
+ */
+export const SHELL_HEADER_MOVED_OUT: readonly {
+  readonly what: string;
+  readonly nowIn: string;
+  readonly since: string;
+  /** 产品页头那一段里**不许再出现**的源码片段（组件名 / testid / 词条）。 */
+  readonly absentInWeb: readonly string[];
+  /** 复刻页头里**不许再出现**的文案（从词条表取，不抄字符串）。 */
+  readonly absentInMock: readonly MessageKey[];
+}[] = [
+  {
+    what: '同步状态 + 立即同步 + 同步设置齿轮',
+    nowIn: 'rail 底部那一组（`sync-rail`）',
+    since: '2026-10-06（工单 H9 第 1 / 3 刀）',
+    absentInWeb: ['SyncBar', 'web.sync.a11y.syncNow', 'sync-settings-entry'],
+    absentInMock: [
+      'web.sync.a11y.syncNow',
+      'web.sync.settings.title',
+      'web.sync.status.synced',
+    ],
+  },
+  {
+    what: '语言切换',
+    nowIn: '设置 → 显示',
+    since: '2026-10-06（H9 第 2 刀）',
+    absentInWeb: ['LanguageSwitcher'],
+    // 切换器画的是**每种语言自己的名字**，`common.lang.en` 就是它当年的标签之一。
+    absentInMock: ['common.lang.en'],
+  },
+  {
+    what: '主题开关',
+    nowIn: '设置 → 显示',
+    since: '2026-10-06（H9 第 2 刀）',
+    absentInWeb: ['ThemeToggle', 'theme-switch'],
+    // 主题按钮原来**没有可访问名**（一枚裸图标），所以反向判据只能从产品侧的源码取；
+    // 复刻这一侧靠"页头子元素数量 = 登记处"那一条兜住（少一件就得多一件才看得见他）。
+    absentInMock: [],
+  },
+  {
+    what: '「日期 / 倒计时」呈现方式',
+    nowIn: '设置 → 显示（带说明的 radiogroup，`due-display-pref`）',
+    since: '2026-09-30',
+    absentInWeb: ['due-display-pref', 'web.shell.dueMode.aria'],
+    absentInMock: ['web.shell.dueMode.date', 'web.shell.dueMode.countdown'],
+  },
 ];
