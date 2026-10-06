@@ -75,17 +75,17 @@ import {
   MOCK_CAPTURE_LIVE_GUARD,
   mockCaptureAddClass,
 } from '../src/mockup/capture-shape.js';
+import { readUiSource, readWebSource } from './helpers/source-text.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = resolve(HERE, '..');
 const REPO = resolve(HERE, '../../..');
 
-const WEB_SRC = process.env.HEYTA_MOCKUP_WEB_SRC ?? join(REPO, 'apps/web/src');
-const UI_SRC = process.env.HEYTA_MOCKUP_UI_SRC ?? join(REPO, 'packages/ui/src');
+// 两枚注入接缝的唯一所有者是 `./helpers/source-text.ts`（原先三份各自定义，
+// 变异台架指过去时只会重定向其中一份 ⇒ 另外两份在"临时树"上读的其实是真源码）。
+const readUi = readUiSource;
+const readWeb = readWebSource;
 const MOCKUP_SRC = process.env.HEYTA_MOCKUP_APP_SRC ?? join(APP, 'src/mockup');
-
-const readUi = (relative: string): string => readFileSync(join(UI_SRC, relative), 'utf8');
-const readWeb = (relative: string): string => readFileSync(join(WEB_SRC, relative), 'utf8');
 const readMockup = (file: string): string => readFileSync(join(MOCKUP_SRC, file), 'utf8');
 
 const captureModelSource = (): string => readUi('capture/model.ts');

@@ -202,30 +202,6 @@ export function showcaseQuadrantCounts(
   return counts;
 }
 
-/**
- * 「今天进度卡」上的数字（产品决策 P5）。
- *
- * 🔴 **它是编的，而且这里说明为什么它只能编** —— 免得下一个人以为"派生一下就好了"：
- *
- *   · 真应用那一张卡的数字来自 `@heyta/domain` 的 `computeTodayProgress()`，
- *     它的入参是 **habits + habitLogs + tasks + focusSessions + today**（五个）；
- *   · 而展厅**只编排了任务**（`SHOWCASE_TASKS`，8 条）—— 没有习惯、没有习惯日志、
- *     没有专注记录。派生的前提数据**不存在**；
- *   · 就算只按任务算也对不上：`dueInDays <= 0` 且未完成的只有 **3** 条（−2 / 0 / −1），
- *     而卡上写的是 `total: 5` —— 因为真应用把**习惯**也算进计划量。
- *   · `ShowcaseTask` 也**没有完成时间**字段（只有 `done` 布尔），
- *     所以"今天完成了几件"同样派不出来。
- * ⇒ **加 `@heyta/domain` 依赖解决不了这件事**（原决策 P5 的前提是错的，已修订）。
- *
- * 它与被删掉又补回的"象限计数"**性质不同**：象限计数是**可派生的**（有样例任务就够），
- * 所以那里必须派生；这张卡是**往真有的数字位里填样例值**，只能编。
- *
- * ⚠️ 但它**不是**"随手写的魔数"：集中登记在这里，且
- * `mockup-shell-shape.spec.tsx` 钉住内部一致性（`remaining === total - done`、
- * `0 < done <= total`）—— 一个自相矛盾的数字（比如 done > total）会红。
- */
-export const SHOWCASE_TODAY_PROGRESS = { done: 2, total: 5, remaining: 3 } as const;
-
 /** 四象限看板每一格里的任务（同样排除已完成）。 */
 export function showcaseTasksByQuadrant(
   tasks: readonly ShowcaseTask[] = SHOWCASE_TASKS,

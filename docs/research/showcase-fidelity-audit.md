@@ -236,7 +236,7 @@ cd e2e && node_modules/.bin/playwright test tests/smoke.spec.ts --reporter=line
 | 复刻漏「标签」整块 | 补上，形态照真应用：标题 + 「新标签」输入框 + `+` | 同上 + `mockup.css` 的 `.mk-field*` |
 | 复刻的清单是三行静态名字 | 改成真应用的形态：「新清单」输入框 + `+` | 同上 |
 | 复刻只有 4 个视图 tab | 补到 **8 个**；标签全部改用 `web.shell.*` / `web.trash.*`（**与应用同一份文案**） | 同上 |
-| **复刻四屏都没有「今天进度卡」** | 补上（`.mk-today`，含 2/5、提示语、进度条），四屏都常驻 —— 与 `App.tsx` 的 `view !== 'settings' && … && <TodayProgressCard />` 对齐 | 同上 |
+| **复刻四屏都没有「今天进度卡」** | 补上（`.mk-today`，含 2/5、提示语、进度条），四屏都常驻 —— 与 `App.tsx` 的 `view !== 'settings' && … && <TodayProgressCard />` 对齐。⚠️ **这一格的前提已在 10-06 过期**：产品侧 R6 那一刀把这张卡从"做事"视图撤进成长页（理由见 `apps/web/src/App.tsx` 那段"数字分散在三个位置"），展厅跟着撤掉，反向判据**从 `App.tsx` 源码派生**而不是写死 —— 全过程在 `docs/plans/goal-layout-audit.md` §9.12 | 同上 |
 | **复刻的输入框只在「任务」那一屏有** | 改成四屏都常驻（真应用的 `CaptureComposer` 在四个视图上都在） | 同上 |
 | **复刻漏四象限底部 footnote** | 补上（`web.quadrant.footnote`）—— 它解释"紧急度由截止时间推导"这条核心不变量 | `mockup/QuadrantGrid.tsx` |
 | **复刻顶栏右侧只有同步状态一个胶囊** | 补上「立即同步 / 设置 / 语言」三件，与 `SyncBar` + `LanguageSwitcher` 对齐 | `mockup/AppWindow.tsx` |

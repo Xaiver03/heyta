@@ -804,3 +804,31 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
    `check:adr-numbering` / `check:backup-retention`）⇒ 这一格等的不是裁决，是那一行的所有权让开；
    给下一位的建议改法：让 `check:gate-wiring` 补一条"遍历 `scripts/check-*.mjs`，
    既没被任何定义引用、又不在允许表里的 ⇒ 红"，这样"写了没接"会从静默变成当场响。
+
+### 9.12 展厅撤掉「今天进度卡」：把一条**写死的过时形状**换成从产品源码派生的判据
+
+原始症状（工单 #24）：展厅五屏每张都常驻 `.mk-today`，而产品早就不在"做事"视图画它了。
+**这不只是复刻件漂了 —— 判据本身把那个漂的形状写成了期望**：
+`mockup-today-shape.spec.tsx` 里那条 `expect(today, '每个"做事"的视图上都应有今日进度卡').not.toBeNull()`
+是正向断言，它保证的是"卡片一直在"，所以产品撤卡那天起，这 26 条测试就一起变成了
+**为过时形状背书**的绿灯（§7 元规则 2：一条永远通过的判据比没有判据更糟）。
+
+| 项 | 现量（10-06 18:4x） |
+|---|---|
+| 产品侧真形状 | `apps/web/src/App.tsx:2288-2304` 那段 R6 说明：卡从做事视图撤掉，共享组件**没删**、只住成长页（`GrowthView` → `GrowthBoard` 的 `today` 槽位）。钉住它的是 web 自己那条：`apps/web/tests/motivation-view.spec.tsx:150` 断言任务视图里 `[data-testid="today-progress"]` **为 null** |
+| 撤掉的东西 | `AppWindow.tsx` 的 `<section className="mk-today">` 与文件尾那份"四视图常驻"的说明、`mockup.css` 的 `.mk-today*` 六条规则（69 行）、`showcase-data.ts` 的 `SHOWCASE_TODAY_PROGRESS`、`mockup-shell-shape.spec.tsx` 的 #6 整节（编造值自洽）、`tests/mockup-today-shape.spec.tsx` **整个文件** |
+| 新判据的形状 | `mockup-fidelity.spec.tsx`：`productDraws = codeOccurrences(readWebAppSource(), 'TodayProgressCard') > 0`，再对四个做事屏断言"展厅画没画 === productDraws"。**方向由产品源码决定**，不是写死的 `toBe(false)` —— 产品哪天把卡放回做事视图，这条会反过来要求展厅跟上 |
+| 判据自己的对照 | 两条：① `expect(app).toContain('TodayProgressCard')`（那个名字**确实**在 App.tsx 里，只是住在注释里）；② `expect(stripComments('/* TodayProgressCard */')).not.toContain(...)`（"剥注释"这一步真的在起作用 —— 摘掉它，方向会静默翻反） |
+| 四臂读数 | 台架 `~/.heyta-window-rigs/heyta-fidelity-today-arms.py`：**A** 展厅多画一张 ⇒ 红；**B** 用注入接缝把卡放回产品做事视图而展厅没跟 ⇒ 红；**C** 摘掉剥注释 ⇒ 红；**复跑（全部还原之后）** ⇒ 绿。`ARMS=4 BAD=0` |
+| 顺带收掉的一处重复 | 三枚 spec 各写一遍 `WEB_SRC` / `UI_SRC` 与 `readWeb` / `readUi`。`HEYTA_MOCKUP_WEB_SRC` 是故障注入台架的接缝，**三份定义意味着台架指过去时只重定向其中一份**，另外两份在"临时树"上读的其实是真源码 ⇒ 变异会打空而照样报绿。现在收进 `tests/helpers/source-text.ts` 一枚所有者 |
+| 门禁读数 | `check:design` / `check:ui-language` / `check:md-tables` / `check:layering` / `landing check:entries` 全 rc=0；`landing typecheck`（`tsconfig.spec.json`）rc=0；`landing test` **1316 passed / 1 failed** |
+
+⚠️ **那 1 枚红不是这一刀的**，三条腿在同一趟里量完：`mockup-quadrant-shape` 在**主检出**
+（web 工作树脏）红 ⇒ 把 `HEYTA_MOCKUP_WEB_SRC` 指到干净载体 **15 passed** ⇒ 载体里 HEAD 原码
++ 干净 web 也绿。⇒ 红跟着 `apps/web/src/features/quadrant/copy.ts` 那枚未提交改动走，属**别线在飞**，
+本刀不动它的判据、也不替它认下（B99 里那条"quadrant 红归因"从此有出处）。
+
+📌 两条一般规律（这一格真正欠的）：**正向判据会把"复刻件当前画了什么"钉成"应该画什么"**——
+被钉住的是历史那一刻而不是产品，所以凡是"照抄真应用"的对账判据，方向必须从真应用**读**出来。
+另一条：**注入接缝（env 旋钮）本身也要有唯一所有者**，多份定义等于把"变异一定打进真在跑那份"
+这个前提悄悄废掉（与 §7 第 82 条、上面 #17 那格是同一族的第三种面目）。
