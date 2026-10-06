@@ -7444,3 +7444,37 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     同一族在 #344（局部标志借用台账计数器名）、#45（管道后 `$?` 是 tail 的）、
     #179（`EXIT=$?` 接在 `tee` 上）里各犯过一次 —— 那三条是"读错了码"，这一条是
     **"码压根不编码那件事"**，更难看出来，因为 rc=0 长得比红更让人放心。
+
+348. 🔴 **`testID` 写在普通 `View` 上，iOS 那一端等于没写 —— 同一枚锚名在 Android 是节点、
+     在 iOS 根本不存在。拿 Android 的锚点词表去驱动 iOS 载体，症状与"界面没渲染那一格"逐字相同。**
+
+    iOS 助手载体第 3 步现量（rig47c）：`wait_id "ai-settings-section"` 恒取空 ⇒ 报
+    「设置面里没有 ai-settings-section（AI 段整块没渲染？）」。而**同一帧**的 AX 树里
+    端点表单四格与 26 枚逐工具授权全在 —— 界面是齐的，缺的是那枚锚点。
+
+    机制：RN 的 `testID` 在 iOS 变成 `accessibilityIdentifier`，而 `idb describe-all` 走
+    无障碍 API —— 只有**带无障碍特性的宿主视图**（Button/TextField/Pressable，即有 traits 的）
+    会被发成 accessibility element。`accessibilityIdentifier` 本身不给元素加特性。
+    原样现量：设置面 137 枚节点 / 31 枚 `AXUniqueId`，逐枚都是 `ai-endpoint-*`（Button/TextField）
+    与 `ai-tool-grant-*`（Checkbox = Pressable）；`settings-sheet`、`ai-settings-section`、
+    `ai-feature-*`、`assistant-screen`、`ai-gate-*`、`ai-endpoint-cap-*`、`${p}disclosure`、
+    `${p}failed` 八类容器锚点**一枚都不在**。
+    ⚠️ 它们在 Android 上都是真节点（`resource-id` 挂在 ViewGroup 上），所以 Android 那趟
+    （rig42 40/2）从来照不出这一档 —— 这是 #345 那一族的另一半：那次是**标签**在两端合成不同，
+    这次是**节点本身**在两端存在与否不同。
+
+    ❌ 不许用的修法：给容器加 `accessible`（RN 会把它并成一个 VoiceOver 元素，子节点从
+    读屏里消失 —— 为了探针伤真用户）。
+    ✅ 用的修法：**把 testID 挪到会被发出的那一层**，并给它一个唯一身份 ——
+      · `GateRow`：容器 → 内部那枚 `Checkbox`（Android 同时受益：`rid_control` 从此读到的是
+        有 `checked` 语义的那一层，不再需要往容器里找子节点）；
+      · `Chip`（`kit.tsx`）新增透传的 `testID`，于是能力 chip、逐档端点 chip
+        （`ai-route-<功能>-<下标>`）、档位 chip（`ai-tier-*`）、助手五档（`ai-mode-*`）都能点名；
+      · 失败面/披露面读它们内部的按钮（`${p}retry` 是这一轮新加的，`${p}send` 本来就在）。
+    📌 **端点 chip 的下标不用 `endpoint.id`**：随机 id 验收载体拿不到，而下标就是界面上
+    从左到右的可见次序 —— 锚点要选"探针与人都能预先知道"的那个维度（同 #236 的 occurrence 那条）。
+
+    📌 一般规律：**跨端验收载体的锚点词表要按"这一端到底发不发节点"来选，不能按"源码里写过
+    testID"来选。** 判某枚锚点在 iOS 存在与否，唯一证据是当场 `describe-all` 里数一遍 `AXUniqueId`；
+    门禁 ㉑ 那本账只保证"锚名对得上源码声明"，它判不了"那一端会不会把它发出来" —— 这一档缺口
+    由本条钉住：新加容器型 testID 时，先问它在哪一端是节点。
