@@ -308,6 +308,184 @@ function tapTabMarkers(text, label) {
   return { desc, rid };
 }
 
+/**
+ * 判据 ㉑：iOS 载体（`scripts/verify-mobile-ios-ai.sh`）用的**两本账**都要对得上源码。
+ *
+ * 为什么单开一判据（2026-10-06）：判据 ①⑤⑳ 的对账面是从**默认那一份脚本**里取的，
+ * 而 iOS 载体读的通道不一样 —— 定位走 `AXUniqueId`（`id:` 前缀）而不是 `resource-id`，
+ * needle 走 `zh <key>`（现取词条）而不是硬编码中文。这两条通道静默失效时，症状与
+ * Android rig44 那一轮**一模一样**：锚点不在树上 ⇒ `found_id` 恒假 ⇒ 反向判据恒真、
+ * 正向判据恒红，而**没有任何一层会在无设备时发现**。设备窗口是全仓最稀缺的资源
+ * （判据 ⑥ 那段注释讲的就是这个），所以这一档必须在离线侧先红。
+ *
+ * 三条子判据：
+ *  a) 每一枚**字面** `id:` 锚点必须命中源码 testID 声明（字面或模板两臂），且两臂各 ≥1
+ *     才算探针有输入 —— 与判据 ②③ 同一条理由：模板臂静默失效就退化成字面 grep；
+ *  b) 每一枚字面 `zh <key>` 必须存在于中文词条表**且值非空**。缺键在设备上表现为 `zh()`
+ *     退 3（探针坏，本轮无效），但那是跑到那一步才知道；离线判它，红在起跑之前；
+ *  c) `absent_id`（"那一格不在树上"）不许**孤句成对**：同一个 `step` 里它之前必须有一次
+ *     正向读取（`found_id`/`wait_id`/`press_id`/`enabled_id`，或逐枚 `found_id` 的邻锚清单）。
+ *     这是**步级**代理（真正的同帧判据住在载体脚本第 2 步里，它自己 bad() 并退场）：
+ *     没有这句，"探针没落到这一页"就会被读成"界面没渲染"（§7 元规则一）。
+ */
+const IOS_AI_SCRIPT = 'scripts/verify-mobile-ios-ai.sh';
+const IOS_ID_CALLS = [
+  'found_id',
+  'absent_id',
+  'wait_id',
+  'press_id',
+  'enabled_id',
+  'set_id',
+  'type_id',
+  'press_in_id',
+];
+const IOS_POS_CALLS = ['found_id', 'wait_id', 'press_id', 'enabled_id'];
+
+/** iOS 脚本里的字面 testID 锚点（变量拼的如实报数，不进对账面 —— 同判据 ① 的规矩）。 */
+function iosIdAnchors(text, label) {
+  const out = [];
+  const dynamic = [];
+  const lines = text.split('\n');
+  lines.forEach((line, i) => {
+    if (line.trim().startsWith('#')) return; // 同一条规矩：注释不是调用点
+    for (const fn of IOS_ID_CALLS) {
+      if (`${line.trim()} `.startsWith(`${fn}() `)) continue; // 定义行不是调用点
+      const lit = new RegExp(`\\b${fn} +(["'])([^"'$]*)\\1`);
+      const dyn = new RegExp(`\\b${fn} +["'][^"']*\\$[^"']*["']`);
+      const m = line.match(lit);
+      if (m && m[2] !== '') out.push({ anchor: m[2], at: `${label}:${String(i + 1)}`, fn });
+      else if (dyn.test(line)) dynamic.push(`${label}:${String(i + 1)} [${fn}]`);
+    }
+    // 逐枚去读的**邻锚清单**：`for n in a b c; do` 且循环体里就是 `found_id "$n"`。
+    // 🔴 必须要求循环体那一句：`for f in capture breakdown …` 那几枚是**功能名**
+    //    （拿去拼 `ai-feature-$f`），把它们当锚点会造出三条假缺陷。
+    const lst = line.match(/\bfor\s+(\w+)\s+in\s+([a-z][a-z0-9-]+(?: +[a-z][a-z0-9-]+)*)\s*;/);
+    if (lst) {
+      const body = lines.slice(i + 1, i + 7).join('\n');
+      if (new RegExp(`\\b(?:${IOS_POS_CALLS.join('|')}) +"\\$${lst[1]}"`).test(body)) {
+        for (const a of lst[2].split(/ +/)) {
+          out.push({ anchor: a, at: `${label}:${String(i + 1)}`, fn: 'for-in(邻锚)' });
+        }
+      }
+    }
+    // `--within "id:X"` 的**块锚点**也是锚点（它取不到时整条判据没有输入）
+    const w = line.match(/--within +(["'])id:([^"'$]*)\1/);
+    if (w && w[2] !== '') out.push({ anchor: w[2], at: `${label}:${String(i + 1)}`, fn: '--within(块锚)' });
+  });
+  const seen = new Set();
+  return {
+    anchors: out.filter((a) => (seen.has(a.anchor) ? false : (seen.add(a.anchor), true))),
+    dynamic,
+  };
+}
+
+/** iOS 脚本里字面量形态的 `zh <key>` 实参（`$(zh "$key")` 那种变量拼的不在面内）。 */
+function iosZhKeys(text, label) {
+  const out = [];
+  text.split('\n').forEach((line, i) => {
+    if (line.trim().startsWith('#')) return;
+    for (const m of line.matchAll(
+      /\bzh +(['"]?)([a-z][a-zA-Z0-9]*(?:\.[a-zA-Z0-9_]+)+)\1/g,
+    )) {
+      out.push({ key: m[2], at: `${label}:${String(i + 1)}` });
+    }
+  });
+  const seen = new Set();
+  return out.filter((k) => (seen.has(k.key) ? false : (seen.add(k.key), true)));
+}
+
+/** `absent_id` 孤句判据（㉑c）：同一 step 内、它之前，必须有一次正向读取。 */
+function iosAbsentPairing(text, label) {
+  const red = [];
+  const lines = text.split('\n');
+  let controls = 0;
+  lines.forEach((line, i) => {
+    const t = line.trim();
+    if (t.startsWith('#')) return;
+    if (/^step +["']/.test(t)) controls = 0;
+    const positive =
+      new RegExp(`\\b(?:${IOS_POS_CALLS.join('|')})\\b`).test(t) || /\bfor\s+\w+\s+in\s+[a-z]/.test(t);
+    if (positive) controls += 1;
+    const ab = t.match(/\babsent_id +(["'])([^"'$]*)\1/);
+    if (ab && ab[2] !== '' && controls === 0) {
+      red.push(
+        `${label}:${String(i + 1)}  [absent_id] "${ab[2]}" —— 「那一格不在树上」这句前面，` +
+          `本 step 没有任何一次正向读取（found_id / wait_id / press_id / enabled_id / 邻锚清单）。` +
+          `没有同帧正向对照，"探针没落到这一页"与"界面没渲染"在输出上长得一模一样。`,
+      );
+    }
+  });
+  return red;
+}
+
+/** 判据 ㉑ 主体：返回 `{red, n}`；探针自己没有输入时直接退 2（不报"都对"）。 */
+function iosCarrierInvariant(scriptRel, decl, zh) {
+  const text = readScript(join(ROOT, scriptRel));
+  const { anchors, dynamic } = iosIdAnchors(text, scriptRel);
+  if (anchors.length === 0) {
+    console.error(`🔴 ${scriptRel} 里一枚字面 id: 锚点都没取到 —— 那是探针坏了，不报"iOS 账都对"（退 2）`);
+    process.exit(2);
+  }
+  const keys = iosZhKeys(text, scriptRel);
+  if (keys.length === 0) {
+    console.error(`🔴 ${scriptRel} 里一条字面 zh 键都没取到 —— 载体不再从词条取 needle，本判据没有输入（退 2）`);
+    process.exit(2);
+  }
+
+  const red = [];
+  let byLiteral = 0;
+  let byPattern = 0;
+  let unmatched = 0;
+  for (const a of anchors) {
+    const hit = match(a.anchor, decl);
+    if (hit === null) {
+      unmatched += 1;
+      red.push(`${a.at}  [${a.fn}] "${a.anchor}" —— 源码里没有任何 testID 声明罩得住它（界面上这一格的 id:` +
+        ` 通道根本不存在，found_id / press_id 会恒取空）`);
+    } else if (hit.via === 'literal') byLiteral += 1;
+    else byPattern += 1;
+  }
+  if (byLiteral === 0) {
+    console.error('🔴 判据 ㉑ 阳性对照为 0：没有任何 id: 锚点按字面命中 —— 本次"iOS 锚点全对"不可信');
+    process.exit(2);
+  }
+  if (byPattern === 0) {
+    console.error(
+      '🔴 判据 ㉑ 没有一条锚点是被**模式**匹配的 —— `ai-consent-${feature}` 那一臂静默失效，' +
+        'iOS 这本账就退化成字面 grep（与判据 ③ 同一条理由）。',
+    );
+    process.exit(2);
+  }
+
+  let zhMissing = 0;
+  for (const k of keys) {
+    if (!zh.has(k.key)) {
+      zhMissing += 1;
+      red.push(`${k.at}  [zh] ${k.key} —— 中文词条表里没有这个键：needle 会变成空串或被 zh() 判成探针坏`);
+    } else if ((zh.get(k.key) ?? '').trim() === '') {
+      zhMissing += 1;
+      red.push(`${k.at}  [zh] ${k.key} —— 词条存在但值为空：拿它当 needle 的判据恒真`);
+    }
+  }
+
+  const orphanRed = iosAbsentPairing(text, scriptRel);
+  for (const line of orphanRed) red.push(line);
+
+  return {
+    red,
+    n: {
+      anchors: anchors.length,
+      byLiteral,
+      byPattern,
+      unmatched,
+      keys: keys.length,
+      zhMissing,
+      absent: orphanRed.length,
+      dynamic: dynamic.length,
+    },
+  };
+}
+
 // 判据 ⑧：双引号**文案**里不许出现反引号。
 //   在 bash 里反引号是命令替换，`bash -n` 不报（语法完全合法），症状是"打印判据的那一行
 //   自己去执行了一条命令"：实测 `line 1226: target: command not found`，判据行输出成半句话。
@@ -1171,7 +1349,18 @@ function run() {
   for (const line of ledgerRed) console.log(`台账对账\t${line}`);
   console.log(`LEDGER_SUMMARY 红=${String(ledgerRed.length)}`);
 
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0 || teardownRed.length > 0 || bandRed.length > 0 || ledgerRed.length > 0) {
+  // ── 判据 ㉑：iOS 载体的 id:/zh 两本账都要对得上源码（载体 = verify-mobile-ios-ai.sh）──
+  const iosScriptRel = process.env.HEYTA_IOS_AI_SCRIPT ?? IOS_AI_SCRIPT;
+  const ios = iosCarrierInvariant(iosScriptRel, decl, zh);
+  for (const line of ios.red) console.log(`iOS载体账\t${line}`);
+  console.log(
+    `IOS_SUMMARY id锚点=${String(ios.n.anchors)} 按字面命中=${String(ios.n.byLiteral)} ` +
+      `按模式命中=${String(ios.n.byPattern)} 未匹配=${String(ios.n.unmatched)} ` +
+      `zh键=${String(ios.n.keys)} 缺键=${String(ios.n.zhMissing)} ` +
+      `反向判据孤句=${String(ios.n.absent)} 变量锚点(不在面内)=${String(ios.n.dynamic)} 红=${String(ios.red.length)}`,
+  );
+
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0 || teardownRed.length > 0 || bandRed.length > 0 || ledgerRed.length > 0 || ios.red.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
       '，双引号文案里的反引号=' + String(backtickRed.length) +
@@ -1179,7 +1368,8 @@ function run() {
       '，授权期望值=' + String(consentRed.length) +
       '，隧道断言=' + String(tunnelRed.length) + '，提案分母=' + String(proposalRed.length) +
       '，收尾判据=' + String(teardownRed.length) + '，安全带守卫=' + String(bandRed.length) +
-      '，台账对账=' + String(ledgerRed.length) + '。' +
+      '，台账对账=' + String(ledgerRed.length) +
+      '，iOS 载体账=' + String(ios.red.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
       '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
@@ -1825,6 +2015,148 @@ if (process.argv.includes('--self-test')) {
     picker !== null &&
       pickerLoose !== picker &&
       runHelper(pickerLoose, PICK_XML, 'scroll_anchor_bounds') !== 'ai-settings-title 42 300 600 360',
+  ]);
+
+  // ── 判据 ㉑（iOS 载体的 id:/zh 两本账）的臂 ──
+  //   前三臂打在**验收脚本的副本**上（经 env 重定向，真树 mtime 不动），
+  //   后五臂打在**合成 AX 树**上：`--within` 的几何包含是 iOS 载体唯一的"块内那一指"
+  //   通道，它坏掉的症状与 Android 臂 9/10 当年抓到的一模一样 —— 手指落下、rc=0、
+  //   打到的是**别人家**那一枚。这几臂不占设备（设备窗口是全仓最稀缺的资源）。
+  const iosBase = readFileSync(join(ROOT, IOS_AI_SCRIPT), 'utf8');
+  const runIosMutant = (text, tag) => {
+    const dir = join(ROOT, 'tmp');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `.mut-ios-${tag}.sh`);
+    writeFileSync(file, text);
+    let code = -1;
+    let out = '';
+    try {
+      const kid = spawnSync(process.execPath, [join(ROOT, 'scripts/check-mobile-ai-anchors.mjs')], {
+        encoding: 'utf8',
+        cwd: ROOT,
+        env: { ...process.env, HEYTA_IOS_AI_SCRIPT: `tmp/.mut-ios-${tag}.sh` },
+      });
+      code = kid.status ?? -1;
+      out = `${kid.stdout ?? ''}${kid.stderr ?? ''}`;
+    } finally {
+      rmSync(file, { force: true });
+    }
+    return { code, out };
+  };
+
+  // 臂 68（阳性对照）：真 iOS 载体必须在账上，而且**有输入**（锚点数、 needle 键数都不是 0）。
+  arms.push([
+    '臂 68 真 iOS 载体整链过，且 IOS_SUMMARY 打出"红=0"与非零锚点',
+    base.status === 0 &&
+      /IOS_SUMMARY id锚点=[1-9]/.test(`${base.stdout ?? ''}`) &&
+      /IOS_SUMMARY[^\n]*红=0/.test(`${base.stdout ?? ''}`),
+  ]);
+
+  // 臂 69（变异 a）：追加一枚源码里没有的 id: 锚点 ⇒ 非零退出且点名。
+  const IOS_BOGUS = 'zz-bogus-ios-anchor';
+  if (match(IOS_BOGUS, lit) !== null) {
+    console.log(`SELFTEST 臂 69 的变异名 ${IOS_BOGUS} 被某条模式命中 —— 换名字，这条臂现在等于没有`);
+    process.exit(1);
+  }
+  const m69 = runIosMutant(`${iosBase}\nfound_id "${IOS_BOGUS}"\n`, 'ios-bogus-anchor');
+  arms.push(['臂 69 iOS 副本里的假锚点 ⇒ 非零退出且点名', m69.code !== 0 && m69.out.includes(IOS_BOGUS)]);
+
+  // 臂 70（变异 b）：把一枚 needle 的词条键换成不存在的 ⇒ 非零退出且点名那个键。
+  const IOS_BOGUS_KEY = 'mobile.tab.bogusNeedleKey';
+  const mutK70 = iosBase.replace('$(zh mobile.tab.profile)', `$(zh ${IOS_BOGUS_KEY})`);
+  arms.push(['臂 70 的变异确实换掉了那枚 zh 键（前置）', mutK70 !== iosBase && mutK70.includes(IOS_BOGUS_KEY)]);
+  const m70 = runIosMutant(mutK70, 'ios-bogus-zh');
+  arms.push(['臂 70 词条键不存在 ⇒ 非零退出且点名', m70.code !== 0 && m70.out.includes(IOS_BOGUS_KEY)]);
+
+  // 臂 71（变异 c）：摘掉第 2 步那圈**同帧邻锚** ⇒ 反向判据变成孤句 ⇒ 非零退出且点名。
+  const mutN71 = iosBase
+    .replace('for n in profile-entry-settings profile-entry-habits profile-entry-trash; do\n  found_id "$n" && NEIGH="$NEIGH $n"\ndone\n', '')
+    .replace('  found_id "$n" && NEIGH="$NEIGH $n"\n', '');
+  arms.push([
+    '臂 71 的变异确实摘掉了邻锚那一圈（前置）',
+    mutN71 !== iosBase && !mutN71.includes('profile-entry-trash; do'),
+  ]);
+  const m71 = runIosMutant(mutN71, 'ios-orphan-absent');
+  arms.push([
+    '臂 71 absent_id 没有同帧正向对照 ⇒ 非零退出且点名"孤句"',
+    m71.code !== 0 && m71.out.includes('本 step 没有任何一次正向读取'),
+  ]);
+
+  // ── 判据 ㉑ 的几何那一半：`--within` 的包含过滤（合成树，不占设备）──
+  const SHIM = join(ROOT, 'scripts/tools/ios-ax-shim.py');
+  const shimProbe = (shimPath, body) => {
+    const kid = spawnSync(
+      'python3',
+      ['-c',
+        `import importlib.util
+spec = importlib.util.spec_from_file_location("shim", ${JSON.stringify(shimPath)})
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+nodes = [
+ {"AXLabel": "chip", "frame": {"x": 0, "y": 0, "width": 100, "height": 50}},
+ {"AXUniqueId": "blk", "frame": {"x": 200, "y": 200, "width": 100, "height": 100}},
+ {"AXLabel": "chip", "frame": {"x": 210, "y": 230, "width": 60, "height": 30}},
+]
+${body}
+`],
+      { encoding: 'utf8', cwd: ROOT },
+    );
+    return `${kid.stdout ?? ''}`.trim();
+  };
+  // 🔴 期望是**写死的坐标**：两块同名 chip，一块在锚点矩形外（0,0 那枚）、一块在内（210,230）。
+  const HIT = '(210, 230, 60, 30)';
+  const MISS = '(0, 0, 100, 50)';
+  arms.push([
+    `臂 72 --within 必须命中**块内**那一枚（期望逐字 "${HIT}"）`,
+    shimProbe(SHIM, 'print(mod.frame_of(mod.find(nodes, "chip", False, False, None, False, 0, "id:blk")))') === HIT,
+  ]);
+  arms.push([
+    `臂 73 不带 --within 时命中的是**块外**那一枚（期望逐字 "${MISS}" —— 证明 72 的期望锁住了过滤，不是巧合）`,
+    shimProbe(SHIM, 'print(mod.frame_of(mod.find(nodes, "chip", False, False, None)))') === MISS,
+  ]);
+  arms.push([
+    '臂 74 锚点取不到时报 within-anchor-missing，且 find 清空候选（不退化成全局匹配）',
+    shimProbe(
+      SHIM,
+      'print(mod.within_error(nodes, "id:nope"), mod.find(nodes, "chip", False, False, None, False, 0, "id:nope"))',
+    ) === 'within-anchor-missing:id:nope None',
+  ]);
+  arms.push([
+    '臂 75 锚点零尺寸时报 within-anchor-zero-frame（与"锚点没取到"分两种话）',
+    shimProbe(
+      SHIM,
+      'zero = [{"AXUniqueId": "z", "frame": {"x": 5, "y": 5, "width": 0, "height": 0}}]\nprint(mod.within_error(zero, "id:z"))',
+    ) === 'within-anchor-zero-frame:id:z',
+  ]);
+  arms.push([
+    '臂 76 整棵树没有一枚 AXUniqueId 时如实报 tree-has-no-AXUniqueId（否则 id: 反向判据恒成立）',
+    shimProbe(
+      SHIM,
+      'bare = [{"AXLabel": "chip", "frame": {"x": 0, "y": 0, "width": 10, "height": 10}}]\nprint(mod.id_channel_warning(bare, "id:chip"))',
+    ) === 'tree-has-no-AXUniqueId',
+  ]);
+  // 臂 77（变异）：把 `in_within` 换成恒真 ⇒ 臂 72 的期望必须不成立。
+  //   🔴 替换串逐字抄被测那一行（臂 14 那条教训：抄错括号=变异原样返回=响的是臂自己坏了）。
+  const shimText = readFileSync(SHIM, 'utf8');
+  const shimLoose = shimText.replace(
+    '    return ax <= cx < ax + aw and ay <= cy < ay + ah',
+    '    return True',
+  );
+  const loosePath = join(ROOT, 'tmp', '.mut-ios-shim-within.py');
+  mkdirSync(join(ROOT, 'tmp'), { recursive: true });
+  let looseReading = '';
+  try {
+    writeFileSync(loosePath, shimLoose);
+    looseReading = shimProbe(
+      loosePath,
+      'print(mod.frame_of(mod.find(nodes, "chip", False, False, None, False, 0, "id:blk")))',
+    );
+  } finally {
+    rmSync(loosePath, { force: true });
+  }
+  arms.push([
+    '臂 77 把包含判据换成恒真后，臂 72 的读数不再等于期望（证明这道过滤是承重的）',
+    shimLoose !== shimText && looseReading !== HIT,
   ]);
 
   let fail = 0;
