@@ -450,6 +450,7 @@ function FailureStep({
       {failure.detail !== undefined && failure.detail !== '' ? (
         <Text variant="caption" tone="subtle" selectable>
           {t('web.ai.failure.details')}
+          {'\n'}
           {failure.detail}
         </Text>
       ) : null}
@@ -598,7 +599,9 @@ function CapturePanel(props: SharedPanelProps): React.JSX.Element {
         lines={3}
         onChangeText={setText}
         placeholder={t('mobile.ai.input.capture.placeholder')}
-        hint={t('web.ai.capture.noteLead')}
+        // noteLead 是**引导语**，不是完整句：web 那侧把它与 noteStrong/noteTail 拼成一句
+        // （`AiCapture.tsx:610`）。只取前半截会在屏上留下一句以「截止时间是」结尾的悬空话。
+        hint={`${t('web.ai.capture.noteLead')}${t('web.ai.capture.noteStrong')}${t('web.ai.capture.noteTail')}`}
         testID="capture-input"
       />
       {applied ? (
