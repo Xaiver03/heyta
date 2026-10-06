@@ -721,10 +721,16 @@ for i in $(seq 1 12); do printf "%s cpu=%s etime=%s netfd=%s\n" "$(date '+%H:%M:
 与前缀（`/tmp/heyta-<线>-<pid>.txt`），并在读回后**先确认字符串集合是本项目产生的**再引用它。
 
 
-## 9. 2026-10-05 合并批收尾：抓出来但**没做完**的两张（W15 / W13 的设备半）
+## 9. 2026-10-05 合并批收尾：抓出来的两张（W15 / W13 的设备半）—— 现量与归属
 
 > 载体：隔离检出 `heyta-wt-merge`，分支 `merge/20261005`。本节只登记**现量**与**归属**，
 > 不代任何一张主张完成。
+>
+> ↪ **2026-10-06 状态更正（标题原来写"没做完的两张"，那是 10-05 的瞬时读数）**：
+> **W13 的设备半已闭合**（载体的第一趟到最新一趟读数在本节末尾的 rig 表里，逐行带 exit），
+> **W15 仍没做完**（下面第 2 步那条"两枚 UI 壳没接"在 10-06 尖端复量仍然成立，
+> 现量命令：`grep -rn "createAssistantSessionActions" apps/` ⇒ 命中**只有** `apps/node-host`）。
+> 所以这张表现在只剩 W15 一格是欠账。
 
 ### W15 🔴 `ASSISTANT_TURN` 只有 `node-host` 在写，两枚 UI 壳都没接
 
@@ -1498,17 +1504,70 @@ NO_COLOR=1 pnpm -r --no-bail test > rtest-full.log 2>&1   # RTEST_RC=$? 写在�
  | 披露面「将发送这些字段：today、title」印的是内部键名 | **有意不做**（本轮与下一轮都不做，除非触发下面的翻案条件） | 词表现量 **42** 枚 `entity.field` 加基线那几枚；换成人类可读名要 46 对中英词条，并且要一条"每枚 `egressFields` 都有中英名"的门禁长期守着 —— 而那个映射本身正是 `ai-assistant.ts:126` 那句"列了就是一份抄件，而抄件一定漂"要防的东西。现名 `task.dueDate` 已经是可核对的标识符，披露的价值在**逐枚穷举**，而穷举由 `check:ai-tools` 守着。**翻案条件**：产品面向非技术用户正式发布时，这条自动升级成必做项 |
  | 第五枚 chip 右缘被切、只露一个字母 | **不是缺陷**（是横向可滚条的"后面还有"提示） | 不是靠看图感觉，是靠设备读数：rig57/58/61/65 里 `press_id "ai-mode-tool-calling"`（正是被切那一枚）**成功**，失败路径是 `bad "切不到「AI 工具调用」那一档"`，而那四趟都是 42/0；且 iOS 按压自带几何安全检查（屏外坐标或被 tab 栏挡住会返回 `tap-outside-screen` / `tap-blocked-by-tab-bar`，AGENTS §7 第 25 条）⇒ 够得着，只是画不全 |
 
- 🔴 **E 项"被改到的端"里唯一没取到证的一格 = 桌面壳**，如实挂着，不折进"整链绿"：
- `apps/desktop/*` 本轮零改动，但它的界面来自 `apps/web/dist`，而 `packages/ui`（`AiDisclosure` 等）改了
- ⇒ 它的**产物**受影响。取证前提不成立，两条现量：本树 `electron@44.4.5` 缺 `path.txt`（运行时二进制没装）；
- 显式跑它的 `install.js` ⇒ `ELECTRON_INSTALL_RC=1`、`TypeError: fetch failed`，
- 而**同一趟**对照 `https://registry.npmjs.org/` 返回 **200** ⇒ 不是整机断网，是 GitHub 那条发布通道走不通
- （与本机那条"直连 GitHub 超时、要靠代理"同源；代理客户端属用户，不动它）。
- ⇒ 链里 `desktop-window.spec.ts` 那 2 条按既有规则**跳过**（就是上面 196/2 里的那 2 条）。
- 闭合条件写清楚，别让它读起来像"桌面端没问题"：代理通道可用 → `node .../electron/install.js` →
- `pnpm --filter @heyta/desktop build` → 那 2 条**实跑** + 截图人打开看过。
+ 🔴 **E 项"被改到的端"里最后那一格 = 桌面壳**。
+ **原先那句理由是我写错的，原话留形**：当时写的是"`apps/desktop/*` 本轮零改动，但它的界面来自
+ `apps/web/dist`，而 `packages/ui`（`AiDisclosure` 等）改了 ⇒ 它的**产物**受影响"。
+ 现量否证它的前半：**Electron 壳不加载 `apps/web/dist`** ——
+ 它 `loadFile(join(__dirname,'..','renderer-dist','index.html'))`（`apps/desktop/src/main.ts:129`），
+ 而 `scripts/package-desktop.mjs` 里 `apps/web` / `web-dist` 命中 **0 处**（只有 `:115` 断言自己的
+ `renderer-dist/index.html`）。"界面来自 web-dist"是**另一枚壳**的形状
+ （`apps/desktop-macos/` 的 Swift 壳才把 `Contents/Resources/web-dist` 打进包，AGENTS §7 第 82 条），
+ 我把它顺手安到了 Electron 壳上 —— 这就是"把印象当读数"的代价：整格取证的前提是假的。
+
+ 正确的"受没受本批影响"要按**import 集合**量，不按包名量：
+ `git diff --name-only $(git merge-base HEAD origin/main) HEAD -- packages/ui` ⇒ 本批只改 **1** 枚
+ （`packages/ui/src/ai/AiDisclosure.tsx`），而 Electron 壳的 renderer 只 import
+ `HeytaUiProvider` + `TaskList`（`apps/desktop/renderer/main.tsx:25`，`AiDisclosure` **不在**其中）。
+ "不被 import ⇒ 不在产物里"这句**没有停在推断上**，它有两枚同尺的读数：
+ `grep -c disclosure apps/desktop/renderer-dist/assets/index-D0QDCcNr.js` = **0**，
+ 而**阳性对照**两处都做了 —— ① 同一个 needle 在 web 那侧的 bundle 里命中 **1** 枚文件
+ （证明压缩后这个字面量本来就查得到，0 不是"被改名了"），
+ ② 同一枚桌面 bundle 里 `task-row-` 命中 **1**（证明这个文件确实是那个 renderer 的产物，不是空壳）。
+ ⇒ **桌面壳的渲染内容没被本批 AI 改动打到**，
+ 它因此**不属于**"被改到的端要重装取证"那一格。
+ 但它仍是 `@heyta/ui` 这个包的**消费者**（包体字节变了 ⇒ 打出的 `renderer-dist` 也变），
+ 所以那条界面门禁值得**实跑一次当回归**，读数是下面"E 项第八批"取的那趟。
+
+ **原先把它记成"外部前提不成立"的那段也已被自己否证，原话留形以免后来者照它行动**：
+ 当时写的是"本树 `electron@44.4.5` 缺 `path.txt`（运行时二进制没装）；显式跑 `install.js` ⇒
+ `ELECTRON_INSTALL_RC=1`、`TypeError: fetch failed`，而同一趟对照 `registry.npmjs.org` 返回 200
+ ⇒ 是 GitHub 那条发布通道走不通"。**"走不通"这句是错的** —— 后续对同一 URL 连拿三种读数：
+ **206** / **curl(16)**（HTTP/2 层断流）/ **curl(28)**（超时）⇒ 真相是**通道不稳定**，
+ 而一次 `fetch failed` 只能记"这一趟没成"，不能记"这条通道不通"（入 [traps #360](../reference/environment-traps.md)）。
+ 代价是具体的：那句"不通"把**该做的下一步**（换个能成的通道取包 + 校验）挡掉了一轮。
+
+ 实际闭合路径（三步，每步一条现量）：
+ 1. **取包换道**：经 npmmirror 取 `electron-v44.4.5-darwin-arm64.zip`，**130,418,529 B**；
+    校验权威**不是镜像**，是 `electron` 包自带的 `checksums.json` 里那一枚
+    （`PUBLISHED_SHA=a212eee6…0e2c`，与下载回来的字节 sha256 **逐字相等**）⇒ 换道只是搬运，
+    信任没有降级，也没有新增依赖（AGENTS §3.1/§3.2 两道门未动）。
+ 2. **装进去之后还差一枚文本**：`path.txt` 的内容必须是 `Electron.app/Contents/MacOS/Electron`
+    —— **不带 `dist/` 前缀**，因为包内 `index.js` 是 `path.join(__dirname, 'dist', executablePath)`。
+    写错的症状**不是**"找不到二进制"：`index.js` 判定"没装" ⇒ 自己去发起一次 100 MB+ 下载，
+    失败后抛 `Electron failed to install correctly. Please delete node_modules/electron…`，
+    那句报错把人推向"重装依赖"。当时那一趟的日志原文就在 `/tmp/dw.log`（`Downloading Electron binary...`
+    → `TypeError: terminated` → `Error: No tests found`，`DESKTOP_SPEC_RC=1`）——
+    🔴 **`No tests found` 是"收集阶段就抛"的结果**，不是"用例没写"，这正是该文件头部第 4 段警告的那件事。
+    验法只有一条且必须逐字照做：从**消费方那侧**解析
+    `createRequire(<apps/desktop/package.json>)('electron')` ⇒ 必须是绝对路径且 `existsSync` 为真
+    （现量：`RESOLVED=…/electron@44.4.5/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron`、
+    `EXISTS=true`）；`…/Electron.app/Contents/MacOS/Electron --version` ⇒ **`v44.4.5`**。入 [traps #359](../reference/environment-traps.md)。
+ 3. **壳产物**：`pnpm --filter @heyta/desktop build` ⇒ `DESKTOP_BUILD_RC=0`，
+    现量落点 `apps/desktop/dist/{main,preload,smoke}.cjs` + `apps/desktop/renderer-dist/index.html`
+    （后者是 `scripts/package-desktop.mjs:115` 的断言输入）。
+
+ 这一格读数的取法与结果写在**本节末尾"E 项第八批"**，不在这里预先主张。
 
  ⚠️ 边界：整链这一趟**没有**重跑四端重装（`pnpm reinstall:all`）—— 移动两端的当前产物取证在 rig46 / rig65
  那一趟已经落在**含本批全部代码**的包上（rig65 由产物归属门当场签认"是本树打的那一枚"），
  而重装整条链会把 iOS/Android 的现场再动一次，属于另一格的动作，不在这一批里顺手做。
+
+ 🔴 **跑整链有一个必须当场处置的副作用**：链里那三段 e2e 会把**固定路径**的证据图重采一遍。
+ 现量（按 mtime 筛被跟踪文件）：**98** 枚被重采，其中 **52** 枚内容变了、**46** 枚逐字节相同。
+ 两组都出自本树、同一个槽（4418/4419）、同一份被测码（`f3e16428` 与上一批采集之间只隔几笔文档改动），
+ 差别只有非确定性像素（日期、动画相位、光标位置）。
+ 这一轮的处理是**回退到已提交、且人打开看过的那一组** —— 依据是 §6.2 规定一第 4 条：
+ "截了图"不等于"看了图"，没看过的图不能因为更新就当证据入库。
+ ⇒ 要写清它**不是**"新图不好"，而是"归属清楚但复核没做"；下次想让重采那组进仓库，
+ 要么跑完当场看图，要么在跑之前就把"重采即待复核"写进用例自己的判据，别让收尾的人临场二选一。
 
