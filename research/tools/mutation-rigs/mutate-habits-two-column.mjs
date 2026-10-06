@@ -55,7 +55,10 @@ const E2E_SPECS = [
 ];
 const BIN = (rel) => path.join(ROOT, 'apps/web', 'node_modules', '.bin', rel);
 
-/** `from` 必须**恰好命中一次**（命中 0 次 = 臂打空，命中 2 次 = 改到了不该改的地方）。 */
+/** `from` 必须**恰好命中一次**（命中 0 次 = 臂打空，命中 2 次 = 改到了不该改的地方）。
+ *  🔴 下面每份 `css:` 都是模板字符串：**注释里不许出现反引号或 `${`** —— 那会把装置
+ *  自己拆成语法错误，而症状是"这台臂台跑不了"，很容易被读成"环境不配合"。
+ *  改完任何一臂先跑一次 `node --check` 再排队。 */
 const ARMS = [
   {
     name: 'N1 摘掉容器声明（两列规则整条永不命中）',
@@ -68,6 +71,19 @@ const ARMS = [
   container-type: normal;
 }
 `,
+    /* 🔴 **这一臂的期望红集是 `T2 + T3 + T7`，一条不多**。中间我曾把 `I2` 加进去，
+       那是**跟着一次性读数改期望**，已被现量否证：
+         · 06:5x 那一趟（`tmp/h7-readings/serial-final.log`）N1 报 `T2,T3,T7,I2`；
+         · 07:3x 整台重跑（`tmp/h7-readings/h1-rig-serial.log`）同一臂报 `T2,T3,T7` —— I2 没红，
+           而**同一趟**的 N2/N3 各报出一条 `I4`（再点同一个字形没有退回派生），
+           复原后**产物摘要与基线逐字相同**的那次复跑又红了 1 条。
+       ⇒ 同一份字节产物在不同时刻给出不同结果 ⇒ 红归 `habit-icon-picker.spec.ts` 那一族的
+       **抖动**（"点一格 → poll 行首字形"），不归任何一臂。
+       配对实验（07:3x，`tmp/h7-readings/icon-flake-ab.sh`，干净产物）：一次跑三份 spec 两遍
+       = `20 passed` ×2，只跑图标那份两遍 = `6 passed` ×2 ⇒ "命令形状"不是成因，
+       抖的是那两条用例本身，而且只在臂台这种"连续重打 5 次包"的负载下现形。
+       🔴 所以这一族的 `I*` 在臂台期望里**一条都不许出现**，直到那条抖动被钉掉
+       （登记见 `BLOCKED.md` B91 §9）。把抖动写进期望 = 让下一次真漂移也没人能发现。 */
     expectTitles: ['T2', 'T3', 'T7'],
     expectMessage: /列轨道不是两根|不在同一排|y 差了/,
   },
@@ -148,15 +164,35 @@ const ARMS = [
       ② 只写「flex-wrap: nowrap」 —— 七枚各 44px 加空隙共 332px，而这一视口下
          详情窗格**放得下**，于是"不换行"没有让任何一枚越界，Q6 逐枚量右边界当然全绿。
       ⇒ 几何臂的前置是"**这一份坏必须真的把某个可见元素推出边界**"。
-      加宽（「padding-inline」）是把 332 变成 532 的最小改动，而它对应的正是
-      代码里那句被记过账的诱惑："给星期名前面拼一个「周」字"。 */
+      加宽（「padding-inline」）是把那一排撑开的最小改动形状，而它对应的正是
+      代码里那句被记过账的诱惑："给星期名前面拼一个「周」字"。
+   🔴 **第三版（「space-4」，每侧 16px）也不够**：这台臂台第一次整台跑通那一趟，N5 报的是
+      「e2e passed=20 failed=-1 rc=0」（现量日志 tmp/h7-readings/serial-final.log 第 52 行之后那段；
+      那个 -1 是本装置的汇总探针在"全过、Playwright 不印 failed 段"时读不到数 —— 与 d6a78636
+      给另一台臂台修的是同一枚 bug，这台**当时还没修**，判"打空"靠的是 rc=0 那一半，不是那个 -1）。
+      七枚各撑到约 50px、合计约 374px，
+      而这一视口下详情窗格的内宽比它大 ⇒ "不换行 + 变宽"仍然没把任何一枚推出边界，
+      Q6 逐枚量右边界当然全绿。**臂不够坏与臂打空是同一件事**：读数都长得像"判据没牙"。
+      第四版取「space-16」（每侧 64px）。**宽度是推出来的，不是拍的**：
+      单枚 = 字形约 12px + 两侧 128px ≈ 140px（chip 自己那条 min-width: touch-target 44px 在这档下不生效），
+      整排 = 7 枚 ≈ 980px + 6 枚空隙（「gap: space-1」 = 4px）24px ≈ **1004px**，
+      而窗格实测只有 319px ⇒ 必然越界。
+      🔴 **第四版也打空了，而原因不是算术错，是 Q6 只量了右边界**（现量：
+      tmp/h7-readings/n5-dump2.log —— 臂体确实落到了渲染上：每枚 padding-inline 64/64、
+      单枚宽 142、整排 1018 且 nowrap，而同一枚 chip 干净态在 x=983（窗格 945..1264），
+      变异态整排落到 x 约 128..1146 —— 容器放不下它时浏览器把它**向左**挤出了窗格，
+      右边缘 1146 仍然小于窗格右边界 1264 ⇒ Q6 逐枚量右边界当然全绿）。
+      ⇒ 这一臂从此是 **Q6 那条判据的缺陷**的证据，不是臂不够坏：判据名字写的是"都在窗格内"，
+      两个边都必须对着窗格量。已按此修 Q6（左边界也对着 pane.x 量），修完这一臂的期望
+      仍然是且只是 Q6 一条。
+      （前三版的算术停在"整排 < 窗格"那一侧，那一版确实是臂不够坏。） */
 .ht-habit__freq-days {
   --h1-arm-n5: 1;
   flex-wrap: nowrap;
 }
 .ht-habit__freq-days .ht-habit__freq-chip {
   flex-shrink: 0;
-  padding-inline: var(--ht-space-4);
+  padding-inline: var(--ht-space-16);
 }
 `,
     expectTitles: ['Q6'],
@@ -199,7 +235,12 @@ const tallyPlaywright = (out) => {
     return hits.length === 0 ? -1 : Number(hits[hits.length - 1][1]);
   };
   const passed = grab('passed');
-  const failed = grab('failed');
+  const failedHit = [...out.matchAll(new RegExp(`^[ \\t]*(\\d+) failed(?:[ \\t(]|$)`, 'gm'))];
+  /* 🔴 "全过时 Playwright 根本不印 failed 段"与"探针一行都没读到"是两回事
+     （`d6a78636` 在另一台臂台上修的就是这个）：数到了 passed 而没数到 failed = **真 0**，
+     两个都没数到 = 探针读不到，必须保持 -1 让它往下走到"响亮地失败"那一支。
+     把 -1 当 0 会把探针坏播成"这条臂没牙"。 */
+  const failed = failedHit.length > 0 ? Number(failedHit[failedHit.length - 1][1]) : passed >= 0 ? 0 : -1;
   return { passed, failed, line: `passed=${String(passed)} failed=${String(failed)}` };
 };
 
