@@ -240,18 +240,19 @@ if (!DRY && ic.status !== 0) {
 /* ───────────────────────── 步骤 6：🔴 出口探针（先于任何下载） ──────────────────────── */
 // 位置是承重的：它必须在**任何会花钱的动作之前**。放在装依赖之后，
 // 就等于"先把额度花完，再宣布这次没花钱"。
-console.log('步骤 6：出口探针（含一条阳性对照，约 1 KB 代理字节，买其余 100% 的可信度）');
-const PROBE_MOUNT = `${RUN_DIR}/src/scripts/ci/egress-probe.sh:/probe.sh:ro`;
-const probeRun = `docker run --rm --cpus=${CPUS} --memory=${MEM} --network=bridge \\
-  -e http_proxy= -e https_proxy= -e HTTP_PROXY= -e HTTPS_PROXY= -e all_proxy= -e ALL_PROXY= \\
-  -v ${PROBE_MOUNT} --entrypoint bash ${IMAGE} /probe.sh ${PROXY}`;
+console.log('步骤 6：出口探针（含一条阳性对照；整套方案里唯一花额度的动作，约 280 KB）');
+// 🔴 探针跑在**宿主机**上，不是容器里：它要读 mihomo 的账本（`172.17.0.1:9090`），
+//    而那件事容器做不到。容器只负责"发一次带标记的请求"，计量由账本这边读。
+//    （第一版把它挂进容器里跑，得到的是 `EGRESS=FAIL` 加一条 `PROXY_ENV=FAIL` ——
+//    六个**空值** proxy 变量被自己的加固动作判成违规。判据判错了对象，比没有判据更糟。）
+const probeRun = `bash ${RUN_DIR}/src/scripts/ci/egress-probe.sh ${IMAGE} ${PROXY} http://172.17.0.1:9090`;
 const pr = ssh(probeRun);
 const probeOut = (pr.stdout || '') + (pr.stderr || '');
 console.log(probeOut.split('\n').filter(Boolean).map((l) => '   ' + l).join('\n'));
 if (!DRY) {
-  if (/EGRESS=FAIL/.test(probeOut)) die('步骤 6（出口探针）', '容器里存在代理残留 ⇒ 这一趟的字节**会**经过 mihomo。停。');
+  if (/EGRESS=FAIL/.test(probeOut)) die('步骤 6（出口探针）', '不挂代理的那一次被 mihomo 记到了 ⇒ 这一趟的字节**会**经过代理。停。');
   if (/EGRESS=INCONCLUSIVE/.test(probeOut)) {
-    console.log('\n🟠 阳性对照不成立（代理没开或不可达）⇒ 本轮**不能**声称"零代理字节"。');
+    console.log('\n🟠 阳性对照不成立（账本看不见那类连接）⇒ 本轮**不能**声称"零代理字节"。');
     console.log('   继续跑门禁（结果仍有效），但汇总里的出口结论只能写"未证明"。');
   }
 }
