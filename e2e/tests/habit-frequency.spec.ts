@@ -220,6 +220,18 @@ test.describe('习惯频次编辑器（H5，web 端）', () => {
         )}px —— 看不见的那一格等于没有那一格`,
       ).toBeLessThanOrEqual((viewport?.width ?? 0) - 1);
       expect(b.x, `「${b.label}」被推到视口左边外面`).toBeGreaterThanOrEqual(0);
+      /* 🔴 左边界也必须对着**窗格**量，不能只对着视口量。这条是臂台 N5 连打空四版之后
+         现量出来的（`tmp/h7-readings/n5-dump2.log`）：把星期那一排撑到不换行 + 每枚 142px 时，
+         整排宽度超出详情窗格，浏览器把它**向左**挤出了窗格 —— 干净态一枚 chip 在 `x=983`
+         （窗格 945..1264），变异态同一排落在 `x≈128..1146`。**右边缘 1146 仍然小于窗格右边界**，
+         所以只量右边界的这条判据在"整排已经逃出自己的容器"时照样全绿。
+         这条用例的名字写的是"都在窗格内"，那么两个边都得对着窗格量。 */
+      expect(
+        b.x,
+        `「${b.label}」左边缘 ${String(Math.round(b.x))}px 退到窗格左边界 ${String(
+          Math.round(pane.x),
+        )}px 之外 —— 被挤出自己那一栏的格子，等于那一格没人管了`,
+      ).toBeGreaterThanOrEqual(pane.x - 1);
       expect(b.right, `「${b.label}」超出窗格右边界`).toBeLessThanOrEqual(pane.x + pane.width + 1);
     }
     await page.screenshot({ path: SHOT('weekly-in-viewport') });

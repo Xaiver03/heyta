@@ -33,7 +33,7 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
-import { addHabit, boxOf, openApp, switchView } from './helpers';
+import { addHabit, boxOf, openApp, selectHabit, switchView } from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 
@@ -80,20 +80,6 @@ const optionGlyph = (page: Page, label: string) =>
     .locator(`.ht-habit__icon-option[aria-label="${label}"] svg`)
     .first()
     .evaluate(shapeOf);
-
-/**
- * 先**选中**那一行 —— 图标选择器住在右侧窗格的标题行里。
- *
- * 🔴 这一步不是铺垫而是**前提**：web 的窗格刻意**没有回落选中**
- *    （`apps/web/tests/habits-list-pane.spec.tsx` 的 G 组钉住"没人点过时零行带
- *    `aria-current`，窗格说的是「选一条习惯」而不是第一条"）。只 `addHabit` 的话
- *    选择器**根本不在 DOM 里**，而报错长这样：`locator.click` 等 90 秒超时 ——
- *    第一版这五条就是全部红在这里，看起来像"选择器坏了"，其实是用例没走到它。
- */
-async function selectHabit(page: Page, name: string): Promise<void> {
-  await page.locator('[data-testid^="habit-row-"]').filter({ hasText: name }).first().click();
-  await expect(page.getByTestId('habit-pane')).toHaveAttribute('aria-label', new RegExp(name));
-}
 
 /**
  * 展开选择器（点那颗「图标」按钮）。
@@ -291,6 +277,15 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
         `「${b.label}」被推到视口左边外面`,
       ).toBeGreaterThanOrEqual(0);
       // 还要落在窗格里：这一排属于那条习惯，不该飘到别的栏去。
+      // 🔴 这一句原先只对右边界 —— 与 §7 第 347 条那个洞同形：容器放不下时浏览器会把整排
+      // **向左**挤出自己的栏（频次那一排实测从 x=983 落到 x≈128），而"不该飘到别的栏去"
+      // 恰好是左边界要管的事。左边界补齐，注释里承诺的那件事才真的在被证。
+      expect(
+        b.x,
+        `「${b.label}」左边缘 ${String(Math.round(b.x))}px 退到窗格左边界 ${String(
+          Math.round(pane.x),
+        )}px 之外 —— 飘到别的栏里的那一格，没人知道它是哪一条习惯的`,
+      ).toBeGreaterThanOrEqual(pane.x - 1);
       expect(b.right, `「${b.label}」超出窗格右边界`).toBeLessThanOrEqual(pane.x + pane.width + 1);
     }
     await page.screenshot({ path: SHOT('picker-in-viewport') });
