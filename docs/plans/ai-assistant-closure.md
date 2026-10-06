@@ -869,7 +869,191 @@ capture=1 breakdown=1 prioritize=1 duration-estimate=1 tool-calling=1
 | rig46 | **47 通过 / 0 失败**（`rc=0`）—— 本批第一次"整条跑完且第 13 步有读数" | 判据逐条与 rig42 对齐后**只多不少**：第 7 步（非回环 ⇒ `ai-consent-breakdown` 在树里 + 同屏回环那档不索取，成对成立）、第 8 步（目的地行 + 字段清单 + 性质行「数据会离开设备」+ 打 192.0.2.1 那趟计数 `0→0`）、第 9 步（提案卡 + `1→1` 不写库 + 回环那趟 `0→1` 作分母）、第 10 步（`+1 条 TASK/UPD`、键集合 `['note']`）、第 11/12 步（手机出去、笔记本读到 9 条 `source=remote`）、第 14 步（端口无监听者 + `adb reverse` 清单无 `tcp:4399`）全绿。**第 13 步现量：`截图齐且归属本轮：4 张，拍的时候前台都是 heyta`**（逐图 mtime 落在起跑之后 + 逐图 `dumpsys window` 前台 = `com.heyta`）。人打开看过其中两张（`android-ai-1-assistant.png` 11:42 / `android-ai-2-egress-blocked.png` 11:47），两处文案修复在当前产物上**看得见**：见下面那段"设备读数已取" |
 | 台账口径 | 输出里的 ✅ 行数现在对得上**本脚本正文** | rig43 是 28 行 ✅ / `PASS=27`：那 1 行差来自 `scripts/lib/mobile-e2e.sh` 的预检（它自己 `echo "   ✅ 装的是当前源码的产物"`，打印时 `PASS` 还不存在）。判据 ⑲ 扫的是验收脚本正文，**不覆盖 lib** —— 这条边界如实挂着，不写成"全仓 ✅ 都入账" |
 
+⚠️ **rig 号是全批统一的流水号**（不分端），所以下面这张表里 rig59 出现在 rig58（iOS）之后：
+`rig59 = Android 腿在"共享披露分隔符 + 两条词条"修好之后的第一次整条跑完`，
+它同时把 **traps #353 那条缺陷的第二个消费者**照了出来（见那段）。
+
+| rig | 读数 | 定性与处置 |
+|---|---|---|
+| rig59 | **48 通过 / 1 失败**（`rc=1`；14 步整条跑完） | 装的是当前产物（预检现量 `APK 16:43:43 / 最新源码 16:33:23` ⇒ ✅），第 13 步 `截图齐且归属本轮：5 张，拍的时候前台都是 heyta`（比 rig46 多一张 —— 载体为这条标题判据补了 `android-ai-5-local-only-blocked.png`）。🔴 **唯一那条红是产品缺陷，不是载体**：助手多轮那一发被设备级同意闸拦下后，失败面标题印的是「AI 服务暂时不可用。」，而技术详情那行一直是对的（`privacy-consent-not-granted: …`）。取证行逐字是 `有「连不上端点」=否 有「同意并联网」=0 有「只用本机」=0 有诊断原文=1` —— 五个面板的失败落点里**五处**写了 `outcome.cause !== undefined ? AI_CAUSE_KEY[...] : 面板表[...]`，只有助手那一处直接查了面板级粗码表 ⇒ 原因码 `consent-not-granted` 被丢掉。这是 traps **#353 同一条缺陷的第二个消费者**（第一次是捕获面），见下面那段"第二个消费者" |
+| rig60 | **49 通过 / 0 失败**（`rc=0`；14 步整条跑完、零红） | 修后复跑，装的是含 ① 归因层（#353）② 渲染层第二消费者 ③ 共享披露分隔符 三处修复的那一枚产物（预检现量 `APK 17:28:32 / 最新源码 17:15:26` ⇒ ✅，负载门 `load1=7 ≤ 12` 放行）。rig59 那条红消掉，且消的是**两句**：`✅ 只用本机档：失败面的**标题句**就是「只用本机」那一句（逐字取自词条表）` + `✅ 标题句不是那句「连不上端点…检查网络」（原因码没被归错）`。第 13 步 `截图齐且归属本轮：5 张，拍的时候前台都是 heyta` 复现 ⇒ 五张 `android-ai-*.png` 是本轮产物 |
+
+#### iOS 侧助手：载体从 0 到"11 步整条跑完"（rig47c → rig51，2026-10-06 12:5x–14:3x）
+
+设备 `heyta-iphone-17pro`（iOS 27.0 全量运行时）+ 真服务端 + 只绑回环的可数假端点，零 mock。
+载体 = 新建的 `scripts/verify-mobile-ios-ai.sh`（`pnpm verify:mobile-ai:ios`），走 AX 的 `id:`（`AXUniqueId`）通道，
+不依赖窗口 z-order / 焦点；常驻门禁 = `check:mobile-ai-anchors` 的 iOS 那几判据（㉑ 两本账、㉒ 新鲜度时刻、㉓ 读侧层、㉔ 披露判据）。
+
+| 趟 | 读数 | 这一趟改掉/证伪了什么 |
+|---|---|---|
+| rig47c | 9 通过 / 1 失败（这一趟的日志已不在，读数取当时记录；形状由后面几趟复现） | 照出 iOS 的**节点发射规则**：只有带 trait 的宿主视图才发 `AXUniqueId`，`<View testID>` 根本不发节点 ⇒ 锚点全部下沉到 `Pressable` / `Checkbox` / `TextField` 那一层；披露/失败两个 `<Stack testID>` 容器读不到，判据改读它们**内部那枚按钮**（`…-send` / `…-retry`） |
+| rig48 | `exit 3`，红在第 0b 步：`built=500e958e2a4a inst=7920a546c8d5` | 字节对账这条隐私/产物判据**钉错了时刻** —— 它在 `simctl install` **之前**比"构建目录 vs 容器"，于是每次重建后恒红（尺钉在动作之前＝一条恒不成立的判据）。修法：装前取指纹 → 装后**重新解析** `get_app_container` → 逐字节比 → 不一致就非零退出，而且必须在 `simctl launch` 之前。判据 ㉒ + 六臂（其中一臂复刻的正是 rig48 这个形状）；rig49 起第 1 步打的是 `已装产物与本轮安装的那一枚逐字节相同（sha256 500e958e2a4a…）` |
+| rig49 | **15 通过 / 2 失败** | ① 第 3 步 `端点条数读成 0（期望恰好 1）`：库回读走错层（顶层 `v["endpoints"]`，真源在 `routing.endpoints`）⇒ "回读=0"与"真没存"输出上一样（§7 元规则一）；判据 ㉓ a 半（载体每个顶层读数必须存在于写入侧 `defaultAiSettingsState()` 那份对象里），臂 85/86 证明它会红。② 第 7 步 `中文送不进（No keycode found for 列）`：`idb ui text` 是 **HID 键码表**（`idb/common/hid.py: text_to_events`），非 ASCII 永远抛 —— 于是把"HID 是唯一输入通道"这条假设从载体里删掉，中文走 `AXSetValue`（`verify-mobile-ios.sh` 那条中文标题早已在**库级**被判据证过） |
+| rig50 | **16 通过 / 1 失败** | 唯一红 `写 id:tool-input 四次都没回读出「列出我的任务」（最后回读：空，setRc=0）`，而单独一次 `--list` 打的是 `"detail": "列出我的任务"` —— **写进去了，回读没读到**：回读按"设值前那圈 frame"匹配，而键盘弹出把 multiline `TextInput` 顶下去了。shim 抽出 `readback_after_set()`：**先按 `AXUniqueId`**，退回按坐标；臂 88 用 rig50 现量的那棵树（同 id、y 从 236→412）钉住期望逐字，臂 89 摘掉按 id 那一档后臂 88 的读数不再等于期望（证明它承重） |
+| rig51 | **26 通过 / 7 失败**（`rc=1`）—— 11 步**第一次整条跑完**，且第 1–6 步全绿 | 已取到的 iOS 设备读数（Goal-C 承诺的那几格，逐条都是这一趟现量）：入口按本机配置**出现/消失成对**（第 2 步不在树里、第 4 步在同一枚锚点上进树）、五档 chips 逐枚 id 齐、常驻那句「AI 只给建议…」在屏、五档路由绑进库后**从被写那一侧回读** `capture=1/0 … tool-calling=1/0`、回环端点下界面**不**索取逐功能授权（五档逐枚查过）。7 条红**逐条定源在载体**（见下面那段），另外照出**一条真产品缺陷**（已修，见 ㉔） |
+| rig52 | **31 通过 / 5 失败**（`rc=1`；这一趟 11 步整条跑完 ⇒ 分母与 rig54 不同） | ① **第 8 步照出一条真产品缺陷**（闸门拒绝被渲染成"连不上端点"，见下面那段，traps **#353**）。② 第 9 步「拆解」禁用态：这一趟给**远程**端点一枚能力都没勾 ⇒ `requiredCapabilities.breakdown=['structured_output','long_context']` 把它挡在候选集外（"没声明=没能力"，ADR-0010）——与 §第 5 步 那条产品缺口同源，但这一次是载体的输入没给够，建端点那一步补两档勾选。③④⑤ 三条（第 9 步授权入口 + 第 10 步两条）**同一个成因**：设备级同意闸是**绝对的**（`apps/mobile/src/privacy/consent-gate.ts`：没同意一个字节都不出这台设备，回环也不例外），所以"计数会涨"这一档在这一屏**结构上取不到** —— 判据⑤⑥与 Goal-D 的正向对照必须先把这一档翻成「同意并联网」再取，而第 8 步必须在**翻之前**跑（它判的就是那道闸） |
+| rig55 | **41 通过 / 1 失败**（`rc=1`；11 步整条跑完，第 0 步负载门从 `load1=40` 等到 12 以下才放行，没绕；装的是修后产物，与 rig54 同一枚 `sha256 905616aa72f6…` 逐字节对账） | **Goal-C 的六格 + Goal-D 那格全部在 iOS 上取到设备读数**（下面那段逐条列）。唯一红在**载体时序**（第 9 步授权入口"点不动"，定源见那段），不在产品 |
+| rig56 | **没跑起来**（`RIG56_RC=3`，第 0b 步新鲜度门拒绝） | 🔴 记作**那道门的证据**，不记作设备读数：我起链时写的是 `pnpm reinstall:all -- --only ios`，`--` 被原样送进脚本参数位（traps **#173**，我自己又踩一次）⇒ 重装退 2，而链继续跑 ⇒ 装着的还是上一轮产物。门打出 `源码内容章 1791274184 > bundle 1791273486` 并 `exit 3`，**没有为了跑绿绕它** |
+| rig57 | **42 通过 / 0 失败**（`rc=0`；11 步整条跑完、零红，这是这条载体第一次整条绿）。装的是当前产物：`内容章 1791274184 ≤ 已装 bundle`，第 1 步逐字节对账，四张 `ios-ai-*.png` 的 mtime 全落在起跑之后（逐张判） | Goal-C 六格 + Goal-D 两版读数**全部复现**，且 rig55 那条红消掉：第 9 步现在是「回到设置面按授权位 → **库里回读** `breakdown=1/1`」一条 ✅ 而不是 ❌。 而且**人打开看了那四张图**，当场照出三处 AX 判据看不见的东西（见下面那张三行表）——其中第 1 处是真缺陷，已修并配了能红的判据 |
+| rig58 | **42 通过 / 0 失败**（`rc=0`；四张 `ios-ai-*.png` 现量 mtime 16:52–16:57 = 本轮产物） | 装的是**含共享披露分隔符修复**的那一枚产物（`内容章 ≤ 已装 bundle` + 第 1 步逐字节对账）。这一轮的存在理由不是"再绿一次"，是**验证修过的东西真的进了产物**：判据 ㉔ 与那条 parity 断言证的是源码与 web，而"移动壳的「发给谁」那一行不再黏成一串"必须在 RN 运行时上看 —— rig58 之后人打开 `ios-ai-3-disclosure.png` 看图确认段与段之间分开了（🔴 这条**不是**子串判据能回答的，见上面三行表第 1 处） |
+| rig61 | **42 通过 / 0 失败**（`rc=0`；四张 `ios-ai-*.png` 现量 mtime 17:59–18:04） | 装的是**含全部三处修复**的那一枚（新鲜度门现量 `bundle 1791279154（17:32:34）> 内容章 1791278126（17:15:26）` ⇒ 放行，第 1 步 `已装产物与本轮安装的那一枚逐字节相同（sha256 baf26b99cc7e…）`）。Goal-C 六格与 Goal-D 两版读数在最终产物上**第三次复现**，且人第二次打开图：`ios-ai-2-local-only-blocked.png` 上标题就是「这台设备设为「只用本机」…一个字都没出去…」（#353 那句在 iOS 当前产物上仍然对）、`ios-ai-3-disclosure.png` 上「发给谁」四段用「、」分开。**顺带一条 A/B**：起跑时我把 UDID 末位打错（`…A10A`），第 0 步直接 `❌ 不在 Booted 列表里 ⇒ 先 xcrun simctl boot` 并 `exit 3` —— "不猜设备"那条门（AGENTS §8.9）连一个字符的漂移都拦得住，这一格从此有了一次真实的拒绝读数 |
+
+🔴 **rig55 唯一那条红的定源：载体在一枚控件不住的那个面上点它**（traps **#348/#239 同族**）。
+`ai-consent-breakdown` 住在**设置面**（`apps/mobile/src/ai/AiSettingsSection.tsx:448`），而载体把它写在
+第 9 步末尾 —— 那时界面已经按过披露步的「发送」、停在助手屏的失败面上，设置面早在
+`open_assistant()` 里被 `leave_settings` 收掉了。于是 `press_id` 的 scroll-into-view 回的是
+`found=False / element-left-tree`：**"入口点不动"与"界面把入口摘掉了"在探针输出上长得一样**（§7 元规则一），
+而那句 bad 文案说的正是后者 —— 它会把下一轮排查引向一条不存在的产品缺陷。
+判据⑤本身在这之前已经取完（授权入口出现、回环那一档不索取、披露步三行齐、目的地点名 `192.0.2.1`、
+未授权发送 `0→0`），红的是它后面那句"点得动"。
+修法不是放宽判据，是**回到它住的那个面**再点（`open_ai_settings()` 自带收助手层/收设置面），
+并且点后**从库里回读授权位**（`routes_reading` 的 `breakdown=1/1`）——按到了 ≠ 存住了。
+顺序仍保持在"未授权 ⇒ 零外发"**之后**：先证明没授权时一发都不出去，再给授权。
+放在授予之后不会污染下一步的成对判据 —— `needs = requiresEgressConsent(destination)` 只看地址类别，
+授权位只翻转按钮文案（「授权」↔「撤回」）。修后读数属于 rig56。
+
+✅ **rig55 在 iOS 上取到的设备级读数**（Goal-C 的六格，逐条都是这一趟现量，**没有**借用 Android）：
+① 入口成对：第 2 步「AI 助手」整行不在树里（同帧三枚邻锚 `profile-entry-settings / -habits / -trash`
+都在 ⇒ 缺席是"没渲染"而不是"通道没读到"），第 4 步在同一枚锚点上进树；
+② 五档 chips 逐枚 id 齐（`check:ai-coverage` 在 iOS 设备上的对应物）；③ 「只给建议」那句常驻脚注在屏；
+④ 只用本机档：闸门拒绝原文（逐字取自词条表）+ 点名 `127.0.0.1` + 假端点 `0→0` + 「重试」出口；
+⑤ 非回环目的地：授权入口**出现**、回环那一档**不**索取（对照）、披露步三行齐、目的地那行逐字点名
+`192.0.2.1`、未授权时发送 `0→0`；而"换回回环后入口**消失**"这半也在第 10 步读到 ⇒ 成对完整；
+⑥ 提案卡出现（`breakdown-apply` 在树里）+ **只看不点确认 ⇒ 本机库 `1→1` 一条都不多**。
+🔴 **Goal-D 那一格在 rig55 取到了两个版本**：第 7 步（设备级同意还关着）规则盖章 + `0→0` + 不落失败面 +
+披露步已收；第 10 步开头（同意已翻成「同意并联网」）**同一趟**里规则章仍然盖着、仍然 `0→0`，
+而紧接着回环那一趟 `0→1` —— 这条 `0→1` 就是正向对照：**同一枚计数尺、同一次运行，会涨的那一侧当场证明它有区分力**，
+所以那两条 `0→0` 不是"压根没走传输边界"。Android 载体上取不到的那一格（无中文输入法，三条注入通道现量已列）
+就此在**能输中文的载体**上闭合，判据一个字没放宽。
+
+🔴 rig51 那 7 条红的三类成因（都不在产品，也**不**包装成"已闭合"）：
+
+1. **逐工具授权没勾**（第 7 步两条）。`apps/mobile/src/ai/AssistantScreen.tsx:1219` 的 `grants` 取的是
+   `localApi.grants` —— 默认**全关**是红线（ADR-0011 §3.1），所以一枚都没勾时 `resolveToolSelection` 的候选集是空集，
+   任何句子都到不了规则那一支，界面报的是「还没有授权任何工具…」。载体把它读成了"规则没有先跑"。
+   修法 = 第 6b 步勾 `ai-tool-grant-list_tasks` 并**从库里回读授权位**（新增 `grants_reading()`，读的仍是写入侧那一层）。
+2. **拆解那一档压根没有可选的行**（第 9 步两条 + 第 10 步两条）。`breakdown-start` 的
+   `disabled = selectedId === undefined || route.target === undefined`，而全新安装的设备上任务列表是空的
+   ⇒ 恒禁用 ⇒ 后面"计数 0→0""等 40 秒没有提案卡"都是它的连锁。
+   修法 = 第 6c 步走真 UI 种一条任务（FAB → `AXSetValue` 写标题 → 「添加」的**启用态**当"文字进了应用"的判据 →
+   Composer 关闭 + `ops` 条数必须涨），第 9/10 步各自 `press_label "$TASK_TITLE"` 选中它
+   （重新进面板会丢选中态，不假设它跨挂载）。
+3. **"拒绝原文"找错了句子**（第 8 步一条）。载体找的是 `web.ai.settings.consentLead` 的尾部，
+   而那句住在**披露步**、且目的地是回环时按设计**不渲染**（与第 6 步"回环不索取授权"同一个口径）——
+   一条恒不成立的判据。改成按词条表取失败面那一句之后，这一条**没有变绿，而是把一条真产品缺陷照了出来**
+   （界面上渲染的是 `web.ai.failure.cause.network`，不是任何一种"没授权"的句子 ——
+   逐条见下面"rig52 照出来的那条产品缺陷"，traps **#353**）。
+   载体同时补上"失败时把界面上到底有哪几句打进日志"（先修探针，不猜）。
+
+✅ **rig51 顺手照出来的那条产品缺陷（已修，不是载体的）**：移动壳的两个发送按钮
+（`tool-start-single` / `tool-start-assistant`）**无条件** `setPhase('disclose')` ——
+于是一句本机规则就答得出的话，界面先向用户承诺"这些内容要离开本机"，而这一条路径一个字节都不发。
+`packages/app-host/src/ai-assistant.ts` 里 `assistantNeedsEgressDisclosure()` 的注释写的正是这件事
+（"那句承诺是假的，而代价…是下一次真需要出境时，用户已经不信这条提示了"），web 的对话面板消费了它，
+移动壳是**漏掉的第二个消费者**。修法 = 壳里那一问交回共享函数（单步用 `resolveToolSelection(grants)`、
+多轮用 `assistantNeedsEgressDisclosure(tier)`），不新建词条、不在壳里抄一份规则匹配；
+新门禁 ㉔ 把"两个按压点各自必须先过共享判据 + 不许壳里自造匹配 + 分母（别的面板本来就该无条件披露）"钉住，
+四条变异臂各红一次（摘掉任一支共享判据 ⇒ 点名那枚锚点；换成 `includes('列出')` ⇒ 点名"第二套口径"）。
+
+✅ **rig52 照出来的第二条产品缺陷（已修，不是载体的）：隐私闸门的拒绝被渲染成"连不上端点"**
+（机制、后果与两条封闭表的修法见 traps **#353**，这里只记这一批的落点）：
+
+| 落点 | 内容 |
+|---|---|
+| 归因 | `packages/ai` 新增原因码 `consent-not-granted`；`provider.ts` 与 `routing.ts` 的 `attemptOnce` 在 catch 里先用 `isPrivacyConsentBlocked` 认出来，不再一律收成 `network` |
+| 两张封闭表 | `countsAsEndpointFailure('consent-not-granted') = false`（没被访问过的端点不许挨熔断锅）、`shouldTryNextEndpoint(...) = false`（换一个目的地偷发不是重试）—— 三枚设备库读数里 `consecutiveFailures` 那一条就是这么被顶成 2 的 |
+| 契约字符串的家 | `PRIVACY_CONSENT_BLOCKED_MARKER` / `PrivacyConsentBlockedError` 从 `packages/app-host/src/privacy-consent.ts` 提到 `packages/ai/src/egress.ts`（失败词表的所有者在下面那层），app-host 改成 re-export ⇒ 全仓仍只有一份口径（AGENTS §3.5） |
+| 措辞 | `web.ai.failure.cause.consentNotGranted` 中英成对，界面用「这台设备设为『只用本机』… nothing left the device」，**不新增任何"出境"式表述**；`apps/web/tests/ai-failure-copy.spec.tsx` 另钉一条"那句里不许出现「检查网络 / 端点地址是否可达」" |
+| 为什么不需要新门禁 | `AiFailureReason` 是**封闭词表**：加一个成员就让 `Record<AiFailureReason, …>` 三处映射（mobile `ai/copy.ts`、web `ai-failure-copy.ts`、app-host `ai-failure-fallback.ts`）与 `ALL_CAUSES` 穷尽表**编译期报错** —— 漏配一种原因的代价从"上线后有人看到空白"变成"`pnpm -r typecheck` 红" |
+| 变异读数 | 把归因改回 `network` ⇒ `packages/ai/tests/routing.spec.ts` **`1 failed / 54 passed (55)`**，`AssertionError: expected 'network' to be 'consent-not-granted'`；还原后 sha256 前缀 `d39e50f16f7b17bb` 与改前逐字相同 |
+
+载体的判据形状同时补了一条（Android 5c 原先只找 `privacy-consent-not-granted`，**那句在改前改后都在**，
+对标题完全无感）：现在两侧载体都**逐字取词条表比标题句**，并各加一条"标题不许是那句「连不上端点…」"
+的反向判据。词条一律经 `scripts/lib/card-export-probe.sh` 的 `zh()` 取（不抄字面量，理由写在那个文件头）。
+
+🔴 **rig59 照出的"第二个消费者"（同一族缺陷换了个面）**：上面那张表修的是**归因层**
+（`packages/ai` 不再把闸门拒绝收成 `network`），而 traps #353 说的是**渲染层**（有原因码却查面板级粗码表）。
+归因修好之后，同一族缺陷在**助手那一处**仍然成立 —— 因为六个失败落点里只有它没接 `AI_CAUSE_KEY`。
+所以这一格真正要的不是"再修一处"，是**一条逐处过的常驻判据**：
+
+| 落点 | 内容 |
+|---|---|
+| 修法 | `apps/mobile/src/ai/AssistantScreen.tsx` 的助手落点改成与另外五处同一形状：`outcome.cause !== undefined ? AI_CAUSE_KEY[outcome.cause] : ASSISTANT_FAILURE_KEY[outcome.reason]`（**面板级粗码只在没有原因码时兜底**） |
+| 新门禁 ㉕ | `check:mobile-ai-anchors` 里 `mobileFailureCauseGuard()`：**逐处**读 `setFailure({` 那一段，含 `*_FAILURE_KEY[` 而不含 `AI_CAUSE_KEY[` ⇒ 红并点名第几处/行号；另带一条**分母自检**（`setFailure({` 处数少于现量基线就红）—— 摘掉一整处会让这条判据没有输入，那是 §7 #191 那一族"门禁安静地不执行还照样打印通过" |
+| 读数 | `FAILURE_CAUSE_SUMMARY 失败落点=6 先过原因码=6 红=0`（真源码）；`--self-test` 五臂各一次：阳性对照、"摘掉助手那一支"的前置 + 红（点名 `没有先过原因码` 与那句假标题、`先过原因码=5`）、"摘掉一整处落点"的前置 + 红（`失败落点分母只剩 5`） |
+| 为什么不靠 typecheck | 这一族**编译期抓不到**：`ASSISTANT_FAILURE_KEY[outcome.reason]` 类型完全合法（`reason` 是封闭词表、映射表齐全），错的只是**查表的顺序**。词表穷尽性管得住"有没有为某个原因写句子"，管不住"界面有没有去查它" —— 后者只能是判据 |
+
+⚠️ **rig59 之后仍开着的**（不写成完成）：
+① 上面那张三行表里的第 2、3 处（披露字段用内部键名 / 五档 chips 第五枚被切）—— 一处修法形状已写清待做，
+一处要产品负责人拍"是不是有意的可滚动暗示"；rig58 与 rig59 的两轮截图里**这两处都还在**（第二次看图确认）；
+② ✅ **两端都在最终产物上取到修后读数**：Android rig60 = **49 通过 / 0 失败**（rig59 那两条标题判据
+现在各是一条 ✅，第 13 步 `5 张，拍的时候前台都是 heyta`），iOS rig61 = **42 通过 / 0 失败**
+（新鲜度门 `bundle 1791279154 > 内容章 1791278126`、第 1 步逐字节对账）。
+两端的失败面截图人**都打开看过**：`android-ai-5-local-only-blocked.png`（设备钟 5:44）与
+`ios-ai-2-local-only-blocked.png`（18:01）上标题逐字是「这台设备设为「只用本机」…一个字都没出去…」，
+「技术详情」独占一行、诊断原文另起一行 —— Goal B 那两处 + #353 那一族在**两个端**的当前产物上都在。
+③ 本批所有改动**尚未提交**（按路径分三笔），push 与生产部署**不在本 Goal 内**。
+✅ 已经不再开着的：rig55 那条载体时序红（rig57 修后读数 = `breakdown=1/1` 库里回读 ✅）、
+四张 `ios-ai-*.png` 的人眼复核（人看过，且照出了东西 —— 这正是 §6.2 规定一存在的理由）。
+rig52 那两张画的是修前的假标题，**不作为修后证据**；iOS 那四张现在是 **rig61** 的产物（mtime 现量 17:59–18:04），
+Android 那五张是 **rig60** 的（17:43–17:52）。🔴 rig59（修前）那五张已被 rig60 同名覆盖 ——
+"标题当时印的是「AI 服务暂时不可用。」"这一条的证据是 **rig59 日志里的取证行**（`/tmp/rig45-android-ai.log:100-108`，
+逐字列出屏上那串文本），不是图。
+
+🔴 **rig57 看图当场照出的三处（§6.2 规定一"人必须打开看"这一轮真的抓到东西了）**：
+
+| # | 界面上看到的 | 定性与处置 |
+|---|---|---|
+| 1 | 「发给谁」那一行四段**逐字黏成一串**：`将发往：stub-remotehttps://192.0.2.1/v1模型 stub-model数据会离开设备` | 🔴 **真缺陷，已修**。`packages/ui/src/ai/AiDisclosure.tsx` 把四段各写成一个相邻 `<Text>`，而 RN/RNW 对相邻 Text **不插任何空白**。而**同一趟里 iOS 判据 `found_label "192.0.2.1"` 照样绿**（子串匹配）—— 这是"验界面写了什么、验不出看不看得清"，与 §7 那条"不验少了什么"同族。修法 = 段与段之间用**已经在 props 里的那一枚** `separator`（`LIST_SEPARATOR[locale]`，正字法、刻意不进词条表），不新造标点常量、不把空格塞进词条。判据 = `apps/web/tests/ai-disclosure-parity.spec.tsx` 新增那条"每段之后的第一个字符必须是分隔"，**变异读数**：摘掉任一枚 `{separator}` ⇒ `1 failed \| 1 passed` 且点名粘住的那一段（`云端首选`），还原 ⇒ 2 passed。共享组件一处修，web 与移动壳同时好（移动壳只是包了一层，没有第二份渲染） |
+| 2 | 披露的字段清单是**内部键名**：`将发送这些字段：today、title` | 🟡 **登记，不改**（不在本 Goal 五项内，且不是红线违例 —— 逐字段披露成立，字段一个没漏）。问题是中文用户读不出 `title` 是"任务标题"。修法形状已想清：给每个 payload 字段一枚 `web.ai.field.<key>` 词条（中英成对），界面上"人话名 + 反引号里的线格式键名"并列（**不能只留人话名** —— 那会让披露与真实请求体失去对账能力）；配一条 `check:*` 把"字段词表 ↔ 词条表"钉住（同 `check:legal-tools` 那个形状：封闭句式的那张表就是授权面，缺一条即红）。谁做谁先读 `packages/ai` 里那张字段来源表，别在壳里另列一份 |
+| 3 | 五档 chips 那一排，第五枚在右边缘被切掉一半（三张图一致，只露出「A」） | 🟡 **登记，判"是有意的可滚动暗示还是缺 affordance"要人拍**。现状：横向滚动、无渐隐、无箭头，用户第一眼只看到四档，而"五档"是 `check:ai-coverage` 的分母。若要修，方向是右缘渐隐 + 可聚焦（键盘/读屏也要能到第五枚），不是把五档挤进一屏（字号会掉到不可读）。⚠️ 载体侧不受影响：判据②是**逐枚按 id 现读**（`ai-mode-*`），不依赖可见性 |
+
+✅ **顺带：Goal B 那两处文案修复在 iOS 当前产物上被看见了**（此前只有 Android 的证据）——
+`ios-ai-1-assistant.png` 上捕获步那句是完整的三段拼句
+「确认后会按上面的字段写入。截止时间是模型的推算，请核对后再填。」（不再以「截止时间是」结尾）；
+`ios-ai-2-local-only-blocked.png` 上失败面「技术详情」独占一行，诊断原文
+`privacy-consent-not-granted: …（http://127.0.0.1:4399/v1/chat/completions）。` 另起一行（不再挤成一句）。
+两张都是 rig57 装的这一枚产物（`内容章 ≤ 已装 bundle` + 第 1 步逐字节对账）。
+
+🔴 **红线自查（本批收口时逐条现量，不写"应该没问题"）**：
+① **对外措辞**：产品界面里那两句还在替我们说"我们在做数据出境"的词条已改 ——
+`web.ai.duration.basis.historyOverflow`「为控制出境…」→「为控制**离开本机的内容**…」，
+`web.ai.assistant.failure.egressOutsideDisclosedSet`「没有批准过出境的字段」→「没有批准过**离开本机**的字段」
+（英文侧本来就是 `egress / sent to limit egress`，不含"跨境"义，逐字未动；`check:ui-language` 现量
+zh / en 各 **3157** 条成对、rc=0）。**没改的那三处也是判断，不是漏掉**：
+`site.docs.privacy.s4p2` 与 `site.legal.ai-and-transfer.lede` / `.seo.description` 里的「出境」
+住在**对外法务文本**里，而那份文本的作用恰恰是把两件事分开 ——「我们的出境」（要由我们履行 PIPL 38/39 的手续）
+与**你自己的出境**（你处分自己的数据，处理者是你），`privacy.ts:454` 那句甚至一开头就写"把它们合成一句话就会变成假话"。
+把那个词从那里拿掉会让**否定句失去它所否定的东西**，而 `LEGAL_SET_VERSION` 里的版本号进同意指纹
+（`packages/legal/src/index.ts`）⇒ 改它是一次对外法律表征变更，要法务那条线拍，不由这批改。
+② `host.submit(` 全仓现量 **2 处**（`packages/local-api/src/server.ts:590`、`packages/app-host/src/ai-tool-run.ts:195`），
+`apps/*` 里**一个调用点都没有**（只有注释在说这件事）⇒ "AI 类型上产不出 op"这一条在本批没有被削弱。
+③ 逐工具默认关 / 回退不跨越隐私边界 / 不 bump `CURRENT_SCHEMA_VERSION` / 新字段一律可选带默认值：本批**一处持久化都没动**，
+改动全在 `packages/ai`（失败词表）、`packages/app-host`（原因码→词条映射）、`apps/mobile`（壳的披露判据）、
+`packages/i18n`（词条）与载体/门禁脚本。
+④ 变异证据（本轮现量读数）：`node scripts/verify-i18n-failures.mjs aifailure` ⇒ 4 用例"该绿的绿、该红的红"，
+其中新加那一臂（把 `consent-not-granted` 指到 `network` 词条）退出码 **1**；
+`node scripts/check-mobile-ai-anchors.mjs --self-test` ⇒ `ARMS=… FAIL=0`，
+🔴 **臂数不在这里抄**（抄一次就开始漂：这一批从 99 → 108 → 147 → 现在这一枚，每次都要回来改数字）——
+要现量就跑上面那条命令看它自己打印的那一行，判据是 `FAIL=0` 而不是某个臂数。
+
+✅ **E 项（收尾）在最终载体上的整批读数**（2026-10-06 18:10–18:12，全部在同一棵树上、串行跑）：
+
+| 类别 | 命令 | 读数 |
+|---|---|---|
+| 类型 | `pnpm -r typecheck` | `rc=0`（含 `apps/desktop` 的两份 tsconfig） |
+| 门禁 14 道 | `check:ui-language` `check:i18n-vars` `check:egress-wording` `check:layering` `check:design` `check:docs` `check:docs-voice` `check:md-tables` `check:script-snapshot` `check:verify-script-copy` `check:mobile-ai-anchors` `check:journey-coverage` `check:ai-coverage` `check:rn-aria` | 逐道 `rc=0`（`check:md-tables` 是本轮往台账里加了三行表之后必须重跑的那一道） |
+| 门禁 6 道（AI/法务侧） | `check:ai-tools` `check:legal-tools` `check:legal-copy` `check:ai-quota` `check:egress-wording` `check:gate-wiring` | 逐道 `rc=0` |
+| 单测（本轮改动经过的包） | `--filter @heyta/ai / app-host / ui / i18n / web test` | `267` / `1487` / `559` / `26` / `1876 passed \| 13 skipped`，五个 `rc=0` |
+| 产物 | `pnpm -r build` ⇒ `reinstall-all --only android,ios` | `BUILD_RC=0`、`REINSTALL_RC=0`；android 截图 `1080x2400 内容占比 56.7% 主蓝命中 4001`，ios `1206x2622 60.1% 主蓝 4152`，ios 内容章 `1791278126 ≤ 已装 bundle 1791279154` |
+| 设备 | rig60（Android 14 步）/ rig61（iOS 11 步） | `49/0 rc=0` 与 `42/0 rc=0`，两端截图人打开看过 |
+
+🔴 **这一批没有闭合的，仍然只有那三条**（不包装）：三行表第 2、3 处（字段印内部键名 / 第五枚 chip 被切，
+一处待做一处待拍）、`apps/mobile/ios/Podfile.lock` 的脏（`pod install` 在本机重写哈希，留给下一次合并登记）、
+以及 **push 与生产部署不在本 Goal 内**（按纪律要另行授权）。
+
 **Goal-7a 的真机对应物现在两半都算数**（rig42 现量，取代本节 earlier 的"只有界面那一半算数"）：
+
 界面那一半（地址类别 ⇒ 授权入口的出现/消失成对、逐字段披露的元素齐）读的是 AX 树，与隧道无关；
 "未授权零外发 / 失败不静默回落"那几条靠**假端点计数**的判据，在 rig42 里跑在**有正向对照的通道**上
 （同一步既打出 `计数 0→0` 又由第 9 步打出 `0→1`），所以 `0→0` 这一次有区分力 —— rig38/39 那句
@@ -894,13 +1078,16 @@ capture=1 breakdown=1 prioritize=1 duration-estimate=1 tool-calling=1
 而那 2 条失败逐条定源在载体自己的对账代码（traps #344），不是产品失败，也不记作产品完成。**
 rig39 那趟的 `31/1` 与它的两条载体成因（`adb root` 拆掉 `adb reverse`、上一轮泄漏的假端点被本轮借用）
 仍然留在表里 —— 它们已由归属判据 + EXIT trap 收掉，第 14 步现在是判据不是清理动作。
-仍开的格子（rig46 之后重取现量）：① 「本机规则命中 ⇒ 零外发」在 **Android 载体**上按设计不可达
-（三条输入通道现量已列，规则表谓词头全是中文）⇒ 这一格换到**能输中文的 iOS 模拟器**上取读数，
-不在这里降级判据；
+仍开的格子（rig46 之后重取现量）：① ✅ **已闭合，而且是在换了载体之后闭合的**：
+「本机规则命中 ⇒ 零外发」在 **Android 载体**上按设计不可达（三条输入通道现量已列，规则表谓词头全是中文），
+换到**能输中文的 iOS 模拟器**后由 rig55 取到读数，两个版本各一条：同意闸**关着**时（第 7 步）规则盖章 +
+假端点 `0→0` + 不落失败面 + 披露步已收；同意闸**开着**时（第 10 步）规则章仍在、仍 `0→0`，
+而同趟回环那一发打出 `0→1` —— 这条 `0→1` 就是正向对照，所以 `0→0` 有区分力。判据一个字没放宽。
 ② ✅ **已闭合**：截图四张图的归属复核由 rig46 取到读数（`4 张 + 前台都是 heyta`），人打开看过承担
    文案判据的那两张（见下面那段）；
-③ iOS 侧助手至今**零设备读数**（这一条不是 Android 能补的）—— 载体正在补：
-   `scripts/verify-mobile-ios-ai.sh` + iOS shim 的 `id:`（`AXUniqueId`）通道（`4ccbab78`）。
+③ iOS 侧助手**不再是零设备读数**（rig51 第一次整条跑完；rig52 逐条定源并把一条真产品缺陷照出来；
+   rig54 装的是修后产物；**rig55 = 41 通过 / 1 失败**，Goal-C 的六格与 Goal-D 那一格逐条在上面）。
+   这一格**仍未闭合**的部分也写在那里：rig55 那条红的修后读数属于 rig57，四张 `ios-ai-*.png` 的人眼复核还没做。
 
 🔴 **看图当场查出的一条移动侧接线缺陷（rig42 的 `android-ai-1-assistant.png`）—— 源码已修，设备读数已取（rig46）**：
 `apps/mobile/src/ai/AssistantScreen.tsx` 的捕获步把词条 `web.ai.capture.noteLead`
