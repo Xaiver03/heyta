@@ -100,12 +100,38 @@ function collectIssues(root) {
     if (!new RegExp(`-e ${v}=`).test(envLine)) issues.push(`CONTAINER_ENV 没有把 ${v} 显式置空 ⇒ 容器可能继承宿主代理，"零代理字节"这句承诺作废`);
   }
 
-  // E. 探针必须有阳性对照，且对照失败必须**不能**被当成通过。
-  if (!/CONTROL_VIA_PROXY=OK/.test(probe)) {
-    issues.push('egress-probe.sh 没有阳性对照（挂代理再连一次 GitHub）⇒ "连不上 GitHub"会被读成"没走代理"，而这两种是相反的事实');
+  // E. 探针是"配对仪器测试"，不是可达性断言。
+  //    🔴 四件套缺一不可，每一件都对应一种"会假装成功"的坏法：
+  //    ① 阳性对照（挂代理真打一次并在账本里看得见）—— 没有它，"没记到"分不清
+  //       "没走代理"与"仪器瞎了"；
+  //    ② 对照看不见 ⇒ INCONCLUSIVE + exit 2，**不许**落回"通过"；
+  //    ③ 拖住连接（--limit-rate）：`/connections` 只列活跃连接，一次 0.2 秒的快请求
+  //       根本采不到 ⇒ 那条"没记到"是探针够不着，不是结论；
+  //    ④ **不许**再写"连不上 GitHub ⇒ 没走代理"那一类判据 —— 2026-10-06 实测这台机器
+  //       直连 github.com 是 200/0.09s，那条前提已经死了，留着它就是一条永远红的判据。
+  //    ⚠️ 全部判据跑在**剥掉注释**的那份文本上：这一枚探针的说明里就写着 `--limit-rate`
+  //       与 `GITHUB_DIRECT`（它讲的是"上一版为什么错"），照原文判会得到一条永远红的
+  //       判据 —— 与上面 Dockerfile 那一处是**同一个 bug 的第二次现形**，同一个提交里修的。
+  const probeCode = probe
+    .split('\n')
+    .filter((l) => !/^\s*#/.test(l))
+    .join('\n');
+  if (!/CONTROL=OK/.test(probeCode)) {
+    issues.push('egress-probe.sh 没有阳性对照（挂代理再打一次并确认账本看得见）⇒ "没记到"会被读成"没走代理"，而这两种是相反的事实');
   }
-  if (!/EGRESS=INCONCLUSIVE[\s\S]*exit 2/.test(probe)) {
-    issues.push('egress-probe.sh 的"对照不成立"没有走到 exit 2 ⇒ 探针作废时会静默变成"通过"');
+  if (!/EGRESS=INCONCLUSIVE[\s\S]{0,80}exit 2/.test(probeCode)) {
+    issues.push('egress-probe.sh 的"对照看不见"没有走到 exit 2 ⇒ 仪器瞎了时会静默变成"通过"');
+  }
+  if (!/--limit-rate/.test(probeCode)) {
+    issues.push('egress-probe.sh 的标记请求没有拖住连接（缺 --limit-rate）⇒ /connections 采不到它，"零记录"是探针失效而不是证据');
+  }
+  if (/GITHUB_DIRECT/.test(probeCode)) {
+    issues.push('egress-probe.sh 里又出现了"以 GitHub 可达性判代理"的写法 —— 2026-10-06 实测直连 github.com = 200/0.09s，这条前提已死');
+  }
+  // 控制器地址只许出现一份（抄件的漂移方式是"改了上面那行、python 还在读旧端口"）
+  const ctrlLiterals = (probeCode.match(/172\.17\.0\.1:9090/g) || []).length;
+  if (ctrlLiterals > 1) {
+    issues.push(`egress-probe.sh 里把 mihomo 控制器地址写死了 ${ctrlLiterals} 处 ⇒ 应当由参数传进去，只留一处默认值`);
   }
 
   // F. 探针必须排在**任何花钱动作之前**（负载门 → 传输 → 构建 → 探针 → 装依赖）。
@@ -155,7 +181,23 @@ if (SELF_TEST) {
   const ARMS = [
     {
       name: '阳性对照被删',
-      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace(/CONTROL_VIA_PROXY=OK[\s\S]*?\nfi/, '# 删掉了\n') },
+      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace(/printf 'CONTROL=OK[^\n]*\n/, '') },
+    },
+    {
+      name: '对照看不见时落回"通过"（不再 exit 2）',
+      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace(/echo 'EGRESS=INCONCLUSIVE'; exit 2/g, "echo 'EGRESS=OK'; exit 0") },
+    },
+    {
+      name: '标记请求不拖住连接（仪器必然瞎）',
+      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace(/--limit-rate 20k /g, '') },
+    },
+    {
+      name: '退回"以 GitHub 可达性判代理"那套死前提',
+      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace('# ── 0)', 'if curl -m 5 https://github.com/ >/dev/null; then echo GITHUB_DIRECT=FAIL; fi\n# ── 0)') },
+    },
+    {
+      name: '控制器地址被抄成两份',
+      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace('CTRL="${3:-http://172.17.0.1:9090}"', 'CTRL="${3:-http://172.17.0.1:9090}"\nBAK=http://172.17.0.1:9090') },
     },
     {
       name: 'ENV_LIMITED 留了一条已经不在链里的项',
