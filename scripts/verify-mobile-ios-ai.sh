@@ -177,7 +177,19 @@ press_in_id() {  # <块 testID> <标签>
     echo "   · $1 里的「$2」滚不进可见区（found=$(jget "$v" found) scrollRc=$(jget "$v" scrollRc)）" >&2
     return 1
   }
-  ax "$2" --pressable --within "id:$1" --press --json >/dev/null 2>&1
+  # 🔴 按压那一句的**语义结果**必须回传给调用方：shim 对"没找到"是 rc=0 + `result:not-found`
+  #   （它把断言留给调用方），所以只看 rc 会把"块里压根没有那一枚"读成"点成功了"。
+  local p
+  p=$(ax "$2" --pressable --within "id:$1" --press --json)
+  case "$(jget "$p" result)" in
+    success) return 0 ;;
+    not-found)
+      echo "   · 块 $1 在树里，但**块内**没有「$2」那一枚（result=not-found detail=$(jget "$p" detail)）" >&2
+      return 3 ;;
+    *)
+      echo "   · 按「$2」没成功（result=$(jget "$p" result)）" >&2
+      return 1 ;;
+  esac
 }
 # 输入框：先收键盘（键盘弹着时被它盖住的元素**整块从树上消失**，实测），再滚进可见区，
 # 再写；判"写进去没有"的是**回读**，不是 rc（`verify-mobile-ios.sh` 第 6 轮那条纪律）。
@@ -212,17 +224,70 @@ set_id() {  # <testID> <值>
 }
 # 中文只能走 HID 键盘（`set-value` 对 RN 的 onChangeText 不可信，实测过两次）。
 type_id() {  # <testID> <值>
-  local out
+  local out back
   ax --dismiss-keyboard --json >/dev/null 2>&1
   out=$(ax "id:$1" --type-text "$2" --json)
   if [ "$(jget "$out" typedRc)" != "0" ]; then
     bad "中文送不进 id:$1（typedRc=$(jget "$out" typedRc)）—— 这一格在 Android 上就是死在这里"
     return 1
   fi
+  # 🔴 判"写进去没有"的是**回读**，不是 rc：HID 打字 rc=0 而字段仍是空串是实测过的形状，
+  #   而调用方拿着"已写入"的假设往下走，那条「计数没动」就会变成"压根没人发"。
+  back=$(jget "$out" detail)
+  if [ "$back" != "$2" ]; then
+    ax --dismiss-keyboard --json >/dev/null 2>&1
+    back=$(jget "$(ax "id:$1" --list --json)" detail)
+  fi
+  if [ "$back" != "$2" ]; then
+    bad "HID 送进 id:$1 后回读不是「$2」（最后回读：${back:-空}）⇒ 这一格没有输入"
+    return 1
+  fi
   return 0
 }
 enabled_id() {  # <testID> → 0 = enabled=True
   [ "$(jget "$(ax "id:$1" --list --json)" enabled)" = "True" ]
+}
+
+# ── 导航（与 Android 那趟同一套形状，只是逐条按 iOS 的通道实现）──────────
+# 🔴 为什么每一段都要显式收层：RN 的 Modal 各开一个原生窗口，立着的时候**底部标签
+#    不在树上**（Android 那侧同一条实测记在 open_ai_settings 头上：第 6 步刚收掉设置面，
+#    第 7 步的 add_endpoint 落在「我的」页上，表单四格一枚都不在树里，报出来的却是
+#    「非回环端点没存进去」）。探针留下的状态就是后续判据的输入（§7 第 83.1 条），
+#    所以"收层"是导航的一部分，不是可选项。
+goto_me_page() {  # 只负责按下并留渲染时间；到没到由调用方的锚点判
+  press_label "$TAB_ME" || return 1
+  sleep 2
+}
+leave_assistant() {
+  found_id "assistant-screen" || return 0   # 没立着 ⇒ 不用收（这一条不报错）
+  echo "   · 助手层还立着 ⇒ 走它自己的出口收掉（立着时底部标签不在树里）"
+  press_id "assistant-back" || return 1
+  sleep 1
+  absent_id "assistant-screen"
+}
+leave_settings() {
+  found_id "settings-sheet" || return 0
+  ax --dismiss-keyboard --json >/dev/null 2>&1
+  echo "   · 设置面还开着 ⇒ 点它自己的关闭键（关它不丢刚存的端点：提交发生在点「添加」那一刻）"
+  press_label "$CLOSE_SETTINGS" || return 1
+  sleep 1
+  absent_id "settings-sheet"
+}
+open_ai_settings() {
+  leave_assistant || { echo "   ❌ 助手层收不掉：点了 assistant-back 而 assistant-screen 还在树里" >&2; return 1; }
+  leave_settings || { echo "   ❌ 设置面收不掉 ⇒ 重开等于叠两层" >&2; return 1; }
+  goto_me_page || { echo "   ❌ 切不到「我的」那一页" >&2; return 1; }
+  press_id "profile-entry-settings" || { echo "   ❌ 点不到「我的 → 设置」那一格（testID=profile-entry-settings）" >&2; return 1; }
+  wait_id "ai-settings-section" 15 || { echo "   ❌ 设置面里没有 ai-settings-section（AI 段整块没渲染？）" >&2; return 1; }
+  return 0
+}
+open_assistant() {
+  leave_settings || { echo "   ❌ 设置面收不掉 ⇒ 底部标签不在树里" >&2; return 1; }
+  leave_assistant || return 1
+  goto_me_page || { echo "   ❌ 切不到「我的」那一页" >&2; return 1; }
+  press_id "profile-entry-assistant" || { echo "   ❌ 点不进助手屏" >&2; return 1; }
+  wait_id "assistant-screen" 12 || { echo "   ❌ 助手屏没起来（assistant-screen 不在树里）" >&2; return 1; }
+  return 0
 }
 
 # ── 假端点：确定性、只绑回环、可数请求 ──────────────────────────────────
@@ -408,6 +473,9 @@ sleep 6
 CONSENT_TITLE=$(zh common.privacy.consent.title)
 WELCOME=$(zh mobile.welcome.offline)
 TAB_ME=$(zh mobile.tab.profile)
+# 设置面是 RN Modal，而它自己的关闭键**没有 testID**（SettingsScreen 那枚 IconButton
+# 只写了 icon+label）⇒ 这一格只能按标签走。它是词条原文，进判据 ㉑b 的键对账面。
+CLOSE_SETTINGS=$(zh mobile.settings.close)
 TREE_N=0
 for _i in 1 2 3 4 5 6 7 8; do
   TREE_N=$(idb_ax_label_count)
@@ -454,9 +522,7 @@ else
 fi
 
 step "3. 开总开关 + 配一枚回环假端点（仍处「只用本机」）"
-press_id "profile-entry-settings" || { bad "进不去设置面"; summary "iOS 助手真机验收"; }
-wait_id "ai-settings-section" 15 \
-  || { bad "设置面里没有 ai-settings-section（AI 段整块没渲染？）"; summary "iOS 助手真机验收"; }
+open_ai_settings || { bad "进不去设置面的 AI 段（导航见 open_ai_settings）"; summary "iOS 助手真机验收"; }
 ok "设置面里的 AI 段在树里（ai-settings-section）"
 press_id "ai-gate-enabled" || bad "开不了「启用 AI 功能」"
 sleep 2
@@ -482,8 +548,10 @@ case "$EP_N" in
 esac
 
 step "4. 判据①（正向那一半）：配好端点后入口进树 —— 与第 2 步的缺席成对"
-press_label "$TAB_ME" || true
-sleep 3
+# 🔴 先收设置面：第 3 步就停在那一层里，而 Modal 立着的时候底部标签与「我的」页的
+#    条目都不在树上 —— 直接按「我的」会读成"点了没反应"。
+leave_settings || { bad "设置面收不掉（点了关闭而 settings-sheet 还在树里）⇒ 后面的屏无从判定"; summary "iOS 助手真机验收"; }
+goto_me_page || { bad "切不到「我的」那一页"; summary "iOS 助手真机验收"; }
 if wait_id "profile-entry-assistant" 12; then
   ok "「AI 助手」这一格进了树（同一枚锚点：第 2 步不在、这一步在 ⇒ 成对成立）"
 else
@@ -522,11 +590,15 @@ else
 fi
 
 step "6. 五档路由绑到回环端点（块内那一指落在哪一层由 --within 判）"
+# 🔴 五块 `ai-feature-<f>` 住在**设置面**的 AI 段里，不在助手屏上 —— 第 4/5 步停在
+#   助手层，直接在这儿按块锚会读到"锚点取不到"，而那是导航没做完，不是界面缺那一格。
+open_ai_settings || { bad "进不去设置面的 AI 段 ⇒ 这一格没有输入"; summary "iOS 助手真机验收"; }
 for f in capture breakdown prioritize duration-estimate tool-calling; do
   press_in_id "ai-feature-$f" "$EP_LOOPBACK"
   case $? in
     0) : ;;
-    2) bad "块 $f 的锚点取不到 ⇒ 绑定这一格没有输入"; ;;
+    2) bad "块 $f 的锚点取不到 ⇒ 绑定这一格没有输入（探针够不着，不是界面缺那一格）" ;;
+    3) bad "块 $f 在树里而块内没有那枚端点 chip ⇒ 这一档根本没渲染出可绑定的行" ;;
     *) bad "$f 里的端点 chip 点不到";;
   esac
 done
@@ -561,11 +633,17 @@ else
 fi
 
 step "7. 判据⑦（Goal-D 那一格）：本机规则命中 ⇒ 零外发"
+open_assistant || { bad "回不到助手屏 ⇒ 这一格没有输入"; summary "iOS 助手真机验收"; }
 # 切到「AI 工具调用」那一档：规则前门只在这条链路上跑。
 press_label "$(zh web.ai.feature.toolCalling)" || bad "切不到「AI 工具调用」那一档"
 sleep 2
-set_id "tool-input" "列出我的任务" || summary "iOS 助手真机验收"
+# 🔴 Goal-D 的全部内容在这一行：规则表 12 条的**谓词头全是中文**，所以这一格在 Android
+#   载体上是不可达的（三条输入通道都送不进中文，记在 verify-mobile-ai.sh 第 5 步 5d）。
+#   iOS 这一侧中文走 HID 键盘（type_id），送得进去 ⇒ 这一格第一次有设备读数。
 RULE_PROMPT="列出我的任务"
+type_id "tool-input" "$RULE_PROMPT" || summary "iOS 助手真机验收"
+ax --dismiss-keyboard --json >/dev/null 2>&1
+sleep 1
 stub_reset
 BEFORE=$(stub_count)
 if enabled_id "tool-start-single"; then
@@ -578,6 +656,18 @@ if enabled_id "tool-start-single"; then
   fi
   sleep 6
   AFTER=$(stub_count)
+  # 🔴 界面自己盖的章：结果卡上那行脚注在 `via==='rule'` 时是「本机规则命中 —— 没有联网」，
+  #   走模型时是「由模型选择」（AssistantScreen.tsx:1448）。**这条才是这一格的正向对照**：
+  #   没有它，"计数没动"与"那一发压根没打出去（输入没落地 / 按钮没按动）"在输出上长得一模一样
+  #   （§7 元规则一），而第 8 步那句 ASCII 句子 misses 规则后的 0→0 也与这一格无法区分。
+  if found_label "$(zh web.ai.tools.viaRule)"; then
+    ok "结果卡上盖着「本机规则命中 —— 没有联网」⇒ 本机路径真的跑到了头，答案落地了"
+  else
+    bad "结果卡没有那句规则章 —— 这一格的零外发无从归因（没发？发了没回来？还是走了模型？）"
+  fi
+  if found_label "$(zh web.ai.tools.viaModel)"; then
+    bad "同一张卡上出现「由模型选择」—— 规则命中的那一发其实出门了"
+  fi
   if [ "$BEFORE" = "$AFTER" ]; then
     ok "本机规则命中那一趟：假端点计数 ${BEFORE}→${AFTER} 一次没动"
   else
@@ -637,10 +727,7 @@ fi
 
 step "9. 判据⑤：非回环目的地 ⇒ 授权入口出现、逐字段披露点名"
 # 先开「允许远程端点」，再存一枚 https 的非回环端点，然后把「拆解任务」那档指过去。
-press_label "$TAB_ME" || true
-sleep 3
-press_id "profile-entry-settings" || { bad "进不去设置面"; summary "iOS 助手真机验收"; }
-wait_id "ai-settings-section" 12 || { bad "设置面的 AI 段没在树里"; summary "iOS 助手真机验收"; }
+open_ai_settings || { bad "进不去设置面的 AI 段 ⇒ 这一格没有输入"; summary "iOS 助手真机验收"; }
 press_id "ai-gate-remote" || bad "开不了「允许远程端点」"
 sleep 1
 set_id "ai-endpoint-label" "$EP_REMOTE" || summary "iOS 助手真机验收"
@@ -669,9 +756,9 @@ else
   ok "对照成立：目的地是回环的那一档**没有**索取授权（挡的是「授权面永远显示」）"
 fi
 # 未授权时披露步就该索取批准，而**此刻一发都不该出去**（这一条与第 7 步共用同一枚计数尺）。
-press_label "$TAB_ME" || true
-sleep 2
-press_id "profile-entry-assistant" || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
+# 🔴 上一段是在**设置面（RN Modal）**里点的，此刻底部标签根本不在树里 —— 直接
+#   `press_label "$TAB_ME"` 会得到"按压失败"，而那既不是产品红也不是导航红。
+open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
 press_label "$(zh web.ai.feature.breakdown)" || bad "切不到「拆解任务」"
 sleep 2
 stub_reset
@@ -720,10 +807,7 @@ step "10. 判据⑥：提案卡出现，且没点确认 ⇒ 本机库一条都�
 # 把「拆解任务」换回**回环**假端点：这一发该真打出去，而假端点返回确定内容 ⇒ 提案卡出得来。
 # 🔴 这一趟同时是第 7/9 步那句「计数没动」的**分母**：同一次运行里计数会 +1，
 #   说明那两条 0→0 不是"压根没人数"（traps #335 那一族：否定判据必须出示分母）。
-press_label "$TAB_ME" || true
-sleep 2
-press_id "profile-entry-settings" || { bad "进不去设置面"; summary "iOS 助手真机验收"; }
-wait_id "ai-settings-section" 12 || { bad "设置面的 AI 段没在树里"; summary "iOS 助手真机验收"; }
+open_ai_settings || { bad "进不去设置面"; summary "iOS 助手真机验收"; }
 press_in_id "ai-feature-breakdown" "$EP_LOOPBACK" || bad "把「拆解任务」换回回环这一指没落地"
 sleep 1
 if found_id "ai-consent-breakdown"; then
@@ -731,9 +815,7 @@ if found_id "ai-consent-breakdown"; then
 else
   ok "路由换回回环后，那一档的授权入口**消失**（成对的另一半）"
 fi
-press_label "$TAB_ME" || true
-sleep 2
-press_id "profile-entry-assistant" || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
+open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
 press_label "$(zh web.ai.feature.breakdown)" || bad "切不到「拆解任务」"
 sleep 2
 BASE=$(ops_count)
