@@ -1571,3 +1571,41 @@ NO_COLOR=1 pnpm -r --no-bail test > rtest-full.log 2>&1   # RTEST_RC=$? 写在�
  ⇒ 要写清它**不是**"新图不好"，而是"归属清楚但复核没做"；下次想让重采那组进仓库，
  要么跑完当场看图，要么在跑之前就把"重采即待复核"写进用例自己的判据，别让收尾的人临场二选一。
 
+### E 项第八批：桌面那一格的实跑读数（2026-10-06 23:34 本地，载体 `f934bc54`+本批文档笔）
+
+跑法：`tmp/dw-runner.sh`（一次性夹具，住在被 gitignore 的 `tmp/`，不进仓库）——
+先 `. scripts/lib/wait-for-quiet-host.sh` + `wait_for_quiet_host`（**没有**改阈值、**没有**绕门），
+再 `HEYTA_E2E_APP_PORT=4418 HEYTA_E2E_STUB_PORT=4419 npx playwright test tests/desktop-window.spec.ts --retries=0`。
+
+| 格 | 现量 |
+|---|---|
+| 宿主机门 | 等了 **1200s / 20 次探测**才开窗，负载峰值 **load1=208**（别人的作业，不是本机底噪）；开窗那一刻 `load1=9`（阈值 12）、`free 60%`、`LIMIT_MB=〈读不到〉` 照原样抄 |
+| 用例 1（开发构建） | ✅ **passed 2.7s**，`DW_RC=0`；被加载的是 `apps/desktop/renderer-dist/index.html`（日志原样打印了这条 URL，所以"加载的是自己的 renderer 而不是 web-dist"这一条**有用例日志背书**，不只是我读码的结论） |
+| 用例 2（打包产物） | ⏭️ 仍 skip —— 缺的产物是 `release/heyta-darwin-arm64/heyta.app`（`release/` 现量不存在，且它被 `.gitignore:15` 挡着）。产出命令是 `pnpm --filter @heyta/desktop run package:mac`，**本批没做**，理由见下面第 3 条 |
+| 与整链 196/2 的对账 | 那 2 条当时 skip 的原因是**运行时二进制没装**（`test.skip(electronBinary === '', …)`），不是"桌面端被规则豁免"。现在装上了 ⇒ 下一次整链应读成 **197 passed / 1 skipped**（**待验证**，本批不再重跑整链去追这个数） |
+
+**图我打开了看了**（§6.2 规定一第 4 条），看到的内容：标题 `heyta` + 副标题「桌面端 · 共享 UI 垂直切片」+
+一个「添加一条示例任务」按钮 + **一行** `示例任务 15:34:36`（那个时间戳就是这一趟的钟，
+所以"IPC 回来了、共享 `TaskList` 画出来了、库里读到了真数据"三件事在同一张图里同时成立）。
+看图另外照出两件事，都**当场量过**再登记：
+
+1. **按钮是 UA 原生样式**（灰底 + 黑边），因为 `apps/desktop/renderer/main.tsx:161` 那枚
+   `<button data-testid="desktop-add">` **一个样式都没有**；而同一文件的标题/副标题是走 token 的
+   （`--ht-font-size-lg`、`--ht-color-foreground-muted`）⇒ 不是"token 没生效"，是这枚壳自己没画按钮。
+   处置：**登记不修**。理由三条，逐条能查：这枚壳在 AGENTS §2 里是 **⚠️ 待退役**；
+   `check:design` 拦的是裸值，这里没有值所以不违规；本批的改动面不含 `apps/desktop/*`。
+2. 全图 **主蓝命中只有 27 枚像素**（2200×1456，逐像素全量数，比 §7 第 82 条要求的 20 万点采样更密），
+   非白占比 **5.45%**。⇒ 🔴 **不要把"必须数得出主蓝"那把尺搬到这枚壳上** ——
+   它量的是"装的是不是我们的界面"，而这枚 spike 壳的界面本来就几乎没有品牌色表面；
+   拿它当判据会造出一枚**永远红的假缺陷**（§7 第 82 条的反面：判据要有 UI 特征，但特征也得真在这枚 UI 里）。
+   行内那个方框不是原生控件（`TaskRow` 用 token 画的 `checkboxHit`），所以 §7 第 83 条第 2 点
+   "原生复选框跟系统强调色"那一类缺陷**在这枚壳上不成立** —— 这条我原先只凭看图感觉，
+   补了现量：全仓 `accent-color` 只有 `apps/web/src/styles/app/ai-panels.css:30-32` 一处，
+   它是 `2989c717`（app.css 拆 14 个模块）那次从聚合样式搬进模块的，裸元素选择器 ⇒ 对 web 仍然全局生效，
+   而桌面壳从不加载 web 那份 CSS。
+
+那张 PNG **没有入库**，而且是故意的：它落在 `.gitignore:84` 的 `test-results/`（用例自己的固定路径，
+重跑即覆盖），而这枚壳**待退役**（AGENTS §2 那一行）⇒ 为它新建一枚 `apps/desktop/evidence/` 目录
+只会留下一张将来没人复核的图。要复现：跑上面那条命令，然后打开
+`e2e/test-results/desktop-window-dev.png`。
+
