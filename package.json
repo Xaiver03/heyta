@@ -100,6 +100,7 @@
     "verify:mobile-tags": "bash scripts/verify-mobile-tags.sh",
     "verify:mobile-notes": "bash scripts/verify-mobile-notes.sh",
     "verify:mobile-ai": "bash scripts/verify-mobile-ai.sh",
+    "verify:mobile-ai:ios": "bash scripts/verify-mobile-ios-ai.sh",
     "verify:mobile-trash": "bash scripts/verify-mobile-trash.sh",
     "verify:mobile-account": "bash scripts/verify-mobile-account.sh",
     "verify:mobile-account-erasure": "bash scripts/verify-mobile-account-erasure.sh",
