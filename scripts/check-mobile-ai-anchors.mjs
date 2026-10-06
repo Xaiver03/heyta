@@ -821,6 +821,82 @@ function bandGuardInvariant(scriptRel) {
   return red;
 }
 
+/**
+ * 判据 ⑲：台账计数器只有一个写入口，对账的输入"写几列就读几个变量"。
+ * rig42 现量（`通过 40 项，失败 2 项` 这句本身是假的）：第 13 步的局部标志取名 `FAIL`，
+ * 而 `FAIL` 是 `scripts/lib/mobile-e2e.sh:150` 的**失败计数**（`bad() { … FAIL=$((FAIL+1)); }`）。
+ * 那句 `FAIL=0` 把先前每一条红从判定里清零 —— 走到这一步的跑会把"第 7 步就红"打印成
+ * 「失败 0 项 / ✅ 通过」并以 **0** 结束（元规则二的最坏形状：一条抹掉别人失败的判据）。
+ * 同一处另外两件事：四条逐图的红走 echo（打印 ❌ 却不计数），tsv 以三列写、两变量读 ——
+ * bash 把尾巴塞进最后一个变量，`rel` 恒读成字面量 "CHECK"，四张真图全判"没落盘"（假红）。
+ * 七条 `echo "   ✅ …"` 同样打印在输出里却不在台账中：47 个 ✅ 行 / PASS=40 就是这么来的。
+ */
+function ledgerInvariant(scriptRel) {
+  const full = codeOf(readFileSync(join(ROOT, scriptRel), 'utf8'));
+  const red = [];
+
+  const clobbers = full.match(/^[ \t]*(?:export )?(PASS|FAIL)=(?!\$)[^\n]*$/gm) || [];
+  const bumps = full.match(/\b(PASS|FAIL)=\$\(\(\s*\1\s*[+-]/g) || [];
+  if (clobbers.length + bumps.length > 0) {
+    red.push(
+      `台账计数器 PASS/FAIL 被正文裸赋值 ${String(clobbers.length + bumps.length)} 处（期望恰好 0，唯一的写入口是 ok()/bad()）⇒ ` +
+        '局部标志一旦借用了这两个名字，它的 `=0` 会把先前每一条红从成败判定里清零，脚本以 0 结束并把红打印成绿。',
+    );
+  }
+
+  const selfPass = (full.match(/echo "[ \t]*✅/g) || []).length;
+  if (selfPass > 0) {
+    red.push(
+      `有 ${String(selfPass)} 行用 echo 打印「✅ …」自称通过而不走 ok() ⇒ 输出里的 ✅ 行数与台账 PASS 不等，` +
+        '读的人无法知道"通过 N 项"是不是全部结论（rig42 现量：47 行 ✅ / PASS=40）。',
+    );
+  }
+
+  const seg = full.match(/step "13\.[\s\S]*?(?=\nstep ")/);
+  if (seg === null) {
+    red.push('取不到第 13 步那一段 —— 截图归属对账没有输入，不报"对账成立"');
+  } else {
+    const body = seg[0];
+    const fmt = body.match(/printf '((?:[^'\\]|\\.)*)'/);
+    const readLine = body.match(/while IFS=\$'\\t' read -r ([^\n;]+)/);
+    if (!fmt || !readLine) {
+      red.push('第 13 步里找不到"写出 tsv 的 printf"或"按 tab 读回的 while read" —— 这条判据没有输入，不报"写读同构"');
+    } else {
+      // 列数 = 格式串按 `\t` 切开的段数（不是 `%s` 的个数：rig42 那版是 `CHECK\t%s\t%s` ——
+      // 两个 %s、三列，光数 %s 会读成"两列对上两个变量"而放它过）。
+      const cols = fmt[1].split('\\t');
+      if (cols.length !== readLine[1].trim().split(/\s+/).length) {
+        red.push(
+          `第 13 步的 tsv 写出 ${String(cols.length)} 列、读回 ${String(readLine[1].trim().split(/\s+/).length)} 个变量 —— bash 会把多余字段塞进最后一个变量，` +
+            '于是 rel 读成别的东西（rig42 现量：键列被读成字面量 "CHECK"，四张真图全判"没落盘"）。',
+        );
+      }
+      const constCols = cols.filter((c) => !c.includes('%s')).map((c) => c.replace(/\\n$/, ''));
+      if (constCols.length > 0) {
+        red.push(
+          `第 13 步的 tsv 里有 ${String(constCols.length)} 列不含 %s（常量列「${constCols.join('」「')}」）⇒ ` +
+            '即使列数对上，第一列也会把键读成那个常量。',
+        );
+      }
+    }
+    const echoRed = (body.match(/echo "[ \t]*❌/g) || []).length;
+    if (echoRed > 0) {
+      red.push(
+        `第 13 步里有 ${String(echoRed)} 条逐图的红走 echo 而不是 bad() ⇒ 它们打印了 ❌ 却不进台账，` +
+          '"失败 N 项"少计，且这段的汇总判据会把它们整个盖掉。',
+      );
+    }
+    const badCalls = (body.match(/\bbad "/g) || []).length;
+    if (badCalls < 3) {
+      red.push(
+        `第 13 步的三种红（没落盘 / 不属本轮 / 前台不对）现在只有 ${String(badCalls)} 条走 bad()（期望 ≥3）⇒ ` +
+          '有一种红不记账，界面上少了图而台账说"全过"。',
+      );
+    }
+  }
+  return red;
+}
+
 function run() {
   const files = walk(join(ROOT, SRC_ROOT));
   if (files.length === 0) {
@@ -1027,14 +1103,20 @@ function run() {
   for (const line of bandRed) console.log(`安全带守卫\t${line}`);
   console.log(`BAND_SUMMARY 四枚 helper 取得到=1 红=${String(bandRed.length)}`);
 
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0 || teardownRed.length > 0 || bandRed.length > 0) {
+  // ── 判据 ⑲：台账计数器只有一个写入口、对账输入写读同构（traps #344）──
+  const ledgerRed = ledgerInvariant(scriptRel);
+  for (const line of ledgerRed) console.log(`台账对账\t${line}`);
+  console.log(`LEDGER_SUMMARY 红=${String(ledgerRed.length)}`);
+
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0 || teardownRed.length > 0 || bandRed.length > 0 || ledgerRed.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
       '，双引号文案里的反引号=' + String(backtickRed.length) +
       '，移动侧能力字段缺口=' + String(capRed.length) + '，装包通道=' + String(installRed.length) + '，滚动方向=' + String(dirRed.length) + '，规则句诚实性=' + String(honesty.red.length) +
       '，授权期望值=' + String(consentRed.length) +
       '，隧道断言=' + String(tunnelRed.length) + '，提案分母=' + String(proposalRed.length) +
-      '，收尾判据=' + String(teardownRed.length) + '，安全带守卫=' + String(bandRed.length) + '。' +
+      '，收尾判据=' + String(teardownRed.length) + '，安全带守卫=' + String(bandRed.length) +
+      '，台账对账=' + String(ledgerRed.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
       '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
@@ -1484,6 +1566,40 @@ if (process.argv.includes('--self-test')) {
   arms.push(['臂 56 的变异确实把失败出口混为一谈（前置）', mutB56 !== baseTun && !mutB56.includes('都没把它带进安全带')]);
   const m56 = runMutantFile(mutB56, 'band-failure-message-merged');
   arms.push(['臂 56 失败出口不分两种 ⇒ 非零退出且点名', m56.code !== 0 && m56.out.includes('没有把"出现过但一直贴带外"')]);
+
+  // ── 判据 ⑲（台账只有一个写入口、对账输入写读同构 —— traps #344）的臂 ──
+  //   rig42 现量：第 13 步的局部标志借用了台账的 `FAIL`，`FAIL=0` 把先前的红清零；
+  //   tsv 三列写两变量读 ⇒ rel 恒读成 "CHECK"，四张真图全判"没落盘"。
+  const lReal = ledgerInvariant(DEFAULT_SCRIPT);
+  arms.push(['臂 57 真脚本 ⑲ 不误红（探针确有输入：第 13 步那段取得到）', lReal.length === 0]);
+  // 臂 58：把局部标志改回 `FAIL`（rig42 跑过的那一版）⇒ 必须红。
+  const mutL58 = baseTun.replace('shot_bad=0\n', 'FAIL=0\n').replace('shot_bad=1', 'FAIL=1');
+  arms.push(['臂 58 的变异确实把局部标志改回 FAIL（前置）', mutL58 !== baseTun && /FAIL=0/.test(mutL58) && !/shot_bad=0/.test(mutL58)]);
+  const m58 = runMutantFile(mutL58, 'ledger-counter-clobber');
+  arms.push(['臂 58 正文裸赋值台账计数器 ⇒ 非零退出且点名', m58.code !== 0 && m58.out.includes('被正文裸赋值')]);
+  // 臂 59：把 tsv 写回三列（第一列是常量 CHECK）⇒ 必须红（列数不等 + 常量键列，两条都该中）。
+  const mutL59 = baseTun.replace("printf '%s\\t%s\\n'", "printf 'CHECK\\t%s\\t%s\\n'");
+  arms.push(['臂 59 的变异确实把写出改回三列（前置）', mutL59 !== baseTun && mutL59.includes("printf 'CHECK\\t")]);
+  const m59 = runMutantFile(mutL59, 'tsv-column-skew');
+  arms.push(['臂 59 写出/读回不同构 ⇒ 非零退出且点名', m59.code !== 0 && m59.out.includes('写出 3 列、读回 2 个变量')]);
+  // 臂 62：列数对上、但第一列换成常量 ⇒ 只有"常量列"那一条规则能抓（光数 %s 的尺会放它过）。
+  const mutL62 = baseTun.replace(
+    "printf '%s\\t%s\\n' \"${line%%=*}\" \"${line#*=}\"",
+    "printf 'IDX\\t%s\\n' \"${line#*=}\"",
+  );
+  arms.push(['臂 62 的变异确实造出"列数对上、键列是常量"（前置）', mutL62 !== baseTun && mutL62.includes("printf 'IDX\\t")]);
+  const m62 = runMutantFile(mutL62, 'tsv-constant-key');
+  arms.push(['臂 62 键列是常量 ⇒ 非零退出且点名', m62.code !== 0 && m62.out.includes('不含 %s（常量列「IDX」）')]);
+  // 臂 60：把逐图的红改回 echo（打印 ❌ 不计数）⇒ 必须红。
+  const mutL60 = baseTun.replace('bad "$rel 没落盘"', 'echo "   ❌ $rel 没落盘"');
+  arms.push(['臂 60 的变异确实把一条红退出台账（前置）', mutL60 !== baseTun && mutL60.includes('echo "   ❌ $rel 没落盘"')]);
+  const m60 = runMutantFile(mutL60, 'red-not-counted');
+  arms.push(['臂 60 逐图的红不走 bad() ⇒ 非零退出且点名', m60.code !== 0 && m60.out.includes('逐图的红走 echo 而不是 bad()')]);
+  // 臂 61：把一条 ok() 退回 echo「✅」（自称通过不进台账）⇒ 必须红。
+  const mutL61 = baseTun.replace('ok "设备内回环可达', 'echo "   ✅ 设备内回环可达');
+  arms.push(['臂 61 的变异确实造出一行不进台账的 ✅（前置）', mutL61 !== baseTun && /echo "   ✅ 设备内回环可达/.test(mutL61)]);
+  const m61 = runMutantFile(mutL61, 'pass-not-counted');
+  arms.push(['臂 61 打印 ✅ 却不走 ok() ⇒ 非零退出且点名', m61.code !== 0 && m61.out.includes('自称通过而不走 ok()')]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
