@@ -99,6 +99,7 @@ import { Button, Card, Chip, EmptyState, Screen, SectionHeader, Stack, Text, Tex
 import { HStack } from '../ui/kit';
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
+import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import { AiDisclosureBlock } from './disclosure';
 import { intentText } from './intent-copy';
 import {
@@ -187,6 +188,35 @@ export function AssistantScreen({ onBack }: { onBack: () => void }): React.JSX.E
     // 🔴 依赖里有 `dataRevision`：同步完不重读，候选集会一直停在旧数据上。
     () => (actions === null ? [] : actions.listPendingTasks()),
     [actions, dataRevision],
+  );
+
+  /**
+   * 本屏消费共享的 `task` 选中（提案面「写进哪一条」），所以它也得**自己**跑一次回落。
+   *
+   * 🔴 谓词取 `listTasks()`（未删除全集），不是上面那份候选集：`listPendingTasks()`
+   *   已经把完成的剔掉了，拿它当谓词的话"用户在另一台设备上完成这条"会被判成
+   *   "这条没了"。共享层那条规则（`app-host/selection.ts`）要的是活跃全集。
+   * 🔴 也不能只在别的面里跑：触屏端的回落**按屏**生效，本屏不喂，选中的那条被删掉时
+   *   这两个提案面不会自己收回 —— 门禁 `check:selection-single-source` 断言 H 钉的就是这个。
+   */
+  useEffect(() => {
+    if (actions === null) return;
+    const aliveTasks = actions.listTasks();
+    pruneSelectionAgainst({ task: aliveTasks.map((task) => task.id) });
+  }, [actions, dataRevision]);
+
+  /**
+   * 离开这一屏时把选中收回去。
+   *
+   * 🔴 与 `TasksScreen` 那条同一个理由，只是方向反过来：本壳的详情是浮层，
+   *   `visible={detailTaskId !== null}` 直接读共享选中。这里不收，用户从助手
+   *   「返回」→ 切到「任务」标签，就会**凭空弹出**一条他刚才给 AI 当目标的任务。
+   */
+  useEffect(
+    () => () => {
+      selection.select('task', null);
+    },
+    [],
   );
 
   /**
@@ -701,7 +731,13 @@ function priorityWord(priority: Priority | undefined): 'none' | 'low' | 'medium'
 
 function BreakdownPanel(props: SharedPanelProps): React.JSX.Element {
   const { t, locale } = useI18n();
-  const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  // 🔴 「这个面板选中了哪条任务」读**全壳那一份**（`lib/selection.ts` → `@heyta/app-host`
+  //   的 `selection.ts`），不在面板里长第二个所有者：同一句"选中的实体没了怎么办"
+  //   只许答一遍（回落规则在共享层，界面这里只读不判）。`check:selection-single-source` 判据 B。
+  const pickedId = useSelected('task') ?? undefined;
+  // 🔴 按钮取的是「这一条还在候选里」，不是「选中过」：选中的任务可能被另一台设备
+  //   完成掉 —— 它仍在活跃全集里，回落不会清，而本屏的候选集已经把它剔掉了。
+  const pickedTask = props.tasks.find((row) => row.id === pickedId);
   const [phase, setPhase] = useState<Phase>('input');
   const [frozen, setFrozen] = useState<{ taskId: string; title: string; note: string | undefined; now: number }>({
     taskId: '',
@@ -784,9 +820,9 @@ function BreakdownPanel(props: SharedPanelProps): React.JSX.Element {
     <Stack gap="loose">
       <TaskPicker
         tasks={props.tasks}
-        selectedId={selectedId}
+        selectedId={pickedId}
         onSelect={(id) => {
-          setSelectedId(id);
+          selection.select('task', id);
           setApplied(false);
         }}
       />
@@ -837,11 +873,10 @@ function BreakdownPanel(props: SharedPanelProps): React.JSX.Element {
           label={t('web.ai.breakdown.button')}
           tone="primary"
           testID="breakdown-start"
-          disabled={selectedId === undefined || props.route.target === undefined}
+          disabled={pickedTask === undefined || props.route.target === undefined}
           onPress={() => {
-            const task = props.tasks.find((row) => row.id === selectedId);
-            if (task === undefined) return;
-            setFrozen({ taskId: task.id, title: task.title, note: task.note, now: Date.now() });
+            if (pickedTask === undefined) return;
+            setFrozen({ taskId: pickedTask.id, title: pickedTask.title, note: pickedTask.note, now: Date.now() });
             setApplied(false);
             setPhase('disclose');
           }}
@@ -1047,7 +1082,13 @@ function PrioritizePanel(props: SharedPanelProps): React.JSX.Element {
 
 function DurationPanel(props: SharedPanelProps): React.JSX.Element {
   const { t, locale } = useI18n();
-  const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  // 🔴 「这个面板选中了哪条任务」读**全壳那一份**（`lib/selection.ts` → `@heyta/app-host`
+  //   的 `selection.ts`），不在面板里长第二个所有者：同一句"选中的实体没了怎么办"
+  //   只许答一遍（回落规则在共享层，界面这里只读不判）。`check:selection-single-source` 判据 B。
+  const pickedId = useSelected('task') ?? undefined;
+  // 🔴 按钮取的是「这一条还在候选里」，不是「选中过」：选中的任务可能被另一台设备
+  //   完成掉 —— 它仍在活跃全集里，回落不会清，而本屏的候选集已经把它剔掉了。
+  const pickedTask = props.tasks.find((row) => row.id === pickedId);
   const [phase, setPhase] = useState<Phase>('input');
   const [frozen, setFrozen] = useState<{ taskId: string; title: string; note: string | undefined; now: number }>({
     taskId: '',
@@ -1131,9 +1172,9 @@ function DurationPanel(props: SharedPanelProps): React.JSX.Element {
     <Stack gap="loose">
       <TaskPicker
         tasks={props.tasks}
-        selectedId={selectedId}
+        selectedId={pickedId}
         onSelect={(id) => {
-          setSelectedId(id);
+          selection.select('task', id);
           setApplied(false);
         }}
       />
@@ -1184,11 +1225,10 @@ function DurationPanel(props: SharedPanelProps): React.JSX.Element {
           label={t('web.ai.duration.button')}
           tone="primary"
           testID="duration-start"
-          disabled={selectedId === undefined || props.route.target === undefined}
+          disabled={pickedTask === undefined || props.route.target === undefined}
           onPress={() => {
-            const task = props.tasks.find((row) => row.id === selectedId);
-            if (task === undefined) return;
-            setFrozen({ taskId: task.id, title: task.title, note: task.note, now: Date.now() });
+            if (pickedTask === undefined) return;
+            setFrozen({ taskId: pickedTask.id, title: pickedTask.title, note: pickedTask.note, now: Date.now() });
             setApplied(false);
             setPhase('disclose');
           }}
