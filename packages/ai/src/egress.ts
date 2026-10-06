@@ -192,3 +192,53 @@ export function retainValidConsents(
   if (!requiresEgressConsent(currentDestination)) return [];
   return consents.filter((c) => c.destination === currentDestination);
 }
+
+/**
+ * **设备级**联网同意的拒绝信号。
+ *
+ * 与上面的 `authorizeEgress` 是两道不同的闸，别混：
+ *
+ * | | 判的是 | 拒绝的形状 |
+ * |---|---|---|
+ * | `authorizeEgress` | 这一**档功能**准不准把这几类字段送到这个目的地 | 返回 `allowed: false` |
+ * | 设备级同意（本文件末尾） | 这台设备准不准发**任何**网络请求 | 由壳的 `fetch` **抛错** |
+ *
+ * 抛错这件事发生在 `provider.ts` / `routing.ts` 的 `try { await doFetch(...) }`
+ * 里面，而那两个 `catch` 原先把所有异常一律归成 `network` —— 于是"用户还没批准联网"
+ * 在界面上渲染成「连不上端点。检查网络，以及端点地址是否可达。」，
+ * 同时被 `countsAsEndpointFailure` 记成端点的锅（实测：一次真机运行里
+ * 回环端点攒到 `consecutiveFailures=2 / lastError=network`，而它一次都没被访问）。
+ * 一句话：**它把"停下来问用户"谎报成"对方坏了"**，把用户支去排查一个没坏的东西。
+ *
+ * 🔴 抛者与归类者分处两个包（壳抛、本包归类），所以这个标记**必须住在本包**：
+ * 一个契约字符串在两处各写一份，就是 §3.5 反复记的那类分叉。
+ */
+export const PRIVACY_CONSENT_BLOCKED_MARKER = 'privacy-consent-not-granted';
+
+/** {@link PRIVACY_CONSENT_BLOCKED_MARKER} 那类错误的 `name`（`instanceof` 跨包不可靠时用）。 */
+export const PRIVACY_CONSENT_BLOCKED_ERROR_NAME = 'PrivacyConsentBlockedError';
+
+/** 被设备级同意闸拦下时抛出的错误：消息里带标记 + 被拒的那个 URL。 */
+export class PrivacyConsentBlockedError extends Error {
+  constructor(url: string) {
+    super(
+      `${PRIVACY_CONSENT_BLOCKED_MARKER}: 用户尚未同意隐私规则，拒绝发起任何请求（${url}）。`,
+    );
+    this.name = PRIVACY_CONSENT_BLOCKED_ERROR_NAME;
+  }
+}
+
+/**
+ * 这个异常是不是"设备级同意还没给"？
+ *
+ * 两个条件取**或**：`name` 是首选（跨 realm 的 `instanceof` 会失效），
+ * 标记子串是兜底（壳可能自己 new 一个普通 Error 再塞进同一标记）。
+ * ⚠️ 不许反过来只靠消息子串：那等于允许任何人用一句文案伪装成"被闸门拦下"。
+ */
+export function isPrivacyConsentBlocked(error: unknown): error is Error {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.name === PRIVACY_CONSENT_BLOCKED_ERROR_NAME ||
+    error.message.includes(PRIVACY_CONSENT_BLOCKED_MARKER)
+  );
+}

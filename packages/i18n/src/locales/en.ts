@@ -1933,6 +1933,7 @@ export const en = {
   'web.ai.failure.aiUnavailable': 'The AI service is unavailable right now.',
   'web.ai.failure.cause.notConfigured': 'AI is not enabled. Choose \u201cuse my own AI endpoint\u201d in Settings to turn it on.',
   'web.ai.failure.cause.egressNotAuthorized': 'This feature needs your permission before any data leaves the device.',
+  'web.ai.failure.cause.consentNotGranted': 'This device is set to "This device only", so no network request is allowed yet — nothing left the device. Choose "Agree and connect" in Settings to use this.',
   'web.ai.failure.cause.noRoute': 'No available endpoint can handle this feature. Check that an endpoint is enabled with a valid address.',
   'web.ai.failure.cause.fallbackNeedsConsent': 'The first endpoint failed, and the fallback would send your data elsewhere, so no automatic switch was made. It needs your permission again.',
   'web.ai.failure.cause.network': 'Could not reach the endpoint. Check your network and that the address is reachable.',

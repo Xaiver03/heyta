@@ -181,11 +181,22 @@ Web 端**没有钥匙串** → 只能实现成会话级内存，并在 UI 上**�
 |---|---|---|
 | `network` / `http-error` / `empty-response` | ✅ | 端点确实没给出可用结果 |
 | `egress-not-authorized` | ❌ | 是**我们没获授权**，与端点无关 |
+| `consent-not-granted` | ❌ | 同上，但挡的位置更低一层（见下） |
 | `fallback-needs-consent` | ❌ | 同上 —— 而且它是"回退被隐私拦住"，端点本身是好的 |
 | `not-configured` / `no-route` | ❌ | 配置问题 |
 
 > 🔴 这张表必须写死。**把自己的错误记到端点头上**会造成最难查的一类 bug：
 > 好好的端点被跳闸，而用户看到的是"AI 时好时坏"。
+
+> 📌 `consent-not-granted` 是 2026-10-06 追加的一行（traps **#353**，rig52 在 iOS 上照出来的），
+> 它**不改**本节结论，只是把两道闸的层次补全：`egress-not-authorized` 是**逐功能出境授权**
+> （`authorizeEgress()` 返回 `allowed: false`，请求根本没被构造），而 `consent-not-granted` 是
+> **设备级隐私同意**（`createConsentGatedFetch()` 直接抛 `PrivacyConsentBlockedError`，
+> 连回环端点也挡、且不看这个功能有没有单独获批）。两者与端点都无关，所以同判 ❌。
+> 归错成 `network` 的代价不只在熔断账本：**用户在界面上读到的那一句会跟着错**
+> （"连不上端点，检查网络"），这一条已由 `apps/web/tests/ai-failure-copy.spec.tsx` 与注入臂
+> `node scripts/verify-i18n-failures.mjs aifailure` 钉住 —— 判据钉的是"用户读到哪一句"，
+> 不是日志里的原因码。
 
 **"要不要记一笔"与"要不要换下一个"是两个问题**，对应两个函数
 （`countsAsEndpointFailure` / `shouldTryNextEndpoint`），**不要合并**：
