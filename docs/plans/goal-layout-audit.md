@@ -927,6 +927,7 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
 | 新增 `e2e/tests/shell-no-document-scroll.spec.ts` | W1（1280×700：内容列确实溢出=前提、`window.scrollY===0`、`docH<=vh+2`、rail 盒不变、`.ht-content` 顶边不变、详情栏钉住）／W3（四视图逐个量，跑前先 `switchView('习惯')` 才拿得到那条输入）／W4（`.ht-main` 的 overflow 必须 visible/visible、给它写 `scrollLeft=100` 必须读回 0、把手中心 `elementFromPoint` 命中自己、overhang == `--ht-space-2`）／W2（900×700 真鼠标点最靠下一行的触发器 → 编辑器可见 → 再滚一次把面板完整带进滚动口） |
 | 既有三份跟着换参照系 | `shell-sidebar-height` 从量 window 改成量 `.ht-content`，并加了一条 **P0 前提**（文档不滚）—— 没有它，这一份会在"整页滚"的旧形态下**照样绿**（退化判据）；`search-overlay` 的 `window.scrollTo(0,1200)` 换成滚宿主并断言 `hostScrolled>0`，⑧ 那组旧数字标注为 H11 之前 |
 | 三族合跑 | `npx playwright test -c playwright.parallel.config.ts tests/shell-no-document-scroll.spec.ts tests/shell-sidebar-height.spec.ts tests/search-overlay.spec.ts` ⇒ **9 passed (42.7s)**，22:11 |
+| 回归面（23:3x 补跑） | `tests/detail-column-slot.spec.ts` + `tests/task-organize.spec.ts` + `tests/inbox.spec.ts` ⇒ **8 passed (18.6s)**。这一组是**冲着本单那处 JSX 换壳去的**：整理编辑器的 `<details>` 被换成槽位 + 相对定位面板，`task-organize` 就是它最直接的消费方；`detail-column-slot` 是臂 D 的红点所在，一并复跑确认"修好的形态"下它是绿的 |
 | 臂台 `bash scripts/h11-arms.sh` | 臂 A（`height`→`min-height`）红 · 臂 B（删行轨 `minmax(0,1fr)`）红 · 臂 D（滚动搬到 `.ht-main`）红（红在 `detail-column-slot` 的把手命中带，**不是**本单那一份）· 末臂 `RESTORED-POSITIVE` 绿 = 臂台自己没坏 |
 | 门禁 | `check:design` ✅ 无硬编码 · `check:l4` ✅ 91 ≤ 98 · `check:row-single-source` ✅ 28 族恰在基线 · `check:e2e-helper-exports` ✅ 120 份 / 407 个导入名 / 缺失 0 |
 | 图 | 5 张入库 `apps/web/evidence/shell-no-document-scroll/`（md5 `a27dca0a`/`08618e69`/`e81c5ce0`/`050689dc`/`9f1f806f`），**人打开核过两张关键帧**：`w1-before-scroll` = 三栏各自到视口底被裁、rail 完整在位（这就是"每栏内滚"的形状）；`w2-editor-open-fitted` = 第 11 行的整理面板（清单下拉 + 「还没有标签」那行）完整落在视口内、底边没被裁 |
@@ -1072,4 +1073,55 @@ aria 变「连续 1 天」 ⑥**杀进程重开**仍在 ⑦暗色 = 主色亮度
 等的是机器窗口。重试台：`bash ~/.heyta-window-rigs/heyta-h12-retry.sh`
 （14 轮，每轮负载门 900s + 间隔 150s，`rc=0` 停并打 `H12_GREEN`，`rc=1` 停着要人读，
 `rc=3` 继续等）。绿了之后把 `apps/mobile/evidence/android-habits-*.png` 九张一起入库。
+
+### 9.18 补跑 4–10 步：查出来的**五处全是探针**，没有一处是产品（而其中一处让一条判据从来没有成立过）
+
+上一节那句"4–8 步在等窗口"只对了一半。窗口来了之后，这一枚载体逐条现量，
+得到的结论是**它当时根本不可能绿**。五条都记下来，因为它们的形状在别的验收脚本里会再出现：
+
+| # | 症状（脚本会报什么） | 真因（现量） | 改法 |
+|---|---|---|---|
+| 1 | `HABIT/… 条数 = 0`、"拿不到 entityId"，而**下一步清单里那条明明在** | 输入框按**可见文本**定位：那一屏是 `TextView text="新习惯名称"`（标签）+ `EditText text="新习惯，例如「喝水」" content-desc="新习惯名称"`。`xy_text` 点的是标签 ⇒ 焦点从没进过输入框，`input text` 把字打进虚空**而退出码仍是 0**（§7 第 43 条的兄弟面） | `scroll_to_edit`（只认 `class=EditText`）+ **提交前**读回 `edit_value` 判精确相等；少了读回，这一格会以"产品没写入"的面目出现 |
+| 2 | 同上（就算字进去了也报 0） | op 类型词表是 **`CRT/UPD/DEL`**（`packages/sync-core/src/operation.types.ts:5`），没有 `ADD`；而 `HABIT_LOG` 的 entityId 是 `habitLogId(habitId,date)` = **`<habitId>:<设备日>`**（`habit-actions.ts:265`），不是习惯 id | 按 `CRT` 数；日期取 `adb shell date +%Y-%m-%d`（跨零点时宿主机的"今天"和设备的不是同一天） |
+| 3 | "拿不到习惯 entityId" | `ORDER BY seq` —— **ops 表没有 `seq` 这一列**，sqlite 的报错被 `2>/dev/null` 吃掉，stdout 得到空串。"空"在这里和"库里真没有"完全同形 | 按 `entityType + opType='CRT' + payload.name` 取（名字带 nonce，唯一），不写 ORDER BY |
+| 4 | "清单里没有新建的那条" | 这台设备的 uiautomator 把 RN 的 `testID` **原样**写进 `resource-id`，**不带 `com.heyta:id/` 前缀**（真读数 `resource-id="habit-row-habit-muwv7yba-2-qydvohv7"`）。按包名拼会恒查不到 | `xy_rid`/`scroll_to_rid` 用裸 id；清单行与打卡按钮都按**带 entityId 的 id** 定位 —— 按文字点只证明"点到了一个叫这名字的东西"，按 id 点证明"点到的是这一条" |
+| 5 | **没有症状 —— 这才是问题**：暗色那两行打印"✅ 亮度 12 vs refModal=252"，看起来在判翻面 | `img_stats` 打印的是 `… refModal=252`，被原样塞进 `python3 -c "print(1 if $modal < $refmodal - 40 …)"` ⇒ python `SyntaxError`、命令替换得**空串** ⇒ 条件永假 ⇒ **这条判据从写下来那刻起就没有成立过** | 解析成数 + 整数比较；并且"要了对照却没解析出对照读数"改成**响亮失败** |
+
+ 第 5 条是这一节唯一值得单独说的：**一条坏掉的判据比没有判据更糟**（§7 元规则二）。
+它不是"没测到"，是**主动制造了一条已经测过的假象** —— 输出里那两个数字看着就是比对结果。
+现在它有牙，而且牙是量出来的：真对（暗 12 < 亮 252 − 40）过；把两张图**对调**喂进去 ⇒
+`❌ 暗色档主色亮度 252 没比亮色档 12 暗 40 以上`。复现：
+
+```bash
+cd <仓库根> && { awk '/^img_stats\(\)/,/^}/' scripts/verify-mobile-habits.sh; \
+  awk '/^judge_shot\(\)/,/^}/' scripts/verify-mobile-habits.sh; } > /tmp/js-fn.sh
+# 然后喂 apps/mobile/evidence/android-habits-{6,7}*.png 两个方向各一次
+```
+
+另两处是**流程顺序**，不是定位符：
+
+- `phone_sync` 之前必须回「我的」—— 那颗按钮不住在习惯屏（H9 那一刀把它下移了）。
+  红的那句"同步按钮既不空闲也不在忙"读起来像同步坏了，缺的只是一次导航。
+- 🔴 **重启腿之后必须重新输入端到端加密口令**：它按设计**只在内存**，词条
+  `mobile.profile.password.hint` 逐字写着"应用重启后需要重新输入"。所以 ⑥⑦ 两条各自
+  `force-stop` 过一次之后，设备**结构上不可能**再同步 —— 而 `wait_synced` 不会报错，
+  它会安静地空转到 180 轮（900 秒）才红。症状是"慢"，成因是"这条路根本不通"。
+  先例：`verify-mobile-account-erasure.sh` 每次重启后重配一遍（同一份 lib 函数被它调 7 次）。
+
+⚠️ 提交这一批时犯了一次**归属事故**（记在这里，因为它和 §9.16 那条"代改要三条齐"是同族）：
+`git add -- <我的文件> && git commit`（**无 pathspec**）把另一条线**早已 staged 的两枚整文件**
+（`docs/plans/goal-p0-ux-remediation.md`、`docs/research/product-level-ia-ux-audit.md`）一起带走了。
+pathspec 限定的是"从工作树取哪些路径的内容"，它**不筛索引里别人预存的条目** —— 这正是
+`verify-mobile-habits.sh` 这类"整文件都是我的"的情形下唯一会漏的那一步。
+撤回没有动工作树也没有动索引：私有索引 `read-tree <parent>` + 只放我的 blob → `commit-tree`
+→ `update-ref refs/heads/main <新> <我那一笔>`（CAS）。HEAD 一挪，那两枚**自动回到 staged 状态**
+（`git status` = `AM`，与动手前逐字相同）。判据三条一起看：`git show --name-status HEAD` 只列我的路径、
+那两枚仍是 `AM`、`git diff --cached --name-only` 仍含他们。
+🔴 **教训不是"记得用 pathspec"，是"提交那一刻必须重跑 `git diff --cached --name-only` 预检"** ——
+这条预检在 §9.16 之前就已经写过一次，漏跑一次就替别人发了一趟通行证。
+
+**还欠什么**：这一节写的时候，绿的那一趟还没跑完 —— 载体在 `615253f3`，
+`bash scripts/verify-mobile-habits.sh; echo $?`（或重试台 `bash ~/.heyta-window-rigs/heyta-h12-retry.sh`）
+拿到 `rc=0` 之后，把九张 `apps/mobile/evidence/android-habits-*.png` 与逐条读数一起入库，
+并把 `BLOCKED.md` B100 第 7 格从"半闭合"改成闭合。
 
