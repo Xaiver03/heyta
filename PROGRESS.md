@@ -1726,6 +1726,14 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
   （`/tmp/heyta-reinstall-ios.png` 11:34、`/tmp/heyta-reinstall-android.png` 11:29 都是**主检出那棵树**的产物，
   不是这棵合流树），§8.9 不许共享载体上并行覆盖 —— 移动两半要么等台架空出来、要么归落地后那棵树跑一次全量。
   ⚠️ 顺带把"当前产物"这个词用准：**四端里只有桌面两端装的是合流态**，别把 `REINSTALL_RC=0` 读成四端。
+  > ↪ **10-06 23:5x 现量更正（AI 收口线，载体 `merge/20261005`）**：上面那句到 10-06 已经**四端都有当前产物读数**了 ——
+  > 移动两端在 rig46（Android）/ rig65（iOS，产物归属门当场签认"是本树打的那一枚"），
+  > 桌面两端 10-06 又按同一把尺重跑了一次 `--only mac,windows` ⇒ `REINSTALL_RC=0`、
+  > mac `9 个 chunk 同一次构建` + `内容占比 100.0% / 主蓝 1127`、windows `ADD_APPX=OK / RESULT=OK /
+  > PAYLOAD_WEBDIST=True / M2D=OK` + `tar sha256` 逐字对账。
+  > 🔴 一条别读反的巧合：**主蓝命中与 10-05 那趟逐字相同（1127）**，而 `web-dist/index.html` 的 sha256
+  > 从 `d224aeea6de8f658…` 变成 `bd45ef1766d65934…` ⇒ 像素统计不是产物的身份判据，判新旧只认对账行。
+  > 明细与看图留下的那一处疑点：`docs/plans/ai-assistant-closure.md` §9「E 项第九批」。
   **① 的读数换成现量**（12:4x）：追平 `main` 后（`82aeb9ac`，那 2 笔只碰 `calendar-profile-handoff.md` 与
   `calendar-line-commit-only-arms.sh`，合流态上把那枚 rig 的 `--list` 重跑成 **pass=9 fail=0**），
   落地阻塞面 = `git diff --name-only main merge/20261005`（**345 文件**）∩ 主检出未提交（**29 文件**）
