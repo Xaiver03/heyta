@@ -6491,8 +6491,13 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 ### 仍然开着的四格，不包装成完成
 
 1. **四套 e2e（multi-end / auth-journey / selfhost-stack / vault）+ `restore-export.cjs` 只做了
-   静态核对与单文件 `tsc`，一次都没运行。** 它们要真服务端 / docker 栈 / 另一台设备。
+   静态核对与类型检查，一次都没运行。** 它们要真服务端 / docker 栈 / 另一台设备。
    跑法在各自 config 里（`playwright.multi-end.config.ts` 等）。
+   ⚠️ 类型检查的现量（同一枚编译器 `../apps/web/node_modules/.bin/tsc --noEmit --strict …`，
+   对 5 份 TS）**4 条错误，一条都不落在本刀写的行上**：2 条 `auth-journey/helpers.ts:116/126`
+   （HEAD 既有的 `WebAuthn.getCredentials` 返回类型硬转）、1 条 `selfhost-web.spec.ts:385`
+   （`ctx.pages[0]`，HEAD 既有）、1 条同文件 449 行（`FileSystemDirectoryHandle.entries()`，
+   **在回收线未提交的 S4 里**）。⇒ 这一格的红归它们各自的所有者，本刀没顺手改。
    ⚠️ 其中 `e2e/selfhost-stack/selfhost-web.spec.ts` 是**混合文件**：里面还带着回收线未提交的
    S4（注销后盘上读不回来），本单只按 hunk 取自己那几处，没代提交别人的那一整块。
 2. **`pnpm --filter @heyta/web build` 现在红在两处与本单无关的半截改动**

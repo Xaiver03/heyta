@@ -232,24 +232,131 @@ export async function loginWithPasskeyViaUi(
 }
 
 /**
- * 在同步设置对话框里填好端到端加密口令并保存。
+ * 打开 **设置 → 同步** 那一节，返回它的定位符。
+ *
+ * 🔴 H9 第 3 刀（2026-10-06）之后「同步设置」不再是 rail 齿轮点开的同级对话框，
+ * 而是设置浮层里的**一节**：`SyncSettingsPanel.tsx` 是个带 `aria-label` 的
+ * `<section>` ⇒ 可访问角色是 **region**，`getByRole('dialog', { name: '同步设置' })`
+ * 从此恒不命中（裸 `getByRole('dialog')` 命中的是设置浮层，语义完全不同）。
+ * 唯一路径是头像 → 设置，而这一节在长列表里 ⇒ 必须先 `scrollIntoViewIfNeeded()`
+ * 才拍得到、点得到。
+ *
+ * 🔴 这一份是**本套件自己的** helper，不去 `import` `e2e/tests/helpers.ts` 里那份
+ * `openSettingsView` —— 不同 testDir、不同 config，两套夹具不该接起来
+ * （本文件只借 `openApp` 那一条入口，是搬家前就有的既成事实）。
+ */
+export async function openSyncSection(page: Page): Promise<Locator> {
+  await page.getByTestId('account-menu-avatar').click();
+  await page.getByTestId('account-menu-settings').click();
+  const section = page.getByTestId('sync-settings-panel');
+  await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();
+  await section.scrollIntoViewIfNeeded();
+  return section;
+}
+
+/** 退出设置浮层：走它自己的 ✕（`settings-sheet-close`），不是凭空按 Esc。 */
+export async function closeSettingsSheet(page: Page): Promise<void> {
+  await page.getByTestId('settings-sheet-close').click();
+  await expect(page.getByTestId('settings-sheet'), '设置浮层没关上').toHaveCount(0);
+}
+
+/**
+ * 在 设置 → 同步 那一节里填好端到端加密口令并保存。
  *
  * ⚠️ 登录只写入 baseUrl + 令牌 + 邮箱（`applyAuthToken`）；**口令从不落盘**
  * （`apps/web/src/features/sync/store.ts` 文件头的安全取舍），所以
  * "登录之后补口令"是每个新会话的真实用户步骤，不是测试的走捷径。
+ *
+ * 🔴 旧写法最后断的是 `expect(dialog).toBeHidden()` —— 那时保存会把同步设置
+ * 那一层关掉，"关掉了"顺带证明这个点击被产品接住了。现在这一节住在设置浮层里，
+ * 保存不再关任何东西（`closeSettings()` 只撤掉"请把界面落到这一节"的请求），
+ * 那条断言没有载体。判据口径没变：调用点（J3 / J4 / W3 / W4）紧随其后的
+ * rail『已同步』断言才是"凭据已写入且同步跑过一轮"的证明，这里不重复等它。
+ * 收尾这一步改成浮层自己的出口是**必须的**，不是顺手：浮层不关，rail 与任务行
+ * 都在它底下，下一张截图拍的是设置浮层（§6.2 规定一要求图里真的是那件事）。
  */
-export async function setE2eePasswordAndSync(page: Page): Promise<void> {
-  await page.getByRole('button', { name: '同步设置' }).click();
-  const dialog = page.getByRole('dialog', { name: '同步设置' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel('端到端加密口令').fill(E2EE_PASSWORD);
-  await dialog.getByRole('button', { name: '保存并同步' }).click();
-  await expect(dialog).toBeHidden();
+/**
+ * 这一节当下**真的**在哪一档口令状态。
+ *
+ * 🔴 不用 `Promise.race([waitFor(a), waitFor(b), waitFor(c)])`：那种写法里"某一档 15s 没出现"
+ * 会先赢过"另一档 16s 才出现"，把一次慢渲染读成 `none` —— 而 `loading`（钥匙包 refresh）
+ * 恰好就是那种会抖十几秒的东西。有界轮询把这一格分开：看见什么答什么，等满预算才认输。
+ */
+async function passwordStateOf(
+  section: Locator,
+  budgetMs = 30_000,
+): Promise<'legacy' | 'create' | 'unlock' | 'unknown'> {
+  const deadline = Date.now() + budgetMs;
+  for (;;) {
+    if (await section.getByTestId('vault-create-form').isVisible()) return 'create';
+    if (await section.getByTestId('vault-unlock-form').isVisible()) return 'unlock';
+    if (await section.getByLabel('端到端加密口令').isVisible()) return 'legacy';
+    if (Date.now() >= deadline) return 'unknown';
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
 }
 
-/** 同步状态条（与 `../multi-end/helpers.ts` 同一结构定位，理由见那边）。 */
+export async function setE2eePasswordAndSync(page: Page): Promise<void> {
+  const section = await openSyncSection(page);
+
+  /*
+    🔴 这里原来只有一句 `section.getByLabel('端到端加密口令').fill(...)`。**那句话本身在产品里
+    是有的**（`web.sync.password.label`，zh-CN:701），但它长在 `SyncSettingsPanel.tsx:137`
+    的 `!vaultMode` 那一块，而 `b3397cda`（2026-10-03 23:58，ADR-0050 密钥生命周期）起，
+    托管登录会把 `session.user.id` 写进 `sync.accountId`（`features/auth/store.ts:323`）
+    ⇒ 本套件的旅程是**真通行密钥登录**（`loginWithPasskeyViaUi`），登录后必然落在钥匙面板那一档，
+    那个 label 从那天起恒不命中。症状不是红，是 30 秒超时后一句"找不到 label"——
+    而这四套没有任何一道门禁跑得到（陷阱 #361 那一族），所以它安静了三天。
+    ⚠️ Windows 那趟 6/6 是 2026-09-30 的读数，早于 `b3397cda`：它证的是当时那条路是通的。
+
+    现在按界面**当下真的在哪一档**分流，三档都不认识就点名报错，不静默走兜底。
+  */
+  const seen = await passwordStateOf(section);
+
+  if (seen === 'unlock') {
+    const unlock = section.getByTestId('vault-unlock-form');
+    await unlock.getByTestId('vault-passphrase').fill(E2EE_PASSWORD);
+    await expect(
+      unlock.getByTestId('vault-unlock'),
+      '口令填了就必须允许解锁',
+    ).toBeEnabled({ timeout: 15_000 });
+    await unlock.getByTestId('vault-unlock').click();
+    await expect(
+      section.getByTestId('vault-unlocked'),
+      '解锁之后界面必须进入"钥匙已解锁"那一档（否则同步只会在后台失败）',
+    ).toBeVisible({ timeout: 30_000 });
+  } else if (seen === 'create') {
+    // 🔴 这一档要真的建钥匙，得把界面显示出来的恢复码**读回来再填回去**并点「发布」，
+    // 那是 `e2e/selfhost-stack/selfhost-web.spec.ts` 的 `setE2eePassword` 已经写完的形状。
+    // 本套件没有接它 —— 把它写成"产品坏了"是错的，静默跳过更是错的，所以在这里点名。
+    throw new Error(
+      '这一台设备落在「创建加密数据钥匙」那一档，而 auth-journey 这套还没接那一档'
+        + '（需要把恢复码读回来再确认发布）⇒ 登记为验收未闭合，不记成产品缺陷',
+    );
+  } else if (seen !== 'legacy') {
+    throw new Error(
+      '等满 30s，设置 → 同步 那一节里既没有 legacy 口令字段、也没有 vault 的创建/解锁档'
+        + ' ⇒ 探针不认识当前档位；不把这一格读成产品坏了，也不静默走兜底',
+    );
+  }
+
+  await section.getByRole('button', { name: '保存并同步' }).click();
+  await closeSettingsSheet(page);
+  await expect(
+    section,
+    '关掉设置之后那一节还在 DOM 里 ⇒ 它其实是常驻浮层，不是设置的一部分',
+  ).toHaveCount(0);
+}
+
+/**
+ * 同步那一枚所在的容器（rail 底部；与 `../multi-end/helpers.ts` 同名同理由）。
+ *
+ * 🔴 H9 第 1 刀之后没有「立即同步」按钮了，所以以前那条
+ * `div[role="status"]` + `has: getByLabel('立即同步')` 的结构判据恒不命中。
+ * 现在容器 testID 就是"结构上唯一"的那一条，整句状态文案常驻在它里面。
+ */
 export function statusBar(page: Page) {
-  return page.locator('div[role="status"]').filter({ has: page.getByLabel('立即同步') });
+  return page.getByTestId('sync-rail');
 }
 
 /**
@@ -282,7 +389,7 @@ export function authStatus(dialog: Locator) {
  * 三种现场分开处理，且**不许再用"看不见就当没事"**：
  *   1. 栏已可见 —— 宿主没给折叠入口（移动壳现状），直接可用；
  *   2. 有展开入口 —— web 未配置服务端：点它，并断言栏真的出现；
- *   3. 两者都没有 —— 这台已经在同步设置里配好服务端，产品明令
+ *   3. 两者都没有 —— 这台已经在 设置 → 同步 那一节里配好了服务端，产品明令
  *      "不给第二个地址来源"（`auth-journey.spec.tsx` 那条），所以不填。
  */
 export async function revealSelfHostField(dialog: Locator): Promise<boolean> {
@@ -366,9 +473,9 @@ export async function acceptTerms(dialog: Locator): Promise<void> {
   await expect(terms).toHaveAttribute('aria-checked', 'true');
 }
 
-/** 按「立即同步」并等到状态变成「已同步」。 */
+/** 按 rail 那枚同步按钮并等到状态变成「已同步」。 */
 export async function syncNow(page: Page): Promise<void> {
-  await statusBar(page).getByLabel('立即同步').click();
+  await page.getByTestId('sync-rail-action').click();
   await expect(statusBar(page)).toContainText('已同步');
 }
 
