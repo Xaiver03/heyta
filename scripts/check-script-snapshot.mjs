@@ -56,6 +56,12 @@ const MANIFEST = [
   'scripts/verify-mobile-account.sh',
   'scripts/verify-mobile-account-erasure.sh',
   'scripts/verify-mobile-aed.sh',
+  // 2026-10-06 补：移动端助手那两条**AI 载体**（Android 14 步 / iOS 11 步）。
+  // 两趟一跑都是"起假端点 → 装包 → 真设备逐屏点 → 等回读"，属清单里最长那一档；
+  // bootstrap 块本来就在，只是没登记 —— B36 记的就是"清单不扫磁盘，漏登记永远不红"，
+  // 这次把本线的两枚补上，并把摆放要求写进脚本头部（标记必须在前 15 行）。
+  'scripts/verify-mobile-ai.sh',
+  'scripts/verify-mobile-ios-ai.sh',
   'scripts/verify-mobile-auth.sh',
   'scripts/verify-mobile-autosync.sh',
   'scripts/verify-mobile-calendar.sh',
@@ -113,14 +119,31 @@ for (const file of MANIFEST) {
     );
   }
   const body = lines.slice(0, MAX_HEADER_LINES + 20).join('\n');
+  const bodyText = lines.join('\n');
   if (!body.includes('.*.snap.*')) {
     failures.push(`${file}: 缺快照名 case 守卫（.*.snap.*）—— 没有它，快照会再次自快照`);
   }
   if (!body.includes('exec bash "$_snap"')) {
     failures.push(`${file}: 缺 exec bash "$_snap" —— 只拷贝不 exec 等于没保护`);
   }
-  if (!body.includes("trap 'rm -f -- \"$0\"' EXIT")) {
-    failures.push(`${file}: 缺 trap 清理 —— 快照文件会一直堆在 scripts/ 里`);
+  // 🔴 清理允许挂在**链式** handler 上：`trap 'rm -f -- "$0"; …teardown_rig' EXIT`。
+  //    bash 的 EXIT trap 只有一份，后注册的顶掉前一份，所以"既要清快照、又要收尾自己
+  //    spawn 的假端点"的脚本**必须**写成一条链（`verify-mobile-ai.sh:41` 就是）。
+  //    原先这条按**逐字整串**比、且只看头部 35 行，于是链式写法和"函数定义在 trap 之前"
+  //    的合法排版都被读成"缺清理" —— 那是一条会自己造红的尺：它依赖了"handler 里没有
+  //    别的命令、且恰好排在头 35 行"这两个巧合（AGENTS §7 元规则二那一族）。
+  //    现在判的是**真正承重的那件事**：这条 trap 必须在**顶层**（顶格、不缩进）注册、
+  //    绑在 EXIT 上、串里带 `rm -f -- "$0"`。缩进的那条不算（藏在 case 分支/函数体里的
+  //    trap 可能根本不执行，而窗口那条判据本来就是为了挡"把块挪进有条件的地方"）。
+  //    A/B 六组读数（2026-10-06，逐组跑过，全部打在下面这一枚带 ^ 的multiline正则上）：
+  //      顶格链式（含 teardown_rig）⇒ 命中；顶格整串 ⇒ 命中；
+  //      只 `trap 'teardown_rig' EXIT` ⇒ 不命中；没绑 EXIT ⇒ 不命中；无关 handler ⇒ 不命中；
+  //      同样内容但**缩进两格**（藏在 case 分支/函数体里）⇒ 不命中。
+  const cleanupTopLevel = /^trap\s+'[^']*rm -f -- "\$0"[^']*'\s+EXIT\b/m;
+  if (!cleanupTopLevel.test(bodyText)) {
+    failures.push(
+      `${file}: 缺 trap 清理（没有一条**顶格**的 EXIT handler 里带 rm -f -- "$0"）—— 快照文件会一直堆在 scripts/ 里`,
+    );
   }
 }
 

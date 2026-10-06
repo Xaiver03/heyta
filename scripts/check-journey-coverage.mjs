@@ -135,6 +135,12 @@ const ENDPOINTS = [
       'scripts/verify-mobile-ticktick-import.sh', // 外部导入
       'scripts/verify-mobile-reminder-ring.sh', // 提醒到点：OS 通知栏真出现
       'scripts/verify-mobile-ios.sh', // iOS 输入侧全链路 + 零点击自动同步
+      // 🔴 助手面两端各一条，**不许互相顶替**（2026-10-06 登记）：Android 那 14 步跑通之后，
+      //    "移动端 AI 已验"很容易被读成一件事都做完 —— 而 iOS 侧此前**零设备读数**。
+      //    两端各自有只在自家设备上现形的失效面（合成 AXLabel、软键盘摘元素、
+      //    press success ≠ 控件收到事件），所以这里是两个条目而不是一个。
+      'scripts/verify-mobile-ai.sh', // Android：闸门/披露/授权/提案四判据族（真模拟器 + 确定性假端点）
+      'scripts/verify-mobile-ios-ai.sh', // iOS 同一判据族（AXUniqueId 通道 + HID 中文输入）
     ],
     shellSpecs: [],
     covers:
