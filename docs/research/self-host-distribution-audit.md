@@ -14237,3 +14237,27 @@ VERIFY_RC=0
 **第 8 项的诚实口径**：四端里两端有"装上的是当前产物且起得来"的判据（mac / windows），
 两端各被一个**具体、可复现、非产品**的成因挡着（远端依赖落后 / GitHub TLS）。
 汇总行按脚本自己的设计大字列出了没装的端 —— 这不是"跑过了就算"。
+
+### 8.273 09:3x 复核：判据修复**已被更强的那份取代**，我的分支删除；android 的成因已消失但撞上两条规则互相矛盾的那一格
+
+- 主检出里 `e2e/selfhost-stack/selfhost-web.spec.ts` 正被日历/回收站那条线改着（工作树 blob `7e43c263`，未提交）。
+  它那版**比我的强**：两档各等各的锚点用 `Promise.race`，**两档都没出现就点名报错**，
+  而我那版（`84a097e6`）是"没等到就静默走 else"。⇒ 我尝试并回 main 时 git 以
+  `Your local changes to the following files would be overwritten by merge` **正确拒绝**（主检出 211 枚脏）。
+  **我没有强推、没有 stash 别人的东西**，改为：`de761797` 标成 superseded 并删除，
+  免得后来人把弱的那份并进去。main 提交态仍是 `e415f6ce`（缺 `vault-recovery-confirm`/`Promise.race`），
+  所以"main 的自托管验收仍红"这一格**由他们那一笔提交关闭**，不由我抢。
+- android 那格的成因**已消失**：`ssh windows-pc "cd /d C:\src\heyta && pnpm install --frozen-lockfile"`
+  ⇒ `Scope: all 21 workspace projects / Already up to date`（起跑前远端 `java.exe` 计数 0，没撞别人的构建）。
+- 🔴 但这一端暴露出**两条既有规则的互相矛盾**：§6.1 新规把 Android 构建与模拟器都移出这台 Mac
+  （"headless 模拟器 3.6G+ 常驻 / 90% CPU、SDK+AVD+Gradle 缓存 20G+"），
+  而 §6.1.1 的四端固定收尾要求 android **装机判据**（`install 输出 Success` + 启动截图主蓝命中）。
+  现量：`adb devices` 列表为空 ⇒ 这台 Mac 现在**没有设备面**，而 Windows 侧按 runbook 明确没有安卓模拟器。
+  ⇒ 第 8 项的 android 一格不是"我没跑"，是**当前规则下没有任何一台机器同时具备打包面与设备面**。
+  要闭合只有两条路：(a) 在 windows-pc 上装一次 Android emulator（runbook 要改），
+  (b) 显式豁免一次"在这台 Mac 起模拟器"（就是 §6.1 那条新规要挡的）。我没有自己选，因为两条都改既有决定。
+- iOS：`git ls-remote https://github.com/facebook/hermes.git` 单发有界探测见本条上方输出；
+  00:39 那三趟 `pod install` 死在 `SSL_ERROR_SYSCALL in connection to github.com:443`。
+  仍**不动本机网络环境**（硬规则）。
+- 载体树 `/tmp/heyta-merge-carrier` 已不在（`/tmp` 那批被清），所以今晚那些跑过的树不再可复用；
+  要再跑验收需重建（`git worktree add` + `pnpm install`）。
