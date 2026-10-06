@@ -531,20 +531,30 @@ if printf '%s' "$WANT" | grep -q "ios"; then
         echo "  ✅ 已安装进模拟器（全新安装）"
         # 🔴 新鲜度判据（沿用 verify-mobile-ios.sh 那次事故的产物）：
         #    "装上了"不够，装的必须是**当前源码**的产物。
+        #    尺用 `lib/apk-freshness.sh` 的**内容章**（git 里最后一次内容改变的时刻），
+        #    不用文件 mtime —— 2026-10-06 rig47b 现量：变异门禁把源码逐字节还原时 mtime 被
+        #    抬到还原那一刻而内容等于 HEAD，旧尺把一条内容上成立的结论打印成"装的是旧代码"，
+        #    而这一格拒的是装包本身 ⇒ 没有任何一层能自愈。同一把尺两处消费，别再抄第二份。
         INSTALLED_APP="$(xcrun simctl get_app_container "$UDID" "$BID" app 2>/dev/null)"
         BUNDLE_MTIME=$(stat -f '%m' "$INSTALLED_APP/main.jsbundle" 2>/dev/null || echo 0)
-        SRC_MTIME=$(find "$ROOT/apps/mobile/src" "$ROOT/packages"/*/src \
-          -type f \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
-          | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1)
+        if [ ! -f "$ROOT/scripts/lib/apk-freshness.sh" ]; then
+          echo "  🔴 缺 $ROOT/scripts/lib/apk-freshness.sh ⇒ 新鲜度判据没有载体，不算通过"
+          SRC_C=""
+        elif ! . "$ROOT/scripts/lib/apk-freshness.sh"; then
+          echo "  🔴 载不进 lib/apk-freshness.sh ⇒ 新鲜度判据没在运行，不算通过"
+          SRC_C=""
+        else
+          SRC_C=$(heyta_src_content_stamp "$ROOT") || SRC_C=""
+        fi
         FRESH=0
-        if [ "${SRC_MTIME:-0}" -le 0 ]; then
-          echo "  🔴 算不出源码最新 mtime —— 新鲜度判据没在运行，不算通过"
+        if [ -z "$SRC_C" ]; then
+          echo "  🔴 取不到源码内容章（不是 git 树？没有 apps/mobile/src|packages 的提交？）—— 新鲜度判据没在运行，不算通过"
         elif [ "${BUNDLE_MTIME:-0}" -le 0 ]; then
           echo "  🔴 读不到已装 app 的 main.jsbundle —— 验的不是刚装的这个"
-        elif [ "$BUNDLE_MTIME" -ge "$SRC_MTIME" ]; then
-          echo "  ✅ 已装的包比源码新 —— 这一轮装的是当前产物"; FRESH=1
+        elif [ "$SRC_C" -le "$BUNDLE_MTIME" ]; then
+          echo "  ✅ 内容章 $SRC_C ≤ 已装 bundle $BUNDLE_MTIME —— 这一轮装的是当前产物"; FRESH=1
         else
-          echo "  🔴 已装的包比源码旧 —— 装的是旧代码"
+          echo "  🔴 源码最后一次内容改变（$SRC_C）晚于已装 bundle（$BUNDLE_MTIME）—— 装的是旧代码"
         fi
         if [ "$FRESH" = "1" ]; then
           xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1

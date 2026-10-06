@@ -103,6 +103,42 @@ heyta_apk_is_fresh() {
   return 1
 }
 
+# ---------------------------------------------------------------------------
+# 🔴 **内容章**：源码"最后一次被改变"的时刻，而不是"最后一次被碰"的时刻。
+#
+# 为什么上面那把 mtime 尺在这一档上不够用（2026-10-06 rig47b 现量，记在 traps #346）：
+#   `mutate-egress-wording.mjs` 那类变异门禁跑完会把源码**逐字节还原**，而还原是一次写 ——
+#   mtime 被抬到还原那一刻，内容却等于 HEAD。iOS 载体因此打印
+#   「装的是旧产物：源码最新 X > bundle Y」，把一条**内容上完全成立**的结论判成红，
+#   而它拒的是装包，于是没有任何一格能自愈（同一份文件在 git 里逐字相同）。
+#   `run-gradle.mjs` / `mutate-egress-wording.mjs` 的文件头都写明这条尺会被这里消费，
+#   所以这不是"探针没考虑到"，是**两把尺量的是两件不同的事**：
+#     · APK 侧要防的是"产物没跟着源码重建" ⇒ mtime 尺够用（APK 的 mtime 由构建回写）；
+#     · 而"源码最后改变的时刻"必须只看**内容**，否则任何一次原地重写都会伪装成新改动。
+#
+# 算法：`git log -1 --format=%ct -- <源面>` 给"已提交那部分"的最后改变时刻，
+#   再用 `git status --porcelain` 列出**未提交**的那几枚（含未跟踪）取其文件 mtime，
+#   两者取大 —— 未提交的内容改动必须算数（否则 `pnpm reinstall:all` 验的是 HEAD 而不是
+#   当前工作树，而那正是 §6.1.1 第 82 条抓过的形状）。
+#   取不到章（不是 git 树 / 没有那两条路径的提交）⇒ **返回 rc 1**，调用方按"没有输入"处理，
+#   与文件头"取不到一律判红、不按新鲜"是同一条纪律。
+# ---------------------------------------------------------------------------
+heyta_src_content_stamp() { # <root?> -> 回显 epoch；取不到回 rc 1
+  local root="${1:-$HEYTA_REPO_ROOT}" newest c f
+  newest=$(git -C "$root" log -1 --format=%ct -- apps/mobile/src packages 2>/dev/null)
+  case "$newest" in (''|*[!0-9]*) return 1 ;; esac
+  # `s/^.* -> //` 让改名行取**新路径**；被删的那枚 stat 不到，自然跳过。
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    c=$(stat -f %m "$root/$f" 2>/dev/null) || c=$(stat -c %Y "$root/$f" 2>/dev/null) || c=""
+    case "$c" in (''|*[!0-9]*) continue ;; esac
+    [ "$c" -gt "$newest" ] && newest="$c"
+  done <<EOF2
+$(git -C "$root" status --porcelain -z -- apps/mobile/src packages 2>/dev/null | tr '\0' '\n' | sed -E 's/^.{3}//; s/^.* -> //')
+EOF2
+  printf '%s' "$newest"
+}
+
 # 🔴 真机验收脚本用的那道门：装包之前当场判。
 # <apk> <脚本名> <root?> -> rc 0 可以装 / 1 拒绝装
 heyta_apk_freshness_guard() {
@@ -250,6 +286,44 @@ JSON
     echo "   ✅ 臂 8 收窄回旧清单后同一枚新文件看不见（rc=0）⇒ 臂 6 的红来自输入集本身"
   else
     echo "   🔴 臂 8 坏了：收窄回旧清单仍判旧（rc=${rc8}）⇒ 臂 6/8 这一对没配起来"; fail=1
+  fi
+
+  # 臂 9：内容章不许被"只碰不改"推进（rig47b 那条假红的机制本身）。
+  #   变异门禁把源码**逐字节还原**时 mtime 被抬起来、内容仍等于 HEAD，旧的 mtime 尺于是把
+  #   一条内容上成立的结论打印成「装的是旧产物」，而它拒的是装包 ⇒ 没有任何一格能自愈。
+  # 臂 10：同一枚文件真的改内容（不提交）⇒ 章必须跟着走，且逐字等于那枚文件的 mtime。
+  #   没有这一臂，臂 9 的"不动"也可能来自"章什么都没读到"
+  #   （一条恒不成立的判据比没有判据更糟 —— §7 元规则二）。
+  local stamp_base stamp_touch stamp_edit git_ok=0
+  if git -C "$root" init -q 2>/dev/null \
+     && printf 'a\n' > "$src_dir/StampProbe.tsx" \
+     && git -C "$root" add -A \
+     && git -C "$root" -c user.name=selftest -c user.email=selftest@local commit -q -m fixture >/dev/null 2>&1; then
+    git_ok=1
+  fi
+  if [ "$git_ok" != 1 ]; then
+    echo "   🔴 臂 9/10 没有输入：夹具里建不出 git 树（git 不在 PATH？）⇒ 内容章没被量过"; fail=1
+  else
+    stamp_base=$(heyta_src_content_stamp "$root") || stamp_base=""
+    touch -t 203801010000 "$src_dir/StampProbe.tsx"          # 只碰，内容一字不改
+    stamp_touch=$(heyta_src_content_stamp "$root") || stamp_touch=""
+    if [ -n "$stamp_base" ] && [ "$stamp_touch" = "$stamp_base" ]; then
+      echo "   ✅ 臂 9 原地重写（内容 == HEAD）不推进内容章（章 $stamp_base）"
+    else
+      echo "   🔴 臂 9 存活：只 touch 就把章从「${stamp_base:-空}」推进到「${stamp_touch:-空}」"; fail=1
+    fi
+    printf 'b\n' > "$src_dir/StampProbe.tsx"                  # 真改内容，不提交
+    # 🔴 改完内容还要把 mtime **钉到一个与提交时刻不可能相等的值**：写文件本身会把
+    #    mtime 刷成"现在"，而"现在"与刚才那发的提交时刻只差几秒 —— 于是"章 == 文件 mtime"
+    #    这句会在两种实现下都成立（读文件的、读提交的），臂自己就废了（§7 元规则二）。
+    touch -t 203801010000 "$src_dir/StampProbe.tsx"
+    stamp_edit=$(heyta_src_content_stamp "$root") || stamp_edit=""
+    if [ -n "$stamp_edit" ] && [ "$stamp_edit" = "$(_mtime "$src_dir/StampProbe.tsx")" ] \
+       && [ "$stamp_edit" != "$stamp_base" ]; then
+      echo "   ✅ 臂 10 未提交的内容改动算数（章 $stamp_edit == 那枚文件的 mtime，且不等于提交章 $stamp_base）"
+    else
+      echo "   🔴 臂 10 坏了：改了内容而章读成「${stamp_edit:-空}」，期望逐字等于文件 mtime「$(_mtime "$src_dir/StampProbe.tsx")」且不等于提交章「${stamp_base:-空}」"; fail=1
+    fi
   fi
 
   HEYTA_APK_SOURCE_DIRS="$saved_dirs"   # 还原调用方的覆盖口（自检不许留下状态）
