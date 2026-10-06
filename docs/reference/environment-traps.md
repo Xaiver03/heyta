@@ -4336,6 +4336,14 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     输出流，而不是它以为自己读的东西**。凡是拿正则数测试输出的脚本，都要问一句
     "关掉颜色还数得到吗"。
 
+    ⚠️ 同一件事的第二面（10-06 实测）：**`NO_COLOR` 不一定赢**。给整条 `pnpm check` 加它时，
+    某个子步骤自己设了 `FORCE_COLOR`，node 当场打了一行
+    `The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set` ——
+    那一趟日志里漂着 **12** 枚 ESC 序列，而同一晚单独跑 `-r test` 那份是 **0** 枚。
+    ⇒ 判据不能写成"我加了 `NO_COLOR`"，要写成"**先数这一份日志里到底有没有 ESC**"
+    （逐字节统计 `0x1b 0x5b`）。环境变量赢没赢，只有落盘的日志能回答 —— 和本条上半句
+    "读的是被格式化过的输出流"其实是同一句话，只是这次坏的是**我以为已经关掉的那个开关**。
+
 164. 🔴 **后台任务通知里的 `exit code 0` 是包装命令的，不是被测命令的。**
     本轮 `pnpm -r build > log 2>&1; echo "BUILD_EXIT=$?"; tail -5 log` 作为后台任务跑，
     通知打印 `completed (exit code 0)` —— 那是 `tail` 的退出码。
