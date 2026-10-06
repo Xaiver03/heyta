@@ -14270,3 +14270,35 @@ VERIFY_RC=0
 处理：`git worktree prune`（只清工作树目录**已经不存在**的注册项，不动任何还在的树），然后分支删净。
 ⚠️ 记这一条是因为它的**症状**很容易读成"分支被别人占用，不能动"——实际是元数据残留，
 判法：`git worktree list` 里那一行带不带 `prunable`。
+
+### 8.275 10:1x 第 8 项补齐：**四端各自都有"装上的是当前产物"的判据**，同时撤回我 §8.273 那条否定结论
+
+| 端 | 结果 | 判据读数（人打开看过图） |
+|---|---|---|
+| mac | ✅ | 装入 `/Applications/Heyta.app`；包内 `web-dist` 与本机 `apps/web/dist` 同一次构建（9 chunk）；自截屏 2164x1432、内容占比 100.0%、**主蓝命中 1127** |
+| windows | ✅ | 远端 tar sha256 逐字相同 + 新鲜度对账（`index.html`/`bridge`/7 枚 assets）+ 取证"5 条全在位" |
+| android | ✅ | 远端 gradle 打出 release APK **65M** → `emulator-5554` 全新安装成功 → 前台窗口 `com.heyta/com.heytamobile.MainActivity` → 截图 1080x2400、内容占比 56.7%、**主蓝命中 4001** |
+| ios | ✅ | `pod install` 沙盒同步 → 构建成功 → 全新安装 → **新鲜度判据过**（已装包比源码新）→ 截图 1206x2622、内容占比 60.1%、**主蓝命中 4152** |
+
+🔴 **撤回 §8.273 的一句**："当前规则下没有任何一台机器同时具备打包面与设备面" **是错的**。
+现量：`/opt/homebrew/share/android-commandlinetools/emulator` **装着**（只是不在 PATH 上），
+系统镜像 `system-images/android-36/google_apis/arm64-v8a` 与 AVD `heyta-w3-yearly` 都在，
+起出来就是 `emulator-5554`（Android 16、`sys.boot_completed=1`）。
+我只查了 `which emulator` 与 `~/Library/Android/sdk` 就下了否定结论 —— 正是我自己那条
+**"否定结论也要枚举分母"** 要拦的形状，而且是同一天第二次（第一次是 §8.270 的差集方向）。
+
+⚠️ **三处边界，别读成"一轮四端同一棵树跑完"**：
+① 四端**不是同一棵树/同一刻**：mac+windows 起跑于 `de761797`（00:3x），android 于 `7473aa63`，ios 于 `ebcf529a` ——
+   main 在两次跑之间又前进了，所以这是"四端各自对当时的 main 有判据"，不是"一批产物同源于一个 commit"。
+② 两张移动端截图的内容都是**首启隐私同意闸**（真共享 UI、中文、主蓝按钮、服务条款/隐私政策在位），
+   它们证到"装上了、起得来、画的是我们的界面"，**不**证到移动端能建任务/同步（那是 `verify:mobile-*` 与自托管三条判据那一层）。
+③ iOS 那趟 `pod install` **改动了 `apps/mobile/ios/Podfile.lock`（与 HEAD 差 4 行）** ⇒ 提交态那份锁与
+   一次干净 `pod install` 的结果不一致。这不是装机判据的失败（脚本把它当警告），但它是一格真实的账：
+   要么把这份锁提交，要么写清"锁允许被 pod install 就地更新"。我没有代提交别人的文件。
+
+**为什么 iOS 端先前红、现在绿（两格成因不同，别并成一条）**：
+00:39 三趟死在 `git clone github.com/facebook/hermes` 的 `SSL_ERROR_SYSCALL:443`（网络面，我没动本机网络）；
+09:5x 换到 `All in one Data/…` 这棵树后红在 `ArgumentError - path name contains null byte`
+（CocoaPods × pnpm 符号链接 × **含空格路径** 的已知崩溃，脚本自己也印了这条 issue 链接）；
+把树放到 `/tmp/heyta-ios-reinstall`（无空格）后同一趟就过了。⇒ 教训：**iOS 原生链路的树必须住在无空格路径**，
+这台机器的工作区根路径带空格，所以 iOS 端只能跑在 `/tmp` 或同级的无空格 worktree 里。
