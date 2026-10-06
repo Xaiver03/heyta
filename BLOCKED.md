@@ -6598,7 +6598,7 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 | 3 | 任务 #17：`check:e2e-helper-exports` 写了却没接进链 | `package.json` 的 `check` 那一行正被别线重写 | `git status --porcelain -- package.json` 为空 ⇒ 才动那一行 | 改那一行 = 覆盖别人在飞的定义。盲区机制与改法建议已登记在 `docs/plans/goal-layout-audit.md` §9.11（"既无定义又不在链上的实现文件"落在 `check:gate-wiring` 两条判据之外） |
 | 4 | ~~工单 H11 / 任务 #25：外壳不滚（桌面那一半）~~ ✅ **22:1x 闭合**：落地 + 四条新判据 + 臂台 + 5 张图人看过，提交 `1cbcbf34` | —— 不再等 | `cd e2e && npx playwright test -c playwright.parallel.config.ts tests/shell-no-document-scroll.spec.ts tests/shell-sidebar-height.spec.ts tests/search-overlay.spec.ts` ⇒ **9 passed**；臂台 `bash scripts/h11-arms.sh`（A/B/D 各红，末臂是还原后的阳性对照） | 🔴 **起跑条件② 没有翻面，是换的载体**：`apps/web/src/styles/app/narrow.css` 在主检出现量仍 ` M`（147 插 / 59 删，正是 W4 塌缩态那一片），所以"等它干净"这一半**不成立**。走的是隔离载体（`~/heyta-carriers/heyta-reinstall-1006`，那一棵 `narrow.css` 干净、`HEAD` 与主检出同指 `86d00c4c`）。落点不相交：我改 `base.css`/`main-area.css`/`material.css`/`TaskOrganizer.tsx`，他们改 `narrow.css`；唯一共享的那枚 `base.css` 用"blob 由 `HEAD` 重建 + 私有索引 `commit-tree` + CAS `update-ref`"只带走我自己的 31/2 行，他们那 22 行**继续留在工作树**（现量：`git diff -- apps/web/src/styles/app/base.css` 只剩 `.ht-app[data-detail-suppressed]` 与 `.ht-app__detail[hidden]` 两条）。全部读数、两条被自己的臂台**否证**的判断、`TaskRepeat.tsx` 同形态浮层的后续改法，以及"刷索引会把他们 base.css 的 staged 态一并刷成 HEAD 那份（工作树内容不受影响）"这条副作用，都在 §9.15 |
 | 5 | ~~`landing test` 那 1 枚红 + `pnpm check` 整链的 9 枚 e2e 红~~ ✅ **22:2x 两组都有 rc=0 读数** | —— 两组"等谁"都要更正，见右 | `pnpm --filter @heyta/landing test` ⇒ rc=0；`cd e2e && NO_COLOR=1 npx playwright test --reporter=line tests/ai-assistant.spec.ts tests/ai-row-layout.spec.ts tests/ai-tool-run.spec.ts tests/calendar-sidebar.spec.ts tests/glass-materials.spec.ts` ⇒ **10 passed / RC=0** | 🔴 **① 等错了对象**：`landing` 那枚的红因是**本仓库那条判据自己**（把一种布局形状写死成契约），不是象限线那枚未提交的 `quadrant/copy.ts` —— 判据改成"形状无关 + 方向从产品读"就绿（`86d00c4c`）。🔴 **② 根本不用再等**：B90 那 8 枚在**当前 HEAD 上已经不存在**，根因由详情面线 `0e9fac95`（10-06 15:37，`taskPaneInColumn` 的第三半 `selectedTaskId !== null`）修掉，而它自己的注释就点名"B90 那 8 枚红的另一条侧" ⇒ **台账比代码落后 6.5 小时**，这一格该做的是去读现量。⚠️ 边界：只跑了点名的那 5 份（10 条），`check:ai-e2e` 整族 250+ 条与 `pnpm check` 整链这一轮没重跑。归因对照（摘掉 H11 再跑一遍，证明不是我顺带修绿的）在 §9.16 |
-| 7 | 习惯屏的**设备侧装机判据缺一枚常驻载体**（工单 H12） | 不是"等谁"：`verify:mobile-habits` 从来没建过，而 `apps/mobile/evidence/android-habits-*.png` 那 9 张是 10-01 一次性脚本产的、脚本没入库 ⇒ 当前产物上**无法复跑** | `node -e 'const s=require("./package.json").scripts;console.log(Object.keys(s).filter(k=>/^verify:mobile/.test(k)&&/habit/.test(k)).length)'` 打 0 即证；`stat -f '%Sm' apps/mobile/evidence/android-habits-1-empty.png` | 与 #17 同族（没有载体的面 = 静默面）。不当场建：那是一条新的设备侧验收线（真服务端 + 模拟器 + 逐屏回读 + 判据钉在本轮 entityId），不是顺手补的一枚脚本 |
+| 7 | 习惯屏的**设备侧装机判据缺一枚常驻载体**（工单 H12）—— 🟡 **23:2x 载体已入库**（`cd546407`：`scripts/verify-mobile-habits.sh` + `verify:mobile-habits`），八条判据、前 3 步有真机读数；**4–8 步与 9 张证据图仍未闭合** | 不是"等谁"：等的是**机器窗口**（22:20 现量 `load1=200`，阈值 12；负载门退 3 = 环境无效，不记产品失败） | `pnpm verify:mobile-habits`（包要在隔离载体里打并**成对**传 `HEYTA_HABITS_APK` + `HEYTA_HABITS_APK_ROOT`，完整命令在 §9.17）；重试台 `bash ~/.heyta-window-rigs/heyta-h12-retry.sh` | 与 #17 同族（没有载体的面 = 静默面）。🔴 **不在主检出打这个包**：`ProfileScreen.tsx`（习惯入口所在）与 `packages/i18n/src/locales/*.ts`、`app-host/*-actions.ts` 此刻都是别线未提交态，而 `run-gradle.mjs` 同步的是**当前工作树** ⇒ 会把他们的 WIP 打进我这份证据里。八条判据的构成、两个当场修掉的探针缺陷（bash 3.2 同条 `local` 内引用未赋值变量 / 填完凭据不等于发起同步）与门禁读数在 §9.17 |
 
 📌 **19:3x 更新**：第 1、2 两格已闭合（iOS 腿补跑绿、提交已推）；表内 3/4/5 与段外第 6 格的所有权
 都不在本会话 ⇒ 这一节是**交棒清单**，不是待办池。原先那句「只有第 1 格是我这一刀本来能带走、被环境挡住」
@@ -6614,9 +6614,11 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 这一条对整篇新文档不成立 —— 内容归属不在我这儿）。
 
 
-📌 **22:2x 更新（Goal 收尾块）**：第 4 格已闭合（H11 桌面那一半，提交 `1cbcbf34`，
-读数与两条被自己臂台否证的判断在 §9.15）；第 3 格（#17 接链 + 反方向判据）与第 6 格
-（CI 线那 2 处死链）此前已闭合。**这一节现在只剩 5 与 7 两格开着。**
+📌 **22:2x 更新（Goal 收尾块）/ 23:3x 续**：第 4 格已闭合（H11 桌面那一半，提交 `1cbcbf34`，
+读数与两条被自己臂台否证的判断在 §9.15）；第 3 格（#17 接链 + 反方向判据）、第 6 格
+（CI 线那 2 处死链）与此前的第 5 格（两组红，§9.16）都已闭合。
+⇒ **这一节只剩第 7 格，而且它现在欠的只有一件事**：`verify:mobile-habits` 的
+4–8 步设备读数与 9 张证据图（载体本身已入库 `cd546407`）。
 
 🔴 **第 6 格自愈之后，`check:docs` 又红了 6 处，但那**不是**同一批**（别把这条读成"第 6 格没修完"）：
 死链目标是 P0 体验整改 / IA 审计那条线**今晚 19:35–21:19 新写的 4 枚未跟踪文档**
@@ -6631,4 +6633,3 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 ⚠️ 顺带一条**否证**：本节原先记的 `check:md-tables` 在 `docs/plans/trash-and-archive.md:744`
 那一格红，22:1x 现量已经不复存在（`pnpm run check:md-tables` ⇒ rc=0，"12 个文件…第四类基线 3 行"）。
 是回收线自己补上的，不是本会话动的。
-
