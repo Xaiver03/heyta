@@ -46,8 +46,9 @@ import {
   SHELL_QUADRANT_NAV,
   SHELL_VIEW_TABS,
 } from '../src/mockup/app-shell-shape.js';
-import { showcaseQuadrantCounts, SHOWCASE_TODAY_PROGRESS } from '../src/mockup/showcase-data.js';
+import { showcaseQuadrantCounts } from '../src/mockup/showcase-data.js';
 import { MOCK_TIMELINE_ROWS } from '../src/mockup/timeline-shape.js';
+import { codeOccurrences, readWebAppSource, stripComments } from './helpers/source-text.js';
 
 /**
  * 🔴 **这里曾经各抄了一份 `VIEW_TABS` / `PRIMARY_NAV`**（产品决策 P6）。
@@ -111,30 +112,33 @@ function renderMockup(
 }
 
 /**
- * 真应用 `App.tsx` 里**四个"做事"的视图都常驻**的两件东西：
- * `TodayProgressCard` 与 `CaptureComposer`。
- * 复刻原来只在"任务"那一屏画了输入框、四屏一张进度卡都没有。
+ * 展厅那五屏**全是**产品的"做事"视图（成长页另说）。
+ *
+ * 🔴 这张表里刻意**没有**"要不要画今天进度卡"这一列 —— 那个形状漂过一次：
+ * 产品 R6 那一刀把常驻卡撤进成长页，而复刻与判据都还写着"四屏常驻"，
+ * 于是**正向判据把过时的形状钉成了期望**，26 条测试全绿却人人都在撒谎。
+ * 卡片的有无改由下面那条判据**从 `App.tsx` 源码派生**。
  */
-const VIEWS_WITH_TODAY_AND_COMPOSER = ['tasks', 'quadrant', 'habits', 'focus'] as const;
+const DOING_VIEWS = ['tasks', 'quadrant', 'habits', 'focus'] as const;
 
 describe('展厅复刻与应用一致', () => {
-  it('四个视图都常驻「今天进度卡 + 捕获输入框」', () => {
-    for (const v of VIEWS_WITH_TODAY_AND_COMPOSER) {
+  it('捕获输入框四屏常驻；今天进度卡的有无从产品源码派生，不是写死的期望', () => {
+    const app = readWebAppSource();
+    // 阳性对照：`App.tsx` 里"共享的 TodayProgressCard 没有删"是一段**历史注释**，
+    // 字面含那个名字却不是一次引用。不剥注释就会数出 ≥1 ⇒ 这条判据会在**正确**的产品上红。
+    expect(app).toContain('TodayProgressCard');
+    // 🔴 而"剥注释真的在起作用"本身也要有对照：摘掉那两行 replace 的话，上面那句
+    // `toContain` 与下面的计数会同时成立，判据静默退化成"产品画了卡"——方向反了都看不出来。
+    expect(stripComments('/* TodayProgressCard */')).not.toContain('TodayProgressCard');
+    const productDraws = codeOccurrences(app, 'TodayProgressCard') > 0;
+
+    for (const v of DOING_VIEWS) {
       const view = renderMockup(v);
-      const today = view.querySelector('.mk-today');
-      expect(today, `${v} 缺今天进度卡`).not.toBeNull();
-      // 🔴 M3 第十一刀之后卡片来自共享 `TodayProgressCard`：它**没有**"今天"标签
-      // （迁移前 web 的 `.ht-today__label` 有），比例是 `done/total` 一整段。
-      // 结构/token 的权威对账在 `mockup-today-shape.spec.tsx`。
-      expect(today?.querySelector('.mk-today__count')?.textContent?.trim()).toMatch(
-        /^\d+\/\d+$/u,
-      );
-      expect(today?.textContent ?? '').toContain(
-        zhCN['web.progress.hint.remaining'].replace(
-          '{count}',
-          String(SHOWCASE_TODAY_PROGRESS.remaining),
-        ),
-      );
+      const drawn = view.querySelector('.mk-today') !== null;
+      expect(
+        drawn,
+        `${v}：产品${productDraws ? '在' : '不在'}做事视图画今天卡，展厅没跟上一个字节`,
+      ).toBe(productDraws);
       expect(view.querySelector('.mk-compose'), `${v} 缺捕获输入框`).not.toBeNull();
       // 输入框里的提示语必须是应用自己的那条
       expect(view.querySelector('.mk-input')?.textContent?.trim()).toBe(

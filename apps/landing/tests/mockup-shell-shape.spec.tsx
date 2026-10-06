@@ -63,44 +63,37 @@ import {
 import {
   SHOWCASE_NOW,
   SHOWCASE_TASKS,
-  SHOWCASE_TODAY_PROGRESS,
   showcaseQuadrantCounts,
 } from '../src/mockup/showcase-data.js';
+import { readWebAppSource, readWebSource, stripComments } from './helpers/source-text.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../../..');
 
 /**
- * 真应用源码的位置。
- *
- * 🔴 `HEYTA_MOCKUP_WEB_SRC` 是**故障注入探针**专用的只读接缝
- *（与 `check-l0-no-style.mjs` 的 `HEYTA_CHECK_ROOT` 同一个约定）：
- * 把 `apps/web/src` 复制到 `/tmp`、在副本上改一处、再把本变量指过去，
- * 就能证明"真应用改了而复刻没跟 → 会红"，而**不必碰共享工作区里的 `apps/web`**。
- * 不设它时就是真实路径。
+ * 真应用源码的位置与读取器住在 `./helpers/source-text.ts` —— `HEYTA_MOCKUP_WEB_SRC`
+ * 那枚故障注入接缝（把 `apps/web/src` 复制到临时树、在副本上改一处、再把本变量指过去，
+ * 就能证明"真应用改了而复刻没跟 → 会红"，而不必碰共享工作区里的 `apps/web`）也在那里，
+ * 两份判据共用同一枚旋钮、同一套剥注释规则。
  */
-const WEB_SRC = process.env.HEYTA_MOCKUP_WEB_SRC ?? join(REPO, 'apps/web/src');
-
-function appSource(): string {
-  return readFileSync(join(WEB_SRC, 'App.tsx'), 'utf8');
-}
+const appSource = readWebAppSource;
 
 /** 视图/导航登记（2026-10-02 起从 App.tsx 抽到独立文件，声明逐字未动）。 */
 function viewTabsSource(): string {
-  return readFileSync(join(WEB_SRC, 'features/shell/view-tabs.ts'), 'utf8');
+  return readWebSource('features/shell/view-tabs.ts');
 }
 
 /** NavButton（计数位的 `count > 0` / `ht-nav__count` 在这份文件里）。 */
 function navButtonSource(): string {
-  return readFileSync(join(WEB_SRC, 'features/shell/NavButton.tsx'), 'utf8');
+  return readWebSource('features/shell/NavButton.tsx');
 }
 
 function projectsPanelSource(): string {
-  return readFileSync(join(WEB_SRC, 'features/projects/ProjectsPanel.tsx'), 'utf8');
+  return readWebSource('features/projects/ProjectsPanel.tsx');
 }
 
 function taskStoreSource(): string {
-  return readFileSync(join(WEB_SRC, 'features/tasks/store.ts'), 'utf8');
+  return readWebSource('features/tasks/store.ts');
 }
 
 /** 从源码里切出一个 `const X = [ … ];` 数组登记块。切不到 = 报错，不是"跳过"。 */
@@ -504,7 +497,7 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
     if (start < 0) throw new Error('App.tsx 里找不到 .ht-header__actions —— 判据锚点已失效');
     const end = app.indexOf('<div className="ht-content">', start);
     if (end < 0) throw new Error('.ht-header__actions 之后找不到 .ht-content —— 判据锚点已失效');
-    return app.slice(start, end).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{?\/\/[^\n]*/g, '');
+    return stripComments(app.slice(start, end));
   }
 
   function webTestids(): string[] {
@@ -592,39 +585,3 @@ describe('#7 页头右侧：登记处 ⟷ 真应用 `.ht-header__actions`', () =
   });
 });
 
-describe('#6 今天进度卡：编造值也必须自洽（产品决策 P5）', () => {
-  /**
-   * 🔴 这张卡的三个数字**派不出来**（展厅没有习惯 / 习惯日志 / 专注记录，
-   * `ShowcaseTask` 也没有完成时间）—— 完整理由写在
-   * `showcase-data.ts` 的 `SHOWCASE_TODAY_PROGRESS` 上方。
-   *
-   * **但它们必须是自洽的**：一个 `done > total` 或
-   * `remaining !== total - done` 的卡片，是"看起来像数据、其实自相矛盾"，
-   * 比明显是占位符更坏 —— 没人会去核对一张卡上的减法。
-   * 这三条断言就是那道核对，且它**会红**（下面每条都做过故障注入）。
-   */
-  it('remaining === total - done，且 0 < done <= total', () => {
-    expect(SHOWCASE_TODAY_PROGRESS.remaining).toBe(
-      SHOWCASE_TODAY_PROGRESS.total - SHOWCASE_TODAY_PROGRESS.done,
-    );
-    expect(SHOWCASE_TODAY_PROGRESS.done).toBeGreaterThan(0);
-    expect(SHOWCASE_TODAY_PROGRESS.done).toBeLessThanOrEqual(SHOWCASE_TODAY_PROGRESS.total);
-  });
-
-  it('进度条的比例落在 (0, 1] —— 超出这个区间 CSS 会静默画错', () => {
-    const ratio = SHOWCASE_TODAY_PROGRESS.done / SHOWCASE_TODAY_PROGRESS.total;
-    expect(ratio).toBeGreaterThan(0);
-    expect(ratio).toBeLessThanOrEqual(1);
-  });
-
-  it('渲染出来的卡显示的就是登记的那三个数（渲染层不许再抄一份）', () => {
-    const app = renderMockup('tasks');
-    const count = app.querySelector('.mk-today__count');
-    expect(count).not.toBeNull();
-    expect(count?.textContent).toContain(String(SHOWCASE_TODAY_PROGRESS.done));
-    expect(count?.textContent).toContain(String(SHOWCASE_TODAY_PROGRESS.total));
-    // 渲染文件里不许再有裸的 today 魔数。
-    const source = readFileSync(join(HERE, '../src/mockup/AppWindow.tsx'), 'utf8');
-    expect(source).not.toMatch(/const today = \{ done:/);
-  });
-});

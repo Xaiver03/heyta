@@ -63,7 +63,7 @@ import {
   MOCK_CAPTURE_KEYS,
   mockCaptureAddClass,
 } from './capture-shape.js';
-import { SHOWCASE_TODAY_PROGRESS, showcaseQuadrantCounts } from './showcase-data.js';
+import { showcaseQuadrantCounts } from './showcase-data.js';
 import { TaskList } from './TaskList.js';
 import { QuadrantGrid } from './QuadrantGrid.js';
 import { HabitHeatmap } from './HabitHeatmap.js';
@@ -339,45 +339,16 @@ export function AppWindow({
             </header>
 
             {/*
-              🔴 内容区的顺序照抄 `apps/web/src/App.tsx`：
-              **今天进度卡 → 捕获输入框 → 视图内容**。
-              复刻原来只在"任务"那一屏画了输入框、四屏都没有进度卡 ——
-              而真应用两者在四个视图上**都在**。
+              🔴 内容区的顺序照抄 `apps/web/src/App.tsx`：**捕获输入框 → 视图内容**。
+
+              ⚠️ 这里**没有**今日进度卡，是刻意的而不是漏画：产品侧 R6 那一刀把它从
+              "做事"的四个视图撤了（理由写在 `App.tsx:2288-2304` —— 把三个位置该说的数字
+              压成一个谁都不看的分数，且 0/0 时它说的是"你什么都没安排"）。共享卡片本身
+              没删，它现在只住成长页。展厅这五屏全是"做事"屏 ⇒ 一张都不该画。
+              这条边界由 `tests/mockup-fidelity.spec.tsx` 反向钉住，并且**从产品源码派生**：
+              哪天真应用把卡放回做事视图，那条判据会先红，而不是让这里悄悄落后。
             */}
             <div className="mk-content">
-              {/*
-                🔴 M3 第十一刀（motivation）之后这张卡是**共享组件**
-                （`packages/ui/src/motivation/TodayProgressCard.tsx`），
-                结构变了：
-                  · **没有"今天"这个标签** —— 共享卡片只画"比例 + 提示 + 横条"；
-                  · 比例是 `done/total` **一整段**（`numeric-display`），不是"大数字 + 小分母"；
-                  · 提示与比例**并排**（head 是一行，`align-items: flex-end`），不换行到下面；
-                  · 横条填充用 `inline-size` 而不是 `scaleX`（RN 的 scaleX 以中心为原点）。
-                取值仍来自 `SHOWCASE_TODAY_PROGRESS`（产品决策 P5）。
-                token 逐个对账的判据在 `tests/mockup-today-shape.spec.tsx`。
-
-                ⚠️ 共享卡片在 `total > 0` 时还会画"习惯/任务/计划外"明细行，`focusMinutes > 0`
-                时画专注行，闭环时画闭环句 —— 展厅样例数据里没有这三组取值
-                （`SHOWCASE_TODAY_PROGRESS` 只有 done/total/remaining，见 `showcase-data.ts`），
-                故**未复刻**；补齐方式见上面那份 spec 的说明。
-              */}
-              <section className="mk-today" aria-label={t('web.progress.aria')}>
-                <div className="mk-today__head">
-                  <div className="mk-today__count">
-                    {today.done}/{today.total}
-                  </div>
-                  <div className="mk-today__hint">
-                    {t('web.progress.hint.remaining', { count: today.remaining })}
-                  </div>
-                </div>
-                <div className="mk-today__bar">
-                  <span
-                    className="mk-today__bar-fill"
-                    style={{ width: `${String((today.done / today.total) * 100)}%` }}
-                  />
-                </div>
-              </section>
-
               {/*
                 🔴 捕获输入行从 `./capture-shape.js` 的登记处派生。
                 它原来手抄了 `.mk-input` / `.mk-btn-primary` 两个类名，而那一族
@@ -411,20 +382,3 @@ export function AppWindow({
     </div>
   );
 }
-
-/**
- * 今日进度卡（复现共享 `packages/ui/src/motivation/TodayProgressCard.tsx`）。
- *
- * 🔴 真应用在**任务 / 四象限 / 习惯 / 番茄钟**四个视图上都常驻这张卡
- * （`App.tsx` 的 `view !== 'settings' && … && <TodayProgressBanner />`，
- * banner 是共享卡片的接线层），而复刻原来四屏**一张都没有**。
- *
- * ⚠️ M3 第十一刀之后它的来源是 `@heyta/ui`（web 侧不再有 `.ht-today` DOM/CSS），
- * 所以结构/取值的权威对照是共享组件本身 —— 逐 token 对账见
- * `tests/mockup-today-shape.spec.tsx`。
- *
- * 🔴 数值来自 `showcase-data.ts` 的 `SHOWCASE_TODAY_PROGRESS`（产品决策 P5）——
- * 那不是"随手写在渲染文件里的魔数"，而是**集中登记 + 有注释说明为何不可派生**的样例数据。
- * 详见那个常量上的说明。
- */
-const today = SHOWCASE_TODAY_PROGRESS;

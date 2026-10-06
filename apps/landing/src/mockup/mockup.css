@@ -271,74 +271,11 @@
   overflow: hidden;
 }
 
-/* ── 今日进度卡 ─────────────────────────────────────────────
-   复现**共享** `packages/ui/src/motivation/TodayProgressCard.tsx`
-   （M3 第十一刀之后 web 侧不再有 `.ht-today` DOM/CSS）。
-   真应用在任务 / 四象限 / 习惯 / 番茄钟四个视图上都常驻它，复刻原来一张都没有。
-
-   🔴 与迁移前的三处**可见差异**（照共享组件改，别照旧 app.css 抄回来）：
-     · 没有"今天"这个标签 —— 共享卡片只画"比例 + 提示 + 横条"；
-     · 比例是一整段 `2/5`（numeric-display：4xl/bold/tight/display 字距），
-       不是"2xl 大数字 + base 小分母"；
-     · 提示与比例**并排**在 head 一行里（`align-items: flex-end`），不换行到下面。
-
-   ⚠️ 逐 token 对账的判据在 `tests/mockup-today-shape.spec.tsx`：它读共享组件源码，
-   把每个 `tokens['…']` 与本节里的 `var(--ht-…)` 比对 —— 共享改了这里就会红。 */
-.mk-today {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-2);
-  padding: var(--ht-space-3);
-  border-radius: var(--ht-radius-lg);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  background: var(--ht-color-surface);
-  /* 布局补偿，不是卡片自己的取值：真应用的卡片外壳（`ht-content`）靠父级 gap
-     留白，而展厅的 `.mk-content` 没有 gap。 */
-  margin-block-end: var(--ht-space-4);
-}
-
-.mk-today__head {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--ht-space-2);
-}
-
-/* = `numeric-display` 语义样式：font-size.4xl / bold / tight / tracking.display。 */
-.mk-today__count {
-  color: var(--ht-color-foreground);
-  font-size: var(--ht-font-size-4xl);
-  font-weight: var(--ht-font-weight-bold);
-  line-height: var(--ht-line-height-tight);
-  letter-spacing: var(--ht-tracking-display);
-  font-variant-numeric: tabular-nums;
-}
-
-/* = `row-meta` 语义样式：font-size.sm / regular / normal / tracking.body。 */
-.mk-today__hint {
-  flex-shrink: 1;
-  padding-block-end: var(--ht-space-1);
-  color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-sm);
-  font-weight: var(--ht-font-weight-regular);
-  line-height: var(--ht-line-height-normal);
-  letter-spacing: var(--ht-tracking-body);
-}
-
-/* 横条 = 共享 `MotivationProgressBar`：轨道 `size.progress-height` 高、full 圆角，
-   填充给 **inline-size**（RN 的 `scaleX` 以中心为原点，所以共享层改成宽度插值）。 */
-.mk-today__bar {
-  block-size: var(--ht-size-progress-height);
-  border-radius: var(--ht-radius-full);
-  background: var(--ht-color-surface-sunken);
-  overflow: hidden;
-}
-
-.mk-today__bar-fill {
-  display: block;
-  block-size: 100%;
-  border-radius: var(--ht-radius-full);
-  background: var(--ht-color-primary);
-}
+/* ── 今日进度卡：刻意**不画** ─────────────────────────────
+   产品侧 R6 那一刀把常驻的今天进度卡从"做事"的四个视图撤了（理由见
+   `apps/web/src/App.tsx` 里那段"数字分散在三个位置"的说明），共享卡现在只住成长页。
+   展厅这五屏全是做事屏 ⇒ 一节样式都不该留。反向判据在
+   `tests/mockup-fidelity.spec.tsx`，它从产品源码派生，不放行"悄悄画回来"。 */
 
 /* ── 输入行 ─────────────────────────────────────────────── */
 
