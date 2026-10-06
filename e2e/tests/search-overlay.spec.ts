@@ -274,9 +274,12 @@ test('🔴 真键盘：⌘K 开 → 输入 → ↓ 高亮并滚进视野 → ↵
   await page.keyboard.press('Meta+k');
   await expect(surface, '⌘K 关（与 Esc 同一个出口）').toHaveCount(0);
   // ⑧ 开/关浮层都不许把页面滚走。🔴 探针量出来的因果链不是"焦点"：浮层挂在一根
-  //    **和列表一样高**的内容列里（docScrollHeight 2365），写成 `position: absolute`
+  //    **和列表一样高**的内容列里（当时 docScrollHeight 2365），写成 `position: absolute`
   //    时卡片钉在**文档顶部**而不在看见的那一屏，输入框的 `autoFocus` 于是把整页
   //    滚回 0（打开前 scrollY=1465 → 打开后 0）。改成 `fixed` 后这一条才成立。
+  //    ⚠️ 那三个数是工单 H11 **之前**的现场读数，留着是为了说清 `fixed` 是哪一条回归的解药；
+  //    10-06 之后外壳钉死（文档恒等于一屏、滚动挂在 `.ht-content`），`fixed` 仍然是对的
+  //    —— 它钉的是视口，而"祖先带 transform/filter 会把它降级"这条判据不受参照系影响。
   await expect(
     page.locator(`[data-testid="task-item-${targetId}"]`),
     '⌘K 关掉之后，刚打开的那一行必须**还**在屏幕上',
@@ -303,7 +306,21 @@ test('关掉搜索后焦点回到开它的那个框，且不许把页面滚回�
   // 🔴 真点一下 composer 再滚：探针实测**提交之后焦点不在 composer 上**
   //（Enter 交完就交出去了），拿那条当"触发器"会测到 null → 兜底，量不到这一支。
   await composer.click();
-  await page.evaluate(() => window.scrollTo(0, 1200));
+  // 🔴 工单 H11 之后外壳不滚（文档恒等于一屏），`window.scrollTo` 是一条**空操作**，
+  //    下面那条"composer 已在屏幕外"的前提会当场红。滚动宿主换成了 `.ht-content`，
+  //    量的还是同一件事（把触发器挤到可视区之外），参照系换了个名字。
+  const hostScrolled = await page.evaluate(() => {
+    const el = document.querySelector<HTMLElement>('.ht-content');
+    if (!el) return -1;
+    el.scrollTop = 1200;
+    return Math.round(el.scrollTop);
+  });
+  expect(
+    hostScrolled,
+    '把 `.ht-content` 的 scrollTop 推到 1200 之后读数仍是 ' +
+      String(hostScrolled) +
+      ' ⇒ 内容列不是滚动宿主（H11 那条裁决变了），下面几条前提全部失去基准',
+  ).toBeGreaterThan(0);
   await page.waitForTimeout(150);
   await expect(composer, '前提：触发器就是 composer').toBeFocused();
   await expect(

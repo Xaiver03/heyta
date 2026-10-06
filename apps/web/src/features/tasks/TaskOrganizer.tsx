@@ -277,31 +277,22 @@ export function TaskOrganizer({
           <SlidersHorizontal size={TRIGGER_ICON_SIZE} aria-hidden="true" />
         </summary>
 
-        <div
-          className="ht-material"
-          style={{
-            position: 'absolute',
-            // 浮层层级来自设计系统的 z 刻度。
-            // ⚠️ 这里原本写的是 `zIndex: 1` —— 一个裸数字，被 `check:design` 拦下了。
-            // 裸 z-index 的问题是它**只在当前这个组件里看着对**：旁边任何一处
-            // 用了更高层级的东西都会盖住它，而那种 bug 只在特定滚动位置才出现。
-            zIndex: cssVar('z.popover'),
-            insetInlineEnd: 0,
-            marginBlockStart: cssVar('space.2'),
-            padding: cssVar('space.3'),
-            display: 'flex',
-            flexDirection: 'column',
-            gap: cssVar('space.3'),
-            border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-            borderRadius: cssVar('radius.lg'),
-            boxShadow: cssVar('shadow.lg'),
-          }}
-        >
-          <OrganizerField
-            task={task}
-            onMoveToProject={onMoveToProject}
-            onSetTags={onSetTags}
-          />
+        {/*
+          🔴 工单 H11：这一枚浮层**不再** `position: absolute`。
+          绝对定位的后代不计入滚动宿主的 `scrollable overflow`，而外壳钉死之后
+          宿主是 `.ht-content` —— 实测滚到底仍差 78px（判据与数字在
+          `e2e/tests/shell-no-document-scroll.spec.ts` W2）。现在走
+          `material.css` 的 `.ht-material__row-slot` + `.ht-material__row-pop`：零高度的槽 +
+          流内的本体，视觉与原来逐字相同（同一批 token），但"够得着"变成结构性质。
+        */}
+        <div className="ht-material__row-slot">
+          <div className="ht-material ht-material__row-pop">
+            <OrganizerField
+              task={task}
+              onMoveToProject={onMoveToProject}
+              onSetTags={onSetTags}
+            />
+          </div>
         </div>
       </details>
     </span>

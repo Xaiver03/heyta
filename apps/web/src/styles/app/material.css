@@ -26,6 +26,54 @@
   background: var(--ht-material-chrome-tint);
 }
 
+/*
+ * 行级悬浮层的「零高度槽 + 本体」（工单 H11）。
+ *
+ * 🔴 为什么不再写 `position: absolute`：外壳钉死之后（`.ht-app` 一屏封顶、
+ * 滚动挂在 `.ht-content`），**绝对定位的后代不计入滚动宿主的 `scrollable overflow`**。
+ * 真浏览器现量（`e2e/tests/shell-no-document-scroll.spec.ts` W2）：滚到底之后
+ * `scrollTop=933` 已经是 max，而那一行展开的整理浮层 `bottom=778` 掉在可视区底
+ * （700）以下 **78px** —— 用户看到的是"最靠下那一行的编辑器打开了、下半截永远够不着"。
+ * 以前整页滚的时候这一档不显形（文档最大值由整列内容给，滚一下就在），
+ * 所以它是 H11 **落地即引入**的那一条，不是既有缺陷（这条预判记在
+ * `docs/plans/goal-layout-audit.md` §9.10 的"硬前置"那一格与 B95 看图）。
+ *
+ * 形状：**槽**零高度、**本体**留在流内。流内后代无论溢出多少都算进滚动范围 ⇒
+ * 一根声明就把"够得着"变成结构性质，不需要测高度、不需要选方向、不会闪一下。
+ * 代价说清楚：槽是零高度，所以浮层**不**把行撑高（视觉上仍是"盖在下面那几行之上"，
+ * 与 ADR-0042 的悬浮功能层裁决一致）；但它现在会**跟着内容一起滚**——
+ * 这是对的：它属于那一行，不是属于视口。
+ *
+ * ⚠️ 为什么写在这里而不是留在那五处内联 `style`：`check:l4-no-style` 的内联棘轮
+ * 只许降不许升，把这些值抄成内联就是往回涨。
+ * ⚠️ 只给**行内**那几枚用。`.ht-compose-panel`（提醒 / 截止那条）本来就在流内，
+ * 没有这一档问题；`DueEditor` 的另一支是 `position: fixed`（钉视口），也不受参照系影响。
+ */
+.ht-material__row-slot {
+  block-size: 0;
+}
+
+.ht-material__row-pop {
+  position: relative;
+  /* 浮层层级来自设计系统的 z 刻度（与原来那枚内联 `z.popover` 同一个值）。 */
+  z-index: var(--ht-z-popover);
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  margin-block-start: var(--ht-space-2);
+  /* 右对齐：原来靠 `inset-inline-end: 0`，流内用 `margin-inline-start: auto` 得到同一条边。 */
+  margin-inline-start: auto;
+  /* 下面这八条是把 `TaskOrganizer.tsx` / `TaskRepeat.tsx` 里**逐字相同的两份内联**
+     搬进来的（AGENTS §3.5：抽取的收尾动作是删掉旧的那份，不是再抄一份新的）。
+     取值逐条等于搬之前那两份，一个都没改。 */
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
+}
+
 @keyframes ht-material-in {
   from {
     opacity: 0;
