@@ -58,7 +58,7 @@
     "check:legal-host": "node scripts/check-legal-host.mjs",
     "check:legal-closure-truth": "node scripts/check-legal-closure-truth.mjs",
     "check:legal-gdpr": "node scripts/check-legal-gdpr.mjs",
-    "check:licenses": "node research/tools/license-inventory.mjs",
+    "check:licenses": "node research/tools/license-inventory.mjs --self-test && node research/tools/license-inventory.mjs",
     "check:licenses:stamp": "node research/tools/render-license-inventory.mjs --check-stamp",
     "check:image-license": "node research/tools/gen-image-npm-tree.mjs --check && node research/tools/check-image-license-coverage.mjs --quiet && node research/tools/check-image-install-contract.mjs",
     "check:doc-citations": "node scripts/check-doc-citations.mjs",
