@@ -14261,3 +14261,12 @@ VERIFY_RC=0
   仍**不动本机网络环境**（硬规则）。
 - 载体树 `/tmp/heyta-merge-carrier` 已不在（`/tmp` 那批被清），所以今晚那些跑过的树不再可复用；
   要再跑验收需重建（`git worktree add` + `pnpm install`）。
+
+### 8.274 就地补正 §8.273 的一句 + 收尾自己留下的残留
+
+§8.273 写"载体树已不在"是对的，但**注册项还在**（`git worktree list` 里 5 枚 `/tmp/heyta-merge-carrier*` 全标 `prunable`），
+所以 `git branch -D fix/selfhost-e2ee-judge-on-main` 第一趟报
+`cannot delete branch … used by worktree at '/private/tmp/heyta-merge-carrier'`。
+处理：`git worktree prune`（只清工作树目录**已经不存在**的注册项，不动任何还在的树），然后分支删净。
+⚠️ 记这一条是因为它的**症状**很容易读成"分支被别人占用，不能动"——实际是元数据残留，
+判法：`git worktree list` 里那一行带不带 `prunable`。
