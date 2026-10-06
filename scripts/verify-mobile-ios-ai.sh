@@ -427,31 +427,20 @@ newest_src() {
     -type f \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
     | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1
 }
-# 「这批源码最后一次被**改变**」的时刻。🔴 判的是内容，不是文件系统时间：
-#   裸 mtime 会被两种与内容无关的写入顶起来 —— 变异门禁"写完再写回同一份字节"的复原、
-#   checkout / rsync。它们把这道门变成一把**恒红的尺**，而恒红的尺最坏处不是碍眼，
-#   是人会去绕它（#346/#344 同一族：尺子的输入不是它声称的那个量）。
-#   真要被 #27 抓住的那种"改了 packages/ 而产物里是旧 JS"，一定是**内容**变了 ⇒
-#   已提交的那部分取该路径集最后一次提交的时刻，未提交的部分逐枚取 mtime（内容确实不同）。
-src_content_stamp() {
-  local f newest c
-  newest=$(git -C "$HEYTA_REPO_ROOT" log -1 --format=%ct -- apps/mobile/src packages 2>/dev/null)
-  case "$newest" in (''|*[!0-9]*) return 1 ;; esac
-  while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    [ -f "$HEYTA_REPO_ROOT/$f" ] || continue
-    c=$(stat -f %m "$HEYTA_REPO_ROOT/$f" 2>/dev/null) || continue
-    [ "$c" -gt "$newest" ] && newest="$c"
-  done <<EOF2
-$(git -C "$HEYTA_REPO_ROOT" status --porcelain -z -- apps/mobile/src packages 2>/dev/null \
-  | tr '\0' '\n' | sed -E 's/^.{3}//; s/^.* -> //')
-EOF2
-  printf '%s' "$newest"
-}
+# 「这批源码最后一次被**改变**」的时刻 —— 尺住在 `lib/apk-freshness.sh`（单一所有者），
+#   本载体只是消费者。为什么不能是裸 mtime（rig47b 现量，记在 traps #346）：变异门禁
+#   "写完再把字节原样写回"的复原、以及 checkout / rsync，都会把 mtime 顶到"刚刚"而内容
+#   等于 HEAD —— 那把这道门变成一把**恒红的尺**，而恒红的尺最坏处不是碍眼，是人会去绕它。
+#   真要被 #27 抓住的那种"改了 packages/ 而产物里是旧 JS"，一定是**内容**变了。
+if [ ! -f "$HEYTA_REPO_ROOT/scripts/lib/apk-freshness.sh" ]; then
+  echo "❌ 载不进 scripts/lib/apk-freshness.sh ⇒ 新鲜度门没有尺，本轮无效（不拿「没有判据」冒充「判过了」）"; exit 3
+fi
+# shellcheck source=lib/apk-freshness.sh
+. "$HEYTA_REPO_ROOT/scripts/lib/apk-freshness.sh"
 DIRTY_SRC=$(git -C "$HEYTA_REPO_ROOT" status --porcelain -- apps/mobile/src packages 2>/dev/null | wc -l | tr -d ' ')
 JSB_M=$(stat -f %m "$JSB")
 SRC_M=$(newest_src)
-SRC_C=$(src_content_stamp) || { echo "❌ 内容章取不到（git log 没有该路径集的提交？）⇒ 本轮无效"; exit 3; }
+SRC_C=$(heyta_src_content_stamp "$HEYTA_REPO_ROOT") || { echo "❌ 内容章取不到（git log 没有该路径集的提交？）⇒ 本轮无效"; exit 3; }
 [ -n "$SRC_M" ] || { echo "❌ 新鲜度门没有输入（源码目录扫不到 .ts/.tsx？）⇒ 本轮无效"; exit 3; }
 echo "   新鲜度门输入：bundle ${JSB_M}（$(date -r "$JSB_M" '+%m-%d %H:%M:%S')）／内容章 ${SRC_C}（$(date -r "$SRC_C" '+%m-%d %H:%M:%S')）／裸 mtime 章 ${SRC_M}／未提交 $DIRTY_SRC 枚"
 if [ "$SRC_C" -gt "$JSB_M" ]; then
@@ -464,21 +453,19 @@ if [ "$SRC_M" -gt "$JSB_M" ]; then
   echo "   ⓘ 有文件的裸 mtime 晚于产物，而它们的内容与 HEAD 逐字相同（未提交 $DIRTY_SRC 枚）"
   echo "     ⇒ 那是门禁 touch-复原／checkout 留下的时间，不是源码变了；这道门判的是内容。"
 fi
-# 「装的就是这次打的那份」：构建目录里那份与容器里那份必须逐字节相同。
-#   内容章回答"产物不落后于源码"，这一条回答"跑的就是刚打的那一枚" —— 两件事，都要有。
+# 「装的就是这次打的那份」：本轮要装的那一枚的字节指纹在这里取，**对账在第 1 步装完之后**。
+#   内容章回答"产物不落后于源码"，那一条只能在装之前判（它判的是将要装的那枚产物）；
+#   而"跑的就是刚打的那一枚"判的是**安装这个动作**，放在 install 之前会退化成
+#   "上一轮装的那份 == 这一轮构建的那份" —— rig48 现量：构建目录 13:34 的 bundle 与容器里
+#   rig47c 装的那份当然不同，于是每次重打之后第一趟必红，而红的原因不是"装错了"，
+#   是"还没装"。判据钉在动作之前，量到的就是别的时刻的状态（§7 那一族"钉错层"的时间版）。
+SHA_WILL_INSTALL=$(shasum -a 256 "$JSB" | cut -d' ' -f1)
 if [ -d "$IOS_APP_DIR" ] && [ -f "$IOS_APP_DIR/main.jsbundle" ]; then
-  SHA_BUILT=$(shasum -a 256 "$IOS_APP_DIR/main.jsbundle" | cut -d' ' -f1)
-  SHA_INST=$(shasum -a 256 "$INSTALLED_APP/main.jsbundle" | cut -d' ' -f1)
-  if [ "$SHA_BUILT" != "$SHA_INST" ]; then
-    echo "   ❌ 容器里那份 main.jsbundle 与构建目录里那份不是同一批字节（built=${SHA_BUILT:0:12} inst=${SHA_INST:0:12}）"
-    echo "      ⇒ 装上去的不是刚打的包；本轮无证（§7 #82：命令退出码 0 不等于内容对上了）"
-    exit 3
-  fi
-  ok "构建产物与已装产物逐字节相同（sha256 ${SHA_INST:0:12}）"
+  echo "   ⓘ 将安装的 bundle 来自构建目录（sha256 ${SHA_WILL_INSTALL:0:12}）；装完后再与容器里那份逐字节对账"
 else
-  echo "   ⓘ 构建目录不在 $IOS_APP_DIR ⇒ 无法做"同一批字节"对账，只对内容章；装的是哪一次构建要人确认"
+  echo "   ⓘ 构建目录不在 $IOS_APP_DIR ⇒ 本轮装的是已装产物的快照（同一批字节，但没有新构建可对账）"
 fi
-ok "装的是当前源码的产物"
+ok "将要安装的是当前源码的产物"
 
 step "0c. 假端点：确定性、只绑回环、可数请求"
 rm -f "$STUB_PIDFILE"
@@ -507,6 +494,21 @@ xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
 xcrun simctl uninstall "$UDID" "$BID" >/dev/null 2>&1 || true
 xcrun simctl install "$UDID" "$APP_SRC" >/dev/null 2>&1 \
   || { echo "❌ simctl install 失败：$APP_SRC ⇒ 本轮无效"; exit 3; }
+# 🔴 「跑的就是刚打的那一枚」在这里判，不是在第 0b 步判：容器路径每次安装都会变，
+#    所以要**重新解析**一次，再与本轮将要安装的那指纹逐字节对账。
+#    （rig48 的读数就是这条判据钉错时刻的产物：它在 install 之前比"上一轮装的 vs 这一轮打的"，
+#     于是每次重打之后第一趟必红，而红的不是产品、也不是安装，是判据自己量的那一刻。）
+INSTALLED_APP=$(xcrun simctl get_app_container "$UDID" "$BID" app 2>/dev/null | tr -d '\r')
+if [ -z "$INSTALLED_APP" ] || [ ! -f "$INSTALLED_APP/main.jsbundle" ]; then
+  echo "❌ 装完之后按 BID=$BID 读不到容器里的 main.jsbundle ⇒ 无法证明跑的是哪一批字节，本轮无效"; exit 3
+fi
+SHA_INST=$(shasum -a 256 "$INSTALLED_APP/main.jsbundle" | cut -d' ' -f1)
+if [ "$SHA_INST" != "$SHA_WILL_INSTALL" ]; then
+  echo "   ❌ 容器里那份 main.jsbundle 与本轮安装的那一枚不是同一批字节（will=${SHA_WILL_INSTALL:0:12} inst=${SHA_INST:0:12}）"
+  echo "      ⇒ 装上去的不是将要打的那份（§7 #82：simctl install 退出码 0 不等于内容对上了）"
+  exit 3
+fi
+ok "已装产物与本轮安装的那一枚逐字节相同（sha256 ${SHA_INST:0:12}，容器 $INSTALLED_APP）"
 xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1 || { echo "❌ simctl launch 失败 ⇒ 本轮无效"; exit 3; }
 sleep 6
 # 🔴 树就绪的判据是"label 数 ≥ 2 且三个候选屏之一在树里"，**不是**"某个标签在不在"：

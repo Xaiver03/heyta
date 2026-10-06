@@ -486,6 +486,122 @@ function iosCarrierInvariant(scriptRel, decl, zh) {
   };
 }
 
+/**
+ * 判据 ㉒：iOS 载体的**新鲜度两半，各自钉在它声称的那个时刻**（rig48 现量的形状）。
+ *
+ * 为什么单开一判据：第 0b 步原先把"容器里那份 == 构建目录里那份"写在 `simctl install`
+ * **之前**，于是它比的其实是"上一轮装的那份 vs 这一轮打的那份" —— 每次重打之后第一趟必红，
+ * 而红的不是产品、不是安装，是**判据量错了时刻**。判据钉错层（该钉在 A 上却钉在 B 上）
+ * 这个老形状，在时间轴上又复现了一次。
+ * 结构上还有一条：容器路径每次安装都会变，所以装之后那份必须**重新解析**
+ * `get_app_container`，沿用装之前那条路径等于对着一份已经不存在的容器打分。
+ *
+ * 四档（纯文本形状，不占设备 —— 设备窗口是全仓最稀缺的资源）：
+ *  a) 装之前有内容章门，且判旧之后真的非零退场；
+ *  b) 装之前取的是**将要安装那枚**的字节指纹（不许取已装那份 —— 那是 rig48 的原文）；
+ *  c) 装之后重新解析容器 → 取已装指纹 → 与 b) 那一枚逐字节对账 → 不一致就非零退场；
+ *  d) 启动排在这次对账**之后**（否则"跑的就是这一枚"在进程起来时还没成立）。
+ */
+function iosFreshnessOrder(scriptRel) {
+  const text = readScript(join(ROOT, scriptRel));
+  const code = [];
+  text.split('\n').forEach((line, i) => {
+    if (!/^\s*#/.test(line)) code.push({ n: i + 1, t: line }); // 注释不是调用点（同判据 ① 的规矩）
+  });
+  const at = (n) => `${scriptRel}:${String(n)}`;
+  const inRegion = (re, from, to) => code.filter((c) => c.n > from && c.n < to && re.test(c.t));
+  const red = [];
+  const n = { installs: 0, stamp: 0, preSha: 0, postContainer: 0, postSha: 0, cmp: 0 };
+
+  // 🔴 只认**调用形**（`xcrun simctl install "`）：那两行判据文案里也写着"simctl install 退出码 0"，
+  //    拿子串当调用点会把 prose 数进分母，而"把讲它的那句话当成它"正是判据 ① 开的那条规矩。
+  const installs = inRegion(/\bxcrun +simctl +install +["'$]/, 0, Infinity);
+  n.installs = installs.length;
+  if (installs.length === 0) {
+    red.push(
+      `${at(1)}  载里没有 simctl install，却在报「装的是当前产物」⇒ 新鲜度两半都没有宿主：` +
+        `这一轮根本没有"装完再验"这个动作。`,
+    );
+    return { red, n };
+  }
+  const ins = installs[0].n;
+  const launchAfter = inRegion(/\bxcrun +simctl +launch +["'$]/, ins, Infinity)[0];
+  const endN = launchAfter ? launchAfter.n : Infinity;
+
+  // a) 装之前：内容章门 + 判旧之后要真的拦住装包
+  const stamp = inRegion(/heyta_src_content_stamp/, 0, ins)[0];
+  if (!stamp) {
+    red.push(
+      `${at(ins)}  装之前没有内容章门（heyta_src_content_stamp）⇒「产物不落后于源码」这一半没人判，` +
+        `装旧包会一路跑到底。`,
+    );
+  } else {
+    const staleTest = inRegion(/\[\s*"\$\w+"\s*-gt\s*"\$\w+"/, stamp.n, ins)[0];
+    const stops = staleTest
+      ? inRegion(/exit +[1-9]/, staleTest.n, ins).length > 0
+      : inRegion(/exit +[1-9]/, stamp.n, ins).length > 0;
+    if (!stops) {
+      red.push(
+        `${at(stamp.n)}  内容章判旧之后没有非零退出 ⇒ 这道门只会打印一行话，拦不住装包（§7 元规则二：` +
+          `一条永远不拦的门比没有门更糟）。`,
+      );
+    } else n.stamp = 1;
+  }
+
+  // b) 装之前：指纹必须取自"本轮将要安装那枚"，不是已装那一份
+  const preSha = inRegion(/^\s*\w+=\$\(\s*shasum\b/, 0, ins)[0];
+  if (!preSha) {
+    red.push(`${at(ins)}  装之前没有取本轮将要安装那枚 bundle 的字节指纹 ⇒ 装之后没有可比的那一头。`);
+  } else if (/INSTALLED_APP/.test(preSha.t)) {
+    red.push(
+      `${at(preSha.n)}  装之前那枚指纹取的是**已装产物**（INSTALLED_APP）而不是将要安装的那枚 ⇒ ` +
+        `装之后比的其实是"上一轮装的 vs 这一轮打的"：每次重打后第一趟必红，而红的不是产品（rig48）。`,
+    );
+  } else n.preSha = 1;
+
+  // c) 装之后：重新解析容器 → 取已装指纹 → 与 b) 对账 → 不一致退场
+  const postContainer = inRegion(/get_app_container/, ins, endN)[0];
+  if (!postContainer) {
+    red.push(
+      `${at(ins)}  装之后没有重新解析容器（get_app_container）⇒ 容器路径每次安装都会变，` +
+        `沿用装之前那条是对着一份已经不存在的目录打分。`,
+    );
+  } else n.postContainer = 1;
+
+  const postSha = inRegion(/^\s*\w+=\$\(\s*shasum\b/, ins, endN)[0];
+  if (!postSha) {
+    red.push(`${at(ins)}  装之后没有对**已装的那一枚**取指纹 ⇒「跑的就是刚打的包」这一半没有读数。`);
+  } else n.postSha = 1;
+
+  if (preSha && postSha) {
+    const preVar = /(\w+)=\$\(\s*shasum/.exec(preSha.t)?.[1] ?? '';
+    const postVar = /(\w+)=\$\(\s*shasum/.exec(postSha.t)?.[1] ?? '';
+    const pair = new RegExp(
+      `\\[\\s*"\\$${postVar}"\\s*!=\\s*"\\$${preVar}"|\\[\\s*"\\$${preVar}"\\s*!=\\s*"\\$${postVar}"`,
+    );
+    const cmp = inRegion(pair, postSha.n, endN)[0];
+    if (!cmp) {
+      red.push(
+        `${at(postSha.n)}  装之后的对账没有把已装指纹（${postVar}）与将要安装的指纹（${preVar}）放在一起比 ` +
+          `⇒ 这一轮没有证明"跑的就是刚打的那一枚"。`,
+      );
+    } else if (inRegion(/exit +[1-9]/, cmp.n, Math.min(endN, cmp.n + 8)).length === 0) {
+      red.push(
+        `${at(cmp.n)}  逐字节对账不一致却没有非零退出 ⇒ 它只是打印一行，不拦住"跑的是别的字节"。`,
+      );
+    } else n.cmp = 1;
+  }
+
+  // d) 启动排在本次对账之后
+  if (postSha && launchAfter && launchAfter.n < postSha.n) {
+    red.push(
+      `${at(launchAfter.n)}  simctl launch 排在逐字节对账之前 ⇒ 进程已经起来了，` +
+        `"跑的就是这一枚"这个结论却还没取。`,
+    );
+  }
+  return { red, n };
+}
+
 // 判据 ⑧：双引号**文案**里不许出现反引号。
 //   在 bash 里反引号是命令替换，`bash -n` 不报（语法完全合法），症状是"打印判据的那一行
 //   自己去执行了一条命令"：实测 `line 1226: target: command not found`，判据行输出成半句话。
@@ -1360,7 +1476,16 @@ function run() {
       `反向判据孤句=${String(ios.n.absent)} 变量锚点(不在面内)=${String(ios.n.dynamic)} 红=${String(ios.red.length)}`,
   );
 
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0 || teardownRed.length > 0 || bandRed.length > 0 || ledgerRed.length > 0 || ios.red.length > 0) {
+  // ── 判据 ㉒：iOS 载体的新鲜度两半，各自钉在它声称的那个时刻（载体 = verify-mobile-ios-ai.sh）──
+  const fresh = iosFreshnessOrder(iosScriptRel);
+  for (const line of fresh.red) console.log(`新鲜度时刻\t${line}`);
+  console.log(
+    `IOS_FRESH_SUMMARY install=${String(fresh.n.installs)} 内容章=${String(fresh.n.stamp)} ` +
+      `装前指纹=${String(fresh.n.preSha)} 装后重解析容器=${String(fresh.n.postContainer)} ` +
+      `装后指纹=${String(fresh.n.postSha)} 逐字节对账=${String(fresh.n.cmp)} 红=${String(fresh.red.length)}`,
+  );
+
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0 || teardownRed.length > 0 || bandRed.length > 0 || ledgerRed.length > 0 || ios.red.length > 0 || fresh.red.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
       '，双引号文案里的反引号=' + String(backtickRed.length) +
@@ -1369,7 +1494,8 @@ function run() {
       '，隧道断言=' + String(tunnelRed.length) + '，提案分母=' + String(proposalRed.length) +
       '，收尾判据=' + String(teardownRed.length) + '，安全带守卫=' + String(bandRed.length) +
       '，台账对账=' + String(ledgerRed.length) +
-      '，iOS 载体账=' + String(ios.red.length) + '。' +
+      '，iOS 载体账=' + String(ios.red.length) +
+      '，新鲜度时刻=' + String(fresh.red.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
       '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
@@ -2158,6 +2284,72 @@ ${body}
     '臂 77 把包含判据换成恒真后，臂 72 的读数不再等于期望（证明这道过滤是承重的）',
     shimLoose !== shimText && looseReading !== HIT,
   ]);
+
+  // ── 判据 ㉒（iOS 载体新鲜度两半钉在各自时刻）的臂 ──
+  //   五臂全部打在**验收脚本的副本**上（经 env 重定向，真树 mtime 不动，不占设备）。
+  //   臂 81 就是 rig48 当时那一版的样子：装之前比"打的 vs 已装的"、装之后什么都不对账。
+  const dropLast = (hay, needle) => {
+    const i = hay.lastIndexOf(needle);
+    return i === -1 ? null : `${hay.slice(0, i)}${hay.slice(i + needle.length)}`;
+  };
+  const dropBlock = (hay, startNeedle, endNeedle) => {
+    const a = hay.indexOf(startNeedle);
+    const b = hay.indexOf(endNeedle, a);
+    return a === -1 || b === -1 ? null : `${hay.slice(0, a)}${hay.slice(b + endNeedle.length)}`;
+  };
+
+  // 臂 78（阳性对照）：真载体整链过，且六格读数都是 1（探针自己有输入）。
+  arms.push([
+    '臂 78 真 iOS 载体 IOS_FRESH_SUMMARY 六格全=1 且红=0',
+    base.status === 0 &&
+      /IOS_FRESH_SUMMARY install=1 内容章=1 装前指纹=1 装后重解析容器=1 装后指纹=1 逐字节对账=1 红=0/.test(
+        `${base.stdout ?? ''}`,
+      ),
+  ]);
+
+  // 臂 79：装之前那枚指纹改取**已装产物**（rig48 的原文形状）⇒ 非零退出且点名"将要安装的那枚"。
+  const m79text = iosBase.replace(
+    `SHA_WILL_INSTALL=$(shasum -a 256 "$JSB" | cut -d' ' -f1)`,
+    `SHA_WILL_INSTALL=$(shasum -a 256 "$INSTALLED_APP/main.jsbundle" | cut -d' ' -f1)`,
+  );
+  arms.push(['臂 79 的变异确实把装前指纹改到已装产物上（前置）', m79text !== iosBase && m79text.includes('SHA_WILL_INSTALL=$(shasum -a 256 "$INSTALLED_APP')]);
+  const m79 = runIosMutant(m79text, 'ios-fresh-pre-from-installed');
+  arms.push(['臂 79 装前指纹取的是已装产物 ⇒ 非零退出且点名「将要安装的那枚」', m79.code !== 0 && m79.out.includes('而不是将要安装的那枚')]);
+
+  // 臂 80：摘掉**装之后**那一次容器重新解析（沿用装之前那条路径）⇒ 非零退出且点名。
+  const CONTAINER_LINE = `INSTALLED_APP=$(xcrun simctl get_app_container "$UDID" "$BID" app 2>/dev/null | tr -d '\\r')\n`;
+  const m80text = dropLast(iosBase, CONTAINER_LINE);
+  arms.push(['臂 80 的变异确实摘掉了装后那一次容器解析（前置）', m80text !== null && (m80text.match(/get_app_container/g) ?? []).length < (iosBase.match(/get_app_container/g) ?? []).length]);
+  const m80 = runIosMutant(m80text ?? iosBase, 'ios-fresh-no-reparse');
+  arms.push(['臂 80 装后不重新解析容器 ⇒ 非零退出且点名「容器路径每次安装都会变」', m80.code !== 0 && m80.out.includes('没有重新解析容器')]);
+
+  // 臂 81（rig48 那一版）：整块装后对账摘掉 ⇒ 非零退出且点名"没有对已装的那一枚取指纹"。
+  const m81text = dropBlock(
+    iosBase,
+    'SHA_INST=$(shasum -a 256 "$INSTALLED_APP/main.jsbundle"',
+    'ok "已装产物与本轮安装的那一枚逐字节相同',
+  );
+  arms.push(['臂 81 的变异确实摘掉了装后对账那一整块（前置）', m81text !== null && !m81text.includes('SHA_INST=$(shasum')]);
+  const m81 = runIosMutant(m81text ?? iosBase, 'ios-fresh-rig48-shape');
+  arms.push(['臂 81 摘掉装后对账（rig48 那一版）⇒ 非零退出且点名「跑的就是刚打的包」没有读数', m81.code !== 0 && m81.out.includes('没有对**已装的那一枚**取指纹')]);
+
+  // 臂 82：对账不一致却不退场 ⇒ 非零退出且点名"没有非零退出"。
+  const m82text = iosBase.replace(
+    `      ⇒ 装上去的不是将要打的那份（§7 #82：simctl install 退出码 0 不等于内容对上了）"\n  exit 3\n`,
+    `      ⇒ 装上去的不是将要打的那份（§7 #82：simctl install 退出码 0 不等于内容对上了）"\n`,
+  );
+  arms.push(['臂 82 的变异确实摘掉了那一发 exit 3（前置）', m82text !== iosBase]);
+  const m82 = runIosMutant(m82text, 'ios-fresh-no-stop');
+  arms.push(['臂 82 逐字节不一致却不退场 ⇒ 非零退出且点名「只是打印一行」', m82.code !== 0 && m82.out.includes('逐字节对账不一致却没有非零退出')]);
+
+  // 臂 83：摘掉装之前的内容章门 ⇒ 非零退出且点名"产物不落后于源码这一半没人判"。
+  const m83text = dropLast(
+    iosBase,
+    `SRC_C=$(heyta_src_content_stamp "$HEYTA_REPO_ROOT") || { echo "❌ 内容章取不到（git log 没有该路径集的提交？）⇒ 本轮无效"; exit 3; }\n`,
+  );
+  arms.push(['臂 83 的变异确实摘掉了内容章那一发调用（前置）', m83text !== null && !m83text.includes('SRC_C=$(heyta_src_content_stamp')]);
+  const m83 = runIosMutant(m83text ?? iosBase, 'ios-fresh-no-stamp');
+  arms.push(['臂 83 装之前没有内容章门 ⇒ 非零退出且点名「产物不落后于源码」', m83.code !== 0 && m83.out.includes('装之前没有内容章门')]);
 
   let fail = 0;
   arms.forEach(([name, ok]) => {
