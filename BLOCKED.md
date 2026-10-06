@@ -6593,15 +6593,15 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 
 | # | 格 | 等谁 | 现量命令 | 为什么不当场做 |
 |---|---|---|---|---|
-| 1 | 固定收尾的 **iOS 腿**没有读数（三端有） | 设备独占：`verify-mobile-ai.sh`（pid 82407，在 `heyta-wt-merge` 里）；外加 github 443 断流（`pod install` 要 clone `facebook/hermes`） | `pgrep -f verify-mobile-ai` 为空 ⇒ 起跑 `bash ~/.heyta-window-rigs/heyta-reinstall-1006-ios-retry.sh`（两道规范闸门在脚本里，最多 40 轮） | 抢设备会把别线验收的读数打成假的（§8.9 共享资源独占验收）；本机网络环境按硬约束不动 |
-| 2 | 本会话那 4 枚提交未推（`295ce9f1` / `940f93bc` / `90232ce0` / `8072da64`） | github 443 连接超时（同一断流 episode） | `git rev-list --count origin/main..HEAD`（写这行时 = 41，其中 37 枚是别线落在同一条 main 上的）；`tail -3 /tmp/push-loop.txt` | `behind=0` ⇒ 这一推是快进、不改写任何已公开历史；不 force。别线那 37 枚被一起公开后就不能再 amend，这一点与 10-04 那次是同一个代价，写在 §9 的老账里 |
+| 1 | ~~固定收尾的 **iOS 腿**没有读数~~ ✅ **19:1x 闭合**：等到第 12 轮开窗，`IOS_RETRY_EXIT=0`，沙盒/构建/安装/新鲜度四条各有读数，图人看过 | —— 不再等 | `tail -6 ~/.heyta-evidence/reinstall-1006-ios-retry-190234/facts.txt` | 它等的正是设备窗口，等到就绿了，没有需要代改的东西。读数与「那张图不证 H9/H10 形状」的边界在 `docs/plans/goal-layout-audit.md` §9.14 |
+| 2 | ~~本会话那几枚提交未推~~ ✅ **19:19 已推**（两趟有界循环各 rc=0，`FINAL_RC=0`） | —— 网络那一格自己好了 | 现量只认 `git -c credential.helper='!gh auth git-credential' ls-remote https://github.com/Xaiver03/heyta.git refs/heads/main`：🔴 按 URL 推**不推进本地 `origin/main` 追踪 ref**，所以 `git rev-list --count origin/main..HEAD` 会一直虚报（19:19 实测推完仍报 42） | 这一格从此是**常态**而不是阻塞：每新增一笔都要重推。快进、不 force、不改写已公开历史这三条没变 |
 | 3 | 任务 #17：`check:e2e-helper-exports` 写了却没接进链 | `package.json` 的 `check` 那一行正被别线重写 | `git status --porcelain -- package.json` 为空 ⇒ 才动那一行 | 改那一行 = 覆盖别人在飞的定义。盲区机制与改法建议已登记在 `docs/plans/goal-layout-audit.md` §9.11（"既无定义又不在链上的实现文件"落在 `check:gate-wiring` 两条判据之外） |
 | 4 | 工单 H11 / 任务 #25：外壳不滚（桌面那一半） | `apps/web/src/styles/narrow.css` 的所有者提交 + 一台安静的载体 | `git status --porcelain -- apps/web/src/styles/narrow.css`；`bash research/tools/b-reinstall-readiness.sh` | 三个起跑条件里 ②③ 仍不成立（§9.11 逐条重量过，① 已翻面成立） |
 | 5 | `landing test` 那 1 枚红 + `pnpm check` 整链的 9 枚 e2e 红 | 象限线那枚未提交的 `quadrant/copy.ts`；回收线自己（B90） | `pnpm --filter @heyta/landing test`（取末尾 `failed` 那行） | 判据口径不代改：两组红的根因都在别人那枚未提交改动里，三条腿归因在 §9.12 与 B90 |
 
-📌 五格里只有第 1 格是"我这一刀本来能带走、被环境挡住"的：iOS 腿即使补跑绿了，也只是把
-§6.1.1 那张表最后一行填上，三端已有的读数与四张人看过的图不因它失效。
-第 2 格是纯网络，第 3/4/5 格的所有权都不在本会话 —— 所以这一节是**交棒清单**，不是待办池。
+📌 **19:2x 更新**：第 1、2 两格已闭合（iOS 腿补跑绿、提交已推），剩 3/4/5/6 四格的所有权都不在本会话
+⇒ 这一节是**交棒清单**，不是待办池。原先那句「只有第 1 格是我这一刀本来能带走、被环境挡住」
+已经兑现：它等的正是设备窗口，等到第 12 轮就绿，全程没有需要代改的东西。
 ⚠️ **第 6 格不是本线的，但下一个跑 `check:docs` 的人会以为是自己的**：该门禁现在红 **2 处死链**，
 两处都指向 `docs/research/ci-proxy-traffic-attribution.md`（CI/代理那条线今天 10:54 写的新文档；
 链接已写进 `docs/README.md:225` 与 `docs/runbooks/ci-and-runner.md:21`，而**目标文档与这两枚宿主
