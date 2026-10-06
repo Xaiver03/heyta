@@ -428,14 +428,56 @@ newest_src() {
     -type f \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
     | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1
 }
-JSB_M=$(stat -f %m "$JSB"); SRC_M=$(newest_src)
+# 「这批源码最后一次被**改变**」的时刻。🔴 判的是内容，不是文件系统时间：
+#   裸 mtime 会被两种与内容无关的写入顶起来 —— 变异门禁"写完再写回同一份字节"的复原、
+#   checkout / rsync。它们把这道门变成一把**恒红的尺**，而恒红的尺最坏处不是碍眼，
+#   是人会去绕它（#346/#344 同一族：尺子的输入不是它声称的那个量）。
+#   真要被 #27 抓住的那种"改了 packages/ 而产物里是旧 JS"，一定是**内容**变了 ⇒
+#   已提交的那部分取该路径集最后一次提交的时刻，未提交的部分逐枚取 mtime（内容确实不同）。
+src_content_stamp() {
+  local f newest c
+  newest=$(git -C "$HEYTA_REPO_ROOT" log -1 --format=%ct -- apps/mobile/src packages 2>/dev/null)
+  case "$newest" in (''|*[!0-9]*) return 1 ;; esac
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    [ -f "$HEYTA_REPO_ROOT/$f" ] || continue
+    c=$(stat -f %m "$HEYTA_REPO_ROOT/$f" 2>/dev/null) || continue
+    [ "$c" -gt "$newest" ] && newest="$c"
+  done <<EOF2
+$(git -C "$HEYTA_REPO_ROOT" status --porcelain -z -- apps/mobile/src packages 2>/dev/null \
+  | tr '\0' '\n' | sed -E 's/^.{3}//; s/^.* -> //')
+EOF2
+  printf '%s' "$newest"
+}
+DIRTY_SRC=$(git -C "$HEYTA_REPO_ROOT" status --porcelain -- apps/mobile/src packages 2>/dev/null | wc -l | tr -d ' ')
+JSB_M=$(stat -f %m "$JSB")
+SRC_M=$(newest_src)
+SRC_C=$(src_content_stamp) || { echo "❌ 内容章取不到（git log 没有该路径集的提交？）⇒ 本轮无效"; exit 3; }
 [ -n "$SRC_M" ] || { echo "❌ 新鲜度门没有输入（源码目录扫不到 .ts/.tsx？）⇒ 本轮无效"; exit 3; }
-echo "   新鲜度门输入：bundle ${JSB_M}（$(date -r "$JSB_M" '+%m-%d %H:%M:%S')）／源码最新 $SRC_M"
-if [ "$SRC_M" -gt "$JSB_M" ]; then
-  echo "   ❌ 装的是旧产物：源码最新 $SRC_M > bundle $JSB_M"
+echo "   新鲜度门输入：bundle ${JSB_M}（$(date -r "$JSB_M" '+%m-%d %H:%M:%S')）／内容章 ${SRC_C}（$(date -r "$SRC_C" '+%m-%d %H:%M:%S')）／裸 mtime 章 ${SRC_M}／未提交 $DIRTY_SRC 枚"
+if [ "$SRC_C" -gt "$JSB_M" ]; then
+  echo "   ❌ 装的是旧产物：源码内容章 $SRC_C > bundle $JSB_M"
   echo "      先 pnpm reinstall:mobile（或 --only ios）。**不许**为了跑绿而绕这道门 —— 那等于把"
   echo "      \"验的是旧代码\"写进取证（§7 第 27 条）。"
   exit 3
+fi
+if [ "$SRC_M" -gt "$JSB_M" ]; then
+  echo "   ⓘ 有文件的裸 mtime 晚于产物，而它们的内容与 HEAD 逐字相同（未提交 $DIRTY_SRC 枚）"
+  echo "     ⇒ 那是门禁 touch-复原／checkout 留下的时间，不是源码变了；这道门判的是内容。"
+fi
+# 「装的就是这次打的那份」：构建目录里那份与容器里那份必须逐字节相同。
+#   内容章回答"产物不落后于源码"，这一条回答"跑的就是刚打的那一枚" —— 两件事，都要有。
+if [ -d "$IOS_APP_DIR" ] && [ -f "$IOS_APP_DIR/main.jsbundle" ]; then
+  SHA_BUILT=$(shasum -a 256 "$IOS_APP_DIR/main.jsbundle" | cut -d' ' -f1)
+  SHA_INST=$(shasum -a 256 "$INSTALLED_APP/main.jsbundle" | cut -d' ' -f1)
+  if [ "$SHA_BUILT" != "$SHA_INST" ]; then
+    echo "   ❌ 容器里那份 main.jsbundle 与构建目录里那份不是同一批字节（built=${SHA_BUILT:0:12} inst=${SHA_INST:0:12}）"
+    echo "      ⇒ 装上去的不是刚打的包；本轮无证（§7 #82：命令退出码 0 不等于内容对上了）"
+    exit 3
+  fi
+  ok "构建产物与已装产物逐字节相同（sha256 ${SHA_INST:0:12}）"
+else
+  echo "   ⓘ 构建目录不在 $IOS_APP_DIR ⇒ 无法做"同一批字节"对账，只对内容章；装的是哪一次构建要人确认"
 fi
 ok "装的是当前源码的产物"
 
