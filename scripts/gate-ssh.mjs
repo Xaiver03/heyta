@@ -86,7 +86,14 @@ const CPUS = process.env.HEYTA_GATE_CPUS || '2';
 const MEM = process.env.HEYTA_GATE_MEM || '3g';
 const PROXY = process.env.HEYTA_GATE_PROXY || 'http://172.17.0.1:7890';
 const APK_MIRROR = process.env.HEYTA_GATE_APK_MIRROR || 'mirrors.aliyun.com';
-const NPM_REGISTRY = process.env.HEYTA_GATE_NPM_REGISTRY || 'https://registry.npmmirror.com/';
+// 🔴 默认是**官方 registry 直连**，不是国内镜像 —— 这条是测出来的，不是偏好：
+//    `registry.npmmirror.com` 缺包。实测 `pnpm install --frozen-lockfile` 在
+//    resolved 968 之后死在 `[ERR_PNPM_FETCH_404] @op-engineering/op-sqlite/-/18.2.5.tgz`
+//    （RN 的 SQLite 原生包，镜像没同步到那一版）。而官方源在这台机器上**直连可达且够快**
+//    （typescript tarball 4,377,468 B @ 1.78 MB/s），所以没有必要为了"看起来本地化"
+//    去用一个会缺包的镜像。要换回 npmmirror：`HEYTA_GATE_NPM_REGISTRY=https://registry.npmmirror.com/`
+//    —— 但那条路今天装不完，别照它排期。
+const NPM_REGISTRY = process.env.HEYTA_GATE_NPM_REGISTRY || 'https://registry.npmjs.org/';
 const ONLY = val('--only', '');
 
 /**

@@ -125,6 +125,15 @@ function collectIssues(root) {
   if (!/--limit-rate/.test(probeCode)) {
     issues.push('egress-probe.sh 的标记请求没有拖住连接（缺 --limit-rate）⇒ /connections 采不到它，"零记录"是探针失效而不是证据');
   }
+  // 🔴 `-4` 与"A 必须真的发出过字节"是同一个洞的两半：那台机器把
+  //    `raw.githubusercontent.com` 解析成 AAAA，容器没有 IPv6 出口 ⇒ 不加 `-4` 时
+  //    A 一个字节都没发出去，"账本零记录"就被读成了"没走代理"。
+  if (!/curl -4/.test(probeCode)) {
+    issues.push('egress-probe.sh 的标记请求没有强制 IPv4（缺 `curl -4`）⇒ 那个域名在这台机器上解析到 AAAA，请求根本发不出去');
+  }
+  if (!/A_TRANSFER=TOO_LITTLE[\s\S]{0,120}EGRESS=INCONCLUSIVE/.test(probeCode)) {
+    issues.push('egress-probe.sh 没有"A 字节数下限"这一档 ⇒ 请求没发出去时的"零记录"会被当成通过（这是最坏的一种假绿）');
+  }
   if (/GITHUB_DIRECT/.test(probeCode)) {
     issues.push('egress-probe.sh 里又出现了"以 GitHub 可达性判代理"的写法 —— 2026-10-06 实测直连 github.com = 200/0.09s，这条前提已死');
   }
@@ -189,7 +198,15 @@ if (SELF_TEST) {
     },
     {
       name: '标记请求不拖住连接（仪器必然瞎）',
-      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace(/--limit-rate 20k /g, '') },
+      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace(/--limit-rate 30k /g, '') },
+    },
+    {
+      name: '不强制 IPv4（那域名解析到 AAAA，请求发不出去）',
+      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace(/curl -4 /g, 'curl ') },
+    },
+    {
+      name: '拿掉"A 必须真发出过字节"那一档',
+      files: { 'scripts/ci/egress-probe.sh': (s) => s.replace(/A_TRANSFER=TOO_LITTLE/, 'A_TRANSFER=FINE') },
     },
     {
       name: '退回"以 GitHub 可达性判代理"那套死前提',
