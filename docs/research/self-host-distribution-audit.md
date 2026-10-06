@@ -14432,7 +14432,7 @@ rsync -az --delete --itemize-changes apps/landing/dist/ ubuntu-jcli:/var/www/hey
 
 | | 结果 | 红的分别是哪几条 |
 |---|---|---|
-| 发布前（01:0x） | **1 failed → 6 failed / 25 passed**（rc=1） | `live-install-claim` 四条（「可安装」×2 + G-71「每句都对得上」×2）、`live-domain` 的 CTA `?lang=` 一条、以及**我这趟新加的** `自建指南（线上）/app/` 一条 |
+| 发布前（01:0x） | **6 failed / 25 passed**（rc=1） | `live-install-claim` 四条（「可安装」×2 + G-71「每句都对得上」×2）、`live-domain` 的 CTA `?lang=` 一条、以及**我这趟新加的** `自建指南（线上）/app/` 一条 |
 | 发布后（01:1x） | **1 failed / 30 passed**（rc=1） | 只剩那条新判据 —— 它要的是**分支上那句还没落地的正文**，挂在任务 #68 |
 
 ⇒ **#20 关闭**（§8.255 那 5 枚红全部转绿，逐条腿名在日志里），**#61 关闭**（节奏已判并已执行）。
@@ -14459,3 +14459,46 @@ rsync -az --delete --itemize-changes apps/landing/dist/ ubuntu-jcli:/var/www/hey
 ⇒ 证据入库 `8b4aaacb`（四张截图），#66 关闭。
 📌 一般规律（这次是自己踩的，写下来挡后来人）：**"日志看起来全绿"与"命令退出码 0"是两件事**，
 后台跑法必须把 rc 从被测命令自己那里取，而且第一趟就该做对 —— 否则要么补一趟，要么这条读数只能记弱。
+
+### 8.280 收尾清账：我欠的现场清理做完了，两枚新登记（G-73 / G-74），以及"这一批还欠什么"的一张表（2026-10-07 01:2x）
+
+**我造的现场，逐条清**：
+
+| 对象 | 处置 | 判据 / 为什么这么处置 |
+|---|---|---|
+| worktree `/tmp/heyta-ios-reinstall`（我建的，iOS 端跑在无空格路径） | 先 `git diff -- apps/mobile/ios > ~/.heyta-evidence/selfhost-closeout-1007/ios-worktree-mutations.diff`（84 行）留档，再 `worktree remove --force` | 那三处未提交改动（两份 `Info.plist` + `Podfile.lock`）是**我这趟的构建副作用**，不是交付物；但"删掉一个脏树"要先把它的内容留得下来 |
+| worktree `heyta-wt-ios-reinstall`（我建的） | `worktree remove`（先 `status --porcelain` 取到**空**才动） | 干净 ⇒ 没有可丢的东西 |
+| 模拟器设备 `heyta-selfhost-reinstall`（`ED4589E9…`，§8.266 写明"是我的，落地做完由我删"） | `shutdown` → 确认状态变 `Shutdown` → `delete` | 它唯一用途（iOS 端当前产物判据）的读数已入 §8.275 与 `reinstall-ios3-*` |
+| 模拟器 `heyta-iphone-17pro`（`FE195661…`，Booted） | **不动** | 名字对应 `verify:mobile-ios` 那条线用的设备，**不是我建的**；"看起来像旧的、可能在挡路"不构成动手理由（AGENTS §8 第 9 条：共享资源先认所有者） |
+| Android 模拟器 `qemu-system-aarch64-headless -avd heyta-w3-yearly`（PID 35743） | **不动** | 我起跑时记的 PID 是 **21712**，它已经不在了；现在这台是 **09:30 由别人起的**（`ps -o lstart`）。按 PID 认人，不按进程名认人 |
+| 主检出 `apps/mobile/ios/Podfile.lock`（`M`，mtime Oct 6 **23:15**） | **不动、不代提交** | 我那趟 pod install 在 `/tmp` 那棵树里（mtime 21:06）。主检出这份是**别人 23:15 那一趟**留下的 |
+
+**G-73（新登记，归 iOS/mobile 那条线）：`PODFILE CHECKSUM` 的漂是**可复现的仓库不自洽**，不是谁的脏改动。**
+两棵互不相干的树（主检出 / 我从干净提交新建的 `/tmp` 树）各自跑 `pod install`，得到
+**同一个新值** `75d7db42…`，而提交里那份 lock 写的是 `4b316b80…` ⇒ 结论只能是
+**committed `Podfile.lock` 的 checksum 与 committed `Podfile` 本来就不对得上**（干净检出 + `pod install` 必漂）。
+同一份 diff 里的 `hermes-engine` 那一行**两棵树得到不同值**（`208b0dcd…` vs `41c0eb35…`）
+⇒ 那一行依环境，与 checksum 是**两个不同成因**，别并成一条"pod 会改 lock"。
+射程：`check:native-deps` 对的是 `package.json ↔ Podfile.lock`，**不覆盖 `PODFILE CHECKSUM`**，
+所以这件事没有任何一层会报。复现命令（不写"我试了一台所以做不到"那种否定结论）：
+
+```
+git -C <干净检出> status --porcelain -- apps/mobile/ios/Podfile.lock   # 起跑前应为空
+cd apps/mobile/ios && pod install && git diff -- Podfile.lock          # 必然漂出 75d7db42…
+```
+
+**G-74（新登记，归各端打包链）：移动端打包里那份版本声称与真源不是同一个空间。**
+`apps/mobile/android/app/build.gradle:140` 是 `versionName "1.0"`、`Heyta.xcodeproj` 三处
+`MARKETING_VERSION = 1.0`。G-44b 之后，`0.1.0` 才是随同步上报进设备清单的那个值；
+而 `"1.0"` 连服务端 `APP_VERSION_RE`（`x.y.z[-prerelease]`）都不合 ⇒ 若哪天移动端改走打包里那份，
+上报会被 `parseAppVersion` 判成**沉默**。要么两处对齐真源，要么在 README 里写明"打包版本 ≠ 上报版本"。
+不在本批：动它要重打 APK（远端打包机）与重跑 iOS 构建，而本批对移动端零改动。
+
+**这一批还欠什么（一张表，别再散在正文里）**：
+
+| 还欠 | 卡在谁手上 | 关闭判据 |
+|---|---|---|
+| 三笔（`324b9e45` / `bfe4497c` / `8b4aaacb`）进 main | **外部**：落地要在主检出里 `git merge --ff-only`，而主检出此刻被别的会话占着（68 枚未提交 + 每两三分钟挪一笔）；且 `--confirm` 要求先在载体上真跑一次完整 `pnpm check`（负载窗口） | `git merge-base --is-ancestor` 成立 + 落地那一刻按 §8.266 那三步复跑 |
+| G-62 那句对外可见（任务 #68） | 上一行的下游 | 落地后**再发一发**，`live-site/live-domain.spec.ts` 那条「自建指南（线上）」由红转绿 |
+| `check:md-tables` 在本载体上红 | **不归本批**：红在 `docs/plans/trash-and-archive.md:744`，该文件本批一字未动（`git status` 干净）⇒ 归回收站/归档那条线 | 那条线自己修完，`check:md-tables` rc=0 |
+| G-73 / G-74 | iOS/mobile 线、各端打包线 | 见上面两段各自写的判据 |
