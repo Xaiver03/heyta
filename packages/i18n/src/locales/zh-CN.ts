@@ -683,7 +683,9 @@ export const zhCN = {
   // 🔴 状态必须进标签：图标加一个状态点在色觉障碍下不可分辨，而这一枚没有可见文字。
   'web.sync.rail.aria': '同步，当前状态：{status}',
   'web.sync.settings.title': '同步设置',
-  'web.sync.settings.close': '关闭同步设置',
+  // H9 第 3 刀：这一节说明"同步到底把什么送出去"。原来的「关闭同步设置」随着
+  // 那层同级浮层一起删掉了 —— 一节设置没有"关闭"这个动作，退出设置就有出口。
+  'web.settings.sync.note': '数据先落在这台设备上；同步服务器只会收到密文，看不到明文。不填地址就只在本机使用。',
   'web.sync.serverUrl.label': '服务端地址',
   'web.sync.token.label': '访问令牌',
   'web.sync.password.label': '端到端加密口令',

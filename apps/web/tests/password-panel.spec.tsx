@@ -181,7 +181,7 @@ beforeEach(() => {
     token: OLD_TOKEN,
     email: EMAIL,
     status: { kind: 'idle' },
-    settingsOpen: false,
+    syncSettingsRequested: false,
   });
 });
 

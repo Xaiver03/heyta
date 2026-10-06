@@ -210,6 +210,8 @@ import {
 } from './features/shell/view-tabs.js';
 import { NavButton } from './features/shell/NavButton.js';
 import { EmptyState, isActive } from './features/shell/EmptyState.js';
+import { SETTINGS_ANCHORS, type SettingsAnchor } from './features/shell/settings-anchors.js';
+import { SyncSettingsPanel } from './features/sync/SyncSettingsPanel.js';
 
 
 export function App(): React.JSX.Element {
@@ -338,8 +340,15 @@ export function App(): React.JSX.Element {
     [],
   );
 
-  /** 「帮助」被点过（见 rail 底部那个按钮）。 */
-  const [scrollToHelp, setScrollToHelp] = useState(false);
+  /**
+   * 设置浮层要**落在哪一节**（`help` / `profile` / `sync`），`undefined` = 不定位。
+   *
+   * 🔴 2026-10-06（H9 第 3 刀）把 `scrollToHelp`、`scrollToProfile` 两枚 boolean
+   * 和新加的 `sync` 收成**一份**：那是同一条规则的三份拷贝（"切到设置之后滚到
+   * 某一节，必须等 `view` 真的变了才滚"），第三份一旦写出来，前两份就会开始漂移。
+   * 消费点见下面的 effect。
+   */
+  const [settingsAnchor, setSettingsAnchor] = useState<SettingsAnchor | undefined>(undefined);
 
   /**
    * 组头折叠：**哪些组现在被收起**。
@@ -434,35 +443,6 @@ export function App(): React.JSX.Element {
     };
   }, []);
 
-  /**
-   * 切到设置页之后**滚到帮助那一段**。
-   *
-   * ⚠️ 必须在 `view` 真的变成 `settings` 之后再滚 —— 设置页那棵树还没渲染时
-   * `getElementById` 拿到的是 `null`，而 `?.` 会把这件事**静默吞掉**，
-   * 症状是"点了帮助，页面停在设置顶部"。
-   */
-  useEffect(() => {
-    if (!scrollToHelp || view !== 'settings') return;
-    document.getElementById('settings-help')?.scrollIntoView({ block: 'start' });
-    setScrollToHelp(false);
-  }, [scrollToHelp, view]);
-  const [scrollToProfile, setScrollToProfile] = useState(false);
-  /**
-   * 从头像菜单点「编辑个人信息」进来时，**滚到个人信息那一节并聚焦昵称框**。
-   *
-   * 与 `scrollToHelp` 同一条纪律：必须等 `view` 真的变成 `settings` 之后再滚，
-   * 否则设置那棵树还没渲染，`getElementById` 拿到 `null` 而 `?.` 会把这件事
-   * **静默吞掉**（症状是"点了编辑个人信息，页面停在设置顶部"）。
-   *
-   * 🔴 焦点也要一起给：只滚不聚焦，键盘用户滚完了还得自己 Tab 十几下才回到
-   * 输入框；而读屏用户根本不知道自己到了哪儿。
-   */
-  useEffect(() => {
-    if (!scrollToProfile || view !== 'settings') return;
-    document.getElementById('settings-profile')?.scrollIntoView({ block: 'start' });
-    (document.querySelector<HTMLInputElement>('#profile-nickname') ?? undefined)?.focus();
-    setScrollToProfile(false);
-  }, [scrollToProfile, view]);
   const [aiSettings, setAiSettings] = useState(loadAiSettings);
   /**
    * AI 面板的「去设置」请求：切到设置页并**落在哪一块**。
@@ -549,6 +529,33 @@ export function App(): React.JSX.Element {
     if (view === 'settings') sheetRef.current?.focus();
   }, [view]);
   /**
+   * 设置浮层落位：**等 `view` 真的变成 `settings` 之后**再滚、再聚焦，然后清掉请求。
+   *
+   * ⚠️ 必须在 `view` 真的变了之后再滚 —— 设置页那棵树还没渲染时
+   * `getElementById` 拿到的是 `null`，而 `?.` 会把这件事**静默吞掉**，
+   * 症状是"点了帮助，页面停在设置顶部"（原来 `scrollToHelp` 与 `scrollToProfile`
+   * 两份拷贝都写过这条，2026-10-06 合成一份之后这条纪律只剩一处）。
+   *
+   * 🔴 焦点也要一起给（凡那一节有第一个该填的框）：只滚不聚焦，键盘用户滚完了
+   * 还得自己 Tab 十几下才回到输入框，而读屏用户根本不知道自己到了哪儿。
+   *
+   * 🔴 **它必须声明在上一条之后** —— effect 按声明顺序跑，"把焦点给浮层容器"
+   * 必须先跑、这一条后跑。反过来写的话容器会把焦点**抢回去**，聚焦就只剩注释了。
+   * 2026-10-06 之前 `scrollToProfile` 正是声明在前的那一头：昵称框从来没拿到过
+   * 焦点，而没有任何一条判据读过 `document.activeElement`，所以没人发现。
+   * 现在这一条由 `settings-anchor-focus` 那组判据钉住（判据在
+   * `apps/web/tests/settings-anchor-focus.spec.tsx`）。
+   */
+  useEffect(() => {
+    if (settingsAnchor === undefined || view !== 'settings') return;
+    const anchor = SETTINGS_ANCHORS[settingsAnchor];
+    document.getElementById(anchor.id)?.scrollIntoView({ block: 'start' });
+    if (anchor.focus !== undefined) {
+      (document.querySelector<HTMLElement>(anchor.focus) ?? undefined)?.focus();
+    }
+    setSettingsAnchor(undefined);
+  }, [settingsAnchor, view]);
+  /**
    * 内容区按它渲染：开着次级表面（设置/搜索）时仍是**下层那个视图**
    * （浮层之下"下层可见"，§11.5）。
    */
@@ -589,6 +596,28 @@ export function App(): React.JSX.Element {
     setSettingsFocus(target);
     setView('settings');
   }, []);
+
+  /**
+   * 别人要求"去看同步设置"⇒ 开设置浮层并**落在同步那一节**。
+   *
+   * 🔴 为什么这个请求必须走壳：同步设置自 H9 第 3 刀起**不再是浮层**，它是
+   * 设置浮层里的一节（`features/sync/SyncSettingsPanel.tsx`）。而"切到设置视图"
+   * 是壳的状态，store 里的 `openSettings()` 够不着 —— 订阅提示那颗
+   * 「改用你自己的服务器」就是这么到达它的。
+   *
+   * ⚠️ 请求**取到即清**（`closeSettings()`）：它是一次性请求，不是状态。
+   * 不清的话，用户关掉设置再点第二次时 store 里仍是 `true` ⇒ React 看不到变化
+   * ⇒ effect 不重跑 ⇒ 界面停在原地（"点了没反应"）。
+   * 落在哪一节由 `settingsAnchor` 接力，所以清掉请求不会把滚动一起清掉。
+   */
+  const syncSettingsRequested = useSyncStore((s) => s.syncSettingsRequested);
+  useEffect(() => {
+    if (!syncSettingsRequested) return;
+    setSettingsFocus(undefined);
+    setView('settings');
+    setSettingsAnchor('sync');
+    useSyncStore.getState().closeSettings();
+  }, [syncSettingsRequested]);
 
   /**
    * 侧栏里点一个筛选（智能清单 / 象限 / 清单）。
@@ -1881,12 +1910,12 @@ export function App(): React.JSX.Element {
               setView('settings');
             }}
             // 「编辑个人信息」= 设置浮层里的**第一节**，所以它开的是同一个表面，
-            // 只是额外要求"落在这一节"（见上面的 scrollToProfile）。
+            // 只是额外要求"落在这一节"（见上面的 `settingsAnchor`）。
             // ⚠️ 未登录时**不出现**这一项（AccountMenu 内部按 showSignIn 过滤）：
             //    昵称与头像属于账号，没有账号就没有可写的那一行。
             onOpenProfile={() => {
               setSettingsFocus(undefined);
-              setScrollToProfile(true);
+              setSettingsAnchor('profile');
               setView('settings');
             }}
             onOpenGrowth={() => {
@@ -2015,7 +2044,7 @@ export function App(): React.JSX.Element {
           onClick={() => {
             setSettingsFocus(undefined);
             setView('settings');
-            setScrollToHelp(true);
+            setSettingsAnchor('help');
           }}
         >
           <CircleHelp size={ICON_SIZE.sm} aria-hidden="true" />
@@ -2770,6 +2799,20 @@ export function App(): React.JSX.Element {
                 用户想减负时第一个看到的东西。
               */}
               <FeatureModulesPanel enabled={enabledModules} onToggle={onToggleModule} />
+              {/*
+                🔴 **同步**（工单 H9 第 3 刀，2026-10-06）：地址 / 令牌 / 口令 / 密钥库
+                这一组原来是一个**同级浮层**（rail 那颗齿轮点开它）。产品负责人第 2 条
+                「设置不应该点击头像之后再打开吗？」的病根就在这：那颗齿轮长得像全局设置，
+                点开的却只是同步。现在它是设置里的**一节**，与「显示」「隐私同意」「AI」并列 ——
+                一个屏幕、一套出口（✕ / Esc / 点回别的视图），§8.2 第 6 条登记的
+                "这个浮层没有 Esc、焦点进不去"从此没有载体。
+
+                排在**功能模块之后、隐私与 AI 之前**是有意的：这一节写的是
+                "数据出门去哪个服务端"，而下面那三道闸（隐私同意 / 允许远程 / 逐功能授权）
+                决定的是"准不准出门" —— 地址是它们的前提，反过来排会让人在一个
+                永远不可能生效的开关上花时间（同一条理由见下面 `PrivacyPanel` 那段）。
+              */}
+              <SyncSettingsPanel />
               {/* 提醒通知（#2）：权限只能由用户手势申请，所以它必须有个按钮。 */}
               <ReminderNotifyPanel />
               {/*

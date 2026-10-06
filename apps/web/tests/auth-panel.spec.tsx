@@ -241,7 +241,7 @@ beforeEach(() => {
     token: undefined,
     password: undefined,
     status: { kind: 'idle' },
-    settingsOpen: false,
+    syncSettingsRequested: false,
   });
 });
 

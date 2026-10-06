@@ -1,8 +1,9 @@
 /**
- * 同步入口搬进 rail 底部（工单 H9 的第一刀，web 端）
- * ===================================================
+ * 同步入口搬进 rail 底部 + 同步设置搬进 设置（工单 H9，web 端）
+ * ============================================================
  *
  * 产品负责人 2026-10-06 的原话："同步按钮不应该放在左下角侧边栏的左下角吗？"
+ * 以及第 2 条："设置不应该点击头像之后再打开吗？"
  * 裁决与逐条现量在 `docs/plans/goal-layout-audit.md` §9.1。这一份用例钉的是
  * **搬走之后两边都还成立**：
  *
@@ -12,8 +13,11 @@
  *      下一批把旧的加回来也不会红。
  *   S2 rail 底部那一枚在、可点、**`aria-label` 里带着整句状态**，
  *      且 DOM 里有一枚 `role="status"` 的 live region（状态是异步变的）。
- *   S3 「同步设置」齿轮仍然打得开对话框，且共享那枚状态条**在对话框里**
- *      （它从页头搬到这里，不是被删掉 —— `check:ui-provider` 登记的消费者必须在）。
+ *   S3 设置里的那一节带着共享状态条（它从页头搬到这里，不是被删掉 ——
+ *      `check:ui-provider` 登记的消费者必须在）。
+ *   S4 🔴 「同步设置」**只有一处**，而那一处在设置浮层里：
+ *      rail 上那颗齿轮必须消失（它长得像全局设置，点开的却只是同步），
+ *      而设置关掉之后这一节必须跟着不在 DOM 里（它不再是常驻的同级浮层）。
  *
  * ⚠️ 载体与图标那一族同一条：`vite preview` + `apps/web/dist`，
  *    改完 `apps/web/src/**` 或 `packages/ui/src/**` **必须先重打**（§7 第 27 条那一族）。
@@ -26,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { openApp } from './helpers';
+import { closeSettingsSheet, openApp, openSettingsView, parkCursor } from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 
@@ -95,15 +99,14 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
     /*
       🔴 下段**每一枚**都要在视口内，而不只同步那一枚。
       这一条的第一版只量了同步按钮，于是它红的时候（底边 y=800 > 视口 720）我把它读成
-      "差一点，挪挪间距就行" —— 真相是 rail 底下整组（通知/帮助/同步/齿轮 ≈ 210px）
+      "差一点，挪挪间距就行" —— 真相是 rail 底下整组（通知/帮助/同步 ≈ 160px）
       都堆在折叠线以下，而只有眼睛能一眼看出"堆了几枚"（§6.2 规定一第 4 条）。
-      逐枚量还把"只把同步那枚救回来、把齿轮留在折叠线下"这种改法挡掉。
+      逐枚量还把"只把同步那枚救回来、把下面那一枚留在折叠线下"这种改法挡掉。
     */
     const bottomGroup = [
       ['通知（铃铛）', page.locator('nav.ht-rail > button[aria-haspopup="dialog"]')],
       ['帮助', page.getByTestId('rail-help')],
       ['同步', button],
-      ['同步设置（齿轮）', page.getByTestId('sync-settings-entry')],
     ] as const;
     const readings: string[] = [];
     for (const [what, locator] of bottomGroup) {
@@ -154,22 +157,89 @@ test.describe('同步入口在 rail 底部（H9，web 端）', () => {
     });
   });
 
-  test('S3 「同步设置」齿轮仍打得开对话框，状态条住在里面', async ({ page }) => {
+  test('S3 设置里那一节带着共享状态条，并且三个字段都在', async ({ page }) => {
     await openApp(page, APP_ZH);
+    await openSettingsView(page);
 
-    await page.getByTestId('sync-settings-entry').click();
-    const dialog = page.getByRole('dialog', { name: '同步设置' });
-    await expect(dialog, '齿轮点不开「同步设置」对话框').toBeVisible();
+    const panel = page.getByTestId('sync-settings-panel');
+    await expect(panel, '设置浮层里没有「同步」那一节').toBeVisible();
+
+    /*
+      🔴 必须**滚进视野再拍**：`toBeVisible()` 量的是 CSS 可见，而设置浮层是一列
+      很长的可滚动列表 —— 不滚的话截图拍的是浮层**顶部**（个人信息 + 显示），
+      而这张图的名字声称的是同步那一节。2026-10-06 人眼看第一版这张图时看到的就是
+      顶部那一屏 —— 判据全绿、图是错的（§6.2 规定一第 4 条要的就是这一步）。
+    */
+    await panel.scrollIntoViewIfNeeded();
+
+    /*
+      🔴 把"图里真的是那一节"从人眼步骤升级成一条几何判据：截图之前量一次盒子，
+      要求它的**顶边在视口内**。没有这一条，下一次有人把 `scrollIntoViewIfNeeded`
+      删掉或把这一节挪到浮层更深处，红只会出现在"人看图"那一格（而那一格经常被跳过），
+      而它红的时候已经太晚了 —— 同 §7 第 82 条"错误屏也非空白"是一个家族：
+      **判据要能自己变红，不能靠人替它红**。
+    */
+    const panelBox = await panel.boundingBox();
+    expect(panelBox, '量不到「同步」那一节的盒子').not.toBeNull();
+    const viewportSize = page.viewportSize();
+    expect(
+      panelBox!.y >= 0 && panelBox!.y < (viewportSize?.height ?? 0),
+      `截图时那一节的顶边在 y=${String(Math.round(panelBox!.y))}，不在视口里 ⇒ 那张图拍的不是它`,
+    ).toBe(true);
+
+    // 🔴 先截图再断言（§6.2 规定一第 1 条）：这张图是"同步设置搬到设置里之后
+    //    到底长什么样"的唯一人眼证据，红的时候也必须留着它。
+    await parkCursor(page);
+    await page.screenshot({ path: SHOT('settings-sync-section') });
 
     // 共享那枚状态条骨架的**消费者从页头改成了这里**，不是被删：
     // 拿掉它会同时让 `check:ui-provider` 红（那枚组件登记在 PROVIDER_DEPENDENT 里）。
     await expect(
-      dialog.getByTestId('sync-status-bar'),
-      '「同步设置」对话框里没有状态条 ⇒ 搬家的收尾是把旧的删了',
+      panel.getByTestId('sync-status-bar'),
+      '「同步设置」那一节里没有状态条 ⇒ 搬家的收尾是把旧的删了',
     ).toBeVisible();
-    await page.screenshot({ path: SHOT('sync-settings-dialog') });
 
-    await page.getByRole('button', { name: '关闭同步设置' }).click();
-    await expect(dialog, '关掉之后对话框还在').toBeHidden();
+    // 字段这一半：地址与令牌必须在（口令在未登录时也在）。
+    for (const label of ['服务端地址', '访问令牌']) {
+      await expect(
+        panel.getByLabel(label),
+        `那一节里没有「${label}」的输入框 ⇒ 表单只搬了一半`,
+      ).toHaveCount(1);
+    }
+    await expect(
+      panel.getByRole('button', { name: '保存并同步' }),
+      '那一节没有「保存并同步」⇒ 填了也没法生效',
+    ).toHaveCount(1);
+  });
+
+  test('S4 🔴 同步设置只有一处，而那一处住在设置浮层里', async ({ page }) => {
+    await openApp(page, APP_ZH);
+
+    // 齿轮必须真的没了 —— 产品负责人第 2 条的病根就是它**长得像**全局设置。
+    await expect(
+      page.getByTestId('sync-settings-entry'),
+      'rail 上还有那颗「同步设置」齿轮 ⇒ 旧入口没删（AGENTS §3.5：抽取的收尾是删掉旧的那份）',
+    ).toHaveCount(0);
+    // 「查看帮助」也跟着表单搬进设置，不再常驻 rail 那一列。
+    await expect(
+      page.locator('.ht-rail__sync [data-testid="sync-help-link"]'),
+      'rail 里还留着「查看帮助」⇒ 它现在住在 设置 → 同步 那一节',
+    ).toHaveCount(0);
+    // 未打开设置时，屏幕上不该有同步表单（它不是常驻的同级浮层了）。
+    await expect(
+      page.getByLabel('服务端地址'),
+      '没进设置就能读到服务端地址输入框 ⇒ 那一节其实是常驻浮层',
+    ).toHaveCount(0);
+
+    await openSettingsView(page);
+    // 「有且只有一处」：多处会红，缺一处也会红。
+    await expect(page.getByTestId('sync-settings-panel'), '同步设置不止一处').toHaveCount(1);
+    await expect(page.getByLabel('服务端地址'), '地址输入框不止一处').toHaveCount(1);
+
+    await closeSettingsSheet(page);
+    await expect(
+      page.getByTestId('sync-settings-panel'),
+      '关掉设置之后那一节还在 DOM 里 ⇒ 它其实不是设置的一部分',
+    ).toHaveCount(0);
   });
 });

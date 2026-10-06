@@ -7888,3 +7888,72 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     （链接指向的文件没进版本库 = 干净检出上是死的），而它只管链接、不管被链接文件自己的
     **语法**。凡是"CI 的唯一形态是干净检出"的门禁，都该顺手问一句：这份文件在 HEAD 里
     还解析得开吗。
+
+360. 🔴 **界面承诺"焦点也给到 X"，而没有任何一条判据读过 `document.activeElement` —— 那句话可以写几天而没人知道它是假的。**
+    而它假的原因不是逻辑，是 **effect 的声明顺序**。
+
+    `App.tsx` 里"打开设置浮层就把焦点给浮层容器"（`sheetRef.current?.focus()`）与
+    "滚到某一节之后把焦点给那一节第一个该填的框"（`scrollToProfile`）是**两个 effect**，
+    而后者声明在**前**。React 按声明顺序跑同一次提交的 effect ⇒ 昵称框先拿到焦点，
+    紧接着被浮层容器抢回去。判据只记了"滚的是哪一节"（`account-profile-entry.spec.tsx`
+    桩 `scrollIntoView` 收 id），所以滚动成立、焦点不成立，而**全绿**。
+
+    ✅ 两件事一起做才算修完：① 把落位 effect 挪到容器聚焦**之后**（`App.tsx` 里
+    "声明位置是承重的"那段注释），② 新写一条真读 `document.activeElement` 的判据
+    （`apps/web/tests/settings-anchor-focus.spec.tsx`）。牙齿台臂 U3 证明：删掉那句
+    `.focus()` ⇒ 三条全红（`research/tools/mutation-rigs/h9-sync-settings-arms.sh`）。
+    📌 一般规律：**"焦点在哪里"是一个可观察事实，不是一个形容词** —— 凡是文案或注释
+    里出现"聚焦 / 焦点落在"，判据就必须是 `document.activeElement`，否则那句话没有载体。
+    同族：#33/#50（一条永远通过的判据比没有判据更糟）、#361（消费者住在没有载体的目录里）。
+
+361. 🔴 **删掉或搬走一个可访问名（aria-label / 按钮文案）时，只有默认载体会报红。**
+    **住在别的 testDir 的套件会静默地恒 0 命中，而 `pnpm check` 全绿。**
+
+    工单 H9 第 1 刀把同步那一组收成 rail 底部一枚按钮，「立即同步」这个可访问名从此
+    **在真应用里不存在**（现量：`grep -rn "web.sync.a11y.syncNow"` 只剩
+    `apps/landing/src/mockup/AppWindow.tsx` 那张假窗口在消费）。而四套 e2e 与一个脚本
+    用 `getByLabel('立即同步')` / `getByRole('dialog', {name:'同步设置'})` 到达它 ——
+    `e2e/multi-end/`、`e2e/auth-journey/`、`e2e/selfhost-stack/`、`e2e/vault/`、
+    `e2e/restore-export.cjs`。它们**各有各的 playwright config 与 testDir**，
+    默认那份 `playwright.config.ts` 的 `testDir` 是 `./tests` ⇒ 命令行参数只是对
+    testDir 内的文件做正则匹配，**根本不会走到它们**。结果：这五处坏了六个小时，
+    中间跑过 `pnpm check`、`check:ai-e2e` 整族（276 passed）与若干单包测试，全绿。
+
+    ✅ 改壳上任何一个"人眼读到的名字"之前，先把消费者列成清单再动手：
+    `grep -rn "<旧文案>|<旧 data-testid>" e2e scripts apps/*/tests`，
+    并**逐目录确认它有没有载体**（没有载体的目录 = 静默面，它不会替你报错）。
+    🔴 反过来也成立：**给一条判据加"存在性反向断言"**（H9 第 5 步那条
+    "页头不许出现同步/语言/齿轮"）只能挡住它圈住的那一排，挡不住别的目录继续引用旧名字。
+    📌 同族：#191（挂在文件名枚举上的门禁，文件被删时安静地不执行还照样报通过）、
+    #360（判据只量了这件事的一半）。
+
+362. 🔴 **`toBeVisible()` 对可滚动长列表里的元素恒真 —— 于是"那张图拍的是那一节"
+    只是文件名在说，判据全绿而图是错的。**
+
+    `e2e/tests/shell-sync-rail.spec.ts` S3 第一版：`openSettingsView()` →
+    `expect(panel).toBeVisible()` → `page.screenshot()`。Playwright 的可见性判的是
+    CSS（非 `display:none`、有尺寸），**不要求在视口内**；设置浮层是一列很长的可滚动
+    列表，"同步"那一节在折叠线以下。于是那张名叫 `settings-sync-section.png` 的图
+    拍的是浮层**顶部**（个人信息 + 显示）。人眼看图才发现（§6.2 规定一第 4 条），
+    而它不是判据能自己红的事 —— 判据当时确实全部成立。
+
+    ✅ 两步：① 截图之前 `await panel.scrollIntoViewIfNeeded()`；② 把"图里真的是它"
+    写成**几何判据** —— 量 `boundingBox()`，要求顶边 `0 <= y < viewport.height`。
+    牙齿台臂 E1 证明：删掉那句滚动 ⇒ S3 当场红（`h9-sync-settings-arms.sh`）。
+    📌 一般规律：**凡是文件名声称图里是 X，就必须有一条量 X 的盒子的断言**，
+    否则文件名是唯一的"证据"，而文件名不会变红。同族：#170（窗口截图当内容载体
+    会同时假红和假绿）、#358（台架覆盖干净证据图）、#82（"非空白"挡不住错误屏）。
+
+363. 🔴 **bash 一行 `local` 里引用同一行刚声明的变量，在 `set -u` 下直接 unbound 退出；
+    而台架的退出码来自外层包装命令 —— 坏掉的台架看起来像"跑完了"。**
+
+    变异台第一版写 `local name="$1" carrier="$2" target="$3" log="/tmp/h9-arms-$name.log" rc=0`：
+    `local` 先把这一行的名字**全部**建成局部（空值）再赋值，所以 `$name` 在
+    `set -u` 下是 unbound ⇒ 脚本在**第一臂之前**就退出，日志里只有
+    `line 66: name: unbound variable` 一行，七臂一台都没跑。
+    而通知/包装命令报的是 `exit code 0`（#164 同一格）。
+
+    ✅ 一行一个 `local`，赋值单独写；并且**台架必须自带一条"我确实跑了"的读数**
+    （这里靠 `NOT_APPLIED` / `SEED_HASH_MISSING` / 收尾的 `BACK_TO_CLEAN` 三格兜）。
+    📌 与 #179（`EXIT=$?` 接在 `tee` 上读到的是 tee 的码）、#45（管道后 `$?` 是 tail 的）
+    同一条元规则：**报错的通道也要有一条能红的判据**。

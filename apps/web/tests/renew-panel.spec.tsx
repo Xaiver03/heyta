@@ -87,7 +87,7 @@ beforeEach(() => {
   useSyncStore.setState({
     baseUrl: 'https://sync.example.com',
     token: 'token-123',
-    settingsOpen: false,
+    syncSettingsRequested: false,
   });
   // 🔴 「同意联网」在这里是**前置条件**，不是被测对象（被测的是那一条，
   // 见下面 `describe('出境同意闸门')`）。真浏览器实测过一遍没有这道前置的后果：

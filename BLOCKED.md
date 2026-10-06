@@ -6447,3 +6447,66 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 2. **门禁里缺一条"HEAD 的 package.json 解析得开"**。`check:docs` 已经会报"本机有、仓库里没有"的
    死链，同一形状的语法判据还没有。要补的话它必须读 `git show HEAD:package.json`
    （不是读工作树），否则它自己就是一条永远绿的判据。登记在此，不占本单。
+
+## B98（2026-10-06 17:1x，本会话）：H9 第 3 刀落地 —— 同步设置进 设置 → 同步，rail 齿轮撤掉；四套 e2e 的定位符只静态核对过
+
+产品负责人六条里的第 2 条（「设置不应该点击头像之后再打开吗？」）到这一刀才算真的答完：
+第 1 刀把同步整组下移 rail 底部之后，rail 上仍留着一颗**长得像全局设置**的齿轮，
+点开的却只是同步设置（一个同级浮层，还没有 Esc / 焦点进不去 —— §8.2 第 6 条那一格）。
+
+### 落地的形状
+
+| 面 | 落点 |
+|---|---|
+| 新组件 | `apps/web/src/features/sync/SyncSettingsPanel.tsx`（`<section id="settings-sync" data-testid="sync-settings-panel">`，排在 功能模块之后、隐私/AI 之前） |
+| 撤掉 | rail 那颗 `sync-settings-entry` 齿轮、同级对话框、`web.sync.settings.close` 词条（中英各一条）、rail 里的 `sync-help-link`（跟着表单进那一节） |
+| 草稿的家 | `store.ts` 新增 `syncDraft` / `syncDraftShown` + `configure` / `applyAuthToken` / `clearCredentials` 三处镜像 —— `AuthPanel` 仍挂在常驻的 `SyncBar`（头像那条路也要能开它），而地址输入框现在住在设置里，**触发者在 A、面板在 B** ⇒ 与 `signInOpen` 同一条搬家理由 |
+| 请求的语义 | `settingsOpen` → `syncSettingsRequested`（一次性请求，由 `App.tsx` 消费：切设置视图 + 落在这一节 + 立刻清） |
+| 顺带收的债 | 设置浮层三处"滚到某一节"的 boolean 拷贝（help / profile / 新增 sync）合成一份 `SETTINGS_ANCHORS` 表 + 一条 effect（AGENTS §3.5"同形状的第三次"） |
+
+### 当场照出来的三件事（都不是"顺手改"，各自有判据）
+
+1. 🔴 **"焦点也要一起给"从来没成立过**：`sheetRef.focus()` 声明在落位 effect 之后，
+   把刚给出去的焦点抢回去；而全仓没有任何一条判据读过 `document.activeElement`。
+   → `apps/web/tests/settings-anchor-focus.spec.tsx` 三条 + 陷阱 **#360**。
+2. 🔴 **H9 第 1 刀删掉「立即同步」之后，四套 e2e + 一个脚本的定位符恒 0 命中六小时**，
+   期间 `pnpm check` 与 `check:ai-e2e` 整族（276 passed）全绿 —— 那些目录各有各的
+   testDir/config，默认载体根本走不到。→ 陷阱 **#361**（含现量 grep）。
+3. 🔴 **第一版那张 `settings-sync-section.png` 拍的是浮层顶部**（`toBeVisible()` 不要求
+   在视口内），判据全绿而图是错的，人看图才发现。→ 加了"顶边必须在视口内"的几何判据，
+   臂 E1 证明它会红。陷阱 **#362**。
+
+### 读数
+
+| 项 | 读数 |
+|---|---|
+| 牙齿台 | `research/tools/mutation-rigs/h9-sync-settings-arms.sh` —— **七臂七 KILLED**：U1 红在"登录之后对齐"+"保存不清空"（后者依赖前者，是预期红集）、U2 恰好红在"登出不清草稿"那条、U3 红在三条焦点判据、U4 恰好红在"取到即清"、E1/E2 红在 S3、E3 红在 S4；`BACK_TO_CLEAN=OK`（干净载体两份 jsdom + 一份真浏览器全绿） |
+| jsdom | `apps/web` 全量 **2002 passed / 13 skipped / 0 failed**（149 文件），`--filter @heyta/web typecheck` 干净 |
+| 真浏览器 | `tests/shell-sync-rail.spec.ts` **4 passed**（S1-S4）、`tests/vault-settings.spec.ts` **1 passed**、`tests/profile-avatar-e2ee.spec.ts` **1 passed** |
+| 图 | `apps/web/evidence/shell-sync-rail/{settings-sync-section,rail-bottom-group,rail-sync-button}.png`（人已看；旧的 `sync-settings-dialog.png` 随那一层浮层一起删）；`evidence/vault-panel/0{0..5}*.png` 由这一刀的载体重出 |
+| 词条 | `web.settings.sync.note` 中英各一条；`web.sync.settings.close` 中英各删一条（净数不变） |
+| Provider 对账 | `pnpm check:ui-provider` **rc=0**：`<HeytaUiProvider>` + `SyncStatusBar` 那层从 `SyncBar.tsx` 搬进 `SyncSettingsPanel.tsx` 之后仍被认在子树之内（apps/web/src 33 处消费者 / 32 个挂点）。这一道是 `PROVIDER_DEPENDENT` 登记的消费者不许丢的那条，搬家最容易撞红 |
+| 文档门禁 | `pnpm check:docs` **真 rc=1**（⚠️ 尾巴上那个 `DOCS_RC=0` 是 `tail` 的码 —— 陷阱 **#363** 同一形状）：2 处死链都指向 `docs/research/ci-proxy-traffic-attribution.md`，那是**别线未跟踪**的文件（`git ls-files` 命中 0），本刀没碰 `docs/README.md` 与 `docs/runbooks/ci-and-runner.md` 那两枚链接方 |
+
+### 仍然开着的四格，不包装成完成
+
+1. **四套 e2e（multi-end / auth-journey / selfhost-stack / vault）+ `restore-export.cjs` 只做了
+   静态核对与单文件 `tsc`，一次都没运行。** 它们要真服务端 / docker 栈 / 另一台设备。
+   跑法在各自 config 里（`playwright.multi-end.config.ts` 等）。
+   ⚠️ 其中 `e2e/selfhost-stack/selfhost-web.spec.ts` 是**混合文件**：里面还带着回收线未提交的
+   S4（注销后盘上读不回来），本单只按 hunk 取自己那几处，没代提交别人的那一整块。
+2. **`pnpm --filter @heyta/web build` 现在红在两处与本单无关的半截改动**
+   （`NotesView.tsx` 缺 `labels.saveFailed`、`TaskDetailCard.tsx:192` 的 `EventTarget.value`），
+   属于并行会话正在写的 notes/quadrant 那一族。⇒ 本单的 e2e 证据取自 **vite dev 载体**，
+   不是打包产物；`check:ai-e2e` 整族与 `-r build` 要在那两处补齐之后重跑。
+3. **落地页那张手抄复刻（`apps/landing/src/mockup/AppWindow.tsx`）仍然画着 H9 之前的页头**
+   （状态 + 立即同步 + 齿轮 + 语言 + 主题），而 `mockup-fidelity.spec.tsx:159-171` 把那个旧形状
+   钉成判据 —— 它是**对外素材**。登记成任务 #23，另开一笔做。
+4. 本刀**没有**在四端当前产物上验（`pnpm reinstall:all` 未跑）；`FULLCHECK-01` 那一档仍开着。
+5. 🔴 **本刀的四枚混合文件是按 hunk 提交的**（`packages/i18n/src/locales/{zh-CN,en}.ts` 里别线在写
+   任务详情四分组与 `notes.error.saveFailed`；`docs/reference/environment-traps.md` 里别线在写 **#322–#343**；
+   `BLOCKED.md` 里回收线在写 B90/B92/B93）。⇒ 落进 HEAD 的只有本刀那几处，**上面所有"绿"的读数都是
+   工作树属性而不是提交属性**（"提交之后要把判据对着 HEAD 复跑"那条老账）：在这一刀上，
+   `check:ui-provider` 与 `check:docs` 是**对着工作树**取的，干净检出上重跑要等那三条线各自入库之后。
+   ⚠️ 另外 `evidence/vault-panel/fixture-failure.png` 留在工作树里没提交 —— 它是 16:53 那一趟
+   **修好之前**的红图（`Received "Settings"` 那一次），本刀的证据是 16:54 之后那六张。

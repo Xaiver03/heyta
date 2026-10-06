@@ -84,14 +84,39 @@ interface SyncStoreState {
    */
   conflictDialogOpen: boolean;
   /**
-   * 同步设置对话框是否打开。
+   * 「请把界面落到 **设置 → 同步** 那一节」的请求。
    *
-   * 🔴 从 `SyncBar` 的局部 state **提到这里**，是因为现在有两个入口要打开它：
-   * 同步条自己的齿轮，以及订阅提示的「改用你自己的服务器」。
-   * 让两处各持一份 `open` state 就必然漂移（一处打开、另一处不知道），
-   * 而这一条正是 `AGENTS.md §3.5` 反复记过的形状。
+   * 🔴 从 `SyncBar` 的局部 state **提到这里**，是因为有两个入口要提出它：
+   * rail 底部那枚同步（2026-10-06 之前它旁边还有一颗齿轮）以及订阅提示的
+   * 「改用你自己的服务器」。让两处各持一份 state 就必然漂移（一处打开、
+   * 另一处不知道），而这一条正是 `AGENTS.md §3.5` 反复记过的形状。
+   *
+   * 🔴 H9 第 3 刀之后它**不是**"对话框是否打开"了 —— 同步设置不再是浮层，
+   * 它是设置浮层里的**一节**（`features/sync/SyncSettingsPanel.tsx`）。
+   * 所以这个名字写的是**请求**而不是**状态**：`App.tsx` 消费它（切到设置视图、
+   * 滚到那一节）之后立刻清掉。留着 `settingsOpen` 这个名字会指着两个真相：
+   * "某一节是开着的"（它没有开关，永远整节渲染）和"有人要求去看它"（真的那个）。
    */
-  settingsOpen: boolean;
+  syncSettingsRequested: boolean;
+  /**
+   * 设置 → 同步 那一节里三个输入框的**草稿**。
+   *
+   * 🔴 与上面的 `baseUrl` / `token` / `password`（= 已生效的配置）刻意分开：
+   * 草稿要点了「保存并同步」才走 `configure()` 变成配置。
+   *
+   * 为什么从组件的局部 state 提到这里：H9 第 3 刀之后**触发者在读屏的另一侧** ——
+   * `AuthPanel` 仍挂在常驻的 `SyncBar`（rail 底部），而地址输入框现在住在设置浮层里。
+   * 「注册 / 登录」必须用**用户眼前那个地址**，否则会出现"对着 A 登录、令牌存到 B"
+   * （这条搬家理由与 `signInOpen` 逐字同形，见下面那段注释）。
+   */
+  syncDraft: { baseUrl: string; token: string; password: string };
+  /**
+   * 那一节当前**在不在屏幕上**。
+   *
+   * 它决定 `AuthPanel` 的地址来源（在 = 用草稿，不在 = 用已保存的配置），
+   * 取代原来那个"`open`（对话框开着）"的判据。由面板自己的挂载 effect 写。
+   */
+  syncDraftShown: boolean;
   /**
    * 注册 / 登录面板是否打开。
    *
@@ -99,7 +124,7 @@ interface SyncStoreState {
    * "注册/登录该长在头像区，不该顶栏横一块大按钮"）：入口搬进 rail 顶部的
    * **账号区**（`AccountMenu`，未登录时它旁边出现紧凑入口），而面板本体
    * 仍渲染在 `SyncBar`（地址来源的语义都在那边）。触发者在 A、面板在 B，
-   * 局部 state 就够不着了 —— 与 `settingsOpen` 同一条搬家理由。
+   * 局部 state 就够不着了 —— 与 `syncSettingsRequested` 同一条搬家理由。
    */
   signInOpen: boolean;
 
@@ -137,6 +162,12 @@ interface SyncStoreState {
   closeConflictDialog: () => void;
   openSettings: () => void;
   closeSettings: () => void;
+  /** 改设置 → 同步 那一节的草稿（只改传入的字段）。 */
+  setSyncDraft: (patch: Partial<SyncStoreState['syncDraft']>) => void;
+  /** 面板挂载：按**当前已生效的配置**播种草稿并标记"在屏"。 */
+  showSyncDraft: () => void;
+  /** 面板卸载：撤掉"在屏"标记 ⇒ `AuthPanel` 退回已保存的配置。 */
+  hideSyncDraft: () => void;
   startAutoRetry: () => void;
   stopAutoRetry: () => void;
 }
@@ -447,7 +478,13 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   email: persisted?.email,
   accountId: persisted?.accountId,
   conflictDialogOpen: false,
-  settingsOpen: false,
+  syncSettingsRequested: false,
+  syncDraft: {
+    baseUrl: persisted?.baseUrl ?? '',
+    token: persisted?.token ?? '',
+    password: '',
+  },
+  syncDraftShown: false,
   signInOpen: false,
 
   openConflictDialog: () => {
@@ -459,12 +496,29 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     set({ conflictDialogOpen: false });
   },
 
+  /** 提出"请把界面落到 设置 → 同步 那一节"的请求（由 `App.tsx` 消费并清掉）。 */
   openSettings: () => {
-    set({ settingsOpen: true });
+    set({ syncSettingsRequested: true });
   },
 
   closeSettings: () => {
-    set({ settingsOpen: false });
+    set({ syncSettingsRequested: false });
+  },
+
+  setSyncDraft: (patch) => {
+    set({ syncDraft: { ...get().syncDraft, ...patch } });
+  },
+
+  showSyncDraft: () => {
+    const { baseUrl, token, password } = get();
+    set({
+      syncDraft: { baseUrl, token: token ?? '', password: password ?? '' },
+      syncDraftShown: true,
+    });
+  },
+
+  hideSyncDraft: () => {
+    set({ syncDraftShown: false });
   },
 
   openSignIn: () => {
@@ -480,7 +534,10 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // in-flight vault load before the new credentials can be used.
     const previous = get();
     if (previous.baseUrl !== baseUrl || previous.token !== token) invalidateWebVaultSession();
-    set({ baseUrl, token, password, status: { kind: 'idle' } });
+    // 🔴 草稿跟着走：「保存并同步」之后，那一节的输入框与配置**必须是同一份值**。
+    // 不写这一半的话，症状是配置已经生效、框里还留着上一次的内容 ——
+    // 那是 2026-09-30 那条"框与配置两套真相"缺陷的镜像版本。
+    set({ baseUrl, token, password, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
     // 🔴 W4：口令**不进** saveCredentials 的参数 —— 它只在内存。
     // ⚠️ 邮箱**保留已有的那个**：手填凭据这条路径不知道账号是谁，
     //    而它不该把上一次登录留下的标签抹掉。
@@ -505,6 +562,12 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
       email: email ?? get().email,
       accountId: accountId ?? get().accountId,
       status: { kind: 'idle' },
+      // 🔴 登录成功时**那一节可能正开着**（头像 → 登录，设置浮层还在下面）。
+      // 地址与令牌要一起对齐，否则用户登录完看到的还是两个空框 ——
+      // 这是 2026-09-30 Windows 旅程验收 W3 那条缺陷的形状。
+      // ⚠️ **口令原样保留**：它可能是用户正在框里输入的那半截，
+      //    而登录从不代填口令（与上面 `password` 不进 `set` 是同一条理由）。
+      syncDraft: { baseUrl, token, password: get().syncDraft.password },
     });
     // 🔴 W4：登录成功即落盘 ⇒ "登录后重开还在"。
     saveCredentials({
@@ -544,6 +607,10 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
       accountId: undefined,
       password: undefined,
       status: { kind: 'idle' },
+      // 🔴 框里也不许留着**上一个人**的令牌与口令：登出是"这台设备不再代表这个人"，
+      // 而设置那一节如果还显示着旧令牌，下一次"保存并同步"会把它当现值写回去。
+      // 地址留着（与上面 `baseUrl` 不进 `set` 同一条理由：换账号不必重填服务器）。
+      syncDraft: { baseUrl: get().baseUrl, token: '', password: '' },
     });
     // 🔴 W4：登出必须把**落盘的那份**也清掉。
     // 只清内存的话，刷新一次令牌就"活"回来了 —— 用户以为登出了，其实没有。

@@ -10,10 +10,18 @@ import { fillVaultSecret } from '../vault/privacy';
  * Every state screenshot is written before its assertions. The light and dark
  * images are fixed evidence files so a reviewer can inspect the rendered UI.
  */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { decidePrivacyConsent, enableAllModules, stubLegalRecheck, stubPublicFacts, switchTheme } from './helpers';
+import {
+  closeSettingsSheet,
+  decidePrivacyConsent,
+  enableAllModules,
+  openSettingsSheet,
+  stubLegalRecheck,
+  stubPublicFacts,
+  switchTheme,
+} from './helpers';
 import { installMissingProducerShims } from './shims';
 
 const SERVER = 'http://sync.vault.e2e.test';
@@ -143,15 +151,42 @@ async function storageDump(page: Page): Promise<string> {
   });
 }
 
+/**
+ * 打开 **设置 → 同步** 那一节，返回它的定位符。
+ *
+ * 🔴 H9 第 3 刀（2026-10-06）之前这里是 `点齿轮 → getByRole('dialog')`。
+ * 同步设置现在是设置浮层里的**一节**，而那一层是可滚动的长列表 ——
+ * 所以必须 `scrollIntoViewIfNeeded()`：不滚的话下面那三张证据图拍的是
+ * 设置浮层的**顶部**，而用例声称在量的是密钥表单（§6.2 规定一"人必须看图"
+ * 的前提是图里真的是那件事）。
+ */
+async function openSyncSection(page: Page): Promise<Locator> {
+  // ⚠️ 用 `openSettingsSheet` 而不是 `openSettingsView`：后者顺手钉一句
+  // 「页头标题真的是『设置』」，而**这一份套件跑的是英文界面**（`/?lang=en`，见上面）——
+  // 用它就会红在夹具的中文前提上（2026-10-06 实测：Received "Settings"）。
+  await openSettingsSheet(page);
+  const section = page.getByTestId('sync-settings-panel');
+  await expect(section, '设置浮层里没有「同步」那一节').toBeVisible();
+  await section.scrollIntoViewIfNeeded();
+  return section;
+}
+
 test('vault settings: create, confirm, lock, recovery unlock and change passphrase', async ({ page }) => {
   const browserErrors: string[] = [];
   const notFoundResponses: string[] = [];
+  // 🔴 设置浮层每挂载一次，`AdminPanel` 就探一次 `/api/admin/overview`，
+  // 而那份桩固定回 403（"这个人不是运营者"）⇒ Chromium 记一条 console error。
+  // H9 第 3 刀之后 同步设置住在设置里，本用例会**多次**进出那一层，
+  // 所以白名单不能再写死条数 —— 改成**由真实可观察量推导**：
+  // 探了几次，就该有几条 403；多一条没登记过的错误照样红。
+  const adminProbes: number[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') { browserErrors.push(`[console.error] ${message.text()}`); console.error(message.text()); }
   });
   page.on('pageerror', (error) => { browserErrors.push(`[pageerror] ${error.message}`); console.error(error.message); });
   page.on('response', (response) => {
     if (response.status() === 404) notFoundResponses.push(`${response.request().method()} ${response.url()}`);
+    if (response.status() === 403 && response.url().includes('/api/admin/overview')) adminProbes.push(response.status());
   });
   await mkdir(EVIDENCE, { recursive: true });
   await seedCredentials(page);
@@ -163,22 +198,20 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   await expect(page.locator('input[placeholder^="Add a task"]')).toBeVisible();
   await decidePrivacyConsent(page, 'accepted');
 
-  await page.getByRole('button', { name: 'Sync settings' }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
+  const syncSection = await openSyncSection(page);
   await screenshot(page, '00-loaded-light.png');
-  await expect(dialog.getByTestId('vault-create-form')).toBeVisible();
-  await fillVaultSecret(dialog.getByTestId('vault-create-passphrase'), 'correct horse battery staple');
-  await dialog.getByTestId('vault-create').click();
-  await expect(dialog.getByTestId('vault-recovery-display')).toBeVisible();
+  await expect(syncSection.getByTestId('vault-create-form')).toBeVisible();
+  await fillVaultSecret(syncSection.getByTestId('vault-create-passphrase'), 'correct horse battery staple');
+  await syncSection.getByTestId('vault-create').click();
+  await expect(syncSection.getByTestId('vault-recovery-display')).toBeVisible();
   await screenshot(page, '01-created-light.png');
   expect(fixture.putCount(), 'unconfirmed recovery code must not publish a package').toBe(0);
 
-  const recoveryCode = await dialog.getByTestId('vault-recovery-display').textContent();
+  const recoveryCode = await syncSection.getByTestId('vault-recovery-display').textContent();
   expect(/^[0-9A-Z-]{40,}$/u.test(recoveryCode ?? ''), 'recovery code format is valid').toBe(true);
-  await fillVaultSecret(dialog.getByTestId('vault-recovery-confirm'), recoveryCode ?? '');
-  await dialog.getByTestId('vault-publish').click();
-  await expect(dialog.getByTestId('vault-ready')).toBeVisible();
+  await fillVaultSecret(syncSection.getByTestId('vault-recovery-confirm'), recoveryCode ?? '');
+  await syncSection.getByTestId('vault-publish').click();
+  await expect(syncSection.getByTestId('vault-ready')).toBeVisible();
   await screenshot(page, '02-ready-light.png');
   expect(fixture.putCount()).toBe(1);
   expect(fixture.published()).toBeDefined();
@@ -190,40 +223,39 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
 
   await page.reload();
   await expect(page.locator('input[placeholder^="Add a task"]')).toBeVisible();
-  await page.getByRole('button', { name: 'Sync settings' }).click();
-  const reloadedDialog = page.getByRole('dialog');
-  await expect(reloadedDialog.getByTestId('vault-unlock-form')).toBeVisible();
+  const sectionAfterReload = await openSyncSection(page);
+  await expect(sectionAfterReload.getByTestId('vault-unlock-form')).toBeVisible();
   await screenshot(page, '03-locked-after-reload-light.png');
 
-  await page.getByRole('button', { name: 'Close sync settings' }).click();
+  await closeSettingsSheet(page);
   // 🔴 主题开关自 2026-10-06（H9 第三刀）起住在**设置浮层**「显示」那一节，不再是页头常驻的一枚。
   // 走共享 `switchTheme`（开浮层 → 点真开关 → 钉 `data-theme` → 收浮层）而不是新写一条路径：
   // `emulateMedia` 那枚假绿在 `calendar-cells` / `habit-month-stats` 各记过一次。
   // ⚠️ 必须**收掉**浮层：它是整屏的，不关就盖住下面那张 `04-wrong-recovery-dark.png`。
   await switchTheme(page, 'dark');
-  await page.getByRole('button', { name: 'Sync settings', exact: true }).click();
-  await fillVaultSecret(reloadedDialog.getByTestId('vault-recovery-code'), '0000-0000-0000-0000-0000-0000-0000-0000-0000');
-  await reloadedDialog.getByTestId('vault-unlock-recovery').click();
+  await openSyncSection(page);
+  await fillVaultSecret(sectionAfterReload.getByTestId('vault-recovery-code'), '0000-0000-0000-0000-0000-0000-0000-0000-0000');
+  await sectionAfterReload.getByTestId('vault-unlock-recovery').click();
   await screenshot(page, '04-wrong-recovery-dark.png');
-  await expect(reloadedDialog.getByTestId('vault-error')).toBeVisible();
-  await expect(reloadedDialog.getByTestId('vault-unlocked')).toHaveCount(0);
+  await expect(sectionAfterReload.getByTestId('vault-error')).toBeVisible();
+  await expect(sectionAfterReload.getByTestId('vault-unlocked')).toHaveCount(0);
 
-  await fillVaultSecret(reloadedDialog.getByTestId('vault-recovery-code'), recoveryCode ?? '');
-  await reloadedDialog.getByTestId('vault-unlock-recovery').click();
-  await expect(reloadedDialog.getByTestId('vault-recovery-rotation')).toBeVisible();
-  await reloadedDialog.getByTestId('vault-lock').click();
-  await expect(reloadedDialog.getByTestId('vault-unlock-form')).toBeVisible();
+  await fillVaultSecret(sectionAfterReload.getByTestId('vault-recovery-code'), recoveryCode ?? '');
+  await sectionAfterReload.getByTestId('vault-unlock-recovery').click();
+  await expect(sectionAfterReload.getByTestId('vault-recovery-rotation')).toBeVisible();
+  await sectionAfterReload.getByTestId('vault-lock').click();
+  await expect(sectionAfterReload.getByTestId('vault-unlock-form')).toBeVisible();
 
-  await fillVaultSecret(reloadedDialog.getByTestId('vault-recovery-code'), recoveryCode ?? '');
-  await reloadedDialog.getByTestId('vault-unlock-recovery').click();
-  await expect(reloadedDialog.getByTestId('vault-recovery-rotation')).toBeVisible();
-  await fillVaultSecret(reloadedDialog.getByTestId('vault-new-passphrase'), 'a different passphrase');
-  await reloadedDialog.getByTestId('vault-change-passphrase').click();
-  await expect(reloadedDialog.getByTestId('vault-recovery-display')).toBeVisible();
-  const nextRecoveryCode = await reloadedDialog.getByTestId('vault-recovery-display').textContent();
-  await fillVaultSecret(reloadedDialog.getByTestId('vault-recovery-confirm'), nextRecoveryCode ?? '');
-  await reloadedDialog.getByTestId('vault-publish').click();
-  await expect(reloadedDialog.getByTestId('vault-ready')).toBeVisible();
+  await fillVaultSecret(sectionAfterReload.getByTestId('vault-recovery-code'), recoveryCode ?? '');
+  await sectionAfterReload.getByTestId('vault-unlock-recovery').click();
+  await expect(sectionAfterReload.getByTestId('vault-recovery-rotation')).toBeVisible();
+  await fillVaultSecret(sectionAfterReload.getByTestId('vault-new-passphrase'), 'a different passphrase');
+  await sectionAfterReload.getByTestId('vault-change-passphrase').click();
+  await expect(sectionAfterReload.getByTestId('vault-recovery-display')).toBeVisible();
+  const nextRecoveryCode = await sectionAfterReload.getByTestId('vault-recovery-display').textContent();
+  await fillVaultSecret(sectionAfterReload.getByTestId('vault-recovery-confirm'), nextRecoveryCode ?? '');
+  await sectionAfterReload.getByTestId('vault-publish').click();
+  await expect(sectionAfterReload.getByTestId('vault-ready')).toBeVisible();
   await screenshot(page, '05-ready-dark.png');
   expect(fixture.putCount()).toBe(2);
   expect((await storageDump(page)).includes(nextRecoveryCode!.replaceAll('-', '')),
@@ -235,12 +267,28 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   expect(notFoundResponses, `404 responses: ${notFoundResponses.join(' | ')}`).toEqual([
     `GET ${SERVER}/api/sync/key-package`,
   ]);
-  expect(browserErrors, `browser errors: ${browserErrors.join(' | ')}`).toEqual([
-    '[console.error] Failed to load resource: the server responded with a status of 404 (Not Found)',
-    // 🔴 2026-10-06 起主题开关住在「设置 → 显示」浮层里，切暗色必须**打开设置**；
-    // 而设置浮层挂载时会探一次 `/api/admin/overview`（上面那行 `page.route` 就是为它准备的，
-    // 固定回 403 = "这个人不是运营者"）。Chromium 把任何 4xx 都记成一条 console error，
-    // 所以这条是**多了一个已命名的来源**，不是放宽：第三枚没登记过的错误照样让这一条红。
-    '[console.error] Failed to load resource: the server responded with a status of 403 (Forbidden)',
-  ]);
+  /*
+    🔴 浏览器错误白名单：**条数由真实可观察量推导，不写死**。
+    来源只有两枚，都登记过：
+      · `key-package` 那次 404（建库之前的预期应答，上面 `notFoundResponses` 已逐条钉死）；
+      · 设置浮层每次挂载时 `AdminPanel` 探一次 `/api/admin/overview`，那份桩固定回 403
+        ⇒ Chromium 记一条 console error。H9 第 3 刀之后 同步设置住在设置里，本用例
+        进出那一层**不止一次**（2026-10-06 之前是 2 次：主题切换那一次；现在是 5 次），
+        所以再写死一个数就是下一批的假红 —— 改成"探了几次就该有几条"。
+    仍然有牙：任何**第三种**错误文本照样让第一条断言红，
+    而"403 少了一条"（说明某次挂载没探 admin，即设置浮层没真的挂载）由第二条红。
+  */
+  const ADMIN_403 = '[console.error] Failed to load resource: the server responded with a status of 403 (Forbidden)';
+  const PACKAGE_404 = '[console.error] Failed to load resource: the server responded with a status of 404 (Not Found)';
+  const unregistered = browserErrors.filter((line) => line !== ADMIN_403 && line !== PACKAGE_404);
+  expect(unregistered, `未登记的浏览器错误: ${unregistered.join(' | ')}`).toEqual([]);
+  expect(
+    browserErrors.filter((line) => line === PACKAGE_404).length,
+    `404 文本的条数应与上面那条 404 响应一一对应（实际 ${String(browserErrors.filter((l) => l === PACKAGE_404).length)}）`,
+  ).toBe(notFoundResponses.length);
+  expect(
+    browserErrors.filter((line) => line === ADMIN_403).length,
+    `403 的条数应等于 admin overview 被探的次数（探了 ${String(adminProbes.length)} 次）`,
+  ).toBe(adminProbes.length);
+  expect(adminProbes.length, '设置浮层一次都没挂载 ⇒ 这个用例根本没走到同步那一节').toBeGreaterThan(0);
 });
