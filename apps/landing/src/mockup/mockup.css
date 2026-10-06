@@ -228,23 +228,28 @@
   flex: 0 0 auto;
 }
 
-/* 同步状态。复现 SyncBar：状态用**图标 + 文字**，不只靠颜色。 */
-.mk-sync {
+/*
+ * 页头的排序控件（复现 `App.tsx` 的 `.ht-header__actions` 里 `task-sort` 那一枚）。
+ * 真应用给的是**文字标签 + 原生 `<select>`**，标签不是可省略的装饰：
+ * 裸 chip 的教训还写在产品那边（"说不清自己作用范围的控件，加了等于没加"）。
+ */
+.mk-sort {
   display: inline-flex;
   align-items: center;
-  gap: var(--ht-space-1);
-  padding: 0 var(--ht-space-2);
-  min-block-size: var(--ht-size-chip-height);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-full);
-  font-size: var(--ht-font-size-2xs);
-  font-variant-numeric: tabular-nums;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
   color: var(--ht-color-foreground-muted);
 }
 
-.mk-sync--ok {
-  color: var(--ht-color-success-strong);
-  border-color: var(--ht-color-success);
+.mk-sort__value {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground);
 }
 
 .mk-iconbtn {
@@ -254,26 +259,6 @@
   block-size: var(--ht-touch-target-min);
   border-radius: var(--ht-radius-md);
   color: var(--ht-color-foreground-muted);
-}
-
-/* 语言切换。真应用里是一排 `.ht-chip`（每个语言一枚，当前那枚带 `--on`）——
-   与主题按钮同一档的全局控件，不该长成醒目的大按钮。 */
-.mk-lang {
-  display: inline-flex;
-  align-items: center;
-  min-block-size: var(--ht-touch-target-min);
-  padding: 0 var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
-  font-size: var(--ht-font-size-sm);
-  color: var(--ht-color-foreground-muted);
-}
-
-/* 当前语言：边框与底色用主色，文字回到前景色 —— 与 `.ht-chip--on` 同一套。 */
-.mk-lang--on {
-  border-color: var(--ht-color-primary);
-  background: var(--ht-color-primary-subtle);
-  color: var(--ht-color-foreground);
 }
 
 .mk-content {

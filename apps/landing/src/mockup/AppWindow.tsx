@@ -30,26 +30,23 @@ import {
   CheckCircle2,
   CircleDot,
   Inbox,
-  Moon,
+  PanelRightOpen,
   Plus,
-  RefreshCw,
   Search,
   Settings,
-  StickyNote,
   Sun,
-  Timer,
+  StickyNote,
   Trash2,
   TrendingUp,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
 
-import { LOCALE_LABEL_KEY, LOCALES, useI18n, type MessageKey } from '@heyta/i18n/provider';
+import { useI18n, type MessageKey } from '@heyta/i18n/provider';
 
 import './mockup.css';
 
 import {
-  SHELL_DUE_MODE_TABS,
+  SHELL_HEADER_ACTIONS,
   SHELL_PANEL_SECTIONS,
   SHELL_PRIMARY_NAV,
   SHELL_QUADRANT_NAV,
@@ -170,20 +167,7 @@ export function AppWindow({
 }): React.JSX.Element {
   const frameRef = useRef<HTMLDivElement>(null);
   const scale = useStageScale(frameRef);
-  const { t, locale } = useI18n();
-
-  /**
-   * 语言切换那排按钮 = **每种已启用语言自己的名字**（与 `LanguageSwitcher.tsx`
-   * 同一个形态：遍历 `LOCALES`，当前语言标出来）。
-   *
-   * 原来这里也是二态取反，和真应用一起带着同一个隐患 —— 现在两边都跟着
-   * `LOCALES`，加第三门语言时这张图会**自己多出一格**，而不是悄悄少一格。
-   */
-  const langOptions = LOCALES.map((option) => ({
-    option,
-    label: t(LOCALE_LABEL_KEY[option]),
-    active: option === locale,
-  }));
+  const { t } = useI18n();
 
   /**
    * 顶部标题。
@@ -321,47 +305,36 @@ export function AppWindow({
               </div>
 
               <div className="mk-header__actions">
-                <div className="mk-viewtabs">
-                  {SHELL_DUE_MODE_TABS.map((tab, index) => (
-                    <div
-                      key={tab.labelKey}
-                      className={`mk-viewtab${index === 0 ? ' mk-viewtab--active' : ''}`}
-                    >
-                      {index === 0 ? <CalendarDays size={ICON_SIZE.xs} /> : <Timer size={ICON_SIZE.xs} />}
-                      {t(tab.labelKey)}
-                    </div>
-                  ))}
-                </div>
-                <div className="mk-sync mk-sync--ok">
-                  <Zap size={ICON_SIZE.xs} />
-                  {t('web.sync.status.synced')}
-                </div>
                 {/*
-                  🔴 这三件原来都漏了。真应用的顶栏右侧是
-                  **SyncBar（状态 + 立即同步 + 设置）+ LanguageSwitcher + 主题**，
-                  而复刻只画了状态那一个胶囊。
-                  文案用应用自己的 key，图标与真应用同一套（lucide）。
+                  🔴 这一排**从登记处派生**，不再手抄。
+                  它原来在这里画着六件早已不在页头的东西：同步状态胶囊、「立即同步」、
+                  同步设置齿轮、两枚语言按钮、主题按钮（后两枚 2026-10-06 搬进
+                  设置 → 显示，同步那三枚同一天下移 rail 底部；「日期 / 倒计时」
+                  更早在 2026-09-30 就进了设置）。而当时那条判据是** positively 要求**
+                  这六件都在的 —— 于是 26 条展厅测试全绿，图上却是过时的形状。
+                  逐件去向写在 `SHELL_HEADER_MOVED_OUT`，对账与反向判据在
+                  `tests/mockup-shell-shape.spec.tsx` 的 #7 那一组。
                 */}
-                <div className="mk-iconbtn" role="img" aria-label={t('web.sync.a11y.syncNow')}>
-                  <RefreshCw size={ICON_SIZE.xs} />
-                </div>
-                <div className="mk-iconbtn" role="img" aria-label={t('web.sync.settings.title')}>
-                  <Settings size={ICON_SIZE.xs} />
-                </div>
-                {/* 当前语言在图上要看得出来（同 `mk-nav__item--active` 的处理）：
-                    一排同样式的格子会被读成"都是当前"。复刻是静态图，不写真控件的 aria。 */}
-                {langOptions.map(({ option, label, active }) => (
-                  <div
-                    key={option}
-                    className={active ? 'mk-lang mk-lang--on' : 'mk-lang'}
-                    lang={option}
-                  >
-                    {label}
-                  </div>
-                ))}
-                <div className="mk-iconbtn">
-                  <Moon size={ICON_SIZE.md} />
-                </div>
+                {SHELL_HEADER_ACTIONS.filter(
+                  (action) => action.onlyForView === undefined || action.onlyForView === view,
+                ).map((action) =>
+                  action.kind === 'sort-select' ? (
+                    <div key={action.id} className="mk-sort">
+                      {/* 与真应用同一条：**带可见的文字标签**，不是光秃秃一枚下拉。 */}
+                      <span className="mk-sort__label">{t(action.labelKey)}</span>
+                      <span className="mk-sort__value">{t(action.optionKey ?? action.labelKey)}</span>
+                    </div>
+                  ) : (
+                    <div
+                      key={action.id}
+                      className="mk-iconbtn"
+                      role="img"
+                      aria-label={t(action.labelKey)}
+                    >
+                      <PanelRightOpen size={ICON_SIZE.md} />
+                    </div>
+                  ),
+                )}
               </div>
             </header>
 

@@ -6515,3 +6515,70 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
    `check:ui-provider` 与 `check:docs` 是**对着工作树**取的，干净检出上重跑要等那三条线各自入库之后。
    ⚠️ 另外 `evidence/vault-panel/fixture-failure.png` 留在工作树里没提交 —— 它是 16:53 那一趟
    **修好之前**的红图（`Received "Settings"` 那一次），本刀的证据是 16:54 之后那六张。
+
+## B99（2026-10-06 17:5x–18:0x，本会话）：落地页展厅复刻的页头修完了，而它照出的是**一条把过时形状钉成期望的判据**
+
+产品负责人 09:23 那六条之后，H9 三刀把同步/语言/主题从页头搬空。任务 #23 记的是**对外素材**那一半：
+`apps/landing/src/mockup/AppWindow.tsx` 的 `.mk-header__actions` 里还手抄着六件产品早已没有的东西。
+
+### 现量：改之前复刻画什么 vs 产品有什么
+
+| 复刻页头（改前） | 产品页头（`App.tsx` 的 `.ht-header__actions`，剥掉注释后 `data-testid` 全集） |
+|---|---|
+| 「日期/倒计时」两枚 tab + 已同步胶囊 + 立即同步 + 同步设置齿轮 + 语言两枚 + 主题 = **六件** | `task-sort` / `task-sort-select` / `detail-pane-toggle` = **两枚**（排序只在任务视图 + 详情开关） |
+
+四件的去处：同步三件套 → rail 底部（10-06 H9 第 1/3 刀）；语言、主题 → 设置 → 显示（10-06 H9 第 2 刀）；
+「日期/倒计时」→ 设置 → 显示（**2026-09-30**，比这三刀早一周，复刻跟得最晚）。
+
+### 🔴 为什么 26 条展厅测试全绿
+
+`mockup-fidelity.spec.tsx` 里那条的名字就叫**「顶栏右侧是完整的四件：同步状态 + 立即同步 + 设置 + 语言 + 主题」**，
+断言是 `expect(labels).toContain('立即同步')` 这种**正向**形状。也就是说它不是"漏了没测"，
+而是**要求复刻必须画错的东西**。对账 `App.tsx` 源码的那份 `mockup-shell-shape.spec.tsx` 逐项核了主导航 /
+象限计数 / 标签区 / 视图 tab，**唯独没核页头右侧** —— 那一排是手抄在渲染文件里的。
+（§7 元规则 2 的第三种面目：一条永远通过的判据比没有判据更糟，而这条还会**主动拒绝**正确的改动。）
+
+### 改完的形状
+
+- 登记处新增 `SHELL_HEADER_ACTIONS`（正向：id + kind + 可访问名 + 产品在用的 `data-testid` 锚点 + 视图条件）
+  与 `SHELL_HEADER_MOVED_OUT`（反向：每一件搬到哪、哪天搬的、产品侧不许再出现的源码片段、
+  复刻侧不许再出现的词条）。渲染改成从登记处派生，`.mk-sync` / `.mk-lang` 两条 CSS 随之删除。
+- `mockup-shell-shape.spec.tsx` 新增 #7 那一组（六条）。承重的是这三条：
+  ① **解析器的阳性对照** —— 直接写死 `['task-sort','task-sort-select','detail-pane-toggle']`，
+     挡"产品那边改名/挪走 ⇒ 解析恒返回空集 ⇒ 双向判据同时绿"；
+  ② **双向等集**（登记锚点 ⟷ 页头实际 testid），不是子集 —— 多一枚少一枚都红；
+  ③ **反向判据**：`SHELL_HEADER_MOVED_OUT` 逐件查两头（产品源码 + 复刻渲染出的文案/aria），
+     并配一条"这些字符串今天仍在 `App.tsx` 的**别处**"的对照 —— 否则反向判据可能只是在建到
+     一个全仓都不存在的串上恒真。
+- 🔴 剥注释是承重的：产品那段里留着一句历史说明，字面上写着 `<SyncBar/>` 与
+  `web.sync.a11y.syncNow`。不剥注释，这条反向判据会**在产品是对的那一天**红，而红字指向产品。
+
+### 读数
+
+| 项 | 读数 |
+|---|---|
+| 展厅对账 | `mockup-shell-shape` 24 passed、`mockup-fidelity` 8 passed、`mockup-today-shape` 3 passed（改前是 18 + 8，新增六条） |
+| 全量 | `apps/landing` vitest **1322 passed / 1 failed**，那 1 条**不是本单的**（见下面第 2 格）；`pnpm --filter @heyta/landing typecheck` rc=0 |
+| 门禁 | `check:design` / `check:ui-language` / `check:layering` / `check:md-tables` 各 rc=0（逐条取的真退出码，不是管道尾） |
+| 真浏览器 | `vite preview`（私有端口 4471，`--strictPort`，只 kill 自己记下的 pid）+ Chromium `--no-proxy-server`：**5 块 `.mk-frame`**，任务屏页头 2 件（「排序方式 默认（按截止时间）」+ aria「展开详情面」），其余四屏 1 件，**控制台零错误**；明暗两版截图 `apps/landing/evidence/mockup-shell-1-{light,dark}.png`，两张都打开看过（§5「暗色不是亮色的反相」这条今天也走了一遍） |
+
+### 四格开着的，不包装成完成
+
+1. 🔴 **今日进度卡：产品在 2026-10-01 把它从外壳删了，复刻还在每一屏上都画着它。**
+   现量：`App.tsx:2287-2300` 那段（"第三次被要求缩小范围…这次不是再挪一次"，并写明共享
+   `TodayProgressCard` 没删是因为**成长页**在用）；而复刻 `AppWindow.tsx` 的 `.mk-today` 在
+   五屏常驻，`mockup-fidelity` 里那条「四个视图都常驻今天进度卡 + 捕获输入框」**今天仍是绿的**。
+   ⇒ 同一族的第二个实例：判据要求过时形状。**没有当场删**，因为这是对外素材的视觉主体，
+   删掉之后展厅那一屏会少一张卡 —— 登记成任务 #24，两条出路（跟着删 / 给展厅补一个成长屏）留给拍板。
+2. 🔴 **`mockup-quadrant-shape.spec.tsx` 那 1 条红是象限线在飞的 W5 造成的，不是本单。**
+   现量：工作树 `apps/web/src/features/quadrant/copy.ts` 里 `empty` 改成了带 `firstEmpty` 参数的函数、
+   `footnote` 整条移走（"W5 起底部规则说明由 web 宿主收进 `<details>`"），而 HEAD 版还是
+   `empty: () => t('web.quadrant.dropHere')` + `footnote: t('web.quadrant.footnote')`。
+   那条 spec 找的就是 `copy.ts` 里 `t(...)` 的实参 ⇒ 它红了，另 3 条连带红。
+   ⚠️ 顺带提醒象限线：W5 落地后 `mockup-fidelity` 的「四象限底部有 footnote」那条也会跟着要改 ——
+   复刻里 `.mk-quadrant__footnote` 现在还在画。本单没代改（判据口径不代改）。
+3. `web.sync.a11y.syncNow` 这条词条**现在没有任何界面在渲染它**（复刻是最后一个消费者，本单撤掉了）。
+   `check:ui-language` 没有"孤儿词条"这一档所以仍绿。删词条要中英同步，且本单那条反向判据正拿它当
+   "不许再出现"的取样来源 ⇒ 记在这里等拍板，不顺手删。
+4. **展厅复刻没有真浏览器载体**：`apps/landing/tests/` 是 jsdom，本单那 5 屏的图是一次性脚本
+   （`/tmp/landing-shot.cjs`）拍的，跑完即失。⇒ 与任务 #17 同族（"没有载体的目录 = 静默面"，#361）。
