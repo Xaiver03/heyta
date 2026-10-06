@@ -1398,7 +1398,11 @@ PY
 #    `configure_sync_credentials` 用的是同一枚 testID）。
 goto_me_page() {
   settle_foreground
-  tap_tab "我的" "立即同步" || return 1
+  # 🔴 标记必须是那一页**常驻**的锚点：rig43 现量断在第 7 步 —— 原来要 `content-desc=立即同步`
+  #    出现才算到了「我的」，而那一枚在自动同步 loading 时不渲染（rig42 第 11 步的注释早就写着这条，
+  #    只是没回过头看这里）⇒ 三发全打"标记没出现"，第 8–14 步没有屏可点。换成 profile-entry-settings
+  #    那一行的标签（配置前后都在），下面那道 has_rid 正面对账照旧兜住"读的是别的屏"。
+  tap_tab "我的" "设置" || return 1
   dump
   if [ "$(has_rid profile-entry-settings)" != "1" ]; then
     echo "   ❌ 自称切到了「我的」，但那一页的正面锚点 profile-entry-settings 不在树里 —— 读的是别的屏"
