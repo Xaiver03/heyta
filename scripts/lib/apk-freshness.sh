@@ -174,6 +174,75 @@ heyta_apk_freshness_guard() {
 }
 
 # ---------------------------------------------------------------------------
+# 🔴 **产物归属章**：这枚 iOS 产物是**哪一棵树、哪一版源码**打出来的。
+#
+# 为什么内容章不够（2026-10-06 rig64 现量）：`/tmp/heyta-ios-release` 是**跨树默认**的
+#   `-derivedDataPath`，两棵树（主检出与隔离 worktree）打的包落在同一个目录里。
+#   那一趟 A 树（另一条会话，HEAD 90232ce0）刚重装完，B 树（含选中态那处修复）的验收
+#   紧接着跑：新鲜度门按**时间戳先后**放行（bundle 19:18 > 内容章 18:40 —— B 树的章当然
+#   早于 A 树刚写完的 bundle），第 3 步随即红在「设置面里读不到「启用 AI 功能」」。
+#   时间戳回答的是"新不新"，**答不了"是谁的"**；而"不是我的"这一档在纯时间比较下
+#   恰好长得像"更新"，于是这道门把污染打印成了放行。
+#
+# 记的三样：`root=`（哪一棵树）、`head=`（哪一笔，只作读数用）、`src=`（那一版源码的内容章）。
+#   🔴 **判的是 root + 内容章，不判 head**：同一批字节可以有两种读法
+#   （"提交前后各一枚" 与 "内容一字未动"），拿 head 判会把一条内容上成立的产物判成红 ——
+#   恒红的尺比没有尺更坏（rig47b 那条教训的原样形状）。章取不到 ⇒ rc 3，按"没有输入"拒绝。
+# ---------------------------------------------------------------------------
+heyta_ios_owner_marker() { # <derived> -> 回显标记文件路径
+  printf '%s/.heyta-build-owner' "${1%/}"
+}
+
+# <derived> <root> -> rc 0 写成 / 1 写不出（章取不到、目录不存在）
+heyta_ios_owner_write() {
+  local derived="$1" root="${2:-$HEYTA_REPO_ROOT}" marker stamp head
+  [ -d "$derived" ] || return 1
+  marker=$(heyta_ios_owner_marker "$derived")
+  stamp=$(heyta_src_content_stamp "$root") || return 1
+  head=$(git -C "$root" rev-parse HEAD 2>/dev/null) || head=""
+  {
+    printf 'root=%s\n' "$root"
+    printf 'head=%s\n' "$head"
+    printf 'src=%s\n' "$stamp"
+  } > "$marker" || return 1
+  return 0
+}
+
+# <derived> <root> -> rc 0 归属成立 / 1 归属不符（树或源码版不同）/ 2 没有章 / 3 读不出输入
+# 读数**自己打印**四个值（章里那两枚 + 现在这两枚）：拒绝的理由必须在输出里可读，
+# 只给一个 rc 的话，下一个排查的人会把它当成"脚本坏了"而不是"装错了树"。
+heyta_ios_owner_check() {
+  local derived="$1" root="${2:-$HEYTA_REPO_ROOT}" marker built_root built_head built_stamp now_stamp
+  marker=$(heyta_ios_owner_marker "$derived")
+  if [ ! -f "$marker" ]; then
+    echo "   ❌ 产物归属：$marker 不存在 ⇒ 不知道这枚产物是哪一棵树打的。"
+    echo "      这**不是**新鲜度问题：时间戳回答「新不新」，回答不了「是谁的」；"
+    echo "      而共享构建目录 /tmp/heyta-ios-release 上，别棵树刚打的包比本树的源码还新。"
+    echo "      要对当前产物取读数：在本树跑 pnpm reinstall:mobile --only ios（或先跑 verify-mobile-ios.sh 那趟构建）。"
+    return 2
+  fi
+  built_root=$(sed -n 's/^root=//p' "$marker" | head -1)
+  built_head=$(sed -n 's/^head=//p' "$marker" | head -1)
+  built_stamp=$(sed -n 's/^src=//p' "$marker" | head -1)
+  now_stamp=$(heyta_src_content_stamp "$root") || {
+    echo "   ❌ 产物归属：本树（${root}）的内容章取不到 ⇒ 这条判据没有输入，不按「归属成立」处理。"
+    return 3
+  }
+  if [ "$built_root" != "$root" ]; then
+    echo "   ❌ 产物归属：构建目录里那枚是**别一棵树**打的 —— 章中 root=${built_root:-空}，本树 root=$root"
+    echo "      那棵树的 HEAD=${built_head:-空}；本轮结论若出自它，写的就不是本树的源码。"
+    return 1
+  fi
+  if [ "$built_stamp" != "$now_stamp" ]; then
+    echo "   ❌ 产物归属：树对了，但源码版不对 —— 章中 src=${built_stamp:-空}，本树现在 src=$now_stamp"
+    echo "      ⇒ 那之后本树的源码又变过（或那枚根本是另一版），这枚产物不是当前产物。"
+    return 1
+  fi
+  echo "   ✅ 产物归属：$derived 里那枚是 **本树**（${root##*/} @ ${built_head:-?}，内容章 ${now_stamp}）打的"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
 # 自检：三臂夹具 + **接线臂**。
 #
 # 接线臂存在的理由：把判据抽进 lib 而不确认调用方真的在调它，就等于新写了一份
@@ -308,7 +377,7 @@ JSON
     touch -t 203801010000 "$src_dir/StampProbe.tsx"          # 只碰，内容一字不改
     stamp_touch=$(heyta_src_content_stamp "$root") || stamp_touch=""
     if [ -n "$stamp_base" ] && [ "$stamp_touch" = "$stamp_base" ]; then
-      echo "   ✅ 臂 9 原地重写（内容 == HEAD）不推进内容章（章 $stamp_base）"
+      echo "   ✅ 臂 9 原地重写（内容 == HEAD）不推进内容章（章 ${stamp_base}）"
     else
       echo "   🔴 臂 9 存活：只 touch 就把章从「${stamp_base:-空}」推进到「${stamp_touch:-空}」"; fail=1
     fi
@@ -320,11 +389,70 @@ JSON
     stamp_edit=$(heyta_src_content_stamp "$root") || stamp_edit=""
     if [ -n "$stamp_edit" ] && [ "$stamp_edit" = "$(_mtime "$src_dir/StampProbe.tsx")" ] \
        && [ "$stamp_edit" != "$stamp_base" ]; then
-      echo "   ✅ 臂 10 未提交的内容改动算数（章 $stamp_edit == 那枚文件的 mtime，且不等于提交章 $stamp_base）"
+      echo "   ✅ 臂 10 未提交的内容改动算数（章 $stamp_edit == 那枚文件的 mtime，且不等于提交章 ${stamp_base}）"
     else
       echo "   🔴 臂 10 坏了：改了内容而章读成「${stamp_edit:-空}」，期望逐字等于文件 mtime「$(_mtime "$src_dir/StampProbe.tsx")」且不等于提交章「${stamp_base:-空}」"; fail=1
     fi
   fi
+
+  # 臂 11：构建目录里**没有**归属章 -> 必须 rc=2 拒绝（不是"没有判据就放行"）。
+  local derived_dir ownB rc_owner marker_owner out_owner
+  derived_dir="$root/derived-fixture"
+  mkdir -p "$derived_dir"
+  heyta_ios_owner_check "$derived_dir" "$root" >/dev/null 2>&1; rc_owner=$?
+  if [ "$rc_owner" = "2" ]; then
+    echo "   ✅ 臂 11 无归属章的构建目录被拒（rc=2）"
+  else
+    echo "   🔴 臂 11 存活：没有归属章却读成 rc=${rc_owner}（期望 2=拒绝）"; fail=1
+  fi
+
+  # 臂 12：同一棵树、同一版源码写的章 -> 必须放行（证明这条判据不是恒红）。
+  if heyta_ios_owner_write "$derived_dir" "$root" \
+     && heyta_ios_owner_check "$derived_dir" "$root" >/dev/null 2>&1; then
+    echo "   ✅ 臂 12 本树 + 当前源码版放行（不是恒红）"
+  else
+    echo "   🔴 臂 12 坏了：本树刚写的章，自己判不过"; fail=1
+  fi
+
+  # 臂 13：拿**另一棵树**去判同一枚章 -> 必须拒，且输出里两枚 root 都读得到。
+  #   这一臂量的就是 rig64 的形状：A 树的产物落在跨树共享的 /tmp/heyta-ios-release，
+  #   B 树的时间戳门把它打印成"更新、放行"。夹具 rootB 是 root 的**逐字节副本**
+  #   （`cp -p` 保 mtime ⇒ 两棵树的内容章相等）⇒ 这一臂的红只能来自"树"这一维。
+  ownB=$(mktemp -d)/treeB
+  if cp -Rp "$root" "$ownB" 2>/dev/null; then
+    out_owner=$(heyta_ios_owner_check "$derived_dir" "$ownB" 2>&1); rc_owner=$?
+    if [ "$rc_owner" = "1" ] && printf '%s' "$out_owner" | grep -q "别一棵树" \
+       && printf '%s' "$out_owner" | grep -qF "$ownB"; then
+      echo "   ✅ 臂 13 别棵树的产物被拒（rc=1），拒绝理由带得出那棵树的路径"
+    else
+      echo "   🔴 臂 13 存活：拿另一棵树判同一枚章读成 rc=${rc_owner}，输出：${out_owner:-（空）}"; fail=1
+    fi
+    rm -rf "$(dirname "$ownB")"
+  else
+    echo "   🔴 臂 13 没有输入：夹具里复制不出第二棵树 ⇒ 「哪一棵树」这一维没被量过"; fail=1
+  fi
+
+  # 臂 14：树对了，但那之后**本树源码内容又变了** -> 必须拒。
+  #   没有这一臂，臂 12 的"放行"可能来自"章里那个 src= 从来没被比较"。
+  printf 'c\n' > "$src_dir/StampProbe.tsx"
+  touch -t 203801010100 "$src_dir/StampProbe.tsx"
+  if heyta_ios_owner_check "$derived_dir" "$root" >/dev/null 2>&1; then
+    echo "   🔴 臂 14 存活：源码又变了而归属章仍判成立（src= 那一位没参与比较）"; fail=1
+  else
+    echo "   ✅ 臂 14 源码版不符被拒（章里的 src= 是承重的）"
+  fi
+
+  # 臂 15（接线）：两枚**写方**与一枚**读方**都必须在调用，缺一臂就红。
+  #   抽进 lib 而不确认调用方真的在调 = 新写一份没人执行的更漂亮版本（§3.5 那条教训的形状）。
+  marker_owner=0
+  grep -q "heyta_ios_owner_write" "$HEYTA_REPO_ROOT/scripts/reinstall-all.sh" \
+    || { echo "   🔴 臂 15 断了：reinstall-all.sh 没写归属章"; marker_owner=1; }
+  grep -q "heyta_ios_owner_write" "$HEYTA_REPO_ROOT/scripts/verify-mobile-ios.sh" \
+    || { echo "   🔴 臂 15 断了：verify-mobile-ios.sh 没写归属章"; marker_owner=1; }
+  grep -q "heyta_ios_owner_check" "$HEYTA_REPO_ROOT/scripts/verify-mobile-ios-ai.sh" \
+    || { echo "   🔴 臂 15 断了：verify-mobile-ios-ai.sh 没判归属章"; marker_owner=1; }
+  [ "$marker_owner" = 0 ] && echo "   ✅ 臂 15 两枚写方 + 一枚读方确有调用点" \
+    || fail=1
 
   HEYTA_APK_SOURCE_DIRS="$saved_dirs"   # 还原调用方的覆盖口（自检不许留下状态）
   rm -rf "$root"

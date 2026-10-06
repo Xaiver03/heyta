@@ -214,7 +214,7 @@ set_id() {  # <testID> <值>
   if [ "$back" = "$val" ]; then
     return 0
   fi
-  bad "写 id:$id 四次都没回读出「$val」（最后回读：${back:-空}，setRc=$(jget "$out" setRc)）"
+  bad "写 id:$id 四次都没回读出「${val}」（最后回读：${back:-空}，setRc=$(jget "$out" setRc)）"
   return 1
 }
 # 🔴 iOS 这一侧中文**只能走 AXSetValue（`set_id`），HID 那条路结构上送不进中文**
@@ -459,7 +459,7 @@ shot() {  # <文件名> <那一刻必须在树里的锚点 testID>
   fi
   SHOTS="${SHOTS}${name}|${anchor}
 "
-  echo "   • 截图 $name（那一刻 $anchor 在树里）"
+  echo "   • 截图 ${name}（那一刻 $anchor 在树里）"
 }
 
 step "0. 现场门：设备显式指名、已启动、没有别的 iOS 验收、宿主机负载"
@@ -527,6 +527,16 @@ if [ ! -f "$HEYTA_REPO_ROOT/scripts/lib/apk-freshness.sh" ]; then
 fi
 # shellcheck source=lib/apk-freshness.sh
 . "$HEYTA_REPO_ROOT/scripts/lib/apk-freshness.sh"
+# 🔴 **归属门**住在时间戳门**之前**，因为两把尺问的不是同一件事：
+#   章（下面那段）回答"这枚产物不落后于源码"，而它只能比较**时刻先后** ——
+#   `/tmp/heyta-ios-release` 是**跨树共享**的默认 derivedDataPath，别的检出往同一枚
+#   目录打完包之后，那枚产物对本树而言"更新"，于是时间戳门把污染打印成放行。
+#   2026-10-06 rig64 现量：`bundle 19:18:04 > 内容章 18:40:00` ⇒ ✅，第 1 步逐字节对账 ✅，
+#   第 3 步随即 `❌ 设置面里读不到「启用 AI 功能」`；事后 `ps` 抓到同时跑着另一棵树的
+#   `reinstall-all.sh --only ios`（pid 15705，其树 HEAD 90232ce0、AssistantScreen.tsx 里
+#   `useSelected` 命中 **0**）。⇒ 本轮验的**不是本树的源码**，那一条读数作废。
+#   这一档没有旋钮可绕：没有章就是"不知道是谁的"，而不是"大概是新的"。
+heyta_ios_owner_check "$IOS_DERIVED" "$HEYTA_REPO_ROOT" || exit 3
 DIRTY_SRC=$(git -C "$HEYTA_REPO_ROOT" status --porcelain -- apps/mobile/src packages 2>/dev/null | wc -l | tr -d ' ')
 JSB_M=$(stat -f %m "$JSB")
 SRC_M=$(newest_src)
@@ -598,7 +608,7 @@ if [ "$SHA_INST" != "$SHA_WILL_INSTALL" ]; then
   echo "      ⇒ 装上去的不是将要打的那份（§7 #82：simctl install 退出码 0 不等于内容对上了）"
   exit 3
 fi
-ok "已装产物与本轮安装的那一枚逐字节相同（sha256 ${SHA_INST:0:12}，容器 $INSTALLED_APP）"
+ok "已装产物与本轮安装的那一枚逐字节相同（sha256 ${SHA_INST:0:12}，容器 ${INSTALLED_APP}）"
 xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1 || { echo "❌ simctl launch 失败 ⇒ 本轮无效"; exit 3; }
 sleep 6
 # 🔴 树就绪的判据是"label 数 ≥ 2 且三个候选屏之一在树里"，**不是**"某个标签在不在"：
@@ -677,8 +687,8 @@ sleep 2
 EP_N=$(endpoint_count)
 case "$EP_N" in
   1) ok "回环假端点已落进设备库（端点条数 = 1，读的是被写那一侧）" ;;
-  NOFILE|BAD*) bad "设备库回读没拿到（$EP_N）⇒ \"存进去没有\"无从判定，不拿\"点过了\"当已通过" ;;
-  *) bad "端点条数读成 $EP_N（期望恰好 1）" ;;
+  NOFILE|BAD*) bad "设备库回读没拿到（${EP_N}）⇒ \"存进去没有\"无从判定，不拿\"点过了\"当已通过" ;;
+  *) bad "端点条数读成 ${EP_N}（期望恰好 1）" ;;
 esac
 
 step "4. 判据①（正向那一半）：配好端点后入口进树 —— 与第 2 步的缺席成对"
@@ -727,7 +737,7 @@ for f in capture breakdown prioritize duration-estimate tool-calling; do
 done
 RR=$(routes_reading)
 case "$RR" in
-  NOFILE|BAD*) bad "库回读没拿到（$RR）—— 绑定到底写进去没有，不许拿\"点了\"当已通过" ;;
+  NOFILE|BAD*) bad "库回读没拿到（${RR}）—— 绑定到底写进去没有，不许拿\"点了\"当已通过" ;;
   *)
     echo "   · 设备库回读（routes/同意，键 heyta.ai.settings）：$RR"
     MISS2=""
@@ -765,22 +775,25 @@ sleep 1
 GR=$(grants_reading)
 case "$GR" in
   NOFILE|BAD*)
-    bad "库回读没拿到（$GR）—— 授权到底写进去没有，不许拿「勾了」当已通过"
+    bad "库回读没拿到（${GR}）—— 授权到底写进去没有，不许拿「勾了」当已通过"
     ;;
   *)
     echo "   · 设备库回读（localApi.grants）：$GR"
     case "$GR" in
       *'list_tasks=1'*) ok "库里 list_tasks 的授权位 = 1（读的是被写那一侧）" ;;
-      *) bad "库里 list_tasks 仍是未授权（$GR）⇒ 第 7 步的规则前门没有候选集" ;;
+      *) bad "库里 list_tasks 仍是未授权（${GR}）⇒ 第 7 步的规则前门没有候选集" ;;
     esac
     ;;
 esac
 
 step "6c. 种一条真任务（第 9/10 步的输入：拆解那一档从任务列表里选一条）"
-# 🔴 `breakdown-start` 的 disabled 表达式是 `selectedId === undefined || route.target === undefined`
+# 🔴 `breakdown-start` 的 disabled 表达式是 `pickedTask === undefined || props.route.target === undefined`
 #   —— 拆解的对象是**已存在的任务**，全新安装的设备上列表是空的 ⇒ 恒禁用。
 #   rig51 第 9/10 步那三条红（按钮禁用 / 计数不动 / 没有提案卡）都是这一个原因，
 #   不是产品缺功能。种任务走真 UI（FAB → 输入 → 「添加」），与 verify-mobile-ios 同一条通道。
+#   ⚠️ 2026-10-06 起 `pickedTask` 来自**全壳那一份**选中（`useSelected('task')`，见门禁
+#   `check:selection-single-source`），不是面板里自己的 `useState`。对本载体是**中性**的：
+#   助手屏退出时收回那一格选中 ⇒ 每次进助手屏都从"没选中"开始，第 9/10 步仍然必须自己按一次 chip。
 leave_settings || { bad "设置面收不掉 ⇒ 种任务没有屏"; summary "iOS 助手真机验收"; }
 press_tab "$(zh mobile.tab.tasks)" || bad "切不到「任务」那一页 ⇒ 种任务没有屏"
 sleep 2
@@ -814,7 +827,7 @@ if add_btn_present; then
   summary "iOS 助手真机验收"
 fi
 AFTER_OPS=$(ops_count)
-case "$AFTER_OPS" in (''|*[!0-9]) bad "op-log 条数读不出（$AFTER_OPS）" ;; esac
+case "$AFTER_OPS" in (''|*[!0-9]) bad "op-log 条数读不出（${AFTER_OPS}）" ;; esac
 if [ "$AFTER_OPS" -gt "$BASE_OPS" ]; then
   ok "种下的任务落了库（ops ${BASE_OPS}→${AFTER_OPS}）—— 拆解那一档现在有得选"
 else
@@ -958,7 +971,7 @@ set_id "ai-endpoint-model" "stub-model" || summary "iOS 助手真机验收"
 #   判据⑤⑥没有读数）根因就在这里，不在产品 —— 第 3 步那枚回环端点勾了三档，
 #   这一枚一枚都没勾。
 for cap in structured_output long_context; do
-  press_id "ai-endpoint-cap-$cap" || bad "勾不上能力 chip ai-endpoint-cap-$cap（非回环那枚）"
+  press_id "ai-endpoint-cap-$cap" || bad "勾不上能力 chip ai-endpoint-cap-${cap}（非回环那枚）"
 done
 ax --dismiss-keyboard --json >/dev/null 2>&1
 press_id "ai-endpoint-add" || bad "远程端点存不下去"
@@ -967,7 +980,7 @@ EP_N2=$(endpoint_count)
 if [ "$EP_N2" = "2" ]; then
   ok "非回环 https 端点已落进设备库（端点条数 1→2）"
 else
-  bad "端点条数读成 $EP_N2（期望 2）—— 新增那枚没存进去，后面的判据都没有输入"
+  bad "端点条数读成 ${EP_N2}（期望 2）—— 新增那枚没存进去，后面的判据都没有输入"
   summary "iOS 助手真机验收"
 fi
 # 第 6 步之后有两枚端点：下标 0 = 回环、下标 1 = 这一轮新存的 https 端点。
@@ -990,7 +1003,7 @@ open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; 
 press_id "ai-mode-breakdown" || bad "切不到「拆解任务」"
 sleep 2
 # 🔴 拆解的对象是从任务列表里**选**的一条（`breakdown-start` 的 disabled =
-#   `selectedId === undefined || route.target === undefined`）。rig51 那两条红
+#   `pickedTask === undefined || props.route.target === undefined`）。rig51 那两条红
 #   不是产品缺功能，是载体没选行、而 6c 之前列表压根是空的。
 press_label "$TASK_TITLE" || bad "选不中第 6c 步种下的那条任务（「${TASK_TITLE}」）⇒ 拆解那一档没有输入"
 sleep 1
@@ -1009,7 +1022,7 @@ if enabled_id "breakdown-start"; then
     found_label "$FLD" || MISSD="$MISSD 字段清单"
     found_label "$REM" || MISSD="$MISSD 性质行「数据会离开设备」"
     if [ -n "$MISSD" ]; then
-      bad "披露步缺这些元素：$MISSD（逐字段披露是红线，不是形容词）"
+      bad "披露步缺这些元素：${MISSD}（逐字段披露是红线，不是形容词）"
     else
       ok "披露步元素齐：目的地行 + 字段清单 + 性质行"
     fi
@@ -1052,7 +1065,7 @@ READ_GRANT=$(routes_reading)
 if printf '%s' "$READ_GRANT" | grep -q 'breakdown=1/1'; then
   ok "逐功能授权点下去并落进设备库（库里回读：breakdown 那一档 路由=1 / 同意=1）"
 else
-  bad "按了授权位而库里读到的不是「已授权」（$READ_GRANT）⇒ 点住了没存住"
+  bad "按了授权位而库里读到的不是「已授权」（${READ_GRANT}）⇒ 点住了没存住"
 fi
 sleep 1
 
@@ -1098,11 +1111,14 @@ fi
 open_assistant || { bad "点不进助手屏"; summary "iOS 助手真机验收"; }
 press_id "ai-mode-breakdown" || bad "切不到「拆解任务」"
 sleep 2
-# 重新进面板会丢掉上一次的选中行 ⇒ 这里再选一次（选中态不是持久状态，别假设它跨挂载）。
+# 这里再选一次。⚠️ 2026-10-06 起理由变了，措辞跟着变：选中现在住在**全壳那一份** store 里，
+# 所以"切个档"不会再把它丢掉（同一屏内换面板是保留的）；丢掉它的时机是**退出助手屏**
+# （`AssistantScreen` 的卸载清理，与任务屏那条同一个理由），而第 10 步正好绕道设置面改过端点 ⇒ 仍然要重按。
+# 结论不变，但"别假设它跨挂载"这句现在只对**跨屏**成立 —— 留着不更正就是两套说法。
 press_label "$TASK_TITLE" || bad "第 10 步选不中那条任务 ⇒ 提案卡判据没有输入"
 sleep 1
 BASE=$(ops_count)
-case "$BASE" in (''|*[!0-9]*) bad "op-log 基线读不出（$BASE）⇒ \"不写库\"这一条没有输入"; summary "iOS 助手真机验收" ;; esac
+case "$BASE" in (''|*[!0-9]*) bad "op-log 基线读不出（${BASE}）⇒ \"不写库\"这一条没有输入"; summary "iOS 助手真机验收" ;; esac
 stub_reset
 B5=$(stub_count)
 press_id "breakdown-start" || bad "「拆解」点不动"
@@ -1152,7 +1168,7 @@ else
     case "$m" in
       ''|*[!0-9]*) bad "$name 的 mtime 读不出来（${m:-空}）⇒ 是尺坏了不是图旧"; SHOT_BAD=1 ;;
       *) if [ "$m" -lt "$RUN_STARTED" ]; then
-           bad "$name 比本轮起跑还旧（mtime $m < 起跑 $RUN_STARTED）—— 它属于上一趟（§7 第 27 条那一族）"
+           bad "$name 比本轮起跑还旧（mtime $m < 起跑 ${RUN_STARTED}）—— 它属于上一趟（§7 第 27 条那一族）"
            SHOT_BAD=1
          else SHOT_N=$((SHOT_N + 1)); fi ;;
     esac

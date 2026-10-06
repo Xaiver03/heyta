@@ -518,15 +518,33 @@ if printf '%s' "$WANT" | grep -q "ios"; then
       fi
     fi
     # 清两样：模拟器里的旧 app + 旧构建产物
+    # 构建目录与消费者（verify-mobile-ios*.sh）用**同一枚旋钮**：默认值逐字不变，
+    # 但把硬编码收成变量是"两边指向同一个地方"这件事的唯一可读写法。
+    IOS_DERIVED_DIR="${HEYTA_IOS_DERIVED:-/tmp/heyta-ios-release}"
     xcrun simctl uninstall "$UDID" "$BID" >/dev/null 2>&1 || true
-    rm -rf /tmp/heyta-ios-release
+    rm -rf "$IOS_DERIVED_DIR"
     echo "  正在 xcodebuild Release（重打 JS bundle，数分钟）…"
     if [ "$PODS_SYNC" = OK ] && xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" \
         -scheme Heyta -configuration Release -sdk iphonesimulator \
-        -destination "id=$UDID" -derivedDataPath /tmp/heyta-ios-release build \
+        -destination "id=$UDID" -derivedDataPath "$IOS_DERIVED_DIR" build \
         >/tmp/heyta-reinstall-ios-build.log 2>&1; then
       echo "  ✅ 构建成功（日志 /tmp/heyta-reinstall-ios-build.log）"
-      IOS_APP_DIR="/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app"
+      IOS_APP_DIR="$IOS_DERIVED_DIR/Build/Products/Release-iphonesimulator/Heyta.app"
+      # 🔴 归属章：把"这一枚是哪一棵树、哪一版源码打的"写在构建目录旁边。
+      #    新鲜度判据（下面那段）比的是**时间戳先后**，它答不了"是谁的"：
+      #    2026-10-06 rig64 现量 —— 别一棵树（另一条会话，HEAD 90232ce0）刚往同一枚
+      #    /tmp/heyta-ios-release 打完包，本树的验收紧接着跑，门打印
+      #    「bundle 19:18 > 内容章 18:40 ⇒ 将要安装的是当前源码的产物」并放行，
+      #    第 3 步随即红在「设置面里读不到「启用 AI 功能」」。污染在纯时间比较下
+      #    恰好长得像"更新"，所以这道门把污染打印成了放行。
+      #    消费者用 heyta_ios_owner_check 判这一档（尺仍只有 `lib/apk-freshness.sh` 一把）。
+      if [ -f "$ROOT/scripts/lib/apk-freshness.sh" ] \
+         && . "$ROOT/scripts/lib/apk-freshness.sh" \
+         && heyta_ios_owner_write "$IOS_DERIVED_DIR" "$ROOT"; then
+        echo "  ✅ 已写产物归属章：${IOS_DERIVED_DIR}/.heyta-build-owner"
+      else
+        echo "  🔴 产物归属章没写成 ⇒ 拿这枚产物取的任何读数都会被验收脚本拒绝"
+      fi
       if xcrun simctl install "$UDID" "$IOS_APP_DIR" >/dev/null 2>&1; then
         echo "  ✅ 已安装进模拟器（全新安装）"
         # 🔴 新鲜度判据（沿用 verify-mobile-ios.sh 那次事故的产物）：
@@ -554,7 +572,7 @@ if printf '%s' "$WANT" | grep -q "ios"; then
         elif [ "$SRC_C" -le "$BUNDLE_MTIME" ]; then
           echo "  ✅ 内容章 $SRC_C ≤ 已装 bundle $BUNDLE_MTIME —— 这一轮装的是当前产物"; FRESH=1
         else
-          echo "  🔴 源码最后一次内容改变（$SRC_C）晚于已装 bundle（$BUNDLE_MTIME）—— 装的是旧代码"
+          echo "  🔴 源码最后一次内容改变（${SRC_C}）晚于已装 bundle（${BUNDLE_MTIME}）—— 装的是旧代码"
         fi
         if [ "$FRESH" = "1" ]; then
           xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1

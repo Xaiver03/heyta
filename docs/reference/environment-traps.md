@@ -7639,3 +7639,45 @@ B-with-lcall,C-no-locale,D-restore}.txt`。⇒ 崩不崩与树无关、与 `LC_A
     📌 **可迁移的规律**：修一类缺陷时，先数出"这一类有几个消费者"并把那个数钉成判据的分母，
     而不是只修手上这一处 —— 抽取式修复的收尾动作永远是"旧的那份删掉 + 一条会红的门禁"（§3.5 那条教训
     在这里的第三种面目：前两次是代码重复，这次是**同一个判断在六个落点各写一遍、只修了一个**）。
+
+356. 🔴 **共享的 `derivedDataPath` 让"产物比源码新"这道门把污染打印成放行 ——
+    时间戳回答「新不新」，回答不了「是谁的」。判"是哪一棵树打的"要另有一条门。**
+
+    2026-10-06 rig64（iOS 助手验收）现量：0b 段打印
+    `新鲜度门输入：bundle 1791285484（10-06 19:18:04）／内容章 1791283200（10-06 18:40:00）`
+    ⇒ `✅ 将要安装的是当前源码的产物`，第 1 步还把"装的就是本轮要装的那一枚"逐字节对上了
+    （`sha256 fb40add08726`），第 2 步 ✅，第 3 步随即 `❌ 设置面里读不到「启用 AI 功能」那枚勾选框`
+    ⇒ `通过 9 项，失败 1 项`。这一格**没有**被记成产品缺陷是对的，但当时归因只到"产物不对"，
+    没说清它为什么能穿过两道门。
+
+    定源用 `ps`，不是靠猜：同时跑着 pid 15705 =
+    `bash /Users/rocalight/heyta-carriers/heyta-reinstall-1006/scripts/reinstall-all.sh --only ios`
+    与 pid 16730 = 同一棵树的 `xcodebuild -derivedDataPath /tmp/heyta-ios-release`。
+    那棵树 HEAD `90232ce0`、其 `apps/mobile/src/ai/AssistantScreen.tsx` 里 `useSelected` 命中 **0**；
+    本树 HEAD `dfd66fff` 且带着选中态那处未提交修复。**同一枚构建目录，两棵树共用**
+    （`/tmp/heyta-ios-release` 是三处 `HEYTA_IOS_DERIVED` 的默认值：`reinstall-all.sh`、
+    `verify-mobile-ios.sh`、`verify-mobile-ios-ai.sh`），于是"比本树源码新"恰好是污染的**形状**：
+    别人刚打完包 ⇒ bundle mtime 必然晚于我的内容章 ⇒ 门放行。**两道门全绿，验的不是我的码。**
+
+    ✅ 修法按"谁打的书谁署名"：`scripts/lib/apk-freshness.sh`（内容章的单一所有者）新增
+    `heyta_ios_owner_write` / `heyta_ios_owner_check`，把 `root=` + `head=` + `src=`（打那枚产物
+    那一刻的**内容章**）写进 `<derivedDataPath>/.heyta-build-owner`；两枚写方（`reinstall-all.sh`
+    构建成功后、`verify-mobile-ios.sh` 装完后）都签，读方（`verify-mobile-ios-ai.sh` 的 0b）
+    在时间戳门**之前**判归属，不成立就 `exit 3` 并把两枚 root/两枚 src 都打出来。
+    🔴 **判 root 与内容章，不判 HEAD**：同一批字节可以有一次纯提交把它前后的两枚 HEAD 都带上，
+    拿 HEAD 判会得到一把恒红的尺 —— 那正是 #346 刚记过的那个形状，绕它的人永远是下一个跑验收的人。
+
+    能失败的证据（同一把尺的自检 `bash scripts/lib/apk-freshness.sh --self-test`，
+    臂数由它自己打印，别抄进文档）：无章的构建目录 rc=2 拒；本树 + 当前源码版放行（不是恒红）；
+    **逐字节副本的第二棵树**（`cp -Rp`，两棵的内容章相等 ⇒ 红只能来自"哪一棵"这一维）rc=1 且
+    输出带得出那棵树的路径；同树但章之后源码内容又变 ⇒ rc=1（证明 `src=` 那一位是承重的）；
+    接线臂查两枚写方 + 一枚读方。**这一臂先红过才有效**：接线那趟现量三行
+    `🔴 臂 15 断了：reinstall-all.sh / verify-mobile-ios.sh / verify-mobile-ios-ai.sh 没…`，
+    补完调用点之后才转绿。另有两发打在真实目录上的控制读数：
+    `/tmp/heyta-ios-release`（无章）⇒ rc=2，伪造一枚 `root=` 指向别棵树的章 ⇒ rc=1。
+
+    📌 **可迁移的规律**：一条"新不新"的判据，在**共享输出目录**上永远挡不住"不是我的"——
+    因为别人写的产物天然比你新。凡是构建产物落在跨检出共享的路径上（`/tmp/*`、远端 `C:\src\*`、
+    容器里的卷），归属要比新鲜度**先判**，而归属只能由**写入方**署名（读方猜不出来）。
+    §6.1.1 第 82 条（"远端字节 == 本地工作树"要有 sha 对账）是同一件事在 Windows 段的形状：
+    那次缺的是"内容对账"，这次缺的是"来源对账"，而两次都是**判据全绿、验的是别的东西**。
