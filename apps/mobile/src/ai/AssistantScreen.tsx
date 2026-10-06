@@ -253,6 +253,7 @@ export function AssistantScreen({ onBack }: { onBack: () => void }): React.JSX.E
               {MODES.map((feature) => (
                 <Chip
                   key={feature}
+                  testID={`ai-mode-${feature}`}
                   label={t(AI_FEATURE_LABEL_KEY[feature])}
                   selected={feature === mode}
                   onPress={() => {
@@ -454,7 +455,12 @@ function FailureStep({
           {failure.detail}
         </Text>
       ) : null}
-      <Button label={t('web.ai.action.retry')} tone="secondary" onPress={onRetry} />
+      <Button
+        label={t('web.ai.action.retry')}
+        tone="secondary"
+        testID={`${testIdPrefix}retry`}
+        onPress={onRetry}
+      />
     </Stack>
   );
 }
