@@ -822,6 +822,7 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
 | 四臂读数 | 台架 `~/.heyta-window-rigs/heyta-fidelity-today-arms.py`：**A** 展厅多画一张 ⇒ 红；**B** 用注入接缝把卡放回产品做事视图而展厅没跟 ⇒ 红；**C** 摘掉剥注释 ⇒ 红；**复跑（全部还原之后）** ⇒ 绿。`ARMS=4 BAD=0` |
 | 顺带收掉的一处重复 | 三枚 spec 各写一遍 `WEB_SRC` / `UI_SRC` 与 `readWeb` / `readUi`。`HEYTA_MOCKUP_WEB_SRC` 是故障注入台架的接缝，**三份定义意味着台架指过去时只重定向其中一份**，另外两份在"临时树"上读的其实是真源码 ⇒ 变异会打空而照样报绿。现在收进 `tests/helpers/source-text.ts` 一枚所有者 |
 | 门禁读数 | `check:design` / `check:ui-language` / `check:md-tables` / `check:layering` / `landing check:entries` 全 rc=0；`landing typecheck`（`tsconfig.spec.json`）rc=0；`landing test` **1316 passed / 1 failed** |
+| 真浏览器取证（§6.2 规定一）| `apps/landing/evidence/mockup-shell-2-{light,dark}.png`（42 202 / 44 073 B）：Chromium 无头开 `vite preview :4471`，`colorScheme` 两版各截 `.mk-app` 一帧，`.mk-today` 命中 **0 张**、控制台错误 **0 条**（装置 `~/.heyta-window-rigs/heyta-mockup-shot.mjs`）。**两张都人打开看过**：收集箱屏从"添加任务"捕获输入框**直接**接到第一条任务行，中间没有进度卡；深色那一帧底/文字/描边整套换掉且主蓝仍在"添加"按钮与选中行的复选框上 —— 是切过主题，不是反相。⚠️ 边界：两帧左下角那枚展厅标注被 `.mk-app` 的框裁掉了一半（截图按元素裁，标注挂在框外），所以这两张证"卡不在了 + 主题真切"，**不证**整屏排版的边界对不对 |
 
 ⚠️ **那 1 枚红不是这一刀的**，三条腿在同一趟里量完：`mockup-quadrant-shape` 在**主检出**
 （web 工作树脏）红 ⇒ 把 `HEYTA_MOCKUP_WEB_SRC` 指到干净载体 **15 passed** ⇒ 载体里 HEAD 原码
