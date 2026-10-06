@@ -1026,3 +1026,50 @@ cd e2e && NO_COLOR=1 npx playwright test --reporter=line \
 的判据（`check` 串里含 `ai-e2e`）现在**不再被这 8 枚挡着**，但整链仍受别的格影响，
 本会话没有取整链读数（§9.15 边界②同一条）。
 
+### 9.17 H12 常驻载体入库：`verify:mobile-habits` 八条判据，前 3 步有真机读数、后 5 步在等窗口
+
+提交 `cd546407`（`scripts/verify-mobile-habits.sh` + `package.json` 的 `verify:mobile-habits`）。
+这一格欠的**是一枚装置**（B100 第 7 格 19:3x 那句），不是"再截一次图" ——
+`apps/mobile/evidence/android-habits-*.png` 那 9 张是 10-01 17:2x 一次性脚本产的、脚本没入库，
+所以自 10-01 之后落地的 H2/H3/H4/H5 四批改动**没有任何一层**会在它们坏掉时变红。
+
+**八条判据**（文件头逐条写了理由）：①APK↔源码 mtime 配对 ②空态文案在 ③建一条习惯
+**恰好 1 条 `HABIT/ADD`** ④行 aria 的数字与物化对得上 ⑤打卡 → `HABIT_LOG/ADD` 恰好 1 条 +
+aria 变「连续 1 天」 ⑥**杀进程重开**仍在 ⑦暗色 = 主色亮度真的翻面 + 两边都还数得出主蓝
+⑧撤销 → `HABIT_LOG/DEL` 恰好 1 条 + aria 回到 0 + **笔记本**读得到这条 HABIT 与两次写入。
+③⑤⑧ 都写成**数条数**而不是"有没有"：一个用户意图 = 一个 op（AGENTS §3.4），
+而"多写一条"在界面上完全看不出来。
+
+**载体与配对**：包在**隔离载体**（`~/heyta-carriers/heyta-reinstall-1006`，工作树 = `10cf58d3`）里
+经 `pnpm build:android` → `windows-pc` 打（67,098,084 B / 22:34:53），
+所以必须 `HEYTA_HABITS_APK=… HEYTA_HABITS_APK_ROOT=…载体` **成对**传 ——
+只指包不指根 = 拿主检出的源码去比载体打的包，两种读数都没有意义。
+🔴 不在主检出打这个包的理由：`apps/mobile/src/screens/ProfileScreen.tsx`（习惯入口就在那枚文件里）
+与 `packages/i18n/src/locales/*.ts`、`packages/app-host/src/*-actions.ts` 此刻**都是别线未提交态**，
+`run-gradle.mjs` 同步的是**当前工作树** ⇒ 从主检出打会把他们的 WIP 一起打进我这一份证据里。
+
+**读数（22:5x–23:2x）**：
+
+| 步 | 读数 |
+|---|---|
+| 1–3 | `✅ 装的是当前源码的产物`（APK 22:34:53 / 最新源码 18:17:32）· `✅ 全新安装：Success` · 隐私门 + 欢迎页自动过 · `✅ 首次同步完成（约 5 秒）` · `✅ 空态文案在（这一屏画出来了，不是白屏）` |
+| 4–8 | **没取到** —— 负载门按设计退 3（22:20 现量 `load1=200`，阈值 12），环境无效不记产品失败 |
+| 门禁 | `check:verify-script-copy` 现量 `缺失=0`（11 条 needle / 4 条走 substring / 1 条插值）· `check:script-snapshot` ✅ 41 个脚本 · `check:journey-coverage` ✅ |
+
+🔴 **两个当场修掉的缺陷，都是"探针坏了会冒充产品坏了"那一族**：
+① `local name=$1 out="…$name…"` 在 macOS bash 3.2 的**同一条** `local` 里，求值 `out` 时
+`name` 还没赋值 ⇒ `set -u` 直接 `unbound variable`，**第一趟就断在截图那一步**；
+② 填完凭据**不等于**发起同步 —— 少了点「立即同步」那一下，下面等的就不是"派生慢"而是
+"根本没人发起"，而两者输出一样（照 `verify-mobile-calendar.sh` 第 3 步补上，
+等待预算 60 轮 → 180 轮，因为纯 JS Argon2id 实测 30–900 秒）。
+`check:verify-script-copy` 首跑还报我 2 条 needle 不在词条表：`新习惯`（改成整条 `新习惯名称`）
+与 `今天还没打卡`（它是 `{date}，今天还没打卡` 的**片段**，按 `verify-mobile-calendar.sh:303`
+那一族走插值 needle）。⚠️ 后者这个写法要下一位看清：**它是刻意留成片段**，
+因为日期前缀由应用拼，脚本复刻那份格式就是造第二套真源。
+
+**这一格现在的准确状态**：载体**在**（`pnpm verify:mobile-habits` 可复跑）、
+判据**有牙**（数 op 条数 + 亮度翻面 + 跨设备回读），但 **4–8 步的设备读数与 9 张证据图未闭合**，
+等的是机器窗口。重试台：`bash ~/.heyta-window-rigs/heyta-h12-retry.sh`
+（14 轮，每轮负载门 900s + 间隔 150s，`rc=0` 停并打 `H12_GREEN`，`rc=1` 停着要人读，
+`rc=3` 继续等）。绿了之后把 `apps/mobile/evidence/android-habits-*.png` 九张一起入库。
+
