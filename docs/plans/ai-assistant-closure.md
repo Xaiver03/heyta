@@ -892,17 +892,20 @@ rig39 那趟的 `31/1` 与它的两条载体成因（`adb root` 拆掉 `adb reve
 ② 截图四张图的**归属复核 + 人打开看过**这一格等 rig43（rig42 的取证对账当时解析坏了自己）；
 ③ iOS 侧助手至今**零设备读数**（这一条不是 Android 能补的）。
 
-🔴 **看图当场查出的一条移动侧接线缺陷（rig42 的 `android-ai-1-assistant.png`，未修，登记在这里）**：
-`apps/mobile/src/ai/AssistantScreen.tsx:601` 把词条 `web.ai.capture.noteLead`
-（「确认后会按上面的字段写入。**截止时间是**」）整句当 `hint` 用，而 Web 那侧是
-`noteLead + noteStrong + noteTail` 三段拼起来、中间插入用户选的截止时间
-（`apps/web/src/features/ai/AiCapture.tsx:610`）。移动端只取了前半截 ⇒
-屏上留下一句以"截止时间是"结尾的悬空话。**这是接线错，不是词条错**：词条本身没写坏，
-坏在把"引导语"当成了完整句。修法二选一（要么移动端同样拼上真实截止时间、没有时说"不设截止时间"，
-要么给移动端一条自己的完整词条，中英成对），要连 `check:ui-language` 与 web/mobile 两侧的同屏对账一起改，
-**不在本轮载体已经占着设备的时候顺手改**。
-同批看图另记一条小的：`2-egress-blocked.png` 里「技术详情」那枚标签与它后面的正文之间没有分隔，
-读起来像同一句话重复了两遍（同一屏的 `发送内容：today、title` 那行是对的）。
+🔴 **看图当场查出的一条移动侧接线缺陷（rig42 的 `android-ai-1-assistant.png`）—— 源码已修，设备读数未取**：
+`apps/mobile/src/ai/AssistantScreen.tsx` 的捕获步把词条 `web.ai.capture.noteLead`
+（「确认后会按上面的字段写入。截止时间是」）整句当 `hint` 用，而 Web 那侧是
+`noteLead + noteStrong + noteTail` 三段拼成一句（`AiCapture.tsx:610`：
+「…截止时间是**模型的推算**，请核对后再填。」）。移动端只取了前半截 ⇒ 屏上留下一句以
+"截止时间是"结尾的悬空话。**这是接线错，不是词条错**（词条没写坏，坏在把"引导语"当成完整句），
+所以修法就是**按同一条口径拼三段**，不新增词条、不动中英对账。
+同处另修一条小的：失败面的「技术详情」标签与它下面的诊断原文之间没有分隔，
+读起来像同一句话重复两遍（现按本文件既有的 `{'\n'}` 分线写法处理）。
+✅ 已跑的：`@heyta/mobile` typecheck、`pnpm check:ui-language`（342 文件 / 475 处文案 / zh 3156 = en 3156）、
+`@heyta/mobile` 单测（现量看汇总行）。
+🔴 **未取的**：设备读数 —— 本轮 rig42/rig43 装的是 05:46 那枚 APK，早于这次改动，
+所以这两处**不能拿 rig43 的截图当已验证**；要等下一次重装（`pnpm reinstall:mobile`）之后
+重新看那张 `android-ai-1-assistant.png`。同一条纪律也适用于 `2-egress-blocked.png` 那处标签。
 
 **第 5 步当前的诚实状态**：三条候选里「逐功能同意没给」从定源**降级为待验证**（设备侧分不开
 「控件没渲染」与「控件没滚到」）。剩下两条不需要设备、只靠读代码就能判：
