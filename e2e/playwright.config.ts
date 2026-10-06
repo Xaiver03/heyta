@@ -49,7 +49,14 @@ export default defineConfig({
   retries: 1,
   workers: 1,
 
-  reporter: process.env['CI'] ? [['list'], ['github']] : [['list']],
+  // 🔴 第三份是**载体健康**报告器：dev server 中途死了要立刻响亮停下，
+  //    而不是把剩下 190 条 `ERR_CONNECTION_REFUSED` 逐条报成产品失败。
+  //    三份进链的配置都必须带上它，由 `check:e2e-carrier` 逐份盯着。
+  reporter: [
+    ['list'],
+    ...(process.env['CI'] ? [['github'] as const] : []),
+    ['./reporters/carrier-health.mjs'],
+  ],
 
   // 真浏览器比 jsdom 慢，但单条用例不该超过这个数。
   timeout: 60_000,
