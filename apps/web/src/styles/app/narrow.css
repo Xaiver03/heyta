@@ -156,7 +156,8 @@
      "展开详情面"的按钮就是界面在说谎（能点、能聚焦、点了什么都不出）。
      同一条理由的先例是上面 `.ht-sidebar__resizer` 那段。 */
   .ht-app__detail,
-  .ht-app__detail-toggle {
+  .ht-app__detail-toggle,
+  .ht-app__detail-resizer {
     display: none;
   }
 }
@@ -178,7 +179,8 @@
 
   /* 🔴 开关与列一起藏（理由同上面塌缩态那一段：点了什么都不出 = 界面在说谎）。 */
   .ht-app__detail,
-  .ht-app__detail-toggle {
+  .ht-app__detail-toggle,
+  .ht-app__detail-resizer {
     display: none;
   }
 }
@@ -220,7 +222,8 @@
   }
 
   .ht-app__detail,
-  .ht-app__detail-toggle {
+  .ht-app__detail-toggle,
+  .ht-app__detail-resizer {
     display: none;
   }
 }

@@ -587,3 +587,85 @@ B94 揭出的那条旧缺陷（一栏收起 52px ⇒ 整篇文档矮 52px ⇒ `s
 而"找不到去哪切语言"这个可发现性问题本来就属于"入口在页头"那一档，搬进设置后入口正是负责人要的位置。
 ⚠️ 但**它换来的代价是真的**：一个完全读不懂当前界面语言的人，此刻要先能读出「设置」两个字。
 下一位若要补那枚标记，判据要跟着加（否则"补了"与"没补"在载体上同样不可区分）。
+
+### 9.7 H10 两刀的落地与读数（2026-10-06 13:0x–15:2x）
+
+**第一刀**做 §9.1 表里第 5、6 条：详情列**没东西可画就不占位** + 它左边缘那条线**可拖**。
+**第二刀**是第一刀照出来的：那一栏在任务视图里"永远空着"不是几何问题，是**装配次序**问题 ——
+2026-10-04 那句「无状态的时候就可以默认显示 AI Chatbot」从来没有生效过。两刀合起来才把负责人
+那两句一起答上：栏里有了真东西，"右边凭空一格空白"就不存在了。
+
+| 项 | 落点 |
+|---|---|
+| 空栏不占位 | `App.tsx` 的 `detailHasContent`（`useLayoutEffect` + `MutationObserver` 量 `childElementCount`，**不是**把那条五分支链在 JS 里重抄一遍）→ `.ht-app[data-detail-empty]` → `base.css` 里 `--ht-detail-track: 0` **并且** `display:none` |
+| 把手 | `features/shell/ColumnResizer.tsx`（由 `SidebarResizer.tsx` 参数化改名而来，`git mv` 保住历史）：七个入参（`edge` / `columnSelector` / `cssVar` / `storageKey` / `min|maxToken` / `labelKey` / `className`），两个导出 `SidebarResizer`（`edge="end"`）与 `DetailColumnResizer`（`edge="start"`）。🔴 **一份实现两条列** —— 负责人那句"都可以自己调整"要的是第二枚把手，不是第二份实现（判据 D6 钉的就是模块名） |
+| 把手挂哪 | `.ht-main` 的右边缘 + `.ht-main { position: relative }`。**不挂在被拖那一栏里**：详情列自己是滚动容器，绝对定位的孩子会跟内容一起滚走（滚一下就没有可拖的地方）；往槽里补一层滚动包装又被 `check:detail-pane-slot` 腿 A 判红。两条理由写在 `ColumnResizer.tsx` 文件头 |
+| 可拖性看得见 | idle 不画线；hover / 拖拽中画 `--ht-color-primary` + `--ht-border-width-thick`；`:focus-visible` 有环（不 `outline:none`）。命中带 8px、其中 4px 骑到交界另一侧，且 `elementFromPoint` **反查**命中的是把手自己；触屏另钉 `touch-action: none` |
+| AI 面落点 | 分支链第 4 支补 `selectedTaskId !== null` ⇒ 未选中时第 5 支（AI 面）第一次拿到那一格。落点只看 `detailColumnShown`（几何 + 用户选择），**不看** `detailHasContent` —— 后者量的正是"这一栏有没有孩子"，而孩子有没有取决于 AI 挂哪，写成那个就是自己决定自己的循环 |
+
+🔴 **两条只有做这一刀才会现形的真缺陷**：
+
+1. **轨道归零时那一栏以 33px 画在视口外面。** grid 子项的自动最小尺寸是 min-content，而这一列带
+   `padding-inline` + `border-left` ⇒ 只把轨道设成 0 会得到 `x=1280 / width=33`、
+   `documentElement.scrollWidth = 1313 > innerWidth = 1280`（1280×720 现量）。
+   **这条不是本刀引入的**：`[data-detail='collapsed']` 一直是这个形状，只是它要用户主动收起才踩到，
+   而"没东西可画"那一档是**默认态**，一进应用就踩。修法：轨道归零的两档都补 `display:none`。
+2. **`aria-valuenow` 慢一帧。** 第一版在 render 里量宽度报给无障碍，而宽度是**写完自定义属性之后**
+   才落到布局上 ⇒ 拖完念的是上一帧（351 vs 352）。改成在 `useEffect` 里、`applyWidth` 之后再量。
+
+**判据怎么变的**（一条都没删）：
+
+- 新写 `e2e/tests/detail-column-resize.spec.ts` 6 条：D1 空档不占位（主区吃满 + 零横向溢出 + 把手不画）、
+  D2 有内容时回来且宽走 token + 把手正骑交界 + 反查命中、D3 方向 / 持久化 / 界内夹取 / 45vw 接管 /
+  双击与键盘等价、D4 idle 与 hover 两张图**必须不同**、D5 收起不留 33px（第二腿在番茄钟）、
+  D6 两条列共用一份实现。
+- 牙齿台 `research/tools/mutation-rigs/detail-column-resize-arms.sh`：四臂逐臂红集
+  `A→D1`、`B→D3,D6`、`C→D4`、`D→D5`，`BACK_TO_CLEAN=OK`。臂 D 先后被**两件事**各自挡住
+  （证人选错视图、同一条声明在文件末尾还有第二份），两件都写进台架注释并入 #357。
+- 三份既有 spec 只补**前提**、口径一字未动：`detail-column-slot` / `detail-pane-collapse` /
+  `detail-pane-overlay` 各加 `showDetailColumnContent(page)`（helper 收在一处，六个调用点不各抄一份）。
+- 🔴 两条**因本刀而必须改写**的别线判据（`detail-pane-task` T1 / T10）：它们原来把
+  "宽档未选中 ⇒ 整机零只备注框 / 行上没有提醒徽标"当成裁决，而那正是第二刀要修的洞
+  （行尾让位给一个**没在画东西**的栏 = 两半都没接，谁都没入口）。改写后钉的仍是同一条不变量、
+  且更可检查：**输入框数 == 任务行数**，并且**栏里那一格零只输入框**；T10 把"重新选中"提到
+  量徽标之前（原来那一句量的是"未选中档行尾长什么样"，不是那发 op 有没有落库）。
+  代改三条齐：一子可改／运行时形状逐字现量（`Received: 1` vs `Expected: 0` 那一格）／
+  `git revert` 一笔可回退。**没有**动任何阈值。
+
+**看图抓到两格，都不是断言抓到的**（本仓同一族第 4、5 次）：
+
+1. `d5-collapsed.png` 里拍的其实是**重新展开之后**的面单 —— 截图那行写在"再点一次开关"之后，
+   而文件名声称收起态。把图挪到收起那一刻、另补一张 `d5-reexpanded.png`，两张才各自对得上名字。
+   📌 **图名与图内容不符是证据链上最贵的一种坏**：下一位拿它对照判据时读不到任何异常信号。
+2. `d1-empty-no-column.png` 里有一枚灰色 tooltip 压在迷你月历上 —— 那是鼠标停在 rail 那一格上
+   被 `title` 叫出来的。D1/D2/D5 三处截图前漏了 `parkCursor(page)`（这一族别的 spec 都有），
+   已补。判据本身没受影响，受影响的是**这张图能不能给别人看**。
+
+**读数**（本刀范围内全部在干净态取）：
+
+| 门禁 | 结果 |
+|---|---|
+| `pnpm --filter @heyta/web typecheck` | RC=0 |
+| `pnpm --filter @heyta/web test` | **1998 passed / 13 skipped**（150 文件）。中途 1 枚红是 `task-detail-card.spec.tsx` 那条"栏里那一支与行尾那两支用同一枚布尔"的**源码形状**门禁 —— 它要求第三半写在布尔里而不是只写在装配处，照它改（这条门禁本刀起了作用） |
+| `pnpm --filter @heyta/i18n test` | 26 passed |
+| `check:design` / `check:layering` / `check:ui-language` | RC=0 / RC=0（384 文件 10 条规则）/ RC=0（词条表 zh **3255** / en **3255**） |
+| `check:row-single-source` / `check:detail-pane-slot` / `check:selection-single-source` | 各 RC=0（`ht-app__detail-resizer` 复用 `ht-app` 族，基线余量 0 不许新开一族） |
+| e2e 类型载体 `tsc --noEmit -p tsconfig.detail-pane.json` | RC=0（本刀点名加进 include：`detail-column-resize`、`sidebar-resize`、`ai-tool-run`） |
+| `check:ai-e2e` **整族** | **276 passed / 2 skipped / 0 failed，RC=0**（13.5 分钟）—— 这一族在本仓的历史读数一直是 8–10 枚红（B90 / B94），**第一次整族绿**。取数时刻 15:2x，载体 = 本刀之后的主检出 |
+
+🔴 **B90 那一簇 8 枚红随本刀全消**（那半是 `check:ai-e2e` 一直不可能绿的根因）：
+AI 侧 4 枚（`ai-assistant:65`、`ai-row-layout:115`、`ai-tool-run:103`、`ai-tool-run:155`）
++ 整理侧 4 枚（`calendar-sidebar:111`、`calendar-sidebar:226`、`glass-materials:158` 的 light 与 dark）。
+其中 `ai-tool-run` 那两枚其实是 H9 第三刀留下的断点（主题开关搬进设置浮层后，那份**本地**
+`toggleTheme` 还在按可访问名找页头的按钮）—— 换成共享 `switchTheme` 就不红了。
+`vault-settings:199` 同一根因、同一刀修掉（它不在 B90 的 8 枚里：那趟整链没跑到它，
+而它多出的那一条 `403` 是设置浮层挂载时探 `/api/admin/overview`，已按"多一个**已命名**来源"
+登记进那条 console 判据，不是放宽）。
+
+⚠️ **仍然开着的三格，不包装成完成**：
+
+1. 负责人第 5 条里"**数据侧边栏**和那个侧边栏哪有这么排版的"那半句仍未裁决：范围列
+   （`.ht-sidebar`）在习惯 / 时间线两档该不该出现，按 §9.2 第 2 步走 ——
+   **出同一屏两种排布的对比图给负责人拍**，不自行决定。
+2. 详情列仍然**没有无障碍名**（定名字要新词条、中英成对，不在这一笔里顺手定）。
+3. 本刀**没有**在四端当前产物上验（`pnpm reinstall:all` 未跑）；`FULLCHECK-01` 那一档仍开着。

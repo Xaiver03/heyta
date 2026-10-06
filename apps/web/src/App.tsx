@@ -9,7 +9,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  *   - 所有取值走 `var(--ht-*)`，**不出现裸 hex / px**
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
   CircleHelp,
@@ -135,7 +135,7 @@ import {
   toggleModule,
   type ShellModuleKey,
 } from './features/shell/modules.js';
-import { SidebarResizer } from './features/shell/SidebarResizer.js';
+import { DetailColumnResizer, SidebarResizer } from './features/shell/ColumnResizer.js';
 import { SyncBar } from './features/sync/SyncBar.js';
 import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
@@ -675,16 +675,53 @@ export function App(): React.JSX.Element {
    *    症状从"悄悄取消一次同意"降级成"少了一条回答"，不是同一件事，登记在
    *    BLOCKED.md B79。
    */
+  // 🔴 `detailRef` 上只挂**一枚**探针：`detailHasContent`（下面那段，量"这一栏画没画出孩子"，
+  // 驱动 `base.css` 的 `[data-detail-empty]`）。
+  // 2026-10-04 起这里还挂过第二枚 `detailHasRoom`（量"这一栏实际有没有宽度"，回答
+  // "AI 面挂哪一列"），第二刀把它删了，两个理由各自独立：
+  //   ① 它与"空 ⇒ 轨道归零"**互相定义**（栏因为没内容而 0 宽，而"有没有内容"又取决于
+  //     AI 挂哪），且只在 `resize` 时重测 ⇒ 首屏量到 0 就**粘住**：现量过一次"AI 配好
+  //     之后两处都不渲染"（`ai-assistant.spec.ts` 当场红，DOM 里 `[data-testid^="ai-"]` 0 个）；
+  //   ② 它替装配处量了一个本来就写得出的布尔 —— 落点是 `detailColumnShown`（几何 + 用户
+  //     选择，与 `narrow.css` 同源）。旧版之所以不敢用它：分支链第 4 支 `taskPaneInColumn`
+  //     在任务视图里**恒真**（`TaskDetailCard` 未选中时渲染空），AI 面从来走不到兜底那一支。
+  //     第二刀给那一支补上"确实选中了一条任务"，这条才成立。
+  // ⇒ 现在**挂不挂**由布尔决定、**画没画出来**由 DOM 量，两件事各有一处真源。
   const detailRef = useRef<HTMLElement>(null);
-  const [detailHasRoom, setDetailHasRoom] = useState(true);
-  useEffect(() => {
-    const sync = (): void => {
-      setDetailHasRoom((detailRef.current?.getBoundingClientRect().width ?? 0) > 0);
-    };
+  /**
+   * 详情列此刻**画没画出东西**。
+   *
+   * 🔴 产品负责人 2026-10-06 第 5 条：「数据侧边栏和那个侧边栏，哪有这么排版的？」
+   * 指的就是这一栏。现量（出厂默认态，四道 AI 闸全关、没选中任何东西）：
+   * 轨道 `64px 240px 624px 352px`、`aside.childElementCount === 0`、
+   * `aside.textContent === ''` —— **右边那 352px 是一格零内容的轨道**。
+   * 一条永远画着空白的列不是"留白"，是界面在说"这里有个东西"而那里什么都没有。
+   * ⇒ 没有东西可画的时候，轨道归零（`base.css` 的 `[data-detail-empty]`），
+   *   中间那一列把拿回来的宽度用掉；一旦有内容（选中任务 / 习惯面单 / AI 开着），
+   *   它按 `--ht-detail-width` 回来。
+   *
+   * 🔴 **为什么是量 DOM，而不是把上面那条分支链再算一遍**：那条链有五个分支，
+   * 在 JS 里重抄一次就是"同一个判断写两遍"—— 本仓为这个形状付过的账写在
+   * `AGENTS.md` §3.5。这一栏自己知道它有没有孩子。
+   *
+   * ⚠️ 与 `detailColumnShown`（几何 + 用户选择）**不是**同一件事，也不许合成一个布尔：
+   * 那条算的是"这一栏该不该出现"，这条量的是"这一格画没画出东西"。
+   * 两者可以各真各假：宽窗口 + 无内容 ⇒ 该出现、没东西。
+   *
+   * ⚠️ 用 `useLayoutEffect` 而不是 `useEffect`：后者要等一帧才收，
+   * 症状是"每次进应用，右边那道空白先亮一下再收"—— 那正是这条要消掉的东西。
+   */
+  const [detailHasContent, setDetailHasContent] = useState(true);
+  useLayoutEffect(() => {
+    const node = detailRef.current;
+    if (node === null) return undefined;
+    const sync = (): void => setDetailHasContent(node.childElementCount > 0);
     sync();
-    window.addEventListener('resize', sync);
+    // 面单是**异步**出现的（选中、切视图、AI 设置加载完），只看这一次会漏。
+    const observer = new MutationObserver(sync);
+    observer.observe(node, { childList: true });
     return () => {
-      window.removeEventListener('resize', sync);
+      observer.disconnect();
     };
   }, []);
   /**
@@ -741,17 +778,27 @@ export function App(): React.JSX.Element {
    * 界面什么都不说，数据却已经进模型。所以看不见时编辑卡回到便签板上方。
    */
   const detailColumnShown = useDetailColumnShown(detailPane === 'collapsed');
-
   /**
-   * 任务面单**此刻画在详情列里**的那个条件 —— 栏在画（几何 + 没被收起）且当前是任务那一族
-   * 的视图（列表 / 四象限 / 时间线：同一批任务行、同一个 `'task'` 选中态）。
+   * 任务面单**此刻真的画在详情列里**的那个条件 —— 栏在画（几何 + 没被收起）、
+   * 当前是任务那一族的视图（列表 / 四象限 / 时间线：同一批任务行、同一个 `'task'` 选中态），
+   * 🔴 **并且确实选中了一条任务**。
+   *
+   * 第三半是 2026-10-06 第二刀补的。旧的两半让这一支在任务视图里**恒真**，而
+   * `TaskDetailCard` 未选中时渲染**空** ⇒ 两件事同时发生：分支链第 5 支（AI 面）
+   * 从来没有拿到过那一格（2026-10-04 那句拍板"落地了但从来没生效"，判据
+   * `ai-row-layout.spec.ts` 一直红），而行尾的整理/备注触发器已经让位给了一个
+   * **没在画东西的栏**（`calendar-sidebar` / `glass-materials` 等
+   * `[data-testid="task-organize-summary"]` 超时 = B90 那 8 枚红的另一条侧）。
    *
    * 🔴 行尾那颗备注 chip 用的是**这同一个布尔的反向**，不是再算一遍条件：两处共用一枚变量，
    * "chip 没了而栏里也没有输入框"（= 任何档下都写不了备注）这一档就结构上不可能出现。
-   * 工单 §8.138。
+   * 工单 §8.138。这半**必须写在布尔里**而不是只写在装配处：只写装配处的话，
+   * 未选中的宽档就是"行尾让了位、栏里没人接"，而钉这件事的正是
+   * `apps/web/tests/task-detail-card.spec.tsx` 那条"同一枚布尔"的源码形状门禁。
    */
   const taskPaneInColumn =
     detailColumnShown &&
+    selectedTaskId !== null &&
     (contentView === 'tasks' || contentView === 'quadrant' || contentView === 'timeline');
 
   /**
@@ -1687,7 +1734,7 @@ export function App(): React.JSX.Element {
     <>
       {/* AI 工具调用（功能 ⑤）。
           🔴 它不新增路由/页面：作为任务视图里的一个面板挂在**右栏**
-          （≤1023px 右栏不出现时退回中间列 —— 见 `detailHasRoom`）。
+          （≤1023px 与用户收起那两档退回中间列 —— 判据是 `detailColumnShown`，见下面任务列末尾）。
           规则命中时**一个字节都不发**（面板会明说）；只有规则处理不了时才披露 + 发送。
           写工具只产出提案，必须用户再点「确认执行」才落库。 */}
       {contentView === 'tasks' && (
@@ -1767,6 +1814,9 @@ export function App(): React.JSX.Element {
         // 🔴 详情列的**用户选择**（不是几何判断）落在这里，CSS 按它把轨道归零 +
         // 不渲染那一列（`styles/app/base.css`）。两条各管一件事，见上面那段注释。
         data-detail={detailPane}
+        // 🔴 而这一条管的是"这一栏此刻有没有要画的东西"（与"用户收没收"是两回事，
+        // 理由与算法见上面 `detailHasContent` 那段）。零内容的列不许占位。
+        data-detail-empty={detailHasContent ? undefined : ''}
       >
       {/*
         ═══════════════════════════════════════════════════════════════════════
@@ -2316,10 +2366,13 @@ export function App(): React.JSX.Element {
 
 
           {/*
-            AI 面（单步工具 + 对话助手）在**右栏没位置**时才退回这里（≤1023px）。
+            AI 面（单步工具 + 对话助手）在**右栏不画**时才退回这里（≤1023px、用户收起）。
             两个挂载点共用下面 `aiPanels` 那一份 JSX —— 不抄第二份。
+            🔴 决定它是"栏在不在画"（`detailColumnShown` = 几何 + 用户选择），**不是**
+            "栏里有没有东西"：后者取决于 AI 挂哪，用它就成了自己决定自己的循环
+            （2026-10-06 第一刀那版正是这样把 AI 面永远锁在中间列的）。
           */}
-          {detailHasRoom ? null : aiPanels}
+          {detailColumnShown ? null : aiPanels}
 
           {/*
             任务列表。**一行只有一个实现** —— 就是 `@heyta/ui` 的 `TaskList`
@@ -2816,6 +2869,18 @@ export function App(): React.JSX.Element {
             </div>
           )}
         </div>
+        {/*
+          🔴 详情列的拖宽把手（产品负责人 2026-10-06 第 6 条：「右边那一栏…中间那条线
+          应该是可以调整的。侧边栏的宽度都可以自己调整」）。
+          它挂在 `.ht-main` 的右边缘上、**不在**被拖的那一列里 —— 详情列自己是滚动容器，
+          而绝对定位的孩子会跟着内容滚走（滚一下之后就没有可拖的地方了），
+          往槽里补一层滚动包装又被 `check:detail-pane-slot` 腿 A 判红。
+          两条理由写在 `features/shell/ColumnResizer.tsx` 文件头。
+          轨道归零（用户收起 / 这一栏没内容）时 CSS 把它一起藏掉 ——
+          "能点、能聚焦、拖了没反应"是这一仓明令禁止的形状（见 `narrow.css` 里
+          `.ht-sidebar__resizer { display: none }` 那一段的同一条理由）。
+        */}
+        <DetailColumnResizer />
       </main>
       {/*
        * 🔴 详情列（工单 W2）：`.ht-app` 的**直接子项**，与 `<main>` 平级。
@@ -2841,9 +2906,13 @@ export function App(): React.JSX.Element {
        * 便签/习惯/任务三面按的是**正条**：选中才换面单，不另开第三处。
        *
        * ⚠️ 窄屏（≤1023px）这一列不出现，规则与算过的账在 `styles/app/narrow.css`。
-       * AI 面在那一档**退回中间列**（`{detailHasRoom ? null : aiPanels}`，见上面任务列末尾），
-       * 不跟着这一栏一起消失；`detailHasRoom` 由挂在 `detailRef` 上的探针量出来，
-       * ⇒ **那个 ref 是承重的**，不要因为它"只是个 aside"就摘掉。
+       * AI 面在那几档**退回中间列**（`{detailColumnShown ? null : aiPanels}`，见上面任务列末尾），
+       * 不跟着这一栏一起消失。
+       * 🔴 落点只看"栏在不在画"（几何 + 用户选择），**不看**"栏里有没有东西"：
+       * 栏里有没有东西恰恰取决于 AI 挂哪。2026-10-06 第一刀那版写成
+       * `detailColumnShown && detailHasContent`，于是任务视图里那一栏先被判成空、
+       * AI 永远进不去 —— 2026-10-04 那句拍板就是这样"落地了但从来没生效"的。
+       * ⚠️ `detailRef` 仍然承重（它是"画没画出孩子"的取样点），不要摘掉。
        * 其余四面走 `detailColumnShown`（收起态/无位置时生产者自己不出）。
        *
        * ⚠️ 这一栏仍然**没有无障碍名**。"因为里面没内容"那句理由已经不成立（五面都在住），
@@ -2870,12 +2939,17 @@ export function App(): React.JSX.Element {
           /* 任务面单（工单 §8.138）：选中哪一条，这一格就是那一条的面单；没选中就不画
              （沿用便签那一支的先例，见 `TaskDetailCard` 文件头那一段"为什么没有空态"）。
              四象限与时间线走同一批任务行、同一个 `'task'` 选中态 ⇒ 三面共用这一支。
+             🔴 "没选中"这一半住在 `taskPaneInColumn` 里（第二刀补的），不写在这一支上 ——
+             因为同一枚布尔还决定行尾让不让位，拆开就会写成"行尾让位、栏里没人接"。
              🔴 备注编辑器的落点在**这一格**，所以行尾那颗备注 chip 在这一支成立时不渲染
              （`renderTaskTrailing` 里的 `noteInColumn`）—— 同一字段任何时刻只有一个所有者。 */
           <TaskDetailCard />
-        ) : detailHasRoom ? (
-          /* 兜底那一格是 AI 面（2026-10-04 拍板：无选中时默认显示 Chatbot）。
-             🔴 它排在**最后**：上面四面任一成立时这一栏已被占，AI 面不叠第二处。 */
+        ) : detailColumnShown ? (
+          /* 兜底那一格是 AI 面（2026-10-04 拍板：无选中时默认显示 Chatbot；
+             2026-10-06 第二刀才真的兑现它，判据 = `ai-row-layout.spec.ts` 的落点那一支）。
+             🔴 它排在**最后**：上面四面任一成立时这一栏已被占，AI 面不叠第二处。
+             ⚠️ 它自己只在任务视图里画东西（`aiPanels` 里两支都 gated 到 `'tasks'`），
+             所以四象限/时间线/日历等档的"未选中"仍然是一格没孩子 ⇒ 轨道归零、不占位。 */
           aiPanels
         ) : null}
       </aside>

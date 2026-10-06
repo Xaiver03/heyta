@@ -62,7 +62,7 @@ import {
 } from '@heyta/ui';
 import { Check, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
 
-import { SidebarResizer } from '../shell/SidebarResizer.js';
+import { SidebarResizer } from '../shell/ColumnResizer.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useProjectStore } from '../projects/store.js';
 import { useTaskStore } from '../tasks/store.js';

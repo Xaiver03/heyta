@@ -464,6 +464,8 @@ export const zhCN = {
   'web.shell.nav.q3': '紧急不重要',
   'web.shell.nav.q4': '不重要不紧急',
   'web.shell.sidebar.resize': '调整侧栏宽度',
+  // 详情列（最右那一栏）左边缘那枚拖拽把手（`ColumnResizer.tsx` 的 `DetailColumnResizer`）。
+  'web.shell.detail.resize': '调整详情栏宽度',
   // 顶栏语言分组的**可见**标签（`LanguageSwitcher.tsx`）。它必须看得见而不是只挂在
   // `aria-label` 上：同一个位置已经判过两次"用户根本不知道它们是什么"
   // （`App.tsx` 排序下拉那段、`main-area.css` 的 `.ht-header__view`）。

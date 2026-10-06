@@ -19,11 +19,18 @@
     为什么是自定义属性而不是把 clamp 抄两遍：抄两遍就会漂 ——
     `check:row-single-source` 那条纪律防的就是这个形状。
     塌缩态把它改成 `0`（见 `narrow.css`），两行轨道声明都不用动。
+
+    🔴 中间那一项从 2026-10-06 起是**用户拖出来的** `--ht-detail-width`
+    （`DetailColumnResizer` 写在 `:root` 上，设备本地），没拖过时回落到 token 默认值。
+    上界多包一层 `min(max, 45vw)`：窗口后来变窄时不需要任何 JS 监听，
+    浏览器每次布局自己重夹 —— 与范围列那条 `min(…, 40vw)` 同一条分工。
+    ⚠️ 这条**不是**装饰：没有它，"拖到 480px 之后把窗口收到 700px"会让详情列
+    吃掉一半以上的主区，而中间那一列是任务列表本身。
   */
   --ht-detail-track: clamp(
     var(--ht-layout-detail-min-width),
-    var(--ht-layout-detail-width),
-    var(--ht-layout-detail-max-width)
+    var(--ht-detail-width, var(--ht-layout-detail-width)),
+    min(var(--ht-layout-detail-max-width), 45vw)
   );
 
   /* 默认两层 + 详情列：rail + main + detail（四象限/习惯/番茄钟… 没有范围列） */
@@ -104,6 +111,100 @@
  */
 .ht-app[data-detail='collapsed'] {
   --ht-detail-track: 0;
+}
+
+/*
+ * 🔴 这一栏**没有东西可画**时也不许占位（`App.tsx` 的 `detailHasContent` 写这个属性，
+ * 它量的是"这一栏有没有孩子"，不是又一份分支判断的抄件）。
+ *
+ * 症状（2026-10-06 现量，出厂默认态）：轨道 `64px 240px 624px 352px`，
+ * 而那 352px 里 `childElementCount === 0`、`textContent === ''`。
+ * 产品负责人那句话就是指着它说的：「数据侧边栏和那个侧边栏，哪有这么排版的？」
+ *
+ * ⚠️ 它与上面那条 `[data-detail='collapsed']` **是两条规则，不许合成一条**：
+ * 那条说的是"用户选了收起"（他选了就一直收起），这条说的是"这一屏此刻没内容"
+ * （选中一条任务就该回来）。合并的后果是"用户没收起，但应用替他收起了，
+ * 而且收起状态被记进偏好" —— 那是把几何事实写进用户的选择里。
+ * 两条各自把同一个轨道归零，走的是同一条 `--ht-detail-track`，所以没有第三份 clamp。
+ */
+.ht-app[data-detail-empty] {
+  --ht-detail-track: 0;
+}
+
+/*
+ * 详情列左边缘的拖拽条（`DetailColumnResizer`）。
+ *
+ * 它住在 `.ht-main` 那一层、骑在两条轨道的交界上 —— 为什么不挂在被拖的那一列里，
+ * 理由（滚动容器会把它带走 + 槽里不许手写包装）写在 `ColumnResizer.tsx` 文件头。
+ *
+ * ⚠️ 与范围列那一枚同一条设计：**不画自己**，只有 hover / 拖拽中 / 键盘聚焦时
+ * 才出现一条线；命中带 8px，其中 4px 骑到交界的另一侧去。
+ */
+.ht-app__detail-resizer {
+  position: absolute;
+  inset-block: 0;
+  inline-size: var(--ht-space-2);
+  inset-inline-end: calc(var(--ht-space-2) * -0.5);
+  cursor: col-resize;
+  background: transparent;
+  /* 🔴 触屏上必须关掉：否则横向拖会被浏览器读成页面滚动（"鼠标能拖、手指拖不动"）。 */
+  touch-action: none;
+}
+
+.ht-app__detail-resizer::after {
+  content: '';
+  position: absolute;
+  inset-block: var(--ht-space-6);
+  inset-inline-start: 50%;
+  inline-size: var(--ht-border-width-thin);
+  transform: translateX(-50%);
+  background: var(--ht-color-border);
+  opacity: 0;
+}
+
+.ht-app__detail-resizer:hover::after,
+.ht-app__detail-resizer--dragging::after {
+  opacity: 1;
+  /* 🔴 换色换粗：`--ht-color-border` 恰好就是详情列 `border-left` 的值，
+     同色同位等于**没画**（范围列那一枚 2026-09-30 实测过，两张截图逐像素相同）。 */
+  background: var(--ht-color-primary);
+  inline-size: var(--ht-border-width-thick);
+}
+
+.ht-app__detail-resizer:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-app__detail-resizer:focus-visible::after {
+  opacity: 1;
+  background: var(--ht-color-primary);
+}
+
+/*
+ * 轨道归零 ⇒ 把手必须跟着消失（两条归零的理由都算）。
+ * 留着它就是一枚"能点、能聚焦、拖了什么都不动"的控件 —— 这一仓在塌缩态那条里
+ * 已经为同一种东西写过判据（`narrow.css` 的 `.ht-sidebar__resizer { display: none }`）。
+ */
+.ht-app[data-detail='collapsed'] .ht-app__detail,
+.ht-app[data-detail='collapsed'] .ht-app__detail-resizer,
+.ht-app[data-detail-empty] .ht-app__detail,
+.ht-app[data-detail-empty] .ht-app__detail-resizer {
+  /*
+    🔴 只把轨道归零**不够**：这一列自己带 `padding-inline` + `border-left`，
+    而 grid 子项的自动最小尺寸是 min-content（= 33px），于是它会以 33px 宽
+    **画在视口外面**。现量（1280×720，出厂默认态）：
+      · 详情列 `x=1280 / width=33` ⇒ 右边缘 1313；
+      · `documentElement.scrollWidth = 1313 > innerWidth = 1280` ⇒ **整页横向溢出 33px**。
+    这条不是新引入的：`[data-detail='collapsed']` 一直就是这个形状，只是它要用户
+    主动收起才踩到，而"没东西可画"那一档是**默认态**，每个人一进应用就踩。
+    （`e2e/tests/detail-column-slot.spec.ts` 的"右边缘 == 视口右边缘"是当场把它抓住的那条。）
+
+    ⚠️ 顺带修正一条旧结论：`App.tsx` 里那个"这一栏实际有没有宽度"的探针
+    （`detailHasRoom`）以前读到的是 **33 > 0 ⇒ 有位置**，于是收起态下 AI 面被挂进
+    一格画在视口外的栏里。`display: none` 之后它读到 0，AI 面按设计退回中间那一列。
+  */
+  display: none;
 }
 
 /* ── 详情列的内容：专注概览（工单 W7）───────────────────────
@@ -259,8 +360,4 @@
 .ht-app__detail-record-aborted {
   /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
   color: var(--ht-color-foreground-muted);
-}
-
-.ht-app[data-detail='collapsed'] .ht-app__detail {
-  display: none;
 }

@@ -410,6 +410,8 @@ export const en = {
   'web.shell.nav.q3': 'Urgent, not important',
   'web.shell.nav.q4': 'Not important, not urgent',
   'web.shell.sidebar.resize': 'Resize the sidebar',
+  // The drag handle on the left edge of the details column (`DetailColumnResizer`).
+  'web.shell.detail.resize': 'Resize the details panel',
   // Visible label of the header language group (`LanguageSwitcher.tsx`). It has to be
   // text on screen, not just an `aria-label` - this exact spot was judged twice for
   // "the user has no idea what these are". The options themselves stay in their own
