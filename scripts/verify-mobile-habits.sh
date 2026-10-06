@@ -48,6 +48,11 @@ trap 'rm -f -- "$0"' EXIT
 #      且两边都还数得出主蓝（挡"暗色只是叠了一层黑"与"暗色把品牌色丢了"两种假绿）
 #   ⑧ 撤销 → `HABIT_LOG` 多**恰好 1 条 DEL**、`连续` 回到 0；随后**笔记本**同步后
 #      读得到这条 HABIT 与那次打卡的痕迹（跨设备，不是本机自说自话）
+#   ⑨ 这一批证据图**各自必须是不同的一屏**（按内容哈希对账，不是按文件名）。
+#      实测撞过：`4-checked` 与 `5-list-after-checkin` 逐字节相同（同一秒、同一 md5），
+#      因为两张之间**没有导航** —— 同一屏连拍了两次。每张自己的判据（非空白 / 数得出主蓝 /
+#      暗色翻面）全过，所以"九张图"里其实只有八屏，而输出上看不出差别。
+#      🔴 这是 §7 元规则二的一个新面目：**逐张合格的判据，合起来挡不住"重复交证据"**。
 #
 # 🔴 ③⑤⑧ 三条都写成**数 op 的条数**，不是"有没有那条 op"。理由与
 #    `verify-mobile-trash.sh` 第 6b 步同一条：一个用户意图 = 一个 op（AGENTS §3.4），
@@ -188,6 +193,9 @@ shot() {  # <名字> —— 落一张带序号前缀的 PNG，并且**必须**�
   rm -f "$out"
   $ADB exec-out screencap -p > "$out" 2>/dev/null
   if [ ! -s "$out" ]; then bad "截图没落盘：$out"; return 1; fi
+  # 逐行记账给第 11 步（重复检测）用。**不能**用空格拼一个列表：仓库路径本身带空格
+  # （`All in one Data`），拼完就切不回原始路径了。
+  SHOT_FILES="${SHOT_FILES:-}${out}"$'\n'
   echo "   📸 $out"
 }
 
@@ -233,6 +241,31 @@ judge_shot() {  # <标签> <路径> [暗色对照路径]
   else
     ok "$label：非空白 · 主蓝 $blue"
   fi
+}
+
+judge_shot_set() {  # 这一批证据图必须**各是一屏**（按内容哈希对账，不按文件名）
+  # 🔴 逐张判据（非空白 / 数得出主蓝 / 暗色翻面）**合起来挡不住"同一屏连拍两次"**：
+  #    两张一样的图各自都合格。实测 07 01:13:27 那两张 md5 逐字相同，而输出上没人变红。
+  local out n uniq dupes
+  out=$(printf '%s' "${SHOT_FILES:-}" | python3 -c '
+import hashlib, sys, collections
+paths = [l for l in sys.stdin.read().splitlines() if l.strip()]
+names = collections.defaultdict(list)
+for p in paths:
+    names[hashlib.sha256(open(p, "rb").read()).hexdigest()].append(p.rsplit("/", 1)[-1])
+dupes = sorted(sum([v for v in names.values() if len(v) > 1], []))
+print("N=%d UNIQ=%d DUPES=%s" % (len(paths), len(names), ",".join(dupes) or "-"))
+' 2>&1)
+  n=$(printf '%s' "$out" | sed -n 's/.*N=\([0-9][0-9]*\).*/\1/p')
+  uniq=$(printf '%s' "$out" | sed -n 's/.*UNIQ=\([0-9][0-9]*\).*/\1/p')
+  dupes=$(printf '%s' "$out" | sed -n 's/.*DUPES=\([^ ]*\).*/\1/p')
+  [ -n "$n" ] || { bad "重复检测探针没读数（原文：${out:-空}）—— 判据没跑，不算产品失败"; return 1; }
+  if [ "$n" = "0" ]; then bad "没有任何一张证据图入账（账单 0 张）"; return 1; fi
+  if [ "$n" != "$uniq" ]; then
+    bad "$n 张证据图只对应 $uniq 个不同内容 ⇒ 有重复交的证据：$dupes"
+    return 1
+  fi
+  ok "$n 张证据图各自是不同的一屏（内容哈希 $uniq/$n）"
 }
 
 # 底部 5 个 tab 的中心 x（1080 宽均分，见 verify-mobile-calendar.sh 那段推导）。
@@ -395,6 +428,10 @@ if [ "$(op_count "$PHONE_DB" HABIT_LOG CRT "$LOG_ID")" = "1" ]; then
 else
   bad "HABIT_LOG/CRT 条数 = $(op_count "$PHONE_DB" HABIT_LOG CRT "$LOG_ID")（期望 1）"
 fi
+# 🔴 这张必须在**详情屏**上拍（还没点返回）。原先它和下面那张清单图连着排在一起，
+#    中间没有导航 ⇒ 九张"证据"里有两张逐字节相同（md5 `218d003e2d…`，实测 07 01:13:27），
+#    而每张自己的判据都过 —— 见第 11 步那条新判据。
+shot 4-checked && judge_shot "⑤ 打卡后详情图" "$EVIDENCE/android-habits-4-checked.png"
 
 step "7. 回清单：那一行必须变成「连续 1 天」"
 # 🔴 用**界面自己的返回**（Screen 头部那颗「返回」），不用 KEYCODE_BACK：
@@ -406,7 +443,6 @@ XY=$(xy_desc "返回")
 $ADB shell input tap $XY; sleep 2
 $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; $ADB shell cat /sdcard/ui.xml > "$UI_XML" 2>/dev/null
 if [ "$(has_desc_sub '连续 1 天')" = "1" ]; then ok "行 aria 变成「连续 1 天」"; else bad "行 aria 没变（还是 0 天？）"; screen_txt; fi
-shot 4-checked && judge_shot "⑤ 打卡后详情/清单图" "$EVIDENCE/android-habits-4-checked.png"
 shot 5-list-after-checkin && judge_shot "⑤ 打卡后清单图" "$EVIDENCE/android-habits-5-list-after-checkin.png"
 
 step "8. ⑥ 杀进程重开：状态必须在库里，不在 React 里"
@@ -501,5 +537,8 @@ if [ "${seen:-0}" != "0" ]; then
 else
   bad "笔记本在 $((ROUNDS*5)) 秒里没读到那条习惯 —— 跨设备没闭环"
 fi
+
+step "11. ⑨ 这一批证据图各自是不同的一屏（内容哈希对账，不是按文件名）"
+judge_shot_set
 
 summary "移动端习惯屏装机验收"
