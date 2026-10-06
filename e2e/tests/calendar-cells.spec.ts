@@ -32,7 +32,10 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { openApp } from './helpers';
+import {
+  openApp,
+  switchTheme,
+} from './helpers';
 
 /**
  * 🔴 必须带 `?lang=zh-CN`：这一屏的定位符与 aria-label 全是中文，而 2026-10-01 起
@@ -387,7 +390,7 @@ test('🔴 月格里的任务条一条都没被裁一半，且「+N」对得上�
   //    · `emulateMedia({colorScheme:'dark'})` 只改 `prefers-color-scheme`，
   //      应用显式选了主题时它压根不参与。
   //    只有走按钮，`applyTheme` 与 `setTheme` 才同时改，量到的才是用户真看到的暗色。
-  await page.getByRole('button', { name: '切换到暗色主题' }).click();
+  await switchTheme(page, 'dark');
   const dark = await ink();
   expect(dark!.missing, '暗色：格子里没找到可读的任务条').toBe('');
   // 🔴 这条是上面那次"假暗色"的**判据化**：卡片底色必须真的换了。

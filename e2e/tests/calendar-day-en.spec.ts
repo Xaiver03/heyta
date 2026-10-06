@@ -128,10 +128,11 @@ async function openAppEnglish(page: Page): Promise<void> {
   await enableAllModules(page);
   await installMissingProducerShims(page);
   await page.goto(APP_EN);
-  // 锚点用 `language-option-en`（testID，语言中立）而不是任何一句界面文字 ——
+  // 锚点用 testID（语言中立）而不是任何一句界面文字 ——
   // 与 `language-first-launch.spec.ts` 同一个理由：拿句子当"起来了"的锚，
-  // 等于把词条抄进测试。
-  await expect(page.getByTestId('language-option-en')).toBeVisible();
+  // 等于把词条抄进测试。原来是 `language-option-en`，H9 第三刀之后它在设置浮层里，
+  // "应用起来了"这一屏并没有它 ⇒ 换成 rail 底部那颗帮助（不随语言、不随视图变）。
+  await expect(page.getByTestId('rail-help')).toBeVisible();
   await decidePrivacyConsent(page);
   // 🔴 英文确实生效：`<html lang>` 是应用按解析结果自己写的。
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');

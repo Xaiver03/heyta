@@ -530,6 +530,11 @@ export const en = {
   'web.settings.display.detail.modeOpen': 'Always shown',
   'web.settings.display.detail.modeCollapsed': 'Hidden',
   'web.settings.display.detailNote': 'The right column shows the details pane for the current selection. When the window is too narrow or too short it hides itself and this setting does nothing. Once you hide it on this device, the header button, this setting, or ⌘/Ctrl + Shift + \\ brings it back.',
+  // Settings → Display: language and theme (moved out of the header on 2026-10-06).
+  // The two notes are not decoration: once these live in Settings, the screen has to
+  // say what each row does — the header used to buy that by always being visible.
+  'web.settings.display.langNote': 'Which language this app shows its interface in. It does not change your system language.',
+  'web.settings.display.themeNote': 'A preference for this device. Until you choose here, the interface follows your system light or dark setting.',
   'web.shell.dueMode.countdown': 'Countdown',
   // Icon-only buttons on a task row: the name must carry the task title, or a
   // screen reader reads out a run of indistinguishable "button"s.

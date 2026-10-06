@@ -599,6 +599,11 @@ export const zhCN = {
   'web.settings.display.detail.modeOpen': '常驻',
   'web.settings.display.detail.modeCollapsed': '收起',
   'web.settings.display.detailNote': '右侧那一栏显示当前选中项的面单。窗口太窄或太矮时它自己不出现，这时这一项设置不起作用。在这一台设备上收起之后，页头的按钮、这里的开关，或快捷键 ⌘/Ctrl + Shift + \\ 都能把它叫回来。',
+  // ── 设置 → 显示：语言与主题（H9 第三刀，2026-10-06 从页头搬进来）────────
+  // 两条说明都不是装饰：搬进设置之后，"这一格管什么"只能靠界面自己说清楚。
+  // 尤其语言那一格 —— 它过去在页头，靠"永远看得见"来免解释。
+  'web.settings.display.langNote': '界面用哪一种语言显示。只改这个应用，不改系统的语言。',
+  'web.settings.display.themeNote': '这台设备上的偏好。在这里选过之前，界面跟随系统的深/浅色设置。',
   'web.shell.dueMode.countdown': '倒计时',
   // 任务行上那几个**纯图标**按钮：名字里必须带上任务标题，
   // 否则屏幕阅读器听到的是一串没有区别的"按钮"。

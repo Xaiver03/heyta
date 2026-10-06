@@ -34,7 +34,13 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-import { addHabit, boxOf, openApp, switchView } from './helpers';
+import {
+  addHabit,
+  boxOf,
+  openApp,
+  switchTheme,
+  switchView,
+} from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 
@@ -277,8 +283,7 @@ test.describe('习惯清单两列卡片（H1）', () => {
     await switchView(page, '习惯');
     await addHabit(page, '喝水');
     await addHabit(page, '阅读');
-    await page.getByRole('button', { name: '切换到暗色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await switchTheme(page, 'dark');
     await page.locator('[data-testid^="habit-row-"]').filter({ hasText: '阅读' }).first().click();
 
     // 暗色不是亮色的反相（AGENTS §5）：这里不只看"画得出来"，还看**选中态那圈边框**

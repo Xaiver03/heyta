@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { openApp, switchView } from './helpers';
+import {
+  openApp,
+  switchTheme,
+  switchView,
+} from './helpers';
 
 /**
  * 收集箱界面 vs 滴答清单参照图（产品负责人 2026-10-01 附 macOS 截图）
@@ -113,8 +117,7 @@ test('组头折叠：收起后行消失、组头与计数留下', async ({ page 
 
   // 🔴 暗色不是亮色的反相（AGENTS §5）：那枚 ▸ 用的是 `color.foreground-subtle`，
   // 在亮底上是浅灰 —— 只截图看一眼才知道它在暗底上有没有跟着翻。
-  await page.getByRole('button', { name: '切换到暗色主题' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await switchTheme(page, 'dark');
   await toggle.click();
   await expect(group.locator('[role="checkbox"]')).toHaveCount(0);
   await page.screenshot({ path: SHOT('collapse-collapsed-dark') });
@@ -172,8 +175,7 @@ test('最近 7 天：侧栏计数 == 点进去的行数，逾期那条不在里�
   await page.screenshot({ path: SHOT('next7-list') });
 
   // 暗色：这一列的组头/计数/勾选框在暗底上有没有跟着翻（AGENTS §5）。
-  await page.getByRole('button', { name: '切换到暗色主题' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await switchTheme(page, 'dark');
   await page.screenshot({ path: SHOT('next7-dark') });
 
   expect(consoleErrors, '控制台不应有异常').toEqual([]);
@@ -226,8 +228,7 @@ test('页头排序：换档位真的换行序，控件带可见标签', async ({
   await page.screenshot({ path: SHOT('sort-priority') });
 
   // 暗色：下拉的底色/边框/文字是否跟着 token 翻（AGENTS §5）。
-  await page.getByRole('button', { name: '切换到暗色主题' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await switchTheme(page, 'dark');
   // ⚠️ 等动效落位再拍：主题切换带 duration token 的过渡，抢拍会把
   // 行尾那些按钮拍成"灰底没文字"——那是探针的假象，不是界面的样子（e2e 探针陷阱）。
   await page.waitForTimeout(600);

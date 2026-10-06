@@ -33,6 +33,16 @@
   },
   "include": [
     "tests/helpers.ts",
+    "tests/shell-sidebar-height.spec.ts",
+    // ⚠️ 本单还动过 `countdown-export` / `task-row-touch-target` / `calendar-cells` 三份，
+    //   但**没**点名进来：它们各自带着与本单无关的既有类型错误（现量 3+1+1 条，
+    //   复现：把这三行加进来再跑上面那条命令）。这道载体的立场是「只收干净的那几份」，
+    //   不是放宽判据 —— 那三份归各自的所有者，登记在 BLOCKED.md 本单那一节。
+    "tests/inbox-dida.spec.ts",
+    "tests/ai-assistant.spec.ts",
+    "tests/theme-switch-contrast.spec.ts",
+    "tests/language-first-launch.spec.ts",
+    "tests/calendar-day-en.spec.ts",
     "tests/detail-column-slot.spec.ts",
     "tests/detail-pane-overlay.spec.ts",
     "tests/detail-pane-collapse.spec.ts",

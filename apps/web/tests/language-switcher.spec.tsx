@@ -11,8 +11,8 @@
  * 手写 `locale="en"` 才会出现。
  *
  * 所以这里钉的不是"函数对不对"，而是**可达性**：
- *   1. 挂**真的 `<App />`**（包上与线上同一个 `LocaleHost`），
- *      从外壳顶栏里找到那些按钮；
+ *   1. 挂**真的 `<App />`**（包上与线上同一个 `LocaleHost`），**走真路径打开设置**，
+ *      从 设置 → 显示 那一节里找到那些按钮；
  *   2. 点它之后，断言**渲染出来的字**变了（不是断言 state）——
  *      侧栏、视图 tab、空状态，三处都要变；
  *   3. 刷新后还得是英文（`localStorage` 落盘），`<html lang>` 也要跟上。
@@ -39,6 +39,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { enableModules } from './enable-all-modules.js';
+import { openSettingsViaAvatar } from './open-settings-via-avatar.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LOCALES } from '@heyta/i18n';
@@ -75,6 +76,34 @@ function mount(strict = false): HTMLDivElement {
   return container;
 }
 
+/**
+ * 挂载 + **走真路径**打开 设置 → 显示。
+ *
+ * 🔴 语言控件住在设置那一节里（H9 第三刀），而设置是**条件渲染**的浮层
+ * （`App.tsx` 里 `{view === 'settings' && …}`）⇒ "用户点得到它"这件事现在**包含**
+ * "走得到设置"那一步。走的是真路径（头像 → 设置），不是往 store 里塞 view ——
+ * 那会把这一族判据声称要钉的东西自己抹掉。
+ *
+ * ⚠️ 只有**要点/要数语言按钮**的用例走这里；纯首启那几条继续用 `mount()`：
+ *   设置开着的时候**范围列不在 DOM 里**（那一列只在有范围的视图里存在），
+ *   拿它当"界面翻过去了"的锚会假红。
+ */
+async function mountIntoSettings(strict = false): Promise<HTMLDivElement> {
+  const el = mount(strict);
+  await openSettingsViaAvatar(el);
+  return el;
+}
+
+/** 收掉设置浮层 —— 回到用户"切完语言关掉设置"那一步，好量外壳。 */
+async function closeSettings(el: HTMLElement): Promise<void> {
+  const close = el.querySelector<HTMLButtonElement>('[data-testid="settings-sheet-close"]');
+  if (close === null) throw new Error('设置浮层没有出口 —— 用户进得去出不来，下面没法量外壳');
+  await act(async () => {
+    close.click();
+  });
+  expect(el.querySelector('[data-testid="settings-sheet"]'), '设置浮层没关掉').toBeNull();
+}
+
 function unmount(): void {
   act(() => {
     root?.unmount();
@@ -103,8 +132,13 @@ function options(el: HTMLElement): HTMLButtonElement[] {
 
 /** 外壳自己渲染的那几块：侧栏 + 视图 tab 条 + 空状态。 */
 function shellText(el: HTMLElement): string {
-  const parts = [el.querySelector('.ht-sidebar'), el.querySelector('[role="tablist"]')];
-  return parts.map((node) => node?.textContent ?? '').join(' ');
+  const sidebar = el.querySelector('.ht-sidebar');
+  if (sidebar === null) {
+    throw new Error('侧栏不在 DOM 里 —— 设置浮层还开着？先 closeSettings()（那一列只在有范围的视图里存在）');
+  }
+  const tabs = el.querySelector('[role="tablist"]');
+  if (tabs === null) throw new Error('视图 tab 条不在 DOM 里 —— 外壳没渲染，量的是空气');
+  return [sidebar, tabs].map((node) => node.textContent ?? '').join(' ');
 }
 
 /** 顶栏那个语言**分组**本身（`role="group"` 的容器）。找不到就抛，理由同 `option()`。 */
@@ -125,11 +159,12 @@ function switcherLabel(el: HTMLElement): HTMLElement {
   if (label === null) throw new Error(`aria-labelledby 指向的 #${id} 不在 DOM 里`);
   // 🔴 「看得见」是这条判据的全部意义：把标签换成 `.sr-only` 仍然满足
   //   "分组有可访问名"，但产品负责人那句"用户根本不知道它们是什么"就回来了。
-  //   jsdom 没有布局盒，所以这里查的是**结构**（挂着渲染它的那个类、没挂隐藏类）；
-  //   "真的画出来了"由 e2e 的 `getByRole('group', { name: '语言' })` + 截图负责。
+  //   jsdom 没有布局盒，所以这里查的是**结构**（挂着渲染它的那个类、没挂隐藏类，
+  //   并且**在设置那一节里面**）；"真的画出来了"由 e2e 的
+  //   `getByRole('group', { name: '语言' })` + 截图负责。
   if (label.className.includes('sr-only')) throw new Error('语言标签被藏成 sr-only —— 界面上没人看得见它');
-  if (!label.className.includes('ht-header__lang-label')) {
-    throw new Error('语言标签没挂 ht-header__lang-label —— 它不再是页头那一族的成员');
+  if (!label.className.includes('ht-settings__lang-label')) {
+    throw new Error('语言标签没挂 ht-settings__lang-label —— 它不再是设置那一族的成员');
   }
   if (label.textContent === '') throw new Error('语言标签是空的 —— 分组名字来自哪里？');
   return label;
@@ -149,8 +184,8 @@ afterEach(() => {
 });
 
 describe('🔴 可达性：真实外壳里有没有那个控件', () => {
-  it('顶栏的全局控件区里，每一种已启用语言都有一个按钮', () => {
-    const el = mount();
+  it('设置 → 显示 那一节里，每一种已启用语言都有一个按钮', async () => {
+    const el = await mountIntoSettings();
     const found = options(el);
 
     // 🔴 项数从 LOCALES 推导，不写死 2 —— 这条断言的真正作用是：
@@ -160,8 +195,11 @@ describe('🔴 可达性：真实外壳里有没有那个控件', () => {
     );
 
     for (const node of found) {
-      // 每一项都在顶栏的全局控件区（与主题切换并列），任何视图下都看得见。
-      expect(node.closest('.ht-header__actions')).not.toBeNull();
+      // 每一项都在 设置 → 显示 那一节里（与主题切换并列，2026-10-06 从页头搬进来）。
+      expect(node.closest('[data-testid="display-pref-panel"]')).not.toBeNull();
+      // 🔴 反向存在性：页头那一排**不许**再长出语言分组 —— 挡"下一批觉得放顶栏方便"又加回来
+      //   （同一个动作两个入口是仓库判过的错形，`goal-layout-audit.md` §6 第 2 条）。
+      expect(node.closest('.ht-header__actions')).toBeNull();
       // 🔴 而且都在**同一个分组**里 —— 散在 `.ht-header__actions` 上的按钮没有组名，
       // 辅助技术读到的是两个孤零零的词，而不是"语言：中文 / English"。
       expect(node.closest('[data-testid="language-switcher"]')).toBe(switcher(el));
@@ -170,8 +208,8 @@ describe('🔴 可达性：真实外壳里有没有那个控件', () => {
     }
   });
 
-  it('🔴 顶栏里语言这件事**只有一个入口**，而且那个入口自己说明自己是什么', () => {
-    const el = mount();
+  it('🔴 整个外壳里语言这件事**只有一个入口**，而且那个入口自己说明自己是什么', async () => {
+    const el = await mountIntoSettings();
     // 一个入口，不是两枚裸胶囊、也不是"胶囊 + 设置页里再来一份"。
     // 「同一个动作两个入口」是仓库明确判过的错形（docs/plans/goal-layout-audit.md §6 第 2 条）。
     expect(el.querySelectorAll('[data-testid="language-switcher"]')).toHaveLength(1);
@@ -183,8 +221,8 @@ describe('🔴 可达性：真实外壳里有没有那个控件', () => {
     expect(group.getAttribute('aria-label')).toBeNull();
   });
 
-  it('🔴 当前语言不只靠颜色标出来：勾只出现在它身上（不靠颜色单独表意）', () => {
-    const el = mount();
+  it('🔴 当前语言不只靠颜色标出来：勾只出现在它身上（不靠颜色单独表意）', async () => {
+    const el = await mountIntoSettings();
     const on = option(el, 'zh-CN');
     const off = option(el, 'en');
     // 颜色之外的那一条通道：一枚 svg 勾。变异：拿掉它 ⇒ 这条红。
@@ -196,8 +234,8 @@ describe('🔴 可达性：真实外壳里有没有那个控件', () => {
     expect(off.textContent).toBe('English');
   });
 
-  it('当前语言那一项是标出来的，其余写着各自语言的自称', () => {
-    const el = mount();
+  it('当前语言那一项是标出来的，其余写着各自语言的自称', async () => {
+    const el = await mountIntoSettings();
     // 中文界面 → zh 项带 aria-current，en 项写着 "English"（目标语言自己的文字）。
     expect(option(el, 'zh-CN').getAttribute('aria-current')).toBe('true');
     expect(option(el, 'en').getAttribute('aria-current')).toBeNull();
@@ -205,17 +243,18 @@ describe('🔴 可达性：真实外壳里有没有那个控件', () => {
     expect(option(el, 'zh-CN').textContent).toBe('中文');
   });
 
-  it('切换器不需要 Provider 之外的任何前置条件（它就是 setLocale 的唯一入口）', () => {
-    const el = mount();
-    // 点之前是中文：侧栏与视图 tab 都是中文。
-    expect(shellText(el)).toMatch(CJK);
+  it('切换器不需要 Provider 之外的任何前置条件（它就是 setLocale 的唯一入口）', async () => {
+    const el = await mountIntoSettings();
+    // 点之前是中文。锚用 rail 那一段：设置开着时**范围列不在 DOM 里**，
+    // 拿 `shellText()` 当锚会把"没渲染"伪装成"没翻语言"。
+    expect(el.querySelector('.ht-rail__tabs')?.textContent).toMatch(CJK);
     expect(el.textContent).toContain('收集箱');
   });
 });
 
 describe('🔴 点一下：界面上的可见文案真的变（不是只改 state）', () => {
-  it('侧栏 / 视图 tab / 空状态三处都换成英文，且外壳里不再有汉字', () => {
-    const el = mount();
+  it('侧栏 / 视图 tab / 空状态三处都换成英文，且外壳里不再有汉字', async () => {
+    const el = await mountIntoSettings();
     expect(el.textContent).toContain('收集箱');
     // ⚠️ 2026-09-29：这里原本断言的是「设置」——那时它是 rail 上的一个 tab。
     // 现在设置收进了**头像菜单**（点开才出现），所以改用两个**一直在屏幕上**的：
@@ -228,6 +267,17 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     act(() => {
       option(el, 'en').click();
     });
+    // 分组自己的标签也跟着翻过去（它是 `web.shell.lang.label`，不是硬编码的「语言」）。
+    // 自称那两项**不许**跟着翻 —— 上面刚断言过 `English` 仍是 `English`。
+    expect(switcherLabel(el).textContent).toBe('Language');
+    // 标记换到 en 项上，中文项回到"可点的目标"（这三条要在**关掉设置之前**量 ——
+    // 开关本身住在设置那一层里）。
+    expect(option(el, 'en').getAttribute('aria-current')).toBe('true');
+    expect(option(el, 'zh-CN').getAttribute('aria-current')).toBeNull();
+    expect(option(el, 'zh-CN').textContent).toBe('中文');
+    // 🔴 用户切完语言是**要关掉设置回到界面**的，而设置开着时范围列不在 DOM 里
+    //   （那一列只在有范围的视图里存在）⇒ 下面量的是关掉之后的外壳。
+    await closeSettings(el);
 
     // 三块**各自**都被断言到，避免"某一块没换语言"从缝里漏过去。
     expect(el.querySelector('.ht-sidebar')?.textContent).toContain('Inbox');
@@ -235,54 +285,49 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     // 「帮助」在 tablist **外面**（它是动作）—— 单独断言，正好钉住这一点。
     expect(el.querySelector('[data-testid="rail-help"]')?.textContent).toContain('Help');
     expect(el.textContent).toContain('Your inbox is empty');
-    // 分组自己的标签也跟着翻过去（它是 `web.shell.lang.label`，不是硬编码的「语言」）。
-    // 自称那两项**不许**跟着翻 —— 上面刚断言过 `English` 仍是 `English`。
-    expect(switcherLabel(el).textContent).toBe('Language');
 
     expect(el.textContent).not.toContain('收集箱');
     expect(el.textContent).not.toContain('回收站');
     expect(el.textContent).not.toContain('帮助');
     // 外壳自己渲染的那几块里一个汉字都不该剩。
     expect(shellText(el)).not.toMatch(CJK);
-
-    // 标记换到 en 项上，中文项回到"可点的目标"。
-    expect(option(el, 'en').getAttribute('aria-current')).toBe('true');
-    expect(option(el, 'zh-CN').getAttribute('aria-current')).toBeNull();
-    expect(option(el, 'zh-CN').textContent).toBe('中文');
   });
 
-  it('点已经是当前语言的那一项：什么都不发生（不写盘、不发账号请求）', () => {
-    const el = mount();
+  it('点已经是当前语言的那一项：什么都不发生（不写盘、不发账号请求）', async () => {
+    const el = await mountIntoSettings();
     act(() => {
       option(el, 'zh-CN').click();
     });
     // 中文界面点中文项 —— 界面不该动，localStorage 也不该被写出一条"偏好"。
-    expect(el.textContent).toContain('收集箱');
+    // 锚用 rail 那一段（设置开着时范围列不在 DOM 里，拿它当锚会假红）。
+    expect(el.querySelector('.ht-rail__tabs')?.textContent).toContain('回收站');
     expect(localStorage.getItem('heyta.locale')).toBeNull();
     expect(option(el, 'zh-CN').getAttribute('aria-current')).toBe('true');
   });
 
-  it('英文界面点回中文（不是单程票）', () => {
-    const el = mount();
+  it('英文界面点回中文（不是单程票）', async () => {
+    const el = await mountIntoSettings();
     act(() => {
       option(el, 'en').click();
     });
     // 先钉住"第一下真的切过去了"，否则这条测试在"按钮完全没接线"时也会绿。
-    expect(el.textContent).toContain('Inbox');
-    expect(el.textContent).not.toContain('收集箱');
+    // 锚用 rail（此刻还开着设置）。
+    expect(el.querySelector('.ht-rail__tabs')?.textContent).toContain('Trash');
+    expect(el.querySelector('.ht-rail__tabs')?.textContent).not.toContain('回收站');
 
     act(() => {
       option(el, 'zh-CN').click();
     });
 
+    await closeSettings(el);
     expect(el.textContent).toContain('收集箱');
     expect(shellText(el)).toMatch(CJK);
   });
 });
 
 describe('🔴 刷新后保持：落盘 + <html lang>', () => {
-  it('切到英文后写进 localStorage、同步 <html lang>，重新挂载仍然是英文', () => {
-    const el = mount();
+  it('切到英文后写进 localStorage、同步 <html lang>，重新挂载仍然是英文', async () => {
+    const el = await mountIntoSettings();
     act(() => {
       option(el, 'en').click();
     });
@@ -292,7 +337,7 @@ describe('🔴 刷新后保持：落盘 + <html lang>', () => {
 
     // 模拟刷新：整棵树卸载后重新挂载 —— 初值来自 localStorage，不是内存。
     unmount();
-    const again = mount();
+    const again = await mountIntoSettings();
 
     expect(option(again, 'en').getAttribute('aria-current')).toBe('true');
     // 设置已收进头像菜单；用一直在屏幕上的「回收站」代替（意图不变：语言落盘了）。
@@ -300,8 +345,8 @@ describe('🔴 刷新后保持：落盘 + <html lang>', () => {
     expect(document.documentElement.lang).toBe('en');
   });
 
-  it('切回中文同样落盘（不是"只在第一次写"）', () => {
-    const el = mount();
+  it('切回中文同样落盘（不是"只在第一次写"）', async () => {
+    const el = await mountIntoSettings();
     act(() => {
       option(el, 'en').click();
     });
@@ -314,7 +359,8 @@ describe('🔴 刷新后保持：落盘 + <html lang>', () => {
 
     expect(localStorage.getItem('heyta.locale')).toBe('zh-CN');
     expect(document.documentElement.lang).toBe('zh-CN');
-    expect(el.textContent).toContain('收集箱');
+    // 锚用 rail（设置还开着；范围列不在 DOM 里）。
+    expect(el.querySelector('.ht-rail__tabs')?.textContent).toContain('回收站');
   });
 });
 
@@ -362,7 +408,7 @@ describe('🔴 <StrictMode>：首启推断不落盘，明确选择落盘', () =>
     vi.restoreAllMocks();
   });
 
-  it('英文浏览器首启：界面是英文，但 localStorage 里没有任何偏好（账号语言那道门还开着）', () => {
+  it('英文浏览器首启：界面是英文，但 localStorage 里没有任何偏好（账号语言那道门还开着）', async () => {
     withNavigatorLocale('en-US');
 
     const el = mount(true);
@@ -377,7 +423,7 @@ describe('🔴 <StrictMode>：首启推断不落盘，明确选择落盘', () =>
     expect(hasStoredLocalePreference()).toBe(false);
   });
 
-  it('带 ?lang= 进来同样不落盘（参数是一次性带来，不是本机选择）', () => {
+  it('带 ?lang= 进来同样不落盘（参数是一次性带来，不是本机选择）', async () => {
     // setup.ts 钉的 navigator 是 zh-CN，这里让参数赢过它，才能区分"参数"和"系统"。
     const url = new URL(window.location.href);
     url.searchParams.set('lang', 'en');
@@ -391,12 +437,12 @@ describe('🔴 <StrictMode>：首启推断不落盘，明确选择落盘', () =>
     }
   });
 
-  it('推断成英文 → 明确切中文 → 再明确切回英文：最后这次必须落盘', () => {
+  it('推断成英文 → 明确切中文 → 再明确切回英文：最后这次必须落盘', async () => {
     withNavigatorLocale('en-US');
 
-    const el = mount(true);
-    // 前提：首启是推断来的英文，且没落盘。
-    expect(el.textContent).toContain('Inbox');
+    const el = await mountIntoSettings(true);
+    // 前提：首启是推断来的英文，且没落盘。（锚用 rail —— 设置还开着。）
+    expect(el.querySelector('.ht-rail__tabs')?.textContent).toContain('Trash');
     expect(localStorage.getItem('heyta.locale')).toBeNull();
 
     act(() => {
@@ -413,7 +459,7 @@ describe('🔴 <StrictMode>：首启推断不落盘，明确选择落盘', () =>
     expect(hasStoredLocalePreference()).toBe(true);
   });
 
-  it('未受支持的系统语言（ja-JP）落回中文兜底，同样不落盘', () => {
+  it('未受支持的系统语言（ja-JP）落回中文兜底，同样不落盘', async () => {
     withNavigatorLocale('ja-JP');
 
     const el = mount(true);

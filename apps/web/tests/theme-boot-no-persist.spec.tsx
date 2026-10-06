@@ -22,6 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { translate, type MessageKey } from '@heyta/i18n';
 
+import { openSettingsViaAvatar } from './open-settings-via-avatar.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { THEME_STORAGE_KEY } from '../src/lib/theme.js';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
@@ -68,13 +69,25 @@ async function mountApp(): Promise<HTMLElement> {
   return container;
 }
 
-/** 顶栏那个纯图标按钮 —— 可访问名跟着当前主题翻，所以两条句子都要认。 */
+/**
+ * 主题开关。🔴 2026-10-06 它在 **设置 → 显示** 里（H9 第三刀），而且不再是"纯图标 +
+ * `aria-label`"：那一枚 `aria-label` 的措辞本来就写着"点下去会怎样"，现在直接当**可见文字**用，
+ * 所以可访问名来自文本、没有 `aria-label` 可锚 —— 定位改按 `data-testid`。
+ * 顺带把"它在设置那一节里、不在页头"钉在这里：这一族的既有立场是"同一个动作只有一个入口"。
+ */
 function themeButton(el: HTMLElement): HTMLButtonElement {
-  const labels = new Set([t('common.a11y.toDarkTheme'), t('common.a11y.toLightTheme')]);
-  const button = [...el.querySelectorAll<HTMLButtonElement>('button[aria-label]')].find((b) =>
-    labels.has(b.getAttribute('aria-label') ?? ''),
-  );
-  if (button === undefined) throw new Error('顶栏没有主题切换按钮');
+  const button = el.querySelector<HTMLButtonElement>('[data-testid="theme-toggle"]');
+  if (button === null) throw new Error('外壳里没有主题开关 —— 是没渲染，还是没打开设置？');
+  expect(
+    button.closest('[data-testid="display-pref-panel"]') !== null,
+    '主题开关不在 设置 → 显示 那一节里',
+  ).toBe(true);
+  expect(
+    button.closest('.ht-header__actions'),
+    '页头那一排又长出主题开关了（同一个动作两个入口）',
+  ).toBeNull();
+  // 措辞跟着当前档位翻 —— 这条断言的是"用户看得见点下去会怎样"，不是实现细节。
+  expect([t('common.a11y.toDarkTheme'), t('common.a11y.toLightTheme')]).toContain(button.textContent);
   return button;
 }
 
@@ -112,6 +125,8 @@ describe('主题记账的时机', () => {
     systemScheme('dark');
     const el = await mountApp();
     expect(storedTheme()).toBeNull();
+    // 开关住在设置那一节里 ⇒ 先走真路径过去（不是往 store 里塞 view）。
+    await openSettingsViaAvatar(el);
 
     await act(async () => {
       themeButton(el).click();

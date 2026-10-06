@@ -26,7 +26,14 @@
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 
-import { addHabit, boxOf, openApp, selectHabit, switchView } from './helpers';
+import {
+  addHabit,
+  boxOf,
+  openApp,
+  selectHabit,
+  switchTheme,
+  switchView,
+} from './helpers';
 
 const APP_ZH = '/?lang=zh-CN';
 
@@ -301,8 +308,7 @@ test.describe('习惯月历与补打卡（H4，web 端）', () => {
          只断属性等于"我以为切了"）。底色取格子而不是取容器：容器那一格没有背景，
          读回来两趟都是 `rgba(0, 0, 0, 0)`，那条断言就会恒真。 */
     const bgBefore = await cellAt(page, TODAY).evaluate((el) => getComputedStyle(el).backgroundColor);
-    await page.getByRole('button', { name: '切换到暗色主题' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await switchTheme(page, 'dark');
     const bgAfter = await cellAt(page, TODAY).evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(
       bgAfter,

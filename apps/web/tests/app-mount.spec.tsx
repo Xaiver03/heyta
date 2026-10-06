@@ -33,6 +33,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
+import { openSettingsViaAvatar } from './open-settings-via-avatar.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { emptyState } from '@heyta/op-log';
 
@@ -816,19 +817,6 @@ describe('应用 → 站点：孤岛的另一半', () => {
  *（滴答的做法：rail 是每天点几十次的地方，设置是低频的）。
  * 所以任何"去设置页"的测试都必须走这条路，而不是找 `role=tab` 里那个「设置」。
  */
-async function openSettingsViaAvatar(el: HTMLElement): Promise<void> {
-  const avatar = el.querySelector<HTMLButtonElement>('[data-testid="account-menu-avatar"]');
-  expect(avatar, '找不到头像').not.toBeNull();
-  await act(async () => {
-    avatar!.click();
-  });
-  const item = el.querySelector<HTMLButtonElement>('[data-testid="account-menu-settings"]');
-  expect(item, '头像菜单里没有「设置」').not.toBeNull();
-  await act(async () => {
-    item!.click();
-  });
-}
-
 async function mountApp(): Promise<{ container: HTMLDivElement }> {
   container = document.createElement('div');
   document.body.appendChild(container);
