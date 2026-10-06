@@ -1398,11 +1398,14 @@ PY
 #    `configure_sync_credentials` 用的是同一枚 testID）。
 goto_me_page() {
   settle_foreground
-  # 🔴 标记必须是那一页**常驻**的锚点：rig43 现量断在第 7 步 —— 原来要 `content-desc=立即同步`
-  #    出现才算到了「我的」，而那一枚在自动同步 loading 时不渲染（rig42 第 11 步的注释早就写着这条，
-  #    只是没回过头看这里）⇒ 三发全打"标记没出现"，第 8–14 步没有屏可点。换成 profile-entry-settings
-  #    那一行的标签（配置前后都在），下面那道 has_rid 正面对账照旧兜住"读的是别的屏"。
-  tap_tab "我的" "设置" || return 1
+  # 🔴 标记必须走 **testID（resource-id）通道**，不能拿文案当标记：
+  #    rig43 断在第 7 步是因为标记「立即同步」在自动同步 loading 时不渲染；
+  #    把它换成文案「设置」后 rig44 断在**更早的第 2 步**，三次全打"点了但没渲染出来"，
+  #    而只读 dump 证明界面**早就在「我的」页** —— 因为 RN 把 accessibilityLabel 与 hint
+  #    合成成了一个串，树里实际是 `content-desc="设置, 同步凭据、桌面小组件与语言"`，
+  #    精确匹配「设置」永远取不到（rig44 现量原话证据）。
+  #    ⇒ 一次"用一个错串替换另一个错串"的修法。文案会随 hint/i18n 变，testID 不会。
+  tap_tab "我的" "rid:profile-entry-settings" || return 1
   dump
   if [ "$(has_rid profile-entry-settings)" != "1" ]; then
     echo "   ❌ 自称切到了「我的」，但那一页的正面锚点 profile-entry-settings 不在树里 —— 读的是别的屏"
