@@ -508,6 +508,40 @@ export async function addTask(page: Page, title: string): Promise<void> {
 }
 
 /**
+ * 让**详情列有东西可画**：建一条任务并点开它。
+ *
+ * 🔴 2026-10-06 工单 H10 第一刀之后新增。那一栏现在承诺"没东西可画就不占位"
+ * （产品负责人第 5 条：「数据侧边栏和那个侧边栏，哪有这么排版的？」），
+ * 于是所有问"这一栏在不在 / 多宽 / 贴不贴边"的判据都必须跑在**有内容**的那一档。
+ * 这条 helper 存在的理由就是把那一步前置**收在一处** —— 六个调用点各抄一遍
+ * "建任务 + 交还焦点 + 点行"就又是一份会漂的抄件。
+ *
+ * ⚠️ 它只喂内容，**不改变任何判据的口径**：调用它的那条断言一个字都不动。
+ * ⚠️ 点行必须走 `task-row-*`（行体）而不是 `task-item-*`（整行）：外层那棵 `View`
+ *   没有 `onPress`，点它不会选中 —— 这条实测记在 `detail-pane-task.spec.ts`
+ *   的 `rowItemOf` 注释里，这里不重抄理由。
+ */
+export async function showDetailColumnContent(page: Page, title = '详情列判据甲'): Promise<void> {
+  await addTask(page, title);
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+  });
+  await page
+    .locator('[data-testid^="task-row-"]')
+    .filter({ hasText: title })
+    .first()
+    .click();
+}
+
+/** 重新点开 `showDetailColumnContent` 建过的那条（刷新之后选中态不在了 —— 选中是视图内状态，不落盘）。 */
+export async function reselectDetailColumnContent(
+  page: Page,
+  title = '详情列判据甲',
+): Promise<void> {
+  await page.locator('[data-testid^="task-row-"]').filter({ hasText: title }).first().click();
+}
+
+/**
  * 按标题找到任务行。
  *
  * ⚠️ 用**标题**而不是 taskId 定位：真浏览器里拿不到 id（也不该去拿内部状态），

@@ -18,7 +18,7 @@
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { openApp, parkCursor, switchView } from './helpers';
+import { openApp, parkCursor, showDetailColumnContent, switchView } from './helpers';
 
 /** 控制台错误收集：监听必须**在导航之前**挂上，否则加载期错误收不到
  *  （§6.2 规定一第 3 条：`控制台无内容` 是最误导人的结果）。 */
@@ -62,6 +62,12 @@ test.describe('详情列槽位', () => {
   test('它贴窗口右边缘，且宽度落在 token 区间内', async ({ page }) => {
     const errors = watchErrors(page);
     await openApp(page, '/?lang=zh-CN');
+
+    // 🔴 前置（2026-10-06 工单 H10 第一刀之后新增）：详情列现在"没东西可画就不占位"，
+    // 所以这一栏"在不在 / 多宽 / 贴不贴边"的判据必须跑在有内容的那一档。
+    // 下面每一条断言逐字未动 —— 动的只有前置这一步，判据口径不变。
+    await showDetailColumnContent(page);
+    await expect(page.getByTestId('detail-column')).toBeVisible();
 
     const viewport = page.viewportSize();
     expect(viewport, '量不到视口尺寸，右边缘判据不成立').not.toBeNull();
@@ -132,7 +138,11 @@ test.describe('详情列槽位', () => {
        把轨道改成字面量 `24rem` 只动两轨那一行 ⇒ 两条用例全绿（实测 2 passed）。
        "两条判据都绿"当时被读成"宽度判据有牙"，其实量的是同一行声明两遍。 */
     const shell = page.locator('.ht-app').first();
-    await switchView(page, '四象限');
+    // 2026-10-06：从「四象限」改成「习惯」。改的**不是**这条判据要量的那一行声明
+    // （两轨、无范围列 —— 下面那条 `not.toMatch(/ht-app--with-sidebar/)` 仍在原地盯着），
+    // 而是"这一栏得先有东西可画"：详情列现在没内容就不占位（工单 H10 第一刀），
+    // 而习惯面单是**始终挂载**的那一枚（`App.tsx` 里那句"没选中时它仍然挂载"）。
+    await switchView(page, '习惯');
     // 切换与前提**同一件事**：这一面必须丢掉 `--with-sidebar`，
     // 否则量的又是四轨那行，这条用例等于把上一条复制一遍。
     await expect
@@ -163,6 +173,11 @@ test.describe('详情列槽位', () => {
 
   test('窄的两档（平板横屏 / 塌缩态）里它不出现', async ({ page }) => {
     await openApp(page, '/?lang=zh-CN');
+
+    // 🔴 前置（2026-10-06 工单 H10 第一刀之后新增）：详情列现在"没东西可画就不占位"，
+    // 所以这一栏"在不在 / 多宽 / 贴不贴边"的判据必须跑在有内容的那一档。
+    // 下面每一条断言逐字未动 —— 动的只有前置这一步，判据口径不变。
+    await showDetailColumnContent(page);
 
     // 769–1023：rail + 侧栏 + 详情已经吃掉 ~41rem，中间列会被挤没 ⇒ 这一档不出现。
     await page.setViewportSize({ width: 900, height: 800 });

@@ -23,7 +23,14 @@
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { openApp, openSettingsView, parkCursor, switchView } from './helpers';
+import {
+  openApp,
+  openSettingsView,
+  parkCursor,
+  reselectDetailColumnContent,
+  showDetailColumnContent,
+  switchView,
+} from './helpers';
 
 const STORAGE_KEY = 'heyta.detailPane';
 
@@ -65,6 +72,11 @@ test.describe('详情列的出现条件与收起', () => {
   test('T1 🔴 高度边界两侧都量：480 有、479 没有、回到 720 又回来', async ({ page }) => {
     const errors = watchErrors(page);
     await openApp(page, '/?lang=zh-CN');
+
+    // 🔴 前置（2026-10-06 工单 H10 第一刀之后新增）：详情列现在"没东西可画就不占位"，
+    // 所以这一栏"在不在 / 多宽 / 贴不贴边"的判据必须跑在有内容的那一档。
+    // 下面每一条断言逐字未动 —— 动的只有前置这一步，判据口径不变。
+    await showDetailColumnContent(page);
     const vw = await viewportWidth(page);
 
     // ── 可行档的下沿：高**正好** 480 必须画出来 ─────────────────────
@@ -113,6 +125,11 @@ test.describe('详情列的出现条件与收起', () => {
     await openApp(page, '/?lang=zh-CN');
     const vw = await viewportWidth(page);
 
+    // 🔴 前置（2026-10-06 工单 H10 第一刀之后新增）：详情列现在"没东西可画就不占位"，
+    // 所以这一栏"在不在 / 多宽 / 贴不贴边"的判据必须跑在有内容的那一档。
+    // 下面每一条断言逐字未动 —— 动的只有前置这一步，判据口径不变。
+    await showDetailColumnContent(page);
+
     // 前提：先证这一栏**本来在**、中间列本来不贴边 —— 后面那句"贴边了"才有对照。
     await expect(page.getByTestId('detail-column')).toBeVisible();
     const before = await mainRightEdge(page);
@@ -146,6 +163,9 @@ test.describe('详情列的出现条件与收起', () => {
     await page.screenshot({ path: SHOT('t2-still-collapsed-after-reload') });
 
     // 反向对照：这一栏并没有被"永久藏起来"——再点开关就回来，而且是同一个机制。
+    // ⚠️ 刷新之后**选中态不在了**（选中是视图内状态，不落盘），所以先重新点开一条：
+    // 回来的是"有内容 ⇒ 占位"这一档，与上面那条前提同一个口径。
+    await reselectDetailColumnContent(page);
     await page.getByTestId('detail-pane-toggle').click();
     await expect(page.getByTestId('detail-column')).toBeVisible();
     expect(errors, `界面里有控制台错误：\n${errors.join('\n')}`).toEqual([]);
@@ -154,6 +174,11 @@ test.describe('详情列的出现条件与收起', () => {
   test('T3a 恢复路径①：页头的开关', async ({ page }) => {
     await seedCollapsed(page);
     await openApp(page, '/?lang=zh-CN');
+
+    // 🔴 前置（2026-10-06 工单 H10 第一刀之后新增）：详情列现在"没东西可画就不占位"，
+    // 所以这一栏"在不在 / 多宽 / 贴不贴边"的判据必须跑在有内容的那一档。
+    // 下面每一条断言逐字未动 —— 动的只有前置这一步，判据口径不变。
+    await showDetailColumnContent(page);
     await expect(page.getByTestId('detail-column')).toBeHidden();
 
     await page.getByTestId('detail-pane-toggle').click();
@@ -167,6 +192,11 @@ test.describe('详情列的出现条件与收起', () => {
   test('T3b 恢复路径②：设置里那一项', async ({ page }) => {
     await seedCollapsed(page);
     await openApp(page, '/?lang=zh-CN');
+
+    // 🔴 前置（2026-10-06 工单 H10 第一刀之后新增）：详情列现在"没东西可画就不占位"，
+    // 所以这一栏"在不在 / 多宽 / 贴不贴边"的判据必须跑在有内容的那一档。
+    // 下面每一条断言逐字未动 —— 动的只有前置这一步，判据口径不变。
+    await showDetailColumnContent(page);
     await expect(page.getByTestId('detail-column')).toBeHidden();
 
     await openSettingsView(page);
@@ -187,6 +217,11 @@ test.describe('详情列的出现条件与收起', () => {
   test('T3c 恢复路径③：快捷键 ⌘/Ctrl + Shift + \\', async ({ page }) => {
     await seedCollapsed(page);
     await openApp(page, '/?lang=zh-CN');
+
+    // 🔴 前置（2026-10-06 工单 H10 第一刀之后新增）：详情列现在"没东西可画就不占位"，
+    // 所以这一栏"在不在 / 多宽 / 贴不贴边"的判据必须跑在有内容的那一档。
+    // 下面每一条断言逐字未动 —— 动的只有前置这一步，判据口径不变。
+    await showDetailColumnContent(page);
     await expect(page.getByTestId('detail-column')).toBeHidden();
 
     // 🔴 从**真键盘**发出去，不走任何一条 JS 出口：这一条路径的全部风险就是
@@ -207,6 +242,11 @@ test.describe('详情列的出现条件与收起', () => {
   test('T4 三种"画不出来"的视口里，开关与列一起消失（界面不许说谎）', async ({ page }) => {
     const errors = watchErrors(page);
     await openApp(page, '/?lang=zh-CN');
+
+    // 🔴 前置（2026-10-06 工单 H10 第一刀之后新增）：详情列现在"没东西可画就不占位"，
+    // 所以这一栏"在不在 / 多宽 / 贴不贴边"的判据必须跑在有内容的那一档。
+    // 下面每一条断言逐字未动 —— 动的只有前置这一步，判据口径不变。
+    await showDetailColumnContent(page);
 
     // 正对照先走一次：这一档里两者**都在**，否则下面三句"都不在"可以是恒真。
     await page.setViewportSize({ width: 1280, height: 720 });

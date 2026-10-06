@@ -109,11 +109,22 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await switchView(page, '任务');
     await addTaskAndRelease(page, '面单甲');
 
-    /* 前提（这一档是**裁决的一部分**，不是漏做）：宽档 + 未选中时栏里没有面单，
-       而整页也**没有**备注输入框 —— 行尾那颗 chip 已经让位。用户要写备注就得先选中一条，
-       这与滴答/Todoist 的"点一条任务才开 task view"同形。 */
+    /* 前提（这一档仍是**裁决的一部分**，不是漏做）：宽档 + 未选中时栏里没有面单。
+       🔴 而"整机也没有备注输入框"这一半在 2026-10-06 第二刀之后不成立了：那一刀把
+       `taskPaneInColumn` 补上"真的选中了一条任务"，于是未选中时编辑权**回到行尾那枚 chip**
+       （`<details>` 收着，不是摊开的 textarea）。旧写法是 §8.138 那版的形状 ——
+       行尾让位给一个**没在画东西的栏**，两半都不接，用户谁都写不了备注。
+       不变量还是那一条：**任何时刻不许两处同时可编辑** ⇒ 输入框数 == 任务行数，
+       而栏里那一格零只输入框。 */
     await expect(paneInColumn(page), '没选中却画了面单').toHaveCount(0);
-    await expect(fieldEverywhere(page), '未选中时行尾那颗 chip 还在，两处会同时可编辑').toHaveCount(0);
+    await expect(
+      page.getByTestId('detail-column').getByTestId('task-note-input'),
+      '栏里没画面单，却藏着一只备注框（那正是"编辑权没人接"的反面）',
+    ).toHaveCount(0);
+    await expect(
+      fieldEverywhere(page),
+      '未选中时行尾没把编辑权接回去 ⇒ 整机没有备注入口',
+    ).toHaveCount(await page.locator('[data-testid^="task-item-"]').count());
 
     await page.keyboard.press('ArrowDown');
     const pane = paneInColumn(page);
@@ -536,13 +547,16 @@ test.describe('任务面单落进那一栏（§8.138）', () => {
     await page.reload();
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '任务');
+    // ⚠️ 选中态**不跨刷新**，而"行尾只剩只读徽标"这一支从第二刀起还要求**真选中**
+    //   （`taskPaneInColumn` 里那半 `selectedTaskId !== null`）。所以"那发 op 落库了没有"
+    //   必须先重新选中再量徽标：原来这两句的顺序是"未选中先量徽标"，量到的 0 其实是
+    //   "行尾此刻画的是 chip 而不是徽标"，不是"op 没落"。下面那句"整页一份列表"本来
+    //   就要求先选中（它自己的注释写着），两件事现在共用同一个前提。
+    await rowOf(page, '提醒甲').click();
     await expect(
       page.locator('[data-testid^="task-reminder-badge-"]'),
-      '那次点击没落成 op（刷新后行上没有提醒徽标）',
+      '那次点击没落成 op（重新选中之后行上仍没有提醒徽标）',
     ).toHaveCount(1);
-    // ⚠️ 选中态**不跨刷新**（刷新后没有一条被选中 ⇒ 栏里根本不画面单），所以"整页一份列表"
-    //   这一句必须先重新选中一条再量 —— 否则量到的是 0，而 0 看起来像"没重复"其实是"没画"。
-    await rowOf(page, '提醒甲').click();
     await expect(listEverywhere, '刷新后列表又不是整页一份').toHaveCount(1);
 
     await badge.scrollIntoViewIfNeeded();

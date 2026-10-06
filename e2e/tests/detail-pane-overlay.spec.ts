@@ -19,11 +19,16 @@
  * 少了它，"不盖详情列"在浮层压根没渲染出来的时候也成立 —— 那是恒真判据
  * （§7 元规则 2）。
  *
+ * 🔴 **前提：详情列里必须有内容**（`showDetailColumnContent`）。2026-10-06 之前
+ * 空详情列也照样占住那一格，所以本文件从不播种；现在"没东西就不画这一列"是
+ * 产品决定（见 `detail-column-resize.spec.ts` D1），于是这三条判据的载体必须先
+ * 真选出一条任务 —— 否则量的是一台根本没渲染第四列的界面。
+ *
  * ⚠️ 截图路径按本文件位置解析，理由与事故记录在 `selection-projections.spec.ts` 文件头。
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openApp, openSettingsView, parkCursor } from './helpers';
+import { openApp, openSettingsView, parkCursor, showDetailColumnContent } from './helpers';
 
 const SHOT = (name: string) =>
   fileURLToPath(new URL(`../../apps/web/evidence/detail-pane-overlay/${name}.png`, import.meta.url));
@@ -109,6 +114,7 @@ async function pxOfCssVar(page: Page, name: string): Promise<number> {
 test.describe('浮层与详情列', () => {
   test('设置浮层只盖中间那一列，详情列在它外面且没被挤掉', async ({ page }) => {
     await openApp(page, '/?lang=zh-CN');
+    await showDetailColumnContent(page);
     await openSettingsView(page);
 
     const sheet = page.getByTestId('settings-sheet');
@@ -141,6 +147,7 @@ test.describe('浮层与详情列', () => {
 
   test('搜索浮层盖满视口，但靠半透明 scrim 让详情列读得出来', async ({ page }) => {
     await openApp(page, '/?lang=zh-CN');
+    await showDetailColumnContent(page);
     await page.getByRole('tab', { name: '搜索' }).click();
 
     const surface = page.locator('.ht-search-overlay');

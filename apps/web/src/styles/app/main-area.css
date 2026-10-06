@@ -4,6 +4,13 @@
   display: flex;
   flex-direction: column;
   min-inline-size: 0; /* 防止 grid 子项被内容撑破 */
+  /* 🔴 它是详情列那枚拖拽把手的**定位祖先**（`DetailColumnResizer` 挂在
+     `.ht-main` 的右边缘上，而不是挂在被拖的那一列里 —— 理由写在
+     `features/shell/ColumnResizer.tsx` 文件头）。
+     现量过才敢加：改之前四象限/日历/习惯/任务四个视图里，`.ht-main` 的绝对定位
+     后代**全部**已经有更近的定位祖先（四枚 quadrant 卡片各自 `section`、
+     一枚 `.ht-content`），所以这一句不改变任何一个元素的包含块。 */
+  position: relative;
 }
 
 .ht-header {

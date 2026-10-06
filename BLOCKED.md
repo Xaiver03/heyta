@@ -6367,3 +6367,58 @@ e2e 类型载体 RC=0；e2e 第一批 `language-first-launch` 5 passed、第二�
 2. **§9.2 第 3 步**（同步设置搬进 设置 → 同步、rail 齿轮随之删除）仍未动 —— 它和 §9.4 第 1 条剩下的
    "外壳不滚"那一半、以及 H10 的把手，是同一批要一起想的。
 3. 本单**没有**在四端当前产物上验（`pnpm reinstall:all` 未跑）；`FULLCHECK-01` 那一档仍开着。
+## B96（2026-10-06 13:0x–15:3x，本会话 H10 两刀）：详情列"没东西就不画"+ 左边缘可拖落完了，而它把 **B90 那 8 枚红一次清掉**
+
+产品负责人第 5、6 条：「数据侧边栏和那个侧边栏，哪有这么排版的？」+「右边那一栏…中间那条线应该是可以
+调整的」。§9.2 的 H10 那一单。全过程与读数在 `docs/plans/goal-layout-audit.md` §9.7，这里只记**归属、
+代改、以及仍然开着的**。
+
+### 1. 落地内容（两刀）
+
+| 面 | 改动 |
+|---|---|
+| 装配 | `App.tsx`：`detailHasContent`（`useLayoutEffect` + `MutationObserver` 量 `childElementCount`）→ `data-detail-empty`；分支链第 4 支补 `selectedTaskId !== null`；AI 面落点只看 `detailColumnShown`；删掉 `detailHasRoom` 那枚探针 |
+| 把手 | `SidebarResizer.tsx` → `ColumnResizer.tsx`（`git mv`），七个入参两个导出；`<DetailColumnResizer/>` 挂在 `.ht-main` 末尾（**不**在槽里，理由两条写在文件头） |
+| 样式 | `base.css`：`--ht-detail-track` 归零两档 + `.ht-app__detail-resizer` 一块；`main-area.css` 给 `.ht-main` 补 `position: relative`；`narrow.css` 三档一起藏把手 |
+| 词条 | `web.shell.detail.resize`（zh「调整详情栏宽度」/ en "Resize the details panel"），词条表 3254 → **3255**（两侧同数） |
+| 判据 | 新 `e2e/tests/detail-column-resize.spec.ts` 6 条 + 新臂台 `research/tools/mutation-rigs/detail-column-resize-arms.sh` 四臂；`helpers.ts` 加 `showDetailColumnContent` / `reselectDetailColumnContent`；4 份既有 spec 只补前提 |
+
+### 2. 🔴 它照出来的三件事（都不是本刀引入，本刀是揭发者）
+
+1. **轨道归零 ≠ 不画**：grid 子项自动最小尺寸 = min-content，那一列带 `padding-inline` + `border-left`
+   ⇒ 以 **33px 画在视口外**（`scrollWidth 1313 > innerWidth 1280`，1280×720 现量）。
+   `[data-detail='collapsed']` **一直**是这个形状，只是要用户主动收起才踩。
+2. **2026-10-04 那句"无状态时右栏默认显示 AI Chatbot"从来没有生效过**：分支链第 4 支
+   `taskPaneInColumn` 在任务视图里恒真（`TaskDetailCard` 未选中时渲染空），第 5 支永远轮不到。
+   而它被一枚"量这一栏实际宽度"的探针遮着 —— 那枚探针把 33px 读成"有位置"。
+   ⇒ 补上"真的选中了一条任务"之后，AI 面第一次住进右栏。
+3. **同一枚布尔的两条侧就是 B90 那 8 枚红**：AI 侧 4 枚（落在中间列 ⇒ 落点判据红）+
+   整理侧 4 枚（行尾已让位、栏里没人接 ⇒ 消费者等 `task-organize-summary` 超时）。
+   一刀同时消掉两侧，`check:ai-e2e` **第一次整族绿**（276 passed / 2 skipped / 0 failed）。
+
+### 3. 🔴 代改的两条别线判据（详情面线所有），三条齐都在这儿
+
+| 哪条 | 一子可改 | 运行时形状（现量） | 一条命令回退 |
+|---|---|---|---|
+| `detail-pane-task` T1「未选中 ⇒ 整机零只备注框」 | 只改那一句的期望与消息 | 改前 `Received: 1`（1 条任务 ⇒ 1 只输入框），改后期望 = `task-item-*` 计数，同一次运行里两个读数**逐格相等** | `git revert <本刀那笔>` 之后 T1 回到原句 |
+| `detail-pane-task` T10「刷新后行上有提醒徽标」 | 只把"重新选中"提到量徽标之前 | 未选中档行尾画的是 chip 而不是徽标（`task-reminder-badge-*` = 0），重新选中之后 = 1，两句都跑过 | 同上 |
+
+🔴 **没有动任何阈值、没有删任何断言**；两条各自钉的不变量（"同一字段只有一个所有者"、
+"那发 op 落库了"）改后**更可检查**而不是更宽。理由与逐条读数在 §9.7「判据怎么变的」那一段。
+
+### 4. 读数
+
+`pnpm --filter @heyta/web typecheck` RC=0；`-r` 之外单包 `@heyta/web test` **1998 passed / 13 skipped**
+（150 文件）；`@heyta/i18n test` 26 passed；`check:design` / `check:layering` / `check:ui-language` /
+`check:row-single-source` / `check:detail-pane-slot` / `check:selection-single-source` **各 RC=0**；
+e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5`、`BACK_TO_CLEAN=OK`；
+`check:ai-e2e` 整族 **276 passed / 2 skipped / 0 failed，RC=0**（13.5 分钟，15:2x）。
+证据图 7 张落在 `apps/web/evidence/detail-column-resize/`，人已打开看过（其中两张当场产出改动，见 §9.7）。
+
+### 5. 本单仍然没闭合的（别读成已完）
+
+1. **负责人第 5 条里"数据侧边栏"那半句仍未裁决**：范围列在习惯 / 时间线两档该不该出现，
+   按 §9.2 第 2 步要**同一屏两种排布的对比图**给负责人拍，不自行决定。
+2. 详情列仍**无无障碍名**（要新词条、中英成对，不在这一笔顺手定）。
+3. 本刀**没有**在四端当前产物上验（`pnpm reinstall:all` 未跑）；`FULLCHECK-01` 那一档仍开着。
+4. 臂台只覆盖新写的 6 条；`check:ai-e2e` 整族绿是**这一趟载体**的读数，不代替下一位在自己载体上的复跑。

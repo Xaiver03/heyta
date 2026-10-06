@@ -34,6 +34,10 @@
   "include": [
     "tests/helpers.ts",
     "tests/shell-sidebar-height.spec.ts",
+    // 工单 H10 第一刀：详情列的把手与"空白列不占位"。`sidebar-resize` 一起点名进来 ——
+    // 它的被测对象（那枚把手）与本单**共用同一份实现**，那份实现这轮改了名。
+    "tests/detail-column-resize.spec.ts",
+    "tests/sidebar-resize.spec.ts",
     // ⚠️ 本单还动过 `countdown-export` / `task-row-touch-target` / `calendar-cells` 三份，
     //   但**没**点名进来：它们各自带着与本单无关的既有类型错误（现量 3+1+1 条，
     //   复现：把这三行加进来再跑上面那条命令）。这道载体的立场是「只收干净的那几份」，
@@ -50,6 +54,10 @@
     "tests/detail-pane-habit.spec.ts",
     "tests/detail-pane-task.spec.ts",
     "tests/focus-detail-pane.spec.ts",
+    // 工单 H10 第一刀顺手把这份的**本地** toggleTheme 换成共享 switchTheme
+    // （那是 H9 那一刀留下的断点：主题开关搬进设置浮层后，按可访问名找按钮的写法失效）。
+    // 加进载体前先逐字跑过：对这份单独 `tsc --noEmit --strict …` = **0 条错误**。
+    "tests/ai-tool-run.spec.ts",
     "tests/keyboard-cursor.spec.ts",
     // 习惯那一族（工单 H1–H8）：同一枚编译器、同一条命令，加进来只可能变严不会变松。
     // 加之前先逐字跑过：`tsc --noEmit --strict …` 对下面 9 份 = **0 条错误**（07:5x 现量），

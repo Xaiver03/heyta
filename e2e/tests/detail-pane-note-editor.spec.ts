@@ -216,8 +216,21 @@ test.describe('便签面单落进详情列', () => {
     // 关掉面单（取消 = 真点界面，不是往 store 里塞值）后槽位还在、面单为零。
     await page.getByTestId('notes-editor-cancel').click();
     await expect(editorEverywhere(page), '取消后面单没收').toHaveCount(0);
-    await expect(page.getByTestId('detail-column'), '收掉面单把那根列一起弄没了').toBeVisible();
+    /* 🔴 工单 H10 第一刀改了**这里的形状**，没改它判的那件事。
+       收掉面单之后那一格没东西可画 ⇒ 按新决定轨道归零、`display:none`（产品负责人
+       2026-10-06 第 5 条「数据侧边栏和那个侧边栏，哪有这么排版的？」）。
+       所以"槽位还在"不能再由 `toBeVisible()` 回答 —— 它今天为假，而且**应该**为假。
+       替代它的是两条更强的：节点计数仍为 1，且再选一张便签时面单回到**同一个节点**
+       （"新铸一根列、把旧的藏起来"这个坏形状在可见性上完全看不出来）。 */
+    await expect(page.getByTestId('detail-column'), '收掉面单后那一格不再占位（H10 的决定）').toBeHidden();
     expect(await page.locator('.ht-app__detail').count(), '收掉面单后多出/少了一根列').toBe(1);
+
+    await openNthNote(page, 0);
+    expect(await page.locator('.ht-app__detail').count(), '重开面单时多出/少了一根列').toBe(1);
+    const backSameNode = await page
+      .getByTestId('notes-editor')
+      .evaluate((el) => el.closest('.ht-app__detail') === document.querySelector('.ht-app__detail'));
+    expect(backSameNode, '面单回来时不住在原来那根列里（= 新铸了槽位）').toBe(true);
 
     await parkCursor(page);
     await page.screenshot({ path: SHOT('n2-same-slot') });

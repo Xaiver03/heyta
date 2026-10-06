@@ -13,7 +13,7 @@ import { fillVaultSecret } from '../vault/privacy';
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { decidePrivacyConsent, enableAllModules, stubLegalRecheck, stubPublicFacts } from './helpers';
+import { decidePrivacyConsent, enableAllModules, stubLegalRecheck, stubPublicFacts, switchTheme } from './helpers';
 import { installMissingProducerShims } from './shims';
 
 const SERVER = 'http://sync.vault.e2e.test';
@@ -196,7 +196,11 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   await screenshot(page, '03-locked-after-reload-light.png');
 
   await page.getByRole('button', { name: 'Close sync settings' }).click();
-  await page.getByRole('button', { name: 'Switch to dark theme', exact: true }).click();
+  // 🔴 主题开关自 2026-10-06（H9 第三刀）起住在**设置浮层**「显示」那一节，不再是页头常驻的一枚。
+  // 走共享 `switchTheme`（开浮层 → 点真开关 → 钉 `data-theme` → 收浮层）而不是新写一条路径：
+  // `emulateMedia` 那枚假绿在 `calendar-cells` / `habit-month-stats` 各记过一次。
+  // ⚠️ 必须**收掉**浮层：它是整屏的，不关就盖住下面那张 `04-wrong-recovery-dark.png`。
+  await switchTheme(page, 'dark');
   await page.getByRole('button', { name: 'Sync settings', exact: true }).click();
   await fillVaultSecret(reloadedDialog.getByTestId('vault-recovery-code'), '0000-0000-0000-0000-0000-0000-0000-0000-0000');
   await reloadedDialog.getByTestId('vault-unlock-recovery').click();
@@ -233,5 +237,10 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   ]);
   expect(browserErrors, `browser errors: ${browserErrors.join(' | ')}`).toEqual([
     '[console.error] Failed to load resource: the server responded with a status of 404 (Not Found)',
+    // 🔴 2026-10-06 起主题开关住在「设置 → 显示」浮层里，切暗色必须**打开设置**；
+    // 而设置浮层挂载时会探一次 `/api/admin/overview`（上面那行 `page.route` 就是为它准备的，
+    // 固定回 403 = "这个人不是运营者"）。Chromium 把任何 4xx 都记成一条 console error，
+    // 所以这条是**多了一个已命名的来源**，不是放宽：第三枚没登记过的错误照样让这一条红。
+    '[console.error] Failed to load resource: the server responded with a status of 403 (Forbidden)',
   ]);
 });

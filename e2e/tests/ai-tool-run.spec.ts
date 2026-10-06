@@ -44,6 +44,7 @@ import {
   rowFor,
   STUB_ENDPOINT,
   stubLog,
+  switchTheme,
   switchView,
   waitForStubCalls,
 } from './helpers.js';
@@ -92,11 +93,6 @@ async function revokeTool(page: Page, name: string): Promise<void> {
 async function runText(page: Page, text: string): Promise<void> {
   await page.getByTestId('ai-tool-input').fill(text);
   await page.getByTestId('ai-tool-run-button').click();
-}
-
-/** 在暗色/亮色之间切一次（纯图标按钮，可访问名来自词条）。 */
-async function toggleTheme(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /切换到(暗色|亮色)主题/ }).click();
 }
 
 test.describe('单步工具面板：真浏览器端到端旅程', () => {
@@ -178,11 +174,10 @@ test.describe('单步工具面板：真浏览器端到端旅程', () => {
     await page.screenshot({ path: `${EVIDENCE}/3-proposal-light.png`, fullPage: true });
 
     // 暗色那张：提案卡在中性面/描边下的可读性只有图能证明（§5 常犯错）。
-    await toggleTheme(page);
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await switchTheme(page, 'dark');
     await expect(page.getByTestId('ai-tool-proposal')).toContainText(title);
     await page.screenshot({ path: `${EVIDENCE}/3b-proposal-dark.png`, fullPage: true });
-    await toggleTheme(page);
+    await switchTheme(page, 'light');
 
     // ══ 5. 确认 ⇒ 一次本地 submit ⇒ 行出现；假端点计数不变 ═══════════════
     await page.getByTestId('ai-tool-confirm').click();
