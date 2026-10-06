@@ -56,7 +56,12 @@ n = b = 0
 for c in (d.get("connections") or []):
     m = c.get("metadata") or {}
     if (m.get("host") or "").endswith(host):
-        st = (m.get("start") or "").[:19]
+        # ⚠️ 这一行原来是 `(m.get("start") or "").[:19]` —— **语法错**，python 直接抛
+        #    SyntaxError，`marker_bytes` 返回空串，于是 A/B 两项都"没记到"，
+        #    探针判成 CONTROL=BLIND / INCONCLUSIVE。
+        #    这正是要的样子：**仪器坏了不能落回"通过"**，只能落回"结论无效"。
+        #    （但仪器坏了也不该装作是"网络的问题"，所以 python 的报错要原样打出来。）
+        st = (m.get("start") or "")[:19]
         try:
             t = time.mktime(time.strptime(st, "%Y-%m-%dT%H:%M:%S"))
         except Exception:
@@ -126,6 +131,10 @@ printf 'B_VIA_PROXY bytes/code=%s   mihomo_matched=%s\n' "$S_B" "$RB_B"
 #    后面的每一处引用都读到解析出来的数字。用 read。
 read -r NA BA <<< "$RB_A"
 read -r NB BB <<< "$RB_B"
+# 数值兜底：python 抛错时这里是空串或非数字。空/非数字一律当 0 —— 也就是当成"没记到"，
+# 从而走 BLIND/INCONCLUSIVE 那一支，**绝不**走"通过"那一支。
+case "$NA" in ''|*[!0-9]*) NA=0;; esac
+case "$NB" in ''|*[!0-9]*) NB=0;; esac
 if [ "$NA" = "ERR" ] || [ "$NB" = "ERR" ]; then
   printf 'CONTROL=ERR 读不到 mihomo 控制器（%s）⇒ 这台机器上的代理出口没法计量\n' "$CTRL"
   echo 'EGRESS=INCONCLUSIVE'; exit 3
