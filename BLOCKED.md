@@ -6596,7 +6596,7 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 | 1 | ~~固定收尾的 **iOS 腿**没有读数~~ ✅ **19:1x 闭合**：等到第 12 轮开窗，`IOS_RETRY_EXIT=0`，沙盒/构建/安装/新鲜度四条各有读数，图人看过 | —— 不再等 | `tail -6 ~/.heyta-evidence/reinstall-1006-ios-retry-190234/facts.txt` | 它等的正是设备窗口，等到就绿了，没有需要代改的东西。读数与「那张图不证 H9/H10 形状」的边界在 `docs/plans/goal-layout-audit.md` §9.14 |
 | 2 | ~~本会话那几枚提交未推~~ ✅ **19:19 已推**（两趟有界循环各 rc=0，`FINAL_RC=0`） | —— 网络那一格自己好了 | 现量只认 `git -c credential.helper='!gh auth git-credential' ls-remote https://github.com/Xaiver03/heyta.git refs/heads/main`：🔴 按 URL 推**不推进本地 `origin/main` 追踪 ref**，所以 `git rev-list --count origin/main..HEAD` 会一直虚报（19:19 实测推完仍报 42） | 这一格从此是**常态**而不是阻塞：每新增一笔都要重推。快进、不 force、不改写已公开历史这三条没变 |
 | 3 | 任务 #17：`check:e2e-helper-exports` 写了却没接进链 | `package.json` 的 `check` 那一行正被别线重写 | `git status --porcelain -- package.json` 为空 ⇒ 才动那一行 | 改那一行 = 覆盖别人在飞的定义。盲区机制与改法建议已登记在 `docs/plans/goal-layout-audit.md` §9.11（"既无定义又不在链上的实现文件"落在 `check:gate-wiring` 两条判据之外） |
-| 4 | 工单 H11 / 任务 #25：外壳不滚（桌面那一半） | `apps/web/src/styles/app/narrow.css` 的所有者提交 + 一台安静的载体 | `git status --porcelain -- apps/web/src/styles/app/narrow.css`（🔴 路径里那一层 `app/` 不能省：写成 `styles/narrow.css` 时它对**不存在的路径输出空**，而"空"正是"已让开"的读数 —— 19:2x 我自己就差点照这个起跑）；`bash research/tools/b-reinstall-readiness.sh` | 19:2x 重量：② 仍 ` M`（P0 体验整改线还在写）、③ 仍不成立（全仓脏 195 枚 + B90 那 9 枚 e2e 红在 HEAD 上）；① 成立 |
+| 4 | ~~工单 H11 / 任务 #25：外壳不滚（桌面那一半）~~ ✅ **22:1x 闭合**：落地 + 四条新判据 + 臂台 + 5 张图人看过，提交 `1cbcbf34` | —— 不再等 | `cd e2e && npx playwright test -c playwright.parallel.config.ts tests/shell-no-document-scroll.spec.ts tests/shell-sidebar-height.spec.ts tests/search-overlay.spec.ts` ⇒ **9 passed**；臂台 `bash scripts/h11-arms.sh`（A/B/D 各红，末臂是还原后的阳性对照） | 🔴 **起跑条件② 没有翻面，是换的载体**：`apps/web/src/styles/app/narrow.css` 在主检出现量仍 ` M`（147 插 / 59 删，正是 W4 塌缩态那一片），所以"等它干净"这一半**不成立**。走的是隔离载体（`~/heyta-carriers/heyta-reinstall-1006`，那一棵 `narrow.css` 干净、`HEAD` 与主检出同指 `86d00c4c`）。落点不相交：我改 `base.css`/`main-area.css`/`material.css`/`TaskOrganizer.tsx`，他们改 `narrow.css`；唯一共享的那枚 `base.css` 用"blob 由 `HEAD` 重建 + 私有索引 `commit-tree` + CAS `update-ref`"只带走我自己的 31/2 行，他们那 22 行**继续留在工作树**（现量：`git diff -- apps/web/src/styles/app/base.css` 只剩 `.ht-app[data-detail-suppressed]` 与 `.ht-app__detail[hidden]` 两条）。全部读数、两条被自己的臂台**否证**的判断、`TaskRepeat.tsx` 同形态浮层的后续改法，以及"刷索引会把他们 base.css 的 staged 态一并刷成 HEAD 那份（工作树内容不受影响）"这条副作用，都在 §9.15 |
 | 5 | `landing test` 那 1 枚红 + `pnpm check` 整链的 9 枚 e2e 红 | 象限线那枚未提交的 `quadrant/copy.ts`；回收线自己（B90） | `pnpm --filter @heyta/landing test`（取末尾 `failed` 那行） | 判据口径不代改：两组红的根因都在别人那枚未提交改动里，三条腿归因在 §9.12 与 B90 |
 | 7 | 习惯屏的**设备侧装机判据缺一枚常驻载体**（工单 H12） | 不是"等谁"：`verify:mobile-habits` 从来没建过，而 `apps/mobile/evidence/android-habits-*.png` 那 9 张是 10-01 一次性脚本产的、脚本没入库 ⇒ 当前产物上**无法复跑** | `node -e 'const s=require("./package.json").scripts;console.log(Object.keys(s).filter(k=>/^verify:mobile/.test(k)&&/habit/.test(k)).length)'` 打 0 即证；`stat -f '%Sm' apps/mobile/evidence/android-habits-1-empty.png` | 与 #17 同族（没有载体的面 = 静默面）。不当场建：那是一条新的设备侧验收线（真服务端 + 模拟器 + 逐屏回读 + 判据钉在本轮 entityId），不是顺手补的一枚脚本 |
 
@@ -6612,4 +6612,23 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
 不是"仓库里的链接烂了"。现量：`git status --porcelain -- docs/research/ci-proxy-traffic-attribution.md docs/README.md`。
 处置：他们把那枚文档 `git add` 进去即自愈；本会话不代提交别人在写的 WIP 文档（三条齐里"一条命令可回退"
 这一条对整篇新文档不成立 —— 内容归属不在我这儿）。
+
+
+📌 **22:2x 更新（Goal 收尾块）**：第 4 格已闭合（H11 桌面那一半，提交 `1cbcbf34`，
+读数与两条被自己臂台否证的判断在 §9.15）；第 3 格（#17 接链 + 反方向判据）与第 6 格
+（CI 线那 2 处死链）此前已闭合。**这一节现在只剩 5 与 7 两格开着。**
+
+🔴 **第 6 格自愈之后，`check:docs` 又红了 6 处，但那**不是**同一批**（别把这条读成"第 6 格没修完"）：
+死链目标是 P0 体验整改 / IA 审计那条线**今晚 19:35–21:19 新写的 4 枚未跟踪文档**
+（`docs/reference/design-system-behavior.md`、`docs/reference/product-ux-performance-baseline.md`、
+`docs/research/product-ux-ia-aesthetic-audit.md`、`docs/plans/product-ux-optimization.md`）
+与 **2 枚未跟踪的 web 测试**（`apps/web/tests/rail-more-menu.spec.ts`、
+`apps/web/tests/shell-more-and-settings.spec.tsx`），宿主是 `docs/README.md:195/196/247`、
+`docs/plans/README.md:15`、`docs/research/product-level-ia-ux-audit.md:280/281`（这三枚宿主自身
+就是 ` M` / `AM` 态）。现量：`pnpm run check:docs` 取末尾那 6 段 `-> 路径（…git 没有跟踪它）`。
+⇒ 与第 6 格同族同处置：**他们 `git add` 即自愈，本会话不代提交**（同一理由：整篇新文档的
+内容归属不在我这儿，"一条命令可回退"不成立）。
+⚠️ 顺带一条**否证**：本节原先记的 `check:md-tables` 在 `docs/plans/trash-and-archive.md:744`
+那一格红，22:1x 现量已经不复存在（`pnpm run check:md-tables` ⇒ rc=0，"12 个文件…第四类基线 3 行"）。
+是回收线自己补上的，不是本会话动的。
 

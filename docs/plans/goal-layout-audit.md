@@ -761,7 +761,7 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
 任务屏页头 2 件、其余四屏 1 件、控制台零错误；明暗两版入库 `evidence/mockup-shell-1-{light,dark}.png`，
 两张都打开看过。
 
-### 9.10 工单 H11：外壳不滚（§9.4 第 1 条剩下的桌面那一半）—— 立案，未开工
+### 9.10 工单 H11：外壳不滚（§9.4 第 1 条剩下的桌面那一半）—— ✅ 22:1x 落地，读数在 §9.15
 
 原裁决就是"**单独一单**，不夹在 H9 里顺手做"（§9.4 第 1 条）。18:0x 现量了开工面，
 结论是**现在不是起跑点**，把清单钉在这里免得下一个人重新推一遍：
@@ -774,6 +774,17 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
 | 参照系要逐条分类的判据 | `e2e/tests/` 里 **14 个文件**含"视口底边/折叠线/`innerHeight`"类断言、**16 个文件**含"底边"量法。改完之后：rail / sidebar / 详情列的元素仍应对**视口**，而 `.ht-main` 里的元素应对 **`.ht-main` 自己的盒子** —— 混用会让一条判据在两种滚动模型下都"看起来对" |
 | 硬前置 | B95 看图时记下的那条：最靠下那一行的整理编辑器**朝下弹**，底边掉到折叠线以下。今天靠整页滚还够得着，H11 落地之后那一档变成**够不着** ⇒ 弹出方向必须一并处理，不能事后补 |
 | 起跑条件 | ① `pnpm -r build` 绿（否则 e2e 证据只能取自 vite dev 载体，得像 B98 那样标明）；② `narrow.css` 静默（别线提交之后）；③ 一次安静载体 —— 这一单会重跑那 14 份几何判据，负载高的读数不可归因（§9.4 那笔"两分钟窗口"的账就是这一类） |
+
+🔴 **落地时（§9.15）这张表里有两行被否证，留形以免下一个人照它推**：
+① 第一行写的"并给 `.ht-main` 加 `overflow-y: auto`"**不是落地形状** —— 滚动挂在
+`.ht-content`，而 W4 反过来断言 `.ht-main` 的 overflow 必须是 `visible/visible`
+（挂 `.ht-main` 的那一臂红在 `detail-column-slot` 的把手命中带）；
+② 第三行"会重跑那 14 份几何判据"没发生 —— 实跑的是**受影响的三族**（9 passed），
+外加臂 C 那一趟顺带覆盖 `quadrant-fill`/`calendar-wheel`/`detail-column-slot`（13 passed）。
+那两族不需要改是**跑出来的**，不是推出来的：`quadrant-fill:259` 早就写了
+`if (scroller) … else window.scrollTo(…)` 的双分支（H11 之后走前一支），
+而 `calendar-wheel:133` 的 `window.scrollY` 只是探针回报字段、不是任何断言的输入。
+⇒ 剩下那 11 份含"视口底边/折叠线"量的文件**仍未逐条分类**，这一格不随本单关闭。
 
 ### 9.11 18:2x 现量：起跑条件① 翻了面，②③ 没翻；顺带两条台账更正
 
@@ -891,4 +902,81 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
 但**流程一次跑完没红**不成立 —— 整趟是 `PHASE_2_EXIT=1` 的主跑 + 一次 `--only ios` 的补跑拼出来的，
 而补跑走的是隔离载体（`90232ce0`），不是主检出。所以准确的现状声明是
 "**四端装的都是 `90232ce0` 及之前的当前产物**"，不是"`pnpm reinstall:all` 全绿"。
+
+### 9.15 H11 外壳不滚（桌面那一半）落地：改的只有两条声明，换掉的是一整条参照系
+
+提交 `1cbcbf34`（14 枚路径）。载体 = 隔离检出 `~/heyta-carriers/heyta-reinstall-1006`
+（`HEAD` 与主检出同指 `86d00c4c`，那一棵 `narrow.css` 干净）。
+
+**落地的两条声明**（`base.css` 的 `.ht-app`：`min-height: 100dvh` → `height: 100dvh` +
+行轨 `minmax(0, 1fr)`；滚动挂在 `main-area.css` 的 `.ht-content`，`@media (min-width: 769px)`）。
+为什么缺一不可、以及 `min-height` 那三条实测代价（rail 被另一栏带着滚 / B94 那 52px 跳点 /
+`.ht-sheet` 的 `overflow-y:auto` 挂在 2365px 高的宿主上永不触发），逐条写在 `base.css` 那段注释里，
+不在这里抄第二遍（抄一遍就是造第二份事实源）。
+
+**顺带修掉的一条真缺陷**（B95 那一档，从"难看"升级成"够不着"）：`TaskOrganizer`
+的整理编辑器原来是 `position:absolute` 的 `<details>` 浮层，而**绝对定位元素不进
+滚动容器的 scrollable overflow** —— 探针实测滚到底仍差 **78px** 够不着面板底部。
+改成零高度槽位（`.ht-material__row-slot{block-size:0}`）+ `position:relative` 面板：
+玻璃浮层外观不变，但参与溢出。视觉声明从两处**逐字相同**的内联块收进 CSS
+⇒ `check:l4` 的内联样式从 98 降到 **91**（门禁自己提示"建议把基线下调到 91"，
+这一条**没代拍**，留给 l4 线）。
+
+| 判据 | 读数 |
+|---|---|
+| 新增 `e2e/tests/shell-no-document-scroll.spec.ts` | W1（1280×700：内容列确实溢出=前提、`window.scrollY===0`、`docH<=vh+2`、rail 盒不变、`.ht-content` 顶边不变、详情栏钉住）／W3（四视图逐个量，跑前先 `switchView('习惯')` 才拿得到那条输入）／W4（`.ht-main` 的 overflow 必须 visible/visible、给它写 `scrollLeft=100` 必须读回 0、把手中心 `elementFromPoint` 命中自己、overhang == `--ht-space-2`）／W2（900×700 真鼠标点最靠下一行的触发器 → 编辑器可见 → 再滚一次把面板完整带进滚动口） |
+| 既有三份跟着换参照系 | `shell-sidebar-height` 从量 window 改成量 `.ht-content`，并加了一条 **P0 前提**（文档不滚）—— 没有它，这一份会在"整页滚"的旧形态下**照样绿**（退化判据）；`search-overlay` 的 `window.scrollTo(0,1200)` 换成滚宿主并断言 `hostScrolled>0`，⑧ 那组旧数字标注为 H11 之前 |
+| 三族合跑 | `npx playwright test -c playwright.parallel.config.ts tests/shell-no-document-scroll.spec.ts tests/shell-sidebar-height.spec.ts tests/search-overlay.spec.ts` ⇒ **9 passed (42.7s)**，22:11 |
+| 臂台 `bash scripts/h11-arms.sh` | 臂 A（`height`→`min-height`）红 · 臂 B（删行轨 `minmax(0,1fr)`）红 · 臂 D（滚动搬到 `.ht-main`）红（红在 `detail-column-slot` 的把手命中带，**不是**本单那一份）· 末臂 `RESTORED-POSITIVE` 绿 = 臂台自己没坏 |
+| 门禁 | `check:design` ✅ 无硬编码 · `check:l4` ✅ 91 ≤ 98 · `check:row-single-source` ✅ 28 族恰在基线 · `check:e2e-helper-exports` ✅ 120 份 / 407 个导入名 / 缺失 0 |
+| 图 | 5 张入库 `apps/web/evidence/shell-no-document-scroll/`（md5 `a27dca0a`/`08618e69`/`e81c5ce0`/`050689dc`/`9f1f806f`），**人打开核过两张关键帧**：`w1-before-scroll` = 三栏各自到视口底被裁、rail 完整在位（这就是"每栏内滚"的形状）；`w2-editor-open-fitted` = 第 11 行的整理面板（清单下拉 + 「还没有标签」那行）完整落在视口内、底边没被裁 |
+
+🔴 **两条我自己写错、被自己的臂台否证的判断**（留着，因为它们各代表一种"听起来对的 CSS 信仰"）：
+1. **`min-block-size: 0` 是多余的** —— 我按 flex 项自动最小尺寸那条常识加了它并写进判据预期，
+   臂 C 拿掉它 **13 passed / RC=0**（存活）⇒ 那一行没有任何判据需要它，**已删**，
+   理由（`overflow:visible` 才等于内容高度）写进 `main-area.css`。
+2. **"滚动挂 `.ht-main` 会让把手被 `overflow-x: clip` 裁掉一半"这句是错的** ——
+   探针两种形态都打印 `mainOverflowX:"auto"`（不是 `clip`）且 `hitIsResizer:true`。
+   真的差异是"页头会跟着滚走"与"多出一条只装得下 4px 的横滚"，
+   于是 W4 改成**可量的两件事**（overflow 必须 visible、写 `scrollLeft` 必须读回 0），
+   而不是复述那句被否证的机制。
+📌 一般形态：**"为什么不挂在 X"这种裁决，理由必须是探针读得出的**，
+否则它会以"注释"的形态活很久，而它的否定证据一次都没被取过。
+
+⚠️ **命名这一档值得下一位记住**：新类最初叫 `.ht-row-pop-slot`/`.ht-row-pop`，
+当场红在 `check:row-single-source` —— 它数的是**顶层 `ht-*` 前缀族**，
+`ht-row` 就是第 29 族 > 基线 28。收进既有 `.ht-material__*` 族后回到 28。
+⇒ 加类名的成本不只在 `check:design`，还在一枚"数前缀"的门禁上。
+
+**载体与射程**：主配置 `--strictPort` 写死 4318/4319 是对的（抢不到就响亮失败，
+不许悄悄换端口＝换被测对象），但同一台机器两个会话不能同时跑真浏览器验收，
+而 H11 的界面改动**必须**有图（§6.2 规定一）。新增 `e2e/playwright.parallel.config.ts`
+（4418/4419）：同一份 vite dev、同一份 `stub-provider.mjs`、同一套判据文本，换的是载体不是尺子。
+🔴 **射程限定**：`tests/helpers.ts` 的 `STUB_ORIGIN` 仍是写死的 4319，所以任何调
+`resetStub`/`stubLog`/`expectStubCount`/`configureEndpoint` 的用例都不能在这一份上跑
+（症状是"计数永远 0"，比报错更糟）。把 `STUB_ORIGIN` 一起参数化是**另一单**，登记在下面。
+
+**共享文件的处置（`base.css`）**：那一枚同时有他们 22 行未提交
+（`.ht-app[data-detail-suppressed]` + `.ht-app__detail[hidden]`）。
+提交 blob 由 `git show HEAD:base.css` 重建 + 只插入我的那段，并**断言**那两条不在结果里；
+私有索引（`GIT_INDEX_FILE` + `read-tree HEAD` + `update-index --cacheinfo`）→ `commit-tree`
+→ CAS `update-ref`。⇒ 他们那 22 行继续是未提交态，逐字未动。
+⚠️ **一条要说清的副作用**：刷真索引时把 `base.css` 的 **staged 态**一并刷成了 HEAD 那份
+（此前它是 `MM`）。工作树内容不受影响，差别只是"他们那 22 行现在在 unstaged 侧"。
+这一刷是**必要的**：不刷的话，他们下一次 `git commit` 会把我那段一起按**旧内容**提交，
+等于静默回退我的改动。
+⚠️ 另一条现量：HEAD 那份 `base.css` **结尾无换行**（`git cat-file` 末字节 `7d`），
+而工作树那份有 ⇒ 他们提交时会带一枚 `\ No newline at end of file` 的尾行差异，不是我的。
+
+📌 **`TaskRepeat.tsx` 还有一处同形态浮层**（`position:absolute` 的重复规则面板）。
+外壳钉死之后它同样是"够不着"那一档，但那一枚文件此刻正被别线写着 ⇒ 不当场动。
+改法已经很便宜：CSS 侧那两条类**已经在库里**（`.ht-material__row-slot` /
+`.ht-material__row-pop`），它只需要两行 JSX 换壳。
+
+**这一单没有证到的**（别读多）：
+① ≤768 塌缩态那一半**不是本单落的**（W4 线在写，滚动宿主按设计是 `.ht-main`，
+与桌面这一半不冲突，因为那一档把手 `display:none`）；
+② 只重跑了**受影响的三族**（9 passed），`check:ai-e2e` 整族与 `pnpm check` 整链这一轮没重跑；
+③ 臂台只覆盖 `shell-no-document-scroll` + `detail-column-slot` 两族，
+`quadrant-fill`/`calendar-wheel` 的臂是臂 C 那一趟顺带跑的（13 passed，用于证明"存活"，不是证明"能红"）。
 
