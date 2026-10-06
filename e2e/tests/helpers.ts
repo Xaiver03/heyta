@@ -31,9 +31,13 @@
 
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import { installMissingProducerShims } from './shims';
+import { STUB_ORIGIN } from '../ports';
 
-/** 假端点的来源（与 `playwright.config.ts` 的 webServer 端口一致）。 */
-export const STUB_ORIGIN = 'http://127.0.0.1:4319';
+/**
+ * 假端点的来源。**端口只有一个所有者**（`e2e/ports.ts`）—— 这里只再导出，不再抄第二遍：
+ * 抄一份字面量就意味着"换槽"要改 8 个文件，而漏改的那几处不会报错，只会连到别人那棵树（traps #358）。
+ */
+export { STUB_ORIGIN };
 
 /** 填进"地址"输入框的值。OpenAI 兼容 base，provider 会拼 `/chat/completions`。 */
 export const STUB_ENDPOINT = `${STUB_ORIGIN}/v1`;

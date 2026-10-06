@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { APP_ORIGIN } from '../ports';
 
 /**
  * 首屏（启动）动画：品牌帧**画得出来**，而且**真的会退场**。
@@ -65,7 +66,7 @@ test.describe('首屏动画（启动品牌帧）', () => {
         });
     });
 
-    await page.goto('http://127.0.0.1:4318/', { waitUntil: 'commit' });
+    await page.goto(`${APP_ORIGIN}/`, { waitUntil: 'commit' });
     // 遮罩本身是 HTML 的一部分，不等 React；只等它出现在 DOM 里。
     await page.waitForSelector(`#${SPLASH_ID}`, { state: 'attached' });
 
@@ -101,7 +102,7 @@ test.describe('首屏动画（启动品牌帧）', () => {
     });
     page.on('pageerror', (err) => consoleErrors.push(`pageerror: ${String(err)}`));
 
-    await page.goto('http://127.0.0.1:4318/');
+    await page.goto(`${APP_ORIGIN}/`);
 
     let failure: Error | null = null;
     try {

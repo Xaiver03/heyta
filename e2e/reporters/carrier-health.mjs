@@ -31,6 +31,18 @@ function errorTextOf(result) {
 }
 
 export default class CarrierHealthReporter {
+  /** 起跑时把**这一轮实际用的**载体地址记下来 —— 端口是一个可以挪开的槽（`e2e/ports.ts`），
+   *  所以作废判定里不许写死号，必须报出真的那一枚，否则换槽之后这句话会把人指到别人的端口上。 */
+  #carrier = '（取不到 webServer.url）';
+
+  onBegin(config) {
+    const urls = []
+      .concat(config?.webServer ?? [])
+      .map((entry) => String(entry?.url ?? ''))
+      .filter((u) => u.length > 0);
+    if (urls.length > 0) this.#carrier = urls.join(' / ');
+  }
+
   onTestEnd(test, result) {
     const text = errorTextOf(result);
     const verdict = carrierFailureReason(text);
@@ -45,8 +57,10 @@ export default class CarrierHealthReporter {
         `   首例：${test.titlePath().join(' › ')}`,
         `   原文：${firstLine.trim()}`,
         '',
-        '   ⇒ 这些红回答的是"载体在不在"，不回答"界面对不对"。先确认 dev server',
-        '     （4318）与假端点（4319）还在，再重跑整轮。',
+        '   ⇒ 这些红回答的是"载体在不在"，不回答"界面对不对"。',
+        `   ⇒ 这一轮实际用的载体：${this.#carrier}`,
+        '     先确认它们还在、而且应答的是**这棵树**（同机兄弟检出共用端口时后者会失效，',
+        '     挪槽的办法见 `e2e/ports.ts`），再重跑整轮。',
         '   ⇒ 不要为了让它跑完去放宽判据，也不要把这一轮的条数当读数记进台账。',
         '',
       ].join('\n'),

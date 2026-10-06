@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { APP_ORIGIN, APP_PORT, STUB_ORIGIN, STUB_PORT } from './ports';
+
 /**
  * 真实浏览器验收的配置。
  *
@@ -17,6 +19,11 @@ import { defineConfig, devices } from '@playwright/test';
  * 端口撞上会让 `reuseExistingServer` 把**别人的应用**当成被测对象，
  * 症状是"测试全绿但测的是另一个网站"。`strictPort` 也是为这个 ——
  * 起不来就报错，而不是悄悄换一个端口。
+ *
+ * 🔴 但这两个号**不是常量**，是 `./ports` 给的一个可以挪开的槽（默认值逐字不变）：
+ * 同一台机上还有兄弟检出（`…/heyta` 与 `…/heyta-wt-merge`），2026-10-06 实测两棵树共用同一对
+ * 固定端口时，跑到一半端口换人 ⇒ 后半程连的是别人那棵树的应用（traps #358）。
+ * 要窗口：`HEYTA_E2E_APP_PORT=… HEYTA_E2E_STUB_PORT=… pnpm check:ai-e2e`。
  */
 export default defineConfig({
   testDir: './tests',
@@ -63,7 +70,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
 
   use: {
-    baseURL: 'http://127.0.0.1:4318',
+    baseURL: APP_ORIGIN,
     // 失败时留下可复查的证据，而不是只给一行报错。
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -79,8 +86,8 @@ export default defineConfig({
 
   webServer: [
     {
-      command: 'node stub-provider.mjs',
-      url: 'http://127.0.0.1:4319/__requests',
+      command: `STUB_PORT=${String(STUB_PORT)} node stub-provider.mjs`,
+      url: `${STUB_ORIGIN}/__requests`,
       reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
@@ -91,10 +98,9 @@ export default defineConfig({
       // `localhost` 常常先解析到 `::1`（IPv6）—— 于是服务确实起来了，
       // 但它**没在监听 127.0.0.1**，而 Playwright 轮询的是 IPv4 那个地址，
       // 结果表现为"命令没问题、却等 120 秒超时"。绑死 IPv4 消除这个歧义。
-      command:
-        'pnpm --filter @heyta/web exec vite --host 127.0.0.1 --port 4318 --strictPort',
+      command: `pnpm --filter @heyta/web exec vite --host 127.0.0.1 --port ${String(APP_PORT)} --strictPort`,
       cwd: '..',
-      url: 'http://127.0.0.1:4318',
+      url: APP_ORIGIN,
       reuseExistingServer: false,
       timeout: 120_000,
     },
