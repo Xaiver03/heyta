@@ -1,0 +1,80 @@
+# heyta 门禁载体镜像（`heyta-gate:local`）
+#
+# 为什么存在
+# ----------
+# 旧的 CI 载体是 GitHub Actions 的自托管 runner 容器（见
+# docs/runbooks/ci-and-runner.md）。它必须挂代理才能拉 runner 本体、Node、
+# Chromium、Electron —— 那些字节走的是 finlaw 上的 mihomo，也就是**付费的代理额度**。
+# 2026-10-06 实测（见 docs/research/ci-proxy-traffic-attribution.md）：
+# 门禁**真正需要的三个源在这台机器上直连就通**，而且比走代理快一个量级：
+#
+#   registry.npmmirror.com      9.4 MB/s（200）
+#   registry.npmjs.org          1.8 MB/s（200）
+#   dl-cdn.alpinelinux.org      200 / 1.67 s（mirrors.aliyun.com 0.61 s）
+#   binaries.prisma.sh          可达（404 是那个路径本身，TLS 与解析都通）
+#
+# 需要代理的只有两件事：**GitHub 的批量传输**（codeload 直连实测 75 KB/s 且 20 s 超时）
+# 和 **docker.io 的镜像拉取**（直连 000）。这一枚镜像把这两件事都从"必须在容器里发生"
+# 挪走了：源码由 SSH 送进来（`scripts/gate-ssh.mjs`），基础镜像用**本机已有**的那枚。
+#
+# 🔴 于是构建这枚镜像本身也不许碰代理。`scripts/gate-ssh.mjs` 在 build 之前
+#    显式把 proxy 相关的 build-arg 置空；空不到就当场拒绝继续（不是警告）。
+#
+# 用法（不要在开发机上手动 build —— 由 gate-ssh.mjs 在 finlaw 上执行）：
+#   docker build -f scripts/ci/Dockerfile.gate \
+#     --build-arg APK_MIRROR=mirrors.aliyun.com \
+#     --build-arg NPM_REGISTRY=https://registry.npmmirror.com/ \
+#     -t heyta-gate:local .
+#
+# 三个构建旋钮与 server/Dockerfile 的 `APK_MIRROR` / `NPM_REGISTRY` / `NODE_IMAGE`
+# **同一族、同一个理由**：仓库里不写死地域性源，别处的自建者拿到的是官方默认值。
+# ⚠️ 默认值与 `server/Dockerfile` 逐字对齐（同一个 `node:24-alpine`），这样
+#    "门禁说能装"与"镜像能构建"用的是同一个 libc / 同一套 Node —— 分开选会造出
+#    "门禁在 glibc 绿、镜像在 musl 红"那种两边都对但合起来没验过的形状。
+
+# 🔴 `NODE_IMAGE` 必须指向**目标机上已经存在**的 tag。docker.io 在这台机器上直连是 000，
+#    而 dockerd 配了走 mihomo 的 proxy —— 一旦这里要拉新镜像，就是**代理字节**，
+#    本文件的存在理由当场失效。`gate-ssh.mjs` 在 build 前先 `docker image inspect` 这一枚，
+#    不在就响亮失败并说清"要么本地 load 一枚，要么改用机器上已有的 tag"。
+ARG NODE_IMAGE=node:24-alpine
+FROM ${NODE_IMAGE}
+
+# 与 AGENTS §7 那条"golden 夹具：时区必须钉死"对齐：门禁产物不许跟着宿主时区/locale 漂。
+ENV TZ=UTC \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+ARG APK_MIRROR=dl-cdn.alpinelinux.org
+RUN if [ "$APK_MIRROR" != "dl-cdn.alpinelinux.org" ]; then \
+      sed -i "s|dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories; \
+    fi && \
+    apk add --no-cache bash git python3 curl tzdata ncurses coreutils
+
+# 🔴 `COREPACK_NPM_REGISTRY`：根 package.json 的 `packageManager` 是 `pnpm@11.8.0`，
+#    corepack 会在 `pnpm install` **之前**去取 pnpm 本体。只给 `NPM_REGISTRY` 环境变量
+#    对它无效（与 server/Dockerfile:46-52 记录的是同一个坑：一枚旋钮两个消费者）。
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
+
+# ⚠️ 与 server/Dockerfile:77-83 同一条实测结论：**必须** `pnpm config set registry`，
+#    只给 `npm_config_registry` 会被 pnpm 忽略、包照旧从官方源取。
+#    写在**用户级**而不是项目级：项目根那份 `.npmrc` 是仓库内容，由 SSH 送进来的源码
+#    会覆盖它，把源固定成"官方"，于是构建参数被静默失效。
+RUN corepack enable && \
+    mkdir -p /home/node && \
+    adduser -D -u 1000 node 2>/dev/null || true && \
+    chown -R node:node /home/node
+
+USER node
+ENV HOME=/home/node \
+    PATH=/home/node/.local/share/pnpm:/usr/local/bin:/usr/bin:/bin
+WORKDIR /work
+
+# 🔴 这里**故意不装依赖**。门禁要回答的问题就是"一个新克隆能不能自己立起来"
+#    （`pnpm install --frozen-lockfile` 是 package.json 与 lockfile 漂移的探测器）；
+#    把依赖烘进镜像等于把那一条判据永久关掉。
+#
+# CMD 不是"一键跑门禁"：`/work` 是空的（源码由 gate-ssh.mjs 在 run 时挂载进来），
+# 直接 `docker run heyta-gate:local` 只会得到一条挂载缺失。留这一行是为了让人
+# 一眼看出**这一枚镜像不携带工作树** —— 携带工作树的镜像会让"干净检出"变成猜。
+CMD ["bash", "-lc", "echo '这一枚是门禁载体镜像：源码与依赖都在运行时挂载/安装。用法见 scripts/gate-ssh.mjs'; exit 78"]
