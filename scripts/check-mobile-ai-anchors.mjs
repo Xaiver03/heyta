@@ -924,6 +924,24 @@ function ledgerInvariant(scriptRel) {
           '有一种红不记账，界面上少了图而台账说"全过"。',
       );
     }
+    // 🔴 新鲜度那把尺的**载体**也在判据范围内（rig45 现量）：
+    //   `find … -newermt "@$epoch"` 在 macOS 的 BSD find 上直接
+    //   `Can't parse date/time: @1791255647`，stdout 空 ⇒ 计数恒 0 ⇒
+    //   四张本轮刚拍的图全判"比起跑还旧"（stderr 被 2>/dev/null 吃掉，所以现场只剩一句假红）。
+    //   判"mtime 是不是本轮的"必须走两端读同一个值的通道，且**读不出要另说一条红** ——
+    //   把"尺坏了"和"图旧了"写成同一句话，下一个人就会去查产物而不是查尺。
+    if (/-newermt/.test(body)) {
+      red.push(
+        '第 13 步用 `find -newermt` 判新鲜度 —— macOS 的 BSD find 解析不了 `@<epoch>`，' +
+          '那句恒为"空输出"⇒ 每条本轮的图都被判成旧图（rig42 那四条假红的真身）。改用 mtime 逐字比较。',
+      );
+    }
+    if (!/getmtime/.test(body) || !/png_mtime" -lt "\$RUN_STARTED/.test(body)) {
+      red.push(
+        '第 13 步现在没有一条"读 mtime 再与起跑时刻逐字比"的判据（要同时见到 getmtime 取值与 ' +
+          '`[ "$png_mtime" -lt "$RUN_STARTED" ]`）⇒ 归属这一半没有尺，不报"对账成立"。',
+      );
+    }
   }
   return red;
 }
@@ -1676,6 +1694,31 @@ if (process.argv.includes('--self-test')) {
   arms.push([
     '臂 65 rid: 标记指向源码里不存在的 testID ⇒ 非零退出且点名',
     m65.code !== 0 && m65.out.includes('profile-entry-nope') && m65.out.includes('tap_tab(rid:)'),
+  ]);
+
+  // ── 判据 ⑲ 的第二把尺：新鲜度那一句**用哪个工具读 mtime**（rig45 现量的四条假红）──
+  const mutF66 = baseTun.replace(
+    'if [ "$png_mtime" -lt "$RUN_STARTED" ]; then',
+    'if [ "$(find "$png" -newermt "@$RUN_STARTED" 2>/dev/null | wc -l | tr -d \' \')" = "0" ]; then',
+  );
+  arms.push([
+    '臂 66 的变异确实把新鲜度换回 find -newermt（前置）',
+    mutF66 !== baseTun && mutF66.includes('-newermt'),
+  ]);
+  const m66 = runMutantFile(mutF66, 'mtime-bsd-find');
+  arms.push([
+    '臂 66 用 BSD find 的 -newermt 判新鲜度 ⇒ 非零退出且点名',
+    m66.code !== 0 && m66.out.includes('macOS 的 BSD find 解析不了'),
+  ]);
+  const mutF67 = baseTun.replace('[ "$png_mtime" -lt "$RUN_STARTED" ]', '[ "$png_mtime" -lt "$png_mtime" ]');
+  arms.push([
+    '臂 67 的变异确实把比较的右端换成自己（前置）',
+    mutF67 !== baseTun && mutF67.includes('-lt "$png_mtime"'),
+  ]);
+  const m67 = runMutantFile(mutF67, 'mtime-self-compare');
+  arms.push([
+    '臂 67 mtime 不再与起跑时刻比 ⇒ 非零退出且点名',
+    m67.code !== 0 && m67.out.includes('归属这一半没有尺'),
   ]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──

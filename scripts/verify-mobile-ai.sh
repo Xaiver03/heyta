@@ -2134,10 +2134,26 @@ while IFS=$'\t' read -r rel focus; do
   [ -n "$rel" ] || continue
   png="$EVIDENCE/$rel"
   if [ ! -s "$png" ]; then bad "$rel 没落盘"; shot_bad=1; continue; fi
-  if [ "$(find "$png" -newermt "@$RUN_STARTED" 2>/dev/null | wc -l | tr -d ' ')" = "0" ]; then
-    bad "$rel 比本轮起跑时间还旧 —— 它属于上一趟（§7 第 27 条那一族：产物在、结论也对，只是不属于这一轮）"
-    shot_bad=1
-  fi
+  # 🔴 新鲜度这把尺**不能用 `find -newermt "@$epoch"`**（rig45 现量）：
+  #    macOS 的 BSD find 对 `@<epoch>` 直接报 `Can't parse date/time: @1791255647`，
+  #    stdout 为空 ⇒ 计数恒 0 ⇒ 四张**本轮刚拍的**图（mtime 11:19/11:24/11:25/11:27，
+  #    起跑 11:11）全被判成"比本轮起跑还旧"。这是一条恒不成立的判据 ——
+  #    它比恒绿的判据好一点的唯一地方是会响亮地红，但代价是把台账里的红与真缺陷混在一起。
+  #    python 的 getmtime 在两端读到的都是同一个东西（秒级 mtime），
+  #    而且这个脚本对 python3 已经是硬依赖（`$XY_PY` 就跑在它上面）。
+  png_mtime=$(python3 -c 'import os,sys;print(int(os.path.getmtime(sys.argv[1])))' "$png" 2>/dev/null)
+  case "$png_mtime" in
+    ''|*[!0-9]*)
+      bad "$rel 的 mtime 读不出来（${png_mtime:-空}）⇒ 这一条判据没有输入，是尺坏了不是图旧"
+      shot_bad=1
+      ;;
+    *)
+      if [ "$png_mtime" -lt "$RUN_STARTED" ]; then
+        bad "$rel 比本轮起跑时间还旧（mtime $png_mtime < 起跑 $RUN_STARTED）—— 它属于上一趟（§7 第 27 条那一族：产物在、结论也对，只是不属于这一轮）"
+        shot_bad=1
+      fi
+      ;;
+  esac
   case "$focus" in
     *com.heyta*) : ;;
     FOCUS-UNKNOWN) bad "$rel 拍的时候 dumpsys 没读到前台 —— 这条判据没有输入"; shot_bad=1 ;;
