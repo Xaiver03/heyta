@@ -40,6 +40,18 @@
     "tests/detail-pane-habit.spec.ts",
     "tests/detail-pane-task.spec.ts",
     "tests/focus-detail-pane.spec.ts",
-    "tests/keyboard-cursor.spec.ts"
+    "tests/keyboard-cursor.spec.ts",
+    // 习惯那一族（工单 H1–H8）：同一枚编译器、同一条命令，加进来只可能变严不会变松。
+    // 加之前先逐字跑过：`tsc --noEmit --strict …` 对下面 9 份 = **0 条错误**（07:5x 现量），
+    // 所以这一批不是"顺手把目录通配进来"（那会带进别的线在飞的红），是点名加已绿的。
+    "tests/habit-counted-amount.spec.ts",
+    "tests/habit-frequency.spec.ts",
+    "tests/habit-heatmap-labels.spec.ts",
+    "tests/habit-icon-picker.spec.ts",
+    "tests/habit-month-stats.spec.ts",
+    "tests/habit-month.spec.ts",
+    "tests/habit-year.spec.ts",
+    "tests/habits-pane.spec.ts",
+    "tests/habits-two-column.spec.ts"
   ]
 }
