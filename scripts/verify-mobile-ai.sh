@@ -22,6 +22,9 @@ esac
 #    下一轮的 readiness 循环只问"有没有带 count 的 JSON"，就会**借用别人的桩**继续跑
 #    （traps #340/#341）。第 14 步仍然保留，它把"清干净"当成一条判据来读。
 teardown_rig() {
+  # 🔴 必须排在 STUB_PIDFILE 那句 `|| return 0` **之前**：那行一 return，后面的清理全不做
+  #    （同 #342 那一族 —— 收尾挂在成功路径上就等于没挂）。
+  [ -n "${SHOTS_TSV:-}" ] && rm -f "$SHOTS_TSV"
   if [ -n "${ADB:-}" ] && [ -n "${STUB_PORT:-}" ]; then
     $ADB reverse --remove "tcp:${STUB_PORT}" >/dev/null 2>&1 || true
   fi
@@ -1003,6 +1006,9 @@ bind_all_routes() {  # <端点标签> —— 五档逐条绑，没绑上的要�
 #    共享 UI 推的，手机界面有 14 张人看过的真图命中 0；而 contentRatio 在编辑屏
 #    只剩 0.8pp 余量（现量与论证见 notes 的同名注释）。两个像素读数照打不判红。
 SHOT_FOCUS=""
+# 🔴 名字带 `$$`：截图归属对账的中间凭据和 pidfile 是同一类东西（#342）—— 固定名会让
+#    下一轮起跑时把它抹掉，而第 13 步读的正是"这一轮拍了哪些张"。
+SHOTS_TSV="/tmp/heyta-ai-shots.$$.tsv"
 shot_evidence() {
   local rel="$1" focus
   mkdir -p "$EVIDENCE"
@@ -1035,7 +1041,7 @@ if ! printf '%s' "$HEALTH" | grep -q '"status":"ok"'; then
   echo "      起栈：bash scripts/mobile-e2e-up.sh"
   exit 3
 fi
-echo "   ✅ 服务端在 ${HOST_SERVER}；设备 ${E2E_SERIAL}；库 $E2E_DB"
+ok "服务端在 ${HOST_SERVER}；设备 ${E2E_SERIAL}；库 $E2E_DB"
 
 # 🔴 起跑时间戳取在**任何破坏性动作之前**（下面的 pm clear / install -r 都算）：
 #    第 13 步的截图归属判据要靠它区分"本轮拍的"和"上一趟留下的"。
@@ -1151,7 +1157,7 @@ except Exception as exc:
 '
 }
 C0=$(stub_count) || summary "移动端 AI 助手真机验收" "假端点计数读不出" 1
-echo "   ✅ 假端点在 ${STUB_HOST_URL}（当前计数 ${C0}，绑定仍是 127.0.0.1）"
+ok "假端点在 ${STUB_HOST_URL}（当前计数 ${C0}，绑定仍是 127.0.0.1）"
 
 step "设备侧端口转发：adb reverse（假端点不改绑定）"
 # 正向对照：从**设备里**打一次假端点。这一条证明"通了"，
@@ -1181,8 +1187,8 @@ if [ -n "$TUNNEL_WHY" ]; then
   echo "   ❌ 设备里发出的 /__probe 没被假端点数到（${TUNNEL_WHY}）—— 设备够不到假端点，环境不成立，不是产品失败"
   summary "移动端 AI 助手真机验收" "设备够不到假端点（起跑前置）" 3
 fi
-echo "   ✅ 转发表：$($ADB reverse --list | tr -d '\r')"
-echo "   ✅ 设备内回环可达（/__probe 正向对照 +1，实现见 ensure_tunnel）"
+ok "转发表：$($ADB reverse --list | tr -d '\r')"
+ok "设备内回环可达（/__probe 正向对照 +1，实现见 ensure_tunnel）"
 
 step "0. 全新安装 + 隐私门（先选「只用本机」）"
 $ADB shell pm clear "$PKG" >/dev/null 2>&1 || true
@@ -1240,7 +1246,7 @@ if [ "$CONSENT_GATE_SEEN" = "1" ]; then
   PRIVACY_STEP_RAN=1
   # 🔴 打印的是**实际点掉的标签**，不是脚本"想要"的那个（写死「只用本机」会在收下
   #    备选按钮时照样报 ✅）。
-  echo "   ✅ 隐私门已选「${CONSENT_GATE_CHOSEN}」"
+  ok "隐私门已选「${CONSENT_GATE_CHOSEN}」"
 else
   PRIVACY_STEP_RAN=0
   echo "   ↷ 这一版没弹隐私门（设备已有态）—— 「只用本机」那一层对照记为**未取证**，不记为通过"
@@ -1794,7 +1800,7 @@ if [ -n "$XY" ]; then
   $ADB shell input tap ${XY% *} ${XY#* } >/dev/null 2>&1
   sleep 2
   handle_privacy_consent "同意并联网" "只用本机" \
-    && echo "   ✅ 隐私层已切到「同意并联网」（功能级授权仍逐条手动）" \
+    && ok "隐私层已切到「同意并联网」（功能级授权仍逐条手动）" \
     || echo "   ↷ 面板没接住 —— 可能已是联网态。**这句不是 ✅**：到底联网与否由第 7/8 步的计数与披露读数裁决，不由这里自称"
 else
   echo "   ❌ 走过「撤回同意」之后，设置里仍然既没有「重新作出选择」也没有「同意并联网」"
@@ -1907,7 +1913,7 @@ open_ai_settings || summary "移动端 AI 助手真机验收" "载体锚点失�
 #    不在 = 此前已授权（合法状态），在却点不动 = 载体坏了（必须停）。分开说。
 if [ "$(has_rid ai-consent-breakdown)" = "1" ]; then
   tap_rid ai-consent-breakdown || summary "移动端 AI 助手真机验收" "逐功能授权入口点不动" 1
-  echo "   ✅ 逐功能授权已点下（ai-consent-breakdown 曾在树里）"
+  ok "逐功能授权已点下（ai-consent-breakdown 曾在树里）"
 else
   echo "   ↷ 那一档已经没有授权入口（此前已授权过）—— 直接看披露步的读数"
 fi
@@ -2099,30 +2105,40 @@ else
 fi
 
 step "13. 取证对账：截图必须属于本轮，且拍的那一刻前台是本应用"
-FAIL=0
-printf '%s' "$SHOT_FOCUS" | while IFS= read -r line; do
+# 🔴 这一步在 rig42 上报了四条「❌ CHECK 没落盘」，而四张图**都在**、mtime 全落在本轮内。
+#    两个独立缺陷叠在一起，各自的后果都不是"多打一行红字"：
+#    ① 写出的是三列（`CHECK` + rel + focus），读回只有两个变量 —— bash 把多余字段
+#       塞进最后一个变量，于是 rel 恒读成字面量 "CHECK"、focus 拿到 "<rel>\t<focus>" 的尾巴。
+#       判据的输入从此不是它以为自己在量的东西（这是"键列被读成常量"那一族）。
+#    ② 这里的局部标志原本就叫 `FAIL`，而 `FAIL` 是 lib 的**失败计数**
+#       （`scripts/lib/mobile-e2e.sh:150`：`bad() { … FAIL=$((FAIL+1)); }`）。
+#       `FAIL=0` 把先前每一条红从台账里清零 —— rig42 报"失败 2 项"里那 2 = 循环里 `FAIL=1`
+#       留下的 1 加上末尾 bad() 的 1，**真红只有 1 条**；而 rig41 那种"第 7 步就红"的跑
+#       只要走到这一步，就会被打印成"失败 0 项 / ✅ 通过"并以 **0** 结束（元规则 2 的最坏形状：
+#       一条把别人的失败抹掉的判据）。四条逐图的红还走 echo、不计入。
+#    现在：局部标志改名 shot_bad，逐图走 bad()，不再补一条汇总 bad()（那会双计）。
+shot_bad=0
+: > "$SHOTS_TSV"
+while IFS= read -r line; do
   [ -n "$line" ] || continue
-  rel=${line%%=*}; focus=${line#*=}
-  printf 'CHECK\t%s\t%s\n' "$rel" "$focus"
-done > /tmp/heyta-ai-shots.tsv
+  printf '%s\t%s\n' "${line%%=*}" "${line#*=}" >> "$SHOTS_TSV"
+done <<< "$SHOT_FOCUS"
 while IFS=$'\t' read -r rel focus; do
   [ -n "$rel" ] || continue
   png="$EVIDENCE/$rel"
-  if [ ! -s "$png" ]; then echo "   ❌ $rel 没落盘"; FAIL=1; continue; fi
+  if [ ! -s "$png" ]; then bad "$rel 没落盘"; shot_bad=1; continue; fi
   if [ "$(find "$png" -newermt "@$RUN_STARTED" 2>/dev/null | wc -l | tr -d ' ')" = "0" ]; then
-    echo "   ❌ $rel 比本轮起跑时间还旧 —— 它属于上一趟（§7 第 27 条那一族：产物在、结论也对，只是不属于这一轮）"
-    FAIL=1
+    bad "$rel 比本轮起跑时间还旧 —— 它属于上一趟（§7 第 27 条那一族：产物在、结论也对，只是不属于这一轮）"
+    shot_bad=1
   fi
   case "$focus" in
     *com.heyta*) : ;;
-    FOCUS-UNKNOWN) echo "   ❌ $rel 拍的时候 dumpsys 没读到前台 —— 这条判据没有输入"; FAIL=1 ;;
-    *) echo "   ❌ $rel 拍的时候前台不是 heyta：$focus"; FAIL=1 ;;
+    FOCUS-UNKNOWN) bad "$rel 拍的时候 dumpsys 没读到前台 —— 这条判据没有输入"; shot_bad=1 ;;
+    *) bad "$rel 拍的时候前台不是 heyta：$focus"; shot_bad=1 ;;
   esac
-done < /tmp/heyta-ai-shots.tsv
-if [ "$FAIL" = "0" ] && [ -s /tmp/heyta-ai-shots.tsv ]; then
-  ok "截图齐且归属本轮：$(wc -l < /tmp/heyta-ai-shots.tsv | tr -d ' ') 张，拍的时候前台都是 heyta"
-else
-  bad "截图取证对账没过（或这一趟一张都没拍）"
+done < "$SHOTS_TSV"
+if [ "$shot_bad" = "0" ] && [ -s "$SHOTS_TSV" ]; then
+  ok "截图齐且归属本轮：$(wc -l < "$SHOTS_TSV" | tr -d ' ') 张，拍的时候前台都是 heyta"
 fi
 echo "   ↷ 图在这里，**人要打开看**（AGENTS §6.2 规定一）：$EVIDENCE/android-ai-*.png"
 
