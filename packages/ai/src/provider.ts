@@ -41,6 +41,7 @@ import {
 import {
   authorizeEgress,
   buildDisclosure,
+  isPrivacyConsentBlocked,
   type AiFeature,
   type EgressConsent,
   type EgressDisclosure,
@@ -163,7 +164,18 @@ export type AiFailureReason =
    * 所以 heyta 在这里**停下来问用户**，而不是自己决定。
    * 见 `routing.ts` 顶部说明与 ADR-0010。
    */
-  | 'fallback-needs-consent';
+  | 'fallback-needs-consent'
+  /**
+   * 🔴 **设备级联网同意**还没给，这一发在本机的 `fetch` 门口就被拦下了 ——
+   * 一个字节都没出去。
+   *
+   * 与 `egress-not-authorized` 的区别不是措辞，是**修复动作**：
+   * 那个去「逐功能授权」，这个去「重新选择联网同意」。而它和 `network`
+   * 的区别更硬：端点没坏、地址没错、重试也没用，
+   * 把它报成 `network` 会把用户支去排查一个没坏的东西
+   * （并且按 `countsAsEndpointFailure` 那张表，还会给端点记一笔不该记的锅）。
+   */
+  | 'consent-not-granted';
 
 export interface AiFailure {
   ok: false;
@@ -382,6 +394,13 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
           },
         };
       } catch (error) {
+        if (isPrivacyConsentBlocked(error)) {
+          return {
+            ok: false,
+            reason: 'consent-not-granted',
+            message: error.message,
+          };
+        }
         const aborted = error instanceof Error && error.name === 'AbortError';
         return {
           ok: false,

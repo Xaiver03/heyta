@@ -293,17 +293,14 @@ export type PrivacyConsentGate = ReturnType<typeof createPrivacyConsentGate>;
  * ⚠️ 而这条路径**正常情况下不该被走到**：界面应当先弹同意面板。
  * 走到它说明某个调用点绕过了检查，那是要响的信号，不是一个静默的降级。
  */
-export const PRIVACY_CONSENT_BLOCKED_MARKER = 'privacy-consent-not-granted';
+/**
+ * 🔴 定义在 `@heyta/ai`，这里只是**转出**。理由不是整洁：抛者是本壳，
+ * 归类者是 `packages/ai` 的那两个 `catch` —— 一个契约字符串在两处各写一份，
+ * 就是 §3.5 记过多次的那种分叉（"抽出来了但旧的那份没删"）。
+ */
+import { PRIVACY_CONSENT_BLOCKED_MARKER, PrivacyConsentBlockedError } from '@heyta/ai';
 
-/** 被闸门拦下时抛出的错误。用 `instanceof` 判，不靠字符串匹配。 */
-export class PrivacyConsentBlockedError extends Error {
-  constructor(url: string) {
-    super(
-      `${PRIVACY_CONSENT_BLOCKED_MARKER}: 用户尚未同意隐私规则，拒绝发起任何请求（${url}）。`,
-    );
-    this.name = 'PrivacyConsentBlockedError';
-  }
-}
+export { PRIVACY_CONSENT_BLOCKED_MARKER, PrivacyConsentBlockedError };
 
 /**
  * 包一层 `fetch`：闸门关闭时**一个字节都不发**。

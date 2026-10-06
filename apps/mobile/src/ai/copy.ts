@@ -136,6 +136,7 @@ export const AI_CAUSE_KEY: Record<AiFailureReason, MessageKey> = {
   'not-configured': 'web.ai.failure.cause.notConfigured',
   'no-route': 'web.ai.failure.cause.noRoute',
   'egress-not-authorized': 'web.ai.failure.cause.egressNotAuthorized',
+  'consent-not-granted': 'web.ai.failure.cause.consentNotGranted',
   'fallback-needs-consent': 'web.ai.failure.cause.fallbackNeedsConsent',
   network: 'web.ai.failure.cause.network',
   'http-error': 'web.ai.failure.cause.httpError',
