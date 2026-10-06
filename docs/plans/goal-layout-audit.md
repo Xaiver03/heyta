@@ -850,7 +850,7 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
 | mac 窗口那一枚 | 判据**不吃它**（只打 ⚠️ 不判红） | ✅ 看过：纯白框只有三个红绿灯 —— 与 10-05 记的形状一致，不是本轮缺陷，但也**不能**拿它当"渲染了共享 UI"的证据 |
 | windows | 同步 tar `sha256` 逐字相同 + 远端新鲜度对账（`web-dist/index.html` / `bridge` / `assets/*.js` 7 枚）+ `判据齐了：5 条全在位` | ✅ 看过：**是真应用**（收集箱 + 头像菜单展开「登录 / 注册」「设置」+ 联网弹窗），10-05 那枚锁屏没复发。⚠️ 但这张取证图**右侧与底部被裁**（详情列与 rail 底部图标不在画面内）⇒ 它证"装上真应用"，不证"整屏排版对" |
 | android | `release APK 64M` 重打 + `emulator-5554 全新安装成功`；`1080x2400 / 内容占比 56.7% / 主蓝命中 4001` | ✅ 看过 |
-| ios | 🔴 **本轮没有读数**：`pod install` 三趟都失败 —— 第 1/2 趟是 CocoaPods #12866 的 `path name contains null byte`，第 3 趟走到更远处死在 `git clone https://github.com/facebook/hermes.git` 的 `curl 92 HTTP/2 stream … CANCEL` + `early EOF`（取 spec 仓库的网络断流）。脚本随后自己判"沙盒未同步 ⇒ 这一轮没有跑 xcodebuild" | —— 没有图可看 |
+| ios | 🔴 **本轮没有读数**：`pod install` 三趟都失败 —— 第 1/2 趟是 CocoaPods #12866 的 `path name contains null byte`，第 3 趟走到更远处死在 `git clone https://github.com/facebook/hermes.git` 的 `curl 92 HTTP/2 stream … CANCEL` + `early EOF`（取 spec 仓库的网络断流）。脚本随后自己判"沙盒未同步 ⇒ 这一轮没有跑 xcodebuild"。✅ **19:1x 补跑闭合，四条判据逐条有读数，见 §9.14** | —— 那一趟没有图可看；补跑那趟有 |
 
 `PHASE_2_EXIT=1` ⇒ **这一轮固定收尾没做完**，不包装成"四端已装当前产物"。
 补跑挂在**两道规范闸门**后面（carrier 那道 + `verify-mobile-window-gate.sh --target b` 那道），
@@ -866,4 +866,29 @@ check:{design,ui-language,layering,md-tables} 各 rc=0。
 ① 张数只数**那一腿 exit 0** 的腿；② 归档时同时落 `基线 md5 → 本轮 md5` 两列，
 只有一枚文件"mtime 新且 md5 变且腿绿"才算数。这与 10-05 那条"共享 `/tmp` 会被别的会话覆写"
 是同一条的**新面目**：那次是覆写让我误判成我的，这次是覆写让我把它**数进了分母**。
+
+### 9.14 iOS 腿补跑闭合：四端都有读数了，而那张图证到的是"首启同意弹窗"，不是外壳
+
+等设备独占等到第 12 轮才开窗（`WINDOW=round12 OPEN (carrier=0 device=0)`；第 1–11 轮
+`REDS=dev` 全是别线在 `heyta-wt-merge` 里跑 `verify-mobile-ai.sh`）⇒ 起跑
+`~/.heyta-window-rigs/heyta-reinstall-1006-ios-retry.sh`，`IOS_RETRY_EXIT=0`，载体 `90232ce0`。
+
+| 判据 | 读数 |
+|---|---|
+| 沙盒 | 本趟 `pod install` 成功（§9.13 那三趟的死因没有复发）：`✅ 沙盒已同步（Manifest.lock == Podfile.lock）`。⚠️ 它同时改动了 `Podfile.lock`（与 HEAD 差 4 行）—— **这 4 行留在载体里没代提交**：载体是 detached HEAD，那枚文件的所有权在 iOS 线 |
+| 构建 / 安装 | `✅ 构建成功` + `✅ 已安装进模拟器（全新安装）` |
+| 新鲜度 | `✅ 已装的包比源码新 —— 这一轮装的是当前产物` |
+| 截图判据 | `1206x2622 / 内容占比 60.1% / 主蓝命中 4152`；`/tmp/heyta-reinstall-ios.png` mtime 19:18:23、md5 `0f6a7339…` —— **与 18:50 那枚别人的 `d0e91b4b…` 逐字不同**，所以 §9.13 那条"腿绿才认领张数"的修法这一趟是真的在起作用，不是碰巧 |
+| 人看过了 | ✅ 打开原图核过：画面是**首启联网同意弹窗**（标题「在使用联网功能之前」+ 服务条款/隐私政策两条链接 + 「同意并联网」主蓝实心、「只用本机」描边，状态栏 19:18）。⇒ 它证"装上了、起得来、渲染的是我们的共享 UI、中文、主蓝在位"；**不证** H9/H10 那两刀的形状 —— 全新安装停在同意页，rail 与详情列压根没进画面（这一点与 mac / windows 那两张不同，那两张里外壳是可见的，见 §9.13 的对应两行） |
+
+🔴 **顺带查出我这枚装置的第二处口径缺陷**：`FRESH_IOS=2` 的第二枚是
+`/private/tmp/heyta-reinstall-ios-build.log`（15.5 MB 构建日志），**不是图** ——
+`find -name 'heyta-reinstall-ios*'` 没有扩展名过滤，而落盘的文件却叫 `images-fresh.txt`。
+⇒ 上一轮修对了"腿绿才算"，分母里却仍能把日志数进"张"。真图只有 1 枚。
+下一位复用这个台架时把 pattern 收成 `heyta-reinstall-ios*.png`。
+
+⚠️ **§6.1.1 这一轮的两件事要分开说**：产物是当前的（四端各自的"清 → 重打 → 重装 → 判据"都成立），
+但**流程一次跑完没红**不成立 —— 整趟是 `PHASE_2_EXIT=1` 的主跑 + 一次 `--only ios` 的补跑拼出来的，
+而补跑走的是隔离载体（`90232ce0`），不是主检出。所以准确的现状声明是
+"**四端装的都是 `90232ce0` 及之前的当前产物**"，不是"`pnpm reinstall:all` 全绿"。
 
