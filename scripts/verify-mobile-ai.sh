@@ -225,6 +225,26 @@ for v in SAFE_TOP SAFE_BOTTOM; do
   esac
 done
 
+# 🔴 "点之前先证明这一枚落在可点带里"是**两个** tapper 的共同前置，不是 tap_rid 的私事：
+#    rig41 现量 `tap_in_rid ai-feature-breakdown stub-remote` 打在 y=2399 —— 屏幕最后一行、
+#    系统导航栏里（带 [$SAFE_TOP,$SAFE_BOTTOM] 之外），它照样报「落在 [clickable-ancestor]」，
+#    实际打开的是端点表单；随后那条「ai-consent-breakdown 没出现」的否定判据就打在
+#    一个根本没到过的面上 ⇒ 红字写着"地址类别维度在设备上没生效"，真身是载体没滚到位（#335 家族）。
+in_band() {  # <中心 y> → 0 = 落在可点带里（边界由设备 inset 现取，见上面 SAFE_* 那段）
+  [ "$1" -ge "$SAFE_TOP" ] && [ "$1" -le "$SAFE_BOTTOM" ]
+}
+# 手势方向由**读数**决定，不由习惯决定（rig32 现量）：这一枚在安全带**上方**时，
+#   `swipe 1900→900`（往下滚）只会让它更靠上，五发滚满永远进不了带子，
+#   而打印出来的那句是「界面形状或 testID 变了」—— 那是假归因。
+#   第 5 步第二发的 `tool-input` 就是这么红的：结果卡渲染在下面，输入框在上面。
+scroll_toward_y() {  # <目标节点的中心 y>
+  if [ "$1" -lt "$SAFE_TOP" ]; then
+    $ADB shell input swipe 540 900 540 1900 300
+  else
+    $ADB shell input swipe 540 1900 540 900 300
+  fi
+}
+
 tap_rid() {  # <testID> [期望 checked]
   local rid=$1 want=${2:-} i pass ctrl cx cy ck src y lo hi
   lo=$SAFE_TOP
@@ -247,18 +267,10 @@ tap_rid() {  # <testID> [期望 checked]
     if [ -n "$ctrl" ]; then
       read -r cx cy ck src <<<"$ctrl"
       y=$cy
-      if [ "$y" -ge "$lo" ] && [ "$y" -le "$hi" ]; then break 2; fi
+      if in_band "$y"; then break 2; fi
       # 在树里但贴着屏边 —— 这不是"没找到"，是"还没滚到位"，两句话要分开说。
       echo "   ↻ testID=$rid 的可点节点（${src}）中心 y=$y 在安全带 [$lo,$hi] 外（贴系统栏），先滚进中段（第 ${i} 次）" >&2
-      # 🔴 手势方向由**读数**决定，不由习惯决定（rig32 现量）：这一枚在安全带**上方**时，
-      #   `swipe 1900→900`（往下滚）只会让它更靠上，五发滚满永远进不了带子，
-      #   而打印出来的那句是「界面形状或 testID 变了」—— 那是假归因。
-      #   第 5 步第二发的 `tool-input` 就是这么红的：结果卡渲染在下面，输入框在上面。
-      if [ "$y" -lt "$lo" ]; then
-        $ADB shell input swipe 540 900 540 1900 300
-      else
-        $ADB shell input swipe 540 1900 540 900 300
-      fi
+      scroll_toward_y "$y"
     else
       # 压根不在树里：先按原方向找（它多半在下方），两趟都试过才说"没有"。
       $ADB shell input swipe 540 1900 540 900 300
@@ -708,7 +720,7 @@ PYPY
 }
 
 tap_in_rid() {  # <块 testID> <content-desc>
-  local block=$1 desc=$2 i out src cx cy
+  local block=$1 desc=$2 i out src cx cy band_skips=0
   for i in 1 2 3 4 5; do
     dump
     out=$(xy_clickable_in_rid "$block" "$desc")
@@ -717,6 +729,17 @@ tap_in_rid() {  # <块 testID> <content-desc>
       echo "   ↻ 块 $block 还没进窗口（第 ${i} 帧），先滚进来" >&2
     elif [ -n "$out" ]; then
       read -r cx cy src <<<"$out"
+      # 🔴 与 tap_rid 同一道安全带守卫（唯一实现见 in_band / scroll_toward_y 头上那段）：
+      #    从前只有 tap_rid 带它，tap_in_rid 拿到坐标就点 ⇒ rig41 打在 y=2399（系统导航栏里），
+      #    照样报"落在 [clickable-ancestor]"，实际打开的是端点表单，
+      #    下一条否定判据「ai-consent-breakdown 没出现」就打在根本没到过的面上。
+      if ! in_band "$cy"; then
+        echo "   ↻ $block 里「$desc」的可点节点（${src}）中心 y=$cy 在安全带 [$SAFE_TOP,$SAFE_BOTTOM] 外（贴系统栏），先滚进中段（第 ${i} 次）" >&2
+        band_skips=$((band_skips + 1))
+        scroll_toward_y "$cy"
+        sleep 1.5
+        continue
+      fi
       echo "   · 点 $block 里的「$desc」→ 落在 [${src}] @ ${cx},${cy}" >&2
       $ADB shell input tap "$cx" "$cy" >/dev/null 2>&1
       sleep 1
@@ -729,6 +752,12 @@ tap_in_rid() {  # <块 testID> <content-desc>
     $ADB shell input swipe 540 1900 540 1100 250
     sleep 1.5
   done
+  # 🔴 两种"没点成"要分开说：块里**从来没出现过**那一枚，与出现过但一直贴着可点带滚不进来。
+  #    后一种要是报成"找不到节点"，下一个读的人会去查 testID/界面形状，而真问题是几何。
+  if [ "$band_skips" -gt 0 ]; then
+    echo "   ❌ 块 $block 里出现过「$desc」，但 $band_skips 次按读数滚过都没把它带进安全带 [$SAFE_TOP,$SAFE_BOTTOM] ⇒ 载体没量到位，不记成产品缺陷" >&2
+    return 1
+  fi
   echo "   ❌ 滚了 5 次，块 $block 里找不到 content-desc=$desc 的节点" >&2
   return 1
 }

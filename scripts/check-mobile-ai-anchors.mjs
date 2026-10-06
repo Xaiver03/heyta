@@ -445,11 +445,14 @@ function revealDirection(scriptRel) {
   //   「滚了 5 次仍没有落在安全带里的可点节点 —— 界面形状或 testID 变了」就是它打印的，
   //   而 reveal_rid 已经修好 —— 同一个缺陷在两枚 helper 上，只修一枚等于没修）。
   //   它比 reveal_rid 多一个条件：它**知道** y 在安全带的哪一侧，所以方向必须由读数选。
+  //   ⚠️ 判据钉的是"这一发点击能到达方向规则"，不是"手势写在 tap_rid 里面"：
+  //      rig41 之后那道守卫被抽成 `scroll_toward_y`（两枚 tapper 共用一份），
+  //      按位置钉会把一次正确的抽取读成缺陷（memory：改不变量要按"谁引用了输入"枚举）。
   const tap = helperBody(scriptRel, 'tap_rid');
   if (tap === null) return null;
-  if (!/540 900 540 1900/.test(tap)) {
+  if (!/540 900 540 1900|scroll_toward_y/.test(tap)) {
     red.push(
-      'tap_rid 里只有往下滚那一种手势（1900→900）⇒ 可点节点在安全带**上方**时它越滚越远，' +
+      'tap_rid 里只有往下滚那一种手势（1900→900）、也没有调用按读数选方向的那一枚 helper ⇒ 可点节点在安全带**上方**时它越滚越远，' +
         '五发滚满后把"还没滚到位"打印成"界面形状或 testID 变了"。方向要由 y 与带子的符号选。',
     );
   }
@@ -769,6 +772,55 @@ function teardownInvariant(scriptRel) {
   return red;
 }
 
+/**
+ * 判据 ⑱：安全带守卫是**两枚 tapper 的共同前置**，而"方向由读数选"只许有一份实现。
+ * rig41 现量：`tap_in_rid` 拿到坐标就点，那一枚 chip 的中心 y=2399 已在系统导航栏里
+ * （带 [$SAFE_TOP,$SAFE_BOTTOM] 之外），它照样打印「落在 [clickable-ancestor]」，
+ * 实际打开的是端点表单；下一条否定判据「ai-consent-breakdown 没出现」就打在
+ * 一个根本没到过的面上 ⇒ 读数写着"地址类别维度在设备上没生效"。
+ */
+function bandGuardInvariant(scriptRel) {
+  const inBand = helperBody(scriptRel, 'in_band');
+  const scroll = helperBody(scriptRel, 'scroll_toward_y');
+  const tap = helperBody(scriptRel, 'tap_rid');
+  const tapIn = helperBody(scriptRel, 'tap_in_rid');
+  if (inBand === null || scroll === null || tap === null || tapIn === null) return null;
+  const red = [];
+  const full = codeOf(readFileSync(join(ROOT, scriptRel), 'utf8'));
+
+  if (!/\$SAFE_TOP/.test(inBand) || !/\$SAFE_BOTTOM/.test(inBand)) {
+    red.push(
+      'in_band 的边界不是从设备现取的 $SAFE_TOP/$SAFE_BOTTOM 推的 ⇒ 换成拍出来的比例带，' +
+        '实测点得动的 y=2112/2335 会被判成"贴边先滚"（rig13 的假归因就是这么来的）。',
+    );
+  }
+  // 方向规则只许一份实现：抄第二份 = 两把尺，而两把尺一起错就永远读成绿。
+  const dirSites = (full.match(/-lt "\$(SAFE_TOP|lo)"/g) || []).length;
+  if (!/540 900 540 1900/.test(scroll) || !/540 1900 540 900/.test(scroll) || dirSites !== 1) {
+    red.push(
+      `按读数选方向的那道判断现在有 ${String(dirSites)} 份（期望恰好 1，唯一实现是 scroll_toward_y），` +
+        '或它少了一种方向 ⇒ 两枚 tapper 会各自滚各自的，五发滚满后把"还没滚到位"打印成"节点不存在"。',
+    );
+  }
+  for (const [name, body] of [['tap_rid', tap], ['tap_in_rid', tapIn]]) {
+    const code = codeOf(body);
+    if (!/in_band/.test(code) || !/scroll_toward_y/.test(code)) {
+      red.push(
+        `${name} 没有走 in_band + scroll_toward_y 这道守卫 ⇒ 它可能在系统导航栏里那一行按下手指，` +
+          '却照样报"落在可点节点"；它后面那条否定判据于是打在根本没到过的面上（rig41 的第 7 步）。',
+      );
+    }
+  }
+  // 失败出口要分两种：出现过但滚不进带 ≠ 从来没出现过。
+  if (!/band_skips/.test(tapIn) || !/没把它带进安全带|都没把它带进安全带/.test(tapIn)) {
+    red.push(
+      'tap_in_rid 的失败出口没有把"出现过但一直贴带外"与"从来没出现过"分开说 ⇒ ' +
+        '下一个人会去查 testID 和界面形状，而真问题是几何。',
+    );
+  }
+  return red;
+}
+
 function run() {
   const files = walk(join(ROOT, SRC_ROOT));
   if (files.length === 0) {
@@ -966,14 +1018,23 @@ function run() {
   for (const line of teardownRed) console.log(`收尾判据\t${line}`);
   console.log(`TEARDOWN_SUMMARY helper 取得到=1 红=${String(teardownRed.length)}`);
 
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0 || teardownRed.length > 0) {
+  // ── 判据 ⑱：安全带守卫两枚 tapper 共用，方向规则只许一份（traps #343）──
+  const bandRed = bandGuardInvariant(scriptRel);
+  if (bandRed === null) {
+    console.error('🔴 取不到 in_band / scroll_toward_y / tap_rid / tap_in_rid 的函数体 —— 探针没输入，不报"几何有人管"');
+    process.exit(2);
+  }
+  for (const line of bandRed) console.log(`安全带守卫\t${line}`);
+  console.log(`BAND_SUMMARY 四枚 helper 取得到=1 红=${String(bandRed.length)}`);
+
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0 || teardownRed.length > 0 || bandRed.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
       '，双引号文案里的反引号=' + String(backtickRed.length) +
       '，移动侧能力字段缺口=' + String(capRed.length) + '，装包通道=' + String(installRed.length) + '，滚动方向=' + String(dirRed.length) + '，规则句诚实性=' + String(honesty.red.length) +
       '，授权期望值=' + String(consentRed.length) +
       '，隧道断言=' + String(tunnelRed.length) + '，提案分母=' + String(proposalRed.length) +
-      '，收尾判据=' + String(teardownRed.length) + '。' +
+      '，收尾判据=' + String(teardownRed.length) + '，安全带守卫=' + String(bandRed.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
       '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
@@ -1233,10 +1294,14 @@ if (process.argv.includes('--self-test')) {
   const m28 = runMutantFile(mutDir28, 'reveal-no-scroll');
   arms.push(['臂 28 那一档只是空壳（没反向手势）⇒ 非零退出且点名', m28.code !== 0 && m28.out.includes('scroll_to_top')]);
 
-  // 臂 29/30/31（tap_rid 的三种漏法）：单方向手势 / 没有第二趟 / 把"没找到"挪回循环里。
+  // 臂 29/30/31（点击路径的三种漏法）：方向规则退化成一个方向 / 没有第二趟 / 把"没找到"挪回循环里。
+  //   ⚠️ 29 这一臂随 rig41 后的抽取改过一次：手势从 tap_rid 搬进 `scroll_toward_y`（两枚 tapper
+  //   共用一份），所以"只往下滚"这一漏法现在打在 helper 上，红字来自判据 ⑱ 而不是 ⑪。
   const mutDir29 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8')
-    .split('        $ADB shell input swipe 540 900 540 1900 300')
-    .join('        $ADB shell input swipe 540 1900 540 900 300');
+    .replace(
+      '    $ADB shell input swipe 540 900 540 1900 300\n  else',
+      '    $ADB shell input swipe 540 1900 540 900 300\n  else',
+    );
   const m29 = runMutantFile(mutDir29, 'tap-one-way');
     // 🔴 断言字串要**从红字里取**，不是凭印象写：这一臂第一版查的是「只有一种手势」，
   //    而红字写的是「只有往下滚那一种手势」—— 于是变异真的生效、门禁真的红了，
@@ -1246,7 +1311,13 @@ if (process.argv.includes('--self-test')) {
     '臂 29 的变异确实改掉了那一行（前置：否则这条臂等于没有）',
     mutDir29 !== readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8'),
   ]);
-  arms.push(['臂 29 tap_rid 只留一个方向 ⇒ 非零退出且点名方向由读数选', m29.code !== 0 && m29.out.includes('tap_rid 里只有往下滚')]);
+  arms.push(['臂 29 方向规则退化成一个方向 ⇒ 非零退出且点名', m29.code !== 0 && m29.out.includes('或它少了一种方向')]);
+  // 臂 29b：tapper 不再调用方向 helper（等于回到"只会往下滚"的 tap_rid）⇒ 判据 ⑪ 必须红。
+  const mutDir29b = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8')
+    .replace('      scroll_toward_y "$y"', '      $ADB shell input swipe 540 1900 540 900 300');
+  arms.push(['臂 29b 的变异确实摘掉了 tap_rid 对方向 helper 的调用（前置）', mutDir29b !== readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8')]);
+  const m29b = runMutantFile(mutDir29b, 'tap-does-not-reach-direction-rule');
+  arms.push(['臂 29b tap_rid 只留往下滚那一发 ⇒ 非零退出且点名方向由读数选', m29b.code !== 0 && m29b.out.includes('tap_rid 里只有往下滚')]);
   const mutDir30 = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8').replace('for pass in 1 2; do', 'for pass in 1; do');
   const m30 = runMutantFile(mutDir30, 'tap-one-pass');
   arms.push(['臂 30 tap_rid 没有第二趟 ⇒ 非零退出且点名', m30.code !== 0 && m30.out.includes('没有第二趟')]);
@@ -1381,6 +1452,38 @@ if (process.argv.includes('--self-test')) {
   arms.push(['臂 51 的变异确实摘掉了 argv 核对（前置）', mutTun51 !== baseTun && !mutTun51.includes('ps -o args= -p "$sp"')]);
   const m51 = runMutantFile(mutTun51, 'kill-without-argv');
   arms.push(['臂 51 按号码就 kill ⇒ 非零退出且点名', m51.code !== 0 && m51.out.includes('teardown_rig 少了')]);
+
+  // ── 判据 ⑱（安全带守卫两枚 tapper 共用、方向规则只许一份 —— traps #343）的臂 ──
+  //   rig41 现量：tap_in_rid 没有这道守卫 ⇒ chip 中心 y=2399（系统导航栏里）照样按下，
+  //   实际打开的是端点表单，下一条否定判据「ai-consent-breakdown 没出现」把红字写成产品缺陷。
+  const bReal = bandGuardInvariant(DEFAULT_SCRIPT);
+  arms.push(['臂 52 真脚本四枚 helper 都取得到、⑱ 不误红（探针确有输入）', bReal !== null && bReal.length === 0]);
+  // 臂 53：解开 tap_in_rid 的守卫（回到 rig41 跑过的那一版）⇒ 必须红。
+  const mutB53 = baseTun.replace('      if ! in_band "$cy"; then', '      if [ "1" = "0" ]; then');
+  arms.push(['臂 53 的变异确实解开了 tap_in_rid 的守卫（前置）', mutB53 !== baseTun && mutB53.includes('if [ "1" = "0" ]; then')]);
+  const m53 = runMutantFile(mutB53, 'in-rid-no-band');
+  arms.push(['臂 53 块内点击不查可点带 ⇒ 非零退出且点名', m53.code !== 0 && m53.out.includes('tap_in_rid 没有走 in_band')]);
+  // 臂 54：把方向规则抄第二份回 tap_rid（两把尺）⇒ 必须红。
+  const mutB54 = baseTun.replace(
+    '      scroll_toward_y "$y"',
+    '      if [ "$y" -lt "$lo" ]; then\n        $ADB shell input swipe 540 900 540 1900 300\n      else\n        $ADB shell input swipe 540 1900 540 900 300\n      fi',
+  );
+  arms.push(['臂 54 的变异确实把方向规则抄回 tap_rid（前置）', mutB54 !== baseTun && (mutB54.match(/-lt "\$(SAFE_TOP|lo)"/g) || []).length === 2]);
+  const m54 = runMutantFile(mutB54, 'direction-copied');
+  arms.push(['臂 54 方向规则出现第二份 ⇒ 非零退出且点名', m54.code !== 0 && m54.out.includes('现在有 2 份')]);
+  // 臂 55：安全带边界改成拍出来的比例（脱离设备现取）⇒ 必须红。
+  const mutB55 = baseTun.replace(
+    '  [ "$1" -ge "$SAFE_TOP" ] && [ "$1" -le "$SAFE_BOTTOM" ]',
+    '  [ "$1" -ge 600 ] && [ "$1" -le 1800 ]',
+  );
+  arms.push(['臂 55 的变异确实把边界换成写死的比例带（前置）', mutB55 !== baseTun && !mutB55.includes('-ge "$SAFE_TOP"')]);
+  const m55 = runMutantFile(mutB55, 'band-hardcoded-ratio');
+  arms.push(['臂 55 边界不再从设备现取 ⇒ 非零退出且点名', m55.code !== 0 && m55.out.includes('in_band 的边界不是从设备现取的')]);
+  // 臂 56：把两种"没点成"混回同一句话 ⇒ 必须红（读的人会去查 testID，而真问题是几何）。
+  const mutB56 = baseTun.replace('都没把它带进安全带', '找不到（同一句话）');
+  arms.push(['臂 56 的变异确实把失败出口混为一谈（前置）', mutB56 !== baseTun && !mutB56.includes('都没把它带进安全带')]);
+  const m56 = runMutantFile(mutB56, 'band-failure-message-merged');
+  arms.push(['臂 56 失败出口不分两种 ⇒ 非零退出且点名', m56.code !== 0 && m56.out.includes('没有把"出现过但一直贴带外"')]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
