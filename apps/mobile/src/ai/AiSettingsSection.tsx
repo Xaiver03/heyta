@@ -377,19 +377,19 @@ export function AiSettingsSection(): React.JSX.Element {
           </Text>
           <HStackish>
             {CAPABILITY_ORDER.map((capability) => (
-              <View key={capability} testID={`ai-endpoint-cap-${capability}`}>
-                <Chip
-                  label={t(CAPABILITY_LABEL_KEY[capability])}
-                  selected={draftCaps.includes(capability)}
-                  onPress={() => {
-                    setDraftCaps((prev) =>
-                      prev.includes(capability)
-                        ? prev.filter((c) => c !== capability)
-                        : [...prev, capability],
-                    );
-                  }}
-                />
-              </View>
+              <Chip
+                key={capability}
+                testID={`ai-endpoint-cap-${capability}`}
+                label={t(CAPABILITY_LABEL_KEY[capability])}
+                selected={draftCaps.includes(capability)}
+                onPress={() => {
+                  setDraftCaps((prev) =>
+                    prev.includes(capability)
+                      ? prev.filter((c) => c !== capability)
+                      : [...prev, capability],
+                  );
+                }}
+              />
             ))}
           </HStackish>
         </Stack>
@@ -422,9 +422,12 @@ export function AiSettingsSection(): React.JSX.Element {
           return (
             <View key={feature} testID={`ai-feature-${feature}`}>
               <HStackish>
-                {routing.endpoints.map((endpoint) => (
+                {/* testID 用**下标**而不是 endpoint.id：随机 id 验收载体拿不到，
+                    而下标就是这一排从左到右的可见次序。 */}
+                {routing.endpoints.map((endpoint, index) => (
                   <Chip
                     key={endpoint.id}
+                    testID={`ai-route-${feature}-${index}`}
                     label={endpoint.label}
                     selected={(routing.routes[feature] ?? []).some(
                       (target) => target.endpointId === endpoint.id,
@@ -461,6 +464,7 @@ export function AiSettingsSection(): React.JSX.Element {
           {ASSISTANT_TIER_ORDER.map((tier) => (
             <Chip
               key={tier}
+              testID={`ai-tier-${tier}`}
               label={t(TIER_LABEL_KEY[tier])}
               selected={settings.assistantTier === tier}
               onPress={() => {
@@ -558,8 +562,11 @@ function GateRow({
 }): React.JSX.Element {
   const tokens = useTokens();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: tokens['space.2'] }} testID={testID}>
-      <Checkbox checked={on} label={label} onToggle={onToggle} />
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: tokens['space.2'] }}>
+      {/* testID 落在**勾选框**上，不落在这行的容器上：容器既不能点也没有 checked 语义，
+          两端踩的是同一个坑（Android 记在 verify-mobile-ai.sh 的 rid_control 头上，
+          iOS 记在 kit.tsx 的 Chip 上 —— 普通 View 在 AX 树上根本不发出节点）。 */}
+      <Checkbox checked={on} label={label} onToggle={onToggle} testID={testID} />
       <Stack gap="tight" style={{ flex: 1 }}>
         <Text variant="row-title">{label}</Text>
         <Text variant="caption" tone="subtle">

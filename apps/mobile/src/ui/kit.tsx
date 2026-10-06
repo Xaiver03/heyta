@@ -1029,12 +1029,20 @@ export function Chip({
   onPress,
   icon,
   color,
+  testID,
 }: {
   label: string;
   selected?: boolean;
   onPress: () => void;
   icon?: IconName;
   color?: string;
+  /**
+   * 定位锚点。写在 `Pressable` 自己这一层，不写在包它的外层 `View` 上：
+   * iOS 只为**带无障碍特性的宿主视图**发 AX 节点，普通 `View testID` 在
+   * `idb describe-all` 里根本不存在（实测：设置面 137 枚节点、31 枚 `AXUniqueId`，
+   * 全在 Button/TextField 上，`ai-settings-section`/`ai-feature-*` 一枚都不在）。
+   */
+  testID?: string;
 }): React.JSX.Element {
   const t = useTokens();
 
@@ -1043,6 +1051,7 @@ export function Chip({
   return (
     <Pressable
       onPress={onPress}
+      testID={testID}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={label}
