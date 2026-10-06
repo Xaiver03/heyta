@@ -300,6 +300,26 @@ require_untouched_device() {  # <标签> —— 设备还是我开局那一台�
 #    而"产品红"与"环境无效"必须分得开：退 1 会被重试台和台账都读成前者。
 step() { require_untouched_device "开步之前"; printf '\n════ %s ════\n' "$1"; }
 
+# 🔴 再收一层：**每一条红之前**先问"设备还是不是我开局那一台"。
+#    只挂在 `step` 上有个粒度洞 —— 实测 07 02:1x 那一趟：第 6 步开始时身份对得上，
+#    而 `02:16:10 firstInstallTime=lastUpdateTime`（另一会话在我**一步之内**把包装掉了）
+#    ⇒ 滚不动、点不到，退 1。长步骤中间被换掉，开步那一次检查读不到。
+#    判红之前再验一次，才把"别人的动作"与"产品的坏"真正分开。
+bad() {
+  if [ -n "${INSTALL_ID_START:-}" ]; then
+    local now
+    now=$(apk_install_identity)
+    if [ "$now" != "$INSTALL_ID_START" ]; then
+      echo "❌ 设备在判红之前已被并发方换掉：开局 [$INSTALL_ID_START] → 现在 [$now]"
+      echo "   ⇒ 下面这条红**不记进产品缺陷**，本轮读数作废："
+      echo "      $1"
+      exit 3
+    fi
+  fi
+  echo "   ❌ $1"
+  FAIL=$((FAIL + 1))
+}
+
 # 底部 5 个 tab 的中心 x（1080 宽均分，见 verify-mobile-calendar.sh 那段推导）。
 TAB_TASKS=108; TAB_CALENDAR=324; TAB_FOCUS=540; TAB_CATEGORIES=756; TAB_PROFILE=972
 TAB_Y=2253
