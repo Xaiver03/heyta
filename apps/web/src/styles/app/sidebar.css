@@ -8,8 +8,47 @@
   background: var(--ht-color-surface);
   /* 扁平风格用边框表达层次，不用阴影 */
   border-right: 1px solid var(--ht-color-border);
-  /* 拖拽手柄绝对定位在这一列的右边缘，需要一个定位祖先。 */
-  position: relative;
+  /*
+   * 🔴 2026-10-06（工单 H9 的第二刀）：这一列**自己必须有界**，滚动交给 `.ht-sidebar__body`。
+   * 形状与理由逐字照 `.ht-sidebar--calendar`（`sidebar.css:225-239`，日历线已经踩过并写下来了）：
+   *
+   *   · 外壳 `.ht-app` 是 `min-height: 100dvh` 而网格行是 `auto` ⇒ 不封顶时这一列被内容撑高，
+   *     **整篇文档的高度就是它给的那个数**。后果不是难看，是**别的列会在指针底下跳**：
+   *     实测 900×600 下"新建清单"那个内联表单**在面板外一次 pointerdown 上**收起 52px
+   *     （`NAV.ht-sidebar 769->717`；收起逻辑在 `ProjectsPanel.tsx` 的捕获监听里，那边写清了为什么不能挂 `blur`），
+   *     文档最大滚动量跟着少 52px ⇒ 浏览器把 `scrollY` 从 169 夹到 117 ⇒
+   *     任务行尾那颗整理触发器**往下跳 52px**，`mousedown` 与 `mouseup` 落在不同元素上，
+   *     `click` 的 target 变成共同祖先、`<details>` 的 `toggle` 一次都没发生 ——
+   *     用户看到的是"第一下点击没有反应"。取证与归因在 BLOCKED.md **B94** §3。
+   *   · 为什么不在这一列上直接写 `overflow-y: auto`：那会把 `overflow-x` 从 `visible` 变成 `clip`，
+   *     而 `.ht-sidebar__resizer` 的命中带**有 4px 骑在右边缘之外** ⇒ 被裁掉一半，
+   *     症状是"把手在那儿、拖不动"（同一条，日历线实测）。
+   *     ⇒ 所以**把手不在滚动层里面**：`SidebarResizer` 留在 `<nav>` 这一层，
+   *     里面那一层 `.ht-sidebar__body` 才是滚动区。
+   *     （`position: sticky` 同时就是那枚绝对定位把手的**定位祖先** ——
+   *     这一列原来那句 `position: relative` 的活，它一并干了。）
+   *
+   * ⚠️ 塌缩态（≤768px）这一列是底部横条，`position: sticky` 与 `max-block-size` 都要收回
+   *   （见 `narrow.css` 里 `.ht-sidebar` 那一段）。
+   */
+  position: sticky;
+  inset-block-start: 0;
+  max-block-size: 100dvh;
+}
+
+/* 这一列里真正滚的那一层。`min-block-size: 0` 是必须的：
+   不写它，flex 项的自动最小尺寸等于内容高度，于是它永远不滚、把外层撑高。 */
+.ht-sidebar__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+/* 子项不许被 flex 压扁（压扁的样子不是滚动条，是清单那一块叠到标签那一块上）。 */
+.ht-sidebar__body > * {
+  flex: 0 0 auto;
 }
 
 /*
