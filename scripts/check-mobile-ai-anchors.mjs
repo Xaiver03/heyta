@@ -134,6 +134,18 @@ function helperBody(file, name) {
 }
 
 /**
+ * 只留**可执行的那些行**（丢掉 `#` 开头的整行注释）。
+ *
+ * 🔴 判"形状"若拿"字符串在不在"去比，注释会把每一条变异都洗成绿 ——
+ *    本文件 臂 36/38/39 第一次就是这么空的（`127.`、`SCAN-CAP`、`blur_focus`
+ *    三串都躺在注释里，摘掉真代码那一行照样报绿）。写在这里而不是各判据里再抄一遍：
+ *    同一个判断抄两遍就是下一次漂移的起点（AGENTS §3.5 那条教训的门禁版）。
+ */
+function codeOf(text) {
+  return text.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+}
+
+/**
  * 源码侧的 testID 声明：字面量 + 模板（模板里的 `${…}` 段变成 `.*`）。
  * 返回 `{ literal:Set<string>, patterns:[{source, regex}] }`。
  */
@@ -553,7 +565,6 @@ function consentExpectation(scriptRel) {
   // 🔴 只读**可执行的那些行**：这三条判据第一版全数失效，因为注释里也写着
   //    `127.0.0.0/8`、`SCAN-CAP`、`blur_focus` —— 拿"字符串在不在"去判形状，
   //    注释会把每一条变异都洗成绿（#191 那一族在门禁自己身上的样子）。
-  const codeOf = (b) => b.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
   const bind = codeOf(bindRaw);
   const scan = codeOf(scanRaw);
   const red = [];
@@ -583,6 +594,120 @@ function consentExpectation(scriptRel) {
     red.push(
       'scan_rids 没在**第一发手势之前**摘焦点、回到顶部 ⇒ 与 reveal_rid 栽过的两档同一形状' +
         '（长手势被输入框吞 / 起点落在屏幕中段，于是"没查到"其实只是"没走到"）。',
+    );
+  }
+  return red;
+}
+
+/**
+ * 判据 ⑮：`adb reverse` 隧道必须是**用到那一刻的断言**，不是起跑前的一次性前置。
+ * rig39 现量（A/B 复现过）：`adb root` 与 `adb unroot` 都会重启 adbd，而重启把该设备上
+ * 全部 `adb reverse` 清掉（root 前 `reverse --list` = `host-20 tcp:4399 tcp:4399`，root 后为空）。
+ * 读设备库的两个 helper 各含一对 root+unroot ⇒ 第一次库回读就把后面每一发 AI 请求的通道拆了。
+ * 最坏的不是第 9 步红，是第 5/7/8 那几条「假端点计数 0→0」——**通道断了**与**闸门拦住了**
+ * 在这条读数上长得一模一样，于是隐私闸门的证据悄悄变成空转（#335 那族的第二种面目）。
+ * 判三件事：① 每一处 `$ADB root` 所在的 bash 函数里都得有补隧道；② 每一发真发送之前都得有
+ * 一次带正向对照的通道断言（顺序判据，不是"整份文件里出现过"）；③ 断言只能在父 shell 里退，
+ * 所以 `ensure_tunnel` 自己不许调 `summary`（子 shell 里 exit 等于没 exit）。
+ */
+function tunnelInvariant(scriptRel) {
+  const full = codeOf(readFileSync(join(ROOT, scriptRel), 'utf8'));
+  const ensure = helperBody(scriptRel, 'ensure_tunnel');
+  const runner = helperBody(scriptRel, 'tunnel_or_environment_fail');
+  if (ensure === null || runner === null) return null;
+  const ensureCode = codeOf(ensure);
+  const runnerCode = codeOf(runner);
+  const red = [];
+
+  // ① root 站点必须带补隧道。按**函数体**扫，不写死函数名清单 ——
+  //    写死清单的那一版，第三处 root 一加进来判据就悄悄不覆盖它了。
+  const fnRe = /^([a-zA-Z_][\w]*)\(\) \{/gm;
+  const bodies = [];
+  let m;
+  while ((m = fnRe.exec(full)) !== null) {
+    const next = full.indexOf('\n}', m.index);
+    if (next === -1) continue;
+    bodies.push({ name: m[1], body: full.slice(m.index, next + 2) });
+  }
+  const rootFns = bodies.filter((b) => /\$ADB root|\$ADB unroot/.test(b.body));
+  const unrepaired = rootFns.filter((b) => !/ensure_tunnel/.test(b.body));
+  if (rootFns.length === 0 || unrepaired.length > 0) {
+    red.push(
+      `含 root/unroot 的 bash 函数里没补 adb reverse 隧道（现量：这类函数 ${String(rootFns.length)} 枚，未补的 ${String(unrepaired.length)} 枚：` +
+        `${unrepaired.map((b) => b.name).join(' ') || '一枚都没扫到'}）⇒ 库回读一跑，后面的发送判据就在断了的通道上打分。`,
+    );
+  }
+
+  // ② **每一步的第一发**发送之前都要有一次通道断言（按步骤分段判，不是"整份文件里出现过"）。
+  //    分段而不是逐发：同一趟里 `breakdown-start` 与紧随的 `ai-send` 之间隔几秒，
+  //    再插一次不增加任何信息，只会把"要不要证"这件事磨成"反正每次都证"的形式主义。
+  const sendRe = /tap_rid (ai-send|ai-tool-send|breakdown-start|tool-start-assistant)/;
+  const stepSplit = full.split(/\n(?=step ")/);
+  const naked = [];
+  for (const seg of stepSplit) {
+    const firstSend = seg.search(sendRe);
+    if (firstSend === -1) continue;
+    const sendName = seg.match(sendRe)[1];
+    if (!seg.slice(0, firstSend).includes('tunnel_or_environment_fail')) naked.push(sendName);
+  }
+  if (naked.length > 0) {
+    red.push(
+      `有 ${String(naked.length)} 个步骤的第一发发送（${naked.join(' ')}）前面没有 tunnel_or_environment_fail ⇒ ` +
+        `起跑那一次正向对照证明不了**这一发**通着，"计数没动"于是有两种读数一样的解释（真没发／通道断了）。`,
+    );
+  }
+
+  // ③ 退出必须在父 shell 里。
+  if (!/TUNNEL_WHY=\$\(ensure_tunnel\)/.test(runnerCode) || /summary/.test(ensureCode)) {
+    red.push(
+      '隧道断言的退出不长在父 shell（ensure_tunnel 里调了 summary，或 runner 没把 $(ensure_tunnel) 的返回值接到自己的变量上）' +
+        '⇒ 命令替换是子 shell，那里面的 exit 退不掉整趟（本仓在同一件事上栽过：scan_rids 的 SCAN_INCOMPLETE）。',
+    );
+  }
+
+  // ④ 断言必须有分母：只 `adb reverse` 而不从设备里打一发 /__probe，就只是"我以为通了"。
+  if (!/\$ADB reverse/.test(ensureCode) || !/stub_probe_hits/.test(ensureCode) || !/toybox nc/.test(ensureCode)) {
+    red.push(
+      'ensure_tunnel 里没有"补转发 + 从设备里打一发 /__probe 再读回 probeHits"这整半 ⇒ ' +
+        '一条只会重新下命令、不证明它生效的断言，等于没有断言（#58 那一族）。',
+    );
+  }
+  return red;
+}
+
+/**
+ * 判据 ⑯：第 9 步那条"没点确认 ⇒ 库里不写"的否定判据必须**挂在提案卡的分母上**。
+ * rig39 现量：屏上是那句"连不上端点"（压根没出提案），下一行照样打 ✅「只看了提案、没点确认
+ * ⇒ 手机库条数不变（1→1）」—— 没有提案可看时，"没写库"只是"什么都没发生"的另一个名字。
+ * 期望值也不许再退成一行 ↷：卡片出现 ⇒ 假端点计数恰好 +1，否则那张卡不是这一发送回来的。
+ */
+function proposalDenominator(scriptRel) {
+  const full = codeOf(readFileSync(join(ROOT, scriptRel), 'utf8'));
+  const red = [];
+  if (!/PROPOSAL=0/.test(full) || !/PROPOSAL=1/.test(full)) {
+    red.push(
+      '第 9 步没有把"提案卡出没出"登记成一个可读的标志（PROPOSAL=0／=1 两档缺其一）⇒ ' +
+        '"没点确认不写库"会在什么都没发生时报绿。',
+    );
+  }
+  // 顺序 + 形状：那条 ok 必须是 PROPOSAL=0 那一支的 **elif**，不是独立 if。
+  const guard = full.indexOf('[ "$PROPOSAL" = "0" ]');
+  const claimed = full.indexOf('只看了提案、没点确认');
+  if (guard === -1 || claimed === -1 || claimed < guard) {
+    red.push(
+      '「只看了提案、没点确认」不在 PROPOSAL=0 那支之后（顺序不对或整支被摘）⇒ 判据可以没有输入就打分。',
+    );
+  }
+  if (!/elif \[ "\$OPS_NOCONFIRM" = "\$OPS_BEFORE" \]/.test(full)) {
+    red.push(
+      '库条数比较不是 PROPOSAL=0 那一支的 elif（被改回独立 if 了）⇒ 摘掉守卫只需要动一个词，' +
+        '而读数上看不出这条判据已经没了分母。',
+    );
+  }
+  if (!/\[ "\$S1" = "\$\(\(S0\+1\)\)" \]/.test(full)) {
+    red.push(
+      '假端点计数恰好 +1 的期望值被退成了一行 ↷ 打印（读的人得自己算）⇒ 提案卡与"这一发真出去了"脱钩，' +
+        '缓存或上一趟残留都能冒充这一趟的产出。',
     );
   }
   return red;
@@ -762,12 +887,27 @@ function run() {
   for (const line of consentRed) console.log(`授权期望值\t${line}`);
   console.log(`CONSENT_SUMMARY bind/scan 取得到=1 红=${String(consentRed.length)}`);
 
-  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0) {
+  // ── 判据 ⑮：隧道是"用到那一刻的断言"（root/unroot 会拆掉 adb reverse）──
+  const tunnelRed = tunnelInvariant(scriptRel);
+  if (tunnelRed === null) {
+    console.error('🔴 取不到 ensure_tunnel / tunnel_or_environment_fail 的函数体 —— 探针没输入，不报"通道有人管"');
+    process.exit(2);
+  }
+  for (const line of tunnelRed) console.log(`隧道断言\t${line}`);
+  console.log(`TUNNEL_SUMMARY 两个 helper 取得到=1 红=${String(tunnelRed.length)}`);
+
+  // ── 判据 ⑯：第 9 步那条否定判据要挂在提案卡的分母上 ──
+  const proposalRed = proposalDenominator(scriptRel);
+  for (const line of proposalRed) console.log(`提案分母\t${line}`);
+  console.log(`PROPOSAL_SUMMARY 红=${String(proposalRed.length)}`);
+
+  if (missing.length > 0 || descRed.length > 0 || backtickRed.length > 0 || capRed.length > 0 || capOrderRed.length > 0 || installRed.length > 0 || dirRed.length > 0 || honesty.red.length > 0 || consentRed.length > 0 || tunnelRed.length > 0 || proposalRed.length > 0) {
     console.log('🔴 有锚点落不到源码上：rid 未匹配=' + String(missing.length) +
       '，desc/text 未命中=' + String(descRed.length) +
       '，双引号文案里的反引号=' + String(backtickRed.length) +
       '，移动侧能力字段缺口=' + String(capRed.length) + '，装包通道=' + String(installRed.length) + '，滚动方向=' + String(dirRed.length) + '，规则句诚实性=' + String(honesty.red.length) +
-      '，授权期望值=' + String(consentRed.length) + '。' +
+      '，授权期望值=' + String(consentRed.length) +
+      '，隧道断言=' + String(tunnelRed.length) + '，提案分母=' + String(proposalRed.length) + '。' +
       '要么脚本写错（如那枚不存在的「保存」、那枚只写了「设置」的行），' +
       '要么界面换了锚点而验收没跟着改，要么判据文案里混进了会被 bash 当成命令替换的反引号。都是红。');
     return 1;
@@ -1107,6 +1247,45 @@ if (process.argv.includes('--self-test')) {
   //    （变异真的生效、门禁却读成绿）—— 现在每条都只看剔掉注释之后的可执行行。
   const m39 = runMutantFile(mutDir39, 'consent-no-blur');
   arms.push(['臂 39 整页扫描不摘焦点 ⇒ 非零退出且点名', m39.code !== 0 && m39.out.includes('没在**第一发手势之前**摘焦点')]);
+
+  // ── 判据 ⑮（隧道是"用到那一刻的断言"）与 ⑯（否定判据要挂分母）的臂 ──
+  //   rig39 现量：`adb root`/`unroot` 重启 adbd ⇒ 每一枚 adb reverse 被清掉，
+  //   而通道断了与闸门拦住了在"计数 0→0"这条读数上**一模一样**；
+  //   同一步里"没有提案"却打了"没点确认不写库"的 ✅。两条都不许靠人记得。
+  const baseTun = readFileSync(join(ROOT, DEFAULT_SCRIPT), 'utf8');
+  const tReal = tunnelInvariant(DEFAULT_SCRIPT);
+  const pReal = proposalDenominator(DEFAULT_SCRIPT);
+  arms.push(['臂 40 真脚本两个 helper 都取得到、⑮⑯ 都不误红（探针确有输入）', tReal !== null && tReal.length === 0 && pReal.length === 0]);
+  // 臂 41：只摘 pull_prefs_db 里那一处补修（replace 第一处）⇒ 必须红，且点名"没补 adb reverse 隧道"。
+  const mutTun41 = baseTun.replace('  ensure_tunnel >/dev/null 2>&1 || true', '  : # 变异：这一处原本把隧道补回来');
+  arms.push(['臂 41 的变异确实摘掉了一处补修（前置）', mutTun41 !== baseTun && (mutTun41.match(/ensure_tunnel >\/dev\/null/g) || []).length === 1]);
+  const m41 = runMutantFile(mutTun41, 'root-no-repair');
+  arms.push(['臂 41 root 站点没补隧道 ⇒ 非零退出且点名', m41.code !== 0 && m41.out.includes('没补 adb reverse 隧道')]);
+  // 臂 42：摘掉第 9 步第一发之前的断言 ⇒ 必须红（顺序判据，不是"整份文件出现过"）。
+  const mutTun42 = baseTun.replace('tunnel_or_environment_fail "第 9 步发送前"\n', '');
+  arms.push(['臂 42 的变异确实摘掉了第 9 步那句断言（前置）', mutTun42 !== baseTun && !mutTun42.includes('第 9 步发送前')]);
+  const m42 = runMutantFile(mutTun42, 'send-no-tunnel-assert');
+  arms.push(['臂 42 第一发发送前没证通道 ⇒ 非零退出且点名', m42.code !== 0 && m42.out.includes('前面没有 tunnel_or_environment_fail')]);
+  // 臂 43：把断言退化成"只下命令不证明"（摘掉设备侧那一发）⇒ 必须红。
+  const mutTun43 = baseTun.replace('toybox nc -w 4 127.0.0.1', 'true # 变异：设备里那一发没了');
+  arms.push(['臂 43 的变异确实摘掉了设备侧那一发（前置）', mutTun43 !== baseTun]);
+  const m43 = runMutantFile(mutTun43, 'tunnel-no-positive-control');
+  arms.push(['臂 43 断言没有正向对照 ⇒ 非零退出且点名', m43.code !== 0 && m43.out.includes('ensure_tunnel 里没有')]);
+  // 臂 44：把"没点确认不写库"从 PROPOSAL 那一支的 elif 改回独立 if ⇒ 必须红。
+  const mutP44 = baseTun.replace('elif [ "$OPS_NOCONFIRM" = "$OPS_BEFORE" ]; then', 'if [ "$OPS_NOCONFIRM" = "$OPS_BEFORE" ]; then');
+  arms.push(['臂 44 的变异确实把守卫解开了（前置）', mutP44 !== baseTun && mutP44.includes('if [ "$OPS_NOCONFIRM"')]);
+  const m44 = runMutantFile(mutP44, 'no-write-without-denominator');
+  arms.push(['臂 44 否定判据脱离分母 ⇒ 非零退出且点名', m44.code !== 0 && m44.out.includes('不是 PROPOSAL=0 那一支的 elif')]);
+  // 臂 45：摘掉 PROPOSAL=1 那一档（标志恒 0）⇒ 必须红。
+  const mutP45 = baseTun.replace('  PROPOSAL=1\n', '');
+  arms.push(['臂 45 的变异确实摘掉了 PROPOSAL=1（前置）', mutP45 !== baseTun && !mutP45.includes('PROPOSAL=1')]);
+  const m45 = runMutantFile(mutP45, 'proposal-flag-half-missing');
+  arms.push(['臂 45 提案标志只剩一档 ⇒ 非零退出且点名', m45.code !== 0 && m45.out.includes('PROPOSAL=0／=1 两档缺其一')]);
+  // 臂 46：把"恰好 +1"的期望退成同数（S1=S0）⇒ 必须红（卡片与"真发出去了"脱钩）。
+  const mutP46 = baseTun.replace('elif [ "$S1" = "$((S0+1))" ]; then', 'elif [ "$S1" = "$S0" ]; then');
+  arms.push(['臂 46 的变异确实改了期望值（前置）', mutP46 !== baseTun && mutP46.includes('[ "$S1" = "$S0" ]')]);
+  const m46 = runMutantFile(mutP46, 'count-expectation-lost');
+  arms.push(['臂 46 计数期望值不再是恰好 +1 ⇒ 非零退出且点名', m46.code !== 0 && m46.out.includes('恰好 +1 的期望值被退成')]);
 
   // ── 判据 ⑥：块内那一指落在**哪一层**（rig20 现量的第三种面目）──
   //   RN 的 `Pressable(accessibilityRole=button, accessibilityLabel=label)` 会把
