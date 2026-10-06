@@ -61,6 +61,7 @@
     "check:licenses:stamp": "node research/tools/render-license-inventory.mjs --check-stamp",
     "check:image-license": "node research/tools/gen-image-npm-tree.mjs --check && node research/tools/check-image-license-coverage.mjs --quiet && node research/tools/check-image-install-contract.mjs",
     "check:doc-citations": "node scripts/check-doc-citations.mjs",
+    "check:adr-numbering": "node scripts/check-adr-numbering.mjs",
     "check:docs": "node research/tools/docs-link-check.mjs",
     "check:md-tables": "node scripts/check-md-table-rows.mjs",
     "check:calendar-evidence-rigs": "bash research/tools/calendar-line-commit-only-arms.sh && bash research/tools/r17-reshoot-arms.sh && bash research/tools/r17-reshoot-stale.sh --selftest",
