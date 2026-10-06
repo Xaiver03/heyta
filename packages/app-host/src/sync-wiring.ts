@@ -49,6 +49,7 @@
 import type { OpLogEngine } from '@heyta/op-log';
 import type { OpLogStore } from '@heyta/storage';
 import { eraseLocalData } from './local-erasure.js';
+import { HEYTA_APP_VERSION } from './app-version.generated.js';
 import type { EntityType } from '@heyta/shared-schema';
 import type { Operation, OpType } from '@heyta/sync-core';
 import {
@@ -70,6 +71,15 @@ export type SyncWiringOptions = SyncEncryptionOptions & {
   store: OpLogStore<Operation<string>>;
   /** 自建服务器地址。空字符串 = 未配置（→ 同步直接失败，不会假装成功）。 */
   baseUrl: string;
+  /**
+   * 随下载请求上报的客户端版本号。**默认就是生成物 `HEYTA_APP_VERSION`，宿主不需要传** ——
+   * 真源是仓库根 `package.json`（`scripts/gen-app-version.mjs` 的文件头写了为什么不让各宿主
+   * 自己传：那正是这件事烂在原地的成因）。留这个口子是给**自己另构建一份客户端**的人。
+   *
+   * ⚠️ 要传就传真版本，**不要传 `0.0.0` 之类的占位值**：服务端把"沉默"和"低于 cut"
+   * 算同一档（都判 old），所以沉默不改任何行为，而占位值会把假版本写进运营面那份设备清单。
+   */
+  appVersion?: string;
   getToken: () => Promise<string | undefined>;
   getPassword: () => Promise<string | undefined>;
   /**
@@ -105,6 +115,7 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
   return new SyncClient({
     baseUrl: options.baseUrl,
     clientId: engine.getClientId(),
+    appVersion: options.appVersion ?? HEYTA_APP_VERSION,
     getToken: options.getToken,
     getPassword: options.getPassword,
     ...(options.encryptionMode === 'vault'
