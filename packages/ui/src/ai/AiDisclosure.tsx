@@ -174,8 +174,20 @@ export function AiDisclosure({
         <Text style={text['row-meta']}>
           {labels.destinationLead}
           <Text style={styles.strong}>{view.label}</Text>
+          {/* 🔴 段与段之间必须**有分隔**。相邻 `<Text>` 子节点在 RN（和 RNW）里是
+              逐字拼接、不插任何空白 —— 于是一行会渲染成
+              「将发往：stub-remotehttps://192.0.2.1/v1模型 stub-model数据会离开设备」
+              （2026-10-06 rig57 的 `ios-ai-3-disclosure.png` 人眼看图照出来的；
+              AX 判据 `found_label "192.0.2.1"` 当时**照样绿**，因为它是子串匹配 ——
+              "验界面写了什么"验不出"看不看得清"，与 §7 里那条"断言不验少了什么"同族）。
+              分隔符用的是**已经在 props 里的那一枚** `separator`（`LIST_SEPARATOR[locale]`，
+              正字法、刻意不进词条表，理由见 `apps/web/src/features/ai/locale-punctuation.ts` 头），
+              不新造标点常量、不把空格塞进词条。 */}
+          {separator}
           <Text style={styles.subtle}>{view.endpoint}</Text>
+          {separator}
           <Text>{labels.model}</Text>
+          {separator}
           <Text style={styles.tag} testID={ids.destinationKind}>
             {view.isLocal ? labels.local : labels.remote}
           </Text>

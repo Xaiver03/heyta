@@ -309,4 +309,54 @@ describe('🔴🔴 同一条路由解析下，5 个入口渲染同一组披露�
       AiToolRun: expected,
     });
   });
+
+  /**
+   * 🔴 「发给谁」那一行必须**读得开**，而不只是"四段都在"。
+   *
+   * 成因（2026-10-06 rig57 的 `ios-ai-3-disclosure.png`，人眼看图照出来的）：
+   * 共享组件把四段各写成一个相邻 `<Text>` 子节点，而 RN / RNW 对相邻 Text 是
+   * **逐字拼接、不插空白** ⇒ 屏上是
+   * `将发往：stub-remotehttps://192.0.2.1/v1模型 stub-model数据会离开设备`，
+   * 用户分不清端点名在哪里结束、URL 从哪里开始。
+   *
+   * 🔴 而**当时 iOS 载体那条判据照样绿** —— 它写的是 `found_label "192.0.2.1"`，
+   * 子串匹配，黏在一起也在。这就是"断言只验界面写了什么、不验看不看得清"，
+   * 与 §7 里"不验少了什么"那条同族。所以这里的判据形状是**段与段之间那个字符**：
+   * 它不许是下一段的第一个字符。摘掉 `AiDisclosure.tsx` 里任一枚 `{separator}`
+   * 就会红（变异臂见 `docs/plans/ai-assistant-closure.md` §9 那段）。
+   */
+  it('🔴 「发给谁」那一行的四段之间必须有分隔，不许逐字黏成一串', async () => {
+    const el = mount(
+      <AiBreakdown
+        task={TASK}
+        routing={ROUTING}
+        consents={CONSENTS}
+        secrets={SECRETS}
+        onApplyNote={() => Promise.resolve()}
+      />,
+    );
+    click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
+    const row = el.querySelector('[data-testid="ai-destination"]');
+    expect(row).not.toBeNull();
+    const text = row?.textContent ?? '';
+
+    // 先证明四段**都在**（否则"没有下一段"会让下面那条循环空转成假绿）。
+    // 三段的内容取自夹具，第四段（「数据会离开设备」/「数据留在本机」）用 testid 证存在 ——
+    // 把那两句抄进测试就等于给界面文案做第二份抄件，它一定会漂。
+    const segments = [PRIMARY.label, PRIMARY.endpoint, PRIMARY.model];
+    for (const segment of segments) {
+      expect({ segment, present: text.includes(segment) }).toEqual({ segment, present: true });
+    }
+    expect(row?.querySelector('[data-testid="ai-destination-kind"]')).not.toBeNull();
+
+    // 再逐对检查"这一段结束后的第一个字符"：它必须是分隔（标点/空白），
+    // 不能是下一段的开头 —— 那正是"黏成一串"的形状。
+    const glued: string[] = [];
+    for (const segment of segments) {
+      const at = text.indexOf(segment);
+      const next = at === -1 ? undefined : text.charAt(at + segment.length);
+      if (next !== undefined && !/^[\s、,，·;；|/)（(]*$/.test(next)) glued.push(segment);
+    }
+    expect({ 哪些段后面直接粘着下一段: glued }).toEqual({ 哪些段后面直接粘着下一段: [] });
+  });
 });
