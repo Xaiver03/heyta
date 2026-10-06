@@ -194,7 +194,55 @@ def label_of(n):
     return (n.get("AXLabel") or n.get("title") or "").strip()
 
 
-def find(nodes, label, want_pressable, want_field, role, exact_only=False, occurrence=0):
+def anchor_of(nodes, within):
+    """`--within` 的锚点节点。锚点**自己**不参与匹配，只提供几何边界。
+
+    🔴 这一档与 Android 的 `xy_in_rid`（`_xy.py` 里"中心落在 resource-id 元素
+    矩形内"）是**同一个语义**，不是另起一把尺：五档功能块各有一枚同名 chip
+    （`ai-feature-<f>` 里都写着端点标签），只按标签找会打到第一次出现的那一枚。
+    为什么用几何而不是 AX 父子树：RN 会把没有无障碍角色的中间 `View` 从树上摘掉，
+    按"后代"筛会整批落空 —— 那会把"载体够不着"读成"界面上没有"（§7 元规则一）。
+    """
+    if not within:
+        return None
+    a = find(nodes, within, False, False, None)
+    if a is None:
+        return None
+    x, y, w, h = frame_of(a)
+    if w <= 0 or h <= 0:
+        return None
+    return (x, y, w, h)
+
+
+def within_error(nodes, within):
+    """锚点取不到 / 锚点零尺寸 ⇒ 一句话说明"这一条判据没有输入"。
+
+    🔴 必须与"锚点在、但块里没有目标"**分成两句话**：前一句说的是探针，
+    后一句才是产品。混成一句就会把桥的失效报成"五档里那一档没渲染"。
+    """
+    if not within:
+        return ""
+    a = find(nodes, within, False, False, None)
+    if a is None:
+        return f"within-anchor-missing:{within}"
+    _x, _y, w, h = frame_of(a)
+    if w <= 0 or h <= 0:
+        return f"within-anchor-zero-frame:{within}"
+    return ""
+
+
+def in_within(n, box):
+    """节点 n 的中心是否落在锚点矩形 box 内（box=None ⇒ 不过滤）。"""
+    if box is None:
+        return True
+    ax, ay, aw, ah = box
+    x, y, w, h = frame_of(n)
+    cx, cy = x + w // 2, y + h // 2
+    return ax <= cx < ax + aw and ay <= cy < ay + ah
+
+
+def find(nodes, label, want_pressable, want_field, role, exact_only=False, occurrence=0,
+         within=None):
     """
     先找**精确标签**，找不到再退化成子串匹配。
 
@@ -214,6 +262,10 @@ def find(nodes, label, want_pressable, want_field, role, exact_only=False, occur
     "标签被合成成 `"设置, 同步凭据、桌面小组件与语言"` ⇒ 精确匹配恒取空"。
     """
     pool = nodes
+    if within:
+        box = anchor_of(nodes, within)
+        # 锚点取不到 ⇒ 候选集清空（found=False），而**为什么**空由 within_error 单独带出
+        pool = [n for n in pool if in_within(n, box)] if box is not None else []
     if want_field:
         pool = [n for n in pool if is_field(n)]
     elif want_pressable:
@@ -513,7 +565,8 @@ def idb_swipe(idb, companion, udid, x0, y0, x1, y1, duration):
         return -1, str(e)[:120]
 
 
-def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence=0):
+def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence=0,
+                     within=None):
     """
     把 label 指向的元素**真的滚进可见区**。返回 emit 用的 dict。
 
@@ -546,7 +599,7 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
         for _ in range(5):
             ns = dump_nodes(idb, companion, udid)
             if ns:
-                return find(ns, label, want_pressable, want_field, role, False, occurrence), ns
+                return find(ns, label, want_pressable, want_field, role, False, occurrence, within), ns
             time.sleep(1)
         return None, None
 
@@ -554,7 +607,7 @@ def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, ro
     if node is None and nodes is None:
         out["scrollRc"] = "tree-empty-repeated"
         return out
-    out["detail"] = id_channel_warning(nodes or [], label)
+    out["detail"] = within_error(nodes or [], within) or id_channel_warning(nodes or [], label)
     swipes = 0
     recoveries = 0
     while node is not None and swipes < 10:
@@ -654,7 +707,8 @@ RETURN_KEY_LABELS = ("换行", "return", "Return", "done", "Done", "go", "Go",
                      "发送", "下一步", "完成")
 
 
-def type_text(idb, companion, udid, label, want_pressable, want_field, role, value, occurrence=0):
+def type_text(idb, companion, udid, label, want_pressable, want_field, role, value, occurrence=0,
+              within=None):
     """
     **聚焦输入框 + 模拟键盘输入**。返回 emit 用的 dict。
 
@@ -666,13 +720,14 @@ def type_text(idb, companion, udid, label, want_pressable, want_field, role, val
     """
     out = {"found": "False", "typedRc": "", "detail": ""}
     # 🔴 先滚进可见区：tap 对屏外坐标是空操作（不报错）—— 2026-10-02 实测。
-    vis = scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence)
+    vis = scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role, occurrence,
+                           within)
     if vis.get("visible") != "True":
         out["typedRc"] = f"not-visible ({vis.get('found')}/{vis.get('scrollRc')})"
         return out
     node, nodes = locate(argparse.Namespace(
         label=label, pressable=want_pressable, field=want_field, role=role,
-        wait=3, exact=False, occurrence=occurrence,
+        wait=3, exact=False, occurrence=occurrence, within=within,
         idb=idb, companion=companion, udid=udid))
     if node is None:
         out["typedRc"] = "not-found"
@@ -790,7 +845,8 @@ def locate(args):
     deadline = time.time() + max(args.wait, 0)
     while True:
         nodes = dump_nodes(args.idb, args.companion, args.udid)
-        n = find(nodes, args.label, args.pressable, args.field, args.role, args.exact, args.occurrence)
+        n = find(nodes, args.label, args.pressable, args.field, args.role, args.exact,
+                 args.occurrence, getattr(args, "within", None))
         if n is not None:
             return n, nodes
         if time.time() >= deadline:
@@ -814,6 +870,10 @@ def main():
     p.add_argument("--occurrence", type=int, default=0,
                    help="同名 AX 节点按树顺序选择第几个（从 0 开始）")
     p.add_argument("--role")
+    # 🔴 只在**某个 testID 容器的矩形内**匹配（与 Android 的 xy_in_rid 同语义）：
+    #    五档功能块里各有一枚同名 chip（端点标签），只按标签找会打到第一枚。
+    p.add_argument("--within", metavar="ANCHOR",
+                   help="只在该锚点（id:<testID> 或标签）的矩形内匹配")
     p.add_argument("--wait", type=int, default=0)
     p.add_argument("--list", action="store_true")
     p.add_argument("--press", action="store_true")
@@ -845,13 +905,13 @@ def main():
     if args.scroll_into_view:
         emit(scroll_into_view(args.idb, args.companion, args.udid,
                               args.label, args.pressable, args.field, args.role,
-                              args.occurrence))
+                              args.occurrence, args.within))
         return 0
 
     if args.type_text is not None:
         emit(type_text(args.idb, args.companion, args.udid,
                        args.label, args.pressable, args.field, args.role,
-                       args.type_text, args.occurrence))
+                       args.type_text, args.occurrence, args.within))
         return 0
 
     if args.tap is not None:
@@ -879,7 +939,7 @@ def main():
         # 原 AXPRESS 也是这个语义：查询失败不影响退出码，由调用方判。
         # 🔴 但 `id:` 前缀那一档要再分一层：整棵树都没有 AXUniqueId 时，"没找到"
         #    说的是桥，不是界面 —— 那句话必须由 detail 带出来（见 id_channel_warning）。
-        warn = id_channel_warning(nodes or [], args.label)
+        warn = within_error(nodes or [], args.within) or id_channel_warning(nodes or [], args.label)
         if args.press:
             emit({"result": "not-found", "detail": warn})
         else:
