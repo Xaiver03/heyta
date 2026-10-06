@@ -197,7 +197,16 @@ test.describe('习惯频次编辑器（H5，web 端）', () => {
 
     await openPanel(page, '拉伸');
     await page.getByRole('button', { name: '每周挑几天' }).click();
+    // 🔴 先**把前提等出来**再量几何。第一版这里直接 `openPanel` + 数格子，于是
+    //    "切档没生效"被报成"展开的格数不是 3 档 + 7 天"（收到 3 枚 = 只有三档那一排），
+    //    读起来像布局坏了，实际是**下面那个 for 循环一次都没跑到** ——
+    //    一条判据的失败信息说错了话，比没有信息更糟（§7 元规则 1）。
+    await expectSummary(page, /每周/, '点了「每周挑几天」而摘要没改口');
     await openPanel(page, '拉伸');
+    await expect(
+      page.locator('[data-testid^="habit-freq-day-"]'),
+      '摘要已经是「每周」，星期那一排却没出来',
+    ).toHaveCount(7);
 
     const viewport = page.viewportSize();
     expect(viewport, '量不到视口尺寸 ⇒ 这一条没有基准').not.toBeNull();

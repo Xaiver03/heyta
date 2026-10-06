@@ -13,8 +13,9 @@
  *
  *   I1 展开后**八个**字形 + 「默认」那一格 ⇒ 挡"选项不是来自闭集"（写死四个、
  *      或者把「默认」省略 —— 省略之后用户挑过就退不回去）。
- *   I2 点一格 ⇒ 清单那一行的字形**真的换了**：比较的是行首 `<svg>` 的路径数据，
- *      不是"某个元素出现了"。挡的是"写了 state 没落盘 / 落盘了界面不动"。
+ *   I2 点一格 ⇒ 清单那一行的字形**换成了那一格的形状**：比较的是行首 `<svg>` 的路径
+ *      数据，不是"某个元素出现了"，也不是只"与之前不同"。挡的是"写了 state 没落盘 /
+ *      落盘了界面不动 / 点月亮画出水杯"。
  *   I3 🔴 **刷新后仍在** —— 这一条才是"落盘"的判据（H2 那批教训：只测内存态会漏
  *      "写进了状态但没写进日志"，症状是当场看着改好了，重开就回去）。
  *   I4 再点同一个 ⇒ 退回派生，且「默认」那一格按下（`aria-pressed`）。
@@ -67,19 +68,44 @@ const rowGlyph = (page: Page, name: string) =>
     .evaluate(shapeOf);
 
 /**
- * 选择器里**某一格自己**的形状（按 `aria-label` 点名那一格）。
+ * 🔴 挑一格**形状与当前行首不同**的选项，返回它的下标与 `aria-label`。
+ *    取形状一律**在点之前**从那一格自己取：写入是异步的（dispatch → op-log → 重渲染），
+ *    "点完立刻读行首当基准"读到的是点击前那一个，报出来像"没落盘"，实际是拿错了时刻
+ *    （§7 第 176 条"桩在外面预取值"那一族）。
  *
- * 🔴 为什么要有这个：I3 / I5 第一版是"点完那一格，立刻读行首当基准"，
- *    而写入是异步的（dispatch → op-log → 重渲染），于是基准取到的是**点击之前**的
- *    字形 —— 报出来像"没落盘 / 两处画得不一样"，实际是用例读早了（同 §7 第 176 条
- *    "桩在外面预取值"那一族：判据没走到被测的那一步就先拿了数）。
- *    正确顺序是：**先**从那一格自己取形状，**再**点，**再** poll 行首等于它。
+ * 为什么必须"挑"而不是写死一个名字（这里曾是 `早睡` / `音乐`）：没设过图标的习惯画的是
+ * `deriveHabitIcon(habit.id)` —— FNV-1a(id) % 8（`packages/domain/src/habit-icons.ts`），
+ * 而 e2e 每条习惯的 id 都是新随机的 ⇒ **当前字形在八个里均匀随机**。写死一格，
+ * 就有 1/8 的运行里那一格恰好等于派生默认，于是"点一格 ⇒ 行首字形变了"这条判据
+ * **在数学上不可能通过**：产品做对了，界面也确实没变。
+ *
+ * 现量（`tmp/h7-readings/icon-flake-hunt.log`，并发猎捕 30 次）：3 红 / 27 绿，
+ * 红的那次打印的是 `before` 与 `after` **逐字相同**、且 `before` 就是被点那一格的形状
+ * （`path:M20.985 12.486a9 9 0 1 1-9.473-9.472…` = 月亮）。
+ * 这就是 `I2` / `I4` 被记成"抖动"的那两条的真身 —— 不是负载、不是时序、不是判据没牙。
+ *
+ * 修法是把**前提**建立起来而不是把断言放宽：先读八个形状，再点一个确实不同的。
+ * 「默认」那一格没有 `<svg>`（它是一段文字），靠 `count()` 明确跳过 —— 不写这一句，
+ * 走到它那一格时 `.locator('svg').first()` 会**静默地等满超时**，报出来的是一条
+ * 与判据无关的 timeout。
  */
-const optionGlyph = (page: Page, label: string) =>
-  page
-    .locator(`.ht-habit__icon-option[aria-label="${label}"] svg`)
-    .first()
-    .evaluate(shapeOf);
+async function otherGlyphOption(
+  page: Page,
+  currentShape: string,
+): Promise<{ index: number; label: string; shape: string }> {
+  const cells = page.locator('.ht-habit__icon-option');
+  const n = await cells.count();
+  expect(n, '选择器没展开出格子 ⇒ 无从挑一格不同的').toBeGreaterThan(1);
+  for (let i = 0; i < n; i += 1) {
+    const svg = cells.nth(i).locator('svg');
+    if ((await svg.count()) === 0) continue;
+    const shape = await svg.first().evaluate(shapeOf);
+    if (shape && shape !== currentShape) {
+      return { index: i, label: (await cells.nth(i).getAttribute('aria-label')) ?? '', shape };
+    }
+  }
+  throw new Error(`八格里没有一格与当前行首字形不同（before=${currentShape.slice(0, 48)}）`);
+}
 
 /**
  * 展开选择器（点那颗「图标」按钮）。
@@ -129,14 +155,18 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
     await selectHabit(page, '晨跑');
     const before = await rowGlyph(page, '晨跑');
     await openPicker(page, '晨跑');
-    await page.getByRole('button', { name: '早睡' }).click();
+    const pick = await otherGlyphOption(page, before);
+    await page.locator('.ht-habit__icon-option').nth(pick.index).click();
 
     // 🔴 比的是**形状**：只看"某个按钮按下了"挡不住"state 换了而 svg 没换"。
+    // 🔴 而且要等于**点下去的那一格**，不是只"与之前不同" —— 后者在"点月亮画出水杯"
+    //    时照样绿。这一句在改之前是 `!== before`，那是 `otherGlyphOption` 之前的形状：
+    //    当时没有"点之前先从那一格取形状"这个动作，也就没有可用的基准。
     await expect
-      .poll(async () => (await rowGlyph(page, '晨跑')) !== before, {
-        message: '点了「早睡」，行首的字形还是原来那一个',
+      .poll(async () => await rowGlyph(page, '晨跑'), {
+        message: `点了「${pick.label}」，行首画的不是那一格的形状`,
       })
-      .toBe(true);
+      .toBe(pick.shape);
     // 选完那一排就收起来了（见 `openPicker` 那条注释），要读选中态得再展开一次。
     await openPicker(page, '晨跑');
     // 选中之外的格子不许同时按下（`aria-pressed` 是单源）。
@@ -155,14 +185,18 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
     await openPicker(page, '记账');
     // 🔴 基准**在点之前**取（从那一格自己取形状）：点完立刻读行首会读到点击前那一个，
     //    于是这条落盘判据报成"字形回到旧值"，而那与产品无关（第一版就红在这里）。
-    const want = await optionGlyph(page, '书写');
-    await page.getByRole('button', { name: '书写' }).click();
+    // 🔴 而且**点的那一格必须与派生默认不同**：写死一格名字时，1/8 的运行里那一格
+    //    恰好就是派生默认，于是"行首等于它"在**没有任何写入**的情况下也成立 ——
+    //    这条落盘判据会静默地退化成"什么都没做也对"。成因与现量见 `otherGlyphOption`。
+    const derived = await rowGlyph(page, '记账');
+    const pick = await otherGlyphOption(page, derived);
+    await page.locator('.ht-habit__icon-option').nth(pick.index).click();
     // 先确认当场就画对了 —— 否则"刷新后仍在"会退化成"刷新后仍是旧值"，两边都看不出来。
     await expect
       .poll(async () => await rowGlyph(page, '记账'), {
         message: '点完那一格，行首当场就没换',
       })
-      .toBe(want);
+      .toBe(pick.shape);
 
     await page.reload();
     await switchView(page, '习惯');
@@ -171,7 +205,7 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
       .poll(async () => await rowGlyph(page, '记账'), {
         message: '刷新之后字形回到旧值（没落盘，或落盘了没读回来）',
       })
-      .toBe(want);
+      .toBe(pick.shape);
 
     // 而且选择器里认得它：按下的那一格就是「书写」。
     // ⚠️ 刷新会把**选中态**清掉（窗格没有回落选中，见 `selectHabit` 那条注释），
@@ -181,7 +215,7 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
     await openPicker(page, '记账');
     await expect(page.locator('.ht-habit__icon-option[aria-pressed="true"]').first()).toHaveAttribute(
       'aria-label',
-      '书写',
+      pick.label,
     );
     await expect(
       page.getByRole('button', { name: '「记账」用默认图标' }),
@@ -196,17 +230,24 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
     await addHabit(page, '拉伸');
 
     await selectHabit(page, '拉伸');
+    /* 🔴 派生默认先取下来，并且**点的那一格必须与它不同**（为什么不能写死名字，
+       见 `otherGlyphOption` 那段：写死就有 1/8 的运行里这条判据在数学上不可能过）。
+       这里比 `I2` 多钉一格：退回派生之后行首必须**等于最初那个派生形状**，
+       而不是只"和显式选的那个不一样" —— 后者在"退回了第三个字形"时也会绿。 */
+    const derived = await rowGlyph(page, '拉伸');
     await openPicker(page, '拉伸');
-    await page.getByRole('button', { name: '音乐' }).click();
-    const explicit = await rowGlyph(page, '拉伸');
+    const pick = await otherGlyphOption(page, derived);
+    const cells = page.locator('.ht-habit__icon-option');
+    await cells.nth(pick.index).click();
+    await expect
+      .poll(() => rowGlyph(page, '拉伸'), { message: `点了「${pick.label}」，行首没换成它的形状` })
+      .toBe(pick.shape);
 
     await openPicker(page, '拉伸');
-    await page.getByRole('button', { name: '音乐' }).click();
+    await cells.nth(pick.index).click();
     await expect
-      .poll(async () => (await rowGlyph(page, '拉伸')) !== explicit, {
-        message: '再点同一个字形没有退回派生',
-      })
-      .toBe(true);
+      .poll(() => rowGlyph(page, '拉伸'), { message: '再点同一个字形没有退回派生' })
+      .toBe(derived);
     // 再展开一次读「默认」那一格（选完就收起了）。
     await openPicker(page, '拉伸');
     await expect(
@@ -225,13 +266,16 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
     // 🔴 顺序：先取那一格的形状 → 点 → 等行首换成它 → 再展开比"按下的那一格"。
     //    第一版是"点 → 立刻读行首"，读到的是点击前那一个（写入是异步的），
     //    于是这条一致性判据报成"两处画得不一样"，而实际是拿错了时刻。
-    const want = await optionGlyph(page, '阅读');
-    await page.getByRole('button', { name: '阅读' }).click();
+    //    与 `I2`/`I3`/`I4` 同一条：点的那一格要**挑**一个与派生默认不同的，
+    //    否则"行首换成了它"这一步有 1/8 的运行是白过的（见 `otherGlyphOption`）。
+    const derived = await rowGlyph(page, '背单词');
+    const pick = await otherGlyphOption(page, derived);
+    await page.locator('.ht-habit__icon-option').nth(pick.index).click();
     await expect
       .poll(async () => await rowGlyph(page, '背单词'), {
-        message: '点了「阅读」，行首没换成那一格的形状',
+        message: `点了「${pick.label}」，行首没换成那一格的形状`,
       })
-      .toBe(want);
+      .toBe(pick.shape);
 
     // 选完就收起了，再展开才能读"按下的那一格"自己。
     await openPicker(page, '背单词');
@@ -241,7 +285,7 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
       .evaluate(shapeOf);
     // 🔴 同一个判断，两处画得一样：行首字形与选择器里那一格必须逐字节相同。
     //    它是"宿主里再抄一张表"最直接的可见症状（清单水滴、选择器月亮）。
-    expect(pressed, '按下的那一格与点之前那一格画的不是同一个字形').toBe(want);
+    expect(pressed, '按下的那一格与点之前那一格画的不是同一个字形').toBe(pick.shape);
   });
 
   test('I6 🔴 展开的每一格都在视口内（`toBeVisible()` 挡不住"被推到视口外"）', async ({ page }) => {

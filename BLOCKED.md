@@ -5758,3 +5758,446 @@ G5 挂了 20 多天没人发现，正是因为红的是**别的臂**，而那台
 ⚠️ **本轮没做**（别把上面那三行绿读成整链绿）：`pnpm -r typecheck` 此刻 **RC=2**，
 报错**全部**在回收线在飞未提交的 `apps/node-host/src/host.ts`（5 条 TS2322，非 node-host 报错现量 **0**）；
 `pnpm -r test` 全量、`check:ai-e2e` 一族、`pnpm reinstall:all` 四端当前产物 —— **都还没跑**。
+## B91（2026-10-06 06:1x，习惯线 H4/H5/H7 收口）：这一批落完了，但**四格读数没取到、两格归属是代收的**
+
+批次本身：H4（月历 + 可点补打卡）、H5（`frequency` 写入口）、H7（年视图 12 张月卡 + 详情面那枚
+"月 ⇄ 年"容器）三张单**已落地并逐档留了现量读数**，状态表在
+[`docs/plans/habits-alignment.md`](docs/plans/habits-alignment.md) §2 第一批那三行。
+下面只登记**没闭合的部分**，不把批次整体读成"完成"。
+
+### 1. 四格没有读数（不是红，是没跑）
+
+| 格 | 现状 | 谁消得掉 |
+|---|---|---|
+| `mutate-habits-two-column.mjs` 的 **N5 臂** | 我接手时这台臂台**连语法都不过**：`css` 那枚模板字符串里嵌了三处反引号 ⇒ `SyntaxError: Unexpected identifier 'display'`（`STEP twocol-rig rc=1` 的真因，不是"Q6 没牙"）。已把三处反引号改成「」并 `node --check` 过。**整台没重跑** —— 它每一臂都要重打 `apps/web` 并占 4371，与别人正在跑的 e2e 撞。⇒ "星期那一排不换行会被 Q6 抓到"这一格**现在没有读数** | 等 4371 与内存闸门同时空出来：`node research/tools/mutation-rigs/mutate-habits-two-column.mjs` |
+| `mutate-habit-year.mjs` 的 **YA4 期望红集** | 已按现量放宽成 `V12 , Z2 , Z3`（放宽前那一趟打印的就是这三条 + 一行`超期望的红：V12`）。**放宽后没重跑** | 同上：`node research/tools/mutation-rigs/mutate-habit-year.mjs`，期望 `存活 0` |
+| **H3-V1 / H7 的设备侧** | 移动端"装出来的包里有这块板、看得见的与 web 一致"没有设备读数。四端重装（AGENTS §6.1.1 `pnpm reinstall:all`）本轮**没跑** | 🔴 **06:3x 现量：这一格本轮消不掉**，三枚前提同时不成立 —— ① `ssh -o ConnectTimeout=6 windows-pc` ⇒ `connect to host 10.111.127.237 port 22: Operation timed out`（打包机不可达 ⇒ Android 那腿按 §6.1 一律走它，**不许**用 `HEYTA_ANDROID_LOCAL_GRADLE=1` 绕，那条开关是给"远程主机正在重装"的，不是给"够不着"的）；② `xcrun simctl list devices booted` ⇒ **一行都没有**（iOS 那腿要模拟器起过核身）；③ `emulator-5554 device` 在，但它是唯一活着的那条腿。⇒ 需求是"Windows 打包机 + iOS 模拟器同时空"，不是"再等等" |
+| **H8 热力图月份标签折行** | 🟡 **代码与判据已落地**（`35ce7ce9`），**两腿读数没取**：内存闸门被另一条线的 `hold-test-lock.sh` 持着（06:2x 现量：已持 18 分钟），验证链已排队等它。跑法 `node research/tools/mutation-rigs/mutate-habit-heatmap-labels.mjs`，期望 `存活 0 / BACK_TO_CLEAN=true`，三臂红集分别是 L3+HL1 / HL2 / L4+HL2 | 闸门空出来即跑；**跑完之前这一格不许被读成已验证** |
+
+### 2. 两格归属是**代收**的，不是我的
+
+- `packages/app-host/src/habit-actions.ts`、`packages/app-host/tests/habit-actions.spec.ts`、
+  `apps/web/src/features/habits/store.ts` 里，H5 的 `setHabitFrequency` 与**回收线**的
+  `purgeHabit → Promise<boolean>` 落在同一枚文件的相邻 hunk 上。按 hunk 拆开试过
+  （`tmp/h7-readings/stage-select.mjs`），store.ts 那一份**拆不开**（保留的 hunk 的上下文依赖被丢掉的
+  hunk ⇒ `patch does not apply`）。所以这三个文件**整档提交**，那几条 `purgedAt`/`boolean` 的 hunk
+  **归属回收线**，提交信息里点名。其余回收线的文件（`actions.ts`、`note-actions.ts`、
+  `project-actions.ts`、`server/*`、`docs/adr/0055*`、`.gitignore`、`scripts/*`）**一概没代提交**。
+- `docs/reference/environment-traps.md` 与 `BLOCKED.md` 是**共享追加账本**：我这一条陷阱（末号现量：
+  `grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md | sort -n | tail -1`）与别人 322–336 段
+  在同一个未提交区域里。**按 hunk 只提我那条，会把别人的编号排到我后面**（文件已经有一段
+  "物理顺序与编号不同序"的记账，不该再加一段），所以两份都**留在工作树里没提交**，
+  等下一次收口时由先跑到的人带上。
+
+### 3. 一条载体污染窗口，请同期跑过 e2e 的人自查
+
+06:0x 我为了取 N2 那一臂的读数，把 `apps/web/dist` 重打成**带临时 CSS 臂**的产物约 **11 分钟**
+（臂台收尾会复原并核对 md5，但那 11 分钟里 4371 上服务的就是脏产物）。
+同期任何跑在 `apps/web/dist` 上的 e2e 读数都要**重取一次**才能算数。
+
+### 4. 一条环境故障，只报告不动手
+
+`~/.tfa-shield/bin/pnpm` 那层包装在本机某次运行后打印语法告警并仍把命令转发了出去
+（症状：`pnpm` 照常工作，stderr 多一行解析错误）。它是**用户级工具**，不属于本仓库，
+我没有动它。等它真的把命令吞掉再说。
+
+### 5. 推送通道这一格是**环境**问题，不是产品问题（06:1x 现量）
+
+`51ff31a3` 落在本地 `main` 上（`origin/main` 是它的祖先 ⇒ 落地是一次快进，不需要 `--force`），
+但**两条通道都不通**：
+
+| 通道 | 命令 | 读数 |
+|---|---|---|
+| SSH | `ssh -T git@github.com` | `Connection closed by 198.18.0.245 port 22`（`198.18.x` 是代理的 fake-ip 段） |
+| HTTPS | `git ls-remote https://github.com/Xaiver03/heyta.git refs/heads/main` | `LibreSSL SSL_connect: SSL_ERROR_SYSCALL` |
+| 本机代理 | `lsof -nP -iTCP:7890 -sTCP:LISTEN`（`http.proxy` 指的就是它） | **无输出 = 没在监听** |
+| `gh` | `gh auth status` | `The token in keyring is invalid` |
+
+⇒ 动网络环境（起停代理客户端）是**明令禁止**的，所以这里只报告不动手，
+`51ff31a3` **暂时只在这台 Mac 上**。下一次通道恢复后 `git push origin main` 一条命令即可收平，
+不需要任何人重做这批工作。
+
+🔴 **06:3x 复探（同两通道，读数没变）**：HTTPS 仍 `SSL_ERROR_SYSCALL`；SSH 那次没重跑。
+同一趟取了**落地资格**的现量（这是瞬时属性，别照这一行行动，要重量）：
+
+```bash
+git merge-base --is-ancestor origin/main HEAD && echo FF_OK   # ← 06:3x 读到 FF_OK
+```
+
+⇒ 现在 `HEAD`（`35ce7ce9`）比 `origin/main`（`7a2fde72`，回收线 W6 那笔台账）领先**三笔**
+（`51ff31a3` / `13c3f16b` / `35ce7ce9`），落地是一次快进、**不带 `--force`**。
+下一次重量若是 NOT ancestor，那说明他们又推了东西 —— 那时要先 fetch 再判断，不要直接推。
+
+### 6. 排队中：三把锁等同一枚闸门（06:3x 现量，给下一棒接着收）
+
+`/tmp/tfa-test.lock` 现在归 **pid 93441**（回收线的 `hold-test-lock.sh … -- pnpm check`，
+06:07 起持着；06:30 仍在跑 e2e 段的 `glass-materials.spec.ts`，那一枚已经 `(retry #1)` 计时 1.0m）。
+我这一批的三条腿**都已排队**在它后面（`with-test-lock.sh` 会自己轮询到闸门空），
+日志落点固定，闸门一开就会逐个打读数：
+
+| 腿 | 日志 | 期望读数 |
+|---|---|---|
+| `pnpm -r --filter '!@heyta/sync-server' test` | `tmp/h7-readings/rtest.log` | 逐包 `Tests N passed` 汇总行**相加**；再做 §6 那条对账：**有 `test` 脚本的包数 == 打了汇总行的包数** |
+| H8 验证链（`L1–L4` vitest → `HL1–HL3` e2e → 臂台） | `tmp/h7-readings/h8.log` | `L_RC=0`、`HL_RC=0`、`RIG_RC=0` 且臂台打印 `存活 0` / `BACK_TO_CLEAN=true`，三臂红集 = `L3+HL1` / `HL2` / `L4+HL2` |
+| 热力区回归（`detail-pane-habit` / `habit-month-stats` / `habit-counted-amount`） | `tmp/h7-readings/h8-regress.log` | 全绿；任何一条红都要先确认不是 §3 那 11 分钟脏产物留下的 |
+
+⚠️ 三条共同的前置：**别在他们那次 `pnpm check` 跑完之前重打 `packages/*/dist` 或 `apps/web/dist`**
+（同一枚物理检出，`vite preview` 吃的是同一份产物 —— §3 那种污染窗口的成因在共享检出上会天天复发）。
+`RIG_RC` 那一臂台自己会重打 `@heyta/ui` + `@heyta/web`，所以它必须排在 `pnpm check` 之后，
+这条顺序不是仪式。
+
+
+### 7. 06:3x–06:5x 第二段：闸门空出来后取到的读数，与三条当场修掉的自造缺陷
+
+排队那三条腿（§6 那张表）在 06:37 闸门释放后跑完了，读数**逐条与 §6 的期望不同**，
+因为其中两条腿的成因不在产品里。下面按"取到什么 → 归因 → 处置"写。
+
+| 腿 | 第一次读数 | 归因（现量） | 处置 |
+|---|---|---|---|
+| 全量单测 `pnpm -r --filter '!@heyta/sync-server' test` | 🔴 `@heyta/i18n` 一条红：`web.habits.freq.summary.interval → Every 1 days` | **本批自己造的**（H5 新增的摘要条英文裸写复数），被 catalog 那条 hazard 规则（把每张表 `{占位符}` 填成 1 念一遍）抓住 | ✅ `68bd52a0`：按本仓已有做法补 `…intervalOne`，**分支写在共享层**（`habitFrequencySummaryKey`），两个宿主只多认一个 key；`branched` 那张枚举表加第四项（不是放宽阈值） |
+| H8 的 e2e 腿（HL1–HL3） | 🔴 三条全 `element(s) not found` | **载体**：那一次服务的是**比源码旧的 `apps/web/dist`**（三条腿排在同一把锁后面，但锁只管内存不管谁重打过产物） | ✅ 重打后同一条命令 **3 passed**（`tmp/h7-readings/h8-chain.log` 第 6 段）；链脚本把 build 失败当前置失败，不再让旧产物上的红进台账 |
+| H8 臂台 | 🔴 `BASELINE_BROKEN 干净态没跑成（端口/构建）` | 🔴 **探针自己坏**：`waitPortFree()` 成功路径写 `return;`（undefined），调用方 `if (!waitPortFree()) return null` ⇒ 干净态永远跑不成。第二次单独重跑（端口现量空）照样这条，才把第一次那句"端口被占"的归因否证 | ✅ 改成 `return true`；同一件事写进 [环境陷阱](docs/reference/environment-traps.md) 新增那条（编号现量：`grep -oE '^[0-9]+\. ' docs/reference/environment-traps.md \| sort -n \| tail -1`） |
+| 热力区回归 | 🔴 `detail-pane-habit` H5 那一条红（红在 `openApp`，不在几何判据） | 与上一行同因（旧产物 + 两条腿共用 4371 与同一份 results 目录，`error-context.md` 被互相覆盖） | ✅ 串行后 **12 passed**（同链第 7 段） |
+
+**另外三条不在原计划里、当场查出来当场修的**：
+
+1. 🔴 **`HEAD` 上那四份习惯 spec 根本载不进**（`habit-frequency` / `habit-heatmap-labels` /
+   `habit-month` / `habit-year` 都 `import { selectHabit } from './helpers'`，而 `helpers.ts`
+   那 14 行从没进任何一笔提交）。根因不是粗心，是 **`e2e/` 不在 pnpm 工作区内 ⇒ `pnpm -r typecheck`
+   对它零覆盖**，这个缺陷形状在本仓没有任何一层会拦。→ `cf3eeff5` 补生产者；
+   对账脚本 `scripts/check-e2e-helper-exports.mjs`（`d2a39d03`）把它变成判据，
+   真树首跑 `射程 117 份 / 372 个导入名 / 缺失 0`，`--self-test` 8 臂全过
+   （其中两臂在写第一版时是红的 —— 我把 `import { type Kind }` 的行内 `type` 当成名字，
+   把 `e2e/auth-journey` / `e2e/windows-shell` 的四份合法文件报成缺失）。
+   ⚠️ **它还没接进 `pnpm check`**：`package.json` 正被另一条线改着，而 `check` 链是**同一行 JSON**，
+   hunk 分不开；他们那笔里带着一枚尚未跟踪的脚本，我若把两行一起提交，`HEAD` 的 `pnpm check`
+   会因找不到那个文件而全体红（正是这台装置要拦的形状）。
+   待 `package.json` 干净时补两处：`"check:e2e-helper-exports": "node scripts/check-e2e-helper-exports.mjs"`
+   与链里一次 `pnpm check:e2e-helper-exports`（`check:gate-wiring` 会自己验接线）。
+2. **H8 注释里三个不存在的 px**（"两列 = 36px""一列宽 16px""溢出 20px"）：真值是从
+   `--ht-icon-xs: 0.875rem`(14px) 与 `--ht-space-1: 0.25rem`(4px) 推的 ⇒ 32px / 14px / 18px。
+   结论没变（32 > 最宽标签 ≈26px），但注释里写着三个错数会让下一位把"要不要再加宽"判错。
+   → `2cf845ff` 把三处换成**推导式 + 现量命令**。
+3. **H8 的三张证据图 md5 逐字相同**（三张都是 `heat` 那一块的元素截图）。
+   这次不是 #337 那种"不同状态拍了同一张"—— 三张判据看的是同一块渲染，图也确实一样。
+   但三张同名不同意的图会误导下一位（`labels-in-pane` 里根本没有窗格那条边）。
+   → HL2 改拍**标签那一排**、HL3 改拍**热力区 + 窗格右边界**（先把视口拉到 1600、
+   再证明要拍的那一块整块在视口内，否则 clip 会裁在半截格子上）。
+
+### 8. 07:2x–07:3x 第三段：全量单测里那条红是**我自己造的**，对账探针也坏过一枚
+
+**① `apps/mobile` 那 1 条红 = 本批 X3 判据被自己的修法判红（不是别线的 `TrashScreen`）**
+
+串行全量（`tmp/h7-readings/rtest-raw.log`）里 mobile 报 `1 failed | 813 passed`，红的是
+`tests/habit-month-entry.spec.ts > X3 列头与月份名来自共享层，移动端没再抄一份`。
+报错原文：`没引用共享层那份星期表: expected '…' to match /import\s*\{[^}]*\bWEEKDAY_MESSAGE_…/ui`。
+成因是 `512632ae` 那次修复（把值导入从 `@heyta/ui` 挪到 `@heyta/ui/node`）——
+**X3 把"从哪个模块名拿"和"不许再抄一份"写进了同一条正则**。已按不变量拆开（说明符抓出来比对
+`['@heyta/ui','@heyta/ui/node']`），并补一条反向对照：换成第三条路径必须红。
+读数在 `tmp/h7-readings/mobile-x3-verify.log`（排队中，见下面 ③）。
+📌 这条**不能**记成"测试写错了改测试"：判据的不变量没动，动的是它顺带钉住的载体事实（§7 第 344 条）。
+
+**② §6 那条"有 `test` 脚本的包数 == 打了汇总行的包数"的对账，探针自己坏了**
+
+我写的 `tmp/h7-readings/count-test-coverage.mjs` 把前缀正则写成 `[a-z./-]+`（**类别里没有数字**），
+于是 `packages/i18n` 只匹配到 `packages/i`、整行不认，读数变成 `18 / 19` 并**点名 i18n 是缺口** ——
+而它的汇总行确实在日志里（`od -c` 逐字节看过：无 ANSI、无 `\r`）。
+修完现量：**`19 / 19`，`missing=0`**，脚本同时补了一段阳性对照（逐包把那条汇总行原文打出来，
+打不到就印 `NO_SUMMARY_LINE`）。这条已入 §7 第 345 条。
+
+**③ 三条腿原来各排各的队，现合成一条串行链**（`tmp/h7-readings/serial-3legs.sh`，外层一枚
+`hold-test-lock.sh` 一次占住）：顺序是 两列臂台 → 热力图臂台 → 移动端 X3 验证，
+理由与前一段一样 —— 后一段读的 `packages/*/dist` 必须是前一台臂台 `restore(); rebuild();` 之后的干净产物。
+先前那三枚各自排队的 waiter（pid 34276 / 35605 / 39505，都是本会话 spawn 的）已逐个 `kill` 并复核不在了；
+**没有动别人的锁主 pid 29134**（`回收线/AI 线` 那条 `pnpm exec playwright test` 从 07:1x 起持锁，07:3x 现量仍活着）。
+
+**④ 臂台这一格的两条"按现量补宽"**（都不是把红解释掉，是把没写进期望的现实写进去）：
+- 热力图 HA3：`L4 + HL2` → **`L4 + HL2 + HL3`**（机制写在臂注释里：每列 `span=1` ⇒ 宽度取下界 ⇒ 末列那枚必越过窗格）。
+- 两列 N1：`T2 + T3 + T7` → **`+ I2`**（I2 报的是"点了「早睡」，行首的字形还是原来那一个"）。
+  🔴 **I2 为什么被这一臂打到，我没有定下来** —— 候选解释（关掉容器化后清单回全宽、图标排落点变了）
+  没有取证，臂注释里写成"候选解释、要补的那一格是打印 `早睡` 那格的 boundingBox 与点击后的 `aria-pressed`"。
+  红按现实留着，机制不许当真。
+
+**⑤ 推送通道复探（07:3x，逐条带直接退出码，不再走管道）**：
+HTTPS `git ls-remote …` **rc=128**（`LibreSSL SSL_connect: SSL_ERROR_SYSCALL`）；
+SSH `-T git@github.com` → `Connection closed by 198.18.0.245 port 22`（fake-ip 段）；
+`gh auth status` → keyring token invalid；本机 `:7890` 无监听。
+落地资格（瞬时属性，照之前先重量）：`git merge-base --is-ancestor origin/main HEAD` = **FF_OK**，
+`git rev-list --count origin/main..HEAD` = **18**。⇒ 通道一恢复，`git push origin main` 一条命令收平，
+**不带 `--force`**；动网络环境仍是明令禁止。
+
+### 9. 🔴 ~~`habit-icon-picker.spec.ts` 的 I2 / I4 是**抖的**~~ ⇒ **08:5x 现量否证：不是抖动，是 1/8 概率的前提失败**，根因与修法见 §14
+
+现量（两趟整台跑 + 一趟配对实验，全部 `tmp/h7-readings/`）：
+
+| 趟 | 命令形状 | 读数 |
+|---|---|---|
+| 06:5x 串行链 | 臂台，一次跑三份 spec，逐臂重打包 | N1 报 `T2,T3,T7,`**`I2`**（`点了「早睡」，行首的字形还是原来那一个`） |
+| 07:3x 整台重跑 | 同上，同一台装置 | N1 报 `T2,T3,T7`（**I2 没红**）；N2 与 N3 各多报一条 `I4`（`再点同一个字形没有退回派生`）；**复原后产物摘要与基线逐字相同**的那次复跑又红 1 条 |
+| 07:3x 配对实验 | 干净产物：一次跑三份 ×2 遍；只跑图标那份 ×2 遍 | `20 passed` ×2、`6 passed` ×2（一条都不红） |
+
+⇒ 结论有两条，都带读数：
+1. **红不归任何一臂**（这一条仍然成立，而且是这次改判唯一没被否证的部分）。字节相同的产物在不同时刻给出不同结果。
+2. ~~**"命令形状"不是成因**……抖的是那两条用例本身；它们只在臂台这种"连续重打 5 次包 + 同机还有别的负载"的窗口里现形~~
+   🔴 **08:5x 全部否证**（§14）：负载与"抖"无关。那两条是**固定 1/8 概率**的前提失败，
+   在臂台里现形只是因为臂台一趟给了 5 次机会、而我那趟配对实验只给了 4 次 ——
+   **"多跑两遍不复现"根本不是"随机/负载"的证据**，这是我这一格真正的 methods 错误。
+
+🔴 **我差点做的事被现量否证了**：06:5x 之后我把 `I2` 按"现量"补进了 N1 的期望红集，
+理由写的是"这一臂真的让 I2 红了"。07:3x 那一趟直接否证了它 —— **把抖动写进期望，
+等于把这条臂的"恰好等于点名那几条"永久废掉**：下一次真漂移（比如 I2 再也不红）会被同一句
+"这是这一臂的连带后果"消化掉。已撤回（`expectTitles: ['T2','T3','T7']`），并在臂注释里
+把两趟读数并排放进去，让下一位看得见它被撤回的理由。
+
+**这一格现在开着的两件事**（都不卡本批落地，卡的是"臂台能不能被读成有牙"）：
+- ① ✅ **08:5x 闭**（不是按这里原来写的候选做法闭的）：这里当时给的候选是"把回读从 UI 竞态改成
+  事实回读（回读那条 op 的 `glyph` 字段）+ 用 `--repeat-each=8` 自证"。前者修的是**时刻**，
+  而真因是**前提**（点的那一格恰好等于派生默认），照它做会把一条好判据换成另一条同样 1/8 的判据；
+  后者（用重复次数证明它会随机红）确实做了，但它证明的是"会红"，不是"为什么红"。
+  实际修法、三组读数与"修完还要再打一次牙"的那一臂在 **§14**。
+- ② 在这之前，`mutate-habits-two-column` 的期望红集里**一条 `I*` 都不许出现**；
+  图标那一族的"有牙"由它自己的臂台 `mutate-habit-icon-picker`（5/5，已在计划 §6 记过读数）负责，
+  不由这台两列臂台兼职证明。
+
+⚠️ ~~另一条**还没闭**：N5（频次那一排撑宽）连四版都打空。~~ ⇒ **§10 已闭**（真因是 `Q6` 只量右边界，
+修的是判据不是臂），§13 那趟整台 5/5 就是它的读数；下面这段留着是因为它记录了"四版打空"的排查路径：第四版改成 `padding-inline: var(--ht-space-16)`
+并把宽度**算出来**（单枚 ≈140px、整排 ≈1004px，而 N1 那臂实测容器宽只有 816px）⇒
+按算术它必然越界；重跑读数在 `tmp/h7-readings/h1-rig-serial3.log`（07:4x 起跑，臂台自己占锁）。
+如果第四版仍然打空，那要判的就不是"臂不够坏"，而是 **Q6 那条几何判据量错了元素** —— 这一格
+不许提前写成结论。
+
+### 10. 🔴 N5 连打空四版的真因找到了：`Q6` 只量右边界，而那份坏把整排**向左**挤出了窗格
+
+这一格从"臂不够坏"翻成了"**判据有洞**"，靠的是只读插桩而不是继续调强臂
+（`tmp/h7-readings/n5-dump2.log`，逐枚 `getComputedStyle` + 盒宽 + 祖先链）：
+
+| 读数 | 干净态 | N5 变异态（`nowrap` + 每枚 `padding-inline: space-16`） |
+|---|---|---|
+| 星期 chip 的 padding-inline | 8px / 8px | **64px / 64px**（臂确实落到了渲染上） |
+| 单枚宽 / 整排宽 | 44px / 163px（wrap 成几行） | **142px / 1018px**（nowrap） |
+| 同一枚 chip 的 `x` | **983**（详情窗格 945..1264 之内） | **≈128**，整排最右 **1146** |
+| `Q6` 的三条断言 | 全绿 | **仍然全绿**：1146 ≤ 窗格右 1264、1146 ≤ 视口 1280、128 ≥ 视口左 0 |
+
+⇒ 1018px 的一排放不进 319px 的窗格时，浏览器把它**向左**挤出了容器；只量右边界 + `x>=0`
+的组合对这种形状**完全无感**。修的是判据不是阈值：用例名字写的是"都在**窗格内**"，
+于是左边界也必须对着 `pane.x` 量（`e2e/tests/habit-frequency.spec.ts` 的 Q6，带这张表的注记）。
+四版臂体的算术逐版都记在臂注释里（①空轨道 ②只 nowrap ③space-4 ④space-16），
+§7 第 347 条把"打空"的四类成因收成了索引。
+
+🔴 **本会话自己的一处失误，如实登记**：为了取上面这组读数我写了插桩脚本，
+第一版收尾的 `restore()` 用的是**仓库根相对路径**，而那时 `cwd` 已经在 `e2e/`
+⇒ `cp` 静默失败，`habits.css` 带着臂体 CSS、`habit-frequency.spec.ts` 带着临时用例
+在**共享检出**里躺了约两分钟（脚本自己打的 `CSS_RESTORED=NO / SPEC_RESTORED=NO` 是唯一诚实的信号）。
+已当场用绝对路径按 `.bak` 复原，并以 `git diff --stat` 复核两份文件与 HEAD **逐字相同**、
+重打了 `apps/web` 的干净产物（`TEMP-N5-DUMP2` 在 `dist/assets/*.css` 里命中 **0** 次）。
+规矩写进 §7 第 348 条。
+
+**这一格现在只剩**：带修好的 Q6 重跑整台 `mutate-habits-two-column`
+（`tmp/h7-readings/h1-rig-serial4.log`，07:52 起排队在别人的 `chain-full-with-lock.sh`（pid 34361）之后）。
+期望：基线（干净态）`Q6` 仍然绿 —— 这条是新加左边界唯一的**假红风险**点，红了就说明
+左边界阈值取错了而不是判据有牙；N5 ⇒ `Q6` 一条红；N1/N2/N3/N4 逐臂红集不变
+（07:4x 那趟已逐臂读到 `T2,T3,T7` / `T2,T3,T7` / `T5` / `I6`，且**复原复跑 `passed=20 failed=0`**
+—— 比 07:3x 那趟多出来的那条 `I4` 没有复现，进一步支持 §9 的"抖动"判断）。
+
+### 11. §7 第 347 条那个"只量右边界"的洞在同族又找到一处，另一处**现量判它不存在**
+
+补齐时逐条对着用例**自己那句话**判，不批量加断言：
+
+| 用例 | 它声称的是 | 原来量了 | 处置 |
+|---|---|---|---|
+| `Q6`（频次） | "展开的每一格都在视口内、**都在窗格内**" | 视口右 / 视口左 `x>=0` / 窗格**右** | 已补窗格**左**（§10） |
+| `I6`（图标） | "都在视口内" + 注释里明写"**还要落在窗格里**：这一排属于那条习惯，不该飘到别的栏去" | 同样只对窗格右 | 已补窗格左（同一形状，`pane.x - 1`） |
+| `HL3`（热力图月份标签） | 标题逐字写的是"没有一枚标签溢出**窗格右边界**" | 窗格右 | **不动**。这一族的左边界由 `HL2` 管（"左边缘贴着它标注的那一周"），所以 #347 那个洞在这一族**不存在** —— 记下来是为了挡"顺手也加一条" |
+| `T5`（卡内三枚数字） | "不被裁切 + 最右那枚**贴着**卡片右边界（阈值 = 内边距）" | 卡片右 + 宽度 > 0 + 贴边 slack | **不动**。它没承诺"都在卡内"，加左边界是替它新立一条口径 |
+
+同批还落了一条**载体**级的事（独立于臂台，已提交 `d0ceb6e7`）：习惯这一族 9 份 e2e 用例
+进了 `e2e/tsconfig.detail-pane.json` 的 `include`，也就是 §7 第 339 条那条"`pnpm -r typecheck`
+对 `e2e/` 零覆盖"的缺口的现有载体。加之前逐字跑过（9 份 = 0 条类型错误），加之后整条命令
+`rc=0`，并用 `--listFiles` 证明这 9 份真在射程里（命中 9）；**没有**改成目录通配 ——
+那会带进别的线在飞的 13 条红，把这道检查变成天生红的。
+
+### 12. B90 那 9 枚 `check:ai-e2e` 的红**不是本批造成的**（一条命令可复核）
+
+`git diff --name-only 35ce7ce9..HEAD | grep -iE 'detail|slot'` → 只有两枚：
+`apps/mobile/src/ui/habit-frequency-slot.tsx`（移动端频次那一排，H5 的消费者）与
+`e2e/tsconfig.detail-pane.json`（类型检查载体，`d0ceb6e7`）。
+本批十笔提交**没有一笔**碰过 `apps/web` 的详情面槽位/三元链 —— 也就是 B90 点名的那处根因
+（详情面 §8.138 那支三元链把 AI 面挤掉）不在本批的落点里。
+⚠️ 这条只回答"谁造成的"，不回答"现在红不红"：整条 `pnpm check` 那一格仍按 §6 DoD 记为
+**不在本单手里**，本批也没有替它取过任何读数。
+
+### 13. ✅ §10 那一格闭了：整台 `mutate-habits-two-column` 报 **5/5**（08:1x–08:28）
+
+链：别人的 `chain-full-with-lock.sh`（pid 34361，持锁 27+ 分钟）放锁后，我这台**排队中的** waiter
+（pid 85521，`hold-test-lock.sh`，预算 10800s）取到锁并开跑 —— 排队不是抢闸，它一直在等。
+日志 `tmp/h7-readings/h1-rig-serial5.log`：
+
+```
+基线：jsdom=Tests 23 passed (23)｜e2e=passed=20 failed=0｜dist=30ee4872b95cd2c7
+N1 → T2,T3,T7    N2 → T2,T3,T7    N3 → T5    N4 → I6    N5 → Q6
+复原：BACK_TO_CLEAN=true 复跑 jsdom=Tests 23 passed (23)｜e2e=passed=20 failed=0
+RIG_RESULT=5/5
+INNER_RC=0
+```
+
+三条读数各自挡住一种假话：
+1. **基线 20 passed / 0 failed** —— 新补的窗格**左**边界在干净态不假红（这是它唯一的假红风险点，
+   所以它是收口判据的第一格，不是附注）。
+2. **N5 第一次打到东西**（`Q6` 一条红）—— §10 那张表把原因钉在判据的方向上，不在"臂不够坏"上；
+   修的是判据之后臂才咬住，臂体 CSS 一个字没改（`padding-inline: var(--ht-space-16)` + `nowrap`）。
+3. **这一趟 I2/I4 一条都没红** —— ~~与 §9 的判断一致：那两条是抖动，不是任何一臂的后果。~~
+   🔴 08:5x 改判：它们**不是任何一臂的后果**这一半仍然成立，"抖动"那一半被否证 ——
+   是 1/8 概率的前提失败（§14）。这一趟没红只说明这 5 次抽到的 id 都不撞，不说明判据可靠。
+   它们不在任何期望红集里，所以"5/5"里没有靠运气凑上的格子。
+
+**未闭的仍然写着**：~~§9 的 ① 那条（`I2`/`I4` 抖动的根因与修法）还开着 —— 这台臂台现在能全红，
+不等于那两条用例可靠。~~ ⇒ **08:5x 闭**：根因是判据自己造的（写死一格 vs 派生默认随机），
+修法与三组读数在 §14；这台臂台在判据改掉之后重跑了一遍，读数记在 §16。
+
+### 14. ✅ `I2` / `I4` 的"抖动"真身：判据**写死了要点哪一格**，而那一格的形状有 1/8 概率恰好等于当前的派生默认
+
+**一句话**：不是负载、不是时序、不是"用例抖"，是**前提没建立起来** —— 而这条前提的失败概率
+是常数 `1/8`，所以它在日志里长得跟抖动一模一样。
+
+机制（逐字可复核）：没设过图标的习惯画 `deriveHabitIcon(habit.id)` =
+FNV-1a(id) `% HABIT_ICONS.length`（`packages/domain/src/habit-icons.ts`），而 e2e 每条习惯的
+id 每次运行都是新随机的 ⇒ **行首那个字形在八个里均匀随机**。旧用例写死"点「早睡」那一格"
+（`moon`），于是 1/8 的运行里"点了 → 行首换了"这件事**在数学上不可能发生**：
+产品完全正确、界面也确实没变，而判据红。
+
+现量（三组，全在 `tmp/h7-readings/`）：
+
+| 组 | 命令形状 | 读数 | 它证明什么 |
+|---|---|---|---|
+| 猎捕 | 只跑图标那份，`--repeat-each=5 --workers=6`，用例里临时打印 `before`/`after`/`changed` | **3 failed / 27 passed**，决定性那一行是 `before=path:M20.985 12.486a9 9 0 1 1-9.473-9.472c… after=`**逐字相同**` changed=false` | 红的那几次，"点之前行首就已经是被点那一格"。`M20.985…` 实测在 `packages/ui/node_modules/lucide/dist/esm/icons/moon.mjs` 里 ⇒ 它就是「早睡」那一格（不是"另一个字形画错了"） |
+| 修后复跑 | **同一条命令形状**，`--repeat-each=10 --workers=6`（30→60 次，把复现它的并发条件原样留着） | `60 passed`、`INNER_RC=0` | 08:5x 实测不再红。但**这一组不算证明**（见下面第二条一般规律），证明在第三组 |
+| 摘写入臂 | 把 `apps/web/src/features/habits/store.ts` 的 `setHabitIcon` 那次 `await habitActions.setHabitIcon(...)` + `refresh()` 换成 `void` （坏产物重打包 → 跑 → 复原 → 干净产物重打包 → 复跑） | `ARM_FAILED=I2,I3,I4,I5`（`4 failed / 2 passed`，绿的恰是 `I1`/`I6` 那两条与写入无关的）；`RESTORE_MD5_OK=YES`、`GIT_DIFF_EMPTY=YES`、`BUILD_CLEAN_RC=0`、`CLEAN_RC=0`（`6 passed`） | 🔴 **新判据有牙**：改成"必须等于点下去那一格"之后，把写入摘掉仍会红 4 条。上一组只是"没再抽中 1/8"，这一组才是"坏界面上它一定红" |
+
+**改了什么**（`e2e/tests/habit-icon-picker.spec.ts`，一份新装置 + 四条用例跟着改）：
+1. 新增 `otherGlyphOption(page, currentShape)`：**点之前**从每一格自己取形状，返回第一格
+   与当前行首不同的 `{ index, label, shape }`；八格全同则**抛错**（不静默退化）。
+   「默认」那一格没有 `<svg>` ⇒ 用 `count()` 明确跳过 —— 不跳的话 `.locator('svg').first()`
+   会**静默等满超时**，报出来是一条与判据无关的 timeout（我第一版就踩在这上面）。
+2. `I2` 从 `poll(() => rowGlyph !== before)` 改成 `poll(() => rowGlyph === pick.shape)`：
+   前者在"点月亮画出水杯"时也绿，后者不会。**这次改动是收紧，不是放宽** —— 值得单独说一句，
+   因为"抖动的判据"最常见的错误修法就是把它改松。
+3. `I3`/`I4`/`I5` 的基准统一取 `pick.shape`，删掉三处重复的"再读一次那一格"。
+   原来那两处 `expect(want).not.toBe(derived)` 一类的"前提断言"也删了：它们与
+   辅助函数的判据逐字重复，是**一条永远通过的判据**（元规则 2），留着只会让人以为前提是被证的。
+
+**两条一般规律**（都进 §7 第 349 条）：
+- 判据里"点哪一格"若是**写死**的，而界面上那一格的存在/形状取决于一条**按 id 派生的随机值**，
+  那这条用例的通过率就是一个可以算出来的常数（这里 `1/8`），不是"偶发"。
+  **能算出概率的红，就不该被记成抖动。**
+- 修完之后"重复跑 60 次全绿"**不构成证明**：它只证明我这 60 次没抽中。判据是否可靠只能问
+  "把产品弄坏它红不红"（第三组）。这一条与本台账 §9 里我原来提的候选做法（"用重复次数自证"）
+  是同一件事的反面 —— 我当时打算用重复次数**代替**变异，那是错的。
+
+⚠️ 顺带一条与 #163 同族但**限定不同**的现量：那一条说"数失败用例必须先 `NO_COLOR=1`"。
+这次 `NO_COLOR=1` 确实传给了 playwright，而 node 仍打印
+`The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set`（`FORCE_COLOR` 由 pnpm 注入子进程）。
+**这一趟日志实测 0 个 ESC 字节，所以红集没读错 —— 但那是运气（版本行为），不是环境变量的功劳。**
+⇒ 数红集之前 `LC_ALL=C grep -c $'\x1b' <log>` 量一次，别从"我设了 NO_COLOR"推。
+
+**这一格闭了**：`I2`/`I4` 不再是开着的格子。臂台在判据改掉之后的重跑读数记在 §16（串行，正在排队）。
+
+### 15. 🔴 不是我这条线的，但挡在我的 push 前面：`HEAD:package.json` 是**坏 JSON**，干净检出上 `pnpm` 一条命令都跑不了
+
+现量（只读，`08:5x`）：
+
+| 问的法子 | 读数 |
+|---|---|
+| `git show HEAD:package.json \| python3 -c 'json.load(sys.stdin)'` | `BROKEN Extra data: line 190 column 5 (char 15513)` |
+| `git show 4b31fde5 -- package.json` 的尾巴 | 那一笔在 `}` **之后**追加了一行 `    "check:adr-numbering": "node scripts/check-adr-numbering.mjs",` |
+| 临时目录里放一份 `HEAD:package.json` 再 `pnpm pkg list --depth -1` | **`PNPM_ON_HEAD_RC=1`**（不是"警告后继续"，是解析失败） |
+| `git merge-base --is-ancestor 4b31fde5 HEAD` | YES ⇒ 坏的那一笔在**我要推的这段历史里**（本地 `main` 领先 `origin/main` 23 笔、落后 0） |
+| `git check-ignore`/工作树 | 工作树那份**是好的**（`WT_JSON=OK`）：他们正在改 `check` 链，修好的那一版还没提交 |
+
+那一笔的提交信息里写着"check:gate-wiring / check:adr-numbering / check:docs 三条读数均为 rc 0"——
+**三句都对，只是都对着一份工作树里已经正确的 `package.json` 取的**；而且它新加的
+`scripts/check-adr-numbering.mjs` 本身已入库，所以 `pnpm check:adr-numbering` 在 HEAD 上
+连"跑并报错"都做不到（清单解析失败）。这与 §7 第 88 条是同一个形状的第二次：
+**提交出去的是半个文件，而所有门禁都对着工作树取读数 ⇒ 没有任何一层会为此变红。**
+
+**我不动它**（一条线一个所有者：文件是他们的、修法是他们 WT 里已经写好的那一版，
+我提交等于把他们的 `check` 链与 `check:backup-retention`（脚本还没入库）一起带走）。
+
+⇒ **给自己加的一条硬前置**：push 之前先 `git show <待推 tip>:package.json | python3 -c 'json.load(sys.stdin)'`，
+非 0 就不推。这一格现在有两种闭法，都不需要我碰他们的文件：
+① 他们把自己那笔提交掉（WT 已经是对的）；② 由用户拍"能不能只删那一行垃圾"（那是一子可删、
+运行时形状逐字不变、`git revert` 一步可回退 —— 按代改三条其实够格，但 `check` 链正在被别人改，
+我提交会与他们的 WT 撞同一枚文件）。**在用户醒着之前按 ① 等。**
+
+### 16. ✅ 判据改掉之后，整台 `mutate-habits-two-column` 重跑仍是 **5/5**（09:33–09:36；中间它在**基线**红过一次）
+
+| 格 | 读数 |
+|---|---|
+| 基线（干净产物） | jsdom `Tests 23 passed (23)` ｜ e2e **`passed=20 failed=0`** ｜ dist 摘要 `30ee4872b95cd2c7` |
+| 逐臂红集（每臂都"恰好等于点名那几条"） | N1 = `T2,T3,T7` ｜ N2 = `T2,T3,T7` ｜ N3 = `T5` ｜ N4 = `I6` ｜ N5 = `Q6` |
+| 复原 | `BACK_TO_CLEAN=true`，复跑仍 jsdom 23 / e2e `20 passed 0 failed` |
+| 结论 | `RIG_RESULT=5/5`、`INNER_RC=0`（`tmp/h7-readings/h1-rig-serial7.log`） |
+
+🔴 **这一格必须先讲一件红，否则"5/5"会被读成"一直就好"**：09:2x 我第一次重跑这台臂台时，
+它在**基线**就停了 —— `PROBE_BROKEN 干净态 e2e 层不干净：passed=19 failed=1`，红的是 `Q6`，
+报的是 `展开的格数不是 3 档 + 7 天`（`Received length: 3`）。
+⚠️ **这条红不是 §14 那次改动带出来的**：08:1x 那趟同一命令形状是 `20 passed / 0 failed`（§13），
+说明它一直在，只是**取决于当次重渲染的快慢**才露不露 —— 这类"有时红"最省事的读法就是"环境抖"，
+而它这次的真因照样是判据自己没等（下面那张表）。
+
+| 跑法 | 读数 | 排除掉什么 |
+|---|---|---|
+| `Q6` 单跑 | 绿 | —— |
+| `Q5\|Q6` | 绿 | 不是"Q5 写了状态" |
+| 整份 `habit-frequency`（Q1–Q7） | **红**，`Received length: 3` | 泄漏来自 Q1–Q4 里的某条 |
+| `Q3\|Q6`、`Q4\|Q6` | **红** | 定位到"前面有活干过"这一类，而不是某一条的具体数据 |
+| 同上下文里把 Q3 的步骤 + Q6 的步骤串成一条用例（一次性探针 `q6-leak-probe.tmp.spec.ts`，跑完已删） | 绿，且打印出 `buttonsAfter` 恰好 10 枚 | ⇒ **不是产品状态串味，是"读早了"**：切档之后星期那一排是**异步重渲染**才出现的，前面习惯越多、重渲染越慢，`toHaveLength(10)` 就抓到中间态（只有三档那 3 枚） |
+
+✅ 修法与 §14 同一条立场（**把前提等出来，而不是把断言放宽**）：`Q6` 在点完「每周挑几天」之后先
+`expectSummary(/每周/)`（轮询）再 `toHaveCount(7)`（星期那一排按 `habit-freq-day-*` 点名数），
+然后才量几何。改完整份 spec `7 passed`、三份连跑 `20 passed / 0 failed`，臂台才有上面那五行。
+🔴 **顺带说清这条判据原来错在哪一层**：`toHaveLength(10)` 是后面那个 for 循环的**前提**，
+前提没建立时它把"还没渲染"报成"布局坏了" —— 一条判据的失败信息说错了话，比没有信息更糟
+（§7 元规则 1）。这一条进 §7 第 351 条。
+
+⚠️ 边界：这次只重跑了这台（改了 e2e 判据的那台）。`mutate-habit-heatmap-labels` 与
+`mutate-habit-icon-picker` 打的都是**改动的字节之外**的产物（前者是热力图模型/组件，后者是移动端
+`apps/mobile` 的 vitest 判据），本次没动它们的落点，所以沿用各自已记的读数（5/5、5/5），
+**不在这格冒充重跑过**。
+
+### 17. 两格**登记、不当场动**的：一道门禁没有自动消费者，以及台账里一枚撞了的号
+
+**① `check:e2e-helper-exports` 至今没有消费者**（`scripts/check-e2e-helper-exports.mjs` 已入库，
+`package.json` 里**没有** `check:e2e-helper-exports` 这一条，`check` 链里也没有）。
+它现在能报 `射程 117 份文件 / 对账 372 个导入名 / 缺失 0 个`（09:2x 现量，rc=0），
+但**没人跑它 = 一条不会红的判据**（元规则 2）。
+
+🔴 **为什么不当场补**：接线要改 `package.json`，而那枚文件正被别人写着（§15），
+且 `check` 链那一行是他们本轮的改动点。等他们落一笔之后再加，成本是一行，撞车成本是一次冲突。
+
+⚠️ **顺带查出一个更大的形状**（这条不是我这批的，但它是我这次普查照出来的）：
+`check:gate-wiring` 的分母是**"`package.json` 里定义了几道"**（现量：`门禁定义 94 道 ｜ 链里被引用 95 段`），
+所以"磁盘上有一枚 `check-*.mjs`，但 `package.json` 里根本没定义它"这种情况**它结构上看不见** ——
+不是它漏了，是它的射程不覆盖这一类。现量（同一台机器、同一刻）：
+磁盘上 `scripts/check-*` + `research/tools/check-*` 共 **73** 枚，其中 **5** 枚在 `package.json` 里零引用：
+
+```
+research/tools/check-evidence-pins.mjs      scripts/check-module-boundaries.mjs
+scripts/check-e2e-helper-exports.mjs        scripts/check-ratchet-ceilings.mjs
+research/tools/check-segments.mjs
+```
+
+⇒ 把"磁盘上的 check 脚本必须被某条 `package.json` 命令引用"补进 `check:gate-wiring` 是**对的修法**，
+但**当场做会让别人的三道未接线门禁立刻红**（那 4 枚不是我的，落点与理由我也不清楚）。
+所以这条留给用户拍：**要么一起拍"给四枚各自的所有者开单、门禁先红着"，要么拍"允许表逐条登记"**。
+我不代拍，也不替他们把没接的线接上。
+
+**② `docs/reference/environment-traps.md` 里 `342.` 有两枚**（09:4x 现量：
+`grep -n '^342\. '` = 第 7947 行"多臂自检只假化了被测命令…"与第 7980 行"移动端 lib 从共享包 barrel 取值…"）。
+两枚都是**未提交的工作树内容**，来自两条并行线各自从 341 往后取的号。
+后果不是难看，是**引用会歧义**：我在 `#344` 里写的"#342 的那一趟"这种指法，
+下一位按裸号去读会读到两条中的一条，而两条讲的是不同的坏。
+
+⇒ **不代改**（重编号会动到别人条目正文与别人文档里的引用）。要闭这一格，需要的是一次
+"谁认领哪一枚号"的当面对齐 —— 与 AGENTS §9 里 2026-10-05 那次"两条会话同一天各占 0053"是同一类事，
+而那次的修法（`check:adr-numbering`）之所以存在，就是因为这种撞号**git 不会报**：
+文件名/行内容各自独立，合并时不冲突，只有读的人会被骗。
