@@ -6570,6 +6570,9 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
    五屏常驻，`mockup-fidelity` 里那条「四个视图都常驻今天进度卡 + 捕获输入框」**今天仍是绿的**。
    ⇒ 同一族的第二个实例：判据要求过时形状。**没有当场删**，因为这是对外素材的视觉主体，
    删掉之后展厅那一屏会少一张卡 —— 登记成任务 #24，两条出路（跟着删 / 给展厅补一个成长屏）留给拍板。
+   ✅ **10-06 19:0x 已闭合（#24 落地）**：选了"跟着删"。而且改的不是那张卡，是**钉住它的判据** ——
+   `mockup-fidelity` 那条现在从 `App.tsx` 读方向（产品哪天把卡放回做事视图，它会反过来要求展厅跟上）。
+   读数、四臂台架与两张人看过的图在 `docs/plans/goal-layout-audit.md` §9.12。
 2. 🔴 **`mockup-quadrant-shape.spec.tsx` 那 1 条红是象限线在飞的 W5 造成的，不是本单。**
    现量：工作树 `apps/web/src/features/quadrant/copy.ts` 里 `empty` 改成了带 `firstEmpty` 参数的函数、
    `footnote` 整条移走（"W5 起底部规则说明由 web 宿主收进 `<details>`"），而 HEAD 版还是
@@ -6582,3 +6585,20 @@ e2e 类型载体 RC=0；臂台四臂 `A→D1`、`B→D3,D6`、`C→D4`、`D→D5
    "不许再出现"的取样来源 ⇒ 记在这里等拍板，不顺手删。
 4. **展厅复刻没有真浏览器载体**：`apps/landing/tests/` 是 jsdom，本单那 5 屏的图是一次性脚本
    （`/tmp/landing-shot.cjs`）拍的，跑完即失。⇒ 与任务 #17 同族（"没有载体的目录 = 静默面"，#361）。
+
+## B100（2026-10-06 19:1x，本会话）：收尾块只剩的五格，逐格写"等谁 / 一条现量命令 / 为什么不当场做"
+
+前提：H1–H7 与同批的 H8/H9/H10、#23/#24 都已落地并提交。这一节**只登记受阻面**，
+按用户指令"所有阻塞事件放到最后一块处理"，逐格都不当场绕开。
+
+| # | 格 | 等谁 | 现量命令 | 为什么不当场做 |
+|---|---|---|---|---|
+| 1 | 固定收尾的 **iOS 腿**没有读数（三端有） | 设备独占：`verify-mobile-ai.sh`（pid 82407，在 `heyta-wt-merge` 里）；外加 github 443 断流（`pod install` 要 clone `facebook/hermes`） | `pgrep -f verify-mobile-ai` 为空 ⇒ 起跑 `bash ~/.heyta-window-rigs/heyta-reinstall-1006-ios-retry.sh`（两道规范闸门在脚本里，最多 40 轮） | 抢设备会把别线验收的读数打成假的（§8.9 共享资源独占验收）；本机网络环境按硬约束不动 |
+| 2 | 本会话那 4 枚提交未推（`295ce9f1` / `940f93bc` / `90232ce0` / `8072da64`） | github 443 连接超时（同一断流 episode） | `git rev-list --count origin/main..HEAD`（写这行时 = 41，其中 37 枚是别线落在同一条 main 上的）；`tail -3 /tmp/push-loop.txt` | `behind=0` ⇒ 这一推是快进、不改写任何已公开历史；不 force。别线那 37 枚被一起公开后就不能再 amend，这一点与 10-04 那次是同一个代价，写在 §9 的老账里 |
+| 3 | 任务 #17：`check:e2e-helper-exports` 写了却没接进链 | `package.json` 的 `check` 那一行正被别线重写 | `git status --porcelain -- package.json` 为空 ⇒ 才动那一行 | 改那一行 = 覆盖别人在飞的定义。盲区机制与改法建议已登记在 `docs/plans/goal-layout-audit.md` §9.11（"既无定义又不在链上的实现文件"落在 `check:gate-wiring` 两条判据之外） |
+| 4 | 工单 H11 / 任务 #25：外壳不滚（桌面那一半） | `apps/web/src/styles/narrow.css` 的所有者提交 + 一台安静的载体 | `git status --porcelain -- apps/web/src/styles/narrow.css`；`bash research/tools/b-reinstall-readiness.sh` | 三个起跑条件里 ②③ 仍不成立（§9.11 逐条重量过，① 已翻面成立） |
+| 5 | `landing test` 那 1 枚红 + `pnpm check` 整链的 9 枚 e2e 红 | 象限线那枚未提交的 `quadrant/copy.ts`；回收线自己（B90） | `pnpm --filter @heyta/landing test`（取末尾 `failed` 那行） | 判据口径不代改：两组红的根因都在别人那枚未提交改动里，三条腿归因在 §9.12 与 B90 |
+
+📌 五格里只有第 1 格是"我这一刀本来能带走、被环境挡住"的：iOS 腿即使补跑绿了，也只是把
+§6.1.1 那张表最后一行填上，三端已有的读数与四张人看过的图不因它失效。
+第 2 格是纯网络，第 3/4/5 格的所有权都不在本会话 —— 所以这一节是**交棒清单**，不是待办池。
