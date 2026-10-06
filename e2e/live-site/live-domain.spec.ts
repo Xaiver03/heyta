@@ -559,3 +559,72 @@ test('自托管文案：线上不许再印那句已被现量否证的话', async
   const hard = hardErrors(logs);
   expect(hard, `线上文档页抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
 });
+
+/**
+ * G-62：线上那篇自建指南必须**读得到**"起完打开 `/app/` 就能用"，
+ * 也要读得到同域那一档的排查顺序 —— 中英两份各判一次。
+ *
+ * 离线侧那三条 needle 由 `apps/landing/tests/public-copy-register.spec.tsx` 判，
+ * 四枚变异臂各自打红过一次；**这一条判的是"发出去的那一份"**：词条改了 ≠ 页面改了，
+ * §8.255 那五枚红就是这一族（改完不重发，线上印的还是能力变之前那个世界）。
+ *
+ * 🔴 needle 与离线那份**同源同值**（三段正文各自独有的片段），因为这一格要防的正是
+ * "只发了半份文案"；阳性对照取本节本来就在场的入口命令 override 文件名 ——
+ * 它在待验状态之外（旧版页面也有它），所以页面整块没烘自托管文案时它同样会是 0，
+ * 此时那三条命中数不构成证据。
+ */
+test('自建指南（线上）：正文要读得到 /app/、同域那一档的排查段与 CORS 的分叉限定', async ({
+  page,
+}) => {
+  const logs = attachLogs(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  const CONTROL = 'docker-compose.migrate-once.yml';
+  const cases = [
+    {
+      path: '/docs/selfhost/',
+      shot: 'live-selfhost-app-path-zh.png',
+      needles: ['https://你的域名/app/', 'https://你的域名/health', '先分清是哪一档'],
+    },
+    {
+      path: '/en/docs/selfhost/',
+      shot: 'live-selfhost-app-path-en.png',
+      needles: [
+        'https://your-domain/app/',
+        'https://your-domain/health',
+        'First work out which setup you are in',
+      ],
+    },
+  ];
+
+  for (const c of cases) {
+    await page.goto(`${ORIGIN}${c.path}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('h1').first().waitFor({ state: 'visible', timeout: 30_000 });
+    // 规定一：先截图，再断言（失败时也要有图）。
+    await page.screenshot({ path: `${SHOT_DIR}/${c.shot}` });
+    console.log(`📷 线上自建指南（${c.path}）：${SHOT_DIR}/${c.shot}`);
+
+    const bodyText = await page.locator('body').innerText();
+    const count = (needle: string) => bodyText.split(needle).length - 1;
+    console.log(
+      `${c.path} 正文：${c.needles.map((n) => `${n} → ${String(count(n))}`).join('  |  ')}` +
+        `  ||  对照 ${CONTROL} → ${String(count(CONTROL))}`,
+    );
+    expect(
+      count(CONTROL),
+      `${c.path} 里连入口命令的 override 文件名「${CONTROL}」都没有 ⇒ 页面没渲染完或没烘这一节，` +
+        '下面那三条命中数不算证据',
+    ).toBeGreaterThan(0);
+    for (const needle of c.needles) {
+      expect(
+        count(needle),
+        `线上 ${c.path} 正文读不到「${needle}」。仓库里这一句已在（词条 ` +
+          '`site.docs.selfhost.s7p4` / `s6p3` / `s6p1`），但落地页要**重新发一次**才会变 ——' +
+          '发布命令见 docs/runbooks/deployment.md。',
+      ).toBeGreaterThan(0);
+    }
+  }
+
+  const hard = hardErrors(logs);
+  expect(hard, `线上自建指南页抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+});
