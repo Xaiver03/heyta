@@ -49,6 +49,13 @@ const TASKS = src('screens/TasksScreen.tsx');
 const HABITS = src('screens/HabitsScreen.tsx');
 const NOTES = src('screens/NotesSection.tsx');
 const SEARCH = src('screens/SearchScreen.tsx');
+/**
+ * 助手屏是 2026-10-06 才进这张名册的：它把「提案写进哪一条任务」接进了共享选中
+ * （原先两片面各揣一份 `useState`，被 `check:selection-single-source` 判据 B 点名）。
+ * 🔴 它进来的理由是**"谁在读这一类"变了**，不是"顺手多测一个文件" ——
+ *    上面第 1 条注释立的就是这条枚举规则，漏掉它等于本文件自己违反自己。
+ */
+const AI = src('ai/AssistantScreen.tsx');
 const LIB = src('lib/selection.ts');
 
 describe('1. 回落喂的是活跃全集，不是筛后的那一截', () => {
@@ -64,6 +71,21 @@ describe('1. 回落喂的是活跃全集，不是筛后的那一截', () => {
   it('习惯屏：同一件事，同样来自全集', () => {
     expect(HABITS).toMatch(/const aliveHabits = actions\.listHabits\(\);/);
     expect(HABITS).toMatch(/pruneSelectionAgainst\(\{\s*habit:\s*aliveHabits\.map\(/);
+  });
+
+  /**
+   * 助手屏这一格**特别容易喂错**：它手里那份 `tasks` 是 `listPendingTasks()`
+   * （已经完成的任务被剔掉），而共享层的回落谓词要的是**未删除全集**。
+   * 拿候选集当谓词的后果不是崩溃，是"用户在另一台设备上勾掉那条任务 ⇒ 这边
+   * 正在给它的提案面板凭空关掉，而那条任务只是完成了、没有消失"。
+   */
+  it('助手屏：喂的是 `listTasks()` 全集，不是它那份"待办候选集"', () => {
+    expect(AI).toMatch(/const aliveTasks = actions\.listTasks\(\);/);
+    expect(AI).toMatch(/pruneSelectionAgainst\(\{\s*task:\s*aliveTasks\.map\(/);
+    expect(AI).toMatch(/actions\.listPendingTasks\(\)/);
+    // 🔴 反向（单独成一条的理由见下面便签那条）：候选集不许进谓词。
+    expect(AI).not.toMatch(/pruneSelectionAgainst\(\{\s*task:\s*tasks/);
+    expect(AI).not.toMatch(/pruneSelectionAgainst\(\{\s*task:\s*props\.tasks/);
   });
 
   /**
@@ -126,12 +148,13 @@ describe('1. 回落喂的是活跃全集，不是筛后的那一截', () => {
 });
 
 describe('2. 旧的本地选中态确实删掉了（不是"又加了一份新的"）', () => {
-  it('四屏都不再 `useState` 一个选中 id', () => {
+  it('五屏都不再 `useState` 一个选中 id', () => {
     for (const [name, text] of [
       ['TasksScreen', TASKS],
       ['HabitsScreen', HABITS],
       ['NotesSection', NOTES],
       ['SearchScreen', SEARCH],
+      ['AssistantScreen', AI],
     ] as const) {
       expect(text, `${name} 又长回本地选中态`).not.toMatch(
         // 🔴 `edit(ing)` 分支是 2026-10-03 补的：`editingNoteId`（TasksScreen）与
@@ -143,19 +166,28 @@ describe('2. 旧的本地选中态确实删掉了（不是"又加了一份新的
     expect(TASKS).toContain("from '../lib/selection'");
     expect(HABITS).toContain("from '../lib/selection'");
     expect(NOTES).toContain("from '../lib/selection'");
+    expect(AI).toContain("from '../lib/selection'");
   });
 
   it('选中态只在 `lib/selection.ts` 里实例化一次', () => {
     expect(LIB).toMatch(/export const selection: SelectionStore = createSelectionStore\(\);/);
     expect(TASKS).not.toContain('createSelectionStore');
     expect(HABITS).not.toContain('createSelectionStore');
+    expect(AI).not.toContain('createSelectionStore');
   });
 });
 
 describe('3. 离开这一屏时收起详情层', () => {
-  it('两屏各有一条卸载清理，且清的是自己那一类', () => {
+  it('三屏各有一条卸载清理，且清的是自己那一类', () => {
     expect(TASKS).toMatch(/useEffect\(\s*\(\) => \(\) => \{\s*selection\.select\('task', null\);/);
     expect(HABITS).toMatch(/useEffect\(\s*\(\) => \(\) => \{\s*selection\.select\('habit', null\);/);
+    /**
+     * 🔴 助手屏这一条**不是**"照抄任务屏的做法"，是新读方带来的**反向**后果：
+     * 任务屏的详情浮层 `visible={detailTaskId !== null}` 直接读共享选中，
+     * 而助手屏在它之前写进了同一个 key。少了这条清理，"给 AI 挑一条目标任务 →
+     * 返回 → 切到「任务」标签"就会**凭空弹出**那条任务的详情 —— 用户没点过它。
+     */
+    expect(AI).toMatch(/useEffect\(\s*\(\) => \(\) => \{\s*selection\.select\('task', null\);/);
   });
 
   /**
@@ -173,10 +205,11 @@ describe('3. 离开这一屏时收起详情层', () => {
 });
 
 describe('4. 回落循环只有一份实现（宿主不各写一遍）', () => {
-  it('两屏都不自己调 `pruneMissingSelection`', () => {
+  it('三屏都不自己调 `pruneMissingSelection`', () => {
     // 逐屏写循环 = 新增一类实体时必然漏一处（那是共享层的 `pruneSelection` 存在的理由）。
     expect(TASKS).not.toContain('pruneMissingSelection');
     expect(HABITS).not.toContain('pruneMissingSelection');
+    expect(AI).not.toContain('pruneMissingSelection');
     expect(LIB).toContain('pruneSelection(');
   });
 });
