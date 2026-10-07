@@ -44,6 +44,11 @@ interface NoteState {
    */
   editError?: string;
 
+  /**
+   * 新建。🔴 失败时 **reject**（W8b）：共享 `NotesBoard` 的 `runNoteSubmit`
+   * 靠 reject 判定"没存上"（保草稿 + 亮失败提示），吞成 resolve 就是假 saved。
+   * `error` 字段失败时照旧写（保留既有诊断行为），但**目前没有任何界面读它**。
+   */
   addNote: (content: string) => Promise<void>;
   /**
    * 改正文。**内容没变时动作层不写 op**（`updateNoteContent` 里那条闸门：
@@ -64,8 +69,12 @@ interface NoteState {
    * "永远恢复不了"要分成两句话，界面对后者要说"不可恢复"。
    */
   restoreNote: (entityId: string) => Promise<boolean>;
-  /** 彻底删除（写 `purgedAt` 标记，墓碑保留）。**不可逆**，确认框由界面负责。 */
-  purgeNote: (entityId: string) => Promise<void>;
+  /**
+   * 彻底删除（写 `purgedAt` 标记，墓碑保留）。**不可逆**，确认框由界面负责。
+   *
+   * 返回**有没有真的落成**（`false` = 它早就被彻底删过，这一次没有写 op）。
+   */
+  purgeNote: (entityId: string) => Promise<boolean>;
   /** `pinned` 是**目标值**，不是"切换一下"（与动作层契约一致）。 */
   togglePinned: (entityId: string, pinned: boolean) => Promise<void>;
 }
@@ -93,8 +102,13 @@ export const useNoteStore = create<NoteState>((set) => ({
       set({ error: undefined });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) });
+      // 🔴 W8b：失败**交回调用方**（re-throw），不许再吞 —— 共享层 `runNoteSubmit`
+      // 只认 reject 为"没存上"；这里咽掉的话，界面会把刚写的草稿清掉、提示也不亮，
+      // 用户以为存上了（W8a 要修的正是这个形状，宿主侧的另一半在这里补齐）。
+      throw error;
+    } finally {
+      refresh();
     }
-    refresh();
   },
 
   updateNote: async (entityId, content) => {
@@ -122,8 +136,9 @@ export const useNoteStore = create<NoteState>((set) => ({
   },
 
   purgeNote: async (entityId) => {
-    await noteActions.purgeNote(entityId);
+    const purged = await noteActions.purgeNote(entityId);
     refresh();
+    return purged;
   },
 
   togglePinned: async (entityId, pinned) => {

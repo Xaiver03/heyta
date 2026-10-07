@@ -224,6 +224,16 @@ describe('notesBoardLabels：共享 NotesBoard 的文案契约', () => {
       expect(text).not.toContain('{excerpt}');
     }
   });
+
+  it('🔴 saveFailed 走 notes.error.saveFailed，且把「内容还在」说进话里（W8b）', () => {
+    // 缺 key 时 `t` 会抛 —— 两侧构造本身就是"词条存在"的判据；再钉值与关键词。
+    expect(notesBoardLabels(zh).saveFailed).toBe(zh('notes.error.saveFailed'));
+    expect(notesBoardLabels(en).saveFailed).toBe(en('notes.error.saveFailed'));
+    // 这句文案的承重承诺：失败时草稿**还留在输入框里**（共享层 W8a 的保草稿）。
+    // 共享层若改回"失败清草稿"，这句话就在撒谎 —— 用关键词把它钉住。
+    expect(notesBoardLabels(zh).saveFailed).toContain('输入框');
+    expect(notesBoardLabels(en).saveFailed).toContain('still in the box');
+  });
 });
 
 /**
@@ -257,6 +267,12 @@ describe('宿主接线：共享组件的必填回调真的传了（少传不会�
     expect(screen).toContain('onAdd={(content) => {');
     expect(screen).toContain('onRemove={(entityId) => {');
     expect(screen).toContain('onTogglePinned={(entityId, pinned) => {');
+    // 🔴 W8b：onAdd 的失败必须交回共享层 —— `run(...)` 把 reject 咽成本地 error，
+    // 共享层只看得到 resolve（= 假 saved ⇒ 清草稿）；`actions === null` 静默
+    // return 同罪（"没提交"被当成"存上了"）。两条接线判据钉在源码上
+    // （本仓库对"少传/改错回调不报类型错"的既有守卫方式，见本 describe 文件头）。
+    expect(screen).toContain("if (actions === null) throw new Error(t('notes.error.saveFailed'));");
+    expect(screen).toContain('return runAdd(actions.createNote(content));');
     // 🔴 **这条断言是翻向的**（多端第二批，2026-10-03）。原文是
     // `expect(screen).not.toContain('onEdit=')`，理由「移动端没有便签编辑屏」。
     // 屏有了（`NoteEditScreen`），所以"不传"从正确变成缺陷：摘要那段会退回纯文本，

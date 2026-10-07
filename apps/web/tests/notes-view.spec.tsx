@@ -17,7 +17,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 等的是**条件**，不是固定 tick（这里 flake 过一次，记下来）
  *
- * 界面里的回调是 `void store.addNote(...)`（fire-and-forget），而真正的落盘要
+ * 界面里的提交是异步的（`onAdd` 返回 store 的 Promise），而真正的落盘要
  * 穿过 `dispatch → op-log 引擎 → IndexedDB → notify → refresh` 好几段微/宏任务。
  * 第一版用"两个 `setTimeout(0)`"来等：**空载时刚好够，全量并行跑时不够** ——
  * 表现为断言读到旧状态、随机变红（比没有测试更糟）。
@@ -30,6 +30,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { emptyState } from '@heyta/op-log';
+import { NOTE_MAX_CONTENT_LENGTH } from '@heyta/domain';
 import { I18nProvider, zhCN } from '@heyta/i18n';
 
 import { selection } from '../src/lib/selection.js';
@@ -192,6 +193,33 @@ describe('便签视图', () => {
 
     // 墓碑还在（软删除）：实体没有消失，只是 `deletedAt` 被写上。
     expect(useTaskStore.getState().entities.notes[noteId!]?.deletedAt).toBeDefined();
+  });
+
+  it('🔴 提交失败（超长被动作层拒绝）⇒ 共享层收到 rejection：提示亮 + 草稿保留（W8b 接线）', async () => {
+    const view = await mount();
+    // 超过 `NOTE_MAX_CONTENT_LENGTH` 会被 `createNoteActions` 抛错 —— 这是唯一
+    // 不需要 mock 就能让**真 store 的 addNote reject** 的失败形态。
+    const tooLong = '长'.repeat(NOTE_MAX_CONTENT_LENGTH + 1);
+    type(view, tooLong);
+    click(view, 'notes-submit');
+
+    // 宿主把失败交回（store re-throw + onAdd 返回 Promise）⇒ 共享层判 failed：
+    // 失败提示亮起来、文案就是 `notes.error.saveFailed` 那句。
+    // 接线任何一半被退回（store 再吞错 / onAdd 又 `void` 掉），这里看到的就是
+    // 假 saved：提示不亮、草稿被清 —— waitFor 超时转红，正是这条判据的牙。
+    await waitFor('失败提示出现', () => byTestId(view, 'notes-save-failed') !== null);
+    expect(byTestId(view, 'notes-save-failed')?.textContent ?? '').toContain(
+      zhCN['notes.error.saveFailed'],
+    );
+
+    // 草稿原样还在输入框里（W8a 的核心承诺，到达这里本身就证明 rejection 没被吞）。
+    const input = byTestId(view, 'notes-input') as HTMLInputElement | null;
+    expect(input, '输入框还在').not.toBeNull();
+    expect(input!.value).toBe(tooLong);
+
+    // 真的没存上：store 与物化状态里都没有它。
+    expect(useNoteStore.getState().notes).toHaveLength(0);
+    expect(Object.values(useTaskStore.getState().entities.notes)).toHaveLength(0);
   });
 });
 

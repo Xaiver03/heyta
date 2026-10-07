@@ -133,6 +133,26 @@ export function NotesSection(): React.JSX.Element {
     [read],
   );
 
+  /**
+   * 提交新便签（W8b）。与 {@link run} 只差一处：**失败不吞** —— `run` 把
+   * reject 咽进本地 `error` 后照常 resolve，而共享 `NotesBoard` 的
+   * `runNoteSubmit` 靠 **reject** 判定"没存上"（保草稿 + 亮 `labels.saveFailed`）。
+   * 本地 `error` 失败时照旧写（文件头决定 3：原始错误文本是给用户对照的数据，
+   * 如超长那一句），与共享层的通用提示**互补**，不是替代。
+   */
+  const runAdd = useCallback(
+    (pending: Promise<unknown>): Promise<void> => {
+      setError(null);
+      return pending
+        .then(read)
+        .catch((e: unknown) => {
+          setError(e instanceof Error ? e.message : String(e));
+          throw e;
+        });
+    },
+    [read],
+  );
+
   const labels = useMemo(() => notesBoardLabels(t), [t]);
 
   return (
@@ -148,8 +168,13 @@ export function NotesSection(): React.JSX.Element {
           notes={notes}
           labels={labels}
           onAdd={(content) => {
-            if (actions === null) return;
-            run(actions.createNote(content));
+            // 🔴 宿主还没就绪 = 这一次**没有提交**：必须以失败形态交回（同步
+            // throw 也会被共享层兜成 failed ⇒ 保草稿 + 亮提示）。静默 return
+            // 会被判成 saved ⇒ 清草稿，用户刚敲的字既没存上、也从输入框里
+            // 消失了（W8a 点名的边缘，接线判据钉在 labels 契约测试旁）。
+            if (actions === null) throw new Error(t('notes.error.saveFailed'));
+            // 🔴 走 runAdd 而不是 run：run 吞 reject，共享层就只看得到成功。
+            return runAdd(actions.createNote(content));
           }}
           onRemove={(entityId) => {
             if (actions === null) return;
