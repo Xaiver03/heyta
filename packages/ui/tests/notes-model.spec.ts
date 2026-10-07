@@ -13,6 +13,9 @@
  *      自己 `slice(0, n)` 的实现会在单词/行中间切断，读起来像乱码。
  *   3. `isPinned` 来自领域层的高亮判据（`isNoteHighlighted`），不是
  *      各端各读一次 `note.isPinnedToToday`。
+ *   4. **提交结局与 composer 状态机**（W8a）：`onAdd` 的两种失败形态
+ *      都要被兜住；失败保草稿、成功才清 —— 无条件清空会把用户写得
+ *      最用心的那一次（超长被拒）整个吞掉，且全程无报错。
  */
 
 import { describe, expect, it } from 'vitest';
@@ -20,7 +23,13 @@ import { noteExcerpt, sortNotesForDisplay, type Note } from '@heyta/domain';
 
 import { NOTE_EXCERPT_LENGTH } from '@heyta/domain';
 
-import { toNoteRows } from '../src/notes/model.js';
+import {
+  NOTE_COMPOSER_INITIAL,
+  noteComposerAfterOutcome,
+  noteComposerTyping,
+  runNoteSubmit,
+  toNoteRows,
+} from '../src/notes/model.js';
 
 const NOW = 1_700_000_000_000;
 
@@ -93,5 +102,98 @@ describe('toNoteRows：摘要走 noteExcerpt', () => {
     const rows = toNoteRows([note({ id: 'n1', content: 'x'.repeat(200) })], 10);
     expect(rows[0]?.excerpt).toHaveLength(10);
     expect(rows[0]?.excerpt.endsWith('…')).toBe(true);
+  });
+});
+
+describe('runNoteSubmit：两种失败形态都兜住（W8a）', () => {
+  it('onAdd 返回的 Promise reject ⇒ failed（工单用例 a 的裁决半）', async () => {
+    const outcome = await runNoteSubmit('买牛奶', () =>
+      Promise.reject(new Error('便签内容不合法：正文超过上限')),
+    );
+    expect(outcome).toBe('failed');
+  });
+
+  it('onAdd 同步 throw ⇒ failed（工单用例 b 的裁决半）', async () => {
+    const thrower = (): void => {
+      throw new Error('同步炸的');
+    };
+    const outcome = await runNoteSubmit('买牛奶', thrower);
+    expect(outcome).toBe('failed');
+  });
+
+  it('onAdd 正常返回 / 返回兑现的 Promise ⇒ saved（工单用例 c 的裁决半）', async () => {
+    expect(await runNoteSubmit('买牛奶', () => undefined)).toBe('saved');
+    expect(await runNoteSubmit('买牛奶', () => Promise.resolve())).toBe('saved');
+  });
+
+  it('空白挡板 ⇒ 不调用 onAdd、结局 blank（工单用例 d）', async () => {
+    const calls: string[] = [];
+    const outcome = await runNoteSubmit('   \n\t ', (content) => {
+      calls.push(content);
+    });
+    expect(outcome).toBe('blank');
+    expect(calls).toEqual([]);
+  });
+
+  it('交给宿主的是原样输入（不替宿主做 trim 规范化）', async () => {
+    const seen: string[] = [];
+    await runNoteSubmit('  买牛奶  ', (content) => {
+      seen.push(content);
+    });
+    expect(seen).toEqual(['  买牛奶  ']);
+  });
+});
+
+describe('noteComposerAfterOutcome：失败保草稿、成功才清（W8a 核心）', () => {
+  it('失败 ⇒ 草稿原样保留 + 亮提示（用例 a/b 的呈现半）', () => {
+    const next = noteComposerAfterOutcome(
+      { draft: '买牛奶', saveFailed: false },
+      '买牛奶',
+      'failed',
+    );
+    expect(next).toEqual({ draft: '买牛奶', saveFailed: true });
+  });
+
+  it('成功 ⇒ 草稿清空且提示熄灭（用例 c 的呈现半）', () => {
+    const next = noteComposerAfterOutcome({ draft: '买牛奶', saveFailed: true }, '买牛奶', 'saved');
+    expect(next).toEqual({ draft: '', saveFailed: false });
+  });
+
+  it('成功，但草稿已在落库期间被接着改 ⇒ 在途输入不吞，只清仍是所提交内容的那份', () => {
+    const next = noteComposerAfterOutcome(
+      { draft: '买牛奶、鸡蛋', saveFailed: false },
+      '买牛奶',
+      'saved',
+    );
+    expect(next.draft).toBe('买牛奶、鸡蛋');
+    expect(next.saveFailed).toBe(false);
+  });
+
+  it('失败，且草稿在落库期间被接着改 ⇒ 整份当前草稿都保留（在途输入同样是用户的）', () => {
+    const next = noteComposerAfterOutcome(
+      { draft: '买牛奶、鸡蛋', saveFailed: false },
+      '买牛奶',
+      'failed',
+    );
+    expect(next).toEqual({ draft: '买牛奶、鸡蛋', saveFailed: true });
+  });
+
+  it('空白挡板 ⇒ 状态原样、不亮提示（用例 d 的呈现半）', () => {
+    const state = { draft: '   ', saveFailed: false };
+    expect(noteComposerAfterOutcome(state, '   ', 'blank')).toBe(state);
+  });
+
+  it('失败后再输入 ⇒ 提示保留（noteComposerTyping 不在打字时熄它）', () => {
+    const next = noteComposerTyping({ draft: '买牛奶', saveFailed: true }, '买牛奶、');
+    expect(next).toEqual({ draft: '买牛奶、', saveFailed: true });
+  });
+
+  it('失败后原稿重试成功 ⇒ 草稿清空、提示熄灭（闭环到干净状态）', () => {
+    const next = noteComposerAfterOutcome({ draft: '买牛奶', saveFailed: true }, '买牛奶', 'saved');
+    expect(next).toEqual({ draft: '', saveFailed: false });
+  });
+
+  it('初始状态：空草稿、无提示', () => {
+    expect(NOTE_COMPOSER_INITIAL).toEqual({ draft: '', saveFailed: false });
   });
 });

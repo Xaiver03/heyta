@@ -105,6 +105,8 @@ interface TaskListSharedProps {
    * 而这是不可撤销语义上的破坏。宁可不可点。
    */
   readonly onOpenTask?: (taskId: string) => void;
+  /** 长按行的入口，供移动端进入批量选择态。 */
+  readonly onLongPressTask?: (taskId: string) => void;
   readonly labels?: TaskListLabels;
   /** 标题下方的元信息行（截止 / 优先级 / 重复…）。 */
   readonly renderMeta?: (row: TaskRowModel) => React.ReactNode;
@@ -120,6 +122,10 @@ interface TaskListSharedProps {
    * 是因为"哪一行"只有列表知道自己展平成了什么顺序。
    */
   readonly activeTaskId?: string | null;
+  /** 批量选择态中的任务 id。 */
+  readonly selectedTaskIds?: ReadonlySet<string>;
+  /** 选择态把行首勾选框用于批量选择，而不是完成任务。 */
+  readonly selectionMode?: boolean;
   /** 标题为空时的替代文案（空标题是真实存在的，见 `model.ts`）。 */
   readonly fallbackTitle?: string;
   /** 没有任务时显示什么。省略则不渲染空态。 */
@@ -197,11 +203,14 @@ export function TaskList<TMeta = undefined>({
   keepEmptySections,
   onToggleTask,
   onOpenTask,
+  onLongPressTask,
   labels,
   renderMeta,
   renderTrailing,
   busyTaskId,
   activeTaskId,
+  selectedTaskIds,
+  selectionMode = false,
   fallbackTitle,
   emptyMessage,
   testID,
@@ -278,15 +287,18 @@ export function TaskList<TMeta = undefined>({
           {...(density === undefined ? {} : { density: density })}
           busy={busyTaskId === row.id}
           {...(activeTaskId === undefined ? {} : { active: activeTaskId === row.id })}
+          {...(selectedTaskIds === undefined ? {} : { selected: selectedTaskIds.has(row.id) })}
+          selectionMode={selectionMode}
           onToggleTask={onToggleTask}
           {...(onOpenTask === undefined ? {} : { onOpenTask })}
+          {...(onLongPressTask === undefined ? {} : { onLongPressTask })}
           {...(labels === undefined ? {} : { labels })}
           {...(renderMeta === undefined ? {} : { renderMeta })}
           {...(renderTrailing === undefined ? {} : { renderTrailing })}
         />
       );
     },
-    [busyTaskId, activeTaskId, labels, onOpenTask, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density],
+    [busyTaskId, activeTaskId, labels, onOpenTask, onLongPressTask, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density, selectedTaskIds, selectionMode],
   );
 
   const keyExtractor = useCallback((item: Item) => item.key, []);

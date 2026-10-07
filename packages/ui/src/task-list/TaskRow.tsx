@@ -63,6 +63,9 @@ export interface TaskRowLabels {
   readonly toggleOn?: (row: TaskRowModel) => string;
   /** 已完成时勾选框的念法，如「取消完成：买牛奶」。 */
   readonly toggleOff?: (row: TaskRowModel) => string;
+  /** 选择态下勾选框的文案。 */
+  readonly selectOn?: (row: TaskRowModel) => string;
+  readonly selectOff?: (row: TaskRowModel) => string;
   /** 整行可点时它的念法，如「打开：买牛奶」。 */
   readonly open?: (row: TaskRowModel) => string;
 }
@@ -98,6 +101,8 @@ export interface TaskRowProps {
    * 那个默认值会让"忘了传"表现成**点一下就误完成一条任务**。
    */
   readonly onOpenTask?: (taskId: string) => void;
+  /** 长按行的入口，供移动端进入批量选择态；Web 不传则保持原行为。 */
+  readonly onLongPressTask?: (taskId: string) => void;
   readonly labels?: TaskRowLabels;
   /** 标题下方的元信息行（截止 / 优先级 / 重复…）。`minimal` 档不渲染它。 */
   readonly renderMeta?: (row: TaskRowModel) => React.ReactNode;
@@ -116,6 +121,10 @@ export interface TaskRowProps {
    * 换成深蓝底会让那些徽章**读不出来**。浅底 + 原字色对所有宿主安全。
    */
   readonly active?: boolean;
+  /** 批量选择态中的行。它是视图态，不进入 op-log。 */
+  readonly selected?: boolean;
+  /** 选择态把行首勾选框切换为批量选择控件。 */
+  readonly selectionMode?: boolean;
 }
 
 export function TaskRow({
@@ -123,11 +132,14 @@ export function TaskRow({
   density,
   onToggleTask,
   onOpenTask,
+  onLongPressTask,
   labels,
   renderMeta,
   renderTrailing,
   busy = false,
   active = false,
+  selected = false,
+  selectionMode = false,
 }: TaskRowProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -240,13 +252,21 @@ export function TaskRow({
           backgroundColor: tokens['color.primary-subtle'],
           borderRadius: tokens['radius.md'],
         },
+        rowSelected: {
+          backgroundColor: tokens['color.primary-subtle'],
+          borderRadius: tokens['radius.md'],
+        },
       }),
     [spec, tokens],
   );
 
-  const toggleLabel = row.done
-    ? (labels?.toggleOff?.(row) ?? row.title)
-    : (labels?.toggleOn?.(row) ?? row.title);
+  const toggleLabel = selectionMode
+    ? selected
+      ? (labels?.selectOn?.(row) ?? row.title)
+      : (labels?.selectOff?.(row) ?? row.title)
+    : row.done
+      ? (labels?.toggleOff?.(row) ?? row.title)
+      : (labels?.toggleOn?.(row) ?? row.title);
   const openLabel = labels?.open?.(row);
 
   /**
@@ -298,13 +318,14 @@ export function TaskRow({
      * 这不是样式或行为，而是**"一行"这个容器缺少可寻址的名字**。
      */
     <View
-      style={active ? [styles.row, styles.rowActive] : styles.row}
+      style={active || selected ? [styles.row, active ? styles.rowActive : styles.rowSelected] : styles.row}
       // 🔴 选中还要**说出来**，不能只画出来（工单 W1c）：底色对色觉障碍用户与
       // 高对比模式不成立，而 web 的习惯面（`HabitsList.tsx` 的 `aria-current`）早就有这一路。
       // 三张面用同一个属性同一个取值，"各处同一套"才是可核对的而不是口号。
       // 载体实测（2026-10-04 一次性探针，阳性对照是 `aria-checked`）：RNW 会把平铺的
       // `aria-current="true"` 写进 DOM，`undefined` 时属性整个不出现 —— 所以不需要 `?? null`。
       aria-current={active ? 'true' : undefined}
+      aria-selected={selected ? true : undefined}
       testID={`task-item-${row.id}`}
     >
       <Pressable
@@ -314,23 +335,23 @@ export function TaskRow({
         // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
         // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
         // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-        aria-checked={row.done}
+        aria-checked={selectionMode ? selected : row.done}
         aria-busy={busy}
         accessibilityLabel={toggleLabel}
         disabled={busy}
         onPress={() => onToggleTask(row.id)}
         style={styles.checkboxHit}
-        testID={`task-toggle-${row.id}`}
+        testID={selectionMode ? `bulk-select-${row.id}` : `task-toggle-${row.id}`}
       >
         <View
           style={[
             styles.box,
             { borderColor: priorityBorderColor },
-            row.done ? styles.boxDone : null,
+            (selectionMode ? selected : row.done) ? styles.boxDone : null,
           ]}
           testID={`task-box-${row.id}`}
         >
-          {row.done ? <Text style={[text[TASK_ROW_TEXT.check], styles.tick]}>✓</Text> : null}
+          {(selectionMode ? selected : row.done) ? <Text style={[text[TASK_ROW_TEXT.check], styles.tick]}>✓</Text> : null}
         </View>
       </Pressable>
 
@@ -351,6 +372,7 @@ export function TaskRow({
           accessibilityRole="button"
           {...(openLabel === undefined ? {} : { accessibilityLabel: openLabel })}
           onPress={() => onOpenTask(row.id)}
+          {...(onLongPressTask === undefined ? {} : { onLongPress: () => onLongPressTask(row.id) })}
           style={styles.body}
           testID={`task-row-${row.id}`}
         >

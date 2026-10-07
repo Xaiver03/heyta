@@ -175,7 +175,10 @@ describe('W5 行组件真的用上了它', () => {
   it('逐行色排在 `box` 之后、`boxDone` 之前：完成态仍压过优先级', () => {
     const boxIndex = row.indexOf('styles.box,');
     const priorityIndex = row.indexOf('{ borderColor: priorityBorderColor }');
-    const doneIndex = row.indexOf('row.done ? styles.boxDone : null');
+    // 批量选择线（2026-10-06）把覆盖条件扩成 `(selectionMode ? selected : row.done)`
+    // —— 选择态的勾选框与完成态同用主色。判据钉的语义不变：**逐行色必须能被
+    // boxDone 覆盖**，needle 随表达式更新。
+    const doneIndex = row.indexOf('(selectionMode ? selected : row.done) ? styles.boxDone : null');
     expect(boxIndex).toBeGreaterThan(-1);
     expect(priorityIndex, '行里没有逐行的描边色声明').toBeGreaterThan(boxIndex);
     expect(doneIndex, '完成态的覆盖被摘掉了').toBeGreaterThan(priorityIndex);
