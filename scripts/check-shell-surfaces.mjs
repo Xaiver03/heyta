@@ -91,10 +91,18 @@
  *   ⇒ 新界面进桌面 = **进 web 产物**，在原生壳里再手写一份倒数日反而是**违反既定决策**。
  *   所以桌面这三端的 reachable 判据**必须**落在"web-dist 通道是否真的把共享 UI 带进包里"。
  *
- * **desktop-linux**
- *   L1 台账里是 `gap`，编号与理由齐全；
- *   L2 反向核对：`apps/desktop-linux/` 下**确实仍然没有** `web-dist` 通道
- *      （有 ⇒ 台账过期，红）。
+ * **desktop-linux**（07 04:4x 起与 mac/Windows 同构，计划 P4）
+ *   L1 台账是 `reachable`，承重判据在【桌面三端】那一节的 D1–D4：
+ *      D1 `package-deb.sh` 把 `apps/web/dist` **整份**拷进包内 `/usr/share/heyta/web-dist`；
+ *      D2 壳按 exe 目录的 `../../share/heyta/web-dist` 认这个位置（FHS + 可重定位，
+ *         可重定位是必需的：D4 就是靠 `dpkg-deb -x` 到临时根再跑才有取证，写死绝对路径跑不了）；
+ *      D3 打包脚本对缺席有失败断言（`RESULT=WEB_DIST_MISSING`）；
+ *      D4 打包脚本**不带任何环境变量**真跑一次解包态的窗口，把六项事实写成机读行
+ *         （`PKG_FRESHNESS` / `PKG_FRESHNESS_INPACKAGE` / `PKG_SHELL_UI` / `PKG_SETTLED` /
+ *          `PKG_PIXELS` / `PKG_RESULT`），本门禁再把 `PKG_INDEX_SHA` 与本工作树的 dist 逐字对账。
+ *   L2 反向核对仍是**双向**的：
+ *      · 写 gap 而树里有 web-dist 引用 ⇒ 红（声明过期）；
+ *      · 写 wired-unverified 而树里没有引用 ⇒ 红（代码撤了声明没退）。
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * ## 刻意不判什么（诚实的不完备 > 假的完备）
@@ -123,7 +131,20 @@
  *   G10 台账：删掉 Linux 那一行                                        → 覆盖完整性红
  *   G11 台账：Linux 保持 gap，但在 `apps/desktop-linux/` 里加一处
  *       `web-dist` 引用（假装有了）                                    → L2 红（声明过期）
- *   G12 台账：把 Linux 那行改成 `reachable` 而通道并没补               → L1/D1 红
+ *       🔴 这一臂的"加引用"在 2026-10-07 变成了**真事**（M2 代码落地）——
+ *          它证明这一臂挡的是"代码与声明不同步"，不挡某个特定模块名。
+ *   G12 台账：Linux 那行改成 `reachable` 而 D1–D4 的锚点/事实被撤掉      → 红
+ *       🔴 这一臂在 07 04:4x **换了含义**：P4 之前 `reachable` 是硬挡的（写就红），
+ *          那时它测的是"别用声明代替取证"；P4 之后取证进来了，所以它现在测的是
+ *          "**声明还在、取证没了**" —— 各臂都实测过（**连阳性对照共六臂**，逐臂读数在 runbook §5.9，
+ *          本文件不抄这个数）：删掉 `cp -R` 那行 → D1 红；
+ *          把事实行 `PKG_SHELL_UI` 改成 `fallback` → D4 红；把生产方的 `FACTS=` 改名
+ *          → 断言 A 红（"锚点漂移"，D4 会永远念未取证那一族）。
+ *          🔴 07 04:5x 又补两臂，而这两臂才是这一格唯一证明"未取证不是装饰"的读数：
+ *          把 `dist/linux/package-facts.txt` 整个挪走 → 未取证从 2 栏升到 **3 栏**而 rc 仍 **0**
+ *          （响亮跳过，不算通过）；同一条件下叠 `HEYTA_REQUIRE_PACKAGED_ARTIFACT=1`
+ *          → **rc=1** 并点名 `[desktop-linux] countdown · 产物`。
+ *   G12b 台账：wired-unverified 而树上**没有** web-dist 引用（代码被撤）  → L2 红
  *   G13 严格模式：`HEYTA_REQUIRE_PACKAGED_ARTIFACT=1` 且本机没有
  *       "确实是本轮打的"那份包                                        → 产物那两栏红
  *       🔴 这一臂是**补出来的**：第一版这个开关只写在"包不存在"那一个分支里，
@@ -237,13 +258,23 @@ const LEDGER = [
   {
     face: 'countdown',
     end: 'desktop-linux',
-    status: 'gap',
-    gapId: 'W8-GAP-L1',
-    reason:
-      'Linux 壳没有 web-dist 通道（它是 JSC + 手写 GTK UI，没有 WebView），' +
-      '共享 UI 进不了包 ⇒ 这一面在 Linux 上不可达。' +
-      '补法不是"给 Linux 手写一屏"（multi-end-unified-strategy §4.3 定案 M2、' +
-      '§6.3-T3 第 1 条把手写业务 UI 列为要删的对象），而是先给它一条 web-dist 通道。',
+    /**
+     * ✅ `reachable`（07 04:4x，计划 P4 落地）：Linux 现在与 mac/Windows **同构地**走
+     *   【桌面三端】那一节的 D1–D4：
+     *     D1 打包脚本把 `apps/web/dist` **整份**拷进包内 `/usr/share/heyta/web-dist`；
+     *     D2 壳按 exe 目录的 `../../share/heyta/web-dist` 认这个位置（FHS 且可重定位 ——
+     *        这条是 P4 现量修出来的：原来写一级 `../` 得到的是 `/usr/lib/share/…`，
+     *        而它从来没被跑到过，因为包里根本没有 web-dist）；
+     *     D3 打包脚本对缺席有失败断言（`RESULT=WEB_DIST_MISSING`）；
+     *     D4 打包脚本 `dpkg-deb -x` 到临时根、**不带任何环境变量**真跑一次窗口，
+     *        六项事实写成机读行；本门禁再拿 `PKG_INDEX_SHA` 与本工作树的 dist 逐字对账。
+     *   ⚠️ 边界与另两端同一条：这台机上没打过包 ⇒ 事实文件不在 ⇒ D4 响亮报"未取证"，
+     *      这一格声明的承重部分是 D1–D3 的文本锚点。
+     */
+    status: 'reachable',
+    basis:
+      'M2 路线：package-deb.sh 把 apps/web/dist 装成包内 /usr/share/heyta/web-dist + 缺席就红的断言 + ' +
+      '解包态真跑一次窗口的六项事实行（与 mac/Windows 同构，判据在 D1–D4）',
   },
 ];
 
@@ -276,6 +307,14 @@ const FILES = {
    * 现在判的是那份事实文件里的机读行。
    */
   winFacts: 'dist/windows/install-capture.txt',
+  /**
+   * Linux 那一端的取证文件（计划 P4，07 04:3x）。`.deb` 是在那台 Ubuntu 载体上打的，
+   * 与 Windows 同一类形状：本机没有包里那份字节 ⇒ 判据建在**远端测出来的机读行**上。
+   * 生产方是 `apps/desktop-linux/scripts/package-deb.sh` 的 ③ 段。
+   */
+  linuxFacts: 'dist/linux/package-facts.txt',
+  linuxPackage: 'apps/desktop-linux/scripts/package-deb.sh',
+  linuxWebShell: 'apps/desktop-linux/src/heyta_web.c',
 };
 
 /* ========================================================================
@@ -475,7 +514,7 @@ const sources = new Map();
  * D4 从此永远念"未取证"而没人发现。所以这里换成**两侧名字对账**（读的是源码，
  * 在任何树上都成立）：门禁锚点的 basename 必须出现在写它的那两行生产方代码里。
  */
-const ARTIFACT_ANCHORS = new Set(['winFacts']);
+const ARTIFACT_ANCHORS = new Set(['winFacts', 'linuxFacts']);
 for (const [name, rel] of Object.entries(FILES)) {
   if (rel.startsWith('/') || !/\.\w+$/.test(rel)) continue; // 产物目录 / 绝对路径不是源文件
   if (ARTIFACT_ANCHORS.has(name)) continue;
@@ -487,20 +526,36 @@ for (const [name, rel] of Object.entries(FILES)) {
   sources.set(name, code);
 }
 {
-  const factsBase = basename(FILES.winFacts);
-  const producers = [
-    ['apps/desktop-windows/scripts/package-msix.sh', new RegExp(`scp[^\\n]*${factsBase}`)],
-    ['apps/desktop-windows/scripts/install-and-capture.ps1', new RegExp(`\\$factsFile[^\\n]*${factsBase}`)],
+  // 每一枚"取证产物"都要有一条**两侧名字对账**：门禁读的 basename 必须出现在写它的那行生产方代码里。
+  // 生产方改名 ⇒ 门禁读一个不存在的旧名 ⇒ D4 永远念"未取证"而没人发现，那比红更糟。
+  const pairs = [
+    {
+      facts: FILES.winFacts,
+      producers: [
+        ['apps/desktop-windows/scripts/package-msix.sh', (b) => new RegExp(`scp[^\\n]*${b}`)],
+        ['apps/desktop-windows/scripts/install-and-capture.ps1', (b) => new RegExp(`\\$factsFile[^\\n]*${b}`)],
+      ],
+    },
+    {
+      facts: FILES.linuxFacts,
+      producers: [
+        // `.deb` 的事实文件由 package-deb.sh 自己写（`FACTS="$OUT_DIR/package-facts.txt"`）。
+        ['apps/desktop-linux/scripts/package-deb.sh', (b) => new RegExp(`FACTS="[^\\n]*${b}`)],
+      ],
+    },
   ];
-  for (const [file, re] of producers) {
-    const raw = readSource(file);
-    if (raw === null) {
-      anchorErrors.push(`   · 取证事实的生产方读不到：${file}（对账做不了，判红不判跳过）`);
-    } else if (!re.test(raw)) {
-      anchorErrors.push(
-        `   · 锚点漂移：门禁读 ${FILES.winFacts}（basename ${factsBase}），` +
-          `而 ${file} 里已经不再写/取这个名字 ⇒ D4 会永远念"未取证"而没人发现`,
-      );
+  for (const { facts, producers } of pairs) {
+    const base = basename(facts).replace(/\./g, '\\.');
+    for (const [file, mkRe] of producers) {
+      const raw = readSource(file);
+      if (raw === null) {
+        anchorErrors.push(`   · 取证事实的生产方读不到：${file}（对账做不了，判红不判跳过）`);
+      } else if (!mkRe(base).test(raw)) {
+        anchorErrors.push(
+          `   · 锚点漂移：门禁读 ${facts}（basename ${basename(facts)}），` +
+            `而 ${file} 里已经不再写/取这个名字 ⇒ D4 会永远念"未取证"而没人发现`,
+        );
+      }
     }
   }
 }
@@ -593,8 +648,10 @@ for (const end of ENDS) {
       anchorErrors.push(`   · 台账有 ${String(rows.length)} 条 (面=${k}, 端=${end}) —— 判定会挑其中一份执行`);
     } else if (rows[0].status === 'gap' && (rows[0].gapId === undefined || rows[0].reason === undefined)) {
       anchorErrors.push(`   · (面=${k}, 端=${end}) 声明 gap 但没写编号或理由`);
-    } else if (rows[0].status !== 'gap' && rows[0].status !== 'reachable') {
-      anchorErrors.push(`   · (面=${k}, 端=${end}) 的 status="${String(rows[0].status)}" 不是 reachable/gap 之一`);
+    } else if (rows[0].status === 'wired-unverified' && (rows[0].gapId === undefined || rows[0].reason === undefined)) {
+      anchorErrors.push(`   · (面=${k}, 端=${end}) 声明 wired-unverified 但没写编号或"还缺哪一步"`);
+    } else if (rows[0].status !== 'gap' && rows[0].status !== 'reachable' && rows[0].status !== 'wired-unverified') {
+      anchorErrors.push(`   · (面=${k}, 端=${end}) 的 status="${String(rows[0].status)}" 不是 reachable/gap/wired-unverified 之一`);
     }
   }
 }
@@ -835,6 +892,38 @@ const DESKTOP_CHANNELS = {
     hostLabel: 'Windows',
     produceCmd: 'pnpm reinstall:desktop（走 windows-pc）／ pnpm verify:windows-auth',
   },
+  'desktop-linux': {
+    package: {
+      file: FILES.linuxPackage,
+      label: '把 apps/web/dist 整份拷进包内 /usr/share/heyta/web-dist',
+      re: /cp -R "\$RD\/apps\/web\/dist" "\$PKG\/usr\/share\/heyta\/web-dist"/,
+    },
+    resolve: {
+      file: FILES.linuxWebShell,
+      label: '壳按 exe 目录的 ../../share/heyta/web-dist 认这个位置（FHS 且可重定位）',
+      re: /%s\/\.\.\/\.\.\/share\/heyta\/web-dist/,
+    },
+    assert: {
+      file: FILES.linuxPackage,
+      label: '打包脚本对 web-dist 有失败断言（WEB_DIST_MISSING）',
+      re: /RESULT=WEB_DIST_MISSING/,
+    },
+    artifactWebDist: null, // 包在那台 Ubuntu 载体上打的 ⇒ 走事实文件
+    artifactFacts: FILES.linuxFacts,
+    hostLabel: 'Linux',
+    produceCmd: 'pnpm build:linux local（在那台 Ubuntu 载体上；见 docs/runbooks/linux-dev-box.md §5.9）',
+    // 🔴 这一端的 D4 与 Windows 不同形：Windows 的事实是"资源文件计数"，
+    //    而 `package-deb.sh` 是在**解包后的那棵树里真跑了一次窗口**，
+    //    所以判据行是一组"键 = 期望值"（缺行 = 未取证，值不对 = 红）。
+    factExpected: {
+      PKG_FRESHNESS: 'OK',
+      PKG_FRESHNESS_INPACKAGE: 'OK',
+      PKG_SHELL_UI: 'web-dist',
+      PKG_SETTLED: 'OK',
+      PKG_PIXELS: 'OK',
+      PKG_RESULT: 'OK',
+    },
+  },
 };
 
 /** 读远端取回的事实文件：只认 `KEY=VALUE` 行，注释与空行跳过。 */
@@ -862,7 +951,7 @@ console.log(
 );
 console.log('     所以"这一面进桌面"= "它进了 apps/web/dist，而 dist 被打进了包"。）\n');
 
-for (const end of ['desktop-macos', 'desktop-windows']) {
+for (const end of ['desktop-macos', 'desktop-windows', 'desktop-linux']) {
   const channel = DESKTOP_CHANNELS[end];
   for (const face of FACES) {
     if (ONLY_FACE !== null && face.key !== ONLY_FACE) continue;
@@ -909,6 +998,60 @@ for (const end of ['desktop-macos', 'desktop-windows']) {
         ]);
       } else {
         const facts = parseFactLines(readFileSync(factsPath, 'utf8'));
+        if (channel.factExpected) {
+          const want = channel.factExpected;
+          const miss = Object.keys(want).filter((k) => !(k in facts));
+          if (miss.length > 0) {
+            skipped(end, `${face.key} · 产物`, [
+              `⚠️ 取证文件在 ${factsPath}，但缺判据行 ${miss.join(' / ')}`,
+              '      ⇒ 那一趟打包用的还是**没测这些事实的旧生产方**，本栏不计为通过。',
+              `      重跑：${channel.produceCmd}`,
+            ]);
+            continue;
+          }
+          const wrong = Object.entries(want).filter(([k, v]) => facts[k] !== v);
+          if (wrong.length > 0) {
+            ok = false;
+            detail.push(
+              `🔴 D4 包内事实不成立：${wrong.map(([k, v]) => `${k}=${facts[k]}（应为 ${v}）`).join('、')}` +
+                ` ⇒ 包打出来了，但**装出来的那棵树跑不出版面**（§7 第 82 条那一族）`,
+            );
+          } else {
+            // 值全对还不够：还得证明**这轮包里的字节就是本工作树这份 dist**。
+            // `PKG_INDEX_SHA` 是打包时在目标机上对包内 index.html 取的指纹。
+            const localDist = process.env.HEYTA_WEB_DIST_DIR ?? join(ROOT, FILES.webDist);
+            const localIndex = join(localDist, 'index.html');
+            const mine = existsSync(localIndex) ? sha256File(localIndex).toUpperCase() : null;
+            const theirs = (facts.PKG_INDEX_SHA ?? '').toUpperCase();
+            let found = false;
+            for (const f of walkAll(localDist)) {
+              if (!/\.(js|html)$/.test(f)) continue;
+              if (readFileSync(f, 'utf8').includes(face.webTestID)) { found = true; break; }
+            }
+            if (mine === null || theirs === '') {
+              skipped(end, `${face.key} · 产物`, [
+                `⚠️ 没有可对照的那份字节（本地 dist 缺 index.html 或取证文件没写 PKG_INDEX_SHA）`,
+                '      ⇒ 包内事实成立，但**不能迁移到"这一轮的 dist 里有这一面"**。',
+              ]);
+            } else if (mine !== theirs) {
+              skipped(end, `${face.key} · 产物`, [
+                `⚠️ 包里那份 index.html 与本工作树的 dist **sha256 不符**：包里 ${theirs.slice(0, 12)} / 本地 ${mine.slice(0, 12)}`,
+                `      ⇒ 那是**别的检出／别的会话打的包或旧产物**，不能当本轮取证。要取证：${channel.produceCmd}`,
+              ]);
+            } else if (!found) {
+              ok = false;
+              detail.push(
+                `🔴 D4 装进包的那份 dist（sha256 已逐字对上 ${mine.slice(0, 12)}）里搜不到 "${face.webTestID}"` +
+                  ` ⇒ 通道在、**字节里没有这一面**`,
+              );
+            } else {
+              detail.push(
+                `D4 包内事实六项全绿，且那份 index.html 与本工作树 dist **sha256 逐字相同**（${mine.slice(0, 12)}）、` +
+                  `里面有 "${face.webTestID}"（解包态真跑过一次窗口：${facts.PKG_SHELL_UI} / ${facts.PKG_SETTLED}）`,
+              );
+            }
+          }
+        } else {
         const missing = WIN_FACT_KEYS.filter((k) => !(k in facts));
         if (missing.length > 0) {
           // 🔴 "生产方没测这些事实" = **未取证**，不是产品红 —— 本门禁的既有规矩是
@@ -977,6 +1120,7 @@ for (const end of ['desktop-macos', 'desktop-windows']) {
             }
           }
         }
+      }
       }
     } else if (channel.artifactWebDist === null) {
       skipped(
@@ -1069,24 +1213,50 @@ for (const face of FACES) {
   const detail = [];
   let ok = true;
 
-  if (row === undefined || row.status !== 'gap') {
+  if (row === undefined) {
     ok = false;
-    detail.push(
-      `🔴 L1 台账里 Linux 这一格不是 gap（${row === undefined ? '没有这一格' : `status=${row.status}`}），` +
-        '而下面那四项通道判据对它**一条都不成立** —— 不许假装覆盖',
-    );
-  } else {
+    detail.push('🔴 L1 台账里根本没有 Linux 这一格 —— 不许用"没登记"当自动跳过');
+  } else if (row.status === 'gap') {
     detail.push(`L1 登记为缺口 ${row.gapId}：${row.reason}`);
-  }
-
-  if (linuxCode.length > 0) {
-    ok = false;
+    if (linuxCode.length > 0) {
+      ok = false;
+      detail.push(
+        `🔴 L2 反向核对失败：apps/desktop-linux 下出现了 web-dist 引用（${linuxCode.join(', ')}）` +
+          ` ⇒ 通道已经写了，而台账仍写着 ${row.gapId}。**声明过期**：翻成 wired-unverified（还差包里字节那一格）` +
+          ' 或 reachable（取证齐了），不许留着 gap',
+      );
+    } else {
+      detail.push('L2 反向核对：apps/desktop-linux 下一个 web-dist 引用都没有 ⇒ 这句缺口现在是**真的**');
+    }
+  } else if (row.status === 'wired-unverified') {
+    detail.push(`L1 这一格是 wired-unverified（${row.gapId}）：通道代码在、运行已取证，缺的是**装出来的包里那份字节**`);
+    if (linuxCode.length === 0) {
+      ok = false;
+      detail.push(
+        `🔴 L2 反向核对失败：台账说通道已接线（${row.gapId}），但 apps/desktop-linux 里` +
+          '一条 web-dist 引用都没有 ⇒ 代码被撤了而声明没退。',
+      );
+    } else {
+      detail.push(`L2：web-dist 引用在 ${linuxCode.length} 枚文件里 ⇒ 与"已接线"一致`);
+    }
+    // 这一档**不记通过**：走响亮跳过（严格模式折成红），因为它承诺的就是"还没取证"。
+    if (ok) {
+      skipped('desktop-linux', face.key, [
+        ...detail,
+        '      翻成 reachable 的前置只剩一条：把 Linux 接进【桌面三端】那一节的 D1/D2/D3 与 .deb 产物对账（计划 P4）。',
+        '      窗口取证那一格已闭合（07 03:5x 载体读数在 docs/runbooks/linux-dev-box.md §5.7），不要重复登记成"还欠着"。',
+      ]);
+      continue;
+    }
+  } else if (row.status === 'reachable') {
     detail.push(
-      `🔴 L2 反向核对失败：apps/desktop-linux 下出现了 web-dist 引用（${linuxCode.join(', ')}）` +
-        ` ⇒ 通道可能已经补上，而台账仍写着 ${row?.gapId ?? 'gap'}。**声明过期**，要么翻台账要么删掉那处引用`,
+      'L1 这一格是 reachable（P4 已落）：承重判据在【桌面三端】那一节的 D1–D4 —— ' +
+        '包括"解包态真跑一次窗口"那六项事实行，以及 `PKG_INDEX_SHA` 与本工作树 dist 的逐字对账。',
     );
+    detail.push('      这台机上没打过包时，D4 会响亮报"未取证"（严格档折成红），不会静默算过。');
   } else {
-    detail.push('L2 反向核对：apps/desktop-linux 下一个 web-dist 引用都没有 ⇒ 这句缺口现在是**真的**');
+    ok = false;
+    detail.push(`🔴 L1：Linux 的 status="${String(row.status)}" 不在本端允许的三档里`);
   }
 
   if (ok) pass('desktop-linux', face.key, detail);
@@ -1110,8 +1280,16 @@ console.log('');
 console.log('─'.repeat(78));
 const judged = results.filter((r) => r.kind === 'judge');
 const red = judged.filter((r) => !r.ok);
+/* 🔴 分母有两种读法，打印时必须说是哪一种：**一条 (面 × 端) 格可以带多条判定**。
+ * desktop-linux 现在就是两条 —— D 档（包内取证）与 L1/L2（台账 ↔ 锚点），判的是同一格的两个侧面。
+ * 原先这里把**记录数**当**格数**印，于是"6 格（面 × 端）"里有一格被数了两遍（现量 distinct = 5）。
+ * 红/绿仍然按**记录**计（一条判定红了就是红了，不能被"同格另一条绿了"摊平），
+ * 只有格数按 (面, 端) 去重。 */
+const cells = new Set(judged.map((r) => `${r.end}\u00d7${r.face}`)).size;
 console.log(
-  `   判定 ${String(judged.length)} 格（面 × 端）：${String(judged.length - red.length)} 绿 / ${String(red.length)} 红` +
+  `   判定 ${String(judged.length)} 条 / ${String(cells)} 格（面 × 端；` +
+    '一格可以带多条判定：desktop-linux = D 档 + L1/L2）：' +
+    `${String(judged.length - red.length)} 绿 / ${String(red.length)} 红` +
     `；未取证 ${String(unverified.length)} 栏`,
 );
 for (const g of gaps) console.log(`   🟡 ${g}`);

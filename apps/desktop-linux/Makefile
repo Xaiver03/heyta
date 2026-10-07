@@ -5,13 +5,27 @@
 #
 # 前置（Ubuntu/Debian）：
 #   sudo apt-get install -y build-essential pkg-config \
-#       libgtk-4-dev libjavascriptcoregtk-4.1-dev libsqlite3-dev
+#       libgtk-4-dev libjavascriptcoregtk-4.1-dev libsqlite3-dev libwebkit2gtk-4.1-dev
+#   ↑ 没有 sudo 就用 scripts/linux/provision-user-prefix.sh（把同一份清单解到用户态前缀，
+#     然后 `source <前缀>/env.sh` 再 make —— 清单同源，这里不必手工对齐包名）
 #
 # 🔴 `libjavascriptcoregtk-4.1` 是 **WebKitGTK 里的 JS 引擎**，与 macOS 自带的是
 #    同一个引擎家族。用它而不是另引一个 JS 运行时，意味着"引擎语义差异"这类坑
 #    在两端只算一次。
 
-PKGS   := gtk4 javascriptcoregtk-4.1 sqlite3
+# 🔴 批二 P2（M2 路线）起这个壳多了一枚必需依赖：`webkitgtk-6.0`。
+#    ⚠️ **不是** `webkit2gtk-4.1` —— 实测：4.1 的那套头文件是按 **GTK3** 编的
+#    （`GtkAction` / `GtkContainer` / `GdkEventKey`），它的 `.pc` 会拉 `-lgtk-3`，
+#    与本壳的 GTK4 同时进来就直接撞编译。GTK4 原生那一档是 **6.0**
+#    （`Requires: glib-2.0 gtk4 libsoup-3.0 javascriptcoregtk-6.0`）。
+#    它仍与 `javascriptcoregtk` 同出一个源码树（本机同为 2.52.6），
+#    所以"引擎语义差异"这类坑在两端仍只算一次。
+#    加进这一行的瞬间，以下四处必须同批动（缺一处都会红，不是靠人记）：
+#      · `scripts/linux/shell-modules.mjs` 的 `DEV_PACKAGE`（模块→-dev 包名，E11 的判据）
+#      · `scripts/linux/setup-build-host.sh --step gtk`（走同一份清单，无需改）
+#      · `scripts/linux/provision-user-prefix.sh`（无 sudo 路线，同样走清单）
+#      · `docs/reference/native-library-licenses.md` 的 LGPL 登记册（ADR-0057：登记与接线同批）
+PKGS   := gtk4 javascriptcoregtk-4.1 sqlite3 webkitgtk-6.0
 CFLAGS := -std=c11 -O2 -Wall -Wextra -Werror -D_POSIX_C_SOURCE=200809L $(shell pkg-config --cflags $(PKGS))
 LDLIBS := $(shell pkg-config --libs $(PKGS)) -lm
 
@@ -29,8 +43,10 @@ GTK_TOKENS := ../../packages/design-system/generated/heyta-tokens.h
 
 all: heyta-linux heyta-smoke
 
-heyta-linux: $(CORE) src/main.c $(GTK_TOKENS) | check-bundle check-tokens
-	$(CC) $(CFLAGS) -I../../packages/design-system/generated -o $@ $(CORE) src/main.c $(LDLIBS)
+# M2 的那一半（WebView）只进**窗口**这一枚：无头冒烟不链 WebKitGTK，
+# 这样"跨语言那一层"在没有任何显示环境的 CI 上照样跑得动。
+heyta-linux: $(CORE) src/main.c src/heyta_web.c src/heyta_web.h $(GTK_TOKENS) | check-bundle check-tokens
+	$(CC) $(CFLAGS) -I../../packages/design-system/generated -o $@ $(CORE) src/main.c src/heyta_web.c $(LDLIBS)
 
 heyta-smoke: $(CORE) src/smoke.c | check-bundle
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)

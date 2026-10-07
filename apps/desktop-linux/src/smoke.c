@@ -21,9 +21,11 @@
 #include <unistd.h>
 
 static int failures = 0;
+static int total_checks = 0;
 
 static void check(bool ok, const char *what) {
     printf("  %s %s\n", ok ? "✅" : "❌", what);
+    ++total_checks;
     if (!ok) ++failures;
 }
 
@@ -193,10 +195,14 @@ int main(void) {
     if (system(cleanup) != 0) { /* 清理失败不影响结论 */ }
 
     printf("\n");
+    /* 条数由这里自己报：这个数字此前住在文档里并写漂过（文档写 12/12，实跑 13）。
+     * 机器读的那一行给门禁当判据 —— 一条**跑过 0 条**的冒烟不算通过。 */
     if (failures == 0) {
         printf("✅ 跨语言那一层 + 落盘 全部通过。\n");
+        printf("HEYTA_LINUX_SMOKE=OK %d/%d\n", total_checks, total_checks);
         return 0;
     }
-    fprintf(stderr, "❌ 冒烟失败 %d 条。\n", failures);
+    fprintf(stderr, "❌ 冒烟失败 %d 条（共执行 %d 条）。\n", failures, total_checks);
+    fprintf(stderr, "HEYTA_LINUX_SMOKE=FAIL %d/%d\n", total_checks - failures, total_checks);
     return 1;
 }

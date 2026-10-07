@@ -1,0 +1,401 @@
+{
+  "_comment": "本仓 shell 里\"只在某一侧系统上存在的工具\"的债务账本；由 --write-baseline 生成，不要手改。判据：research/tools/check-shell-portability.mjs（只许减不许增，攒旧账也红）。",
+  "classes": [
+    {
+      "id": "md5_bsd",
+      "label": "`md5 -q`（BSD/macOS 独有 ⇒ GNU 上取到空串）"
+    },
+    {
+      "id": "md5sum_gnu",
+      "label": "`md5sum`（GNU 独有 ⇒ macOS 上没有这枚命令）"
+    },
+    {
+      "id": "stat_f_bsd",
+      "label": "`stat -f`（BSD 与 GNU 用它读两件不同的事，§7 第 364 条）"
+    }
+  ],
+  "files": {
+    "apps/desktop-macos/scripts/package-app.sh": {
+      "stat_f_bsd": {
+        "count": 3,
+        "lines": [
+          58,
+          141,
+          274
+        ]
+      }
+    },
+    "apps/desktop-windows/scripts/capture-window.sh": {
+      "stat_f_bsd": {
+        "count": 1,
+        "lines": [
+          31
+        ]
+      }
+    },
+    "apps/mobile/ios/scripts/export-ipa.sh": {
+      "stat_f_bsd": {
+        "count": 1,
+        "lines": [
+          67
+        ]
+      }
+    },
+    "apps/mobile/scripts/verify-release-builds.sh": {
+      "stat_f_bsd": {
+        "count": 2,
+        "lines": [
+          73,
+          107
+        ]
+      }
+    },
+    "research/tools/b-arm3-mutation-arms.sh": {
+      "md5_bsd": {
+        "count": 2,
+        "lines": [
+          21,
+          134
+        ]
+      }
+    },
+    "research/tools/b-batch-reconcile.sh": {
+      "md5_bsd": {
+        "count": 1,
+        "lines": [
+          35
+        ]
+      },
+      "md5sum_gnu": {
+        "count": 2,
+        "lines": [
+          90,
+          92
+        ]
+      },
+      "stat_f_bsd": {
+        "count": 1,
+        "lines": [
+          106
+        ]
+      }
+    },
+    "research/tools/b-wedge-mutation-arms.sh": {
+      "md5_bsd": {
+        "count": 2,
+        "lines": [
+          18,
+          155
+        ]
+      }
+    },
+    "research/tools/calendar-line-commit-only-arms.sh": {
+      "md5_bsd": {
+        "count": 19,
+        "lines": [
+          844,
+          846,
+          868,
+          872,
+          886,
+          888,
+          964,
+          967,
+          977,
+          979,
+          991,
+          994,
+          1015,
+          1045,
+          1047,
+          1106,
+          1108,
+          1135,
+          1138
+        ]
+      }
+    },
+    "research/tools/mutation-rigs/detail-column-resize-arms.sh": {
+      "md5_bsd": {
+        "count": 1,
+        "lines": [
+          25
+        ]
+      }
+    },
+    "research/tools/mutation-rigs/e2-destroyed-guard-arms.sh": {
+      "md5_bsd": {
+        "count": 2,
+        "lines": [
+          45,
+          123
+        ]
+      }
+    },
+    "research/tools/mutation-rigs/e2-isolated-carrier-check.sh": {
+      "md5_bsd": {
+        "count": 1,
+        "lines": [
+          97
+        ]
+      }
+    },
+    "research/tools/mutation-rigs/e2-remaining-gates.sh": {
+      "md5_bsd": {
+        "count": 1,
+        "lines": [
+          121
+        ]
+      }
+    },
+    "research/tools/mutation-rigs/ios-erase-arm-b76.sh": {
+      "md5_bsd": {
+        "count": 8,
+        "lines": [
+          162,
+          164,
+          172,
+          197,
+          205,
+          211,
+          233,
+          257
+        ]
+      },
+      "stat_f_bsd": {
+        "count": 1,
+        "lines": [
+          258
+        ]
+      }
+    },
+    "research/tools/mutation-rigs/w6-note-restore-device-arm.sh": {
+      "md5_bsd": {
+        "count": 4,
+        "lines": [
+          90,
+          104,
+          133,
+          153
+        ]
+      }
+    },
+    "research/tools/r14c-bundle-testid-preflight.sh": {
+      "stat_f_bsd": {
+        "count": 1,
+        "lines": [
+          65
+        ]
+      }
+    },
+    "research/tools/r14c-carrier-chain.sh": {
+      "md5_bsd": {
+        "count": 1,
+        "lines": [
+          80
+        ]
+      },
+      "md5sum_gnu": {
+        "count": 3,
+        "lines": [
+          74,
+          77,
+          81
+        ]
+      }
+    },
+    "research/tools/r14c-carrier-heal.sh": {
+      "md5_bsd": {
+        "count": 5,
+        "lines": [
+          88,
+          90,
+          178,
+          181,
+          207
+        ]
+      }
+    },
+    "research/tools/r14c-chain-overlay-arms.sh": {
+      "md5_bsd": {
+        "count": 1,
+        "lines": [
+          27
+        ]
+      }
+    },
+    "research/tools/r17-evidence-md5-check.sh": {
+      "md5_bsd": {
+        "count": 10,
+        "lines": [
+          199,
+          277,
+          302,
+          360,
+          367,
+          455,
+          477,
+          526,
+          556,
+          576
+        ]
+      }
+    },
+    "research/tools/r17-reshoot-stale.sh": {
+      "md5_bsd": {
+        "count": 4,
+        "lines": [
+          134,
+          201,
+          238,
+          368
+        ]
+      }
+    },
+    "scripts/b90-attribution-control.sh": {
+      "md5_bsd": {
+        "count": 1,
+        "lines": [
+          41
+        ]
+      }
+    },
+    "scripts/h11-arms.sh": {
+      "md5_bsd": {
+        "count": 3,
+        "lines": [
+          41,
+          42,
+          47
+        ]
+      }
+    },
+    "scripts/lib/apk-freshness.sh": {
+      "stat_f_bsd": {
+        "count": 2,
+        "lines": [
+          72,
+          87
+        ]
+      }
+    },
+    "scripts/mobile-e2e-up.sh": {
+      "stat_f_bsd": {
+        "count": 1,
+        "lines": [
+          123
+        ]
+      }
+    },
+    "scripts/reinstall-all.sh": {
+      "stat_f_bsd": {
+        "count": 4,
+        "lines": [
+          281,
+          282,
+          535,
+          538
+        ]
+      }
+    },
+    "scripts/upload-dist.sh": {
+      "stat_f_bsd": {
+        "count": 2,
+        "lines": [
+          51,
+          86
+        ]
+      }
+    },
+    "scripts/verify-harmony-toolchain.sh": {
+      "stat_f_bsd": {
+        "count": 1,
+        "lines": [
+          186
+        ]
+      }
+    },
+    "scripts/verify-macos-account-erasure.sh": {
+      "md5_bsd": {
+        "count": 1,
+        "lines": [
+          193
+        ]
+      },
+      "stat_f_bsd": {
+        "count": 2,
+        "lines": [
+          191,
+          192
+        ]
+      }
+    },
+    "scripts/verify-mobile-card-export-ios.sh": {
+      "stat_f_bsd": {
+        "count": 3,
+        "lines": [
+          117,
+          159,
+          341
+        ]
+      }
+    },
+    "scripts/verify-mobile-card-export.sh": {
+      "stat_f_bsd": {
+        "count": 1,
+        "lines": [
+          120
+        ]
+      }
+    },
+    "scripts/verify-mobile-due-time.sh": {
+      "stat_f_bsd": {
+        "count": 3,
+        "lines": [
+          367,
+          372,
+          393
+        ]
+      }
+    },
+    "scripts/verify-mobile-ios-account-erasure.sh": {
+      "stat_f_bsd": {
+        "count": 4,
+        "lines": [
+          391,
+          392,
+          411,
+          453
+        ]
+      }
+    },
+    "scripts/verify-mobile-ios-reminder.sh": {
+      "stat_f_bsd": {
+        "count": 2,
+        "lines": [
+          636,
+          708
+        ]
+      }
+    },
+    "scripts/verify-mobile-ios.sh": {
+      "stat_f_bsd": {
+        "count": 2,
+        "lines": [
+          422,
+          467
+        ]
+      }
+    },
+    "scripts/verify-mobile-notes.sh": {
+      "stat_f_bsd": {
+        "count": 3,
+        "lines": [
+          714,
+          716,
+          718
+        ]
+      }
+    }
+  }
+}
