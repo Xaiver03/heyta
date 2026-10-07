@@ -221,7 +221,20 @@ if (!DRY && lg.status === 3) {
 // 那条坑的代价是"判据全绿而装的是三天前的旧树"。这里同一条判据，只是方向反过来。
 console.log(`步骤 4：传到 ${HOST}:${REMOTE}/runs/${runId}/ （SSH 22 端口，实测无 ProxyCommand）`);
 const RUN_DIR = `${REMOTE}/runs/${runId}`;
-ssh(`mkdir -p ${RUN_DIR}/src ${REMOTE}/store ${REMOTE}/logs`);
+// 🔴 `mkdir -p` 必须把**这一趟自己的** logs 建出来。少建一格的后果不是报错，
+//    是 Docker 在 bind-mount 时**以 root 身份**替你把目录建出来（实测：
+//    `drwxr-xr-x 2 root root …/runs/<id>/logs`），于是容器里 uid 1000 写不进去，
+//    而宿主上的 ubuntu 也写不进去 —— 症状是"驱动脚本投放 Permission denied"，
+//    看起来像权限问题，实际是**目录是谁建的**问题。
+ssh(`mkdir -p ${RUN_DIR}/src ${RUN_DIR}/logs ${REMOTE}/store`);
+if (!DRY) {
+  const w = ssh(`touch ${RUN_DIR}/logs/.w 2>/dev/null && rm -f ${RUN_DIR}/logs/.w && echo WRITABLE=OK || echo WRITABLE=NO`);
+  if (!/WRITABLE=OK/.test(w.stdout)) {
+    die('步骤 4（工作目录）', `${RUN_DIR}/logs 不可写。多半是上一版留下的 root 属主目录（Docker 自动建的）。`,
+      `   修这一趟的：ssh ${HOST} 'sudo chown -R 1000:1000 ${RUN_DIR}/logs'\n` +
+        '   清历史遗留：ssh ' + HOST + " 'sudo chown -R 1000:1000 ~/heyta-gate/runs ~/heyta-gate/logs'");
+  }
+}
 const scp = run('scp', ['-q', '-o', 'ConnectTimeout=20', tarPath, `${HOST}:${RUN_DIR}/src.tar.gz`]);
 if (scp.status !== 0) die('步骤 4（传输）', `scp 失败 rc=${scp.status}`, scp.stderr.slice(0, 300));
 const remoteShaCmd = `cd ${RUN_DIR} && sha256sum src.tar.gz | cut -d" " -f1 && stat -c%s src.tar.gz`;

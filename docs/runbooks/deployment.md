@@ -1102,6 +1102,14 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
 
 ### 3.8 服务端镜像（`supersync`）的重建 —— 2026-09-27 首次在本机完成
 
+> 🔴 **2026-10-06 起，发布走 §3.8.2（`scripts/deploy-ssh.mjs`）。**
+> 下面这一节**不是过时内容**，它是这一族所有失败读数的所在地 ——
+> `APK_MIRROR` / `NPM_REGISTRY` / `PRISMA_ENGINES_MIRROR` 各自怎么坏的、
+> `tar` 为什么会覆盖生产 `.env`、`deploy.sh` 为什么会拉起一个绑不上 80 的 caddy、
+> "本地全绿但镜像建不出来"现过两次 —— 这些与**走哪条发布路无关**，换载体不会让它们失效。
+> 新路径只改了三件事：源码送达有 sha256 对账、**不 pull 任何基础镜像**、
+> 换生产容器之前先在**一次性沙箱**里把迁移和 `/health` 跑通。
+
 服务端**不是**静态产物，改动 `server/` 必须重建镜像并换容器。步骤与两个实测陷阱：
 
 ```bash
@@ -1186,6 +1194,12 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
   pnpm 会忽略 `npm_config_registry`，照旧从 `registry.npmjs.org` 取包并超时
   （构建日志里命令打印得完全正确，只有 URL 出卖了它）。`server/Dockerfile` 现在用
   `pnpm config set registry "$NPM_REGISTRY"`。详见 `AGENTS.md` §7 第 74 条。
+- ⚠️ 构建旋钮**不止上面两枚**：还有 `NODE_IMAGE`（base 镜像）与 `PRISMA_ENGINES_MIRROR`
+  （`prisma generate` 下载引擎二进制走的第三家 CDN），以及一条**不需要旋钮**但会让人误判"换源没生效"的
+  corepack 层 —— 全部逐枚说明与实测错误原文在 [`self-host.md`](self-host.md) §3。
+  🔴 **这台生产主机需不需要后两枚，本轮没有读数**：那两枚的实测是在**开发机上的自建栈验收**里做的
+  （`pnpm verify:selfhost-stack`），不要照抄成"部署时也要给"。上面那两条命令保持只给前两个旋钮，
+  是因为它们各自都有**这台机器上的**失败读数。
 - 🔴 **镜像里原来根本没有 `packages/domain`，也没有 `tsconfig.base.json`** ——
   于是 `server` 其实**早就构建不出来了**（`TS2307` / `TS5083`），而本地 `pnpm -r build` 永远绿。
   这是本次重建挖出的最危险的一条：**"本地全绿"证不了"镜像能构建"**。
@@ -1332,7 +1346,64 @@ ssh ubuntu-jcli 'sudo docker logs --since 5m supersync-server 2>&1 | grep -i "Pa
 不需要单独吊销。
 
 
+### 3.8.2 ✅ SSH 发布（2026-10-06 起的默认路径）：`scripts/deploy-ssh.mjs`
+
+**默认不动生产。** 这条命令的默认动作是**沙箱验证**：把源码送上去、把镜像建出来、
+在一次性 Postgres 上把迁移从空库跑通、把一次性容器打到 `/health=200`，
+然后只删自己创建的那三枚对象。
+
+```bash
+node scripts/deploy-ssh.mjs                       # 沙箱验 HEAD（安全，不碰线上）
+node scripts/deploy-ssh.mjs --ref <sha>           # 沙箱验指定提交
+node scripts/deploy-ssh.mjs --dry-run             # 只打印计划
+node scripts/deploy-ssh.mjs --apply --yes-production   # 🔴 真换生产（两个旗标都要给）
+node scripts/deploy-ssh.mjs --rollback <tag>      # 生产指回上一个 tag
+```
+
+| 步 | 动作 | 🔴 判据（不对就停，不降级） |
+|---|---|---|
+| 1 | 打包清单 = `server/image-inputs.txt`，并与 `server/Dockerfile` 的 `COPY` **逐字对账** | 两份不等 ⇒ 停。那份清单文件头写着后果：revision 标签会算出一个"看起来最新"的 commit，而镜像里其实是旧的前端 |
+| 2 | `git archive <ref>` | 归档里 `.env` **枚数必须 0**（§3.8 那条 `JWT_SECRET` 事故的锁） |
+| 3 | 经 **SSH** 送达 | 两端 **sha256 逐字相同**，对不上**拒绝部署**（AGENTS §7 第 82 条：判据全绿而装的是三天前的旧树） |
+| 4 | 基础镜像必须在机器上 | 缺 ⇒ 停，并点名"`docker pull` 在这台就是代理字节"。要补请离线 `docker save \| ssh \| docker load` |
+| 5 | `docker build`，**六个 proxy build-arg 显式置空** + `APK_MIRROR=aliyun` + `NPM_REGISTRY` | 建不出来 ⇒ 停（§7 第 75 条那一族）。✅ 建完必须回读镜像里的 `org.opencontainers.image.revision` 标签 **== 送出去的那个 commit** |
+| 6a | 沙箱：一次性网络/库/容器，**镜像自带的 `scripts/migrate-deploy.sh`** 在空库跑通，`/health=200` | 迁移在空库跑不通 ⇒ 那是镜像自身的迁移链坏了，与生产无关。`/health` 不是 200 ⇒ 停 —— **命令退出码 0 不算这条判据** |
+| 6b | 生产：先 `docker tag supersync:local supersync:rollback-<日期>` → 旧容器仍在服务时跑迁移 → 只有 `MIGRATE_RC=0` 才 `up -d --wait supersync` | 迁移失败 ⇒ **拒绝换容器**（旧容器继续服务）。这一支**只碰 `supersync`**，不跑 `deploy.sh`，所以不会造出一个绑不上 80 的 caddy（§3.8 那条） |
+
+**迁移纪律照旧，且写死在实现里**：绝不 `prisma migrate deploy`（AGENTS §4：
+PostgreSQL 禁止在事务块内 `CREATE INDEX CONCURRENTLY`，而 `deploy` 会在含它的迁移上
+以 `P3018 / SQLSTATE 25001` 失败）。用的就是镜像内那份 `server/scripts/migrate-deploy.sh`，
+它的权威规范在 [`../../server/prisma/migrations/README.md`](../../server/prisma/migrations/README.md)。
+
+**回退**：`--rollback <tag>` 或直接
+`ssh ubuntu-jcli 'cd ~/heyta/server && docker tag supersync:rollback-<日期> supersync:local && docker compose -f docker-compose.yml up -d --wait supersync'`。
+
+**换完仍然要重取 §3.8.1 那五条线上判据** —— 本脚本只证 `sha256 对账` / `镜像 revision 标签` /
+`/health=200` 这三格，**它不证明用户那条旅程通了**。
+
+<!--DEPLOY-SSH-MEASURED-->
+
+#### 为什么不是"在 Mac 上建好 amd64 镜像再管道送过去"
+
+任务原本的目标形态是 `docker save | ssh cat | docker load`。实测之后把**默认**定成
+"送源码 + 远端零代理构建"，四条数都在归因文档里：
+
+| 事实 | 读数 | 后果 |
+|---|---|---|
+| 这台 Mac 的 `docker` 是 CLI，daemon（OrbStack）**当前没在跑** | `Cannot connect to the Docker daemon at unix:///…/orbstack/run/docker.sock` | 本地构建这条路今天**无法验证**，不是"不想" |
+| Mac 是 `arm64`，目标机是 `x86_64` | `uname -m` = `arm64`；finlaw `uname -m` = `x86_64` | 必须 `--platform linux/amd64` 交叉 ⇒ `pnpm install` + `tsc` 全部跑在模拟层里 |
+| SSH 上行带宽 | **≈ 350 KB/s**（40 MB 用时 120 s，22 端口直连） | `supersync:local` 是 513 MB ⇒ 一次 `save\|ssh\|load` 约 **25 分钟**；改一次 `server/` 也要等这么久 |
+| 远端构建的依赖来源 | `registry.npmjs.org` 直连 **1.78 MB/s**、`registry.npmmirror.com` **9.4 MB/s**（都在**不挂代理**的会话里实测） | 🔴 **装依赖本来就不需要代理** —— 那正是这条路当初必须离开 finlaw 的理由里，已经被量掉的那一半 |
+
+⇒ 不变量是"**零代理字节**"，不是"字节必须从 Mac 出发"。按实测，前者在远端构建成立且快得多。
+`save|ssh|load` 那条**保留为第 4 步的补救动作**（基础镜像缺失时离线补），
+脚本在第 4 步的报错里就写着这句。
+⚠️ **未验证**：本脚本没有 `--image-from-mac` 这条实现 —— 在 daemon 起来之前它无法被测，
+而"写了但没跑"在这个仓库里不算交付。
+
 ### 3.9 ✅ 生产 SMTP —— 2026-09-27 打通，发信已实测**真投递**
+
+
 
 **历史问题**（保留，因为它是"看起来像代码 bug 的部署缺口"的典型）：
 服务端日志一直是

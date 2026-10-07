@@ -10,6 +10,27 @@
 >
 > ⚠️ 本文件里的每一条命令都**在 finlaw 上实跑过**。标「未核实」的才是没验过的。
 
+---
+
+## 🟢 当前答案（2026-10-06 起）
+
+| | 现在怎么跑 | 以前怎么跑 |
+|---|---|---|
+| **载体** | **`node scripts/gate-ssh.mjs`**（§12）：源码经 **SSH** 送到 finlaw，在一枚容器里干净装依赖、逐段跑根 `package.json` 的 `check` | push → GitHub Actions → finlaw 上的自托管 runner 容器 |
+| **为什么换** | runner 那条路的每一个字节都要经宿主机 mihomo（付费代理额度）。实测**门禁需要的源这台机器直连就通**，需要代理的只有 GitHub 的批量传输与 docker.io 拉取 —— 两样都能绕开 | 当时以为"GitHub 直连不通 ⇒ 必须走代理" |
+| **归因** | 见 [`../research/ci-proxy-traffic-attribution.md`](../research/ci-proxy-traffic-attribution.md)（逐条读数 + 明确写了哪些**归因不到**） | —— |
+| **已停用** | 两枚 workflow 手工停用，**没有删除**：`367547590`(CI) / `374087511`(服务端镜像发布) 都是 `disabled_manually` | —— |
+| **恢复一条命令** | `gh api -X PUT /repos/Xaiver03/heyta/actions/workflows/367547590/enable`，然后 `ssh ubuntu-jcli 'docker start heyta-ci-runner'` | —— |
+| **再停一条命令** | `gh api -X POST /repos/Xaiver03/heyta/actions/workflows/367547590/disable` + `ssh ubuntu-jcli 'docker stop heyta-ci-runner'` | —— |
+
+🔴 **§3–§11 描述的是那台自托管 runner**（容器与 `/opt/heyta-ci` 都**还在**，只是停了）。
+留着不是整理没做完 —— 那里记着"为什么当初必须自托管"（§2、§7 转公开的硬约束）
+和七八条**只会以同样方式再踩一次**的坑（§4.2 的 Compose 拆词、§8.1 的"看着在跑其实什么都没验"）。
+那些理由与坑**和走哪条路无关**，换载体不会让它们失效。
+
+---
+
+
 ## 0. 图例
 
 | 标记 | 含义 |
@@ -22,15 +43,23 @@
 
 ## 1. 一句话
 
-`push` 到 `main`（或提 PR）→ GitHub 把任务派给 **finlaw 上的自托管 runner**
-→ 在容器里干净检出一份新克隆 → 跑 `pnpm check`（门禁串联）+ `pnpm test`
-→ 结果回报 GitHub。
+**现在**：人在开发机上敲一条 `node scripts/gate-ssh.mjs` → 源码打包经 **SSH** 送到 finlaw
+的一个隔离目录 → 在一枚容器里 `pnpm install --frozen-lockfile` → **逐段**跑根
+`package.json` 的 `check` → 每段一个 rc 落进 `result.tsv`，汇总印"真正执行 N / 全链 M 段、
+因环境跳过 K 段"。全程**没有一个字节经过 mihomo**（这条是被测出来的，见 §12.4）。
+
+**以前（§3 起那一整段，已停用但保留）**：`push` 到 `main`（或提 PR）→ GitHub 把任务派给
+**finlaw 上的自托管 runner** → 在容器里干净检出一份新克隆 → 跑 `pnpm check`（门禁串联）
++ `pnpm test` → 结果回报 GitHub。
 
 ⚠️ **门禁条数刻意不写在这里** —— 它漂过好几次。唯一权威是根 `package.json` 的
 `check` 脚本，`pnpm check` 就是按它逐条跑的；要数就直接读那一行。
+新载体同样是**运行时解析那一行**，`scripts/check-gate-ssh.mjs` 里有一条臂专门钉这件事
+（注入"抄一份硬编码清单"会红）。
 
-**这个 workflow 的核心不是"跑一下测试"，而是每次都在干净环境里重新回答一次
-「一个新克隆能不能自己立起来」。**
+**这个载体的核心不是"跑一下测试"，而是每次都在干净环境里重新回答一次
+「一个新克隆能不能自己立起来」。** 换载体没有改这一条 —— §12.3 里那条"镜像不许预装依赖"
+就是它的落地。
 
 ---
 
@@ -57,6 +86,9 @@ package.json 与 lockfile 一旦漂移立刻红，而不是等到某个人在新
 
 ## 3. runner 放在哪
 
+> ⚠️ **§3 到 §11 是已停用的那条路**（2026-10-06 停用，容器与目录都还在）。
+> 保留的理由写在文件顶部那张表下面；要跑门禁请看 §12。
+
 | 项 | 值 |
 |---|---|
 | 主机 | **finlaw**（SSH 别名 `finlaw` / `ubuntu-jcli`，`124.223.13.226`） |
@@ -65,7 +97,7 @@ package.json 与 lockfile 一旦漂移立刻红，而不是等到某个人在新
 | 标签 | `self-hosted`, `Linux`, `X64`, `heyta-ci` |
 | 容器名 | `heyta-ci-runner` |
 | 目录 | `/opt/heyta-ci/` |
-| 状态 | ✅ `online` |
+| 状态 | 🟡 **`exited (143)`，容器保留**（2026-10-06 由 `docker stop` 停；恢复 `docker start heyta-ci-runner`） |
 
 **为什么是 finlaw**：这台本来就是构建机（跑着 registry + buildkit），
 而且**没有邮件服务器** —— 最坏的失败模式只是"构建变慢"，不是"邮件发不出去"。
@@ -120,10 +152,39 @@ entrypoint:
 
 ### 4.3 🔴 代理是必需的，不是可选
 
-**finlaw 直连 `github.com` 是超时的（实测）** —— 不挂代理，clone 会永久卡住。
-宿主机 mihomo 监听 docker0 网关 `172.17.0.1:7890`，容器可达。
+> 🔴 **这条的前提在 2026-10-06 被复测推翻了一半，原文留着**（它撑住了"当初为什么必须
+> 自托管 + 为什么必须挂代理"，那部分**结论仍然成立**，只是理由换了位置）：
+>
+> | 原话 | 复测读数（2026-10-06，命令见归因文档 §6.7） |
+> |---|---|
+> | "finlaw 直连 `github.com` 是超时的（实测）" | **不再成立**：`https://github.com/` = **200 / 0.09 s**，宿主 5/5 次、容器 1/1 次；`api.github.com` = 200 / 0.47 s |
+> | "不挂代理，clone 会永久卡住" | **仍然成立，但要改口径**：慢的是**批量传输** —— `codeload.github.com` 直连实测 **109 KB/s**，20 s 只拿到 2.19 MB 就超时。63 MiB 的源码包按这个速率约 **10 分钟且会中途失败** |
+> | "所以必须走代理" | 对**当时的动作**成立（一次冷构建要下 Node 208 MB + Chromium 658 MB + Electron 100 MB+，全从 GitHub/Azure CDN） |
+>
+> 🔴 **可迁移的一条**：那条"实测"在十天内变成了"只对批量传输成立"，而没人回去量过 ——
+> 于是它同时撑住了两句本来该分开说的话。凡把一条网络读数当**决策前提**，旁边必须写复现命令。
+>
+> **换载体之后**：批量传输那一站被绕开了 —— 源码由 SSH（22 端口，实测直连、`~/.ssh/config`
+> 无 ProxyCommand）送来，依赖从 `registry.npmmirror.com` 取（实测**直连 9.4 MB/s**，
+> 比走代理的 0–40 KiB/s 快两个数量级），基础镜像用机器上已有的那一枚（不 pull）。
+> 详见 §12。
 
-✅ 实测走代理：`github.com` HTTP **200 / 0.68 s / 846 KB/s**。
+**宿主机 mihomo 监听 docker0 网关 `172.17.0.1:7890`**，容器可达（这条没变，仍是事实）。
+✅ 实测走代理：`github.com` HTTP **200 / 0.68 s / 846 KB/s**（2026-09-26 的读数）。
+
+⚠️ 另有三条**不写在环境变量里**的代理通道，2026-10-06 现量：
+
+1. `git config --global http.proxy=http://172.17.0.1:7890`（finlaw 的 ubuntu 用户）。
+   ⇒ 清掉 shell 变量**拦不住它**：一次 `git ls-remote https://github.com/…` 在
+   "看起来没有代理"的 shell 里照样成功。我自己差点把这条读成"直连 GitHub 通了"。
+2. `/etc/docker/daemon.json` 里的 `proxies` 块 = 同一个 mihomo。
+   ⇒ 任何 `docker pull` 都是代理字节。这一条**不能改**（红线），所以新载体只用
+   **机器上已有**的基础镜像，缺了就响亮拒绝、不去 pull。
+3. runner 容器 compose 里那 6 行（`HTTP_PROXY` 等）—— 那是**显式**设置，最容易看见。
+
+✅ 同时实测：daemon 的 proxy **不会**注入到普通容器 ——
+`docker inspect supersync-server` 里 proxy 变量命中 **0 条**。所以"容器不挂代理"
+是默认状态，而新载体仍然把六个变量**显式置空**：盖掉镜像层可能带进来的值。
 
 ---
 
@@ -376,3 +437,137 @@ gh run view <id> --json jobs -q '.jobs[].steps[] | "\(.conclusion//"-") \(.name)
 6. `gh api repos/Xaiver03/heyta/actions/runners` 确认在线、标签含 `heyta-ci`。
 7. 🔴 确认 `runs-on` 的四个标签与新 runner 一致；
    若是**替换**而非新增，删掉 GitHub 上的旧 runner 记录。
+
+---
+
+## 12. ✅ 当前载体：`gate:ssh`（2026-10-06 起）
+
+### 12.1 一条命令
+
+```bash
+node scripts/gate-ssh.mjs              # 跑 HEAD 那一批源码（= 新克隆的语义）
+node scripts/gate-ssh.mjs --dirty      # 跑**当前工作树**（含未提交文件，按 .gitignore 排除）
+node scripts/gate-ssh.mjs --strict     # 环境类跳过也算红（发版前用这一档）
+node scripts/gate-ssh.mjs --dry-run    # 只打印计划，一个字节都不写
+```
+
+九个步骤，每一步都有读数、任何一步不对就**响亮停**：
+
+| 步 | 做什么 | 判据（不对就停） |
+|---|---|---|
+| 1 | 从根 `package.json` 的 `check` **运行时解析**门禁链 | 解析不到就停，不凭记忆编一份 |
+| 2 | `git archive`（或临时索引 + `write-tree`）打包 | 归档里 `.env` **枚数必须为 0** |
+| 3 | 读远端负载 | 阈值 = `nproc × 3/4`（从被约束的常量推导，不写死）；等满 15 分钟 ⇒ **exit 3 = 环境无效**，不是产品失败 |
+| 4 | tar 经 **SSH** 送达 | 两端 **sha256 逐字相同**，对不上拒绝继续 |
+| 5 | 确认载体镜像 | 基础镜像必须**已在机器上**；缺了就停 —— 去 `docker pull` 就是代理字节 |
+| 6 | 🔴 **出口探针**（在任何花钱动作之前） | `EGRESS=FAIL` 停；`EGRESS=INCONCLUSIVE` 可以继续，但汇总只能写"未证明" |
+| 7 | `pnpm install --frozen-lockfile` | 失败 ⇒ 汇总必须写「N 段门禁**一段都没有执行**」并 exit 1 |
+| 8 | **逐段**跑链 | 每段一个 rc 进 `result.tsv`；**行数 ≠ 段数就停**（少一行就是有一段既没跑也没登记） |
+| 9 | 汇总 | 「真正执行 N / 全链 M」+「因环境跳过 K」逐条点名理由 |
+
+### 12.2 为什么是这个形状（含被否掉的备选）
+
+不变量只有一条：**跑门禁这件事，一个字节都不许再经过 mihomo。** 四条候选路，
+按实测挑了一条，其余三条留下为什么不行：
+
+| 备选 | 判决 | 实测理由 |
+|---|---|---|
+| 在**这台 Mac** 上跑门禁（容器里干净装依赖） | ❌ 否掉 | Mac 的 `git config --global` 里就写着 `http.proxy=127.0.0.1:7890` —— 装依赖同样是**那份付费额度**，只是换台机器花。"零代理"这个性质只有在 finlaw 才成立（那里 SSH 会话里根本没有 proxy 变量，且 npm 源直连可达） |
+| 复用那台自托管 **runner**，只是少跑几步 | ❌ 否掉 | runner 的字节大头是 GitHub 批量与 CDN 二进制，"少跑几步"改不了载体；而且它**空转**就在花 1.2 GiB/月（归因文档 §2 第 7 条实测） |
+| 在 finlaw 上 `git clone` 拉源码 | ❌ 否掉 | GitHub 的**批量传输**直连实测 109 KB/s 且 20 s 超时（63 MiB ⇒ 十分钟级、中途失败）；而宿主 ubuntu 用户 `git config --global http.proxy` 写着 mihomo ⇒ 一次"看起来没代理"的 clone **照样走代理** |
+| **SSH 送 tar + 国内/官方 npm 源直连 + 机器上已有的基础镜像** | ✅ 采用 | 三条都有数：SSH 22 端口直连（`~/.ssh/config` 无 ProxyCommand，实测上行约 350 KB/s ⇒ 63 MiB ≈ 3 分钟）；`registry.npmjs.org` 直连 1.78 MB/s；`node:24-alpine` 242 MB **已在机器上** ⇒ 零 pull |
+
+依赖源那一格有个**反直觉的更正**：默认用的是**官方 registry**，不是国内镜像 ——
+`registry.npmmirror.com` 缺包（实测 `pnpm install --frozen-lockfile` 死在
+`[ERR_PNPM_FETCH_404] @op-engineering/op-sqlite/-/op-sqlite-18.2.5.tgz`）。
+"为了看起来本地化而用一个会缺包的镜像"不成立。旋钮 `HEYTA_GATE_NPM_REGISTRY` 留着。
+
+### 12.3 门禁清单与「响亮跳过」
+
+- **链的唯一权威是根 `package.json` 的 `check`**，`gate-ssh.mjs` 在**运行时解析**它。
+  `scripts/check-gate-ssh.mjs` 里有一臂专门注入"抄一份硬编码清单"，会红。
+- 逐段跑，**不是**一条 `pnpm check`。理由：那条链是 `&&`，第一段红就整条断，
+  后面什么样永远看不到；而"逐段"能给出"哪几段红、红在哪"，也才谈得上把
+  **载体跑不了**与**代码坏了**分开登记。
+- 🔴 跳过必须**点名 + 给缺的是什么**。`ENV_LIMITED` 那张表每一项都写着缺哪个能力，
+  汇总里印成「下面这些**没有被验证**（不是"通过"，是"没跑"）」。今天跳过的是：
+  `check:ai-e2e` / `check:privacy-consent-e2e` / `check:landing-e2e`（载体无 Chromium）、
+  `screenshot:verify`（没有本轮采集的图）、`check:arkts`（没有 DevEco 的 `es2abc`）。
+- `--only` 跑出来的绿会被大字标成「**这不是一次完整验证**」（子集段数 / 全链段数并列）。
+  这一条防的是 §8.1 那个形状的**新版**：拿一次局部运行当整体通过。
+- `--strict` 把所有跳过折成红。
+
+### 12.4 🔴 "确实没走代理"是怎么证的
+
+见 `scripts/ci/egress-probe.sh`。它**不判可达性**（那条前提已被推翻，见 §4.3），
+而是拿 mihomo 的 `/connections` 当仪器做一次**配对测量**：
+
+```
+A：容器内不挂代理，打一次只有本项目会打的 URL（自己仓库的 pnpm-lock.yaml，限速拖住 14 秒）
+B：同一发请求，显式 -x http://172.17.0.1:7890
+```
+
+| 读数 | 含义 |
+|---|---|
+| B 在账本里**有**记录 | 仪器看得见这类连接（对照成立） |
+| A 在账本里**零**记录 | 这批发出去的字节确实没经过 mihomo |
+| B **没**记录 | 🟠 `EGRESS=INCONCLUSIVE` + exit 2 —— 仪器瞎了，A 的"没有"什么都不是 |
+| A **有**记录 | 🔴 `EGRESS=FAIL`，整趟停 |
+
+2026-10-06 实测读数：`B_VIA_PROXY … mihomo_matched=1 73506` / `A_NO_PROXY … mihomo_matched=0 0`
+⇒ `CONTROL=OK`、`LEAK=NONE`、`EGRESS=OK`。B 那一次约 218 KB 是**整套方案里唯一刻意花额度的动作**。
+
+四个"仪器自己坏了"的坑，都是跑出来的，都写在脚本注释里，`check-gate-ssh` 各自有一臂盯着：
+① 采样时机（`/connections` 只列活跃连接，跑完再采 ⇒ 永远 BLIND）；
+② `-4`（那个域名解析到 AAAA，容器没有 IPv6 出口 ⇒ A 一个字节都没发出去，
+   而"零记录"会被读成"没走代理" —— 这是最坏的一种假绿，所以补了「A 字节下限」那一档）；
+③ 判据跑在带注释的原文上（说明里就写着被禁的那个词 ⇒ 永远红）；
+④ 控制器地址被抄成两份。
+
+### 12.5 触发方式：手动一条命令（默认）
+
+| 候选 | 判决 | 理由 |
+|---|---|---|
+| **人敲一条命令** | ✅ 采用 | 与这个仓库现有的工作方式一致（提交前人跑 `pnpm check`）；负载门保护那台共享生产机 |
+| `post-receive` 钩子 | ❌ 暂不做 | finlaw 上**没有**这个仓库的 git remote（源码是按 tar 送来的），要先建裸库 + 配 SSH 推送；而这个仓库有**多个并行会话在同一条 main 上高频推送**（一天里 207 次 run 就是那台托管 runner 被 push 出来的）⇒ 钩子会把 4 核的生产机打成队列 |
+| 定时（每晚之类） | ❌ 暂不做 | 没有决策需求时烧 4 核共享机的 30–60 分钟，只为"看起来在跑" |
+
+需要钩子或定时的话，落点是清楚的：把它们做成 `gate-ssh.mjs` 的两个调用方，**不要再抄一份流程**。
+
+### 12.6 GitHub 侧可见性（未做，且这不是环境问题）
+
+🔴 实测**不需要代理**也能回报：`api.github.com` 从 finlaw 直连 **200 / 0.47 s**。
+所以"要不要把结果写回 commit status"是一个**纯决策**，不是"这条路技术上不通"：
+代价是要在那台共享生产机上放一枚凭据（`repo:status` 范围的 fine-grained token 最小），
+而那台机器上还跑着别的项目。→ 记在归因文档 §7 待裁决。
+在拿到决定之前，结果**只在本地与远端留档**（`/tmp/heyta-gate-evidence/<run>.summary.txt`
++ `ubuntu-jcli:~/heyta-gate/runs/<id>/logs/{result.tsv,steps.log}`），
+没有留任何"会悄悄走代理的轮询"。
+
+### 12.7 红了怎么归因
+
+```bash
+ssh ubuntu-jcli 'cat ~/heyta-gate/runs/<id>/logs/result.tsv'        # 每段一行：rc / 段名 / 起止
+ssh ubuntu-jcli 'tail -200 ~/heyta-gate/runs/<id>/logs/steps.log'   # 那一段的原文
+```
+
+`result.tsv` 三列固定：`rc \t step \t note`。**跳过与执行过在文件里长得就不一样** ——
+这是"不许把没跑的读成跑过的"那一半的实现。
+
+### 12.8 还没验到的边界（不包装成完成）
+
+- ⚠️ **载体是 musl（`node:24-alpine`）**。门禁里凡依赖 glibc 行为、原生模块编译、
+  Prisma 引擎二进制分档的段，在 musl 上的结果**不等于** Debian 上的结果。
+  第一次全量跑的逐段读数写在 §12.9（跑完回填；没跑完之前这一格是空的）。
+- ⚠️ **`--dirty` 跑的是工作树**，里面有并行会话未提交的代码。那些段红了不一定是本路的问题，
+  而归属只能靠 run id + 当时的 HEAD 去对。要"这条 main 到底行不行"的结论请用 `--ref`。
+- ⚠️ 首次真跑就抓到一条**已提交的 main 是坏的**：`package.json` 从 `4b31fde5` 起
+  在 `}` 之后多了一行 ⇒ 不是合法 JSON ⇒ 任何新克隆 `pnpm install` 直接失败。
+  这正是这个载体存在的理由（§2 那句话今天又成立了一次），**修法归那个改动的所有者**，
+  本路不代改（工作树里那份已经是好的）。
+- ⚠️ 真机/原生类段（`check:macos-*`、`check:windows-shell`、`check:linux-shell`、
+  `check:native-deps`、`check:mobile-*`）在这台机器上的表现与在开发机上不同，
+  它们**自己**的跳过逻辑是否够响亮，要看 §12.9 那一次读数。
+- ⚠️ **e2e 那一族今天没有跑**（无 Chromium）。要在这台机器上跑它们，需要先解决
+  浏览器二进制的来路（`cdn.playwright.dev` 实测 307/400，机器上也没有那份缓存）——
+  那是另一件事，不在本路的范围里。

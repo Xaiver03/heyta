@@ -15,6 +15,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  *      并且 service worker 在 `/app/` 这个 scope 下**真的注册上了**。
  *   S2 在这台实例上注册一个账号并登录，凭据落在**这台服务器**上。
  *   S3 建一条任务同步出去，**另一台全新设备**（空 IndexedDB）能读到它。
+ *   S4 注销之后，那条任务的明文在这台浏览器的**两类本机宿主**（IndexedDB 与 OPFS）里
+ *      都读不回来，并且在一段覆盖后台写入的窗口之后**仍然**读不回来（见下面的分层）。
  *
  * ## 🔴 为什么 S1 里"SW 注册上了"是一条独立判据
  *
@@ -393,4 +395,169 @@ test('S3 建一条任务同步出去，全新设备只能从服务端读到它',
 
   await fresh.screenshot({ path: 'selfhost-stack-results/s3-device-b-recovered.png' });
   await ctx.close();
+});
+
+/**
+ * 扫这台浏览器里**属于本机的明文**，返回含该子串的位置。两类宿主都扫：
+ *
+ * · IndexedDB：遍历**已存在**的库（`indexedDB.open(name)` 对不存在的库会把它**建出来** ——
+ *   那样探针自己就成了被观测的那次重建），逐仓库 `getAll()` 比对；
+ * · OPFS：从 `navigator.storage.getDirectory()` 递归走到每个文件，按字节读进来比对。
+ *
+ * 🔴 **为什么必须扫两类，而不是一句"扫 IndexedDB"**：`apps/web/src/lib/oplog.ts` 的
+ * `resolveBackend()` 里那句 `return raw === 'indexeddb' ? 'indexeddb' : 'sqlite'` ——
+ * **默认后端是 OPFS 里的 SQLite**，`VITE_HEYTA_STORAGE` 没设时明文躺在
+ * `.heyta-web/heyta.sqlite`，IndexedDB 里根本没有任务正文。
+ * 只按字面去扫 IndexedDB 的判据会**永远扫不到**，于是"注销后扫不到"这条在没修好的产品上照样绿，
+ * 而它的阳性对照（注销前扫得到）会先红 —— 那是探针够不着，不是产品坏了（§7 元规则 1）。
+ *
+ * 子串一律用 **ASCII 的 nonce**（`selfhost-task-<7 位数字>`）：SQLite 里正文按 UTF-8 存，
+ * 纯 ASCII 的 needle 在两种解码下字节相同，所以按 latin1 解一遍就能命中，不必处理多字节边界。
+ *
+ * 库名/目录名**不在这里抄第二份**（这一族跑的是打进镜像的产物，页面里没有 dev server，
+ * import 不到 `WEB_DATABASE_NAMES` / `WEB_OPFS_DIRECTORY`）—— 改成遍历，名字漂了自动跟着变。
+ */
+async function scanLocalPlaintextFor(page: Page, needle: string): Promise<string[]> {
+  return page.evaluate(async (needle: string) => {
+    const hits: string[] = [];
+
+    for (const { name } of await indexedDB.databases()) {
+      if (!name) continue;
+      const db = await new Promise<IDBDatabase | null>((resolve) => {
+        const req = indexedDB.open(name);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+        req.onblocked = () => resolve(null);
+      });
+      if (!db) continue;
+      for (const storeName of Array.from(db.objectStoreNames)) {
+        const rows = await new Promise<unknown[]>((resolve) => {
+          const tx = db.transaction(storeName, 'readonly');
+          const read = tx.objectStore(storeName).getAll();
+          read.onsuccess = () => resolve(read.result as unknown[]);
+          read.onerror = () => resolve([]);
+        });
+        if (rows.some((row) => JSON.stringify(row ?? null).includes(needle))) {
+          hits.push(`idb:${name}/${storeName}`);
+        }
+      }
+      db.close();
+    }
+
+    if (navigator.storage?.getDirectory) {
+      const walk = async (dir: FileSystemDirectoryHandle, prefix: string): Promise<void> => {
+        for await (const [name, handle] of dir.entries()) {
+          if (handle.kind === 'directory') {
+            await walk(handle as FileSystemDirectoryHandle, `${prefix}/${name}`);
+            continue;
+          }
+          const file = await (handle as FileSystemFileHandle).getFile();
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          // 一次性解码：这套栈里这个文件是刚建的小库；真要防大文件，分块要带重叠窗口，
+          // 否则命中正好跨块边界会漏 —— 现在这个尺寸够不到那个形状。
+          if (new TextDecoder('latin1').decode(bytes).includes(needle)) {
+            hits.push(`opfs:${prefix}/${name}(${bytes.byteLength}B)`);
+          }
+        }
+      };
+      await walk(await navigator.storage.getDirectory(), '');
+    }
+
+    return hits;
+  }, needle);
+}
+
+/**
+ * S4 注销之后：这条任务的明文**从这台浏览器的盘上读不回来**，而且之后也没被重建。
+ *
+ * ## 这一腿补的是哪一格
+ *
+ * `docs/plans/trash-and-archive.md` §10.230 给 #104 指名的缺口是：**注销销毁的到底是
+ * 哪一个适配器实例**。在此之前 `eraseWebLocalData()` 是"另开一个 `IndexedDbAdapter` 去
+ * `deleteDatabase`"，盘上的库确实删了，而**这个页面会话真正在用的那个实例**（`lib/oplog.ts`
+ * 的模块单例，同步客户端在构造时就把它的 store captures 住了）没有被标记成已销毁 ——
+ * 它下一发读写会把同名库**空着建回来**，界面却说"已清除"。
+ *
+ * ## 🔴 三层的判据不重叠，这一层只答它答得了的那一句
+ *
+ * · **实例级**"旧句柄的下一发读写以 `AdapterDestroyedError` 失败"住
+ *   `apps/web/tests/local-destroy-live-adapter.spec.ts` —— 它只能从**真模块的模块态**里读，
+ *   而打过包的产品页面里没有任何句柄可以被测试拿到（不给生产产物开测试后门是刻意的）。
+ * · **字节级**"真库里真的没留下"住这一条：它验的是**外部可见后果** —— 注销之后这台浏览器的
+ *   **两类明文宿主**（IndexedDB 与 OPFS）里都扫不到那条任务，并且在一段会覆盖自动同步去抖与
+ *   在途写回执的窗口之后**仍然**扫不到。旧句柄还活着时会在这段窗口里把库写回来，
+ *   所以这一条是那一族缺陷**在真产物上可见的形状**。
+ * · 而"注销在服务端真的成了"（`DELETE /api/account` 之后同一份凭据登录不回来）**不在这一条里判** ——
+ *   它由 `server/tests/delete-account.routes.spec.ts` 在真服务端路由上判。这一条只答"这台设备干净了没有"。
+ *
+ * ⚠️ 这条不是"UI 上没有那一行"：界面读的是内存里物化的状态，库被重建了它也不一定会再显示出来。
+ *    所以判据直接读盘上的字节，不读 DOM。
+ *
+ * 🔴 **这一载体跑的是默认后端（OPFS SQLite），所以它结构上碰不到 IndexedDB 那一支**：
+ * `openStorage()` 只在 `resolveStorageBackend() === 'indexeddb'` 时给模块单例 `db` 赋值，
+ * 默认那一条 `db` 一直是 `undefined` ⇒ 销毁在那一支走的是 `releaseStorageWorker()`（句柄在
+ * worker 那一侧），不是 `destroyLiveStorage()`。所以这一条**不许被读成**"证过了销毁后拒用"：
+ * 它证的是"这台机器上没有属于这个人的明文，且没有被他刚才那个会话写回来"。
+ */
+test('S4 注销之后：这条任务的明文在这台浏览器的两类宿主里都读不回来，之后也没被重建', async ({ page }) => {
+  test.slow();
+  const { email } = newAccount();
+  const title = `${TASK_TITLE_PREFIX}-${accountSeq}`;
+
+  const consoleErrors: string[] = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error') consoleErrors.push(m.text());
+  });
+  page.on('pageerror', (e) => consoleErrors.push(`pageerror: ${e.message}`));
+
+  await openApp(page);
+  await registerAndSignIn(page, email);
+  await setE2eePassword(page);
+
+  const composer = page.locator('input[placeholder^="添加任务"]');
+  await composer.fill(title);
+  await composer.press('Enter');
+  const row = page.locator('[data-testid^="task-item-"]').filter({ hasText: title });
+  await expect(row).toBeVisible();
+  await page.getByTestId('sync-rail-action').click();
+  await expect(statusBar(page)).toContainText('已同步', { timeout: 30_000 });
+
+  // ── 阳性对照：探针**扫得到**这条任务 ────────────────────────────
+  // 🔴 没有这一格，"注销后扫不到"在整台机器上永远成立（扫不到任何字节时，
+  //    探针坏、库本来就是空、产品真的删干净 —— 三种解释在输出上一模一样）。
+  const before = await scanLocalPlaintextFor(page, title);
+  expect(before.length, '注销前必须能在本机明文宿主里扫到那条任务（否则后面的"扫不到"不算证据）').toBeGreaterThan(0);
+  // 把命中的宿主打进日志：这条载体到底跑的是 IndexedDB 还是 OPFS，读日志的人不用猜。
+  console.log(`S4 阳性对照命中宿主：${before.join(', ')}`);
+
+  // ── 走真实入口注销：头像 → 设置 → 注销账号 → 打勾 → 两段确认 ──────
+  await page.getByTestId('account-menu-avatar').click();
+  await page.getByTestId('account-menu-settings').click();
+  const panel = page.getByTestId('close-account-panel');
+  await expect(panel, '已登录时设置页里必须有注销面板').toBeVisible();
+  await panel.scrollIntoViewIfNeeded();
+
+  await panel.locator('#close-account-ack').check();
+  await panel.getByTestId('close-account-open').click();
+  await panel.getByTestId('close-account-confirm').click();
+
+  const result = panel.getByTestId('close-account-result');
+  await expect(result, '注销必须给出结局那一句').toBeVisible({ timeout: 30_000 });
+  await expect(result).toHaveAttribute('data-disposition', 'closed-and-erased');
+  await page.screenshot({ path: 'selfhost-stack-results/s4-after-close.png' });
+
+  // ── 字节级判据：那条任务在这台浏览器的 IndexedDB 里读不回来 ────────
+  const after = await scanLocalPlaintextFor(page, title);
+  expect(after, `注销后仍扫得到明文，命中的库/仓库：${after.join(', ')}`).toEqual([]);
+
+  // ── 重建窗口：覆盖自动同步去抖与在途写回执会落笔的时间 ─────────────
+  // 🔴 只查"注销那一瞬间"是不够的：旧实例被复活成空壳这件事**发生在下一次读写**，
+  //    而下一次读写由后台那条链驱动（去抖同步 / 回执落库）。给一段有界窗口。
+  await page.waitForTimeout(6_000);
+  const later = await scanLocalPlaintextFor(page, title);
+  expect(later, `注销后 6s 内明文又被写回来了，命中的库/仓库：${later.join(', ')}`).toEqual([]);
+
+  // 界面不许在销毁之后继续用那个已销毁的实例：那种失败会以未捕获错误出现在控制台。
+  const resurrected = consoleErrors.filter((line) => /AdapterDestroyedError|already destroyed/i.test(line));
+  expect(resurrected, `注销之后仍有接线在用旧句柄读写：${resurrected.join(' | ')}`).toEqual([]);
 });
