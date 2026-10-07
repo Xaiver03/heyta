@@ -174,13 +174,22 @@ describe('回收站：恢复可跨设备', () => {
     expect(actionsA.listTrashed().map((t) => t.id)).toEqual([second]);
   });
 
-  it('对活着的任务调 restore 不产生 op（没有用户意图要落库）', async () => {
+  it('对活着的任务调 restore 不产生 op，并返回 false（G-8 的布尔出口）', async () => {
     const id = await actionsA.create('任务');
     const before = (await engineA.getOpsForEntity('TASK', id)).length;
 
-    await actionsA.restore(id);
+    expect(
+      await actionsA.restore(id),
+      '一条本来就在回收站外的任务被返回 true ⇒ 宿主会说"已还原"（G-8 登记的正是这一格）',
+    ).toBe(false);
 
     expect((await engineA.getOpsForEntity('TASK', id)).length).toBe(before);
+  });
+
+  it('真的还原一次返回 true（上面那条 false 的阳性对照）', async () => {
+    const id = await actionsA.create('任务');
+    await actionsA.remove(id);
+    expect(await actionsA.restore(id), '还原确实写了 op 却返回 false').toBe(true);
   });
 });
 
@@ -214,13 +223,16 @@ describe('回收站：彻底删除可跨设备且不可恢复', () => {
     await expect(actionsB.restore(id)).rejects.toThrow('已被彻底删除');
   });
 
-  it('purge 幂等：重复调用不再发 op', async () => {
+  it('purge 幂等：重复调用不再发 op，第二句返回 false（G-8）', async () => {
     const id = await actionsA.create('任务');
     await actionsA.remove(id);
-    await actionsA.purge(id);
+    expect(await actionsA.purge(id), '真的打上了标记却返回 false').toBe(true);
     const count = (await engineA.getOpsForEntity('TASK', id)).length;
 
-    await actionsA.purge(id);
+    expect(
+      await actionsA.purge(id),
+      '早已彻底删除却返回 true ⇒ CLI 会把什么都没写成的一句印成"已彻底删除"',
+    ).toBe(false);
 
     expect((await engineA.getOpsForEntity('TASK', id)).length).toBe(count);
   });

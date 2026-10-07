@@ -137,10 +137,16 @@ export interface TaskActions {
   rename(entityId: string, title: string): Promise<void>;
   /** 显式设置完成态（幂等，不像 `toggle` 依赖当前状态）。 */
   setCompleted(entityId: string, completed: boolean): Promise<void>;
+  /** 批量设置完成态：一个用户意图、一个带 entityIds 的 BATCH op。 */
+  bulkSetCompleted(entityIds: readonly string[], completed: boolean): Promise<void>;
   /** 在完成/未完成之间切换。 */
   toggleCompleted(entityId: string): Promise<void>;
   /** 软删除（发 `DEL` op，由 reducer 转成墓碑 `deletedAt`）。 */
   remove(entityId: string): Promise<void>;
+  /** 批量软删除：一个用户意图、一个 BATCH op。 */
+  bulkRemove(entityIds: readonly string[]): Promise<void>;
+  /** 撤销一批软删除：一个反向 BATCH op。 */
+  bulkRestore(entityIds: readonly string[]): Promise<void>;
   /**
    * 从回收站恢复。
    *
@@ -170,9 +176,12 @@ export interface TaskActions {
    * ═════════════════════════════════════════════════════════════════════
    *
    * 已经彻底删除（`purgedAt` 存在）的条目**拒绝恢复**：那是不可逆的。
-   * 本来就没被删除时**不发 op**（没有用户意图要落库，发空 op 只是噪声）。
+   * 本来就没被删除时**不发 op**（没有用户意图要落库，发空 op 只是噪声），
+   * 并**返回 `false`** —— 与便签/清单/习惯那三类的 `restore*()` 同一个形状。
+   * 🔴 `false` 不是失败，是"没产生 op"：它区分的是"写了新事实"与"已经是那个状态"，
+   * 所以宿主可以照它说不同的话（CLI 就是第一个消费者）。
    */
-  restore(entityId: string): Promise<void>;
+  restore(entityId: string): Promise<boolean>;
   /**
    * 彻底删除（purge）—— 回收站里的**不可逆**动作。
    *
@@ -188,8 +197,10 @@ export interface TaskActions {
    *
    * 只能对**已软删除**的条目用：对一条活着的任务发 purge 会让它在
    * 没有任何墓碑的情况下从视图里消失，而离线端完全不知道发生过什么。
+   *
+   * 已经彻底过就**返回 `false`** 且不重复写 op（同 `restore()` 那一格）。
    */
-  purge(entityId: string): Promise<void>;
+  purge(entityId: string): Promise<boolean>;
   setPriority(entityId: string, priority: Priority): Promise<void>;
   /** 四象限的"重要"维度。 */
   setImportant(entityId: string, important: boolean): Promise<void>;
@@ -272,6 +283,8 @@ export interface TaskActions {
   setNote(entityId: string, note: string | undefined): Promise<void>;
   /** 传 `undefined` 表示移出项目（会写成 `null`）。 */
   moveToProject(entityId: string, projectId: string | undefined): Promise<void>;
+  /** 批量移动到清单：一个用户意图、一个 BATCH op。 */
+  bulkMoveToProject(entityIds: readonly string[], projectId: string | undefined): Promise<void>;
 
   /**
    * 改任务的**父**（子任务语义，B1-3 的写路径）。
@@ -475,6 +488,27 @@ export function createTaskActions(
       await update(entityId, { completedAt: null });
     },
 
+    async bulkSetCompleted(entityIds, completed) {
+      const ids = [...new Set(entityIds)];
+      if (ids.length === 0) return;
+      const [first, ...rest] = ids;
+      if (first === undefined) return;
+      const tasks = ids.map(taskOf);
+      if (tasks.some((task) => task === undefined)) {
+        throw new Error('批量完成包含不存在的任务');
+      }
+      if (completed && tasks.some((task) => task?.repeatRule !== undefined)) {
+        throw new Error('重复任务请逐条完成');
+      }
+      await ctx.dispatch({
+        entityType: 'TASK' as EntityType,
+        entityId: first,
+        ...(rest.length === 0 ? {} : { entityIds: rest }),
+        opType: OpType.Batch,
+        payload: { completedAt: completed ? now() : null },
+      });
+    },
+
     async toggleCompleted(entityId) {
       const task = taskOf(entityId);
       if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
@@ -495,6 +529,41 @@ export function createTaskActions(
       });
     },
 
+    async bulkRemove(entityIds) {
+      const ids = [...new Set(entityIds)];
+      if (ids.length === 0) return;
+      const [first, ...rest] = ids;
+      if (first === undefined) return;
+      if (ids.some((id) => taskOf(id) === undefined)) {
+        throw new Error('批量删除包含不存在的任务');
+      }
+      await ctx.dispatch({
+        entityType: 'TASK' as EntityType,
+        entityId: first,
+        ...(rest.length === 0 ? {} : { entityIds: rest }),
+        opType: OpType.Delete,
+        payload: {},
+      });
+    },
+
+    async bulkRestore(entityIds) {
+      const ids = [...new Set(entityIds)];
+      if (ids.length === 0) return;
+      const [first, ...rest] = ids;
+      if (first === undefined) return;
+      const tasks = ids.map((id) => ctx.getState().tasks[id]);
+      if (tasks.some((task) => task === undefined || task.purgedAt !== undefined)) {
+        throw new Error('批量撤销包含无法恢复的任务');
+      }
+      await ctx.dispatch({
+        entityType: 'TASK' as EntityType,
+        entityId: first,
+        ...(rest.length === 0 ? {} : { entityIds: rest }),
+        opType: OpType.Batch,
+        payload: { deletedAt: null },
+      });
+    },
+
     async restore(entityId) {
       // 直接读桶，**不用 `taskOf`**：那个辅助函数把墓碑过滤掉了，
       // 而这里恰恰要处理墓碑。
@@ -506,13 +575,14 @@ export function createTaskActions(
         throw new Error(`任务「${entityId}」已被彻底删除，无法恢复`);
       }
       // 本来就没删除：不产生 op。见 `TaskActions.restore` 的注释。
-      if (task.deletedAt === undefined) return;
+      if (task.deletedAt === undefined) return false;
 
       // 🔴 `null` = 显式清除 `deletedAt`（reducer 的既有约定）。
       // 不要写 `deletedAt: undefined` —— 那会被 JSON 丢掉，
       // 对端既不清除也不报错，"恢复"在另一台设备上静默失效。
       // 原字段（标题/备注/清单/标签/日期/重复规则）本来就在墓碑里，无需重写。
       await update(entityId, { deletedAt: null });
+      return true;
     },
 
     async purge(entityId) {
@@ -522,10 +592,11 @@ export function createTaskActions(
         throw new Error(`任务「${entityId}」不在回收站里，不能彻底删除`);
       }
       // 已彻底删除：幂等，不重复发 op。
-      if (task.purgedAt !== undefined) return;
+      if (task.purgedAt !== undefined) return false;
 
       // 只加标记，**不清 `deletedAt`** —— 墓碑留着，离线端才不会复活它。
       await update(entityId, { purgedAt: now() });
+      return true;
     },
 
     setPriority(entityId, priority) {
@@ -627,6 +698,23 @@ export function createTaskActions(
 
     moveToProject(entityId, projectId) {
       return update(entityId, { projectId: projectId ?? null });
+    },
+
+    async bulkMoveToProject(entityIds, projectId) {
+      const ids = [...new Set(entityIds)];
+      if (ids.length === 0) return;
+      const [first, ...rest] = ids;
+      if (first === undefined) return;
+      if (ids.some((id) => taskOf(id) === undefined)) {
+        throw new Error('批量移动包含不存在的任务');
+      }
+      await ctx.dispatch({
+        entityType: 'TASK' as EntityType,
+        entityId: first,
+        ...(rest.length === 0 ? {} : { entityIds: rest }),
+        opType: OpType.Batch,
+        payload: { projectId: projectId ?? null },
+      });
     },
 
     // 🔴 **必须是 `async`。** 校验失败时 `throw` 会变成一个**被拒绝的 Promise** ——

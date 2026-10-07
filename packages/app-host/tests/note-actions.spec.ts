@@ -301,12 +301,14 @@ describe('回收站：listTrashed 与三件套', () => {
     expect(await opCount(id)).toBe(1);
   });
 
-  it('purge 幂等：重复调用不再发 op', async () => {
+  it('purge 幂等：重复调用不再发 op，且第二句返回 false（G-8 的布尔出口）', async () => {
     const id = await actions.createNote('买菜');
     await actions.removeNote(id);
     const before = await opCount(id);
-    await actions.purgeNote(id);
-    await actions.purgeNote(id);
+    // 🔴 布尔那一格单独钉：只数 op 的话，"返回 undefined"和"返回 false"长得一样，
+    //    而宿主（CLI）要凭这个值决定终端上印"已彻底删除"还是"未写入"。
+    expect(await actions.purgeNote(id), '真的打上了标记却返回 false').toBe(true);
+    expect(await actions.purgeNote(id), '早已彻底删除却返回 true（宿主会说"已彻底删除"）').toBe(false);
     expect(await opCount(id)).toBe(before + 1);
   });
 
