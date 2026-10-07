@@ -56,7 +56,7 @@ import { mobileSources, read, stripComments } from './source-reading';
 
 const SCREEN = 'apps/mobile/src/screens/HabitsScreen.tsx';
 const SLOT = 'apps/mobile/src/ui/habit-icon-slot.tsx';
-const UI_GLYPHS = 'packages/ui/src/habits/HabitProgressList.tsx';
+const UI_LABELS = 'packages/ui/src/habits/HabitProgressList.tsx';
 const WEB_GLYPHS = 'apps/web/src/features/habits/habit-glyphs.ts';
 
 // ── 行为层夹具 ─────────────────────────────────────────────────────────
@@ -175,18 +175,14 @@ describe('移动端图标选择器的接线与单一事实源（源码层）', (
       /(?:const|let|var)\s+HABIT_GLYPHS\s*[:=]/.test(stripComments(read(rel))),
     );
     expect(definers, `移动端出现了自己的字形表：${definers.join(' , ')}`).toEqual([]);
-    // 反向阳性对照：本屏确实**引用**了共享层那张（否则上面那条会因为"没用它"而假绿）。
-    expect(slot, '选择器没有引用共享层的 HABIT_GLYPHS').toMatch(
-      /import\s*\{[^}]*\bHABIT_GLYPHS\b[^}]*\}\s*from\s*'@heyta\/ui'/,
-    );
-    // 清单那侧也一样：它画的是同一张表，不是自己算的。
-    expect(stripComments(read(UI_GLYPHS)), '共享层那张字形表不见了').toMatch(
-      /const HABIT_GLYPHS\s*:/,
+    // 反向阳性对照：本屏确实引用统一绘制组件（否则上面那条会因为"没用它"而假绿）。
+    expect(slot, '选择器没有引用共享层的 HabitArtwork').toMatch(
+      /import\s*\{[^}]*\bHabitArtwork\b[^}]*\}\s*from\s*'@heyta\/ui'/,
     );
   });
 
   it('S3 字形词条表住在共享层，web 那份手抄已删', () => {
-    const ui = stripComments(read(UI_GLYPHS));
+    const ui = stripComments(read(UI_LABELS));
     expect(ui, '词条表不在共享层').toMatch(/const HABIT_ICON_LABEL_KEYS\s*=/);
     // 穷尽性仍然要成立：`as const satisfies Record<HabitIcon, string>`。
     expect(ui, '词条表丢了穷尽性（加第 9 个 key 不会再有编译错误）').toMatch(
@@ -231,5 +227,14 @@ describe('移动端图标选择器的接线与单一事实源（源码层）', (
       .filter((rel) => stripComments(read(rel)).includes('setHabitIcon('))
       .map((rel) => rel);
     expect(hits, `调用点不是恰好一枚：${hits.join(' , ')}`).toEqual([SCREEN]);
+  });
+
+  it('S7 选择器不套边框：选中只用轻底色 + check，触区仍保持最小尺寸', () => {
+    expect(slot, '选择器又给图标选项套了边框').not.toMatch(/borderWidth\s*:/);
+    expect(slot, '选中态没有使用轻量高亮底色').toMatch(/color\.primary-subtle/);
+    expect(slot, '选中态没有明确的 check 反馈').toMatch(/name="action\.keep"/);
+    expect(slot, '图标选项触区没有遵守最小触控尺寸').toMatch(
+      /minWidth:\s*tokens\['touch-target\.min'\][\s\S]*minHeight:\s*tokens\['touch-target\.min'\]/,
+    );
   });
 });

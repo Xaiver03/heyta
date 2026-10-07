@@ -1,0 +1,24 @@
+# macOS 安装态：原生小组件环境识别（AX 只读证据）
+
+日期：2026-10-07（本机安装副本 `/Applications/Heyta.app`）
+探针：`open -g /Applications/Heyta.app` 后用 macOS Accessibility 读取 `HeytaMac` 的窗口树；没有重新构建、安装、关闭窗口，也没有读取账号凭据。
+
+## 已验证
+
+打开「账号 → 应用设置 → 任务与显示」后，AX 树实际读到：
+
+```text
+SETTINGS_SECTION=任务与显示
+WIDGET_TITLE=桌面小组件
+NATIVE_STATUS=正在原生桌面应用中运行
+WIDGET_BODY=当前桌面应用暂不支持系统小组件。你仍可在应用内查看任务、习惯与专注进度。
+PWA_INSTALL_GUIDE=未出现
+```
+
+这证明安装态没有把 macOS 原生窗口误判成浏览器/PWA，也没有给 macOS 用户显示 Windows PWA 安装步骤。原生环境分支与小组件能力边界已被真实安装态界面读到。
+
+设置侧栏同时实际暴露了 `关于与帮助` 入口；帮助面板的生产实现使用 `target="_blank"` 和 `siteLink('/docs')`，原生壳通过 `NSWorkspace.open` 处理 HTTP(S) 链接，并保留当前 WebView。该代码路径已静态核对，但本轮没有把“点击后系统浏览器新开帮助页、当前壳仍留存”标成安装态通过。
+
+## 未验证边界
+
+现有整条 AppleScript 旅程会对 WKWebView 反复执行 `entire contents`，在登录弹层/设置重渲染时出现 AX 窗口索引瞬时失效，最终只能得到 `UNVERIFIED`。本轮没有把这个自动化超时转换成产品失败，也没有重复运行同一个超时探针。下一步应使用 AXUIElement 的增量、按角色/标题查找并在每次 React 重渲染后重新取根元素，再单独记录浏览器 tab 增量与壳窗口存活。

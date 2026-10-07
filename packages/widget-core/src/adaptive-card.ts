@@ -103,6 +103,12 @@ export const ADAPTIVE_CARD_VERSION = '1.5';
  *   另起一个 `widget.*` 的同义句就会**逃出那道门禁**。
  */
 export type WidgetCardKey =
+  | 'widget.preview.more'
+  | 'widget.task.pending'
+  | 'widget.task.completed'
+  | 'widget.task.completeAction'
+  | 'widget.task.reopenAction'
+  | 'widget.focus.title'
   | 'widget.placeholder.openApp'
   | 'widget.today.title'
   | 'widget.today.count'
@@ -174,6 +180,8 @@ export interface AdaptiveCardTaskRow {
   /** 完成态的视觉（模板直接绑它，避免模板里写条件表达式）。 */
   style: 'default' | 'good';
   strikethrough: boolean;
+  statusText: string;
+  actionText: string;
 }
 
 export interface AdaptiveCardTodayData extends AdaptiveCardCommonData {
@@ -182,6 +190,8 @@ export interface AdaptiveCardTodayData extends AdaptiveCardCommonData {
   count: number;
   isEmpty: boolean;
   rows: AdaptiveCardTaskRow[];
+  previewRows: AdaptiveCardTaskRow[];
+  overflowText: string;
   /** 卡片标题（`widget.today.title`）。 */
   titleText: string;
   /** 已格式化好的计数行 —— **不在模板里拼字符串**，那是本地化的位置。 */
@@ -199,6 +209,8 @@ export interface AdaptiveCardQuadrantSlot {
   count: number;
   isEmpty: boolean;
   rows: AdaptiveCardTaskRow[];
+  previewRows: AdaptiveCardTaskRow[];
+  overflowText: string;
 }
 
 export interface AdaptiveCardQuadrantData extends AdaptiveCardCommonData {
@@ -225,6 +237,8 @@ export interface AdaptiveCardHabitsData extends AdaptiveCardCommonData {
   emptyText: string;
   isEmpty: boolean;
   rows: AdaptiveCardHabitRow[];
+  previewRows: AdaptiveCardHabitRow[];
+  overflowText: string;
 }
 
 /**
@@ -237,6 +251,7 @@ export type AdaptiveCardFocusState = 'placeholder' | 'stale' | 'idle' | 'active'
 
 export interface AdaptiveCardFocusData extends AdaptiveCardCommonData {
   kind: 'focus';
+  titleText: string;
   state: AdaptiveCardFocusState;
   dayStr: string | null;
   /** 仅 `active` 时非空。 */
@@ -259,7 +274,7 @@ export type AdaptiveCardData =
 // 内部：一行任务
 // ─────────────────────────────────────────────────────────────────────
 
-function toTaskRow(task: WidgetTask): AdaptiveCardTaskRow {
+function toTaskRow(task: WidgetTask, t: WidgetTranslate): AdaptiveCardTaskRow {
   const done = task.isDone === true;
   return {
     id: task.id,
@@ -268,6 +283,8 @@ function toTaskRow(task: WidgetTask): AdaptiveCardTaskRow {
     targetIsDone: !done,
     style: done ? 'good' : 'default',
     strikethrough: done,
+    statusText: t(done ? 'widget.task.completed' : 'widget.task.pending'),
+    actionText: t(done ? 'widget.task.reopenAction' : 'widget.task.completeAction', { title: task.title }),
   };
 }
 
@@ -292,13 +309,15 @@ export function buildTodayCardData(
   dayStr: string,
   t: WidgetTranslate,
 ): AdaptiveCardTodayData {
-  const rows = payload.today.map(toTaskRow);
+  const rows = payload.today.map(task => toTaskRow(task, t));
   return {
     kind: 'today',
     dayStr,
     count: rows.length,
     isEmpty: rows.length === 0,
     rows,
+    previewRows: rows.slice(0, 4),
+    overflowText: rows.length > 4 ? t('widget.preview.more', { count: rows.length - 4 }) : '',
     showPlaceholder: false,
     placeholderText: t('widget.placeholder.openApp'),
     titleText: t('widget.today.title'),
@@ -324,7 +343,7 @@ export function buildQuadrantCardData(
     Quadrant.UrgentNotImportant,
     Quadrant.Neither,
   ].map((slot, index) => {
-    const rows = ((payload.quadrant ?? {})[String(slot)] ?? []).map(toTaskRow);
+    const rows = ((payload.quadrant ?? {})[String(slot)] ?? []).map(task => toTaskRow(task, t));
     // 槽位号 = 数组下标 + 1，与 `QUADRANT_META[q].tokenPrefix`（`quadrant-1`…）同源；
     // 上面的显式数组就是那个顺序的**唯一**事实源，词条表按同一个号取。
     const keys = QUADRANT_KEYS[(index + 1) as 1 | 2 | 3 | 4];
@@ -337,6 +356,8 @@ export function buildQuadrantCardData(
       count: rows.length,
       isEmpty: rows.length === 0,
       rows,
+      previewRows: rows.slice(0, 2),
+      overflowText: rows.length > 2 ? t('widget.preview.more', { count: rows.length - 2 }) : '',
     };
   });
   return {
@@ -372,6 +393,8 @@ export function buildHabitsCardData(
     dayStr,
     isEmpty: rows.length === 0,
     rows,
+    previewRows: rows.slice(0, 4),
+    overflowText: rows.length > 4 ? t('widget.preview.more', { count: rows.length - 4 }) : '',
     showPlaceholder: false,
     placeholderText: t('widget.placeholder.openApp'),
     titleText: t('widget.habits.title'),
@@ -416,6 +439,7 @@ export function buildFocusCardData(
   const focus = payload.focus;
   const common = {
     dayStr,
+    titleText: t('widget.focus.title'),
     showPlaceholder: false,
     placeholderText: t('widget.placeholder.openApp'),
     staleText: t('widget.focus.stale'),
@@ -446,6 +470,7 @@ export function buildFocusCardFallback(
 ): AdaptiveCardFocusData {
   return {
     kind: 'focus',
+    titleText: t('widget.focus.title'),
     state,
     dayStr: null,
     sessionTitle: '',
@@ -484,6 +509,8 @@ export function buildAdaptiveCardPlaceholder(
         count: 0,
         isEmpty: true,
         rows: [],
+        previewRows: [],
+        overflowText: '',
         showPlaceholder: true,
         placeholderText: t('widget.placeholder.openApp'),
         titleText: t('widget.today.title'),
@@ -505,6 +532,8 @@ export function buildAdaptiveCardPlaceholder(
         dayStr: '',
         isEmpty: true,
         rows: [],
+        previewRows: [],
+        overflowText: '',
         showPlaceholder: true,
         placeholderText: t('widget.placeholder.openApp'),
         titleText: t('widget.habits.title'),
@@ -557,10 +586,11 @@ function taskRowTemplate(): unknown {
       //    而 service worker 要凭它写一条意图。少一个字段 = 点击被丢掉，
       //    且**没有任何错误**（事件照常触发，只是什么都做不了）。
       verb: 'toggle',
+      title: '${actionText}',
       data: { taskId: '${id}', targetIsDone: '${targetIsDone}' },
     },
     columns: [
-      { type: 'Column', width: 'auto', items: [{ type: 'TextBlock', text: '·', size: 'Medium' }] },
+      { type: 'Column', width: 'auto', items: [textBlock('${statusText}', { size: 'Small', color: '${style}', isSubtle: '${done}' })] },
       {
         type: 'Column',
         width: 'stretch',
@@ -569,8 +599,9 @@ function taskRowTemplate(): unknown {
             type: 'TextBlock',
             text: '${title}',
             wrap: true,
+            maxLines: 2,
             color: '${style}',
-            strikethrough: '${strikethrough}',
+            isSubtle: '${done}',
           },
         ],
       },
@@ -580,6 +611,33 @@ function taskRowTemplate(): unknown {
 
 function textBlock(text: string, extra: Record<string, unknown> = {}): unknown {
   return { type: 'TextBlock', text, wrap: true, ...extra };
+}
+
+/** Host-owned semantic sizes and colors follow Windows theme and text scaling. */
+function cardHeader(showCount = false): unknown {
+  return {
+    type: 'ColumnSet', spacing: 'None',
+    columns: [
+      { type: 'Column', width: 'stretch', items: [textBlock('${titleText}', { weight: 'Bolder', size: 'Medium', maxLines: 1 })] },
+      ...(showCount ? [{ type: 'Column', width: 'auto', items: [textBlock('${countText}', { isSubtle: true, size: 'Small' })] }] : []),
+    ],
+  };
+}
+
+function overflowNote(): unknown {
+  return textBlock('${overflowText}', { size: 'Small', isSubtle: true, spacing: 'Small', isVisible: "${overflowText != ''}" });
+}
+
+function quadrantColumn(index: number): unknown {
+  return {
+    type: 'Column', width: 'stretch', $data: '${slots[' + String(index) + ']}',
+    items: [
+      textBlock('${heading}', { weight: 'Bolder', maxLines: 2, spacing: 'None' }),
+      textBlock('${hint}', { isSubtle: true, size: 'Small', isVisible: '${isEmpty}', maxLines: 2 }),
+      { type: 'Container', $data: '${previewRows}', items: [taskRowTemplate()] },
+      overflowNote(),
+    ],
+  };
 }
 
 /**
@@ -595,7 +653,8 @@ function textBlock(text: string, extra: Record<string, unknown> = {}): unknown {
 function withPlaceholderGate(realContent: unknown[]): unknown[] {
   return [
     textBlock('${placeholderText}', { isSubtle: true, isVisible: '${showPlaceholder}' }),
-    { type: 'Container', isVisible: '${!showPlaceholder}', items: realContent },
+    // $when skips template evaluation too: placeholder data has no quadrant slots.
+    { type: 'Container', $when: '${!showPlaceholder}', isVisible: '${!showPlaceholder}', items: realContent },
   ];
 }
 
@@ -605,10 +664,10 @@ export const ADAPTIVE_CARD_TEMPLATES: Record<AdaptiveCardKind, AdaptiveCardTempl
     type: 'AdaptiveCard',
     version: ADAPTIVE_CARD_VERSION,
     body: withPlaceholderGate([
-      textBlock('${titleText}', { weight: 'Bolder', size: 'Medium' }),
-      textBlock('${countText}', { isSubtle: true, spacing: 'None' }),
+      cardHeader(true),
       textBlock('${emptyText}', { isSubtle: true, isVisible: '${isEmpty}' }),
-      { type: 'Container', $data: '${rows}', items: [taskRowTemplate()] },
+      { type: 'Container', $data: '${previewRows}', items: [taskRowTemplate()] },
+      overflowNote(),
     ]),
   },
   quadrant: {
@@ -616,16 +675,9 @@ export const ADAPTIVE_CARD_TEMPLATES: Record<AdaptiveCardKind, AdaptiveCardTempl
     type: 'AdaptiveCard',
     version: ADAPTIVE_CARD_VERSION,
     body: withPlaceholderGate([
-      textBlock('${titleText}', { weight: 'Bolder', size: 'Medium' }),
-      {
-        type: 'Container',
-        $data: '${slots}',
-        items: [
-          textBlock('${heading}', { weight: 'Bolder', spacing: 'Medium' }),
-          textBlock('${hint}', { isSubtle: true, spacing: 'None' }),
-          { type: 'Container', $data: '${rows}', items: [taskRowTemplate()] },
-        ],
-      },
+      cardHeader(),
+      { type: 'ColumnSet', spacing: 'Medium', columns: [quadrantColumn(0), quadrantColumn(1)] },
+      { type: 'ColumnSet', spacing: 'Medium', separator: true, columns: [quadrantColumn(2), quadrantColumn(3)] },
     ]),
   },
   habits: {
@@ -633,11 +685,11 @@ export const ADAPTIVE_CARD_TEMPLATES: Record<AdaptiveCardKind, AdaptiveCardTempl
     type: 'AdaptiveCard',
     version: ADAPTIVE_CARD_VERSION,
     body: withPlaceholderGate([
-      textBlock('${titleText}', { weight: 'Bolder', size: 'Medium' }),
+      cardHeader(),
       textBlock('${emptyText}', { isSubtle: true, isVisible: '${isEmpty}' }),
       {
         type: 'Container',
-        $data: '${rows}',
+        $data: '${previewRows}',
         items: [
           {
             type: 'ColumnSet',
@@ -646,18 +698,19 @@ export const ADAPTIVE_CARD_TEMPLATES: Record<AdaptiveCardKind, AdaptiveCardTempl
               {
                 type: 'Column',
                 width: 'stretch',
-                items: [textBlock('${title}')],
+                items: [textBlock('${title}', { maxLines: 2 })],
               },
               {
                 type: 'Column',
                 width: 'auto',
-                items: [textBlock('${doneLabel}', { color: 'good' })],
+                items: [textBlock('${doneLabel}', { color: 'good', size: 'Small', maxLines: 2 })],
               },
             ],
           },
           textBlock('${streakLabel}', { isSubtle: true, size: 'Small', spacing: 'None' }),
         ],
       },
+      overflowNote(),
     ]),
   },
   focus: {
@@ -665,6 +718,7 @@ export const ADAPTIVE_CARD_TEMPLATES: Record<AdaptiveCardKind, AdaptiveCardTempl
     type: 'AdaptiveCard',
     version: ADAPTIVE_CARD_VERSION,
     body: withPlaceholderGate([
+      cardHeader(),
       // ⚠️ 这四句是**互斥**的四种状态，不是四条并列的提示。
       //    用一个 `state` 字段而不是四个布尔量，是为了让"同时显示两句"
       //    在数据层面就**不可能**构造出来。
@@ -672,6 +726,8 @@ export const ADAPTIVE_CARD_TEMPLATES: Record<AdaptiveCardKind, AdaptiveCardTempl
       textBlock('${idleText}', { isSubtle: true, isVisible: "${state == 'idle'}" }),
       textBlock('${sessionTitle}', {
         weight: 'Bolder',
+        size: 'Large',
+        maxLines: 2,
         isVisible: "${state == 'active'}",
       }),
       textBlock('${targetLabel}', {

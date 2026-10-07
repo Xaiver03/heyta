@@ -1,3 +1,4 @@
+import type { InboundUploadIdentity } from '../automation/worker-identity';
 import { prisma } from '../db';
 import {
   MS_PER_MINUTE,
@@ -185,6 +186,7 @@ export class SyncService {
     repairBaseServerSeq?: number,
     allowLegacyRepairWithoutBase: boolean = false,
     lastKnownServerSeq?: number,
+    inboundIdentity?: InboundUploadIdentity,
   ): Promise<UploadResult[]> {
     if (isCleanSlate && ops.length === 0) {
       return [];
@@ -433,6 +435,7 @@ export class SyncService {
                 validation,
                 requestStartOccupiedIds?.has(op.id),
                 firstRequestOperation,
+                inboundIdentity,
               );
             results.push(result);
             if (result.accepted) {

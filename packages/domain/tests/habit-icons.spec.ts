@@ -4,9 +4,8 @@
  *
  * 这个模块错了不报错，只在界面上"看起来有点怪"，所以逐条钉住。三组各自的失效形状：
  *
- * **词表**：`HABIT_ICONS` 的**顺序**决定 `deriveHabitIcon` 的取值 —— 换序等于给存量
- * 习惯换图标（磁盘里没存图标的那些没有任何东西能把它拉回来）。所以这里逐字钉住
- * 这一份列表，改它必须是一次显式的、带理由的编辑，而不是顺手重排。
+ * **词表**：前八项是历史派生集合，顺序与长度必须保持；`HABIT_ICONS` 后面可以增加
+ * 显式选择项，但不能让新增项改变无显式 icon 的存量习惯。
  * 另外钉住「不许出现字形名」：把 `Droplets` 写进磁盘，等于让一次换库改掉用户数据。
  *
  * **解析**：不认识的值必须返回 `undefined`，**不许回退成第一项**。
@@ -29,7 +28,32 @@ import {
 
 describe('图标词表（闭集）', () => {
   it('🔴 逐字钉住这份列表与顺序：改顺序 = 给存量习惯换图标', () => {
-    expect(HABIT_ICONS).toEqual(['drop', 'activity', 'book', 'moon', 'leaf', 'pencil', 'sun', 'music']);
+    expect(HABIT_ICONS).toEqual([
+      'drop',
+      'activity',
+      'book',
+      'moon',
+      'leaf',
+      'pencil',
+      'sun',
+      'music',
+      'heart',
+      'strength',
+      'meditation',
+      'tea',
+      'fruit',
+      'cycling',
+      'camera',
+      'art',
+      'code',
+      'dental',
+      'pet',
+      'savings',
+      'home',
+      'language',
+      'journal',
+      'walking',
+    ]);
   });
 
   it('没有重复项（重复会让 `parseHabitIcon` 的取值变得看运气）', () => {
@@ -89,6 +113,17 @@ describe('deriveHabitIcon', () => {
     const distinct = new Set<string>();
     for (let i = 0; i < 200; i += 1) distinct.add(deriveHabitIcon(`habit-${String(i)}`));
     expect(distinct.size).toBeGreaterThan(1);
+  });
+
+  it('新增显式图标不改变旧习惯的派生结果', () => {
+    expect(deriveHabitIcon('h1')).toBe('book');
+    expect(deriveHabitIcon('habit-1')).toBe('moon');
+    expect(deriveHabitIcon('keep-me')).toBe('activity');
+    for (let i = 0; i < 500; i += 1) {
+      expect(deriveHabitIcon(`habit-${String(i)}`)).toMatch(
+        /^(drop|activity|book|moon|leaf|pencil|sun|music)$/u,
+      );
+    }
   });
 
   it('只取决于自己的 id：新增/删除别的习惯不会让它换图标', () => {

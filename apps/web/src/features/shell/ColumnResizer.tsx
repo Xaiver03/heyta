@@ -194,6 +194,7 @@ export function ColumnResizer(props: ColumnResizerProps) {
     // （默认值由 token 决定），拿 0 当下手会让那一列瞬间弹走。
     const column = columnWidth();
     if (column === null) return;
+    keyboardOrigin.current = undefined;
     event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = { x: event.clientX, start: column, previous: widthRef.current, current: column };
     setDragging(true);
@@ -276,6 +277,9 @@ export function ColumnResizer(props: ColumnResizerProps) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onBlur={() => {
+        keyboardOrigin.current = undefined;
+      }}
       onDoubleClick={() => {
         commit(null);
       }}

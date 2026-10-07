@@ -253,7 +253,7 @@ const server = createServer((req, res) => {
      */
     // ⚠️ **不能锚 `^`**：出境的用户文本带着前缀（`ai-tool-call.ts` 的
     // `user: \`用户这句话：${source.text}\``），整串并不以"新建任务"开头。
-    const createTitle = /新建任务[：:](.+)$/s.exec(user.trim());
+    const createTitle = /新建任务[：:]([^\r\n]+)$/u.exec(user.trim());
     const message =
       feature === 'tool-calling'
         ? {
@@ -281,11 +281,15 @@ const server = createServer((req, res) => {
             role: 'assistant',
             content: null,
             tool_calls: [
-              {
-                id: 'stub-call-1',
-                type: 'function',
-                function: { name: 'list_tasks', arguments: '{}' },
-              },
+              createTitle
+                ? {
+                    id: 'stub-assistant-write', type: 'function',
+                    function: { name: 'create_task', arguments: JSON.stringify({ title: createTitle[1].trim() }) },
+                  }
+                : {
+                    id: 'stub-call-1', type: 'function',
+                    function: { name: 'list_tasks', arguments: '{}' },
+                  },
             ],
           }
         : feature === 'assistant'

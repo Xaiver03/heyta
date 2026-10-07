@@ -139,6 +139,9 @@ public sealed partial class MainWindow : Window
         if (_webMode == "app")
         {
             Root.Padding = new Thickness(0);
+            // 隐藏实验面板不会移除 Grid 行间距：WebView 前仍有四段空隙。
+            // 产品模式只留共享 UI，行距必须一起归零（125% 缩放时原空带为 60px）。
+            Root.RowSpacing = 0;
             NativeRow.Height = new GridLength(0);
             ShellTitle.Visibility = Visibility.Collapsed;
             ShellComposer.Visibility = Visibility.Collapsed;
@@ -153,6 +156,12 @@ public sealed partial class MainWindow : Window
         try
         {
             await SharedUi.EnsureCoreWebView2Async();
+
+            // Public help, pricing and changelog pages belong in the system
+            // browser. Keep the workspace mounted in this window and only
+            // hand off absolute HTTP(S) URLs; the local heyta host stays inside.
+            SharedUi.CoreWebView2.NavigationStarting += OnNavigationStarting;
+            SharedUi.CoreWebView2.NewWindowRequested += OnNewWindowRequested;
 
             // 共享 UI 的产物目录：优先环境变量（spike 用），否则找 exe 旁边的 web-dist。
             var root = Environment.GetEnvironmentVariable("HEYTA_WEB_ROOT");
@@ -449,6 +458,68 @@ public sealed partial class MainWindow : Window
             SharedUiHostNote = $"M2-A 失败：{error.Message}";
             StatusText.Text = SharedUiHostNote;
             WriteEvidence($"ERROR {error.Message}");
+        }
+    }
+
+    private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
+    {
+        if (!IsExternalHttpUri(args.Uri)) return;
+        args.Cancel = true;
+        _ = OpenExternalUriAsync(args.Uri);
+    }
+
+    private void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)
+    {
+        if (IsExternalHttpUri(args.Uri))
+        {
+            args.Handled = true;
+            _ = OpenExternalUriAsync(args.Uri);
+            return;
+        }
+
+        // Keep links back into the packaged app in the current workspace too.
+        // Leaving this request unhandled lets WebView2 create a second window,
+        // which would split the shell even though the URL is ours.
+        if (!IsInternalShellUri(args.Uri)) return;
+        args.Handled = true;
+        SharedUi.CoreWebView2.Navigate(args.Uri);
+    }
+
+    private static bool IsExternalHttpUri(string raw)
+    {
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri)) return false;
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // The packaged app itself is served from this virtual host. It must
+        // remain in the WebView while public-site links leave for the browser.
+        return !IsInternalShellUri(uri);
+    }
+
+    private static bool IsInternalShellUri(string raw)
+    {
+        return Uri.TryCreate(raw, UriKind.Absolute, out var uri) && IsInternalShellUri(uri);
+    }
+
+    private static bool IsInternalShellUri(Uri uri)
+    {
+        return string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(uri.Host, "heyta.local", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async Task OpenExternalUriAsync(string raw)
+    {
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri)) return;
+        try
+        {
+            await Launcher.LaunchUriAsync(uri);
+        }
+        catch
+        {
+            // A failed handoff must not navigate or close the current workspace.
         }
     }
 

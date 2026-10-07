@@ -1,0 +1,117 @@
+{
+  "status": "passed",
+  "serial": "emulator-5554",
+  "artifact": {
+    "apk": "apps/mobile/android/app/build/outputs/apk/release/app-release.apk",
+    "expectedSha256": "e6d82ff5ee493ddec99ef935a919948341d52b93772d2db69b14fbabb1cf2f44",
+    "installedSha256": "e6d82ff5ee493ddec99ef935a919948341d52b93772d2db69b14fbabb1cf2f44",
+    "matches": true
+  },
+  "emptyStateArtwork": "00-empty-inbox-ai-artwork.png",
+  "steps": [
+    {
+      "name": "创建任务 A",
+      "status": "passed",
+      "evidence": [
+        "01-created-task-a.png"
+      ]
+    },
+    {
+      "name": "创建任务 B",
+      "status": "passed",
+      "evidence": [
+        "02-created-task-b.png"
+      ]
+    },
+    {
+      "name": "列表滚动",
+      "status": "passed",
+      "evidence": [
+        "03-list-scroll.png"
+      ]
+    },
+    {
+      "name": "长按进入选择",
+      "status": "passed",
+      "evidence": [
+        "04-long-press-enters-selection.png"
+      ]
+    },
+    {
+      "name": "多选第二条任务",
+      "status": "passed",
+      "evidence": [
+        "05-multi-select-second-task.png"
+      ]
+    },
+    {
+      "name": "退出选择",
+      "status": "passed",
+      "evidence": [
+        "06-exit-selection.png"
+      ]
+    },
+    {
+      "name": "打开四象限移动面板",
+      "status": "passed",
+      "evidence": [
+        "07-open-quadrant-move-sheet.png"
+      ]
+    },
+    {
+      "name": "四象限移动反馈",
+      "status": "passed",
+      "evidence": [
+        "07-open-quadrant-move-sheet.png",
+        "09-quadrant-undo.png"
+      ]
+    },
+    {
+      "name": "撤销四象限移动",
+      "status": "passed",
+      "evidence": [
+        "09-quadrant-undo.png"
+      ]
+    },
+    {
+      "name": "时间线打开详情",
+      "status": "passed",
+      "evidence": [
+        "10-timeline-row-opens-detail.png"
+      ]
+    },
+    {
+      "name": "详情键盘显示",
+      "status": "passed",
+      "evidence": [
+        "11-detail-keyboard-visible.png"
+      ]
+    },
+    {
+      "name": "详情键盘收起",
+      "status": "passed",
+      "evidence": [
+        "12-detail-keyboard-dismissed.png"
+      ]
+    },
+    {
+      "name": "第二次返回关闭详情",
+      "status": "passed",
+      "evidence": [
+        "13-detail-closes-after-second-back.png"
+      ]
+    },
+    {
+      "name": "Profile/Settings 链",
+      "status": "passed",
+      "evidence": [
+        "profile/journey.json"
+      ]
+    }
+  ],
+  "notes": [
+    "00 空收集箱截图已在当前安装态捕获并人工确认插画可见。",
+    "任务 01–13 截图在当前 APK 重装后执行；Profile/Settings 独立探针随后在同一 APK 上通过。",
+    "外层探针嵌套 Profile 子进程曾因管道收尾挂住；证据已拆分保存，未改产品源码。"
+  ]
+}

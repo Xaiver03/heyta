@@ -1,0 +1,8 @@
+历史首次发布（由后续版本替代）：
+b1b7ba18f58a9a29cea645206d0e91ee5754521c864ded4cd396cb8c06b142c3  apps/landing/dist/index.html
+b1b7ba18f58a9a29cea645206d0e91ee5754521c864ded4cd396cb8c06b142c3  /var/www/heyta-landing/index.html
+
+当前发布（含原创助手图标与 More 浮层修订）：
+965e9537e1bd744c2ee42d47a53acfa23aab3e4c339bd5933fa2d5d9d8aa1ede  apps/landing/dist/index.html
+965e9537e1bd744c2ee42d47a53acfa23aab3e4c339bd5933fa2d5d9d8aa1ede  /var/www/heyta-landing/index.html
+完整发布记录：apps/web/evidence/ux-final-release/deployment-s9-82.txt

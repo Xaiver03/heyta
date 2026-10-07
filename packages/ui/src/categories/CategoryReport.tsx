@@ -91,6 +91,8 @@ import {
   type CategorySeries,
   type CategorySlot,
 } from '@heyta/domain';
+import { Clock } from 'lucide';
+import { EmptyState } from '../empty-state/EmptyState.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import {
   categoryBarSegments,
@@ -111,6 +113,10 @@ export interface CategoryReportLabels {
   readonly note: string;
   /** 完全没有记录时的一句话。 */
   readonly empty: string;
+  /** 空态标题；省略时沿用 `empty`，保持宿主兼容。 */
+  readonly emptyTitle?: string;
+  /** 空态下一步短提示；省略时不额外渲染。 */
+  readonly emptyHint?: string;
   /** 窗口区间，例如「2026-07-06 至 2026-09-27」。 */
   readonly range: (start: string, end: string) => string;
   /** 未归类时长那一句（`duration` 已格式化）。 */
@@ -197,8 +203,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
     laneCard: {
       gap: tokens['space.2'],
       padding: tokens['space.3'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       borderRadius: tokens['radius.md'],
       backgroundColor: tokens['color.surface'],
     },
@@ -264,8 +268,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'column-reverse',
       overflow: 'hidden',
       borderRadius: tokens['radius.sm'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
     },
     barSegment: {
@@ -323,7 +325,13 @@ export function CategoryReportView({
       )}
 
       {report === null ? null : isEmptyCategoryReport(report) ? (
-        <Text style={[text['row-meta'], { color: muted }]}>{labels.empty}</Text>
+        <EmptyState
+          icon={Clock}
+          title={labels.emptyTitle ?? labels.empty}
+          hint={labels.emptyHint}
+          size="section"
+          testID={testID === undefined ? undefined : `${testID}-empty`}
+        />
       ) : (
         <>
           <Text testID="category-range" style={[text.caption, { color: subtle }]}>

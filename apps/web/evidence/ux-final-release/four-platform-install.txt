@@ -1,0 +1,11 @@
+$ bash scripts/reinstall-all.sh
+═══ 0. 前置：pnpm -r build ═══
+  ✅ 全仓构建完成（日志 /tmp/heyta-reinstall-build.log）
+═══ 0b. 原生壳前置：@heyta/web build（确保 web-dist 晚于 workspace dist）═══
+  ✅ Web 产物已在 workspace 构建之后刷新（日志 /tmp/heyta-reinstall-web.log）
+
+═══ 1. macOS：清旧包 → 打包 → 卸旧 → 装新 ═══
+  macOS 输出目录 = /tmp/heyta-macos-ux-final-20261007（覆盖旋钮 HEYTA_MACOS_DIST_DIR）
+  清空前该目录不存在（首次运行）
+/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/scripts/.reinstall-all.sh.snap.15088: line 305: 16587 Terminated: 15          bash apps/desktop-macos/scripts/package-app.sh "$MAC_OUT" > /tmp/heyta-reinstall-mac.log 2>&1
+[ELIFECYCLE] Command failed.

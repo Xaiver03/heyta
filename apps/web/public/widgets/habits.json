@@ -12,14 +12,28 @@
     },
     {
       "type": "Container",
+      "$when": "${!showPlaceholder}",
       "isVisible": "${!showPlaceholder}",
       "items": [
         {
-          "type": "TextBlock",
-          "text": "${titleText}",
-          "wrap": true,
-          "weight": "Bolder",
-          "size": "Medium"
+          "type": "ColumnSet",
+          "spacing": "None",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${titleText}",
+                  "wrap": true,
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "maxLines": 1
+                }
+              ]
+            }
+          ]
         },
         {
           "type": "TextBlock",
@@ -30,7 +44,7 @@
         },
         {
           "type": "Container",
-          "$data": "${rows}",
+          "$data": "${previewRows}",
           "items": [
             {
               "type": "ColumnSet",
@@ -43,7 +57,8 @@
                     {
                       "type": "TextBlock",
                       "text": "${title}",
-                      "wrap": true
+                      "wrap": true,
+                      "maxLines": 2
                     }
                   ]
                 },
@@ -55,7 +70,9 @@
                       "type": "TextBlock",
                       "text": "${doneLabel}",
                       "wrap": true,
-                      "color": "good"
+                      "color": "good",
+                      "size": "Small",
+                      "maxLines": 2
                     }
                   ]
                 }
@@ -70,6 +87,15 @@
               "spacing": "None"
             }
           ]
+        },
+        {
+          "type": "TextBlock",
+          "text": "${overflowText}",
+          "wrap": true,
+          "size": "Small",
+          "isSubtle": true,
+          "spacing": "Small",
+          "isVisible": "${overflowText != ''}"
         }
       ]
     }

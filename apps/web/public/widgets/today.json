@@ -12,21 +12,41 @@
     },
     {
       "type": "Container",
+      "$when": "${!showPlaceholder}",
       "isVisible": "${!showPlaceholder}",
       "items": [
         {
-          "type": "TextBlock",
-          "text": "${titleText}",
-          "wrap": true,
-          "weight": "Bolder",
-          "size": "Medium"
-        },
-        {
-          "type": "TextBlock",
-          "text": "${countText}",
-          "wrap": true,
-          "isSubtle": true,
-          "spacing": "None"
+          "type": "ColumnSet",
+          "spacing": "None",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${titleText}",
+                  "wrap": true,
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "maxLines": 1
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "auto",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${countText}",
+                  "wrap": true,
+                  "isSubtle": true,
+                  "size": "Small"
+                }
+              ]
+            }
+          ]
         },
         {
           "type": "TextBlock",
@@ -37,7 +57,7 @@
         },
         {
           "type": "Container",
-          "$data": "${rows}",
+          "$data": "${previewRows}",
           "items": [
             {
               "type": "ColumnSet",
@@ -45,6 +65,7 @@
               "selectAction": {
                 "type": "Action.Execute",
                 "verb": "toggle",
+                "title": "${actionText}",
                 "data": {
                   "taskId": "${id}",
                   "targetIsDone": "${targetIsDone}"
@@ -57,8 +78,11 @@
                   "items": [
                     {
                       "type": "TextBlock",
-                      "text": "·",
-                      "size": "Medium"
+                      "text": "${statusText}",
+                      "wrap": true,
+                      "size": "Small",
+                      "color": "${style}",
+                      "isSubtle": "${done}"
                     }
                   ]
                 },
@@ -70,14 +94,24 @@
                       "type": "TextBlock",
                       "text": "${title}",
                       "wrap": true,
+                      "maxLines": 2,
                       "color": "${style}",
-                      "strikethrough": "${strikethrough}"
+                      "isSubtle": "${done}"
                     }
                   ]
                 }
               ]
             }
           ]
+        },
+        {
+          "type": "TextBlock",
+          "text": "${overflowText}",
+          "wrap": true,
+          "size": "Small",
+          "isSubtle": true,
+          "spacing": "Small",
+          "isVisible": "${overflowText != ''}"
         }
       ]
     }

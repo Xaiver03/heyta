@@ -365,13 +365,13 @@ test.describe('习惯面单落进详情列', () => {
   /*
     H6/H7 是工单 §8.134 那一处看图的读数。§8.133 记下的是**观感**（"三颗浮在栏顶、与页头
     同高，读起来像页头的工具条"），观感不能直接当判据 —— 把它翻译成两件量得到的事：
-      · H6 **这一行有名字**：工具与"所选那条的名字"在同一行（竖向重叠）、在名字右侧。
-        一条没名字的浮排控件才会被读成页头的；名字一在，归属就在。
+      · H6 **这一行有名字**：工具与"所选那条的名字"不重叠，且标题和工具都在同一个详情栏内、可达。
+        窄栏允许标题与工具换行；一条没名字的浮排控件才会被读成页头的，名字一在，归属就在。
       · H7 **这一行不离它说的卡片**：工具不许跑出头行盒子，且它与卡片之间的空白不许超过
         这一栏的栏内间距（阈值从 `--ht-space-4` 推导，不抄像素 —— §7 元规则 2）。
     两件事合起来才是那条观感，而它们各自能被不同的臂打红（E4 只红 H6，E3 两条都红）。
   */
-  test('H6 三颗工具与所选那条的名字在同一行（不再是一排没名字的浮控件）', async ({ page }) => {
+  test('H6 三颗工具与所选那条的名字不重叠，且都在详情栏内可达', async ({ page }) => {
     const errors = watchErrors(page);
     await openApp(page, '/?lang=zh-CN');
     await switchView(page, '习惯');
@@ -388,17 +388,54 @@ test.describe('习惯面单落进详情列', () => {
       '标题写的不是带痕迹那一条 ⇒ 工具没有归属，又回到"没名字的一排浮控件"',
     ).toBe(marked);
 
+    const pane = paneInColumn(page);
+    const paneBox = await paintedBox(page, pane);
     const titleBox = await paintedBox(page, title);
-    const tools = await paintedBox(page, paneInColumn(page).locator('.ht-habit__pane-tools'));
+    const toolParts = pane.locator('.ht-habit__pane-tools button');
+    await expect(toolParts, '详情工具缺少可达的图标/改名/删除控件').toHaveCount(3);
+    for (let i = 0; i < 3; i += 1) {
+      await expect(toolParts.nth(i), `第 ${String(i + 1)} 个详情工具不可见`).toBeVisible();
+    }
+    const tools = await toolParts.evaluateAll((elements) => {
+      const boxes = elements.map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom };
+      });
+      return {
+        x: Math.min(...boxes.map((box) => box.x)),
+        y: Math.min(...boxes.map((box) => box.y)),
+        right: Math.max(...boxes.map((box) => box.right)),
+        bottom: Math.max(...boxes.map((box) => box.bottom)),
+      };
+    });
+    const toolsBox = {
+      x: tools.x,
+      y: tools.y,
+      width: tools.right - tools.x,
+      height: tools.bottom - tools.y,
+    };
+    const paneRight = paneBox.x + paneBox.width;
+    const titleRight = titleBox.x + titleBox.width;
+    const toolsRight = toolsBox.x + toolsBox.width;
+
+    // 窄详情栏允许标题与工具换行；两块区域仍不得发生任何二维相交。
+    const overlaps =
+      titleBox.x < toolsRight && toolsBox.x < titleRight && titleBox.y < toolsBox.y + toolsBox.height && toolsBox.y < titleBox.y + titleBox.height;
     expect(
-      tools.y < titleBox.y + titleBox.height && tools.y + tools.height > titleBox.y,
-      `工具不在同一行：标题 ${String(titleBox.y)}–${String(titleBox.y + titleBox.height)}，` +
-        `工具 ${String(tools.y)}–${String(tools.y + tools.height)}`,
-    ).toBe(true);
-    expect(
-      tools.x,
-      `工具压在标题文字上（工具左缘 ${String(tools.x)} < 标题右缘 ${String(titleBox.x + titleBox.width)}）`,
-    ).toBeGreaterThanOrEqual(titleBox.x + titleBox.width - 1);
+      overlaps,
+      `标题与工具发生重叠：标题 ${String(titleBox.x)},${String(titleBox.y)},${String(titleBox.width)},${String(titleBox.height)}；` +
+        `工具 ${String(toolsBox.x)},${String(toolsBox.y)},${String(toolsBox.width)},${String(toolsBox.height)}`,
+    ).toBe(false);
+
+    for (const [label, box, right] of [
+      ['标题', titleBox, titleRight],
+      ['工具', toolsBox, toolsRight],
+    ] as const) {
+      expect(box.x, `${label}左边缘跑出详情栏`).toBeGreaterThanOrEqual(paneBox.x - 1);
+      expect(right, `${label}右边缘跑出详情栏`).toBeLessThanOrEqual(paneRight + 1);
+      expect(box.y, `${label}上边缘跑出详情栏`).toBeGreaterThanOrEqual(paneBox.y - 1);
+      expect(box.y + box.height, `${label}下边缘跑出详情栏`).toBeLessThanOrEqual(paneBox.y + paneBox.height + 1);
+    }
 
     await parkCursor(page);
     await page.screenshot({ path: SHOT('h6-head-row') });

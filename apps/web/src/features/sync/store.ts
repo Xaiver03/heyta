@@ -165,7 +165,8 @@ interface SyncStoreState {
   /** 改设置 → 同步 那一节的草稿（只改传入的字段）。 */
   setSyncDraft: (patch: Partial<SyncStoreState['syncDraft']>) => void;
   /** 面板挂载：按**当前已生效的配置**播种草稿并标记"在屏"。 */
-  showSyncDraft: () => void;
+  /** Mark the sync section visible; preserve keeps an unsaved UI draft intact. */
+  showSyncDraft: (preserve?: boolean) => void;
   /** 面板卸载：撤掉"在屏"标记 ⇒ `AuthPanel` 退回已保存的配置。 */
   hideSyncDraft: () => void;
   startAutoRetry: () => void;
@@ -214,7 +215,7 @@ function buildClient(
   _set: (partial: Partial<SyncStoreState>) => void,
 ): SyncClient | undefined {
   const { baseUrl, token } = get();
-  if (baseUrl === '' || token === undefined) return undefined;
+  if (baseUrl.trim() === '' || token === undefined || token.trim() === '') return undefined;
 
   const accountId = get().accountId;
   if (accountId !== undefined && accountId !== '') {
@@ -324,7 +325,7 @@ function restartRealtime(get: () => SyncStoreState): void {
   const { baseUrl, token } = get();
   // 未配置/未登录就**不连**。登录之后再调一次本函数即可 ——
   // 这正是 `configure` / `applyAuthToken` 里两处调用的意义。
-  if (baseUrl === '' || token === undefined) return;
+  if (baseUrl.trim() === '' || token === undefined || token.trim() === '') return;
 
   /**
    * 🔴 **先问"引擎就绪了吗"，而不是让 `requireEngine()` 抛了再 catch。**
@@ -509,10 +510,10 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     set({ syncDraft: { ...get().syncDraft, ...patch } });
   },
 
-  showSyncDraft: () => {
+  showSyncDraft: (preserve = false) => {
     const { baseUrl, token, password } = get();
     set({
-      syncDraft: { baseUrl, token: token ?? '', password: password ?? '' },
+      ...(preserve ? {} : { syncDraft: { baseUrl, token: token ?? '', password: password ?? '' } }),
       syncDraftShown: true,
     });
   },
@@ -533,11 +534,18 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // A server/token edit changes the authentication binding. Fence any
     // in-flight vault load before the new credentials can be used.
     const previous = get();
-    if (previous.baseUrl !== baseUrl || previous.token !== token) invalidateWebVaultSession();
+    const authBindingChanged = previous.baseUrl !== baseUrl || previous.token !== token;
+    if (authBindingChanged) invalidateWebVaultSession();
+    // An account id is scoped to the server/token session that produced it.
+    // Keeping it across a manual advanced/self-hosted credential change makes
+    // the UI enter hosted Vault mode for the previous account and hides the
+    // legacy E2EE password path. Re-authentication is the only operation that
+    // may establish a new hosted account scope.
+    const accountId = authBindingChanged ? undefined : previous.accountId;
     // 🔴 草稿跟着走：「保存并同步」之后，那一节的输入框与配置**必须是同一份值**。
     // 不写这一半的话，症状是配置已经生效、框里还留着上一次的内容 ——
     // 那是 2026-09-30 那条"框与配置两套真相"缺陷的镜像版本。
-    set({ baseUrl, token, password, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
+    set({ baseUrl, token, password, accountId, status: { kind: 'idle' }, syncDraft: { baseUrl, token, password } });
     // 🔴 W4：口令**不进** saveCredentials 的参数 —— 它只在内存。
     // ⚠️ 邮箱**保留已有的那个**：手填凭据这条路径不知道账号是谁，
     //    而它不该把上一次登录留下的标签抹掉。

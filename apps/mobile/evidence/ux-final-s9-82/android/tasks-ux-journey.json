@@ -1,0 +1,85 @@
+{
+  "status": "failed",
+  "serial": "emulator-5554",
+  "error": "profile/settings chain failed: ttings-android.py\", line 52, in wait\n    raise AssertionError((label,texts(r)))\nAssertionError: ('偏好与账号', ['我的', '账号', '还没登录', '不登录也能使用任务、专注和本地回顾。', '注册 / 登录', '注册 / 登录', '设置, 个人资料、偏好、同步与安全', '设置', '个人资料、偏好、同步与安全', '近期状态', '本周完成任务', '0', '本周专注分钟', '0', '已达成成就', '0/17', '查看完整成长, 查看里程碑、习惯连续性和年度趋势。', '查看完整成长', '查看里程碑、习惯连续性和年度趋势。', '尚未同步', '通知, 系统消息与邀请好友活动', '通知', '系统消息与邀请好友活动', '我的成长, 今日进度、连续天数与里程碑', '我的成长', '今日进度、连续天数与里程碑', '习惯, 打卡、连续天数与热力图', '习惯', '打卡、连续天数与热力图', '倒数纪念日, 记下要盯的日子，看它还有几天', '倒数纪念日', '记下要盯的日子，看它还有几天', '整理与记录', '任务', '2 项', '2', '任务', '日历', '日历', '专注', '专注', '分类', '分类', '我的', '我的'])\n",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1791382579.0303109,
+      "title": "UxTaskA1791382563"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1791382596.160217,
+      "title": "UxTaskB1791382563"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1791382609.0124102,
+      "rowCount": 2
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1791382615.464399
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1791382621.045162
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1791382626.193964
+    },
+    {
+      "name": "07-open-quadrant-move-sheet",
+      "status": "passed",
+      "at": 1791382642.234376
+    },
+    {
+      "name": "08-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1791382647.1847181,
+      "sourceQuadrant": "quadrant-cell-4",
+      "targetQuadrant": "quadrant-cell-1",
+      "feedback": "任务已移动到「马上做」，截止时间已调整",
+      "undoBounds": [
+        753,
+        1628,
+        1004,
+        1744
+      ]
+    },
+    {
+      "name": "09-quadrant-undo",
+      "status": "passed",
+      "at": 1791382649.1924312,
+      "sourceQuadrant": "quadrant-cell-4"
+    },
+    {
+      "name": "10-timeline-row-opens-detail",
+      "status": "passed",
+      "at": 1791382664.2370539
+    },
+    {
+      "name": "11-detail-keyboard-visible",
+      "status": "passed",
+      "at": 1791382666.9236412
+    },
+    {
+      "name": "12-detail-keyboard-dismissed",
+      "status": "passed",
+      "at": 1791382669.834112
+    },
+    {
+      "name": "13-detail-closes-after-second-back",
+      "status": "passed",
+      "at": 1791382674.693391
+    }
+  ]
+}

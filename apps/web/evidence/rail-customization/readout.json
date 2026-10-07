@@ -1,0 +1,28 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 420
+  },
+  "trigger": {
+    "x": 8,
+    "y": 132,
+    "width": 34,
+    "height": 44
+  },
+  "menu": {
+    "x": 8,
+    "y": 176.5,
+    "width": 176,
+    "height": 243
+  },
+  "scroll": {
+    "clientHeight": 241,
+    "scrollHeight": 352
+  },
+  "primary": [
+    "日历",
+    "任务",
+    "习惯",
+    "搜索"
+  ]
+}

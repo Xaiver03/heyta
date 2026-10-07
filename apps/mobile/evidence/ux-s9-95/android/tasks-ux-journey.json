@@ -1,0 +1,80 @@
+{
+  "status": "failed",
+  "serial": "emulator-5554",
+  "error": "timed out waiting for label '展开排期'; visible=['任务详情', '关闭任务详情', '标题', '标题', '备注', '备注', '离开输入框或关闭面板时保存', '清单', '收集箱', '收集箱', '新建清单', '新建清单', '上级任务', '（顶级任务）', '（顶级任务）', 'UxTaskB1791394477', 'UxTaskB1791394477', '标签', '还没有标签，先到「我的」页新建一个。', '截止日期', '今天', '今天', '明天', '明天', '本周末', '本周末', '下周一', '下周一', '上个月', '‹', '2026年10月', '下个月', '›', '一', '二', '三', '四', '五', '六', '日', '9月28日', '28', '9月29日', '29', '9月30日', '30', '10月1日', '1', '10月2日', '2', '10月3日', '3', '10月4日', '4', '10月5日', '5', '10月6日', '6', '10月7日', '7', '10月8日', '8', '10月9日', '9', '10月10日', '10', '10月11日', '11', '10月12日', '12', '10月13日', '13', '10月14日', '14', '10月15日', '15', '10月16日', '16', '10月17日', '17', '10月18日', '18']",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1791394485.639835,
+      "title": "UxTaskA1791394477"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1791394495.624609,
+      "title": "UxTaskB1791394477"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1791394508.165041,
+      "rowCount": 2
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1791394515.131532
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1791394520.8972301
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1791394526.4291992
+    },
+    {
+      "name": "06b-timeline-clears-selection",
+      "status": "passed",
+      "at": 1791394554.29346
+    },
+    {
+      "name": "07-view-options-sort-and-date",
+      "status": "passed",
+      "at": 1791394595.619957
+    },
+    {
+      "name": "08-open-quadrant-move-sheet",
+      "status": "passed",
+      "at": 1791394618.062667
+    },
+    {
+      "name": "09-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1791394622.152478,
+      "sourceQuadrant": "quadrant-cell-4",
+      "targetQuadrant": "quadrant-cell-1",
+      "feedback": "任务已移动到「马上做」，截止时间已调整",
+      "undoBounds": [
+        756,
+        1634,
+        1007,
+        1749
+      ]
+    },
+    {
+      "name": "10-quadrant-undo",
+      "status": "passed",
+      "at": 1791394624.1477928,
+      "sourceQuadrant": "quadrant-cell-4"
+    },
+    {
+      "name": "11-timeline-view-options",
+      "status": "passed",
+      "at": 1791394650.363169
+    }
+  ]
+}

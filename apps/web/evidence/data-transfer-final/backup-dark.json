@@ -1,0 +1,113 @@
+{
+  "app": {
+    "host": "web",
+    "name": "heyta"
+  },
+  "counts": {
+    "entities": {
+      "AI_FEEDBACK": {
+        "deleted": 0,
+        "total": 0
+      },
+      "ASSISTANT_TURN": {
+        "deleted": 0,
+        "total": 0
+      },
+      "EVENT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "FOCUS_SESSION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "HABIT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "HABIT_LOG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "NOTE": {
+        "deleted": 0,
+        "total": 0
+      },
+      "PREFERENCE_CORRECTION": {
+        "deleted": 0,
+        "total": 0
+      },
+      "PROJECT": {
+        "deleted": 0,
+        "total": 0
+      },
+      "REMINDER": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TAG": {
+        "deleted": 0,
+        "total": 0
+      },
+      "TASK": {
+        "deleted": 0,
+        "total": 1
+      }
+    },
+    "opsByEntityType": {
+      "TASK": 1
+    },
+    "totalDeleted": 0,
+    "totalEntities": 1,
+    "totalOps": 1
+  },
+  "entities": {
+    "AI_FEEDBACK": [],
+    "ASSISTANT_TURN": [],
+    "EVENT": [],
+    "FOCUS_SESSION": [],
+    "HABIT": [],
+    "HABIT_LOG": [],
+    "NOTE": [],
+    "PREFERENCE_CORRECTION": [],
+    "PROJECT": [],
+    "REMINDER": [],
+    "TAG": [],
+    "TASK": [
+      {
+        "_lastClientId": "4f74c178-3850-4564-ae3c-f536b7743480",
+        "_lastClock": {
+          "4f74c178-3850-4564-ae3c-f536b7743480": 1
+        },
+        "_lastOpId": "4f74c178-3850-4564-ae3c-f536b7743480-1791376479316-1",
+        "createdAt": 1791376479316,
+        "id": "task-d36bfbc6-7a86-4f69-9d4a-a40fa017082b",
+        "priority": 0,
+        "title": "数据往返验收 dark",
+        "updatedAt": 1791376479316
+      }
+    ]
+  },
+  "exportedAt": "2026-10-07T12:34:39.774Z",
+  "formatVersion": 1,
+  "opLog": [
+    {
+      "actionType": "CRT_TASK",
+      "clientId": "4f74c178-3850-4564-ae3c-f536b7743480",
+      "entityId": "task-d36bfbc6-7a86-4f69-9d4a-a40fa017082b",
+      "entityType": "TASK",
+      "id": "4f74c178-3850-4564-ae3c-f536b7743480-1791376479316-1",
+      "opType": "CRT",
+      "payload": {
+        "priority": 0,
+        "title": "数据往返验收 dark"
+      },
+      "schemaVersion": 1,
+      "timestamp": 1791376479316,
+      "vectorClock": {
+        "4f74c178-3850-4564-ae3c-f536b7743480": 1
+      }
+    }
+  ],
+  "schemaVersion": 1
+}

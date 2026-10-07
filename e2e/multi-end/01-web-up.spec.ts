@@ -55,13 +55,13 @@ test('Web 建清单/标签/任务并上传', async ({ page }) => {
 
   // 🔴 两个输入框**默认不在 DOM 里**（2026-09-30 起：点标题右侧的 + 才展开）。
   await panel.getByLabel('新建清单').click();
-  await panel.getByLabel('新清单名称').fill(LIST);
-  await panel.getByLabel('添加清单').click();
+  await panel.locator('#ht-category-create-name').fill(LIST);
+  await panel.getByRole('button', { name: '创建清单' }).click();
   await expect(panel.getByText(LIST, { exact: true })).toBeVisible();
 
   await panel.getByLabel('新建标签').click();
-  await panel.getByLabel('新标签名称').fill(TAG);
-  await panel.getByLabel('添加标签').click();
+  await panel.locator('#ht-category-create-name').fill(TAG);
+  await panel.getByRole('button', { name: '创建标签' }).click();
   await expect(panel.getByText(TAG, { exact: true })).toBeVisible();
 
   // ── 建任务并挂上两者 ────────────────────────────────────────────

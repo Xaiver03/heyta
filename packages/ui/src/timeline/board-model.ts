@@ -60,9 +60,25 @@ export interface BoardWindow {
   readonly endMs: number;
 }
 
+/** Fit labels to the measured track, retaining today before secondary dates. */
+export function fitBoardTicks(ticks: readonly BoardTick[], window: BoardWindow, width: number, labelWidth: number): readonly { tick: BoardTick; left: number }[] {
+  const span = Math.max(labelWidth, width);
+  const bounds = (tick: BoardTick) => Math.min(span - labelWidth, Math.max(0, percentAt(tick.atMs, window) * span / 100 - labelWidth / 2));
+  const priority = [...ticks.filter((tick) => tick.isToday), ...ticks];
+  const chosen: { tick: BoardTick; left: number }[] = [];
+  for (const tick of priority) {
+    const left = bounds(tick);
+    if (chosen.some((item) => item.tick.atMs === tick.atMs || Math.abs(item.left - left) < labelWidth)) continue;
+    chosen.push({ tick, left });
+  }
+  return chosen.sort((a, b) => a.tick.atMs - b.tick.atMs);
+}
+
 /** 板的文案契约。语义见参数名；实现全部在宿主（用词条表填）。 */
 export interface TimelineBoardLabels {
   readonly empty: string;
+  /** 空态下一步提示；旧宿主可省略，保持只有标题的最小形态。 */
+  readonly emptyHint?: string;
   readonly ariaEmpty: string;
   readonly ariaGroup: (count: number) => string;
   /** 星期名，**周一体**，7 项（`weekday.1` … `weekday.7`）。 */
@@ -78,6 +94,10 @@ export interface TimelineBoardLabels {
   readonly overdue: string;
   /** 「点空白建任务」的默认标题（数据来自产品 ⇒ 仍走词条表，由宿主装配）。 */
   readonly untitledTask: string;
+  /** 空白轴的可访问名称；未提供时宿主可回退到 untitledTask。 */
+  readonly createAt?: string;
+  /** 时间条末端手柄的可访问名称；点按打开详情编辑排期，拖拽仍调整时长。 */
+  readonly editSchedule?: (title: string) => string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

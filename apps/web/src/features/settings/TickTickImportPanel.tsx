@@ -32,7 +32,7 @@ import {
   type TickTickSkipReason,
   type TickTickUnmappedField,
 } from '@heyta/domain';
-import { AlertTriangle, Info, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
@@ -42,6 +42,8 @@ import {
   previewTickTickImport,
   type TickTickPreview,
 } from './ticktick-import.js';
+import { SettingsNotice } from './SettingsNotice.js';
+import { SettingsFilePicker } from './SettingsFilePicker.js';
 
 /**
  * 解析失败的两种原因 → 词条。**穷举**（加一个成员就编译失败）。
@@ -99,6 +101,7 @@ type Stage =
 export function TickTickImportPanel(): React.JSX.Element {
   const { t } = useI18n();
   const [fileName, setFileName] = useState<string | undefined>(undefined);
+  const [fileSize, setFileSize] = useState<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState<Stage>({ kind: 'idle' });
 
@@ -132,84 +135,113 @@ export function TickTickImportPanel(): React.JSX.Element {
 
   const skipped = stage.kind === 'ready' ? stage.preview.report.skippedCounts : {};
   const unmapped = stage.kind === 'ready' ? stage.preview.report.unmappedCounts : {};
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   return (
     <div className="ht-settings" data-testid="ticktick-import-panel">
       <h2 className="ht-settings__title ht-type-section-title">{t('web.ticktick.title')}</h2>
       <p className="ht-settings__hint">{t('web.ticktick.intro')}</p>
 
-      <section className="ht-settings__section">
-        <h3 className="ht-settings__h3 ht-type-headline">
+      <section className="ht-settings__section" aria-labelledby="ticktick-file-title">
+        <h3 id="ticktick-file-title" className="ht-settings__h3 ht-type-headline">
           <Upload size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.fileLabel')}
         </h3>
         <div className="ht-settings__actions">
-          <input
-            className="ht-input"
-            type="file"
+          <SettingsFilePicker
+            selected={fileName !== undefined}
             accept=".csv,text/csv"
-            data-testid="ticktick-file"
-            aria-label={t('web.ticktick.fileLabel')}
+            testId="ticktick-file"
+            label={t('web.ticktick.fileLabel')}
             disabled={busy}
             onChange={(event) => {
               const next = event.target.files?.[0];
-              if (next !== undefined) void pick(next);
+              if (next !== undefined) {
+                setFileSize(next.size);
+                void pick(next);
+              }
             }}
           />
         </div>
         {fileName !== undefined && (
-          <p className="ht-settings__hint" data-testid="ticktick-file-name">
-            {t('web.ticktick.picked', { name: fileName })}
-          </p>
+          <div className="ht-settings__file-summary" data-testid="ticktick-file-name">
+            <strong>{fileName}</strong>
+            {fileSize !== undefined && <span>{formatFileSize(fileSize)}</span>}
+          </div>
         )}
       </section>
 
       {/* 诚实条款：只认滴答清单 —— Todoist 的解析在本仓库不存在。 */}
-      <p className="ht-settings__notice" data-testid="ticktick-ticktick-only">
-        <Info size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.ticktickOnly')}
-      </p>
+      <SettingsNotice title={t('web.ticktick.ticktickOnly')} testId="ticktick-ticktick-only" />
 
       {/* 与"还原自己的导出"是两个不同的承诺，必须在界面上分开说。 */}
-      <p className="ht-settings__notice" data-testid="ticktick-coexist">
-        <Info size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.coexist')}
-      </p>
+      <SettingsNotice title={t('web.ticktick.coexist')} testId="ticktick-coexist" />
 
       {busy && (
-        <p className="ht-settings__hint" data-testid="ticktick-busy">
-          {t('web.ticktick.busy')}
-        </p>
+        <SettingsNotice title={t('web.ticktick.busy')} testId="ticktick-busy" live />
       )}
 
       {stage.kind === 'parse-failed' && (
-        <p className="ht-settings__danger" role="alert" data-testid="ticktick-parse-failed">
-          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t(FAILURE_KEYS[stage.reason])}
-        </p>
+        <SettingsNotice
+          title={t(FAILURE_KEYS[stage.reason])}
+          tone="danger"
+          testId="ticktick-parse-failed"
+          live
+        />
       )}
 
       {stage.kind === 'read-failed' && (
-        <p className="ht-settings__danger" role="alert" data-testid="ticktick-read-failed">
-          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.readFailed')}
-        </p>
+        <SettingsNotice title={t('web.ticktick.readFailed')} tone="danger" testId="ticktick-read-failed" live />
       )}
 
       {stage.kind === 'import-failed' && (
-        <p className="ht-settings__danger" role="alert" data-testid="ticktick-import-failed">
-          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.importFailed')}
-        </p>
+        <SettingsNotice title={t('web.ticktick.importFailed')} tone="danger" testId="ticktick-import-failed" live />
       )}
 
       {stage.kind === 'ready' && (
         <section className="ht-settings__section" data-testid="ticktick-preview">
           <h3 className="ht-settings__h3 ht-type-headline">{t('web.ticktick.previewTitle')}</h3>
-          <p className="ht-settings__hint" data-testid="ticktick-preview-counts">
-            {stage.preview.batch.entries.length === 0
-              ? t('web.ticktick.previewNoop')
-              : t('web.ticktick.previewCounts', {
-                  projects: stage.preview.batch.plan.projects.length,
-                  tags: stage.preview.batch.plan.tags.length,
-                  tasks: stage.preview.batch.plan.tasks.length,
-                  ops: stage.preview.batch.entries.length,
-                })}
-          </p>
+          {stage.preview.batch.entries.length === 0 ? (
+            <SettingsNotice title={t('web.ticktick.previewNoop')} testId="ticktick-preview-counts" />
+          ) : (
+            <div className="ht-settings__data-status" data-testid="ticktick-preview-counts">
+              <div className="ht-settings__data-status-item">
+                <span className="ht-settings__data-status-value ht-type-headline">{stage.preview.batch.plan.projects.length}</span>
+                <span className="ht-settings__data-status-label">
+                  {t('web.ticktick.preview.projectCount', {
+                    count: stage.preview.batch.plan.projects.length,
+                  })}
+                </span>
+              </div>
+              <div className="ht-settings__data-status-item">
+                <span className="ht-settings__data-status-value ht-type-headline">{stage.preview.batch.plan.tags.length}</span>
+                <span className="ht-settings__data-status-label">
+                  {t('web.ticktick.preview.tagCount', {
+                    count: stage.preview.batch.plan.tags.length,
+                  })}
+                </span>
+              </div>
+              <div className="ht-settings__data-status-item">
+                <span className="ht-settings__data-status-value ht-type-headline">{stage.preview.batch.plan.tasks.length}</span>
+                <span className="ht-settings__data-status-label">
+                  {t('web.ticktick.preview.taskCount', {
+                    count: stage.preview.batch.plan.tasks.length,
+                  })}
+                </span>
+              </div>
+              <div className="ht-settings__data-status-item">
+                <span className="ht-settings__data-status-value ht-type-headline">{stage.preview.batch.entries.length}</span>
+                <span className="ht-settings__data-status-label">
+                  {t('web.ticktick.preview.operationCount', {
+                    count: stage.preview.batch.entries.length,
+                  })}
+                </span>
+              </div>
+            </div>
+          )}
           <p className="ht-settings__hint" data-testid="ticktick-preview-rows">
             {t('web.ticktick.previewRows', {
               rows: stage.preview.report.dataRows,
@@ -261,16 +293,21 @@ export function TickTickImportPanel(): React.JSX.Element {
       )}
 
       {stage.kind === 'done' && (
-        <p className="ht-settings__hint" data-testid="ticktick-done">
-          {stage.result.opCount === 0
-            ? t('web.ticktick.doneNoop')
-            : t('web.ticktick.done', {
-                projects: stage.result.added.projects,
-                tags: stage.result.added.tags,
-                tasks: stage.result.added.tasks,
-                ops: stage.result.opCount,
-              })}
-        </p>
+        <SettingsNotice
+          title={
+            stage.result.opCount === 0
+              ? t('web.ticktick.doneNoop')
+              : t('web.ticktick.done', {
+                  projects: stage.result.added.projects,
+                  tags: stage.result.added.tags,
+                  tasks: stage.result.added.tasks,
+                  ops: stage.result.opCount,
+                })
+          }
+          tone="success"
+          testId="ticktick-done"
+          live
+        />
       )}
     </div>
   );

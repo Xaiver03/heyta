@@ -32,6 +32,9 @@ import {
   expectNoStubCall,
   openApp,
   resetStub,
+  rowFor,
+  expectStubCount,
+  selectSettingsSection,
   STUB_ENDPOINT,
   switchTheme,
   switchView,
@@ -75,10 +78,13 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await switchView(page, '任务');
     await addTask(page, '写周报');
 
-    // ══ 1. 面板在任务视图里，档位默认"只读" ═══════════════════════════
+    // ══ 1. 面板在任务视图里，档位默认"执行" ═══════════════════════════
     const panel = page.locator('[data-testid="ai-assistant"]');
     await expect(panel).toBeVisible();
-    await expect(page.locator('[data-testid="ai-assistant-tier"]')).toContainText('只读');
+    await expect(page.locator('[data-testid="ai-agent-surface"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ai-assistant-suggestions"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ai-tool-run"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="ai-assistant-tier"]')).toContainText('执行');
     await expect(page.locator('[data-testid="ai-assistant-disclaimer"]')).toBeVisible();
 
     // ══ 1b. 🔴 规则本机就答得出的那一句：**不弹披露**，而且一个请求都不发 ══
@@ -162,13 +168,16 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
 
     // ══ 6. 档位是第二个授权前端：切换 + 刷新后仍在 ══════════════════════
     await switchView(page, '设置');
+    await selectSettingsSection(page, 'ai');
     const section = page.locator('[data-testid="ai-assistant-section"]');
     await expect(section).toBeVisible();
-    // 🔴 默认必须是只读那一格被选中。
-    await expect(section.locator('[data-testid="assistant-tier-read-only"] input')).toBeChecked();
+    // 🔴 默认是执行；真正写入仍需逐条确认。
+    await expect(section.locator('[data-testid="assistant-tier-read-and-propose"] input')).toBeChecked();
+    await expect(section.locator('[data-testid="assistant-tier-read-only"] input')).not.toBeChecked();
     await section.locator('[data-testid="assistant-tier-read-and-propose"] input').check();
     await page.reload();
     await switchView(page, '设置');
+    await selectSettingsSection(page, 'ai');
     const again = page.locator('[data-testid="ai-assistant-section"]');
     await expect(again.locator('[data-testid="assistant-tier-read-and-propose"] input')).toBeChecked();
     await expect(again.locator('[data-testid="assistant-tier-read-only"] input')).not.toBeChecked();
@@ -184,7 +193,7 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await page.locator('#local-api-enabled').check();
     const createTaskGrant = page.locator('input[aria-label="create_task"]');
     await expect(createTaskGrant).toBeVisible();
-    // 方向一：助手开了"可提议改动"，外部程序的逐工具授权**没跟着变**。
+    // 方向一：助手开了"执行"，外部程序的逐工具授权**没跟着变**。
     await expect(createTaskGrant).not.toBeChecked();
     // 方向二：给外部程序开一个工具，助手的档位**也不跟着变**。
     await createTaskGrant.check();
@@ -196,4 +205,27 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
 
     expect(errors, `控制台不该有错误：\n${errors.join('\n')}`).toEqual([]);
   });
+});
+
+
+test('Chatbot 默认执行，确认前不创建，确认后只创建一次', async ({ page, request }) => {
+  await resetStub(request);
+  await openApp(page, '/', 'accepted');
+  await configureEndpoint(page, { capabilities: ['tool_calling'], features: ['tool-calling'] });
+  await switchView(page, '任务');
+  const title = '整理下一周的计划';
+  await expect(page.getByTestId('ai-assistant-tier-select')).toHaveValue('read-and-propose');
+  await page.getByTestId('ai-assistant-input').fill(`新建任务：${title}`);
+  await page.getByTestId('ai-assistant-send-button').click();
+  await expect(page.getByTestId('ai-assistant-disclosure')).toBeVisible();
+  await expectNoStubCall(request);
+  await page.getByTestId('ai-assistant-send').click();
+  await expect(page.locator('p[data-testid="ai-chat-proposal"]')).toContainText(title);
+  await expect(rowFor(page, title)).toHaveCount(0);
+  await page.screenshot({ path: `${EVIDENCE}/proposal-before-confirm.png` });
+  await page.getByTestId('ai-chat-confirm').click();
+  await expect(page.getByTestId('ai-chat-confirmed')).toBeVisible();
+  await expect(rowFor(page, title)).toHaveCount(1);
+  await expectStubCount(request, 1);
+  await page.screenshot({ path: `${EVIDENCE}/proposal-confirmed.png` });
 });

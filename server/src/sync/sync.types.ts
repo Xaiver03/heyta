@@ -322,6 +322,7 @@ export interface UploadOpsRequest {
   lastKnownServerSeq?: number;
   requestId?: string; // For request deduplication on retries
   causalFrontierToken?: string;
+  inboundCommitProofs?: Record<string, string>;
 }
 
 export interface UploadResult {

@@ -65,7 +65,12 @@ async function resetStores(): Promise<void> {
   //     会漏进这一轮 —— 症状是"这一轮的断言看着像范围筛错了"。
   useTaskStore.setState({ entities: currentState(), now: SEPT(28) });
   useProjectStore.setState({ projects: [], tags: [] });
-  useCalendarViewStore.setState({ cursor: '2026-09-01', selected: TODAY, scope: FULL_SCOPE });
+  useCalendarViewStore.setState({
+    cursor: '2026-09-01',
+    selected: TODAY,
+    scope: FULL_SCOPE,
+    calendarSidebarOpen: true,
+  });
 }
 
 async function flush(): Promise<void> {
@@ -142,11 +147,11 @@ function miniDays(): HTMLElement[] {
   return [...container!.querySelectorAll<HTMLElement>('[data-testid^="calendar-mini-day-"]')];
 }
 
-/** 主区当日列表里有没有那一行（与 `calendar-view.spec.tsx` 同一条判据形状）。 */
+/** 当前月格里有没有那一行。Web 月档不再重复渲染选中日清单。 */
 function hasRow(title: string): boolean {
-  const list = byTestId('calendar-board-day-list');
-  if (list === null) return false;
-  return [...list.querySelectorAll('*')].some((el) => (el.textContent ?? '') === title);
+  return [...container!.querySelectorAll<HTMLElement>(
+    '[data-testid$="-bar-title"], [data-testid$="-event-title"]',
+  )].some((el) => (el.textContent ?? '') === title);
 }
 
 function checkbox(testId: string): HTMLInputElement {
@@ -191,8 +196,8 @@ async function taskId(title: string): Promise<string> {
  * | 买菜 | 09-28 | 清单 生活 | 同上 |
  * | 修电脑 | 09-28 | 标签 紧急（无清单） | 同上 |
  * | 月结 | 09-05（周六） | 清单 生活 | 主色点 |
- * | 逾期的事 | 09-20（已过） | 清单 工作 | danger 点 |
- * | 已完成的事 | 09-10 | 清单 工作，勾完 | subtle 点（**不是没有点**） |
+ * | 逾期的事 | 09-20（已过） | 清单 工作 | 主蓝点（点只表达有内容） |
+ * | 已完成的事 | 09-10 | 清单 工作，勾完 | 主蓝点（点只表达有内容） |
  */
 async function seedFull(): Promise<void> {
   await act(async () => {
@@ -282,7 +287,7 @@ describe('日历侧栏（Web）', () => {
 
     // 侧栏点一天 → 主区当天标题跟着变。
     await click(`calendar-mini-day-${'2026-09-05'}`);
-    expect(need('calendar-board-day-title').textContent).toContain('9月5日');
+    expect(need('calendar-cell-2026-09-05').getAttribute('aria-selected')).toBe('true');
 
     // 侧栏翻月 → 两列的月份标题**同时**变（各存一份的话这里必红）。
     await click('calendar-mini-prev');
@@ -292,7 +297,7 @@ describe('日历侧栏（Web）', () => {
     // 点补白格（8月31日，出现在 9 月的网格里）：选中跟过去，**月份也必须跟过去**。
     await click('calendar-mini-next');
     await click(`calendar-mini-day-${OUTSIDE_PREV}`);
-    expect(need('calendar-board-day-title').textContent).toContain('8月31日');
+    expect(need('calendar-cell-2026-08-31').getAttribute('aria-selected')).toBe('true');
     expect(
       need('calendar-toolbar-month').textContent,
       '点了补白格只改选中日、没改月份 —— 主区列着 9 月、侧栏圈着 8 月',
@@ -302,11 +307,11 @@ describe('日历侧栏（Web）', () => {
     await click('calendar-mini-today');
     expect(need('calendar-mini-title').textContent).toBe('2026年9月');
     expect(need('calendar-toolbar-month').textContent).toBe('2026年9月');
-    expect(need('calendar-board-day-title').textContent).toContain('9月28日');
+    expect(need('calendar-cell-2026-09-28').getAttribute('aria-selected')).toBe('true');
     expect(miniCell(TODAY).getAttribute('aria-current')).toBe('date');
   });
 
-  it('🔴 一天**一颗**点，颜色来自共享 `calendarDayTone`，没安排的日子没有点', async () => {
+  it('🔴 一天**一颗**主蓝点，点只表达有内容，没安排的日子没有点', async () => {
     await seedFull();
     await mount();
     await openCalendar();
@@ -316,11 +321,11 @@ describe('日历侧栏（Web）', () => {
     expect(dots(TODAY), '今天有 3 条任务却画了多颗点').toBe(1);
     expect(dotColor(TODAY)).toBe('var(--ht-color-primary)');
     expect(dots('2026-09-05')).toBe(1);
-    expect(dots('2026-09-20'), '逾期应当是 danger 色').toBe(1);
-    expect(dotColor('2026-09-20')).toBe('var(--ht-color-danger)');
-    // 全部做完的那天给 subtle，而不是"没有点"：这天清空了 ≠ 这天本来没安排。
+    expect(dots('2026-09-20')).toBe(1);
+    expect(dotColor('2026-09-20')).toBe('var(--ht-color-primary)');
+    // 逾期和已完成仍然保留内容存在感；点不再承担任务状态编码。
     expect(dots('2026-09-10')).toBe(1);
-    expect(dotColor('2026-09-10')).toBe('var(--ht-color-foreground-subtle)');
+    expect(dotColor('2026-09-10')).toBe('var(--ht-color-primary)');
     expect(dots('2026-09-15'), '没安排的日子不该有点').toBe(0);
 
     // 总数：颗数 = **有任务的天数**（4 天：05 / 10 / 20 / 28），不是任务条数。
@@ -330,6 +335,39 @@ describe('日历侧栏（Web）', () => {
       miniDays().every((el) => el.querySelectorAll('.ht-sidebar__day-dots > i').length <= 1),
       '有格子画了不止一颗点',
     ).toBe(true);
+  });
+
+  it('🔴 跨天排期在侧栏的每个自然日都有点，并与读屏计数一致', async () => {
+    await act(async () => {
+      await useTaskStore.getState().addTask('跨天排期');
+    });
+    const id = await taskId('跨天排期');
+    await act(async () => {
+      await useTaskStore.getState().setSchedule(id, {
+        // setSchedule clamps durations to the product's 8-hour maximum. Start
+        // late in the day so that this valid business duration crosses midnight.
+        // SEPT is noon, so +11 hours gives a real 23:00 local start.
+        startDate: SEPT(5) + 11 * 60 * 60 * 1000,
+        durationMinutes: 8 * 60,
+      });
+    });
+    await mount();
+    await openCalendar();
+
+    expect(dots('2026-09-05')).toBe(1);
+    expect(dots('2026-09-06')).toBe(1);
+    expect(miniCell('2026-09-06').getAttribute('aria-label')).toContain('1 个任务');
+  });
+
+  it('节日名称进入日期辅助层，并保留完整读屏名称', async () => {
+    useCalendarViewStore.setState({ cursor: '2026-10-01', selected: '2026-10-01' });
+    await mount();
+    await openCalendar();
+
+    expect(need('calendar-mini-day-2026-10-01').querySelector('.ht-sidebar__day-aux')?.textContent).toBe(
+      '国庆节',
+    );
+    expect(need('calendar-mini-day-2026-10-01').getAttribute('aria-label')).toContain('国庆节');
   });
 
   it('🔴 勾选范围**同时**筛掉主区列表与格子里的点', async () => {

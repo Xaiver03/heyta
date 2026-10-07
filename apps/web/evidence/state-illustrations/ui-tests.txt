@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/ui
+
+
+ Test Files  2 passed (2)
+      Tests  33 passed (33)
+   Start at  19:01:50
+   Duration  249ms (transform 61%, import 30%, tests 6%, worker 3%)
+

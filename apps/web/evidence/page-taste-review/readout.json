@@ -1,0 +1,294 @@
+[
+  {
+    "id": "tasks",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "收集箱",
+      "无截止时间"
+    ]
+  },
+  {
+    "id": "habits",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "习惯"
+    ]
+  },
+  {
+    "id": "timeline",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "时间线"
+    ]
+  },
+  {
+    "id": "notes",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "便签"
+    ]
+  },
+  {
+    "id": "countdown",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "倒数纪念日"
+    ]
+  },
+  {
+    "id": "search",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "搜索"
+    ]
+  },
+  {
+    "id": "trash",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "回收站"
+    ]
+  },
+  {
+    "id": "quadrant",
+    "width": 1440,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "四象限"
+    ]
+  },
+  {
+    "id": "tasks",
+    "width": 390,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "收集箱",
+      "无截止时间"
+    ]
+  },
+  {
+    "id": "habits",
+    "width": 390,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "习惯"
+    ]
+  },
+  {
+    "id": "timeline",
+    "width": 390,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "时间线"
+    ]
+  },
+  {
+    "id": "notes",
+    "width": 390,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "便签"
+    ]
+  },
+  {
+    "id": "countdown",
+    "width": 390,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "倒数纪念日"
+    ]
+  },
+  {
+    "id": "search",
+    "width": 390,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "搜索"
+    ]
+  },
+  {
+    "id": "trash",
+    "width": 390,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "回收站"
+    ]
+  },
+  {
+    "id": "quadrant",
+    "width": 390,
+    "theme": "light",
+    "overflow": false,
+    "headings": [
+      "四象限"
+    ]
+  },
+  {
+    "id": "tasks",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "收集箱",
+      "无截止时间"
+    ]
+  },
+  {
+    "id": "habits",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "习惯"
+    ]
+  },
+  {
+    "id": "timeline",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "时间线"
+    ]
+  },
+  {
+    "id": "notes",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "便签"
+    ]
+  },
+  {
+    "id": "countdown",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "倒数纪念日"
+    ]
+  },
+  {
+    "id": "search",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "搜索"
+    ]
+  },
+  {
+    "id": "trash",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "回收站"
+    ]
+  },
+  {
+    "id": "quadrant",
+    "width": 1440,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "四象限"
+    ]
+  },
+  {
+    "id": "tasks",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "收集箱",
+      "无截止时间"
+    ]
+  },
+  {
+    "id": "habits",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "习惯"
+    ]
+  },
+  {
+    "id": "timeline",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "时间线"
+    ]
+  },
+  {
+    "id": "notes",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "便签"
+    ]
+  },
+  {
+    "id": "countdown",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "倒数纪念日"
+    ]
+  },
+  {
+    "id": "search",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "搜索"
+    ]
+  },
+  {
+    "id": "trash",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "回收站"
+    ]
+  },
+  {
+    "id": "quadrant",
+    "width": 390,
+    "theme": "dark",
+    "overflow": false,
+    "headings": [
+      "四象限"
+    ]
+  }
+]

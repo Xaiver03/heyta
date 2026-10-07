@@ -100,6 +100,8 @@ export function SettingsScreen({
   dataActions,
   securityActions,
   syncStatus,
+  onOpenAuth,
+  onUseOfficialSync,
   initialSection,
 }: {
   /** 「我的」持有这个状态；关闭只是把它拨回 `false`，不卸载「我的」。 */
@@ -121,6 +123,10 @@ export function SettingsScreen({
   securityActions?: readonly SettingsRowModel[];
   /** 同步状态与重试动作由父屏提供，表单仍由父屏持有。 */
   syncStatus?: React.ReactNode;
+  /** 从同步设置进入登录；参数为 true 时明确打开自托管认证路径。 */
+  onOpenAuth?: (allowServerSelection?: boolean) => void;
+  /** 切回官方同步时清理自托管凭据，避免把令牌带到另一个服务端。 */
+  onUseOfficialSync?: () => void;
   /** 从个人资料直达“个人资料”二级分组，普通打开时留在目录。 */
   initialSection?: SettingsSectionKey;
 }): React.JSX.Element {
@@ -144,6 +150,9 @@ export function SettingsScreen({
   const [privacyFailed, setPrivacyFailed] = useState(false);
   const [privacyBusy, setPrivacyBusy] = useState(false);
   const [section, setSection] = useState<SettingsSectionKey | undefined>(initialSection);
+  const [advancedSync, setAdvancedSync] = useState(
+    () => form.token.trim() !== '' && form.serverUrl.trim() !== '' && form.serverUrl !== DEFAULT_SERVER_URL,
+  );
   const sectionRef = useRef<SettingsSectionKey | undefined>(initialSection);
   const openSection = useCallback((next: SettingsSectionKey | undefined): void => {
     sectionRef.current = next;
@@ -368,43 +377,88 @@ export function SettingsScreen({
       {syncStatus}
       {renderPrivacy()}
       <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
-      <Text variant="caption" tone="subtle">
-        {t('mobile.profile.sync.manualHint')}
-      </Text>
       <Card>
-        <View style={{ gap: tokens['space.4'] }}>
-          <TextField
-            label={t('mobile.profile.serverUrl.label')}
-            value={form.serverUrl}
-            onChangeText={form.setServerUrl}
-            placeholder={DEFAULT_SERVER_URL}
-            keyboard="url"
-            hint={t('mobile.profile.serverUrl.hint')}
-          />
-          {form.transport === 'plaintext' ? (
-            <Text variant="caption" tone="warning">
-              {t('mobile.profile.transport.plaintext')}
+        {advancedSync ? (
+          <View style={{ gap: tokens['space.4'] }}>
+            <Stack>
+              <Text variant="row-title">{t('mobile.profile.sync.advancedTitle')}</Text>
+              <Text variant="caption" tone="subtle">
+                {t('mobile.profile.sync.advancedHint')}
+              </Text>
+            </Stack>
+            <TextField
+              label={t('mobile.profile.serverUrl.label')}
+              value={form.serverUrl}
+              onChangeText={form.setServerUrl}
+              placeholder={DEFAULT_SERVER_URL}
+              keyboard="url"
+              hint={t('mobile.profile.serverUrl.hint')}
+            />
+            {form.transport === 'plaintext' ? (
+              <Text variant="caption" tone="warning">
+                {t('mobile.profile.transport.plaintext')}
+              </Text>
+            ) : null}
+            {form.transport === 'plaintext-local' ? (
+              <Text variant="caption" tone="warning">
+                {t('mobile.profile.transport.plaintextLocal')}
+              </Text>
+            ) : null}
+            <TextField
+              label={t('mobile.profile.token.label')}
+              value={form.token}
+              onChangeText={form.setToken}
+              placeholder={t('mobile.profile.token.placeholder')}
+            />
+            <TextField
+              label={t('mobile.profile.password.label')}
+              value={form.password}
+              onChangeText={form.setPassword}
+              secure
+              hint={t('mobile.profile.password.hint')}
+            />
+            {onOpenAuth !== undefined ? (
+              <Button
+                label={form.configured ? t('mobile.profile.account.switchAccount') : t('mobile.profile.account.signIn')}
+                tone="primary"
+                onPress={() => onOpenAuth(true)}
+              />
+            ) : null}
+            <Button
+              label={t('mobile.profile.sync.advancedClose')}
+              tone="ghost"
+              onPress={() => {
+                onUseOfficialSync?.();
+                form.setServerUrl(DEFAULT_SERVER_URL);
+                setAdvancedSync(false);
+              }}
+            />
+          </View>
+        ) : (
+          <Stack>
+            <Text variant="row-title">{t('mobile.profile.sync.officialTitle')}</Text>
+            <Text variant="caption" tone="subtle">
+              {t('mobile.profile.sync.officialHint')}
             </Text>
-          ) : null}
-          {form.transport === 'plaintext-local' ? (
-            <Text variant="caption" tone="warning">
-              {t('mobile.profile.transport.plaintextLocal')}
+            <Text variant="caption" tone="subtle">
+              {form.configured
+                ? t('mobile.profile.account.signedInHint')
+                : t('mobile.profile.account.signInHint')}
             </Text>
-          ) : null}
-          <TextField
-            label={t('mobile.profile.token.label')}
-            value={form.token}
-            onChangeText={form.setToken}
-            placeholder={t('mobile.profile.token.placeholder')}
-          />
-          <TextField
-            label={t('mobile.profile.password.label')}
-            value={form.password}
-            onChangeText={form.setPassword}
-            secure
-            hint={t('mobile.profile.password.hint')}
-          />
-        </View>
+            {onOpenAuth !== undefined ? (
+              <Button
+                label={form.configured ? t('mobile.profile.account.switchAccount') : t('mobile.profile.account.signIn')}
+                tone="primary"
+                onPress={() => onOpenAuth()}
+              />
+            ) : null}
+            <Button
+              label={t('mobile.profile.sync.advancedOpen')}
+              tone="ghost"
+              onPress={() => setAdvancedSync(true)}
+            />
+          </Stack>
+        )}
       </Card>
     </>
   );
@@ -533,8 +587,6 @@ export function SettingsScreen({
             alignItems: 'center',
             paddingHorizontal: tokens['screen.gutter'],
             gap: tokens['space.2'],
-            borderBottomWidth: tokens['border-width.thin'],
-            borderBottomColor: tokens['color.border'],
             backgroundColor: tokens['color.surface'],
           }}
         >
@@ -554,7 +606,7 @@ export function SettingsScreen({
           )}
         </View>
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView
             key={section ?? 'directory'}
             style={{ flex: 1 }}

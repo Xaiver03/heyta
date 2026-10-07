@@ -240,12 +240,12 @@ test.describe('链 5 · 同意之前一个请求都不发（真浏览器）', ()
 
     const terms = page.locator('[data-testid="privacy-consent-terms"]');
     await expect(terms).toBeVisible();
-    // 🔴 这台"自建实例"（127.0.0.1）的链接必须指向**它自己的** `/terms.html`
-    // （链 2 的分流），而不是落地页或缺失。
-    expect(await terms.getAttribute('href')).toMatch(/\/terms\.html$/);
+    // 本机 preview 只是载体。未主动开启自托管时，默认服务仍为官方，
+    // 因而条款链接指向官方站点；链接存在不应提前产生请求。
+    expect(await terms.getAttribute('href')).toBe('https://heyta.waytofuture.cn/legal/terms/');
     expect(
       await page.locator('[data-testid="privacy-consent-privacy"]').getAttribute('href'),
-    ).toMatch(/\/privacy\.html$/);
+    ).toBe('https://heyta.waytofuture.cn/legal/privacy/');
 
     expect(egress, `光打开面板不该因为渲染链接就发请求：${JSON.stringify(egress)}`).toEqual([]);
   });

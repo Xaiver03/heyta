@@ -249,6 +249,10 @@ const LOCALE_SCRIPT_RULES = {
  * （`common.lang.*` 原来也逐条登记在这里，现在由自称策略推导，见 `isForeignEndonym`。）
  */
 const UNTRANSLATABLE_KEYS = new Set([
+  // Literal local API configuration path and executable command; translating
+  // either would make the setup instructions unusable.
+  'web.ai.settings.localApi.source.file',
+  'web.ai.settings.localApi.source.command',
   'common.brand',
   // 平台名（产品名，不是普通名词）
   'site.platforms.web.name',

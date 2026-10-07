@@ -32,16 +32,19 @@
  * 钉住它的判据是 `apps/web/tests/sync-settings-prefill.spec.tsx`。
  */
 
-import { useEffect } from 'react';
-import { cssVar, ICON_SIZE } from '@heyta/design-system';
+import { useEffect, useRef } from 'react';
+import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import { HeytaUiProvider, SyncStatusBar, syncStatusAffordances } from '@heyta/ui';
 import { CircleHelp } from 'lucide-react';
 
 import { HELP_SYNC_ANCHOR, siteLink } from '../../lib/site-url.js';
+import { SettingsNotice } from '../settings/SettingsNotice.js';
 import { describeSyncStatus } from './status-copy.js';
 import { useSyncStore } from './store.js';
+import { SettingsAccountGate } from '../settings/SettingsAccountGate.js';
 import { VaultSettingsPanel } from './VaultSettingsPanel.js';
+import './sync-settings.css';
 
 /**
  * 服务端地址的示例。**不是文案，是 URL 字面量。**
@@ -53,15 +56,22 @@ import { VaultSettingsPanel } from './VaultSettingsPanel.js';
  */
 const SERVER_URL_EXAMPLE = 'http://127.0.0.1:3000';
 
-export function SyncSettingsPanel(): React.JSX.Element {
+export function SyncSettingsPanel({ active = true }: { active?: boolean }): React.JSX.Element {
   const { t } = useI18n();
   const sync = useSyncStore();
   const draft = sync.syncDraft;
-  const setDraft = sync.setSyncDraft;
   const showSyncDraft = useSyncStore((s) => s.showSyncDraft);
   const hideSyncDraft = useSyncStore((s) => s.hideSyncDraft);
+  const signedIn = sync.baseUrl.trim() !== '' && sync.token?.trim() !== '';
   const vaultMode = sync.accountId !== undefined && sync.accountId.trim() !== '';
   const affordances = syncStatusAffordances(sync.status);
+  const draftDirtyRef = useRef(false);
+  const seededRef = useRef(false);
+  const observedCredentialsRef = useRef<string | undefined>(undefined);
+  const setDraft = (patch: Partial<typeof draft>): void => {
+    draftDirtyRef.current = true;
+    sync.setSyncDraft(patch);
+  };
 
   /**
    * 挂载即按**当前配置**播种，卸载即声明"这一节不在屏幕上了"。
@@ -71,13 +81,30 @@ export function SyncSettingsPanel(): React.JSX.Element {
    * 用户正在输入的地址会被他自己刚敲进去的那个字符覆盖掉。
    */
   useEffect(() => {
-    showSyncDraft();
+    if (!active) {
+      hideSyncDraft();
+      return undefined;
+    }
+    const credentialsKey = `${sync.baseUrl}\u0000${sync.token ?? ''}\u0000${sync.password ?? ''}`;
+    const credentialsChanged = observedCredentialsRef.current !== undefined && observedCredentialsRef.current !== credentialsKey;
+    if (!seededRef.current) {
+      showSyncDraft();
+      draftDirtyRef.current = false;
+      seededRef.current = true;
+    } else if (credentialsChanged && !draftDirtyRef.current) {
+      showSyncDraft();
+    } else {
+      // Re-entering the category must restore the visibility flag without
+      // replacing an unsaved URL/token/password draft.
+      showSyncDraft(true);
+    }
+    observedCredentialsRef.current = credentialsKey;
     return hideSyncDraft;
-  }, [showSyncDraft, hideSyncDraft]);
+  }, [active, hideSyncDraft, showSyncDraft, sync.baseUrl, sync.password, sync.token]);
 
   return (
     <section
-      className="ht-settings"
+      className="ht-settings sync-settings"
       id="settings-sync"
       data-testid="sync-settings-panel"
       aria-label={t('web.sync.settings.title')}
@@ -85,79 +112,110 @@ export function SyncSettingsPanel(): React.JSX.Element {
       <h2 className="ht-settings__title ht-type-section-title">{t('web.sync.settings.title')}</h2>
       <p className="ht-settings__hint">{t('web.settings.sync.note')}</p>
 
-      {/*
-        共享那枚状态条骨架（`@heyta/ui`）。
-        ⚠️ 这层 `<HeytaUiProvider>` 不能拆：`scripts/check-ui-provider.mjs` 的
-        `PROVIDER_DEPENDENT` 清单里登记的是 `SyncBar.tsx` 那一层；搬到这里之后
-        清单要跟着改（`check:ui-provider` 会红 —— 那是它该有的样子，不是巧合）。
-      */}
-      <HeytaUiProvider>
-        <SyncStatusBar
-          status={sync.status}
-          labels={{ status: (status) => describeSyncStatus(status, t) }}
-          testID="sync-status-bar"
-        />
-      </HeytaUiProvider>
+      <div className="sync-settings__stack">
+        {signedIn ? <fieldset className="sync-settings__fieldset" aria-labelledby="sync-status-title">
+          <legend id="sync-status-title" className="sync-settings__legend">{t('web.settings.syncUx.statusTitle')}</legend>
+          <p className="sync-settings__section-hint">{t('web.settings.syncUx.statusHint')}</p>
+          {/* 共享那枚状态条骨架（`@heyta/ui`）。Provider 由 Web 壳提供。 */}
+          {signedIn ? <HeytaUiProvider>
+            <SyncStatusBar
+              status={sync.status}
+              labels={{ status: (status) => describeSyncStatus(status, t) }}
+              testID="sync-status-bar"
+            />
+          </HeytaUiProvider> : <p className="sync-settings__section-hint">{t('common.sync.signIn')}</p>}
+          {signedIn && sync.status.kind === 'error' ? (
+            <SettingsNotice
+              title={t('web.settings.syncUx.errorTitle')}
+              tone="danger"
+              live
+              testId="sync-status-error"
+              actions={affordances.showsHelp ? (
+                <a className="ht-btn ht-btn--ghost" href={siteLink(HELP_SYNC_ANCHOR)} rel="noopener noreferrer" data-testid="sync-help-link">
+                  <CircleHelp size={ICON_SIZE.sm} aria-hidden="true" />
+                  {t('web.sync.help.link')}
+                </a>
+              ) : undefined}
+            >
+              {describeSyncStatus(sync.status, t)}
+            </SettingsNotice>
+          ) : null}
+        </fieldset> : null}
 
-      <label style={labelStyle}>
-        {t('web.sync.serverUrl.label')}
-        <input
-          value={draft.baseUrl}
-          onChange={(e) => setDraft({ baseUrl: e.target.value })}
-          placeholder={SERVER_URL_EXAMPLE}
-          // 「从订阅提示跳到这一节」时焦点落在它身上（见 `shell/settings-anchors.ts`）。
-          data-testid="sync-server-url"
-          style={fieldStyle}
-        />
-      </label>
+        <fieldset className="sync-settings__fieldset" aria-labelledby="sync-hosted-title">
+          <legend id="sync-hosted-title" className="sync-settings__legend">{t('common.sync.hosted.title')}</legend>
+          {signedIn ? (
+            <p className="sync-settings__section-hint">{sync.email ?? t('common.sync.account.connected')}</p>
+          ) : (
+            <SettingsAccountGate messageKey="common.sync.hosted.hint" testId="sync-signin-required" />
+          )}
+        </fieldset>
 
-      <label style={labelStyle}>
-        {t('web.sync.token.label')}
-        <input
-          type="password"
-          value={draft.token}
-          onChange={(e) => setDraft({ token: e.target.value })}
-          autoComplete="off"
-          style={fieldStyle}
-        />
-      </label>
-
-      {/* 「令牌从哪来」的入口。手填**保留**（自建用户可能已有令牌），
-          这里只是补上一条不必手填的路。 */}
-      <p style={hintStyle}>{t('web.auth.tokenHint')}</p>
-      <button
-        type="button"
-        className="ht-btn ht-btn--ghost"
-        style={{ alignSelf: 'flex-start' }}
-        onClick={() => sync.openSignIn()}
-      >
-        {t('web.auth.open')}
-      </button>
-
-      {!vaultMode ? (
-        <>
-          <label style={labelStyle}>
-            {t('web.sync.password.label')}
+        {signedIn ? (
+        <fieldset className="sync-settings__fieldset" aria-labelledby="sync-encryption-title">
+          <legend id="sync-encryption-title" className="sync-settings__legend">{t('web.settings.syncUx.encryptionTitle')}</legend>
+          <p className="sync-settings__section-hint">{t('web.settings.syncUx.encryptionHint')}</p>
+          {!vaultMode ? (
+            <>
+              <label className="sync-settings__field">
+                {t('web.sync.password.label')}
+                <input
+                  className="sync-settings__input"
+                  type="password"
+                  value={draft.password}
+                  onChange={(e) => setDraft({ password: e.target.value })}
+                  autoComplete="new-password"
+                />
+              </label>
+              <p className="sync-settings__field-hint">
+                {t('web.sync.password.lead')}
+                <strong>{t('web.sync.password.strong')}</strong>
+                {t('web.sync.password.tail')}
+              </p>
+            </>
+          ) : null}
+          {!vaultMode ? <button type="button" className="ht-btn ht-btn--primary" data-testid="sync-unlock-and-sync"
+            onClick={() => {
+              sync.configure(sync.baseUrl, sync.token ?? '', draft.password);
+              draftDirtyRef.current = false;
+              void sync.syncNow();
+            }}>{t('web.sync.saveAndSync')}</button> : null}
+          <VaultSettingsPanel active={active && signedIn} />
+        </fieldset>
+        ) : null}
+        <details className="sync-settings__advanced" data-testid="sync-advanced">
+          <summary className="sync-settings__advanced-summary">{t('common.sync.advanced')}</summary>
+        <fieldset className="sync-settings__fieldset" aria-labelledby="sync-account-title">
+          <legend id="sync-account-title" className="sync-settings__legend">{t('web.settings.syncUx.accountTitle')}</legend>
+          <p className="sync-settings__section-hint">{t('web.settings.syncUx.accountHint')}</p>
+          <label className="sync-settings__field">
+            {t('web.sync.serverUrl.label')}
             <input
-              type="password"
-              value={draft.password}
-              onChange={(e) => setDraft({ password: e.target.value })}
-              autoComplete="new-password"
-              style={fieldStyle}
+              className="sync-settings__input"
+              value={draft.baseUrl}
+              onChange={(e) => setDraft({ baseUrl: e.target.value })}
+              placeholder={SERVER_URL_EXAMPLE}
+              // 「从订阅提示跳到这一节」时焦点落在它身上（见 `shell/settings-anchors.ts`）。
+              data-testid="sync-server-url"
             />
           </label>
+          <label className="sync-settings__field">
+            {t('web.sync.token.label')}
+            <input
+              className="sync-settings__input"
+              type="password"
+              value={draft.token}
+              onChange={(e) => setDraft({ token: e.target.value })}
+              autoComplete="off"
+            />
+          </label>
+          <p className="sync-settings__field-hint">{t('web.auth.tokenHint')}</p>
+          <button type="button" className="ht-btn ht-btn--ghost sync-settings__fit-button" onClick={() => sync.openSignIn()}>
+            {t('web.auth.open')}
+          </button>
+        </fieldset>
 
-          <p className="ht-settings__hint">
-            {t('web.sync.password.lead')}
-            <strong>{t('web.sync.password.strong')}</strong>
-            {t('web.sync.password.tail')}
-          </p>
-        </>
-      ) : null}
-
-      <VaultSettingsPanel />
-
-      <div style={{ display: 'flex', gap: cssVar('space.2'), justifyContent: 'flex-end' }}>
+      <div className="sync-settings__actions">
         {/*
           🔴 2026-09-30 撤掉了「清除凭据」按钮：它和头像菜单里的「退出登录」是
           **同一个动作**（都走 `sync.clearCredentials()`），却名字不同、视觉分量不同、
@@ -168,8 +226,10 @@ export function SyncSettingsPanel(): React.JSX.Element {
           type="button"
           className="ht-btn ht-btn--primary"
           data-testid="sync-save-and-sync"
+          disabled={!draft.baseUrl.trim() || !draft.token.trim()}
           onClick={() => {
             sync.configure(draft.baseUrl, draft.token, draft.password);
+            draftDirtyRef.current = false;
             sync.closeSettings();
             void sync.syncNow();
           }}
@@ -177,55 +237,9 @@ export function SyncSettingsPanel(): React.JSX.Element {
           {t('web.sync.saveAndSync')}
         </button>
       </div>
+        </details>
+      </div>
 
-      {affordances.showsHelp ? (
-        /*
-          🔴 出错时才给「查看帮助」，而且**直接落到「同步」那一问**上（`/help#sync`），
-          不是帮助页顶部 —— 报错的人要找的就是那一篇，让他再找一次是把成本
-          从我们这边挪到他那边。只在 `error` 分支出现（`showsHelp`）的理由见
-          `syncStatusAffordances` 那段原注释。
-          它原来住在 rail 那一列里（齿轮旁边），H9 第 3 刀跟着表单搬进来 ——
-          「同步失败了，去哪查」和「改同步配置」是同一件事的上下两屏。
-        */
-        <a
-          className="ht-btn ht-btn--ghost"
-          href={siteLink(HELP_SYNC_ANCHOR)}
-          rel="noopener noreferrer"
-          data-testid="sync-help-link"
-          style={{ alignSelf: 'flex-start' }}
-        >
-          <CircleHelp size={ICON_SIZE.sm} aria-hidden="true" />
-          {t('web.sync.help.link')}
-        </a>
-      ) : null}
     </section>
   );
 }
-
-const labelStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: cssVar('space.1'),
-  fontSize: cssVar('font-size.2xs'),
-  color: cssVar('color.foreground-muted'),
-};
-
-/** 字段下方的说明句 —— 比标签更轻，但仍然可读。 */
-const hintStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: cssVar('font-size.2xs'),
-  color: cssVar('color.foreground-muted'),
-  lineHeight: cssVar('line-height.normal'),
-};
-
-const fieldStyle: React.CSSProperties = {
-  minHeight: cssVar('touch-target.min'),
-  padding: `0 ${cssVar('space.2')}`,
-  borderRadius: cssVar('radius.md'),
-  border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-  background: cssVar('color.background'),
-  color: cssVar('color.foreground'),
-  // ≥16px，否则 iOS 聚焦时自动放大页面
-  fontSize: cssVar('font-size.base'),
-  fontFamily: cssVar('font.sans'),
-};

@@ -440,6 +440,8 @@ export const createServer = (
             'X-Expected-Rev',
             'X-Force-Overwrite',
             'X-Requested-With',
+            'X-Heyta-Worker-Token',
+            'X-Heyta-Database-Epoch',
           ],
           exposedHeaders: ['X-Rev', 'X-Updated-At'],
           credentials: true,

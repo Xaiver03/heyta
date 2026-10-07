@@ -167,62 +167,49 @@ test('把手的可拖性要看得见：idle 不画线，hover 画主蓝且比静
   });
 });
 
-test('新建入口是标题右侧的 +：默认无输入框，点开才出现，收起分两种', async ({ page }) => {
+test('新建入口打开统一对话框：校验、取消、颜色能力和标签上下文', async ({ page }) => {
   await openApp(page, APP_ZH);
   const sidebar = page.locator('aside[aria-label="清单与标签"]');
   const addList = page.getByRole('button', { name: '新建清单' });
-  const listInput = page.getByLabel('新清单名称');
+  const listInput = page.locator('#ht-category-create-name');
 
-  // ① 旧形态不许回来：常驻输入框 + 旁边一个「+」。
-  await expect(page.locator('input[placeholder="新清单"]'), '常驻输入框必须消失').toHaveCount(0);
-  await expect(listInput).toHaveCount(0);
+  // 侧栏只保留入口；创建表单不再挤进清单层级。
+  await expect(page.locator('#ht-category-create-name')).toHaveCount(0);
   await expect(addList, '标题右侧只有一个 +').toHaveCount(1);
   await expect(addList).toHaveAttribute('aria-expanded', 'false');
   await page.screenshot({ path: 'test-results/organizer-collapsed.png' });
 
-  // ② 点开：输入框出现且**自动聚焦**（不聚焦的话"点 + 然后打字"这条直觉断掉）。
+  // 打开后自动聚焦，清单可以选择颜色。
   await addList.click();
+  await expect(page.locator('[data-testid="category-create-dialog"]')).toBeVisible();
   await expect(listInput).toBeVisible();
   await expect(addList).toHaveAttribute('aria-expanded', 'true');
   expect(
     await listInput.evaluate((el) => el === document.activeElement),
-    '展开那一刻必须拿到焦点',
+    '打开那一刻必须拿到焦点',
   ).toBe(true);
+  await expect(page.getByRole('button', { name: '色槽 1' })).toBeVisible();
   await page.screenshot({ path: 'test-results/organizer-expanded.png' });
 
-  // ③ 连建是常态：提交后**不收起**、草稿清空。
+  // 提交后对话框关闭，侧栏出现新清单。
   await listInput.fill('深度工作');
-  await page.getByRole('button', { name: '添加清单' }).click();
+  await page.getByRole('button', { name: '创建清单' }).click();
   await expect(sidebar.getByText('深度工作', { exact: true })).toBeVisible();
-  await expect(listInput, '建完不许收起（否则每建一条都要重新点 +）').toHaveValue('');
+  await expect(page.locator('[data-testid="category-create-dialog"]')).toHaveCount(0);
+  await expect(addList).toHaveAttribute('aria-expanded', 'false');
 
-  // ④ 展开按钮与提交按钮**不能共用一个可及名** —— 共用会让 strict mode 直接红，
-  //    而屏幕阅读器里两个不同的动作听起来是同一件事。
-  await expect(page.getByRole('button', { name: '新建清单' })).toHaveCount(1);
-  await expect(page.getByRole('button', { name: '添加清单' })).toHaveCount(1);
-
-  // ⑤ Esc = 明确丢弃：连草稿一起清掉并收起。
+  // Escape 是明确取消，不会写入一条空记录。
+  await addList.click();
   await listInput.fill('不该存在');
   await listInput.press('Escape');
-  await expect(listInput).toHaveCount(0);
-  await expect(sidebar.getByText('不该存在')).toHaveCount(0);
-  await addList.click();
-  await expect(listInput, 'Esc 之后重新点开必须是空的').toHaveValue('');
+  await expect(page.locator('[data-testid="category-create-dialog"]')).toHaveCount(0);
+  await expect(sidebar.getByText('不该存在', { exact: true })).toHaveCount(0);
 
-  // ⑥ 点到区块外 = 只是收起，草稿留着（与 Esc 相反；挂 blur 会跟标题的 + 打架）。
-  await listInput.fill('草稿留着');
-  await page.mouse.click(900, 600);
-  await expect(listInput).toHaveCount(0);
-  await expect(sidebar.getByText('草稿留着')).toHaveCount(0);
-  await addList.click();
-  await expect(listInput, '点走再回来，字还在').toHaveValue('草稿留着');
-
-  // ⑦ 标签同一形态；且一次只开一个 composer。
+  // 标签复用同一个 dialog，但不显示没有写入 action 的颜色能力。
   await page.getByRole('button', { name: '新建标签' }).click();
-  await expect(page.getByLabel('新标签名称')).toBeVisible();
-  await expect(listInput, '一次只开一个输入框').toHaveCount(0);
-  await page.screenshot({ path: 'test-results/organizer-tag-composer.png' });
-  await page.getByLabel('新标签名称').fill('重要');
-  await page.getByRole('button', { name: '添加标签' }).click();
+  await expect(page.locator('#ht-category-create-name')).toBeVisible();
+  await expect(page.getByRole('button', { name: '色槽 1' })).toHaveCount(0);
+  await page.locator('#ht-category-create-name').fill('重要');
+  await page.getByRole('button', { name: '创建标签' }).click();
   await expect(sidebar.getByText('重要', { exact: true })).toBeVisible();
 });

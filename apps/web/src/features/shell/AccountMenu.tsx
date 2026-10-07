@@ -9,18 +9,18 @@ import { ICON_SIZE } from '@heyta/design-system';
  *
  * 产品负责人 2026-09-29 给的做法（滴答截图实测）：rail 上段只放"去哪看"，
  * 而**账号相关的一律收进头像**。理由与「功能模块」是同一个：
- * rail 是**每天点几十次**的地方，而"登录/注册/设置/统计/退出登录"是低频的 ——
+ * rail 是**每天点几十次**的地方，而"登录账号/个人中心/应用设置/退出登录"是低频的 ——
  * 它们占着 rail 的每一屏，换来的只是每次扫读时多几个要跳过的词。
  *
- * ## 🔴 2026-09-30 修正：身份入口**只能有一个**，而且登录/注册在菜单里
+ * ## 🔴 2026-09-30 修正：身份入口**只能有一个**，而且登录账号在菜单里
  *
  * 产品负责人实测："注册登录那个地方排版还是不对吧？应该是点击头像出来注册、登录吧？"
- * —— 上一版把「登录 / 注册」做成头像**旁边**的第二个控件（一个常驻 ghost pill）。
+ * —— 上一版把「登录账号」做成头像**旁边**的第二个控件（一个常驻 ghost pill）。
  * 那有两个真问题：
  *
  * 1. **身份入口有两个**（头像 + pill）：点哪个才是"登进去"？两个都长得像账号入口，
  *    而它们开的是同一块面板 —— 用户要先猜一次。
- * 2. **未登录的人也看到「退出登录」**：菜单里那三项（设置/统计/退出登录）曾经
+ * 2. **未登录的人也看到「退出登录」**：菜单里那组账号动作曾经
  *    无条件渲染。「退出登录」是**会清掉本机凭据**的动作，对一个根本没登录的人
  *    渲染它，等于给了一个按不出效果的危险按钮 —— 那是把"危险动作"降级成噪音。
  *
@@ -29,9 +29,9 @@ import { ICON_SIZE } from '@heyta/design-system';
  * ```
  *   未登录                          已登录
  *   ┌──────────────────┐            ┌──────────────────┐
- *   │ [→] 登录 / 注册   │  ← 主操作  │ user@example.com │  ← 身份区
- *   │     设置          │            │     设置          │
- *   │     统计          │            │     统计          │
+ *   │ [→] 登录账号      │  ← 主操作  │ user@example.com │  ← 身份区
+ *   │     个人中心      │            │     个人中心      │
+ *   │     应用设置      │            │     应用设置      │
  *   └──────────────────┘            │     退出登录      │  ← 危险、最底
  *                                   └──────────────────┘
  * ```
@@ -46,7 +46,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  *   且绝不能让破坏性动作与常规项**同样的视觉分量**。
  *   <https://www.saasui.design/blog/saas-profile-account-ux-patterns>
  *
- * ⚠️ 「登录 / 注册」在菜单里**不是**把前置性降级：前置的判据是
+ * ⚠️ 「登录账号」在菜单里**不是**把前置性降级：前置的判据是
  * "冷启动 ≤1 次点击能看见身份入口、≤2 次到表单"，不是"入口必须常驻在屏幕上"。
  * 判据本体在 `apps/web/tests/signin-entry.spec.tsx`，定义见
  * `docs/plans/user-journey-and-auth.md` §0。
@@ -72,10 +72,11 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useI18n } from '@heyta/i18n';
 import { avatarInitialFromEmail } from '@heyta/shared-schema';
 import { placeAnchoredPanel } from '@heyta/ui';
-import { CircleUser, LogIn, LogOut, Settings, TrendingUp, UserRound, UserRoundPen } from 'lucide-react';
+import { CircleUser, LogIn, LogOut, Settings, UserRound } from 'lucide-react';
 
 /**
  * 读一个 token 的像素值。
@@ -107,28 +108,27 @@ export function AccountMenu({
   /**
    * 🔴 未登录（`token === undefined`）。
    *
-   * 未登录时菜单第一项是「登录 / 注册」**主操作**，且**不出现「退出登录」**
+   * 未登录时菜单第一项是「登录账号」**主操作**，且**不出现「退出登录」**
    * （见文件头：给没登录的人一个会清凭据的按钮是纯噪音）。
    * 已登录后主操作消失、身份区与退出登录出现。
    */
   showSignIn?: boolean;
-  /** 打开「登录 / 注册」面板。`showSignIn` 为真时它是菜单的第一项。 */
+  /** 打开登录面板。`showSignIn` 为真时它是菜单的第一项。 */
   onSignIn: () => void;
   onOpenSettings: () => void;
   /**
-   * 打开「编辑个人信息」（昵称 + 头像）。
+   * 兼容旧接线的资料编辑回调。
    *
-   * 🔴 只在**已登录**时渲染。昵称与头像是**账号上的行**（`users.display_name` /
-   * `user_avatars`），没有令牌就没有可读写的那一行 —— 给没登录的人看这一项，
-   * 和这个文件头记过的那条「退出登录」是同一个错误：把一个语义上不存在
-   * 的动作摆成一个能点的按钮。
+   * 资料编辑不再作为头像菜单的并列入口；统一从“个人中心 → 设置资料”进入。
+   * 保留这个 prop 只为避免原生壳和旧宿主接线在同一轮改造中漂移，组件不直接消费它。
    */
   onOpenProfile?: () => void;
-  /** 打开只读的个人中心概览；资料编辑仍由 onOpenProfile 进入设置。 */
+  /** 打开个人中心概览；资料编辑由个人中心内部进入设置资料。 */
   onOpenProfileCenter?: () => void;
+  /** 兼容旧接线的成长回调；成长属于主导航/个人中心内容，不再作为头像菜单动作。 */
   onOpenGrowth: () => void;
   /**
-   * 🔴 「成长」模块是否启用（功能模块开关）。
+   * 🔴 兼容旧接线保留的「成长」模块开关；成长不再从头像菜单渲染。
    *
    * 不传（或 false）时**不渲染那一条**：关掉一个模块的语义是"它从界面上消失"，
    * 而菜单里留一条能进去的入口就是绕过那条开关（rail 上那条已经按开关过滤了）。
@@ -159,7 +159,7 @@ export function AccountMenu({
   useEffect(() => {
     if (!open) return;
     const onDown = (event: MouseEvent): void => {
-      if (!wrapRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!wrapRef.current?.contains(event.target as Node) && !panelRef.current?.contains(event.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', onDown);
     return () => {
@@ -320,7 +320,7 @@ export function AccountMenu({
         )}
       </button>
 
-      {open ? (
+      {open ? createPortal(
         <div
           role="menu"
           ref={panelRef}
@@ -337,18 +337,15 @@ export function AccountMenu({
             </div>
           )}
           {/*
-            未登录：登录/注册是这一组里的**主操作**（第一项、强调样式）；
+            未登录：登录账号是这一组里的**主操作**（第一项、强调样式）；
             已登录：完全不出现（不给已登录的人看"去登录"）。
           */}
           {showSignIn
-            ? item(t('web.auth.title'), LogIn, onSignIn, 'sync-signin-entry', 'primary')
+            ? item(t('web.shell.account.signIn'), LogIn, onSignIn, 'sync-signin-entry', 'primary')
             : null}
           {/*
-            「编辑个人信息」在**身份区下面、设置上面**（R10）。
-            排序理由：它改的是"这个账号是谁"，设置改的是"这个账号怎么行为" ——
-            前者离上面那行身份更近。六家竞品里把资料页挂在设置**里面**的也有，
-            但那样会变成"设置 → 资料"两层，而这一页只有两个字段，不值得。
-            ⚠️ 未登录时不渲染（`onOpenProfile` 只在已登录那一支传）。
+            个人中心是头像菜单唯一的身份入口；资料编辑从个人中心内部进入设置资料。
+            应用设置承载行为偏好、同步、AI、数据与安全，不与资料入口并列复制。
           */}
           {onOpenProfileCenter === undefined
             ? null
@@ -358,26 +355,14 @@ export function AccountMenu({
                 onOpenProfileCenter,
                 `${testID}-profile-center`,
               )}
-          {showSignIn || onOpenProfile === undefined
-            ? null
-            : item(t('web.shell.account.profile'), UserRoundPen, onOpenProfile, `${testID}-profile`)}
           {item(t('web.shell.account.settings'), Settings, onOpenSettings, `${testID}-settings`)}
-          {/*
-            「成长」用**与 rail 同一条词条**（`web.shell.views.growth` = 成长）——
-            此前这里单独一条 `web.shell.account.growth` = 「统计」，于是**同一个视图
-            两个名字**（rail 叫成长、菜单叫统计），而两边点下去都是 `setView('growth')`。
-            并且它按**功能模块开关**决定是否渲染：模块关掉的语义是"从界面消失"，
-            菜单里留一条能进去的入口就是绕过那条开关。
-          */}
-          {growthEnabled
-            ? item(t('web.shell.views.growth'), TrendingUp, onOpenGrowth, `${testID}-growth`)
-            : null}
           {/* 🔴 退出登录只在**已登录**时出现，且永远在最底、危险色。
               未登录时它不是"暂时没用"，而是**语义上不存在**。 */}
           {showSignIn
             ? null
             : item(t('web.shell.account.signOut'), LogOut, onSignOut, `${testID}-signout`, 'danger')}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );

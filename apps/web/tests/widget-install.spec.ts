@@ -12,6 +12,7 @@ import {
   installSteps,
   isRunningStandalone,
   resolveInstallPlatform,
+  resolveWidgetJourneyHost,
   shouldShowInstallGuide,
 } from '../src/pwa/widget-install';
 
@@ -102,5 +103,56 @@ describe('shouldShowInstallGuide', () => {
 
   it('🔴 已经装成应用 → 不再教怎么装', () => {
     expect(shouldShowInstallGuide(true)).toBe(false);
+  });
+});
+
+describe('resolveWidgetJourneyHost', () => {
+  it('原生桌面壳是已安装宿主，但不冒充系统小组件提供方', () => {
+    expect(resolveWidgetJourneyHost('Windows', false, true)).toEqual({
+      platform: 'windows',
+      host: 'native-shell',
+      provider: 'none',
+      standalone: true,
+      showInstallGuide: false,
+    });
+    expect(resolveWidgetJourneyHost('MacIntel', true, true).provider).toBe('none');
+  });
+
+  it('非 Windows 的独立窗口仍显示为已安装宿主，但不宣称有系统小组件', () => {
+    expect(resolveWidgetJourneyHost('MacIntel', true, false)).toEqual({
+      platform: 'macos',
+      host: 'standalone',
+      provider: 'none',
+      standalone: true,
+      showInstallGuide: false,
+    });
+  });
+
+  it('Windows PWA 才是当前桌面小组件提供方', () => {
+    expect(resolveWidgetJourneyHost('Win32', true, false)).toEqual({
+      platform: 'windows',
+      host: 'windows-pwa',
+      provider: 'windows-pwa',
+      standalone: true,
+      showInstallGuide: false,
+    });
+  });
+
+  it('Windows 浏览器标签页显示安装路径，非 Windows 不显示走不通的步骤', () => {
+    expect(resolveWidgetJourneyHost('Windows', false, false)).toMatchObject({
+      host: 'browser',
+      provider: 'windows-pwa-candidate',
+      showInstallGuide: true,
+    });
+    expect(resolveWidgetJourneyHost('MacIntel', false, false)).toMatchObject({
+      host: 'browser',
+      provider: 'none',
+      showInstallGuide: false,
+    });
+    expect(resolveWidgetJourneyHost('Linux x86_64', false, false)).toMatchObject({
+      host: 'browser',
+      provider: 'none',
+      showInstallGuide: false,
+    });
   });
 });

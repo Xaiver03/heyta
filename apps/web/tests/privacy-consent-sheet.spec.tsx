@@ -29,7 +29,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PRIVACY_CONSENT_KEY } from '@heyta/app-host';
+import { OFFICIAL_SITE_ORIGIN, PRIVACY_CONSENT_KEY } from '@heyta/app-host';
 
 import { initOpLog, __resetOpLogForTests } from '../src/lib/oplog.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
@@ -298,7 +298,7 @@ describe('条款链接：必须点开就有内容，且不许顺带触发别的�
     expect(terms?.href, '未配置时条款链接消失了').toBeTruthy();
     expect(privacy?.href).toBeTruthy();
     // 链接指向的是**这次要发给哪台服务端**那一个来源，与 authBaseUrl 同一判据。
-    expect(new URL(terms!.href).host).toBe(new URL(window.location.origin).host);
+    expect(new URL(terms!.href).host).toBe(new URL(OFFICIAL_SITE_ORIGIN).host);
   });
 
   it('面板开着期间一个请求都不发（拼链接不等于探测链接）', async () => {

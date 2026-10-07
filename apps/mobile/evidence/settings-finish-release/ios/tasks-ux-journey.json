@@ -1,0 +1,70 @@
+{
+  "status": "passed",
+  "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1791365473.134727,
+      "title": "UxTaskA1791365466"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1791365479.9283578,
+      "title": "UxTaskB1791365466"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1791365482.00845
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1791365484.411328
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1791365486.265406
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1791365488.114592
+    },
+    {
+      "name": "07-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1791365496.850931,
+      "destination": "马上做"
+    },
+    {
+      "name": "08-quadrant-undo",
+      "status": "passed",
+      "at": 1791365498.941152
+    },
+    {
+      "name": "09-timeline-row-opens-detail",
+      "status": "passed",
+      "at": 1791365505.76448
+    },
+    {
+      "name": "10-detail-keyboard-visible-and-unobstructed",
+      "status": "passed",
+      "at": 1791365511.620977,
+      "keyboardTop": 545
+    },
+    {
+      "name": "11-detail-recovers-after-keyboard",
+      "status": "passed",
+      "at": 1791365519.033385
+    },
+    {
+      "name": "12-profile-settings-chain",
+      "status": "passed",
+      "profileEvidence": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/mobile/evidence/settings-finish-release/ios/profile"
+    }
+  ]
+}

@@ -89,31 +89,65 @@ model User {
   // 那是一份**只读**派生值，不是这一列）。
   displayName                   String?  @map("display_name")
 
-  operations                  Operation[]
-  syncState                   UserSyncState?
-  devices                     SyncDevice[]
-  revokedSyncDevices          RevokedSyncDevice[]
-  vaultKeyPackage             VaultKeyPackage?
-  vaultKeyMigrations          VaultKeyMigration[]
-  passkeys                    Passkey[]
-  pendingPasskeyRegistrations PendingPasskeyRegistration[]
-  subscriptions               Subscription[]
-  checkoutOrders              CheckoutOrder[]
-  couponRedemptions           CouponRedemption[]
-  widgetPushSubscriptions     WidgetPushSubscription[]
-  inviteCode                  InviteCode?
-  referralsMade               Referral[]            @relation("ReferralInviter")
-  referralReceived            Referral?             @relation("ReferralInvitee")
-  notifications               AccountNotification[]
-  consents                    UserConsent[]
-  avatar                      UserAvatar?
-  aiUsageCounters             AiUsageCounter[]
+  automationWorkers                   AutomationWorker[]
+  automationCommitPermits             AutomationCommitPermit[]
+  operations                          Operation[]
+  syncState                           UserSyncState?
+  devices                             SyncDevice[]
+  revokedSyncDevices                  RevokedSyncDevice[]
+  vaultKeyPackage                     VaultKeyPackage?
+  vaultKeyMigrations                  VaultKeyMigration[]
+  passkeys                            Passkey[]
+  pendingPasskeyRegistrations         PendingPasskeyRegistration[]
+  subscriptions                       Subscription[]
+  checkoutOrders                      CheckoutOrder[]
+  couponRedemptions                   CouponRedemption[]
+  widgetPushSubscriptions             WidgetPushSubscription[]
+  inviteCode                          InviteCode?
+  referralsMade                       Referral[]                           @relation("ReferralInviter")
+  referralReceived                    Referral?                            @relation("ReferralInvitee")
+  notifications                       AccountNotification[]
+  consents                            UserConsent[]
+  avatar                              UserAvatar?
+  aiUsageCounters                     AiUsageCounter[]
+  emailPasswordRegistrationChallenges EmailPasswordRegistrationChallenge[]
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
   @@index([passkeyRecoveryToken])
   @@index([loginToken])
   @@map("users")
+}
+
+/// 邮箱+密码注册的一次性验证码挑战。
+///
+/// challenge 本身不保存验证码明文，只保存按 challengeId/purpose 域分离后的 HMAC 摘要。
+/// pendingPasswordHash 必须和这一次 challenge 绑定，验证时只允许激活它所绑定的用户，
+/// 避免把未验证 User 当前的 passwordHash 当成待注册凭据。
+model EmailPasswordRegistrationChallenge {
+  id                   String   @id
+  email                String
+  userId               Int?     @map("user_id")
+  pendingPasswordHash  String   @map("pending_password_hash")
+  codeDigest           String   @map("code_digest")
+  expiresAt            BigInt   @map("expires_at")
+  lastSentAt           BigInt   @map("last_sent_at")
+  resendAvailableAt    BigInt   @map("resend_available_at")
+  attemptCount         Int      @default(0) @map("attempt_count")
+  resendCount          Int      @default(0) @map("resend_count")
+  consumedAt           BigInt?  @map("consumed_at")
+  termsAcceptedAt      BigInt?  @map("terms_accepted_at")
+  termsDocumentVersion String?  @map("terms_document_version")
+  inviteCode           String?  @map("invite_code")
+  locale               String?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_password_registration_challenges")
 }
 
 model Passkey {
@@ -338,7 +372,7 @@ model PaymentEvent {
 
   /// 关联的订阅行。可空：事件可能早于订阅创建，或该 provider 根本没有订阅状态机
   /// （支付宝 / 微信只有单次支付）。`onDelete: SetNull` —— 删订阅**不删事件审计**。
-  subscriptionId Int?         @map("subscription_id")
+  subscriptionId Int?          @map("subscription_id")
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
   /// 🔴 幂等的唯一可靠落点。
@@ -398,15 +432,15 @@ model AccountTombstone {
 /// or decrypt the vault root key. A new keyVersion is published after a
 /// client-side rotation has re-encrypted every local record.
 model VaultKeyPackage {
-  userId              Int      @id @map("user_id")
-  keyVersion          Int      @map("key_version")
-  packageData         Json     @map("package_data")
+  userId                  Int    @id @map("user_id")
+  keyVersion              Int    @map("key_version")
+  packageData             Json   @map("package_data")
   /// Null means this account has not completed the first payload migration.
   /// This is independent from key_version: changing a passphrase wrapper does
   /// not require rewriting operation ciphertext.
-  activePayloadKeyVersion Int? @map("active_payload_key_version")
-  createdAt           BigInt   @map("created_at")
-  updatedAt           BigInt   @map("updated_at")
+  activePayloadKeyVersion Int?   @map("active_payload_key_version")
+  createdAt               BigInt @map("created_at")
+  updatedAt               BigInt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -418,29 +452,29 @@ model VaultKeyPackage {
 /// it never contains a plaintext key. A committed row is the recovery answer
 /// when the HTTP response was lost after the database transaction committed.
 model VaultKeyMigration {
-  id                    String   @id @default(cuid())
-  userId                Int      @map("user_id")
-  requestId             String   @map("request_id")
-  requestFingerprint    String   @map("request_fingerprint")
-  state                 String   @default("STAGING")
-  expectedKeyVersion    Int      @map("expected_key_version")
-  expectedLatestSeq     Int      @map("expected_latest_seq")
-  targetPayloadKeyVersion Int   @map("target_payload_key_version")
-  keyVersion            Int      @map("key_version")
-  latestSeq             Int      @map("latest_seq")
-  expectedOperationCount Int     @default(0) @map("expected_operation_count")
-  expectedPayloadBytes  BigInt   @default(0) @map("expected_payload_bytes")
-  uploadedOperationCount Int    @default(0) @map("uploaded_operation_count")
-  uploadedPayloadBytes  BigInt   @default(0) @map("uploaded_payload_bytes")
-  reservedStorageBytes  BigInt   @default(0) @map("reserved_storage_bytes")
-  migratedOperationCount Int    @default(0) @map("migrated_operation_count")
-  expiresAt             BigInt   @map("expires_at")
-  cancelledAt           BigInt?  @map("cancelled_at")
-  packageData           Json     @map("package_data")
-  createdAt             BigInt   @map("created_at")
+  id                      String  @id @default(cuid())
+  userId                  Int     @map("user_id")
+  requestId               String  @map("request_id")
+  requestFingerprint      String  @map("request_fingerprint")
+  state                   String  @default("STAGING")
+  expectedKeyVersion      Int     @map("expected_key_version")
+  expectedLatestSeq       Int     @map("expected_latest_seq")
+  targetPayloadKeyVersion Int     @map("target_payload_key_version")
+  keyVersion              Int     @map("key_version")
+  latestSeq               Int     @map("latest_seq")
+  expectedOperationCount  Int     @default(0) @map("expected_operation_count")
+  expectedPayloadBytes    BigInt  @default(0) @map("expected_payload_bytes")
+  uploadedOperationCount  Int     @default(0) @map("uploaded_operation_count")
+  uploadedPayloadBytes    BigInt  @default(0) @map("uploaded_payload_bytes")
+  reservedStorageBytes    BigInt  @default(0) @map("reserved_storage_bytes")
+  migratedOperationCount  Int     @default(0) @map("migrated_operation_count")
+  expiresAt               BigInt  @map("expires_at")
+  cancelledAt             BigInt? @map("cancelled_at")
+  packageData             Json    @map("package_data")
+  createdAt               BigInt  @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  chunks VaultKeyMigrationChunk[]
+  user             User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks           VaultKeyMigrationChunk[]
   stagedOperations VaultKeyMigrationOperation[]
 
   @@unique([userId, requestId])
@@ -453,16 +487,16 @@ model VaultKeyMigration {
 /// Child operation rows make identity coverage and duplicate detection
 /// relational rather than trusting a large JSON array at commit time.
 model VaultKeyMigrationChunk {
-  id                String   @id @default(cuid())
-  migrationId       String   @map("migration_id")
-  chunkId           String   @map("chunk_id")
-  chunkIndex        Int      @map("chunk_index")
-  requestFingerprint String  @map("request_fingerprint")
-  operationCount    Int      @map("operation_count")
-  payloadBytes      BigInt   @map("payload_bytes")
-  createdAt         BigInt   @map("created_at")
+  id                 String @id @default(cuid())
+  migrationId        String @map("migration_id")
+  chunkId            String @map("chunk_id")
+  chunkIndex         Int    @map("chunk_index")
+  requestFingerprint String @map("request_fingerprint")
+  operationCount     Int    @map("operation_count")
+  payloadBytes       BigInt @map("payload_bytes")
+  createdAt          BigInt @map("created_at")
 
-  migration  VaultKeyMigration @relation(fields: [migrationId], references: [id], onDelete: Cascade)
+  migration  VaultKeyMigration            @relation(fields: [migrationId], references: [id], onDelete: Cascade)
   operations VaultKeyMigrationOperation[]
 
   @@unique([migrationId, chunkId])
@@ -474,17 +508,17 @@ model VaultKeyMigrationChunk {
 /// One staged replacement. It is opaque to the server apart from the public
 /// envelope generation and is removed after publication/cancellation.
 model VaultKeyMigrationOperation {
-  id           String   @id @default(cuid())
-  migrationId  String   @map("migration_id")
-  chunkId      String   @map("chunk_id")
-  operationId  String   @map("operation_id")
-  serverSeq    Int      @map("server_seq")
+  id           String @id @default(cuid())
+  migrationId  String @map("migration_id")
+  chunkId      String @map("chunk_id")
+  operationId  String @map("operation_id")
+  serverSeq    Int    @map("server_seq")
   payload      Json
-  payloadBytes BigInt   @map("payload_bytes")
-  storageBytes BigInt   @map("storage_bytes")
-  createdAt    BigInt   @map("created_at")
+  payloadBytes BigInt @map("payload_bytes")
+  storageBytes BigInt @map("storage_bytes")
+  createdAt    BigInt @map("created_at")
 
-  migration VaultKeyMigration @relation(fields: [migrationId], references: [id], onDelete: Cascade)
+  migration VaultKeyMigration      @relation(fields: [migrationId], references: [id], onDelete: Cascade)
   chunk     VaultKeyMigrationChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
 
   @@unique([migrationId, operationId])
@@ -625,7 +659,7 @@ model Coupon {
   /// 所以"全部适用"用**显式布尔列**表达，而不是拿空数组当哨兵 ——
   /// 后者会在 `[]` 究竟是"全部"还是"一个都不"上产生第二种约定。
   appliesToAllPrices Boolean  @default(true) @map("applies_to_all_prices")
-  priceIds            String[] @map("price_ids")
+  priceIds           String[] @map("price_ids")
 
   appliesToAllRegions Boolean  @default(true) @map("applies_to_all_regions")
   regions             String[] @map("regions")
@@ -767,7 +801,7 @@ model CouponRedemption {
 
   /// 🔴 **一单一券**：这个唯一约束就是"同一订单不会被核销两次"的保证，
   /// 也是"一单只能用一张券"这条产品策略的落点。
-  orderId Int          @unique @map("order_id")
+  orderId Int           @unique @map("order_id")
   order   CheckoutOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   /// `reserved` | `applied` | `expired` | `reversed`（见 `REDEMPTION_STATES`）。
@@ -828,7 +862,7 @@ model CouponRedemption {
 model Refund {
   id Int @id @default(autoincrement())
 
-  orderId Int          @map("order_id")
+  orderId Int           @map("order_id")
   order   CheckoutOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   /// 退款属于哪个账号。**冗余自订单**，为的是"按用户查退款"不用 join 订单表，
@@ -910,13 +944,13 @@ model Refund {
 /// ⚠️ 反过来说：谁掌握了这个 URL 谁就能把它注册到自己名下。这是 Web Push
 /// 协议本身的性质（能力即身份），不是这里的取舍。
 model WidgetPushSubscription {
-  id         Int    @id @default(autoincrement())
-  userId     Int    @map("user_id")
-  endpoint   String @unique
+  id       Int    @id @default(autoincrement())
+  userId   Int    @map("user_id")
+  endpoint String @unique
   /// 用户代理的 P-256 公钥，base64url 编码的 65 字节未压缩点。
-  p256dh     String
+  p256dh   String
   /// 用户代理的认证密钥，base64url 编码的 16 字节。
-  auth       String
+  auth     String
 
   /// 🔴 **连续失败次数**，到阈值由调用方删除这一行。
   ///
@@ -1016,7 +1050,7 @@ model Referral {
   /// 实际发出去的奖励天数。**与 `activatedAt` 同进同退** ——
   /// 只有 `activatedAt` 而不记天数，就没法回答"这条邀请到底发了多少天"，
   /// 而那是运营对账时唯一要问的问题。
-  rewardDays Int? @map("reward_days")
+  rewardDays Int?    @map("reward_days")
   rewardedAt BigInt? @map("rewarded_at")
 
   invitee User @relation("ReferralInvitee", fields: [inviteeUserId], references: [id], onDelete: Cascade)
@@ -1265,7 +1299,7 @@ model HolidayAdjustmentDay {
   /// 冗余一份年份：取某一年的全部安排是热路径（后台回显、公开 GET 都按年取），
   /// 而 `day::date` 上的主键范围扫描要走索引边界。也是 CHECK「年份与日期必须一致」
   /// 的左操作数 —— 没有这一列，那条约束就得每次逐行 cast。
-  year     Int
+  year Int
 
   yearRef HolidayAdjustmentYear @relation(fields: [year], references: [year], onDelete: Cascade)
 
@@ -1307,7 +1341,7 @@ model AiUsageCounter {
   /// 归属账号。**级联删除**是保留承诺的一半（ADR-0054 §2「计数随账号级联删除」）：
   /// 少了它，删掉的账号会留下一堆指向不存在的 `user_id` 的计数行 —— 任何界面读不到、
   /// 任何清理任务不知道该删谁，"删账号即删"就只在文档里成立。
-  userId Int  @map("user_id")
+  userId Int @map("user_id")
 
   /// 这一行属于**哪一个计费周期** = 该周期结束时刻（epoch 毫秒），
   /// 出处是 `subscriptions.current_period_end`（唯一权威边界，不做墙上时钟推算）。
@@ -1335,4 +1369,41 @@ model AiUsageCounter {
 
   @@unique([userId, periodAnchor])
   @@map("ai_usage_counters")
+}
+
+// Worker credentials are local to one database instance; never synced in a vault.
+model AutomationWorker {
+  id             String   @id
+  userId         Int      @map("user_id")
+  credentialHash String   @unique @map("credential_hash")
+  syncClientId   String   @map("sync_client_id")
+  databaseEpoch  String   @map("database_epoch")
+  revokedAt      BigInt?  @map("revoked_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  permits        AutomationCommitPermit[]
+
+  @@unique([id, userId])
+  @@index([userId, syncClientId])
+  @@map("automation_workers")
+}
+
+// A durable authorization, not a lease. No expiry or reassignment column.
+model AutomationCommitPermit {
+  eventId      String   @id @map("event_id")
+  userId       Int      @map("user_id")
+  workerId     String   @map("worker_id")
+  opId         String   @unique @map("op_id")
+  ruleId       String   @map("rule_id")
+  ruleVersion  Int      @map("rule_version")
+  parseVersion Int      @map("parse_version")
+  resultDigest String   @map("result_digest")
+  itemCount    Int      @map("item_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  worker       AutomationWorker @relation(fields: [workerId, userId], references: [id, userId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([userId, ruleId])
+  @@index([workerId, userId])
+  @@map("automation_commit_permits")
 }

@@ -1,0 +1,31 @@
+# WKWebView custom-scheme Origin probe
+
+Date: 2026-10-07 (local macOS development machine)
+Probe: a temporary Swift `WKWebView` with the same `heyta-local://app` scheme, loading a minimal page that performs a credential-free GET to a loopback HTTP server. The server records the request's `Origin` header. No account, password, token, or application storage was read.
+
+## Result
+
+WKWebView page:
+
+```text
+{"origin":"heyta-local://app","body":"ok"}
+```
+
+Loopback server:
+
+```text
+PATH=/probe
+ORIGIN=heyta-local://app
+```
+
+The same probe was then run with the authentication request shape used by `@heyta/app-host` (`POST`, `content-type: application/json`, dummy loopback credentials only):
+
+```text
+{"origin":"heyta-local://app","body":"{\"ok\":true}"}
+OPTIONS_PATH=/api/login/email-password
+OPTIONS_ORIGIN=heyta-local://app
+POST_PATH=/api/login/email-password
+POST_ORIGIN=heyta-local://app
+```
+
+Conclusion: the real custom-scheme page sends `Origin: heyta-local://app` for both the CORS preflight and auth-shaped POST; it does not send `null`. The production CORS allowlist must therefore contain the exact custom origin alongside the hosted Web origin. This probe only verifies the browser side; production configuration remains the authority for deployment.

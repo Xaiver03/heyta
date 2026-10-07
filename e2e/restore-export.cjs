@@ -85,11 +85,11 @@ async function main() {
 
   // 建 1 个清单与 1 个标签（ProjectsPanel 的 + / 输入 / 提交）
   await page.locator('[aria-label="新建清单"]').click();
-  await page.locator('[aria-label="新清单名称"]').fill('backup-list-1');
+  await page.locator('#ht-category-create-name').fill('backup-list-1');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
   await page.locator('[aria-label="新建标签"]').click();
-  await page.locator('[aria-label="新标签名称"]').fill('backup-tag-1');
+  await page.locator('#ht-category-create-name').fill('backup-tag-1');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
   console.log('STEP list+tag OK');

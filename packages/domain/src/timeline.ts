@@ -1,3 +1,4 @@
+import { TASK_MIN_DURATION_MINUTES as MIN_DURATION_MINUTES, TASK_MAX_DURATION_MINUTES as MAX_DURATION_MINUTES } from '@heyta/shared-schema';
 /**
  * ⚠️ **这个文件是从 `apps/web/src/features/timeline/buildTimeline.ts` 搬过来的**（2026-10-05）。
  *
@@ -90,10 +91,10 @@
 export const DEFAULT_DURATION_MINUTES = 60;
 
 /** 单条工期的下限（分钟）。与 `ai-duration.ts` 对齐：5 分钟以下没有排程意义。 */
-export const MIN_DURATION_MINUTES = 5;
+export { TASK_MIN_DURATION_MINUTES as MIN_DURATION_MINUTES } from '@heyta/shared-schema';
 
 /** 单条工期的上限（分钟）。与 `ai-duration.ts` 的 `MAX_DURATION_MINUTES` 对齐（8 小时）。 */
-export const MAX_DURATION_MINUTES = 480;
+export { TASK_MAX_DURATION_MINUTES as MAX_DURATION_MINUTES } from '@heyta/shared-schema';
 
 /** 一次最多排多少条。超出截断并如实标记 —— 与 AI 侧的封顶同一个理由。 */
 export const MAX_TIMELINE_ENTRIES = 100;

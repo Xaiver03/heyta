@@ -38,6 +38,8 @@
 @define-color ht_color_info #0284c7;
 @define-color ht_color_info_strong #0369a1;
 @define-color ht_color_info_subtle #f0f9ff;
+@define-color ht_color_calendar_day_off #2563eb;
+@define-color ht_color_calendar_day_work #475569;
 @define-color ht_color_quadrant_1 #dc2626;
 @define-color ht_color_quadrant_1_subtle #fef2f2;
 @define-color ht_color_quadrant_2 #2563eb;

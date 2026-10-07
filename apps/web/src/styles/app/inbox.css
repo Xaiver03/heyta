@@ -65,7 +65,7 @@
   justify-content: space-between;
   gap: var(--ht-space-2);
   padding: var(--ht-space-2);
-  border-bottom: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-bottom: 0;
 }
 
 .ht-inbox__tabs {
@@ -149,7 +149,7 @@
   display: flex;
   gap: var(--ht-space-3);
   padding: var(--ht-space-3) var(--ht-space-2);
-  border-bottom: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-bottom: 0;
 }
 
 .ht-inbox__item:last-child {
@@ -233,7 +233,7 @@
   flex-direction: column;
   gap: var(--ht-space-2);
   padding: var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-raised);
 }
@@ -290,7 +290,7 @@
   min-height: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
   cursor: pointer;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-sm);
   background: var(--ht-color-surface);
   color: var(--ht-color-foreground);
@@ -402,9 +402,10 @@
 .ht-rail {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--ht-space-3);
   padding: var(--ht-space-3) var(--ht-space-2);
-  border-right: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-right: 0;
   background: var(--ht-color-surface-sunken);
   /*
    * 🔴 2026-10-06（工单 H9）：rail 现在**自己就是视口那一高**，滚动区是 `.ht-rail__tabs`。
@@ -441,6 +442,7 @@
 .ht-rail__tabs {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--ht-space-2);
   /* 🔴 必须**撑满**rail 的剩余高度，否则段内的 `margin-top: auto` 没有空白可分配，
      回收站就还贴在上段列表的尾巴上（`min-height: 0` 是给下面那条 `overflow-y: auto`
@@ -474,6 +476,16 @@
      这一条同时**定义了** rail 的宽度（token 里 44 + 16 = 64px），
      所以调小它会同时把 rail 挤窄 —— 而 44px 是可访问性硬下限，不许动。 */
   min-height: var(--ht-touch-target-min);
+  /* 统一 rail 上段、工具段与同步动作的图标中轴：头像本身是 44px，
+     纯图标按钮也必须有同样的方形命中区。否则按钮只由图标和左右 padding
+     撑开，在不同的父级对齐规则下会出现上下两段看似错开的中心线。 */
+  min-inline-size: var(--ht-touch-target-min);
+  /* The rail content box is 47px wide after its border and padding. Keep the
+     desktop icon hit box at the same 44px axis as the avatar and primary tabs;
+     the previous min-size let direct tool buttons stretch to the parent box,
+     producing the measured 30px vs 31.5px center-line split. Narrow mode
+     explicitly restores content-sized icon + label tabs below. */
+  inline-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
   /* 🔴 与原来那条 `flex: 0 0 auto` 同源：不被压扁、标签不折行 */
   white-space: nowrap;
@@ -509,17 +521,17 @@
  *    是裁剪容器；absolute 的标签会被切掉（`.ht-inbox__panel` 的说明是同一件事）。
  *    fixed 因此**退出文档流**，正好不再撑宽按钮。
  * 3. **y 坐标必须由实测给出。** fixed 元素不知道自己贴在哪个按钮旁边，
- *    所以 `--ht-rail-label-top` 由 `App.tsx` 的 `anchorRailLabel()` 在
- *    pointerover / focus 时写进按钮（写的是**中心**，配合 `translateY(-50%)`）。
+ *    所以 `--ht-rail-label-top` 由 `RailNavigation` 在 pointerover / focus 时写进按钮
+ *    （写的是**中心**，配合 `translateY(-50%)`）。
  *    ⚠️ 不用 React state：那会让整个外壳每次 hover 都重渲染。
  *
- * 滚轮滚动时浏览器会对"滚进指针下方"的按钮重新派发 pointerover ⇒ 坐标自动跟手。
+ * `RailNavigation` 也在窗口 resize 与捕获阶段的 document scroll 时重算坐标，覆盖 WebKit 的滚动行为。
  */
 .ht-rail__label {
   /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
   position: fixed;
   top: var(--ht-rail-label-top, 0px);
-  left: calc(var(--ht-layout-rail-width) + var(--ht-space-1));
+  left: var(--ht-rail-label-left, calc(var(--ht-layout-rail-width) + var(--ht-space-1)));
   transform: translateY(-50%);
   z-index: var(--ht-z-tooltip);
   padding: var(--ht-space-1) var(--ht-space-2);
@@ -544,43 +556,156 @@
 }
 
 .ht-rail__tab--active {
-  background: var(--ht-color-surface);
+  background: transparent;
+  border-color: transparent;
+}
+
+/* Selection is carried by the icon alone. The hit box stays quiet so a rail
+   with several destinations reads as one centered icon column. */
+.ht-rail__tab--active > svg {
   color: var(--ht-color-primary);
-  border-color: var(--ht-color-border);
 }
 
 /* 低频目的地的唯一入口。菜单脱离 rail 的裁剪层，避免窄 rail 把选项切掉。 */
 .ht-rail__more {
   position: relative;
+  inline-size: var(--ht-touch-target-min);
+  align-self: center;
   flex: 0 0 auto;
+}
+
+.ht-rail__item,
+.ht-rail__more-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+}
+
+.ht-rail__item {
+  inline-size: var(--ht-touch-target-min);
+  align-self: center;
+}
+
+.ht-rail__item--dragging,
+.ht-rail__more-row--dragging {
+  opacity: var(--ht-state-disabled-opacity);
+}
+
+.ht-rail__customize-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  margin-inline-start: auto;
+}
+
+.ht-rail__customize-action,
+.ht-rail__customize-toggle,
+.ht-rail__reset {
+  min-block-size: var(--ht-touch-target-min);
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.ht-rail__customize-action,
+.ht-rail__customize-toggle,
+.ht-rail__reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-rail__customize-action:hover,
+.ht-rail__customize-action:focus-visible,
+.ht-rail__customize-toggle:hover,
+.ht-rail__customize-toggle:focus-visible,
+.ht-rail__reset:hover,
+.ht-rail__reset:focus-visible {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+}
+
+.ht-rail__customize-action:focus-visible,
+.ht-rail__customize-toggle:focus-visible,
+.ht-rail__reset:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
 }
 
 .ht-rail__more-menu {
   position: fixed;
-  inset-inline-start: calc(var(--ht-layout-rail-width) + var(--ht-space-2));
-  inset-block-end: var(--ht-space-3);
+  inset-inline-start: auto;
+  inset-block-end: auto;
   z-index: var(--ht-z-popover);
   display: grid;
-  min-inline-size: calc(var(--ht-touch-target-min) * 4);
-  gap: var(--ht-space-1);
-  padding: var(--ht-space-2);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  min-inline-size: calc(var(--ht-touch-target-min) * 2);
+  max-inline-size: calc(100vw - var(--ht-space-4));
+  gap: 0;
+  padding: var(--ht-space-1);
+  border: 0;
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
+  max-block-size: calc(100dvh - var(--ht-space-4));
+  overflow-y: auto;
+}
+
+.ht-rail__more-menu--measuring {
+  visibility: hidden;
+}
+
+.ht-rail__more-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0 var(--ht-space-1);
+}
+
+.ht-rail__customize-toggle {
+  padding-inline: var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+  white-space: nowrap;
+}
+
+.ht-rail__reset {
+  inline-size: 100%;
+  margin-block-start: var(--ht-space-1);
+  padding-inline: var(--ht-space-2);
+  text-align: start;
+}
+
+.ht-rail__tabs--drop-target,
+.ht-rail__more--drop-target {
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
 }
 
 .ht-rail__more-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--ht-icon-sm) minmax(0, 1fr);
   align-items: center;
   gap: var(--ht-space-2);
+  inline-size: 100%;
+  min-inline-size: 0;
   min-block-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
   border: var(--ht-border-width-thin) solid transparent;
   border-radius: var(--ht-radius-sm);
   background: transparent;
   color: var(--ht-color-foreground);
+  cursor: pointer;
   white-space: nowrap;
   text-align: start;
+}
+
+.ht-rail__more-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--ht-space-1);
 }
 
 .ht-rail__more-item:hover,
@@ -642,3 +767,44 @@
    设计系统已在 tokens.css 的媒体查询里把所有 --ht-duration-* 压成 1ms，
    组件只要用 token 就自动获得降低动效行为。
    我第一版又写了一遍，既是冗余，也引入了裸值 1ms。 */
+
+/* Portal keeps this menu above the narrow rail's paint/scroll containment. */
+@media (max-width: 768px) {
+  .ht-rail__tab {
+    inline-size: auto;
+  }
+
+  .ht-rail__sync {
+    inline-size: auto;
+    align-self: auto;
+  }
+
+  .ht-rail__more-menu {
+    inset-block-end: auto;
+    max-inline-size: calc(100vw - var(--ht-space-4));
+    max-block-size: calc(100dvh - var(--ht-touch-target-min) - var(--ht-space-8));
+    overflow-y: auto;
+  }
+}
+
+/* Drag destinations stay exposed beside the More popover. */
+.ht-rail__item--insert-before::before {
+  content: '';
+  position: absolute;
+  inset-inline: var(--ht-space-1);
+  inset-block-start: calc(-1 * var(--ht-space-1));
+  block-size: var(--ht-border-width-thick);
+  background: var(--ht-color-primary);
+  border-radius: var(--ht-radius-full);
+}
+.ht-rail__drag-preview {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  color: var(--ht-color-primary);
+  background: var(--ht-color-surface-raised);
+  border-radius: var(--ht-radius-md);
+  box-shadow: var(--ht-shadow-md);
+  pointer-events: none;
+}

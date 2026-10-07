@@ -201,16 +201,17 @@ async function typeInto(el: HTMLDivElement, testId: string, text: string): Promi
 
 /** React 受控输入：必须走原生 setter，否则 onChange 收不到。 */
 async function type(el: HTMLDivElement, text: string): Promise<void> {
-  const input = el.querySelector<HTMLInputElement>('[data-testid="ai-assistant-input"]');
+  const input = el.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
   if (input === null) throw new Error('找不到输入框');
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, text);
+    const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(input, text);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
 
 function inputValue(el: HTMLDivElement): string {
-  const input = el.querySelector<HTMLInputElement>('[data-testid="ai-assistant-input"]');
+  const input = el.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
   if (input === null) throw new Error('找不到输入框');
   return input.value;
 }

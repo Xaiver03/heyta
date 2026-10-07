@@ -8,7 +8,7 @@
  *      这条如果坏了，症状是"一切正常"，只有请求计数知道。
  *   2. 披露里说的字段与工具，必须**逐字等于** `planAssistantEgress(tier)` 给的集合 ——
  *      界面自己抄一份，就是替隐私承诺撒一个会过期的谎。
- *   3. 写提案出现时 `host.submit` **必须是 0**；只有按下确认才变成 1。
+ *   3. 执行档低风险写入自动提交；高风险提案出现时 `host.submit` **必须是 0**，只有按下确认才变成 1。
  *   4. 「新会话」要重新要求披露（上界与出境集合是按"一段会话"承诺的）。
  *
  * ⚠️ 全程真实链路：真 `requestAssistantTurn` + 真 `confirmAiToolProposal`，
@@ -150,9 +150,10 @@ async function render(props: {
 
 /** React 受控输入：必须走原生 setter，否则 onChange 收不到。 */
 async function type(el: HTMLDivElement, text: string): Promise<void> {
-  const input = el.querySelector<HTMLInputElement>('[data-testid="ai-assistant-input"]');
+  const input = el.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-testid="ai-assistant-input"]');
   if (input === null) throw new Error('找不到输入框');
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  const prototype = input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
   await act(async () => {
     setter?.call(input, text);
     input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -320,8 +321,19 @@ describe('🔴 一次性披露在循环之前', () => {
   });
 });
 
-describe('🔴 写：提案卡 + 用户确认，没有第二条路', () => {
-  it('模型要写 ⇒ 出提案卡，**submit 次数为 0**', async () => {
+describe('Chatbot IA：历史列与中央空态', () => {
+  it('空会话把新会话、历史、问候和紧凑建议收进同一个 Chatbot', async () => {
+    const el = await render({ host: fakeHost(), fetchImpl: scriptedFetch([{ kind: 'text', text: '好。' }]).impl });
+    expect(el.querySelector('[data-testid="ai-assistant-history"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="ai-assistant-greeting"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="ai-assistant-new-session"]')).not.toBeNull();
+    expect(el.querySelectorAll('[data-testid^="ai-assistant-suggestion-"]')).toHaveLength(3);
+    expect(el.querySelector('[data-testid="ai-assistant-input"]')).not.toBeNull();
+  });
+});
+
+describe('🔴 写：低风险自动执行，高风险提案确认', () => {
+  it('执行档模型要建任务 ⇒ 自动执行并显示已执行，不出提案卡', async () => {
     const host = fakeHost();
     const { impl } = scriptedFetch([
       { kind: 'call', id: 'c1', name: 'create_task', args: '{"title":"买咖啡"}' },
@@ -331,16 +343,15 @@ describe('🔴 写：提案卡 + 用户确认，没有第二条路', () => {
     await click(el, 'ai-assistant-send-button');
     await click(el, 'ai-assistant-send');
 
-    const card = el.querySelector('[data-testid="ai-chat-proposal"]');
-    expect(card).not.toBeNull();
-    expect(card?.textContent).toContain('买咖啡');
-    expect(host.submits).toBe(0);
+    expect(el.querySelector('[data-testid="ai-chat-proposal"]')).toBeNull();
+    expect(el.querySelector('[data-testid="ai-chat-assistant"]')?.textContent).toContain('已执行');
+    expect(host.submits).toBe(1);
   });
 
-  it('按下确认才落库：submit 从 0 变 1', async () => {
+  it('高风险批量完成任务 ⇒ 按下确认才落库：submit 从 0 变 1', async () => {
     const host = fakeHost();
     const { impl } = scriptedFetch([
-      { kind: 'call', id: 'c1', name: 'create_task', args: '{"title":"买咖啡"}' },
+      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
     ]);
     const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
     await type(el, '记一下 买咖啡');
@@ -355,7 +366,7 @@ describe('🔴 写：提案卡 + 用户确认，没有第二条路', () => {
   it('🔴 提案之后**没有第二次模型调用**（模型看不到它被批准）', async () => {
     const host = fakeHost();
     const { impl, bodies } = scriptedFetch([
-      { kind: 'call', id: 'c1', name: 'create_task', args: '{"title":"买咖啡"}' },
+      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
       // 故意留一条：循环没停在提案上就会消费它、请求数变成 2。
       { kind: 'text', text: '我还想再问一句' },
     ]);
@@ -470,7 +481,7 @@ describe('过程可见与失败', () => {
     const { impl } = scriptedFetch([{ kind: 'text', text: '好' }]);
     const el = await render({ host, fetchImpl: impl, tier: 'read-and-propose' });
     expect(el.querySelector('[data-testid="ai-assistant-disclaimer"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="ai-assistant-tier"]')?.textContent).toContain('可提议改动');
+    expect(el.querySelector('[data-testid="ai-assistant-tier"]')?.textContent).toContain('执行');
   });
 });
 

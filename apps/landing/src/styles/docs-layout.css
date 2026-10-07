@@ -1,0 +1,48 @@
+/* SSOS help-center structure, using heyta semantic tokens. */
+.lp-docs-site a,
+.lp-docs-site a:hover,
+.lp-docs-site a:active,
+.lp-docs-site a:focus,
+.lp-docs-site a:focus-visible {
+  text-decoration: none;
+}
+
+/* Every docs link keeps a visible keyboard target while its state is expressed
+   by colour/background. This includes RichText links when a help answer gains
+   one later, so the centre never falls back to browser underlines. */
+.lp-docs-site a:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.lp-docs-site #main { padding-block: var(--ht-space-8); }
+.lp-docs-site .lp-docs { column-gap: var(--ht-space-8); }
+.lp-docs-site .lp-docs__body { max-inline-size: var(--ht-layout-prose-max); align-content: start; }
+.lp-docs__page-head { margin-block-end: var(--ht-space-4); }
+.lp-docs__page-head h1 { margin: 0; }
+.lp-docs__page-head p { margin-block: var(--ht-space-3) 0; color: var(--ht-color-foreground-muted); }
+.lp-docs-site .lp-docs__toc { inset-block-start: calc(var(--ht-layout-header-height) + var(--ht-space-6)); }
+.lp-docs-site .lp-docs__nav { max-block-size: calc(100dvh - var(--ht-layout-header-height) - var(--ht-space-8)); overflow-y: auto; }
+.lp-docs-site .lp-docs__body .lp-page__section { padding-block: var(--ht-space-5); }
+.lp-docs-site .lp-docs__body .lp-h2,
+.lp-docs-site .lp-help__module > .ht-type-section-title {
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-title);
+}
+@media (max-width: 56.25rem) {
+  .lp-docs-site .lp-docs > .lp-docs__nav { display: none; }
+  .lp-docs-site .lp-docs__drawer .lp-docs__nav { display: grid; max-block-size: none; }
+  .lp-docs-site .lp-docs__body { max-inline-size: 100%; }
+  .lp-docs-site #main { padding-block: var(--ht-space-5) var(--ht-space-8); }
+  /* The fixed "文档目录" trigger sits over the lower-right edge of the page.
+     Keep a real reading safe-area below the article so it never covers the last
+     paragraph or link, including devices with a home-indicator inset. */
+  .lp-docs-site .lp-docs__body {
+    padding-block-end: calc(var(--ht-space-16) + var(--ht-space-8) + env(safe-area-inset-bottom));
+  }
+}
+
+.lp-docs__drawer-close { display: flex; align-items: center; justify-content: center; margin-inline-start: auto; min-block-size: var(--ht-touch-target-min); min-inline-size: var(--ht-touch-target-min); color: var(--ht-color-foreground); background: transparent; border: 0; border-radius: var(--ht-radius-md); }
+.lp-docs__drawer-close:hover { background: var(--ht-color-hover); }

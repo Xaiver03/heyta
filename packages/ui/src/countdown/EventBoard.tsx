@@ -223,12 +223,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['size.chip-height'],
       paddingHorizontal: tokens['size.chip-padding-x'],
       borderRadius: tokens['radius.full'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       alignItems: 'center',
       justifyContent: 'center',
     },
-    chipOn: { backgroundColor: tokens['color.primary'], borderColor: tokens['color.primary'] },
+    chipOn: { backgroundColor: tokens['color.primary'] },
     chipTextOn: { color: tokens['color.on-primary'] },
     chipText: { color: tokens['color.foreground'] },
     input: {
@@ -236,8 +234,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['size.field-height'],
       paddingHorizontal: tokens['size.field-padding-x'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground'],
     },
@@ -248,8 +244,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['size.field-height'],
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     solid: {
       flexDirection: 'row',
@@ -272,8 +266,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.2'],
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
     },
     /** 模板只画在这条强调条上（不当文字色用，见文件头）。 */
@@ -296,8 +288,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     iconButton: {
       width: tokens['touch-target.min'],
@@ -310,16 +300,13 @@ function makeStyles(tokens: HeytaNativeTokens) {
       width: tokens['size.checkbox'],
       height: tokens['size.checkbox'],
       borderRadius: tokens['radius.full'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
-    swatchOn: { borderWidth: tokens['border-width.thick'], borderColor: tokens['color.foreground'] },
+    swatchOn: { backgroundColor: tokens['color.primary-subtle'] },
     swatchDefault: { backgroundColor: tokens['color.surface-sunken'] },
     error: {
       padding: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.danger'],
+      backgroundColor: tokens['color.danger-subtle'],
     },
   });
 }
@@ -511,6 +498,7 @@ export function EventBoard({
         //    换成页面级组件是视觉回归；这一处是**整屏内容区**空着，正是页面级那一档。
         //    词条仍由宿主构造（共享层不许 import `@heyta/i18n`）。
         <EmptyState
+          illustration="calendar"
           icon={Hourglass}
           title={view === 'active' ? labels.empty : labels.archivedEmpty}
           hint={view === 'active' ? labels.emptyHint : labels.archivedEmptyHint}

@@ -83,6 +83,11 @@ export type CalendarCellBar = {
   readonly done: boolean;
   readonly overdue: boolean;
   /**
+   * 排期任务在月格中的连续段。没有排期字段的旧任务不带这个属性，仍按单日条显示。
+   * `start` / `middle` / `end` 只描述可见日期，不改变任务的 dueDate 语义。
+   */
+  readonly span?: 'start' | 'middle' | 'end';
+  /**
    * W6：这一条来自**倒数日**而不是任务。
    *
    * 🔴 可选且默认 `undefined`，因为改动前每一条都是任务条 —— 判据里
@@ -91,6 +96,76 @@ export type CalendarCellBar = {
    */
   readonly event?: boolean | undefined;
 };
+
+/** 日历里一条排期任务覆盖的本地日期区间（两端都包含）。 */
+export interface CalendarTaskSpan {
+  readonly from: LocalDate;
+  readonly to: LocalDate;
+}
+
+const validEpochMs = (value: number | undefined): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+
+const validDurationMinutes = (value: number | undefined): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+
+/**
+ * 复用时间线已经落地的 start / due / duration 关系，把任务投影到日历日期。
+ *
+ * - start + duration：从 start 到区间结束前一天；
+ * - start + due：用 due 作为排期终点；
+ * - 只有 due：只落在 due 当天；
+ * - 没有可用日期：不进入日历。
+ *
+ * 区间的结束端点是排他的，所以恰好在午夜结束的任务不会凭空多占下一天。
+ */
+export function calendarTaskSpan(task: Pick<Task, 'startDate' | 'dueDate' | 'durationMinutes'>):
+  | CalendarTaskSpan
+  | undefined {
+  const startMs = validEpochMs(task.startDate);
+  const dueMs = validEpochMs(task.dueDate);
+  if (startMs === undefined) {
+    return dueMs === undefined ? undefined : { from: toLocalDate(dueMs), to: toLocalDate(dueMs) };
+  }
+
+  const durationMinutes = validDurationMinutes(task.durationMinutes);
+  const endMs =
+    durationMinutes === undefined
+      ? dueMs !== undefined && dueMs > startMs
+        ? dueMs
+        : startMs
+      : startMs + durationMinutes * 60_000;
+  const from = toLocalDate(startMs);
+  // A range endpoint at midnight is exclusive. A point is handled separately so
+  // an all-day due date still occupies its due date.
+  const to = endMs > startMs ? toLocalDate(endMs - 1) : from;
+  return { from, to: to < from ? from : to };
+}
+
+/**
+ * 把排期任务摊到当前月/周网格的可见区间。返回的每个日期仍引用原任务，
+ * 因此完成状态、标题与详情动作继续走同一条任务事实源。
+ */
+export function groupTasksByCalendarDate(
+  tasks: readonly Task[],
+  rangeFrom: LocalDate,
+  rangeTo: LocalDate,
+): Map<LocalDate, Task[]> {
+  const map = new Map<LocalDate, Task[]>();
+  if (rangeFrom > rangeTo) return map;
+  for (const task of tasks) {
+    const span = calendarTaskSpan(task);
+    if (span === undefined || span.to < rangeFrom || span.from > rangeTo) continue;
+    const from = span.from < rangeFrom ? rangeFrom : span.from;
+    const to = span.to > rangeTo ? rangeTo : span.to;
+    for (let date = from; date <= to; date = addDays(date, 1)) {
+      const list = map.get(date);
+      if (list === undefined) map.set(date, [task]);
+      else list.push(task);
+    }
+  }
+  return map;
+}
 
 /**
  * 把当天的任务（和倒数日）折成"可见条 + 被折叠数"。
@@ -117,30 +192,66 @@ export function calendarCellBars(
   events?: readonly CalendarDayEvent[] | undefined,
   eventLabels?: CalendarEventBarLabels | undefined,
 ): { readonly bars: readonly CalendarCellBar[]; readonly hidden: number } {
-  const decorated: CalendarCellBar[] = tasks.map((task) => {
+  type DecoratedCalendarBar = {
+    readonly bar: CalendarCellBar;
+    readonly laneStart: LocalDate;
+    readonly multiDay: boolean;
+    readonly index: number;
+  };
+  const decorated: DecoratedCalendarBar[] = tasks.map((task, index) => {
     const done = task.completedAt !== undefined;
+    const span = calendarTaskSpan(task);
+    const spanKind =
+      span === undefined || span.from === span.to
+        ? undefined
+        : date === span.from
+          ? 'start'
+          : date === span.to
+            ? 'end'
+            : 'middle';
     // 逾期 = 截止时间在今天之前**且还没做完**。已完成的不再算逾期 ——
     // 给一件做完的事标红是噪音，而红色在这个应用里只表示"要注意"（见 `calendarDayTone`）。
     return {
-      id: task.id,
-      title: task.title,
-      done,
-      overdue: !done && date < today,
-    } satisfies CalendarCellBar;
+      bar: {
+        id: task.id,
+        title: task.title,
+        done,
+        overdue: !done && date < today,
+        ...(spanKind === undefined ? {} : { span: spanKind }),
+      } satisfies CalendarCellBar,
+      /** Multi-day bars keep the lane implied by their original start date. */
+      laneStart: span?.from ?? date,
+      multiDay: span !== undefined && span.from !== span.to,
+      index,
+    };
   });
-  for (const event of events ?? []) {
+  for (const [eventIndex, event] of (events ?? []).entries()) {
     decorated.push({
-      id: event.id,
-      title: calendarEventBarTitle(event, eventLabels),
-      done: false,
-      overdue: false,
-      event: true,
+      bar: {
+        id: event.id,
+        title: calendarEventBarTitle(event, eventLabels),
+        done: false,
+        overdue: false,
+        event: true,
+      },
+      laneStart: date,
+      multiDay: false,
+      index: tasks.length + eventIndex,
     });
   }
   const rank = (bar: CalendarCellBar): number => (bar.event ? 3 : bar.overdue ? 0 : bar.done ? 2 : 1);
-  decorated.sort((a, b) => rank(a) - rank(b));
-  const bars = decorated.slice(0, Math.max(0, max));
-  return { bars, hidden: decorated.length - bars.length };
+  decorated.sort((a, b) => {
+    // A spanning task must retain its vertical lane across every date it occupies.
+    // Compare the stable start date whenever either side is a spanning bar; within
+    // the same lane keep the existing pending → done → event priority.
+    if (a.multiDay || b.multiDay) {
+      const byStart = a.laneStart.localeCompare(b.laneStart);
+      if (byStart !== 0) return byStart;
+    }
+    return rank(a.bar) - rank(b.bar) || a.index - b.index;
+  });
+  const visible = decorated.slice(0, Math.max(0, max));
+  return { bars: visible.map(({ bar }) => bar), hidden: decorated.length - visible.length };
 }
 
 /**
@@ -594,7 +705,7 @@ export interface CalendarDayMarkerView {
   /** 实际写字的那个字符（或降级用的一颗点）。 */
   readonly text: string;
   /** 用哪个语义色 —— 只能取 token 名，组件里不许出现裸色。 */
-  readonly colorToken: 'color.success-strong' | 'color.warning-strong';
+  readonly colorToken: 'color.calendar-day-off' | 'color.calendar-day-work';
   /**
    * 这一格该不该被**念出来**。
    *
@@ -623,7 +734,7 @@ export function calendarDayMarkerView(
   const word = labels?.[kind];
   return {
     text: word ?? '●',
-    colorToken: kind === 'off' ? 'color.success-strong' : 'color.warning-strong',
+    colorToken: kind === 'off' ? 'color.calendar-day-off' : 'color.calendar-day-work',
     spoken: word,
   };
 }
@@ -729,4 +840,3 @@ export function calendarEventBarTitle(
     event.days === 0 ? labels.today : event.days > 0 ? labels.until(event.days) : labels.since(-event.days);
   return `${event.title} · ${phrase}`;
 }
-

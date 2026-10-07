@@ -35,7 +35,7 @@ import type {
   Task,
 } from '@heyta/domain';
 import { OpType, compareVectorClocks } from '@heyta/sync-core';
-import { SUPER_SYNC_SNAPSHOT_OP_TYPES, isHeytaFullStatePayload, type HeytaFullStatePayload } from '@heyta/shared-schema';
+import { SUPER_SYNC_SNAPSHOT_OP_TYPES, isHeytaFullStatePayload, hasTaskBatchMarker, parseTaskBatchOperation, type HeytaFullStatePayload } from '@heyta/shared-schema';
 import type { Operation, VectorClock } from '@heyta/sync-core';
 
 /** 物化状态。所有实体按 id 索引。 */
@@ -583,6 +583,18 @@ export function applyOperation(
   state: MaterializedState,
   op: Operation<string>,
 ): MaterializedState {
+  if (hasTaskBatchMarker(op.payload)) {
+    // Validate every member and the complete scope before changing any state.
+    // Synthetic per-member views preserve the one original operation's metadata.
+    const batch = parseTaskBatchOperation(op);
+    return batch.tasks.reduce((next, item, itemIndex) => {
+      const { id, ...fields } = item;
+      return applyOperationToEntity(next, {
+        ...op, opType: OpType.Create,
+        payload: { ...fields, automationSource: { ...batch.source, itemIndex } },
+      }, id);
+    }, state);
+  }
   if (isFullStateOperation(op)) return applyFullState(state, op);
   if (!isModeled(op.entityType)) return state;
   const ids = Array.from(

@@ -37,6 +37,7 @@ import { habitIconOf, parseCategorySlot } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   HABIT_LIST_WEEK_DAYS,
+  HabitArtwork,
   heatmapLevelToken,
   type HabitProgressRow,
   type HeatmapDay,
@@ -45,7 +46,6 @@ import { Check, Flame, TrendingUp } from 'lucide-react';
 
 import { categorySlotColor, unsetSlotColor } from '../../lib/category-colors.js';
 import { currentStreakText, longestStreakText, totalCheckInText } from './copy.js';
-import { HABIT_GLYPHS } from './habit-glyphs.js';
 
 /**
  * 行首那排点的天数窗口。
@@ -93,7 +93,6 @@ export function HabitsList({ rows, selectedId, onSelect }: HabitsListProps) {
       {rows.map(({ progress, week }) => {
         const { habit } = progress;
         const growth = progress.resilience.resilience;
-        const Glyph = HABIT_GLYPHS[habitIconOf(habit)];
         const slot = parseCategorySlot(habit.color);
         const selected = habit.id === selectedId;
         const current = currentStreakText(growth.current, t);
@@ -128,7 +127,7 @@ export function HabitsList({ rows, selectedId, onSelect }: HabitsListProps) {
                   className="ht-habit__disc"
                   style={{ color: discColor, borderColor: discColor }}
                 >
-                  <Glyph size={ICON_SIZE.sm} aria-hidden="true" />
+                  <HabitArtwork icon={habitIconOf(habit)} size={ICON_SIZE.sm} />
                 </span>
                 <span className="ht-habit__name">{habit.name}</span>
               </span>

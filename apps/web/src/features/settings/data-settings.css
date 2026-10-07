@@ -1,0 +1,112 @@
+/* Data settings uses explicit task cards so the user can scan the action, scope,
+   and current state without reading a wall of prose. */
+.ht-settings__data-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.ht-settings__data-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-4);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-settings__data-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+}
+
+.ht-settings__data-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin: 0;
+}
+
+.ht-settings__data-card-title svg {
+  flex-shrink: 0;
+  color: var(--ht-color-primary);
+}
+
+.ht-settings__data-card-lead {
+  max-inline-size: 48rem;
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-settings__data-card .ht-settings {
+  gap: var(--ht-space-3);
+  padding: 0;
+}
+
+.ht-settings__data-card .ht-settings__title {
+  display: none;
+}
+
+.ht-settings__data-card .ht-settings > .ht-settings__hint:first-of-type {
+  display: none;
+}
+
+.ht-settings__data-card .ht-settings__section {
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-settings__file-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+  align-items: center;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-settings__file-summary strong {
+  overflow-wrap: anywhere;
+}
+
+.ht-settings__data-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__data-status-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-settings__data-status-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-settings__data-status-label {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+@media (max-width: 40rem) {
+  .ht-settings__data-card {
+    padding: var(--ht-space-3);
+  }
+
+  .ht-settings__data-card-header {
+    flex-direction: column;
+  }
+}

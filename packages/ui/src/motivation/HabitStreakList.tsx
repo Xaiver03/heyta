@@ -97,7 +97,7 @@ export interface HabitStreakListProps {
   readonly onRepair?: (habitId: string, date: LocalDate) => void;
   /** 重新开始。省略 = 只显示提示文字。 */
   readonly onFreshStart?: (habitId: string) => void;
-  /** 正在处理中的习惯 id —— 用于置灰它的按钮，避免连点发出两条 op。 */
+  /** 正在处理中的习惯 id —— 只要有一个动作在处理，就置灰所有按钮，避免并发写入。 */
   readonly busyHabitId?: string | null;
   readonly testID?: string;
 }
@@ -113,8 +113,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     currentRow: {
       flexDirection: 'row',
@@ -149,8 +147,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       justifyContent: 'center',
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: 'transparent',
       alignSelf: 'flex-start',
     },
@@ -200,7 +196,7 @@ export function HabitStreakList({
       {rows.map((row) => {
         const r = row.resilience.resilience;
         const { repair, freshStart } = row.resilience;
-        const busy = busyHabitId === row.habit.id;
+        const busy = busyHabitId !== undefined && busyHabitId !== null;
         const frozen = frozenDays(row.resilience);
 
         return (

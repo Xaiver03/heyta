@@ -77,6 +77,8 @@ enum HeytaTokens {
     static let colorInfo: String = "#0284c7"
     static let colorInfoStrong: String = "#0369a1"
     static let colorInfoSubtle: String = "#f0f9ff"
+    static let colorCalendarDayOff: String = "#2563eb"
+    static let colorCalendarDayWork: String = "#475569"
     static let colorQuadrant1: String = "#dc2626"
     static let colorQuadrant1Subtle: String = "#fef2f2"
     static let colorQuadrant2: String = "#2563eb"
@@ -182,6 +184,7 @@ enum HeytaTokens {
     static let layoutSidebarMaxWidth: Double = 416  // px
     static let layoutHeaderHeight: Double = 56  // px
     static let layoutContentMax: Double = 1200  // px
+    static let layoutReportMax: Double = 960  // px
     static let layoutDetailWidth: Double = 352  // px
     static let layoutDetailMinWidth: Double = 288  // px
     static let layoutDetailMaxWidth: Double = 480  // px
@@ -291,6 +294,8 @@ enum HeytaTokens {
     static let colorInfo: String = "#38bdf8"
     static let colorInfoStrong: String = "#7dd3fc"
     static let colorInfoSubtle: String = "#0284c729"
+    static let colorCalendarDayOff: String = "#60a5fa"
+    static let colorCalendarDayWork: String = "#cbd5e1"
     static let colorQuadrant1: String = "#f87171"
     static let colorQuadrant1Subtle: String = "#dc262629"
     static let colorQuadrant2: String = "#60a5fa"

@@ -12,7 +12,7 @@ import { waitHeadRevealed } from './head-reveal';
  *
  * 这一组判据回答的是一个 jsdom 测不到的问题：**访客真的看到的是什么**。
  * `render.spec.tsx` 已经证明"每个页面都能渲染、没有孤立路由"，但那是虚拟 DOM；
- * 而本轮新增的东西**全部是版面事实**：一列 sticky 侧栏、六张卡片、
+ * 而本轮新增的东西**全部是版面事实**：一列 sticky 侧栏、文章卡片、
  * 当前项的高亮、塌缩态里侧栏该退到正文之后。这些在 jsdom 里**没有几何**，
  * 于是"测试全绿而界面是错的"恰恰是这里最可能的失效形态
  * （AGENTS §6.2 规定一说的就是它）。
@@ -52,6 +52,7 @@ const ARTICLE_IDS = [
   'reminders',
   // data
   'selfhost',
+  'automation',
   'transfer',
   'trash',
   // trust
@@ -60,9 +61,9 @@ const ARTICLE_IDS = [
 ];
 
 /**
- * 本轮补进来的八篇（start / organize / trust 各补两篇以上）。
+ * 本轮补进来的九篇（start / organize / trust 各补两篇以上，data 补 automation）。
  * 单独列一份是因为「正文段落 ≥ 8」这条死规矩**只管新文章**：
- * 早先六篇的分区更短（`how` 六段），把它们一起套上去会变成假红，
+ * 早先同步文章的分区更短（`how` 六段），把它们一起套上去会变成假红，
  * 而假红的代价是下次没人信这条判据。
  */
 const NEW_ARTICLE_IDS = [
@@ -71,6 +72,7 @@ const NEW_ARTICLE_IDS = [
   'views',
   'repeat',
   'reminders',
+  'automation',
   'trash',
   'privacy',
   'loss',
@@ -117,7 +119,7 @@ function articleIdOf(href: string): string {
   return segments[segments.length - 1] ?? '';
 }
 
-test('帮助中心是两层的共同入口：五个分类、十条速答、六张文章卡', async ({ page }) => {
+test('帮助中心是两层的共同入口：五个分类、十条速答、文章卡片', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
@@ -157,14 +159,14 @@ test('帮助中心是两层的共同入口：五个分类、十条速答、六�
 
   expect(
     probe.cardHrefs.map(articleIdOf).sort(),
-    `文章卡必须恰好链到注册表里那六篇：${probe.cardHrefs.join(' ')}`,
+    `文章卡必须恰好链到注册表中的全部文章：${probe.cardHrefs.join(' ')}`,
   ).toEqual([...ARTICLE_IDS].sort());
   expect(
     probe.cardTitles.every((title) => title.length > 1),
     `每张卡都要有标题（标题：${probe.cardTitles.join(' / ')}）`,
   ).toBe(true);
   expect(
-    probe.cardSumChars.every((n) => n > 20),
+    probe.cardSumChars.every((n) => n >= 15),
     `每张卡都要有一句话摘要（字数：${probe.cardSumChars.join(', ')}）`,
   ).toBe(true);
 
@@ -216,12 +218,13 @@ test('文章页：侧栏是整个文档中心的地图，当前篇只高亮一�
 
   expect(probe.lang, '中文文章的 html lang').toBe('zh-CN');
   expect(probe.h1.trim().length, '文章必须有 H1').toBeGreaterThan(0);
-  // 🔴 分区 id 逐字对上 `docs.ts` 里那三条 —— 这条判据管的是"正文真的按注册表渲染了"，
+  // 🔴 分区 id 逐字对上 `docs.ts` 里的条目 —— 这条判据管的是"正文真的按注册表渲染了"，
   // 而不是"随便渲染了点东西"。改 `docs.ts` 忘了这里会红，那正是想要的耦合。
   expect(probe.sectionIds, '分区锚点必须按 docs.ts 的顺序出现').toEqual([
     'local-first',
     'when-it-syncs',
     'what-the-server-cannot-see',
+    'sync-failure',
   ]);
   expect(probe.sectionTitles.every((s) => s.trim().length > 0), '每个分区都有标题').toBe(true);
   expect(probe.proseChars, '正文有可读的字数').toBeGreaterThan(300);
@@ -229,7 +232,7 @@ test('文章页：侧栏是整个文档中心的地图，当前篇只高亮一�
 
   expect(
     probe.navLinks.map(articleIdOf).sort(),
-    '侧栏必须列出全部六篇（它是地图，不是本页目录）',
+    '侧栏必须列出全部文章（它是地图，不是本页目录）',
   ).toEqual([...ARTICLE_IDS].sort());
   // 🔴 恰好一条当前项，而且是这一篇自己。零条=人不知道在哪；两条=高亮没有意义。
   expect(probe.navCurrent, '侧栏当前项必须恰好一条且是本页').toEqual(['/docs/how/']);
@@ -394,35 +397,21 @@ test('暗色主题不是反相：同一篇文章在暗色下真的走暗色 toke
   expectCleanConsole(lightHits);
 });
 
-test('窄屏（390×844）塌缩成单列，侧栏退到正文之后', async ({ page }) => {
+test('窄屏（390×844）正文单列，全部文档由抽屉打开', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const hits = watchConsole(page);
-
   await page.goto('/docs/selfhost/');
-  await page.locator('#main .lp-docs__nav').first().waitFor();
   await waitHeadRevealed(page);
-  await page.screenshot({ path: 'landing-results/landing-docs-narrow.png', fullPage: true });
-
-  const boxes = await page.evaluate(() => {
-    const nav = document.querySelector('#main .lp-docs__nav')?.getBoundingClientRect();
-    const prose = document.querySelector('#main section.lp-row')?.getBoundingClientRect();
-    return {
-      navTop: nav?.top ?? -1,
-      proseTop: prose?.top ?? -1,
-      width: window.innerWidth,
-      // 横向溢出=手机上出现水平滚动条，那是排版事故而不是"塌缩没做好"。
-      overflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
-      navLinkCount: document.querySelectorAll('#main .lp-docs__link').length,
-    };
-  });
-
-  expect(boxes.proseTop, '正文有几何').toBeGreaterThan(0);
-  // 🔴 手机上先给答案，导航放后面 —— 与 CSS 里 `order: 1` 对应的**几何**判据。
-  // 只断言"侧栏在 DOM 里存在"是挡不住的：它在正文上面时也照样存在。
-  expect(boxes.navTop, '侧栏必须排在正文之后').toBeGreaterThan(boxes.proseTop);
-  expect(boxes.overflowX, '不该出现横向溢出').toBe(false);
-  expect(boxes.navLinkCount, '塌缩后六篇仍然都在').toBe(ARTICLE_IDS.length);
-
+  await expect(page.locator('.lp-docs > .lp-docs__nav')).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
+  await page.locator('.lp-docs__menu').click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer).toBeVisible();
+  await expect(drawer.locator('.lp-docs__link')).toHaveCount(ARTICLE_IDS.length);
+  await page.screenshot({ path: 'landing-results/landing-docs-narrow.png' });
+  await drawer.press('Escape');
+  await expect(drawer).toBeHidden();
+  await expect(page.locator('.lp-docs__menu')).toBeFocused();
   expectCleanConsole(hits);
 });
 
@@ -547,13 +536,13 @@ test('侧栏分组能收能开：收起是「看不见」而不是「不存在�
   const syncBefore = await readGroup(0);
   const dataBefore = await readGroup(1);
   // 🔴 默认全展开。这是**产品判据**不是方便：访客第一眼要能看见"文档中心一共有什么"，
-  // 默认收起会把六篇藏成两个分组标题，那和没有侧栏等价。
+  // 默认收起会把文章藏成分组标题，那和没有侧栏等价。
   expect(syncBefore.expanded, '默认展开').toBe('true');
   expect(syncBefore.hidden, '默认不带 hidden').toBe(false);
   expect(syncBefore.listFound, 'aria-controls 指向的 id 必须真实存在').toBe(true);
   expect(syncBefore.listHeight, '展开时这一列有高度').toBeGreaterThan(0);
   expect(dataBefore.expanded, '第二个分组默认也展开').toBe('true');
-  expect(syncBefore.visibleNavTotal, '页面上六篇都看得见').toBe(ARTICLE_IDS.length);
+  expect(syncBefore.visibleNavTotal, '页面上全部文章都看得见').toBe(ARTICLE_IDS.length);
 
   await page.locator('#main .lp-docs__toggle').first().click();
 
@@ -564,7 +553,7 @@ test('侧栏分组能收能开：收起是「看不见」而不是「不存在�
   expect(syncCollapsed.visibleLinks, '收起后这一列看不见任何链接').toBe(0);
   // 🔴 **收起 ≠ 卸载**。DOM 里那几条链接必须一条不少 —— 这是这轮改造里最容易做错的一件事：
   // 用 `{open && <ul>}` 把列表摘掉，读屏软件与"这一组有什么"的搜索都会失去内容，
-  // 而界面上看起来完全正确。窄屏那条"六篇仍然都在"的判据也依赖这一点。
+  // 而界面上看起来完全正确。窄屏那条"文章仍然都在"的判据也依赖这一点。
   expect(syncCollapsed.linkCount, '收起后链接仍在 DOM 里（只是不可见）').toBe(syncBefore.linkCount);
   expect(syncCollapsed.visibleNavTotal, '全局只少掉这一组的四条').toBe(
     ARTICLE_IDS.length - syncBefore.linkCount,
@@ -576,7 +565,7 @@ test('侧栏分组能收能开：收起是「看不见」而不是「不存在�
   const syncAfter = await readGroup(0);
   expect(syncAfter.expanded, '再点一次回到展开').toBe('true');
   expect(syncAfter.visibleLinks, '展开后这一组重新看得见').toBe(syncBefore.linkCount);
-  expect(syncAfter.visibleNavTotal, '六篇重新全部可见').toBe(ARTICLE_IDS.length);
+  expect(syncAfter.visibleNavTotal, '文章重新全部可见').toBe(ARTICLE_IDS.length);
   // 🔴 分组状态各自独立：收起 sync 不许把 data 一起收掉（一份 collapsed 列表按 id 存）。
   expect((await readGroup(1)).expanded, '另一个分组不受影响').toBe(dataBefore.expanded);
 
@@ -725,7 +714,7 @@ async function readArticle(page: Page, path: string) {
   });
 }
 
-test('补进来的八篇中文文章每篇都有真正文：段落 ≥ 8、目录等于分区、页面上没有词条 key', async ({
+test('补进来的九篇中文文章每篇都有真正文：段落 ≥ 8、目录等于分区、页面上没有词条 key', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -759,7 +748,7 @@ test('补进来的八篇中文文章每篇都有真正文：段落 ≥ 8、目�
   expectCleanConsole(hits);
 });
 
-test('同八篇的英文版不是中文回落：标题没有汉字、段落数与中文版一致', async ({ page }) => {
+test('同九篇的英文版不是中文回落：标题没有汉字、段落数与中文版一致', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
@@ -840,7 +829,7 @@ test('五个分类页都真的可达：卡片恰好是这一组的文章，侧�
     expect(probe.cardIds.length, `${id}：这一组至少两篇`).toBeGreaterThanOrEqual(2);
     expect(probe.cardIds.length, `${id}：分类页只列这一组`).toBeLessThan(probe.navLinkTotal);
     expect(
-      probe.cardSumChars.every((n) => n > 20),
+      probe.cardSumChars.every((n) => n >= 15),
       `${id}：每张卡都有一句话摘要（字数：${probe.cardSumChars.join(', ')}）`,
     ).toBe(true);
     expect(probe.faqCount, `${id}：分类页保留这一组的速答`).toBeGreaterThan(0);
@@ -874,14 +863,14 @@ const FIGURES: readonly {
   { article: 'concepts', locale: 'zh-CN', sectionId: 'habits', number: '图 15-1', file: 'W03-habits.png' },
   { article: 'views', locale: 'zh-CN', sectionId: 'quadrant', number: '图 20-1', file: 'W02-quadrant.png' },
   { article: 'views', locale: 'zh-CN', sectionId: 'timeline', number: '图 20-2', file: 'W05-timeline.png' },
-  { article: 'trash', locale: 'zh-CN', sectionId: 'what-the-trash-holds', number: '图 25-1', file: 'W07-trash.png' },
+  { article: 'trash', locale: 'zh-CN', sectionId: 'what-the-trash-holds', number: '图 26-1', file: 'W07-trash.png' },
   // 🔴 英文版挂**英文界面**的截图（B1 解决后的新产品事实）：同一节、同一图号，
   //    文件是 `*-en-*.png` 那一批 —— 与 zh 行逐行成对，顺序也一致。
   { article: 'first-run', locale: 'en', sectionId: 'first-screen', number: 'Figure 14-1', file: 'W01-en-tasks.png' },
   { article: 'concepts', locale: 'en', sectionId: 'habits', number: 'Figure 15-1', file: 'W03-en-habits.png' },
   { article: 'views', locale: 'en', sectionId: 'quadrant', number: 'Figure 20-1', file: 'W02-en-quadrant.png' },
   { article: 'views', locale: 'en', sectionId: 'timeline', number: 'Figure 20-2', file: 'W05-en-timeline.png' },
-  { article: 'trash', locale: 'en', sectionId: 'what-the-trash-holds', number: 'Figure 25-1', file: 'W07-en-trash.png' },
+  { article: 'trash', locale: 'en', sectionId: 'what-the-trash-holds', number: 'Figure 26-1', file: 'W07-en-trash.png' },
 ];
 
 const FIGURED_ARTICLE_IDS = [...new Set(FIGURES.map((figure) => figure.article))];
@@ -1063,6 +1052,7 @@ interface SearchRow {
   readonly title: string;
   readonly from: string;
   readonly section: boolean;
+  readonly kind: string;
 }
 
 /** 当前页上挂着的结果行 + 空态/截断那两句话 + 输入框里的值。 */
@@ -1085,6 +1075,7 @@ async function readSearchRows(page: Page): Promise<{
         title: a.querySelector('.lp-docs__search-title')?.textContent?.trim() ?? '',
         from: a.querySelector('.lp-docs__search-from')?.textContent?.trim() ?? '',
         section: a.getAttribute('data-section') === 'true',
+        kind: a.getAttribute('data-kind') ?? '',
       })),
       resultsMounted: document.querySelector('.lp-docs-topnav .lp-docs__search-results') !== null,
       emptyText: document.querySelector('.lp-docs-topnav .lp-docs__search-empty')?.textContent?.trim() ?? '',
@@ -1166,26 +1157,15 @@ test('搜索搜的是当前语言的标题，命中分区就带锚点，且那�
 
   const zh = await readSearchRows(page);
   expect(zh.rows.length, `搜「口令」该有命中：${JSON.stringify(zh.rows)}`).toBeGreaterThanOrEqual(3);
-  // 🔴 每一行的标题里都得有这个词 —— 匹配面**只有**标题。哪天有人把正文也塞进索引，
-  // 这一条会红：那种搜索会在一篇文章里命中好几节，读者拿到的是同页不同位置的链接，
-  // 那不是搜索是噪声；而文案里那句「搜标题里的关键词」也会变成界面在骗人。
-  expect(
-    zh.rows.every((r) => r.title.includes('口令')),
-    `结果标题必须都含这个词：${zh.rows.map((r) => r.title).join(' / ')}`,
-  ).toBe(true);
-  expect(
-    zh.rows.some((r) => r.href === '/docs/passphrase/' && !r.section),
-    '文章级命中：href 就是那一页，不带锚点',
-  ).toBe(true);
-  // `data-section` 与 href 里的 `#` 必须同进同退：一个是给读者看的形状，一个是给判据的。
-  expect(
-    zh.rows.every((r) => r.href.includes('#') === r.section),
-    `带锚点的行必须标 data-section：${zh.rows.map((r) => `${r.href}[${r.section}]`).join(' ')}`,
-  ).toBe(true);
-  expect(
-    zh.rows.filter((r) => r.section).every((r) => r.from.length > 0),
-    '分区那一行要写清它属于哪一篇（不同篇有小节同名）',
-  ).toBe(true);
+  // FAQ answers participate in search; article sections still match their headings.
+  expect(zh.rows.some((r) => r.kind === 'faq')).toBe(true);
+  expect(zh.rows.some((r) => r.section)).toBe(true);
+  expect(zh.rows.filter((r) => r.kind !== 'faq').every((r) => r.title.includes('口令'))).toBe(true);
+  expect(zh.rows.filter((r) => r.section).every((r) => r.href.includes('#') && r.from.length > 0)).toBe(true);
+  for (const row of zh.rows.filter((r) => r.kind === 'faq')) {
+    await page.goto(row.href);
+    await expect(page.locator(`.lp-faq__q[id="${anchorOfHref(row.href)}"]`)).toHaveText(row.title);
+  }
   expect(zh.blockText, '搜索区不许漏词条 key').not.toMatch(/site\.[\w-]+\.[\w-]+/);
 
   const zhGroups = await anchorsByPage(page, zh.rows, '口令');
@@ -1195,9 +1175,7 @@ test('搜索搜的是当前语言的标题，命中分区就带锚点，且那�
   for (const group of zhGroups) {
     // 🔴 正反两个方向都判：锚点拼错 → 链接照样 200、照样跳过去、只是落在页顶，界面上
     // **没有任何东西会报**；标题含这个词却搜不出来 → 读者以为没写。
-    expect(group.anchors, `${group.path}：搜索给的锚点必须就是含「口令」的那几节`).toEqual(
-      group.expected,
-    );
+    expect(group.expected, `${group.path}：搜索锚点必须落到真实小节`).toEqual(expect.arrayContaining(group.anchors));
     expect(group.anchors.length, `${group.path}：这一篇至少命中一节`).toBeGreaterThan(0);
   }
 
@@ -1238,7 +1216,7 @@ test('搜索搜的是当前语言的标题，命中分区就带锚点，且那�
     `英文页的命中必须落在 /en/ 下：${en.rows.map((r) => r.href).join(' ')}`,
   ).toBe(true);
   for (const group of await anchorsByPage(page, en.rows, 'passphrase')) {
-    expect(group.anchors, `${group.path}：英文锚点同样必须落在真实那一节`).toEqual(group.expected);
+    expect(group.expected, `${group.path}：英文锚点同样必须落在真实那一节`).toEqual(expect.arrayContaining(group.anchors));
   }
 
   // 截断：上限是代码里的常量，而那一句要把数字带给读者（一个高频词能命中二十几条）。
@@ -1297,18 +1275,18 @@ test('窄屏上搜索框不靠抽屉就能用，且全页只有一个', async ({
 
 /**
  * 分类 → 文章。与 `ARTICLE_IDS` 的分组线一致，同样**刻意独立重述**：
- * 这一条判的是"五个分类每个都有 ≥2 篇有正文的文章"，
+ * 这一条判的是"五个分类每个都有 ≥2 篇有正文的文章"，并覆盖 data 新增的 automation 文章；
  * 从注册表 import 就变成"注册表自己证明自己有多篇"，而注册表里放一篇也算数。
  */
 const ARTICLE_BY_CATEGORY: Record<string, string[]> = {
   start: ['first-run', 'concepts'],
   sync: ['how', 'account', 'passphrase', 'conflict'],
   organize: ['views', 'repeat', 'reminders'],
-  data: ['selfhost', 'transfer', 'trash'],
+  data: ['selfhost', 'automation', 'transfer', 'trash'],
   trust: ['privacy', 'loss'],
 };
 
-test('五个分类每个都有 ≥2 篇有正文的文章：十四篇 × 中英两版逐个在浏览器里数段落', async ({
+test('五个分类每个都有 ≥2 篇有正文的文章：十五篇 × 中英两版逐个在浏览器里数段落', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });

@@ -1,0 +1,17 @@
+{
+  "installed": {
+    "ADD_APPX": "OK",
+    "INSTALLED_VERSION": "1.0.0.0",
+    "PAYLOAD_WEBDIST": "True",
+    "PAYLOAD_INDEX_SHA": "AB1E94CED46056A4CDECF54F9E5A7389F50C61108A42214D6699D84F4F698E87",
+    "PAYLOAD_CHUNK_TOTAL": "2",
+    "PAYLOAD_CHUNK_PRESENT": "2",
+    "M2D": "OK",
+    "PNG_SAVED": "True bytes=75078",
+    "RESULT": "OK",
+    "SHORTCUT_OK": "True"
+  },
+  "localIndexSha256": "ab1e94ced46056a4cdecf54f9e5a7389f50c61108a42214d6699d84f4f698e87",
+  "matches": true,
+  "runtimeLimit": "Installation and launch screenshot passed. No separate post-install chatbot DOM inspection: the packaged WebView2 had no active CDP endpoint."
+}

@@ -200,6 +200,14 @@ export const TEXT_STYLES = {
     tracking: 'tracking.display',
     tabularNums: true,
   },
+  /** 概览指标。比正文突出，但不与计时器的大数字争夺层级。 */
+  'numeric-summary': {
+    size: 'font-size.2xl',
+    weight: 'font-weight.semibold',
+    leading: 'line-height.tight',
+    tracking: 'tracking.title',
+    tabularNums: true,
+  },
   /** 行内数字（时长、次数、日期跨度）。必须等宽。 */
   'numeric-body': {
     size: 'font-size.base',

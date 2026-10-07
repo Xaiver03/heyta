@@ -640,6 +640,7 @@ const zh = [
       },
     ],
   },
+  { id: "automation-metadata", title: "自动收集元数据与注册挑战", blocks: [{ kind: "p", text: "自动收集尚未开放。服务端预留两类明文元数据：自动收集执行身份（账号、设备标识、本地数据库实例标识、随机凭据的 SHA-256、创建及撤销时间），用于确认哪台设备有权提交；自动收集提交许可（不透明事件与规则标识、规则和解析版本、执行身份、固定操作标识、结果摘要、条数及创建时间），用于防止重复创建。这些记录不含任务标题、正文或随机凭据原文。执行身份保留至账号注销；提交许可的规则删除清理必须在功能开放前完成，许可一旦发出不因租约到期而转交另一设备。注销账号时两类记录随账号级联删除，不能据此远程擦除离线设备的本地副本。另有邮箱注册验证码挑战：保存待验证身份、验证码摘要、有效期、尝试次数和待激活的口令散列，用于完成邮箱验证，不保存验证码原文；关联账号的挑战也随注销删除。" }] },
 ] as const;
 
 const en = [
@@ -1254,6 +1255,7 @@ const en = [
       },
     ],
   },
+  { id: "automation-metadata", title: "Automation metadata and registration challenges", blocks: [{ kind: "p", text: "Automatic capture is not yet available. Two categories of plaintext metadata are reserved on the server: automation worker identities (account, device and local database identifiers, SHA-256 of a random credential, creation and revocation times), to authenticate the submitting device; and automation commit permits (opaque event and rule identifiers, rule and parse versions, worker identity, fixed operation identifier, result digest, item count and creation time), to prevent duplicate creation. Neither contains task titles, body content or the original credential. Worker identities remain until account closure. Rule-deletion cleanup of permits must be implemented before launch; an issued permit is not reassigned when a lease expires. Both categories cascade on account closure, which cannot remotely erase local copies on offline devices. Email registration challenges also store pending identity, a verification-code digest, expiry, attempt counts and a pending password hash to verify the email address; they do not store the original code. Challenges associated with an account cascade on closure." }] },
 ] as const;
 
 export const personalInfoList: LegalDocument = {
@@ -1262,9 +1264,9 @@ export const personalInfoList: LegalDocument = {
   // 运维元数据的期限定为 45 天且到期删除尚未实现），并把那段"45 天不是可选项"的说明
   // 补成"表里有两个同值的 45 天，不是同一个旋钮"。版本号进同意指纹（`legalSetVersion()`），
   // 改了期限表述而不 bump = 让旧那枚同意覆盖一段它没见过的话。
-  version: '1.4',
+  version: '1.5',
   status: 'draft',
-  updatedDate: '2026-10-05',
+  updatedDate: '2026-10-07',
   title: {
     'zh-CN': '个人信息收集清单',
     en: 'Personal Information Collection Inventory',

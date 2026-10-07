@@ -81,6 +81,8 @@ export interface ShowcaseTask {
   readonly dueTone?: ShowcaseDueTone;
   /** 展示用的「AI 拆解」入口。 */
   readonly ai?: boolean;
+  /** 任务详情里展示的样例清单。 */
+  readonly projectKey?: MessageKey;
 }
 
 /**
@@ -107,6 +109,7 @@ export const SHOWCASE_TASKS: readonly ShowcaseTask[] = [
     priority: 3,
     dueKey: 'landing.mock.due.overdue2',
     dueTone: 'overdue',
+    projectKey: 'landing.mock.project.work',
   },
   {
     id: 'mk-weekly',
@@ -117,6 +120,7 @@ export const SHOWCASE_TASKS: readonly ShowcaseTask[] = [
     dueKey: 'landing.mock.due.today1800',
     dueTone: 'today',
     ai: true,
+    projectKey: 'landing.mock.project.work',
   },
   {
     id: 'mk-q4',
@@ -127,6 +131,7 @@ export const SHOWCASE_TASKS: readonly ShowcaseTask[] = [
     important: true,
     dueKey: 'landing.mock.due.in3Days',
     dueTone: 'soon',
+    projectKey: 'landing.mock.project.work',
   },
   {
     id: 'mk-book',
@@ -136,6 +141,7 @@ export const SHOWCASE_TASKS: readonly ShowcaseTask[] = [
     important: true,
     dueKey: 'landing.mock.due.in5Days',
     dueTone: 'later',
+    projectKey: 'landing.mock.project.reading',
   },
   {
     id: 'mk-review',
@@ -146,6 +152,7 @@ export const SHOWCASE_TASKS: readonly ShowcaseTask[] = [
     important: true,
     dueKey: 'landing.mock.due.in5Days',
     dueTone: 'later',
+    projectKey: 'landing.mock.project.work',
   },
   {
     id: 'mk-photo',
@@ -153,6 +160,7 @@ export const SHOWCASE_TASKS: readonly ShowcaseTask[] = [
     quadrant: 'q2',
     priority: 1,
     important: true,
+    projectKey: 'landing.mock.project.personal',
   },
   {
     id: 'mk-dentist',
@@ -162,6 +170,7 @@ export const SHOWCASE_TASKS: readonly ShowcaseTask[] = [
     priority: 2,
     dueKey: 'landing.mock.due.tomorrow',
     dueTone: 'soon',
+    projectKey: 'landing.mock.project.personal',
   },
   {
     id: 'mk-expense',
@@ -176,6 +185,7 @@ export const SHOWCASE_TASKS: readonly ShowcaseTask[] = [
     done: true,
     dueKey: 'landing.mock.due.done',
     dueTone: 'later',
+    projectKey: 'landing.mock.project.work',
   },
 ];
 

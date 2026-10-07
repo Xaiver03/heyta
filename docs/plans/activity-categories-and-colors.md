@@ -486,3 +486,57 @@ error Unable to resolve module ./ListsSection from …/apps/mobile/src/screens/P
 **移动端的接线只有两处落在别人的在飞文件里**（`App.tsx` 挂载一行、
 `ui/icons.tsx` 登记一行，且复用文件里已有的 `ChartColumn` 导入），
 冲突按并集收；`nav/TabBar.tsx` 无人在飞。
+
+## 9. 统一语义颜色审计与后续清单
+
+本节把本计划中的分类色决策与全产品颜色规范接起来。颜色不是装饰层的自由变量：
+状态、交互、数据分类和信息层级必须分别使用各自的 token 家族。完整规则见
+[`design-system/heyta/MASTER.md`](../../design-system/heyta/MASTER.md) §3.1–3.2。
+
+### 9.1 已确定的语义边界
+
+| 颜色家族 | 唯一职责 | 禁止替代 |
+|---|---|---|
+| `primary-*` | 品牌、主操作、选中态、当前导航、拖拽目标 | 完成、成功、优先级、用户分类 |
+| `success-*` | 完成、同步成功、成功反馈 | 高优先级、健康度、普通分类 |
+| `warning-*` | 需要注意或需要决策但尚未故障 | 普通强调、工作日、优先级 |
+| `danger-*` | 错误、删除、破坏性操作、逾期风险 | “坏活动”、一般重要性 |
+| `info-*` | 进行中、说明性、非结论性提示 | 成功、失败、用户分类 |
+| `priority-*` | 任务优先级 | 状态结果或风险结论 |
+| `quadrant-*` | 四象限位置 | 优先级或状态 |
+| `category-*` | 用户赋义槽位 | 应用预设的好坏、状态或风险 |
+| `heat-*` | 活动强度 | 好坏、风险或完成状态 |
+| `calendar-day-off` / `calendar-day-work` | 工作日/休息日分类 | 成功、警告、风险或任务优先级 |
+
+普通状态色适合图形、背景和足够大的视觉元素；`success`、`warning`、`info` 用于正文、
+时间线标签、说明文字或小字号图标时，使用对应的 `*-strong`。`danger` 已通过正文 AA
+登记，错误正文在对比度通过时可以使用普通 `danger`，更高强调或小字号再使用
+`danger-strong`。`*-subtle` 只能承担弱背景，不能独自传达状态。
+同步状态必须沿用共享的 `syncStatusSeverity` 映射，各端不得重新判断。任何颜色都不能是
+唯一信息通道，必须同时提供文字、图标、形状、位置、数字或状态属性。
+
+### 9.2 代码消费者整改清单
+
+以下位置是本轮审计发现的语义误用或需要逐项确认的消费者。它们被记录在计划中，避免
+后续只改一个端而让 Web、移动端和桌面端重新漂移；本节不改变 token 或组件实现。
+
+本节之后的颜色统一增量已同步生成三端 token 产物；当前设计系统测试现量为 **525 项**，
+而 §8.4 的 402 项是分类功能实现当时的历史快照，不代表当前总量或当前源码安装状态。
+
+| 编号 | 位置 | 审计结论 | 状态 |
+|---|---|---|---|
+| COLOR-CODE-01 | `apps/web/src/dev/universal-slice.tsx:105` | “重要/高优先级”已改为共享 `color.priority-high`，不再借用 `danger` | 已修复 |
+| COLOR-CODE-02 | `packages/ui/src/calendar/model.ts:737`、`apps/web/src/features/calendar/CalendarSidebar.tsx:97-101`、`apps/web/src/styles/app/sidebar.css:456-466` | `off/work` 已改用 `color.calendar-day-off` / `color.calendar-day-work` 专用语义，并同步生成三端产物 | 已修复 |
+| COLOR-CODE-03 | `packages/ui/src/motivation/TodayProgressCard.tsx:214`、`AuthForm`、`ChecklistPlanPreview` 相关反馈文字 | 成功文字已改用 `success-strong`；警告文字已改用 `warning-strong`；图形背景保留普通档 | 已修复 |
+| COLOR-CODE-04 | `packages/ui/src/timeline/TimelineBoard.tsx`、`GanttChart` 相关 caption | 正文/小字号警告已改用 `warning-strong`；纯图形背景保留普通档 | 已修复 |
+| COLOR-CODE-05 | `packages/ui/src/countdown/EventBoard.tsx:322` | 该处只是 error 边框；普通 `danger` 已通过 AA，符合图形语境，无需修改 | 已确认无需改 |
+
+### 9.3 空态动画验收项
+
+| 编号 | 规则 | 覆盖范围 |
+|---|---|---|
+| COLOR-UX-01 | 空态动画只能表达进入、加载、成功或下一步反馈；不得用持续漂浮、循环装饰或颜色闪烁制造状态。主要信息和行动即使关闭动效也必须立即可见；必须尊重 `prefers-reduced-motion`。动画颜色只能使用对应状态 token，不得用 `category-*`、`priority-*` 或 `heat-*` 伪造状态。 | Web、Landing、移动端 |
+
+验收时需逐端检查：无动效时标题、说明、主要行动仍可用；减少动效设置生效；状态文字与
+图标仍存在；亮暗主题对比度达标；动画不会导致布局位移或横向滚动。该项与既有 UX-S9-19、
+UX-S9-20、UX-S9-21 和空态组件清单关联，新增空态实现必须回填证据，不得只在规范里声明。

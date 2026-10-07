@@ -1,0 +1,104 @@
+{
+  "status": "passed",
+  "serial": "emulator-5554",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1791394853.3119738,
+      "title": "UxTaskA1791394844"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1791394863.869531,
+      "title": "UxTaskB1791394844"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1791394873.260811,
+      "rowCount": 4
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1791394878.265931
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1791394882.364786
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1791394886.6224399
+    },
+    {
+      "name": "06b-timeline-clears-selection",
+      "status": "passed",
+      "at": 1791394906.537339
+    },
+    {
+      "name": "07-view-options-sort-and-date",
+      "status": "passed",
+      "at": 1791394946.101055
+    },
+    {
+      "name": "08-open-quadrant-move-sheet",
+      "status": "passed",
+      "at": 1791394969.258873
+    },
+    {
+      "name": "09-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1791394973.4660869,
+      "sourceQuadrant": "quadrant-cell-4",
+      "targetQuadrant": "quadrant-cell-1",
+      "feedback": "任务已移动到「马上做」，截止时间已调整",
+      "undoBounds": [
+        756,
+        1634,
+        1007,
+        1749
+      ]
+    },
+    {
+      "name": "10-quadrant-undo",
+      "status": "passed",
+      "at": 1791394975.4804502,
+      "sourceQuadrant": "quadrant-cell-4"
+    },
+    {
+      "name": "11-timeline-view-options",
+      "status": "passed",
+      "at": 1791395002.5992699
+    },
+    {
+      "name": "12-timeline-row-opens-detail",
+      "status": "passed",
+      "at": 1791395025.048279
+    },
+    {
+      "name": "13-detail-keyboard-visible",
+      "status": "passed",
+      "at": 1791395027.666452
+    },
+    {
+      "name": "14-detail-keyboard-dismissed",
+      "status": "passed",
+      "at": 1791395029.885846
+    },
+    {
+      "name": "15-detail-closes-after-second-back",
+      "status": "passed",
+      "at": 1791395033.972644
+    },
+    {
+      "name": "16-profile-settings-chain",
+      "status": "passed",
+      "profileEvidence": "apps/mobile/evidence/ux-s9-95/android-final/profile"
+    }
+  ]
+}

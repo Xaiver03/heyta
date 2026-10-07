@@ -78,6 +78,8 @@ export const SUPER_SYNC_ERROR_CODES = {
   MISSING_ENTITY_ID: 'MISSING_ENTITY_ID',
   INVALID_SCHEMA_VERSION: 'INVALID_SCHEMA_VERSION',
   INVALID_CLIENT_ID: 'INVALID_CLIENT_ID',
+  // Authorization may recover; never discard the local operation as malformed.
+  INBOUND_AUTH_REQUIRED: 'INBOUND_AUTH_REQUIRED',
 
   // Conflict errors (409)
   CONFLICT_CONCURRENT: 'CONFLICT_CONCURRENT',
@@ -183,6 +185,18 @@ const SuperSyncUploadOperationSchema = SuperSyncOperationSchema.extend({
   schemaVersion: z.number(),
 });
 
+export const SuperSyncInboundCommitProofsSchema = z.record(
+  z.string().regex(/^inbound:[A-Za-z0-9][A-Za-z0-9:_-]{0,63}$/), z.string().min(1).max(2048),
+).refine((proofs) => Object.keys(proofs).length <= SUPER_SYNC_MAX_OPS_PER_UPLOAD);
+
+/** Local transport credentials; never persist these in a business operation. */
+export const SuperSyncInboundUploadAuthorizationSchema = z.object({
+  workerToken: z.string().regex(/^[0-9a-f]{64}$/),
+  databaseEpoch: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
+  commitProofs: SuperSyncInboundCommitProofsSchema,
+}).strict();
+export type SuperSyncInboundUploadAuthorization = z.infer<typeof SuperSyncInboundUploadAuthorizationSchema>;
+
 export const SuperSyncUploadOpsRequestSchema = z.object({
   ops: z.array(SuperSyncUploadOperationSchema).min(1).max(SUPER_SYNC_MAX_OPS_PER_UPLOAD),
   clientId: SuperSyncClientIdSchema,
@@ -190,6 +204,8 @@ export const SuperSyncUploadOpsRequestSchema = z.object({
   requestId: SuperSyncRequestIdSchema.optional(),
   /** Signed frontier used by operations encoded as `frontier-delta`. */
   causalFrontierToken: z.string().min(1).max(65536).optional(),
+  /** Owner-held commit receipts; transport authorization, never part of an op. */
+  inboundCommitProofs: SuperSyncInboundCommitProofsSchema.optional(),
 });
 
 export const SuperSyncDownloadOpsQuerySchema = z.object({

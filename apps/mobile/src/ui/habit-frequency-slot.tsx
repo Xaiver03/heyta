@@ -101,9 +101,11 @@ export function HabitFrequencySlot({
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: tokens['radius.md'],
-        borderWidth: pressed ? tokens['border-width.thick'] : tokens['border-width.thin'],
-        borderColor: pressed ? tokens['color.primary'] : tokens['color.border'],
-        backgroundColor: down ? tokens['color.surface-sunken'] : tokens['color.surface'],
+        backgroundColor: pressed
+          ? tokens['color.primary-subtle']
+          : down
+            ? tokens['color.surface-sunken']
+            : tokens['color.surface'],
       })}
     >
       <Text variant="row-meta" tone={pressed ? 'default' : 'muted'}>

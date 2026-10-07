@@ -36,7 +36,7 @@ import {
   bucketByQuadrant,
   trashedIn,
   filterTasks,
-  type QuadrantDropPlan,
+  type QuadrantTaskPatch,
   type Task,
   type TaskFilter,
 } from '@heyta/domain';
@@ -104,7 +104,7 @@ interface TaskState {
    * 一次拖放 = 一条 op。计划来自领域层的 `planQuadrantDrop`。
    * 不要拆成 `setImportant` + `setDueDate` 两次 —— 那会写出两条 op。
    */
-  setQuadrantDrop: (id: string, plan: QuadrantDropPlan) => Promise<void>;
+  setQuadrantDrop: (id: string, plan: QuadrantTaskPatch) => Promise<void>;
   setDueDate: (id: string, dueDate: number | undefined) => Promise<void>;
   /**
    * 排期（时间线 P2，ADR-0043）。时间线板的拖拽出口：泳道拖上轴 / 拖条移动 /

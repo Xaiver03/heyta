@@ -1,0 +1,9 @@
+health=200 db=connected
+password-login-invalid=401 invalid_credentials
+legacy-fragment-sessionToken=3
+argon2-known-answer=verified
+app-index=public-bytes-match
+app-js=200
+app-css=200
+docs=200
+production-mail-delivery=NOT_VERIFIED

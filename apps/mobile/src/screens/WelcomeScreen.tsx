@@ -98,7 +98,7 @@ export function WelcomeScreen({
         而变成一个看起来同样重要的推荐路径 —— 那与"本地优先"的定位不符。
       */}
       <View style={{ gap: tokens['space.4'] }}>
-        <Text variant="screen-title">{t('common.brand')}</Text>
+        <Text variant="screen-title">{t('mobile.welcome.title')}</Text>
         <Text variant="row-title" tone="muted">
           {t('mobile.welcome.tagline')}
         </Text>

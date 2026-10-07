@@ -5,9 +5,8 @@
  * 这个文件存在的理由不是"覆盖一个函数"，而是钉住三条**改了就出问题、
  * 但没有任何一层会报错**的不变量：
  *
- *   1. 出厂默认 = 只读。反过来（默认开写）等于"让模型能改数据"成了没选过的状态。
- *   2. 顺序第一格 = 默认档。设置界面用 `.map()` 渲染单选项，顺序错了就是
- *      界面上写着只读、实际是更高的那一档 —— 用户看不出来。
+ *   1. 出厂默认 = 执行，但真正落库仍需逐条确认；坏值仍然回到只读。
+ *   2. 顺序固定为低权限到高权限。设置界面用 `.map()` 渲染单选项，不能跨端漂移。
  *   3. 归一只认**逐字**等于开写那一档的值。"看起来像真"的读法会把一次坏 JSON、
  *      一个别家写的同名键、或一次手滑的编辑变成放开写入。
  *
@@ -56,12 +55,12 @@ describe('磁盘词汇', () => {
     expect(ASSISTANT_TIER_READ_AND_PROPOSE).toBe('read-and-propose');
   });
 
-  it('出厂默认 = 只读：让模型能改数据必须是用户明确选过的状态', () => {
-    expect(DEFAULT_ASSISTANT_TIER).toBe(ASSISTANT_TIER_READ_ONLY);
+  it('出厂默认 = 执行：真正落库仍需用户确认', () => {
+    expect(DEFAULT_ASSISTANT_TIER).toBe(ASSISTANT_TIER_READ_AND_PROPOSE);
   });
 
-  it('🔴 顺序第一格必须是默认档（界面按这个顺序渲染单选，第二格看起来是更高权限）', () => {
-    expect(ASSISTANT_TIER_ORDER[0]).toBe(DEFAULT_ASSISTANT_TIER);
+  it('🔴 档位顺序固定为低权限到高权限', () => {
+    expect(ASSISTANT_TIER_ORDER[0]).toBe(ASSISTANT_TIER_READ_ONLY);
     expect(ASSISTANT_TIER_ORDER).toEqual([
       ASSISTANT_TIER_READ_ONLY,
       ASSISTANT_TIER_READ_AND_PROPOSE,
@@ -133,7 +132,7 @@ describe('端口装出来的仓库（下一个壳的复用面）', () => {
   it('clear 回到出厂档并落盘', () => {
     const store = createAssistantTierStore(port);
     store.set(ASSISTANT_TIER_READ_AND_PROPOSE);
-    expect(store.clear()).toBe(ASSISTANT_TIER_READ_ONLY);
-    expect(port.raw()).toBe(ASSISTANT_TIER_READ_ONLY);
+    expect(store.clear()).toBe(ASSISTANT_TIER_READ_AND_PROPOSE);
+    expect(port.raw()).toBe(ASSISTANT_TIER_READ_AND_PROPOSE);
   });
 });

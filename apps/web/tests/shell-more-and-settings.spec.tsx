@@ -63,11 +63,11 @@ function moreButton(): HTMLButtonElement {
 }
 
 const railTabs = (): string[] =>
-  // 只数**上段目的地**：回收站/设置带着 `--tool` 修饰住在同一条 tablist 里
-  // （历史 a11y 决策，见 App.tsx 工具段注释），它们不是"去哪看"。
+  // 只数**上段产品目的地**：统一 AI Agent 入口不是模块目的地，
+  // 回收站/设置带着 `--tool` 修饰住在同一条 tablist 里也不是目的地。
   [
     ...container!.querySelectorAll(
-      '.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool)',
+      '.ht-rail__tabs button[role="tab"]:not(.ht-rail__tab--tool):not([data-testid="rail-assistant"])',
     ),
   ].map((el) => el.textContent?.trim() ?? '');
 
@@ -141,7 +141,7 @@ describe('W1：rail 主段 + 更多菜单（接线层）', () => {
     });
     expect(button.getAttribute('aria-expanded')).toBe('true');
     const items = [
-      ...container!.querySelectorAll<HTMLButtonElement>('[role="menu"] .ht-rail__more-item'),
+      ...document.querySelectorAll<HTMLButtonElement>('[role="menu"] .ht-rail__more-item'),
     ];
     expect(items.length, '菜单里必须有可去的目的地').toBeGreaterThan(0);
     expect(document.activeElement, '打开后焦点应在第一项上').toBe(items[0]);
@@ -153,20 +153,20 @@ describe('W1：rail 主段 + 更多菜单（接线层）', () => {
       );
     });
     expect(button.getAttribute('aria-expanded')).toBe('false');
-    expect(container!.querySelector('[role="menu"]')).toBeNull();
+    expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement, 'Esc 后焦点必须还给「更多」按钮').toBe(button);
 
     // 点一项 ⇒ 切视图 + 收起；且当前视图被提升进主段（"你在哪，哪就在台面上"）。
     await act(async () => {
       button.click();
     });
-    const item = container!.querySelector<HTMLButtonElement>('[role="menu"] .ht-rail__more-item');
+    const item = document.querySelector<HTMLButtonElement>('[role="menu"] .ht-rail__more-item');
     const chosen = item!.textContent?.trim();
     await act(async () => {
       item!.click();
     });
     await flush();
-    expect(container!.querySelector('[role="menu"]')).toBeNull();
+    expect(document.querySelector('[role="menu"]')).toBeNull();
     expect(railTabs(), '激活的低频视图应被提升进主段').toContain(chosen);
   });
 });
@@ -226,28 +226,30 @@ describe('W2：设置浮层遮蔽详情列', () => {
   });
 });
 
-describe('W3：AI 工具调用默认收起', () => {
-  it('🔴 任务视图首屏：抽屉存在但收起；展开后输入框可用（行为与收起前一致）', async () => {
+describe('W3：任务视图只有一个 AI Agent / Chatbot 入口', () => {
+  it('🔴 任务视图首屏：显示单一 Chatbot，工具调用不作为并列入口出现', async () => {
     mount();
-    const drawer = container!.querySelector<HTMLDetailsElement>('[data-testid="ai-drawer"]');
-    expect(drawer, '任务视图里应有 AI 抽屉（入口收拢的那一枚）').not.toBeNull();
+    const agentSurface = container!.querySelector<HTMLElement>('[data-testid="ai-agent-surface"]');
+    expect(agentSurface, '任务视图里应有单一 AI Agent surface').not.toBeNull();
     expect(
-      drawer!.hasAttribute('open'),
-      '抽屉默认必须收起 —— 首屏唯一主动作是任务输入框，不是 AI',
-    ).toBe(false);
+      container!.querySelectorAll('[data-testid="ai-agent-surface"]'),
+      '任务视图只能挂载一枚 Agent surface',
+    ).toHaveLength(1);
     expect(
-      drawer!.querySelector('summary')?.textContent?.trim(),
-      '抽屉入口要有一枚可读的 summary',
-    ).not.toBe('');
-
-    // 展开是原生 `<details>` 语义：点 summary ⇒ open ⇒ 输入框可用。
-    await act(async () => {
-      drawer!.querySelector('summary')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(drawer!.hasAttribute('open'), '点 summary 后抽屉必须展开').toBe(true);
-    expect(
-      drawer!.querySelector('[data-testid="ai-tool-input"]'),
-      '展开后 AI 输入框必须在（交互本体没动）',
+      agentSurface!.querySelector('[data-testid="ai-assistant"]'),
+      'Agent surface 内必须是 Chatbot 面板',
     ).not.toBeNull();
+    expect(
+      agentSurface!.querySelector('[data-testid="ai-assistant-input"]'),
+      'Chatbot 面板必须提供统一对话输入框',
+    ).not.toBeNull();
+    expect(
+      container!.querySelector('[data-testid="ai-drawer"]'),
+      '旧的 AI 抽屉入口不应再出现',
+    ).toBeNull();
+    expect(
+      container!.querySelector('[data-testid="ai-tool-input"]'),
+      '工具调用输入不应作为独立产品入口出现',
+    ).toBeNull();
   });
 });

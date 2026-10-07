@@ -13,7 +13,7 @@
  *   3. **视图不建实体**：四象限、今日视图都是 TASK 的派生结果。
  */
 
-import type { EntityType } from '@heyta/shared-schema';
+import type { EntityType, TaskAutomationSource } from '@heyta/shared-schema';
 
 import type { CategorySlot } from './activity-categories.js';
 import type { LocalDate } from './date.js';
@@ -207,6 +207,8 @@ export interface Task extends EntityBase {
   title: string;
   /** 备注（Markdown）。可选 —— 老数据可能没有。 */
   note?: string;
+  /** Absent on ordinary/older tasks; persisted with the atomic creation op. */
+  automationSource?: TaskAutomationSource & { itemIndex: number };
   /** 所属清单。未归类时为 undefined（收集箱）。 */
   projectId?: string;
   /**

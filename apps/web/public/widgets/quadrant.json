@@ -12,74 +12,365 @@
     },
     {
       "type": "Container",
+      "$when": "${!showPlaceholder}",
       "isVisible": "${!showPlaceholder}",
       "items": [
         {
-          "type": "TextBlock",
-          "text": "${titleText}",
-          "wrap": true,
-          "weight": "Bolder",
-          "size": "Medium"
-        },
-        {
-          "type": "Container",
-          "$data": "${slots}",
-          "items": [
+          "type": "ColumnSet",
+          "spacing": "None",
+          "columns": [
             {
-              "type": "TextBlock",
-              "text": "${heading}",
-              "wrap": true,
-              "weight": "Bolder",
-              "spacing": "Medium"
-            },
-            {
-              "type": "TextBlock",
-              "text": "${hint}",
-              "wrap": true,
-              "isSubtle": true,
-              "spacing": "None"
-            },
-            {
-              "type": "Container",
-              "$data": "${rows}",
+              "type": "Column",
+              "width": "stretch",
               "items": [
                 {
-                  "type": "ColumnSet",
-                  "spacing": "Small",
-                  "selectAction": {
-                    "type": "Action.Execute",
-                    "verb": "toggle",
-                    "data": {
-                      "taskId": "${id}",
-                      "targetIsDone": "${targetIsDone}"
-                    }
-                  },
-                  "columns": [
+                  "type": "TextBlock",
+                  "text": "${titleText}",
+                  "wrap": true,
+                  "weight": "Bolder",
+                  "size": "Medium",
+                  "maxLines": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "ColumnSet",
+          "spacing": "Medium",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "$data": "${slots[0]}",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${heading}",
+                  "wrap": true,
+                  "weight": "Bolder",
+                  "maxLines": 2,
+                  "spacing": "None"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${hint}",
+                  "wrap": true,
+                  "isSubtle": true,
+                  "size": "Small",
+                  "isVisible": "${isEmpty}",
+                  "maxLines": 2
+                },
+                {
+                  "type": "Container",
+                  "$data": "${previewRows}",
+                  "items": [
                     {
-                      "type": "Column",
-                      "width": "auto",
-                      "items": [
-                        {
-                          "type": "TextBlock",
-                          "text": "·",
-                          "size": "Medium"
+                      "type": "ColumnSet",
+                      "spacing": "Small",
+                      "selectAction": {
+                        "type": "Action.Execute",
+                        "verb": "toggle",
+                        "title": "${actionText}",
+                        "data": {
+                          "taskId": "${id}",
+                          "targetIsDone": "${targetIsDone}"
                         }
-                      ]
-                    },
-                    {
-                      "type": "Column",
-                      "width": "stretch",
-                      "items": [
+                      },
+                      "columns": [
                         {
-                          "type": "TextBlock",
-                          "text": "${title}",
-                          "wrap": true,
-                          "color": "${style}",
-                          "strikethrough": "${strikethrough}"
+                          "type": "Column",
+                          "width": "auto",
+                          "items": [
+                            {
+                              "type": "TextBlock",
+                              "text": "${statusText}",
+                              "wrap": true,
+                              "size": "Small",
+                              "color": "${style}",
+                              "isSubtle": "${done}"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Column",
+                          "width": "stretch",
+                          "items": [
+                            {
+                              "type": "TextBlock",
+                              "text": "${title}",
+                              "wrap": true,
+                              "maxLines": 2,
+                              "color": "${style}",
+                              "isSubtle": "${done}"
+                            }
+                          ]
                         }
                       ]
                     }
                   ]
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${overflowText}",
+                  "wrap": true,
+                  "size": "Small",
+                  "isSubtle": true,
+                  "spacing": "Small",
+                  "isVisible": "${overflowText != ''}"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "stretch",
+              "$data": "${slots[1]}",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${heading}",
+                  "wrap": true,
+                  "weight": "Bolder",
+                  "maxLines": 2,
+                  "spacing": "None"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${hint}",
+                  "wrap": true,
+                  "isSubtle": true,
+                  "size": "Small",
+                  "isVisible": "${isEmpty}",
+                  "maxLines": 2
+                },
+                {
+                  "type": "Container",
+                  "$data": "${previewRows}",
+                  "items": [
+                    {
+                      "type": "ColumnSet",
+                      "spacing": "Small",
+                      "selectAction": {
+                        "type": "Action.Execute",
+                        "verb": "toggle",
+                        "title": "${actionText}",
+                        "data": {
+                          "taskId": "${id}",
+                          "targetIsDone": "${targetIsDone}"
+                        }
+                      },
+                      "columns": [
+                        {
+                          "type": "Column",
+                          "width": "auto",
+                          "items": [
+                            {
+                              "type": "TextBlock",
+                              "text": "${statusText}",
+                              "wrap": true,
+                              "size": "Small",
+                              "color": "${style}",
+                              "isSubtle": "${done}"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Column",
+                          "width": "stretch",
+                          "items": [
+                            {
+                              "type": "TextBlock",
+                              "text": "${title}",
+                              "wrap": true,
+                              "maxLines": 2,
+                              "color": "${style}",
+                              "isSubtle": "${done}"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${overflowText}",
+                  "wrap": true,
+                  "size": "Small",
+                  "isSubtle": true,
+                  "spacing": "Small",
+                  "isVisible": "${overflowText != ''}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "ColumnSet",
+          "spacing": "Medium",
+          "separator": true,
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "$data": "${slots[2]}",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${heading}",
+                  "wrap": true,
+                  "weight": "Bolder",
+                  "maxLines": 2,
+                  "spacing": "None"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${hint}",
+                  "wrap": true,
+                  "isSubtle": true,
+                  "size": "Small",
+                  "isVisible": "${isEmpty}",
+                  "maxLines": 2
+                },
+                {
+                  "type": "Container",
+                  "$data": "${previewRows}",
+                  "items": [
+                    {
+                      "type": "ColumnSet",
+                      "spacing": "Small",
+                      "selectAction": {
+                        "type": "Action.Execute",
+                        "verb": "toggle",
+                        "title": "${actionText}",
+                        "data": {
+                          "taskId": "${id}",
+                          "targetIsDone": "${targetIsDone}"
+                        }
+                      },
+                      "columns": [
+                        {
+                          "type": "Column",
+                          "width": "auto",
+                          "items": [
+                            {
+                              "type": "TextBlock",
+                              "text": "${statusText}",
+                              "wrap": true,
+                              "size": "Small",
+                              "color": "${style}",
+                              "isSubtle": "${done}"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Column",
+                          "width": "stretch",
+                          "items": [
+                            {
+                              "type": "TextBlock",
+                              "text": "${title}",
+                              "wrap": true,
+                              "maxLines": 2,
+                              "color": "${style}",
+                              "isSubtle": "${done}"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${overflowText}",
+                  "wrap": true,
+                  "size": "Small",
+                  "isSubtle": true,
+                  "spacing": "Small",
+                  "isVisible": "${overflowText != ''}"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "stretch",
+              "$data": "${slots[3]}",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${heading}",
+                  "wrap": true,
+                  "weight": "Bolder",
+                  "maxLines": 2,
+                  "spacing": "None"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${hint}",
+                  "wrap": true,
+                  "isSubtle": true,
+                  "size": "Small",
+                  "isVisible": "${isEmpty}",
+                  "maxLines": 2
+                },
+                {
+                  "type": "Container",
+                  "$data": "${previewRows}",
+                  "items": [
+                    {
+                      "type": "ColumnSet",
+                      "spacing": "Small",
+                      "selectAction": {
+                        "type": "Action.Execute",
+                        "verb": "toggle",
+                        "title": "${actionText}",
+                        "data": {
+                          "taskId": "${id}",
+                          "targetIsDone": "${targetIsDone}"
+                        }
+                      },
+                      "columns": [
+                        {
+                          "type": "Column",
+                          "width": "auto",
+                          "items": [
+                            {
+                              "type": "TextBlock",
+                              "text": "${statusText}",
+                              "wrap": true,
+                              "size": "Small",
+                              "color": "${style}",
+                              "isSubtle": "${done}"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Column",
+                          "width": "stretch",
+                          "items": [
+                            {
+                              "type": "TextBlock",
+                              "text": "${title}",
+                              "wrap": true,
+                              "maxLines": 2,
+                              "color": "${style}",
+                              "isSubtle": "${done}"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${overflowText}",
+                  "wrap": true,
+                  "size": "Small",
+                  "isSubtle": true,
+                  "spacing": "Small",
+                  "isVisible": "${overflowText != ''}"
                 }
               ]
             }

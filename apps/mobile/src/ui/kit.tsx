@@ -40,6 +40,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { TextStyleName } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
+import { StateIllustration, type StateIllustrationVariant } from '@heyta/ui';
 import { useText, useTheme, useTokens } from '../theme';
 import { Icon, type IconName } from './icons';
 
@@ -64,7 +65,7 @@ const TONE_TOKENS = {
   subtle: 'color.foreground-subtle',
   primary: 'color.primary',
   danger: 'color.danger',
-  success: 'color.success',
+  success: 'color.success-strong',
   'on-primary': 'color.on-primary',
   // 🔴 用 `warning-strong`（amber-700，5.02:1）而不是 `warning`（amber-600，3.19:1）。
   // 设计系统的对比度测试已经证明 amber-600 不达标（quadrant-3 就是因此改的），
@@ -149,9 +150,11 @@ export interface AppBarAction {
 export function AppBar({
   title,
   actions,
+  titleLeading,
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
+  titleLeading?: React.ReactNode;
 }): React.JSX.Element {
   const t = useTokens();
   const insets = useSafeAreaInsets();
@@ -161,8 +164,6 @@ export function AppBar({
       style={{
         paddingTop: insets.top,
         backgroundColor: t['color.surface'],
-        borderBottomWidth: t['border-width.thin'],
-        borderBottomColor: t['color.border'],
       }}
     >
       <View
@@ -176,6 +177,7 @@ export function AppBar({
       >
         {/* 标题区 flex:1 且**不加 numberOfLines 限制**会让长标题把操作挤掉；
             这里限 1 行并允许收缩。 */}
+        {titleLeading}
         <View style={{ flex: 1 }}>
           <Text variant="headline" numberOfLines={1}>
             {title}
@@ -245,13 +247,18 @@ export function IconButton({
 export function Screen({
   title,
   actions,
+  titleLeading,
   children,
   scroll = true,
+  fixedControls,
 }: {
   title: string;
   actions?: ReadonlyArray<AppBarAction>;
+  titleLeading?: React.ReactNode;
   children: React.ReactNode;
   scroll?: boolean;
+  /** Contextual controls remain reachable while the content scrolls. */
+  fixedControls?: React.ReactNode;
 }): React.JSX.Element {
   const t = useTokens();
   const body = (
@@ -276,7 +283,12 @@ export function Screen({
 
   return (
     <View style={{ flex: 1, backgroundColor: t['color.background'] }}>
-      <AppBar title={title} actions={actions} />
+      <AppBar title={title} actions={actions} titleLeading={titleLeading} />
+      {fixedControls ? (
+        <View style={{ paddingHorizontal: t['screen.gutter'], paddingTop: t['space.2'] }}>
+          {fixedControls}
+        </View>
+      ) : null}
       {scroll ? (
         <ScrollView
           style={{ flex: 1 }}
@@ -641,9 +653,6 @@ export function Card({ children, style, gap = 'default' }: CardProps): React.JSX
         {
           backgroundColor: t['color.surface'],
           borderRadius: t['radius.lg'],
-          borderWidth: t['border-width.thin'],
-          // 扁平风格用边框表达层次，阴影只给真正的浮层（AGENTS.md §5）。
-          borderColor: t['color.border'],
           padding: t['space.4'],
           gap: gapValue(t, gap),
         },
@@ -728,8 +737,7 @@ export function Button({
           paddingHorizontal: t['space.4'],
           borderRadius: t['radius.md'],
           backgroundColor: c.bg,
-          borderWidth: tone === 'ghost' ? 0 : t['border-width.thin'],
-          borderColor: c.border,
+          borderWidth: 0,
           // disabled 用 token 的不透明度，不写死 0.5。
           opacity: isDisabled
             ? t['state.disabled-opacity']
@@ -818,12 +826,14 @@ export function Divider({ inset = true }: { inset?: boolean }): React.JSX.Elemen
 /** 空状态。不是"暂无数据"四个字就完事 —— 它得说明下一步能做什么。 */
 export function EmptyState({
   icon,
+  illustration,
   title,
   hint,
   detail,
   detailTone = 'danger',
 }: {
   icon?: IconName;
+  illustration?: StateIllustrationVariant;
   title: string;
   hint: string;
   /** 补充说明。技术细节给错误用，step 说明给"还没做"用。 */
@@ -846,7 +856,9 @@ export function EmptyState({
         gap: t['space.2'],
       }}
     >
-      {icon !== undefined ? (
+      {illustration !== undefined ? (
+        <StateIllustration variant={illustration} />
+      ) : icon !== undefined ? (
         <Icon name={icon} size="xl" color={t['color.foreground-subtle']} strokeWidth={1.5} />
       ) : null}
       <Text variant="section-title" tone="muted" style={{ textAlign: 'center' }}>
@@ -938,7 +950,6 @@ export function TextField({
 }: TextFieldProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
-  const [focused, setFocused] = React.useState(false);
 
   return (
     <View style={{ gap: t['space.1'] }}>
@@ -965,12 +976,6 @@ export function TextField({
         returnKeyType={onSubmitEditing === undefined ? undefined : 'done'}
         // cursorColor 是 TextInput 的 **prop**，不是 style —— 放进 style 会被静默忽略。
         cursorColor={t['color.primary']}
-        onFocus={() => {
-          setFocused(true);
-        }}
-        onBlur={() => {
-          setFocused(false);
-        }}
         style={[
           // ⚠️ 样式名必须**真实存在**于 `TEXT_STYLES`。我第一版写了 `'body'` ——
           // 表里没有这个名字（最接近的是 `row-title`），取到 `undefined`，
@@ -989,10 +994,8 @@ export function TextField({
             borderRadius: t['radius.md'],
             backgroundColor: t['color.surface'],
             color: t['color.foreground'],
-            // 🔴 焦点态用**边框加粗**表达，不用阴影位移 ——
-            // 扁平风格靠边框分层，且位移会让布局跳动。
-            borderWidth: focused ? t['border-width.thick'] : t['border-width.thin'],
-            borderColor: focused ? t['color.primary'] : t['color.border'],
+            // 文本输入以光标表示编辑位置，不再叠加焦点边框。
+            borderWidth: 0,
             opacity: editable ? 1 : t['state.disabled-opacity'],
           },
         ]}
@@ -1019,9 +1022,8 @@ export function TextField({
  * 改用 `color.surface-sunken` 这个**已有的** token。
  * 需要新变量时先加 token 再消费，而不是先写个数字。
  *
- * 🔴 选中态同时改**边框粗细**与**底色**，不只改颜色：
- * 只改颜色的话，色觉障碍用户看不出哪一个是选中的
- * （UIX Pro 第 1 条是可达性，排在风格前面）。
+ * 🔴 选中态使用主色底与反色文字表达，不再叠加边框：
+ * `accessibilityState.selected` 同步保留给读屏，视觉上避免框中框。
  */
 export function Chip({
   label,
@@ -1054,8 +1056,7 @@ export function Chip({
         gap: t['space.1'],
         paddingHorizontal: t['space.3'],
         borderRadius: t['radius.full'],
-        borderWidth: selected ? t['border-width.thick'] : t['border-width.thin'],
-        borderColor: selected ? t['color.primary'] : t['color.border'],
+        borderWidth: 0,
         backgroundColor: selected
           ? t['color.primary']
           : pressed

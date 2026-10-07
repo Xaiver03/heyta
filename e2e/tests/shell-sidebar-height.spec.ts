@@ -115,13 +115,11 @@ test.describe('侧栏不许把主区顶得跳起来（H9 第二刀）', () => {
     const TASK_COUNT = 8;
     const sidebar = page.locator('aside[aria-label="清单与标签"]');
     await expect(sidebar, '侧栏没画出来 ⇒ 连清单都建不了，这一条没有基准').toBeVisible();
-    // 🔴 「新建清单」的表单**建完不收起**（`ProjectsPanel.tsx` 里"连建几条清单是常态"那条注释），
-    //   而再点一次「新建清单」是 **toggle**（会把它关掉，`fill` 就解析到 0 个元素而超时）。
-    //   所以：只点一次展开，然后连填连提交。
-    await sidebar.getByLabel('新建清单').click();
+    // 创建表单是独立对话框：每次提交后对话框关闭，下一条从同一个侧栏入口打开。
     for (let i = 0; i < LIST_COUNT; i++) {
-      await sidebar.getByLabel('新清单名称').fill(`侧栏高度乙清单${String(i)}`);
-      await sidebar.getByLabel('添加清单').click();
+      await sidebar.getByLabel('新建清单').click();
+      await sidebar.locator('#ht-category-create-name').fill(`侧栏高度乙清单${String(i)}`);
+      await sidebar.getByRole('button', { name: '创建清单' }).click();
     }
 
     const titles: string[] = [];
@@ -131,13 +129,6 @@ test.describe('侧栏不许把主区顶得跳起来（H9 第二刀）', () => {
       await addTask(page, title);
     }
     const target = await bottomRowTitle(page, titles);
-
-    // 🔴 触发条件：内联表单必须**还展开着**（收起的触发是"面板外一次 pointerdown"，不是失焦 ——
-    //   见 `ProjectsPanel.tsx:107-118` 那段）。不展开的话，下面那一下根本不会收起 52px。
-    await expect(
-      sidebar.getByLabel('新建清单'),
-      '「新建清单」的表单没展开 ⇒ 这一条点下去什么都不会收起，量不到任何东西',
-    ).toHaveAttribute('aria-expanded', 'true');
 
     const trigger = rowOf(page, target).getByTestId('task-organize-summary');
 

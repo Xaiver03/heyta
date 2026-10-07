@@ -1,0 +1,57 @@
+{
+  "navigationStyle": {
+    "groupSize": "16px",
+    "itemSize": "14px",
+    "underlines": 0,
+    "home": "/"
+  },
+  "url": "https://heyta.waytofuture.cn/docs/",
+  "headings": 1,
+  "searches": 1,
+  "searchResults": 3,
+  "navigation": true,
+  "checkedAt": "2026-10-07T07:56:52.506Z",
+  "liveArticleVerification": {
+    "checkedAt": "2026-10-07T09:23:58.323Z",
+    "route": "/docs/first-run/",
+    "screenshots": [
+      "docs-live-first-run-1440-light.png",
+      "docs-live-first-run-1440-dark.png",
+      "docs-live-first-run-390-light.png",
+      "docs-live-first-run-390-dark.png"
+    ],
+    "returnHome": {
+      "visibleText": "返回首页",
+      "href": "/",
+      "destination": "https://heyta.waytofuture.cn/",
+      "passed": true
+    },
+    "headingHierarchy": {
+      "h1Count": 1,
+      "group": {
+        "fontSize": "16px",
+        "fontWeight": "600"
+      },
+      "child": {
+        "fontSize": "14px",
+        "fontWeight": "400"
+      },
+      "groupLargerThanChild": true
+    },
+    "linkPresentation": {
+      "underlinedLinkCount": 0,
+      "passed": true
+    },
+    "layout": {
+      "viewports": [
+        "1440x900",
+        "390x844"
+      ],
+      "lightAndDark": true,
+      "documentHorizontalOverflow": false,
+      "headingInsideReadingBody": true
+    },
+    "consoleErrors": [],
+    "pageErrors": []
+  }
+}

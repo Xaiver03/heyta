@@ -1,0 +1,10 @@
+$ vitest run
+
+ RUN  v5.0.1 /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/design-system
+
+
+ Test Files  7 passed (7)
+      Tests  525 passed (525)
+   Start at  18:16:11
+   Duration  420ms (transform 58%, import 34%, tests 7%, worker 1%)
+

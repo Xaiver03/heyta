@@ -1,0 +1,54 @@
+[
+  {
+    "theme": "light",
+    "width": 1440,
+    "appearance": {
+      "outline": "0px",
+      "border": "0px",
+      "borderColor": "rgba(0, 0, 0, 0)",
+      "shadow": "none",
+      "caret": "rgb(37, 99, 235)"
+    },
+    "calendarCells": 42,
+    "overflow": false
+  },
+  {
+    "theme": "light",
+    "width": 390,
+    "appearance": {
+      "outline": "0px",
+      "border": "0px",
+      "borderColor": "rgba(0, 0, 0, 0)",
+      "shadow": "none",
+      "caret": "rgb(37, 99, 235)"
+    },
+    "calendarCells": 42,
+    "overflow": false
+  },
+  {
+    "theme": "dark",
+    "width": 1440,
+    "appearance": {
+      "outline": "0px",
+      "border": "0px",
+      "borderColor": "rgba(0, 0, 0, 0)",
+      "shadow": "none",
+      "caret": "rgb(96, 165, 250)"
+    },
+    "calendarCells": 42,
+    "overflow": false
+  },
+  {
+    "theme": "dark",
+    "width": 390,
+    "appearance": {
+      "outline": "0px",
+      "border": "0px",
+      "borderColor": "rgba(0, 0, 0, 0)",
+      "shadow": "none",
+      "caret": "rgb(96, 165, 250)"
+    },
+    "calendarCells": 42,
+    "overflow": false
+  }
+]

@@ -45,7 +45,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '@heyta/i18n';
 
+import { SyncBar } from '../src/features/sync/SyncBar.js';
 import { SyncSettingsPanel } from '../src/features/sync/SyncSettingsPanel.js';
+import { __resetAuthForTests, useAuthStore } from '../src/features/auth/store.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 
 const SERVER = 'https://sync.example.test';
@@ -58,12 +60,13 @@ let root: Root;
 beforeEach(() => {
   // 同步 store 是模块级单例 —— 不重置的话用例之间会互相带状态。
   localStorage.clear();
+  __resetAuthForTests();
   act(() => {
     const sync = useSyncStore.getState();
     sync.closeSettings();
     sync.closeSignIn();
     useSyncStore.setState({
-      baseUrl: undefined,
+      baseUrl: '',
       token: undefined,
       password: undefined,
       email: undefined,
@@ -113,6 +116,11 @@ function saveButton(): HTMLButtonElement | undefined {
 }
 
 describe('设置 → 同步 那一节的输入框对齐', () => {
+  it('未登录时只显示一个登录入口，不重复渲染空的同步状态卡', async () => {
+    expect(container.querySelector('[data-testid="sync-status-bar"]')).toBeNull();
+    expect(container.querySelector('[data-testid="sync-signin-required-action"]')).not.toBeNull();
+  });
+
   it('登录发生在面板挂载**之后**时，框里必须显示已保存的地址与令牌', async () => {
     // 冷启动：面板已挂载，此时还没有任何凭据。
     expect(useSyncStore.getState().baseUrl ?? '').toBe('');
@@ -179,6 +187,23 @@ describe('设置 → 同步 那一节的输入框对齐', () => {
     ).toBe(PASSWORD);
   });
 
+  it('切换高级自托管凭据时清掉旧托管账号作用域，恢复传统 E2EE 路径', async () => {
+    act(() => {
+      useSyncStore.getState().applyAuthToken(SERVER, TOKEN, 'a@example.test', 'hosted-account');
+    });
+    await flush();
+    expect(useSyncStore.getState().accountId).toBe('hosted-account');
+
+    act(() => {
+      useSyncStore.getState().configure('https://self-hosted.example.test', 'self-hosted-token', PASSWORD);
+    });
+    await flush();
+
+    const after = useSyncStore.getState();
+    expect(after.accountId, '自托管凭据不得继续沿用旧托管账号的 Vault 作用域').toBeUndefined();
+    expect(after.password, '切换自托管时传统 E2EE 口令应保留在当前会话').toBe(PASSWORD);
+  });
+
   it('登出之后框里不许留着**上一个人**的令牌（否则下一次保存会把它写回去）', async () => {
     act(() => {
       useSyncStore.getState().configure(SERVER, TOKEN, PASSWORD);
@@ -193,5 +218,76 @@ describe('设置 → 同步 那一节的输入框对齐', () => {
 
     expect(fieldValues(), '登出后框里还留着旧令牌').not.toContain(TOKEN);
     expect(fieldValues(), '登出后框里还留着旧口令').not.toContain(PASSWORD);
+  });
+
+  it('切走同步分类再回来时保留未保存地址，登录入口也使用这份草稿', async () => {
+    const draftUrl = 'https://draft-sync.example.test';
+    const signInWithPassword = vi.fn(async () => undefined);
+    useAuthStore.setState({ signInWithPassword });
+
+    // 真实设置旅程：同步分类常驻 mounted，只由 active 表示当前是否可见。
+    act(() => root.unmount());
+    root = createRoot(container);
+    act(() => {
+      root.render(
+        <I18nProvider locale="zh-CN">
+          <SyncSettingsPanel active />
+          <SyncBar />
+        </I18nProvider>,
+      );
+    });
+    await flush();
+
+    const urlInput = container.querySelector('[data-testid="sync-server-url"]') as HTMLInputElement;
+    expect(urlInput).toBeTruthy();
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    expect(setter).toBeDefined();
+    act(() => {
+      setter?.call(urlInput, draftUrl);
+      urlInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await flush();
+
+    act(() => {
+      root.render(
+        <I18nProvider locale="zh-CN">
+          <SyncSettingsPanel active={false} />
+          <SyncBar />
+        </I18nProvider>,
+      );
+    });
+    await flush();
+    expect(useSyncStore.getState().syncDraftShown).toBe(false);
+
+    act(() => {
+      root.render(
+        <I18nProvider locale="zh-CN">
+          <SyncSettingsPanel active />
+          <SyncBar />
+        </I18nProvider>,
+      );
+    });
+    await flush();
+    expect(useSyncStore.getState().syncDraftShown).toBe(true);
+    expect(useSyncStore.getState().syncDraft.baseUrl).toBe(draftUrl);
+
+    // 打开设置里的登录入口，走到口令提交，验证 AuthPanel 读取的是 draft URL。
+    act(() => useSyncStore.getState().openSignIn());
+    await flush();
+    const email = container.querySelector('[data-testid="auth-form-email"]') as HTMLInputElement;
+    expect(email).toBeTruthy();
+    const type = (input: HTMLInputElement, value: string): void => {
+      setter?.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    act(() => type(email, 'me@example.test'));
+    await flush();
+    const password = container.querySelector('[data-testid="auth-form-password"]') as HTMLInputElement;
+    act(() => type(password, 'correct horse battery'));
+    await flush();
+    act(() => (container.querySelector('[data-testid="auth-form-submit"]') as HTMLButtonElement).click());
+    await flush();
+
+    expect(signInWithPassword).toHaveBeenCalledWith(draftUrl, 'me@example.test', 'correct horse battery');
   });
 });

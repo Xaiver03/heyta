@@ -289,8 +289,8 @@ describe('多步读循环', () => {
   });
 });
 
-describe('🔴 写：一次一个、一次确认', () => {
-  it('模型要写 ⇒ 产出提案并**停**，第二次请求根本没发', async () => {
+describe('🔴 写：一次一个，按风险自动执行或确认', () => {
+  it('模型要写低风险任务 ⇒ 自动执行并停，第二次请求根本没发', async () => {
     const host = fakeHost();
     const { impl, calls } = scriptedFetch([
       { kind: 'call', id: 'c1', name: 'list_tasks', args: '{}' },
@@ -313,12 +313,35 @@ describe('🔴 写：一次一个、一次确认', () => {
 
     expect(calls.length).toBe(2);
     expect(outcome.ok).toBe(true);
-    if (!outcome.ok || outcome.kind !== 'proposal') return;
+    if (!outcome.ok || outcome.kind !== 'executed') return;
     expect(outcome.proposal.intent).toEqual({ action: 'create-task', title: '买咖啡' });
     expect(outcome.stopsHere).toBe(true);
-    // 🔴 确认之前不许写：数调用，不看返回值。
-    expect(host.submits).toBe(0);
+    expect(outcome.result).toEqual({ ok: true, taskId: 'created-1' });
+    expect(host.submits).toBe(1);
     expect(outcome.steps.map((s) => s.kind)).toEqual(['read', 'write']);
+  });
+
+  it('模型要批量完成 ⇒ 保留提案并停，不能自动写入', async () => {
+    const host = fakeHost();
+    const { impl, calls } = scriptedFetch([
+      { kind: 'call', id: 'c1', name: 'complete_task', args: '{"taskIds":["t1","t2"]}' },
+    ]);
+    const outcome = await requestAssistantTurn(
+      { text: '把两条任务都完成' },
+      {
+        routing: routing(LOCAL),
+        consents: [],
+        tier: 'read-and-propose',
+        host,
+        executionId: 'assistant-risky-batch',
+        routed: { fetchImpl: impl },
+      },
+    );
+    expect(calls.length).toBe(1);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok || outcome.kind !== 'proposal') return;
+    expect(outcome.proposal.intent).toEqual({ action: 'complete-tasks', taskIds: ['t1', 't2'] });
+    expect(host.submits).toBe(0);
   });
 
   it('`read-only` 档里写工具**根本不在模型看得见的集合里**', async () => {
@@ -758,7 +781,7 @@ describe('规则先跑、命中即零外发', () => {
     expect(outcome.destination).toBe('none');
   });
 
-  it('写意图的规则命中 ⇒ 提案 + 零请求 + 确认前一条 op 都没写', async () => {
+  it('低风险写意图的规则命中 ⇒ 自动执行 + 零请求 + 只提交一次', async () => {
     const host = fakeHost(TASKS, PROJECTS);
     const { impl, calls } = scriptedFetch([{ kind: 'text', text: '端点不该被用到' }]);
     const outcome = await requestAssistantTurn(
@@ -782,11 +805,11 @@ describe('规则先跑、命中即零外发', () => {
     expect(calls.length).toBe(0);
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.kind).toBe('proposal');
-    if (outcome.kind !== 'proposal') return;
+    expect(outcome.kind).toBe('executed');
+    if (outcome.kind !== 'executed') return;
     expect(outcome.destination).toBe('none');
     expect(outcome.stopsHere).toBe(true);
-    expect(host.submits, '用户还没确认就写了').toBe(0);
+    expect(host.submits).toBe(1);
   });
 
   it('低档（read-only）下写规则**不该**命中：授权范围先于规则', async () => {

@@ -54,7 +54,7 @@ describe('移动端二级导航栈', () => {
   it('ProfileScreen 的功能域入口和摘要入口都写入 profile 栈', () => {
     expect(profileScreenSource).toContain('navigation.push(featureRouteKey(entry.key));');
     expect(profileScreenSource).toContain("navigation.push(featureRouteKey('growth'));" );
-    expect(profileScreenSource).toContain('return featureScreen(openFeature, () => {');
+    expect(profileScreenSource).toContain('return featureScreen(');
     expect(profileScreenSource).toContain('navigation.pop();');
     expect(profileScreenSource).not.toContain(
       'useState<MobileFeatureEntryKey | null>(null)',

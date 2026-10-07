@@ -421,6 +421,28 @@ function runRemote() {
     die('步骤 2（源码同步）', `同步没成功（主机 ${HOST}）。`, '   ⚠️ 不在旧树上构建，也不退回本机 —— 先让远端可达。');
   }
 
+  /* 步骤 2.5：源码同步后重建远端 workspace 依赖 */
+  // 🔴 依赖安装必须发生在源码同步之后。远端 node_modules 是持久目录，不能只看
+  // ``apps/mobile/node_modules`` 是否存在：本次 Metro 实际会从 workspace 包（例如
+  // packages/ui）解析其 runtime dependencies，而这些包的 manifest 可能刚随源码包更新。
+  // 2026-10-07 真构建复现：packages/ui 新增的 zxcvbn 依赖已在 lockfile 中，但远端旧
+  // node_modules 没有它；目录级前置因此通过，Metro 直到构建后期才报无法解析模块。
+  // frozen install 是幂等的：依赖不变时 pnpm 只做快速校验，依赖变更时按当前 lockfile
+  // 补齐 symlink 与包。它放在同步之后、Gradle 之前，保证构建输入与依赖树来自同一源码包。
+  console.log('  步骤 2.5：源码同步后在远端执行 pnpm install --frozen-lockfile');
+  const remoteInstall = runLogged(
+    'ssh',
+    ['-o', 'ConnectTimeout=10', HOST, `cd /d ${REMOTE_ROOT} && pnpm install --frozen-lockfile --reporter append-only`],
+  );
+  if (remoteInstall.status !== 0) {
+    die(
+      '步骤 2.5（远端 workspace 依赖安装）',
+      `pnpm install --frozen-lockfile 退出码 ${remoteInstall.status}。`,
+      `   命令是：ssh ${HOST} "cd /d ${REMOTE_ROOT} && pnpm install --frozen-lockfile --reporter append-only"`,
+    );
+  }
+  console.log('  ✅ 远端 workspace 依赖与当前同步源码一致');
+
   /* 步骤 3：清远端旧产物，并用**远端自己的时钟**记本次构建的起点 */
   // 🔴 起点必须取**远端时钟**而不是本地 `Date.now()`：跨机器比时间戳会把两台机器的
   //    时钟差算进判据里（远端慢半分钟就是一条假的"产物是旧的"）。

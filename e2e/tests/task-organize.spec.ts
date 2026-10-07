@@ -69,15 +69,15 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(sidebar.getByText(TAG, { exact: true })).toHaveCount(0);
 
     // 🔴 输入框**默认不在 DOM 里**（点标题右侧的 + 才展开）——
-    // 先点开，再填。少了这一步，`getByLabel('新清单名称')` 会解析到 0 个元素。
+    // 先点开，再填。少了这一步，`locator('#ht-category-create-name')` 会解析到 0 个元素。
     await sidebar.getByLabel('新建清单').click();
-    await sidebar.getByLabel('新清单名称').fill(LIST);
-    await sidebar.getByLabel('添加清单').click();
+    await sidebar.locator('#ht-category-create-name').fill(LIST);
+    await sidebar.getByRole('button', { name: '创建清单' }).click();
     await expect(sidebar.getByText(LIST, { exact: true })).toBeVisible();
 
     await sidebar.getByLabel('新建标签').click();
-    await sidebar.getByLabel('新标签名称').fill(TAG);
-    await sidebar.getByLabel('添加标签').click();
+    await sidebar.locator('#ht-category-create-name').fill(TAG);
+    await sidebar.getByRole('button', { name: '创建标签' }).click();
     await expect(sidebar.getByText(TAG, { exact: true })).toBeVisible();
 
     // ── 挂到任务上 ────────────────────────────────────────────────────
@@ -181,8 +181,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
     const sidebar = page.locator(SIDEBAR);
     // 输入框**默认不在 DOM 里**（点标题右侧的 + 才展开），先点开。
     await sidebar.getByLabel('新建标签').click();
-    await sidebar.getByLabel('新标签名称').fill(TAG);
-    await sidebar.getByLabel('添加标签').click();
+    await sidebar.locator('#ht-category-create-name').fill(TAG);
+    await sidebar.getByRole('button', { name: '创建标签' }).click();
     await expect(sidebar.getByText(TAG, { exact: true })).toBeVisible();
 
     const row = rowFor(page, title);

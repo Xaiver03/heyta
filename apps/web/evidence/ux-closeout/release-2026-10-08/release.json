@@ -1,0 +1,81 @@
+{
+  "release": "1.0.1-test.20261008.1",
+  "sourceSnapshot": "0107fe15440aecf5775a71574ba973406d8b4c49",
+  "serverSnapshot": "3880bdd1fd5e8fe3710bd19c5f753947ea89c468",
+  "webIndexSha256": "4622eeb422e927dddf8968aeb1962cbd6269ae2c68dba72914b4d2c477cd2f54",
+  "desktopWebIndexSha256": "72d2a570e9060cb07289bee804b424329ae2afb32672e08260975bad84a77c62",
+  "testflight": {
+    "bundleId": "com.heyta",
+    "version": "1.0",
+    "build": "3",
+    "appId": "6817635248",
+    "buildId": "93beccab-2a77-4513-a1d3-acfc8c58720e",
+    "processingState": "VALID",
+    "group": "内部测试",
+    "publicInvitation": false,
+    "whatToTestLocale": "zh-Hans",
+    "existingInternalTesterCount": 1
+  },
+  "packages": {
+    "macos": {
+      "name": "Heyta-1.0.0.dmg",
+      "size": 2948973,
+      "sha256": "28ce433147cb2c47e1491c03dbf9e66aed2c193acaf71f8b3ffce4a64d32120c"
+    },
+    "windows": {
+      "name": "heyta-windows-test.zip",
+      "size": 98547886,
+      "sha256": "86cf7ee2ee1be31627ed0aee3648f0f499d1f3869dc93a1135523c4296bdf104"
+    },
+    "linux": {
+      "name": "heyta_1.0.0_amd64.deb",
+      "size": 1763132,
+      "sha256": "b41431d1b635ada3d0b206a34f5955aa014c7b5c5bd24855a3ff6091f5da0a4e"
+    },
+    "ios": {
+      "name": "Heyta.ipa",
+      "size": 14551903,
+      "sha256": "8d7247f92ec5271b3940ca52e22b23842b05976657d4fc09ae7bbd7b5096e036"
+    },
+    "android": {
+      "name": "app-release.apk",
+      "size": 68357256,
+      "sha256": "470353159b906fa79f769f9d26fed0ac69a9395d773baf46664271e1732aff67",
+      "certificateSha256": "C4:6D:03:86:17:9C:3C:EF:12:58:2D:13:47:ED:2F:87:1E:B0:3A:64:AA:A2:BF:F9:65:11:C1:CB:76:06:25:56"
+    }
+  },
+  "nativeAcceptance": {
+    "ios": {
+      "taskJourney": "passed 12",
+      "profileJourney": "passed 23"
+    },
+    "android": {
+      "taskJourney": "passed 13",
+      "profileJourney": "passed independent rerun (profile-final-2)"
+    }
+  },
+  "github": {
+    "url": "https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.1",
+    "draft": false,
+    "prerelease": true,
+    "assets": 5,
+    "allAssetSha256DigestsMatch": true
+  },
+  "productionBrowser": {
+    "viewports": [
+      390,
+      1440
+    ],
+    "loginAndRegistrationFields": "passed",
+    "passwordStrength": "passed",
+    "helpHomeAndArticleNavigation": "passed",
+    "pageErrors": 0,
+    "sentEmail": false
+  },
+  "cos": {
+    "manifestUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json",
+    "version": "1.0.1-test.20261008.1",
+    "allFourPlatformsPublic": true,
+    "allSizesAndManifestHashesMatch": true
+  }
+}

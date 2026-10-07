@@ -24,6 +24,50 @@ struct HeytaWeb {
     guint probe_source;
 };
 
+/* Public help/pricing/changelog pages are site content, not shell content.
+ * Keep the workspace in the WebView and hand only absolute HTTP(S) URLs to the
+ * user's default browser. Custom heyta-local resources continue in-process. */
+static gboolean on_decide_policy(
+    WebKitWebView *view,
+    WebKitPolicyDecision *decision,
+    WebKitPolicyDecisionType type,
+    gpointer user_data
+) {
+    (void)view;
+    (void)user_data;
+    if (type != WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION &&
+        type != WEBKIT_POLICY_DECISION_TYPE_NEW_WINDOW_ACTION) {
+        return FALSE;
+    }
+
+    WebKitNavigationPolicyDecision *navigation =
+        WEBKIT_NAVIGATION_POLICY_DECISION(decision);
+    WebKitNavigationAction *action =
+        webkit_navigation_policy_decision_get_navigation_action(navigation);
+    WebKitURIRequest *request = webkit_navigation_action_get_request(action);
+    const char *uri = request == NULL ? NULL : webkit_uri_request_get_uri(request);
+    GUri *parsed = uri == NULL ? NULL : g_uri_parse(uri, G_URI_FLAGS_NONE, NULL);
+    const char *scheme = parsed == NULL ? NULL : g_uri_get_scheme(parsed);
+    const bool external = scheme != NULL &&
+        (g_ascii_strcasecmp(scheme, "http") == 0 ||
+         g_ascii_strcasecmp(scheme, "https") == 0);
+
+    if (external) {
+        GError *error = NULL;
+        if (!g_app_info_launch_default_for_uri(uri, NULL, &error)) {
+            g_printerr("HELP_EXTERNAL_OPEN_FAILED=%s\n",
+                       error == NULL ? "unknown" : error->message);
+            g_clear_error(&error);
+        }
+        webkit_policy_decision_ignore(decision);
+        if (parsed != NULL) g_uri_unref(parsed);
+        return TRUE;
+    }
+
+    if (parsed != NULL) g_uri_unref(parsed);
+    return FALSE;
+}
+
 /* ── 产物目录解析 ─────────────────────────────────────────────────────── */
 
 /* 候选路径逐个试；判据是**里面真的有 index.html**，不是"目录存在"。
@@ -624,6 +668,7 @@ HeytaWeb *heyta_web_new(const char *root, GtkWidget **widget, char *errbuf, size
 
     g_signal_connect(view, "load-changed", G_CALLBACK(on_load_changed), web);
     g_signal_connect(view, "load-failed", G_CALLBACK(on_load_failed), web);
+    g_signal_connect(view, "decide-policy", G_CALLBACK(on_decide_policy), web);
     g_signal_connect(view, "web-process-terminated",
                      G_CALLBACK(on_web_process_terminated), web);
 

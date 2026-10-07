@@ -1,0 +1,36 @@
+.privacy-settings__fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.privacy-settings__legend {
+  max-inline-size: 100%;
+  padding: 0 0 var(--ht-space-3);
+  color: var(--ht-color-foreground);
+  font: inherit;
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.privacy-settings__hint {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  line-height: var(--ht-line-height-normal);
+}
+
+.privacy-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+}
+
+@media (max-width: 30rem) {
+  .privacy-settings__actions .ht-btn {
+    flex: 1;
+  }
+}

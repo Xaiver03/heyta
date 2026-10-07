@@ -76,6 +76,7 @@ import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 import { useAuthStore, type AuthStatus } from '../auth/store.js';
 import { useSyncStore } from '../sync/store.js';
+import { SettingsAccountGate } from './SettingsAccountGate.js';
 
 /**
  * 本面板自己那一段结果。
@@ -176,7 +177,7 @@ function PasswordField(props: {
   const { t } = useI18n();
   const [revealed, setRevealed] = useState(defaultPasswordRevealed('desktop'));
   return (
-    <>
+    <div className="ht-settings__field">
       <label className="ht-settings__item-label" htmlFor={props.id}>
         {props.label}
       </label>
@@ -218,7 +219,7 @@ function PasswordField(props: {
           {t('common.auth.form.showPassword')}
         </button>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -370,9 +371,10 @@ export function PasswordPanel(): React.JSX.Element {
       </p>
 
       {!signedIn ? (
-        <p className="ht-settings__hint" data-testid="password-needs-sign-in">
-          {t('web.settings.password.needsSignIn')}
-        </p>
+        <SettingsAccountGate
+          messageKey="web.settings.password.needsSignIn"
+          testId="password-needs-sign-in"
+        />
       ) : mode === 'set' ? (
         /*
           「设第一个密码」那张表：一个框、没有"当前密码"（这个账号从来没有过），

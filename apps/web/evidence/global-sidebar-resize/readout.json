@@ -1,0 +1,1550 @@
+[
+  {
+    "theme": "light",
+    "view": "任务",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": true,
+        "width": 159,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "任务",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": true,
+        "width": 383,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "任务",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": true,
+        "width": 283,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 680,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "日历",
+    "phase": "narrow",
+    "rightDragged": false,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": true,
+        "width": 159,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": false
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1184,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "日历",
+    "phase": "wide",
+    "rightDragged": false,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": true,
+        "width": 383,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": false
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 960,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "日历",
+    "phase": "restore",
+    "rightDragged": false,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": true,
+        "width": 283,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": false
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1060,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "四象限",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "四象限",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "四象限",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "时间线",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "时间线",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "时间线",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "习惯",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": true,
+        "width": 255,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "习惯",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": true,
+        "width": 447,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "习惯",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": true,
+        "width": 347,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "便签",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "便签",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "便签",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "番茄钟",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "番茄钟",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "view": "番茄钟",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "任务",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": true,
+        "width": 159,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "任务",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": true,
+        "width": 383,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "任务",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": true,
+        "width": 283,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 680,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "日历",
+    "phase": "narrow",
+    "rightDragged": false,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": true,
+        "width": 159,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": false
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1184,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "日历",
+    "phase": "wide",
+    "rightDragged": false,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": true,
+        "width": 383,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": false
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 960,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "日历",
+    "phase": "restore",
+    "rightDragged": false,
+    "leftDragged": true,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": true,
+        "width": 283,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": false
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1060,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "四象限",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "四象限",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "四象限",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "时间线",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "时间线",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "时间线",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "习惯",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": true,
+        "width": 255,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "习惯",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": true,
+        "width": 447,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "习惯",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": true,
+        "width": 347,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "便签",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "便签",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "便签",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "番茄钟",
+    "phase": "narrow",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 288,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 1088,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "番茄钟",
+    "phase": "wide",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 480,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 896,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "view": "番茄钟",
+    "phase": "restore",
+    "rightDragged": true,
+    "leftDragged": false,
+    "documentOverflow": 0,
+    "columns": [
+      {
+        "selector": ".ht-sidebar__body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-sidebar__calendar-body",
+        "visible": false
+      },
+      {
+        "selector": ".ht-app__detail",
+        "visible": true,
+        "width": 380,
+        "horizontalOverflow": 0,
+        "spill": []
+      },
+      {
+        "selector": ".ht-habit__pane",
+        "visible": false
+      },
+      {
+        "selector": ".ht-content",
+        "visible": true,
+        "width": 996,
+        "horizontalOverflow": 0,
+        "spill": []
+      }
+    ]
+  }
+]

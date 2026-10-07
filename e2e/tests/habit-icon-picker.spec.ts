@@ -1,35 +1,9 @@
 /**
- * 习惯图标选择器（工单 H3 的 **web 端**视觉与落盘证据）
- * ======================================================
- *
- * H3 的主体是"移动端补一个图标入口"，但这一份量在**浏览器**里取：
- * 图标那条写路径（`setHabitIcon` → 一条 UPD → 刷新后仍在 → 行首字形跟着换）
- * 是两端共用的，而 web 这端有零成本的真浏览器载体。移动端的视觉证据需要
- * 重新打包 + 装机（Android 走 windows-pc，iOS 需要模拟器），那是 §6.1.1
- * 固定收尾那一格，登记在计划里，**不在这里冒充已验**。
- *
- * ─────────────────────────────────────────────────────────────────────────
- * 🔴 判据为什么长这样（每条挡一份不同的坏）
- *
- *   I1 展开后**八个**字形 + 「默认」那一格 ⇒ 挡"选项不是来自闭集"（写死四个、
- *      或者把「默认」省略 —— 省略之后用户挑过就退不回去）。
- *   I2 点一格 ⇒ 清单那一行的字形**换成了那一格的形状**：比较的是行首 `<svg>` 的路径
- *      数据，不是"某个元素出现了"，也不是只"与之前不同"。挡的是"写了 state 没落盘 /
- *      落盘了界面不动 / 点月亮画出水杯"。
- *   I3 🔴 **刷新后仍在** —— 这一条才是"落盘"的判据（H2 那批教训：只测内存态会漏
- *      "写进了状态但没写进日志"，症状是当场看着改好了，重开就回去）。
- *   I4 再点同一个 ⇒ 退回派生，且「默认」那一格按下（`aria-pressed`）。
- *   I5 选择器里亮着的那一格与行首画的是**同一个字形** —— 界面内一致性。
- *      ⚠️ 跨端（web↔移动端）等值不在这里：那张表的结构上必须两份（组件 vs 数据），
- *      由 `apps/web/tests/habits-list-pane.spec.tsx` F 组逐对比 + 移动端
- *      `apps/mobile/tests/habit-icon-picker.spec.ts` 的 S2/S3（不许出现第三份）钉。
- *
- * ⚠️ 载体是 `vite preview` + `apps/web/dist`：改完 `apps/web/src/**` 或
- *    `packages/ui/src/**` **必须先重打**，否则量的是旧产物（§7 第 27 条那一族）。
- *    跑法（仓库根）：
- *      pnpm --filter @heyta/ui build && pnpm --filter @heyta/web build
- *      cd e2e && npx playwright test tests/habit-icon-picker.spec.ts \
- *        --config playwright.detail-pane.config.ts
+ * 原创习惯图标的真实 Web 验收。
+ * 核对 24 枚图片加载、选择前后的实际图片字节、刷新持久化、恢复默认、
+ * 列表与选择器一致，以及全部选项的横向边界。
+ * 默认图标仍从旧 8 项稳定派生；选择时主动挑不同图片，避免无写入也通过。
+ * 浏览器证据不替代移动端与最终安装产物验收。
  */
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
@@ -52,11 +26,12 @@ function watchErrors(page: Page): string[] {
   return errors;
 }
 
-/** 一个 `<svg>` 的**形状指纹**（路径数据），不是"有没有 svg"。 */
-const shapeOf = (el: Element): string =>
-  Array.from(el.querySelectorAll('path, circle, rect, line'))
-    .map((n) => `${n.tagName}:${n.getAttribute('d') ?? n.getAttribute('cx') ?? n.getAttribute('x') ?? ''}`)
-    .join('|');
+/** Compare the actual decoded artwork, not a selection marker or a fallback glyph. */
+const shapeOf = (el: Element): string => {
+  const image = el as HTMLImageElement;
+  if (!image.complete || image.naturalWidth === 0) throw new Error('习惯插画尚未成功解码');
+  return image.currentSrc || image.src;
+};
 
 /** 行首那个字形的形状。 */
 const rowGlyph = (page: Page, name: string) =>
@@ -64,31 +39,10 @@ const rowGlyph = (page: Page, name: string) =>
     .locator('[data-testid^="habit-row-"]')
     .filter({ hasText: name })
     .first()
-    .locator('.ht-habit__disc svg')
+    .locator('.ht-habit__disc img')
     .evaluate(shapeOf);
 
-/**
- * 🔴 挑一格**形状与当前行首不同**的选项，返回它的下标与 `aria-label`。
- *    取形状一律**在点之前**从那一格自己取：写入是异步的（dispatch → op-log → 重渲染），
- *    "点完立刻读行首当基准"读到的是点击前那一个，报出来像"没落盘"，实际是拿错了时刻
- *    （§7 第 176 条"桩在外面预取值"那一族）。
- *
- * 为什么必须"挑"而不是写死一个名字（这里曾是 `早睡` / `音乐`）：没设过图标的习惯画的是
- * `deriveHabitIcon(habit.id)` —— FNV-1a(id) % 8（`packages/domain/src/habit-icons.ts`），
- * 而 e2e 每条习惯的 id 都是新随机的 ⇒ **当前字形在八个里均匀随机**。写死一格，
- * 就有 1/8 的运行里那一格恰好等于派生默认，于是"点一格 ⇒ 行首字形变了"这条判据
- * **在数学上不可能通过**：产品做对了，界面也确实没变。
- *
- * 现量（`tmp/h7-readings/icon-flake-hunt.log`，并发猎捕 30 次）：3 红 / 27 绿，
- * 红的那次打印的是 `before` 与 `after` **逐字相同**、且 `before` 就是被点那一格的形状
- * （`path:M20.985 12.486a9 9 0 1 1-9.473-9.472…` = 月亮）。
- * 这就是 `I2` / `I4` 被记成"抖动"的那两条的真身 —— 不是负载、不是时序、不是判据没牙。
- *
- * 修法是把**前提**建立起来而不是把断言放宽：先读八个形状，再点一个确实不同的。
- * 「默认」那一格没有 `<svg>`（它是一段文字），靠 `count()` 明确跳过 —— 不写这一句，
- * 走到它那一格时 `.locator('svg').first()` 会**静默地等满超时**，报出来的是一条
- * 与判据无关的 timeout。
- */
+/** 先读选项的已解码图片，再点击，避免把异步更新前的行首作为预期值。 */
 async function otherGlyphOption(
   page: Page,
   currentShape: string,
@@ -97,14 +51,14 @@ async function otherGlyphOption(
   const n = await cells.count();
   expect(n, '选择器没展开出格子 ⇒ 无从挑一格不同的').toBeGreaterThan(1);
   for (let i = 0; i < n; i += 1) {
-    const svg = cells.nth(i).locator('svg');
-    if ((await svg.count()) === 0) continue;
-    const shape = await svg.first().evaluate(shapeOf);
+    const artwork = cells.nth(i).locator('img');
+    if ((await artwork.count()) === 0) continue;
+    const shape = await artwork.first().evaluate(shapeOf);
     if (shape && shape !== currentShape) {
       return { index: i, label: (await cells.nth(i).getAttribute('aria-label')) ?? '', shape };
     }
   }
-  throw new Error(`八格里没有一格与当前行首字形不同（before=${currentShape.slice(0, 48)}）`);
+  throw new Error(`选项里没有一格与当前行首字形不同（before=${currentShape.slice(0, 48)}）`);
 }
 
 /**
@@ -124,7 +78,7 @@ async function openPicker(page: Page, name: string): Promise<void> {
 }
 
 test.describe('习惯图标选择器（H3，web 端）', () => {
-  test('I1 展开后八个字形都在，且有「默认」那一格', async ({ page }) => {
+  test('I1 展开后24枚原创插画都在，且有「默认」那一格', async ({ page }) => {
     const errors = watchErrors(page);
     await openApp(page, APP_ZH);
     await switchView(page, '习惯');
@@ -132,12 +86,12 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
 
     await selectHabit(page, '喝水');
     await openPicker(page, '喝水');
-    // 选项数 = 闭集那 8 个（数界面，不抄字面量：读 `HABIT_ICONS` 的长度做基准）。
+    // 本轮产品要求 24 枚原创素材；用固定验收数量避免源数据漏项也一起变绿。
     const closedSet = await page
       .locator('.ht-habit__icon-option')
-      .filter({ has: page.locator('svg') })
+      .filter({ has: page.locator('img') })
       .count();
-    expect(closedSet, `闭集字形不是 8 个（实际 ${String(closedSet)}）`).toBe(8);
+    expect(closedSet, `闭集插画不是 24 个（实际 ${String(closedSet)}）`).toBe(24);
     await expect(
       page.getByRole('button', { name: '「喝水」用默认图标' }),
       '少了「默认」那一格 —— 挑过就退不回去',
@@ -280,7 +234,7 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
     // 选完就收起了，再展开才能读"按下的那一格"自己。
     await openPicker(page, '背单词');
     const pressed = await page
-      .locator('.ht-habit__icon-option[aria-pressed="true"] svg')
+      .locator('.ht-habit__icon-option[aria-pressed="true"] img')
       .first()
       .evaluate(shapeOf);
     // 🔴 同一个判断，两处画得一样：行首字形与选择器里那一格必须逐字节相同。
@@ -307,8 +261,8 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
           return { x: r.x, right: r.right, label: el.getAttribute('aria-label') ?? '' };
         }),
       );
-    // 9 = 八个字形 + 「默认」那一格。少一格就是有一格被排到看不见的地方去了。
-    expect(boxes, '展开的格子数不是 8 + 默认').toHaveLength(9);
+    // 25 = 24 枚插画 + 「默认」那一格。少一格就是有一格被排到看不见的地方去了。
+    expect(boxes, '展开的格子数不是 24 + 默认').toHaveLength(25);
     for (const b of boxes) {
       expect(
         b.right,
@@ -333,5 +287,52 @@ test.describe('习惯图标选择器（H3，web 端）', () => {
       expect(b.right, `「${b.label}」超出窗格右边界`).toBeLessThanOrEqual(pane.x + pane.width + 1);
     }
     await page.screenshot({ path: SHOT('picker-in-viewport') });
+  });
+
+  test('I7 暗色主题展开 picker 的真实画面可见', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('heyta.theme', 'dark');
+    });
+    await openApp(page, APP_ZH);
+    await switchView(page, '习惯');
+    await addHabit(page, '暗色图标');
+
+    await selectHabit(page, '暗色图标');
+    await openPicker(page, '暗色图标');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('.ht-habit__icon-options')).toBeVisible();
+    await expect(page.locator('.ht-habit__icon-option')).toHaveCount(25);
+    await page.screenshot({ path: SHOT('picker-open-dark') });
+  });
+});
+
+test.describe('窄详情栏截图', () => {
+  // 保持桌面双栏（大于移动端单列断点），同时让详情 pane 进入窄容器布局。
+  test.use({ viewport: { width: 800, height: 900 } });
+
+  test('I8 窄详情栏展开 picker 的真实画面可见', async ({ page }) => {
+    await openApp(page, APP_ZH);
+    await switchView(page, '习惯');
+    await addHabit(page, '窄栏图标');
+
+    await selectHabit(page, '窄栏图标');
+    await openPicker(page, '窄栏图标');
+    await expect(page.getByTestId('habit-pane')).toBeVisible();
+    await expect(page.locator('.ht-habit__icon-options')).toBeVisible();
+    await expect(page.locator('.ht-habit__icon-option')).toHaveCount(25);
+
+    const pane = await boxOf(page, page.getByTestId('habit-pane'), '详情窗格');
+    const boxes = await page.locator('.ht-habit__icon-option').evaluateAll((els) =>
+      els.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x, right: r.right, top: r.top, bottom: r.bottom };
+      }),
+    );
+    for (const b of boxes) {
+      expect(b.x, '窄详情栏选项左边缘不能跑出窗格').toBeGreaterThanOrEqual(pane.x - 1);
+      expect(b.right, '窄详情栏选项右边缘不能跑出窗格').toBeLessThanOrEqual(pane.x + pane.width + 1);
+      expect(b.top, '窄详情栏选项必须有实际高度').toBeLessThan(b.bottom);
+    }
+    await page.screenshot({ path: SHOT('picker-open-narrow') });
   });
 });

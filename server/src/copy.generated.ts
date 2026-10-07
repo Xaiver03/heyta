@@ -34,6 +34,12 @@ export type ServerCopyKey =
   | "server.email.recover.ignore"
   | "server.email.recover.subject"
   | "server.email.recover.title"
+  | "server.email.registerCode.body"
+  | "server.email.registerCode.codeLabel"
+  | "server.email.registerCode.expiry"
+  | "server.email.registerCode.ignore"
+  | "server.email.registerCode.subject"
+  | "server.email.registerCode.title"
   | "server.email.reset.body"
   | "server.email.reset.button"
   | "server.email.reset.expiry"
@@ -120,6 +126,12 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.recover.ignore": "如果这不是你本人发起的，忽略这封邮件即可，你的账号不会有任何变化。",
     "server.email.recover.subject": "恢复你的 heyta 通行密钥",
     "server.email.recover.title": "通行密钥恢复",
+    "server.email.registerCode.body": "请输入下面的验证码，完成邮箱验证并激活你的账号。",
+    "server.email.registerCode.codeLabel": "注册验证码",
+    "server.email.registerCode.expiry": "验证码 10 分钟内有效，最多可尝试 5 次。",
+    "server.email.registerCode.ignore": "如果这不是你本人发起的，忽略这封邮件即可。",
+    "server.email.registerCode.subject": "你的 heyta 注册验证码",
+    "server.email.registerCode.title": "完成 heyta 注册",
     "server.email.reset.body": "你申请了重置登录密码。点击下面的按钮设置一个新密码 —— 设置成功后，其他设备上的登录都会失效。",
     "server.email.reset.button": "设置新密码",
     "server.email.reset.expiry": "这个链接 15 分钟内有效，且只能使用一次。",
@@ -203,6 +215,12 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.recover.ignore": "If you did not request this, just ignore this email — nothing about your account will change.",
     "server.email.recover.subject": "Recover your heyta passkey",
     "server.email.recover.title": "Passkey recovery",
+    "server.email.registerCode.body": "Enter the code below to verify your email and activate your account.",
+    "server.email.registerCode.codeLabel": "Registration code",
+    "server.email.registerCode.expiry": "This code is valid for 10 minutes and can be tried up to 5 times.",
+    "server.email.registerCode.ignore": "If you did not start this registration, just ignore this email.",
+    "server.email.registerCode.subject": "Your heyta registration code",
+    "server.email.registerCode.title": "Finish creating your heyta account",
     "server.email.reset.body": "You asked to reset your sign-in password. Click the button below to choose a new one — once that succeeds, every other device will be signed out.",
     "server.email.reset.button": "Choose a new password",
     "server.email.reset.expiry": "This link is valid for 15 minutes and can be used once.",

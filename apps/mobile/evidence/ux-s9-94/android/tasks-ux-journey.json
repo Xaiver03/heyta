@@ -1,0 +1,120 @@
+{
+  "status": "passed_with_independent_profile_retest",
+  "serial": "emulator-5554",
+  "error": "profile/settings chain failed: ttings-android.py\", line 52, in wait\n    raise AssertionError((label,texts(r)))\nAssertionError: ('偏好与账号', ['我的', '账号', '还没登录', '不登录也能使用任务、专注和本地回顾。', '注册 / 登录', '注册 / 登录', '设置, 个人资料、偏好、同步与安全', '设置', '个人资料、偏好、同步与安全', '近期状态', '本周完成任务', '0', '本周专注分钟', '0', '已达成成就', '0/17', '查看完整成长, 查看里程碑、习惯连续性和年度趋势。', '查看完整成长', '查看里程碑、习惯连续性和年度趋势。', '尚未同步', '通知, 系统消息与邀请好友活动', '通知', '系统消息与邀请好友活动', '我的成长, 今日进度、连续天数与里程碑', '我的成长', '今日进度、连续天数与里程碑', '习惯, 打卡、连续天数与热力图', '习惯', '打卡、连续天数与热力图', '倒数纪念日, 记下要盯的日子，看它还有几天', '倒数纪念日', '记下要盯的日子，看它还有几天', '整理与记录', '任务', '2 项', '2', '任务', '日历', '日历', '专注', '专注', '分类', '分类', '我的', '我的'])\n",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1791390883.745336,
+      "title": "UxTaskA1791390875"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1791390892.342056,
+      "title": "UxTaskB1791390875"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1791390901.616811,
+      "rowCount": 2
+    },
+    {
+      "name": "04-long-press-enters-selection",
+      "status": "passed",
+      "at": 1791390906.859079
+    },
+    {
+      "name": "05-multi-select-second-task",
+      "status": "passed",
+      "at": 1791390910.937612
+    },
+    {
+      "name": "06-exit-selection",
+      "status": "passed",
+      "at": 1791390915.1440141
+    },
+    {
+      "name": "07-open-quadrant-move-sheet",
+      "status": "passed",
+      "at": 1791390927.8425112
+    },
+    {
+      "name": "08-quadrant-move-feedback",
+      "status": "passed",
+      "at": 1791390932.0336142,
+      "sourceQuadrant": "quadrant-cell-4",
+      "targetQuadrant": "quadrant-cell-1",
+      "feedback": "任务已移动到「马上做」，截止时间已调整",
+      "undoBounds": [
+        756,
+        1634,
+        1007,
+        1749
+      ]
+    },
+    {
+      "name": "09-quadrant-undo",
+      "status": "passed",
+      "at": 1791390934.139328,
+      "sourceQuadrant": "quadrant-cell-4"
+    },
+    {
+      "name": "10-timeline-row-opens-detail",
+      "status": "passed",
+      "at": 1791390949.2476852
+    },
+    {
+      "name": "11-detail-keyboard-visible",
+      "status": "passed",
+      "at": 1791390951.868962
+    },
+    {
+      "name": "12-detail-keyboard-dismissed",
+      "status": "passed",
+      "at": 1791390954.114704
+    },
+    {
+      "name": "13-detail-closes-after-second-back",
+      "status": "passed",
+      "at": 1791390958.2048059
+    }
+  ],
+  "taskJourneyStatus": "passed",
+  "taskJourneyPassedSteps": 13,
+  "profileIndependentRetest": {
+    "status": "passed",
+    "report": "apps/mobile/evidence/ux-s9-94/android/profile-final-2/journey.json",
+    "script": "scripts/qa/profile-settings-android.py",
+    "notes": "独立复验；使用当前“我的 → 设置 → 偏好与账号”IA，并以当前 settings-directory/settings-sheet 资源节点锁定路由，避免旧文案/旧页面的假阳性。"
+  },
+  "profileChainFailure": "profile/settings chain failed: ttings-android.py\", line 52, in wait\n    raise AssertionError((label,texts(r)))\nAssertionError: ('偏好与账号', ['我的', '账号', '还没登录', '不登录也能使用任务、专注和本地回顾。', '注册 / 登录', '注册 / 登录', '设置, 个人资料、偏好、同步与安全', '设置', '个人资料、偏好、同步与安全', '近期状态', '本周完成任务', '0', '本周专注分钟', '0', '已达成成就', '0/17', '查看完整成长, 查看里程碑、习惯连续性和年度趋势。', '查看完整成长', '查看里程碑、习惯连续性和年度趋势。', '尚未同步', '通知, 系统消息与邀请好友活动', '通知', '系统消息与邀请好友活动', '我的成长, 今日进度、连续天数与里程碑', '我的成长', '今日进度、连续天数与里程碑', '习惯, 打卡、连续天数与热力图', '习惯', '打卡、连续天数与热力图', '倒数纪念日, 记下要盯的日子，看它还有几天', '倒数纪念日', '记下要盯的日子，看它还有几天', '整理与记录', '任务', '2 项', '2', '任务', '日历', '日历', '专注', '专注', '分类', '分类', '我的', '我的'])\n",
+  "visualReview": [
+    {
+      "screen": "我的（profile）",
+      "severity": "中",
+      "finding": "底部固定导航覆盖了「倒数纪念日」列表项的下缘；滚动容器需要为底部导航预留安全内边距。",
+      "evidence": "apps/mobile/evidence/ux-s9-94/android/profile-final-2/my.png"
+    },
+    {
+      "screen": "我的（profile）",
+      "severity": "中",
+      "finding": "通知、我的成长、习惯、倒数纪念日仍以蓝色文字链接加说明文字呈现，缺少统一的整行组件容器与明确的点击区域；与上方状态卡片的组件层级不一致。",
+      "evidence": "apps/mobile/evidence/ux-s9-94/android/profile-final-2/my.png"
+    },
+    {
+      "screen": "我的成长",
+      "severity": "低",
+      "finding": "空数据态主要依靠文字和数值，缺少与项目整体一致的空状态插画或轻量动效，视觉密度偏低。",
+      "evidence": "apps/mobile/evidence/ux-s9-94/android/profile-final-2/growth.png"
+    },
+    {
+      "screen": "同步与隐私",
+      "severity": "低",
+      "finding": "离线状态下同步按钮保持禁用，状态说明可读；自托管入口位于页面底部，后续可评估是否需要更清晰的分组层级与首次使用引导。",
+      "evidence": "apps/mobile/evidence/ux-s9-94/android/profile-final-2/sync.png"
+    }
+  ]
+}

@@ -257,9 +257,11 @@ function LocaleHost(): React.JSX.Element {
   const [locale, setLocale] = useState<Locale>(resolveDeviceLocale);
   return (
     <I18nProvider locale={locale}>
+      <ThemeProvider locale={locale}>
       <LocalePreferenceProvider locale={locale} setLocale={setLocale}>
         <App />
       </LocalePreferenceProvider>
+      </ThemeProvider>
     </I18nProvider>
   );
 }
@@ -287,9 +289,7 @@ function LocaleHost(): React.JSX.Element {
 export function Root(): React.JSX.Element {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <LocaleHost />
-      </ThemeProvider>
+      <LocaleHost />
     </SafeAreaProvider>
   );
 }

@@ -74,6 +74,7 @@ import {
 } from '@heyta/ui';
 
 import { Button, Card, Divider, HStack, Screen, SectionHeader, Stack, Text, TextField } from '../ui/kit';
+import { Icon, type IconName } from '../ui/icons';
 import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
 import { AssistantScreen } from '../ai/AssistantScreen';
 import { isAiConfiguredOnThisDevice, useAiSettings } from '../ai/settings-store';
@@ -100,7 +101,7 @@ import { TrashScreen } from './TrashScreen';
 import { formatStamp } from '../lib/date';
 import { useTokens } from '../theme';
 import { useSyncCredentialForm } from '../sync/credential-form';
-import { readSyncConfig, writeSyncConfig } from '../sync/config';
+import { DEFAULT_SERVER_URL, readSyncConfig, writeSyncConfig } from '../sync/config';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
 import { useMobileSync, refreshPendingUpload } from '../sync/store';
 import { currentSignedInEmail, forgetSignedInUser } from '../auth/session';
@@ -123,8 +124,8 @@ export function ProfileScreen(): React.JSX.Element {
    * 凭据表单的状态与"输入即生效"接线 —— **活在本屏**（理由见
    * `credential-form.ts` 文件头）。设置面拿的是值与回调。
    */
-  const form = useSyncCredentialForm();
   const [vaultCleanupPending, setVaultCleanupPending] = useState<VaultSecureStorageScope>();
+  const form = useSyncCredentialForm(setVaultCleanupPending);
 
   // 🔴 冲突界面的可见性只是**界面状态**，不进 store。
   const [conflictsOpen, setConflictsOpen] = useState(false);
@@ -132,6 +133,13 @@ export function ProfileScreen(): React.JSX.Element {
   /** 设置面是当前 tab 的二级栈页面；返回优先 pop 回个人页。 */
   const settingsOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'settings';
   const [settingsSection, setSettingsSection] = useState<SettingsSectionKey>();
+
+  // The profile screen stays mounted while tabs switch. Drop a pending
+  // shortcut section when leaving the profile tab so returning to a retained
+  // settings entry always opens the directory, never a stale child page.
+  useEffect(() => {
+    if (navigation.tab !== 'profile') setSettingsSection(undefined);
+  }, [navigation.tab]);
 
   /**
    * 注册 / 登录面板（W3 · 规范 §3.1 的「前置」落点）。
@@ -141,9 +149,21 @@ export function ProfileScreen(): React.JSX.Element {
    * （一级可见），所以"前置"兑现为"冷启动 ≤1 次点击"而不是"多一个标签"。
    */
   const authOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:auth';
+  const [authAllowServerSelection, setAuthAllowServerSelection] = useState(false);
   const setAuthOpen = (open: boolean): void => {
     if (open) navigation.push('profile:auth');
-    else navigation.pop();
+    else {
+      setAuthAllowServerSelection(false);
+      navigation.pop();
+    }
+  };
+  /** 普通账号入口只连官方服务；自托管登录必须从同步设置的高级路径进入。 */
+  const openAuth = (allowServerSelection = false): void => {
+    if (!allowServerSelection) {
+      form.setServerUrl(DEFAULT_SERVER_URL);
+    }
+    setAuthAllowServerSelection(allowServerSelection);
+    setAuthOpen(true);
   };
   /** 登录/切换账号后，个人资料摘要必须按新账号重新读，不能沿用旧账号的投影。 */
   const [profileRevision, setProfileRevision] = useState(0);
@@ -695,6 +715,7 @@ export function ProfileScreen(): React.JSX.Element {
       testID: entry.testID,
       label: t(entry.labelKey),
       hint: t(entry.hintKey),
+      leading: <Icon name={FEATURE_ENTRY_ICONS[entry.key]} size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         navigation.push(featureRouteKey(entry.key));
       },
@@ -710,6 +731,7 @@ export function ProfileScreen(): React.JSX.Element {
     testID: 'profile-entry-settings',
     label: t('mobile.profile.entry.settings'),
     hint: t('mobile.profile.entry.settings.hint'),
+    leading: <Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />,
     onPress: () => {
       setSettingsSection(undefined);
       navigation.push('settings');
@@ -725,30 +747,35 @@ export function ProfileScreen(): React.JSX.Element {
       onPress: () => {
         setNotificationsOpen(true);
       },
-      leading:
-        inboxUnread > 0 ? (
-          <View
-            accessibilityLabel={t('mobile.inbox.badge.aria', { count: inboxUnread })}
-            style={{
-              minWidth: tokens['space.6'],
-              paddingHorizontal: tokens['space.2'],
-              paddingVertical: tokens['space.1'],
-              borderRadius: tokens['radius.full'],
-              backgroundColor: tokens['color.primary'],
-              alignItems: 'center',
-            }}
-          >
-            <Text variant="caption" style={{ color: tokens['color.on-primary'] }}>
-              {inboxUnread}
-            </Text>
-          </View>
-        ) : undefined,
+      leading: (
+        <HStack gap="tight" align="center">
+          <Icon name="task.reminder" size="sm" color={tokens['color.foreground-muted']} />
+          {inboxUnread > 0 ? (
+            <View
+              accessibilityLabel={t('mobile.inbox.badge.aria', { count: inboxUnread })}
+              style={{
+                minWidth: tokens['space.6'],
+                paddingHorizontal: tokens['space.2'],
+                paddingVertical: tokens['space.1'],
+                borderRadius: tokens['radius.full'],
+                backgroundColor: tokens['color.primary'],
+                alignItems: 'center',
+              }}
+            >
+              <Text variant="caption" style={{ color: tokens['color.on-primary'] }}>
+                {inboxUnread}
+              </Text>
+            </View>
+          ) : null}
+        </HStack>
+      ),
     },
     {
       kind: 'action',
       testID: 'profile-entry-security',
       label: t('mobile.security.trigger'),
       hint: t('mobile.security.entry.hint'),
+      leading: <Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('security');
         setSecurityOpen(true);
@@ -762,6 +789,7 @@ export function ProfileScreen(): React.JSX.Element {
             testID: 'profile-entry-assistant',
             label: t('mobile.ai.entry'),
             hint: t('mobile.ai.entry.hint'),
+            leading: <Icon name="action.more" size="sm" color={tokens['color.foreground-muted']} />,
             onPress: () => {
               setAssistantOpen(true);
             },
@@ -773,6 +801,7 @@ export function ProfileScreen(): React.JSX.Element {
       testID: 'profile-entry-trash',
       label: t('mobile.trash.entry'),
       hint: t('mobile.trash.entry.hint'),
+      leading: <Icon name="task.delete" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('data');
         setTrashOpen(true);
@@ -783,6 +812,7 @@ export function ProfileScreen(): React.JSX.Element {
       testID: 'profile-entry-export',
       label: t('mobile.export.entry'),
       hint: t('mobile.export.entry.hint'),
+      leading: <Icon name="action.share" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('data');
         setExportOpen(true);
@@ -795,6 +825,7 @@ export function ProfileScreen(): React.JSX.Element {
       testID: 'profile-entry-close-account',
       label: t('common.accountClosure.title'),
       hint: t('common.accountClosure.entryHint'),
+      leading: <Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />,
       onPress: () => {
         setSettingsSection('security');
         setClosureOpen(true);
@@ -893,6 +924,7 @@ export function ProfileScreen(): React.JSX.Element {
       <AuthScreen
         initialServerUrl={form.serverUrl}
         initialPassword={form.password}
+        allowServerSelection={authAllowServerSelection}
         onBack={() => {
           setAuthOpen(false);
         }}
@@ -907,9 +939,15 @@ export function ProfileScreen(): React.JSX.Element {
      * 组件由穷尽 switch 决定：注册表加一项而不在这儿接上 = `apps/mobile` 编译红
      * （这条就是"入口存在但点了没反应"那类失效的编译期版本）。
     */
-    return featureScreen(openFeature, () => {
-      navigation.pop();
-    });
+    return featureScreen(
+      openFeature,
+      () => {
+        navigation.pop();
+      },
+      () => {
+        navigation.push(featureRouteKey('habits'));
+      },
+    );
   }
 
   /**
@@ -1145,9 +1183,7 @@ export function ProfileScreen(): React.JSX.Element {
             ? t('mobile.profile.account.switchAccount')
             : t('mobile.profile.account.signIn')
         }
-        onPress={() => {
-          setAuthOpen(true);
-        }}
+        onPress={openAuth}
         tone={accountHasCredential ? 'secondary' : 'primary'}
       />
       <SettingsRow row={settingsRow} />
@@ -1183,9 +1219,9 @@ export function ProfileScreen(): React.JSX.Element {
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
       <SectionHeader icon="task.project" title={t('mobile.profile.tools')} />
       <Card>
-        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', onPress: () => { navigation.push('profile:lists'); } }} />
-        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', onPress: () => { navigation.push('profile:tags'); } }} />
-        <SettingsRow row={{ kind: 'action', label: t('notes.title'), testID: 'profile-entry-notes', onPress: () => { navigation.push('profile:notes'); } }} />
+        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', leading: <Icon name="task.project" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:lists'); } }} />
+        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', leading: <Icon name="task.tag" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:tags'); } }} />
+        <SettingsRow row={{ kind: 'action', label: t('notes.title'), testID: 'profile-entry-notes', leading: <Icon name="note.sticky" size="sm" color={tokens['color.foreground-muted']} />, onPress: () => { navigation.push('profile:notes'); } }} />
       </Card>
 
       <ConflictSheet
@@ -1203,12 +1239,18 @@ export function ProfileScreen(): React.JSX.Element {
         initialSection={settingsSection}
         profileEditor={profileEditor}
         syncStatus={syncStatus}
+        onOpenAuth={openAuth}
+        onUseOfficialSync={onClearCredentials}
         dataActions={entryRows.filter((row) => ['profile-entry-export', 'profile-entry-trash'].includes(row.testID ?? ''))}
         securityActions={entryRows.filter((row) => ['profile-entry-security', 'profile-entry-close-account'].includes(row.testID ?? ''))}
         // Shell 保留各 tab 的屏幕实例；设置是 profile 的二级 surface，
         // 离开 profile 时必须隐藏 Modal，回到 profile 再恢复原栈位置。
         visible={navigation.tab === 'profile' && settingsOpen}
         onClose={() => {
+          // Clear the source section when the sheet is dismissed. Otherwise a
+          // profile shortcut can leave a stale child section in the mounted
+          // SettingsScreen while the user changes tabs and returns later.
+          setSettingsSection(undefined);
           navigation.pop();
         }}
         form={form}
@@ -1248,10 +1290,16 @@ function featureKeyFromRoute(routeKey: string | undefined): MobileFeatureEntryKe
  * "行在、点了没反应"，而它**不报错、界面也不难看**（AGENTS §7 那类）。
  * 让它在编译期就站不住，比给它写一条运行时判据更便宜。
  */
-function featureScreen(key: MobileFeatureEntryKey, onBack: () => void): React.JSX.Element {
+const FEATURE_ENTRY_ICONS: Record<MobileFeatureEntryKey, IconName> = {
+  growth: 'growth.week',
+  habits: 'focus.streak',
+  countdown: 'task.due',
+};
+
+function featureScreen(key: MobileFeatureEntryKey, onBack: () => void, onOpenHabits: () => void): React.JSX.Element {
   switch (key) {
     case 'growth':
-      return <GrowthScreen onBack={onBack} />;
+      return <GrowthScreen onBack={onBack} onOpenHabits={onOpenHabits} />;
     case 'habits':
       return <HabitsScreen onBack={onBack} />;
     // 🔴 注册表里加了 `countdown` 而这一行没接上 ⇒ 本函数"所有分支之外还可能走到结尾"，
