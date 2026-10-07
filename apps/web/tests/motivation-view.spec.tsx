@@ -69,7 +69,22 @@ function click(el: Element | null | undefined): void {
 }
 
 function byText(text: string): HTMLElement | undefined {
-  return [...(container?.querySelectorAll('button') ?? [])].find((b) =>
+  const direct = [...(container?.querySelectorAll('button') ?? [])].find((b) =>
+    b.textContent?.includes(text),
+  ) as HTMLElement | undefined;
+  if (direct !== undefined) return direct;
+
+  // 低频视图从 rail 主段收进「更多」后，测试仍走真实的发现路径：
+  // 先打开菜单，再拿 menuitem，而不是把入口重新假设成平铺 tab。
+  const more = [...(container?.querySelectorAll('.ht-rail button') ?? [])].find(
+    (button) => (button.textContent ?? '').trim() === '更多',
+  ) as HTMLElement | undefined;
+  if (more !== undefined && container?.querySelector('[role="menu"]') === null) {
+    act(() => {
+      more.click();
+    });
+  }
+  return [...(container?.querySelectorAll('[role="menuitem"]') ?? [])].find((b) =>
     b.textContent?.includes(text),
   ) as HTMLElement | undefined;
 }

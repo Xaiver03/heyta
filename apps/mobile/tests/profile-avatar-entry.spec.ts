@@ -145,9 +145,12 @@ describe('移动端 Profile 的头像（R15b）', () => {
     expect(logicTo, '找不到头像状态的终点').toBeGreaterThan(logicFrom);
     expect(src.slice(logicFrom, logicTo)).not.toMatch(/style=\{\{/u);
 
-    const jsxFrom = src.indexOf('{savedName === undefined ? null : (');
+    const jsxFrom = src.indexOf('{savedName === undefined ? null : !profileNetworkAllowed ? null : (');
     expect(jsxFrom, '找不到头像 JSX 的起点').toBeGreaterThan(-1);
-    const jsxTo = src.indexOf('{savedName === undefined ? null : nameEditing', jsxFrom);
+    const jsxTo = src.indexOf(
+      '{savedName === undefined ? null : !profileNetworkAllowed ? null : nameEditing',
+      jsxFrom,
+    );
     expect(jsxTo, '找不到昵称 JSX 的起点（头像段的终点）').toBeGreaterThan(jsxFrom);
     expect(src.slice(jsxFrom, jsxTo)).not.toMatch(/style=\{\{/u);
     // 正向对照：证明这两段真的在被扫（里面有组件，不是空串）。
@@ -166,7 +169,9 @@ describe('移动端 Profile 的头像（R15b）', () => {
 
   it('界面文案全部走 i18n，且本屏不读 `web.*` 命名空间的键', () => {
     const raw = readFileSync(SCREEN, 'utf8');
-    const jsx = raw.slice(raw.indexOf('{savedName === undefined ? null : ('));
+    const jsx = raw.slice(
+      raw.indexOf('{savedName === undefined ? null : !profileNetworkAllowed ? null : ('),
+    );
     expect(jsx).not.toMatch(/>[^<{\n]*[\u4e00-\u9fa5]/u);
     expect(jsx).toMatch(/t\('common\.profile\.avatar\./u);
     expect(raw).not.toMatch(/t\('web\./u);

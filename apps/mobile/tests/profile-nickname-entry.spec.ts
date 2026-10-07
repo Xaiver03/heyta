@@ -89,10 +89,39 @@ describe('移动端 Profile 的昵称（R15a）', () => {
 
   it('🔴 三态是分开的：还没读到 ⇒ **整行不出现**；读到 null ⇒ 显示那句占位', () => {
     const src = screen();
-    expect(src).toMatch(/savedName === undefined \? null :/u);
+    expect(src).toMatch(
+      /savedName === undefined \? null : !profileNetworkAllowed \? null :/u,
+    );
     expect(src).toMatch(/savedName \?\? t\('common\.profile\.nickname\.placeholder'\)/u);
     // 正向对照：这一行确实可点（编辑入口挂上了）。
     expect(src).toMatch(/onPress: \(\) =>/u);
+  });
+
+  it('本地模式只说明本地可用，不显示无效重试或伪造的读取失败', () => {
+    const src = screen();
+    const editorStart = src.indexOf('const profileEditor =');
+    const editorEnd = src.indexOf('return (\n    <Screen', editorStart);
+    expect(editorStart).toBeGreaterThan(-1);
+    expect(editorEnd).toBeGreaterThan(editorStart);
+    const editor = src.slice(editorStart, editorEnd);
+    const localStart = editor.indexOf('!profileNetworkAllowed ? (');
+    const readStart = editor.indexOf(': savedName === undefined ? (', localStart);
+    expect(localStart).toBeGreaterThan(-1);
+    expect(readStart).toBeGreaterThan(localStart);
+
+    const localBranch = editor.slice(localStart, readStart);
+    expect(localBranch).toContain("t('mobile.profile.localOnly')");
+    expect(localBranch).not.toContain('mobile.profile.retry');
+    expect(localBranch).not.toContain('mobile.profile.loading');
+    expect(localBranch).not.toContain('common.profile.loadFailed');
+
+    const readEnd = editor.indexOf('\n      ) : null}', readStart);
+    expect(readEnd).toBeGreaterThan(readStart);
+    const readBranch = editor.slice(readStart, readEnd);
+    expect(readBranch).toContain("'mobile.profile.loading'");
+    expect(readBranch).toContain("'common.profile.loadFailed'");
+    expect(readBranch).toContain("profileReadState === 'loading'");
+    expect(readBranch).toContain("t('mobile.profile.retry')");
   });
 
   it('保存路径的三个出口都有文案：失败 / 已保存 / 已清除', () => {
@@ -113,7 +142,7 @@ describe('移动端 Profile 的昵称（R15a）', () => {
 
   it('界面文案全部走 i18n：昵称这一段里没有硬编码中文', () => {
     const src = readFileSync(SCREEN, 'utf8');
-    const jsx = src.slice(src.indexOf('{savedName === undefined'));
+    const jsx = src.slice(src.indexOf('{savedName === undefined ? null : !profileNetworkAllowed'));
     expect(jsx).not.toMatch(/>[^<{\n]*[\u4e00-\u9fa5]/u);
     // 正向对照：这段里确实有 t() 调用。
     expect(jsx).toMatch(/t\('common\.profile\.nickname\./u);

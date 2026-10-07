@@ -1,0 +1,324 @@
+#!/usr/bin/env python3
+"""Offline iOS acceptance journey for Profile -> Settings IA.
+
+This probe deliberately stays at the accessibility-tree layer.  It does not
+sign in, enter credentials, change settings, export data, or delete anything.
+Every tap is followed by a fresh AX-tree assertion; an idb exit code alone is
+never treated as a product assertion.
+
+The existing ``ios-ax-shim.py`` owns AX-tree retries and device geometry.  This
+file only composes that vocabulary into the product journey so the journey can
+be rerun after a fresh install without taking over the Simulator window.
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any, Iterable
+
+
+ROOT = Path(__file__).resolve().parents[2]
+SHIM_PATH = ROOT / "scripts" / "tools" / "ios-ax-shim.py"
+DEFAULT_EVIDENCE = ROOT / "apps" / "mobile" / "evidence" / "profile-center"
+
+
+def load_shim():
+    spec = importlib.util.spec_from_file_location("heyta_ios_ax_shim", SHIM_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load AX shim: {SHIM_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+AX = load_shim()
+
+
+class JourneyError(RuntimeError):
+    pass
+
+
+def labels(nodes: Iterable[dict[str, Any]]) -> list[str]:
+    return [value for node in nodes if (value := AX.label_of(node))]
+
+
+def present(nodes: list[dict[str, Any]], candidates: Iterable[str], *, pressable: bool = False) -> str | None:
+    for candidate in candidates:
+        node = AX.find(nodes, candidate, pressable, False, None, False, 0)
+        if node is not None:
+            return AX.label_of(node) or candidate
+    return None
+
+
+class Probe:
+    def __init__(self, args: argparse.Namespace) -> None:
+        self.idb = args.idb
+        self.companion = args.companion
+        self.udid = args.udid
+        self.timeout = args.timeout
+        self.evidence_dir = Path(args.evidence_dir)
+        self.steps: list[dict[str, Any]] = []
+
+    def tree(self) -> list[dict[str, Any]]:
+        return AX.dump_nodes(self.idb, self.companion, self.udid, attempts=3)
+
+    def wait_for(
+        self,
+        candidates: Iterable[str],
+        *,
+        pressable: bool = False,
+        absent: Iterable[str] = (),
+    ) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
+        wanted = tuple(candidates)
+        forbidden = tuple(absent)
+        deadline = time.monotonic() + self.timeout
+        last: list[dict[str, Any]] = []
+        while time.monotonic() <= deadline:
+            last = self.tree()
+            if forbidden and any(present(last, (item,)) is not None for item in forbidden):
+                time.sleep(0.25)
+                continue
+            for candidate in wanted:
+                node = AX.find(last, candidate, pressable, False, None, False, 0)
+                if node is not None:
+                    return node, last, AX.label_of(node) or candidate
+            time.sleep(0.35)
+        visible = labels(last)
+        raise JourneyError(
+            f"timed out waiting for {wanted!r}; pressable={pressable}; "
+            f"visible labels={visible[:80]!r}"
+        )
+
+    def wait_for_any_label(self, candidates: Iterable[str]) -> list[dict[str, Any]]:
+        """Wait for one of the launch states without requiring a fixed first tap."""
+        wanted = tuple(candidates)
+        deadline = time.monotonic() + self.timeout
+        last: list[dict[str, Any]] = []
+        while time.monotonic() <= deadline:
+            last = self.tree()
+            if any(present(last, (candidate,)) is not None for candidate in wanted):
+                return last
+            time.sleep(0.35)
+        raise JourneyError(f"timed out waiting for a launch state {wanted!r}; visible labels={labels(last)[:80]!r}")
+
+    def wait_for_all(self, candidates: Iterable[str]) -> list[dict[str, Any]]:
+        wanted = tuple(candidates)
+        deadline = time.monotonic() + self.timeout
+        last: list[dict[str, Any]] = []
+        while time.monotonic() <= deadline:
+            last = self.tree()
+            if all(present(last, (candidate,)) is not None for candidate in wanted):
+                return last
+            time.sleep(0.35)
+        missing = [candidate for candidate in wanted if present(last, (candidate,)) is None]
+        raise JourneyError(f"timed out waiting for all labels {missing!r}; visible labels={labels(last)[:80]!r}")
+
+    def record(self, name: str, status: str, **details: Any) -> None:
+        self.steps.append({"name": name, "status": status, "at": time.time(), **details})
+
+    def assert_visible(self, name: str, candidates: Iterable[str]) -> list[dict[str, Any]]:
+        tree = self.wait_for_all(candidates)
+        self.record(name, "passed", expected=list(candidates), labels=labels(tree)[:100])
+        return tree
+
+    def tap(self, name: str, candidates: Iterable[str], then: Iterable[str], *, absent: Iterable[str] = ()) -> None:
+        wanted = tuple(candidates)
+        node, before, matched = self.wait_for(wanted, pressable=True)
+        # AX can expose the destination before a native Modal transition finishes.
+        time.sleep(0.5)
+        node, before, matched = self.wait_for(wanted, pressable=True)
+        x, y = AX.center(node)
+        try:
+            result = subprocess.run(
+                [self.idb, *AX.companion_args(self.companion), "ui", "tap", str(x), str(y), "--udid", self.udid],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            self.record(name, "failed", target=matched, error=f"tap transport: {exc}")
+            raise JourneyError(f"tap transport failed for {matched!r}: {exc}") from exc
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "").strip()[:300]
+            self.record(name, "failed", target=matched, error=f"tap rc={result.returncode}: {detail}")
+            raise JourneyError(f"tap returned rc={result.returncode} for {matched!r}: {detail}")
+        # The tap command's success is not the assertion.  wait_for performs a
+        # new describe-all and requires the destination state to be present.
+        _, after, destination = self.wait_for(then, absent=absent)
+        self.record(
+            name,
+            "passed",
+            target=matched,
+            targetFrame=list(AX.frame_of(node)),
+            beforeLabels=labels(before)[:100],
+            destination=destination,
+            afterLabels=labels(after)[:100],
+        )
+
+    def screenshot(self, name: str) -> None:
+        self.evidence_dir.mkdir(parents=True, exist_ok=True)
+        path = self.evidence_dir / f"{name}.png"
+        result = subprocess.run(
+            [self.idb, *AX.companion_args(self.companion), "screenshot", "--udid", self.udid, str(path)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0 or not path.exists() or path.stat().st_size == 0:
+            # simctl is a read-only screenshot fallback; it does not depend on
+            # Simulator.app being visible or in the foreground.
+            fallback = subprocess.run(
+                ["xcrun", "simctl", "io", self.udid, "screenshot", str(path)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if fallback.returncode != 0 or not path.exists() or path.stat().st_size == 0:
+                detail = (result.stderr or fallback.stderr or result.stdout or "").strip()[:300]
+                self.record(name + " screenshot", "failed", path=str(path), error=detail)
+                raise JourneyError(f"could not capture {name} screenshot: {detail}")
+        self.record(name + " screenshot", "passed", path=str(path), bytes=path.stat().st_size)
+
+    def scroll_to(self, name: str, candidates: Iterable[str]) -> None:
+        wanted = tuple(candidates)
+        result = AX.scroll_into_view(self.idb, self.companion, self.udid, wanted[0], True, False, None)
+        if result.get("visible") != "True":
+            self.record(name, "failed", target=list(wanted), result=result)
+            raise JourneyError(f"could not scroll {wanted!r} into view: {result}")
+        self.wait_for(wanted, pressable=True)
+        self.record(name, "passed", target=list(wanted), result=result)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--udid", default=os.environ.get("IOS_UDID", ""))
+    parser.add_argument(
+        "--idb",
+        default=os.environ.get("IDB_BIN", str(Path.home() / ".heyta-tools/idb/venv/bin/idb")),
+    )
+    parser.add_argument(
+        "--companion",
+        default=os.environ.get("IDB_COMPANION", str(Path.home() / ".heyta-tools/idb/idb_companion")),
+    )
+    parser.add_argument("--timeout", type=float, default=8.0)
+    parser.add_argument(
+        "--evidence-dir",
+        default=os.environ.get("HEYTA_PROFILE_EVIDENCE_DIR", str(DEFAULT_EVIDENCE)),
+        help="directory for screenshots and settings-ia-journey.json",
+    )
+    return parser.parse_args()
+
+
+def run(probe: Probe) -> None:
+    # Fresh install journey is privacy sheet -> welcome -> app.  The probe is
+    # also rerunnable on an existing home screen, so inspect the current AX
+    # state before deciding whether either onboarding tap is needed.
+    launch_tree = probe.wait_for_any_label(("只用本机", "先离线使用", "任务", "我的"))
+    if present(launch_tree, ("只用本机",), pressable=True) is not None:
+        # This label is sourced from common.privacy.consent.localOnly.  It is
+        # the privacy sheet action, not the later welcome-page offline action.
+        probe.tap("choose local-only privacy", ("只用本机",), ("先离线使用",))
+        launch_tree = probe.wait_for_any_label(("先离线使用", "任务", "我的"))
+
+    if present(launch_tree, ("先离线使用",), pressable=True) is not None:
+        probe.tap("choose offline", ("先离线使用",), ("任务", "我的"))
+    else:
+        probe.record("onboarding already complete", "passed", labels=labels(launch_tree)[:100])
+
+    # The screenshot is intentionally taken only after the Profile tab is
+    # active; a fresh install otherwise captures the default Tasks tab.
+    probe.tap(
+        "open profile tab",
+        ("我的", "Profile"),
+        ("设置, 个人资料、偏好、同步与安全", "设置", "Settings"),
+    )
+    probe.screenshot("my")
+    probe.tap(
+        "open settings directory",
+        ("设置, 个人资料、偏好、同步与安全", "设置", "Settings"),
+        ("常规", "General"),
+    )
+    # The current acceptance fixture is zh-CN.  English candidates remain on
+    # individual taps for diagnostics, while the group assertion is explicitly
+    # Chinese so a locale mismatch cannot masquerade as a passed IA check.
+    probe.assert_visible("settings directory", ("常规", "同步与隐私", "AI 与集成", "数据管理", "账号安全"))
+    probe.screenshot("settings-directory")
+
+    probe.tap("open general", ("常规", "General"), ("语言", "Language"))
+    probe.screenshot("general")
+    probe.tap("general back to directory", ("返回", "Back"), ("常规", "General"))
+
+    # `隐私同意` is the current Chinese value of common.privacy.settings.title;
+    # do not infer a label from the section name.
+    probe.tap("open sync and privacy", ("同步与隐私", "Sync & privacy"), ("隐私同意",))
+    probe.screenshot("sync")
+    probe.tap("sync back to directory", ("返回", "Back"), ("同步与隐私", "Sync & privacy"))
+
+    probe.tap("open data management", ("数据管理", "Data management", "Data"), ("导出数据", "Export data"))
+    probe.tap(
+        "open export screen",
+        ("导出数据", "Export data"),
+        ("返回", "Back"),
+        absent=("数据管理", "Data management", "Data"),
+    )
+    probe.tap("export back to data group", ("返回", "Back"), ("数据管理", "Data management", "Data"))
+    probe.tap("data group back to directory", ("返回", "Back"), ("常规", "General"))
+    probe.tap("close settings to profile", ("关闭", "Close"), ("我的", "Profile"), absent=("偏好与账号", "Settings"))
+
+    probe.tap("open full growth", ("查看完整成长", "View full growth"), ("我的成长", "My growth"))
+    probe.screenshot("growth")
+    probe.tap("growth back to profile", ("返回", "Back"), ("我的", "Profile"))
+
+    probe.scroll_to("scroll lists entry", ("清单", "Lists"))
+    probe.tap("open lists", ("清单", "Lists"), ("清单", "Lists"), absent=("整理与记录",))
+    probe.tap("lists back to profile", ("返回", "Back"), ("我的", "Profile"))
+
+
+def main() -> int:
+    args = parse_args()
+    if not args.udid:
+        print("--udid is required (or set IOS_UDID)", file=sys.stderr)
+        return 2
+    probe = Probe(args)
+    report_path = Path(args.evidence_dir) / "settings-ia-journey.json"
+    status = "failed"
+    error: str | None = None
+    try:
+        run(probe)
+        status = "passed"
+    except (JourneyError, OSError, subprocess.SubprocessError) as exc:
+        status = "failed"
+        error = str(exc)
+        probe.steps.append({"name": "journey", "status": "failed", "error": error, "at": time.time()})
+    finally:
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(
+                {
+                    "status": status,
+                    "udid": args.udid,
+                    "idb": args.idb,
+                    "companion": args.companion,
+                    "journey": "offline-profile-settings-ia",
+                    "steps": probe.steps,
+                    "error": error,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    print(json.dumps({"status": status, "report": str(report_path), "error": error}, ensure_ascii=False))
+    return 0 if status == "passed" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

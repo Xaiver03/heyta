@@ -58,6 +58,13 @@
   flex: 0 0 auto;
 }
 
+.ht-header__brand {
+  flex: 0 0 auto;
+  color: var(--ht-color-primary);
+  white-space: nowrap;
+  letter-spacing: var(--ht-tracking-caption);
+}
+
 .ht-header__actions {
   margin-inline-start: auto;
   display: flex;
@@ -76,6 +83,18 @@
      收缩到装不下时在**这一层**折行。`min-inline-size: 0` 让的是**整块**可收缩，
      块里每一只控件仍按自己的内容宽度排版、文字不会被压成竖排（那正是原来要防的）。 */
   flex: 0 1 auto;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+/* 批量工具栏是页头动作中的一个可换行单元。让它能收缩到当前主列，
+   内层按钮随后才有机会按触控尺寸换行，而不是把页头撑出视口。 */
+.ht-header__actions > [data-testid="bulk-toolbar"] {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.ht-header__actions > [data-testid="bulk-toolbar"] select {
   min-inline-size: 0;
   max-inline-size: 100%;
 }

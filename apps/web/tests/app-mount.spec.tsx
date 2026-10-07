@@ -870,20 +870,30 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
     // 把期望写死在这里，是成本最低、又能真正盖住"有人在 rail 上顺手加了个按钮"
     // 这一失效模式的做法。
     //
-    // 默认 = 5 个模块视图（任务/日历/四象限/习惯/时间线，顺序同 `MODULE_VIEW_TABS`）
-    //        + 常驻的「搜索」（排在上段最后）+ 下段工具「回收站」。
+    // 默认主段 = 4 个高频目的地（任务/日历/习惯/搜索）+ 下段工具「回收站」。
+    // 低频的四象限 / 时间线进入「更多」，但仍必须保持可达。
     const railLabels = [...rail!.querySelectorAll('button[role="tab"]')].map((b) =>
       (b.textContent ?? '').trim(),
     );
-    expect(railLabels, '默认 rail 的标签与顺序').toEqual([
+    expect(railLabels, '默认 rail 主段的标签与顺序').toEqual([
       '任务',
       '日历',
-      '四象限',
       '习惯',
-      '时间线',
       '搜索',
       '回收站',
     ]);
+
+    const more = [...rail!.querySelectorAll('button')].find((button) =>
+      (button.textContent ?? '').trim() === '更多',
+    ) as HTMLButtonElement | undefined;
+    expect(more, '低频视图必须有「更多」入口').toBeDefined();
+    await act(async () => {
+      more?.click();
+    });
+    const overflowLabels = [...rail!.querySelectorAll('[role="menuitem"]')].map((button) =>
+      (button.textContent ?? '').trim(),
+    );
+    expect(overflowLabels, '低频视图必须在「更多」里可达').toEqual(['四象限', '时间线']);
 
     const header = container.querySelector('.ht-header');
     expect(header, '没有 header').not.toBeNull();
@@ -940,7 +950,20 @@ describe('信息架构：rail / sidebar / header 的分工', () => {
  */
 describe('功能模块：关掉的模块从 rail 消失', () => {
   const railTabLabels = (el: HTMLElement): string[] =>
-    [...el.querySelectorAll('.ht-rail button[role="tab"]')].map((b) => b.textContent?.trim() ?? '');
+    [...el.querySelectorAll('.ht-rail button[role="tab"], .ht-rail [role="menuitem"]')].map(
+      (b) => b.textContent?.trim() ?? '',
+    );
+
+  async function openMoreIfPresent(el: HTMLElement): Promise<void> {
+    const more = [...el.querySelectorAll('.ht-rail button')].find(
+      (button) => (button.textContent ?? '').trim() === '更多',
+    ) as HTMLButtonElement | undefined;
+    if (more !== undefined && el.querySelector('[role="menu"]') === null) {
+      await act(async () => {
+        more.click();
+      });
+    }
+  }
 
   /** 开/关一个模块（设置页里的那个 checkbox）。 */
   async function toggleModule(el: HTMLElement, key: string): Promise<void> {
@@ -954,6 +977,7 @@ describe('功能模块：关掉的模块从 rail 消失', () => {
 
   it('默认开着「四象限」，可以关掉 —— 关掉之后 rail 上就没有它了', async () => {
     const { container } = await mountApp();
+    await openMoreIfPresent(container);
     expect(railTabLabels(container), '四象限默认应当是开的').toContain('四象限');
 
     await toggleModule(container, 'quadrant');
@@ -963,10 +987,12 @@ describe('功能模块：关掉的模块从 rail 消失', () => {
 
   it('默认关着「番茄钟」，可以打开 —— 打开之后 rail 上出现它', async () => {
     const { container } = await mountApp();
+    await openMoreIfPresent(container);
     expect(railTabLabels(container), '番茄钟默认应当是关的').not.toContain('番茄钟');
 
     await toggleModule(container, 'focus');
 
+    await openMoreIfPresent(container);
     expect(railTabLabels(container), '打开之后 rail 上应当出现番茄钟').toContain('番茄钟');
   });
 

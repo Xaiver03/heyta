@@ -15,10 +15,8 @@
  * 在这之前，本屏是 899 行的"什么都塞"：凭据表单、小组件旅程、语言胶囊
  * 全部内联在滚动流里。现在：
  *
- *   · 本屏只留**身份**（账号卡 + 注册/登录）、**同步状态**（状态卡 +
- *     「立即同步」）、**入口行**（设置 / 成长 / 习惯 / 回收站 / 导出）、
- *     清单/标签/便签管理；
- *   · 凭据表单 / 小组件 / 语言 / 清除凭据在 `SettingsScreen`（RN Modal）里；
+ *   · 本屏呈现只读身份、近期回顾、简短同步状态与功能入口；
+ *   · 唯一个人资料编辑器、同步详情、数据管理与安全在 `SettingsScreen`（RN Modal）里；
  *   · **表单状态仍活在本屏**（`useSyncCredentialForm`）—— 设置面是 Modal，
  *     `visible={false}` 时 children 整体卸载，状态放那边会在每次关闭时丢字。
  *     注册/登录成功后的回填也因此仍能直达 setters（`onSignedIn`）。
@@ -45,7 +43,7 @@
  *    不是"盖在当前上下文上的浮层"，与 §11.5 的规律不冲突。
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { pick } from '@react-native-documents/picker';
 import type { SyncStatus } from '@heyta/sync-client';
@@ -75,7 +73,7 @@ import {
   type SettingsRowModel,
 } from '@heyta/ui';
 
-import { Button, Card, Divider, HStack, Screen, SectionHeader, Text, TextField } from '../ui/kit';
+import { Button, Card, Divider, HStack, Screen, SectionHeader, Stack, Text, TextField } from '../ui/kit';
 import { MOBILE_FEATURE_ENTRIES, type MobileFeatureEntryKey } from '../nav/feature-entries';
 import { AssistantScreen } from '../ai/AssistantScreen';
 import { isAiConfiguredOnThisDevice, useAiSettings } from '../ai/settings-store';
@@ -90,12 +88,13 @@ import { EntitlementSection } from './EntitlementSection';
 import { RenewSection } from './RenewSection';
 import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';
+import { ProfileProgressSummary } from './ProfileProgressSummary';
 import { HabitsScreen } from './HabitsScreen';
 import { ListsSection } from './ListsSection';
 import { NotesSection } from './NotesSection';
 import { NotificationsScreen } from './NotificationsScreen';
 import { SecurityScreen } from './SecurityScreen';
-import { SettingsScreen } from './SettingsScreen';
+import { SettingsScreen, type SettingsSectionKey } from './SettingsScreen';
 import { TagsSection } from './TagsSection';
 import { TrashScreen } from './TrashScreen';
 import { formatStamp } from '../lib/date';
@@ -112,11 +111,13 @@ import {
   type VaultSecureStorageScope,
 } from '../lib/vault-secure-storage';
 import { clearMobileVaultSession } from '../lib/vault-session-cleanup';
+import { useMobileNavigation } from '../nav/navigation';
 
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
   const { t } = useI18n();
   const tokens = useTokens();
+  const navigation = useMobileNavigation();
 
   /**
    * 凭据表单的状态与"输入即生效"接线 —— **活在本屏**（理由见
@@ -128,8 +129,9 @@ export function ProfileScreen(): React.JSX.Element {
   // 🔴 冲突界面的可见性只是**界面状态**，不进 store。
   const [conflictsOpen, setConflictsOpen] = useState(false);
 
-  /** 设置面（`SettingsScreen`）的可见性 —— 同样只是界面状态。 */
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** 设置面是当前 tab 的二级栈页面；返回优先 pop 回个人页。 */
+  const settingsOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'settings';
+  const [settingsSection, setSettingsSection] = useState<SettingsSectionKey>();
 
   /**
    * 注册 / 登录面板（W3 · 规范 §3.1 的「前置」落点）。
@@ -138,7 +140,14 @@ export function ProfileScreen(): React.JSX.Element {
    * 都把"底部标签保持 5 个"写成硬约束。入口在**本屏顶部的账号卡片**下
    * （一级可见），所以"前置"兑现为"冷启动 ≤1 次点击"而不是"多一个标签"。
    */
-  const [authOpen, setAuthOpen] = useState(false);
+  const authOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:auth';
+  const setAuthOpen = (open: boolean): void => {
+    if (open) navigation.push('profile:auth');
+    else navigation.pop();
+  };
+  /** 登录/切换账号后，个人资料摘要必须按新账号重新读，不能沿用旧账号的投影。 */
+  const [profileRevision, setProfileRevision] = useState(0);
+  const profileGeneration = useRef(0);
 
   /**
    * 登录成功之后把令牌 / 地址 / 口令**回填到表单**。
@@ -148,6 +157,9 @@ export function ProfileScreen(): React.JSX.Element {
    * 把刚拿到的令牌覆盖掉 —— 症状是"明明登录成功了，一同步就说未配置"。
    */
   const onSignedIn = (saved: SavedAuthSession): void => {
+    // 先让旧账号的资料请求失效，再回填新凭据；慢请求返回时不能把旧头像/昵称写回来。
+    profileGeneration.current += 1;
+    setProfileRevision((revision) => revision + 1);
     // The form is already mounted while AuthScreen is open.  Replaying its
     // three controlled values can run its input effect between React commits;
     // that effect intentionally omits accountId because ordinary manual edits
@@ -187,6 +199,8 @@ export function ProfileScreen(): React.JSX.Element {
    *    "当前账号：x@y" —— 一句与实际同步状态矛盾的话。
    */
   const onClearCredentials = (): void => {
+    profileGeneration.current += 1;
+    setProfileRevision((revision) => revision + 1);
     const config = readSyncConfig();
     const accountId = config?.accountId?.trim();
     let scope: VaultSecureStorageScope | undefined;
@@ -252,17 +266,40 @@ export function ProfileScreen(): React.JSX.Element {
    * 原来是 `growthOpen` / `habitsOpen` 两个布尔 + 两段手写行 —— 那就是
    * "同一个判断写两遍"，加第三个功能域（倒数纪念日）会写成第三遍，
    * 而漏掉一处**不会报错**（少一个 setState 调用点 = 点了没反应）。
-   * 现在是一张表 + 一个状态 + 一个穷尽 switch：**加一项不接屏 = 编译错误**。
+   * 现在是一张表 + 一条栈路由 + 一个穷尽 switch：**加一项不接屏 = 编译错误**。
    *
-   * ⚠️ 这些 `useState` 与下面的提前 return 必须**在所有 hook 之后** ——
-   * 提前 return 会让后面没跑到的 hook 数量在两次渲染间变化，React 会直接报错。
+   * 功能域二级页使用当前 tab 的轻量导航栈，而不是本屏的局部状态。这样 Android
+   * 硬件返回会先 pop 回「我的」，不会因为 ProfileScreen 仍是持久挂载的隐藏实例而
+   * 直接把用户带回「任务」。`navigation.tab` 的判断也很关键：ProfileScreen 在
+   * 切换 tab 时不会卸载，不能把其他 tab 的栈项解释成自己的页面。
    */
-  const [openFeature, setOpenFeature] = useState<MobileFeatureEntryKey | null>(null);
-  const [trashOpen, setTrashOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [closureOpen, setClosureOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [securityOpen, setSecurityOpen] = useState(false);
+  const activeProfileRoute = navigation.tab === 'profile' ? navigation.stack.at(-1)?.key : undefined;
+  const openFeature = featureKeyFromRoute(activeProfileRoute);
+  const trashOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:trash';
+  const setTrashOpen = (open: boolean): void => {
+    if (open) navigation.push('profile:trash');
+    else navigation.pop();
+  };
+  const exportOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:export';
+  const setExportOpen = (open: boolean): void => {
+    if (open) navigation.push('profile:export');
+    else navigation.pop();
+  };
+  const closureOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:closure';
+  const setClosureOpen = (open: boolean): void => {
+    if (open) navigation.push('profile:closure');
+    else navigation.pop();
+  };
+  const notificationsOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:notifications';
+  const setNotificationsOpen = (open: boolean): void => {
+    if (open) navigation.push('profile:notifications');
+    else navigation.pop();
+  };
+  const securityOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:security';
+  const setSecurityOpen = (open: boolean): void => {
+    if (open) navigation.push('profile:security');
+    else navigation.pop();
+  };
   /**
    * AI 助手那一屏（五个功能共用一个入口，见 `ai/AssistantScreen.tsx` 的文件头）。
    *
@@ -271,7 +308,11 @@ export function ProfileScreen(): React.JSX.Element {
    * 关掉的功能留在树上、点进去五个面板都发不出去，正是本仓反复记过的那类
    * "界面在说谎"；而设置那一面**不受它影响** —— 闸就住在那里，看不见就无法打开。
    */
-  const [assistantOpen, setAssistantOpen] = useState(false);
+  const assistantOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:assistant';
+  const setAssistantOpen = (open: boolean): void => {
+    if (open) navigation.push('profile:assistant');
+    else navigation.pop();
+  };
 
   /**
    * 「通知」入口行的未读徽标（批二，多端覆盖审计 P0-2）。
@@ -315,18 +356,24 @@ export function ProfileScreen(): React.JSX.Element {
    * `null` = 读到了、用户确实没设（渲染那句「留空则显示邮箱」）。
    */
   const [savedName, setSavedName] = useState<string | null | undefined>(undefined);
+  const [profileReadState, setProfileReadState] = useState<'idle' | 'loading' | 'failed'>('idle');
+  const [profileNetworkAllowed, setProfileNetworkAllowed] = useState(() => privacyConsent.networkAllowed());
   const [nameDraft, setNameDraft] = useState('');
   const [nameEditing, setNameEditing] = useState(false);
   const [nameSaving, setNameSaving] = useState(false);
   const [nameNotice, setNameNotice] = useState<{ text: string; danger: boolean } | null>(null);
 
   const fetchDisplayName = useCallback((): Promise<void> => {
+    const generation = profileGeneration.current;
     if (!privacyConsent.networkAllowed()) return Promise.resolve();
     const config = readSyncConfig();
     const token = config?.token ?? '';
     if (config === undefined || config.serverUrl === '' || token === '') return Promise.resolve();
+    setProfileReadState('loading');
     return getAccountProfile({ baseUrl: config.serverUrl }, token).then((outcome) => {
+      if (generation !== profileGeneration.current) return;
       // 🔴 失败**不清空**已有读数：一次网络抖动不该让"你的昵称"在界面上凭空消失。
+      setProfileReadState(outcome.ok ? 'idle' : 'failed');
       if (!outcome.ok) return;
       setSavedName(outcome.displayName);
       // 同一次读取顺手带回 `avatarHash` —— 头像"有没有"的事实源就是这一行，
@@ -334,12 +381,33 @@ export function ProfileScreen(): React.JSX.Element {
       setAvatarHash(outcome.avatarHash);
     });
   }, []);
-  useEffect(() => {
+  useEffect(() => subscribePrivacyConsent(() => {
+    profileGeneration.current += 1;
+    setProfileNetworkAllowed(privacyConsent.networkAllowed());
+    setNameSaving(false);
+    setAvatarBusy(false);
+    setProfileReadState('idle');
     void fetchDisplayName();
-  }, [fetchDisplayName]);
+  }), [fetchDisplayName]);
+  useEffect(() => {
+    // 账号切换后先清除上一账号的投影，直到新账号读取完成再显示。
+    setSavedName(undefined);
+    setAvatarHash(undefined);
+    setAvatarImage(undefined);
+    setAvatarState(undefined);
+    setAvatarNotice(null);
+    setNameNotice(null);
+    setNameEditing(false);
+    setNameSaving(false);
+    setAvatarBusy(false);
+    setNameDraft('');
+    setProfileReadState('idle');
+    void fetchDisplayName();
+  }, [fetchDisplayName, profileRevision]);
 
   const saveDisplayName = useCallback(async (): Promise<void> => {
     if (nameSaving) return;
+    const generation = profileGeneration.current;
     const config = readSyncConfig();
     const plan = planDisplayNameWrite({
       token: config === undefined || config.serverUrl === '' ? undefined : (config.token ?? ''),
@@ -367,6 +435,7 @@ export function ProfileScreen(): React.JSX.Element {
       plan.token,
       plan.value,
     );
+    if (generation !== profileGeneration.current) return;
     setNameSaving(false);
     if (!outcome.ok) {
       // 🔴 说的是**昵称**那句。web 这里曾经复用头像的失败文案（"头像没有传上去"），
@@ -419,6 +488,7 @@ export function ProfileScreen(): React.JSX.Element {
         : null;
 
   const fetchAvatarImage = useCallback((): Promise<void> => {
+    const generation = profileGeneration.current;
     // `null` = 服务端说没有 ⇒ **一个请求都不发**（这是契约前提，不是优化）。
     if (avatarHash === undefined || avatarHash === null) return Promise.resolve();
     if (!privacyConsent.networkAllowed()) return Promise.resolve();
@@ -431,6 +501,7 @@ export function ProfileScreen(): React.JSX.Element {
       config.password,
       avatarHash,
     ).then((reading) => {
+      if (generation !== profileGeneration.current) return;
       setAvatarState(reading.state);
       // 🔴 失败**不清掉**上一次显示的那张图：一次取不到不该让已经看到的头像凭空消失，
       //    但它也不会被当成"最新的"——下一句 `avatarReadMessage` 会说明它可能不是最新。
@@ -470,6 +541,7 @@ export function ProfileScreen(): React.JSX.Element {
 
   const changeAvatar = useCallback(async (): Promise<void> => {
     if (avatarBusy) return;
+    const generation = profileGeneration.current;
     const config = readSyncConfig();
     const token = config?.token ?? '';
     const password = config?.password ?? '';
@@ -485,7 +557,7 @@ export function ProfileScreen(): React.JSX.Element {
       setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
       return undefined;
     });
-    if (picked === undefined) return;
+    if (generation !== profileGeneration.current || picked === undefined) return;
     const doc = picked[0];
     if (doc === undefined) {
       setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
@@ -493,6 +565,7 @@ export function ProfileScreen(): React.JSX.Element {
     }
     setAvatarBusy(true);
     const prepared = await prepareAvatarFromUri(doc.uri, doc.type ?? doc.nativeType ?? '');
+    if (generation !== profileGeneration.current) return;
     if (!prepared.ok) {
       setAvatarBusy(false);
       setAvatarNotice({ text: prepareMessage(prepared.error), danger: true });
@@ -504,6 +577,7 @@ export function ProfileScreen(): React.JSX.Element {
       password,
       prepared.image,
     );
+    if (generation !== profileGeneration.current) return;
     setAvatarBusy(false);
     if (!outcome.ok) {
       setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
@@ -518,11 +592,13 @@ export function ProfileScreen(): React.JSX.Element {
 
   const removeAvatar = useCallback(async (): Promise<void> => {
     if (avatarBusy) return;
+    const generation = profileGeneration.current;
     const config = readSyncConfig();
     const token = config?.token ?? '';
     if (config === undefined || config.serverUrl === '' || token === '') return;
     setAvatarBusy(true);
     const outcome = await deleteAccountAvatar({ baseUrl: config.serverUrl }, token);
+    if (generation !== profileGeneration.current) return;
     setAvatarBusy(false);
     if (!outcome.ok) {
       setAvatarNotice({ text: t('common.profile.avatar.failed'), danger: true });
@@ -542,6 +618,7 @@ export function ProfileScreen(): React.JSX.Element {
    * 显示"当前账号：还没登录"而同步其实配好了 —— 一句自相矛盾的话。
    */
   const signedInEmail = currentSignedInEmail();
+  const accountHasCredential = signedInEmail !== undefined || form.token.trim() !== '';
 
   // 🔴 为什么要把"慢"提前说出来。
   //
@@ -619,33 +696,27 @@ export function ProfileScreen(): React.JSX.Element {
       label: t(entry.labelKey),
       hint: t(entry.hintKey),
       onPress: () => {
-        setOpenFeature(entry.key);
+        navigation.push(featureRouteKey(entry.key));
       },
     }),
   );
 
   /**
-   * 「关于我 / 我的数据」的入口行。
-   *
-   * 🔴 **「设置」排第一**（goal M1：入口要在首屏一眼可见）—— 它是这组里
-   * 唯一"配置类"的动作，也是搬动后凭据表单的新家；后面几项是"关于我"的
-   * 回顾与后悔药（功能域那几行由 `nav/feature-entries.ts` 生成），频率都低于它。
-   * 骨架来自共享动作行。
-   *
-   * 🔴 **AI 助手那一格按开关进不进树**（`aiEntryVisible`）—— 关掉的功能
-   * 留在树上、点进去五个面板一个都发不出去，就是"界面在说谎"那个形状。
-   * 它排在功能域那几行之后：那是"让机器替我干活"，频率低于回顾与打卡。
+   * 设置是身份卡后的高频配置入口；其余行才是低频的"关于我 / 我的数据"动作。
+   * AI 助手仍按本机配置闸门决定是否进入低频入口列表。
    */
-  const entryRows: readonly SettingsRowModel[] = [
-    {
-      kind: 'action',
-      testID: 'profile-entry-settings',
-      label: t('mobile.profile.entry.settings'),
-      hint: t('mobile.profile.entry.settings.hint'),
-      onPress: () => {
-        setSettingsOpen(true);
-      },
+  const settingsRow: SettingsRowModel = {
+    kind: 'action',
+    testID: 'profile-entry-settings',
+    label: t('mobile.profile.entry.settings'),
+    hint: t('mobile.profile.entry.settings.hint'),
+    onPress: () => {
+      setSettingsSection(undefined);
+      navigation.push('settings');
     },
+  };
+
+  const entryRows: readonly SettingsRowModel[] = [
     {
       kind: 'action',
       testID: 'profile-entry-notifications',
@@ -679,6 +750,7 @@ export function ProfileScreen(): React.JSX.Element {
       label: t('mobile.security.trigger'),
       hint: t('mobile.security.entry.hint'),
       onPress: () => {
+        setSettingsSection('security');
         setSecurityOpen(true);
       },
     },
@@ -702,6 +774,7 @@ export function ProfileScreen(): React.JSX.Element {
       label: t('mobile.trash.entry'),
       hint: t('mobile.trash.entry.hint'),
       onPress: () => {
+        setSettingsSection('data');
         setTrashOpen(true);
       },
     },
@@ -711,6 +784,7 @@ export function ProfileScreen(): React.JSX.Element {
       label: t('mobile.export.entry'),
       hint: t('mobile.export.entry.hint'),
       onPress: () => {
+        setSettingsSection('data');
         setExportOpen(true);
       },
     },
@@ -722,15 +796,27 @@ export function ProfileScreen(): React.JSX.Element {
       label: t('common.accountClosure.title'),
       hint: t('common.accountClosure.entryHint'),
       onPress: () => {
+        setSettingsSection('security');
         setClosureOpen(true);
       },
     },
   ];
 
   /**
-   * 🔴 提前 return **必须在所有 hook 之后**（见 `openFeature` 的注释）。
-   * 第二层屏各自带顶栏返回，所以这里不需要任何导航库。
+   * 🔴 提前 return **必须在所有 hook 之后**。
+   * 功能域二级屏各自带顶栏返回，但返回动作必须 pop 当前 tab 的栈，才能与
+   * Android 硬件返回保持同一条路径。
    */
+  const managementPage = navigation.tab === 'profile' ? navigation.stack.at(-1)?.key : undefined;
+  if (managementPage === 'profile:lists' || managementPage === 'profile:tags' || managementPage === 'profile:notes') {
+    const titleKey = managementPage === 'profile:lists' ? 'mobile.profile.section.lists' : managementPage === 'profile:tags' ? 'mobile.profile.section.tags' : 'notes.title';
+    return (
+      <Screen title={t(titleKey)} actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: () => { navigation.pop(); } }]}>
+        {managementPage === 'profile:lists' ? <ListsSection /> : managementPage === 'profile:tags' ? <TagsSection /> : <NotesSection />}
+      </Screen>
+    );
+  }
+
   if (securityOpen) {
     return (
       <SecurityScreen
@@ -820,9 +906,9 @@ export function ProfileScreen(): React.JSX.Element {
      * 🔴 功能域那几屏**整屏替换**（第二层），返回由那一屏自己的顶栏给。
      * 组件由穷尽 switch 决定：注册表加一项而不在这儿接上 = `apps/mobile` 编译红
      * （这条就是"入口存在但点了没反应"那类失效的编译期版本）。
-     */
+    */
     return featureScreen(openFeature, () => {
-      setOpenFeature(null);
+      navigation.pop();
     });
   }
 
@@ -840,27 +926,61 @@ export function ProfileScreen(): React.JSX.Element {
   const avatarLineDanger =
     avatarNotice !== null ? avatarNotice.danger : avatarReadMessage !== null;
 
-  return (
-    <Screen title={t('mobile.profile.title')}>
+  const syncStatus = (<>
       {/*
-        🔴 **账号卡片（顶部，一级可见）** —— W3 · 规范 §3.1 的「前置」落点。
-        在这一刀之前，本屏**只有**三个手填输入框，而没有任何地方告诉用户
-        访问令牌从哪来。现在注册/登录是这一屏的**第一条**内容。
+        同步状态。🔴 手动凭据表单已搬进设置面（上面的入口行第一项）；
+        这里留的是**状态的呈现与手动重试** —— 用户看的是结果，
+        改配置去设置面，两件事不再挤在一段滚动流里。
       */}
-      <SectionHeader icon="action.settings" title={t('mobile.profile.section.account')} />
+      <SectionHeader icon="action.sync" title={t('mobile.profile.section.status')} />
       <Card>
         <View style={{ gap: tokens['space.3'] }}>
-          <SettingsRow
-            row={{
-              kind: 'value',
-              label: t('mobile.profile.account.signedInLabel'),
-              // 🔴 没登录时显示「还没登录」，**不是**空字符串：空值会被读成
-              //    "读取中"或"界面坏了"，而这两件事的处置完全不同。
-              value: signedInEmail ?? t('mobile.profile.account.offline'),
-              tone: signedInEmail === undefined ? 'subtle' : 'default',
-              valueTestID: 'profile-account-value',
+          <StatusRow
+            status={status}
+            busy={busy}
+            onOpenConflicts={() => {
+              setConflictsOpen(true);
             }}
           />
+          <Divider />
+          {/* 值行的骨架来自共享 `SettingsRow`（`statusRows` 见上）。 */}
+          {statusRows.map((row) => (
+            <SettingsRow key={row.testID ?? row.kind} row={row} />
+          ))}
+        </View>
+      </Card>
+
+      <Button
+        label={busy ? t('mobile.profile.sync.busy') : t('mobile.profile.sync.now')}
+        onPress={form.submit}
+        tone="primary"
+        icon="action.sync"
+        disabled={!form.configured}
+        loading={busy}
+      />
+      {!form.configured ? (
+        <Text variant="caption" tone="subtle" style={{ textAlign: 'center' }}>
+          {t('mobile.profile.sync.notConfigured')}
+        </Text>
+      ) : null}
+      {form.configured && slowKdf && status.kind !== 'synced' ? (
+        <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
+          {t('mobile.profile.sync.slowKdf')}
+        </Text>
+      ) : null}
+
+  </>);
+
+  const profileEditor = accountHasCredential ? (
+    <Stack>
+      {!profileNetworkAllowed ? (
+        <Text variant="caption" tone="subtle">{t('mobile.profile.localOnly')}</Text>
+      ) : savedName === undefined ? (
+        <>
+          <Text variant="caption" tone="subtle">{t(profileReadState === 'failed' ? 'common.profile.loadFailed' : 'mobile.profile.loading')}</Text>
+          {profileReadState === 'loading' ? null : <Button label={t('mobile.profile.retry')} tone="secondary" onPress={() => { void fetchDisplayName(); }} />}
+        </>
+      ) : null}
           {/*
             🔴 昵称行**只在真的读到之后**出现。没凭据 / 没同意出境 ⇒ 一个请求都不发，
             于是这里连行都不画 —— 画一行"昵称：（空）"会被读成"设置坏了"，
@@ -878,7 +998,7 @@ export function ProfileScreen(): React.JSX.Element {
             ⚠️ 这一段同样**一个 `style={{ }}` 都不许有**：圈和图的样式在 `ui/avatar.tsx`
             （那是 `check:l4` mobile 段豁免的目录），这里只给数据与文案。
           */}
-          {savedName === undefined ? null : (
+          {savedName === undefined ? null : !profileNetworkAllowed ? null : (
             <>
               <HStack gap="default" align="center">
                 <AvatarBadge dataUri={avatarImage} email={signedInEmail} />
@@ -913,7 +1033,7 @@ export function ProfileScreen(): React.JSX.Element {
               )}
             </>
           )}
-          {savedName === undefined ? null : nameEditing ? (
+          {savedName === undefined ? null : !profileNetworkAllowed ? null : nameEditing ? (
             <>
               <TextField
                 label={t('common.profile.nickname.label')}
@@ -978,6 +1098,40 @@ export function ProfileScreen(): React.JSX.Element {
               </Text>
             </>
           )}
+      <SettingsRow row={{ kind: 'value', label: t('common.profile.email.label'), value: signedInEmail ?? t('mobile.profile.account.offline') }} />
+      <Text variant="caption" tone="subtle">{t('common.profile.email.hint')}</Text>
+    </Stack>
+  ) : undefined;
+
+  return (
+    <Screen title={t('mobile.profile.title')}>
+      {/*
+        🔴 **账号卡片（顶部，一级可见）** —— W3 · 规范 §3.1 的「前置」落点。
+        在这一刀之前，本屏**只有**三个手填输入框，而没有任何地方告诉用户
+        访问令牌从哪来。现在注册/登录是这一屏的**第一条**内容。
+      */}
+      <SectionHeader icon="action.settings" title={t('mobile.profile.section.account')} />
+      <Card>
+        <View style={{ gap: tokens['space.3'] }}>
+          <View testID="profile-account-value">
+            <HStack gap="default" align="center">
+              {signedInEmail === undefined ? null : <AvatarBadge dataUri={avatarImage} email={signedInEmail} />}
+              <Text variant="row-title" grow>
+                {savedName ?? signedInEmail ?? t('mobile.profile.account.offline')}
+              </Text>
+            </HStack>
+            {savedName && signedInEmail ? <Text variant="caption" tone="subtle">{signedInEmail}</Text> : null}
+          </View>
+          {accountHasCredential ? (
+            <Button
+              label={t('mobile.profile.edit')}
+              tone="ghost"
+              onPress={() => {
+                setSettingsSection('profile');
+                navigation.push('settings');
+              }}
+            />
+          ) : null}
           <Text variant="caption" tone="subtle">
             {signedInEmail === undefined
               ? t('mobile.profile.account.offlineHint')
@@ -986,61 +1140,30 @@ export function ProfileScreen(): React.JSX.Element {
         </View>
       </Card>
       <Button
-        label={t('mobile.profile.account.signIn')}
+        label={
+          accountHasCredential
+            ? t('mobile.profile.account.switchAccount')
+            : t('mobile.profile.account.signIn')
+        }
         onPress={() => {
           setAuthOpen(true);
         }}
-        tone="primary"
+        tone={accountHasCredential ? 'secondary' : 'primary'}
+      />
+      <SettingsRow row={settingsRow} />
+      <ProfileProgressSummary
+        onOpenGrowth={() => {
+          navigation.push(featureRouteKey('growth'));
+        }}
       />
 
+      <StatusRow status={status} busy={busy} onOpenConflicts={() => { setConflictsOpen(true); }} />
       {/*
-        同步状态。🔴 手动凭据表单已搬进设置面（上面的入口行第一项）；
-        这里留的是**状态的呈现与手动重试** —— 用户看的是结果，
-        改配置去设置面，两件事不再挤在一段滚动流里。
-      */}
-      <SectionHeader icon="action.sync" title={t('mobile.profile.section.status')} />
-      <Card>
-        <View style={{ gap: tokens['space.3'] }}>
-          <StatusRow
-            status={status}
-            busy={busy}
-            onOpenConflicts={() => {
-              setConflictsOpen(true);
-            }}
-          />
-          <Divider />
-          {/* 值行的骨架来自共享 `SettingsRow`（`statusRows` 见上）。 */}
-          {statusRows.map((row) => (
-            <SettingsRow key={row.testID ?? row.kind} row={row} />
-          ))}
-        </View>
-      </Card>
-
-      <Button
-        label={busy ? t('mobile.profile.sync.busy') : t('mobile.profile.sync.now')}
-        onPress={form.submit}
-        tone="primary"
-        icon="action.sync"
-        disabled={!form.configured}
-        loading={busy}
-      />
-      {!form.configured ? (
-        <Text variant="caption" tone="subtle" style={{ textAlign: 'center' }}>
-          {t('mobile.profile.sync.notConfigured')}
-        </Text>
-      ) : null}
-      {form.configured && slowKdf && status.kind !== 'synced' ? (
-        <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-          {t('mobile.profile.sync.slowKdf')}
-        </Text>
-      ) : null}
-
-      {/*
-        「关于我 / 我的数据」的入口行（`entryRows` 见上，设置排第一）。
+        「关于我 / 我的数据」的低频入口行（设置已在身份卡后单独展示）。
         🔴 成长**不是第 6 个底部标签**：标签栏必须保持 5 个（P10 / ADR-0015 §4）。
       */}
       <View style={{ gap: tokens['space.3'] }} testID="profile-entries">
-        {entryRows.filter(shouldRenderSettingsRow).map((row) => (
+        {entryRows.filter((row) => !['profile-entry-security', 'profile-entry-close-account', 'profile-entry-export', 'profile-entry-trash'].includes(row.testID ?? '')).filter(shouldRenderSettingsRow).map((row) => (
           <SettingsRow key={row.testID ?? row.kind} row={row} />
         ))}
       </View>
@@ -1058,9 +1181,12 @@ export function ProfileScreen(): React.JSX.Element {
 
       {/* 清单 / 标签 / 便签管理。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}
-      <ListsSection />
-      <TagsSection />
-      <NotesSection />
+      <SectionHeader icon="task.project" title={t('mobile.profile.tools')} />
+      <Card>
+        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.lists'), testID: 'profile-entry-lists', onPress: () => { navigation.push('profile:lists'); } }} />
+        <SettingsRow row={{ kind: 'action', label: t('mobile.profile.section.tags'), testID: 'profile-entry-tags', onPress: () => { navigation.push('profile:tags'); } }} />
+        <SettingsRow row={{ kind: 'action', label: t('notes.title'), testID: 'profile-entry-notes', onPress: () => { navigation.push('profile:notes'); } }} />
+      </Card>
 
       <ConflictSheet
         visible={conflictsOpen}
@@ -1074,9 +1200,16 @@ export function ProfileScreen(): React.JSX.Element {
         （goal M2）。本屏（含账号卡与表单状态）在它打开期间**照常挂着**。
       */}
       <SettingsScreen
-        visible={settingsOpen}
+        initialSection={settingsSection}
+        profileEditor={profileEditor}
+        syncStatus={syncStatus}
+        dataActions={entryRows.filter((row) => ['profile-entry-export', 'profile-entry-trash'].includes(row.testID ?? ''))}
+        securityActions={entryRows.filter((row) => ['profile-entry-security', 'profile-entry-close-account'].includes(row.testID ?? ''))}
+        // Shell 保留各 tab 的屏幕实例；设置是 profile 的二级 surface，
+        // 离开 profile 时必须隐藏 Modal，回到 profile 再恢复原栈位置。
+        visible={navigation.tab === 'profile' && settingsOpen}
         onClose={() => {
-          setSettingsOpen(false);
+          navigation.pop();
         }}
         form={form}
         onClearCredentials={onClearCredentials}
@@ -1086,6 +1219,21 @@ export function ProfileScreen(): React.JSX.Element {
       />
     </Screen>
   );
+}
+
+const FEATURE_ROUTE_PREFIX = 'feature:';
+
+function featureRouteKey(key: MobileFeatureEntryKey): string {
+  return `${FEATURE_ROUTE_PREFIX}${key}`;
+}
+
+function featureKeyFromRoute(routeKey: string | undefined): MobileFeatureEntryKey | null {
+  if (routeKey === undefined || !routeKey.startsWith(FEATURE_ROUTE_PREFIX)) return null;
+  const candidate = routeKey.slice(FEATURE_ROUTE_PREFIX.length);
+  for (const entry of MOBILE_FEATURE_ENTRIES) {
+    if (entry.key === candidate) return entry.key;
+  }
+  return null;
 }
 
 /**

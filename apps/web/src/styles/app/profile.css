@@ -1,0 +1,153 @@
+/* 个人中心：低密度的身份与回顾 surface。设置表单不在这里重复。 */
+.ht-profile-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-6);
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-modal-max);
+  margin-inline: auto;
+}
+
+.ht-sheet[data-account-surface='profile'] > .ht-settings__header {
+  max-inline-size: var(--ht-layout-modal-max);
+  margin-inline: auto;
+}
+
+.ht-profile-overview__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-5);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+}
+
+.ht-profile-overview__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  inline-size: var(--ht-size-avatar-lg);
+  block-size: var(--ht-size-avatar-lg);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-profile-overview__identity-copy {
+  min-inline-size: 0;
+  flex: 1 1 auto;
+}
+
+.ht-profile-overview__avatar img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.ht-profile-overview__identity-copy h2,
+.ht-profile-overview__section h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ht-profile-overview__status,
+.ht-profile-overview__note {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  margin: var(--ht-space-1) 0 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+  overflow-wrap: anywhere;
+}
+
+.ht-profile-overview__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+}
+
+.ht-profile-overview__section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+}
+
+.ht-profile-overview__accent {
+  color: var(--ht-color-primary);
+}
+
+.ht-profile-overview__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ht-space-2);
+  border-block: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-profile-overview__stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+  padding-block: var(--ht-space-4);
+}
+
+.ht-profile-overview__value {
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-profile-overview__label {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-profile-overview__achievement {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-profile-overview__achievement-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+.ht-profile-overview__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+  padding-block-start: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+@media (max-width: 30rem) {
+  .ht-profile-overview__identity {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .ht-profile-overview__identity .ht-btn {
+    inline-size: 100%;
+  }
+
+  .ht-profile-overview__actions .ht-btn {
+    flex: 1 1 100%;
+  }
+}

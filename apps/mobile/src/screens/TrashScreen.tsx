@@ -178,15 +178,15 @@ export function TrashScreen({ onBack }: { onBack: () => void }): React.JSX.Eleme
               purge: (id: string) => taskActions.purge(id),
             },
             NOTE: {
-              restore: (id: string) => noteActions.restoreNote(id).then(() => undefined),
+              restore: (id: string) => noteActions.restoreNote(id),
               purge: (id: string) => noteActions.purgeNote(id),
             },
             PROJECT: {
-              restore: (id: string) => projectActions.restoreProject(id).then(() => undefined),
+              restore: (id: string) => projectActions.restoreProject(id),
               purge: (id: string) => projectActions.purgeProject(id),
             },
             HABIT: {
-              restore: (id: string) => habitActions.restoreHabit(id).then(() => undefined),
+              restore: (id: string) => habitActions.restoreHabit(id),
               purge: (id: string) => habitActions.purgeHabit(id),
             },
           } satisfies Record<

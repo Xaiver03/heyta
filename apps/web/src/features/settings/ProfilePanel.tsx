@@ -69,6 +69,7 @@ import {
 
 import { useSyncStore } from '../sync/store.js';
 import { loadAvatarImage, type AvatarFileError } from './avatar-encode.js';
+import { notifyAccountIdentityChanged } from './useAccountIdentity.js';
 
 /** 一次写请求的结果，只用于决定底部那一行字。 */
 type Notice =
@@ -204,6 +205,7 @@ export function ProfilePanel(): React.JSX.Element {
     //    于是用户换完照片看到的是一句关于别的东西的话。
     setAvatarNotice({ kind: 'done', text: t('common.profile.avatar.uploaded') });
     setAvatarState('ready');
+    notifyAccountIdentityChanged();
   };
 
   const fileErrorText = (error: AvatarFileError): string =>
@@ -243,6 +245,7 @@ export function ProfilePanel(): React.JSX.Element {
           ? t('common.profile.nickname.cleared')
           : t('common.profile.nickname.saved'),
     });
+    notifyAccountIdentityChanged();
   };
 
   const removeAvatar = async (): Promise<void> => {
@@ -258,6 +261,7 @@ export function ProfilePanel(): React.JSX.Element {
     setAvatarUrl(undefined);
     setAvatarState('absent');
     setAvatarNotice({ kind: 'done', text: t('common.profile.avatar.removed') });
+    notifyAccountIdentityChanged();
   };
 
   const codePoints = displayNameCodePoints(draft);
@@ -279,6 +283,11 @@ export function ProfilePanel(): React.JSX.Element {
       <h2 className="ht-settings__title ht-type-section-title">
         {t('common.profile.title')}
       </h2>
+      {!signedIn ? (
+        <p className="ht-settings__hint" data-testid="profile-signin-required">
+          {t('common.profile.signInToEdit')}
+        </p>
+      ) : null}
       <NoticeLine notice={loadNotice} testId="profile-load-notice" />
 
       <div className="ht-settings__section" data-testid="profile-avatar-row">
@@ -314,6 +323,7 @@ export function ProfilePanel(): React.JSX.Element {
             type="button"
             className="ht-btn ht-btn--ghost"
             data-testid="profile-avatar-change"
+            disabled={!canTouchAvatar}
             onClick={() => fileRef.current?.click()}
           >
             {t('common.profile.avatar.change')}
@@ -323,6 +333,7 @@ export function ProfilePanel(): React.JSX.Element {
               type="button"
               className="ht-btn ht-btn--ghost"
               data-testid="profile-avatar-remove"
+              disabled={!canTouchAvatar}
               onClick={() => void removeAvatar()}
             >
               {t('common.profile.avatar.remove')}
@@ -356,6 +367,7 @@ export function ProfilePanel(): React.JSX.Element {
           type="text"
           className="ht-input"
           data-testid="profile-nickname-input"
+          disabled={!signedIn}
           value={draft}
           maxLength={ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS * 2}
           placeholder={t('common.profile.nickname.placeholder')}
@@ -382,6 +394,7 @@ export function ProfilePanel(): React.JSX.Element {
             type="button"
             className="ht-btn ht-btn--primary"
             data-testid="profile-nickname-save"
+            disabled={!signedIn}
             onClick={() => void saveNickname()}
           >
             {t('common.profile.nickname.save')}

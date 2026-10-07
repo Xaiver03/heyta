@@ -196,6 +196,21 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
     expect(document.activeElement).toBe(avatar);
   });
 
+  it('已登录时，键盘展开后焦点落在个人中心首项', async () => {
+    useSyncStore.setState({ baseUrl: 'https://sync.example', token: 'JWT', email: 'me@example.com' });
+    const el = await render();
+    const avatar = el.querySelector<HTMLButtonElement>('[data-testid="account-menu-avatar"]')!;
+    avatar.focus();
+    keydown(avatar, 'ArrowDown');
+
+    // 定位完成后才可聚焦：给 passive effects 一个异步边界，模拟真实浏览器的
+    // 「先挂 hidden panel，再写 fixed 坐标」时序。
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('account-menu-profile-center');
+  });
+
   it('未配置服务端时，认证面板自己提供地址输入（两次点击仍然够）', async () => {
     const el = await render();
     expect(useSyncStore.getState().baseUrl).toBe('');

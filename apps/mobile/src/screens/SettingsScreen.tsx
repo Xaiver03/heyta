@@ -25,7 +25,7 @@
  * 而 Modal 里没有标签栏）；头部骨架照 `TaskDetailSheet` 的手写先例。
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -55,6 +55,7 @@ import {
 import { Icon } from '../ui/icons';
 import { useLocalePreference } from '../i18n/locale-preference';
 import { useTokens } from '../theme';
+import { useMobileNavigation } from '../nav/navigation';
 import type { SyncCredentialForm } from '../sync/credential-form';
 import { DEFAULT_SERVER_URL } from '../sync/config';
 import { VaultSettingsSection } from './VaultSettingsSection';
@@ -84,14 +85,22 @@ import {
  */
 const WIDGET_ADD_STEPS = widgetAddSteps(resolveWidgetPlatform(Platform.OS));
 
+/** 一级目录的稳定语义 key。父屏可以用它把“从哪一组进入”传回设置面。 */
+export type SettingsSectionKey = 'profile' | 'general' | 'sync' | 'ai' | 'data' | 'security';
+
 export function SettingsScreen({
   visible,
-  onClose,
+  onClose: closeParent,
   form,
   onClearCredentials,
   vaultCleanupPending,
   onRetryVaultCleanup,
   onVaultCleanupPending,
+  profileEditor,
+  dataActions,
+  securityActions,
+  syncStatus,
+  initialSection,
 }: {
   /** 「我的」持有这个状态；关闭只是把它拨回 `false`，不卸载「我的」。 */
   visible: boolean;
@@ -104,11 +113,22 @@ export function SettingsScreen({
   vaultCleanupPending?: boolean;
   onRetryVaultCleanup?: () => void;
   onVaultCleanupPending?: (scope: import('../lib/vault-secure-storage').VaultSecureStorageScope) => void;
+  /** 资料编辑器由 ProfileScreen 持有；设置面只提供唯一入口，不复制表单。 */
+  profileEditor?: React.ReactNode;
+  /** 数据管理入口由父屏提供，避免在设置面复制整屏路由状态。 */
+  dataActions?: readonly SettingsRowModel[];
+  /** 账号安全入口由父屏提供，避免在设置面复制整屏路由状态。 */
+  securityActions?: readonly SettingsRowModel[];
+  /** 同步状态与重试动作由父屏提供，表单仍由父屏持有。 */
+  syncStatus?: React.ReactNode;
+  /** 从个人资料直达“个人资料”二级分组，普通打开时留在目录。 */
+  initialSection?: SettingsSectionKey;
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
   const insets = useSafeAreaInsets();
   const { locale, setLocale } = useLocalePreference();
+  const navigation = useMobileNavigation();
 
   /**
    * W5-2 · 锁屏组件的"隐藏任务标题"开关。
@@ -123,6 +143,18 @@ export function SettingsScreen({
   const [widgetBridgeAvailable] = useState(() => isWidgetBridgeAvailable());
   const [privacyFailed, setPrivacyFailed] = useState(false);
   const [privacyBusy, setPrivacyBusy] = useState(false);
+  const [section, setSection] = useState<SettingsSectionKey | undefined>(initialSection);
+  const sectionRef = useRef<SettingsSectionKey | undefined>(initialSection);
+  const openSection = useCallback((next: SettingsSectionKey | undefined): void => {
+    sectionRef.current = next;
+    setSection(next);
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    sectionRef.current = initialSection;
+    setSection(initialSection);
+  }, [initialSection, visible]);
 
   /*
     ── 隐私同意（PIPL 第 15 条那个"便捷的撤回方式"）───────────────
@@ -195,9 +227,9 @@ export function SettingsScreen({
    * （§3.5）—— 两张面板就是两个裁决者，而它们对"同意长什么样"的理解会漂移。
    */
   const chooseAgain = useCallback((): void => {
-    onClose();
+    closeParent();
     openPrivacySheet('revoked');
-  }, [onClose]);
+  }, [closeParent]);
 
   /**
    * 当前状态那一行的措辞。**三分支而不是一个布尔**：
@@ -246,13 +278,244 @@ export function SettingsScreen({
       : []),
   ];
 
+  const sectionLabels: Record<SettingsSectionKey, string> = {
+    profile: t('mobile.settings.section.profile'),
+    general: t('mobile.settings.section.general'),
+    sync: t('mobile.settings.section.sync'),
+    ai: t('mobile.settings.section.ai'),
+    data: t('mobile.settings.section.data'),
+    security: t('mobile.settings.section.security'),
+  };
+
+  const sectionIcons: Record<SettingsSectionKey, React.ComponentProps<typeof Icon>['name']> = {
+    profile: 'tab.profile',
+    general: 'action.settings',
+    sync: 'action.sync',
+    ai: 'action.more',
+    data: 'action.share',
+    security: 'privacy.consent',
+  };
+
+  const sectionRows: readonly SettingsRowModel[] = (
+    Object.keys(sectionLabels) as SettingsSectionKey[]
+  )
+    .filter(
+      (key) =>
+        key !== 'profile' ||
+        (profileEditor !== undefined && profileEditor !== null && profileEditor !== false),
+    )
+    .map((key): SettingsRowModel => ({
+      kind: 'action',
+      testID: `settings-section-${key}`,
+      label: sectionLabels[key],
+      leading: <Icon name={sectionIcons[key]} size="sm" color={tokens['color.foreground-muted']} />,
+      onPress: () => openSection(key),
+    }));
+
+  const handleRequestClose = useCallback((): boolean => {
+    const current = sectionRef.current;
+    if (current !== undefined) {
+      sectionRef.current = undefined;
+      setSection(undefined);
+    } else {
+      closeParent();
+    }
+    return true;
+  }, [closeParent]);
+  // Keep the existing SettingsScreen close contract as the Modal callback. The
+  // wrapper adds the directory -> section back step without changing the
+  // outer ProfileScreen ownership of the sheet.
+  const onClose = handleRequestClose;
+
+  useEffect(() => {
+    navigation.setBackHandler(visible ? handleRequestClose : null);
+    return () => navigation.setBackHandler(null);
+  }, [handleRequestClose, navigation, visible]);
+
+  const renderPrivacy = (): React.JSX.Element => (
+    <Stack gap="loose" testID="privacy-consent-section">
+      <SectionHeader icon="privacy.consent" title={t('common.privacy.settings.title')} />
+      <Card>
+        <Stack>
+          <Text variant="row-title">
+            {t(consentStateKey)}
+            {consentRecord === null
+              ? null
+              : ` · ${t('common.privacy.settings.decidedAt', {
+                  time: formatPrivacyDecisionTime(consentRecord.decidedAt),
+                })}`}
+          </Text>
+          <Text variant="caption" tone="subtle">
+            {t('common.privacy.settings.revokeHint')}
+          </Text>
+        </Stack>
+      </Card>
+      {consentRecord === null ? (
+        <Button label={t('common.privacy.settings.chooseAgain')} onPress={chooseAgain} tone="primary" />
+      ) : (
+        <Button label={t('common.privacy.settings.revoke')} onPress={revokeConsent} tone="secondary" />
+      )}
+      {revokeNotPersisted ? (
+        <Text variant="caption" tone="warning">
+          {t('common.privacy.consent.notPersisted')}
+        </Text>
+      ) : null}
+    </Stack>
+  );
+
+  const renderSync = (): React.JSX.Element => (
+    <>
+      {syncStatus}
+      {renderPrivacy()}
+      <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
+      <Text variant="caption" tone="subtle">
+        {t('mobile.profile.sync.manualHint')}
+      </Text>
+      <Card>
+        <View style={{ gap: tokens['space.4'] }}>
+          <TextField
+            label={t('mobile.profile.serverUrl.label')}
+            value={form.serverUrl}
+            onChangeText={form.setServerUrl}
+            placeholder={DEFAULT_SERVER_URL}
+            keyboard="url"
+            hint={t('mobile.profile.serverUrl.hint')}
+          />
+          {form.transport === 'plaintext' ? (
+            <Text variant="caption" tone="warning">
+              {t('mobile.profile.transport.plaintext')}
+            </Text>
+          ) : null}
+          {form.transport === 'plaintext-local' ? (
+            <Text variant="caption" tone="warning">
+              {t('mobile.profile.transport.plaintextLocal')}
+            </Text>
+          ) : null}
+          <TextField
+            label={t('mobile.profile.token.label')}
+            value={form.token}
+            onChangeText={form.setToken}
+            placeholder={t('mobile.profile.token.placeholder')}
+          />
+          <TextField
+            label={t('mobile.profile.password.label')}
+            value={form.password}
+            onChangeText={form.setPassword}
+            secure
+            hint={t('mobile.profile.password.hint')}
+          />
+        </View>
+      </Card>
+    </>
+  );
+
+  const renderGeneral = (): React.JSX.Element => (
+    <>
+      {shouldShowWidgetJourney(widgetBridgeAvailable) ? (
+        <SettingsSection
+          variant="card"
+          testID="widget-journey"
+          title={t('mobile.widgetJourney.sectionTitle')}
+          leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
+          rows={widgetRows}
+        />
+      ) : null}
+      <Text variant="caption" tone="subtle">
+        {t('mobile.profile.footnote')}
+      </Text>
+      <SettingsSection
+        variant="card"
+        testID="profile-language"
+        title={t('mobile.profile.section.language')}
+        note={t('mobile.profile.language.hint')}
+        leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
+      >
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.3'] }}>
+          {LOCALES.map((code) => (
+            <Chip
+              key={code}
+              label={code === 'zh-CN' ? t('common.lang.zh') : t('common.lang.en')}
+              selected={locale === code}
+              onPress={() => setLocale(code)}
+            />
+          ))}
+        </View>
+      </SettingsSection>
+    </>
+  );
+
+  const renderSecurity = (): React.JSX.Element => (
+    <>
+      {securityActions !== undefined && securityActions.length > 0 ? (
+        <SettingsSection
+          variant="card"
+          testID="settings-security-actions"
+          title={sectionLabels.security}
+          leading={<Icon name="privacy.consent" size="sm" color={tokens['color.foreground-muted']} />}
+          rows={securityActions}
+        />
+      ) : null}
+      <VaultSettingsSection onVaultCleanupPending={onVaultCleanupPending} />
+      {vaultCleanupPending && onRetryVaultCleanup !== undefined ? (
+        <Card>
+          <Stack>
+            <Text variant="caption" tone="danger">
+              {t('mobile.vault.logoutCleanupFailed')}
+            </Text>
+            <Button label={t('mobile.vault.retryCleanup')} onPress={onRetryVaultCleanup} tone="ghost" />
+          </Stack>
+        </Card>
+      ) : null}
+      <Button
+        label={t('mobile.profile.clearCredentials')}
+        onPress={onClearCredentials}
+        tone="ghost"
+        disabled={form.token === '' && form.password === ''}
+      />
+    </>
+  );
+
+  const renderSection = (): React.JSX.Element => {
+    switch (section) {
+      case 'profile':
+        return <>{profileEditor}</>;
+      case 'general':
+        return renderGeneral();
+      case 'sync':
+        return renderSync();
+      case 'ai':
+        return <AiSettingsSection />;
+      case 'data':
+        return (
+          <SettingsSection
+            variant="card"
+            testID="settings-data-actions"
+            title={sectionLabels.data}
+            leading={<Icon name="action.share" size="sm" color={tokens['color.foreground-muted']} />}
+            rows={dataActions ?? []}
+          />
+        );
+      case 'security':
+        return renderSecurity();
+      case undefined:
+        return (
+          <SettingsSection
+            variant="card"
+            testID="settings-directory"
+            title={t('mobile.settings.directory.title')}
+            note={t('mobile.settings.directory.hint')}
+            rows={sectionRows}
+          />
+        );
+    }
+  };
+
   return (
     <Modal
       visible={visible}
       animationType="slide"
       onRequestClose={onClose}
       statusBarTranslucent
-      // Android 返回键 / 读屏的"离开"动作都落到 onClose。
       accessibilityViewIsModal
       testID="settings-sheet"
     >
@@ -260,13 +523,9 @@ export function SettingsScreen({
         style={{
           flex: 1,
           backgroundColor: tokens['color.background'],
-          // Modal 不吃 kit `Screen` 的标签栏预留，但**必须**自己让出状态栏
-          //（`statusBarTranslucent` 下内容会顶到状态栏底下）。
           paddingTop: insets.top,
         }}
       >
-        {/* 头部：关闭 + 标题。骨架照 `TaskDetailSheet` 的手写先例 ——
-            刻意不用 kit `AppBar`：它绑定了页面的 insets 语义。 */}
         <View
           style={{
             height: tokens['nav.app-bar-height'],
@@ -280,20 +539,24 @@ export function SettingsScreen({
           }}
         >
           <IconButton
-            icon="action.close"
-            label={t('mobile.settings.close')}
+            icon={section === undefined ? 'action.close' : 'action.back'}
+            label={section === undefined ? t('mobile.settings.close') : t('mobile.growth.back')}
             color={tokens['color.foreground-muted']}
-            onPress={onClose}
+            onPress={handleRequestClose}
           />
           <View style={{ flex: 1 }}>
             <Text variant="headline" numberOfLines={1}>
-              {t('mobile.settings.title')}
+              {section === undefined ? t('mobile.settings.title') : sectionLabels[section]}
             </Text>
           </View>
+          {section === undefined ? null : (
+            <IconButton icon="action.close" label={t('mobile.settings.close')} onPress={closeParent} />
+          )}
         </View>
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView
+            key={section ?? 'directory'}
             style={{ flex: 1 }}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{
@@ -302,185 +565,7 @@ export function SettingsScreen({
               paddingBottom: tokens['screen.gutter'] + insets.bottom,
             }}
           >
-            {/*
-              ── 隐私同意（**撤回的那个入口**）─────────────────────
-              🔴 放在**第一段**，不在同步表单下面。PIPL 第 15 条要"便捷"，
-              而这一面下面是一整张四栏凭据表单 + 清凭据按钮 —— 把它排到下面，
-              在小屏上就是"要点开设置、滚过一整屏才找得到"。
-              排在这里的成本是"改服务器地址要往下滚一格"，撤回的成本是"找不到入口"，
-              后者是合规问题，前者不是。
-            */}
-            <Stack gap="loose" testID="privacy-consent-section">
-              <SectionHeader icon="privacy.consent" title={t('common.privacy.settings.title')} />
-              <Card>
-                <Stack>
-                  <Text variant="row-title">
-                    {t(consentStateKey)}
-                    {consentRecord === null
-                      ? null
-                      : ` · ${t('common.privacy.settings.decidedAt', {
-                          time: formatPrivacyDecisionTime(consentRecord.decidedAt),
-                        })}`}
-                  </Text>
-                  <Text variant="caption" tone="subtle">
-                    {t('common.privacy.settings.revokeHint')}
-                  </Text>
-                </Stack>
-              </Card>
-              {consentRecord === null ? (
-                // 没决定过（首启跳过了、或刚撤回）：把**同一张**面板再打开一次。
-                <Button
-                  label={t('common.privacy.settings.chooseAgain')}
-                  onPress={chooseAgain}
-                  tone="primary"
-                />
-              ) : (
-                <Button
-                  label={t('common.privacy.settings.revoke')}
-                  onPress={revokeConsent}
-                  tone="secondary"
-                />
-              )}
-              {revokeNotPersisted ? (
-                <Text variant="caption" tone="warning">
-                  {t('common.privacy.consent.notPersisted')}
-                </Text>
-              ) : null}
-            </Stack>
-
-            {/*
-              ── 同步凭据（手动兜底路径）───────────────────────────
-              🔴 从「我的」搬进设置面的那段表单，一个字没改逻辑 ——
-              改的只是"住在哪"（goal M3 的注入判据盯的就是这一点：
-              搬回去，门禁红）。
-            */}
-            <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
-            <Text variant="caption" tone="subtle">
-              {t('mobile.profile.sync.manualHint')}
-            </Text>
-            <Card>
-              <View style={{ gap: tokens['space.4'] }}>
-                <TextField
-                  label={t('mobile.profile.serverUrl.label')}
-                  value={form.serverUrl}
-                  onChangeText={form.setServerUrl}
-                  placeholder={DEFAULT_SERVER_URL}
-                  keyboard="url"
-                  hint={t('mobile.profile.serverUrl.hint')}
-                />
-                {form.transport === 'plaintext' ? (
-                  <Text variant="caption" tone="warning">
-                    {t('mobile.profile.transport.plaintext')}
-                  </Text>
-                ) : null}
-                {form.transport === 'plaintext-local' ? (
-                  <Text variant="caption" tone="warning">
-                    {t('mobile.profile.transport.plaintextLocal')}
-                  </Text>
-                ) : null}
-                <TextField
-                  label={t('mobile.profile.token.label')}
-                  value={form.token}
-                  onChangeText={form.setToken}
-                  placeholder={t('mobile.profile.token.placeholder')}
-                />
-                <TextField
-                  label={t('mobile.profile.password.label')}
-                  value={form.password}
-                  onChangeText={form.setPassword}
-                  secure
-                  hint={t('mobile.profile.password.hint')}
-                />
-              </View>
-            </Card>
-
-            {/*
-              ── AI 设置（四道闸 + 端点 + 逐功能授权 + 逐工具授权 + 助手档位）──
-              🔴 与同步凭据**同一层**是有意的：AI 的端点就是"这台设备跟谁说话"，
-              把它放到「我的」的滚动流里会撞 `check:mobile-settings` 那条注入判据。
-              判断本身（默认值、fail-closed 归一、bindAddress 不许从磁盘读）
-              全在 `@heyta/app-host`，这里只是通道（AGENTS §3.5）。
-            */}
-            <AiSettingsSection />
-
-            <VaultSettingsSection onVaultCleanupPending={onVaultCleanupPending} />
-            {vaultCleanupPending && onRetryVaultCleanup !== undefined ? (
-              <Card>
-                <Stack>
-                  <Text variant="caption" tone="danger">
-                    {t('mobile.vault.logoutCleanupFailed')}
-                  </Text>
-                  <Button
-                    label={t('mobile.vault.retryCleanup')}
-                    onPress={onRetryVaultCleanup}
-                    tone="ghost"
-                  />
-                </Stack>
-              </Card>
-            ) : null}
-
-            {/*
-              清凭据必须**连小组件一起清**（决策 D6）—— 组合逻辑在
-              「我的」（`onClearCredentials`），这里只有按钮。
-            */}
-            <Button
-              label={t('mobile.profile.clearCredentials')}
-              onPress={onClearCredentials}
-              tone="ghost"
-              disabled={form.token === '' && form.password === ''}
-            />
-
-            {/*
-              桌面小组件 —— 应用内旅程。整段的判据是"原生桥在不在这台设备上"
-              （不是平台名）；桥不在时整段不画。理由在 `widget-journey.ts` 文件头。
-            */}
-            {shouldShowWidgetJourney(widgetBridgeAvailable) ? (
-              <SettingsSection
-                variant="card"
-                testID="widget-journey"
-                title={t('mobile.widgetJourney.sectionTitle')}
-                leading={
-                  <Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />
-                }
-                rows={widgetRows}
-              />
-            ) : null}
-
-            <Text variant="caption" tone="subtle">
-              {t('mobile.profile.footnote')}
-            </Text>
-
-            {/*
-              语言。胶囊是移动端 L2 原语（`Chip`），走插槽注入 ——
-              共享层只负责分组骨架、标题与说明。
-              语言名永远用**它自己的语言**写（中文 / English），
-              不跟着当前语言翻译。
-            */}
-            <SettingsSection
-              variant="card"
-              testID="profile-language"
-              title={t('mobile.profile.section.language')}
-              note={t('mobile.profile.language.hint')}
-              leading={
-                <Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />
-              }
-            >
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.3'] }}>
-                {LOCALES.map((code) => {
-                  const label = code === 'zh-CN' ? t('common.lang.zh') : t('common.lang.en');
-                  return (
-                    <Chip
-                      key={code}
-                      label={label}
-                      selected={locale === code}
-                      onPress={() => {
-                        setLocale(code);
-                      }}
-                    />
-                  );
-                })}
-              </View>
-            </SettingsSection>
+            {renderSection()}
           </ScrollView>
         </KeyboardAvoidingView>
       </View>

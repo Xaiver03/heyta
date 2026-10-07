@@ -137,12 +137,10 @@ export const CONSENT_LOCAL_ONLY = {
  *   - `device`     → DEVICES 的键
  *   - `fullPage`   → 是否截整页
  *   - `appStore`   → 是否纳入 App Store 截图集
- *   - `locale`     → 截图时的界面语言（默认 `zh-CN`）。🔴 web 应用**不读**
- *     `navigator.language`（见 `apps/web/src/lib/locale.ts` 文件头：刻意不做
- *     设备语言判断），Playwright 的 `locale:` 只改浏览器侧协商 —— 真正让界面
- *     切语言的是 `?lang=` 参数（已存偏好 > `?lang=` > 默认中文）。所以
- *     capture 对非默认 locale 的目标是把 `?lang=` 拼进 URL，`locale` 字段
- *     同时进 newContext 保持两层一致。
+ *   - `locale`     → 截图时的界面语言（默认 `zh-CN`）。web 首启会读取
+ *     `navigator.language`，同时接受落地页传入的 `?lang=`；已存偏好优先级最高。
+ *     因此 capture 同时设置 Playwright `locale:` 与非默认语言的 `?lang=`，让
+ *     浏览器协商和应用自身的语言来源保持一致。
  */
 export const TARGETS = [
   // ── 官网（路径式）────────────────────────────────────────────────
@@ -158,9 +156,9 @@ export const TARGETS = [
   { id: 'W01', name: '任务', site: 'web', openVia: 'tab', view: 'tasks', readyText: '任务', appStore: true },
   { id: 'W02', name: '四象限', site: 'web', openVia: 'tab', view: 'quadrant', readyText: '四象限', appStore: true },
   { id: 'W03', name: '习惯', site: 'web', openVia: 'tab', view: 'habits', readyText: '习惯', appStore: true },
-  { id: 'W04', name: '番茄钟', site: 'web', openVia: 'tab', view: 'focus', readyText: '番茄钟', appStore: true },
+  { id: 'W04', name: '番茄钟', site: 'web', openVia: 'tab', view: 'focus', readyText: '番茄钟', enableModules: ['focus'], appStore: true },
   { id: 'W05', name: '时间线', site: 'web', openVia: 'tab', view: 'timeline', readyText: '时间线', appStore: true },
-  { id: 'W06', name: '成长', site: 'web', openVia: 'tab', view: 'growth', readyText: '成长', appStore: true },
+  { id: 'W06', name: '成长', site: 'web', openVia: 'tab', view: 'growth', readyText: '成长', enableModules: ['growth'], appStore: true },
   // 🔴 `seed`：这张图主张的是"回收站里四类都有"，而截图流水线原来**没有任何种数据的层**
   //   （计划 §10.219 现量），所以它只能截出一个空回收站或只有任务的回收站。
   //   `capture.mjs` 会把 `fixture` 走**产品自己的「从备份还原」通道**喂进去，

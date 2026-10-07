@@ -43,7 +43,19 @@ async function flush(): Promise<void> {
 }
 
 function byText(text: string): HTMLElement | undefined {
-  return [...(container?.querySelectorAll('button') ?? [])].find((b) =>
+  const direct = [...(container?.querySelectorAll('button') ?? [])].find((b) =>
+    b.textContent?.includes(text),
+  ) as HTMLElement | undefined;
+  if (direct !== undefined) return direct;
+  const more = [...(container?.querySelectorAll('.ht-rail button') ?? [])].find(
+    (button) => (button.textContent ?? '').trim() === '更多',
+  ) as HTMLElement | undefined;
+  if (more !== undefined && container?.querySelector('[role="menu"]') === null) {
+    act(() => {
+      more.click();
+    });
+  }
+  return [...(container?.querySelectorAll('[role="menuitem"]') ?? [])].find((b) =>
     b.textContent?.includes(text),
   ) as HTMLElement | undefined;
 }

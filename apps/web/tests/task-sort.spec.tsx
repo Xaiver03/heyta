@@ -214,6 +214,61 @@ describe('任务列表的排序控件', () => {
     const el = await mountApp();
     expect(el.querySelector('[data-testid="task-sort"]')).toBeNull();
   });
+
+  it('批量选择入口只在任务列表里出现，完成后退出选择态', async () => {
+    await seedThree();
+    const el = await mountApp();
+    const selectButton = [...el.querySelectorAll('button')].find((button) => button.textContent?.includes('选择任务'));
+    expect(selectButton).toBeDefined();
+    await act(async () => {
+      selectButton?.click();
+      await Promise.resolve();
+    });
+    const task = Object.values(useTaskStore.getState().entities.tasks)[0]!;
+    const checkbox = el.querySelector<HTMLInputElement>(`[data-testid="bulk-select-${task.id}"]`);
+    expect(checkbox).not.toBeNull();
+    await act(async () => {
+      checkbox?.click();
+    });
+    expect(el.textContent).toContain('已选 1 项');
+    const row = el.querySelector<HTMLElement>(`[data-testid="task-item-${task.id}"]`);
+    expect(row, '选择态任务行必须保留稳定锚点').not.toBeNull();
+    expect(
+      row?.querySelector(`button[aria-label="删除：${task.title}"]`),
+      '批量选择时不应继续暴露单条删除动作',
+    ).toBeNull();
+    expect(
+      getComputedStyle(row as HTMLElement).backgroundColor,
+      '选中的任务行必须有共享层的高亮',
+    ).not.toBe('rgba(0, 0, 0, 0)');
+    const complete = [...el.querySelectorAll('button')].find((button) => button.textContent?.includes('批量完成'));
+    expect(complete).toBeDefined();
+    await act(async () => {
+      complete?.click();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(useTaskStore.getState().entities.tasks[task.id]?.completedAt).toBeDefined();
+    expect(el.textContent).not.toContain('已选 1 项');
+  });
+
+  it('Esc 退出批量选择态并清除已选任务', async () => {
+    await seedThree();
+    const el = await mountApp();
+    const selectButton = [...el.querySelectorAll('button')].find((button) => button.textContent?.includes('选择任务'))!;
+    await act(async () => {
+      selectButton.click();
+      await Promise.resolve();
+    });
+    const task = Object.values(useTaskStore.getState().entities.tasks)[0]!;
+    const checkbox = el.querySelector<HTMLInputElement>(`[data-testid="bulk-select-${task.id}"]`)!;
+    await act(async () => {
+      checkbox.click();
+    });
+    expect(el.textContent).toContain('已选 1 项');
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(el.textContent).not.toContain('已选 1 项');
+    expect(el.querySelector(`[data-testid="bulk-select-${task.id}"]`)).toBeNull();
+  });
 });
-
-

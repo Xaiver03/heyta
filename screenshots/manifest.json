@@ -1,14 +1,14 @@
 {
-  "capturedAt": "2026-10-05T12:01:38.902Z",
+  "capturedAt": "2026-10-06T14:17:29.113Z",
   "targets": 1,
   "artifacts": [
     {
-      "path": "screenshots/landing/L07-登录.png",
+      "path": "screenshots/web-desktop/W01-任务.png",
       "width": 1440,
       "height": 900,
-      "contentRatio": 0.032,
-      "colorSpan": 227,
-      "sha256": "24b65b05f7167c29eea6f36dacd89c25517b94667174ecaf663acc0b529fe195"
+      "contentRatio": 0.0848,
+      "colorSpan": 228,
+      "sha256": "9c674806ffeb9493ba03b68765c491e55a1eaa6d2599e7dfa6e1a835b06fc47e"
     }
   ]
 }
