@@ -496,7 +496,24 @@ export async function switchView(
    * 只在这两个整屏浮层真的开着时才按 —— 别在普通视图里凭空发一个 Esc。
    */
   await dismissFullBleedOverlay(page);
-  await page.getByRole('tab', { name: label }).click();
+  // W1（2026-10-06）：rail 收成「主段 ≤4 + 更多」后，低频目的地（时间线/番茄钟/
+  // 成长/便签/倒数纪念日，模块全开时连「搜索」也在内）不在 tablist 里 ——
+  // 它们住在「更多」菜单里，`role="menuitem"`。主段找不到就走菜单这条**真路径**
+  // （与人的操作一致：点「更多」→ 点那一项）；点完该视图被提升进主段，
+  // 之后的调用照旧命中 tab。这条收口在 helper 里，免得每个 spec 各修一遍。
+  // 🔴 判定必须是**带等待的点击**而不是 `count()` 快照：page.reload() 之后应用
+  // 还在启动，瞬间 count()===0 会把钉在主段的目的地（如「习惯」）误判进菜单 ——
+  // 菜单里恰恰没有它 ⇒ 死等超时（habit-icon-picker I3 / habit-month R2 实测）。
+  // click 的 auto-wait 覆盖启动渲染窗口；真低频目的地 5s 内等不到才走菜单。
+  const tab = page.getByRole('tab', { name: label });
+  try {
+    await tab.click({ timeout: 5_000 });
+    return;
+  } catch {
+    // 主段确实没有这一枚 ⇒ 走「更多」。
+  }
+  await page.locator('.ht-rail__more button').click();
+  await page.getByRole('menuitem', { name: label }).click();
 }
 
 /** 通过输入框回车建一条任务（走 `CaptureComposer`，真 op-log）。 */
