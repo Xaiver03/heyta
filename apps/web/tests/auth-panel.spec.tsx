@@ -18,8 +18,8 @@
  *   - 输入框一律按 `data-testid="auth-form-*"` 找 —— 那是**四端共用**的契约，
  *     不是 web 自己的一套 DOM；原来那些 `input[type="checkbox"]` 之类的选择器
  *     钉的是"web 恰好这么写"，共享实现一换就整片红，而红的原因与判断无关。
- *   - 二级入口（邮件链接、找回、粘贴兜底）在第二步才出现，所以每条都先走
- *     邮箱 → 「继续」（理由与代价见 `auth-recovery.spec.tsx` 文件头）。
+ *   - 二级入口（邮件链接、找回、粘贴兜底）由共享表单统一渐进披露；测试显式展开
+ *     「其他登录方式」后再验证动作。
  *   - 同意项不再是 `<input type=checkbox>` 而是 `role="checkbox"` + `aria-checked`：
  *     **判定一个字没改**（没勾就不该发出去），改的只是怎么读出"勾了没有"。
  *
@@ -30,6 +30,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider, translate, type Locale, type MessageKey } from '@heyta/i18n';
+import { OFFICIAL_SITE_ORIGIN, type HostedAuthSession } from '@heyta/app-host';
 
 import { AuthPanel } from '../src/features/auth/AuthPanel.js';
 import { __resetAuthForTests, useAuthStore } from '../src/features/auth/store.js';
@@ -55,6 +56,10 @@ const AUTH_MESSAGE_KEYS = [
   'web.auth.tokenHint',
   'web.auth.empty.title',
   'web.auth.empty.body',
+  'web.auth.plan.title',
+  'web.auth.plan.kicker',
+  'web.auth.plan.lead',
+  'web.auth.plan.local',
   'web.auth.email.label',
   'web.auth.email.placeholder',
   'web.auth.sendLoginLink',
@@ -68,10 +73,20 @@ const AUTH_MESSAGE_KEYS = [
   'web.auth.verify',
   'web.auth.sent.login',
   'web.auth.sent.register',
+  'web.auth.registrationCode.title',
+  'web.auth.registrationCode.sent',
+  'web.auth.registrationCode.label',
+  'web.auth.registrationCode.placeholder',
+  'web.auth.registrationCode.verify',
+  'web.auth.registrationCode.resend',
+  'web.auth.registrationCode.resendIn',
+  'web.auth.registrationCode.changeEmail',
+  'web.auth.registrationCode.expired',
   'web.auth.signedIn.title',
   'web.auth.signedIn.body',
-  'web.auth.server.at',
-  'web.auth.server.prefilled',
+  'web.auth.server.official',
+  'web.auth.server.custom',
+  'web.auth.server.address',
   'web.auth.invite.label',
   'web.auth.invite.invalid',
   'common.auth.form.continue',
@@ -101,6 +116,12 @@ const SESSION = { token: 'jwt-abc', user: { id: 3, email: 'me@example.com' } };
 const EMAIL = 'me@example.com';
 /** 一句合规格（≥8 码点）且不泄露的口令；这里的值不参与任何判定，只是别空着。 */
 const PASSWORD = 'correct horse battery';
+const REGISTRATION_CHALLENGE = {
+  challengeId: 'challenge-1',
+  expiresAt: Date.now() + 600_000,
+  resendAvailableAt: Date.now(),
+  emailDelivered: true,
+};
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -153,6 +174,9 @@ async function renderPanel(locale: Locale = 'zh-CN'): Promise<HTMLDivElement> {
 async function renderPanelAtBaseUrl(
   baseUrl: string,
   locale: Locale = 'zh-CN',
+  allowAdvanced = false,
+  onSignedIn?: (session: HostedAuthSession) => void,
+  onClose: () => void = () => undefined,
 ): Promise<HTMLDivElement> {
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -160,7 +184,12 @@ async function renderPanelAtBaseUrl(
   await act(async () => {
     root!.render(
       <I18nProvider locale={locale}>
-        <AuthPanel baseUrl={baseUrl} onClose={() => undefined} />
+        <AuthPanel
+          baseUrl={baseUrl}
+          allowAdvanced={allowAdvanced}
+          onClose={onClose}
+          onSignedIn={onSignedIn}
+        />
       </I18nProvider>,
     );
     await Promise.resolve();
@@ -209,6 +238,7 @@ async function typeInto(el: HTMLElement, selector: string, value: string): Promi
   await act(async () => {
     setter.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
     await Promise.resolve();
   });
 }
@@ -217,10 +247,12 @@ async function typeById(el: HTMLElement, testId: string, value: string): Promise
   await typeInto(el, `[data-testid="${testId}"]`, value);
 }
 
-/** 邮箱 → 「继续」，停在第二步的**登录档**。 */
+/** 填好邮箱并展开二级入口，停在**登录档**。 */
 async function toCredential(el: HTMLElement, email = EMAIL): Promise<void> {
   await typeById(el, 'auth-form-email', email);
-  await tap(el, 'auth-form-continue');
+  if (el.querySelector('[data-testid="auth-form-other-ways-toggle"]') !== null) {
+    await tap(el, 'auth-form-other-ways-toggle');
+  }
 }
 
 /** 再切到**注册档**（同意项与邀请码在那一档才出现）。 */
@@ -256,12 +288,34 @@ afterEach(() => {
 });
 
 describe('未登录 / 未配置时是明确的空状态', () => {
+  it('把认证收敛成一个计划入口，主路径可见且高级能力不抢首屏', async () => {
+    const el = await renderPanelAtBaseUrl('', 'zh-CN');
+    const dialog = el.querySelector('[role="dialog"]');
+
+    expect(dialog?.getAttribute('aria-label')).toBe(translate('zh-CN', 'web.auth.title'));
+    expect(el.querySelector('.ht-sheet__auth-plan')).not.toBeNull();
+    expect(el.textContent).toContain(translate('zh-CN', 'web.auth.plan.title'));
+    expect(el.querySelector('[data-testid="auth-form-email"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-password"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-submit"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-advanced-toggle"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-self-host-toggle"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-have-token-toggle"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-server-url"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-paste"]')).toBeNull();
+  });
+
+  it('设置 → 同步显式进入时才提供高级入口', async () => {
+    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
+    expect(el.querySelector('[data-testid="auth-form-advanced-toggle"]')).not.toBeNull();
+  });
+
   it('明说"还没有凭据"，并说清凭据怎么来 —— 不是一片空白', async () => {
     const el = await renderPanel('zh-CN');
     const text = el.textContent ?? '';
 
-    expect(text).toContain(translate('zh-CN', 'web.auth.empty.title'));
-    expect(text).toContain(translate('zh-CN', 'web.auth.empty.body'));
+    expect(text).toContain(translate('zh-CN', 'web.auth.plan.title'));
+    expect(text).toContain(translate('zh-CN', 'web.auth.plan.lead'));
     // 空状态不能说成"已登录"。
     expect(text).not.toContain(translate('zh-CN', 'web.auth.signedIn.title'));
   });
@@ -270,13 +324,13 @@ describe('未登录 / 未配置时是明确的空状态', () => {
     const el = await renderPanel('en');
     const text = el.textContent ?? '';
 
-    expect(text).toContain(translate('en', 'web.auth.empty.title'));
+    expect(text).toContain(translate('en', 'web.auth.plan.title'));
     expect(CJK.test(text)).toBe(false);
   });
 });
 
 describe('🔴 口令这条路在界面上**可达**（此前它是"做了但点不到"）', () => {
-  it('登录：填邮箱 → 继续 → 填口令 → 提交，打到 `/api/login/email-password` 并把令牌接上同步', async () => {
+  it('登录：填邮箱 → 填口令 → 提交，打到 `/api/login/email-password` 并把令牌接上同步', async () => {
     stubFetch(200, SESSION);
     const el = await renderPanel('zh-CN');
 
@@ -295,16 +349,89 @@ describe('🔴 口令这条路在界面上**可达**（此前它是"做了但点
     expect(el.textContent ?? '').toContain(translate('zh-CN', 'web.auth.signedIn.title'));
   });
 
+  it('切换服务端后旧的延迟登录响应不写入同步，也不触发 onSignedIn', async () => {
+    let release!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn(() => pending));
+    const onSignedIn = vi.fn();
+    const el = await renderPanelAtBaseUrl('', 'zh-CN', true, onSignedIn);
+
+    await tap(el, 'auth-form-advanced-toggle');
+    await typeById(el, 'auth-form-email', EMAIL);
+    await typeById(el, 'auth-form-password', PASSWORD);
+    await tap(el, 'auth-form-submit');
+
+    await typeInto(el, 'input[inputmode="url"]', 'https://self-hosted.example.test');
+    release({
+      status: 200,
+      ok: true,
+      headers: new Headers(),
+      json: () => Promise.resolve(SESSION),
+    } as unknown as Response);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(useSyncStore.getState().token).toBeUndefined();
+    expect(onSignedIn).not.toHaveBeenCalled();
+    expect(el.querySelector('[role="dialog"]')).not.toBeNull();
+    expect((el.querySelector('input[inputmode="url"]') as HTMLInputElement).value).toBe(
+      'https://self-hosted.example.test',
+    );
+  });
+
+  it('关闭后重开时旧的延迟登录响应不恢复旧会话或触发旧 onSignedIn', async () => {
+    let release!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn(() => pending));
+    const oldOnSignedIn = vi.fn();
+    const el = await renderPanelAtBaseUrl(BASE_URL, 'zh-CN', false, oldOnSignedIn, () => {
+      root?.unmount();
+      container?.remove();
+      root = undefined;
+      container = undefined;
+    });
+
+    await typeById(el, 'auth-form-email', EMAIL);
+    await typeById(el, 'auth-form-password', PASSWORD);
+    await tap(el, 'auth-form-submit');
+    await tap(el, 'auth-form-close');
+
+    const reopenedOnSignedIn = vi.fn();
+    const reopened = await renderPanelAtBaseUrl(BASE_URL, 'zh-CN', false, reopenedOnSignedIn);
+    release({
+      status: 200,
+      ok: true,
+      headers: new Headers(),
+      json: () => Promise.resolve(SESSION),
+    } as unknown as Response);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(useSyncStore.getState().token).toBeUndefined();
+    expect(oldOnSignedIn).not.toHaveBeenCalled();
+    expect(reopenedOnSignedIn).not.toHaveBeenCalled();
+    expect(reopened.textContent ?? '').not.toContain(translate('zh-CN', 'web.auth.signedIn.title'));
+  });
+
   it('注册：切到创建账号档之后才有同意项，勾了才发得出去', async () => {
-    stubFetch(201, { message: 'ok' });
+    stubFetch(200, REGISTRATION_CHALLENGE);
     const el = await renderPanel('zh-CN');
 
     await toRegister(el);
     await tap(el, 'auth-form-terms');
     await typeById(el, 'auth-form-password', PASSWORD);
+    await typeById(el, 'auth-form-password-confirmation', PASSWORD);
     await tap(el, 'auth-form-submit');
 
-    const sent = calls.find((c) => c.url.endsWith('/register/email-password'))!;
+    const sent = calls.find((c) => c.url.endsWith('/register/email-password/request'))!;
     expect(sent).toBeDefined();
     expect(sent.body).toEqual({
       email: EMAIL,
@@ -312,8 +439,9 @@ describe('🔴 口令这条路在界面上**可达**（此前它是"做了但点
       termsAccepted: true,
       locale: 'zh-CN',
     });
-    // 注册成功**不等于已登录**：状态必须是"去邮箱点验证链接"。
-    expect(el.textContent ?? '').toContain(translate('zh-CN', 'web.auth.sent.register'));
+    // 请求验证码后停在验证码阶段，尚未写入会话。
+    expect(el.querySelector('[data-testid="auth-form-registration-code-stage"]')).not.toBeNull();
+    expect(useSyncStore.getState().token).toBeUndefined();
     expect(el.textContent ?? '').not.toContain(translate('zh-CN', 'web.auth.signedIn.title'));
   });
 
@@ -325,17 +453,94 @@ describe('🔴 口令这条路在界面上**可达**（此前它是"做了但点
    *  ⇒ 这一条红；把 `registeredFrom` 弄成永远不带 `mailDelivered` ⇒ 同样红。）
    */
   it('注册：服务端说信没发出去 ⇒ 换那一句，且不再提"查收邮件"', async () => {
-    stubFetch(201, { message: 'ok', emailDelivered: false });
+    stubFetch(200, { ...REGISTRATION_CHALLENGE, emailDelivered: false });
     const el = await renderPanel('zh-CN');
 
     await toRegister(el);
     await tap(el, 'auth-form-terms');
     await typeById(el, 'auth-form-password', PASSWORD);
+    await typeById(el, 'auth-form-password-confirmation', PASSWORD);
     await tap(el, 'auth-form-submit');
 
     const text = el.textContent ?? '';
     expect(text).toContain(translate('zh-CN', 'web.auth.sent.mailNotSent'));
     expect(text).not.toContain(translate('zh-CN', 'web.auth.sent.register'));
+  });
+
+  it('验证码阶段：输入 6 位验证码后验证成功并写入统一会话', async () => {
+    stubFetch(200, REGISTRATION_CHALLENGE);
+    const signedIn = vi.fn();
+    const el = await renderPanelAtBaseUrl(BASE_URL, 'zh-CN', false, signedIn);
+
+    await toRegister(el);
+    await tap(el, 'auth-form-terms');
+    await typeById(el, 'auth-form-password', PASSWORD);
+    await typeById(el, 'auth-form-password-confirmation', PASSWORD);
+    await tap(el, 'auth-form-submit');
+    expect(el.querySelector('[data-testid="auth-form-registration-code-stage"]')).not.toBeNull();
+
+    fetchMock.mockImplementationOnce((input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        init,
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      });
+      return Promise.resolve({
+        status: 200,
+        ok: true,
+        headers: new Headers(),
+        json: () => Promise.resolve(SESSION),
+      } as unknown as Response);
+    });
+    await typeById(el, 'auth-form-registration-code', '12a3456');
+    expect((byTestId(el, 'auth-form-registration-code') as HTMLInputElement).value).toBe('123456');
+    await tap(el, 'auth-form-registration-code-submit');
+
+    expect(calls.some((call) => call.url.endsWith('/register/email-password/verify'))).toBe(true);
+    expect(useSyncStore.getState().token).toBe(SESSION.token);
+    expect(signedIn).toHaveBeenCalledWith(SESSION);
+  });
+
+  it('验证码阶段可以改邮箱，并清除旧 challenge', async () => {
+    stubFetch(200, REGISTRATION_CHALLENGE);
+    const el = await renderPanel('zh-CN');
+    await toRegister(el);
+    await tap(el, 'auth-form-terms');
+    await typeById(el, 'auth-form-password', PASSWORD);
+    await typeById(el, 'auth-form-password-confirmation', PASSWORD);
+    await tap(el, 'auth-form-submit');
+    await tap(el, 'auth-form-registration-code-change-email');
+
+    expect(el.querySelector('[data-testid="auth-form-registration-code-stage"]')).toBeNull();
+    expect(el.querySelector('[data-testid="auth-form-password"]')).not.toBeNull();
+    expect(useAuthStore.getState().registrationChallenge).toBeUndefined();
+  });
+
+  it('切换服务端时延迟的注册 challenge 响应不会覆盖当前认证状态', async () => {
+    let release!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn(() => pending));
+    const el = await renderPanelAtBaseUrl(BASE_URL, 'zh-CN', false);
+    await toRegister(el);
+    await tap(el, 'auth-form-terms');
+    await typeById(el, 'auth-form-password', PASSWORD);
+    await typeById(el, 'auth-form-password-confirmation', PASSWORD);
+    await tap(el, 'auth-form-submit');
+    useAuthStore.getState().invalidatePendingAuth();
+    release({
+      status: 200,
+      ok: true,
+      headers: new Headers(),
+      json: () => Promise.resolve(REGISTRATION_CHALLENGE),
+    } as unknown as Response);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(useAuthStore.getState().registrationChallenge).toBeUndefined();
+    expect(el.querySelector('[data-testid="auth-form-registration-code-stage"]')).toBeNull();
   });
 
   it('「忘记密码」在登录档，点了发的是重置邮件而不是登录链接', async () => {
@@ -361,6 +566,7 @@ describe('🔴 口令这条路在界面上**可达**（此前它是"做了但点
     await toRegister(el);
     await tap(el, 'auth-form-terms');
     await typeById(el, 'auth-form-password', 'short');
+    await typeById(el, 'auth-form-password-confirmation', 'short');
     await tap(el, 'auth-form-submit');
 
     expect(el.textContent ?? '').toContain(
@@ -422,11 +628,10 @@ describe('🔴 拿到令牌之后必须真的接上同步配置', () => {
 
   it('粘贴兜底走的是界面上那一个按钮，不是直接调 store', async () => {
     stubFetch(200, SESSION);
-    const el = await renderPanel('zh-CN');
+    const el = await renderPanelAtBaseUrl(BASE_URL, 'zh-CN', true);
 
-    // 兜底那栏默认收起（2026-10-02 晚），先展开 —— 判的还是「走界面上那个按钮」，
-    // 而不是「节点必须一直挂着」。
-    await tap(el, 'auth-form-have-token-toggle');
+    // 兜底那栏只在同步设置显式进入后存在，先展开备用入口。
+    await tap(el, 'auth-form-advanced-toggle');
     await typeById(el, 'auth-form-paste', 'https://sync.example.com/magic-login?token=tok-123');
     await tap(el, 'auth-form-verify');
 
@@ -598,9 +803,10 @@ describe('邀请码：URL 带码要预填，形状不对不许发出去', () => 
     expect(byTestId(el, 'auth-form-invite')).not.toBeNull();
     await tap(el, 'auth-form-terms');
     await typeById(el, 'auth-form-password', PASSWORD);
+    await typeById(el, 'auth-form-password-confirmation', PASSWORD);
     await tap(el, 'auth-form-submit');
 
-    const sent = calls.find((c) => c.url.endsWith('/register/email-password'))!;
+    const sent = calls.find((c) => c.url.endsWith('/register/email-password/request'))!;
     expect(sent.body).toMatchObject({ inviteCode: 'ABCD2345' });
     setSearch('/');
   });
@@ -617,9 +823,10 @@ describe('邀请码：URL 带码要预填，形状不对不许发出去', () => 
     await typeById(el, 'auth-form-invite', 'ZZZZ2345');
     await tap(el, 'auth-form-terms');
     await typeById(el, 'auth-form-password', PASSWORD);
+    await typeById(el, 'auth-form-password-confirmation', PASSWORD);
     await tap(el, 'auth-form-submit');
 
-    const sent = calls.find((c) => c.url.endsWith('/register/email-password'))!;
+    const sent = calls.find((c) => c.url.endsWith('/register/email-password/request'))!;
     expect(sent.body).toMatchObject({ inviteCode: 'ZZZZ2345' });
     setSearch('/');
   });
@@ -637,9 +844,10 @@ describe('邀请码：URL 带码要预填，形状不对不许发出去', () => 
 
     await tap(el, 'auth-form-terms');
     await typeById(el, 'auth-form-password', PASSWORD);
+    await typeById(el, 'auth-form-password-confirmation', PASSWORD);
     await tap(el, 'auth-form-submit');
 
-    const sent = calls.find((c) => c.url.endsWith('/register/email-password'))!;
+    const sent = calls.find((c) => c.url.endsWith('/register/email-password/request'))!;
     expect(Object.keys(sent.body as object)).not.toContain('inviteCode');
   });
 });
@@ -718,6 +926,11 @@ describe('条款链接：按连的那台服务端分流', () => {
     ]);
   });
 
+  it('官方地址带尾斜杠时仍按官方服务处理', async () => {
+    const el = await renderPanelAtBaseUrl(`${OFFICIAL}/`);
+    expect(el.textContent ?? '').not.toContain(translate('zh-CN', 'web.auth.server.custom'));
+  });
+
   it('英文界面落到 `/en/legal/*`', async () => {
     const el = await renderPanelAtBaseUrl(OFFICIAL, 'en');
     await toRegister(el);
@@ -740,15 +953,15 @@ describe('条款链接：按连的那台服务端分流', () => {
     const el = await renderPanelAtBaseUrl('');
     await toRegister(el);
     expect(legalAnchors(el).map((a) => a.getAttribute('href'))).toEqual([
-      `${window.location.origin}/terms.html`,
-      `${window.location.origin}/privacy.html`,
+      `${OFFICIAL_SITE_ORIGIN}/legal/terms/`,
+      `${OFFICIAL_SITE_ORIGIN}/legal/privacy/`,
     ]);
     expect(el.querySelector('[role="checkbox"]')).not.toBeNull();
   });
 
   it('在面板里现敲一个官方地址，链接跟着换过去（分流读的是 `effectiveBaseUrl`）', async () => {
-    const el = await renderPanelAtBaseUrl('');
-    await tap(el, 'auth-form-self-host-toggle');
+    const el = await renderPanelAtBaseUrl('', 'zh-CN', true);
+    await tap(el, 'auth-form-advanced-toggle');
     await typeInto(el, 'input[inputmode="url"]', `${OFFICIAL}/`);
     await toRegister(el);
 

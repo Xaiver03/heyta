@@ -43,6 +43,12 @@ export interface NotificationCtor {
   requestPermission?: () => Promise<NotificationPermission>;
 }
 
+/** The browser may expose Notification while the current context cannot use it. */
+export type NotificationCapability = NotificationPermission | 'unsupported';
+
+/** A permission request can fail without the user explicitly denying it. */
+export type NotificationRequestResult = NotificationCapability | 'error';
+
 /** 能力探测：这台浏览器/这个上下文有没有通知。 */
 export function notificationsSupported(
   ctor: NotificationCtor | undefined = globalThis.Notification as NotificationCtor | undefined,
@@ -50,14 +56,17 @@ export function notificationsSupported(
   // ⚠️ `new Notification(...)` 在**非安全上下文**下直接抛（http:// 的自托管实例），
   // 所以只判 `typeof` 不够 —— 还要判 `permission` 属性在不在
   //（不在时构造会 TypeError，而那是"不支持"而不是"被拒"）。
+  if (typeof globalThis.isSecureContext === 'boolean' && !globalThis.isSecureContext) {
+    return false;
+  }
   return typeof ctor === 'function' && typeof ctor.permission === 'string';
 }
 
-/** 当前权限。不支持时返回 `'denied'` —— 与"用户拒绝"同一个后果，调用方无需分支。 */
+/** 当前权限。把“不支持”和“用户拒绝”分开，界面才能给出正确的下一步。 */
 export function notificationPermission(
   ctor: NotificationCtor | undefined = globalThis.Notification as NotificationCtor | undefined,
-): NotificationPermission {
-  if (!notificationsSupported(ctor)) return 'denied';
+): NotificationCapability {
+  if (!notificationsSupported(ctor)) return 'unsupported';
   return ctor!.permission;
 }
 
@@ -71,8 +80,8 @@ export function notificationPermission(
  */
 export async function requestNotificationPermission(
   ctor: NotificationCtor | undefined = globalThis.Notification as NotificationCtor | undefined,
-): Promise<NotificationPermission> {
-  if (!notificationsSupported(ctor)) return 'denied';
+): Promise<NotificationRequestResult> {
+  if (!notificationsSupported(ctor)) return 'unsupported';
   const request = ctor!.requestPermission;
   if (request === undefined) {
     // 老浏览器只有 `permission` 没有 `requestPermission`：按当前值处理。
@@ -81,7 +90,7 @@ export async function requestNotificationPermission(
   try {
     return await request.call(ctor);
   } catch {
-    return 'denied';
+    return 'error';
   }
 }
 

@@ -15,7 +15,7 @@
  * └──────────────────────────────────────────────┘
  * ```
  *
- * · `lead`：标题前的装饰图标（`AiToolRun` 的 Sparkles）。**不给就不渲染**。
+ * · `lead`：标题前的装饰图标（`AiToolRun` 的 原创助手图形）。**不给就不渲染**。
  * · `tag`：右端的来源标签（本机 / 远端）。**不给就不渲染** —— 不开分支。
  * · `close`：`onClose` + `closeLabel` 都给才渲染。
  *   🔴 **`closeLabel` 必填**（与 `onClose` 成对）：一个没有可访问名的关闭按钮
@@ -78,9 +78,8 @@ export function AiPanelHead(props: AiPanelHeadProps): React.JSX.Element {
     },
     tag: {
       paddingHorizontal: tokens['space.2'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       borderRadius: tokens['radius.sm'],
+      backgroundColor: tokens['color.surface-sunken'],
       color: tokens['color.foreground-subtle'],
     },
     close: {

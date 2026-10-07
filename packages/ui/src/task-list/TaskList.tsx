@@ -133,6 +133,13 @@ interface TaskListSharedProps {
   /** 列表根节点的测试标识。 */
   readonly testID?: string;
   /**
+   * 列表头内容。移动端用它承载当前列表的筛选与视图控制，保证控制区与
+   * 任务行共享同一个纵向滚动宿主；其它宿主可省略。
+   */
+  readonly listHeaderComponent?: React.ReactElement | React.ComponentType;
+  /** 空列表时的完整空态；给出后优先于 `emptyMessage`。 */
+  readonly emptyComponent?: React.ReactElement | React.ComponentType;
+  /**
    * **本列表里的行有多紧凑。** 默认 `'comfortable'` —— 就是抽取 `TaskRow`
    * 之前那段内联行的行为，所以不传时逐字节等价。
    *
@@ -213,6 +220,8 @@ export function TaskList<TMeta = undefined>({
   selectionMode = false,
   fallbackTitle,
   emptyMessage,
+  listHeaderComponent,
+  emptyComponent,
   testID,
   density,
 }: TaskListProps<TMeta>): React.JSX.Element {
@@ -320,7 +329,8 @@ export function TaskList<TMeta = undefined>({
       data={items}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
-      ListEmptyComponent={empty}
+      ListHeaderComponent={listHeaderComponent}
+      ListEmptyComponent={emptyComponent ?? empty}
       contentContainerStyle={styles.list}
       testID={testID}
     />

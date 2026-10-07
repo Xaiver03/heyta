@@ -327,6 +327,26 @@ describe('🔴 专注组件不许画倒计时', () => {
 });
 
 describe('🔴 模板与数据不能漂移', () => {
+  it('紧凑预览保留源顺序和总量，剩余内容有明确提示', () => {
+    const data = buildAdaptiveCardData('today', goldenPayload(), DAY, probe);
+    if (data.kind !== 'today') throw new Error('wrong kind');
+    expect(data.rows).toHaveLength(6);
+    expect(data.previewRows.map(row => row.id)).toEqual(data.rows.slice(0, 4).map(row => row.id));
+    expect(data.overflowText).toBe('widget.preview.more|{"count":2}');
+    expect(data.previewRows[0]!.actionText).toBe('widget.task.completeAction|{"title":"交房租"}');
+    expect(data.rows[5]!.actionText).toContain('widget.task.reopenAction');
+  });
+
+  it('四象限各自限量，不能让一个象限挤掉另外三个', () => {
+    const data = buildAdaptiveCardData('quadrant', goldenPayload(), DAY, probe);
+    if (data.kind !== 'quadrant') throw new Error('wrong kind');
+    expect(data.slots).toHaveLength(4);
+    for (const slot of data.slots) {
+      expect(slot.previewRows.length).toBeLessThanOrEqual(2);
+      expect(slot.previewRows).toEqual(slot.rows.slice(0, 2));
+      expect(Boolean(slot.overflowText)).toBe(slot.rows.length > 2);
+    }
+  });
   /**
    * 收集模板里所有**简单标识符**绑定（`${name}`），不含表达式（`${a == 'b'}`）。
    *
@@ -462,6 +482,12 @@ describe('词条 key 联合 ↔ 真实使用（双向）', () => {
    * **自动跟随会让"看一眼这条新词条该说什么话"这个决定消失。**
    */
   const DECLARED: WidgetCardKey[] = [
+    'widget.preview.more',
+    'widget.task.pending',
+    'widget.task.completed',
+    'widget.task.completeAction',
+    'widget.task.reopenAction',
+    'widget.focus.title',
     'widget.placeholder.openApp',
     'widget.today.title',
     'widget.today.count',

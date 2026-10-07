@@ -175,6 +175,9 @@ export function HabitDetailCard({ inset }: { inset: boolean }): React.JSX.Elemen
     [store, now],
   );
 
+  // 空数据时空态属于列表侧；不挂载一个只剩空白的详情面板。
+  if (store.habits.length === 0) return <></>;
+
   return (
     <div
       className={inset ? 'ht-habit__pane ht-app__detail-habit' : 'ht-habit__pane'}

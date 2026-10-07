@@ -57,6 +57,7 @@ import {
   PASSWORD_AUTH_ERROR_CODES,
   PASSWORD_POLICY_CODES,
   type PasswordPolicyCode,
+  type EmailPasswordRegistrationChallengeResponse,
   ACCOUNT_PROFILE_PATHS,
   ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS,
   accountProfileResponseSchema,
@@ -136,6 +137,9 @@ export const HOSTED_AUTH_PATHS = {
   passwordChange: `/api${AUTH_PASSWORD_PATHS.change}`,
   /** 已登录**加上第一个**口令（与 `passwordChange` 不是一条路，见共享契约）。 */
   passwordSet: `/api${AUTH_PASSWORD_PATHS.set}`,
+  emailPasswordRegistrationRequest: `/api${AUTH_PASSWORD_PATHS.registerRequest}`,
+  emailPasswordRegistrationVerify: `/api${AUTH_PASSWORD_PATHS.registerVerify}`,
+  emailPasswordRegistrationResend: `/api${AUTH_PASSWORD_PATHS.registerResend}`,
   /**
    * 注销账号。服务端是 `DELETE /api/account`（**级联硬删**：ops / syncState / devices）。
    *
@@ -503,6 +507,24 @@ function readServerEmailDelivered(body: unknown): false | undefined {
  */
 export type HostedRegisterResult = { message: string; emailDelivered?: false };
 
+export type HostedRegistrationChallengeResult = EmailPasswordRegistrationChallengeResponse;
+
+function registrationChallengeResult(body: unknown): HostedRegistrationChallengeResult | undefined {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return undefined;
+  const record = body as Record<string, unknown>;
+  if (typeof record.challengeId !== 'string' || record.challengeId === '') return undefined;
+  if (typeof record.expiresAt !== 'number' || !Number.isFinite(record.expiresAt)) return undefined;
+  if (typeof record.resendAvailableAt !== 'number' || !Number.isFinite(record.resendAvailableAt)) return undefined;
+  const delivered = record.emailDelivered;
+  if (delivered !== undefined && typeof delivered !== 'boolean') return undefined;
+  return {
+    challengeId: record.challengeId,
+    expiresAt: record.expiresAt,
+    resendAvailableAt: record.resendAvailableAt,
+    ...(delivered === undefined ? {} : { emailDelivered: delivered }),
+  };
+}
+
 function registerResult(body: unknown): HostedRegisterResult {
   const delivered = readServerEmailDelivered(body);
   return {
@@ -587,6 +609,10 @@ export const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFa
   no_password_set: 'no-password-set',
   // "设第一个口令"打在已有口令的账号上 ⇒ 该走改密。与上一条相反，两张不同的表单。
   password_already_set: 'password-already-set',
+  // 注册验证码的 code 保留在 HostedAuthFailure.code；reason 复用已有动作分类，
+  // 避免为了一个注册子流程迫使所有壳重复增加词条。
+  invalid_registration_challenge: 'invalid-input',
+  registration_code_rate_limited: 'rate-limited',
 };
 
 /** 由服务端 `code` 与 HTTP 状态共同决定原因；只有白名单里的码会覆盖状态分类。 */
@@ -1713,6 +1739,59 @@ export async function registerWithEmailPassword(
   });
   if (!result.ok) return result;
   return { ok: true, ...registerResult(result.body) };
+}
+
+/**
+ * 新版邮箱密码注册的第一步：服务端创建独立验证码 challenge 并发信。
+ * `passwordConfirmation` 只属于 UI 本地校验，不跨网络传送第二份秘密。
+ */
+export async function requestEmailPasswordRegistrationCode(
+  options: HostedAuthOptions,
+  input: { email: string; password: string; termsAccepted?: boolean; inviteCode?: string },
+): Promise<HostedAuthOutcome<HostedRegistrationChallengeResult>> {
+  const normalized = normalizedEmail(input.email);
+  if (normalized === undefined || input.password === '') return failure('invalid-input');
+  const result = await postJson(options, HOSTED_AUTH_PATHS.emailPasswordRegistrationRequest, {
+    email: normalized,
+    password: input.password,
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
+    ...(input.termsAccepted === undefined ? {} : { termsAccepted: input.termsAccepted }),
+    ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
+  });
+  if (!result.ok) return result;
+  const challenge = registrationChallengeResult(result.body);
+  return challenge === undefined ? failure('malformed-response') : { ok: true, ...challenge };
+}
+
+/** 验证六位邮箱验证码，并复用登录端点的会话响应解析。 */
+export async function verifyEmailPasswordRegistrationCode(
+  options: HostedAuthOptions,
+  input: { challengeId: string; code: string },
+): Promise<HostedAuthOutcome<{ session: HostedAuthSession }>> {
+  if (input.challengeId.trim() === '' || !/^\d{6}$/.test(input.code)) {
+    return failure('invalid-input');
+  }
+  const result = await postJson(options, HOSTED_AUTH_PATHS.emailPasswordRegistrationVerify, {
+    challengeId: input.challengeId,
+    code: input.code,
+  });
+  if (!result.ok) return result;
+  const session = parseSession(result.body);
+  return session === undefined ? failure('malformed-response') : { ok: true, session };
+}
+
+/** 重发验证码；服务端以 challengeId 归属邮箱，不接受客户端再次提交邮箱。 */
+export async function resendEmailPasswordRegistrationCode(
+  options: HostedAuthOptions,
+  challengeId: string,
+): Promise<HostedAuthOutcome<HostedRegistrationChallengeResult>> {
+  if (challengeId.trim() === '') return failure('invalid-input');
+  const result = await postJson(options, HOSTED_AUTH_PATHS.emailPasswordRegistrationResend, {
+    challengeId,
+  });
+  if (!result.ok) return result;
+  const challenge = registrationChallengeResult(result.body);
+  return challenge === undefined ? failure('malformed-response') : { ok: true, ...challenge };
 }
 
 /**

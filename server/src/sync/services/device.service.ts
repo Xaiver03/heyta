@@ -31,6 +31,12 @@ export class DeviceService {
   async revokeDevice(userId: number, clientId: string): Promise<void> {
     const now = BigInt(Date.now());
     await prisma.$transaction(async (tx) => {
+      // Same user lock as inbound uploads: revocation and persistence serialize.
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      await tx.$executeRaw`
+        UPDATE automation_workers SET revoked_at = ${now}
+        WHERE user_id = ${userId} AND sync_client_id = ${clientId} AND revoked_at IS NULL
+      `;
       await tx.syncDevice.deleteMany({ where: { userId, clientId } });
       await tx.revokedSyncDevice.upsert({
         where: { userId_clientId: { userId, clientId } },

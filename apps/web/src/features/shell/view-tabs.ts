@@ -28,6 +28,7 @@ import {
 import { Quadrant, type TaskSortKey } from '@heyta/domain';
 import type { MessageKey } from '@heyta/i18n';
 import type { TaskFilter } from '../tasks/store.js';
+import type { RailPreference } from './rail-pref.js';
 
 export interface NavEntry {
   filter: TaskFilter;
@@ -310,11 +311,41 @@ export interface RailTabSplit {
 }
 
 /**
- * 将已启用的目的地压缩成可扫描的 rail：最多四个主入口，剩余入口进入“更多”。
+ * 默认以四个主入口起步；用户主动固定的入口全部保留，多出视口时在 rail 内滚动。
  * 当前所在的低频视图会被临时提升到主入口，避免用户切换后失去位置感。
  * 这是纯函数，桌面 Web 与测试共享同一条导航裁决；窄屏由宿主再决定如何呈现。
  */
-export function splitRailTabs(tabs: readonly ViewTab[], active: ViewKey): RailTabSplit {
+export function splitRailTabs(
+  tabs: readonly ViewTab[],
+  active: ViewKey,
+  preference?: RailPreference,
+): RailTabSplit {
+  if (preference !== undefined) {
+    const available = new Map(tabs.map((tab) => [tab.key, tab]));
+    const seen = new Set<ViewKey>();
+    const primary: ViewTab[] = [];
+    const overflow: ViewTab[] = [];
+    const add = (key: ViewKey, target: ViewTab[]): void => {
+      if (seen.has(key) || !available.has(key)) return;
+      const tab = available.get(key);
+      if (tab === undefined) return;
+      seen.add(key);
+      target.push(tab);
+    };
+    preference.primary.forEach((key) => add(key, primary));
+    preference.overflow.forEach((key) => add(key, overflow));
+    // 偏好之外新启用的模块进入更多，不擅自加入用户编排的常驻区。
+    tabs.forEach((tab) => add(tab.key, overflow));
+    // 任务与搜索是恢复路径，不能被用户拖到不可达区域。
+    for (const required of ['tasks', 'search'] as const) {
+      const index = overflow.findIndex((tab) => tab.key === required);
+      if (index < 0 || primary.some((tab) => tab.key === required)) continue;
+      // 恢复必需入口，但不挤走任何用户明确固定的入口。
+      const moved = overflow.splice(index, 1)[0];
+      if (moved !== undefined) primary.push(moved);
+    }
+    return { primary, overflow };
+  }
   if (tabs.length <= 5) return { primary: tabs, overflow: [] };
   // 搜索是高频恢复入口，即使它在登记表后段也必须留在台面上。
   const pinned: readonly ViewKey[] = ['tasks', 'calendar', 'habits', 'search'];
@@ -372,9 +403,30 @@ export const SORT_LABEL: Record<TaskSortKey, MessageKey> = {
  * 写的是**中心**（`top + height / 2`），配合 CSS 里的 `translateY(-50%)` ——
  * 这样标签永远对齐图标的中线，而不依赖按钮高度。
  */
+/** Position one fixed rail label from the live button and viewport geometry. */
+export function anchorRailLabelElement(tab: HTMLElement): void {
+  const rect = tab.getBoundingClientRect();
+  const label = tab.querySelector<HTMLElement>('.ht-rail__label');
+  const labelRect = label?.getBoundingClientRect();
+  const tabStyle = getComputedStyle(tab);
+  // The button padding is token-backed and is the same visual gap used by the
+  // rail icon column. Reading the computed value keeps this coordinate logic
+  // aligned with the design system without introducing a second pixel value.
+  const gap = Number.parseFloat(tabStyle.paddingRight) || 0;
+  const edge = Number.parseFloat(tabStyle.paddingLeft) || 0;
+  const labelWidth = labelRect?.width ?? 0;
+  const labelHeight = labelRect?.height ?? 0;
+  const maxLeft = Math.max(edge, window.innerWidth - edge - labelWidth);
+  const left = Math.min(Math.max(edge, rect.right + gap), maxLeft);
+  const minTop = edge + labelHeight / 2;
+  const maxTop = Math.max(minTop, window.innerHeight - edge - labelHeight / 2);
+  const top = Math.min(Math.max(minTop, rect.top + rect.height / 2), maxTop);
+  tab.style.setProperty('--ht-rail-label-left', `${Math.round(left)}px`);
+  tab.style.setProperty('--ht-rail-label-top', `${Math.round(top)}px`);
+}
+
 export function anchorRailLabel(event: SyntheticEvent<HTMLElement>): void {
   const tab = (event.target as HTMLElement).closest<HTMLElement>('.ht-rail__tab');
   if (tab === null) return;
-  const rect = tab.getBoundingClientRect();
-  tab.style.setProperty('--ht-rail-label-top', `${Math.round(rect.top + rect.height / 2)}px`);
+  anchorRailLabelElement(tab);
 }

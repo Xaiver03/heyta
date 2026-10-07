@@ -24,8 +24,14 @@
 @import './app/rail.css';
 @import './app/inbox.css';
 @import './app/ai-panels.css';
+@import './app/settings-account.css';
 @import './app/growth.css';
 @import './app/trash.css';
 @import './app/admin.css';
 @import './app/habits.css';
 @import './app/narrow.css';
+
+@import './app/assistant-layout.css';
+@import './app/scope-drawer.css';
+
+@import './app/borderless-controls.css';

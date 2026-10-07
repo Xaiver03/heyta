@@ -86,6 +86,13 @@ function makeStyles(tokens: HeytaNativeTokens) {
     copyText: {
       color: tokens['color.on-primary'],
     },
+    preview: {
+      paddingVertical: tokens['space.2'],
+      paddingHorizontal: tokens['space.3'],
+      borderRadius: tokens['radius.md'],
+      backgroundColor: tokens['color.surface-sunken'],
+      color: tokens['color.foreground-muted'],
+    },
   });
 }
 
@@ -130,6 +137,14 @@ export function ShareSummarySection({
 
   return (
     <View style={styles.section} testID={testID}>
+      <Text
+        numberOfLines={3}
+        ellipsizeMode="tail"
+        style={[text.caption, styles.preview]}
+        testID={testID === undefined ? undefined : `${testID}-preview`}
+      >
+        {summary}
+      </Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={labels.copy}

@@ -88,6 +88,7 @@ beforeEach(() => {
     baseUrl: 'https://sync.example.com',
     token: 'token-123',
     syncSettingsRequested: false,
+    signInOpen: false,
   });
   // 🔴 「同意联网」在这里是**前置条件**，不是被测对象（被测的是那一条，
   // 见下面 `describe('出境同意闸门')`）。真浏览器实测过一遍没有这道前置的后果：
@@ -202,7 +203,7 @@ describe('失败态说的是真话', () => {
     expect(el.querySelector('#renew-pay-url')).toBeNull();
   });
 
-  it('🔴 没配服务器地址 / 没登录时一个请求都不发，并说明原因', async () => {
+  it('🔴 没配服务器地址不发请求；未登录时只显示登录入口', async () => {
     stubCheckout(() => ({ status: 200, body: ORDER_OK }));
     useSyncStore.setState({ baseUrl: '', token: 'token-123' });
     const unconfigured = await renderPanel();
@@ -219,11 +220,16 @@ describe('失败态说的是真话', () => {
     useSyncStore.setState({ baseUrl: 'https://sync.example.com', token: undefined });
     stubCheckout(() => ({ status: 200, body: ORDER_OK }));
     const signedOut = await renderPanel();
-    await clickPlace(signedOut);
+    expect(signedOut.querySelector('[data-testid="renew-place-order"]')).toBeNull();
+    expect(signedOut.querySelector('[data-testid="renew-needs-sign-in"]')).not.toBeNull();
+    expect(signedOut.querySelector('[data-testid="renew-needs-sign-in-action"]')).not.toBeNull();
+    await act(async () => {
+      signedOut
+        .querySelector<HTMLButtonElement>('[data-testid="renew-needs-sign-in-action"]')!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(signedOut.querySelector('[data-testid="renew-failure"]')?.textContent).toBe(
-      translate('zh-CN', 'web.subscription.renew.fail.unauthorized'),
-    );
+    expect(useSyncStore.getState().signInOpen).toBe(true);
   });
 
   it('断网说"没有下成"，而不是静默', async () => {

@@ -1,0 +1,114 @@
+/* Sync settings is a sequence of decisions, not a pile of anonymous fields. */
+.sync-settings__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.sync-settings__fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.sync-settings__legend {
+  max-inline-size: 100%;
+  padding: 0 0 var(--ht-space-3);
+  color: var(--ht-color-foreground);
+  font: inherit;
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.sync-settings__section-hint,
+.sync-settings__field-hint {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  line-height: var(--ht-line-height-normal);
+}
+
+.sync-settings__field-hint {
+  font-size: var(--ht-font-size-sm);
+}
+
+.sync-settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+}
+
+.sync-settings__input {
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-base);
+}
+
+.sync-settings__input:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.sync-settings__fit-button {
+  align-self: flex-start;
+}
+
+.sync-settings__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+}
+
+/* Vault owns the async state machine; visually it continues the encryption
+   fieldset instead of introducing a card inside a card. */
+.sync-settings__fieldset > .ht-settings__vault {
+  max-inline-size: none;
+  padding: 0;
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.sync-settings__fieldset > .ht-settings__vault .ht-settings__section {
+  padding: var(--ht-space-3) 0 0;
+  border: 0;
+  background: transparent;
+}
+
+@media (max-width: 30rem) {
+  .sync-settings__actions {
+    justify-content: stretch;
+  }
+
+  .sync-settings__actions .ht-btn {
+    flex: 1;
+  }
+}
+
+.sync-settings__advanced {
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  padding-block-start: var(--ht-space-2);
+}
+.sync-settings__advanced-summary {
+  cursor: pointer;
+  color: var(--ht-color-foreground-muted);
+  padding-block: var(--ht-space-2);
+}
+.sync-settings__advanced[open] > .sync-settings__fieldset {
+  margin-block: var(--ht-space-4);
+}
+
+/* The enclosing settings section already supplies the surface. */
+.sync-settings__fieldset > .ht-settings__account-gate {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}

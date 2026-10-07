@@ -77,9 +77,10 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { Note } from '@heyta/domain';
-import { Pin, PinOff, Plus, Trash2 } from 'lucide';
+import { Pin, PinOff, Plus, StickyNote, Trash2 } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
+import { EmptyState } from '../empty-state/EmptyState.js';
 import {
   isNoteDraftBlank,
   NOTE_COMPOSER_INITIAL,
@@ -177,8 +178,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground'],
     },
@@ -198,9 +197,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
     },
     addText: {
       color: tokens['color.on-primary'],
-    },
-    empty: {
-      gap: tokens['space.1'],
     },
     list: {
       gap: tokens['space.2'],
@@ -255,8 +251,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minWidth: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: 'transparent',
     },
     actionText: {
@@ -366,14 +360,13 @@ export function NotesBoard({
       ) : null}
 
       {rows.length === 0 ? (
-        <View style={styles.empty} testID="notes-empty">
-          <Text style={[text['row-title'], { color: tokens['color.foreground-muted'] }]}>
-            {labels.empty}
-          </Text>
-          <Text style={[text.caption, { color: tokens['color.foreground-subtle'] }]}>
-            {labels.emptyHint}
-          </Text>
-        </View>
+        <EmptyState
+          illustration="notes"
+          icon={StickyNote}
+          title={labels.empty}
+          hint={labels.emptyHint}
+          testID="notes-empty"
+        />
       ) : (
         <View style={styles.list} accessibilityRole="list" testID="notes-list">
           {rows.map((row) => {

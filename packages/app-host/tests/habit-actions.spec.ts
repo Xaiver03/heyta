@@ -94,6 +94,26 @@ describe('新建习惯', () => {
     await expect(actions.createHabit('  ')).rejects.toThrow();
     expect(actions.listHabits()).toEqual([]);
   });
+
+  it('新建配置在一条 Create 中保存，undefined 目标仍取默认值', async () => {
+    const id = await actions.createHabit('阅读', {
+      target: undefined, unit: ' 页 ', icon: 'book', backfillDays: 7,
+      frequency: { type: 'weekly', daysOfWeek: [1, 3, 5] },
+    });
+    const ops = await engine.getOpsForEntity('HABIT', id);
+    expect(ops).toHaveLength(1);
+    expect(payloadOf(ops[0]!)).toMatchObject({ target: 1, unit: '页', icon: 'book', backfillDays: 7 });
+  });
+
+  it('非法目标或补打卡范围在新建时不落盘', async () => {
+    for (const target of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(actions.createHabit('阅读', { target })).rejects.toThrow();
+    }
+    for (const backfillDays of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+      await expect(actions.createHabit('阅读', { backfillDays })).rejects.toThrow();
+    }
+    expect(actions.listHabits()).toEqual([]);
+  });
 });
 
 describe('打卡', () => {

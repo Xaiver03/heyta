@@ -316,6 +316,16 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
     });
   }
 
+  async getOpById(opId: string): Promise<StoredOperation<TOperation> | undefined> {
+    return this.db.transaction([STORES.OPS, STORES.ARCHIVE], 'readonly', async (tx) => {
+      for (const name of [STORES.OPS, STORES.ARCHIVE]) {
+        const key = await tx.getKeyFromIndex(name, OP_INDEXES.OP_ID, opId);
+        if (key !== undefined) return tx.get<StoredOperation<TOperation>>(name, key);
+      }
+      return undefined;
+    });
+  }
+
   async getLastLocalSeq(): Promise<number> {
     const value = await this.db.get<{ key: string; value: number }>(
       STORES.META,

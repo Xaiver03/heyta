@@ -22,7 +22,13 @@ import type {
   LocalApiProject,
 } from '@heyta/local-api';
 
-import { confirmAiToolProposal, runSelectedTool } from '../src/ai-tool-run.js';
+import {
+  aiToolProposalRequiresConfirmation,
+  confirmAiToolProposal,
+  executeAiToolProposal,
+  runSelectedTool,
+  type AiToolProposal,
+} from '../src/ai-tool-run.js';
 import {
   resolveToolSelection,
   type ToolSelectionRule,
@@ -193,6 +199,72 @@ describe('规则 → 执行（写工具只提案）', () => {
       rules: [emptyTitle],
     });
     expect(outcome.kind).toBe('failed');
+    expect(host.submits).toBe(0);
+  });
+});
+
+describe('执行档的写风险与重放保护', () => {
+  const proposal = (intent: AiToolProposal['intent']): AiToolProposal => ({
+    ruleId: 'test',
+    tool: intent.action,
+    intent,
+  });
+
+  it('低风险写意图可自动提交，危险写意图仍要求确认', () => {
+    expect(aiToolProposalRequiresConfirmation(proposal({ action: 'create-task', title: '买牛奶' }))).toBe(false);
+    expect(aiToolProposalRequiresConfirmation(proposal({ action: 'complete-task', taskId: 't1' }))).toBe(false);
+    expect(
+      aiToolProposalRequiresConfirmation(
+        proposal({ action: 'set-task-tags', taskId: 't1', tagIds: ['important'] }),
+      ),
+    ).toBe(false);
+    expect(
+      aiToolProposalRequiresConfirmation(
+        proposal({ action: 'complete-tasks', taskIds: ['t1', 't2'] }),
+      ),
+    ).toBe(true);
+    expect(
+      aiToolProposalRequiresConfirmation(proposal({ action: 'set-task-tags', taskId: 't1', tagIds: [] })),
+    ).toBe(true);
+    expect(
+      aiToolProposalRequiresConfirmation(proposal({ action: 'update-task', taskId: 't1', fields: { title: null } })),
+    ).toBe(true);
+  });
+
+  it('低风险动作同一执行标识只提交一次，换意图则拒绝', async () => {
+    const host = fakeHost();
+    const first = proposal({ action: 'create-task', title: '买咖啡' });
+    const second = proposal({ action: 'create-task', title: '买茶' });
+    const result1 = await executeAiToolProposal(host, first, 'replay-1');
+    const result2 = await executeAiToolProposal(host, first, 'replay-1');
+    expect(result1).toEqual({ ok: true, taskId: 'created-1' });
+    expect(result2).toEqual(result1);
+    expect(host.submits).toBe(1);
+
+    const mismatch = await executeAiToolProposal(host, second, 'replay-1');
+    expect(mismatch).toEqual({ ok: false, reason: 'invalid', message: '同一执行标识对应了不同的改动。' });
+    expect(host.submits).toBe(1);
+  });
+
+  it('单条完成是可撤销的日常动作，可在执行档自动提交', async () => {
+    const host = fakeHost();
+    const result = await executeAiToolProposal(
+      host,
+      proposal({ action: 'complete-task', taskId: 't1' }),
+      'complete-one-1',
+    );
+    expect(result).toEqual({ ok: true, taskId: 'created-1' });
+    expect(host.submits).toBe(1);
+  });
+
+  it('高风险批量动作不会绕过确认闸门', async () => {
+    const host = fakeHost();
+    const result = await executeAiToolProposal(
+      host,
+      proposal({ action: 'complete-tasks', taskIds: ['t1', 't2'] }),
+      'risky-1',
+    );
+    expect(result).toEqual({ ok: false, reason: 'invalid', message: '这项改动需要先确认。' });
     expect(host.submits).toBe(0);
   });
 });

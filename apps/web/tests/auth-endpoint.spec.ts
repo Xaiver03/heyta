@@ -34,9 +34,9 @@ afterEach(() => {
 });
 
 describe('authBaseUrl', () => {
-  it('没配过服务端时取当前来源 —— 注册不需要任何人敲域名', () => {
-    expect(authBaseUrl('')).toBe(window.location.origin);
-    expect(authBaseUrl()).toBe(window.location.origin);
+  it('没配过服务端时使用官方服务 —— 注册不需要任何人敲域名', () => {
+    expect(authBaseUrl('')).toBe(OFFICIAL_SITE_ORIGIN);
+    expect(authBaseUrl()).toBe(OFFICIAL_SITE_ORIGIN);
   });
 
   it('🔴 算出来的地址永远非空 —— 「空地址」不再是界面要用户填的东西', () => {
@@ -62,7 +62,7 @@ describe('authBaseUrl', () => {
   it('🔴 不合法的 VITE_SYNC_URL 当成没配 —— 而不是拿它去发请求', () => {
     for (const bad of ['', '   ', 'not a url', 'undefined', 'ftp://x.example.com']) {
       vi.stubEnv('VITE_SYNC_URL', bad);
-      expect(authBaseUrl(''), `"${bad}" 应该被当成没配`).toBe(window.location.origin);
+      expect(authBaseUrl(''), `"${bad}" 应该被当成没配`).toBe(OFFICIAL_SITE_ORIGIN);
     }
   });
 
@@ -135,9 +135,10 @@ describe('authBaseUrl：来源不是 http(s) 时（macOS / Windows 壳）', () =
     });
   });
 
-  it('🔴 自建 web 的 http(s) 来源**原样保留** —— 不许被公共服务顶掉', () => {
+  it('普通 Web 来源不会被误认为同步服务，自托管通过显式配置', () => {
     withOrigin('https://sync.mycompany.example', () => {
-      expect(authBaseUrl('')).toBe('https://sync.mycompany.example');
+      expect(authBaseUrl('')).toBe(OFFICIAL_SITE_ORIGIN);
+      expect(authBaseUrl('https://sync.mycompany.example')).toBe('https://sync.mycompany.example');
     });
   });
 });

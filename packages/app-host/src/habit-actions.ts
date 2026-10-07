@@ -84,6 +84,16 @@ export interface NewHabitFields {
   backfillDays?: number;
 }
 
+/** Creation and editing must reject the same invalid goal before writing an op. */
+function validateHabitGoal(goal: Pick<NewHabitFields, 'target' | 'goalType'>): void {
+  if (goal.target !== undefined && (!Number.isFinite(goal.target) || goal.target < 0)) {
+    throw new Error(`习惯目标必须是不小于 0 的有限数，收到「${String(goal.target)}」`);
+  }
+  if (goal.goalType !== undefined && !(['atLeast', 'atMost', 'exactly'] as const).includes(goal.goalType)) {
+    throw new Error('习惯目标口径无效');
+  }
+}
+
 /**
  * 频次的**校验 + 归一**（工单 H5；`createHabit` 与 `setHabitFrequency` 共用这一份）。
  *
@@ -296,11 +306,17 @@ export function createHabitActions(
     async createHabit(name, over = {}) {
       const trimmed = name.trim();
       if (trimmed === '') throw new Error('习惯名称不能为空');
+      validateHabitGoal(over);
+      if (over.backfillDays !== undefined && (!Number.isSafeInteger(over.backfillDays) || over.backfillDays < 1)) {
+        throw new Error('补打卡范围必须是大于 0 的安全整数');
+      }
+      const icon = over.icon === undefined ? undefined : parseHabitIcon(over.icon);
+      if (over.icon !== undefined && icon === undefined) throw new Error('习惯图标必须是闭集里的 key');
 
       const entityId = makeHabitId();
       // 🔴 建的时候也要过一遍归一/校验：`setHabitFrequency` 有牙而 `createHabit` 没牙，
       //    得到的结果是"改的时候拦、建的时候放"，非法值照样能落盘（同一判断写两遍必漂一处）。
-      const { frequency, ...rest } = over;
+      const { frequency, target, unit, icon: _icon, ...rest } = over;
       await ctx.dispatch({
         entityType: 'HABIT' as EntityType,
         entityId,
@@ -309,8 +325,10 @@ export function createHabitActions(
         // 不写 `target: null` —— 这里的 1 是**默认值**，不是"清除"。
         payload: {
           name: trimmed,
-          target: 1,
+          target: target ?? 1,
           ...rest,
+          ...(unit?.trim() ? { unit: unit.trim() } : {}),
+          ...(icon === undefined ? {} : { icon }),
           ...(frequency === undefined ? {} : { frequency: normalizeHabitFrequency(frequency) }),
         },
       });
@@ -385,9 +403,7 @@ export function createHabitActions(
       //    `isAchieved` 是 `value >= target` / `<=` / `===` 这类比较，
       //    一个负数或 NaN 会让"达成"恒真或恒假，而界面上看不出哪里不对。
       //    `goalType: 'atMost'` 时 `target: 0` 是**合法**的（"一次都不碰"），所以下界是 0 不是 1。
-      if (goal.target !== undefined && (!Number.isFinite(goal.target) || goal.target < 0)) {
-        throw new Error(`习惯目标必须是不小于 0 的有限数，收到「${String(goal.target)}」`);
-      }
+      validateHabitGoal(goal);
 
       const payload: Record<string, unknown> = {};
       if (goal.target !== undefined) payload.target = goal.target;

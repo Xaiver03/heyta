@@ -65,7 +65,7 @@
 
 .ht-accountmenu {
   position: relative;
-  /* 头像 + 登录/注册 **一行**（见 AccountMenu.tsx 内注释：竖叠曾把 rail 顶
+  /* 头像 + 登录账号 **一行**（见 AccountMenu.tsx 内注释：竖叠曾把 rail 顶
      的品牌名吊到半空）。面板仍是 absolute，不受布局方式影响。 */
   display: flex;
   align-items: center;
@@ -80,7 +80,7 @@
   height: var(--ht-touch-target-min);
   padding: 0;
   cursor: pointer;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   /* 正圆：它是头像，不是一个方形按钮 */
   border-radius: 50%;
   background: var(--ht-color-surface);
@@ -177,6 +177,12 @@
   background: var(--ht-color-surface-sunken);
 }
 
+.ht-accountmenu__item:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+  background: var(--ht-color-primary-subtle);
+}
+
 /* 退出登录是这一组里唯一**会清掉本机凭据**的动作 —— 颜色要说清这件事。
    它永远在最后一项（见 `AccountMenu.tsx` 文件头：破坏性动作在最底、
    且未登录时**根本不渲染**）。 */
@@ -184,10 +190,10 @@
   color: var(--ht-color-danger);
 }
 
-/* 未登录时菜单的第一项「登录 / 注册」是这一组的**主操作** —— 强调样式，
+/* 未登录时菜单的第一项「登录账号」是这一组的**主操作** —— 强调样式，
    与其余无损导航项区分开。它仍然是一个菜单项（不是大按钮）：
    SaaSUI 的账号面调研要求身份入口在菜单里**一眼可辨**，而不是与
-   「设置 / 统计」同样的视觉分量。 */
+   「个人中心 / 应用设置」同样的视觉分量。 */
 .ht-accountmenu__item--primary {
   background: var(--ht-color-primary-subtle);
   color: var(--ht-color-primary);
@@ -212,9 +218,17 @@
  * 颜色取 `@heyta/ui` 的 `SEVERITY_COLOR` 那五个 token，不在这另起一套。
  */
 .ht-rail__sync {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* Match the 44px desktop rail axis used by every icon hit box. The parent
+     content box is 47px wide; leaving this group stretched was the last source
+     of the measured 31.5px center after the tab fix. */
+  inline-size: var(--ht-touch-target-min);
+  /* Align to the same leading edge as the fixed-width tab boxes. Centering
+     inside the rail's 47px content box would reintroduce a 1.5px offset. */
+  align-self: center;
   gap: var(--ht-space-1);
   padding-bottom: var(--ht-space-2);
 }

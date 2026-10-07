@@ -118,7 +118,7 @@ const PUSH_REASON_MESSAGE_KEY: Record<PushFailureReason, MessageKey> = {
   unexpected: 'web.widgetPush.reason.unexpected',
 };
 
-export function WidgetPushPanel(): React.JSX.Element | null {
+export function WidgetPushPanel({ active = true }: { active?: boolean } = {}): React.JSX.Element | null {
   const { t } = useI18n();
   const [visibility, setVisibility] = useState<Visibility>(null);
   const [subscribed, setSubscribed] = useState(false);
@@ -132,6 +132,7 @@ export function WidgetPushPanel(): React.JSX.Element | null {
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {
+    if (!active) return;
     // ⚠️ `alive` 守卫：探测是异步的，而设置页可以被很快地切走。
     //    没有它就会在已卸载的组件上 setState（React 会警告，且状态是垃圾）。
     let alive = true;
@@ -149,7 +150,7 @@ export function WidgetPushPanel(): React.JSX.Element | null {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [active]);
 
   const toggle = useCallback(async () => {
     setBusy(true);

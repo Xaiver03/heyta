@@ -114,9 +114,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'column',
       gap: tokens['space.1'],
       padding: tokens['space.2'],
-      borderWidth: tokens['border-width.thin'],
       borderRadius: tokens['radius.md'],
-      borderColor: tokens['color.border-subtle'],
       backgroundColor: tokens['color.surface-raised'],
     },
     option: {

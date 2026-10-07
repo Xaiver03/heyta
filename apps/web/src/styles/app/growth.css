@@ -12,6 +12,138 @@
    就是第二套降级策略，两套必然漂移。
    ─────────────────────────────────────────────────────────────────────── */
 
+/* ── 成长页的 Web 层级与响应式约束 ───────────────────────────────────────
+   共享区块仍由 RN 原语渲染；这些宿主规则只处理 Web 的可读宽度、滚动和信息层级。
+   每个区块都有稳定的 data-testid，避免为 Web 另造一套共享组件 DOM。 */
+
+[data-testid='growth-board'] {
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-report-max);
+  margin-inline: auto;
+  min-inline-size: 0;
+  padding-block-end: var(--ht-space-8);
+  gap: var(--ht-space-6);
+}
+
+[data-testid^='growth-section-'] {
+  min-inline-size: 0;
+}
+
+[data-testid^='growth-section-'] > h2 {
+  margin: 0;
+  color: var(--ht-color-foreground);
+}
+
+[data-testid^='growth-section-'] > p {
+  margin: var(--ht-space-1) 0 var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 周报以三列 metric grid 呈现；每个指标内部再紧凑排列标签、当前值与上周参照，
+   不再用 space-between 把两端拉成两块互不相关的文字。 */
+[data-testid='growth-week'] {
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+[data-testid='growth-week-stats'] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ht-space-2) var(--ht-space-4);
+}
+
+[data-testid^='growth-week-stat-'] {
+  /* Shared label tracks keep all three values aligned when a translation wraps. */
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  align-items: start;
+  justify-content: stretch;
+  row-gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+[data-testid^='growth-week-stat-'] > div {
+  min-inline-size: 0;
+  justify-content: flex-start;
+}
+
+/* 年度视图在窄容器内自己滚动，不能把整个工作区撑宽；月份只作为列标记，
+   不能折成逐字竖排。 */
+[data-testid='growth-heatmap'] {
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+[data-testid='growth-heatmap'] > div:first-child > div {
+  white-space: nowrap;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+[data-testid='growth-heatmap'] > div:first-child > div * {
+  white-space: nowrap;
+}
+
+/* 分类以泳道作为主要扫描单位，弱化每一格边界，避免“满屏卡片”。 */
+[data-testid='growth-section-category'] [data-testid='category-lane'] {
+  padding-block: var(--ht-space-2);
+  border-block-end: 0;
+}
+
+[data-testid='growth-section-category'] [data-testid='category-lane']:last-child {
+  border-block-end: none;
+}
+
+/* 里程碑的 group card 是层级单元。保留共享组件的容器语法，再用左侧语义边界
+   把四个维度串成同一组，避免前面的卡片与后面的裸列表各说一套。 */
+[data-testid='growth-section-milestones'] [data-testid^='milestone-group-'] {
+  border-inline-start: 0;
+  padding-inline: var(--ht-space-4);
+  padding-block: var(--ht-space-4);
+}
+
+[data-testid='growth-milestones'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-6);
+}
+
+[data-testid='growth-section-share'] {
+  padding-block-start: var(--ht-space-2);
+  border-block-start: 0;
+}
+
+/* 横向提示只在确实需要滑动的窄屏出现；桌面端不再用解释文字占一行。 */
+[data-testid='growth-heatmap-scroll-hint'] {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  [data-testid='growth-milestones'] { grid-template-columns: minmax(0, 1fr); }
+  [data-testid='growth-board'] {
+    gap: var(--ht-space-5);
+    padding-block-end: var(--ht-space-12);
+  }
+
+  [data-testid='growth-heatmap-scroll-hint'] { display: block; }
+
+  [data-testid^='growth-week-stat-'] {
+    column-gap: var(--ht-space-2);
+  }
+
+  /* 三个指标仍是一组横向对照：窄屏只收紧列间距，不把每个指标拆成
+     三段纵向大卡片。这样 390px 首屏能同时看到打卡、完成任务和专注，
+     单位与上周参照在各自小列内自然换行，不牺牲扫描效率。 */
+  [data-testid='growth-week-stats'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: var(--ht-space-2);
+    row-gap: var(--ht-space-2);
+  }
+}
+
 /* ── L2 习惯卡片 ─────────────────────────────────────────────────────
    这一族原来的十条规则（`__name` / `__metrics` / `__metric--current` / `__freeze`
    / `__action*` / `__checkin` / `__title`）**零引用**（`git grep "ht-habit__"`
@@ -23,6 +155,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-3);
+  /* 分类报告是一个完整的信息模块：标题、口径、范围和结果必须被读成一组。
+     之前只有文字和分隔线，空库时尤其像三段散落说明；这一层用低对比 surface
+     建立组件边界，避免再靠字号和颜色硬凑层级。 */
+  box-sizing: border-box;
+  padding: var(--ht-space-4);
+  border: 0;
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
 }
 
 .ht-categories h2 {
@@ -109,7 +249,7 @@
   width: var(--ht-space-3);
   height: var(--ht-space-3);
   border-radius: var(--ht-radius-sm);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
 }
 
 /* 3 列 × 3 行：8 个槽位 + 1 个"不用颜色"，正好铺满。
@@ -159,7 +299,7 @@
 
 .ht-slot-picker__swatch--none {
   background: transparent;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
 }
 
 .ht-slot-picker__number {

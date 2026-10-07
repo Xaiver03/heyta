@@ -118,6 +118,9 @@ export interface OpLogStore<
 
   // ── 读取 ────────────────────────────────────────────────
 
+  /** Indexed lookup in the shared hot/archive identity namespace. */
+  getOpById(opId: string): Promise<StoredOperation<TOperation> | undefined>;
+
   /** 按本地 seq 区间读取操作（含下界、不含上界）。 */
   getOpsSince(
     sinceSeq: number,

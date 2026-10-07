@@ -113,7 +113,7 @@ beforeEach(() => {
     erased += 1;
     return [{ target: 'stub', containerRemoved: true, storesCleared: 4 }];
   });
-  useSyncStore.setState({ baseUrl: SERVER, token: TOKEN });
+  useSyncStore.setState({ baseUrl: SERVER, token: TOKEN, signInOpen: false });
   stubFetch(() => response(500, { error: 'unused default' }));
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -128,19 +128,22 @@ afterEach(() => {
   });
   container.remove();
   vi.unstubAllGlobals();
-  useSyncStore.setState({ baseUrl: '', token: undefined });
+  useSyncStore.setState({ baseUrl: '', token: undefined, signInOpen: false });
   useAuthStore.getState().reset();
 });
 
 describe('CloseAccountPanel', () => {
-  it('🔴 未登录时**什么都不画**（没有令牌就没有"哪个账号"可注销）', async () => {
-    // 不重挂，只翻 store：面板如果只在挂载时读一次令牌，这一翻就不会让它消失，
-    // 断言就会红 —— 判据落在"订阅"上而不是"渲染过一次"上。
+  it('🔴 未登录时显示可执行的登录入口，不摆注销控件', async () => {
+    // 不重挂，只翻 store：面板必须订阅凭据变化，并把账号动作切换成登录入口。
     await act(async () => {
       useSyncStore.setState({ token: undefined });
     });
-    expect(find('[data-testid="close-account-panel"]')).toBeNull();
+    expect(find('[data-testid="close-account-panel"]')).not.toBeNull();
+    expect(find('[data-testid="close-account-needs-sign-in"]')).not.toBeNull();
+    expect(find('[data-testid="close-account-needs-sign-in-action"]')).not.toBeNull();
     expect(find('#close-account-ack')).toBeNull();
+    await click(must('[data-testid="close-account-needs-sign-in-action"]'));
+    expect(useSyncStore.getState().signInOpen).toBe(true);
   });
 
   it('🔴 没打那个勾 ⇒ 连"注销"按钮都不存在，更不会发请求', () => {

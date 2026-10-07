@@ -30,13 +30,14 @@ import {
   type ExportCounts,
   type ExportFormat,
 } from '@heyta/app-host';
-import { AlertTriangle, Download, FileJson, FileText, Info } from 'lucide-react';
+import { Download, FileJson, FileText } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
 
 import { currentState, requireStore } from '../../lib/oplog.js';
 import { tasksMarkdownCopy } from './export-copy.js';
 import { downloadTextFile } from './export-download.js';
+import { SettingsNotice } from './SettingsNotice.js';
 
 export function ExportPanel(): React.JSX.Element {
   const { t } = useI18n();
@@ -137,14 +138,14 @@ export function ExportPanel(): React.JSX.Element {
         🔴 诚实条款，不是说明文字。这一轮**不做导入**，所以必须明说 ——
         否则用户会把它当成还原点，而一个导不回来的文件当还原点用等于没有备份。
       */}
-      <p className="ht-settings__notice" data-testid="export-not-restore-point">
-        <Info size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.notRestorePoint')}
-      </p>
+      <SettingsNotice
+        title={t('web.settings.dataUx.formatsTitle')}
+        tone="warning"
+        testId="export-not-restore-point"
+      >{t('web.export.notRestorePoint')}</SettingsNotice>
 
       {failed && (
-        <p className="ht-settings__danger" role="alert" data-testid="export-failed">
-          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.failed')}
-        </p>
+        <SettingsNotice title={t('web.export.failed')} tone="danger" testId="export-failed" live />
       )}
     </div>
   );

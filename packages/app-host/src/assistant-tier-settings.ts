@@ -41,10 +41,7 @@
  * 包括 `true`、`1`、`'READ-AND-PROPOSE'`、`'read_and_propose'`、`undefined`、
  * 以及旧版本根本没存过这个字段的情形。
  *
- * 理由与 ADR-0014 那条"必填且默认关闭"同源：**"让模型能改数据"必须是用户
- * 明确选过的状态**，而"看起来像真"的读法会把一次配置写坏、一个别家工具的字符串、
- * 或一次手滑的 JSON 编辑，直接变成放开写入。
- * 这个方向**不能反过来**：反过来之后默认值就形同虚设，而界面上仍然显示"只读"。
+ * 持久化坏值仍然必须回到只读：未知或缺失的值不能因为一次配置损坏而获得写提案能力。
  */
 
 import type { AssistantTier } from './ai-assistant.js';
@@ -56,21 +53,26 @@ export const ASSISTANT_TIER_READ_ONLY = 'read-only';
 export const ASSISTANT_TIER_READ_AND_PROPOSE = 'read-and-propose';
 
 /**
+ * 产品层的名称：执行。
+ *
+ * 持久化值继续保留 `read-and-propose`，这样已有设备和跨端配置无需迁移；
+ * “提议”是内部确认链路的实现细节，不再作为用户可见的第三档心智。
+ */
+export const ASSISTANT_TIER_EXECUTE = ASSISTANT_TIER_READ_AND_PROPOSE;
+
+/**
  * 两档**按权限从低到高**的固定顺序。
  *
  * ⚠️ 顺序是承重的，不只是列表：设置界面用 `.map()` 渲染单选项，
- * 而默认档必须排在**第一格** —— 否则"出厂状态"在界面上看起来像第二格
- * 那个更高的权限，用户会以为自己在只读档、其实不是。
- * 这条不变量在下面 `ASSISTANT_TIER_ORDER[0] === DEFAULT_ASSISTANT_TIER`
- * 的测试里钉住，而不是只写在注释里。
+ * 低权限选项固定在前，高权限选项固定在后，避免不同端展示顺序漂移。
  */
 export const ASSISTANT_TIER_ORDER: readonly AssistantTier[] = [
   ASSISTANT_TIER_READ_ONLY,
   ASSISTANT_TIER_READ_AND_PROPOSE,
 ];
 
-/** 出厂默认：只读。见文件头那条 fail-closed 的理由。 */
-export const DEFAULT_ASSISTANT_TIER: AssistantTier = ASSISTANT_TIER_READ_ONLY;
+/** 出厂默认：执行模式；真正落库仍必须逐条确认。 */
+export const DEFAULT_ASSISTANT_TIER: AssistantTier = ASSISTANT_TIER_READ_AND_PROPOSE;
 
 /**
  * 把持久化通道里读回的**原始值**归一成档位。

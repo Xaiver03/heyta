@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider, LOCALES, translate, type Locale, type MessageKey } from '@heyta/i18n';
 
 import { SubscriptionNotice } from '../src/features/subscription/SubscriptionNotice.js';
+import { siteLink } from '../src/lib/site-url.js';
 /**
  * 这 7 条第 16 轮已收编进 `packages/i18n`（原来在 `subscription/copy.ts` 里）。
  * 这里保留一份 key 清单，是为了下面那条"每种语言都真的翻了"的断言 ——
@@ -158,8 +159,9 @@ describe('托管同步到期', () => {
       link,
       '到期提示里没有任何指向价格页的链接 —— 用户读完提示仍然不知道该去哪问"还能不能续"',
     ).not.toBeNull();
-    // 站点地址默认取**当前来源**（站点在同一个域名的根上，见 lib/site-url.ts）。
-    expect(link!.getAttribute('href')).toBe(`${window.location.origin}/pricing`);
+    // 站点地址来自产品站点事实源（本地 WebView / 开发服务器也不能把用户
+    // 送回没有帮助中心的 localhost；自托管部署可用 VITE_SITE_URL 覆盖）。
+    expect(link!.getAttribute('href')).toBe(siteLink('/pricing'));
     expect(link!.getAttribute('rel')).toBe('noopener noreferrer');
 
     // 反向判据：不许出现任何"点了没反应"的催收措辞。

@@ -95,12 +95,13 @@
  */
 
 import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewProps } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type ViewProps } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { Habit, HabitLog, LocalDate } from '@heyta/domain';
-import { Check, Flame, Minus, Plus, Undo2 } from 'lucide';
+import { Check, Minus, Plus, Undo2 } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
+import { HabitMetricIcon } from './HabitMetricIcon.js';
 import {
   HABIT_HEATMAP_DAYS,
   habitHeatmap,
@@ -293,8 +294,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     headerRow: {
       flexDirection: 'row',
@@ -361,16 +360,12 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: 'transparent',
     },
-    /** 补打卡 / 重新开始：与上面的指标区用**边框**分开（扁平风格不用阴影）。 */
+    /** 补打卡 / 重新开始：与上面的指标区用留白分开。 */
     action: {
       gap: tokens['space.2'],
       paddingTop: tokens['space.2'],
-      borderTopWidth: tokens['border-width.thin'],
-      borderTopColor: tokens['color.border-subtle'],
     },
     checkin: {
       minWidth: tokens['touch-target.min'],
@@ -381,14 +376,11 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.1'],
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
     },
     checkinOn: {
-      borderColor: tokens['color.primary'],
       backgroundColor: tokens['color.primary'],
     },
     checkinOff: {
-      borderColor: tokens['color.border'],
       backgroundColor: 'transparent',
     },
     checkinOnText: {
@@ -405,8 +397,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.1'],
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: 'transparent',
       alignSelf: 'flex-start',
     },
@@ -557,11 +547,7 @@ export function HabitBoard({
                 */}
                 <View style={styles.metrics}>
                   <View style={styles.metric}>
-                    <HeytaIcon
-                      data={Flame}
-                      size={tokens['font-size.xs']}
-                      color={tokens['color.foreground-muted']}
-                    />
+                    <HabitMetricIcon kind="streak" size={tokens['font-size.xs']} />
                     <Text
                       style={[
                         text.caption,
@@ -572,7 +558,9 @@ export function HabitBoard({
                       {labels.streakCurrent(r.current)}
                     </Text>
                   </View>
-                  <Text
+                  <View style={styles.metric}>
+                    <HabitMetricIcon kind="best" size={tokens['font-size.xs']} />
+                    <Text
                     style={[
                       text.caption,
                       styles.numeric,
@@ -580,8 +568,11 @@ export function HabitBoard({
                     ]}
                   >
                     {labels.streakLongest(r.longest)}
-                  </Text>
-                  <Text
+                    </Text>
+                  </View>
+                  <View style={styles.metric}>
+                    <HabitMetricIcon kind="total" size={tokens['font-size.xs']} />
+                    <Text
                     style={[
                       text.caption,
                       styles.numeric,
@@ -589,8 +580,11 @@ export function HabitBoard({
                     ]}
                   >
                     {labels.streakTotal(r.total)}
-                  </Text>
-                  <Text
+                    </Text>
+                  </View>
+                  <View style={styles.metric}>
+                    <HabitMetricIcon kind="month" size={tokens['font-size.xs']} />
+                    <Text
                     style={[
                       text.caption,
                       styles.numeric,
@@ -599,8 +593,11 @@ export function HabitBoard({
                     testID={`habit-month-days-${row.habit.id}`}
                   >
                     {labels.monthDays(row.month.achievedDays)}
-                  </Text>
-                  <Text
+                    </Text>
+                  </View>
+                  <View style={styles.metric}>
+                    <HabitMetricIcon kind="rate" size={tokens['font-size.xs']} />
+                    <Text
                     style={[
                       text.caption,
                       styles.numeric,
@@ -616,8 +613,11 @@ export function HabitBoard({
                     {row.month.scheduledDays === 0
                       ? labels.monthRatePending
                       : labels.monthRate(Math.round(row.month.rate * 100))}
-                  </Text>
-                  <Text
+                    </Text>
+                  </View>
+                  <View style={styles.metric}>
+                    <HabitMetricIcon kind="journal" size={tokens['font-size.xs']} />
+                    <Text
                     style={[
                       text.caption,
                       styles.numeric,
@@ -629,8 +629,11 @@ export function HabitBoard({
                       value: row.month.monthValue,
                       unit: (row.habit.unit ?? '').trim(),
                     })}
-                  </Text>
-                  <Text
+                    </Text>
+                  </View>
+                  <View style={styles.metric}>
+                    <HabitMetricIcon kind="calendar" size={tokens['font-size.xs']} />
+                    <Text
                     style={[
                       text.caption,
                       styles.numeric,
@@ -642,7 +645,8 @@ export function HabitBoard({
                       value: row.month.totalValue,
                       unit: (row.habit.unit ?? '').trim(),
                     })}
-                  </Text>
+                    </Text>
+                  </View>
                 </View>
 
                 {/*
@@ -882,6 +886,7 @@ export function HabitBoard({
               </View>
             ) : null}
 
+            <ScrollView horizontal testID={`${testID}-heat-scroll`}>
             <View style={styles.heat} testID={`${testID}-heat`}>
               {/* 月份标签与格子**同一套列宽**，否则标签会与它标注的那一列错开。
                   兑现这句话的方式不是把标签压成一列宽（那会折成两行，工单 H8），
@@ -969,6 +974,7 @@ export function HabitBoard({
                 </View>
               )}
             </View>
+            </ScrollView>
           </View>
         );
       })}

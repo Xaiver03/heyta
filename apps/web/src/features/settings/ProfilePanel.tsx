@@ -69,6 +69,7 @@ import {
 
 import { useSyncStore } from '../sync/store.js';
 import { loadAvatarImage, type AvatarFileError } from './avatar-encode.js';
+import { SettingsAccountGate } from './SettingsAccountGate.js';
 import { notifyAccountIdentityChanged } from './useAccountIdentity.js';
 
 /** 一次写请求的结果，只用于决定底部那一行字。 */
@@ -78,7 +79,7 @@ type Notice =
   | { kind: 'done'; text: string }
   | { kind: 'error'; text: string };
 
-export function ProfilePanel(): React.JSX.Element {
+export function ProfilePanel({ active = true }: { active?: boolean }): React.JSX.Element {
   const { t } = useI18n();
 
   const baseUrl = useSyncStore((s) => s.baseUrl);
@@ -112,6 +113,8 @@ export function ProfilePanel(): React.JSX.Element {
   const aliveRef = useRef(true);
   /** 账号/口令切换后，前一个会话的响应即使晚到也不能写回当前面板。 */
   const sessionGenerationRef = useRef(0);
+  const activeRef = useRef(active);
+  activeRef.current = active;
   useEffect(() => {
     // StrictMode 会执行 setup → cleanup → setup；每次 setup 都恢复存活状态。
     aliveRef.current = true;
@@ -134,7 +137,10 @@ export function ProfilePanel(): React.JSX.Element {
     const isCurrent = (): boolean =>
       aliveRef.current && !cancelled && sessionGenerationRef.current === generation;
 
-    if (!signedIn || token === undefined) {
+    if (!active || !signedIn || token === undefined) {
+      if (!active) return () => {
+        cancelled = true;
+      };
       setSavedName(null);
       setDraft('');
       setAvatarUrl(undefined);
@@ -170,12 +176,12 @@ export function ProfilePanel(): React.JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, password, signedIn, t, token]);
+  }, [active, baseUrl, password, signedIn, t, token]);
 
   /** 换一张：编码在前、上限判断在后，任何一步不对都**不发请求**。 */
   const onPickFile = async (file: File): Promise<void> => {
     const generation = sessionGenerationRef.current;
-    if (!signedIn || token === undefined || password === undefined) {
+    if (!activeRef.current || !signedIn || token === undefined || password === undefined) {
       setAvatarNotice({
         kind: 'error',
         text: t('common.profile.avatar.needPassword'),
@@ -184,7 +190,7 @@ export function ProfilePanel(): React.JSX.Element {
     }
     setAvatarNotice({ kind: 'busy' });
     const encoded = await loadAvatarImage(file);
-    if (!aliveRef.current || sessionGenerationRef.current !== generation) return;
+    if (!activeRef.current || !aliveRef.current || sessionGenerationRef.current !== generation) return;
     if (!encoded.ok) {
       setAvatarNotice({ kind: 'error', text: fileErrorText(encoded.error) });
       return;
@@ -195,7 +201,7 @@ export function ProfilePanel(): React.JSX.Element {
       password,
       encoded.image,
     );
-    if (!aliveRef.current || sessionGenerationRef.current !== generation) return;
+    if (!activeRef.current || !aliveRef.current || sessionGenerationRef.current !== generation) return;
     if (!outcome.ok) {
       setAvatarNotice({ kind: 'error', text: t('common.profile.avatar.failed') });
       return;
@@ -221,6 +227,7 @@ export function ProfilePanel(): React.JSX.Element {
 
   const saveNickname = async (): Promise<void> => {
     const generation = sessionGenerationRef.current;
+    if (!activeRef.current) return;
     // 🔴 「这一发到底发不发、发什么」不在这里判 —— 见 `planDisplayNameWrite`。
     //    移动端做的是同一件事，两边各写一遍就是从两个地方各判一遍（AGENTS §3.5）。
     //    `baseUrl === ''` 折算成"没有可用凭据"：本机的 `signedIn` 就是这么定义的。
@@ -232,7 +239,7 @@ export function ProfilePanel(): React.JSX.Element {
     if (plan.action === 'skip') return;
     setNameNotice({ kind: 'busy' });
     const outcome = await updateAccountDisplayName({ baseUrl }, plan.token, plan.value);
-    if (!aliveRef.current || sessionGenerationRef.current !== generation) return;
+    if (!activeRef.current || !aliveRef.current || sessionGenerationRef.current !== generation) return;
     if (!outcome.ok) {
       setNameNotice({ kind: 'error', text: t('common.profile.nickname.failed') });
       return;
@@ -250,10 +257,10 @@ export function ProfilePanel(): React.JSX.Element {
 
   const removeAvatar = async (): Promise<void> => {
     const generation = sessionGenerationRef.current;
-    if (!signedIn || token === undefined) return;
+    if (!activeRef.current || !signedIn || token === undefined) return;
     setAvatarNotice({ kind: 'busy' });
     const outcome = await deleteAccountAvatar({ baseUrl }, token);
-    if (!aliveRef.current || sessionGenerationRef.current !== generation) return;
+    if (!activeRef.current || !aliveRef.current || sessionGenerationRef.current !== generation) return;
     if (!outcome.ok) {
       setAvatarNotice({ kind: 'error', text: t('common.profile.avatar.failed') });
       return;
@@ -278,16 +285,18 @@ export function ProfilePanel(): React.JSX.Element {
   /** 与当前值相同 ⇒ 这一次点击不产生写（空转的请求也算副作用）。 */
   const unchanged = draft.trim() === (savedName ?? '').trim();
 
+  if (!signedIn) return (
+    <section className="ht-settings" data-testid="profile-panel">
+      <h2 className="ht-settings__title ht-type-section-title">{t('common.profile.title')}</h2>
+      <SettingsAccountGate messageKey="common.profile.signInToEdit" testId="profile-signin-required" />
+    </section>
+  );
+
   return (
     <section className="ht-settings" data-testid="profile-panel">
       <h2 className="ht-settings__title ht-type-section-title">
         {t('common.profile.title')}
       </h2>
-      {!signedIn ? (
-        <p className="ht-settings__hint" data-testid="profile-signin-required">
-          {t('common.profile.signInToEdit')}
-        </p>
-      ) : null}
       <NoticeLine notice={loadNotice} testId="profile-load-notice" />
 
       <div className="ht-settings__section" data-testid="profile-avatar-row">
@@ -340,7 +349,7 @@ export function ProfilePanel(): React.JSX.Element {
             </button>
           )}
         </div>
-        {canTouchAvatar ? null : (
+        {!signedIn || canTouchAvatar ? null : (
           <p className="ht-settings__hint" data-testid="profile-avatar-need-password">
             {t('common.profile.avatar.needPassword')}
           </p>

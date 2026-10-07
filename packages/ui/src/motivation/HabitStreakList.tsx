@@ -113,8 +113,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       padding: tokens['space.3'],
       borderRadius: tokens['radius.lg'],
       backgroundColor: tokens['color.surface'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
     },
     currentRow: {
       flexDirection: 'row',
@@ -149,8 +147,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       justifyContent: 'center',
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: 'transparent',
       alignSelf: 'flex-start',
     },

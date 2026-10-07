@@ -103,6 +103,8 @@ export {
   calendarDayTone,
   calendarDayMarkerView,
   calendarCellBars,
+  calendarTaskSpan,
+  groupTasksByCalendarDate,
   calendarDayBuckets,
   calendarHourMark,
   calendarCursorFor,
@@ -118,6 +120,7 @@ export {
   CALENDAR_VIEW_ORDER,
   type CalendarBoardLabels,
   type CalendarCellBar,
+  type CalendarTaskSpan,
   type CalendarViewKind,
   type CalendarViewLabelKey,
   type CalendarDayBuckets,
@@ -151,6 +154,13 @@ export {
   type EmptyStateProps,
   type EmptyStateSlots,
 } from './empty-state/EmptyState.js';
+export {
+  StateIllustration,
+  type StateIllustrationLocale,
+  type StateIllustrationMotion,
+  type StateIllustrationProps,
+  type StateIllustrationVariant,
+} from './empty-state/StateIllustration.js';
 export {
   nonBlank,
   toEmptyStateViewModel,
@@ -198,6 +208,7 @@ export {
   useHeytaText,
   useHeytaTokens,
   useHeytaUiTheme,
+  useHeytaUiLocale,
   type HeytaUiNativeAccessors,
   type HeytaUiProviderProps,
   type HeytaUiTheme,
@@ -884,6 +895,14 @@ export {
   type HabitProgressListLabels,
   type HabitProgressListProps,
 } from './habits/HabitProgressList.js';
+export {
+  HabitArtwork,
+  type HabitArtworkProps,
+} from './habits/HabitArtwork.js';
+export {
+  HabitMetricIcon,
+  type HabitMetricKind,
+} from './habits/HabitMetricIcon.js';
 
 /**
  * ── W6：认证表单的**共享纯逻辑**（口令这条路）──
@@ -929,6 +948,14 @@ export {
   type AuthFormProps,
   type AuthFormStatus,
 } from './auth/AuthForm.js';
+export {
+  PasswordStrength,
+  passwordCodePointLength,
+  passwordStrengthLevel,
+  type PasswordStrengthLabels,
+  type PasswordStrengthLevel,
+  type PasswordStrengthProps,
+} from './auth/PasswordStrength.js';
 
 /**
  * ── W7：失败句子**连同要填的数字**一起交出 ──
@@ -1131,26 +1158,15 @@ export {
 } from './calendar/model.js';
 
 /**
- * ── 工单 H3：习惯图标的**两张共享表** ──
+ * ── 工单 H3：习惯图形与图标词条的共享接线 ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
  *
- * 转出的动机不是"方便"，是**移动端要画同一批字形**：`HabitsScreen` 详情层的图标
- * 选择器（工单 H3）如果自己在 `apps/mobile` 里再抄一张 `key → 字形`，那就是
- * **第三份事实源** —— 而它坏的时候两端都不报错，症状只是"手机上水滴、web 上月亮"。
- * 现有判据（`apps/web/tests/habits-list-pane.spec.tsx` F 组）比的是**清单**那两张
- * （web 的组件表 vs 共享层的数据表），管不到宿主里新长出来的第三张。
- *
- * ⚠️ 两张表的性质不同，别读成"重复被消除了"：
- *   · `HABIT_GLYPHS`（key → `lucide` **图标数据**，经 `HeytaIcon` 在 RN 上画）
- *     与 web 那张 `key → lucide-react **组件**`**结构上必须分开**（画的不是同一种东西），
- *     一致性由 F 组逐对比钉住 —— 这一份导出只是让移动端**不必**再抄；
- *   · `HABIT_ICON_LABEL_KEYS`（key → 词条名）是**真的只有一份**：web 已改为从这里取
- *     （`apps/web/src/features/habits/habit-glyphs.ts` 里那 10 行删掉了），
- *     抽取的收尾动作是删掉旧的那份，不是再写一份更好的。
+ * `HabitArtwork`（原创位图）是移动端与共享清单的唯一绘制入口；`HABIT_ICON_LABEL_KEYS`
+ * 仍是唯一的 key → 词条表。原先的 `HABIT_GLYPHS` 已收进实现内部，不再作为公共 API
+ * 暴露，避免宿主绕过统一图形组件。
  */
 export {
-  HABIT_GLYPHS,
   HABIT_ICON_LABEL_KEYS,
   type HabitIconLabelKey,
 } from './habits/HabitProgressList.js';
@@ -1211,3 +1227,5 @@ export {
   type HabitTrendBoardProps,
   type HabitTrendView,
 } from './habits/HabitTrendBoard.js';
+
+export { AssistantMark } from './ai/AssistantMark.js';

@@ -13,7 +13,7 @@
  * `CalendarDays` 图标、习惯热力图、日期显示，**没有一个日历视图**。
  * 这正是本仓反复记的"判据必须是结构性的，不能是「出现了这个词」"。
  *
- * ⇒ 所以这里的判据全部是**渲染出来的东西**：42 个格子、当天的行、
+ * ⇒ 所以这里的判据全部是**渲染出来的东西**：42 个格子、月格里的任务条、
  * 页脚那句"未设截止时间的任务不在日历上"。字符串命中不算。
  *
  * ## 🔴 它同时钉住"共享"这件事
@@ -146,7 +146,7 @@ describe('日历视图（Web）', () => {
       .toBeGreaterThanOrEqual(42);
   });
 
-  it('🔴 月份标题与当天标题来自**共享的** `date-text.ts`（中文口径）', async () => {
+  it('🔴 月份标题与选中格子的无障碍日期来自**共享的** `date-text.ts`（中文口径）', async () => {
     await mount();
     await openCalendar();
 
@@ -154,10 +154,11 @@ describe('日历视图（Web）', () => {
     // 「2026年9月」——这条形状由共享的 `formatMonthTitleText` 决定。
     expect(month, `月份标题不像共享实现给的形状：「${month}」`).toMatch(/^\d{4}年\d{1,2}月$/);
 
-    const day = container!.querySelector('[data-testid="calendar-board-day-title"]')?.textContent ?? '';
-    // 「9月29日 星期一」
-    expect(day, `当天标题不像共享实现给的形状：「${day}」`).toMatch(
-      /^\d{1,2}月\d{1,2}日 星期[一二三四五六日]$/,
+    const selected = container!.querySelector<HTMLElement>('[data-testid^="calendar-cell-"][aria-selected="true"]');
+    const day = selected?.getAttribute('aria-label') ?? '';
+    // 「9月29日 星期一」是共享层无障碍日期的一部分；后面可能还有“有几条/无安排”。
+    expect(day, `选中格子的日期不像共享实现给的形状：「${day}」`).toMatch(
+      /\d{1,2}月\d{1,2}日 星期[一二三四五六日]/,
     );
   });
 
@@ -173,7 +174,7 @@ describe('日历视图（Web）', () => {
     expect(footnote!.textContent ?? '').toContain('未设截止时间');
   });
 
-  it('🔴 当天有任务时，列表里**真的有那一行**（列不出来等于没接上）', async () => {
+  it('🔴 当天有任务时，月格里**真的有那一行**（列不出来等于没接上）', async () => {
     await useTaskStore.getState().addTask('今天要交的东西');
     // 设成今天到期（走 action，不直接改 state）。
     // ⚠️ `setDueDate` 收的是**时间戳**（`LocalDate` → 当日零点），不是 LocalDate 串 ——
@@ -185,12 +186,10 @@ describe('日历视图（Web）', () => {
     await mount();
     await openCalendar();
 
-    const list = container!.querySelector('[data-testid="calendar-board-day-list"]');
-    expect(list, '当天列表没渲染').not.toBeNull();
-    expect(
-      [...list!.querySelectorAll('*')].some((el) => (el.textContent ?? '') === '今天要交的东西'),
-      `列表里找不到那条任务。实际文本：${list!.textContent ?? ''}`,
-    ).toBe(true);
+    const date = toLocalDate(Date.now());
+    const title = container!.querySelector(`[data-testid="calendar-cell-${date}-bar-title"]`);
+    expect(title, '当天月格里的任务条没渲染').not.toBeNull();
+    expect(title?.textContent).toBe('今天要交的东西');
   });
 
   /**
@@ -243,11 +242,13 @@ describe('日历视图（Web）', () => {
     const cell = container!.querySelector<HTMLElement>(`[data-testid="calendar-cell-${today}"]`);
     expect(cell).not.toBeNull();
     const bars = cell!.querySelectorAll(`[data-testid="calendar-cell-${today}-bar"]`);
-    expect(bars.length, `可见条数应当封顶在 ${String(MAX_CALENDAR_BARS)}`).toBe(MAX_CALENDAR_BARS);
+    // jsdom 没有真实格高；初始容量保守预留 +N 行，真实缩放由浏览器旅程验证。
+    expect(bars.length).toBeGreaterThan(0);
+    expect(bars.length).toBeLessThanOrEqual(MAX_CALENDAR_BARS);
 
     const more = cell!.querySelector(`[data-testid="calendar-cell-${today}-more"]`);
-    expect(more, `5 条任务却没有折叠标记（应当出现 +${String(5 - MAX_CALENDAR_BARS)}）`).not.toBeNull();
-    expect(more!.textContent).toBe(`+${String(5 - MAX_CALENDAR_BARS)}`);
+    expect(more, '剩余任务应有准确的折叠数量').not.toBeNull();
+    expect(more!.textContent).toBe(`+${String(5 - bars.length)}`);
   });
 
   it('🔴 恰好等于上限时**不出现「+0」**（那句废话在数据上就该是 0）', async () => {
@@ -309,10 +310,10 @@ describe('日历视图（Web）', () => {
     await flush();
 
     expect(monthOf(), '「回到今天」之后月份没有回来').toBe(before);
-    // 选中那天应当是今天 —— 标题与今日标题一致。
-    const day = container!.querySelector('[data-testid="calendar-board-day-title"]')?.textContent;
+    // 选中那天应当是今天 —— 选中格子的无障碍日期与今日一致。
+    const day = container!.querySelector<HTMLElement>('[data-testid^="calendar-cell-"][aria-selected="true"]')?.getAttribute('aria-label');
     const d = new Date();
-    expect(day).toContain(`${String(d.getMonth() + 1)}月${String(d.getDate())}日`);
+    expect(day ?? '').toContain(`${String(d.getMonth() + 1)}月${String(d.getDate())}日`);
     expect(today).toBeTruthy();
   });
 

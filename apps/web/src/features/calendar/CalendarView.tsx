@@ -42,7 +42,7 @@ import {
   stepCalendarCursor,
 } from '@heyta/ui';
 
-import { CaptureComposer } from '../capture/CaptureComposer.js';
+import { CalendarCapturePopover } from './CalendarCapturePopover.js';
 import { useCountdownStore } from '../countdown/store.js';
 import { useTaskStore } from '../tasks/store.js';
 import { useCalendarLabels } from './useCalendarLabels.js';
@@ -142,6 +142,18 @@ export function CalendarView(): React.JSX.Element {
   );
 
   /**
+   * 月格点击是一次完整的新建意图：先选中日期，再打开同一条捕获浮层。
+   * 草稿仍由 `CaptureComposer` 自己持有，取消或关闭只卸载草稿，不触发任何 op。
+   */
+  const onSelectDay = useCallback(
+    (date: LocalDate) => {
+      view.selectDay(date);
+      if (view.view !== 'year' && !view.captureOpen) view.toggleCapture();
+    },
+    [view.captureOpen, view.selectDay, view.toggleCapture, view.view],
+  );
+
+  /**
    * 滚轮翻月 / 翻周（产品负责人 2026-10-01：「上下滑动自由无限切换日历」）。
    *
    * 🔴 走的是**和页头那两个箭头同一个** `stepCalendarCursor` ——
@@ -215,7 +227,7 @@ export function CalendarView(): React.JSX.Element {
              `retention-undecided` 仍然挡着 `managed`，而这条根本不需要它）。
         */}
         {view.captureOpen ? (
-          <CaptureComposer anchorDate={view.selected} />
+          <CalendarCapturePopover date={view.selected} title={labels.dayTitle(view.selected)} onClose={view.toggleCapture} />
         ) : null}
         <SharedCalendarBoard
           tasks={tasks}
@@ -223,7 +235,7 @@ export function CalendarView(): React.JSX.Element {
           cursor={view.cursor}
           selected={view.selected}
           onCursorChange={view.setCursor}
-          onSelect={view.selectDay}
+          onSelect={onSelectDay}
           /*
             年档里点一张月卡（R13）。🔴 宿主**只做接线**，"去哪"由共享层决定
             （`calendarMonthDrill`）—— 移动端接同一档时抄的是同一个函数，
@@ -236,6 +248,8 @@ export function CalendarView(): React.JSX.Element {
           toolbar="external"
           /* 档位由页头那个下拉决定（store 里唯一一份），板子只照它画。 */
           view={view.view}
+          showSelectedDayList={false}
+          fillMonth
           /* 🔴 日档那条"现在"线的时钟**只有一个来源**：任务 store 的 `now`。
              界面 store 刻意不存时钟（存了就会漂 —— 放着不动的一屏，线还在走才算"现在"）。 */
           now={store.now}

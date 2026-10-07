@@ -30,14 +30,10 @@
   gap: var(--ht-space-4);
   margin-block-end: var(--ht-space-4);
   padding-block-end: var(--ht-space-4);
-  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-block-end: 0;
 }
 
-.ht-settings__eyebrow {
-  margin: 0 0 var(--ht-space-1);
-  color: var(--ht-color-primary);
-  letter-spacing: var(--ht-tracking-caption);
-}
+
 
 .ht-settings__page-title,
 .ht-settings__lead {
@@ -64,7 +60,12 @@
 .ht-settings__nav-link {
   display: block;
   padding: var(--ht-space-2) var(--ht-space-3);
-  border-inline-start: var(--ht-border-width-thick) solid transparent;
+  border: var(--ht-border-width-thin) solid transparent;
+  min-block-size: var(--ht-touch-target-min);
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
   border-radius: var(--ht-radius-sm);
   color: var(--ht-color-foreground-muted);
   text-decoration: none;
@@ -73,6 +74,22 @@
 .ht-settings__nav-link:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
+}
+
+.ht-settings__nav-link[aria-current='page'] {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__group[hidden] { display: none; }
+
+.ht-settings__content > .ht-settings__group > .ht-settings,
+.ht-settings__content > .ht-settings__group > div > .ht-settings {
+  border: 0;
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  max-inline-size: none;
 }
 
 .ht-settings__nav-link:focus-visible {
@@ -89,6 +106,7 @@
 
 .ht-settings__content {
   min-inline-size: 0;
+  max-inline-size: var(--ht-layout-prose-max);
 }
 
 .ht-settings__group {
@@ -103,7 +121,7 @@
 .ht-settings__group-title {
   margin: 0;
   padding-block-end: var(--ht-space-2);
-  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-block-end: 0;
 }
 
 @media (max-width: 64rem) {
@@ -116,13 +134,12 @@
     overflow-x: auto;
     margin-inline: calc(var(--ht-space-6) * -1);
     padding-inline: var(--ht-space-6);
-    border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+    border-block-end: 0;
   }
 
   .ht-settings__nav-link {
     flex: 0 0 auto;
-    border-inline-start: 0;
-    border-block-end: var(--ht-border-width-thick) solid transparent;
+
     white-space: nowrap;
   }
 }
@@ -159,7 +176,7 @@
   margin-block-end: calc(var(--ht-space-2) * -1);
   padding: 0;
   cursor: pointer;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-surface);
   color: var(--ht-color-foreground-muted);
@@ -250,11 +267,6 @@
   inline-size: min(100%, var(--ht-layout-modal-max));
   aspect-ratio: 16 / 9;
   max-block-size: 100%;
-  /* 玻璃的另一半。底色是共享层的 `material.chrome-tint`（见
-     `SearchPanel.tsx`），`backdrop-filter` 只在 CSS 里合法 ⇒ 归宿主。
-     半径复用既有的 `--ht-blur-chrome`，与落地页那两处同一档材质。 */
-  backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
   /* 入场时长接**弹簧参数**（P1-3）：`--ht-motion-spring-response-sheet`
      （0.3s，"抽屉 / 底部面板"的响应档）。🔴 damping = 1.0（临界阻尼，
      tokens.css §3c 默认）意味着**不过冲** —— `--ht-ease-enter`（ease-out）
@@ -274,7 +286,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ht-search-overlay {
+  .ht-search-overlay,
+  .ht-search-overlay > * {
     animation: none;
   }
 }
@@ -387,4 +400,45 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--ht-space-3);
+}
+
+/* 同一选择语言覆盖单选和功能开关：整个选项表达当前值。 */
+.ht-settings__option {
+  min-block-size: var(--ht-touch-target-min);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+}
+.ht-settings__option:has(input:checked),
+.ht-settings__card:has(input:checked) {
+  background: var(--ht-color-primary-subtle);
+  border-color: var(--ht-color-primary);
+}
+.ht-settings__option:has(input:focus-visible),
+.ht-settings__card:has(input:focus-visible) {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/* The app header already names Settings. Keep dismiss available without a second title row. */
+.ht-settings__header--compact {
+  position: absolute;
+  inset-block-start: var(--ht-space-4);
+  inset-inline-end: var(--ht-space-4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  z-index: var(--ht-z-popover);
+}
+.ht-settings__header--compact .ht-sheet__close { border-color: transparent; border-radius: var(--ht-radius-md); }
+.ht-settings__header--compact + .ht-settings__layout { padding-inline-end: var(--ht-touch-target-min); }
+@media (max-width: 64rem) {
+  .ht-settings__header--compact + .ht-settings__layout { padding-inline-end: 0; }
+  .ht-settings__header--compact + .ht-settings__layout .ht-settings__nav {
+    margin-inline-end: var(--ht-touch-target-min);
+    /* The dismiss control occupies the trailing 44px. Keep a full safe zone
+       inside the scrollport so the last category can be brought clear of it. */
+    padding-inline-end: calc(var(--ht-space-6) + var(--ht-touch-target-min));
+    scroll-padding-inline-end: calc(var(--ht-space-6) + var(--ht-touch-target-min));
+  }
 }

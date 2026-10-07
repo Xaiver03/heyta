@@ -242,7 +242,7 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
         {todayVisible && (
           <Text
             testID="gantt-today"
-            style={[text.caption, { color: tokens['color.warning'] }]}
+            style={[text.caption, { color: tokens['color.warning-strong'] }]}
           >
             {labels.today(todayDayIndex)}
           </Text>
@@ -382,7 +382,7 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
                 {overlaps && (
                   <Text
                     testID={`gantt-overlap-${String(index)}`}
-                    style={[text.caption, { color: tokens['color.warning'] }]}
+                    style={[text.caption, { color: tokens['color.warning-strong'] }]}
                   >
                     {labels.overlap}
                   </Text>

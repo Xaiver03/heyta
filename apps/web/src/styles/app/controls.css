@@ -77,6 +77,79 @@
  * `renderTaskTrailing`）与 `.ht-due`（本端特有的截止呈现：日期/倒计时两种）。
  */
 
+/*
+ * 任务行次级动作：默认只显示一个有名的入口。
+ *
+ * 备注、整理、重复、截止、提醒、AI 和删除仍然在这个 disclosure 里，
+ * 所以它们的既有组件、键盘操作和 action 回调都保持不变；收起时不会再
+ * 把标题列挤成半幅。面板走文档流，避免被任务列表滚动容器裁掉。
+ */
+.ht-task-actions {
+  position: relative;
+  flex: 0 0 auto;
+  min-inline-size: 0;
+}
+
+.ht-task-actions > summary {
+  list-style: none;
+}
+
+.ht-task-actions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ht-task-actions__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+  background: var(--ht-color-surface);
+  font-size: var(--ht-font-size-xs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ht-task-actions__trigger:hover,
+.ht-task-actions[open] > .ht-task-actions__trigger {
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-foreground);
+  background: var(--ht-color-primary-subtle);
+}
+
+.ht-task-actions__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  inline-size: min(24rem, calc(100vw - var(--ht-space-8)));
+  max-inline-size: 100%;
+  margin-block-start: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-task-actions__items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: center;
+  justify-content: flex-start;
+  gap: var(--ht-space-2);
+  min-inline-size: 0;
+}
+
+@media (max-width: 40rem) {
+  .ht-task-actions__panel {
+    inline-size: min(22rem, calc(100vw - var(--ht-space-6)));
+  }
+}
+
 /* ── 截止时间徽标 ───────────────────────────────────── */
 
 /* 🔴 tabular-nums 是必须的：「还剩 3 天」→「还剩 12 天」会让整行文字宽度跳动，
@@ -153,7 +226,7 @@
   min-block-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-4);
   background: var(--ht-color-surface);
-  border: 1px solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
   transition: border-color var(--ht-duration-fast) var(--ht-ease-standard);

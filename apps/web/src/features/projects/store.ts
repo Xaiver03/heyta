@@ -39,7 +39,7 @@ interface ProjectState {
   /** 🔴 回收站那一路（有墓碑且未彻底删除）；判据与顺序在领域层。 */
   trashed: Project[];
 
-  addProject: (name: string, parentId?: string) => Promise<void>;
+  addProject: (name: string, parentId?: string, color?: CategorySlot) => Promise<string | undefined>;
   renameProject: (id: string, name: string) => Promise<void>;
   /** 归档/取消归档。**目标状态**省略时 = 归档（`app-host` 那边的默认值）。 */
   archiveProject: (id: string, archived?: boolean) => Promise<void>;
@@ -69,7 +69,7 @@ interface ProjectState {
    */
   setProjectParent: (id: string, parentId?: string) => Promise<void>;
 
-  addTag: (name: string) => Promise<void>;
+  addTag: (name: string) => Promise<string | undefined>;
   renameTag: (id: string, name: string) => Promise<void>;
   deleteTag: (id: string) => Promise<void>;
 }
@@ -87,11 +87,11 @@ export const useProjectStore = create<ProjectState>(() => ({
   tags: [],
   trashed: [],
 
-  addProject: async (name, parentId) => {
+  addProject: async (name, parentId, color) => {
     // ⚠️ 交互决策，不是数据决策：用户按了空回车就该什么都不发生。
     // 动作层对空名字抛错（它不知道调用方是"用户按了回车"还是"程序写错了"）。
-    if (name.trim() === '') return;
-    await projectActions.createProject(name, parentId);
+    if (name.trim() === '') return undefined;
+    return projectActions.createProject(name, parentId, color);
   },
 
   renameProject: async (id, name) => {
@@ -136,8 +136,8 @@ export const useProjectStore = create<ProjectState>(() => ({
   },
 
   addTag: async (name) => {
-    if (name.trim() === '') return;
-    await projectActions.createTag(name);
+    if (name.trim() === '') return undefined;
+    return projectActions.createTag(name);
   },
 
   renameTag: async (id, name) => {

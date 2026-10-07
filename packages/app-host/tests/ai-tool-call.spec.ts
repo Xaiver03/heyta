@@ -7,7 +7,7 @@
  *   1. 🔴 **规则命中时一次网络请求都不发** —— 隐私优先，数 `fetch` 次数。
  *   2. 🔴 **`fields` 必须含 `tools`** —— 工具名与说明是出境数据。
  *   3. 🔴 **模型不可信**：目录外 / 未授权 / 坏参数 / 多个调用，一律回问，不猜。
- *   4. 🔴 **写工具只产出提案**：`submit` 次数为 0。
+ *   4. 🔴 **默认写工具只产出提案**：未传执行档标识时 `submit` 次数为 0。
  *   5. 🔴 **一个工具都没授权时不发请求**（送模型也没用）。
  *   6. 🔴 **失败原因用 `packages/ai` 给的句子**，`cause` 带具体原因码。
  */
@@ -30,6 +30,7 @@ const ALL_GRANTS = {
   get_task: true,
   list_projects: true,
   create_task: true,
+  complete_task: true,
 } as const;
 
 interface Captured {
@@ -171,6 +172,32 @@ describe('模型路径：严格校验', () => {
     expect(host.submits).toBe(0);
   });
 
+  it('执行档低风险写工具 → 自动执行一次并返回 executed', async () => {
+    const host = fakeHost();
+    const { impl } = countingFetch(toolCallResponse('create_task', '{"title":"写周报"}'));
+    const outcome = await requestToolCall(
+      { text: '帮我记一下写周报这件事' },
+      { ...deps(impl, host), tier: 'read-and-propose', executionId: 'tool-call-create-1' },
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.result.kind).toBe('executed');
+    expect(host.submits).toBe(1);
+  });
+
+  it('执行档高风险批量完成 → 仍返回提案，不自动提交', async () => {
+    const host = fakeHost();
+    const { impl } = countingFetch(toolCallResponse('complete_task', '{"taskIds":["t1","t2"]}'));
+    const outcome = await requestToolCall(
+      { text: '把这些任务都完成' },
+      { ...deps(impl, host), tier: 'read-and-propose', executionId: 'tool-call-complete-1' },
+    );
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.result.kind).toBe('proposal');
+    expect(host.submits).toBe(0);
+  });
+
   it('🔴 模型编了一个目录外的工具 → failed unknown-tool（不猜）', async () => {
     const { impl } = countingFetch(toolCallResponse('delete_everything', '{}'));
     const outcome = await requestToolCall({ text: '帮我看看下周三评审要准备什么' }, deps(impl));
@@ -183,7 +210,10 @@ describe('模型路径：严格校验', () => {
 
   it('🔴 模型调了一个未授权的工具 → denied', async () => {
     const { impl } = countingFetch(toolCallResponse('complete_task', '{"taskId":"t1"}'));
-    const outcome = await requestToolCall({ text: '帮我看看下周三评审要准备什么' }, deps(impl));
+    const outcome = await requestToolCall(
+      { text: '帮我看看下周三评审要准备什么' },
+      { ...deps(impl), grants: { ...ALL_GRANTS, complete_task: false } },
+    );
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
     expect(outcome.result.kind).toBe('denied');

@@ -82,9 +82,12 @@
     /* 刘海屏安全区跟着最底下这一行走（旧塌缩写在 sidebar 上 —— 那时它才在最底）。 */
     padding-block-end: max(var(--ht-space-2), env(safe-area-inset-bottom));
     border-right: none;
-    border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
+    border-top: 0;
     overflow-x: auto;
     overflow-y: hidden;
+    /* Bound intrinsic width without creating a containing block for fixed
+       account/notification overlays. Paint containment clips those menus. */
+    contain: inline-size;
     /* 滚动条隐藏（做法与理由同 `.ht-viewtabs` / `.ht-nav`）：classic 滚动条
        会占掉导航的高度，行高随是否溢出跳一下（CLS）；键盘聚焦时浏览器自动
        把聚焦项滚进视野，不需要滑块。 */
@@ -107,6 +110,7 @@
 
   .ht-rail__tabs {
     flex-direction: row;
+    align-items: center;
     /* 🔴 这一档**不再自己滚**：滚的是外层 `.ht-rail`。旧塌缩里两层同轴
        （rail `overflow-x:auto` + tabs `overflow-x:auto`）是嵌套横滚 ——
        手指划在 tab 上只带动内层、划到头像/铃铛才带动外层，"这段滚不动、
@@ -118,6 +122,7 @@
   }
 
   .ht-rail__tab {
+    inline-size: auto;
     padding: 0 var(--ht-space-2);
     /* 图标与名字**都**在流里了（见下面 `.ht-rail__label`），需要间距。
        桌面态这条 gap 是不生效的 —— 那里名字是 fixed、徽标是 absolute。 */
@@ -127,6 +132,12 @@
        "顺手优化"时弄丢它们，而竖排/折行在这一档就是回归。 */
     white-space: nowrap;
     flex: 0 0 auto;
+  }
+
+  .ht-rail__item,
+  .ht-rail__more {
+    inline-size: auto;
+    align-self: center;
   }
 
   /* 同步组在桌面 rail 是"贴底一列"（自带 padding-bottom 与 column 排布）；
@@ -156,7 +167,7 @@
   }
 
   /* ══ sidebar：范围筛选区（底栏上方那一区，order 2）══
-     它不再是底部导航的第二节。高度封顶（面板上限与六成视口取小）、
+     它不再是底部导航的第二节。高度封顶（面板上限与三成视口取小）、
      内部纵滚：清单/标签可以很长，不封顶会把 main 挤成一条缝（旧塌缩正是
      这么把整条 sidebar 压进底栏、再一起被推出屏幕的）。
      🔴 桌面态那三条"钉住 + 一屏封顶 + 内部滚动"（`sidebar.css`）里：
@@ -167,11 +178,11 @@
   .ht-sidebar {
     order: 2;
     position: static;
-    max-block-size: min(var(--ht-layout-panel-max-height), 60dvh);
+    max-block-size: min(var(--ht-layout-panel-max-height), 30dvh);
     border-right: none;
     /* 分隔线画在**上沿**（旧塌缩里它排在底栏之下，线在下沿 —— 顺序换了，
        线跟着换；它与底栏之间那条由 `.ht-rail` 的 border-top 负责）。 */
-    border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+    border-block-start: 0;
     padding: var(--ht-space-1) var(--ht-space-2);
   }
 
@@ -238,11 +249,47 @@
     padding: var(--ht-space-4);
   }
 
-  /* 批量工具在窄屏单独占一行，内层控件才会从左到右换行，
-     不会和标题、排序控件争夺一条不可收缩的横向空间。 */
+  /* 任务操作在窄屏进入同一条紧凑工具栏；选择、排序与助手入口
+     保持各自完整的触控单元，放不下时才由父级按单元换行。 */
   .ht-header__actions > [data-testid="bulk-toolbar"] {
-    flex-basis: 100%;
+    /* The selection action belongs to the same compact task toolbar as sort
+       and the assistant entry.  Giving it a full row made the 390px header
+       grow to three visual rows before the composer even started. */
+    flex: 0 0 auto;
+    flex-basis: auto;
     justify-content: flex-start;
+  }
+
+  .ht-header__actions {
+    column-gap: var(--ht-space-1);
+  }
+
+  /* Keep the task controls in one scan line at phone widths.  The native
+     select remains the accessible control; its width is capped so the
+     visible label can sit beside selection and the icon-only assistant
+     action without changing their touch targets.  At narrower widths the
+     parent still wraps these complete controls naturally. */
+  .ht-header__actions > [data-testid="task-sort"] {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    gap: var(--ht-space-1);
+  }
+
+  .ht-header__actions > [data-testid="task-sort"] select {
+    inline-size: 7rem;
+    min-inline-size: 0;
+  }
+
+  /* 日历工具栏在窄屏拆成两行：导航与新增/筛选动作都保留，不能让月份
+     工具栏以一个不可收缩的长 flex 行把「回到今天」推到视口左侧之外。 */
+  .ht-header__calendar-toolbar {
+    flex-basis: 100%;
+  }
+
+  .ht-header__calendar-toolbar > div {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: var(--ht-space-1);
   }
 
   /* 详情列（W2 的槽位）在塌缩态里没有位置：单列 + 底部导航里再插一根竖列
@@ -337,6 +384,6 @@
 
   .ht-habit__pane {
     padding-top: var(--ht-space-4);
-    border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
+    border-top: 0;
   }
 }

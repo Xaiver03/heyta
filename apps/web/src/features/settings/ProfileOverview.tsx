@@ -6,7 +6,7 @@
  * 只有一条事实链，也不会因为再造一个页面而产生第二套统计口径。
  */
 import { useMemo } from 'react';
-import { ArrowRight, LockKeyhole, Settings2, Sparkles, UserRoundPen } from 'lucide-react';
+import { ArrowRight, LockKeyhole, Settings2, UserRoundPen } from 'lucide-react';
 
 import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
@@ -65,9 +65,17 @@ export function ProfileOverview({
               {t('web.profile.overview.identityLoading')}
             </p>
           ) : identity.status === 'error' ? (
-            <p className="ht-profile-overview__note" role="status">
-              {t('web.profile.overview.identityUnavailable')}
-            </p>
+            <div className="ht-profile-overview__note" role="status">
+              <span>{t('web.profile.overview.identityUnavailable')}</span>{' '}
+              <button
+                type="button"
+                className="ht-btn ht-btn--ghost"
+                data-testid="profile-center-identity-retry"
+                onClick={identity.retry}
+              >
+                {t('web.profile.overview.identityRetry')}
+              </button>
+            </div>
           ) : null}
           <p className="ht-profile-overview__note">{t('web.profile.overview.localOnly')}</p>
           {identity.avatarState === 'needs-password' ? (
@@ -115,7 +123,15 @@ export function ProfileOverview({
               </h2>
               <p className="ht-profile-overview__note">{t('web.profile.overview.achievementsHint')}</p>
             </div>
-            <Sparkles size={ICON_SIZE.md} aria-hidden="true" className="ht-profile-overview__accent" />
+            <button
+              type="button"
+              className="ht-btn ht-btn--ghost ht-profile-overview__achievement-action"
+              data-testid="profile-center-growth"
+              onClick={onOpenGrowth}
+            >
+              <ArrowRight size={ICON_SIZE.sm} aria-hidden="true" />
+              {t('web.profile.overview.growth')}
+            </button>
           </div>
           <div className="ht-profile-overview__achievement" data-testid="profile-achievements">
             <span className="ht-profile-overview__value">
@@ -142,17 +158,6 @@ export function ProfileOverview({
       ) : null}
 
       <nav className="ht-profile-overview__actions" aria-label={t('web.profile.overview.title')}>
-        {growthEnabled ? (
-          <button
-            type="button"
-            className="ht-btn ht-btn--primary"
-            data-testid="profile-center-growth"
-            onClick={onOpenGrowth}
-          >
-            <ArrowRight size={ICON_SIZE.sm} aria-hidden="true" />
-            {t('web.profile.overview.growth')}
-          </button>
-        ) : null}
         <button
           type="button"
           className="ht-btn ht-btn--ghost"

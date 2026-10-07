@@ -83,6 +83,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.ht-type-numeric-summary {
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-title);
+  font-variant-numeric: tabular-nums;
+}
+
 .ht-type-numeric-body {
   font-size: var(--ht-font-size-base);
   font-weight: var(--ht-font-weight-medium);

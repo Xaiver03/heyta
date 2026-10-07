@@ -46,6 +46,7 @@ function overview(over: Partial<FocusOverview> = {}): FocusOverview {
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
+const originalMatchMedia = window.matchMedia;
 
 async function mount(node: React.JSX.Element): Promise<HTMLDivElement> {
   container = document.createElement('div');
@@ -69,6 +70,18 @@ function countOf(el: HTMLElement, testId: string): number {
 
 beforeEach(() => {
   localStorage.clear();
+  // 这组接线判据覆盖桌面三栏：任务无选中时，详情列由单一 AI Agent 占位。
+  // 直接挂 FocusDetailPane 的单元测试不依赖这个媒体查询。
+  window.matchMedia = ((query: string) => ({
+    matches: query === '(min-width: 1024px) and (min-height: 480px)',
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
 });
 
 afterEach(() => {
@@ -79,6 +92,7 @@ afterEach(() => {
   container = undefined;
   root = undefined;
   useFocusStore.setState({ overview: overview() });
+  window.matchMedia = originalMatchMedia;
 });
 
 describe('A 四张卡读的是那个出口，不是自己算的', () => {
@@ -176,7 +190,7 @@ describe('B 专注记录列表', () => {
   });
 });
 
-describe('C 这一栏只在专注面出现（其他视图不许借它的位置）', () => {
+describe('C 详情列按视图交给对应面板；任务面默认显示单一 AI Agent', () => {
   beforeEach(async () => {
     __resetOpLogForTests();
     await initOpLog();
@@ -186,11 +200,19 @@ describe('C 这一栏只在专注面出现（其他视图不许借它的位置�
     localStorage.setItem('heyta.shell.modules', JSON.stringify({ focus: true }));
   });
 
-  it('默认那一面（任务）里这一栏是空的', async () => {
+  it('默认那一面（任务）里详情列显示 Chatbot，而不是空栏', async () => {
     const el = await mountApp(false);
     const column = el.querySelector<HTMLElement>('[data-testid="detail-column"]');
     expect(column, '详情列没渲染出来（W2 那格被弄坏了？）').not.toBeNull();
-    expect((column?.textContent ?? '').trim(), '任务面就出现了专注概览').toBe('');
+    expect(
+      column?.querySelector('[data-testid="ai-agent-surface"]'),
+      '任务面无选中态时应由同一格显示 AI Agent',
+    ).not.toBeNull();
+    expect(
+      column?.querySelector('[data-testid="ai-assistant"]'),
+      '任务面详情列应显示统一 Chatbot 面板',
+    ).not.toBeNull();
+    expect(column?.querySelector('[data-testid="focus-detail-pane"]')).toBeNull();
   });
 
   it('切到专注面之后，概览与记录出现在**同一格里**', async () => {
@@ -227,7 +249,7 @@ async function clickRailDestination(el: HTMLElement, label: string): Promise<voi
   await act(async () => {
     more!.click();
   });
-  const item = [...el.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find((b) =>
+  const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find((b) =>
     (b.textContent ?? '').includes(label),
   );
   expect(item, `「更多」菜单里没有「${label}」`).not.toBeUndefined();

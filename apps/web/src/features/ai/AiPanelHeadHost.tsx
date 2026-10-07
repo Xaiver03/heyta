@@ -26,7 +26,7 @@ import { AiPanelHead, HeytaUiProvider } from '@heyta/ui';
 export interface AiPanelHeadHostProps {
   /** 标题。可以是拼好的句子（`AiDuration` 的提案标题里嵌着 `<strong>`）。 */
   readonly title: React.ReactNode;
-  /** 标题前的装饰图标（工具调用面板的 Sparkles）。 */
+  /** 标题前的装饰图标（工具调用面板的 原创助手图形）。 */
   readonly lead?: React.ReactNode;
   /** 右端的来源标签（本机 / 远端）。 */
   readonly tag?: {

@@ -132,6 +132,10 @@ const LABELS: AuthFormLabels = {
   switchToRegister: t('common.auth.form.switchToRegister'),
   switchToSignIn: t('common.auth.form.switchToSignIn'),
   otherWays: t('common.auth.form.otherWays'),
+  otherWaysToggle: {
+    open: t('common.auth.form.otherWaysOpen'),
+    close: t('common.auth.form.otherWaysClose'),
+  },
   terms: '我已阅读并同意条款',
   magicLink: '用邮件链接登录',
   recovery: '找回通行密钥',
@@ -219,11 +223,11 @@ function render(props: Partial<AuthFormProps> = {}): HTMLElement {
   return container;
 }
 
-/** 走到第二步（口令那一屏）：默认档 = 登录。 */
+/** 当前默认路径是邮箱 + 登录密码同屏；同时展开二级路以测试其真实动作。 */
 function renderCredential(props: Partial<AuthFormProps> = {}, email = 'me@example.com'): HTMLElement {
   const el = render(props);
   typeIn(el, 'auth-form-email', email);
-  press(el, 'auth-form-continue');
+  if (maybe(el, 'auth-form-other-ways-toggle') !== null) press(el, 'auth-form-other-ways-toggle');
   return el;
 }
 
@@ -290,73 +294,51 @@ afterEach(() => {
 });
 
 /* ════════════════════════════════════════════════════════════════════════
- * A. 两步：一个邮箱框 + 「继续」，口令紧随其后
- * ══════════════════════════════════════════════════════════════════════ */
+ * A. 邮箱与登录口令同屏
+ * ════════════════════════════════════════════════════════════════════════ */
 
-describe('A 两步旅程', () => {
-  it('第一步只有邮箱：口令框与主按钮**都不在** DOM 里', () => {
+describe('A 邮箱与登录口令同屏', () => {
+  it('首屏同时提供邮箱、口令和主提交按钮', () => {
     const el = render();
     expect(maybe(el, 'auth-form-email')).not.toBeNull();
-    expect(maybe(el, 'auth-form-password')).toBeNull();
-    expect(maybe(el, 'auth-form-submit')).toBeNull();
-    // 二级链也还没出现：没有身份就没有"用别的方式"的对象。
-    expect(maybe(el, 'auth-form-passkey')).toBeNull();
+    expect(maybe(el, 'auth-form-password')).not.toBeNull();
+    expect(maybe(el, 'auth-form-submit')).not.toBeNull();
+    expect(maybe(el, 'auth-form-other-ways-toggle')).not.toBeNull();
   });
 
-  it('「继续」之后邮箱框**离开 DOM**，身份以一回执（不是第二个可编辑来源）', () => {
-    const el = renderCredential();
-    expect(maybe(el, 'auth-form-email')).toBeNull();
-    expect(texts(el)).toContain('登录到：me@example.com');
-    expect(node(el, 'auth-form-password')).not.toBeNull();
-  });
-
-  it('「改邮箱」回第一步：邮箱**值还在**，已输入的口令**也还在**', () => {
-    const el = renderCredential();
-    typeIn(el, 'auth-form-password', 'correct horse');
-    press(el, 'auth-form-change-email');
-    expect(inputOf(el, 'auth-form-email').value).toBe('me@example.com');
-    // 口令框在第一步**不在 DOM 里**，所以"没清空"只能这样证明：
-    // 再走一次「继续」，看到的必须还是他打过的那一句。
-    press(el, 'auth-form-continue');
-    expect(inputOf(el, 'auth-form-password').value).toBe('correct horse');
-  });
-
-  it('空邮箱点「继续」**不前进**：标字段、说出那句话、焦点落在邮箱框', () => {
+  it('空邮箱提交**不出门**：标字段、说出那句话、焦点落在邮箱框', () => {
     const el = render();
-    press(el, 'auth-form-continue');
-    expect(maybe(el, 'auth-form-password')).toBeNull();
+    press(el, 'auth-form-submit');
     expect(inputOf(el, 'auth-form-email').getAttribute('aria-invalid')).toBe('true');
     expect(texts(el)).toContain(LABELS.localErrors.email);
     expect(focusedTestID()).toBe('auth-form-email');
   });
 
-  it('本地校验只在按下之后出现：不逐键飘红（NNG/GOV.UK）', () => {
+  it('本地校验只在提交之后出现：不逐键飘红（NNG/GOV.UK）', () => {
     const el = render();
     expect(texts(el)).not.toContain(LABELS.localErrors.email);
     inputOf(el, 'auth-form-email').focus();
     typeIn(el, 'auth-form-email', '  ');
     expect(texts(el)).not.toContain(LABELS.localErrors.email);
-    press(el, 'auth-form-continue');
+    press(el, 'auth-form-submit');
     expect(texts(el)).toContain(LABELS.localErrors.email);
-    // 一开始修改就把错误清掉：留着红字是最劝退的形态。
     typeIn(el, 'auth-form-email', 'me@example.com');
     expect(texts(el)).not.toContain(LABELS.localErrors.email);
     expect(inputOf(el, 'auth-form-email').getAttribute('aria-invalid')).toBe('false');
   });
 
-  it('全空格邮箱不算"填过了"：前进的判据是 trim 之后有没有内容', () => {
+  it('全空格邮箱不算"填过了"：提交判据是 trim 之后有没有内容', () => {
     const el = render();
     typeIn(el, 'auth-form-email', '   ');
-    press(el, 'auth-form-continue');
-    expect(maybe(el, 'auth-form-password')).toBeNull();
+    press(el, 'auth-form-submit');
+    expect(inputOf(el, 'auth-form-email').getAttribute('aria-invalid')).toBe('true');
   });
 
   it('这里**不判**邮箱格式：格式归服务端裁决，组件不许长出第二套规则', () => {
-    const el = render();
-    typeIn(el, 'auth-form-email', 'not-an-email');
-    press(el, 'auth-form-continue');
-    expect(node(el, 'auth-form-password')).not.toBeNull();
-    expect(signIn).not.toHaveBeenCalled();
+    const el = renderCredential({}, 'not-an-email');
+    typeIn(el, 'auth-form-password', 'passphrase');
+    press(el, 'auth-form-submit');
+    expect(signIn).toHaveBeenCalledWith({ email: 'not-an-email', password: 'passphrase' });
   });
 });
 
@@ -426,6 +408,50 @@ describe('B autofill 与显隐（DOM 属性级）', () => {
       password: ' Pa55w0rd  ',
     });
   });
+
+  it('服务端地址变化会清掉口令与令牌，但保留地址输入节点和焦点', () => {
+    const server = { value: 'https://one.example.com', onChange: serverUrlChange };
+    const labels: AuthFormLabels = {
+      ...SERVER_URL_LABELS,
+      paste: PASTE_LABELS.paste,
+    };
+    const props: Partial<AuthFormProps> = {
+      labels,
+      serverUrl: server,
+      onVerifyToken: verifyToken,
+    };
+    const el = render(props);
+    typeIn(el, 'auth-form-password', 'old-login-secret');
+    typeIn(el, 'auth-form-paste', 'old-session-token');
+    const address = inputOf(el, 'auth-form-server-url');
+    address.focus();
+
+    server.value = 'https://two.example.com';
+    act(() => {
+      root?.render(
+        <I18nProvider locale="zh-CN">
+          <HeytaUiProvider>
+            <AuthForm
+              labels={labels}
+              onClose={close}
+              onSignIn={signIn}
+              onRegister={register}
+              onMagicLink={magicLink}
+              onPasskey={passkey}
+              onRecovery={recovery}
+              onForgotPassword={forgot}
+              {...props}
+            />
+          </HeytaUiProvider>
+        </I18nProvider>,
+      );
+    });
+
+    expect(inputOf(el, 'auth-form-password').value).toBe('');
+    expect(inputOf(el, 'auth-form-paste').value).toBe('');
+    expect(inputOf(el, 'auth-form-server-url')).toBe(address);
+    expect(document.activeElement).toBe(address);
+  });
 });
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -452,8 +478,8 @@ describe('C 进行中的守卫', () => {
     const el = renderCredential({ busy: true });
     const busyRow = node(el, 'auth-form-busy');
     expect(busyRow.textContent).toBe(LABELS.busyText);
-    // 同一时刻"或者用别的方式"那组仍然在（降级不等于删除），但动作全部拦住了。
-    expect(texts(el)).toContain(LABELS.otherWays);
+    // 同一时刻二级路仍然在（降级不等于删除），但动作全部拦住了。
+    expect(texts(el)).toContain(LABELS.otherWaysToggle!.close);
   });
 
   it('`busy` 时三条降级入口（通行密钥 / 邮件链接 / 找回）也都不放行', () => {
@@ -505,6 +531,7 @@ describe('D 注册档', () => {
     press(el, 'auth-form-terms');
     expect(node(el, 'auth-form-terms').getAttribute('aria-checked')).toBe('true');
     typeIn(el, 'auth-form-password', 'a fairly long passphrase');
+    typeIn(el, 'auth-form-password-confirmation', 'a fairly long passphrase');
     press(el, 'auth-form-submit');
     expect(register).toHaveBeenCalledWith({
       email: 'me@example.com',
@@ -525,6 +552,7 @@ describe('D 注册档', () => {
     toRegister(el);
     press(el, 'auth-form-terms');
     typeIn(el, 'auth-form-password', 'pass');
+    typeIn(el, 'auth-form-password-confirmation', 'pass');
     press(el, 'auth-form-submit');
     const sent = register.mock.calls[0]?.[0] as Record<string, unknown>;
     expect('inviteCode' in sent).toBe(false);
@@ -536,6 +564,7 @@ describe('D 注册档', () => {
     typeIn(el, 'auth-form-invite', ' ab12 ');
     press(el, 'auth-form-terms');
     typeIn(el, 'auth-form-password', 'pass');
+    typeIn(el, 'auth-form-password-confirmation', 'pass');
     press(el, 'auth-form-submit');
     expect(register.mock.calls[0]?.[0]).toMatchObject({ inviteCode: ' ab12 ' });
   });
@@ -568,6 +597,7 @@ describe('D 注册档', () => {
     typeIn(el, 'auth-form-invite', 'ab1');
     press(el, 'auth-form-terms');
     typeIn(el, 'auth-form-password', 'pass');
+    typeIn(el, 'auth-form-password-confirmation', 'pass');
     press(el, 'auth-form-submit');
     expect(register).toHaveBeenCalledTimes(1);
     const sent = register.mock.calls[0]?.[0] as Record<string, unknown>;

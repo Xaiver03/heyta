@@ -265,7 +265,12 @@ export function PrivacyConsentSheet(): React.JSX.Element | null {
               type="button"
               data-testid="privacy-consent-accept"
               className="ht-btn ht-btn--primary"
-              onClick={accept}
+              onClick={() => {
+                accept();
+                if (!usePrivacyStore.getState().open && !useSyncStore.getState().token) {
+                  useSyncStore.getState().openSignIn();
+                }
+              }}
             >
               {t('common.privacy.consent.accept')}
             </button>
