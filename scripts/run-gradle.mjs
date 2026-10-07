@@ -469,7 +469,14 @@ function runRemote() {
       );
     }
   }
-  const remoteCmd = `cd /d ${REMOTE_ANDROID_WIN} && gradlew.bat ${gradleArgs.join(' ')}`;
+  // 🔴 `--no-build-cache` 是步骤 5 那道"产物 mtime ≥ begin"新鲜度证明的**承重前提**，
+  // 不是性能开关：Gradle 从 build cache 回填产物时会**保留缓存条目的原始 mtime** ——
+  // 2026-10-06 实测踩过：上一轮被断开的 ssh 留下的守护进程把构建写完进了缓存，
+  // 下一轮步骤 3 明明删了 APK、gradle 全程 up-to-date，步骤 5 却读到
+  // "mtime=15:15:47Z < begin=15:16:07Z" 的假"陈旧产物"（两端时钟逐秒同步已排除偏差）。
+  // 关掉缓存后，步骤 3 删除过的产物只能由**本次调用**重新写出 ⇒ mtime 证明重新成立。
+  // 代价：远端失去构建缓存（实测 assembleRelease 全程 ~35s，可忽略）。
+  const remoteCmd = `cd /d ${REMOTE_ANDROID_WIN} && gradlew.bat --no-build-cache ${gradleArgs.join(' ')}`;
   const build = runLogged('ssh', ['-o', 'ConnectTimeout=10', HOST, remoteCmd]);
   if (build.status !== 0) {
     die(
