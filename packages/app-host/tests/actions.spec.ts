@@ -169,6 +169,36 @@ describe('完成态', () => {
   });
 });
 
+describe('批量任务动作', () => {
+  it('批量完成只写一条 BATCH op，并物化到全部任务', async () => {
+    const a = await actions.create('A');
+    const b = await actions.create('B');
+    await actions.bulkSetCompleted([a, b], true);
+    const opsA = await opsOf(a);
+    expect(opsA.at(-1)?.opType).toBe(OpType.Batch);
+    expect(opsA.at(-1)?.entityIds).toEqual([b]);
+    expect(actions.findTask(a)?.completedAt).toBe(clock);
+    expect(actions.findTask(b)?.completedAt).toBe(clock);
+  });
+
+  it('批量删除可由一个反向批量更新恢复', async () => {
+    const a = await actions.create('A');
+    const b = await actions.create('B');
+    await actions.bulkRemove([a, b]);
+    expect(actions.findTask(a)).toBeUndefined();
+    expect(actions.findTask(b)).toBeUndefined();
+    await actions.bulkRestore([a, b]);
+    expect(actions.findTask(a)?.deletedAt).toBeUndefined();
+    expect(actions.findTask(b)?.deletedAt).toBeUndefined();
+  });
+
+  it('重复任务拒绝批量完成，避免跳过重复规则语义', async () => {
+    const id = await actions.create('每周复盘');
+    await actions.setRepeat(id, 'FREQ=WEEKLY');
+    await expect(actions.bulkSetCompleted([id], true)).rejects.toThrow('重复任务请逐条完成');
+  });
+});
+
 describe('清除类字段（null 语义）', () => {
   it('🔴 setDueDate(undefined) 写 null 而不是漏掉键', async () => {
     const id = await actions.create('A');

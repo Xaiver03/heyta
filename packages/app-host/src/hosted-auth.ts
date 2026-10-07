@@ -434,6 +434,8 @@ export interface HostedAuthOptions {
   locale?: HostedAuthLocale;
   /** 网络实现，宿主注入（浏览器 fetch / RN fetch / 测试替身）。 */
   fetchImpl?: typeof fetch;
+  /** 可选的请求取消信号；宿主在账号或会话切换时可终止过期读请求。 */
+  signal?: AbortSignal;
 }
 
 /** 只报 2xx 主体，失败已归一成 `HostedAuthFailure`。 */
@@ -651,6 +653,7 @@ async function sendJson(
       method,
       headers,
       ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
   } catch (error) {
     // 🔴 **本机闸门拦下不等于网络故障**。这一条是本轮实测出来的：

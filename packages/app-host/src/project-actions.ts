@@ -175,9 +175,10 @@ export interface ProjectActions {
    *
    * 🔴 不清 `deletedAt` —— 清了以后离线对端回放会把这条**复活**（ADR-0048）。
    *    也不物理删 op：那会改写同步历史。
+   * ⚠️ 已经 purge 过返回 `false` 且不重复写 op（与 `restoreProject` 同一句话）。
    * @throws 找不到 / 不在回收站里
    */
-  purgeProject(entityId: string): Promise<void>;
+  purgeProject(entityId: string): Promise<boolean>;
 
   /** 未删除的标签，顺序同 `listProjects()`。⚠️ 标签**没有** `archived` 这一态。 */
   listTags(): Tag[];
@@ -378,13 +379,14 @@ export function createProjectActions(
       if (raw === undefined) throw new Error(`找不到清单「${entityId}」`);
       if (raw.deletedAt === undefined) throw new Error(`清单「${entityId}」不在回收站里`);
       // 幂等：已经打过标记就什么都不做（不可逆动作被点两次不该产出两条 op）。
-      if (raw.purgedAt !== undefined) return;
+      if (raw.purgedAt !== undefined) return false;
       await ctx.dispatch({
         entityType: 'PROJECT' as EntityType,
         entityId,
         opType: OpType.Update,
         payload: { purgedAt: now() },
       });
+      return true;
     },
 
     listTrashedProjects() {
