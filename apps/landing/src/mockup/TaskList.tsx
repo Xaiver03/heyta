@@ -1,3 +1,4 @@
+import { AssistantIcon } from '../components/AssistantIcon.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 真实界面复现：任务列表
@@ -73,7 +74,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useMemo } from 'react';
-import { Check, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n/provider';
 
@@ -93,7 +94,17 @@ const URGENCY_CLASS: Record<ShowcaseDueTone, string> = {
   later: '',
 };
 
-export function TaskList(): React.JSX.Element {
+export function TaskList({
+  completedIds,
+  onTaskToggle,
+  selectedId,
+  onSelect,
+}: {
+  completedIds?: ReadonlySet<string>;
+  onTaskToggle?: (id: string) => void;
+  selectedId?: string;
+  onSelect?: (id: string) => void;
+}): React.JSX.Element {
   const { t } = useI18n();
 
   /**
@@ -115,47 +126,77 @@ export function TaskList(): React.JSX.Element {
 
   return (
     <div className="mk-tasklist">
-      {rows.map(({ demo, title }) => (
-        <div
-          key={demo.id}
-          className={`mk-task${demo.done === true ? ' mk-task--done' : ''}`}
-        >
-          <span className="mk-task__check">
-            <Check size={ICON_SIZE.xs} />
-          </span>
-
-          <span className="mk-task__body">
-            <span className="mk-task__title">
-              {title}
-            </span>
-
-            {demo.dueKey === undefined && demo.priority === undefined ? null : (
-              <span className="mk-task__meta">
-                {demo.dueKey === undefined ? null : (
-                  <span className={`mk-due${URGENCY_CLASS[demo.dueTone ?? 'later']}`}>
-                    {t(demo.dueKey)}
-                  </span>
-                )}
-                {demo.priority === undefined ? null : (
-                  <span className="mk-prio">P{demo.priority}</span>
-                )}
+      {rows.map(({ demo, title }) => {
+          const body = (
+            <>
+              <span className="mk-task__title">
+                {title}
               </span>
-            )}
-          </span>
 
-          {/* AI 拆解入口。应用里配置关着时它**仍然在**，点了会说明该去开什么 ——
-              "找不到入口"和"入口说为什么不可用"是两件事。 */}
-          {demo.ai === true ? (
-            <span className="mk-iconbtn">
-              <Sparkles size={ICON_SIZE.sm} />
-            </span>
-          ) : null}
+              {demo.dueKey === undefined && demo.priority === undefined ? null : (
+                <span className="mk-task__meta">
+                  {demo.dueKey === undefined ? null : (
+                    <span className={`mk-due${URGENCY_CLASS[demo.dueTone ?? 'later']}`}>
+                      {t(demo.dueKey)}
+                    </span>
+                  )}
+                  {demo.priority === undefined ? null : (
+                    <span className="mk-prio">P{demo.priority}</span>
+                  )}
+                </span>
+              )}
+            </>
+          );
+          return (
+            <div
+              key={demo.id}
+              className={`mk-task${(completedIds?.has(demo.id) ?? demo.done === true) ? ' mk-task--done' : ''}${selectedId === demo.id ? ' mk-task--selected' : ''}`}
+            >
+              {onTaskToggle === undefined ? (
+                <span className="mk-task__check" aria-hidden="true">
+                  <Check size={ICON_SIZE.xs} />
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="mk-task__check"
+                  role="checkbox"
+                  aria-label={title}
+                  aria-checked={completedIds?.has(demo.id) ?? demo.done === true}
+                  onClick={() => onTaskToggle(demo.id)}
+                >
+                  <Check size={ICON_SIZE.xs} />
+                </button>
+              )}
 
-          <span className="mk-iconbtn">
-            <Trash2 size={ICON_SIZE.sm} />
-          </span>
-        </div>
-      ))}
+              {onSelect === undefined ? (
+                <span className="mk-task__body">{body}</span>
+              ) : (
+            <button
+              type="button"
+              className="mk-task__body"
+              aria-label={title}
+              aria-pressed={selectedId === demo.id}
+              onClick={() => onSelect(demo.id)}
+            >
+              {body}
+            </button>
+              )}
+
+              {/* AI 拆解入口。应用里配置关着时它**仍然在**，点了会说明该去开什么 ——
+                  "找不到入口"和"入口说为什么不可用"是两件事。 */}
+              {demo.ai === true ? (
+                <span className="mk-iconbtn">
+                  <AssistantIcon size={ICON_SIZE.sm} />
+                </span>
+              ) : null}
+
+              <span className="mk-iconbtn">
+                <Trash2 size={ICON_SIZE.sm} />
+              </span>
+            </div>
+          );
+      })}
     </div>
   );
 }

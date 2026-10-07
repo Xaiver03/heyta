@@ -251,7 +251,7 @@ export function staggerContainer(reduced: boolean, stagger = STAGGER): Variants 
  *
  * ## 为什么不是 `1 - |o| * 1.05` 这个简单的对称淡出
  *
- * 三块窗口是 `inset: 0` 的整屏元素、在 `perspective` + `preserve-3d` 的舞台里
+ * 旧版窗口是 `inset: 0` 的整屏元素、在 `perspective` + `preserve-3d` 的舞台里
  * 靠 `translateZ` 分前后。对称淡出在**换位的中点上**让前后两块同时半透明：
  * `|o| = 0.5` 时两块都是 47.6%。前面那块一旦不是不透明的，后面那块就会从它
  * 里面透出来 —— 中间那一片看起来像**双重曝光**（叠影/ghosting）。
@@ -278,7 +278,7 @@ export function showcaseWindowOpacity(offset: number): number {
 /**
  * 减动效路径的不透明度：**纯交叉淡入**。
  *
- * 减动效下位移与旋转都被去掉，三块窗口全部 `inset: 0` 直叠 ——
+ * 减动效下位移与旋转都被去掉，旧版窗口全部 `inset: 0` 直叠 ——
  * 这时候"前后关系"不存在了，遮挡只能由透明度表达，所以必须保留平滑淡出。
  * 把 3D 那条平台曲线用在这里会让换位变成一次**硬切**（两块都是 1，
  * 靠 DOM 顺序决定谁在上面）。

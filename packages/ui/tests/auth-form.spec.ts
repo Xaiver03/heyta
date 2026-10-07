@@ -55,10 +55,20 @@ describe('AuthForm —— 不该存在的形状', () => {
     expect(code).not.toMatch(/maxLength/);
   });
 
-  it('🔴 提交类控件**不禁用**（用 in-flight guard，见文件头那条纪律）', () => {
-    // `disabled=` 是这条纪律唯一的可 grep 形状。它出现就意味着有人
-    // 用"禁用"代替了"不响应"—— 那会在提交后把焦点从用户脚下抽走。
-    expect(code).not.toMatch(/\bdisabled=/);
+  it('🔴 普通登录注册提交不禁用；验证码过期或未完整时可以禁用', () => {
+    // 普通提交仍用 in-flight guard，避免提交后焦点被抽走；验证码是明确的
+    // 例外：过期或位数不足时必须阻止无效请求，并让控件呈现不可提交状态。
+    const registrationStageStart = code.indexOf("{stage === 'registration-code' &&");
+    const registrationStageEnd = code.indexOf(") : stage === 'identify' ?", registrationStageStart);
+    expect(registrationStageStart, '验证码阶段不见了').toBeGreaterThanOrEqual(0);
+    expect(registrationStageEnd, '验证码阶段边界不完整').toBeGreaterThan(registrationStageStart);
+    const registrationStage = code.slice(registrationStageStart, registrationStageEnd);
+    expect(registrationStage).toMatch(/disabled=\{busy \|\| registrationExpired \|\| registrationCode\.length !== registrationCodeLabel\.codeLength\}/);
+
+    const disabledMatches = [...code.matchAll(/\bdisabled=/g)];
+    expect(disabledMatches, '普通登录/注册提交不应重新长出 disabled').toHaveLength(1);
+    expect(disabledMatches[0]?.index).toBeGreaterThan(registrationStageStart);
+    expect(disabledMatches[0]?.index).toBeLessThan(registrationStageEnd);
   });
 
   it('🔴 没有协议知识：不许出现端点、fetch、服务端的错误码', () => {

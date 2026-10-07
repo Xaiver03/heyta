@@ -1,3 +1,4 @@
+import { loadCommitProofKeyring, verifyCommitProof } from './commit-proof';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { Operation } from '../sync/sync.types';
@@ -6,6 +7,7 @@ export interface InboundUploadIdentity {
   credentialHash: string;
   databaseEpoch: string;
   tokenVersion: number;
+  commitProofs?: Readonly<Record<string, string>>;
 }
 type SqlReader = Pick<Prisma.TransactionClient, '$queryRaw'>;
 const EPOCH = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -49,21 +51,32 @@ export async function authorizeInboundOperations(
   const inbound = ops.filter(isInboundOperation);
   if (inbound.length === 0) return true;
   if (!identity) return false;
-  const permits = await db.$queryRaw<Array<{ opId: string; eventId: string; itemCount: number }>>`
-    SELECT p.op_id AS "opId", p.event_id AS "eventId", p.item_count AS "itemCount"
+  const permits = await db.$queryRaw<Array<{ workerId: string; opId: string | null; eventId: string | null; itemCount: number | null }>>`
+    SELECT w.id AS "workerId", p.op_id AS "opId", p.event_id AS "eventId", p.item_count AS "itemCount"
     FROM automation_workers w
     JOIN users u ON u.id = w.user_id
-    JOIN automation_commit_permits p ON p.worker_id = w.id AND p.user_id = w.user_id
+    LEFT JOIN automation_commit_permits p ON p.worker_id = w.id AND p.user_id = w.user_id
+      AND p.op_id = ANY(${inbound.map((op) => op.id)}::text[])
     WHERE w.credential_hash = ${identity.credentialHash}
       AND w.user_id = ${userId} AND w.sync_client_id = ${clientId}
       AND w.database_epoch = ${identity.databaseEpoch} AND w.revoked_at IS NULL
       AND u.token_version = ${identity.tokenVersion} AND u.is_verified = 1
-      AND p.op_id = ANY(${inbound.map((op) => op.id)}::text[])
   `;
-  const byId = new Map(permits.map((permit) => [permit.opId, permit]));
+  const workerId = permits[0]?.workerId;
+  if (!workerId) return false;
+  const byId = new Map(permits.filter((permit) => permit.opId !== null).map((permit) => [permit.opId, permit]));
+  // Missing active rows can follow rule deletion. Only a server-authenticated
+  // owner receipt can preserve the already-authorized intent across that erase.
+  const keyring = inbound.some((op) => !byId.has(op.id) && identity.commitProofs?.[op.id])
+    ? loadCommitProofKeyring() : undefined;
   return inbound.every((op) => {
-    const permit = byId.get(op.id);
-    if (!permit || !EVENT.test(permit.eventId) || op.id !== `inbound:${permit.eventId}` ||
+    const stored = byId.get(op.id);
+    const proof = !stored && identity.commitProofs?.[op.id]
+      ? verifyCommitProof(identity.commitProofs[op.id], keyring) : undefined;
+    const permit = stored ?? (proof && proof.userId === userId && proof.workerId === workerId &&
+      proof.syncClientId === clientId && proof.databaseEpoch === identity.databaseEpoch
+      ? proof : undefined);
+    if (!permit || !permit.eventId || permit.itemCount === null || !EVENT.test(permit.eventId) || op.id !== `inbound:${permit.eventId}` ||
         op.clientId !== clientId || op.entityType !== 'TASK' || op.opType !== 'BATCH' ||
         (op.entityIds != null && !Array.isArray(op.entityIds)) ||
         !Number.isInteger(permit.itemCount) || permit.itemCount < 1 || permit.itemCount > 50) return false;

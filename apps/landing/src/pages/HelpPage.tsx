@@ -1,5 +1,5 @@
 /**
- * `/help`：帮助中心 —— **速答 + 文档中心的两层入口**
+ * `/docs`：帮助中心 —— **速答 + 文档中心的两层入口**
  * ====================================================
  *
  * 组织方式是**按你在做什么**（问题模块），不是按文档类型 —— 借滴答清单帮助中心
@@ -10,7 +10,7 @@
  *   - **速答**：每个模块下那两条一问一答（`HELP_MODULES`，住在 `content.ts`）；
  *   - **深读**：同一模块下的文档文章卡片（文章注册在 `pages.ts`，分组与正文在
  *      `docs.ts`，两者由 `docsOutline()` 配成一对）。
- * 原来的"首版把答案都写在这一页里、没有拆成文章路由"已经不成立 —— 六篇文章
+ * 原来的"首版把答案都写在这一页里、没有拆成文章路由"已经不成立 —— 注册表中的文章
  * 各自有地址、各自进 sitemap 与 hreflang。
  *
  * ⚠️ **顺序是速答在前、深读在后。** 到这个页面的人手上有一个具体问题，
@@ -31,7 +31,7 @@
  * 这个文件只负责画出来，于是 `FAQPage` 结构化数据与页面用的是同一份清单。
  *
  * 🔴 **一个分类的那一块住在 `DocsModuleBlock`，不在这个文件里。**
- * 分类页（`/help/sync`、`/help/data`）画的是**同一块**（同组速答 + 同组卡片 + 同样顺序）。
+ * 分类页（`/docs/sync`、`/docs/data`）画的是**同一块**（同组速答 + 同组卡片 + 同样顺序）。
  * 复制一份，"摘要要有一句话""没文章就不出小标题"这些纪律就有了第二个住处，
  * 而第二个住处最先过期。
  *
@@ -40,27 +40,24 @@
  * 所以这里不会出现"点了没反应的分类标题"。
  */
 
-import { useI18n } from '@heyta/i18n/provider';
-
 import { DocsModuleBlock } from '../site/DocsModule.js';
 import { docsOutline } from '../site/docs.js';
+import { HelpQuickLinks } from '../site/help-search.js';
+import { DocsLayout } from '../site/DocsLayout.js';
 import { PageHead } from '../site/PageSections.js';
 import type { SitePage } from '../site/pages.js';
+import '../styles/help-discovery.css';
 
 export function HelpPage({ page }: { page: SitePage }): React.JSX.Element {
-  const { t } = useI18n();
-
   return (
-    <>
-      <PageHead page={page} />
-      <div className="lp-section">
-        <div className="lp-wrap">
-          <h2 className="lp-h2">{t('site.help.topics.title')}</h2>
-          {docsOutline().map(({ module, articles }) => (
-            <DocsModuleBlock key={module.id} module={module} articles={articles} />
-          ))}
-        </div>
-      </div>
-    </>
+    <DocsLayout page={page}>
+      <article className="lp-docs__body">
+        <PageHead page={page} cta={false} />
+        <HelpQuickLinks page={page} />
+        {docsOutline().map(({ module, articles }) => (
+          <DocsModuleBlock key={module.id} module={module} articles={articles} />
+        ))}
+      </article>
+    </DocsLayout>
   );
 }

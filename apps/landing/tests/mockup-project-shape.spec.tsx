@@ -15,7 +15,7 @@
  *
  * `grep` 实测（2026-09-28）：
  *   · `apps/landing/src/mockup/AppWindow.tsx` 有一段 `.mk-projects`
- *     （分区标题 + `.mk-field__box` 输入框形态 + `.mk-field__add` 加号），
+ *     （分区标题 + 静态样例行 + `.mk-field__add` 创建入口），
  *     从 `SHELL_PANEL_SECTIONS` 渲染；
  *   · `apps/landing/tests/mockup-shell-shape.spec.tsx` §4 已把它与
  *     `ProjectsPanel.tsx` 的源码对账（四个词条 key）。
@@ -109,8 +109,8 @@ describe('落地页侧栏的清单/标签块：登记处 = 实际复刻范围', 
   it('登记处说没画行，渲染文件里就没有任何"行"的痕迹', () => {
     // 前件：五个部件在落地页一个都没复刻（部分复刻是**已知**的，见文件头）。
     expect(ORGANIZER_ROW_PARTS.filter((p) => p.replicatedOnLanding)).toEqual([]);
-    // 落地页只画了标题与输入框形态。
-    expect([...MOCK_PROJECT_DRAWN_PARTS]).toEqual(['heading', 'composer']);
+    // 落地页只画了标题、静态行与创建入口。
+    expect([...MOCK_PROJECT_DRAWN_PARTS]).toEqual(['heading', 'rows', 'create-trigger']);
 
     const code = stripComments(appWindowSource());
     // 🔴 判据锚点：`.mk-projects` 必须还在（复刻件被整块删掉也要有人知道）。

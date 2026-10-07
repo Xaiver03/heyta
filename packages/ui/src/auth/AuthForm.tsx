@@ -483,8 +483,12 @@ export function AuthForm({
     if (stage === 'registration-code') {
       const codeLabel = labels.registrationCode;
       if (registrationChallenge === undefined || codeLabel === undefined) return;
+      if (Date.now() >= registrationChallenge.expiresAt) return;
       const code = registrationCode.replace(/\D/g, '').slice(0, codeLabel.codeLength);
-      if (code.length !== codeLabel.codeLength) return;
+      if (code.length !== codeLabel.codeLength) {
+        registrationCodeInput.current?.focus();
+        return;
+      }
       idleOnly(() => registrationChallenge.onVerify(code));
       return;
     }
@@ -652,8 +656,12 @@ export function AuthForm({
           <Pressable
             accessibilityRole="button"
             onPress={guard(onSubmit)}
-            style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null]}
             testID={`${testID}-registration-code-submit`}
+            disabled={busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength}
+            accessibilityState={{ disabled: busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength }}
+            style={({ pressed }) => [styles.primary, pressed ? styles.primaryPressed : null,
+              busy || registrationExpired || registrationCode.length !== registrationCodeLabel.codeLength
+                ? { opacity: tokens['state.disabled-opacity'] } : null]}
           >
             <Text style={[text['headline'], styles.primaryLabel]}>{registrationCodeLabel.verify}</Text>
           </Pressable>
@@ -1243,8 +1251,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['size.field-height'],
       paddingHorizontal: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.background'],
       color: tokens['color.foreground'],
       // 🔴 字号走 `text['row-title']`（`font-size.base` = 16）整条带上 ——
@@ -1276,8 +1282,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.2'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border-subtle'],
       backgroundColor: tokens['color.surface-sunken'],
     },
     identityText: {
@@ -1307,14 +1311,11 @@ function makeStyles(tokens: HeytaNativeTokens) {
       paddingHorizontal: tokens['space.4'],
       borderRadius: tokens['radius.md'],
       backgroundColor: tokens['color.primary'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.primary'],
     },
     primaryPressed: {
       // 按压态用**更深的品牌色**，不用透明度：`state.pressed-opacity` 是 0.08，
       // 给实心主按钮用会让它按下去像"变淡了"，而按钮的实心感正是它的可点性提示。
       backgroundColor: tokens['color.primary-active'],
-      borderColor: tokens['color.primary-active'],
     },
     primaryLabel: { color: tokens['color.on-primary'] },
     ghost: {
@@ -1322,8 +1323,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1345,8 +1344,6 @@ function makeStyles(tokens: HeytaNativeTokens) {
       justifyContent: 'center',
       paddingHorizontal: tokens['space.3'],
       borderRadius: tokens['radius.md'],
-      borderWidth: tokens['border-width.thin'],
-      borderColor: tokens['color.border'],
       backgroundColor: tokens['color.surface-sunken'],
     },
     disclosureText: {

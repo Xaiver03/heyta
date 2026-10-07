@@ -100,7 +100,7 @@ import { TrashScreen } from './TrashScreen';
 import { formatStamp } from '../lib/date';
 import { useTokens } from '../theme';
 import { useSyncCredentialForm } from '../sync/credential-form';
-import { readSyncConfig, writeSyncConfig } from '../sync/config';
+import { DEFAULT_SERVER_URL, readSyncConfig, writeSyncConfig } from '../sync/config';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
 import { useMobileSync, refreshPendingUpload } from '../sync/store';
 import { currentSignedInEmail, forgetSignedInUser } from '../auth/session';
@@ -123,8 +123,8 @@ export function ProfileScreen(): React.JSX.Element {
    * 凭据表单的状态与"输入即生效"接线 —— **活在本屏**（理由见
    * `credential-form.ts` 文件头）。设置面拿的是值与回调。
    */
-  const form = useSyncCredentialForm();
   const [vaultCleanupPending, setVaultCleanupPending] = useState<VaultSecureStorageScope>();
+  const form = useSyncCredentialForm(setVaultCleanupPending);
 
   // 🔴 冲突界面的可见性只是**界面状态**，不进 store。
   const [conflictsOpen, setConflictsOpen] = useState(false);
@@ -132,6 +132,13 @@ export function ProfileScreen(): React.JSX.Element {
   /** 设置面是当前 tab 的二级栈页面；返回优先 pop 回个人页。 */
   const settingsOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'settings';
   const [settingsSection, setSettingsSection] = useState<SettingsSectionKey>();
+
+  // The profile screen stays mounted while tabs switch. Drop a pending
+  // shortcut section when leaving the profile tab so returning to a retained
+  // settings entry always opens the directory, never a stale child page.
+  useEffect(() => {
+    if (navigation.tab !== 'profile') setSettingsSection(undefined);
+  }, [navigation.tab]);
 
   /**
    * 注册 / 登录面板（W3 · 规范 §3.1 的「前置」落点）。
@@ -141,9 +148,21 @@ export function ProfileScreen(): React.JSX.Element {
    * （一级可见），所以"前置"兑现为"冷启动 ≤1 次点击"而不是"多一个标签"。
    */
   const authOpen = navigation.tab === 'profile' && navigation.stack.at(-1)?.key === 'profile:auth';
+  const [authAllowServerSelection, setAuthAllowServerSelection] = useState(false);
   const setAuthOpen = (open: boolean): void => {
     if (open) navigation.push('profile:auth');
-    else navigation.pop();
+    else {
+      setAuthAllowServerSelection(false);
+      navigation.pop();
+    }
+  };
+  /** 普通账号入口只连官方服务；自托管登录必须从同步设置的高级路径进入。 */
+  const openAuth = (allowServerSelection = false): void => {
+    if (!allowServerSelection) {
+      form.setServerUrl(DEFAULT_SERVER_URL);
+    }
+    setAuthAllowServerSelection(allowServerSelection);
+    setAuthOpen(true);
   };
   /** 登录/切换账号后，个人资料摘要必须按新账号重新读，不能沿用旧账号的投影。 */
   const [profileRevision, setProfileRevision] = useState(0);
@@ -893,6 +912,7 @@ export function ProfileScreen(): React.JSX.Element {
       <AuthScreen
         initialServerUrl={form.serverUrl}
         initialPassword={form.password}
+        allowServerSelection={authAllowServerSelection}
         onBack={() => {
           setAuthOpen(false);
         }}
@@ -1145,9 +1165,7 @@ export function ProfileScreen(): React.JSX.Element {
             ? t('mobile.profile.account.switchAccount')
             : t('mobile.profile.account.signIn')
         }
-        onPress={() => {
-          setAuthOpen(true);
-        }}
+        onPress={openAuth}
         tone={accountHasCredential ? 'secondary' : 'primary'}
       />
       <SettingsRow row={settingsRow} />
@@ -1203,12 +1221,18 @@ export function ProfileScreen(): React.JSX.Element {
         initialSection={settingsSection}
         profileEditor={profileEditor}
         syncStatus={syncStatus}
+        onOpenAuth={openAuth}
+        onUseOfficialSync={onClearCredentials}
         dataActions={entryRows.filter((row) => ['profile-entry-export', 'profile-entry-trash'].includes(row.testID ?? ''))}
         securityActions={entryRows.filter((row) => ['profile-entry-security', 'profile-entry-close-account'].includes(row.testID ?? ''))}
         // Shell 保留各 tab 的屏幕实例；设置是 profile 的二级 surface，
         // 离开 profile 时必须隐藏 Modal，回到 profile 再恢复原栈位置。
         visible={navigation.tab === 'profile' && settingsOpen}
         onClose={() => {
+          // Clear the source section when the sheet is dismissed. Otherwise a
+          // profile shortcut can leave a stale child section in the mounted
+          // SettingsScreen while the user changes tabs and returns later.
+          setSettingsSection(undefined);
           navigation.pop();
         }}
         form={form}

@@ -159,6 +159,7 @@ export const ASSISTANT_FAILURE_KEY: Record<AssistantFailureReason, MessageKey> =
   'routing-failed': 'web.ai.failure.aiUnavailable',
   'multiple-tool-calls': 'web.ai.assistant.failure.multipleToolCalls',
   'arguments-malformed': 'web.ai.assistant.failure.argumentsMalformed',
+  'write-failed': 'web.ai.assistant.failure.writeFailed',
   'egress-outside-disclosed-set': 'web.ai.assistant.failure.egressOutsideDisclosedSet',
 };
 

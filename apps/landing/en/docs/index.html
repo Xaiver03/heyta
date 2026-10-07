@@ -99,7 +99,7 @@
         "name": "How do I create a task?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Type one line into the capture box at the top of the app and press Enter. Dates and priorities can be written inside the sentence (for example \"submit the report tomorrow at 3pm\"); whatever it recognises appears as a chip you can undo. A bare title is fine too — you can add a note later on the task row."
+          "text": "Enter a title above the task list and press Enter. You can also type “submit the report tomorrow at 3pm” and review the detected date before adding it. Open the task to add notes, a list and tags."
         }
       },
       {
@@ -107,7 +107,7 @@
         "name": "I have a new device — how does my data get there?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Enter the sync server address and an access token in settings. Data is uploaded encrypted, so the passphrase must match — data encrypted under a different passphrase cannot be decrypted. That is the cost of end-to-end encryption, not a bug."
+          "text": "Enable networking and sign in to heyta to use the official sync service. No server address or token is required. Check the connection under App settings → Account sync. Keep your recovery information when setting up encryption; other devices need the same encryption credentials."
         }
       },
       {
@@ -163,7 +163,7 @@
         "name": "How do I run my own server?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "You can, but this is \"operate a service yourself\": no prebuilt image is published (you build it), and upgrading is not one command — the one-shot migration service exits after it runs and compose does not restart an exited service, so after a table-structure change you re-run the command that names supersync-migrate. Registration and sign-in run on email + password; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with REQUIRE_EMAIL_VERIFICATION=false. See \"Running your own sync server\"."
+          "text": "You can use your own sync server. See “Self-host your sync” for deployment, upgrades and backups. Connect through the advanced options in sync settings."
         }
       },
       {
@@ -171,7 +171,7 @@
         "name": "Where does my data actually live?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "On your own device first. This answer is about the sync channel - once sync is on, that channel holds ciphertext only in the cloud, and a sync endpoint that receives plaintext rejects it outright. ⚠️ AI is a different path and is not covered by that sentence: a language model has to read your text in order to suggest anything, so the field-by-field, feature-by-feature disclosure lives in the \"AI & Data Flow\" document, linked in the footer. One more thing: sync metadata is not encrypted - sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise \"we can see nothing\"."
+          "text": "Tasks are saved on your device first. Sync uploads task content with end-to-end encryption; metadata such as sync times and device identifiers remains visible to the server. AI has separate data permissions. See “AI & Data Flow” for the information it sends."
         }
       }
     ]

@@ -160,7 +160,8 @@ describe('移动端 Profile 的头像（R15b）', () => {
   it('头像圈消费的每一枚 token 都真的存在（拼错在 `any` 下不会报错）', () => {
     const badge = stripComments(readFileSync(BADGE, 'utf8'));
     const keys = [...badge.matchAll(/\['([a-z0-9.-]+)'\]/gu)].map((m) => m[1] as string);
-    expect(keys.length, '一个 token 都没读到 = 探针坏了').toBeGreaterThan(3);
+    // 无描边头像仍须消费尺寸、形状和底色，不以旧边框 token 数量判定探针。
+    expect(keys).toEqual(expect.arrayContaining(['size.avatar-lg', 'radius.full', 'color.surface-sunken']));
     const table = readFileSync(TOKENS, 'utf8');
     for (const key of keys) {
       expect(table, `tokens.native.ts 里没有 '${key}'`).toContain(`'${key}':`);

@@ -14,9 +14,9 @@
  *     避免"看起来是同一套样式"的错觉
  *   - 文案取自应用的真实字符串（`收集箱` / `马上做` / `拖任务到这里` …）
  *
- * 🔴 **已知的漂移风险**：应用改了布局而这里没改，落地页就会展示一个
- * 已经不存在的界面。没有门禁能自动发现这件事 —— 它需要一个"渲染真实应用
- * 并与复现对比"的视觉回归测试，目前**没做**。不要假装它是自动同步的。
+ * 🔴 **结构漂移由对账测试拦截**：应用改了 rail、侧栏或页头动作而这里没改，
+ * `mockup-shell-shape.spec.tsx` 会先红；视觉细节仍需浏览器验收，不能把截图
+ * 相似当作结构同步。
  *
  * 尺寸策略：stage 固定为 80rem × 50rem（= 应用在 1280×800 下的真实布局），
  * 再由 `AppWindow` 用 ResizeObserver 算出一个 `--mk-scale` 等比缩放塞进外框。
@@ -38,6 +38,44 @@
   user-select: none;
 }
 
+/* 展厅开放明确的视图导航与任务勾选演示，其余复现件仍是静态展示。 */
+.mk-frame--interactive {
+  pointer-events: auto;
+  user-select: auto;
+}
+
+@media (max-width: 40rem) {
+  .mk-frame--interactive {
+    block-size: auto;
+    min-block-size: 34rem;
+    aspect-ratio: auto;
+    overflow: hidden;
+  }
+
+  .mk-frame--interactive .mk-stage {
+    position: relative;
+    inline-size: 100%;
+    block-size: auto;
+    transform: none;
+  }
+
+  .mk-frame--interactive .mk-app,
+  .mk-frame--interactive .mk-app--with-sidebar {
+    grid-template-columns: var(--ht-layout-rail-width) minmax(0, 1fr);
+    block-size: auto;
+    min-block-size: 34rem;
+  }
+
+  .mk-frame--interactive .mk-sidebar,
+  .mk-frame--interactive .mk-detail {
+    display: none;
+  }
+
+  .mk-frame--interactive .mk-main {
+    min-inline-size: 0;
+  }
+}
+
 .mk-stage {
   position: absolute;
   inset-block-start: 0;
@@ -52,13 +90,130 @@
 
 .mk-app {
   display: grid;
-  grid-template-columns: var(--ht-layout-sidebar-width) 1fr;
+  grid-template-columns: var(--ht-layout-rail-width) 1fr;
   block-size: 100%;
   background: var(--ht-color-background);
   color: var(--ht-color-foreground);
   font-family: var(--ht-font-sans);
   font-size: var(--ht-font-size-base);
   line-height: var(--ht-line-height-normal);
+}
+
+.mk-app--with-sidebar {
+  grid-template-columns: var(--ht-layout-rail-width) var(--ht-layout-sidebar-width) 1fr var(--ht-layout-detail-width);
+}
+
+/* The live shell is a narrow icon rail.  Labels remain in the DOM for the
+   same accessible names as Web; the compact stage hides them visually. */
+.mk-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.mk-rail__top {
+  display: flex;
+  justify-content: center;
+  padding-block-end: var(--ht-space-2);
+}
+
+.mk-avatar {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-rail__tabs,
+.mk-rail__tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.mk-rail__tabs { position: relative; }
+
+.mk-rail__tools {
+  margin-block-start: auto;
+  padding-block-start: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.mk-rail__tab,
+.mk-rail__more,
+.mk-rail__sync {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+  text-align: center;
+}
+
+.mk-rail__tab,
+.mk-rail__more {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.mk-rail__tab:hover,
+.mk-rail__more:hover,
+.mk-rail__tab:focus-visible,
+.mk-rail__more:focus-visible {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+}
+
+.mk-rail__overflow {
+  position: absolute;
+  inset-inline-start: calc(100% + var(--ht-space-2));
+  inset-block-end: 0;
+  min-inline-size: calc(var(--ht-touch-target-min) * 3);
+  z-index: var(--ht-z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  box-shadow: var(--ht-shadow-md);
+}
+
+.mk-rail__tab span,
+.mk-rail__more span,
+.mk-rail__sync span {
+  display: none;
+}
+
+.mk-rail__overflow .mk-rail__tab { justify-content: flex-start; gap: var(--ht-space-2); padding-inline: var(--ht-space-2); font-size: var(--ht-font-size-sm); }
+.mk-rail__overflow .mk-rail__tab span { display: inline; }
+
+.mk-rail__tab--active {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.mk-frame--interactive .mk-rail__tab--active {
+  background: transparent;
+  color: var(--ht-color-primary);
+}
+
+.mk-rail__sync {
+  color: var(--ht-color-foreground-subtle);
 }
 
 /* ── 侧栏 ───────────────────────────────────────────────── */
@@ -71,23 +226,6 @@
   background: var(--ht-color-surface);
   /* 扁平风格用边框表达层次，不用阴影 */
   border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border);
-}
-
-.mk-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-  padding: var(--ht-space-2);
-  margin-block-end: var(--ht-space-4);
-  font-size: var(--ht-font-size-lg);
-  font-weight: var(--ht-font-weight-bold);
-}
-
-.mk-brand__dot {
-  inline-size: var(--ht-icon-sm);
-  block-size: var(--ht-icon-sm);
-  border-radius: var(--ht-radius-full);
-  background: var(--ht-color-primary);
 }
 
 .mk-nav {
@@ -116,6 +254,20 @@
   font-weight: var(--ht-font-weight-medium);
   color: var(--ht-color-foreground-muted);
   text-align: start;
+}
+
+button.mk-nav__item {
+  inline-size: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.mk-nav__item:hover,
+button.mk-nav__item:focus-visible {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
 }
 
 .mk-nav__item--active {
@@ -178,47 +330,6 @@
   flex: 0 0 auto;
 }
 
-/* 🔴 与 `apps/web/src/styles/app.css` 的 `.ht-viewtabs` **必须成对维护**：
-   真应用那边不加 `nowrap` + `flex: 0 0 auto` 会让 8 个 tab 的标签折成两行
-   （1280/1440 实测 10/10 折行）；复刻这边少一条，复刻就会**比真应用还难看** ——
-   而"复刻比真应用好看"正是这份 mockup 最该避免的事。
-   见 `docs/research/showcase-fidelity-audit.md` §3。 */
-.mk-viewtabs {
-  display: flex;
-  gap: var(--ht-space-1);
-  padding: var(--ht-space-1);
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface-sunken);
-  margin-inline-end: auto;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.mk-viewtabs::-webkit-scrollbar {
-  display: none;
-}
-
-.mk-viewtab {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-1);
-  min-block-size: var(--ht-touch-target-min);
-  padding: 0 var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid transparent;
-  border-radius: var(--ht-radius-sm);
-  color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-xs);
-  font-weight: var(--ht-font-weight-medium);
-  white-space: nowrap;
-  flex: 0 0 auto;
-}
-
-.mk-viewtab--active {
-  background: var(--ht-color-surface);
-  color: var(--ht-color-primary);
-  border-color: var(--ht-color-border);
-}
-
 .mk-header__actions {
   margin-inline-start: auto;
   display: flex;
@@ -226,6 +337,18 @@
   gap: var(--ht-space-2);
   /* 与 `.ht-header__actions` 成对：右侧动作不被压窄 */
   flex: 0 0 auto;
+}
+
+.mk-bulk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.mk-bulk__warning {
+  color: var(--ht-color-foreground-subtle);
 }
 
 /*
@@ -271,13 +394,78 @@
   overflow: hidden;
 }
 
+.mk-detail {
+  min-inline-size: 0;
+  block-size: 100%;
+  padding: var(--ht-space-4);
+  overflow: hidden;
+  border-inline-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.mk-detail__task-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  margin-block-end: var(--ht-space-4);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.mk-detail__status {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-detail__group {
+  padding-block: var(--ht-space-3);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.mk-detail__group h2 {
+  margin: 0 0 var(--ht-space-2);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.mk-detail__field {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  min-block-size: var(--ht-touch-target-min);
+  padding-block: var(--ht-space-1);
+  font-size: var(--ht-font-size-xs);
+}
+
+.mk-detail__label {
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-detail__value {
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--ht-color-foreground);
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── 今日进度卡：刻意**不画** ─────────────────────────────
    产品侧 R6 那一刀把常驻的今天进度卡从"做事"的四个视图撤了（理由见
    `apps/web/src/App.tsx` 里那段"数字分散在三个位置"的说明），共享卡现在只住成长页。
    展厅这五屏全是做事屏 ⇒ 一节样式都不该留。反向判据在
    `tests/mockup-fidelity.spec.tsx`，它从产品源码派生，不放行"悄悄画回来"。 */
 
-/* ── 输入行 ─────────────────────────────────────────────── */
+/* ── 输入行：共享 CaptureComposer 与复刻均为无边框编辑面 ───── */
 
 .mk-compose {
   display: flex;
@@ -290,7 +478,7 @@
   min-block-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-4);
   background: var(--ht-color-surface);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border: 0;
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
   color: var(--ht-color-foreground-subtle);
@@ -395,6 +583,17 @@
   color: transparent;
 }
 
+.mk-task__check:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: var(--ht-space-1);
+}
+
+button.mk-task__check {
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 .mk-task--done .mk-task__check {
   background: var(--ht-color-primary);
   border-color: var(--ht-color-primary);
@@ -409,6 +608,27 @@
   padding-block: var(--ht-space-2);
   gap: var(--ht-space-1);
   min-inline-size: 0;
+}
+
+button.mk-task__body {
+  align-items: flex-start;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+button.mk-task__body:hover,
+button.mk-task__body:focus-visible,
+.mk-task--selected {
+  background: var(--ht-color-surface-sunken);
+}
+
+button.mk-task__body:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: calc(var(--ht-space-1) * -1);
 }
 
 /* 标题：**语义文字样式** `TASK_ROW_TEXT.title`（= `row-title`）的四个 token。
@@ -429,6 +649,12 @@
 .mk-task--done .mk-task__title {
   text-decoration: line-through;
   color: var(--ht-color-foreground-subtle);
+}
+
+.mk-detail__status--done {
+  background: var(--ht-color-primary);
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
 }
 
 /* 徽章行：间距 = `TASK_ROW_SHAPE.metaGap`；排版 = `TASK_ROW_TEXT.meta`。 */
@@ -479,24 +705,11 @@
   gap: var(--ht-space-3);
 }
 
-/* 四宫格与底部注释是**两行**（真应用 `QuadrantBoard` 也是这个结构：
-   网格 + 下面一条 footnote），所以网格本身单独一层。 */
+/* 四宫格自身是一个内容区；规则说明由真实应用的帮助折叠承载。 */
 .mk-quadrant__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--ht-space-3);
-}
-
-/* 底部注释。真实现给它的是**语义文字样式** `caption`（`text.caption`）+
-   弱化色 —— 复刻原来抄的是 `font-size-2xs`（更小）而没跟语义样式。
-   判据 `mockup-quadrant-shape.spec.tsx` 逐项比对 `TEXT_STYLES.caption`。 */
-.mk-quadrant__footnote {
-  margin: 0;
-  font-size: var(--ht-font-size-xs);
-  font-weight: var(--ht-font-weight-medium);
-  line-height: var(--ht-line-height-normal);
-  letter-spacing: var(--ht-tracking-caption);
-  color: var(--ht-color-foreground-muted);
 }
 
 .mk-quad {
@@ -634,6 +847,17 @@
   background: var(--ht-color-heat-4);
 }
 
+button.mk-heat__cell {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+
+button.mk-heat__cell:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: var(--ht-space-1);
+}
+
 .mk-heat__legend {
   display: flex;
   align-items: center;
@@ -649,8 +873,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--ht-space-4);
-  padding-block-start: var(--ht-space-6);
+  gap: var(--ht-space-3);
+  max-inline-size: var(--ht-layout-sidebar-width);
+  margin-inline: auto;
+  padding-block: var(--ht-space-4);
 }
 
 .mk-focus__ring {
@@ -673,8 +899,8 @@
 }
 
 .mk-focus__time {
-  font-size: var(--ht-font-size-3xl);
-  font-weight: var(--ht-font-weight-bold);
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-semibold);
   /* tabular-nums：否则秒数跳动时整个计时器左右晃 */
   font-variant-numeric: tabular-nums;
   line-height: var(--ht-line-height-tight);
@@ -684,17 +910,62 @@
 .mk-focus__phase {
   display: inline-flex;
   align-items: center;
-  gap: var(--ht-space-1);
   font-size: var(--ht-font-size-2xs);
   color: var(--ht-color-foreground-muted);
 }
 
 .mk-focus__actions {
   display: flex;
+  inline-size: 100%;
   gap: var(--ht-space-2);
 }
 
+.mk-focus__actions .mk-btn-primary {
+  flex: 1;
+  justify-content: center;
+}
+
+.mk-focus__secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  white-space: nowrap;
+}
+
+.mk-focus__task {
+  inline-size: 100%;
+  box-sizing: border-box;
+  margin-block-start: var(--ht-space-1);
+}
+
+.mk-focus__settings {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  inline-size: 100%;
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-1);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.mk-focus__settings-values {
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
 .mk-focus__stat {
+  inline-size: 100%;
+  padding-block-start: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
   font-size: var(--ht-font-size-2xs);
   color: var(--ht-color-foreground-muted);
   font-variant-numeric: tabular-nums;
@@ -709,29 +980,37 @@
   gap: var(--ht-space-1);
 }
 
-/* 「新清单 / 新标签」—— 真应用里 `ProjectsPanel` 与标签区各是一个
-   **输入框 + 框外一个 `+`**，不是一行静态名字。复刻照它的形态画。 */
-.mk-field {
+/* 与 Web `ProjectsPanel` 对齐：标题负责分区，+ 是创建入口，行由共享
+   `OrganizerList` 产生。展厅只复现静态行，不伪造可输入的表单。 */
+.mk-projects__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mk-projects__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.mk-projects__row {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
-}
-
-.mk-field__box {
-  flex: 1;
-  display: flex;
-  align-items: center;
   min-block-size: var(--ht-touch-target-min);
-  padding: 0 var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
-  color: var(--ht-color-foreground-muted);
+  color: var(--ht-color-foreground);
 }
 
 .mk-field__add {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-md);
   color: var(--ht-color-foreground-muted);
 }
 
@@ -827,4 +1106,77 @@
   margin: 0;
   font-size: var(--ht-font-size-xs);
   color: var(--ht-color-foreground-muted);
+}
+
+.mk-detail__close { display: none; }
+.mk-habit__check-in {
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: 0;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.mk-habit__check-in:focus-visible,
+.mk-detail__close:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-primary);
+  outline-offset: var(--ht-space-1);
+}
+
+/* The interactive preview follows a small screen's actual reading order. */
+@media (max-width: 40rem) {
+  .mk-frame--interactive .mk-app { align-items: start; }
+  .mk-frame--interactive .mk-rail { grid-row: 1 / span 2; align-self: stretch; }
+  .mk-frame--interactive .mk-header { padding-inline: var(--ht-space-3); }
+  .mk-frame--interactive .mk-header__actions { display: none; }
+  .mk-frame--interactive .mk-content { padding: var(--ht-space-3); }
+  .mk-frame--interactive .mk-input { min-inline-size: 0; overflow: hidden; white-space: nowrap; }
+  .mk-frame--interactive .mk-btn-primary { flex-shrink: 0; }
+  .mk-frame--interactive .mk-task { padding-inline: var(--ht-space-2); }
+  .mk-frame--interactive .mk-task__body { max-inline-size: 100%; padding-inline: var(--ht-space-1); }
+  .mk-frame--interactive .mk-task__title { white-space: normal; overflow-wrap: anywhere; }
+  .mk-frame--interactive .mk-task .mk-iconbtn { display: none; }
+  .mk-frame--interactive .mk-task__meta { flex-wrap: wrap; }
+  .mk-frame--interactive .mk-task__check { position: relative; }
+  .mk-frame--interactive button.mk-task__check::after {
+    content: '';
+    position: absolute;
+    min-inline-size: var(--ht-touch-target-min);
+    min-block-size: var(--ht-touch-target-min);
+  }
+  .mk-frame--interactive .mk-detail[data-open='true'] {
+    display: block;
+    grid-column: 2;
+    grid-row: 2;
+    border-inline-start: 0;
+    border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+    block-size: auto;
+    scroll-margin-block-start: calc(var(--ht-layout-header-height) + var(--ht-space-4));
+  }
+  .mk-frame--interactive .mk-detail__task-title { align-items: flex-start; }
+  .mk-frame--interactive .mk-detail__task-title strong { flex: 1; min-inline-size: 0; overflow-wrap: anywhere; }
+  .mk-frame--interactive .mk-detail__status { flex-shrink: 0; }
+  .mk-frame--interactive .mk-detail__close {
+    display: grid;
+    place-items: center;
+    min-inline-size: var(--ht-touch-target-min);
+    min-block-size: var(--ht-touch-target-min);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ht-color-foreground-muted);
+    cursor: pointer;
+  }
+  .mk-frame--interactive .mk-detail__value { white-space: normal; overflow-wrap: anywhere; }
+  .mk-frame--interactive .mk-quadrant__grid { grid-template-columns: minmax(0, 1fr); }
+  .mk-frame--interactive .mk-habit { padding: var(--ht-space-3); min-inline-size: 0; }
+  .mk-frame--interactive .mk-habit__head { flex-wrap: wrap; }
+  .mk-frame--interactive .mk-heat { overflow-x: auto; padding-block: var(--ht-space-1); }
+  .mk-frame--interactive .mk-focus__ring { max-inline-size: 100%; }
+  .mk-frame--interactive .mk-focus__ring svg { max-inline-size: 100%; block-size: auto; }
+  .mk-frame--interactive .mk-focus__actions { flex-wrap: wrap; justify-content: center; }
+  .mk-frame--interactive .mk-timeline__axis,
+  .mk-frame--interactive .mk-timeline__row { grid-template-columns: minmax(0, 1fr); }
 }

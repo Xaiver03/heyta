@@ -24,6 +24,16 @@ describe('移动端个人中心的成长摘要', () => {
     expect(source).toContain("import { onLocalWrite } from '../sync/write-signal';");
     expect(source).toContain('const [localWriteRevision, setLocalWriteRevision] = useState(0);');
     expect(source).toContain('useEffect(() => onLocalWrite(() => {');
-    expect(source).toContain('}, [dataRevision, localWriteRevision]);');
+    expect(source).toContain('}, [dataRevision, localWriteRevision, retryRevision]);');
+  });
+
+  it('读取过程有可见的 loading / error / retry / stale 状态', () => {
+    expect(source).toContain("useState<'loading' | 'ready' | 'error'>('loading')");
+    expect(source).toContain("setReadState('error')");
+    expect(source).toContain("mobile.profile.progress.loading");
+    expect(source).toContain("mobile.profile.progress.error");
+    expect(source).toContain("mobile.profile.progress.stale");
+    expect(source).toContain("mobile.profile.progress.retry");
+    expect(source).toContain('setRetryRevision');
   });
 });

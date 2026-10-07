@@ -293,10 +293,10 @@ describe('复刻件的取值 = 共享层那一组（逐项对账）', () => {
     expect(captureComposerSource()).toContain(
       "placeholderTextColor={tokens['color.foreground-subtle']}",
     );
-    // 边框：`border-width.thin` + `color.border`（共享层是两条属性，复刻是简写）。
+    // 无边界输入：共享层与复刻都明确使用 0；其余输入属性仍逐项走 token 对账。
+    expect(styleDeclarations(styleBlock(composer, 'input')).get('borderWidth')).toBe('0');
     const border = cssDeclarations(ruleBody(css, '.mk-input')).get('border') ?? '';
-    expect(border).toContain(`var(${cssVarName(tokenOf(composer, 'input', 'borderWidth'))})`);
-    expect(border).toContain(`var(${cssVarName(tokenOf(composer, 'input', 'borderColor'))})`);
+    expect(border).toBe('0');
     // `row-meta` 的排版四件套（字号一条，其余三条在修饰类里）。
     expectVar(css, '.mk-input', 'font-size', 'font-size.sm');
     expectVar(css, '.mk-input--capture', 'font-weight', 'font-weight.regular');

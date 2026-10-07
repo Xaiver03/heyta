@@ -17,8 +17,8 @@
  * 🔴 落地页的清单/标签块是**部分复刻**，这一点必须被写下来
  *
  * 真实现的 `OrganizerList` 一行有**五个部件**（见 `ORGANIZER_ROW_PARTS`），
- * 而落地页侧栏只画了「分区标题 + 新建输入框 + `+`」——
- * 行、计数、取色、删除**都没有**。这不是本刀引入的：迁移前的复刻件就是这样
+ * 而落地页侧栏只画了「分区标题 + 静态行 + `+`」——
+ * 行上的计数、取色、删除**都没有**。这不是本刀引入的：迁移前的复刻件就是这样
  * （`showcase-fidelity-audit.md` §2 #3/#4 记过它的上一版）。
  *
  * 🔴 本刀做的是**把它变成"可被机器核对的部分复刻"**，不是假装它是完整复刻：
@@ -86,7 +86,7 @@ export const ORGANIZER_ROW_PARTS: readonly OrganizerRowPart[] = [
 /**
  * 落地页侧栏在那两块里**真的画了**的东西。
  *
- * 只有两件：分区标题、以及"新…"输入框形态（含 `+`）。行与行上的四个部件
+ * 现在画三件：分区标题、静态样例行、以及标题级创建入口。行上的计数、取色、删除
  * 一件没画 —— 与上面 `replicatedOnLanding` 全为 `false` 是同一件事的两种说法。
  */
-export const MOCK_PROJECT_DRAWN_PARTS: readonly string[] = ['heading', 'composer'];
+export const MOCK_PROJECT_DRAWN_PARTS: readonly string[] = ['heading', 'rows', 'create-trigger'];

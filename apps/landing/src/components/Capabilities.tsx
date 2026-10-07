@@ -1,3 +1,4 @@
+import { AssistantIcon } from './AssistantIcon.js';
 import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 能力（bento 网格）
@@ -22,7 +23,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { CheckCircle2, CloudOff, Repeat, Sparkles, Zap } from 'lucide-react';
+import { CheckCircle2, CloudOff, Repeat, Zap } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n/provider';
 
@@ -142,7 +143,7 @@ export function Capabilities(): React.JSX.Element {
         title: t('landing.capabilities.breakdown.title'),
         body: t('landing.capabilities.breakdown.body'),
         span: '',
-        icon: <Sparkles size={ICON_SIZE.md} />,
+        icon: <AssistantIcon size={ICON_SIZE.md} />,
       },
       {
         title: t('landing.capabilities.repeat.title'),

@@ -13,7 +13,7 @@ import { openTaskHost } from '../db/open-host';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { onLocalWrite } from '../sync/write-signal';
-import { Card, SectionHeader } from '../ui/kit';
+import { Button, Card, SectionHeader, Stack, Text } from '../ui/kit';
 
 export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => void }): React.JSX.Element | null {
   const { t } = useI18n();
@@ -21,6 +21,8 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
   const { dataRevision } = useMobileSync();
   const [tables, setTables] = useState<MotivationTables | null>(null);
   const [localWriteRevision, setLocalWriteRevision] = useState(0);
+  const [readState, setReadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [retryRevision, setRetryRevision] = useState(0);
 
   // `dataRevision` advances after sync/conflict handling. Local task, focus, and
   // habit writes emit through the host's write signal instead, so a persistent
@@ -31,17 +33,22 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
 
   useEffect(() => {
     let alive = true;
+    setReadState('loading');
     void openTaskHost()
       .then((host) => {
-        if (alive) setTables(host.getState());
+        if (!alive) return;
+        setTables(host.getState());
+        setReadState('ready');
       })
       .catch(() => {
         // 个人中心摘要是渐进增强；读取失败不应阻塞账号卡和设置入口。
+        // 保留上一次成功的快照，避免一次本地读取抖动让用户以为数据消失。
+        if (alive) setReadState('error');
       });
     return () => {
       alive = false;
     };
-  }, [dataRevision, localWriteRevision]);
+  }, [dataRevision, localWriteRevision, retryRevision]);
 
   const snapshot = useMemo(() => {
     if (tables === null) return null;
@@ -52,7 +59,27 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
     return { week, reached, total };
   }, [tables, now]);
 
-  if (snapshot === null) return null;
+  const retry = (): void => setRetryRevision((revision) => revision + 1);
+
+  if (snapshot === null) {
+    return (
+      <>
+        <SectionHeader icon="growth.week" title={t('mobile.profile.section.progress')} />
+        <Card>
+          <Stack>
+            <Text variant="caption" tone="subtle">
+              {readState === 'error'
+                ? t('mobile.profile.progress.error')
+                : t('mobile.profile.progress.loading')}
+            </Text>
+            {readState === 'error' ? (
+              <Button label={t('mobile.profile.progress.retry')} onPress={retry} tone="secondary" />
+            ) : null}
+          </Stack>
+        </Card>
+      </>
+    );
+  }
 
   const rows: readonly SettingsRowModel[] = [
     {
@@ -89,6 +116,14 @@ export function ProfileProgressSummary({ onOpenGrowth }: { onOpenGrowth: () => v
         {rows.map((row, index) => (
           <SettingsRow key={settingsRowKey(row, index)} row={row} />
         ))}
+        {readState === 'error' ? (
+          <Stack>
+            <Text variant="caption" tone="subtle">
+              {t('mobile.profile.progress.stale')}
+            </Text>
+            <Button label={t('mobile.profile.progress.retry')} onPress={retry} tone="secondary" />
+          </Stack>
+        ) : null}
       </Card>
     </>
   );

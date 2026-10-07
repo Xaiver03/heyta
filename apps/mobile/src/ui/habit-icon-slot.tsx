@@ -9,11 +9,10 @@
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 「key → 字形」与「key → 词条」都来自 `@heyta/ui`，本文件里不许出现第三份
  *
- * 共享层那张 `HABIT_GLYPHS` 配的是 `lucide` 的**图标数据**，由 `HeytaIcon` 在 RN 上画 ——
- * 移动端的**清单**（`HabitProgressList`）已经用的是它。如果这里另抄一张，两份会漂移，
- * 而漂移的症状是"同一个习惯在清单上是水滴、在选择器里是月亮"，两边都不报错。
- * web 那张 `key → lucide-react 组件` 结构上必须分开（画的不是同一种东西），
- * 由 `apps/web/tests/habits-list-pane.spec.tsx` F 组逐对比钉住；**这一份不需要**。
+ * 共享层的 `HabitArtwork` 统一负责 `key → 图形` 的映射与绘制 —— 清单和选择器
+ * 必须消费同一个组件。如果这里另抄一张，两份会漂移，症状是"同一个习惯在清单上
+ * 是水滴、在选择器里是月亮"，两边都不报错。web 的 DOM 图形实现仍由共享的
+ * key 词表与 web 适配层负责，移动端不再接触底层图形表。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 存的是**闭集 key**（`'drop'`），不是字形名，也不是字形本身
@@ -39,10 +38,11 @@ import { Pressable, View } from 'react-native';
 
 import { HABIT_ICONS, habitIconOf, parseHabitIcon, type Habit, type HabitIcon } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { HABIT_GLYPHS, HABIT_ICON_LABEL_KEYS, HeytaIcon } from '@heyta/ui';
+import { HABIT_ICON_LABEL_KEYS, HabitArtwork } from '@heyta/ui';
 
 import { useTokens } from '../theme';
 import { Text } from './kit';
+import { Icon } from './icons';
 
 export interface HabitIconSlotProps {
   habit: Habit;
@@ -56,8 +56,8 @@ export function HabitIconSlot({ habit, onChoose }: HabitIconSlotProps): React.JS
   const [open, setOpen] = useState(false);
 
   // 🔴 磁盘上的值先过解析器再当类型用：`habit.icon` 是 `string`，直接 `as HabitIcon`
-  //    会让一个不认识的历史值（改名前的 key）穿透到 `HABIT_GLYPHS[...]`，
-  //    拿到 `undefined` 的数据 —— 到 `HeytaIcon` 里才炸，而且炸在读一个既有习惯的时候。
+  //    会让一个不认识的历史值（改名前的 key）穿透到图形组件，拿到 `undefined` 的
+  //    数据 —— 直到渲染时才炸，而且炸在读一个既有习惯的时候。
   const value = parseHabitIcon(habit.icon);
   const effective = habitIconOf(habit);
 
@@ -80,7 +80,7 @@ export function HabitIconSlot({ habit, onChoose }: HabitIconSlotProps): React.JS
       >
         {/* 当前字形**常驻可见**：只放进展开面板的话，扫一眼详情看不出这条习惯现在是哪个图标，
             而"我挑过没有"正是这一格要回答的事。 */}
-        <HeytaIcon data={HABIT_GLYPHS[effective]} color={tokens['color.foreground']} />
+        <HabitArtwork icon={effective} size={tokens['icon.md']} />
         <Text variant="row-meta" tone="muted">
           {t('web.habits.icon.toggle')}
         </Text>
@@ -110,14 +110,29 @@ export function HabitIconSlot({ habit, onChoose }: HabitIconSlotProps): React.JS
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: tokens['radius.md'],
-                borderWidth:
-                  effective === icon ? tokens['border-width.thick'] : tokens['border-width.thin'],
-                borderColor:
-                  effective === icon ? tokens['color.primary'] : tokens['color.border'],
-                backgroundColor: pressed ? tokens['color.surface-sunken'] : tokens['color.surface'],
+                // 图标选择是轻量的 inline control：不再给每个选项套一层框。
+                // 选中态只用浅色底 + check 保留明确反馈，触区仍保持 44pt。
+                backgroundColor:
+                  effective === icon
+                    ? tokens['color.primary-subtle']
+                    : pressed
+                      ? tokens['color.surface-sunken']
+                      : 'transparent',
               })}
             >
-              <HeytaIcon data={HABIT_GLYPHS[icon]} color={tokens['color.foreground']} />
+              <HabitArtwork icon={icon} size={tokens['icon.md']} />
+              {effective === icon ? (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    right: tokens['space.1'],
+                    bottom: tokens['space.1'],
+                  }}
+                >
+                  <Icon name="action.keep" size="xs" color={tokens['color.primary']} strokeWidth={2.5} />
+                </View>
+              ) : null}
             </Pressable>
           ))}
 
@@ -136,16 +151,29 @@ export function HabitIconSlot({ habit, onChoose }: HabitIconSlotProps): React.JS
               minHeight: tokens['touch-target.min'],
               alignItems: 'center',
               justifyContent: 'center',
-              paddingHorizontal: tokens['space.2'],
               borderRadius: tokens['radius.md'],
-              borderWidth:
-                value === undefined ? tokens['border-width.thick'] : tokens['border-width.thin'],
-              borderColor:
-                value === undefined ? tokens['color.primary'] : tokens['color.border'],
-              backgroundColor: pressed ? tokens['color.surface-sunken'] : tokens['color.surface'],
+              paddingHorizontal: tokens['space.2'],
+              backgroundColor:
+                value === undefined
+                  ? tokens['color.primary-subtle']
+                  : pressed
+                    ? tokens['color.surface-sunken']
+                    : 'transparent',
             })}
           >
             <Text variant="row-meta">{t('web.habits.icon.default')}</Text>
+            {value === undefined ? (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  right: tokens['space.1'],
+                  bottom: tokens['space.1'],
+                }}
+              >
+                <Icon name="action.keep" size="xs" color={tokens['color.primary']} strokeWidth={2.5} />
+              </View>
+            ) : null}
           </Pressable>
         </View>
       ) : null}

@@ -65,8 +65,6 @@ export function AvatarBadge({
         width: edge,
         height: edge,
         borderRadius: t['radius.full'],
-        borderWidth: t['border-width.thin'],
-        borderColor: t['color.border'],
         backgroundColor: t['color.surface-sunken'],
         alignItems: 'center',
         justifyContent: 'center',

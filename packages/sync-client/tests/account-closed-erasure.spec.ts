@@ -102,6 +102,18 @@ describe('E2 —— 码决定动作，状态码不决定', () => {
     expect(eraser, '把凭据失效读成注销 = 删掉了还在用的数据').not.toHaveBeenCalled();
   });
 
+  it('an unrelated errorCode field cannot become an account-erasure signal', async () => {
+    const eraser = vi.fn(async () => undefined);
+    const { client } = makeClient(() => Response.json({ errorCode: 'ACCOUNT_CLOSED' }, { status: 401 }), {
+      onAccountClosed: eraser,
+    });
+    const status = await client.sync();
+    expect(status.kind).toBe('error');
+    if (status.kind !== 'error') return;
+    expect(status.reason).toBe('unauthorized');
+    expect(eraser).not.toHaveBeenCalled();
+  });
+
   it('🔴 401 + ACCOUNT_CLOSED 仍算注销（E1b 之前服务端就是回 401）', async () => {
     // 判定只认码。状态码从 401 换成 410 是**对外**语义（别重试），
     // 不是客户端识别注销的前提 —— 否则先发服务端、后发客户端的窗口里

@@ -4,11 +4,11 @@
 > 重新生成：`node research/tools/render-license-inventory.mjs`
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
-> lockfile 指纹：`a60c9f81c96f52a8`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
+> lockfile 指纹：`847802a22a36e0bb`（清单在这把指纹下渲染；对账：`node research/tools/render-license-inventory.mjs --check-stamp`）
 
-生成时间：2026-10-06
+生成时间：2026-10-07
 
-**总计 1093 个包** —— 宽松许可 1092，受限 0，无许可证 0，白名单外已登记 1。
+**总计 1096 个包** —— 宽松许可 1095，受限 0，无许可证 0，白名单外已登记 1。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -27,7 +27,7 @@
 
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（1093 个）
+### 📋 全部依赖（1096 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -252,6 +252,7 @@
 | `@lukeed/ms` | 2.0.2 | MIT |
 | `@malept/cross-spawn-promise` | 2.0.0 | Apache-2.0 |
 | `@noble/ciphers` | 2.4.0 | MIT |
+| `@noble/curves` | 2.4.0 | MIT |
 | `@noble/hashes` | 2.4.0 | MIT |
 | `@noble/hashes` | 1.8.0 | MIT |
 | `@node-rs/argon2` | 2.2.1 | MIT |
@@ -381,6 +382,7 @@
 | `@vscode/sudo-prompt` | 9.3.2 | MIT |
 | `@xmldom/xmldom` | 0.8.15 | MIT |
 | `@xmldom/xmldom` | 0.9.12 | MIT |
+| `@zxcvbn-ts/core` | 4.2.0 | MIT |
 | `@zxcvbn-ts/dictionary-compression` | 3.0.1 | MIT |
 | `@zxcvbn-ts/language-common` | 4.1.3 | MIT |
 | `abort-controller` | 3.0.0 | MIT |
@@ -603,6 +605,7 @@
 | `fast-uri` | 4.2.1 | BSD-3-Clause |
 | `fast-uri` | 3.1.8 | BSD-3-Clause |
 | `fast-xml-parser` | 4.5.7 | MIT |
+| `fastest-levenshtein` | 1.0.16 | MIT |
 | `fastify` | 5.12.5 | MIT |
 | `fastify-plugin` | 6.0.0 | MIT |
 | `fastify-plugin` | 5.1.0 | MIT |

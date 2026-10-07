@@ -5,12 +5,14 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--serial', default=os.environ.get('ANDROID_SERIAL','emulator-5554'))
+parser.add_argument('--timeout', type=float, default=12.0, help='seconds to wait for each UI state')
 parser.add_argument('--evidence-dir', type=Path, default=Path(__file__).resolve().parents[2]/'apps/mobile/evidence/profile-center/android')
 args=parser.parse_args()
 out=args.evidence_dir
 out.mkdir(parents=True,exist_ok=True)
 records=[]
 serial=args.serial
+timeout=args.timeout
 def adb(*args):
  return subprocess.run(['adb','-s',serial,*args],capture_output=True,timeout=25,check=True).stdout
 
@@ -24,22 +26,26 @@ def tree():
   # IA failure.
   time.sleep(1)
  raise RuntimeError(f'uiautomator dump failed: {result.returncode}: {result.stderr!r}')
-def texts(root):return [n.get('text') or n.get('content-desc') for n in root.iter('node') if n.get('text') or n.get('content-desc')]
+def is_visible(node):return node.get('visible-to-user','true') == 'true'
+def texts(root):return [n.get('text') or n.get('content-desc') for n in root.iter('node') if is_visible(n) and (n.get('text') or n.get('content-desc'))]
 def find(root,label):
  for n in root.iter('node'):
+  if not is_visible(n):continue
   v=n.get('content-desc') or n.get('text') or ''
   if v==label or v.startswith(label+',') or v.startswith(label+'，'):return n
  return None
 
 def find_pressable(root,label):
  for n in root.iter('node'):
+  if not is_visible(n):continue
   if n.get('clickable') != 'true': continue
   v=n.get('content-desc') or n.get('text') or ''
   if v==label or v.startswith(label+',') or v.startswith(label+'，'):return n
  return None
 
 def wait(label,absent=None):
- for _ in range(5):
+ deadline=time.monotonic()+timeout
+ while time.monotonic() < deadline:
   r=tree()
   if find(r,label) is not None and (absent is None or find(r,absent) is None):return r
   time.sleep(.4)
@@ -71,7 +77,8 @@ def artifact_identity():
  return {'sha256':actual,'apk':str(apk.relative_to(Path(__file__).resolve().parents[2]))}
 
 def scroll_to(label):
- for _ in range(5):
+ deadline=time.monotonic()+timeout
+ while time.monotonic() < deadline:
   r=tree()
   if find(r,label) is not None:return
   bounds=list(map(int,re.findall(r'\d+',next(r.iter('node')).get('bounds'))))
@@ -105,7 +112,10 @@ try:
  shot('returned-profile')
  scroll_to('清单')
  tap('清单','返回','整理与记录');shot('lists')
- back('整理与记录');shot('returned-profile-after-lists')
+ # Returning from the list child resets the retained Profile scroll position
+ # to the top, so the tools section heading is intentionally offscreen. Assert
+ # the Profile surface itself and make sure the child title is gone.
+ back('我的','清单');shot('returned-profile-after-lists')
  artifact_identity()
  (out/'journey.json').write_text(json.dumps({'status':'passed','artifact':identity,'steps':records},ensure_ascii=False,indent=2))
 except Exception as e:

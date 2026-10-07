@@ -10,8 +10,8 @@
  * 版面顺序（每个区块用**不同的布局族**，避免"八段长得一样"）：
  *   1. 英雄区        非对称分栏（左文右 3D 景）
  *   2. 事实条        四栏等分
- *   3. 能力          非对称 bento 网格
- *   4. 真实界面展厅   滚动固定的横向切换
+ *   3. 真实界面展厅   直接选择的真实工作区预览
+ *   4. 能力          非对称 bento 网格
  *   5. 同步          全宽 3D 画布（WebGL）
  *   6. 隐私          滚动驱动的逐字加密
  *   7. 价格          两栏对等对比（免费的自建 / 收费的托管）
@@ -85,8 +85,8 @@ export function Landing(): React.JSX.Element {
     <>
       <Hero />
       <Facts />
-      <Capabilities />
       <Showcase />
+      <Capabilities />
       {/* 快滚到这一节才去取 three.js 那个 chunk，并创建 WebGL 上下文 */}
       {/* 🔴 `id="sync"` 给的是 Deferred 的**占位块**（见 Deferred.tsx 的说明）：
           给里面那棵树的话，导航点 `#sync` 会因为"找不到落点→不滚动→
