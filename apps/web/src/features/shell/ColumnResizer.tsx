@@ -151,7 +151,9 @@ export function ColumnResizer(props: ColumnResizerProps) {
   /** `width === null`（= 用默认值）时**实际画出来**的那个数，供 `aria-valuenow` 报。 */
   const [reportedWidth, setReportedWidth] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
-  const drag = useRef<{ x: number; start: number } | null>(null);
+  const drag = useRef<{ x: number; start: number; previous: number | null; current: number } | null>(null);
+  const widthRef = useRef<number | null>(null);
+  const keyboardOrigin = useRef<number | null | undefined>(undefined);
 
   /** 被拖那一列此刻的宽度（`null` = 读不到）。 */
   const columnWidth = (): number | null => {
@@ -165,6 +167,7 @@ export function ColumnResizer(props: ColumnResizerProps) {
     const box = bounds(minToken, maxToken);
     const next = stored !== null && box !== null ? Math.min(Math.max(stored, box.min), box.max) : stored;
     setWidth(next);
+    widthRef.current = next;
     applyWidth(cssVar, next);
   }, [cssVar, maxToken, minToken, storageKey]);
 
@@ -180,6 +183,7 @@ export function ColumnResizer(props: ColumnResizerProps) {
   const commit = useCallback(
     (px: number | null) => {
       setWidth(px);
+      widthRef.current = px;
       writeStored(storageKey, px);
     },
     [storageKey],
@@ -191,7 +195,7 @@ export function ColumnResizer(props: ColumnResizerProps) {
     const column = columnWidth();
     if (column === null) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    drag.current = { x: event.clientX, start: column };
+    drag.current = { x: event.clientX, start: column, previous: widthRef.current, current: column };
     setDragging(true);
   }
 
@@ -201,15 +205,32 @@ export function ColumnResizer(props: ColumnResizerProps) {
     const delta = event.clientX - drag.current.x;
     const next = edge === 'end' ? drag.current.start + delta : drag.current.start - delta;
     const box = bounds(minToken, maxToken);
-    setWidth(box === null ? Math.round(next) : Math.round(Math.min(Math.max(next, box.min), box.max)));
+    const clamped = box === null ? Math.round(next) : Math.round(Math.min(Math.max(next, box.min), box.max));
+    drag.current.current = clamped;
+    setWidth(clamped);
+    widthRef.current = clamped;
   }
 
   function onPointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (drag.current === null) return;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const finalWidth = drag.current.current;
     drag.current = null;
     setDragging(false);
-    commit(width);
+    commit(finalWidth);
+  }
+
+  function onPointerCancel(event: React.PointerEvent<HTMLDivElement>) {
+    if (drag.current === null) return;
+    const previous = drag.current.previous;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    drag.current = null;
+    setDragging(false);
+    commit(previous);
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -222,12 +243,18 @@ export function ColumnResizer(props: ColumnResizerProps) {
     const shrinkKey = edge === 'end' ? 'ArrowLeft' : 'ArrowRight';
     if (event.key === growKey || event.key === shrinkKey) {
       event.preventDefault();
+      if (keyboardOrigin.current === undefined) keyboardOrigin.current = width;
       const next = current + (event.key === growKey ? step : -step);
       commit(box === null ? Math.round(next) : Math.round(Math.min(Math.max(next, box.min), box.max)));
     } else if (event.key === 'Home') {
       // 回到设计系统的默认值（双击同一条路）。
       event.preventDefault();
       commit(null);
+      keyboardOrigin.current = undefined;
+    } else if (event.key === 'Escape' && keyboardOrigin.current !== undefined) {
+      event.preventDefault();
+      commit(keyboardOrigin.current);
+      keyboardOrigin.current = undefined;
     }
   }
 
@@ -248,7 +275,7 @@ export function ColumnResizer(props: ColumnResizerProps) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      onPointerCancel={onPointerCancel}
       onDoubleClick={() => {
         commit(null);
       }}

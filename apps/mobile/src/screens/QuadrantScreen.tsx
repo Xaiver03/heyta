@@ -83,6 +83,10 @@ export interface QuadrantScreenProps {
   readonly onToggleTask: (taskId: string) => void;
   /** 点整行的行为：打开任务详情。 */
   readonly onOpenTask: (taskId: string) => void;
+  /** 与任务列表相同的长按批量选择快捷入口。 */
+  readonly onLongPressTask?: (taskId: string) => void;
+  readonly selectedTaskIds?: ReadonlySet<string>;
+  readonly selectionMode?: boolean;
   /** 选中的那一条 ⇒ 高亮。传的是宿主的**全局选中**，不是本屏自己记的 id。 */
   readonly activeTaskId?: string | null;
 }
@@ -96,6 +100,9 @@ export function QuadrantScreen({
   renderTrailing,
   onToggleTask,
   onOpenTask,
+  onLongPressTask,
+  selectedTaskIds,
+  selectionMode = false,
   activeTaskId,
 }: QuadrantScreenProps): React.JSX.Element {
   const { t } = useI18n();
@@ -108,6 +115,9 @@ export function QuadrantScreen({
       labels={boardLabels}
       onToggleTask={onToggleTask}
       onOpenTask={onOpenTask}
+      onLongPressTask={onLongPressTask}
+      selectedTaskIds={selectedTaskIds}
+      selectionMode={selectionMode}
       activeTaskId={activeTaskId}
       taskLabels={labels}
       renderMeta={renderMeta}

@@ -210,6 +210,21 @@ else
   exit 1
 fi
 
+# 🔴 原生壳的 web-dist 新鲜度校验要求它晚于所有 workspace 依赖产物。
+# `pnpm -r build` 的拓扑顺序可能让 apps/web 先于最后几个 packages 完成，
+# 导致 macOS 打包器把“比产物新的输入”误判为旧 web-dist。壳里装的必须是
+# 当前依赖产物对应的 UI，因此在跨端收口前再按同一 pnpm 入口重建一次 web。
+if printf '%s' "$WANT" | grep -Eq 'mac|windows'; then
+  echo "═══ 0b. 原生壳前置：@heyta/web build（确保 web-dist 晚于 workspace dist）═══"
+  if "$PNPM" --filter @heyta/web build > /tmp/heyta-reinstall-web.log 2>&1; then
+    echo "  ✅ Web 产物已在 workspace 构建之后刷新（日志 /tmp/heyta-reinstall-web.log）"
+  else
+    echo "  🔴 Web 产物刷新失败 —— 原生壳不能安全打包（日志末尾：）"
+    tail -15 /tmp/heyta-reinstall-web.log | sed 's/^/     /'
+    exit 1
+  fi
+fi
+
 # ── mac ──────────────────────────────────────────────────────────────────
 if printf '%s' "$WANT" | grep -q "mac"; then
   echo ""
@@ -336,7 +351,11 @@ if printf '%s' "$WANT" | grep -q "android"; then
       echo "  ✅ release APK 已重打（$(du -h "$APK" | cut -f1)；日志 /tmp/heyta-reinstall-apk.log）"
       # 🔴 卸旧装新（不是 install -r）：清掉旧数据与旧容器，"重装"必须是干净的。
       adb -s "$SERIAL" uninstall "$PKG" >/dev/null 2>&1 || true
-      if adb -s "$SERIAL" install "$APK" 2>&1 | grep -q "Success"; then
+      # Do not pipe adb directly into grep under pipefail: grep exits as soon
+      # as it sees "Success", which can make adb receive SIGPIPE and turn a
+      # successful install into a false failure.
+      INSTALL_OUT="$(adb -s "$SERIAL" install "$APK" 2>&1)"
+      if printf '%s' "$INSTALL_OUT" | grep -q "Success"; then
         echo "  ✅ 模拟器 $SERIAL 全新安装成功"
         adb -s "$SERIAL" shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
         sleep 8
