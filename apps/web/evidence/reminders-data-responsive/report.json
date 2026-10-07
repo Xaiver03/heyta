@@ -1,0 +1,916 @@
+{
+  "origin": "http://127.0.0.1:4379",
+  "cases": [
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 960
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 960
+    }
+  ],
+  "reminders": [
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "default",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1670,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-default.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "granted",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1636,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-granted.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "denied",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1656,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-denied.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "unsupported",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1636,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-unsupported.png"
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "mode": "error",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1670,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-reminder-error.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "default",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1670,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-default.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "granted",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1636,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-granted.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "denied",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 186.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1656,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-denied.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "unsupported",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 166.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1636,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-unsupported.png"
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "mode": "error",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 1333.5,
+          "width": 358,
+          "height": 200.5
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1670,
+          "clientHeight": 732
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-reminder-error.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "default",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-default.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "granted",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-granted.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "denied",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-denied.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "unsupported",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-unsupported.png"
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "mode": "error",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-reminder-error.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "default",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-default.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "granted",
+      "statuses": {
+        "granted": true,
+        "denied": false,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "granted"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-granted.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "denied",
+      "statuses": {
+        "granted": false,
+        "denied": true,
+        "unsupported": false,
+        "failed": false,
+        "request": false,
+        "permission": "denied"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-denied.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "unsupported",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": true,
+        "failed": false,
+        "request": false,
+        "permission": "unsupported"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 148.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1206,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-unsupported.png"
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "mode": "error",
+      "statuses": {
+        "granted": false,
+        "denied": false,
+        "unsupported": false,
+        "failed": true,
+        "request": true,
+        "permission": "default"
+      },
+      "facts": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 931.5,
+          "width": 655.078125,
+          "height": 182.5
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1240,
+          "clientHeight": 904
+        }
+      },
+      "screenshot": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-reminder-error.png"
+    }
+  ],
+  "data": [
+    {
+      "theme": "light",
+      "width": 390,
+      "before": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 358,
+          "height": 1210
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1381,
+          "clientHeight": 732
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-390-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "before": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "documentScrollWidth": 390,
+        "documentClientWidth": 390,
+        "panel": {
+          "x": 16,
+          "y": 178.5,
+          "width": 358,
+          "height": 1210
+        },
+        "sheet": {
+          "x": 0,
+          "y": 56,
+          "width": 390,
+          "height": 732,
+          "scrollHeight": 1381,
+          "clientHeight": 732
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-390-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "before": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 126.5,
+          "width": 655.078125,
+          "height": 1045
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1172,
+          "clientHeight": 904
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/light-1440-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "before": {
+        "viewport": {
+          "width": 1440,
+          "height": 960
+        },
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "panel": {
+          "x": 424,
+          "y": 126.5,
+          "width": 655.078125,
+          "height": 1045
+        },
+        "sheet": {
+          "x": 152,
+          "y": 56,
+          "width": 1200,
+          "height": 904,
+          "scrollHeight": 1172,
+          "clientHeight": 904
+        }
+      },
+      "exports": {
+        "json": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-backup.json",
+        "markdown": "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/evidence/reminders-data-responsive/dark-1440-tasks.md",
+        "jsonEntities": 0,
+        "opCount": 1
+      },
+      "failurePreserved": {
+        "summaryVisible": true,
+        "refusalVisible": true,
+        "panelVisible": true
+      },
+      "refusedExisting": "本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。",
+      "existingTaskStillVisible": true,
+      "cancelPreserved": true
+    }
+  ],
+  "assertions": {
+    "noHorizontalOverflow": true,
+    "allPermissionStatesRendered": true,
+    "dataFailurePreserved": true,
+    "existingDataRefusedWithoutLoss": true,
+    "cancelPreserved": true
+  }
+}

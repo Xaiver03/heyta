@@ -76,7 +76,7 @@ export function ReminderNotifyPanel(): React.JSX.Element {
           actions={
             <button
               type="button"
-              className="ht-btn"
+              className="ht-btn ht-btn--primary"
               data-testid="reminder-notify-request"
               onClick={() => {
                 void requestNotificationPermission().then(setPermission);
@@ -89,17 +89,19 @@ export function ReminderNotifyPanel(): React.JSX.Element {
       ) : (
         <>
           <p className="ht-settings__hint">{t('web.reminder.notify.intro')}</p>
-          <button
-            type="button"
-            className="ht-btn"
-            data-testid="reminder-notify-request"
-            onClick={() => {
-              // 🔴 只能在**用户手势里**调 —— 这是这个按钮存在的全部理由。
-              void requestNotificationPermission().then(setPermission);
-            }}
-          >
-            {t('web.reminder.notify.request')}
-          </button>
+          <div className="ht-settings__actions">
+            <button
+              type="button"
+              className="ht-btn ht-btn--primary"
+              data-testid="reminder-notify-request"
+              onClick={() => {
+                // 🔴 只能在**用户手势里**调 —— 这是这个按钮存在的全部理由。
+                void requestNotificationPermission().then(setPermission);
+              }}
+            >
+              {t('web.reminder.notify.request')}
+            </button>
+          </div>
         </>
       )}
 

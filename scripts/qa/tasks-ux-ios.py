@@ -222,6 +222,70 @@ class Probe:
             time.sleep(1.0)
         raise ProbeError(f"{field_label} did not return to the detail viewport after schedule toggle")
 
+    def tap_list_target(self, candidates: Iterable[str], description: str) -> None:
+        """Scroll a list target from the list content, then tap it.
+
+        Selection mode adds a toolbar above the FlatList and leaves a spacer
+        below it. The generic shim can therefore start its recovery swipe in
+        that non-scrollable spacer. Use the target's current AX frame to start
+        inside the preceding list rows instead of assuming the screen bottom
+        is part of the scroll container.
+        """
+        wanted = tuple(candidates)
+        for _ in range(4):
+            nodes = self.tree()
+            node = next((AX.find(nodes, label, True, False, None, False, 0) for label in wanted
+                         if AX.find(nodes, label, True, False, None, False, 0) is not None), None)
+            width, height = AX.screen_size(nodes)
+            if node is None or width is None or height is None:
+                time.sleep(0.5)
+                continue
+            _x, y, _w, h = AX.frame_of(node)
+            if y + h / 2 < height - 120:
+                self.tap_node(node, description)
+                return
+            start_y = max(180, min(int(y) - 80, height - 220))
+            end_y = max(160, start_y - 400)
+            rc, detail = AX.idb_swipe(
+                self.idb, self.companion, self.udid,
+                width // 2, start_y, width // 2, end_y, 1.0,
+            )
+            if rc != 0:
+                raise ProbeError(f"{description} list recovery swipe failed: {detail}")
+            time.sleep(1.0)
+        raise ProbeError(f"{description} did not enter the list viewport")
+
+    def tap_list_control(self, candidates: Iterable[str], description: str) -> None:
+        """Recover a list control in either scroll direction before tapping."""
+        wanted = tuple(candidates)
+        for _ in range(4):
+            nodes = self.tree()
+            node = next((AX.find(nodes, label, True, False, None, False, 0) for label in wanted
+                         if AX.find(nodes, label, True, False, None, False, 0) is not None), None)
+            width, height = AX.screen_size(nodes)
+            if node is None or width is None or height is None:
+                time.sleep(0.5)
+                continue
+            _x, y, _w, h = AX.frame_of(node)
+            center_y = y + h / 2
+            if 0 <= center_y < height - 120:
+                self.tap_node(node, description)
+                return
+            if center_y < 0:
+                start_y = max(200, min(300, height - 300))
+                end_y = min(height - 120, start_y + 400)
+            else:
+                start_y = max(180, min(int(center_y) - 80, height - 220))
+                end_y = max(160, start_y - 400)
+            rc, detail = AX.idb_swipe(
+                self.idb, self.companion, self.udid,
+                width // 2, start_y, width // 2, end_y, 1.0,
+            )
+            if rc != 0:
+                raise ProbeError(f"{description} list control recovery swipe failed: {detail}")
+            time.sleep(1.0)
+        raise ProbeError(f"{description} did not enter the list viewport")
+
     def create_task(self, title: str) -> None:
         self.tap(("新建任务",), "open composer")
         self.node(("新任务标题",), pressable=False)
@@ -292,15 +356,15 @@ class Probe:
         self.record("04-long-press-enters-selection")
 
         select_b = f"选择：{task_b}"
-        self.tap((select_b, task_open_b), "select second task")
+        self.tap_list_target((select_b, task_open_b), "select second task")
         self.wait_labels(("已选 2 项",), "two selected tasks")
         self.record("05-multi-select-second-task")
         self.tap(("退出选择",), "exit selection")
         self.wait_absent(("退出选择",), "selection mode exit")
         self.record("06-exit-selection")
 
-        self.tap(("选择任务",), "start explicit selection")
-        self.tap((f"选择：{task_a}", task_open_a), "select task before changing view")
+        self.tap_list_control(("选择任务",), "start explicit selection")
+        self.tap_list_target((f"选择：{task_a}", task_open_a), "select task before changing view")
         self.choose_view("列表", "时间线")
         self.wait_absent(("退出选择", "已选 1 项"), "timeline clears hidden bulk selection")
         self.record("06b-timeline-clears-selection")

@@ -1230,6 +1230,7 @@ function ToolPanel(
           consents: props.consents,
           tier: props.tier,
           host: props.toolHost,
+          localize: (key, vars) => t(key as MessageKey, vars),
           executionId: `mobile:${String(++executionCounter.current)}`,
           history,
           routed: routedDeps(props.healthSnapshot),

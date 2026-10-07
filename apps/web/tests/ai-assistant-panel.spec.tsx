@@ -125,6 +125,11 @@ async function render(props: {
   routing?: AiRoutingConfig;
   locale?: 'zh-CN' | 'en';
   consents?: typeof CONSENTS;
+  historyStorage?: {
+    getItem: (key: string) => string | null;
+    setItem: (key: string, value: string) => void;
+    removeItem: (key: string) => void;
+  };
 }): Promise<HTMLDivElement> {
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -140,6 +145,7 @@ async function render(props: {
           secrets={secrets}
           host={props.host}
           {...(props.fetchImpl === undefined ? {} : { fetchImpl: props.fetchImpl })}
+          {...(props.historyStorage === undefined ? {} : { historyStorage: props.historyStorage })}
         />
       </PanelEphemeralProvider>
       </I18nProvider>,
@@ -200,6 +206,30 @@ describe('🔴 一次性披露在循环之前', () => {
     expect(el.querySelector('[data-testid="ai-assistant-disclosure"]')).not.toBeNull();
     expect(bodies).toHaveLength(0);
     expect(host.submits).toBe(0);
+  });
+
+  it('取消披露会恢复草稿，并移除未发送的乐观消息与本机历史', async () => {
+    let saved: string | null = null;
+    const historyStorage = {
+      getItem: () => saved,
+      setItem: (_key: string, value: string) => { saved = value; },
+      removeItem: () => { saved = null; },
+    };
+    const host = fakeHost();
+    const { impl, bodies } = scriptedFetch([{ kind: 'text', text: '不应发送' }]);
+    const el = await render({ host, fetchImpl: impl, historyStorage });
+
+    await type(el, '先看一下再决定');
+    await click(el, 'ai-assistant-send-button');
+    expect(el.querySelector('[data-testid="ai-chat-user"]')).not.toBeNull();
+    expect(saved).toContain('先看一下再决定');
+
+    await click(el, 'ai-assistant-disclosure-close');
+    expect(el.querySelector('[data-testid="ai-assistant-disclosure"]')).toBeNull();
+    expect(el.querySelector('[data-testid="ai-chat-user"]')).toBeNull();
+    expect((el.querySelector('[data-testid="ai-assistant-input"]') as HTMLTextAreaElement).value).toBe('先看一下再决定');
+    expect(saved).toBeNull();
+    expect(bodies).toHaveLength(0);
   });
 
   it('按披露块里的「发送」才真的出境，回答渲染出来', async () => {

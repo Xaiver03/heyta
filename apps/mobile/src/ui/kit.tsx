@@ -527,13 +527,16 @@ export function Badge({ count, max = 99, dot, tone = 'danger' }: BadgeProps): Re
 
   const bg = tone === 'primary' ? t['color.primary'] : t['color.danger'];
   const label = count !== undefined && count > max ? `${max}+` : String(count ?? '');
+  // 视觉上用 `max+` 保持角标紧凑，但无障碍树必须读出真实数量；
+  // 否则 137 会被错误地报告成 99+，用户无法得到准确计数。
+  const accessibilityCount = String(count ?? '');
   // 同上：无障碍名在外面算好，别把字面量留在无障碍名的花括号表达式里。
   // 英文单复数也在这一层分支（词条表没有 ICU）：`1` 走单数兄弟词条。
   const accessibility =
     dot === true
       ? translate('mobile.common.badge.new')
       : translate(count === 1 ? 'mobile.common.badge.countOne' : 'mobile.common.badge.count', {
-          count: label,
+          count: accessibilityCount,
         });
 
   return (
@@ -541,13 +544,22 @@ export function Badge({ count, max = 99, dot, tone = 'danger' }: BadgeProps): Re
       accessibilityRole="text"
       accessibilityLabel={accessibility}
       style={{
-        minWidth: dot === true ? t['size.badge-dot'] : t['size.badge-min-width'],
-        height: dot === true ? t['size.badge-dot'] : t['size.badge-height'],
+        ...(dot === true
+          ? {
+              width: t['size.badge-dot'],
+              height: t['size.badge-dot'],
+            }
+          : {
+              minWidth: t['size.badge-min-width'],
+              minHeight: t['size.badge-height'],
+            }),
         borderRadius: t['radius.full'],
         backgroundColor: bg,
         // 与所在底色同色的外圈，把角标从图标笔画上"切"出来。
         borderWidth: t['size.badge-ring'],
         borderColor: t['color.surface'],
+        // 宽度由内容决定；由宿主决定对齐方向，不覆盖角标右锚点。
+        flexShrink: 0,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: dot === true ? 0 : t['space.1'],
@@ -556,7 +568,15 @@ export function Badge({ count, max = 99, dot, tone = 'danger' }: BadgeProps): Re
       {dot === true ? null : (
         <RNText
           numberOfLines={1}
-          style={[text.badge, { color: t['color.on-primary'], fontFamily: native.fontSans }]}
+          maxFontSizeMultiplier={2}
+          style={[
+            text.badge,
+            {
+              color: t['color.on-primary'],
+              fontFamily: native.fontSans,
+              flexShrink: 0,
+            },
+          ]}
         >
           {label}
         </RNText>

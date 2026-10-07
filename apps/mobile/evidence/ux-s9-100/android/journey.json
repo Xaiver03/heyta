@@ -1,0 +1,83 @@
+{
+  "status": "passed",
+  "scope": "当前已安装 Android APK 的 UI-only 验收；未构建、未填写服务器地址、未提交登录、未更改同步账户",
+  "artifact": {
+    "apk": "apps/mobile/android/app/build/outputs/apk/release/app-release.apk",
+    "sha256": "983023e5d006fe9a010af0b29ca1e15775fa955249fa6cbf81381cf4f4c30e9e"
+  },
+  "accountState": {
+    "before": {
+      "profile": "还没登录",
+      "syncStatus": "尚未同步",
+      "pendingUploads": "8 项",
+      "lastSuccessfulSync": "从未"
+    },
+    "after": {
+      "syncStatus": "尚未同步",
+      "officialPathVisible": true,
+      "credentialsSubmitted": false
+    }
+  },
+  "checks": {
+    "officialSyncDefault": {
+      "status": "passed",
+      "observedTitle": "heyta 官方同步",
+      "observedHint": "登录 heyta 后，任务会自动在设备间同步，不需要填写服务器地址或手抄令牌。",
+      "officialLoginAction": "注册 / 登录",
+      "selfHostedAction": "使用自托管服务器",
+      "evidence": [
+        "01-official-default.png",
+        "01-official-default.uia.xml"
+      ]
+    },
+    "selfHostedRequiresExplicitEntry": {
+      "status": "passed",
+      "action": "点击同步设置中的‘使用自托管服务器’",
+      "observedTitle": "自托管同步",
+      "observedHint": "只有在你运行自己的 heyta 服务端并已有访问令牌时，才使用这条路径。",
+      "observedFields": ["服务器地址", "访问令牌", "端到端加密口令"],
+      "observedReturnAction": "返回 heyta 官方同步",
+      "noServerValueChanged": true,
+      "noCredentialsEntered": true,
+      "evidence": [
+        "02-selfhost-entry.png",
+        "02-selfhost-entry.uia.xml",
+        "03-selfhost-scrolled.png",
+        "03-selfhost-scrolled.uia.xml"
+      ]
+    },
+    "explicitReturnPreservesOfficialPath": {
+      "status": "passed",
+      "action": "点击‘返回 heyta 官方同步’",
+      "officialTitlePresent": true,
+      "selfHostedTitleAbsent": true,
+      "serverAddressFieldAbsent": true,
+      "officialLoginActionPresent": true,
+      "selfHostedEntryPresent": true,
+      "evidence": ["04-return-official.png"]
+    },
+    "officialAuthBackPreservesOfficialPath": {
+      "status": "passed",
+      "action": "从官方‘注册 / 登录’界面点击‘返回’；重新打开同步与隐私",
+      "authScreenHadNoSubmission": true,
+      "officialTitlePresentAfterBack": true,
+      "evidence": [
+        "05-official-auth.png",
+        "06-auth-back-official.png",
+        "07-auth-back-sync.png"
+      ]
+    },
+    "selfHostedAuthBackPreservesOfficialPath": {
+      "status": "passed",
+      "action": "从自托管显式路径打开‘注册 / 登录’，不填写任何字段，点击‘返回’；重新打开同步与隐私",
+      "authScreenHadNoSubmission": true,
+      "officialTitlePresentAfterBack": true,
+      "selfHostedEntryPresentAfterBack": true,
+      "evidence": [
+        "08-selfhost-auth.png",
+        "09-selfhost-auth-back-directory.png",
+        "10-selfhost-auth-back-official.png"
+      ]
+    }
+  }
+}

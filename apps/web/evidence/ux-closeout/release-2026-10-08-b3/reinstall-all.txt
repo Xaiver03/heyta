@@ -1,0 +1,62 @@
+$ bash scripts/reinstall-all.sh
+═══ 0. 前置：pnpm -r build ═══
+  ✅ 全仓构建完成（日志 /tmp/heyta-reinstall-build.log）
+═══ 0b. 原生壳前置：@heyta/web build（确保 web-dist 晚于 workspace dist）═══
+  ✅ Web 产物已在 workspace 构建之后刷新（日志 /tmp/heyta-reinstall-web.log）
+
+═══ 1. macOS：清旧包 → 打包 → 卸旧 → 装新 ═══
+  macOS 输出目录 = /tmp/heyta-macos-dist（覆盖旋钮 HEYTA_MACOS_DIST_DIR）
+  清空前里面有 6 项：
+     Heyta-1.0.0.dmg
+     Heyta.app
+     entitlements.plist
+     packaged-first-run.png
+     packaged-first-run.png.txt
+     packaged-first-run.png.webview.png
+  ✅ 打包完成（.app + .dmg，含打包即启动的自截屏验证；日志 /tmp/heyta-reinstall-mac.log）
+  ✅ 已安装到 /Applications/Heyta.app
+  ✅ 安装对账：.app 里的 web-dist 与本机 apps/web/dist 是**同一次构建**（9 个 chunk）
+  ⚠️ 窗口截图内容 0.0% —— 本机常态：WebView 没合成进窗口，不据此判红
+  主蓝采样命中 997（数的是 heyta-reinstall-mac-installed.png.webview.png）
+  ✅ 窗口 2318x1508、heyta-reinstall-mac-installed.png.webview.png 内容占比 74.6%、主蓝命中 997 —— 是共享 UI
+  截图证据：/tmp/heyta-reinstall-mac-installed.png（窗口）+ /tmp/heyta-reinstall-mac-installed.png.webview.png（共享 UI）
+
+═══ 2. Windows：同步当前源码 → 清旧包 → 远端打包 + 安装（默认主机 windows-pc）═══
+  esbuild：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/app-host/src/native-bridge.ts → /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/app-host/bridge-bundle/native-bridge.js
+  ✅ 源码包 192M（清单 5338 条，含工作树未提交改动 + 构建输入）
+  ✅ 远端收到的是这一包（tar sha256=647c004454ef5697… 逐字相同）
+** WARNING: connection is not using a post-quantum key exchange algorithm.
+** This session may be vulnerable to "store now, decrypt later" attacks.
+** The server may need to be upgraded. See https://openssh.com/pq.html
+  ✅ 远端新鲜度对账通过（web-dist/index.html=f61e6d478669d278… bridge=0aec337ed71f1daa… assets/*.js=7 枚一致）
+  ✅ 远端打包 + 安装 + 启动截图完成（日志 /tmp/heyta-reinstall-win.log）
+  ✅ 远端取证：判据齐了：5 条全在位
+
+═══ 3. Android：清旧包 → release APK → 模拟器卸旧装新 ═══
+  ✅ release APK 已重打（ 80M；日志 /tmp/heyta-reinstall-apk.log）
+  ✅ 模拟器 emulator-5554 全新安装成功
+  ⚠️ monkey 之后前台不是 com.heyta，用 am start -W 显式拉起再验一次
+  ✅ 前台窗口确认：  mCurrentFocus=Window{c3164e6 u0 com.heyta/com.heytamobile.MainActivity}
+  主蓝采样命中 4005（数的是 heyta-reinstall-android.png）
+  ✅ 窗口 1080x2400、heyta-reinstall-android.png 内容占比 58.6%、主蓝命中 4005 —— 是共享 UI
+  截图证据：/tmp/heyta-reinstall-android.png
+
+═══ 4. iOS：模拟器卸旧 → Release 重打 → 装新 + 新鲜度判据 ═══
+  模拟器：FE195661-B021-4A71-AAD1-1F2F7AE3A102
+  Pods 哈希本已一致，仍重跑 pod install（半写沙盒不会被哈希相等挡住）…
+    ⚠️ 第 1 趟失败：ArgumentError - path name contains null byte（日志 /tmp/heyta-reinstall-pod-1.log）
+    （第 2 趟才成功 —— 与上面那条非确定性记录一致）
+  ✅ 沙盒已同步（Manifest.lock == Podfile.lock）
+  正在 xcodebuild Release（重打 JS bundle，数分钟）…
+  ✅ 构建成功（日志 /tmp/heyta-reinstall-ios-build.log）
+  ✅ 已安装进模拟器（全新安装）
+  ✅ 已装的包比源码新 —— 这一轮装的是当前产物
+  主蓝采样命中 4133（数的是 heyta-reinstall-ios.png）
+  ✅ 窗口 1206x2622、heyta-reinstall-ios.png 内容占比 99.9%、主蓝命中 4133 —— 是共享 UI
+  截图证据：/tmp/heyta-reinstall-ios.png
+
+═══ 重装汇总 ═══
+  ✅ mac：已清旧包、重打、重装、有当前产物判据
+  ✅ windows：已清旧包、重打、重装、有当前产物判据
+  ✅ android：已清旧包、重打、重装、有当前产物判据
+  ✅ ios：已清旧包、重打、重装、有当前产物判据

@@ -661,6 +661,16 @@ input[type="radio"] {
   list-style: none;
 }
 
+.ht-ai__conversation {
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ht-ai__items--chat > .ht-ai__item {
+  flex-shrink: 0;
+}
+
 /* ⚠️ 两种角色各写**一整块**，不写成"两个选择器共用一块"：面板 spec 里那条
    "class 真的有规则"的判据是按"选择器 + 左花括号"取块的，合并选择器会让它
    读到共享声明的那一块、把 `align-self` 判成"没有"。两条各自完整也更直接。 */
@@ -983,7 +993,8 @@ input[type="radio"] {
   min-block-size: 0;
 }
 
-.ht-ai__history-toggle {
+.ht-ai__history-toggle,
+.ht-ai__history-close {
   display: none;
 }
 
@@ -1076,7 +1087,8 @@ input[type="radio"] {
     position: relative;
   }
 
-  .ht-ai__history-toggle {
+  .ht-ai__history-toggle,
+.ht-ai__history-close {
     display: inline-flex;
   }
 
@@ -1146,7 +1158,8 @@ input[type="radio"] {
     position: relative;
   }
 
-  .ht-ai__history-toggle {
+  .ht-ai__history-toggle,
+.ht-ai__history-close {
     display: inline-flex;
   }
 

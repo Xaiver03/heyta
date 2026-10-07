@@ -1,0 +1,72 @@
+{
+  "status": "partial-pass",
+  "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+  "mode": "segmented AX acceptance using existing UxTaskA/B fixtures",
+  "capturedAt": 1791396693.6343849,
+  "segments": [
+    {
+      "name": "view-options-and-timeline",
+      "status": "passed",
+      "assertions": [
+        "view-options sheet exposed 列表/四象限/时间线/日期显示/选择排序方式",
+        "priority sort 按优先级 selected and sheet closed",
+        "countdown date display 倒计时 selected and sheet closed",
+        "switch to 时间线 after 已选 2 项; AX exposed 视图选项：时间线 and no 退出选择/已选 labels"
+      ],
+      "evidence": "seg-timeline-clears-selection-selected2.png"
+    },
+    {
+      "name": "detail-schedule-toggle",
+      "status": "passed",
+      "assertions": [
+        "任务详情 opened through an existing UxTask row",
+        "展开排期 changed to 收起排期",
+        "收起排期 changed back to 展开排期"
+      ],
+      "evidence": "seg-detail-schedule-collapsed.png"
+    },
+    {
+      "name": "long-press-multi-select",
+      "status": "passed",
+      "assertions": [
+        "AX long press on existing UxTaskA row exposed 退出选择 and 已选 1 项",
+        "second existing UxTaskB row exposed 已选 2 项"
+      ],
+      "evidence": "seg-multi-select-two.png"
+    },
+    {
+      "name": "profile-center",
+      "status": "passed",
+      "assertions": [
+        "我的 opened through bottom navigation",
+        "AX exposed account/status/整理与记录 sections and 我的成长 entry"
+      ],
+      "evidence": "seg-profile-center.png"
+    },
+    {
+      "name": "growth-entry",
+      "status": "passed",
+      "assertions": [
+        "我的成长 entry opened and AX exposed 返回/我的成长/连续/习惯"
+      ],
+      "evidence": "seg-growth-entry.png"
+    }
+  ],
+  "fullJourney": {
+    "status": "not-green",
+    "errors": [
+      "Repeated full run can encounter idb AX zero-size Application root after terminate/launch while screenshot remains rendered; companion/simulator restart restores AX.",
+      "Shared scroll_into_view starts outside the actual FlatList/detail content in several layouts; QA script now has bounded content-area recovery helpers.",
+      "The last full run stopped at long-press timing after fixture accumulation; manual AX long press at the same visible row succeeded."
+    ]
+  },
+  "fixtures": {
+    "prefixes": [
+      "UxTaskA",
+      "UxTaskB"
+    ],
+    "cleanupRequired": true,
+    "countObserved": 14,
+    "otherTasksTouched": false
+  }
+}

@@ -32,7 +32,7 @@ def find(root,label):
  for n in root.iter('node'):
   if not is_visible(n):continue
   v=n.get('content-desc') or n.get('text') or ''
- if v==label or v.startswith(label+',') or v.startswith(label+'，'):return n
+  if v==label or v.startswith(label+',') or v.startswith(label+'，'):return n
  return None
 
 def find_exact(root,label):
@@ -116,6 +116,14 @@ def wait(label,absent=None,resource=None):
   time.sleep(.4)
  raise AssertionError((label,texts(r)))
 
+def wait_resource_only(resource_id):
+ deadline=time.monotonic()+timeout
+ while time.monotonic() < deadline:
+  r=tree()
+  if find_resource(r,resource_id) is not None:return r
+  time.sleep(.4)
+ raise AssertionError((resource_id,texts(r)))
+
 def tap(label,after,absent=None,resource=None):
  r=wait(label);n=find(r,label)
  if find_pressable(r,label) is not None: n=find_pressable(r,label)
@@ -163,8 +171,14 @@ try:
  if find(r,'先离线使用') is not None:tap('先离线使用','我的','在使用联网功能之前')
  # The current tab is already “我的”; this tap is an explicit assertion that
  # the profile surface is reachable before entering its settings row below.
- if find_pressable(r,'设置') is None:
-  tap('我的','设置')
+ if find_resource(r,'profile-entry-settings') is None:
+  tab=find_pressable(r,'我的')
+  if tab is None:raise AssertionError(('profile tab',texts(r)))
+  x1,y1,x2,y2=node_bounds(tab)
+  adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
+  r=wait_resource_only('profile-entry-settings')
+  records.append({'action':'我的','destination':'设置','labels':texts(r)})
+  print('我的 => 设置',flush=True)
  shot('my')
  tap('设置','常规',resource='settings-section-general');shot('settings-directory')
  tap('常规','语言');shot('general')
@@ -192,7 +206,7 @@ try:
  records.append({'action':'countdownGeometryBeforeNudge','geometry':geometry_before_nudge})
  entry_before_nudge=countdown_entry(r)
  x1,y1,x2,y2=node_bounds(entry_before_nudge)
- adb('shell','input','swipe',str((x1+x2)//2),str((y1+y2)//2),str((x1+x2)//2),str(max(y1+80,(y1+y2)//2-320)),'450')
+ adb('shell','input','swipe',str((x1+x2)//2),str((y1+y2)//2),str((x1+x2)//2),str(min(y1+80,(y1+y2)//2-320)),'450')
  time.sleep(.7)
  r=tree()
  geometry=profile_geometry(r)
@@ -207,14 +221,13 @@ try:
  if not geometry['entryBottomStrictlyAboveTabTop']:
   raise AssertionError(('countdown entry is not strictly above bottom tab bar',geometry))
  entry=countdown_entry(r)
- tap_node(entry,'倒数纪念日','倒数纪念日')
- destination=tree()
- countdown_resource_seen=find_resource(destination,'countdown-view') is not None
- records.append({'action':'countdownDestination','title':'倒数纪念日','countdownResourcePresent':countdown_resource_seen,'labels':texts(destination)})
+ tap_node(entry,'倒数纪念日','倒数纪念日',resource='countdown-view')
+ destination=wait_resource_only('countdown-view')
+ records.append({'action':'countdownDestination','title':'倒数纪念日','countdownResourcePresent':True,'labels':texts(destination)})
  time.sleep(.5)
  adb('shell','input','keyevent','4')
  back_result=wait('我的')
- if countdown_resource_seen and find_resource(back_result,'countdown-view') is not None:
+ if find_resource(back_result,'countdown-view') is not None:
   raise AssertionError(('countdown screen still present after back',texts(back_result)))
  records.append({'action':'hardwareBack','destination':'我的','labels':texts(back_result)})
  print('BACK => 我的',flush=True)

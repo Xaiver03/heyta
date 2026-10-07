@@ -1,0 +1,126 @@
+{
+  "release": "1.0.1-test.20261008.2",
+  "sourceSnapshot": "c938a0bbf6e3102652f2358ad987685a65aeaefe",
+  "serverSnapshot": "3880bdd1fd5e8fe3710bd19c5f753947ea89c468",
+  "webIndexSha256": "270754e847929964ccfa3f884ba99e8ca08a11ad43ba7ef52b9f0a5b204d7c12",
+  "desktopWebIndexSha256": "d2bd1d4edbc2df57f57699acb8bfcdc235bcf475db855739a145e289a4538de2",
+  "testflight": {
+    "bundleId": "com.heyta",
+    "version": "1.0",
+    "build": "4",
+    "appId": "6817635248",
+    "buildId": "70f39cd6-36b2-447d-b951-4e3871a7a370",
+    "processingState": "VALID",
+    "group": "内部测试",
+    "groupAssociationReadback": true,
+    "publicInvitation": false,
+    "whatToTestLocale": "zh-Hans"
+  },
+  "packages": {
+    "linux": {
+      "name": "heyta-1.0.1-test.20261008.2-linux.deb",
+      "size": 1763174,
+      "sha256": "eb8e039d71be78251267eaf574adc1322bc4d8cc7bdf3c3cd52735c1c929788c"
+    },
+    "macos": {
+      "name": "heyta-1.0.1-test.20261008.2-macos.dmg",
+      "size": 2951887,
+      "sha256": "82e6e4f60844122b382ff0c39ec2a61d33f33cbd5e866bfdb6060247566bd709"
+    },
+    "android": {
+      "name": "heyta-1.0.1-test.20261008.2-android.apk",
+      "size": 68361456,
+      "sha256": "983023e5d006fe9a010af0b29ca1e15775fa955249fa6cbf81381cf4f4c30e9e"
+    },
+    "windows": {
+      "name": "heyta-1.0.1-test.20261008.2-windows.zip",
+      "size": 98549246,
+      "sha256": "3fd738b61ecda4c986ad5bcab74ac49fe408d706c4316b3934f97acb404449b5"
+    },
+    "ios": {
+      "name": "Heyta.ipa",
+      "size": 14553181,
+      "sha256": "5651a897f8c3f510ae610feadf7d0a92bbb12128af287278e7068ec7b4a14ea6",
+      "distribution": "TestFlight only"
+    }
+  },
+  "nativeAcceptance": {
+    "android": {
+      "taskJourney": "passed",
+      "profileJourney": "passed; required countdown destination and return assertions",
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "countdownCompleteRow": {
+        "bottom": 1899,
+        "tabBarTop": 2169
+      },
+      "syncHostingNavigation": "official default; selfhost explicit opt-in; return and cancellation preserve official route; no credentials submitted"
+    },
+    "ios": {
+      "installed": true,
+      "taskJourney": "segmented pass: view menu, sort/date, schedule toggle, long-press two-item selection, selected2→timeline clears selection; full automated journey not green",
+      "profileJourney": "profile center and growth entry individually passed",
+      "physicalIphoneTested": false,
+      "qaFixtures": {
+        "remaining": 14,
+        "deleted": 0,
+        "prefixes": [
+          "UxTaskA",
+          "UxTaskB"
+        ],
+        "cleanup": "not completed; no deletion confirmation submitted",
+        "otherTasksTouched": false
+      }
+    },
+    "windows": {
+      "installed": true,
+      "widgetHostRecognition": "native shell",
+      "helpExternalBrowser": "passed; shell URL unchanged"
+    },
+    "macos": {
+      "installed": true,
+      "notarization": "Accepted; stapled",
+      "helpExternalBrowser": "unverified; locked desktop"
+    },
+    "linux": {
+      "unpackedRun": "passed",
+      "systemInstalled": false,
+      "sandboxDisabledOnValidationHost": true
+    }
+  },
+  "productionBrowser": {
+    "viewports": [
+      390,
+      1440
+    ],
+    "loginAndRegistrationFields": "passed",
+    "passwordStrength": "passed",
+    "helpHomeAndArticleNavigation": "passed",
+    "pageErrors": 0,
+    "sentEmail": false
+  },
+  "github": {
+    "url": "https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.2",
+    "draft": false,
+    "prerelease": true,
+    "assets": 5,
+    "anonymousApiReadable": true,
+    "allAssetSha256DigestsMatch": true
+  },
+  "cos": {
+    "manifestUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json",
+    "version": "1.0.1-test.20261008.2",
+    "allFourPlatformsPublic": true,
+    "allSizesAndManifestHashesMatch": true
+  },
+  "remaining": [
+    "Production OTP actual email receipt",
+    "macOS actual Help click",
+    "Native OS widget panel registration/addition",
+    "Human VoiceOver/TalkBack",
+    "Habit model fields listed unimplemented in UX-S9-79",
+    "UX-S9-101: iOS tab task count14 truncates to 1…"
+  ]
+}

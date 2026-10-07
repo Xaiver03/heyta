@@ -1,0 +1,120 @@
+{
+  "capturedAt": 1791412340.0,
+  "status": "partial",
+  "scope": "read-only native widget registration investigation",
+  "simulator": {
+    "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+    "installedAppBundle": "com.heyta",
+    "installedAppPath": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Containers/Bundle/Application/1BDAB96F-08B2-4DD6-92AE-7D624B13F382/Heyta.app",
+    "installedExtension": "Heyta.app/PlugIns/HeytaWidgetExtension.appex",
+    "extensionBundleId": "com.heyta.WidgetExtension",
+    "extensionInfo": {
+      "NSExtensionPointIdentifier": "com.apple.widgetkit-extension",
+      "CFBundleDisplayName": "Heyta",
+      "MinimumOSVersion": "17.0",
+      "UIDeviceFamily": [
+        1,
+        2
+      ]
+    },
+    "gallery": {
+      "actions": [
+        "HOME",
+        "long-press home blank area",
+        "编辑",
+        "添加小组件",
+        "set 搜索小组件 = heyta"
+      ],
+      "result": "no heyta provider row exposed by AX after search; only search field, clear/close controls and keyboard remained",
+      "evidence": "ios/widget-gallery-heyta-search.png"
+    }
+  },
+  "source": {
+    "ios": {
+      "entry": "apps/mobile/ios/HeytaWidgetExtension/HeytaWidgetBundle.swift",
+      "declaredWidgets": [
+        "TodayWidget",
+        "QuadrantWidget",
+        "HabitsWidget",
+        "FocusWidget"
+      ],
+      "entryPoint": "@main WidgetBundle",
+      "wiring": "apps/mobile/ios/tools/wire-widget-target.rb",
+      "entitlements": "apps/mobile/ios/HeytaWidgetExtension/HeytaWidgetExtension.entitlements",
+      "projectBundleIds": {
+        "app": "com.heyta",
+        "extension": "com.heyta.WidgetExtension",
+        "projectFile": "apps/mobile/ios/Heyta.xcodeproj/project.pbxproj",
+        "result": "checked-in project settings match the installed app and appex"
+      },
+      "wireScriptDefaults": {
+        "path": "apps/mobile/ios/tools/wire-widget-target.rb",
+        "app": "com.heyta.mobile",
+        "extension": "com.heyta.mobile.WidgetExtension",
+        "result": "stale source mismatch; this script would overwrite the current project IDs if rerun"
+      }
+    },
+    "macos": {
+      "status": "not implemented",
+      "evidence": "apps/desktop-macos/README.md:126 says WidgetKit extension not done; project has no WidgetKit extension target"
+    },
+    "windows": {
+      "status": "not implemented",
+      "evidence": "apps/desktop-windows/README.md:120 says system widgets not done; no IWidgetProvider COM server found"
+    }
+  },
+  "gap": {
+    "finding": "The installed iOS app contains a registered WidgetKit appex whose project IDs, Info.plist, @main entry, four widget symbols, and AppIntents metadata are present, but the current simulator widget gallery still exposes no Heyta provider row.",
+    "interpretation": "The failure is after PlugInKit registration and before/while WidgetKit descriptor enumeration. The stale wire-widget-target.rb defaults are a reproducible future wiring hazard, but they do not explain this installed artifact because the current project and installed IDs already match.",
+    "next_safe_step": "Build/reinstall the current project after this wiring-script correction, then repeat the gallery check; the build/reinstall remains outside the current investigation.",
+    "no_change_made": false,
+    "no_build_run": true,
+    "no_environment_restart": true,
+    "changes_made": [
+      "apps/mobile/ios/tools/wire-widget-target.rb: corrected app PRODUCT_BUNDLE_IDENTIFIER to com.heyta",
+      "apps/mobile/ios/tools/wire-widget-target.rb: corrected extension PRODUCT_BUNDLE_IDENTIFIER to com.heyta.WidgetExtension"
+    ]
+  },
+  "installedChecks": {
+    "pluginkitWidgetProtocol": {
+      "command": "xcrun simctl spawn FE195661-B021-4A71-AAD1-1F2F7AE3A102 pluginkit -m -p com.apple.widgetkit-extension",
+      "match": "com.heyta.WidgetExtension(1.0)",
+      "result": "registered"
+    },
+    "pluginkitVerbose": {
+      "match": "com.heyta.WidgetExtension(1.0)",
+      "path": ".../Heyta.app/PlugIns/HeytaWidgetExtension.appex",
+      "result": "registered from the installed Heyta app"
+    },
+    "binarySymbols": {
+      "executable": "HeytaWidgetExtension",
+      "symbols": [
+        "HeytaWidgetBundle",
+        "TodayWidget",
+        "QuadrantWidget",
+        "HabitsWidget",
+        "FocusWidget"
+      ],
+      "result": "extension entry and four widget types are present in the installed binary"
+    },
+    "appIntentsMetadata": {
+      "path": "HeytaWidgetExtension.appex/Metadata.appintents/extract.actionsdata",
+      "result": "present; ToggleTaskIntent and OpenFocusIntent metadata extracted"
+    },
+    "entitlements": {
+      "app": "empty adhoc simulator entitlements",
+      "extension": "empty adhoc simulator entitlements",
+      "note": "codesign reports adhoc signatures with no embedded entitlements on this simulator artifact; source entitlements still declare group.com.heyta and the shared keychain group"
+    },
+    "logs": {
+      "pluginDiscovery": "pkd logged Created plugin for com.heyta.WidgetExtension(1.0)",
+      "heytaChronodDescriptor": "no Heyta chronod/widget descriptor or extension launch record found in the captured last-1h query",
+      "localizationErrors": "no development-region, Unable to parse Info.plist, or Failed to fetch metadata records found in the captured last-1h query"
+    }
+  },
+  "validation": {
+    "rubySyntax": "ruby -c apps/mobile/ios/tools/wire-widget-target.rb => Syntax OK",
+    "readOnlyRegistrationChecks": "completed",
+    "buildOrInstall": "not run"
+  }
+}

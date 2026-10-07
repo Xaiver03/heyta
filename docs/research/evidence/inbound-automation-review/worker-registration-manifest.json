@@ -1,0 +1,22 @@
+{
+  "recordedAt": "2026-10-08T06:44:13+08:00",
+  "head": "b081811c691a17ff57ed0379a005d1a175fe393d",
+  "scope": "W3 registration/revocation/permit issuance plus identity gate; disposable PostgreSQL 14.18 and real HTTP; shared dirty working tree, not final isolated delivery baseline",
+  "command": "python3 research/tools/verify-inbound-worker-identity.py --pg-bin /opt/homebrew/opt/postgresql@14/bin --log /tmp/heyta-inbound-worker-proof-20261008f.log",
+  "passed": 15,
+  "database": "Disposable loopback PostgreSQL 14.18; actual migration SQL + Fastify HTTP; not Linux deployment-script validation",
+  "files": {
+    "server/src/api.ts": "45fca6deb543f7c9a923d9bbcfc7f2dcc5fa6cfee634549b27d5925bf7da625b",
+    "server/src/automation/worker-identity.ts": "96b4803cf061a169cd73180ee35f3f7329ebd14c77a00df7f12d762e3286acf9",
+    "server/src/automation/commit-proof.ts": "da8a68bac222cd949502a00b90d5a5973330f54bc6ed3e49f1bbc83495e0ab21",
+    "server/src/entitlement.ts": "b8089a9f1c874553431616a7095e558f9bc50d1fe2f8831550c528cc9408faca",
+    "server/src/billing/price-book.ts": "b2ab4079b89d5d2f5ab27d8a276f2a030b2b636b6a7729759572546a30ae90ba",
+    "server/prisma/migrations/20261018000000_add_automation_grant/migration.sql": "96c702387c00db962aa01fa6c6af9f2a539101fc4bee1b74d8ea94a7269fb612",
+    "server/tests/integration/inbound-worker-identity.integration.spec.ts": "8cb326e91877caa03f42e3110641efbf55d904ac1057ed24754ad9dfb5b1677d",
+    "server/src/automation/rules.ts": "2de4cfbc414f64878408b7238570e61159f92f78bb89ce6da1998e11c96ab227",
+    "server/prisma/migrations/20261018010000_add_automation_rules_events/migration.sql": "0ed46f7862602c4e16f23602cdf55ea811bbee4585bc44114c958f415096a001",
+    "server/prisma/migrations/20261018020000_add_automation_recipient_key/migration.sql": "f238e1d93c0215c5686f2e1884cf80b443f93b52e71ed77818d91c7dca85121f"
+  },
+  "transcriptSha256": "492e033f7c4846166640fbe2e80ad774d1482b5e7968e9bbc86cb5d4db51d351",
+  "secretScan": "No 64-hex token or signing key matched in transcript"
+}

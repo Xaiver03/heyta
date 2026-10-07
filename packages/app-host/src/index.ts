@@ -170,6 +170,23 @@ export {
   type SyncWiringOptions,
 } from './sync-wiring.js';
 
+export {
+  createInboundUploadAuthorization,
+  claimAutomationEvent,
+  journalCommitProofBeforeDispatch,
+  publishAutomationResult,
+  registerAutomationWorker,
+  renewAutomationLease,
+  requestCommitPermitAndJournal,
+  type AutomationCommitJournal,
+  type AutomationWorkerCredential,
+  type AutomationWorkerSecretStore,
+  type InboundWorkerAuthorizationOptions,
+  type CommitPermitRequest,
+  type ClaimedAutomationEvent,
+  type RegisterAutomationWorkerOptions,
+} from './inbound-worker.js';
+
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';
 
 /**
@@ -531,6 +548,8 @@ export {
   type AssistantStep,
   type AssistantTier,
   type AssistantTurnDeps,
+  type LocalObservationKey,
+  type LocalObservationTranslate,
 } from './ai-assistant.js';
 export {
   ASSISTANT_TIER_ORDER,

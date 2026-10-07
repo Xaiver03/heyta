@@ -1,6 +1,24 @@
 {
   "status": "failed",
   "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
-  "error": "workspace did not open after onboarding",
-  "steps": []
+  "error": "timed out waiting for long-press selection mode; visible=['heyta', '打开搜索', '同步', '任务', '10月8日 星期四', '14 项待办，0 项已完成', '搜索任务（标题与备注）', '视图选项：列表', '选择任务', '收集箱', '14', '打开任务：UxTaskA1791394581', '完成：UxTaskA1791394581', '删除任务：UxTaskA1791394581', '打开任务：UxTaskB1791394581', '完成：UxTaskB1791394581', '删除任务：UxTaskB1791394581', '打开任务：UxTaskA1791394710', '完成：UxTaskA1791394710', '删除任务：UxTaskA1791394710', '打开任务：UxTaskB1791394710', '完成：UxTaskB1791394710', '删除任务：UxTaskB1791394710', '打开任务：UxTaskA1791394816', '完成：UxTaskA1791394816', '删除任务：UxTaskA1791394816', '打开任务：UxTaskB1791394816', '完成：UxTaskB1791394816', '删除任务：UxTaskB1791394816', '打开任务：UxTaskA1791395488', '完成：UxTaskA1791395488', '删除任务：UxTaskA1791395488', '打开任务：UxTaskB1791395488', '完成：UxTaskB1791395488', '删除任务：UxTaskB1791395488', '打开任务：UxTaskA1791395649', '完成：UxTaskA1791395649', '删除任务：UxTaskA1791395649', '打开任务：UxTaskB1791395649', '完成：UxTaskB1791395649', '删除任务：UxTaskB1791395649', '打开任务：UxTaskA1791395786', '完成：UxTaskA1791395786', '删除任务：UxTaskA1791395786', '打开任务：UxTaskB1791395786', '完成：UxTaskB1791395786', '删除任务：UxTaskB1791395786', '打开任务：UxTaskA1791395869', '完成：UxTaskA1791395869', '删除任务：UxTaskA1791395869', '打开任务：UxTaskB1791395869', '完成：UxTaskB1791395869', '删除任务：UxTaskB1791395869', '新建任务', '任务', '日历', '专注', '分类', '我的']",
+  "steps": [
+    {
+      "name": "01-created-task-a",
+      "status": "passed",
+      "at": 1791395876.940491,
+      "title": "UxTaskA1791395869"
+    },
+    {
+      "name": "02-created-task-b",
+      "status": "passed",
+      "at": 1791395888.1310909,
+      "title": "UxTaskB1791395869"
+    },
+    {
+      "name": "03-list-scroll",
+      "status": "passed",
+      "at": 1791395890.5452008
+    }
+  ]
 }

@@ -1,0 +1,51 @@
+{
+  "capturedAt": "2026-10-08T06:42:29+08:00",
+  "capturedBy": "read-only xcrun simctl log show",
+  "simulator": {
+    "udid": "FE195661-B021-4A71-AAD1-1F2F7AE3A102",
+    "runtime": "iOS 27.1",
+    "installedAppBundle": "com.heyta",
+    "extensionBundleId": "com.heyta.WidgetExtension",
+    "installedAppPath": "/Users/rocalight/Library/Developer/CoreSimulator/Devices/FE195661-B021-4A71-AAD1-1F2F7AE3A102/data/Containers/Bundle/Application/99876405-4C26-40C7-BC11-DBD36E4ABA8D/Heyta.app"
+  },
+  "commands": [
+    "xcrun simctl spawn FE195661-B021-4A71-AAD1-1F2F7AE3A102 pluginkit -m -p com.apple.widgetkit-extension",
+    "xcrun simctl spawn FE195661-B021-4A71-AAD1-1F2F7AE3A102 log show --last 2h --style compact --predicate '(process == chronod OR process == SpringBoard OR process == pkd) AND eventMessage CONTAINS[c] com.heyta'"
+  ],
+  "pluginRegistration": "com.heyta.WidgetExtension(1.0) present",
+  "chronod": {
+    "queryTimestamp": "2026-10-08T06:42:29.699+08:00",
+    "queryResult": "query returned 4 widget descriptors, 1 controls, 1 activities",
+    "descriptors": [
+      {
+        "kind": "HeytaTodayWidget",
+        "supportedFamilies": ["systemSmall", "systemMedium", "accessoryCircular", "accessoryRectangular", "accessoryInline"],
+        "enabled": true,
+        "displayName": "今日任务"
+      },
+      {
+        "kind": "HeytaQuadrantWidget",
+        "supportedFamilies": ["systemMedium", "systemLarge"],
+        "enabled": true,
+        "displayName": "四象限"
+      },
+      {
+        "kind": "HeytaHabitsWidget",
+        "supportedFamilies": ["systemSmall", "systemMedium"],
+        "enabled": true,
+        "displayName": "今日习惯"
+      },
+      {
+        "kind": "HeytaFocusWidget",
+        "supportedFamilies": ["systemSmall"],
+        "enabled": true,
+        "displayName": "专注"
+      }
+    ],
+    "controls": 1,
+    "activities": 1,
+    "descriptorCacheUpdated": true
+  },
+  "interpretation": "The installed extension is registered and chronod enumerated all four WidgetKit descriptors successfully. The prior gallery no-result evidence does not indicate a missing WidgetBundle or malformed extension; the remaining hypotheses are gallery/search indexing or stale SpringBoard/chronod state.",
+  "uiVerification": "not run while the parallel Badge verification owns the simulator UI"
+}
