@@ -22,6 +22,7 @@ import {
   detectRow,
   releaseManifest,
   resolveRows,
+  type ReleaseFile,
   type ReleaseManifest,
 } from '../src/site/downloads.js';
 import { installPageRenderer, renderPage } from './helpers/render-page.js';
@@ -60,6 +61,18 @@ const PUBLISHED: ReleaseManifest = {
     },
   },
 };
+
+/**
+ * `files` 是 `Record<string, ReleaseFile>` ⇒ 点号取值带 `undefined`（`noUncheckedIndexedAccess`）。
+ * 摊开一个可能为 undefined 的文件会得到"全是可选字段"的对象，它不是 `ReleaseFile`；
+ * 而拿它的 `.url` 去比对更糟：undefined 会让那条断言变成"等于 undefined"。
+ * 所以走这个取法 —— **取不到就是 fixture 坏了，当场抛**，不返回 undefined 让测试静默地什么都不测。
+ */
+function publishedFile(platform: string): ReleaseFile {
+  const found = PUBLISHED.files[platform];
+  if (found === undefined) throw new Error(`fixture PUBLISHED 里没有 ${platform}`);
+  return found;
+}
 
 /** 今天桶里的真状态：字节在，但那是 `0.0.0-dev` 的那一轮试传。 */
 const DEV_CHANNEL: ReleaseManifest = {
@@ -142,7 +155,7 @@ describe('清单决定出口：三种状态，同一把尺', () => {
       ...PUBLISHED,
       channels: undefined,
       files: {
-        macos: { ...PUBLISHED.files.macos, version: '1.0.0' },
+        macos: { ...publishedFile('macos'), version: '1.0.0' },
         android: {
           name: 'heyta-0.0.0-dev-android.bin',
           url: `https://${BUCKET}/app-releases/heyta/latest/heyta-0.0.0-dev-android.bin`,
@@ -154,7 +167,7 @@ describe('清单决定出口：三种状态，同一把尺', () => {
       },
     };
     const view = renderPage('download', 'zh-CN', { manifest: mixed });
-    expect(bucketLinks(view)).toEqual([PUBLISHED.files.macos.url]);
+    expect(bucketLinks(view)).toEqual([publishedFile('macos').url]);
     expect(view.querySelector('#dl-android a.lp-btn')).toBeNull();
     // 正向对照：另一端的按钮真的画出来了 —— 否则"只有一条"会因为整页没按钮而恒绿。
     expect(view.querySelector('#dl-macos a.lp-btn')).not.toBeNull();
@@ -288,11 +301,11 @@ describe('发布清单的校验（错了要响亮，不要安静地画出一个�
   });
 
   const BAD: readonly [string, unknown][] = [
-    ['缺 sha256', { ...PUBLISHED, files: { macos: { ...PUBLISHED.files.macos, sha256: 'zz' } } }],
-    ['http 直链', { ...PUBLISHED, files: { macos: { ...PUBLISHED.files.macos, url: 'http://x/y' } } }],
+    ['缺 sha256', { ...PUBLISHED, files: { macos: { ...publishedFile('macos'), sha256: 'zz' } } }],
+    ['http 直链', { ...PUBLISHED, files: { macos: { ...publishedFile('macos'), url: 'http://x/y' } } }],
     [
       'name 与 version 不同轮',
-      { ...PUBLISHED, files: { macos: { ...PUBLISHED.files.macos, name: 'heyta-0.9.0-macos.bin' } } },
+      { ...PUBLISHED, files: { macos: { ...publishedFile('macos'), name: 'heyta-0.9.0-macos.bin' } } },
     ],
     ['未登记的产物', { ...PUBLISHED, files: { ...PUBLISHED.files, watchos: fileAt('watchos', '1.0.0') } }],
     ['未登记的通道', { ...PUBLISHED, channels: { macos: PUBLISHED.channels!.ios } }],

@@ -1,14 +1,24 @@
 {
   "version": "1.0.0",
-  "releasedAt": "2026-10-07T03:41:45+00:00",
+  "releasedAt": "2026-10-07T04:24:20+00:00",
   "files": {
     "android": {
-      "name": "heyta-0.0.0-dev-android.apk",
-      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-0.0.0-dev-android.apk",
-      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/0.0.0-dev/heyta-0.0.0-dev-android.apk",
-      "sha256": "a911ce7752fe228bbae62031421b906e2938cea93df47acbc164c737505071aa",
-      "size": 66049508,
-      "version": "0.0.0-dev"
+      "name": "heyta-1.0.0-android.apk",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.0-android.apk",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.0/heyta-1.0.0-android.apk",
+      "sha256": "f8c2b40b84615af864f23e68584cc7878dd3d308b5314ad0992bda962a03faea",
+      "size": 67196357,
+      "version": "1.0.0",
+      "releasedAt": "2026-10-07T04:13:13+00:00"
+    },
+    "linux": {
+      "name": "heyta-1.0.0-linux.deb",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.0-linux.deb",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.0/heyta-1.0.0-linux.deb",
+      "sha256": "0d9335ee6600d09a56db061d069d3e095192d75d9188a83359500e0feeced8cc",
+      "size": 1300282,
+      "version": "1.0.0",
+      "releasedAt": "2026-10-07T04:24:20+00:00"
     },
     "macos": {
       "name": "heyta-1.0.0-macos.dmg",
@@ -18,6 +28,15 @@
       "size": 2362276,
       "version": "1.0.0",
       "releasedAt": "2026-10-07T03:41:45+00:00"
+    },
+    "windows": {
+      "name": "heyta-1.0.0-windows.zip",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.0-windows.zip",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.0/heyta-1.0.0-windows.zip",
+      "sha256": "f024c228059739a30a092128e272577c9a2e6bc9b956de7473b4612bea45eb20",
+      "size": 96659883,
+      "version": "1.0.0",
+      "releasedAt": "2026-10-07T04:13:13+00:00"
     }
   }
 }

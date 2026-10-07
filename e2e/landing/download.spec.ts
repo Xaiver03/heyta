@@ -48,7 +48,11 @@ test('中文 /download：八端全画、直链只来自清单、拿不到的那�
     .toHaveCount(expectLinks);
 
   // 没有产物的那几档：不许有一个看起来能点的按钮，但必须有一句"差在哪一步"。
-  for (const id of ['windows', 'linux', 'harmony']) {
+  // 名单由快照推（见 rowsWithoutExit 那段），并且**先证明这个名单不是空的** ——
+  // 一个空集合会让下面这个循环变成"什么都没测"的恒绿。
+  const noExit = rowsWithoutExit(manifest);
+  expect(noExit.length, '全五端都发布完之后，这一条要靠 harmony 那一档兜住').toBeGreaterThan(0);
+  for (const id of noExit) {
     const card = page.locator(`#dl-${id}`);
     await expect(card.locator('.lp-btn'), `${id} 没有产物却画了按钮`).toHaveCount(0);
     const gap = card.locator('.dl-gap');
@@ -76,7 +80,9 @@ test('英文 /download：同一套结构，没有半页还是中文', async ({pa
   await page.screenshot({path: 'landing-results/download-en.png', fullPage: true, animations: 'disabled'});
 
   await expect(page.locator('.dl-card')).toHaveCount(ROW_IDS.length);
-  await expect(page.locator('#dl-windows .dl-gap')).toBeVisible();
+  // 英文页也要有"差在哪一步"那一句 —— 挑哪一档同样由快照推，不写死 windows。
+  const enNoExit = rowsWithoutExit(readSnapshot());
+  await expect(page.locator(`#dl-${enNoExit[0]} .dl-gap`)).toBeVisible();
   // 英文页里不许出现中文正文（页脚与语言切换器除外，那是两种语言都要显示的东西）。
   const bodyText = await page.locator('.dl-body').innerText();
   expect(/[\u4e00-\u9fff]/.test(bodyText), `英文页正文里出现了中文字符：${bodyText.slice(0, 80)}`).toBe(false);
@@ -152,4 +158,26 @@ function stable(version: string): boolean {
 function stablePublishedCount(manifest: ReturnType<typeof readSnapshot>): number {
   return Object.values(manifest.files ?? {}).filter((file) => stable(file.version ?? manifest.version))
     .length;
+}
+
+/** 注册表里 `via: 'file'` 的那几行 —— 行 id 与清单 key 同名（臂 C 钉住登记，单测用真注册表）。 */
+const FILE_ROWS = ['macos', 'android', 'windows', 'linux'];
+
+/**
+ * 按快照推出**这一轮真的没有出口**的那几档，不写死名单。
+ *
+ * 🔴 原来这里写的是 `['windows','linux','harmony']` —— 那是"只有 macOS 发出去"那一轮的形状。
+ * 2026-10-07 下午四端都发了，它就以"windows 没有产物却画了按钮"的形式红在自己身上。
+ * 本页文件头的第 2 条前提说的就是这件事：**快照说什么，期望值推什么**。
+ *
+ * `web` 与 `selfhost` 不在内：它们的出口不是产物（一个是打开就用，一个是指南），
+ * 永远有东西可点。
+ */
+function rowsWithoutExit(manifest: ReturnType<typeof readSnapshot>): string[] {
+  const unpublishedFiles = FILE_ROWS.filter((id) => {
+    const file = manifest.files[id];
+    return file === undefined || !stable(file.version ?? manifest.version);
+  });
+  const noStoreChannel = manifest.channels?.ios === undefined ? ['ios'] : [];
+  return [...unpublishedFiles, ...noStoreChannel, 'harmony'];
 }
