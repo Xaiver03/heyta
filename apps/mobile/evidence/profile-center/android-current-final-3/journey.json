@@ -1,0 +1,5 @@
+{
+  "status": "failed",
+  "error": "Installed APK differs from current build: bffa000dbd07c21bd12a4fc313f8b29bc37e8de34b94e5a3b303f3ad876dd770 != 2939a39d2b0a321d81f7adcd000a2086ef35cf6ddbbd127cabb38e085b162193",
+  "steps": []
+}

@@ -19,6 +19,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  BackHandler,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -112,6 +113,7 @@ type SectionMeta = {
 };
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
+import { useMobileNavigation } from '../nav/navigation';
 
 import { dueTone, toDueDisplay, type DueDisplayMode } from '../lib/due-display';
 // 🔴 排序档位：比较规则**不在这里**（在 `@heyta/domain` 的 `sortTasks`），
@@ -412,6 +414,7 @@ export function TasksScreen({
   // `locale` 也要：重复规则的句子必须按当前语言说（`describeRecurrenceText`），
   // 否则英文界面上会漏出「每周一、三」。
   const { t, locale } = useI18n();
+  const navigation = useMobileNavigation();
   const [host, setHost] = useState<AppHost | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -446,6 +449,29 @@ export function TasksScreen({
    * `NoteEditScreen` 是全屏 `Modal`，一次只有一个 tab 挂在树上 ⇒ 不会叠两层。
    */
   const editingNoteId = useSelected('note');
+
+  /**
+   * 任务详情与便签编辑都是当前 tab 的二级目的地。
+   *
+   * 它们仍然使用原生 Modal 承载输入，但路由事实由同一条 tab 栈记录：
+   * 切换 tab 时 Modal 隐藏，回到任务 tab 时恢复；系统返回先收起当前层，
+   * 不会直接把用户送回根页面。
+   */
+  const pushTaskRoute = useCallback((): void => {
+    if (navigation.stack.at(-1)?.key !== 'task-detail') navigation.push('task-detail');
+  }, [navigation]);
+  const closeTask = useCallback((): void => {
+    selection.select('task', null);
+    if (navigation.stack.at(-1)?.key === 'task-detail') navigation.pop();
+  }, [navigation]);
+  const openNote = useCallback((id: string): void => {
+    if (navigation.stack.at(-1)?.key !== 'note-editor') navigation.push('note-editor');
+    selection.select('note', id);
+  }, [navigation]);
+  const closeNote = useCallback((): void => {
+    selection.select('note', null);
+    if (navigation.stack.at(-1)?.key === 'note-editor') navigation.pop();
+  }, [navigation]);
   /** 截止时间的呈现方式。与 Web 端 `DueBadge` 的开关一致，默认 `date`。 */
   const [dueMode, setDueMode] = useState<DueDisplayMode>('date');
   /**
@@ -459,6 +485,12 @@ export function TasksScreen({
   const [taskSort, setTaskSort] = useState<TaskSortKey>(readTaskSort);
   /** 排序选择面板。 */
   const [sortPickerOpen, setSortPickerOpen] = useState(false);
+  /** 移动端批量选择态：长按一条任务进入，之后点行只切换选择，不打开详情。 */
+  const [bulkSelecting, setBulkSelecting] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<ReadonlySet<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkUndoIds, setBulkUndoIds] = useState<readonly string[] | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
   const chooseTaskSort = useCallback((next: TaskSortKey) => {
     // `writeTaskSort` 的返回值这里**刻意不消费**：写不进去的唯一后果是
     // "下次冷启动回到默认档"，而那一天的列表照常可用 —— 为它弹一句
@@ -591,12 +623,115 @@ export function TasksScreen({
     }
   }, [actions, projectActions, noteActions]);
 
+  // 同步或删除后，选择集合只保留当前仍存在的任务，避免工具栏显示幽灵数量。
+  useEffect(() => {
+    setSelectedTaskIds((current) => {
+      const alive = new Set(tasks.map((task) => task.id));
+      const next = new Set([...current].filter((id) => alive.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [tasks]);
+
+  // 批量删除的撤销窗口是短时的，避免把旧动作误认为当前动作。
+  useEffect(() => {
+    if (bulkUndoIds === null) return;
+    const timer = setTimeout(() => setBulkUndoIds(null), 5000);
+    return () => clearTimeout(timer);
+  }, [bulkUndoIds]);
+
+  const clearBulkSelection = useCallback(() => {
+    setBulkSelecting(false);
+    setSelectedTaskIds(new Set());
+    setBulkMoveOpen(false);
+    setBulkError(null);
+  }, []);
+
+  /**
+   * Android 返回键按用户当前正在处理的层级消费：短时浮层、多选态、详情，
+   * 最后才交给根导航。TaskScreen 在 Shell 里常驻挂载，所以必须同时按当前
+   * tab 过滤；否则隐藏的任务页会抢走其它 tab 的返回键。
+   */
+  useEffect(() => {
+    if (navigation.tab !== 'tasks') return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (bulkMoveOpen) {
+        setBulkMoveOpen(false);
+        return true;
+      }
+      if (sortPickerOpen) {
+        setSortPickerOpen(false);
+        return true;
+      }
+      if (searchOpen) {
+        setSearchOpen(false);
+        return true;
+      }
+      if (editingNoteId !== null) {
+        closeNote();
+        return true;
+      }
+      if (detailTaskId !== null) {
+        closeTask();
+        return true;
+      }
+      if (bulkSelecting) {
+        clearBulkSelection();
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [
+    bulkMoveOpen,
+    bulkSelecting,
+    clearBulkSelection,
+    closeNote,
+    closeTask,
+    detailTaskId,
+    editingNoteId,
+    navigation.tab,
+    searchOpen,
+    sortPickerOpen,
+  ]);
+
+  const enterBulkSelection = useCallback((id: string) => {
+    setBulkSelecting(true);
+    setSelectedTaskIds(new Set([id]));
+    setBulkError(null);
+  }, []);
+
+  const toggleBulkSelection = useCallback((id: string) => {
+    setSelectedTaskIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const runBulk = useCallback(
+    async (operation: (ids: readonly string[]) => Promise<void>, deleted = false): Promise<void> => {
+      if (actions === null || selectedTaskIds.size === 0) return;
+      const ids = [...selectedTaskIds];
+      setBulkError(null);
+      try {
+        await operation(ids);
+        if (deleted) setBulkUndoIds(ids);
+        refresh();
+        clearBulkSelection();
+      } catch (error) {
+        setBulkError(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [actions, clearBulkSelection, refresh, selectedTaskIds],
+  );
+
   /**
    * 离开这一屏时收起"详情"这一层。
    *
    * 🔴 这一条**不是**共享层的规则，是移动端的形态决定的：这里的详情是一个
-   * `Modal` 浮层（外壳按标签切屏时会把本屏**卸载**），选中态若留着，
-   * 用户切回「任务」标签就会**凭空弹出一个面板**。
+   * `Modal` 浮层（外壳按标签切换时本屏仍常驻，但 Modal 会按当前 tab 隐藏），
+   * 路由栈与选择态仍需在宿主卸载时收口。
    * web 恰好相反 —— 详情是常驻列，跨视图保持选中就是它要的东西。
    *
    * ⚠️ 所以"移动端要不要也做成常驻栏"仍然是一条待拍的产品决定
@@ -734,6 +869,29 @@ export function TasksScreen({
     [refresh],
   );
 
+  const handleTaskOpen = useCallback(
+    (id: string) => {
+      if (bulkSelecting) {
+        toggleBulkSelection(id);
+        return;
+      }
+      pushTaskRoute();
+      selection.select('task', id);
+    },
+    [bulkSelecting, pushTaskRoute, toggleBulkSelection],
+  );
+
+  const handleTaskToggle = useCallback(
+    (id: string) => {
+      if (bulkSelecting) {
+        toggleBulkSelection(id);
+        return;
+      }
+      if (actions !== null) runFor(id, actions.toggleCompleted(id));
+    },
+    [actions, bulkSelecting, runFor, toggleBulkSelection],
+  );
+
   /**
    * 行内插槽。**这些是"内容"，本来就该各端各写**，所以留在本文件。
    *
@@ -813,6 +971,8 @@ export function TasksScreen({
     () => ({
       toggleOn: (row: SharedTaskRow) => t('mobile.tasks.a11y.complete', { title: row.title }),
       toggleOff: (row: SharedTaskRow) => t('mobile.tasks.a11y.uncomplete', { title: row.title }),
+      selectOn: (row: SharedTaskRow) => t('web.shell.tasks.unselect', { title: row.title }),
+      selectOff: (row: SharedTaskRow) => t('web.shell.tasks.select', { title: row.title }),
       open: (row: SharedTaskRow) => {
         // ⚠️ 同上：这个 `useMemo` 的 body 立刻执行，但它**声明在守卫之前**。
         //    闭包只在列表真的渲染时被调用，那时 `actions` 一定非空。
@@ -886,6 +1046,71 @@ export function TasksScreen({
           { icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh },
         ]}
       >
+        {bulkSelecting ? (
+          <View
+            testID="mobile-bulk-toolbar"
+            style={{
+              gap: tokens['space.2'],
+              padding: tokens['space.2'],
+              borderRadius: tokens['radius.md'],
+              borderWidth: tokens['border-width.thin'],
+              borderColor: tokens['color.primary'],
+              backgroundColor: tokens['color.primary-subtle'],
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
+              <Text variant="row-meta" style={{ flex: 1 }}>
+                {t('web.shell.bulk.selected', { count: selectedTaskIds.size })}
+              </Text>
+              <Button label={t('web.shell.bulk.cancel')} tone="ghost" onPress={clearBulkSelection} />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: tokens['space.2'] }}>
+              <Button
+                label={t('web.shell.bulk.complete')}
+                icon="task.done"
+                disabled={selectedTaskIds.size === 0}
+                onPress={() => {
+                  void runBulk((ids) => actions?.bulkSetCompleted(ids, true) ?? Promise.resolve());
+                }}
+              />
+              <Button
+                label={t('web.shell.bulk.move')}
+                icon="task.project"
+                disabled={selectedTaskIds.size === 0}
+                onPress={() => setBulkMoveOpen(true)}
+              />
+              <Button
+                label={t('web.shell.bulk.delete')}
+                icon="task.delete"
+                tone="danger"
+                disabled={selectedTaskIds.size === 0}
+                onPress={() => {
+                  void runBulk((ids) => actions?.bulkRemove(ids) ?? Promise.resolve(), true);
+                }}
+              />
+            </ScrollView>
+            {bulkError === null ? null : (
+              <Text variant="row-meta" tone="danger">
+                {t('web.shell.bulk.error', { message: bulkError })}
+              </Text>
+            )}
+          </View>
+        ) : null}
+
+        {bulkUndoIds === null ? null : (
+          <Button
+            testID="mobile-bulk-undo"
+            label={t('web.shell.bulk.undo')}
+            tone="ghost"
+            icon="task.reopen"
+            onPress={() => {
+              const ids = bulkUndoIds;
+              setBulkUndoIds(null);
+              if (actions !== null) void actions.bulkRestore(ids).then(refresh);
+            }}
+          />
+        )}
+
         {/* 大标题 + 日期。大标题属于**内容区**（会随内容滚动），不属于顶栏。 */}
         <View style={{ paddingTop: tokens['space.2'], gap: tokens['space.1'] }}>
           <Text variant="screen-title">{formatDayTitleText(toLocalDate(now), t)}</Text>
@@ -1084,8 +1309,16 @@ export function TasksScreen({
               runFor(id, actions.toggleCompleted(id));
             }}
             onOpenTask={(id) => {
+              if (bulkSelecting) {
+                toggleBulkSelection(id);
+                return;
+              }
+              pushTaskRoute();
               selection.select('task', id);
             }}
+            onLongPressTask={enterBulkSelection}
+            selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
+            selectionMode={bulkSelecting}
           />
         ) : view === 'timeline' ? (
           /*
@@ -1102,6 +1335,7 @@ export function TasksScreen({
             activeTaskId={detailTaskId}
             // 触屏端的排期入口：点行 → 详情表单（横向拖拽与滚动冲突，不搬鼠标手势）。
             onOpenTask={(id) => {
+              pushTaskRoute();
               selection.select('task', id);
             }}
           />
@@ -1120,17 +1354,16 @@ export function TasksScreen({
               // 漏传不会报错，只会退回"宿主给的顺序"（即 createdAt 升序），
               // 于是新建的任务又掉到屏幕外。那条回归由 mobile 的测试钉着。
               sort={taskSort}
-              onToggleTask={(id) => {
-                runFor(id, actions.toggleCompleted(id));
-              }}
-              onOpenTask={(id) => {
-                selection.select('task', id);
-              }}
+              onToggleTask={handleTaskToggle}
+              onOpenTask={handleTaskOpen}
+              onLongPressTask={enterBulkSelection}
+              selectedTaskIds={bulkSelecting ? selectedTaskIds : undefined}
+              selectionMode={bulkSelecting}
               activeTaskId={detailTaskId}
               busyTaskId={busyId}
               labels={taskRowLabels}
               renderMeta={renderTaskMeta}
-              renderTrailing={renderTaskTrailing}
+              renderTrailing={bulkSelecting ? undefined : renderTaskTrailing}
               renderSectionHeader={(section) => (
                 <View style={{ paddingTop: tokens['space.3'] }}>
                   <SectionHeader
@@ -1146,12 +1379,15 @@ export function TasksScreen({
         )}
       </Screen>
 
-      {actions !== null ? (
+      {actions !== null && navigation.tab === 'tasks' ? (
         <TaskDetailSheet
           task={detailTask}
+          // visible={detailTaskId !== null} is the selection contract; the tab
+          // gate prevents a retained hidden tab from surfacing its Modal.
           visible={detailTaskId !== null}
           onClose={() => {
             selection.select('task', null);
+            if (navigation.stack.at(-1)?.key === 'task-detail') navigation.pop();
           }}
           actions={actions}
           projects={projects}
@@ -1180,21 +1416,22 @@ export function TasksScreen({
         }}
         onOpenTask={(id) => {
           setSearchOpen(false);
+          pushTaskRoute();
           selection.select('task', id);
         }}
         onOpenNote={(id) => {
           // 🔴 先关浮层再开编辑屏：两个 `Modal` 同时在场在 Android 上没实测过，
           //    而"关掉搜索再看这条便签"本来就是用户想要的次序。
           setSearchOpen(false);
-          selection.select('note', id);
+          openNote(id);
         }}
       />
 
-      {editingNoteId === null ? null : (
+      {navigation.tab !== 'tasks' || editingNoteId === null ? null : (
         <NoteEditScreen
           noteId={editingNoteId}
           onBack={() => {
-            selection.select('note', null);
+            closeNote();
           }}
         />
       )}
@@ -1208,6 +1445,57 @@ export function TasksScreen({
           setSortPickerOpen(false);
         }}
       />
+      <Modal
+        visible={bulkMoveOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBulkMoveOpen(false)}
+      >
+        <Pressable
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: tokens['material.scrim'],
+          }}
+          onPress={() => setBulkMoveOpen(false)}
+          accessibilityLabel={t('mobile.tasks.composer.close')}
+        />
+        <View
+          style={{
+            marginTop: 'auto',
+            padding: tokens['space.4'],
+            gap: tokens['space.2'],
+            backgroundColor: tokens['color.surface'],
+            borderTopLeftRadius: tokens['radius.lg'],
+            borderTopRightRadius: tokens['radius.lg'],
+          }}
+        >
+          <Text variant="section-title">{t('web.shell.bulk.move')}</Text>
+          <Button
+            label={t('web.shell.bulk.moveInbox')}
+            icon="task.project"
+            onPress={() => {
+              setBulkMoveOpen(false);
+              void runBulk((ids) => actions?.bulkMoveToProject(ids, undefined) ?? Promise.resolve());
+            }}
+          />
+          {projects.map((project) => (
+            <Button
+              key={project.id}
+              label={project.name}
+              icon="task.project"
+              onPress={() => {
+                setBulkMoveOpen(false);
+                void runBulk((ids) => actions?.bulkMoveToProject(ids, project.id) ?? Promise.resolve());
+              }}
+            />
+          ))}
+          <Button label={t('web.shell.bulk.cancel')} tone="ghost" onPress={() => setBulkMoveOpen(false)} />
+        </View>
+      </Modal>
       <Composer
         visible={composerOpen}
         onClose={() => setComposerOpen(false)}

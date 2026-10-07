@@ -7,9 +7,8 @@
  * 所以它们**不离开当前视图**；而主视图（任务/日历/四象限/习惯）之间切换
  * 不需要这种回头，才留在应用内。
  *
- * ⚠️ 所以这里的 `absolute` 与那层半透明**都是语义**：
- * 它们保证"下层可见"。把它改成 `position: fixed` 盖满全屏、
- * 或让 `App.tsx` 不再渲染下层视图，都会让 IA 判据变红。
+ * 下层继续保留在 DOM 里，保证关闭设置后回到原来的视图与滚动位置；设置内容
+ * 自己使用不透明表面，避免任务标题从背景透出来与设置文字叠在一起。
  */
 .ht-sheet {
   position: absolute;
@@ -17,15 +16,126 @@
   z-index: var(--ht-z-dropdown);
   overflow-y: auto;
   padding: var(--ht-space-6);
-  /* 半透明：下层视图**看得见**但退到后面 —— 不是"关掉它"。
-     ⚠️ 刻意**不用** `backdrop-filter: blur(...)`：那会引入一个裸尺寸值，
-     而"下层可见"靠的是**透明度**，不是模糊 —— 模糊反而让下层更看不清。
-     ⚠️ 不透明度钉在 95%：再低（曾为 88%）时下层深色文字会以可读的浓度
-     透上来，与设置内容叠成"文字压文字"（页8 扫描截图实测）；
-     "下层可见"的判据是 DOM 里下层标记仍在（`settings-sheet-ia.spec`），
-     视觉上退成隐约一层就够。 */
-  background: color-mix(in srgb, var(--ht-color-background) 95%, transparent);
+  background: var(--ht-color-background);
   animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+/* 设置是高密度的二级工作区，不是一条没有目录的表单长页。
+   左侧目录让用户先按心智模型定位，再在右侧处理具体控件；窄屏时同一目录
+   横向滚动到顶部，保留同样的分组事实源。 */
+.ht-settings__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ht-space-4);
+  margin-block-end: var(--ht-space-4);
+  padding-block-end: var(--ht-space-4);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-settings__eyebrow {
+  margin: 0 0 var(--ht-space-1);
+  color: var(--ht-color-primary);
+  letter-spacing: var(--ht-tracking-caption);
+}
+
+.ht-settings__page-title,
+.ht-settings__lead {
+  margin: 0;
+}
+
+.ht-settings__lead {
+  margin-block-start: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-settings__nav {
+  position: sticky;
+  top: 0;
+  z-index: var(--ht-z-dropdown);
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  gap: var(--ht-space-1);
+  padding-block: var(--ht-space-2);
+  background: var(--ht-color-background);
+}
+
+.ht-settings__nav-link {
+  display: block;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-inline-start: var(--ht-border-width-thick) solid transparent;
+  border-radius: var(--ht-radius-sm);
+  color: var(--ht-color-foreground-muted);
+  text-decoration: none;
+}
+
+.ht-settings__nav-link:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-settings__nav-link:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-settings__layout {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--ht-space-6);
+}
+
+.ht-settings__content {
+  min-inline-size: 0;
+}
+
+.ht-settings__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  min-inline-size: 0;
+  margin-block-end: var(--ht-space-8);
+  scroll-margin-block-start: var(--ht-space-4);
+}
+
+.ht-settings__group-title {
+  margin: 0;
+  padding-block-end: var(--ht-space-2);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+@media (max-width: 64rem) {
+  .ht-settings__layout {
+    display: block;
+  }
+
+  .ht-settings__nav {
+    flex-direction: row;
+    overflow-x: auto;
+    margin-inline: calc(var(--ht-space-6) * -1);
+    padding-inline: var(--ht-space-6);
+    border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  }
+
+  .ht-settings__nav-link {
+    flex: 0 0 auto;
+    border-inline-start: 0;
+    border-block-end: var(--ht-border-width-thick) solid transparent;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 30rem) {
+  .ht-sheet {
+    padding: var(--ht-space-4);
+  }
+
+  .ht-settings__nav {
+    margin-inline: calc(var(--ht-space-4) * -1);
+    padding-inline: var(--ht-space-4);
+  }
 }
 
 /* 设置浮层的退出口（2026-09-30 补）。

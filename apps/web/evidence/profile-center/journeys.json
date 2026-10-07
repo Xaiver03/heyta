@@ -1,0 +1,73 @@
+[
+  {
+    "name": "desktop-light",
+    "width": 1440,
+    "height": 1000,
+    "theme": "light",
+    "overflow": {
+      "client": 1200,
+      "scroll": 1200
+    },
+    "editAndReturn": true,
+    "settingsAndReturn": true,
+    "closeRestoresWork": true,
+    "keyboardEnterEscape": true
+  },
+  {
+    "name": "desktop-dark",
+    "width": 1440,
+    "height": 1000,
+    "theme": "dark",
+    "overflow": {
+      "client": 1200,
+      "scroll": 1200
+    },
+    "editAndReturn": true,
+    "settingsAndReturn": true,
+    "closeRestoresWork": true,
+    "keyboardEnterEscape": true
+  },
+  {
+    "name": "narrow-light",
+    "width": 390,
+    "height": 844,
+    "theme": "light",
+    "overflow": {
+      "client": 390,
+      "scroll": 390
+    },
+    "editAndReturn": true,
+    "settingsAndReturn": true,
+    "closeRestoresWork": true,
+    "keyboardEnterEscape": true
+  },
+  {
+    "name": "narrow-dark",
+    "width": 390,
+    "height": 844,
+    "theme": "dark",
+    "overflow": {
+      "client": 390,
+      "scroll": 390
+    },
+    "editAndReturn": true,
+    "settingsAndReturn": true,
+    "closeRestoresWork": true,
+    "keyboardEnterEscape": true
+  },
+  {
+    "name": "growth-disabled",
+    "width": 1440,
+    "height": 1000,
+    "theme": "light",
+    "growth": false,
+    "overflow": {
+      "client": 1200,
+      "scroll": 1200
+    },
+    "editAndReturn": true,
+    "settingsAndReturn": true,
+    "closeRestoresWork": true,
+    "keyboardEnterEscape": true
+  }
+]

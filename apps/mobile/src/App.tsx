@@ -21,10 +21,10 @@
  * 未登录的本地功能照常。这里**没有登录墙**，理由写在规范 §0。
  *
  * 🔴 刻意**不引入导航库**（React Navigation / Expo Router）。
- * 当前需求是"5 个平级 tab、无栈、无深链" —— 这是一段不到 200 行的状态切换。
+ * 当前需求是"5 个平级 tab + 每个 tab 一条轻量二级栈"，由 `nav/navigation.tsx`
+ * 维护根 tab 与 push/pop；Modal 只负责平台输入表面，不再另造一套路由状态。
  * 引入导航库会带来：一整套依赖树、它自己的主题系统（与我们的 token 必然重复）、
- * 以及原生侧额外的配置。**先不引入，等出现真实的栈/深链需求再评估** ——
- * 那时才有足够信息判断引哪个、值不值。
+ * 以及原生侧额外的配置。等真实深链需求出现，再用证据评估是否值得引入。
  *
  * 这不是"重复造轮子"：这里没有造轮子，只是在**还没有轮子需求**的时候
  * 用了最简单正确的东西。
@@ -37,7 +37,8 @@ import { I18nProvider, type Locale } from '@heyta/i18n';
 import { ThemeProvider, useTheme, useTokens } from './theme';
 import { LocalePreferenceProvider } from './i18n/locale-preference';
 import { resolveDeviceLocale } from './i18n/locale';
-import { TabBar, type TabKey } from './nav/TabBar';
+import { TabBar } from './nav/TabBar';
+import { NavigationProvider, useMobileNavigation } from './nav/navigation';
 import { TasksScreen } from './screens/TasksScreen';
 // 🔴 五个 tab 现在**全部是真实屏幕**了 —— `screens/NotYetImplemented.tsx`
 // 已按它自己文件头写好的方式删除（"实现一个就移走一个，最后删掉它"）。
@@ -77,7 +78,7 @@ startPrivacyGate();
 function Shell(): React.JSX.Element {
   const t = useTokens();
   const { theme } = useTheme();
-  const [tab, setTab] = useState<TabKey>('tasks');
+  const { tab, setTab } = useMobileNavigation();
   /**
    * 「任务」标签的角标数字。
    *
@@ -218,11 +219,13 @@ function Shell(): React.JSX.Element {
         backgroundColor={t['color.background']}
       />
       <View style={{ flex: 1 }}>
-        {tab === 'tasks' ? <TasksScreen onPendingCountChange={setPendingCount} /> : null}
-        {tab === 'calendar' ? <CalendarScreen /> : null}
-        {tab === 'focus' ? <FocusScreen /> : null}
-        {tab === 'categories' ? <CategoriesScreen /> : null}
-        {tab === 'profile' ? <ProfileScreen /> : null}
+        <View style={{ flex: 1, display: tab === 'tasks' ? 'flex' : 'none' }}>
+          <TasksScreen onPendingCountChange={setPendingCount} />
+        </View>
+        <View style={{ flex: 1, display: tab === 'calendar' ? 'flex' : 'none' }}><CalendarScreen /></View>
+        <View style={{ flex: 1, display: tab === 'focus' ? 'flex' : 'none' }}><FocusScreen /></View>
+        <View style={{ flex: 1, display: tab === 'categories' ? 'flex' : 'none' }}><CategoriesScreen /></View>
+        <View style={{ flex: 1, display: tab === 'profile' ? 'flex' : 'none' }}><ProfileScreen /></View>
       </View>
       <TabBar
         active={tab}
@@ -236,7 +239,11 @@ function Shell(): React.JSX.Element {
 }
 
 export default function App(): React.JSX.Element {
-  return <Shell />;
+  return (
+    <NavigationProvider>
+      <Shell />
+    </NavigationProvider>
+  );
 }
 
 /**

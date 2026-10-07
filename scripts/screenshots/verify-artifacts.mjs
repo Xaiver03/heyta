@@ -152,6 +152,84 @@ function newRegExpValue(table, text) {
   return new RegExp(`:[ \\t]*(['"])${escapeForRegex(text)}\\1[ \\t]*(?:[,;\\n])`).test(table);
 }
 
+// ── 5b. 🔴 `seed` 的三份额外对账：入口文案 / 夹具在不在 / 夹具里的四类 ──────────
+//
+// seed 步骤（`capture.mjs#applySeed`）手里握着两份会悄悄烂掉的东西：
+//   1. 一句**无障碍名抄件**（要点开「设置」才走得到还原面板）—— 失效形状与 dismissTexts 完全一样：
+//      症状不是"文案过期"，而是截图静默停在别的视图上；
+//   2. 一条**夹具路径与它的内容** —— 夹具被删/被手写坏（少一类、或某条没有可显示的标题）时，
+//      "回收站里有四类"这句话就没有分母了，而 capture 仍会截出一张看着正常的图。
+// 所以这三条长在门禁里，每次 `pnpm check` 都跑（`screenshot:verify` 已在链上）。
+const REQUIRED_SEED_KINDS = ['TASK', 'NOTE', 'PROJECT', 'HABIT'];
+let seedChecked = 0;
+
+for (const target of TARGETS) {
+  if (target.seed == null) continue;
+  seedChecked += 1;
+
+  const source = LOCALE_SOURCE[target.locale];
+  const table = source == null ? undefined : (localeTables.get(source) ?? loadLocaleTable(source));
+  if (table === undefined) {
+    problems.push(`seed 目标 ${target.id}: 语言「${target.locale}」的词条表读不到，无法校验设置入口文案「${String(target.seed.settingsLabel)}」`);
+  } else if (!newRegExpValue(table, target.seed.settingsLabel)) {
+    problems.push(
+      `seed 目标 ${target.id} 的设置入口文案「${target.seed.settingsLabel}」在 ${source} 里不再是任何词条的值\n` +
+        `    ⇒ 词条改了、清单没跟上：seed 步骤会等不到那颗按钮，还原从不发生，图却照样截出来`,
+    );
+  }
+
+  const fixturePath = join(root, target.seed.fixture);
+  if (!existsSync(fixturePath)) {
+    problems.push(
+      `seed 目标 ${target.id}: 夹具不存在 ${target.seed.fixture}\n` +
+        `    ⇒ 生成它：node scripts/screenshots/seed-trash-fixture.mjs（**别手写墓碑 JSON** —— 那会绕开产品自己的写通道）`,
+    );
+    continue;
+  }
+  const doc = JSON.parse(readFileSync(fixturePath, 'utf8'));
+  const trashedByKind = {};
+  for (const [type, rows] of Object.entries(doc.entities ?? {})) {
+    trashedByKind[type] = (Array.isArray(rows) ? rows : []).filter((row) => row?.deletedAt != null).length;
+  }
+  const missingKinds = REQUIRED_SEED_KINDS.filter((kind) => !trashedByKind[kind]);
+  if (missingKinds.length > 0) {
+    problems.push(
+      `seed 目标 ${target.id}: 夹具「${target.seed.fixture}」里这四类中被删的行缺：${missingKinds.join('、')}\n` +
+        `    ⇒ 这张图主张的就是"这几类也进回收站"，夹具缺哪一类，图就演示不出哪一类`,
+    );
+  }
+  // 🔴 三字段依次取：这条判据第一次跑就抓到"取不到标题"的两行 —— 因为**每类的标题字段不一样**
+  //   （任务是 `title`、便签是 `content`、清单与习惯是 `name`），而这正是 `@heyta/domain#toTrashItems`
+  //   里那份取标题规则的镜像。只取 title/content 会把清单和习惯读成"没有可显示的字"，
+  //   于是截图判据永远命不中它们 —— 一个看不见的字段名差异，被这条门禁按住了。
+  const displayLabel = (row) => String(row.title ?? row.content ?? row.name ?? '').trim();
+  const labelless = Object.values(doc.entities ?? {})
+    .flat()
+    .filter((row) => row?.deletedAt != null && displayLabel(row) === '');
+  if (labelless.length > 0) {
+    problems.push(
+      `seed 目标 ${target.id}: 夹具里有 ${String(labelless.length)} 条被删的行没有可显示的标题\n` +
+        `    ⇒ capture 的逐条存在性判据（assertSeededTitles）对它们永远无从命中，会把好夹具读成失败`,
+    );
+  }
+}
+
+/** 词条表按路径读一次（§5 那张缓存表只在有遮挡物时才填，seed 目标可能没遮挡物清单）。 */
+function loadLocaleTable(source) {
+  const path = join(root, source);
+  if (!existsSync(path)) return undefined;
+  const table = readFileSync(path, 'utf8');
+  localeTables.set(source, table);
+  return table;
+}
+
+if (TARGETS.some((t) => t.view === 'trash') && !TARGETS.some((t) => t.view === 'trash' && t.seed != null)) {
+  problems.push(
+    '回收站那张配图**没有** seed 了 ⇒ 「图里画出四类」这句话退回成"截一张只有任务的图"\n' +
+      '    （接线在 targets.mjs 的 `seed` 字段与 capture.mjs 的 applySeed；拆掉判据不是修好它）',
+  );
+}
+
 // ── 原生壳证据：**来源门禁**（防回归的核心）＋ 糊字启发式 ─────────────────
 //
 // 顺序很重要：先证明"这份证据是可信的采集路径产出的"，再看它长什么样。

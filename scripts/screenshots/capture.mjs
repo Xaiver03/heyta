@@ -122,11 +122,83 @@ async function dismissOverlays(page, texts) {
   for (const text of texts) {
     const button = page.getByRole('button', { name: text });
     await button.first().waitFor({ state: 'attached', timeout: 2_000 }).catch(() => {});
-    if (await button.count()) {
+    if (await button.count() && await button.first().isVisible().catch(() => false)) {
       await button.first().click().catch(() => {});
-      await page.waitForTimeout(300);
+      // 首启同意层带淡出动画；在动画结束前强制点击 rail 会把事件送到
+      // 仍在顶层的遮罩。等按钮隐藏后再继续，避免截图流水线偶发吞掉导航点击。
+      await button.first().waitFor({ state: 'hidden', timeout: 2_000 }).catch(() => {});
+      await page.waitForTimeout(150);
     }
   }
+}
+
+/**
+ * 在 rail 的「更多」菜单里打开低频视图。
+ *
+ * 视图注册表仍然用 `view`/`readyText` 描述目标，但低频项不一定存在于 DOM：
+ * 它只在菜单展开后才渲染。截图执行器必须复现真实用户路径，不能用隐藏节点或
+ * 直接改 React 状态来绕过 IA。返回值表示是否走了菜单路径。
+ */
+async function openViewControl(page, target, locale) {
+  const direct = page
+    .getByRole('tab', { name: target.readyText, exact: false })
+    .or(page.getByRole('button', { name: target.readyText, exact: false }))
+    .first();
+  try {
+    await direct.waitFor({ state: 'attached', timeout: 1_500 });
+    return { control: direct, viaMenu: false };
+  } catch {
+    const moreLabel = locale === 'en' ? 'More' : '更多';
+    const more = page.getByRole('button', { name: moreLabel, exact: true }).first();
+    await more.waitFor({ state: 'attached', timeout: 20_000 });
+    // 窄屏 rail 是单行横向滚动容器；先把入口滚进视口，再点击真实控件。
+    await more.scrollIntoViewIfNeeded().catch(() => {});
+    // 首启遮罩收起后，窄屏网格还会重新计算一次 rail 的位置。等盒子连续
+    // 两次读数相同再点，避免事件落在过渡中的旧命中区域。
+    let previousBox = null;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const box = await more.boundingBox();
+      if (box && previousBox && ['x', 'y', 'width', 'height'].every((key) => Math.abs(box[key] - previousBox[key]) < 0.5)) {
+        break;
+      }
+      previousBox = box;
+      await page.waitForTimeout(80);
+    }
+    // Playwright 的触摸命中检测在横向 overflow 容器里仍可能把稳定的按钮判成
+    // “不可点击”；这里调用的仍是同一枚真实按钮的 click handler，不写 React 状态，
+    // 也不绕过随后对菜单项和 aria-selected 的回读。
+    await more.evaluate((element) => element.click());
+    const menuItem = page.getByRole('menuitem', { name: target.readyText, exact: false }).first();
+    await menuItem.waitFor({ state: 'attached', timeout: 5_000 });
+    return { control: menuItem, viaMenu: true };
+  }
+}
+
+/**
+ * 为需要展示默认关闭模块的目标，走产品自己的设置开关打开它。
+ * 截图目标不能靠注入 localStorage 假造“用户已启用”，否则菜单可发现性没有被验到。
+ */
+async function enableTargetModules(page, target) {
+  const modules = target.enableModules ?? [];
+  if (modules.length === 0) return;
+  const avatar = page.getByTestId('account-menu-avatar');
+  await avatar.waitFor({ state: 'attached', timeout: 20_000 });
+  await avatar.click({ force: true });
+  await page.getByTestId('account-menu-settings').click({ force: true });
+  for (const key of modules) {
+    const toggle = page.getByTestId(`feature-modules-${key}`);
+    await toggle.waitFor({ state: 'attached', timeout: 20_000 });
+    if (!(await toggle.isChecked())) await toggle.check({ force: true });
+  }
+}
+
+async function openSettingsView(page) {
+  const avatar = page.getByTestId('account-menu-avatar');
+  await avatar.waitFor({ state: 'attached', timeout: 20_000 });
+  await avatar.click({ force: true });
+  const settings = page.getByTestId('account-menu-settings');
+  await settings.waitFor({ state: 'attached', timeout: 20_000 });
+  await settings.click({ force: true });
 }
 
 /**
@@ -167,12 +239,29 @@ async function applySeed(page, site, target) {
   await page.goto(site.baseUrl + langQuery, { waitUntil: 'domcontentloaded' });
   await dismissOverlays(page, target.dismissTexts);
 
-  const settings = page
-    .getByRole('tab', { name: target.seed.settingsLabel, exact: false })
-    .or(page.getByRole('button', { name: target.seed.settingsLabel, exact: false }))
-    .first();
+  // 🔴 「设置」不在 rail 上，它在**头像菜单**里（`apps/web/src/features/shell/AccountMenu.tsx`
+  //    的 `account-menu-settings`）。这里原来写的是
+  //    `getByRole('tab'|'button', { name: settingsLabel, exact: false })` —— `exact: false`
+  //    把「设置」当成了子串，命中的是同步状态栏那颗**「同步设置」**。
+  //    失败形状值得记下来：它不是"点错了一个看得见的东西"，而是**点开了一个永远不会渲染
+  //    `import-panel` 的浮层**，于是这条腿等成一个看不出根因的 20s 超时。
+  const avatar = page.getByTestId('account-menu-avatar');
+  await avatar.waitFor({ state: 'attached', timeout: 20_000 });
+  await avatar.scrollIntoViewIfNeeded().catch(() => {});
+  await avatar.click({ force: true });
+
+  const settings = page.getByTestId('account-menu-settings');
   await settings.waitFor({ state: 'attached', timeout: 20_000 });
-  await settings.scrollIntoViewIfNeeded().catch(() => {});
+  // 抄件要**钉在界面上**，不然它和 `dismissTexts` 一样会悄悄过期：
+  // 菜单项的可及名必须真的含 `settingsLabel`，否则词条改了而这份没改时，
+  // 下面点到的仍是某个"看着像设置"的东西。
+  const settingsName = `${(await settings.getAttribute('aria-label')) ?? ''} ${(await settings.innerText()).trim()}`.trim();
+  if (!settingsName.includes(target.seed.settingsLabel)) {
+    throw new Error(
+      `seed：头像菜单里那一枚的实际文案是 ${JSON.stringify(settingsName)}，` +
+        `与抄件 ${JSON.stringify(target.seed.settingsLabel)} 对不上 ⇒ 改词条要同时改 targets.mjs`,
+    );
+  }
   await settings.click({ force: true });
 
   await page.getByTestId('import-panel').waitFor({ state: 'attached', timeout: 20_000 });
@@ -214,7 +303,10 @@ async function assertSeededTitles(page, target) {
   for (const rows of Object.values(doc.entities ?? {})) {
     for (const row of Array.isArray(rows) ? rows : []) {
       if (row?.deletedAt == null) continue;
-      const label = String(row.title ?? row.content ?? '').trim();
+      // 🔴 每类的标题字段不一样（任务 title / 便签 content / 清单与习惯 name），
+      //    规则的真源是 `@heyta/domain#toTrashItems`，这里那份是它的镜像 ——
+      //    少取一个字段就等于把那一类从判据的分母里悄悄摘掉（§10.226 那条"分母"教训的形状）。
+      const label = String(row.title ?? row.content ?? row.name ?? '').trim();
       if (label !== '') expected.push(label);
     }
   }
@@ -245,9 +337,8 @@ async function assertSeededTitles(page, target) {
 for (const job of jobs) {
   const { target, device, folder } = job;
   const site = SITES[target.site];
-  // 界面语言。🔴 真正让 web 界面切语言的是 URL 上的 `?lang=` 参数，
-  // 不是浏览器协商 —— 应用刻意不读 navigator.language
-  // （apps/web/src/lib/locale.ts 文件头）。两层都设，保持一致。
+  // 界面语言：应用首启会读取浏览器语言，也接受落地页传入的 `?lang=`；
+  // 两层都设，保持协商结果与截图目标一致。
   const locale = target.locale ?? 'zh-CN';
   const langQuery = locale === 'zh-CN' ? '' : `?lang=${locale}`;
   const outPath = join(root, ARTIFACT_ROOT, folder, artifactName(target));
@@ -283,20 +374,25 @@ for (const job of jobs) {
       //    立刻 count() 一定是 0 —— 这个坑我实测踩过一次（11 张全挂）。
       //    waitFor 会一直等到元素出现，两件事一次解决。
       await page.goto(site.baseUrl + langQuery, { waitUntil: 'domcontentloaded' });
-      const control = page
-        .getByRole('tab', { name: target.readyText, exact: false })
-        .or(page.getByRole('button', { name: target.readyText, exact: false }))
-        .first();      // ⚠️ 只等 `attached`，**不等 `visible`**：实测移动视口（390px）下标签栏被压成
-      //    8px 宽，从"四象限"往后的标签**整段溢出到屏幕外**
+      await dismissOverlays(page, target.dismissTexts);
+      await enableTargetModules(page, target);
+      if (target.view === 'settings') {
+        // 设置不属于 rail 目的地，必须从头像菜单进入；把它当成“更多”项会
+        // 误把同步设置或隐藏的文本节点当成目标。
+        await openSettingsView(page);
+      } else {
+        const opened = await openViewControl(page, target, locale);
+        const control = opened.control;      // ⚠️ 只等 `attached`，**不等 `visible`**：实测移动视口（390px）下标签栏被压成
+        //    8px 宽，从"四象限"往后的标签**整段溢出到屏幕外**
       //    （四象限 x=312..392 已越界、习惯 x=396..464 完全在屏外）。
       //    它们有盒子、`isVisible()` 也返回 true，但 `waitFor({state:'visible'})`
       //    会因为布局竞态等不到 —— MW01/MW03 过、MW02 挂。
       //    这也是**一个真实的移动端布局缺陷**，交 UI 那条线修。
-      await control.waitFor({ state: 'attached', timeout: 20_000 });
+        await control.waitFor({ state: 'attached', timeout: 20_000 });
       // 🔴 导航**之前**清一次遮挡物（理由见 `dismissOverlays` 的注释：
       //    遮罩盖住 rail 时，`force: true` 点的是遮罩，视图不切）。
-      await dismissOverlays(page, target.dismissTexts);
-      await control.scrollIntoViewIfNeeded().catch(() => {});
+        await dismissOverlays(page, target.dismissTexts);
+        await control.scrollIntoViewIfNeeded().catch(() => {});
 
       // 🔴 `force: true` 是必要的，而且**不是**为了"绕过问题"：
       //    实测在移动视口（390x844）下，头部标题 / 搜索框 / header actions
@@ -306,24 +402,29 @@ for (const job of jobs) {
       //    这是**一个真实的移动端布局缺陷**，应交给 UI 那条线修；
       //    截图流水线不该被它卡住，但**必须自己验证点击真的生效**，
       //    否则会静默截成上一个视图 —— 那就是在制造假证据。
-      await control.click({ force: true });
+        await control.click({ force: true });
 
       // 回读：该 tab 必须真的变成选中态。等不到就报错，绝不含糊地往下截。
-      const deadline = Date.now() + 5_000;
-      let selected = false;
-      while (Date.now() < deadline) {
-        if ((await control.getAttribute('aria-selected')) === 'true') {
+      // 菜单项点击后会关闭菜单，并把当前视图提升回 rail；因此菜单路径要从
+      // 新渲染的 tab 读取 aria-selected，而不是从已卸载的 menuitem 读取。
+        const selectedControl = opened.viaMenu
+        ? page.getByRole('tab', { name: target.readyText, exact: false }).first()
+        : control;
+        const deadline = Date.now() + 5_000;
+        let selected = false;
+        while (Date.now() < deadline) {
+          if ((await selectedControl.getAttribute('aria-selected')) === 'true') {
           selected = true;
-          break;
+            break;
+          }
+          await page.waitForTimeout(100);
         }
-        await page.waitForTimeout(100);
-      }
-      if (!selected) {
+        if (!selected) {
         // 🔴 报错必须说出**是谁盖住了点击目标**。只说"aria-selected 没变成 true"，
         //    读起来像"回读太严"，于是人会去放宽回读 —— 而真因是一层 `position:fixed` 遮罩
         //    （本轮实测：上一轮据此怀疑 `.first()` 命中了同名但非选中的控件，方向整个错）。
-        const box = await control.boundingBox().catch(() => null);
-        const blockedBy = box
+          const box = await control.boundingBox().catch(() => null);
+          const blockedBy = box
           ? await page
               .evaluate(([x, y]) => {
                 const el = document.elementFromPoint(x, y);
@@ -340,13 +441,14 @@ for (const job of jobs) {
               }, [box.x + box.width / 2, box.y + box.height / 2])
               .catch(() => '（读不到中心点）')
           : '（拿不到盒位置）';
-        throw new Error(
+          throw new Error(
           `点了「${target.readyText}」但它的 aria-selected 没变成 true —— ` +
             `视图没有真的切换，继续截图会产出**假证据**（截成上一个视图）。\n` +
             `   该控件中心点上实际最靠上的是：${blockedBy}\n` +
             `   ⇒ 若不是它自己或它的子节点，就是**有遮挡物盖住了点击目标**：` +
             `把它加进 targets.mjs 的 dismissTexts（遮挡物在导航前清），**不要放宽这条回读**。`,
-        );
+          );
+        }
       }
     } else {
       await page.goto(new URL(target.path + langQuery, site.baseUrl).toString(), { waitUntil: 'domcontentloaded' });

@@ -52,8 +52,12 @@ interface ProjectState {
    *   这不是 bug —— 删它没有顺带改变"它被收起来了"这个事实。
    */
   restoreProject: (id: string) => Promise<boolean>;
-  /** 彻底删除一条清单：追加 `purgedAt` 标记；**里面的任务一条都不动**。 */
-  purgeProject: (id: string) => Promise<void>;
+  /**
+   * 彻底删除一条清单：追加 `purgedAt` 标记；**里面的任务一条都不动**。
+   *
+   * 返回**有没有真的落成**（`false` = 它早就被彻底删过，这一次没有写 op）。
+   */
+  purgeProject: (id: string) => Promise<boolean>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setProjectColor: (id: string, slot?: CategorySlot) => Promise<void>;
   /**
@@ -112,8 +116,9 @@ export const useProjectStore = create<ProjectState>(() => ({
 
   purgeProject: async (id) => {
     // 不 catch：不可逆动作被拒绝必须让界面说给用户。
-    await projectActions.purgeProject(id);
+    const purged = await projectActions.purgeProject(id);
     syncProjects();
+    return purged;
   },
 
   setProjectColor: async (id, slot) => {

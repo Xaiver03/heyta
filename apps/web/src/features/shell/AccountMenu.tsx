@@ -75,7 +75,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
 import { avatarInitialFromEmail } from '@heyta/shared-schema';
 import { placeAnchoredPanel } from '@heyta/ui';
-import { CircleUser, LogIn, LogOut, Settings, TrendingUp, UserRoundPen } from 'lucide-react';
+import { CircleUser, LogIn, LogOut, Settings, TrendingUp, UserRound, UserRoundPen } from 'lucide-react';
 
 /**
  * 读一个 token 的像素值。
@@ -96,6 +96,7 @@ export function AccountMenu({
   onSignIn,
   onOpenSettings,
   onOpenProfile,
+  onOpenProfileCenter,
   onOpenGrowth,
   growthEnabled = false,
   onSignOut,
@@ -123,6 +124,8 @@ export function AccountMenu({
    * 的动作摆成一个能点的按钮。
    */
   onOpenProfile?: () => void;
+  /** 打开只读的个人中心概览；资料编辑仍由 onOpenProfile 进入设置。 */
+  onOpenProfileCenter?: () => void;
   onOpenGrowth: () => void;
   /**
    * 🔴 「成长」模块是否启用（功能模块开关）。
@@ -139,6 +142,8 @@ export function AccountMenu({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const avatarRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  /** Focus is pending only for the current open gesture, never for repositioning. */
+  const menuOpenFocusPending = useRef(false);
   /** 面板的 fixed 坐标。`undefined` = 还没量（只在挂载那一帧，人看不到）。 */
   const [pos, setPos] = useState<{ top: number; left: number } | undefined>(undefined);
 
@@ -201,16 +206,27 @@ export function AccountMenu({
     };
   }, [open]);
 
+  /** Mark one focus handoff for this open; resize/reposition must not steal focus. */
+  useEffect(() => {
+    if (!open) {
+      menuOpenFocusPending.current = false;
+      return;
+    }
+    menuOpenFocusPending.current = true;
+  }, [open]);
+
   /**
    * 打开时把焦点送进菜单（WAI-ARIA menu-button 形态：菜单获得焦点，
-   * 第一个条目是入口）。**不给** `tabIndex=0` 的条目：菜单是一组互斥选项，
-   * 不是一个 Tab 序列 —— 所以全部 `tabIndex=-1`，靠方向键走。
+   * 第一个条目是入口）。等 fixed 坐标就位后再聚焦：定位前菜单是 hidden，
+   * 真实浏览器会拒绝对不可见条目调用 focus。**不给** `tabIndex=0` 的条目：
+   * 菜单是一组互斥选项，不是一个 Tab 序列 —— 所以全部 `tabIndex=-1`，靠方向键走。
    */
   useEffect(() => {
-    if (!open) return;
+    if (!open || pos === undefined || !menuOpenFocusPending.current) return;
+    menuOpenFocusPending.current = false;
     const first = panelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
     first?.focus();
-  }, [open]);
+  }, [open, pos]);
 
   const close = (returnFocus = false): void => {
     setOpen(false);
@@ -334,6 +350,14 @@ export function AccountMenu({
             但那样会变成"设置 → 资料"两层，而这一页只有两个字段，不值得。
             ⚠️ 未登录时不渲染（`onOpenProfile` 只在已登录那一支传）。
           */}
+          {onOpenProfileCenter === undefined
+            ? null
+            : item(
+                t('web.shell.account.profileCenter'),
+                UserRound,
+                onOpenProfileCenter,
+                `${testID}-profile-center`,
+              )}
           {showSignIn || onOpenProfile === undefined
             ? null
             : item(t('web.shell.account.profile'), UserRoundPen, onOpenProfile, `${testID}-profile`)}

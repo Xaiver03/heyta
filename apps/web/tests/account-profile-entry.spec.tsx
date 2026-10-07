@@ -191,3 +191,50 @@ describe('身份菜单里的「编辑个人信息」', () => {
     ).not.toBeNull();
   });
 });
+
+describe('头像菜单里的「个人中心」', () => {
+  it('展示身份、近期状态与成就摘要，并把编辑动作交回设置', async () => {
+    localStorage.setItem('heyta.shell.modules', JSON.stringify({ growth: true }));
+    signIn();
+    const el = await render();
+    click(el.querySelector('[data-testid="account-menu-avatar"]')!);
+    click(el.querySelector('[data-testid="account-menu-profile-center"]')!);
+
+    expect(el.querySelector('[data-testid="profile-center"]')).not.toBeNull();
+    expect(el.querySelector('.ht-settings__page-title')?.textContent).toContain('个人中心');
+    expect(el.querySelector('#profile-center-identity-title')).not.toBeNull();
+    expect(el.querySelector('#profile-center-recent-title')).not.toBeNull();
+    expect(el.querySelector('[data-testid="profile-achievements"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="profile-panel"]')).toBeNull();
+
+    click(el.querySelector('[data-testid="profile-center"] .ht-btn')!);
+    expect(el.querySelector('[data-testid="profile-panel"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="settings-back-to-profile"]')).not.toBeNull();
+  });
+
+  it('成长模块关闭时，个人中心不绕过开关提供成长入口', async () => {
+    localStorage.setItem('heyta.shell.modules', JSON.stringify({ growth: false }));
+    signIn();
+    const el = await render();
+    click(el.querySelector('[data-testid="account-menu-avatar"]')!);
+    click(el.querySelector('[data-testid="account-menu-profile-center"]')!);
+
+    expect(el.querySelector('[data-testid="profile-center-growth"]')).toBeNull();
+    expect(el.querySelector('[data-testid="profile-achievements"]')).toBeNull();
+  });
+
+  it('从个人中心进入设置后可以返回个人中心', async () => {
+    signIn();
+    const el = await render();
+    click(el.querySelector('[data-testid="account-menu-avatar"]')!);
+    click(el.querySelector('[data-testid="account-menu-profile-center"]')!);
+    click(el.querySelector('[data-testid="profile-center-settings"]')!);
+
+    expect(el.querySelector('[data-testid="settings-back-to-profile"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="profile-center"]')).toBeNull();
+
+    click(el.querySelector('[data-testid="settings-back-to-profile"]')!);
+    expect(el.querySelector('[data-testid="profile-center"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="settings-back-to-profile"]')).toBeNull();
+  });
+});
