@@ -105,7 +105,7 @@ node scripts/tools/cos-api.mjs --bucket heyta-dist-1380503169 \
 - **MSIX / deb 的常规产出**：Windows 包在远端打包机、Linux 包路径见
   [`multi-platform-build.md`](multi-platform-build.md) §6，接入 upload-dist 时按实际产物路径传参即可。
 
-## 7. 2026-10-08 多端测试批次
+## 7. 2026-10-08 第一批测试（历史）
 
 发布标签 `v1.0.1-test.20261008.1`，源码快照 `0107fe15440aecf5775a71574ba973406d8b4c49`。批次号区分安装包，非强制改写各端内部版本；iOS 为 `1.0 (3)`，模拟器同源码验收包为 `1.0 (1)`。
 
@@ -123,3 +123,27 @@ node scripts/tools/cos-api.mjs --bucket heyta-dist-1380503169 \
 - [本批产物校验记录](../../apps/web/evidence/ux-closeout/release-2026-10-08/release.json)
 
 本轮未发邀请/通知、未提交外部 Beta 审核。Web 和帮助中心已更新，真实邮箱收件及其完整验证码闭环仍待专门验证，不能由上传成功代替。
+
+
+## 8. 2026-10-08 第二批测试（历史）
+
+当前源码快照 `c938a0bbf6e3102652f2358ad987685a65aeaefe`，标签 `v1.0.1-test.20261008.2`。包含移动任务视图菜单与排期渐进披露、个人中心整行入口、成长空态/年度活动，以及四象限撤销与新建清单防重入修复。后续 QA 脚本和证据更新不改变这批二进制。
+
+- iOS：`com.heyta` **1.0 (4)**，Apple 处理 `VALID`；API 回读确认加入既有“内部测试”组，已补 `zh-Hans` 测试说明。本机 Apple Developer 签名可用，无需重新提供账号。未发邀请、未创建公开测试链接；模拟器已重装，不能据此声称用户的实体 iPhone 已安装。
+- macOS：Developer ID 签名，公证 `Accepted`，staple 验证通过；已安装。实际帮助入口点击因本机锁屏尚未复验。
+- Windows：当前 MSIX 已安装，签名有效。ZIP 包含 MSIX、公开 CER、中文安装说明和管理员安装脚本；证书与包签名、说明中的包哈希均已核对。首次安装需按说明信任测试证书。
+- Android：发布签名 APK 已重打、安装；任务旅程、Profile 链路与深浅主题已复验。
+- Linux：DEB 包内共享 UI 字节对账及解包启动通过；尚未系统安装，验证机沙箱限制仍保留。
+- Web：已部署；390/1440 下登录、注册确认密码与强度、帮助首页/文章导航通过。未发送验证码邮件，不代表生产 SMTP 已验收。
+
+[国内下载清单](https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/latest.json) 已切换 `1.0.1-test.20261008.2`，四端文件匿名可读，大小及清单 SHA-256 与本机一致。[GitHub 第二批测试版](https://github.com/Xaiver03/heyta/releases/tag/v1.0.1-test.20261008.2) 已公开，五个资产 SHA-256 与本机一致。完整校验读数见 [第二批分发证据](../../apps/web/evidence/ux-closeout/release-2026-10-08-b2/release.json)。
+
+## 9. 2026-10-08 第三批测试（分发中）
+
+本批修复助手长对话滚动、历史面板关闭、取消披露恢复草稿、跨布局披露/等待状态、提醒按钮暗色与宽度，以及移动端任务角标截断。macOS、Windows、Android、iOS 模拟器已完成当前源码重打重装；Web 已部署并通过深浅主题/多视口助手与设置2条真实浏览器旅程。
+
+iOS **1.0 (5)** 已上传 TestFlight，Apple 状态 VALID，既有内部测试组关联已 API 回读确认，附中文测试说明。没有创建公开邀请链接，也没有实体 iPhone 安装证据。其余平台的第三批下载包正在上传，上传完成前公共下载入口仍以第二批为准。
+
+本批不部署服务端，仍保留 `3880bdd1fd5e8fe3710bd19c5f753947ea89c468`。另一任务的 inbound automation 服务端修改不纳入本次客户端发布；共享包中的可选 worker 接线不表示公网回调功能已交付。小组件 descriptor 已注册，但系统组件库添加尚未成功。
+
+[第三批构建与分发证据](../../apps/web/evidence/ux-closeout/release-2026-10-08-b3/release.json)。

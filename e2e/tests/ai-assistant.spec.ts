@@ -95,7 +95,7 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await page.locator('[data-testid="ai-assistant-send-button"]').click();
     await expect(page.locator('[data-testid="ai-assistant-disclosure"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="ai-chat-assistant"]').last()).toContainText(
-      '没有发出任何请求',
+      '没有符合条件的内容。',
     );
     await expectNoStubCall(request);
 
@@ -160,7 +160,21 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     expect(four.count).toBe(4);
 
     // ══ 5. 「新会话」重新要求披露（一次会话一次的承诺随之重来）══════════
-    await page.locator('[data-testid="ai-assistant-new-session"]').click();
+    const newSession = page.getByTestId('ai-assistant-new-session');
+    if (!await newSession.isVisible()) {
+      const historyToggle = page.getByTestId('ai-assistant-history-toggle');
+      await historyToggle.click();
+      await page.getByTestId('ai-assistant-history-close').click();
+      await expect(historyToggle).toBeFocused();
+      await historyToggle.click();
+      await page.keyboard.press('Escape');
+      await expect(historyToggle).toHaveAttribute('aria-expanded', 'false');
+      await historyToggle.click();
+    }
+    await newSession.click();
+    const historyToggle = page.getByTestId('ai-assistant-history-toggle');
+    await expect(historyToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('ai-assistant-input')).toBeFocused();
     await expect(page.locator('[data-testid="ai-assistant-transcript"]')).toHaveCount(0);
     await page.locator('[data-testid="ai-assistant-input"]').fill('第三句');
     await page.locator('[data-testid="ai-assistant-send-button"]').click();
@@ -171,7 +185,7 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
     await selectSettingsSection(page, 'ai');
     const section = page.locator('[data-testid="ai-assistant-section"]');
     await expect(section).toBeVisible();
-    // 🔴 默认是执行；真正写入仍需逐条确认。
+    // 默认执行：普通写入直接执行，高风险操作按风险策略确认。
     await expect(section.locator('[data-testid="assistant-tier-read-and-propose"] input')).toBeChecked();
     await expect(section.locator('[data-testid="assistant-tier-read-only"] input')).not.toBeChecked();
     await section.locator('[data-testid="assistant-tier-read-and-propose"] input').check();
@@ -208,7 +222,7 @@ test.describe('对话助手：真浏览器端到端旅程', () => {
 });
 
 
-test('Chatbot 默认执行，确认前不创建，确认后只创建一次', async ({ page, request }) => {
+test('Chatbot 默认执行，出境同意前不创建，授权后创建一次且刷新不重复', async ({ page, request }) => {
   await resetStub(request);
   await openApp(page, '/', 'accepted');
   await configureEndpoint(page, { capabilities: ['tool_calling'], features: ['tool-calling'] });
@@ -219,13 +233,14 @@ test('Chatbot 默认执行，确认前不创建，确认后只创建一次', asy
   await page.getByTestId('ai-assistant-send-button').click();
   await expect(page.getByTestId('ai-assistant-disclosure')).toBeVisible();
   await expectNoStubCall(request);
-  await page.getByTestId('ai-assistant-send').click();
-  await expect(page.locator('p[data-testid="ai-chat-proposal"]')).toContainText(title);
   await expect(rowFor(page, title)).toHaveCount(0);
-  await page.screenshot({ path: `${EVIDENCE}/proposal-before-confirm.png` });
-  await page.getByTestId('ai-chat-confirm').click();
-  await expect(page.getByTestId('ai-chat-confirmed')).toBeVisible();
+  await page.getByTestId('ai-assistant-send').click();
+  await expect(page.getByTestId('ai-chat-assistant')).toContainText('已执行');
+  await expect(page.getByTestId('ai-chat-confirm')).toHaveCount(0);
   await expect(rowFor(page, title)).toHaveCount(1);
   await expectStubCount(request, 1);
-  await page.screenshot({ path: `${EVIDENCE}/proposal-confirmed.png` });
+  await page.screenshot({ path: `${EVIDENCE}/execute-created.png` });
+  await page.reload();
+  await expect(rowFor(page, title)).toHaveCount(1);
+  await expectStubCount(request, 1);
 });

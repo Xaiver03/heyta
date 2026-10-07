@@ -51,7 +51,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Maximize2, Minimize2, Send, X } from 'lucide-react';
 
-import { useI18n, type I18nValue } from '@heyta/i18n';
+import { useI18n, type I18nValue, type MessageKey } from '@heyta/i18n';
 import {
   buildDisclosure,
   fromHealthSnapshot,
@@ -187,6 +187,16 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   /** Chat 内的选择只影响当前会话；父级可选地把它写回自己的设置事实源。 */
   const [selectedTier, setSelectedTier] = useState<AssistantTier>(props.tier);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const historyToggleRef = useRef<HTMLButtonElement>(null);
+  const historyCloseRef = useRef<HTMLButtonElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (historyOpen) historyCloseRef.current?.focus();
+  }, [historyOpen]);
+  function closeHistory(): void {
+    setHistoryOpen(false);
+    historyToggleRef.current?.focus();
+  }
   useEffect(() => {
     setSelectedTier(props.tier);
   }, [props.tier]);
@@ -241,6 +251,10 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
     .map((x) => ({ role: x.role as 'user' | 'assistant', text: x.text }));
   const firstUserMessage = items.find((item) => item.role === 'user');
   const sessionLabel = firstUserMessage?.text.trim() || t('web.ai.chat.history.current');
+  // The phase lives above this panel's mount point. During a responsive move
+  // the panel can remount before its optimistic message is restored; keep the
+  // conversation surface mounted so disclosure/waiting remains visible.
+  const hasConversation = items.length > 0 || phase !== 'idle';
 
   // 🔴 每一段可见的会话变化都要落一次本机盘；空会话则**删掉**那份记录。
   // 为什么在这儿写而不是在 `append` 里写：`append` 有两处会改状态却不改历史
@@ -271,6 +285,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         consents: props.consents,
         tier: selectedTier,
         host,
+        localize: (key, vars) => t(key as MessageKey, vars),
         executionId: `web:${session.account}:${String(idRef.current)}`,
         history,
         routed: {
@@ -327,6 +342,24 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
     void turn(text);
   }
 
+  /** Closing disclosure means the message was not sent. Restore the frozen
+   * text and remove its optimistic row so it cannot be persisted as sent. */
+  function cancelDisclosure(): void {
+    const text = pending ?? '';
+    if (text !== '') {
+      setDraft(text);
+      setItems((previous) => {
+        const last = previous[previous.length - 1];
+        return last?.role === 'user' && last.text === text
+          ? previous.slice(0, -1)
+          : previous;
+      });
+    }
+    setPending(undefined);
+    setPhase('idle');
+    requestAnimationFrame(() => composerRef.current?.focus());
+  }
+
   /** 用户在披露块上按「发送」。写"已披露"这件事只在这里发生。 */
   function confirmDisclosure(): void {
     const text = pending ?? '';
@@ -348,6 +381,8 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   }
 
   function newSession(): void {
+    setHistoryOpen(false);
+    requestAnimationFrame(() => composerRef.current?.focus());
     setItems([]);
     setDisclosed(false);
     setPending(undefined);
@@ -363,6 +398,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
   const composer = (
     <div className="ht-ai__composer">
       <textarea
+        ref={composerRef}
         className="ht-input ht-ai__input"
         aria-label={t('web.ai.chat.inputAria')}
         placeholder={t('web.ai.chat.placeholder')}
@@ -395,7 +431,12 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
     // 🔴 块级面板用 `.ht-ai-panel`（`.ht-ai` 是行内小件的 `inline-flex`，
     //    误用过一次：标题/说明/输入行被摆成一行）。
     <section className="ht-ai-panel" data-testid="ai-assistant" data-history-open={historyOpen ? 'true' : undefined}>
-      <div className="ht-ai__workspace">
+      <div className="ht-ai__workspace" onKeyDown={(event) => {
+        if (event.key === 'Escape' && historyOpen) {
+          event.stopPropagation();
+          closeHistory();
+        }
+      }}>
         <aside id="ai-assistant-history" className="ht-ai__history" data-testid="ai-assistant-history" aria-label={t('web.ai.chat.history.title')}>
           <div className="ht-ai__history-head">
             <span className="ht-ai__history-title ht-type-caption">{t('web.ai.chat.history.title')}</span>
@@ -407,11 +448,21 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
             >
               {t('web.ai.chat.newSession')}
             </button>
+            <button
+              ref={historyCloseRef}
+              type="button"
+              className="ht-btn ht-btn--ghost ht-ai__history-close"
+              aria-label={t('web.ai.chat.history.close')}
+              data-testid="ai-assistant-history-close"
+              onClick={closeHistory}
+            >
+              <X size={ICON_SIZE.xs} aria-hidden="true" />
+            </button>
           </div>
           <div className="ht-ai__history-group">
             <span className="ht-ai__history-group-label ht-type-caption">{t('web.ai.chat.history.today')}</span>
             {items.length > 0 ? (
-              <button type="button" className="ht-ai__history-item ht-ai__history-item--active" aria-current="page">
+              <button type="button" className="ht-ai__history-item ht-ai__history-item--active" aria-current="page" onClick={closeHistory}>
                 <span>{sessionLabel}</span>
               </button>
             ) : (
@@ -433,6 +484,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
                 aria-expanded={historyOpen}
                 aria-controls="ai-assistant-history"
                 data-testid="ai-assistant-history-toggle"
+                ref={historyToggleRef}
                 onClick={() => setHistoryOpen((open) => !open)}
               >
                 {historyOpen ? t('web.ai.chat.history.close') : t('web.ai.chat.history.open')}
@@ -483,13 +535,13 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
               )}
             </div>
           </header>
-      <div className={`ht-ai__chat-body ${items.length === 0 ? 'ht-ai__chat-body--empty' : ''}`}>
+      <div className={`ht-ai__chat-body ${!hasConversation ? 'ht-ai__chat-body--empty' : ''}`}>
       {/*
        * 空会话不应该让用户面对一块“什么都没有”的技术面板。
        * 快捷建议只是把自然语言填入同一个输入框，不创建第二套执行入口；
        * 用户仍然可以编辑后再发送，隐私披露与确认流程也完全不变。
        */}
-      {items.length === 0 && <div className="ht-ai__empty" data-testid="ai-assistant-empty">
+      {!hasConversation && <div className="ht-ai__empty" data-testid="ai-assistant-empty">
         <div className="ht-ai__greeting" data-testid="ai-assistant-greeting">
           <h3 className="ht-ai__greeting-title">{t('web.ai.chat.greeting')}</h3>
           <p className="ht-ai__note">{t('web.ai.chat.greetingHint')}</p>
@@ -516,7 +568,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         </div>
       </div>}
 
-      {items.length > 0 && (
+      {hasConversation && <div className="ht-ai__conversation" data-testid="ai-assistant-conversation">
         <ul
           className="ht-ai__items ht-ai__items--chat"
           data-testid="ai-assistant-transcript"
@@ -559,7 +611,6 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
             </li>
           ))}
         </ul>
-      )}
 
       {phase === 'disclose' && (
         <AiPanelHost label={t('web.ai.chat.disclosureHeading')} testID="ai-assistant-disclosure" role="dialog">
@@ -567,7 +618,7 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
             title={t('web.ai.chat.disclosureHeading')}
             closeLabel={t('web.ai.action.cancel')}
             closeTestID="ai-assistant-disclosure-close"
-            onClose={() => setPhase('idle')}
+            onClose={cancelDisclosure}
           />
           <p className="ht-ai__note">{t('web.ai.chat.disclosureLead')}</p>
 
@@ -619,7 +670,9 @@ export function AssistantPanel(props: AssistantPanelProps): React.JSX.Element {
         </p>
       )}
 
-      {items.length > 0 && composer}
+      </div>}
+
+      {hasConversation && composer}
       </div>
 
       <div className="ht-ai__footer">

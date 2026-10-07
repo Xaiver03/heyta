@@ -183,6 +183,19 @@ export interface AssistantMessage {
   readonly text: string;
 }
 
+/** 本机读结果只需要这四个界面句子；词条选择留在宿主，避免 app-host 依赖 i18n。 */
+export type LocalObservationKey =
+  | 'web.ai.chat.local.empty'
+  | 'web.ai.chat.local.found'
+  | 'web.ai.chat.local.untitled'
+  | 'web.ai.chat.local.more';
+
+/** 形状与两端的 `t()` 兼容，实际语言由调用方已有的 locale 决定。 */
+export type LocalObservationTranslate = (
+  key: LocalObservationKey,
+  vars?: Record<string, string | number>,
+) => string;
+
 /** 一步的轨迹。界面用它渲染"已调用 N 个工具"（ADR-0045 的"过程可见"）。 */
 export interface AssistantStep {
   readonly tool: string;
@@ -273,6 +286,8 @@ export interface AssistantTurnDeps {
   /** 能力档位 —— 第二授权前端的输入，**不是** `localApi.grants`。 */
   readonly tier: AssistantTier;
   readonly host: LocalApiHost;
+  /** 本机规则命中后的用户可见句子，由宿主按当前界面语言取唯一词条表。 */
+  readonly localize: LocalObservationTranslate;
   /** 一次用户发送的稳定标识；执行档以此防止重放产生重复 op。 */
   readonly executionId?: string;
   /** 已有历史（由壳持久化）。出境的只有这次实际带上消息数组。 */
@@ -444,7 +459,11 @@ export const LOCAL_ANSWER_MAX_ITEMS = 8;
  * `label` / `text`，或者再往里一层（`{ task: { title } }`）。
  * 更深的内容不在这里展开 —— 那是卡片渲染的事，不是回答文案的事。
  */
-export function localObservationText(tool: string, data: unknown): string | undefined {
+export function localObservationText(
+  _tool: string,
+  data: unknown,
+  localize: LocalObservationTranslate,
+): string | undefined {
   const rows = Array.isArray(data)
     ? data
     : data !== null && typeof data === 'object'
@@ -455,8 +474,8 @@ export function localObservationText(tool: string, data: unknown): string | unde
     // 🔴 **空集合是一个真答案**，不是"没答案"。带日期参数的规则（`list.today` 传 `dueOn`）
     // 查回空数组时，退回模型意味着：为一句话发一次请求，而请求里唯一的真信息就是
     // "本机一条都没有" —— 模型拿到它也只能说"今天没有任务"，还可能顺手编一条。
-    // 所以这里直接答"0 项"，零出境。
-    return `这条我在这台设备上查过了（${tool}），没有发出任何请求。结果是空的：共 0 项。`;
+    // 所以这里直接答词条，零出境；工具名与链路事实留在 trace/状态。
+    return localize('web.ai.chat.local.empty');
   }
 
   const labelOf = (row: unknown): string | undefined => {
@@ -485,11 +504,13 @@ export function localObservationText(tool: string, data: unknown): string | unde
   // 因为**丢掉它**会让条数与内容对不上，而"共 5 项，只列 3 项"是另一种谎话。
   if (labels.every((label) => label === undefined)) return undefined;
 
-  const shown = labels.slice(0, LOCAL_ANSWER_MAX_ITEMS).map((label) => label ?? '（这一项没有标题）');
+  const shown = labels
+    .slice(0, LOCAL_ANSWER_MAX_ITEMS)
+    .map((label) => label ?? localize('web.ai.chat.local.untitled'));
   const lines = shown.map((label) => `- ${label}`).join('\n');
   const rest = rows.length - shown.length;
-  const tail = rest > 0 ? `\n（还有 ${String(rest)} 项没列出）` : '';
-  return `这条我在这台设备上查到了，没有发出任何请求（${tool}）。\n共 ${String(rows.length)} 项：\n${lines}${tail}`;
+  const tail = rest > 0 ? `\n${localize('web.ai.chat.local.more', { count: rest })}` : '';
+  return `${localize('web.ai.chat.local.found', { count: rows.length })}\n${lines}${tail}`;
 }
 
 /**
@@ -653,7 +674,7 @@ export async function requestAssistantTurn(
     }
 
     if (run.kind === 'observation') {
-      const answer = localObservationText(run.tool, run.data);
+      const answer = localObservationText(run.tool, run.data, deps.localize);
       if (answer !== undefined) {
         return {
           ok: true,

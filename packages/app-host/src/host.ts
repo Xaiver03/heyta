@@ -52,6 +52,7 @@ import type { VaultKeyMigrationResponse } from '@heyta/shared-schema';
 import { randomId } from './ids.js';
 import { hasLocalEraser, registerLocalEraser } from './local-erasure.js';
 import { createSyncClient } from './sync-wiring.js';
+import type { SyncClientOptions } from '@heyta/sync-client';
 import {
   createVaultKeyMigrationRemote,
   createVaultMigrationInventorySource,
@@ -168,6 +169,8 @@ export interface AppHostOptions {
    * 销毁抛错时不调（那份库还在，宿主不该假装清过）。
    */
   onLocalDataErased?: () => void;
+  /** Platform secret/journal bridge for inbound automation uploads. */
+  getInboundUploadAuthorization?: SyncClientOptions['getInboundUploadAuthorization'];
 }
 
 export interface AppHost {
@@ -533,6 +536,8 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
           await engine.applyRemote(ops);
         },
         ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        ...(options.getInboundUploadAuthorization !== undefined
+          ? { getInboundUploadAuthorization: options.getInboundUploadAuthorization } : {}),
       });
     }
 
@@ -548,6 +553,8 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
         await engine.applyRemote(ops);
       },
       ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+      ...(options.getInboundUploadAuthorization !== undefined
+        ? { getInboundUploadAuthorization: options.getInboundUploadAuthorization } : {}),
     });
   };
 
