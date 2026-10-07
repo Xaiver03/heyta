@@ -89,9 +89,16 @@ apksigner verify --print-certs heyta-<v>-android.apk   # 期望 DN 里有 CN=hey
 zipalign -c 4 heyta-<v>-android.apk
 ```
 
-🔴 **这条路径目前没有脚本、也没有门禁**：仓里没有任何地方执行 `apksigner`，"期望的 Signer DN"
-也没钉住 —— 也就是说下一轮谁忘了重签就直接上传，页面会照样给一个调试签名的按钮（臂 D 只核版本号，
-不核签名）。**要补的是判据，不是这段文字**（登记在 `BLOCKED.md` 本轮那条）。
+🔴 **这一枚在离开这台机之前会被 `upload-dist.sh` 拦住。** 发布脚本里现在有一道
+`assert_android_release_signature`：发 `android=*.apk` 之前先 `apksigner verify --print-certs`，
+**读到 `CN=Android Debug` 就退出 1**（并印出补签那两条命令），读不出签名或这台机上没有
+`apksigner` 也退出 1 —— 找不到工具不等于没问题，那是"证明不了"，按不放行处理。
+三臂都实测过：调试那枚被拒、正式那枚放行并打印出 `CN=heyta, OU=Mobile, …`、
+把工具藏掉也拒。
+
+⚠️ **它拦的是"调试签名 / 读不出签名"，不拦"用了另一张正式证书"** —— 门禁里没有"期望 DN"这一项，
+打印出来的 DN 是给人核对的。要把正身也钉住，得先决定证书轮换时那一档该红还是该改判据，
+那是另一个决定（登记在 `BLOCKED.md` 本轮那条）。
 
 **② `.dmg` 不是可复现容器。** 同一份源码，上午那批与下午重装各打出一枚，
 字节数不同（2,362,276 vs 2,367,142）。所以"发布的是哪一枚"只能由 **sha256** 回答，
