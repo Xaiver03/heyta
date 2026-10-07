@@ -15,6 +15,17 @@ import { ICON_SIZE } from '@heyta/design-system';
  *      （那等于让 iOS 去解析 DOM），所以拖放整套留在这里。
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 W5（四象限空态减重，2026-10-06）之后本文件还回答三个 web 侧的问题：
+ *
+ *   3. **占位去重**：展示顺序里只有**第一个**空象限显示「拖任务到这里」
+ *      （此前四个空格各念一遍，同屏最多 3 次）。哪一个是"第一个"用共享的
+ *      `toQuadrantCards` 算，选词在 `copy.ts`；
+ *   4. **计数徽标**：每格标题行行尾挂任务数（经共享层 `renderHeaderTrailing`
+ *      插槽 —— 那一行是共享层渲染的，宿主没有别的入口）；
+ *   5. **折叠帮助**：底部那段规则说明收进 `<details>`（DOM 元素进不了共享层，
+ *      见下方案释）。summary 用现成「帮助」词条，正文沿用 `web.quadrant.footnote`。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
  * 🔴 行的骨架来自共享 `TaskList`，于是**整行不再可拖**
  *
  * 迁移前 web 有一份本地 `DraggableTask`（只有一行标题文字，`useDraggable`
@@ -57,18 +68,20 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { cssVar } from '@heyta/design-system';
-import { Quadrant, planQuadrantDrop } from '@heyta/domain';
+import { isImportant, Quadrant, planQuadrantDrop, type QuadrantDropPlan } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   HeytaUiProvider,
   QuadrantBoard as SharedQuadrantBoard,
+  quadrantSlot,
+  toQuadrantCards,
   type QuadrantCardModel,
   type TaskRow,
 } from '@heyta/ui';
 import { GripVertical } from 'lucide-react';
 
 import { useTaskStore } from '../tasks/store.js';
-import { dragHandleLabel, quadrantBoardLabels } from './copy.js';
+import { dragHandleLabel, quadrantBoardLabels, quadrantCountA11y } from './copy.js';
 
 /**
  * 类型守卫：穷举比较，**不做数组强转**（与迁移前同一写法）。
@@ -125,7 +138,7 @@ function DragHandle({ taskId, label }: { taskId: string; label: string }) {
 }
 
 /**
- * 一格里的**投放区**。
+ * 格子里的**投放区**。
  *
  * 它不需要可点 —— dnd-kit 按 `getBoundingClientRect` 命中，不靠事件冒泡。
  * 共享层把它放在一个 `pointerEvents: none` 的绝对定位容器里，所以它
@@ -139,6 +152,53 @@ function CellDropZone({ quadrant }: { quadrant: Quadrant }) {
       data-quadrant={quadrant}
       style={{ width: '100%', height: '100%' }}
     />
+  );
+}
+
+/**
+ * 象限标题行的**计数徽标**（W5：四象限空态减重 —— "标题+颜色+数量为主层级"）。
+ *
+ * · 内容是纯数字（数字不是文案，不需要词条）；
+ * · 无障碍名是「现有象限名词条 + 数字」的组合（`quadrantCountA11y`，零新增词条）；
+ * · 排版四件套（字号/字重/行高/字距 + tabular-nums）来自设计系统生成的
+ *   `ht-type-badge` 档位类；几何与颜色是**内联 cssVar**（本文件对宿主侧
+ *   小样式的一贯做法，见 `DragHandle` / `DragOverlay`）。
+ *   🔴 刻意**不**落 css 文件：`check:row-single-source` 断言 B 钉死
+ *   `apps/web/src/styles` 的 ht-* 前缀族**只减不增** —— 新视图样式应该
+ *   长在共享模式层（packages/ui 的 RN 样式）或宿主内联，不该再开一族。
+ * · 配色取安静档（`surface-sunken` 底 + `foreground-muted` 字）：象限计数
+ *   是常态信息不是提醒，不该像铃铛未读数那样用主蓝抢眼。
+ * · 它经共享层的 `renderHeaderTrailing` 插槽进标题行 —— DOM 节点插进
+ *   共享 RN 树与 `DragHandle`（`renderTrailing` 里的 `<button>`）同一条先例。
+ */
+function QuadrantCountBadge({
+  label,
+  count,
+  slot,
+}: {
+  label: string;
+  count: number;
+  slot: number;
+}) {
+  return (
+    <span
+      className="ht-type-badge"
+      aria-label={label}
+      data-testid={`quadrant-count-${String(slot)}`}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: cssVar('size.badge-min-width'),
+        height: cssVar('size.badge-height'),
+        paddingInline: cssVar('space.1'),
+        borderRadius: cssVar('radius.full'),
+        background: cssVar('color.surface-sunken'),
+        color: cssVar('color.foreground-muted'),
+      }}
+    >
+      {String(count)}
+    </span>
   );
 }
 
@@ -157,6 +217,14 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
   const store = useTaskStore();
   const [activeId, setActiveId] = useState<string | undefined>();
   const [overQuadrant, setOverQuadrant] = useState<Quadrant | null>(null);
+  const [dropNotice, setDropNotice] = useState<string>('');
+  const [undoDrop, setUndoDrop] = useState<{ taskId: string; plan: QuadrantDropPlan } | null>(null);
+
+  useEffect(() => {
+    if (undoDrop === null) return;
+    const timer = window.setTimeout(() => setUndoDrop(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [undoDrop]);
 
   /**
    * 🔴 **两列还是单列 —— 断点读 token，判定听窗口**（goal-layout-audit 页 1：
@@ -187,7 +255,22 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
   }, []);
 
   const tasks = useMemo(() => Object.values(store.entities.tasks), [store.entities.tasks]);
-  const labels = useMemo(() => quadrantBoardLabels(t), [t]);
+  /**
+   * W5（四象限空态减重）：展示顺序里**第一个**空象限 —— 只有它显示
+   * 「拖任务到这里」的引导文案，其余空象限走轻量占位（无文案）。
+   *
+   * 分桶用的是与共享板**同一个纯投影** `toQuadrantCards`（`@heyta/ui`
+   * 导出），不在此另写一份"什么算空"的判断；共享板内部会再算一次，
+   * 纯函数、代价可忽略 —— 换取的是不往共享层加"谁是第一个空格"的 API。
+   */
+  const firstEmptyQuadrant = useMemo(() => {
+    const cards = toQuadrantCards(tasks, store.now);
+    return cards.find((card) => card.count === 0)?.quadrant;
+  }, [tasks, store.now]);
+  const labels = useMemo(
+    () => quadrantBoardLabels(t, { firstEmptyQuadrant }),
+    [t, firstEmptyQuadrant],
+  );
   const handleLabel = useMemo(() => dragHandleLabel(t), [t]);
   /** 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。 */
   const taskLabels = useMemo(
@@ -211,6 +294,20 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
   const renderCellOverlay = useCallback(
     (card: QuadrantCardModel) => <CellDropZone quadrant={card.quadrant} />,
     [],
+  );
+  /**
+   * 每格标题行行尾挂计数徽标（W5）。插槽内容由本端决定，共享层只给位置
+   * （`marginLeft: 'auto'` 推到行尾）—— mobile 不传它，行为逐字节不变。
+   */
+  const renderHeaderTrailing = useCallback(
+    (card: QuadrantCardModel) => (
+      <QuadrantCountBadge
+        label={quadrantCountA11y(t, card.quadrant, card.count)}
+        count={card.count}
+        slot={quadrantSlot(card.quadrant)}
+      />
+    ),
+    [t],
   );
 
   async function handleDragEnd(event: DragEndEvent): Promise<void> {
@@ -238,8 +335,34 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
      */
     const plan = planQuadrantDrop(task, over, { now: store.now });
     // 一次拖放 = 一条 op（`setQuadrantDrop` 只写一次，不拆成两个动作）。
-    await store.setQuadrantDrop(taskId, plan);
+    // 保存拖放前的语义值，给用户一个短时撤销出口；拖放不是不可逆的魔法。
+    const previous: QuadrantDropPlan = {
+      important: isImportant(task),
+      dueDate: task.dueDate ?? null,
+    };
+    try {
+      await store.setQuadrantDrop(taskId, plan);
+      setUndoDrop({ taskId, plan: previous });
+      setDropNotice(
+        t(plan.dueDateChange === undefined ? 'web.quadrant.drop.success' : 'web.quadrant.drop.changedDue', {
+          quadrant: labels.title(over),
+        }),
+      );
+    } catch {
+      setUndoDrop(null);
+      setDropNotice(t('web.quadrant.drop.error'));
+    }
   }
+
+  const undoLastDrop = useCallback(() => {
+    if (undoDrop === null) return;
+    const action = undoDrop;
+    setUndoDrop(null);
+    void store
+      .setQuadrantDrop(action.taskId, action.plan)
+      .then(() => setDropNotice(''))
+      .catch(() => setDropNotice(t('web.quadrant.drop.error')));
+  }, [store, t, undoDrop]);
 
   const activeTask = activeId === undefined ? undefined : store.entities.tasks[activeId];
 
@@ -272,12 +395,68 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
           taskLabels={taskLabels}
           renderTrailing={renderTrailing}
           renderCellOverlay={renderCellOverlay}
+          renderHeaderTrailing={renderHeaderTrailing}
           highlightedQuadrant={overQuadrant}
           onOpenTask={onOpenTask}
           activeTaskId={activeTaskId}
           testID="quadrant-board"
         />
       </HeytaUiProvider>
+
+      {/*
+        W5（四象限空态减重）：底部那段四象限规则说明不再裸排长文 ——
+        收进折叠帮助。默认折叠（没有 `open` 属性，浏览器不渲染正文）；
+        summary 复用现成的「帮助」词条（`web.shell.nav.help`），
+        正文沿用原文案与原 key（`web.quadrant.footnote`）—— 零新增词条。
+        `<details>` 是 DOM 元素，进不了共享层（那边只许 RN 原语），
+        所以由 web 宿主自己渲染在板子下方。样式走内联 cssVar
+        （不开新的 ht-* 前缀族，理由见 QuadrantCountBadge 的注释）。
+      */}
+      <details data-testid="quadrant-help" style={{ marginTop: cssVar('space.2') }}>
+        <summary
+          className="ht-type-caption"
+          style={{ cursor: 'pointer', color: cssVar('color.foreground-muted') }}
+        >
+          {t('web.shell.nav.help')}
+        </summary>
+        <p
+          className="ht-type-caption"
+          style={{
+            margin: 0,
+            marginTop: cssVar('space.2'),
+            color: cssVar('color.foreground-muted'),
+          }}
+        >
+          {t('web.quadrant.footnote')}
+        </p>
+      </details>
+
+      {dropNotice === '' ? null : (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="quadrant-drop-status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: cssVar('space.2'),
+            marginTop: cssVar('space.2'),
+            color: cssVar('color.foreground-muted'),
+          }}
+        >
+          <span>{dropNotice}</span>
+          {undoDrop === null ? null : (
+            <button
+              type="button"
+              className="ht-btn ht-btn--ghost"
+              onClick={undoLastDrop}
+              data-testid="quadrant-drop-undo"
+            >
+              {t('web.quadrant.drop.undo')}
+            </button>
+          )}
+        </div>
+      )}
 
       {/*
         拖拽的**可视化**：手指下跟着一份标题的浮层。

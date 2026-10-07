@@ -16,10 +16,8 @@
  * 这一处**不是**本刀要改的东西 —— 顺手改文案会让"迁移"变成"改版"，
  * 而两者混在一起就没人能说清界面变了是因为哪一件。
  *
- * ⚠️ 没有一个"拖动手柄"的专门词条（`packages/i18n` 不在白名单）。
- * 手柄的无障碍名**临时复用** `web.quadrant.dragging`（它语义上是进行时，
- * 作为手柄名略勉强）。最小一步：在 `packages/i18n` 加
- * `web.quadrant.a11y.handle`（中英同步）后替换。
+ * 拖动手柄使用独立的动作名；进行时文案只留给 live region，避免读屏把
+ * “正在拖拽”误当成一个可执行动作。
  */
 
 import type { QuadrantBoardLabels } from '@heyta/ui';
@@ -52,8 +50,21 @@ const QUADRANT_HINT_KEY: Record<Quadrant, MessageKey> = {
  *
  * 共享层**不 import i18n**（见它的文件头），所以模板留在这里；
  * 字段名必须与 `QuadrantBoardLabels` 逐项对上 —— 漏了编译不过。
+ *
+ * @param options.firstEmptyQuadrant 展示顺序里**第一个**空象限。
+ *   W5（四象限空态减重）之前的写法是四个空格各显示一遍「拖任务到这里」
+ *   （审计证据 02-quadrant.png：同屏 3 次）。现在只有**第一个**空象限
+ *   显示这句引导（"空态必须有下一步提示"由它守住）；其余空象限给
+ *   **空串** —— 共享 `TaskList` 对空串仍渲染那个带内边距的占位块
+ *   （轻量视觉占位、无文案），只是不再念引导句。
+ *   哪一个是"第一个"由宿主（feature 层）用 `toQuadrantCards` 算，
+ *   这里只管按它选词。
  */
-export function quadrantBoardLabels(t: I18nValue['t']): QuadrantBoardLabels {
+export function quadrantBoardLabels(
+  t: I18nValue['t'],
+  options?: { readonly firstEmptyQuadrant?: Quadrant },
+): QuadrantBoardLabels {
+  const firstEmpty = options?.firstEmptyQuadrant;
   return {
     title: (quadrant) => t(QUADRANT_TITLE_KEY[quadrant]),
     hint: (quadrant) => t(QUADRANT_HINT_KEY[quadrant]),
@@ -63,15 +74,31 @@ export function quadrantBoardLabels(t: I18nValue['t']): QuadrantBoardLabels {
      * ⚠️ 模板只用 `title` / `hint`（`web.quadrant.a11y.cell` 就是这两个占位符）。
      * 计数**不**进这句：一格里有多少条，读屏用户往下走就会听到，
      * 而把它塞进格名会让"进这一格"这件事从"听一句"变成"听一串"。
+     * 计数的无障碍名在徽标自己身上（见 {@link quadrantCountA11y}）。
      */
     cellA11y: ({ title, hint }) => t('web.quadrant.a11y.cell', { title, hint }),
     /** 空格不是"什么都没有"，它说的是"这一类现在没有要处理的事"。 */
-    empty: () => t('web.quadrant.dropHere'),
-    footnote: t('web.quadrant.footnote'),
+    empty: (quadrant) =>
+      quadrant === firstEmpty ? t('web.quadrant.dropHere') : '',
+    // footnote 不在这里给：W5 起底部规则说明由 web 宿主收进 <details> 折叠帮助
+    // （summary 用 `web.shell.nav.help`，正文仍是 `web.quadrant.footnote`，
+    // 一条词条都不加）。共享板收不到 footnote 就不渲染那一行。
   };
+}
+
+/**
+ * 计数徽标的无障碍名（W5）：**现有象限名词条 + 数字**的组合
+ * （如「马上做 2」）—— 零新增词条的硬约束下唯一合法的拼法。
+ */
+export function quadrantCountA11y(
+  t: I18nValue['t'],
+  quadrant: Quadrant,
+  count: number,
+): string {
+  return `${t(QUADRANT_TITLE_KEY[quadrant])} ${String(count)}`;
 }
 
 /** 拖拽手柄的无障碍名（见文件头的诚实记账）。 */
 export function dragHandleLabel(t: I18nValue['t']): string {
-  return t('web.quadrant.dragging');
+  return t('web.quadrant.a11y.handle');
 }
