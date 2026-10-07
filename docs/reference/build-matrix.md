@@ -422,7 +422,7 @@ pnpm build:ios                     # Release, iphonesimulator
 |---|---|---|
 | macOS 桌面 | **SwiftUI / AppKit 原生**（推荐方向） | ⏸ **可达，但本轮不启动** —— 它和 Windows 卡在同一个问题上（跨语言调用 `packages/domain`），先做 macOS 就是**把那个问题付两遍**。触发条件见 §3 of the 迁移计划 |
 | macOS 桌面（备选） | `react-native-macos` | 🔴 **现在不可行**：最新 0.81.9，官方要求"同一 minor"，而 heyta 在 RN **0.84.1** → 硬冲突 |
-| Linux 桌面 | GTK4 / libadwaita（或 Qt） | ⏸ **没有需求证据** —— RN 生态没有 Linux，真原生 = **又一个独立代码库**；而目前没有任何 Linux 桌面用户的证据 |
+| Linux 桌面 | **GTK4 + WebKitGTK 6.0 + JavaScriptCoreGTK（已建壳，走 M2）** | ✅ **壳已走 M2 并有 `.deb` 取证**（07 05:1x 收口，读数在 [runbook](../runbooks/linux-dev-box.md) §5.7–§5.10）：原生 GTK4 壳 + 壳内 WebView 加载**与其它端同一份** `apps/web/dist`；`.deb` 用 `pnpm build:linux <目标机\|local>` 产出，包内 `/usr/share/heyta/web-dist`、缺席就拒绝打包、包内字节与本工作树 sha256 逐字对账，取证走 `dpkg-deb -x` 的**免 root 解包态真窗口**（判据 = 非空白**且主蓝命中**）。🔴 原先这行写的"没走 M2、手写的 GTK 界面只有任务列表"到 07 03:4x 为止是真的，现已过期。仍未接的：同步（🔴 是**共享门面**那一档，不是 Linux 特有：`packages/app-host/src/native-bridge.ts:38` 明写"目前不接同步：不传 `serverUrl` ⇒ `openAppHost` 不建同步客户端"）、登录、装进系统（`dpkg -i`）、签名与更新渠道、`reinstall-all.sh` 的第五端（计划 E7）。定位在 2026-10-06 由"不做专项功能"改为**要交付的一档**（驱动是这台 Ubuntu 载体机 + 自托管诉求，**不是**新增的 Linux 桌面用户证据）。工单与待拍点见 [Linux 端适配计划](../plans/linux-adaptation.md) |
 
 🔴 **本节此前写的是"未规划（可复用 Web / Tauri）"—— 已过期**：那是"桌面端拿 Web 顶一下"
 的思路，而 ADR-0031 已定"每端都交原生应用"、ADR-0034 把 Windows 定为 WinUI 3 原生。
@@ -469,7 +469,7 @@ pnpm build:ios                     # Release, iphonesimulator
 | iOS | 仅 Mac | `pnpm build:ios` | `Heyta.app` | ✅ 模拟器 |
 | Windows 桌面 | Windows | — | — | 🔲 选型未定 |
 | macOS 桌面 | Mac | — | — | 🔲 未规划 |
-| Linux 桌面 | Linux | — | — | 🔲 未规划 |
+| Linux 桌面 | Linux（构建在 `linux-dev-lan` 那台 Ubuntu 开发载体；**不是** `sanjiaozhou` —— 那是生产机，只借编译、不装包） | `pnpm build:linux <目标机\|local>` | `heyta_1.0.0_amd64.deb`（包内 `/usr/share/heyta/web-dist`） | ✅ **`.deb` 打过、解包态真窗口取过证**（07 04:4x，runbook §5.9）。⚠️ 未做：装进系统（`dpkg -i`）、签名/更新渠道、`reinstall-all.sh` 第五端 |
 | HarmonyOS | Mac | `pnpm verify:harmony-toolchain` 等三条 | `.hap`（release 20 MB / debug 37 MB，**均未签名**） | ⚠️ 有 HAP，未运行 |
 
 **签名现状**：Android release 用 debug keystore（可测试、不可上架）；

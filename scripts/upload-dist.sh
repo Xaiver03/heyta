@@ -36,6 +36,18 @@ done
 
 declare -a UPLOADED_NAME=() UPLOADED_PLATFORM=() UPLOADED_SHA=() UPLOADED_SIZE=()
 
+# 🔴 字节数要一条两边都认的取法。实测（06 15:4x，Ubuntu 24.04）：`stat -f%z` 在 GNU 上 rc=1、
+#    stdout 全空，只留一行 `stat: 无效的选项 -- %` —— 而本脚本 `set -euo pipefail`，
+#    于是上传在第一个产物那里当场死，症状是一行 stat 用法错，看不出"这脚本没打算在 Linux 跑"。
+#    GNU 在前（`stat -c %s` 在 BSD 上真的 rc=1，所以兜底会被走到）。
+file_size() { # <file> -> 字节数
+  local v
+  v=$(stat -c %s "$1" 2>/dev/null) || v=""
+  [ -n "$v" ] || v=$(stat -f%z "$1" 2>/dev/null) || v=""
+  [ -n "$v" ] || { echo "🔴 取不到字节数：$1（两种 stat 形状都失败）"; exit 1; }
+  printf '%s' "$v"
+}
+
 for entry in "${FILES[@]}"; do
   platform="${entry%%=*}"
   src="${entry#*=}"
@@ -48,7 +60,7 @@ for entry in "${FILES[@]}"; do
   name="heyta-${VERSION}-${platform}.${ext}"
   cp "$src" "$STAGE/$name"
   sha=$(shasum -a 256 "$STAGE/$name" | awk '{print $1}')
-  size=$(stat -f%z "$STAGE/$name")
+  size=$(file_size "$STAGE/$name")
   UPLOADED_NAME+=("$name"); UPLOADED_PLATFORM+=("$platform")
   UPLOADED_SHA+=("$sha"); UPLOADED_SIZE+=("$size")
 done
@@ -83,7 +95,7 @@ upload_one() {
   # 🔴 用**匿名** HEAD 验证 —— 带授权的成功证明不了公开读。
   local len size
   len=$(curl -sI "${BASE_URL}/${PREFIX}/${dest}/${name}" | tr -d '\r' | awk 'tolower($1)=="content-length:"{print $2}' | tail -1)
-  size=$(stat -f%z "$STAGE/$name")
+  size=$(file_size "$STAGE/$name")
   if [ -z "$len" ] || [ "$len" != "$size" ]; then
     echo "🔴 匿名回读失败：${dest}/${name}（HEAD content-length='${len}'，本地=${size}）"
     exit 1

@@ -223,3 +223,18 @@ tmp-commit-plan.sh
 # ⚠️ 它此前以跟踪态进过仓库；**忽略规则不会让已跟踪的文件消失**，要让它真正不再脏
 # 需要一次 `git rm --cached e2e/selfhost-stack-results/.last-run.json`（索引动作，留给所有者）。
 e2e/selfhost-stack-results/.last-run.json
+# 🔴 这套验收的**失败工件**里有一枚活的 E2EE 恢复码与账号 JWT（2026-10-06 现量：
+# `selfhost-web-S2-…/error-context.md` 把「加密数据钥匙 → 恢复码」那一屏逐字写进了无障碍树）。
+# AGENTS §10 的口径是"失败截图遮敏、trace/video 关闭、原始请求仅存于内存"，而
+# `error-context.md` **不受截图遮罩与 trace 开关保护**（它是 reporter 另存的一份快照）
+# ⇒ 这三类一律不许进版本库。拆栈带 `-v`（卷一起删），这枚码指向的库当场就不存在了；
+# 但"落在本机"与"会被一次 `git add -A` 顺手提交"是两件事，后者才是这条规则挡得住的那件。
+# ⚠️ 同目录 s1–s3 那几张**成功路径**截图仍可提交（§6.2 规定一要的就是它们），故不整目录忽略。
+e2e/selfhost-stack-results/**/error-context.md
+e2e/selfhost-stack-results/**/trace.zip
+e2e/selfhost-stack-results/**/test-failed-*.png
+# 跑批**进行中**的那枚暂存目录（`traces/` 与按哈希命名的快照图）。它正常收尾时会被
+# reporter 自己清掉，但**中途红一次就会留在盘上**（2026-10-06 现量：第四趟跑到 S2 时
+# `git status` 里出现 `?? selfhost-stack-results/.playwright-artifacts-0/`）。
+# 它和上面三行是同一份数据的**前身**，所以按前缀忽略，而不是按那一次的具体编号。
+e2e/selfhost-stack-results/.playwright-artifacts-*/
