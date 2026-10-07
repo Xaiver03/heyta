@@ -753,9 +753,6 @@ importers:
       '@heyta/domain':
         specifier: '*'
         version: link:../packages/domain
-      '@heyta/inbound-core':
-        specifier: workspace:*
-        version: link:../packages/inbound-core
       '@heyta/shared-schema':
         specifier: '*'
         version: link:../packages/shared-schema
