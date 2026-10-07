@@ -216,10 +216,41 @@ export const SITE_PAGES = [
     descriptionKey: 'site.features.seo.description',
   },
   {
+    id: 'download',
+    path: '/download',
+    group: 'product',
+    /**
+     * 🔴 **它进导航，而「平台」退到页脚 —— 同一条理由，不是审美。**
+     *
+     * 这两页回答的是两个不同阶段的问题：
+     *
+     *   · `/download` = 「**我现在这台机器怎么拿到它**」（行动）
+     *   · `/platforms` = 「**各端各到哪一步了**」（进度）
+     *
+     * 首访访客的问题只有第一个，而导航那一排只解决首访问题（`changelog` 那一行写的
+     * 就是这条判据）。把两个都留在导航里，访客会先撞见一页没有出口的散文，
+     * 再撞见一页有出口的东西 —— 而这两个链接看起来是同一件事。
+     *
+     * ⚠️ 「平台」**不是**因此变成孤岛：它 `inFooter: true`，也被下载面每一条"这一端
+     * 的进度"链住；而 N2 那条判据是从**渲染出的 DOM** 里走真实 href 的。
+     *
+     * 🔴 分界的另一半由代码保证：`/platforms` 上不许出现下载链接，
+     * `/download` 上不许自带一份状态口径（徽标从状态表按 `sectionId` 取回）。
+     * 判据在 `scripts/check-downloads.mjs` 与 `tests/downloads.spec.tsx`。
+     */
+    inNav: true,
+    inFooter: true,
+    labelKey: 'site.nav.download',
+    headingKey: 'site.download.title',
+    ledeKey: 'site.download.lede',
+    titleKey: 'site.download.seo.title',
+    descriptionKey: 'site.download.seo.description',
+  },
+  {
     id: 'platforms',
     path: '/platforms',
     group: 'product',
-    inNav: true,
+    inNav: false,
     inFooter: true,
     labelKey: 'site.nav.platforms',
     headingKey: 'site.platforms.title',
