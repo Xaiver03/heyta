@@ -30,6 +30,21 @@
  * "提交什么"由宿主决定。想顺手规范化就会在两端各长出一次，而它们必然分叉。
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 提交失败不静默、草稿不白丢（W8a）
+ *
+ * 提交是**异步裁决**的：`onAdd` 同步 throw 或返回的 Promise reject 都算失败
+ * （两种形态都在 `runNoteSubmit` 里兜住）—— 失败 ⇒ **草稿原样保留** +
+ * composer 下方一句 `labels.saveFailed`（`accessibilityRole="alert"`）；
+ * 成功 ⇒ 清草稿 + 熄提示。结局怎么落到状态上由 `notes/model.ts` 单点定义，
+ * 本组件零分支套用（所以 model 的测试红 = 这里的行为红）。
+ *
+ * ⚠️ 失败的**判定**在共享层，失败**说什么**在宿主：`labels.saveFailed` 是
+ * 必填项（可选 prop 会把"宿主没接"伪装成"做完了"，陷阱 #195）。宿主如果
+ * 把失败吞在自己肚子里（fire-and-forget 地 `void addNote(...)`），共享层
+ * 无从得知 —— 那一半要靠宿主接线时把失败原样交回来。
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * ─────────────────────────────────────────────────────────────────────────
  * 🔴 文案一律由宿主注入，本文件不 import `@heyta/i18n`
  *
  * 与 `TaskList` / `HabitBoard` / `OrganizerList` 同一个理由：i18n 包自己带过
@@ -58,14 +73,22 @@
  * 等价实现；`<textarea>` 在 iOS 上不存在。
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
 import type { Note } from '@heyta/domain';
 import { Pin, PinOff, Plus, Trash2 } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { isNoteDraftBlank, toNoteRows } from './model.js';
+import {
+  isNoteDraftBlank,
+  NOTE_COMPOSER_INITIAL,
+  noteComposerAfterOutcome,
+  noteComposerTyping,
+  runNoteSubmit,
+  toNoteRows,
+  type NoteComposerState,
+} from './model.js';
 
 /** 面板全部文案，**每一项都由宿主注入**（见文件头）。 */
 export interface NotesBoardLabels {
@@ -75,6 +98,14 @@ export interface NotesBoardLabels {
   readonly emptyHint: string;
   readonly composerPlaceholder: string;
   readonly add: string;
+  /**
+   * 提交失败时 composer 下方那一句（"没存上，内容还在，请重试"之类）。
+   *
+   * 🔴 **必填**：错误文案走 labels 管道，而可选 prop 会把"宿主没接线"
+   * 伪装成"做完了"（陷阱 #195）—— 必填让没接线的宿主在 typecheck 就红，
+   * 这是刻意的诚实信号（宿主接线由 W8b 补）。
+   */
+  readonly saveFailed: string;
   /** 未钉选时按钮上的字（点了会钉）。 */
   readonly pin: string;
   /** 已钉选时按钮上的字（点了会取消）。 */
@@ -97,8 +128,14 @@ export interface NotesBoardProps {
   /**
    * 新建。**内容校验的权威是宿主的 `createNoteActions`**（见文件头）——
    * 这里只在 `trim()` 后为空时不调用它。
+   *
+   * 🔴 失败必须能让共享层看见：**同步 throw** 或**返回会被 reject 的 Promise**
+   * 都会被兜住（`runNoteSubmit`），兜住之后的呈现是"草稿保留 +
+   * `labels.saveFailed`"。宿主若把失败吞在自己肚子里（对动作层返回的
+   * Promise 做 fire-and-forget 的 `void`），共享层无从得知，用户看到的
+   * 就还是"按钮没反应"—— 接线时把失败原样交回来（W8b）。
    */
-  readonly onAdd: (content: string) => void;
+  readonly onAdd: (content: string) => void | Promise<void>;
   /** 移除某一条。收便签 id。 */
   readonly onRemove: (entityId: string) => void;
   /** 切换钉选。`pinned` 是**目标值**（不是"切换一下"）。收便签 id。 */
@@ -243,17 +280,37 @@ export function NotesBoard({
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const rows = useMemo(() => toNoteRows(notes, excerptLength), [notes, excerptLength]);
-  const [draft, setDraft] = useState('');
+  const [composer, setComposer] = useState<NoteComposerState>(NOTE_COMPOSER_INITIAL);
+  const draft = composer.draft;
 
   /**
-   * 提交。**只挡"看起来是空的"**（见文件头）：
-   * `trim()` 后为空则不调用 `onAdd`，也不清空输入框 ——
-   * 清空会让用户以为自己写的空格被当成了一张便签。
+   * 提交在途标记。🔴 防连点两下是**界面**的职责（`note-actions.ts` 文件头明写：
+   * 便签 id 是随机的、没有自然键可幂等，数据层替它挡不了）。提交改为异步
+   * 裁决之后，按下到落库之间多出一段真实等待、草稿又还留在输入框里，
+   * 不挡的话双击就是两张便签。用 ref 而不是 state：只在本函数里读写，
+   * 不需要触发渲染。
+   */
+  const submittingRef = useRef(false);
+
+  /**
+   * 提交。**只挡"看起来是空的"**（见文件头）：`trim()` 后为空则不调用 `onAdd`，
+   * 也不清空输入框 —— 清空会让用户以为自己写的空格被当成了一张便签。
+   *
+   * 其余结局（成功清草稿 / 失败保草稿 + 亮 `labels.saveFailed`）全部由
+   * `noteComposerAfterOutcome` 单点定义，本函数只把它的输出装进状态 ——
+   * 判断在 model、可测也在 model。
    */
   function submit(): void {
-    if (isNoteDraftBlank(draft)) return;
-    onAdd(draft);
-    setDraft('');
+    if (submittingRef.current) return;
+    const submitted = draft;
+    submittingRef.current = true;
+    void runNoteSubmit(submitted, onAdd)
+      .then((outcome) => {
+        setComposer((state) => noteComposerAfterOutcome(state, submitted, outcome));
+      })
+      .finally(() => {
+        submittingRef.current = false;
+      });
   }
 
   return (
@@ -265,7 +322,10 @@ export function NotesBoard({
           placeholder={labels.composerPlaceholder}
           placeholderTextColor={tokens['color.foreground-subtle']}
           accessibilityLabel={labels.composerPlaceholder}
-          onChangeText={setDraft}
+          onChangeText={(next) => {
+            // 打字不清提示（`noteComposerTyping`）：见 model 里那条注释。
+            setComposer((state) => noteComposerTyping(state, next));
+          }}
           onSubmitEditing={submit}
           returnKeyType="done"
           testID="notes-input"
@@ -287,6 +347,23 @@ export function NotesBoard({
           <Text style={[text.caption, styles.addText]}>{labels.add}</Text>
         </Pressable>
       </View>
+
+      {/*
+        🔴 提交失败必须看得见（W8a）：静默的话用户会以为便签存上了。
+        与 `FocusPanel` 的落盘失败提示同一个模式：`accessibilityRole="alert"`
+        （RNW 落 `role="alert"`，读屏会播报）+ `color.danger`。位置贴着
+        composer —— 失败发生在输入这里，提示就长在输入旁边。再次输入时
+        保留，直到下一次提交的结局来更新（`noteComposerTyping`）。
+      */}
+      {composer.saveFailed ? (
+        <Text
+          accessibilityRole="alert"
+          style={[text['row-meta'], { color: tokens['color.danger'] }]}
+          testID="notes-save-failed"
+        >
+          {labels.saveFailed}
+        </Text>
+      ) : null}
 
       {rows.length === 0 ? (
         <View style={styles.empty} testID="notes-empty">

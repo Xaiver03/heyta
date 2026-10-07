@@ -124,6 +124,11 @@ export interface QuadrantBoardProps {
   readonly onToggleTask: (taskId: string) => void;
   /** 点整行的行为。**给了就打开详情；不给时整行不可点**（理由见 `TaskList`）。 */
   readonly onOpenTask?: (taskId: string) => void;
+  /** 移动端长按快捷入口；长按只是批量选择的快捷方式，不能成为唯一入口。 */
+  readonly onLongPressTask?: (taskId: string) => void;
+  /** 批量选择态沿用任务列表的同一套行语义。 */
+  readonly selectedTaskIds?: ReadonlySet<string>;
+  readonly selectionMode?: boolean;
   /**
    * 选中的那一行 —— 原样转给 `TaskList` 的 `activeTaskId`，四格共用一个值。
    *
@@ -156,6 +161,15 @@ export interface QuadrantBoardProps {
    * 不传就完全不产出这一层 —— mobile 没有鼠标，也就不需要。
    */
   readonly renderCellOverlay?: (card: QuadrantCardModel) => React.ReactNode;
+  /**
+   * 标题行**行尾**的宿主插槽（W5：web 用它挂任务计数徽标）。
+   *
+   * 与 `renderMeta` / `renderTrailing` / `renderCellOverlay` 同一条纪律：
+   * 内容（徽标长什么样、无障碍名怎么拼）归宿主，共享层只给**位置** ——
+   * 标题行是本组件渲染的，宿主没有别的入口把东西放进那一行。
+   * 不传就完全不产出 —— mobile 不传，DOM 逐字节不变。
+   */
+  readonly renderHeaderTrailing?: (card: QuadrantCardModel) => React.ReactNode;
   /**
    * 🔴 **摆两列还是单列 —— 由宿主决定，共享层不猜。**
    *
@@ -257,6 +271,20 @@ function makeStyles(tokens: HeytaNativeTokens) {
     cellHighlighted: {
       borderColor: tokens['color.primary'],
     },
+    /**
+     * 🔴 **空格铺满是正确形态**（2026-10-06 产品负责人看过 W5 实装后拍板，
+     * 附滴答桌面截图为证：2×2 等分占满视口、空象限居中一句"没有任务"）。
+     *
+     * 历史注记（防再摆回）：W5 曾按审计 §4-5 给两列形态的空格上过
+     * `alignSelf:'flex-start'`（退回内容高度）—— 实装当天即被推翻：
+     * 四象限的心智模型就是"一屏四格"的**固定框架**，空格塌缩反而让
+     * 看板读起来像没加载完。W5 保留的是另外三样：占位去重（同屏 ≤1 处
+     * 引导文案）、计数徽标、规则说明收进「帮助」——那三样与铺满不冲突。
+     *
+     * ⚠️ 行/格的拉伸由 `styles.row`（`flexGrow`）与 `styles.cell`（默认
+     * `stretch`）自然完成，这里**不需要**任何按 count 的分支 ——
+     * 任何"空格特殊布局"的提案先过产品负责人。
+     */
     header: {
       marginBottom: tokens['space.2'],
     },
@@ -264,6 +292,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: tokens['space.2'],
+    },
+    /** 标题行的行尾插槽容器：`marginLeft: 'auto'` 把它推到行的另一头。 */
+    headerTrailing: {
+      marginLeft: 'auto',
     },
     /**
      * 色块：象限色只在这里出现，用**语义 token**（`color.quadrant-N`）
@@ -312,6 +344,9 @@ export function QuadrantBoard({
   labels,
   onToggleTask,
   onOpenTask,
+  onLongPressTask,
+  selectedTaskIds,
+  selectionMode = false,
   activeTaskId,
   taskLabels,
   renderMeta,
@@ -320,6 +355,7 @@ export function QuadrantBoard({
   fallbackTitle,
   highlightedQuadrant,
   renderCellOverlay,
+  renderHeaderTrailing,
   twoColumns = false,
   testID,
 }: QuadrantBoardProps): React.JSX.Element {
@@ -364,6 +400,9 @@ export function QuadrantBoard({
                   <View style={styles.headerRow}>
                     <View style={[styles.swatch, { backgroundColor: tokens[card.token] }]} />
                     <Text style={[text['row-meta'], styles.cellTitle]}>{title}</Text>
+                    {renderHeaderTrailing === undefined ? null : (
+                      <View style={styles.headerTrailing}>{renderHeaderTrailing(card)}</View>
+                    )}
                   </View>
                   <Text style={[text.caption, styles.cellHint]}>{hint}</Text>
                 </View>
@@ -376,6 +415,9 @@ export function QuadrantBoard({
                     tasks={card.tasks}
                     onToggleTask={onToggleTask}
                     onOpenTask={onOpenTask}
+                    onLongPressTask={onLongPressTask}
+                    selectedTaskIds={selectedTaskIds}
+                    selectionMode={selectionMode}
                     activeTaskId={activeTaskId}
                     labels={taskLabels}
                     renderMeta={renderMeta}

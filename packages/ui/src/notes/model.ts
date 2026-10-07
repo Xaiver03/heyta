@@ -92,3 +92,91 @@ export function toNoteRows(
 export function isNoteDraftBlank(draft: string): boolean {
   return draft.trim() === '';
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * 提交结局与 composer 状态机（W8a）
+ * =======================================================================
+ *
+ * 🔴 修的是哪条：`NotesBoard` 的 submit 原来是「先 `onAdd` 再无条件
+ * `setDraft('')`」—— `onAdd` 失败（最现实的一例：正文超过 10,000 字上限被
+ * `createNoteActions` 拒绝）时，**错误被吞掉、用户刚敲的内容也被清掉**。
+ * 上限拒绝恰恰发生在用户写得最用心的那一次。
+ *
+ * 两件事分开定义、分开可测：
+ *   1. 「这一次提交成没成」（{@link runNoteSubmit}）—— 两种失败形态
+ *      （同步 throw / Promise reject）在这里折成一个结局；
+ *   2. 「结局落到界面上是什么样」（{@link noteComposerAfterOutcome}）——
+ *      失败保草稿、成功才清。组件零分支套用它们的输出，所以这里红 = 那里红。
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/** 一次提交尝试的结局。 */
+export type NoteSubmitOutcome =
+  | /** 草稿看起来是空的：**没有调用 `onAdd`**（挡板，见 `isNoteDraftBlank`）。 */
+  'blank'
+  | /** `onAdd` 正常返回，或返回的 Promise 兑现。 */
+  'saved'
+  | /** `onAdd` 同步 throw，或返回的 Promise reject —— 两种形态一视同仁。 */
+  'failed';
+
+/**
+ * 跑一次提交：空白挡板 + 把两种失败形态都兜住。
+ *
+ * ⚠️ 宿主的 `onAdd` 两种形态都真实存在：`createNote` 是 async 函数，它内部
+ * 同步 `throw` 出去也会变成 reject；而宿主的接线函数本身完全可能同步 throw。
+ * 只兜其中一种，另一种就还是"静默吞掉"。
+ *
+ * 这一层**不决定**失败后界面长什么样（那是 `noteComposerAfterOutcome` 的事），
+ * 也不吞掉错误细节之外的东西：错误对象在这里就地丢弃 —— 共享层只呈现
+ * `labels.saveFailed` 那一句，要说更具体的原因是宿主（i18n）的事。
+ */
+export async function runNoteSubmit(
+  draft: string,
+  onAdd: (content: string) => void | Promise<void>,
+): Promise<NoteSubmitOutcome> {
+  if (isNoteDraftBlank(draft)) return 'blank';
+  try {
+    await onAdd(draft);
+    return 'saved';
+  } catch {
+    return 'failed';
+  }
+}
+
+/** composer 的状态：草稿 +「上一次提交失败了吗」。 */
+export interface NoteComposerState {
+  readonly draft: string;
+  /** 为 `true` 时 composer 下方渲染 `labels.saveFailed`（alert 语义）。 */
+  readonly saveFailed: boolean;
+}
+
+/** 初始状态：空草稿、无提示。 */
+export const NOTE_COMPOSER_INITIAL: NoteComposerState = { draft: '', saveFailed: false };
+
+/**
+ * 用户又敲了一个字。🔴 **错误提示不在打字时熄灭**，保留到下一次提交的结局
+ * 来更新它为止："上一次没存上"这个事实在用户改字期间仍然成立，边打边闪
+ * 还会让读屏用户听到提示被反复播报又反复撤回。
+ */
+export function noteComposerTyping(state: NoteComposerState, draft: string): NoteComposerState {
+  return { ...state, draft };
+}
+
+/**
+ * 把提交结局落到 composer 状态上。
+ *
+ * - `blank`：什么都没发生，状态原样；
+ * - `failed`：🔴 **草稿原样保留**（W8a 的核心）+ 亮提示 —— 保留的是**当前**
+ *   整份草稿：落库在途期间用户接着敲的字也是用户的输入，一样不能吞；
+ * - `saved`：清草稿 + 熄提示 —— 但**只清"仍是所提交内容"的那一份**：草稿
+ *   若已在落库期间被改动，说明用户开始了下一条，清掉等于把在途输入吞掉
+ *   （与失败吞草稿同一种罪，只是更难得逞）。
+ */
+export function noteComposerAfterOutcome(
+  state: NoteComposerState,
+  submitted: string,
+  outcome: NoteSubmitOutcome,
+): NoteComposerState {
+  if (outcome === 'blank') return state;
+  if (outcome === 'failed') return { ...state, saveFailed: true };
+  return { draft: state.draft === submitted ? '' : state.draft, saveFailed: false };
+}
