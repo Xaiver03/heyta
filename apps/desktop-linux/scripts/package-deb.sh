@@ -346,6 +346,7 @@ else
   rsync -az --delete \
     --include='/*' --include='/apps/' --include='/apps/desktop-linux/***' \
     --include='/packages/' --include='/packages/app-host/' --include='/packages/app-host/bridge-bundle/***' \
+    --include='/packages/design-system/' --include='/packages/design-system/generated/***' \
     --include='/apps/web/' --include='/apps/web/public/' --include='/apps/web/public/icons/***' \
     --include='/apps/web/dist/***' \
     --exclude='*' \
