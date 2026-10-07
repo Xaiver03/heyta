@@ -39,6 +39,20 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/features/" />
   </url>
   <url>
+    <loc>https://heyta.waytofuture.cn/download/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/download/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/download/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/download/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/download/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/download/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/download/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/download/" />
+  </url>
+  <url>
     <loc>https://heyta.waytofuture.cn/platforms/</loc>
     <changefreq>weekly</changefreq>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/platforms/" />

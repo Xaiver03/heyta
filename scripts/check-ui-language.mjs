@@ -257,6 +257,17 @@ const UNTRANSLATABLE_KEYS = new Set([
   'site.platforms.harmony.name',
   // 技术缩写：中文语境里本来就这么写（写成「人工智能」反而让缩写对不上）
   'site.pricing.compare.row.ai',
+  // 🔴 下载面的端名与架构标识（ADR-0058）。为什么状态页那一侧的同类值不在这里：
+  //    `/platforms` 只到 `web/android/ios/harmony` 与一句「桌面（Windows / macOS / Linux）」，
+  //    而下载面必须拆到 OS 粒度才能各自给出口与架构 —— 于是 macOS / Linux 这两个**产品名**
+  //    第一次以独立词条出现。架构值（`x64` / `x86_64`）是标识符：翻译它等于给错指令。
+  'site.download.row.macos.name',
+  'site.download.row.ios.name',
+  'site.download.row.android.name',
+  'site.download.row.windows.name',
+  'site.download.row.linux.name',
+  'site.download.row.windows.arch',
+  'site.download.row.linux.arch',
 ]);
 
 /**

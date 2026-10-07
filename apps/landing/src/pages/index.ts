@@ -25,6 +25,7 @@ import { Landing } from '../Landing.js';
 import { ChangelogPage } from './ChangelogPage.js';
 import { DocsArticlePage } from './DocsArticlePage.js';
 import { DocsCategoryPage } from './DocsCategoryPage.js';
+import { DownloadPage } from './DownloadPage.js';
 import { FeaturesPage } from './FeaturesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { IntegrationsPage } from './IntegrationsPage.js';
@@ -39,6 +40,7 @@ type PageComponent = ComponentType<{ page: SitePage }>;
 export const PAGE_COMPONENTS: Record<SitePageId, PageComponent> = {
   home: Landing,
   features: FeaturesPage,
+  download: DownloadPage,
   platforms: PlatformsPage,
   pricing: PricingPage,
   integrations: IntegrationsPage,

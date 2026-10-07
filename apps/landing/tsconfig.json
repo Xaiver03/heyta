@@ -8,6 +8,7 @@
     "jsx": "react-jsx",
     "types": ["vite/client"]
   },
-  "include": ["src/**/*"],
+  // 🔴 `.json` 要**单独列一条**：TS 的 `include` 默认只收 `.ts/.tsx/.d.ts`，开了 `resolveJsonModule` 也不会把 JSON 算进项目文件表。不补这一条的后果不是"构建少个文件"，而是 `tsc -b` 报 TS6307 —— 而它只在**发布构建**那一档出现（`pnpm --filter @heyta/landing typecheck` 走的是 spec 配置，那边 rootDir 放宽了，所以本地是绿的）。
+  "include": ["src/**/*", "src/**/*.json"],
   "exclude": ["node_modules", "dist", "dist-types"]
 }

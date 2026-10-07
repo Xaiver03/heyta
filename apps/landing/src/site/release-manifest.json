@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "releasedAt": "2026-10-07T03:41:45+00:00",
+  "files": {
+    "android": {
+      "name": "heyta-0.0.0-dev-android.apk",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-0.0.0-dev-android.apk",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/0.0.0-dev/heyta-0.0.0-dev-android.apk",
+      "sha256": "a911ce7752fe228bbae62031421b906e2938cea93df47acbc164c737505071aa",
+      "size": 66049508,
+      "version": "0.0.0-dev"
+    },
+    "macos": {
+      "name": "heyta-1.0.0-macos.dmg",
+      "url": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/latest/heyta-1.0.0-macos.dmg",
+      "versionedUrl": "https://heyta-dist-1380503169.cos.ap-guangzhou.myqcloud.com/app-releases/heyta/1.0.0/heyta-1.0.0-macos.dmg",
+      "sha256": "15ae558303543482cd42e43a986b617a64457a389bef8197966d157cd526fe12",
+      "size": 2362276,
+      "version": "1.0.0",
+      "releasedAt": "2026-10-07T03:41:45+00:00"
+    }
+  }
+}
