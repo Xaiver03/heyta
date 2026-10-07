@@ -859,6 +859,11 @@ test('五个分类页都真的可达：卡片恰好是这一组的文章，侧�
  * 测试里再 import 一遍就成了自我印证。加一篇没配图的文章、或把某篇在注册表里挪个位置，
  * 这张表必须跟着改 —— 而浏览器里那行字面必须对上，对不上就红。
  *
+ * 🔴 **2026-10-07 就发生了一次**：新增 `/download`（[ADR-0058](../../docs/adr/0058-download-page-and-manifest-single-source.md)）插在 `features` 与 `platforms` 之间，
+ *    于是每一篇文章的注册序整体 +1，`first-run` 从 `图 14-1` 变 `图 15-1`。
+ *    这一批编号因此**按新顺序重述**，而不是把注册表挪回去 —— 规则本身没改：
+ *    图号仍然由注册表顺序现算，挪动任何一页仍然会让这一条红。
+ *
  * ⚠️ `file` 不是装饰：它是 `gen-help-figures.mjs` 落盘的复制品名。
  * 渲染器与生成器共用 `helpFigures.ts` 那一条命名规则，这里第三个视图对不上，
  * 说明有一处悄悄改了规则。
@@ -870,18 +875,18 @@ const FIGURES: readonly {
   readonly number: string;
   readonly file: string;
 }[] = [
-  { article: 'first-run', locale: 'zh-CN', sectionId: 'first-screen', number: '图 14-1', file: 'W01-tasks.png' },
-  { article: 'concepts', locale: 'zh-CN', sectionId: 'habits', number: '图 15-1', file: 'W03-habits.png' },
-  { article: 'views', locale: 'zh-CN', sectionId: 'quadrant', number: '图 20-1', file: 'W02-quadrant.png' },
-  { article: 'views', locale: 'zh-CN', sectionId: 'timeline', number: '图 20-2', file: 'W05-timeline.png' },
-  { article: 'trash', locale: 'zh-CN', sectionId: 'what-the-trash-holds', number: '图 25-1', file: 'W07-trash.png' },
+  { article: 'first-run', locale: 'zh-CN', sectionId: 'first-screen', number: '图 15-1', file: 'W01-tasks.png' },
+  { article: 'concepts', locale: 'zh-CN', sectionId: 'habits', number: '图 16-1', file: 'W03-habits.png' },
+  { article: 'views', locale: 'zh-CN', sectionId: 'quadrant', number: '图 21-1', file: 'W02-quadrant.png' },
+  { article: 'views', locale: 'zh-CN', sectionId: 'timeline', number: '图 21-2', file: 'W05-timeline.png' },
+  { article: 'trash', locale: 'zh-CN', sectionId: 'what-the-trash-holds', number: '图 26-1', file: 'W07-trash.png' },
   // 🔴 英文版挂**英文界面**的截图（B1 解决后的新产品事实）：同一节、同一图号，
   //    文件是 `*-en-*.png` 那一批 —— 与 zh 行逐行成对，顺序也一致。
-  { article: 'first-run', locale: 'en', sectionId: 'first-screen', number: 'Figure 14-1', file: 'W01-en-tasks.png' },
-  { article: 'concepts', locale: 'en', sectionId: 'habits', number: 'Figure 15-1', file: 'W03-en-habits.png' },
-  { article: 'views', locale: 'en', sectionId: 'quadrant', number: 'Figure 20-1', file: 'W02-en-quadrant.png' },
-  { article: 'views', locale: 'en', sectionId: 'timeline', number: 'Figure 20-2', file: 'W05-en-timeline.png' },
-  { article: 'trash', locale: 'en', sectionId: 'what-the-trash-holds', number: 'Figure 25-1', file: 'W07-en-trash.png' },
+  { article: 'first-run', locale: 'en', sectionId: 'first-screen', number: 'Figure 15-1', file: 'W01-en-tasks.png' },
+  { article: 'concepts', locale: 'en', sectionId: 'habits', number: 'Figure 16-1', file: 'W03-en-habits.png' },
+  { article: 'views', locale: 'en', sectionId: 'quadrant', number: 'Figure 21-1', file: 'W02-en-quadrant.png' },
+  { article: 'views', locale: 'en', sectionId: 'timeline', number: 'Figure 21-2', file: 'W05-en-timeline.png' },
+  { article: 'trash', locale: 'en', sectionId: 'what-the-trash-holds', number: 'Figure 26-1', file: 'W07-en-trash.png' },
 ];
 
 const FIGURED_ARTICLE_IDS = [...new Set(FIGURES.map((figure) => figure.article))];

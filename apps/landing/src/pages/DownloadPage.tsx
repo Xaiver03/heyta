@@ -237,7 +237,8 @@ function FileExit({
 }): React.JSX.Element {
   return (
     <div className="dl-exit">
-      <a className="lp-btn lp-btn--primary" href={file.url}>
+      {/* 分发桶是**另一个来源**：外链一律带 rel（`render.spec.tsx` 那条整站不变量抓的就是这个）。 */}
+      <a className="lp-btn lp-btn--primary" href={file.url} rel="noopener noreferrer">
         <KeyText messageKey="site.download.get" />
       </a>
       <dl className="dl-meta">
