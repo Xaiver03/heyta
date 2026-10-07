@@ -260,19 +260,42 @@ describe('栏里那一格的外壳形状（pane 级不变量，五格共用一�
    *   注入落在这个 pane 里的哪一格都一样）。同一个判断写三遍，就是 AGENTS §3.2
    *   那条"失败判据被抄了三遍、三遍都漏"的同族形状 —— 而且它会把臂的红集读成"判据变多了"。
    *   合成一条之后：一条不变量 → 一个所有者 → 一次注入红一条。
+   *
+   * ⚠️ W6（审计 §4.6）之后这条**重新钉过一次**，动因不是放松：产品裁决把自定义
+   *   RRULE 收进「高级」折叠（`TaskRepeat.tsx` 文件头第 4 条），编辑本体自带的
+   *   这枚 `<details>` 是**要的东西**，"栏里一律不许有 `<details>`"从此是一条
+   *   会挡住产品裁决的判据。重新钉成三条**更窄也更有牙**的：
+   *     ① 玻璃浮层外壳（`.ht-material`）仍然整个禁入（原来那半，一字未动）；
+   *     ② 折叠机关**默认必须收起**（进栏就展开 = 把噪声常驻）；
+   *     ③ **主编辑器不许藏进折叠**（radio/checkbox/select/textarea/月历任何一样
+   *        被收进 `<details>`，那一格的字段就"默认看不见"—— 这正是当年禁入的动因）。
+   *   e2e 侧同族判据（`detail-pane-task.spec.ts` 的 T10）钉的是
+   *   `details.ht-compose--popover` 那一档，不受这枚 classless 折叠影响。
    */
-  it('🔴 栏里那一格不许有行尾的两层外壳（`<details>` 展开机关 / `.ht-material` 玻璃浮层）', async () => {
+  it('🔴 栏里的折叠机关只许是收起的「高级」：浮层仍禁入、默认收起、主编辑器不许藏进折叠', async () => {
     const id = await addTask('外壳甲');
     selection.select('task', id);
     mount();
     const box = document.querySelector('[data-testid="task-pane"]');
     if (box === null) throw new Error('栏里没画面单 ⇒ 这一条判据在空转');
-    // 展开机关属于行尾那一支：栏里那一格再套一层 `<details>`，收起时里面**不画**，
-    // 用户读到的是"这一格里还有一层没打开"。
-    expect(box.querySelector('details'), '拿到了行尾的展开机关').toBeNull();
-    // 玻璃浮层同理：一栏里出现 `position:absolute` 的浮层面板，读到的是"这格里漂着
-    // 一块不属于这格的板子"。
+    // ① 行尾的浮层外壳不许进栏：一栏里漂一块 `position:absolute` 的板子，
+    //    用户读到的是"这格里浮着一块不属于这格的板子"。
     expect(box.querySelector('.ht-material'), '拿到了行尾的浮层外壳').toBeNull();
+    const disclosures = [...box.querySelectorAll('details')];
+    for (const d of disclosures) {
+      // ② 折叠默认收起。
+      expect(d.open, '折叠机关默认就是展开的').toBe(false);
+      // ③ 折叠里只许住进阶项（原始 RRULE 输入/应用/报错），主编辑器一样都不许进。
+      expect(d.querySelector('summary')?.textContent, '折叠的 summary 不是「高级」').toBe(
+        zhCN['web.tasks.detail.advanced'],
+      );
+      expect(
+        d.querySelectorAll(
+          'input[type="radio"], input[type="checkbox"], select, textarea, [data-testid="date-picker"]',
+        ).length,
+        '主编辑器被藏进了折叠（那一格的字段会"默认看不见"）',
+      ).toBe(0);
+    }
   });
 });
 

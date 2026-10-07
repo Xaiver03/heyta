@@ -81,14 +81,23 @@ interface TaskState {
 
   addTask: (title: string, over?: NewTaskFields) => Promise<void>;
   toggleComplete: (id: string) => Promise<void>;
+  bulkSetCompleted: (ids: readonly string[], completed: boolean) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  bulkDeleteTask: (ids: readonly string[]) => Promise<void>;
+  bulkRestoreTask: (ids: readonly string[]) => Promise<void>;
   /**
    * 从回收站恢复。**走 op-log**（一条 `UPD { deletedAt: null }`），
    * 所以另一台设备回放后也会看到条目回来 —— 不是只改本地 UI 状态。
    */
-  restoreTask: (id: string) => Promise<void>;
-  /** 彻底删除（不可逆）。用户已二次确认。 */
-  purgeTask: (id: string) => Promise<void>;
+  /** 还原（`false` = 它本来就在回收站外面，没写 op）。 */
+  restoreTask: (id: string) => Promise<boolean>;
+  /** 彻底删除（不可逆）。用户已二次确认。`false` = 它已经被彻底删过。 */
+  purgeTask: (id: string) => Promise<boolean>;
+  /**
+   * 改标题（W7：`app-host` 的 `rename` 一直存在，Web 上却没有任何调用点 ——
+   * 详情卡标题只读。trim / 空标题 throw / 存在性 throw 全在动作层）。
+   */
+  renameTask: (id: string, title: string) => Promise<void>;
   setPriority: (id: string, priority: Priority) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
   /**
@@ -113,6 +122,7 @@ interface TaskState {
   /** 写备注。AI 拆解出的清单就是经这里落到 `Task.note` 的。 */
   setNote: (id: string, note: string | undefined) => Promise<void>;
   moveToProject: (id: string, projectId: string | undefined) => Promise<void>;
+  bulkMoveToProject: (ids: readonly string[], projectId: string | undefined) => Promise<void>;
   /**
    * 改任务的父（子任务）。
    *
@@ -252,22 +262,41 @@ export const useTaskStore = create<TaskState>((set) => ({
     await taskActions.toggleCompleted(id);
   },
 
+  bulkSetCompleted: async (ids, completed) => {
+    await taskActions.bulkSetCompleted(ids, completed);
+  },
+
   deleteTask: async (id) => {
     // 软删除（墓碑）。`DEL` op 由 reducer 转成 `deletedAt` ——
     // 物理删除会让同步端永远看不到这次删除。
     await taskActions.remove(id);
   },
 
+  bulkDeleteTask: async (ids) => {
+    await taskActions.bulkRemove(ids);
+  },
+
+  bulkRestoreTask: async (ids) => {
+    await taskActions.bulkRestore(ids);
+  },
+
   restoreTask: async (id) => {
     // 恢复同样是一次 op（`UPD { deletedAt: null }`）。这里**不碰 entities** ——
     // 绕开 op-log 直接改状态就同步不出去，也会在下次同步时被墓碑覆盖回来。
-    await taskActions.restore(id);
+    return taskActions.restore(id);
   },
 
   purgeTask: async (id) => {
     // 写 `purgedAt` 标记（可加性字段，不 bump schema）。墓碑保留 ——
     // 清掉它会让离线端把这条旧数据又同步回来。
-    await taskActions.purge(id);
+    return taskActions.purge(id);
+  },
+
+  renameTask: async (id, title) => {
+    // 校验（trim / 空标题 throw / 找不到任务 throw）全在动作层，与本文件其余
+    // 写入同一条纪律：这里不预读状态、也不吞错 —— "界面摆着已被删掉的任务"
+    // 这类真问题要能一路冒出来（见文件头 toggleComplete 那条）。
+    await taskActions.rename(id, title);
   },
 
   setPriority: async (id, priority) => {
@@ -316,6 +345,10 @@ export const useTaskStore = create<TaskState>((set) => ({
 
   moveToProject: async (id, projectId) => {
     await taskActions.moveToProject(id, projectId);
+  },
+
+  bulkMoveToProject: async (ids, projectId) => {
+    await taskActions.bulkMoveToProject(ids, projectId);
   },
 
   setParent: async (id, parentId) => {
