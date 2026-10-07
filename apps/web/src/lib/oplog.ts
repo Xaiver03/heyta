@@ -16,6 +16,7 @@ import { OpLogEngine, type MaterializedState, type OpIntent } from '@heyta/op-lo
 import {
   createOpLogWirePort,
   createWorkerOpLogSession,
+  type DbDestroyReport,
   IndexedDbAdapter,
   IndexedDbOpLogStore,
   type OpLogStore,
@@ -270,6 +271,34 @@ export async function releaseStorageWorker(): Promise<void> {
 }
 
 /**
+ * 注销：销毁**这个页面会话真正在用的那个适配器实例**，而不是另开一个实例去删库。
+ *
+ * 🔴 为什么这一格不能省：`DbAdapter.destroy()` 的契约（`@heyta/storage` 的 errors.ts）说的是
+ * "销毁后的那个**实例**拒绝读写，而不是把刚删掉的容器重新建成空壳"。另开一个实例去 `destroy()`
+ * 删掉的是盘上的库，而页面里那个还带着活连接的实例**没有被标记成已销毁** —— 于是它的下一次读写
+ * 会把同名库**空着建回来**，界面看起来"注销成功了"，盘上却多了一个属于这个人的空壳容器，
+ * 而任何还攥着旧 store 的接线（同步客户端在构造时就把 store captures 住了）会安静地写进它。
+ * 政策承诺的是这台设备回到全新空状态，不是"回到一个刚被自己重建的壳"。
+ *
+ * 顺序要紧：先摘掉模块单例（让**后来者**走 `initOpLog()` 建一个全新实例 —— 重新登录是同一条页面
+ * 会话里发生的，不能被这里销毁的实例挡住），再销毁那个实例（让**旧句柄**的下一发读写以
+ * `AdapterDestroyedError` 失败）。两个方向各有各的判据，都钉在
+ * `apps/web/tests/local-data-destruction.spec.ts`。
+ *
+ * @returns 没开过存储（纯测试环境、或注销前一个 op 都没写过）就是 `undefined` ——
+ *          调用方据此回落到"新建一个实例去删"，那一发仍然要把盘上的库删掉。
+ */
+export async function destroyLiveStorage(): Promise<DbDestroyReport | undefined> {
+  const adapter = db;
+  if (adapter === undefined) return undefined;
+  db = undefined;
+  engine = undefined;
+  opLogStore = undefined;
+  initPromise = undefined;
+  return adapter.destroy();
+}
+
+/**
  * 把**旧 IndexedDB 里的 op** 一次性搬进 SQLite。
  *
  * 🔴 没有这一步，切到 SQLite 的用户会看到**一个空应用** ——
@@ -320,8 +349,47 @@ async function migrateLegacyOpfsSqlite(target: OpLogStore<Operation<string>>): P
     const worker = new Worker(new URL('../worker/storage.worker.ts', import.meta.url), {
       type: 'module',
     });
+    /**
+     * 🔴 **worker 起不来时 `session.ready` 永不落定** —— Worker 的 `error` 事件不会让它 reject，
+     * 于是这条"顺手迁移旧数据"的路径会把**启动整个挂死**，而上面第五条守卫写的是
+     * "失败不阻断启动，但必须留痕"。这句在实测之前只是文档意图。
+     *
+     * 实测形状（Linux 原生壳，2026-10-07 03:3x）：WebKitGTK 6.0 下自定义 scheme 的
+     * `type: 'module'` worker **构造即失败**（`worker-error` 有事件、message 为空，
+     * 而壳的 scheme 处理程序**根本没收到那一发请求**），页侧读数停在
+     * `port=1 posts=… mounted=0 backend=` 且**零条错误** —— 也就是"应用永远不开"。
+     *
+     * 所以这里把 error 变成一个**会被 `importIntoEmptyTarget` catch 的失败**，
+     * 让第五条守卫真的兑现：从空库开始，并在控制台留下痕迹。
+     * ⚠️ 对 Linux 壳这**不丢数据**：同一个 worker 正是当年写那份 OPFS 的唯一入口，
+     *    它在这一档 scheme 下从来没起来过 ⇒ 那里不可能有属于本机的旧库。
+     */
     const session = createWorkerOpLogSession<Operation<string>>(worker);
-    await session.ready;
+    try {
+      await Promise.race([
+        session.ready,
+        new Promise<never>((_, reject) => {
+          worker.addEventListener(
+            'error',
+            (event) =>
+              reject(
+                new Error(
+                  `旧 OPFS SQLite 的探测 worker 起不来：${event.message || '（无 message）'}`,
+                ),
+              ),
+            { once: true },
+          );
+        }),
+      ]);
+    } catch (error) {
+      /**
+       * 🔴 `importIntoEmptyTarget` 的 `close` 只在 `openSource()` **成功返回之后**才被赋值，
+       * 所以这条失败路径上没人会关掉这个 worker。新加的 `error` 分支让这条路第一次真的可达 ——
+       * 判据当场把它抓出来了（`失败的 worker 也要被关掉`）。
+       */
+      worker.terminate();
+      throw error;
+    }
     return { store: session.store, close: () => worker.terminate() };
   });
 }

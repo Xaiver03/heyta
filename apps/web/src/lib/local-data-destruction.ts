@@ -33,7 +33,7 @@
 import { IndexedDbAdapter, type DbDestroyReport } from '@heyta/storage';
 
 // 🔴 销毁 OPFS 之前要能关掉那个持句柄的 worker（为什么必须，见 `removeOpfsDirectory` 上面那段实测）。
-import { releaseStorageWorker } from './oplog.js';
+import { destroyLiveStorage, releaseStorageWorker } from './oplog.js';
 
 /**
  * 这个宿主管辖的 IndexedDB 数据库名。
@@ -258,12 +258,22 @@ export async function eraseWebLocalData(): Promise<DbDestroyReport[]> {
 
   // 1. 主库走**适配器自己的 destroy**（`DbAdapter.destroy` 契约的调用方就是这里；
   //    它此前零调用方，是 §10.2 那条取证点名的洞）。
-  try {
-    reports.push(await new IndexedDbAdapter(MAIN_DATABASE).destroy());
-  } catch (error) {
-    reports.push(
-      report(MAIN_DATABASE, false, { reason: `adapter-destroy-failed: ${(error as Error).message}` }),
-    );
+  // 🔴 优先销毁**这个页面会话真正在用的那个实例**（`destroyLiveStorage()`）。另开一个实例去删，
+  //    删掉的只是盘上的库，页面里那个还攥着活连接的实例没有被标记成已销毁 —— 它的下一发读写会把
+  //    同名库**空着建回来**：界面报"已清除"，盘上却留着一个属于这个人的空壳，而任何还 captures 着
+  //    旧 store 的接线会安静地写进它。没开过存储时（纯测试、或注销前一个 op 都没写）才回落到下面
+  //    那一发"新建实例去删"，因为那时盘上可能真有上一段会话留下的库。
+  const liveReport = await destroyLiveStorage();
+  if (liveReport !== undefined) {
+    reports.push(liveReport);
+  } else {
+    try {
+      reports.push(await new IndexedDbAdapter(MAIN_DATABASE).destroy());
+    } catch (error) {
+      reports.push(
+        report(MAIN_DATABASE, false, { reason: `adapter-destroy-failed: ${(error as Error).message}` }),
+      );
+    }
   }
 
   for (const name of WEB_DATABASE_NAMES) {

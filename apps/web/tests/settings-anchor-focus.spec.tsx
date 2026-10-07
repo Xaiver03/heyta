@@ -121,6 +121,22 @@ afterEach(() => {
 });
 
 describe('设置浮层的落位与焦点', () => {
+  it('设置页先给出分组目录与立即可见的关闭出口', async () => {
+    const el = await render();
+    act(() => {
+      useSyncStore.getState().openSettings();
+    });
+
+    const sheet = el.querySelector('[data-testid="settings-sheet"]')!;
+    const nav = sheet.querySelector('nav.ht-settings__nav')!;
+    expect(nav.querySelectorAll('a')).toHaveLength(7);
+    expect(nav.querySelector('a[href="#settings-group-sync"]')).not.toBeNull();
+    const close = sheet.querySelector('[data-testid="settings-sheet-close"]')!;
+    expect(close.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sheet.querySelector('#settings-group-profile')).not.toBeNull();
+    expect(sheet.querySelector('#settings-group-help')).not.toBeNull();
+  });
+
   it('同步设置请求 ⇒ 浮层打开、滚到「同步」那一节、焦点在**服务端地址框**里', async () => {
     const el = await render();
 

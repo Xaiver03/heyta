@@ -41,10 +41,18 @@
 
 ## 3. 备份侧：crypto-erase 解决 Art.32，不解决 Art.17（P-12）
 
-现量现状（`server/scripts/backup.sh`）：每日两份 `pg_dump` —— 整库 + **accounts（邮箱明文、口令散列、passkey 凭据）**，
-`.sql.gz` **不加密**，`RETENTION_DAYS` 默认 14（`server/docs/backup-and-recovery.md:45`），
-示例 cron 里却写 3 天（口径不一致，生产实际值未读）；已有 `umask 077` 与一个可选的加密脚本
+现量现状（**写这份 ADR 当时**的 `server/scripts/backup.sh`）：每日两份 `pg_dump` —— 整库 + **accounts（邮箱明文、口令散列、passkey 凭据）**，
+`.sql.gz` **不加密**，`RETENTION_DAYS` 默认 14，示例 cron 里却写 3 天（口径不一致）；已有 `umask 077` 与一个可选的加密脚本
 `server/tools/backup-encrypted.sh`（PostgreSQL → gzip → OpenSSL 流式加密，无中间明文文件），**未被接成默认路径**。
+
+🔴 **10-06 现量更正（这一段的三句"未接线/口径不一致"已经被本线自己那两板改掉，照旧文行动会做错事）**：
+默认产物现在是 `.sql.gz.enc`（管道里加密，盘上任何时刻不落明文；明文只能显式 `BACKUP_ALLOW_PLAINTEXT=1` 那一档，
+逐臂读数见计划 §10.247③），`RETENTION_DAYS` 的唯一事实源是 `server/scripts/backup.sh` 的默认值
+（现量：`grep -n 'RETENTION_DAYS=' server/scripts/backup.sh`），cron 示例里**不再写数字**，
+三方（脚本默认值 / runbook 表格 / 法务中英两句）由 `scripts/check-backup-retention.mjs` 对账，
+它自带六臂自检（现量：`node scripts/check-backup-retention.mjs --self-test` ⇒ `SELF_TEST=OK arms=6`）。
+**仍然开着的那一半**：生产机上到底几天、是否真的每日跑 —— 仓内证不出来（见 §6）。
+本 ADR 的裁决（crypto-erase 解决 Art.32、**不解决** Art.17）**没有因此改变**。
 
 两件事必须分开，否则会把一个安全措施当成权利实现：
 
@@ -95,5 +103,11 @@
 - **GDPR 硬阻塞项**：Art.27 欧盟境内代表、Art.33/34 泄露检测与通知、Art.30 处理活动记录、
   Art.44/46 跨境传输机制 —— 这些**不是代码问题**，需要运营者提供事实；逐项判定在
   `docs/research/legal-gdpr-alignment.md`。
-- **备份加密默认值**：待密钥托管方案（§3）。
-- **备份保留期口径不一致**：文档 14 天 vs 示例 cron 3 天，生产实际值未读 → 待核（`D-08` 同源）。
+- ~~**备份加密默认值**：待密钥托管方案（§3）~~ ✅ 10-06 现量已闭合：默认产物 `.sql.gz.enc`，
+  口令按 [ADR-0055](0055-account-tombstones-and-restore-gate.md) §5.2 的口径写成"**仓库之外下发 + 脚本校验形态**"
+  （存在 / 组其他位必须为 0 / 不与产物同目录，缺则拒绝且**不写任何产物**）——
+  ⚠️ 这一格买到的是"产物离开这台机器后不是明文"，**没买到**"本机 root 不可读"，照旧文读成后者会过度承诺。
+- ~~**备份保留期口径不一致**：文档 14 天 vs 示例 cron 3 天~~ ✅ 仓内那一半已闭合：数字定 14，
+  唯一事实源是 `server/scripts/backup.sh` 的默认值，cron 示例不再写数字，三方由
+  `scripts/check-backup-retention.mjs` 对账（六臂自检 `--self-test` 现量）。
+  🔴 **仍开着的一半**：生产机上到底几天、是否真的每日跑 —— 仓内证不出来，`D-08` 同源那条判断**没有变**。

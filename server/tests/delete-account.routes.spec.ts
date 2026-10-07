@@ -4,6 +4,8 @@ import Fastify, { FastifyInstance } from 'fastify';
 const mocks = vi.hoisted(() => ({
   closeForUser: vi.fn(),
   userDelete: vi.fn(),
+  tombstoneUpsert: vi.fn(),
+  transaction: vi.fn(),
 }));
 
 vi.mock('../src/sync/services/websocket-connection.service', () => ({
@@ -12,9 +14,25 @@ vi.mock('../src/sync/services/websocket-connection.service', () => ({
 
 // The global setup.ts prisma mock exposes only user.findUnique/update — this
 // route's cascade call (user.delete) is not on it, so redeclare the surface.
+// 🔴 `$transaction` is faked as a **runner** (`cb({…})`), not as `vi.fn()`:
+// a bare mock would let the route pass while the transaction body never ran,
+// and the tombstone would go unwritten in the test while being "asserted" green.
 vi.mock('../src/db', () => ({
   prisma: {
-    user: { delete: (...args: unknown[]) => mocks.userDelete(...args) },
+    $transaction: (cb: (tx: unknown) => Promise<unknown>) => {
+      mocks.transaction(cb);
+      return cb({
+        user: {
+          findUniqueOrThrow: async () => ({ email: 'someone@example.test' }),
+          delete: (...args: unknown[]) => mocks.userDelete(...args),
+        },
+        accountTombstone: {
+          upsert: (...args: unknown[]) => mocks.tombstoneUpsert(...args),
+        },
+      });
+    },
+    // 🔴 这里**故意不再挂** `user.delete`：路由绕过 `$transaction` 直接删的话,
+    // 那次删除会当场 TypeError ⇒ 500，而不是"看起来过了"。
   },
 }));
 
@@ -41,6 +59,8 @@ describe('DELETE /api/account (socket teardown)', () => {
   beforeEach(async () => {
     mocks.closeForUser.mockClear();
     mocks.userDelete.mockClear().mockResolvedValue({ id: 1 });
+    mocks.tombstoneUpsert.mockClear().mockResolvedValue({ userId: 1 });
+    mocks.transaction.mockClear();
     app = Fastify();
     await app.register(apiRoutes, { prefix: '/api', requireTermsConsent: false });
     await app.ready();
@@ -74,5 +94,28 @@ describe('DELETE /api/account (socket teardown)', () => {
 
     expect(res.statusCode).toBe(500);
     expect(mocks.closeForUser).not.toHaveBeenCalled();
+  });
+
+  it('writes the tombstone in the SAME transaction, before the delete (ADR-0055)', async () => {
+    const res = await inject();
+
+    expect(res.statusCode).toBe(200);
+    // 🔴 一次事务，不是两次提交：分开提交的形状是"账号没了、墓碑没落"，
+    // 而那正是恢复时没有任何一层记得该拒绝谁的那一半。
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.tombstoneUpsert).toHaveBeenCalledTimes(1);
+    expect(mocks.tombstoneUpsert.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.userDelete.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('the tombstone carries a hash, never the plaintext address', async () => {
+    await inject();
+
+    const call = mocks.tombstoneUpsert.mock.calls[0]?.[0] as object;
+    expect(call).toBeDefined();
+    const hash = (call as { create?: { emailHash?: string } }).create?.emailHash;
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(call)).not.toContain('someone@example.test');
   });
 });
