@@ -1,6 +1,7 @@
 # 备份侧的定点删除（P-12）：监管要求什么、本仓能做到哪一步
 
-状态：**调研 + 建议，未拍板**（拍板点写在 §6）。起因是批次 E 挂着的一条敞口：
+状态：**调研 + 建议 → B/C 两半已按 [ADR-0055](../adr/0055-account-tombstones-and-restore-gate.md) 落码（10-05 23:3x），
+A 与 §6 的三块板仍未拍**。起因是批次 E 挂着的一条敞口：
 注销在活库里有真硬删除，但**备份里没有"把某一个人单独删掉"的能力**，
 法务文档因此只能写成"随保留期自然过期"（`packages/legal/src/documents/privacy.ts:410`、
 `personal-info-list.ts:522-524`、`data-rights.ts:328`）。
@@ -36,7 +37,7 @@ ICO《Right to erasure》正面处理了备份，四句话可执行：
 | 主路径**不加密**，只有 `umask 077` + `chmod 700` | `backup.sh:28`、`:68`；`docs/adr/0049-…:45` |
 | 加密版与轮制版脚本**存在但没接线**（无 compose/CI/runbook 引用） | `server/tools/backup-encrypted.sh:76-80`、`backup-rotate.sh:3`；`ADR-0049:47`"未被接成默认路径" |
 | **仓内没有任何定时任务**；部署脚本明确不碰操作者的 crontab | `server/scripts/deploy.sh:504`、`:514-526` |
-| 生产机上到底几天、是否每日跑 —— **仓内无法证明**，runbook 自己的示例还与默认值打架（示例 `RETENTION_DAYS=3` vs 表里默认 14） | `server/docs/backup-and-recovery.md:35` vs `:45`；`ADR-0049:46,99` |
+| 生产机上到底几天、是否每日跑 —— **仓内无法证明**（~~runbook 自己的示例还与默认值打架~~：那一半 10-06 已闭合，cron 示例里不再写数字，见 §6 末） | `server/docs/backup-and-recovery.md`（现量：`grep -n RETENTION_DAYS server/docs/backup-and-recovery.md`）；`ADR-0049` §3 的 10-06 更正段 |
 | **没有恢复脚本**（`server/scripts/` 里只有 `backup.sh`） | `ls server/scripts` 现量 |
 | 服务端**没有**可解全量的托管密钥；根密钥客户端生成、Argon2id 包裹、AAD 带 `keyVersion` | `docs/adr/0050-…:11-13`、`:57`；`packages/sync-core/src/key-lifecycle.ts:255-266` |
 | 服务端持有的账号面密钥只有**全舰队共享**的两枚（Argon2 pepper、`JWT_SECRET`） | `server/src/password/hash.ts:10-15` |
@@ -61,9 +62,14 @@ ADR-0049 已经判过一次：crypto-erase 解决 Art.32、**不解决 Art.17**�
 
 **A. 把"established schedule"从声称变成对账。**
 唯一数字源：`RETENTION_DAYS` 与备份频率写进一处（照 `docs/reference/pricing-and-entitlements.md` 的 ssot 块那个形状），
-法务三份里的"14 天 / 每日一份"由它生成或对它；新门禁 `check:legal-backup-retention` 三方对账
-**脚本默认值 / runbook 示例 / 法务句子**，不一致就红。今天现成的第一条红就是它该抓的：
-`backup-and-recovery.md:35` 的 `RETENTION_DAYS=3` 与 `:45` 的默认 14 与 `privacy.ts:409-410` 的"每日一份 / 14 天"。
+法务三份里的"14 天 / 每日一份"由它生成或对它；门禁 `check:backup-retention`（脚本
+`scripts/check-backup-retention.mjs`，现量名：`node -e 'console.log(Object.keys(require("./package.json").scripts).filter(k=>/retention/.test(k)))'`）
+三方对账 **脚本默认值 / runbook 表格 / 法务中英两句**，不一致就红。
+~~今天现成的第一条红就是它该抓的：`backup-and-recovery.md:35` 的 `RETENTION_DAYS=3` 与 `:45` 的默认 14~~ ——
+**这一句在 10-06 被它自己要求的那一步否证**：cron 示例里的数字已摘掉（改成写明"窗口不在这里设，取 `backup.sh` 的默认值"），
+门禁落码后三方一致（现量：`node scripts/check-backup-retention.mjs` ⇒ `RESULT=OK days=14`），
+而"改任一处而不改其余就红"由它自带的六臂自检回答（现量：`--self-test` ⇒ `SELF_TEST=OK arms=6`，
+逐臂臂数由那条命令自己打印，不抄进文档）。
 ⚠️ 频率那一半**必须先在生产机上现量**（crontab 与产物 mtime），仓内证不出来；量不出来就不许在法务里写"每日"。
 
 **B. 账号面做真正的定点删除；密文面做 beyond use。**
@@ -76,6 +82,18 @@ ADR-0049 已经判过一次：crypto-erase 解决 Art.32、**不解决 Art.17**�
    ⇒ **新备份不再含已注销账号**；整库那份做不到，由 A 的窗口 + C 的恢复闸覆盖。
 3. 判据：造一个含"已注销账号"的旧 accounts 档 → 跑导出 → 数得出该 id **0 次**；
    变异 = 摘掉 `NOT IN` 那一支 ⇒ 必须恰好红一条。
+
+> 🔴 **10-05 23:3x 落地时的现量更正（B.2 那一半没有兑现对象，不做了）**：
+> 硬删发生在**活库**上（`DELETE /account` 删 users 行 + schema 级联），而两份产物都读活库
+> （`backup.sh` 的 `run_pg_dump` 是对容器里的库做的 dump）。⇒ **"新备份不再含已注销账号"是硬删
+> 已有的后果**，不需要行级过滤；`NOT IN` 那一支只对"旧产物"有效，而那一半由 A 的留存窗口
+> + C 的恢复闸覆盖。改成 `COPY` 形状会重做整条恢复路径，换来的是一条已经被活库保证的承诺 ⇒
+> **否决**，理由与后果记在 [ADR-0055](../adr/0055-account-tombstones-and-restore-gate.md) §3。
+> B.1 与 C **已按本文落地**（墓碑表 + CHECK + 同事务写入 + `server/scripts/restore.sh` 的拒绝式闸；
+> 判据在 `server/tests/account-tombstone.pglite.spec.ts`、`restore-script.spec.ts`、
+> `account-deletion-paths.spec.ts`）。B 那一半**实际落成的是**：accounts 产物补上
+> `--table=account_tombstones`，让"只恢复账号面"那条路径带上闸的输入。
+> A 仍然做不了 —— 它要 §6 第 1 块板（`RETENTION_DAYS` 到底是 3 还是 14），数字没定就没有唯一数字源可对账。
 
 **C. 补一条恢复闸（今天根本没有恢复脚本，这是最薄的一环）。**
 在服务端脚本目录里新增一枚恢复脚本（今天那里只有 `server/scripts/backup.sh` 一枚 —— 现量 `ls` 过）：

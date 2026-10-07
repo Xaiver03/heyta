@@ -1,4 +1,5 @@
 import { prisma, disconnectDb } from '../src/db';
+import { deleteAccountWithTombstone } from '../src/account/account-tombstones';
 import { Logger } from '../src/logger';
 
 const deleteUser = async (email: string) => {
@@ -13,11 +14,11 @@ const deleteUser = async (email: string) => {
       return;
     }
 
-    // Delete user
-    // Cascading deletes in schema will handle related data (operations, syncState, etc.)
-    await prisma.user.delete({
-      where: { id: user.id },
-    });
+    // Same entry point as DELETE /account: cascading deletes handle the related rows
+    // (operations, syncState, devices …) and the tombstone is written in that
+    // transaction, so an operator deleting an account cannot produce a backup-restorable
+    // account with no closure record.
+    await prisma.$transaction((tx) => deleteAccountWithTombstone(tx, user.id));
 
     Logger.info(`Successfully deleted user: ${email}`);
   } catch (error) {

@@ -42,6 +42,14 @@ RUN set -eux; \
 # heyta 的工作区定义在 pnpm-workspace.yaml（不在 package.json 的 `workspaces` 字段），
 # npm 根本看不到它是一个 monorepo，所以必须改用 pnpm。
 # 版本与根 package.json 的 `packageManager` 保持一致。
+#
+# 🔴 `ARG NPM_REGISTRY` 原来声明在下面 `pnpm install` 那一段，现在**提到这里**：
+# `corepack prepare` 只认环境变量 `COREPACK_NPM_REGISTRY`，而它排在 install **之前**，
+# 于是"换了源仍然停在 corepack"。实测这台主机与容器直连 `registry.npmjs.org` 都是
+# SSL EOF，而 `registry.npmmirror.com` 可达 —— 一枚旋钮两个消费者，不设第二条 ARG，
+# 因为两条就是两处默认值，漂了没人对账（下面 install 那段的注释仍指向这里）。
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ENV COREPACK_NPM_REGISTRY=${NPM_REGISTRY}
 RUN corepack enable && corepack prepare pnpm@11.8.0 --activate
 
 # 根工作区文件 + 各包的 package.json（先只拷清单，让依赖层可缓存）
@@ -71,7 +79,7 @@ COPY server/package.json ./server/
 # （日志里 `GET https://registry.npmjs.org/… error (23)`），于是还在同一处超时。
 # 锁文件里没有任何硬编码 URL（`grep registry.npmjs.org pnpm-lock.yaml` = 0），
 # 所以取包地址完全由配置决定 —— 把配置真的设上就行了。
-ARG NPM_REGISTRY=https://registry.npmjs.org/
+# ⚠️ `ARG NPM_REGISTRY` 不在这里声明（它在上面 corepack 之前，一枚旋钮两个消费者）。
 RUN pnpm config set registry "$NPM_REGISTRY" \
  && pnpm install --frozen-lockfile --ignore-scripts
 
@@ -110,6 +118,13 @@ RUN pnpm pack
 
 # 构建服务端
 WORKDIR /repo/server
+# 🔧 heyta 改动：Prisma 引擎的下载源可覆盖，与 `APK_MIRROR` / `NPM_REGISTRY` 同一族、同一个理由。
+# 默认逐字等于内置值（`https://binaries.prisma.sh`），不给参数时行为不变。
+# 这台主机的实测：`binaries.prisma.sh` 直连 000（主机与容器两侧都不可达），
+# 不给镜像就构建不出服务端 —— 它是这条路上第四枚必须换源的外网域名（前三枚分别是
+# `dl-cdn.alpinelinux.org`、`registry.npmjs.org`、`binaries.prisma.sh` 之外的 corepack）。
+ARG PRISMA_ENGINES_MIRROR=https://binaries.prisma.sh
+ENV PRISMA_ENGINES_MIRROR=${PRISMA_ENGINES_MIRROR}
 RUN pnpm exec prisma generate
 RUN rm -rf dist && pnpm run build
 
@@ -306,6 +321,10 @@ COPY --from=builder --chown=supersync:nodejs /repo/packages/domain/heyta-domain-
 #    那处 `@heyta/app-host` 是**注释**，值用的是字面量，由
 #    `server/tests/recover-artifact-envelope.spec.ts` 钉住），运行时不需要。
 ARG NPM_REGISTRY=https://registry.npmjs.org/
+# 与 builder 阶段同一个理由、同一个默认值：不给参数时逐字等于 Prisma 内置的
+# `https://binaries.prisma.sh`。这一层也要下一枚引擎，换源只在这一条路上生效不够。
+ARG PRISMA_ENGINES_MIRROR=https://binaries.prisma.sh
+ENV PRISMA_ENGINES_MIRROR=${PRISMA_ENGINES_MIRROR}
 RUN npm pkg delete devDependencies && \
     npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npm install --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \

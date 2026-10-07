@@ -31,6 +31,7 @@ import {
 } from './passkey';
 import { authenticate, getAuthUser } from './middleware';
 import { withAccountProfile } from './account/account-profile.store';
+import { deleteAccountWithTombstone } from './account/account-tombstones';
 import { evaluateLegalRecheck, recordLegalReconfirm } from './legal-recheck';
 import {
   loginWithEmailPassword,
@@ -730,8 +731,11 @@ export const apiRoutes = async (
         // AUTH_CACHE_INVALIDATION: account deletion must not leave a ghost-token window.
         authCache.invalidate(userId);
 
-        // Cascade delete handles: operations, syncState, devices (via Prisma schema)
-        await prisma.user.delete({ where: { id: userId } });
+        // Cascade delete handles: operations, syncState, devices (via Prisma schema).
+        // The tombstone is written in the SAME transaction (ADR-0055): split commits
+        // can leave "account gone, no tombstone", which is silent until a restore
+        // brings that person back.
+        await prisma.$transaction((tx) => deleteAccountWithTombstone(tx, userId));
         // AUTH_CACHE_INVALIDATION: account deletion must not leave a ghost-token window.
         authCache.invalidate(userId);
 
