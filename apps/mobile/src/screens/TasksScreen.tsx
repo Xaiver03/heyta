@@ -17,7 +17,7 @@
  * 全部来自 `@heyta/app-host` 的 `createTaskActions`。
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BackHandler,
   KeyboardAvoidingView,
@@ -29,6 +29,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  classifyQuadrant,
+  isImportant,
+  planQuadrantDrop,
+  Quadrant,
+  type QuadrantDropPlan,
+} from '@heyta/domain';
 import type { Project, Tag, Task, TaskSortKey } from '@heyta/domain';
 // `formatDayTitleText` 在壳里把领域层给的 `LocalDate` 说成当前语言：
 // **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
@@ -63,6 +70,7 @@ import { useToday } from '../lib/use-today';
 // 🔴 日期措辞已上移到共享层（见 `lib/date.ts` 文件头）：日历要在四端共用。
 import { formatDayTitleText } from '@heyta/ui';
 import { describeRecurrenceText } from '../lib/recurrence-display';
+import { quadrantBoardLabels } from '../lib/quadrant-display';
 import { useText, useTheme, useTokens } from '../theme';
 import {
   Button,
@@ -408,6 +416,7 @@ export function TasksScreen({
   onPendingCountChange?: (pending: number) => void;
 } = {}): React.JSX.Element {
   const tokens = useTokens();
+  const insets = useSafeAreaInsets();
   // 搜索框要 `fontSans` 与 `row-meta` 两样（都走归一化访问器）。
   const text = useText();
   const { native } = useTheme();
@@ -491,6 +500,21 @@ export function TasksScreen({
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [bulkUndoIds, setBulkUndoIds] = useState<readonly string[] | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [quadrantMoveTaskId, setQuadrantMoveTaskId] = useState<string | null>(null);
+  const [quadrantMoveUndo, setQuadrantMoveUndo] = useState<{
+    readonly taskId: string;
+    readonly plan: QuadrantDropPlan;
+    readonly target: Quadrant;
+    readonly changedDue: boolean;
+  } | null>(null);
+  const [quadrantMoveError, setQuadrantMoveError] = useState<string | null>(null);
+  /**
+   * A ref closes the same-frame gap before `setBusyId` re-renders the sheet.
+   * Without it, two rapid confirmations (or undo taps) can each enqueue an op
+   * before the disabled state reaches the button.
+   */
+  const quadrantMoveBusyRef = useRef(false);
+  const quadrantLabels = useMemo(() => quadrantBoardLabels(t), [t]);
   const chooseTaskSort = useCallback((next: TaskSortKey) => {
     // `writeTaskSort` 的返回值这里**刻意不消费**：写不进去的唯一后果是
     // "下次冷启动回到默认档"，而那一天的列表照常可用 —— 为它弹一句
@@ -639,6 +663,14 @@ export function TasksScreen({
     return () => clearTimeout(timer);
   }, [bulkUndoIds]);
 
+  // 四象限移动的撤销入口与批量删除使用同一条短时窗口，避免把旧动作
+  // 留在屏幕上，让用户误以为它仍然可以回滚。
+  useEffect(() => {
+    if (quadrantMoveUndo === null) return;
+    const timer = setTimeout(() => setQuadrantMoveUndo(null), 5000);
+    return () => clearTimeout(timer);
+  }, [quadrantMoveUndo]);
+
   const clearBulkSelection = useCallback(() => {
     setBulkSelecting(false);
     setSelectedTaskIds(new Set());
@@ -666,6 +698,11 @@ export function TasksScreen({
         setSearchOpen(false);
         return true;
       }
+      if (quadrantMoveUndo !== null || quadrantMoveError !== null) {
+        setQuadrantMoveUndo(null);
+        setQuadrantMoveError(null);
+        return true;
+      }
       if (editingNoteId !== null) {
         closeNote();
         return true;
@@ -690,6 +727,8 @@ export function TasksScreen({
     detailTaskId,
     editingNoteId,
     navigation.tab,
+    quadrantMoveError,
+    quadrantMoveUndo,
     searchOpen,
     sortPickerOpen,
   ]);
@@ -725,6 +764,62 @@ export function TasksScreen({
     },
     [actions, clearBulkSelection, refresh, selectedTaskIds],
   );
+
+  const moveTaskToQuadrant = useCallback(
+    async (target: Quadrant): Promise<void> => {
+      if (quadrantMoveBusyRef.current) return;
+      const taskId = quadrantMoveTaskId;
+      const task = taskId === null ? undefined : tasks.find((item) => item.id === taskId);
+      if (task === undefined || actions === null) return;
+
+      quadrantMoveBusyRef.current = true;
+      const plan = planQuadrantDrop(task, target, { now });
+      const undoPlan: QuadrantDropPlan = {
+        important: isImportant(task),
+        dueDate: task.dueDate ?? null,
+      };
+      setQuadrantMoveTaskId(null);
+      setQuadrantMoveError(null);
+      setBusyId(task.id);
+      try {
+        await actions.setQuadrantDrop(task.id, plan);
+        setQuadrantMoveUndo({
+          taskId: task.id,
+          plan: undoPlan,
+          target,
+          changedDue: plan.dueDateChange !== undefined,
+        });
+        refresh();
+      } catch {
+        // Keep transport/storage details out of product UI. The technical
+        // error remains available to diagnostics at the action boundary;
+        // this surface only needs the stable, localized recovery copy.
+        setQuadrantMoveError(t('web.quadrant.drop.error'));
+      } finally {
+        quadrantMoveBusyRef.current = false;
+        setBusyId(null);
+      }
+    },
+    [actions, now, quadrantMoveTaskId, quadrantMoveBusyRef, refresh, t, tasks],
+  );
+
+  const undoQuadrantMove = useCallback(async (): Promise<void> => {
+    if (quadrantMoveBusyRef.current) return;
+    const undo = quadrantMoveUndo;
+    if (undo === null || actions === null) return;
+    quadrantMoveBusyRef.current = true;
+    setQuadrantMoveUndo(null);
+    setBusyId(undo.taskId);
+    try {
+      await actions.setQuadrantDrop(undo.taskId, undo.plan);
+      refresh();
+    } catch {
+      setQuadrantMoveError(t('web.quadrant.drop.error'));
+    } finally {
+      quadrantMoveBusyRef.current = false;
+      setBusyId(null);
+    }
+  }, [actions, quadrantMoveBusyRef, quadrantMoveUndo, refresh, t]);
 
   /**
    * 离开这一屏时收起"详情"这一层。
@@ -832,6 +927,10 @@ export function TasksScreen({
   }, [pending, onPendingCountChange]);
 
   const nothing = tasks.length === 0;
+  const quadrantMoveTask =
+    quadrantMoveTaskId === null ? undefined : tasks.find((task) => task.id === quadrantMoveTaskId);
+  const quadrantMoveCurrent =
+    quadrantMoveTask === undefined ? undefined : classifyQuadrant(quadrantMoveTask, { now });
 
   /**
    * 分节数据交给共享 `TaskList`（M1-4）。
@@ -955,6 +1054,25 @@ export function TasksScreen({
     [actions, runFor, t, tokens],
   );
 
+  /** 四象限里的显式移动入口：一行意图一次调用，沿用领域层投放计划。 */
+  const renderQuadrantTrailing = useCallback(
+    (row: SharedTaskRow): React.ReactNode => (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
+        <IconButton
+          icon="action.more"
+          label={t('web.quadrant.moveTask', { title: row.title })}
+          color={tokens['color.foreground-subtle']}
+          onPress={() => {
+            setQuadrantMoveError(null);
+            setQuadrantMoveTaskId(row.id);
+          }}
+        />
+        {renderTaskTrailing(row)}
+      </View>
+    ),
+    [renderTaskTrailing, t, tokens],
+  );
+
   /**
    * 行级无障碍文案。
    *
@@ -1035,26 +1153,15 @@ export function TasksScreen({
     );
   }
 
-  return (
-    <View style={{ flex: 1 }}>
-      <Screen
-        title={t('mobile.tasks.title')}
-        actions={[
-          // 🔴 全局搜索的**唯一**入口（产品负责人 2026-10-01：一个应用只有一个搜索入口）。
-          // 放在「同步」之前 = 靠左，因为它是日常动作、同步是偶发动作。
-          { icon: 'action.search', label: t('mobile.search.open'), onPress: () => setSearchOpen(true) },
-          { icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh },
-        ]}
-      >
-        {bulkSelecting ? (
+  const bulkControls = (
+    <>
+      {bulkSelecting ? (
           <View
             testID="mobile-bulk-toolbar"
             style={{
               gap: tokens['space.2'],
               padding: tokens['space.2'],
               borderRadius: tokens['radius.md'],
-              borderWidth: tokens['border-width.thin'],
-              borderColor: tokens['color.primary'],
               backgroundColor: tokens['color.primary-subtle'],
             }}
           >
@@ -1111,6 +1218,11 @@ export function TasksScreen({
           />
         )}
 
+    </>
+  );
+
+  const taskControls = (
+    <>
         {/* 大标题 + 日期。大标题属于**内容区**（会随内容滚动），不属于顶栏。 */}
         <View style={{ paddingTop: tokens['space.2'], gap: tokens['space.1'] }}>
           <Text variant="screen-title">{formatDayTitleText(toLocalDate(now), t)}</Text>
@@ -1123,6 +1235,12 @@ export function TasksScreen({
                 })}
           </Text>
         </View>
+        {bulkSelecting ? null : (
+          <Text variant="caption" tone="muted">
+            {t('mobile.tasks.gestureHint')}
+          </Text>
+        )}
+
 
         {/*
           搜索框。
@@ -1157,8 +1275,6 @@ export function TasksScreen({
                 minHeight: tokens['touch-target.min'],
                 paddingHorizontal: tokens['space.3'],
                 borderRadius: tokens['radius.md'],
-                borderWidth: tokens['border-width.thin'],
-                borderColor: tokens['color.border'],
                 backgroundColor: tokens['color.surface-sunken'],
                 color: tokens['color.foreground'],
                 fontFamily: native.fontSans,
@@ -1202,6 +1318,16 @@ export function TasksScreen({
               setView('timeline');
             }}
           />
+          {bulkSelecting || view === 'timeline' ? null : (
+            <Chip
+              label={t('web.shell.bulk.select')}
+              onPress={() => {
+                setBulkSelecting(true);
+                setSelectedTaskIds(new Set());
+                setBulkError(null);
+              }}
+            />
+          )}
         </View>
 
         {/* 截止时间两种呈现的开关。
@@ -1284,6 +1410,26 @@ export function TasksScreen({
             ))}
           </ScrollView>
         ) : null}
+    </>
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Screen
+        title={t('mobile.tasks.title')}
+        // 列表视图把 FlatList 作为唯一纵向滚动宿主；标题、筛选与视图控制
+        // 也在它的 ListHeaderComponent 内，避免 ScrollView + FlatList 竞争手势。
+        // 四象限/时间线仍使用屏幕级滚动。
+        scroll={view !== 'list'}
+        fixedControls={bulkSelecting || bulkUndoIds !== null ? bulkControls : undefined}
+        actions={[
+          // 🔴 全局搜索的**唯一**入口（产品负责人 2026-10-01：一个应用只有一个搜索入口）。
+          // 放在「同步」之前 = 靠左，因为它是日常动作、同步是偶发动作。
+          { icon: 'action.search', label: t('mobile.search.open'), onPress: () => setSearchOpen(true) },
+          { icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh },
+        ]}
+      >
+        {view === 'list' ? null : taskControls}
 
         {view === 'quadrant' ? (
           /*
@@ -1304,7 +1450,7 @@ export function TasksScreen({
             activeTaskId={detailTaskId}
             labels={taskRowLabels}
             renderMeta={renderTaskMeta}
-            renderTrailing={renderTaskTrailing}
+            renderTrailing={bulkSelecting ? undefined : renderQuadrantTrailing}
             onToggleTask={(id) => {
               runFor(id, actions.toggleCompleted(id));
             }}
@@ -1339,15 +1485,20 @@ export function TasksScreen({
               selection.select('task', id);
             }}
           />
-        ) : nothing ? (
-          <EmptyState
-            icon="group.inbox"
-            title={t('mobile.tasks.empty.title')}
-            hint={t('mobile.tasks.empty.hint')}
-          />
         ) : (
-          <View style={{ paddingTop: tokens['space.2'] }}>
+          <View style={{ paddingTop: tokens['space.2'], flex: 1 }}>
             <TaskList
+              listHeaderComponent={taskControls}
+              emptyComponent={
+                nothing ? (
+                  <EmptyState
+                    illustration="tasks"
+                    icon="group.inbox"
+                    title={t('mobile.tasks.empty.title')}
+                    hint={t('mobile.tasks.empty.hint')}
+                  />
+                ) : undefined
+              }
               sections={listSections}
               // 🔴 组内顺序由这一档决定（共享层把它交给领域的 `sortTasks`）。
               // 这一行就是"删掉屏幕里那句 `reverse()`"之后唯一的顺序来源 ——
@@ -1436,7 +1587,39 @@ export function TasksScreen({
         />
       )}
 
-      <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
+      {bulkSelecting ? null : quadrantMoveUndo === null && quadrantMoveError === null ? (
+        <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
+      ) : (
+        <View accessibilityLiveRegion="polite" style={{
+          position: 'absolute', left: tokens['screen.gutter'], right: tokens['screen.gutter'],
+          bottom: tokens['nav.tab-bar-height'] + insets.bottom + tokens['space.4'],
+          padding: tokens['space.3'], borderRadius: tokens['radius.md'],
+          backgroundColor: tokens['color.surface-raised'],
+        }}>
+        {quadrantMoveUndo === null ? null : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
+            <Text variant="caption" tone="muted" grow>
+              {t(
+                !quadrantMoveUndo.changedDue
+                  ? 'web.quadrant.drop.success'
+                  : 'web.quadrant.drop.changedDue',
+                { quadrant: quadrantLabels.title(quadrantMoveUndo.target) },
+              )}
+            </Text>
+            <Button label={t('web.quadrant.drop.undo')} tone="ghost" onPress={() => void undoQuadrantMove()} />
+          </View>
+        )}
+        {quadrantMoveError === null ? null : (
+          <Text variant="caption" tone="danger">
+            {t('web.quadrant.drop.error')}
+          </Text>
+        )}
+        <Button label={t('mobile.tasks.feedback.dismiss')} tone="ghost" onPress={() => {
+          setQuadrantMoveUndo(null);
+          setQuadrantMoveError(null);
+        }} />
+        </View>
+      )}
       <SortPicker
         visible={sortPickerOpen}
         current={taskSort}
@@ -1445,6 +1628,63 @@ export function TasksScreen({
           setSortPickerOpen(false);
         }}
       />
+      <Modal
+        visible={quadrantMoveTask !== undefined}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQuadrantMoveTaskId(null)}
+      >
+        <Pressable
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: tokens['material.scrim'],
+          }}
+          onPress={() => setQuadrantMoveTaskId(null)}
+          accessibilityLabel={t('mobile.tasks.composer.close')}
+        />
+        <View
+          style={{
+            marginTop: 'auto',
+            padding: tokens['space.4'],
+            paddingBottom: insets.bottom + tokens['space.4'],
+            gap: tokens['space.2'],
+            backgroundColor: tokens['color.surface'],
+            borderTopLeftRadius: tokens['radius.lg'],
+            borderTopRightRadius: tokens['radius.lg'],
+          }}
+        >
+          <Text variant="section-title">
+            {quadrantMoveTask === undefined
+              ? t('web.quadrant.move')
+              : t('web.quadrant.moveTask', { title: quadrantMoveTask.title })}
+          </Text>
+          {(
+            [
+              Quadrant.UrgentImportant,
+              Quadrant.ImportantNotUrgent,
+              Quadrant.UrgentNotImportant,
+              Quadrant.Neither,
+            ] as const
+          ).map((target) => (
+            <Button
+              key={target}
+              label={quadrantLabels.title(target)}
+              icon="action.more"
+              disabled={quadrantMoveCurrent === target || busyId === quadrantMoveTask?.id}
+              onPress={() => void moveTaskToQuadrant(target)}
+            />
+          ))}
+          <Button
+            label={t('web.shell.bulk.cancel')}
+            tone="ghost"
+            onPress={() => setQuadrantMoveTaskId(null)}
+          />
+        </View>
+      </Modal>
       <Modal
         visible={bulkMoveOpen}
         transparent

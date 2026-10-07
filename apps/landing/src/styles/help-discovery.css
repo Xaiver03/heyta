@@ -1,0 +1,211 @@
+/* 帮助中心的发现入口。内容结构由 docsOutline 派生，样式独立以免文档正文被搜索状态影响。 */
+
+.lp-help-discovery {
+  max-inline-size: var(--ht-layout-prose-max);
+  margin-block-end: var(--ht-space-8);
+}
+
+.lp-help-discovery__title {
+  margin-block-end: var(--ht-space-3);
+}
+
+.lp-help-discovery__search {
+  max-inline-size: var(--ht-layout-prose-max);
+}
+
+.lp-help-discovery__field {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding-inline: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  transition:
+    border-color var(--ht-duration-fast) var(--ht-ease-standard),
+    box-shadow var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-help-discovery__field:focus-within {
+  border-color: var(--ht-color-primary);
+  box-shadow: 0 0 0 var(--ht-focus-ring-width) var(--ht-color-ring);
+}
+
+.lp-help-discovery__icon {
+  flex: none;
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-help-discovery__input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  padding-block: var(--ht-space-3);
+  border: none;
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font: inherit;
+}
+
+.lp-help-discovery__input::placeholder {
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-help-discovery__input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.lp-help-discovery__clear {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--ht-touch-target-min);
+  min-inline-size: var(--ht-touch-target-min);
+  padding: var(--ht-space-1);
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.lp-help-discovery__clear:hover {
+  color: var(--ht-color-foreground);
+  background: var(--ht-color-primary-subtle);
+}
+
+.lp-help-discovery__results {
+  margin-block-start: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+}
+
+.lp-help-discovery__count {
+  padding-block: var(--ht-space-1) var(--ht-space-2);
+  padding-inline: var(--ht-space-3);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.lp-help-discovery__count-number {
+  color: var(--ht-color-foreground);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-help-discovery__list,
+.lp-help-discovery__quick-list {
+  display: grid;
+  gap: var(--ht-space-1);
+  list-style: none;
+}
+
+.lp-help-discovery__link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-3);
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground);
+  text-decoration: none;
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-help-discovery__link:hover,
+.lp-help-discovery__link:focus-visible {
+  background: var(--ht-color-primary-subtle);
+}
+
+.lp-help-discovery__result-title {
+  line-height: var(--ht-line-height-normal);
+}
+
+.lp-help-discovery__result-from {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.lp-help-discovery__empty,
+.lp-help-discovery__more {
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-3);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.lp-help-discovery__quick {
+  margin-block-end: var(--ht-space-10);
+}
+
+.lp-help-discovery__quick-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-3);
+  max-inline-size: var(--ht-layout-prose-max);
+}
+
+.lp-help-discovery__quick-link {
+  display: grid;
+  gap: var(--ht-space-1);
+  block-size: 100%;
+  padding: var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  text-decoration: none;
+  transition:
+    border-color var(--ht-duration-fast) var(--ht-ease-standard),
+    background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-help-discovery__quick-link:hover,
+.lp-help-discovery__quick-link:focus-visible {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+}
+
+.lp-help-discovery__quick-module {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.lp-help-discovery__quick-label {
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-normal);
+}
+
+.lp-sr-only {
+  position: absolute;
+  inline-size: var(--ht-size-badge-dot);
+  block-size: var(--ht-size-badge-dot);
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .lp-help-discovery__quick-list {
+    grid-template-columns: 1fr;
+  }
+
+  .lp-help-discovery__link {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--ht-space-1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-help-discovery__field,
+  .lp-help-discovery__clear,
+  .lp-help-discovery__link,
+  .lp-help-discovery__quick-link {
+    transition: none;
+  }
+}

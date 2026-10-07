@@ -72,9 +72,11 @@ export function SlotPicker({ name, value, onChange }: SlotPickerProps): React.JS
             justifyContent: 'center',
             gap: tokens['space.1'],
             borderRadius: tokens['radius.md'],
-            borderWidth: value === slot ? tokens['border-width.thick'] : tokens['border-width.thin'],
-            borderColor: value === slot ? tokens['color.primary'] : tokens['color.border'],
-            backgroundColor: pressed ? tokens['color.surface-sunken'] : tokens['color.surface'],
+            backgroundColor: value === slot
+              ? tokens['color.primary-subtle']
+              : pressed
+                ? tokens['color.surface-sunken']
+                : tokens['color.surface'],
           })}
         >
           <View
@@ -106,10 +108,11 @@ export function SlotPicker({ name, value, onChange }: SlotPickerProps): React.JS
           justifyContent: 'center',
           paddingHorizontal: tokens['space.2'],
           borderRadius: tokens['radius.md'],
-          borderWidth:
-            value === undefined ? tokens['border-width.thick'] : tokens['border-width.thin'],
-          borderColor: value === undefined ? tokens['color.primary'] : tokens['color.border'],
-          backgroundColor: pressed ? tokens['color.surface-sunken'] : tokens['color.surface'],
+          backgroundColor: value === undefined
+            ? tokens['color.primary-subtle']
+            : pressed
+              ? tokens['color.surface-sunken']
+              : tokens['color.surface'],
         })}
       >
         <Text variant="row-meta">{t('mobile.categories.slot.none')}</Text>

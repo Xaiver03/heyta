@@ -1,13 +1,13 @@
 /**
- * 移动端的 AI 助手面 —— 五个功能都从这里走
+ * 移动端的 AI Agent 面 —— 一个入口，内部按意图选择能力
  * =======================================
  *
  * 🔴 本文件**没有一行业务判断**（AGENTS.md §3.5）。五个功能各自那条链路
  * （出境闸门 → 路由 → 回退 → 解析 → 夹取）全在 `@heyta/app-host` 的 `request*()` 里；
- * 这里只做四件事：**冻结用户刚说的那句话、渲染披露、把候选摆成可确认的样子、
- * 用户点头之后把字段交给动作层。**
+ * 这里只做四件事：**冻结用户刚说的那句话、渲染披露、把候选摆成可理解的样子、
+ * 把字段交给 app-host 的风险与提交闸门。**
  *
- * ## 五个功能 → 五个入口（`pnpm check:ai-coverage` 的分子就是这么数的）
+ * ## 内部能力（不作为并列产品入口）
  *
  * | 功能 | 入口（app-host） | 确认后的落点 |
  * |---|---|---|
@@ -15,7 +15,7 @@
  * | `breakdown` | `requestBreakdown` | `TaskActions.setNote`（`mergeChecklistIntoNote`） |
  * | `prioritize` | `requestPrioritize` | 逐条 `TaskActions.setPriority`（用户勾了几条就几条） |
  * | `duration-estimate` | `requestDuration` | `TaskActions.setNote`（`writeDurationIntoNote`，**不加持久化字段**） |
- * | `tool-calling` | `requestToolCall` + `requestAssistantTurn` | 读工具即执行；写工具**只出提案**，`confirmAiToolProposal` 才落库 |
+ * | `tool-calling` | `requestToolCall` + `requestAssistantTurn` | 读工具即执行；低风险写意图自动提交，高风险仍由 `confirmAiToolProposal` 落库 |
  *
  * ## 🔴 三条被本文件守着的隐私不变量
  *
@@ -23,8 +23,8 @@
  *    点"发送"那一步只**冻结**输入与 `now`，界面切到披露态，一个字节都不发；
  *    用户看完整份披露再按「发送」才真的出去。同一次点击里既算披露又发请求，
  *    跨过午夜时两边会是**两个不同的"今天"**。
- * 2. **写路径永远停在候选上。** 本文件构造不出 op：建任务 / 改备注 / 改优先级
- *    都走 `TaskActions`，工具写入走 `confirmAiToolProposal()`。
+ * 2. **写路径永远经过候选与 app-host 闸门。** 本文件构造不出 op：建任务 / 改备注 /
+ *    改优先级都走 `TaskActions`，工具写入由 app-host 按风险决定自动提交或确认。
  *    `host.submit(` 在 `apps/*` 里一个调用点都没有（`check:ai-tools` 钉着那份清单）。
  * 3. **本文件不写 `consents`。** 授权只有设置面那一个前端；
  *    面板里放一个"同意"勾就是第二套事实源（web 侧 `route-explanation.ts`
@@ -41,8 +41,9 @@
  *   差别在界面里看得见，不影响出境的数据集。
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
+import { AssistantMark } from '@heyta/ui';
 
 import {
   authorizeEgress,
@@ -116,7 +117,7 @@ import {
   useAiSettings,
 } from './settings-store';
 
-/** 界面顺序 = 用户说话的顺序：先记下来，再拆开，再排序，再估时，最后让它动手。 */
+/** Agent 内部能力顺序；用户只看到快捷建议和同一个对话入口。 */
 const MODES = [
   'capture',
   'breakdown',
@@ -124,6 +125,8 @@ const MODES = [
   'duration-estimate',
   'tool-calling',
 ] as const satisfies readonly AiFeature[];
+
+const QUICK_START_MODES = MODES.filter((feature) => feature !== 'tool-calling');
 
 /**
  * 四个面板共用的相位机。
@@ -213,6 +216,7 @@ export function AssistantScreen({ onBack }: { onBack: () => void }): React.JSX.E
   return (
     <Screen
       title={t('mobile.ai.title')}
+      titleLeading={<AssistantMark size={tokens['icon.md']} color={tokens['color.foreground']} />}
       actions={[
         {
           icon: 'action.back',
@@ -247,7 +251,7 @@ export function AssistantScreen({ onBack }: { onBack: () => void }): React.JSX.E
           <>
             <SectionHeader icon="action.more" title={t('mobile.ai.section.mode')} />
             <HStack gap="tight">
-              {MODES.map((feature) => (
+              {QUICK_START_MODES.map((feature) => (
                 <Chip
                   key={feature}
                   label={t(AI_FEATURE_LABEL_KEY[feature])}
@@ -1199,6 +1203,8 @@ function ToolPanel(
   const [frozenText, setFrozenText] = useState('');
   /** `assistant = true` 走多轮循环；`false` 走单步（那条有"规则命中零出境"的短路）。 */
   const [assistantTurn, setAssistantTurn] = useState(false);
+  const executionCounter = useRef(0);
+  const confirmInFlight = useRef(false);
   const [toolOutcome, setToolOutcome] = useState<ToolCallOutcome | undefined>(undefined);
   const [assistantOutcome, setAssistantOutcome] = useState<AssistantOutcome | undefined>(undefined);
   const [confirmed, setConfirmed] = useState<string | undefined>(undefined);
@@ -1224,6 +1230,7 @@ function ToolPanel(
           consents: props.consents,
           tier: props.tier,
           host: props.toolHost,
+          executionId: `mobile:${String(++executionCounter.current)}`,
           history,
           routed: routedDeps(props.healthSnapshot),
         },
@@ -1247,6 +1254,8 @@ function ToolPanel(
         consents: props.consents,
         grants,
         host: props.toolHost,
+        tier: props.tier,
+        executionId: `mobile:${String(++executionCounter.current)}`,
         routed: routedDeps(props.healthSnapshot),
       },
     );
@@ -1264,20 +1273,29 @@ function ToolPanel(
   }
 
   async function confirm(): Promise<void> {
+    if (confirmInFlight.current) return;
+    confirmInFlight.current = true;
     const proposal =
       assistantOutcome !== undefined && assistantOutcome.ok && assistantOutcome.kind === 'proposal'
         ? assistantOutcome.proposal
         : toolOutcome?.ok === true && toolOutcome.result.kind === 'proposal'
           ? toolOutcome.result.proposal
           : undefined;
-    if (props.toolHost === null || proposal === undefined) return;
-    // 🔴 唯一能把提案变成写入的那一步，而它调的是 app-host 的
-    // `confirmAiToolProposal()` —— `host.submit(` 在本壳里仍然一个都没有。
-    const result = await confirmAiToolProposal(props.toolHost, proposal);
-    setConfirmed(result.ok ? t('web.ai.tools.confirmedOk') : t('web.ai.tools.confirmedFail'));
-    setPhase('input');
-    setToolOutcome(undefined);
-    setAssistantOutcome(undefined);
+    if (props.toolHost === null || proposal === undefined) {
+      confirmInFlight.current = false;
+      return;
+    }
+    // 🔴 高风险提案仍通过 app-host 的 `confirmAiToolProposal()`；
+    // 低风险执行档已经在 requestToolCall 的共享闸门中自动提交。
+    try {
+      const result = await confirmAiToolProposal(props.toolHost, proposal);
+      setConfirmed(result.ok ? t('web.ai.tools.confirmedOk') : t('web.ai.tools.confirmedFail'));
+      setPhase('input');
+      setToolOutcome(undefined);
+      setAssistantOutcome(undefined);
+    } finally {
+      confirmInFlight.current = false;
+    }
   }
 
   const pendingProposal =
@@ -1431,6 +1449,14 @@ function ToolResultCard({
   }
   if (outcome === undefined || !outcome.ok) return null;
   const result = outcome.result;
+  if (result.kind === 'executed') {
+    return (
+      <Card gap="loose">
+        <Text variant="row-title">{t('web.ai.tools.confirmedOk')}</Text>
+        <Text variant="row-meta" selectable>{intentText(result.proposal.intent, t)}</Text>
+      </Card>
+    );
+  }
   if (result.kind === 'observation') {
     return (
       <Card gap="loose">

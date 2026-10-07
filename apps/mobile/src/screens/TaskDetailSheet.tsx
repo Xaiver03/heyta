@@ -34,6 +34,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -41,6 +42,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   Priority,
@@ -145,6 +147,7 @@ export function TaskDetailSheet({
   now: number;
 }): React.JSX.Element | null {
   const tokens = useTokens();
+  const insets = useSafeAreaInsets();
   const text = useText();
   const { native } = useTheme();
   const { t, locale } = useI18n();
@@ -303,6 +306,15 @@ export function TaskDetailSheet({
     onClose();
   }, [commitTitle, commitNote, onClose]);
 
+  /** Android back first dismisses the keyboard; a second back closes the sheet. */
+  const handleRequestClose = useCallback((): void => {
+    if (Keyboard.isVisible()) {
+      Keyboard.dismiss();
+      return;
+    }
+    close();
+  }, [close]);
+
   /**
    * 自定义 RRULE 的输入草稿与错误（B2-3 的移动端尾巴）。
    *
@@ -396,7 +408,7 @@ export function TaskDetailSheet({
   const customRule = repeat !== undefined && activePreset === undefined ? repeat.rule : undefined;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleRequestClose} statusBarTranslucent>
       {/* 遮罩。**刻意不进无障碍树。**
           理由有两条，第二条是实测踩出来的：
 
@@ -415,7 +427,7 @@ export function TaskDetailSheet({
         importantForAccessibility="no"
         accessibilityElementsHidden
       />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View
           style={{
             backgroundColor: tokens['color.surface'],
@@ -424,7 +436,7 @@ export function TaskDetailSheet({
             // ⚠️ 只给纵向内边距，不给固定 height ——
             // 同一节点上同时给 height 与 padding 会让内容在被压缩的盒子里居中。
             paddingTop: tokens['space.4'],
-            paddingBottom: tokens['space.8'],
+            paddingBottom: tokens['space.8'] + insets.bottom,
             gap: tokens['space.3'],
             maxHeight: '90%',
           }}
@@ -471,8 +483,6 @@ export function TaskDetailSheet({
                     minHeight: tokens['touch-target.min'],
                     paddingHorizontal: tokens['space.3'],
                     borderRadius: tokens['radius.md'],
-                    borderWidth: tokens['border-width.thin'],
-                    borderColor: tokens['color.border'],
                     backgroundColor: tokens['color.surface-sunken'],
                     color: tokens['color.foreground'],
                     // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条
@@ -506,8 +516,6 @@ export function TaskDetailSheet({
                     paddingHorizontal: tokens['space.3'],
                     paddingVertical: tokens['space.2'],
                     borderRadius: tokens['radius.md'],
-                    borderWidth: tokens['border-width.thin'],
-                    borderColor: tokens['color.border'],
                     backgroundColor: tokens['color.surface-sunken'],
                     color: tokens['color.foreground'],
                     // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条
@@ -587,8 +595,6 @@ export function TaskDetailSheet({
                           minHeight: tokens['touch-target.min'],
                           paddingHorizontal: tokens['space.3'],
                           borderRadius: tokens['radius.md'],
-                          borderWidth: tokens['border-width.thin'],
-                          borderColor: tokens['color.border'],
                           backgroundColor: tokens['color.surface-sunken'],
                           color: tokens['color.foreground'],
                           fontFamily: native.fontSans,

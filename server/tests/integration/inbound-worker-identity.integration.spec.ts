@@ -4,6 +4,7 @@ import Fastify from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import * as jwt from 'jsonwebtoken';
+import { signCommitProof } from '../../src/automation/commit-proof';
 import { generateWorkerCredential } from '../../src/automation/worker-identity';
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -17,6 +18,8 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
   const clientB = `b-${randomUUID()}`;
   const eventId = randomUUID();
   const oldSecret = process.env.JWT_SECRET;
+  const oldCommitKeys = process.env.AUTOMATION_COMMIT_KEYS;
+  const signing = { instanceId: '6ff03f66-5bdb-48ab-a8e7-3606f38b7bf3', activeKeyId: 'test', keys: { test: '11'.repeat(32) } };
   let userId: number;
   let otherId: number;
   let base: string;
@@ -29,15 +32,16 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
     vectorClock: { [clientA]: 1 }, timestamp: Date.now(), schemaVersion: 1,
   };
   const upload = async (workerToken: string | undefined, overrides: {
-    epoch?: string; token?: string; op?: Record<string, unknown>; path?: string;
+    epoch?: string; token?: string; op?: Record<string, unknown>; path?: string; proofs?: Record<string, string>;
   } = {}) => fetch(`${base}/api/sync/${overrides.path ?? 'ops'}`, {
     method: 'POST', headers: { authorization: overrides.token ?? token, 'content-type': 'application/json',
       ...(workerToken ? { 'x-heyta-worker-token': workerToken } : {}),
       'x-heyta-database-epoch': overrides.epoch ?? epoch },
-    body: JSON.stringify({ clientId: clientA, requestId: 'inbound-identity-retry', ops: [overrides.op ?? op] }),
+    body: JSON.stringify({ clientId: clientA, requestId: 'inbound-identity-retry', ops: [overrides.op ?? op], inboundCommitProofs: overrides.proofs }),
   });
   beforeAll(async () => {
     process.env.JWT_SECRET = 'inbound-identity-test-secret-at-least-32';
+    process.env.AUTOMATION_COMMIT_KEYS = JSON.stringify(signing);
     const { initSyncService } = await import('../../src/sync/sync.service');
     const { syncRoutes } = await import('../../src/sync/sync.routes');
     initSyncService();
@@ -61,6 +65,7 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
     if (otherId) await db.user.delete({ where: { id: otherId } });
     await db.$disconnect();
     const { disconnectDb } = await import('../../src/db'); await disconnectDb();
+    if (oldCommitKeys === undefined) delete process.env.AUTOMATION_COMMIT_KEYS; else process.env.AUTOMATION_COMMIT_KEYS = oldCommitKeys;
     if (oldSecret === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = oldSecret;
   });
   it('rejects missing credentials without writing', async () => {
@@ -156,6 +161,32 @@ describe.skipIf(!DATABASE_URL)('inbound identity through ordinary sync HTTP', ()
     expect((await response.json() as any).results[0].accepted).toBe(false);
     expect(await db.operation.count({ where: { id: raceOp.id } })).toBe(0);
   }, 20000);
+  it('owner-held receipt permits late sync after erasing the server permit and digest', async () => {
+    const worker = generateWorkerCredential();
+    const event = randomUUID();
+    const lateOp = { ...op, id: `inbound:${event}`, entityId: `inbound:${event}:0`,
+      entityIds: [`inbound:${event}:1`], vectorClock: { [clientA]: 3 } };
+    await db.automationWorker.create({ data: { id: worker.workerId, userId,
+      credentialHash: worker.credentialHash, syncClientId: clientA, databaseEpoch: epoch } });
+    await db.automationCommitPermit.create({ data: { eventId: event, userId, workerId: worker.workerId,
+      opId: lateOp.id, ruleId: randomUUID(), ruleVersion: 1, parseVersion: 1, resultDigest: 'c'.repeat(64), itemCount: 2 } });
+    const proof = signCommitProof({ userId, workerId: worker.workerId, syncClientId: clientA,
+      databaseEpoch: epoch, eventId: event, itemCount: 2 }, signing);
+    await db.automationCommitPermit.delete({ where: { eventId: event } });
+    expect(await db.automationCommitPermit.findUnique({ where: { eventId: event } })).toBeNull();
+    expect((await upload(worker.token, { op: lateOp })).status).toBe(403);
+    expect((await upload(worker.token, { op: lateOp, proofs: { [lateOp.id]: proof + 'x' } })).status).toBe(403);
+    const proofs = { [lateOp.id]: proof };
+    expect((await upload(workerB.token, { op: lateOp, proofs })).status).toBe(403);
+    const first = await upload(worker.token, { op: lateOp, proofs });
+    expect(first.status).toBe(200); expect((await first.json() as any).results[0].accepted).toBe(true);
+    const retry = await upload(worker.token, { op: lateOp, proofs });
+    expect((await retry.json() as any).results[0].accepted).toBe(true);
+    expect(await db.operation.count({ where: { id: lateOp.id } })).toBe(1);
+    const { DeviceService } = await import('../../src/sync/services/device.service');
+    await new DeviceService().revokeDevice(userId, clientA);
+    expect((await upload(worker.token, { op: lateOp, proofs })).status).toBe(403);
+  });
   it('account deletion cascades both tables despite the composite worker ownership FK', async () => {
     await db.user.delete({ where: { id: userId } });
     expect(await db.automationWorker.count({ where: { userId } })).toBe(0);

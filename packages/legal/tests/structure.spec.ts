@@ -441,6 +441,9 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
    * 表名来自上面的推导，而"这一类在中文里叫什么"是人话，只用来检查文案有没有漏掉一类。
    */
   const CATEGORY_NAMES: Array<{ table: string; zh: string; en: string }> = [
+    { table: 'automation_workers', zh: '自动收集执行身份', en: 'automation worker identit' },
+    { table: 'automation_commit_permits', zh: '自动收集提交许可', en: 'automation commit permit' },
+    { table: 'email_password_registration_challenges', zh: '邮箱注册验证码挑战', en: 'email registration challenge' },
     { table: 'operations', zh: '同步事件', en: 'sync event' },
     { table: 'vault_key_packages', zh: '加密密钥包', en: 'wrapped key package' },
     { table: 'vault_key_migrations', zh: '密钥迁移记录', en: 'key migration record' },

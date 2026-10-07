@@ -242,7 +242,7 @@ export class OperationUploadService {
     // This also guards internal upload callers and exact duplicate returns.
     if (!await authorizeInboundOperations(tx, userId, clientId, [op], inboundIdentity)) {
       return reject({ opId: op.id, accepted: false, error: 'Inbound commit authorization required',
-        errorCode: SYNC_ERROR_CODES.INVALID_CLIENT_ID });
+        errorCode: SYNC_ERROR_CODES.INBOUND_AUTH_REQUIRED });
     }
 
     // Clamp future timestamps instead of rejecting them (prevents silent data

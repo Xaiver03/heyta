@@ -90,8 +90,6 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
           // 上下各剩 1px，看着像完全没有留白。
           paddingBottom: Math.max(insets.bottom, tokens['nav.safe-bottom-min']),
           backgroundColor: tokens['color.surface'],
-          borderTopWidth: tokens['border-width.thin'],
-          borderTopColor: tokens['color.border'],
         },
         barRow: {
           flexDirection: 'row',

@@ -334,7 +334,7 @@
 |---|---|---|
 | `NODE_ENV` | `production` | ✅ |
 | `PUBLIC_URL` | `https://heyta.waytofuture.cn` | ✅ 2026-09-30 起（§3.7.2） |
-| `CORS_ORIGINS` | `https://heyta.waytofuture.cn` | ✅ 与 `PUBLIC_URL` 同源 |
+| `CORS_ORIGINS` | `https://heyta.waytofuture.cn,heyta-local://app,https://heyta.local` | ✅ 官方站点 + 原生 macOS / Windows 壳 origin |
 | `DOMAIN` | `heyta.waytofuture.cn` | ✅ 供 compose 的 caddy 服务用（当前没起，nginx 直接反代 1900） |
 | `RUN_MIGRATIONS_ON_STARTUP` | `false` | ✅ 迁移由 `deploy.sh` / `migrate-deploy.sh` 显式跑 |
 | `TEST_MODE` | ~~`true`~~ **已于 2026-09-27 删除** | ✅ **服务端从来不在测试模式**：生产 compose 不转发它，容器里是空的，线上 `/api/test/*` 全是 404。见 §7.4 |
@@ -571,7 +571,7 @@ cd apps/web && VITE_SITE_URL=https://site.example.com pnpm exec tsc -b && \
 #### 🔴 站点已经是多页站点：`try_files` 里的 `$uri/` **不能删**
 
 落地页从 2026-09-28 起不再是一页：`/features/`、`/platforms/`、`/pricing/`、
-`/help/`、`/changelog/`、`/signin/` 各自是一个**目录 + `index.html`**
+`/docs/`、`/changelog/`、`/signin/` 各自是一个**目录 + `index.html`**
 （中英双份，共 14 份入口，由 `apps/landing/scripts/gen-entries.mjs` 生成）。
 
 §3.3.1 里那条 `try_files $uri $uri/ /index.html` 的 **`$uri/` 正是它们能打开的原因**。

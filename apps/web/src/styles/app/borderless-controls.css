@@ -2,6 +2,9 @@
  * 输入靠光标；按钮/菜单靠文字与底色表达焦点。日历格的数据分隔线不是按钮描边。
  * important 用于覆盖 RN-web 生成的内联边框，以及分散在功能 CSS 中的旧焦点框。
  */
+a[href], a[href]:hover, a[href]:focus-visible {
+  text-decoration: none;
+}
 :is(button, [role='button'], [role='tab'], [role='menuitem']):not([data-testid^='calendar-cell-']) {
   border-color: transparent !important;
   box-shadow: none !important;

@@ -56,6 +56,7 @@ import {
   SyncClient,
   type RealtimeClient,
   type SyncEncryptionOptions,
+  type SyncClientOptions,
   type WebSocketFactory,
 } from '@heyta/sync-client';
 
@@ -81,6 +82,7 @@ export type SyncWiringOptions = SyncEncryptionOptions & {
   applyRemote: (ops: Operation<string>[]) => Promise<void>;
   /** 网络实现。原生宿主用它注入证书固定等平台能力。 */
   fetchImpl?: typeof fetch;
+  getInboundUploadAuthorization?: SyncClientOptions['getInboundUploadAuthorization'];
   /**
    * 账号注销时要做的本机销毁。**不传就用注册表里的那一个**
    * （`registerLocalEraser`，见 `./local-erasure.ts` 文件头讲的两条理由）。
@@ -142,6 +144,8 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
       });
     },
     ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+    ...(options.getInboundUploadAuthorization !== undefined
+      ? { getInboundUploadAuthorization: options.getInboundUploadAuthorization } : {}),
     // 账号注销 ⇒ 销毁本机明文。**默认值读注册表**，所以经这条路的所有宿主
     // 都有反应，包括构造点在别的文件里、这一轮改不动的那些。
     onAccountClosed: options.onAccountClosed ?? (async () => void (await eraseLocalData())),

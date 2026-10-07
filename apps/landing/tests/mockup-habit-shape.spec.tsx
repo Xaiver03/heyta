@@ -212,13 +212,19 @@ describe('复刻件的色阶 = 真实现那一族 `color.heat-*`', () => {
 });
 
 describe('复刻件与真实现都不许"手抄一套交互/随机"', () => {
-  it('复刻件的格子没有点击；也不产出 `data-cell-title`（那是 web 的悬停通道）', () => {
+  it('静态复刻的格子不占键盘焦点；也不产出 `data-cell-title`（那是 web 的悬停通道）', () => {
     const code = stripComments(mockupSource());
-    expect(code).not.toContain('onClick');
+    expect(code).toContain('onClick');
     expect(code).not.toContain('data-cell-title');
     // 🔴 图案必须确定（`determinism.spec.ts` 也钉了 `levelFor`）：
     // 随机会让每次重渲染换一副图，看起来像数据在乱跳。
     expect(code).not.toContain('Math.random');
+    const view = renderMockup();
+    const cells = [...view.querySelectorAll('.mk-habit .mk-heat > .mk-heat__cell')];
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells.every((cell) => cell.tagName === 'SPAN')).toBe(true);
+    expect(view.querySelectorAll('.mk-heat button')).toHaveLength(0);
+    expect(view.querySelectorAll('.mk-habit__check-in')).toHaveLength(0);
   });
 
   it('复刻件的每个习惯卡都有"名字 + 连续"两件事（与真实现的卡头同结构）', () => {

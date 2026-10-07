@@ -13,7 +13,7 @@
  * 留白各调一套），而那正是 N4 拦的"两个站点拼起来"的观感。
  *
  * 🔴 **页头也只有一份**：`PageHead`，只是把那颗主行动按钮关掉（`cta={false}`）。
- * 读 `/help/passphrase` 的人正在解决一件具体的事 —— 把"立即使用"塞在答案前面
+ * 读 `/docs/passphrase` 的人正在解决一件具体的事 —— 把"立即使用"塞在答案前面
  * 是打断，不是导流（理由写在 `PageHead` 的 `cta` 注释里）。
  *
  * ⚠️ **右栏那一列是 `DocsToc`**（2026-10-01 起从正文顶部挪到右栏，SSOS 文档站
@@ -42,15 +42,11 @@ export function DocsArticlePage({ page }: { page: SitePage }): React.JSX.Element
   const locale = useLocale();
 
   return (
-    <>
-      <PageHead page={page} cta={false} />
-      <div className="lp-section">
         <DocsLayout page={page} toc={<DocsToc sections={article.sections} />}>
-          <div className="lp-docs__body">
+          <article className="lp-docs__body">
+            <PageHead page={page} cta={false} />
             <PageSections sections={article.sections} figures={docsFiguresOf(article, locale)} />
-          </div>
+          </article>
         </DocsLayout>
-      </div>
-    </>
   );
 }

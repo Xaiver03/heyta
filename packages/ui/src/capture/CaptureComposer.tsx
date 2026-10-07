@@ -197,6 +197,8 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flex: 1,
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['size.field-padding-x'],
+      // 无边界输入面：光标和 placeholder 已经提供编辑反馈，不再叠加输入框框线。
+      borderWidth: 0,
       borderRadius: tokens['radius.md'],
       backgroundColor: tokens['color.surface'],
       color: tokens['color.foreground'],

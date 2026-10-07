@@ -156,6 +156,7 @@ export const HELP_FIGURES: Record<DocsArticleId, readonly HelpFigure[]> = {
   repeat: [],
   reminders: [],
   selfhost: [],
+  automation: [],
   transfer: [],
   trash: [
     {

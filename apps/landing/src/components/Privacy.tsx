@@ -18,7 +18,7 @@ import { ICON_SIZE } from '@heyta/design-system';
  */
 
 import { useRef, useState } from 'react';
-import { useMotionValueEvent, useScroll } from 'motion/react';
+import { useMotionValueEvent, useReducedMotion, useScroll } from 'motion/react';
 import { Server, Smartphone } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n/provider';
@@ -44,6 +44,7 @@ export function Privacy(): React.JSX.Element {
   const sectionRef = useRef<HTMLElement>(null);
   const [encrypted, setEncrypted] = useState(0);
   const { t } = useI18n();
+  const reduced = useReducedMotion() === true;
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -56,10 +57,15 @@ export function Privacy(): React.JSX.Element {
   const chars = [...plaintext];
 
   useMotionValueEvent(scrollYProgress, 'change', (value) => {
+    if (reduced) return;
     // 进度 0 → 0 个字已加密；进度 1 → 全部加密
     const next = Math.round(Math.max(0, Math.min(1, value)) * chars.length);
     setEncrypted((previous) => (previous === next ? previous : next));
   });
+
+  // 减少动效时直接给出完整的“设备明文 → 服务端密文”对照，
+  // 信息不依赖滚动或逐字变换才能获得。
+  const visibleEncrypted = reduced ? chars.length : encrypted;
 
   return (
     <section className="lp-section lp-privacy" id="privacy" ref={sectionRef}>
@@ -93,17 +99,19 @@ export function Privacy(): React.JSX.Element {
                 <span
                   key={`${char}-${String(index)}`}
                   className={
-                    index < encrypted
+                    index < visibleEncrypted
                       ? 'lp-privacy__char lp-privacy__char--locked'
                       : 'lp-privacy__char'
                   }
                 >
-                  {index < encrypted ? cipherCharAt(index) : char}
+                  {index < visibleEncrypted ? cipherCharAt(index) : char}
                 </span>
               ))}
             </p>
             <p className="lp-privacy__note">
-              {encrypted === 0
+              {reduced
+                ? t('landing.privacy.noteReduced')
+                : encrypted === 0
                 ? t('landing.privacy.noteIdle')
                 : t('landing.privacy.noteProgress', {
                     done: encrypted,

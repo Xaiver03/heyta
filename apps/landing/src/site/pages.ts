@@ -104,7 +104,7 @@ export interface SitePage {
   /**
    * 顶部导航里**哪一项该被标成"当前"**。
    *
-   * 🔴 只在"这一页不是导航项本身"时才需要写。文档文章（`/help/passphrase/`）
+   * 🔴 只在"这一页不是导航项本身"时才需要写。文档文章（`/docs/passphrase/`）
    * 不进导航（六条同类链接会把导航挤成一列侧栏），但它语义上属于「帮助」那一节 ——
    * 不标出来，访客在这一页就看不到自己在哪，而"我在哪"是导航的第二职责
    * （第一条是"能去哪"）。
@@ -121,9 +121,9 @@ export interface SitePage {
    * （一个分类的落地页）。非文档中心的页面不写。
    *
    * 🔴 **这条判据以前是路径形状，现在形状不够用了。** 文章一直是
-   * 「`/help/` 开头」，而 `docs.ts` 正是用这个形状从注册表**反推**
+   * 「`/docs/` 开头」，而 `docs.ts` 正是用这个形状从注册表**反推**
    * "哪些页面必须有正文"（`DOCS_ENTRIES` 的键类型由它派生）。分类页
-   * `/help/sync` 同样以 `/help/` 开头，于是它会被那道 `Extract` 一起捞进去，
+   * `/docs/sync` 同样以 `/docs/` 开头，于是它会被那道 `Extract` 一起捞进去，
    * 被迫配一份它根本不该有的正文 —— 要么编译期红，要么写一个假条目骗过类型。
    * 加一层显式标记后，"什么算一篇文章"有了唯一来源，而**分类页没有正文**
    * 这件事在类型上就说清了。
@@ -317,7 +317,7 @@ export const SITE_PAGES = [
   },
   /**
    * ─────────────────────────────────────────────────────────────────────
-   * 文档中心的**分类页** —— 一个分类一层深度，`/help/<分类>`，**五个分类五张页**。
+   * 文档中心的**分类页** —— 一个分类一层深度，`/docs/<分类>`，**五个分类五张页**。
    *
    * 🔴 **只给「有文章的分类」建页。** 这条不是省工：帮助中心那一侧的五条分类
    * 名共用一份词表（`content.ts` 的 `HELP_MODULES`），如果某个空分类建了页，
@@ -407,7 +407,7 @@ export const SITE_PAGES = [
   },
   /**
    * ─────────────────────────────────────────────────────────────────────
-   * 文档中心 —— `/help` 的第二层深度。**十四条文章路由，十四条都注册在这里**
+   * 文档中心 —— `/docs` 的第二层深度。**十四条文章路由，十四条都注册在这里**
    * （start 2 / sync 4 / organize 3 / data 3 / trust 2，每个分类都 ≥ 2 篇）。
    *
    * 🔴 **这一段的顺序就是阅读顺序，而且是唯一一份顺序**：侧栏分组里的排列、
@@ -419,7 +419,7 @@ export const SITE_PAGES = [
    * 由这一层标记**决定**（`docs.ts` 仍用 `Extract` 从 `SITE_PAGES` 反向取出这个联合，
    * 所以 id 清单**还是只有一份**），加一篇文章 = 在这里加一条 + 在 `docs.ts`
    * 给它写正文，**不存在第三份清单**。第三份清单是漂移的起点：它会忘记自己已经过时。
-   * ⚠️ 以前这条判据是"`path` 以 `/help/` 开头"，而分类页也是 —— 形状判据会把
+   * ⚠️ 以前这条判据是"`path` 以 `/docs/` 开头"，而分类页也是 —— 形状判据会把
    * 它一起捞进"必须有正文"的那一批。见上面 `SitePage.docsKind`。
    *
    * ⚠️ 这里只写**结构**（路径、五个词条 key、归属哪个分组），
@@ -576,6 +576,20 @@ export const SITE_PAGES = [
     ledeKey: 'site.docs.selfhost.sum',
     titleKey: 'site.docs.selfhost.seo.title',
     descriptionKey: 'site.docs.selfhost.sum',
+  },
+  {
+    id: 'automation',
+    path: '/docs/automation',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'article',
+    labelKey: 'site.docs.automation.title',
+    headingKey: 'site.docs.automation.title',
+    ledeKey: 'site.docs.automation.sum',
+    titleKey: 'site.docs.automation.seo.title',
+    descriptionKey: 'site.docs.automation.sum',
   },
   {
     id: 'transfer',
