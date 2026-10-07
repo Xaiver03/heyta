@@ -40,7 +40,7 @@ arm() {  # <名字> <期望 red|green> <账单...>
   shift 2
   ARMS=$((ARMS + 1))
   SHOT_FILES=$(printf '%s\n' "$@")
-  echo "── $name（期望 $want）──"
+  echo "── ${name}（期望 ${want}）──"
   out=$(judge_shot_set 2>&1); rc=$?
   printf '%s\n' "$out"
   if [ "$want" = "red" ] && [ "$rc" -eq 0 ]; then
