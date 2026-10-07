@@ -455,6 +455,16 @@ export const zhCN = {
   'web.shell.sort.display': '默认（按截止时间）',
   'web.shell.sort.addedAt': '按添加时间',
   'web.shell.sort.priority': '按优先级',
+  'web.shell.bulk.select': '选择任务',
+  'web.shell.bulk.cancel': '退出选择',
+  'web.shell.bulk.selected': '已选 {count} 项',
+  'web.shell.bulk.complete': '批量完成',
+  'web.shell.bulk.repeatNotice': '包含重复任务，请逐条完成',
+  'web.shell.bulk.delete': '批量删除',
+  'web.shell.bulk.move': '移动到清单',
+  'web.shell.bulk.moveInbox': '收集箱',
+  'web.shell.bulk.undo': '撤销本次批量操作',
+  'web.shell.bulk.error': '批量操作未完成：{message}',
   'web.shell.search.placeholder': '搜索任务',
   'web.shell.search.aria': '搜索任务（标题与备注）',
   'web.shell.search.clear': '清除搜索',
@@ -479,6 +489,7 @@ export const zhCN = {
   // R10：身份区之后、设置之前。**六家一致**的"头像 → 菜单 → 二级页"形态，
   // 所以它是菜单的一项而不是一个常驻 tab（见 docs/plans/ui-review-fill-zh-timeline.md §8.2）。
   'web.shell.account.profile': '编辑个人信息',
+  'web.shell.account.profileCenter': '个人中心',
   'web.shell.account.settings': '设置',
   'web.shell.account.signOut': '退出登录',
   'web.shell.nav.help': '帮助',
@@ -545,9 +556,35 @@ export const zhCN = {
   // 它与习惯/成长同属"日常会翻一下"的内容视图。
   'web.shell.views.notes': '便签',
   'web.shell.views.settings': '设置',
+  'web.shell.profile.close': '关闭个人中心',
   // 设置浮层的退出口（Esc / ✕ 共用一个可访问名）。见 App.tsx 的 sheet 段：
   // 浮层的**标准出口**是"看得见的关闭 + Esc"，缺一个都会让人以为要按浏览器后退。
   'web.shell.settings.close': '关闭设置',
+  'web.settings.nav.profile': '个人资料',
+  'web.settings.nav.appearance': '任务与显示',
+  'web.settings.nav.syncPrivacy': '同步与隐私',
+  'web.settings.nav.aiIntegrations': 'AI 与集成',
+  'web.settings.nav.data': '数据管理',
+  'web.settings.nav.account': '账号与安全',
+  'web.settings.nav.help': '关于与帮助',
+  'web.profile.overview.title': '个人中心',
+  'web.profile.overview.back': '返回个人中心',
+  'web.profile.overview.lead': '查看你的身份、近期状态和成长进度。',
+  'web.profile.overview.identity': '我的身份',
+  'web.profile.overview.localOnly': '数据先保存在本机，服务器只负责同步加密内容。',
+  'web.profile.overview.signedIn': '已连接同步账号',
+  'web.profile.overview.local': '仅在本机使用',
+  'web.profile.overview.edit': '编辑个人资料',
+  'web.profile.overview.settings': '打开设置',
+  'web.profile.overview.growth': '查看完整成长',
+  'web.profile.overview.recent': '近期状态',
+  'web.profile.overview.tasks': '本周完成任务',
+  'web.profile.overview.focus': '本周专注分钟',
+  'web.profile.overview.checkIns': '本周习惯打卡',
+  'web.profile.overview.achievements': '成就进度',
+  'web.profile.overview.achievementsHint': '只和过去的自己比较，达成不会因中断而消失。',
+  'web.profile.overview.identityLoading': '正在读取个人资料…',
+  'web.profile.overview.identityUnavailable': '暂时读不到个人资料；本地回顾仍可用。',
   'web.shell.dueMode.aria': '截止时间显示方式',
   'web.shell.dueMode.date': '日期',
 
@@ -585,6 +622,7 @@ export const zhCN = {
   'common.profile.avatar.undecryptable': '这台设备解不开你的头像 —— 端到端加密口令不对。在「同步设置」里重新填一次口令即可。',
   'common.profile.avatar.unreadable': '暂时读不到头像，请稍后再试。',
   'common.profile.loadFailed': '个人信息没有读到，请稍后再试。',
+  'common.profile.signInToEdit': '登录后可以编辑昵称和头像；本地任务与回顾无需登录。',
   'common.profile.email.label': '邮箱',
   // 只读要有理由，否则用户会以为这是个没做好的输入框。
   'common.profile.email.hint': '邮箱是登录标识，也是找回账号的唯一凭据，不能在这里修改。',
@@ -611,6 +649,8 @@ export const zhCN = {
   // 否则屏幕阅读器听到的是一串没有区别的"按钮"。
   'web.shell.tasks.complete': '完成：{title}',
   'web.shell.tasks.uncomplete': '取消完成：{title}',
+  'web.shell.tasks.select': '选择：{title}',
+  'web.shell.tasks.unselect': '取消选择：{title}',
   'web.shell.tasks.delete': '删除：{title}',
   // ── 任务页的日期分组头（滴答同款，2026-09-30）────────────────
   // 组序与归属规则在 `@heyta/domain` 的 `groupTasksByDate`；这里只管措辞。
@@ -623,6 +663,16 @@ export const zhCN = {
   'web.tasks.group.undated': '无截止时间',
   'web.tasks.group.postpone': '顺延',
   'web.tasks.group.postponeAria': '把这 {count} 条逾期任务顺延到今天',
+  // ── 任务详情列的四分组（审计 §4.6：「详情列功能太全、层级不够」）──────────
+  // 固定四组：基本信息（标题/备注）→ 时间（截止/提醒）→ 组织（清单/标签/子任务/优先级）
+  // → 自动化（重复）。优先级归「组织」而非「时间」的裁决理由写在 `TaskDetailCard` 里。
+  'web.tasks.detail.section.basic': '基本信息',
+  'web.tasks.detail.section.time': '时间',
+  'web.tasks.detail.section.organize': '组织',
+  'web.tasks.detail.section.automation': '自动化',
+  // 重复面板里收起自定义 RRULE 的那枚 summary（审计 §4.6：先展示自然语言选项，
+  // 原始 RRULE 收进「高级」）。与登录面板「高级」指的是同一档交互，成对词条。
+  'web.tasks.detail.advanced': '高级',
   // ── 任务备注 ──
   // 🔴 在它之前，Web 上**没有任何备注输入框**：`Task.note` 存在、`setNote` 存在，
   // 但唯一调用点是 AI 拆解与 AI 估时。数据层是通的（备注会被导出、会同步），
@@ -1565,6 +1615,11 @@ export const zhCN = {
   'web.quadrant.a11y.cell': '象限：{title}，{hint}',
   'web.quadrant.dropHere': '拖任务到这里',
   'web.quadrant.dragging': '正在拖拽任务',
+  'web.quadrant.a11y.handle': '移动任务到另一个象限',
+  'web.quadrant.drop.success': '任务已移动到「{quadrant}」',
+  'web.quadrant.drop.changedDue': '任务已移动到「{quadrant}」，截止时间已调整',
+  'web.quadrant.drop.error': '任务移动失败，请重试',
+  'web.quadrant.drop.undo': '撤销移动',
   // 🔴 原文是"拖拽**只改**「重要」**并**把截止时间推入/移出 2 天窗口" ——
   //    它同时说了"不改"和"改"，自相矛盾。紧急是**推导**出来的：
   //    要让任务真的落在你放下的那一格，就必须动截止时间。
@@ -2954,13 +3009,26 @@ export const zhCN = {
   'common.auth.error.termsRequired': '注册前请先勾选同意项——这一项必须由你自己做出，我们不会替你同意。',
 
   // ── 移动端 · 「我的」屏 ───────────────────────────────────
+  'mobile.profile.tools': '整理与记录',
+  'mobile.profile.edit': '编辑个人资料',
+  'mobile.profile.loading': '正在读取个人资料…',
+  'mobile.profile.localOnly': '当前只用本机。可在设置的“同步与隐私”中允许联网后编辑个人资料。',
+  'mobile.profile.retry': '重新读取',
   'mobile.profile.title': '我的',
   // 🔴 设置是**独立的第二层表面**（RN Modal），不是「我的」滚动流里的一段 ——
   //    对标 §11.5 的规律（次级表面独立成面）。入口行在「我的」上，内容在设置面里。
+  'mobile.settings.section.profile': '个人资料',
+  'mobile.settings.section.general': '常规',
+  'mobile.settings.section.sync': '同步与隐私',
+  'mobile.settings.section.ai': 'AI 与集成',
+  'mobile.settings.section.data': '数据管理',
+  'mobile.settings.section.security': '账号安全',
+  'mobile.settings.directory.title': '偏好与账号',
+  'mobile.settings.directory.hint': '选择要调整的内容。',
   'mobile.settings.title': '设置',
   'mobile.settings.close': '关闭',
   'mobile.profile.entry.settings': '设置',
-  'mobile.profile.entry.settings.hint': '同步凭据、桌面小组件与语言',
+  'mobile.profile.entry.settings.hint': '个人资料、偏好、同步与安全',
   'mobile.profile.section.sync': '同步',
   'mobile.profile.section.status': '状态',
   // 「我的」里那条托管同步权益。只有服务端**明确说**有才显示这一行
@@ -2971,7 +3039,14 @@ export const zhCN = {
   // 🔴 认证入口在这一屏的**顶部卡片**（一级可见）—— 规范 §3.1 的「前置」落点。
   //    底部标签必须保持 5 个（规范 §2-A8），所以它是入口卡片，不是第 6 个 tab。
   'mobile.profile.section.account': '账号',
+  'mobile.profile.section.progress': '近期状态',
+  'mobile.profile.progress.tasks': '本周完成任务',
+  'mobile.profile.progress.focus': '本周专注分钟',
+  'mobile.profile.progress.achievements': '已达成成就',
+  'mobile.profile.progress.openGrowth': '查看完整成长',
+  'mobile.profile.progress.openGrowthHint': '查看里程碑、习惯连续性和年度趋势。',
   'mobile.profile.account.signIn': '注册 / 登录',
+  'mobile.profile.account.switchAccount': '切换账号',
   'mobile.profile.account.signInHint': '用邮箱或通行密钥登录；登录后自动接上同步，不必手抄令牌。',
   'mobile.profile.account.signedInLabel': '当前账号',
   'mobile.profile.account.signedInHint': '已拿到访问令牌。要换账号或补一条凭据，重新登录一次即可。',
@@ -2982,7 +3057,7 @@ export const zhCN = {
   'mobile.profile.account.offline': '还没登录',
   // ⚠️ 表单搬进设置面之后，"下面那一段"不再成立 —— 指路要说**现在**的位置，
   // 否则用户在「我的」上找一圈找不到表单，会以为功能没了。
-  'mobile.profile.account.offlineHint': '不登录也可以继续用；手动填写凭据的兜底路径在「设置」里。',
+  'mobile.profile.account.offlineHint': '不登录也能使用任务、专注和本地回顾。',
   // 手动路径是**兜底**，不是主路径：从别的设备复制令牌过来时才用它。
   'mobile.profile.sync.manualHint': '下面是手动填写凭据的兜底路径：已经有令牌（比如从别的设备复制过来）时才需要用它。',
   // ⚠️ 必须明说"重开会回到设备语言"：不说的话用户会以为选择被记住了，
@@ -4187,6 +4262,10 @@ export const zhCN = {
   'notes.a11y.pin': '把便签「{excerpt}」钉到今天',
   'notes.a11y.unpin': '取消便签「{excerpt}」的钉选',
   'notes.error.empty': '便签不能是空的',
+  // 提交失败时共享 NotesBoard 在 composer 下方的那句（W8a 保草稿 + W8b 宿主接线）。
+  // 🔴 这句话的承重承诺是「内容还在输入框里」—— 共享层失败时**保留草稿**；
+  // 若哪天改回"失败清草稿"，这句话就在撒谎（mobile 的 labels 契约测试钉了「输入框」三个字）。
+  'notes.error.saveFailed': '没存上，内容还在输入框里，请重试',
   // 便签编辑屏（多端第二批）。正文没改动时不写 op，那条闸门在 app-host 的 updateNoteContent。
   'notes.edit.title': '编辑便签',
   'notes.save': '保存',
