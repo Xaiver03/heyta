@@ -31,6 +31,117 @@ import { runAuthCommand } from './cli-auth.js';
 import { runAccountCommand } from './cli-account.js';
 import type { SyncStatus } from '@heyta/sync-client';
 
+/**
+ * 回收站写通道：四类实体 × 四个动词，一张表。
+ *
+ * 🔴 这张表**不判断任何业务语义**（AGENTS §3.5）：它只把 `notes restore <id>` 这种参数形状
+ * 交给 `@heyta/app-host` 里已经实现好的那一个方法。还原要发哪种 op、purge 为什么只接受
+ * 已软删除的条目、删习惯时打卡记录跟不跟着删 —— 全在共享层，这里一句都没有。
+ *
+ * 为什么合成一张表：原来每个实体各写一份 `if (verb === 'add' || verb === 'remove')`，
+ * 同一个判断写四遍。它的实际后果就是这次现量到的那格缺口 —— **CLI 把回收站四类都列得出来，
+ * 却只有任务能彻底删除、四类都不能还原**：少一个动词要改四处，就一定会漏在某一处。
+ */
+type Host = Awaited<ReturnType<typeof openNodeHost>>;
+
+type TrashWrite = {
+  /** 成功后的书面凭据（打在终端与 `--json` 之外的输出里）。 */
+  readonly label: string;
+  /**
+   * 动作层返回 `false`（**这一次没有写 op**）时的书面凭据。
+   *
+   * 🔴 缺省值必须是"未写入"，不能退回 `label`：G-8 之前 `void` 契约把这一格
+   * 伪装成"已彻底删除"，而终端上那行字就是这条不可逆动作唯一的凭据。
+   */
+  readonly noopLabel?: string;
+  /** 缺参数时的提示里该写什么名字。 */
+  readonly argName: string;
+  readonly run: (arg: string) => Promise<unknown>;
+};
+
+/**
+ * 一次回收站写动作的输出 —— 四个实体与任务共用这一份。
+ *
+ * 🔴 原来每个分支各写一遍 `out(\`${write.label} ${id}\`)`，而动作层的 `false`
+ * （"这一条早就 purge 过了、这一句什么都没写"）被四份重复各自咽掉：同一个判断
+ * 写四遍，漂移就是从那里开始的（AGENTS §7 那几条同族教训）。
+ */
+function reportWrite(
+  json: boolean,
+  payload: Record<string, unknown>,
+  id: string,
+  write: { label: string; noopLabel?: string },
+  result: unknown,
+): void {
+  const opWritten = result !== false;
+  if (json) {
+    out(JSON.stringify({ ok: true, ...payload, opWritten }));
+  } else {
+    out(`${opWritten ? write.label : (write.noopLabel ?? '未写入任何变化')} ${id}`);
+  }
+}
+
+function trashWrites(host: Host): {
+  readonly notes: Record<string, TrashWrite | undefined>;
+  readonly projects: Record<string, TrashWrite | undefined>;
+  readonly habits: Record<string, TrashWrite | undefined>;
+} {
+  return {
+    notes: {
+      add: { label: '已新建', argName: '正文', run: (arg) => host.createNote(arg) },
+      remove: { label: '已软删除（进回收站）', argName: 'id', run: (arg) => host.removeNote(arg) },
+      restore: {
+        label: '已还原',
+        noopLabel: '本来就在回收站外，未写入',
+        argName: 'id',
+        run: (arg) => host.restoreNote(arg),
+      },
+      purge: {
+        label: '已彻底删除',
+        noopLabel: '早已是彻底删除态，未写入',
+        argName: 'id',
+        run: (arg) => host.purgeNote(arg),
+      },
+    },
+    projects: {
+      add: { label: '已新建', argName: '名称', run: (arg) => host.createProject(arg) },
+      remove: { label: '已软删除（进回收站）', argName: 'id', run: (arg) => host.removeProject(arg) },
+      restore: {
+        label: '已还原',
+        noopLabel: '本来就在回收站外，未写入',
+        argName: 'id',
+        run: (arg) => host.restoreProject(arg),
+      },
+      purge: {
+        label: '已彻底删除',
+        noopLabel: '早已是彻底删除态，未写入',
+        argName: 'id',
+        run: (arg) => host.purgeProject(arg),
+      },
+      // 归档与软删除是**两件事**（ADR-0048：归档不进回收站、也不进任何出口），
+      // 但它们的参数形状完全一样，所以共用这一张分流表 —— 语义仍在 `archiveProject` 里。
+      archive: { label: '已归档（不进任何出口）', argName: 'id', run: (arg) => host.archiveProject(arg, true) },
+      unarchive: { label: '已取消归档', argName: 'id', run: (arg) => host.archiveProject(arg, false) },
+    },
+    habits: {
+      add: { label: '已新建', argName: '名称', run: (arg) => host.createHabit(arg) },
+      remove: { label: '已软删除（进回收站）', argName: 'id', run: (arg) => host.removeHabit(arg) },
+      restore: {
+        label: '已还原',
+        noopLabel: '本来就在回收站外，未写入',
+        argName: 'id',
+        run: (arg) => host.restoreHabit(arg),
+      },
+      purge: {
+        label: '已彻底删除',
+        noopLabel: '早已是彻底删除态，未写入',
+        argName: 'id',
+        run: (arg) => host.purgeHabit(arg),
+      },
+    },
+  };
+}
+
 const VALUE_FLAGS = new Set([
   'db',
   'server',
@@ -222,6 +333,11 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   notes add <正文>          新建便签
   notes remove <id>         软删除便签（进回收站）
   habits add <名称>         新建习惯
+  habits list               列出未删除的习惯（W6 三态判据缺的那一腿）
+  restore <id>              从回收站还原那条任务
+  notes|projects|habits restore <id>   从回收站还原那一条
+  notes|projects|habits purge <id>     彻底删除那一条（必须先 remove）
+  projects archive|unarchive <id>      归档 / 取消归档（归档不等于删除：不进回收站，也不进任何出口）
   habits remove <id>        软删除习惯（进回收站）
   tags                      列出标签
   assistant new             生成一段新会话的 id（这台设备上，**不写 op**）
@@ -436,17 +552,13 @@ async function main(): Promise<number> {
 
       case 'notes': {
         const verb = positionals[0];
-        if (verb === 'add' || verb === 'remove') {
+        const write = verb === undefined ? undefined : trashWrites(host).notes[verb];
+        if (write !== undefined) {
           const arg = positionals[1];
-          if (arg === undefined) {
-            throw new Error(`notes ${verb} 需要 <${verb === 'add' ? '正文' : 'id'}>`);
-          }
-          // 语义全在 `@heyta/app-host` 的 `createNote / removeNote`（remove 发 DEL op）。
-          const created = verb === 'add' ? await host.createNote(arg) : undefined;
-          if (verb === 'remove') await host.removeNote(arg);
-          const id = created ?? arg;
-          if (json) out(JSON.stringify({ ok: true, command: 'notes', verb, id }));
-          else out(`${verb === 'add' ? '已新建' : '已软删除（进回收站）'} ${id}`);
+          if (arg === undefined) throw new Error(`notes ${verb} 需要 <${write.argName}>`);
+          const created = await write.run(arg);
+          const id = typeof created === 'string' ? created : arg;
+          reportWrite(json, { command: 'notes', verb, id }, id, write, created);
           return 0;
         }
         const notes = host.listNotes();
@@ -474,16 +586,13 @@ async function main(): Promise<number> {
 
       case 'projects': {
         const verb = positionals[0];
-        if (verb === 'add' || verb === 'remove') {
+        const write = verb === undefined ? undefined : trashWrites(host).projects[verb];
+        if (write !== undefined) {
           const arg = positionals[1];
-          if (arg === undefined) {
-            throw new Error(`projects ${verb} 需要 <${verb === 'add' ? '名称' : 'id'}>`);
-          }
-          const created = verb === 'add' ? await host.createProject(arg) : undefined;
-          if (verb === 'remove') await host.removeProject(arg);
-          const id = created ?? arg;
-          if (json) out(JSON.stringify({ ok: true, command: 'projects', verb, id }));
-          else out(`${verb === 'add' ? '已新建' : '已软删除（进回收站）'} ${id}`);
+          if (arg === undefined) throw new Error(`projects ${verb} 需要 <${write.argName}>`);
+          const created = await write.run(arg);
+          const id = typeof created === 'string' ? created : arg;
+          reportWrite(json, { command: 'projects', verb, id }, id, write, created);
           return 0;
         }
         const projects = host.listProjects();
@@ -510,19 +619,36 @@ async function main(): Promise<number> {
 
       case 'habits': {
         const verb = positionals[0];
-        if (verb !== 'add' && verb !== 'remove') {
-          throw new Error('habits 需要 add <名称> 或 remove <id>');
+        const write = verb === undefined ? undefined : trashWrites(host).habits[verb];
+        if (write !== undefined) {
+          const arg = positionals[1];
+          if (arg === undefined) throw new Error(`habits ${verb} 需要 <${write.argName}>`);
+          // 打卡记录跟不跟着删那条规则在 `@heyta/app-host#removeHabit`，本壳不判断。
+          const created = await write.run(arg);
+          const id = typeof created === 'string' ? created : arg;
+          reportWrite(json, { command: 'habits', verb, id }, id, write, created);
+          return 0;
         }
-        const arg = positionals[1];
-        if (arg === undefined) {
-          throw new Error(`habits ${verb} 需要 <${verb === 'add' ? '名称' : 'id'}>`);
+        if (verb !== undefined && verb !== 'list') {
+          throw new Error('habits 需要 add <名称> / remove|restore|purge <id> / list');
         }
-        // 打卡记录不跟着删那条规则在 `@heyta/app-host#removeHabit`，本壳不判断。
-        const created = verb === 'add' ? await host.createHabit(arg) : undefined;
-        if (verb === 'remove') await host.removeHabit(arg);
-        const id = created ?? arg;
-        if (json) out(JSON.stringify({ ok: true, command: 'habits', verb, id }));
-        else out(`${verb === 'add' ? '已新建' : '已软删除（进回收站）'} ${id}`);
+        // 没有动词（或 `list`）= 列出未删除的习惯，与 notes/projects 同一个形状。
+        // 🔴 补这一路的理由不在"多一个子命令"，在三态判据：没有它，
+        //    "purge 之后列表里读不到这条习惯"在习惯这一类上**永远不可判**。
+        const habits = host.listHabits();
+        if (json) {
+          out(
+            JSON.stringify({
+              ok: true,
+              command: 'habits',
+              habits: habits.map((habit) => ({ id: habit.id, name: habit.name })),
+            }),
+          );
+        } else if (habits.length === 0) {
+          out('（没有习惯）');
+        } else {
+          for (const habit of habits) out(`${habit.name}  (${habit.id})`);
+        }
         return 0;
       }
 
@@ -650,15 +776,34 @@ async function main(): Promise<number> {
       }
 
       case 'remove':
-      case 'purge': {
+      case 'purge':
+      case 'restore': {
         const id = positionals[0];
         if (id === undefined) throw new Error(`${command} 需要 <id>`);
         // 语义全在 `@heyta/app-host`（remove 发 DEL op；purge 只接受已软删除的条目，
-        // 对活着的任务会抛错）—— 本壳不判断，只递参数。
-        if (command === 'remove') await host.removeTask(id);
-        else await host.purgeTask(id);
-        if (json) out(JSON.stringify({ ok: true, command, id }));
-        else out(`${command === 'remove' ? '已软删除（进回收站）' : '已彻底删除'} ${id}`);
+        // 对活着的任务会抛错；restore 把 deletedAt 置回 null）—— 本壳不判断，只递参数。
+        //
+        // 🔴 三条各写一遍 if/else 时，任务这一路的"没写成"是**没有出口**的：
+        // 它落在与 notes/projects/habits 不同的代码上，那张表里的 `noopLabel`
+        // 一条都管不到它（G-8 登记的正是这一格）。
+        const write: TrashWrite =
+          command === 'remove'
+            ? { label: '已软删除（进回收站）', argName: 'id', run: (arg) => host.removeTask(arg) }
+            : command === 'restore'
+              ? {
+                  label: '已还原',
+                  noopLabel: '本来就在回收站外，未写入',
+                  argName: 'id',
+                  run: (arg) => host.restoreTask(arg),
+                }
+              : {
+                  label: '已彻底删除',
+                  noopLabel: '早已是彻底删除态，未写入',
+                  argName: 'id',
+                  run: (arg) => host.purgeTask(arg),
+                };
+        const result = await write.run(id);
+        reportWrite(json, { command, id }, id, write, result);
         return 0;
       }
 

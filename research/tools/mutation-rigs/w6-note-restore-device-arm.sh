@@ -15,10 +15,16 @@
 # 用法：bash research/tools/mutation-rigs/w6-note-restore-device-arm.sh [--dry-run]
 #   --dry-run = 只跑四道前置然后退出（0=窗口可开，3=环境无效），**一个字节都不改**。
 #               这一档存在的理由：整臂要 30 分钟以上，而"窗口是不是我的"这件事不该靠开臂来试。
+#   🔴 这条承诺本身有个例外，而且它曾经不成立：前置 1 的"本臂残留自愈"要**写文件**，
+#      旧实现把它放在 DRY 判定之前，于是 `--dry-run` 会悄悄改动工作树。
+#      现在 DRY 只**报告**残留（DRY=HEAL-SKIPPED）不动字节；判据见同目录的
+#      `w6-dry-run-arms.sh`（臂数由它自己打印的 `ARMS=` 为准，别往文档里抄；含
+#      "dry 前后 md5 逐字相同"与"非 dry 确实从 HEAD 取回"两档）。
 # 需要独占：emulator-5554 + 一台能出 APK 的 Android 构建主机。一趟 = 变异构建 + 干净构建 + 跑到第 7 步。
 set -u
 
 DRY=0
+RESIDUE_FOUND=0
 [ "${1:-}" = "--dry-run" ] && DRY=1
 
 # 🔴 三层不是两层：这个文件在 research/tools/mutation-rigs/ 下，少算一层会把 R 落到 research/，
@@ -48,11 +54,17 @@ SRCREL="packages/app-host/src/note-actions.ts"
 [ "$SRC" = "$R/$SRCREL" ] || die3 "SRCREL 与 SRC 不一致（装置自己漂了）"
 if [ -n "$(git status --porcelain -- "$SRC")" ]; then
   if node -e 'const t=require("fs").readFileSync(process.argv[1],"utf8");process.exit(t.includes("        payload: {},\n      });\n      return true;\n")?0:1)' "$SRC"; then
-    git show "HEAD:$SRCREL" > "$SRC"
-    git diff --quiet -- "$SRC" && say "RESIDUE_HEALED=上一趟的本臂变异已从 HEAD 取回（不是别人的改动）" \
-      || die3 "自愈后仍脏，不动别人的东西"
+    if [ "$DRY" = 1 ]; then
+      # 🔴 dry 只报告，不写。写下去就违反了本文件对 --dry-run 的承诺。
+      RESIDUE_FOUND=1
+      say "DRY=HEAL-SKIPPED 检测到上一趟本臂的残留（针脚逐字节相符，可自愈），但 --dry-run 不写任何字节 ⇒ 要清就正式开臂"
+    else
+      git show "HEAD:$SRCREL" > "$SRC"
+      git diff --quiet -- "$SRC" && say "RESIDUE_HEALED=上一趟的本臂变异已从 HEAD 取回（不是别人的改动）" \
+        || die3 "自愈后仍脏，不动别人的东西"
+    fi
   else
-    die3 "$SRC 有**别人的**未提交 diff，不是本臂可独占的落点"
+    die3 "$SRC 有未提交 diff 且**不是**本臂那发针脚 ⇒ 本臂不落任何未提交的字节（归属不由本装置判：现量 git diff -- ${SRCREL}）"
   fi
 fi
 
@@ -81,8 +93,14 @@ if [ "${HEYTA_ANDROID_LOCAL_GRADLE:-0}" != "1" ]; then
 fi
 
 if [ "$DRY" = 1 ]; then
-  say "PREFLIGHTS=OK（载体自证 / 源码干净 / 设备窗口独占 / adb 有设备 / :$PORT 可达 / 构建主机可达）"
-  say "DRY=1 ⇒ 没有改任何字节、没有装包、没有跑验证。要取读数就去掉 --dry-run 并保证 ≥30 分钟独占。"
+  # 🔴 "源码干净"这一格在发现残留时**不能照原样打印** —— 那是把"没写"读成"本来就是干净的"。
+  if [ "$RESIDUE_FOUND" = 1 ]; then
+    say "PREFLIGHTS=OK-WITH-RESIDUE（载体自证 / 源码**有本臂残留、dry 没清** / 设备窗口独占 / adb 有设备 / :$PORT 可达 / 构建主机可达）"
+    say "DRY=1 ⇒ 没有改任何字节、没有装包、没有跑验证。⚠️ 但 $SRCREL 现在仍是变异内容，正式开臂时前置 1 会自动取回。"
+  else
+    say "PREFLIGHTS=OK（载体自证 / 源码干净 / 设备窗口独占 / adb 有设备 / :$PORT 可达 / 构建主机可达）"
+    say "DRY=1 ⇒ 没有改任何字节、没有装包、没有跑验证。要取读数就去掉 --dry-run 并保证 ≥30 分钟独占。"
+  fi
   exit 0
 fi
 

@@ -241,7 +241,7 @@ NO_COLOR=1 pnpm --filter @heyta/web exec vitest run \
 if [ "$CLEAN_RC" = "0" ]; then
   echo "BACK_TO_CLEAN=OK（干净载体：两份 jsdom + 一份真浏览器全绿）"
 else
-  echo "BACK_TO_CLEAN=FAIL rc=$CLEAN_RC（恢复之后载体跑不绿 ⇒ 上面那些 KILLED 读数全部作废）"
+  echo "BACK_TO_CLEAN=FAIL rc=${CLEAN_RC}（恢复之后载体跑不绿 ⇒ 上面那些 KILLED 读数全部作废）"
   FAILS=$((FAILS + 1))
 fi
 
